@@ -39,7 +39,8 @@ for language and host portability decisions.
 12. [Language and platform strategy](12-language-and-platforms.md): C++ boundaries and tiered backends.
 13. [V1 allocation ledger](13-allocation-ledger.md): explicit 128K budget and proof boundary.
 14. [Artifact validation](14-artifact-validation.md): exact identity, tensor roles, and byte ranges.
-15. [Source and evidence ledger](sources.md).
+15. [Tokenizer authority](15-tokenizer-authority.md): pinned Unicode/BPE fixtures and native admission boundary.
+16. [Source and evidence ledger](sources.md).
 
 Claims use four labels: **Measured** (this exact artifact and hardware),
 **External** (a linked source), **Estimated** (reproducible arithmetic), and

@@ -132,3 +132,19 @@ def test_checked_in_tensor_inventory_is_complete() -> None:
         "Q6_K",
         "Q8_0",
     }
+
+
+def test_tokenizer_authority_fixtures_are_pinned() -> None:
+    pins = json.loads((ROOT / "pins" / "artifacts.lock.json").read_text())
+    fixtures = json.loads((ROOT / "fixtures" / "tokenizer_authority.json").read_text())
+    assert fixtures["authority"]["revision"] == pins["tokenizer"]["revision"]
+    assert (
+        fixtures["authority"]["tokenizer_json_sha256"]
+        == pins["tokenizer"]["files"]["tokenizer.json"]["sha256"]
+    )
+    assert fixtures["normalizer"] == "NFC"
+    assert len(fixtures["cases"]) >= 12
+    assert all(
+        bytes.fromhex(case["utf8_hex"]).decode("utf-8") is not None
+        for case in fixtures["cases"]
+    )

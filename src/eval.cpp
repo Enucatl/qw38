@@ -125,6 +125,9 @@ int main(int argc, char** argv) {
     std::cout << "query_heads=" << info.query_heads << '\n';
     std::cout << "kv_heads=" << info.kv_heads << '\n';
     std::cout << "rope_dimensions=" << info.rope_dimensions << '\n';
+    std::cout << "tokenizer_model=" << info.tokenizer_model << '\n';
+    std::cout << "tokenizer_tokens=" << info.tokenizer_tokens.size() << '\n';
+    std::cout << "tokenizer_merges=" << info.tokenizer_merges.size() << '\n';
     return 0;
   }
   if (argc == 3 && std::string(argv[1]) == "--sha256") {

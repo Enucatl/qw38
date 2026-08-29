@@ -54,6 +54,10 @@ struct ModelInfo final {
   std::uint64_t rope_dimensions = 0;
   std::uint64_t data_offset = 0;
   std::vector<TensorInfo> tensors;
+  std::string tokenizer_model;
+  std::vector<std::string> tokenizer_tokens;
+  std::vector<std::uint32_t> tokenizer_token_types;
+  std::vector<std::string> tokenizer_merges;
 };
 
 Status inspect_gguf(const std::string& path, ModelInfo* info) noexcept;

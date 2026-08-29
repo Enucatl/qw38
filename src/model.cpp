@@ -168,6 +168,39 @@ bool read_unsigned_value(Reader* reader, std::uint32_t type,
   return false;
 }
 
+bool read_string_array(Reader* reader, std::uint32_t type,
+                       std::vector<std::string>* output) noexcept {
+  std::uint32_t element_type = 0;
+  std::uint64_t count = 0;
+  if (type != 9 || !reader->u32(&element_type) || element_type != 8 ||
+      !reader->u64(&count) || count > kMaxArray) {
+    return false;
+  }
+  output->reserve(static_cast<std::size_t>(count));
+  for (std::uint64_t index = 0; index < count; ++index) {
+    std::string value;
+    if (!reader->string(&value)) return false;
+    output->push_back(std::move(value));
+  }
+  return true;
+}
+
+bool read_u32_array(Reader* reader, std::uint32_t type,
+                    std::vector<std::uint32_t>* output) noexcept {
+  std::uint32_t element_type = 0;
+  std::uint64_t count = 0;
+  if (type != 9 || !reader->u32(&element_type) ||
+      (element_type != 4 && element_type != 5) || !reader->u64(&count) ||
+      count > kMaxArray) {
+    return false;
+  }
+  output->resize(static_cast<std::size_t>(count));
+  for (std::uint32_t& value : *output) {
+    if (!reader->u32(&value)) return false;
+  }
+  return true;
+}
+
 Status malformed(const std::string& detail) noexcept {
   return {StatusCode::kIncompatibleArtifact, "malformed GGUF: " + detail};
 }
@@ -333,13 +366,31 @@ Status inspect_gguf(const std::string& path, ModelInfo* info) noexcept {
     if (!reader.string(&key) || !reader.u32(&type)) {
       return malformed("truncated metadata key");
     }
-    if (key == "general.architecture" || key == "general.name") {
+    if (key == "general.architecture" || key == "general.name" ||
+        key == "tokenizer.ggml.model") {
       if (type != 8) {
         return malformed("string metadata has wrong type");
       }
-      std::string* target = key == "general.architecture" ? &parsed.architecture : &parsed.name;
+      std::string* target = &parsed.tokenizer_model;
+      if (key == "general.architecture") target = &parsed.architecture;
+      if (key == "general.name") target = &parsed.name;
       if (!reader.string(target)) {
         return malformed("truncated string metadata");
+      }
+      continue;
+    }
+    if (key == "tokenizer.ggml.tokens" || key == "tokenizer.ggml.merges") {
+      std::vector<std::string>* target = key == "tokenizer.ggml.tokens"
+                                             ? &parsed.tokenizer_tokens
+                                             : &parsed.tokenizer_merges;
+      if (!read_string_array(&reader, type, target)) {
+        return malformed("tokenizer string array has wrong type or is truncated");
+      }
+      continue;
+    }
+    if (key == "tokenizer.ggml.token_type") {
+      if (!read_u32_array(&reader, type, &parsed.tokenizer_token_types)) {
+        return malformed("tokenizer type array has wrong type or is truncated");
       }
       continue;
     }
@@ -433,7 +484,10 @@ Status validate_qwen38_contract(ModelInfo* info) noexcept {
       info->block_count != 64 || info->context_length != 262144 ||
       info->embedding_length != 5120 || info->query_heads != 24 ||
       info->kv_heads != 4 || info->rope_dimensions != 64 ||
-      info->tensors.size() != 851) {
+      info->tensors.size() != 851 || info->tokenizer_model != "gpt2" ||
+      info->tokenizer_tokens.size() != 248320 ||
+      info->tokenizer_token_types.size() != info->tokenizer_tokens.size() ||
+      info->tokenizer_merges.size() != 247587) {
     return {StatusCode::kIncompatibleArtifact,
             "GGUF does not match the pinned Qwen3.8-27B contract"};
   }

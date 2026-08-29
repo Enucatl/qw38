@@ -21,7 +21,7 @@ are repository-relative unless stated otherwise.
 | API-001 | Implement explicit `Status` and move-only Engine/Session boundary | BLD-001 | done | Public header compiles without exceptions/RTTI and exposes the approved operations | [`include/qw38/engine.h`](include/qw38/engine.h), build log 2026-08-29T09:52:00Z |
 | MDL-001 | Parse, mmap, inventory, and fail-closed validate GGUF | PIN-001, API-001 | done | Exact tensor metadata/ranges/roles are checked; malformed fixtures pass pytest | [`pins/tensor_inventory.json`](pins/tensor_inventory.json), [`src/model.cpp`](src/model.cpp); log 2026-08-29T10:35:51Z |
 | MDL-002 | Validate official 64-layer hybrid model contract | MDL-001 | done | 48 GDN/16 attention schedule, width, GQA, partial RoPE, and dtypes match authority | [`pins/model_contract.json`](pins/model_contract.json), [`docs/14-artifact-validation.md`](docs/14-artifact-validation.md); log 2026-08-29T10:35:51Z |
-| TOK-001 | Implement pinned tokenizer | MDL-001, PIN-002 | pending | Token IDs match frozen authority fixtures byte-for-byte | — |
+| TOK-001 | Implement pinned tokenizer | MDL-001, PIN-002 | in_progress | Token IDs match frozen authority fixtures byte-for-byte | — |
 | TOK-002 | Implement chat/reasoning/tool template | TOK-001 | pending | All supported roles, reasoning, tool calls/results, and rejection cases match fixtures | — |
 | CPU-001 | Implement Q4_K/Q6_K scalar decoding and dot products | MDL-001 | pending | Numeric fixtures meet frozen metrics and exact structural checks | — |
 | CPU-002 | Implement scalar GDN oracle | CPU-001, MDL-002 | pending | Warm-up, recurrence, state, head mapping, and chunk-boundary fixtures pass | — |
@@ -230,6 +230,38 @@ are repository-relative unless stated otherwise.
   full semantic contract, payload hashes, malformed tests, and handbook evidence.
 - The runtime GGUF remains ignored. Formatter, build, tests, production contract,
   and production full-open evidence above satisfy the commit boundary.
+
+### 2026-08-29T10:37:00Z — Model admission pushed; TOK-001 started
+
+- Commit `73c5745` (`feat: validate exact model tensor contract`) created after
+  Ruff and 8 pytest tests passed, then pushed to `origin/main` successfully.
+- Began TOK-001 by resolving tokenizer assets from the already pinned official
+  source revision. Template behavior remains TOK-002 and will not be mixed into
+  tokenizer admission.
+
+### 2026-08-29T10:42:00Z — Tokenizer authority boundary established
+
+- Resolved `tokenizer.json`, `tokenizer_config.json`, `vocab.json`, and
+  `merges.txt` at official revision
+  `1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0`; recorded exact byte sizes and
+  locally verified SHA-256 values in the artifact lock.
+- Extended native GGUF admission to parse rather than skip tokenizer model,
+  token, token-type, and merge metadata. The production artifact reports GPT-2,
+  248,320 tokens/token types, and 247,587 merges; contract admission passes.
+- Pinned `tokenizers==0.22.1` as the fixture authority tool and added a typed,
+  identity-checking fixture generator. Generated 12 cases retaining prompt
+  bytes, IDs, token strings, and decoded bytes across Unicode and special-token
+  boundaries.
+- Commands: fixture generator, Ruff format/check, and pytest — passed; 9 tests.
+- TOK-001 remains in progress. No C++ tokenization claim is made until the native
+  NFC, Unicode splitting, byte mapping, BPE, and special-token path matches every
+  frozen fixture.
+
+### 2026-08-29T10:43:00Z — Tokenizer oracle commit boundary
+
+- Reviewed pins, GGUF metadata admission, generated fixtures, generator, tests,
+  dependency lock, and code-linked handbook note before commit.
+- Runtime tokenizer assets remain ignored and will not be committed.
 
 ## Decisions and Negative Results
 
