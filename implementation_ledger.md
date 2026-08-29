@@ -30,9 +30,10 @@ are repository-relative unless stated otherwise.
 | CPU-008 | Bind every admitted global and layer tensor into typed scalar weight structures | CPU-006, CPU-007, MDL-002 | done | All 851 tensors bind by exact name, layer kind, shape, dtype, and mapped range; missing, swapped, or incompatible roles fail closed | [`src/weights.cpp`](src/weights.cpp); [`src/tensor.cpp`](src/tensor.cpp); [`tests/test_weights.py`](tests/test_weights.py); log 2026-08-29T17:36:00Z |
 | CPU-009 | Implement exact packed GDN QKV and attention query/gate projection slicing | CPU-003, CPU-007, CPU-008 | done | GDN contiguous Q/K/V ranges, per-head attention query/gate halves, output counts, alias rejection, and frozen layout fixtures pass | [`src/projection.cpp`](src/projection.cpp); [`pins/projection_layout_contract.json`](pins/projection_layout_contract.json); [`tests/test_projection.py`](tests/test_projection.py); log 2026-08-29T17:40:00Z |
 | CPU-010 | Execute typed real-artifact GDN and attention mixer projections with exact scalar workspaces | CPU-006, CPU-008, CPU-009 | done | Deterministic activation drives complete layer-0/layer-3 mixer projections; packed and split taps match independently decoded admitted rows and workspace guards fail closed | [`src/mixer.cpp`](src/mixer.cpp); [`fixtures/mixer_projections.json`](fixtures/mixer_projections.json); [`tests/test_mixer.py`](tests/test_mixer.py); log 2026-08-29T18:20:00Z |
+| CPU-011 | Execute one complete real layer-0 GDN mixer update and residual | CPU-002, CPU-007, CPU-010 | done | GGUF-scale input norm, real projections, convolution ring, grouped recurrence, gated norm, output projection, residual, state taps, and malformed workspaces pass frozen evidence | [`src/mixer.cpp`](src/mixer.cpp); [`fixtures/real_gdn_step.json`](fixtures/real_gdn_step.json); [`tests/test_real_gdn.py`](tests/test_real_gdn.py); log 2026-08-29T18:33:00Z |
 | CPU-002 | Implement scalar GDN oracle | CPU-001, MDL-002 | done | Warm-up, recurrence, state, head mapping, and chunk-boundary fixtures pass | [`src/gdn.cpp`](src/gdn.cpp); [`fixtures/gdn_authority.json`](fixtures/gdn_authority.json); [`tests/test_gdn.py`](tests/test_gdn.py); log 2026-08-29T12:26:00Z |
 | CPU-003 | Implement scalar attention and FFN oracle | CPU-001, MDL-002 | done | Layers 3/7/63, partial RoPE, grouped KV, causality, and FFN taps pass | [`src/attention.cpp`](src/attention.cpp); [`fixtures/attention_ffn_authority.json`](fixtures/attention_ffn_authority.json); [`tests/test_attention.py`](tests/test_attention.py); log 2026-08-29T12:54:00Z |
-| CPU-004 | Implement full scalar 64-layer scheduler and logits | CPU-002, CPU-003, CPU-005, CPU-006, CPU-007, CPU-008, CPU-009, CPU-010 | pending | Token/chunk execution and logits match semantic-authority fixtures | — |
+| CPU-004 | Implement full scalar 64-layer scheduler and logits | CPU-002, CPU-003, CPU-005, CPU-006, CPU-007, CPU-008, CPU-009, CPU-010, CPU-011 | pending | Token/chunk execution and logits match semantic-authority fixtures | — |
 | TRC-001 | Define versioned trace bundle and typed comparison metrics | PIN-002 | pending | Manifest/blob schema, checksums, summaries, session frontiers, and metric reporter pass tests | — |
 | TRC-002 | Add diagnostic-only stable scalar/CUDA taps | TRC-001, CPU-004 | pending | Required taps filter by layer/name and are absent from release builds | — |
 | ORA-001 | Generate and freeze scalar/oracle fixtures and tolerances | TOK-002, CPU-004, TRC-002 | pending | Three authorities are attributed; tolerances and greedy tie exceptions are immutable inputs | — |
@@ -73,6 +74,7 @@ are repository-relative unless stated otherwise.
 | EDU-009 | Explain typed model weights and complete layer binding for beginners | CPU-008, DOC-001 | done | Views versus ownership, vectors/matrices, common and variant layer fields, exact-name/schema admission, counts, and scheduler boundary are code-linked and worked | [`docs/23-typed-model-weights.md`](docs/23-typed-model-weights.md); [`tests/test_weights.py`](tests/test_weights.py); log 2026-08-29T17:36:00Z |
 | EDU-010 | Explain packed projection layouts and slicing for beginners | CPU-009, DOC-001 | done | Packing purpose, GDN contiguous segments, attention per-head halves, physical versus semantic order, aliasing, and downstream conversion are code-linked and worked | [`docs/24-packed-projections.md`](docs/24-packed-projections.md); [`tests/test_projection.py`](tests/test_projection.py); log 2026-08-29T17:40:00Z |
 | EDU-011 | Explain real scalar projection execution and workspaces for beginners | CPU-010, DOC-001 | done | Activations, projection rows, typed views, packed/split workspace sizes, selected-tap evidence, cost, and remaining layer boundary are code-linked and worked | [`docs/25-real-mixer-projections.md`](docs/25-real-mixer-projections.md); [`tests/test_mixer.py`](tests/test_mixer.py); log 2026-08-29T18:20:00Z |
+| EDU-012 | Explain a complete real GDN mixer layer update for beginners | CPU-011, DOC-001 | done | Input norm, convolution state, physical/semantic head order, recurrence state, gated norm, output projection, residual, atomicity boundary, and evidence taps are code-linked and worked | [`docs/26-real-gdn-layer.md`](docs/26-real-gdn-layer.md); [`tests/test_real_gdn.py`](tests/test_real_gdn.py); log 2026-08-29T18:33:00Z |
 | REL-001 | Publish reproducible release evidence bundle | CMP-003, QLT-001, DOC-001 | pending | Builds, hashes, raw results, reports, and documentation claims reconcile | — |
 
 ## Delivery-Gate Mapping
@@ -913,6 +915,66 @@ are repository-relative unless stated otherwise.
   packed/split ordering, independent row generator and hashes, real-output taps,
   finite sentinels, measured-cost labels, beginner documentation, proof boundary,
   and clean host/container verification before committing.
+
+### 2026-08-29T18:28:00Z — Real projections pushed; CPU-011 started
+
+- Commit `643fe5c` (`feat: execute real mixer projections`) was pushed to
+  `origin/main` successfully and the worktree was clean.
+- Added CPU-011 before implementation and made it a CPU-004 dependency. This is
+  the first state-mutating real layer boundary: it must compose direct-scale
+  input RMSNorm, packed projection, convolution-before-split, GGUF tiled to
+  semantic grouped conversion, folded gates, FP32 recurrence, gated RMSNorm,
+  output projection, and residual addition without losing physical-state order.
+- Added EDU-012 so convolution versus recurrent state, layout transitions,
+  gate/norm order, residual ownership, evidence taps, and the later session
+  atomicity boundary are explained alongside the implementation.
+- Re-verified the pinned Transformers source after the web fetch could not serve
+  the commit URL. The exact hashed file defines variance-mean RMSNorm with
+  epsilon `1e-6`, direct learned scale, then FP32 SiLU gate multiplication; it
+  also confirms convolution precedes Q/K/V split and recurrence precedes gated
+  norm/output projection.
+
+### 2026-08-29T18:33:00Z — CPU-011 and EDU-012 accepted
+
+- Extended the pinned GDN contract with the exact gated RMSNorm symbol and
+  equation: per-head FP32 variance mean, reciprocal square root with `1e-6`,
+  direct learned scale, then FP32 SiLU gate multiplication.
+- Implemented prepared scalar parameter decoding for input norm, 10,240 × 4
+  convolution weights, folded A, time bias, and recurrent norm. Added exact
+  state/workspace contracts and a complete real layer-0 GDN mixer step through
+  input normalization, projection, convolution, split, layout conversions,
+  gates, recurrence, gated norm, output projection, and residual addition.
+- The scalar path keeps convolution rings in physical packed/tiled order and
+  recurrent matrices in semantic grouped order. Value-associated activations
+  cross the explicit conversion boundary in each direction required by the
+  stored GGUF matrices.
+- An independent Python transcription maps only the pinned GGUF, decodes selected
+  real rows, uses float libm equations, and matches native normalization,
+  convolution, grouped heads 0/1/3, folded/update gates, recurrence, gated norm,
+  convolution state, and recurrent state under frozen tolerances. Exact selected
+  residual additions also pass.
+- A short gated-tiled workspace is rejected before projection or state mutation;
+  both persistent buffers remain exactly zero. Later failures after validated
+  in-place mutation remain the explicit SES-002 atomic-staging boundary.
+- Added a beginner chapter explaining the complete branch, parameter/workspace/
+  state ownership and byte counts, direct norm scale, convolution-before-split,
+  physical versus semantic state, recurrence order, gated norm, output and
+  residual, evidence selection, and remaining oracle/atomicity limitations.
+- Commands: pinned raw-source re-verification, fixture generation (2.57 s),
+  timed real diagnostic (0.25 s; 149,920 KiB maximum RSS), Ruff format/check,
+  JSON validation, clean restricted C++17 build, 52 pytest tests,
+  `git diff --check`, pinned CUDA 13.0.2 full build, SM120 compilation, and RTX
+  5090 probe — passed. Probe values were 33,671,348,224 total and
+  33,139,458,048 free bytes.
+- Marked CPU-011 and EDU-012 done. The layer FFN, real attention state, multiple
+  real tokens, 64-layer schedule, final norm, and logits remain CPU-004.
+
+### 2026-08-29T18:33:30Z — Real-GDN commit boundary
+
+- Reviewed source equations, prepared parameters, all workspace/state counts,
+  physical/semantic layout transitions, mutation order, independent selected
+  taps, residual arithmetic, pre-mutation failure behavior, documentation,
+  evidence labels, and clean host/container verification before committing.
 
 ## Decisions and Negative Results
 

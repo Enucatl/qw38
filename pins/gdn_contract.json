@@ -10,7 +10,8 @@
       "causal_conv1d_update",
       "l2norm",
       "torch_recurrent_gated_delta_rule",
-      "Qwen3_5GatedDeltaNet"
+      "Qwen3_5GatedDeltaNet",
+      "Qwen3_5RMSNormGated"
     ]
   },
   "production_shape": {
@@ -35,6 +36,7 @@
       "state = state + key * transpose(delta)",
       "output = transpose(query) * state"
     ],
-    "convolution": "shift zero-warmed per-channel ring, append current projection, dot oldest-to-newest with four weights, then SiLU"
+    "convolution": "shift zero-warmed per-channel ring, append current projection, dot oldest-to-newest with four weights, then SiLU",
+    "gated_rmsnorm": "FP32 variance mean over each 128-lane value head, reciprocal sqrt with 1e-6, direct learned scale, then multiply by FP32 SiLU(value gate)"
   }
 }

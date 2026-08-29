@@ -31,6 +31,11 @@ Status gdn_recurrent_step_precomputed(
     std::size_t gate_count, float* state, std::size_t state_count,
     float* output, std::size_t output_count) noexcept;
 
+Status gdn_gated_rms_norm(const float* input, const float* gate,
+                          std::size_t heads, std::size_t head_width,
+                          const float* weight, std::size_t weight_count,
+                          float* output, std::size_t output_count) noexcept;
+
 Status gdn_recurrent_step(
     const GdnShape& shape, const float* query, std::size_t query_count,
     const float* key, std::size_t key_count, const float* value,

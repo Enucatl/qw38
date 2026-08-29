@@ -578,6 +578,146 @@ int check_mixer_projections(const char* model_path, const std::string& mode) {
   return 0;
 }
 
+int check_real_gdn_step(const char* model_path, const std::string& mode) {
+  qw38::internal::ModelInfo info;
+  qw38::Status status = qw38::internal::inspect_gguf(model_path, &info);
+  if (status.is_ok()) status = qw38::internal::validate_qwen38_contract(&info);
+  qw38::internal::MappedFile mapping;
+  if (status.is_ok()) status = mapping.open(model_path);
+  qw38::internal::ModelWeights weights;
+  if (status.is_ok()) {
+    status = qw38::internal::bind_model_weights(info, mapping, &weights);
+  }
+  if (!status.is_ok()) {
+    std::cerr << qw38::status_code_name(status.code()) << ": "
+              << status.message() << '\n';
+    return 1;
+  }
+
+  std::vector<float> input_norm(qw38::internal::kResidualWidth);
+  std::vector<float> convolution(qw38::internal::kGdnConvolutionValues);
+  std::vector<float> folded_a(qw38::internal::kGdnGateCount);
+  std::vector<float> dt_bias(qw38::internal::kGdnGateCount);
+  std::vector<float> recurrent_norm(qw38::internal::kGdnHeadWidth);
+  const qw38::internal::GdnScalarParameters parameters{
+      input_norm.data(), input_norm.size(), convolution.data(),
+      convolution.size(), folded_a.data(), folded_a.size(), dt_bias.data(),
+      dt_bias.size(), recurrent_norm.data(), recurrent_norm.size()};
+  status = qw38::internal::prepare_gdn_scalar_parameters(weights.layers[0],
+                                                         parameters);
+  if (!status.is_ok()) {
+    std::cerr << qw38::status_code_name(status.code()) << ": "
+              << status.message() << '\n';
+    return 1;
+  }
+
+  std::vector<float> residual(qw38::internal::kResidualWidth);
+  for (std::size_t index = 0; index < residual.size(); ++index) {
+    residual[index] = static_cast<float>(
+                          static_cast<int>((index * 37) % 101) - 50) /
+                      32.0F;
+  }
+  std::vector<float> conv_state(qw38::internal::kGdnConvolutionValues);
+  std::vector<float> recurrent_state(
+      qw38::internal::kGdnRecurrentStateValues);
+  qw38::internal::GdnLayerStateView state{
+      conv_state.data(), conv_state.size(), recurrent_state.data(),
+      recurrent_state.size()};
+
+  std::vector<float> normalized(qw38::internal::kResidualWidth, NAN);
+  std::vector<float> packed(qw38::internal::kGdnPackedQkvWidth, NAN);
+  std::vector<float> projected_gate(qw38::internal::kGdnValueWidth, NAN);
+  std::vector<float> projected_alpha(qw38::internal::kGdnGateCount, NAN);
+  std::vector<float> projected_beta(qw38::internal::kGdnGateCount, NAN);
+  std::vector<float> convolved(qw38::internal::kGdnPackedQkvWidth, NAN);
+  std::vector<float> query(qw38::internal::kGdnKeyWidth, NAN);
+  std::vector<float> key(qw38::internal::kGdnKeyWidth, NAN);
+  std::vector<float> value_tiled(qw38::internal::kGdnValueWidth, NAN);
+  std::vector<float> value_grouped(qw38::internal::kGdnValueWidth, NAN);
+  std::vector<float> gate_grouped(qw38::internal::kGdnValueWidth, NAN);
+  std::vector<float> alpha_grouped(qw38::internal::kGdnGateCount, NAN);
+  std::vector<float> beta_grouped(qw38::internal::kGdnGateCount, NAN);
+  std::vector<float> folded_grouped(qw38::internal::kGdnGateCount, NAN);
+  std::vector<float> dt_grouped(qw38::internal::kGdnGateCount, NAN);
+  std::vector<float> log_decay(qw38::internal::kGdnGateCount, NAN);
+  std::vector<float> update_gate(qw38::internal::kGdnGateCount, NAN);
+  std::vector<float> recurrent_output(qw38::internal::kGdnValueWidth, NAN);
+  std::vector<float> gated_grouped(qw38::internal::kGdnValueWidth, NAN);
+  std::vector<float> gated_tiled(qw38::internal::kGdnValueWidth, NAN);
+  std::vector<float> mixer_output(qw38::internal::kResidualWidth, NAN);
+  std::vector<float> output(qw38::internal::kResidualWidth, NAN);
+  const qw38::internal::GdnProjectionWorkspace projection_workspace{
+      packed.data(), packed.size(), projected_gate.data(), projected_gate.size(),
+      projected_alpha.data(), projected_alpha.size(), projected_beta.data(),
+      projected_beta.size()};
+  qw38::internal::GdnStepWorkspace workspace{
+      normalized.data(), normalized.size(), projection_workspace,
+      convolved.data(), convolved.size(), query.data(), query.size(), key.data(),
+      key.size(), value_tiled.data(), value_tiled.size(), value_grouped.data(),
+      value_grouped.size(), gate_grouped.data(), gate_grouped.size(),
+      alpha_grouped.data(), beta_grouped.data(), folded_grouped.data(),
+      dt_grouped.data(), log_decay.data(), update_gate.data(),
+      update_gate.size(), recurrent_output.data(), recurrent_output.size(),
+      gated_grouped.data(), gated_grouped.size(), gated_tiled.data(),
+      gated_tiled.size(), mixer_output.data(), mixer_output.size()};
+  if (mode == "invalid_workspace") --workspace.gated_tiled_count;
+  if (mode != "valid" && mode != "invalid_workspace") {
+    std::cerr << "invalid_argument: unknown real-GDN-step mode\n";
+    return 1;
+  }
+  status = qw38::internal::execute_gdn_mixer_step(
+      weights.layers[0], parameters, residual.data(), residual.size(), state,
+      workspace, output.data(), output.size());
+  if (!status.is_ok()) {
+    if (mode == "invalid_workspace") {
+      const bool unchanged =
+          std::all_of(conv_state.begin(), conv_state.end(),
+                      [](float value) { return value == 0.0F; }) &&
+          std::all_of(recurrent_state.begin(), recurrent_state.end(),
+                      [](float value) { return value == 0.0F; });
+      std::cout << "state_unchanged=" << (unchanged ? 1 : 0) << '\n';
+    }
+    std::cerr << qw38::status_code_name(status.code()) << ": "
+              << status.message() << '\n';
+    return 1;
+  }
+  const auto taps = [](const std::vector<float>& values,
+                       std::initializer_list<std::size_t> indices) {
+    std::vector<float> selected;
+    selected.reserve(indices.size());
+    for (std::size_t index : indices) selected.push_back(values[index]);
+    return selected;
+  };
+  write_float_vector("normalized_f32_le_hex",
+                     taps(normalized, {0, 1, 5118, 5119}));
+  write_float_vector("convolved_f32_le_hex",
+                     taps(convolved, {0, 127, 2048, 2175, 4096, 4223, 6144,
+                                      6271, 4224, 4351}));
+  write_float_vector("value_grouped_f32_le_hex",
+                     taps(value_grouped, {0, 127, 128, 255, 384, 511}));
+  write_float_vector("gate_controls_f32_le_hex",
+                     taps(alpha_grouped, {0, 1, 3, 47}));
+  write_float_vector("log_decay_f32_le_hex",
+                     taps(log_decay, {0, 1, 3, 47}));
+  write_float_vector("update_gate_f32_le_hex",
+                     taps(update_gate, {0, 1, 3, 47}));
+  write_float_vector("recurrent_output_f32_le_hex",
+                     taps(recurrent_output, {0, 127, 128, 255, 384, 511}));
+  write_float_vector("gated_grouped_f32_le_hex",
+                     taps(gated_grouped, {0, 127, 128, 255, 384, 511}));
+  write_float_vector("mixer_output_f32_le_hex",
+                     taps(mixer_output, {0, 1, 2559, 5119}));
+  write_float_vector("residual_output_f32_le_hex",
+                     taps(output, {0, 1, 2559, 5119}));
+  write_float_vector("convolution_state_f32_le_hex",
+                     taps(conv_state, {0, 1, 2, 3, 16384, 16385, 16386,
+                                       16387}));
+  write_float_vector("recurrent_state_f32_le_hex",
+                     taps(recurrent_state, {0, 127, 16383, 16384, 32767,
+                                            49152, 65535}));
+  return 0;
+}
+
 float fixture_query(std::size_t token, std::size_t head, std::size_t lane) {
   const int numerator =
       static_cast<int>((token * 11 + head * 7 + lane * 3) % 19) - 9;
@@ -1181,6 +1321,9 @@ int main(int argc, char** argv) {
   if (argc == 4 && std::string(argv[1]) == "--check-mixer-projections") {
     return check_mixer_projections(argv[2], argv[3]);
   }
+  if (argc == 4 && std::string(argv[1]) == "--check-real-gdn-step") {
+    return check_real_gdn_step(argv[2], argv[3]);
+  }
   if (argc == 3 && std::string(argv[1]) == "--check-attention") {
     return check_attention(std::atoi(argv[2]));
   }
@@ -1203,6 +1346,7 @@ int main(int argc, char** argv) {
                "--check-weight-binding MODEL MODE, "
                "--check-projection-layout COMPONENT, "
                "--check-mixer-projections MODEL MODE, "
+               "--check-real-gdn-step MODEL MODE, "
                "--check-ffn LAYER, --check-matvec KIND COLUMNS ROWS PAYLOAD "
                "ACTIVATION, or --check-tensor-row MODEL NAME ROW\n";
   return 2;

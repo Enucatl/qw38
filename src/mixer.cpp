@@ -1,5 +1,8 @@
 #include "mixer.h"
 
+#include "attention.h"
+#include "conversion.h"
+#include "gdn.h"
 #include "projection.h"
 #include "tensor.h"
 
@@ -70,6 +73,197 @@ Status project_attention_mixer(
                            workspace.value, workspace.value_count);
   }
   return status;
+}
+
+Status prepare_gdn_scalar_parameters(
+    const LayerWeights& weights,
+    const GdnScalarParameters& parameters) noexcept {
+  if (weights.kind != LayerKind::kGdn || parameters.input_norm == nullptr ||
+      parameters.input_norm_count != kResidualWidth ||
+      parameters.convolution == nullptr ||
+      parameters.convolution_count != kGdnConvolutionValues ||
+      parameters.folded_a_tiled == nullptr ||
+      parameters.folded_a_count != kGdnGateCount ||
+      parameters.dt_bias_tiled == nullptr ||
+      parameters.dt_bias_count != kGdnGateCount ||
+      parameters.recurrent_norm == nullptr ||
+      parameters.recurrent_norm_count != kGdnHeadWidth) {
+    return {StatusCode::kInvalidArgument,
+            "GDN scalar parameter buffers are invalid"};
+  }
+  Status status = vector_decode(weights.common.input_norm, parameters.input_norm,
+                                parameters.input_norm_count);
+  for (std::size_t channel = 0;
+       status.is_ok() && channel < kGdnPackedQkvWidth; ++channel) {
+    status = tensor_row_decode(weights.gdn.convolution, channel,
+                               parameters.convolution + channel * 4, 4);
+  }
+  if (status.is_ok()) {
+    status = vector_decode(weights.gdn.folded_a, parameters.folded_a_tiled,
+                           parameters.folded_a_count);
+  }
+  if (status.is_ok()) {
+    status = vector_decode(weights.gdn.dt_bias, parameters.dt_bias_tiled,
+                           parameters.dt_bias_count);
+  }
+  if (status.is_ok()) {
+    status = vector_decode(weights.gdn.norm, parameters.recurrent_norm,
+                           parameters.recurrent_norm_count);
+  }
+  return status;
+}
+
+namespace {
+
+bool valid_gdn_step_buffers(const GdnScalarParameters& parameters,
+                            const GdnLayerStateView& state,
+                            const GdnStepWorkspace& workspace,
+                            const float* residual, std::size_t residual_count,
+                            float* output, std::size_t output_count) noexcept {
+  return parameters.input_norm != nullptr &&
+         parameters.input_norm_count == kResidualWidth &&
+         parameters.convolution != nullptr &&
+         parameters.convolution_count == kGdnConvolutionValues &&
+         parameters.folded_a_tiled != nullptr &&
+         parameters.folded_a_count == kGdnGateCount &&
+         parameters.dt_bias_tiled != nullptr &&
+         parameters.dt_bias_count == kGdnGateCount &&
+         parameters.recurrent_norm != nullptr &&
+         parameters.recurrent_norm_count == kGdnHeadWidth && residual != nullptr &&
+         residual_count == kResidualWidth && output != nullptr &&
+         output_count == kResidualWidth && state.convolution != nullptr &&
+         state.convolution_count == kGdnConvolutionValues &&
+         state.recurrent != nullptr &&
+         state.recurrent_count == kGdnRecurrentStateValues &&
+         workspace.normalized != nullptr &&
+         workspace.normalized_count == kResidualWidth &&
+         workspace.convolved_qkv != nullptr &&
+         workspace.convolved_qkv_count == kGdnPackedQkvWidth &&
+         workspace.query != nullptr && workspace.query_count == kGdnKeyWidth &&
+         workspace.key != nullptr && workspace.key_count == kGdnKeyWidth &&
+         workspace.value_tiled != nullptr &&
+         workspace.value_tiled_count == kGdnValueWidth &&
+         workspace.value_grouped != nullptr &&
+         workspace.value_grouped_count == kGdnValueWidth &&
+         workspace.gate_grouped != nullptr &&
+         workspace.gate_grouped_count == kGdnValueWidth &&
+         workspace.alpha_grouped != nullptr && workspace.beta_grouped != nullptr &&
+         workspace.folded_a_grouped != nullptr &&
+         workspace.dt_bias_grouped != nullptr && workspace.log_decay != nullptr &&
+         workspace.update_gate != nullptr &&
+         workspace.gate_count == kGdnGateCount &&
+         workspace.recurrent_output != nullptr &&
+         workspace.recurrent_output_count == kGdnValueWidth &&
+         workspace.gated_grouped != nullptr &&
+         workspace.gated_grouped_count == kGdnValueWidth &&
+         workspace.gated_tiled != nullptr &&
+         workspace.gated_tiled_count == kGdnValueWidth &&
+         workspace.mixer_output != nullptr &&
+         workspace.mixer_output_count == kResidualWidth;
+}
+
+}  // namespace
+
+Status execute_gdn_mixer_step(
+    const LayerWeights& weights, const GdnScalarParameters& parameters,
+    const float* residual, std::size_t residual_count,
+    const GdnLayerStateView& state, const GdnStepWorkspace& workspace,
+    float* output, std::size_t output_count) noexcept {
+  if (weights.kind != LayerKind::kGdn ||
+      !valid_gdn_step_buffers(parameters, state, workspace, residual,
+                              residual_count, output, output_count)) {
+    return {StatusCode::kInvalidArgument,
+            "GDN step parameters, state, or workspace are invalid"};
+  }
+  Status status = rms_norm_scale(residual, parameters.input_norm,
+                                 residual_count, workspace.normalized);
+  if (status.is_ok()) {
+    status = project_gdn_mixer(weights.gdn, workspace.normalized,
+                               workspace.normalized_count,
+                               workspace.projections);
+  }
+  if (status.is_ok()) {
+    status = causal_depthwise_conv_step(
+        kGdnPackedQkvWidth, 4, workspace.projections.packed_qkv,
+        workspace.projections.packed_qkv_count, parameters.convolution,
+        parameters.convolution_count, state.convolution,
+        state.convolution_count, workspace.convolved_qkv,
+        workspace.convolved_qkv_count);
+  }
+  if (status.is_ok()) {
+    status = split_gdn_qkv(
+        workspace.convolved_qkv, workspace.convolved_qkv_count, 16, 128, 48,
+        128, workspace.query, workspace.query_count, workspace.key,
+        workspace.key_count, workspace.value_tiled,
+        workspace.value_tiled_count);
+  }
+  if (status.is_ok()) {
+    status = gdn_tiled_to_grouped(workspace.value_tiled, 16, 3, 128,
+                                  workspace.value_grouped,
+                                  workspace.value_grouped_count);
+  }
+  if (status.is_ok()) {
+    status = gdn_tiled_to_grouped(
+        workspace.projections.value_gate, 16, 3, 128,
+        workspace.gate_grouped, workspace.gate_grouped_count);
+  }
+  if (status.is_ok()) {
+    status = gdn_tiled_to_grouped(workspace.projections.alpha, 16, 3, 1,
+                                  workspace.alpha_grouped,
+                                  workspace.gate_count);
+  }
+  if (status.is_ok()) {
+    status = gdn_tiled_to_grouped(workspace.projections.beta, 16, 3, 1,
+                                  workspace.beta_grouped,
+                                  workspace.gate_count);
+  }
+  if (status.is_ok()) {
+    status = gdn_tiled_to_grouped(parameters.folded_a_tiled, 16, 3, 1,
+                                  workspace.folded_a_grouped,
+                                  workspace.gate_count);
+  }
+  if (status.is_ok()) {
+    status = gdn_tiled_to_grouped(parameters.dt_bias_tiled, 16, 3, 1,
+                                  workspace.dt_bias_grouped,
+                                  workspace.gate_count);
+  }
+  if (status.is_ok()) {
+    status = gdn_gates_from_gguf(
+        workspace.alpha_grouped, workspace.beta_grouped,
+        workspace.folded_a_grouped, workspace.dt_bias_grouped,
+        workspace.gate_count, workspace.log_decay, workspace.update_gate);
+  }
+  constexpr GdnShape kShape{16, 48, 128, 128};
+  if (status.is_ok()) {
+    status = gdn_recurrent_step_precomputed(
+        kShape, workspace.query, workspace.query_count, workspace.key,
+        workspace.key_count, workspace.value_grouped,
+        workspace.value_grouped_count, workspace.log_decay,
+        workspace.update_gate, workspace.gate_count, state.recurrent,
+        state.recurrent_count, workspace.recurrent_output,
+        workspace.recurrent_output_count);
+  }
+  if (status.is_ok()) {
+    status = gdn_gated_rms_norm(
+        workspace.recurrent_output, workspace.gate_grouped, 48, 128,
+        parameters.recurrent_norm, parameters.recurrent_norm_count,
+        workspace.gated_grouped, workspace.gated_grouped_count);
+  }
+  if (status.is_ok()) {
+    status = gdn_grouped_to_tiled(
+        workspace.gated_grouped, 16, 3, 128, workspace.gated_tiled,
+        workspace.gated_tiled_count);
+  }
+  if (status.is_ok()) {
+    status = tensor_matvec(weights.gdn.output, workspace.gated_tiled,
+                           workspace.gated_tiled_count, workspace.mixer_output,
+                           workspace.mixer_output_count);
+  }
+  if (!status.is_ok()) return status;
+  for (std::size_t index = 0; index < output_count; ++index) {
+    output[index] = residual[index] + workspace.mixer_output[index];
+  }
+  return Status::ok();
 }
 
 }  // namespace qw38::internal

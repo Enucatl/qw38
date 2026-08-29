@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "model_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+  "authority": "pinned Transformers scalar equations plus independently decoded GGUF rows",
+  "tolerances": {
+    "absolute": 3e-06,
+    "relative": 3e-05,
+    "rms": 1e-06
+  },
+  "normalized_f32_le_hex": "148ae6bf3703d6be8db4a93f61422dbf",
+  "convolved_f32_le_hex": "5e21a3bd190eac3d0b21d3baf092fb3a11b1db39a0425c3c2c474739797a7a3ea9c9a4bbf75d203a",
+  "value_grouped_f32_le_hex": "11b1db39a0425c3c2c474739797a7a3ea9c9a4bbf75d203a",
+  "gate_controls_f32_le_hex": "e8ab3d3f1a9cf4bec0e2c6bf154844bf",
+  "log_decay_f32_le_hex": "f89a28bb6a5263bfb45a2ebadd6a9dbf",
+  "update_gate_f32_le_hex": "8759d33e0b7fe33e37b50e3f86cccf3e",
+  "recurrent_output_f32_le_hex": "18293035d29db037dbffab34f030d8397b8a95367f8711b5",
+  "gated_grouped_f32_le_hex": "91c2eab8fdf61b3c45023f399244a53ea5e685ba38d9edb8",
+  "convolution_state_f32_le_hex": "000000000000000000000000e2c010400000000000000000000000005166e6bd",
+  "recurrent_state_f32_le_hex": "db3716b5639b96b73e75b3377dab92b45dabdb39030c07baa9a84db7"
+}

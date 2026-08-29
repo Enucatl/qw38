@@ -2,6 +2,7 @@
 
 #include <array>
 #include <cmath>
+#include <limits>
 
 namespace qw38::internal {
 namespace {
@@ -219,6 +220,40 @@ Status gdn_recurrent_step(
   return gdn_recurrent_step_precomputed(
       shape, query, query_count, key, key_count, value, value_count, log_decay,
       beta, gate_count, state, state_count, output, output_count);
+}
+
+Status gdn_gated_rms_norm(const float* input, const float* gate,
+                          std::size_t heads, std::size_t head_width,
+                          const float* weight, std::size_t weight_count,
+                          float* output, std::size_t output_count) noexcept {
+  if (input == nullptr || gate == nullptr || weight == nullptr ||
+      output == nullptr || heads == 0 || head_width == 0 ||
+      heads > kMaximumValueHeads || head_width > kMaximumValueWidth ||
+      heads > std::numeric_limits<std::size_t>::max() / head_width ||
+      weight_count != head_width || output_count != heads * head_width) {
+    return {StatusCode::kInvalidArgument,
+            "GDN gated RMSNorm dimensions or buffers are invalid"};
+  }
+  for (std::size_t head = 0; head < heads; ++head) {
+    const std::size_t base = head * head_width;
+    float sum_squares = 0.0F;
+    for (std::size_t lane = 0; lane < head_width; ++lane) {
+      const float value = input[base + lane];
+      sum_squares += value * value;
+    }
+    const float inverse =
+        1.0F / std::sqrt(sum_squares / static_cast<float>(head_width) +
+                         kL2Epsilon);
+    for (std::size_t lane = 0; lane < head_width; ++lane) {
+      const float normalized = input[base + lane] * inverse;
+      const float scaled = normalized * weight[lane];
+      const float gate_value = gate[base + lane];
+      const float activated_gate =
+          gate_value / (1.0F + std::exp(-gate_value));
+      output[base + lane] = scaled * activated_gate;
+    }
+  }
+  return Status::ok();
 }
 
 Status causal_depthwise_conv_step(

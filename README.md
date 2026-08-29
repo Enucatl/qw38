@@ -21,6 +21,8 @@ different GDN and attention slicing rules used by scalar execution.
 The [real-mixer chapter](docs/25-real-mixer-projections.md) executes complete
 typed layer-0 and layer-3 projections and records their exact workspaces and
 independently decoded evidence taps.
+The [real GDN layer chapter](docs/26-real-gdn-layer.md) follows one layer-0 token
+through normalization, both persistent states, gated output, and residual.
 
 ## Build
 

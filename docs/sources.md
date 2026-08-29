@@ -82,6 +82,12 @@ DSpark are explicitly rejected as Qwen model semantics.
   packed-layout contract. The deterministic real-row evidence and physical row
   hashes are frozen in
   [`fixtures/mixer_projections.json`](../fixtures/mixer_projections.json).
+- CPU-011 composes the same pinned sources through a state-mutating real GDN
+  layer. The GDN contract now explicitly includes `Qwen3_5RMSNormGated`; selected
+  real parameter/state taps are independently transcribed and frozen in
+  [`fixtures/real_gdn_step.json`](../fixtures/real_gdn_step.json). The web reader
+  could not serve the pinned commit URL during re-verification, so the exact
+  already-hashed raw source was read directly; no moving branch was substituted.
 
 ## Specialization and hardware references
 
