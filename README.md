@@ -10,6 +10,11 @@ scope is in [plan.md](plan.md), and implementation claims and evidence are in
 The repository is not yet a usable inference server. Current binaries fail
 closed when an operation has not passed its delivery gate.
 
+The beginner-oriented [implementation handbook](docs/README.md) explains each
+admitted concept and links it to code, fixtures, failures, and evidence. The
+latest chapter covers [GGUF parameter conversion](docs/22-gguf-conversion.md),
+including folded decay, RMSNorm scales, squeezed shapes, and GDN head order.
+
 ## Build
 
 ```sh

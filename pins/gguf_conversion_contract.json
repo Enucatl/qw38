@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "authority": {
+    "repository": "https://github.com/ggml-org/llama.cpp.git",
+    "revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+    "license": "MIT",
+    "files": [
+      {"path": "conversion/qwen.py", "sha256": "3e3ea6be268c65915f8f5b8419edc15c291f0adf374b97216f436191d23456b4"},
+      {"path": "src/models/qwen35.cpp", "sha256": "b61c5813fc80c54269d45cbbdbbc34b090500e8017dc190483605b37249d007c"}
+    ]
+  },
+  "transforms": {
+    "ssm_a": "GGUF stores -exp(source A_log), reordered with value heads",
+    "ssm_dt_bias": "GGUF stores source dt_bias, reordered with value heads",
+    "ordinary_rmsnorm": "GGUF stores 1 + source offset weight; multiply by the stored scale directly",
+    "gdn_gated_rmsnorm": "GGUF preserves the source linear_attn.norm.weight; multiply by the stored scale directly",
+    "convolution": "source [channels, 1, width] is squeezed to GGUF [width, channels]",
+    "value_head_order": {
+      "source_grouped": "[key_head][replica_within_key][lane]",
+      "gguf_tiled": "[replica_within_key][key_head][lane]",
+      "key_heads": 16,
+      "replicas_per_key": 3,
+      "affected": [
+        "V rows within attn_qkv",
+        "attn_gate rows",
+        "ssm_alpha rows",
+        "ssm_beta rows",
+        "ssm_a elements",
+        "ssm_dt.bias elements",
+        "V channels within ssm_conv1d",
+        "input columns of ssm_out"
+      ]
+    }
+  }
+}

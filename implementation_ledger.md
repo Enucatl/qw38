@@ -26,9 +26,10 @@ are repository-relative unless stated otherwise.
 | CPU-001 | Implement Q4_K/Q6_K scalar decoding and dot products | MDL-001 | done | Numeric fixtures meet frozen metrics and exact structural checks | [`src/quant.cpp`](src/quant.cpp); [`fixtures/quant_authority.json`](fixtures/quant_authority.json); [`tests/test_quant.py`](tests/test_quant.py); log 2026-08-29T12:05:00Z |
 | CPU-005 | Implement discovered Q8_0 scalar decoding and dot products | CPU-001, MDL-001 | done | Exact 34-byte/32-value layout, signed values, FP16 scale, malformed sizes, and frozen decode/dot fixtures pass | [`src/quant.cpp`](src/quant.cpp); [`fixtures/quant_authority.json`](fixtures/quant_authority.json); [`tests/test_quant.py`](tests/test_quant.py); log 2026-08-29T13:07:00Z |
 | CPU-006 | Bind admitted tensor rows and implement mixed-format scalar matvec | CPU-001, CPU-005, MDL-001 | done | GGUF dimension order, row bounds/bytes, F32/Q8_0/Q4_K/Q6_K dots, malformed views, synthetic matrices, and admitted artifact rows pass | [`src/tensor.cpp`](src/tensor.cpp); [`fixtures/tensor_rows.json`](fixtures/tensor_rows.json); [`tests/test_tensor.py`](tests/test_tensor.py); log 2026-08-29T13:28:00Z |
+| CPU-007 | Implement pinned GGUF-to-semantic parameter and GDN head-layout transforms | CPU-002, CPU-006, PIN-002 | done | Folded A, RMSNorm convention, squeezed convolution, grouped/tiled head permutations, round trips, and admitted parameter fixtures pass | [`src/conversion.cpp`](src/conversion.cpp); [`pins/gguf_conversion_contract.json`](pins/gguf_conversion_contract.json); [`fixtures/gguf_conversion.json`](fixtures/gguf_conversion.json); [`tests/test_conversion.py`](tests/test_conversion.py); log 2026-08-29T17:29:00Z |
 | CPU-002 | Implement scalar GDN oracle | CPU-001, MDL-002 | done | Warm-up, recurrence, state, head mapping, and chunk-boundary fixtures pass | [`src/gdn.cpp`](src/gdn.cpp); [`fixtures/gdn_authority.json`](fixtures/gdn_authority.json); [`tests/test_gdn.py`](tests/test_gdn.py); log 2026-08-29T12:26:00Z |
 | CPU-003 | Implement scalar attention and FFN oracle | CPU-001, MDL-002 | done | Layers 3/7/63, partial RoPE, grouped KV, causality, and FFN taps pass | [`src/attention.cpp`](src/attention.cpp); [`fixtures/attention_ffn_authority.json`](fixtures/attention_ffn_authority.json); [`tests/test_attention.py`](tests/test_attention.py); log 2026-08-29T12:54:00Z |
-| CPU-004 | Implement full scalar 64-layer scheduler and logits | CPU-002, CPU-003, CPU-005, CPU-006 | pending | Token/chunk execution and logits match semantic-authority fixtures | — |
+| CPU-004 | Implement full scalar 64-layer scheduler and logits | CPU-002, CPU-003, CPU-005, CPU-006, CPU-007 | pending | Token/chunk execution and logits match semantic-authority fixtures | — |
 | TRC-001 | Define versioned trace bundle and typed comparison metrics | PIN-002 | pending | Manifest/blob schema, checksums, summaries, session frontiers, and metric reporter pass tests | — |
 | TRC-002 | Add diagnostic-only stable scalar/CUDA taps | TRC-001, CPU-004 | pending | Required taps filter by layer/name and are absent from release builds | — |
 | ORA-001 | Generate and freeze scalar/oracle fixtures and tolerances | TOK-002, CPU-004, TRC-002 | pending | Three authorities are attributed; tolerances and greedy tie exceptions are immutable inputs | — |
@@ -65,6 +66,7 @@ are repository-relative unless stated otherwise.
 | EDU-005 | Explain grouped causal attention, partial RoPE, and SwiGLU for beginners | CPU-003, DOC-001 | done | Q/K/V, KV history, causality, grouped heads, RoPE pairs/positions, softmax, RMSNorm, gate/up/down FFN, fixtures, and numeric gates have worked examples linked to code/evidence | [`docs/19-attention-and-ffn.md`](docs/19-attention-and-ffn.md); [`tests/test_attention.py`](tests/test_attention.py); log 2026-08-29T12:54:00Z |
 | EDU-006 | Explain Q8_0 and scalar matrix rows for beginners | CPU-005, DOC-001 | done | Signed bytes, per-block scale, row blocks, decode/dot use, format selection, fixtures, and full-scheduler dependency are code-linked and worked | [`docs/20-q8-scalar-rows.md`](docs/20-q8-scalar-rows.md); [`tests/test_quant.py`](tests/test_quant.py); log 2026-08-29T13:07:00Z |
 | EDU-007 | Explain GGUF tensor dimensions, row orientation, and matvec for beginners | CPU-006, DOC-001 | done | Shape order, fastest dimension, rows/outputs, block alignment, mixed formats, bounds, synthetic/admitted fixtures, and scheduler use are code-linked and worked | [`docs/21-tensor-rows.md`](docs/21-tensor-rows.md); [`tests/test_tensor.py`](tests/test_tensor.py); log 2026-08-29T13:28:00Z |
+| EDU-008 | Explain converter-owned parameter folding and GDN head reordering for beginners | CPU-007, DOC-001 | done | Source vs GGUF semantics, folded exponent, norm weight convention, squeeze, grouped/tiled indices, affected tensors, inverse transforms, and checkpoint ownership are code-linked and worked | [`docs/22-gguf-conversion.md`](docs/22-gguf-conversion.md); [`tests/test_conversion.py`](tests/test_conversion.py); log 2026-08-29T17:29:00Z |
 | REL-001 | Publish reproducible release evidence bundle | CMP-003, QLT-001, DOC-001 | pending | Builds, hashes, raw results, reports, and documentation claims reconcile | — |
 
 ## Delivery-Gate Mapping
@@ -705,6 +707,55 @@ are repository-relative unless stated otherwise.
 - Reviewed the discovered dependency, pinned physical layout, checked view and
   arithmetic code, synthetic/admitted fixtures, two preserved test failures,
   malformed cases, beginner documentation, provenance, and clean verification
+  before committing.
+
+### 2026-08-29T13:31:00Z — Tensor rows pushed; CPU-007 discovered
+
+- Commit `f92b4fd` (`feat: bind scalar tensor rows`) created after the documented
+  33-test and container gates, then pushed to `origin/main` successfully.
+- Began the next CPU-004 binding increment by auditing the pinned GGUF converter
+  and llama.cpp Qwen3.5 graph. This discovered semantic conversions that cannot
+  be represented as mere byte/shape binding, so CPU-007 and EDU-008 were added
+  before implementation and CPU-004 now depends on them.
+- The converter folds `A_log` to `-exp(A_log)`, squeezes depthwise convolution,
+  adds one to ordinary Qwen RMSNorm weights, and reorders GDN value-associated
+  rows/columns from Hugging Face grouped order to GGML tiled order. The native
+  semantic core currently uses grouped head order; explicit reversible transforms
+  are required rather than silently applying the wrong value-to-key mapping.
+
+### 2026-08-29T17:29:00Z — CPU-007 and EDU-008 accepted
+
+- Pinned the exact llama.cpp converter and Qwen3.5 graph file hashes and froze
+  the converted meanings for folded decay, direct norm scales, squeezed
+  convolution, and every value-associated grouped/tiled GDN tensor role.
+- Added checked grouped-to-tiled and tiled-to-grouped FP32 transforms. A visible
+  2-key, 3-replica, 2-lane fixture proves the exact index mapping and reproduces
+  the grouped input bit-for-bit after a round trip.
+- Split source `-exp(A_log)` gate construction from the GGUF folded-A route and
+  split source-offset RMSNorm from GGUF direct-scale RMSNorm. Both pairs emit
+  identical FP32 bytes in focused diagnostics. Nonfinite, zero, and positive
+  folded decay parameters fail closed before outputs are changed.
+- Froze exact payload hashes, endpoint bytes, ranges, shapes, and storage sizes
+  for layer-0 decay, time bias, ordinary norm, GDN norm, and convolution. The
+  admitted decay payload is entirely negative and the admitted convolution is
+  the squeezed GGUF `[4, 10240]` shape.
+- Added a beginner chapter explaining source checkpoints versus runtime GGUF,
+  exponent folding, softplus/decay, norm offsets versus scales, squeezing,
+  grouped/tiled indices with a worked example, every affected tensor role,
+  fixture equality, engine/session ownership, and the remaining CPU-004 proof
+  boundary. Updated the handbook index, root entry point, and provenance ledger.
+- Commands: fixture regeneration, Ruff format/check, clean restricted C++17
+  build, 38 pytest tests, `git diff --check`, pinned CUDA 13.0.2 full build,
+  SM120 compilation, and RTX 5090 probe — passed. Probe values were
+  33,671,348,224 total and 33,139,458,048 free bytes.
+- Marked CPU-007 and EDU-008 done. Complete typed binding of all tensor roles,
+  real projections, the 64-layer schedule, final norm, and logits remain CPU-004.
+
+### 2026-08-29T17:30:00Z — GGUF conversion commit boundary
+
+- Reviewed the source pins, conversion contract, explicit semantic APIs,
+  reversible layout code, synthetic and admitted fixtures, malformed input,
+  beginner documentation, evidence labels, and clean host/container verification
   before committing.
 
 ## Decisions and Negative Results

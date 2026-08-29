@@ -54,10 +54,9 @@ void matrix_vector(const float* weights, std::size_t rows,
   }
 }
 
-}  // namespace
-
-Status rms_norm(const float* input, const float* weight, std::size_t count,
-                float* output) noexcept {
+Status rms_norm_impl(const float* input, const float* weight,
+                     std::size_t count, bool weight_is_offset,
+                     float* output) noexcept {
   if (input == nullptr || weight == nullptr || output == nullptr) {
     return {StatusCode::kInvalidArgument, "RMSNorm pointers must not be null"};
   }
@@ -71,9 +70,23 @@ Status rms_norm(const float* input, const float* weight, std::size_t count,
   const float inverse =
       1.0F / std::sqrt(sum_squares / static_cast<float>(count) + kRmsEpsilon);
   for (std::size_t index = 0; index < count; ++index) {
-    output[index] = input[index] * inverse * (1.0F + weight[index]);
+    const float scale =
+        weight_is_offset ? 1.0F + weight[index] : weight[index];
+    output[index] = input[index] * inverse * scale;
   }
   return Status::ok();
+}
+
+}  // namespace
+
+Status rms_norm(const float* input, const float* weight, std::size_t count,
+                float* output) noexcept {
+  return rms_norm_impl(input, weight, count, true, output);
+}
+
+Status rms_norm_scale(const float* input, const float* scale,
+                      std::size_t count, float* output) noexcept {
+  return rms_norm_impl(input, scale, count, false, output);
 }
 
 Status attention_decode_step(

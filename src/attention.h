@@ -18,6 +18,9 @@ struct AttentionShape final {
 Status rms_norm(const float* input, const float* weight, std::size_t count,
                 float* output) noexcept;
 
+Status rms_norm_scale(const float* input, const float* scale,
+                      std::size_t count, float* output) noexcept;
+
 Status attention_decode_step(
     const AttentionShape& shape, std::size_t position, const float* query,
     std::size_t query_count, const float* key, std::size_t key_count,

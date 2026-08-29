@@ -12,6 +12,7 @@
 
 #include "qw38/engine.h"
 #include "attention.h"
+#include "conversion.h"
 #include "gdn.h"
 #include "model.h"
 #include "quant.h"
@@ -223,6 +224,109 @@ void write_float_vector(const char* name, const std::vector<float>& values) {
   std::cout << name << '=';
   for (float value : values) write_float_hex(value);
   std::cout << '\n';
+}
+
+template <std::size_t Size>
+void write_float_array(const char* name, const std::array<float, Size>& values) {
+  std::cout << name << '=';
+  for (float value : values) write_float_hex(value);
+  std::cout << '\n';
+}
+
+int check_conversion(const std::string& component) {
+  if (component == "permutation") {
+    constexpr std::array<float, 12> kGrouped{
+        0.0F, 1.0F, 10.0F, 11.0F, 20.0F, 21.0F,
+        100.0F, 101.0F, 110.0F, 111.0F, 120.0F, 121.0F};
+    std::array<float, kGrouped.size()> tiled{};
+    std::array<float, kGrouped.size()> roundtrip{};
+    qw38::Status status = qw38::internal::gdn_grouped_to_tiled(
+        kGrouped.data(), 2, 3, 2, tiled.data(), tiled.size());
+    if (status.is_ok()) {
+      status = qw38::internal::gdn_tiled_to_grouped(
+          tiled.data(), 2, 3, 2, roundtrip.data(), roundtrip.size());
+    }
+    if (!status.is_ok()) {
+      std::cerr << qw38::status_code_name(status.code()) << ": "
+                << status.message() << '\n';
+      return 1;
+    }
+    write_float_array("grouped_f32_le_hex", kGrouped);
+    write_float_array("tiled_f32_le_hex", tiled);
+    write_float_array("roundtrip_f32_le_hex", roundtrip);
+    return 0;
+  }
+  if (component == "gates") {
+    constexpr std::array<float, 4> kA{-0.75F, -0.125F, 0.5F, 1.25F};
+    constexpr std::array<float, 4> kB{-1.0F, -0.25F, 0.25F, 1.0F};
+    constexpr std::array<float, 4> kALog{-1.5F, -0.5F, 0.0F, 0.75F};
+    constexpr std::array<float, 4> kDt{-0.25F, 0.0F, 0.25F, 0.5F};
+    std::array<float, 4> folded_a{};
+    std::array<float, 4> source_decay{};
+    std::array<float, 4> source_beta{};
+    std::array<float, 4> gguf_decay{};
+    std::array<float, 4> gguf_beta{};
+    for (std::size_t index = 0; index < folded_a.size(); ++index) {
+      folded_a[index] = -std::exp(kALog[index]);
+    }
+    qw38::Status status = qw38::internal::gdn_gates_from_source(
+        kA.data(), kB.data(), kALog.data(), kDt.data(), kA.size(),
+        source_decay.data(), source_beta.data());
+    if (status.is_ok()) {
+      status = qw38::internal::gdn_gates_from_gguf(
+          kA.data(), kB.data(), folded_a.data(), kDt.data(), kA.size(),
+          gguf_decay.data(), gguf_beta.data());
+    }
+    if (!status.is_ok()) {
+      std::cerr << qw38::status_code_name(status.code()) << ": "
+                << status.message() << '\n';
+      return 1;
+    }
+    write_float_array("folded_a_f32_le_hex", folded_a);
+    write_float_array("source_decay_f32_le_hex", source_decay);
+    write_float_array("gguf_decay_f32_le_hex", gguf_decay);
+    write_float_array("source_beta_f32_le_hex", source_beta);
+    write_float_array("gguf_beta_f32_le_hex", gguf_beta);
+    return 0;
+  }
+  if (component == "norm") {
+    constexpr std::array<float, 4> kInput{-2.0F, -0.5F, 1.0F, 3.0F};
+    constexpr std::array<float, 4> kSourceWeight{-0.125F, 0.0F, 0.25F,
+                                                 0.5F};
+    std::array<float, 4> gguf_scale{};
+    std::array<float, 4> source_output{};
+    std::array<float, 4> gguf_output{};
+    for (std::size_t index = 0; index < gguf_scale.size(); ++index) {
+      gguf_scale[index] = 1.0F + kSourceWeight[index];
+    }
+    qw38::Status status = qw38::internal::rms_norm(
+        kInput.data(), kSourceWeight.data(), kInput.size(),
+        source_output.data());
+    if (status.is_ok()) {
+      status = qw38::internal::rms_norm_scale(
+          kInput.data(), gguf_scale.data(), kInput.size(), gguf_output.data());
+    }
+    if (!status.is_ok()) {
+      std::cerr << qw38::status_code_name(status.code()) << ": "
+                << status.message() << '\n';
+      return 1;
+    }
+    write_float_array("gguf_scale_f32_le_hex", gguf_scale);
+    write_float_array("source_output_f32_le_hex", source_output);
+    write_float_array("gguf_output_f32_le_hex", gguf_output);
+    return 0;
+  }
+  if (component == "invalid_folded_a") {
+    float value = 0.0F;
+    float result = 0.0F;
+    const qw38::Status status = qw38::internal::gdn_gates_from_gguf(
+        &value, &value, &value, &value, 1, &result, &result);
+    std::cerr << qw38::status_code_name(status.code()) << ": "
+              << status.message() << '\n';
+    return status.is_ok() ? 0 : 1;
+  }
+  std::cerr << "invalid_argument: unknown conversion component\n";
+  return 1;
 }
 
 float fixture_query(std::size_t token, std::size_t head, std::size_t lane) {
@@ -816,6 +920,9 @@ int main(int argc, char** argv) {
   if (argc == 4 && std::string(argv[1]) == "--check-gdn") {
     return check_gdn(argv[2], argv[3]);
   }
+  if (argc == 3 && std::string(argv[1]) == "--check-conversion") {
+    return check_conversion(argv[2]);
+  }
   if (argc == 3 && std::string(argv[1]) == "--check-attention") {
     return check_attention(std::atoi(argv[2]));
   }
@@ -834,6 +941,7 @@ int main(int argc, char** argv) {
                "--inventory-gguf PATH OUTPUT, --tokenize-hex PATH HEX, or "
                "--render-template-case NAME, --check-quant KIND HEX, or "
                "--check-gdn COMPONENT CHUNKING, --check-attention LAYER, or "
+               "--check-conversion COMPONENT, "
                "--check-ffn LAYER, --check-matvec KIND COLUMNS ROWS PAYLOAD "
                "ACTIVATION, or --check-tensor-row MODEL NAME ROW\n";
   return 2;

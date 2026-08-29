@@ -1,0 +1,73 @@
+{
+  "schema_version": 1,
+  "model_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+  "authority": "pins/gguf_conversion_contract.json",
+  "cases": [
+    {
+      "name": "blk.0.ssm_a",
+      "shape": [
+        48
+      ],
+      "dtype": "F32",
+      "storage_bytes": 192,
+      "sha256": "6fa020e5e381129d391bccf078e2926e67203bd70d765ad1cb590ddad40b9c07",
+      "first_8_f32_le_hex": "e87026bd65ae1bbc982b72bdd93ba2bc457df2bb94c93bbcccca8fbdda8b17bd",
+      "last_8_f32_le_hex": "741001bcc845fbbcf6d7acbee1c9a4bc62b196bd0005aabc65ae1bbc8bc7cabd",
+      "minimum": -0.3375851511955261,
+      "maximum": -0.0038391663692891598
+    },
+    {
+      "name": "blk.0.ssm_dt.bias",
+      "shape": [
+        48
+      ],
+      "dtype": "F32",
+      "storage_bytes": 192,
+      "sha256": "bf313b166f0b8c1253b041d381699f2b55921ac5dc32aed460db0fae70d4de83",
+      "first_8_f32_le_hex": "00005ec0000089bf000093410000a240000009c0000048c000007641000048bf",
+      "last_8_f32_le_hex": "000002c000008cc000006e4100003ac00000244100005bc0000036c000005341",
+      "minimum": -5.71875,
+      "maximum": 19.25
+    },
+    {
+      "name": "blk.0.attn_norm.weight",
+      "shape": [
+        5120
+      ],
+      "dtype": "F32",
+      "storage_bytes": 20480,
+      "sha256": "ba6e15470f040f5b46b0533ee632b3db609cee947fe1f2b59a8b3f8d3ca9488c",
+      "first_8_f32_le_hex": "0070863f0000703f00606d3f0030713f0020673f00e06a3f0000873f00a0633f",
+      "last_8_f32_le_hex": "00cc7c3f0020693f00b0753f00206c3f0010753f0060733f00a06b3f00a0653f",
+      "minimum": 0.8681640625,
+      "maximum": 1.1982421875
+    },
+    {
+      "name": "blk.0.ssm_norm.weight",
+      "shape": [
+        128
+      ],
+      "dtype": "F32",
+      "storage_bytes": 512,
+      "sha256": "9b99b9e43d21529320cfb320ad2ffc630b0d0d373369011261b623fe9de66891",
+      "first_8_f32_le_hex": "0000623f0000643f00005f3f00005a3f00005e3f0000633f00005b3f0000603f",
+      "last_8_f32_le_hex": "0000523f0000563f00005a3f0000633f00005e3f00005f3f0000693f0000593f",
+      "minimum": 0.78515625,
+      "maximum": 0.9296875
+    },
+    {
+      "name": "blk.0.ssm_conv1d.weight",
+      "shape": [
+        4,
+        10240
+      ],
+      "dtype": "F32",
+      "storage_bytes": 163840,
+      "sha256": "afc30d66532c417e1e766cc823881f1f8ca41b77b453f2bc1f8b9c6ca95b734c",
+      "first_8_f32_le_hex": "0000723a0000a33a0000d4ba00009ebd00008aba000009bb00001cba00009c3d",
+      "last_8_f32_le_hex": "0000263a00009cba0000eb3c0000fe3900008bba000039ba0000093d00009a3a",
+      "minimum": -0.51171875,
+      "maximum": 0.431640625
+    }
+  ]
+}

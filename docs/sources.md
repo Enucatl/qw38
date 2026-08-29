@@ -59,6 +59,13 @@ DSpark are explicitly rejected as Qwen model semantics.
   CPU-006's physical row-layout authority. The source hash, dimension-0 row-width
   interpretation, format block sizes, and admitted fixture link are frozen in
   [`pins/tensor_layout_contract.json`](../pins/tensor_layout_contract.json).
+- llama.cpp's pinned Qwen converter and Qwen3.5 graph are CPU-007's authority
+  for folded `-exp(A_log)`, ordinary norm offset conversion, convolution
+  squeezing, and value-head tiling. Exact revision and file hashes, the affected
+  tensor roles, and the local transform meanings are frozen in
+  [`pins/gguf_conversion_contract.json`](../pins/gguf_conversion_contract.json).
+  Quartz implements only the small reversible layout boundary and two explicit
+  scalar conventions; it does not copy the upstream model graph.
 
 ## Specialization and hardware references
 

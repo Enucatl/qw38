@@ -46,6 +46,46 @@ Status validate_shape(const GdnShape& shape) noexcept {
   return Status::ok();
 }
 
+Status validate_gates(const float* a, const float* b, const float* decay,
+                      const float* dt_bias, std::size_t count,
+                      float* log_decay, float* beta) noexcept {
+  if (a == nullptr || b == nullptr || decay == nullptr || dt_bias == nullptr ||
+      log_decay == nullptr || beta == nullptr) {
+    return {StatusCode::kInvalidArgument, "GDN gate pointers must not be null"};
+  }
+  if (count == 0 || count > kMaximumValueHeads) {
+    return {StatusCode::kInvalidArgument,
+            "GDN gate count exceeds the admitted Qwen3.8 contract"};
+  }
+  return Status::ok();
+}
+
+Status validate_recurrent_buffers(
+    const GdnShape& shape, const float* query, std::size_t query_count,
+    const float* key, std::size_t key_count, const float* value,
+    std::size_t value_count, const float* log_decay, const float* beta,
+    std::size_t gate_count, const float* state, std::size_t state_count,
+    const float* output, std::size_t output_count) noexcept {
+  Status status = validate_shape(shape);
+  if (!status.is_ok()) return status;
+  if (query == nullptr || key == nullptr || value == nullptr ||
+      log_decay == nullptr || beta == nullptr || state == nullptr ||
+      output == nullptr) {
+    return {StatusCode::kInvalidArgument, "GDN pointers must not be null"};
+  }
+  const std::size_t expected_query = shape.key_heads * shape.key_width;
+  const std::size_t expected_value = shape.value_heads * shape.value_width;
+  const std::size_t expected_state =
+      shape.value_heads * shape.key_width * shape.value_width;
+  if (query_count != expected_query || key_count != expected_query ||
+      value_count != expected_value || gate_count != shape.value_heads ||
+      state_count != expected_state || output_count != expected_value) {
+    return {StatusCode::kInvalidArgument,
+            "GDN buffer counts do not match the declared shape"};
+  }
+  return Status::ok();
+}
+
 void normalize_heads(const float* input, std::size_t heads,
                      std::size_t width, bool scale_query,
                      float* output) noexcept {
@@ -66,31 +106,52 @@ void normalize_heads(const float* input, std::size_t heads,
 
 }  // namespace
 
-Status gdn_recurrent_step(
+Status gdn_gates_from_source(const float* a, const float* b,
+                             const float* a_log, const float* dt_bias,
+                             std::size_t count, float* log_decay,
+                             float* beta) noexcept {
+  Status status =
+      validate_gates(a, b, a_log, dt_bias, count, log_decay, beta);
+  if (!status.is_ok()) return status;
+  for (std::size_t head = 0; head < count; ++head) {
+    beta[head] = sigmoid(b[head]);
+    log_decay[head] =
+        -std::exp(a_log[head]) * softplus(a[head] + dt_bias[head]);
+  }
+  return Status::ok();
+}
+
+Status gdn_gates_from_gguf(const float* a, const float* b,
+                           const float* folded_a, const float* dt_bias,
+                           std::size_t count, float* log_decay,
+                           float* beta) noexcept {
+  Status status =
+      validate_gates(a, b, folded_a, dt_bias, count, log_decay, beta);
+  if (!status.is_ok()) return status;
+  for (std::size_t head = 0; head < count; ++head) {
+    if (!std::isfinite(folded_a[head]) || folded_a[head] >= 0.0F) {
+      return {StatusCode::kInvalidArgument,
+              "GGUF folded GDN A values must be finite and negative"};
+    }
+  }
+  for (std::size_t head = 0; head < count; ++head) {
+    beta[head] = sigmoid(b[head]);
+    log_decay[head] =
+        folded_a[head] * softplus(a[head] + dt_bias[head]);
+  }
+  return Status::ok();
+}
+
+Status gdn_recurrent_step_precomputed(
     const GdnShape& shape, const float* query, std::size_t query_count,
     const float* key, std::size_t key_count, const float* value,
-    std::size_t value_count, const float* a, const float* b,
-    const float* a_log, const float* dt_bias, std::size_t gate_count,
-    float* state, std::size_t state_count, float* output,
-    std::size_t output_count, float* log_decay, float* beta) noexcept {
-  Status status = validate_shape(shape);
+    std::size_t value_count, const float* log_decay, const float* beta,
+    std::size_t gate_count, float* state, std::size_t state_count,
+    float* output, std::size_t output_count) noexcept {
+  Status status = validate_recurrent_buffers(
+      shape, query, query_count, key, key_count, value, value_count, log_decay,
+      beta, gate_count, state, state_count, output, output_count);
   if (!status.is_ok()) return status;
-  if (query == nullptr || key == nullptr || value == nullptr || a == nullptr ||
-      b == nullptr || a_log == nullptr || dt_bias == nullptr ||
-      state == nullptr || output == nullptr || log_decay == nullptr ||
-      beta == nullptr) {
-    return {StatusCode::kInvalidArgument, "GDN pointers must not be null"};
-  }
-  const std::size_t expected_query = shape.key_heads * shape.key_width;
-  const std::size_t expected_value = shape.value_heads * shape.value_width;
-  const std::size_t expected_state =
-      shape.value_heads * shape.key_width * shape.value_width;
-  if (query_count != expected_query || key_count != expected_query ||
-      value_count != expected_value || gate_count != shape.value_heads ||
-      state_count != expected_state || output_count != expected_value) {
-    return {StatusCode::kInvalidArgument,
-            "GDN buffer counts do not match the declared shape"};
-  }
 
   std::array<float, kMaximumKeyHeads * kMaximumKeyWidth> normalized_query{};
   std::array<float, kMaximumKeyHeads * kMaximumKeyWidth> normalized_key{};
@@ -98,11 +159,6 @@ Status gdn_recurrent_step(
                   normalized_query.data());
   normalize_heads(key, shape.key_heads, shape.key_width, false,
                   normalized_key.data());
-  for (std::size_t head = 0; head < shape.value_heads; ++head) {
-    beta[head] = sigmoid(b[head]);
-    log_decay[head] =
-        -std::exp(a_log[head]) * softplus(a[head] + dt_bias[head]);
-  }
 
   const std::size_t reuse = shape.value_heads / shape.key_heads;
   for (std::size_t value_head = 0; value_head < shape.value_heads;
@@ -144,6 +200,25 @@ Status gdn_recurrent_step(
     }
   }
   return Status::ok();
+}
+
+Status gdn_recurrent_step(
+    const GdnShape& shape, const float* query, std::size_t query_count,
+    const float* key, std::size_t key_count, const float* value,
+    std::size_t value_count, const float* a, const float* b,
+    const float* a_log, const float* dt_bias, std::size_t gate_count,
+    float* state, std::size_t state_count, float* output,
+    std::size_t output_count, float* log_decay, float* beta) noexcept {
+  Status status = validate_recurrent_buffers(
+      shape, query, query_count, key, key_count, value, value_count, log_decay,
+      beta, gate_count, state, state_count, output, output_count);
+  if (!status.is_ok()) return status;
+  status = gdn_gates_from_source(a, b, a_log, dt_bias, gate_count, log_decay,
+                                 beta);
+  if (!status.is_ok()) return status;
+  return gdn_recurrent_step_precomputed(
+      shape, query, query_count, key, key_count, value, value_count, log_decay,
+      beta, gate_count, state, state_count, output, output_count);
 }
 
 Status causal_depthwise_conv_step(

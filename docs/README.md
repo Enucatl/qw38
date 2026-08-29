@@ -46,7 +46,8 @@ for language and host portability decisions.
 19. [Attention and feed-forward networks](19-attention-and-ffn.md): grouped causal lookup, partial RoPE, KV history, softmax, and SwiGLU.
 20. [Q8_0 scalar rows](20-q8-scalar-rows.md): signed-byte blocks, mixed-format artifacts, and matrix-row preparation.
 21. [Tensor rows and matvec](21-tensor-rows.md): GGUF dimension order, checked row binding, mixed-format multiplication, and admitted fixtures.
-22. [Source and evidence ledger](sources.md).
+22. [GGUF parameter conversion](22-gguf-conversion.md): folded decay, direct norm scales, squeezed convolution, and grouped/tiled GDN heads.
+23. [Source and evidence ledger](sources.md).
 
 Claims use four labels: **Measured** (this exact artifact and hardware),
 **External** (a linked source), **Estimated** (reproducible arithmetic), and
