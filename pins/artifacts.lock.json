@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "generated_utc": "2026-08-29T09:48:32Z",
+  "model": {
+    "repository": "ggml-org/Qwen3.8-27B-GGUF",
+    "revision": "0669b98607d47046c7c2b3f801011d54a08cfccf",
+    "filename": "Qwen3.8-27B-Q4_K_M.gguf",
+    "bytes": 18973870432,
+    "sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+    "source_repository": "Qwen/Qwen3.8-27B",
+    "source_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+    "quantization": "Q4_K_M",
+    "architecture": "qwen35",
+    "license": "Apache-2.0"
+  },
+  "sources": {
+    "transformers": {
+      "repository": "https://github.com/huggingface/transformers.git",
+      "revision": "42ca97014c85d71a88ad60d55f08cb9fb4d26e2c",
+      "license": "Apache-2.0",
+      "role": "primary semantic authority"
+    },
+    "llama_cpp": {
+      "repository": "https://github.com/ggml-org/llama.cpp.git",
+      "revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+      "license": "MIT",
+      "role": "independent same-GGUF oracle and baseline"
+    },
+    "vllm": {
+      "repository": "https://github.com/vllm-project/vllm.git",
+      "revision": "cacc429f62c3738c9c95093e9bd410e96103221a",
+      "license": "Apache-2.0",
+      "role": "operator attribution and baseline"
+    },
+    "ollama": {
+      "repository": "https://github.com/ollama/ollama.git",
+      "revision": "f96e7aa0513b9973a0ccc71be414c2ecb9d65b1a",
+      "license": "MIT",
+      "role": "independently reported related-runtime baseline"
+    },
+    "dwarfstar": {
+      "repository": "https://github.com/antirez/ds4.git",
+      "revision": "c1d4597a80e300b803dc642519718f2c999589da",
+      "observed_main_revision": "8db89fe083ae4d17c9a2428ccd29803d3ae8f577",
+      "license": "MIT",
+      "role": "attributed implementation patterns only"
+    }
+  },
+  "containers": {
+    "cuda_devel": {
+      "reference": "docker.io/nvidia/cuda:13.0.2-devel-ubuntu24.04",
+      "linux_amd64_digest": "sha256:0eee3094c71518ad31d011a594ae6ed6de72959ee07e318cb31cffe71690e90c"
+    }
+  }
+}

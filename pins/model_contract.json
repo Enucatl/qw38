@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "authority": {
+    "repository": "Qwen/Qwen3.8-27B",
+    "revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+    "path": "config.json"
+  },
+  "architecture": "qwen3_5",
+  "text": {
+    "layers": 64,
+    "layer_schedule": [
+      "gdn", "gdn", "gdn", "attention", "gdn", "gdn", "gdn", "attention",
+      "gdn", "gdn", "gdn", "attention", "gdn", "gdn", "gdn", "attention",
+      "gdn", "gdn", "gdn", "attention", "gdn", "gdn", "gdn", "attention",
+      "gdn", "gdn", "gdn", "attention", "gdn", "gdn", "gdn", "attention",
+      "gdn", "gdn", "gdn", "attention", "gdn", "gdn", "gdn", "attention",
+      "gdn", "gdn", "gdn", "attention", "gdn", "gdn", "gdn", "attention",
+      "gdn", "gdn", "gdn", "attention", "gdn", "gdn", "gdn", "attention",
+      "gdn", "gdn", "gdn", "attention", "gdn", "gdn", "gdn", "attention"
+    ],
+    "residual_width": 5120,
+    "ffn_width": 17408,
+    "vocabulary": 248320,
+    "attention_query_heads": 24,
+    "attention_kv_heads": 4,
+    "attention_head_width": 256,
+    "partial_rotary_factor": 0.25,
+    "gdn_key_heads": 16,
+    "gdn_value_heads": 48,
+    "gdn_key_head_width": 128,
+    "gdn_value_head_width": 128,
+    "gdn_convolution_width": 4,
+    "recurrence_dtype": "float32",
+    "maximum_positions": 262144,
+    "v1_context": 131072
+  }
+}

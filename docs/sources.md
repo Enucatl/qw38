@@ -1,0 +1,71 @@
+# Source and evidence ledger
+
+[Index](README.md)
+
+Pin exact revisions in the milestone-1 fixture; moving `main` links below are
+discovery links, not reproducibility records.
+
+## Semantic authorities
+
+| Source | Use | Status |
+|---|---|---|
+| [Qwen3.8-27B config](https://huggingface.co/Qwen/Qwen3.8-27B/blob/main/config.json) | dimensions, layer schedule, state dtype, positions, vision | **External primary** |
+| [Qwen3.8-27B repository](https://huggingface.co/Qwen/Qwen3.8-27B) | checkpoint, tokenizer, processor, template, model card | **External primary** |
+| [Transformers Qwen3.5 implementation](https://github.com/huggingface/transformers/blob/main/src/transformers/models/qwen3_5/modeling_qwen3_5.py) | norm, packed layouts, recurrence, attention, residual order | **External primary** |
+| [llama.cpp](https://github.com/ggml-org/llama.cpp) | independent trace after pinning a supporting revision | **External oracle** |
+
+The Qwen3.8 config declares `Qwen3_5ForConditionalGeneration`; this is why the
+official Transformers implementation path contains `qwen3_5`.
+
+## DwarfStar anchors
+
+Baseline: DwarfStar [`c1d4597`](https://github.com/antirez/ds4/tree/c1d4597a80e300b803dc642519718f2c999589da).
+Relevant reusable evidence lives in `ds4_shape`, `model_open`,
+`config_validate_model`, `weights_bind`, `ds4_session_create`,
+`ds4_session_save_payload`, `forward_token_raw_swa_cpu`,
+`prefill_layer_major_cpu`, CUDA MMV/MMQ dispatch, allocation guards, and graph
+capture. These are **source-verified patterns**, not Qwen support or 5090 results.
+
+DeepSeek compressed attention, sparse indexer, MoE expert streaming, mHC, and
+DSpark are explicitly rejected as Qwen model semantics.
+
+## Specialization and hardware references
+
+- [q27](https://github.com/signalnine/q27): attributed Qwen-on-5090 case study.
+  Its reported formats and measurements are **External** and apply only to its
+  artifacts, revisions, harnesses, and hardware.
+- [RTX 5090 specifications](https://www.nvidia.com/en-us/geforce/graphics-cards/50-series/rtx-5090/),
+  [CUDA GPU compute capabilities](https://developer.nvidia.com/cuda-gpus),
+  [Blackwell tuning guide](https://docs.nvidia.com/cuda/blackwell-tuning-guide/),
+  and [CUDA release notes](https://docs.nvidia.com/cuda/cuda-toolkit-release-notes/):
+  **External**, version-sensitive hardware/toolchain facts.
+- [CUDA C++ Programming Guide](https://docs.nvidia.com/cuda/cuda-c-programming-guide/)
+  and [CUTLASS](https://github.com/NVIDIA/cutlass): **External primary** sources
+  for CUDA execution, memory, and kernel-building interfaces.
+- [DGX Spark product specifications](https://www.nvidia.com/en-us/products/workstations/dgx-spark/)
+  and [DGX Spark user guide](https://docs.nvidia.com/dgx/dgx-spark/): **External
+  primary** sources for its GB10 platform, ARM host, and 128 GB coherent unified
+  system memory. Exact toolchain and compute-target support remain
+  version-sensitive.
+- Apple's [Metal overview](https://developer.apple.com/metal/),
+  and [resource storage modes](https://developer.apple.com/documentation/metal/choosing-a-resource-storage-mode-for-apple-gpus):
+  **External primary** sources for Metal execution and Apple Silicon unified
+  memory behavior.
+
+## Arithmetic and proposed claims
+
+- FFN elements/FLOPs, BF16/4-bit lower bounds, 144 MiB recurrence, 7.5 MiB
+  convolution storage, and 64 KiB/token KV are **Estimated** from displayed
+  formulas and official shapes.
+- Weight artifact size, runtime allocations, quant quality, context capacity,
+  RTX 5090 throughput, and every optimization result are **Proposed** until the
+  milestone protocol emits named logs and fixtures.
+- No q27 measurement is evidence for DwarfStar or for the proposed engine.
+
+## Review checklist
+
+- Re-pin and hash config, checkpoint, tokenizer/template, Transformers, llama.cpp, and converter.
+- Re-inventory tensors and recalculate every shape/memory table.
+- Run Markdown internal-link, heading/navigation, and Mermaid rendering checks.
+- Run all scalar/CUDA/checkpoint/quant/context acceptance scenarios.
+- Audit every performance and fit statement for an evidence label and raw record.

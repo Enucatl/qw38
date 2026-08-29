@@ -1,2 +1,29 @@
-# qw38
-A swiss made inference engine for Qwen 3.8. It ticks fast.
+# Quartz Watch 38
+
+**Quartz Watch 38 — Swiss-made inference for Qwen3.8-27B. It ticks fast.**
+
+Quartz Watch 38 (`qw38`) is a deliberately narrow, work-in-progress inference
+engine for the pinned Qwen3.8-27B Q4_K_M artifact on one RTX 5090. The approved
+scope is in [plan.md](plan.md), and implementation claims and evidence are in
+[implementation_ledger.md](implementation_ledger.md).
+
+The repository is not yet a usable inference server. Current binaries fail
+closed when an operation has not passed its delivery gate.
+
+## Build
+
+```sh
+make
+make test
+```
+
+The host-only build establishes and tests the public boundary. CUDA compilation
+uses the immutable CUDA 13.0 container:
+
+```sh
+make cuda-image
+make cuda-build
+```
+
+Run `build/qw38-eval --build-info` to inspect the compiled target and artifact
+pin. No model is downloaded by the build.
