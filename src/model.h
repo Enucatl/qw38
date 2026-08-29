@@ -2,6 +2,7 @@
 #define QW38_MODEL_H_
 
 #include <cstdint>
+#include <cstddef>
 #include <string>
 #include <vector>
 
@@ -14,7 +15,29 @@ struct TensorInfo final {
   std::vector<std::uint64_t> dimensions;
   std::uint32_t type = 0;
   std::uint64_t offset = 0;
-  std::uint64_t bytes = 0;
+  std::uint64_t storage_bytes = 0;
+  std::uint64_t padded_span_bytes = 0;
+  std::string semantic_role;
+};
+
+class MappedFile final {
+ public:
+  MappedFile() noexcept;
+  ~MappedFile();
+  MappedFile(MappedFile&& other) noexcept;
+  MappedFile& operator=(MappedFile&& other) noexcept;
+  MappedFile(const MappedFile&) = delete;
+  MappedFile& operator=(const MappedFile&) = delete;
+
+  Status open(const std::string& path) noexcept;
+  const unsigned char* data() const noexcept;
+  std::size_t size() const noexcept;
+
+ private:
+  void close() noexcept;
+  int descriptor_ = -1;
+  unsigned char* data_ = nullptr;
+  std::size_t size_ = 0;
 };
 
 struct ModelInfo final {
@@ -34,7 +57,8 @@ struct ModelInfo final {
 };
 
 Status inspect_gguf(const std::string& path, ModelInfo* info) noexcept;
-Status validate_qwen38_contract(const ModelInfo& info) noexcept;
+Status validate_qwen38_contract(ModelInfo* info) noexcept;
+const char* ggml_type_name(std::uint32_t type) noexcept;
 
 }  // namespace qw38::internal
 

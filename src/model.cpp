@@ -4,7 +4,13 @@
 #include <array>
 #include <fstream>
 #include <limits>
+#include <set>
 #include <utility>
+
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
 namespace qw38::internal {
 namespace {
@@ -166,7 +172,136 @@ Status malformed(const std::string& detail) noexcept {
   return {StatusCode::kIncompatibleArtifact, "malformed GGUF: " + detail};
 }
 
+bool tensor_storage_bytes(const TensorInfo& tensor,
+                          std::uint64_t* bytes) noexcept {
+  std::uint64_t elements = 1;
+  for (std::uint64_t dimension : tensor.dimensions) {
+    if (dimension > std::numeric_limits<std::uint64_t>::max() / elements) {
+      return false;
+    }
+    elements *= dimension;
+  }
+  std::uint64_t block_elements = 0;
+  std::uint64_t block_bytes = 0;
+  switch (tensor.type) {
+    case 0:  // F32
+      block_elements = 1;
+      block_bytes = 4;
+      break;
+    case 8:  // Q8_0
+      block_elements = 32;
+      block_bytes = 34;
+      break;
+    case 12:  // Q4_K
+      block_elements = 256;
+      block_bytes = 144;
+      break;
+    case 14:  // Q6_K
+      block_elements = 256;
+      block_bytes = 210;
+      break;
+    default:
+      return false;
+  }
+  if (elements % block_elements != 0 ||
+      elements / block_elements >
+          std::numeric_limits<std::uint64_t>::max() / block_bytes) {
+    return false;
+  }
+  *bytes = elements / block_elements * block_bytes;
+  return true;
+}
+
+bool dimensions_equal(const TensorInfo& tensor,
+                      std::initializer_list<std::uint64_t> expected) noexcept {
+  return tensor.dimensions.size() == expected.size() &&
+         std::equal(tensor.dimensions.begin(), tensor.dimensions.end(),
+                    expected.begin());
+}
+
+struct ExpectedTensor final {
+  std::string name;
+  std::initializer_list<std::uint64_t> dimensions;
+  std::uint32_t type;
+  const char* role;
+};
+
+Status admit_tensor(std::vector<TensorInfo>* tensors,
+                    std::set<std::string>* admitted,
+                    const ExpectedTensor& expected) noexcept {
+  const auto match = std::find_if(
+      tensors->begin(), tensors->end(), [&expected](const TensorInfo& tensor) {
+        return tensor.name == expected.name;
+      });
+  if (match == tensors->end() || match->type != expected.type ||
+      !dimensions_equal(*match, expected.dimensions)) {
+    return {StatusCode::kIncompatibleArtifact,
+            "tensor contract mismatch: " + expected.name};
+  }
+  match->semantic_role = expected.role;
+  admitted->insert(expected.name);
+  return Status::ok();
+}
+
 }  // namespace
+
+MappedFile::MappedFile() noexcept = default;
+MappedFile::~MappedFile() { close(); }
+
+MappedFile::MappedFile(MappedFile&& other) noexcept
+    : descriptor_(other.descriptor_), data_(other.data_), size_(other.size_) {
+  other.descriptor_ = -1;
+  other.data_ = nullptr;
+  other.size_ = 0;
+}
+
+MappedFile& MappedFile::operator=(MappedFile&& other) noexcept {
+  if (this != &other) {
+    close();
+    descriptor_ = other.descriptor_;
+    data_ = other.data_;
+    size_ = other.size_;
+    other.descriptor_ = -1;
+    other.data_ = nullptr;
+    other.size_ = 0;
+  }
+  return *this;
+}
+
+Status MappedFile::open(const std::string& path) noexcept {
+  close();
+  descriptor_ = ::open(path.c_str(), O_RDONLY | O_CLOEXEC);
+  if (descriptor_ < 0) {
+    return {StatusCode::kIoError, "cannot open model for mapping"};
+  }
+  struct stat attributes {};
+  if (fstat(descriptor_, &attributes) != 0 || attributes.st_size <= 0 ||
+      static_cast<std::uintmax_t>(attributes.st_size) >
+          std::numeric_limits<std::size_t>::max()) {
+    close();
+    return {StatusCode::kIoError, "cannot size model mapping"};
+  }
+  size_ = static_cast<std::size_t>(attributes.st_size);
+  void* mapping = mmap(nullptr, size_, PROT_READ, MAP_PRIVATE, descriptor_, 0);
+  if (mapping == MAP_FAILED) {
+    data_ = nullptr;
+    close();
+    return {StatusCode::kResourceExhausted, "cannot mmap model"};
+  }
+  data_ = static_cast<unsigned char*>(mapping);
+  return Status::ok();
+}
+
+const unsigned char* MappedFile::data() const noexcept { return data_; }
+std::size_t MappedFile::size() const noexcept { return size_; }
+
+void MappedFile::close() noexcept {
+  if (data_ != nullptr) munmap(data_, size_);
+  if (descriptor_ >= 0) ::close(descriptor_);
+  descriptor_ = -1;
+  data_ = nullptr;
+  size_ = 0;
+}
 
 Status inspect_gguf(const std::string& path, ModelInfo* info) noexcept {
   if (info == nullptr || path.empty()) {
@@ -264,30 +399,123 @@ Status inspect_gguf(const std::string& path, ModelInfo* info) noexcept {
   });
   for (std::size_t index = 0; index < order.size(); ++index) {
     TensorInfo& tensor = parsed.tensors[order[index]];
+    if (tensor.offset > reader.size() - parsed.data_offset) {
+      return malformed("tensor offset overflows or exceeds file");
+    }
     const std::uint64_t absolute = parsed.data_offset + tensor.offset;
-    const std::uint64_t next = index + 1 == order.size()
-                                   ? reader.size()
-                                   : parsed.data_offset + parsed.tensors[order[index + 1]].offset;
+    std::uint64_t next = reader.size();
+    if (index + 1 != order.size()) {
+      const std::uint64_t next_offset = parsed.tensors[order[index + 1]].offset;
+      if (next_offset > reader.size() - parsed.data_offset) {
+        return malformed("tensor offset overflows or exceeds file");
+      }
+      next = parsed.data_offset + next_offset;
+    }
     if (absolute < parsed.data_offset || absolute > reader.size() || next <= absolute ||
         next > reader.size() || tensor.offset % parsed.alignment != 0) {
       return malformed("overlapping, unaligned, or out-of-range tensor data");
     }
-    tensor.bytes = next - absolute;
+    tensor.padded_span_bytes = next - absolute;
+    if (!tensor_storage_bytes(tensor, &tensor.storage_bytes) ||
+        tensor.storage_bytes > tensor.padded_span_bytes) {
+      return malformed("unsupported type or invalid quantized tensor size");
+    }
   }
   *info = std::move(parsed);
   return Status::ok();
 }
 
-Status validate_qwen38_contract(const ModelInfo& info) noexcept {
-  if (info.architecture != "qwen35" || info.name != "Qwen3.8-27B" ||
-      info.block_count != 64 || info.context_length != 262144 ||
-      info.embedding_length != 5120 || info.query_heads != 24 ||
-      info.kv_heads != 4 || info.rope_dimensions != 64 ||
-      info.tensors.size() != 851) {
+Status validate_qwen38_contract(ModelInfo* info) noexcept {
+  if (info == nullptr) {
+    return {StatusCode::kInvalidArgument, "model contract output is required"};
+  }
+  if (info->architecture != "qwen35" || info->name != "Qwen3.8-27B" ||
+      info->block_count != 64 || info->context_length != 262144 ||
+      info->embedding_length != 5120 || info->query_heads != 24 ||
+      info->kv_heads != 4 || info->rope_dimensions != 64 ||
+      info->tensors.size() != 851) {
     return {StatusCode::kIncompatibleArtifact,
             "GGUF does not match the pinned Qwen3.8-27B contract"};
   }
+  std::set<std::string> admitted;
+  Status status = admit_tensor(
+      &info->tensors, &admitted,
+      {"output.weight", {5120, 248320}, 14, "output_projection"});
+  if (!status.is_ok()) return status;
+  status = admit_tensor(&info->tensors, &admitted,
+                        {"output_norm.weight", {5120}, 0, "final_norm"});
+  if (!status.is_ok()) return status;
+  status = admit_tensor(&info->tensors, &admitted,
+                        {"token_embd.weight", {5120, 248320}, 12,
+                         "token_embedding"});
+  if (!status.is_ok()) return status;
+
+  for (std::uint32_t layer = 0; layer < 64; ++layer) {
+    const std::string prefix = "blk." + std::to_string(layer) + ".";
+    const bool attention = layer % 4 == 3;
+    const std::array<ExpectedTensor, 5> common = {{
+        {prefix + "attn_norm.weight", {5120}, 0, "input_norm"},
+        {prefix + "ffn_down.weight", {17408, 5120}, 12, "ffn_down"},
+        {prefix + "ffn_gate.weight", {5120, 17408}, 12, "ffn_gate"},
+        {prefix + "ffn_up.weight", {5120, 17408}, 12, "ffn_up"},
+        {prefix + "post_attention_norm.weight", {5120}, 0, "ffn_norm"},
+    }};
+    for (const ExpectedTensor& expected : common) {
+      status = admit_tensor(&info->tensors, &admitted, expected);
+      if (!status.is_ok()) return status;
+    }
+    if (attention) {
+      const std::array<ExpectedTensor, 6> expected = {{
+          {prefix + "attn_k.weight", {5120, 1024}, 8, "attention_k"},
+          {prefix + "attn_k_norm.weight", {256}, 0, "attention_k_norm"},
+          {prefix + "attn_output.weight", {6144, 5120}, 14,
+           "attention_output"},
+          {prefix + "attn_q.weight", {5120, 12288}, 8, "attention_q_gate"},
+          {prefix + "attn_q_norm.weight", {256}, 0, "attention_q_norm"},
+          {prefix + "attn_v.weight", {5120, 1024}, 8, "attention_v"},
+      }};
+      for (const ExpectedTensor& tensor : expected) {
+        status = admit_tensor(&info->tensors, &admitted, tensor);
+        if (!status.is_ok()) return status;
+      }
+    } else {
+      const std::array<ExpectedTensor, 9> expected = {{
+          {prefix + "attn_gate.weight", {5120, 6144}, 8, "gdn_value_gate"},
+          {prefix + "attn_qkv.weight", {5120, 10240}, 8, "gdn_packed_qkv"},
+          {prefix + "ssm_a", {48}, 0, "gdn_decay"},
+          {prefix + "ssm_alpha.weight", {5120, 48}, 8, "gdn_alpha"},
+          {prefix + "ssm_beta.weight", {5120, 48}, 8, "gdn_beta"},
+          {prefix + "ssm_conv1d.weight", {4, 10240}, 0, "gdn_convolution"},
+          {prefix + "ssm_dt.bias", {48}, 0, "gdn_dt_bias"},
+          {prefix + "ssm_norm.weight", {128}, 0, "gdn_norm"},
+          {prefix + "ssm_out.weight", {6144, 5120}, 8, "gdn_output"},
+      }};
+      for (const ExpectedTensor& tensor : expected) {
+        status = admit_tensor(&info->tensors, &admitted, tensor);
+        if (!status.is_ok()) return status;
+      }
+    }
+  }
+  if (admitted.size() != info->tensors.size()) {
+    return {StatusCode::kIncompatibleArtifact,
+            "GGUF contains unrecognized or duplicate tensors"};
+  }
   return Status::ok();
+}
+
+const char* ggml_type_name(std::uint32_t type) noexcept {
+  switch (type) {
+    case 0:
+      return "F32";
+    case 8:
+      return "Q8_0";
+    case 12:
+      return "Q4_K";
+    case 14:
+      return "Q6_K";
+    default:
+      return "UNSUPPORTED";
+  }
 }
 
 }  // namespace qw38::internal

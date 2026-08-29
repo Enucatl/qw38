@@ -19,8 +19,8 @@ are repository-relative unless stated otherwise.
 | BLD-002 | Add pinned CUDA 13.0 SM120 build path | PIN-003, BLD-001 | in_progress | Diagnostic and release CUDA builds target `sm_120` with recorded flags | — |
 | BLD-003 | Define and enforce the device allocation ledger | PIN-001 | in_progress | All persistent/transient allocations and 128K budgets are enumerated and checked | — |
 | API-001 | Implement explicit `Status` and move-only Engine/Session boundary | BLD-001 | done | Public header compiles without exceptions/RTTI and exposes the approved operations | [`include/qw38/engine.h`](include/qw38/engine.h), build log 2026-08-29T09:52:00Z |
-| MDL-001 | Parse, mmap, inventory, and fail-closed validate GGUF | PIN-001, API-001 | in_progress | Exact tensor metadata/ranges/roles are checked; malformed fixtures pass pytest | Raw-header inspection; log 2026-08-29T10:00:59Z |
-| MDL-002 | Validate official 64-layer hybrid model contract | MDL-001 | in_progress | 48 GDN/16 attention schedule, width, GQA, partial RoPE, and dtypes match authority | [`pins/model_contract.json`](pins/model_contract.json); raw-header inspection |
+| MDL-001 | Parse, mmap, inventory, and fail-closed validate GGUF | PIN-001, API-001 | done | Exact tensor metadata/ranges/roles are checked; malformed fixtures pass pytest | [`pins/tensor_inventory.json`](pins/tensor_inventory.json), [`src/model.cpp`](src/model.cpp); log 2026-08-29T10:35:51Z |
+| MDL-002 | Validate official 64-layer hybrid model contract | MDL-001 | done | 48 GDN/16 attention schedule, width, GQA, partial RoPE, and dtypes match authority | [`pins/model_contract.json`](pins/model_contract.json), [`docs/14-artifact-validation.md`](docs/14-artifact-validation.md); log 2026-08-29T10:35:51Z |
 | TOK-001 | Implement pinned tokenizer | MDL-001, PIN-002 | pending | Token IDs match frozen authority fixtures byte-for-byte | — |
 | TOK-002 | Implement chat/reasoning/tool template | TOK-001 | pending | All supported roles, reasoning, tool calls/results, and rejection cases match fixtures | — |
 | CPU-001 | Implement Q4_K/Q6_K scalar decoding and dot products | MDL-001 | pending | Numeric fixtures meet frozen metrics and exact structural checks | — |
@@ -192,6 +192,44 @@ are repository-relative unless stated otherwise.
   directory and will not be committed or pushed.
 - Reverification and the resulting commit/push identifiers are recorded in the
   follow-up log entry below before any subsequent implementation commit.
+
+### 2026-08-29T10:30:00Z — Foundation committed and pushed
+
+- Reverification before commit: `uv run ruff format .`, `uv run ruff check .`,
+  clean `make -j2`, `uv run pytest -q`, and staged diff checks all passed.
+- Commit `5bc6610` (`feat: establish verified engine foundation`) created with
+  the approved foundation boundary and pushed to `origin/main` successfully.
+- Began the next MDL-001/MDL-002 increment: mmap ownership, exact quantized
+  tensor byte sizing, per-tensor checksums, and semantic role/shape validation.
+
+### 2026-08-29T10:35:51Z — MDL-001 and MDL-002 accepted
+
+- Added move-only POSIX mmap ownership retained by a successfully opened Engine.
+  Mapping is private/read-only and its descriptor/mapping lifetimes are coupled.
+- Replaced inferred byte spans with block-exact F32, Q8_0, Q4_K, and Q6_K
+  storage calculations; added checked offset arithmetic and payload-bound proofs.
+- Encoded and passed the complete semantic tensor schedule: 48 GDN layers × 14
+  tensors, 16 attention layers × 11 tensors, and three global tensors. Every
+  expected name, role, shape, and GGML type is exact and extra/duplicate tensors
+  fail admission.
+- Generated [`pins/tensor_inventory.json`](pins/tensor_inventory.json) after
+  full artifact validation. The 851 payload SHA-256 values cover 18,962,876,416
+  bytes; all names are unique, all roles are assigned, and observed inter-tensor
+  padding is zero. Generation took 1m56.997s.
+- Added code-linked artifact admission documentation with **Measured** and
+  implementation-boundary labels.
+- Commands: Ruff format/check, clean restricted C++17 build, 8 pytest tests,
+  production `--check-contract`, diff check, and production `--verify-model` —
+  all passed. Final full open took 56.485s.
+- Marked MDL-001 and MDL-002 done. CUDA-resident weight preparation remains
+  future CUDA/build work and is not implied by these host artifact gates.
+
+### 2026-08-29T10:36:00Z — Model admission commit boundary
+
+- Reviewed the increment for commit: mmap ownership, exact storage/range checks,
+  full semantic contract, payload hashes, malformed tests, and handbook evidence.
+- The runtime GGUF remains ignored. Formatter, build, tests, production contract,
+  and production full-open evidence above satisfy the commit boundary.
 
 ## Decisions and Negative Results
 

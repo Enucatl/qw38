@@ -24,6 +24,7 @@ Status unavailable(const char* operation) noexcept {
 struct Engine::Impl final {
   std::string model_path;
   internal::ModelInfo model;
+  internal::MappedFile mapping;
 };
 
 struct Session::Impl final {};
@@ -52,7 +53,7 @@ Status Engine::open(const std::string& model_path, Engine* engine) noexcept {
   if (!status.is_ok()) {
     return status;
   }
-  status = internal::validate_qwen38_contract(model);
+  status = internal::validate_qwen38_contract(&model);
   if (!status.is_ok()) {
     return status;
   }
@@ -66,6 +67,10 @@ Status Engine::open(const std::string& model_path, Engine* engine) noexcept {
             "model SHA-256 does not match the pinned artifact"};
   }
   auto impl = std::make_unique<Impl>();
+  status = impl->mapping.open(model_path);
+  if (!status.is_ok()) {
+    return status;
+  }
   impl->model_path = model_path;
   impl->model = std::move(model);
   *engine = Engine(std::move(impl));

@@ -119,6 +119,13 @@ class Sha256 final {
   std::uint64_t total_bytes_ = 0;
 };
 
+std::string hex_digest(const std::array<std::uint32_t, 8>& words) {
+  std::ostringstream output;
+  output << std::hex << std::setfill('0');
+  for (std::uint32_t word : words) output << std::setw(8) << word;
+  return output.str();
+}
+
 }  // namespace
 
 Status sha256_file(const std::string& path, std::string* digest) noexcept {
@@ -139,10 +146,19 @@ Status sha256_file(const std::string& path, std::string* digest) noexcept {
   if (!input.eof()) {
     return {StatusCode::kIoError, "failed while reading file for SHA-256"};
   }
-  std::ostringstream output;
-  output << std::hex << std::setfill('0');
-  for (std::uint32_t word : hash.finish()) output << std::setw(8) << word;
-  *digest = output.str();
+  *digest = hex_digest(hash.finish());
+  return Status::ok();
+}
+
+Status sha256_bytes(const unsigned char* data, std::size_t size,
+                    std::string* digest) noexcept {
+  if (digest == nullptr || (data == nullptr && size != 0)) {
+    return {StatusCode::kInvalidArgument,
+            "SHA-256 bytes and output are required"};
+  }
+  Sha256 hash;
+  hash.update(data, size);
+  *digest = hex_digest(hash.finish());
   return Status::ok();
 }
 
