@@ -16,6 +16,8 @@ latest chapter covers [GGUF parameter conversion](docs/22-gguf-conversion.md),
 including folded decay, RMSNorm scales, squeezed shapes, and GDN head order.
 The following [typed-weight chapter](docs/23-typed-model-weights.md) explains how
 all 851 admitted ranges become safe global and per-layer fields.
+The [packed-projection chapter](docs/24-packed-projections.md) then fixes the
+different GDN and attention slicing rules used by scalar execution.
 
 ## Build
 

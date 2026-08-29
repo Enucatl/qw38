@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "semantic_authority": {
+    "repository": "https://github.com/huggingface/transformers.git",
+    "revision": "42ca97014c85d71a88ad60d55f08cb9fb4d26e2c",
+    "path": "src/transformers/models/qwen3_5/modeling_qwen3_5.py",
+    "sha256": "1d538599c80b3d2986911f269fe091d936c6e64a65188e7705d1290b7f403245",
+    "license": "Apache-2.0"
+  },
+  "gguf_converter": {
+    "repository": "https://github.com/ggml-org/llama.cpp.git",
+    "revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+    "path": "conversion/qwen.py",
+    "sha256": "3e3ea6be268c65915f8f5b8419edc15c291f0adf374b97216f436191d23456b4"
+  },
+  "gdn": {
+    "packed_values": 10240,
+    "ranges": {
+      "query": [0, 2048],
+      "key": [2048, 4096],
+      "value": [4096, 10240]
+    },
+    "runtime_note": "split after width-4 causal convolution; GGUF value segment is tiled and then converted to grouped semantic order"
+  },
+  "attention": {
+    "packed_values": 12288,
+    "shape": [24, 2, 256],
+    "per_head": {
+      "query_lanes": [0, 256],
+      "gate_lanes": [256, 512]
+    }
+  }
+}

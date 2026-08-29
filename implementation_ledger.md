@@ -28,9 +28,10 @@ are repository-relative unless stated otherwise.
 | CPU-006 | Bind admitted tensor rows and implement mixed-format scalar matvec | CPU-001, CPU-005, MDL-001 | done | GGUF dimension order, row bounds/bytes, F32/Q8_0/Q4_K/Q6_K dots, malformed views, synthetic matrices, and admitted artifact rows pass | [`src/tensor.cpp`](src/tensor.cpp); [`fixtures/tensor_rows.json`](fixtures/tensor_rows.json); [`tests/test_tensor.py`](tests/test_tensor.py); log 2026-08-29T13:28:00Z |
 | CPU-007 | Implement pinned GGUF-to-semantic parameter and GDN head-layout transforms | CPU-002, CPU-006, PIN-002 | done | Folded A, RMSNorm convention, squeezed convolution, grouped/tiled head permutations, round trips, and admitted parameter fixtures pass | [`src/conversion.cpp`](src/conversion.cpp); [`pins/gguf_conversion_contract.json`](pins/gguf_conversion_contract.json); [`fixtures/gguf_conversion.json`](fixtures/gguf_conversion.json); [`tests/test_conversion.py`](tests/test_conversion.py); log 2026-08-29T17:29:00Z |
 | CPU-008 | Bind every admitted global and layer tensor into typed scalar weight structures | CPU-006, CPU-007, MDL-002 | done | All 851 tensors bind by exact name, layer kind, shape, dtype, and mapped range; missing, swapped, or incompatible roles fail closed | [`src/weights.cpp`](src/weights.cpp); [`src/tensor.cpp`](src/tensor.cpp); [`tests/test_weights.py`](tests/test_weights.py); log 2026-08-29T17:36:00Z |
+| CPU-009 | Implement exact packed GDN QKV and attention query/gate projection slicing | CPU-003, CPU-007, CPU-008 | done | GDN contiguous Q/K/V ranges, per-head attention query/gate halves, output counts, alias rejection, and frozen layout fixtures pass | [`src/projection.cpp`](src/projection.cpp); [`pins/projection_layout_contract.json`](pins/projection_layout_contract.json); [`tests/test_projection.py`](tests/test_projection.py); log 2026-08-29T17:40:00Z |
 | CPU-002 | Implement scalar GDN oracle | CPU-001, MDL-002 | done | Warm-up, recurrence, state, head mapping, and chunk-boundary fixtures pass | [`src/gdn.cpp`](src/gdn.cpp); [`fixtures/gdn_authority.json`](fixtures/gdn_authority.json); [`tests/test_gdn.py`](tests/test_gdn.py); log 2026-08-29T12:26:00Z |
 | CPU-003 | Implement scalar attention and FFN oracle | CPU-001, MDL-002 | done | Layers 3/7/63, partial RoPE, grouped KV, causality, and FFN taps pass | [`src/attention.cpp`](src/attention.cpp); [`fixtures/attention_ffn_authority.json`](fixtures/attention_ffn_authority.json); [`tests/test_attention.py`](tests/test_attention.py); log 2026-08-29T12:54:00Z |
-| CPU-004 | Implement full scalar 64-layer scheduler and logits | CPU-002, CPU-003, CPU-005, CPU-006, CPU-007, CPU-008 | pending | Token/chunk execution and logits match semantic-authority fixtures | — |
+| CPU-004 | Implement full scalar 64-layer scheduler and logits | CPU-002, CPU-003, CPU-005, CPU-006, CPU-007, CPU-008, CPU-009 | pending | Token/chunk execution and logits match semantic-authority fixtures | — |
 | TRC-001 | Define versioned trace bundle and typed comparison metrics | PIN-002 | pending | Manifest/blob schema, checksums, summaries, session frontiers, and metric reporter pass tests | — |
 | TRC-002 | Add diagnostic-only stable scalar/CUDA taps | TRC-001, CPU-004 | pending | Required taps filter by layer/name and are absent from release builds | — |
 | ORA-001 | Generate and freeze scalar/oracle fixtures and tolerances | TOK-002, CPU-004, TRC-002 | pending | Three authorities are attributed; tolerances and greedy tie exceptions are immutable inputs | — |
@@ -69,6 +70,7 @@ are repository-relative unless stated otherwise.
 | EDU-007 | Explain GGUF tensor dimensions, row orientation, and matvec for beginners | CPU-006, DOC-001 | done | Shape order, fastest dimension, rows/outputs, block alignment, mixed formats, bounds, synthetic/admitted fixtures, and scheduler use are code-linked and worked | [`docs/21-tensor-rows.md`](docs/21-tensor-rows.md); [`tests/test_tensor.py`](tests/test_tensor.py); log 2026-08-29T13:28:00Z |
 | EDU-008 | Explain converter-owned parameter folding and GDN head reordering for beginners | CPU-007, DOC-001 | done | Source vs GGUF semantics, folded exponent, norm weight convention, squeeze, grouped/tiled indices, affected tensors, inverse transforms, and checkpoint ownership are code-linked and worked | [`docs/22-gguf-conversion.md`](docs/22-gguf-conversion.md); [`tests/test_conversion.py`](tests/test_conversion.py); log 2026-08-29T17:29:00Z |
 | EDU-009 | Explain typed model weights and complete layer binding for beginners | CPU-008, DOC-001 | done | Views versus ownership, vectors/matrices, common and variant layer fields, exact-name/schema admission, counts, and scheduler boundary are code-linked and worked | [`docs/23-typed-model-weights.md`](docs/23-typed-model-weights.md); [`tests/test_weights.py`](tests/test_weights.py); log 2026-08-29T17:36:00Z |
+| EDU-010 | Explain packed projection layouts and slicing for beginners | CPU-009, DOC-001 | done | Packing purpose, GDN contiguous segments, attention per-head halves, physical versus semantic order, aliasing, and downstream conversion are code-linked and worked | [`docs/24-packed-projections.md`](docs/24-packed-projections.md); [`tests/test_projection.py`](tests/test_projection.py); log 2026-08-29T17:40:00Z |
 | REL-001 | Publish reproducible release evidence bundle | CMP-003, QLT-001, DOC-001 | pending | Builds, hashes, raw results, reports, and documentation claims reconcile | — |
 
 ## Delivery-Gate Mapping
@@ -821,6 +823,48 @@ are repository-relative unless stated otherwise.
   behavior, corrupted metadata cases, preserved fixture error, beginner
   documentation, evidence labels, and clean host/container verification before
   committing.
+
+### 2026-08-29T17:39:00Z — Typed weights pushed; CPU-009 started
+
+- Commit `30204e1` (`feat: bind typed model weights`) was pushed to `origin/main`
+  successfully after all recorded acceptance gates; the worktree was clean.
+- Added CPU-009 before implementation and made it a CPU-004 dependency. The GDN
+  packed projection uses three global contiguous channel ranges, while the
+  attention query/gate projection stores two contiguous 256-lane halves inside
+  each of 24 heads. Treating both 12,288/10,240-value outputs with one generic
+  “split in half” rule would silently mix heads or roles.
+- Added EDU-010 so packing, slicing, per-head layout, alias restrictions, and the
+  subsequent tiled-to-grouped GDN conversion are taught at the code boundary.
+
+### 2026-08-29T17:40:00Z — CPU-009 and EDU-010 accepted
+
+- Pinned the exact Transformers semantic source and llama.cpp converter hashes
+  with production GDN ranges and attention `[24, 2, 256]` layout.
+- Implemented checked GDN splitting into global contiguous Q/K/V ranges and
+  attention splitting into query/gate halves inside each query head. Count
+  arithmetic detects overflow, and packed/output or output/output byte-range
+  aliases fail before copying.
+- Frozen asymmetric examples prove GDN `Q|K|V` segmentation and per-head
+  attention deinterleaving. A short packed input and an aliased output both
+  return explicit errors.
+- Added a beginner chapter explaining projections, packing, slice notation,
+  both layouts with worked values, convolution-before-GDN-split ordering,
+  tiled-to-grouped V conversion after the split, gate activation ownership,
+  count validation, aliases, and the remaining real-projection proof boundary.
+- Commands: Ruff format/check, clean restricted C++17 build, 46 pytest tests,
+  `git diff --check`, pinned CUDA 13.0.2 full build, SM120 compilation, and RTX
+  5090 probe — passed. Probe values were 33,671,348,224 total and
+  33,139,458,048 free bytes.
+- Marked CPU-009 and EDU-010 done. Real typed projections, activation/state
+  workspaces, complete layer execution, residuals, final norm, and logits remain
+  CPU-004.
+
+### 2026-08-29T17:40:30Z — Packed-layout commit boundary
+
+- Reviewed source identities, production and synthetic layouts, checked count
+  and address arithmetic, alias behavior, downstream conversion ownership,
+  diagnostic fixtures, beginner documentation, and clean host/container
+  verification before committing.
 
 ## Decisions and Negative Results
 

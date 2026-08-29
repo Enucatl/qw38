@@ -71,6 +71,12 @@ DSpark are explicitly rejected as Qwen model semantics.
   fields. [`src/weights.cpp`](../src/weights.cpp) deliberately repeats the exact
   scheduler-facing schema and binds only non-owning mapped views; this increment
   introduces no new external implementation dependency.
+- The pinned Transformers Qwen3.5 source and llama.cpp Qwen converter jointly
+  define CPU-009's packed projection boundary: semantic Q/K/V and per-head
+  query/gate slices come from Transformers, while the post-slice GGUF value-head
+  order comes from the converter. Their existing hashes and the exact production
+  ranges are collected in
+  [`pins/projection_layout_contract.json`](../pins/projection_layout_contract.json).
 
 ## Specialization and hardware references
 

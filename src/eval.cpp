@@ -16,6 +16,7 @@
 #include "conversion.h"
 #include "gdn.h"
 #include "model.h"
+#include "projection.h"
 #include "quant.h"
 #include "sha256.h"
 #include "template.h"
@@ -394,6 +395,70 @@ int check_weight_binding(const char* model_path, const std::string& mode) {
   write_float_vector("final_norm_endpoints_f32_le_hex",
                      {final_norm.front(), final_norm.back()});
   return 0;
+}
+
+int check_projection_layout(const std::string& component) {
+  if (component == "gdn") {
+    constexpr std::array<float, 12> kPacked{0.0F,  1.0F,  2.0F,  3.0F,
+                                            10.0F, 11.0F, 12.0F, 13.0F,
+                                            20.0F, 21.0F, 22.0F, 23.0F};
+    std::array<float, 4> query{};
+    std::array<float, 4> key{};
+    std::array<float, 4> value{};
+    const qw38::Status status = qw38::internal::split_gdn_qkv(
+        kPacked.data(), kPacked.size(), 2, 2, 2, 2, query.data(), query.size(),
+        key.data(), key.size(), value.data(), value.size());
+    if (!status.is_ok()) {
+      std::cerr << qw38::status_code_name(status.code()) << ": "
+                << status.message() << '\n';
+      return 1;
+    }
+    write_float_array("query_f32_le_hex", query);
+    write_float_array("key_f32_le_hex", key);
+    write_float_array("value_f32_le_hex", value);
+    return 0;
+  }
+  if (component == "attention") {
+    constexpr std::array<float, 12> kPacked{
+        0.0F, 1.0F, 10.0F, 11.0F, 100.0F, 101.0F,
+        110.0F, 111.0F, 200.0F, 201.0F, 210.0F, 211.0F};
+    std::array<float, 6> query{};
+    std::array<float, 6> gate{};
+    const qw38::Status status = qw38::internal::split_attention_query_gate(
+        kPacked.data(), kPacked.size(), 3, 2, query.data(), query.size(),
+        gate.data(), gate.size());
+    if (!status.is_ok()) {
+      std::cerr << qw38::status_code_name(status.code()) << ": "
+                << status.message() << '\n';
+      return 1;
+    }
+    write_float_array("query_f32_le_hex", query);
+    write_float_array("gate_f32_le_hex", gate);
+    return 0;
+  }
+  if (component == "invalid_alias") {
+    std::array<float, 4> packed{};
+    std::array<float, 2> gate{};
+    const qw38::Status status = qw38::internal::split_attention_query_gate(
+        packed.data(), packed.size(), 1, 2, packed.data(), 2, gate.data(),
+        gate.size());
+    std::cerr << qw38::status_code_name(status.code()) << ": "
+              << status.message() << '\n';
+    return status.is_ok() ? 0 : 1;
+  }
+  if (component == "invalid_count") {
+    std::array<float, 4> packed{};
+    std::array<float, 2> query{};
+    std::array<float, 2> gate{};
+    const qw38::Status status = qw38::internal::split_attention_query_gate(
+        packed.data(), packed.size() - 1, 1, 2, query.data(), query.size(),
+        gate.data(), gate.size());
+    std::cerr << qw38::status_code_name(status.code()) << ": "
+              << status.message() << '\n';
+    return status.is_ok() ? 0 : 1;
+  }
+  std::cerr << "invalid_argument: unknown projection-layout component\n";
+  return 1;
 }
 
 float fixture_query(std::size_t token, std::size_t head, std::size_t lane) {
@@ -993,6 +1058,9 @@ int main(int argc, char** argv) {
   if (argc == 4 && std::string(argv[1]) == "--check-weight-binding") {
     return check_weight_binding(argv[2], argv[3]);
   }
+  if (argc == 3 && std::string(argv[1]) == "--check-projection-layout") {
+    return check_projection_layout(argv[2]);
+  }
   if (argc == 3 && std::string(argv[1]) == "--check-attention") {
     return check_attention(std::atoi(argv[2]));
   }
@@ -1013,6 +1081,7 @@ int main(int argc, char** argv) {
                "--check-gdn COMPONENT CHUNKING, --check-attention LAYER, or "
                "--check-conversion COMPONENT, "
                "--check-weight-binding MODEL MODE, "
+               "--check-projection-layout COMPONENT, "
                "--check-ffn LAYER, --check-matvec KIND COLUMNS ROWS PAYLOAD "
                "ACTIVATION, or --check-tensor-row MODEL NAME ROW\n";
   return 2;
