@@ -32,9 +32,10 @@ are repository-relative unless stated otherwise.
 | CPU-010 | Execute typed real-artifact GDN and attention mixer projections with exact scalar workspaces | CPU-006, CPU-008, CPU-009 | done | Deterministic activation drives complete layer-0/layer-3 mixer projections; packed and split taps match independently decoded admitted rows and workspace guards fail closed | [`src/mixer.cpp`](src/mixer.cpp); [`fixtures/mixer_projections.json`](fixtures/mixer_projections.json); [`tests/test_mixer.py`](tests/test_mixer.py); log 2026-08-29T18:20:00Z |
 | CPU-011 | Execute one complete real layer-0 GDN mixer update and residual | CPU-002, CPU-007, CPU-010 | done | GGUF-scale input norm, real projections, convolution ring, grouped recurrence, gated norm, output projection, residual, state taps, and malformed workspaces pass frozen evidence | [`src/mixer.cpp`](src/mixer.cpp); [`fixtures/real_gdn_step.json`](fixtures/real_gdn_step.json); [`tests/test_real_gdn.py`](tests/test_real_gdn.py); log 2026-08-29T18:33:00Z |
 | CPU-012 | Execute one complete real Q4_K SwiGLU FFN branch and residual | CPU-003, CPU-008, CPU-011 | done | Direct-scale FFN norm, complete gate/up/down projections, SwiGLU taps, exact workspace, residual addition, and malformed workspace behavior pass frozen evidence | [`src/mixer.cpp`](src/mixer.cpp); [`fixtures/real_ffn_step.json`](fixtures/real_ffn_step.json); [`tests/test_real_ffn.py`](tests/test_real_ffn.py); log 2026-08-29T18:46:07Z |
+| CPU-013 | Execute real layer-3 grouped-query attention steps, KV mutation, output projection, and residual | CPU-003, CPU-008, CPU-009, CPU-010 | done | Direct-scale norms, packed projection split, partial RoPE, two-position grouped causal attention, KV state, output gate/projection, residual, capacity, and malformed buffers pass frozen evidence | [`src/mixer.cpp`](src/mixer.cpp); [`fixtures/real_attention_step.json`](fixtures/real_attention_step.json); [`tests/test_real_attention.py`](tests/test_real_attention.py); log 2026-08-29T18:54:26Z |
 | CPU-002 | Implement scalar GDN oracle | CPU-001, MDL-002 | done | Warm-up, recurrence, state, head mapping, and chunk-boundary fixtures pass | [`src/gdn.cpp`](src/gdn.cpp); [`fixtures/gdn_authority.json`](fixtures/gdn_authority.json); [`tests/test_gdn.py`](tests/test_gdn.py); log 2026-08-29T12:26:00Z |
 | CPU-003 | Implement scalar attention and FFN oracle | CPU-001, MDL-002 | done | Layers 3/7/63, partial RoPE, grouped KV, causality, and FFN taps pass | [`src/attention.cpp`](src/attention.cpp); [`fixtures/attention_ffn_authority.json`](fixtures/attention_ffn_authority.json); [`tests/test_attention.py`](tests/test_attention.py); log 2026-08-29T12:54:00Z |
-| CPU-004 | Implement full scalar 64-layer scheduler and logits | CPU-002, CPU-003, CPU-005, CPU-006, CPU-007, CPU-008, CPU-009, CPU-010, CPU-011, CPU-012 | pending | Token/chunk execution and logits match semantic-authority fixtures | — |
+| CPU-004 | Implement full scalar 64-layer scheduler and logits | CPU-002, CPU-003, CPU-005, CPU-006, CPU-007, CPU-008, CPU-009, CPU-010, CPU-011, CPU-012, CPU-013 | pending | Token/chunk execution and logits match semantic-authority fixtures | — |
 | TRC-001 | Define versioned trace bundle and typed comparison metrics | PIN-002 | pending | Manifest/blob schema, checksums, summaries, session frontiers, and metric reporter pass tests | — |
 | TRC-002 | Add diagnostic-only stable scalar/CUDA taps | TRC-001, CPU-004 | pending | Required taps filter by layer/name and are absent from release builds | — |
 | ORA-001 | Generate and freeze scalar/oracle fixtures and tolerances | TOK-002, CPU-004, TRC-002 | pending | Three authorities are attributed; tolerances and greedy tie exceptions are immutable inputs | — |
@@ -77,6 +78,7 @@ are repository-relative unless stated otherwise.
 | EDU-011 | Explain real scalar projection execution and workspaces for beginners | CPU-010, DOC-001 | done | Activations, projection rows, typed views, packed/split workspace sizes, selected-tap evidence, cost, and remaining layer boundary are code-linked and worked | [`docs/25-real-mixer-projections.md`](docs/25-real-mixer-projections.md); [`tests/test_mixer.py`](tests/test_mixer.py); log 2026-08-29T18:20:00Z |
 | EDU-012 | Explain a complete real GDN mixer layer update for beginners | CPU-011, DOC-001 | done | Input norm, convolution state, physical/semantic head order, recurrence state, gated norm, output projection, residual, atomicity boundary, and evidence taps are code-linked and worked | [`docs/26-real-gdn-layer.md`](docs/26-real-gdn-layer.md); [`tests/test_real_gdn.py`](tests/test_real_gdn.py); log 2026-08-29T18:33:00Z |
 | EDU-013 | Explain a complete real SwiGLU FFN branch for beginners | CPU-012, DOC-001 | done | Post-mixer norm, gate/up/down roles, SiLU and elementwise product, intermediate width, Q4_K cost, workspace, residual, evidence limits, and layer boundary are code-linked and worked | [`docs/27-real-ffn-layer.md`](docs/27-real-ffn-layer.md); [`tests/test_real_ffn.py`](tests/test_real_ffn.py); log 2026-08-29T18:46:07Z |
+| EDU-014 | Explain real grouped-query attention and KV mutation for beginners | CPU-013, DOC-001 | done | Query/key/value, head normalization, partial RoPE, grouped head mapping, causal scores/softmax, KV ownership, output gate/projection, residual, and atomicity are code-linked and worked | [`docs/28-real-attention-layer.md`](docs/28-real-attention-layer.md); [`tests/test_real_attention.py`](tests/test_real_attention.py); log 2026-08-29T18:54:26Z |
 | REL-001 | Publish reproducible release evidence bundle | CMP-003, QLT-001, DOC-001 | pending | Builds, hashes, raw results, reports, and documentation claims reconcile | — |
 
 ## Delivery-Gate Mapping
@@ -1040,6 +1042,76 @@ are repository-relative unless stated otherwise.
   reproducibility, finite full-path execution, documentation claims and labels,
   preserved compile failure, and clean host/container verification before
   committing.
+
+### 2026-08-29T18:47:14Z — Real FFN pushed; CPU-013 started
+
+- Commit `3db3f0a` (`feat: execute real SwiGLU FFN`) was pushed to `origin/main`
+  successfully and the worktree was clean.
+- Added CPU-013 before implementation and made it a CPU-004 dependency. The
+  existing attention oracle proves the equation with synthetic tensors, while
+  CPU-010 stops after real layer-3 Q/gate/K/V projection. The new boundary must
+  compose direct-scale input/query/key norms, partial RoPE, two sequential KV
+  appends, six-query-head grouping, causal softmax, sigmoid output gating, the
+  Q6_K output projection, and residual addition through admitted typed views.
+- Two positions are required because position zero alone makes RoPE an identity
+  and causal softmax a single value. Capacity and malformed-buffer failures must
+  be tested before persistent KV mutation; session-level rollback after later
+  failures remains SES-002 work.
+- Added EDU-014 so KV ownership, query-to-KV grouping, position-dependent RoPE,
+  causal lookup, softmax, output gating, projection, residual, and the atomicity
+  boundary are explained alongside the implementation.
+
+### 2026-08-29T18:54:26Z — CPU-013 and EDU-014 accepted
+
+- Added a direct-scale form of the retained scalar attention primitive so real
+  converted GGUF query/key norm scales are not treated as source-checkpoint
+  offsets. The original offset-form synthetic oracle and its fixtures remain
+  unchanged and passing.
+- Implemented prepared layer-3 input/query/key norm parameters and two real
+  attention steps through input normalization, Q8_0 packed Q/gate/K/V
+  projections, head-local split, per-head direct RMSNorm, 64-of-256 partial
+  RoPE, grouped causal attention, sigmoid output gate, Q6_K output projection,
+  and FP32 residual addition.
+- The two-position FP32 state contains 4,096 KV values. Exact preflight checks
+  cover pointer/count contracts, cache-size multiplication overflow, position
+  capacity, score scratch, and output sizes before persistent KV mutation.
+- An independent mapped-GGUF transcription matches exact FP32 taps for token-one
+  normalization and raw Q/gate, both positions' rotated-normalized K and raw V,
+  and two-position gated attention. Taps cover RoPE lanes 31/32/63/64, query
+  heads 5/6 around the first six-to-one group boundary, and the final head 23;
+  selected physical rows are bound by SHA-256.
+- The full Q6_K output projection executes natively with finite buffers and
+  selected output lanes obey exact token-one FP32 residual addition. Its complete
+  semantic trace remains explicit TRC/ORA work rather than being promoted from
+  a native self-check.
+- Malformed attention-output storage and a position equal to capacity both fail
+  before KV or final output changes. A hypothetical failure after the admitted
+  KV append remains the explicit SES-002 transactional-staging boundary.
+- Added a beginner chapter explaining Q/K/V, heads and lanes, direct norms,
+  partial RoPE pairs, KV ownership and 8 GiB production arithmetic, GQA mapping,
+  causal scoring, stable softmax, output gates, projection/residual, workspace,
+  evidence, and atomicity. Updated the handbook index, root reading path, and
+  source ledger.
+- The independent generator completed in 4.49 s with 28,800 KiB maximum RSS;
+  the two-token native diagnostic completed in 0.35 s with 127,520 KiB maximum
+  RSS. Projection dimension arithmetic is 104,857,600 scalar weight products
+  per token; explicit two-position workspace is 43,010 FP32 values.
+- Commands: Ruff format/check, fixture generation and JSON validation, focused
+  9-test attention suite, clean restricted C++17 build, 61 pytest tests,
+  `git diff --check`, pinned CUDA 13.0.2 full build, SM120 compilation, and RTX
+  5090 probe — passed. Probe values were 33,671,348,224 total and
+  33,139,458,048 free bytes.
+- Marked CPU-013 and EDU-014 done. Full-layer composition, multiple real hybrid
+  layers, embedding/final norm/logits, and direct trace admission remain
+  CPU-004/TRC/ORA work.
+
+### 2026-08-29T18:55:00Z — Real-attention commit boundary
+
+- Reviewed source-offset versus converted direct-scale norm ownership, exact
+  production shapes, partial-RoPE lanes, GQA boundaries, causal FP32 arithmetic,
+  KV mutation order, overflow/count validation, physical-row hashes, output and
+  residual proof limits, beginner documentation, and clean host/container
+  verification before committing.
 
 ## Decisions and Negative Results
 

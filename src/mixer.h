@@ -19,6 +19,7 @@ constexpr std::size_t kGdnHeadWidth = 128;
 constexpr std::size_t kAttentionPackedQueryGateWidth = 12288;
 constexpr std::size_t kAttentionQueryWidth = 6144;
 constexpr std::size_t kAttentionKvWidth = 1024;
+constexpr std::size_t kAttentionHeadWidth = 256;
 constexpr std::size_t kFfnWidth = 17408;
 
 struct GdnProjectionWorkspace final {
@@ -116,6 +117,35 @@ struct FfnStepWorkspace final {
   std::size_t correction_count;
 };
 
+struct AttentionScalarParameters final {
+  float* input_norm;
+  std::size_t input_norm_count;
+  float* query_norm;
+  std::size_t query_norm_count;
+  float* key_norm;
+  std::size_t key_norm_count;
+};
+
+struct AttentionLayerStateView final {
+  float* key_cache;
+  std::size_t key_cache_count;
+  float* value_cache;
+  std::size_t value_cache_count;
+  std::size_t capacity;
+};
+
+struct AttentionStepWorkspace final {
+  float* normalized;
+  std::size_t normalized_count;
+  AttentionProjectionWorkspace projections;
+  float* attention_output;
+  std::size_t attention_output_count;
+  float* scores;
+  std::size_t score_count;
+  float* mixer_output;
+  std::size_t mixer_output_count;
+};
+
 Status project_gdn_mixer(const GdnLayerWeights& weights,
                          const float* activation,
                          std::size_t activation_count,
@@ -144,6 +174,17 @@ Status execute_ffn_step(
     const CommonLayerWeights& weights, const FfnScalarParameters& parameters,
     const float* residual, std::size_t residual_count,
     const FfnStepWorkspace& workspace, float* output,
+    std::size_t output_count) noexcept;
+
+Status prepare_attention_scalar_parameters(
+    const LayerWeights& weights,
+    const AttentionScalarParameters& parameters) noexcept;
+
+Status execute_attention_mixer_step(
+    const LayerWeights& weights, const AttentionScalarParameters& parameters,
+    std::size_t position, const float* residual, std::size_t residual_count,
+    const AttentionLayerStateView& state,
+    const AttentionStepWorkspace& workspace, float* output,
     std::size_t output_count) noexcept;
 
 }  // namespace qw38::internal

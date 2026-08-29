@@ -26,6 +26,9 @@ through normalization, both persistent states, gated output, and residual.
 The [real FFN chapter](docs/27-real-ffn-layer.md) then explains the complete
 layer-0 SwiGLU branch, including its three Q4_K projections, temporary memory,
 numeric evidence, and remaining scheduler boundary.
+The [real attention chapter](docs/28-real-attention-layer.md) follows two
+layer-3 positions through partial RoPE, grouped causal lookup, KV mutation,
+output gating, projection, and residual.
 
 ## Build
 

@@ -94,6 +94,12 @@ DSpark are explicitly rejected as Qwen model semantics.
   [`fixtures/real_ffn_step.json`](../fixtures/real_ffn_step.json). The complete
   down projection is currently native regression evidence; direct semantic
   trace admission remains TRC-001, TRC-002, and ORA-001 work.
+- CPU-013 composes the same pinned Transformers attention contract with the
+  typed layer-3 Q8_0/Q6_K GGUF views and packed projection rules. The independent
+  two-position transcription and exact selected physical-row hashes are frozen
+  in [`fixtures/real_attention_step.json`](../fixtures/real_attention_step.json).
+  Its full output projection remains native regression evidence pending direct
+  TRC-001/TRC-002/ORA-001 trace admission.
 
 ## Specialization and hardware references
 

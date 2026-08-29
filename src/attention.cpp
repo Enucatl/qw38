@@ -89,14 +89,17 @@ Status rms_norm_scale(const float* input, const float* scale,
   return rms_norm_impl(input, scale, count, false, output);
 }
 
-Status attention_decode_step(
+namespace {
+
+Status attention_decode_step_impl(
     const AttentionShape& shape, std::size_t position, const float* query,
     std::size_t query_count, const float* key, std::size_t key_count,
     const float* value, std::size_t value_count, const float* query_norm_weight,
     const float* key_norm_weight, const float* output_gate,
     std::size_t gate_count, float* key_cache, std::size_t key_cache_count,
     float* value_cache, std::size_t value_cache_count, float* score_workspace,
-    std::size_t score_count, float* output, std::size_t output_count) noexcept {
+    std::size_t score_count, float* output, std::size_t output_count,
+    bool norm_weight_is_offset) noexcept {
   if (shape.query_heads == 0 || shape.kv_heads == 0 ||
       shape.head_width == 0 || shape.capacity == 0 ||
       shape.query_heads > kMaximumQueryHeads ||
@@ -131,17 +134,19 @@ Status attention_decode_step(
   std::array<float, kMaximumQueryHeads * kMaximumHeadWidth> normalized_query{};
   std::array<float, kMaximumKvHeads * kMaximumHeadWidth> normalized_key{};
   for (std::size_t head = 0; head < shape.query_heads; ++head) {
-    Status status = rms_norm(query + head * shape.head_width,
-                             query_norm_weight, shape.head_width,
-                             normalized_query.data() + head * shape.head_width);
+    Status status = rms_norm_impl(
+        query + head * shape.head_width, query_norm_weight, shape.head_width,
+        norm_weight_is_offset,
+        normalized_query.data() + head * shape.head_width);
     if (!status.is_ok()) return status;
     rotate_partial(normalized_query.data() + head * shape.head_width,
                    shape.rotary_width, position);
   }
   for (std::size_t head = 0; head < shape.kv_heads; ++head) {
-    Status status = rms_norm(key + head * shape.head_width, key_norm_weight,
-                             shape.head_width,
-                             normalized_key.data() + head * shape.head_width);
+    Status status = rms_norm_impl(
+        key + head * shape.head_width, key_norm_weight, shape.head_width,
+        norm_weight_is_offset,
+        normalized_key.data() + head * shape.head_width);
     if (!status.is_ok()) return status;
     rotate_partial(normalized_key.data() + head * shape.head_width,
                    shape.rotary_width, position);
@@ -190,6 +195,38 @@ Status attention_decode_step(
     }
   }
   return Status::ok();
+}
+
+}  // namespace
+
+Status attention_decode_step(
+    const AttentionShape& shape, std::size_t position, const float* query,
+    std::size_t query_count, const float* key, std::size_t key_count,
+    const float* value, std::size_t value_count, const float* query_norm_weight,
+    const float* key_norm_weight, const float* output_gate,
+    std::size_t gate_count, float* key_cache, std::size_t key_cache_count,
+    float* value_cache, std::size_t value_cache_count, float* score_workspace,
+    std::size_t score_count, float* output, std::size_t output_count) noexcept {
+  return attention_decode_step_impl(
+      shape, position, query, query_count, key, key_count, value, value_count,
+      query_norm_weight, key_norm_weight, output_gate, gate_count, key_cache,
+      key_cache_count, value_cache, value_cache_count, score_workspace,
+      score_count, output, output_count, true);
+}
+
+Status attention_decode_step_scale(
+    const AttentionShape& shape, std::size_t position, const float* query,
+    std::size_t query_count, const float* key, std::size_t key_count,
+    const float* value, std::size_t value_count, const float* query_norm_scale,
+    const float* key_norm_scale, const float* output_gate,
+    std::size_t gate_count, float* key_cache, std::size_t key_cache_count,
+    float* value_cache, std::size_t value_cache_count, float* score_workspace,
+    std::size_t score_count, float* output, std::size_t output_count) noexcept {
+  return attention_decode_step_impl(
+      shape, position, query, query_count, key, key_count, value, value_count,
+      query_norm_scale, key_norm_scale, output_gate, gate_count, key_cache,
+      key_cache_count, value_cache, value_cache_count, score_workspace,
+      score_count, output, output_count, false);
 }
 
 Status swiglu_ffn(

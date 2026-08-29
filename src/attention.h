@@ -30,6 +30,15 @@ Status attention_decode_step(
     float* value_cache, std::size_t value_cache_count, float* score_workspace,
     std::size_t score_count, float* output, std::size_t output_count) noexcept;
 
+Status attention_decode_step_scale(
+    const AttentionShape& shape, std::size_t position, const float* query,
+    std::size_t query_count, const float* key, std::size_t key_count,
+    const float* value, std::size_t value_count, const float* query_norm_scale,
+    const float* key_norm_scale, const float* output_gate,
+    std::size_t gate_count, float* key_cache, std::size_t key_cache_count,
+    float* value_cache, std::size_t value_cache_count, float* score_workspace,
+    std::size_t score_count, float* output, std::size_t output_count) noexcept;
+
 Status swiglu_ffn(
     const float* input, std::size_t hidden_width,
     const float* gate_weights, const float* up_weights,

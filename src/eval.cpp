@@ -810,6 +810,161 @@ int check_real_ffn_step(const char* model_path, const std::string& mode) {
   return 0;
 }
 
+int check_real_attention_step(const char* model_path, const std::string& mode) {
+  qw38::internal::ModelInfo info;
+  qw38::Status status = qw38::internal::inspect_gguf(model_path, &info);
+  if (status.is_ok()) status = qw38::internal::validate_qwen38_contract(&info);
+  qw38::internal::MappedFile mapping;
+  if (status.is_ok()) status = mapping.open(model_path);
+  qw38::internal::ModelWeights weights;
+  if (status.is_ok()) {
+    status = qw38::internal::bind_model_weights(info, mapping, &weights);
+  }
+  if (!status.is_ok()) {
+    std::cerr << qw38::status_code_name(status.code()) << ": "
+              << status.message() << '\n';
+    return 1;
+  }
+
+  constexpr std::size_t kCapacity = 2;
+  std::vector<float> input_norm(qw38::internal::kResidualWidth);
+  std::vector<float> query_norm(qw38::internal::kAttentionHeadWidth);
+  std::vector<float> key_norm(qw38::internal::kAttentionHeadWidth);
+  const qw38::internal::AttentionScalarParameters parameters{
+      input_norm.data(), input_norm.size(), query_norm.data(),
+      query_norm.size(), key_norm.data(), key_norm.size()};
+  status = qw38::internal::prepare_attention_scalar_parameters(
+      weights.layers[3], parameters);
+  if (!status.is_ok()) {
+    std::cerr << qw38::status_code_name(status.code()) << ": "
+              << status.message() << '\n';
+    return 1;
+  }
+
+  std::vector<float> normalized(qw38::internal::kResidualWidth, NAN);
+  std::vector<float> packed_query_gate(
+      qw38::internal::kAttentionPackedQueryGateWidth, NAN);
+  std::vector<float> query(qw38::internal::kAttentionQueryWidth, NAN);
+  std::vector<float> gate(qw38::internal::kAttentionQueryWidth, NAN);
+  std::vector<float> key(qw38::internal::kAttentionKvWidth, NAN);
+  std::vector<float> value(qw38::internal::kAttentionKvWidth, NAN);
+  std::vector<float> attention_output(qw38::internal::kAttentionQueryWidth,
+                                      NAN);
+  std::vector<float> scores(kCapacity, NAN);
+  std::vector<float> mixer_output(qw38::internal::kResidualWidth, NAN);
+  std::vector<float> key_cache(kCapacity * qw38::internal::kAttentionKvWidth,
+                               NAN);
+  std::vector<float> value_cache(
+      kCapacity * qw38::internal::kAttentionKvWidth, NAN);
+  std::vector<float> output(qw38::internal::kResidualWidth, NAN);
+  std::vector<float> first_output(qw38::internal::kResidualWidth, NAN);
+  qw38::internal::AttentionStepWorkspace workspace{
+      normalized.data(),
+      normalized.size(),
+      {packed_query_gate.data(), packed_query_gate.size(), query.data(),
+       query.size(), gate.data(), gate.size(), key.data(), key.size(),
+       value.data(), value.size()},
+      attention_output.data(),
+      attention_output.size(),
+      scores.data(),
+      scores.size(),
+      mixer_output.data(),
+      mixer_output.size()};
+  const qw38::internal::AttentionLayerStateView state{
+      key_cache.data(), key_cache.size(), value_cache.data(),
+      value_cache.size(), kCapacity};
+  if (mode == "invalid_workspace") --workspace.attention_output_count;
+  if (mode != "valid" && mode != "invalid_workspace" &&
+      mode != "capacity") {
+    std::cerr << "invalid_argument: unknown real-attention-step mode\n";
+    return 1;
+  }
+
+  const auto fill_residual = [](std::vector<float>* residual,
+                                std::size_t token) {
+    for (std::size_t index = 0; index < residual->size(); ++index) {
+      (*residual)[index] = static_cast<float>(
+                               static_cast<int>((index * 37 + token * 17) %
+                                                101) -
+                               50) /
+                           32.0F;
+    }
+  };
+  std::vector<float> residual(qw38::internal::kResidualWidth);
+  fill_residual(&residual, 0);
+  const std::size_t first_position = mode == "capacity" ? kCapacity : 0;
+  status = qw38::internal::execute_attention_mixer_step(
+      weights.layers[3], parameters, first_position, residual.data(),
+      residual.size(), state, workspace, output.data(), output.size());
+  if (!status.is_ok()) {
+    const bool state_unchanged =
+        std::all_of(key_cache.begin(), key_cache.end(),
+                    [](float item) { return std::isnan(item); }) &&
+        std::all_of(value_cache.begin(), value_cache.end(),
+                    [](float item) { return std::isnan(item); });
+    const bool output_untouched = std::all_of(
+        output.begin(), output.end(),
+        [](float item) { return std::isnan(item); });
+    std::cout << "state_unchanged=" << (state_unchanged ? 1 : 0) << '\n';
+    std::cout << "output_untouched=" << (output_untouched ? 1 : 0) << '\n';
+    std::cerr << qw38::status_code_name(status.code()) << ": "
+              << status.message() << '\n';
+    return 1;
+  }
+  first_output = output;
+  fill_residual(&residual, 1);
+  status = qw38::internal::execute_attention_mixer_step(
+      weights.layers[3], parameters, 1, residual.data(), residual.size(), state,
+      workspace, output.data(), output.size());
+  if (!status.is_ok()) {
+    std::cerr << qw38::status_code_name(status.code()) << ": "
+              << status.message() << '\n';
+    return 1;
+  }
+  const auto finite = [](const std::vector<float>& values) {
+    return std::all_of(values.begin(), values.end(),
+                       [](float item) { return std::isfinite(item); });
+  };
+  if (!finite(normalized) || !finite(packed_query_gate) || !finite(query) ||
+      !finite(gate) || !finite(key) || !finite(value) ||
+      !finite(attention_output) || !finite(mixer_output) ||
+      !finite(key_cache) || !finite(value_cache) || !finite(first_output) ||
+      !finite(output)) {
+    std::cerr << "internal: attention left a nonfinite value\n";
+    return 1;
+  }
+  const auto taps = [](const std::vector<float>& values,
+                       std::initializer_list<std::size_t> indices) {
+    std::vector<float> selected;
+    selected.reserve(indices.size());
+    for (std::size_t index : indices) selected.push_back(values[index]);
+    return selected;
+  };
+  const std::initializer_list<std::size_t> kResidualTaps{0, 1, 2559, 5119};
+  const std::initializer_list<std::size_t> kHeadTaps{
+      0, 63, 64, 255, 5 * 256, 6 * 256, 23 * 256 + 255};
+  const std::initializer_list<std::size_t> kCacheTaps{
+      0, 31, 32, 63, 64, 255, 256, 511,
+      1024, 1024 + 31, 1024 + 32, 1024 + 63, 1024 + 64, 1024 + 255,
+      1024 + 256, 1024 + 511};
+  write_float_vector("normalized_f32_le_hex",
+                     taps(normalized, kResidualTaps));
+  write_float_vector("query_f32_le_hex", taps(query, kHeadTaps));
+  write_float_vector("gate_f32_le_hex", taps(gate, kHeadTaps));
+  write_float_vector("key_cache_f32_le_hex", taps(key_cache, kCacheTaps));
+  write_float_vector("value_cache_f32_le_hex", taps(value_cache, kCacheTaps));
+  write_float_vector("attention_output_f32_le_hex",
+                     taps(attention_output, kHeadTaps));
+  write_float_vector("first_output_f32_le_hex",
+                     taps(first_output, kResidualTaps));
+  write_float_vector("mixer_output_f32_le_hex",
+                     taps(mixer_output, kResidualTaps));
+  write_float_vector("residual_output_f32_le_hex",
+                     taps(output, kResidualTaps));
+  std::cout << "kv_values=" << key_cache.size() + value_cache.size() << '\n';
+  return 0;
+}
+
 float fixture_query(std::size_t token, std::size_t head, std::size_t lane) {
   const int numerator =
       static_cast<int>((token * 11 + head * 7 + lane * 3) % 19) - 9;
@@ -1419,6 +1574,9 @@ int main(int argc, char** argv) {
   if (argc == 4 && std::string(argv[1]) == "--check-real-ffn-step") {
     return check_real_ffn_step(argv[2], argv[3]);
   }
+  if (argc == 4 && std::string(argv[1]) == "--check-real-attention-step") {
+    return check_real_attention_step(argv[2], argv[3]);
+  }
   if (argc == 3 && std::string(argv[1]) == "--check-attention") {
     return check_attention(std::atoi(argv[2]));
   }
@@ -1443,6 +1601,7 @@ int main(int argc, char** argv) {
                "--check-mixer-projections MODEL MODE, "
                "--check-real-gdn-step MODEL MODE, "
                "--check-real-ffn-step MODEL MODE, "
+               "--check-real-attention-step MODEL MODE, "
                "--check-ffn LAYER, --check-matvec KIND COLUMNS ROWS PAYLOAD "
                "ACTIVATION, or --check-tensor-row MODEL NAME ROW\n";
   return 2;

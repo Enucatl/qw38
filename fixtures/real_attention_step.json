@@ -1,0 +1,166 @@
+{
+  "schema_version": 1,
+  "model_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+  "authority": "pinned Transformers grouped eager attention plus independently decoded GGUF rows",
+  "tolerances": {
+    "absolute": 3e-06,
+    "relative": 3e-05,
+    "rms": 1e-06
+  },
+  "head_taps": [
+    [
+      0,
+      0
+    ],
+    [
+      0,
+      63
+    ],
+    [
+      0,
+      64
+    ],
+    [
+      0,
+      255
+    ],
+    [
+      5,
+      0
+    ],
+    [
+      6,
+      0
+    ],
+    [
+      23,
+      255
+    ]
+  ],
+  "cache_taps": [
+    [
+      0,
+      0,
+      0
+    ],
+    [
+      0,
+      0,
+      31
+    ],
+    [
+      0,
+      0,
+      32
+    ],
+    [
+      0,
+      0,
+      63
+    ],
+    [
+      0,
+      0,
+      64
+    ],
+    [
+      0,
+      0,
+      255
+    ],
+    [
+      0,
+      1,
+      0
+    ],
+    [
+      0,
+      1,
+      255
+    ],
+    [
+      1,
+      0,
+      0
+    ],
+    [
+      1,
+      0,
+      31
+    ],
+    [
+      1,
+      0,
+      32
+    ],
+    [
+      1,
+      0,
+      63
+    ],
+    [
+      1,
+      0,
+      64
+    ],
+    [
+      1,
+      0,
+      255
+    ],
+    [
+      1,
+      1,
+      0
+    ],
+    [
+      1,
+      1,
+      255
+    ]
+  ],
+  "normalized_f32_le_hex": "0c0fabbfefa72e3ea1010a3f933350be",
+  "query_f32_le_hex": "5833e6bf7481f3bd199b22bf5ed80640d86f813ec51c503e6fc6583f",
+  "gate_f32_le_hex": "87ea20c079e4bbbd616301c0dd0f6bbf561317c0bbca2c40dde7c33f",
+  "key_cache_f32_le_hex": "984d0ac07506ab3f9e945c3f40be02bfbf340d3f945fc03e5a84e9bd36d1173f8f3b00bee495653fc4fec23eabf6c3bd9ac1c13f78dca4bdd3c4a43f0c3aa83e",
+  "value_cache_f32_le_hex": "396a2940225066bf339bb9bf05f98440208a74bc1caf81bf6729c8bf042476bf1bfe6b3e6dc0e4bf064bd7bfbc64fc3f5456a7bffe2a853fba2cd33f659089bf",
+  "attention_output_f32_le_hex": "6818243e0ecfe13f38e408bd76452abe54bc593e24bfa9bfa95a1040",
+  "row_sha256": {
+    "blk.3.attn_q.weight": {
+      "0": "8939c762dd0a89da2fda2a60c74457adb6cf4573e3e8b6de928e1d76b7f82162",
+      "256": "4f3e4bcee5214529031ac5ddc28288cee69c87f1ec48a93cb68876ae11d10d63",
+      "63": "c334aea6e920b412bee4385e0445d8588bbdd85868940ea45f7a9c2f8b28185e",
+      "319": "f54c367cd80107a6171a5fc42842388d95acde9b48a7e763cd4cf820496114ea",
+      "64": "98cd2dfa13470bbd496074917faed3a616641d4406f73bfbd9fb01b694a753b4",
+      "320": "e22c70a65f4946a8fc0322bcb03bf67867a6f24febfd4fa938b49016706a5ed9",
+      "255": "ff71ec3a6b73c50bc7681226ebc980c22509cc417093d79aefdebf3835c6c6d4",
+      "511": "9831a1284110de194e944c83ca5fd416ddc9e7c59cbdd8333fb83a33d06c28b6",
+      "2560": "2e0fd4f2216168fde4df633e8598bdbd3f8228b2f4cee05f5f4b492c2208ea89",
+      "2816": "ea7938916e558286718809098876b2bd92add3eb1ee8cdac1214c63106c137e9",
+      "3072": "a308ec30a8e1d95937cba5fc1ec459fc58ec5df7b5e413598e42a0289ebf158b",
+      "3328": "429ba0db28c789ee82fd9d0f16a74d74c63669763170e831bcb9891f82fe5af9",
+      "12031": "ac13fb8d7792866ba7f0466a0651f618f55fd8b6fcb6d95f74dc793e361bd1b0",
+      "12287": "944cab2ffec8d0da989000ba50251767f4a1cfdb3c4fbf1c6d57542e0ba4a7e3"
+    },
+    "blk.3.attn_k.weight": {
+      "0": "3a6f578b8308b78565b5c7e9a5335fb056418262a8e8db073855f2867010dfe9",
+      "31": "75f3b68bbd22a109b0376bd4fb8df5fe44782dd366b2e459c199cf9dc2b7b155",
+      "32": "158ea59f1d63e4b28f7c278e478c38c08415ae5c592478c4e20c4edf485edb45",
+      "63": "e0861cfe9c213677010d594ca924d78f5dd36cb8adcd82a458329100182bbd4d",
+      "64": "ca36ce334d50788cac0e2b9033dd3d8706e5309d4223803741391ad564bd2175",
+      "255": "919e8a32343484996f36c3a067d54abaa17be573091661f9918df058101031de",
+      "256": "e7b4bb20a4b389db0797fc7df7091d5ddf3228d2e577515c10dde58fd466a4e9",
+      "511": "6c1873005b04727f31d27b12e48c377fef941ccefa44022b40182d80e2bed954"
+    },
+    "blk.3.attn_v.weight": {
+      "0": "c9fa4979bffd2f42c9a6ac5e24b5bc042aef63703a931cf04b17ddbf65a437a3",
+      "31": "680f21669da3cb2db29ee301f9d4c74c7044b37b1f1e5b782ddb8f2fce23f877",
+      "32": "b5ef7b0c8a92e7f127247e6afbfc5a7b668887b78473adc83b4b10d0f533c279",
+      "63": "df073588c60bafd9bed931f4c24ec2b6b26427065da9c49f691f6092c073e1f9",
+      "64": "9fad5b020e6d20655ea58a45d75436bde866beb387c951ed3c99bb19b944e461",
+      "255": "a4418af5062c30dd49a94753159de90d02136c55604602a2890673ac8d477e7d",
+      "256": "7e5b9bf6a93264bc7a1c7cd90f840675041d4c83a4fd41ea46ae32ea258e02ee",
+      "511": "aa2e316e69f1ecb23e3449648c6ac85f6628f53eb1194c54643f94230d73ccfc"
+    }
+  }
+}

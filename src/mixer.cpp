@@ -1,6 +1,7 @@
 #include "mixer.h"
 
 #include <cmath>
+#include <limits>
 
 #include "attention.h"
 #include "conversion.h"
@@ -321,6 +322,101 @@ Status execute_ffn_step(
   if (!status.is_ok()) return status;
   for (std::size_t index = 0; index < output_count; ++index) {
     output[index] = residual[index] + workspace.correction[index];
+  }
+  return Status::ok();
+}
+
+Status prepare_attention_scalar_parameters(
+    const LayerWeights& weights,
+    const AttentionScalarParameters& parameters) noexcept {
+  if (weights.kind != LayerKind::kAttention ||
+      parameters.input_norm == nullptr ||
+      parameters.input_norm_count != kResidualWidth ||
+      parameters.query_norm == nullptr ||
+      parameters.query_norm_count != kAttentionHeadWidth ||
+      parameters.key_norm == nullptr ||
+      parameters.key_norm_count != kAttentionHeadWidth) {
+    return {StatusCode::kInvalidArgument,
+            "attention scalar parameter buffers are invalid"};
+  }
+  Status status = vector_decode(weights.common.input_norm,
+                                parameters.input_norm,
+                                parameters.input_norm_count);
+  if (status.is_ok()) {
+    status = vector_decode(weights.attention.query_norm,
+                           parameters.query_norm,
+                           parameters.query_norm_count);
+  }
+  if (status.is_ok()) {
+    status = vector_decode(weights.attention.key_norm, parameters.key_norm,
+                           parameters.key_norm_count);
+  }
+  return status;
+}
+
+Status execute_attention_mixer_step(
+    const LayerWeights& weights, const AttentionScalarParameters& parameters,
+    std::size_t position, const float* residual, std::size_t residual_count,
+    const AttentionLayerStateView& state,
+    const AttentionStepWorkspace& workspace, float* output,
+    std::size_t output_count) noexcept {
+  if (state.capacity >
+      std::numeric_limits<std::size_t>::max() / kAttentionKvWidth) {
+    return {StatusCode::kInvalidArgument,
+            "attention step capacity overflows its cache size"};
+  }
+  const std::size_t cache_count = state.capacity * kAttentionKvWidth;
+  if (weights.kind != LayerKind::kAttention ||
+      parameters.input_norm == nullptr ||
+      parameters.input_norm_count != kResidualWidth ||
+      parameters.query_norm == nullptr ||
+      parameters.query_norm_count != kAttentionHeadWidth ||
+      parameters.key_norm == nullptr ||
+      parameters.key_norm_count != kAttentionHeadWidth || residual == nullptr ||
+      residual_count != kResidualWidth || state.capacity == 0 ||
+      position >= state.capacity || state.key_cache == nullptr ||
+      state.key_cache_count != cache_count || state.value_cache == nullptr ||
+      state.value_cache_count != cache_count || workspace.normalized == nullptr ||
+      workspace.normalized_count != kResidualWidth ||
+      workspace.attention_output == nullptr ||
+      workspace.attention_output_count != kAttentionQueryWidth ||
+      workspace.scores == nullptr || workspace.score_count < state.capacity ||
+      workspace.mixer_output == nullptr ||
+      workspace.mixer_output_count != kResidualWidth || output == nullptr ||
+      output_count != kResidualWidth) {
+    return {StatusCode::kInvalidArgument,
+            "attention step parameters, state, or workspace are invalid"};
+  }
+  Status status = rms_norm_scale(residual, parameters.input_norm,
+                                 residual_count, workspace.normalized);
+  if (status.is_ok()) {
+    status = project_attention_mixer(
+        weights.attention, workspace.normalized, workspace.normalized_count,
+        workspace.projections);
+  }
+  if (status.is_ok()) {
+    const AttentionShape shape{24, 4, kAttentionHeadWidth, 64, state.capacity};
+    status = attention_decode_step_scale(
+        shape, position, workspace.projections.query,
+        workspace.projections.query_count, workspace.projections.key,
+        workspace.projections.key_count, workspace.projections.value,
+        workspace.projections.value_count, parameters.query_norm,
+        parameters.key_norm, workspace.projections.gate,
+        workspace.projections.gate_count, state.key_cache,
+        state.key_cache_count, state.value_cache, state.value_cache_count,
+        workspace.scores, workspace.score_count, workspace.attention_output,
+        workspace.attention_output_count);
+  }
+  if (status.is_ok()) {
+    status = tensor_matvec(weights.attention.output,
+                           workspace.attention_output,
+                           workspace.attention_output_count,
+                           workspace.mixer_output,
+                           workspace.mixer_output_count);
+  }
+  if (!status.is_ok()) return status;
+  for (std::size_t index = 0; index < output_count; ++index) {
+    output[index] = residual[index] + workspace.mixer_output[index];
   }
   return Status::ok();
 }
