@@ -71,6 +71,13 @@
       "observed_main_revision": "8db89fe083ae4d17c9a2428ccd29803d3ae8f577",
       "license": "MIT",
       "role": "attributed implementation patterns only"
+    },
+    "utf8proc": {
+      "repository": "https://github.com/JuliaStrings/utf8proc.git",
+      "revision": "d7bf128df773c2a1a7242eb80e51e91a769fc985",
+      "tag": "v2.11.0",
+      "license": "MIT with Unicode data notice",
+      "role": "NFC normalization and Unicode general categories for TOK-001"
     }
   },
   "containers": {

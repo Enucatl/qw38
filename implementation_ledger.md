@@ -263,6 +263,29 @@ are repository-relative unless stated otherwise.
   dependency lock, and code-linked handbook note before commit.
 - Runtime tokenizer assets remain ignored and will not be committed.
 
+### 2026-08-29T10:44:00Z — Tokenizer oracle pushed; Unicode dependency decision
+
+- Commit `0312cba` (`test: pin tokenizer authority fixtures`) created after a
+  clean restricted build, Ruff, 9 pytest tests, and production contract check,
+  then pushed to `origin/main` successfully.
+- TOK-001 requires full NFC normalization and Unicode general categories for the
+  pinned pre-tokenization expression. An ASCII approximation is rejected because
+  it would invalidate the frozen NFD, multilingual, combining-mark, and emoji
+  cases.
+- Selected a pinned utf8proc submodule for NFC/category primitives under its MIT
+  license. Quartz will retain local control of Qwen-specific splitting, GPT-2
+  byte mapping, special-token handling, and BPE; no generic tokenizer backend is
+  introduced. Exact revision and license evidence must be recorded before use.
+
+### 2026-08-29T10:45:00Z — Unicode primitive pinned
+
+- Added utf8proc `v2.11.0` at commit
+  `d7bf128df773c2a1a7242eb80e51e91a769fc985` as a git submodule.
+- Inspected and retained its MIT license and Unicode data notice. Recorded the
+  exact revision, role, and narrow usage boundary in the artifact/source ledgers.
+- This dependency pin does not complete TOK-001; native splitting, byte mapping,
+  BPE, special tokens, and fixture equality remain to implement.
+
 ## Decisions and Negative Results
 
 - **2026-08-29 / BLD-002:** Host `nvcc` is absent. Resolved for reproducibility

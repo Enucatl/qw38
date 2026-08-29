@@ -29,6 +29,14 @@ capture. These are **source-verified patterns**, not Qwen support or 5090 result
 DeepSeek compressed attention, sparse indexer, MoE expert streaming, mHC, and
 DSpark are explicitly rejected as Qwen model semantics.
 
+## Focused implementation dependencies
+
+- [utf8proc](https://github.com/JuliaStrings/utf8proc) is pinned as a submodule
+  at `d7bf128df773c2a1a7242eb80e51e91a769fc985` (`v2.11.0`). Quartz uses only its
+  NFC normalization and Unicode general-category primitives for TOK-001. Its MIT
+  license and Unicode data notice are retained in the submodule. Qwen-specific
+  splitting, byte mapping, special-token handling, and BPE remain local code.
+
 ## Specialization and hardware references
 
 - [q27](https://github.com/signalnine/q27): attributed Qwen-on-5090 case study.
