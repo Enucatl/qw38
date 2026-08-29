@@ -6,6 +6,7 @@
 
 #include "model.h"
 #include "sha256.h"
+#include "tokenizer.h"
 
 namespace qw38 {
 namespace {
@@ -25,6 +26,7 @@ struct Engine::Impl final {
   std::string model_path;
   internal::ModelInfo model;
   internal::MappedFile mapping;
+  internal::Tokenizer tokenizer;
 };
 
 struct Session::Impl final {};
@@ -73,6 +75,10 @@ Status Engine::open(const std::string& model_path, Engine* engine) noexcept {
   }
   impl->model_path = model_path;
   impl->model = std::move(model);
+  status = impl->tokenizer.build(impl->model);
+  if (!status.is_ok()) {
+    return status;
+  }
   *engine = Engine(std::move(impl));
   return Status::ok();
 }

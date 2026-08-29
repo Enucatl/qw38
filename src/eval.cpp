@@ -9,6 +9,7 @@
 #include "qw38/engine.h"
 #include "model.h"
 #include "sha256.h"
+#include "tokenizer.h"
 
 namespace {
 constexpr const char* kBrand =
@@ -94,6 +95,49 @@ int write_inventory(const char* model_path, const char* output_path) {
   std::cout << "inventory=" << output_path << '\n';
   return 0;
 }
+
+int hex_value(char character) {
+  if (character >= '0' && character <= '9') return character - '0';
+  if (character >= 'a' && character <= 'f') return character - 'a' + 10;
+  if (character >= 'A' && character <= 'F') return character - 'A' + 10;
+  return -1;
+}
+
+int tokenize_hex(const char* model_path, const std::string& hex) {
+  if (hex.size() % 2 != 0) {
+    std::cerr << "invalid_argument: input hex has odd length\n";
+    return 1;
+  }
+  std::string input;
+  input.reserve(hex.size() / 2);
+  for (std::size_t index = 0; index < hex.size(); index += 2) {
+    const int high = hex_value(hex[index]);
+    const int low = hex_value(hex[index + 1]);
+    if (high < 0 || low < 0) {
+      std::cerr << "invalid_argument: input is not hexadecimal\n";
+      return 1;
+    }
+    input.push_back(static_cast<char>((high << 4) | low));
+  }
+  qw38::internal::ModelInfo info;
+  qw38::Status status = qw38::internal::inspect_gguf(model_path, &info);
+  if (status.is_ok()) status = qw38::internal::validate_qwen38_contract(&info);
+  qw38::internal::Tokenizer tokenizer;
+  if (status.is_ok()) status = tokenizer.build(info);
+  std::vector<std::uint32_t> ids;
+  if (status.is_ok()) status = tokenizer.encode(input, &ids);
+  if (!status.is_ok()) {
+    std::cerr << qw38::status_code_name(status.code()) << ": "
+              << status.message() << '\n';
+    return 1;
+  }
+  for (std::size_t index = 0; index < ids.size(); ++index) {
+    if (index != 0) std::cout << ',';
+    std::cout << ids[index];
+  }
+  std::cout << '\n';
+  return 0;
+}
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -167,9 +211,12 @@ int main(int argc, char** argv) {
   if (argc == 4 && std::string(argv[1]) == "--inventory-gguf") {
     return write_inventory(argv[2], argv[3]);
   }
+  if (argc == 4 && std::string(argv[1]) == "--tokenize-hex") {
+    return tokenize_hex(argv[2], argv[3]);
+  }
   std::cout << kBrand << '\n';
   std::cerr << "qw38-eval: use --build-info, --inspect-gguf PATH, --sha256 PATH, "
                "--verify-model PATH, --check-contract PATH, or "
-               "--inventory-gguf PATH OUTPUT\n";
+               "--inventory-gguf PATH OUTPUT, or --tokenize-hex PATH HEX\n";
   return 2;
 }

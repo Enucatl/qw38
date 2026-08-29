@@ -148,3 +148,18 @@ def test_tokenizer_authority_fixtures_are_pinned() -> None:
         bytes.fromhex(case["utf8_hex"]).decode("utf-8") is not None
         for case in fixtures["cases"]
     )
+
+
+def test_beginner_tokenizer_documentation_covers_every_stage() -> None:
+    handbook = (ROOT / "docs" / "15-tokenizer-authority.md").read_text()
+    for concept in (
+        "bytes, characters, and tokens",
+        "NFC normalization",
+        "Unicode-aware splitting",
+        "GPT-2 byte mapping",
+        "byte-pair encoding (BPE)",
+        "Special tokens",
+        "Fixtures and fixture equality",
+        "Worked real example",
+    ):
+        assert concept in handbook

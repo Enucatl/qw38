@@ -21,7 +21,7 @@ are repository-relative unless stated otherwise.
 | API-001 | Implement explicit `Status` and move-only Engine/Session boundary | BLD-001 | done | Public header compiles without exceptions/RTTI and exposes the approved operations | [`include/qw38/engine.h`](include/qw38/engine.h), build log 2026-08-29T09:52:00Z |
 | MDL-001 | Parse, mmap, inventory, and fail-closed validate GGUF | PIN-001, API-001 | done | Exact tensor metadata/ranges/roles are checked; malformed fixtures pass pytest | [`pins/tensor_inventory.json`](pins/tensor_inventory.json), [`src/model.cpp`](src/model.cpp); log 2026-08-29T10:35:51Z |
 | MDL-002 | Validate official 64-layer hybrid model contract | MDL-001 | done | 48 GDN/16 attention schedule, width, GQA, partial RoPE, and dtypes match authority | [`pins/model_contract.json`](pins/model_contract.json), [`docs/14-artifact-validation.md`](docs/14-artifact-validation.md); log 2026-08-29T10:35:51Z |
-| TOK-001 | Implement pinned tokenizer | MDL-001, PIN-002 | in_progress | Token IDs match frozen authority fixtures byte-for-byte | — |
+| TOK-001 | Implement pinned tokenizer | MDL-001, PIN-002 | done | Token IDs match frozen authority fixtures byte-for-byte | [`src/tokenizer.cpp`](src/tokenizer.cpp), [`fixtures/tokenizer_authority.json`](fixtures/tokenizer_authority.json); log 2026-08-29T11:02:00Z |
 | TOK-002 | Implement chat/reasoning/tool template | TOK-001 | pending | All supported roles, reasoning, tool calls/results, and rejection cases match fixtures | — |
 | CPU-001 | Implement Q4_K/Q6_K scalar decoding and dot products | MDL-001 | pending | Numeric fixtures meet frozen metrics and exact structural checks | — |
 | CPU-002 | Implement scalar GDN oracle | CPU-001, MDL-002 | pending | Warm-up, recurrence, state, head mapping, and chunk-boundary fixtures pass | — |
@@ -56,6 +56,7 @@ are repository-relative unless stated otherwise.
 | CMP-002 | Run controlled 30-sample comparative matrix | BEN-001, OPT-004, CMP-001 | pending | All contexts/metrics/environment data and negative runs are retained | — |
 | CMP-003 | Pass prefill/decode statistical speed gates | CMP-002 | pending | Paired bootstrap lower bounds exceed 1.05 and no workload is >5% slower | — |
 | DOC-001 | Maintain code-linked handbook and provenance ledger | BLD-001 | pending | Each implemented concept has claim labels, invariants, failures, task IDs, and evidence | — |
+| EDU-001 | Explain tokenizer concepts for readers with no prior background | TOK-001, DOC-001 | done | NFC, Unicode splitting, byte mapping, BPE, fixtures, and equality gates have worked examples linked to code/evidence | [`docs/15-tokenizer-authority.md`](docs/15-tokenizer-authority.md); tests; log 2026-08-29T11:02:00Z |
 | REL-001 | Publish reproducible release evidence bundle | CMP-003, QLT-001, DOC-001 | pending | Builds, hashes, raw results, reports, and documentation claims reconcile | — |
 
 ## Delivery-Gate Mapping
@@ -286,6 +287,55 @@ are repository-relative unless stated otherwise.
 - This dependency pin does not complete TOK-001; native splitting, byte mapping,
   BPE, special tokens, and fixture equality remain to implement.
 
+### 2026-08-29T10:53:18Z — Beginner documentation gap recorded
+
+- User review identified that the tokenizer authority note names NFC
+  normalization, Unicode splitting, GPT-2 byte mapping, BPE, and fixture equality
+  without explaining them to a reader with no tokenizer background.
+- Added EDU-001 before corrective work. It affects TOK-001 and DOC-001: native
+  tokenizer code cannot be admitted until the handbook explains each stage with
+  concrete bytes/tokens, invariants, failure modes, and evidence links.
+
+### 2026-08-29T10:57:00Z — First native tokenizer comparison (negative result)
+
+- Implemented the initial native NFC, Unicode-category split, GPT-2 byte map,
+  special-token matcher, and ranked BPE path using the GGUF vocabulary/merges.
+- First comparison matched 10 of 12 authority cases. `spaces` and `code` failed:
+  native IDs were `[256,20028,262,19055,256,371,13868,256]` instead of
+  `[220,6187,256,5956,220,26849,256]`, and the indented code boundary emitted
+  `[257,671]` instead of `[262,460]`.
+- Diagnosis: the `\s+(?!\S)` regex alternative backtracks before a following
+  non-space, leaving the final ASCII space for the next word's optional prefix.
+  The first implementation consumed the whole whitespace run. Added the exact
+  backtracking rule; follow-up remains TOK-001 fixture equality.
+
+### 2026-08-29T11:02:00Z — TOK-001 and EDU-001 accepted
+
+- Corrected whitespace lookahead behavior. All 12 frozen authority cases now
+  match exact native token IDs, including NFC/NFD, multilingual text, emoji,
+  whitespace/indentation, CR/LF, contractions, and special markers.
+- Ran 100 additional seeded randomized differential cases over ASCII, combining
+  marks, CJK, Arabic, Indic, emoji/ZWJ, punctuation, and whitespace: zero ID
+  differences against the pinned authority.
+- Added invalid UTF-8 rejection and an integration pytest that exercises every
+  authority fixture when the ignored production GGUF is installed.
+- Integrated tokenizer construction into successful `Engine::open`; an Engine
+  cannot exist with invalid vocabulary, merges, byte map, or special-token data.
+- Expanded the tokenizer handbook from an evidence note into a beginner chapter:
+  bytes/code points/tokens, NFC, ordered Unicode splitting, GPT-2 byte symbols,
+  ranked BPE, special tokens, a real byte-to-ID example, fixture equality, and
+  failure modes are explained and linked to code/evidence.
+- Clean host build, Ruff, 12 pytest tests, pinned CUDA 13.0.2 container build,
+  SM120 device probe, and full production `Engine::open` all passed. Full open
+  with tokenizer construction took 58.077s.
+- Marked TOK-001 and EDU-001 done. TOK-002 chat rendering remains separate.
+
+### 2026-08-29T11:03:00Z — Native tokenizer commit boundary
+
+- Reviewed native/tokenizer dependency code, oracle fixtures, randomized result,
+  tests, beginner documentation, negative result, and final environment evidence
+  before the requested commit and push.
+
 ## Decisions and Negative Results
 
 - **2026-08-29 / BLD-002:** Host `nvcc` is absent. Resolved for reproducibility
@@ -299,3 +349,6 @@ are repository-relative unless stated otherwise.
   optimization, and comparative performance have no implementation evidence and
   remain pending. Product stubs exit nonzero so their presence cannot be mistaken
   for delivery.
+- **2026-08-29 / TOK-001:** Initial native compilation failed because the C++
+  include path omitted the pinned utf8proc directory. Added the explicit include
+  path to the restricted Makefile; clean host and container builds then passed.
