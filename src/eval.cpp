@@ -9,6 +9,7 @@
 #include "qw38/engine.h"
 #include "model.h"
 #include "sha256.h"
+#include "template.h"
 #include "tokenizer.h"
 
 namespace {
@@ -138,6 +139,63 @@ int tokenize_hex(const char* model_path, const std::string& hex) {
   std::cout << '\n';
   return 0;
 }
+
+int render_template_case(const std::string& name) {
+  using qw38::internal::Message;
+  using qw38::internal::MessageRole;
+  qw38::internal::TemplateInput input;
+  if (name == "user_no_thinking") {
+    input.messages = {{MessageRole::kUser, "Hello"}};
+    input.options.enable_thinking = false;
+  } else if (name == "user_default_xhigh") {
+    input.messages = {{MessageRole::kUser, "Explain quartz."}};
+  } else if (name == "system_low") {
+    input.messages = {{MessageRole::kSystem, "Be concise."},
+                      {MessageRole::kUser, "Why a watch?"}};
+    input.options.reasoning_effort = "low";
+  } else if (name == "assistant_history") {
+    Message assistant{MessageRole::kAssistant, "4"};
+    assistant.reasoning_content = "Two plus two is four.";
+    input.messages = {{MessageRole::kUser, "2+2?"}, assistant,
+                      {MessageRole::kUser, "And plus 3?"}};
+    input.options.enable_thinking = false;
+  } else if (name == "tools_and_result") {
+    Message assistant{MessageRole::kAssistant, ""};
+    assistant.reasoning_content = "I should check.";
+    assistant.tool_calls = {
+        {"weather", {{"city", "Bern"}, {"unit", "C"}}}};
+    input.messages = {{MessageRole::kUser, "Weather in Bern?"}, assistant,
+                      {MessageRole::kTool, "{\"temperature\":18}"}};
+    input.canonical_tool_json = {
+        R"({"function": {"description": "Get current weather", "name": "weather", "parameters": {"properties": {"city": {"type": "string"}}, "required": ["city"], "type": "object"}}, "type": "function"})"};
+  } else if (name == "no_messages") {
+  } else if (name == "late_system") {
+    input.messages = {{MessageRole::kUser, "Hi"},
+                      {MessageRole::kSystem, "Too late"}};
+  } else if (name == "invalid_reasoning_effort") {
+    input.messages = {{MessageRole::kUser, "Hi"}};
+    input.options.reasoning_effort = "maximum";
+  } else if (name == "image_rejected_in_v1") {
+    Message message{MessageRole::kUser, ""};
+    message.has_unsupported_content = true;
+    input.messages = {message};
+  } else if (name == "leading_developer_mapped_to_system") {
+    input.messages = {{MessageRole::kDeveloper, "Follow API policy."},
+                      {MessageRole::kUser, "Hi"}};
+    input.options.enable_thinking = false;
+  } else {
+    std::cerr << "unknown template fixture\n";
+    return 2;
+  }
+  std::string rendered;
+  const qw38::Status status = qw38::internal::render_chat(input, &rendered);
+  if (!status.is_ok()) {
+    std::cerr << status.message() << '\n';
+    return 1;
+  }
+  std::cout << rendered;
+  return 0;
+}
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -214,9 +272,13 @@ int main(int argc, char** argv) {
   if (argc == 4 && std::string(argv[1]) == "--tokenize-hex") {
     return tokenize_hex(argv[2], argv[3]);
   }
+  if (argc == 3 && std::string(argv[1]) == "--render-template-case") {
+    return render_template_case(argv[2]);
+  }
   std::cout << kBrand << '\n';
   std::cerr << "qw38-eval: use --build-info, --inspect-gguf PATH, --sha256 PATH, "
                "--verify-model PATH, --check-contract PATH, or "
-               "--inventory-gguf PATH OUTPUT, or --tokenize-hex PATH HEX\n";
+               "--inventory-gguf PATH OUTPUT, --tokenize-hex PATH HEX, or "
+               "--render-template-case NAME\n";
   return 2;
 }

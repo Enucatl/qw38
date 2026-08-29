@@ -40,3 +40,23 @@ def test_native_tokenizer_rejects_invalid_utf8() -> None:
     )
     assert result.returncode == 1
     assert "invalid_argument: invalid UTF-8" in result.stderr
+
+
+@pytest.mark.skipif(not MODEL.exists(), reason="pinned runtime GGUF is not installed")
+def test_rendered_templates_have_exact_authority_token_ids() -> None:
+    fixtures = json.loads((ROOT / "fixtures" / "template_authority.json").read_text())
+    for case in fixtures["successes"] + fixtures["policy_successes"]:
+        result = subprocess.run(
+            [
+                str(EVAL),
+                "--tokenize-hex",
+                str(MODEL),
+                case["rendered_utf8_hex"],
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        actual = [int(value) for value in result.stdout.strip().split(",")]
+        assert result.returncode == 0, f"{case['name']}: {result.stderr}"
+        assert actual == case["ids"], case["name"]

@@ -22,7 +22,7 @@ are repository-relative unless stated otherwise.
 | MDL-001 | Parse, mmap, inventory, and fail-closed validate GGUF | PIN-001, API-001 | done | Exact tensor metadata/ranges/roles are checked; malformed fixtures pass pytest | [`pins/tensor_inventory.json`](pins/tensor_inventory.json), [`src/model.cpp`](src/model.cpp); log 2026-08-29T10:35:51Z |
 | MDL-002 | Validate official 64-layer hybrid model contract | MDL-001 | done | 48 GDN/16 attention schedule, width, GQA, partial RoPE, and dtypes match authority | [`pins/model_contract.json`](pins/model_contract.json), [`docs/14-artifact-validation.md`](docs/14-artifact-validation.md); log 2026-08-29T10:35:51Z |
 | TOK-001 | Implement pinned tokenizer | MDL-001, PIN-002 | done | Token IDs match frozen authority fixtures byte-for-byte | [`src/tokenizer.cpp`](src/tokenizer.cpp), [`fixtures/tokenizer_authority.json`](fixtures/tokenizer_authority.json); log 2026-08-29T11:02:00Z |
-| TOK-002 | Implement chat/reasoning/tool template | TOK-001 | pending | All supported roles, reasoning, tool calls/results, and rejection cases match fixtures | — |
+| TOK-002 | Implement chat/reasoning/tool template | TOK-001 | done | All supported roles, reasoning, tool calls/results, and rejection cases match fixtures | [`src/template.cpp`](src/template.cpp), [`fixtures/template_authority.json`](fixtures/template_authority.json); log 2026-08-29T11:39:57Z |
 | CPU-001 | Implement Q4_K/Q6_K scalar decoding and dot products | MDL-001 | pending | Numeric fixtures meet frozen metrics and exact structural checks | — |
 | CPU-002 | Implement scalar GDN oracle | CPU-001, MDL-002 | pending | Warm-up, recurrence, state, head mapping, and chunk-boundary fixtures pass | — |
 | CPU-003 | Implement scalar attention and FFN oracle | CPU-001, MDL-002 | pending | Layers 3/7/63, partial RoPE, grouped KV, causality, and FFN taps pass | — |
@@ -57,6 +57,7 @@ are repository-relative unless stated otherwise.
 | CMP-003 | Pass prefill/decode statistical speed gates | CMP-002 | pending | Paired bootstrap lower bounds exceed 1.05 and no workload is >5% slower | — |
 | DOC-001 | Maintain code-linked handbook and provenance ledger | BLD-001 | pending | Each implemented concept has claim labels, invariants, failures, task IDs, and evidence | — |
 | EDU-001 | Explain tokenizer concepts for readers with no prior background | TOK-001, DOC-001 | done | NFC, Unicode splitting, byte mapping, BPE, fixtures, and equality gates have worked examples linked to code/evidence | [`docs/15-tokenizer-authority.md`](docs/15-tokenizer-authority.md); tests; log 2026-08-29T11:02:00Z |
+| EDU-002 | Explain chat-template concepts and policy ownership for beginners | TOK-002, DOC-001 | done | Roles, delimiters, reasoning, tools, results, mapping, and byte-equality gates have worked examples linked to code/evidence | [`docs/16-chat-template.md`](docs/16-chat-template.md); tests; log 2026-08-29T11:39:57Z |
 | REL-001 | Publish reproducible release evidence bundle | CMP-003, QLT-001, DOC-001 | pending | Builds, hashes, raw results, reports, and documentation claims reconcile | — |
 
 ## Delivery-Gate Mapping
@@ -335,6 +336,64 @@ are repository-relative unless stated otherwise.
 - Reviewed native/tokenizer dependency code, oracle fixtures, randomized result,
   tests, beginner documentation, negative result, and final environment evidence
   before the requested commit and push.
+
+### 2026-08-29T11:04:00Z — Native tokenizer pushed; TOK-002 started
+
+- Commit `93efe69` (`feat: implement exact native tokenizer`) created after Ruff
+  and 12 pytest tests passed, then pushed to `origin/main` successfully.
+- Began TOK-002 by freezing the official text-template behavior before writing a
+  native renderer. Roles, reasoning modes, tools, continuations, and rejection
+  behavior stay within the v1 text boundary.
+
+### 2026-08-29T11:06:00Z — Template generator strict-undefined negative result
+
+- First authority render used Jinja `StrictUndefined` and failed on an ordinary
+  user message because the official template probes optional `tool_calls` fields.
+- Diagnosis: Transformers-compatible Jinja treats missing optional mapping fields
+  as false/undefined rather than raising on access. Switched the fixture renderer
+  to standard Jinja undefined behavior; explicit template `raise_exception`
+  calls remain authoritative rejection evidence.
+
+### 2026-08-29T11:07:00Z — Vision rejection ownership clarified
+
+- The official template accepted a user image item and rendered vision markers;
+  the initial fixture incorrectly expected an upstream error.
+- Diagnosis: Qwen is multimodal, while Quartz v1 explicitly excludes vision.
+  Moved this case to a separately labeled Quartz v1 policy-rejection set. Native
+  rendering must reject it before emitting any vision marker; documentation must
+  not attribute the rejection to the upstream template.
+
+### 2026-08-29T11:10:00Z — Template diagnostic compile error
+
+- First strict build of the native template diagnostic failed under `-Werror`
+  because aggregate `Message` fixtures omitted later optional fields and triggered
+  `-Wmissing-field-initializers`.
+- Added a two-field Message constructor that deliberately default-initializes
+  reasoning, tool calls, and policy flags. No warning suppression or relaxed
+  compiler flag was introduced.
+
+### 2026-08-29T11:39:57Z — TOK-002 and EDU-002 accepted
+
+- Pinned the official Jinja chat-template text hash and Jinja 3.1.6 fixture tool.
+  Frozen five official success paths, three upstream errors, one developer-role
+  policy mapping, and one v1 vision policy rejection.
+- Implemented a typed native renderer for leading system/developer instructions,
+  user/assistant/tool roles, low/medium/xhigh reasoning, historical thinking,
+  generation prompts, canonical tool definitions, function arguments/results,
+  consecutive results, and explicit unsupported-content rejection.
+- Native rendered UTF-8 bytes match every official/policy success fixture exactly;
+  all rendered token ID sequences also match the pinned tokenizer authority.
+- Added a beginner chat-template chapter explaining roles, delimiters, reasoning,
+  tool execution/results, developer mapping, official-versus-Quartz ownership,
+  a real structured-message-to-prompt example, byte equality, and failure modes.
+- Commands: generator, Ruff, clean restricted host build, 16 pytest tests,
+  pinned CUDA 13.0.2 full build, SM120 compilation, and RTX 5090 probe — passed.
+- Marked TOK-002 and EDU-002 done. HTTP/API behavior remains SRV work.
+
+### 2026-08-29T11:40:00Z — Chat-template commit boundary
+
+- Reviewed source, authority/policy fixtures, generator, dependency lock, tests,
+  beginner documentation, negative results, and container evidence before commit.
 
 ## Decisions and Negative Results
 

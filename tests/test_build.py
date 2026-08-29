@@ -163,3 +163,30 @@ def test_beginner_tokenizer_documentation_covers_every_stage() -> None:
         "Worked real example",
     ):
         assert concept in handbook
+
+
+def test_template_authority_and_beginner_documentation_are_complete() -> None:
+    pins = json.loads((ROOT / "pins" / "artifacts.lock.json").read_text())
+    fixtures = json.loads((ROOT / "fixtures" / "template_authority.json").read_text())
+    assert fixtures["authority"]["revision"] == pins["tokenizer"]["revision"]
+    assert (
+        fixtures["authority"]["tokenizer_config_sha256"]
+        == pins["tokenizer"]["files"]["tokenizer_config.json"]["sha256"]
+    )
+    assert len(fixtures["successes"]) >= 5
+    assert fixtures["errors"] and fixtures["policy_errors"]
+    assert all(
+        case["owner"] == "quartz_v1_policy" for case in fixtures["policy_errors"]
+    )
+
+    handbook = (ROOT / "docs" / "16-chat-template.md").read_text()
+    for concept in (
+        "Roles",
+        "Control tokens and delimiters",
+        "Reasoning controls",
+        "Tools, calls, and results",
+        "Official behavior versus Quartz policy",
+        "Worked example",
+        "Template fixtures and equality",
+    ):
+        assert concept in handbook

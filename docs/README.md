@@ -40,7 +40,8 @@ for language and host portability decisions.
 13. [V1 allocation ledger](13-allocation-ledger.md): explicit 128K budget and proof boundary.
 14. [Artifact validation](14-artifact-validation.md): exact identity, tensor roles, and byte ranges.
 15. [Tokenizer authority](15-tokenizer-authority.md): pinned Unicode/BPE fixtures and native admission boundary.
-16. [Source and evidence ledger](sources.md).
+16. [Chat templates](16-chat-template.md): roles, reasoning, tools, policy ownership, and exact rendering.
+17. [Source and evidence ledger](sources.md).
 
 Claims use four labels: **Measured** (this exact artifact and hardware),
 **External** (a linked source), **Estimated** (reproducible arithmetic), and
