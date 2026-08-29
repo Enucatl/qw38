@@ -57,6 +57,14 @@ Claims use four labels: **Measured** (this exact artifact and hardware),
 **External** (a linked source), **Estimated** (reproducible arithmetic), and
 **Proposed** (a design or experiment not yet demonstrated).
 
+## Runtime architecture
+
+![Quartz Watch 38 runtime architecture](architecture/qw38-runtime-architecture.svg)
+
+The diagram summarizes the public request path, artifact admission, session
+persistence, and the host/GPU trust boundary. The [interactive version](architecture/architecture.html)
+supports focus and route exploration.
+
 ## Engine boundary
 
 - `ModelSpec`: validated dimensions, layer kinds, tensor names, dtypes, and quantization policy.

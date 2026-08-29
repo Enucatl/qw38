@@ -1,0 +1,232 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Quartz Watch 38 Runtime Architecture",
+    "output": "architecture.html",
+    "quality_profile": "showcase",
+    "locale": "en",
+    "repository": {
+      "url": "https://github.com/Enucatl/qw38.git",
+      "revision": "643fe5c560af2b572c45fc0fee892e040cf293be"
+    },
+    "views": [
+      {
+        "id": "request-path",
+        "label": "Primary request path",
+        "focus": ["client", "server", "request", "engine", "gpu"],
+        "note": "Follow one request from the public boundary into token execution on the target GPU."
+      },
+      {
+        "id": "artifact-load",
+        "label": "Artifact loading",
+        "focus": ["artifact", "request", "engine"],
+        "note": "Inspect the pinned GGUF identity and the fail-closed load path."
+      },
+      {
+        "id": "state-persistence",
+        "label": "Session state",
+        "focus": ["engine", "checkpoint"],
+        "note": "See where the move-only session boundary owns persistence."
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "client",
+      "type": "external",
+      "label": "Client",
+      "sublabel": "CLI or OpenAI-compatible caller",
+      "pos": [40, 315],
+      "size": [160, 72],
+      "sources": [{"path": "README.md", "line": 1, "label": "product scope"}]
+    },
+    {
+      "id": "server",
+      "type": "backend",
+      "label": "qw38-server",
+      "sublabel": "single-flight HTTP boundary",
+      "tag": "planned / fail-closed",
+      "pos": [260, 315],
+      "size": [180, 72],
+      "sources": [{"path": "src/server.cpp", "line": 3, "label": "server stub"}]
+    },
+    {
+      "id": "request",
+      "type": "backend",
+      "label": "Request preparation",
+      "sublabel": "roles, template, tokenizer",
+      "pos": [500, 315],
+      "size": [190, 72],
+      "sources": [
+        {"path": "src/template.cpp", "line": 1, "label": "chat template"},
+        {"path": "src/tokenizer.cpp", "line": 117, "label": "tokenizer"}
+      ]
+    },
+    {
+      "id": "engine",
+      "type": "backend",
+      "label": "Engine / Session",
+      "sublabel": "move-only public runtime API",
+      "tag": "fail-closed gates",
+      "pos": [750, 315],
+      "size": [200, 78],
+      "sources": [
+        {"path": "include/qw38/engine.h", "line": 1, "label": "public boundary"},
+        {"path": "src/engine.cpp", "line": 42, "label": "artifact gate"}
+      ]
+    },
+    {
+      "id": "gpu",
+      "type": "cloud",
+      "label": "CUDA execution",
+      "sublabel": "one RTX 5090 / SM120",
+      "tag": "planned target",
+      "pos": [1010, 315],
+      "size": [180, 78],
+      "sources": [{"path": "plan.md", "line": 34, "label": "CUDA target"}]
+    },
+    {
+      "id": "artifact",
+      "type": "external",
+      "label": "Pinned model artifact",
+      "sublabel": "Qwen3.8-27B Q4_K_M GGUF",
+      "tag": "18.97 GB + SHA-256",
+      "pos": [500, 135],
+      "size": [210, 76],
+      "sources": [
+        {"path": "pins/artifacts.lock.json", "line": 4, "label": "identity pin"},
+        {"path": "src/engine.cpp", "line": 13, "label": "size/hash gate"}
+      ]
+    },
+    {
+      "id": "checkpoint",
+      "type": "database",
+      "label": "Checkpoint files",
+      "sublabel": "atomic session persistence",
+      "tag": "planned",
+      "pos": [750, 515],
+      "size": [200, 72],
+      "sources": [{"path": "plan.md", "line": 63, "label": "save / restore"}]
+    },
+    {
+      "id": "authorities",
+      "type": "external",
+      "label": "Pinned authorities & toolchain",
+      "sublabel": "Transformers, llama.cpp, vLLM, utf8proc, CUDA image",
+      "tag": "build / test only",
+      "pos": [40, 135],
+      "size": [300, 76],
+      "sources": [{"path": "pins/artifacts.lock.json", "line": 47, "label": "revisions"}]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "security-group",
+      "label": "Quartz host process · explicit Status boundary",
+      "wraps": ["server", "request", "engine"],
+      "pad": 28
+    },
+    {
+      "kind": "region",
+      "label": "GPU device boundary · CUDA 13.0 / SM120",
+      "wraps": ["gpu"],
+      "pad": 24
+    }
+  ],
+  "connections": [
+    {
+      "id": "client-server",
+      "from": "client",
+      "to": "server",
+      "label": "HTTP / OpenAI API",
+      "variant": "emphasis",
+      "labelDy": 60
+    },
+    {
+      "id": "server-request",
+      "from": "server",
+      "to": "request",
+      "label": "messages + options",
+      "labelDy": 60
+    },
+    {
+      "id": "request-engine",
+      "from": "request",
+      "to": "engine",
+      "label": "tokens / logits / session",
+      "labelDy": 66
+    },
+    {
+      "id": "engine-gpu",
+      "from": "engine",
+      "to": "gpu",
+      "label": "CUDA kernels + state",
+      "variant": "emphasis",
+      "labelDy": 63
+    },
+    {
+      "id": "artifact-engine",
+      "from": "artifact",
+      "to": "engine",
+      "label": "mmap after GGUF + hash validation",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelDy": 42
+    },
+    {
+      "id": "engine-checkpoint",
+      "from": "engine",
+      "to": "checkpoint",
+      "label": "save / restore session state",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelDy": 24
+    },
+    {
+      "id": "authorities-request",
+      "from": "authorities",
+      "to": "request",
+      "label": "build + semantic test inputs",
+      "variant": "dashed",
+      "fromSide": "right",
+      "toSide": "top"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Runtime contract",
+      "items": [
+        "CLI and server operate on tokens, logits, and sessions; tensor layouts stay inside the engine.",
+        "The current server and session operations fail closed until their delivery gates pass."
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Model execution",
+      "items": [
+        "64-layer hybrid Qwen3.8 schedule: 48 GDN layers plus 16 full-attention layers.",
+        "BF16 activations, FP32 sensitive accumulation, FP32 logits, and two-byte KV storage are planned."
+      ]
+    },
+    {
+      "dot": "violet",
+      "title": "Trust & ownership",
+      "items": [
+        "The host process owns API validation, artifact admission, session state, and persistence.",
+        "CUDA execution is isolated behind the device boundary; external authorities are provenance and test inputs, not runtime services."
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "External dependencies",
+      "items": [
+        "Pinned GGUF and tokenizer metadata are admitted only by exact size, contract, tensor inventory, and SHA-256 checks.",
+        "CUDA 13.0 Docker, utf8proc, Transformers, llama.cpp, vLLM, and Ollama support build, semantics, diagnostics, or comparison."
+      ]
+    }
+  ]
+}
