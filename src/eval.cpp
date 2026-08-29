@@ -17,6 +17,7 @@
 #include "quant.h"
 #include "sha256.h"
 #include "template.h"
+#include "tensor.h"
 #include "tokenizer.h"
 
 namespace {
@@ -120,6 +121,32 @@ bool parse_hex(const std::string& hex, std::vector<std::uint8_t>* bytes) {
     const int low = hex_value(hex[index + 1]);
     if (high < 0 || low < 0) return false;
     bytes->push_back(static_cast<std::uint8_t>((high << 4) | low));
+  }
+  return true;
+}
+
+bool parse_size(const char* text, std::size_t* value) {
+  if (text == nullptr || *text == '\0') return false;
+  char* end = nullptr;
+  const unsigned long long parsed = std::strtoull(text, &end, 10);
+  if (*end != '\0' || parsed > std::numeric_limits<std::size_t>::max()) {
+    return false;
+  }
+  *value = static_cast<std::size_t>(parsed);
+  return true;
+}
+
+bool parse_float_hex(const std::string& hex, std::vector<float>* values) {
+  std::vector<std::uint8_t> bytes;
+  if (!parse_hex(hex, &bytes) || bytes.size() % 4 != 0) return false;
+  values->resize(bytes.size() / 4);
+  for (std::size_t index = 0; index < values->size(); ++index) {
+    const std::uint32_t bits =
+        static_cast<std::uint32_t>(bytes[index * 4]) |
+        (static_cast<std::uint32_t>(bytes[index * 4 + 1]) << 8U) |
+        (static_cast<std::uint32_t>(bytes[index * 4 + 2]) << 16U) |
+        (static_cast<std::uint32_t>(bytes[index * 4 + 3]) << 24U);
+    std::memcpy(values->data() + index, &bits, sizeof(bits));
   }
   return true;
 }
@@ -519,6 +546,99 @@ int check_ffn(int layer) {
   return 0;
 }
 
+int check_matvec(const std::string& kind, const char* columns_text,
+                 const char* rows_text, const std::string& payload_hex,
+                 const std::string& activation_hex) {
+  std::size_t columns = 0;
+  std::size_t rows = 0;
+  std::uint32_t type = 0;
+  if (kind == "f32") {
+    type = 0;
+  } else if (kind == "q8_0") {
+    type = 8;
+  } else if (kind == "q4_k") {
+    type = 12;
+  } else if (kind == "q6_k") {
+    type = 14;
+  } else {
+    std::cerr << "invalid_argument: unknown matrix tensor type\n";
+    return 1;
+  }
+  std::vector<std::uint8_t> payload;
+  std::vector<float> activation;
+  if (!parse_size(columns_text, &columns) || !parse_size(rows_text, &rows) ||
+      !parse_hex(payload_hex, &payload) ||
+      !parse_float_hex(activation_hex, &activation)) {
+    std::cerr << "invalid_argument: malformed matrix dimensions or hex\n";
+    return 1;
+  }
+  qw38::internal::TensorView view;
+  qw38::Status status = qw38::internal::make_tensor_view(
+      payload.data(), payload.size(), type, columns, rows, &view);
+  std::vector<float> output(rows);
+  std::vector<float> decoded(columns);
+  if (status.is_ok()) {
+    status = qw38::internal::tensor_matvec(
+        view, activation.data(), activation.size(), output.data(), output.size());
+  }
+  if (status.is_ok()) {
+    status = qw38::internal::tensor_row_decode(
+        view, 0, decoded.data(), decoded.size());
+  }
+  if (!status.is_ok()) {
+    std::cerr << qw38::status_code_name(status.code()) << ": "
+              << status.message() << '\n';
+    return 1;
+  }
+  std::cout << "columns=" << view.columns << "\nrows=" << view.rows
+            << "\nrow_bytes=" << view.row_bytes << '\n';
+  write_float_vector("output_f32_le_hex", output);
+  write_float_vector("row0_f32_le_hex", decoded);
+  return 0;
+}
+
+int check_tensor_row(const char* model_path, const std::string& name,
+                     const char* row_text) {
+  std::size_t row = 0;
+  if (!parse_size(row_text, &row)) {
+    std::cerr << "invalid_argument: malformed tensor row index\n";
+    return 1;
+  }
+  qw38::internal::ModelInfo info;
+  qw38::Status status = qw38::internal::inspect_gguf(model_path, &info);
+  if (status.is_ok()) status = qw38::internal::validate_qwen38_contract(&info);
+  qw38::internal::MappedFile mapping;
+  if (status.is_ok()) status = mapping.open(model_path);
+  qw38::internal::TensorView view;
+  if (status.is_ok()) {
+    status = qw38::internal::bind_tensor_view(info, mapping, name, &view);
+  }
+  std::vector<float> activation;
+  if (status.is_ok()) {
+    activation.resize(view.columns);
+    for (std::size_t index = 0; index < activation.size(); ++index) {
+      const int numerator = static_cast<int>((index * 37) % 101) - 50;
+      activation[index] = static_cast<float>(numerator) / 32.0F;
+    }
+  }
+  float dot = 0.0F;
+  if (status.is_ok()) {
+    status = qw38::internal::tensor_row_dot(
+        view, row, activation.data(), activation.size(), &dot);
+  }
+  if (!status.is_ok()) {
+    std::cerr << qw38::status_code_name(status.code()) << ": "
+              << status.message() << '\n';
+    return 1;
+  }
+  std::cout << "dtype=" << qw38::internal::ggml_type_name(view.type)
+            << "\ncolumns=" << view.columns << "\nrows=" << view.rows
+            << "\nrow_bytes=" << view.row_bytes << "\ndot_f32_le_hex=";
+  write_float_hex(dot);
+  std::cout << '\n';
+  return 0;
+}
+
 int tokenize_hex(const char* model_path, const std::string& hex) {
   if (hex.size() % 2 != 0) {
     std::cerr << "invalid_argument: input hex has odd length\n";
@@ -702,12 +822,19 @@ int main(int argc, char** argv) {
   if (argc == 3 && std::string(argv[1]) == "--check-ffn") {
     return check_ffn(std::atoi(argv[2]));
   }
+  if (argc == 7 && std::string(argv[1]) == "--check-matvec") {
+    return check_matvec(argv[2], argv[3], argv[4], argv[5], argv[6]);
+  }
+  if (argc == 5 && std::string(argv[1]) == "--check-tensor-row") {
+    return check_tensor_row(argv[2], argv[3], argv[4]);
+  }
   std::cout << kBrand << '\n';
   std::cerr << "qw38-eval: use --build-info, --inspect-gguf PATH, --sha256 PATH, "
                "--verify-model PATH, --check-contract PATH, or "
                "--inventory-gguf PATH OUTPUT, --tokenize-hex PATH HEX, or "
                "--render-template-case NAME, --check-quant KIND HEX, or "
                "--check-gdn COMPONENT CHUNKING, --check-attention LAYER, or "
-               "--check-ffn LAYER\n";
+               "--check-ffn LAYER, --check-matvec KIND COLUMNS ROWS PAYLOAD "
+               "ACTIVATION, or --check-tensor-row MODEL NAME ROW\n";
   return 2;
 }

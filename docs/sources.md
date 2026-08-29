@@ -55,6 +55,10 @@ DSpark are explicitly rejected as Qwen model semantics.
   output gating, and the SwiGLU MLP. Production dimensions, order, used symbols,
   and source identity are frozen separately in
   [`pins/attention_ffn_contract.json`](../pins/attention_ffn_contract.json).
+- llama.cpp's pinned `ggml_tensor` element counts and byte-stride definition are
+  CPU-006's physical row-layout authority. The source hash, dimension-0 row-width
+  interpretation, format block sizes, and admitted fixture link are frozen in
+  [`pins/tensor_layout_contract.json`](../pins/tensor_layout_contract.json).
 
 ## Specialization and hardware references
 

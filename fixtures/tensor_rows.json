@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "model_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+  "dimension_order": "GGUF dimension 0 is the contiguous row width; dimension 1 is the output row count",
+  "accumulation": "left-to-right FP32 within each format block, then left-to-right FP32 block totals",
+  "cases": [
+    {
+      "name": "token_embd.weight",
+      "row": 42,
+      "dtype": "Q4_K",
+      "columns": 5120,
+      "rows": 248320,
+      "row_bytes": 2880,
+      "row_sha256": "620dc7836b06f21309f5668d1a55e6254f06d93083528119d9c30ec4358cd4ad",
+      "activation": "a[i] = (((i * 37) % 101) - 50) / 32, rounded to FP32",
+      "dot_f32_le_hex": "37778a3e"
+    },
+    {
+      "name": "output.weight",
+      "row": 17,
+      "dtype": "Q6_K",
+      "columns": 5120,
+      "rows": 248320,
+      "row_bytes": 4200,
+      "row_sha256": "43e37c2c8fa9d436b5c4b72cee9fe6c8dabe8950f3b0aeeb35de90a2c66d30b1",
+      "activation": "a[i] = (((i * 37) % 101) - 50) / 32, rounded to FP32",
+      "dot_f32_le_hex": "a80ff03e"
+    },
+    {
+      "name": "blk.3.attn_q.weight",
+      "row": 9,
+      "dtype": "Q8_0",
+      "columns": 5120,
+      "rows": 12288,
+      "row_bytes": 5440,
+      "row_sha256": "083d4ab4f1292972fa7a42c2c302c1e2cefa140976bccfa1675d15ca656d7b6f",
+      "activation": "a[i] = (((i * 37) % 101) - 50) / 32, rounded to FP32",
+      "dot_f32_le_hex": "3fcba0be"
+    },
+    {
+      "name": "blk.0.ssm_conv1d.weight",
+      "row": 5,
+      "dtype": "F32",
+      "columns": 4,
+      "rows": 10240,
+      "row_bytes": 16,
+      "row_sha256": "36fa86b755aa5c6e147603e47aa71fc060e5e44ecd1c05f15b112fa25bd3a909",
+      "activation": "a[i] = (((i * 37) % 101) - 50) / 32, rounded to FP32",
+      "dot_f32_le_hex": "004425bb"
+    }
+  ]
+}

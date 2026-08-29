@@ -25,9 +25,10 @@ are repository-relative unless stated otherwise.
 | TOK-002 | Implement chat/reasoning/tool template | TOK-001 | done | All supported roles, reasoning, tool calls/results, and rejection cases match fixtures | [`src/template.cpp`](src/template.cpp), [`fixtures/template_authority.json`](fixtures/template_authority.json); log 2026-08-29T11:39:57Z |
 | CPU-001 | Implement Q4_K/Q6_K scalar decoding and dot products | MDL-001 | done | Numeric fixtures meet frozen metrics and exact structural checks | [`src/quant.cpp`](src/quant.cpp); [`fixtures/quant_authority.json`](fixtures/quant_authority.json); [`tests/test_quant.py`](tests/test_quant.py); log 2026-08-29T12:05:00Z |
 | CPU-005 | Implement discovered Q8_0 scalar decoding and dot products | CPU-001, MDL-001 | done | Exact 34-byte/32-value layout, signed values, FP16 scale, malformed sizes, and frozen decode/dot fixtures pass | [`src/quant.cpp`](src/quant.cpp); [`fixtures/quant_authority.json`](fixtures/quant_authority.json); [`tests/test_quant.py`](tests/test_quant.py); log 2026-08-29T13:07:00Z |
+| CPU-006 | Bind admitted tensor rows and implement mixed-format scalar matvec | CPU-001, CPU-005, MDL-001 | done | GGUF dimension order, row bounds/bytes, F32/Q8_0/Q4_K/Q6_K dots, malformed views, synthetic matrices, and admitted artifact rows pass | [`src/tensor.cpp`](src/tensor.cpp); [`fixtures/tensor_rows.json`](fixtures/tensor_rows.json); [`tests/test_tensor.py`](tests/test_tensor.py); log 2026-08-29T13:28:00Z |
 | CPU-002 | Implement scalar GDN oracle | CPU-001, MDL-002 | done | Warm-up, recurrence, state, head mapping, and chunk-boundary fixtures pass | [`src/gdn.cpp`](src/gdn.cpp); [`fixtures/gdn_authority.json`](fixtures/gdn_authority.json); [`tests/test_gdn.py`](tests/test_gdn.py); log 2026-08-29T12:26:00Z |
 | CPU-003 | Implement scalar attention and FFN oracle | CPU-001, MDL-002 | done | Layers 3/7/63, partial RoPE, grouped KV, causality, and FFN taps pass | [`src/attention.cpp`](src/attention.cpp); [`fixtures/attention_ffn_authority.json`](fixtures/attention_ffn_authority.json); [`tests/test_attention.py`](tests/test_attention.py); log 2026-08-29T12:54:00Z |
-| CPU-004 | Implement full scalar 64-layer scheduler and logits | CPU-002, CPU-003, CPU-005 | pending | Token/chunk execution and logits match semantic-authority fixtures | — |
+| CPU-004 | Implement full scalar 64-layer scheduler and logits | CPU-002, CPU-003, CPU-005, CPU-006 | pending | Token/chunk execution and logits match semantic-authority fixtures | — |
 | TRC-001 | Define versioned trace bundle and typed comparison metrics | PIN-002 | pending | Manifest/blob schema, checksums, summaries, session frontiers, and metric reporter pass tests | — |
 | TRC-002 | Add diagnostic-only stable scalar/CUDA taps | TRC-001, CPU-004 | pending | Required taps filter by layer/name and are absent from release builds | — |
 | ORA-001 | Generate and freeze scalar/oracle fixtures and tolerances | TOK-002, CPU-004, TRC-002 | pending | Three authorities are attributed; tolerances and greedy tie exceptions are immutable inputs | — |
@@ -63,6 +64,7 @@ are repository-relative unless stated otherwise.
 | EDU-004 | Explain GDN recurrence and persistent state for beginners | CPU-002, DOC-001 | done | Projections, heads, convolution warm-up/rings, gates, delta-rule recurrence, mutation order, chunk equivalence, and FP32 state have worked examples linked to code/evidence | [`docs/18-gated-delta-network.md`](docs/18-gated-delta-network.md); [`tests/test_gdn.py`](tests/test_gdn.py); log 2026-08-29T12:26:00Z |
 | EDU-005 | Explain grouped causal attention, partial RoPE, and SwiGLU for beginners | CPU-003, DOC-001 | done | Q/K/V, KV history, causality, grouped heads, RoPE pairs/positions, softmax, RMSNorm, gate/up/down FFN, fixtures, and numeric gates have worked examples linked to code/evidence | [`docs/19-attention-and-ffn.md`](docs/19-attention-and-ffn.md); [`tests/test_attention.py`](tests/test_attention.py); log 2026-08-29T12:54:00Z |
 | EDU-006 | Explain Q8_0 and scalar matrix rows for beginners | CPU-005, DOC-001 | done | Signed bytes, per-block scale, row blocks, decode/dot use, format selection, fixtures, and full-scheduler dependency are code-linked and worked | [`docs/20-q8-scalar-rows.md`](docs/20-q8-scalar-rows.md); [`tests/test_quant.py`](tests/test_quant.py); log 2026-08-29T13:07:00Z |
+| EDU-007 | Explain GGUF tensor dimensions, row orientation, and matvec for beginners | CPU-006, DOC-001 | done | Shape order, fastest dimension, rows/outputs, block alignment, mixed formats, bounds, synthetic/admitted fixtures, and scheduler use are code-linked and worked | [`docs/21-tensor-rows.md`](docs/21-tensor-rows.md); [`tests/test_tensor.py`](tests/test_tensor.py); log 2026-08-29T13:28:00Z |
 | REL-001 | Publish reproducible release evidence bundle | CMP-003, QLT-001, DOC-001 | pending | Builds, hashes, raw results, reports, and documentation claims reconcile | — |
 
 ## Delivery-Gate Mapping
@@ -631,6 +633,80 @@ are repository-relative unless stated otherwise.
   decoder/dot code, expanded fixture generator, upstream adapter, tests,
   beginner documentation, provenance, and downstream boundary before committing.
 
+### 2026-08-29T13:10:00Z — Q8_0 pushed; CPU-006 started
+
+- Commit `9fd22ee` (`feat: add scalar Q8_0 oracle`) was pushed and independently
+  confirmed current on `origin/main` by the user's subsequent `git push`.
+- Added CPU-006 before implementation and made it an explicit CPU-004 dependency.
+  Block decoders alone cannot execute a projection: the runtime must bind the
+  exact mapped tensor payload, interpret GGUF's fastest-changing first dimension
+  as row width, prove block-aligned row byte spans, and accumulate every output
+  row without transposing the matrix.
+- Added EDU-007 so shape notation, physical row order, mixed formats, bounds, and
+  matrix-vector multiplication are explained before the full scheduler uses them.
+  This is required scalar plumbing, not a release-boundary expansion.
+
+### 2026-08-29T13:18:00Z — CPU-006 pytest collection failure
+
+- The first focused `tests/test_tensor.py` run stopped during collection with
+  `ModuleNotFoundError: No module named 'tools'`; no native diagnostic executed.
+- Diagnosis: the pytest launcher did not place the repository root on Python's
+  module search path, while the test reuses deterministic decoders from the
+  checked-in quant fixture generator. The follow-up adds the explicit repository
+  root before importing that helper; tensor code and expected arithmetic remain
+  unchanged.
+
+### 2026-08-29T13:20:00Z — CPU-006 admitted-row oracle failure
+
+- After collection was fixed, three synthetic tests passed and the admitted
+  token-embedding row failed: native dot bytes `37778a3e` versus Python oracle
+  `dab46e3e`.
+- Diagnosis: the reused fixture decoder intentionally accepts one quant block,
+  but the admitted-row helper passed an entire 5,120-value row. It decoded only
+  the first 256 weights, and Python `zip` then silently truncated the activation.
+  The native implementation had processed all 20 Q4_K blocks as designed.
+- The follow-up changes only the independent admitted-row helper to split the
+  payload by the pinned block byte size and concatenate every decoded block.
+  The failed values remain recorded; CPU-006 is not admitted yet.
+
+### 2026-08-29T13:28:00Z — CPU-006 and EDU-007 accepted
+
+- Pinned GGML's dimension/stride source identity and froze the interpretation:
+  dimension 0 is contiguous input columns, dimension 1 is output rows, row bytes
+  derive from complete format blocks, and matvec emits one dot per stored row.
+- Implemented non-owning checked TensorView creation and model-name binding,
+  little-endian F32 row reads, Q8_0/Q4_K/Q6_K row decoding, block-ordered FP32
+  row dots, and mixed-format matvec. Offset, multiplication, mapping, rank, row,
+  activation/output count, block alignment, and complete-storage checks return
+  explicit Status failures.
+- Synthetic evidence covers an asymmetric 3×5 F32 matrix and two-block,
+  asymmetric two-row matrices for every quantized format. Partial Q4 storage, a
+  31-column Q8 row, and a wrong activation count fail closed.
+- Froze four admitted model rows with payload SHA-256 and exact dot bytes:
+  `token_embd.weight` row 42 (Q4_K), `output.weight` row 17 (Q6_K),
+  `blk.3.attn_q.weight` row 9 (Q8_0), and
+  `blk.0.ssm_conv1d.weight` row 5 (F32). Independent mapped-byte decoding and
+  native named binding agree exactly. Unknown names, rank-1 tensors, and a row at
+  the exclusive upper bound fail.
+- Added a beginner chapter explaining vectors/matrices, why GGUF shapes appear
+  reversed relative to Python, worked row-byte arithmetic, TensorView ownership
+  and bounds, decode versus dot, mixed formats, synthetic/admitted fixtures, both
+  failed oracle approaches, and the CPU-004 proof boundary.
+- Commands: fixture generation, Ruff format/check, clean restricted C++17 build,
+  33 pytest tests, `git diff --check`, pinned CUDA 13.0.2 full build, SM120
+  compilation, and RTX 5090 probe — passed. Probe values were 33,671,348,224
+  total and 33,139,458,048 free bytes.
+- Marked CPU-006 and EDU-007 done. Typed binding of all layer roles, complete
+  real projections, session state, the 64-layer schedule, final norm, and logits
+  remain CPU-004.
+
+### 2026-08-29T13:29:00Z — Tensor-row commit boundary
+
+- Reviewed the discovered dependency, pinned physical layout, checked view and
+  arithmetic code, synthetic/admitted fixtures, two preserved test failures,
+  malformed cases, beginner documentation, provenance, and clean verification
+  before committing.
+
 ## Decisions and Negative Results
 
 - **2026-08-29 / BLD-002:** Host `nvcc` is absent. Resolved for reproducibility
@@ -655,3 +731,7 @@ are repository-relative unless stated otherwise.
   Python transcendental functions despite claiming scalar FP32 operations and
   failed the frozen relative gate. Regenerating through float libm functions
   fixed the authority transcription; no native code or tolerance was changed.
+- **2026-08-29 / CPU-006:** Initial test collection lacked the repository import
+  root; after fixing that harness issue, the admitted-row oracle decoded only
+  the first block of a multi-block Q4 row. Walking every block resolved the
+  mismatch without changing native tensor code or expected arithmetic order.

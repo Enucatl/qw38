@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "authority": {
+    "repository": "https://github.com/ggml-org/llama.cpp.git",
+    "revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+    "path": "ggml/include/ggml.h",
+    "sha256": "c6e7e86d00ee042e384aa3c738f4d4a80aa29eef26430da178a8d0abfece6d42",
+    "license": "MIT",
+    "evidence": "ggml_tensor ne[] element counts and nb[] byte strides"
+  },
+  "matrix_interpretation": {
+    "gguf_dimension_0": "contiguous input columns within one row",
+    "gguf_dimension_1": "output row count",
+    "row_bytes": "dimension_0 / block_values * block_bytes",
+    "storage_bytes": "row_bytes * dimension_1",
+    "matvec": "output[row] = dot(stored_row[row], input[0:dimension_0])"
+  },
+  "formats": {
+    "F32": {"block_values": 1, "block_bytes": 4},
+    "Q8_0": {"block_values": 32, "block_bytes": 34},
+    "Q4_K": {"block_values": 256, "block_bytes": 144},
+    "Q6_K": {"block_values": 256, "block_bytes": 210}
+  },
+  "admitted_row_fixtures": "fixtures/tensor_rows.json"
+}
