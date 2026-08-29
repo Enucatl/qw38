@@ -23,7 +23,7 @@ are repository-relative unless stated otherwise.
 | MDL-002 | Validate official 64-layer hybrid model contract | MDL-001 | done | 48 GDN/16 attention schedule, width, GQA, partial RoPE, and dtypes match authority | [`pins/model_contract.json`](pins/model_contract.json), [`docs/14-artifact-validation.md`](docs/14-artifact-validation.md); log 2026-08-29T10:35:51Z |
 | TOK-001 | Implement pinned tokenizer | MDL-001, PIN-002 | done | Token IDs match frozen authority fixtures byte-for-byte | [`src/tokenizer.cpp`](src/tokenizer.cpp), [`fixtures/tokenizer_authority.json`](fixtures/tokenizer_authority.json); log 2026-08-29T11:02:00Z |
 | TOK-002 | Implement chat/reasoning/tool template | TOK-001 | done | All supported roles, reasoning, tool calls/results, and rejection cases match fixtures | [`src/template.cpp`](src/template.cpp), [`fixtures/template_authority.json`](fixtures/template_authority.json); log 2026-08-29T11:39:57Z |
-| CPU-001 | Implement Q4_K/Q6_K scalar decoding and dot products | MDL-001 | pending | Numeric fixtures meet frozen metrics and exact structural checks | — |
+| CPU-001 | Implement Q4_K/Q6_K scalar decoding and dot products | MDL-001 | done | Numeric fixtures meet frozen metrics and exact structural checks | [`src/quant.cpp`](src/quant.cpp); [`fixtures/quant_authority.json`](fixtures/quant_authority.json); [`tests/test_quant.py`](tests/test_quant.py); log 2026-08-29T12:05:00Z |
 | CPU-002 | Implement scalar GDN oracle | CPU-001, MDL-002 | pending | Warm-up, recurrence, state, head mapping, and chunk-boundary fixtures pass | — |
 | CPU-003 | Implement scalar attention and FFN oracle | CPU-001, MDL-002 | pending | Layers 3/7/63, partial RoPE, grouped KV, causality, and FFN taps pass | — |
 | CPU-004 | Implement full scalar 64-layer scheduler and logits | CPU-002, CPU-003 | pending | Token/chunk execution and logits match semantic-authority fixtures | — |
@@ -58,6 +58,7 @@ are repository-relative unless stated otherwise.
 | DOC-001 | Maintain code-linked handbook and provenance ledger | BLD-001 | pending | Each implemented concept has claim labels, invariants, failures, task IDs, and evidence | — |
 | EDU-001 | Explain tokenizer concepts for readers with no prior background | TOK-001, DOC-001 | done | NFC, Unicode splitting, byte mapping, BPE, fixtures, and equality gates have worked examples linked to code/evidence | [`docs/15-tokenizer-authority.md`](docs/15-tokenizer-authority.md); tests; log 2026-08-29T11:02:00Z |
 | EDU-002 | Explain chat-template concepts and policy ownership for beginners | TOK-002, DOC-001 | done | Roles, delimiters, reasoning, tools, results, mapping, and byte-equality gates have worked examples linked to code/evidence | [`docs/16-chat-template.md`](docs/16-chat-template.md); tests; log 2026-08-29T11:39:57Z |
+| EDU-003 | Explain scalar quantization and numeric equality for beginners | CPU-001, DOC-001 | done | Bits/bytes, FP16/FP32, blocks, Q4_K/Q6_K packing, decoding, dot products, accumulation, fixtures, and numeric metrics have worked examples linked to code/evidence | [`docs/17-quantization.md`](docs/17-quantization.md); [`tests/test_quant.py`](tests/test_quant.py); log 2026-08-29T12:05:00Z |
 | REL-001 | Publish reproducible release evidence bundle | CMP-003, QLT-001, DOC-001 | pending | Builds, hashes, raw results, reports, and documentation claims reconcile | — |
 
 ## Delivery-Gate Mapping
@@ -395,6 +396,71 @@ are repository-relative unless stated otherwise.
 - Reviewed source, authority/policy fixtures, generator, dependency lock, tests,
   beginner documentation, negative results, and container evidence before commit.
 
+### 2026-08-29T11:42:00Z — Chat template pushed; CPU-001 started
+
+- Commit `dc96299` (`feat: implement exact chat template`) created after Ruff and
+  16 pytest tests passed, then pushed to `origin/main` successfully.
+- Began CPU-001. Exact Q4_K/Q6_K packed layouts and fixture values must be pinned
+  to the admitted GGML definitions before implementing scalar decoding or dot
+  products; CUDA work remains downstream.
+
+### 2026-08-29T11:55:00Z — CPU-001 cosine-metric test negative result
+
+- Pinned the exact llama.cpp Q4_K/Q6_K block definitions and generated four
+  deterministic authority fixtures before implementing the scalar decoder.
+- The native decoder and dot product matched every frozen FP32 bit, but the
+  first 19-test run had one failure in the Python metric reporter: it required
+  computed cosine similarity to equal exactly `1.0`. For a bit-identical vector,
+  `sum(x*x) / (sqrt(sum(x*x)) * sqrt(sum(x*x)))` rounded just below one because
+  the square-root operations introduce floating-point rounding.
+- Diagnosis: this was an invalid exact assertion on a derived metric, not a
+  decoded-value or dot-product mismatch. The exact byte gates remain unchanged;
+  follow-up CPU-001 work uses a declared `1e-15` absolute tolerance only for the
+  reported cosine calculation.
+
+### 2026-08-29T11:57:00Z — EDU-003 started
+
+- Added EDU-003 before writing the quantization chapter. The user-facing
+  documentation boundary now explicitly requires a no-prerequisites account of
+  binary storage, floating-point scales, Q4_K/Q6_K block packing, scalar decode,
+  dot products, FP32 accumulation, fixture provenance, equality, error metrics,
+  and the cosine-rounding negative result. This elaborates CPU-001 without
+  expanding the v1 product boundary.
+
+### 2026-08-29T12:05:00Z — CPU-001 and EDU-003 accepted
+
+- Pinned the exact 256-value Q4_K (144-byte) and Q6_K (210-byte) structures,
+  field offsets, equations, upstream files, MIT license, and llama.cpp revision.
+- Implemented bounded scalar decoders, explicit little-endian FP16 conversion,
+  portable signed Q6 scale conversion, and separate FP32 block dot products.
+  The scalar build disables multiply-add contraction to freeze its arithmetic
+  order; CUDA arithmetic remains a later differential gate.
+- Generated four deterministic fixtures covering Q4 packed 6-bit scale/minimum
+  boundaries, Q4 zero, signed Q6 extremes, and Q6 zero scale. All 1,024 decoded
+  FP32 values and four dot products match their frozen bytes exactly.
+- Independently compiled [`tools/llama_quant_oracle.c`](tools/llama_quant_oracle.c)
+  with the pinned upstream `ggml-quants.c`; upstream output matched all 1,024
+  frozen decoded FP32 values exactly. This check used a fresh checkout at the
+  pinned revision and did not link Quartz's decoder.
+- Added malformed kind/hex/byte-size checks and explicit zero absolute/RMS,
+  no-NaN/Inf, and cosine metric assertions. The previously recorded cosine
+  harness error is resolved without weakening decoded-value or dot equality.
+- Added the beginner chapter explaining binary storage, FP16/FP32, lossy
+  quantization, Q4_K/Q6_K layouts and equations, dot products, rounding order,
+  fixtures, exact equality, metrics, failure modes, and the proof boundary.
+- Commands: fixture regeneration, Ruff format/check, clean restricted C++17
+  build, 19 pytest tests, `git diff --check`, pinned-container full host build,
+  SM120 compilation, and RTX 5090 probe — passed. The device probe measured
+  33,671,348,224 total and 33,139,458,048 free bytes at this run.
+- Marked CPU-001 and EDU-003 done. Scalar model layers begin at CPU-002; reusable
+  trace metrics remain TRC-001 and CUDA quant kernels remain CUD-001.
+
+### 2026-08-29T12:06:00Z — Scalar quantization commit boundary
+
+- Reviewed the pin, fixture generator/output, upstream adapter, scalar source,
+  strict build flag, diagnostics, tests, beginner documentation, provenance,
+  and preserved negative result before the requested commit.
+
 ## Decisions and Negative Results
 
 - **2026-08-29 / BLD-002:** Host `nvcc` is absent. Resolved for reproducibility
@@ -411,3 +477,7 @@ are repository-relative unless stated otherwise.
 - **2026-08-29 / TOK-001:** Initial native compilation failed because the C++
   include path omitted the pinned utf8proc directory. Added the explicit include
   path to the restricted Makefile; clean host and container builds then passed.
+- **2026-08-29 / CPU-001:** Exact equality is appropriate for frozen decoded
+  FP32 bytes, but not for a cosine value derived through square roots. The first
+  metric test failed on this distinction; the cosine reporter now has a `1e-15`
+  absolute tolerance while structural, decoded-value, and dot bits stay exact.

@@ -36,6 +36,13 @@ DSpark are explicitly rejected as Qwen model semantics.
   NFC normalization and Unicode general-category primitives for TOK-001. Its MIT
   license and Unicode data notice are retained in the submodule. Qwen-specific
   splitting, byte mapping, special-token handling, and BPE remain local code.
+- [llama.cpp](https://github.com/ggml-org/llama.cpp) revision
+  `cc83d7b4824f73cfdda4dfbb47ee39804f71b328` supplies the MIT-licensed GGML
+  `block_q4_K`/`block_q6_K` layouts and scalar dequantization equations pinned in
+  [`pins/quant_contract.json`](../pins/quant_contract.json). Quartz uses those
+  definitions as the CPU-001 format authority; its local scalar implementation
+  and independently stored fixtures remain code-reviewed and differentially
+  tested boundaries.
 
 ## Specialization and hardware references
 

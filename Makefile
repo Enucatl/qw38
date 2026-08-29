@@ -1,12 +1,12 @@
 CXX ?= g++
 CC ?= cc
 NVCC ?= nvcc
-CXXFLAGS := -std=c++17 -O2 -Wall -Wextra -Wpedantic -Werror -fno-exceptions -fno-rtti
+CXXFLAGS := -std=c++17 -O2 -Wall -Wextra -Wpedantic -Werror -fno-exceptions -fno-rtti -ffp-contract=off
 CFLAGS := -std=c11 -O2 -Wall -Wextra -Wpedantic -Werror
 NVCCFLAGS := -std=c++17 -O2 -arch=sm_120 --expt-relaxed-constexpr
 CPPFLAGS := -Iinclude -Isrc -Ithird_party/utf8proc
 BUILD_DIR := build
-LIB_SOURCES := src/status.cpp src/sha256.cpp src/model.cpp src/tokenizer.cpp src/template.cpp src/engine.cpp
+LIB_SOURCES := src/status.cpp src/sha256.cpp src/model.cpp src/tokenizer.cpp src/template.cpp src/quant.cpp src/engine.cpp
 LIB_OBJECTS := $(LIB_SOURCES:src/%.cpp=$(BUILD_DIR)/%.o)
 THIRD_PARTY_OBJECTS := $(BUILD_DIR)/utf8proc.o
 BINARIES := $(BUILD_DIR)/qw38 $(BUILD_DIR)/qw38-server $(BUILD_DIR)/qw38-bench $(BUILD_DIR)/qw38-eval

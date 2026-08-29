@@ -1,13 +1,17 @@
+#include <array>
 #include <cstdio>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <string>
+#include <vector>
 
 #include <unistd.h>
 
 #include "qw38/engine.h"
 #include "model.h"
+#include "quant.h"
 #include "sha256.h"
 #include "template.h"
 #include "tokenizer.h"
@@ -102,6 +106,76 @@ int hex_value(char character) {
   if (character >= 'a' && character <= 'f') return character - 'a' + 10;
   if (character >= 'A' && character <= 'F') return character - 'A' + 10;
   return -1;
+}
+
+bool parse_hex(const std::string& hex, std::vector<std::uint8_t>* bytes) {
+  if (hex.size() % 2 != 0) return false;
+  bytes->clear();
+  bytes->reserve(hex.size() / 2);
+  for (std::size_t index = 0; index < hex.size(); index += 2) {
+    const int high = hex_value(hex[index]);
+    const int low = hex_value(hex[index + 1]);
+    if (high < 0 || low < 0) return false;
+    bytes->push_back(static_cast<std::uint8_t>((high << 4) | low));
+  }
+  return true;
+}
+
+void write_float_hex(float value) {
+  std::uint32_t bits = 0;
+  std::memcpy(&bits, &value, sizeof(bits));
+  constexpr char kHex[] = "0123456789abcdef";
+  for (unsigned int byte = 0; byte < 4; ++byte) {
+    const unsigned int value_byte = (bits >> (byte * 8U)) & 0xFFU;
+    std::cout << kHex[value_byte >> 4U] << kHex[value_byte & 15U];
+  }
+}
+
+int check_quant(const std::string& kind, const std::string& hex) {
+  std::vector<std::uint8_t> block;
+  if (!parse_hex(hex, &block)) {
+    std::cerr << "invalid_argument: quant block is not even-length hexadecimal\n";
+    return 1;
+  }
+  std::array<float, qw38::internal::kQuantBlockValues> decoded{};
+  std::array<float, qw38::internal::kQuantBlockValues> activation{};
+  for (std::size_t index = 0; index < activation.size(); ++index) {
+    const int numerator = static_cast<int>((index * 37) % 101) - 50;
+    activation[index] = static_cast<float>(numerator) / 32.0F;
+  }
+  float dot = 0.0F;
+  qw38::Status status;
+  if (kind == "q4_k") {
+    status = qw38::internal::decode_q4_k(block.data(), block.size(),
+                                         decoded.data(), decoded.size());
+    if (status.is_ok()) {
+      status = qw38::internal::dot_q4_k(block.data(), block.size(),
+                                        activation.data(), activation.size(),
+                                        &dot);
+    }
+  } else if (kind == "q6_k") {
+    status = qw38::internal::decode_q6_k(block.data(), block.size(),
+                                         decoded.data(), decoded.size());
+    if (status.is_ok()) {
+      status = qw38::internal::dot_q6_k(block.data(), block.size(),
+                                        activation.data(), activation.size(),
+                                        &dot);
+    }
+  } else {
+    std::cerr << "invalid_argument: quant kind must be q4_k or q6_k\n";
+    return 1;
+  }
+  if (!status.is_ok()) {
+    std::cerr << qw38::status_code_name(status.code()) << ": "
+              << status.message() << '\n';
+    return 1;
+  }
+  std::cout << "decoded_f32_le_hex=";
+  for (float value : decoded) write_float_hex(value);
+  std::cout << "\ndot_f32_le_hex=";
+  write_float_hex(dot);
+  std::cout << '\n';
+  return 0;
 }
 
 int tokenize_hex(const char* model_path, const std::string& hex) {
@@ -275,10 +349,13 @@ int main(int argc, char** argv) {
   if (argc == 3 && std::string(argv[1]) == "--render-template-case") {
     return render_template_case(argv[2]);
   }
+  if (argc == 4 && std::string(argv[1]) == "--check-quant") {
+    return check_quant(argv[2], argv[3]);
+  }
   std::cout << kBrand << '\n';
   std::cerr << "qw38-eval: use --build-info, --inspect-gguf PATH, --sha256 PATH, "
                "--verify-model PATH, --check-contract PATH, or "
                "--inventory-gguf PATH OUTPUT, --tokenize-hex PATH HEX, or "
-               "--render-template-case NAME\n";
+               "--render-template-case NAME, or --check-quant KIND HEX\n";
   return 2;
 }

@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "authority": {
+    "repository": "https://github.com/ggml-org/llama.cpp.git",
+    "revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+    "license": "MIT",
+    "files": [
+      "ggml/src/ggml-common.h",
+      "ggml/src/ggml-quants.c"
+    ]
+  },
+  "common": {
+    "values_per_block": 256,
+    "half_encoding": "IEEE 754 binary16, little-endian"
+  },
+  "q4_k": {
+    "bytes_per_block": 144,
+    "fields": [
+      {"name": "d", "offset": 0, "bytes": 2, "meaning": "super-block quant scale"},
+      {"name": "dmin", "offset": 2, "bytes": 2, "meaning": "super-block minimum scale"},
+      {"name": "scales", "offset": 4, "bytes": 12, "meaning": "eight packed 6-bit scales and eight packed 6-bit minima"},
+      {"name": "qs", "offset": 16, "bytes": 128, "meaning": "256 packed unsigned 4-bit values"}
+    ],
+    "equation": "weight = d * subblock_scale * q - dmin * subblock_min"
+  },
+  "q6_k": {
+    "bytes_per_block": 210,
+    "fields": [
+      {"name": "ql", "offset": 0, "bytes": 128, "meaning": "low four bits of 256 values"},
+      {"name": "qh", "offset": 128, "bytes": 64, "meaning": "high two bits of 256 values"},
+      {"name": "scales", "offset": 192, "bytes": 16, "meaning": "signed 8-bit scale for each 16-value group"},
+      {"name": "d", "offset": 208, "bytes": 2, "meaning": "super-block quant scale"}
+    ],
+    "equation": "weight = d * subblock_scale * (unsigned_6_bit_q - 32)"
+  }
+}
