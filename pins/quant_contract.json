@@ -32,5 +32,14 @@
       {"name": "d", "offset": 208, "bytes": 2, "meaning": "super-block quant scale"}
     ],
     "equation": "weight = d * subblock_scale * (unsigned_6_bit_q - 32)"
+  },
+  "q8_0": {
+    "bytes_per_block": 34,
+    "values_per_block": 32,
+    "fields": [
+      {"name": "d", "offset": 0, "bytes": 2, "meaning": "block quant scale"},
+      {"name": "qs", "offset": 2, "bytes": 32, "meaning": "32 signed 8-bit values"}
+    ],
+    "equation": "weight = d * signed_8_bit_q"
   }
 }

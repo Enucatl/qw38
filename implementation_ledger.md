@@ -24,9 +24,10 @@ are repository-relative unless stated otherwise.
 | TOK-001 | Implement pinned tokenizer | MDL-001, PIN-002 | done | Token IDs match frozen authority fixtures byte-for-byte | [`src/tokenizer.cpp`](src/tokenizer.cpp), [`fixtures/tokenizer_authority.json`](fixtures/tokenizer_authority.json); log 2026-08-29T11:02:00Z |
 | TOK-002 | Implement chat/reasoning/tool template | TOK-001 | done | All supported roles, reasoning, tool calls/results, and rejection cases match fixtures | [`src/template.cpp`](src/template.cpp), [`fixtures/template_authority.json`](fixtures/template_authority.json); log 2026-08-29T11:39:57Z |
 | CPU-001 | Implement Q4_K/Q6_K scalar decoding and dot products | MDL-001 | done | Numeric fixtures meet frozen metrics and exact structural checks | [`src/quant.cpp`](src/quant.cpp); [`fixtures/quant_authority.json`](fixtures/quant_authority.json); [`tests/test_quant.py`](tests/test_quant.py); log 2026-08-29T12:05:00Z |
+| CPU-005 | Implement discovered Q8_0 scalar decoding and dot products | CPU-001, MDL-001 | done | Exact 34-byte/32-value layout, signed values, FP16 scale, malformed sizes, and frozen decode/dot fixtures pass | [`src/quant.cpp`](src/quant.cpp); [`fixtures/quant_authority.json`](fixtures/quant_authority.json); [`tests/test_quant.py`](tests/test_quant.py); log 2026-08-29T13:07:00Z |
 | CPU-002 | Implement scalar GDN oracle | CPU-001, MDL-002 | done | Warm-up, recurrence, state, head mapping, and chunk-boundary fixtures pass | [`src/gdn.cpp`](src/gdn.cpp); [`fixtures/gdn_authority.json`](fixtures/gdn_authority.json); [`tests/test_gdn.py`](tests/test_gdn.py); log 2026-08-29T12:26:00Z |
 | CPU-003 | Implement scalar attention and FFN oracle | CPU-001, MDL-002 | done | Layers 3/7/63, partial RoPE, grouped KV, causality, and FFN taps pass | [`src/attention.cpp`](src/attention.cpp); [`fixtures/attention_ffn_authority.json`](fixtures/attention_ffn_authority.json); [`tests/test_attention.py`](tests/test_attention.py); log 2026-08-29T12:54:00Z |
-| CPU-004 | Implement full scalar 64-layer scheduler and logits | CPU-002, CPU-003 | pending | Token/chunk execution and logits match semantic-authority fixtures | — |
+| CPU-004 | Implement full scalar 64-layer scheduler and logits | CPU-002, CPU-003, CPU-005 | pending | Token/chunk execution and logits match semantic-authority fixtures | — |
 | TRC-001 | Define versioned trace bundle and typed comparison metrics | PIN-002 | pending | Manifest/blob schema, checksums, summaries, session frontiers, and metric reporter pass tests | — |
 | TRC-002 | Add diagnostic-only stable scalar/CUDA taps | TRC-001, CPU-004 | pending | Required taps filter by layer/name and are absent from release builds | — |
 | ORA-001 | Generate and freeze scalar/oracle fixtures and tolerances | TOK-002, CPU-004, TRC-002 | pending | Three authorities are attributed; tolerances and greedy tie exceptions are immutable inputs | — |
@@ -61,6 +62,7 @@ are repository-relative unless stated otherwise.
 | EDU-003 | Explain scalar quantization and numeric equality for beginners | CPU-001, DOC-001 | done | Bits/bytes, FP16/FP32, blocks, Q4_K/Q6_K packing, decoding, dot products, accumulation, fixtures, and numeric metrics have worked examples linked to code/evidence | [`docs/17-quantization.md`](docs/17-quantization.md); [`tests/test_quant.py`](tests/test_quant.py); log 2026-08-29T12:05:00Z |
 | EDU-004 | Explain GDN recurrence and persistent state for beginners | CPU-002, DOC-001 | done | Projections, heads, convolution warm-up/rings, gates, delta-rule recurrence, mutation order, chunk equivalence, and FP32 state have worked examples linked to code/evidence | [`docs/18-gated-delta-network.md`](docs/18-gated-delta-network.md); [`tests/test_gdn.py`](tests/test_gdn.py); log 2026-08-29T12:26:00Z |
 | EDU-005 | Explain grouped causal attention, partial RoPE, and SwiGLU for beginners | CPU-003, DOC-001 | done | Q/K/V, KV history, causality, grouped heads, RoPE pairs/positions, softmax, RMSNorm, gate/up/down FFN, fixtures, and numeric gates have worked examples linked to code/evidence | [`docs/19-attention-and-ffn.md`](docs/19-attention-and-ffn.md); [`tests/test_attention.py`](tests/test_attention.py); log 2026-08-29T12:54:00Z |
+| EDU-006 | Explain Q8_0 and scalar matrix rows for beginners | CPU-005, DOC-001 | done | Signed bytes, per-block scale, row blocks, decode/dot use, format selection, fixtures, and full-scheduler dependency are code-linked and worked | [`docs/20-q8-scalar-rows.md`](docs/20-q8-scalar-rows.md); [`tests/test_quant.py`](tests/test_quant.py); log 2026-08-29T13:07:00Z |
 | REL-001 | Publish reproducible release evidence bundle | CMP-003, QLT-001, DOC-001 | pending | Builds, hashes, raw results, reports, and documentation claims reconcile | — |
 
 ## Delivery-Gate Mapping
@@ -590,6 +592,44 @@ are repository-relative unless stated otherwise.
   synthetic layer fixtures, frozen metrics, causal sentinels, tests, beginner
   chapter, provenance, failed run and resolution, and eager-trace limitation
   before committing.
+
+### 2026-08-29T12:57:00Z — Scalar attention pushed; CPU-005 discovered
+
+- Commit `c594040` (`feat: add scalar attention oracle`) created after the
+  documented 28-test and container gates, then pushed to `origin/main`.
+- Added CPU-005 before implementation and made it an explicit CPU-004 dependency.
+  The exact admitted inventory contains Q8_0 attention/GDN projections, but the
+  approved CPU-001 boundary named only Q4_K/Q6_K. A full real-weight scalar
+  scheduler cannot interpret those rows without a Q8_0 primitive.
+- Added EDU-006 so this discovered format and its role in matrix rows are
+  explained rather than appearing as an unexplained implementation detour. This
+  fills a required artifact format; it does not expand the v1 product boundary.
+
+### 2026-08-29T13:07:00Z — CPU-005 and EDU-006 accepted
+
+- Extended the pinned quant contract with upstream Q8_0's exact 34-byte block:
+  one little-endian FP16 scale and 32 signed bytes representing 32 weights.
+- Implemented portable signed-byte decoding and a 32-value FP32 block dot product.
+  Added signed-extreme and zero fixtures; decoded values and dot products match
+  every frozen FP32 bit. Existing Q4_K/Q6_K gates remain unchanged.
+- Recompiled the focused llama adapter with pinned upstream `ggml-quants.c`.
+  All six Q4_K/Q6_K/Q8_0 cases matched the upstream decoded bytes exactly.
+- Added a beginner chapter explaining why a Q4_K_M artifact mixes formats,
+  signed two's-complement bytes, Q8_0's equation and 8.5-bit effective size, a
+  worked value, how 32-value blocks form a matrix row, the distinction from F32,
+  fixtures, provenance, and the CPU-004 dependency/proof boundary.
+- Commands: fixture regeneration, Ruff format/check, clean restricted C++17
+  build, 28 pytest tests, upstream differential compile/run, `git diff --check`,
+  pinned CUDA 13.0.2 full build, SM120 compilation, and RTX 5090 probe — passed.
+  Probe values were 33,671,348,224 total and 33,139,458,048 free bytes.
+- Marked CPU-005 and EDU-006 done. Arbitrary real tensor row binding, orientation,
+  complete projections, the 64-layer schedule, and logits remain CPU-004.
+
+### 2026-08-29T13:08:00Z — Q8_0 scalar commit boundary
+
+- Reviewed the discovered-task rationale/dependency, upstream layout, portable
+  decoder/dot code, expanded fixture generator, upstream adapter, tests,
+  beginner documentation, provenance, and downstream boundary before committing.
 
 ## Decisions and Negative Results
 

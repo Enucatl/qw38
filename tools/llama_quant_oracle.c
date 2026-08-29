@@ -20,14 +20,15 @@ static int hex_value(char character) {
 
 int main(int argc, char **argv) {
   if (argc != 3) {
-    fputs("usage: llama-quant-oracle q4_k|q6_k BLOCK_HEX\n", stderr);
+    fputs("usage: llama-quant-oracle q4_k|q6_k|q8_0 BLOCK_HEX\n", stderr);
     return 2;
   }
-  const size_t expected = strcmp(argv[1], "q4_k") == 0
-                              ? sizeof(block_q4_K)
-                              : strcmp(argv[1], "q6_k") == 0
-                                    ? sizeof(block_q6_K)
-                                    : 0;
+  const size_t expected =
+      strcmp(argv[1], "q4_k") == 0
+          ? sizeof(block_q4_K)
+          : strcmp(argv[1], "q6_k") == 0
+                ? sizeof(block_q6_K)
+                : strcmp(argv[1], "q8_0") == 0 ? sizeof(block_q8_0) : 0;
   if (expected == 0 || strlen(argv[2]) != expected * 2) {
     fputs("invalid kind or block size\n", stderr);
     return 1;
@@ -35,6 +36,7 @@ int main(int argc, char **argv) {
   union {
     block_q4_K q4;
     block_q6_K q6;
+    block_q8_0 q8;
     uint8_t bytes[sizeof(block_q6_K)];
   } block;
   for (size_t index = 0; index < expected; ++index) {
@@ -49,11 +51,14 @@ int main(int argc, char **argv) {
   float output[QK_K];
   if (strcmp(argv[1], "q4_k") == 0) {
     dequantize_row_q4_K(&block.q4, output, QK_K);
-  } else {
+  } else if (strcmp(argv[1], "q6_k") == 0) {
     dequantize_row_q6_K(&block.q6, output, QK_K);
+  } else {
+    dequantize_row_q8_0(&block.q8, output, QK8_0);
   }
   static const char hex[] = "0123456789abcdef";
-  for (size_t index = 0; index < QK_K; ++index) {
+  const size_t output_count = strcmp(argv[1], "q8_0") == 0 ? QK8_0 : QK_K;
+  for (size_t index = 0; index < output_count; ++index) {
     uint32_t bits = 0;
     memcpy(&bits, output + index, sizeof(bits));
     for (unsigned int byte = 0; byte < 4; ++byte) {

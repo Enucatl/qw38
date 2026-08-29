@@ -47,7 +47,10 @@ def test_exact_fixtures_imply_frozen_zero_error_metrics() -> None:
         expected = floats_from_hex(case["decoded_f32_le_hex"])
         differences = [abs(left - right) for left, right in zip(actual, expected)]
         assert max(differences) == 0.0
-        assert math.sqrt(sum(value * value for value in differences) / 256) == 0.0
+        assert (
+            math.sqrt(sum(value * value for value in differences) / len(differences))
+            == 0.0
+        )
         assert not any(math.isnan(value) or math.isinf(value) for value in actual)
         if any(expected):
             numerator = sum(left * right for left, right in zip(actual, expected))
@@ -68,7 +71,7 @@ def test_quant_diagnostic_rejects_wrong_sizes_kinds_and_hex() -> None:
 
     wrong_kind = run_quant("q5_k", "00" * 144)
     assert wrong_kind.returncode == 1
-    assert "quant kind must be q4_k or q6_k" in wrong_kind.stderr
+    assert "quant kind must be q4_k, q6_k, or q8_0" in wrong_kind.stderr
 
     invalid_hex = run_quant("q4_k", "not-hex")
     assert invalid_hex.returncode == 1

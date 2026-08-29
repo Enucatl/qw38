@@ -44,7 +44,8 @@ for language and host portability decisions.
 17. [Quantization and scalar arithmetic](17-quantization.md): packed Q4_K/Q6_K weights, decoding, dot products, and numeric equality.
 18. [Gated Delta Networks](18-gated-delta-network.md): recurrence, convolution warm-up, head mapping, persistent state, and chunks.
 19. [Attention and feed-forward networks](19-attention-and-ffn.md): grouped causal lookup, partial RoPE, KV history, softmax, and SwiGLU.
-20. [Source and evidence ledger](sources.md).
+20. [Q8_0 scalar rows](20-q8-scalar-rows.md): signed-byte blocks, mixed-format artifacts, and matrix-row preparation.
+21. [Source and evidence ledger](sources.md).
 
 Claims use four labels: **Measured** (this exact artifact and hardware),
 **External** (a linked source), **Estimated** (reproducible arithmetic), and

@@ -40,9 +40,9 @@ DSpark are explicitly rejected as Qwen model semantics.
   `cc83d7b4824f73cfdda4dfbb47ee39804f71b328` supplies the MIT-licensed GGML
   `block_q4_K`/`block_q6_K` layouts and scalar dequantization equations pinned in
   [`pins/quant_contract.json`](../pins/quant_contract.json). Quartz uses those
-  definitions as the CPU-001 format authority; its local scalar implementation
-  and independently stored fixtures remain code-reviewed and differentially
-  tested boundaries.
+  definitions as the CPU-001 Q4_K/Q6_K and discovered CPU-005 Q8_0 format
+  authority; its local scalar implementation and independently stored fixtures
+  remain code-reviewed and differentially tested boundaries.
 - [Transformers Qwen3.5 implementation](https://github.com/huggingface/transformers/blob/42ca97014c85d71a88ad60d55f08cb9fb4d26e2c/src/transformers/models/qwen3_5/modeling_qwen3_5.py)
   revision `42ca97014c85d71a88ad60d55f08cb9fb4d26e2c` is the Apache-2.0
   semantic authority for CPU-002's GDN convolution, L2 normalization, gate, head

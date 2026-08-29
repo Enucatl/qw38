@@ -42,7 +42,7 @@ float half_to_float(std::uint16_t half) noexcept {
 
 Status validate(const std::uint8_t* block, std::size_t block_bytes,
                 std::size_t expected_bytes, float* output,
-                std::size_t output_count) noexcept {
+                std::size_t output_count, std::size_t expected_count) noexcept {
   if (block == nullptr || output == nullptr) {
     return {StatusCode::kInvalidArgument,
             "quant block and output pointers must not be null"};
@@ -50,9 +50,9 @@ Status validate(const std::uint8_t* block, std::size_t block_bytes,
   if (block_bytes != expected_bytes) {
     return {StatusCode::kInvalidArgument, "quant block has the wrong byte size"};
   }
-  if (output_count != kQuantBlockValues) {
+  if (output_count != expected_count) {
     return {StatusCode::kInvalidArgument,
-            "quant output must contain exactly 256 values"};
+            "quant output has the wrong value count"};
   }
   return Status::ok();
 }
@@ -71,17 +71,18 @@ void q4_scale_min(const std::uint8_t* packed, std::size_t index,
 }
 
 Status dot_decoded(const float* values, const float* activation,
-                   std::size_t activation_count, float* output) noexcept {
+                   std::size_t activation_count, std::size_t expected_count,
+                   float* output) noexcept {
   if (activation == nullptr || output == nullptr) {
     return {StatusCode::kInvalidArgument,
             "activation and dot output pointers must not be null"};
   }
-  if (activation_count != kQuantBlockValues) {
+  if (activation_count != expected_count) {
     return {StatusCode::kInvalidArgument,
-            "quant dot activation must contain exactly 256 values"};
+            "quant dot activation has the wrong value count"};
   }
   float total = 0.0F;
-  for (std::size_t index = 0; index < kQuantBlockValues; ++index) {
+  for (std::size_t index = 0; index < expected_count; ++index) {
     const float product = values[index] * activation[index];
     total += product;
   }
@@ -94,7 +95,8 @@ Status dot_decoded(const float* values, const float* activation,
 Status decode_q4_k(const std::uint8_t* block, std::size_t block_bytes,
                    float* output, std::size_t output_count) noexcept {
   Status status =
-      validate(block, block_bytes, kQ4KBlockBytes, output, output_count);
+      validate(block, block_bytes, kQ4KBlockBytes, output, output_count,
+               kQuantBlockValues);
   if (!status.is_ok()) return status;
 
   const float d = half_to_float(read_u16_le(block));
@@ -128,7 +130,8 @@ Status decode_q4_k(const std::uint8_t* block, std::size_t block_bytes,
 Status decode_q6_k(const std::uint8_t* block, std::size_t block_bytes,
                    float* output, std::size_t output_count) noexcept {
   Status status =
-      validate(block, block_bytes, kQ6KBlockBytes, output, output_count);
+      validate(block, block_bytes, kQ6KBlockBytes, output, output_count,
+               kQuantBlockValues);
   if (!status.is_ok()) return status;
 
   const std::uint8_t* low = block;
@@ -172,13 +175,29 @@ Status decode_q6_k(const std::uint8_t* block, std::size_t block_bytes,
   return Status::ok();
 }
 
+Status decode_q8_0(const std::uint8_t* block, std::size_t block_bytes,
+                   float* output, std::size_t output_count) noexcept {
+  Status status = validate(block, block_bytes, kQ80BlockBytes, output,
+                           output_count, kQ80BlockValues);
+  if (!status.is_ok()) return status;
+  const float scale = half_to_float(read_u16_le(block));
+  for (std::size_t index = 0; index < kQ80BlockValues; ++index) {
+    const std::uint8_t byte = block[index + 2];
+    const int quant =
+        byte < 128U ? static_cast<int>(byte) : static_cast<int>(byte) - 256;
+    output[index] = scale * static_cast<float>(quant);
+  }
+  return Status::ok();
+}
+
 Status dot_q4_k(const std::uint8_t* block, std::size_t block_bytes,
                 const float* activation, std::size_t activation_count,
                 float* output) noexcept {
   std::array<float, kQuantBlockValues> values{};
   Status status = decode_q4_k(block, block_bytes, values.data(), values.size());
   if (!status.is_ok()) return status;
-  return dot_decoded(values.data(), activation, activation_count, output);
+  return dot_decoded(values.data(), activation, activation_count,
+                     kQuantBlockValues, output);
 }
 
 Status dot_q6_k(const std::uint8_t* block, std::size_t block_bytes,
@@ -187,7 +206,18 @@ Status dot_q6_k(const std::uint8_t* block, std::size_t block_bytes,
   std::array<float, kQuantBlockValues> values{};
   Status status = decode_q6_k(block, block_bytes, values.data(), values.size());
   if (!status.is_ok()) return status;
-  return dot_decoded(values.data(), activation, activation_count, output);
+  return dot_decoded(values.data(), activation, activation_count,
+                     kQuantBlockValues, output);
+}
+
+Status dot_q8_0(const std::uint8_t* block, std::size_t block_bytes,
+                const float* activation, std::size_t activation_count,
+                float* output) noexcept {
+  std::array<float, kQ80BlockValues> values{};
+  Status status = decode_q8_0(block, block_bytes, values.data(), values.size());
+  if (!status.is_ok()) return status;
+  return dot_decoded(values.data(), activation, activation_count,
+                     kQ80BlockValues, output);
 }
 
 }  // namespace qw38::internal

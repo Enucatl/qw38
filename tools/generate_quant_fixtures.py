@@ -81,6 +81,12 @@ def decode_q6(block: bytes) -> list[float]:
     return values
 
 
+def decode_q8(block: bytes) -> list[float]:
+    (scale,) = struct.unpack_from("<e", block)
+    quants = struct.unpack_from("<32b", block, 2)
+    return [f32(scale * quant) for quant in quants]
+
+
 def activation(index: int) -> float:
     return f32(((index * 37) % 101 - 50) / 32.0)
 
@@ -93,7 +99,12 @@ def scalar_dot(values: list[float]) -> float:
 
 
 def fixture(name: str, kind: str, block: bytes) -> dict[str, object]:
-    values = decode_q4(block) if kind == "q4_k" else decode_q6(block)
+    if kind == "q4_k":
+        values = decode_q4(block)
+    elif kind == "q6_k":
+        values = decode_q6(block)
+    else:
+        values = decode_q8(block)
     return {
         "name": name,
         "kind": kind,
@@ -122,6 +133,42 @@ def main() -> None:
         + half(0.25)
     )
     q6_zero = bytes(208) + half(1.0)
+    q8_pattern = half(0.25) + struct.pack(
+        "<32b",
+        -128,
+        -127,
+        -96,
+        -64,
+        -33,
+        -32,
+        -17,
+        -1,
+        0,
+        1,
+        2,
+        7,
+        15,
+        16,
+        31,
+        32,
+        47,
+        63,
+        64,
+        79,
+        95,
+        96,
+        111,
+        126,
+        127,
+        -2,
+        -7,
+        -15,
+        -48,
+        -80,
+        -112,
+        48,
+    )
+    q8_zero = bytes(34)
     document = {
         "schema_version": 1,
         "authority": {
@@ -136,6 +183,8 @@ def main() -> None:
             fixture("q4_all_zero", "q4_k", q4_zero),
             fixture("q6_signed_extremes", "q6_k", q6_pattern),
             fixture("q6_zero_scale", "q6_k", q6_zero),
+            fixture("q8_signed_extremes", "q8_0", q8_pattern),
+            fixture("q8_all_zero", "q8_0", q8_zero),
         ],
     }
     OUTPUT.write_text(json.dumps(document, indent=2) + "\n")

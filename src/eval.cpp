@@ -140,8 +140,11 @@ int check_quant(const std::string& kind, const std::string& hex) {
     std::cerr << "invalid_argument: quant block is not even-length hexadecimal\n";
     return 1;
   }
-  std::array<float, qw38::internal::kQuantBlockValues> decoded{};
-  std::array<float, qw38::internal::kQuantBlockValues> activation{};
+  const std::size_t value_count = kind == "q8_0"
+                                      ? qw38::internal::kQ80BlockValues
+                                      : qw38::internal::kQuantBlockValues;
+  std::vector<float> decoded(value_count);
+  std::vector<float> activation(value_count);
   for (std::size_t index = 0; index < activation.size(); ++index) {
     const int numerator = static_cast<int>((index * 37) % 101) - 50;
     activation[index] = static_cast<float>(numerator) / 32.0F;
@@ -164,8 +167,16 @@ int check_quant(const std::string& kind, const std::string& hex) {
                                         activation.data(), activation.size(),
                                         &dot);
     }
+  } else if (kind == "q8_0") {
+    status = qw38::internal::decode_q8_0(block.data(), block.size(),
+                                         decoded.data(), decoded.size());
+    if (status.is_ok()) {
+      status = qw38::internal::dot_q8_0(block.data(), block.size(),
+                                        activation.data(), activation.size(),
+                                        &dot);
+    }
   } else {
-    std::cerr << "invalid_argument: quant kind must be q4_k or q6_k\n";
+    std::cerr << "invalid_argument: quant kind must be q4_k, q6_k, or q8_0\n";
     return 1;
   }
   if (!status.is_ok()) {
