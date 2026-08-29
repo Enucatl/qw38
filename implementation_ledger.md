@@ -24,7 +24,7 @@ are repository-relative unless stated otherwise.
 | TOK-001 | Implement pinned tokenizer | MDL-001, PIN-002 | done | Token IDs match frozen authority fixtures byte-for-byte | [`src/tokenizer.cpp`](src/tokenizer.cpp), [`fixtures/tokenizer_authority.json`](fixtures/tokenizer_authority.json); log 2026-08-29T11:02:00Z |
 | TOK-002 | Implement chat/reasoning/tool template | TOK-001 | done | All supported roles, reasoning, tool calls/results, and rejection cases match fixtures | [`src/template.cpp`](src/template.cpp), [`fixtures/template_authority.json`](fixtures/template_authority.json); log 2026-08-29T11:39:57Z |
 | CPU-001 | Implement Q4_K/Q6_K scalar decoding and dot products | MDL-001 | done | Numeric fixtures meet frozen metrics and exact structural checks | [`src/quant.cpp`](src/quant.cpp); [`fixtures/quant_authority.json`](fixtures/quant_authority.json); [`tests/test_quant.py`](tests/test_quant.py); log 2026-08-29T12:05:00Z |
-| CPU-002 | Implement scalar GDN oracle | CPU-001, MDL-002 | pending | Warm-up, recurrence, state, head mapping, and chunk-boundary fixtures pass | — |
+| CPU-002 | Implement scalar GDN oracle | CPU-001, MDL-002 | done | Warm-up, recurrence, state, head mapping, and chunk-boundary fixtures pass | [`src/gdn.cpp`](src/gdn.cpp); [`fixtures/gdn_authority.json`](fixtures/gdn_authority.json); [`tests/test_gdn.py`](tests/test_gdn.py); log 2026-08-29T12:26:00Z |
 | CPU-003 | Implement scalar attention and FFN oracle | CPU-001, MDL-002 | pending | Layers 3/7/63, partial RoPE, grouped KV, causality, and FFN taps pass | — |
 | CPU-004 | Implement full scalar 64-layer scheduler and logits | CPU-002, CPU-003 | pending | Token/chunk execution and logits match semantic-authority fixtures | — |
 | TRC-001 | Define versioned trace bundle and typed comparison metrics | PIN-002 | pending | Manifest/blob schema, checksums, summaries, session frontiers, and metric reporter pass tests | — |
@@ -59,6 +59,7 @@ are repository-relative unless stated otherwise.
 | EDU-001 | Explain tokenizer concepts for readers with no prior background | TOK-001, DOC-001 | done | NFC, Unicode splitting, byte mapping, BPE, fixtures, and equality gates have worked examples linked to code/evidence | [`docs/15-tokenizer-authority.md`](docs/15-tokenizer-authority.md); tests; log 2026-08-29T11:02:00Z |
 | EDU-002 | Explain chat-template concepts and policy ownership for beginners | TOK-002, DOC-001 | done | Roles, delimiters, reasoning, tools, results, mapping, and byte-equality gates have worked examples linked to code/evidence | [`docs/16-chat-template.md`](docs/16-chat-template.md); tests; log 2026-08-29T11:39:57Z |
 | EDU-003 | Explain scalar quantization and numeric equality for beginners | CPU-001, DOC-001 | done | Bits/bytes, FP16/FP32, blocks, Q4_K/Q6_K packing, decoding, dot products, accumulation, fixtures, and numeric metrics have worked examples linked to code/evidence | [`docs/17-quantization.md`](docs/17-quantization.md); [`tests/test_quant.py`](tests/test_quant.py); log 2026-08-29T12:05:00Z |
+| EDU-004 | Explain GDN recurrence and persistent state for beginners | CPU-002, DOC-001 | done | Projections, heads, convolution warm-up/rings, gates, delta-rule recurrence, mutation order, chunk equivalence, and FP32 state have worked examples linked to code/evidence | [`docs/18-gated-delta-network.md`](docs/18-gated-delta-network.md); [`tests/test_gdn.py`](tests/test_gdn.py); log 2026-08-29T12:26:00Z |
 | REL-001 | Publish reproducible release evidence bundle | CMP-003, QLT-001, DOC-001 | pending | Builds, hashes, raw results, reports, and documentation claims reconcile | — |
 
 ## Delivery-Gate Mapping
@@ -460,6 +461,65 @@ are repository-relative unless stated otherwise.
 - Reviewed the pin, fixture generator/output, upstream adapter, scalar source,
   strict build flag, diagnostics, tests, beginner documentation, provenance,
   and preserved negative result before the requested commit.
+
+### 2026-08-29T12:08:00Z — Scalar quantization pushed; CPU-002 started
+
+- Commit `290ff0f` (`feat: add scalar quantization oracle`) created after Ruff,
+  19 pytest tests, restricted host build, upstream differential check, pinned
+  CUDA container build, SM120 compilation, and RTX 5090 probe passed; pushed to
+  `origin/main` successfully.
+- Began CPU-002 and added EDU-004 before implementation. The official pinned
+  Qwen3.5 authority must first fix the GDN projection packing, head mapping,
+  causal convolution warm-up, gate equations, recurrence mutation order, and
+  persistent-state shapes. The native oracle and beginner explanation will be
+  derived from that frozen contract, not from a generic recurrent abstraction.
+
+### 2026-08-29T12:18:00Z — CPU-002 authority-environment boundary
+
+- Inspected and hashed the exact pinned Transformers Qwen3.5 implementation.
+  The local Python environment does not contain PyTorch, so it cannot directly
+  execute the decorated Transformers fallback as part of this focused host gate.
+- The CPU-002 fixture generator is therefore labeled precisely as an explicit
+  FP32 scalar transcription of the pinned `causal_conv1d_update`, `l2norm`, gate,
+  and `torch_recurrent_gated_delta_rule` equations. It is not labeled as a
+  Transformers eager trace. Direct eager/offloaded model traces remain required
+  by ORA-001 and cannot be inferred from CPU-002 success.
+
+### 2026-08-29T12:26:00Z — CPU-002 and EDU-004 accepted
+
+- Pinned the official implementation revision, file SHA-256, used symbols,
+  production shapes, normalization/gate equations, mutation order, convolution
+  semantics, and FP32 state dtype in the GDN contract.
+- Implemented a shape-bounded scalar GDN core: stable sigmoid/softplus gates,
+  per-head FP32 L2 normalization, query scaling, exact three-to-one head reuse,
+  decay-before-delta mutation, updated-state readout, four-wide zero-warmed
+  depthwise causal convolution, and SiLU.
+- Frozen `2e-6` maximum absolute, `2e-5` maximum relative, `1e-6` RMS, and
+  `0.999999` minimum cosine tolerances before CUDA work. Measured maxima were
+  `1.1920928955078125e-7` absolute, `2.703506447862878e-6` relative, and
+  `3.825640424749008e-8` RMS; minimum measured cosine exceeded
+  `0.999999999999994`.
+- Whole, `[2,1,2]`, and token-wise recurrent schedules produced byte-identical
+  gates, outputs, and final matrices. Whole, `[1,2,3]`, and token-wise
+  convolution schedules likewise produced byte-identical outputs and histories.
+  Invalid head ratios, buffer counts, components, and chunk names fail closed.
+- Added a beginner chapter covering fixed-state memory, projections, heads and
+  the three-to-one map, matrix sizes, normalization, gates, a worked delta-rule
+  update, convolution warm-up/rings, mutation ownership, atomicity boundaries,
+  chunks, fixtures, tolerances, authority labels, and remaining proof gaps.
+- Commands: fixture regeneration, Ruff format/check, clean restricted C++17
+  build, 24 pytest tests, `git diff --check`, pinned CUDA 13.0.2 full build,
+  SM120 compilation, and RTX 5090 probe — passed. Probe values were
+  33,671,348,224 total and 33,139,458,048 free bytes.
+- Marked CPU-002 and EDU-004 done. Direct Transformers eager trace evidence is
+  still ORA-001; full real-weight GDN projections/scheduling remain CPU-004.
+
+### 2026-08-29T12:27:00Z — Scalar GDN commit boundary
+
+- Reviewed the official pin/hash, scalar transcription and tolerances, native
+  recurrence/convolution code, diagnostics, shape failures, tests, educational
+  chapter, provenance, measured metrics, and explicit eager-trace limitation
+  before committing.
 
 ## Decisions and Negative Results
 

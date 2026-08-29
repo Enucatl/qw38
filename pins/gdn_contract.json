@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "semantic_authority": {
+    "repository": "https://github.com/huggingface/transformers.git",
+    "revision": "42ca97014c85d71a88ad60d55f08cb9fb4d26e2c",
+    "path": "src/transformers/models/qwen3_5/modeling_qwen3_5.py",
+    "sha256": "1d538599c80b3d2986911f269fe091d936c6e64a65188e7705d1290b7f403245",
+    "license": "Apache-2.0",
+    "symbols": [
+      "causal_conv1d_update",
+      "l2norm",
+      "torch_recurrent_gated_delta_rule",
+      "Qwen3_5GatedDeltaNet"
+    ]
+  },
+  "production_shape": {
+    "key_heads": 16,
+    "value_heads": 48,
+    "key_head_width": 128,
+    "value_head_width": 128,
+    "convolution_width": 4,
+    "key_head_reuse": 3,
+    "recurrent_state_shape_per_layer": [48, 128, 128],
+    "recurrent_state_dtype": "float32"
+  },
+  "equations": {
+    "qk_normalization": "x / sqrt(sum(x*x) + 1e-6)",
+    "query_scaling": "normalized_query / sqrt(key_head_width)",
+    "beta": "sigmoid(b)",
+    "log_decay": "-exp(A_log) * softplus(a + dt_bias)",
+    "mutation_order": [
+      "state = state * exp(log_decay)",
+      "prediction = transpose(key) * state",
+      "delta = (value - prediction) * beta",
+      "state = state + key * transpose(delta)",
+      "output = transpose(query) * state"
+    ],
+    "convolution": "shift zero-warmed per-channel ring, append current projection, dot oldest-to-newest with four weights, then SiLU"
+  }
+}

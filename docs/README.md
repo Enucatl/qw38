@@ -42,7 +42,8 @@ for language and host portability decisions.
 15. [Tokenizer authority](15-tokenizer-authority.md): pinned Unicode/BPE fixtures and native admission boundary.
 16. [Chat templates](16-chat-template.md): roles, reasoning, tools, policy ownership, and exact rendering.
 17. [Quantization and scalar arithmetic](17-quantization.md): packed Q4_K/Q6_K weights, decoding, dot products, and numeric equality.
-18. [Source and evidence ledger](sources.md).
+18. [Gated Delta Networks](18-gated-delta-network.md): recurrence, convolution warm-up, head mapping, persistent state, and chunks.
+19. [Source and evidence ledger](sources.md).
 
 Claims use four labels: **Measured** (this exact artifact and hardware),
 **External** (a linked source), **Estimated** (reproducible arithmetic), and

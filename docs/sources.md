@@ -43,6 +43,13 @@ DSpark are explicitly rejected as Qwen model semantics.
   definitions as the CPU-001 format authority; its local scalar implementation
   and independently stored fixtures remain code-reviewed and differentially
   tested boundaries.
+- [Transformers Qwen3.5 implementation](https://github.com/huggingface/transformers/blob/42ca97014c85d71a88ad60d55f08cb9fb4d26e2c/src/transformers/models/qwen3_5/modeling_qwen3_5.py)
+  revision `42ca97014c85d71a88ad60d55f08cb9fb4d26e2c` is the Apache-2.0
+  semantic authority for CPU-002's GDN convolution, L2 normalization, gate, head
+  mapping, and recurrent mutation order. Its source SHA-256 and used symbols are
+  frozen in [`pins/gdn_contract.json`](../pins/gdn_contract.json). The local
+  fixture is transparently labeled a scalar transcription; a direct eager trace
+  remains ORA-001 work.
 
 ## Specialization and hardware references
 

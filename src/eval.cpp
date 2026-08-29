@@ -1,4 +1,5 @@
 #include <array>
+#include <cmath>
 #include <cstdio>
 #include <cstring>
 #include <filesystem>
@@ -10,6 +11,7 @@
 #include <unistd.h>
 
 #include "qw38/engine.h"
+#include "gdn.h"
 #include "model.h"
 #include "quant.h"
 #include "sha256.h"
@@ -176,6 +178,205 @@ int check_quant(const std::string& kind, const std::string& hex) {
   write_float_hex(dot);
   std::cout << '\n';
   return 0;
+}
+
+void write_float_vector(const char* name, const std::vector<float>& values) {
+  std::cout << name << '=';
+  for (float value : values) write_float_hex(value);
+  std::cout << '\n';
+}
+
+float fixture_query(std::size_t token, std::size_t head, std::size_t lane) {
+  const int numerator =
+      static_cast<int>((token * 11 + head * 7 + lane * 3) % 19) - 9;
+  return static_cast<float>(numerator) / 8.0F;
+}
+
+float fixture_key(std::size_t token, std::size_t head, std::size_t lane) {
+  const int numerator =
+      static_cast<int>((token * 13 + head * 5 + lane * 7) % 23) - 11;
+  return static_cast<float>(numerator) / 8.0F;
+}
+
+float fixture_value(std::size_t token, std::size_t head, std::size_t lane) {
+  const int numerator =
+      static_cast<int>((token * 17 + head * 3 + lane * 5) % 29) - 14;
+  return static_cast<float>(numerator) / 8.0F;
+}
+
+int check_gdn_recurrent(const std::string& chunking) {
+  constexpr qw38::internal::GdnShape kShape{2, 6, 3, 2};
+  constexpr std::size_t kTokens = 5;
+  std::vector<std::size_t> chunks;
+  if (chunking == "whole") {
+    chunks = {5};
+  } else if (chunking == "mixed") {
+    chunks = {2, 1, 2};
+  } else if (chunking == "token") {
+    chunks = {1, 1, 1, 1, 1};
+  } else {
+    std::cerr << "invalid_argument: unknown GDN chunking\n";
+    return 1;
+  }
+  std::vector<float> state(kShape.value_heads * kShape.key_width *
+                           kShape.value_width);
+  for (std::size_t head = 0; head < kShape.value_heads; ++head) {
+    for (std::size_t key_lane = 0; key_lane < kShape.key_width; ++key_lane) {
+      for (std::size_t value_lane = 0; value_lane < kShape.value_width;
+           ++value_lane) {
+        const int numerator = static_cast<int>(
+                                  (head * 17 + key_lane * 5 + value_lane * 3) %
+                                  13) -
+                              6;
+        state[head * kShape.key_width * kShape.value_width +
+              key_lane * kShape.value_width + value_lane] =
+            static_cast<float>(numerator) / 32.0F;
+      }
+    }
+  }
+  std::vector<float> all_output;
+  std::vector<float> all_log_decay;
+  std::vector<float> all_beta;
+  std::size_t token = 0;
+  for (std::size_t chunk : chunks) {
+    for (std::size_t offset = 0; offset < chunk; ++offset, ++token) {
+      std::array<float, 6> query{};
+      std::array<float, 6> key{};
+      std::array<float, 12> value{};
+      std::array<float, 6> a{};
+      std::array<float, 6> b{};
+      std::array<float, 6> a_log{};
+      std::array<float, 6> dt_bias{};
+      std::array<float, 12> output{};
+      std::array<float, 6> log_decay{};
+      std::array<float, 6> beta{};
+      for (std::size_t head = 0; head < kShape.key_heads; ++head) {
+        for (std::size_t lane = 0; lane < kShape.key_width; ++lane) {
+          query[head * kShape.key_width + lane] =
+              fixture_query(token, head, lane);
+          key[head * kShape.key_width + lane] =
+              fixture_key(token, head, lane);
+        }
+      }
+      for (std::size_t head = 0; head < kShape.value_heads; ++head) {
+        for (std::size_t lane = 0; lane < kShape.value_width; ++lane) {
+          value[head * kShape.value_width + lane] =
+              fixture_value(token, head, lane);
+        }
+        a[head] = static_cast<float>(
+                      static_cast<int>((token * 5 + head * 3) % 13) - 6) /
+                  8.0F;
+        b[head] = static_cast<float>(
+                      static_cast<int>((token * 7 + head * 2) % 11) - 5) /
+                  8.0F;
+        a_log[head] = std::log(0.25F * static_cast<float>(head + 1));
+        dt_bias[head] =
+            static_cast<float>(static_cast<int>(head) - 2) / 8.0F;
+      }
+      const qw38::Status status = qw38::internal::gdn_recurrent_step(
+          kShape, query.data(), query.size(), key.data(), key.size(),
+          value.data(), value.size(), a.data(), b.data(), a_log.data(),
+          dt_bias.data(), a.size(), state.data(), state.size(), output.data(),
+          output.size(), log_decay.data(), beta.data());
+      if (!status.is_ok()) {
+        std::cerr << qw38::status_code_name(status.code()) << ": "
+                  << status.message() << '\n';
+        return 1;
+      }
+      all_output.insert(all_output.end(), output.begin(), output.end());
+      all_log_decay.insert(all_log_decay.end(), log_decay.begin(),
+                           log_decay.end());
+      all_beta.insert(all_beta.end(), beta.begin(), beta.end());
+    }
+  }
+  if (token != kTokens) {
+    std::cerr << "internal: GDN fixture chunking has the wrong token count\n";
+    return 1;
+  }
+  write_float_vector("output_f32_le_hex", all_output);
+  write_float_vector("final_state_f32_le_hex", state);
+  write_float_vector("log_decay_f32_le_hex", all_log_decay);
+  write_float_vector("beta_f32_le_hex", all_beta);
+  return 0;
+}
+
+int check_gdn_convolution(const std::string& chunking) {
+  constexpr std::size_t kChannels = 3;
+  constexpr std::size_t kWidth = 4;
+  std::vector<std::size_t> chunks;
+  if (chunking == "whole") {
+    chunks = {6};
+  } else if (chunking == "mixed") {
+    chunks = {1, 2, 3};
+  } else if (chunking == "token") {
+    chunks = {1, 1, 1, 1, 1, 1};
+  } else {
+    std::cerr << "invalid_argument: unknown GDN chunking\n";
+    return 1;
+  }
+  std::array<float, kChannels * kWidth> weights{};
+  std::array<float, kChannels * kWidth> state{};
+  for (std::size_t channel = 0; channel < kChannels; ++channel) {
+    for (std::size_t index = 0; index < kWidth; ++index) {
+      const int numerator =
+          static_cast<int>((channel * 11 + index * 3) % 13) - 6;
+      weights[channel * kWidth + index] =
+          static_cast<float>(numerator) / 8.0F;
+    }
+  }
+  std::vector<float> all_output;
+  std::size_t token = 0;
+  for (std::size_t chunk : chunks) {
+    for (std::size_t offset = 0; offset < chunk; ++offset, ++token) {
+      std::array<float, kChannels> input{};
+      std::array<float, kChannels> output{};
+      for (std::size_t channel = 0; channel < kChannels; ++channel) {
+        const int numerator =
+            static_cast<int>((token * 7 + channel * 5) % 17) - 8;
+        input[channel] = static_cast<float>(numerator) / 8.0F;
+      }
+      const qw38::Status status = qw38::internal::causal_depthwise_conv_step(
+          kChannels, kWidth, input.data(), input.size(), weights.data(),
+          weights.size(), state.data(), state.size(), output.data(),
+          output.size());
+      if (!status.is_ok()) {
+        std::cerr << qw38::status_code_name(status.code()) << ": "
+                  << status.message() << '\n';
+        return 1;
+      }
+      all_output.insert(all_output.end(), output.begin(), output.end());
+    }
+  }
+  write_float_vector("output_f32_le_hex", all_output);
+  write_float_vector("final_state_f32_le_hex", {state.begin(), state.end()});
+  return 0;
+}
+
+int check_gdn(const std::string& component, const std::string& chunking) {
+  if (component == "recurrent") return check_gdn_recurrent(chunking);
+  if (component == "convolution") return check_gdn_convolution(chunking);
+  if (component == "invalid_shape") {
+    float value = 0.0F;
+    const qw38::internal::GdnShape shape{2, 5, 3, 2};
+    const qw38::Status status = qw38::internal::gdn_recurrent_step(
+        shape, &value, 1, &value, 1, &value, 1, &value, &value, &value,
+        &value, 1, &value, 1, &value, 1, &value, &value);
+    std::cerr << qw38::status_code_name(status.code()) << ": "
+              << status.message() << '\n';
+    return status.is_ok() ? 0 : 1;
+  }
+  if (component == "invalid_buffers") {
+    float value = 0.0F;
+    const qw38::internal::GdnShape shape{1, 1, 1, 1};
+    const qw38::Status status = qw38::internal::gdn_recurrent_step(
+        shape, &value, 0, &value, 1, &value, 1, &value, &value, &value,
+        &value, 1, &value, 1, &value, 1, &value, &value);
+    std::cerr << qw38::status_code_name(status.code()) << ": "
+              << status.message() << '\n';
+    return status.is_ok() ? 0 : 1;
+  }
+  std::cerr << "invalid_argument: GDN component must be recurrent or convolution\n";
+  return 1;
 }
 
 int tokenize_hex(const char* model_path, const std::string& hex) {
@@ -352,10 +553,14 @@ int main(int argc, char** argv) {
   if (argc == 4 && std::string(argv[1]) == "--check-quant") {
     return check_quant(argv[2], argv[3]);
   }
+  if (argc == 4 && std::string(argv[1]) == "--check-gdn") {
+    return check_gdn(argv[2], argv[3]);
+  }
   std::cout << kBrand << '\n';
   std::cerr << "qw38-eval: use --build-info, --inspect-gguf PATH, --sha256 PATH, "
                "--verify-model PATH, --check-contract PATH, or "
                "--inventory-gguf PATH OUTPUT, --tokenize-hex PATH HEX, or "
-               "--render-template-case NAME, or --check-quant KIND HEX\n";
+               "--render-template-case NAME, --check-quant KIND HEX, or "
+               "--check-gdn COMPONENT CHUNKING\n";
   return 2;
 }

@@ -1,0 +1,72 @@
+{
+  "schema_version": 1,
+  "authority": {
+    "implementation": "Transformers Qwen3_5 recurrent fallback, transcribed as explicit FP32 scalar operations",
+    "revision": "42ca97014c85d71a88ad60d55f08cb9fb4d26e2c",
+    "contract": "pins/gdn_contract.json"
+  },
+  "tolerances": {
+    "absolute": 2e-06,
+    "relative": 2e-05,
+    "rms": 1e-06,
+    "cosine_minimum": 0.999999
+  },
+  "recurrent": {
+    "shape": {
+      "tokens": 5,
+      "key_heads": 2,
+      "value_heads": 6,
+      "key_width": 3,
+      "value_width": 2,
+      "key_head_reuse": 3
+    },
+    "chunkings": [
+      [
+        5
+      ],
+      [
+        2,
+        1,
+        2
+      ],
+      [
+        1,
+        1,
+        1,
+        1,
+        1
+      ]
+    ],
+    "output_f32_le_hex": "470d84be6a9413bea46280be8a8439be040a54be5bcbd4bd7cca3dbe4573bf3c8c9fb8bda3adfd3db026403d16638b3ee046953df0074bbd409cb4bb6084d23bc82939bc10d528bcfc53d33e6bf3b0be75e3dfbed215a4be220bd2bebca07ebeaf52bebe32596fbe94ad9dbe2aa251be16102fbe86c3aebca035c4bc13006b3ee44dcd3dc889583e4011333e306a9c3eb400733edcdc423eaef45f3eb79fa83e600bde3c2625e73de94d563e814be63d3cab2a3e864e7f3dc181fa3dd21cbf3bf283bdbe60fc3fbe891c1fbe52dd0f3e0853513ce640ab3e6a74e73ddea8733ec89e673e3ecabd3ec0b8bb3e5008e6be",
+    "final_state_f32_le_hex": "e2861d3f12f7a33e61ec69bec7dfdabec52995be86560ebebc7a7d3e52f443bedc89b4bd25b01b3f604308bee4701c3e9c1bc63d1e1dc2be0d0aa7be12b1013fa019033eec5ee13e455ab0be788a69be0cac9d3e4055e13ecc9934bea6f09fbed2364dbeb23cc7bd804ac63eea90033f04aea0be286801bf81b398bd39987cbcd605ee3e7a24f5be732e06bf9c5e2a3f",
+    "log_decay_f32_le_hex": "d663a0bd38ba72be921505bf1c5d79bf321fd2bf04eb72bf68eb05be03f2c1be7f4f4abf38baf2be9ece5dbfd505bbbfc47053be546732be1ce1c8be03f241bf9497a8bf8cfd06c0f513c6bdc47093be93941ebffd8491bf426627bf827591bf03f221be68ebe5bef88e94bec47013bf7a2684bf7c47dabf",
+    "beta_f32_le_hex": "9d81b23e018ed03e5305f03e56fd073f00b9173f31bf263fcdea0f3f7f591f3f9d81b23e018ed03e5305f03e56fd073f672ae03e0000003fcdea0f3f7f591f3f9d81b23e018ed03e31bf263f034dc13e672ae03e0000003fcdea0f3f7f591f3f56fd073f00b9173f31bf263f034dc13e672ae03e0000003f"
+  },
+  "convolution": {
+    "shape": {
+      "tokens": 6,
+      "channels": 3,
+      "width": 4
+    },
+    "chunkings": [
+      [
+        6
+      ],
+      [
+        1,
+        2,
+        3
+      ],
+      [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1
+      ]
+    ],
+    "output_f32_le_hex": "816a1cbe3680bbbc15007cbc3680bbbc8179ac3d00000000713add3effff003c01ccf03ef01cca3e5d0b12be0c8d6bbe3680bbbc89181e3f8d3d7bbefe676ebee6e980be066bf73e",
+    "final_state_f32_le_hex": "0000403f000000bf0000c03e000060bf000040bf0000003e0000803f000080be000000be0000403f000000bf0000c03e"
+  }
+}
