@@ -29,9 +29,10 @@ are repository-relative unless stated otherwise.
 | CPU-007 | Implement pinned GGUF-to-semantic parameter and GDN head-layout transforms | CPU-002, CPU-006, PIN-002 | done | Folded A, RMSNorm convention, squeezed convolution, grouped/tiled head permutations, round trips, and admitted parameter fixtures pass | [`src/conversion.cpp`](src/conversion.cpp); [`pins/gguf_conversion_contract.json`](pins/gguf_conversion_contract.json); [`fixtures/gguf_conversion.json`](fixtures/gguf_conversion.json); [`tests/test_conversion.py`](tests/test_conversion.py); log 2026-08-29T17:29:00Z |
 | CPU-008 | Bind every admitted global and layer tensor into typed scalar weight structures | CPU-006, CPU-007, MDL-002 | done | All 851 tensors bind by exact name, layer kind, shape, dtype, and mapped range; missing, swapped, or incompatible roles fail closed | [`src/weights.cpp`](src/weights.cpp); [`src/tensor.cpp`](src/tensor.cpp); [`tests/test_weights.py`](tests/test_weights.py); log 2026-08-29T17:36:00Z |
 | CPU-009 | Implement exact packed GDN QKV and attention query/gate projection slicing | CPU-003, CPU-007, CPU-008 | done | GDN contiguous Q/K/V ranges, per-head attention query/gate halves, output counts, alias rejection, and frozen layout fixtures pass | [`src/projection.cpp`](src/projection.cpp); [`pins/projection_layout_contract.json`](pins/projection_layout_contract.json); [`tests/test_projection.py`](tests/test_projection.py); log 2026-08-29T17:40:00Z |
+| CPU-010 | Execute typed real-artifact GDN and attention mixer projections with exact scalar workspaces | CPU-006, CPU-008, CPU-009 | done | Deterministic activation drives complete layer-0/layer-3 mixer projections; packed and split taps match independently decoded admitted rows and workspace guards fail closed | [`src/mixer.cpp`](src/mixer.cpp); [`fixtures/mixer_projections.json`](fixtures/mixer_projections.json); [`tests/test_mixer.py`](tests/test_mixer.py); log 2026-08-29T18:20:00Z |
 | CPU-002 | Implement scalar GDN oracle | CPU-001, MDL-002 | done | Warm-up, recurrence, state, head mapping, and chunk-boundary fixtures pass | [`src/gdn.cpp`](src/gdn.cpp); [`fixtures/gdn_authority.json`](fixtures/gdn_authority.json); [`tests/test_gdn.py`](tests/test_gdn.py); log 2026-08-29T12:26:00Z |
 | CPU-003 | Implement scalar attention and FFN oracle | CPU-001, MDL-002 | done | Layers 3/7/63, partial RoPE, grouped KV, causality, and FFN taps pass | [`src/attention.cpp`](src/attention.cpp); [`fixtures/attention_ffn_authority.json`](fixtures/attention_ffn_authority.json); [`tests/test_attention.py`](tests/test_attention.py); log 2026-08-29T12:54:00Z |
-| CPU-004 | Implement full scalar 64-layer scheduler and logits | CPU-002, CPU-003, CPU-005, CPU-006, CPU-007, CPU-008, CPU-009 | pending | Token/chunk execution and logits match semantic-authority fixtures | — |
+| CPU-004 | Implement full scalar 64-layer scheduler and logits | CPU-002, CPU-003, CPU-005, CPU-006, CPU-007, CPU-008, CPU-009, CPU-010 | pending | Token/chunk execution and logits match semantic-authority fixtures | — |
 | TRC-001 | Define versioned trace bundle and typed comparison metrics | PIN-002 | pending | Manifest/blob schema, checksums, summaries, session frontiers, and metric reporter pass tests | — |
 | TRC-002 | Add diagnostic-only stable scalar/CUDA taps | TRC-001, CPU-004 | pending | Required taps filter by layer/name and are absent from release builds | — |
 | ORA-001 | Generate and freeze scalar/oracle fixtures and tolerances | TOK-002, CPU-004, TRC-002 | pending | Three authorities are attributed; tolerances and greedy tie exceptions are immutable inputs | — |
@@ -71,6 +72,7 @@ are repository-relative unless stated otherwise.
 | EDU-008 | Explain converter-owned parameter folding and GDN head reordering for beginners | CPU-007, DOC-001 | done | Source vs GGUF semantics, folded exponent, norm weight convention, squeeze, grouped/tiled indices, affected tensors, inverse transforms, and checkpoint ownership are code-linked and worked | [`docs/22-gguf-conversion.md`](docs/22-gguf-conversion.md); [`tests/test_conversion.py`](tests/test_conversion.py); log 2026-08-29T17:29:00Z |
 | EDU-009 | Explain typed model weights and complete layer binding for beginners | CPU-008, DOC-001 | done | Views versus ownership, vectors/matrices, common and variant layer fields, exact-name/schema admission, counts, and scheduler boundary are code-linked and worked | [`docs/23-typed-model-weights.md`](docs/23-typed-model-weights.md); [`tests/test_weights.py`](tests/test_weights.py); log 2026-08-29T17:36:00Z |
 | EDU-010 | Explain packed projection layouts and slicing for beginners | CPU-009, DOC-001 | done | Packing purpose, GDN contiguous segments, attention per-head halves, physical versus semantic order, aliasing, and downstream conversion are code-linked and worked | [`docs/24-packed-projections.md`](docs/24-packed-projections.md); [`tests/test_projection.py`](tests/test_projection.py); log 2026-08-29T17:40:00Z |
+| EDU-011 | Explain real scalar projection execution and workspaces for beginners | CPU-010, DOC-001 | done | Activations, projection rows, typed views, packed/split workspace sizes, selected-tap evidence, cost, and remaining layer boundary are code-linked and worked | [`docs/25-real-mixer-projections.md`](docs/25-real-mixer-projections.md); [`tests/test_mixer.py`](tests/test_mixer.py); log 2026-08-29T18:20:00Z |
 | REL-001 | Publish reproducible release evidence bundle | CMP-003, QLT-001, DOC-001 | pending | Builds, hashes, raw results, reports, and documentation claims reconcile | — |
 
 ## Delivery-Gate Mapping
@@ -865,6 +867,52 @@ are repository-relative unless stated otherwise.
   and address arithmetic, alias behavior, downstream conversion ownership,
   diagnostic fixtures, beginner documentation, and clean host/container
   verification before committing.
+
+### 2026-08-29T17:45:00Z — Packed layouts pushed; CPU-010 started
+
+- Commit `b267891` (`feat: split packed projections`) was pushed to `origin/main`
+  successfully and the worktree was clean.
+- Added CPU-010 before implementation and made it a CPU-004 dependency. Earlier
+  gates proved individual mapped rows and synthetic split layouts, but had not
+  driven a complete real mixer projection through the typed layer structures or
+  fixed the exact activation and output workspace contract.
+- Added EDU-011 so the difference between one projection row, a complete matvec,
+  packed output storage, split storage, evidence taps, and scalar cost is
+  explained alongside the executable boundary.
+
+### 2026-08-29T18:20:00Z — CPU-010 and EDU-011 accepted
+
+- Added exact pointer/count workspace contracts and real typed matvec composition
+  for layer-0 GDN packed QKV, value gate, alpha and beta, plus layer-3 attention
+  packed query/gate, split query/gate, key, and value projections.
+- The deterministic 5,120-value activation drives 30,816 complete real matrix
+  rows, representing 157,777,920 scalar weight/activation products. All 43,104
+  output and split-workspace values replace NaN sentinels with finite results.
+- Independently decoded selected rows cover every GDN Q/K/V packed boundary,
+  gate/control endpoints, attention per-head query/gate boundaries, the last
+  gate lane, and K/V endpoints. Each physical row hash and expected FP32 dot is
+  frozen; native complete matvec taps match exactly.
+- A 10,239-value GDN packed workspace returns an error before the first matvec.
+  The focused complete diagnostic measured 0.29 seconds and 189,760 KiB maximum
+  resident host memory; this is explicitly not an end-to-end or CUDA speed claim.
+- Added a beginner chapter explaining activations, rows and matvec, typed
+  execution, exact workspace tables, ownership and reuse, why GDN stays packed
+  until convolution, real attention splitting, selected-tap evidence strategy,
+  scalar cost, measurement scope, and the remaining full-layer boundary.
+- Commands: fixture regeneration, timed focused diagnostic, Ruff format/check,
+  clean restricted C++17 build, 49 pytest tests, `git diff --check`, pinned CUDA
+  13.0.2 full build, SM120 compilation, and RTX 5090 probe — passed. Probe values
+  were 33,671,348,224 total and 33,139,458,048 free bytes.
+- Marked CPU-010 and EDU-011 done. Input normalization, GDN convolution and
+  recurrence, attention KV execution, mixer output projection, residuals, FFN,
+  final norm, and logits remain CPU-004.
+
+### 2026-08-29T18:20:30Z — Real-mixer commit boundary
+
+- Reviewed typed weight use, exact workspace guards, complete projection loops,
+  packed/split ordering, independent row generator and hashes, real-output taps,
+  finite sentinels, measured-cost labels, beginner documentation, proof boundary,
+  and clean host/container verification before committing.
 
 ## Decisions and Negative Results
 

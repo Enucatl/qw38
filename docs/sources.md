@@ -77,6 +77,11 @@ DSpark are explicitly rejected as Qwen model semantics.
   order comes from the converter. Their existing hashes and the exact production
   ranges are collected in
   [`pins/projection_layout_contract.json`](../pins/projection_layout_contract.json).
+- CPU-010 introduces no new external dependency. It composes the already pinned
+  typed GGUF weights, scalar quantization equations, tensor-row arithmetic, and
+  packed-layout contract. The deterministic real-row evidence and physical row
+  hashes are frozen in
+  [`fixtures/mixer_projections.json`](../fixtures/mixer_projections.json).
 
 ## Specialization and hardware references
 

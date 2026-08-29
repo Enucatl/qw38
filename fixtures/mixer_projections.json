@@ -1,0 +1,109 @@
+{
+  "schema_version": 1,
+  "model_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+  "activation": "a[i] = (((i * 37) % 101) - 50) / 32, rounded to FP32",
+  "cases": [
+    {
+      "name": "blk.0.attn_qkv.weight",
+      "rows": [
+        0,
+        2047,
+        2048,
+        4095,
+        4096,
+        10239
+      ],
+      "row_sha256": [
+        "7731f8d1936db9e34e115f6e0381312e735f1c818a07b0ed48da3cffe3ad20f5",
+        "9299e7f758405f7093773c18780ad522adc8e5d227c17751df6250556383730a",
+        "9835d0f671c70cc4f0611a1dce397fcab349ab0314874fa555f3d440d72d9723",
+        "65b3b6f2f39be2b89e951dac185ae9305d6761c05869609026c70124c7f29be4",
+        "0a6c6291e9f3da3dba52d53fc0cc0a993b51d804727d1561cec52611bbb7f832",
+        "abf952311d1d4b09ee030d4f56a648548383a10b7e882257b51668e82c096dc6"
+      ],
+      "output_f32_le_hex": "0ec8044055c4993f636de6be7099e3be95f7bfbdf95fb53f"
+    },
+    {
+      "name": "blk.0.attn_gate.weight",
+      "rows": [
+        0,
+        6143
+      ],
+      "row_sha256": [
+        "25bbda2a40567aec388c7af8c855691d257165491b49429ee3b2fdfb2edb3d3f",
+        "0134ca22b6c1aa679e9b2d18d35e592c170def9fc9bda184b44329764c594ed5"
+      ],
+      "output_f32_le_hex": "9890e3be39964e3f"
+    },
+    {
+      "name": "blk.0.ssm_alpha.weight",
+      "rows": [
+        0,
+        47
+      ],
+      "row_sha256": [
+        "ebccc79005475f5077a8c970635be697af037e55f61a5ca8ed49d62b234cb768",
+        "42089bbfbe49523f9f096a9c3e23f54d74b00d4ee7e52a725ba5a0eea7211624"
+      ],
+      "output_f32_le_hex": "9017253f615b2dbf"
+    },
+    {
+      "name": "blk.0.ssm_beta.weight",
+      "rows": [
+        0,
+        47
+      ],
+      "row_sha256": [
+        "234a5c4b8950b318f086aae90f47d476ce2f5dd3eabde5d18499e4e4d3f7be86",
+        "22185d1af95df663561d3bc2f6a8c8c82efd3f568e6dbe08889db890fb221971"
+      ],
+      "output_f32_le_hex": "0b98a8bece07bbbe"
+    },
+    {
+      "name": "blk.3.attn_q.weight",
+      "rows": [
+        0,
+        255,
+        256,
+        511,
+        512,
+        767,
+        12287
+      ],
+      "row_sha256": [
+        "8939c762dd0a89da2fda2a60c74457adb6cf4573e3e8b6de928e1d76b7f82162",
+        "ff71ec3a6b73c50bc7681226ebc980c22509cc417093d79aefdebf3835c6c6d4",
+        "4f3e4bcee5214529031ac5ddc28288cee69c87f1ec48a93cb68876ae11d10d63",
+        "9831a1284110de194e944c83ca5fd416ddc9e7c59cbdd8333fb83a33d06c28b6",
+        "e017742759c511bba01135263880692fa3b0329375db6b4e0775e46bf125ad7f",
+        "747948e0702aba53fd2ce8fcd4caf93b8a0571ac87bc7bd83120e8cb3f8218fc",
+        "944cab2ffec8d0da989000ba50251767f4a1cfdb3c4fbf1c6d57542e0ba4a7e3"
+      ],
+      "output_f32_le_hex": "c7ea1d3f08e1be3f1e09c5becbc448c00220703ffd503e3ffe5d103f"
+    },
+    {
+      "name": "blk.3.attn_k.weight",
+      "rows": [
+        0,
+        1023
+      ],
+      "row_sha256": [
+        "3a6f578b8308b78565b5c7e9a5335fb056418262a8e8db073855f2867010dfe9",
+        "dd91e794fe68a3f656d3904bf36c1d2837cc73ff7d8f449c917a01a44034cf89"
+      ],
+      "output_f32_le_hex": "f0b9d8bf14bce8bd"
+    },
+    {
+      "name": "blk.3.attn_v.weight",
+      "rows": [
+        0,
+        1023
+      ],
+      "row_sha256": [
+        "c9fa4979bffd2f42c9a6ac5e24b5bc042aef63703a931cf04b17ddbf65a437a3",
+        "72658acde28276c4851758dc645606243b8949e5d1f8927b9299a0146d18319f"
+      ],
+      "output_f32_le_hex": "4a63f63f789a433d"
+    }
+  ]
+}

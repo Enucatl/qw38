@@ -15,6 +15,7 @@
 #include "attention.h"
 #include "conversion.h"
 #include "gdn.h"
+#include "mixer.h"
 #include "model.h"
 #include "projection.h"
 #include "quant.h"
@@ -459,6 +460,122 @@ int check_projection_layout(const std::string& component) {
   }
   std::cerr << "invalid_argument: unknown projection-layout component\n";
   return 1;
+}
+
+int check_mixer_projections(const char* model_path, const std::string& mode) {
+  qw38::internal::ModelInfo info;
+  qw38::Status status = qw38::internal::inspect_gguf(model_path, &info);
+  if (status.is_ok()) status = qw38::internal::validate_qwen38_contract(&info);
+  qw38::internal::MappedFile mapping;
+  if (status.is_ok()) status = mapping.open(model_path);
+  qw38::internal::ModelWeights weights;
+  if (status.is_ok()) {
+    status = qw38::internal::bind_model_weights(info, mapping, &weights);
+  }
+  if (!status.is_ok()) {
+    std::cerr << qw38::status_code_name(status.code()) << ": "
+              << status.message() << '\n';
+    return 1;
+  }
+
+  std::vector<float> activation(qw38::internal::kResidualWidth);
+  for (std::size_t index = 0; index < activation.size(); ++index) {
+    activation[index] = static_cast<float>(
+                            static_cast<int>((index * 37) % 101) - 50) /
+                        32.0F;
+  }
+  std::vector<float> gdn_packed(qw38::internal::kGdnPackedQkvWidth, NAN);
+  std::vector<float> gdn_value_gate(qw38::internal::kGdnValueWidth, NAN);
+  std::vector<float> gdn_alpha(qw38::internal::kGdnGateCount, NAN);
+  std::vector<float> gdn_beta(qw38::internal::kGdnGateCount, NAN);
+  qw38::internal::GdnProjectionWorkspace gdn_workspace{
+      gdn_packed.data(), gdn_packed.size(), gdn_value_gate.data(),
+      gdn_value_gate.size(), gdn_alpha.data(), gdn_alpha.size(),
+      gdn_beta.data(), gdn_beta.size()};
+  if (mode == "invalid_workspace") {
+    --gdn_workspace.packed_qkv_count;
+    status = qw38::internal::project_gdn_mixer(
+        weights.layers[0].gdn, activation.data(), activation.size(),
+        gdn_workspace);
+    std::cerr << qw38::status_code_name(status.code()) << ": "
+              << status.message() << '\n';
+    return status.is_ok() ? 0 : 1;
+  }
+  if (mode != "valid") {
+    std::cerr << "invalid_argument: unknown mixer-projection mode\n";
+    return 1;
+  }
+  status = qw38::internal::project_gdn_mixer(
+      weights.layers[0].gdn, activation.data(), activation.size(),
+      gdn_workspace);
+
+  std::vector<float> attention_packed(
+      qw38::internal::kAttentionPackedQueryGateWidth, NAN);
+  std::vector<float> attention_query(qw38::internal::kAttentionQueryWidth, NAN);
+  std::vector<float> attention_gate(qw38::internal::kAttentionQueryWidth, NAN);
+  std::vector<float> attention_key(qw38::internal::kAttentionKvWidth, NAN);
+  std::vector<float> attention_value(qw38::internal::kAttentionKvWidth, NAN);
+  const qw38::internal::AttentionProjectionWorkspace attention_workspace{
+      attention_packed.data(), attention_packed.size(), attention_query.data(),
+      attention_query.size(), attention_gate.data(), attention_gate.size(),
+      attention_key.data(), attention_key.size(), attention_value.data(),
+      attention_value.size()};
+  if (status.is_ok()) {
+    status = qw38::internal::project_attention_mixer(
+        weights.layers[3].attention, activation.data(), activation.size(),
+        attention_workspace);
+  }
+  const auto finite = [](const std::vector<float>& values) {
+    return std::all_of(values.begin(), values.end(),
+                       [](float value) { return std::isfinite(value); });
+  };
+  if (status.is_ok() &&
+      (!finite(gdn_packed) || !finite(gdn_value_gate) || !finite(gdn_alpha) ||
+       !finite(gdn_beta) || !finite(attention_packed) ||
+       !finite(attention_query) || !finite(attention_gate) ||
+       !finite(attention_key) || !finite(attention_value))) {
+    status = {qw38::StatusCode::kInternal,
+              "mixer projection left a nonfinite workspace value"};
+  }
+  if (!status.is_ok()) {
+    std::cerr << qw38::status_code_name(status.code()) << ": "
+              << status.message() << '\n';
+    return 1;
+  }
+
+  write_float_vector("blk.0.attn_qkv.weight", {gdn_packed[0], gdn_packed[2047],
+                                                gdn_packed[2048],
+                                                gdn_packed[4095],
+                                                gdn_packed[4096],
+                                                gdn_packed[10239]});
+  write_float_vector("blk.0.attn_gate.weight",
+                     {gdn_value_gate.front(), gdn_value_gate.back()});
+  write_float_vector("blk.0.ssm_alpha.weight",
+                     {gdn_alpha.front(), gdn_alpha.back()});
+  write_float_vector("blk.0.ssm_beta.weight",
+                     {gdn_beta.front(), gdn_beta.back()});
+  write_float_vector("blk.3.attn_q.weight",
+                     {attention_packed[0], attention_packed[255],
+                      attention_packed[256], attention_packed[511],
+                      attention_packed[512], attention_packed[767],
+                      attention_packed[12287]});
+  write_float_vector("blk.3.attn_k.weight",
+                     {attention_key.front(), attention_key.back()});
+  write_float_vector("blk.3.attn_v.weight",
+                     {attention_value.front(), attention_value.back()});
+  write_float_vector("attention_query_split_f32_le_hex",
+                     {attention_query[0], attention_query[255],
+                      attention_query[256], attention_query[511]});
+  write_float_vector("attention_gate_split_f32_le_hex",
+                     {attention_gate[0], attention_gate[255],
+                      attention_gate.back()});
+  std::cout << "computed_values="
+            << gdn_packed.size() + gdn_value_gate.size() + gdn_alpha.size() +
+                   gdn_beta.size() + attention_packed.size() +
+                   attention_query.size() + attention_gate.size() +
+                   attention_key.size() + attention_value.size()
+            << '\n';
+  return 0;
 }
 
 float fixture_query(std::size_t token, std::size_t head, std::size_t lane) {
@@ -1061,6 +1178,9 @@ int main(int argc, char** argv) {
   if (argc == 3 && std::string(argv[1]) == "--check-projection-layout") {
     return check_projection_layout(argv[2]);
   }
+  if (argc == 4 && std::string(argv[1]) == "--check-mixer-projections") {
+    return check_mixer_projections(argv[2], argv[3]);
+  }
   if (argc == 3 && std::string(argv[1]) == "--check-attention") {
     return check_attention(std::atoi(argv[2]));
   }
@@ -1082,6 +1202,7 @@ int main(int argc, char** argv) {
                "--check-conversion COMPONENT, "
                "--check-weight-binding MODEL MODE, "
                "--check-projection-layout COMPONENT, "
+               "--check-mixer-projections MODEL MODE, "
                "--check-ffn LAYER, --check-matvec KIND COLUMNS ROWS PAYLOAD "
                "ACTIVATION, or --check-tensor-row MODEL NAME ROW\n";
   return 2;

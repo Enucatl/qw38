@@ -49,7 +49,8 @@ for language and host portability decisions.
 22. [GGUF parameter conversion](22-gguf-conversion.md): folded decay, direct norm scales, squeezed convolution, and grouped/tiled GDN heads.
 23. [Typed model weights](23-typed-model-weights.md): non-owning vector/matrix views, common and variant layer fields, exact schema admission, and complete binding.
 24. [Packed projection layouts](24-packed-projections.md): GDN Q/K/V ranges, per-head attention query/gate halves, aliasing, and downstream head conversion.
-25. [Source and evidence ledger](sources.md).
+25. [Real mixer projections](25-real-mixer-projections.md): complete typed matvec execution, exact scalar workspaces, independently decoded taps, and measured cost.
+26. [Source and evidence ledger](sources.md).
 
 Claims use four labels: **Measured** (this exact artifact and hardware),
 **External** (a linked source), **Estimated** (reproducible arithmetic), and
