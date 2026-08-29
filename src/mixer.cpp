@@ -1,5 +1,7 @@
 #include "mixer.h"
 
+#include <cmath>
+
 #include "attention.h"
 #include "conversion.h"
 #include "gdn.h"
@@ -262,6 +264,63 @@ Status execute_gdn_mixer_step(
   if (!status.is_ok()) return status;
   for (std::size_t index = 0; index < output_count; ++index) {
     output[index] = residual[index] + workspace.mixer_output[index];
+  }
+  return Status::ok();
+}
+
+Status prepare_ffn_scalar_parameters(
+    const CommonLayerWeights& weights,
+    const FfnScalarParameters& parameters) noexcept {
+  if (parameters.norm == nullptr || parameters.norm_count != kResidualWidth) {
+    return {StatusCode::kInvalidArgument,
+            "FFN scalar parameter buffer is invalid"};
+  }
+  return vector_decode(weights.ffn_norm, parameters.norm,
+                       parameters.norm_count);
+}
+
+Status execute_ffn_step(
+    const CommonLayerWeights& weights, const FfnScalarParameters& parameters,
+    const float* residual, std::size_t residual_count,
+    const FfnStepWorkspace& workspace, float* output,
+    std::size_t output_count) noexcept {
+  if (parameters.norm == nullptr || parameters.norm_count != kResidualWidth ||
+      residual == nullptr || residual_count != kResidualWidth ||
+      workspace.normalized == nullptr ||
+      workspace.normalized_count != kResidualWidth || workspace.gate == nullptr ||
+      workspace.gate_count != kFfnWidth || workspace.up == nullptr ||
+      workspace.up_count != kFfnWidth || workspace.activated == nullptr ||
+      workspace.activated_count != kFfnWidth ||
+      workspace.correction == nullptr ||
+      workspace.correction_count != kResidualWidth || output == nullptr ||
+      output_count != kResidualWidth) {
+    return {StatusCode::kInvalidArgument,
+            "FFN parameters, activation, or workspace are invalid"};
+  }
+  Status status = rms_norm_scale(residual, parameters.norm, residual_count,
+                                 workspace.normalized);
+  if (status.is_ok()) {
+    status = tensor_matvec(weights.ffn_gate, workspace.normalized,
+                           workspace.normalized_count, workspace.gate,
+                           workspace.gate_count);
+  }
+  if (status.is_ok()) {
+    status = tensor_matvec(weights.ffn_up, workspace.normalized,
+                           workspace.normalized_count, workspace.up,
+                           workspace.up_count);
+  }
+  if (!status.is_ok()) return status;
+  for (std::size_t index = 0; index < kFfnWidth; ++index) {
+    const float gate = workspace.gate[index];
+    const float silu = gate / (1.0F + std::exp(-gate));
+    workspace.activated[index] = silu * workspace.up[index];
+  }
+  status = tensor_matvec(weights.ffn_down, workspace.activated,
+                         workspace.activated_count, workspace.correction,
+                         workspace.correction_count);
+  if (!status.is_ok()) return status;
+  for (std::size_t index = 0; index < output_count; ++index) {
+    output[index] = residual[index] + workspace.correction[index];
   }
   return Status::ok();
 }

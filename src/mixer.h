@@ -19,6 +19,7 @@ constexpr std::size_t kGdnHeadWidth = 128;
 constexpr std::size_t kAttentionPackedQueryGateWidth = 12288;
 constexpr std::size_t kAttentionQueryWidth = 6144;
 constexpr std::size_t kAttentionKvWidth = 1024;
+constexpr std::size_t kFfnWidth = 17408;
 
 struct GdnProjectionWorkspace final {
   float* packed_qkv;
@@ -97,6 +98,24 @@ struct GdnStepWorkspace final {
   std::size_t mixer_output_count;
 };
 
+struct FfnScalarParameters final {
+  float* norm;
+  std::size_t norm_count;
+};
+
+struct FfnStepWorkspace final {
+  float* normalized;
+  std::size_t normalized_count;
+  float* gate;
+  std::size_t gate_count;
+  float* up;
+  std::size_t up_count;
+  float* activated;
+  std::size_t activated_count;
+  float* correction;
+  std::size_t correction_count;
+};
+
 Status project_gdn_mixer(const GdnLayerWeights& weights,
                          const float* activation,
                          std::size_t activation_count,
@@ -116,6 +135,16 @@ Status execute_gdn_mixer_step(
     const float* residual, std::size_t residual_count,
     const GdnLayerStateView& state, const GdnStepWorkspace& workspace,
     float* output, std::size_t output_count) noexcept;
+
+Status prepare_ffn_scalar_parameters(
+    const CommonLayerWeights& weights,
+    const FfnScalarParameters& parameters) noexcept;
+
+Status execute_ffn_step(
+    const CommonLayerWeights& weights, const FfnScalarParameters& parameters,
+    const float* residual, std::size_t residual_count,
+    const FfnStepWorkspace& workspace, float* output,
+    std::size_t output_count) noexcept;
 
 }  // namespace qw38::internal
 

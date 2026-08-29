@@ -23,6 +23,9 @@ typed layer-0 and layer-3 projections and records their exact workspaces and
 independently decoded evidence taps.
 The [real GDN layer chapter](docs/26-real-gdn-layer.md) follows one layer-0 token
 through normalization, both persistent states, gated output, and residual.
+The [real FFN chapter](docs/27-real-ffn-layer.md) then explains the complete
+layer-0 SwiGLU branch, including its three Q4_K projections, temporary memory,
+numeric evidence, and remaining scheduler boundary.
 
 ## Build
 

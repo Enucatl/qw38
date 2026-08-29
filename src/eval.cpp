@@ -718,6 +718,98 @@ int check_real_gdn_step(const char* model_path, const std::string& mode) {
   return 0;
 }
 
+int check_real_ffn_step(const char* model_path, const std::string& mode) {
+  qw38::internal::ModelInfo info;
+  qw38::Status status = qw38::internal::inspect_gguf(model_path, &info);
+  if (status.is_ok()) status = qw38::internal::validate_qwen38_contract(&info);
+  qw38::internal::MappedFile mapping;
+  if (status.is_ok()) status = mapping.open(model_path);
+  qw38::internal::ModelWeights weights;
+  if (status.is_ok()) {
+    status = qw38::internal::bind_model_weights(info, mapping, &weights);
+  }
+  if (!status.is_ok()) {
+    std::cerr << qw38::status_code_name(status.code()) << ": "
+              << status.message() << '\n';
+    return 1;
+  }
+
+  std::vector<float> norm(qw38::internal::kResidualWidth);
+  const qw38::internal::FfnScalarParameters parameters{norm.data(), norm.size()};
+  status = qw38::internal::prepare_ffn_scalar_parameters(
+      weights.layers[0].common, parameters);
+  if (!status.is_ok()) {
+    std::cerr << qw38::status_code_name(status.code()) << ": "
+              << status.message() << '\n';
+    return 1;
+  }
+  std::vector<float> residual(qw38::internal::kResidualWidth);
+  for (std::size_t index = 0; index < residual.size(); ++index) {
+    residual[index] = static_cast<float>(
+                          static_cast<int>((index * 37) % 101) - 50) /
+                      32.0F;
+  }
+  std::vector<float> normalized(qw38::internal::kResidualWidth, NAN);
+  std::vector<float> gate(qw38::internal::kFfnWidth, NAN);
+  std::vector<float> up(qw38::internal::kFfnWidth, NAN);
+  std::vector<float> activated(qw38::internal::kFfnWidth, NAN);
+  std::vector<float> correction(qw38::internal::kResidualWidth, NAN);
+  std::vector<float> output(qw38::internal::kResidualWidth, NAN);
+  qw38::internal::FfnStepWorkspace workspace{
+      normalized.data(), normalized.size(), gate.data(), gate.size(), up.data(),
+      up.size(), activated.data(), activated.size(), correction.data(),
+      correction.size()};
+  if (mode == "invalid_workspace") --workspace.activated_count;
+  if (mode != "valid" && mode != "invalid_workspace") {
+    std::cerr << "invalid_argument: unknown real-FFN-step mode\n";
+    return 1;
+  }
+  status = qw38::internal::execute_ffn_step(
+      weights.layers[0].common, parameters, residual.data(), residual.size(),
+      workspace, output.data(), output.size());
+  if (!status.is_ok()) {
+    const bool untouched =
+        std::all_of(gate.begin(), gate.end(),
+                    [](float value) { return std::isnan(value); }) &&
+        std::all_of(output.begin(), output.end(),
+                    [](float value) { return std::isnan(value); });
+    std::cout << "outputs_untouched=" << (untouched ? 1 : 0) << '\n';
+    std::cerr << qw38::status_code_name(status.code()) << ": "
+              << status.message() << '\n';
+    return 1;
+  }
+  const auto finite = [](const std::vector<float>& values) {
+    return std::all_of(values.begin(), values.end(),
+                       [](float value) { return std::isfinite(value); });
+  };
+  if (!finite(normalized) || !finite(gate) || !finite(up) ||
+      !finite(activated) || !finite(correction) || !finite(output)) {
+    std::cerr << "internal: FFN left a nonfinite workspace value\n";
+    return 1;
+  }
+  const auto taps = [](const std::vector<float>& values,
+                       std::initializer_list<std::size_t> indices) {
+    std::vector<float> selected;
+    selected.reserve(indices.size());
+    for (std::size_t index : indices) selected.push_back(values[index]);
+    return selected;
+  };
+  const std::initializer_list<std::size_t> kWideTaps{0, 1, 8703, 8704, 17407};
+  const std::initializer_list<std::size_t> kResidualTaps{0, 1, 2559, 5119};
+  write_float_vector("normalized_f32_le_hex",
+                     taps(normalized, kResidualTaps));
+  write_float_vector("gate_f32_le_hex", taps(gate, kWideTaps));
+  write_float_vector("up_f32_le_hex", taps(up, kWideTaps));
+  write_float_vector("activated_f32_le_hex", taps(activated, kWideTaps));
+  write_float_vector("correction_f32_le_hex", taps(correction, kResidualTaps));
+  write_float_vector("residual_output_f32_le_hex", taps(output, kResidualTaps));
+  std::cout << "workspace_values="
+            << normalized.size() + gate.size() + up.size() + activated.size() +
+                   correction.size()
+            << '\n';
+  return 0;
+}
+
 float fixture_query(std::size_t token, std::size_t head, std::size_t lane) {
   const int numerator =
       static_cast<int>((token * 11 + head * 7 + lane * 3) % 19) - 9;
@@ -1324,6 +1416,9 @@ int main(int argc, char** argv) {
   if (argc == 4 && std::string(argv[1]) == "--check-real-gdn-step") {
     return check_real_gdn_step(argv[2], argv[3]);
   }
+  if (argc == 4 && std::string(argv[1]) == "--check-real-ffn-step") {
+    return check_real_ffn_step(argv[2], argv[3]);
+  }
   if (argc == 3 && std::string(argv[1]) == "--check-attention") {
     return check_attention(std::atoi(argv[2]));
   }
@@ -1347,6 +1442,7 @@ int main(int argc, char** argv) {
                "--check-projection-layout COMPONENT, "
                "--check-mixer-projections MODEL MODE, "
                "--check-real-gdn-step MODEL MODE, "
+               "--check-real-ffn-step MODEL MODE, "
                "--check-ffn LAYER, --check-matvec KIND COLUMNS ROWS PAYLOAD "
                "ACTIVATION, or --check-tensor-row MODEL NAME ROW\n";
   return 2;

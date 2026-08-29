@@ -51,7 +51,8 @@ for language and host portability decisions.
 24. [Packed projection layouts](24-packed-projections.md): GDN Q/K/V ranges, per-head attention query/gate halves, aliasing, and downstream head conversion.
 25. [Real mixer projections](25-real-mixer-projections.md): complete typed matvec execution, exact scalar workspaces, independently decoded taps, and measured cost.
 26. [One real GDN mixer layer](26-real-gdn-layer.md): input norm, convolution and recurrent state, layout transitions, gated norm, output projection, and residual.
-27. [Source and evidence ledger](sources.md).
+27. [One real SwiGLU FFN branch](27-real-ffn-layer.md): post-mixer norm, gate/up/down projections, SiLU, workspace, residual, and evidence limits.
+28. [Source and evidence ledger](sources.md).
 
 Claims use four labels: **Measured** (this exact artifact and hardware),
 **External** (a linked source), **Estimated** (reproducible arithmetic), and

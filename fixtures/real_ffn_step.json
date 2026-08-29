@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "model_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+  "authority": "pinned Transformers SwiGLU equation plus independently decoded GGUF rows",
+  "tolerances": {
+    "absolute": 2e-06,
+    "relative": 2e-05,
+    "rms": 1e-06
+  },
+  "intermediate_taps": [
+    0,
+    1,
+    8703,
+    8704,
+    17407
+  ],
+  "normalized_f32_le_hex": "03569abfcb16a8be0480dbbd03e816bf",
+  "gate_f32_le_hex": "1f2fe5be380086bd261361be7c8e833fda481abf",
+  "up_f32_le_hex": "a0b043bfb3e9783dacd8e8be46b7efbd903481be",
+  "activated_f32_le_hex": "8e9f083e780ffcba504f363df973b5bd795b5c3d",
+  "row_sha256": {
+    "blk.0.ffn_gate.weight": [
+      "93bfa0f9e4acdf04a0248756f1ddaa2ed12e05da4386b1d35a46e4988368e7db",
+      "a80d3e6a1391a3471e870bde826552512ae9cc4f7bca99d5e613ea0d6b37cf1d",
+      "82bbe17ac26eadbd19a1e1d5e13c32abec2a3dfc2618551bc8bc90e5b4a91743",
+      "e11f1a88017148518683e6f8d091a45408260f0fcc9c3f4109abefe5de7f8630",
+      "f8974ab8790ecb907944998a5659df292950102121fb1303b417b904e42a286d"
+    ],
+    "blk.0.ffn_up.weight": [
+      "7fbc7542ec2de17462b4ba5df427f9d410320282b10b4fadcb67b2615c8c4e45",
+      "fdcec2beb45c0ba31deb40402d1be37fcc37dec0ef995d0bae8b7d1e6b4dfbef",
+      "c3ffbd2ef24ba398ea9333993d9c0ab6e75948e9a6ee02ccfafefee4fcb53744",
+      "a64aa71d6ce0dba23457b20e1458f9c4dd4f056086914ab359bb6a05415a2524",
+      "76efbe684224738e0d73d6a4f5b9e921a2cf94d8b7069d35791d39ee02cc2ac9"
+    ]
+  }
+}

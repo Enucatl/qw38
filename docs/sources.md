@@ -88,6 +88,12 @@ DSpark are explicitly rejected as Qwen model semantics.
   [`fixtures/real_gdn_step.json`](../fixtures/real_gdn_step.json). The web reader
   could not serve the pinned commit URL during re-verification, so the exact
   already-hashed raw source was read directly; no moving branch was substituted.
+- CPU-012 composes the pinned Transformers SwiGLU equation, typed GGUF views,
+  direct-scale conversion contract, and Q4_K row decoder. Selected gate/up rows
+  are independently decoded and physically hashed in
+  [`fixtures/real_ffn_step.json`](../fixtures/real_ffn_step.json). The complete
+  down projection is currently native regression evidence; direct semantic
+  trace admission remains TRC-001, TRC-002, and ORA-001 work.
 
 ## Specialization and hardware references
 

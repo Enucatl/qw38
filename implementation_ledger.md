@@ -31,9 +31,10 @@ are repository-relative unless stated otherwise.
 | CPU-009 | Implement exact packed GDN QKV and attention query/gate projection slicing | CPU-003, CPU-007, CPU-008 | done | GDN contiguous Q/K/V ranges, per-head attention query/gate halves, output counts, alias rejection, and frozen layout fixtures pass | [`src/projection.cpp`](src/projection.cpp); [`pins/projection_layout_contract.json`](pins/projection_layout_contract.json); [`tests/test_projection.py`](tests/test_projection.py); log 2026-08-29T17:40:00Z |
 | CPU-010 | Execute typed real-artifact GDN and attention mixer projections with exact scalar workspaces | CPU-006, CPU-008, CPU-009 | done | Deterministic activation drives complete layer-0/layer-3 mixer projections; packed and split taps match independently decoded admitted rows and workspace guards fail closed | [`src/mixer.cpp`](src/mixer.cpp); [`fixtures/mixer_projections.json`](fixtures/mixer_projections.json); [`tests/test_mixer.py`](tests/test_mixer.py); log 2026-08-29T18:20:00Z |
 | CPU-011 | Execute one complete real layer-0 GDN mixer update and residual | CPU-002, CPU-007, CPU-010 | done | GGUF-scale input norm, real projections, convolution ring, grouped recurrence, gated norm, output projection, residual, state taps, and malformed workspaces pass frozen evidence | [`src/mixer.cpp`](src/mixer.cpp); [`fixtures/real_gdn_step.json`](fixtures/real_gdn_step.json); [`tests/test_real_gdn.py`](tests/test_real_gdn.py); log 2026-08-29T18:33:00Z |
+| CPU-012 | Execute one complete real Q4_K SwiGLU FFN branch and residual | CPU-003, CPU-008, CPU-011 | done | Direct-scale FFN norm, complete gate/up/down projections, SwiGLU taps, exact workspace, residual addition, and malformed workspace behavior pass frozen evidence | [`src/mixer.cpp`](src/mixer.cpp); [`fixtures/real_ffn_step.json`](fixtures/real_ffn_step.json); [`tests/test_real_ffn.py`](tests/test_real_ffn.py); log 2026-08-29T18:46:07Z |
 | CPU-002 | Implement scalar GDN oracle | CPU-001, MDL-002 | done | Warm-up, recurrence, state, head mapping, and chunk-boundary fixtures pass | [`src/gdn.cpp`](src/gdn.cpp); [`fixtures/gdn_authority.json`](fixtures/gdn_authority.json); [`tests/test_gdn.py`](tests/test_gdn.py); log 2026-08-29T12:26:00Z |
 | CPU-003 | Implement scalar attention and FFN oracle | CPU-001, MDL-002 | done | Layers 3/7/63, partial RoPE, grouped KV, causality, and FFN taps pass | [`src/attention.cpp`](src/attention.cpp); [`fixtures/attention_ffn_authority.json`](fixtures/attention_ffn_authority.json); [`tests/test_attention.py`](tests/test_attention.py); log 2026-08-29T12:54:00Z |
-| CPU-004 | Implement full scalar 64-layer scheduler and logits | CPU-002, CPU-003, CPU-005, CPU-006, CPU-007, CPU-008, CPU-009, CPU-010, CPU-011 | pending | Token/chunk execution and logits match semantic-authority fixtures | — |
+| CPU-004 | Implement full scalar 64-layer scheduler and logits | CPU-002, CPU-003, CPU-005, CPU-006, CPU-007, CPU-008, CPU-009, CPU-010, CPU-011, CPU-012 | pending | Token/chunk execution and logits match semantic-authority fixtures | — |
 | TRC-001 | Define versioned trace bundle and typed comparison metrics | PIN-002 | pending | Manifest/blob schema, checksums, summaries, session frontiers, and metric reporter pass tests | — |
 | TRC-002 | Add diagnostic-only stable scalar/CUDA taps | TRC-001, CPU-004 | pending | Required taps filter by layer/name and are absent from release builds | — |
 | ORA-001 | Generate and freeze scalar/oracle fixtures and tolerances | TOK-002, CPU-004, TRC-002 | pending | Three authorities are attributed; tolerances and greedy tie exceptions are immutable inputs | — |
@@ -75,6 +76,7 @@ are repository-relative unless stated otherwise.
 | EDU-010 | Explain packed projection layouts and slicing for beginners | CPU-009, DOC-001 | done | Packing purpose, GDN contiguous segments, attention per-head halves, physical versus semantic order, aliasing, and downstream conversion are code-linked and worked | [`docs/24-packed-projections.md`](docs/24-packed-projections.md); [`tests/test_projection.py`](tests/test_projection.py); log 2026-08-29T17:40:00Z |
 | EDU-011 | Explain real scalar projection execution and workspaces for beginners | CPU-010, DOC-001 | done | Activations, projection rows, typed views, packed/split workspace sizes, selected-tap evidence, cost, and remaining layer boundary are code-linked and worked | [`docs/25-real-mixer-projections.md`](docs/25-real-mixer-projections.md); [`tests/test_mixer.py`](tests/test_mixer.py); log 2026-08-29T18:20:00Z |
 | EDU-012 | Explain a complete real GDN mixer layer update for beginners | CPU-011, DOC-001 | done | Input norm, convolution state, physical/semantic head order, recurrence state, gated norm, output projection, residual, atomicity boundary, and evidence taps are code-linked and worked | [`docs/26-real-gdn-layer.md`](docs/26-real-gdn-layer.md); [`tests/test_real_gdn.py`](tests/test_real_gdn.py); log 2026-08-29T18:33:00Z |
+| EDU-013 | Explain a complete real SwiGLU FFN branch for beginners | CPU-012, DOC-001 | done | Post-mixer norm, gate/up/down roles, SiLU and elementwise product, intermediate width, Q4_K cost, workspace, residual, evidence limits, and layer boundary are code-linked and worked | [`docs/27-real-ffn-layer.md`](docs/27-real-ffn-layer.md); [`tests/test_real_ffn.py`](tests/test_real_ffn.py); log 2026-08-29T18:46:07Z |
 | REL-001 | Publish reproducible release evidence bundle | CMP-003, QLT-001, DOC-001 | pending | Builds, hashes, raw results, reports, and documentation claims reconcile | — |
 
 ## Delivery-Gate Mapping
@@ -975,6 +977,69 @@ are repository-relative unless stated otherwise.
   physical/semantic layout transitions, mutation order, independent selected
   taps, residual arithmetic, pre-mutation failure behavior, documentation,
   evidence labels, and clean host/container verification before committing.
+
+### 2026-08-29T18:41:00Z — Real GDN pushed; CPU-012 started
+
+- Commit `1725fc5` (`feat: execute real GDN mixer step`) was pushed to
+  `origin/main` successfully. The separate runtime-architecture artifacts were
+  subsequently committed as `1ee916c` and the shared worktree returned clean.
+- Added CPU-012 before implementation and made it a CPU-004 dependency. The
+  existing FFN oracle used small dense synthetic matrices; the real path must
+  prove direct-scale post-mixer normalization, all 17,408 Q4_K gate/up rows,
+  elementwise SwiGLU, all 5,120 Q4_K down rows, exact temporary storage, and the
+  second residual addition through typed GGUF views.
+- Added EDU-013 so the two wide projections, nonlinear elementwise stage, down
+  projection, scalar cost, evidence limits, and complete decoder-layer boundary
+  are explained with the implementation.
+
+### 2026-08-29T18:45:00Z — CPU-012 diagnostic compile failure
+
+- The first native diagnostic build failed under restricted C++17 because two
+  local `constexpr std::initializer_list` objects referred to compiler-created
+  backing arrays that were not constant expressions. No diagnostic executed.
+- The tap indices are runtime-only display metadata and require no compile-time
+  evaluation. The follow-up changes those two locals to `const`; FFN arithmetic,
+  workspace sizes, and expected evidence remain unchanged.
+
+### 2026-08-29T18:46:07Z — CPU-012 and EDU-013 accepted
+
+- Implemented prepared direct-scale post-mixer norm parameters and the complete
+  real layer-0 FFN branch: 5,120-to-17,408 Q4_K gate/up projections, FP32
+  `SiLU(gate) * up`, 17,408-to-5,120 Q4_K down projection, and FP32 residual
+  addition. Every pointer and exact count is rejected before any write.
+- Added an independently mapped GGUF fixture generator using the pinned Q4_K
+  equations and float libm functions. Selected normalization, gate, up, and
+  activated taps meet frozen absolute, relative, and RMS tolerances; exact
+  SHA-256 hashes bind all selected physical gate/up rows to the admitted model.
+- The native diagnostic executes all 62,464 workspace values, verifies they are
+  finite, and proves exact FP32 residual addition at selected lanes. A one-value
+  short activated buffer fails before either the gate or output is written.
+- The complete scalar branch performs an estimated 267,386,880 weight products.
+  Its 62,464-value FP32 workspace occupies 249,856 bytes (244 KiB), and its
+  prepared 5,120-value norm occupies 20 KiB. The timed admitted-model diagnostic
+  completed in 0.33 s with 172,960 KiB maximum RSS.
+- Added a beginner chapter explaining feature vectors, feed-forward execution,
+  the intermediate width, independent gate/up projections, SiLU, elementwise
+  multiplication versus dot products, Q4_K row execution, down projection,
+  residuals, workspace lifetime, fixture equality, and the remaining oracle and
+  scheduler boundary. Updated the handbook index, root reading path, and source
+  ledger.
+- Commands: fixture regeneration, focused diagnostic and 4 focused tests, Ruff
+  format/check, clean restricted C++17 build, 56 pytest tests,
+  `git diff --check`, pinned CUDA 13.0.2 full build, SM120 compilation, and RTX
+  5090 probe — passed. Probe values were 33,671,348,224 total and
+  33,139,458,048 free bytes.
+- Marked CPU-012 and EDU-013 done. GDN-to-FFN layer composition, real attention
+  state/output, multiple real tokens, all 64 layers, final norm, logits, and
+  direct semantic trace admission remain CPU-004/TRC/ORA work.
+
+### 2026-08-29T18:46:30Z — Real-FFN commit boundary
+
+- Reviewed exact workspace validation, projection dimensions, FP32 SwiGLU and
+  residual arithmetic, independent physical-row fixture evidence, generator
+  reproducibility, finite full-path execution, documentation claims and labels,
+  preserved compile failure, and clean host/container verification before
+  committing.
 
 ## Decisions and Negative Results
 
