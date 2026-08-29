@@ -66,6 +66,11 @@ DSpark are explicitly rejected as Qwen model semantics.
   [`pins/gguf_conversion_contract.json`](../pins/gguf_conversion_contract.json).
   Quartz implements only the small reversible layout boundary and two explicit
   scalar conventions; it does not copy the upstream model graph.
+- The official Qwen model contract and the already pinned GGUF tensor inventory
+  are CPU-008's authority for typed global, common-layer, GDN, and attention
+  fields. [`src/weights.cpp`](../src/weights.cpp) deliberately repeats the exact
+  scheduler-facing schema and binds only non-owning mapped views; this increment
+  introduces no new external implementation dependency.
 
 ## Specialization and hardware references
 

@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstdio>
@@ -20,6 +21,7 @@
 #include "template.h"
 #include "tensor.h"
 #include "tokenizer.h"
+#include "weights.h"
 
 namespace {
 constexpr const char* kBrand =
@@ -327,6 +329,71 @@ int check_conversion(const std::string& component) {
   }
   std::cerr << "invalid_argument: unknown conversion component\n";
   return 1;
+}
+
+int check_weight_binding(const char* model_path, const std::string& mode) {
+  qw38::internal::ModelInfo info;
+  qw38::Status status = qw38::internal::inspect_gguf(model_path, &info);
+  if (status.is_ok()) status = qw38::internal::validate_qwen38_contract(&info);
+  qw38::internal::MappedFile mapping;
+  if (status.is_ok()) status = mapping.open(model_path);
+  if (!status.is_ok()) {
+    std::cerr << qw38::status_code_name(status.code()) << ": "
+              << status.message() << '\n';
+    return 1;
+  }
+  auto find = [&info](const std::string& name) {
+    return std::find_if(info.tensors.begin(), info.tensors.end(),
+                        [&name](const qw38::internal::TensorInfo& tensor) {
+                          return tensor.name == name;
+                        });
+  };
+  if (mode == "missing") {
+    find("blk.0.ssm_a")->name = "blk.0.missing_ssm_a";
+  } else if (mode == "role") {
+    find("blk.0.ssm_a")->semantic_role = "gdn_dt_bias";
+  } else if (mode == "shape") {
+    find("blk.0.ssm_a")->dimensions[0] = 47;
+  } else if (mode == "range") {
+    find("output.weight")->offset = mapping.size();
+  } else if (mode != "valid") {
+    std::cerr << "invalid_argument: unknown weight-binding mode\n";
+    return 1;
+  }
+  qw38::internal::ModelWeights weights;
+  status = qw38::internal::bind_model_weights(info, mapping, &weights);
+  if (!status.is_ok()) {
+    std::cerr << qw38::status_code_name(status.code()) << ": "
+              << status.message() << '\n';
+    return 1;
+  }
+  std::size_t gdn_layers = 0;
+  std::size_t attention_layers = 0;
+  for (const qw38::internal::LayerWeights& layer : weights.layers) {
+    if (layer.kind == qw38::internal::LayerKind::kGdn) {
+      ++gdn_layers;
+    } else {
+      ++attention_layers;
+    }
+  }
+  std::cout << "bound_tensors=" << weights.bound_tensor_count << '\n';
+  std::cout << "gdn_layers=" << gdn_layers << '\n';
+  std::cout << "attention_layers=" << attention_layers << '\n';
+  std::cout << "embedding_columns=" << weights.token_embedding.columns << '\n';
+  std::cout << "embedding_rows=" << weights.token_embedding.rows << '\n';
+  std::cout << "final_norm_values=" << weights.output_norm.count << '\n';
+  std::cout << "logit_rows=" << weights.output.rows << '\n';
+  std::vector<float> final_norm(weights.output_norm.count);
+  status = qw38::internal::vector_decode(weights.output_norm, final_norm.data(),
+                                         final_norm.size());
+  if (!status.is_ok()) {
+    std::cerr << qw38::status_code_name(status.code()) << ": "
+              << status.message() << '\n';
+    return 1;
+  }
+  write_float_vector("final_norm_endpoints_f32_le_hex",
+                     {final_norm.front(), final_norm.back()});
+  return 0;
 }
 
 float fixture_query(std::size_t token, std::size_t head, std::size_t lane) {
@@ -923,6 +990,9 @@ int main(int argc, char** argv) {
   if (argc == 3 && std::string(argv[1]) == "--check-conversion") {
     return check_conversion(argv[2]);
   }
+  if (argc == 4 && std::string(argv[1]) == "--check-weight-binding") {
+    return check_weight_binding(argv[2], argv[3]);
+  }
   if (argc == 3 && std::string(argv[1]) == "--check-attention") {
     return check_attention(std::atoi(argv[2]));
   }
@@ -942,6 +1012,7 @@ int main(int argc, char** argv) {
                "--render-template-case NAME, --check-quant KIND HEX, or "
                "--check-gdn COMPONENT CHUNKING, --check-attention LAYER, or "
                "--check-conversion COMPONENT, "
+               "--check-weight-binding MODEL MODE, "
                "--check-ffn LAYER, --check-matvec KIND COLUMNS ROWS PAYLOAD "
                "ACTIVATION, or --check-tensor-row MODEL NAME ROW\n";
   return 2;

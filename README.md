@@ -14,6 +14,8 @@ The beginner-oriented [implementation handbook](docs/README.md) explains each
 admitted concept and links it to code, fixtures, failures, and evidence. The
 latest chapter covers [GGUF parameter conversion](docs/22-gguf-conversion.md),
 including folded decay, RMSNorm scales, squeezed shapes, and GDN head order.
+The following [typed-weight chapter](docs/23-typed-model-weights.md) explains how
+all 851 admitted ranges become safe global and per-layer fields.
 
 ## Build
 

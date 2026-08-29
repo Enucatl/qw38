@@ -118,6 +118,69 @@ Status bind_tensor_view(const ModelInfo& info, const MappedFile& mapping,
                           static_cast<std::size_t>(match->dimensions[1]), view);
 }
 
+Status make_vector_view(const std::uint8_t* data, std::size_t storage_bytes,
+                        std::uint32_t type, std::size_t count,
+                        VectorView* view) noexcept {
+  if (view == nullptr) {
+    return {StatusCode::kInvalidArgument, "vector view output is required"};
+  }
+  if (data == nullptr || type != 0 || count == 0 ||
+      count > std::numeric_limits<std::size_t>::max() / sizeof(float) ||
+      count * sizeof(float) != storage_bytes) {
+    return {StatusCode::kInvalidArgument,
+            "vector must be a complete nonempty F32 payload"};
+  }
+  *view = {data, storage_bytes, type, count};
+  return Status::ok();
+}
+
+Status bind_vector_view(const ModelInfo& info, const MappedFile& mapping,
+                        const std::string& name, VectorView* view) noexcept {
+  const auto match = std::find_if(
+      info.tensors.begin(), info.tensors.end(), [&name](const TensorInfo& tensor) {
+        return tensor.name == name;
+      });
+  if (match == info.tensors.end()) {
+    return {StatusCode::kInvalidArgument, "vector name is not admitted"};
+  }
+  if (match->dimensions.size() != 1 ||
+      match->dimensions[0] > std::numeric_limits<std::size_t>::max() ||
+      match->storage_bytes > std::numeric_limits<std::size_t>::max() ||
+      match->offset > std::numeric_limits<std::size_t>::max() ||
+      info.data_offset > std::numeric_limits<std::size_t>::max()) {
+    return {StatusCode::kInvalidArgument,
+            "tensor is not a supported one-dimensional host vector"};
+  }
+  const std::size_t relative = static_cast<std::size_t>(match->offset);
+  const std::size_t data_offset = static_cast<std::size_t>(info.data_offset);
+  const std::size_t bytes = static_cast<std::size_t>(match->storage_bytes);
+  if (relative > std::numeric_limits<std::size_t>::max() - data_offset) {
+    return {StatusCode::kInvalidArgument, "vector absolute offset overflows"};
+  }
+  const std::size_t absolute = data_offset + relative;
+  if (absolute > mapping.size() || bytes > mapping.size() - absolute) {
+    return {StatusCode::kInvalidArgument,
+            "vector payload exceeds the mapped artifact"};
+  }
+  return make_vector_view(mapping.data() + absolute, bytes, match->type,
+                          static_cast<std::size_t>(match->dimensions[0]), view);
+}
+
+Status vector_decode(const VectorView& view, float* output,
+                     std::size_t output_count) noexcept {
+  if (view.data == nullptr || view.type != 0 || view.count == 0 ||
+      view.count > std::numeric_limits<std::size_t>::max() / sizeof(float) ||
+      view.count * sizeof(float) != view.storage_bytes || output == nullptr ||
+      output_count != view.count) {
+    return {StatusCode::kInvalidArgument,
+            "vector view or output count is invalid"};
+  }
+  for (std::size_t index = 0; index < view.count; ++index) {
+    output[index] = read_f32_le(view.data + index * sizeof(float));
+  }
+  return Status::ok();
+}
+
 Status tensor_row_decode(const TensorView& view, std::size_t row, float* output,
                          std::size_t output_count) noexcept {
   Status status = validate_view(view);

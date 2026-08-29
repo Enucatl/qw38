@@ -27,9 +27,10 @@ are repository-relative unless stated otherwise.
 | CPU-005 | Implement discovered Q8_0 scalar decoding and dot products | CPU-001, MDL-001 | done | Exact 34-byte/32-value layout, signed values, FP16 scale, malformed sizes, and frozen decode/dot fixtures pass | [`src/quant.cpp`](src/quant.cpp); [`fixtures/quant_authority.json`](fixtures/quant_authority.json); [`tests/test_quant.py`](tests/test_quant.py); log 2026-08-29T13:07:00Z |
 | CPU-006 | Bind admitted tensor rows and implement mixed-format scalar matvec | CPU-001, CPU-005, MDL-001 | done | GGUF dimension order, row bounds/bytes, F32/Q8_0/Q4_K/Q6_K dots, malformed views, synthetic matrices, and admitted artifact rows pass | [`src/tensor.cpp`](src/tensor.cpp); [`fixtures/tensor_rows.json`](fixtures/tensor_rows.json); [`tests/test_tensor.py`](tests/test_tensor.py); log 2026-08-29T13:28:00Z |
 | CPU-007 | Implement pinned GGUF-to-semantic parameter and GDN head-layout transforms | CPU-002, CPU-006, PIN-002 | done | Folded A, RMSNorm convention, squeezed convolution, grouped/tiled head permutations, round trips, and admitted parameter fixtures pass | [`src/conversion.cpp`](src/conversion.cpp); [`pins/gguf_conversion_contract.json`](pins/gguf_conversion_contract.json); [`fixtures/gguf_conversion.json`](fixtures/gguf_conversion.json); [`tests/test_conversion.py`](tests/test_conversion.py); log 2026-08-29T17:29:00Z |
+| CPU-008 | Bind every admitted global and layer tensor into typed scalar weight structures | CPU-006, CPU-007, MDL-002 | done | All 851 tensors bind by exact name, layer kind, shape, dtype, and mapped range; missing, swapped, or incompatible roles fail closed | [`src/weights.cpp`](src/weights.cpp); [`src/tensor.cpp`](src/tensor.cpp); [`tests/test_weights.py`](tests/test_weights.py); log 2026-08-29T17:36:00Z |
 | CPU-002 | Implement scalar GDN oracle | CPU-001, MDL-002 | done | Warm-up, recurrence, state, head mapping, and chunk-boundary fixtures pass | [`src/gdn.cpp`](src/gdn.cpp); [`fixtures/gdn_authority.json`](fixtures/gdn_authority.json); [`tests/test_gdn.py`](tests/test_gdn.py); log 2026-08-29T12:26:00Z |
 | CPU-003 | Implement scalar attention and FFN oracle | CPU-001, MDL-002 | done | Layers 3/7/63, partial RoPE, grouped KV, causality, and FFN taps pass | [`src/attention.cpp`](src/attention.cpp); [`fixtures/attention_ffn_authority.json`](fixtures/attention_ffn_authority.json); [`tests/test_attention.py`](tests/test_attention.py); log 2026-08-29T12:54:00Z |
-| CPU-004 | Implement full scalar 64-layer scheduler and logits | CPU-002, CPU-003, CPU-005, CPU-006, CPU-007 | pending | Token/chunk execution and logits match semantic-authority fixtures | — |
+| CPU-004 | Implement full scalar 64-layer scheduler and logits | CPU-002, CPU-003, CPU-005, CPU-006, CPU-007, CPU-008 | pending | Token/chunk execution and logits match semantic-authority fixtures | — |
 | TRC-001 | Define versioned trace bundle and typed comparison metrics | PIN-002 | pending | Manifest/blob schema, checksums, summaries, session frontiers, and metric reporter pass tests | — |
 | TRC-002 | Add diagnostic-only stable scalar/CUDA taps | TRC-001, CPU-004 | pending | Required taps filter by layer/name and are absent from release builds | — |
 | ORA-001 | Generate and freeze scalar/oracle fixtures and tolerances | TOK-002, CPU-004, TRC-002 | pending | Three authorities are attributed; tolerances and greedy tie exceptions are immutable inputs | — |
@@ -67,6 +68,7 @@ are repository-relative unless stated otherwise.
 | EDU-006 | Explain Q8_0 and scalar matrix rows for beginners | CPU-005, DOC-001 | done | Signed bytes, per-block scale, row blocks, decode/dot use, format selection, fixtures, and full-scheduler dependency are code-linked and worked | [`docs/20-q8-scalar-rows.md`](docs/20-q8-scalar-rows.md); [`tests/test_quant.py`](tests/test_quant.py); log 2026-08-29T13:07:00Z |
 | EDU-007 | Explain GGUF tensor dimensions, row orientation, and matvec for beginners | CPU-006, DOC-001 | done | Shape order, fastest dimension, rows/outputs, block alignment, mixed formats, bounds, synthetic/admitted fixtures, and scheduler use are code-linked and worked | [`docs/21-tensor-rows.md`](docs/21-tensor-rows.md); [`tests/test_tensor.py`](tests/test_tensor.py); log 2026-08-29T13:28:00Z |
 | EDU-008 | Explain converter-owned parameter folding and GDN head reordering for beginners | CPU-007, DOC-001 | done | Source vs GGUF semantics, folded exponent, norm weight convention, squeeze, grouped/tiled indices, affected tensors, inverse transforms, and checkpoint ownership are code-linked and worked | [`docs/22-gguf-conversion.md`](docs/22-gguf-conversion.md); [`tests/test_conversion.py`](tests/test_conversion.py); log 2026-08-29T17:29:00Z |
+| EDU-009 | Explain typed model weights and complete layer binding for beginners | CPU-008, DOC-001 | done | Views versus ownership, vectors/matrices, common and variant layer fields, exact-name/schema admission, counts, and scheduler boundary are code-linked and worked | [`docs/23-typed-model-weights.md`](docs/23-typed-model-weights.md); [`tests/test_weights.py`](tests/test_weights.py); log 2026-08-29T17:36:00Z |
 | REL-001 | Publish reproducible release evidence bundle | CMP-003, QLT-001, DOC-001 | pending | Builds, hashes, raw results, reports, and documentation claims reconcile | — |
 
 ## Delivery-Gate Mapping
@@ -757,6 +759,68 @@ are repository-relative unless stated otherwise.
   reversible layout code, synthetic and admitted fixtures, malformed input,
   beginner documentation, evidence labels, and clean host/container verification
   before committing.
+
+### 2026-08-29T17:34:00Z — Conversion pushed; CPU-008 started
+
+- Commit `7f296f5` (`feat: define GGUF conversion boundary`) was pushed to
+  `origin/main` successfully after the documented host, fixture, container, and
+  device gates.
+- Added CPU-008 before implementation and made it an explicit CPU-004
+  dependency. The inventory proves 851 byte ranges, but a scheduler also needs
+  compile-time named fields for 3 globals, 48 fourteen-tensor GDN layers, and 16
+  eleven-tensor attention layers; unchecked string lookup inside execution would
+  allow missing or variant-incompatible roles to surface too late.
+- Added EDU-009 so non-owning vector/matrix views, common versus variant-specific
+  weights, exact schema checks, and the remaining execution boundary are taught
+  alongside the binding code.
+
+### 2026-08-29T17:35:00Z — CPU-008 endpoint fixture mismatch
+
+- The first focused typed-binding run bound all 851 tensors and passed four
+  malformed-schema cases, but the final-norm endpoint assertion used guessed
+  bytes `0000903f00008d3f`; the mapped vector decoder returned
+  `0000fb3f0000f13f`.
+- Diagnosis: the expected endpoint was entered before reading the admitted
+  payload and had no authority. The follow-up freezes the observed bytes only
+  after checking them independently against the already hashed
+  `output_norm.weight` range in the tensor inventory. Native binding and decoding
+  code are unchanged; this negative result remains part of the evidence trail.
+
+### 2026-08-29T17:36:00Z — CPU-008 and EDU-009 accepted
+
+- Added checked non-owning F32 VectorView creation, mapped name binding, and
+  explicit little-endian decode alongside the already admitted matrix view.
+- Added narrow typed structures for the three globals, five common layer fields,
+  nine GDN fields, and six attention fields. Binding uses the official
+  three-GDN/one-attention schedule, validates exact name, semantic role, rank,
+  dimensions, dtype, complete storage, and mapped range, and publishes only a
+  fully populated candidate.
+- The pinned artifact binds exactly 851 tensors: 3 globals, 48 × 14 GDN tensors,
+  and 16 × 11 attention tensors. Its embedding and output shapes, final-norm
+  width, and independently verified final-norm endpoint bytes match the focused
+  diagnostic.
+- In-memory corruptions of one required name, semantic role, vector shape, and
+  mapped offset all return errors. The initially guessed endpoint fixture and
+  its independent hash-based resolution remain in the preceding log entry.
+- Added a beginner chapter explaining inventory versus typed fields, views and
+  ownership, vector/matrix distinction, common and variant layers, schedule and
+  851-count arithmetic, exact schema admission, transactional publication,
+  fail-closed behavior, the failed fixture, and the CPU-004 execution boundary.
+- Commands: independent final-norm payload/hash read, Ruff format/check, clean
+  restricted C++17 build, 43 pytest tests, `git diff --check`, pinned CUDA 13.0.2
+  full build, SM120 compilation, and RTX 5090 probe — passed. Probe values were
+  33,671,348,224 total and 33,139,458,048 free bytes.
+- Marked CPU-008 and EDU-009 done. Activation workspaces, real projection
+  execution, session state, the 64-layer schedule, final norm, and logits remain
+  CPU-004.
+
+### 2026-08-29T17:36:30Z — Typed-weight commit boundary
+
+- Reviewed the discovered dependency, vector and matrix lifetime/range checks,
+  exact global/common/variant schema, all 851 bindings, failure publication
+  behavior, corrupted metadata cases, preserved fixture error, beginner
+  documentation, evidence labels, and clean host/container verification before
+  committing.
 
 ## Decisions and Negative Results
 
