@@ -25,7 +25,7 @@ are repository-relative unless stated otherwise.
 | TOK-002 | Implement chat/reasoning/tool template | TOK-001 | done | All supported roles, reasoning, tool calls/results, and rejection cases match fixtures | [`src/template.cpp`](src/template.cpp), [`fixtures/template_authority.json`](fixtures/template_authority.json); log 2026-08-29T11:39:57Z |
 | CPU-001 | Implement Q4_K/Q6_K scalar decoding and dot products | MDL-001 | done | Numeric fixtures meet frozen metrics and exact structural checks | [`src/quant.cpp`](src/quant.cpp); [`fixtures/quant_authority.json`](fixtures/quant_authority.json); [`tests/test_quant.py`](tests/test_quant.py); log 2026-08-29T12:05:00Z |
 | CPU-002 | Implement scalar GDN oracle | CPU-001, MDL-002 | done | Warm-up, recurrence, state, head mapping, and chunk-boundary fixtures pass | [`src/gdn.cpp`](src/gdn.cpp); [`fixtures/gdn_authority.json`](fixtures/gdn_authority.json); [`tests/test_gdn.py`](tests/test_gdn.py); log 2026-08-29T12:26:00Z |
-| CPU-003 | Implement scalar attention and FFN oracle | CPU-001, MDL-002 | pending | Layers 3/7/63, partial RoPE, grouped KV, causality, and FFN taps pass | — |
+| CPU-003 | Implement scalar attention and FFN oracle | CPU-001, MDL-002 | done | Layers 3/7/63, partial RoPE, grouped KV, causality, and FFN taps pass | [`src/attention.cpp`](src/attention.cpp); [`fixtures/attention_ffn_authority.json`](fixtures/attention_ffn_authority.json); [`tests/test_attention.py`](tests/test_attention.py); log 2026-08-29T12:54:00Z |
 | CPU-004 | Implement full scalar 64-layer scheduler and logits | CPU-002, CPU-003 | pending | Token/chunk execution and logits match semantic-authority fixtures | — |
 | TRC-001 | Define versioned trace bundle and typed comparison metrics | PIN-002 | pending | Manifest/blob schema, checksums, summaries, session frontiers, and metric reporter pass tests | — |
 | TRC-002 | Add diagnostic-only stable scalar/CUDA taps | TRC-001, CPU-004 | pending | Required taps filter by layer/name and are absent from release builds | — |
@@ -60,6 +60,7 @@ are repository-relative unless stated otherwise.
 | EDU-002 | Explain chat-template concepts and policy ownership for beginners | TOK-002, DOC-001 | done | Roles, delimiters, reasoning, tools, results, mapping, and byte-equality gates have worked examples linked to code/evidence | [`docs/16-chat-template.md`](docs/16-chat-template.md); tests; log 2026-08-29T11:39:57Z |
 | EDU-003 | Explain scalar quantization and numeric equality for beginners | CPU-001, DOC-001 | done | Bits/bytes, FP16/FP32, blocks, Q4_K/Q6_K packing, decoding, dot products, accumulation, fixtures, and numeric metrics have worked examples linked to code/evidence | [`docs/17-quantization.md`](docs/17-quantization.md); [`tests/test_quant.py`](tests/test_quant.py); log 2026-08-29T12:05:00Z |
 | EDU-004 | Explain GDN recurrence and persistent state for beginners | CPU-002, DOC-001 | done | Projections, heads, convolution warm-up/rings, gates, delta-rule recurrence, mutation order, chunk equivalence, and FP32 state have worked examples linked to code/evidence | [`docs/18-gated-delta-network.md`](docs/18-gated-delta-network.md); [`tests/test_gdn.py`](tests/test_gdn.py); log 2026-08-29T12:26:00Z |
+| EDU-005 | Explain grouped causal attention, partial RoPE, and SwiGLU for beginners | CPU-003, DOC-001 | done | Q/K/V, KV history, causality, grouped heads, RoPE pairs/positions, softmax, RMSNorm, gate/up/down FFN, fixtures, and numeric gates have worked examples linked to code/evidence | [`docs/19-attention-and-ffn.md`](docs/19-attention-and-ffn.md); [`tests/test_attention.py`](tests/test_attention.py); log 2026-08-29T12:54:00Z |
 | REL-001 | Publish reproducible release evidence bundle | CMP-003, QLT-001, DOC-001 | pending | Builds, hashes, raw results, reports, and documentation claims reconcile | — |
 
 ## Delivery-Gate Mapping
@@ -521,6 +522,75 @@ are repository-relative unless stated otherwise.
   chapter, provenance, measured metrics, and explicit eager-trace limitation
   before committing.
 
+### 2026-08-29T12:29:00Z — Scalar GDN pushed; CPU-003 started
+
+- Commit `f0c5087` (`feat: add scalar GDN oracle`) created after the documented
+  24-test and container gates, then pushed to `origin/main` successfully.
+- Began CPU-003 and added EDU-005 before implementation. The next frozen contract
+  must cover the official 24-query/4-KV grouped mapping, 256-wide heads, 64
+  rotary dimensions, causal KV append/read order, stable softmax, and SwiGLU FFN
+  order, with focused fixtures representing required attention layers 3/7/63.
+
+### 2026-08-29T12:43:00Z — CPU-003 relative-metric failure
+
+- The first 28-test run failed one CPU-003 attention metric. Native outputs met
+  the frozen `3e-6` absolute and `1e-6` RMS limits, but a near-zero output had
+  `1.151611987684236e-4` relative error, above the frozen `3e-5` limit. The
+  difference is at the one-ULP/library-math scale, but the relative gate remains
+  binding.
+- No tolerance was loosened. CPU-003 remains in progress while the exact failing
+  lane and arithmetic source are diagnosed; the failed run is retained here as
+  required admission evidence.
+
+### 2026-08-29T12:46:00Z — CPU-003 metric failure resolved
+
+- Located the worst lane at attention layer fixture 63, flattened output index
+  108: native `-0.00044878353946842253` versus fixture
+  `-0.0004488352278713137`, an absolute difference of
+  `5.168840289115906e-8` but relative error `1.151611987684236e-4`.
+- Diagnosis: the fixture claimed explicit FP32 scalar transcendental operations
+  but used Python's double-precision `math` functions followed by FP32 rounding.
+  The native oracle and the pinned fallback operate on FP32 tensors. Corrected
+  the generator to call `expf`, `sqrtf`, `powf`, `sinf`, and `cosf` directly and
+  then regenerated expected data. No native code or frozen tolerance changed.
+- The focused four-test CPU-003 suite then passed. The worst relative error is
+  now `7.796529634717427e-6`, below the unchanged `3e-5` gate.
+
+### 2026-08-29T12:54:00Z — CPU-003 and EDU-005 accepted
+
+- Pinned the official source identity/symbols, 24-query/4-KV production shape,
+  six-to-one grouped mapping, 256 head width, first-64-lane partial RoPE,
+  10,000,000 theta, stable causal attention order, RMSNorm equation, query
+  output gate, and 5,120→17,408→5,120 SwiGLU equation.
+- Implemented per-head RMSNorm, partial half-rotation RoPE, causal KV append and
+  bounded-frontier reads, grouped-query scoring, FP32 stable softmax, sigmoid
+  output gating, and visible dense FFN gate/up/activated/down taps.
+- Frozen `3e-6` maximum absolute, `3e-5` maximum relative, `1e-6` RMS, and
+  `0.999999` minimum cosine gates. Across layers 3/7/63, worst measured absolute
+  error was `2.384185791015625e-7`, relative error
+  `7.796529634717427e-6`, and aggregate fixture RMS below `2.7e-8`.
+- Future KV rows were initialized with ±1,000-scale sentinels; first-position
+  outputs remained below magnitude two and matched the causal fixture. Rotated
+  key caches, unrotated value caches, and all FFN taps passed. The earlier failed
+  relative gate and FP64-generator diagnosis remain preserved above.
+- Added a beginner chapter covering lookup intuition, heads and six-to-one GQA,
+  query gating, RMSNorm, worked partial-RoPE pairing, KV causality, the 64 KiB per
+  token/8 GiB estimate, stable softmax, SwiGLU projection order, fixtures,
+  metrics, the failed gate, authority labels, and proof limits.
+- Commands: fixture regeneration, Ruff format/check, clean restricted C++17
+  build, 28 pytest tests, `git diff --check`, pinned CUDA 13.0.2 full build,
+  SM120 compilation, and RTX 5090 probe — passed. Probe values were
+  33,671,348,224 total and 33,139,458,048 free bytes.
+- Marked CPU-003 and EDU-005 done. Direct eager traces remain ORA-001; real
+  tensor projections, residual scheduling, and logits remain CPU-004.
+
+### 2026-08-29T12:55:00Z — Scalar attention/FFN commit boundary
+
+- Reviewed the official contract, scalar attention/RoPE/RMSNorm/FFN code,
+  synthetic layer fixtures, frozen metrics, causal sentinels, tests, beginner
+  chapter, provenance, failed run and resolution, and eager-trace limitation
+  before committing.
+
 ## Decisions and Negative Results
 
 - **2026-08-29 / BLD-002:** Host `nvcc` is absent. Resolved for reproducibility
@@ -541,3 +611,7 @@ are repository-relative unless stated otherwise.
   FP32 bytes, but not for a cosine value derived through square roots. The first
   metric test failed on this distinction; the cosine reporter now has a `1e-15`
   absolute tolerance while structural, decoded-value, and dot bits stay exact.
+- **2026-08-29 / CPU-003:** The first attention fixture used double-precision
+  Python transcendental functions despite claiming scalar FP32 operations and
+  failed the frozen relative gate. Regenerating through float libm functions
+  fixed the authority transcription; no native code or tolerance was changed.

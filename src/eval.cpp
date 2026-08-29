@@ -11,6 +11,7 @@
 #include <unistd.h>
 
 #include "qw38/engine.h"
+#include "attention.h"
 #include "gdn.h"
 #include "model.h"
 #include "quant.h"
@@ -379,6 +380,134 @@ int check_gdn(const std::string& component, const std::string& chunking) {
   return 1;
 }
 
+float attention_fixture_value(int layer, std::size_t token, std::size_t head,
+                              std::size_t lane, int salt) {
+  const int value =
+      (layer * 3 + static_cast<int>(token * 11 + head * 7 + lane * 5) + salt) %
+          31 -
+      15;
+  return static_cast<float>(value) / 8.0F;
+}
+
+bool supported_attention_layer(int layer) {
+  return layer == 3 || layer == 7 || layer == 63;
+}
+
+int check_attention(int layer) {
+  if (!supported_attention_layer(layer)) {
+    std::cerr << "invalid_argument: attention fixture layer must be 3, 7, or 63\n";
+    return 1;
+  }
+  constexpr qw38::internal::AttentionShape kShape{6, 2, 8, 4, 4};
+  constexpr std::size_t kQueryValues = kShape.query_heads * kShape.head_width;
+  constexpr std::size_t kKvValues = kShape.kv_heads * kShape.head_width;
+  constexpr std::size_t kCacheValues = kShape.capacity * kKvValues;
+  std::array<float, kShape.head_width> query_weight{};
+  std::array<float, kShape.head_width> key_weight{};
+  for (std::size_t lane = 0; lane < kShape.head_width; ++lane) {
+    query_weight[lane] =
+        static_cast<float>(static_cast<int>(lane) - 3) / 64.0F;
+    key_weight[lane] =
+        static_cast<float>(3 - static_cast<int>(lane)) / 64.0F;
+  }
+  std::array<float, kCacheValues> key_cache{};
+  std::array<float, kCacheValues> value_cache{};
+  for (std::size_t index = 0; index < kCacheValues; ++index) {
+    key_cache[index] = 1000.0F + static_cast<float>(index);
+    value_cache[index] = -1000.0F - static_cast<float>(index);
+  }
+  std::vector<float> all_output;
+  for (std::size_t token = 0; token < kShape.capacity; ++token) {
+    std::array<float, kQueryValues> query{};
+    std::array<float, kQueryValues> gate{};
+    std::array<float, kKvValues> key{};
+    std::array<float, kKvValues> value{};
+    std::array<float, kShape.capacity> scores{};
+    std::array<float, kQueryValues> output{};
+    for (std::size_t head = 0; head < kShape.query_heads; ++head) {
+      for (std::size_t lane = 0; lane < kShape.head_width; ++lane) {
+        const std::size_t index = head * kShape.head_width + lane;
+        query[index] = attention_fixture_value(layer, token, head, lane, 1);
+        gate[index] = attention_fixture_value(layer, token, head, lane, 9);
+      }
+    }
+    for (std::size_t head = 0; head < kShape.kv_heads; ++head) {
+      for (std::size_t lane = 0; lane < kShape.head_width; ++lane) {
+        const std::size_t index = head * kShape.head_width + lane;
+        key[index] = attention_fixture_value(layer, token, head, lane, 4);
+        value[index] = attention_fixture_value(layer, token, head, lane, 13);
+      }
+    }
+    const qw38::Status status = qw38::internal::attention_decode_step(
+        kShape, token, query.data(), query.size(), key.data(), key.size(),
+        value.data(), value.size(), query_weight.data(), key_weight.data(),
+        gate.data(), gate.size(), key_cache.data(), key_cache.size(),
+        value_cache.data(), value_cache.size(), scores.data(), scores.size(),
+        output.data(), output.size());
+    if (!status.is_ok()) {
+      std::cerr << qw38::status_code_name(status.code()) << ": "
+                << status.message() << '\n';
+      return 1;
+    }
+    all_output.insert(all_output.end(), output.begin(), output.end());
+  }
+  write_float_vector("output_f32_le_hex", all_output);
+  write_float_vector("key_cache_f32_le_hex",
+                     {key_cache.begin(), key_cache.end()});
+  write_float_vector("value_cache_f32_le_hex",
+                     {value_cache.begin(), value_cache.end()});
+  return 0;
+}
+
+int check_ffn(int layer) {
+  if (!supported_attention_layer(layer)) {
+    std::cerr << "invalid_argument: FFN fixture layer must be 3, 7, or 63\n";
+    return 1;
+  }
+  constexpr std::size_t kHidden = 4;
+  constexpr std::size_t kIntermediate = 6;
+  std::array<float, kHidden> input{};
+  std::array<float, kIntermediate * kHidden> gate_weights{};
+  std::array<float, kIntermediate * kHidden> up_weights{};
+  std::array<float, kHidden * kIntermediate> down_weights{};
+  for (std::size_t lane = 0; lane < kHidden; ++lane) {
+    input[lane] = attention_fixture_value(layer, 0, 0, lane, 2);
+  }
+  for (std::size_t row = 0; row < kIntermediate; ++row) {
+    for (std::size_t column = 0; column < kHidden; ++column) {
+      gate_weights[row * kHidden + column] =
+          attention_fixture_value(layer, row, 0, column, 3) / 4.0F;
+      up_weights[row * kHidden + column] =
+          attention_fixture_value(layer, row, 0, column, 7) / 4.0F;
+    }
+  }
+  for (std::size_t row = 0; row < kHidden; ++row) {
+    for (std::size_t column = 0; column < kIntermediate; ++column) {
+      down_weights[row * kIntermediate + column] =
+          attention_fixture_value(layer, row, 0, column, 11) / 4.0F;
+    }
+  }
+  std::array<float, kIntermediate> gate{};
+  std::array<float, kIntermediate> up{};
+  std::array<float, kIntermediate> activated{};
+  std::array<float, kHidden> output{};
+  const qw38::Status status = qw38::internal::swiglu_ffn(
+      input.data(), input.size(), gate_weights.data(), up_weights.data(),
+      kIntermediate, down_weights.data(), gate.data(), up.data(),
+      activated.data(), output.data());
+  if (!status.is_ok()) {
+    std::cerr << qw38::status_code_name(status.code()) << ": "
+              << status.message() << '\n';
+    return 1;
+  }
+  write_float_vector("gate_f32_le_hex", {gate.begin(), gate.end()});
+  write_float_vector("up_f32_le_hex", {up.begin(), up.end()});
+  write_float_vector("activated_f32_le_hex",
+                     {activated.begin(), activated.end()});
+  write_float_vector("output_f32_le_hex", {output.begin(), output.end()});
+  return 0;
+}
+
 int tokenize_hex(const char* model_path, const std::string& hex) {
   if (hex.size() % 2 != 0) {
     std::cerr << "invalid_argument: input hex has odd length\n";
@@ -556,11 +685,18 @@ int main(int argc, char** argv) {
   if (argc == 4 && std::string(argv[1]) == "--check-gdn") {
     return check_gdn(argv[2], argv[3]);
   }
+  if (argc == 3 && std::string(argv[1]) == "--check-attention") {
+    return check_attention(std::atoi(argv[2]));
+  }
+  if (argc == 3 && std::string(argv[1]) == "--check-ffn") {
+    return check_ffn(std::atoi(argv[2]));
+  }
   std::cout << kBrand << '\n';
   std::cerr << "qw38-eval: use --build-info, --inspect-gguf PATH, --sha256 PATH, "
                "--verify-model PATH, --check-contract PATH, or "
                "--inventory-gguf PATH OUTPUT, --tokenize-hex PATH HEX, or "
                "--render-template-case NAME, --check-quant KIND HEX, or "
-               "--check-gdn COMPONENT CHUNKING\n";
+               "--check-gdn COMPONENT CHUNKING, --check-attention LAYER, or "
+               "--check-ffn LAYER\n";
   return 2;
 }

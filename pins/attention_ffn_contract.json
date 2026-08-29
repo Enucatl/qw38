@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "semantic_authority": {
+    "repository": "https://github.com/huggingface/transformers.git",
+    "revision": "42ca97014c85d71a88ad60d55f08cb9fb4d26e2c",
+    "path": "src/transformers/models/qwen3_5/modeling_qwen3_5.py",
+    "sha256": "1d538599c80b3d2986911f269fe091d936c6e64a65188e7705d1290b7f403245",
+    "license": "Apache-2.0",
+    "symbols": [
+      "Qwen3_5TextRotaryEmbedding",
+      "apply_rotary_pos_emb",
+      "repeat_kv",
+      "eager_attention_forward",
+      "Qwen3_5Attention",
+      "Qwen3_5MLP",
+      "Qwen3_5RMSNorm"
+    ]
+  },
+  "production_shape": {
+    "attention_layers_sampled": [3, 7, 63],
+    "query_heads": 24,
+    "kv_heads": 4,
+    "head_width": 256,
+    "kv_group_size": 6,
+    "rotary_width": 64,
+    "rotary_fraction": 0.25,
+    "rope_theta": 10000000,
+    "residual_width": 5120,
+    "ffn_width": 17408,
+    "rms_epsilon": 0.000001
+  },
+  "attention_order": [
+    "split projected query and sigmoid output gate",
+    "apply per-head RMSNorm to query and key",
+    "apply RoPE only to the first 64 lanes",
+    "append rotated key and unrotated value to the layer KV timeline",
+    "map six adjacent query heads to each KV head",
+    "score causal positions with dot(query,key)/sqrt(256)",
+    "apply FP32 stable softmax",
+    "sum values and multiply each query-head lane by sigmoid(gate)"
+  ],
+  "ffn_equation": "down_proj(silu(gate_proj(x)) * up_proj(x))",
+  "rmsnorm_equation": "x * reciprocal_sqrt(mean(x*x) + 1e-6) * (1 + weight)"
+}

@@ -50,6 +50,11 @@ DSpark are explicitly rejected as Qwen model semantics.
   frozen in [`pins/gdn_contract.json`](../pins/gdn_contract.json). The local
   fixture is transparently labeled a scalar transcription; a direct eager trace
   remains ORA-001 work.
+- The same pinned Transformers file is CPU-003's authority for partial text
+  RoPE, grouped KV repetition, eager causal attention, per-head RMSNorm, query
+  output gating, and the SwiGLU MLP. Production dimensions, order, used symbols,
+  and source identity are frozen separately in
+  [`pins/attention_ffn_contract.json`](../pins/attention_ffn_contract.json).
 
 ## Specialization and hardware references
 
