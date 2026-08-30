@@ -113,6 +113,12 @@ DSpark are explicitly rejected as Qwen model semantics.
   [`fixtures/real_model_boundaries.json`](../fixtures/real_model_boundaries.json).
   The deterministic embedding-to-output diagnostic is a boundary proof, not a
   real 64-layer continuation authority.
+- CPU-016 introduces no new external implementation dependency. It composes all
+  already pinned and admitted scalar boundaries using the official 48-GDN/16-
+  attention layer schedule. [`fixtures/real_scalar_token.json`](../fixtures/real_scalar_token.json)
+  is explicitly a native structural zero-state regression; it must not be cited
+  as Transformers, llama.cpp, quality, or continuation agreement before
+  TRC-001/TRC-002/ORA-001.
 
 ## Specialization and hardware references
 

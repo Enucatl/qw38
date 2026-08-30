@@ -20,6 +20,7 @@
 #include "projection.h"
 #include "quant.h"
 #include "scheduler.h"
+#include "scalar_runtime.h"
 #include "sha256.h"
 #include "template.h"
 #include "tensor.h"
@@ -1198,6 +1199,188 @@ int check_real_model_boundaries(const char* model_path,
   return 0;
 }
 
+int check_real_scalar_token(const char* model_path, const std::string& mode) {
+  qw38::internal::ModelInfo info;
+  qw38::Status status = qw38::internal::inspect_gguf(model_path, &info);
+  if (status.is_ok()) status = qw38::internal::validate_qwen38_contract(&info);
+  qw38::internal::MappedFile mapping;
+  if (status.is_ok()) status = mapping.open(model_path);
+  qw38::internal::ModelWeights weights;
+  if (status.is_ok()) {
+    status = qw38::internal::bind_model_weights(info, mapping, &weights);
+  }
+  if (!status.is_ok()) {
+    std::cerr << qw38::status_code_name(status.code()) << ": "
+              << status.message() << '\n';
+    return 1;
+  }
+  if (mode != "valid" && mode != "invalid_workspace") {
+    std::cerr << "invalid_argument: unknown real-scalar-token mode\n";
+    return 1;
+  }
+
+  qw38::internal::ScalarModelParameters parameters;
+  status = qw38::internal::prepare_scalar_model_parameters(weights, &parameters);
+  qw38::internal::ScalarSessionState state;
+  if (status.is_ok()) {
+    status = qw38::internal::create_scalar_session_state(1, &state);
+  }
+  qw38::internal::ScalarWorkspace workspace;
+  if (status.is_ok()) {
+    status = qw38::internal::create_scalar_workspace(1, &workspace);
+  }
+  if (!status.is_ok()) {
+    std::cerr << qw38::status_code_name(status.code()) << ": "
+              << status.message() << '\n';
+    return 1;
+  }
+  std::vector<float> logits(qw38::internal::kVocabularySize, NAN);
+  if (mode == "invalid_workspace") workspace.ffn_activated.pop_back();
+  status = qw38::internal::execute_scalar_token(
+      weights, parameters, 42, &state, &workspace, logits.data(), logits.size());
+  if (!status.is_ok()) {
+    const bool state_unchanged =
+        std::all_of(state.gdn_convolution.begin(),
+                    state.gdn_convolution.end(),
+                    [](float value) { return value == 0.0F; }) &&
+        std::all_of(state.gdn_recurrent.begin(), state.gdn_recurrent.end(),
+                    [](float value) { return value == 0.0F; }) &&
+        std::all_of(state.attention_key.begin(), state.attention_key.end(),
+                    [](float value) { return value == 0.0F; }) &&
+        std::all_of(state.attention_value.begin(), state.attention_value.end(),
+                    [](float value) { return value == 0.0F; });
+    const bool logits_untouched = std::all_of(
+        logits.begin(), logits.end(),
+        [](float value) { return std::isnan(value); });
+    std::cout << "state_unchanged=" << (state_unchanged ? 1 : 0) << '\n';
+    std::cout << "logits_untouched=" << (logits_untouched ? 1 : 0) << '\n';
+    std::cout << "frontier=" << state.frontier << '\n';
+    std::cout << "layers_completed=" << workspace.layers_completed << '\n';
+    std::cerr << qw38::status_code_name(status.code()) << ": "
+              << status.message() << '\n';
+    return 1;
+  }
+  const auto finite = [](const std::vector<float>& values) {
+    return std::all_of(values.begin(), values.end(),
+                       [](float value) { return std::isfinite(value); });
+  };
+  if (!finite(workspace.activation_a) || !finite(workspace.final_normalized) ||
+      !finite(logits) || !finite(state.gdn_convolution) ||
+      !finite(state.gdn_recurrent) || !finite(state.attention_key) ||
+      !finite(state.attention_value)) {
+    std::cerr << "internal: scalar token execution left a nonfinite value\n";
+    return 1;
+  }
+  std::size_t gdn_mutated = 0;
+  std::size_t attention_mutated = 0;
+  for (std::size_t layer = 0; layer < qw38::internal::kModelLayerCount;
+       ++layer) {
+    if (layer % 4 == 3) {
+      const auto& view = state.attention[layer];
+      const bool changed =
+          std::any_of(view.key_cache, view.key_cache + view.key_cache_count,
+                      [](float value) { return value != 0.0F; }) ||
+          std::any_of(view.value_cache,
+                      view.value_cache + view.value_cache_count,
+                      [](float value) { return value != 0.0F; });
+      if (changed) ++attention_mutated;
+    } else {
+      const auto& view = state.gdn[layer];
+      const bool changed =
+          std::any_of(view.convolution,
+                      view.convolution + view.convolution_count,
+                      [](float value) { return value != 0.0F; }) ||
+          std::any_of(view.recurrent, view.recurrent + view.recurrent_count,
+                      [](float value) { return value != 0.0F; });
+      if (changed) ++gdn_mutated;
+    }
+  }
+  const auto taps = [](const std::vector<float>& values,
+                       std::initializer_list<std::size_t> indices) {
+    std::vector<float> selected;
+    selected.reserve(indices.size());
+    for (std::size_t index : indices) selected.push_back(values[index]);
+    return selected;
+  };
+  const std::initializer_list<std::size_t> kHiddenTaps{0, 1, 2559, 5119};
+  write_float_vector("final_hidden_f32_le_hex",
+                     taps(workspace.activation_a, kHiddenTaps));
+  write_float_vector("final_normalized_f32_le_hex",
+                     taps(workspace.final_normalized, kHiddenTaps));
+  write_float_vector("logits_f32_le_hex",
+                     taps(logits, {0, 1, 42, 1000, 248319}));
+  write_float_vector(
+      "gdn_state_f32_le_hex",
+      {state.gdn[0].convolution[3], state.gdn[0].recurrent[0],
+       state.gdn[1].convolution[3], state.gdn[1].recurrent[0],
+       state.gdn[62].convolution[3], state.gdn[62].recurrent[0]});
+  write_float_vector(
+      "attention_state_f32_le_hex",
+      {state.attention[3].key_cache[0], state.attention[3].value_cache[0],
+       state.attention[7].key_cache[0], state.attention[7].value_cache[0],
+       state.attention[63].key_cache[0], state.attention[63].value_cache[0]});
+  const auto greedy = std::max_element(logits.begin(), logits.end());
+  std::cout << "greedy_token=" << std::distance(logits.begin(), greedy) << '\n';
+  std::cout << "gdn_slots_mutated=" << gdn_mutated << '\n';
+  std::cout << "attention_slots_mutated=" << attention_mutated << '\n';
+  std::cout << "frontier=" << state.frontier << '\n';
+  std::cout << "layers_completed=" << workspace.layers_completed << '\n';
+  std::cout << "logit_count=" << logits.size() << '\n';
+  std::cout << "prepared_values="
+            << parameters.input_norms.size() + parameters.ffn_norms.size() +
+                   parameters.gdn_convolution.size() +
+                   parameters.gdn_folded_a.size() +
+                   parameters.gdn_dt_bias.size() +
+                   parameters.gdn_recurrent_norm.size() +
+                   parameters.attention_query_norm.size() +
+                   parameters.attention_key_norm.size() +
+                   parameters.output_norm.size()
+            << '\n';
+  std::cout << "state_values="
+            << state.gdn_convolution.size() + state.gdn_recurrent.size() +
+                   state.attention_key.size() + state.attention_value.size()
+            << '\n';
+  std::cout << "workspace_values="
+            << workspace.activation_a.size() + workspace.activation_b.size() +
+                   workspace.post_mixer.size() +
+                   workspace.gdn_normalized.size() +
+                   workspace.gdn_packed.size() +
+                   workspace.gdn_projected_gate.size() +
+                   workspace.gdn_projected_alpha.size() +
+                   workspace.gdn_projected_beta.size() +
+                   workspace.gdn_convolved.size() +
+                   workspace.gdn_query.size() + workspace.gdn_key.size() +
+                   workspace.gdn_value_tiled.size() +
+                   workspace.gdn_value_grouped.size() +
+                   workspace.gdn_gate_grouped.size() +
+                   workspace.gdn_alpha_grouped.size() +
+                   workspace.gdn_beta_grouped.size() +
+                   workspace.gdn_folded_grouped.size() +
+                   workspace.gdn_dt_grouped.size() +
+                   workspace.gdn_log_decay.size() +
+                   workspace.gdn_update_gate.size() +
+                   workspace.gdn_recurrent_output.size() +
+                   workspace.gdn_gated_grouped.size() +
+                   workspace.gdn_gated_tiled.size() +
+                   workspace.gdn_mixer_output.size() +
+                   workspace.attention_normalized.size() +
+                   workspace.attention_packed.size() +
+                   workspace.attention_query.size() +
+                   workspace.attention_gate.size() +
+                   workspace.attention_key.size() +
+                   workspace.attention_value.size() +
+                   workspace.attention_output.size() +
+                   workspace.attention_scores.size() +
+                   workspace.attention_mixer_output.size() +
+                   workspace.ffn_normalized.size() +
+                   workspace.ffn_gate.size() + workspace.ffn_up.size() +
+                   workspace.ffn_activated.size() +
+                   workspace.ffn_correction.size() +
+                   workspace.final_normalized.size()
+            << '\n';
+  return 0;
+}
+
 float fixture_query(std::size_t token, std::size_t head, std::size_t lane) {
   const int numerator =
       static_cast<int>((token * 11 + head * 7 + lane * 3) % 19) - 9;
@@ -1813,6 +1996,9 @@ int main(int argc, char** argv) {
   if (argc == 4 && std::string(argv[1]) == "--check-real-model-boundaries") {
     return check_real_model_boundaries(argv[2], argv[3]);
   }
+  if (argc == 4 && std::string(argv[1]) == "--check-real-scalar-token") {
+    return check_real_scalar_token(argv[2], argv[3]);
+  }
   if (argc == 3 && std::string(argv[1]) == "--check-attention") {
     return check_attention(std::atoi(argv[2]));
   }
@@ -1839,6 +2025,7 @@ int main(int argc, char** argv) {
                "--check-real-ffn-step MODEL MODE, "
                "--check-real-attention-step MODEL MODE, "
                "--check-real-model-boundaries MODEL MODE, "
+               "--check-real-scalar-token MODEL MODE, "
                "--check-ffn LAYER, --check-matvec KIND COLUMNS ROWS PAYLOAD "
                "ACTIVATION, or --check-tensor-row MODEL NAME ROW\n";
   return 2;

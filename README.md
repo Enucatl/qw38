@@ -35,6 +35,9 @@ memory lifetimes, and the remaining full-scheduler boundary.
 The [embedding and logits chapter](docs/30-embeddings-and-logits.md) explains how
 token IDs become hidden vectors and how final normalized state becomes all
 248,320 vocabulary scores.
+The [full scalar token chapter](docs/31-full-scalar-token.md) follows one real
+token through all 48 GDN and 16 attention layers, final logits, state ownership,
+scratch reuse, and the remaining oracle boundary.
 
 ## Build
 

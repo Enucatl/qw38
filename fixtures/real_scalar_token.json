@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "model_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+  "input_token": 42,
+  "authority": "native structural 64-layer zero-state scalar regression",
+  "proof_limit": "not an independent semantic continuation authority; requires TRC-001, TRC-002, and ORA-001",
+  "expected": {
+    "final_hidden_f32_le_hex": "f43382c02ae0ad4194fafc4020f7ab3f",
+    "final_normalized_f32_le_hex": "7e725abf5c2b82402fe6e03f78828a3e",
+    "logits_f32_le_hex": "6ac19440eeb11f408e702f4029b8663fa3dd283e",
+    "gdn_state_f32_le_hex": "0836393f575f15358a2627bf285c9a36a3244abf9cf42eb7",
+    "attention_state_f32_le_hex": "afcc0b3fd571e1be0a52823d88413a3eae62b93ed3538fbf",
+    "greedy_token": "3649",
+    "gdn_slots_mutated": "48",
+    "attention_slots_mutated": "16",
+    "frontier": "1",
+    "layers_completed": "64",
+    "logit_count": "248320",
+    "prepared_values": "2645504",
+    "state_values": "39747584",
+    "workspace_values": "204161"
+  }
+}

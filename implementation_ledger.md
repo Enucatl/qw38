@@ -35,9 +35,10 @@ are repository-relative unless stated otherwise.
 | CPU-013 | Execute real layer-3 grouped-query attention steps, KV mutation, output projection, and residual | CPU-003, CPU-008, CPU-009, CPU-010 | done | Direct-scale norms, packed projection split, partial RoPE, two-position grouped causal attention, KV state, output gate/projection, residual, capacity, and malformed buffers pass frozen evidence | [`src/mixer.cpp`](src/mixer.cpp); [`fixtures/real_attention_step.json`](fixtures/real_attention_step.json); [`tests/test_real_attention.py`](tests/test_real_attention.py); log 2026-08-29T18:54:26Z |
 | CPU-014 | Compose complete real GDN and attention decoder layers through their FFN branches | CPU-011, CPU-012, CPU-013 | done | Layer-0 GDN→FFN and layer-3 attention→FFN use the post-mixer residual, preserve exact branch order, meet frozen taps, and reject malformed FFN storage before persistent mixer-state mutation | [`src/scheduler.cpp`](src/scheduler.cpp); [`fixtures/real_layer_composition.json`](fixtures/real_layer_composition.json); [`tests/test_real_layer_composition.py`](tests/test_real_layer_composition.py); log 2026-08-30T06:31:18Z |
 | CPU-015 | Execute real token embedding lookup, final RMSNorm, and complete FP32 vocabulary logits | CPU-006, CPU-008, CPU-014 | done | Valid token rows decode exactly, out-of-range IDs fail before writes, direct-scale final norm and all 248,320 Q6_K logits are finite, selected logits match independently decoded rows, and malformed workspaces fail closed | [`src/scheduler.cpp`](src/scheduler.cpp); [`fixtures/real_model_boundaries.json`](fixtures/real_model_boundaries.json); [`tests/test_real_model_boundaries.py`](tests/test_real_model_boundaries.py); log 2026-08-30T06:39:56Z |
+| CPU-016 | Execute one real token through the exact 64-layer scalar schedule and complete logits | CPU-014, CPU-015 | done | Prepared parameters and independent state slots cover 48 GDN/16 attention layers; token embedding flows through layers 0–63, final norm, and all logits; stable boundary taps and state mutations are retained; malformed global storage fails before mutation | [`src/scalar_runtime.cpp`](src/scalar_runtime.cpp); [`fixtures/real_scalar_token.json`](fixtures/real_scalar_token.json); [`tests/test_real_scalar_token.py`](tests/test_real_scalar_token.py); log 2026-08-30T06:53:51Z |
 | CPU-002 | Implement scalar GDN oracle | CPU-001, MDL-002 | done | Warm-up, recurrence, state, head mapping, and chunk-boundary fixtures pass | [`src/gdn.cpp`](src/gdn.cpp); [`fixtures/gdn_authority.json`](fixtures/gdn_authority.json); [`tests/test_gdn.py`](tests/test_gdn.py); log 2026-08-29T12:26:00Z |
 | CPU-003 | Implement scalar attention and FFN oracle | CPU-001, MDL-002 | done | Layers 3/7/63, partial RoPE, grouped KV, causality, and FFN taps pass | [`src/attention.cpp`](src/attention.cpp); [`fixtures/attention_ffn_authority.json`](fixtures/attention_ffn_authority.json); [`tests/test_attention.py`](tests/test_attention.py); log 2026-08-29T12:54:00Z |
-| CPU-004 | Implement full scalar 64-layer scheduler and logits | CPU-002, CPU-003, CPU-005, CPU-006, CPU-007, CPU-008, CPU-009, CPU-010, CPU-011, CPU-012, CPU-013, CPU-014, CPU-015 | pending | Token/chunk execution and logits match semantic-authority fixtures | — |
+| CPU-004 | Implement full scalar 64-layer scheduler and logits | CPU-002, CPU-003, CPU-005, CPU-006, CPU-007, CPU-008, CPU-009, CPU-010, CPU-011, CPU-012, CPU-013, CPU-014, CPU-015, CPU-016 | pending | Token/chunk execution and logits match semantic-authority fixtures | — |
 | TRC-001 | Define versioned trace bundle and typed comparison metrics | PIN-002 | pending | Manifest/blob schema, checksums, summaries, session frontiers, and metric reporter pass tests | — |
 | TRC-002 | Add diagnostic-only stable scalar/CUDA taps | TRC-001, CPU-004 | pending | Required taps filter by layer/name and are absent from release builds | — |
 | ORA-001 | Generate and freeze scalar/oracle fixtures and tolerances | TOK-002, CPU-004, TRC-002 | pending | Three authorities are attributed; tolerances and greedy tie exceptions are immutable inputs | — |
@@ -83,6 +84,7 @@ are repository-relative unless stated otherwise.
 | EDU-014 | Explain real grouped-query attention and KV mutation for beginners | CPU-013, DOC-001 | done | Query/key/value, head normalization, partial RoPE, grouped head mapping, causal scores/softmax, KV ownership, output gate/projection, residual, and atomicity are code-linked and worked | [`docs/28-real-attention-layer.md`](docs/28-real-attention-layer.md); [`tests/test_real_attention.py`](tests/test_real_attention.py); log 2026-08-29T18:54:26Z |
 | EDU-015 | Explain complete decoder-layer composition for beginners | CPU-014, DOC-001 | done | Mixer→residual→post-mixer norm→SwiGLU→residual order, layer variants, buffer reuse, preflight validation, state mutation, and scheduler boundary are code-linked and worked | [`docs/29-complete-decoder-layer.md`](docs/29-complete-decoder-layer.md); [`tests/test_real_layer_composition.py`](tests/test_real_layer_composition.py); log 2026-08-30T06:31:18Z |
 | EDU-016 | Explain embeddings, final normalization, logits, and token choice for beginners | CPU-015, DOC-001 | done | Token IDs versus embeddings, row lookup, hidden vectors, final RMSNorm, vocabulary projection, logits versus probabilities, argmax, workspace/cost, exact bounds, and evidence limits are code-linked and worked | [`docs/30-embeddings-and-logits.md`](docs/30-embeddings-and-logits.md); [`tests/test_real_model_boundaries.py`](tests/test_real_model_boundaries.py); log 2026-08-30T06:39:56Z |
+| EDU-017 | Explain the full hybrid layer schedule and scalar runtime ownership for beginners | CPU-016, DOC-001 | done | Layer order, slot mapping, prepared parameters, per-session state, shared scratch, ping-pong residuals, one-token execution, final logits, state frontier, structural fixtures, and oracle limits are code-linked and worked | [`docs/31-full-scalar-token.md`](docs/31-full-scalar-token.md); [`tests/test_real_scalar_token.py`](tests/test_real_scalar_token.py); log 2026-08-30T06:53:51Z |
 | REL-001 | Publish reproducible release evidence bundle | CMP-003, QLT-001, DOC-001 | pending | Builds, hashes, raw results, reports, and documentation claims reconcile | — |
 
 ## Delivery-Gate Mapping
@@ -1235,6 +1237,74 @@ are repository-relative unless stated otherwise.
   all-logit finite execution, independent row hashes and selected dots,
   pre-write failures, scalar arithmetic and memory claims, beginner
   documentation, and clean host/container verification before committing.
+
+### 2026-08-30T06:43:22Z — CPU-016 full scalar pass started
+
+- Commit `27b0d11` (`feat: execute embeddings and logits`) is present on both
+  `main` and `origin/main`; the worktree was clean before this task began.
+- Added CPU-016 before implementation and made it a CPU-004 dependency. It will
+  own prepared scalar parameters for every layer, allocate 48 independent GDN
+  state slots and 16 independent attention KV slots, reuse one exact scratch
+  arena sequentially, and connect token embedding through layers 0–63 to final
+  norm and complete logits.
+- CPU-016 is a structural one-token zero-state admission. Frozen native layer
+  boundary/state/logit taps will detect schedule or ownership regressions, while
+  the result remains explicitly ineligible as semantic continuation authority
+  until TRC-001/TRC-002/ORA-001 compare it with pinned Transformers and the
+  independent same-GGUF oracle.
+- Added EDU-017 so the hybrid schedule, physical layer versus variant slot,
+  engine-prepared data, session-owned state, shared scratch, ping-pong residuals,
+  state frontier, runtime cost, evidence, and remaining oracle/token-chunk work
+  are explained alongside implementation.
+
+### 2026-08-30T06:53:51Z — CPU-016 and EDU-017 accepted
+
+- Added move-only scalar runtime owners for engine-prepared parameters,
+  session-persistent state, and reusable execution scratch. Preparation checks
+  the exact physical schedule and builds direct physical-layer views over 48
+  compact GDN and 16 compact attention slots without copying mapped matrices.
+- Prepared storage contains 2,645,504 FP32 values (10.091796875 MiB). A
+  capacity-one zero state contains 39,747,584 FP32 values (151.625 MiB), and the
+  complete named scratch arena contains 204,161 FP32 values (about 797.504 KiB),
+  excluding the caller-owned 970 KiB logits.
+- Implemented token execution through embedding, exact layers 0–63, shared
+  branch workspaces, ping-pong residual buffers, final direct norm, and every
+  vocabulary logit. Successful token 42 completed 64 layers, mutated exactly 48
+  GDN and 16 attention slots, produced finite state/hidden/logits, selected
+  native greedy token 3,649, and advanced the frontier from zero to one only
+  after logits completed.
+- Global preflight validates exact parameter/state/workspace vector sizes,
+  capacity/frontier, vocabulary/logit counts, and the complete layer-kind
+  schedule before embedding or state mutation. Removing one shared FFN value
+  leaves zero completed layers, frontier zero, all state unchanged, and all
+  logits untouched.
+- Frozen final-hidden, final-norm, selected-logit, early/middle/final GDN and
+  attention state taps, counts, and greedy index are explicitly labeled a native
+  structural zero-state regression. CPU-004 remains pending because no direct
+  full-model semantic authority has admitted these continuation logits.
+- Added a beginner chapter explaining the 3-GDN/1-attention schedule, physical
+  layers versus compact slots, engine/session/scratch ownership, move-only
+  pointers, exact memory totals, workspace reuse, ping-pong residuals, frontier,
+  preflight, structural fixtures, timings, and oracle/atomicity limits.
+- The first full host run took 36.21 s with 18,013,440 KiB maximum RSS; warm
+  fixture capture took 22.81 s with the same maximum RSS. The clean full suite
+  completed 75 tests in 38.27 s.
+- Commands: Ruff format/check, fixture JSON validation, focused two-test
+  full-token suite, clean restricted C++17 build, 75 pytest tests,
+  `git diff --check`, pinned CUDA 13.0.2 full build, SM120 compilation, and RTX
+  5090 probe — passed. Probe values were 33,671,348,224 total and
+  33,139,458,048 free bytes.
+- Marked CPU-016 and EDU-017 done. CPU-004 still requires direct full-model trace
+  admission, multiple-token continuation equality, arbitrary chunks, and
+  token-wise versus chunked execution.
+
+### 2026-08-30T06:54:20Z — Full-scalar-token commit boundary
+
+- Reviewed move-only pointer ownership, exact storage formulas, schedule and slot
+  mapping, state isolation, shared workspace construction, 64 ping-pong handoffs,
+  frontier order, full finite checks, global preflight, structural fixture
+  labeling, beginner documentation, and clean host/container verification before
+  committing.
 
 ## Decisions and Negative Results
 
