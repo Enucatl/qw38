@@ -38,9 +38,10 @@ are repository-relative unless stated otherwise.
 | CPU-016 | Execute one real token through the exact 64-layer scalar schedule and complete logits | CPU-014, CPU-015 | done | Prepared parameters and independent state slots cover 48 GDN/16 attention layers; token embedding flows through layers 0–63, final norm, and all logits; stable boundary taps and state mutations are retained; malformed global storage fails before mutation | [`src/scalar_runtime.cpp`](src/scalar_runtime.cpp); [`fixtures/real_scalar_token.json`](fixtures/real_scalar_token.json); [`tests/test_real_scalar_token.py`](tests/test_real_scalar_token.py); log 2026-08-30T06:53:51Z |
 | CPU-002 | Implement scalar GDN oracle | CPU-001, MDL-002 | done | Warm-up, recurrence, state, head mapping, and chunk-boundary fixtures pass | [`src/gdn.cpp`](src/gdn.cpp); [`fixtures/gdn_authority.json`](fixtures/gdn_authority.json); [`tests/test_gdn.py`](tests/test_gdn.py); log 2026-08-29T12:26:00Z |
 | CPU-003 | Implement scalar attention and FFN oracle | CPU-001, MDL-002 | done | Layers 3/7/63, partial RoPE, grouped KV, causality, and FFN taps pass | [`src/attention.cpp`](src/attention.cpp); [`fixtures/attention_ffn_authority.json`](fixtures/attention_ffn_authority.json); [`tests/test_attention.py`](tests/test_attention.py); log 2026-08-29T12:54:00Z |
-| CPU-004 | Implement full scalar 64-layer scheduler and logits | CPU-002, CPU-003, CPU-005, CPU-006, CPU-007, CPU-008, CPU-009, CPU-010, CPU-011, CPU-012, CPU-013, CPU-014, CPU-015, CPU-016 | pending | Token/chunk execution and logits match semantic-authority fixtures | — |
+| CPU-004 | Implement full scalar 64-layer scheduler and logits | CPU-002, CPU-003, CPU-005, CPU-006, CPU-007, CPU-008, CPU-009, CPU-010, CPU-011, CPU-012, CPU-013, CPU-014, CPU-015, CPU-016 | pending | Multi-token token-wise and arbitrary chunk execution have exact state/frontier/chunk equivalence and emit logits ready for oracle comparison | — |
 | TRC-001 | Define versioned trace bundle and typed comparison metrics | PIN-002 | done | Manifest/blob schema, checksums, summaries, session frontiers, and metric reporter pass tests | [`pins/trace_contract.json`](pins/trace_contract.json); [`tools/qw38_trace.py`](tools/qw38_trace.py); [`tests/test_trace.py`](tests/test_trace.py); log 2026-08-30T07:13:12Z |
-| TRC-002 | Add diagnostic-only stable scalar/CUDA taps | TRC-001, CPU-004 | pending | Required taps filter by layer/name and are absent from release builds | — |
+| TRC-003 | Add build-isolated backend-neutral trace sink and exact filters | TRC-001 | done | Diagnostic build accepts validated layer/name filters and emits typed views; release objects contain no trace API or tap names | [`src/diagnostic_trace.h`](src/diagnostic_trace.h); [`tests/test_diagnostic_trace.py`](tests/test_diagnostic_trace.py); log 2026-08-30T07:19:17Z |
+| TRC-002 | Add diagnostic-only stable scalar/CUDA taps | TRC-003, CPU-016 | pending | Required taps use the backend-neutral sink, emit through the v1 bundle, and match filtered scalar authority evidence | — |
 | ORA-001 | Generate and freeze scalar/oracle fixtures and tolerances | TOK-002, CPU-004, TRC-002 | pending | Three authorities are attributed; tolerances and greedy tie exceptions are immutable inputs | — |
 | CUD-001 | Implement CUDA Q4_K/Q6_K decode MMV | CPU-001, BLD-002, ORA-001 | pending | Scalar-vs-CUDA and focused primitive pytest gates pass | — |
 | CUD-002 | Implement quantized tiled prompt MMQ | CUD-001 | pending | Arbitrary prompt-row fixtures pass frozen tolerances | — |
@@ -86,6 +87,7 @@ are repository-relative unless stated otherwise.
 | EDU-016 | Explain embeddings, final normalization, logits, and token choice for beginners | CPU-015, DOC-001 | done | Token IDs versus embeddings, row lookup, hidden vectors, final RMSNorm, vocabulary projection, logits versus probabilities, argmax, workspace/cost, exact bounds, and evidence limits are code-linked and worked | [`docs/30-embeddings-and-logits.md`](docs/30-embeddings-and-logits.md); [`tests/test_real_model_boundaries.py`](tests/test_real_model_boundaries.py); log 2026-08-30T06:39:56Z |
 | EDU-017 | Explain the full hybrid layer schedule and scalar runtime ownership for beginners | CPU-016, DOC-001 | done | Layer order, slot mapping, prepared parameters, per-session state, shared scratch, ping-pong residuals, one-token execution, final logits, state frontier, structural fixtures, and oracle limits are code-linked and worked | [`docs/31-full-scalar-token.md`](docs/31-full-scalar-token.md); [`tests/test_real_scalar_token.py`](tests/test_real_scalar_token.py); log 2026-08-30T06:53:51Z |
 | EDU-018 | Explain trace bundles and numeric comparison metrics for beginners | TRC-001, DOC-001 | done | Taps, manifests, little-endian blobs, shapes, checksums, frontiers, absolute/relative/RMS/cosine errors, non-finite values, first failures, top logits, and evidence limits are code-linked and worked | [`docs/32-trace-bundles-and-metrics.md`](docs/32-trace-bundles-and-metrics.md); [`tests/test_trace.py`](tests/test_trace.py); log 2026-08-30T07:13:12Z |
+| EDU-019 | Explain diagnostic build isolation and stable runtime taps for beginners | TRC-003, DOC-001 | done | Compile-time isolation, filters, stable tap names/shapes, capture timing, backend-neutral sinks, cost, and oracle limits are code-linked and worked | [`docs/33-diagnostic-trace-isolation.md`](docs/33-diagnostic-trace-isolation.md); [`tests/test_diagnostic_trace.py`](tests/test_diagnostic_trace.py); log 2026-08-30T07:19:17Z |
 | REL-001 | Publish reproducible release evidence bundle | CMP-003, QLT-001, DOC-001 | pending | Builds, hashes, raw results, reports, and documentation claims reconcile | — |
 
 ## Delivery-Gate Mapping
@@ -1383,6 +1385,62 @@ are repository-relative unless stated otherwise.
   state metadata, deterministic FP32 conversion, contiguous range arithmetic,
   whole/per-tensor checksums, summaries, tolerance/non-finite/top-logit rules,
   corruption tests, proof labels, and beginner documentation before committing.
+
+### 2026-08-30T07:14:15Z — TRC-002 runtime taps started
+
+- Commit `4ef411e` (`feat: define diagnostic trace bundles`) is present on both
+  `main` and `origin/main`; the worktree was clean before this task began.
+- Found an operational dependency cycle: CPU-004 required semantic-authority
+  fixtures, TRC-002 depended on CPU-004, and ORA-001 depended on both. This did
+  not reflect the approved plan's separation between scalar mechanics, trace
+  plumbing, and later oracle admission.
+- Corrected the ledger boundary before implementation. CPU-004 now owns
+  multi-token/arbitrary-chunk scalar mechanics and exact internal equivalence;
+  TRC-002 depends on the admitted one-token runtime CPU-016 and owns stable
+  backend-neutral trace plumbing; ORA-001 remains the independent semantic
+  authority gate. Product scope and execution architecture are unchanged.
+- Added and began TRC-003 before implementation after inspecting the build and
+  scalar runtime. It isolates the reusable sink/filter/build boundary from the
+  much larger real 64-layer tap wiring owned by TRC-002; this keeps invalid
+  filters and release-symbol absence independently testable.
+- Began EDU-019 alongside TRC-003. Diagnostic tap code must be excluded at compile time
+  from normal binaries, accept exact layer/name filters, expose stable semantic
+  names and shapes through a backend-neutral sink, and feed the v1 bundle
+  without making the C++ runtime depend on JSON or Python.
+
+### 2026-08-30T07:19:17Z — TRC-003 and EDU-019 accepted
+
+- Added a diagnostic-only C++ trace boundary with exact registered semantic tap
+  names, layer/name filters, typed non-owning tensor views, one-to-three-
+  dimensional shape validation, overflow/count checks, and an explicit-Status
+  backend-neutral sink callback.
+- Added a separate `make diagnostic` object tree and executable. The guarded
+  header cannot be included without `QW38_DIAGNOSTIC_TRACE`; ordinary library
+  sources do not link the trace implementation. The diagnostic evaluator's
+  synthetic command exercises wildcard, exact, zero-match, and malformed-filter
+  behavior without loading the production model.
+- Added four tests that build the diagnostic target, exercise filter selection
+  and failure behavior, and inspect the normal evaluator bytes. The normal
+  binary contains neither `--check-trace-filter` nor representative attention
+  and GDN tap strings.
+- Added a beginner chapter explaining separate builds, compile-time versus
+  runtime disabling, sinks and callbacks, borrowed views, exact filters, stable
+  semantic naming, shape validation, CUDA transfer implications, and why
+  synthetic views are not model evidence.
+- Verification: Ruff format/check, 19 focused trace tests, clean restricted
+  C++17 normal and diagnostic builds, all 94 pytest tests in 38.46 s, and
+  `git diff --check` passed. The pinned CUDA 13.0.2 container rebuilt the normal
+  tools, compiled SM120, and probed 33,671,348,224 total and 33,139,458,048 free
+  device bytes.
+- Marked TRC-003 and EDU-019 done. TRC-002 remains pending until the real scalar
+  stages call this sink and selected tensors are written through the v1 bundle.
+
+### 2026-08-30T07:19:30Z — Diagnostic-isolation commit boundary
+
+- Reviewed dependency-cycle correction, macro/object isolation, tap-name
+  registry coverage, filter validation, shape arithmetic, callback status
+  propagation, release binary inspection, documentation proof labels, and clean
+  host/container evidence before committing.
 
 ## Decisions and Negative Results
 

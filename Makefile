@@ -6,13 +6,14 @@ CFLAGS := -std=c11 -O2 -Wall -Wextra -Wpedantic -Werror
 NVCCFLAGS := -std=c++17 -O2 -arch=sm_120 --expt-relaxed-constexpr
 CPPFLAGS := -Iinclude -Isrc -Ithird_party/utf8proc
 BUILD_DIR := build
+DIAGNOSTIC_DIR := $(BUILD_DIR)/diagnostic
 LIB_SOURCES := src/status.cpp src/sha256.cpp src/model.cpp src/tokenizer.cpp src/template.cpp src/quant.cpp src/tensor.cpp src/conversion.cpp src/projection.cpp src/weights.cpp src/mixer.cpp src/scheduler.cpp src/scalar_runtime.cpp src/gdn.cpp src/attention.cpp src/engine.cpp
 LIB_OBJECTS := $(LIB_SOURCES:src/%.cpp=$(BUILD_DIR)/%.o)
 THIRD_PARTY_OBJECTS := $(BUILD_DIR)/utf8proc.o
 BINARIES := $(BUILD_DIR)/qw38 $(BUILD_DIR)/qw38-server $(BUILD_DIR)/qw38-bench $(BUILD_DIR)/qw38-eval
 CUDA_IMAGE := qw38-cuda:13.0.2
 
-.PHONY: all clean test cuda-image cuda-build cuda-native
+.PHONY: all clean test diagnostic cuda-image cuda-build cuda-native
 
 all: $(BINARIES)
 
@@ -21,6 +22,12 @@ $(BUILD_DIR):
 
 $(BUILD_DIR)/%.o: src/%.cpp | $(BUILD_DIR)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -MMD -MP -c $< -o $@
+
+$(DIAGNOSTIC_DIR):
+	mkdir -p $@
+
+$(DIAGNOSTIC_DIR)/%.o: src/%.cpp | $(DIAGNOSTIC_DIR)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DQW38_DIAGNOSTIC_TRACE -MMD -MP -c $< -o $@
 
 $(BUILD_DIR)/utf8proc.o: third_party/utf8proc/utf8proc.c | $(BUILD_DIR)
 	$(CC) $(CFLAGS) -Ithird_party/utf8proc -MMD -MP -c $< -o $@
@@ -35,6 +42,13 @@ $(BUILD_DIR)/qw38-bench: $(LIB_OBJECTS) $(THIRD_PARTY_OBJECTS) $(BUILD_DIR)/benc
 	$(CXX) $(CXXFLAGS) $^ -o $@
 
 $(BUILD_DIR)/qw38-eval: $(LIB_OBJECTS) $(THIRD_PARTY_OBJECTS) $(BUILD_DIR)/eval.o
+	$(CXX) $(CXXFLAGS) $^ -o $@
+
+DIAGNOSTIC_OBJECTS := $(LIB_SOURCES:src/%.cpp=$(DIAGNOSTIC_DIR)/%.o) $(DIAGNOSTIC_DIR)/diagnostic_trace.o $(DIAGNOSTIC_DIR)/eval.o
+
+diagnostic: $(BUILD_DIR)/qw38-eval-diagnostic
+
+$(BUILD_DIR)/qw38-eval-diagnostic: $(DIAGNOSTIC_OBJECTS) $(THIRD_PARTY_OBJECTS)
 	$(CXX) $(CXXFLAGS) $^ -o $@
 
 test: all
@@ -54,4 +68,4 @@ $(BUILD_DIR)/qw38-cuda-probe: cuda/device_probe.cu | $(BUILD_DIR)
 clean:
 	rm -rf $(BUILD_DIR)
 
--include $(LIB_OBJECTS:.o=.d) $(THIRD_PARTY_OBJECTS:.o=.d) $(BUILD_DIR)/cli.d $(BUILD_DIR)/server.d $(BUILD_DIR)/bench.d $(BUILD_DIR)/eval.d
+-include $(LIB_OBJECTS:.o=.d) $(DIAGNOSTIC_OBJECTS:.o=.d) $(THIRD_PARTY_OBJECTS:.o=.d) $(BUILD_DIR)/cli.d $(BUILD_DIR)/server.d $(BUILD_DIR)/bench.d $(BUILD_DIR)/eval.d

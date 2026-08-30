@@ -27,6 +27,10 @@
 #include "tokenizer.h"
 #include "weights.h"
 
+#ifdef QW38_DIAGNOSTIC_TRACE
+#include "diagnostic_trace.h"
+#endif
+
 namespace {
 constexpr const char* kBrand =
     "Quartz Watch 38 — Swiss-made inference for Qwen3.8-27B. It ticks fast.";
@@ -142,6 +146,48 @@ bool parse_size(const char* text, std::size_t* value) {
   *value = static_cast<std::size_t>(parsed);
   return true;
 }
+
+#ifdef QW38_DIAGNOSTIC_TRACE
+qw38::Status count_trace_tensor(const qw38::internal::TraceTensorView& tensor,
+                                void* context) noexcept {
+  auto* count = static_cast<std::size_t*>(context);
+  ++*count;
+  std::cout << "tap=" << tensor.name << ",layer=" << tensor.layer
+            << ",count=" << tensor.value_count << '\n';
+  return qw38::Status::ok();
+}
+
+int check_trace_filter(const char* layer_text, const char* tap) {
+  std::size_t layer = qw38::internal::kTraceAllLayers;
+  if (std::strcmp(layer_text, "all") != 0 && !parse_size(layer_text, &layer)) {
+    std::cerr << "invalid_argument: malformed diagnostic trace layer\n";
+    return 1;
+  }
+  const qw38::internal::TraceFilter filter{layer, tap};
+  constexpr std::array<float, 4> kValues{1.0F, 2.0F, 3.0F, 4.0F};
+  const std::array<qw38::internal::TraceTensorView, 3> tensors{{
+      {"embedding", qw38::internal::kTraceAllLayers, kValues.data(), 4,
+       {4, 0, 0}, 1},
+      {"attention.rope_query", 3, kValues.data(), 4, {2, 2, 0}, 2},
+      {"layer_residual", 3, kValues.data(), 4, {4, 0, 0}, 1},
+  }};
+  std::size_t count = 0;
+  qw38::Status status = qw38::internal::validate_trace_filter(filter);
+  for (const auto& tensor : tensors) {
+    if (status.is_ok()) {
+      status = qw38::internal::emit_trace_tensor(filter, count_trace_tensor,
+                                                 &count, tensor);
+    }
+  }
+  if (!status.is_ok()) {
+    std::cerr << qw38::status_code_name(status.code()) << ": "
+              << status.message() << '\n';
+    return 1;
+  }
+  std::cout << "matched=" << count << '\n';
+  return 0;
+}
+#endif
 
 bool parse_float_hex(const std::string& hex, std::vector<float>* values) {
   std::vector<std::uint8_t> bytes;
@@ -1890,6 +1936,11 @@ int render_template_case(const std::string& name) {
 }  // namespace
 
 int main(int argc, char** argv) {
+#ifdef QW38_DIAGNOSTIC_TRACE
+  if (argc == 4 && std::string(argv[1]) == "--check-trace-filter") {
+    return check_trace_filter(argv[2], argv[3]);
+  }
+#endif
   if (argc == 2 && std::string(argv[1]) == "--build-info") {
     std::cout << "brand=" << kBrand << '\n';
     std::cout << "cxx=17\n";

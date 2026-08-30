@@ -57,7 +57,8 @@ for language and host portability decisions.
 30. [Embeddings and logits](30-embeddings-and-logits.md): token-row lookup, hidden vectors, final norm, vocabulary scores, greedy choice, and proof limits.
 31. [One full scalar token](31-full-scalar-token.md): exact 64-layer hybrid schedule, parameter/state/scratch ownership, ping-pong residuals, frontier, and structural evidence.
 32. [Trace bundles and numeric comparison](32-trace-bundles-and-metrics.md): taps, manifest/blob layout, identities, checksums, session frontiers, tolerance metrics, and top-logit differences.
-33. [Source and evidence ledger](sources.md).
+33. [Diagnostic trace isolation and filters](33-diagnostic-trace-isolation.md): separate builds, backend-neutral typed sinks, stable names, exact filters, and release-binary exclusion.
+34. [Source and evidence ledger](sources.md).
 
 Claims use four labels: **Measured** (this exact artifact and hardware),
 **External** (a linked source), **Estimated** (reproducible arithmetic), and

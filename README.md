@@ -41,6 +41,9 @@ scratch reuse, and the remaining oracle boundary.
 The [trace bundle chapter](docs/32-trace-bundles-and-metrics.md) explains how
 diagnostic taps are stored, authenticated, and compared using absolute,
 relative, RMS, cosine, non-finite, first-failure, and top-logit evidence.
+The [diagnostic isolation chapter](docs/33-diagnostic-trace-isolation.md) then
+defines stable tap names and exact filters while proving trace machinery is
+absent from the normal binary.
 
 ## Build
 

@@ -125,6 +125,10 @@ DSpark are explicitly rejected as Qwen model semantics.
   They carry the already pinned model/tool identities but do not promote any
   producer to semantic authority. Real cross-runtime evidence remains
   TRC-002/ORA-001 work.
+- TRC-003 introduces no new external implementation dependency. Its callback,
+  tensor-view validation, tap registry, filter semantics, and separate
+  diagnostic-object build are local infrastructure. Synthetic filter output is
+  structural evidence only; it is not a Transformers or llama.cpp trace.
 
 ## Specialization and hardware references
 
