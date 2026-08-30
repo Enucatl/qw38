@@ -474,6 +474,15 @@ Status execute_scalar_token_impl(
             "gdn.key", layer, workspace->gdn_key.data(), kGdnKeyWidth, 16,
             kGdnHeadWidth);
         if (status.is_ok()) status = offer_trace(filter, sink, sink_context,
+            "gdn.value", layer, workspace->gdn_value_grouped.data(),
+            kGdnValueWidth, 48, kGdnHeadWidth);
+        if (status.is_ok()) status = offer_trace(filter, sink, sink_context,
+            "gdn.decay", layer, workspace->gdn_log_decay.data(),
+            kGdnGateCount, kGdnGateCount);
+        if (status.is_ok()) status = offer_trace(filter, sink, sink_context,
+            "gdn.beta", layer, workspace->gdn_update_gate.data(),
+            kGdnGateCount, kGdnGateCount);
+        if (status.is_ok()) status = offer_trace(filter, sink, sink_context,
             "gdn.recurrent_output", layer,
             workspace->gdn_recurrent_output.data(), kGdnValueWidth, 48,
             kGdnHeadWidth);
@@ -482,7 +491,10 @@ Status execute_scalar_token_impl(
             kGdnRecurrentStateValues, 48, kGdnHeadWidth, kGdnHeadWidth);
         if (status.is_ok()) status = offer_trace(filter, sink, sink_context,
             "gdn.convolution_state", layer, state->gdn[layer].convolution,
-            kGdnConvolutionValues, 4, kGdnPackedQkvWidth);
+            kGdnConvolutionValues, kGdnPackedQkvWidth, 4);
+        if (status.is_ok()) status = offer_trace(filter, sink, sink_context,
+            "gdn.gated_output", layer, workspace->gdn_gated_grouped.data(),
+            kGdnValueWidth, 48, kGdnHeadWidth);
         if (status.is_ok()) status = offer_trace(filter, sink, sink_context,
             "gdn.output", layer, workspace->gdn_mixer_output.data(),
             kResidualWidth, kResidualWidth);

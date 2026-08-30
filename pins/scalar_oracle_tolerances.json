@@ -1,0 +1,3012 @@
+{
+  "admission_rule": "every exact identity/shape must match; every sample must satisfy all absolute, RMS, cosine, and finite-count gates; greedy tokens must match unless listed in greedy_near_tie_exceptions",
+  "authorities": {
+    "llama_vs_quartz": {
+      "taps": {
+        "global.embedding": {
+          "admission": {
+            "maximum_absolute_error": 0.0,
+            "maximum_root_mean_square_error": 0.0,
+            "minimum_cosine_similarity": 1.0,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.0,
+            "maximum_relative_error": 0.0,
+            "maximum_root_mean_square_error": 0.0,
+            "minimum_cosine_similarity": 1.0
+          },
+          "sample_count": 2
+        },
+        "global.final_norm": {
+          "admission": {
+            "maximum_absolute_error": 0.21,
+            "maximum_root_mean_square_error": 0.035,
+            "minimum_cosine_similarity": 0.999852,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.18672943115234375,
+            "maximum_relative_error": 2363.888584104784,
+            "maximum_root_mean_square_error": 0.031180474694874574,
+            "minimum_cosine_similarity": 0.9998662161246362
+          },
+          "sample_count": 2
+        },
+        "global.logits": {
+          "admission": {
+            "maximum_absolute_error": 0.21,
+            "maximum_root_mean_square_error": 0.037,
+            "minimum_cosine_similarity": 0.999831,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.1903996467590332,
+            "maximum_relative_error": 31215.770833333332,
+            "maximum_root_mean_square_error": 0.03334593792341889,
+            "minimum_cosine_similarity": 0.999847126346273
+          },
+          "sample_count": 2
+        },
+        "layer.0.ffn.correction": {
+          "admission": {
+            "maximum_absolute_error": 0.025,
+            "maximum_root_mean_square_error": 0.0009400000000000001,
+            "minimum_cosine_similarity": 0.999949,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.022074222564697266,
+            "maximum_relative_error": 436.3408081705151,
+            "maximum_root_mean_square_error": 0.0008512977169106285,
+            "minimum_cosine_similarity": 0.999953951875746
+          },
+          "sample_count": 2
+        },
+        "layer.0.ffn.input_norm": {
+          "admission": {
+            "maximum_absolute_error": 0.018000000000000002,
+            "maximum_root_mean_square_error": 0.0036000000000000003,
+            "minimum_cosine_similarity": 0.999795,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.016118675470352173,
+            "maximum_relative_error": 1234.5270497849017,
+            "maximum_root_mean_square_error": 0.0032558717050795412,
+            "minimum_cosine_similarity": 0.9998142230857526
+          },
+          "sample_count": 2
+        },
+        "layer.0.gdn.beta": {
+          "admission": {
+            "maximum_absolute_error": 0.0028,
+            "maximum_root_mean_square_error": 0.0008500000000000001,
+            "minimum_cosine_similarity": 0.999999,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.0024709999561309814,
+            "maximum_relative_error": 0.005744277961171721,
+            "maximum_root_mean_square_error": 0.0007682074874388907,
+            "minimum_cosine_similarity": 0.9999995693753476
+          },
+          "sample_count": 2
+        },
+        "layer.0.gdn.convolution": {
+          "admission": {
+            "maximum_absolute_error": 0.03,
+            "maximum_root_mean_square_error": 0.0008100000000000001,
+            "minimum_cosine_similarity": 0.999999,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.0270843505859375,
+            "maximum_relative_error": 29.07578648666276,
+            "maximum_root_mean_square_error": 0.000734757339272016,
+            "minimum_cosine_similarity": 0.9999998258405794
+          },
+          "sample_count": 2
+        },
+        "layer.0.gdn.decay": {
+          "admission": {
+            "maximum_absolute_error": 0.0092,
+            "maximum_root_mean_square_error": 0.0016,
+            "minimum_cosine_similarity": 0.999999,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.008298873901367188,
+            "maximum_relative_error": 0.050025352739324284,
+            "maximum_root_mean_square_error": 0.0014510474698767898,
+            "minimum_cosine_similarity": 0.9999995944518568
+          },
+          "sample_count": 2
+        },
+        "layer.0.gdn.gated_output": {
+          "admission": {
+            "maximum_absolute_error": 0.0043,
+            "maximum_root_mean_square_error": 0.00013000000000000002,
+            "minimum_cosine_similarity": 0.999997,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.003831535577774048,
+            "maximum_relative_error": 47.90668765641191,
+            "maximum_root_mean_square_error": 0.00011738407698587078,
+            "minimum_cosine_similarity": 0.9999980710041838
+          },
+          "sample_count": 2
+        },
+        "layer.0.gdn.key": {
+          "admission": {
+            "maximum_absolute_error": 0.0094,
+            "maximum_root_mean_square_error": 0.0006500000000000001,
+            "minimum_cosine_similarity": 0.999996,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.008477449417114258,
+            "maximum_relative_error": 28.544471853245113,
+            "maximum_root_mean_square_error": 0.0005836872608381916,
+            "minimum_cosine_similarity": 0.9999963778422345
+          },
+          "sample_count": 2
+        },
+        "layer.0.gdn.output": {
+          "admission": {
+            "maximum_absolute_error": 0.032,
+            "maximum_root_mean_square_error": 0.00088,
+            "minimum_cosine_similarity": 0.99999,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.0282135009765625,
+            "maximum_relative_error": 389.75321569920845,
+            "maximum_root_mean_square_error": 0.0007970188240248138,
+            "minimum_cosine_similarity": 0.9999912430745985
+          },
+          "sample_count": 2
+        },
+        "layer.0.gdn.packed_qkv": {
+          "admission": {
+            "maximum_absolute_error": 0.093,
+            "maximum_root_mean_square_error": 0.012,
+            "minimum_cosine_similarity": 0.999997,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.08420753479003906,
+            "maximum_relative_error": 34.205420900851415,
+            "maximum_root_mean_square_error": 0.010648250214025032,
+            "minimum_cosine_similarity": 0.9999973876214754
+          },
+          "sample_count": 2
+        },
+        "layer.0.gdn.query": {
+          "admission": {
+            "maximum_absolute_error": 0.008700000000000001,
+            "maximum_root_mean_square_error": 0.00043000000000000004,
+            "minimum_cosine_similarity": 0.999998,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.007847309112548828,
+            "maximum_relative_error": 29.07578648666276,
+            "maximum_root_mean_square_error": 0.00038379630969774325,
+            "minimum_cosine_similarity": 0.9999988794029591
+          },
+          "sample_count": 2
+        },
+        "layer.0.gdn.recurrent_output": {
+          "admission": {
+            "maximum_absolute_error": 0.0016,
+            "maximum_root_mean_square_error": 4.1e-05,
+            "minimum_cosine_similarity": 0.999999,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.0013682246208190918,
+            "maximum_relative_error": 35.10941171810403,
+            "maximum_root_mean_square_error": 3.698913164322923e-05,
+            "minimum_cosine_similarity": 0.999999199294843
+          },
+          "sample_count": 2
+        },
+        "layer.0.gdn.value": {
+          "admission": {
+            "maximum_absolute_error": 0.03,
+            "maximum_root_mean_square_error": 0.001,
+            "minimum_cosine_similarity": 0.999999,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.0270843505859375,
+            "maximum_relative_error": 21.604965365712044,
+            "maximum_root_mean_square_error": 0.000907345328812751,
+            "minimum_cosine_similarity": 0.9999998848338328
+          },
+          "sample_count": 2
+        },
+        "layer.0.input_norm": {
+          "admission": {
+            "maximum_absolute_error": 1.8999999999999998e-05,
+            "maximum_root_mean_square_error": 1.5e-06,
+            "minimum_cosine_similarity": 0.999999,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 1.71661376953125e-05,
+            "maximum_relative_error": 1.5054682660607118e-06,
+            "maximum_root_mean_square_error": 1.3123358789334636e-06,
+            "minimum_cosine_similarity": 0.9999999999999988
+          },
+          "sample_count": 2
+        },
+        "layer.0.layer_residual": {
+          "admission": {
+            "maximum_absolute_error": 0.012,
+            "maximum_root_mean_square_error": 0.0012000000000000001,
+            "minimum_cosine_similarity": 0.999989,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.010435104370117188,
+            "maximum_relative_error": 105.21166429587483,
+            "maximum_root_mean_square_error": 0.0010366998873245648,
+            "minimum_cosine_similarity": 0.9999900116916326
+          },
+          "sample_count": 2
+        },
+        "layer.0.mixer_residual": {
+          "admission": {
+            "maximum_absolute_error": 0.032,
+            "maximum_root_mean_square_error": 0.00088,
+            "minimum_cosine_similarity": 0.99999,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.0282135009765625,
+            "maximum_relative_error": 1231.6965753424658,
+            "maximum_root_mean_square_error": 0.000797018813898376,
+            "minimum_cosine_similarity": 0.9999913188128738
+          },
+          "sample_count": 2
+        },
+        "layer.3.attention.context": {
+          "admission": {
+            "maximum_absolute_error": 0.021,
+            "maximum_root_mean_square_error": 0.0005700000000000001,
+            "minimum_cosine_similarity": 0.999808,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.018850475549697876,
+            "maximum_relative_error": 184.1157183255487,
+            "maximum_root_mean_square_error": 0.0005164169930005053,
+            "minimum_cosine_similarity": 0.9998263044475744
+          },
+          "sample_count": 2
+        },
+        "layer.3.attention.key": {
+          "admission": {
+            "maximum_absolute_error": 0.083,
+            "maximum_root_mean_square_error": 0.024,
+            "minimum_cosine_similarity": 0.999829,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.0747154951095581,
+            "maximum_relative_error": 10.04064094207006,
+            "maximum_root_mean_square_error": 0.02179032494109305,
+            "minimum_cosine_similarity": 0.9998446660546746
+          },
+          "sample_count": 2
+        },
+        "layer.3.attention.kv_key_row": {
+          "admission": {
+            "maximum_absolute_error": 0.084,
+            "maximum_root_mean_square_error": 0.025,
+            "minimum_cosine_similarity": 0.999815,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.07621783018112183,
+            "maximum_relative_error": 174.06307645671697,
+            "maximum_root_mean_square_error": 0.021920024776867008,
+            "minimum_cosine_similarity": 0.9998320534095714
+          },
+          "sample_count": 2
+        },
+        "layer.3.attention.kv_value_row": {
+          "admission": {
+            "maximum_absolute_error": 0.088,
+            "maximum_root_mean_square_error": 0.024,
+            "minimum_cosine_similarity": 0.999524,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.07991775870323181,
+            "maximum_relative_error": 33.16910569831604,
+            "maximum_root_mean_square_error": 0.021358663504957597,
+            "minimum_cosine_similarity": 0.999567917498981
+          },
+          "sample_count": 2
+        },
+        "layer.3.attention.output": {
+          "admission": {
+            "maximum_absolute_error": 0.046,
+            "maximum_root_mean_square_error": 0.00107,
+            "minimum_cosine_similarity": 0.999951,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.041533470153808594,
+            "maximum_relative_error": 127.7685546875,
+            "maximum_root_mean_square_error": 0.0009671309093149828,
+            "minimum_cosine_similarity": 0.9999562818459353
+          },
+          "sample_count": 2
+        },
+        "layer.3.attention.packed_query_gate": {
+          "admission": {
+            "maximum_absolute_error": 0.14,
+            "maximum_root_mean_square_error": 0.025,
+            "minimum_cosine_similarity": 0.999977,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.12049007415771484,
+            "maximum_relative_error": 70.74883779369267,
+            "maximum_root_mean_square_error": 0.02249185308177762,
+            "minimum_cosine_similarity": 0.9999798344153611
+          },
+          "sample_count": 2
+        },
+        "layer.3.attention.query": {
+          "admission": {
+            "maximum_absolute_error": 0.094,
+            "maximum_root_mean_square_error": 0.021,
+            "minimum_cosine_similarity": 0.999762,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.0853276252746582,
+            "maximum_relative_error": 70.74883779369267,
+            "maximum_root_mean_square_error": 0.0190065791551409,
+            "minimum_cosine_similarity": 0.999783979054532
+          },
+          "sample_count": 2
+        },
+        "layer.3.attention.rope_key": {
+          "admission": {
+            "maximum_absolute_error": 0.084,
+            "maximum_root_mean_square_error": 0.025,
+            "minimum_cosine_similarity": 0.999815,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.07621783018112183,
+            "maximum_relative_error": 174.06307645671697,
+            "maximum_root_mean_square_error": 0.021920024776867008,
+            "minimum_cosine_similarity": 0.9998320534095714
+          },
+          "sample_count": 2
+        },
+        "layer.3.attention.rope_query": {
+          "admission": {
+            "maximum_absolute_error": 0.15,
+            "maximum_root_mean_square_error": 0.032,
+            "minimum_cosine_similarity": 0.999654,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.13329333066940308,
+            "maximum_relative_error": 70.99076348913346,
+            "maximum_root_mean_square_error": 0.028828065104743544,
+            "minimum_cosine_similarity": 0.9996857393231905
+          },
+          "sample_count": 2
+        },
+        "layer.3.attention.value": {
+          "admission": {
+            "maximum_absolute_error": 0.088,
+            "maximum_root_mean_square_error": 0.024,
+            "minimum_cosine_similarity": 0.999524,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.07991775870323181,
+            "maximum_relative_error": 33.16910569831604,
+            "maximum_root_mean_square_error": 0.021358663504957597,
+            "minimum_cosine_similarity": 0.999567917498981
+          },
+          "sample_count": 2
+        },
+        "layer.3.ffn.correction": {
+          "admission": {
+            "maximum_absolute_error": 0.012,
+            "maximum_root_mean_square_error": 0.0014,
+            "minimum_cosine_similarity": 0.999841,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.010623335838317871,
+            "maximum_relative_error": 2531.0376275510203,
+            "maximum_root_mean_square_error": 0.0012390032360589498,
+            "minimum_cosine_similarity": 0.9998561379165536
+          },
+          "sample_count": 2
+        },
+        "layer.3.ffn.input_norm": {
+          "admission": {
+            "maximum_absolute_error": 0.02,
+            "maximum_root_mean_square_error": 0.0049,
+            "minimum_cosine_similarity": 0.99986,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.01793840527534485,
+            "maximum_relative_error": 448.9765333751913,
+            "maximum_root_mean_square_error": 0.004368611339292258,
+            "minimum_cosine_similarity": 0.999873123900054
+          },
+          "sample_count": 2
+        },
+        "layer.3.input_norm": {
+          "admission": {
+            "maximum_absolute_error": 0.038,
+            "maximum_root_mean_square_error": 0.0089,
+            "minimum_cosine_similarity": 0.999979,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.03394748270511627,
+            "maximum_relative_error": 631.5138786319882,
+            "maximum_root_mean_square_error": 0.008048654161087085,
+            "minimum_cosine_similarity": 0.9999811469838298
+          },
+          "sample_count": 2
+        },
+        "layer.3.layer_residual": {
+          "admission": {
+            "maximum_absolute_error": 0.04,
+            "maximum_root_mean_square_error": 0.0029000000000000002,
+            "minimum_cosine_similarity": 0.999985,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.0360565185546875,
+            "maximum_relative_error": 185.8857816400111,
+            "maximum_root_mean_square_error": 0.0025794555464661176,
+            "minimum_cosine_similarity": 0.9999863820472153
+          },
+          "sample_count": 2
+        },
+        "layer.3.mixer_residual": {
+          "admission": {
+            "maximum_absolute_error": 0.052000000000000005,
+            "maximum_root_mean_square_error": 0.0026000000000000003,
+            "minimum_cosine_similarity": 0.999986,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.04667854309082031,
+            "maximum_relative_error": 448.73874458874457,
+            "maximum_root_mean_square_error": 0.0023358997287389917,
+            "minimum_cosine_similarity": 0.9999879504319762
+          },
+          "sample_count": 2
+        },
+        "layer.62.ffn.correction": {
+          "admission": {
+            "maximum_absolute_error": 0.5700000000000001,
+            "maximum_root_mean_square_error": 0.059000000000000004,
+            "minimum_cosine_similarity": 0.999695,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.5165061950683594,
+            "maximum_relative_error": 119.5715480331817,
+            "maximum_root_mean_square_error": 0.05356789928295644,
+            "minimum_cosine_similarity": 0.9997232577304795
+          },
+          "sample_count": 2
+        },
+        "layer.62.ffn.input_norm": {
+          "admission": {
+            "maximum_absolute_error": 0.33,
+            "maximum_root_mean_square_error": 0.034,
+            "minimum_cosine_similarity": 0.999667,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.2973966598510742,
+            "maximum_relative_error": 102.71085959834568,
+            "maximum_root_mean_square_error": 0.03000653131063364,
+            "minimum_cosine_similarity": 0.9996976400833736
+          },
+          "sample_count": 2
+        },
+        "layer.62.gdn.beta": {
+          "admission": {
+            "maximum_absolute_error": 0.008700000000000001,
+            "maximum_root_mean_square_error": 0.0028,
+            "minimum_cosine_similarity": 0.999997,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.007831752300262451,
+            "maximum_relative_error": 0.010238689898674493,
+            "maximum_root_mean_square_error": 0.002475030010286777,
+            "minimum_cosine_similarity": 0.9999973755259852
+          },
+          "sample_count": 2
+        },
+        "layer.62.gdn.convolution": {
+          "admission": {
+            "maximum_absolute_error": 0.12,
+            "maximum_root_mean_square_error": 0.0025,
+            "minimum_cosine_similarity": 0.999937,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.10687446594238281,
+            "maximum_relative_error": 109.44543685825862,
+            "maximum_root_mean_square_error": 0.0022490476851038717,
+            "minimum_cosine_similarity": 0.9999428786040615
+          },
+          "sample_count": 2
+        },
+        "layer.62.gdn.decay": {
+          "admission": {
+            "maximum_absolute_error": 0.038,
+            "maximum_root_mean_square_error": 0.01,
+            "minimum_cosine_similarity": 0.999971,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.03420710563659668,
+            "maximum_relative_error": 0.057961945596023426,
+            "maximum_root_mean_square_error": 0.00905929407655849,
+            "minimum_cosine_similarity": 0.9999737202279394
+          },
+          "sample_count": 2
+        },
+        "layer.62.gdn.gated_output": {
+          "admission": {
+            "maximum_absolute_error": 0.61,
+            "maximum_root_mean_square_error": 0.019,
+            "minimum_cosine_similarity": 0.999829,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.5542449951171875,
+            "maximum_relative_error": 67.1014281576249,
+            "maximum_root_mean_square_error": 0.01703322415548019,
+            "minimum_cosine_similarity": 0.9998451765614179
+          },
+          "sample_count": 2
+        },
+        "layer.62.gdn.key": {
+          "admission": {
+            "maximum_absolute_error": 0.046,
+            "maximum_root_mean_square_error": 0.0029000000000000002,
+            "minimum_cosine_similarity": 0.9999,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.04150688648223877,
+            "maximum_relative_error": 109.44543685825862,
+            "maximum_root_mean_square_error": 0.002569770744520002,
+            "minimum_cosine_similarity": 0.9999095369377257
+          },
+          "sample_count": 2
+        },
+        "layer.62.gdn.output": {
+          "admission": {
+            "maximum_absolute_error": 0.2,
+            "maximum_root_mean_square_error": 0.027,
+            "minimum_cosine_similarity": 0.999745,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.18001747131347656,
+            "maximum_relative_error": 1004.1125280269058,
+            "maximum_root_mean_square_error": 0.024489957379381016,
+            "minimum_cosine_similarity": 0.9997682060097239
+          },
+          "sample_count": 2
+        },
+        "layer.62.gdn.packed_qkv": {
+          "admission": {
+            "maximum_absolute_error": 0.28,
+            "maximum_root_mean_square_error": 0.042,
+            "minimum_cosine_similarity": 0.999908,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.24819564819335938,
+            "maximum_relative_error": 228.20593525179856,
+            "maximum_root_mean_square_error": 0.037343682914183614,
+            "minimum_cosine_similarity": 0.9999165679458891
+          },
+          "sample_count": 2
+        },
+        "layer.62.gdn.query": {
+          "admission": {
+            "maximum_absolute_error": 0.12,
+            "maximum_root_mean_square_error": 0.004200000000000001,
+            "minimum_cosine_similarity": 0.999933,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.10687446594238281,
+            "maximum_relative_error": 36.64577439664133,
+            "maximum_root_mean_square_error": 0.0037856416930734734,
+            "minimum_cosine_similarity": 0.9999392801056944
+          },
+          "sample_count": 2
+        },
+        "layer.62.gdn.recurrent_output": {
+          "admission": {
+            "maximum_absolute_error": 0.0014,
+            "maximum_root_mean_square_error": 4.2e-05,
+            "minimum_cosine_similarity": 0.999882,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.0012427940964698792,
+            "maximum_relative_error": 66.96693876026622,
+            "maximum_root_mean_square_error": 3.799183945519853e-05,
+            "minimum_cosine_similarity": 0.99989340677454
+          },
+          "sample_count": 2
+        },
+        "layer.62.gdn.value": {
+          "admission": {
+            "maximum_absolute_error": 0.028,
+            "maximum_root_mean_square_error": 0.0018000000000000002,
+            "minimum_cosine_similarity": 0.999953,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.024668216705322266,
+            "maximum_relative_error": 89.06267930913549,
+            "maximum_root_mean_square_error": 0.001635387497415556,
+            "minimum_cosine_similarity": 0.9999575848889296
+          },
+          "sample_count": 2
+        },
+        "layer.62.input_norm": {
+          "admission": {
+            "maximum_absolute_error": 0.39,
+            "maximum_root_mean_square_error": 0.033,
+            "minimum_cosine_similarity": 0.999646,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.34599971771240234,
+            "maximum_relative_error": 116.1938833362474,
+            "maximum_root_mean_square_error": 0.029710540055290297,
+            "minimum_cosine_similarity": 0.9996790424600088
+          },
+          "sample_count": 2
+        },
+        "layer.62.layer_residual": {
+          "admission": {
+            "maximum_absolute_error": 0.66,
+            "maximum_root_mean_square_error": 0.12,
+            "minimum_cosine_similarity": 0.999763,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.592681884765625,
+            "maximum_relative_error": 106.00991364421417,
+            "maximum_root_mean_square_error": 0.10348776518491745,
+            "minimum_cosine_similarity": 0.9997851605675016
+          },
+          "sample_count": 2
+        },
+        "layer.62.mixer_residual": {
+          "admission": {
+            "maximum_absolute_error": 0.71,
+            "maximum_root_mean_square_error": 0.098,
+            "minimum_cosine_similarity": 0.999703,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.6427154541015625,
+            "maximum_relative_error": 103.3731343283582,
+            "maximum_root_mean_square_error": 0.08862075759037799,
+            "minimum_cosine_similarity": 0.999730035963085
+          },
+          "sample_count": 2
+        },
+        "layer.63.attention.context": {
+          "admission": {
+            "maximum_absolute_error": 0.27,
+            "maximum_root_mean_square_error": 0.022,
+            "minimum_cosine_similarity": 0.999871,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.24468231201171875,
+            "maximum_relative_error": 24.38545550888166,
+            "maximum_root_mean_square_error": 0.019345023403319703,
+            "minimum_cosine_similarity": 0.9998832359551425
+          },
+          "sample_count": 2
+        },
+        "layer.63.attention.key": {
+          "admission": {
+            "maximum_absolute_error": 0.22,
+            "maximum_root_mean_square_error": 0.037,
+            "minimum_cosine_similarity": 0.999909,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.19127964973449707,
+            "maximum_relative_error": 981.8264604810996,
+            "maximum_root_mean_square_error": 0.033193126514700015,
+            "minimum_cosine_similarity": 0.9999180310251727
+          },
+          "sample_count": 2
+        },
+        "layer.63.attention.kv_key_row": {
+          "admission": {
+            "maximum_absolute_error": 0.16,
+            "maximum_root_mean_square_error": 0.021,
+            "minimum_cosine_similarity": 0.999911,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.14143478870391846,
+            "maximum_relative_error": 984.9559147878933,
+            "maximum_root_mean_square_error": 0.018936320821914012,
+            "minimum_cosine_similarity": 0.9999195081295705
+          },
+          "sample_count": 2
+        },
+        "layer.63.attention.kv_value_row": {
+          "admission": {
+            "maximum_absolute_error": 0.25,
+            "maximum_root_mean_square_error": 0.054,
+            "minimum_cosine_similarity": 0.999972,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.22298431396484375,
+            "maximum_relative_error": 31.936382898380465,
+            "maximum_root_mean_square_error": 0.04894082226967764,
+            "minimum_cosine_similarity": 0.9999747236453835
+          },
+          "sample_count": 2
+        },
+        "layer.63.attention.output": {
+          "admission": {
+            "maximum_absolute_error": 0.26,
+            "maximum_root_mean_square_error": 0.035,
+            "minimum_cosine_similarity": 0.999877,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.23406982421875,
+            "maximum_relative_error": 138.87759754493644,
+            "maximum_root_mean_square_error": 0.031722216927230436,
+            "minimum_cosine_similarity": 0.9998885018145266
+          },
+          "sample_count": 2
+        },
+        "layer.63.attention.packed_query_gate": {
+          "admission": {
+            "maximum_absolute_error": 0.25,
+            "maximum_root_mean_square_error": 0.031,
+            "minimum_cosine_similarity": 0.99995,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.22421646118164062,
+            "maximum_relative_error": 191.53782972908746,
+            "maximum_root_mean_square_error": 0.027929122729564018,
+            "minimum_cosine_similarity": 0.999955074693288
+          },
+          "sample_count": 2
+        },
+        "layer.63.attention.query": {
+          "admission": {
+            "maximum_absolute_error": 0.25,
+            "maximum_root_mean_square_error": 0.033,
+            "minimum_cosine_similarity": 0.999921,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.22421646118164062,
+            "maximum_relative_error": 191.53782972908746,
+            "maximum_root_mean_square_error": 0.029831495548342652,
+            "minimum_cosine_similarity": 0.9999283113380485
+          },
+          "sample_count": 2
+        },
+        "layer.63.attention.rope_key": {
+          "admission": {
+            "maximum_absolute_error": 0.16,
+            "maximum_root_mean_square_error": 0.021,
+            "minimum_cosine_similarity": 0.999911,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.14143478870391846,
+            "maximum_relative_error": 984.9559147878933,
+            "maximum_root_mean_square_error": 0.018936320821914012,
+            "minimum_cosine_similarity": 0.9999195081295705
+          },
+          "sample_count": 2
+        },
+        "layer.63.attention.rope_query": {
+          "admission": {
+            "maximum_absolute_error": 0.14,
+            "maximum_root_mean_square_error": 0.021,
+            "minimum_cosine_similarity": 0.999892,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.12404489517211914,
+            "maximum_relative_error": 190.52535157869733,
+            "maximum_root_mean_square_error": 0.018578524213585332,
+            "minimum_cosine_similarity": 0.9999024595554958
+          },
+          "sample_count": 2
+        },
+        "layer.63.attention.value": {
+          "admission": {
+            "maximum_absolute_error": 0.25,
+            "maximum_root_mean_square_error": 0.054,
+            "minimum_cosine_similarity": 0.999972,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.22298431396484375,
+            "maximum_relative_error": 31.936382898380465,
+            "maximum_root_mean_square_error": 0.04894082226967764,
+            "minimum_cosine_similarity": 0.9999747236453835
+          },
+          "sample_count": 2
+        },
+        "layer.63.ffn.correction": {
+          "admission": {
+            "maximum_absolute_error": 1.9000000000000001,
+            "maximum_root_mean_square_error": 0.10400000000000001,
+            "minimum_cosine_similarity": 0.999838,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 1.6818618774414062,
+            "maximum_relative_error": 69.83015486375159,
+            "maximum_root_mean_square_error": 0.09370993349404266,
+            "minimum_cosine_similarity": 0.9998529724337611
+          },
+          "sample_count": 2
+        },
+        "layer.63.ffn.input_norm": {
+          "admission": {
+            "maximum_absolute_error": 0.35000000000000003,
+            "maximum_root_mean_square_error": 0.028,
+            "minimum_cosine_similarity": 0.999751,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.31023406982421875,
+            "maximum_relative_error": 530.8762354202199,
+            "maximum_root_mean_square_error": 0.02506884335564389,
+            "minimum_cosine_similarity": 0.9997744043004452
+          },
+          "sample_count": 2
+        },
+        "layer.63.input_norm": {
+          "admission": {
+            "maximum_absolute_error": 0.32,
+            "maximum_root_mean_square_error": 0.027,
+            "minimum_cosine_similarity": 0.999786,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.2890586853027344,
+            "maximum_relative_error": 105.40056416978577,
+            "maximum_root_mean_square_error": 0.024025662423565717,
+            "minimum_cosine_similarity": 0.9998062454664716
+          },
+          "sample_count": 2
+        },
+        "layer.63.layer_residual": {
+          "admission": {
+            "maximum_absolute_error": 1.7000000000000002,
+            "maximum_root_mean_square_error": 0.16,
+            "minimum_cosine_similarity": 0.999854,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 1.4839096069335938,
+            "maximum_relative_error": 2366.6797385620916,
+            "maximum_root_mean_square_error": 0.14392872568567314,
+            "minimum_cosine_similarity": 0.9998675286639513
+          },
+          "sample_count": 2
+        },
+        "layer.63.mixer_residual": {
+          "admission": {
+            "maximum_absolute_error": 0.84,
+            "maximum_root_mean_square_error": 0.12,
+            "minimum_cosine_similarity": 0.99976,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.7624969482421875,
+            "maximum_relative_error": 530.8844714686624,
+            "maximum_root_mean_square_error": 0.10634649720584648,
+            "minimum_cosine_similarity": 0.9997820945952901
+          },
+          "sample_count": 2
+        },
+        "layer.7.attention.context": {
+          "admission": {
+            "maximum_absolute_error": 0.024,
+            "maximum_root_mean_square_error": 0.0010500000000000002,
+            "minimum_cosine_similarity": 0.999832,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.02106773853302002,
+            "maximum_relative_error": 140.86537917568006,
+            "maximum_root_mean_square_error": 0.0009520458427402029,
+            "minimum_cosine_similarity": 0.9998479002937195
+          },
+          "sample_count": 2
+        },
+        "layer.7.attention.key": {
+          "admission": {
+            "maximum_absolute_error": 0.083,
+            "maximum_root_mean_square_error": 0.019,
+            "minimum_cosine_similarity": 0.999893,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.07459735870361328,
+            "maximum_relative_error": 5.196672194121016,
+            "maximum_root_mean_square_error": 0.017021069745933908,
+            "minimum_cosine_similarity": 0.999903049923878
+          },
+          "sample_count": 2
+        },
+        "layer.7.attention.kv_key_row": {
+          "admission": {
+            "maximum_absolute_error": 0.12,
+            "maximum_root_mean_square_error": 0.021,
+            "minimum_cosine_similarity": 0.999875,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.10292410850524902,
+            "maximum_relative_error": 5.206207738061607,
+            "maximum_root_mean_square_error": 0.019075612107638317,
+            "minimum_cosine_similarity": 0.9998868694279572
+          },
+          "sample_count": 2
+        },
+        "layer.7.attention.kv_value_row": {
+          "admission": {
+            "maximum_absolute_error": 0.083,
+            "maximum_root_mean_square_error": 0.02,
+            "minimum_cosine_similarity": 0.999771,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.07459013164043427,
+            "maximum_relative_error": 17.02350578785731,
+            "maximum_root_mean_square_error": 0.01807606937838261,
+            "minimum_cosine_similarity": 0.999792490645695
+          },
+          "sample_count": 2
+        },
+        "layer.7.attention.output": {
+          "admission": {
+            "maximum_absolute_error": 0.081,
+            "maximum_root_mean_square_error": 0.002,
+            "minimum_cosine_similarity": 0.9999,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.07338714599609375,
+            "maximum_relative_error": 461.7138935810811,
+            "maximum_root_mean_square_error": 0.0017291849985303627,
+            "minimum_cosine_similarity": 0.9999099342168664
+          },
+          "sample_count": 2
+        },
+        "layer.7.attention.packed_query_gate": {
+          "admission": {
+            "maximum_absolute_error": 0.092,
+            "maximum_root_mean_square_error": 0.021,
+            "minimum_cosine_similarity": 0.999983,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.08332633972167969,
+            "maximum_relative_error": 153.81970818974997,
+            "maximum_root_mean_square_error": 0.018350804979711022,
+            "minimum_cosine_similarity": 0.9999849629707671
+          },
+          "sample_count": 2
+        },
+        "layer.7.attention.query": {
+          "admission": {
+            "maximum_absolute_error": 0.08700000000000001,
+            "maximum_root_mean_square_error": 0.019,
+            "minimum_cosine_similarity": 0.999799,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.0788709819316864,
+            "maximum_relative_error": 153.81970818974997,
+            "maximum_root_mean_square_error": 0.01673105158473608,
+            "minimum_cosine_similarity": 0.9998180087725169
+          },
+          "sample_count": 2
+        },
+        "layer.7.attention.rope_key": {
+          "admission": {
+            "maximum_absolute_error": 0.12,
+            "maximum_root_mean_square_error": 0.021,
+            "minimum_cosine_similarity": 0.999875,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.10292410850524902,
+            "maximum_relative_error": 5.206207738061607,
+            "maximum_root_mean_square_error": 0.019075612107638317,
+            "minimum_cosine_similarity": 0.9998868694279572
+          },
+          "sample_count": 2
+        },
+        "layer.7.attention.rope_query": {
+          "admission": {
+            "maximum_absolute_error": 0.13,
+            "maximum_root_mean_square_error": 0.031,
+            "minimum_cosine_similarity": 0.999715,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.11240911483764648,
+            "maximum_relative_error": 153.5623896421589,
+            "maximum_root_mean_square_error": 0.02805474434370432,
+            "minimum_cosine_similarity": 0.9997409857492617
+          },
+          "sample_count": 2
+        },
+        "layer.7.attention.value": {
+          "admission": {
+            "maximum_absolute_error": 0.083,
+            "maximum_root_mean_square_error": 0.02,
+            "minimum_cosine_similarity": 0.999771,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.07459013164043427,
+            "maximum_relative_error": 17.02350578785731,
+            "maximum_root_mean_square_error": 0.01807606937838261,
+            "minimum_cosine_similarity": 0.999792490645695
+          },
+          "sample_count": 2
+        },
+        "layer.7.ffn.correction": {
+          "admission": {
+            "maximum_absolute_error": 0.023,
+            "maximum_root_mean_square_error": 0.0022,
+            "minimum_cosine_similarity": 0.999817,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.020432591438293457,
+            "maximum_relative_error": 50.21716005793952,
+            "maximum_root_mean_square_error": 0.001935484854197448,
+            "minimum_cosine_similarity": 0.9998337740532203
+          },
+          "sample_count": 2
+        },
+        "layer.7.ffn.input_norm": {
+          "admission": {
+            "maximum_absolute_error": 0.022,
+            "maximum_root_mean_square_error": 0.0061,
+            "minimum_cosine_similarity": 0.999884,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.019842922687530518,
+            "maximum_relative_error": 90.13516502654873,
+            "maximum_root_mean_square_error": 0.0055209562934936465,
+            "minimum_cosine_similarity": 0.9998950572774021
+          },
+          "sample_count": 2
+        },
+        "layer.7.input_norm": {
+          "admission": {
+            "maximum_absolute_error": 0.05,
+            "maximum_root_mean_square_error": 0.0079,
+            "minimum_cosine_similarity": 0.999981,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.04508781433105469,
+            "maximum_relative_error": 59.95645696666545,
+            "maximum_root_mean_square_error": 0.0071633519477055175,
+            "minimum_cosine_similarity": 0.9999827677532132
+          },
+          "sample_count": 2
+        },
+        "layer.7.layer_residual": {
+          "admission": {
+            "maximum_absolute_error": 0.10300000000000001,
+            "maximum_root_mean_square_error": 0.0053,
+            "minimum_cosine_similarity": 0.999979,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.09311294555664062,
+            "maximum_relative_error": 72.7147693609818,
+            "maximum_root_mean_square_error": 0.00476808868500022,
+            "minimum_cosine_similarity": 0.9999816828984649
+          },
+          "sample_count": 2
+        },
+        "layer.7.mixer_residual": {
+          "admission": {
+            "maximum_absolute_error": 0.13,
+            "maximum_root_mean_square_error": 0.0051,
+            "minimum_cosine_similarity": 0.99998,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.11354446411132812,
+            "maximum_relative_error": 89.96345177664975,
+            "maximum_root_mean_square_error": 0.004589288001238913,
+            "minimum_cosine_similarity": 0.999982238043921
+          },
+          "sample_count": 2
+        }
+      }
+    },
+    "official_vs_quartz": {
+      "taps": {
+        "global.embedding": {
+          "admission": {
+            "maximum_absolute_error": 0.0085,
+            "maximum_root_mean_square_error": 0.0016,
+            "minimum_cosine_similarity": 0.994768,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.0076656341552734375,
+            "maximum_relative_error": 888.04,
+            "maximum_root_mean_square_error": 0.001401264669679371,
+            "minimum_cosine_similarity": 0.9952443977666878
+          },
+          "sample_count": 2
+        },
+        "global.final_norm": {
+          "admission": {
+            "maximum_absolute_error": 1.6,
+            "maximum_root_mean_square_error": 0.24,
+            "minimum_cosine_similarity": 0.992878,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 1.4254846572875977,
+            "maximum_relative_error": 308346062898.63586,
+            "maximum_root_mean_square_error": 0.21624592974601942,
+            "minimum_cosine_similarity": 0.9935257475023622
+          },
+          "sample_count": 2
+        },
+        "global.logits": {
+          "admission": {
+            "maximum_absolute_error": 1.5,
+            "maximum_root_mean_square_error": 0.24,
+            "minimum_cosine_similarity": 0.993418,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 1.2858233451843262,
+            "maximum_relative_error": 179927.9375,
+            "maximum_root_mean_square_error": 0.21300218615399139,
+            "minimum_cosine_similarity": 0.9940170801410351
+          },
+          "sample_count": 2
+        },
+        "layer.0.ffn.activated": {
+          "admission": {
+            "maximum_absolute_error": 0.03,
+            "maximum_root_mean_square_error": 0.0018000000000000002,
+            "minimum_cosine_similarity": 0.997483,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.02718532085418701,
+            "maximum_relative_error": 6344.257275132275,
+            "maximum_root_mean_square_error": 0.001620087351237317,
+            "minimum_cosine_similarity": 0.9977121252657573
+          },
+          "sample_count": 2
+        },
+        "layer.0.ffn.correction": {
+          "admission": {
+            "maximum_absolute_error": 0.051000000000000004,
+            "maximum_root_mean_square_error": 0.0039000000000000003,
+            "minimum_cosine_similarity": 0.998879,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.04636049270629883,
+            "maximum_relative_error": 971.5629272460938,
+            "maximum_root_mean_square_error": 0.003484442815668919,
+            "minimum_cosine_similarity": 0.9989816218216466
+          },
+          "sample_count": 2
+        },
+        "layer.0.ffn.gate": {
+          "admission": {
+            "maximum_absolute_error": 0.092,
+            "maximum_root_mean_square_error": 0.014,
+            "minimum_cosine_similarity": 0.997463,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.08309417963027954,
+            "maximum_relative_error": 6004.754605263158,
+            "maximum_root_mean_square_error": 0.012002705784248308,
+            "minimum_cosine_similarity": 0.9976944441722819
+          },
+          "sample_count": 2
+        },
+        "layer.0.ffn.input_norm": {
+          "admission": {
+            "maximum_absolute_error": 0.044,
+            "maximum_root_mean_square_error": 0.0095,
+            "minimum_cosine_similarity": 0.998369,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.03916984796524048,
+            "maximum_relative_error": 16033308580.517769,
+            "maximum_root_mean_square_error": 0.008611773504919517,
+            "minimum_cosine_similarity": 0.9985175902554188
+          },
+          "sample_count": 2
+        },
+        "layer.0.ffn.up": {
+          "admission": {
+            "maximum_absolute_error": 0.057,
+            "maximum_root_mean_square_error": 0.013000000000000001,
+            "minimum_cosine_similarity": 0.99728,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.0510677844285965,
+            "maximum_relative_error": 1549.1,
+            "maximum_root_mean_square_error": 0.011321522737886608,
+            "minimum_cosine_similarity": 0.9975273789924493
+          },
+          "sample_count": 2
+        },
+        "layer.0.gdn.beta": {
+          "admission": {
+            "maximum_absolute_error": 0.034,
+            "maximum_root_mean_square_error": 0.0099,
+            "minimum_cosine_similarity": 0.999929,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.030554771423339844,
+            "maximum_relative_error": 0.07968854037198153,
+            "maximum_root_mean_square_error": 0.008954441490931926,
+            "minimum_cosine_similarity": 0.9999359853547142
+          },
+          "sample_count": 2
+        },
+        "layer.0.gdn.convolution": {
+          "admission": {
+            "maximum_absolute_error": 0.25,
+            "maximum_root_mean_square_error": 0.0068000000000000005,
+            "minimum_cosine_similarity": 0.999984,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.22406679391860962,
+            "maximum_relative_error": 197.94074603873239,
+            "maximum_root_mean_square_error": 0.006123215539516568,
+            "minimum_cosine_similarity": 0.9999854571672923
+          },
+          "sample_count": 2
+        },
+        "layer.0.gdn.convolution_state": {
+          "admission": {
+            "maximum_absolute_error": 0.51,
+            "maximum_root_mean_square_error": 0.07100000000000001,
+            "minimum_cosine_similarity": 0.999681,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.46356678009033203,
+            "maximum_relative_error": 320.1691836124402,
+            "maximum_root_mean_square_error": 0.06407528964932173,
+            "minimum_cosine_similarity": 0.9997107254112876
+          },
+          "sample_count": 2
+        },
+        "layer.0.gdn.decay": {
+          "admission": {
+            "maximum_absolute_error": 0.049,
+            "maximum_root_mean_square_error": 0.010700000000000001,
+            "minimum_cosine_similarity": 0.999968,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.04417133331298828,
+            "maximum_relative_error": 0.20295876447635,
+            "maximum_root_mean_square_error": 0.009718464838957096,
+            "minimum_cosine_similarity": 0.9999715349676128
+          },
+          "sample_count": 2
+        },
+        "layer.0.gdn.gated_output": {
+          "admission": {
+            "maximum_absolute_error": 0.041,
+            "maximum_root_mean_square_error": 0.0013000000000000002,
+            "minimum_cosine_similarity": 0.999769,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.03682112693786621,
+            "maximum_relative_error": 1872.3896190987125,
+            "maximum_root_mean_square_error": 0.0011797498680694357,
+            "minimum_cosine_similarity": 0.9997905126255727
+          },
+          "sample_count": 2
+        },
+        "layer.0.gdn.key": {
+          "admission": {
+            "maximum_absolute_error": 0.25,
+            "maximum_root_mean_square_error": 0.0102,
+            "minimum_cosine_similarity": 0.999633,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.22406679391860962,
+            "maximum_relative_error": 64.94937202214126,
+            "maximum_root_mean_square_error": 0.00924576317710089,
+            "minimum_cosine_similarity": 0.9996663979944677
+          },
+          "sample_count": 2
+        },
+        "layer.0.gdn.output": {
+          "admission": {
+            "maximum_absolute_error": 0.011000000000000001,
+            "maximum_root_mean_square_error": 0.0017000000000000001,
+            "minimum_cosine_similarity": 0.999956,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.009913444519042969,
+            "maximum_relative_error": 12402.914141414141,
+            "maximum_root_mean_square_error": 0.0014848551948432958,
+            "minimum_cosine_similarity": 0.999960290001984
+          },
+          "sample_count": 2
+        },
+        "layer.0.gdn.packed_qkv": {
+          "admission": {
+            "maximum_absolute_error": 0.51,
+            "maximum_root_mean_square_error": 0.12,
+            "minimum_cosine_similarity": 0.999681,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.46356678009033203,
+            "maximum_relative_error": 320.1691836124402,
+            "maximum_root_mean_square_error": 0.1028686330240783,
+            "minimum_cosine_similarity": 0.9997107254112876
+          },
+          "sample_count": 2
+        },
+        "layer.0.gdn.query": {
+          "admission": {
+            "maximum_absolute_error": 0.049,
+            "maximum_root_mean_square_error": 0.0037,
+            "minimum_cosine_similarity": 0.999873,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.043670654296875,
+            "maximum_relative_error": 74.95674075356013,
+            "maximum_root_mean_square_error": 0.0033201741206995744,
+            "minimum_cosine_similarity": 0.9998847724803024
+          },
+          "sample_count": 2
+        },
+        "layer.0.gdn.recurrent_output": {
+          "admission": {
+            "maximum_absolute_error": 0.0102,
+            "maximum_root_mean_square_error": 0.00026000000000000003,
+            "minimum_cosine_similarity": 0.999967,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.009221971035003662,
+            "maximum_relative_error": 1925.5291666666667,
+            "maximum_root_mean_square_error": 0.00023497650265029825,
+            "minimum_cosine_similarity": 0.9999701720381964
+          },
+          "sample_count": 2
+        },
+        "layer.0.gdn.recurrent_state": {
+          "admission": {
+            "maximum_absolute_error": 0.34,
+            "maximum_root_mean_square_error": 0.0033,
+            "minimum_cosine_similarity": 0.999486,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.30013926327228546,
+            "maximum_relative_error": 282156.42784810124,
+            "maximum_root_mean_square_error": 0.00295005357237083,
+            "minimum_cosine_similarity": 0.9995330433625151
+          },
+          "sample_count": 2
+        },
+        "layer.0.gdn.value": {
+          "admission": {
+            "maximum_absolute_error": 0.16,
+            "maximum_root_mean_square_error": 0.006200000000000001,
+            "minimum_cosine_similarity": 0.99999,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.14246749877929688,
+            "maximum_relative_error": 197.94074603873239,
+            "maximum_root_mean_square_error": 0.005576830331999282,
+            "minimum_cosine_similarity": 0.9999909540542995
+          },
+          "sample_count": 2
+        },
+        "layer.0.input_norm": {
+          "admission": {
+            "maximum_absolute_error": 0.62,
+            "maximum_root_mean_square_error": 0.10300000000000001,
+            "minimum_cosine_similarity": 0.9951,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.5624592304229736,
+            "maximum_relative_error": 884.1374362244898,
+            "maximum_root_mean_square_error": 0.09361100779483966,
+            "minimum_cosine_similarity": 0.9955455439122057
+          },
+          "sample_count": 2
+        },
+        "layer.0.layer_residual": {
+          "admission": {
+            "maximum_absolute_error": 0.082,
+            "maximum_root_mean_square_error": 0.0044,
+            "minimum_cosine_similarity": 0.99985,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.07390022277832031,
+            "maximum_relative_error": 5620721727.609634,
+            "maximum_root_mean_square_error": 0.003949780730755745,
+            "minimum_cosine_similarity": 0.9998643127109574
+          },
+          "sample_count": 2
+        },
+        "layer.0.mixer_residual": {
+          "admission": {
+            "maximum_absolute_error": 0.012,
+            "maximum_root_mean_square_error": 0.0021000000000000003,
+            "minimum_cosine_similarity": 0.999933,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.010027945041656494,
+            "maximum_relative_error": 3264622762.799263,
+            "maximum_root_mean_square_error": 0.001843141646288526,
+            "minimum_cosine_similarity": 0.9999393694625397
+          },
+          "sample_count": 2
+        },
+        "layer.3.attention.context": {
+          "admission": {
+            "maximum_absolute_error": 0.051000000000000004,
+            "maximum_root_mean_square_error": 0.0016,
+            "minimum_cosine_similarity": 0.999424,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.04627606272697449,
+            "maximum_relative_error": 428.46778998940675,
+            "maximum_root_mean_square_error": 0.0014035192808863344,
+            "minimum_cosine_similarity": 0.9994764103450645
+          },
+          "sample_count": 2
+        },
+        "layer.3.attention.key": {
+          "admission": {
+            "maximum_absolute_error": 0.19,
+            "maximum_root_mean_square_error": 0.049,
+            "minimum_cosine_similarity": 0.999319,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.16760802268981934,
+            "maximum_relative_error": 34.34221596659919,
+            "maximum_root_mean_square_error": 0.04451216294057857,
+            "minimum_cosine_similarity": 0.9993812088711612
+          },
+          "sample_count": 2
+        },
+        "layer.3.attention.kv_key_row": {
+          "admission": {
+            "maximum_absolute_error": 0.18,
+            "maximum_root_mean_square_error": 0.049,
+            "minimum_cosine_similarity": 0.999248,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.1562669277191162,
+            "maximum_relative_error": 34.24687439718364,
+            "maximum_root_mean_square_error": 0.04422108796183239,
+            "minimum_cosine_similarity": 0.9993171976137988
+          },
+          "sample_count": 2
+        },
+        "layer.3.attention.kv_value_row": {
+          "admission": {
+            "maximum_absolute_error": 0.18,
+            "maximum_root_mean_square_error": 0.052000000000000005,
+            "minimum_cosine_similarity": 0.998418,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.16270172595977783,
+            "maximum_relative_error": 293.2131651606426,
+            "maximum_root_mean_square_error": 0.04639368995022166,
+            "minimum_cosine_similarity": 0.998562564500656
+          },
+          "sample_count": 2
+        },
+        "layer.3.attention.output": {
+          "admission": {
+            "maximum_absolute_error": 0.27,
+            "maximum_root_mean_square_error": 0.004200000000000001,
+            "minimum_cosine_similarity": 0.999909,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.2427530288696289,
+            "maximum_relative_error": 534.257035136816,
+            "maximum_root_mean_square_error": 0.0038167939341541787,
+            "minimum_cosine_similarity": 0.9999173000722933
+          },
+          "sample_count": 2
+        },
+        "layer.3.attention.packed_query_gate": {
+          "admission": {
+            "maximum_absolute_error": 0.27,
+            "maximum_root_mean_square_error": 0.053,
+            "minimum_cosine_similarity": 0.9999,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.24331378936767578,
+            "maximum_relative_error": 217.885498046875,
+            "maximum_root_mean_square_error": 0.04757300009106464,
+            "minimum_cosine_similarity": 0.999909091758904
+          },
+          "sample_count": 2
+        },
+        "layer.3.attention.query": {
+          "admission": {
+            "maximum_absolute_error": 0.17,
+            "maximum_root_mean_square_error": 0.044,
+            "minimum_cosine_similarity": 0.999263,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.147938072681427,
+            "maximum_relative_error": 217.885498046875,
+            "maximum_root_mean_square_error": 0.03926794888266477,
+            "minimum_cosine_similarity": 0.9993300447839506
+          },
+          "sample_count": 2
+        },
+        "layer.3.attention.rope_key": {
+          "admission": {
+            "maximum_absolute_error": 0.18,
+            "maximum_root_mean_square_error": 0.049,
+            "minimum_cosine_similarity": 0.999248,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.1562669277191162,
+            "maximum_relative_error": 34.24687439718364,
+            "maximum_root_mean_square_error": 0.04422108796183239,
+            "minimum_cosine_similarity": 0.9993171976137988
+          },
+          "sample_count": 2
+        },
+        "layer.3.attention.rope_query": {
+          "admission": {
+            "maximum_absolute_error": 0.25,
+            "maximum_root_mean_square_error": 0.055,
+            "minimum_cosine_similarity": 0.999011,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.2221132516860962,
+            "maximum_relative_error": 220.0495949074074,
+            "maximum_root_mean_square_error": 0.04920498315086891,
+            "minimum_cosine_similarity": 0.9991015199047478
+          },
+          "sample_count": 2
+        },
+        "layer.3.attention.value": {
+          "admission": {
+            "maximum_absolute_error": 0.18,
+            "maximum_root_mean_square_error": 0.052000000000000005,
+            "minimum_cosine_similarity": 0.998418,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.16270172595977783,
+            "maximum_relative_error": 293.2131651606426,
+            "maximum_root_mean_square_error": 0.04639368995022166,
+            "minimum_cosine_similarity": 0.998562564500656
+          },
+          "sample_count": 2
+        },
+        "layer.3.ffn.activated": {
+          "admission": {
+            "maximum_absolute_error": 0.15,
+            "maximum_root_mean_square_error": 0.0047,
+            "minimum_cosine_similarity": 0.995385,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.13460087776184082,
+            "maximum_relative_error": 6797.794416243655,
+            "maximum_root_mean_square_error": 0.004259570913659719,
+            "minimum_cosine_similarity": 0.995804780565435
+          },
+          "sample_count": 2
+        },
+        "layer.3.ffn.correction": {
+          "admission": {
+            "maximum_absolute_error": 0.03,
+            "maximum_root_mean_square_error": 0.0086,
+            "minimum_cosine_similarity": 0.994436,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.026637405157089233,
+            "maximum_relative_error": 51720.548192771086,
+            "maximum_root_mean_square_error": 0.0078081992644039346,
+            "minimum_cosine_similarity": 0.994941983113619
+          },
+          "sample_count": 2
+        },
+        "layer.3.ffn.gate": {
+          "admission": {
+            "maximum_absolute_error": 0.105,
+            "maximum_root_mean_square_error": 0.024,
+            "minimum_cosine_similarity": 0.996571,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.09486803784966469,
+            "maximum_relative_error": 465.7929184549356,
+            "maximum_root_mean_square_error": 0.02160341055790127,
+            "minimum_cosine_similarity": 0.996883198988635
+          },
+          "sample_count": 2
+        },
+        "layer.3.ffn.input_norm": {
+          "admission": {
+            "maximum_absolute_error": 0.079,
+            "maximum_root_mean_square_error": 0.021,
+            "minimum_cosine_similarity": 0.997649,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.07129988819360733,
+            "maximum_relative_error": 32235201448.202133,
+            "maximum_root_mean_square_error": 0.018187888604472922,
+            "minimum_cosine_similarity": 0.997862782762084
+          },
+          "sample_count": 2
+        },
+        "layer.3.ffn.up": {
+          "admission": {
+            "maximum_absolute_error": 0.12,
+            "maximum_root_mean_square_error": 0.024,
+            "minimum_cosine_similarity": 0.995495,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.10015302896499634,
+            "maximum_relative_error": 6937.837009803921,
+            "maximum_root_mean_square_error": 0.02114144168995272,
+            "minimum_cosine_similarity": 0.9959053520241543
+          },
+          "sample_count": 2
+        },
+        "layer.3.input_norm": {
+          "admission": {
+            "maximum_absolute_error": 0.44,
+            "maximum_root_mean_square_error": 0.04,
+            "minimum_cosine_similarity": 0.999587,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.39641571044921875,
+            "maximum_relative_error": 39184987545.01343,
+            "maximum_root_mean_square_error": 0.03592722883866527,
+            "minimum_cosine_similarity": 0.9996247929783239
+          },
+          "sample_count": 2
+        },
+        "layer.3.layer_residual": {
+          "admission": {
+            "maximum_absolute_error": 0.3,
+            "maximum_root_mean_square_error": 0.015,
+            "minimum_cosine_similarity": 0.99966,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.26798248291015625,
+            "maximum_relative_error": 18094120547.175407,
+            "maximum_root_mean_square_error": 0.012968880075501838,
+            "minimum_cosine_similarity": 0.9996917512028733
+          },
+          "sample_count": 2
+        },
+        "layer.3.mixer_residual": {
+          "admission": {
+            "maximum_absolute_error": 0.36,
+            "maximum_root_mean_square_error": 0.0108,
+            "minimum_cosine_similarity": 0.999771,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.3244476318359375,
+            "maximum_relative_error": 16398144885.897636,
+            "maximum_root_mean_square_error": 0.009792473130214623,
+            "minimum_cosine_similarity": 0.9997919364547597
+          },
+          "sample_count": 2
+        },
+        "layer.62.ffn.activated": {
+          "admission": {
+            "maximum_absolute_error": 5.0,
+            "maximum_root_mean_square_error": 0.2,
+            "minimum_cosine_similarity": 0.989788,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 4.496376037597656,
+            "maximum_relative_error": 6236.346337579618,
+            "maximum_root_mean_square_error": 0.1797212725454303,
+            "minimum_cosine_similarity": 0.9907171224938636
+          },
+          "sample_count": 2
+        },
+        "layer.62.ffn.correction": {
+          "admission": {
+            "maximum_absolute_error": 2.5,
+            "maximum_root_mean_square_error": 0.38,
+            "minimum_cosine_similarity": 0.988443,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 2.1823883056640625,
+            "maximum_relative_error": 6218.901595744681,
+            "maximum_root_mean_square_error": 0.339535798303933,
+            "minimum_cosine_similarity": 0.9894938417586615
+          },
+          "sample_count": 2
+        },
+        "layer.62.ffn.gate": {
+          "admission": {
+            "maximum_absolute_error": 1.5,
+            "maximum_root_mean_square_error": 0.2,
+            "minimum_cosine_similarity": 0.995554,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 1.329315185546875,
+            "maximum_relative_error": 2391.461856617647,
+            "maximum_root_mean_square_error": 0.17816814923050522,
+            "minimum_cosine_similarity": 0.9959582928613213
+          },
+          "sample_count": 2
+        },
+        "layer.62.ffn.input_norm": {
+          "admission": {
+            "maximum_absolute_error": 0.87,
+            "maximum_root_mean_square_error": 0.18,
+            "minimum_cosine_similarity": 0.99111,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.7839155197143555,
+            "maximum_relative_error": 261985301971.43555,
+            "maximum_root_mean_square_error": 0.15536548158169763,
+            "minimum_cosine_similarity": 0.991918990172791
+          },
+          "sample_count": 2
+        },
+        "layer.62.ffn.up": {
+          "admission": {
+            "maximum_absolute_error": 0.85,
+            "maximum_root_mean_square_error": 0.19,
+            "minimum_cosine_similarity": 0.994036,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.7656950950622559,
+            "maximum_relative_error": 5583.100267379679,
+            "maximum_root_mean_square_error": 0.16437630353662527,
+            "minimum_cosine_similarity": 0.9945783340975032
+          },
+          "sample_count": 2
+        },
+        "layer.62.gdn.beta": {
+          "admission": {
+            "maximum_absolute_error": 0.029,
+            "maximum_root_mean_square_error": 0.0088,
+            "minimum_cosine_similarity": 0.999955,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.025987088680267334,
+            "maximum_relative_error": 0.03913349824793198,
+            "maximum_root_mean_square_error": 0.007974811368183076,
+            "minimum_cosine_similarity": 0.9999591941015852
+          },
+          "sample_count": 2
+        },
+        "layer.62.gdn.convolution": {
+          "admission": {
+            "maximum_absolute_error": 0.39,
+            "maximum_root_mean_square_error": 0.012,
+            "minimum_cosine_similarity": 0.998461,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.3482353687286377,
+            "maximum_relative_error": 21141.5765625,
+            "maximum_root_mean_square_error": 0.010788038669510521,
+            "minimum_cosine_similarity": 0.9986011304261212
+          },
+          "sample_count": 2
+        },
+        "layer.62.gdn.convolution_state": {
+          "admission": {
+            "maximum_absolute_error": 2.2,
+            "maximum_root_mean_square_error": 0.13,
+            "minimum_cosine_similarity": 0.99783,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 1.9254741668701172,
+            "maximum_relative_error": 21109.015625,
+            "maximum_root_mean_square_error": 0.11331177429205445,
+            "minimum_cosine_similarity": 0.9980279254469318
+          },
+          "sample_count": 2
+        },
+        "layer.62.gdn.decay": {
+          "admission": {
+            "maximum_absolute_error": 0.12,
+            "maximum_root_mean_square_error": 0.032,
+            "minimum_cosine_similarity": 0.999779,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.10464310646057129,
+            "maximum_relative_error": 0.3613608332335449,
+            "maximum_root_mean_square_error": 0.028574015462212835,
+            "minimum_cosine_similarity": 0.9997999707595103
+          },
+          "sample_count": 2
+        },
+        "layer.62.gdn.gated_output": {
+          "admission": {
+            "maximum_absolute_error": 1.9000000000000001,
+            "maximum_root_mean_square_error": 0.077,
+            "minimum_cosine_similarity": 0.994787,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 1.6397075653076172,
+            "maximum_relative_error": 20874.411082474227,
+            "maximum_root_mean_square_error": 0.0696114369728123,
+            "minimum_cosine_similarity": 0.9952610365535822
+          },
+          "sample_count": 2
+        },
+        "layer.62.gdn.key": {
+          "admission": {
+            "maximum_absolute_error": 0.14,
+            "maximum_root_mean_square_error": 0.013000000000000001,
+            "minimum_cosine_similarity": 0.998147,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.12026405334472656,
+            "maximum_relative_error": 270.9826692139738,
+            "maximum_root_mean_square_error": 0.01107883792744093,
+            "minimum_cosine_similarity": 0.9983161301000105
+          },
+          "sample_count": 2
+        },
+        "layer.62.gdn.output": {
+          "admission": {
+            "maximum_absolute_error": 1.9000000000000001,
+            "maximum_root_mean_square_error": 0.096,
+            "minimum_cosine_similarity": 0.995418,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 1.7097539901733398,
+            "maximum_relative_error": 3762.970766129032,
+            "maximum_root_mean_square_error": 0.08688530870296146,
+            "minimum_cosine_similarity": 0.9958353582384384
+          },
+          "sample_count": 2
+        },
+        "layer.62.gdn.packed_qkv": {
+          "admission": {
+            "maximum_absolute_error": 2.2,
+            "maximum_root_mean_square_error": 0.21,
+            "minimum_cosine_similarity": 0.99783,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 1.9254741668701172,
+            "maximum_relative_error": 21109.015625,
+            "maximum_root_mean_square_error": 0.18292741798238,
+            "minimum_cosine_similarity": 0.9980279254469318
+          },
+          "sample_count": 2
+        },
+        "layer.62.gdn.query": {
+          "admission": {
+            "maximum_absolute_error": 0.39,
+            "maximum_root_mean_square_error": 0.019,
+            "minimum_cosine_similarity": 0.998172,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.3482353687286377,
+            "maximum_relative_error": 113.51348912646199,
+            "maximum_root_mean_square_error": 0.016871964993994244,
+            "minimum_cosine_similarity": 0.9983386505246796
+          },
+          "sample_count": 2
+        },
+        "layer.62.gdn.recurrent_output": {
+          "admission": {
+            "maximum_absolute_error": 0.0059,
+            "maximum_root_mean_square_error": 0.00026000000000000003,
+            "minimum_cosine_similarity": 0.994483,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.0053363218903541565,
+            "maximum_relative_error": 20083.422680412372,
+            "maximum_root_mean_square_error": 0.00023281588331192665,
+            "minimum_cosine_similarity": 0.9949847516439917
+          },
+          "sample_count": 2
+        },
+        "layer.62.gdn.recurrent_state": {
+          "admission": {
+            "maximum_absolute_error": 0.095,
+            "maximum_root_mean_square_error": 0.0014,
+            "minimum_cosine_similarity": 0.99772,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.08582472801208496,
+            "maximum_relative_error": 1732891.460176991,
+            "maximum_root_mean_square_error": 0.0012041110882262537,
+            "minimum_cosine_similarity": 0.9979276244192695
+          },
+          "sample_count": 2
+        },
+        "layer.62.gdn.value": {
+          "admission": {
+            "maximum_absolute_error": 0.2,
+            "maximum_root_mean_square_error": 0.0099,
+            "minimum_cosine_similarity": 0.998764,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.18076887726783752,
+            "maximum_relative_error": 21141.5765625,
+            "maximum_root_mean_square_error": 0.008974200002914181,
+            "minimum_cosine_similarity": 0.9988765466391264
+          },
+          "sample_count": 2
+        },
+        "layer.62.input_norm": {
+          "admission": {
+            "maximum_absolute_error": 0.9,
+            "maximum_root_mean_square_error": 0.17,
+            "minimum_cosine_similarity": 0.990952,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.8161754608154297,
+            "maximum_relative_error": 255603939294.81506,
+            "maximum_root_mean_square_error": 0.1502766939848632,
+            "minimum_cosine_similarity": 0.9917754280609998
+          },
+          "sample_count": 2
+        },
+        "layer.62.layer_residual": {
+          "admission": {
+            "maximum_absolute_error": 4.0,
+            "maximum_root_mean_square_error": 0.61,
+            "minimum_cosine_similarity": 0.993041,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 3.622241973876953,
+            "maximum_relative_error": 1156266689300.537,
+            "maximum_root_mean_square_error": 0.5484601512054467,
+            "minimum_cosine_similarity": 0.9936744114163352
+          },
+          "sample_count": 2
+        },
+        "layer.62.mixer_residual": {
+          "admission": {
+            "maximum_absolute_error": 3.0,
+            "maximum_root_mean_square_error": 0.49,
+            "minimum_cosine_similarity": 0.992271,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 2.681964874267578,
+            "maximum_relative_error": 720484972000.1221,
+            "maximum_root_mean_square_error": 0.4388329334884324,
+            "minimum_cosine_similarity": 0.9929744088808578
+          },
+          "sample_count": 2
+        },
+        "layer.63.attention.context": {
+          "admission": {
+            "maximum_absolute_error": 2.1,
+            "maximum_root_mean_square_error": 0.12,
+            "minimum_cosine_similarity": 0.994624,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 1.8379945755004883,
+            "maximum_relative_error": 317.8780126633987,
+            "maximum_root_mean_square_error": 0.10092258152789849,
+            "minimum_cosine_similarity": 0.9951133611249038
+          },
+          "sample_count": 2
+        },
+        "layer.63.attention.key": {
+          "admission": {
+            "maximum_absolute_error": 0.53,
+            "maximum_root_mean_square_error": 0.15,
+            "minimum_cosine_similarity": 0.998656,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.47662901878356934,
+            "maximum_relative_error": 465.6186868686869,
+            "maximum_root_mean_square_error": 0.12775278949732696,
+            "minimum_cosine_similarity": 0.998778318770331
+          },
+          "sample_count": 2
+        },
+        "layer.63.attention.kv_key_row": {
+          "admission": {
+            "maximum_absolute_error": 0.32,
+            "maximum_root_mean_square_error": 0.084,
+            "minimum_cosine_similarity": 0.99859,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.2872425764799118,
+            "maximum_relative_error": 463.1769205729167,
+            "maximum_root_mean_square_error": 0.07554402053909856,
+            "minimum_cosine_similarity": 0.9987186148168109
+          },
+          "sample_count": 2
+        },
+        "layer.63.attention.kv_value_row": {
+          "admission": {
+            "maximum_absolute_error": 1.6,
+            "maximum_root_mean_square_error": 0.33,
+            "minimum_cosine_similarity": 0.999092,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 1.3975982666015625,
+            "maximum_relative_error": 66.63842268318966,
+            "maximum_root_mean_square_error": 0.29472217485955293,
+            "minimum_cosine_similarity": 0.9991749084542023
+          },
+          "sample_count": 2
+        },
+        "layer.63.attention.output": {
+          "admission": {
+            "maximum_absolute_error": 1.6,
+            "maximum_root_mean_square_error": 0.16,
+            "minimum_cosine_similarity": 0.996102,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 1.3823151588439941,
+            "maximum_relative_error": 408.828523089172,
+            "maximum_root_mean_square_error": 0.13802157925252298,
+            "minimum_cosine_similarity": 0.9964571912694195
+          },
+          "sample_count": 2
+        },
+        "layer.63.attention.packed_query_gate": {
+          "admission": {
+            "maximum_absolute_error": 1.3,
+            "maximum_root_mean_square_error": 0.16,
+            "minimum_cosine_similarity": 0.998842,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 1.0954084396362305,
+            "maximum_relative_error": 735.0307148972603,
+            "maximum_root_mean_square_error": 0.1439981278580895,
+            "minimum_cosine_similarity": 0.9989479529316888
+          },
+          "sample_count": 2
+        },
+        "layer.63.attention.query": {
+          "admission": {
+            "maximum_absolute_error": 1.3,
+            "maximum_root_mean_square_error": 0.17,
+            "minimum_cosine_similarity": 0.998198,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 1.0954084396362305,
+            "maximum_relative_error": 735.0307148972603,
+            "maximum_root_mean_square_error": 0.14613906150866338,
+            "minimum_cosine_similarity": 0.9983623170056615
+          },
+          "sample_count": 2
+        },
+        "layer.63.attention.rope_key": {
+          "admission": {
+            "maximum_absolute_error": 0.32,
+            "maximum_root_mean_square_error": 0.084,
+            "minimum_cosine_similarity": 0.99859,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.2872425764799118,
+            "maximum_relative_error": 463.1769205729167,
+            "maximum_root_mean_square_error": 0.07554402053909856,
+            "minimum_cosine_similarity": 0.9987186148168109
+          },
+          "sample_count": 2
+        },
+        "layer.63.attention.rope_query": {
+          "admission": {
+            "maximum_absolute_error": 0.45,
+            "maximum_root_mean_square_error": 0.096,
+            "minimum_cosine_similarity": 0.997644,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.4031479209661484,
+            "maximum_relative_error": 709.8669829842931,
+            "maximum_root_mean_square_error": 0.08716713911798651,
+            "minimum_cosine_similarity": 0.9978582878965891
+          },
+          "sample_count": 2
+        },
+        "layer.63.attention.value": {
+          "admission": {
+            "maximum_absolute_error": 1.6,
+            "maximum_root_mean_square_error": 0.33,
+            "minimum_cosine_similarity": 0.999092,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 1.3975982666015625,
+            "maximum_relative_error": 66.63842268318966,
+            "maximum_root_mean_square_error": 0.29472217485955293,
+            "minimum_cosine_similarity": 0.9991749084542023
+          },
+          "sample_count": 2
+        },
+        "layer.63.ffn.activated": {
+          "admission": {
+            "maximum_absolute_error": 12.0,
+            "maximum_root_mean_square_error": 0.32,
+            "minimum_cosine_similarity": 0.990806,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 10.13424825668335,
+            "maximum_relative_error": 14466.901741293532,
+            "maximum_root_mean_square_error": 0.2852749864335796,
+            "minimum_cosine_similarity": 0.9916422713809907
+          },
+          "sample_count": 2
+        },
+        "layer.63.ffn.correction": {
+          "admission": {
+            "maximum_absolute_error": 18.0,
+            "maximum_root_mean_square_error": 0.68,
+            "minimum_cosine_similarity": 0.990237,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 15.828716278076172,
+            "maximum_relative_error": 4866.667647058824,
+            "maximum_root_mean_square_error": 0.6091759752510295,
+            "minimum_cosine_similarity": 0.9911254336322877
+          },
+          "sample_count": 2
+        },
+        "layer.63.ffn.gate": {
+          "admission": {
+            "maximum_absolute_error": 1.3,
+            "maximum_root_mean_square_error": 0.19,
+            "minimum_cosine_similarity": 0.997115,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 1.1118431091308594,
+            "maximum_relative_error": 17683.179864253394,
+            "maximum_root_mean_square_error": 0.16874256853046699,
+            "minimum_cosine_similarity": 0.9973776189612871
+          },
+          "sample_count": 2
+        },
+        "layer.63.ffn.input_norm": {
+          "admission": {
+            "maximum_absolute_error": 1.07,
+            "maximum_root_mean_square_error": 0.16,
+            "minimum_cosine_similarity": 0.992661,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.9677543640136719,
+            "maximum_relative_error": 163465648889.54163,
+            "maximum_root_mean_square_error": 0.1364642106878238,
+            "minimum_cosine_similarity": 0.9933285061350172
+          },
+          "sample_count": 2
+        },
+        "layer.63.ffn.up": {
+          "admission": {
+            "maximum_absolute_error": 1.8,
+            "maximum_root_mean_square_error": 0.18,
+            "minimum_cosine_similarity": 0.996783,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 1.628507375717163,
+            "maximum_relative_error": 709.9680686773256,
+            "maximum_root_mean_square_error": 0.15534761826909052,
+            "minimum_cosine_similarity": 0.9970755861250418
+          },
+          "sample_count": 2
+        },
+        "layer.63.input_norm": {
+          "admission": {
+            "maximum_absolute_error": 1.3,
+            "maximum_root_mean_square_error": 0.14,
+            "minimum_cosine_similarity": 0.994015,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 1.1234474182128906,
+            "maximum_relative_error": 258946537971.49658,
+            "maximum_root_mean_square_error": 0.1272261903306649,
+            "minimum_cosine_similarity": 0.994559123418303
+          },
+          "sample_count": 2
+        },
+        "layer.63.layer_residual": {
+          "admission": {
+            "maximum_absolute_error": 15.0,
+            "maximum_root_mean_square_error": 0.92,
+            "minimum_cosine_similarity": 0.992928,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 12.949943542480469,
+            "maximum_relative_error": 1500172615051.2695,
+            "maximum_root_mean_square_error": 0.8356013837289695,
+            "minimum_cosine_similarity": 0.9935711493620971
+          },
+          "sample_count": 2
+        },
+        "layer.63.mixer_residual": {
+          "admission": {
+            "maximum_absolute_error": 3.4000000000000004,
+            "maximum_root_mean_square_error": 0.62,
+            "minimum_cosine_similarity": 0.993073,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 3.0175323486328125,
+            "maximum_relative_error": 944806098937.9883,
+            "maximum_root_mean_square_error": 0.5569893977157985,
+            "minimum_cosine_similarity": 0.9937031524835501
+          },
+          "sample_count": 2
+        },
+        "layer.7.attention.context": {
+          "admission": {
+            "maximum_absolute_error": 0.13,
+            "maximum_root_mean_square_error": 0.0033,
+            "minimum_cosine_similarity": 0.998773,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.11258459091186523,
+            "maximum_relative_error": 75.6724609375,
+            "maximum_root_mean_square_error": 0.002963415237525511,
+            "minimum_cosine_similarity": 0.9988849808242988
+          },
+          "sample_count": 2
+        },
+        "layer.7.attention.key": {
+          "admission": {
+            "maximum_absolute_error": 0.23,
+            "maximum_root_mean_square_error": 0.058,
+            "minimum_cosine_similarity": 0.999101,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.20674896240234375,
+            "maximum_relative_error": 131.00305838178295,
+            "maximum_root_mean_square_error": 0.05187510673233777,
+            "minimum_cosine_similarity": 0.9991833747658571
+          },
+          "sample_count": 2
+        },
+        "layer.7.attention.kv_key_row": {
+          "admission": {
+            "maximum_absolute_error": 0.22,
+            "maximum_root_mean_square_error": 0.061,
+            "minimum_cosine_similarity": 0.998964,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.19706958532333374,
+            "maximum_relative_error": 133.00340757978722,
+            "maximum_root_mean_square_error": 0.0550373756618898,
+            "minimum_cosine_similarity": 0.9990587426792759
+          },
+          "sample_count": 2
+        },
+        "layer.7.attention.kv_value_row": {
+          "admission": {
+            "maximum_absolute_error": 0.29,
+            "maximum_root_mean_square_error": 0.057,
+            "minimum_cosine_similarity": 0.998328,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.2570152282714844,
+            "maximum_relative_error": 221.10905864876761,
+            "maximum_root_mean_square_error": 0.051357119383903596,
+            "minimum_cosine_similarity": 0.9984802882513111
+          },
+          "sample_count": 2
+        },
+        "layer.7.attention.output": {
+          "admission": {
+            "maximum_absolute_error": 0.34,
+            "maximum_root_mean_square_error": 0.006500000000000001,
+            "minimum_cosine_similarity": 0.999643,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.3042140007019043,
+            "maximum_relative_error": 126.27298747119816,
+            "maximum_root_mean_square_error": 0.005904738959211156,
+            "minimum_cosine_similarity": 0.9996759112647451
+          },
+          "sample_count": 2
+        },
+        "layer.7.attention.packed_query_gate": {
+          "admission": {
+            "maximum_absolute_error": 0.3,
+            "maximum_root_mean_square_error": 0.057,
+            "minimum_cosine_similarity": 0.999876,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.2638145685195923,
+            "maximum_relative_error": 702.0565017772511,
+            "maximum_root_mean_square_error": 0.05156647929325389,
+            "minimum_cosine_similarity": 0.9998876063671688
+          },
+          "sample_count": 2
+        },
+        "layer.7.attention.query": {
+          "admission": {
+            "maximum_absolute_error": 0.22,
+            "maximum_root_mean_square_error": 0.051000000000000004,
+            "minimum_cosine_similarity": 0.999125,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.19867610931396484,
+            "maximum_relative_error": 702.0565017772511,
+            "maximum_root_mean_square_error": 0.04567408099269648,
+            "minimum_cosine_similarity": 0.9992052876349788
+          },
+          "sample_count": 2
+        },
+        "layer.7.attention.rope_key": {
+          "admission": {
+            "maximum_absolute_error": 0.22,
+            "maximum_root_mean_square_error": 0.061,
+            "minimum_cosine_similarity": 0.998964,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.19706958532333374,
+            "maximum_relative_error": 133.00340757978722,
+            "maximum_root_mean_square_error": 0.0550373756618898,
+            "minimum_cosine_similarity": 0.9990587426792759
+          },
+          "sample_count": 2
+        },
+        "layer.7.attention.rope_query": {
+          "admission": {
+            "maximum_absolute_error": 0.31,
+            "maximum_root_mean_square_error": 0.064,
+            "minimum_cosine_similarity": 0.998778,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.2803363502025604,
+            "maximum_relative_error": 708.1857461734694,
+            "maximum_root_mean_square_error": 0.057458477687961314,
+            "minimum_cosine_similarity": 0.9988891149424936
+          },
+          "sample_count": 2
+        },
+        "layer.7.attention.value": {
+          "admission": {
+            "maximum_absolute_error": 0.29,
+            "maximum_root_mean_square_error": 0.057,
+            "minimum_cosine_similarity": 0.998328,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.2570152282714844,
+            "maximum_relative_error": 221.10905864876761,
+            "maximum_root_mean_square_error": 0.051357119383903596,
+            "minimum_cosine_similarity": 0.9984802882513111
+          },
+          "sample_count": 2
+        },
+        "layer.7.ffn.activated": {
+          "admission": {
+            "maximum_absolute_error": 0.097,
+            "maximum_root_mean_square_error": 0.0076,
+            "minimum_cosine_similarity": 0.993152,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.0877525806427002,
+            "maximum_relative_error": 4428.100328947368,
+            "maximum_root_mean_square_error": 0.006832937613336092,
+            "minimum_cosine_similarity": 0.9937751143969202
+          },
+          "sample_count": 2
+        },
+        "layer.7.ffn.correction": {
+          "admission": {
+            "maximum_absolute_error": 0.107,
+            "maximum_root_mean_square_error": 0.014,
+            "minimum_cosine_similarity": 0.992696,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.09708476066589355,
+            "maximum_relative_error": 1674.176037117904,
+            "maximum_root_mean_square_error": 0.012171043597477267,
+            "minimum_cosine_similarity": 0.9933600201018956
+          },
+          "sample_count": 2
+        },
+        "layer.7.ffn.gate": {
+          "admission": {
+            "maximum_absolute_error": 0.15,
+            "maximum_root_mean_square_error": 0.036000000000000004,
+            "minimum_cosine_similarity": 0.995049,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.13208389282226562,
+            "maximum_relative_error": 4810.3765,
+            "maximum_root_mean_square_error": 0.03254328138359926,
+            "minimum_cosine_similarity": 0.9954998817417707
+          },
+          "sample_count": 2
+        },
+        "layer.7.ffn.input_norm": {
+          "admission": {
+            "maximum_absolute_error": 0.14,
+            "maximum_root_mean_square_error": 0.033,
+            "minimum_cosine_similarity": 0.996768,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.12337273359298706,
+            "maximum_relative_error": 16525197774.17183,
+            "maximum_root_mean_square_error": 0.029443949434872267,
+            "minimum_cosine_similarity": 0.9970619574893258
+          },
+          "sample_count": 2
+        },
+        "layer.7.ffn.up": {
+          "admission": {
+            "maximum_absolute_error": 0.15,
+            "maximum_root_mean_square_error": 0.036000000000000004,
+            "minimum_cosine_similarity": 0.993621,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.1318340301513672,
+            "maximum_relative_error": 1044.8864644970415,
+            "maximum_root_mean_square_error": 0.031867840551751854,
+            "minimum_cosine_similarity": 0.9942009952828612
+          },
+          "sample_count": 2
+        },
+        "layer.7.input_norm": {
+          "admission": {
+            "maximum_absolute_error": 0.61,
+            "maximum_root_mean_square_error": 0.046,
+            "minimum_cosine_similarity": 0.999381,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.5509872436523438,
+            "maximum_relative_error": 40937907993.79349,
+            "maximum_root_mean_square_error": 0.04093684180106243,
+            "minimum_cosine_similarity": 0.999437523566717
+          },
+          "sample_count": 2
+        },
+        "layer.7.layer_residual": {
+          "admission": {
+            "maximum_absolute_error": 0.3,
+            "maximum_root_mean_square_error": 0.03,
+            "minimum_cosine_similarity": 0.999381,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.26519012451171875,
+            "maximum_relative_error": 40771953761.57761,
+            "maximum_root_mean_square_error": 0.02684186654728399,
+            "minimum_cosine_similarity": 0.9994379811084293
+          },
+          "sample_count": 2
+        },
+        "layer.7.mixer_residual": {
+          "admission": {
+            "maximum_absolute_error": 0.31,
+            "maximum_root_mean_square_error": 0.027,
+            "minimum_cosine_similarity": 0.999449,
+            "nan_count": 0,
+            "negative_infinity_count": 0,
+            "positive_infinity_count": 0
+          },
+          "observed": {
+            "maximum_absolute_error": 0.2774810791015625,
+            "maximum_relative_error": 14661218971.014023,
+            "maximum_root_mean_square_error": 0.02429828223623653,
+            "minimum_cosine_similarity": 0.9994991640323215
+          },
+          "sample_count": 2
+        }
+      }
+    }
+  },
+  "calibration": {
+    "absolute_and_rms_margin": "1.10x then round upward to two significant digits",
+    "cosine_margin": "1.10x observed distance from 1 then floor to six decimals",
+    "freezer_sha256": "60be81783de6e94e56459e8739c05820e6e964af49a9131ccfcebb055b846de7",
+    "input_tokens": [
+      42,
+      3649
+    ],
+    "layers": [
+      0,
+      3,
+      7,
+      62,
+      63
+    ],
+    "positions": [
+      0,
+      1
+    ],
+    "relative_error": "reported but not gated because near-zero denominators make maxima unstable"
+  },
+  "greedy_near_tie_exceptions": [],
+  "schema_version": 1,
+  "status": "frozen_before_cuda_optimization"
+}

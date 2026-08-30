@@ -247,10 +247,10 @@ hash and symbols are pinned in the contract.
 transcription fixtures with maximum observed differences on this run below
 `1.2e-7`, and all chunkings are byte-identical.
 
-**Not yet measured:** PyTorch is absent from the focused local environment, so
-CPU-002 is not a direct Transformers eager/offloaded trace. ORA-001 still must
-run that primary semantic authority, llama.cpp traces, and Quartz together before
-freezing model-layer tolerances. The ledger preserves this boundary explicitly.
+**Historical boundary:** PyTorch was absent from the focused CPU-002 environment,
+so this fixture was not a direct Transformers eager/offloaded trace. ORA-001
+subsequently joined the primary authority, llama.cpp, and Quartz and froze the
+model-layer tolerances documented in [Chapter 38](38-scalar-authority-tolerances.md).
 
 ## What CPU-002 proves—and what it does not
 

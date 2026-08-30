@@ -14,8 +14,8 @@ real mapped GGUF -> scalar stage -> filtered borrowed view
 ```
 
 This proves that a trace describes an actual runtime value rather than a
-synthetic test array. It is still native structural evidence until ORA-001
-compares it with pinned Transformers and llama.cpp traces.
+synthetic test array. At TRC-002 it was still native structural evidence;
+ORA-001 subsequently compared it with pinned Transformers and llama.cpp traces.
 
 ## Why the release entry point did not change
 
@@ -183,8 +183,8 @@ code; normal code compiles without trace fields; one filtered real final-norm
 tensor copies exactly, survives trace-v1 validation, and matches the frozen
 native structural fixture at its admitted indices.
 
-**Proposed:** ORA-001 must capture corresponding pinned Transformers and
-llama.cpp tensors, freeze per-tap tolerances, and decide semantic admission.
-Future CUDA kernels will offer the same names at visible unfused boundaries and
-compare through those frozen gates; this scalar gate does not claim CUDA taps
-exist yet.
+**Subsequently measured:** ORA-001 captured corresponding pinned Transformers
+and llama.cpp tensors and froze per-tap tolerances in
+[Chapter 38](38-scalar-authority-tolerances.md). Future CUDA kernels must offer
+the same names at visible unfused boundaries and pass those immutable gates;
+this scalar chapter alone still does not claim CUDA taps exist.

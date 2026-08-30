@@ -197,6 +197,54 @@ struct RawTraceCapture final {
   std::size_t count = 0;
 };
 
+struct BundleTraceRecord final {
+  const char* name = nullptr;
+  std::size_t layer = 0;
+  std::size_t position = 0;
+  std::array<std::size_t, qw38::internal::kTraceMaximumRank> shape{};
+  std::size_t rank = 0;
+  std::size_t count = 0;
+  std::size_t offset = 0;
+};
+
+struct BundleTraceCapture final {
+  static constexpr std::size_t kMaximumRecords = 4096;
+  std::ofstream* output = nullptr;
+  std::array<BundleTraceRecord, kMaximumRecords> records{};
+  std::size_t record_count = 0;
+  std::size_t position = 0;
+  std::size_t bytes = 0;
+};
+
+qw38::Status append_raw_trace_tensor(
+    const qw38::internal::TraceTensorView& tensor, void* context) noexcept {
+  auto* capture = static_cast<BundleTraceCapture*>(context);
+  if (capture == nullptr || capture->output == nullptr ||
+      capture->record_count == BundleTraceCapture::kMaximumRecords ||
+      tensor.value_count > std::numeric_limits<std::size_t>::max() /
+                               sizeof(float)) {
+    return {qw38::StatusCode::kInvalidArgument,
+            "scalar bundle trace capture is invalid or full"};
+  }
+  const std::size_t tensor_bytes = tensor.value_count * sizeof(float);
+  if (capture->bytes >
+      std::numeric_limits<std::size_t>::max() - tensor_bytes) {
+    return {qw38::StatusCode::kInvalidArgument,
+            "scalar bundle trace byte count overflows"};
+  }
+  capture->output->write(reinterpret_cast<const char*>(tensor.values),
+                         static_cast<std::streamsize>(tensor_bytes));
+  if (!*capture->output) {
+    return {qw38::StatusCode::kInternal,
+            "cannot append scalar bundle trace tensor"};
+  }
+  BundleTraceRecord& record = capture->records[capture->record_count++];
+  record = {tensor.name, tensor.layer, capture->position, tensor.shape,
+            tensor.rank, tensor.value_count, capture->bytes};
+  capture->bytes += tensor_bytes;
+  return qw38::Status::ok();
+}
+
 qw38::Status write_raw_trace_tensor(
     const qw38::internal::TraceTensorView& tensor, void* context) noexcept {
   auto* capture = static_cast<RawTraceCapture*>(context);
@@ -321,6 +369,124 @@ int capture_real_scalar_trace(const char* model_path, const char* token_text,
     std::cout << "state_before_" << kStateNames[index] << "=" << before[index]
               << "\nstate_after_" << kStateNames[index] << "=" << after[index]
               << '\n';
+  }
+  return 0;
+}
+
+int capture_real_scalar_bundle(const char* model_path, const char* output_path,
+                               const char* first_token_text,
+                               const char* second_token_text) {
+  std::array<std::size_t, 2> tokens{};
+  if (!parse_size(first_token_text, &tokens[0]) ||
+      !parse_size(second_token_text, &tokens[1])) {
+    std::cerr << "invalid_argument: malformed scalar bundle token\n";
+    return 1;
+  }
+  std::error_code error;
+  if (std::filesystem::exists(output_path, error) || error) {
+    std::cerr << "invalid_argument: scalar bundle output already exists\n";
+    return 1;
+  }
+  const qw38::internal::TraceFilter filter{
+      qw38::internal::kTraceAllLayers, "*"};
+  qw38::Status status = qw38::internal::validate_trace_filter(filter);
+  qw38::internal::ModelInfo info;
+  if (status.is_ok()) status = qw38::internal::inspect_gguf(model_path, &info);
+  if (status.is_ok()) status = qw38::internal::validate_qwen38_contract(&info);
+  qw38::internal::MappedFile mapping;
+  if (status.is_ok()) status = mapping.open(model_path);
+  qw38::internal::ModelWeights weights;
+  if (status.is_ok()) {
+    status = qw38::internal::bind_model_weights(info, mapping, &weights);
+  }
+  qw38::internal::ScalarModelParameters parameters;
+  if (status.is_ok()) {
+    status =
+        qw38::internal::prepare_scalar_model_parameters(weights, &parameters);
+  }
+  qw38::internal::ScalarSessionState state;
+  if (status.is_ok()) {
+    status = qw38::internal::create_scalar_session_state(tokens.size(), &state);
+  }
+  qw38::internal::ScalarWorkspace workspace;
+  if (status.is_ok()) {
+    status = qw38::internal::create_scalar_workspace(tokens.size(), &workspace);
+  }
+  std::array<std::string, 4> before;
+  if (status.is_ok() &&
+      (!vector_digest(state.gdn_convolution, &before[0]) ||
+       !vector_digest(state.gdn_recurrent, &before[1]) ||
+       !vector_digest(state.attention_key, &before[2]) ||
+       !vector_digest(state.attention_value, &before[3]))) {
+    status = {qw38::StatusCode::kInternal,
+              "cannot hash scalar state before bundle tracing"};
+  }
+  std::ofstream output;
+  if (status.is_ok()) {
+    output.open(output_path, std::ios::binary | std::ios::trunc);
+    if (!output) {
+      status = {qw38::StatusCode::kInternal,
+                "cannot create scalar bundle output"};
+    }
+  }
+  BundleTraceCapture capture{&output};
+  std::vector<float> logits(qw38::internal::kVocabularySize, NAN);
+  for (std::size_t position = 0;
+       status.is_ok() && position < tokens.size(); ++position) {
+    capture.position = position;
+    status = qw38::internal::execute_scalar_token_traced(
+        weights, parameters, tokens[position], &state, &workspace,
+        logits.data(), logits.size(), filter, append_raw_trace_tensor, &capture);
+  }
+  output.close();
+  if (status.is_ok() && !output) {
+    status = {qw38::StatusCode::kInternal,
+              "cannot close scalar bundle output"};
+  }
+  std::array<std::string, 4> after;
+  if (status.is_ok() &&
+      (!vector_digest(state.gdn_convolution, &after[0]) ||
+       !vector_digest(state.gdn_recurrent, &after[1]) ||
+       !vector_digest(state.attention_key, &after[2]) ||
+       !vector_digest(state.attention_value, &after[3]))) {
+    status = {qw38::StatusCode::kInternal,
+              "cannot hash scalar state after bundle tracing"};
+  }
+  if (status.is_ok() && capture.record_count == 0) {
+    status = {qw38::StatusCode::kInternal,
+              "scalar bundle trace captured no tensors"};
+  }
+  if (!status.is_ok()) {
+    std::remove(output_path);
+    std::cerr << qw38::status_code_name(status.code()) << ": "
+              << status.message() << '\n';
+    return 1;
+  }
+
+  std::cout << "schema_version=1\ntoken_count=" << tokens.size()
+            << "\ntoken_0=" << tokens[0] << "\ntoken_1=" << tokens[1]
+            << "\nfrontier_before=0\nfrontier_after=" << state.frontier
+            << "\ntensor_count=" << capture.record_count
+            << "\nblob_bytes=" << capture.bytes << '\n';
+  constexpr const char* kStateNames[] = {"gdn_convolution", "gdn_recurrent",
+                                          "attention_key", "attention_value"};
+  for (std::size_t index = 0; index < before.size(); ++index) {
+    std::cout << "state_before_" << kStateNames[index] << '=' << before[index]
+              << "\nstate_after_" << kStateNames[index] << '=' << after[index]
+              << '\n';
+  }
+  for (std::size_t index = 0; index < capture.record_count; ++index) {
+    const BundleTraceRecord& record = capture.records[index];
+    std::cout << "tensor_" << index << "_name=" << record.name << "\ntensor_"
+              << index << "_layer=" << record.layer << "\ntensor_" << index
+              << "_position=" << record.position << "\ntensor_" << index
+              << "_shape=";
+    for (std::size_t dimension = 0; dimension < record.rank; ++dimension) {
+      if (dimension != 0) std::cout << ',';
+      std::cout << record.shape[dimension];
+    }
+    std::cout << "\ntensor_" << index << "_count=" << record.count
+              << "\ntensor_" << index << "_offset=" << record.offset << '\n';
   }
   return 0;
 }
@@ -2274,6 +2440,9 @@ int main(int argc, char** argv) {
   if (argc == 7 && std::string(argv[1]) == "--capture-real-scalar-trace") {
     return capture_real_scalar_trace(argv[2], argv[3], argv[4], argv[5],
                                      argv[6]);
+  }
+  if (argc == 6 && std::string(argv[1]) == "--capture-real-scalar-bundle") {
+    return capture_real_scalar_bundle(argv[2], argv[3], argv[4], argv[5]);
   }
 #endif
   if (argc == 2 && std::string(argv[1]) == "--build-info") {

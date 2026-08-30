@@ -214,10 +214,11 @@ and used symbols.
 behavior, and FFN gate/up/activation/output taps pass the frozen metrics. The
 worst measured relative error is about `7.80e-6`.
 
-**Not yet measured:** as with CPU-002, local PyTorch is absent. These are
-transparent scalar transcriptions, not direct Transformers eager/offloaded
-traces. ORA-001 still requires primary eager traces and the independent
-same-GGUF llama.cpp oracle before complete-layer tolerances are admitted.
+**Historical boundary:** as with CPU-002, local PyTorch was absent at this gate.
+These remain transparent scalar transcriptions, not direct eager traces.
+ORA-001 subsequently compared the primary eager authority, the independent
+same-GGUF llama.cpp oracle, and Quartz as documented in
+[Chapter 38](38-scalar-authority-tolerances.md).
 
 ## Proof boundary
 

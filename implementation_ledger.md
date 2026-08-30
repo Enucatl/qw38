@@ -45,8 +45,8 @@ are repository-relative unless stated otherwise.
 | TRC-004 | Add diagnostic-only stable CUDA taps | TRC-002, CUD-001 | pending | CUDA visible boundaries use pinned scalar tap names/shapes and pass frozen scalar/oracle comparison gates | — |
 | ORA-002 | Build and validate pinned llama.cpp same-GGUF authority harness | PIN-001, PIN-002, CPU-004 | done | Exact revision builds reproducibly; identical tokens/template run on the pinned GGUF; logits/continuation metadata and source identity are retained | [`pins/llama_authority_contract.json`](pins/llama_authority_contract.json); [`fixtures/llama_scalar_authority.json`](fixtures/llama_scalar_authority.json); [`tests/test_llama_authority.py`](tests/test_llama_authority.py); log 2026-08-30T12:27:27Z |
 | ORA-003 | Build pinned Transformers eager/offload semantic trace authority | PIN-002, TRC-002 | done | Exact source/model revisions execute within host/GPU limits and emit required taps, or an evidenced infeasibility creates an approved replacement task | [`pins/transformers_authority_contract.json`](pins/transformers_authority_contract.json); [`fixtures/transformers_scalar_authority.json`](fixtures/transformers_scalar_authority.json); [`tools/run_transformers_authority.py`](tools/run_transformers_authority.py); [`tests/test_transformers_authority.py`](tests/test_transformers_authority.py); log 2026-08-30T17:38:10Z |
-| ORA-004 | Freeze three-authority scalar fixtures and per-tap tolerances | ORA-002, ORA-003, TRC-002, CPU-004 | pending | Attributed bundles compare every required tap/logit; tolerances and genuine greedy near-ties are immutable | — |
-| ORA-001 | Generate and freeze scalar/oracle fixtures and tolerances | ORA-002, ORA-003, ORA-004 | pending | Three authorities are attributed; tolerances and greedy tie exceptions are immutable inputs | — |
+| ORA-004 | Freeze three-authority scalar fixtures and per-tap tolerances | ORA-002, ORA-003, TRC-002, CPU-004 | done | Attributed bundles compare every required tap/logit; tolerances and genuine greedy near-ties are immutable | [`fixtures/scalar_authority_alignment.json`](fixtures/scalar_authority_alignment.json); [`pins/scalar_oracle_tolerances.json`](pins/scalar_oracle_tolerances.json); [`tests/test_scalar_authority_alignment.py`](tests/test_scalar_authority_alignment.py); log 2026-08-30T18:16:04Z |
+| ORA-001 | Generate and freeze scalar/oracle fixtures and tolerances | ORA-002, ORA-003, ORA-004 | done | Three authorities are attributed; tolerances and greedy tie exceptions are immutable inputs | [`fixtures/scalar_authority_alignment.json`](fixtures/scalar_authority_alignment.json); [`pins/scalar_oracle_tolerances.json`](pins/scalar_oracle_tolerances.json); log 2026-08-30T18:16:04Z |
 | CUD-001 | Implement CUDA Q4_K/Q6_K decode MMV | CPU-001, BLD-002, ORA-001 | pending | Scalar-vs-CUDA and focused primitive pytest gates pass | — |
 | CUD-002 | Implement quantized tiled prompt MMQ | CUD-001 | pending | Arbitrary prompt-row fixtures pass frozen tolerances | — |
 | GDN-001 | Implement exact one-token CUDA GDN and atomic state commit | CUD-001, CPU-002 | pending | State/taps match oracle and injected failures leave frontier unchanged | — |
@@ -96,6 +96,7 @@ are repository-relative unless stated otherwise.
 | EDU-021 | Explain multi-token scalar chunks and exact equivalence for beginners | CPU-004, DOC-001 | done | Chunk preflight, token/position order, logits layout, repeated-token equivalence, state/frontier equality, failure behavior, cost, and oracle limits are code-linked and worked | [`docs/35-scalar-token-chunks.md`](docs/35-scalar-token-chunks.md); [`tests/test_real_scalar_chunk.py`](tests/test_real_scalar_chunk.py); log 2026-08-30T11:57:06Z |
 | EDU-022 | Explain independent authority hierarchy and same-GGUF llama comparison for beginners | ORA-002, DOC-001 | done | Primary versus independent versus native authority, artifact/template/token identity, build pins, logits/continuation limits, and failure evidence are code-linked and worked | [`docs/36-independent-llama-authority.md`](docs/36-independent-llama-authority.md); [`tests/test_llama_authority.py`](tests/test_llama_authority.py); log 2026-08-30T12:27:27Z |
 | EDU-023 | Explain official-checkpoint Transformers eager/offload authority for beginners | ORA-003, DOC-001 | done | Original checkpoint versus GGUF roles, Safetensors shards, eager execution, CPU/GPU/disk offload, hooks/taps, memory limits, and semantic proof boundaries are code-linked and worked | [`docs/37-transformers-authority.md`](docs/37-transformers-authority.md); [`tests/test_transformers_authority.py`](tests/test_transformers_authority.py); log 2026-08-30T17:38:10Z |
+| EDU-024 | Explain three-authority tap alignment and tolerance freezing for beginners | ORA-004, DOC-001 | done | Comparable versus runtime-private boundaries, layout normalization, error distributions, tolerance selection, near-ties, and immutable admission are code-linked and worked | [`docs/38-scalar-authority-tolerances.md`](docs/38-scalar-authority-tolerances.md); [`tests/test_scalar_authority_alignment.py`](tests/test_scalar_authority_alignment.py); log 2026-08-30T18:16:04Z |
 | REL-001 | Publish reproducible release evidence bundle | CMP-003, QLT-001, DOC-001 | pending | Builds, hashes, raw results, reports, and documentation claims reconcile | — |
 
 ## Delivery-Gate Mapping
@@ -1803,6 +1804,158 @@ are repository-relative unless stated otherwise.
 - Marked ORA-003 and EDU-023 done. No numeric tolerance was frozen or loosened.
   ORA-004 is now the next task: align official, llama.cpp, and Quartz stable taps,
   diagnose each boundary, and freeze the immutable scalar admission tolerances.
+
+### 2026-08-30T17:39:58Z — ORA-004 three-authority alignment started
+
+- Commit `05dfeb3` (`feat: add Transformers semantic authority`) is present on
+  both `main` and `origin/main`; the worktree was clean before this task began.
+  Began ORA-004 and added EDU-024 before implementation.
+- The initial alignment audit found that Quartz already emits all conceptual
+  scalar boundaries, but its old one-filter-per-process capture wrapper cannot
+  collect a complete two-token trace efficiently. The diagnostic sink supports
+  wildcard filters; ORA-004 must add a multi-tensor writer rather than rerun the
+  roughly 36-second scalar model once per tap.
+- Pinned llama.cpp's public evaluation callback already exposes Qwen3.5 graph
+  tensors such as `model.input_embed`, `attn_norm`, `attn_residual`,
+  `attn_post_norm`, `ffn_out`, `post_ffn`, `result_norm`, and `result_output`,
+  plus detailed GDN/attention nodes. ORA-002 deliberately deferred wiring these
+  debug tensors; ORA-004 now owns a narrow callback adapter and exact name/shape
+  inventory. No upstream source edit is required.
+- Layout differences must be normalized explicitly before comparison. Examples:
+  Transformers repeats each of 16 GDN Q/K heads three times for 48 value heads,
+  while Quartz retains 16 unique heads; Transformers attention caches include
+  the full history while Quartz's existing tap exposes the current row; and the
+  upstream FFN activation hook observes SiLU(gate) before multiplication by the
+  up branch while Quartz `ffn.activated` is the product. These are mapping tasks,
+  not grounds to compare incompatible arrays or inflate a tolerance.
+- The first callback-adapter compile failed under `-Werror` because
+  `ggml_bf16_t` is a wrapper type and cannot be initialized from integer zero.
+  Changed that temporary to value-initialization (`{}`); the failure occurred
+  before linking or execution and is retained here.
+- After that compile fix, linking exposed a formerly unused direct call to
+  `ggml_backend_tensor_get`; the adapter previously inherited enough libraries
+  for llama/logits only, but the backend symbol lives in `ggml-base` and the
+  linker correctly rejected the missing direct dependency. Added `ggml-base`
+  explicitly to the narrow adapter target rather than relying on transitive
+  shared-library behavior.
+- The first real llama.cpp callback inventory succeeded and retained 168
+  selected tensors (5,010,944 canonical FP32 bytes) while choosing tokens 3649
+  and 1277. It also showed that names such as `Vcur-3` can identify both a
+  projected `[1024]` node and a reshaped `[256,4]` node, so the mapping key must
+  include shape and cannot assume names are unique.
+- The first aligned Transformers rerun added unique 16-head GDN Q/K views,
+  convolution states, FFN products, and current attention cache rows: 272 finite
+  taps and 21,626,720 bytes with unchanged full-logit hash
+  `9b64105a1c7262271c85054ef30cd116e0af4e85a497e6ae24c478007ed97947`.
+  Alignment then found four diagnostic-only Quartz registry omissions—grouped
+  GDN value, log-decay, update beta, and gated-normalized output—and one missing
+  official post-convolution view. Added these existing workspace/function views
+  before comparing; no model arithmetic or production build path changed.
+- While aligning persistent state, the audit found that Quartz's convolution
+  buffer is physically and semantically channel-major (`[10240,4]`), but the
+  diagnostic manifest had labeled the unchanged flat bytes as `[4,10240]`.
+  Corrected the trace shape and contract; the convolution implementation and
+  stored bytes were already channel-major, so no runtime arithmetic changed.
+- The first reporting-only comparison stopped on an unequal tensor length, as
+  required, but its generic metric error did not identify the boundary. Added
+  position/layer/boundary and both lengths to this structural precondition so
+  the mismatch can be diagnosed before any numeric metric is considered.
+- The identified mismatch was the official first-token convolution function's
+  four-position padded return versus Quartz's current-position output. The
+  upstream model slices that return to the current sequence length immediately
+  afterward. Added an explicitly derived `convolution_current` tap (last padded
+  position for the warm-up call, direct output for cached updates) and retained
+  the full upstream function result as separate evidence; no unequal arrays are
+  compared.
+- The first complete reporting pass produced 194 official/Quartz and 156
+  llama.cpp/Quartz rows, but several same-GGUF cosine values were obviously
+  incompatible with the near-identical enclosing residuals. Diagnosis found
+  three mapping errors: official GDN value-associated channels use grouped head
+  order while the GGUF projection/convolution storage is tiled; Quartz's
+  `attention.query` is the raw split projection, not the normalized query; and
+  Quartz's `attention.context` includes the sigmoid output gate while the mapped
+  upstream tensors were pre-gate. Added the already documented 16-by-3 GDN
+  permutation, derives raw query lanes from the packed official projection, and
+  captures/maps post-gate attention context. No tolerance has been selected.
+- The corrected report reduced every previously suspect GDN/context boundary to
+  the expected neighborhood. Raw attention K still mapped to normalized K in
+  both upstream authorities, and llama.cpp raw Q still mapped to `Qcur_normed`.
+  Remapped official K to its projection, llama K to the 1,024-value pre-reshape
+  node (shape disambiguates the repeated name), and llama Q to
+  `Qcur_reshaped`. RoPE taps continue to use the normalized/rotated nodes.
+
+### 2026-08-30T18:16:04Z — ORA-004, ORA-001, and EDU-024 accepted
+
+- Added one-pass two-token Quartz bundle capture. The final diagnostic execution
+  emitted 2,502 tensors and 383,393,792 bytes in 45.33 seconds on its first
+  measured run, with maximum resident set 18,014,080 KiB. Its final raw hash is
+  `96e14a3e29af2781a9a716ec913098f2b576d988e27ab9ff5d8c3ab548261b17`.
+  The first attempted command was rejected before execution because it combined
+  unconditional file removal with the run; switched to validated unique output
+  paths and the checked-in reproducer now creates a fresh `mktemp` evidence
+  directory without deleting previous evidence.
+- Extended the public-API llama.cpp adapter with a selective evaluation callback
+  and direct `ggml-base` dependency. It requests only named nodes at layers
+  0/3/7/62/63 and global endpoints, disambiguates repeated names by shape,
+  converts F32/F16/BF16 to canonical FP32, and emitted 180 tensors totaling
+  5,305,856 bytes with hash
+  `e950c76b04580d251ba2a9da5a0ba21cb73135202201f1ebd0696066ef0dc245`.
+  It selected greedy tokens 3649 and 1277.
+- The final Transformers eager capture emitted 286 finite selected taps totaling
+  22,347,616 bytes with hash
+  `99d47367f411786f4d5f483a0a927491e412eca119bf7d7dcf0805538b1ab164`.
+  Observation-only additions exposed the current convolution position, unique
+  GDN Q/K heads, persistent convolution states, FFN product, current KV rows,
+  and post-gate attention context. Its complete logits remained byte-identical
+  to ORA-003 and selected the same two greedy tokens.
+- Structural comparison failures were resolved by semantic mapping rather than
+  tolerance changes: padded versus current convolution output; grouped versus
+  tiled 16-by-3 GDN value layouts; raw versus normalized attention Q/K; pre-gate
+  versus post-gate attention context; and duplicate llama graph names at
+  different shapes. Corrected the mislabeled native convolution state shape
+  from `[4,10240]` to its actual channel-major `[10240,4]` without changing its
+  bytes or arithmetic.
+- The admitted fixture contains 194 official/Quartz rows and 156 independently
+  visible llama.cpp/Quartz comparisons. All are finite. Same-GGUF global extrema
+  are minimum cosine 0.99956792, maximum RMS 0.14392873, and maximum absolute
+  error 1.68186188. Official-BF16 versus Q4 global extrema are minimum cosine
+  0.98949384, maximum RMS 0.83560138, and maximum absolute error 15.82871628;
+  the frozen gates remain per authority/layer/tap rather than using these broad
+  global extrema.
+- Froze 97 official/Quartz and 78 llama.cpp/Quartz tap identities before CUDA
+  optimization. Maximum-absolute and RMS gates use 1.10 times the observed
+  maximum rounded upward to two significant digits; cosine expands the observed
+  distance from one by 1.10 then floors to six decimals. Non-finite counts must
+  remain zero. Relative errors and first-failing indices remain reported, but
+  maximum relative error is not gated because near-zero denominators make it
+  unstable. Future paths may not regenerate or loosen these pins to admit
+  themselves.
+- All three authorities greedily selected 3649 then 1277. The smallest winner
+  margin was the official position-0 margin of 0.0625. No greedy near-tie
+  exception was required or stored; the immutable exception list is empty.
+- Added a sequential one-large-GPU-process reproducer, six focused admission and
+  provenance tests, and beginner Chapter 38 covering comparable/runtime-private
+  boundaries, exact layout normalization, every metric, failed mappings,
+  deterministic gate selection, greedy near-ties, immutability, and proof
+  limits. Source/evidence and handbook/root indexes are reconciled.
+- Reconciled the earlier scalar, trace, llama.cpp, and Transformers handbook
+  chapters at the commit boundary. Their original gate-specific proof limits
+  remain explicit, while dated or historical wording now points beginners to
+  Chapter 38 instead of incorrectly presenting completed oracle work as future.
+- At `2026-08-30T18:21:20Z`, the first focused commit-boundary pytest command
+  named a nonexistent `tests/test_docs.py`; pytest exited 4 before running any
+  test. No product result failed. Replaced that mistaken aggregate name with the
+  actual authority documentation/provenance test modules and the repository's
+  explicit Markdown-link check below.
+- Clean normal and diagnostic builds passed, followed by all 119 pytest tests in
+  166.24 seconds. The pinned CUDA 13.0.2 image rebuilt every host product and the
+  SM120 probe; the RTX 5090 reported compute capability 12.0,
+  33,671,348,224 total bytes, and 33,139,458,048 free bytes. Ruff, JSON, shell
+  syntax, Markdown local links, and diff whitespace checks are the final commit
+  boundary checks.
+- Marked ORA-004, umbrella ORA-001, and EDU-024 done. The scalar path is now an
+  admitted numeric oracle. CUD-001—the first CUDA Q4_K/Q6_K decode MMV—is the
+  next implementation task and must use these frozen gates without loosening.
 
 ## Decisions and Negative Results
 

@@ -244,3 +244,7 @@ CPU-016 does not close CPU-004. It still lacks a direct semantic-authority trace
 multiple-token continuation equality, arbitrary chunked prefill, and token-wise
 versus chunked comparison. Those are the next scalar trace/oracle increments
 before CUDA admission.
+
+**Status update (2026-08-30):** CPU-004 and ORA-001 subsequently closed those
+scalar requirements. [Chapter 38](38-scalar-authority-tolerances.md) freezes the
+resulting pre-CUDA numeric gates.

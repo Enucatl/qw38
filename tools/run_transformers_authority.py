@@ -98,6 +98,11 @@ def run(
                     return_dict=True,
                 )
                 past_key_values = output.past_key_values
+                for layer in (0, 62):
+                    capture.add(
+                        f"layer.{layer}.gdn.convolution_state",
+                        past_key_values.layers[layer].conv_states[0],
+                    )
                 row = output.logits[0, -1].float().cpu()
                 capture.add_logits(row)
                 rows.append(row)

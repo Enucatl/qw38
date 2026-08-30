@@ -58,6 +58,9 @@ The [Transformers authority chapter](docs/37-transformers-authority.md) then
 explains original Safetensors checkpoints, eager execution, GPU/CPU/disk
 offload, diagnostic hooks and taps, and exactly what the official-checkpoint
 comparison does and does not prove.
+The [scalar tolerance chapter](docs/38-scalar-authority-tolerances.md) aligns all
+three authorities, explains exact layout normalization and numeric error
+metrics, and freezes the immutable scalar gates CUDA implementations must pass.
 
 ## Build
 

@@ -23,7 +23,7 @@ smooth curve with fewer tick marks: it saves memory, but introduces small
 numeric differences. Consequently, original-checkpoint logits are not expected
 to be bit-for-bit equal to GGUF logits. Both artifacts must still choose the
 same unambiguous greedy continuation and remain within tolerances that ORA-004
-will freeze.
+subsequently froze.
 
 ## What a Safetensors shard is
 
@@ -140,7 +140,7 @@ reviewed fixture. Exact fields—identity, tokens, shapes, byte ranges, and
 hashes—must match exactly. Floating-point taps require explicit per-boundary
 tolerances because different admitted numeric formats do not have identical
 bits. ORA-003 records values with zero tolerance only to show where differences
-start; ORA-004 owns choosing and freezing the admission tolerances.
+start; ORA-004 subsequently chose and froze the admission tolerances.
 
 ## What this proves
 
@@ -155,8 +155,10 @@ start; ORA-004 owns choosing and freezing the admission tolerances.
 
 ## What this does not prove
 
-- It does not yet admit Quartz numeric accuracy. ORA-004 must compare matching
-  taps, investigate first failures, and freeze tolerances before CUDA work.
+- This chapter alone does not admit Quartz numeric accuracy. ORA-004
+  subsequently compared matching taps, investigated layout mismatches, and
+  froze the pre-CUDA tolerances in
+  [Chapter 38](38-scalar-authority-tolerances.md).
 - It is not a tokenizer, template, quality, long-context, speed, or 128K memory
   test.
 - Two equal greedy tokens do not prove all logits or hidden states are close.
@@ -164,7 +166,6 @@ start; ORA-004 owns choosing and freezing the admission tolerances.
 - The raw 20 MB tap blob is local evidence identified by its hash; the committed
   manifest alone cannot reconstruct its numeric values.
 
-That narrow proof boundary is deliberate: ORA-003 establishes a trustworthy
-primary source. The next gate, ORA-004, decides whether Quartz agrees closely
-enough at every visible boundary without loosening a tolerance after seeing an
-optimization.
+That narrow proof boundary was deliberate: ORA-003 established a trustworthy
+primary source. ORA-004 then admitted Quartz at every mapped visible boundary
+and froze the tolerances before any CUDA optimization could see or loosen them.

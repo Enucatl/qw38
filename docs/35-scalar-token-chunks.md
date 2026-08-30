@@ -121,9 +121,9 @@ stride, and exact-equivalence result. It labels itself a **native structural
 two-token scalar chunk equivalence** fixture.
 
 The first row again chooses token 3649. After consuming token 3649, the second
-row chooses token 1277. These IDs are useful regression identifiers, not an
-admitted model answer. ORA-001 must compare the same rendered inputs and traces
-with independent authorities before Quartz can make a semantic claim.
+row chooses token 1277. At CPU-004 these IDs were useful regression identifiers,
+not an admitted model answer. ORA-001 subsequently compared the same rendered
+inputs and traces with independent authorities.
 
 ## Measured cost
 
@@ -156,7 +156,8 @@ production optimized prefill paths must compare against this scalar definition.
 calls across every output logit, every persistent state element, and frontier;
 three whole-chunk preflight failures leave state and outputs untouched.
 
-**Proposed:** ORA-001 still needs independent full-model semantic traces,
-per-tap tolerances, greedy continuation admission, and any documented genuine
-near-tie. CPU-004 proves local scalar chunk invariance, not model quality or
-external implementation agreement.
+**Subsequently measured:** ORA-001 supplied independent full-model semantic
+traces, per-tap tolerances, and greedy continuation admission with no near-tie
+exception. CPU-004 by itself still proves only local scalar chunk invariance;
+the external agreement is documented in
+[Chapter 38](38-scalar-authority-tolerances.md).

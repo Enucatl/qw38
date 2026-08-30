@@ -62,7 +62,8 @@ for language and host portability decisions.
 35. [Multi-token scalar chunks](35-scalar-token-chunks.md): whole-chunk preflight, token positions, logit rows, exact state equivalence, and structural continuation evidence.
 36. [Independent same-GGUF llama.cpp authority](36-independent-llama-authority.md): authority hierarchy, exact build/model/token identity, complete logit rows, and the tolerance-freeze boundary.
 37. [Official-checkpoint Transformers authority](37-transformers-authority.md): original versus GGUF weights, Safetensors shards, eager offload, hooks/taps, real logits, and proof limits.
-38. [Source and evidence ledger](sources.md).
+38. [Three-authority scalar tolerances](38-scalar-authority-tolerances.md): comparable boundaries, exact layout normalization, error metrics, greedy margins, and immutable pre-CUDA gates.
+39. [Source and evidence ledger](sources.md).
 
 Claims use four labels: **Measured** (this exact artifact and hardware),
 **External** (a linked source), **Estimated** (reproducible arithmetic), and

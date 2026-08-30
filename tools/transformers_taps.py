@@ -147,7 +147,12 @@ class TapCapture:
             )
             self._hook_output(layer.mlp.gate_proj, f"{prefix}.ffn.gate_projection")
             self._hook_output(layer.mlp.up_proj, f"{prefix}.ffn.up_projection")
-            self._hook_output(layer.mlp.act_fn, f"{prefix}.ffn.activation")
+            self._hook_output(layer.mlp.act_fn, f"{prefix}.ffn.silu_gate")
+            self._handles.append(
+                layer.mlp.down_proj.register_forward_pre_hook(
+                    self._capture_input(f"{prefix}.ffn.activated")
+                )
+            )
             self._hook_output(layer.mlp.down_proj, f"{prefix}.ffn.output")
             self._hook_output(layer, f"{prefix}.residual.output")
 
@@ -182,6 +187,11 @@ class TapCapture:
                 self._hook_output(mixer.v_proj, f"{prefix}.attention.value_projection")
                 self._hook_output(mixer.q_norm, f"{prefix}.attention.query_norm")
                 self._hook_output(mixer.k_norm, f"{prefix}.attention.key_norm")
+                self._handles.append(
+                    mixer.o_proj.register_forward_pre_hook(
+                        self._capture_input(f"{prefix}.attention.gated_context")
+                    )
+                )
                 self._hook_output(mixer.o_proj, f"{prefix}.attention.output")
 
         self._wrap_functions(modeling)
@@ -192,6 +202,24 @@ class TapCapture:
         setattr(module, name, replacement)
 
     def _wrap_functions(self, modeling: Any) -> None:
+        for function_name in ("causal_conv1d_fn", "causal_conv1d_update"):
+            original_convolution = getattr(modeling, function_name)
+
+            def convolution(
+                *args: Any,
+                _original: Callable[..., Any] = original_convolution,
+                **kwargs: Any,
+            ) -> Any:
+                result = _original(*args, **kwargs)
+                layer = self.active_gdn
+                if layer is not None:
+                    self.add(f"layer.{layer}.gdn.convolution", result)
+                    current = result[..., -1] if result.ndim == 3 else result
+                    self.add(f"layer.{layer}.gdn.convolution_current", current)
+                return result
+
+            self._replace(modeling, function_name, convolution)
+
         for function_name in (
             "torch_chunk_gated_delta_rule",
             "torch_recurrent_gated_delta_rule",
@@ -211,6 +239,14 @@ class TapCapture:
                 if layer is not None:
                     for name in names:
                         self.add(f"layer.{layer}.gdn.{name}", values[name])
+                    self.add(
+                        f"layer.{layer}.gdn.query_unique",
+                        values["query"][:, :, ::3, :],
+                    )
+                    self.add(
+                        f"layer.{layer}.gdn.key_unique",
+                        values["key"][:, :, ::3, :],
+                    )
                     self.add(f"layer.{layer}.gdn.core_output", result[0])
                     self.add(f"layer.{layer}.gdn.recurrent_state", result[1])
                 return result
@@ -247,6 +283,8 @@ class TapCapture:
                 self.add(f"layer.{layer}.attention.query", query)
                 self.add(f"layer.{layer}.attention.key_cache", key)
                 self.add(f"layer.{layer}.attention.value_cache", value)
+                self.add(f"layer.{layer}.attention.key_row", key[:, :, -1:, :])
+                self.add(f"layer.{layer}.attention.value_row", value[:, :, -1:, :])
                 self.add(f"layer.{layer}.attention.core_output", result[0])
                 self.add(f"layer.{layer}.attention.weights", result[1])
             return result

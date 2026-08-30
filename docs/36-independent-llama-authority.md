@@ -92,9 +92,9 @@ also the greedy result expected after token 42, so the second row tests a real
 continuation edge rather than an unrelated token.
 
 Bypassing the template here does **not** prove templates match. TOK-001 and
-TOK-002 own exact native tokenizer/template fixtures; ORA-004 will join rendered
-prompt bytes, IDs, tensor taps, and all three authorities in one admission
-bundle. Keeping these gates separate makes a failure easier to locate.
+TOK-002 own exact native tokenizer/template fixtures; ORA-004 subsequently
+joined rendered prompt bytes, IDs, tensor taps, and all three authorities in one
+admission bundle. Keeping these gates separate makes a failure easier to locate.
 
 ORA-002 also performs a separate identity-only check before model execution. It
 renders the existing `user_no_thinking` case with Quartz, gives the exact 74
@@ -144,10 +144,9 @@ equality is therefore not the default rule across runtimes.
 
 ORA-002 uses zero tolerances only to locate and report the first difference. Its
 fixture says `reporting_only_tolerances_not_frozen`: a false `passed` field at
-zero tolerance is information, not a failed release gate. ORA-004 will freeze a
-justified absolute and relative tolerance for every visible tap after
-Transformers evidence exists. Later optimizations may meet those limits; they
-may not loosen them.
+zero tolerance is information, not a failed release gate. ORA-004 subsequently
+froze justified limits for every visible tap after Transformers evidence became
+available. Later optimizations may meet those limits; they may not loosen them.
 
 Greedy equality remains independently visible. If the top two scores are nearly
 tied, a small legal rounding difference may choose a different token. Such an
@@ -179,7 +178,9 @@ different indices, and top-ten comparisons are recorded in
 [`fixtures/llama_scalar_authority.json`](../fixtures/llama_scalar_authority.json)
 and the dated ledger entry.
 
-**Proposed:** ORA-003 must still establish feasible pinned Transformers
-eager/offloaded execution. ORA-004 must then capture attributed taps and freeze
-tolerances before ORA-001 can admit the scalar model semantically. This chapter
-does not claim V1 quality, 128K capacity, or production CUDA performance.
+**Status update (2026-08-30):** ORA-003 subsequently established pinned
+Transformers eager/offloaded execution, and ORA-004 captured attributed taps and
+froze tolerances, completing ORA-001. See
+[Chapter 37](37-transformers-authority.md) and
+[Chapter 38](38-scalar-authority-tolerances.md). This chapter alone still does
+not claim V1 quality, 128K capacity, or production CUDA performance.

@@ -147,8 +147,9 @@ checks three separate properties for layer 0 and layer 3:
 
 The first check catches regressions. The second proves the handoff source. The
 third proves the second residual target. Earlier independent GGUF fixtures
-remain the numeric evidence for each underlying mixer and selected FFN rows.
-A direct Transformers full-layer trace remains TRC-001/TRC-002/ORA-001 work.
+remain the numeric evidence for each underlying mixer and selected FFN rows. At
+CPU-014, a direct Transformers full-layer trace remained
+TRC-001/TRC-002/ORA-001 work; those gates subsequently completed it.
 
 ## A worked four-number analogy
 
@@ -183,3 +184,7 @@ from the explicit production-sized buffers above.
 CPU-014 still does not prove cross-layer scheduling, token embedding, all 48 GDN
 and 16 attention state slots, final RMSNorm, vocabulary logits, multi-token
 chunking, or atomic session commit. Those remain CPU-004 and later gates.
+
+**Status update (2026-08-30):** CPU-004 and ORA-001 now admit scalar scheduling,
+chunking, logits, and independent semantic agreement. Atomic production sessions
+remain separate work. See [Chapter 38](38-scalar-authority-tolerances.md).

@@ -217,9 +217,8 @@ absolute, relative, and RMS limits and rejects NaN or infinity. It also checks
 the exact FP32 residual-add relationship.
 
 The complete Q6_K output projection executes natively and every result is
-finite, but the correction is currently a native regression tap rather than an
-independently decoded semantic result. Direct trace/oracle admission remains
-TRC-001, TRC-002, and ORA-001 work.
+finite. At CPU-013, the correction was only a native regression tap; TRC-001,
+TRC-002, and ORA-001 subsequently supplied direct trace/oracle admission.
 
 ## Failure and atomicity boundary
 
@@ -252,3 +251,7 @@ two-byte KV arithmetic yields exactly 8 GiB at 128K across 16 layers.
 CPU-013 does not yet execute attention prefill, join the attention FFN, traverse
 the hybrid 64-layer schedule, apply final norm, compute logits, or demonstrate
 the production KV allocation. Those remain explicit later gates.
+
+**Status update (2026-08-30):** the scalar scheduler and cross-runtime oracle are
+now admitted through ORA-001; production CUDA prefill and allocation remain
+later work. See [Chapter 38](38-scalar-authority-tolerances.md).

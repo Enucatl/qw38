@@ -174,10 +174,9 @@ hashes, workspace counts, and the explicit FP32 residual-add relationship.
 
 The fixture independently covers the norm and selected gate/up/SwiGLU rows.
 The native diagnostic executes the complete down matrix and verifies that all
-62,464 workspace values are finite, but its final correction is currently a
-native regression tap, not an independent semantic-authority result. A direct
-Transformers or trace comparison is still required by TRC-001, TRC-002, and
-ORA-001 before the full scalar scheduler can become the frozen CUDA oracle.
+62,464 workspace values are finite. At CPU-012, its final correction was only a
+native regression tap; TRC-001, TRC-002, and ORA-001 subsequently supplied the
+independent comparison needed to freeze the CUDA oracle.
 
 ## Failure boundary
 
@@ -208,3 +207,7 @@ CPU-012 does not yet join GDN and FFN, execute a real attention layer, process a
 second real token, schedule all 64 layers, apply final norm, or produce logits.
 Those are explicit CPU-004 and later trace/oracle gates, not implied by this
 single-branch result.
+
+**Status update (2026-08-30):** those scalar composition and authority gates are
+now complete through ORA-001. [Chapter 38](38-scalar-authority-tolerances.md)
+records the cross-runtime evidence; this chapter still proves only CPU-012.

@@ -311,10 +311,10 @@ recomputes all byte ranges, checksums, and summaries; corruption and malformed
 metadata fail closed; the comparator reports every required metric with explicit
 non-finite and top-logit behavior.
 
-**Proposed:** real embeddings, GDN stages/state, attention Q/K/RoPE/KV/output,
-FFN stages, residuals, final norm, and logits will use this container in TRC-002.
+**Subsequently measured:** TRC-002 and ORA-001 use this container for real
+embeddings, GDN stages/state, attention Q/K/RoPE/KV/output, FFN stages,
+residuals, final norm, and logits.
 
-TRC-001 proves that Quartz can preserve and compare diagnostic evidence. It does
-not prove that the current full scalar output is semantically correct. That claim
-requires real taps from pinned Quartz, Transformers, and llama.cpp executions in
-TRC-002 and ORA-001.
+TRC-001 alone proves only that Quartz can preserve and compare diagnostic
+evidence. TRC-002 and ORA-001 subsequently supplied the three-runtime semantic
+evidence described in [Chapter 38](38-scalar-authority-tolerances.md).

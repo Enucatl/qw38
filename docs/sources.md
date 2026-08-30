@@ -48,8 +48,8 @@ DSpark are explicitly rejected as Qwen model semantics.
   semantic authority for CPU-002's GDN convolution, L2 normalization, gate, head
   mapping, and recurrent mutation order. Its source SHA-256 and used symbols are
   frozen in [`pins/gdn_contract.json`](../pins/gdn_contract.json). The local
-  fixture is transparently labeled a scalar transcription; a direct eager trace
-  remains ORA-001 work.
+  fixture is transparently labeled a scalar transcription. At CPU-002, the
+  direct eager trace remained ORA-001 work; ORA-004 later completed it.
 - The same pinned Transformers file is CPU-003's authority for partial text
   RoPE, grouped KV repetition, eager causal attention, per-head RMSNorm, query
   output gating, and the SwiGLU MLP. Production dimensions, order, used symbols,
@@ -91,21 +91,21 @@ DSpark are explicitly rejected as Qwen model semantics.
 - CPU-012 composes the pinned Transformers SwiGLU equation, typed GGUF views,
   direct-scale conversion contract, and Q4_K row decoder. Selected gate/up rows
   are independently decoded and physically hashed in
-  [`fixtures/real_ffn_step.json`](../fixtures/real_ffn_step.json). The complete
-  down projection is currently native regression evidence; direct semantic
-  trace admission remains TRC-001, TRC-002, and ORA-001 work.
+  [`fixtures/real_ffn_step.json`](../fixtures/real_ffn_step.json). At CPU-012,
+  the complete down projection was native regression evidence; TRC-001,
+  TRC-002, and ORA-001 later supplied direct semantic trace admission.
 - CPU-013 composes the same pinned Transformers attention contract with the
   typed layer-3 Q8_0/Q6_K GGUF views and packed projection rules. The independent
   two-position transcription and exact selected physical-row hashes are frozen
   in [`fixtures/real_attention_step.json`](../fixtures/real_attention_step.json).
-  Its full output projection remains native regression evidence pending direct
-  TRC-001/TRC-002/ORA-001 trace admission.
+  At CPU-013, its full output projection was native regression evidence pending
+  direct TRC-001/TRC-002/ORA-001 trace admission; those gates later completed.
 - CPU-014 introduces no new external implementation dependency. It composes the
   already pinned and separately admitted real GDN, attention, and SwiGLU
   boundaries in Transformers decoder-layer order. The explicitly labeled native
   structural regression is frozen in
-  [`fixtures/real_layer_composition.json`](../fixtures/real_layer_composition.json);
-  it does not replace the pending independent full-layer trace authority.
+  [`fixtures/real_layer_composition.json`](../fixtures/real_layer_composition.json).
+  It did not replace the then-pending independent full-layer trace authority.
 - CPU-015 introduces no new external implementation dependency. It executes the
   already admitted typed embedding, final-norm, and output views using the
   pinned Q4_K/Q6_K scalar contracts. Independently decoded endpoint/interior
@@ -116,15 +116,15 @@ DSpark are explicitly rejected as Qwen model semantics.
 - CPU-016 introduces no new external implementation dependency. It composes all
   already pinned and admitted scalar boundaries using the official 48-GDN/16-
   attention layer schedule. [`fixtures/real_scalar_token.json`](../fixtures/real_scalar_token.json)
-  is explicitly a native structural zero-state regression; it must not be cited
-  as Transformers, llama.cpp, quality, or continuation agreement before
-  TRC-001/TRC-002/ORA-001.
+  is explicitly a native structural zero-state regression. By itself it must not
+  be cited as Transformers, llama.cpp, quality, or continuation agreement;
+  TRC-001/TRC-002/ORA-001 later supplied that separate evidence.
 - TRC-001 introduces no new external implementation dependency. The deliberately
   narrow JSON plus little-endian FP32 format and comparison semantics are local
   Quartz contracts frozen in [`pins/trace_contract.json`](../pins/trace_contract.json).
   They carry the already pinned model/tool identities but do not promote any
-  producer to semantic authority. Real cross-runtime evidence remains
-  TRC-002/ORA-001 work.
+  producer to semantic authority. At TRC-001 completion, real cross-runtime
+  evidence remained TRC-002/ORA-001 work.
 - TRC-003 introduces no new external implementation dependency. Its callback,
   tensor-view validation, tap registry, filter semantics, and separate
   diagnostic-object build are local infrastructure. Synthetic filter output is
@@ -132,10 +132,9 @@ DSpark are explicitly rejected as Qwen model semantics.
 - TRC-002's scalar increment introduces no new external implementation
   dependency. It exposes already implemented scalar stages through the local
   diagnostic sink and wraps them with the local trace-v1 writer. The filtered
-  final-norm check uses the explicitly labeled native structural fixture; direct
-  pinned Transformers and llama.cpp comparison remains ORA-001 work. CUDA tap
-  wiring is deferred to its corresponding kernel gates because no production
-  CUDA model kernel exists yet.
+  final-norm check uses the explicitly labeled native structural fixture. At
+  TRC-002 completion, direct pinned Transformers and llama.cpp comparison
+  remained ORA-001 work; CUDA tap wiring remains deferred to its kernel gates.
 - CPU-004 introduces no new external implementation dependency. Its chunk loop
   invokes the already admitted one-token scalar scheduler without changing
   arithmetic order. [`fixtures/real_scalar_chunk.json`](../fixtures/real_scalar_chunk.json)
@@ -149,8 +148,8 @@ DSpark are explicitly rejected as Qwen model semantics.
   graph. Complete raw logit rows stay in ignored evidence storage, while their
   hashes and numeric summaries are retained in
   [`fixtures/llama_scalar_authority.json`](../fixtures/llama_scalar_authority.json).
-  This comparison is not a substitute for the pending pinned Transformers
-  semantic authority or ORA-004 tolerance freeze.
+  At ORA-002 completion, this comparison was not a substitute for the then-
+  pending pinned Transformers authority or ORA-004 tolerance freeze.
 - ORA-003 executes the official Qwen checkpoint revision
   `1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0` through Transformers revision
   `42ca97014c85d71a88ad60d55f08cb9fb4d26e2c`. Every Safetensors shard and
@@ -161,7 +160,18 @@ DSpark are explicitly rejected as Qwen model semantics.
   in ignored evidence storage; their identities, all 238 tap records, measured
   resource use, and reporting-only cross-artifact metrics are retained in
   [`fixtures/transformers_scalar_authority.json`](../fixtures/transformers_scalar_authority.json).
-  Per-tap admission tolerances remain ORA-004 work.
+  At ORA-003 completion, per-tap admission tolerances remained ORA-004 work;
+  the following entry records their completion.
+- ORA-004 introduces no new model implementation source. It aligns the already
+  pinned Transformers, llama.cpp, and Quartz diagnostics through explicit local
+  mappings in [`tools/compare_scalar_authorities.py`](../tools/compare_scalar_authorities.py).
+  The only data reorder is the previously documented pinned-GGUF 16-key-head by
+  3-value-replica permutation; its inverse is tested. Raw blobs remain ignored,
+  while [`fixtures/scalar_authority_alignment.json`](../fixtures/scalar_authority_alignment.json)
+  retains their hashes and 350 attributed comparisons across 194 aligned rows.
+  Immutable pre-CUDA gates
+  and the deterministic calibration rule are frozen in
+  [`pins/scalar_oracle_tolerances.json`](../pins/scalar_oracle_tolerances.json).
 
 ## Specialization and hardware references
 

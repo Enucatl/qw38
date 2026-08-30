@@ -12,7 +12,7 @@ target_include_directories(
   qw38-llama-token-oracle
   PRIVATE "${LLAMA_SOURCE}/include" "${LLAMA_SOURCE}/ggml/include")
 target_link_directories(qw38-llama-token-oracle PRIVATE "${LLAMA_BUILD}/bin")
-target_link_libraries(qw38-llama-token-oracle PRIVATE llama ggml)
+target_link_libraries(qw38-llama-token-oracle PRIVATE llama ggml ggml-base)
 set_target_properties(
   qw38-llama-token-oracle
   PROPERTIES
