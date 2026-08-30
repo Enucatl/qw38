@@ -19,6 +19,7 @@
 #include "model.h"
 #include "projection.h"
 #include "quant.h"
+#include "scheduler.h"
 #include "sha256.h"
 #include "template.h"
 #include "tensor.h"
@@ -603,8 +604,19 @@ int check_real_gdn_step(const char* model_path, const std::string& mode) {
       input_norm.data(), input_norm.size(), convolution.data(),
       convolution.size(), folded_a.data(), folded_a.size(), dt_bias.data(),
       dt_bias.size(), recurrent_norm.data(), recurrent_norm.size()};
-  status = qw38::internal::prepare_gdn_scalar_parameters(weights.layers[0],
-                                                         parameters);
+  std::vector<float> ffn_norm(qw38::internal::kResidualWidth);
+  const qw38::internal::FfnScalarParameters ffn_parameters{ffn_norm.data(),
+                                                           ffn_norm.size()};
+  const bool layer_mode = mode == "layer" || mode == "layer_invalid_ffn";
+  if (layer_mode) {
+    const qw38::internal::GdnLayerScalarParameters layer_parameters{
+        parameters, ffn_parameters};
+    status = qw38::internal::prepare_gdn_layer_scalar_parameters(
+        weights.layers[0], layer_parameters);
+  } else {
+    status = qw38::internal::prepare_gdn_scalar_parameters(weights.layers[0],
+                                                           parameters);
+  }
   if (!status.is_ok()) {
     std::cerr << qw38::status_code_name(status.code()) << ": "
               << status.message() << '\n';
@@ -645,6 +657,12 @@ int check_real_gdn_step(const char* model_path, const std::string& mode) {
   std::vector<float> gated_grouped(qw38::internal::kGdnValueWidth, NAN);
   std::vector<float> gated_tiled(qw38::internal::kGdnValueWidth, NAN);
   std::vector<float> mixer_output(qw38::internal::kResidualWidth, NAN);
+  std::vector<float> post_mixer(qw38::internal::kResidualWidth, NAN);
+  std::vector<float> ffn_normalized(qw38::internal::kResidualWidth, NAN);
+  std::vector<float> ffn_gate(qw38::internal::kFfnWidth, NAN);
+  std::vector<float> ffn_up(qw38::internal::kFfnWidth, NAN);
+  std::vector<float> ffn_activated(qw38::internal::kFfnWidth, NAN);
+  std::vector<float> ffn_correction(qw38::internal::kResidualWidth, NAN);
   std::vector<float> output(qw38::internal::kResidualWidth, NAN);
   const qw38::internal::GdnProjectionWorkspace projection_workspace{
       packed.data(), packed.size(), projected_gate.data(), projected_gate.size(),
@@ -660,25 +678,55 @@ int check_real_gdn_step(const char* model_path, const std::string& mode) {
       update_gate.size(), recurrent_output.data(), recurrent_output.size(),
       gated_grouped.data(), gated_grouped.size(), gated_tiled.data(),
       gated_tiled.size(), mixer_output.data(), mixer_output.size()};
+  qw38::internal::FfnStepWorkspace ffn_workspace{
+      ffn_normalized.data(), ffn_normalized.size(), ffn_gate.data(),
+      ffn_gate.size(), ffn_up.data(), ffn_up.size(), ffn_activated.data(),
+      ffn_activated.size(), ffn_correction.data(), ffn_correction.size()};
   if (mode == "invalid_workspace") --workspace.gated_tiled_count;
-  if (mode != "valid" && mode != "invalid_workspace") {
+  if (mode == "layer_invalid_ffn") --ffn_workspace.activated_count;
+  if (mode != "valid" && mode != "invalid_workspace" && !layer_mode) {
     std::cerr << "invalid_argument: unknown real-GDN-step mode\n";
     return 1;
   }
-  status = qw38::internal::execute_gdn_mixer_step(
-      weights.layers[0], parameters, residual.data(), residual.size(), state,
-      workspace, output.data(), output.size());
+  if (layer_mode) {
+    const qw38::internal::GdnLayerScalarParameters layer_parameters{
+        parameters, ffn_parameters};
+    const qw38::internal::GdnLayerWorkspace layer_workspace{
+        workspace, ffn_workspace, post_mixer.data(), post_mixer.size()};
+    status = qw38::internal::execute_gdn_layer_step(
+        weights.layers[0], layer_parameters, residual.data(), residual.size(),
+        state, layer_workspace, output.data(), output.size());
+  } else {
+    status = qw38::internal::execute_gdn_mixer_step(
+        weights.layers[0], parameters, residual.data(), residual.size(), state,
+        workspace, output.data(), output.size());
+  }
   if (!status.is_ok()) {
-    if (mode == "invalid_workspace") {
+    if (mode == "invalid_workspace" || mode == "layer_invalid_ffn") {
       const bool unchanged =
           std::all_of(conv_state.begin(), conv_state.end(),
                       [](float value) { return value == 0.0F; }) &&
           std::all_of(recurrent_state.begin(), recurrent_state.end(),
                       [](float value) { return value == 0.0F; });
       std::cout << "state_unchanged=" << (unchanged ? 1 : 0) << '\n';
+      const bool output_untouched = std::all_of(
+          output.begin(), output.end(),
+          [](float value) { return std::isnan(value); });
+      std::cout << "output_untouched=" << (output_untouched ? 1 : 0) << '\n';
     }
     std::cerr << qw38::status_code_name(status.code()) << ": "
               << status.message() << '\n';
+    return 1;
+  }
+  const auto finite = [](const std::vector<float>& values) {
+    return std::all_of(values.begin(), values.end(),
+                       [](float value) { return std::isfinite(value); });
+  };
+  if (layer_mode &&
+      (!finite(post_mixer) || !finite(ffn_normalized) || !finite(ffn_gate) ||
+       !finite(ffn_up) || !finite(ffn_activated) || !finite(ffn_correction) ||
+       !finite(output))) {
+    std::cerr << "internal: GDN layer left a nonfinite value\n";
     return 1;
   }
   const auto taps = [](const std::vector<float>& values,
@@ -709,6 +757,20 @@ int check_real_gdn_step(const char* model_path, const std::string& mode) {
                      taps(mixer_output, {0, 1, 2559, 5119}));
   write_float_vector("residual_output_f32_le_hex",
                      taps(output, {0, 1, 2559, 5119}));
+  if (layer_mode) {
+    write_float_vector("post_mixer_f32_le_hex",
+                       taps(post_mixer, {0, 1, 2559, 5119}));
+    write_float_vector("ffn_normalized_f32_le_hex",
+                       taps(ffn_normalized, {0, 1, 2559, 5119}));
+    write_float_vector("ffn_gate_f32_le_hex",
+                       taps(ffn_gate, {0, 1, 8703, 8704, 17407}));
+    write_float_vector("ffn_up_f32_le_hex",
+                       taps(ffn_up, {0, 1, 8703, 8704, 17407}));
+    write_float_vector("ffn_activated_f32_le_hex",
+                       taps(ffn_activated, {0, 1, 8703, 8704, 17407}));
+    write_float_vector("ffn_correction_f32_le_hex",
+                       taps(ffn_correction, {0, 1, 2559, 5119}));
+  }
   write_float_vector("convolution_state_f32_le_hex",
                      taps(conv_state, {0, 1, 2, 3, 16384, 16385, 16386,
                                        16387}));
@@ -833,8 +895,19 @@ int check_real_attention_step(const char* model_path, const std::string& mode) {
   const qw38::internal::AttentionScalarParameters parameters{
       input_norm.data(), input_norm.size(), query_norm.data(),
       query_norm.size(), key_norm.data(), key_norm.size()};
-  status = qw38::internal::prepare_attention_scalar_parameters(
-      weights.layers[3], parameters);
+  std::vector<float> ffn_norm(qw38::internal::kResidualWidth);
+  const qw38::internal::FfnScalarParameters ffn_parameters{ffn_norm.data(),
+                                                           ffn_norm.size()};
+  const bool layer_mode = mode == "layer" || mode == "layer_invalid_ffn";
+  if (layer_mode) {
+    const qw38::internal::AttentionLayerScalarParameters layer_parameters{
+        parameters, ffn_parameters};
+    status = qw38::internal::prepare_attention_layer_scalar_parameters(
+        weights.layers[3], layer_parameters);
+  } else {
+    status = qw38::internal::prepare_attention_scalar_parameters(
+        weights.layers[3], parameters);
+  }
   if (!status.is_ok()) {
     std::cerr << qw38::status_code_name(status.code()) << ": "
               << status.message() << '\n';
@@ -852,6 +925,12 @@ int check_real_attention_step(const char* model_path, const std::string& mode) {
                                       NAN);
   std::vector<float> scores(kCapacity, NAN);
   std::vector<float> mixer_output(qw38::internal::kResidualWidth, NAN);
+  std::vector<float> post_mixer(qw38::internal::kResidualWidth, NAN);
+  std::vector<float> ffn_normalized(qw38::internal::kResidualWidth, NAN);
+  std::vector<float> ffn_gate(qw38::internal::kFfnWidth, NAN);
+  std::vector<float> ffn_up(qw38::internal::kFfnWidth, NAN);
+  std::vector<float> ffn_activated(qw38::internal::kFfnWidth, NAN);
+  std::vector<float> ffn_correction(qw38::internal::kResidualWidth, NAN);
   std::vector<float> key_cache(kCapacity * qw38::internal::kAttentionKvWidth,
                                NAN);
   std::vector<float> value_cache(
@@ -870,12 +949,17 @@ int check_real_attention_step(const char* model_path, const std::string& mode) {
       scores.size(),
       mixer_output.data(),
       mixer_output.size()};
+  qw38::internal::FfnStepWorkspace ffn_workspace{
+      ffn_normalized.data(), ffn_normalized.size(), ffn_gate.data(),
+      ffn_gate.size(), ffn_up.data(), ffn_up.size(), ffn_activated.data(),
+      ffn_activated.size(), ffn_correction.data(), ffn_correction.size()};
   const qw38::internal::AttentionLayerStateView state{
       key_cache.data(), key_cache.size(), value_cache.data(),
       value_cache.size(), kCapacity};
   if (mode == "invalid_workspace") --workspace.attention_output_count;
+  if (mode == "layer_invalid_ffn") --ffn_workspace.activated_count;
   if (mode != "valid" && mode != "invalid_workspace" &&
-      mode != "capacity") {
+      mode != "capacity" && !layer_mode) {
     std::cerr << "invalid_argument: unknown real-attention-step mode\n";
     return 1;
   }
@@ -893,9 +977,19 @@ int check_real_attention_step(const char* model_path, const std::string& mode) {
   std::vector<float> residual(qw38::internal::kResidualWidth);
   fill_residual(&residual, 0);
   const std::size_t first_position = mode == "capacity" ? kCapacity : 0;
-  status = qw38::internal::execute_attention_mixer_step(
-      weights.layers[3], parameters, first_position, residual.data(),
-      residual.size(), state, workspace, output.data(), output.size());
+  const qw38::internal::AttentionLayerScalarParameters layer_parameters{
+      parameters, ffn_parameters};
+  const qw38::internal::AttentionLayerWorkspace layer_workspace{
+      workspace, ffn_workspace, post_mixer.data(), post_mixer.size()};
+  if (layer_mode) {
+    status = qw38::internal::execute_attention_layer_step(
+        weights.layers[3], layer_parameters, first_position, residual.data(),
+        residual.size(), state, layer_workspace, output.data(), output.size());
+  } else {
+    status = qw38::internal::execute_attention_mixer_step(
+        weights.layers[3], parameters, first_position, residual.data(),
+        residual.size(), state, workspace, output.data(), output.size());
+  }
   if (!status.is_ok()) {
     const bool state_unchanged =
         std::all_of(key_cache.begin(), key_cache.end(),
@@ -913,9 +1007,15 @@ int check_real_attention_step(const char* model_path, const std::string& mode) {
   }
   first_output = output;
   fill_residual(&residual, 1);
-  status = qw38::internal::execute_attention_mixer_step(
-      weights.layers[3], parameters, 1, residual.data(), residual.size(), state,
-      workspace, output.data(), output.size());
+  if (layer_mode) {
+    status = qw38::internal::execute_attention_layer_step(
+        weights.layers[3], layer_parameters, 1, residual.data(),
+        residual.size(), state, layer_workspace, output.data(), output.size());
+  } else {
+    status = qw38::internal::execute_attention_mixer_step(
+        weights.layers[3], parameters, 1, residual.data(), residual.size(),
+        state, workspace, output.data(), output.size());
+  }
   if (!status.is_ok()) {
     std::cerr << qw38::status_code_name(status.code()) << ": "
               << status.message() << '\n';
@@ -929,7 +1029,11 @@ int check_real_attention_step(const char* model_path, const std::string& mode) {
       !finite(gate) || !finite(key) || !finite(value) ||
       !finite(attention_output) || !finite(mixer_output) ||
       !finite(key_cache) || !finite(value_cache) || !finite(first_output) ||
-      !finite(output)) {
+      !finite(output) ||
+      (layer_mode &&
+       (!finite(post_mixer) || !finite(ffn_normalized) || !finite(ffn_gate) ||
+        !finite(ffn_up) || !finite(ffn_activated) ||
+        !finite(ffn_correction)))) {
     std::cerr << "internal: attention left a nonfinite value\n";
     return 1;
   }
@@ -961,6 +1065,20 @@ int check_real_attention_step(const char* model_path, const std::string& mode) {
                      taps(mixer_output, kResidualTaps));
   write_float_vector("residual_output_f32_le_hex",
                      taps(output, kResidualTaps));
+  if (layer_mode) {
+    write_float_vector("post_mixer_f32_le_hex",
+                       taps(post_mixer, kResidualTaps));
+    write_float_vector("ffn_normalized_f32_le_hex",
+                       taps(ffn_normalized, kResidualTaps));
+    write_float_vector("ffn_gate_f32_le_hex",
+                       taps(ffn_gate, {0, 1, 8703, 8704, 17407}));
+    write_float_vector("ffn_up_f32_le_hex",
+                       taps(ffn_up, {0, 1, 8703, 8704, 17407}));
+    write_float_vector("ffn_activated_f32_le_hex",
+                       taps(ffn_activated, {0, 1, 8703, 8704, 17407}));
+    write_float_vector("ffn_correction_f32_le_hex",
+                       taps(ffn_correction, kResidualTaps));
+  }
   std::cout << "kv_values=" << key_cache.size() + value_cache.size() << '\n';
   return 0;
 }

@@ -100,6 +100,12 @@ DSpark are explicitly rejected as Qwen model semantics.
   in [`fixtures/real_attention_step.json`](../fixtures/real_attention_step.json).
   Its full output projection remains native regression evidence pending direct
   TRC-001/TRC-002/ORA-001 trace admission.
+- CPU-014 introduces no new external implementation dependency. It composes the
+  already pinned and separately admitted real GDN, attention, and SwiGLU
+  boundaries in Transformers decoder-layer order. The explicitly labeled native
+  structural regression is frozen in
+  [`fixtures/real_layer_composition.json`](../fixtures/real_layer_composition.json);
+  it does not replace the pending independent full-layer trace authority.
 
 ## Specialization and hardware references
 

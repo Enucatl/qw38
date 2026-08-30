@@ -170,6 +170,12 @@ Status prepare_ffn_scalar_parameters(
     const CommonLayerWeights& weights,
     const FfnScalarParameters& parameters) noexcept;
 
+Status validate_ffn_step(const FfnScalarParameters& parameters,
+                         const float* residual,
+                         std::size_t residual_count,
+                         const FfnStepWorkspace& workspace, float* output,
+                         std::size_t output_count) noexcept;
+
 Status execute_ffn_step(
     const CommonLayerWeights& weights, const FfnScalarParameters& parameters,
     const float* residual, std::size_t residual_count,

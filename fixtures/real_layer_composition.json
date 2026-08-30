@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "model_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+  "authority": "native composition regression over separately admitted mixer and FFN semantic boundaries",
+  "proof_limit": "structural branch-order fixture; not an independent full-layer semantic authority",
+  "cases": {
+    "gdn_layer_0_position_0": {
+      "post_mixer_f32_le_hex": "ff4bdfbf731bf3be2dc24abe2a8051bf",
+      "ffn_normalized_f32_le_hex": "0675abbfb87bc3be44fc2cbecfbc32bf",
+      "ffn_gate_f32_le_hex": "2f49f8bee30d01beb5849cbe9018843fd3cd16bf",
+      "ffn_up_f32_le_hex": "23bc65bf0054633cae54f9becea727bec2afa0be",
+      "ffn_activated_f32_le_hex": "73d2293ecbc656baed51813d1623ffbda91c873d",
+      "ffn_correction_f32_le_hex": "57af1f3ebbcf57beb3cca73cd18678be",
+      "residual_output_f32_le_hex": "1456cbbfa8812fbf97c835beefd087bf"
+    },
+    "attention_layer_3_position_1": {
+      "post_mixer_f32_le_hex": "0f4206bfa64aa1bf926cbc3f547d673f",
+      "ffn_normalized_f32_le_hex": "edb0a4be730f39bf4e9f6a3f24720d3f",
+      "ffn_gate_f32_le_hex": "8f97ddbedc25f1bd6064373cd0f3043f101c6dbc",
+      "ffn_up_f32_le_hex": "732a66be5abcc33d3244febd6ee9793f0d9af0be",
+      "ffn_activated_f32_le_hex": "13c71c3d8c89adbb6a2b37ba86c1a23e303c5d3b",
+      "ffn_correction_f32_le_hex": "9459a43ef5b8d1be55473ebe74e0583f",
+      "residual_output_f32_le_hex": "145550bee3b8d5bfa7a3a43fe42ee03f"
+    }
+  }
+}

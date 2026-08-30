@@ -53,7 +53,8 @@ for language and host portability decisions.
 26. [One real GDN mixer layer](26-real-gdn-layer.md): input norm, convolution and recurrent state, layout transitions, gated norm, output projection, and residual.
 27. [One real SwiGLU FFN branch](27-real-ffn-layer.md): post-mixer norm, gate/up/down projections, SiLU, workspace, residual, and evidence limits.
 28. [Real grouped-query attention and KV state](28-real-attention-layer.md): two-position partial RoPE, grouped causal lookup, cache mutation, output gating, and residual.
-29. [Source and evidence ledger](sources.md).
+29. [Complete decoder-layer composition](29-complete-decoder-layer.md): mixer-to-FFN handoff, two residuals, layer variants, validation order, and scheduler boundary.
+30. [Source and evidence ledger](sources.md).
 
 Claims use four labels: **Measured** (this exact artifact and hardware),
 **External** (a linked source), **Estimated** (reproducible arithmetic), and

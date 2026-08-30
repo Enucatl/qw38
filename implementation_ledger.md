@@ -33,9 +33,10 @@ are repository-relative unless stated otherwise.
 | CPU-011 | Execute one complete real layer-0 GDN mixer update and residual | CPU-002, CPU-007, CPU-010 | done | GGUF-scale input norm, real projections, convolution ring, grouped recurrence, gated norm, output projection, residual, state taps, and malformed workspaces pass frozen evidence | [`src/mixer.cpp`](src/mixer.cpp); [`fixtures/real_gdn_step.json`](fixtures/real_gdn_step.json); [`tests/test_real_gdn.py`](tests/test_real_gdn.py); log 2026-08-29T18:33:00Z |
 | CPU-012 | Execute one complete real Q4_K SwiGLU FFN branch and residual | CPU-003, CPU-008, CPU-011 | done | Direct-scale FFN norm, complete gate/up/down projections, SwiGLU taps, exact workspace, residual addition, and malformed workspace behavior pass frozen evidence | [`src/mixer.cpp`](src/mixer.cpp); [`fixtures/real_ffn_step.json`](fixtures/real_ffn_step.json); [`tests/test_real_ffn.py`](tests/test_real_ffn.py); log 2026-08-29T18:46:07Z |
 | CPU-013 | Execute real layer-3 grouped-query attention steps, KV mutation, output projection, and residual | CPU-003, CPU-008, CPU-009, CPU-010 | done | Direct-scale norms, packed projection split, partial RoPE, two-position grouped causal attention, KV state, output gate/projection, residual, capacity, and malformed buffers pass frozen evidence | [`src/mixer.cpp`](src/mixer.cpp); [`fixtures/real_attention_step.json`](fixtures/real_attention_step.json); [`tests/test_real_attention.py`](tests/test_real_attention.py); log 2026-08-29T18:54:26Z |
+| CPU-014 | Compose complete real GDN and attention decoder layers through their FFN branches | CPU-011, CPU-012, CPU-013 | done | Layer-0 GDN→FFN and layer-3 attention→FFN use the post-mixer residual, preserve exact branch order, meet frozen taps, and reject malformed FFN storage before persistent mixer-state mutation | [`src/scheduler.cpp`](src/scheduler.cpp); [`fixtures/real_layer_composition.json`](fixtures/real_layer_composition.json); [`tests/test_real_layer_composition.py`](tests/test_real_layer_composition.py); log 2026-08-30T06:31:18Z |
 | CPU-002 | Implement scalar GDN oracle | CPU-001, MDL-002 | done | Warm-up, recurrence, state, head mapping, and chunk-boundary fixtures pass | [`src/gdn.cpp`](src/gdn.cpp); [`fixtures/gdn_authority.json`](fixtures/gdn_authority.json); [`tests/test_gdn.py`](tests/test_gdn.py); log 2026-08-29T12:26:00Z |
 | CPU-003 | Implement scalar attention and FFN oracle | CPU-001, MDL-002 | done | Layers 3/7/63, partial RoPE, grouped KV, causality, and FFN taps pass | [`src/attention.cpp`](src/attention.cpp); [`fixtures/attention_ffn_authority.json`](fixtures/attention_ffn_authority.json); [`tests/test_attention.py`](tests/test_attention.py); log 2026-08-29T12:54:00Z |
-| CPU-004 | Implement full scalar 64-layer scheduler and logits | CPU-002, CPU-003, CPU-005, CPU-006, CPU-007, CPU-008, CPU-009, CPU-010, CPU-011, CPU-012, CPU-013 | pending | Token/chunk execution and logits match semantic-authority fixtures | — |
+| CPU-004 | Implement full scalar 64-layer scheduler and logits | CPU-002, CPU-003, CPU-005, CPU-006, CPU-007, CPU-008, CPU-009, CPU-010, CPU-011, CPU-012, CPU-013, CPU-014 | pending | Token/chunk execution and logits match semantic-authority fixtures | — |
 | TRC-001 | Define versioned trace bundle and typed comparison metrics | PIN-002 | pending | Manifest/blob schema, checksums, summaries, session frontiers, and metric reporter pass tests | — |
 | TRC-002 | Add diagnostic-only stable scalar/CUDA taps | TRC-001, CPU-004 | pending | Required taps filter by layer/name and are absent from release builds | — |
 | ORA-001 | Generate and freeze scalar/oracle fixtures and tolerances | TOK-002, CPU-004, TRC-002 | pending | Three authorities are attributed; tolerances and greedy tie exceptions are immutable inputs | — |
@@ -79,6 +80,7 @@ are repository-relative unless stated otherwise.
 | EDU-012 | Explain a complete real GDN mixer layer update for beginners | CPU-011, DOC-001 | done | Input norm, convolution state, physical/semantic head order, recurrence state, gated norm, output projection, residual, atomicity boundary, and evidence taps are code-linked and worked | [`docs/26-real-gdn-layer.md`](docs/26-real-gdn-layer.md); [`tests/test_real_gdn.py`](tests/test_real_gdn.py); log 2026-08-29T18:33:00Z |
 | EDU-013 | Explain a complete real SwiGLU FFN branch for beginners | CPU-012, DOC-001 | done | Post-mixer norm, gate/up/down roles, SiLU and elementwise product, intermediate width, Q4_K cost, workspace, residual, evidence limits, and layer boundary are code-linked and worked | [`docs/27-real-ffn-layer.md`](docs/27-real-ffn-layer.md); [`tests/test_real_ffn.py`](tests/test_real_ffn.py); log 2026-08-29T18:46:07Z |
 | EDU-014 | Explain real grouped-query attention and KV mutation for beginners | CPU-013, DOC-001 | done | Query/key/value, head normalization, partial RoPE, grouped head mapping, causal scores/softmax, KV ownership, output gate/projection, residual, and atomicity are code-linked and worked | [`docs/28-real-attention-layer.md`](docs/28-real-attention-layer.md); [`tests/test_real_attention.py`](tests/test_real_attention.py); log 2026-08-29T18:54:26Z |
+| EDU-015 | Explain complete decoder-layer composition for beginners | CPU-014, DOC-001 | done | Mixer→residual→post-mixer norm→SwiGLU→residual order, layer variants, buffer reuse, preflight validation, state mutation, and scheduler boundary are code-linked and worked | [`docs/29-complete-decoder-layer.md`](docs/29-complete-decoder-layer.md); [`tests/test_real_layer_composition.py`](tests/test_real_layer_composition.py); log 2026-08-30T06:31:18Z |
 | REL-001 | Publish reproducible release evidence bundle | CMP-003, QLT-001, DOC-001 | pending | Builds, hashes, raw results, reports, and documentation claims reconcile | — |
 
 ## Delivery-Gate Mapping
@@ -1112,6 +1114,66 @@ are repository-relative unless stated otherwise.
   KV mutation order, overflow/count validation, physical-row hashes, output and
   residual proof limits, beginner documentation, and clean host/container
   verification before committing.
+
+### 2026-08-30T06:25:03Z — CPU-014 layer composition started
+
+- Commit `f5837e7` (`feat: execute real attention steps`) is present on both
+  `main` and `origin/main`; the worktree was clean before this task began.
+- Added CPU-014 before implementation and made it a CPU-004 dependency. The
+  admitted mixer and FFN branches currently run only as separate diagnostics;
+  the new boundary must prove that the mixer residual—not the original layer
+  input—feeds post-mixer RMSNorm and SwiGLU for both layer kinds.
+- The scheduler-facing layer wrapper will preflight the complete FFN storage
+  contract before invoking a state-mutating GDN or attention mixer. This covers
+  deterministic caller errors without claiming rollback for a hypothetical
+  failure after validated persistent-state mutation; SES-002 remains responsible
+  for transactional session commit.
+- Added EDU-015 so branch order, the two residual additions, GDN versus attention
+  state, temporary buffer reuse, validation order, and the remaining full-model
+  boundary are explained alongside the implementation.
+
+### 2026-08-30T06:31:18Z — CPU-014 and EDU-015 accepted
+
+- Added explicit scalar scheduler-layer types for GDN and attention parameters,
+  state, mixer workspace, the 5,120-value post-mixer handoff, shared FFN
+  workspace, and final output. The layer entry points preserve the pinned
+  pre-norm mixer → first residual → post-mixer pre-norm SwiGLU → second residual
+  order without a generic operator registry or backend inheritance.
+- Separated FFN structural validation from arithmetic. Both layer wrappers
+  preflight the complete FFN and final-output contract before invoking a
+  state-mutating mixer. One-value-short FFN activation storage is rejected with
+  GDN convolution/recurrent state or attention KV and final output untouched.
+- Layer-0 and two-position layer-3 diagnostics execute every production-sized
+  mixer and FFN value. Their post-mixer selected lanes are bit-identical to the
+  separately admitted mixer diagnostics; final selected lanes equal exact FP32
+  post-mixer plus FFN-correction additions.
+- Frozen post-mixer, FFN norm/gate/up/SwiGLU/correction, and layer-output taps are
+  stored as an explicitly labeled native composition regression. It proves the
+  wrapper handoff and order but does not claim to replace the pending direct
+  Transformers full-layer trace.
+- Added a beginner chapter explaining a decoder layer, pre-norm, both residual
+  branches, why FFN must consume the first residual, GDN versus attention state,
+  parameter/state/workspace/output lifetimes, exact scalar memory totals,
+  validation order, a four-value worked analogy, evidence limits, and the
+  remaining full-model scheduler boundary.
+- Measured real composed diagnostics were 0.65 s / 297,120 KiB maximum RSS for
+  layer 0 and 0.97 s / 274,720 KiB for the two-position layer 3 run. Fixture
+  capture completed in 1.26 s with 297,280 KiB maximum RSS.
+- Commands: Ruff format/check, fixture regeneration and JSON validation,
+  focused 20-test real-branch suite, clean restricted C++17 build, 69 pytest
+  tests, `git diff --check`, pinned CUDA 13.0.2 full build, SM120 compilation,
+  and RTX 5090 probe — passed. Probe values were 33,671,348,224 total and
+  33,139,458,048 free bytes.
+- Marked CPU-014 and EDU-015 done. CPU-004 still requires cross-layer schedule
+  ownership, embedding lookup, all 64 state slots, final norm, vocabulary logits,
+  and token/chunk execution.
+
+### 2026-08-30T06:31:45Z — Layer-composition commit boundary
+
+- Reviewed both layer kinds, scheduler-visible types, exact branch and residual
+  order, preflight-before-state behavior, full-workspace finite checks, native
+  fixture labeling, memory arithmetic, beginner documentation, and clean
+  host/container verification before committing.
 
 ## Decisions and Negative Results
 

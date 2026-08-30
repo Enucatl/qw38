@@ -280,11 +280,11 @@ Status prepare_ffn_scalar_parameters(
                        parameters.norm_count);
 }
 
-Status execute_ffn_step(
-    const CommonLayerWeights& weights, const FfnScalarParameters& parameters,
-    const float* residual, std::size_t residual_count,
-    const FfnStepWorkspace& workspace, float* output,
-    std::size_t output_count) noexcept {
+Status validate_ffn_step(const FfnScalarParameters& parameters,
+                         const float* residual,
+                         std::size_t residual_count,
+                         const FfnStepWorkspace& workspace, float* output,
+                         std::size_t output_count) noexcept {
   if (parameters.norm == nullptr || parameters.norm_count != kResidualWidth ||
       residual == nullptr || residual_count != kResidualWidth ||
       workspace.normalized == nullptr ||
@@ -298,8 +298,19 @@ Status execute_ffn_step(
     return {StatusCode::kInvalidArgument,
             "FFN parameters, activation, or workspace are invalid"};
   }
-  Status status = rms_norm_scale(residual, parameters.norm, residual_count,
-                                 workspace.normalized);
+  return Status::ok();
+}
+
+Status execute_ffn_step(
+    const CommonLayerWeights& weights, const FfnScalarParameters& parameters,
+    const float* residual, std::size_t residual_count,
+    const FfnStepWorkspace& workspace, float* output,
+    std::size_t output_count) noexcept {
+  Status status = validate_ffn_step(parameters, residual, residual_count,
+                                    workspace, output, output_count);
+  if (!status.is_ok()) return status;
+  status = rms_norm_scale(residual, parameters.norm, residual_count,
+                          workspace.normalized);
   if (status.is_ok()) {
     status = tensor_matvec(weights.ffn_gate, workspace.normalized,
                            workspace.normalized_count, workspace.gate,

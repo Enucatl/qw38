@@ -29,6 +29,9 @@ numeric evidence, and remaining scheduler boundary.
 The [real attention chapter](docs/28-real-attention-layer.md) follows two
 layer-3 positions through partial RoPE, grouped causal lookup, KV mutation,
 output gating, projection, and residual.
+The [complete-layer chapter](docs/29-complete-decoder-layer.md) joins each mixer
+variant to its SwiGLU branch and explains both residuals, validation order,
+memory lifetimes, and the remaining full-scheduler boundary.
 
 ## Build
 
