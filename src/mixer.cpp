@@ -393,7 +393,14 @@ Status execute_attention_mixer_step(
       workspace.attention_output_count != kAttentionQueryWidth ||
       workspace.scores == nullptr || workspace.score_count < state.capacity ||
       workspace.mixer_output == nullptr ||
-      workspace.mixer_output_count != kResidualWidth || output == nullptr ||
+      workspace.mixer_output_count != kResidualWidth ||
+#ifdef QW38_DIAGNOSTIC_TRACE
+      workspace.rope_query == nullptr ||
+      workspace.rope_query_count != kAttentionQueryWidth ||
+      workspace.rope_key == nullptr ||
+      workspace.rope_key_count != kAttentionKvWidth ||
+#endif
+      output == nullptr ||
       output_count != kResidualWidth) {
     return {StatusCode::kInvalidArgument,
             "attention step parameters, state, or workspace are invalid"};
@@ -407,7 +414,12 @@ Status execute_attention_mixer_step(
   }
   if (status.is_ok()) {
     const AttentionShape shape{24, 4, kAttentionHeadWidth, 64, state.capacity};
-    status = attention_decode_step_scale(
+    status =
+#ifdef QW38_DIAGNOSTIC_TRACE
+        attention_decode_step_scale_traced(
+#else
+        attention_decode_step_scale(
+#endif
         shape, position, workspace.projections.query,
         workspace.projections.query_count, workspace.projections.key,
         workspace.projections.key_count, workspace.projections.value,
@@ -416,7 +428,12 @@ Status execute_attention_mixer_step(
         workspace.projections.gate_count, state.key_cache,
         state.key_cache_count, state.value_cache, state.value_cache_count,
         workspace.scores, workspace.score_count, workspace.attention_output,
-        workspace.attention_output_count);
+        workspace.attention_output_count
+#ifdef QW38_DIAGNOSTIC_TRACE
+        , workspace.rope_query, workspace.rope_query_count, workspace.rope_key,
+        workspace.rope_key_count
+#endif
+        );
   }
   if (status.is_ok()) {
     status = tensor_matvec(weights.attention.output,

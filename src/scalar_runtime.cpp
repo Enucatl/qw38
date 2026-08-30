@@ -84,6 +84,10 @@ bool valid_workspace_storage(const ScalarWorkspace& workspace,
          workspace.attention_output.size() == kAttentionQueryWidth &&
          workspace.attention_scores.size() == capacity &&
          workspace.attention_mixer_output.size() == kResidualWidth &&
+#ifdef QW38_DIAGNOSTIC_TRACE
+         workspace.attention_rope_query.size() == kAttentionQueryWidth &&
+         workspace.attention_rope_key.size() == kAttentionKvWidth &&
+#endif
          workspace.ffn_normalized.size() == kResidualWidth &&
          workspace.ffn_gate.size() == kFfnWidth &&
          workspace.ffn_up.size() == kFfnWidth &&
@@ -91,6 +95,20 @@ bool valid_workspace_storage(const ScalarWorkspace& workspace,
          workspace.ffn_correction.size() == kResidualWidth &&
          workspace.final_normalized.size() == kResidualWidth;
 }
+
+#ifdef QW38_DIAGNOSTIC_TRACE
+Status offer_trace(const TraceFilter* filter, TraceSink sink, void* context,
+                   const char* name, std::size_t layer, const float* values,
+                   std::size_t count, std::size_t first,
+                   std::size_t second = 0,
+                   std::size_t third = 0) noexcept {
+  if (filter == nullptr) return Status::ok();
+  const std::size_t rank = third != 0 ? 3 : (second != 0 ? 2 : 1);
+  return emit_trace_tensor(*filter, sink, context,
+                           {name, layer, values, count, {first, second, third},
+                            rank});
+}
+#endif
 
 }  // namespace
 
@@ -259,6 +277,10 @@ Status create_scalar_workspace(std::size_t capacity,
   candidate.attention_output.resize(kAttentionQueryWidth);
   candidate.attention_scores.resize(capacity);
   candidate.attention_mixer_output.resize(kResidualWidth);
+#ifdef QW38_DIAGNOSTIC_TRACE
+  candidate.attention_rope_query.resize(kAttentionQueryWidth);
+  candidate.attention_rope_key.resize(kAttentionKvWidth);
+#endif
 
   candidate.ffn_normalized.resize(kResidualWidth);
   candidate.ffn_gate.resize(kFfnWidth);
@@ -327,7 +349,13 @@ Status create_scalar_workspace(std::size_t capacity,
       candidate.attention_scores.data(),
       candidate.attention_scores.size(),
       candidate.attention_mixer_output.data(),
-      candidate.attention_mixer_output.size()};
+      candidate.attention_mixer_output.size()
+#ifdef QW38_DIAGNOSTIC_TRACE
+      , candidate.attention_rope_query.data(),
+      candidate.attention_rope_query.size(), candidate.attention_rope_key.data(),
+      candidate.attention_rope_key.size()
+#endif
+  };
   candidate.attention = {attention_mixer, ffn, candidate.post_mixer.data(),
                          candidate.post_mixer.size()};
   candidate.output = {candidate.final_normalized.data(),
@@ -338,11 +366,16 @@ Status create_scalar_workspace(std::size_t capacity,
   return Status::ok();
 }
 
-Status execute_scalar_token(const ModelWeights& weights,
-                            const ScalarModelParameters& parameters,
-                            std::size_t token, ScalarSessionState* state,
-                            ScalarWorkspace* workspace, float* logits,
-                            std::size_t logits_count) noexcept {
+namespace {
+
+Status execute_scalar_token_impl(
+    const ModelWeights& weights, const ScalarModelParameters& parameters,
+    std::size_t token, ScalarSessionState* state, ScalarWorkspace* workspace,
+    float* logits, std::size_t logits_count
+#ifdef QW38_DIAGNOSTIC_TRACE
+    , const TraceFilter* filter, TraceSink sink, void* sink_context
+#endif
+    ) noexcept {
   if (state == nullptr || workspace == nullptr || token >= kVocabularySize ||
       logits == nullptr || logits_count != kVocabularySize ||
       !valid_parameter_storage(parameters) || !valid_state_storage(*state) ||
@@ -362,6 +395,13 @@ Status execute_scalar_token(const ModelWeights& weights,
   workspace->layers_completed = 0;
   Status status = embed_token(weights, token, workspace->activation_a.data(),
                               workspace->activation_a.size());
+#ifdef QW38_DIAGNOSTIC_TRACE
+  if (status.is_ok()) {
+    status = offer_trace(filter, sink, sink_context, "embedding",
+                         kTraceAllLayers, workspace->activation_a.data(),
+                         kResidualWidth, kResidualWidth);
+  }
+#endif
   float* input = workspace->activation_a.data();
   float* output = workspace->activation_b.data();
   for (std::size_t layer = 0; status.is_ok() && layer < kModelLayerCount;
@@ -377,6 +417,97 @@ Status execute_scalar_token(const ModelWeights& weights,
           state->gdn[layer], workspace->gdn, output, kResidualWidth);
     }
     if (status.is_ok()) {
+#ifdef QW38_DIAGNOSTIC_TRACE
+      if (weights.layers[layer].kind == LayerKind::kAttention) {
+        const std::size_t row = state->frontier * kAttentionKvWidth;
+        status = offer_trace(filter, sink, sink_context, "input_norm", layer,
+                             workspace->attention_normalized.data(),
+                             kResidualWidth, kResidualWidth);
+        if (status.is_ok()) status = offer_trace(filter, sink, sink_context,
+            "attention.packed_query_gate", layer,
+            workspace->attention_packed.data(), kAttentionPackedQueryGateWidth,
+            kAttentionPackedQueryGateWidth);
+        if (status.is_ok()) status = offer_trace(filter, sink, sink_context,
+            "attention.query", layer, workspace->attention_query.data(),
+            kAttentionQueryWidth, 24, kAttentionHeadWidth);
+        if (status.is_ok()) status = offer_trace(filter, sink, sink_context,
+            "attention.key", layer, workspace->attention_key.data(),
+            kAttentionKvWidth, 4, kAttentionHeadWidth);
+        if (status.is_ok()) status = offer_trace(filter, sink, sink_context,
+            "attention.rope_query", layer,
+            workspace->attention_rope_query.data(), kAttentionQueryWidth, 24,
+            kAttentionHeadWidth);
+        if (status.is_ok()) status = offer_trace(filter, sink, sink_context,
+            "attention.rope_key", layer, workspace->attention_rope_key.data(),
+            kAttentionKvWidth, 4, kAttentionHeadWidth);
+        if (status.is_ok()) status = offer_trace(filter, sink, sink_context,
+            "attention.value", layer, workspace->attention_value.data(),
+            kAttentionKvWidth, 4, kAttentionHeadWidth);
+        if (status.is_ok()) status = offer_trace(filter, sink, sink_context,
+            "attention.kv_key_row", layer,
+            state->attention[layer].key_cache + row, kAttentionKvWidth, 4,
+            kAttentionHeadWidth);
+        if (status.is_ok()) status = offer_trace(filter, sink, sink_context,
+            "attention.kv_value_row", layer,
+            state->attention[layer].value_cache + row, kAttentionKvWidth, 4,
+            kAttentionHeadWidth);
+        if (status.is_ok()) status = offer_trace(filter, sink, sink_context,
+            "attention.context", layer, workspace->attention_output.data(),
+            kAttentionQueryWidth, 24, kAttentionHeadWidth);
+        if (status.is_ok()) status = offer_trace(filter, sink, sink_context,
+            "attention.output", layer, workspace->attention_mixer_output.data(),
+            kResidualWidth, kResidualWidth);
+      } else {
+        status = offer_trace(filter, sink, sink_context, "input_norm", layer,
+                             workspace->gdn_normalized.data(), kResidualWidth,
+                             kResidualWidth);
+        if (status.is_ok()) status = offer_trace(filter, sink, sink_context,
+            "gdn.packed_qkv", layer, workspace->gdn_packed.data(),
+            kGdnPackedQkvWidth, kGdnPackedQkvWidth);
+        if (status.is_ok()) status = offer_trace(filter, sink, sink_context,
+            "gdn.convolution", layer, workspace->gdn_convolved.data(),
+            kGdnPackedQkvWidth, kGdnPackedQkvWidth);
+        if (status.is_ok()) status = offer_trace(filter, sink, sink_context,
+            "gdn.query", layer, workspace->gdn_query.data(), kGdnKeyWidth, 16,
+            kGdnHeadWidth);
+        if (status.is_ok()) status = offer_trace(filter, sink, sink_context,
+            "gdn.key", layer, workspace->gdn_key.data(), kGdnKeyWidth, 16,
+            kGdnHeadWidth);
+        if (status.is_ok()) status = offer_trace(filter, sink, sink_context,
+            "gdn.recurrent_output", layer,
+            workspace->gdn_recurrent_output.data(), kGdnValueWidth, 48,
+            kGdnHeadWidth);
+        if (status.is_ok()) status = offer_trace(filter, sink, sink_context,
+            "gdn.recurrent_state", layer, state->gdn[layer].recurrent,
+            kGdnRecurrentStateValues, 48, kGdnHeadWidth, kGdnHeadWidth);
+        if (status.is_ok()) status = offer_trace(filter, sink, sink_context,
+            "gdn.convolution_state", layer, state->gdn[layer].convolution,
+            kGdnConvolutionValues, 4, kGdnPackedQkvWidth);
+        if (status.is_ok()) status = offer_trace(filter, sink, sink_context,
+            "gdn.output", layer, workspace->gdn_mixer_output.data(),
+            kResidualWidth, kResidualWidth);
+      }
+      if (status.is_ok()) status = offer_trace(filter, sink, sink_context,
+          "mixer_residual", layer, workspace->post_mixer.data(), kResidualWidth,
+          kResidualWidth);
+      if (status.is_ok()) status = offer_trace(filter, sink, sink_context,
+          "ffn.input_norm", layer, workspace->ffn_normalized.data(),
+          kResidualWidth, kResidualWidth);
+      if (status.is_ok()) status = offer_trace(filter, sink, sink_context,
+          "ffn.gate", layer, workspace->ffn_gate.data(), kFfnWidth, kFfnWidth);
+      if (status.is_ok()) status = offer_trace(filter, sink, sink_context,
+          "ffn.up", layer, workspace->ffn_up.data(), kFfnWidth, kFfnWidth);
+      if (status.is_ok()) status = offer_trace(filter, sink, sink_context,
+          "ffn.activated", layer, workspace->ffn_activated.data(), kFfnWidth,
+          kFfnWidth);
+      if (status.is_ok()) status = offer_trace(filter, sink, sink_context,
+          "ffn.correction", layer, workspace->ffn_correction.data(),
+          kResidualWidth, kResidualWidth);
+      if (status.is_ok()) status = offer_trace(filter, sink, sink_context,
+          "layer_residual", layer, output, kResidualWidth, kResidualWidth);
+#endif
+    }
+    if (status.is_ok()) {
       ++workspace->layers_completed;
       std::swap(input, output);
     }
@@ -385,8 +516,52 @@ Status execute_scalar_token(const ModelWeights& weights,
   status = project_logits(weights, parameters.output, input, kResidualWidth,
                           workspace->output, logits, logits_count);
   if (!status.is_ok()) return status;
+#ifdef QW38_DIAGNOSTIC_TRACE
+  status = offer_trace(filter, sink, sink_context, "final_norm",
+                       kTraceAllLayers, workspace->final_normalized.data(),
+                       kResidualWidth, kResidualWidth);
+  if (status.is_ok()) {
+    status = offer_trace(filter, sink, sink_context, "logits", kTraceAllLayers,
+                         logits, logits_count, logits_count);
+  }
+  if (!status.is_ok()) return status;
+#endif
   ++state->frontier;
   return Status::ok();
 }
+
+}  // namespace
+
+Status execute_scalar_token(const ModelWeights& weights,
+                            const ScalarModelParameters& parameters,
+                            std::size_t token, ScalarSessionState* state,
+                            ScalarWorkspace* workspace, float* logits,
+                            std::size_t logits_count) noexcept {
+  return execute_scalar_token_impl(weights, parameters, token, state, workspace,
+                                   logits, logits_count
+#ifdef QW38_DIAGNOSTIC_TRACE
+                                   , nullptr, nullptr, nullptr
+#endif
+  );
+}
+
+#ifdef QW38_DIAGNOSTIC_TRACE
+Status execute_scalar_token_traced(
+    const ModelWeights& weights, const ScalarModelParameters& parameters,
+    std::size_t token, ScalarSessionState* state, ScalarWorkspace* workspace,
+    float* logits, std::size_t logits_count, const TraceFilter& filter,
+    TraceSink sink, void* sink_context) noexcept {
+  Status status = validate_trace_filter(filter);
+  if (!status.is_ok() || sink == nullptr) {
+    return status.is_ok()
+               ? Status{StatusCode::kInvalidArgument,
+                        "diagnostic scalar trace sink is required"}
+               : status;
+  }
+  return execute_scalar_token_impl(weights, parameters, token, state, workspace,
+                                   logits, logits_count, &filter, sink,
+                                   sink_context);
+}
+#endif
 
 }  // namespace qw38::internal

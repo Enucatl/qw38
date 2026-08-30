@@ -187,6 +187,143 @@ int check_trace_filter(const char* layer_text, const char* tap) {
   std::cout << "matched=" << count << '\n';
   return 0;
 }
+
+struct RawTraceCapture final {
+  const char* path;
+  const char* name = nullptr;
+  std::size_t layer = 0;
+  std::array<std::size_t, qw38::internal::kTraceMaximumRank> shape{};
+  std::size_t rank = 0;
+  std::size_t count = 0;
+};
+
+qw38::Status write_raw_trace_tensor(
+    const qw38::internal::TraceTensorView& tensor, void* context) noexcept {
+  auto* capture = static_cast<RawTraceCapture*>(context);
+  if (capture->count != 0) {
+    return {qw38::StatusCode::kInvalidArgument,
+            "exact scalar trace filter matched more than one tensor"};
+  }
+  std::ofstream output(capture->path, std::ios::binary | std::ios::trunc);
+  if (!output) {
+    return {qw38::StatusCode::kInternal,
+            "cannot create scalar trace tensor output"};
+  }
+  output.write(reinterpret_cast<const char*>(tensor.values),
+               static_cast<std::streamsize>(tensor.value_count * sizeof(float)));
+  output.close();
+  if (!output) {
+    std::remove(capture->path);
+    return {qw38::StatusCode::kInternal,
+            "cannot write scalar trace tensor output"};
+  }
+  capture->name = tensor.name;
+  capture->layer = tensor.layer;
+  capture->shape = tensor.shape;
+  capture->rank = tensor.rank;
+  capture->count = tensor.value_count;
+  return qw38::Status::ok();
+}
+
+bool vector_digest(const std::vector<float>& values, std::string* digest) {
+  return qw38::internal::sha256_bytes(
+             reinterpret_cast<const unsigned char*>(values.data()),
+             values.size() * sizeof(float), digest)
+      .is_ok();
+}
+
+int capture_real_scalar_trace(const char* model_path, const char* token_text,
+                              const char* layer_text, const char* tap,
+                              const char* output_path) {
+  std::size_t token = 0;
+  std::size_t layer = qw38::internal::kTraceAllLayers;
+  if (!parse_size(token_text, &token) ||
+      (std::strcmp(layer_text, "global") != 0 &&
+       !parse_size(layer_text, &layer))) {
+    std::cerr << "invalid_argument: malformed scalar trace token or layer\n";
+    return 1;
+  }
+  std::error_code error;
+  if (std::filesystem::exists(output_path, error) || error) {
+    std::cerr << "invalid_argument: scalar trace output already exists\n";
+    return 1;
+  }
+  const qw38::internal::TraceFilter filter{layer, tap};
+  qw38::Status status = qw38::internal::validate_trace_filter(filter);
+  qw38::internal::ModelInfo info;
+  if (status.is_ok()) status = qw38::internal::inspect_gguf(model_path, &info);
+  if (status.is_ok()) status = qw38::internal::validate_qwen38_contract(&info);
+  qw38::internal::MappedFile mapping;
+  if (status.is_ok()) status = mapping.open(model_path);
+  qw38::internal::ModelWeights weights;
+  if (status.is_ok()) {
+    status = qw38::internal::bind_model_weights(info, mapping, &weights);
+  }
+  qw38::internal::ScalarModelParameters parameters;
+  if (status.is_ok()) {
+    status = qw38::internal::prepare_scalar_model_parameters(weights, &parameters);
+  }
+  qw38::internal::ScalarSessionState state;
+  if (status.is_ok()) {
+    status = qw38::internal::create_scalar_session_state(1, &state);
+  }
+  qw38::internal::ScalarWorkspace workspace;
+  if (status.is_ok()) {
+    status = qw38::internal::create_scalar_workspace(1, &workspace);
+  }
+  std::array<std::string, 4> before;
+  if (status.is_ok() &&
+      (!vector_digest(state.gdn_convolution, &before[0]) ||
+       !vector_digest(state.gdn_recurrent, &before[1]) ||
+       !vector_digest(state.attention_key, &before[2]) ||
+       !vector_digest(state.attention_value, &before[3]))) {
+    status = {qw38::StatusCode::kInternal,
+              "cannot hash scalar state before tracing"};
+  }
+  std::vector<float> logits(qw38::internal::kVocabularySize, NAN);
+  RawTraceCapture capture{output_path};
+  if (status.is_ok()) {
+    status = qw38::internal::execute_scalar_token_traced(
+        weights, parameters, token, &state, &workspace, logits.data(),
+        logits.size(), filter, write_raw_trace_tensor, &capture);
+  }
+  std::array<std::string, 4> after;
+  if (status.is_ok() &&
+      (!vector_digest(state.gdn_convolution, &after[0]) ||
+       !vector_digest(state.gdn_recurrent, &after[1]) ||
+       !vector_digest(state.attention_key, &after[2]) ||
+       !vector_digest(state.attention_value, &after[3]))) {
+    status = {qw38::StatusCode::kInternal,
+              "cannot hash scalar state after tracing"};
+  }
+  if (status.is_ok() && capture.count == 0) {
+    status = {qw38::StatusCode::kInvalidArgument,
+              "scalar trace filter matched no real tensor"};
+  }
+  if (!status.is_ok()) {
+    std::remove(output_path);
+    std::cerr << qw38::status_code_name(status.code()) << ": "
+              << status.message() << '\n';
+    return 1;
+  }
+  std::cout << "tap_name=" << capture.name << "\ntap_layer=" << capture.layer
+            << "\nshape=";
+  for (std::size_t dimension = 0; dimension < capture.rank; ++dimension) {
+    if (dimension != 0) std::cout << ',';
+    std::cout << capture.shape[dimension];
+  }
+  std::cout << "\ncount=" << capture.count << "\ntoken=" << token
+            << "\nposition=0\nfrontier_before=0\nfrontier_after="
+            << state.frontier << '\n';
+  constexpr const char* kStateNames[] = {"gdn_convolution", "gdn_recurrent",
+                                          "attention_key", "attention_value"};
+  for (std::size_t index = 0; index < before.size(); ++index) {
+    std::cout << "state_before_" << kStateNames[index] << "=" << before[index]
+              << "\nstate_after_" << kStateNames[index] << "=" << after[index]
+              << '\n';
+  }
+  return 0;
+}
 #endif
 
 bool parse_float_hex(const std::string& hex, std::vector<float>* values) {
@@ -972,6 +1109,10 @@ int check_real_attention_step(const char* model_path, const std::string& mode) {
                                       NAN);
   std::vector<float> scores(kCapacity, NAN);
   std::vector<float> mixer_output(qw38::internal::kResidualWidth, NAN);
+#ifdef QW38_DIAGNOSTIC_TRACE
+  std::vector<float> rope_query(qw38::internal::kAttentionQueryWidth, NAN);
+  std::vector<float> rope_key(qw38::internal::kAttentionKvWidth, NAN);
+#endif
   std::vector<float> post_mixer(qw38::internal::kResidualWidth, NAN);
   std::vector<float> ffn_normalized(qw38::internal::kResidualWidth, NAN);
   std::vector<float> ffn_gate(qw38::internal::kFfnWidth, NAN);
@@ -995,7 +1136,11 @@ int check_real_attention_step(const char* model_path, const std::string& mode) {
       scores.data(),
       scores.size(),
       mixer_output.data(),
-      mixer_output.size()};
+      mixer_output.size()
+#ifdef QW38_DIAGNOSTIC_TRACE
+      , rope_query.data(), rope_query.size(), rope_key.data(), rope_key.size()
+#endif
+  };
   qw38::internal::FfnStepWorkspace ffn_workspace{
       ffn_normalized.data(), ffn_normalized.size(), ffn_gate.data(),
       ffn_gate.size(), ffn_up.data(), ffn_up.size(), ffn_activated.data(),
@@ -1939,6 +2084,10 @@ int main(int argc, char** argv) {
 #ifdef QW38_DIAGNOSTIC_TRACE
   if (argc == 4 && std::string(argv[1]) == "--check-trace-filter") {
     return check_trace_filter(argv[2], argv[3]);
+  }
+  if (argc == 7 && std::string(argv[1]) == "--capture-real-scalar-trace") {
+    return capture_real_scalar_trace(argv[2], argv[3], argv[4], argv[5],
+                                     argv[6]);
   }
 #endif
   if (argc == 2 && std::string(argv[1]) == "--build-info") {

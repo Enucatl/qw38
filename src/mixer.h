@@ -144,6 +144,12 @@ struct AttentionStepWorkspace final {
   std::size_t score_count;
   float* mixer_output;
   std::size_t mixer_output_count;
+#ifdef QW38_DIAGNOSTIC_TRACE
+  float* rope_query;
+  std::size_t rope_query_count;
+  float* rope_key;
+  std::size_t rope_key_count;
+#endif
 };
 
 Status project_gdn_mixer(const GdnLayerWeights& weights,

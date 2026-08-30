@@ -129,6 +129,13 @@ DSpark are explicitly rejected as Qwen model semantics.
   tensor-view validation, tap registry, filter semantics, and separate
   diagnostic-object build are local infrastructure. Synthetic filter output is
   structural evidence only; it is not a Transformers or llama.cpp trace.
+- TRC-002's scalar increment introduces no new external implementation
+  dependency. It exposes already implemented scalar stages through the local
+  diagnostic sink and wraps them with the local trace-v1 writer. The filtered
+  final-norm check uses the explicitly labeled native structural fixture; direct
+  pinned Transformers and llama.cpp comparison remains ORA-001 work. CUDA tap
+  wiring is deferred to its corresponding kernel gates because no production
+  CUDA model kernel exists yet.
 
 ## Specialization and hardware references
 

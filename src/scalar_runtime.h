@@ -9,6 +9,10 @@
 #include "scheduler.h"
 #include "weights.h"
 
+#ifdef QW38_DIAGNOSTIC_TRACE
+#include "diagnostic_trace.h"
+#endif
+
 namespace qw38::internal {
 
 constexpr std::size_t kGdnLayerCount = 48;
@@ -95,6 +99,10 @@ struct ScalarWorkspace final {
   std::vector<float> attention_output;
   std::vector<float> attention_scores;
   std::vector<float> attention_mixer_output;
+#ifdef QW38_DIAGNOSTIC_TRACE
+  std::vector<float> attention_rope_query;
+  std::vector<float> attention_rope_key;
+#endif
 
   std::vector<float> ffn_normalized;
   std::vector<float> ffn_gate;
@@ -124,6 +132,14 @@ Status execute_scalar_token(const ModelWeights& weights,
                             std::size_t token, ScalarSessionState* state,
                             ScalarWorkspace* workspace, float* logits,
                             std::size_t logits_count) noexcept;
+
+#ifdef QW38_DIAGNOSTIC_TRACE
+Status execute_scalar_token_traced(
+    const ModelWeights& weights, const ScalarModelParameters& parameters,
+    std::size_t token, ScalarSessionState* state, ScalarWorkspace* workspace,
+    float* logits, std::size_t logits_count, const TraceFilter& filter,
+    TraceSink sink, void* sink_context) noexcept;
+#endif
 
 }  // namespace qw38::internal
 

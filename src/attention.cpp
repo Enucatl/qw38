@@ -1,5 +1,6 @@
 #include "attention.h"
 
+#include <algorithm>
 #include <array>
 #include <cmath>
 
@@ -99,7 +100,12 @@ Status attention_decode_step_impl(
     std::size_t gate_count, float* key_cache, std::size_t key_cache_count,
     float* value_cache, std::size_t value_cache_count, float* score_workspace,
     std::size_t score_count, float* output, std::size_t output_count,
-    bool norm_weight_is_offset) noexcept {
+    bool norm_weight_is_offset
+#ifdef QW38_DIAGNOSTIC_TRACE
+    , float* traced_query, std::size_t traced_query_count, float* traced_key,
+    std::size_t traced_key_count
+#endif
+    ) noexcept {
   if (shape.query_heads == 0 || shape.kv_heads == 0 ||
       shape.head_width == 0 || shape.capacity == 0 ||
       shape.query_heads > kMaximumQueryHeads ||
@@ -158,6 +164,18 @@ Status attention_decode_step_impl(
       value_cache[cache_base + lane] = value[head * shape.head_width + lane];
     }
   }
+#ifdef QW38_DIAGNOSTIC_TRACE
+  if ((traced_query == nullptr) != (traced_key == nullptr) ||
+      (traced_query != nullptr &&
+       (traced_query_count != query_values || traced_key_count != kv_values))) {
+    return {StatusCode::kInvalidArgument,
+            "attention traced RoPE buffers are invalid"};
+  }
+  if (traced_query != nullptr) {
+    std::copy_n(normalized_query.data(), query_values, traced_query);
+    std::copy_n(normalized_key.data(), kv_values, traced_key);
+  }
+#endif
 
   const std::size_t group_size = shape.query_heads / shape.kv_heads;
   const float scaling = 1.0F / std::sqrt(static_cast<float>(shape.head_width));
@@ -211,7 +229,11 @@ Status attention_decode_step(
       shape, position, query, query_count, key, key_count, value, value_count,
       query_norm_weight, key_norm_weight, output_gate, gate_count, key_cache,
       key_cache_count, value_cache, value_cache_count, score_workspace,
-      score_count, output, output_count, true);
+      score_count, output, output_count, true
+#ifdef QW38_DIAGNOSTIC_TRACE
+      , nullptr, 0, nullptr, 0
+#endif
+  );
 }
 
 Status attention_decode_step_scale(
@@ -226,8 +248,32 @@ Status attention_decode_step_scale(
       shape, position, query, query_count, key, key_count, value, value_count,
       query_norm_scale, key_norm_scale, output_gate, gate_count, key_cache,
       key_cache_count, value_cache, value_cache_count, score_workspace,
-      score_count, output, output_count, false);
+      score_count, output, output_count, false
+#ifdef QW38_DIAGNOSTIC_TRACE
+      , nullptr, 0, nullptr, 0
+#endif
+  );
 }
+
+#ifdef QW38_DIAGNOSTIC_TRACE
+Status attention_decode_step_scale_traced(
+    const AttentionShape& shape, std::size_t position, const float* query,
+    std::size_t query_count, const float* key, std::size_t key_count,
+    const float* value, std::size_t value_count, const float* query_norm_scale,
+    const float* key_norm_scale, const float* output_gate,
+    std::size_t gate_count, float* key_cache, std::size_t key_cache_count,
+    float* value_cache, std::size_t value_cache_count, float* score_workspace,
+    std::size_t score_count, float* output, std::size_t output_count,
+    float* rope_query, std::size_t rope_query_count, float* rope_key,
+    std::size_t rope_key_count) noexcept {
+  return attention_decode_step_impl(
+      shape, position, query, query_count, key, key_count, value, value_count,
+      query_norm_scale, key_norm_scale, output_gate, gate_count, key_cache,
+      key_cache_count, value_cache, value_cache_count, score_workspace,
+      score_count, output, output_count, false, rope_query, rope_query_count,
+      rope_key, rope_key_count);
+}
+#endif
 
 Status swiglu_ffn(
     const float* input, std::size_t hidden_width,

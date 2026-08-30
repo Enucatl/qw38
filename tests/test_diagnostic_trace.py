@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import json
 import subprocess
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 RELEASE_EVAL = ROOT / "build" / "qw38-eval"
 DIAGNOSTIC_EVAL = ROOT / "build" / "qw38-eval-diagnostic"
+CONTRACT = ROOT / "pins" / "scalar_trace_contract.json"
 
 
 def run_filter(layer: str, tap: str) -> subprocess.CompletedProcess[str]:
@@ -65,3 +67,17 @@ def test_release_binary_has_no_trace_command_or_stable_tap_names() -> None:
     assert b"--check-trace-filter" not in image
     assert b"attention.rope_query" not in image
     assert b"gdn.recurrent_state" not in image
+
+
+def test_every_pinned_tap_is_registered_and_offered_by_scalar_runtime() -> None:
+    contract = json.loads(CONTRACT.read_text())
+    registry = (ROOT / "src/diagnostic_trace.cpp").read_text()
+    runtime = (ROOT / "src/scalar_runtime.cpp").read_text()
+    taps = contract["global_taps"] + contract["layer_taps"]
+
+    assert len({tap["name"] for tap in taps}) == len(taps)
+    for tap in taps:
+        spelling = f'"{tap["name"]}"'
+        assert spelling in registry
+        assert spelling in runtime
+        assert all(dimension > 0 for dimension in tap["shape"])

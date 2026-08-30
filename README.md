@@ -44,6 +44,9 @@ relative, RMS, cosine, non-finite, first-failure, and top-logit evidence.
 The [diagnostic isolation chapter](docs/33-diagnostic-trace-isolation.md) then
 defines stable tap names and exact filters while proving trace machinery is
 absent from the normal binary.
+The [real scalar trace chapter](docs/34-real-scalar-traces.md) maps every tap to
+its execution moment and shape, then follows one filtered real tensor through a
+model-identified, state-aware trace-v1 bundle.
 
 ## Build
 
