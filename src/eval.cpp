@@ -1083,6 +1083,121 @@ int check_real_attention_step(const char* model_path, const std::string& mode) {
   return 0;
 }
 
+int check_real_model_boundaries(const char* model_path,
+                                const std::string& mode) {
+  qw38::internal::ModelInfo info;
+  qw38::Status status = qw38::internal::inspect_gguf(model_path, &info);
+  if (status.is_ok()) status = qw38::internal::validate_qwen38_contract(&info);
+  qw38::internal::MappedFile mapping;
+  if (status.is_ok()) status = mapping.open(model_path);
+  qw38::internal::ModelWeights weights;
+  if (status.is_ok()) {
+    status = qw38::internal::bind_model_weights(info, mapping, &weights);
+  }
+  if (!status.is_ok()) {
+    std::cerr << qw38::status_code_name(status.code()) << ": "
+              << status.message() << '\n';
+    return 1;
+  }
+  if (mode != "valid" && mode != "invalid_token" &&
+      mode != "invalid_workspace") {
+    std::cerr << "invalid_argument: unknown real-model-boundary mode\n";
+    return 1;
+  }
+
+  std::vector<float> embedding_zero(qw38::internal::kResidualWidth, NAN);
+  std::vector<float> embedding(qw38::internal::kResidualWidth, NAN);
+  std::vector<float> embedding_last(qw38::internal::kResidualWidth, NAN);
+  if (mode == "invalid_token") {
+    status = qw38::internal::embed_token(
+        weights, qw38::internal::kVocabularySize, embedding.data(),
+        embedding.size());
+    const bool untouched = std::all_of(
+        embedding.begin(), embedding.end(),
+        [](float value) { return std::isnan(value); });
+    std::cout << "embedding_untouched=" << (untouched ? 1 : 0) << '\n';
+    std::cerr << qw38::status_code_name(status.code()) << ": "
+              << status.message() << '\n';
+    return status.is_ok() ? 0 : 1;
+  }
+  status = qw38::internal::embed_token(weights, 0, embedding_zero.data(),
+                                       embedding_zero.size());
+  if (status.is_ok()) {
+    status = qw38::internal::embed_token(weights, 42, embedding.data(),
+                                         embedding.size());
+  }
+  if (status.is_ok()) {
+    status = qw38::internal::embed_token(
+        weights, qw38::internal::kVocabularySize - 1, embedding_last.data(),
+        embedding_last.size());
+  }
+
+  std::vector<float> output_norm(qw38::internal::kResidualWidth);
+  const qw38::internal::OutputScalarParameters parameters{output_norm.data(),
+                                                           output_norm.size()};
+  if (status.is_ok()) {
+    status =
+        qw38::internal::prepare_output_scalar_parameters(weights, parameters);
+  }
+  std::vector<float> normalized(qw38::internal::kResidualWidth, NAN);
+  std::vector<float> logits(qw38::internal::kVocabularySize, NAN);
+  qw38::internal::OutputWorkspace workspace{normalized.data(),
+                                            normalized.size()};
+  if (mode == "invalid_workspace") --workspace.normalized_count;
+  if (status.is_ok()) {
+    status = qw38::internal::project_logits(
+        weights, parameters, embedding.data(), embedding.size(), workspace,
+        logits.data(), logits.size());
+  }
+  if (!status.is_ok()) {
+    if (mode == "invalid_workspace") {
+      const bool normalized_untouched = std::all_of(
+          normalized.begin(), normalized.end(),
+          [](float value) { return std::isnan(value); });
+      const bool logits_untouched = std::all_of(
+          logits.begin(), logits.end(),
+          [](float value) { return std::isnan(value); });
+      std::cout << "normalized_untouched=" << (normalized_untouched ? 1 : 0)
+                << '\n';
+      std::cout << "logits_untouched=" << (logits_untouched ? 1 : 0) << '\n';
+    }
+    std::cerr << qw38::status_code_name(status.code()) << ": "
+              << status.message() << '\n';
+    return 1;
+  }
+  const auto finite = [](const std::vector<float>& values) {
+    return std::all_of(values.begin(), values.end(),
+                       [](float value) { return std::isfinite(value); });
+  };
+  if (!finite(embedding_zero) || !finite(embedding) ||
+      !finite(embedding_last) || !finite(normalized) || !finite(logits)) {
+    std::cerr << "internal: model boundary left a nonfinite value\n";
+    return 1;
+  }
+  const auto taps = [](const std::vector<float>& values,
+                       std::initializer_list<std::size_t> indices) {
+    std::vector<float> selected;
+    selected.reserve(indices.size());
+    for (std::size_t index : indices) selected.push_back(values[index]);
+    return selected;
+  };
+  const std::initializer_list<std::size_t> kHiddenTaps{0, 1, 2559, 5119};
+  const std::initializer_list<std::size_t> kLogitTaps{0, 1, 42, 1000, 248319};
+  write_float_vector("embedding_0_f32_le_hex",
+                     taps(embedding_zero, kHiddenTaps));
+  write_float_vector("embedding_42_f32_le_hex",
+                     taps(embedding, kHiddenTaps));
+  write_float_vector("embedding_last_f32_le_hex",
+                     taps(embedding_last, kHiddenTaps));
+  write_float_vector("final_normalized_f32_le_hex",
+                     taps(normalized, kHiddenTaps));
+  write_float_vector("logits_f32_le_hex", taps(logits, kLogitTaps));
+  const auto greedy = std::max_element(logits.begin(), logits.end());
+  std::cout << "greedy_token=" << std::distance(logits.begin(), greedy) << '\n';
+  std::cout << "logit_count=" << logits.size() << '\n';
+  return 0;
+}
+
 float fixture_query(std::size_t token, std::size_t head, std::size_t lane) {
   const int numerator =
       static_cast<int>((token * 11 + head * 7 + lane * 3) % 19) - 9;
@@ -1695,6 +1810,9 @@ int main(int argc, char** argv) {
   if (argc == 4 && std::string(argv[1]) == "--check-real-attention-step") {
     return check_real_attention_step(argv[2], argv[3]);
   }
+  if (argc == 4 && std::string(argv[1]) == "--check-real-model-boundaries") {
+    return check_real_model_boundaries(argv[2], argv[3]);
+  }
   if (argc == 3 && std::string(argv[1]) == "--check-attention") {
     return check_attention(std::atoi(argv[2]));
   }
@@ -1720,6 +1838,7 @@ int main(int argc, char** argv) {
                "--check-real-gdn-step MODEL MODE, "
                "--check-real-ffn-step MODEL MODE, "
                "--check-real-attention-step MODEL MODE, "
+               "--check-real-model-boundaries MODEL MODE, "
                "--check-ffn LAYER, --check-matvec KIND COLUMNS ROWS PAYLOAD "
                "ACTIVATION, or --check-tensor-row MODEL NAME ROW\n";
   return 2;

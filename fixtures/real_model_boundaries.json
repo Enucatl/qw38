@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "model_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+  "authority": "independently decoded pinned GGUF embedding and output rows with direct-scale FP32 final RMSNorm",
+  "tolerances": {
+    "absolute": 3e-06,
+    "relative": 3e-05,
+    "rms": 1e-06
+  },
+  "embedding_rows": [
+    0,
+    42,
+    248319
+  ],
+  "logit_rows": [
+    0,
+    1,
+    42,
+    1000,
+    248319
+  ],
+  "embedding_0_f32_le_hex": "0062a63b000272bc400dbfbc0038083b",
+  "embedding_42_f32_le_hex": "8034c9bcc0180d3d003053bc0080383c",
+  "embedding_last_f32_le_hex": "00f9c7bb0025703b00483a3a0060c83a",
+  "final_normalized_f32_le_hex": "97e355c05cdb8540c9eaedbf2051bc3f",
+  "logits_f32_le_hex": "fff5a1c0e9c298c0de3e3840490e8e3f0853623e",
+  "row_sha256": {
+    "token_embd.weight": {
+      "0": "c1795850b672078daca4ce8724969cc019becb56ea6a2f201f14b99663d78bb3",
+      "42": "620dc7836b06f21309f5668d1a55e6254f06d93083528119d9c30ec4358cd4ad",
+      "248319": "4fe63ae699cd893e0f1d31c50eea30ee37893185e05a40e8dfa9a5add7a8df8c"
+    },
+    "output.weight": {
+      "0": "a4ec4b69ed12c751c09b0831ac1778ff193bd460b0f161f6ca7a0ea7cebffe09",
+      "1": "8443801d81c2706613ac5467e30ab920a1dc68a527d45b09203df55a868a39c2",
+      "42": "d453e8cec0db52e21c7ec0f4867ded9608542f16b70bf2e8d03958ea633d1f0d",
+      "1000": "f8a00c3803b5c8f1fa7b7365b1eb04a210af607710158864ed940c4fc85c40a5",
+      "248319": "726bcf5590fd3b4c1762ccde2fb3c198b808798714678c3e902c6f218996cb4a"
+    }
+  }
+}

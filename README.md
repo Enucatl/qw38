@@ -32,6 +32,9 @@ output gating, projection, and residual.
 The [complete-layer chapter](docs/29-complete-decoder-layer.md) joins each mixer
 variant to its SwiGLU branch and explains both residuals, validation order,
 memory lifetimes, and the remaining full-scheduler boundary.
+The [embedding and logits chapter](docs/30-embeddings-and-logits.md) explains how
+token IDs become hidden vectors and how final normalized state becomes all
+248,320 vocabulary scores.
 
 ## Build
 

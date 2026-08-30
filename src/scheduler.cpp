@@ -1,5 +1,7 @@
 #include "scheduler.h"
 
+#include "attention.h"
+
 namespace qw38::internal {
 namespace {
 
@@ -17,6 +19,50 @@ Status validate_layer_ffn(const FfnScalarParameters& parameters,
 }
 
 }  // namespace
+
+Status embed_token(const ModelWeights& weights, std::size_t token,
+                   float* output, std::size_t output_count) noexcept {
+  if (token >= kVocabularySize || output == nullptr ||
+      output_count != kResidualWidth) {
+    return {StatusCode::kInvalidArgument,
+            "token ID or embedding output is invalid"};
+  }
+  return tensor_row_decode(weights.token_embedding, token, output,
+                           output_count);
+}
+
+Status prepare_output_scalar_parameters(
+    const ModelWeights& weights,
+    const OutputScalarParameters& parameters) noexcept {
+  if (parameters.norm == nullptr || parameters.norm_count != kResidualWidth) {
+    return {StatusCode::kInvalidArgument,
+            "output scalar parameter buffer is invalid"};
+  }
+  return vector_decode(weights.output_norm, parameters.norm,
+                       parameters.norm_count);
+}
+
+Status project_logits(const ModelWeights& weights,
+                      const OutputScalarParameters& parameters,
+                      const float* hidden, std::size_t hidden_count,
+                      const OutputWorkspace& workspace, float* logits,
+                      std::size_t logits_count) noexcept {
+  if (parameters.norm == nullptr || parameters.norm_count != kResidualWidth ||
+      hidden == nullptr || hidden_count != kResidualWidth ||
+      workspace.normalized == nullptr ||
+      workspace.normalized_count != kResidualWidth || logits == nullptr ||
+      logits_count != kVocabularySize) {
+    return {StatusCode::kInvalidArgument,
+            "final hidden, output workspace, or logits are invalid"};
+  }
+  Status status = rms_norm_scale(hidden, parameters.norm, hidden_count,
+                                 workspace.normalized);
+  if (status.is_ok()) {
+    status = tensor_matvec(weights.output, workspace.normalized,
+                           workspace.normalized_count, logits, logits_count);
+  }
+  return status;
+}
 
 Status prepare_gdn_layer_scalar_parameters(
     const LayerWeights& weights,

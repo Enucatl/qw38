@@ -54,7 +54,8 @@ for language and host portability decisions.
 27. [One real SwiGLU FFN branch](27-real-ffn-layer.md): post-mixer norm, gate/up/down projections, SiLU, workspace, residual, and evidence limits.
 28. [Real grouped-query attention and KV state](28-real-attention-layer.md): two-position partial RoPE, grouped causal lookup, cache mutation, output gating, and residual.
 29. [Complete decoder-layer composition](29-complete-decoder-layer.md): mixer-to-FFN handoff, two residuals, layer variants, validation order, and scheduler boundary.
-30. [Source and evidence ledger](sources.md).
+30. [Embeddings and logits](30-embeddings-and-logits.md): token-row lookup, hidden vectors, final norm, vocabulary scores, greedy choice, and proof limits.
+31. [Source and evidence ledger](sources.md).
 
 Claims use four labels: **Measured** (this exact artifact and hardware),
 **External** (a linked source), **Estimated** (reproducible arithmetic), and

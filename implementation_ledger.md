@@ -34,9 +34,10 @@ are repository-relative unless stated otherwise.
 | CPU-012 | Execute one complete real Q4_K SwiGLU FFN branch and residual | CPU-003, CPU-008, CPU-011 | done | Direct-scale FFN norm, complete gate/up/down projections, SwiGLU taps, exact workspace, residual addition, and malformed workspace behavior pass frozen evidence | [`src/mixer.cpp`](src/mixer.cpp); [`fixtures/real_ffn_step.json`](fixtures/real_ffn_step.json); [`tests/test_real_ffn.py`](tests/test_real_ffn.py); log 2026-08-29T18:46:07Z |
 | CPU-013 | Execute real layer-3 grouped-query attention steps, KV mutation, output projection, and residual | CPU-003, CPU-008, CPU-009, CPU-010 | done | Direct-scale norms, packed projection split, partial RoPE, two-position grouped causal attention, KV state, output gate/projection, residual, capacity, and malformed buffers pass frozen evidence | [`src/mixer.cpp`](src/mixer.cpp); [`fixtures/real_attention_step.json`](fixtures/real_attention_step.json); [`tests/test_real_attention.py`](tests/test_real_attention.py); log 2026-08-29T18:54:26Z |
 | CPU-014 | Compose complete real GDN and attention decoder layers through their FFN branches | CPU-011, CPU-012, CPU-013 | done | Layer-0 GDN→FFN and layer-3 attention→FFN use the post-mixer residual, preserve exact branch order, meet frozen taps, and reject malformed FFN storage before persistent mixer-state mutation | [`src/scheduler.cpp`](src/scheduler.cpp); [`fixtures/real_layer_composition.json`](fixtures/real_layer_composition.json); [`tests/test_real_layer_composition.py`](tests/test_real_layer_composition.py); log 2026-08-30T06:31:18Z |
+| CPU-015 | Execute real token embedding lookup, final RMSNorm, and complete FP32 vocabulary logits | CPU-006, CPU-008, CPU-014 | done | Valid token rows decode exactly, out-of-range IDs fail before writes, direct-scale final norm and all 248,320 Q6_K logits are finite, selected logits match independently decoded rows, and malformed workspaces fail closed | [`src/scheduler.cpp`](src/scheduler.cpp); [`fixtures/real_model_boundaries.json`](fixtures/real_model_boundaries.json); [`tests/test_real_model_boundaries.py`](tests/test_real_model_boundaries.py); log 2026-08-30T06:39:56Z |
 | CPU-002 | Implement scalar GDN oracle | CPU-001, MDL-002 | done | Warm-up, recurrence, state, head mapping, and chunk-boundary fixtures pass | [`src/gdn.cpp`](src/gdn.cpp); [`fixtures/gdn_authority.json`](fixtures/gdn_authority.json); [`tests/test_gdn.py`](tests/test_gdn.py); log 2026-08-29T12:26:00Z |
 | CPU-003 | Implement scalar attention and FFN oracle | CPU-001, MDL-002 | done | Layers 3/7/63, partial RoPE, grouped KV, causality, and FFN taps pass | [`src/attention.cpp`](src/attention.cpp); [`fixtures/attention_ffn_authority.json`](fixtures/attention_ffn_authority.json); [`tests/test_attention.py`](tests/test_attention.py); log 2026-08-29T12:54:00Z |
-| CPU-004 | Implement full scalar 64-layer scheduler and logits | CPU-002, CPU-003, CPU-005, CPU-006, CPU-007, CPU-008, CPU-009, CPU-010, CPU-011, CPU-012, CPU-013, CPU-014 | pending | Token/chunk execution and logits match semantic-authority fixtures | — |
+| CPU-004 | Implement full scalar 64-layer scheduler and logits | CPU-002, CPU-003, CPU-005, CPU-006, CPU-007, CPU-008, CPU-009, CPU-010, CPU-011, CPU-012, CPU-013, CPU-014, CPU-015 | pending | Token/chunk execution and logits match semantic-authority fixtures | — |
 | TRC-001 | Define versioned trace bundle and typed comparison metrics | PIN-002 | pending | Manifest/blob schema, checksums, summaries, session frontiers, and metric reporter pass tests | — |
 | TRC-002 | Add diagnostic-only stable scalar/CUDA taps | TRC-001, CPU-004 | pending | Required taps filter by layer/name and are absent from release builds | — |
 | ORA-001 | Generate and freeze scalar/oracle fixtures and tolerances | TOK-002, CPU-004, TRC-002 | pending | Three authorities are attributed; tolerances and greedy tie exceptions are immutable inputs | — |
@@ -81,6 +82,7 @@ are repository-relative unless stated otherwise.
 | EDU-013 | Explain a complete real SwiGLU FFN branch for beginners | CPU-012, DOC-001 | done | Post-mixer norm, gate/up/down roles, SiLU and elementwise product, intermediate width, Q4_K cost, workspace, residual, evidence limits, and layer boundary are code-linked and worked | [`docs/27-real-ffn-layer.md`](docs/27-real-ffn-layer.md); [`tests/test_real_ffn.py`](tests/test_real_ffn.py); log 2026-08-29T18:46:07Z |
 | EDU-014 | Explain real grouped-query attention and KV mutation for beginners | CPU-013, DOC-001 | done | Query/key/value, head normalization, partial RoPE, grouped head mapping, causal scores/softmax, KV ownership, output gate/projection, residual, and atomicity are code-linked and worked | [`docs/28-real-attention-layer.md`](docs/28-real-attention-layer.md); [`tests/test_real_attention.py`](tests/test_real_attention.py); log 2026-08-29T18:54:26Z |
 | EDU-015 | Explain complete decoder-layer composition for beginners | CPU-014, DOC-001 | done | Mixer→residual→post-mixer norm→SwiGLU→residual order, layer variants, buffer reuse, preflight validation, state mutation, and scheduler boundary are code-linked and worked | [`docs/29-complete-decoder-layer.md`](docs/29-complete-decoder-layer.md); [`tests/test_real_layer_composition.py`](tests/test_real_layer_composition.py); log 2026-08-30T06:31:18Z |
+| EDU-016 | Explain embeddings, final normalization, logits, and token choice for beginners | CPU-015, DOC-001 | done | Token IDs versus embeddings, row lookup, hidden vectors, final RMSNorm, vocabulary projection, logits versus probabilities, argmax, workspace/cost, exact bounds, and evidence limits are code-linked and worked | [`docs/30-embeddings-and-logits.md`](docs/30-embeddings-and-logits.md); [`tests/test_real_model_boundaries.py`](tests/test_real_model_boundaries.py); log 2026-08-30T06:39:56Z |
 | REL-001 | Publish reproducible release evidence bundle | CMP-003, QLT-001, DOC-001 | pending | Builds, hashes, raw results, reports, and documentation claims reconcile | — |
 
 ## Delivery-Gate Mapping
@@ -1174,6 +1176,65 @@ are repository-relative unless stated otherwise.
   order, preflight-before-state behavior, full-workspace finite checks, native
   fixture labeling, memory arithmetic, beginner documentation, and clean
   host/container verification before committing.
+
+### 2026-08-30T06:35:08Z — CPU-015 model boundaries started
+
+- Commit `c8f0c02` (`feat: compose complete decoder layers`) is present on both
+  `main` and `origin/main`; the worktree was clean before this task began.
+- Added CPU-015 before implementation and made it a CPU-004 dependency. The
+  typed model already binds the 248,320 × 5,120 Q4_K embedding table, 5,120
+  final direct-scale norm, and 248,320 × 5,120 Q6_K output matrix, but no
+  scheduler-facing operation currently executes them.
+- The new boundary will decode exactly one admitted embedding row, reject token
+  IDs outside `[0, 248320)` before writes, normalize a deterministic final
+  hidden vector, compute every FP32 logit, and independently verify selected
+  physical Q4_K/Q6_K rows. It will not claim that the deterministic vector is a
+  real layer-63 result; cross-layer execution remains CPU-004.
+- Added EDU-016 so token IDs, embeddings, hidden vectors, final normalization,
+  logits, probabilities, greedy selection, vocabulary size, scalar cost,
+  workspace, bounds, and the remaining model boundary are explained alongside
+  implementation.
+
+### 2026-08-30T06:39:56Z — CPU-015 and EDU-016 accepted
+
+- Added scheduler-facing real model boundaries: exact-range Q4_K token embedding
+  row decode, prepared 5,120-value direct final-norm scale, complete final
+  RMSNorm, and the 248,320-row Q6_K FP32 vocabulary projection. Sampling remains
+  separate from raw logits and neither boundary mutates session state.
+- The diagnostic decodes endpoint IDs 0 and 248,319 plus interior ID 42, uses
+  row 42 as an explicitly artificial final-hidden input, computes every native
+  logit, verifies all outputs are finite, and reports the full-vector greedy
+  index and exact count. It does not label those scores as a model continuation.
+- An independent mapped-GGUF generator hashes and decodes all three physical
+  embedding rows, applies float-libm direct-scale RMSNorm, hashes and decodes
+  output rows 0/1/42/1000/248319, and matches native selected logits under frozen
+  absolute, relative, and RMS limits.
+- Token ID 248,320 is rejected before any embedding write. A one-value-short
+  final normalized workspace is rejected before either normalization or logits
+  are written. Exact vocabulary and residual widths are required.
+- Added a beginner chapter explaining token IDs versus text, vocabulary bounds,
+  embedding rows and hidden features, final RMSNorm, output rows, logits versus
+  probabilities, greedy and sampled choices, Q4_K/Q6_K storage, exact scalar
+  cost/workspace, independent evidence, and why this is not yet a continuation.
+- The complete native boundary ran in 2.21 s with 1,045,280 KiB maximum RSS.
+  Independent selected-row fixture generation ran in 0.04 s with 28,800 KiB
+  maximum RSS. The full output performs exactly 1,271,398,400 scalar weight
+  products and emits 970 KiB of FP32 logits.
+- Commands: Ruff format/check, fixture generation and JSON validation, focused
+  14-test boundary/tensor/weight suite, clean restricted C++17 build, 73 pytest
+  tests, `git diff --check`, pinned CUDA 13.0.2 full build, SM120 compilation,
+  and RTX 5090 probe — passed. Probe values were 33,671,348,224 total and
+  33,139,458,048 free bytes.
+- Marked CPU-015 and EDU-016 done. CPU-004 still requires owning all layer
+  parameters/state, iterating the exact 64-layer schedule, joining real embedding
+  to layer 0 and layer 63 to final logits, and token/chunk execution evidence.
+
+### 2026-08-30T06:40:15Z — Model-boundary commit boundary
+
+- Reviewed vocabulary bounds, exact Q4_K/Q6_K typed views, direct final norm,
+  all-logit finite execution, independent row hashes and selected dots,
+  pre-write failures, scalar arithmetic and memory claims, beginner
+  documentation, and clean host/container verification before committing.
 
 ## Decisions and Negative Results
 

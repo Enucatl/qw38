@@ -106,6 +106,13 @@ DSpark are explicitly rejected as Qwen model semantics.
   structural regression is frozen in
   [`fixtures/real_layer_composition.json`](../fixtures/real_layer_composition.json);
   it does not replace the pending independent full-layer trace authority.
+- CPU-015 introduces no new external implementation dependency. It executes the
+  already admitted typed embedding, final-norm, and output views using the
+  pinned Q4_K/Q6_K scalar contracts. Independently decoded endpoint/interior
+  rows, direct-scale normalization, and selected logits are frozen in
+  [`fixtures/real_model_boundaries.json`](../fixtures/real_model_boundaries.json).
+  The deterministic embedding-to-output diagnostic is a boundary proof, not a
+  real 64-layer continuation authority.
 
 ## Specialization and hardware references
 

@@ -9,6 +9,8 @@
 
 namespace qw38::internal {
 
+constexpr std::size_t kVocabularySize = 248320;
+
 struct GdnLayerScalarParameters final {
   GdnScalarParameters mixer;
   FfnScalarParameters ffn;
@@ -32,6 +34,29 @@ struct AttentionLayerWorkspace final {
   float* post_mixer;
   std::size_t post_mixer_count;
 };
+
+struct OutputScalarParameters final {
+  float* norm;
+  std::size_t norm_count;
+};
+
+struct OutputWorkspace final {
+  float* normalized;
+  std::size_t normalized_count;
+};
+
+Status embed_token(const ModelWeights& weights, std::size_t token,
+                   float* output, std::size_t output_count) noexcept;
+
+Status prepare_output_scalar_parameters(
+    const ModelWeights& weights,
+    const OutputScalarParameters& parameters) noexcept;
+
+Status project_logits(const ModelWeights& weights,
+                      const OutputScalarParameters& parameters,
+                      const float* hidden, std::size_t hidden_count,
+                      const OutputWorkspace& workspace, float* logits,
+                      std::size_t logits_count) noexcept;
 
 Status prepare_gdn_layer_scalar_parameters(
     const LayerWeights& weights,
