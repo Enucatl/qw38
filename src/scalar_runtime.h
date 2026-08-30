@@ -133,6 +133,12 @@ Status execute_scalar_token(const ModelWeights& weights,
                             ScalarWorkspace* workspace, float* logits,
                             std::size_t logits_count) noexcept;
 
+Status execute_scalar_chunk(
+    const ModelWeights& weights, const ScalarModelParameters& parameters,
+    const std::size_t* tokens, std::size_t token_count,
+    ScalarSessionState* state, ScalarWorkspace* workspace, float* logits,
+    std::size_t logits_count) noexcept;
+
 #ifdef QW38_DIAGNOSTIC_TRACE
 Status execute_scalar_token_traced(
     const ModelWeights& weights, const ScalarModelParameters& parameters,

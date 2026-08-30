@@ -1572,6 +1572,133 @@ int check_real_scalar_token(const char* model_path, const std::string& mode) {
   return 0;
 }
 
+int check_real_scalar_chunk(const char* model_path, const std::string& mode) {
+  if (mode != "valid" && mode != "invalid_token" &&
+      mode != "insufficient_capacity" && mode != "invalid_logits") {
+    std::cerr << "invalid_argument: unknown real-scalar-chunk mode\n";
+    return 1;
+  }
+  qw38::internal::ModelInfo info;
+  qw38::Status status = qw38::internal::inspect_gguf(model_path, &info);
+  if (status.is_ok()) status = qw38::internal::validate_qwen38_contract(&info);
+  qw38::internal::MappedFile mapping;
+  if (status.is_ok()) status = mapping.open(model_path);
+  qw38::internal::ModelWeights weights;
+  if (status.is_ok()) {
+    status = qw38::internal::bind_model_weights(info, mapping, &weights);
+  }
+  qw38::internal::ScalarModelParameters parameters;
+  if (status.is_ok()) {
+    status = qw38::internal::prepare_scalar_model_parameters(weights, &parameters);
+  }
+  const std::array<std::size_t, 2> tokens{42, 3649};
+  const std::size_t capacity = mode == "insufficient_capacity" ? 1 : 2;
+  qw38::internal::ScalarSessionState chunk_state;
+  if (status.is_ok()) {
+    status = qw38::internal::create_scalar_session_state(capacity, &chunk_state);
+  }
+  qw38::internal::ScalarWorkspace chunk_workspace;
+  if (status.is_ok()) {
+    status = qw38::internal::create_scalar_workspace(capacity, &chunk_workspace);
+  }
+  if (!status.is_ok()) {
+    std::cerr << qw38::status_code_name(status.code()) << ": "
+              << status.message() << '\n';
+    return 1;
+  }
+  std::vector<float> chunk_logits(tokens.size() * qw38::internal::kVocabularySize,
+                                  NAN);
+  std::array<std::size_t, 2> attempted = tokens;
+  if (mode == "invalid_token") attempted[1] = qw38::internal::kVocabularySize;
+  std::size_t logits_count = chunk_logits.size();
+  if (mode == "invalid_logits") --logits_count;
+  status = qw38::internal::execute_scalar_chunk(
+      weights, parameters, attempted.data(), attempted.size(), &chunk_state,
+      &chunk_workspace, chunk_logits.data(), logits_count);
+  if (mode != "valid") {
+    const auto zeros = [](const std::vector<float>& values) {
+      return std::all_of(values.begin(), values.end(),
+                         [](float value) { return value == 0.0F; });
+    };
+    const bool state_unchanged =
+        zeros(chunk_state.gdn_convolution) && zeros(chunk_state.gdn_recurrent) &&
+        zeros(chunk_state.attention_key) && zeros(chunk_state.attention_value);
+    const bool logits_untouched = std::all_of(
+        chunk_logits.begin(), chunk_logits.end(),
+        [](float value) { return std::isnan(value); });
+    std::cout << "state_unchanged=" << (state_unchanged ? 1 : 0)
+              << "\nlogits_untouched=" << (logits_untouched ? 1 : 0)
+              << "\nfrontier=" << chunk_state.frontier
+              << "\nlayers_completed=" << chunk_workspace.layers_completed
+              << '\n';
+    if (status.is_ok()) {
+      std::cerr << "internal: invalid scalar chunk unexpectedly succeeded\n";
+      return 1;
+    }
+    std::cerr << qw38::status_code_name(status.code()) << ": "
+              << status.message() << '\n';
+    return 1;
+  }
+  if (!status.is_ok()) {
+    std::cerr << qw38::status_code_name(status.code()) << ": "
+              << status.message() << '\n';
+    return 1;
+  }
+
+  qw38::internal::ScalarSessionState token_state;
+  status = qw38::internal::create_scalar_session_state(2, &token_state);
+  qw38::internal::ScalarWorkspace token_workspace;
+  if (status.is_ok()) {
+    status = qw38::internal::create_scalar_workspace(2, &token_workspace);
+  }
+  std::vector<float> token_logits(chunk_logits.size(), NAN);
+  for (std::size_t index = 0; status.is_ok() && index < tokens.size(); ++index) {
+    status = qw38::internal::execute_scalar_token(
+        weights, parameters, tokens[index], &token_state, &token_workspace,
+        token_logits.data() + index * qw38::internal::kVocabularySize,
+        qw38::internal::kVocabularySize);
+  }
+  if (!status.is_ok()) {
+    std::cerr << qw38::status_code_name(status.code()) << ": "
+              << status.message() << '\n';
+    return 1;
+  }
+  const bool equivalent =
+      chunk_logits == token_logits &&
+      chunk_state.gdn_convolution == token_state.gdn_convolution &&
+      chunk_state.gdn_recurrent == token_state.gdn_recurrent &&
+      chunk_state.attention_key == token_state.attention_key &&
+      chunk_state.attention_value == token_state.attention_value &&
+      chunk_state.frontier == token_state.frontier &&
+      chunk_workspace.layers_completed == token_workspace.layers_completed;
+  if (!equivalent) {
+    std::cerr << "internal: scalar chunk differs from repeated token execution\n";
+    return 1;
+  }
+  const auto taps = [](const std::vector<float>& values, std::size_t row) {
+    const std::size_t base = row * qw38::internal::kVocabularySize;
+    return std::vector<float>{values[base], values[base + 1],
+                              values[base + 42], values[base + 1000],
+                              values[base + 248319]};
+  };
+  write_float_vector("token0_logits_f32_le_hex", taps(chunk_logits, 0));
+  write_float_vector("token1_logits_f32_le_hex", taps(chunk_logits, 1));
+  for (std::size_t row = 0; row < tokens.size(); ++row) {
+    const auto begin = chunk_logits.begin() +
+                       static_cast<std::ptrdiff_t>(
+                           row * qw38::internal::kVocabularySize);
+    const auto greedy = std::max_element(
+        begin, begin + qw38::internal::kVocabularySize);
+    std::cout << "token" << row << "_greedy="
+              << std::distance(begin, greedy) << '\n';
+  }
+  std::cout << "equivalent=1\ntoken_count=2\nfrontier=" << chunk_state.frontier
+            << "\nlayers_completed=" << chunk_workspace.layers_completed
+            << "\nlogit_rows=2\nlogit_stride="
+            << qw38::internal::kVocabularySize << '\n';
+  return 0;
+}
+
 float fixture_query(std::size_t token, std::size_t head, std::size_t lane) {
   const int numerator =
       static_cast<int>((token * 11 + head * 7 + lane * 3) % 19) - 9;
@@ -2199,6 +2326,9 @@ int main(int argc, char** argv) {
   if (argc == 4 && std::string(argv[1]) == "--check-real-scalar-token") {
     return check_real_scalar_token(argv[2], argv[3]);
   }
+  if (argc == 4 && std::string(argv[1]) == "--check-real-scalar-chunk") {
+    return check_real_scalar_chunk(argv[2], argv[3]);
+  }
   if (argc == 3 && std::string(argv[1]) == "--check-attention") {
     return check_attention(std::atoi(argv[2]));
   }
@@ -2226,6 +2356,7 @@ int main(int argc, char** argv) {
                "--check-real-attention-step MODEL MODE, "
                "--check-real-model-boundaries MODEL MODE, "
                "--check-real-scalar-token MODEL MODE, "
+               "--check-real-scalar-chunk MODEL MODE, "
                "--check-ffn LAYER, --check-matvec KIND COLUMNS ROWS PAYLOAD "
                "ACTIVATION, or --check-tensor-row MODEL NAME ROW\n";
   return 2;

@@ -38,7 +38,7 @@ are repository-relative unless stated otherwise.
 | CPU-016 | Execute one real token through the exact 64-layer scalar schedule and complete logits | CPU-014, CPU-015 | done | Prepared parameters and independent state slots cover 48 GDN/16 attention layers; token embedding flows through layers 0–63, final norm, and all logits; stable boundary taps and state mutations are retained; malformed global storage fails before mutation | [`src/scalar_runtime.cpp`](src/scalar_runtime.cpp); [`fixtures/real_scalar_token.json`](fixtures/real_scalar_token.json); [`tests/test_real_scalar_token.py`](tests/test_real_scalar_token.py); log 2026-08-30T06:53:51Z |
 | CPU-002 | Implement scalar GDN oracle | CPU-001, MDL-002 | done | Warm-up, recurrence, state, head mapping, and chunk-boundary fixtures pass | [`src/gdn.cpp`](src/gdn.cpp); [`fixtures/gdn_authority.json`](fixtures/gdn_authority.json); [`tests/test_gdn.py`](tests/test_gdn.py); log 2026-08-29T12:26:00Z |
 | CPU-003 | Implement scalar attention and FFN oracle | CPU-001, MDL-002 | done | Layers 3/7/63, partial RoPE, grouped KV, causality, and FFN taps pass | [`src/attention.cpp`](src/attention.cpp); [`fixtures/attention_ffn_authority.json`](fixtures/attention_ffn_authority.json); [`tests/test_attention.py`](tests/test_attention.py); log 2026-08-29T12:54:00Z |
-| CPU-004 | Implement full scalar 64-layer scheduler and logits | CPU-002, CPU-003, CPU-005, CPU-006, CPU-007, CPU-008, CPU-009, CPU-010, CPU-011, CPU-012, CPU-013, CPU-014, CPU-015, CPU-016 | pending | Multi-token token-wise and arbitrary chunk execution have exact state/frontier/chunk equivalence and emit logits ready for oracle comparison | — |
+| CPU-004 | Implement full scalar 64-layer scheduler and logits | CPU-002, CPU-003, CPU-005, CPU-006, CPU-007, CPU-008, CPU-009, CPU-010, CPU-011, CPU-012, CPU-013, CPU-014, CPU-015, CPU-016 | done | Multi-token token-wise and arbitrary chunk execution have exact state/frontier/chunk equivalence and emit logits ready for oracle comparison | [`src/scalar_runtime.cpp`](src/scalar_runtime.cpp); [`fixtures/real_scalar_chunk.json`](fixtures/real_scalar_chunk.json); [`tests/test_real_scalar_chunk.py`](tests/test_real_scalar_chunk.py); log 2026-08-30T11:57:06Z |
 | TRC-001 | Define versioned trace bundle and typed comparison metrics | PIN-002 | done | Manifest/blob schema, checksums, summaries, session frontiers, and metric reporter pass tests | [`pins/trace_contract.json`](pins/trace_contract.json); [`tools/qw38_trace.py`](tools/qw38_trace.py); [`tests/test_trace.py`](tests/test_trace.py); log 2026-08-30T07:13:12Z |
 | TRC-003 | Add build-isolated backend-neutral trace sink and exact filters | TRC-001 | done | Diagnostic build accepts validated layer/name filters and emits typed views; release objects contain no trace API or tap names | [`src/diagnostic_trace.h`](src/diagnostic_trace.h); [`tests/test_diagnostic_trace.py`](tests/test_diagnostic_trace.py); log 2026-08-30T07:19:17Z |
 | TRC-002 | Add diagnostic-only stable scalar taps | TRC-003, CPU-016 | done | Required scalar taps use the backend-neutral sink, emit through the v1 bundle, and match filtered native scalar evidence | [`pins/scalar_trace_contract.json`](pins/scalar_trace_contract.json); [`src/scalar_runtime.cpp`](src/scalar_runtime.cpp); [`tests/test_real_scalar_trace.py`](tests/test_real_scalar_trace.py); log 2026-08-30T07:32:39Z |
@@ -90,6 +90,7 @@ are repository-relative unless stated otherwise.
 | EDU-018 | Explain trace bundles and numeric comparison metrics for beginners | TRC-001, DOC-001 | done | Taps, manifests, little-endian blobs, shapes, checksums, frontiers, absolute/relative/RMS/cosine errors, non-finite values, first failures, top logits, and evidence limits are code-linked and worked | [`docs/32-trace-bundles-and-metrics.md`](docs/32-trace-bundles-and-metrics.md); [`tests/test_trace.py`](tests/test_trace.py); log 2026-08-30T07:13:12Z |
 | EDU-019 | Explain diagnostic build isolation and stable runtime taps for beginners | TRC-003, DOC-001 | done | Compile-time isolation, filters, stable tap names/shapes, capture timing, backend-neutral sinks, cost, and oracle limits are code-linked and worked | [`docs/33-diagnostic-trace-isolation.md`](docs/33-diagnostic-trace-isolation.md); [`tests/test_diagnostic_trace.py`](tests/test_diagnostic_trace.py); log 2026-08-30T07:19:17Z |
 | EDU-020 | Explain real scalar tap timing and v1 bundle capture for beginners | TRC-002, DOC-001 | done | Each real tap's semantic timing, shape, state scope, filter/copy behavior, bundle path, evidence, and authority limit are code-linked and worked | [`docs/34-real-scalar-traces.md`](docs/34-real-scalar-traces.md); [`tests/test_real_scalar_trace.py`](tests/test_real_scalar_trace.py); log 2026-08-30T07:32:39Z |
+| EDU-021 | Explain multi-token scalar chunks and exact equivalence for beginners | CPU-004, DOC-001 | done | Chunk preflight, token/position order, logits layout, repeated-token equivalence, state/frontier equality, failure behavior, cost, and oracle limits are code-linked and worked | [`docs/35-scalar-token-chunks.md`](docs/35-scalar-token-chunks.md); [`tests/test_real_scalar_chunk.py`](tests/test_real_scalar_chunk.py); log 2026-08-30T11:57:06Z |
 | REL-001 | Publish reproducible release evidence bundle | CMP-003, QLT-001, DOC-001 | pending | Builds, hashes, raw results, reports, and documentation claims reconcile | — |
 
 ## Delivery-Gate Mapping
@@ -1521,6 +1522,59 @@ are repository-relative unless stated otherwise.
   file behavior, full artifact/tool identity, bundle revalidation, source pin
   coverage, structural proof labels, and clean host/container evidence before
   committing.
+
+### 2026-08-30T10:54:58Z — CPU-004 scalar chunks started
+
+- Commit `c9c9c1c` (`feat: capture real scalar traces`) is present on both `main`
+  and `origin/main`; the worktree was clean before this task began.
+- Began CPU-004 and added EDU-021 before implementation. The chunk API will
+  validate the complete token span, remaining session capacity, output stride,
+  and multiplication bounds before calling the admitted one-token runtime, then
+  retain one full FP32 vocabulary row per input token.
+- Exact equivalence will compare a two-token chunk with two repeated one-token
+  calls from independent zero states, including every logit, all four owning
+  state slabs, frontier, and completed-layer count. Negative cases must leave
+  frontier/state/logit sentinels untouched when whole-chunk preflight fails.
+- This gate proves scalar scheduling and chunk-boundary invariance. The native
+  continuation remains ineligible as semantic authority until ORA-001 compares
+  traces/logits against the pinned external implementations.
+
+### 2026-08-30T11:57:06Z — CPU-004 and EDU-021 accepted
+
+- Added `execute_scalar_chunk`, which retains a complete FP32 vocabulary row per
+  input token and calls the admitted one-token scheduler in strict token order at
+  the session's current frontier. The API checks parameter/state/workspace
+  owners, positive token count, remaining capacity, output multiplication and
+  exact length, and every vocabulary ID before executing the first token.
+- The real equivalence diagnostic ran `[42, 3649]` as one length-2 chunk and as
+  two independent one-token calls from a second zero state. All 496,640 logits,
+  every GDN convolution/recurrent value, every attention K/V value, and frontier
+  matched exactly; both final workspaces reported 64 completed layers.
+- The first row retained greedy token 3,649 and the second selected token 1,277.
+  Five exact logits from each row plus stride/frontier/count evidence are frozen
+  as native structural evidence, explicitly not an external semantic fixture.
+- Invalid second token, capacity one for two inputs, and one-short logits storage
+  all failed during whole-chunk preflight with frontier zero, zero state,
+  `layers_completed = 0`, and every logit NaN sentinel untouched.
+- Added a beginner chapter explaining token-wise versus chunk scheduling,
+  history and positions, full preflight, row-major logits, exact state equality,
+  completed-layer counter meaning, arbitrary partitions, measured cost, and the
+  remaining semantic-authority boundary.
+- The standalone four-token equivalence run took 87.08 s with 18,172,800 KiB
+  maximum RSS. The four focused chunk tests passed in 87.48 s. Clean normal and
+  diagnostic builds plus all 101 pytest tests passed in 157.94 s; JSON, Ruff,
+  and `git diff --check` also passed.
+- The pinned CUDA 13.0.2 container rebuilt all normal tools, compiled the SM120
+  probe, and reported 33,671,348,224 total and 33,139,458,048 free device bytes.
+- Marked CPU-004 and EDU-021 done. ORA-001 is now unblocked and is the remaining
+  scalar semantic-admission gate before CUDA MMV implementation.
+
+### 2026-08-30T11:57:20Z — Scalar-chunk commit boundary
+
+- Reviewed whole-chunk preflight ordering and overflow arithmetic, row strides,
+  token positions, state ownership, exact full-output/state comparisons,
+  negative sentinel behavior, fixture authority labels, measured resource cost,
+  and clean host/container evidence before committing.
 
 ## Decisions and Negative Results
 

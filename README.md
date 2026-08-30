@@ -47,6 +47,9 @@ absent from the normal binary.
 The [real scalar trace chapter](docs/34-real-scalar-traces.md) maps every tap to
 its execution moment and shape, then follows one filtered real tensor through a
 model-identified, state-aware trace-v1 bundle.
+The [scalar chunk chapter](docs/35-scalar-token-chunks.md) explains multi-token
+positions, whole-request preflight, vocabulary-logit row layout, and exact
+equivalence with repeated one-token execution.
 
 ## Build
 

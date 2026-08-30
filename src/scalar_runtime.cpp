@@ -545,6 +545,36 @@ Status execute_scalar_token(const ModelWeights& weights,
   );
 }
 
+Status execute_scalar_chunk(
+    const ModelWeights& weights, const ScalarModelParameters& parameters,
+    const std::size_t* tokens, std::size_t token_count,
+    ScalarSessionState* state, ScalarWorkspace* workspace, float* logits,
+    std::size_t logits_count) noexcept {
+  if (tokens == nullptr || token_count == 0 || state == nullptr ||
+      workspace == nullptr || logits == nullptr ||
+      !valid_parameter_storage(parameters) || !valid_state_storage(*state) ||
+      !valid_workspace_storage(*workspace, state->capacity) ||
+      token_count > state->capacity - state->frontier ||
+      token_count > std::numeric_limits<std::size_t>::max() / kVocabularySize ||
+      logits_count != token_count * kVocabularySize) {
+    return {StatusCode::kInvalidArgument,
+            "scalar chunk tokens, capacity, storage, or output are invalid"};
+  }
+  for (std::size_t index = 0; index < token_count; ++index) {
+    if (tokens[index] >= kVocabularySize) {
+      return {StatusCode::kInvalidArgument,
+              "scalar chunk contains an invalid token ID"};
+    }
+  }
+  for (std::size_t index = 0; index < token_count; ++index) {
+    Status status = execute_scalar_token(
+        weights, parameters, tokens[index], state, workspace,
+        logits + index * kVocabularySize, kVocabularySize);
+    if (!status.is_ok()) return status;
+  }
+  return Status::ok();
+}
+
 #ifdef QW38_DIAGNOSTIC_TRACE
 Status execute_scalar_token_traced(
     const ModelWeights& weights, const ScalarModelParameters& parameters,

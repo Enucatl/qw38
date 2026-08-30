@@ -1,0 +1,22 @@
+{
+  "authority": "native structural two-token scalar chunk equivalence",
+  "expected": {
+    "equivalent": 1,
+    "frontier": 2,
+    "layers_completed": 64,
+    "logit_rows": 2,
+    "logit_stride": 248320,
+    "token0_greedy": 3649,
+    "token0_logits_f32_le_hex": "6ac19440eeb11f408e702f4029b8663fa3dd283e",
+    "token1_greedy": 1277,
+    "token1_logits_f32_le_hex": "219cb03fd09b1a40eaa0844006924fbfa245293f",
+    "token_count": 2
+  },
+  "input_tokens": [
+    42,
+    3649
+  ],
+  "model_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+  "proof_limit": "exact native chunk versus repeated-token equivalence; not an independent semantic continuation authority",
+  "schema_version": 1
+}

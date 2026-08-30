@@ -59,7 +59,8 @@ for language and host portability decisions.
 32. [Trace bundles and numeric comparison](32-trace-bundles-and-metrics.md): taps, manifest/blob layout, identities, checksums, session frontiers, tolerance metrics, and top-logit differences.
 33. [Diagnostic trace isolation and filters](33-diagnostic-trace-isolation.md): separate builds, backend-neutral typed sinks, stable names, exact filters, and release-binary exclusion.
 34. [Real scalar taps and bundle capture](34-real-scalar-traces.md): stage timing, raw versus RoPE attention values, state hashes, exact capture, and trace-v1 round trips.
-35. [Source and evidence ledger](sources.md).
+35. [Multi-token scalar chunks](35-scalar-token-chunks.md): whole-chunk preflight, token positions, logit rows, exact state equivalence, and structural continuation evidence.
+36. [Source and evidence ledger](sources.md).
 
 Claims use four labels: **Measured** (this exact artifact and hardware),
 **External** (a linked source), **Estimated** (reproducible arithmetic), and

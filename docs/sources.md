@@ -136,6 +136,11 @@ DSpark are explicitly rejected as Qwen model semantics.
   pinned Transformers and llama.cpp comparison remains ORA-001 work. CUDA tap
   wiring is deferred to its corresponding kernel gates because no production
   CUDA model kernel exists yet.
+- CPU-004 introduces no new external implementation dependency. Its chunk loop
+  invokes the already admitted one-token scalar scheduler without changing
+  arithmetic order. [`fixtures/real_scalar_chunk.json`](../fixtures/real_scalar_chunk.json)
+  is explicitly native structural equivalence evidence and is not a
+  Transformers or llama.cpp continuation fixture.
 
 ## Specialization and hardware references
 
