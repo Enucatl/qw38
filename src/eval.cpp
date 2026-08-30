@@ -1699,6 +1699,65 @@ int check_real_scalar_chunk(const char* model_path, const std::string& mode) {
   return 0;
 }
 
+int dump_real_scalar_logits(const char* model_path, const char* output_path) {
+  qw38::internal::ModelInfo info;
+  qw38::Status status = qw38::internal::inspect_gguf(model_path, &info);
+  if (status.is_ok()) status = qw38::internal::validate_qwen38_contract(&info);
+  qw38::internal::MappedFile mapping;
+  if (status.is_ok()) status = mapping.open(model_path);
+  qw38::internal::ModelWeights weights;
+  if (status.is_ok()) {
+    status = qw38::internal::bind_model_weights(info, mapping, &weights);
+  }
+  qw38::internal::ScalarModelParameters parameters;
+  if (status.is_ok()) {
+    status = qw38::internal::prepare_scalar_model_parameters(weights, &parameters);
+  }
+  qw38::internal::ScalarSessionState state;
+  if (status.is_ok()) {
+    status = qw38::internal::create_scalar_session_state(2, &state);
+  }
+  qw38::internal::ScalarWorkspace workspace;
+  if (status.is_ok()) {
+    status = qw38::internal::create_scalar_workspace(2, &workspace);
+  }
+  const std::array<std::size_t, 2> tokens{42, 3649};
+  std::vector<float> logits(tokens.size() * qw38::internal::kVocabularySize);
+  if (status.is_ok()) {
+    status = qw38::internal::execute_scalar_chunk(
+        weights, parameters, tokens.data(), tokens.size(), &state, &workspace,
+        logits.data(), logits.size());
+  }
+  if (!status.is_ok()) {
+    std::cerr << qw38::status_code_name(status.code()) << ": "
+              << status.message() << '\n';
+    return 1;
+  }
+
+  const std::string temporary =
+      std::string(output_path) + ".tmp." + std::to_string(getpid());
+  std::ofstream output(temporary, std::ios::binary | std::ios::trunc);
+  output.write(reinterpret_cast<const char*>(logits.data()),
+               static_cast<std::streamsize>(logits.size() * sizeof(float)));
+  output.close();
+  if (!output || std::rename(temporary.c_str(), output_path) != 0) {
+    std::remove(temporary.c_str());
+    std::cerr << "cannot commit scalar logits output\n";
+    return 1;
+  }
+  std::cout << "schema_version=1\ntoken_count=" << tokens.size()
+            << "\nvocabulary_size=" << qw38::internal::kVocabularySize
+            << "\ntoken_0=" << tokens[0] << "\ntoken_1=" << tokens[1];
+  for (std::size_t row = 0; row < tokens.size(); ++row) {
+    const float* begin = logits.data() + row * qw38::internal::kVocabularySize;
+    const float* greedy =
+        std::max_element(begin, begin + qw38::internal::kVocabularySize);
+    std::cout << "\ngreedy_" << row << '=' << greedy - begin;
+  }
+  std::cout << "\nlogits_bytes=" << logits.size() * sizeof(float) << '\n';
+  return 0;
+}
+
 float fixture_query(std::size_t token, std::size_t head, std::size_t lane) {
   const int numerator =
       static_cast<int>((token * 11 + head * 7 + lane * 3) % 19) - 9;
@@ -2329,6 +2388,9 @@ int main(int argc, char** argv) {
   if (argc == 4 && std::string(argv[1]) == "--check-real-scalar-chunk") {
     return check_real_scalar_chunk(argv[2], argv[3]);
   }
+  if (argc == 4 && std::string(argv[1]) == "--dump-real-scalar-logits") {
+    return dump_real_scalar_logits(argv[2], argv[3]);
+  }
   if (argc == 3 && std::string(argv[1]) == "--check-attention") {
     return check_attention(std::atoi(argv[2]));
   }
@@ -2357,6 +2419,7 @@ int main(int argc, char** argv) {
                "--check-real-model-boundaries MODEL MODE, "
                "--check-real-scalar-token MODEL MODE, "
                "--check-real-scalar-chunk MODEL MODE, "
+               "--dump-real-scalar-logits MODEL OUTPUT, "
                "--check-ffn LAYER, --check-matvec KIND COLUMNS ROWS PAYLOAD "
                "ACTIVATION, or --check-tensor-row MODEL NAME ROW\n";
   return 2;

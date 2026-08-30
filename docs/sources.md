@@ -141,6 +141,16 @@ DSpark are explicitly rejected as Qwen model semantics.
   arithmetic order. [`fixtures/real_scalar_chunk.json`](../fixtures/real_scalar_chunk.json)
   is explicitly native structural equivalence evidence and is not a
   Transformers or llama.cpp continuation fixture.
+- ORA-002 executes pinned llama.cpp revision
+  `cc83d7b4824f73cfdda4dfbb47ee39804f71b328` as an independent same-GGUF
+  authority. The reproducible build and raw-token adapter are frozen in
+  [`pins/llama_authority_contract.json`](../pins/llama_authority_contract.json);
+  the repository-owned adapter calls the public llama API and copies no model
+  graph. Complete raw logit rows stay in ignored evidence storage, while their
+  hashes and numeric summaries are retained in
+  [`fixtures/llama_scalar_authority.json`](../fixtures/llama_scalar_authority.json).
+  This comparison is not a substitute for the pending pinned Transformers
+  semantic authority or ORA-004 tolerance freeze.
 
 ## Specialization and hardware references
 

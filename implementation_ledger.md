@@ -43,7 +43,10 @@ are repository-relative unless stated otherwise.
 | TRC-003 | Add build-isolated backend-neutral trace sink and exact filters | TRC-001 | done | Diagnostic build accepts validated layer/name filters and emits typed views; release objects contain no trace API or tap names | [`src/diagnostic_trace.h`](src/diagnostic_trace.h); [`tests/test_diagnostic_trace.py`](tests/test_diagnostic_trace.py); log 2026-08-30T07:19:17Z |
 | TRC-002 | Add diagnostic-only stable scalar taps | TRC-003, CPU-016 | done | Required scalar taps use the backend-neutral sink, emit through the v1 bundle, and match filtered native scalar evidence | [`pins/scalar_trace_contract.json`](pins/scalar_trace_contract.json); [`src/scalar_runtime.cpp`](src/scalar_runtime.cpp); [`tests/test_real_scalar_trace.py`](tests/test_real_scalar_trace.py); log 2026-08-30T07:32:39Z |
 | TRC-004 | Add diagnostic-only stable CUDA taps | TRC-002, CUD-001 | pending | CUDA visible boundaries use pinned scalar tap names/shapes and pass frozen scalar/oracle comparison gates | — |
-| ORA-001 | Generate and freeze scalar/oracle fixtures and tolerances | TOK-002, CPU-004, TRC-002 | pending | Three authorities are attributed; tolerances and greedy tie exceptions are immutable inputs | — |
+| ORA-002 | Build and validate pinned llama.cpp same-GGUF authority harness | PIN-001, PIN-002, CPU-004 | done | Exact revision builds reproducibly; identical tokens/template run on the pinned GGUF; logits/continuation metadata and source identity are retained | [`pins/llama_authority_contract.json`](pins/llama_authority_contract.json); [`fixtures/llama_scalar_authority.json`](fixtures/llama_scalar_authority.json); [`tests/test_llama_authority.py`](tests/test_llama_authority.py); log 2026-08-30T12:27:27Z |
+| ORA-003 | Build pinned Transformers eager/offload semantic trace authority | PIN-002, TRC-002 | pending | Exact source/model revisions execute within host/GPU limits and emit required taps, or an evidenced infeasibility creates an approved replacement task | — |
+| ORA-004 | Freeze three-authority scalar fixtures and per-tap tolerances | ORA-002, ORA-003, TRC-002, CPU-004 | pending | Attributed bundles compare every required tap/logit; tolerances and genuine greedy near-ties are immutable | — |
+| ORA-001 | Generate and freeze scalar/oracle fixtures and tolerances | ORA-002, ORA-003, ORA-004 | pending | Three authorities are attributed; tolerances and greedy tie exceptions are immutable inputs | — |
 | CUD-001 | Implement CUDA Q4_K/Q6_K decode MMV | CPU-001, BLD-002, ORA-001 | pending | Scalar-vs-CUDA and focused primitive pytest gates pass | — |
 | CUD-002 | Implement quantized tiled prompt MMQ | CUD-001 | pending | Arbitrary prompt-row fixtures pass frozen tolerances | — |
 | GDN-001 | Implement exact one-token CUDA GDN and atomic state commit | CUD-001, CPU-002 | pending | State/taps match oracle and injected failures leave frontier unchanged | — |
@@ -91,6 +94,7 @@ are repository-relative unless stated otherwise.
 | EDU-019 | Explain diagnostic build isolation and stable runtime taps for beginners | TRC-003, DOC-001 | done | Compile-time isolation, filters, stable tap names/shapes, capture timing, backend-neutral sinks, cost, and oracle limits are code-linked and worked | [`docs/33-diagnostic-trace-isolation.md`](docs/33-diagnostic-trace-isolation.md); [`tests/test_diagnostic_trace.py`](tests/test_diagnostic_trace.py); log 2026-08-30T07:19:17Z |
 | EDU-020 | Explain real scalar tap timing and v1 bundle capture for beginners | TRC-002, DOC-001 | done | Each real tap's semantic timing, shape, state scope, filter/copy behavior, bundle path, evidence, and authority limit are code-linked and worked | [`docs/34-real-scalar-traces.md`](docs/34-real-scalar-traces.md); [`tests/test_real_scalar_trace.py`](tests/test_real_scalar_trace.py); log 2026-08-30T07:32:39Z |
 | EDU-021 | Explain multi-token scalar chunks and exact equivalence for beginners | CPU-004, DOC-001 | done | Chunk preflight, token/position order, logits layout, repeated-token equivalence, state/frontier equality, failure behavior, cost, and oracle limits are code-linked and worked | [`docs/35-scalar-token-chunks.md`](docs/35-scalar-token-chunks.md); [`tests/test_real_scalar_chunk.py`](tests/test_real_scalar_chunk.py); log 2026-08-30T11:57:06Z |
+| EDU-022 | Explain independent authority hierarchy and same-GGUF llama comparison for beginners | ORA-002, DOC-001 | done | Primary versus independent versus native authority, artifact/template/token identity, build pins, logits/continuation limits, and failure evidence are code-linked and worked | [`docs/36-independent-llama-authority.md`](docs/36-independent-llama-authority.md); [`tests/test_llama_authority.py`](tests/test_llama_authority.py); log 2026-08-30T12:27:27Z |
 | REL-001 | Publish reproducible release evidence bundle | CMP-003, QLT-001, DOC-001 | pending | Builds, hashes, raw results, reports, and documentation claims reconcile | — |
 
 ## Delivery-Gate Mapping
@@ -1575,6 +1579,141 @@ are repository-relative unless stated otherwise.
   token positions, state ownership, exact full-output/state comparisons,
   negative sentinel behavior, fixture authority labels, measured resource cost,
   and clean host/container evidence before committing.
+
+### 2026-08-30T11:58:50Z — ORA-002 llama authority started
+
+- Commit `6d4ed6d` (`feat: execute scalar token chunks`) is present on both
+  `main` and `origin/main`; the worktree was clean before this task began.
+- Split the broad ORA-001 gate into executable evidence increments before doing
+  authority work: ORA-002 owns pinned same-GGUF llama.cpp, ORA-003 owns pinned
+  Transformers eager/offload feasibility and taps, and ORA-004 freezes the
+  resulting three-authority fixtures/tolerances. ORA-001 remains the umbrella
+  admission gate and the product architecture is unchanged.
+- Began ORA-002 and EDU-022. The machine has 248 GiB disk free, about 29 GiB
+  available host RAM, and 32,607 MiB GPU memory. The pinned 18,973,870,432-byte
+  GGUF is installed; PyTorch, Transformers, Accelerate, and Safetensors are not
+  installed, and no pinned llama.cpp checkout or binary exists locally.
+- The immediate work will fetch/build exact llama.cpp revision
+  `cc83d7b4824f73cfdda4dfbb47ee39804f71b328` in ignored authority cache, retain
+  reproducible commands/configuration in the repository, and first establish
+  exact token/template/model identity plus deterministic greedy continuation.
+  Debug tensor taps remain ORA-004 work and cannot be substituted by native
+  Quartz self-comparison.
+
+### 2026-08-30T12:09:12Z — ORA-002 harness tests corrected
+
+- Added the exact-build contract, pinned CUDA container, public-API raw-token
+  adapter, full-logit comparison helper, focused tests, and beginner authority
+  chapter while the upstream CUDA build continued.
+- The first five focused tests had two documentation/metadata assertion errors:
+  the artifact lock uses `sources.llama_cpp`, not `tools.llama_cpp`, and a test
+  searched across a Markdown line break for the full phrase `independent
+  same-GGUF oracle`. Neither error affected runtime code. Corrected the JSON key
+  and asserted the stable unbroken phrase; the failed result is retained here
+  rather than erased.
+- The first pinned upstream build was intentionally stopped after 172 of 484
+  Ninja edges because `-j 2` used only two of 20 host CPUs while more than 28
+  GiB RAM remained available. No completed objects were removed. Increased the
+  checked-in build limit to six jobs and resumed the same configured build
+  incrementally; this is a build-time adjustment, not a source/configuration
+  identity change.
+
+### 2026-08-30T12:12:15Z — ORA-002 build scope corrected
+
+- The resumed compile completed both requested upstream targets and the local
+  adapter, then failed during host-side `llama-cli --version`: container-built
+  `llama-cli` could not resolve `libllama-cli-impl.so` on the host. The relevant
+  binaries and libraries had compiled successfully; the failure was in the
+  verification environment.
+- More importantly, the pinned revision's `llama-cli` dependency graph built
+  unrelated server, UI, and multimodal targets and attempted a moving UI asset
+  download. Its first bucket URL failed, then the unversioned `latest` URL
+  succeeded. This network-dependent target is inadmissible in ORA-002 and the
+  negative result is retained here.
+- Narrowed ORA-002 to `llama-eval-callback` plus the repository-owned public-API
+  raw-token adapter. The later comparative-baseline gate owns its own controlled
+  upstream server build. Moved binary verification inside the pinned container,
+  where its shared-library and CUDA runtime environment are defined.
+- Audited the authority image's installed package versions and pinned all five
+  packages literally in the Dockerfile/contract. The first image already
+  resolved to those exact versions; a final rebuild will prove the checked-in
+  pins rather than relying on an `apt` moving choice.
+
+### 2026-08-30T12:16:03Z — ORA-002 first real run retained
+
+- The fully pinned narrow build completed and container-side binary verification
+  passed. Ninja reported and recovered from a premature `.ninja_log` end left
+  by the intentional earlier termination; all required target edges then built
+  successfully.
+- Model verification, the two-token Quartz scalar execution, and the same
+  two-token llama.cpp CUDA execution all succeeded. Both wrote exactly
+  1,986,560 bytes (2 × 248,320 × 4) of logits and independently chose greedy
+  tokens 3649 then 1277. llama.cpp reported 38.68 token/s for its two decode
+  runs; this diagnostic timing is not a benchmark result.
+- Final orchestration failed before comparison because invoking the Python file
+  directly set its import root to `tools/`, so `from tools.qw38_trace` raised
+  `ModuleNotFoundError`. The complete raw evidence was preserved. Corrected the
+  checked-in harness to invoke the typed helper as module
+  `python -m tools.compare_llama_authority`; no model/runtime result was changed.
+- The first standalone comparison then rejected NVIDIA's stdout banner
+  (`==========`) as an empty duplicate key before reading the adapter fields.
+  Tightened the mixed-output parser to accept only lowercase identifier field
+  names while retaining duplicate rejection, and added the banner as a focused
+  regression test. Raw logits again remained unchanged.
+- Added exact template identity to the harness using the existing
+  `user_no_thinking` native rendering and llama.cpp's public tokenizer in
+  vocabulary-only mode. Its first focused run incorrectly reported a read
+  failure because `istreambuf_iterator` completion does not guarantee the
+  stream's `eofbit` is set. Replaced that invalid success test with explicit
+  open and `badbit` checks before any authority comparison.
+
+### 2026-08-30T12:27:27Z — ORA-002 and EDU-022 accepted
+
+- The corrected checked-in authority build completed from exact llama.cpp
+  revision `cc83d7b4824f73cfdda4dfbb47ee39804f71b328` with a clean detached
+  checkout, pinned package versions, CUDA 13.0.2, requested architecture 120
+  rewritten by upstream CMake to `120a`, `GGML_CUDA=ON`, `GGML_NATIVE=OFF`,
+  tests off, and only the callback/local-adapter target boundary.
+- The final `tools/run_llama_authority.sh` invocation completed with exit zero.
+  Quartz and llama.cpp exactly matched the 74 rendered bytes and all 13 token
+  IDs for `user_no_thinking`. Both complete 248,320-wide logit rows were finite
+  and both runtimes chose greedy tokens 3649 then 1277.
+- Position 0 reported maximum absolute error 0.17721319, RMS error 0.02946198,
+  cosine 0.99984713, and 9/10 common top logits. Position 1 reported maximum
+  absolute error 0.19039965, RMS error 0.03334594, cosine 0.99985330, and 10/10
+  common top logits. Exact zero-tolerance equality failed at index 0 in both
+  rows as expected for reporting-only cross-runtime evidence. No tolerance was
+  admitted or loosened; ORA-003/ORA-004 remain mandatory.
+- Frozen raw-row hashes are Quartz
+  `1be136936bca8baea761464e16814ae01471f5e4e09d908efaf2432df834095b`
+  and llama.cpp
+  `03d747c8291b07f44ac47649c317a71fea633886f48e9dfbd4da6bb27ae74513`.
+  The raw 1,986,560-byte files/logs remain in ignored evidence storage; their
+  identities and complete metrics are committed in the small fixture.
+- Added and tested an atomic Quartz full-logit dump diagnostic, strict raw-byte
+  sizing, mixed container-output parsing, duplicate-field rejection, exact
+  authority identity checks, and explicit reporting/admission separation.
+- `uv run ruff format .` formatted the Python sources. Clean release and
+  diagnostic builds passed, followed by all 108 pytest tests in 166.83 s.
+  Ruff, every JSON parse, Markdown local-link validation, and `git diff --check`
+  passed. The pinned CUDA build compiled all products plus the SM120 probe; the
+  RTX 5090 reported compute capability 12.0, 33,671,348,224 total bytes, and
+  33,139,458,048 free bytes.
+- Marked ORA-002 and EDU-022 done. ORA-003—the pinned Transformers
+  eager/offload feasibility and semantic trace—is the next task. ORA-001 and
+  CUDA MMV remain blocked on the complete three-authority/tolerance gate.
+
+### 2026-08-30T12:29:51Z — Llama-authority commit boundary
+
+- Re-reviewed the exact source/model/container contract, narrow target graph,
+  adapter ownership and cleanup, template/token identity, atomic native output,
+  strict byte sizing, comparison direction, zero-tolerance label, proof limits,
+  beginner chapter, source ledger, and every preserved negative result before
+  commit. Made the runner independent of its caller's working directory.
+- Final shell syntax, seven focused authority tests, Ruff, and
+  `git diff --check` passed after the last script-only adjustment. The full
+  108-test, clean-build, real authority, and CUDA evidence remains the accepted
+  evidence recorded immediately above.
 
 ## Decisions and Negative Results
 

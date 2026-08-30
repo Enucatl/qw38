@@ -1,0 +1,47 @@
+{
+  "build": {
+    "cmake": {
+      "CMAKE_BUILD_TYPE": "Release",
+      "CMAKE_CUDA_ARCHITECTURES": "120",
+      "GGML_CUDA": true,
+      "GGML_NATIVE": false,
+      "LLAMA_BUILD_EXAMPLES": true,
+      "LLAMA_BUILD_TESTS": false,
+      "LLAMA_CURL": false
+    },
+    "container": "docker/llama-authority.Dockerfile",
+    "container_packages": {
+      "ca-certificates": "20260601~24.04.1",
+      "cmake": "3.28.3-1build7",
+      "g++": "4:13.2.0-7ubuntu1",
+      "git": "1:2.43.0-1ubuntu7.3",
+      "ninja-build": "1.11.1-2"
+    },
+    "script": "tools/build_llama_authority.sh",
+    "targets": [
+      "llama-eval-callback",
+      "qw38-llama-token-oracle"
+    ]
+  },
+  "diagnostic": {
+    "input_tokens": [
+      42,
+      3649
+    ],
+    "logits_dtype": "float32",
+    "logits_endianness": "little",
+    "source": "tools/llama_authority/token_oracle.cpp",
+    "template_case": "user_no_thinking"
+  },
+  "model": {
+    "bytes": 18973870432,
+    "filename": "Qwen3.8-27B-Q4_K_M.gguf",
+    "sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34"
+  },
+  "source": {
+    "license": "MIT",
+    "repository": "https://github.com/ggml-org/llama.cpp.git",
+    "revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328"
+  },
+  "version": 1
+}

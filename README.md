@@ -50,6 +50,10 @@ model-identified, state-aware trace-v1 bundle.
 The [scalar chunk chapter](docs/35-scalar-token-chunks.md) explains multi-token
 positions, whole-request preflight, vocabulary-logit row layout, and exact
 equivalence with repeated one-token execution.
+The [independent-authority chapter](docs/36-independent-llama-authority.md)
+explains why Quartz is checked against both llama.cpp and Transformers, how the
+same GGUF and raw token history are enforced, and why numeric reporting precedes
+the tolerance freeze.
 
 ## Build
 
