@@ -38,6 +38,9 @@ token IDs become hidden vectors and how final normalized state becomes all
 The [full scalar token chapter](docs/31-full-scalar-token.md) follows one real
 token through all 48 GDN and 16 attention layers, final logits, state ownership,
 scratch reuse, and the remaining oracle boundary.
+The [trace bundle chapter](docs/32-trace-bundles-and-metrics.md) explains how
+diagnostic taps are stored, authenticated, and compared using absolute,
+relative, RMS, cosine, non-finite, first-failure, and top-logit evidence.
 
 ## Build
 

@@ -56,7 +56,8 @@ for language and host portability decisions.
 29. [Complete decoder-layer composition](29-complete-decoder-layer.md): mixer-to-FFN handoff, two residuals, layer variants, validation order, and scheduler boundary.
 30. [Embeddings and logits](30-embeddings-and-logits.md): token-row lookup, hidden vectors, final norm, vocabulary scores, greedy choice, and proof limits.
 31. [One full scalar token](31-full-scalar-token.md): exact 64-layer hybrid schedule, parameter/state/scratch ownership, ping-pong residuals, frontier, and structural evidence.
-32. [Source and evidence ledger](sources.md).
+32. [Trace bundles and numeric comparison](32-trace-bundles-and-metrics.md): taps, manifest/blob layout, identities, checksums, session frontiers, tolerance metrics, and top-logit differences.
+33. [Source and evidence ledger](sources.md).
 
 Claims use four labels: **Measured** (this exact artifact and hardware),
 **External** (a linked source), **Estimated** (reproducible arithmetic), and

@@ -119,6 +119,12 @@ DSpark are explicitly rejected as Qwen model semantics.
   is explicitly a native structural zero-state regression; it must not be cited
   as Transformers, llama.cpp, quality, or continuation agreement before
   TRC-001/TRC-002/ORA-001.
+- TRC-001 introduces no new external implementation dependency. The deliberately
+  narrow JSON plus little-endian FP32 format and comparison semantics are local
+  Quartz contracts frozen in [`pins/trace_contract.json`](../pins/trace_contract.json).
+  They carry the already pinned model/tool identities but do not promote any
+  producer to semantic authority. Real cross-runtime evidence remains
+  TRC-002/ORA-001 work.
 
 ## Specialization and hardware references
 

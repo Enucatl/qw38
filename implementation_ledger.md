@@ -39,7 +39,7 @@ are repository-relative unless stated otherwise.
 | CPU-002 | Implement scalar GDN oracle | CPU-001, MDL-002 | done | Warm-up, recurrence, state, head mapping, and chunk-boundary fixtures pass | [`src/gdn.cpp`](src/gdn.cpp); [`fixtures/gdn_authority.json`](fixtures/gdn_authority.json); [`tests/test_gdn.py`](tests/test_gdn.py); log 2026-08-29T12:26:00Z |
 | CPU-003 | Implement scalar attention and FFN oracle | CPU-001, MDL-002 | done | Layers 3/7/63, partial RoPE, grouped KV, causality, and FFN taps pass | [`src/attention.cpp`](src/attention.cpp); [`fixtures/attention_ffn_authority.json`](fixtures/attention_ffn_authority.json); [`tests/test_attention.py`](tests/test_attention.py); log 2026-08-29T12:54:00Z |
 | CPU-004 | Implement full scalar 64-layer scheduler and logits | CPU-002, CPU-003, CPU-005, CPU-006, CPU-007, CPU-008, CPU-009, CPU-010, CPU-011, CPU-012, CPU-013, CPU-014, CPU-015, CPU-016 | pending | Token/chunk execution and logits match semantic-authority fixtures | — |
-| TRC-001 | Define versioned trace bundle and typed comparison metrics | PIN-002 | pending | Manifest/blob schema, checksums, summaries, session frontiers, and metric reporter pass tests | — |
+| TRC-001 | Define versioned trace bundle and typed comparison metrics | PIN-002 | done | Manifest/blob schema, checksums, summaries, session frontiers, and metric reporter pass tests | [`pins/trace_contract.json`](pins/trace_contract.json); [`tools/qw38_trace.py`](tools/qw38_trace.py); [`tests/test_trace.py`](tests/test_trace.py); log 2026-08-30T07:13:12Z |
 | TRC-002 | Add diagnostic-only stable scalar/CUDA taps | TRC-001, CPU-004 | pending | Required taps filter by layer/name and are absent from release builds | — |
 | ORA-001 | Generate and freeze scalar/oracle fixtures and tolerances | TOK-002, CPU-004, TRC-002 | pending | Three authorities are attributed; tolerances and greedy tie exceptions are immutable inputs | — |
 | CUD-001 | Implement CUDA Q4_K/Q6_K decode MMV | CPU-001, BLD-002, ORA-001 | pending | Scalar-vs-CUDA and focused primitive pytest gates pass | — |
@@ -85,6 +85,7 @@ are repository-relative unless stated otherwise.
 | EDU-015 | Explain complete decoder-layer composition for beginners | CPU-014, DOC-001 | done | Mixer→residual→post-mixer norm→SwiGLU→residual order, layer variants, buffer reuse, preflight validation, state mutation, and scheduler boundary are code-linked and worked | [`docs/29-complete-decoder-layer.md`](docs/29-complete-decoder-layer.md); [`tests/test_real_layer_composition.py`](tests/test_real_layer_composition.py); log 2026-08-30T06:31:18Z |
 | EDU-016 | Explain embeddings, final normalization, logits, and token choice for beginners | CPU-015, DOC-001 | done | Token IDs versus embeddings, row lookup, hidden vectors, final RMSNorm, vocabulary projection, logits versus probabilities, argmax, workspace/cost, exact bounds, and evidence limits are code-linked and worked | [`docs/30-embeddings-and-logits.md`](docs/30-embeddings-and-logits.md); [`tests/test_real_model_boundaries.py`](tests/test_real_model_boundaries.py); log 2026-08-30T06:39:56Z |
 | EDU-017 | Explain the full hybrid layer schedule and scalar runtime ownership for beginners | CPU-016, DOC-001 | done | Layer order, slot mapping, prepared parameters, per-session state, shared scratch, ping-pong residuals, one-token execution, final logits, state frontier, structural fixtures, and oracle limits are code-linked and worked | [`docs/31-full-scalar-token.md`](docs/31-full-scalar-token.md); [`tests/test_real_scalar_token.py`](tests/test_real_scalar_token.py); log 2026-08-30T06:53:51Z |
+| EDU-018 | Explain trace bundles and numeric comparison metrics for beginners | TRC-001, DOC-001 | done | Taps, manifests, little-endian blobs, shapes, checksums, frontiers, absolute/relative/RMS/cosine errors, non-finite values, first failures, top logits, and evidence limits are code-linked and worked | [`docs/32-trace-bundles-and-metrics.md`](docs/32-trace-bundles-and-metrics.md); [`tests/test_trace.py`](tests/test_trace.py); log 2026-08-30T07:13:12Z |
 | REL-001 | Publish reproducible release evidence bundle | CMP-003, QLT-001, DOC-001 | pending | Builds, hashes, raw results, reports, and documentation claims reconcile | — |
 
 ## Delivery-Gate Mapping
@@ -1305,6 +1306,83 @@ are repository-relative unless stated otherwise.
   frontier order, full finite checks, global preflight, structural fixture
   labeling, beginner documentation, and clean host/container verification before
   committing.
+
+### 2026-08-30T07:04:30Z — TRC-001 trace contract started
+
+- Commit `584ad97` (`feat: execute full scalar token`) is present on both `main`
+  and `origin/main`; the worktree was clean before this task began.
+- Began TRC-001. The v1 format will use a versioned JSON manifest plus one
+  deterministic little-endian FP32 blob, with exact model/tool identities,
+  prompt bytes, token IDs, positions, tensor names/shapes/ranges/checksums and
+  summaries, and session frontiers before and after execution.
+- The typed comparator will report absolute, relative, RMS, cosine, NaN/Inf,
+  first-failing-index, and top-logit differences. Its tolerance rule and
+  non-finite behavior are part of the contract, not caller-specific convention.
+- Added EDU-018 before implementation so a reader new to numerical inference can
+  understand taps, binary layout, checksums, frontiers, every metric, and the
+  difference between structural integrity and semantic agreement.
+- Real scalar layer taps remain TRC-002 work. This task defines and validates the
+  evidence container; it does not claim that the current native scalar output
+  agrees with Transformers or llama.cpp.
+
+### 2026-08-30T07:09:36Z — TRC-001 focused-test corrections
+
+- The first focused pytest collection failed because the repository root was
+  absent from pytest's import path, so `tools.qw38_trace` could not be imported.
+  Adding only `tools/__init__.py` did not resolve collection. Added the explicit
+  `pythonpath = ["."]` pytest setting; the helper then imported normally.
+- The next focused run passed 13 cases and failed two assertions. One expected a
+  different maximum-relative-error index for two decimal values whose binary
+  errors were effectively tied; the other expected equal decimal logit deltas,
+  although their FP64 representations differed. The implementation was stable;
+  corrected the assertions to the actual deterministic floating-point ordering
+  instead of adding an undocumented approximate tie rule.
+- Tightened participant metadata to a typed `ArtifactIdentity` with exact name,
+  revision, and SHA-256 fields. Also made every NaN or infinity an admission
+  failure even when both arrays contain the same non-finite value; equal broken
+  outputs must not pass a semantic gate.
+- Commands: Ruff format/check and 15 focused trace tests — passed after the
+  corrections. The earlier collection and assertion failures are preserved
+  above rather than erased.
+
+### 2026-08-30T07:13:12Z — TRC-001 and EDU-018 accepted
+
+- Froze trace schema `qw38.trace` version 1: exact typed model/tool identities,
+  base64 prompt bytes with count/hash, token IDs and positions, before/after
+  session frontiers and named state hashes, a canonical JSON manifest, and one
+  contiguous manifest-ordered little-endian FP32 blob.
+- The writer rounds values to stored FP32 before summaries and emits deterministic
+  files. The fail-closed reader validates exact versioned fields, canonical
+  prompt encoding, dimensions, byte ranges, full/per-tensor hashes, complete
+  blob coverage, and recomputed finite/non-finite summaries before returning
+  values.
+- Added typed absolute, relative, RMS, cosine, NaN/Inf, first-failing-index, and
+  deterministic top-logit reports. The frozen finite gate fails only when both
+  absolute and relative tolerances are exceeded; every non-finite input fails.
+- Added 15 focused tests covering deterministic round trips, exact endian bytes,
+  FP32 rounding, metadata/frontiers, invalid writer inputs, malformed manifests,
+  blob corruption, tolerance behavior, non-finite values, and near-tie top-logit
+  order. Added explicit repository-root pytest import configuration for typed
+  diagnostic helpers.
+- Added a beginner chapter defining taps, manifests versus blobs, FP32 and byte
+  order, shapes/ranges, checksums versus correctness, pinned identities, prompt
+  representations, frontiers, summaries, every metric, near ties, fixture versus
+  numeric equality, negative evidence, and the remaining semantic proof boundary.
+- Verification: Ruff format/check, JSON validation, focused 15-test trace suite,
+  clean restricted C++17 build, all 90 pytest tests in 38.26 s, and
+  `git diff --check` passed. The pinned CUDA 13.0.2 container rebuilt all host
+  tools, compiled the SM120 probe, and ran it on the RTX 5090 with
+  33,671,348,224 total and 33,139,458,048 free bytes.
+- Marked TRC-001 and EDU-018 done. TRC-002 remains pending: no real runtime tap
+  has yet been emitted through this format, so CPU-004 and semantic oracle
+  admission remain open.
+
+### 2026-08-30T07:13:40Z — Trace-contract commit boundary
+
+- Reviewed schema/version fail-closed behavior, typed identities, prompt and
+  state metadata, deterministic FP32 conversion, contiguous range arithmetic,
+  whole/per-tensor checksums, summaries, tolerance/non-finite/top-logit rules,
+  corruption tests, proof labels, and beginner documentation before committing.
 
 ## Decisions and Negative Results
 
