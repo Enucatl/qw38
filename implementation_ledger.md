@@ -44,7 +44,7 @@ are repository-relative unless stated otherwise.
 | TRC-002 | Add diagnostic-only stable scalar taps | TRC-003, CPU-016 | done | Required scalar taps use the backend-neutral sink, emit through the v1 bundle, and match filtered native scalar evidence | [`pins/scalar_trace_contract.json`](pins/scalar_trace_contract.json); [`src/scalar_runtime.cpp`](src/scalar_runtime.cpp); [`tests/test_real_scalar_trace.py`](tests/test_real_scalar_trace.py); log 2026-08-30T07:32:39Z |
 | TRC-004 | Add diagnostic-only stable CUDA taps | TRC-002, CUD-001 | pending | CUDA visible boundaries use pinned scalar tap names/shapes and pass frozen scalar/oracle comparison gates | — |
 | ORA-002 | Build and validate pinned llama.cpp same-GGUF authority harness | PIN-001, PIN-002, CPU-004 | done | Exact revision builds reproducibly; identical tokens/template run on the pinned GGUF; logits/continuation metadata and source identity are retained | [`pins/llama_authority_contract.json`](pins/llama_authority_contract.json); [`fixtures/llama_scalar_authority.json`](fixtures/llama_scalar_authority.json); [`tests/test_llama_authority.py`](tests/test_llama_authority.py); log 2026-08-30T12:27:27Z |
-| ORA-003 | Build pinned Transformers eager/offload semantic trace authority | PIN-002, TRC-002 | pending | Exact source/model revisions execute within host/GPU limits and emit required taps, or an evidenced infeasibility creates an approved replacement task | — |
+| ORA-003 | Build pinned Transformers eager/offload semantic trace authority | PIN-002, TRC-002 | done | Exact source/model revisions execute within host/GPU limits and emit required taps, or an evidenced infeasibility creates an approved replacement task | [`pins/transformers_authority_contract.json`](pins/transformers_authority_contract.json); [`fixtures/transformers_scalar_authority.json`](fixtures/transformers_scalar_authority.json); [`tools/run_transformers_authority.py`](tools/run_transformers_authority.py); [`tests/test_transformers_authority.py`](tests/test_transformers_authority.py); log 2026-08-30T17:38:10Z |
 | ORA-004 | Freeze three-authority scalar fixtures and per-tap tolerances | ORA-002, ORA-003, TRC-002, CPU-004 | pending | Attributed bundles compare every required tap/logit; tolerances and genuine greedy near-ties are immutable | — |
 | ORA-001 | Generate and freeze scalar/oracle fixtures and tolerances | ORA-002, ORA-003, ORA-004 | pending | Three authorities are attributed; tolerances and greedy tie exceptions are immutable inputs | — |
 | CUD-001 | Implement CUDA Q4_K/Q6_K decode MMV | CPU-001, BLD-002, ORA-001 | pending | Scalar-vs-CUDA and focused primitive pytest gates pass | — |
@@ -95,6 +95,7 @@ are repository-relative unless stated otherwise.
 | EDU-020 | Explain real scalar tap timing and v1 bundle capture for beginners | TRC-002, DOC-001 | done | Each real tap's semantic timing, shape, state scope, filter/copy behavior, bundle path, evidence, and authority limit are code-linked and worked | [`docs/34-real-scalar-traces.md`](docs/34-real-scalar-traces.md); [`tests/test_real_scalar_trace.py`](tests/test_real_scalar_trace.py); log 2026-08-30T07:32:39Z |
 | EDU-021 | Explain multi-token scalar chunks and exact equivalence for beginners | CPU-004, DOC-001 | done | Chunk preflight, token/position order, logits layout, repeated-token equivalence, state/frontier equality, failure behavior, cost, and oracle limits are code-linked and worked | [`docs/35-scalar-token-chunks.md`](docs/35-scalar-token-chunks.md); [`tests/test_real_scalar_chunk.py`](tests/test_real_scalar_chunk.py); log 2026-08-30T11:57:06Z |
 | EDU-022 | Explain independent authority hierarchy and same-GGUF llama comparison for beginners | ORA-002, DOC-001 | done | Primary versus independent versus native authority, artifact/template/token identity, build pins, logits/continuation limits, and failure evidence are code-linked and worked | [`docs/36-independent-llama-authority.md`](docs/36-independent-llama-authority.md); [`tests/test_llama_authority.py`](tests/test_llama_authority.py); log 2026-08-30T12:27:27Z |
+| EDU-023 | Explain official-checkpoint Transformers eager/offload authority for beginners | ORA-003, DOC-001 | done | Original checkpoint versus GGUF roles, Safetensors shards, eager execution, CPU/GPU/disk offload, hooks/taps, memory limits, and semantic proof boundaries are code-linked and worked | [`docs/37-transformers-authority.md`](docs/37-transformers-authority.md); [`tests/test_transformers_authority.py`](tests/test_transformers_authority.py); log 2026-08-30T17:38:10Z |
 | REL-001 | Publish reproducible release evidence bundle | CMP-003, QLT-001, DOC-001 | pending | Builds, hashes, raw results, reports, and documentation claims reconcile | — |
 
 ## Delivery-Gate Mapping
@@ -1714,6 +1715,94 @@ are repository-relative unless stated otherwise.
   `git diff --check` passed after the last script-only adjustment. The full
   108-test, clean-build, real authority, and CUDA evidence remains the accepted
   evidence recorded immediately above.
+
+### 2026-08-30T12:30:42Z — ORA-003 Transformers authority started
+
+- Commit `6ea9750` (`feat: add llama GGUF authority`) is present on both `main`
+  and `origin/main`; the worktree was clean before this task began.
+- Began ORA-003 and added EDU-023 before implementation. The primary authority
+  must use official checkpoint revision
+  `1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0` and exact Transformers revision
+  `42ca97014c85d71a88ad60d55f08cb9fb4d26e2c`; it cannot reuse GGUF or promote
+  llama.cpp to official-checkpoint authority.
+- Initial capacity audit: 247 GiB disk free, about 29 GiB host RAM available,
+  no swap, and 32,111 MiB GPU memory free on the RTX 5090. No PyTorch,
+  Transformers, Accelerate, or Safetensors environment exists yet. The next
+  read-only step inventories official checkpoint shards/bytes and exact pinned
+  source dependencies before selecting an eager CPU/GPU/disk offload map.
+- The first checkpoint command incorrectly combined one `--include` option with
+  additional positional glob arguments. `hf` warned that it ignored the include
+  filter and downloaded only the ten requested metadata/template/tokenizer
+  files, not any weight shard. Those files are required and valid, so they were
+  retained. Corrected the next command to one Safetensors include filter; shard
+  inventory remains 18 files and 55,563,006,776 bytes.
+
+### 2026-08-30T12:36:58Z — ORA-003 eager feasibility and taps measured
+
+- Downloaded and verified all 18 official Safetensors shards at exact checkpoint
+  revision `1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0`: 55,563,006,776 file bytes,
+  55,562,855,904 indexed tensor bytes, and 1,199 tensors. The exact clean
+  Transformers checkout is revision
+  `42ca97014c85d71a88ad60d55f08cb9fb4d26e2c`; the hash-locked Python 3.12.3
+  environment uses Torch 2.10.0+cu130 and the verified CUDA device reports
+  compute capability 12.0.
+- The first untapped real eager run succeeded with embeddings, final norm,
+  output head, and layers 0–24 on GPU; layers 25–44 on CPU; layers 45–63 and
+  the unused visual module on disk. It loaded in 23.03 seconds, executed two
+  tokens in 45.18 seconds, peaked at 24,460,563,456 allocated and
+  24,490,541,056 reserved GPU bytes, and selected tokens 3649 then 1277. The
+  complete 1,986,560-byte logit blob hash was
+  `9b64105a1c7262271c85054ef30cd116e0af4e85a497e6ae24c478007ed97947`.
+- The upstream text wrapper loaded 1,184 of 1,199 checkpoint tensors. Its
+  explicit unexpected-key policy ignored the 15 MTP tensors, consistent with
+  V1's MTP exclusion; vision remains present but unused/offloaded. Accelerate
+  directly reopens original Safetensors ranges for disk-mapped layers, so the
+  offload directory remained empty rather than duplicating weights. Both facts
+  are documented instead of being silently treated as missing work.
+- Added observation-only module hooks and wrappers around the original upstream
+  GDN recurrence, partial RoPE, and eager-attention functions. The captured run
+  again chose tokens 3649 and 1277 with the identical full-logit hash, proving
+  the taps did not change this diagnostic result. It emitted 238 finite named
+  tensors totaling 20,160,352 canonical little-endian FP32 bytes with blob hash
+  `1083ab56433026ac03128603dbed017391c98e3053b9169774e9654e8e85a031`.
+  Representative evidence includes full `[1,48,128,128]` GDN states and an
+  attention K/V history growing from one to two positions.
+- Reporting-only official-versus-GGUF row metrics were recorded with zero
+  tolerance, not admitted: Quartz cosine was 0.99557/0.99402 with RMS
+  0.15852/0.21300; llama.cpp cosine was 0.99535/0.99375 with RMS
+  0.16242/0.21763. All three selected the same greedy continuations. These are
+  expected cross-artifact quantization differences; ORA-004 still owns
+  first-failure diagnosis and immutable per-tap tolerances.
+- The repository-wide validation command mistakenly requested nonexistent Make
+  target `cuda-probe` after `make cuda-build` had already compiled the probe.
+  Make correctly failed with “No rule to make target”; no build result was
+  invalidated. The follow-up executes `build/qw38-cuda-probe` inside the pinned
+  CUDA container, its actual runtime environment.
+
+### 2026-08-30T17:38:10Z — ORA-003 and EDU-023 accepted
+
+- Added a reproducible setup script, exact 18-shard/source/environment contract,
+  fail-closed verifier, eager/offload runner, diagnostic tap collector, fixture
+  freezer, complete 238-record checked-in evidence manifest, and five focused
+  tests. The 20 MB raw tap blob and full logits remain in ignored local evidence
+  storage and are authenticated by committed SHA-256 values.
+- Added handbook Chapter 37 and linked it from the root and handbook indexes and
+  source ledger. It explains original BF16 versus quantized GGUF, Safetensors
+  and shards, eager execution, GPU/CPU/disk offload, hooks and taps, raw-token
+  isolation, logits, greedy selection, fixture equality, MTP/vision exclusions,
+  measured resource use, failure history, and the exact proof boundary. Every
+  performance-looking value is labeled as a feasibility measurement, not a
+  benchmark claim.
+- `uv run ruff format .` and `uv run ruff check .` passed. Five focused tests
+  passed, then clean normal and diagnostic builds and all 113 pytest tests
+  passed in 185.49 seconds. JSON parsing, shell syntax, Markdown local links,
+  and `git diff --check` passed.
+- The pinned CUDA 13.0.2 image rebuilt, all host products and the SM120 probe
+  compiled inside it, and the probe ran on the RTX 5090: compute capability
+  12.0, 33,671,348,224 total bytes, and 33,139,458,048 free bytes.
+- Marked ORA-003 and EDU-023 done. No numeric tolerance was frozen or loosened.
+  ORA-004 is now the next task: align official, llama.cpp, and Quartz stable taps,
+  diagnose each boundary, and freeze the immutable scalar admission tolerances.
 
 ## Decisions and Negative Results
 

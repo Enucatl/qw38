@@ -1,0 +1,6141 @@
+{
+  "admission_status": "reporting_only_tolerances_not_frozen",
+  "authority": "pinned official-checkpoint Transformers eager execution",
+  "checkpoint": {
+    "ignored_mtp_tensor_count": 15,
+    "loaded_text_wrapper_tensor_count": 1184,
+    "repository": "Qwen/Qwen3.8-27B",
+    "revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+    "shard_bytes": 55563006776,
+    "shard_count": 18,
+    "tensor_bytes": 55562855904,
+    "tensor_count": 1199
+  },
+  "comparisons": [
+    {
+      "llama_cpp": {
+        "actual_non_finite": {
+          "nan": 0,
+          "negative_infinity": 0,
+          "positive_infinity": 0
+        },
+        "cosine_similarity": 0.9953469372313433,
+        "count": 248320,
+        "expected_non_finite": {
+          "nan": 0,
+          "negative_infinity": 0,
+          "positive_infinity": 0
+        },
+        "first_failing_index": 0,
+        "maximum_absolute_error": 0.9036941528320312,
+        "maximum_absolute_error_index": 281,
+        "maximum_relative_error": 34076.65789473684,
+        "maximum_relative_error_index": 244599,
+        "passed": false,
+        "root_mean_square_error": 0.1624190221138399,
+        "top_logits": {
+          "actual_token_ids": [
+            3649,
+            1219,
+            299,
+            327,
+            269,
+            308,
+            505,
+            499,
+            27844,
+            150010
+          ],
+          "common_token_count": 8,
+          "exact_order": false,
+          "expected_token_ids": [
+            3649,
+            1219,
+            299,
+            327,
+            530,
+            27844,
+            269,
+            308,
+            1322,
+            505
+          ],
+          "k": 10,
+          "largest_union_delta": 0.4263877868652344,
+          "largest_union_delta_token_id": 530
+        }
+      },
+      "official_greedy_token": 3649,
+      "position": 0,
+      "quartz": {
+        "actual_non_finite": {
+          "nan": 0,
+          "negative_infinity": 0,
+          "positive_infinity": 0
+        },
+        "cosine_similarity": 0.9955675232758155,
+        "count": 248320,
+        "expected_non_finite": {
+          "nan": 0,
+          "negative_infinity": 0,
+          "positive_infinity": 0
+        },
+        "first_failing_index": 0,
+        "maximum_absolute_error": 0.9694176912307739,
+        "maximum_absolute_error_index": 281,
+        "maximum_relative_error": 39076.05592105263,
+        "maximum_relative_error_index": 244599,
+        "passed": false,
+        "root_mean_square_error": 0.15851843579823116,
+        "top_logits": {
+          "actual_token_ids": [
+            3649,
+            1219,
+            327,
+            299,
+            269,
+            308,
+            499,
+            27844,
+            150010,
+            547
+          ],
+          "common_token_count": 7,
+          "exact_order": false,
+          "expected_token_ids": [
+            3649,
+            1219,
+            299,
+            327,
+            530,
+            27844,
+            269,
+            308,
+            1322,
+            505
+          ],
+          "k": 10,
+          "largest_union_delta": 0.4488086700439453,
+          "largest_union_delta_token_id": 530
+        }
+      }
+    },
+    {
+      "llama_cpp": {
+        "actual_non_finite": {
+          "nan": 0,
+          "negative_infinity": 0,
+          "positive_infinity": 0
+        },
+        "cosine_similarity": 0.9937515365409041,
+        "count": 248320,
+        "expected_non_finite": {
+          "nan": 0,
+          "negative_infinity": 0,
+          "positive_infinity": 0
+        },
+        "first_failing_index": 0,
+        "maximum_absolute_error": 1.3920860290527344,
+        "maximum_absolute_error_index": 1178,
+        "maximum_relative_error": 199971.8,
+        "maximum_relative_error_index": 233492,
+        "passed": false,
+        "root_mean_square_error": 0.21762548718263489,
+        "top_logits": {
+          "actual_token_ids": [
+            1277,
+            1544,
+            8808,
+            8454,
+            1917,
+            26542,
+            15190,
+            5259,
+            3445,
+            190796
+          ],
+          "common_token_count": 10,
+          "exact_order": false,
+          "expected_token_ids": [
+            1277,
+            8808,
+            1544,
+            8454,
+            1917,
+            15190,
+            26542,
+            3445,
+            5259,
+            190796
+          ],
+          "k": 10,
+          "largest_union_delta": 0.46907806396484375,
+          "largest_union_delta_token_id": 1917
+        }
+      },
+      "official_greedy_token": 1277,
+      "position": 1,
+      "quartz": {
+        "actual_non_finite": {
+          "nan": 0,
+          "negative_infinity": 0,
+          "positive_infinity": 0
+        },
+        "cosine_similarity": 0.9940170801410351,
+        "count": 248320,
+        "expected_non_finite": {
+          "nan": 0,
+          "negative_infinity": 0,
+          "positive_infinity": 0
+        },
+        "first_failing_index": 0,
+        "maximum_absolute_error": 1.2858233451843262,
+        "maximum_absolute_error_index": 1178,
+        "maximum_relative_error": 179927.9375,
+        "maximum_relative_error_index": 233492,
+        "passed": false,
+        "root_mean_square_error": 0.21300218615399139,
+        "top_logits": {
+          "actual_token_ids": [
+            1277,
+            8808,
+            1544,
+            8454,
+            1917,
+            26542,
+            15190,
+            5259,
+            3445,
+            190796
+          ],
+          "common_token_count": 10,
+          "exact_order": false,
+          "expected_token_ids": [
+            1277,
+            8808,
+            1544,
+            8454,
+            1917,
+            15190,
+            26542,
+            3445,
+            5259,
+            190796
+          ],
+          "k": 10,
+          "largest_union_delta": 0.48251914978027344,
+          "largest_union_delta_token_id": 1917
+        }
+      }
+    }
+  ],
+  "environment": {
+    "attention": "eager",
+    "python": "3.12.3",
+    "torch": "2.10.0+cu130",
+    "transformers_revision": "42ca97014c85d71a88ad60d55f08cb9fb4d26e2c"
+  },
+  "execution": {
+    "cuda_peak_allocated_bytes": 24460563456,
+    "cuda_peak_reserved_bytes": 24490541056,
+    "device_map": {
+      "lm_head": 0,
+      "model.language_model.embed_tokens": 0,
+      "model.language_model.layers.0": 0,
+      "model.language_model.layers.1": 0,
+      "model.language_model.layers.10": 0,
+      "model.language_model.layers.11": 0,
+      "model.language_model.layers.12": 0,
+      "model.language_model.layers.13": 0,
+      "model.language_model.layers.14": 0,
+      "model.language_model.layers.15": 0,
+      "model.language_model.layers.16": 0,
+      "model.language_model.layers.17": 0,
+      "model.language_model.layers.18": 0,
+      "model.language_model.layers.19": 0,
+      "model.language_model.layers.2": 0,
+      "model.language_model.layers.20": 0,
+      "model.language_model.layers.21": 0,
+      "model.language_model.layers.22": 0,
+      "model.language_model.layers.23": 0,
+      "model.language_model.layers.24": 0,
+      "model.language_model.layers.25": "cpu",
+      "model.language_model.layers.26": "cpu",
+      "model.language_model.layers.27": "cpu",
+      "model.language_model.layers.28": "cpu",
+      "model.language_model.layers.29": "cpu",
+      "model.language_model.layers.3": 0,
+      "model.language_model.layers.30": "cpu",
+      "model.language_model.layers.31": "cpu",
+      "model.language_model.layers.32": "cpu",
+      "model.language_model.layers.33": "cpu",
+      "model.language_model.layers.34": "cpu",
+      "model.language_model.layers.35": "cpu",
+      "model.language_model.layers.36": "cpu",
+      "model.language_model.layers.37": "cpu",
+      "model.language_model.layers.38": "cpu",
+      "model.language_model.layers.39": "cpu",
+      "model.language_model.layers.4": 0,
+      "model.language_model.layers.40": "cpu",
+      "model.language_model.layers.41": "cpu",
+      "model.language_model.layers.42": "cpu",
+      "model.language_model.layers.43": "cpu",
+      "model.language_model.layers.44": "cpu",
+      "model.language_model.layers.45": "disk",
+      "model.language_model.layers.46": "disk",
+      "model.language_model.layers.47": "disk",
+      "model.language_model.layers.48": "disk",
+      "model.language_model.layers.49": "disk",
+      "model.language_model.layers.5": 0,
+      "model.language_model.layers.50": "disk",
+      "model.language_model.layers.51": "disk",
+      "model.language_model.layers.52": "disk",
+      "model.language_model.layers.53": "disk",
+      "model.language_model.layers.54": "disk",
+      "model.language_model.layers.55": "disk",
+      "model.language_model.layers.56": "disk",
+      "model.language_model.layers.57": "disk",
+      "model.language_model.layers.58": "disk",
+      "model.language_model.layers.59": "disk",
+      "model.language_model.layers.6": 0,
+      "model.language_model.layers.60": "disk",
+      "model.language_model.layers.61": "disk",
+      "model.language_model.layers.62": "disk",
+      "model.language_model.layers.63": "disk",
+      "model.language_model.layers.7": 0,
+      "model.language_model.layers.8": 0,
+      "model.language_model.layers.9": 0,
+      "model.language_model.norm": 0,
+      "model.visual": "disk"
+    },
+    "execute_seconds": 46.362635737001256,
+    "greedy_tokens": [
+      3649,
+      1277
+    ],
+    "input_tokens": [
+      42,
+      3649
+    ],
+    "load_seconds": 20.718263226001,
+    "maximum_rss_kib": 24357984
+  },
+  "identity": {
+    "checkpoint_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+    "identity": "verified",
+    "schema_version": 1,
+    "shard_bytes": 55563006776,
+    "shard_count": 18,
+    "transformers_revision": "42ca97014c85d71a88ad60d55f08cb9fb4d26e2c"
+  },
+  "logits": {
+    "bytes": 1986560,
+    "dtype": "float32",
+    "endianness": "little",
+    "llama_cpp_sha256": "03d747c8291b07f44ac47649c317a71fea633886f48e9dfbd4da6bb27ae74513",
+    "official_sha256": "9b64105a1c7262271c85054ef30cd116e0af4e85a497e6ae24c478007ed97947",
+    "quartz_sha256": "1be136936bca8baea761464e16814ae01471f5e4e09d908efaf2432df834095b",
+    "row_count": 2,
+    "row_width": 248320
+  },
+  "proof_limit": "official-checkpoint eager taps and logits are captured; cross-artifact differences are reporting-only until ORA-004 freezes per-tap tolerances",
+  "schema_version": 1,
+  "taps": {
+    "bytes": 20160352,
+    "records": [
+      {
+        "bytes": 20480,
+        "name": "position.0.embedding.output",
+        "offset": 0,
+        "sha256": "a7a3e26ac97523d8abde0e94e79cf79666ac5a222f55582c199c8f78f181a41f",
+        "shape": [
+          1,
+          1,
+          5120
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 5120,
+          "finite_count": 5120,
+          "maximum": 0.18359375,
+          "mean": -0.00028739152767229823,
+          "minimum": -0.1474609375,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 0.014356966629967789
+        }
+      },
+      {
+        "bytes": 20480,
+        "name": "position.0.layer.0.residual.input",
+        "offset": 20480,
+        "sha256": "a7a3e26ac97523d8abde0e94e79cf79666ac5a222f55582c199c8f78f181a41f",
+        "shape": [
+          1,
+          1,
+          5120
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 5120,
+          "finite_count": 5120,
+          "maximum": 0.18359375,
+          "mean": -0.00028739152767229823,
+          "minimum": -0.1474609375,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 0.014356966629967789
+        }
+      },
+      {
+        "bytes": 20480,
+        "name": "position.0.layer.0.input_norm.output",
+        "offset": 40960,
+        "sha256": "4b8087f84b0d2eae68da4c51366b8afdd39760cc1360ed0bdd39ba52a55530af",
+        "shape": [
+          1,
+          1,
+          5120
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 5120,
+          "finite_count": 5120,
+          "maximum": 13.3125,
+          "mean": -0.018660697620362043,
+          "minimum": -10.4375,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 0.9920212270475083
+        }
+      },
+      {
+        "bytes": 40960,
+        "name": "position.0.layer.0.gdn.qkv_projection",
+        "offset": 61440,
+        "sha256": "05e1b48918ae9402b3f551f5a0967b4e2924039e2502ca3f348e4c106690ca1d",
+        "shape": [
+          1,
+          1,
+          10240
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 10240,
+          "finite_count": 10240,
+          "maximum": 47.75,
+          "mean": -0.039622212573885915,
+          "minimum": -55.75,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 4.273864900259629
+        }
+      },
+      {
+        "bytes": 24576,
+        "name": "position.0.layer.0.gdn.gate_projection",
+        "offset": 102400,
+        "sha256": "ad589a89893b2e550f4b3e7808a48611ca6482cc1986031e261fb37cec7fb61c",
+        "shape": [
+          1,
+          1,
+          6144
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 6144,
+          "finite_count": 6144,
+          "maximum": 12.125,
+          "mean": -1.1433833688497543,
+          "minimum": -19.25,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 2.7942689523872994
+        }
+      },
+      {
+        "bytes": 192,
+        "name": "position.0.layer.0.gdn.beta_projection",
+        "offset": 126976,
+        "sha256": "f20c3a6db419c6de21a7cff2fb368e3cd38c9b6acf0e7d10d527a0293e00c7e3",
+        "shape": [
+          1,
+          1,
+          48
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 48,
+          "finite_count": 48,
+          "maximum": 5.78125,
+          "mean": 1.8668212890625,
+          "minimum": -2.25,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 2.825460692906851
+        }
+      },
+      {
+        "bytes": 192,
+        "name": "position.0.layer.0.gdn.decay_projection",
+        "offset": 127168,
+        "sha256": "76d21873a731dc6812a51936b8161fe18db933ff50c605675321854c2b314456",
+        "shape": [
+          1,
+          1,
+          48
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 48,
+          "finite_count": 48,
+          "maximum": 5.34375,
+          "mean": -0.6528422037760416,
+          "minimum": -7.6875,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 2.6645414093488426
+        }
+      },
+      {
+        "bytes": 24576,
+        "name": "position.0.layer.0.gdn.query",
+        "offset": 127360,
+        "sha256": "12017d43956b96f06ba7e406cd94bcee761e3ab5c70b68ed2aea2264615c7342",
+        "shape": [
+          1,
+          1,
+          48,
+          128
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 6144,
+          "finite_count": 6144,
+          "maximum": 7.34375,
+          "mean": 0.020912930057420454,
+          "minimum": -0.27734375,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 0.2293977325973524
+        }
+      },
+      {
+        "bytes": 24576,
+        "name": "position.0.layer.0.gdn.key",
+        "offset": 151936,
+        "sha256": "978138bbd0f87ae00635c670c9e1d1b939d407642e32bbd99cb6cd4ef8802870",
+        "shape": [
+          1,
+          1,
+          48,
+          128
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 6144,
+          "finite_count": 6144,
+          "maximum": 1.84375,
+          "mean": 0.006470495180110447,
+          "minimum": -0.27734375,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 0.10273836442851024
+        }
+      },
+      {
+        "bytes": 24576,
+        "name": "position.0.layer.0.gdn.value",
+        "offset": 176512,
+        "sha256": "54a5d73761835aca4634d67bb2548ca4d02c267cd02fd56d71e6d8fdc5cb256f",
+        "shape": [
+          1,
+          1,
+          48,
+          128
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 6144,
+          "finite_count": 6144,
+          "maximum": 17.125,
+          "mean": 0.06683899629266914,
+          "minimum": -0.2734375,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 0.6949531670999551
+        }
+      },
+      {
+        "bytes": 192,
+        "name": "position.0.layer.0.gdn.g",
+        "offset": 201088,
+        "sha256": "59c58244c95260914d0eedc2a1d73240d9d3540a8620057d97ac9390feb3f49d",
+        "shape": [
+          1,
+          1,
+          48
+        ],
+        "source_dtype": "float32",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 48,
+          "finite_count": 48,
+          "maximum": -7.85621594445729e-08,
+          "mean": -0.5517398820613054,
+          "minimum": -6.477415084838867,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 1.2430494160421426
+        }
+      },
+      {
+        "bytes": 192,
+        "name": "position.0.layer.0.gdn.beta",
+        "offset": 201280,
+        "sha256": "259c39d0b0489755d4cca8958a229e7d406b0b58b2291fbf2517e3daf535d463",
+        "shape": [
+          1,
+          1,
+          48
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 48,
+          "finite_count": 48,
+          "maximum": 0.99609375,
+          "mean": 0.735198974609375,
+          "minimum": 0.09521484375,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 0.7871675966751897
+        }
+      },
+      {
+        "bytes": 24576,
+        "name": "position.0.layer.0.gdn.core_output",
+        "offset": 201472,
+        "sha256": "7004212dd75350f1b19f250b07d6cfc2b6e05fc207a81364ad8ffd051d1cefda",
+        "shape": [
+          1,
+          1,
+          48,
+          128
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 6144,
+          "finite_count": 6144,
+          "maximum": 0.59765625,
+          "mean": 0.000875329117943228,
+          "minimum": -0.00787353515625,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 0.015965030988108836
+        }
+      },
+      {
+        "bytes": 3145728,
+        "name": "position.0.layer.0.gdn.recurrent_state",
+        "offset": 226048,
+        "sha256": "a4c5b4f85449e07baa87c8ab073d5e03325e2e145a7b2f1fac32fd4bd6f3d5ee",
+        "shape": [
+          1,
+          48,
+          128,
+          128
+        ],
+        "source_dtype": "float32",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 786432,
+          "finite_count": 786432,
+          "maximum": 10.670490264892578,
+          "mean": 0.00029440610257902344,
+          "minimum": -5.2195916175842285,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 0.05027955765672434
+        }
+      },
+      {
+        "bytes": 24576,
+        "name": "position.0.layer.0.gdn.gated_norm",
+        "offset": 3371776,
+        "sha256": "10b6de11db0ce578139132a21444cfb727a9bcb43ddd32fa42f7b2cb189a26df",
+        "shape": [
+          48,
+          128
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 6144,
+          "finite_count": 6144,
+          "maximum": 0.48046875,
+          "mean": -0.0019930304940573387,
+          "minimum": -2.46875,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 0.056465941258931104
+        }
+      },
+      {
+        "bytes": 20480,
+        "name": "position.0.layer.0.gdn.output",
+        "offset": 3396352,
+        "sha256": "6b4319b4f0b20a3411aeb07218c39579edcd133aeb1e5e9775132240286d5ae7",
+        "shape": [
+          1,
+          1,
+          5120
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 5120,
+          "finite_count": 5120,
+          "maximum": 12.75,
+          "mean": 0.0015717151680291863,
+          "minimum": -0.578125,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 0.18098211937044492
+        }
+      },
+      {
+        "bytes": 20480,
+        "name": "position.0.layer.0.mixer_residual.output",
+        "offset": 3416832,
+        "sha256": "35eda2cef659d4007a441d09b36b57f7d0dffd07305425f0e2f212b8f4f1b369",
+        "shape": [
+          1,
+          1,
+          5120
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 5120,
+          "finite_count": 5120,
+          "maximum": 12.75,
+          "mean": 0.0012799281626939773,
+          "minimum": -0.5859375,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 0.18150514525040276
+        }
+      },
+      {
+        "bytes": 20480,
+        "name": "position.0.layer.0.post_mixer_norm.output",
+        "offset": 3437312,
+        "sha256": "be143dc6f2c0e768f95a5add8a039b4181726d368527acc93b5767f0382dc929",
+        "shape": [
+          1,
+          1,
+          5120
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 5120,
+          "finite_count": 5120,
+          "maximum": 1.359375,
+          "mean": -0.004680613428354264,
+          "minimum": -2.125,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 0.144365808631621
+        }
+      },
+      {
+        "bytes": 69632,
+        "name": "position.0.layer.0.ffn.gate_projection",
+        "offset": 3457792,
+        "sha256": "368719e94588f8712b4e2df48223e5cbc2bff841830bba656fcfb06e200886a4",
+        "shape": [
+          1,
+          1,
+          17408
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 17408,
+          "finite_count": 17408,
+          "maximum": 1.0625,
+          "mean": -0.03952639579160057,
+          "minimum": -3.171875,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 0.14641182193010754
+        }
+      },
+      {
+        "bytes": 69632,
+        "name": "position.0.layer.0.ffn.activation",
+        "offset": 3527424,
+        "sha256": "65f40a18eb853dadffa1d64a5a53a1456e852643d241b2ec8ded3f8953eb4952",
+        "shape": [
+          1,
+          1,
+          17408
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 17408,
+          "finite_count": 17408,
+          "maximum": 0.7890625,
+          "mean": -0.014540261132317349,
+          "minimum": -0.279296875,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 0.06948044332292194
+        }
+      },
+      {
+        "bytes": 69632,
+        "name": "position.0.layer.0.ffn.up_projection",
+        "offset": 3597056,
+        "sha256": "467047b04863454e889ccdaf0521711c9aa83399fc4fd6a3fb2a6891bba375e5",
+        "shape": [
+          1,
+          1,
+          17408
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 17408,
+          "finite_count": 17408,
+          "maximum": 1.9765625,
+          "mean": 0.0001189296120120322,
+          "minimum": -4.125,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 0.13476216337269525
+        }
+      },
+      {
+        "bytes": 20480,
+        "name": "position.0.layer.0.ffn.output",
+        "offset": 3666688,
+        "sha256": "697177962173cdf10bf51ae52382c771cd89bb59fd21b01bf489bc72af86fb76",
+        "shape": [
+          1,
+          1,
+          5120
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 5120,
+          "finite_count": 5120,
+          "maximum": 4.90625,
+          "mean": -7.322700694203376e-05,
+          "minimum": -0.2265625,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 0.07674545313971677
+        }
+      },
+      {
+        "bytes": 20480,
+        "name": "position.0.layer.0.residual.output",
+        "offset": 3687168,
+        "sha256": "b34e408279b152193ff0ca0d81e8e4348d58d133b6a5f556083a3f606bdd79d1",
+        "shape": [
+          1,
+          1,
+          5120
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 5120,
+          "finite_count": 5120,
+          "maximum": 17.625,
+          "mean": 0.0012006644159555436,
+          "minimum": -0.67578125,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 0.2529044537415961
+        }
+      },
+      {
+        "bytes": 20480,
+        "name": "position.0.layer.3.residual.input",
+        "offset": 3707648,
+        "sha256": "5b0da43dac8303dec5642d97dd24580278666f4f77eeed1edb8a0c8dfeff2c87",
+        "shape": [
+          1,
+          1,
+          5120
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 5120,
+          "finite_count": 5120,
+          "maximum": 33.5,
+          "mean": 0.0016907751560211182,
+          "minimum": -4.0625,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 0.48450569204075533
+        }
+      },
+      {
+        "bytes": 20480,
+        "name": "position.0.layer.3.input_norm.output",
+        "offset": 3728128,
+        "sha256": "0cd7865a9d21f9bd7262e70b5ab733991a4e78679572a278ba10713afb8504b2",
+        "shape": [
+          1,
+          1,
+          5120
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 5120,
+          "finite_count": 5120,
+          "maximum": 89.5,
+          "mean": 0.003543485701084137,
+          "minimum": -15.875,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 1.304961171695617
+        }
+      },
+      {
+        "bytes": 49152,
+        "name": "position.0.layer.3.attention.query_gate_projection",
+        "offset": 3748608,
+        "sha256": "6d711e15c19c53ade9bffe535e1a76ab5e22ef102dcb3b59534ab351cd837639",
+        "shape": [
+          1,
+          1,
+          12288
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 12288,
+          "finite_count": 12288,
+          "maximum": 11.4375,
+          "mean": -2.0692505343661955,
+          "minimum": -7.6875,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 3.0054192691351878
+        }
+      },
+      {
+        "bytes": 24576,
+        "name": "position.0.layer.3.attention.query_norm",
+        "offset": 3797760,
+        "sha256": "86e9c16842b4409ec0ad6f537c32cb54e29c640fe82511bb636fa121fa5d96d7",
+        "shape": [
+          1,
+          1,
+          24,
+          256
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 6144,
+          "finite_count": 6144,
+          "maximum": 10.5,
+          "mean": 0.007175692357122898,
+          "minimum": -6.71875,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 1.1489098522002017
+        }
+      },
+      {
+        "bytes": 4096,
+        "name": "position.0.layer.3.attention.key_projection",
+        "offset": 3822336,
+        "sha256": "c88126b5f955dc9024d1d41288601eba400449daeee2738911addaa1c33b027e",
+        "shape": [
+          1,
+          1,
+          1024
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 1024,
+          "finite_count": 1024,
+          "maximum": 6.03125,
+          "mean": 0.020534534007310867,
+          "minimum": -6.0,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 1.0253223880767097
+        }
+      },
+      {
+        "bytes": 4096,
+        "name": "position.0.layer.3.attention.key_norm",
+        "offset": 3826432,
+        "sha256": "03719f11966e7340fac9edeccc9b3734713de274cf849241ec22e4a337df8778",
+        "shape": [
+          1,
+          1,
+          4,
+          256
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 1024,
+          "finite_count": 1024,
+          "maximum": 9.625,
+          "mean": 0.017097286880016327,
+          "minimum": -6.15625,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 1.146870401790646
+        }
+      },
+      {
+        "bytes": 4096,
+        "name": "position.0.layer.3.attention.value_projection",
+        "offset": 3830528,
+        "sha256": "adb6ee55fd4a6845ba46b5a8fc9c7bc73fa2e5a397749659e736386e07b19252",
+        "shape": [
+          1,
+          1,
+          1024
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 1024,
+          "finite_count": 1024,
+          "maximum": 3.71875,
+          "mean": 0.000654345378279686,
+          "minimum": -2.015625,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 0.5216455818108539
+        }
+      },
+      {
+        "bytes": 24576,
+        "name": "position.0.layer.3.attention.query_before_rope",
+        "offset": 3834624,
+        "sha256": "86e9c16842b4409ec0ad6f537c32cb54e29c640fe82511bb636fa121fa5d96d7",
+        "shape": [
+          1,
+          24,
+          1,
+          256
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 6144,
+          "finite_count": 6144,
+          "maximum": 10.5,
+          "mean": 0.007175692357122898,
+          "minimum": -6.71875,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 1.1489098522002017
+        }
+      },
+      {
+        "bytes": 4096,
+        "name": "position.0.layer.3.attention.key_before_rope",
+        "offset": 3859200,
+        "sha256": "03719f11966e7340fac9edeccc9b3734713de274cf849241ec22e4a337df8778",
+        "shape": [
+          1,
+          4,
+          1,
+          256
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 1024,
+          "finite_count": 1024,
+          "maximum": 9.625,
+          "mean": 0.017097286880016327,
+          "minimum": -6.15625,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 1.146870401790646
+        }
+      },
+      {
+        "bytes": 24576,
+        "name": "position.0.layer.3.attention.query_after_rope",
+        "offset": 3863296,
+        "sha256": "86e9c16842b4409ec0ad6f537c32cb54e29c640fe82511bb636fa121fa5d96d7",
+        "shape": [
+          1,
+          24,
+          1,
+          256
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 6144,
+          "finite_count": 6144,
+          "maximum": 10.5,
+          "mean": 0.007175692357122898,
+          "minimum": -6.71875,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 1.1489098522002017
+        }
+      },
+      {
+        "bytes": 4096,
+        "name": "position.0.layer.3.attention.key_after_rope",
+        "offset": 3887872,
+        "sha256": "03719f11966e7340fac9edeccc9b3734713de274cf849241ec22e4a337df8778",
+        "shape": [
+          1,
+          4,
+          1,
+          256
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 1024,
+          "finite_count": 1024,
+          "maximum": 9.625,
+          "mean": 0.017097286880016327,
+          "minimum": -6.15625,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 1.146870401790646
+        }
+      },
+      {
+        "bytes": 24576,
+        "name": "position.0.layer.3.attention.query",
+        "offset": 3891968,
+        "sha256": "86e9c16842b4409ec0ad6f537c32cb54e29c640fe82511bb636fa121fa5d96d7",
+        "shape": [
+          1,
+          24,
+          1,
+          256
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 6144,
+          "finite_count": 6144,
+          "maximum": 10.5,
+          "mean": 0.007175692357122898,
+          "minimum": -6.71875,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 1.1489098522002017
+        }
+      },
+      {
+        "bytes": 4096,
+        "name": "position.0.layer.3.attention.key_cache",
+        "offset": 3916544,
+        "sha256": "03719f11966e7340fac9edeccc9b3734713de274cf849241ec22e4a337df8778",
+        "shape": [
+          1,
+          4,
+          1,
+          256
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 1024,
+          "finite_count": 1024,
+          "maximum": 9.625,
+          "mean": 0.017097286880016327,
+          "minimum": -6.15625,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 1.146870401790646
+        }
+      },
+      {
+        "bytes": 4096,
+        "name": "position.0.layer.3.attention.value_cache",
+        "offset": 3920640,
+        "sha256": "adb6ee55fd4a6845ba46b5a8fc9c7bc73fa2e5a397749659e736386e07b19252",
+        "shape": [
+          1,
+          4,
+          1,
+          256
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 1024,
+          "finite_count": 1024,
+          "maximum": 3.71875,
+          "mean": 0.000654345378279686,
+          "minimum": -2.015625,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 0.5216455818108539
+        }
+      },
+      {
+        "bytes": 24576,
+        "name": "position.0.layer.3.attention.core_output",
+        "offset": 3924736,
+        "sha256": "4140f97387b521008d168152eaeba9833a617f240a4d27bc99bda9ecd824cac6",
+        "shape": [
+          1,
+          1,
+          24,
+          256
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 6144,
+          "finite_count": 6144,
+          "maximum": 3.71875,
+          "mean": 0.000654345378279686,
+          "minimum": -2.015625,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 0.5216455818108539
+        }
+      },
+      {
+        "bytes": 96,
+        "name": "position.0.layer.3.attention.weights",
+        "offset": 3949312,
+        "sha256": "849203e6b4e586413022ab65a115f70a9e41cb0ee678fa1984c90f7d4a5f33ad",
+        "shape": [
+          1,
+          24,
+          1,
+          1
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 24,
+          "finite_count": 24,
+          "maximum": 1.0,
+          "mean": 1.0,
+          "minimum": 1.0,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 1.0
+        }
+      },
+      {
+        "bytes": 20480,
+        "name": "position.0.layer.3.attention.output",
+        "offset": 3949408,
+        "sha256": "e7e6d37df995b9abc2d4834731086dd915ba19f19c363fa70be207662c356a8d",
+        "shape": [
+          1,
+          1,
+          5120
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 5120,
+          "finite_count": 5120,
+          "maximum": 5.0,
+          "mean": 0.001541925992933102,
+          "minimum": -0.322265625,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 0.07790746679940859
+        }
+      },
+      {
+        "bytes": 20480,
+        "name": "position.0.layer.3.mixer_residual.output",
+        "offset": 3969888,
+        "sha256": "ecff76cade6e244d9c5be55ea973deb0379bd8f9eebd3fbaeb5b6f129e742dd6",
+        "shape": [
+          1,
+          1,
+          5120
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 5120,
+          "finite_count": 5120,
+          "maximum": 38.5,
+          "mean": 0.0032330818474292757,
+          "minimum": -4.375,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 0.5553168598736354
+        }
+      },
+      {
+        "bytes": 20480,
+        "name": "position.0.layer.3.post_mixer_norm.output",
+        "offset": 3990368,
+        "sha256": "2afb0419b6b77e7c2857583be79b2a877096bd369e62552a9e7927a8d39dbeb4",
+        "shape": [
+          1,
+          1,
+          5120
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 5120,
+          "finite_count": 5120,
+          "maximum": 3.828125,
+          "mean": -0.004578640125691891,
+          "minimum": -2.734375,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 0.1746418926023017
+        }
+      },
+      {
+        "bytes": 69632,
+        "name": "position.0.layer.3.ffn.gate_projection",
+        "offset": 4010848,
+        "sha256": "4a51e40900ec600189a55848b9f4cd99875b8342149ec9d8890403ed4bcb37a2",
+        "shape": [
+          1,
+          1,
+          17408
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 17408,
+          "finite_count": 17408,
+          "maximum": 1.2734375,
+          "mean": 0.013967975035912412,
+          "minimum": -0.73046875,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 0.158508035313697
+        }
+      },
+      {
+        "bytes": 69632,
+        "name": "position.0.layer.3.ffn.activation",
+        "offset": 4080480,
+        "sha256": "e82a3696585d9056853a8199caaa944733b8457ea655b39e1d46464a2d8248e1",
+        "shape": [
+          1,
+          1,
+          17408
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 17408,
+          "finite_count": 17408,
+          "maximum": 0.99609375,
+          "mean": 0.013200645906823304,
+          "minimum": -0.2373046875,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 0.08373051874810494
+        }
+      },
+      {
+        "bytes": 69632,
+        "name": "position.0.layer.3.ffn.up_projection",
+        "offset": 4150112,
+        "sha256": "16878f996ba51d651e85f84c35a44d818ad22846709d70c294a34e998c7a1625",
+        "shape": [
+          1,
+          1,
+          17408
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 17408,
+          "finite_count": 17408,
+          "maximum": 1.4140625,
+          "mean": 0.0006373036431956707,
+          "minimum": -1.375,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 0.13580463497278128
+        }
+      },
+      {
+        "bytes": 20480,
+        "name": "position.0.layer.3.ffn.output",
+        "offset": 4219744,
+        "sha256": "3f5530bc99243b76e149c355add07b0613f45c8df4f1563c8dc5b4fd868bc8c1",
+        "shape": [
+          1,
+          1,
+          5120
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 5120,
+          "finite_count": 5120,
+          "maximum": 0.32421875,
+          "mean": 0.00014757477565581213,
+          "minimum": -0.201171875,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 0.027322595133517945
+        }
+      },
+      {
+        "bytes": 20480,
+        "name": "position.0.layer.3.residual.output",
+        "offset": 4240224,
+        "sha256": "9c9806278dd7814d1bb5ed5fedefae8fc0bc11eecb454a93c257e87f5f0dcb9e",
+        "shape": [
+          1,
+          1,
+          5120
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 5120,
+          "finite_count": 5120,
+          "maximum": 38.25,
+          "mean": 0.0033707715570926665,
+          "minimum": -4.46875,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 0.5550982463311253
+        }
+      },
+      {
+        "bytes": 20480,
+        "name": "position.0.layer.7.residual.input",
+        "offset": 4260704,
+        "sha256": "bbca995ad304cd63aacc4a2c7d15de4a2b6841dc0577c1cde3c97ccbfc1a8cee",
+        "shape": [
+          1,
+          1,
+          5120
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 5120,
+          "finite_count": 5120,
+          "maximum": 55.75,
+          "mean": 0.0065091937780380246,
+          "minimum": -7.5,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 0.8354912995431782
+        }
+      },
+      {
+        "bytes": 20480,
+        "name": "position.0.layer.7.input_norm.output",
+        "offset": 4281184,
+        "sha256": "0a0e0090741ce6c7d1630d9e021bd730974cf0273528b11aa0cf9bda6fdf747c",
+        "shape": [
+          1,
+          1,
+          5120
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 5120,
+          "finite_count": 5120,
+          "maximum": 78.5,
+          "mean": 0.007388139702379703,
+          "minimum": -18.5,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 1.2130784403747874
+        }
+      },
+      {
+        "bytes": 49152,
+        "name": "position.0.layer.7.attention.query_gate_projection",
+        "offset": 4301664,
+        "sha256": "4f9627900942f075a99d300116b02bdbbb3c89eeea6883bf2683ef1d22cd3d0f",
+        "shape": [
+          1,
+          1,
+          12288
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 12288,
+          "finite_count": 12288,
+          "maximum": 13.1875,
+          "mean": -1.9106228800180058,
+          "minimum": -9.5,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 2.8334862176455236
+        }
+      },
+      {
+        "bytes": 24576,
+        "name": "position.0.layer.7.attention.query_norm",
+        "offset": 4350816,
+        "sha256": "f4ae148d87a6d1902d5ba09b8b5ff4f555b8036c12ccbcaecd1d43008c04d835",
+        "shape": [
+          1,
+          1,
+          24,
+          256
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 6144,
+          "finite_count": 6144,
+          "maximum": 9.3125,
+          "mean": 0.03657978416110078,
+          "minimum": -6.1875,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 1.2327992889625041
+        }
+      },
+      {
+        "bytes": 4096,
+        "name": "position.0.layer.7.attention.key_projection",
+        "offset": 4375392,
+        "sha256": "a5aa7bd5138d6e9be5479750d69ba0ee0c6377e0e5f0556390a85be336b0d670",
+        "shape": [
+          1,
+          1,
+          1024
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 1024,
+          "finite_count": 1024,
+          "maximum": 17.25,
+          "mean": 0.06403148174285889,
+          "minimum": -5.25,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 1.344868703265431
+        }
+      },
+      {
+        "bytes": 4096,
+        "name": "position.0.layer.7.attention.key_norm",
+        "offset": 4379488,
+        "sha256": "6d0474c59ff48395e2e0413cf05a6680c1e353381355e68ad3a8369a4ab2f509",
+        "shape": [
+          1,
+          1,
+          4,
+          256
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 1024,
+          "finite_count": 1024,
+          "maximum": 11.0,
+          "mean": 0.05172765254974365,
+          "minimum": -6.78125,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 1.2428074313261974
+        }
+      },
+      {
+        "bytes": 4096,
+        "name": "position.0.layer.7.attention.value_projection",
+        "offset": 4383584,
+        "sha256": "b5fccbbc3127ccd4eda70396960dd81d594ce7077676776565468d2592677229",
+        "shape": [
+          1,
+          1,
+          1024
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 1024,
+          "finite_count": 1024,
+          "maximum": 5.0,
+          "mean": -0.02282598614692688,
+          "minimum": -8.0625,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 0.7533686204495389
+        }
+      },
+      {
+        "bytes": 24576,
+        "name": "position.0.layer.7.attention.query_before_rope",
+        "offset": 4387680,
+        "sha256": "f4ae148d87a6d1902d5ba09b8b5ff4f555b8036c12ccbcaecd1d43008c04d835",
+        "shape": [
+          1,
+          24,
+          1,
+          256
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 6144,
+          "finite_count": 6144,
+          "maximum": 9.3125,
+          "mean": 0.03657978416110078,
+          "minimum": -6.1875,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 1.2327992889625041
+        }
+      },
+      {
+        "bytes": 4096,
+        "name": "position.0.layer.7.attention.key_before_rope",
+        "offset": 4412256,
+        "sha256": "6d0474c59ff48395e2e0413cf05a6680c1e353381355e68ad3a8369a4ab2f509",
+        "shape": [
+          1,
+          4,
+          1,
+          256
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 1024,
+          "finite_count": 1024,
+          "maximum": 11.0,
+          "mean": 0.05172765254974365,
+          "minimum": -6.78125,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 1.2428074313261974
+        }
+      },
+      {
+        "bytes": 24576,
+        "name": "position.0.layer.7.attention.query_after_rope",
+        "offset": 4416352,
+        "sha256": "f4ae148d87a6d1902d5ba09b8b5ff4f555b8036c12ccbcaecd1d43008c04d835",
+        "shape": [
+          1,
+          24,
+          1,
+          256
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 6144,
+          "finite_count": 6144,
+          "maximum": 9.3125,
+          "mean": 0.03657978416110078,
+          "minimum": -6.1875,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 1.2327992889625041
+        }
+      },
+      {
+        "bytes": 4096,
+        "name": "position.0.layer.7.attention.key_after_rope",
+        "offset": 4440928,
+        "sha256": "6d0474c59ff48395e2e0413cf05a6680c1e353381355e68ad3a8369a4ab2f509",
+        "shape": [
+          1,
+          4,
+          1,
+          256
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 1024,
+          "finite_count": 1024,
+          "maximum": 11.0,
+          "mean": 0.05172765254974365,
+          "minimum": -6.78125,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 1.2428074313261974
+        }
+      },
+      {
+        "bytes": 24576,
+        "name": "position.0.layer.7.attention.query",
+        "offset": 4445024,
+        "sha256": "f4ae148d87a6d1902d5ba09b8b5ff4f555b8036c12ccbcaecd1d43008c04d835",
+        "shape": [
+          1,
+          24,
+          1,
+          256
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 6144,
+          "finite_count": 6144,
+          "maximum": 9.3125,
+          "mean": 0.03657978416110078,
+          "minimum": -6.1875,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 1.2327992889625041
+        }
+      },
+      {
+        "bytes": 4096,
+        "name": "position.0.layer.7.attention.key_cache",
+        "offset": 4469600,
+        "sha256": "6d0474c59ff48395e2e0413cf05a6680c1e353381355e68ad3a8369a4ab2f509",
+        "shape": [
+          1,
+          4,
+          1,
+          256
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 1024,
+          "finite_count": 1024,
+          "maximum": 11.0,
+          "mean": 0.05172765254974365,
+          "minimum": -6.78125,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 1.2428074313261974
+        }
+      },
+      {
+        "bytes": 4096,
+        "name": "position.0.layer.7.attention.value_cache",
+        "offset": 4473696,
+        "sha256": "b5fccbbc3127ccd4eda70396960dd81d594ce7077676776565468d2592677229",
+        "shape": [
+          1,
+          4,
+          1,
+          256
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 1024,
+          "finite_count": 1024,
+          "maximum": 5.0,
+          "mean": -0.02282598614692688,
+          "minimum": -8.0625,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 0.7533686204495389
+        }
+      },
+      {
+        "bytes": 24576,
+        "name": "position.0.layer.7.attention.core_output",
+        "offset": 4477792,
+        "sha256": "36c02d4beb644965c4f88ac814851d2aa30dbabafecaba2121d634bffca214ac",
+        "shape": [
+          1,
+          1,
+          24,
+          256
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 6144,
+          "finite_count": 6144,
+          "maximum": 5.0,
+          "mean": -0.02282598614692688,
+          "minimum": -8.0625,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 0.7533686204495389
+        }
+      },
+      {
+        "bytes": 96,
+        "name": "position.0.layer.7.attention.weights",
+        "offset": 4502368,
+        "sha256": "849203e6b4e586413022ab65a115f70a9e41cb0ee678fa1984c90f7d4a5f33ad",
+        "shape": [
+          1,
+          24,
+          1,
+          1
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 24,
+          "finite_count": 24,
+          "maximum": 1.0,
+          "mean": 1.0,
+          "minimum": 1.0,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 1.0
+        }
+      },
+      {
+        "bytes": 20480,
+        "name": "position.0.layer.7.attention.output",
+        "offset": 4502464,
+        "sha256": "93f09ff55c88ecfedb7ea2eba115a574ca6181690c36f79faa944a2994ff99d9",
+        "shape": [
+          1,
+          1,
+          5120
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 5120,
+          "finite_count": 5120,
+          "maximum": 3.015625,
+          "mean": -0.0007305947365239263,
+          "minimum": -0.59375,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 0.08438240142220295
+        }
+      },
+      {
+        "bytes": 20480,
+        "name": "position.0.layer.7.mixer_residual.output",
+        "offset": 4522944,
+        "sha256": "5e202734c328e0d2c3177dac8a5b4b2f7a00562785bf31d2355dc5520aef01d1",
+        "shape": [
+          1,
+          1,
+          5120
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 5120,
+          "finite_count": 5120,
+          "maximum": 56.0,
+          "mean": 0.005761060118675232,
+          "minimum": -7.875,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 0.8549865819008302
+        }
+      },
+      {
+        "bytes": 20480,
+        "name": "position.0.layer.7.post_mixer_norm.output",
+        "offset": 4543424,
+        "sha256": "6513b28ba9c5ab052ff11dd6ca9df4dd62118f2284921782bbabcf8878958bc9",
+        "shape": [
+          1,
+          1,
+          5120
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 5120,
+          "finite_count": 5120,
+          "maximum": 7.75,
+          "mean": -0.0034427618607878684,
+          "minimum": -4.6875,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 0.25505982044848746
+        }
+      },
+      {
+        "bytes": 69632,
+        "name": "position.0.layer.7.ffn.gate_projection",
+        "offset": 4563904,
+        "sha256": "06b5b9f4b1212ae12abab8eb766362d13720ba694a7d55de2d60579f784c0c11",
+        "shape": [
+          1,
+          1,
+          17408
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 17408,
+          "finite_count": 17408,
+          "maximum": 1.40625,
+          "mean": -0.06383330321542043,
+          "minimum": -0.84375,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 0.20123484995108357
+        }
+      },
+      {
+        "bytes": 69632,
+        "name": "position.0.layer.7.ffn.activation",
+        "offset": 4633536,
+        "sha256": "0358b5c5cc6a86848b746cee3113e0bbdd16ae6e84e77cbffcba2803f435178d",
+        "shape": [
+          1,
+          1,
+          17408
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 17408,
+          "finite_count": 17408,
+          "maximum": 1.1328125,
+          "mean": -0.021912832422565448,
+          "minimum": -0.25390625,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 0.09620039048477502
+        }
+      },
+      {
+        "bytes": 69632,
+        "name": "position.0.layer.7.ffn.up_projection",
+        "offset": 4703168,
+        "sha256": "58b988bd63ecf929e0df88dc6c79c8bd2029a8a2f93fdf40f874213e792d6175",
+        "shape": [
+          1,
+          1,
+          17408
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 17408,
+          "finite_count": 17408,
+          "maximum": 1.25,
+          "mean": 0.0014558386550668407,
+          "minimum": -1.34375,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 0.16476005289028253
+        }
+      },
+      {
+        "bytes": 20480,
+        "name": "position.0.layer.7.ffn.output",
+        "offset": 4772800,
+        "sha256": "8c400f61b15cd8c0cb29b3947ac0b7c934d38083d66cb1b001f067b977ac4f5b",
+        "shape": [
+          1,
+          1,
+          5120
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 5120,
+          "finite_count": 5120,
+          "maximum": 0.310546875,
+          "mean": -0.0007084746001055464,
+          "minimum": -0.154296875,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 0.03123544793476305
+        }
+      },
+      {
+        "bytes": 20480,
+        "name": "position.0.layer.7.residual.output",
+        "offset": 4793280,
+        "sha256": "02a75f4480501ad75e75337531d50cd6e6b51b4f97c6762789cd7d696282db85",
+        "shape": [
+          1,
+          1,
+          5120
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 5120,
+          "finite_count": 5120,
+          "maximum": 56.0,
+          "mean": 0.005035040341317654,
+          "minimum": -7.90625,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 0.8586565867911152
+        }
+      },
+      {
+        "bytes": 20480,
+        "name": "position.0.layer.62.residual.input",
+        "offset": 4813760,
+        "sha256": "af48ac0bdb35ffb6ab5b20f9648e190e7fd9c83f73419342307152b8d14329d5",
+        "shape": [
+          1,
+          1,
+          5120
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 5120,
+          "finite_count": 5120,
+          "maximum": 100.5,
+          "mean": -0.042327243089675906,
+          "minimum": -28.0,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 3.3345414474772697
+        }
+      },
+      {
+        "bytes": 20480,
+        "name": "position.0.layer.62.input_norm.output",
+        "offset": 4834240,
+        "sha256": "9093bd7413c447292daf66313a22e100be238d8575420463db182772a3206999",
+        "shape": [
+          1,
+          1,
+          5120
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 5120,
+          "finite_count": 5120,
+          "maximum": 29.0,
+          "mean": -0.018061808496713638,
+          "minimum": -14.375,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 1.1710921190551875
+        }
+      },
+      {
+        "bytes": 40960,
+        "name": "position.0.layer.62.gdn.qkv_projection",
+        "offset": 4854720,
+        "sha256": "5acbc75415d97e1057bdca9b1345af41ed4bc22acfc971de29357f6a952912e8",
+        "shape": [
+          1,
+          1,
+          10240
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 10240,
+          "finite_count": 10240,
+          "maximum": 29.5,
+          "mean": -0.017660863418132066,
+          "minimum": -25.25,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 2.805529012859971
+        }
+      },
+      {
+        "bytes": 24576,
+        "name": "position.0.layer.62.gdn.gate_projection",
+        "offset": 4895680,
+        "sha256": "e93723ff43012027af180f328c20394d423ec43016b4d177089a881448b5afda",
+        "shape": [
+          1,
+          1,
+          6144
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 6144,
+          "finite_count": 6144,
+          "maximum": 14.9375,
+          "mean": -0.7408520287523667,
+          "minimum": -9.0625,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 2.3450930709212536
+        }
+      },
+      {
+        "bytes": 192,
+        "name": "position.0.layer.62.gdn.beta_projection",
+        "offset": 4920256,
+        "sha256": "fd80a957f77e37a334dc6715cf7c01f0da60dd29d715bc217ca89d597f466f8a",
+        "shape": [
+          1,
+          1,
+          48
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 48,
+          "finite_count": 48,
+          "maximum": 6.375,
+          "mean": 2.76220703125,
+          "minimum": 1.015625,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 2.983402326698911
+        }
+      },
+      {
+        "bytes": 192,
+        "name": "position.0.layer.62.gdn.decay_projection",
+        "offset": 4920448,
+        "sha256": "bf2f71baaa37c778829f8e0ef6cd67a7c12871ac03581064a9295e91111d7d2a",
+        "shape": [
+          1,
+          1,
+          48
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 48,
+          "finite_count": 48,
+          "maximum": 8.5,
+          "mean": 2.9606526692708335,
+          "minimum": -2.671875,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 3.9247971650376043
+        }
+      },
+      {
+        "bytes": 24576,
+        "name": "position.0.layer.62.gdn.query",
+        "offset": 4920640,
+        "sha256": "0350c5885cf9767a5429848fa4a33f0576812769b5e5cf9adcdee419e48a41fd",
+        "shape": [
+          1,
+          1,
+          48,
+          128
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 6144,
+          "finite_count": 6144,
+          "maximum": 8.5625,
+          "mean": -0.013892251707147807,
+          "minimum": -0.279296875,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 0.28484835343383913
+        }
+      },
+      {
+        "bytes": 24576,
+        "name": "position.0.layer.62.gdn.key",
+        "offset": 4945216,
+        "sha256": "c02d8e2c5eb7e59905623696c19d796d039a4295b5acfc4e3d4b45effad8d76e",
+        "shape": [
+          1,
+          1,
+          48,
+          128
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 6144,
+          "finite_count": 6144,
+          "maximum": 1.59375,
+          "mean": -0.003348250043927692,
+          "minimum": -0.279296875,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 0.13571514531027581
+        }
+      },
+      {
+        "bytes": 24576,
+        "name": "position.0.layer.62.gdn.value",
+        "offset": 4969792,
+        "sha256": "9583a0117cd0593d95f6b2b30c61a722b927042a1b286f462e298c429f476af7",
+        "shape": [
+          1,
+          1,
+          48,
+          128
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 6144,
+          "finite_count": 6144,
+          "maximum": 3.703125,
+          "mean": 0.025105731844935992,
+          "minimum": -0.279296875,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 0.1695629199400403
+        }
+      },
+      {
+        "bytes": 192,
+        "name": "position.0.layer.62.gdn.g",
+        "offset": 4994368,
+        "sha256": "a99ecff6e80e586935af1a624c61572f3329009615cb72deb2509f851bbdc63e",
+        "shape": [
+          1,
+          1,
+          48
+        ],
+        "source_dtype": "float32",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 48,
+          "finite_count": 48,
+          "maximum": -0.0012897825799882412,
+          "mean": -0.6412465392762291,
+          "minimum": -3.9372947216033936,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 1.1156537148505135
+        }
+      },
+      {
+        "bytes": 192,
+        "name": "position.0.layer.62.gdn.beta",
+        "offset": 4994560,
+        "sha256": "345d34d12e9bf2add3a69bca03c04a3b97f23efa2c073da1a49def3bff721daa",
+        "shape": [
+          1,
+          1,
+          48
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 48,
+          "finite_count": 48,
+          "maximum": 1.0,
+          "mean": 0.9132486979166666,
+          "minimum": 0.734375,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 0.9159326793691736
+        }
+      },
+      {
+        "bytes": 24576,
+        "name": "position.0.layer.62.gdn.core_output",
+        "offset": 4994752,
+        "sha256": "51dbbca3349507b4914e2ec2e56d0bb1b7c1a994b5b774ecaa776d8fe1c34a80",
+        "shape": [
+          1,
+          1,
+          48,
+          128
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 6144,
+          "finite_count": 6144,
+          "maximum": 0.04296875,
+          "mean": 0.0002464743292331188,
+          "minimum": -0.0155029296875,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 0.002234360249094184
+        }
+      },
+      {
+        "bytes": 3145728,
+        "name": "position.0.layer.62.gdn.recurrent_state",
+        "offset": 5019328,
+        "sha256": "6ef82b67ea374bc89853f67c12ea00f023171451677eabbbcd83ba60e0c96a05",
+        "shape": [
+          1,
+          48,
+          128,
+          128
+        ],
+        "source_dtype": "float32",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 786432,
+          "finite_count": 786432,
+          "maximum": 1.7160675525665283,
+          "mean": -0.00023549045602171102,
+          "minimum": -0.7760560512542725,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 0.013893120623091233
+        }
+      },
+      {
+        "bytes": 24576,
+        "name": "position.0.layer.62.gdn.gated_norm",
+        "offset": 8165056,
+        "sha256": "8dff839e7a3aa9b96a0f2da08e9010bcfcdff3edfda9a659ff80a8f5415352b7",
+        "shape": [
+          48,
+          128
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 6144,
+          "finite_count": 6144,
+          "maximum": 76.5,
+          "mean": 0.044675043856235185,
+          "minimum": -11.9375,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 1.1328593456552993
+        }
+      },
+      {
+        "bytes": 20480,
+        "name": "position.0.layer.62.gdn.output",
+        "offset": 8189632,
+        "sha256": "7f7d3b487d4371dc543dc06da7e857a07bdb672a9703baa0e03e80075e8bbf61",
+        "shape": [
+          1,
+          1,
+          5120
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 5120,
+          "finite_count": 5120,
+          "maximum": 11.0,
+          "mean": -0.009592444729059934,
+          "minimum": -9.6875,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 1.0810095541843723
+        }
+      },
+      {
+        "bytes": 20480,
+        "name": "position.0.layer.62.mixer_residual.output",
+        "offset": 8210112,
+        "sha256": "34cfbfa7b836b25c5818beb17c766177459b3ebbed08eb3f4a9c030be801b01d",
+        "shape": [
+          1,
+          1,
+          5120
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 5120,
+          "finite_count": 5120,
+          "maximum": 106.0,
+          "mean": -0.05184879302978516,
+          "minimum": -37.0,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 3.70792688540642
+        }
+      },
+      {
+        "bytes": 20480,
+        "name": "position.0.layer.62.post_mixer_norm.output",
+        "offset": 8230592,
+        "sha256": "d853afb3b241f1c229d3cfd7d23bd786a15364e9ac69cc3e73a3fcf18f2b5bb6",
+        "shape": [
+          1,
+          1,
+          5120
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 5120,
+          "finite_count": 5120,
+          "maximum": 26.875,
+          "mean": -0.019932033866643904,
+          "minimum": -8.625,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 1.2234141161505967
+        }
+      },
+      {
+        "bytes": 69632,
+        "name": "position.0.layer.62.ffn.gate_projection",
+        "offset": 8251072,
+        "sha256": "d479322b4ca400222056092f48f44eb65c9febd9956c901e6976a7974c787312",
+        "shape": [
+          1,
+          1,
+          17408
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 17408,
+          "finite_count": 17408,
+          "maximum": 11.125,
+          "mean": -1.0456779152154922,
+          "minimum": -10.0,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 1.9829002136445715
+        }
+      },
+      {
+        "bytes": 69632,
+        "name": "position.0.layer.62.ffn.activation",
+        "offset": 8320704,
+        "sha256": "82da56c43142fb3d267d1911740ab6f1be96ab0875d056a531fa3d921bd3fce9",
+        "shape": [
+          1,
+          1,
+          17408
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 17408,
+          "finite_count": 17408,
+          "maximum": 11.125,
+          "mean": 0.05551502985112807,
+          "minimum": -0.279296875,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 0.8316535213976768
+        }
+      },
+      {
+        "bytes": 69632,
+        "name": "position.0.layer.62.ffn.up_projection",
+        "offset": 8390336,
+        "sha256": "774b0223b85c4f8a8ae2d9c1a480260c29e5638ba2c03cafc0c2c91afe184837",
+        "shape": [
+          1,
+          1,
+          17408
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 17408,
+          "finite_count": 17408,
+          "maximum": 14.4375,
+          "mean": 0.010668978040270945,
+          "minimum": -13.9375,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 1.5763421600203362
+        }
+      },
+      {
+        "bytes": 20480,
+        "name": "position.0.layer.62.ffn.output",
+        "offset": 8459968,
+        "sha256": "7dde6b7e747ff6470fb89db6a2e73659d86679e6a7e1edfd4da07d09809f7c6c",
+        "shape": [
+          1,
+          1,
+          5120
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 5120,
+          "finite_count": 5120,
+          "maximum": 35.25,
+          "mean": 0.024061988294124603,
+          "minimum": -22.875,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 2.301970862755349
+        }
+      },
+      {
+        "bytes": 20480,
+        "name": "position.0.layer.62.residual.output",
+        "offset": 8480448,
+        "sha256": "6bd6c6fbc9c2663d2c8f7b00ad26ea1725cbb8da8de25b40b597e6540f400543",
+        "shape": [
+          1,
+          1,
+          5120
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 5120,
+          "finite_count": 5120,
+          "maximum": 141.0,
+          "mean": -0.027796268463134766,
+          "minimum": -43.0,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 4.878147965221328
+        }
+      },
+      {
+        "bytes": 20480,
+        "name": "position.0.layer.63.residual.input",
+        "offset": 8500928,
+        "sha256": "6bd6c6fbc9c2663d2c8f7b00ad26ea1725cbb8da8de25b40b597e6540f400543",
+        "shape": [
+          1,
+          1,
+          5120
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 5120,
+          "finite_count": 5120,
+          "maximum": 141.0,
+          "mean": -0.027796268463134766,
+          "minimum": -43.0,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 4.878147965221328
+        }
+      },
+      {
+        "bytes": 20480,
+        "name": "position.0.layer.63.input_norm.output",
+        "offset": 8521408,
+        "sha256": "bf963db1ae16c8c92e70bb9f2ec000e01220a04ba3a60d992c9ec2c828f255b5",
+        "shape": [
+          1,
+          1,
+          5120
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 5120,
+          "finite_count": 5120,
+          "maximum": 29.25,
+          "mean": -0.009337505698204041,
+          "minimum": -17.5,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 1.219329460940936
+        }
+      },
+      {
+        "bytes": 49152,
+        "name": "position.0.layer.63.attention.query_gate_projection",
+        "offset": 8541888,
+        "sha256": "e20db5d8c12c1c0e4ec6a96ecd660e62ea62492d6a2b328f333875775b649c85",
+        "shape": [
+          1,
+          1,
+          12288
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 12288,
+          "finite_count": 12288,
+          "maximum": 21.375,
+          "mean": -1.3287198022007942,
+          "minimum": -22.625,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 2.851821983832674
+        }
+      },
+      {
+        "bytes": 24576,
+        "name": "position.0.layer.63.attention.query_norm",
+        "offset": 8591040,
+        "sha256": "9c4cc927ae25305740d87a9ee7c8dda311481198a49e761f9675ef72459134c7",
+        "shape": [
+          1,
+          1,
+          24,
+          256
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 6144,
+          "finite_count": 6144,
+          "maximum": 9.5625,
+          "mean": -0.046258411991099514,
+          "minimum": -9.4375,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 1.332408981134006
+        }
+      },
+      {
+        "bytes": 4096,
+        "name": "position.0.layer.63.attention.key_projection",
+        "offset": 8615616,
+        "sha256": "cc45373e7f79cf3170e542abf5fc8725a4c36d527fc5619ff0eda43d2c592460",
+        "shape": [
+          1,
+          1,
+          1024
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 1024,
+          "finite_count": 1024,
+          "maximum": 11.9375,
+          "mean": -0.010752454400062561,
+          "minimum": -12.5,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 2.447592792583224
+        }
+      },
+      {
+        "bytes": 4096,
+        "name": "position.0.layer.63.attention.key_norm",
+        "offset": 8619712,
+        "sha256": "5f3e60b461e1fb3f96a2cb59f3c73e55aac5e66dceba6d1ffb0e5dd8f34cf237",
+        "shape": [
+          1,
+          1,
+          4,
+          256
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 1024,
+          "finite_count": 1024,
+          "maximum": 7.375,
+          "mean": -0.0029813721776008606,
+          "minimum": -8.0625,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 1.4919629533127783
+        }
+      },
+      {
+        "bytes": 4096,
+        "name": "position.0.layer.63.attention.value_projection",
+        "offset": 8623808,
+        "sha256": "391c7c084756e1e838bb1b69751651f697e4929e4c0559126a27461cdc63eda2",
+        "shape": [
+          1,
+          1,
+          1024
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 1024,
+          "finite_count": 1024,
+          "maximum": 65.0,
+          "mean": 0.5727342292666435,
+          "minimum": -30.375,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 6.598602678639777
+        }
+      },
+      {
+        "bytes": 24576,
+        "name": "position.0.layer.63.attention.query_before_rope",
+        "offset": 8627904,
+        "sha256": "9c4cc927ae25305740d87a9ee7c8dda311481198a49e761f9675ef72459134c7",
+        "shape": [
+          1,
+          24,
+          1,
+          256
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 6144,
+          "finite_count": 6144,
+          "maximum": 9.5625,
+          "mean": -0.046258411991099514,
+          "minimum": -9.4375,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 1.332408981134006
+        }
+      },
+      {
+        "bytes": 4096,
+        "name": "position.0.layer.63.attention.key_before_rope",
+        "offset": 8652480,
+        "sha256": "5f3e60b461e1fb3f96a2cb59f3c73e55aac5e66dceba6d1ffb0e5dd8f34cf237",
+        "shape": [
+          1,
+          4,
+          1,
+          256
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 1024,
+          "finite_count": 1024,
+          "maximum": 7.375,
+          "mean": -0.0029813721776008606,
+          "minimum": -8.0625,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 1.4919629533127783
+        }
+      },
+      {
+        "bytes": 24576,
+        "name": "position.0.layer.63.attention.query_after_rope",
+        "offset": 8656576,
+        "sha256": "9c4cc927ae25305740d87a9ee7c8dda311481198a49e761f9675ef72459134c7",
+        "shape": [
+          1,
+          24,
+          1,
+          256
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 6144,
+          "finite_count": 6144,
+          "maximum": 9.5625,
+          "mean": -0.046258411991099514,
+          "minimum": -9.4375,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 1.332408981134006
+        }
+      },
+      {
+        "bytes": 4096,
+        "name": "position.0.layer.63.attention.key_after_rope",
+        "offset": 8681152,
+        "sha256": "5f3e60b461e1fb3f96a2cb59f3c73e55aac5e66dceba6d1ffb0e5dd8f34cf237",
+        "shape": [
+          1,
+          4,
+          1,
+          256
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 1024,
+          "finite_count": 1024,
+          "maximum": 7.375,
+          "mean": -0.0029813721776008606,
+          "minimum": -8.0625,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 1.4919629533127783
+        }
+      },
+      {
+        "bytes": 24576,
+        "name": "position.0.layer.63.attention.query",
+        "offset": 8685248,
+        "sha256": "9c4cc927ae25305740d87a9ee7c8dda311481198a49e761f9675ef72459134c7",
+        "shape": [
+          1,
+          24,
+          1,
+          256
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 6144,
+          "finite_count": 6144,
+          "maximum": 9.5625,
+          "mean": -0.046258411991099514,
+          "minimum": -9.4375,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 1.332408981134006
+        }
+      },
+      {
+        "bytes": 4096,
+        "name": "position.0.layer.63.attention.key_cache",
+        "offset": 8709824,
+        "sha256": "5f3e60b461e1fb3f96a2cb59f3c73e55aac5e66dceba6d1ffb0e5dd8f34cf237",
+        "shape": [
+          1,
+          4,
+          1,
+          256
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 1024,
+          "finite_count": 1024,
+          "maximum": 7.375,
+          "mean": -0.0029813721776008606,
+          "minimum": -8.0625,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 1.4919629533127783
+        }
+      },
+      {
+        "bytes": 4096,
+        "name": "position.0.layer.63.attention.value_cache",
+        "offset": 8713920,
+        "sha256": "391c7c084756e1e838bb1b69751651f697e4929e4c0559126a27461cdc63eda2",
+        "shape": [
+          1,
+          4,
+          1,
+          256
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 1024,
+          "finite_count": 1024,
+          "maximum": 65.0,
+          "mean": 0.5727342292666435,
+          "minimum": -30.375,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 6.598602678639777
+        }
+      },
+      {
+        "bytes": 24576,
+        "name": "position.0.layer.63.attention.core_output",
+        "offset": 8718016,
+        "sha256": "be8a064c9ea953bc3d31021f08fc67aa584a982f926f4bcbfa9e210a3933a374",
+        "shape": [
+          1,
+          1,
+          24,
+          256
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 6144,
+          "finite_count": 6144,
+          "maximum": 65.0,
+          "mean": 0.5727342292666435,
+          "minimum": -30.375,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 6.598602678639777
+        }
+      },
+      {
+        "bytes": 96,
+        "name": "position.0.layer.63.attention.weights",
+        "offset": 8742592,
+        "sha256": "849203e6b4e586413022ab65a115f70a9e41cb0ee678fa1984c90f7d4a5f33ad",
+        "shape": [
+          1,
+          24,
+          1,
+          1
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 24,
+          "finite_count": 24,
+          "maximum": 1.0,
+          "mean": 1.0,
+          "minimum": 1.0,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 1.0
+        }
+      },
+      {
+        "bytes": 20480,
+        "name": "position.0.layer.63.attention.output",
+        "offset": 8742688,
+        "sha256": "518d7a1c537e394abbd553b6e2c082a84b05ba3c526efe4e3019abeb3e162b36",
+        "shape": [
+          1,
+          1,
+          5120
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 5120,
+          "finite_count": 5120,
+          "maximum": 23.875,
+          "mean": -0.06614257693290711,
+          "minimum": -32.25,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 2.1397476557790758
+        }
+      },
+      {
+        "bytes": 20480,
+        "name": "position.0.layer.63.mixer_residual.output",
+        "offset": 8763168,
+        "sha256": "2200263f027ade03f4b241aa3c10e4777c3ba3d87590f9438dfcbe1543dc043e",
+        "shape": [
+          1,
+          1,
+          5120
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 5120,
+          "finite_count": 5120,
+          "maximum": 109.0,
+          "mean": -0.09406399726867676,
+          "minimum": -39.75,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 4.9516022945052365
+        }
+      },
+      {
+        "bytes": 20480,
+        "name": "position.0.layer.63.post_mixer_norm.output",
+        "offset": 8783648,
+        "sha256": "a7bf5bba0f3c2717dceb8c5c9614415e4201431cf2ed097a26b5f2ea3bc10d81",
+        "shape": [
+          1,
+          1,
+          5120
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 5120,
+          "finite_count": 5120,
+          "maximum": 22.0,
+          "mean": -0.023251749202609064,
+          "minimum": -8.1875,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 1.1822816815531179
+        }
+      },
+      {
+        "bytes": 69632,
+        "name": "position.0.layer.63.ffn.gate_projection",
+        "offset": 8804128,
+        "sha256": "2af2a380792236d89fb40b8ed91a491b90ae91160ed38077fb8e1e82595b2c49",
+        "shape": [
+          1,
+          1,
+          17408
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 17408,
+          "finite_count": 17408,
+          "maximum": 18.875,
+          "mean": -0.8873035331694957,
+          "minimum": -18.125,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 2.4510692969105845
+        }
+      },
+      {
+        "bytes": 69632,
+        "name": "position.0.layer.63.ffn.activation",
+        "offset": 8873760,
+        "sha256": "ada181ae4ac1e7b31af0241784741d6d39c1e2f935933d3827793393205899f7",
+        "shape": [
+          1,
+          1,
+          17408
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 17408,
+          "finite_count": 17408,
+          "maximum": 18.875,
+          "mean": 0.24745403505146576,
+          "minimum": -0.279296875,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 1.4475247221654612
+        }
+      },
+      {
+        "bytes": 69632,
+        "name": "position.0.layer.63.ffn.up_projection",
+        "offset": 8943392,
+        "sha256": "a6d182314c46eea223de564bbdaaae8b7ca7b5143a8be05337462b9a3d41ed64",
+        "shape": [
+          1,
+          1,
+          17408
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 17408,
+          "finite_count": 17408,
+          "maximum": 20.5,
+          "mean": 0.0042822300182545885,
+          "minimum": -20.375,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 2.150119604274992
+        }
+      },
+      {
+        "bytes": 20480,
+        "name": "position.0.layer.63.ffn.output",
+        "offset": 9013024,
+        "sha256": "22b1308742846770345efc05f97209fb200ebbe2485c8d1c80e13d8d9d263ebf",
+        "shape": [
+          1,
+          1,
+          5120
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 5120,
+          "finite_count": 5120,
+          "maximum": 80.0,
+          "mean": 0.10576401948928833,
+          "minimum": -80.5,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 7.680011062756938
+        }
+      },
+      {
+        "bytes": 20480,
+        "name": "position.0.layer.63.residual.output",
+        "offset": 9033504,
+        "sha256": "ab9ceb24ead7d20da0cbf6a24589caec06b590e583a4accaf1e1261425f66d26",
+        "shape": [
+          1,
+          1,
+          5120
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 5120,
+          "finite_count": 5120,
+          "maximum": 101.0,
+          "mean": 0.011683368682861328,
+          "minimum": -120.0,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 9.645835697780697
+        }
+      },
+      {
+        "bytes": 20480,
+        "name": "position.0.final_norm.output",
+        "offset": 9053984,
+        "sha256": "f5509ff59cb4d55d7f10baff01506c102fe3870b0edf93ed8ee277bd291844a0",
+        "shape": [
+          1,
+          1,
+          5120
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 5120,
+          "finite_count": 5120,
+          "maximum": 21.0,
+          "mean": 0.0057152509689331055,
+          "minimum": -22.125,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 1.897845200971828
+        }
+      },
+      {
+        "bytes": 993280,
+        "name": "position.0.logits",
+        "offset": 9074464,
+        "sha256": "a5584ce3d0c2b0ba4ef83f24d92df59954e74c54da9d978416b067f72661e1fe",
+        "shape": [
+          248320
+        ],
+        "source_dtype": "float32",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 248320,
+          "finite_count": 248320,
+          "maximum": 11.75,
+          "mean": -0.2728876509295642,
+          "minimum": -9.25,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 1.6816453667226194
+        }
+      },
+      {
+        "bytes": 20480,
+        "name": "position.1.embedding.output",
+        "offset": 10067744,
+        "sha256": "15c9d4e2b75c3944dd75607e1d0f63aeec41e21f59c1f20a0aa5b216a4534e13",
+        "shape": [
+          1,
+          1,
+          5120
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 5120,
+          "finite_count": 5120,
+          "maximum": 0.060546875,
+          "mean": -0.0004959247366059571,
+          "minimum": -0.056396484375,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 0.014818461224897552
+        }
+      },
+      {
+        "bytes": 20480,
+        "name": "position.1.layer.0.residual.input",
+        "offset": 10088224,
+        "sha256": "15c9d4e2b75c3944dd75607e1d0f63aeec41e21f59c1f20a0aa5b216a4534e13",
+        "shape": [
+          1,
+          1,
+          5120
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 5120,
+          "finite_count": 5120,
+          "maximum": 0.060546875,
+          "mean": -0.0004959247366059571,
+          "minimum": -0.056396484375,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 0.014818461224897552
+        }
+      },
+      {
+        "bytes": 20480,
+        "name": "position.1.layer.0.input_norm.output",
+        "offset": 10108704,
+        "sha256": "318effbc7606c8d7c8b8d40246720fb8438f2894be790bf82269cacb5c1377d2",
+        "shape": [
+          1,
+          1,
+          5120
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 5120,
+          "finite_count": 5120,
+          "maximum": 3.890625,
+          "mean": -0.031463923119008544,
+          "minimum": -3.765625,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 0.9741924141891832
+        }
+      },
+      {
+        "bytes": 40960,
+        "name": "position.1.layer.0.gdn.qkv_projection",
+        "offset": 10129184,
+        "sha256": "c7357637166504e8cf9181851c403d16dfb5c4404183d2098f2e5194d2bd42f1",
+        "shape": [
+          1,
+          1,
+          10240
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 10240,
+          "finite_count": 10240,
+          "maximum": 43.75,
+          "mean": -0.05170758599415422,
+          "minimum": -42.75,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 3.4556494824064923
+        }
+      },
+      {
+        "bytes": 24576,
+        "name": "position.1.layer.0.gdn.gate_projection",
+        "offset": 10170144,
+        "sha256": "57a994e63adebdb12376cbdde24bd936b624d61715ef074f8528d972273cfd5f",
+        "shape": [
+          1,
+          1,
+          6144
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 6144,
+          "finite_count": 6144,
+          "maximum": 9.75,
+          "mean": -0.5835671535072228,
+          "minimum": -13.4375,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 2.147179921453787
+        }
+      },
+      {
+        "bytes": 192,
+        "name": "position.1.layer.0.gdn.beta_projection",
+        "offset": 10194720,
+        "sha256": "74cab7665ff0c9a124c19a6a30feca7e5a2779ff3b5c2f4be86d24599c5aba47",
+        "shape": [
+          1,
+          1,
+          48
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 48,
+          "finite_count": 48,
+          "maximum": 6.4375,
+          "mean": 1.7203470865885417,
+          "minimum": -2.3125,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 2.7493352926560366
+        }
+      },
+      {
+        "bytes": 192,
+        "name": "position.1.layer.0.gdn.decay_projection",
+        "offset": 10194912,
+        "sha256": "34b2894c82dc4d598922fe4d99adb68b635acbbd44ed58f07b7a912101fb9170",
+        "shape": [
+          1,
+          1,
+          48
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 48,
+          "finite_count": 48,
+          "maximum": 6.5,
+          "mean": -1.8245646158854167,
+          "minimum": -11.375,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 3.6142484590412285
+        }
+      },
+      {
+        "bytes": 24576,
+        "name": "position.1.layer.0.gdn.query",
+        "offset": 10195104,
+        "sha256": "8ae6b3a7196732b9ee22e407f77f13e863d1f84e0e9a58b61f7c851fa9cb1d2c",
+        "shape": [
+          1,
+          1,
+          48,
+          128
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 6144,
+          "finite_count": 6144,
+          "maximum": 5.3125,
+          "mean": 0.01720692854723893,
+          "minimum": -0.279296875,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 0.1931717444601661
+        }
+      },
+      {
+        "bytes": 24576,
+        "name": "position.1.layer.0.gdn.key",
+        "offset": 10219680,
+        "sha256": "92ee32f96f19b69baf3bd025ce104f3d5776da9ddf58749362db058df146e38f",
+        "shape": [
+          1,
+          1,
+          48,
+          128
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 6144,
+          "finite_count": 6144,
+          "maximum": 11.8125,
+          "mean": 0.053383684949949384,
+          "minimum": -0.279296875,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 0.44534000074934316
+        }
+      },
+      {
+        "bytes": 24576,
+        "name": "position.1.layer.0.gdn.value",
+        "offset": 10244256,
+        "sha256": "559baa308229faa7ebbdde08d6edc672df42045a2af2d4d8b565b1e40cbce380",
+        "shape": [
+          1,
+          1,
+          48,
+          128
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 6144,
+          "finite_count": 6144,
+          "maximum": 27.0,
+          "mean": 0.13117317439658413,
+          "minimum": -0.27734375,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 1.305936883687393
+        }
+      },
+      {
+        "bytes": 192,
+        "name": "position.1.layer.0.gdn.g",
+        "offset": 10268832,
+        "sha256": "e773d9fb20071db4a227230406d8e40b1aad290635a301b794ce97058cba3adb",
+        "shape": [
+          1,
+          1,
+          48
+        ],
+        "source_dtype": "float32",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 48,
+          "finite_count": 48,
+          "maximum": -3.844808361463947e-06,
+          "mean": -0.507079026973931,
+          "minimum": -6.741153717041016,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 1.252927708782364
+        }
+      },
+      {
+        "bytes": 192,
+        "name": "position.1.layer.0.gdn.beta",
+        "offset": 10269024,
+        "sha256": "f1d640e9e8eb43e68f733e3c43cf6c7a32502c2ac1c1f6fe80eb65b26aa87eb4",
+        "shape": [
+          1,
+          1,
+          48
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 48,
+          "finite_count": 48,
+          "maximum": 1.0,
+          "mean": 0.7092183430989584,
+          "minimum": 0.09033203125,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 0.7576483748683528
+        }
+      },
+      {
+        "bytes": 24576,
+        "name": "position.1.layer.0.gdn.core_output",
+        "offset": 10269216,
+        "sha256": "abb694bcb6517d9fa131d5b09016197f52da457f071fa8469c1af110dfb6ed76",
+        "shape": [
+          1,
+          1,
+          48,
+          128
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 6144,
+          "finite_count": 6144,
+          "maximum": 0.8125,
+          "mean": 0.0018621574656142077,
+          "minimum": -0.0101318359375,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 0.027757780518909987
+        }
+      },
+      {
+        "bytes": 3145728,
+        "name": "position.1.layer.0.gdn.recurrent_state",
+        "offset": 10293792,
+        "sha256": "04bf10e3af3e2f939b38e021b0df85e44cb22ba63003e47493c83300f93c9f0f",
+        "shape": [
+          1,
+          48,
+          128,
+          128
+        ],
+        "source_dtype": "float32",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 786432,
+          "finite_count": 786432,
+          "maximum": 12.450485229492188,
+          "mean": 0.0014059262569225493,
+          "minimum": -8.158047676086426,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 0.09626627177865893
+        }
+      },
+      {
+        "bytes": 24576,
+        "name": "position.1.layer.0.gdn.gated_norm",
+        "offset": 13439520,
+        "sha256": "d54419ffefe820ca6c2f213511cf5ee8971780840979e7d08e594fc73086bb0e",
+        "shape": [
+          48,
+          128
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 6144,
+          "finite_count": 6144,
+          "maximum": 0.7421875,
+          "mean": -0.001899943101837683,
+          "minimum": -2.421875,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 0.05730964760730834
+        }
+      },
+      {
+        "bytes": 20480,
+        "name": "position.1.layer.0.gdn.output",
+        "offset": 13464096,
+        "sha256": "408c71f943ade4da29a015f2bc6e5a136a380abedea66bae31c03dd527645ec3",
+        "shape": [
+          1,
+          1,
+          5120
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 5120,
+          "finite_count": 5120,
+          "maximum": 11.6875,
+          "mean": 0.0016539490308787208,
+          "minimum": -0.2734375,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 0.16660460564835503
+        }
+      },
+      {
+        "bytes": 20480,
+        "name": "position.1.layer.0.mixer_residual.output",
+        "offset": 13484576,
+        "sha256": "62668d158defc7349e42a53f12c9eeb9dc3fed29ce4f1ec105cfc6cf2de5b7e7",
+        "shape": [
+          1,
+          1,
+          5120
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 5120,
+          "finite_count": 5120,
+          "maximum": 11.6875,
+          "mean": 0.001158469170331955,
+          "minimum": -0.30078125,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 0.16735071689168596
+        }
+      },
+      {
+        "bytes": 20480,
+        "name": "position.1.layer.0.post_mixer_norm.output",
+        "offset": 13505056,
+        "sha256": "231d16ff08d6a6d033ce2606b9e53531b3662d097699e45d6b7d21ed26ffd85f",
+        "shape": [
+          1,
+          1,
+          5120
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 5120,
+          "finite_count": 5120,
+          "maximum": 1.046875,
+          "mean": -0.0053368788212537766,
+          "minimum": -1.109375,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 0.1675858131888581
+        }
+      },
+      {
+        "bytes": 69632,
+        "name": "position.1.layer.0.ffn.gate_projection",
+        "offset": 13525536,
+        "sha256": "2999fd1c4b8c30a831a513f774b9bee45cf2d7fb919e020be67089d75c2b7ce6",
+        "shape": [
+          1,
+          1,
+          17408
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 17408,
+          "finite_count": 17408,
+          "maximum": 1.671875,
+          "mean": -0.013505385013345136,
+          "minimum": -1.8046875,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 0.18569878440973048
+        }
+      },
+      {
+        "bytes": 69632,
+        "name": "position.1.layer.0.ffn.activation",
+        "offset": 13595168,
+        "sha256": "d03bee38a5ed71a365afd4ae5e6ea01309852210839614477bfb5db06fa1ae9a",
+        "shape": [
+          1,
+          1,
+          17408
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 17408,
+          "finite_count": 17408,
+          "maximum": 1.40625,
+          "mean": 0.0016894385287955897,
+          "minimum": -0.279296875,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 0.09704407427768556
+        }
+      },
+      {
+        "bytes": 69632,
+        "name": "position.1.layer.0.ffn.up_projection",
+        "offset": 13664800,
+        "sha256": "abc252057d7b91880563bf2aad497b276e934baa89348bc9fd69b6bbbf8aeb33",
+        "shape": [
+          1,
+          1,
+          17408
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 17408,
+          "finite_count": 17408,
+          "maximum": 1.3046875,
+          "mean": -0.00042925900026388904,
+          "minimum": -1.609375,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 0.16364860637263057
+        }
+      },
+      {
+        "bytes": 20480,
+        "name": "position.1.layer.0.ffn.output",
+        "offset": 13734432,
+        "sha256": "afd1cbfe862c2956cdf11f09ded28232083c5b6dcf4aada14d728faddbc0226e",
+        "shape": [
+          1,
+          1,
+          5120
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 5120,
+          "finite_count": 5120,
+          "maximum": 4.21875,
+          "mean": 0.0017756003420799971,
+          "minimum": -0.2578125,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 0.0751555708169305
+        }
+      },
+      {
+        "bytes": 20480,
+        "name": "position.1.layer.0.residual.output",
+        "offset": 13754912,
+        "sha256": "60853455c0c608c345c5b87c1fe8189fc70cdbd66706797c5316813ea1493735",
+        "shape": [
+          1,
+          1,
+          5120
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 5120,
+          "finite_count": 5120,
+          "maximum": 15.875,
+          "mean": 0.0029287919402122497,
+          "minimum": -0.48828125,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 0.23088925167077973
+        }
+      },
+      {
+        "bytes": 20480,
+        "name": "position.1.layer.3.residual.input",
+        "offset": 13775392,
+        "sha256": "c64fb479e6ca93c9042c7b9dcfe2ca68b3dfc9822fc327030030ad63134ef8ec",
+        "shape": [
+          1,
+          1,
+          5120
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 5120,
+          "finite_count": 5120,
+          "maximum": 20.875,
+          "mean": 0.0013335317373275757,
+          "minimum": -3.625,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 0.329676026379189
+        }
+      },
+      {
+        "bytes": 20480,
+        "name": "position.1.layer.3.input_norm.output",
+        "offset": 13795872,
+        "sha256": "83759e4d369e4862abb9091f54114bb3515602317db7b53b2d671494956d8d1c",
+        "shape": [
+          1,
+          1,
+          5120
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 5120,
+          "finite_count": 5120,
+          "maximum": 82.0,
+          "mean": 0.0037838231772184374,
+          "minimum": -20.75,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 1.308874445820596
+        }
+      },
+      {
+        "bytes": 49152,
+        "name": "position.1.layer.3.attention.query_gate_projection",
+        "offset": 13816352,
+        "sha256": "9a0b8bffcbfdc423ccd41e68e46250f1969de6ad6b16db98d6220bdce3c310d7",
+        "shape": [
+          1,
+          1,
+          12288
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 12288,
+          "finite_count": 12288,
+          "maximum": 15.625,
+          "mean": -2.3596438966536275,
+          "minimum": -12.8125,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 3.526735196436163
+        }
+      },
+      {
+        "bytes": 24576,
+        "name": "position.1.layer.3.attention.query_norm",
+        "offset": 13865504,
+        "sha256": "694d8444821a3a6b8483bac3043a8b966b75c2bc1509d6e110eb6dbed5dd86ca",
+        "shape": [
+          1,
+          1,
+          24,
+          256
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 6144,
+          "finite_count": 6144,
+          "maximum": 10.0625,
+          "mean": 0.04985110259925326,
+          "minimum": -8.25,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 1.1609593041705368
+        }
+      },
+      {
+        "bytes": 4096,
+        "name": "position.1.layer.3.attention.key_projection",
+        "offset": 13890080,
+        "sha256": "e8d0dad022a4d2350fdb96fd25a82ca67c2fa1b6a4b4a3dce21add39e5aaee4d",
+        "shape": [
+          1,
+          1,
+          1024
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 1024,
+          "finite_count": 1024,
+          "maximum": 5.25,
+          "mean": 0.04117880389094353,
+          "minimum": -5.53125,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 1.2421603057076516
+        }
+      },
+      {
+        "bytes": 4096,
+        "name": "position.1.layer.3.attention.key_norm",
+        "offset": 13894176,
+        "sha256": "85246d72367cc705ce81b8a913392070105ad79b614dcd361f03db5ae3def597",
+        "shape": [
+          1,
+          1,
+          4,
+          256
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 1024,
+          "finite_count": 1024,
+          "maximum": 6.5625,
+          "mean": 0.030688995495438576,
+          "minimum": -4.6875,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 1.1968609304002216
+        }
+      },
+      {
+        "bytes": 4096,
+        "name": "position.1.layer.3.attention.value_projection",
+        "offset": 13898272,
+        "sha256": "6cd9a980c5d6f52dc400a579cf11c21f07f759b41a373f37eeff6dc27fee28b7",
+        "shape": [
+          1,
+          1,
+          1024
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 1024,
+          "finite_count": 1024,
+          "maximum": 4.46875,
+          "mean": -0.00784074841067195,
+          "minimum": -3.515625,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 0.851196984457903
+        }
+      },
+      {
+        "bytes": 24576,
+        "name": "position.1.layer.3.attention.query_before_rope",
+        "offset": 13902368,
+        "sha256": "694d8444821a3a6b8483bac3043a8b966b75c2bc1509d6e110eb6dbed5dd86ca",
+        "shape": [
+          1,
+          24,
+          1,
+          256
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 6144,
+          "finite_count": 6144,
+          "maximum": 10.0625,
+          "mean": 0.04985110259925326,
+          "minimum": -8.25,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 1.1609593041705368
+        }
+      },
+      {
+        "bytes": 4096,
+        "name": "position.1.layer.3.attention.key_before_rope",
+        "offset": 13926944,
+        "sha256": "85246d72367cc705ce81b8a913392070105ad79b614dcd361f03db5ae3def597",
+        "shape": [
+          1,
+          4,
+          1,
+          256
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 1024,
+          "finite_count": 1024,
+          "maximum": 6.5625,
+          "mean": 0.030688995495438576,
+          "minimum": -4.6875,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 1.1968609304002216
+        }
+      },
+      {
+        "bytes": 24576,
+        "name": "position.1.layer.3.attention.query_after_rope",
+        "offset": 13931040,
+        "sha256": "fcb5f4ac4fad8747bcf08bc8b4a045549241fe6fc29e2429bb7dbc242220af97",
+        "shape": [
+          1,
+          24,
+          1,
+          256
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 6144,
+          "finite_count": 6144,
+          "maximum": 10.0625,
+          "mean": 0.049023258655021586,
+          "minimum": -8.25,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 1.1609445503126536
+        }
+      },
+      {
+        "bytes": 4096,
+        "name": "position.1.layer.3.attention.key_after_rope",
+        "offset": 13955616,
+        "sha256": "0c31a749de9e2aef83858df32a0028c8a03b73c97c249b603b9e9c05a8793728",
+        "shape": [
+          1,
+          4,
+          1,
+          256
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 1024,
+          "finite_count": 1024,
+          "maximum": 6.5625,
+          "mean": 0.028394514694809914,
+          "minimum": -4.6875,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 1.1968532078802332
+        }
+      },
+      {
+        "bytes": 24576,
+        "name": "position.1.layer.3.attention.query",
+        "offset": 13959712,
+        "sha256": "fcb5f4ac4fad8747bcf08bc8b4a045549241fe6fc29e2429bb7dbc242220af97",
+        "shape": [
+          1,
+          24,
+          1,
+          256
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 6144,
+          "finite_count": 6144,
+          "maximum": 10.0625,
+          "mean": 0.049023258655021586,
+          "minimum": -8.25,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 1.1609445503126536
+        }
+      },
+      {
+        "bytes": 8192,
+        "name": "position.1.layer.3.attention.key_cache",
+        "offset": 13984288,
+        "sha256": "90510cfbb5798112d7b532967f2f78ff74545b9df00b01d5d0fe1f92df3f82c6",
+        "shape": [
+          1,
+          4,
+          2,
+          256
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 2048,
+          "finite_count": 2048,
+          "maximum": 9.625,
+          "mean": 0.02274590078741312,
+          "minimum": -6.15625,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 1.172128260839368
+        }
+      },
+      {
+        "bytes": 8192,
+        "name": "position.1.layer.3.attention.value_cache",
+        "offset": 13992480,
+        "sha256": "de204e099e05135e9916bcb381859c7afd3bb5030ea7cbfff4489bc84b7c1dfc",
+        "shape": [
+          1,
+          4,
+          2,
+          256
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 2048,
+          "finite_count": 2048,
+          "maximum": 4.46875,
+          "mean": -0.0035932015161961317,
+          "minimum": -3.515625,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 0.705921532244559
+        }
+      },
+      {
+        "bytes": 24576,
+        "name": "position.1.layer.3.attention.core_output",
+        "offset": 14000672,
+        "sha256": "07d9a7a0a4eee05c7cc931c7cda260dab9f4e9bcba898ec2fbf85f042609f79f",
+        "shape": [
+          1,
+          1,
+          24,
+          256
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 6144,
+          "finite_count": 6144,
+          "maximum": 4.09375,
+          "mean": 0.011443526018410921,
+          "minimum": -3.234375,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 0.5885873042330033
+        }
+      },
+      {
+        "bytes": 192,
+        "name": "position.1.layer.3.attention.weights",
+        "offset": 14025248,
+        "sha256": "fa91ba6ef57552d1d18379888adcbca7b6d70857c8fab23f77e8c95b680e1ec6",
+        "shape": [
+          1,
+          24,
+          1,
+          2
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 48,
+          "finite_count": 48,
+          "maximum": 0.98046875,
+          "mean": 0.5000228881835938,
+          "minimum": 0.0191650390625,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 0.6059785053199325
+        }
+      },
+      {
+        "bytes": 20480,
+        "name": "position.1.layer.3.attention.output",
+        "offset": 14025440,
+        "sha256": "d3d2afd4c88643344465d7c7383d06a845d5611e3e9d254e5088aecdfc64db2f",
+        "shape": [
+          1,
+          1,
+          5120
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 5120,
+          "finite_count": 5120,
+          "maximum": 10.1875,
+          "mean": 0.0014731676317751407,
+          "minimum": -0.296875,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 0.14872612449352948
+        }
+      },
+      {
+        "bytes": 20480,
+        "name": "position.1.layer.3.mixer_residual.output",
+        "offset": 14045920,
+        "sha256": "596f0808c167a9f22aa7e6f802bce32a1c815494d16aebe77c0b46588ead4db0",
+        "shape": [
+          1,
+          1,
+          5120
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 5120,
+          "finite_count": 5120,
+          "maximum": 31.0,
+          "mean": 0.002796187996864319,
+          "minimum": -3.71875,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 0.46179596835002096
+        }
+      },
+      {
+        "bytes": 20480,
+        "name": "position.1.layer.3.post_mixer_norm.output",
+        "offset": 14066400,
+        "sha256": "507b7260af906bf170e107d79ba725ffb1223d84d3532299d93021eeab0cf2a6",
+        "shape": [
+          1,
+          1,
+          5120
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 5120,
+          "finite_count": 5120,
+          "maximum": 1.40625,
+          "mean": -0.0053968334570527075,
+          "minimum": -2.796875,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 0.27601627768512477
+        }
+      },
+      {
+        "bytes": 69632,
+        "name": "position.1.layer.3.ffn.gate_projection",
+        "offset": 14086880,
+        "sha256": "a51ec39c48a9becc03fbd28da0b0413119019ebdc2c9916a54d96b94cfbdbf9c",
+        "shape": [
+          1,
+          1,
+          17408
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 17408,
+          "finite_count": 17408,
+          "maximum": 2.421875,
+          "mean": -0.06448596728253453,
+          "minimum": -1.09375,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 0.27203706559107327
+        }
+      },
+      {
+        "bytes": 69632,
+        "name": "position.1.layer.3.ffn.activation",
+        "offset": 14156512,
+        "sha256": "3fea23136bcfa9336470de2b894160ca9d414dd16674c917bca53eaa06fd1f76",
+        "shape": [
+          1,
+          1,
+          17408
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 17408,
+          "finite_count": 17408,
+          "maximum": 2.21875,
+          "mean": -0.014351687948767315,
+          "minimum": -0.275390625,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 0.14212232458003454
+        }
+      },
+      {
+        "bytes": 69632,
+        "name": "position.1.layer.3.ffn.up_projection",
+        "offset": 14226144,
+        "sha256": "3ba885178843b0fcb104905ff19c8bffe1e8da85f3879943cfef712585067575",
+        "shape": [
+          1,
+          1,
+          17408
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 17408,
+          "finite_count": 17408,
+          "maximum": 1.609375,
+          "mean": 0.002339368800783311,
+          "minimum": -1.5078125,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 0.23279844971947966
+        }
+      },
+      {
+        "bytes": 20480,
+        "name": "position.1.layer.3.ffn.output",
+        "offset": 14295776,
+        "sha256": "dfbb5c43267782f53d6c07b989c371596e737215e6e9cbbc4b32ce52134d2e1d",
+        "shape": [
+          1,
+          1,
+          5120
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 5120,
+          "finite_count": 5120,
+          "maximum": 1.40625,
+          "mean": 0.001296370744239539,
+          "minimum": -0.361328125,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 0.07519356086657489
+        }
+      },
+      {
+        "bytes": 20480,
+        "name": "position.1.layer.3.residual.output",
+        "offset": 14316256,
+        "sha256": "3ab70f24a95580d2f47ba48ee2ce2ca51370afd6499bd23a4cd5f744fe0218dd",
+        "shape": [
+          1,
+          1,
+          5120
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 5120,
+          "finite_count": 5120,
+          "maximum": 32.5,
+          "mean": 0.004109473526477813,
+          "minimum": -3.6875,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 0.4904446498194558
+        }
+      },
+      {
+        "bytes": 20480,
+        "name": "position.1.layer.7.residual.input",
+        "offset": 14336736,
+        "sha256": "632b450361bee294e57520247c7b2b90563df87f6246c4d3e2b56ea72ec7d1ab",
+        "shape": [
+          1,
+          1,
+          5120
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 5120,
+          "finite_count": 5120,
+          "maximum": 39.0,
+          "mean": 0.007979503273963929,
+          "minimum": -8.5,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 0.6416071988728118
+        }
+      },
+      {
+        "bytes": 20480,
+        "name": "position.1.layer.7.input_norm.output",
+        "offset": 14357216,
+        "sha256": "7ebb471224db31f39e8e474a3ef7483d25c8b991068376c6d4f869132925e59c",
+        "shape": [
+          1,
+          1,
+          5120
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 5120,
+          "finite_count": 5120,
+          "maximum": 71.5,
+          "mean": 0.013069770857691764,
+          "minimum": -27.25,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 1.2181217095036276
+        }
+      },
+      {
+        "bytes": 49152,
+        "name": "position.1.layer.7.attention.query_gate_projection",
+        "offset": 14377696,
+        "sha256": "08750e26588d8e86b9b6aac0ec1ab4ad73913b9ccfc1d8e964565f43ad475f1d",
+        "shape": [
+          1,
+          1,
+          12288
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 12288,
+          "finite_count": 12288,
+          "maximum": 16.875,
+          "mean": -2.262794839179454,
+          "minimum": -12.125,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 3.4355347525230417
+        }
+      },
+      {
+        "bytes": 24576,
+        "name": "position.1.layer.7.attention.query_norm",
+        "offset": 14426848,
+        "sha256": "22273d69972963daebc42ecd2791359d5ae59a53c4c26fe96a434c6e58332910",
+        "shape": [
+          1,
+          1,
+          24,
+          256
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 6144,
+          "finite_count": 6144,
+          "maximum": 8.75,
+          "mean": 0.05203646266212066,
+          "minimum": -5.8125,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 1.2193270151886648
+        }
+      },
+      {
+        "bytes": 4096,
+        "name": "position.1.layer.7.attention.key_projection",
+        "offset": 14451424,
+        "sha256": "0f0ef24cf820c6d4eaebc770d2e4dcad84edf02f7e321b3d2ccdbfde228cad0f",
+        "shape": [
+          1,
+          1,
+          1024
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 1024,
+          "finite_count": 1024,
+          "maximum": 6.8125,
+          "mean": -0.00837288424372673,
+          "minimum": -4.6875,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 1.2275509550990993
+        }
+      },
+      {
+        "bytes": 4096,
+        "name": "position.1.layer.7.attention.key_norm",
+        "offset": 14455520,
+        "sha256": "2ecb97b4e2a90636b5af868d8ba649fce79b73bd72ba668bb7ab2912a886016d",
+        "shape": [
+          1,
+          1,
+          4,
+          256
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 1024,
+          "finite_count": 1024,
+          "maximum": 5.03125,
+          "mean": -0.003165777772665024,
+          "minimum": -4.84375,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 1.2686867462671652
+        }
+      },
+      {
+        "bytes": 4096,
+        "name": "position.1.layer.7.attention.value_projection",
+        "offset": 14459616,
+        "sha256": "b99c2f5168d15532a24ea351d0cceb1bb44f1f2be8e0925e7179e1030b6e73f8",
+        "shape": [
+          1,
+          1,
+          1024
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 1024,
+          "finite_count": 1024,
+          "maximum": 3.375,
+          "mean": -0.023646945133805275,
+          "minimum": -4.5,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 0.9106347426872756
+        }
+      },
+      {
+        "bytes": 24576,
+        "name": "position.1.layer.7.attention.query_before_rope",
+        "offset": 14463712,
+        "sha256": "22273d69972963daebc42ecd2791359d5ae59a53c4c26fe96a434c6e58332910",
+        "shape": [
+          1,
+          24,
+          1,
+          256
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 6144,
+          "finite_count": 6144,
+          "maximum": 8.75,
+          "mean": 0.05203646266212066,
+          "minimum": -5.8125,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 1.2193270151886648
+        }
+      },
+      {
+        "bytes": 4096,
+        "name": "position.1.layer.7.attention.key_before_rope",
+        "offset": 14488288,
+        "sha256": "2ecb97b4e2a90636b5af868d8ba649fce79b73bd72ba668bb7ab2912a886016d",
+        "shape": [
+          1,
+          4,
+          1,
+          256
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 1024,
+          "finite_count": 1024,
+          "maximum": 5.03125,
+          "mean": -0.003165777772665024,
+          "minimum": -4.84375,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 1.2686867462671652
+        }
+      },
+      {
+        "bytes": 24576,
+        "name": "position.1.layer.7.attention.query_after_rope",
+        "offset": 14492384,
+        "sha256": "89e195db252ac459701166f27647173933a92ed04906a41b324d1523edcb9d5b",
+        "shape": [
+          1,
+          24,
+          1,
+          256
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 6144,
+          "finite_count": 6144,
+          "maximum": 8.75,
+          "mean": 0.05310623922074834,
+          "minimum": -5.8125,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 1.219327685308855
+        }
+      },
+      {
+        "bytes": 4096,
+        "name": "position.1.layer.7.attention.key_after_rope",
+        "offset": 14516960,
+        "sha256": "54ba85c8b7d1f8f6c129f65bcb23707f4b48ecb9ac0e31822a0fbe86b4d95bd3",
+        "shape": [
+          1,
+          4,
+          1,
+          256
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 1024,
+          "finite_count": 1024,
+          "maximum": 4.75,
+          "mean": -0.004844363778829575,
+          "minimum": -4.59375,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 1.2687170324372106
+        }
+      },
+      {
+        "bytes": 24576,
+        "name": "position.1.layer.7.attention.query",
+        "offset": 14521056,
+        "sha256": "89e195db252ac459701166f27647173933a92ed04906a41b324d1523edcb9d5b",
+        "shape": [
+          1,
+          24,
+          1,
+          256
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 6144,
+          "finite_count": 6144,
+          "maximum": 8.75,
+          "mean": 0.05310623922074834,
+          "minimum": -5.8125,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 1.219327685308855
+        }
+      },
+      {
+        "bytes": 8192,
+        "name": "position.1.layer.7.attention.key_cache",
+        "offset": 14545632,
+        "sha256": "95537761216fe5fa4690bcd39417e51e6af08ea4fa890faa37064c9b06d823a6",
+        "shape": [
+          1,
+          4,
+          2,
+          256
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 2048,
+          "finite_count": 2048,
+          "maximum": 11.0,
+          "mean": 0.02344164438545704,
+          "minimum": -6.78125,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 1.2558290528085227
+        }
+      },
+      {
+        "bytes": 8192,
+        "name": "position.1.layer.7.attention.value_cache",
+        "offset": 14553824,
+        "sha256": "bda4bf0b3759d1c23cd1f665f5b438a8ca840ffd92c8511b9904e5bc1ca0d73a",
+        "shape": [
+          1,
+          4,
+          2,
+          256
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 2048,
+          "finite_count": 2048,
+          "maximum": 5.0,
+          "mean": -0.023236465640366077,
+          "minimum": -8.0625,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 0.8357092535287504
+        }
+      },
+      {
+        "bytes": 24576,
+        "name": "position.1.layer.7.attention.core_output",
+        "offset": 14562016,
+        "sha256": "20389e2d2878c3983ac60141b78144384febf8dd8bf515feae872848de023b41",
+        "shape": [
+          1,
+          1,
+          24,
+          256
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 6144,
+          "finite_count": 6144,
+          "maximum": 4.875,
+          "mean": -0.022090161064018805,
+          "minimum": -8.0625,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 0.7512789966846533
+        }
+      },
+      {
+        "bytes": 192,
+        "name": "position.1.layer.7.attention.weights",
+        "offset": 14586592,
+        "sha256": "d530e40a32c3e5dd3cc96a8d0bf62f9cae6124e90231dac8a5c2f228efd43acf",
+        "shape": [
+          1,
+          24,
+          1,
+          2
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 48,
+          "finite_count": 48,
+          "maximum": 0.99609375,
+          "mean": 0.5000534057617188,
+          "minimum": 0.0052490234375,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 0.6075866971090378
+        }
+      },
+      {
+        "bytes": 20480,
+        "name": "position.1.layer.7.attention.output",
+        "offset": 14586784,
+        "sha256": "58f83dc22f9dafc3213b02ff82759c41cf512a1a8f0044f4e647b7ca3bb90c89",
+        "shape": [
+          1,
+          1,
+          5120
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 5120,
+          "finite_count": 5120,
+          "maximum": 7.625,
+          "mean": 0.0017884222674183548,
+          "minimum": -0.6171875,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 0.1355504035496797
+        }
+      },
+      {
+        "bytes": 20480,
+        "name": "position.1.layer.7.mixer_residual.output",
+        "offset": 14607264,
+        "sha256": "4d56f82ff820b9b85f4a5e4135a85cde2f2758787706da02491f630cbc004659",
+        "shape": [
+          1,
+          1,
+          5120
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 5120,
+          "finite_count": 5120,
+          "maximum": 46.5,
+          "mean": 0.009743143618106843,
+          "minimum": -8.6875,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 0.7402451861629173
+        }
+      },
+      {
+        "bytes": 20480,
+        "name": "position.1.layer.7.post_mixer_norm.output",
+        "offset": 14627744,
+        "sha256": "54ba1d94bb64f6c7e55fd5555c1de1f361e9eb5855a058269afa32d1a347190b",
+        "shape": [
+          1,
+          1,
+          5120
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 5120,
+          "finite_count": 5120,
+          "maximum": 2.5,
+          "mean": 0.0008161369012668728,
+          "minimum": -5.96875,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 0.38151630368664885
+        }
+      },
+      {
+        "bytes": 69632,
+        "name": "position.1.layer.7.ffn.gate_projection",
+        "offset": 14648224,
+        "sha256": "7aa0ca03d57771d9bff5fd89264545706548e8b51cfde8845c888ba252d6af3c",
+        "shape": [
+          1,
+          1,
+          17408
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 17408,
+          "finite_count": 17408,
+          "maximum": 2.015625,
+          "mean": -0.11643855527782922,
+          "minimum": -1.296875,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 0.341816402635177
+        }
+      },
+      {
+        "bytes": 69632,
+        "name": "position.1.layer.7.ffn.activation",
+        "offset": 14717856,
+        "sha256": "f852665895b7bfe06fec6f72269f60ffe4267fc2ed4c15307a45a91df8ee58ac",
+        "shape": [
+          1,
+          1,
+          17408
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 17408,
+          "finite_count": 17408,
+          "maximum": 1.78125,
+          "mean": -0.029858575979768133,
+          "minimum": -0.279296875,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 0.15353253231403455
+        }
+      },
+      {
+        "bytes": 69632,
+        "name": "position.1.layer.7.ffn.up_projection",
+        "offset": 14787488,
+        "sha256": "836e086f25bf172c56db293512e6b2f7ccfdb6e3d14629a1787f1fc075148f39",
+        "shape": [
+          1,
+          1,
+          17408
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 17408,
+          "finite_count": 17408,
+          "maximum": 2.65625,
+          "mean": -0.00023509890717618605,
+          "minimum": -1.859375,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 0.29572287006193276
+        }
+      },
+      {
+        "bytes": 20480,
+        "name": "position.1.layer.7.ffn.output",
+        "offset": 14857120,
+        "sha256": "1d38b01da5d9051c0292d19f196632fffc64c290e2dea1218a4273020b87118a",
+        "shape": [
+          1,
+          1,
+          5120
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 5120,
+          "finite_count": 5120,
+          "maximum": 1.859375,
+          "mean": 0.0012588296231115237,
+          "minimum": -0.41015625,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 0.10622407213161367
+        }
+      },
+      {
+        "bytes": 20480,
+        "name": "position.1.layer.7.residual.output",
+        "offset": 14877600,
+        "sha256": "98899d4a5d8e8ff4d18db838f438e87849c74ac8e417962e388653c57611a817",
+        "shape": [
+          1,
+          1,
+          5120
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 5120,
+          "finite_count": 5120,
+          "maximum": 48.25,
+          "mean": 0.010971587896347047,
+          "minimum": -8.5625,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 0.7764214472193324
+        }
+      },
+      {
+        "bytes": 20480,
+        "name": "position.1.layer.62.residual.input",
+        "offset": 14898080,
+        "sha256": "f21c3f54168e6ac1c404b85a7c2b7a4014777d5d3c5638f68d3a4949af660c10",
+        "shape": [
+          1,
+          1,
+          5120
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 5120,
+          "finite_count": 5120,
+          "maximum": 38.75,
+          "mean": -0.03854436874389648,
+          "minimum": -40.5,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 3.960655134924009
+        }
+      },
+      {
+        "bytes": 20480,
+        "name": "position.1.layer.62.input_norm.output",
+        "offset": 14918560,
+        "sha256": "a2dadf737fc96698ec5e6dc35ec9813c09bd61cbe2492e9a3163a5b99b02995b",
+        "shape": [
+          1,
+          1,
+          5120
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 5120,
+          "finite_count": 5120,
+          "maximum": 9.4375,
+          "mean": -0.013837192952632905,
+          "minimum": -15.0625,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 1.1849588511097868
+        }
+      },
+      {
+        "bytes": 40960,
+        "name": "position.1.layer.62.gdn.qkv_projection",
+        "offset": 14939040,
+        "sha256": "2da1568589aa4e8302a82084d425c46f8d99451fd4600af9600b6cbc9d400f88",
+        "shape": [
+          1,
+          1,
+          10240
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 10240,
+          "finite_count": 10240,
+          "maximum": 19.5,
+          "mean": -0.036344343610107896,
+          "minimum": -22.0,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 2.339059387901379
+        }
+      },
+      {
+        "bytes": 24576,
+        "name": "position.1.layer.62.gdn.gate_projection",
+        "offset": 14980000,
+        "sha256": "d40fb187cc8d786c9f64b51665515d104da4ff3cdde2e2cab0d23494a7eb6a70",
+        "shape": [
+          1,
+          1,
+          6144
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 6144,
+          "finite_count": 6144,
+          "maximum": 12.375,
+          "mean": -1.4097766214981675,
+          "minimum": -11.375,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 2.406643492396046
+        }
+      },
+      {
+        "bytes": 192,
+        "name": "position.1.layer.62.gdn.beta_projection",
+        "offset": 15004576,
+        "sha256": "92df7f82286ff12f1f520590303812aa9fa67ff384ccca5f8f250351159e5c94",
+        "shape": [
+          1,
+          1,
+          48
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 48,
+          "finite_count": 48,
+          "maximum": 5.625,
+          "mean": 1.882080078125,
+          "minimum": -0.609375,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 2.312223778801086
+        }
+      },
+      {
+        "bytes": 192,
+        "name": "position.1.layer.62.gdn.decay_projection",
+        "offset": 15004768,
+        "sha256": "261e82843be7d7b1b4b31a824e0d86c0bdbbe8d5d6552e4cfff4599586da5f6d",
+        "shape": [
+          1,
+          1,
+          48
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 48,
+          "finite_count": 48,
+          "maximum": 8.4375,
+          "mean": 3.34521484375,
+          "minimum": -2.890625,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 4.50198129905772
+        }
+      },
+      {
+        "bytes": 24576,
+        "name": "position.1.layer.62.gdn.query",
+        "offset": 15004960,
+        "sha256": "4d9fb66af531335efe39e793c413b777447e1723dccc33421058d87734474da2",
+        "shape": [
+          1,
+          1,
+          48,
+          128
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 6144,
+          "finite_count": 6144,
+          "maximum": 10.8125,
+          "mean": -0.02082604868337512,
+          "minimum": -0.279296875,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 0.32511771104337595
+        }
+      },
+      {
+        "bytes": 24576,
+        "name": "position.1.layer.62.gdn.key",
+        "offset": 15029536,
+        "sha256": "445246ea34e28cc45e2ec498edb97b08a93241ddb3fa34bd30806634e49bc0c1",
+        "shape": [
+          1,
+          1,
+          48,
+          128
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 6144,
+          "finite_count": 6144,
+          "maximum": 2.140625,
+          "mean": -0.012842412455938756,
+          "minimum": -0.279296875,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 0.18719229768936013
+        }
+      },
+      {
+        "bytes": 24576,
+        "name": "position.1.layer.62.gdn.value",
+        "offset": 15054112,
+        "sha256": "a27ff71f7957104e078b531fb30f86ecbadecf39651c9876795bf31d5e6ec38a",
+        "shape": [
+          1,
+          1,
+          48,
+          128
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 6144,
+          "finite_count": 6144,
+          "maximum": 7.6875,
+          "mean": 0.0034272396442247555,
+          "minimum": -0.279296875,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 0.25008505146427384
+        }
+      },
+      {
+        "bytes": 192,
+        "name": "position.1.layer.62.gdn.g",
+        "offset": 15078688,
+        "sha256": "f61cc867449e7b474197368e56e8775cb4469264343c0b8dbe7fc6fd68fdaeca",
+        "shape": [
+          1,
+          1,
+          48
+        ],
+        "source_dtype": "float32",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 48,
+          "finite_count": 48,
+          "maximum": -0.0009747323929332197,
+          "mean": -0.6076016760234779,
+          "minimum": -2.9892466068267822,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 0.9766649565617993
+        }
+      },
+      {
+        "bytes": 192,
+        "name": "position.1.layer.62.gdn.beta",
+        "offset": 15078880,
+        "sha256": "4057728a8a6aadff71082a5df662d709587247b4a479626507a162cd33a298f2",
+        "shape": [
+          1,
+          1,
+          48
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 48,
+          "finite_count": 48,
+          "maximum": 0.99609375,
+          "mean": 0.8084309895833334,
+          "minimum": 0.3515625,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 0.8213422820772102
+        }
+      },
+      {
+        "bytes": 24576,
+        "name": "position.1.layer.62.gdn.core_output",
+        "offset": 15079072,
+        "sha256": "0694df19c79fa61729bfb6ba227e3fbbd4800b53eedabafb618cd24c9f0d13d9",
+        "shape": [
+          1,
+          1,
+          48,
+          128
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 6144,
+          "finite_count": 6144,
+          "maximum": 0.07666015625,
+          "mean": 0.000375952136740428,
+          "minimum": -0.0164794921875,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 0.003520310512020656
+        }
+      },
+      {
+        "bytes": 3145728,
+        "name": "position.1.layer.62.gdn.recurrent_state",
+        "offset": 15103648,
+        "sha256": "fade91c3f508ca6efef387c1850da94fda6b856ba3c5b1242ef960ef158e3cd6",
+        "shape": [
+          1,
+          48,
+          128,
+          128
+        ],
+        "source_dtype": "float32",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 786432,
+          "finite_count": 786432,
+          "maximum": 3.1246743202209473,
+          "mean": -0.0001620393255597399,
+          "minimum": -0.9367828965187073,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 0.02069689278136472
+        }
+      },
+      {
+        "bytes": 24576,
+        "name": "position.1.layer.62.gdn.gated_norm",
+        "offset": 18249376,
+        "sha256": "5f70e38d03661dff428534c3b775ddccaf4ec08abc9b5ae9a99e25eea0bbb1ea",
+        "shape": [
+          48,
+          128
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 6144,
+          "finite_count": 6144,
+          "maximum": 12.4375,
+          "mean": -0.009058338992569285,
+          "minimum": -10.5625,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 0.4651570084066491
+        }
+      },
+      {
+        "bytes": 20480,
+        "name": "position.1.layer.62.gdn.output",
+        "offset": 18273952,
+        "sha256": "4716d7e5b8ec4739a03d63c29182ddb2db7a16e9dfb5056438ebf5d7e32dc387",
+        "shape": [
+          1,
+          1,
+          5120
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 5120,
+          "finite_count": 5120,
+          "maximum": 4.75,
+          "mean": -0.028058174159377815,
+          "minimum": -7.875,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 0.5930472408966003
+        }
+      },
+      {
+        "bytes": 20480,
+        "name": "position.1.layer.62.mixer_residual.output",
+        "offset": 18294432,
+        "sha256": "fd787f1dd594727999f97f4485374aeaaecf28d0f541399d5fa7fb016b4b9c52",
+        "shape": [
+          1,
+          1,
+          5120
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 5120,
+          "finite_count": 5120,
+          "maximum": 33.5,
+          "mean": -0.06653720140457153,
+          "minimum": -48.5,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 3.9936479359375374
+        }
+      },
+      {
+        "bytes": 20480,
+        "name": "position.1.layer.62.post_mixer_norm.output",
+        "offset": 18314912,
+        "sha256": "764c0a9d4607d612fff00ef10d8fd110e4e75ab48196b00168c7faebcc5e8218",
+        "shape": [
+          1,
+          1,
+          5120
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 5120,
+          "finite_count": 5120,
+          "maximum": 7.875,
+          "mean": -0.02334395535290241,
+          "minimum": -11.625,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 1.2870785071014792
+        }
+      },
+      {
+        "bytes": 69632,
+        "name": "position.1.layer.62.ffn.gate_projection",
+        "offset": 18335392,
+        "sha256": "f6bbcd29f3cbcc788ca5f36d23149a85beacba8eb05f035a466bf97cf42151c6",
+        "shape": [
+          1,
+          1,
+          17408
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 17408,
+          "finite_count": 17408,
+          "maximum": 9.125,
+          "mean": -0.7747799411744756,
+          "minimum": -9.0625,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 1.8707575649096149
+        }
+      },
+      {
+        "bytes": 69632,
+        "name": "position.1.layer.62.ffn.activation",
+        "offset": 18405024,
+        "sha256": "4cb0954f17588ef1f153fe377063e536fcecc893249252b40b3983a2cbae8eee",
+        "shape": [
+          1,
+          1,
+          17408
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 17408,
+          "finite_count": 17408,
+          "maximum": 9.125,
+          "mean": 0.14229537549373858,
+          "minimum": -0.279296875,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 0.8367255912886238
+        }
+      },
+      {
+        "bytes": 69632,
+        "name": "position.1.layer.62.ffn.up_projection",
+        "offset": 18474656,
+        "sha256": "f683408595a5e3aeeaca44d66121c52eacb06dcaed0d6abe231f928933809bc6",
+        "shape": [
+          1,
+          1,
+          17408
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 17408,
+          "finite_count": 17408,
+          "maximum": 10.0,
+          "mean": 0.00661387133603806,
+          "minimum": -10.5,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 1.4819157507087888
+        }
+      },
+      {
+        "bytes": 20480,
+        "name": "position.1.layer.62.ffn.output",
+        "offset": 18544288,
+        "sha256": "00785e105715b72784ed2916978e28d492660f3dae94b3c55a1d18ef759cbe90",
+        "shape": [
+          1,
+          1,
+          5120
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 5120,
+          "finite_count": 5120,
+          "maximum": 11.3125,
+          "mean": 0.005935689294710755,
+          "minimum": -7.9375,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 2.1231911521988773
+        }
+      },
+      {
+        "bytes": 20480,
+        "name": "position.1.layer.62.residual.output",
+        "offset": 18564768,
+        "sha256": "ddfcd6f325c0b7b423cc88752b72d548c31b703bdd5676dc46599340eead397e",
+        "shape": [
+          1,
+          1,
+          5120
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 5120,
+          "finite_count": 5120,
+          "maximum": 44.75,
+          "mean": -0.06041903495788574,
+          "minimum": -55.75,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 4.688616359859877
+        }
+      },
+      {
+        "bytes": 20480,
+        "name": "position.1.layer.63.residual.input",
+        "offset": 18585248,
+        "sha256": "ddfcd6f325c0b7b423cc88752b72d548c31b703bdd5676dc46599340eead397e",
+        "shape": [
+          1,
+          1,
+          5120
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 5120,
+          "finite_count": 5120,
+          "maximum": 44.75,
+          "mean": -0.06041903495788574,
+          "minimum": -55.75,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 4.688616359859877
+        }
+      },
+      {
+        "bytes": 20480,
+        "name": "position.1.layer.63.input_norm.output",
+        "offset": 18605728,
+        "sha256": "abd0af79cf0a960c7f0e314a256503b0bd0a6f178fd0fbd921b692bacc9182ed",
+        "shape": [
+          1,
+          1,
+          5120
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 5120,
+          "finite_count": 5120,
+          "maximum": 12.625,
+          "mean": -0.014070829749107361,
+          "minimum": -23.5,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 1.2263657553222436
+        }
+      },
+      {
+        "bytes": 49152,
+        "name": "position.1.layer.63.attention.query_gate_projection",
+        "offset": 18626208,
+        "sha256": "0bc18ff0e3212a4ae8092b6d04c4090947929a56186fc8cac099fbd0c49b49e9",
+        "shape": [
+          1,
+          1,
+          12288
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 12288,
+          "finite_count": 12288,
+          "maximum": 24.5,
+          "mean": -1.509617490073045,
+          "minimum": -28.125,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 3.10446172964694
+        }
+      },
+      {
+        "bytes": 24576,
+        "name": "position.1.layer.63.attention.query_norm",
+        "offset": 18675360,
+        "sha256": "47d0ef5d3cc3b098cb6590f3330e8bdd443d03a558f78338cc44abd710ba7e41",
+        "shape": [
+          1,
+          1,
+          24,
+          256
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 6144,
+          "finite_count": 6144,
+          "maximum": 11.125,
+          "mean": -0.02430564972261588,
+          "minimum": -11.3125,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 1.2042103288487613
+        }
+      },
+      {
+        "bytes": 4096,
+        "name": "position.1.layer.63.attention.key_projection",
+        "offset": 18699936,
+        "sha256": "73d41540507cef9d8e3fd07fa1734a553319249bff1e687e6e046df7426e8e72",
+        "shape": [
+          1,
+          1,
+          1024
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 1024,
+          "finite_count": 1024,
+          "maximum": 8.5,
+          "mean": 0.012976287864148617,
+          "minimum": -8.4375,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 2.206723019039724
+        }
+      },
+      {
+        "bytes": 4096,
+        "name": "position.1.layer.63.attention.key_norm",
+        "offset": 18704032,
+        "sha256": "4f22f437c621e91df081caaf51eb055f102dd125e9efd9bbae8caca0b1297661",
+        "shape": [
+          1,
+          1,
+          4,
+          256
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 1024,
+          "finite_count": 1024,
+          "maximum": 5.59375,
+          "mean": 0.010769959539175034,
+          "minimum": -6.90625,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 1.5053762912794728
+        }
+      },
+      {
+        "bytes": 4096,
+        "name": "position.1.layer.63.attention.value_projection",
+        "offset": 18708128,
+        "sha256": "17c166388758f2a389d078810f3c34e79f884cbabf99cbc36d7dbc3a904ae91b",
+        "shape": [
+          1,
+          1,
+          1024
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 1024,
+          "finite_count": 1024,
+          "maximum": 26.75,
+          "mean": 0.616569459438324,
+          "minimum": -29.375,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 6.090525877477079
+        }
+      },
+      {
+        "bytes": 24576,
+        "name": "position.1.layer.63.attention.query_before_rope",
+        "offset": 18712224,
+        "sha256": "47d0ef5d3cc3b098cb6590f3330e8bdd443d03a558f78338cc44abd710ba7e41",
+        "shape": [
+          1,
+          24,
+          1,
+          256
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 6144,
+          "finite_count": 6144,
+          "maximum": 11.125,
+          "mean": -0.02430564972261588,
+          "minimum": -11.3125,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 1.2042103288487613
+        }
+      },
+      {
+        "bytes": 4096,
+        "name": "position.1.layer.63.attention.key_before_rope",
+        "offset": 18736800,
+        "sha256": "4f22f437c621e91df081caaf51eb055f102dd125e9efd9bbae8caca0b1297661",
+        "shape": [
+          1,
+          4,
+          1,
+          256
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 1024,
+          "finite_count": 1024,
+          "maximum": 5.59375,
+          "mean": 0.010769959539175034,
+          "minimum": -6.90625,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 1.5053762912794728
+        }
+      },
+      {
+        "bytes": 24576,
+        "name": "position.1.layer.63.attention.query_after_rope",
+        "offset": 18740896,
+        "sha256": "be4f20f971155927b5fd254b635fc1a02adb780fc00d48910251290815700bbb",
+        "shape": [
+          1,
+          24,
+          1,
+          256
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 6144,
+          "finite_count": 6144,
+          "maximum": 11.125,
+          "mean": -0.0219316800745825,
+          "minimum": -11.3125,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 1.2041879898406125
+        }
+      },
+      {
+        "bytes": 4096,
+        "name": "position.1.layer.63.attention.key_after_rope",
+        "offset": 18765472,
+        "sha256": "1334ebf7b7da55ed01e0f4c10997af86c64b64c7635b83929ded70e4db62441e",
+        "shape": [
+          1,
+          4,
+          1,
+          256
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 1024,
+          "finite_count": 1024,
+          "maximum": 5.59375,
+          "mean": 0.014283321797847748,
+          "minimum": -6.90625,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 1.5053676327058725
+        }
+      },
+      {
+        "bytes": 24576,
+        "name": "position.1.layer.63.attention.query",
+        "offset": 18769568,
+        "sha256": "be4f20f971155927b5fd254b635fc1a02adb780fc00d48910251290815700bbb",
+        "shape": [
+          1,
+          24,
+          1,
+          256
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 6144,
+          "finite_count": 6144,
+          "maximum": 11.125,
+          "mean": -0.0219316800745825,
+          "minimum": -11.3125,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 1.2041879898406125
+        }
+      },
+      {
+        "bytes": 8192,
+        "name": "position.1.layer.63.attention.key_cache",
+        "offset": 18794144,
+        "sha256": "0fa3e129d8d73710e242a6147f5941218a93e59aa612a31f029739fa33f0ae90",
+        "shape": [
+          1,
+          4,
+          2,
+          256
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 2048,
+          "finite_count": 2048,
+          "maximum": 7.375,
+          "mean": 0.005650974810123444,
+          "minimum": -8.0625,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 1.4986802800558012
+        }
+      },
+      {
+        "bytes": 8192,
+        "name": "position.1.layer.63.attention.value_cache",
+        "offset": 18802336,
+        "sha256": "cec304af6a19779d96cc9a15195322e485187c9c773982b10471fd75d7ef0d3b",
+        "shape": [
+          1,
+          4,
+          2,
+          256
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 2048,
+          "finite_count": 2048,
+          "maximum": 65.0,
+          "mean": 0.5946518443524837,
+          "minimum": -30.375,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 6.3496481309900155
+        }
+      },
+      {
+        "bytes": 24576,
+        "name": "position.1.layer.63.attention.core_output",
+        "offset": 18810528,
+        "sha256": "06f66c5678d9dc25e3af5a6756ab819d897c6b563ea059a8827c2ca5557e4cdd",
+        "shape": [
+          1,
+          1,
+          24,
+          256
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 6144,
+          "finite_count": 6144,
+          "maximum": 37.0,
+          "mean": 0.6108977279315392,
+          "minimum": -28.0,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 6.014811441775614
+        }
+      },
+      {
+        "bytes": 192,
+        "name": "position.1.layer.63.attention.weights",
+        "offset": 18835104,
+        "sha256": "ee558525ee7150549ccb0ef832ddeccdca8ba803935d6e8fa6c98d4ef1dd915a",
+        "shape": [
+          1,
+          24,
+          1,
+          2
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 48,
+          "finite_count": 48,
+          "maximum": 1.0,
+          "mean": 0.5000259876251221,
+          "minimum": 0.000667572021484375,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 0.6176525321348755
+        }
+      },
+      {
+        "bytes": 20480,
+        "name": "position.1.layer.63.attention.output",
+        "offset": 18835296,
+        "sha256": "7ab70e6cdd924e7a2eb4f85702a85da65908e1b2dd935f67132851caab4bc448",
+        "shape": [
+          1,
+          1,
+          5120
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 5120,
+          "finite_count": 5120,
+          "maximum": 20.75,
+          "mean": -0.042852804996073246,
+          "minimum": -15.25,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 1.0812301628891114
+        }
+      },
+      {
+        "bytes": 20480,
+        "name": "position.1.layer.63.mixer_residual.output",
+        "offset": 18855776,
+        "sha256": "f97f9080a07aaa344137342867980adf817962f250e30086b08d060e5e7c779c",
+        "shape": [
+          1,
+          1,
+          5120
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 5120,
+          "finite_count": 5120,
+          "maximum": 29.5,
+          "mean": -0.10308737754821777,
+          "minimum": -35.0,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 4.538845404921706
+        }
+      },
+      {
+        "bytes": 20480,
+        "name": "position.1.layer.63.post_mixer_norm.output",
+        "offset": 18876256,
+        "sha256": "5de4fc03de928ec3ba888b7dad2fd5c53a11f90bbfcadeb460b3dc058447ea27",
+        "shape": [
+          1,
+          1,
+          5120
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 5120,
+          "finite_count": 5120,
+          "maximum": 6.96875,
+          "mean": -0.027557278424501418,
+          "minimum": -8.125,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 1.2041801860898922
+        }
+      },
+      {
+        "bytes": 69632,
+        "name": "position.1.layer.63.ffn.gate_projection",
+        "offset": 18896736,
+        "sha256": "7a378b1f77fab7bfbf7efe541a88dfe4280ac0b230b3c17a81486bd5031161c5",
+        "shape": [
+          1,
+          1,
+          17408
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 17408,
+          "finite_count": 17408,
+          "maximum": 17.625,
+          "mean": -0.6810251326259116,
+          "minimum": -13.625,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 2.129176929382401
+        }
+      },
+      {
+        "bytes": 69632,
+        "name": "position.1.layer.63.ffn.activation",
+        "offset": 18966368,
+        "sha256": "fe900d4034e89da724da0addc1d01d8c23347dc592b3d2ea3ea33f2317d8a5e4",
+        "shape": [
+          1,
+          1,
+          17408
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 17408,
+          "finite_count": 17408,
+          "maximum": 17.625,
+          "mean": 0.2470453597488813,
+          "minimum": -0.279296875,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 1.1796570108347098
+        }
+      },
+      {
+        "bytes": 69632,
+        "name": "position.1.layer.63.ffn.up_projection",
+        "offset": 19036000,
+        "sha256": "a05c94a13e1625d16cac0f3fbffc307361235dc4cdd06d48f9dae49db9a16a64",
+        "shape": [
+          1,
+          1,
+          17408
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 17408,
+          "finite_count": 17408,
+          "maximum": 15.5625,
+          "mean": 0.006197999834137804,
+          "minimum": -15.0,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 1.913736254906325
+        }
+      },
+      {
+        "bytes": 20480,
+        "name": "position.1.layer.63.ffn.output",
+        "offset": 19105632,
+        "sha256": "86c19c4b7ac7cf5c917aca7f94eebdc557d32501d29f710d2228f8b246089438",
+        "shape": [
+          1,
+          1,
+          5120
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 5120,
+          "finite_count": 5120,
+          "maximum": 61.0,
+          "mean": 0.06613966459408402,
+          "minimum": -27.25,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 3.1138939423541707
+        }
+      },
+      {
+        "bytes": 20480,
+        "name": "position.1.layer.63.residual.output",
+        "offset": 19126112,
+        "sha256": "97c3528554b100d2c96b23f2aebdae6153940926742aaf5c5134f0c3224635df",
+        "shape": [
+          1,
+          1,
+          5120
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 5120,
+          "finite_count": 5120,
+          "maximum": 90.5,
+          "mean": -0.037023746967315675,
+          "minimum": -47.5,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 5.49067057130127
+        }
+      },
+      {
+        "bytes": 20480,
+        "name": "position.1.final_norm.output",
+        "offset": 19146592,
+        "sha256": "b0efab121c16e57e76c029c2e1c12671ca6c9b017b81e0d531049e866111f4c7",
+        "shape": [
+          1,
+          1,
+          5120
+        ],
+        "source_dtype": "bfloat16",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 5120,
+          "finite_count": 5120,
+          "maximum": 14.125,
+          "mean": -0.016333052515983583,
+          "minimum": -16.75,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 1.8936762797723847
+        }
+      },
+      {
+        "bytes": 993280,
+        "name": "position.1.logits",
+        "offset": 19167072,
+        "sha256": "f452cfe3146d97163b06db0e013130dde164374d38aed4c48df8133e077a70f3",
+        "shape": [
+          248320
+        ],
+        "source_dtype": "float32",
+        "storage_dtype": "float32_le",
+        "summary": {
+          "count": 248320,
+          "finite_count": 248320,
+          "maximum": 21.375,
+          "mean": 0.5716465722366246,
+          "minimum": -7.15625,
+          "nan_count": 0,
+          "negative_infinity_count": 0,
+          "positive_infinity_count": 0,
+          "rms": 1.948108558355756
+        }
+      }
+    ],
+    "schema_version": 1,
+    "sha256": "1083ab56433026ac03128603dbed017391c98e3053b9169774e9654e8e85a031",
+    "storage": "concatenated_float32_little_endian"
+  }
+}

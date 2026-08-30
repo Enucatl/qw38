@@ -151,6 +151,17 @@ DSpark are explicitly rejected as Qwen model semantics.
   [`fixtures/llama_scalar_authority.json`](../fixtures/llama_scalar_authority.json).
   This comparison is not a substitute for the pending pinned Transformers
   semantic authority or ORA-004 tolerance freeze.
+- ORA-003 executes the official Qwen checkpoint revision
+  `1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0` through Transformers revision
+  `42ca97014c85d71a88ad60d55f08cb9fb4d26e2c`. Every Safetensors shard and
+  support file is pinned in
+  [`pins/transformers_authority_contract.json`](../pins/transformers_authority_contract.json),
+  and the Python environment is hash-locked. Local hook infrastructure only
+  observes original upstream operations. The raw official logit/tap blobs stay
+  in ignored evidence storage; their identities, all 238 tap records, measured
+  resource use, and reporting-only cross-artifact metrics are retained in
+  [`fixtures/transformers_scalar_authority.json`](../fixtures/transformers_scalar_authority.json).
+  Per-tap admission tolerances remain ORA-004 work.
 
 ## Specialization and hardware references
 

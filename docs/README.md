@@ -61,7 +61,8 @@ for language and host portability decisions.
 34. [Real scalar taps and bundle capture](34-real-scalar-traces.md): stage timing, raw versus RoPE attention values, state hashes, exact capture, and trace-v1 round trips.
 35. [Multi-token scalar chunks](35-scalar-token-chunks.md): whole-chunk preflight, token positions, logit rows, exact state equivalence, and structural continuation evidence.
 36. [Independent same-GGUF llama.cpp authority](36-independent-llama-authority.md): authority hierarchy, exact build/model/token identity, complete logit rows, and the tolerance-freeze boundary.
-37. [Source and evidence ledger](sources.md).
+37. [Official-checkpoint Transformers authority](37-transformers-authority.md): original versus GGUF weights, Safetensors shards, eager offload, hooks/taps, real logits, and proof limits.
+38. [Source and evidence ledger](sources.md).
 
 Claims use four labels: **Measured** (this exact artifact and hardware),
 **External** (a linked source), **Estimated** (reproducible arithmetic), and

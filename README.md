@@ -54,6 +54,10 @@ The [independent-authority chapter](docs/36-independent-llama-authority.md)
 explains why Quartz is checked against both llama.cpp and Transformers, how the
 same GGUF and raw token history are enforced, and why numeric reporting precedes
 the tolerance freeze.
+The [Transformers authority chapter](docs/37-transformers-authority.md) then
+explains original Safetensors checkpoints, eager execution, GPU/CPU/disk
+offload, diagnostic hooks and taps, and exactly what the official-checkpoint
+comparison does and does not prove.
 
 ## Build
 

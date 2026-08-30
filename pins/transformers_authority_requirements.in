@@ -1,0 +1,12 @@
+accelerate==1.14.0
+huggingface-hub==1.29.0
+numpy==2.5.2
+packaging==26.3
+psutil==7.2.2
+pyyaml==6.0.3
+regex==2026.7.19
+requests==2.34.2
+safetensors==0.8.0
+tokenizers==0.23.1
+torch @ https://download-r2.pytorch.org/whl/cu130/torch-2.10.0%2Bcu130-cp312-cp312-manylinux_2_28_x86_64.whl#sha256=858f0cbcc78d726fea9499eb3464faa98392fa093845a3262209bd226b7844d6
+tqdm==4.70.0
