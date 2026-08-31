@@ -67,6 +67,9 @@ scalar-versus-device admission boundary.
 The [CUDA prompt MMQ chapter](docs/40-cuda-prompt-mmq.md) extends that boundary
 to arbitrary prompt rows with explicit two-dimensional tiles, packed-weight
 reuse, token-major output, and tail handling.
+The [CUDA GDN step chapter](docs/41-cuda-gdn-step.md) adds the first stateful GPU
+model core and explains committed versus candidate recurrence, cancellation,
+and frontier-last publication.
 
 ## Build
 

@@ -49,7 +49,7 @@ are repository-relative unless stated otherwise.
 | ORA-001 | Generate and freeze scalar/oracle fixtures and tolerances | ORA-002, ORA-003, ORA-004 | done | Three authorities are attributed; tolerances and greedy tie exceptions are immutable inputs | [`fixtures/scalar_authority_alignment.json`](fixtures/scalar_authority_alignment.json); [`pins/scalar_oracle_tolerances.json`](pins/scalar_oracle_tolerances.json); log 2026-08-30T18:16:04Z |
 | CUD-001 | Implement CUDA Q4_K/Q6_K decode MMV | CPU-001, BLD-002, ORA-001 | done | Scalar-vs-CUDA and focused primitive pytest gates pass | [`cuda/quant_mmv.cu`](cuda/quant_mmv.cu); [`fixtures/cuda_quant_mmv.json`](fixtures/cuda_quant_mmv.json); [`tests/test_cuda_quant_mmv.py`](tests/test_cuda_quant_mmv.py); log 2026-08-31T06:05:47Z |
 | CUD-002 | Implement quantized tiled prompt MMQ | CUD-001 | done | Arbitrary prompt-row fixtures pass frozen tolerances | [`cuda/quant_mmv.cu`](cuda/quant_mmv.cu); [`fixtures/cuda_quant_mmq.json`](fixtures/cuda_quant_mmq.json); [`tests/test_cuda_quant_mmv.py`](tests/test_cuda_quant_mmv.py); log 2026-08-31T06:16:39Z |
-| GDN-001 | Implement exact one-token CUDA GDN and atomic state commit | CUD-001, CPU-002 | pending | State/taps match oracle and injected failures leave frontier unchanged | — |
+| GDN-001 | Implement exact one-token CUDA GDN and atomic state commit | CUD-001, CPU-002 | done | State/taps match oracle and injected failures leave frontier unchanged | [`cuda/gdn_step.cu`](cuda/gdn_step.cu); [`fixtures/cuda_gdn_step.json`](fixtures/cuda_gdn_step.json); [`tests/test_cuda_gdn.py`](tests/test_cuda_gdn.py); log 2026-08-31T06:29:12Z |
 | GDN-002 | Implement chunked GDN prefill with 64-token scans | GDN-001, CUD-002 | pending | Arbitrary chunks equal token-wise execution under frozen gates | — |
 | ATN-001 | Implement grouped-query attention and partial RoPE | CUD-001, CPU-003 | pending | Decode, causality, KV grouping, and layers 3/7/63 pass | — |
 | ATN-002 | Implement memory-bounded causal attention prefill | ATN-001, CUD-002 | pending | Chunked prompt fixtures and 131,072 capacity boundary pass | — |
@@ -99,6 +99,7 @@ are repository-relative unless stated otherwise.
 | EDU-024 | Explain three-authority tap alignment and tolerance freezing for beginners | ORA-004, DOC-001 | done | Comparable versus runtime-private boundaries, layout normalization, error distributions, tolerance selection, near-ties, and immutable admission are code-linked and worked | [`docs/38-scalar-authority-tolerances.md`](docs/38-scalar-authority-tolerances.md); [`tests/test_scalar_authority_alignment.py`](tests/test_scalar_authority_alignment.py); log 2026-08-30T18:16:04Z |
 | EDU-025 | Explain CUDA decode MMV and transient activation quantization for beginners | CUD-001, DOC-001 | done | Thread/warp ownership, BF16-to-Q8 staging, packed-weight decoding, FP32 reduction, launch validation, numeric gates, timing, and proof limits are code-linked and worked | [`docs/39-cuda-quant-mmv.md`](docs/39-cuda-quant-mmv.md); [`tests/test_cuda_quant_mmv.py`](tests/test_cuda_quant_mmv.py); log 2026-08-31T06:05:47Z |
 | EDU-026 | Explain tiled CUDA prompt MMQ for beginners | CUD-002, DOC-001 | done | Prompt rows, output layout, two-dimensional tiles, weight reuse, tail handling, scalar equivalence, numeric gates, timing, and proof limits are code-linked and worked | [`docs/40-cuda-prompt-mmq.md`](docs/40-cuda-prompt-mmq.md); [`tests/test_cuda_quant_mmv.py`](tests/test_cuda_quant_mmv.py); log 2026-08-31T06:16:39Z |
+| EDU-027 | Explain one-token CUDA GDN staging and atomic commit for beginners | GDN-001, DOC-001 | done | Convolution candidate state, normalized head reuse, recurrent mutation order, prepare/commit ownership, failure injection, numeric gates, timing, and proof limits are code-linked and worked | [`docs/41-cuda-gdn-step.md`](docs/41-cuda-gdn-step.md); [`tests/test_cuda_gdn.py`](tests/test_cuda_gdn.py); log 2026-08-31T06:29:12Z |
 | REL-001 | Publish reproducible release evidence bundle | CMP-003, QLT-001, DOC-001 | pending | Builds, hashes, raw results, reports, and documentation claims reconcile | — |
 
 ## Delivery-Gate Mapping
@@ -2080,6 +2081,53 @@ are repository-relative unless stated otherwise.
 - Marked CUD-002 and EDU-026 done. Delivery gate 6 now has admitted decode MMV
   and tiled prompt MMQ primitives. GDN-001, exact one-token CUDA GDN with atomic
   state commit, is the next implementation-plan task.
+
+### 2026-08-31T06:19:46Z — GDN-001 one-token CUDA state staging started
+
+- Marked GDN-001 and discovered documentation task EDU-027 in progress before
+  source edits. The focused boundary begins after learned projection: one
+  10,240-channel convolution input is split into Q/K/V after width-four causal
+  convolution and SiLU, then precomputed decay/beta drive the exact recurrent
+  mutation order at the production 16-key-head/48-value-head/128-lane shape.
+- Atomicity is explicit rather than inferred from stream ordering. A prepare
+  operation reads committed convolution/recurrent state and writes separate
+  candidate buffers plus output. A distinct commit operation copies candidates
+  only after the caller has synchronized, checked errors, and chosen to accept
+  the token. Invalid preparation and deliberate cancellation must leave the
+  committed bytes unchanged.
+- Learned projections, gated RMSNorm, output projection, the FFN branch, and the
+  64-layer transaction remain scheduler/session work. GDN-001 must not describe
+  a focused arithmetic state commit as a complete request commit.
+
+### 2026-08-31T06:29:12Z — GDN-001 and EDU-027 accepted
+
+- Added production-shape one-token CUDA convolution and recurrent kernels. The
+  convolution prepares a distinct width-four history and SiLU output. One
+  128-thread recurrence block per value head preserves 16-to-48 head reuse,
+  sequential FP32 key-lane accumulation, decay/prediction/delta/update/read
+  order, and the exact 786,432-value production state layout.
+- Added separate prepare and commit entry points. Prepare rejects aliased
+  candidate/committed state before launch and never changes committed state or
+  frontier. The one-block commit copies both state families, synchronizes all
+  256 threads, and advances the frontier last. The diagnostic proves deliberate
+  cancellation at frontier 41 and byte-exact acceptance at frontier 42.
+- Small `2/6/8/8` and production `16/48/128/128` cases compare candidate
+  convolution state, recurrent state, convolution output, and recurrent output
+  with the admitted scalar functions. All outputs were finite. Global maximum
+  absolute error was `3.7252903e-9`; global aggregate RMS was
+  `2.7502714e-10`, passing frozen `5e-8` and `5e-9` limits.
+- Three warm-ups and 30 synchronized CUDA-event samples produced mean prepare
+  times of about `0.00612 ms` for the small shape and `0.02055 ms` for the
+  production state core. The evidence explicitly excludes learned projections,
+  gated RMSNorm, output projection, FFN, and request-level transaction time.
+- Added source-authenticated contract/fixture, ordinary and opt-in pytest gates,
+  beginner Chapter 41, and reconciled handbook/source indexes. Clean normal and
+  diagnostic builds passed. The full suite passed 122 tests with two expected
+  exclusive-GPU skips in 164.24 seconds. A clean pinned CUDA rebuild compiled
+  all products, and the combined explicit RTX 5090 primitive suite passed five
+  tests.
+- Marked GDN-001 and EDU-027 done. GDN-002, arbitrary chunked GDN prefill with
+  internal 64-token scans and token-wise equivalence, is the next plan task.
 
 ## Decisions and Negative Results
 

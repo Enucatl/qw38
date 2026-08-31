@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "task": "GDN-001",
+  "device": "NVIDIA GeForce RTX 5090",
+  "compute_capability": "12.0",
+  "toolkit": "CUDA 13.0.2",
+  "samples_per_case": 30,
+  "warmups_per_case": 3,
+  "cases": [
+    {"name": "small", "key_heads": 2, "value_heads": 6, "key_width": 8, "value_width": 8, "max_abs": 0.00000000186264515, "rms": 0.000000000189384661, "nonfinite": 0, "prepare_atomic": true, "commit_exact": true, "mean_ms": 0.00612480007},
+    {"name": "production", "key_heads": 16, "value_heads": 48, "key_width": 128, "value_width": 128, "max_abs": 0.0000000037252903, "rms": 0.00000000027502714, "nonfinite": 0, "prepare_atomic": true, "commit_exact": true, "mean_ms": 0.0205482654}
+  ],
+  "claim": "post-projection one-token GDN core correctness timing, not a complete layer or request"
+}

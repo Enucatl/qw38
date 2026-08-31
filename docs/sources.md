@@ -188,6 +188,12 @@ DSpark are explicitly rejected as Qwen model semantics.
   [`fixtures/cuda_quant_mmq.json`](../fixtures/cuda_quant_mmq.json). Production
   tile selection remains profiler work rather than an externally borrowed
   performance claim.
+- GDN-001 uses the already pinned Transformers Qwen3.5 GDN equations and local
+  CPU-002 scalar implementation as its semantic references; it introduces no
+  new external source. [`pins/cuda_gdn_contract.json`](../pins/cuda_gdn_contract.json)
+  freezes the production shape, prepare/commit protocol, limits, and CUDA source
+  identities. Small and production-shape device comparisons are retained in
+  [`fixtures/cuda_gdn_step.json`](../fixtures/cuda_gdn_step.json).
 
 ## Specialization and hardware references
 

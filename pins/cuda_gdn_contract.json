@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "task": "GDN-001",
+  "target": "sm_120",
+  "toolkit": "CUDA 13.0.2",
+  "semantic_authority": "pins/gdn_contract.json",
+  "input_boundary": "post-projection FP32 convolution channels plus precomputed FP32 log_decay and beta",
+  "production_shape": {
+    "key_heads": 16,
+    "value_heads": 48,
+    "key_width": 128,
+    "value_width": 128,
+    "convolution_width": 4,
+    "convolution_channels": 10240,
+    "convolution_state_values": 40960,
+    "recurrent_state_values": 786432,
+    "output_values": 6144
+  },
+  "state_protocol": {
+    "prepare": "read committed state; write distinct candidate state and outputs; do not change frontier",
+    "commit": "one block copies both candidate states, synchronizes, then advances frontier",
+    "cancellation": "discard candidate buffers without launching commit"
+  },
+  "admission": {
+    "maximum_absolute_error": 0.00000005,
+    "maximum_rms_error": 0.000000005,
+    "relative_error": "report_only",
+    "nonfinite_count": 0,
+    "prepare_preserves_committed_bytes": true,
+    "commit_matches_candidate_bytes": true
+  },
+  "local_sources": {
+    "cuda/gdn_step.cu": "13a8a1fc0d5f0fb88b788e24e8412ddf6e745f747ba0073f1e5b99f6a7afaec3",
+    "cuda/gdn_step.h": "cc4acfa7d4bbef5f7a36f34f5bd2d227f3f2e3b910c50e4e7440d8c1b57aa601",
+    "cuda/gdn_step_test.cu": "c5fe6296904f2933e29b0ebf794d43ec2606ed6741d0821ba681f11c0e69e312"
+  }
+}
