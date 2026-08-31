@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "task": "CUD-003",
+  "device": "NVIDIA GeForce RTX 5090",
+  "compute_capability": "12.0",
+  "toolkit": "CUDA 13.0.2",
+  "warmups": 3,
+  "samples": 30,
+  "q8_0_mmv": [
+    {"name": "q8_0_17x256", "max_abs": 0.0000534057617, "rms": 0.0000199190126, "nonfinite": 0, "transient_q8_exact": true, "mean_ms": 0.00416533323},
+    {"name": "q8_0_257x512", "max_abs": 0.0000762939453, "rms": 0.0000269527864, "nonfinite": 0, "transient_q8_exact": true, "mean_ms": 0.00614400022}
+  ],
+  "q8_0_mmq": {"name": "q8_0_3x17x256", "max_abs": 0.0000534057617, "rms": 0.0000200998238, "nonfinite": 0, "transient_q8_exact": true, "mean_ms": 0.00819199998},
+  "pointwise": {"shape": "5120 residual and 17408 FFN", "max_abs": 0.0, "rms": 0.0, "nonfinite": 0, "mean_ms": 0.0621792041},
+  "layouts": {"shape": "production", "attention_split_exact": true, "gate_max_abs": 0.0000000298023224, "gate_rms": 0.0000000122614319, "nonfinite": 0},
+  "embedding": {"format": "Q4_K", "bf16_exact": true},
+  "gdn": {"mapping": "tiled_to_grouped", "exact": true},
+  "claim": "correctness-first component timing, not a complete scheduler or throughput result"
+}

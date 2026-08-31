@@ -17,9 +17,9 @@
     "-ffp-contract=off"
   ],
   "local_sources": {
-    "cuda/quant_mmv.cu": "a7c665d0a27a9e5218a8fa61a0b0cbdb981e47024c4db536ccbb4c7d02e00d00",
-    "cuda/quant_mmv.h": "7365249fa98f33ae70e182fdff2269d3577576f8be17bdd2116aed63313f0f3e",
-    "cuda/quant_mmv_test.cu": "8e0abced01a46cd4b6fba208c9715e01038981928d4d420ec01a102c3dab83ea"
+    "cuda/quant_mmv.cu": "872ce75e28854611b9ac01fedabce3eb52e2f242caa031326e072592dd528dab",
+    "cuda/quant_mmv.h": "08fef2dddbe027bc5ba4b03f9019b930c8d583d64a2abfd704a6b6ff7a3246d0",
+    "cuda/quant_mmv_test.cu": "574464f39c076597797a06a1dddb5d895cfade13f0ba50d9d402713decc78ae4"
   },
   "weight_authority": {
     "repository": "https://github.com/ggml-org/llama.cpp.git",

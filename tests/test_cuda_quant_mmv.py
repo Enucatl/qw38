@@ -84,7 +84,11 @@ def test_cuda_quant_mmv_matches_scalar_reference() -> None:
         text=True,
     )
     assert run.returncode == 0, run.stdout + run.stderr
-    lines = [line for line in run.stdout.splitlines() if line.startswith("case=")]
+    lines = [
+        line
+        for line in run.stdout.splitlines()
+        if line.startswith(("case=q4_k_", "case=q6_k_"))
+    ]
     assert [line.split()[0] for line in lines] == [
         "case=q4_k_17x256",
         "case=q4_k_257x512",
@@ -99,7 +103,9 @@ def test_cuda_quant_mmv_matches_scalar_reference() -> None:
         assert float(fields["rms"]) <= 2.0e-4
         assert float(fields["mean_ms"]) > 0.0
     mmq_lines = [
-        line for line in run.stdout.splitlines() if line.startswith("mmq_case=")
+        line
+        for line in run.stdout.splitlines()
+        if line.startswith(("mmq_case=q4_k_", "mmq_case=q6_k_"))
     ]
     assert [line.split()[0] for line in mmq_lines] == [
         "mmq_case=q4_k_3x17x256",

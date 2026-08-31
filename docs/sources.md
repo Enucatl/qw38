@@ -214,6 +214,13 @@ DSpark are explicitly rejected as Qwen model semantics.
   [`pins/cuda_attention_prefill_contract.json`](../pins/cuda_attention_prefill_contract.json).
   Chunk-equivalence and final-position RTX 5090 evidence are retained in
   [`fixtures/cuda_attention_prefill.json`](../fixtures/cuda_attention_prefill.json).
+- CUD-003 introduces no new external implementation source. GGUF Q8_0 decoding
+  follows the format already admitted by the pinned scalar decoder, and the
+  pointwise/layout equations come from the pinned model contract and scalar
+  layers. [`pins/cuda_scheduler_primitives_contract.json`](../pins/cuda_scheduler_primitives_contract.json)
+  authenticates the narrow CUDA boundary; Q8_0, BF16 pointwise, embedding, and
+  tiled/grouped measurements are retained in
+  [`fixtures/cuda_scheduler_primitives.json`](../fixtures/cuda_scheduler_primitives.json).
 
 ## Specialization and hardware references
 

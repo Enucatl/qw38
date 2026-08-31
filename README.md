@@ -79,6 +79,10 @@ softmax, and candidate-row commit on the GPU.
 The [CUDA attention prefill chapter](docs/44-cuda-attention-prefill.md) extends
 that state through atomic prompt chunks with linear score storage and executes
 the final legal position in a real 131,072-row production cache.
+The [CUDA scheduler-prerequisite chapter](docs/45-cuda-scheduler-primitives.md)
+then explains resident Q8_0 weights versus temporary Q8 activations, embedding
+row lookup, BF16 pointwise operations, and the packed-layout conversions needed
+before the complete 64-layer scheduler can be assembled.
 
 ## Build
 

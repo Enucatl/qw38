@@ -9,7 +9,7 @@
 
 namespace qw38::cuda {
 
-enum class QuantKind : std::uint8_t { kQ4K, kQ6K };
+enum class QuantKind : std::uint8_t { kQ4K, kQ6K, kQ8_0 };
 
 struct Q8Block {
   float scale;
@@ -32,6 +32,12 @@ cudaError_t launch_quant_mmq(QuantKind kind, const std::uint8_t* weights,
                              const __nv_bfloat16* prompt,
                              std::size_t prompt_rows, Q8Block* q8_workspace,
                              float* output, cudaStream_t stream) noexcept;
+
+cudaError_t launch_quant_row_decode(QuantKind kind,
+                                    const std::uint8_t* weights,
+                                    std::size_t rows, std::size_t columns,
+                                    std::size_t row, __nv_bfloat16* output,
+                                    cudaStream_t stream) noexcept;
 
 }  // namespace qw38::cuda
 

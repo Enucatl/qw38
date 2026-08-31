@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "task": "CUD-003",
+  "target": "sm_120",
+  "toolkit": "CUDA 13.0.2",
+  "purpose": "bounded projection and pointwise prerequisites for the real 64-layer scheduler",
+  "resident_weight_formats": ["Q4_K", "Q6_K", "Q8_0"],
+  "activation_storage": "BF16",
+  "accumulation": "FP32",
+  "production_shape": {
+    "residual_width": 5120,
+    "ffn_width": 17408,
+    "attention_query_heads": 24,
+    "attention_head_width": 256,
+    "gdn_key_heads": 16,
+    "gdn_value_heads": 48,
+    "gdn_head_width": 128
+  },
+  "layout_contract": {
+    "attention": "each packed head stores 256 query values followed by 256 gate values",
+    "gdn_projection": "GGUF value heads are replica-major tiled",
+    "gdn_recurrence": "recurrent state is key-head-major grouped",
+    "gdn_mapping": "grouped_head = key_head * 3 + replica; tiled_head = replica * 16 + key_head"
+  },
+  "admission": {
+    "q8_0_mmv_maximum_absolute_error": 0.0003,
+    "q8_0_mmv_maximum_rms_error": 0.0002,
+    "pointwise_bf16_maximum_absolute_error": 0.0078125,
+    "pointwise_bf16_maximum_rms_error": 0.0005,
+    "gate_maximum_absolute_error": 0.0000005,
+    "gate_maximum_rms_error": 0.0000001,
+    "embedding_bf16_exact": true,
+    "attention_split_exact": true,
+    "gdn_tiled_grouped_exact": true,
+    "nonfinite_count": 0
+  },
+  "local_sources": {
+    "cuda/quant_mmv.cu": "872ce75e28854611b9ac01fedabce3eb52e2f242caa031326e072592dd528dab",
+    "cuda/quant_mmv.h": "08fef2dddbe027bc5ba4b03f9019b930c8d583d64a2abfd704a6b6ff7a3246d0",
+    "cuda/gdn_step.cu": "db28a4415e104784a4ed65603fa8ffd8fa2e867924cb37bbf1ac76e139a5aff5",
+    "cuda/gdn_step.h": "d2ba77c1225cb765b51d132812cb30045fe9b30ae2ad27b0e9987c0e1ec5ac46",
+    "cuda/scheduler_primitives.cu": "bbebdaceb1eac48e8d02ef8a898452eba4f9ba8c9128f1bc29f9258094154b76",
+    "cuda/scheduler_primitives.h": "a0d5033702d8e425672a3beae548a4333fb481fd4525bc347e93ac6238573f24",
+    "cuda/scheduler_primitives_test.cu": "85e292a5da3c4d0924e22dde5ee59847dffb097646f3d49a7a7dfe124da380cf"
+  }
+}

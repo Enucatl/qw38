@@ -23,8 +23,12 @@ void write_u16(std::uint8_t* bytes, std::uint16_t value) {
 void fill_weights(qw38::cuda::QuantKind kind, std::size_t rows,
                   std::size_t columns, std::vector<std::uint8_t>* weights) {
   const std::size_t block_bytes =
-      kind == qw38::cuda::QuantKind::kQ4K ? 144 : 210;
-  weights->resize(rows * (columns / 256) * block_bytes);
+      kind == qw38::cuda::QuantKind::kQ4K ? 144
+      : kind == qw38::cuda::QuantKind::kQ6K ? 210
+                                           : 34;
+  const std::size_t block_values =
+      kind == qw38::cuda::QuantKind::kQ8_0 ? 32 : 256;
+  weights->resize(rows * (columns / block_values) * block_bytes);
   for (std::size_t index = 0; index < weights->size(); ++index) {
     (*weights)[index] = static_cast<std::uint8_t>((index * 73 + 19) & 0xFFU);
   }
@@ -33,8 +37,14 @@ void fill_weights(qw38::cuda::QuantKind kind, std::size_t rows,
     if (kind == qw38::cuda::QuantKind::kQ4K) {
       write_u16(weights->data() + offset, 0x2400U);      // 2^-6
       write_u16(weights->data() + offset + 2, 0x1C00U);  // 2^-8
-    } else {
+    } else if (kind == qw38::cuda::QuantKind::kQ6K) {
       write_u16(weights->data() + offset + 208, 0x1C00U);  // 2^-8
+    } else {
+      write_u16(weights->data() + offset, 0x3400U);  // 2^-3
+      for (std::size_t lane = 0; lane < 32; ++lane) {
+        (*weights)[offset + 2 + lane] = static_cast<std::uint8_t>(
+            static_cast<std::int8_t>(static_cast<int>((lane * 11 + offset) % 63) - 31));
+      }
     }
   }
 }
@@ -81,23 +91,31 @@ bool reference(qw38::cuda::QuantKind kind,
                const std::vector<qw38::cuda::Q8Block>& activation,
                std::vector<float>* output) {
   const std::size_t block_bytes =
-      kind == qw38::cuda::QuantKind::kQ4K ? 144 : 210;
+      kind == qw38::cuda::QuantKind::kQ4K ? 144
+      : kind == qw38::cuda::QuantKind::kQ6K ? 210
+                                           : 34;
+  const std::size_t block_values =
+      kind == qw38::cuda::QuantKind::kQ8_0 ? 32 : 256;
   output->assign(rows, 0.0F);
-  std::vector<float> decoded(256);
+  std::vector<float> decoded(block_values);
   for (std::size_t row = 0; row < rows; ++row) {
     float sum = 0.0F;
-    for (std::size_t block = 0; block < columns / 256; ++block) {
+    for (std::size_t block = 0; block < columns / block_values; ++block) {
       const std::uint8_t* packed =
-          weights.data() + (row * (columns / 256) + block) * block_bytes;
+          weights.data() +
+          (row * (columns / block_values) + block) * block_bytes;
       const qw38::Status status =
           kind == qw38::cuda::QuantKind::kQ4K
               ? qw38::internal::decode_q4_k(packed, block_bytes, decoded.data(),
                                             decoded.size())
-              : qw38::internal::decode_q6_k(packed, block_bytes, decoded.data(),
+          : kind == qw38::cuda::QuantKind::kQ6K
+              ? qw38::internal::decode_q6_k(packed, block_bytes, decoded.data(),
+                                            decoded.size())
+              : qw38::internal::decode_q8_0(packed, block_bytes, decoded.data(),
                                             decoded.size());
       if (!status.is_ok()) return false;
-      for (std::size_t within = 0; within < 256; ++within) {
-        const std::size_t column = block * 256 + within;
+      for (std::size_t within = 0; within < block_values; ++within) {
+        const std::size_t column = block * block_values + within;
         const auto& q8 = activation[column / 32];
         sum += decoded[within] *
                (q8.scale * static_cast<float>(q8.values[column % 32]));
@@ -353,7 +371,9 @@ int main() {
   if (run_case(qw38::cuda::QuantKind::kQ4K, "q4_k_17x256", 17, 256) != 0 ||
       run_case(qw38::cuda::QuantKind::kQ4K, "q4_k_257x512", 257, 512) != 0 ||
       run_case(qw38::cuda::QuantKind::kQ6K, "q6_k_17x256", 17, 256) != 0 ||
-      run_case(qw38::cuda::QuantKind::kQ6K, "q6_k_257x512", 257, 512) != 0) {
+      run_case(qw38::cuda::QuantKind::kQ6K, "q6_k_257x512", 257, 512) != 0 ||
+      run_case(qw38::cuda::QuantKind::kQ8_0, "q8_0_17x256", 17, 256) != 0 ||
+      run_case(qw38::cuda::QuantKind::kQ8_0, "q8_0_257x512", 257, 512) != 0) {
     return 1;
   }
   if (qw38::cuda::q8_prompt_workspace_bytes(3, 256) !=
@@ -366,7 +386,9 @@ int main() {
       run_prompt_case(qw38::cuda::QuantKind::kQ6K, "q6_k_1x17x256", 17,
                       256, 1) != 0 ||
       run_prompt_case(qw38::cuda::QuantKind::kQ6K, "q6_k_9x257x512", 257,
-                      512, 9) != 0) {
+                      512, 9) != 0 ||
+      run_prompt_case(qw38::cuda::QuantKind::kQ8_0, "q8_0_3x17x256", 17,
+                      256, 3) != 0) {
     return 1;
   }
   std::printf("status=passed\n");

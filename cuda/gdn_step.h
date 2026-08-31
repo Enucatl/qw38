@@ -33,6 +33,13 @@ cudaError_t launch_gdn_prepare(
     float* convolution_output, float* recurrent_output,
     cudaStream_t stream) noexcept;
 
+cudaError_t launch_gdn_prepare_tiled(
+    const GdnConfig& config, const float* convolution_input,
+    const float* convolution_weights, const float* log_decay,
+    const float* beta, const GdnState& committed, const GdnState& candidate,
+    float* convolution_output, float* recurrent_output,
+    cudaStream_t stream) noexcept;
+
 cudaError_t launch_gdn_prepare_chunk(
     const GdnConfig& config, const float* convolution_input,
     const float* convolution_weights, const float* log_decay,

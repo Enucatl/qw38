@@ -11,6 +11,7 @@ constexpr int kPromptRowsPerTile = 4;
 constexpr std::size_t kValuesPerWeightBlock = 256;
 constexpr std::size_t kQ4KBytes = 144;
 constexpr std::size_t kQ6KBytes = 210;
+constexpr std::size_t kQ80Bytes = 34;
 
 __device__ float read_half(const std::uint8_t* bytes) {
   const unsigned short bits = static_cast<unsigned short>(bytes[0]) |
@@ -62,6 +63,18 @@ __device__ float decode_q6(const std::uint8_t* block, int index) {
   return read_half(block + 208) * static_cast<float>(scale * quant);
 }
 
+__device__ float decode_q8(const std::uint8_t* block, int index) {
+  return read_half(block) *
+         static_cast<float>(static_cast<std::int8_t>(block[2 + index]));
+}
+
+template <QuantKind Kind>
+__device__ float decode_weight(const std::uint8_t* block, int index) {
+  if constexpr (Kind == QuantKind::kQ4K) return decode_q4(block, index);
+  if constexpr (Kind == QuantKind::kQ6K) return decode_q6(block, index);
+  return decode_q8(block, index);
+}
+
 __global__ void quantize_bf16_q8(const __nv_bfloat16* input, Q8Block* output,
                                  std::size_t count) {
   const std::size_t index =
@@ -94,16 +107,19 @@ __global__ void quant_mmv(const std::uint8_t* weights, std::size_t rows,
   if (row >= rows) return;
 
   constexpr std::size_t kWeightBytes =
-      Kind == QuantKind::kQ4K ? kQ4KBytes : kQ6KBytes;
+      Kind == QuantKind::kQ4K ? kQ4KBytes
+      : Kind == QuantKind::kQ6K ? kQ6KBytes
+                               : kQ80Bytes;
+  constexpr std::size_t kWeightValues =
+      Kind == QuantKind::kQ8_0 ? kWarpSize : kValuesPerWeightBlock;
   const std::uint8_t* row_weights =
-      weights + row * (columns / kValuesPerWeightBlock) * kWeightBytes;
+      weights + row * (columns / kWeightValues) * kWeightBytes;
   float sum = 0.0F;
   for (std::size_t column = lane; column < columns; column += kWarpSize) {
-    const std::size_t weight_block = column / kValuesPerWeightBlock;
-    const int within = static_cast<int>(column % kValuesPerWeightBlock);
+    const std::size_t weight_block = column / kWeightValues;
+    const int within = static_cast<int>(column % kWeightValues);
     const std::uint8_t* block = row_weights + weight_block * kWeightBytes;
-    const float weight = Kind == QuantKind::kQ4K ? decode_q4(block, within)
-                                                 : decode_q6(block, within);
+    const float weight = decode_weight<Kind>(block, within);
     const Q8Block& q8 = activation[column / kWarpSize];
     const float value =
         q8.scale * static_cast<float>(q8.values[column % kWarpSize]);
@@ -129,17 +145,20 @@ __global__ void quant_mmq(const std::uint8_t* weights, std::size_t output_rows,
   if (output_row >= output_rows) return;
 
   constexpr std::size_t kWeightBytes =
-      Kind == QuantKind::kQ4K ? kQ4KBytes : kQ6KBytes;
+      Kind == QuantKind::kQ4K ? kQ4KBytes
+      : Kind == QuantKind::kQ6K ? kQ6KBytes
+                               : kQ80Bytes;
+  constexpr std::size_t kWeightValues =
+      Kind == QuantKind::kQ8_0 ? kWarpSize : kValuesPerWeightBlock;
   const std::size_t q8_blocks_per_row = columns / kWarpSize;
   const std::uint8_t* row_weights =
-      weights + output_row * (columns / kValuesPerWeightBlock) * kWeightBytes;
+      weights + output_row * (columns / kWeightValues) * kWeightBytes;
   float sums[kPromptRowsPerTile] = {0.0F, 0.0F, 0.0F, 0.0F};
   for (std::size_t column = lane; column < columns; column += kWarpSize) {
-    const std::size_t weight_block = column / kValuesPerWeightBlock;
-    const int within = static_cast<int>(column % kValuesPerWeightBlock);
+    const std::size_t weight_block = column / kWeightValues;
+    const int within = static_cast<int>(column % kWeightValues);
     const std::uint8_t* block = row_weights + weight_block * kWeightBytes;
-    const float weight = Kind == QuantKind::kQ4K ? decode_q4(block, within)
-                                                 : decode_q6(block, within);
+    const float weight = decode_weight<Kind>(block, within);
 #pragma unroll
     for (int prompt_offset = 0; prompt_offset < kPromptRowsPerTile;
          ++prompt_offset) {
@@ -170,6 +189,26 @@ __global__ void quant_mmq(const std::uint8_t* weights, std::size_t output_rows,
   }
 }
 
+template <QuantKind Kind>
+__global__ void quant_row_decode(const std::uint8_t* weights,
+                                 std::size_t columns, std::size_t row,
+                                 __nv_bfloat16* output) {
+  const std::size_t column =
+      static_cast<std::size_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+  if (column >= columns) return;
+  constexpr std::size_t kWeightBytes =
+      Kind == QuantKind::kQ4K ? kQ4KBytes
+      : Kind == QuantKind::kQ6K ? kQ6KBytes
+                               : kQ80Bytes;
+  constexpr std::size_t kWeightValues =
+      Kind == QuantKind::kQ8_0 ? kWarpSize : kValuesPerWeightBlock;
+  const std::size_t row_bytes = columns / kWeightValues * kWeightBytes;
+  const std::uint8_t* block =
+      weights + row * row_bytes + column / kWeightValues * kWeightBytes;
+  output[column] = __float2bfloat16_rn(
+      decode_weight<Kind>(block, static_cast<int>(column % kWeightValues)));
+}
+
 }  // namespace
 
 std::size_t q8_workspace_bytes(std::size_t columns) noexcept {
@@ -192,7 +231,8 @@ cudaError_t launch_quant_mmv(QuantKind kind, const std::uint8_t* weights,
   if (weights == nullptr || activation == nullptr || q8_workspace == nullptr ||
       output == nullptr || rows == 0 || columns == 0 ||
       columns % kValuesPerWeightBlock != 0 ||
-      (kind != QuantKind::kQ4K && kind != QuantKind::kQ6K)) {
+      (kind != QuantKind::kQ4K && kind != QuantKind::kQ6K &&
+       kind != QuantKind::kQ8_0)) {
     return cudaErrorInvalidValue;
   }
   const unsigned int quant_blocks =
@@ -209,6 +249,9 @@ cudaError_t launch_quant_mmv(QuantKind kind, const std::uint8_t* weights,
   } else if (kind == QuantKind::kQ6K) {
     quant_mmv<QuantKind::kQ6K><<<row_blocks, kThreads, 0, stream>>>(
         weights, rows, columns, q8_workspace, output);
+  } else {
+    quant_mmv<QuantKind::kQ8_0><<<row_blocks, kThreads, 0, stream>>>(
+        weights, rows, columns, q8_workspace, output);
   }
   return cudaPeekAtLastError();
 }
@@ -221,7 +264,8 @@ cudaError_t launch_quant_mmq(QuantKind kind, const std::uint8_t* weights,
   if (weights == nullptr || prompt == nullptr || q8_workspace == nullptr ||
       output == nullptr || output_rows == 0 || columns == 0 ||
       prompt_rows == 0 || columns % kValuesPerWeightBlock != 0 ||
-      (kind != QuantKind::kQ4K && kind != QuantKind::kQ6K)) {
+      (kind != QuantKind::kQ4K && kind != QuantKind::kQ6K &&
+       kind != QuantKind::kQ8_0)) {
     return cudaErrorInvalidValue;
   }
   const std::size_t prompt_values = prompt_rows * columns;
@@ -240,9 +284,38 @@ cudaError_t launch_quant_mmq(QuantKind kind, const std::uint8_t* weights,
   if (kind == QuantKind::kQ4K) {
     quant_mmq<QuantKind::kQ4K><<<grid, kThreads, 0, stream>>>(
         weights, output_rows, columns, q8_workspace, prompt_rows, output);
-  } else {
+  } else if (kind == QuantKind::kQ6K) {
     quant_mmq<QuantKind::kQ6K><<<grid, kThreads, 0, stream>>>(
         weights, output_rows, columns, q8_workspace, prompt_rows, output);
+  } else {
+    quant_mmq<QuantKind::kQ8_0><<<grid, kThreads, 0, stream>>>(
+        weights, output_rows, columns, q8_workspace, prompt_rows, output);
+  }
+  return cudaPeekAtLastError();
+}
+
+cudaError_t launch_quant_row_decode(QuantKind kind,
+                                    const std::uint8_t* weights,
+                                    std::size_t rows, std::size_t columns,
+                                    std::size_t row, __nv_bfloat16* output,
+                                    cudaStream_t stream) noexcept {
+  if (weights == nullptr || output == nullptr || rows == 0 || columns == 0 ||
+      row >= rows || columns % kValuesPerWeightBlock != 0 ||
+      (kind != QuantKind::kQ4K && kind != QuantKind::kQ6K &&
+       kind != QuantKind::kQ8_0)) {
+    return cudaErrorInvalidValue;
+  }
+  const unsigned int blocks =
+      static_cast<unsigned int>((columns + kThreads - 1) / kThreads);
+  if (kind == QuantKind::kQ4K) {
+    quant_row_decode<QuantKind::kQ4K><<<blocks, kThreads, 0, stream>>>(
+        weights, columns, row, output);
+  } else if (kind == QuantKind::kQ6K) {
+    quant_row_decode<QuantKind::kQ6K><<<blocks, kThreads, 0, stream>>>(
+        weights, columns, row, output);
+  } else {
+    quant_row_decode<QuantKind::kQ8_0><<<blocks, kThreads, 0, stream>>>(
+        weights, columns, row, output);
   }
   return cudaPeekAtLastError();
 }

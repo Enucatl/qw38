@@ -49,11 +49,12 @@ are repository-relative unless stated otherwise.
 | ORA-001 | Generate and freeze scalar/oracle fixtures and tolerances | ORA-002, ORA-003, ORA-004 | done | Three authorities are attributed; tolerances and greedy tie exceptions are immutable inputs | [`fixtures/scalar_authority_alignment.json`](fixtures/scalar_authority_alignment.json); [`pins/scalar_oracle_tolerances.json`](pins/scalar_oracle_tolerances.json); log 2026-08-30T18:16:04Z |
 | CUD-001 | Implement CUDA Q4_K/Q6_K decode MMV | CPU-001, BLD-002, ORA-001 | done | Scalar-vs-CUDA and focused primitive pytest gates pass | [`cuda/quant_mmv.cu`](cuda/quant_mmv.cu); [`fixtures/cuda_quant_mmv.json`](fixtures/cuda_quant_mmv.json); [`tests/test_cuda_quant_mmv.py`](tests/test_cuda_quant_mmv.py); log 2026-08-31T06:05:47Z |
 | CUD-002 | Implement quantized tiled prompt MMQ | CUD-001 | done | Arbitrary prompt-row fixtures pass frozen tolerances | [`cuda/quant_mmv.cu`](cuda/quant_mmv.cu); [`fixtures/cuda_quant_mmq.json`](fixtures/cuda_quant_mmq.json); [`tests/test_cuda_quant_mmv.py`](tests/test_cuda_quant_mmv.py); log 2026-08-31T06:16:39Z |
+| CUD-003 | Complete real-scheduler CUDA projection and pointwise prerequisites | CUD-001, CPU-016 | done | Q8_0 MMV, quantized embedding-row decode, BF16 RMSNorm/residual/SwiGLU, packed attention split, GDN gate/layout preparation, and gated output meet scalar/device gates | [`cuda/scheduler_primitives.cu`](cuda/scheduler_primitives.cu); [`fixtures/cuda_scheduler_primitives.json`](fixtures/cuda_scheduler_primitives.json); [`tests/test_cuda_scheduler_primitives.py`](tests/test_cuda_scheduler_primitives.py); log 2026-08-31T11:26:17Z |
 | GDN-001 | Implement exact one-token CUDA GDN and atomic state commit | CUD-001, CPU-002 | done | State/taps match oracle and injected failures leave frontier unchanged | [`cuda/gdn_step.cu`](cuda/gdn_step.cu); [`fixtures/cuda_gdn_step.json`](fixtures/cuda_gdn_step.json); [`tests/test_cuda_gdn.py`](tests/test_cuda_gdn.py); log 2026-08-31T06:29:12Z |
 | GDN-002 | Implement chunked GDN prefill with 64-token scans | GDN-001, CUD-002 | done | Arbitrary chunks equal token-wise execution under frozen gates | [`cuda/gdn_step.cu`](cuda/gdn_step.cu); [`fixtures/cuda_gdn_chunk.json`](fixtures/cuda_gdn_chunk.json); [`tests/test_cuda_gdn_chunk.py`](tests/test_cuda_gdn_chunk.py); log 2026-08-31T06:42:29Z |
 | ATN-001 | Implement grouped-query attention and partial RoPE | CUD-001, CPU-003 | done | Decode, causality, KV grouping, and layers 3/7/63 pass | [`cuda/attention_decode.cu`](cuda/attention_decode.cu); [`fixtures/cuda_attention_decode.json`](fixtures/cuda_attention_decode.json); [`tests/test_cuda_attention.py`](tests/test_cuda_attention.py); log 2026-08-31T06:57:49Z |
 | ATN-002 | Implement memory-bounded causal attention prefill | ATN-001, CUD-002 | done | Chunked prompt fixtures and 131,072 capacity boundary pass | [`cuda/attention_decode.cu`](cuda/attention_decode.cu); [`fixtures/cuda_attention_prefill.json`](fixtures/cuda_attention_prefill.json); [`tests/test_cuda_attention_prefill.py`](tests/test_cuda_attention_prefill.py); log 2026-08-31T09:33:05Z |
-| SCH-001 | Implement hybrid 64-layer CUDA scheduler and FP32 logits | GDN-002, ATN-002 | pending | Full traces/logits and greedy continuations meet frozen gates | — |
+| SCH-001 | Implement hybrid 64-layer CUDA scheduler and FP32 logits | GDN-002, ATN-002, CUD-003 | pending | Full traces/logits and greedy continuations meet frozen gates | — |
 | SES-001 | Implement exact common-prefix sync/reuse | SCH-001 | pending | Reuse and full replay produce the same committed state and logits | — |
 | SES-002 | Implement atomic eval/sample/commit semantics | SCH-001 | pending | Sampling is separate; cancellation/error cannot partially commit state | — |
 | SES-003 | Implement atomic checkpoint save/restore | SES-001, SES-002 | pending | All state and compatibility hashes persist; resumed continuation is exact | — |
@@ -103,6 +104,7 @@ are repository-relative unless stated otherwise.
 | EDU-028 | Explain chunked CUDA GDN prefill and 64-token windows for beginners | GDN-002, DOC-001 | done | Prefill chunks, strict recurrence order, internal windows, candidate continuity, output layout, chunk-vs-token equivalence, cancellation, timing, and proof limits are code-linked and worked | [`docs/42-cuda-gdn-chunks.md`](docs/42-cuda-gdn-chunks.md); [`tests/test_cuda_gdn_chunk.py`](tests/test_cuda_gdn_chunk.py); log 2026-08-31T06:42:29Z |
 | EDU-029 | Explain CUDA grouped-query decode attention and partial RoPE for beginners | ATN-001, DOC-001 | done | Query/KV head sharing, normalization, partial RoPE, two-byte KV rows, causal reads, stable softmax, candidate/commit ownership, timing, numeric gates, and proof limits are code-linked and worked | [`docs/43-cuda-attention-decode.md`](docs/43-cuda-attention-decode.md); [`tests/test_cuda_attention.py`](tests/test_cuda_attention.py); log 2026-08-31T06:57:49Z |
 | EDU-030 | Explain memory-bounded CUDA attention prefill and the 128K boundary for beginners | ATN-002, DOC-001 | done | Chunk causality, candidate-row continuity, linear score workspace, whole-chunk commit/cancellation, token-wise equivalence, 131,072 sizing/execution, timing, and proof limits are code-linked and worked | [`docs/44-cuda-attention-prefill.md`](docs/44-cuda-attention-prefill.md); [`tests/test_cuda_attention_prefill.py`](tests/test_cuda_attention_prefill.py); log 2026-08-31T09:33:05Z |
+| EDU-031 | Explain the CUDA scheduler prerequisite primitives for beginners | CUD-003, DOC-001 | done | Q8_0 resident weights versus transient Q8 activations, embedding row decode, BF16 pointwise storage, packed layouts, GDN grouped/tiled mapping, numeric gates, timing, and proof limits are code-linked and worked | [`docs/45-cuda-scheduler-primitives.md`](docs/45-cuda-scheduler-primitives.md); [`tests/test_cuda_scheduler_primitives.py`](tests/test_cuda_scheduler_primitives.py); log 2026-08-31T11:26:17Z |
 | REL-001 | Publish reproducible release evidence bundle | CMP-003, QLT-001, DOC-001 | pending | Builds, hashes, raw results, reports, and documentation claims reconcile | — |
 
 ## Delivery-Gate Mapping
@@ -114,7 +116,7 @@ are repository-relative unless stated otherwise.
 | 3. Pins | PIN-001–PIN-003 |
 | 4. Build/API/allocation skeleton | BLD-001–BLD-003, API-001 |
 | 5. Loader/tokenizer/scalar/traces/fixtures | MDL-001–MDL-002, TOK-001–TOK-002, CPU-001–CPU-004, TRC-001–TRC-002, ORA-001 |
-| 6. CUDA primitives | CUD-001–CUD-002 |
+| 6. CUDA primitives | CUD-001–CUD-003 |
 | 7. GDN/attention/scheduler | GDN-001–GDN-002, ATN-001–ATN-002, SCH-001 |
 | 8. Sessions and 128K | SES-001–SES-003, MEM-001 |
 | 9. Profiling/optimization | OPT-001–OPT-004 |
@@ -2278,6 +2280,55 @@ are repository-relative unless stated otherwise.
 - Marked ATN-002 and EDU-030 done. SCH-001, the hybrid 64-layer CUDA scheduler
   and FP32 logits, is the next delivery-gate task. MEM-001 remains pending until
   complete-model post-graph allocation and reserve evidence exists.
+
+### 2026-08-31T11:00:45Z — CUD-003 scheduler prerequisite discovered
+
+- Read the typed real-artifact schema, scalar mixer/layer/token schedule, and all
+  admitted CUDA boundaries before starting SCH-001. The real GDN and attention
+  projection matrices are Q8_0, but CUD-001 intentionally admitted only Q4_K
+  and Q6_K. A CUDA scheduler cannot execute the pinned artifact through the
+  existing API, so CUD-003 was added before implementation and SCH-001 now
+  depends on it.
+- The same bounded prerequisite owns Q4_K embedding-row decode and the small
+  visible operations between matrix products: BF16/direct-scale RMSNorm,
+  residual publication, SwiGLU, per-head attention query/gate splitting, GDN
+  gate conversion, grouped/tiled value mapping, and gated recurrent output.
+  These are required semantic boundaries, not speculative fusion work.
+- Admission will compare every operation with the retained scalar equations,
+  preserve Q8_0 block decoding and transient activation bytes, cover production
+  dimensions and layout boundary indices, and retain synchronized device timing.
+  CUD-003 does not upload the complete model, schedule layers, allocate session
+  state, produce logits, or claim end-to-end speed; those remain SCH-001.
+
+### 2026-08-31T11:26:17Z — CUD-003 scheduler prerequisite admitted
+
+- Added resident GGUF Q8_0 decoding to the existing MMV/MMQ boundary without
+  changing its temporary FP32-scale Q8 activation layout. Two MMV shapes and a
+  three-row MMQ case preserved temporary activation bytes and stayed below the
+  frozen quantized projection gates; the largest Q8_0 error was
+  `7.62939453e-5` absolute and `2.69527864e-5` RMS.
+- Added exact BF16 embedding-row decode plus production-sized BF16 RMSNorm,
+  residual add, SwiGLU, and FP32-to-BF16 publication. The three exercised
+  pointwise operations matched BF16-aware references exactly and averaged
+  about `0.0624 ms` together after three warm-ups across 30 synchronized
+  CUDA-event samples. This is retained as component evidence, not scheduler
+  throughput.
+- Added exact packed per-head attention query/gate splitting, folded GDN gate
+  preparation, grouped recurrent output gating, and the real artifact's tiled
+  value-head entry into GDN. Production gate conversion measured
+  `2.98023224e-8` maximum and `1.22614319e-8` RMS error; tiled and already
+  admitted grouped recurrence executions produced byte-identical output and
+  recurrent state.
+- Re-authenticated the shared quant and GDN sources, then reran their existing
+  one-token and chunk gates to ensure the new formats/layout entry did not
+  regress prior behavior. Clean normal and diagnostic builds passed; the full
+  suite passed 126 tests with six expected exclusive-GPU skips in 164.63
+  seconds. A clean pinned CUDA build compiled every product, and all seven CUDA
+  diagnostics passed together, including the real 131,071 attention position.
+- Added the source-authenticated contract, retained fixture, ordinary and
+  opt-in pytest gates, beginner Chapter 45, and source/index reconciliation.
+  Marked CUD-003 and EDU-031 done. SCH-001, complete resident model upload,
+  hybrid 64-layer scheduling, and FP32 logits, is now unblocked and next.
 
 ## Decisions and Negative Results
 
