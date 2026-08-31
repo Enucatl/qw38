@@ -1,5 +1,6 @@
 #include "full_scheduler.h"
 
+#include <cmath>
 #include <cstdlib>
 #include <cstring>
 #include <limits>
@@ -384,6 +385,7 @@ SchedulerSession& SchedulerSession::operator=(SchedulerSession&& other) noexcept
   capacity_ = other.capacity_;
   frontier_ = other.frontier_;
   allocated_bytes_ = other.allocated_bytes_;
+  sampler_state_ = other.sampler_state_;
   other.gdn_convolution_ = nullptr;
   other.gdn_recurrent_ = nullptr;
   other.attention_key_ = nullptr;
@@ -394,6 +396,7 @@ SchedulerSession& SchedulerSession::operator=(SchedulerSession&& other) noexcept
   other.capacity_ = 0;
   other.frontier_ = 0;
   other.allocated_bytes_ = 0;
+  other.sampler_state_ = {};
   return *this;
 }
 
@@ -415,6 +418,7 @@ void SchedulerSession::release() noexcept {
   capacity_ = 0;
   frontier_ = 0;
   allocated_bytes_ = 0;
+  sampler_state_ = {};
 }
 
 Status SchedulerSession::create(std::size_t capacity) noexcept {
@@ -514,6 +518,11 @@ Status SchedulerSession::state_equals(const SchedulerSession& other,
   }
   *equal = false;
   if (capacity_ != other.capacity_ || frontier_ != other.frontier_ ||
+      sampler_state_.temperature != other.sampler_state_.temperature ||
+      sampler_state_.top_p != other.sampler_state_.top_p ||
+      sampler_state_.top_k != other.sampler_state_.top_k ||
+      sampler_state_.seed != other.sampler_state_.seed ||
+      sampler_state_.rng_state != other.sampler_state_.rng_state ||
       std::memcmp(tokens_, other.tokens_, frontier_ * sizeof(std::size_t)) != 0) {
     return Status::ok();
   }
@@ -566,6 +575,20 @@ std::size_t SchedulerSession::frontier() const noexcept { return frontier_; }
 std::size_t SchedulerSession::token_count() const noexcept { return frontier_; }
 std::size_t SchedulerSession::allocated_bytes() const noexcept {
   return allocated_bytes_;
+}
+
+Status SchedulerSession::set_sampler_state(const SamplerState& state) noexcept {
+  if (!std::isfinite(state.temperature) || state.temperature < 0.0F ||
+      !std::isfinite(state.top_p) || state.top_p <= 0.0F ||
+      state.top_p > 1.0F || state.top_k > internal::kVocabularySize) {
+    return {StatusCode::kInvalidArgument, "CUDA sampler state is invalid"};
+  }
+  sampler_state_ = state;
+  return Status::ok();
+}
+
+SamplerState SchedulerSession::sampler_state() const noexcept {
+  return sampler_state_;
 }
 
 SchedulerWorkspace::SchedulerWorkspace() noexcept = default;

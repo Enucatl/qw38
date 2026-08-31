@@ -57,7 +57,7 @@ are repository-relative unless stated otherwise.
 | SCH-001 | Implement hybrid 64-layer CUDA scheduler and FP32 logits | GDN-002, ATN-002, CUD-003 | done | Full traces/logits and greedy continuations meet frozen gates | [`cuda/full_scheduler.cu`](cuda/full_scheduler.cu); [`fixtures/cuda_full_scheduler.json`](fixtures/cuda_full_scheduler.json); [`tests/test_cuda_full_scheduler.py`](tests/test_cuda_full_scheduler.py); log 2026-08-31T12:13:55Z |
 | SES-001 | Implement exact common-prefix sync/reuse | SCH-001 | done | Reuse and full replay produce the same committed state and logits | [`cuda/full_scheduler.cu`](cuda/full_scheduler.cu); [`fixtures/cuda_prefix_sync.json`](fixtures/cuda_prefix_sync.json); [`tests/test_cuda_prefix_sync.py`](tests/test_cuda_prefix_sync.py); log 2026-08-31T13:45:38Z |
 | SES-002 | Implement atomic eval/sample/commit semantics | SCH-001 | done | Sampling is separate; cancellation/error cannot partially commit state | [`cuda/full_scheduler.cu`](cuda/full_scheduler.cu); [`fixtures/cuda_atomic_eval.json`](fixtures/cuda_atomic_eval.json); [`tests/test_cuda_atomic_eval.py`](tests/test_cuda_atomic_eval.py); log 2026-08-31T17:55:34Z |
-| SES-003 | Implement atomic checkpoint save/restore | SES-001, SES-002 | pending | All state and compatibility hashes persist; resumed continuation is exact | — |
+| SES-003 | Implement atomic checkpoint save/restore | SES-001, SES-002 | done | All state and compatibility hashes persist; resumed continuation is exact | [`cuda/checkpoint.cu`](cuda/checkpoint.cu); [`fixtures/cuda_checkpoint.json`](fixtures/cuda_checkpoint.json); [`tests/test_cuda_checkpoint.py`](tests/test_cuda_checkpoint.py); log 2026-08-31T19:09:54Z |
 | MEM-001 | Demonstrate 131,072-token fit with 1.5 GiB reserve | BLD-003, SCH-001 | pending | Post-graph measured ledger includes 8 GiB KV and every named allocation on RTX 5090 | — |
 | OPT-001 | Add synchronized timings, NVTX, and attribution | SCH-001 | pending | Component/end-to-end measurements expose every named time category | — |
 | OPT-002 | Profile and implement justified fusions | OPT-001, ORA-001 | pending | Nsight evidence justifies each fusion; fused/unfused boundaries pass frozen gates | — |
@@ -108,6 +108,7 @@ are repository-relative unless stated otherwise.
 | EDU-032 | Explain resident CUDA model execution and the 64-layer hybrid schedule for beginners | SCH-001, DOC-001 | done | Upload ownership, layer alternation, scratch reuse, BF16/FP32 boundaries, state offsets, full logits, numeric/greedy gates, timing, and proof limits are code-linked and worked | [`docs/46-cuda-full-scheduler.md`](docs/46-cuda-full-scheduler.md); [`tests/test_cuda_full_scheduler.py`](tests/test_cuda_full_scheduler.py); log 2026-08-31T12:13:55Z |
 | EDU-033 | Explain exact CUDA prefix synchronization and replay for beginners | SES-001, DOC-001 | done | Tokens, common prefixes, append/no-op reuse, divergent/shortened replay, exact equality, memory rationale, preflight failure behavior, and proof limits are code-linked and worked | [`docs/47-cuda-prefix-sync.md`](docs/47-cuda-prefix-sync.md); [`tests/test_cuda_prefix_sync.py`](tests/test_cuda_prefix_sync.py); log 2026-08-31T13:45:38Z |
 | EDU-034 | Explain atomic CUDA evaluation, commit, cancellation, errors, and separate sampling for beginners | SES-002, DOC-001 | done | Candidate versus committed state, pointer publication, frontier-last visibility, polling, injected failure, sampling purity, memory cost, and proof limits are code-linked and worked | [`docs/48-atomic-eval-and-sampling.md`](docs/48-atomic-eval-and-sampling.md); [`tests/test_cuda_atomic_eval.py`](tests/test_cuda_atomic_eval.py); log 2026-08-31T17:55:34Z |
+| EDU-035 | Explain versioned atomic CUDA checkpoint save/restore for beginners | SES-003, DOC-001 | done | File framing, compatibility and payload hashes, logical state sections, atomic rename, validation-before-mutation, sampler persistence, exact continuation, corruption, and proof limits are code-linked and worked | [`docs/49-cuda-checkpoints.md`](docs/49-cuda-checkpoints.md); [`tests/test_cuda_checkpoint.py`](tests/test_cuda_checkpoint.py); log 2026-08-31T19:09:54Z |
 | REL-001 | Publish reproducible release evidence bundle | CMP-003, QLT-001, DOC-001 | pending | Builds, hashes, raw results, reports, and documentation claims reconcile | — |
 
 ## Delivery-Gate Mapping
@@ -2509,6 +2510,56 @@ are repository-relative unless stated otherwise.
   passed six tests in 59.20 seconds after the final host-output staging audit.
 - Marked SES-002 and EDU-034 done. SES-003, atomic disk checkpoint save/restore
   of every logical state component and compatibility identity, is next.
+
+### 2026-08-31T18:50:52Z — SES-003 atomic CUDA checkpointing started
+
+- Marked SES-003 and newly discovered documentation task EDU-035 in progress
+  before source changes. The versioned little-endian checkpoint will carry the
+  pinned model SHA-256, a fixed state-layout compatibility hash, capacity and
+  frontier, sampler configuration/RNG fields, exact token IDs, all GDN bytes,
+  committed attention rows, and the last committed logits/hidden vector.
+- Save will write and close an adjacent temporary file, authenticate its framed
+  bytes, append the digest, and publish by same-directory rename. Restore will
+  validate magic, version, identities, section arithmetic, token bounds, exact
+  file size, and payload digest before changing logical session state.
+- Acceptance will compare a restored session byte-for-byte with its source,
+  then compare their next-token continuation. Corrupt and incompatible files
+  must fail without changing an already valid target. The file stores only KV
+  rows below the frontier; unwritten capacity is not conversation state.
+
+### 2026-08-31T19:09:54Z — SES-003 atomic CUDA checkpointing admitted
+
+- Added checkpoint-v1 little-endian framing with fixed `QW38CKP1` magic,
+  version/header sizes, the pinned model SHA-256, a state-layout compatibility
+  SHA-256, capacity/frontier, five sampler fields, and exact section sizes. The
+  payload contains u32 tokens, every FP32 GDN convolution/recurrent byte,
+  committed BF16 KV prefixes, and last committed FP32 logits/hidden state.
+- Save streams device state through a bounded 1 MiB host buffer to an adjacent
+  `.tmp`, closes it, authenticates header plus payload, appends the 64-character
+  SHA-256 footer, syncs the file, renames it over the destination, and syncs the
+  parent directory. The diagnostic observed the destination and no temporary
+  file after success.
+- Restore validates magic/version, model/layout identities, capacity/frontier,
+  sampler bounds, section arithmetic, exact total size, payload digest, and all
+  token IDs before changing logical state. GDN restores through the existing
+  transaction candidate and frontier publishes last. Corrupt-payload and
+  incompatible-layout files were rejected with the already valid target still
+  byte-exact to its uninterrupted reference.
+- The two-token capacity-three checkpoint measured 160,004,416 bytes: 248-byte
+  header, 8 token bytes, 7,864,320 convolution bytes, 150,994,944 recurrent
+  bytes, 65,536 bytes each for keys and values, 993,280 logits bytes, 20,480
+  hidden bytes, and a 64-byte digest footer. Restored sampler fields matched;
+  evaluating token `1277` in uninterrupted/restored sessions produced identical
+  frontier-three state and outputs.
+- Added a bounded SHA-256 file-prefix helper, authenticated contract, retained
+  fixture, native diagnostic, pytest gate, beginner Chapter 49, and source/index
+  reconciliation. `uv run ruff format .` completed; the full suite passed 130
+  tests with ten expected exclusive-GPU skips in 168.27 seconds. A clean pinned
+  build compiled every host product and eleven CUDA diagnostics; all 21 opt-in
+  CUDA tests passed in 67.44 seconds, and the focused checkpoint/atomic/prefix/
+  scheduler regression passed eight tests in 63.70 seconds.
+- Marked SES-003 and EDU-035 done. MEM-001, simultaneous 131,072-token allocation
+  with every workspace/graph/overhead category and 1.5 GiB reserve, is next.
 
 ## Decisions and Negative Results
 

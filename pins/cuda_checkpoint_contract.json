@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "task": "SES-003",
+  "format": {
+    "magic": "QW38CKP1",
+    "version": 1,
+    "endianness": "little",
+    "header_bytes": 248,
+    "footer_sha256_ascii_bytes": 64,
+    "model_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+    "layout_sha256": "b816f20fc25c3de29b71e0404a3b7ef829142e7ad41aad0d67bcfbb92c7550fd"
+  },
+  "sections": [
+    "token IDs as u32 little-endian",
+    "48 FP32 GDN convolution rings",
+    "48 FP32 GDN recurrent matrices",
+    "16 committed BF16 attention key-cache prefixes",
+    "16 committed BF16 attention value-cache prefixes",
+    "last committed FP32 logits",
+    "last committed FP32 hidden vector"
+  ],
+  "sampler_fields": ["temperature", "top_p", "top_k", "seed", "rng_state"],
+  "save_publication": ["adjacent .tmp write", "close", "SHA-256 footer", "file fsync", "same-directory rename", "directory fsync"],
+  "restore_preflight": ["magic/version", "model/layout hashes", "capacity/frontier", "sampler bounds", "section arithmetic", "exact file size", "SHA-256 footer", "token bounds"],
+  "logical_attention_state": "only rows below frontier; file size grows by 65536 bytes per committed token",
+  "local_sources": {
+    "Makefile": "a775b25a711e9e7d8840130b323bc2f8fac6b7ce37382e37d3623860a84a9381",
+    "cuda/checkpoint.cu": "39d57a3d35c9491cf33ae2a0dc529cfec5bf4bc79acf229e060420faa9e17731",
+    "cuda/checkpoint_test.cu": "b54eff76501d89a2a3be91d023f26582a50cb18c2af9f1f22ea97595a4532b43",
+    "cuda/full_scheduler.cu": "9440e81eabc5cc720da1f2784d4d98f6c8c02fde25836ee97bbd3535d76d70ed",
+    "cuda/full_scheduler.h": "9e9911a7815655346cf0b5df1f116e92833d8577ad138c2fe101740c0b77c585",
+    "src/sha256.cpp": "c92e235777001baa56f55446c7505d13147ac6860c19a1b65269225607d66852",
+    "src/sha256.h": "8ad20231cc77f4dcc07fb435dc45699d32ce8cec627ba4baeed05f13b26a2a77"
+  }
+}

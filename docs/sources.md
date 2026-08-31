@@ -243,6 +243,13 @@ DSpark are explicitly rejected as Qwen model semantics.
   [`pins/cuda_atomic_eval_contract.json`](../pins/cuda_atomic_eval_contract.json);
   cancellation, injected-error, exact-commit, and sampling-purity evidence is
   retained in [`fixtures/cuda_atomic_eval.json`](../fixtures/cuda_atomic_eval.json).
+- SES-003 introduces no new external implementation source. Its little-endian
+  framing, fixed layout identity, bounded SHA-256 prefix helper, logical-state
+  sections, Linux `fsync`/rename publication, and validation order are local
+  Quartz contracts authenticated in
+  [`pins/cuda_checkpoint_contract.json`](../pins/cuda_checkpoint_contract.json).
+  Exact round-trip/continuation and retained corrupt/incompatible failures are
+  recorded in [`fixtures/cuda_checkpoint.json`](../fixtures/cuda_checkpoint.json).
 
 ## Specialization and hardware references
 

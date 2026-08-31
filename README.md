@@ -92,6 +92,9 @@ replay for divergent or shortened requests with byte-exact state and outputs.
 The [atomic evaluation chapter](docs/48-atomic-eval-and-sampling.md) explains
 candidate state, failure/cancellation preservation, frontier-last commit, and
 why sampling committed logits must not mutate the session.
+The [checkpoint chapter](docs/49-cuda-checkpoints.md) explains the complete
+versioned disk format, atomic durable publication, corruption and compatibility
+checks, sampler persistence, and byte-exact resumed continuation.
 
 ## Build
 

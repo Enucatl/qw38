@@ -1,5 +1,6 @@
 #include "sha256.h"
 
+#include <algorithm>
 #include <array>
 #include <cstdint>
 #include <fstream>
@@ -145,6 +146,33 @@ Status sha256_file(const std::string& path, std::string* digest) noexcept {
   }
   if (!input.eof()) {
     return {StatusCode::kIoError, "failed while reading file for SHA-256"};
+  }
+  *digest = hex_digest(hash.finish());
+  return Status::ok();
+}
+
+Status sha256_file_prefix(const std::string& path, std::size_t bytes,
+                          std::string* digest) noexcept {
+  if (digest == nullptr || path.empty()) {
+    return {StatusCode::kInvalidArgument,
+            "SHA-256 prefix path and output are required"};
+  }
+  std::ifstream input(path, std::ios::binary);
+  if (!input) {
+    return {StatusCode::kIoError, "cannot open file for SHA-256 prefix"};
+  }
+  Sha256 hash;
+  std::array<unsigned char, 1024 * 1024> buffer{};
+  std::size_t remaining = bytes;
+  while (remaining > 0) {
+    const std::size_t request = std::min(remaining, buffer.size());
+    input.read(reinterpret_cast<char*>(buffer.data()),
+               static_cast<std::streamsize>(request));
+    if (input.gcount() != static_cast<std::streamsize>(request)) {
+      return {StatusCode::kIoError, "SHA-256 prefix is shorter than declared"};
+    }
+    hash.update(buffer.data(), request);
+    remaining -= request;
   }
   *digest = hex_digest(hash.finish());
   return Status::ok();

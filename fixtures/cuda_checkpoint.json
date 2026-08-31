@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "task": "SES-003",
+  "device": "NVIDIA GeForce RTX 5090",
+  "compute_capability": "12.0",
+  "toolkit": "CUDA 13.0.2",
+  "saved_tokens": [42, 3649],
+  "continuation_token": 1277,
+  "capacity": 3,
+  "checkpoint_bytes": 160004416,
+  "section_bytes": {
+    "header": 248,
+    "tokens": 8,
+    "gdn_convolution": 7864320,
+    "gdn_recurrent": 150994944,
+    "attention_key": 65536,
+    "attention_value": 65536,
+    "logits": 993280,
+    "hidden": 20480,
+    "sha256_footer": 64
+  },
+  "sampler": {"temperature": 0.75, "top_p": 0.9, "top_k": 40, "seed": 123456789, "rng_state": 987654321},
+  "cases": [
+    {"name": "round_trip", "atomic_file_published": true, "temporary_absent": true, "state_equal": true, "passed": true},
+    {"name": "exact_continuation", "frontier": 3, "state_equal": true, "passed": true},
+    {"name": "corrupt_rejected", "target_state_equal": true, "passed": true},
+    {"name": "incompatible_rejected", "target_state_equal": true, "passed": true}
+  ],
+  "claim": "capacity-three atomic file publication, validation-before-mutation, exact restore, sampler persistence, and exact next-token continuation; not 128K checkpoint timing, crash-injection, public Engine wiring, or cross-version migration evidence"
+}

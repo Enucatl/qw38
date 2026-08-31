@@ -4,6 +4,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <string>
 
 #include <cuda_bf16.h>
 #include <cuda_runtime.h>
@@ -71,6 +72,16 @@ struct EvalControl final {
   void* context = nullptr;
 };
 
+struct SamplerState final {
+  float temperature = 1.0F;
+  float top_p = 1.0F;
+  std::uint32_t top_k = 0;
+  std::uint64_t seed = 0;
+  std::uint64_t rng_state = 0;
+};
+
+class SchedulerWorkspace;
+
 class ResidentModel final {
  public:
   ResidentModel() noexcept;
@@ -114,6 +125,11 @@ class SchedulerSession final {
   Status create(std::size_t capacity) noexcept;
   Status reset() noexcept;
   Status state_equals(const SchedulerSession& other, bool* equal) const noexcept;
+  Status set_sampler_state(const SamplerState& state) noexcept;
+  SamplerState sampler_state() const noexcept;
+  Status save_checkpoint(const std::string& path) const noexcept;
+  Status restore_checkpoint(const std::string& path,
+                            SchedulerWorkspace* workspace) noexcept;
   std::size_t capacity() const noexcept;
   std::size_t frontier() const noexcept;
   std::size_t token_count() const noexcept;
@@ -131,6 +147,7 @@ class SchedulerSession final {
   std::size_t capacity_ = 0;
   std::size_t frontier_ = 0;
   std::size_t allocated_bytes_ = 0;
+  SamplerState sampler_state_{};
 
   friend Status execute_token(const ResidentModel&, std::size_t,
                               SchedulerSession*, class SchedulerWorkspace*,
