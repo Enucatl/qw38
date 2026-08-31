@@ -194,6 +194,13 @@ DSpark are explicitly rejected as Qwen model semantics.
   freezes the production shape, prepare/commit protocol, limits, and CUDA source
   identities. Small and production-shape device comparisons are retained in
   [`fixtures/cuda_gdn_step.json`](../fixtures/cuda_gdn_step.json).
+- GDN-002 introduces no new external source. It repeats the already admitted
+  GDN-001 mutation order inside bounded local windows and compares directly with
+  repeated one-token CUDA commits. The window/candidate protocol and current
+  source identities are frozen in
+  [`pins/cuda_gdn_chunk_contract.json`](../pins/cuda_gdn_chunk_contract.json),
+  with boundary and production-shape measurements retained in
+  [`fixtures/cuda_gdn_chunk.json`](../fixtures/cuda_gdn_chunk.json).
 
 ## Specialization and hardware references
 

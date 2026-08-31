@@ -30,8 +30,8 @@
     "commit_matches_candidate_bytes": true
   },
   "local_sources": {
-    "cuda/gdn_step.cu": "13a8a1fc0d5f0fb88b788e24e8412ddf6e745f747ba0073f1e5b99f6a7afaec3",
-    "cuda/gdn_step.h": "cc4acfa7d4bbef5f7a36f34f5bd2d227f3f2e3b910c50e4e7440d8c1b57aa601",
+    "cuda/gdn_step.cu": "504aa4431f4a4d2492ec990738b443b7daf1d18caf43ff59ce2413bcd0e85b1a",
+    "cuda/gdn_step.h": "aa659587839ab8b13be8511cc8cbcbd376d137799a86a41230997cf267df53cb",
     "cuda/gdn_step_test.cu": "c5fe6296904f2933e29b0ebf794d43ec2606ed6741d0821ba681f11c0e69e312"
   }
 }

@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "task": "GDN-002",
+  "device": "NVIDIA GeForce RTX 5090",
+  "compute_capability": "12.0",
+  "toolkit": "CUDA 13.0.2",
+  "samples_per_case": 30,
+  "warmups_per_case": 3,
+  "cases": [
+    {"name": "small_3", "tokens": 3, "windows": 1, "max_abs": 0.0000000074505806, "rms": 0.000000000597767558, "nonfinite": 0, "prepare_atomic": true, "tokenwise_equal": true, "mean_ms": 0.0102400007},
+    {"name": "small_64", "tokens": 64, "windows": 1, "max_abs": 0.0000000186264515, "rms": 0.00000000137352818, "nonfinite": 0, "prepare_atomic": true, "tokenwise_equal": true, "mean_ms": 0.0941973403},
+    {"name": "small_65", "tokens": 65, "windows": 2, "max_abs": 0.0000000186264515, "rms": 0.00000000138054457, "nonfinite": 0, "prepare_atomic": true, "tokenwise_equal": true, "mean_ms": 0.100352004},
+    {"name": "small_129", "tokens": 129, "windows": 3, "max_abs": 0.0000000158324838, "rms": 0.00000000132176425, "nonfinite": 0, "prepare_atomic": true, "tokenwise_equal": true, "mean_ms": 0.194558933},
+    {"name": "production_65", "tokens": 65, "windows": 2, "max_abs": 0.0000000223517418, "rms": 0.00000000178365356, "nonfinite": 0, "prepare_atomic": true, "tokenwise_equal": true, "mean_ms": 0.499839991}
+  ],
+  "claim": "correctness-first sequential recurrence windows, not an associative scan or tuned prefill result"
+}

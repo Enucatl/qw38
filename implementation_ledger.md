@@ -50,7 +50,7 @@ are repository-relative unless stated otherwise.
 | CUD-001 | Implement CUDA Q4_K/Q6_K decode MMV | CPU-001, BLD-002, ORA-001 | done | Scalar-vs-CUDA and focused primitive pytest gates pass | [`cuda/quant_mmv.cu`](cuda/quant_mmv.cu); [`fixtures/cuda_quant_mmv.json`](fixtures/cuda_quant_mmv.json); [`tests/test_cuda_quant_mmv.py`](tests/test_cuda_quant_mmv.py); log 2026-08-31T06:05:47Z |
 | CUD-002 | Implement quantized tiled prompt MMQ | CUD-001 | done | Arbitrary prompt-row fixtures pass frozen tolerances | [`cuda/quant_mmv.cu`](cuda/quant_mmv.cu); [`fixtures/cuda_quant_mmq.json`](fixtures/cuda_quant_mmq.json); [`tests/test_cuda_quant_mmv.py`](tests/test_cuda_quant_mmv.py); log 2026-08-31T06:16:39Z |
 | GDN-001 | Implement exact one-token CUDA GDN and atomic state commit | CUD-001, CPU-002 | done | State/taps match oracle and injected failures leave frontier unchanged | [`cuda/gdn_step.cu`](cuda/gdn_step.cu); [`fixtures/cuda_gdn_step.json`](fixtures/cuda_gdn_step.json); [`tests/test_cuda_gdn.py`](tests/test_cuda_gdn.py); log 2026-08-31T06:29:12Z |
-| GDN-002 | Implement chunked GDN prefill with 64-token scans | GDN-001, CUD-002 | pending | Arbitrary chunks equal token-wise execution under frozen gates | — |
+| GDN-002 | Implement chunked GDN prefill with 64-token scans | GDN-001, CUD-002 | done | Arbitrary chunks equal token-wise execution under frozen gates | [`cuda/gdn_step.cu`](cuda/gdn_step.cu); [`fixtures/cuda_gdn_chunk.json`](fixtures/cuda_gdn_chunk.json); [`tests/test_cuda_gdn_chunk.py`](tests/test_cuda_gdn_chunk.py); log 2026-08-31T06:42:29Z |
 | ATN-001 | Implement grouped-query attention and partial RoPE | CUD-001, CPU-003 | pending | Decode, causality, KV grouping, and layers 3/7/63 pass | — |
 | ATN-002 | Implement memory-bounded causal attention prefill | ATN-001, CUD-002 | pending | Chunked prompt fixtures and 131,072 capacity boundary pass | — |
 | SCH-001 | Implement hybrid 64-layer CUDA scheduler and FP32 logits | GDN-002, ATN-002 | pending | Full traces/logits and greedy continuations meet frozen gates | — |
@@ -100,6 +100,7 @@ are repository-relative unless stated otherwise.
 | EDU-025 | Explain CUDA decode MMV and transient activation quantization for beginners | CUD-001, DOC-001 | done | Thread/warp ownership, BF16-to-Q8 staging, packed-weight decoding, FP32 reduction, launch validation, numeric gates, timing, and proof limits are code-linked and worked | [`docs/39-cuda-quant-mmv.md`](docs/39-cuda-quant-mmv.md); [`tests/test_cuda_quant_mmv.py`](tests/test_cuda_quant_mmv.py); log 2026-08-31T06:05:47Z |
 | EDU-026 | Explain tiled CUDA prompt MMQ for beginners | CUD-002, DOC-001 | done | Prompt rows, output layout, two-dimensional tiles, weight reuse, tail handling, scalar equivalence, numeric gates, timing, and proof limits are code-linked and worked | [`docs/40-cuda-prompt-mmq.md`](docs/40-cuda-prompt-mmq.md); [`tests/test_cuda_quant_mmv.py`](tests/test_cuda_quant_mmv.py); log 2026-08-31T06:16:39Z |
 | EDU-027 | Explain one-token CUDA GDN staging and atomic commit for beginners | GDN-001, DOC-001 | done | Convolution candidate state, normalized head reuse, recurrent mutation order, prepare/commit ownership, failure injection, numeric gates, timing, and proof limits are code-linked and worked | [`docs/41-cuda-gdn-step.md`](docs/41-cuda-gdn-step.md); [`tests/test_cuda_gdn.py`](tests/test_cuda_gdn.py); log 2026-08-31T06:29:12Z |
+| EDU-028 | Explain chunked CUDA GDN prefill and 64-token windows for beginners | GDN-002, DOC-001 | done | Prefill chunks, strict recurrence order, internal windows, candidate continuity, output layout, chunk-vs-token equivalence, cancellation, timing, and proof limits are code-linked and worked | [`docs/42-cuda-gdn-chunks.md`](docs/42-cuda-gdn-chunks.md); [`tests/test_cuda_gdn_chunk.py`](tests/test_cuda_gdn_chunk.py); log 2026-08-31T06:42:29Z |
 | REL-001 | Publish reproducible release evidence bundle | CMP-003, QLT-001, DOC-001 | pending | Builds, hashes, raw results, reports, and documentation claims reconcile | — |
 
 ## Delivery-Gate Mapping
@@ -2128,6 +2129,45 @@ are repository-relative unless stated otherwise.
   tests.
 - Marked GDN-001 and EDU-027 done. GDN-002, arbitrary chunked GDN prefill with
   internal 64-token scans and token-wise equivalence, is the next plan task.
+
+### 2026-08-31T06:32:01Z — GDN-002 chunked CUDA prefill started
+
+- Marked GDN-002 and discovered documentation task EDU-028 in progress before
+  source edits. The API accepts token-major post-projection channels and gates,
+  emits token-major recurrent outputs, and divides work into internal windows of
+  at most 64 tokens while preserving one-token mutation order.
+- The whole chunk retains GDN-001's candidate-state transaction. Window zero
+  reads committed state; later windows continue from the same candidate state;
+  none advances the committed frontier. Cancellation discards the final
+  candidate regardless of how many internal windows completed.
+- Admission must compare one chunk against repeated one-token CUDA prepare and
+  commit, including counts immediately below, at, and above 64. This increment
+  is correctness-first sequential recurrence inside each head block, not yet a
+  parallel associative scan or tuned prefill claim.
+
+### 2026-08-31T06:42:29Z — GDN-002 chunked CUDA prefill admitted
+
+- Added arbitrary-token chunk preparation in [`cuda/gdn_step.cu`](cuda/gdn_step.cu).
+  External chunks are divided into at-most-64-token windows while convolution
+  rings and recurrent matrices continue through one whole-chunk candidate. The
+  committed state and frontier remain byte-identical until explicit commit.
+- Added a native SM120 diagnostic covering 3, 64, 65, and 129 tokens plus a
+  production-state 65-token case. Every chunk output and ending state was
+  byte-identical to repeated one-token CUDA prepare/commit. Against the scalar
+  oracle, the worst absolute error was `2.23517418e-8`, aggregate RMS stayed
+  below `1.79e-9`, and all non-finite counts were zero.
+- Three warm-ups and 30 synchronized CUDA-event samples measured about
+  `0.100 ms` for the small 65-token state core and `0.500 ms` for the
+  production-state 65-token core. These figures exclude projections, norms,
+  output projection, FFN, attention, and scheduler work.
+- Added the source-authenticated contract, retained fixture, ordinary and
+  opt-in pytest gates, beginner Chapter 42, and source/index reconciliation.
+  JSON parsing and diff-whitespace checks passed. Clean normal and diagnostic
+  builds passed; the full suite passed 123 tests with three expected
+  exclusive-GPU skips in 164.55 seconds. A clean pinned CUDA rebuild and the
+  combined explicit quantization/GDN suite passed all seven tests.
+- Marked GDN-002 and EDU-028 done. ATN-001, grouped-query CUDA attention with
+  partial RoPE and focused layers 3, 7, and 63, is the next plan task.
 
 ## Decisions and Negative Results
 

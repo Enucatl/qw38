@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "task": "GDN-002",
+  "target": "sm_120",
+  "toolkit": "CUDA 13.0.2",
+  "inherits": "pins/cuda_gdn_contract.json",
+  "input": "token-major FP32 post-projection convolution channels and token-major log_decay/beta",
+  "output": "token-major FP32 recurrent values",
+  "scan_window_tokens": 64,
+  "window_protocol": {
+    "first": "read committed convolution and recurrent state; write candidate",
+    "continuation": "read and update candidate state",
+    "commit": "caller may publish only the final whole-chunk candidate",
+    "cancellation": "discard candidate; committed state and frontier remain unchanged"
+  },
+  "admission": {
+    "maximum_absolute_error": 0.00000005,
+    "maximum_rms_error": 0.000000005,
+    "relative_error": "report_only",
+    "nonfinite_count": 0,
+    "chunk_equals_repeated_cuda_tokens_exactly": true,
+    "prepare_preserves_committed_bytes": true
+  },
+  "local_sources": {
+    "cuda/gdn_step.cu": "504aa4431f4a4d2492ec990738b443b7daf1d18caf43ff59ce2413bcd0e85b1a",
+    "cuda/gdn_step.h": "aa659587839ab8b13be8511cc8cbcbd376d137799a86a41230997cf267df53cb",
+    "cuda/gdn_chunk_test.cu": "f8af81e3365de9b1da851b3e359cdb2fd16aeda79b8aad43dd4ac6479557e8fc"
+  }
+}

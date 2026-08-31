@@ -70,6 +70,9 @@ reuse, token-major output, and tail handling.
 The [CUDA GDN step chapter](docs/41-cuda-gdn-step.md) adds the first stateful GPU
 model core and explains committed versus candidate recurrence, cancellation,
 and frontier-last publication.
+The [chunked CUDA GDN chapter](docs/42-cuda-gdn-chunks.md) carries that state
+through arbitrary prompt chunks using continuous 64-token windows and proves
+byte-exact equivalence with repeated one-token GPU execution.
 
 ## Build
 

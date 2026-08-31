@@ -66,7 +66,8 @@ for language and host portability decisions.
 39. [The first CUDA matrix-vector kernel](39-cuda-quant-mmv.md): BF16-to-Q8 staging, packed Q4_K/Q6_K rows, warp ownership, FP32 reduction, device gates, and measured proof limits.
 40. [Tiled CUDA multiplication for prompt rows](40-cuda-prompt-mmq.md): prompt matrices, token-major output, two-dimensional tiles, packed-weight reuse, tails, and scalar/device gates.
 41. [One CUDA GDN step and atomic state staging](41-cuda-gdn-step.md): production recurrence, causal convolution, candidate state, cancellation, commit, and frontier publication.
-42. [Source and evidence ledger](sources.md).
+42. [Chunked CUDA GDN prefill](42-cuda-gdn-chunks.md): token-major chunks, strict recurrence order, 64-token windows, candidate continuity, cancellation, and token-wise equivalence.
+43. [Source and evidence ledger](sources.md).
 
 Claims use four labels: **Measured** (this exact artifact and hardware),
 **External** (a linked source), **Estimated** (reproducible arithmetic), and

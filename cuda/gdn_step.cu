@@ -1,5 +1,6 @@
 #include "gdn_step.h"
 
+#include <algorithm>
 #include <cmath>
 
 namespace qw38::cuda {
@@ -10,6 +11,7 @@ constexpr std::uint32_t kMaximumValueHeads = 48;
 constexpr std::uint32_t kMaximumWidth = 128;
 constexpr std::uint32_t kMaximumConvolutionWidth = 4;
 constexpr int kThreads = 128;
+constexpr std::size_t kScanWindow = 64;
 constexpr float kL2Epsilon = 1.0e-6F;
 
 bool valid_config(const GdnConfig& config) noexcept {
@@ -22,29 +24,40 @@ bool valid_config(const GdnConfig& config) noexcept {
          config.convolution_width <= kMaximumConvolutionWidth;
 }
 
-__global__ void prepare_convolution(
-    const float* input, const float* weights, const float* committed,
-    float* candidate, float* output, std::size_t channels,
-    std::uint32_t width) {
+__global__ void prepare_convolution_window(
+    const float* input, const float* weights, const float* source,
+    float* candidate, float* output, std::size_t channels, std::uint32_t width,
+    std::size_t token_count) {
   const std::size_t channel =
       static_cast<std::size_t>(blockIdx.x) * blockDim.x + threadIdx.x;
   if (channel >= channels) return;
   const std::size_t base = channel * width;
-  float convolution = 0.0F;
+  float history[kMaximumConvolutionWidth];
   for (std::uint32_t index = 0; index < width; ++index) {
-    const float value =
-        index + 1 < width ? committed[base + index + 1] : input[channel];
-    candidate[base + index] = value;
-    convolution = __fadd_rn(
-        convolution, __fmul_rn(value, weights[base + index]));
+    history[index] = source[base + index];
   }
-  output[channel] = convolution / (1.0F + expf(-convolution));
+  for (std::size_t token = 0; token < token_count; ++token) {
+    for (std::uint32_t index = 0; index + 1 < width; ++index) {
+      history[index] = history[index + 1];
+    }
+    history[width - 1] = input[token * channels + channel];
+    float convolution = 0.0F;
+    for (std::uint32_t index = 0; index < width; ++index) {
+      convolution = __fadd_rn(
+          convolution, __fmul_rn(history[index], weights[base + index]));
+    }
+    output[token * channels + channel] =
+        convolution / (1.0F + expf(-convolution));
+  }
+  for (std::uint32_t index = 0; index < width; ++index) {
+    candidate[base + index] = history[index];
+  }
 }
 
-__global__ void prepare_recurrence(
+__global__ void prepare_recurrence_window(
     GdnConfig config, const float* convolution_output,
-    const float* log_decay, const float* beta, const float* committed,
-    float* candidate, float* output) {
+    const float* log_decay, const float* beta, const float* source,
+    float* candidate, float* output, std::size_t token_count) {
   const std::uint32_t value_head = blockIdx.x;
   const std::uint32_t lane = threadIdx.x;
   if (value_head >= config.value_heads || lane >= config.value_width) return;
@@ -52,62 +65,71 @@ __global__ void prepare_recurrence(
   const std::uint32_t key_head = value_head / reuse;
   const std::size_t query_count =
       static_cast<std::size_t>(config.key_heads) * config.key_width;
-  const float* query = convolution_output + key_head * config.key_width;
-  const float* key = convolution_output + query_count +
-                     key_head * config.key_width;
-  const float* value = convolution_output + 2 * query_count +
-                       value_head * config.value_width;
-
   __shared__ float query_inverse;
   __shared__ float key_inverse;
-  if (lane == 0) {
-    float query_squares = 0.0F;
-    float key_squares = 0.0F;
-    for (std::uint32_t index = 0; index < config.key_width; ++index) {
-      query_squares = __fadd_rn(
-          query_squares, __fmul_rn(query[index], query[index]));
-      key_squares =
-          __fadd_rn(key_squares, __fmul_rn(key[index], key[index]));
-    }
-    query_inverse =
-        1.0F / sqrtf(query_squares + kL2Epsilon) /
-        sqrtf(static_cast<float>(config.key_width));
-    key_inverse = 1.0F / sqrtf(key_squares + kL2Epsilon);
-  }
-  __syncthreads();
-
   const std::size_t head_base =
       static_cast<std::size_t>(value_head) * config.key_width *
       config.value_width;
-  const float decay = expf(log_decay[value_head]);
-  float prediction = 0.0F;
-  for (std::uint32_t key_lane = 0; key_lane < config.key_width; ++key_lane) {
-    const std::size_t index =
-        head_base + static_cast<std::size_t>(key_lane) * config.value_width +
-        lane;
-    const float decayed = __fmul_rn(committed[index], decay);
-    prediction = __fadd_rn(
-        prediction,
-        __fmul_rn(__fmul_rn(key[key_lane], key_inverse), decayed));
+  const std::size_t channels = 2 * query_count +
+                               static_cast<std::size_t>(config.value_heads) *
+                                   config.value_width;
+  for (std::size_t token = 0; token < token_count; ++token) {
+    const float* token_convolution = convolution_output + token * channels;
+    const float* query = token_convolution + key_head * config.key_width;
+    const float* key = token_convolution + query_count +
+                       key_head * config.key_width;
+    const float* value = token_convolution + 2 * query_count +
+                         value_head * config.value_width;
+    if (lane == 0) {
+      float query_squares = 0.0F;
+      float key_squares = 0.0F;
+      for (std::uint32_t index = 0; index < config.key_width; ++index) {
+        query_squares = __fadd_rn(
+            query_squares, __fmul_rn(query[index], query[index]));
+        key_squares =
+            __fadd_rn(key_squares, __fmul_rn(key[index], key[index]));
+      }
+      query_inverse =
+          1.0F / sqrtf(query_squares + kL2Epsilon) /
+          sqrtf(static_cast<float>(config.key_width));
+      key_inverse = 1.0F / sqrtf(key_squares + kL2Epsilon);
+    }
+    __syncthreads();
+
+    const float* current = token == 0 ? source : candidate;
+    const float decay =
+        expf(log_decay[token * config.value_heads + value_head]);
+    float prediction = 0.0F;
+    for (std::uint32_t key_lane = 0; key_lane < config.key_width; ++key_lane) {
+      const std::size_t index =
+          head_base + static_cast<std::size_t>(key_lane) * config.value_width +
+          lane;
+      const float decayed = __fmul_rn(current[index], decay);
+      prediction = __fadd_rn(
+          prediction,
+          __fmul_rn(__fmul_rn(key[key_lane], key_inverse), decayed));
+    }
+    const float delta = __fmul_rn(
+        value[lane] - prediction,
+        beta[token * config.value_heads + value_head]);
+    float result = 0.0F;
+    for (std::uint32_t key_lane = 0; key_lane < config.key_width; ++key_lane) {
+      const std::size_t index =
+          head_base + static_cast<std::size_t>(key_lane) * config.value_width +
+          lane;
+      const float decayed = __fmul_rn(current[index], decay);
+      const float updated = __fadd_rn(
+          decayed,
+          __fmul_rn(__fmul_rn(key[key_lane], key_inverse), delta));
+      candidate[index] = updated;
+      result = __fadd_rn(
+          result,
+          __fmul_rn(__fmul_rn(query[key_lane], query_inverse), updated));
+    }
+    output[(token * config.value_heads + value_head) * config.value_width +
+           lane] = result;
+    __syncthreads();
   }
-  const float delta =
-      __fmul_rn(value[lane] - prediction, beta[value_head]);
-  float result = 0.0F;
-  for (std::uint32_t key_lane = 0; key_lane < config.key_width; ++key_lane) {
-    const std::size_t index =
-        head_base + static_cast<std::size_t>(key_lane) * config.value_width +
-        lane;
-    const float decayed = __fmul_rn(committed[index], decay);
-    const float updated = __fadd_rn(
-        decayed,
-        __fmul_rn(__fmul_rn(key[key_lane], key_inverse), delta));
-    candidate[index] = updated;
-    result = __fadd_rn(
-        result,
-        __fmul_rn(__fmul_rn(query[key_lane], query_inverse), updated));
-  }
-  output[static_cast<std::size_t>(value_head) * config.value_width + lane] =
-      result;
 }
 
 __global__ void commit_state(const float* candidate_convolution,
@@ -159,8 +181,19 @@ cudaError_t launch_gdn_prepare(
     const float* beta, const GdnState& committed, const GdnState& candidate,
     float* convolution_output, float* recurrent_output,
     cudaStream_t stream) noexcept {
+  return launch_gdn_prepare_chunk(
+      config, convolution_input, convolution_weights, log_decay, beta, 1,
+      committed, candidate, convolution_output, recurrent_output, stream);
+}
+
+cudaError_t launch_gdn_prepare_chunk(
+    const GdnConfig& config, const float* convolution_input,
+    const float* convolution_weights, const float* log_decay,
+    const float* beta, std::size_t token_count, const GdnState& committed,
+    const GdnState& candidate, float* convolution_output,
+    float* recurrent_output, cudaStream_t stream) noexcept {
   const std::size_t channels = gdn_convolution_channels(config);
-  if (channels == 0 || convolution_input == nullptr ||
+  if (channels == 0 || token_count == 0 || convolution_input == nullptr ||
       convolution_weights == nullptr || log_decay == nullptr ||
       beta == nullptr || committed.convolution == nullptr ||
       committed.recurrent == nullptr || candidate.convolution == nullptr ||
@@ -171,16 +204,30 @@ cudaError_t launch_gdn_prepare(
   }
   const unsigned int blocks =
       static_cast<unsigned int>((channels + kThreads - 1) / kThreads);
-  prepare_convolution<<<blocks, kThreads, 0, stream>>>(
-      convolution_input, convolution_weights, committed.convolution,
-      candidate.convolution, convolution_output, channels,
-      config.convolution_width);
-  cudaError_t error = cudaPeekAtLastError();
-  if (error != cudaSuccess) return error;
-  prepare_recurrence<<<config.value_heads, kThreads, 0, stream>>>(
-      config, convolution_output, log_decay, beta, committed.recurrent,
-      candidate.recurrent, recurrent_output);
-  return cudaPeekAtLastError();
+  for (std::size_t start = 0; start < token_count; start += kScanWindow) {
+    const std::size_t window =
+        std::min(kScanWindow, token_count - start);
+    const float* source_convolution =
+        start == 0 ? committed.convolution : candidate.convolution;
+    const float* source_recurrent =
+        start == 0 ? committed.recurrent : candidate.recurrent;
+    prepare_convolution_window<<<blocks, kThreads, 0, stream>>>(
+        convolution_input + start * channels, convolution_weights,
+        source_convolution, candidate.convolution,
+        convolution_output + start * channels, channels,
+        config.convolution_width, window);
+    cudaError_t error = cudaPeekAtLastError();
+    if (error != cudaSuccess) return error;
+    prepare_recurrence_window<<<config.value_heads, kThreads, 0, stream>>>(
+        config, convolution_output + start * channels,
+        log_decay + start * config.value_heads,
+        beta + start * config.value_heads, source_recurrent,
+        candidate.recurrent,
+        recurrent_output + start * gdn_output_values(config), window);
+    error = cudaPeekAtLastError();
+    if (error != cudaSuccess) return error;
+  }
+  return cudaSuccess;
 }
 
 cudaError_t launch_gdn_commit(const GdnConfig& config,
