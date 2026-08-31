@@ -55,7 +55,7 @@ are repository-relative unless stated otherwise.
 | ATN-001 | Implement grouped-query attention and partial RoPE | CUD-001, CPU-003 | done | Decode, causality, KV grouping, and layers 3/7/63 pass | [`cuda/attention_decode.cu`](cuda/attention_decode.cu); [`fixtures/cuda_attention_decode.json`](fixtures/cuda_attention_decode.json); [`tests/test_cuda_attention.py`](tests/test_cuda_attention.py); log 2026-08-31T06:57:49Z |
 | ATN-002 | Implement memory-bounded causal attention prefill | ATN-001, CUD-002 | done | Chunked prompt fixtures and 131,072 capacity boundary pass | [`cuda/attention_decode.cu`](cuda/attention_decode.cu); [`fixtures/cuda_attention_prefill.json`](fixtures/cuda_attention_prefill.json); [`tests/test_cuda_attention_prefill.py`](tests/test_cuda_attention_prefill.py); log 2026-08-31T09:33:05Z |
 | SCH-001 | Implement hybrid 64-layer CUDA scheduler and FP32 logits | GDN-002, ATN-002, CUD-003 | done | Full traces/logits and greedy continuations meet frozen gates | [`cuda/full_scheduler.cu`](cuda/full_scheduler.cu); [`fixtures/cuda_full_scheduler.json`](fixtures/cuda_full_scheduler.json); [`tests/test_cuda_full_scheduler.py`](tests/test_cuda_full_scheduler.py); log 2026-08-31T12:13:55Z |
-| SES-001 | Implement exact common-prefix sync/reuse | SCH-001 | pending | Reuse and full replay produce the same committed state and logits | — |
+| SES-001 | Implement exact common-prefix sync/reuse | SCH-001 | done | Reuse and full replay produce the same committed state and logits | [`cuda/full_scheduler.cu`](cuda/full_scheduler.cu); [`fixtures/cuda_prefix_sync.json`](fixtures/cuda_prefix_sync.json); [`tests/test_cuda_prefix_sync.py`](tests/test_cuda_prefix_sync.py); log 2026-08-31T13:45:38Z |
 | SES-002 | Implement atomic eval/sample/commit semantics | SCH-001 | pending | Sampling is separate; cancellation/error cannot partially commit state | — |
 | SES-003 | Implement atomic checkpoint save/restore | SES-001, SES-002 | pending | All state and compatibility hashes persist; resumed continuation is exact | — |
 | MEM-001 | Demonstrate 131,072-token fit with 1.5 GiB reserve | BLD-003, SCH-001 | pending | Post-graph measured ledger includes 8 GiB KV and every named allocation on RTX 5090 | — |
@@ -106,6 +106,7 @@ are repository-relative unless stated otherwise.
 | EDU-030 | Explain memory-bounded CUDA attention prefill and the 128K boundary for beginners | ATN-002, DOC-001 | done | Chunk causality, candidate-row continuity, linear score workspace, whole-chunk commit/cancellation, token-wise equivalence, 131,072 sizing/execution, timing, and proof limits are code-linked and worked | [`docs/44-cuda-attention-prefill.md`](docs/44-cuda-attention-prefill.md); [`tests/test_cuda_attention_prefill.py`](tests/test_cuda_attention_prefill.py); log 2026-08-31T09:33:05Z |
 | EDU-031 | Explain the CUDA scheduler prerequisite primitives for beginners | CUD-003, DOC-001 | done | Q8_0 resident weights versus transient Q8 activations, embedding row decode, BF16 pointwise storage, packed layouts, GDN grouped/tiled mapping, numeric gates, timing, and proof limits are code-linked and worked | [`docs/45-cuda-scheduler-primitives.md`](docs/45-cuda-scheduler-primitives.md); [`tests/test_cuda_scheduler_primitives.py`](tests/test_cuda_scheduler_primitives.py); log 2026-08-31T11:26:17Z |
 | EDU-032 | Explain resident CUDA model execution and the 64-layer hybrid schedule for beginners | SCH-001, DOC-001 | done | Upload ownership, layer alternation, scratch reuse, BF16/FP32 boundaries, state offsets, full logits, numeric/greedy gates, timing, and proof limits are code-linked and worked | [`docs/46-cuda-full-scheduler.md`](docs/46-cuda-full-scheduler.md); [`tests/test_cuda_full_scheduler.py`](tests/test_cuda_full_scheduler.py); log 2026-08-31T12:13:55Z |
+| EDU-033 | Explain exact CUDA prefix synchronization and replay for beginners | SES-001, DOC-001 | done | Tokens, common prefixes, append/no-op reuse, divergent/shortened replay, exact equality, memory rationale, preflight failure behavior, and proof limits are code-linked and worked | [`docs/47-cuda-prefix-sync.md`](docs/47-cuda-prefix-sync.md); [`tests/test_cuda_prefix_sync.py`](tests/test_cuda_prefix_sync.py); log 2026-08-31T13:45:38Z |
 | REL-001 | Publish reproducible release evidence bundle | CMP-003, QLT-001, DOC-001 | pending | Builds, hashes, raw results, reports, and documentation claims reconcile | — |
 
 ## Delivery-Gate Mapping
@@ -2407,6 +2408,55 @@ are repository-relative unless stated otherwise.
 - Marked SCH-001 and EDU-032 done. SES-001, exact common-prefix synchronization
   and reuse over the admitted hybrid state, is the next task. Request-level
   atomicity remains SES-002, and simultaneous 128K allocation remains MEM-001.
+
+### 2026-08-31T12:59:26Z — SES-001 exact prefix synchronization started
+
+- Marked SES-001 and the newly discovered beginner-documentation task EDU-033
+  in progress before source changes. Acceptance requires exact committed-state,
+  hidden-vector, and full-logit equality between synchronization and execution
+  from a fresh zero state.
+- The admitted reuse boundary is deliberately narrow: an unchanged request is
+  a no-op, and a request that appends to the complete committed token history
+  evaluates only its suffix. A shorter or divergent request clears the session
+  and deterministically replays from token zero. Keeping an approximately
+  159 MB GDN snapshot at every token would make the 131,072-token product
+  requirement impossible; SES-003 later adds explicit disk checkpoints instead.
+- All requested token IDs and output sizes will be checked before reset or
+  execution. This proves invalid-input preflight preservation; general atomic
+  behavior under cancellation or CUDA failure remains the separate SES-002
+  gate and is not silently claimed here.
+
+### 2026-08-31T13:45:38Z — SES-001 exact prefix synchronization admitted
+
+- Added an exact host token history to the move-only CUDA session and a
+  synchronization result that reports common-prefix, reused-token,
+  evaluated-token, and reset/replay counts. An unchanged request evaluates
+  nothing; a pure append evaluates only its suffix; a shorter, divergent, or
+  empty request clears all persistent CUDA state and replays the requested
+  history from position zero.
+- Kept the last 248,320 FP32 logits and 5,120-value FP32 hidden vector in
+  session-owned host memory (about 1 MB). This discovered ownership requirement
+  makes no-op output independent of scratch-workspace identity. Persistent GDN,
+  attention, token, frontier, hidden, and logit state is compared byte-exactly;
+  a small CUDA mismatch flag avoids copying the approximately 159 MB persistent
+  state to the host merely to compare it.
+- The capacity-three RTX 5090 diagnostic passed initial execution, append reuse,
+  no-op reuse, divergent replay, shorter replay, empty reset, and whole-request
+  invalid-token preflight. Append, divergent, and shorter results matched fresh
+  execution byte for byte across persistent state, full logits, and the final
+  hidden vector. Token ID `248320` was rejected before mutation and left state
+  equal to the valid reference.
+- Added the source-authenticated contract, retained fixture, focused native
+  diagnostic, ordinary/opt-in pytest gates, beginner Chapter 47, and source and
+  index reconciliation. `uv run ruff format .` completed; the full suite passed
+  128 tests with eight expected exclusive-GPU skips in 166.50 seconds. A clean
+  pinned CUDA build compiled all host products and nine CUDA diagnostics, and
+  the complete opt-in CUDA test set passed 17 tests in 59.83 seconds. The
+  prefix/full-scheduler regression alone passed four tests in 51.10 seconds.
+- Marked SES-001 and EDU-033 done. SES-002, whole-request atomic
+  eval/sample/commit behavior under cancellation and execution failure, is the
+  next task. Checkpoint persistence remains SES-003 and 128K simultaneous fit
+  remains MEM-001.
 
 ## Decisions and Negative Results
 

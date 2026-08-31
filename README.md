@@ -86,6 +86,9 @@ before the complete 64-layer scheduler can be assembled.
 The [complete CUDA token chapter](docs/46-cuda-full-scheduler.md) follows two
 real tokens through resident model upload, all 48 GDN and 16 attention layers,
 state continuation, selected trace boundaries, and every vocabulary logit.
+The [exact prefix-sync chapter](docs/47-cuda-prefix-sync.md) explains token
+histories and common prefixes, then proves append/no-op reuse and deterministic
+replay for divergent or shortened requests with byte-exact state and outputs.
 
 ## Build
 

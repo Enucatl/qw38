@@ -57,6 +57,13 @@ struct DeviceLayer final {
   DeviceAttentionLayer attention;
 };
 
+struct SyncResult final {
+  std::size_t common_prefix = 0;
+  std::size_t reused_tokens = 0;
+  std::size_t evaluated_tokens = 0;
+  bool reset_and_replayed = false;
+};
+
 class ResidentModel final {
  public:
   ResidentModel() noexcept;
@@ -98,8 +105,11 @@ class SchedulerSession final {
   SchedulerSession& operator=(const SchedulerSession&) = delete;
 
   Status create(std::size_t capacity) noexcept;
+  Status reset() noexcept;
+  Status state_equals(const SchedulerSession& other, bool* equal) const noexcept;
   std::size_t capacity() const noexcept;
   std::size_t frontier() const noexcept;
+  std::size_t token_count() const noexcept;
   std::size_t allocated_bytes() const noexcept;
 
  private:
@@ -108,6 +118,9 @@ class SchedulerSession final {
   float* gdn_recurrent_ = nullptr;
   __nv_bfloat16* attention_key_ = nullptr;
   __nv_bfloat16* attention_value_ = nullptr;
+  std::size_t* tokens_ = nullptr;
+  float* last_logits_ = nullptr;
+  float* last_hidden_ = nullptr;
   std::size_t capacity_ = 0;
   std::size_t frontier_ = 0;
   std::size_t allocated_bytes_ = 0;
@@ -116,6 +129,10 @@ class SchedulerSession final {
                               SchedulerSession*, class SchedulerWorkspace*,
                               float*, std::size_t, float*, std::size_t,
                               float*) noexcept;
+  friend Status sync_tokens(const ResidentModel&, const std::size_t*,
+                            std::size_t, SchedulerSession*,
+                            class SchedulerWorkspace*, float*, std::size_t,
+                            float*, std::size_t, SyncResult*) noexcept;
 };
 
 class SchedulerWorkspace final {
@@ -164,6 +181,10 @@ class SchedulerWorkspace final {
                               SchedulerSession*, SchedulerWorkspace*, float*,
                               std::size_t, float*, std::size_t,
                               float*) noexcept;
+  friend Status sync_tokens(const ResidentModel&, const std::size_t*,
+                            std::size_t, SchedulerSession*, SchedulerWorkspace*,
+                            float*, std::size_t, float*, std::size_t,
+                            SyncResult*) noexcept;
 };
 
 Status execute_token(const ResidentModel& model, std::size_t token,
@@ -171,6 +192,12 @@ Status execute_token(const ResidentModel& model, std::size_t token,
                      float* host_logits, std::size_t logits_count,
                      float* host_hidden, std::size_t hidden_count,
                      float* elapsed_milliseconds) noexcept;
+
+Status sync_tokens(const ResidentModel& model, const std::size_t* tokens,
+                   std::size_t token_count, SchedulerSession* session,
+                   SchedulerWorkspace* workspace, float* host_logits,
+                   std::size_t logits_count, float* host_hidden,
+                   std::size_t hidden_count, SyncResult* result) noexcept;
 
 }  // namespace qw38::cuda
 

@@ -228,6 +228,14 @@ DSpark are explicitly rejected as Qwen model semantics.
   authenticates the source/model/authority boundary; selected taps, complete
   logit metrics, timings, allocations, and negative results are retained in
   [`fixtures/cuda_full_scheduler.json`](../fixtures/cuda_full_scheduler.json).
+- SES-001 introduces no new external implementation source. It composes the
+  admitted local CUDA scheduler with an exact host token history, reset/replay
+  rule, and device byte-comparison diagnostic. The authenticated ownership and
+  reuse boundary is frozen in
+  [`pins/cuda_prefix_sync_contract.json`](../pins/cuda_prefix_sync_contract.json),
+  while append/no-op reuse, divergent/shorter replay, and invalid-input
+  preservation are retained in
+  [`fixtures/cuda_prefix_sync.json`](../fixtures/cuda_prefix_sync.json).
 
 ## Specialization and hardware references
 

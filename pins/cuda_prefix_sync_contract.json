@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "task": "SES-001",
+  "target": "sm_120",
+  "toolkit": "CUDA 13.0.2",
+  "model": {
+    "filename": "Qwen3.8-27B-Q4_K_M.gguf",
+    "bytes": 18973870432,
+    "sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34"
+  },
+  "history": {
+    "representation": "one exact host token-ID row per committed position",
+    "maximum_tokens": 131072,
+    "append_rule": "reuse only when the complete committed history is a prefix of the requested history",
+    "same_rule": "return session-owned last logits and hidden state without evaluation",
+    "shorter_or_divergent_rule": "clear all persistent CUDA state and replay the request from position zero",
+    "invalid_input_rule": "validate the complete request before reset or execution"
+  },
+  "session_owned_outputs": {
+    "logits": {"dtype": "FP32", "values": 248320},
+    "hidden": {"dtype": "FP32", "values": 5120},
+    "reason": "a no-op sync is independent of which scratch workspace the caller supplies"
+  },
+  "exact_admission": [
+    "token history and frontier",
+    "all GDN convolution and recurrent bytes",
+    "all attention key and value cache bytes",
+    "last hidden-vector bytes",
+    "all last-logit bytes"
+  ],
+  "memory_boundary": {
+    "per_token_gdn_snapshot": "rejected",
+    "approximate_snapshot_bytes": 158990336,
+    "reason": "one snapshot at every 131072 positions cannot fit the product memory budget",
+    "arbitrary_rollback": "deterministic replay in SES-001; explicit disk checkpoints are SES-003"
+  },
+  "deferred": [
+    "atomic rollback after CUDA failure or cancellation (SES-002)",
+    "disk checkpoint save and restore (SES-003)",
+    "128K simultaneous fit proof (MEM-001)"
+  ],
+  "local_sources": {
+    "Makefile": "7e862b123c13c28677bc7ad0b4e93bab6f2a04d9777b71ff3943ac1973077ff9",
+    "cuda/full_scheduler.cu": "1ad7f2dcd1f3f712982d488bba97aae18bafd849503ff29f00eb426e834f2ee5",
+    "cuda/full_scheduler.h": "3670a485f81d5973b49cee8ccd6932ae0b23945d7995e1e93a958cea6701e212",
+    "cuda/prefix_sync_test.cu": "4a292e07fc47353439f5a1a766be445fd1714df955ae1d09f39cd807b8bd4c19"
+  }
+}

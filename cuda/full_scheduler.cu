@@ -1,5 +1,7 @@
 #include "full_scheduler.h"
 
+#include <cstdlib>
+#include <cstring>
 #include <limits>
 #include <utility>
 
@@ -86,6 +88,19 @@ __global__ void residual_add_fp32(const float* residual,
       static_cast<std::size_t>(blockIdx.x) * blockDim.x + threadIdx.x;
   if (index < count) {
     output[index] = __fadd_rn(residual[index], correction[index]);
+  }
+}
+
+__global__ void compare_bytes(const std::uint8_t* left,
+                              const std::uint8_t* right,
+                              std::size_t count,
+                              unsigned int* mismatch) {
+  const std::size_t stride =
+      static_cast<std::size_t>(gridDim.x) * blockDim.x;
+  for (std::size_t index =
+           static_cast<std::size_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+       index < count; index += stride) {
+    if (left[index] != right[index]) atomicExch(mismatch, 1U);
   }
 }
 
@@ -363,6 +378,9 @@ SchedulerSession& SchedulerSession::operator=(SchedulerSession&& other) noexcept
   gdn_recurrent_ = other.gdn_recurrent_;
   attention_key_ = other.attention_key_;
   attention_value_ = other.attention_value_;
+  tokens_ = other.tokens_;
+  last_logits_ = other.last_logits_;
+  last_hidden_ = other.last_hidden_;
   capacity_ = other.capacity_;
   frontier_ = other.frontier_;
   allocated_bytes_ = other.allocated_bytes_;
@@ -370,6 +388,9 @@ SchedulerSession& SchedulerSession::operator=(SchedulerSession&& other) noexcept
   other.gdn_recurrent_ = nullptr;
   other.attention_key_ = nullptr;
   other.attention_value_ = nullptr;
+  other.tokens_ = nullptr;
+  other.last_logits_ = nullptr;
+  other.last_hidden_ = nullptr;
   other.capacity_ = 0;
   other.frontier_ = 0;
   other.allocated_bytes_ = 0;
@@ -377,6 +398,9 @@ SchedulerSession& SchedulerSession::operator=(SchedulerSession&& other) noexcept
 }
 
 void SchedulerSession::release() noexcept {
+  std::free(last_hidden_);
+  std::free(last_logits_);
+  std::free(tokens_);
   if (attention_value_ != nullptr) cudaFree(attention_value_);
   if (attention_key_ != nullptr) cudaFree(attention_key_);
   if (gdn_recurrent_ != nullptr) cudaFree(gdn_recurrent_);
@@ -385,6 +409,9 @@ void SchedulerSession::release() noexcept {
   gdn_recurrent_ = nullptr;
   attention_key_ = nullptr;
   attention_value_ = nullptr;
+  tokens_ = nullptr;
+  last_logits_ = nullptr;
+  last_hidden_ = nullptr;
   capacity_ = 0;
   frontier_ = 0;
   allocated_bytes_ = 0;
@@ -394,6 +421,17 @@ Status SchedulerSession::create(std::size_t capacity) noexcept {
   if (capacity == 0 || capacity > 131072 || capacity_ != 0) {
     return {StatusCode::kInvalidArgument,
             "CUDA scheduler session capacity is invalid"};
+  }
+  tokens_ = static_cast<std::size_t*>(
+      std::malloc(capacity * sizeof(std::size_t)));
+  last_logits_ = static_cast<float*>(
+      std::malloc(internal::kVocabularySize * sizeof(float)));
+  last_hidden_ = static_cast<float*>(
+      std::malloc(internal::kResidualWidth * sizeof(float)));
+  if (tokens_ == nullptr || last_logits_ == nullptr || last_hidden_ == nullptr) {
+    release();
+    return {StatusCode::kResourceExhausted,
+            "cannot allocate CUDA scheduler host session state"};
   }
   cudaError_t error = allocate(&gdn_convolution_,
                                kGdnLayers * internal::kGdnConvolutionValues,
@@ -437,8 +475,91 @@ Status SchedulerSession::create(std::size_t capacity) noexcept {
   return Status::ok();
 }
 
+Status SchedulerSession::reset() noexcept {
+  if (capacity_ == 0 || tokens_ == nullptr) {
+    return {StatusCode::kInvalidArgument,
+            "CUDA scheduler session is not initialized"};
+  }
+  const std::size_t attention_values =
+      kAttentionLayers * capacity_ * internal::kAttentionKvWidth;
+  cudaError_t error = cudaMemset(
+      gdn_convolution_, 0,
+      kGdnLayers * internal::kGdnConvolutionValues * sizeof(float));
+  if (error == cudaSuccess) {
+    error = cudaMemset(
+        gdn_recurrent_, 0,
+        kGdnLayers * internal::kGdnRecurrentStateValues * sizeof(float));
+  }
+  if (error == cudaSuccess) {
+    error = cudaMemset(attention_key_, 0,
+                       attention_values * sizeof(__nv_bfloat16));
+  }
+  if (error == cudaSuccess) {
+    error = cudaMemset(attention_value_, 0,
+                       attention_values * sizeof(__nv_bfloat16));
+  }
+  if (error == cudaSuccess) error = cudaDeviceSynchronize();
+  if (error != cudaSuccess) {
+    return cuda_status(error, "cannot reset CUDA scheduler session state");
+  }
+  frontier_ = 0;
+  return Status::ok();
+}
+
+Status SchedulerSession::state_equals(const SchedulerSession& other,
+                                      bool* equal) const noexcept {
+  if (equal == nullptr || capacity_ == 0 || other.capacity_ == 0) {
+    return {StatusCode::kInvalidArgument,
+            "CUDA scheduler state comparison input is invalid"};
+  }
+  *equal = false;
+  if (capacity_ != other.capacity_ || frontier_ != other.frontier_ ||
+      std::memcmp(tokens_, other.tokens_, frontier_ * sizeof(std::size_t)) != 0) {
+    return Status::ok();
+  }
+  if (frontier_ > 0 &&
+      (std::memcmp(last_logits_, other.last_logits_,
+                   internal::kVocabularySize * sizeof(float)) != 0 ||
+       std::memcmp(last_hidden_, other.last_hidden_,
+                   internal::kResidualWidth * sizeof(float)) != 0)) {
+    return Status::ok();
+  }
+  unsigned int* mismatch = nullptr;
+  cudaError_t error = cudaMalloc(&mismatch, sizeof(unsigned int));
+  if (error == cudaSuccess) error = cudaMemset(mismatch, 0, sizeof(unsigned int));
+  const auto compare = [&error, mismatch](const void* left, const void* right,
+                                         std::size_t bytes) {
+    if (error != cudaSuccess) return;
+    compare_bytes<<<256, kThreads>>>(
+        static_cast<const std::uint8_t*>(left),
+        static_cast<const std::uint8_t*>(right), bytes, mismatch);
+    error = cudaPeekAtLastError();
+  };
+  compare(gdn_convolution_, other.gdn_convolution_,
+          kGdnLayers * internal::kGdnConvolutionValues * sizeof(float));
+  compare(gdn_recurrent_, other.gdn_recurrent_,
+          kGdnLayers * internal::kGdnRecurrentStateValues * sizeof(float));
+  const std::size_t attention_bytes =
+      kAttentionLayers * capacity_ * internal::kAttentionKvWidth *
+      sizeof(__nv_bfloat16);
+  compare(attention_key_, other.attention_key_, attention_bytes);
+  compare(attention_value_, other.attention_value_, attention_bytes);
+  unsigned int host_mismatch = 1;
+  if (error == cudaSuccess) {
+    error = cudaMemcpy(&host_mismatch, mismatch, sizeof(unsigned int),
+                       cudaMemcpyDeviceToHost);
+  }
+  if (mismatch != nullptr) cudaFree(mismatch);
+  if (error != cudaSuccess) {
+    return cuda_status(error, "cannot compare CUDA scheduler session state");
+  }
+  *equal = host_mismatch == 0;
+  return Status::ok();
+}
+
 std::size_t SchedulerSession::capacity() const noexcept { return capacity_; }
 std::size_t SchedulerSession::frontier() const noexcept { return frontier_; }
+std::size_t SchedulerSession::token_count() const noexcept { return frontier_; }
 std::size_t SchedulerSession::allocated_bytes() const noexcept {
   return allocated_bytes_;
 }
@@ -800,7 +921,68 @@ Status execute_token(const ResidentModel& model, std::size_t token,
   if (error != cudaSuccess) {
     return cuda_status(error, "CUDA hybrid token schedule failed");
   }
+  session->tokens_[session->frontier_] = token;
+  std::memcpy(session->last_logits_, host_logits,
+              internal::kVocabularySize * sizeof(float));
+  std::memcpy(session->last_hidden_, host_hidden,
+              internal::kResidualWidth * sizeof(float));
   ++session->frontier_;
+  return Status::ok();
+}
+
+Status sync_tokens(const ResidentModel& model, const std::size_t* tokens,
+                   std::size_t token_count, SchedulerSession* session,
+                   SchedulerWorkspace* workspace, float* host_logits,
+                   std::size_t logits_count, float* host_hidden,
+                   std::size_t hidden_count, SyncResult* result) noexcept {
+  if (session == nullptr || workspace == nullptr || result == nullptr ||
+      model.resident_bytes() == 0 || session->capacity_ == 0 ||
+      workspace->capacity_ != session->capacity_ ||
+      token_count > session->capacity_ ||
+      (token_count > 0 &&
+       (tokens == nullptr || host_logits == nullptr ||
+        logits_count != internal::kVocabularySize || host_hidden == nullptr ||
+        hidden_count != internal::kResidualWidth)) ||
+      (token_count == 0 &&
+       (tokens != nullptr || host_logits != nullptr || logits_count != 0 ||
+        host_hidden != nullptr || hidden_count != 0))) {
+    return {StatusCode::kInvalidArgument,
+            "CUDA token synchronization input, state, or output is invalid"};
+  }
+  for (std::size_t index = 0; index < token_count; ++index) {
+    if (tokens[index] >= internal::kVocabularySize) {
+      return {StatusCode::kInvalidArgument,
+              "CUDA token synchronization contains an invalid token"};
+    }
+  }
+  std::size_t common_prefix = 0;
+  while (common_prefix < session->frontier_ &&
+         common_prefix < token_count &&
+         session->tokens_[common_prefix] == tokens[common_prefix]) {
+    ++common_prefix;
+  }
+  const bool append_or_same = common_prefix == session->frontier_;
+  const std::size_t start = append_or_same ? session->frontier_ : 0;
+  *result = {common_prefix, append_or_same ? session->frontier_ : 0,
+             token_count - start, !append_or_same};
+  if (!append_or_same) {
+    const Status reset_status = session->reset();
+    if (!reset_status.is_ok()) return reset_status;
+  }
+  if (start == token_count && token_count > 0) {
+    std::memcpy(host_logits, session->last_logits_,
+                internal::kVocabularySize * sizeof(float));
+    std::memcpy(host_hidden, session->last_hidden_,
+                internal::kResidualWidth * sizeof(float));
+    return Status::ok();
+  }
+  float elapsed = 0.0F;
+  for (std::size_t index = start; index < token_count; ++index) {
+    const Status status = execute_token(
+        model, tokens[index], session, workspace, host_logits, logits_count,
+        host_hidden, hidden_count, &elapsed);
+    if (!status.is_ok()) return status;
+  }
   return Status::ok();
 }
 

@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "task": "SES-001",
+  "device": "NVIDIA GeForce RTX 5090",
+  "compute_capability": "12.0",
+  "toolkit": "CUDA 13.0.2",
+  "capacity": 3,
+  "cases": [
+    {"name": "initial", "requested": [42], "common_prefix": 0, "reused_tokens": 0, "evaluated_tokens": 1, "reset_and_replayed": false, "passed": true},
+    {"name": "append", "requested": [42, 3649], "common_prefix": 1, "reused_tokens": 1, "evaluated_tokens": 1, "reset_and_replayed": false, "passed": true},
+    {"name": "no_op", "requested": [42, 3649], "common_prefix": 2, "reused_tokens": 2, "evaluated_tokens": 0, "reset_and_replayed": false, "passed": true},
+    {"name": "divergent", "requested": [42, 1219], "common_prefix": 1, "reused_tokens": 0, "evaluated_tokens": 2, "reset_and_replayed": true, "passed": true},
+    {"name": "shorter", "requested": [42], "common_prefix": 1, "reused_tokens": 0, "evaluated_tokens": 1, "reset_and_replayed": true, "passed": true},
+    {"name": "empty_reset", "requested": [], "common_prefix": 0, "reused_tokens": 0, "evaluated_tokens": 0, "reset_and_replayed": true, "passed": true}
+  ],
+  "exact_comparisons": [
+    {"name": "append_vs_fresh", "state_bytes_equal": true, "logits_equal": true, "hidden_equal": true, "passed": true},
+    {"name": "no_op_outputs", "logits_equal": true, "hidden_equal": true, "passed": true},
+    {"name": "divergent_vs_fresh", "state_bytes_equal": true, "logits_equal": true, "hidden_equal": true, "passed": true},
+    {"name": "shorter_vs_fresh", "state_bytes_equal": true, "logits_equal": true, "hidden_equal": true, "passed": true}
+  ],
+  "invalid_input": {"token": 248320, "rejected_before_mutation": true, "state_equal_after_rejection": true, "passed": true},
+  "timing": "not measured at SES-001; this is a synchronized correctness diagnostic, and OPT-001 owns attributed timing",
+  "claim": "exact current-prefix reuse and deterministic reset/replay evidence at capacity three; not CUDA-failure atomicity, checkpointing, 128K fit, or throughput evidence"
+}
