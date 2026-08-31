@@ -24,7 +24,7 @@
   "exact_admission": [
     "token history and frontier",
     "all GDN convolution and recurrent bytes",
-    "all attention key and value cache bytes",
+    "all committed attention key and value cache rows below the frontier",
     "last hidden-vector bytes",
     "all last-logit bytes"
   ],
@@ -35,14 +35,14 @@
     "arbitrary_rollback": "deterministic replay in SES-001; explicit disk checkpoints are SES-003"
   },
   "deferred": [
-    "atomic rollback after CUDA failure or cancellation (SES-002)",
+    "atomic rollback after CUDA failure or cancellation (completed by SES-002)",
     "disk checkpoint save and restore (SES-003)",
     "128K simultaneous fit proof (MEM-001)"
   ],
   "local_sources": {
-    "Makefile": "7e862b123c13c28677bc7ad0b4e93bab6f2a04d9777b71ff3943ac1973077ff9",
-    "cuda/full_scheduler.cu": "1ad7f2dcd1f3f712982d488bba97aae18bafd849503ff29f00eb426e834f2ee5",
-    "cuda/full_scheduler.h": "3670a485f81d5973b49cee8ccd6932ae0b23945d7995e1e93a958cea6701e212",
+    "Makefile": "baa1eb52cd4ea20e95a69d6b444793b7d733a11c84f081f8a14cc113f5d745ae",
+    "cuda/full_scheduler.cu": "58a7ec0f37488a78708e30323edcc393d9d9b8e1ea248492c1c0cc1c0ef9e0af",
+    "cuda/full_scheduler.h": "49e94ed7b06029d2c8c8e950f2d2d362e8e6add966a51e26b61462e1d6ce27a7",
     "cuda/prefix_sync_test.cu": "4a292e07fc47353439f5a1a766be445fd1714df955ae1d09f39cd807b8bd4c19"
   }
 }

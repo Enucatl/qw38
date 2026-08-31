@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "task": "SES-002",
+  "target": "sm_120",
+  "toolkit": "CUDA 13.0.2",
+  "transaction": {
+    "unit": "one token",
+    "gdn_prepare": "all 48 candidate layer states in one reusable alternate workspace buffer",
+    "gdn_publish": "two host pointer swaps after successful output and KV commit",
+    "attention_prepare": "one candidate key row and value row for each of 16 attention layers",
+    "attention_publish": "copy candidate rows at the uncommitted frontier, synchronize, then publish the frontier",
+    "logical_kv_state": "rows strictly below the committed frontier",
+    "publication_order": ["attention rows", "GDN pointer swap", "token and output copies", "frontier last"]
+  },
+  "interruption": {
+    "interface": "caller status poll after a synchronized layer boundary",
+    "statuses_tested": ["cancelled", "internal"],
+    "invariant": "a non-ok poll status returns without publishing candidate state"
+  },
+  "sampling": {
+    "implemented_gate": "greedy argmax over session-owned committed FP32 logits",
+    "mutation": "none",
+    "ordinary stochastic controls": "deferred to product sampler integration"
+  },
+  "memory": {
+    "capacity_3_workspace_bytes": 160380704,
+    "candidate_is_per_workspace_not_per_token": true,
+    "duplicate_128k_kv_cache": "rejected"
+  },
+  "local_sources": {
+    "Makefile": "baa1eb52cd4ea20e95a69d6b444793b7d733a11c84f081f8a14cc113f5d745ae",
+    "cuda/atomic_eval_test.cu": "d7815b43173f8a6828e59d10731de3a691238daf5ebef61bf27c1895dc11be77",
+    "cuda/full_scheduler.cu": "58a7ec0f37488a78708e30323edcc393d9d9b8e1ea248492c1c0cc1c0ef9e0af",
+    "cuda/full_scheduler.h": "49e94ed7b06029d2c8c8e950f2d2d362e8e6add966a51e26b61462e1d6ce27a7"
+  }
+}

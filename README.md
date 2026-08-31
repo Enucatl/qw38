@@ -89,6 +89,9 @@ state continuation, selected trace boundaries, and every vocabulary logit.
 The [exact prefix-sync chapter](docs/47-cuda-prefix-sync.md) explains token
 histories and common prefixes, then proves append/no-op reuse and deterministic
 replay for divergent or shortened requests with byte-exact state and outputs.
+The [atomic evaluation chapter](docs/48-atomic-eval-and-sampling.md) explains
+candidate state, failure/cancellation preservation, frontier-last commit, and
+why sampling committed logits must not mutate the session.
 
 ## Build
 

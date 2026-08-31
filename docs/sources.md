@@ -236,6 +236,13 @@ DSpark are explicitly rejected as Qwen model semantics.
   while append/no-op reuse, divergent/shorter replay, and invalid-input
   preservation are retained in
   [`fixtures/cuda_prefix_sync.json`](../fixtures/cuda_prefix_sync.json).
+- SES-002 introduces no new external implementation source. It changes the
+  local CUDA scheduler's ownership and publication protocol without changing
+  model arithmetic. The all-layer candidate, status-poll, frontier-last commit,
+  and read-only greedy boundary are authenticated in
+  [`pins/cuda_atomic_eval_contract.json`](../pins/cuda_atomic_eval_contract.json);
+  cancellation, injected-error, exact-commit, and sampling-purity evidence is
+  retained in [`fixtures/cuda_atomic_eval.json`](../fixtures/cuda_atomic_eval.json).
 
 ## Specialization and hardware references
 

@@ -35,7 +35,7 @@
     "gdn_recurrent_layers": 48,
     "attention_cache_layers": 16,
     "frontier_after_test": 2,
-    "atomic_request_commit": "deferred to SES-002"
+    "atomic_token_commit": "completed by SES-002 with all-layer GDN candidates, candidate KV rows, and frontier-last publication"
   },
   "admission_authority": "Quartz scalar CPU under immutable pre-CUDA llama-vs-Quartz envelopes",
   "admission": {
@@ -54,8 +54,8 @@
     "greedy_equality": true
   },
   "local_sources": {
-    "cuda/full_scheduler.cu": "1ad7f2dcd1f3f712982d488bba97aae18bafd849503ff29f00eb426e834f2ee5",
-    "cuda/full_scheduler.h": "3670a485f81d5973b49cee8ccd6932ae0b23945d7995e1e93a958cea6701e212",
+    "cuda/full_scheduler.cu": "58a7ec0f37488a78708e30323edcc393d9d9b8e1ea248492c1c0cc1c0ef9e0af",
+    "cuda/full_scheduler.h": "49e94ed7b06029d2c8c8e950f2d2d362e8e6add966a51e26b61462e1d6ce27a7",
     "cuda/full_scheduler_test.cu": "76ee531e8f4ba0b00f9cea7500dcc00fc77b58a4846f53f664ef337cc8cc222c"
   }
 }

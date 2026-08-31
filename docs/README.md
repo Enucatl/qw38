@@ -72,7 +72,8 @@ for language and host portability decisions.
 45. [CUDA scheduler prerequisites](45-cuda-scheduler-primitives.md): resident Q8_0 weights, embedding lookup, BF16/FP32 boundaries, pointwise layer glue, and packed GDN/attention layouts.
 46. [The first complete CUDA token](46-cuda-full-scheduler.md): resident model remapping, the 48/16 hybrid schedule, FP32 residual accumulation, reusable state/scratch, full logits, frozen trace gates, and retained negative results.
 47. [Exact token-prefix synchronization](47-cuda-prefix-sync.md): token histories, common prefixes, append/no-op reuse, divergent and shorter replay, preflight, and byte-exact fixture equality.
-48. [Source and evidence ledger](sources.md).
+48. [Atomic CUDA evaluation and separate sampling](48-atomic-eval-and-sampling.md): committed versus candidate state, pointer publication, frontier-last visibility, cancellation/errors, and read-only token choice.
+49. [Source and evidence ledger](sources.md).
 
 Claims use four labels: **Measured** (this exact artifact and hardware),
 **External** (a linked source), **Estimated** (reproducible arithmetic), and

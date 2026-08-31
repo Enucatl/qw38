@@ -24,12 +24,12 @@
     {"row": 0, "max_abs": 0.167108774, "rms": 0.0300765479514, "cosine": 0.999842589961, "nonfinite": 0, "envelope_passed": true, "greedy_equal": true},
     {"row": 1, "max_abs": 0.206399560, "rms": 0.0360483520117, "cosine": 0.999828237063, "nonfinite": 0, "envelope_passed": false, "greedy_equal": true}
   ],
-  "allocation": {"model_bytes": 18973870432, "session_bytes_at_capacity_2": 158990336, "workspace_bytes": 4769472, "free_bytes_after_run": 13996654592, "total_device_bytes": 33671348224},
-  "timing": {"upload_ms": 1557.876099, "token_0_ms": 60.914143, "token_1_ms": 60.413216, "scalar_two_token_ms": 42695.107260},
+  "allocation": {"model_bytes": 18973870432, "session_bytes_at_capacity_2": 158990336, "workspace_bytes": 160380608, "free_bytes_after_run": 13841465344, "total_device_bytes": 33671348224},
+  "timing": {"upload_ms": 1563.117920, "token_0_ms": 60.559425, "token_1_ms": 60.146336, "scalar_two_token_ms": 42778.909803},
   "negative_results": [
     "BF16 residual storage plus transient-Q8 staging failed the frozen full-logit envelope despite exact greedy tokens",
     "direct BF16 Q8_0 inputs plus an FP32 residual accumulator passed the scalar-device gates",
     "the independent llama.cpp token-1 cosine missed the scalar-derived envelope by approximately 0.0000028; no tolerance changed"
   ],
-  "claim": "correctness-first decode evidence at capacity two; not atomic request commit, 128K fit, graph, tuned throughput, or quality-suite evidence"
+  "claim": "correctness-first decode evidence at capacity two with SES-002 one-token atomic commit; not multi-token request rollback, 128K fit, graph, tuned throughput, or quality-suite evidence"
 }

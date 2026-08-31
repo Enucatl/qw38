@@ -64,6 +64,13 @@ struct SyncResult final {
   bool reset_and_replayed = false;
 };
 
+using EvalPoll = Status (*)(void*) noexcept;
+
+struct EvalControl final {
+  EvalPoll poll = nullptr;
+  void* context = nullptr;
+};
+
 class ResidentModel final {
  public:
   ResidentModel() noexcept;
@@ -92,7 +99,7 @@ class ResidentModel final {
   friend Status execute_token(const ResidentModel&, std::size_t,
                               class SchedulerSession*, class SchedulerWorkspace*,
                               float*, std::size_t, float*, std::size_t,
-                              float*) noexcept;
+                              float*, const EvalControl*) noexcept;
 };
 
 class SchedulerSession final {
@@ -128,11 +135,12 @@ class SchedulerSession final {
   friend Status execute_token(const ResidentModel&, std::size_t,
                               SchedulerSession*, class SchedulerWorkspace*,
                               float*, std::size_t, float*, std::size_t,
-                              float*) noexcept;
+                              float*, const EvalControl*) noexcept;
   friend Status sync_tokens(const ResidentModel&, const std::size_t*,
                             std::size_t, SchedulerSession*,
                             class SchedulerWorkspace*, float*, std::size_t,
                             float*, std::size_t, SyncResult*) noexcept;
+  friend Status greedy_sample(const SchedulerSession&, std::size_t*) noexcept;
 };
 
 class SchedulerWorkspace final {
@@ -174,13 +182,15 @@ class SchedulerWorkspace final {
   float* attention_scores_ = nullptr;
   float* logits_ = nullptr;
   float* trace_taps_ = nullptr;
+  float* candidate_logits_host_ = nullptr;
+  float* candidate_hidden_host_ = nullptr;
   std::size_t capacity_ = 0;
   std::size_t allocated_bytes_ = 0;
 
   friend Status execute_token(const ResidentModel&, std::size_t,
                               SchedulerSession*, SchedulerWorkspace*, float*,
                               std::size_t, float*, std::size_t,
-                              float*) noexcept;
+                              float*, const EvalControl*) noexcept;
   friend Status sync_tokens(const ResidentModel&, const std::size_t*,
                             std::size_t, SchedulerSession*, SchedulerWorkspace*,
                             float*, std::size_t, float*, std::size_t,
@@ -191,7 +201,11 @@ Status execute_token(const ResidentModel& model, std::size_t token,
                      SchedulerSession* session, SchedulerWorkspace* workspace,
                      float* host_logits, std::size_t logits_count,
                      float* host_hidden, std::size_t hidden_count,
-                     float* elapsed_milliseconds) noexcept;
+                     float* elapsed_milliseconds,
+                     const EvalControl* control = nullptr) noexcept;
+
+Status greedy_sample(const SchedulerSession& session,
+                     std::size_t* token) noexcept;
 
 Status sync_tokens(const ResidentModel& model, const std::size_t* tokens,
                    std::size_t token_count, SchedulerSession* session,

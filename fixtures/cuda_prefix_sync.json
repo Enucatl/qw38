@@ -21,5 +21,5 @@
   ],
   "invalid_input": {"token": 248320, "rejected_before_mutation": true, "state_equal_after_rejection": true, "passed": true},
   "timing": "not measured at SES-001; this is a synchronized correctness diagnostic, and OPT-001 owns attributed timing",
-  "claim": "exact current-prefix reuse and deterministic reset/replay evidence at capacity three; not CUDA-failure atomicity, checkpointing, 128K fit, or throughput evidence"
+  "claim": "exact current-prefix reuse and deterministic reset/replay evidence at capacity three; this fixture alone does not establish the later SES-002 atomicity gate, checkpointing, 128K fit, or throughput"
 }

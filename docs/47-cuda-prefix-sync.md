@@ -66,10 +66,10 @@ and every token ID. The vocabulary contains IDs `0` through `248319`; `248320`
 is rejected. The diagnostic proves that this invalid token leaves the earlier
 valid state byte-exact.
 
-This is narrower than request atomicity. A CUDA error or cancellation after
-valid execution begins could still leave partial state in SES-001. Candidate
-state and frontier-last publication for the whole public request belong to
-SES-002.
+This SES-001 preflight result is narrower than execution atomicity. SES-002 now
+adds candidate state and frontier-last publication for one CUDA token; see
+[Chapter 48](48-atomic-eval-and-sampling.md). Multi-token public-request rollback
+remains outside this fixture.
 
 ## What “exact” and fixture equality mean
 
@@ -109,6 +109,7 @@ owns synchronized timing and attribution.
 The authenticated rules and source hashes are in
 [`cuda_prefix_sync_contract.json`](../pins/cuda_prefix_sync_contract.json).
 This gate proves exact current-prefix reuse and replay correctness at capacity
-three. Its proof boundary excludes CUDA-failure/cancellation atomicity
-(SES-002), checkpoint persistence (SES-003), the simultaneous 128K memory-fit
-gate (MEM-001), and server-level response continuation.
+three. SES-002 separately completed one-token CUDA failure/cancellation
+atomicity. This proof boundary still excludes multi-token request rollback,
+checkpoint persistence (SES-003), the simultaneous 128K memory-fit gate
+(MEM-001), and server-level response continuation.

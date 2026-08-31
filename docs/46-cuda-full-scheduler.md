@@ -178,8 +178,9 @@ decode calls took about `60.9 ms` and `60.4 ms`; the scalar reference took about
 diagnostic tap copies, no CUDA graph, and no tuning, so they are not release
 throughput claims.
 
-With a two-token session, about 13.997 GB of 33.671 GB remained free after the
-resident model, state, and workspace allocations. This does not prove 128K fit:
+After SES-002 added its reusable all-layer transaction candidate, a two-token
+session left about 13.841 GB of 33.671 GB free after the resident model, state,
+and 160.38 MB workspace allocations. This does not prove 128K fit:
 the 8 GiB full attention cache, graph allocations, allocator overhead, and
 required 1.5 GiB reserve must coexist in MEM-001.
 

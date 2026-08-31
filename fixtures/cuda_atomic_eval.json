@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "task": "SES-002",
+  "device": "NVIDIA GeForce RTX 5090",
+  "compute_capability": "12.0",
+  "toolkit": "CUDA 13.0.2",
+  "seed_token": 42,
+  "candidate_token": 3649,
+  "cases": [
+    {"name": "cancellation", "poll_calls": 8, "status": "cancelled", "frontier_before": 1, "frontier_after": 1, "state_equal_to_uninterrupted_reference": true, "caller_outputs_unchanged": true, "passed": true},
+    {"name": "injected_error", "poll_calls": 31, "status": "internal", "frontier_before": 1, "frontier_after": 1, "state_equal_to_uninterrupted_reference": true, "caller_outputs_unchanged": true, "passed": true},
+    {"name": "successful_commit", "frontier_before": 1, "frontier_after": 2, "state_equal_to_fresh_execution": true, "passed": true},
+    {"name": "separate_sampling", "sampled_token": 1277, "frontier_before": 2, "frontier_after": 2, "state_equal_after_sampling": true, "passed": true},
+    {"name": "preflight_error", "token": 248320, "status": "invalid_argument", "frontier_before": 2, "frontier_after": 2, "state_equal_after_error": true, "passed": true}
+  ],
+  "workspace_bytes_at_capacity_3": 160380704,
+  "claim": "one-token CUDA transaction, cancellation/error preservation, successful exact commit, and greedy sampling purity; not multi-token request rollback, stochastic sampling, checkpointing, 128K fit, or throughput evidence"
+}

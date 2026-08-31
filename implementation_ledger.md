@@ -56,7 +56,7 @@ are repository-relative unless stated otherwise.
 | ATN-002 | Implement memory-bounded causal attention prefill | ATN-001, CUD-002 | done | Chunked prompt fixtures and 131,072 capacity boundary pass | [`cuda/attention_decode.cu`](cuda/attention_decode.cu); [`fixtures/cuda_attention_prefill.json`](fixtures/cuda_attention_prefill.json); [`tests/test_cuda_attention_prefill.py`](tests/test_cuda_attention_prefill.py); log 2026-08-31T09:33:05Z |
 | SCH-001 | Implement hybrid 64-layer CUDA scheduler and FP32 logits | GDN-002, ATN-002, CUD-003 | done | Full traces/logits and greedy continuations meet frozen gates | [`cuda/full_scheduler.cu`](cuda/full_scheduler.cu); [`fixtures/cuda_full_scheduler.json`](fixtures/cuda_full_scheduler.json); [`tests/test_cuda_full_scheduler.py`](tests/test_cuda_full_scheduler.py); log 2026-08-31T12:13:55Z |
 | SES-001 | Implement exact common-prefix sync/reuse | SCH-001 | done | Reuse and full replay produce the same committed state and logits | [`cuda/full_scheduler.cu`](cuda/full_scheduler.cu); [`fixtures/cuda_prefix_sync.json`](fixtures/cuda_prefix_sync.json); [`tests/test_cuda_prefix_sync.py`](tests/test_cuda_prefix_sync.py); log 2026-08-31T13:45:38Z |
-| SES-002 | Implement atomic eval/sample/commit semantics | SCH-001 | pending | Sampling is separate; cancellation/error cannot partially commit state | — |
+| SES-002 | Implement atomic eval/sample/commit semantics | SCH-001 | done | Sampling is separate; cancellation/error cannot partially commit state | [`cuda/full_scheduler.cu`](cuda/full_scheduler.cu); [`fixtures/cuda_atomic_eval.json`](fixtures/cuda_atomic_eval.json); [`tests/test_cuda_atomic_eval.py`](tests/test_cuda_atomic_eval.py); log 2026-08-31T17:55:34Z |
 | SES-003 | Implement atomic checkpoint save/restore | SES-001, SES-002 | pending | All state and compatibility hashes persist; resumed continuation is exact | — |
 | MEM-001 | Demonstrate 131,072-token fit with 1.5 GiB reserve | BLD-003, SCH-001 | pending | Post-graph measured ledger includes 8 GiB KV and every named allocation on RTX 5090 | — |
 | OPT-001 | Add synchronized timings, NVTX, and attribution | SCH-001 | pending | Component/end-to-end measurements expose every named time category | — |
@@ -107,6 +107,7 @@ are repository-relative unless stated otherwise.
 | EDU-031 | Explain the CUDA scheduler prerequisite primitives for beginners | CUD-003, DOC-001 | done | Q8_0 resident weights versus transient Q8 activations, embedding row decode, BF16 pointwise storage, packed layouts, GDN grouped/tiled mapping, numeric gates, timing, and proof limits are code-linked and worked | [`docs/45-cuda-scheduler-primitives.md`](docs/45-cuda-scheduler-primitives.md); [`tests/test_cuda_scheduler_primitives.py`](tests/test_cuda_scheduler_primitives.py); log 2026-08-31T11:26:17Z |
 | EDU-032 | Explain resident CUDA model execution and the 64-layer hybrid schedule for beginners | SCH-001, DOC-001 | done | Upload ownership, layer alternation, scratch reuse, BF16/FP32 boundaries, state offsets, full logits, numeric/greedy gates, timing, and proof limits are code-linked and worked | [`docs/46-cuda-full-scheduler.md`](docs/46-cuda-full-scheduler.md); [`tests/test_cuda_full_scheduler.py`](tests/test_cuda_full_scheduler.py); log 2026-08-31T12:13:55Z |
 | EDU-033 | Explain exact CUDA prefix synchronization and replay for beginners | SES-001, DOC-001 | done | Tokens, common prefixes, append/no-op reuse, divergent/shortened replay, exact equality, memory rationale, preflight failure behavior, and proof limits are code-linked and worked | [`docs/47-cuda-prefix-sync.md`](docs/47-cuda-prefix-sync.md); [`tests/test_cuda_prefix_sync.py`](tests/test_cuda_prefix_sync.py); log 2026-08-31T13:45:38Z |
+| EDU-034 | Explain atomic CUDA evaluation, commit, cancellation, errors, and separate sampling for beginners | SES-002, DOC-001 | done | Candidate versus committed state, pointer publication, frontier-last visibility, polling, injected failure, sampling purity, memory cost, and proof limits are code-linked and worked | [`docs/48-atomic-eval-and-sampling.md`](docs/48-atomic-eval-and-sampling.md); [`tests/test_cuda_atomic_eval.py`](tests/test_cuda_atomic_eval.py); log 2026-08-31T17:55:34Z |
 | REL-001 | Publish reproducible release evidence bundle | CMP-003, QLT-001, DOC-001 | pending | Builds, hashes, raw results, reports, and documentation claims reconcile | — |
 
 ## Delivery-Gate Mapping
@@ -2457,6 +2458,57 @@ are repository-relative unless stated otherwise.
   eval/sample/commit behavior under cancellation and execution failure, is the
   next task. Checkpoint persistence remains SES-003 and 128K simultaneous fit
   remains MEM-001.
+
+### 2026-08-31T17:40:47Z — SES-002 atomic CUDA evaluation started
+
+- Marked SES-002 and newly discovered documentation task EDU-034 in progress
+  before source changes. The admitted implementation boundary is the real CUDA
+  scheduler; the host `Engine`/`Session` facade remains deliberately fail-closed
+  until its later product integration gate.
+- One token will prepare every GDN layer in a complete alternate state buffer
+  and every attention layer in a candidate KV row. Only successful final output
+  copies may swap the GDN buffers, publish the candidate KV rows, copy the token
+  and outputs, and advance the frontier. A caller-supplied status poll between
+  layers supplies both cancellation and deterministic injected-error evidence.
+- Sampling will be a read-only operation over committed logits. The extra GDN
+  transaction buffer is about 159 MB per active workspace, not per token;
+  duplicating the 8 GiB 128K KV cache is rejected. Unpublished attention rows
+  beyond the frontier are explicitly outside logical/checkpoint state, so exact
+  comparison must inspect only committed rows.
+
+### 2026-08-31T17:55:34Z — SES-002 atomic CUDA evaluation admitted
+
+- Replaced layer-by-layer GDN mutation with 48 corresponding candidate slots in
+  one reusable workspace allocation. Successful evaluation publishes the whole
+  GDN transaction through two pointer swaps. All 16 attention layers likewise
+  retain candidate key/value rows until output succeeds; committed cache state
+  is now defined precisely as rows below the frontier. A final audit also moved
+  device-to-host logits and hidden copies into workspace-owned host staging, so
+  caller output buffers are published only after the state commit succeeds.
+- Added a caller status poll at synchronized layer boundaries. Cancellation
+  after layer eight and an injected internal error after layer 31 both returned
+  their exact statuses with frontier one, unchanged caller outputs, and
+  byte-exact committed state versus an untouched reference. Invalid token
+  `248320` remained a preflight error.
+  A successful retry advanced to frontier two and matched uninterrupted fresh
+  execution exactly.
+- Added read-only greedy sampling over session-owned committed FP32 logits. It
+  selected token `1277` without changing the frontier or any compared state.
+  Stochastic temperature/top-k/top-p sampling remains later product-sampler
+  work and is not silently claimed by this correctness boundary.
+- The reusable candidate increased the capacity-three workspace to 160,380,704
+  bytes. A remeasured capacity-two scheduler used 160,380,608 workspace bytes
+  and left 13,841,465,344 of 33,671,348,224 device bytes free. This is recorded
+  MEM-001 input, not a 128K-fit result. A duplicate 8 GiB KV cache was avoided.
+- Added the authenticated contract, retained fixture, focused native diagnostic,
+  pytest gate, beginner Chapter 48, and reconciled prior scheduler/prefix claims.
+  `uv run ruff format .` completed; the full suite passed 129 tests with nine
+  expected exclusive-GPU skips in 166.20 seconds. A clean pinned build compiled
+  every host product and ten CUDA diagnostics; the complete opt-in CUDA suite
+  passed 19 tests in 64.01 seconds, while the atomic/prefix/full regression
+  passed six tests in 59.20 seconds after the final host-output staging audit.
+- Marked SES-002 and EDU-034 done. SES-003, atomic disk checkpoint save/restore
+  of every logical state component and compatibility identity, is next.
 
 ## Decisions and Negative Results
 

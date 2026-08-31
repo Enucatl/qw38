@@ -539,11 +539,15 @@ Status SchedulerSession::state_equals(const SchedulerSession& other,
           kGdnLayers * internal::kGdnConvolutionValues * sizeof(float));
   compare(gdn_recurrent_, other.gdn_recurrent_,
           kGdnLayers * internal::kGdnRecurrentStateValues * sizeof(float));
-  const std::size_t attention_bytes =
-      kAttentionLayers * capacity_ * internal::kAttentionKvWidth *
-      sizeof(__nv_bfloat16);
-  compare(attention_key_, other.attention_key_, attention_bytes);
-  compare(attention_value_, other.attention_value_, attention_bytes);
+  const std::size_t cache_stride = capacity_ * internal::kAttentionKvWidth;
+  const std::size_t committed_bytes =
+      frontier_ * internal::kAttentionKvWidth * sizeof(__nv_bfloat16);
+  for (std::size_t layer = 0; layer < kAttentionLayers; ++layer) {
+    compare(attention_key_ + layer * cache_stride,
+            other.attention_key_ + layer * cache_stride, committed_bytes);
+    compare(attention_value_ + layer * cache_stride,
+            other.attention_value_ + layer * cache_stride, committed_bytes);
+  }
   unsigned int host_mismatch = 1;
   if (error == cudaSuccess) {
     error = cudaMemcpy(&host_mismatch, mismatch, sizeof(unsigned int),
@@ -599,6 +603,8 @@ SchedulerWorkspace& SchedulerWorkspace::operator=(
   QW38_MOVE_POINTER(attention_scores_);
   QW38_MOVE_POINTER(logits_);
   QW38_MOVE_POINTER(trace_taps_);
+  QW38_MOVE_POINTER(candidate_logits_host_);
+  QW38_MOVE_POINTER(candidate_hidden_host_);
 #undef QW38_MOVE_POINTER
   capacity_ = other.capacity_;
   allocated_bytes_ = other.allocated_bytes_;
@@ -608,6 +614,10 @@ SchedulerWorkspace& SchedulerWorkspace::operator=(
 }
 
 void SchedulerWorkspace::release() noexcept {
+  std::free(candidate_hidden_host_);
+  std::free(candidate_logits_host_);
+  candidate_hidden_host_ = nullptr;
+  candidate_logits_host_ = nullptr;
 #define QW38_FREE(name) if (name != nullptr) cudaFree(name); name = nullptr
   QW38_FREE(trace_taps_);
   QW38_FREE(logits_);
@@ -643,6 +653,15 @@ Status SchedulerWorkspace::create(std::size_t capacity) noexcept {
     return {StatusCode::kInvalidArgument,
             "CUDA scheduler workspace capacity is invalid"};
   }
+  candidate_logits_host_ = static_cast<float*>(
+      std::malloc(internal::kVocabularySize * sizeof(float)));
+  candidate_hidden_host_ = static_cast<float*>(
+      std::malloc(internal::kResidualWidth * sizeof(float)));
+  if (candidate_logits_host_ == nullptr || candidate_hidden_host_ == nullptr) {
+    release();
+    return {StatusCode::kResourceExhausted,
+            "cannot allocate CUDA scheduler host candidate output"};
+  }
   cudaError_t error = allocate(&residual_a_, internal::kResidualWidth,
                                &allocated_bytes_);
 #define QW38_ALLOCATE(name, count)                                           \
@@ -662,11 +681,13 @@ Status SchedulerWorkspace::create(std::size_t capacity) noexcept {
   QW38_ALLOCATE(gdn_convolved_, internal::kGdnPackedQkvWidth);
   QW38_ALLOCATE(gdn_recurrent_output_, internal::kGdnValueWidth);
   QW38_ALLOCATE(gdn_candidate_convolution_,
-                internal::kGdnConvolutionValues);
+                kGdnLayers * internal::kGdnConvolutionValues);
   QW38_ALLOCATE(gdn_candidate_recurrent_,
-                internal::kGdnRecurrentStateValues);
-  QW38_ALLOCATE(attention_candidate_key_, internal::kAttentionKvWidth);
-  QW38_ALLOCATE(attention_candidate_value_, internal::kAttentionKvWidth);
+                kGdnLayers * internal::kGdnRecurrentStateValues);
+  QW38_ALLOCATE(attention_candidate_key_,
+                kAttentionLayers * internal::kAttentionKvWidth);
+  QW38_ALLOCATE(attention_candidate_value_,
+                kAttentionLayers * internal::kAttentionKvWidth);
   QW38_ALLOCATE(attention_normalized_query_, internal::kAttentionQueryWidth);
   QW38_ALLOCATE(attention_normalized_key_, internal::kAttentionKvWidth);
   QW38_ALLOCATE(attention_scores_, 24 * capacity);
@@ -702,7 +723,8 @@ Status execute_token(const ResidentModel& model, std::size_t token,
                      SchedulerSession* session, SchedulerWorkspace* workspace,
                      float* host_logits, std::size_t logits_count,
                      float* host_hidden, std::size_t hidden_count,
-                     float* elapsed_milliseconds) noexcept {
+                     float* elapsed_milliseconds,
+                     const EvalControl* control) noexcept {
   if (model.blob_ == nullptr || token >= internal::kVocabularySize ||
       session == nullptr || workspace == nullptr ||
       session->capacity_ == 0 || session->frontier_ >= session->capacity_ ||
@@ -731,10 +753,13 @@ Status execute_token(const ResidentModel& model, std::size_t token,
   }
   std::size_t gdn_slot = 0;
   std::size_t attention_slot = 0;
+  Status poll_status = Status::ok();
+  bool interrupted = false;
   float* residual = workspace->residual_a_;
   float* next = workspace->residual_b_;
   for (std::size_t layer_index = 0;
-       error == cudaSuccess && layer_index < model.layers_.size();
+       error == cudaSuccess && !interrupted &&
+       layer_index < model.layers_.size();
        ++layer_index) {
     const DeviceLayer& layer = model.layers_[layer_index];
     rms_norm_fp32_to_bf16<<<1, kThreads>>>(
@@ -769,8 +794,11 @@ Status execute_token(const ResidentModel& model, std::size_t token,
               gdn_slot * internal::kGdnConvolutionValues,
           session->gdn_recurrent_ +
               gdn_slot * internal::kGdnRecurrentStateValues};
-      const GdnState candidate{workspace->gdn_candidate_convolution_,
-                               workspace->gdn_candidate_recurrent_};
+      const GdnState candidate{
+          workspace->gdn_candidate_convolution_ +
+              gdn_slot * internal::kGdnConvolutionValues,
+          workspace->gdn_candidate_recurrent_ +
+              gdn_slot * internal::kGdnRecurrentStateValues};
       if (error == cudaSuccess) {
         error = launch_gdn_prepare_tiled(
             kGdnConfig, workspace->projection_a_, layer.gdn.convolution,
@@ -786,18 +814,6 @@ Status execute_token(const ResidentModel& model, std::size_t token,
       if (error == cudaSuccess) {
         error = matrix_vector(layer.gdn.output, workspace->projected_bf16_,
                               workspace, workspace->mixer_output_);
-      }
-      if (error == cudaSuccess) {
-        error = cudaMemcpyAsync(
-            committed.convolution, candidate.convolution,
-            internal::kGdnConvolutionValues * sizeof(float),
-            cudaMemcpyDeviceToDevice);
-      }
-      if (error == cudaSuccess) {
-        error = cudaMemcpyAsync(
-            committed.recurrent, candidate.recurrent,
-            internal::kGdnRecurrentStateValues * sizeof(float),
-            cudaMemcpyDeviceToDevice);
       }
       ++gdn_slot;
     } else {
@@ -826,8 +842,11 @@ Status execute_token(const ResidentModel& model, std::size_t token,
       const AttentionCache committed{
           session->attention_key_ + attention_slot * cache_stride,
           session->attention_value_ + attention_slot * cache_stride};
-      const AttentionCache candidate{workspace->attention_candidate_key_,
-                                     workspace->attention_candidate_value_};
+      const AttentionCache candidate{
+          workspace->attention_candidate_key_ +
+              attention_slot * internal::kAttentionKvWidth,
+          workspace->attention_candidate_value_ +
+              attention_slot * internal::kAttentionKvWidth};
       if (error == cudaSuccess) {
         error = launch_attention_prepare(
             config, session->frontier_, workspace->gdn_convolved_,
@@ -848,20 +867,6 @@ Status execute_token(const ResidentModel& model, std::size_t token,
                               workspace->projected_bf16_, workspace,
                               workspace->mixer_output_);
       }
-      const std::size_t target =
-          session->frontier_ * internal::kAttentionKvWidth;
-      if (error == cudaSuccess) {
-        error = cudaMemcpyAsync(
-            committed.key + target, candidate.key,
-            internal::kAttentionKvWidth * sizeof(__nv_bfloat16),
-            cudaMemcpyDeviceToDevice);
-      }
-      if (error == cudaSuccess) {
-        error = cudaMemcpyAsync(
-            committed.value + target, candidate.value,
-            internal::kAttentionKvWidth * sizeof(__nv_bfloat16),
-            cudaMemcpyDeviceToDevice);
-      }
       ++attention_slot;
     }
     if (error == cudaSuccess) {
@@ -881,52 +886,108 @@ Status execute_token(const ResidentModel& model, std::size_t token,
           workspace->trace_taps_ + tap * internal::kResidualWidth, residual,
           internal::kResidualWidth * sizeof(float), cudaMemcpyDeviceToDevice);
     }
+    if (error == cudaSuccess && control != nullptr &&
+        control->poll != nullptr) {
+      error = cudaDeviceSynchronize();
+      if (error == cudaSuccess) {
+        poll_status = control->poll(control->context);
+        interrupted = !poll_status.is_ok();
+      }
+    }
   }
-  if (error == cudaSuccess &&
+  if (error == cudaSuccess && !interrupted &&
       (gdn_slot != kGdnLayers || attention_slot != kAttentionLayers)) {
     error = cudaErrorInvalidValue;
   }
-  if (error == cudaSuccess) {
+  if (error == cudaSuccess && !interrupted) {
     rms_norm_fp32_to_bf16<<<1, kThreads>>>(
         residual, model.output_norm_, internal::kResidualWidth,
         workspace->normalized_);
     error = cudaPeekAtLastError();
   }
-  if (error == cudaSuccess) {
+  if (error == cudaSuccess && !interrupted) {
     error = matrix_vector(model.output_, workspace->normalized_, workspace,
                           workspace->logits_);
   }
-  if (error == cudaSuccess) {
+  if (error == cudaSuccess && !interrupted) {
     bf16_to_fp32<<<20, kThreads>>>(
         workspace->normalized_, internal::kResidualWidth,
         workspace->trace_taps_ + 3 * internal::kResidualWidth);
     error = cudaPeekAtLastError();
   }
-  if (error == cudaSuccess) error = cudaEventRecord(stop);
-  if (error == cudaSuccess) error = cudaEventSynchronize(stop);
-  if (error == cudaSuccess) {
+  if (error == cudaSuccess && !interrupted) error = cudaEventRecord(stop);
+  if (error == cudaSuccess && !interrupted) error = cudaEventSynchronize(stop);
+  if (error == cudaSuccess && !interrupted) {
     error = cudaEventElapsedTime(elapsed_milliseconds, start, stop);
   }
-  if (error == cudaSuccess) {
-    error = cudaMemcpy(host_logits, workspace->logits_,
+  if (error == cudaSuccess && !interrupted) {
+    error = cudaMemcpy(workspace->candidate_logits_host_, workspace->logits_,
                        logits_count * sizeof(float), cudaMemcpyDeviceToHost);
   }
-  if (error == cudaSuccess) {
-    error = cudaMemcpy(host_hidden, residual,
+  if (error == cudaSuccess && !interrupted) {
+    error = cudaMemcpy(workspace->candidate_hidden_host_, residual,
                        hidden_count * sizeof(float),
                        cudaMemcpyDeviceToHost);
   }
   if (stop != nullptr) cudaEventDestroy(stop);
   if (start != nullptr) cudaEventDestroy(start);
+  if (interrupted) return poll_status;
   if (error != cudaSuccess) {
     return cuda_status(error, "CUDA hybrid token schedule failed");
   }
+  const std::size_t cache_stride =
+      session->capacity_ * internal::kAttentionKvWidth;
+  const std::size_t target =
+      session->frontier_ * internal::kAttentionKvWidth;
+  for (std::size_t slot = 0; error == cudaSuccess && slot < kAttentionLayers;
+       ++slot) {
+    error = cudaMemcpyAsync(
+        session->attention_key_ + slot * cache_stride + target,
+        workspace->attention_candidate_key_ +
+            slot * internal::kAttentionKvWidth,
+        internal::kAttentionKvWidth * sizeof(__nv_bfloat16),
+        cudaMemcpyDeviceToDevice);
+    if (error == cudaSuccess) {
+      error = cudaMemcpyAsync(
+          session->attention_value_ + slot * cache_stride + target,
+          workspace->attention_candidate_value_ +
+              slot * internal::kAttentionKvWidth,
+          internal::kAttentionKvWidth * sizeof(__nv_bfloat16),
+          cudaMemcpyDeviceToDevice);
+    }
+  }
+  if (error == cudaSuccess) error = cudaDeviceSynchronize();
+  if (error != cudaSuccess) {
+    return cuda_status(error, "CUDA hybrid token state commit failed");
+  }
+  std::swap(session->gdn_convolution_,
+            workspace->gdn_candidate_convolution_);
+  std::swap(session->gdn_recurrent_, workspace->gdn_candidate_recurrent_);
   session->tokens_[session->frontier_] = token;
-  std::memcpy(session->last_logits_, host_logits,
+  std::memcpy(session->last_logits_, workspace->candidate_logits_host_,
               internal::kVocabularySize * sizeof(float));
-  std::memcpy(session->last_hidden_, host_hidden,
+  std::memcpy(session->last_hidden_, workspace->candidate_hidden_host_,
+              internal::kResidualWidth * sizeof(float));
+  std::memcpy(host_logits, workspace->candidate_logits_host_,
+              internal::kVocabularySize * sizeof(float));
+  std::memcpy(host_hidden, workspace->candidate_hidden_host_,
               internal::kResidualWidth * sizeof(float));
   ++session->frontier_;
+  return Status::ok();
+}
+
+Status greedy_sample(const SchedulerSession& session,
+                     std::size_t* token) noexcept {
+  if (token == nullptr || session.frontier_ == 0 ||
+      session.last_logits_ == nullptr) {
+    return {StatusCode::kInvalidArgument,
+            "CUDA greedy sampling input or committed logits are invalid"};
+  }
+  std::size_t best = 0;
+  for (std::size_t index = 1; index < internal::kVocabularySize; ++index) {
+    if (session.last_logits_[index] > session.last_logits_[best]) best = index;
+  }
+  *token = best;
   return Status::ok();
 }
 
