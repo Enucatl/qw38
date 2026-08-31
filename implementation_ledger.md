@@ -58,7 +58,7 @@ are repository-relative unless stated otherwise.
 | SES-001 | Implement exact common-prefix sync/reuse | SCH-001 | done | Reuse and full replay produce the same committed state and logits | [`cuda/full_scheduler.cu`](cuda/full_scheduler.cu); [`fixtures/cuda_prefix_sync.json`](fixtures/cuda_prefix_sync.json); [`tests/test_cuda_prefix_sync.py`](tests/test_cuda_prefix_sync.py); log 2026-08-31T13:45:38Z |
 | SES-002 | Implement atomic eval/sample/commit semantics | SCH-001 | done | Sampling is separate; cancellation/error cannot partially commit state | [`cuda/full_scheduler.cu`](cuda/full_scheduler.cu); [`fixtures/cuda_atomic_eval.json`](fixtures/cuda_atomic_eval.json); [`tests/test_cuda_atomic_eval.py`](tests/test_cuda_atomic_eval.py); log 2026-08-31T17:55:34Z |
 | SES-003 | Implement atomic checkpoint save/restore | SES-001, SES-002 | done | All state and compatibility hashes persist; resumed continuation is exact | [`cuda/checkpoint.cu`](cuda/checkpoint.cu); [`fixtures/cuda_checkpoint.json`](fixtures/cuda_checkpoint.json); [`tests/test_cuda_checkpoint.py`](tests/test_cuda_checkpoint.py); log 2026-08-31T19:09:54Z |
-| MEM-001 | Demonstrate 131,072-token fit with 1.5 GiB reserve | BLD-003, SCH-001 | pending | Post-graph measured ledger includes 8 GiB KV and every named allocation on RTX 5090 | — |
+| MEM-001 | Demonstrate 131,072-token fit with 1.5 GiB reserve | BLD-003, SCH-001 | in_progress | Post-graph measured ledger includes 8 GiB KV and every named allocation on RTX 5090 | Pre-graph evidence: [`cuda/memory_fit_test.cu`](cuda/memory_fit_test.cu); [`fixtures/cuda_memory_fit_pre_graph.json`](fixtures/cuda_memory_fit_pre_graph.json); [`tests/test_cuda_memory_fit.py`](tests/test_cuda_memory_fit.py); final admission pending OPT-003 |
 | OPT-001 | Add synchronized timings, NVTX, and attribution | SCH-001 | pending | Component/end-to-end measurements expose every named time category | — |
 | OPT-002 | Profile and implement justified fusions | OPT-001, ORA-001 | pending | Nsight evidence justifies each fusion; fused/unfused boundaries pass frozen gates | — |
 | OPT-003 | Implement stable-address CUDA graphs | OPT-002 | pending | Graph/non-graph equivalence passes and graph allocations are in MEM-001 | — |
@@ -109,6 +109,7 @@ are repository-relative unless stated otherwise.
 | EDU-033 | Explain exact CUDA prefix synchronization and replay for beginners | SES-001, DOC-001 | done | Tokens, common prefixes, append/no-op reuse, divergent/shortened replay, exact equality, memory rationale, preflight failure behavior, and proof limits are code-linked and worked | [`docs/47-cuda-prefix-sync.md`](docs/47-cuda-prefix-sync.md); [`tests/test_cuda_prefix_sync.py`](tests/test_cuda_prefix_sync.py); log 2026-08-31T13:45:38Z |
 | EDU-034 | Explain atomic CUDA evaluation, commit, cancellation, errors, and separate sampling for beginners | SES-002, DOC-001 | done | Candidate versus committed state, pointer publication, frontier-last visibility, polling, injected failure, sampling purity, memory cost, and proof limits are code-linked and worked | [`docs/48-atomic-eval-and-sampling.md`](docs/48-atomic-eval-and-sampling.md); [`tests/test_cuda_atomic_eval.py`](tests/test_cuda_atomic_eval.py); log 2026-08-31T17:55:34Z |
 | EDU-035 | Explain versioned atomic CUDA checkpoint save/restore for beginners | SES-003, DOC-001 | done | File framing, compatibility and payload hashes, logical state sections, atomic rename, validation-before-mutation, sampler persistence, exact continuation, corruption, and proof limits are code-linked and worked | [`docs/49-cuda-checkpoints.md`](docs/49-cuda-checkpoints.md); [`tests/test_cuda_checkpoint.py`](tests/test_cuda_checkpoint.py); log 2026-08-31T19:09:54Z |
+| EDU-036 | Explain the complete pre-graph 128K GPU allocation ledger and remaining graph gate for beginners | MEM-001, DOC-001 | done | GiB versus GB, resident/session/workspace categories, KV arithmetic, runtime/allocator deltas, reserve calculation, physical allocation, and why post-graph admission remains open are code-linked and worked | [`docs/50-pre-graph-128k-memory.md`](docs/50-pre-graph-128k-memory.md); [`tests/test_cuda_memory_fit.py`](tests/test_cuda_memory_fit.py); log 2026-08-31T19:17:33Z |
 | REL-001 | Publish reproducible release evidence bundle | CMP-003, QLT-001, DOC-001 | pending | Builds, hashes, raw results, reports, and documentation claims reconcile | — |
 
 ## Delivery-Gate Mapping
@@ -2560,6 +2561,47 @@ are repository-relative unless stated otherwise.
   scheduler regression passed eight tests in 63.70 seconds.
 - Marked SES-003 and EDU-035 done. MEM-001, simultaneous 131,072-token allocation
   with every workspace/graph/overhead category and 1.5 GiB reserve, is next.
+
+### 2026-08-31T19:12:15Z — MEM-001 pre-graph 128K fit measurement started
+
+- Marked MEM-001 and newly discovered documentation task EDU-036 in progress
+  before source changes. The diagnostic will simultaneously allocate the exact
+  resident GGUF, a capacity-131,072 session with all 16 BF16 K/V caches, and the
+  current atomic-evaluation workspace, then reconcile explicit owner bytes with
+  CUDA's before/after free-memory measurements and process host RSS.
+- The final acceptance condition explicitly says post-graph. OPT-003 has not
+  implemented graph objects, so this increment must report graph bytes as
+  unavailable and keep MEM-001 open even if the pre-graph reserve exceeds
+  1.5 GiB. It is a retained physical-capacity measurement, not a semantic
+  substitute for the later post-graph rerun.
+
+### 2026-08-31T19:17:33Z — MEM-001 pre-graph 128K allocation passed
+
+- Simultaneously uploaded the 18,973,870,432-byte resident model, allocated a
+  capacity-131,072 session containing 158,859,264 GDN bytes and the complete
+  8,589,934,592-byte K/V cache, and allocated the 172,963,328-byte atomic
+  workspace. Exact Quartz owners totalled 27,895,627,616 device bytes.
+- CUDA measured a 27,898,413,056-byte free-memory delta from the post-context
+  baseline. The 2,785,440-byte difference from explicit owners is retained as
+  allocator delta; the context itself occupied 531,890,176 bytes before Quartz
+  allocations. Process host RSS measured 19,106,787,328 bytes after model upload
+  and allocations.
+- With all current owners live, 5,241,044,992 of 33,671,348,224 device bytes
+  remained free, exceeding the 1,610,612,736-byte (1.5 GiB) reserve by
+  3,630,432,256 bytes. Session capacity and independent GDN/KV arithmetic were
+  exact, and allocation/zero-initialization executed on the RTX 5090.
+- Added the authenticated provisional contract, raw fixture, focused native
+  diagnostic and pytest gate, beginner Chapter 50, and source/index updates.
+  EDU-036 is done. MEM-001 deliberately remains in progress: graph bytes are
+  recorded as unavailable, and its stated post-graph acceptance condition
+  cannot be satisfied until OPT-003 creates and measures the admitted graphs.
+- `uv run ruff format .` completed; the full suite passed 131 tests with eleven
+  expected exclusive-GPU skips in 163.26 seconds. A clean pinned build compiled
+  every host product and twelve CUDA diagnostics; all 23 opt-in CUDA tests
+  passed in 70.32 seconds.
+- OPT-001 synchronized timing/NVTX attribution is the next executable task in
+  the optimization sequence. After OPT-002 and OPT-003, this exact allocation
+  diagnostic must rerun with graph ownership before MEM-001 may become done.
 
 ## Decisions and Negative Results
 

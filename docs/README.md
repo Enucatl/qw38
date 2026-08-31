@@ -74,7 +74,8 @@ for language and host portability decisions.
 47. [Exact token-prefix synchronization](47-cuda-prefix-sync.md): token histories, common prefixes, append/no-op reuse, divergent and shorter replay, preflight, and byte-exact fixture equality.
 48. [Atomic CUDA evaluation and separate sampling](48-atomic-eval-and-sampling.md): committed versus candidate state, pointer publication, frontier-last visibility, cancellation/errors, and read-only token choice.
 49. [Versioned atomic CUDA checkpoints](49-cuda-checkpoints.md): complete logical state, little-endian framing, compatibility and payload hashes, durable rename publication, validation, and exact continuation.
-50. [Source and evidence ledger](sources.md).
+50. [The pre-graph 128K memory ledger](50-pre-graph-128k-memory.md): raw-byte ownership, 8 GiB KV arithmetic, runtime/allocator deltas, measured reserve, and the still-open post-graph gate.
+51. [Source and evidence ledger](sources.md).
 
 Claims use four labels: **Measured** (this exact artifact and hardware),
 **External** (a linked source), **Estimated** (reproducible arithmetic), and

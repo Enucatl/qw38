@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "task": "MEM-001-pre-graph",
+  "device": "NVIDIA GeForce RTX 5090",
+  "compute_capability": "12.0",
+  "toolkit": "CUDA 13.0.2",
+  "capacity": 131072,
+  "total_device_bytes": 33671348224,
+  "free_baseline_bytes": 33139458048,
+  "owners": {
+    "runtime_context_bytes": 531890176,
+    "resident_model_bytes": 18973870432,
+    "gdn_state_bytes": 158859264,
+    "attention_kv_bytes": 8589934592,
+    "session_total_bytes": 8748793856,
+    "workspace_bytes": 172963328,
+    "explicit_quartz_bytes": 27895627616,
+    "allocator_delta_bytes": 2785440,
+    "graph_bytes": null
+  },
+  "measured_quartz_delta_bytes": 27898413056,
+  "free_after_allocation_bytes": 5241044992,
+  "required_reserve_bytes": 1610612736,
+  "reserve_margin_bytes": 3630432256,
+  "host_rss_bytes": 19106787328,
+  "arithmetic_exact": true,
+  "pre_graph_passed": true,
+  "post_graph_admitted": false,
+  "post_graph_reason": "OPT-003 pending",
+  "claim": "real simultaneous pre-graph 128K allocation and reserve evidence; not final MEM-001 admission, final graph/allocator footprint, 128K full-model execution, retrieval quality, or throughput"
+}

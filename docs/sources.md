@@ -250,6 +250,13 @@ DSpark are explicitly rejected as Qwen model semantics.
   [`pins/cuda_checkpoint_contract.json`](../pins/cuda_checkpoint_contract.json).
   Exact round-trip/continuation and retained corrupt/incompatible failures are
   recorded in [`fixtures/cuda_checkpoint.json`](../fixtures/cuda_checkpoint.json).
+- MEM-001's pre-graph increment introduces no external implementation source.
+  It exercises existing local allocation owners and reconciles their exact byte
+  counters with CUDA's runtime `cudaMemGetInfo` readings. The provisional
+  contract and explicit OPT-003 dependency are authenticated in
+  [`pins/cuda_memory_fit_contract.json`](../pins/cuda_memory_fit_contract.json),
+  with raw owner, allocator-delta, host-RSS, and reserve values retained in
+  [`fixtures/cuda_memory_fit_pre_graph.json`](../fixtures/cuda_memory_fit_pre_graph.json).
 
 ## Specialization and hardware references
 

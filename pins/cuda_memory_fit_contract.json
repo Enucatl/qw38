@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "task": "MEM-001-pre-graph",
+  "target": "sm_120",
+  "toolkit": "CUDA 13.0.2",
+  "capacity": 131072,
+  "required_reserve_bytes": 1610612736,
+  "owners": {
+    "resident_model": "one exact canonical GGUF device allocation",
+    "session": ["48 FP32 GDN convolution rings", "48 FP32 GDN recurrent matrices", "16 complete BF16 K caches", "16 complete BF16 V caches"],
+    "workspace": ["all-layer atomic GDN candidate", "16 candidate K/V rows", "maximum attention scores", "projections, residuals, logits, trace taps"],
+    "runtime_context": "CUDA memory used before Quartz allocations",
+    "allocator_delta": "measured CUDA free-memory delta minus exact Quartz owner bytes",
+    "graphs": "unavailable until OPT-003"
+  },
+  "admission": {
+    "pre_graph_physical_allocation": "passed",
+    "post_graph_MEM_001": "pending OPT-003",
+    "reason": "the approved acceptance condition requires reserve measurement after graph creation"
+  },
+  "local_sources": {
+    "Makefile": "300d63f116599287f17648f30a087840f753b34f5ce4bce8fb1d881a18c81a86",
+    "cuda/memory_fit_test.cu": "b39c909c5383b071ef750f9bd729e8ef1161be52bb144f8df181949358e3ad55"
+  }
+}

@@ -95,6 +95,9 @@ why sampling committed logits must not mutate the session.
 The [checkpoint chapter](docs/49-cuda-checkpoints.md) explains the complete
 versioned disk format, atomic durable publication, corruption and compatibility
 checks, sampler persistence, and byte-exact resumed continuation.
+The [pre-graph 128K memory chapter](docs/50-pre-graph-128k-memory.md) records the
+first simultaneous full-capacity allocation and remaining reserve while keeping
+the final post-graph MEM-001 admission explicitly open.
 
 ## Build
 
