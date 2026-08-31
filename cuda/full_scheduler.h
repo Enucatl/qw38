@@ -80,6 +80,29 @@ struct SamplerState final {
   std::uint64_t rng_state = 0;
 };
 
+struct TimingValue final {
+  float milliseconds = 0.0F;
+  bool measured = false;
+};
+
+// One request-level attribution record. A false `measured` flag means that the
+// runtime boundary does not exist yet; it must not be interpreted as zero work.
+struct RuntimeTimings final {
+  TimingValue loading;
+  TimingValue embedding;
+  TimingValue gdn;
+  TimingValue attention;
+  TimingValue ffn;
+  TimingValue logits;
+  TimingValue sampling;
+  TimingValue graph_launch;
+  TimingValue queueing;
+  TimingValue persistence;
+  TimingValue idle_gaps;
+  TimingValue state_commit;
+  TimingValue token_total;
+};
+
 class SchedulerWorkspace;
 
 class ResidentModel final {
@@ -110,7 +133,8 @@ class ResidentModel final {
   friend Status execute_token(const ResidentModel&, std::size_t,
                               class SchedulerSession*, class SchedulerWorkspace*,
                               float*, std::size_t, float*, std::size_t,
-                              float*, const EvalControl*) noexcept;
+                              float*, const EvalControl*,
+                              RuntimeTimings*) noexcept;
 };
 
 class SchedulerSession final {
@@ -127,9 +151,11 @@ class SchedulerSession final {
   Status state_equals(const SchedulerSession& other, bool* equal) const noexcept;
   Status set_sampler_state(const SamplerState& state) noexcept;
   SamplerState sampler_state() const noexcept;
-  Status save_checkpoint(const std::string& path) const noexcept;
+  Status save_checkpoint(const std::string& path,
+                         RuntimeTimings* timings = nullptr) const noexcept;
   Status restore_checkpoint(const std::string& path,
-                            SchedulerWorkspace* workspace) noexcept;
+                            SchedulerWorkspace* workspace,
+                            RuntimeTimings* timings = nullptr) noexcept;
   std::size_t capacity() const noexcept;
   std::size_t frontier() const noexcept;
   std::size_t token_count() const noexcept;
@@ -152,12 +178,14 @@ class SchedulerSession final {
   friend Status execute_token(const ResidentModel&, std::size_t,
                               SchedulerSession*, class SchedulerWorkspace*,
                               float*, std::size_t, float*, std::size_t,
-                              float*, const EvalControl*) noexcept;
+                              float*, const EvalControl*,
+                              RuntimeTimings*) noexcept;
   friend Status sync_tokens(const ResidentModel&, const std::size_t*,
                             std::size_t, SchedulerSession*,
                             class SchedulerWorkspace*, float*, std::size_t,
                             float*, std::size_t, SyncResult*) noexcept;
-  friend Status greedy_sample(const SchedulerSession&, std::size_t*) noexcept;
+  friend Status greedy_sample(const SchedulerSession&, std::size_t*,
+                              RuntimeTimings*) noexcept;
 };
 
 class SchedulerWorkspace final {
@@ -207,7 +235,8 @@ class SchedulerWorkspace final {
   friend Status execute_token(const ResidentModel&, std::size_t,
                               SchedulerSession*, SchedulerWorkspace*, float*,
                               std::size_t, float*, std::size_t,
-                              float*, const EvalControl*) noexcept;
+                              float*, const EvalControl*,
+                              RuntimeTimings*) noexcept;
   friend Status sync_tokens(const ResidentModel&, const std::size_t*,
                             std::size_t, SchedulerSession*, SchedulerWorkspace*,
                             float*, std::size_t, float*, std::size_t,
@@ -219,10 +248,12 @@ Status execute_token(const ResidentModel& model, std::size_t token,
                      float* host_logits, std::size_t logits_count,
                      float* host_hidden, std::size_t hidden_count,
                      float* elapsed_milliseconds,
-                     const EvalControl* control = nullptr) noexcept;
+                     const EvalControl* control = nullptr,
+                     RuntimeTimings* timings = nullptr) noexcept;
 
 Status greedy_sample(const SchedulerSession& session,
-                     std::size_t* token) noexcept;
+                     std::size_t* token,
+                     RuntimeTimings* timings = nullptr) noexcept;
 
 Status sync_tokens(const ResidentModel& model, const std::size_t* tokens,
                    std::size_t token_count, SchedulerSession* session,

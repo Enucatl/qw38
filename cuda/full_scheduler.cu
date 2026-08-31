@@ -1,5 +1,8 @@
 #include "full_scheduler.h"
 
+#include <algorithm>
+#include <array>
+#include <chrono>
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
@@ -7,6 +10,7 @@
 #include <utility>
 
 #include <cuda_fp16.h>
+#include <nvtx3/nvToolsExt.h>
 
 #include "attention_decode.h"
 #include "gdn_step.h"
@@ -24,6 +28,95 @@ constexpr std::size_t kTraceTapCount = 4;
 constexpr GdnConfig kGdnConfig{16, 48, 128, 128, 4};
 constexpr int kThreads = 256;
 constexpr int kWarpSize = 32;
+
+class NvtxRange final {
+ public:
+  explicit NvtxRange(const char* name) noexcept { nvtxRangePushA(name); }
+  ~NvtxRange() { nvtxRangePop(); }
+  NvtxRange(const NvtxRange&) = delete;
+  NvtxRange& operator=(const NvtxRange&) = delete;
+};
+
+class GpuPhaseRecorder final {
+ public:
+  GpuPhaseRecorder() noexcept = default;
+  ~GpuPhaseRecorder() {
+    const std::size_t cleanup_count = count_ + (active_ ? 1 : 0);
+    for (std::size_t index = 0; index < cleanup_count; ++index) {
+      if (phases_[index].stop != nullptr) cudaEventDestroy(phases_[index].stop);
+      if (phases_[index].start != nullptr) {
+        cudaEventDestroy(phases_[index].start);
+      }
+    }
+  }
+  GpuPhaseRecorder(const GpuPhaseRecorder&) = delete;
+  GpuPhaseRecorder& operator=(const GpuPhaseRecorder&) = delete;
+
+  cudaError_t begin(TimingValue* destination) noexcept {
+    if (destination == nullptr || active_ || count_ == phases_.size()) {
+      return cudaErrorInvalidValue;
+    }
+    Phase& phase = phases_[count_];
+    phase.destination = destination;
+    cudaError_t error = cudaEventCreate(&phase.start);
+    if (error == cudaSuccess) error = cudaEventCreate(&phase.stop);
+    if (error == cudaSuccess) error = cudaEventRecord(phase.start);
+    if (error != cudaSuccess) {
+      if (phase.stop != nullptr) cudaEventDestroy(phase.stop);
+      if (phase.start != nullptr) cudaEventDestroy(phase.start);
+      phase = {};
+      return error;
+    }
+    active_ = true;
+    return cudaSuccess;
+  }
+
+  cudaError_t end() noexcept {
+    if (!active_) return cudaErrorInvalidValue;
+    cudaError_t error = cudaEventRecord(phases_[count_].stop);
+    if (error == cudaSuccess) {
+      ++count_;
+      active_ = false;
+    }
+    return error;
+  }
+
+  cudaError_t collect() noexcept {
+    if (active_) return cudaErrorInvalidValue;
+    for (std::size_t index = 0; index < count_; ++index) {
+      Phase& phase = phases_[index];
+      cudaError_t error = cudaEventSynchronize(phase.stop);
+      float milliseconds = 0.0F;
+      if (error == cudaSuccess) {
+        error = cudaEventElapsedTime(&milliseconds, phase.start, phase.stop);
+      }
+      if (error != cudaSuccess) return error;
+      phase.destination->milliseconds += milliseconds;
+      phase.destination->measured = true;
+    }
+    return cudaSuccess;
+  }
+
+ private:
+  struct Phase final {
+    cudaEvent_t start = nullptr;
+    cudaEvent_t stop = nullptr;
+    TimingValue* destination = nullptr;
+  };
+  // token total + embedding + 64 mixers + 64 FFNs + logits + commit.
+  std::array<Phase, 132> phases_{};
+  std::size_t count_ = 0;
+  bool active_ = false;
+};
+
+cudaError_t begin_phase(GpuPhaseRecorder* recorder,
+                        TimingValue* destination) noexcept {
+  return recorder == nullptr ? cudaSuccess : recorder->begin(destination);
+}
+
+cudaError_t end_phase(GpuPhaseRecorder* recorder) noexcept {
+  return recorder == nullptr ? cudaSuccess : recorder->end();
+}
 
 __device__ float read_q8_half(const std::uint8_t* bytes) {
   const unsigned short bits = static_cast<unsigned short>(bytes[0]) |
@@ -272,6 +365,7 @@ void ResidentModel::release() noexcept {
 Status ResidentModel::upload(const internal::ModelWeights& weights,
                              const std::uint8_t* mapped_base,
                              std::size_t mapped_bytes) noexcept {
+  const NvtxRange range("qw38.loading");
   if (blob_ != nullptr || mapped_base == nullptr || mapped_bytes == 0 ||
       weights.bound_tensor_count != 851) {
     return {StatusCode::kInvalidArgument,
@@ -747,7 +841,8 @@ Status execute_token(const ResidentModel& model, std::size_t token,
                      float* host_logits, std::size_t logits_count,
                      float* host_hidden, std::size_t hidden_count,
                      float* elapsed_milliseconds,
-                     const EvalControl* control) noexcept {
+                     const EvalControl* control,
+                     RuntimeTimings* timings) noexcept {
   if (model.blob_ == nullptr || token >= internal::kVocabularySize ||
       session == nullptr || workspace == nullptr ||
       session->capacity_ == 0 || session->frontier_ >= session->capacity_ ||
@@ -758,11 +853,29 @@ Status execute_token(const ResidentModel& model, std::size_t token,
     return {StatusCode::kInvalidArgument,
             "CUDA token scheduler input, state, or output is invalid"};
   }
+  const NvtxRange token_range("qw38.token");
+  GpuPhaseRecorder category_recorder;
+  GpuPhaseRecorder total_recorder;
+  GpuPhaseRecorder* categories = timings == nullptr ? nullptr : &category_recorder;
+  GpuPhaseRecorder* total = timings == nullptr ? nullptr : &total_recorder;
+  if (timings != nullptr) {
+    *timings = {};
+    timings->loading = {model.upload_milliseconds(), true};
+  }
   cudaEvent_t start = nullptr;
   cudaEvent_t stop = nullptr;
   cudaError_t error = cudaEventCreate(&start);
   if (error == cudaSuccess) error = cudaEventCreate(&stop);
   if (error == cudaSuccess) error = cudaEventRecord(start);
+  if (error == cudaSuccess) {
+    error = begin_phase(total, timings == nullptr ? nullptr
+                                                  : &timings->token_total);
+  }
+  if (error == cudaSuccess) {
+    error = begin_phase(categories, timings == nullptr ? nullptr
+                                                       : &timings->embedding);
+  }
+  nvtxRangePushA("qw38.embedding");
   if (error == cudaSuccess) {
     error = launch_quant_row_decode(
         model.embedding_.kind, model.embedding_.data, model.embedding_.rows,
@@ -774,6 +887,8 @@ Status execute_token(const ResidentModel& model, std::size_t token,
                                    workspace->residual_a_);
     error = cudaPeekAtLastError();
   }
+  if (error == cudaSuccess) error = end_phase(categories);
+  nvtxRangePop();
   std::size_t gdn_slot = 0;
   std::size_t attention_slot = 0;
   Status poll_status = Status::ok();
@@ -785,10 +900,21 @@ Status execute_token(const ResidentModel& model, std::size_t token,
        layer_index < model.layers_.size();
        ++layer_index) {
     const DeviceLayer& layer = model.layers_[layer_index];
-    rms_norm_fp32_to_bf16<<<1, kThreads>>>(
-        residual, layer.common.input_norm, internal::kResidualWidth,
-        workspace->normalized_);
-    error = cudaPeekAtLastError();
+    nvtxRangePushA(layer.kind == internal::LayerKind::kGdn ? "qw38.gdn"
+                                                           : "qw38.attention");
+    if (error == cudaSuccess) {
+      error = begin_phase(categories, timings == nullptr
+                                          ? nullptr
+                                          : (layer.kind == internal::LayerKind::kGdn
+                                                 ? &timings->gdn
+                                                 : &timings->attention));
+    }
+    if (error == cudaSuccess) {
+      rms_norm_fp32_to_bf16<<<1, kThreads>>>(
+          residual, layer.common.input_norm, internal::kResidualWidth,
+          workspace->normalized_);
+      error = cudaPeekAtLastError();
+    }
     if (layer.kind == internal::LayerKind::kGdn) {
       if (error == cudaSuccess) {
         error = matrix_vector(layer.gdn.packed_qkv, workspace->normalized_,
@@ -897,9 +1023,18 @@ Status execute_token(const ResidentModel& model, std::size_t token,
           residual, workspace->mixer_output_, internal::kResidualWidth, next);
       error = cudaPeekAtLastError();
     }
+    if (error == cudaSuccess) error = end_phase(categories);
+    nvtxRangePop();
+    nvtxRangePushA("qw38.ffn");
+    if (error == cudaSuccess) {
+      error = begin_phase(categories,
+                          timings == nullptr ? nullptr : &timings->ffn);
+    }
     if (error == cudaSuccess) {
       error = execute_ffn(layer.common, next, workspace, residual);
     }
+    if (error == cudaSuccess) error = end_phase(categories);
+    nvtxRangePop();
     std::size_t tap = kTraceTapCount;
     if (layer_index == 0) tap = 0;
     if (layer_index == 3) tap = 1;
@@ -921,6 +1056,11 @@ Status execute_token(const ResidentModel& model, std::size_t token,
   if (error == cudaSuccess && !interrupted &&
       (gdn_slot != kGdnLayers || attention_slot != kAttentionLayers)) {
     error = cudaErrorInvalidValue;
+  }
+  nvtxRangePushA("qw38.logits");
+  if (error == cudaSuccess && !interrupted) {
+    error = begin_phase(categories,
+                        timings == nullptr ? nullptr : &timings->logits);
   }
   if (error == cudaSuccess && !interrupted) {
     rms_norm_fp32_to_bf16<<<1, kThreads>>>(
@@ -952,12 +1092,21 @@ Status execute_token(const ResidentModel& model, std::size_t token,
                        hidden_count * sizeof(float),
                        cudaMemcpyDeviceToHost);
   }
-  if (stop != nullptr) cudaEventDestroy(stop);
-  if (start != nullptr) cudaEventDestroy(start);
-  if (interrupted) return poll_status;
+  if (error == cudaSuccess && !interrupted) error = end_phase(categories);
+  nvtxRangePop();
+  if (interrupted) {
+    if (stop != nullptr) cudaEventDestroy(stop);
+    if (start != nullptr) cudaEventDestroy(start);
+    return poll_status;
+  }
   if (error != cudaSuccess) {
+    if (stop != nullptr) cudaEventDestroy(stop);
+    if (start != nullptr) cudaEventDestroy(start);
     return cuda_status(error, "CUDA hybrid token schedule failed");
   }
+  nvtxRangePushA("qw38.state_commit");
+  error = begin_phase(categories,
+                      timings == nullptr ? nullptr : &timings->state_commit);
   const std::size_t cache_stride =
       session->capacity_ * internal::kAttentionKvWidth;
   const std::size_t target =
@@ -980,8 +1129,32 @@ Status execute_token(const ResidentModel& model, std::size_t token,
     }
   }
   if (error == cudaSuccess) error = cudaDeviceSynchronize();
+  if (error == cudaSuccess) error = end_phase(categories);
+  nvtxRangePop();
   if (error != cudaSuccess) {
+    if (stop != nullptr) cudaEventDestroy(stop);
+    if (start != nullptr) cudaEventDestroy(start);
     return cuda_status(error, "CUDA hybrid token state commit failed");
+  }
+  if (error == cudaSuccess) error = end_phase(total);
+  if (error == cudaSuccess && categories != nullptr) {
+    error = categories->collect();
+  }
+  if (error == cudaSuccess && total != nullptr) error = total->collect();
+  if (stop != nullptr) cudaEventDestroy(stop);
+  if (start != nullptr) cudaEventDestroy(start);
+  if (error != cudaSuccess) {
+    return cuda_status(error, "cannot collect CUDA token attribution");
+  }
+  if (timings != nullptr) {
+    const float attributed = timings->embedding.milliseconds +
+                             timings->gdn.milliseconds +
+                             timings->attention.milliseconds +
+                             timings->ffn.milliseconds +
+                             timings->logits.milliseconds +
+                             timings->state_commit.milliseconds;
+    timings->idle_gaps = {
+        std::max(0.0F, timings->token_total.milliseconds - attributed), true};
   }
   std::swap(session->gdn_convolution_,
             workspace->gdn_candidate_convolution_);
@@ -1000,7 +1173,9 @@ Status execute_token(const ResidentModel& model, std::size_t token,
 }
 
 Status greedy_sample(const SchedulerSession& session,
-                     std::size_t* token) noexcept {
+                     std::size_t* token, RuntimeTimings* timings) noexcept {
+  const NvtxRange range("qw38.sampling");
+  const auto started = std::chrono::steady_clock::now();
   if (token == nullptr || session.frontier_ == 0 ||
       session.last_logits_ == nullptr) {
     return {StatusCode::kInvalidArgument,
@@ -1011,6 +1186,13 @@ Status greedy_sample(const SchedulerSession& session,
     if (session.last_logits_[index] > session.last_logits_[best]) best = index;
   }
   *token = best;
+  if (timings != nullptr) {
+    timings->sampling = {
+        static_cast<float>(std::chrono::duration<double, std::milli>(
+                               std::chrono::steady_clock::now() - started)
+                               .count()),
+        true};
+  }
   return Status::ok();
 }
 

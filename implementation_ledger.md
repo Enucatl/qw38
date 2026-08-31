@@ -59,7 +59,7 @@ are repository-relative unless stated otherwise.
 | SES-002 | Implement atomic eval/sample/commit semantics | SCH-001 | done | Sampling is separate; cancellation/error cannot partially commit state | [`cuda/full_scheduler.cu`](cuda/full_scheduler.cu); [`fixtures/cuda_atomic_eval.json`](fixtures/cuda_atomic_eval.json); [`tests/test_cuda_atomic_eval.py`](tests/test_cuda_atomic_eval.py); log 2026-08-31T17:55:34Z |
 | SES-003 | Implement atomic checkpoint save/restore | SES-001, SES-002 | done | All state and compatibility hashes persist; resumed continuation is exact | [`cuda/checkpoint.cu`](cuda/checkpoint.cu); [`fixtures/cuda_checkpoint.json`](fixtures/cuda_checkpoint.json); [`tests/test_cuda_checkpoint.py`](tests/test_cuda_checkpoint.py); log 2026-08-31T19:09:54Z |
 | MEM-001 | Demonstrate 131,072-token fit with 1.5 GiB reserve | BLD-003, SCH-001 | in_progress | Post-graph measured ledger includes 8 GiB KV and every named allocation on RTX 5090 | Pre-graph evidence: [`cuda/memory_fit_test.cu`](cuda/memory_fit_test.cu); [`fixtures/cuda_memory_fit_pre_graph.json`](fixtures/cuda_memory_fit_pre_graph.json); [`tests/test_cuda_memory_fit.py`](tests/test_cuda_memory_fit.py); final admission pending OPT-003 |
-| OPT-001 | Add synchronized timings, NVTX, and attribution | SCH-001 | pending | Component/end-to-end measurements expose every named time category | — |
+| OPT-001 | Add synchronized timings, NVTX, and attribution | SCH-001 | done | Component/end-to-end measurements expose every named time category | [`cuda/full_scheduler.cu`](cuda/full_scheduler.cu); [`cuda/timing_test.cu`](cuda/timing_test.cu); [`fixtures/cuda_timing.json`](fixtures/cuda_timing.json); tests; log 2026-08-31T20:00:28Z |
 | OPT-002 | Profile and implement justified fusions | OPT-001, ORA-001 | pending | Nsight evidence justifies each fusion; fused/unfused boundaries pass frozen gates | — |
 | OPT-003 | Implement stable-address CUDA graphs | OPT-002 | pending | Graph/non-graph equivalence passes and graph allocations are in MEM-001 | — |
 | OPT-004 | Tune row buckets/chunks and check in dispatch evidence | OPT-003 | pending | Offline RTX 5090 sweep selects a reproducible table from retained raw results | — |
@@ -110,6 +110,7 @@ are repository-relative unless stated otherwise.
 | EDU-034 | Explain atomic CUDA evaluation, commit, cancellation, errors, and separate sampling for beginners | SES-002, DOC-001 | done | Candidate versus committed state, pointer publication, frontier-last visibility, polling, injected failure, sampling purity, memory cost, and proof limits are code-linked and worked | [`docs/48-atomic-eval-and-sampling.md`](docs/48-atomic-eval-and-sampling.md); [`tests/test_cuda_atomic_eval.py`](tests/test_cuda_atomic_eval.py); log 2026-08-31T17:55:34Z |
 | EDU-035 | Explain versioned atomic CUDA checkpoint save/restore for beginners | SES-003, DOC-001 | done | File framing, compatibility and payload hashes, logical state sections, atomic rename, validation-before-mutation, sampler persistence, exact continuation, corruption, and proof limits are code-linked and worked | [`docs/49-cuda-checkpoints.md`](docs/49-cuda-checkpoints.md); [`tests/test_cuda_checkpoint.py`](tests/test_cuda_checkpoint.py); log 2026-08-31T19:09:54Z |
 | EDU-036 | Explain the complete pre-graph 128K GPU allocation ledger and remaining graph gate for beginners | MEM-001, DOC-001 | done | GiB versus GB, resident/session/workspace categories, KV arithmetic, runtime/allocator deltas, reserve calculation, physical allocation, and why post-graph admission remains open are code-linked and worked | [`docs/50-pre-graph-128k-memory.md`](docs/50-pre-graph-128k-memory.md); [`tests/test_cuda_memory_fit.py`](tests/test_cuda_memory_fit.py); log 2026-08-31T19:17:33Z |
+| EDU-037 | Explain synchronized GPU timing, NVTX ranges, attribution categories, and profiler evidence for beginners | OPT-001, DOC-001 | done | CPU clocks versus CUDA events, asynchronous work, synchronization, ranges, category sums, unavailable boundaries, perturbation, and Nsight proof limits are code-linked and worked | [`docs/51-runtime-timing-and-nvtx.md`](docs/51-runtime-timing-and-nvtx.md); [`tests/test_cuda_timing.py`](tests/test_cuda_timing.py); log 2026-08-31T20:00:28Z |
 | REL-001 | Publish reproducible release evidence bundle | CMP-003, QLT-001, DOC-001 | pending | Builds, hashes, raw results, reports, and documentation claims reconcile | — |
 
 ## Delivery-Gate Mapping
@@ -2602,6 +2603,62 @@ are repository-relative unless stated otherwise.
 - OPT-001 synchronized timing/NVTX attribution is the next executable task in
   the optimization sequence. After OPT-002 and OPT-003, this exact allocation
   diagnostic must rerun with graph ownership before MEM-001 may become done.
+
+### 2026-08-31T19:30:00Z — OPT-001 and EDU-037 started
+
+- Began synchronized runtime attribution before fusion or CUDA graph work. The
+  existing scheduler exposes model-upload time and one whole-token CUDA-event
+  duration, but cannot distinguish embedding, GDN mixer, attention mixer, FFN,
+  logits, or atomic commit work.
+- Added EDU-037 before source changes so asynchronous GPU timing, explicit
+  synchronization, NVTX timeline ranges, category ownership, measurement
+  overhead, and unavailable future boundaries are explained for a reader with
+  no profiler background.
+- The implementation will preserve atomic execution and make detailed timing
+  opt-in. Queueing and idle gaps belong to the pending single-flight server;
+  graph launch belongs to OPT-003. They must appear explicitly as unavailable,
+  never as measured zero-duration work.
+
+### 2026-08-31T20:00:28Z — OPT-001 and EDU-037 accepted
+
+- Added opt-in synchronized CUDA-event attribution for embedding, all 48 GDN
+  mixers, all 16 attention mixers, all 64 FFNs, logits/output copies, state
+  commit, the complete token span, and the measured unassigned gap. Resident
+  upload retains its CUDA-event measurement; steady monotonic CPU clocks now
+  measure greedy sampling and checkpoint save/restore.
+- Resolved the start-time assumption that all idle time belonged to the future
+  server: the current GPU-stream idle gap is measurable as the non-negative
+  token-span remainder. Server queueing remains a distinct unavailable category.
+- Added balanced NVTX v3 ranges for loading, complete token execution, every
+  attributed GPU category, sampling, and checkpoint persistence. Detailed event
+  pairs are created only when a `RuntimeTimings` record is requested because
+  instrumentation perturbs the schedule. Graph launch and server queueing are
+  explicit unavailable values pending OPT-003 and SRV-001, not measured zeros.
+- The focused RTX 5090 sample measured a 60.594017 ms token stream span. FFN was
+  39.8940468 ms, GDN 13.7372789 ms, attention 4.34175968 ms, logits 2.43088007
+  ms, commit 0.0804480016 ms, embedding 0.0100480001 ms, and the remaining gap
+  0.0995559692 ms; the attributed sum equalled the total. Greedy sampling chose
+  token 1277 and checkpoint persistence measured 609.965942 ms. This one sample
+  is diagnostic attribution, not a benchmark distribution or speed claim.
+- Retained two profiling environment negatives. The pinned image does not
+  contain `nsys`. Nsight Compute 2025.3.1 connected to the diagnostic, then the
+  host denied hardware-counter access with `ERR_NVGPUCTRPERM`; the instrumented
+  executable still completed, but its perturbed 107.092094 ms run is not used
+  as optimization evidence. OPT-002 must establish admitted profiler access
+  before accepting a fusion.
+- Added the authenticated timing contract, raw fixture, focused native/pytest
+  diagnostic, beginner Chapter 51, source provenance, and handbook navigation.
+  During final review, fixed cleanup of an active event pair on cancellation or
+  event-record failure; focused atomic/timing CUDA regressions then passed.
+- `uv run ruff format .` reported 60 files unchanged. The ordinary suite passed
+  132 tests with twelve expected exclusive-GPU skips in 163.36 seconds. A clean
+  pinned CUDA build compiled all four host products and thirteen native
+  diagnostics; the complete opt-in suite passed 144 tests in 234.12 seconds.
+  Post-review focused contracts passed five tests with five expected skips, and
+  the real timing/atomic pair passed four tests in 10.50 seconds.
+- Marked OPT-001 and EDU-037 done. OPT-002 profiler-led fusion is next; OPT-003
+  stable-address CUDA graphs and the final post-graph MEM-001 rerun remain
+  explicitly queued after it.
 
 ## Decisions and Negative Results
 

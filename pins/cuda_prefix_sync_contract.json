@@ -40,9 +40,9 @@
     "128K simultaneous fit proof (MEM-001)"
   ],
   "local_sources": {
-    "Makefile": "300d63f116599287f17648f30a087840f753b34f5ce4bce8fb1d881a18c81a86",
-    "cuda/full_scheduler.cu": "9440e81eabc5cc720da1f2784d4d98f6c8c02fde25836ee97bbd3535d76d70ed",
-    "cuda/full_scheduler.h": "9e9911a7815655346cf0b5df1f116e92833d8577ad138c2fe101740c0b77c585",
+    "Makefile": "bcf395215fc0a235e7066fa4ce52ab27d8142945ceedd832abd1b04562312be7",
+    "cuda/full_scheduler.cu": "404d7b67cb8bc35526dd39e675a34002c1c87c2358838029d3d0f1f2a3fcc9e1",
+    "cuda/full_scheduler.h": "70bf280a353acb6263c53f13878de8891f6e6f5ef5b66b6660547978fbcbcf0d",
     "cuda/prefix_sync_test.cu": "4a292e07fc47353439f5a1a766be445fd1714df955ae1d09f39cd807b8bd4c19"
   }
 }

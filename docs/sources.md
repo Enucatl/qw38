@@ -257,6 +257,13 @@ DSpark are explicitly rejected as Qwen model semantics.
   [`pins/cuda_memory_fit_contract.json`](../pins/cuda_memory_fit_contract.json),
   with raw owner, allocator-delta, host-RSS, and reserve values retained in
   [`fixtures/cuda_memory_fit_pre_graph.json`](../fixtures/cuda_memory_fit_pre_graph.json).
+- OPT-001 uses NVIDIA's CUDA event and NVTX v3 interfaces supplied by the pinned
+  CUDA 13.0.2 image; no external implementation code is copied. The local
+  category/availability boundary and source identities are authenticated in
+  [`pins/cuda_timing_contract.json`](../pins/cuda_timing_contract.json). One
+  RTX 5090 attribution sample plus the retained unavailable-Nsight-Systems and
+  denied-Nsight-Compute-counter results are recorded in
+  [`fixtures/cuda_timing.json`](../fixtures/cuda_timing.json).
 
 ## Specialization and hardware references
 

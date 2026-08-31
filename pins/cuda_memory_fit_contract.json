@@ -19,7 +19,7 @@
     "reason": "the approved acceptance condition requires reserve measurement after graph creation"
   },
   "local_sources": {
-    "Makefile": "300d63f116599287f17648f30a087840f753b34f5ce4bce8fb1d881a18c81a86",
+    "Makefile": "bcf395215fc0a235e7066fa4ce52ab27d8142945ceedd832abd1b04562312be7",
     "cuda/memory_fit_test.cu": "b39c909c5383b071ef750f9bd729e8ef1161be52bb144f8df181949358e3ad55"
   }
 }

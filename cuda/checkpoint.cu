@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <array>
+#include <chrono>
 #include <cmath>
 #include <cstdio>
 #include <cstring>
@@ -12,6 +13,8 @@
 
 #include <fcntl.h>
 #include <unistd.h>
+
+#include <nvtx3/nvToolsExt.h>
 
 #include "scheduler.h"
 #include "sha256.h"
@@ -30,6 +33,30 @@ constexpr const char* kModelSha256 =
     "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34";
 constexpr const char* kLayoutSha256 =
     "b816f20fc25c3de29b71e0404a3b7ef829142e7ad41aad0d67bcfbb92c7550fd";
+
+class PersistenceTiming final {
+ public:
+  PersistenceTiming(const char* range, RuntimeTimings* timings) noexcept
+      : timings_(timings), started_(std::chrono::steady_clock::now()) {
+    nvtxRangePushA(range);
+  }
+  ~PersistenceTiming() {
+    nvtxRangePop();
+    if (timings_ != nullptr) {
+      timings_->persistence = {
+          static_cast<float>(std::chrono::duration<double, std::milli>(
+                                 std::chrono::steady_clock::now() - started_)
+                                 .count()),
+          true};
+    }
+  }
+  PersistenceTiming(const PersistenceTiming&) = delete;
+  PersistenceTiming& operator=(const PersistenceTiming&) = delete;
+
+ private:
+  RuntimeTimings* timings_;
+  std::chrono::steady_clock::time_point started_;
+};
 
 void append_u32(std::vector<unsigned char>* output, std::uint32_t value) {
   for (std::size_t byte = 0; byte < 4; ++byte) {
@@ -133,7 +160,9 @@ bool sync_path(const std::string& path, bool directory) noexcept {
 
 }  // namespace
 
-Status SchedulerSession::save_checkpoint(const std::string& path) const noexcept {
+Status SchedulerSession::save_checkpoint(const std::string& path,
+                                         RuntimeTimings* timings) const noexcept {
+  const PersistenceTiming timing("qw38.persistence.save", timings);
   if (capacity_ == 0 || path.empty()) {
     return {StatusCode::kInvalidArgument,
             "initialized session and checkpoint path are required"};
@@ -262,7 +291,9 @@ Status SchedulerSession::save_checkpoint(const std::string& path) const noexcept
 }
 
 Status SchedulerSession::restore_checkpoint(
-    const std::string& path, SchedulerWorkspace* workspace) noexcept {
+    const std::string& path, SchedulerWorkspace* workspace,
+    RuntimeTimings* timings) noexcept {
+  const PersistenceTiming timing("qw38.persistence.restore", timings);
   if (capacity_ == 0 || path.empty() || workspace == nullptr ||
       workspace->capacity_ != capacity_) {
     return {StatusCode::kInvalidArgument,

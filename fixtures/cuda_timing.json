@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "task": "OPT-001",
+  "device": "NVIDIA GeForce RTX 5090",
+  "compute_capability": "12.0",
+  "toolkit": "CUDA 13.0.2",
+  "token_position": 1,
+  "categories_ms": {
+    "loading": 1561.28857,
+    "embedding": 0.0100480001,
+    "gdn": 13.7372789,
+    "attention": 4.34175968,
+    "ffn": 39.8940468,
+    "logits": 2.43088007,
+    "sampling": 0.110270001,
+    "graph_launch": null,
+    "queueing": null,
+    "persistence": 609.965942,
+    "idle_gaps": 0.0995559692,
+    "state_commit": 0.0804480016,
+    "token_total": 60.594017
+  },
+  "attributed_sum_ms": 60.594017,
+  "sampled_token": 1277,
+  "frontier": 2,
+  "profiler_environment": {
+    "nsight_compute_version": "2025.3.1.0",
+    "nsight_compute_result": "ERR_NVGPUCTRPERM",
+    "nsight_systems_result": "unavailable"
+  },
+  "claim": "one synchronized attributed diagnostic sample; not a benchmark distribution, fusion justification, graph measurement, queue measurement, or comparative speed result"
+}

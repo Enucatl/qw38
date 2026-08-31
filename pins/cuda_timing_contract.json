@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "task": "OPT-001",
+  "target": "sm_120",
+  "toolkit": "CUDA 13.0.2",
+  "categories": ["loading", "embedding", "gdn", "attention", "ffn", "logits", "sampling", "graph_launch", "queueing", "persistence", "idle_gaps", "state_commit", "token_total"],
+  "measurement": {
+    "gpu_work": "synchronized CUDA events on the default stream",
+    "host_work": "steady monotonic CPU clock",
+    "timeline_labels": "NVTX v3 nested ranges",
+    "detailed_mode": "opt-in because event markers perturb execution"
+  },
+  "availability": {
+    "graph_launch": "unavailable until OPT-003",
+    "queueing": "unavailable until SRV-001",
+    "nsight_systems": "not installed in the pinned CUDA image",
+    "nsight_compute": "2025.3.1 installed; GPU performance counters denied by host ERR_NVGPUCTRPERM"
+  },
+  "local_sources": {
+    "cuda/full_scheduler.h": "70bf280a353acb6263c53f13878de8891f6e6f5ef5b66b6660547978fbcbcf0d",
+    "cuda/full_scheduler.cu": "404d7b67cb8bc35526dd39e675a34002c1c87c2358838029d3d0f1f2a3fcc9e1",
+    "cuda/checkpoint.cu": "2c3c03a47b401be8635bd5e5df8cf2b889fa720285e2e18772d86a42043680f9",
+    "cuda/timing_test.cu": "1dc203b7e11c9e32e0e19fb96d1915e959138488cf483d8607e23750ea7557dd"
+  }
+}
