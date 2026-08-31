@@ -83,6 +83,9 @@ The [CUDA scheduler-prerequisite chapter](docs/45-cuda-scheduler-primitives.md)
 then explains resident Q8_0 weights versus temporary Q8 activations, embedding
 row lookup, BF16 pointwise operations, and the packed-layout conversions needed
 before the complete 64-layer scheduler can be assembled.
+The [complete CUDA token chapter](docs/46-cuda-full-scheduler.md) follows two
+real tokens through resident model upload, all 48 GDN and 16 attention layers,
+state continuation, selected trace boundaries, and every vocabulary logit.
 
 ## Build
 

@@ -221,6 +221,13 @@ DSpark are explicitly rejected as Qwen model semantics.
   authenticates the narrow CUDA boundary; Q8_0, BF16 pointwise, embedding, and
   tiled/grouped measurements are retained in
   [`fixtures/cuda_scheduler_primitives.json`](../fixtures/cuda_scheduler_primitives.json).
+- SCH-001 introduces no new external implementation source. It composes the
+  already admitted local CUDA primitives under the pinned typed model and
+  scalar schedule, and checks its complete logits against the pinned scalar and
+  llama.cpp evidence. [`pins/cuda_scheduler_contract.json`](../pins/cuda_scheduler_contract.json)
+  authenticates the source/model/authority boundary; selected taps, complete
+  logit metrics, timings, allocations, and negative results are retained in
+  [`fixtures/cuda_full_scheduler.json`](../fixtures/cuda_full_scheduler.json).
 
 ## Specialization and hardware references
 

@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "task": "SCH-001",
+  "device": "NVIDIA GeForce RTX 5090",
+  "compute_capability": "12.0",
+  "toolkit": "CUDA 13.0.2",
+  "tokens": [42, 3649],
+  "greedy": [3649, 1277],
+  "scalar_logit_comparisons": [
+    {"row": 0, "count": 248320, "max_abs": 0.138223410, "max_rel": 4582.41797, "rms": 0.0272042992578, "cosine": 0.999871596214, "nonfinite": 0, "passed": true},
+    {"row": 1, "count": 248320, "max_abs": 0.161953151, "max_rel": 7624.78271, "rms": 0.0321325798966, "cosine": 0.999863985516, "nonfinite": 0, "passed": true}
+  ],
+  "scalar_tap_comparisons": [
+    {"name": "layer_0_residual", "row": 0, "max_abs": 0.00811195374, "rms": 0.000325656828912, "cosine": 0.999999275906, "nonfinite": 0, "passed": true},
+    {"name": "layer_3_residual", "row": 0, "max_abs": 0.0375251770, "rms": 0.000961786041520, "cosine": 0.999998907788, "nonfinite": 0, "passed": true},
+    {"name": "layer_63_residual", "row": 0, "max_abs": 0.755096436, "rms": 0.112812462056, "cosine": 0.999936634406, "nonfinite": 0, "passed": true},
+    {"name": "final_norm", "row": 0, "max_abs": 0.122957230, "rms": 0.0220696393459, "cosine": 0.999932362513, "nonfinite": 0, "passed": true},
+    {"name": "layer_0_residual", "row": 1, "max_abs": 0.00863456726, "rms": 0.000411775056712, "cosine": 0.999998573062, "nonfinite": 0, "passed": true},
+    {"name": "layer_3_residual", "row": 1, "max_abs": 0.0132789612, "rms": 0.00147444580381, "cosine": 0.999995426464, "nonfinite": 0, "passed": true},
+    {"name": "layer_63_residual", "row": 1, "max_abs": 0.394790649, "rms": 0.0804051908828, "cosine": 0.999887074500, "nonfinite": 0, "passed": true},
+    {"name": "final_norm", "row": 1, "max_abs": 0.181641579, "rms": 0.0296463456751, "cosine": 0.999878710972, "nonfinite": 0, "passed": true}
+  ],
+  "llama_same_gguf_comparisons": [
+    {"row": 0, "max_abs": 0.167108774, "rms": 0.0300765479514, "cosine": 0.999842589961, "nonfinite": 0, "envelope_passed": true, "greedy_equal": true},
+    {"row": 1, "max_abs": 0.206399560, "rms": 0.0360483520117, "cosine": 0.999828237063, "nonfinite": 0, "envelope_passed": false, "greedy_equal": true}
+  ],
+  "allocation": {"model_bytes": 18973870432, "session_bytes_at_capacity_2": 158990336, "workspace_bytes": 4769472, "free_bytes_after_run": 13996654592, "total_device_bytes": 33671348224},
+  "timing": {"upload_ms": 1557.876099, "token_0_ms": 60.914143, "token_1_ms": 60.413216, "scalar_two_token_ms": 42695.107260},
+  "negative_results": [
+    "BF16 residual storage plus transient-Q8 staging failed the frozen full-logit envelope despite exact greedy tokens",
+    "direct BF16 Q8_0 inputs plus an FP32 residual accumulator passed the scalar-device gates",
+    "the independent llama.cpp token-1 cosine missed the scalar-derived envelope by approximately 0.0000028; no tolerance changed"
+  ],
+  "claim": "correctness-first decode evidence at capacity two; not atomic request commit, 128K fit, graph, tuned throughput, or quality-suite evidence"
+}

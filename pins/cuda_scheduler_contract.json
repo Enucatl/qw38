@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "task": "SCH-001",
+  "target": "sm_120",
+  "toolkit": "CUDA 13.0.2",
+  "model": {
+    "filename": "Qwen3.8-27B-Q4_K_M.gguf",
+    "bytes": 18973870432,
+    "sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+    "bound_tensors": 851,
+    "device_layout": "one exact canonical-file allocation with checked typed-view offsets"
+  },
+  "schedule": {
+    "layers": 64,
+    "gdn_layers": 48,
+    "attention_layers": 16,
+    "rule": "layer modulo 4 equals 3 is attention; every other layer is GDN",
+    "tested_tokens": [42, 3649],
+    "expected_greedy": [3649, 1277],
+    "vocabulary": 248320
+  },
+  "numeric_storage": {
+    "residual_accumulator": "FP32",
+    "normalized_projection_inputs": "BF16",
+    "gdn_and_attention_projection_outputs": "FP32",
+    "gdn_recurrence": "FP32",
+    "attention_kv": "BF16",
+    "ffn_activated": "BF16",
+    "logits": "FP32",
+    "q4_k_q6_k_activation_staging": "transient Q8 with FP32 scale",
+    "q8_0_activation_input": "direct BF16"
+  },
+  "state": {
+    "gdn_convolution_layers": 48,
+    "gdn_recurrent_layers": 48,
+    "attention_cache_layers": 16,
+    "frontier_after_test": 2,
+    "atomic_request_commit": "deferred to SES-002"
+  },
+  "admission_authority": "Quartz scalar CPU under immutable pre-CUDA llama-vs-Quartz envelopes",
+  "admission": {
+    "logits": {"maximum_absolute_error": 0.21, "maximum_rms_error": 0.037, "minimum_cosine": 0.999831, "nonfinite": 0},
+    "layer_0_residual": {"maximum_absolute_error": 0.012, "maximum_rms_error": 0.0012, "minimum_cosine": 0.999989, "nonfinite": 0},
+    "layer_3_residual": {"maximum_absolute_error": 0.04, "maximum_rms_error": 0.0029, "minimum_cosine": 0.999985, "nonfinite": 0},
+    "layer_63_residual": {"maximum_absolute_error": 1.7, "maximum_rms_error": 0.16, "minimum_cosine": 0.999854, "nonfinite": 0},
+    "final_norm": {"maximum_absolute_error": 0.21, "maximum_rms_error": 0.035, "minimum_cosine": 0.999852, "nonfinite": 0},
+    "greedy_equality": true
+  },
+  "independent_same_gguf": {
+    "path": ".cache/authorities/llama-evidence/llama.f32le.bin",
+    "bytes": 1986560,
+    "sha256": "03d747c8291b07f44ac47649c317a71fea633886f48e9dfbd4da6bb27ae74513",
+    "numeric_envelope_result": "reported negative: token 1 cosine misses the scalar-derived envelope by approximately 0.0000028",
+    "greedy_equality": true
+  },
+  "local_sources": {
+    "cuda/full_scheduler.cu": "d34bc4f699bb6cf0ea8f8ab772224569a04d48f355cbc4c213702ea4206f1e65",
+    "cuda/full_scheduler.h": "20ab7ceb7cdb7ede958411a628e5fe6b2fa83c5fc6d5ee507634065f1db4c2e5",
+    "cuda/full_scheduler_test.cu": "76ee531e8f4ba0b00f9cea7500dcc00fc77b58a4846f53f664ef337cc8cc222c"
+  }
+}

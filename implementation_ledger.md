@@ -54,7 +54,7 @@ are repository-relative unless stated otherwise.
 | GDN-002 | Implement chunked GDN prefill with 64-token scans | GDN-001, CUD-002 | done | Arbitrary chunks equal token-wise execution under frozen gates | [`cuda/gdn_step.cu`](cuda/gdn_step.cu); [`fixtures/cuda_gdn_chunk.json`](fixtures/cuda_gdn_chunk.json); [`tests/test_cuda_gdn_chunk.py`](tests/test_cuda_gdn_chunk.py); log 2026-08-31T06:42:29Z |
 | ATN-001 | Implement grouped-query attention and partial RoPE | CUD-001, CPU-003 | done | Decode, causality, KV grouping, and layers 3/7/63 pass | [`cuda/attention_decode.cu`](cuda/attention_decode.cu); [`fixtures/cuda_attention_decode.json`](fixtures/cuda_attention_decode.json); [`tests/test_cuda_attention.py`](tests/test_cuda_attention.py); log 2026-08-31T06:57:49Z |
 | ATN-002 | Implement memory-bounded causal attention prefill | ATN-001, CUD-002 | done | Chunked prompt fixtures and 131,072 capacity boundary pass | [`cuda/attention_decode.cu`](cuda/attention_decode.cu); [`fixtures/cuda_attention_prefill.json`](fixtures/cuda_attention_prefill.json); [`tests/test_cuda_attention_prefill.py`](tests/test_cuda_attention_prefill.py); log 2026-08-31T09:33:05Z |
-| SCH-001 | Implement hybrid 64-layer CUDA scheduler and FP32 logits | GDN-002, ATN-002, CUD-003 | pending | Full traces/logits and greedy continuations meet frozen gates | — |
+| SCH-001 | Implement hybrid 64-layer CUDA scheduler and FP32 logits | GDN-002, ATN-002, CUD-003 | done | Full traces/logits and greedy continuations meet frozen gates | [`cuda/full_scheduler.cu`](cuda/full_scheduler.cu); [`fixtures/cuda_full_scheduler.json`](fixtures/cuda_full_scheduler.json); [`tests/test_cuda_full_scheduler.py`](tests/test_cuda_full_scheduler.py); log 2026-08-31T12:13:55Z |
 | SES-001 | Implement exact common-prefix sync/reuse | SCH-001 | pending | Reuse and full replay produce the same committed state and logits | — |
 | SES-002 | Implement atomic eval/sample/commit semantics | SCH-001 | pending | Sampling is separate; cancellation/error cannot partially commit state | — |
 | SES-003 | Implement atomic checkpoint save/restore | SES-001, SES-002 | pending | All state and compatibility hashes persist; resumed continuation is exact | — |
@@ -105,6 +105,7 @@ are repository-relative unless stated otherwise.
 | EDU-029 | Explain CUDA grouped-query decode attention and partial RoPE for beginners | ATN-001, DOC-001 | done | Query/KV head sharing, normalization, partial RoPE, two-byte KV rows, causal reads, stable softmax, candidate/commit ownership, timing, numeric gates, and proof limits are code-linked and worked | [`docs/43-cuda-attention-decode.md`](docs/43-cuda-attention-decode.md); [`tests/test_cuda_attention.py`](tests/test_cuda_attention.py); log 2026-08-31T06:57:49Z |
 | EDU-030 | Explain memory-bounded CUDA attention prefill and the 128K boundary for beginners | ATN-002, DOC-001 | done | Chunk causality, candidate-row continuity, linear score workspace, whole-chunk commit/cancellation, token-wise equivalence, 131,072 sizing/execution, timing, and proof limits are code-linked and worked | [`docs/44-cuda-attention-prefill.md`](docs/44-cuda-attention-prefill.md); [`tests/test_cuda_attention_prefill.py`](tests/test_cuda_attention_prefill.py); log 2026-08-31T09:33:05Z |
 | EDU-031 | Explain the CUDA scheduler prerequisite primitives for beginners | CUD-003, DOC-001 | done | Q8_0 resident weights versus transient Q8 activations, embedding row decode, BF16 pointwise storage, packed layouts, GDN grouped/tiled mapping, numeric gates, timing, and proof limits are code-linked and worked | [`docs/45-cuda-scheduler-primitives.md`](docs/45-cuda-scheduler-primitives.md); [`tests/test_cuda_scheduler_primitives.py`](tests/test_cuda_scheduler_primitives.py); log 2026-08-31T11:26:17Z |
+| EDU-032 | Explain resident CUDA model execution and the 64-layer hybrid schedule for beginners | SCH-001, DOC-001 | done | Upload ownership, layer alternation, scratch reuse, BF16/FP32 boundaries, state offsets, full logits, numeric/greedy gates, timing, and proof limits are code-linked and worked | [`docs/46-cuda-full-scheduler.md`](docs/46-cuda-full-scheduler.md); [`tests/test_cuda_full_scheduler.py`](tests/test_cuda_full_scheduler.py); log 2026-08-31T12:13:55Z |
 | REL-001 | Publish reproducible release evidence bundle | CMP-003, QLT-001, DOC-001 | pending | Builds, hashes, raw results, reports, and documentation claims reconcile | — |
 
 ## Delivery-Gate Mapping
@@ -2329,6 +2330,83 @@ are repository-relative unless stated otherwise.
   opt-in pytest gates, beginner Chapter 45, and source/index reconciliation.
   Marked CUD-003 and EDU-031 done. SCH-001, complete resident model upload,
   hybrid 64-layer scheduling, and FP32 logits, is now unblocked and next.
+
+### 2026-08-31T11:36:47Z — SCH-001 hybrid CUDA scheduler started
+
+- Marked SCH-001 and the newly discovered documentation task EDU-032 in
+  progress before implementation. The scheduler will copy the exact admitted
+  18,973,870,432-byte mapped GGUF into one device allocation, then remap all
+  typed tensor views by checked byte offset. This keeps canonical row bytes and
+  tensor padding intact while avoiding 851 independent allocations.
+- A capacity-bounded CUDA session will own all 48 GDN states and 16 BF16
+  attention caches. One reusable workspace will carry BF16 residuals and FFN
+  activations, FP32 projection/recurrent/attention intermediates, transient Q8
+  blocks, per-layer candidate state, and FP32 vocabulary logits.
+- Decode admission starts with two zero-state tokens so every layer variant,
+  recurrent/cache continuation, final norm, all 248,320 logits, and greedy
+  choices are exercised. The diagnostic will compare full CUDA logit rows with
+  the retained scalar implementation and report absolute, relative, RMS,
+  cosine, non-finite, first-failing-index, and top-logit differences under the
+  frozen pre-CUDA policy. Atomic request rollback, 128K simultaneous fit,
+  tracing, graphs, and optimized prefill remain their existing later tasks.
+
+### 2026-08-31T11:43:58Z — SCH-001 first full-logit negative result
+
+- The first complete two-token device execution crossed all 64 layers and
+  produced the required greedy continuation `3649, 1277` in about `64 ms` per
+  token. It uploaded the exact 18,973,870,432-byte artifact in about `1.56 s`
+  and left roughly 13.997 GB device memory free at capacity two.
+- Full-row comparison did not pass the frozen same-GGUF logit envelope. Against
+  the scalar path, token 0 measured `0.230289` maximum error, `0.0506235` RMS,
+  and `0.999561` cosine. Direct comparison with pinned llama.cpp reduced token
+  0 maximum error to `0.209277`, but RMS/cosine still failed; token 1 measured
+  `0.233516` maximum, `0.0394132` RMS, and `0.999796` cosine. No non-finite
+  values occurred. The harness and failed result are retained; no tolerance was
+  changed.
+- Diagnosis: every projection, including resident Q8_0 weights, used the
+  transient activation quantizer. The approved CUD-001 design requires that
+  staging for Q4_K/Q6_K, while Q8_0 was added later only to unblock the real
+  scheduler. SCH-001 will test a direct BF16-input Q8_0 row dot so its already
+  eight-bit resident weights do not incur a second eight-bit rounding. Q4_K and
+  Q6_K continue to use the admitted transient-Q8 path.
+
+### 2026-08-31T12:13:55Z — SCH-001 hybrid CUDA scheduler admitted
+
+- Added one checked device copy of the canonical 18,973,870,432-byte GGUF and
+  remapped all 851 typed views by their authenticated mapped-file offsets. The
+  move-only resident model, capacity-bounded session, and reusable workspace
+  own their allocations explicitly and release them without exceptions.
+- Implemented the literal 64-layer schedule: 48 GDN and 16 attention mixers,
+  each followed by its SwiGLU FFN, then final RMSNorm and the complete 248,320
+  row FP32 output projection. Two real tokens advanced frontier 0 to 2 and
+  produced exact scalar greedy continuation `3649, 1277`.
+- Retained FP32 only for the numerically sensitive residual accumulator while
+  keeping normalized projection inputs, mixer output-projection inputs, and
+  SwiGLU activations in BF16. Q4_K/Q6_K retain transient-Q8 activation staging;
+  Q8_0 resident weights consume BF16 directly. This resolved the earlier
+  full-logit failure without changing a frozen tolerance.
+- Both complete scalar-device logit rows passed: token 0 measured `0.138223`
+  maximum, `0.0272043` RMS, and `0.999872` cosine; token 1 measured `0.161953`,
+  `0.0321326`, and `0.999864`. All 5,120 values at layer 0, layer 3, layer 63,
+  and final norm passed their immutable layer-specific absolute/RMS/cosine and
+  finite-count gates at both positions.
+- Preserved the independent same-GGUF result separately. Both llama.cpp greedy
+  choices match and absolute/RMS limits pass, but token 1 cosine
+  `0.999828237` is about `0.0000028` below the scalar-derived independent
+  envelope. It remains a named negative result for quality evaluation; it was
+  not used to widen or replace the scalar-device admission gate.
+- The clean run measured about `1.58 s` for canonical upload and `60.7/60.3 ms`
+  for diagnostic decode tokens. At capacity two, resident model, 158,990,336
+  session bytes, and 4,769,472 workspace bytes left 13,996,654,592 device bytes
+  free. These are correctness measurements, not tuned throughput or MEM-001.
+- Added the source-authenticated contract, retained fixture, ordinary/opt-in
+  pytest gates, beginner Chapter 46, and source/index reconciliation. Clean
+  normal and diagnostic builds passed; the full suite passed 127 tests with
+  seven expected exclusive-GPU skips in 164.14 seconds. A clean pinned CUDA
+  build compiled every product, and all eight CUDA diagnostics passed together.
+- Marked SCH-001 and EDU-032 done. SES-001, exact common-prefix synchronization
+  and reuse over the admitted hybrid state, is the next task. Request-level
+  atomicity remains SES-002, and simultaneous 128K allocation remains MEM-001.
 
 ## Decisions and Negative Results
 
