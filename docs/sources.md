@@ -181,6 +181,13 @@ DSpark are explicitly rejected as Qwen model semantics.
   copy llama.cpp's generic type dispatch or kernel framework. The scalar/device
   metrics and CUDA-event timing samples are frozen in
   [`fixtures/cuda_quant_mmv.json`](../fixtures/cuda_quant_mmv.json).
+- CUD-002 introduces no new external implementation source. It extends the
+  local CUD-001 decoder and transient Q8 contract with an `8 × 4` result tile;
+  [`pins/cuda_mmq_contract.json`](../pins/cuda_mmq_contract.json) freezes its
+  layout and limits. Arbitrary prompt-row and tail evidence is retained in
+  [`fixtures/cuda_quant_mmq.json`](../fixtures/cuda_quant_mmq.json). Production
+  tile selection remains profiler work rather than an externally borrowed
+  performance claim.
 
 ## Specialization and hardware references
 

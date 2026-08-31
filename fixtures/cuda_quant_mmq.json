@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "task": "CUD-002",
+  "device": "NVIDIA GeForce RTX 5090",
+  "compute_capability": "12.0",
+  "toolkit": "CUDA 13.0.2",
+  "samples_per_case": 30,
+  "warmups_per_case": 3,
+  "cases": [
+    {"name": "q4_k_3x17x256", "prompt_rows": 3, "output_rows": 17, "columns": 256, "max_abs": 0.000244140625, "max_rel": 0.000101597965, "rms": 0.0000968698805, "nonfinite": 0, "q8_equal": true, "mean_ms": 0.00819199998},
+    {"name": "q4_k_5x257x512", "prompt_rows": 5, "output_rows": 257, "columns": 512, "max_abs": 0.000427246094, "max_rel": 0.0000072410312, "rms": 0.000204815471, "nonfinite": 0, "q8_equal": true, "mean_ms": 0.0123562664},
+    {"name": "q6_k_1x17x256", "prompt_rows": 1, "output_rows": 17, "columns": 256, "max_abs": 0.0000457763672, "max_rel": 0.0000108711711, "rms": 0.0000262543326, "nonfinite": 0, "q8_equal": true, "mean_ms": 0.00614400022},
+    {"name": "q6_k_9x257x512", "prompt_rows": 9, "output_rows": 257, "columns": 512, "max_abs": 0.000183105469, "max_rel": 0.0000508669655, "rms": 0.0000456086091, "nonfinite": 0, "q8_equal": true, "mean_ms": 0.00873813313}
+  ],
+  "claim": "correctness-first tile timing, not production prefill throughput"
+}

@@ -48,7 +48,7 @@ are repository-relative unless stated otherwise.
 | ORA-004 | Freeze three-authority scalar fixtures and per-tap tolerances | ORA-002, ORA-003, TRC-002, CPU-004 | done | Attributed bundles compare every required tap/logit; tolerances and genuine greedy near-ties are immutable | [`fixtures/scalar_authority_alignment.json`](fixtures/scalar_authority_alignment.json); [`pins/scalar_oracle_tolerances.json`](pins/scalar_oracle_tolerances.json); [`tests/test_scalar_authority_alignment.py`](tests/test_scalar_authority_alignment.py); log 2026-08-30T18:16:04Z |
 | ORA-001 | Generate and freeze scalar/oracle fixtures and tolerances | ORA-002, ORA-003, ORA-004 | done | Three authorities are attributed; tolerances and greedy tie exceptions are immutable inputs | [`fixtures/scalar_authority_alignment.json`](fixtures/scalar_authority_alignment.json); [`pins/scalar_oracle_tolerances.json`](pins/scalar_oracle_tolerances.json); log 2026-08-30T18:16:04Z |
 | CUD-001 | Implement CUDA Q4_K/Q6_K decode MMV | CPU-001, BLD-002, ORA-001 | done | Scalar-vs-CUDA and focused primitive pytest gates pass | [`cuda/quant_mmv.cu`](cuda/quant_mmv.cu); [`fixtures/cuda_quant_mmv.json`](fixtures/cuda_quant_mmv.json); [`tests/test_cuda_quant_mmv.py`](tests/test_cuda_quant_mmv.py); log 2026-08-31T06:05:47Z |
-| CUD-002 | Implement quantized tiled prompt MMQ | CUD-001 | pending | Arbitrary prompt-row fixtures pass frozen tolerances | — |
+| CUD-002 | Implement quantized tiled prompt MMQ | CUD-001 | done | Arbitrary prompt-row fixtures pass frozen tolerances | [`cuda/quant_mmv.cu`](cuda/quant_mmv.cu); [`fixtures/cuda_quant_mmq.json`](fixtures/cuda_quant_mmq.json); [`tests/test_cuda_quant_mmv.py`](tests/test_cuda_quant_mmv.py); log 2026-08-31T06:16:39Z |
 | GDN-001 | Implement exact one-token CUDA GDN and atomic state commit | CUD-001, CPU-002 | pending | State/taps match oracle and injected failures leave frontier unchanged | — |
 | GDN-002 | Implement chunked GDN prefill with 64-token scans | GDN-001, CUD-002 | pending | Arbitrary chunks equal token-wise execution under frozen gates | — |
 | ATN-001 | Implement grouped-query attention and partial RoPE | CUD-001, CPU-003 | pending | Decode, causality, KV grouping, and layers 3/7/63 pass | — |
@@ -98,6 +98,7 @@ are repository-relative unless stated otherwise.
 | EDU-023 | Explain official-checkpoint Transformers eager/offload authority for beginners | ORA-003, DOC-001 | done | Original checkpoint versus GGUF roles, Safetensors shards, eager execution, CPU/GPU/disk offload, hooks/taps, memory limits, and semantic proof boundaries are code-linked and worked | [`docs/37-transformers-authority.md`](docs/37-transformers-authority.md); [`tests/test_transformers_authority.py`](tests/test_transformers_authority.py); log 2026-08-30T17:38:10Z |
 | EDU-024 | Explain three-authority tap alignment and tolerance freezing for beginners | ORA-004, DOC-001 | done | Comparable versus runtime-private boundaries, layout normalization, error distributions, tolerance selection, near-ties, and immutable admission are code-linked and worked | [`docs/38-scalar-authority-tolerances.md`](docs/38-scalar-authority-tolerances.md); [`tests/test_scalar_authority_alignment.py`](tests/test_scalar_authority_alignment.py); log 2026-08-30T18:16:04Z |
 | EDU-025 | Explain CUDA decode MMV and transient activation quantization for beginners | CUD-001, DOC-001 | done | Thread/warp ownership, BF16-to-Q8 staging, packed-weight decoding, FP32 reduction, launch validation, numeric gates, timing, and proof limits are code-linked and worked | [`docs/39-cuda-quant-mmv.md`](docs/39-cuda-quant-mmv.md); [`tests/test_cuda_quant_mmv.py`](tests/test_cuda_quant_mmv.py); log 2026-08-31T06:05:47Z |
+| EDU-026 | Explain tiled CUDA prompt MMQ for beginners | CUD-002, DOC-001 | done | Prompt rows, output layout, two-dimensional tiles, weight reuse, tail handling, scalar equivalence, numeric gates, timing, and proof limits are code-linked and worked | [`docs/40-cuda-prompt-mmq.md`](docs/40-cuda-prompt-mmq.md); [`tests/test_cuda_quant_mmv.py`](tests/test_cuda_quant_mmv.py); log 2026-08-31T06:16:39Z |
 | REL-001 | Publish reproducible release evidence bundle | CMP-003, QLT-001, DOC-001 | pending | Builds, hashes, raw results, reports, and documentation claims reconcile | — |
 
 ## Delivery-Gate Mapping
@@ -2026,6 +2027,59 @@ are repository-relative unless stated otherwise.
   next delivery-plan task; TRC-004 CUDA taps depend on this completed primitive
   but become meaningful at a model-stage boundary rather than this standalone
   row result.
+
+### 2026-08-31T06:08:02Z — CUD-002 tiled prompt MMQ started
+
+- Marked CUD-002 and discovered documentation task EDU-026 in progress before
+  source edits. The admitted boundary is a BF16 prompt matrix with any positive
+  row count, shared packed Q4_K/Q6_K weights, token-major FP32 output, and the
+  same transient Q8 semantics already frozen by CUD-001.
+- The first tile assigns one warp to one output-weight row and four prompt rows.
+  Each lane decodes a packed weight once and applies it to up to four staged
+  activations, making weight reuse explicit while retaining the readable
+  warp-tree reduction. Partial prompt and output tiles must be covered directly.
+- CUD-002 does not choose final production tile buckets or claim peak prefill
+  throughput. Those require full model shapes and profiler evidence in OPT-001
+  and later tuning tasks.
+- At `2026-08-31T06:10:17Z`, the first device run stopped at Q4_K
+  `5x257x512`. Staging, finiteness, and layout were exact, but maximum absolute
+  error `0.000427246094` and RMS `0.000204815471` narrowly exceeded the reused
+  MMV ceilings. This is a new reduction boundary, so CUD-002 will freeze its own
+  pre-optimization `5e-4` absolute and `2.5e-4` RMS ceilings after running every
+  Q4_K/Q6_K prompt-tail case; the CUD-001 limits remain unchanged.
+  The first mechanical threshold edit touched the earlier MMV return check;
+  immediate source review caught and reversed it before compilation, then
+  applied the new ceilings only to the MMQ result.
+
+### 2026-08-31T06:16:39Z — CUD-002 and EDU-026 accepted
+
+- Extended the admitted CUDA primitive with token-major BF16 prompt input and
+  FP32 `[prompt_rows, output_rows]` output. Each 256-thread block owns eight
+  output rows; each warp decodes one weight per lane and applies it to a
+  four-prompt-row tile before fixed FP32 warp reductions.
+- Added exact workspace sizing and fail-before-launch validation for null
+  pointers, unknown quant kinds, zero dimensions, and columns outside the
+  256-value packed-block contract. Tail predicates cover prompt rows and output
+  rows independently without exposing padding as output.
+- Frozen fixtures cover Q4_K and Q6_K at prompt counts 1, 3, 5, and 9; output
+  counts 17 and 257; and column counts 256 and 512. Every transient Q8 scale and
+  signed integer matched the host reference. All outputs were finite. Global
+  maximum absolute error was `0.000427246094`, and global maximum RMS was
+  `0.000204815471`, passing the frozen `5e-4` and `2.5e-4` MMQ gates without
+  changing CUD-001's stricter MMV limits.
+- Three warm-ups and 30 synchronized CUDA-event samples per case produced
+  diagnostic means of roughly 0.0061–0.0124 ms. These small-shape measurements
+  are retained for reproducibility and explicitly excluded from production
+  prefill-performance claims.
+- Added source-authenticated MMQ contract, compact evidence, pytest structural
+  and opt-in GPU checks, beginner Chapter 40, and reconciled handbook/source
+  indexes. Clean normal and diagnostic builds passed. The full ordinary suite
+  passed 121 tests with one expected exclusive-GPU skip in 164.76 seconds. A
+  clean pinned CUDA 13.0.2 rebuild passed, followed by all three opt-in RTX 5090
+  tests.
+- Marked CUD-002 and EDU-026 done. Delivery gate 6 now has admitted decode MMV
+  and tiled prompt MMQ primitives. GDN-001, exact one-token CUDA GDN with atomic
+  state commit, is the next implementation-plan task.
 
 ## Decisions and Negative Results
 

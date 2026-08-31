@@ -18,12 +18,20 @@ struct Q8Block {
 static_assert(sizeof(Q8Block) == 36, "unexpected transient Q8 block padding");
 
 std::size_t q8_workspace_bytes(std::size_t columns) noexcept;
+std::size_t q8_prompt_workspace_bytes(std::size_t prompt_rows,
+                                      std::size_t columns) noexcept;
 
 cudaError_t launch_quant_mmv(QuantKind kind, const std::uint8_t* weights,
                              std::size_t rows, std::size_t columns,
                              const __nv_bfloat16* activation,
                              Q8Block* q8_workspace, float* output,
                              cudaStream_t stream) noexcept;
+
+cudaError_t launch_quant_mmq(QuantKind kind, const std::uint8_t* weights,
+                             std::size_t output_rows, std::size_t columns,
+                             const __nv_bfloat16* prompt,
+                             std::size_t prompt_rows, Q8Block* q8_workspace,
+                             float* output, cudaStream_t stream) noexcept;
 
 }  // namespace qw38::cuda
 

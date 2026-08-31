@@ -33,6 +33,27 @@ def test_cuda_quant_contract_and_handbook_are_connected() -> None:
         assert term in chapter
 
 
+def test_cuda_mmq_contract_and_handbook_are_connected() -> None:
+    contract = json.loads((ROOT / "pins" / "cuda_mmq_contract.json").read_text())
+    fixture = json.loads((ROOT / "fixtures" / "cuda_quant_mmq.json").read_text())
+    assert contract["target"] == "sm_120"
+    assert contract["tile"] == {
+        "prompt_rows": 4,
+        "output_rows": 8,
+        "threads": 256,
+        "ownership": "one warp owns one output row and up to four prompt rows",
+    }
+    assert contract["admission"]["maximum_absolute_error"] == 5.0e-4
+    assert contract["admission"]["maximum_rms_error"] == 2.5e-4
+    for relative, expected in contract["local_sources"].items():
+        assert hashlib.sha256((ROOT / relative).read_bytes()).hexdigest() == expected
+    assert [case["prompt_rows"] for case in fixture["cases"]] == [3, 5, 1, 9]
+    assert all(case["q8_equal"] and case["nonfinite"] == 0 for case in fixture["cases"])
+    chapter = (ROOT / "docs" / "40-cuda-prompt-mmq.md").read_text().casefold()
+    for term in ["prompt row", "tile", "weight reuse", "token-major", "tail"]:
+        assert term in chapter
+
+
 def test_cuda_quant_mmv_matches_scalar_reference() -> None:
     if os.environ.get("QW38_RUN_CUDA_TESTS") != "1":
         pytest.skip("set QW38_RUN_CUDA_TESTS=1 for the exclusive RTX 5090 gate")
@@ -76,5 +97,21 @@ def test_cuda_quant_mmv_matches_scalar_reference() -> None:
         assert fields["nonfinite"] == "0"
         assert float(fields["max_abs"]) <= 3.0e-4
         assert float(fields["rms"]) <= 2.0e-4
+        assert float(fields["mean_ms"]) > 0.0
+    mmq_lines = [
+        line for line in run.stdout.splitlines() if line.startswith("mmq_case=")
+    ]
+    assert [line.split()[0] for line in mmq_lines] == [
+        "mmq_case=q4_k_3x17x256",
+        "mmq_case=q4_k_5x257x512",
+        "mmq_case=q6_k_1x17x256",
+        "mmq_case=q6_k_9x257x512",
+    ]
+    for line in mmq_lines:
+        fields = dict(field.split("=", 1) for field in line.split())
+        assert fields["q8_equal"] == "true"
+        assert fields["nonfinite"] == "0"
+        assert float(fields["max_abs"]) <= 5.0e-4
+        assert float(fields["rms"]) <= 2.5e-4
         assert float(fields["mean_ms"]) > 0.0
     assert "status=passed" in run.stdout

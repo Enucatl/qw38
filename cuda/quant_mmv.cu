@@ -7,6 +7,7 @@ namespace {
 
 constexpr int kWarpSize = 32;
 constexpr int kThreads = 256;
+constexpr int kPromptRowsPerTile = 4;
 constexpr std::size_t kValuesPerWeightBlock = 256;
 constexpr std::size_t kQ4KBytes = 144;
 constexpr std::size_t kQ6KBytes = 210;
@@ -115,12 +116,72 @@ __global__ void quant_mmv(const std::uint8_t* weights, std::size_t rows,
   if (lane == 0) output[row] = sum;
 }
 
+template <QuantKind Kind>
+__global__ void quant_mmq(const std::uint8_t* weights, std::size_t output_rows,
+                          std::size_t columns, const Q8Block* prompt,
+                          std::size_t prompt_rows, float* output) {
+  const int warp = threadIdx.x / kWarpSize;
+  const int lane = threadIdx.x & (kWarpSize - 1);
+  const std::size_t output_row =
+      static_cast<std::size_t>(blockIdx.x) * (kThreads / kWarpSize) + warp;
+  const std::size_t prompt_start =
+      static_cast<std::size_t>(blockIdx.y) * kPromptRowsPerTile;
+  if (output_row >= output_rows) return;
+
+  constexpr std::size_t kWeightBytes =
+      Kind == QuantKind::kQ4K ? kQ4KBytes : kQ6KBytes;
+  const std::size_t q8_blocks_per_row = columns / kWarpSize;
+  const std::uint8_t* row_weights =
+      weights + output_row * (columns / kValuesPerWeightBlock) * kWeightBytes;
+  float sums[kPromptRowsPerTile] = {0.0F, 0.0F, 0.0F, 0.0F};
+  for (std::size_t column = lane; column < columns; column += kWarpSize) {
+    const std::size_t weight_block = column / kValuesPerWeightBlock;
+    const int within = static_cast<int>(column % kValuesPerWeightBlock);
+    const std::uint8_t* block = row_weights + weight_block * kWeightBytes;
+    const float weight = Kind == QuantKind::kQ4K ? decode_q4(block, within)
+                                                 : decode_q6(block, within);
+#pragma unroll
+    for (int prompt_offset = 0; prompt_offset < kPromptRowsPerTile;
+         ++prompt_offset) {
+      const std::size_t prompt_row = prompt_start + prompt_offset;
+      if (prompt_row < prompt_rows) {
+        const Q8Block& q8 =
+            prompt[prompt_row * q8_blocks_per_row + column / kWarpSize];
+        const float value =
+            q8.scale * static_cast<float>(q8.values[column % kWarpSize]);
+        sums[prompt_offset] = __fadd_rn(
+            sums[prompt_offset], __fmul_rn(weight, value));
+      }
+    }
+  }
+#pragma unroll
+  for (int prompt_offset = 0; prompt_offset < kPromptRowsPerTile;
+       ++prompt_offset) {
+    for (int offset = 16; offset > 0; offset /= 2) {
+      sums[prompt_offset] = __fadd_rn(
+          sums[prompt_offset],
+          __shfl_down_sync(0xFFFFFFFFU, sums[prompt_offset], offset,
+                           kWarpSize));
+    }
+    const std::size_t prompt_row = prompt_start + prompt_offset;
+    if (lane == 0 && prompt_row < prompt_rows) {
+      output[prompt_row * output_rows + output_row] = sums[prompt_offset];
+    }
+  }
+}
+
 }  // namespace
 
 std::size_t q8_workspace_bytes(std::size_t columns) noexcept {
   return columns % kValuesPerWeightBlock == 0
              ? (columns / kWarpSize) * sizeof(Q8Block)
              : 0;
+}
+
+std::size_t q8_prompt_workspace_bytes(std::size_t prompt_rows,
+                                      std::size_t columns) noexcept {
+  if (prompt_rows == 0 || columns % kValuesPerWeightBlock != 0) return 0;
+  return prompt_rows * (columns / kWarpSize) * sizeof(Q8Block);
 }
 
 cudaError_t launch_quant_mmv(QuantKind kind, const std::uint8_t* weights,
@@ -148,6 +209,40 @@ cudaError_t launch_quant_mmv(QuantKind kind, const std::uint8_t* weights,
   } else if (kind == QuantKind::kQ6K) {
     quant_mmv<QuantKind::kQ6K><<<row_blocks, kThreads, 0, stream>>>(
         weights, rows, columns, q8_workspace, output);
+  }
+  return cudaPeekAtLastError();
+}
+
+cudaError_t launch_quant_mmq(QuantKind kind, const std::uint8_t* weights,
+                             std::size_t output_rows, std::size_t columns,
+                             const __nv_bfloat16* prompt,
+                             std::size_t prompt_rows, Q8Block* q8_workspace,
+                             float* output, cudaStream_t stream) noexcept {
+  if (weights == nullptr || prompt == nullptr || q8_workspace == nullptr ||
+      output == nullptr || output_rows == 0 || columns == 0 ||
+      prompt_rows == 0 || columns % kValuesPerWeightBlock != 0 ||
+      (kind != QuantKind::kQ4K && kind != QuantKind::kQ6K)) {
+    return cudaErrorInvalidValue;
+  }
+  const std::size_t prompt_values = prompt_rows * columns;
+  const unsigned int quant_blocks = static_cast<unsigned int>(
+      (prompt_values + kThreads - 1) / kThreads);
+  quantize_bf16_q8<<<quant_blocks, kThreads, 0, stream>>>(
+      prompt, q8_workspace, prompt_values);
+  cudaError_t error = cudaPeekAtLastError();
+  if (error != cudaSuccess) return error;
+  const dim3 grid(
+      static_cast<unsigned int>(
+          (output_rows + (kThreads / kWarpSize) - 1) /
+          (kThreads / kWarpSize)),
+      static_cast<unsigned int>((prompt_rows + kPromptRowsPerTile - 1) /
+                                kPromptRowsPerTile));
+  if (kind == QuantKind::kQ4K) {
+    quant_mmq<QuantKind::kQ4K><<<grid, kThreads, 0, stream>>>(
+        weights, output_rows, columns, q8_workspace, prompt_rows, output);
+  } else {
+    quant_mmq<QuantKind::kQ6K><<<grid, kThreads, 0, stream>>>(
+        weights, output_rows, columns, q8_workspace, prompt_rows, output);
   }
   return cudaPeekAtLastError();
 }

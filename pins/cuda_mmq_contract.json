@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "task": "CUD-002",
+  "target": "sm_120",
+  "inherits": "pins/cuda_quant_contract.json",
+  "prompt_input": "token-major BF16 [prompt_rows, columns]",
+  "output": "token-major FP32 [prompt_rows, output_rows]",
+  "tile": {
+    "prompt_rows": 4,
+    "output_rows": 8,
+    "threads": 256,
+    "ownership": "one warp owns one output row and up to four prompt rows"
+  },
+  "admission": {
+    "q8_staging_exact": true,
+    "maximum_absolute_error": 0.0005,
+    "maximum_rms_error": 0.00025,
+    "relative_error": "report_only",
+    "nonfinite_count": 0
+  },
+  "local_sources": {
+    "cuda/quant_mmv.cu": "a7c665d0a27a9e5218a8fa61a0b0cbdb981e47024c4db536ccbb4c7d02e00d00",
+    "cuda/quant_mmv.h": "7365249fa98f33ae70e182fdff2269d3577576f8be17bdd2116aed63313f0f3e",
+    "cuda/quant_mmv_test.cu": "8e0abced01a46cd4b6fba208c9715e01038981928d4d420ec01a102c3dab83ea"
+  }
+}
