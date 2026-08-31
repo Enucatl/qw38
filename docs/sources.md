@@ -172,6 +172,15 @@ DSpark are explicitly rejected as Qwen model semantics.
   Immutable pre-CUDA gates
   and the deterministic calibration rule are frozen in
   [`pins/scalar_oracle_tolerances.json`](../pins/scalar_oracle_tolerances.json).
+- CUD-001 adapts the pinned llama.cpp revision's MIT-licensed Q8_1 activation
+  staging and Q4_K/Q6_K CUDA vector-dot technique. The consulted files and
+  revision are frozen in
+  [`pins/cuda_quant_contract.json`](../pins/cuda_quant_contract.json). Quartz
+  retains the packed formats but uses a smaller local FP32-scale Q8 scratch
+  layout, readable per-value unpacking, and warp-per-row scheduler; it does not
+  copy llama.cpp's generic type dispatch or kernel framework. The scalar/device
+  metrics and CUDA-event timing samples are frozen in
+  [`fixtures/cuda_quant_mmv.json`](../fixtures/cuda_quant_mmv.json).
 
 ## Specialization and hardware references
 

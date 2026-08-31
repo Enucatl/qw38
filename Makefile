@@ -3,7 +3,7 @@ CC ?= cc
 NVCC ?= nvcc
 CXXFLAGS := -std=c++17 -O2 -Wall -Wextra -Wpedantic -Werror -fno-exceptions -fno-rtti -ffp-contract=off
 CFLAGS := -std=c11 -O2 -Wall -Wextra -Wpedantic -Werror
-NVCCFLAGS := -std=c++17 -O2 -arch=sm_120 --expt-relaxed-constexpr
+NVCCFLAGS := -std=c++17 -O2 -arch=sm_120 --expt-relaxed-constexpr --fmad=false -Xcompiler=-Wall,-Wextra,-Werror,-fno-exceptions,-fno-rtti,-ffp-contract=off
 CPPFLAGS := -Iinclude -Isrc -Ithird_party/utf8proc
 BUILD_DIR := build
 DIAGNOSTIC_DIR := $(BUILD_DIR)/diagnostic
@@ -60,10 +60,16 @@ cuda-image:
 cuda-build: cuda-image
 	docker run --rm --gpus all --user "$$(id -u):$$(id -g)" -v "$$(pwd):/workspace" $(CUDA_IMAGE) make clean all cuda-native
 
-cuda-native: $(BUILD_DIR)/qw38-cuda-probe
+cuda-native: $(BUILD_DIR)/qw38-cuda-probe $(BUILD_DIR)/qw38-cuda-quant-test
 
 $(BUILD_DIR)/qw38-cuda-probe: cuda/device_probe.cu | $(BUILD_DIR)
 	$(NVCC) $(NVCCFLAGS) $< -o $@
+
+$(BUILD_DIR)/quant_mmv.cuda.o: cuda/quant_mmv.cu cuda/quant_mmv.h | $(BUILD_DIR)
+	$(NVCC) $(NVCCFLAGS) -Icuda -c $< -o $@
+
+$(BUILD_DIR)/qw38-cuda-quant-test: cuda/quant_mmv_test.cu $(BUILD_DIR)/quant_mmv.cuda.o $(BUILD_DIR)/quant.o $(BUILD_DIR)/status.o | $(BUILD_DIR)
+	$(NVCC) $(NVCCFLAGS) $(CPPFLAGS) -Icuda $^ -o $@
 
 clean:
 	rm -rf $(BUILD_DIR)

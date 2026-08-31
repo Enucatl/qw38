@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "task": "CUD-001",
+  "device": "NVIDIA GeForce RTX 5090",
+  "compute_capability": "12.0",
+  "toolkit": "CUDA 13.0.2",
+  "samples_per_case": 30,
+  "warmups_per_case": 3,
+  "cases": [
+    {"name": "q4_k_17x256", "max_abs": 0.000213623047, "max_rel": 0.00000287139915, "rms": 0.0000831767102, "nonfinite": 0, "q8_equal": true, "mean_ms": 0.00693546701},
+    {"name": "q4_k_257x512", "max_abs": 0.000228881836, "max_rel": 0.00000135221057, "rms": 0.000148385821, "nonfinite": 0, "q8_equal": true, "mean_ms": 0.00826026686},
+    {"name": "q6_k_17x256", "max_abs": 0.0000457763672, "max_rel": 0.0000284627913, "rms": 0.0000200204813, "nonfinite": 0, "q8_equal": true, "mean_ms": 0.00621226663},
+    {"name": "q6_k_257x512", "max_abs": 0.000198364258, "max_rel": 0.00000558879219, "rms": 0.0000588576186, "nonfinite": 0, "q8_equal": true, "mean_ms": 0.00621226663}
+  ],
+  "claim": "correctness diagnostic timing, not an optimized throughput result"
+}

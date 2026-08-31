@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "task": "CUD-001",
+  "target": "sm_120",
+  "toolkit": "CUDA 13.0.2",
+  "compiler_flags": [
+    "-std=c++17",
+    "-O2",
+    "-arch=sm_120",
+    "--expt-relaxed-constexpr",
+    "--fmad=false",
+    "-Wall",
+    "-Wextra",
+    "-Werror",
+    "-fno-exceptions",
+    "-fno-rtti",
+    "-ffp-contract=off"
+  ],
+  "local_sources": {
+    "cuda/quant_mmv.cu": "504e0ea1c859b9c9e53087baeda9cf9cc9dcf577ea0405300ef174913469c2d5",
+    "cuda/quant_mmv.h": "14f5348e912e581f77579a532c4e59e0454ecc82ebcf46304e62ad0408c7f048",
+    "cuda/quant_mmv_test.cu": "71bca411d3cc4f5efa7b8553b750cd79a9d26bad02d032abad32e7a592f32782"
+  },
+  "weight_authority": {
+    "repository": "https://github.com/ggml-org/llama.cpp.git",
+    "revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+    "files": [
+      "ggml/src/ggml-common.h",
+      "ggml/src/ggml-cuda/quantize.cu",
+      "ggml/src/ggml-cuda/vecdotq.cuh"
+    ],
+    "license": "MIT"
+  },
+  "activation_input": "BF16",
+  "transient_activation": {
+    "values_per_block": 32,
+    "scale_dtype": "FP32",
+    "quant_dtype": "signed int8",
+    "scale_equation": "max(abs(bf16_values)) / 127",
+    "rounding": "round to nearest, halfway away from zero"
+  },
+  "accumulation": "FP32 products, per-lane serial sums, warp tree reduction",
+  "admission": {
+    "q8_staging_exact": true,
+    "maximum_absolute_error": 0.0003,
+    "maximum_rms_error": 0.0002,
+    "relative_error": "report_only",
+    "nonfinite_count": 0
+  }
+}

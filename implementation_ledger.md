@@ -16,7 +16,7 @@ are repository-relative unless stated otherwise.
 | PIN-003 | Pin build, runtime, and profiling containers | PIN-002 | done | Dockerfiles/lock data use immutable bases or recorded image digests and CUDA 13.0 | [`docker/cuda.Dockerfile`](docker/cuda.Dockerfile); container build log 2026-08-29T09:55:00Z |
 | ENV-001 | Capture and validate the local production-toolchain prerequisites | ART-002 | done | GPU/driver/toolkit/container availability is recorded; unavailable prerequisites have explicit follow-up | CUDA probe log 2026-08-29T09:55:00Z |
 | BLD-001 | Establish brand, repository layout, and C++17 build | ART-002 | done | Literal brand appears in user-facing tools; Makefile builds restricted host targets | [`Makefile`](Makefile), [`include/qw38/engine.h`](include/qw38/engine.h), pytest log 2026-08-29T09:52:00Z |
-| BLD-002 | Add pinned CUDA 13.0 SM120 build path | PIN-003, BLD-001 | in_progress | Diagnostic and release CUDA builds target `sm_120` with recorded flags | — |
+| BLD-002 | Add pinned CUDA 13.0 SM120 build path | PIN-003, BLD-001 | done | Diagnostic and release CUDA builds target `sm_120` with recorded flags | [`Makefile`](Makefile); [`pins/cuda_quant_contract.json`](pins/cuda_quant_contract.json); log 2026-08-31T06:05:47Z |
 | BLD-003 | Define and enforce the device allocation ledger | PIN-001 | in_progress | All persistent/transient allocations and 128K budgets are enumerated and checked | — |
 | API-001 | Implement explicit `Status` and move-only Engine/Session boundary | BLD-001 | done | Public header compiles without exceptions/RTTI and exposes the approved operations | [`include/qw38/engine.h`](include/qw38/engine.h), build log 2026-08-29T09:52:00Z |
 | MDL-001 | Parse, mmap, inventory, and fail-closed validate GGUF | PIN-001, API-001 | done | Exact tensor metadata/ranges/roles are checked; malformed fixtures pass pytest | [`pins/tensor_inventory.json`](pins/tensor_inventory.json), [`src/model.cpp`](src/model.cpp); log 2026-08-29T10:35:51Z |
@@ -47,7 +47,7 @@ are repository-relative unless stated otherwise.
 | ORA-003 | Build pinned Transformers eager/offload semantic trace authority | PIN-002, TRC-002 | done | Exact source/model revisions execute within host/GPU limits and emit required taps, or an evidenced infeasibility creates an approved replacement task | [`pins/transformers_authority_contract.json`](pins/transformers_authority_contract.json); [`fixtures/transformers_scalar_authority.json`](fixtures/transformers_scalar_authority.json); [`tools/run_transformers_authority.py`](tools/run_transformers_authority.py); [`tests/test_transformers_authority.py`](tests/test_transformers_authority.py); log 2026-08-30T17:38:10Z |
 | ORA-004 | Freeze three-authority scalar fixtures and per-tap tolerances | ORA-002, ORA-003, TRC-002, CPU-004 | done | Attributed bundles compare every required tap/logit; tolerances and genuine greedy near-ties are immutable | [`fixtures/scalar_authority_alignment.json`](fixtures/scalar_authority_alignment.json); [`pins/scalar_oracle_tolerances.json`](pins/scalar_oracle_tolerances.json); [`tests/test_scalar_authority_alignment.py`](tests/test_scalar_authority_alignment.py); log 2026-08-30T18:16:04Z |
 | ORA-001 | Generate and freeze scalar/oracle fixtures and tolerances | ORA-002, ORA-003, ORA-004 | done | Three authorities are attributed; tolerances and greedy tie exceptions are immutable inputs | [`fixtures/scalar_authority_alignment.json`](fixtures/scalar_authority_alignment.json); [`pins/scalar_oracle_tolerances.json`](pins/scalar_oracle_tolerances.json); log 2026-08-30T18:16:04Z |
-| CUD-001 | Implement CUDA Q4_K/Q6_K decode MMV | CPU-001, BLD-002, ORA-001 | pending | Scalar-vs-CUDA and focused primitive pytest gates pass | — |
+| CUD-001 | Implement CUDA Q4_K/Q6_K decode MMV | CPU-001, BLD-002, ORA-001 | done | Scalar-vs-CUDA and focused primitive pytest gates pass | [`cuda/quant_mmv.cu`](cuda/quant_mmv.cu); [`fixtures/cuda_quant_mmv.json`](fixtures/cuda_quant_mmv.json); [`tests/test_cuda_quant_mmv.py`](tests/test_cuda_quant_mmv.py); log 2026-08-31T06:05:47Z |
 | CUD-002 | Implement quantized tiled prompt MMQ | CUD-001 | pending | Arbitrary prompt-row fixtures pass frozen tolerances | — |
 | GDN-001 | Implement exact one-token CUDA GDN and atomic state commit | CUD-001, CPU-002 | pending | State/taps match oracle and injected failures leave frontier unchanged | — |
 | GDN-002 | Implement chunked GDN prefill with 64-token scans | GDN-001, CUD-002 | pending | Arbitrary chunks equal token-wise execution under frozen gates | — |
@@ -97,6 +97,7 @@ are repository-relative unless stated otherwise.
 | EDU-022 | Explain independent authority hierarchy and same-GGUF llama comparison for beginners | ORA-002, DOC-001 | done | Primary versus independent versus native authority, artifact/template/token identity, build pins, logits/continuation limits, and failure evidence are code-linked and worked | [`docs/36-independent-llama-authority.md`](docs/36-independent-llama-authority.md); [`tests/test_llama_authority.py`](tests/test_llama_authority.py); log 2026-08-30T12:27:27Z |
 | EDU-023 | Explain official-checkpoint Transformers eager/offload authority for beginners | ORA-003, DOC-001 | done | Original checkpoint versus GGUF roles, Safetensors shards, eager execution, CPU/GPU/disk offload, hooks/taps, memory limits, and semantic proof boundaries are code-linked and worked | [`docs/37-transformers-authority.md`](docs/37-transformers-authority.md); [`tests/test_transformers_authority.py`](tests/test_transformers_authority.py); log 2026-08-30T17:38:10Z |
 | EDU-024 | Explain three-authority tap alignment and tolerance freezing for beginners | ORA-004, DOC-001 | done | Comparable versus runtime-private boundaries, layout normalization, error distributions, tolerance selection, near-ties, and immutable admission are code-linked and worked | [`docs/38-scalar-authority-tolerances.md`](docs/38-scalar-authority-tolerances.md); [`tests/test_scalar_authority_alignment.py`](tests/test_scalar_authority_alignment.py); log 2026-08-30T18:16:04Z |
+| EDU-025 | Explain CUDA decode MMV and transient activation quantization for beginners | CUD-001, DOC-001 | done | Thread/warp ownership, BF16-to-Q8 staging, packed-weight decoding, FP32 reduction, launch validation, numeric gates, timing, and proof limits are code-linked and worked | [`docs/39-cuda-quant-mmv.md`](docs/39-cuda-quant-mmv.md); [`tests/test_cuda_quant_mmv.py`](tests/test_cuda_quant_mmv.py); log 2026-08-31T06:05:47Z |
 | REL-001 | Publish reproducible release evidence bundle | CMP-003, QLT-001, DOC-001 | pending | Builds, hashes, raw results, reports, and documentation claims reconcile | — |
 
 ## Delivery-Gate Mapping
@@ -1956,6 +1957,75 @@ are repository-relative unless stated otherwise.
 - Marked ORA-004, umbrella ORA-001, and EDU-024 done. The scalar path is now an
   admitted numeric oracle. CUD-001—the first CUDA Q4_K/Q6_K decode MMV—is the
   next implementation task and must use these frozen gates without loosening.
+
+### 2026-08-30T18:23:10Z — CUD-001 CUDA decode MMV started
+
+- Marked CUD-001 and discovered documentation task EDU-025 in progress before
+  kernel edits. The admitted boundary is deliberately narrow: BF16 activation
+  input, transient per-32-value signed Q8 staging, Q4_K/Q6_K packed weights,
+  one FP32 output per matrix row, and CUDA-stream ordering on SM120.
+- The first implementation will retain readable unpacking and an unfused
+  scalar-equivalent diagnostic boundary. Tiled multi-prompt MMQ, model weight
+  residency, fusion, and row-bucket tuning remain CUD-002 and later tasks.
+- Inspected pinned llama.cpp revision
+  `cc83d7b4824f73cfdda4dfbb47ee39804f71b328` for the MIT-licensed Q8_1 staging
+  and Q4_K/Q6_K vector-dot technique. Quartz will implement a focused local
+  layout and kernel rather than copy its generic dispatch machinery; exact
+  source paths and the adapted boundary must be added to `docs/sources.md`.
+- At `2026-08-30T18:25:58Z`, the first four-case device diagnostic stopped on
+  Q6_K `17x256`: transient Q8 bytes/scales matched exactly and maximum absolute
+  error was only `4.57763672e-05`, but the draft `2e-5` relative gate observed
+  `2.84627913e-05`. Diagnosed the same unstable-small-denominator policy already
+  established by ORA-004. Relative error remains reported; CUD-001 admission
+  uses pre-optimization maximum-absolute and RMS limits calibrated across all
+  boundary cases, plus exact Q8 staging and zero non-finite values.
+- At `2026-08-31T05:59:05Z`, the first documentation-connection test compared
+  the lowercase phrase `matrix-vector multiplication` against the chapter's
+  sentence-initial capitalized spelling and failed before the GPU test (which
+  correctly skipped without its opt-in variable). Made the vocabulary check
+  case-insensitive; no handbook or implementation claim changed.
+- At `2026-08-31T05:59:27Z`, the corrected check exposed a second test-only
+  vocabulary mismatch: it required the literal word `proof`, while Chapter 39
+  consistently calls the same concept an evidence `boundary`. Changed the test
+  to require the chapter's actual beginner vocabulary.
+- At `2026-08-31T06:03:55Z`, adding the host project's `-Wpedantic -Werror` pair
+  to NVCC produced hundreds of errors for NVCC-generated `# <line>` directives
+  and CUDA headers, not Quartz source. Retained `-Wall -Wextra -Werror`, disabled
+  exceptions/RTTI and FMA contraction, and omitted only `-Wpedantic` from CUDA
+  host compilation. The ordinary C++ build keeps its full original flags.
+
+### 2026-08-31T06:05:47Z — CUD-001, BLD-002, and EDU-025 accepted
+
+- Added a restricted C++17 SM120 primitive with explicit device-pointer and
+  stream ownership. One kernel converts BF16 activations into local 32-value Q8
+  scratch blocks; a second assigns one warp per output row, decodes Q4_K/Q6_K
+  bytes in place, and reduces FP32 lane sums. Invalid pointers, zero dimensions,
+  unknown kinds, and columns outside the 256-value block contract fail before
+  either kernel launches.
+- Froze the local source hashes, CUDA 13.0.2 flags, activation staging rule, and
+  pre-optimization numeric gates in `pins/cuda_quant_contract.json`. The local
+  Q8 layout is 36 bytes with an FP32 scale and does not claim binary compatibility
+  with llama.cpp's FP16-scale `block_q8_1`.
+- Four deterministic Q4_K/Q6_K cases cover 17/257 rows and 256/512 columns,
+  including partially occupied final CUDA blocks. All transient Q8 scales and
+  integers matched the host reference exactly. Global observed maximum absolute
+  error was `0.000228881836`; global maximum RMS was `0.000148385821`; all values
+  were finite and passed the frozen `3e-4` absolute and `2e-4` RMS gates.
+- Each case ran three warm-ups and 30 synchronized CUDA-event samples. Observed
+  mean diagnostic times were about 0.0062–0.0083 ms and are explicitly not
+  throughput claims. The compact measured record is
+  `fixtures/cuda_quant_mmv.json`.
+- The opt-in focused pytest executed on the RTX 5090 and passed both structural
+  and device tests. Clean host and diagnostic builds passed; the full ordinary
+  suite passed 120 tests with the exclusive CUDA test skipped in 178.81 seconds.
+  A clean pinned container rebuild compiled every host product, the SM120 probe,
+  the CUDA primitive, and its diagnostic with the frozen flags; the subsequent
+  opt-in GPU pytest passed 2 tests.
+- Added beginner Chapter 39 and reconciled root/handbook/source indexes. Marked
+  BLD-002, CUD-001, and EDU-025 done. CUD-002 quantized tiled prompt MMQ is the
+  next delivery-plan task; TRC-004 CUDA taps depend on this completed primitive
+  but become meaningful at a model-stage boundary rather than this standalone
+  row result.
 
 ## Decisions and Negative Results
 

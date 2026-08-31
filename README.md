@@ -61,6 +61,9 @@ comparison does and does not prove.
 The [scalar tolerance chapter](docs/38-scalar-authority-tolerances.md) aligns all
 three authorities, explains exact layout normalization and numeric error
 metrics, and freezes the immutable scalar gates CUDA implementations must pass.
+The [CUDA MMV chapter](docs/39-cuda-quant-mmv.md) then explains the first SM120
+kernel, transient BF16-to-Q8 staging, warp-per-row ownership, and the measured
+scalar-versus-device admission boundary.
 
 ## Build
 
