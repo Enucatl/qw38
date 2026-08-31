@@ -73,6 +73,9 @@ and frontier-last publication.
 The [chunked CUDA GDN chapter](docs/42-cuda-gdn-chunks.md) carries that state
 through arbitrary prompt chunks using continuous 64-token windows and proves
 byte-exact equivalence with repeated one-token GPU execution.
+The [CUDA attention decode chapter](docs/43-cuda-attention-decode.md) explains
+grouped query-to-KV sharing, partial RoPE, BF16 cache rows, causal reads, stable
+softmax, and candidate-row commit on the GPU.
 
 ## Build
 

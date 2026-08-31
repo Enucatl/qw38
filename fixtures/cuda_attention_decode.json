@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "task": "ATN-001",
+  "device": "NVIDIA GeForce RTX 5090",
+  "compute_capability": "12.0",
+  "toolkit": "CUDA 13.0.2",
+  "samples_per_case": 30,
+  "warmups_per_case": 3,
+  "cases": [
+    {"name": "layer_3", "layer": 3, "query_heads": 6, "kv_heads": 2, "head_width": 8, "rotary_width": 4, "max_abs": 0.0000000037252903, "rms": 0.00000000035269368, "oracle_max_abs": 0.0000179708004, "oracle_rms": 0.00000924939104, "oracle_cosine": 0.999999999865, "nonfinite": 0, "candidate_exact": true, "prepare_atomic": true, "commit_exact": true, "mean_ms": 0.00885759946},
+    {"name": "layer_7", "layer": 7, "query_heads": 6, "kv_heads": 2, "head_width": 8, "rotary_width": 4, "max_abs": 0.000000000465661287, "rms": 0.000000000044000855, "oracle_max_abs": 0.0000176876783, "oracle_rms": 0.00000956692838, "oracle_cosine": 0.999999995312, "nonfinite": 0, "candidate_exact": true, "prepare_atomic": true, "commit_exact": true, "mean_ms": 0.00826026686},
+    {"name": "layer_63", "layer": 63, "query_heads": 6, "kv_heads": 2, "head_width": 8, "rotary_width": 4, "max_abs": 0.0000000037252903, "rms": 0.00000000035200684, "oracle_max_abs": 0.00000473484397, "oracle_rms": 0.00000201042621, "oracle_cosine": 0.999999999314, "nonfinite": 0, "candidate_exact": true, "prepare_atomic": true, "commit_exact": true, "mean_ms": 0.00826026686},
+    {"name": "production_layer_3", "layer": 3, "query_heads": 24, "kv_heads": 4, "head_width": 256, "rotary_width": 64, "max_abs": 0.00000011920929, "rms": 0.00000000715209136, "oracle_max_abs": 0.000205144286, "oracle_rms": 0.0000172939599, "oracle_cosine": 0.999999981848, "nonfinite": 0, "candidate_exact": true, "prepare_atomic": true, "commit_exact": true, "mean_ms": 0.0327573344}
+  ],
+  "claim": "post-projection single-token attention decode core correctness timing at four cached positions, not projection, long-context, or full-layer throughput"
+}

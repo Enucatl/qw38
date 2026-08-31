@@ -60,7 +60,7 @@ cuda-image:
 cuda-build: cuda-image
 	docker run --rm --gpus all --user "$$(id -u):$$(id -g)" -v "$$(pwd):/workspace" $(CUDA_IMAGE) make clean all cuda-native
 
-cuda-native: $(BUILD_DIR)/qw38-cuda-probe $(BUILD_DIR)/qw38-cuda-quant-test $(BUILD_DIR)/qw38-cuda-gdn-test $(BUILD_DIR)/qw38-cuda-gdn-chunk-test
+cuda-native: $(BUILD_DIR)/qw38-cuda-probe $(BUILD_DIR)/qw38-cuda-quant-test $(BUILD_DIR)/qw38-cuda-gdn-test $(BUILD_DIR)/qw38-cuda-gdn-chunk-test $(BUILD_DIR)/qw38-cuda-attention-test
 
 $(BUILD_DIR)/qw38-cuda-probe: cuda/device_probe.cu | $(BUILD_DIR)
 	$(NVCC) $(NVCCFLAGS) $< -o $@
@@ -78,6 +78,12 @@ $(BUILD_DIR)/qw38-cuda-gdn-test: cuda/gdn_step_test.cu $(BUILD_DIR)/gdn_step.cud
 	$(NVCC) $(NVCCFLAGS) $(CPPFLAGS) -Icuda $^ -o $@
 
 $(BUILD_DIR)/qw38-cuda-gdn-chunk-test: cuda/gdn_chunk_test.cu $(BUILD_DIR)/gdn_step.cuda.o $(BUILD_DIR)/gdn.o $(BUILD_DIR)/status.o | $(BUILD_DIR)
+	$(NVCC) $(NVCCFLAGS) $(CPPFLAGS) -Icuda $^ -o $@
+
+$(BUILD_DIR)/attention_decode.cuda.o: cuda/attention_decode.cu cuda/attention_decode.h | $(BUILD_DIR)
+	$(NVCC) $(NVCCFLAGS) -Icuda -c $< -o $@
+
+$(BUILD_DIR)/qw38-cuda-attention-test: cuda/attention_decode_test.cu $(BUILD_DIR)/attention_decode.cuda.o $(BUILD_DIR)/attention.o $(BUILD_DIR)/status.o | $(BUILD_DIR)
 	$(NVCC) $(NVCCFLAGS) $(CPPFLAGS) -Icuda $^ -o $@
 
 clean:

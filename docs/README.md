@@ -67,7 +67,8 @@ for language and host portability decisions.
 40. [Tiled CUDA multiplication for prompt rows](40-cuda-prompt-mmq.md): prompt matrices, token-major output, two-dimensional tiles, packed-weight reuse, tails, and scalar/device gates.
 41. [One CUDA GDN step and atomic state staging](41-cuda-gdn-step.md): production recurrence, causal convolution, candidate state, cancellation, commit, and frontier publication.
 42. [Chunked CUDA GDN prefill](42-cuda-gdn-chunks.md): token-major chunks, strict recurrence order, 64-token windows, candidate continuity, cancellation, and token-wise equivalence.
-43. [Source and evidence ledger](sources.md).
+43. [CUDA grouped-query attention decode](43-cuda-attention-decode.md): heads and KV sharing, normalization, partial RoPE, BF16 cache rows, causal stable softmax, candidate commit, and frozen numeric gates.
+44. [Source and evidence ledger](sources.md).
 
 Claims use four labels: **Measured** (this exact artifact and hardware),
 **External** (a linked source), **Estimated** (reproducible arithmetic), and

@@ -51,7 +51,7 @@ are repository-relative unless stated otherwise.
 | CUD-002 | Implement quantized tiled prompt MMQ | CUD-001 | done | Arbitrary prompt-row fixtures pass frozen tolerances | [`cuda/quant_mmv.cu`](cuda/quant_mmv.cu); [`fixtures/cuda_quant_mmq.json`](fixtures/cuda_quant_mmq.json); [`tests/test_cuda_quant_mmv.py`](tests/test_cuda_quant_mmv.py); log 2026-08-31T06:16:39Z |
 | GDN-001 | Implement exact one-token CUDA GDN and atomic state commit | CUD-001, CPU-002 | done | State/taps match oracle and injected failures leave frontier unchanged | [`cuda/gdn_step.cu`](cuda/gdn_step.cu); [`fixtures/cuda_gdn_step.json`](fixtures/cuda_gdn_step.json); [`tests/test_cuda_gdn.py`](tests/test_cuda_gdn.py); log 2026-08-31T06:29:12Z |
 | GDN-002 | Implement chunked GDN prefill with 64-token scans | GDN-001, CUD-002 | done | Arbitrary chunks equal token-wise execution under frozen gates | [`cuda/gdn_step.cu`](cuda/gdn_step.cu); [`fixtures/cuda_gdn_chunk.json`](fixtures/cuda_gdn_chunk.json); [`tests/test_cuda_gdn_chunk.py`](tests/test_cuda_gdn_chunk.py); log 2026-08-31T06:42:29Z |
-| ATN-001 | Implement grouped-query attention and partial RoPE | CUD-001, CPU-003 | pending | Decode, causality, KV grouping, and layers 3/7/63 pass | — |
+| ATN-001 | Implement grouped-query attention and partial RoPE | CUD-001, CPU-003 | done | Decode, causality, KV grouping, and layers 3/7/63 pass | [`cuda/attention_decode.cu`](cuda/attention_decode.cu); [`fixtures/cuda_attention_decode.json`](fixtures/cuda_attention_decode.json); [`tests/test_cuda_attention.py`](tests/test_cuda_attention.py); log 2026-08-31T06:57:49Z |
 | ATN-002 | Implement memory-bounded causal attention prefill | ATN-001, CUD-002 | pending | Chunked prompt fixtures and 131,072 capacity boundary pass | — |
 | SCH-001 | Implement hybrid 64-layer CUDA scheduler and FP32 logits | GDN-002, ATN-002 | pending | Full traces/logits and greedy continuations meet frozen gates | — |
 | SES-001 | Implement exact common-prefix sync/reuse | SCH-001 | pending | Reuse and full replay produce the same committed state and logits | — |
@@ -101,6 +101,7 @@ are repository-relative unless stated otherwise.
 | EDU-026 | Explain tiled CUDA prompt MMQ for beginners | CUD-002, DOC-001 | done | Prompt rows, output layout, two-dimensional tiles, weight reuse, tail handling, scalar equivalence, numeric gates, timing, and proof limits are code-linked and worked | [`docs/40-cuda-prompt-mmq.md`](docs/40-cuda-prompt-mmq.md); [`tests/test_cuda_quant_mmv.py`](tests/test_cuda_quant_mmv.py); log 2026-08-31T06:16:39Z |
 | EDU-027 | Explain one-token CUDA GDN staging and atomic commit for beginners | GDN-001, DOC-001 | done | Convolution candidate state, normalized head reuse, recurrent mutation order, prepare/commit ownership, failure injection, numeric gates, timing, and proof limits are code-linked and worked | [`docs/41-cuda-gdn-step.md`](docs/41-cuda-gdn-step.md); [`tests/test_cuda_gdn.py`](tests/test_cuda_gdn.py); log 2026-08-31T06:29:12Z |
 | EDU-028 | Explain chunked CUDA GDN prefill and 64-token windows for beginners | GDN-002, DOC-001 | done | Prefill chunks, strict recurrence order, internal windows, candidate continuity, output layout, chunk-vs-token equivalence, cancellation, timing, and proof limits are code-linked and worked | [`docs/42-cuda-gdn-chunks.md`](docs/42-cuda-gdn-chunks.md); [`tests/test_cuda_gdn_chunk.py`](tests/test_cuda_gdn_chunk.py); log 2026-08-31T06:42:29Z |
+| EDU-029 | Explain CUDA grouped-query decode attention and partial RoPE for beginners | ATN-001, DOC-001 | done | Query/KV head sharing, normalization, partial RoPE, two-byte KV rows, causal reads, stable softmax, candidate/commit ownership, timing, numeric gates, and proof limits are code-linked and worked | [`docs/43-cuda-attention-decode.md`](docs/43-cuda-attention-decode.md); [`tests/test_cuda_attention.py`](tests/test_cuda_attention.py); log 2026-08-31T06:57:49Z |
 | REL-001 | Publish reproducible release evidence bundle | CMP-003, QLT-001, DOC-001 | pending | Builds, hashes, raw results, reports, and documentation claims reconcile | — |
 
 ## Delivery-Gate Mapping
@@ -2168,6 +2169,65 @@ are repository-relative unless stated otherwise.
   combined explicit quantization/GDN suite passed all seven tests.
 - Marked GDN-002 and EDU-028 done. ATN-001, grouped-query CUDA attention with
   partial RoPE and focused layers 3, 7, and 63, is the next plan task.
+
+### 2026-08-31T06:45:22Z — ATN-001 CUDA decode attention started
+
+- Marked ATN-001 and discovered documentation task EDU-029 in progress before
+  CUDA source edits. The minimal boundary consumes already projected FP32 Q/K/V
+  and query gates, performs per-head normalization and first-64-lane RoPE, and
+  maps each group of six production query heads to one KV head.
+- The production cache must use two-byte BF16 rows. Prepare will stage only the
+  current candidate K/V row, read committed history only through the declared
+  position, and leave the committed frontier unchanged. Commit publishes the
+  candidate row before advancing the frontier; cancellation discards it.
+- Admission will cover the frozen semantic layers 3, 7, and 63, future-row
+  sentinel causality, grouped-head boundaries, partial-RoPE lanes, scalar/device
+  metrics, malformed inputs, and synchronized RTX 5090 timings. ATN-002 retains
+  arbitrary causal prefill and the 131,072-token capacity boundary.
+
+### 2026-08-31T06:51:07Z — ATN-001 two-byte KV tolerance diagnosis
+
+- The first native device run passed CUDA-versus-BF16-aware reference metrics,
+  candidate isolation, exact BF16 row conversion, commit order, and all finite
+  checks. Adding a comparison with CPU-003's all-FP32 synthetic cache then failed
+  its `3e-6` absolute/`1e-6` RMS transcription limits: layer 3 measured about
+  `1.80e-5` absolute and `9.25e-6` RMS after the required BF16 key row rounding.
+- This is a real storage-policy difference, not a CUDA arithmetic regression.
+  V1 explicitly requires two-byte KV storage, while CPU-003's tight fixture
+  verifies a scalar equation with FP32 cache rows. No CPU-003 tolerance is being
+  changed. Device admission will additionally apply ORA-004's already-frozen
+  actual-model `layer.3.attention.context` boundary (`0.051` absolute, `0.0016`
+  RMS, `0.999424` cosine), which is stricter than the corresponding layer 7 and
+  63 context gates. The failed all-FP32 synthetic admission remains recorded.
+
+### 2026-08-31T06:57:49Z — ATN-001 CUDA decode attention admitted
+
+- Added the post-projection single-token CUDA attention boundary with direct
+  per-head RMSNorm scales, partial first-64-lane RoPE, 24-to-4 grouped-query
+  head mapping, causal scaled scores, stable FP32 softmax, query output gating,
+  and BF16 K/V cache rows.
+- Prepare writes a distinct candidate row and leaves every committed cache byte
+  plus the frontier unchanged. Commit replaces only the declared position's K/V
+  bytes, synchronizes, and publishes the new frontier last. A future committed
+  row contains large sentinels and is excluded by the causal position bound.
+- Layers 3, 7, and 63 passed the inspectable fixture, and the exact production
+  `24 × 4 × 256` shape passed. The production case measured `1.1920929e-7`
+  maximum error and `7.15209136e-9` RMS against the BF16-aware reference. Its
+  all-FP32 scalar comparison measured `2.05144286e-4` maximum error,
+  `1.72939599e-5` RMS, and `0.999999981848` cosine, inside the frozen ORA-004
+  layer-3 context gate.
+- Three warm-ups and 30 synchronized CUDA-event samples averaged about
+  `0.0328 ms` for the production-shape four-row attention core. This excludes
+  learned projections, output projection, residual/FFN work, graph launch, and
+  long-context traffic.
+- Added the source-authenticated contract, retained device fixture, ordinary and
+  opt-in pytest gates, beginner Chapter 43, and source/index reconciliation.
+  Clean normal/diagnostic builds passed; the complete suite passed 124 tests
+  with four expected exclusive-GPU skips in 164.38 seconds. A clean pinned CUDA
+  rebuild compiled every product, and the combined explicit primitive suite
+  passed all nine tests.
+- Marked ATN-001 and EDU-029 done. ATN-002, arbitrary memory-bounded causal
+  attention prefill and the 131,072-token capacity boundary, is the next task.
 
 ## Decisions and Negative Results
 

@@ -201,6 +201,12 @@ DSpark are explicitly rejected as Qwen model semantics.
   [`pins/cuda_gdn_chunk_contract.json`](../pins/cuda_gdn_chunk_contract.json),
   with boundary and production-shape measurements retained in
   [`fixtures/cuda_gdn_chunk.json`](../fixtures/cuda_gdn_chunk.json).
+- ATN-001 implements the attention ordering already pinned from the official
+  Transformers Qwen3.5 source for CPU-003. The CUDA-specific two-byte cache,
+  candidate-row protocol, frozen ORA-004 gate, and current source identities are
+  retained in [`pins/cuda_attention_contract.json`](../pins/cuda_attention_contract.json).
+  Layers 3/7/63 and production-shape device results are retained in
+  [`fixtures/cuda_attention_decode.json`](../fixtures/cuda_attention_decode.json).
 
 ## Specialization and hardware references
 
