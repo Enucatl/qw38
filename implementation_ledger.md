@@ -52,7 +52,7 @@ are repository-relative unless stated otherwise.
 | GDN-001 | Implement exact one-token CUDA GDN and atomic state commit | CUD-001, CPU-002 | done | State/taps match oracle and injected failures leave frontier unchanged | [`cuda/gdn_step.cu`](cuda/gdn_step.cu); [`fixtures/cuda_gdn_step.json`](fixtures/cuda_gdn_step.json); [`tests/test_cuda_gdn.py`](tests/test_cuda_gdn.py); log 2026-08-31T06:29:12Z |
 | GDN-002 | Implement chunked GDN prefill with 64-token scans | GDN-001, CUD-002 | done | Arbitrary chunks equal token-wise execution under frozen gates | [`cuda/gdn_step.cu`](cuda/gdn_step.cu); [`fixtures/cuda_gdn_chunk.json`](fixtures/cuda_gdn_chunk.json); [`tests/test_cuda_gdn_chunk.py`](tests/test_cuda_gdn_chunk.py); log 2026-08-31T06:42:29Z |
 | ATN-001 | Implement grouped-query attention and partial RoPE | CUD-001, CPU-003 | done | Decode, causality, KV grouping, and layers 3/7/63 pass | [`cuda/attention_decode.cu`](cuda/attention_decode.cu); [`fixtures/cuda_attention_decode.json`](fixtures/cuda_attention_decode.json); [`tests/test_cuda_attention.py`](tests/test_cuda_attention.py); log 2026-08-31T06:57:49Z |
-| ATN-002 | Implement memory-bounded causal attention prefill | ATN-001, CUD-002 | pending | Chunked prompt fixtures and 131,072 capacity boundary pass | — |
+| ATN-002 | Implement memory-bounded causal attention prefill | ATN-001, CUD-002 | done | Chunked prompt fixtures and 131,072 capacity boundary pass | [`cuda/attention_decode.cu`](cuda/attention_decode.cu); [`fixtures/cuda_attention_prefill.json`](fixtures/cuda_attention_prefill.json); [`tests/test_cuda_attention_prefill.py`](tests/test_cuda_attention_prefill.py); log 2026-08-31T09:33:05Z |
 | SCH-001 | Implement hybrid 64-layer CUDA scheduler and FP32 logits | GDN-002, ATN-002 | pending | Full traces/logits and greedy continuations meet frozen gates | — |
 | SES-001 | Implement exact common-prefix sync/reuse | SCH-001 | pending | Reuse and full replay produce the same committed state and logits | — |
 | SES-002 | Implement atomic eval/sample/commit semantics | SCH-001 | pending | Sampling is separate; cancellation/error cannot partially commit state | — |
@@ -102,6 +102,7 @@ are repository-relative unless stated otherwise.
 | EDU-027 | Explain one-token CUDA GDN staging and atomic commit for beginners | GDN-001, DOC-001 | done | Convolution candidate state, normalized head reuse, recurrent mutation order, prepare/commit ownership, failure injection, numeric gates, timing, and proof limits are code-linked and worked | [`docs/41-cuda-gdn-step.md`](docs/41-cuda-gdn-step.md); [`tests/test_cuda_gdn.py`](tests/test_cuda_gdn.py); log 2026-08-31T06:29:12Z |
 | EDU-028 | Explain chunked CUDA GDN prefill and 64-token windows for beginners | GDN-002, DOC-001 | done | Prefill chunks, strict recurrence order, internal windows, candidate continuity, output layout, chunk-vs-token equivalence, cancellation, timing, and proof limits are code-linked and worked | [`docs/42-cuda-gdn-chunks.md`](docs/42-cuda-gdn-chunks.md); [`tests/test_cuda_gdn_chunk.py`](tests/test_cuda_gdn_chunk.py); log 2026-08-31T06:42:29Z |
 | EDU-029 | Explain CUDA grouped-query decode attention and partial RoPE for beginners | ATN-001, DOC-001 | done | Query/KV head sharing, normalization, partial RoPE, two-byte KV rows, causal reads, stable softmax, candidate/commit ownership, timing, numeric gates, and proof limits are code-linked and worked | [`docs/43-cuda-attention-decode.md`](docs/43-cuda-attention-decode.md); [`tests/test_cuda_attention.py`](tests/test_cuda_attention.py); log 2026-08-31T06:57:49Z |
+| EDU-030 | Explain memory-bounded CUDA attention prefill and the 128K boundary for beginners | ATN-002, DOC-001 | done | Chunk causality, candidate-row continuity, linear score workspace, whole-chunk commit/cancellation, token-wise equivalence, 131,072 sizing/execution, timing, and proof limits are code-linked and worked | [`docs/44-cuda-attention-prefill.md`](docs/44-cuda-attention-prefill.md); [`tests/test_cuda_attention_prefill.py`](tests/test_cuda_attention_prefill.py); log 2026-08-31T09:33:05Z |
 | REL-001 | Publish reproducible release evidence bundle | CMP-003, QLT-001, DOC-001 | pending | Builds, hashes, raw results, reports, and documentation claims reconcile | — |
 
 ## Delivery-Gate Mapping
@@ -2228,6 +2229,55 @@ are repository-relative unless stated otherwise.
   passed all nine tests.
 - Marked ATN-001 and EDU-029 done. ATN-002, arbitrary memory-bounded causal
   attention prefill and the 131,072-token capacity boundary, is the next task.
+
+### 2026-08-31T09:17:26Z — ATN-002 causal attention prefill started
+
+- Marked ATN-002 and discovered documentation task EDU-030 in progress before
+  CUDA edits. The chunk API will accept token-major projected Q/K/V/gates,
+  preserve earlier candidate K/V rows across the chunk, and emit token-major
+  contexts in strict causal order.
+- The implementation will reuse one current-token normalization workspace and
+  one score slab sized `query_heads × (start_position + token_count)`. It will
+  never allocate the quadratic `[chunk_tokens, context_tokens]` score matrix.
+  This correctness-first launch sequence is memory-bounded but not yet a fused
+  or tuned attention-prefill claim.
+- Whole-chunk prepare must leave committed cache/frontier unchanged; later chunk
+  tokens read prior candidate rows, and commit copies all candidate rows before
+  publishing the final frontier. Admission includes chunk-versus-repeated-token
+  equality, positions crossing arbitrary chunk boundaries, overflow rejection,
+  and a real production-shape execution at position 131,071 with a 131,072-row
+  BF16 cache. MEM-001 remains separate because it measures the complete model,
+  graphs, allocator overhead, and required free reserve.
+
+### 2026-08-31T09:33:05Z — ATN-002 causal attention prefill admitted
+
+- Generalized the single-token boundary into arbitrary token-major chunks.
+  Tokens launch in strict order, reuse current-token normalization buffers and
+  one `query_heads × maximum_context` score slab, and read earlier rows from
+  either committed prefix or the same provisional candidate chunk. No
+  `chunk_tokens × context_tokens` score rectangle is allocated.
+- Whole-chunk outputs, BF16 candidate rows, final committed caches, and frontier
+  were byte-identical to repeated one-token CUDA prepare/commit for 3-token and
+  9-token inspectable cases and a production-shape 9-token case. Prepare left
+  committed cache/frontier unchanged; invalid zero-length, overflow, and
+  out-of-capacity boundaries fail closed.
+- Allocated a real production one-layer cache with 131,072 rows: 512 MiB for K/V
+  plus a 12 MiB FP32 score slab. Position 131,071 executed on the RTX 5090,
+  emitted finite output, preserved the prepare frontier, committed frontier
+  131,072, and rejected position/chunk overflow. Device free memory after the
+  diagnostic allocations was 32,585,809,920 of 33,671,348,224 bytes.
+- Three warm-ups and 30 synchronized samples averaged about `0.369 ms` for the
+  short-prefix production nine-token core. The correctness-first final-position
+  call took about `871.98 ms`; this negative performance result is retained for
+  later profiling/tuning and is not presented as release throughput.
+- Added a source-authenticated contract, retained fixture, ordinary/opt-in
+  pytest gates, beginner Chapter 44, and source/index reconciliation. Clean
+  normal and diagnostic builds passed; the complete suite passed 125 tests with
+  five expected exclusive-GPU skips in 164.50 seconds. A clean pinned CUDA build
+  compiled every product, and all 11 explicit primitive tests passed together.
+- Marked ATN-002 and EDU-030 done. SCH-001, the hybrid 64-layer CUDA scheduler
+  and FP32 logits, is the next delivery-gate task. MEM-001 remains pending until
+  complete-model post-graph allocation and reserve evidence exists.
 
 ## Decisions and Negative Results
 

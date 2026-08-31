@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "task": "ATN-002",
+  "device": "NVIDIA GeForce RTX 5090",
+  "compute_capability": "12.0",
+  "toolkit": "CUDA 13.0.2",
+  "samples_per_chunk_case": 30,
+  "warmups_per_chunk_case": 3,
+  "chunk_cases": [
+    {"name": "small_3", "start": 2, "tokens": 3, "score_values": 30, "rectangular_score_values_avoided": 90, "nonfinite": 0, "prepare_atomic": true, "tokenwise_equal": true, "commit_exact": true, "mean_ms": 0.0246442668},
+    {"name": "small_9", "start": 2, "tokens": 9, "score_values": 66, "rectangular_score_values_avoided": 594, "nonfinite": 0, "prepare_atomic": true, "tokenwise_equal": true, "commit_exact": true, "mean_ms": 0.0840362608},
+    {"name": "production_9", "start": 2, "tokens": 9, "score_values": 264, "rectangular_score_values_avoided": 2376, "nonfinite": 0, "prepare_atomic": true, "tokenwise_equal": true, "commit_exact": true, "mean_ms": 0.369322687}
+  ],
+  "capacity_case": {
+    "capacity": 131072,
+    "position": 131071,
+    "cache_bytes": 536870912,
+    "score_bytes": 12582912,
+    "free_after_allocation_bytes": 32585809920,
+    "total_device_bytes": 33671348224,
+    "nonfinite": 0,
+    "prepare_atomic": true,
+    "commit_exact": true,
+    "overflow_rejected": true,
+    "elapsed_ms": 871.975281
+  },
+  "claim": "post-projection correctness-first causal chunking and one-layer final-position capacity execution, not tuned prefill or complete-model memory fit"
+}

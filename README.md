@@ -76,6 +76,9 @@ byte-exact equivalence with repeated one-token GPU execution.
 The [CUDA attention decode chapter](docs/43-cuda-attention-decode.md) explains
 grouped query-to-KV sharing, partial RoPE, BF16 cache rows, causal reads, stable
 softmax, and candidate-row commit on the GPU.
+The [CUDA attention prefill chapter](docs/44-cuda-attention-prefill.md) extends
+that state through atomic prompt chunks with linear score storage and executes
+the final legal position in a real 131,072-row production cache.
 
 ## Build
 

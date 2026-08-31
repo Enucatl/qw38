@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "task": "ATN-002",
+  "target": "sm_120",
+  "toolkit": "CUDA 13.0.2",
+  "inherits": "pins/cuda_attention_contract.json",
+  "input": "token-major FP32 projected query, key, value, and query-gate rows with shared direct RMSNorm scales",
+  "output": "token-major FP32 gated attention contexts",
+  "causal_chunk_protocol": {
+    "committed_prefix": "contexts before start_position read the committed BF16 cache",
+    "candidate_prefix": "contexts from start_position through the current token read earlier rows in the same candidate chunk",
+    "prepare": "all candidate K/V rows and outputs are produced without changing committed cache or frontier",
+    "commit": "copy every candidate row into its final contiguous cache range, synchronize, then publish the final frontier",
+    "cancellation": "discard the complete candidate range"
+  },
+  "workspace": {
+    "score_values": "query_heads * (start_position + token_count)",
+    "current_normalized_query_values": "query_heads * head_width",
+    "current_normalized_key_values": "kv_heads * head_width",
+    "candidate_values": "token_count * kv_heads * head_width for each of K and V",
+    "excluded": "no token_count * context_count score matrix"
+  },
+  "capacity_boundary": {
+    "tokens": 131072,
+    "last_valid_position": 131071,
+    "one_layer_kv_bytes": 536870912,
+    "all_16_attention_layer_kv_bytes": 8589934592,
+    "maximum_score_values": 3145728,
+    "maximum_score_bytes": 12582912
+  },
+  "admission": {
+    "chunk_outputs_equal_repeated_cuda_tokens_exactly": true,
+    "chunk_candidate_rows_equal_repeated_committed_rows_exactly": true,
+    "prepare_preserves_committed_bytes": true,
+    "commit_matches_repeated_token_cache_exactly": true,
+    "nonfinite_count": 0,
+    "last_valid_production_position_executes": true,
+    "position_or_chunk_past_capacity_rejected": true
+  },
+  "not_claimed": [
+    "tuned or fused prefill throughput",
+    "complete 16-layer KV allocation with model weights and graphs",
+    "1.5 GiB post-graph free reserve",
+    "request-level atomicity across all 64 layers"
+  ],
+  "local_sources": {
+    "cuda/attention_decode.cu": "d9b79f8a3dd93b8534e3cd4c1785439bbc209e2867a72169d9b31004f910bd34",
+    "cuda/attention_decode.h": "6371e6cf83a08b9517715d41bdb0514fd20be26f0e7f3afc76c8b0a82a57deaa",
+    "cuda/attention_chunk_test.cu": "b5e768967a49cd9c4f25ce37110edb37a0cc2502a5ba509a1fe6642060527c72"
+  }
+}

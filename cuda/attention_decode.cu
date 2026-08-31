@@ -110,20 +110,22 @@ __global__ void normalize_key_and_stage_value(
 }
 
 __global__ void grouped_attention(
-    AttentionConfig config, std::size_t position, const float* query,
+    AttentionConfig config, std::size_t chunk_start, std::size_t token_offset,
+    std::size_t score_stride, const float* query,
     const float* gate, const __nv_bfloat16* committed_key,
     const __nv_bfloat16* committed_value,
     const __nv_bfloat16* candidate_key,
     const __nv_bfloat16* candidate_value, float* scores, float* output) {
   const std::uint32_t query_head = blockIdx.x;
   const std::uint32_t lane = threadIdx.x;
+  const std::size_t position = chunk_start + token_offset;
   const std::uint32_t group_size = config.query_heads / config.kv_heads;
   const std::uint32_t kv_head = query_head / group_size;
   const std::size_t query_base =
       static_cast<std::size_t>(query_head) * config.head_width;
   const std::size_t row_values =
       static_cast<std::size_t>(config.kv_heads) * config.head_width;
-  float* head_scores = scores + query_head * (position + 1);
+  float* head_scores = scores + query_head * score_stride;
   __shared__ float denominator;
   if (lane == 0) {
     float maximum = -INFINITY;
@@ -131,8 +133,9 @@ __global__ void grouped_attention(
         1.0F / sqrtf(static_cast<float>(config.head_width));
     for (std::size_t context = 0; context <= position; ++context) {
       const __nv_bfloat16* key_row =
-          context == position ? candidate_key
-                              : committed_key + context * row_values;
+          context < chunk_start
+              ? committed_key + context * row_values
+              : candidate_key + (context - chunk_start) * row_values;
       const std::size_t key_base =
           static_cast<std::size_t>(kv_head) * config.head_width;
       float score = 0.0F;
@@ -158,8 +161,9 @@ __global__ void grouped_attention(
         static_cast<std::size_t>(kv_head) * config.head_width;
     for (std::size_t context = 0; context <= position; ++context) {
       const __nv_bfloat16* value_row =
-          context == position ? candidate_value
-                              : committed_value + context * row_values;
+          context < chunk_start
+              ? committed_value + context * row_values
+              : candidate_value + (context - chunk_start) * row_values;
       result = __fadd_rn(
           result,
           __fmul_rn(head_scores[context] / denominator,
@@ -174,15 +178,18 @@ __global__ void grouped_attention(
   }
 }
 
-__global__ void commit_row(const __nv_bfloat16* candidate_key,
-                           const __nv_bfloat16* candidate_value,
-                           __nv_bfloat16* committed_key,
-                           __nv_bfloat16* committed_value,
-                           std::size_t row_values, std::size_t position,
-                           std::uint64_t new_frontier,
-                           std::uint64_t* committed_frontier) {
-  const std::size_t target = position * row_values;
-  for (std::size_t index = threadIdx.x; index < row_values;
+__global__ void commit_rows(const __nv_bfloat16* candidate_key,
+                            const __nv_bfloat16* candidate_value,
+                            __nv_bfloat16* committed_key,
+                            __nv_bfloat16* committed_value,
+                            std::size_t row_values,
+                            std::size_t start_position,
+                            std::size_t token_count,
+                            std::uint64_t new_frontier,
+                            std::uint64_t* committed_frontier) {
+  const std::size_t values = token_count * row_values;
+  const std::size_t target = start_position * row_values;
+  for (std::size_t index = threadIdx.x; index < values;
        index += blockDim.x) {
     committed_key[target + index] = candidate_key[index];
     committed_value[target + index] = candidate_value[index];
@@ -213,6 +220,18 @@ std::size_t attention_score_values(const AttentionConfig& config,
   return static_cast<std::size_t>(config.query_heads) * (position + 1);
 }
 
+std::size_t attention_chunk_score_values(const AttentionConfig& config,
+                                         std::size_t start_position,
+                                         std::size_t token_count) noexcept {
+  if (!valid_config(config) || token_count == 0 ||
+      start_position >= config.capacity ||
+      token_count > config.capacity - start_position) {
+    return 0;
+  }
+  return static_cast<std::size_t>(config.query_heads) *
+         (start_position + token_count);
+}
+
 cudaError_t launch_attention_prepare(
     const AttentionConfig& config, std::size_t position, const float* query,
     const float* key, const float* value, const float* query_norm_scale,
@@ -220,31 +239,59 @@ cudaError_t launch_attention_prepare(
     const AttentionCache& committed, const AttentionCache& candidate_row,
     float* normalized_query, float* normalized_key, float* score_workspace,
     float* output, cudaStream_t stream) noexcept {
-  if (!valid_config(config) || position >= config.capacity || query == nullptr ||
+  return launch_attention_prepare_chunk(
+      config, position, 1, query, key, value, query_norm_scale, key_norm_scale,
+      output_gate, committed, candidate_row, normalized_query, normalized_key,
+      score_workspace, output, stream);
+}
+
+cudaError_t launch_attention_prepare_chunk(
+    const AttentionConfig& config, std::size_t start_position,
+    std::size_t token_count, const float* query, const float* key,
+    const float* value, const float* query_norm_scale,
+    const float* key_norm_scale, const float* output_gate,
+    const AttentionCache& committed, const AttentionCache& candidate_rows,
+    float* normalized_query, float* normalized_key, float* score_workspace,
+    float* output, cudaStream_t stream) noexcept {
+  const std::size_t score_values = attention_chunk_score_values(
+      config, start_position, token_count);
+  if (score_values == 0 || query == nullptr ||
       key == nullptr || value == nullptr || query_norm_scale == nullptr ||
       key_norm_scale == nullptr || output_gate == nullptr ||
       committed.key == nullptr || committed.value == nullptr ||
-      candidate_row.key == nullptr || candidate_row.value == nullptr ||
+      candidate_rows.key == nullptr || candidate_rows.value == nullptr ||
       normalized_query == nullptr || normalized_key == nullptr ||
       score_workspace == nullptr || output == nullptr ||
-      candidate_row.key == committed.key ||
-      candidate_row.value == committed.value) {
+      candidate_rows.key == committed.key ||
+      candidate_rows.value == committed.value) {
     return cudaErrorInvalidValue;
   }
-  normalize_query<<<config.query_heads, kThreads, 0, stream>>>(
-      config, position, query, query_norm_scale, normalized_query);
-  cudaError_t error = cudaPeekAtLastError();
-  if (error != cudaSuccess) return error;
-  normalize_key_and_stage_value<<<config.kv_heads, kThreads, 0, stream>>>(
-      config, position, key, value, key_norm_scale, normalized_key,
-      candidate_row.key, candidate_row.value);
-  error = cudaPeekAtLastError();
-  if (error != cudaSuccess) return error;
-  grouped_attention<<<config.query_heads, kThreads, 0, stream>>>(
-      config, position, normalized_query, output_gate, committed.key,
-      committed.value, candidate_row.key, candidate_row.value, score_workspace,
-      output);
-  return cudaPeekAtLastError();
+  const std::size_t query_values = attention_query_values(config);
+  const std::size_t row_values = attention_kv_row_values(config);
+  const std::size_t score_stride = start_position + token_count;
+  for (std::size_t token = 0; token < token_count; ++token) {
+    const std::size_t position = start_position + token;
+    normalize_query<<<config.query_heads, kThreads, 0, stream>>>(
+        config, position, query + token * query_values, query_norm_scale,
+        normalized_query);
+    cudaError_t error = cudaPeekAtLastError();
+    if (error != cudaSuccess) return error;
+    normalize_key_and_stage_value<<<config.kv_heads, kThreads, 0, stream>>>(
+        config, position, key + token * row_values,
+        value + token * row_values, key_norm_scale, normalized_key,
+        candidate_rows.key + token * row_values,
+        candidate_rows.value + token * row_values);
+    error = cudaPeekAtLastError();
+    if (error != cudaSuccess) return error;
+    grouped_attention<<<config.query_heads, kThreads, 0, stream>>>(
+        config, start_position, token, score_stride, normalized_query,
+        output_gate + token * query_values, committed.key, committed.value,
+        candidate_rows.key, candidate_rows.value, score_workspace,
+        output + token * query_values);
+    error = cudaPeekAtLastError();
+    if (error != cudaSuccess) return error;
+  }
+  return cudaSuccess;
 }
 
 cudaError_t launch_attention_commit(
@@ -252,17 +299,30 @@ cudaError_t launch_attention_commit(
     const AttentionCache& candidate_row, const AttentionCache& committed,
     std::uint64_t new_frontier, std::uint64_t* committed_frontier,
     cudaStream_t stream) noexcept {
+  return launch_attention_commit_chunk(
+      config, position, 1, candidate_row, committed, new_frontier,
+      committed_frontier, stream);
+}
+
+cudaError_t launch_attention_commit_chunk(
+    const AttentionConfig& config, std::size_t start_position,
+    std::size_t token_count, const AttentionCache& candidate_rows,
+    const AttentionCache& committed, std::uint64_t new_frontier,
+    std::uint64_t* committed_frontier, cudaStream_t stream) noexcept {
   const std::size_t row_values = attention_kv_row_values(config);
-  if (row_values == 0 || position >= config.capacity ||
-      candidate_row.key == nullptr || candidate_row.value == nullptr ||
+  if (row_values == 0 || token_count == 0 ||
+      start_position >= config.capacity ||
+      token_count > config.capacity - start_position ||
+      candidate_rows.key == nullptr || candidate_rows.value == nullptr ||
       committed.key == nullptr || committed.value == nullptr ||
-      committed_frontier == nullptr || candidate_row.key == committed.key ||
-      candidate_row.value == committed.value) {
+      committed_frontier == nullptr || candidate_rows.key == committed.key ||
+      candidate_rows.value == committed.value) {
     return cudaErrorInvalidValue;
   }
-  commit_row<<<1, kThreads, 0, stream>>>(
-      candidate_row.key, candidate_row.value, committed.key, committed.value,
-      row_values, position, new_frontier, committed_frontier);
+  commit_rows<<<1, kThreads, 0, stream>>>(
+      candidate_rows.key, candidate_rows.value, committed.key, committed.value,
+      row_values, start_position, token_count, new_frontier,
+      committed_frontier);
   return cudaPeekAtLastError();
 }
 
