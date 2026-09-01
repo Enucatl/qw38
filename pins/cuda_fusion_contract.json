@@ -27,9 +27,9 @@
     "sha256": "97a88c6b9c48fd7f1d493eca67ab748af71ea228d7fa6986bc09c992a053a4a9"
   },
   "local_sources": {
-    "Makefile": "418a122a652134533f1b300fb2772b8b98d3ef1cf26d356cee97d3ff4ef7417e",
-    "cuda/full_scheduler.h": "3cd111c8903cbe996a49724cdd020f57ccd62b168a8794118cb881ce1071c06e",
-    "cuda/full_scheduler.cu": "745c1dcd933e20c7fea2475184b2f203622723a86d30b3cf93884c861c35e431",
+    "Makefile": "cd8390ecf1869e47e763cbbcd6d0eb3b9716bfd32a8a43681ac04bb4007fc21a",
+    "cuda/full_scheduler.h": "95bc5d1ef877bfc493b0f9444c9034e6b1fc021be2853f3615c0a9b4c2854147",
+    "cuda/full_scheduler.cu": "d5d894fc6f64dfdda8f3c0f7b12ad8cfb01ed4b0e210e6d3cb9ec9582d750508",
     "cuda/fusion_test.cu": "40cbb6b8e9721141e7b6fa6f38bd6fefbf5ea015935338ea1a42e531ef4588e8"
   }
 }

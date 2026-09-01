@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "task": "CLI-001",
+  "measured_at_utc": "2026-09-01T11:47:55Z",
+  "environment": {
+    "container": "qw38-cuda:13.0.2",
+    "gpu": "NVIDIA GeForce RTX 5090",
+    "model_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+    "sha256_backend": "openssl-evp"
+  },
+  "input": {
+    "prompt": "Reply with exactly: hello",
+    "reasoning": "off",
+    "temperature": 0.0,
+    "max_tokens": 8
+  },
+  "result": {
+    "exit_code": 0,
+    "visible_answer": "hello",
+    "checkpoint_magic": "QW38CKP1",
+    "checkpoint_bytes": 161118596,
+    "restore_in_same_process": true,
+    "stderr_empty": true,
+    "passed": true
+  },
+  "pytest_elapsed_seconds": 13.03,
+  "notes": [
+    "The elapsed time includes the no-op product build check, container startup, full model authentication, CUDA upload, one generated turn, checkpoint save, and restore.",
+    "This single smoke is functional evidence, not a throughput benchmark."
+  ]
+}

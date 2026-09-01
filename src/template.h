@@ -42,6 +42,8 @@ struct TemplateInput final {
 };
 
 Status render_chat(const TemplateInput& input, std::string* rendered) noexcept;
+Status render_user_turn(const std::string& content, bool enable_thinking,
+                        std::string* rendered) noexcept;
 
 }  // namespace qw38::internal
 

@@ -2377,6 +2377,19 @@ int tokenize_hex(const char* model_path, const std::string& hex) {
 int render_template_case(const std::string& name) {
   using qw38::internal::Message;
   using qw38::internal::MessageRole;
+  if (name == "user_turn_no_thinking" || name == "user_turn_thinking" ||
+      name == "empty_user_turn") {
+    std::string rendered;
+    const std::string content = name == "empty_user_turn" ? "  \n" : " Next ";
+    const qw38::Status status = qw38::internal::render_user_turn(
+        content, name == "user_turn_thinking", &rendered);
+    if (!status.is_ok()) {
+      std::cerr << status.message() << '\n';
+      return 1;
+    }
+    std::cout << rendered;
+    return 0;
+  }
   qw38::internal::TemplateInput input;
   if (name == "user_no_thinking") {
     input.messages = {{MessageRole::kUser, "Hello"}};
@@ -2487,6 +2500,10 @@ int main(int argc, char** argv) {
       return 1;
     }
     std::cout << digest << '\n';
+    return 0;
+  }
+  if (argc == 2 && std::string(argv[1]) == "--sha256-backend") {
+    std::cout << qw38::internal::sha256_backend_name() << '\n';
     return 0;
   }
   if (argc == 3 && std::string(argv[1]) == "--verify-model") {

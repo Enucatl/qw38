@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "task": "MDL-003",
+  "identity": {
+    "algorithm": "SHA-256",
+    "model_bytes": 18973870432,
+    "expected_digest": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+    "changed": false
+  },
+  "dispatch": {
+    "accelerated_backend": "openssl-evp",
+    "shared_object": "libcrypto.so.3",
+    "portable_backend": "portable",
+    "force_portable_environment": "QW38_SHA256_FORCE_PORTABLE=1",
+    "provider_failure_after_init": "fail_closed"
+  },
+  "container": {
+    "base_digest": "sha256:0eee3094c71518ad31d011a594ae6ed6de72959ee07e318cb31cffe71690e90c",
+    "observed_openssl": "3.0.13"
+  },
+  "local_sources": {
+    "src/sha256.cpp": "9091626b414d41389f51a3293be0213c109291b761d8afc25158bd3710d10d93",
+    "src/sha256.h": "ef3dc912fe13f9f94203135be982ad20f44b607c49ed4dea8faa3b1ed8f573fc",
+    "src/eval.cpp": "dd3d9c773a0233372837676b109cb9b4afb1d93c6058659b0a6dcd4a7ba4f5df",
+    "tests/test_build.py": "8525e44af11e9a6de9b4174ba5be88933e487061352655511d958886766f22d7",
+    "fixtures/sha256_acceleration.json": "a594b7a0fe0a7de1ebfcdedf72407b32fdcd572bda20c5d48199a38103ff3009",
+    "docs/57-hardware-sha256.md": "52e23f027dde2781a0cb8f7aa8e4f24a332bee9b6e2dc2ae1b7e4934799d25f5",
+    "docker/cuda.Dockerfile": "27af293315faba9979972af5871253f099890b11e3dcde4ef28d014e32582b65"
+  }
+}

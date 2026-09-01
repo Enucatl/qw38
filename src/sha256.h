@@ -13,6 +13,7 @@ Status sha256_file_prefix(const std::string& path, std::size_t bytes,
                           std::string* digest) noexcept;
 Status sha256_bytes(const unsigned char* data, std::size_t size,
                     std::string* digest) noexcept;
+const char* sha256_backend_name() noexcept;
 
 }  // namespace qw38::internal
 

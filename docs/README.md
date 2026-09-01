@@ -80,7 +80,9 @@ for language and host portability decisions.
 53. [Stable-address CUDA graphs](53-stable-address-cuda-graphs.md): capture, instantiate, upload, replay, pointer lifetime, dynamic exclusions, equality, launch attribution, and graph memory.
 54. [Final post-graph 128K memory ledger](54-post-graph-128k-memory.md): all simultaneous owners, uploaded graph bytes, allocator reconciliation, free reserve, admission, and proof limits.
 55. [Offline CUDA dispatch tuning](55-offline-dispatch-tuning.md): launch shapes, row buckets, prompt tiles, warmups, samples, selection, retained losers, reproducibility, and proof limits.
-56. [Source and evidence ledger](sources.md).
+56. [Interactive text CLI](56-interactive-text-cli.md): public engine/session ownership, terminal turns, generation, sampling, stops, and checkpoints.
+57. [Hardware-accelerated SHA-256](57-hardware-sha256.md): whole-file identity, SHA-NI runtime dispatch, portable fallback, and storage-cache limits.
+58. [Source and evidence ledger](sources.md).
 
 Claims use four labels: **Measured** (this exact artifact and hardware),
 **External** (a linked source), **Estimated** (reproducible arithmetic), and

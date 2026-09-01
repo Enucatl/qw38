@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import hashlib
+import os
 import struct
 import subprocess
 from pathlib import Path
@@ -21,11 +22,23 @@ def run_binary(name: str, *arguments: str) -> subprocess.CompletedProcess[str]:
 
 
 def test_all_product_binaries_exist_and_fail_closed() -> None:
-    for name in ("qw38", "qw38-server", "qw38-bench"):
+    cli = run_binary("qw38")
+    assert cli.returncode == 2
+    assert "usage: qw38 MODEL [options]" in cli.stderr
+    assert "--reasoning MODE" in cli.stderr
+
+    for name in ("qw38-server", "qw38-bench"):
         result = run_binary(name)
         assert result.returncode == 2
         assert BRAND in result.stdout
         assert "has not passed its delivery gate" in result.stderr
+
+
+def test_cli_help_does_not_require_a_model() -> None:
+    result = run_binary("qw38", "--help")
+    assert result.returncode == 0
+    assert "usage: qw38 MODEL [options]" in result.stdout
+    assert "interactive commands:" in result.stdout
 
 
 def test_eval_reports_pinned_build_identity() -> None:
@@ -79,9 +92,77 @@ def test_native_sha256_matches_standard_library(tmp_path: Path) -> None:
     fixture = tmp_path / "sha.fixture"
     payload = bytes(range(256)) * 1000 + b"quartz-watch-38"
     fixture.write_bytes(payload)
-    result = run_binary("qw38-eval", "--sha256", str(fixture))
-    assert result.returncode == 0
-    assert result.stdout.strip() == hashlib.sha256(payload).hexdigest()
+    expected = hashlib.sha256(payload).hexdigest()
+    accelerated = run_binary("qw38-eval", "--sha256", str(fixture))
+    assert accelerated.returncode == 0
+    assert accelerated.stdout.strip() == expected
+
+    environment = os.environ.copy()
+    environment["QW38_SHA256_FORCE_PORTABLE"] = "1"
+    portable = subprocess.run(
+        [str(BUILD / "qw38-eval"), "--sha256", str(fixture)],
+        check=False,
+        capture_output=True,
+        text=True,
+        env=environment,
+    )
+    assert portable.returncode == 0
+    assert portable.stdout.strip() == expected
+
+
+def test_sha256_backend_is_explicit_and_fallback_is_selectable() -> None:
+    accelerated = run_binary("qw38-eval", "--sha256-backend")
+    assert accelerated.returncode == 0
+    assert accelerated.stdout.strip() == "openssl-evp"
+
+    environment = os.environ.copy()
+    environment["QW38_SHA256_FORCE_PORTABLE"] = "1"
+    portable = subprocess.run(
+        [str(BUILD / "qw38-eval"), "--sha256-backend"],
+        check=False,
+        capture_output=True,
+        text=True,
+        env=environment,
+    )
+    assert portable.returncode == 0
+    assert portable.stdout.strip() == "portable"
+
+
+def test_accelerated_sha256_evidence_and_handbook_are_connected() -> None:
+    contract = json.loads(
+        (ROOT / "pins" / "sha256_acceleration_contract.json").read_text()
+    )
+    fixture = json.loads((ROOT / "fixtures" / "sha256_acceleration.json").read_text())
+    for relative, expected in contract["local_sources"].items():
+        assert hashlib.sha256((ROOT / relative).read_bytes()).hexdigest() == expected
+    assert contract["identity"]["changed"] is False
+    assert contract["identity"]["expected_digest"] == fixture["model"]["sha256"]
+    assert (
+        fixture["model"]["sha256"]
+        == json.loads((ROOT / "pins" / "artifacts.lock.json").read_text())["model"][
+            "sha256"
+        ]
+    )
+    assert fixture["before"]["backend"] == "portable"
+    assert fixture["after"]["backend"] == "openssl-evp"
+    assert fixture["after"]["sha256"] == fixture["model"]["sha256"]
+    assert (
+        fixture["before"]["elapsed_seconds"] / fixture["after"]["elapsed_seconds"] > 5.0
+    )
+    handbook = (ROOT / "docs" / "57-hardware-sha256.md").read_text().casefold()
+    for concept in (
+        "cryptographic hash",
+        "whole-file",
+        "sha-ni",
+        "runtime dispatch",
+        "openssl evp",
+        "portable fallback",
+        "zfs",
+        "warm cache",
+        "cold cache",
+        "proof boundary",
+    ):
+        assert concept in handbook
 
 
 def gguf_string(value: bytes) -> bytes:

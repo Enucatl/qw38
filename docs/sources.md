@@ -293,6 +293,24 @@ DSpark are explicitly rejected as Qwen model semantics.
   [`fixtures/cuda_dispatch_tuning.json`](../fixtures/cuda_dispatch_tuning.json)
   and individual samples in
   [`evidence/profiling/opt004-dispatch-sweep-raw.txt`](../evidence/profiling/opt004-dispatch-sweep-raw.txt).
+- CLI-001 and EDU-041 use no copied implementation. The public CUDA runtime,
+  inverse tokenizer byte map, incremental chat suffix, seeded sampler, and
+  terminal loop are local Quartz code. Their ownership and command contract is
+  authenticated in [`pins/cli_contract.json`](../pins/cli_contract.json), and
+  the real-model generation/save/restore result is retained in
+  [`fixtures/cli_smoke.json`](../fixtures/cli_smoke.json).
+- MDL-003 dynamically uses OpenSSL 3's high-level
+  [EVP digest interface](https://docs.openssl.org/3.0/man3/EVP_DigestInit/),
+  whose implementation is supplied by the immutable CUDA base image; no
+  OpenSSL code is copied. OpenSSL's
+  [x86 capability documentation](https://docs.openssl.org/3.4/man3/OPENSSL_ia32cap/)
+  identifies the SHA extension used by provider dispatch. The local wrapper,
+  portable fallback, and measurement identity are authenticated in
+  [`pins/sha256_acceleration_contract.json`](../pins/sha256_acceleration_contract.json),
+  with the full-model result in
+  [`fixtures/sha256_acceleration.json`](../fixtures/sha256_acceleration.json).
+  The distinction between artifact identity and ZFS block integrity follows
+  OpenZFS's [checksum documentation](https://openzfs.github.io/openzfs-docs/Basic%20Concepts/Data%20Storage/Checksums.html).
 
 ## Specialization and hardware references
 

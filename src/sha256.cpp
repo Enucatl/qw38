@@ -3,9 +3,13 @@
 #include <algorithm>
 #include <array>
 #include <cstdint>
+#include <cstdlib>
+#include <cstring>
 #include <fstream>
 #include <iomanip>
 #include <sstream>
+
+#include <dlfcn.h>
 
 namespace qw38::internal {
 namespace {
@@ -29,16 +33,30 @@ std::uint32_t rotate(std::uint32_t value, std::uint32_t count) noexcept {
   return (value >> count) | (value << (32U - count));
 }
 
-class Sha256 final {
+class PortableSha256 final {
  public:
   void update(const unsigned char* data, std::size_t size) noexcept {
     total_bytes_ += size;
-    for (std::size_t index = 0; index < size; ++index) {
-      block_[block_bytes_++] = data[index];
+    if (block_bytes_ != 0) {
+      const std::size_t copied = std::min(size, block_.size() - block_bytes_);
+      std::memcpy(block_.data() + block_bytes_, data, copied);
+      block_bytes_ += copied;
+      data += copied;
+      size -= copied;
       if (block_bytes_ == block_.size()) {
         transform();
         block_bytes_ = 0;
       }
+    }
+    while (size >= block_.size()) {
+      std::memcpy(block_.data(), data, block_.size());
+      transform();
+      data += block_.size();
+      size -= block_.size();
+    }
+    if (size != 0) {
+      std::memcpy(block_.data(), data, size);
+      block_bytes_ = size;
     }
   }
 
@@ -127,6 +145,124 @@ std::string hex_digest(const std::array<std::uint32_t, 8>& words) {
   return output.str();
 }
 
+std::string hex_digest(const unsigned char* bytes, std::size_t size) {
+  std::ostringstream output;
+  output << std::hex << std::setfill('0');
+  for (std::size_t index = 0; index < size; ++index) {
+    output << std::setw(2) << static_cast<unsigned int>(bytes[index]);
+  }
+  return output.str();
+}
+
+template <typename Function>
+bool load_symbol(void* handle, const char* name, Function* function) noexcept {
+  void* symbol = dlsym(handle, name);
+  static_assert(sizeof(symbol) == sizeof(*function));
+  std::memcpy(function, &symbol, sizeof(symbol));
+  return symbol != nullptr;
+}
+
+struct CryptoApi final {
+  using ContextNew = void* (*)();
+  using ContextFree = void (*)(void*);
+  using Sha256 = const void* (*)();
+  using DigestInit = int (*)(void*, const void*, void*);
+  using DigestUpdate = int (*)(void*, const void*, std::size_t);
+  using DigestFinal = int (*)(void*, unsigned char*, unsigned int*);
+
+  CryptoApi() noexcept {
+    handle = dlopen("libcrypto.so.3", RTLD_NOW | RTLD_LOCAL);
+    if (handle == nullptr) return;
+    available = load_symbol(handle, "EVP_MD_CTX_new", &context_new) &&
+                load_symbol(handle, "EVP_MD_CTX_free", &context_free) &&
+                load_symbol(handle, "EVP_sha256", &sha256) &&
+                load_symbol(handle, "EVP_DigestInit_ex", &digest_init) &&
+                load_symbol(handle, "EVP_DigestUpdate", &digest_update) &&
+                load_symbol(handle, "EVP_DigestFinal_ex", &digest_final);
+    if (!available) {
+      dlclose(handle);
+      handle = nullptr;
+    }
+  }
+
+  ~CryptoApi() {
+    if (handle != nullptr) dlclose(handle);
+  }
+
+  CryptoApi(const CryptoApi&) = delete;
+  CryptoApi& operator=(const CryptoApi&) = delete;
+
+  void* handle = nullptr;
+  ContextNew context_new = nullptr;
+  ContextFree context_free = nullptr;
+  Sha256 sha256 = nullptr;
+  DigestInit digest_init = nullptr;
+  DigestUpdate digest_update = nullptr;
+  DigestFinal digest_final = nullptr;
+  bool available = false;
+};
+
+CryptoApi& crypto_api() noexcept {
+  static CryptoApi api;
+  return api;
+}
+
+bool force_portable() noexcept {
+  const char* value = std::getenv("QW38_SHA256_FORCE_PORTABLE");
+  return value != nullptr && std::string(value) == "1";
+}
+
+class Sha256 final {
+ public:
+  Sha256() noexcept : api_(&crypto_api()) {
+    if (force_portable() || !api_->available) return;
+    context_ = api_->context_new();
+    if (context_ != nullptr &&
+        api_->digest_init(context_, api_->sha256(), nullptr) == 1) {
+      accelerated_ = true;
+      return;
+    }
+    if (context_ != nullptr) api_->context_free(context_);
+    context_ = nullptr;
+  }
+
+  ~Sha256() {
+    if (context_ != nullptr) api_->context_free(context_);
+  }
+
+  Sha256(const Sha256&) = delete;
+  Sha256& operator=(const Sha256&) = delete;
+
+  bool update(const unsigned char* data, std::size_t size) noexcept {
+    if (accelerated_) return api_->digest_update(context_, data, size) == 1;
+    portable_.update(data, size);
+    return true;
+  }
+
+  bool finish(std::string* digest) noexcept {
+    if (!accelerated_) {
+      *digest = hex_digest(portable_.finish());
+      return true;
+    }
+    std::array<unsigned char, 32> bytes{};
+    unsigned int size = 0;
+    if (api_->digest_final(context_, bytes.data(), &size) != 1 ||
+        size != bytes.size()) {
+      return false;
+    }
+    *digest = hex_digest(bytes.data(), bytes.size());
+    return true;
+  }
+
+  bool accelerated() const noexcept { return accelerated_; }
+
+ private:
+  CryptoApi* api_;
+  void* context_ = nullptr;
+  bool accelerated_ = false;
+  PortableSha256 portable_;
+};
+
 }  // namespace
 
 Status sha256_file(const std::string& path, std::string* digest) noexcept {
@@ -142,12 +278,17 @@ Status sha256_file(const std::string& path, std::string* digest) noexcept {
   while (input) {
     input.read(reinterpret_cast<char*>(buffer.data()), buffer.size());
     const std::streamsize count = input.gcount();
-    if (count > 0) hash.update(buffer.data(), static_cast<std::size_t>(count));
+    if (count > 0 &&
+        !hash.update(buffer.data(), static_cast<std::size_t>(count))) {
+      return {StatusCode::kInternal, "accelerated SHA-256 update failed"};
+    }
   }
   if (!input.eof()) {
     return {StatusCode::kIoError, "failed while reading file for SHA-256"};
   }
-  *digest = hex_digest(hash.finish());
+  if (!hash.finish(digest)) {
+    return {StatusCode::kInternal, "accelerated SHA-256 finalization failed"};
+  }
   return Status::ok();
 }
 
@@ -171,10 +312,14 @@ Status sha256_file_prefix(const std::string& path, std::size_t bytes,
     if (input.gcount() != static_cast<std::streamsize>(request)) {
       return {StatusCode::kIoError, "SHA-256 prefix is shorter than declared"};
     }
-    hash.update(buffer.data(), request);
+    if (!hash.update(buffer.data(), request)) {
+      return {StatusCode::kInternal, "accelerated SHA-256 update failed"};
+    }
     remaining -= request;
   }
-  *digest = hex_digest(hash.finish());
+  if (!hash.finish(digest)) {
+    return {StatusCode::kInternal, "accelerated SHA-256 finalization failed"};
+  }
   return Status::ok();
 }
 
@@ -185,9 +330,15 @@ Status sha256_bytes(const unsigned char* data, std::size_t size,
             "SHA-256 bytes and output are required"};
   }
   Sha256 hash;
-  hash.update(data, size);
-  *digest = hex_digest(hash.finish());
+  if (!hash.update(data, size) || !hash.finish(digest)) {
+    return {StatusCode::kInternal, "accelerated SHA-256 operation failed"};
+  }
   return Status::ok();
+}
+
+const char* sha256_backend_name() noexcept {
+  Sha256 hash;
+  return hash.accelerated() ? "openssl-evp" : "portable";
 }
 
 }  // namespace qw38::internal

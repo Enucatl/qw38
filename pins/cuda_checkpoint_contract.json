@@ -24,12 +24,12 @@
   "restore_preflight": ["magic/version", "model/layout hashes", "capacity/frontier", "sampler bounds", "section arithmetic", "exact file size", "SHA-256 footer", "token bounds"],
   "logical_attention_state": "only rows below frontier; file size grows by 65536 bytes per committed token",
   "local_sources": {
-    "Makefile": "418a122a652134533f1b300fb2772b8b98d3ef1cf26d356cee97d3ff4ef7417e",
+    "Makefile": "cd8390ecf1869e47e763cbbcd6d0eb3b9716bfd32a8a43681ac04bb4007fc21a",
     "cuda/checkpoint.cu": "2c3c03a47b401be8635bd5e5df8cf2b889fa720285e2e18772d86a42043680f9",
     "cuda/checkpoint_test.cu": "b54eff76501d89a2a3be91d023f26582a50cb18c2af9f1f22ea97595a4532b43",
-    "cuda/full_scheduler.cu": "745c1dcd933e20c7fea2475184b2f203622723a86d30b3cf93884c861c35e431",
-    "cuda/full_scheduler.h": "3cd111c8903cbe996a49724cdd020f57ccd62b168a8794118cb881ce1071c06e",
-    "src/sha256.cpp": "c92e235777001baa56f55446c7505d13147ac6860c19a1b65269225607d66852",
-    "src/sha256.h": "8ad20231cc77f4dcc07fb435dc45699d32ce8cec627ba4baeed05f13b26a2a77"
+    "cuda/full_scheduler.cu": "d5d894fc6f64dfdda8f3c0f7b12ad8cfb01ed4b0e210e6d3cb9ec9582d750508",
+    "cuda/full_scheduler.h": "95bc5d1ef877bfc493b0f9444c9034e6b1fc021be2853f3615c0a9b4c2854147",
+    "src/sha256.cpp": "9091626b414d41389f51a3293be0213c109291b761d8afc25158bd3710d10d93",
+    "src/sha256.h": "ef3dc912fe13f9f94203135be982ad20f44b607c49ed4dea8faa3b1ed8f573fc"
   }
 }

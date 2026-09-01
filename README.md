@@ -7,8 +7,58 @@ engine for the pinned Qwen3.8-27B Q4_K_M artifact on one RTX 5090. The approved
 scope is in [plan.md](plan.md), and implementation claims and evidence are in
 [implementation_ledger.md](implementation_ledger.md).
 
-The repository is not yet a usable inference server. Current binaries fail
-closed when an operation has not passed its delivery gate.
+The CUDA text CLI is usable now. The OpenAI-compatible server, comparative
+benchmarks, and release quality gate are still under construction; unfinished
+product binaries continue to fail closed.
+
+## Chat with Quartz now
+
+Prerequisites are Linux/x86-64, Docker with NVIDIA GPU access, one RTX 5090,
+and the pinned model at `models/Qwen3.8-27B-Q4_K_M.gguf`. The build never
+downloads the model.
+
+Build the pinned CUDA 13.0.2 image and all SM120 products:
+
+```sh
+make cuda-build
+```
+
+Create a durable checkpoint directory and start an interactive terminal:
+
+```sh
+mkdir -p checkpoints
+docker run --rm -it --gpus all \
+  --user "$(id -u):$(id -g)" \
+  -v "$PWD:/workspace" \
+  qw38-cuda:13.0.2 \
+  ./build/cuda/qw38 models/Qwen3.8-27B-Q4_K_M.gguf \
+  --reasoning off --temperature 0 --save checkpoints/chat.qw38
+```
+
+Type a message at `user>`. Inside the CLI, `/help` lists commands; `/save
+PATH`, `/load PATH`, `/reset`, and `/quit` manage the conversation. Resume a
+saved session and append another user turn with:
+
+```sh
+docker run --rm -it --gpus all \
+  --user "$(id -u):$(id -g)" \
+  -v "$PWD:/workspace" \
+  qw38-cuda:13.0.2 \
+  ./build/cuda/qw38 models/Qwen3.8-27B-Q4_K_M.gguf \
+  --load checkpoints/chat.qw38 --save checkpoints/chat.qw38 \
+  --reasoning off --temperature 0
+```
+
+For a single shell-driven turn, add `--prompt "your question"`. Use
+`--reasoning low`, `medium`, or `xhigh` to show a reasoning section. Run
+`./build/cuda/qw38 --help` inside the same container for all sampling, stop,
+and generation-limit options.
+
+The complete beginner explanation is
+[The interactive text CLI](docs/56-interactive-text-cli.md). Model
+authentication still reads the complete artifact but now uses hardware-
+accelerated SHA-256 where available; see
+[Hardware-accelerated model authentication](docs/57-hardware-sha256.md).
 
 The beginner-oriented [implementation handbook](docs/README.md) explains each
 admitted concept and links it to code, fixtures, failures, and evidence. The
@@ -98,6 +148,9 @@ checks, sampler persistence, and byte-exact resumed continuation.
 The [pre-graph 128K memory chapter](docs/50-pre-graph-128k-memory.md) records the
 first simultaneous full-capacity allocation and remaining reserve while keeping
 the final post-graph MEM-001 admission explicitly open.
+Chapters 51–55 cover timing, fusion, CUDA graphs, the final admitted 128K
+allocation, and offline RTX 5090 dispatch tuning. Chapters 56–57 cover the
+working interactive CLI and accelerated model authentication.
 
 ## Build
 

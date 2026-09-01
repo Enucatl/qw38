@@ -6,6 +6,7 @@ CFLAGS := -std=c11 -O2 -Wall -Wextra -Wpedantic -Werror
 NVCCFLAGS := -std=c++17 -O2 -arch=sm_120 --expt-relaxed-constexpr --fmad=false -Xcompiler=-Wall,-Wextra,-Werror,-fno-exceptions,-fno-rtti,-ffp-contract=off
 CPPFLAGS := -Iinclude -Isrc -Ithird_party/utf8proc
 BUILD_DIR := build
+CUDA_BUILD_DIR := $(BUILD_DIR)/cuda
 DIAGNOSTIC_DIR := $(BUILD_DIR)/diagnostic
 LIB_SOURCES := src/status.cpp src/sha256.cpp src/model.cpp src/tokenizer.cpp src/template.cpp src/quant.cpp src/tensor.cpp src/conversion.cpp src/projection.cpp src/weights.cpp src/mixer.cpp src/scheduler.cpp src/scalar_runtime.cpp src/gdn.cpp src/attention.cpp src/engine.cpp
 LIB_OBJECTS := $(LIB_SOURCES:src/%.cpp=$(BUILD_DIR)/%.o)
@@ -13,7 +14,7 @@ THIRD_PARTY_OBJECTS := $(BUILD_DIR)/utf8proc.o
 BINARIES := $(BUILD_DIR)/qw38 $(BUILD_DIR)/qw38-server $(BUILD_DIR)/qw38-bench $(BUILD_DIR)/qw38-eval
 CUDA_IMAGE := qw38-cuda:13.0.2
 
-.PHONY: all clean test diagnostic cuda-image cuda-build cuda-native
+.PHONY: all clean test diagnostic cuda-image cuda-build cuda-native cuda-products
 
 all: $(BINARIES)
 
@@ -59,7 +60,20 @@ cuda-image:
 	docker build -f docker/cuda.Dockerfile -t $(CUDA_IMAGE) .
 
 cuda-build: cuda-image
-	docker run --rm --gpus all --user "$$(id -u):$$(id -g)" -v "$$(pwd):/workspace" $(CUDA_IMAGE) make clean all cuda-native
+	docker run --rm --gpus all --user "$$(id -u):$$(id -g)" -v "$$(pwd):/workspace" $(CUDA_IMAGE) make clean all cuda-products cuda-native
+
+$(CUDA_BUILD_DIR):
+	mkdir -p $@
+
+$(CUDA_BUILD_DIR)/engine.o: src/engine.cpp include/qw38/engine.h cuda/full_scheduler.h | $(CUDA_BUILD_DIR)
+	$(NVCC) $(NVCCFLAGS) $(CPPFLAGS) -DQW38_CUDA_RUNTIME -Icuda -c $< -o $@
+
+CUDA_ENGINE_OBJECTS := $(filter-out $(BUILD_DIR)/engine.o,$(LIB_OBJECTS)) $(CUDA_BUILD_DIR)/engine.o $(THIRD_PARTY_OBJECTS)
+
+cuda-products: $(CUDA_BUILD_DIR)/qw38
+
+$(CUDA_BUILD_DIR)/qw38: $(CUDA_ENGINE_OBJECTS) $(BUILD_DIR)/cli.o $(BUILD_DIR)/checkpoint.cuda.o $(BUILD_DIR)/full_scheduler.cuda.o $(BUILD_DIR)/scheduler_primitives.cuda.o $(BUILD_DIR)/quant_mmv.cuda.o $(BUILD_DIR)/gdn_step.cuda.o $(BUILD_DIR)/attention_decode.cuda.o | $(CUDA_BUILD_DIR)
+	$(NVCC) $(NVCCFLAGS) $^ -o $@
 
 cuda-native: $(BUILD_DIR)/qw38-cuda-probe $(BUILD_DIR)/qw38-cuda-quant-test $(BUILD_DIR)/qw38-cuda-dispatch-tuning-test $(BUILD_DIR)/qw38-cuda-gdn-test $(BUILD_DIR)/qw38-cuda-gdn-chunk-test $(BUILD_DIR)/qw38-cuda-attention-test $(BUILD_DIR)/qw38-cuda-attention-chunk-test $(BUILD_DIR)/qw38-cuda-scheduler-primitives-test $(BUILD_DIR)/qw38-cuda-full-scheduler-test $(BUILD_DIR)/qw38-cuda-prefix-sync-test $(BUILD_DIR)/qw38-cuda-atomic-eval-test $(BUILD_DIR)/qw38-cuda-checkpoint-test $(BUILD_DIR)/qw38-cuda-memory-fit-test $(BUILD_DIR)/qw38-cuda-timing-test $(BUILD_DIR)/qw38-cuda-fusion-test $(BUILD_DIR)/qw38-cuda-graph-test
 

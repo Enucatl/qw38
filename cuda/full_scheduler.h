@@ -164,6 +164,11 @@ class SchedulerSession final {
   Status restore_checkpoint(const std::string& path,
                             SchedulerWorkspace* workspace,
                             RuntimeTimings* timings = nullptr) noexcept;
+  Status copy_last_outputs(float* logits, std::size_t logits_count,
+                           float* hidden,
+                           std::size_t hidden_count) const noexcept;
+  Status copy_tokens(std::size_t* output,
+                     std::size_t output_count) const noexcept;
   std::size_t capacity() const noexcept;
   std::size_t frontier() const noexcept;
   std::size_t token_count() const noexcept;

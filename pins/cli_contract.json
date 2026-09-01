@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "task": "CLI-001",
+  "production_binary": "build/cuda/qw38",
+  "host_binary_scope": "validation_only",
+  "cuda_architecture": "sm_120",
+  "context_capacity": 131072,
+  "model_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+  "generation_order": ["sample", "eval", "publish"],
+  "supported": {
+    "interactive_turns": true,
+    "one_shot_prompt": true,
+    "reasoning_modes": ["off", "low", "medium", "xhigh"],
+    "sampling": ["temperature", "top_p", "top_k", "seed"],
+    "stops": ["im_end_token", "custom_text", "maximum_tokens"],
+    "commands": ["help", "save", "load", "reset", "quit"],
+    "atomic_checkpoint": true
+  },
+  "excluded": {
+    "token_streaming_within_turn": true,
+    "http_protocol": true,
+    "codex_provider": true,
+    "concurrent_gpu_sessions": true
+  },
+  "local_sources": {
+    "README.md": "8da62fcd1e36bb54fe48cfc4c754e292a3341b5a3bb13c0d0ae5ee8cf15761ab",
+    "Makefile": "cd8390ecf1869e47e763cbbcd6d0eb3b9716bfd32a8a43681ac04bb4007fc21a",
+    "include/qw38/engine.h": "35477862c4a057ffbf5f7e17bbff60c94c1906eba16a260efdbedb1a7c6eec4f",
+    "src/engine.cpp": "e4dc7608ff7af8ca6c52cd15dc80256f2742d5c1228c19fab8c11c44d7a6da15",
+    "src/cli.cpp": "80a3afa8655882fddc94c445538e656b80be07e1c7c2213bc551b9881e01c947",
+    "src/tokenizer.cpp": "83a11e2b283e5ede080fb5614811b29e1b90b0ed60db34451005315140961a05",
+    "src/tokenizer.h": "9d5c648f830fc07af941a7a1fe4b12ca633ec39347425ce074d7a4fff06b45a3",
+    "src/template.cpp": "4703f9a46dd2a0259ddfb7a73e4f454f82b8d9d654f04819cb8a9bb6b6b3770f",
+    "src/template.h": "516642294cb3086d84e0d16becfd58d3b451b31ab9782652efa2611768806a32",
+    "cuda/full_scheduler.cu": "d5d894fc6f64dfdda8f3c0f7b12ad8cfb01ed4b0e210e6d3cb9ec9582d750508",
+    "cuda/full_scheduler.h": "95bc5d1ef877bfc493b0f9444c9034e6b1fc021be2853f3615c0a9b4c2854147",
+    "tests/test_cli.py": "aa708b624f600723674c4e1ba057343942230de4bc1754614314368855f2d8b9",
+    "fixtures/cli_smoke.json": "6c9683758af5d0392727f17bada2c2c0030887cf7514c6645e7cfe457c863bcb",
+    "docs/56-interactive-text-cli.md": "dea87b13eb62159e6b24f13ca0c54324be176ec140c8d08a66fb598531b5a6b6"
+  }
+}

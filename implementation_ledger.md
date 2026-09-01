@@ -20,6 +20,7 @@ are repository-relative unless stated otherwise.
 | BLD-003 | Define and enforce the device allocation ledger | PIN-001 | in_progress | All persistent/transient allocations and 128K budgets are enumerated and checked | — |
 | API-001 | Implement explicit `Status` and move-only Engine/Session boundary | BLD-001 | done | Public header compiles without exceptions/RTTI and exposes the approved operations | [`include/qw38/engine.h`](include/qw38/engine.h), build log 2026-08-29T09:52:00Z |
 | MDL-001 | Parse, mmap, inventory, and fail-closed validate GGUF | PIN-001, API-001 | done | Exact tensor metadata/ranges/roles are checked; malformed fixtures pass pytest | [`pins/tensor_inventory.json`](pins/tensor_inventory.json), [`src/model.cpp`](src/model.cpp); log 2026-08-29T10:35:51Z |
+| MDL-003 | Accelerate full-file SHA-256 authentication with hardware dispatch | PIN-001, MDL-001 | done | The exact pinned digest is unchanged; accelerated and portable backends pass byte fixtures; the production container selects acceleration; full-model before/after timings and fallback behavior are retained | [`src/sha256.cpp`](src/sha256.cpp); [`fixtures/sha256_acceleration.json`](fixtures/sha256_acceleration.json); [`docs/57-hardware-sha256.md`](docs/57-hardware-sha256.md); log 2026-09-01T11:56:52Z |
 | MDL-002 | Validate official 64-layer hybrid model contract | MDL-001 | done | 48 GDN/16 attention schedule, width, GQA, partial RoPE, and dtypes match authority | [`pins/model_contract.json`](pins/model_contract.json), [`docs/14-artifact-validation.md`](docs/14-artifact-validation.md); log 2026-08-29T10:35:51Z |
 | TOK-001 | Implement pinned tokenizer | MDL-001, PIN-002 | done | Token IDs match frozen authority fixtures byte-for-byte | [`src/tokenizer.cpp`](src/tokenizer.cpp), [`fixtures/tokenizer_authority.json`](fixtures/tokenizer_authority.json); log 2026-08-29T11:02:00Z |
 | TOK-002 | Implement chat/reasoning/tool template | TOK-001 | done | All supported roles, reasoning, tool calls/results, and rejection cases match fixtures | [`src/template.cpp`](src/template.cpp), [`fixtures/template_authority.json`](fixtures/template_authority.json); log 2026-08-29T11:39:57Z |
@@ -63,7 +64,7 @@ are repository-relative unless stated otherwise.
 | OPT-002 | Profile and implement justified fusions | OPT-001, ORA-001 | done | Nsight evidence justifies each fusion; fused/unfused boundaries pass frozen gates | [`cuda/full_scheduler.cu`](cuda/full_scheduler.cu); [`fixtures/cuda_fusion.json`](fixtures/cuda_fusion.json); [`evidence/profiling/opt002-nsight-compute.txt`](evidence/profiling/opt002-nsight-compute.txt); tests; log 2026-09-01T05:44:16Z |
 | OPT-003 | Implement stable-address CUDA graphs | OPT-002 | done | Graph/non-graph equivalence passes and graph allocations are in MEM-001 | [`cuda/full_scheduler.cu`](cuda/full_scheduler.cu); [`fixtures/cuda_graph.json`](fixtures/cuda_graph.json); [`tests/test_cuda_graph.py`](tests/test_cuda_graph.py); log 2026-09-01T07:08:29Z |
 | OPT-004 | Tune row buckets/chunks and check in dispatch evidence | OPT-003 | done | Offline RTX 5090 sweep selects a reproducible table from retained raw results | [`cuda/quant_mmv.cu`](cuda/quant_mmv.cu); [`fixtures/cuda_dispatch_tuning.json`](fixtures/cuda_dispatch_tuning.json); [`evidence/profiling/opt004-dispatch-sweep-raw.txt`](evidence/profiling/opt004-dispatch-sweep-raw.txt); [`tests/test_cuda_dispatch_tuning.py`](tests/test_cuda_dispatch_tuning.py); log 2026-09-01T07:30:51Z |
-| CLI-001 | Implement interactive `qw38` text CLI | TOK-002, SES-003 | pending | Interactive generation, reasoning, stops, sampling, and persistence pass smoke tests | — |
+| CLI-001 | Implement interactive `qw38` text CLI | TOK-002, SES-003 | done | Interactive generation, reasoning, stops, sampling, and persistence pass smoke tests | [`src/cli.cpp`](src/cli.cpp); [`src/engine.cpp`](src/engine.cpp); [`fixtures/cli_smoke.json`](fixtures/cli_smoke.json); [`tests/test_cli.py`](tests/test_cli.py); log 2026-09-01T11:56:52Z |
 | SRV-001 | Implement single-flight HTTP server core and queue | API-001 | pending | Health/models endpoints, cancellation, queue timing, and one GPU session pass tests | — |
 | SRV-002 | Implement Chat Completions API | TOK-002, SES-002, SRV-001 | pending | Supported roles/tools/streaming/sampling/stops pass; exclusions reject explicitly | — |
 | SRV-003 | Implement Responses API and continuation | TOK-002, SES-003, SRV-001 | pending | Streaming/tools/`previous_response_id` and exclusions pass API fixtures | — |
@@ -114,6 +115,8 @@ are repository-relative unless stated otherwise.
 | EDU-038 | Explain profiler-led fusion and fused/unfused admission for beginners | OPT-002, DOC-001 | done | Kernel launch cost, utilization, fusion boundary, retained reference path, exact/numeric comparison, A/B samples, rejected candidates, and proof limits are code-linked and worked | [`docs/52-profiler-led-fusion.md`](docs/52-profiler-led-fusion.md); [`tests/test_cuda_fusion.py`](tests/test_cuda_fusion.py); log 2026-09-01T05:44:16Z |
 | EDU-039 | Explain stable-address CUDA graph capture, replay, ownership, and dynamic-boundary limits for beginners | OPT-003, DOC-001 | done | Capture/instantiate/replay, stable pointers, FFN graph scope, dynamic attention exclusion, retained non-graph path, equivalence, memory ownership, and proof limits are code-linked and worked | [`docs/53-stable-address-cuda-graphs.md`](docs/53-stable-address-cuda-graphs.md); [`tests/test_cuda_graph.py`](tests/test_cuda_graph.py); log 2026-09-01T07:08:29Z |
 | EDU-040 | Explain offline CUDA dispatch tuning, row buckets, prompt tiles, and selection limits for beginners | OPT-004, DOC-001 | done | Candidate launch shapes, row buckets, prompt tiles/chunks, warmups, samples, selection rule, retained negatives, checked-in table, and proof limits are code-linked and worked | [`docs/55-offline-dispatch-tuning.md`](docs/55-offline-dispatch-tuning.md); [`tests/test_cuda_dispatch_tuning.py`](tests/test_cuda_dispatch_tuning.py); log 2026-09-01T07:30:51Z |
+| EDU-041 | Explain the interactive CLI, public runtime ownership, generation loop, sampling, stops, and persistence for beginners | CLI-001, DOC-001 | done | Terminal input, chat rendering, encode/decode, sync/eval/sample separation, reasoning display, stop tokens, checkpoint commands, CUDA-only production build, and proof limits are code-linked and worked | [`docs/56-interactive-text-cli.md`](docs/56-interactive-text-cli.md); [`README.md`](README.md); log 2026-09-01T11:56:52Z |
+| EDU-042 | Explain artifact hashing, SHA-NI dispatch, fallback, and cold/warm storage limits for beginners | MDL-003, DOC-001 | done | Whole-file identity versus ZFS block integrity, CPU instructions, runtime dispatch, exact digest equality, cache/storage limits, measurements, and proof boundaries are code-linked and worked | [`docs/57-hardware-sha256.md`](docs/57-hardware-sha256.md); [`fixtures/sha256_acceleration.json`](fixtures/sha256_acceleration.json); log 2026-09-01T11:56:52Z |
 | REL-001 | Publish reproducible release evidence bundle | CMP-003, QLT-001, DOC-001 | pending | Builds, hashes, raw results, reports, and documentation claims reconcile | — |
 
 ## Delivery-Gate Mapping
@@ -2859,14 +2862,117 @@ are repository-relative unless stated otherwise.
 - Marked OPT-004 and EDU-040 done. The profiler/optimization delivery sequence
   is complete; CLI-001 is the next executable product task.
 
+### 2026-09-01T11:18:35Z — CLI-001 and EDU-041 started
+
+- Began the first usable product surface and added EDU-041 before implementation.
+  The current `qw38` binary intentionally exits 2, while public `Engine::open`
+  validates/maps/tokenizes the artifact but does not upload CUDA weights and all
+  public `Session` operations return `kUnimplemented`. The accepted CUDA model,
+  session, workspace, graphs, prefix sync, eval, greedy sampling, and checkpoint
+  implementations currently live only behind native diagnostics.
+- Scoped the work as two connected boundaries: compile a CUDA-enabled production
+  `Engine`/`Session` implementation while preserving the host-only validation
+  build, then keep the CLI limited to chat messages, tokens, logits, and session
+  methods. Token decoding and chat rendering require narrow public engine helpers;
+  no tensor pointer or device layout may enter `src/cli.cpp`.
+- The CLI will support interactive user turns, generation limits, reasoning
+  enable/disable and effort, temperature/top-p/top-k/seed, stop at the admitted
+  chat terminator, and explicit save/restore commands. HTTP compatibility and
+  Codex use remain SRV-001–SRV-003; a terminal executable alone is not presented
+  as an OpenAI-compatible model provider.
+
+### 2026-09-01T11:42:18Z — CLI-001 smoke harness negative
+
+- The first automated CUDA CLI smoke exited successfully after opening the
+  model but produced no answer. Diagnosis: the test passed input to
+  `subprocess.run`, but its `docker run` command omitted `-i`, so Docker did not
+  attach that input to the container and `qw38` observed immediate EOF at its
+  first `user>` prompt. Added Docker's stdin flag to the harness; no runtime or
+  expected model output changed. The failed 59.69-second run remains recorded
+  here and the corrected test must pass before CLI-001 can be accepted.
+
+### 2026-09-01T11:45:09Z — CLI-001 checkpoint-size negative
+
+- The corrected stdin-attached smoke generated exact `assistant> hello`, saved
+  a checkpoint with the expected magic, and executed `/load`, but its final
+  assertion reused the 160,004,416-byte size of SES-003's two-token fixture.
+  This CLI prompt has a longer committed frontier, so its checkpoint contains
+  more committed attention KV rows and is 161,118,596 bytes. Updated the test
+  and handbook to treat size as frontier-dependent, and made successful
+  interactive `/save` and `/load` commands print their resolved path so restore
+  success is directly assertable. No checkpoint layout changed.
+
+### 2026-09-01T11:41:26Z — MDL-003 and EDU-042 started
+
+- Added the startup-authentication task before changing hashing code. Quartz's
+  portable SHA-256 path authenticates the complete 18,973,870,432-byte artifact
+  on every `Engine::open` and previously measured 56.603 seconds. It copies
+  input through a byte-at-a-time update loop and runs a scalar compression
+  function despite this Ryzen 9 9900X exposing `sha_ni`.
+- A warm-cache `/usr/bin/sha256sum` control produced the identical pinned digest
+  `31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34`
+  in 8.56 seconds (7.82 user, 0.73 system), establishing that full SHA-256 can
+  be kept while removing most CPU cost. The selected boundary is runtime
+  dispatch to the pinned container's accelerated cryptographic provider with
+  the self-contained portable implementation retained as an explicit fallback.
+  BLAKE3 and metadata-only identity are not introduced by this task.
+
+### 2026-09-01T11:56:52Z — CLI-001, MDL-003, EDU-041, and EDU-042 accepted
+
+- Added the CUDA production `Engine`/`Session` implementation and linked
+  `build/cuda/qw38` while preserving the host validation product. A session now
+  owns the resident model safely beyond the originating engine handle and owns
+  its independent 131,072-token state, workspace, and 64 FFN graphs. Public
+  helpers expose only chat messages, token IDs, decoded text, logits, sampling,
+  evaluation, and persistence; the CLI never handles tensor/device layouts.
+- Added exact inverse GPT-2 byte decoding and an incremental user-turn template.
+  The interactive and one-shot CLI supports reasoning modes, greedy or seeded
+  temperature/top-p/top-k sampling, generation/custom/model stops, reset,
+  atomic checkpoint save/load, and exact token-history continuation. Pending
+  stochastic RNG state is committed only after evaluation of its sampled token
+  succeeds. A real RTX 5090 smoke produced exact `assistant> hello`, wrote a
+  frontier-dependent 161,118,596-byte `QW38CKP1` checkpoint, restored it in the
+  same process, and completed in 13.03 seconds.
+- Preserved two implementation negatives in addition to the smoke-harness and
+  checkpoint-size negatives above. The first CUDA engine compilation rejected
+  the host-only `unavailable` helper as unused under `-Werror`; isolating that
+  helper behind the host build condition fixed the ownership boundary. Review
+  also found that the first stochastic sampler draft advanced persisted RNG
+  state before token evaluation and held a raw resident-model pointer; pending
+  sampler commit and shared immutable model ownership fixed both issues before
+  admission.
+- Replaced the byte-at-a-time portable-only SHA-256 default with runtime
+  resolution of OpenSSL 3 EVP from the pinned container's `libcrypto.so.3`.
+  OpenSSL selects the CPU implementation, including SHA-NI on this Ryzen 9
+  9900X. The exact full-model digest remained
+  `31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34`;
+  warm-cache time fell from 56.603 to 8.47 seconds (6.682x). The block-copy
+  portable implementation remains selectable and exact; missing provider/init
+  falls back, while failures after provider initialization fail closed.
+- Added top-level copy-paste interactive/resume instructions and beginner
+  Chapters 56–57 covering runtime ownership, templates/tokens, atomic
+  sample/eval, stops, persistence, cryptographic hashes, SHA-NI/provider
+  dispatch, ZFS block integrity versus whole-file identity, and warm/cold cache
+  limits. Contracts and structured fixtures authenticate both gates.
+- `uv run ruff format .` completed with 64 Python files unchanged on the final
+  formatting pass. The ordinary suite passed 141 tests with sixteen expected
+  opt-in GPU skips in 162.25 seconds. A clean pinned CUDA 13.0.2 build compiled
+  all four host products, the CUDA CLI, and sixteen native SM120 diagnostics.
+  The complete RTX 5090 suite passed all 157 tests in 263.85 seconds.
+- Marked CLI-001, MDL-003, EDU-041, and EDU-042 done. SRV-001, the single-flight
+  HTTP server core, is the next executable product task; the CLI is usable now
+  but is not presented as a Codex/OpenAI-compatible provider.
+
 ## Decisions and Negative Results
 
 - **2026-08-29 / BLD-002:** Host `nvcc` is absent. Resolved for reproducibility
   by the pinned CUDA 13.0.2 container; the task stays in progress because only a
   device diagnostic, not engine CUDA kernels, targets SM120.
-- **2026-08-29 / MDL-001:** Whole-file in-process SHA-256 takes 56.603 s. It is
-  correct and fail-closed, but cache-keyed verification has not been designed or
-  admitted. No shortcut was implemented.
+- **2026-08-29 / MDL-001:** Whole-file in-process SHA-256 originally took
+  56.603 s. MDL-003 resolved the CPU bottleneck without a metadata shortcut:
+  the unchanged full-file digest now uses OpenSSL EVP runtime dispatch with a
+  portable fallback and measured 8.47 s warm-cache. Cold-cache storage cost and
+  optional immutable-snapshot receipts remain distinct future concerns.
 - **2026-08-29 / release boundary:** CUDA primitives, scalar execution,
   tokenizer/template, sessions, HTTP APIs, quality evaluation, 128K fit,
   optimization, and comparative performance have no implementation evidence and

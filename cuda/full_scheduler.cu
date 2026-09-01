@@ -805,6 +805,32 @@ Status SchedulerSession::state_equals(const SchedulerSession& other,
   return Status::ok();
 }
 
+Status SchedulerSession::copy_last_outputs(
+    float* logits, std::size_t logits_count, float* hidden,
+    std::size_t hidden_count) const noexcept {
+  if (frontier_ == 0 || logits == nullptr || hidden == nullptr ||
+      logits_count != internal::kVocabularySize ||
+      hidden_count != internal::kResidualWidth) {
+    return {StatusCode::kInvalidArgument,
+            "CUDA committed output copy input is invalid"};
+  }
+  std::memcpy(logits, last_logits_, logits_count * sizeof(float));
+  std::memcpy(hidden, last_hidden_, hidden_count * sizeof(float));
+  return Status::ok();
+}
+
+Status SchedulerSession::copy_tokens(std::size_t* output,
+                                     std::size_t output_count) const noexcept {
+  if ((frontier_ > 0 && output == nullptr) || output_count != frontier_) {
+    return {StatusCode::kInvalidArgument,
+            "CUDA committed token copy input is invalid"};
+  }
+  if (frontier_ > 0) {
+    std::memcpy(output, tokens_, frontier_ * sizeof(std::size_t));
+  }
+  return Status::ok();
+}
+
 std::size_t SchedulerSession::capacity() const noexcept { return capacity_; }
 std::size_t SchedulerSession::frontier() const noexcept { return frontier_; }
 std::size_t SchedulerSession::token_count() const noexcept { return frontier_; }

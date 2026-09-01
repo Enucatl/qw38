@@ -117,6 +117,9 @@ Status Tokenizer::build(const ModelInfo& model) noexcept {
   merge_ranks_.clear();
   special_tokens_.clear();
   byte_tokens_.assign(256, {});
+  byte_values_.clear();
+  id_tokens_ = model.tokenizer_tokens;
+  special_ids_.assign(model.tokenizer_tokens.size(), false);
   for (std::size_t index = 0; index < model.tokenizer_tokens.size(); ++index) {
     if (!vocabulary_.emplace(model.tokenizer_tokens[index], index).second) {
       return {StatusCode::kIncompatibleArtifact, "duplicate tokenizer token"};
@@ -124,6 +127,7 @@ Status Tokenizer::build(const ModelInfo& model) noexcept {
     const std::uint32_t type = model.tokenizer_token_types[index];
     if (type == 3 || type == 4) {
       special_tokens_.emplace_back(model.tokenizer_tokens[index], index);
+      special_ids_[index] = true;
     }
   }
   std::sort(special_tokens_.begin(), special_tokens_.end(),
@@ -154,6 +158,7 @@ Status Tokenizer::build(const ModelInfo& model) noexcept {
     const utf8proc_ssize_t length = utf8proc_encode_char(mapped, encoded.data());
     byte_tokens_[value].assign(reinterpret_cast<const char*>(encoded.data()),
                                static_cast<std::size_t>(length));
+    byte_values_.emplace(byte_tokens_[value], static_cast<std::uint8_t>(value));
   }
   return Status::ok();
 }
@@ -309,6 +314,38 @@ Status Tokenizer::encode_piece(const std::string& bytes,
               "BPE produced a token absent from the vocabulary"};
     }
     ids->push_back(token->second);
+  }
+  return Status::ok();
+}
+
+Status Tokenizer::decode(const std::vector<std::uint32_t>& ids,
+                         bool skip_special_tokens,
+                         std::string* utf8) const noexcept {
+  if (utf8 == nullptr) {
+    return {StatusCode::kInvalidArgument, "decoded text output is required"};
+  }
+  utf8->clear();
+  for (std::uint32_t id : ids) {
+    if (id >= id_tokens_.size()) {
+      return {StatusCode::kInvalidArgument, "token ID is outside the vocabulary"};
+    }
+    if (special_ids_[id]) {
+      if (!skip_special_tokens) *utf8 += id_tokens_[id];
+      continue;
+    }
+    std::vector<Codepoint> points;
+    Status status = codepoints(id_tokens_[id], &points);
+    if (!status.is_ok()) return status;
+    for (const Codepoint& point : points) {
+      const std::string symbol =
+          id_tokens_[id].substr(point.begin, point.end - point.begin);
+      const auto byte = byte_values_.find(symbol);
+      if (byte == byte_values_.end()) {
+        return {StatusCode::kIncompatibleArtifact,
+                "token contains a symbol outside the GPT-2 byte map"};
+      }
+      utf8->push_back(static_cast<char>(byte->second));
+    }
   }
   return Status::ok();
 }

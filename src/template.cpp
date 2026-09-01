@@ -221,4 +221,19 @@ Status render_chat(const TemplateInput& input, std::string* rendered) noexcept {
   return Status::ok();
 }
 
+Status render_user_turn(const std::string& content, bool enable_thinking,
+                        std::string* rendered) noexcept {
+  if (rendered == nullptr) {
+    return {StatusCode::kInvalidArgument, "rendered turn output is required"};
+  }
+  const std::string query = trim(content);
+  if (query.empty()) {
+    return {StatusCode::kInvalidArgument, "user turn cannot be empty"};
+  }
+  *rendered = "<|im_start|>user\n" + query +
+              "<|im_end|>\n<|im_start|>assistant\n";
+  *rendered += enable_thinking ? "<think>\n" : "<think>\n\n</think>\n\n";
+  return Status::ok();
+}
+
 }  // namespace qw38::internal
