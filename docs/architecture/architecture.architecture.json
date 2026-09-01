@@ -46,11 +46,12 @@
       "type": "backend",
       "label": "qw38-server",
       "sublabel": "single-flight HTTP boundary",
-      "tag": "control plane admitted",
+      "tag": "Chat Completions admitted",
       "pos": [260, 315],
       "size": [180, 72],
       "sources": [
-        {"path": "src/server.cpp", "line": 196, "label": "HTTP control routes"},
+        {"path": "src/server.cpp", "line": 535, "label": "Chat Completions route"},
+        {"path": "src/server_generation.cpp", "line": 97, "label": "generation loop"},
         {"path": "src/server_core.cpp", "line": 8, "label": "single-flight queue"}
       ]
     },
@@ -204,7 +205,7 @@
       "title": "Runtime contract",
       "items": [
         "CLI and server operate on tokens, logits, and sessions; tensor layouts stay inside the engine.",
-        "The current server and session operations fail closed until their delivery gates pass."
+        "Chat Completions is admitted; Responses and unsupported operations fail closed."
       ]
     },
     {

@@ -147,13 +147,11 @@ invalid sampler values fail before inference.
 
 ## Can Codex call this engine?
 
-Not yet. Codex and other OpenAI-compatible clients expect generation endpoints,
-JSON request/response objects, streaming events, tool-call semantics,
-cancellation, and protocol errors. SRV-001 now provides the HTTP control plane,
-model discovery, and one-request-at-a-time ownership, but it deliberately has no
-generation route. Chat Completions and Responses remain SRV-002 and SRV-003.
-The CLI proves that a person or shell script can run the engine now; the two API
-gates must pass before Codex can select Quartz as an OpenAI-compatible provider.
+Not yet as a full Codex provider. SRV-002 now supplies an OpenAI-compatible Chat
+Completions generation endpoint with JSON, streaming, tools, cancellation, and
+protocol errors. Codex's required Responses behavior and continuation IDs remain
+the SRV-003 gate. The CLI and Chat Completions clients can run the engine now;
+Codex provider use must wait for that final API boundary.
 
 ## Evidence and proof boundary
 

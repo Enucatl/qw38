@@ -19,6 +19,7 @@ are repository-relative unless stated otherwise.
 | BLD-002 | Add pinned CUDA 13.0 SM120 build path | PIN-003, BLD-001 | done | Diagnostic and release CUDA builds target `sm_120` with recorded flags | [`Makefile`](Makefile); [`pins/cuda_quant_contract.json`](pins/cuda_quant_contract.json); log 2026-08-31T06:05:47Z |
 | BLD-003 | Define and enforce the device allocation ledger | PIN-001 | in_progress | All persistent/transient allocations and 128K budgets are enumerated and checked | — |
 | API-001 | Implement explicit `Status` and move-only Engine/Session boundary | BLD-001 | done | Public header compiles without exceptions/RTTI and exposes the approved operations | [`include/qw38/engine.h`](include/qw38/engine.h), build log 2026-08-29T09:52:00Z |
+| API-002 | Implement bounded JSON parsing and canonical serialization for the server | SRV-001 | done | Valid JSON, Unicode escapes, depth/body limits, canonical tool JSON, and malformed inputs pass native fixtures without a general JSON dependency | [`src/server_json.cpp`](src/server_json.cpp); [`src/server_api_test.cpp`](src/server_api_test.cpp); [`pins/chat_completions_contract.json`](pins/chat_completions_contract.json); log 2026-09-01T19:00:04Z |
 | MDL-001 | Parse, mmap, inventory, and fail-closed validate GGUF | PIN-001, API-001 | done | Exact tensor metadata/ranges/roles are checked; malformed fixtures pass pytest | [`pins/tensor_inventory.json`](pins/tensor_inventory.json), [`src/model.cpp`](src/model.cpp); log 2026-08-29T10:35:51Z |
 | MDL-003 | Accelerate full-file SHA-256 authentication with hardware dispatch | PIN-001, MDL-001 | done | The exact pinned digest is unchanged; accelerated and portable backends pass byte fixtures; the production container selects acceleration; full-model before/after timings and fallback behavior are retained | [`src/sha256.cpp`](src/sha256.cpp); [`fixtures/sha256_acceleration.json`](fixtures/sha256_acceleration.json); [`docs/57-hardware-sha256.md`](docs/57-hardware-sha256.md); log 2026-09-01T11:56:52Z |
 | MDL-002 | Validate official 64-layer hybrid model contract | MDL-001 | done | 48 GDN/16 attention schedule, width, GQA, partial RoPE, and dtypes match authority | [`pins/model_contract.json`](pins/model_contract.json), [`docs/14-artifact-validation.md`](docs/14-artifact-validation.md); log 2026-08-29T10:35:51Z |
@@ -66,7 +67,7 @@ are repository-relative unless stated otherwise.
 | OPT-004 | Tune row buckets/chunks and check in dispatch evidence | OPT-003 | done | Offline RTX 5090 sweep selects a reproducible table from retained raw results | [`cuda/quant_mmv.cu`](cuda/quant_mmv.cu); [`fixtures/cuda_dispatch_tuning.json`](fixtures/cuda_dispatch_tuning.json); [`evidence/profiling/opt004-dispatch-sweep-raw.txt`](evidence/profiling/opt004-dispatch-sweep-raw.txt); [`tests/test_cuda_dispatch_tuning.py`](tests/test_cuda_dispatch_tuning.py); log 2026-09-01T07:30:51Z |
 | CLI-001 | Implement interactive `qw38` text CLI | TOK-002, SES-003 | done | Interactive generation, reasoning, stops, sampling, and persistence pass smoke tests | [`src/cli.cpp`](src/cli.cpp); [`src/engine.cpp`](src/engine.cpp); [`fixtures/cli_smoke.json`](fixtures/cli_smoke.json); [`tests/test_cli.py`](tests/test_cli.py); log 2026-09-01T11:56:52Z |
 | SRV-001 | Implement single-flight HTTP server core and queue | API-001 | done | Health/models endpoints, cancellation, queue timing, and one GPU session pass tests | [`src/server.cpp`](src/server.cpp); [`src/server_core.cpp`](src/server_core.cpp); [`fixtures/server_core.json`](fixtures/server_core.json); [`tests/test_server.py`](tests/test_server.py); log 2026-09-01T18:19:42Z |
-| SRV-002 | Implement Chat Completions API | TOK-002, SES-002, SRV-001 | pending | Supported roles/tools/streaming/sampling/stops pass; exclusions reject explicitly | — |
+| SRV-002 | Implement Chat Completions API | TOK-002, SES-002, SRV-001 | done | Supported roles/tools/streaming/sampling/stops pass; exclusions reject explicitly | [`src/server.cpp`](src/server.cpp); [`src/server_generation.cpp`](src/server_generation.cpp); [`fixtures/chat_completions.json`](fixtures/chat_completions.json); [`tests/test_server.py`](tests/test_server.py); log 2026-09-01T19:00:04Z |
 | SRV-003 | Implement Responses API and continuation | TOK-002, SES-003, SRV-001 | pending | Streaming/tools/`previous_response_id` and exclusions pass API fixtures | — |
 | BEN-001 | Implement `qw38-bench` component/end-to-end harness | OPT-001 | pending | Warmups/samples, telemetry, raw samples, failures, and environment metadata are retained | — |
 | EVAL-001 | Implement `qw38-eval` logits/traces/checkpoints harness | ORA-001, SES-003 | pending | Focused native diagnostics are driven by typed pytest helpers | — |
@@ -118,6 +119,7 @@ are repository-relative unless stated otherwise.
 | EDU-041 | Explain the interactive CLI, public runtime ownership, generation loop, sampling, stops, and persistence for beginners | CLI-001, DOC-001 | done | Terminal input, chat rendering, encode/decode, sync/eval/sample separation, reasoning display, stop tokens, checkpoint commands, CUDA-only production build, and proof limits are code-linked and worked | [`docs/56-interactive-text-cli.md`](docs/56-interactive-text-cli.md); [`README.md`](README.md); log 2026-09-01T11:56:52Z |
 | EDU-042 | Explain artifact hashing, SHA-NI dispatch, fallback, and cold/warm storage limits for beginners | MDL-003, DOC-001 | done | Whole-file identity versus ZFS block integrity, CPU instructions, runtime dispatch, exact digest equality, cache/storage limits, measurements, and proof boundaries are code-linked and worked | [`docs/57-hardware-sha256.md`](docs/57-hardware-sha256.md); [`fixtures/sha256_acceleration.json`](fixtures/sha256_acceleration.json); log 2026-09-01T11:56:52Z |
 | EDU-043 | Explain the HTTP listener, routes, single-flight queue, cancellation, and server lifecycle for beginners | SRV-001, DOC-001 | done | Sockets, HTTP requests/responses, loopback binding, health/models payloads, queue tickets/timing, cancellation, one-session ownership, shutdown, exclusions, and proof limits are code-linked and worked | [`docs/58-http-server-core.md`](docs/58-http-server-core.md); [`pins/server_core_contract.json`](pins/server_core_contract.json); [`fixtures/server_core.json`](fixtures/server_core.json); log 2026-09-01T18:19:42Z |
+| EDU-044 | Explain JSON, Chat Completions, SSE streaming, tools, stops, usage, queueing, and cancellation for beginners | SRV-002, API-002, DOC-001 | done | Request/response fields, validation, token generation, reasoning/content separation, function calls, stream events, stop behavior, session reuse, and proof limits are code-linked and worked | [`docs/59-chat-completions.md`](docs/59-chat-completions.md); [`pins/chat_completions_contract.json`](pins/chat_completions_contract.json); [`fixtures/chat_completions.json`](fixtures/chat_completions.json); log 2026-09-01T19:00:04Z |
 | REL-001 | Publish reproducible release evidence bundle | CMP-003, QLT-001, DOC-001 | pending | Builds, hashes, raw results, reports, and documentation claims reconcile | — |
 
 ## Delivery-Gate Mapping
@@ -3034,6 +3036,113 @@ are repository-relative unless stated otherwise.
   RTX 5090 suite passed all 160 tests in 275.58 seconds.
 - Marked SRV-001 and EDU-043 done. SRV-002, the Chat Completions request,
   generation, streaming, and cancellation boundary, is the next product task.
+
+### 2026-09-01T18:24:29Z — SRV-002, API-002, and EDU-044 started
+
+- Audited the admitted control plane, public Engine/Session API, official Qwen
+  template fixtures, CLI generation loop, and CUDA atomic-evaluation controls.
+  No JSON library is present by design. Added API-002 before implementation so
+  the strict JSON grammar, Unicode handling, nesting/body bounds, and canonical
+  tool serialization have their own acceptance evidence rather than being
+  hidden inside the HTTP handler.
+- Scoped SRV-002 to `POST /v1/chat/completions` with the exact pinned model,
+  system/developer/user/assistant/tool history, text content parts, reasoning
+  controls, function definitions/calls/results and tool choice, temperature,
+  top-p, top-k, seed, token limit, string/array stops, non-streaming JSON, and
+  `text/event-stream` output. One request acquires the existing FIFO gate and
+  synchronizes the one session to the rendered prompt, allowing exact-prefix
+  reuse while divergent histories reset and replay through the existing engine.
+- Active cancellation must cover both queue wait and CUDA work. A connection
+  watcher will turn peer disconnect into one atomic flag; the public session
+  boundary will pass that flag into prompt synchronization and per-token
+  `EvalControl` polling. Atomic CUDA evaluation ensures an interrupted token
+  does not publish partial GDN/KV state. Previously committed response tokens
+  are harmless because the next request synchronizes to its own exact prompt.
+- Explicitly kept Responses and `previous_response_id` in SRV-003. V1 text Chat
+  Completions will reject image/audio/file content, structured output, `n != 1`,
+  unsupported penalties/logprobs, legacy function fields, chunked request
+  bodies, and unknown protocol controls instead of silently pretending support.
+  Authentication, TLS, persistent connections, continuous batching, and
+  concurrent GPU sessions remain outside the approved v1 boundary.
+
+### 2026-09-01T18:30:27Z — SRV-002 first host-build negative
+
+- The first `make -j2 all` stopped while recompiling `src/cli.cpp`: extending
+  public `ChatMessage` with tool-call history made its two existing three-field
+  aggregate initializers trigger `-Werror=missing-field-initializers`. This is a
+  compile-time compatibility diagnosis, not a runtime or numerical failure.
+  Resolve it by explicitly initializing the empty tool-call vector at both CLI
+  sites, then rerun the complete host build before evaluating the new parser.
+
+### 2026-09-01T18:32:01Z — API-002 fixture-encoding negative
+
+- The new native API diagnostic compiled but exited one with no label. Source
+  inspection found that the patch transport had interpreted intended C++ `\xNN`
+  byte escapes before writing the file, producing UTF-8 for mojibake characters
+  instead of the expected emoji and deliberately incomplete sequence. Replace
+  those fixture literals with explicit C++ byte construction and make every
+  diagnostic failure print its stable case name. Parser behavior is unchanged.
+
+### 2026-09-01T18:49:50Z — SRV-002 focused-contract negatives
+
+- The focused 24-case contract run passed 19 cases with three expected CUDA
+  skips and failed two documentation/source-authentication assertions. Chapter
+  59 used the equally descriptive heading "One-session generation" while its
+  beginner vocabulary test requires the literal term "single-session". The CLI
+  contract also retained the old `src/cli.cpp` hash after the compile-time
+  compatibility fix explicitly initialized two empty tool-call vectors. Change
+  the heading and refresh only those authenticated hashes; no runtime behavior,
+  tolerance, or expected model output changes.
+
+### 2026-09-01T19:00:04Z — API-002, SRV-002, and EDU-044 accepted
+
+- Added a strict original JSON parser with all six JSON kinds, exact number
+  grammar, Unicode escapes and surrogate pairs, UTF-8 validation, duplicate-key
+  rejection, sorted canonical objects, a 64-level nesting limit, and compact or
+  template-compatible spaced serialization. HTTP POST bodies require a valid
+  `Content-Length`, `application/json`, no transfer encoding, and at most 1 MiB.
+- Added `POST /v1/chat/completions` for the exact pinned model. It validates
+  system/developer/user/assistant/tool history and text parts; reasoning modes;
+  temperature, top-p, top-k, seed and token limits; string/array stops; function
+  definitions, historical calls/results and auto/none/required/named choice;
+  ordinary JSON and SSE with optional usage. Unknown controls and image, audio,
+  file, structured output, multiple choices, parallel calls, log probabilities,
+  nonzero penalties, legacy functions, and chunked request bodies fail explicitly.
+- Extended the public message shape only with tool-call records and canonical
+  definitions, keeping HTTP objects outside the engine. The public session sync
+  and eval overloads accept one atomic cancellation flag; CUDA prefix replay now
+  forwards it into the same per-layer `EvalControl` used by atomic token
+  execution. The original overloads and CLI behavior remain intact.
+- Generation acquires the FIFO gate, renders/tokenizes the complete prompt,
+  enforces the 131,072-token capacity, synchronizes exact prefixes, and keeps
+  sample/eval commit ordering. It separates reasoning/content, parses declared
+  Qwen XML calls into typed JSON arguments, enforces forced tool choice, withholds
+  split stops, partial UTF-8 and internal tool XML, reports exact usage/finish
+  reasons, and exposes queue depth/delay headers. A socket monitor cancels queued
+  or active work; `/health` makes the accumulated cancellation count observable.
+- **Measured RTX 5090:** exact non-streaming `hello` and streamed `stream`
+  responses passed; SSE ended with `[DONE]` and usage; a canonical function-tool
+  prompt traversed the public engine; a custom `!` stop returned only `hello`;
+  the second concurrent request arrived at queue depth one with positive delay;
+  an already-active request observed peer disconnect, incremented the cancellation
+  counter, released the gate, and left the server healthy. The focused live case
+  passed in 43.02 seconds and SIGTERM exited zero.
+- Added beginner Chapter 59 from JSON value kinds, escapes and surrogate pairs
+  through HTTP body framing, every admitted/rejected field, roles, Qwen template
+  conversion, tool schemas and choices, prefix reuse, sampling/commit, SSE,
+  partial characters/stops, cancellation, and proof limits. Reconciled the
+  README, older handbook chapters, source ledger, and architecture view.
+- Final verification: `uv run ruff format .` left 65 Python files unchanged;
+  the focused affected-contract set passed 23 tests with five expected GPU
+  skips. The full ordinary suite passed 145 tests with seventeen expected GPU
+  skips in 161.44 seconds. A clean CUDA 13.0.2 build compiled four host products,
+  two native server diagnostics, two CUDA products, and sixteen SM120 diagnostics
+  with warnings as errors. The complete exclusive RTX 5090 suite passed all 162
+  tests in 304.97 seconds.
+- Marked API-002, SRV-002, and EDU-044 done. SRV-003—Responses objects,
+  streaming, tools, continuation storage, and `previous_response_id`—is the next
+  API product task. Authentication and remote-deployment concerns remain outside
+  the approved local v1 boundary.
 
 ## Decisions and Negative Results
 

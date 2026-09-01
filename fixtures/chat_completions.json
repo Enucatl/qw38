@@ -1,0 +1,70 @@
+{
+  "schema_version": 1,
+  "tasks": ["API-002", "SRV-002"],
+  "measured_at_utc": "2026-09-01T18:45:00Z",
+  "native": {
+    "strict_json": true,
+    "unicode_surrogate_pair": true,
+    "duplicate_keys_rejected": true,
+    "depth_limit_rejected": true,
+    "canonical_tool_json": true,
+    "roles_and_tool_history": true,
+    "named_tool_choice": true,
+    "reasoning_and_sampling_controls": true,
+    "image_rejected": true,
+    "structured_output_rejected": true,
+    "tool_output_parsed": true,
+    "split_stop_withheld": true,
+    "partial_utf8_withheld": true
+  },
+  "http": {
+    "route": "POST /v1/chat/completions",
+    "maximum_header_bytes": 65536,
+    "maximum_body_bytes": 1048576,
+    "maximum_json_depth": 64,
+    "request_transfer": "content_length",
+    "connections": "one_request_then_close"
+  },
+  "cuda_smoke": {
+    "container": "qw38-cuda:13.0.2",
+    "gpu": "NVIDIA GeForce RTX 5090",
+    "model_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+    "pytest_elapsed_seconds": 43.02,
+    "non_streaming_exact_content": "hello",
+    "streaming_exact_content": "stream",
+    "stream_done": true,
+    "stream_usage": true,
+    "canonical_tool_prompt_executed": true,
+    "custom_stop_visible_content": "hello",
+    "second_request_queue_depth": 1,
+    "second_request_queue_delay_positive": true,
+    "active_disconnect_cancelled": true,
+    "cancelled_requests_after_disconnect": 1,
+    "healthy_after_cancellation": true,
+    "graceful_sigterm_exit_code": 0,
+    "passed": true
+  },
+  "regression": {
+    "host_passed": 145,
+    "host_gpu_skipped": 17,
+    "host_elapsed_seconds": 161.44,
+    "cuda_passed": 162,
+    "cuda_elapsed_seconds": 304.97,
+    "clean_cuda_build": true
+  },
+  "negative_runs": [
+    {
+      "at_utc": "2026-09-01T18:30:27Z",
+      "cause": "new ChatMessage tool_calls field exposed two incomplete CLI aggregate initializers under -Werror",
+      "resolution": "explicitly initialize the empty tool-call vector",
+      "resolved": true
+    },
+    {
+      "at_utc": "2026-09-01T18:32:01Z",
+      "cause": "patch transport interpreted intended C++ byte escapes in the native fixture",
+      "resolution": "construct exact test bytes explicitly and label every diagnostic failure",
+      "resolved": true
+    }
+  ],
+  "scope": "Text Chat Completions on one CUDA session; Responses and previous_response_id remain SRV-003"
+}

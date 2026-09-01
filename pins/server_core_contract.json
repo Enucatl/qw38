@@ -11,6 +11,7 @@
   "requests_per_connection": 1,
   "gpu_sessions": 1,
   "public_routes": ["GET /health", "GET /v1/models"],
+  "health_extension": "cancelled_requests added by SRV-002",
   "errors": {
     "malformed": 400,
     "unknown_get": 404,
@@ -27,29 +28,28 @@
     "shutdown": "wake_all_with_cancelled"
   },
   "deferred": [
-    "chat_completions",
     "responses",
-    "request_json",
-    "streaming",
-    "tools",
     "authentication",
-    "active_cuda_cancellation",
     "tls",
     "persistent_connections"
   ],
+  "subsequently_admitted": {
+    "task": "SRV-002",
+    "features": ["chat_completions", "request_json", "streaming", "tools", "active_cuda_cancellation"]
+  },
   "local_sources": {
-    "Makefile": "f014e1a0081e061f283fe90cfa877e462314fee5fb93f01705e94c81d1a3d149",
-    "README.md": "153fdbe127b48b7d3d19c397eb6c29630af69f7c161e1b3ea8c9624a8a63dc49",
+    "Makefile": "688547d2d47384ddb4eed5eb983caf874f5df7bd3d126c64a0e741e1c7c79ece",
+    "README.md": "c1ffb0a208ee1d99dd64761a584dac69a93b352d693cd6ddb84aa9dfb754e3cd",
     ".gitignore": "961084adb4dd1a3c4bde4776aa337d8fa66e2d66e87d98f0f9e75a7e7bfa00ad",
-    "src/server.cpp": "0b9cfa54fca085611c0a775f1ae1e52732d64b5cbe4f29a89f380d6219abfd70",
+    "src/server.cpp": "2ebed4026d06edb57f858dc34ec897a96f517e228eee5beabffdca9f6382b62c",
     "src/server_core.cpp": "94b2df61560d8aa0fa777cd8588faa30a16b658e4ed2faaf57279160671f3db2",
     "src/server_core.h": "930a8e8ac6914f80a77e7194fa47023ff0b333bdff759279306220707fa870e8",
     "src/server_core_test.cpp": "754796d5836452e1fa80924676325e34f0f524996e9b848040469e639288d518",
-    "tests/test_server.py": "08c39597b0c996d176d90611eeaec15c1f61513fd4280a3f0a372504466101ad",
-    "fixtures/server_core.json": "344292f1ac6b13099bbe1f6e7c9b1b254a856cd7c787049b2e6a5614d0cf6924",
-    "docs/58-http-server-core.md": "5d5b71dc248c01e7c1483a17e4400a9113ca26fc690566b5e3e0f7ccb1a39b6c",
-    "docs/architecture/architecture.architecture.json": "26c5f7bfbad655dd803deb8f61c392baec33eaf799d2dfda0fe8c674d935cd64",
-    "docs/architecture/qw38-runtime-architecture.svg": "040e8fe9dab540c5b1260fd10ee5dd395013d3786a3af4bf2d2e9bade54b00b9",
-    "docs/architecture/architecture.html": "e37735edab0ebcbf0b9c4d0fd915e82b90898bb650b5ebba65b0afb0adb27f62"
+    "tests/test_server.py": "64ef5b681debc508b8c64351d6a5cd17f0c67e3c3e14b808dfaff3e3b055036c",
+    "fixtures/server_core.json": "50c404ede9cfeac92551736273ab3e4b3b25508f972e4c50549dfcf4c52584ec",
+    "docs/58-http-server-core.md": "558644cfb65759f0016dc5489ca30939f6eb2a8c4fc5312831284f160de3231f",
+    "docs/architecture/architecture.architecture.json": "521b3d29f29793c5f93f4eef2aea829bfb7d6dac062b019f297289a4e273836a",
+    "docs/architecture/qw38-runtime-architecture.svg": "3ba13ce9d8d26b29a7e95ab3b784fb8aba6767bbe1eb38057d3e63e719a1e966",
+    "docs/architecture/architecture.html": "deaaded30f1eda3b5140896bad953c9cb3d703de215a15950b3f2fbd3aabc5d2"
   }
 }

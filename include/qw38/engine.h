@@ -1,9 +1,11 @@
 #ifndef QW38_ENGINE_H_
 #define QW38_ENGINE_H_
 
+#include <atomic>
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "qw38/status.h"
@@ -31,12 +33,18 @@ struct ChatMessage final {
   ChatRole role = ChatRole::kUser;
   std::string content;
   std::string reasoning_content;
+  struct ToolCall final {
+    std::string name;
+    std::vector<std::pair<std::string, std::string>> rendered_arguments;
+  };
+  std::vector<ToolCall> tool_calls;
 };
 
 struct ChatOptions final {
   bool enable_thinking = true;
   std::string reasoning_effort = "xhigh";
   bool preserve_thinking = true;
+  std::vector<std::string> canonical_tools;
 };
 
 class Session final {
@@ -49,9 +57,12 @@ class Session final {
   Session& operator=(const Session&) = delete;
 
   Status sync(const std::vector<Token>& tokens) noexcept;
+  Status sync(const std::vector<Token>& tokens,
+              const std::atomic<bool>* cancelled) noexcept;
   Status logits(std::vector<float>* output) const noexcept;
   Status sample(const SamplerConfig& config, Token* token) const noexcept;
   Status eval(Token token) noexcept;
+  Status eval(Token token, const std::atomic<bool>* cancelled) noexcept;
   Status save(const std::string& path) const noexcept;
   Status restore(const std::string& path) noexcept;
   Status tokens(std::vector<Token>* output) const noexcept;

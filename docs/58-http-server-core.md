@@ -61,9 +61,10 @@ a five-second receive timeout. Responses use `MSG_NOSIGNAL`, so a client that
 disconnects during a write cannot terminate the server with `SIGPIPE`.
 
 Malformed input receives status 400 and a JSON error. An unsupported method on
-a known or unknown route receives 405 plus `Allow: GET`; an unknown GET path
-receives 404. The parser does not yet accept JSON request bodies or chunked
-request transfer encoding because SRV-001 has no generation route.
+a control route receives 405 plus `Allow: GET`; an unknown GET path receives
+404. SRV-002 extends the reader with `Content-Length` JSON bodies up to 1 MiB.
+Chunked request transfer remains unsupported. The data plane is explained in
+[Chapter 59](59-chat-completions.md).
 
 ## Control plane versus data plane
 
@@ -81,12 +82,13 @@ local startup probes.
 
 This returns the OpenAI-style list envelope and the one admitted model ID,
 `qwen3.8-27b-q4_k_m`. Reporting a model does not imply that every OpenAI
-endpoint is implemented. Chat Completions and Responses are the later SRV-002
-and SRV-003 gates.
+endpoint is implemented. Chat Completions was subsequently admitted by SRV-002;
+Responses remains the later SRV-003 gate.
 
-The **data plane** will contain requests that tokenize, synchronize a session,
-run CUDA, and generate output. SRV-001 builds its ownership mechanism but does
-not expose a placeholder generation route.
+The **data plane** now includes `POST /v1/chat/completions`, which tokenizes,
+synchronizes the session, runs CUDA, and generates output. SRV-001's focused
+proof remains the ownership mechanism and control routes; SRV-002 owns the
+generation behavior.
 
 ## Why single-flight exists
 
@@ -112,7 +114,7 @@ waits with arrival depth one, and records a maximum active count of one.
 A queued request carries an atomic cancellation flag. The queue checks it while
 waiting. On **cancellation**, it removes that ticket, wakes the other waiters,
 and returns an explicit `cancelled` status; it never becomes the GPU owner.
-This is the mechanism a later connection handler will set when its client
+The Chat Completions connection monitor now sets this flag when its client
 disconnects.
 
 `SIGINT` and `SIGTERM` initiate **graceful shutdown**. The listener closes so no
@@ -120,9 +122,8 @@ new connections arrive, the gate wakes every queued waiter with cancellation,
 and the server waits for its small control-plane connection handlers to finish.
 The session and resident model are then released by their ordinary owners.
 
-Active CUDA generation cancellation is not claimed here. SRV-002 must connect
-client disconnect detection to the scheduler's existing cancellation control
-while preserving atomic session state.
+SRV-002 subsequently connected client disconnect detection to prompt replay and
+the scheduler's atomic cancellation control. See Chapter 59 for that proof.
 
 ## Run the admitted control plane
 
@@ -158,9 +159,11 @@ The first real harness timed out even though the server was listening because a
 buffered text reader hid the readiness line from `select`; the corrected test
 uses raw pipe reads. That negative remains in the fixture and ledger.
 
-**Proof boundary:** this gate proves the socket lifecycle, bounded header
+**Proof boundary:** SRV-001 proves the socket lifecycle, bounded header
 parser, exact control routes, one-session allocation, FIFO exclusion, queue
 timing, queued cancellation, and graceful shutdown. It does not prove Chat
 Completions, Responses, request JSON, streaming, tools, authentication, active
 CUDA cancellation, TLS, persistent HTTP connections, remote deployment safety,
-or concurrent GPU sessions.
+or concurrent GPU sessions. Chat Completions, JSON, streaming, tools, and active
+cancellation were subsequently admitted by SRV-002 without changing this gate's
+historical measurements.

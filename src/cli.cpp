@@ -179,9 +179,9 @@ qw38::Status append_user(const qw38::Engine& engine,
     std::vector<qw38::ChatMessage> messages;
     if (!options.system.empty()) {
       messages.push_back(
-          {qw38::ChatRole::kSystem, options.system, std::string()});
+          {qw38::ChatRole::kSystem, options.system, std::string(), {}});
     }
-    messages.push_back({qw38::ChatRole::kUser, user, std::string()});
+    messages.push_back({qw38::ChatRole::kUser, user, std::string(), {}});
     status = engine.render_chat(messages, options.chat, &suffix);
   } else {
     status = engine.render_user_turn(user, options.chat.enable_thinking,

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import http.client
 import json
 import os
 import re
@@ -10,6 +11,7 @@ import subprocess
 import time
 import urllib.error
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import pytest
@@ -18,6 +20,7 @@ ROOT = Path(__file__).resolve().parents[1]
 IMAGE = "qw38-cuda:13.0.2"
 MODEL = ROOT / "models" / "Qwen3.8-27B-Q4_K_M.gguf"
 CORE_TEST = ROOT / "build" / "qw38-server-core-test"
+API_TEST = ROOT / "build" / "qw38-server-api-test"
 
 
 def test_server_contract_fixture_and_handbook_are_connected() -> None:
@@ -79,6 +82,58 @@ def test_single_flight_queue_is_fifo_timed_and_cancellable() -> None:
     assert "status=passed" in lines
 
 
+def test_chat_api_json_tools_and_output_contract() -> None:
+    result = subprocess.run(
+        [str(API_TEST)], check=False, capture_output=True, text=True
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert result.stdout.splitlines() == [
+        "json_case=unicode_canonical_duplicate_depth passed=true",
+        "request_case=roles_tools_sampling_stream passed=true",
+        "rejection_case=image_structured_output passed=true",
+        "output_case=reasoning_tool_stop_utf8 passed=true",
+        "status=passed",
+    ]
+
+
+def test_chat_completions_contract_fixture_and_handbook_are_connected() -> None:
+    contract = json.loads(
+        (ROOT / "pins" / "chat_completions_contract.json").read_text()
+    )
+    fixture = json.loads((ROOT / "fixtures" / "chat_completions.json").read_text())
+    assert contract["route"] == "POST /v1/chat/completions"
+    assert contract["model_id"] == "qwen3.8-27b-q4_k_m"
+    assert contract["limits"]["body_bytes"] == 1_048_576
+    assert contract["limits"]["json_depth"] == 64
+    assert contract["single_flight_sessions"] == 1
+    assert fixture["native"]["strict_json"] is True
+    assert fixture["native"]["canonical_tool_json"] is True
+    assert fixture["cuda_smoke"]["passed"] is True
+    assert fixture["cuda_smoke"]["second_request_queue_depth"] == 1
+    assert fixture["cuda_smoke"]["active_disconnect_cancelled"] is True
+    assert fixture["cuda_smoke"]["healthy_after_cancellation"] is True
+    for relative, expected in contract["local_sources"].items():
+        assert hashlib.sha256((ROOT / relative).read_bytes()).hexdigest() == expected
+
+    handbook = (ROOT / "docs" / "59-chat-completions.md").read_text().casefold()
+    for term in [
+        "json",
+        "surrogate pair",
+        "content-length",
+        "chatmessage",
+        "reasoning_content",
+        "tool_choice",
+        "single-session",
+        "finish_reason",
+        "server-sent events",
+        "partial utf-8",
+        "cancellation",
+        "atomic state",
+        "proof boundary",
+    ]:
+        assert term in handbook
+
+
 def _wait_for_server(
     process: subprocess.Popen[bytes], timeout: float
 ) -> tuple[int, list[str]]:
@@ -108,6 +163,22 @@ def _request(url: str, method: str = "GET") -> tuple[int, dict[str, object]]:
             return response.status, json.loads(response.read())
     except urllib.error.HTTPError as error:
         return error.code, json.loads(error.read())
+
+
+def _post_json(
+    base: str, body: dict[str, object]
+) -> tuple[int, dict[str, object], dict[str, str]]:
+    request = urllib.request.Request(
+        base + "/v1/chat/completions",
+        data=json.dumps(body).encode(),
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=30) as response:
+            return response.status, json.loads(response.read()), dict(response.headers)
+    except urllib.error.HTTPError as error:
+        return error.code, json.loads(error.read()), dict(error.headers)
 
 
 @pytest.mark.skipif(not MODEL.exists(), reason="the pinned GGUF is required")
@@ -179,6 +250,7 @@ def test_cuda_server_owns_one_session_and_serves_control_routes() -> None:
             "sessions": 1,
             "queue_active": False,
             "queue_depth": 0,
+            "cancelled_requests": 0,
         }
         status, models = _request(base + "/v1/models?ignored=true")
         assert status == 200
@@ -202,6 +274,211 @@ def test_cuda_server_owns_one_session_and_serves_control_routes() -> None:
             client.sendall(b"not-http\r\n\r\n")
             response = client.recv(4096)
         assert response.startswith(b"HTTP/1.1 400 Bad Request\r\n")
+
+        status, rejected, _ = _post_json(
+            base,
+            {
+                "model": "qwen3.8-27b-q4_k_m",
+                "messages": [{"role": "user", "content": "hello"}],
+                "response_format": {"type": "json_object"},
+            },
+        )
+        assert status == 400
+        assert rejected["error"]["code"] == "unimplemented"
+
+        status, completion, headers = _post_json(
+            base,
+            {
+                "model": "qwen3.8-27b-q4_k_m",
+                "messages": [{"role": "user", "content": "Reply with exactly: hello"}],
+                "reasoning_effort": "none",
+                "temperature": 0,
+                "max_completion_tokens": 8,
+            },
+        )
+        assert status == 200
+        assert completion["object"] == "chat.completion"
+        assert completion["choices"][0]["message"] == {
+            "role": "assistant",
+            "content": "hello",
+        }
+        assert completion["choices"][0]["finish_reason"] == "stop"
+        assert completion["usage"]["prompt_tokens"] > 0
+        assert completion["usage"]["completion_tokens"] > 0
+        assert int(headers["X-QW38-Queue-Depth"]) == 0
+        assert int(headers["X-QW38-Queue-Us"]) >= 0
+
+        status, tool_prompt, _ = _post_json(
+            base,
+            {
+                "model": "qwen3.8-27b-q4_k_m",
+                "messages": [
+                    {"role": "developer", "content": "Use tools when useful."},
+                    {"role": "user", "content": "What is the weather in Bern?"},
+                ],
+                "tools": [
+                    {
+                        "type": "function",
+                        "function": {
+                            "name": "weather",
+                            "description": "Get weather",
+                            "parameters": {
+                                "type": "object",
+                                "properties": {"city": {"type": "string"}},
+                                "required": ["city"],
+                            },
+                        },
+                    }
+                ],
+                "tool_choice": "auto",
+                "reasoning_effort": "none",
+                "temperature": 0,
+                "max_tokens": 1,
+            },
+        )
+        assert status == 200
+        assert (
+            tool_prompt["usage"]["prompt_tokens"] > completion["usage"]["prompt_tokens"]
+        )
+        assert tool_prompt["choices"][0]["finish_reason"] == "length"
+
+        status, stopped, _ = _post_json(
+            base,
+            {
+                "model": "qwen3.8-27b-q4_k_m",
+                "messages": [{"role": "user", "content": "Reply with exactly: hello!"}],
+                "reasoning_effort": "none",
+                "temperature": 0,
+                "max_tokens": 8,
+                "stop": "!",
+            },
+        )
+        assert status == 200
+        assert stopped["choices"][0]["message"]["content"] == "hello"
+        assert stopped["choices"][0]["finish_reason"] == "stop"
+
+        connection = http.client.HTTPConnection("127.0.0.1", port, timeout=30)
+        connection.request(
+            "POST",
+            "/v1/chat/completions",
+            body=json.dumps(
+                {
+                    "model": "qwen3.8-27b-q4_k_m",
+                    "messages": [
+                        {"role": "user", "content": "Reply with exactly: stream"}
+                    ],
+                    "reasoning_effort": "none",
+                    "temperature": 0,
+                    "max_tokens": 8,
+                    "stream": True,
+                    "stream_options": {"include_usage": True},
+                }
+            ),
+            headers={"Content-Type": "application/json"},
+        )
+        response = connection.getresponse()
+        assert response.status == 200
+        assert response.getheader("Content-Type") == "text/event-stream"
+        event_lines = [
+            line.decode().strip()
+            for line in response.readlines()
+            if line.startswith(b"data: ")
+        ]
+        connection.close()
+        assert event_lines[-1] == "data: [DONE]"
+        events = [json.loads(line[6:]) for line in event_lines[:-1]]
+        assert events[0]["choices"][0]["delta"]["role"] == "assistant"
+        streamed = "".join(
+            event["choices"][0]["delta"].get("content", "")
+            for event in events
+            if event["choices"]
+        )
+        assert streamed == "stream"
+        assert events[-1]["choices"] == []
+        assert events[-1]["usage"]["completion_tokens"] > 0
+
+        long_body: dict[str, object] = {
+            "model": "qwen3.8-27b-q4_k_m",
+            "messages": [
+                {
+                    "role": "user",
+                    "content": "List twenty distinct Swiss municipalities, one per line.",
+                }
+            ],
+            "reasoning_effort": "none",
+            "temperature": 0,
+            "max_tokens": 64,
+        }
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            first = executor.submit(_post_json, base, long_body)
+            deadline = time.monotonic() + 5
+            while time.monotonic() < deadline:
+                _, busy = _request(base + "/health")
+                if busy["queue_active"]:
+                    break
+                time.sleep(0.01)
+            else:
+                raise AssertionError("first generation never acquired the queue")
+            second_status, second, second_headers = _post_json(
+                base,
+                {
+                    "model": "qwen3.8-27b-q4_k_m",
+                    "messages": [
+                        {"role": "user", "content": "Reply with exactly: queued"}
+                    ],
+                    "reasoning_effort": "none",
+                    "temperature": 0,
+                    "max_tokens": 8,
+                },
+            )
+            first_status, _, _ = first.result(timeout=30)
+        assert first_status == 200
+        assert second_status == 200
+        assert second["choices"][0]["message"]["content"] == "queued"
+        assert int(second_headers["X-QW38-Queue-Depth"]) == 1
+        assert int(second_headers["X-QW38-Queue-Us"]) > 0
+
+        cancelled_body = json.dumps(
+            {
+                "model": "qwen3.8-27b-q4_k_m",
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": "Write a long essay that must not complete.",
+                    }
+                ],
+                "reasoning_effort": "none",
+                "temperature": 0,
+                "max_tokens": 128,
+            }
+        ).encode()
+        client = socket.create_connection(("127.0.0.1", port), timeout=5)
+        client.sendall(
+            b"POST /v1/chat/completions HTTP/1.1\r\n"
+            b"Host: 127.0.0.1\r\nContent-Type: application/json\r\n"
+            + f"Content-Length: {len(cancelled_body)}\r\n\r\n".encode()
+            + cancelled_body
+        )
+        deadline = time.monotonic() + 5
+        while time.monotonic() < deadline:
+            _, before_cancel = _request(base + "/health")
+            if before_cancel["queue_active"]:
+                break
+            time.sleep(0.01)
+        else:
+            client.close()
+            raise AssertionError("request never became active before cancellation")
+        client.close()
+        deadline = time.monotonic() + 5
+        while time.monotonic() < deadline:
+            _, after_cancel = _request(base + "/health")
+            if after_cancel["cancelled_requests"] >= 1:
+                break
+            time.sleep(0.01)
+        else:
+            raise AssertionError("client disconnect was not observed as cancellation")
+        assert after_cancel["queue_active"] is False
+        assert after_cancel["queue_depth"] == 0
 
         with socket.create_connection(("127.0.0.1", port), timeout=5) as client:
             client.sendall(

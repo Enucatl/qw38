@@ -7,10 +7,9 @@ engine for the pinned Qwen3.8-27B Q4_K_M artifact on one RTX 5090. The approved
 scope is in [plan.md](plan.md), and implementation claims and evidence are in
 [implementation_ledger.md](implementation_ledger.md).
 
-The CUDA text CLI is usable now. The server's health/model control plane is
-also admitted, while Chat Completions, Responses, comparative benchmarks, and
-the release quality gate remain under construction; unfinished operations
-continue to fail closed.
+The CUDA text CLI and OpenAI Chat Completions endpoint are usable now. Responses,
+comparative benchmarks, and the release quality gate remain under construction;
+unfinished operations continue to fail closed.
 
 ## Chat with Quartz now
 
@@ -61,10 +60,11 @@ authentication still reads the complete artifact but now uses hardware-
 accelerated SHA-256 where available; see
 [Hardware-accelerated model authentication](docs/57-hardware-sha256.md).
 
-## Start the server control plane
+## Start the Chat Completions server
 
-The CUDA server currently exposes `GET /health` and `GET /v1/models`. Start it
-with host networking so its loopback-only default is reachable from the host:
+The CUDA server exposes `GET /health`, `GET /v1/models`, and
+`POST /v1/chat/completions`. Start it with host networking so its loopback-only
+default is reachable from the host:
 
 ```sh
 docker run --rm --network host --gpus all \
@@ -81,10 +81,20 @@ curl http://127.0.0.1:8080/health
 curl http://127.0.0.1:8080/v1/models
 ```
 
-Generation endpoints are not available yet, so Codex cannot use this server as
-a provider until SRV-002 and SRV-003 pass. See the
-[single-flight server chapter](docs/58-http-server-core.md) for the HTTP parser,
-queue, cancellation, lifecycle, and proof boundary.
+Generate a deterministic response:
+
+```sh
+curl http://127.0.0.1:8080/v1/chat/completions \
+  -H 'Content-Type: application/json' \
+  -d '{"model":"qwen3.8-27b-q4_k_m","messages":[{"role":"user","content":"Reply with exactly: hello"}],"reasoning_effort":"none","temperature":0}'
+```
+
+Add `"stream":true` and use `curl -N` for token streaming. Chat Completions
+supports text roles, reasoning, function tools/results and choice, ordinary
+sampling controls, stops, usage, FIFO queueing, and disconnect cancellation.
+Codex still cannot use Quartz as its full provider because the Responses API is
+the separate SRV-003 gate. See the [server-core chapter](docs/58-http-server-core.md)
+and [Chat Completions chapter](docs/59-chat-completions.md).
 
 The beginner-oriented [implementation handbook](docs/README.md) explains each
 admitted concept and links it to code, fixtures, failures, and evidence. The
@@ -176,8 +186,8 @@ first simultaneous full-capacity allocation and remaining reserve while keeping
 the final post-graph MEM-001 admission explicitly open.
 Chapters 51–55 cover timing, fusion, CUDA graphs, the final admitted 128K
 allocation, and offline RTX 5090 dispatch tuning. Chapters 56–58 cover the
-working interactive CLI, accelerated model authentication, and admitted HTTP
-control plane.
+working interactive CLI, accelerated model authentication, the HTTP control
+plane, and Chat Completions data plane.
 
 ## Build
 

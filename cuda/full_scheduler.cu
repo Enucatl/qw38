@@ -1394,7 +1394,8 @@ Status sync_tokens(const ResidentModel& model, const std::size_t* tokens,
                    std::size_t token_count, SchedulerSession* session,
                    SchedulerWorkspace* workspace, float* host_logits,
                    std::size_t logits_count, float* host_hidden,
-                   std::size_t hidden_count, SyncResult* result) noexcept {
+                   std::size_t hidden_count, SyncResult* result,
+                   const EvalControl* control) noexcept {
   if (session == nullptr || workspace == nullptr || result == nullptr ||
       model.resident_bytes() == 0 || session->capacity_ == 0 ||
       workspace->capacity_ != session->capacity_ ||
@@ -1440,7 +1441,7 @@ Status sync_tokens(const ResidentModel& model, const std::size_t* tokens,
   for (std::size_t index = start; index < token_count; ++index) {
     const Status status = execute_token(
         model, tokens[index], session, workspace, host_logits, logits_count,
-        host_hidden, hidden_count, &elapsed);
+        host_hidden, hidden_count, &elapsed, control);
     if (!status.is_ok()) return status;
   }
   return Status::ok();

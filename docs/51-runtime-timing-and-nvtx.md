@@ -101,6 +101,7 @@ timeline does not accidentally swallow later work.
 OPT-001 proves category exposure, synchronized ordering, NVTX range placement,
 sampling/persistence timing, and explicit unavailable values on this runtime.
 It does not prove a fusion is beneficial, provide an Nsight report, measure CUDA
-graphs, merge the separately measured SRV-001 queue delay into an end-to-end
-request record, establish p50/p95 latency, or pass the comparative speed gate.
-Those belong to OPT-002 through OPT-004, SRV-002, BEN-001, and CMP.
+graphs, establish p50/p95 request latency, or pass the comparative speed gate.
+SRV-002 now exposes separately measured queue depth/delay on Chat Completions
+responses; merging repeated queue and engine samples into benchmark statistics
+belongs to OPT-002 through OPT-004, BEN-001, and CMP.

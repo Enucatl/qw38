@@ -173,6 +173,7 @@ Status Engine::render_chat(const std::vector<ChatMessage>& messages,
   input.options.enable_thinking = options.enable_thinking;
   input.options.reasoning_effort = options.reasoning_effort;
   input.options.preserve_thinking = options.preserve_thinking;
+  input.canonical_tool_json = options.canonical_tools;
   input.messages.reserve(messages.size());
   for (const ChatMessage& message : messages) {
     internal::Message converted;
@@ -189,6 +190,10 @@ Status Engine::render_chat(const std::vector<ChatMessage>& messages,
     }
     converted.content = message.content;
     converted.reasoning_content = message.reasoning_content;
+    converted.tool_calls.reserve(message.tool_calls.size());
+    for (const ChatMessage::ToolCall& call : message.tool_calls) {
+      converted.tool_calls.push_back({call.name, call.rendered_arguments});
+    }
     input.messages.push_back(std::move(converted));
   }
   std::string rendered;
@@ -218,22 +223,43 @@ Session::Session(Session&&) noexcept = default;
 Session& Session::operator=(Session&&) noexcept = default;
 
 Status Session::sync(const std::vector<Token>& tokens) noexcept {
+  return sync(tokens, nullptr);
+}
+
+namespace {
+#ifdef QW38_CUDA_RUNTIME
+Status poll_cancelled(void* context) noexcept {
+  const auto* cancelled = static_cast<const std::atomic<bool>*>(context);
+  return cancelled != nullptr && cancelled->load(std::memory_order_relaxed)
+             ? Status(StatusCode::kCancelled, "request was cancelled")
+             : Status::ok();
+}
+#endif
+}  // namespace
+
+Status Session::sync(const std::vector<Token>& tokens,
+                     const std::atomic<bool>* cancelled) noexcept {
 #ifdef QW38_CUDA_RUNTIME
   if (!impl_) return {StatusCode::kInvalidArgument, "session is not initialized"};
   impl_->has_pending_sampler = false;
   std::vector<std::size_t> widened(tokens.begin(), tokens.end());
   cuda::SyncResult result;
+  const cuda::EvalControl control{poll_cancelled,
+                                  const_cast<std::atomic<bool>*>(cancelled)};
+  const cuda::EvalControl* control_pointer =
+      cancelled == nullptr ? nullptr : &control;
   if (widened.empty()) {
     return cuda::sync_tokens(*impl_->model, nullptr, 0, &impl_->session,
                              &impl_->workspace, nullptr, 0, nullptr, 0,
-                             &result);
+                             &result, control_pointer);
   }
   return cuda::sync_tokens(
       *impl_->model, widened.data(), widened.size(), &impl_->session,
       &impl_->workspace, impl_->logits.data(), impl_->logits.size(),
-      impl_->hidden.data(), impl_->hidden.size(), &result);
+      impl_->hidden.data(), impl_->hidden.size(), &result, control_pointer);
 #else
   (void)tokens;
+  (void)cancelled;
   return unavailable("prefix synchronization");
 #endif
 }
@@ -343,13 +369,21 @@ Status Session::sample(const SamplerConfig& config, Token* token) const noexcept
 #endif
 }
 Status Session::eval(Token token) noexcept {
+  return eval(token, nullptr);
+}
+
+Status Session::eval(Token token,
+                     const std::atomic<bool>* cancelled) noexcept {
 #ifdef QW38_CUDA_RUNTIME
   if (!impl_) return {StatusCode::kInvalidArgument, "session is not initialized"};
   float elapsed = 0.0F;
+  const cuda::EvalControl control{poll_cancelled,
+                                  const_cast<std::atomic<bool>*>(cancelled)};
   Status status = cuda::execute_token(
       *impl_->model, token, &impl_->session, &impl_->workspace,
       impl_->logits.data(), impl_->logits.size(), impl_->hidden.data(),
-      impl_->hidden.size(), &elapsed, nullptr, nullptr,
+      impl_->hidden.size(), &elapsed,
+      cancelled == nullptr ? nullptr : &control, nullptr,
       cuda::PointwisePath::kFused, &impl_->graphs);
   if (status.is_ok() && impl_->has_pending_sampler &&
       impl_->pending_token == token) {
@@ -359,6 +393,7 @@ Status Session::eval(Token token) noexcept {
   return status;
 #else
   (void)token;
+  (void)cancelled;
   return unavailable("evaluation");
 #endif
 }

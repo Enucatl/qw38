@@ -197,7 +197,8 @@ class SchedulerSession final {
   friend Status sync_tokens(const ResidentModel&, const std::size_t*,
                             std::size_t, SchedulerSession*,
                             class SchedulerWorkspace*, float*, std::size_t,
-                            float*, std::size_t, SyncResult*) noexcept;
+                            float*, std::size_t, SyncResult*,
+                            const EvalControl*) noexcept;
   friend Status greedy_sample(const SchedulerSession&, std::size_t*,
                               RuntimeTimings*) noexcept;
 };
@@ -255,7 +256,7 @@ class SchedulerWorkspace final {
   friend Status sync_tokens(const ResidentModel&, const std::size_t*,
                             std::size_t, SchedulerSession*, SchedulerWorkspace*,
                             float*, std::size_t, float*, std::size_t,
-                            SyncResult*) noexcept;
+                            SyncResult*, const EvalControl*) noexcept;
   friend class SchedulerGraphs;
 };
 
@@ -310,7 +311,8 @@ Status sync_tokens(const ResidentModel& model, const std::size_t* tokens,
                    std::size_t token_count, SchedulerSession* session,
                    SchedulerWorkspace* workspace, float* host_logits,
                    std::size_t logits_count, float* host_hidden,
-                   std::size_t hidden_count, SyncResult* result) noexcept;
+                   std::size_t hidden_count, SyncResult* result,
+                   const EvalControl* control = nullptr) noexcept;
 
 }  // namespace qw38::cuda
 

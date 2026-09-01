@@ -318,6 +318,17 @@ DSpark are explicitly rejected as Qwen model semantics.
   [`pins/server_core_contract.json`](../pins/server_core_contract.json), with
   native concurrency and real CUDA route evidence retained in
   [`fixtures/server_core.json`](../fixtures/server_core.json).
+- API-002, SRV-002, and EDU-044 use an original bounded JSON grammar,
+  OpenAI-shaped Chat Completions records, the Qwen tool format attributed above,
+  POSIX socket polling, and the admitted Engine/Session API. The parser in
+  [`src/server_json.cpp`](../src/server_json.cpp), protocol mapping in
+  [`src/server_api.cpp`](../src/server_api.cpp), generation loop in
+  [`src/server_generation.cpp`](../src/server_generation.cpp), and SRV-002
+  additions to [`src/server.cpp`](../src/server.cpp) do not copy a JSON library
+  or external serving-runtime implementation. Source identities and measured
+  behavior are authenticated by
+  [`pins/chat_completions_contract.json`](../pins/chat_completions_contract.json)
+  and [`fixtures/chat_completions.json`](../fixtures/chat_completions.json).
 
 ## Specialization and hardware references
 

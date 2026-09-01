@@ -24,7 +24,7 @@
   "routes": {
     "GET /health": {
       "status": 200,
-      "body": {"status": "ok", "ready": true, "model": "qwen3.8-27b-q4_k_m", "single_flight": true, "sessions": 1, "queue_active": false, "queue_depth": 0}
+      "body": {"status": "ok", "ready": true, "model": "qwen3.8-27b-q4_k_m", "single_flight": true, "sessions": 1, "queue_active": false, "queue_depth": 0, "cancelled_requests": 0}
     },
     "GET /v1/models": {
       "status": 200,
