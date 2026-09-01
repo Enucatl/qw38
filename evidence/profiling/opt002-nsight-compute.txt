@@ -1,0 +1,55 @@
+Quartz Watch 38 OPT-002 targeted Nsight Compute evidence
+Captured: 2026-09-01 UTC
+Device: NVIDIA GeForce RTX 5090, compute capability 12.0, 170 SMs
+Container: qw38-cuda:13.0.2
+Profiler: NVIDIA Nsight Compute 2025.3.1
+Host driver parameter: RmProfilingAdminOnly: 1
+Counter access: docker --cap-add SYS_ADMIN (no host driver change)
+
+Baseline input RMSNorm command:
+  ncu --set basic --kernel-name regex:rms_norm_fp32_to_bf16 \
+    --launch-count 1 --export build/opt002-rms-baseline \
+    ./build/qw38-cuda-timing-test MODEL CHECKPOINT
+
+Kernel: rms_norm_fp32_to_bf16
+Grid/block: (1,1,1) x (256,1,1)
+Duration: 159.39 us
+Compute (SM) throughput: 0.02%
+Memory throughput: 0.21%
+DRAM throughput: 0.02%
+Achieved occupancy: 16.66%
+Waves per SM: 0.00
+Profiler finding: grid too small to fill the device; one block for 170 SMs.
+
+Admitted fused command:
+  ncu --set basic --kernel-name regex:residual_add_norm_fp32_to_bf16 \
+    --launch-count 1 --export build/opt002-fused \
+    ./build/qw38-cuda-fusion-test MODEL
+
+Kernel: residual_add_norm_fp32_to_bf16
+Grid/block: (1,1,1) x (256,1,1)
+Duration: 45.54 us
+Compute (SM) throughput: 0.08%
+Memory throughput: 0.75%
+DRAM throughput: 0.09%
+Achieved occupancy: 16.62%
+Waves per SM: 0.00
+
+Rejected projection rewrite candidate:
+Kernel: q8_mmv_bf16, 5,120 rows
+Grid/block: (1280,1,1) x (256,1,1)
+Duration: 74.98 us
+Compute/memory throughput: 61.37%
+DRAM throughput: 42.14%
+Achieved occupancy: 73.83%
+Profiler finding: compute and memory are well-balanced.
+Decision: no Q8 MMV rewrite or fusion admitted under OPT-002.
+
+Important interpretation:
+- Nsight durations above use nine-pass kernel replay and are not ordinary token
+  timings. They select and explain a candidate; paired CUDA-event timings decide
+  whether the complete fused scheduler is admitted.
+- Nsight Systems is not installed in the pinned image, so no Systems timeline is
+  claimed. OPT-001 NVTX ranges are ready for the later profiling image.
+- Raw paired A/B samples and both fusion implementations are retained in
+  fixtures/cuda_fusion.json and cuda/full_scheduler.cu.

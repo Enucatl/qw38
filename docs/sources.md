@@ -264,6 +264,14 @@ DSpark are explicitly rejected as Qwen model semantics.
   RTX 5090 attribution sample plus the retained unavailable-Nsight-Systems and
   denied-Nsight-Compute-counter results are recorded in
   [`fixtures/cuda_timing.json`](../fixtures/cuda_timing.json).
+- OPT-002 uses Nsight Compute 2025.3.1 from the pinned CUDA image to profile
+  local kernels; no external implementation code is copied. NVIDIA profiler
+  metrics select the candidate, while Quartz's retained unfused path and paired
+  CUDA-event samples decide admission. The source/fusion boundary is
+  authenticated in [`pins/cuda_fusion_contract.json`](../pins/cuda_fusion_contract.json);
+  raw A/B samples, profiler metrics, the balanced-MMV rejection, and the slower
+  serialized-fusion negative are retained in
+  [`fixtures/cuda_fusion.json`](../fixtures/cuda_fusion.json).
 
 ## Specialization and hardware references
 

@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "task": "OPT-002",
+  "target": "sm_120",
+  "toolkit": "CUDA 13.0.2",
+  "profiler": "Nsight Compute 2025.3.1",
+  "profiler_invocation": "container root with SYS_ADMIN; host RmProfilingAdminOnly remains 1",
+  "fusion": {
+    "name": "ffn_residual_add_with_next_input_norm",
+    "production_default": "fused",
+    "retained_reference": "unfused",
+    "removed_launches_per_token": 63,
+    "visible_boundaries": ["layer residual", "next BF16 normalized input", "logits", "session state"]
+  },
+  "admission": {
+    "logits_exact": true,
+    "hidden_exact": true,
+    "trace_taps_exact": true,
+    "session_state_exact": true,
+    "greedy_exact": true,
+    "minimum_warmups": 3,
+    "minimum_paired_samples": 30,
+    "fused_mean_must_be_lower": true
+  },
+  "profiling_report": {
+    "path": "evidence/profiling/opt002-nsight-compute.txt",
+    "sha256": "97a88c6b9c48fd7f1d493eca67ab748af71ea228d7fa6986bc09c992a053a4a9"
+  },
+  "local_sources": {
+    "Makefile": "9fc0f9f3119dafd6fdab9b100175bf60083c714e602f126955bb132b48ad3a8e",
+    "cuda/full_scheduler.h": "5bec20700fc7a184c98f7c2b012e006669609b1ec1e4de6dd3b592e0e28a826f",
+    "cuda/full_scheduler.cu": "1b5a9d8a67b9bafc85980248bf3828fa4314082111d4d65703f246824b284914",
+    "cuda/fusion_test.cu": "40cbb6b8e9721141e7b6fa6f38bd6fefbf5ea015935338ea1a42e531ef4588e8"
+  }
+}

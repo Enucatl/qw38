@@ -60,7 +60,7 @@ are repository-relative unless stated otherwise.
 | SES-003 | Implement atomic checkpoint save/restore | SES-001, SES-002 | done | All state and compatibility hashes persist; resumed continuation is exact | [`cuda/checkpoint.cu`](cuda/checkpoint.cu); [`fixtures/cuda_checkpoint.json`](fixtures/cuda_checkpoint.json); [`tests/test_cuda_checkpoint.py`](tests/test_cuda_checkpoint.py); log 2026-08-31T19:09:54Z |
 | MEM-001 | Demonstrate 131,072-token fit with 1.5 GiB reserve | BLD-003, SCH-001 | in_progress | Post-graph measured ledger includes 8 GiB KV and every named allocation on RTX 5090 | Pre-graph evidence: [`cuda/memory_fit_test.cu`](cuda/memory_fit_test.cu); [`fixtures/cuda_memory_fit_pre_graph.json`](fixtures/cuda_memory_fit_pre_graph.json); [`tests/test_cuda_memory_fit.py`](tests/test_cuda_memory_fit.py); final admission pending OPT-003 |
 | OPT-001 | Add synchronized timings, NVTX, and attribution | SCH-001 | done | Component/end-to-end measurements expose every named time category | [`cuda/full_scheduler.cu`](cuda/full_scheduler.cu); [`cuda/timing_test.cu`](cuda/timing_test.cu); [`fixtures/cuda_timing.json`](fixtures/cuda_timing.json); tests; log 2026-08-31T20:00:28Z |
-| OPT-002 | Profile and implement justified fusions | OPT-001, ORA-001 | pending | Nsight evidence justifies each fusion; fused/unfused boundaries pass frozen gates | — |
+| OPT-002 | Profile and implement justified fusions | OPT-001, ORA-001 | done | Nsight evidence justifies each fusion; fused/unfused boundaries pass frozen gates | [`cuda/full_scheduler.cu`](cuda/full_scheduler.cu); [`fixtures/cuda_fusion.json`](fixtures/cuda_fusion.json); [`evidence/profiling/opt002-nsight-compute.txt`](evidence/profiling/opt002-nsight-compute.txt); tests; log 2026-09-01T05:44:16Z |
 | OPT-003 | Implement stable-address CUDA graphs | OPT-002 | pending | Graph/non-graph equivalence passes and graph allocations are in MEM-001 | — |
 | OPT-004 | Tune row buckets/chunks and check in dispatch evidence | OPT-003 | pending | Offline RTX 5090 sweep selects a reproducible table from retained raw results | — |
 | CLI-001 | Implement interactive `qw38` text CLI | TOK-002, SES-003 | pending | Interactive generation, reasoning, stops, sampling, and persistence pass smoke tests | — |
@@ -111,6 +111,7 @@ are repository-relative unless stated otherwise.
 | EDU-035 | Explain versioned atomic CUDA checkpoint save/restore for beginners | SES-003, DOC-001 | done | File framing, compatibility and payload hashes, logical state sections, atomic rename, validation-before-mutation, sampler persistence, exact continuation, corruption, and proof limits are code-linked and worked | [`docs/49-cuda-checkpoints.md`](docs/49-cuda-checkpoints.md); [`tests/test_cuda_checkpoint.py`](tests/test_cuda_checkpoint.py); log 2026-08-31T19:09:54Z |
 | EDU-036 | Explain the complete pre-graph 128K GPU allocation ledger and remaining graph gate for beginners | MEM-001, DOC-001 | done | GiB versus GB, resident/session/workspace categories, KV arithmetic, runtime/allocator deltas, reserve calculation, physical allocation, and why post-graph admission remains open are code-linked and worked | [`docs/50-pre-graph-128k-memory.md`](docs/50-pre-graph-128k-memory.md); [`tests/test_cuda_memory_fit.py`](tests/test_cuda_memory_fit.py); log 2026-08-31T19:17:33Z |
 | EDU-037 | Explain synchronized GPU timing, NVTX ranges, attribution categories, and profiler evidence for beginners | OPT-001, DOC-001 | done | CPU clocks versus CUDA events, asynchronous work, synchronization, ranges, category sums, unavailable boundaries, perturbation, and Nsight proof limits are code-linked and worked | [`docs/51-runtime-timing-and-nvtx.md`](docs/51-runtime-timing-and-nvtx.md); [`tests/test_cuda_timing.py`](tests/test_cuda_timing.py); log 2026-08-31T20:00:28Z |
+| EDU-038 | Explain profiler-led fusion and fused/unfused admission for beginners | OPT-002, DOC-001 | done | Kernel launch cost, utilization, fusion boundary, retained reference path, exact/numeric comparison, A/B samples, rejected candidates, and proof limits are code-linked and worked | [`docs/52-profiler-led-fusion.md`](docs/52-profiler-led-fusion.md); [`tests/test_cuda_fusion.py`](tests/test_cuda_fusion.py); log 2026-09-01T05:44:16Z |
 | REL-001 | Publish reproducible release evidence bundle | CMP-003, QLT-001, DOC-001 | pending | Builds, hashes, raw results, reports, and documentation claims reconcile | — |
 
 ## Delivery-Gate Mapping
@@ -2659,6 +2660,79 @@ are repository-relative unless stated otherwise.
 - Marked OPT-001 and EDU-037 done. OPT-002 profiler-led fusion is next; OPT-003
   stable-address CUDA graphs and the final post-graph MEM-001 rerun remain
   explicitly queued after it.
+
+### 2026-09-01T05:29:23Z — OPT-002 and EDU-038 started
+
+- Began OPT-002 with the clean OPT-001 scheduler and added EDU-038 before fusion
+  source changes. The chapter must explain why adjacent operations may be
+  combined, what remains visible, how the unfused reference is retained, and
+  why profiler output is evidence rather than an instruction to optimize every
+  warning.
+- Confirmed the host NVIDIA driver has `RmProfilingAdminOnly: 1`. Running Nsight
+  Compute as ordinary container user and as container root both reproduced
+  `ERR_NVGPUCTRPERM`; adding only the `SYS_ADMIN` container capability admitted
+  performance counters without changing the host driver setting.
+- Profiled one 5,120-row Q8 MMV with Nsight Compute 2025.3.1. It took 74.98 us,
+  reached 61.37% compute/memory throughput and 42.14% DRAM throughput, and was
+  described as balanced. This rejects blindly fusing or rewriting the dominant
+  FFN matrix multiplication in this task.
+- Profiled the 5,120-element FP32-to-BF16 RMSNorm boundary and retained
+  `build/opt002-rms-baseline.ncu-rep` as working evidence. Its one-block grid
+  used one of 170 SMs, reported 0.02% compute throughput, 0.21% memory
+  throughput, 16.66% achieved occupancy on its active SM, and a 159.39 us
+  replay-measured duration. This justifies testing fusion of the preceding FFN
+  residual add with the next layer's input normalization, while retaining the
+  current two-kernel path for A/B correctness and timing.
+- The first fused implementation made thread 0 perform both all 5,120 residual
+  additions/stores and the ordered norm sum. It was bit-exact at logits, hidden,
+  taps, complete session state, and greedy output, but 30 alternating samples
+  measured 78.0371094 ms fused versus 63.2383232 ms unfused (0.81036222x).
+  Rejected that work assignment. Follow-up keeps parallel residual writes and
+  only the already-serial ordered norm sum on thread 0, preserving arithmetic
+  while still testing whether removal of the second launch pays off.
+
+### 2026-09-01T05:44:16Z — OPT-002 and EDU-038 accepted
+
+- Implemented one admitted fusion: each layer's final FFN residual add also
+  prepares the next layer's BF16 input norm. Layer zero retains its standalone
+  input norm and layer 63 retains its final residual add, removing 63 launches
+  per token. `PointwisePath::kUnfused` preserves the old path for diagnostics;
+  fused is the production default.
+- The revised kernel parallelizes residual additions/stores, synchronizes its
+  block, then performs the same ordered FP32 sum and BF16 conversion as the
+  unfused norm. Across 33 repeated tokens, fused and unfused logits, final
+  hidden values, selected CUDA trace taps, complete session state, and greedy
+  output were byte-exact.
+- Three independent 3-warmup/30-sample alternating A/B runs measured speedups
+  of 1.02321708x, 1.02286899x, and 1.02247679x. The retained raw run measured
+  64.8529892 ms fused versus 66.3453064 ms unfused (1.02301073x), with all 30
+  paired samples stored. This is a local fusion result, not a product or
+  comparative benchmark claim.
+- Nsight Compute profiled the admitted fused kernel at 45.54 us under nine-pass
+  replay versus 159.39 us for the separate input RMSNorm profile. The targeted
+  report records commands, environment, metrics, and the rejected balanced Q8
+  MMV candidate. Replay durations are not treated as ordinary token timings.
+  Nsight Systems remains unavailable in this image; OPT-001 NVTX ranges remain
+  ready for a later profiling container.
+- Added the authenticated fusion contract, raw fixture, focused native/pytest
+  A/B gate, targeted profiler report, beginner Chapter 52, provenance entry,
+  and handbook navigation. The first static fixture test failed because Python
+  double-precision averaging differed by about 1.2e-5 ms from the diagnostic's
+  FP32 running sum; widened only that fixture-consistency rounding check from
+  `1e-7` to `5e-7` relative tolerance. No model/fusion correctness tolerance
+  changed.
+- `uv run ruff format .` reformatted one Python file. The ordinary suite passed
+  133 tests with thirteen expected exclusive-GPU skips in 161.61 seconds. A
+  clean pinned build compiled all four host products and fourteen native CUDA
+  diagnostics; the complete opt-in RTX 5090 suite passed 146 tests in 244.85
+  seconds.
+- Final review added fail-closed validation for an out-of-range diagnostic path
+  selector and verified that it leaves the frontier at zero. Six affected
+  contract tests passed with six expected GPU skips; the final real fusion gate
+  then passed both tests in 10.18 seconds.
+- Marked OPT-002 and EDU-038 done. OPT-003 stable-address CUDA graphs is now the
+  next executable task, followed immediately by the final post-graph MEM-001
+  reserve measurement.
 
 ## Decisions and Negative Results
 

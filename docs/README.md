@@ -76,7 +76,8 @@ for language and host portability decisions.
 49. [Versioned atomic CUDA checkpoints](49-cuda-checkpoints.md): complete logical state, little-endian framing, compatibility and payload hashes, durable rename publication, validation, and exact continuation.
 50. [The pre-graph 128K memory ledger](50-pre-graph-128k-memory.md): raw-byte ownership, 8 GiB KV arithmetic, runtime/allocator deltas, measured reserve, and the still-open post-graph gate.
 51. [Synchronized runtime timing and NVTX attribution](51-runtime-timing-and-nvtx.md): asynchronous launches, CUDA events, CPU clocks, named ranges, category ownership, unavailable boundaries, overhead, and profiler limits.
-52. [Source and evidence ledger](sources.md).
+52. [Profiler-led pointwise fusion](52-profiler-led-fusion.md): launch overhead, Nsight evidence, fused/unfused boundaries, rejected work assignment, bit-exact admission, and paired A/B samples.
+53. [Source and evidence ledger](sources.md).
 
 Claims use four labels: **Measured** (this exact artifact and hardware),
 **External** (a linked source), **Estimated** (reproducible arithmetic), and

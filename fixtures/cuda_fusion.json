@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "task": "OPT-002",
+  "device": "NVIDIA GeForce RTX 5090",
+  "compute_capability": "12.0",
+  "toolkit": "CUDA 13.0.2",
+  "profiler": {
+    "version": "2025.3.1",
+    "counter_access": "admitted with container SYS_ADMIN",
+    "q8_mmv_rejected_candidate": {
+      "duration_us": 74.98,
+      "compute_memory_throughput_percent": 61.37,
+      "dram_throughput_percent": 42.14,
+      "classification": "balanced; no rewrite admitted in OPT-002"
+    },
+    "unfused_rms_norm": {
+      "grid_blocks": 1,
+      "sms": 170,
+      "duration_us": 159.39,
+      "compute_throughput_percent": 0.02,
+      "memory_throughput_percent": 0.21,
+      "achieved_occupancy_percent": 16.66
+    },
+    "fused_residual_norm": {
+      "grid_blocks": 1,
+      "duration_us": 45.54,
+      "compute_throughput_percent": 0.08,
+      "memory_throughput_percent": 0.75,
+      "achieved_occupancy_percent": 16.62
+    },
+    "note": "durations are replay-instrumented single-kernel measurements and are not interchangeable with ordinary event timings"
+  },
+  "rejected_serial_variant": {
+    "fused_mean_ms": 78.0371094,
+    "unfused_mean_ms": 63.2383232,
+    "speedup": 0.81036222,
+    "correctness": "bit-exact",
+    "resolution": "rejected; parallelized residual writes while retaining ordered norm sum"
+  },
+  "admitted_run": {
+    "warmups": 3,
+    "samples": 30,
+    "alternating_first_path": true,
+    "fused_ms": [62.9678726, 63.5298882, 63.8516464, 63.9252815, 64.0102081, 64.0667496, 64.2201309, 64.3690872, 64.4280624, 64.4345932, 64.5489883, 64.5985565, 64.6615982, 64.8412781, 64.7955551, 65.0605087, 64.9520645, 65.1386566, 65.1729584, 65.3919373, 65.2759323, 65.4144669, 65.4095078, 65.5836182, 65.5689926, 65.7589111, 65.7634277, 65.920639, 65.8839645, 66.0446396],
+    "unfused_ms": [64.2651825, 65.1023712, 65.252861, 65.3326416, 65.3825607, 65.5622406, 65.6365433, 65.8067551, 65.8212128, 65.8969574, 65.9961929, 66.1343689, 66.135582, 66.3570557, 66.3132477, 66.5107193, 66.5689621, 66.6766434, 66.6302109, 66.8105316, 66.8305283, 66.9570541, 66.9465942, 67.1953583, 67.1854706, 67.295105, 67.2658844, 67.4897919, 67.4382706, 67.5626526],
+    "fused_mean_ms": 64.8529892,
+    "unfused_mean_ms": 66.3453064,
+    "fused_median_ms": 64.8966675,
+    "unfused_median_ms": 66.4338837,
+    "speedup": 1.02301073,
+    "exact": {
+      "logits": true,
+      "hidden": true,
+      "trace_taps": true,
+      "session_state": true,
+      "greedy": true
+    }
+  },
+  "replicate_speedups": [1.02321708, 1.02286899, 1.02247679],
+  "claim": "one admitted pointwise fusion with raw paired diagnostic samples; not a benchmark distribution for product throughput or evidence for unrelated kernels"
+}

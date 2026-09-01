@@ -185,6 +185,29 @@ __global__ void residual_add_fp32(const float* residual,
   }
 }
 
+__global__ void residual_add_norm_fp32_to_bf16(
+    const float* residual, const float* correction, const float* scale,
+    std::size_t count, float* output, __nv_bfloat16* normalized) {
+  __shared__ float inverse;
+  for (std::size_t index = threadIdx.x; index < count; index += blockDim.x) {
+    output[index] = __fadd_rn(residual[index], correction[index]);
+  }
+  __syncthreads();
+  if (threadIdx.x == 0) {
+    float sum = 0.0F;
+    for (std::size_t index = 0; index < count; ++index) {
+      const float value = output[index];
+      sum = __fadd_rn(sum, __fmul_rn(value, value));
+    }
+    inverse = 1.0F / sqrtf(sum / static_cast<float>(count) + 1.0e-6F);
+  }
+  __syncthreads();
+  for (std::size_t index = threadIdx.x; index < count; index += blockDim.x) {
+    normalized[index] = __float2bfloat16_rn(
+        __fmul_rn(__fmul_rn(output[index], inverse), scale[index]));
+  }
+}
+
 __global__ void compare_bytes(const std::uint8_t* left,
                               const std::uint8_t* right,
                               std::size_t count,
@@ -300,7 +323,8 @@ cudaError_t matrix_vector(const DeviceTensor& matrix,
 cudaError_t execute_ffn(const DeviceCommonLayer& layer,
                         const float* residual,
                         SchedulerWorkspace* workspace,
-                        float* output) noexcept {
+                        float* output, const float* next_input_norm,
+                        PointwisePath pointwise_path) noexcept {
   rms_norm_fp32_to_bf16<<<1, kThreads>>>(
       residual, layer.ffn_norm, internal::kResidualWidth,
       workspace->normalized_);
@@ -323,8 +347,15 @@ cudaError_t execute_ffn(const DeviceCommonLayer& layer,
                           workspace->mixer_output_);
   }
   if (error == cudaSuccess) {
-    residual_add_fp32<<<20, kThreads>>>(
-        residual, workspace->mixer_output_, internal::kResidualWidth, output);
+    if (pointwise_path == PointwisePath::kFused &&
+        next_input_norm != nullptr) {
+      residual_add_norm_fp32_to_bf16<<<1, kThreads>>>(
+          residual, workspace->mixer_output_, next_input_norm,
+          internal::kResidualWidth, output, workspace->normalized_);
+    } else {
+      residual_add_fp32<<<20, kThreads>>>(
+          residual, workspace->mixer_output_, internal::kResidualWidth, output);
+    }
     error = cudaPeekAtLastError();
   }
   return error;
@@ -842,14 +873,17 @@ Status execute_token(const ResidentModel& model, std::size_t token,
                      float* host_hidden, std::size_t hidden_count,
                      float* elapsed_milliseconds,
                      const EvalControl* control,
-                     RuntimeTimings* timings) noexcept {
+                     RuntimeTimings* timings,
+                     PointwisePath pointwise_path) noexcept {
   if (model.blob_ == nullptr || token >= internal::kVocabularySize ||
       session == nullptr || workspace == nullptr ||
       session->capacity_ == 0 || session->frontier_ >= session->capacity_ ||
       workspace->capacity_ != session->capacity_ || host_logits == nullptr ||
       logits_count != internal::kVocabularySize || host_hidden == nullptr ||
       hidden_count != internal::kResidualWidth ||
-      elapsed_milliseconds == nullptr) {
+      elapsed_milliseconds == nullptr ||
+      (pointwise_path != PointwisePath::kFused &&
+       pointwise_path != PointwisePath::kUnfused)) {
     return {StatusCode::kInvalidArgument,
             "CUDA token scheduler input, state, or output is invalid"};
   }
@@ -909,7 +943,8 @@ Status execute_token(const ResidentModel& model, std::size_t token,
                                                  ? &timings->gdn
                                                  : &timings->attention));
     }
-    if (error == cudaSuccess) {
+    if (error == cudaSuccess &&
+        (layer_index == 0 || pointwise_path == PointwisePath::kUnfused)) {
       rms_norm_fp32_to_bf16<<<1, kThreads>>>(
           residual, layer.common.input_norm, internal::kResidualWidth,
           workspace->normalized_);
@@ -1031,7 +1066,12 @@ Status execute_token(const ResidentModel& model, std::size_t token,
                           timings == nullptr ? nullptr : &timings->ffn);
     }
     if (error == cudaSuccess) {
-      error = execute_ffn(layer.common, next, workspace, residual);
+      const float* next_input_norm =
+          layer_index + 1 < model.layers_.size()
+              ? model.layers_[layer_index + 1].common.input_norm
+              : nullptr;
+      error = execute_ffn(layer.common, next, workspace, residual,
+                          next_input_norm, pointwise_path);
     }
     if (error == cudaSuccess) error = end_phase(categories);
     nvtxRangePop();

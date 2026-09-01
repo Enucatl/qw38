@@ -103,6 +103,11 @@ struct RuntimeTimings final {
   TimingValue token_total;
 };
 
+enum class PointwisePath : std::uint8_t {
+  kFused = 0,
+  kUnfused = 1,
+};
+
 class SchedulerWorkspace;
 
 class ResidentModel final {
@@ -134,7 +139,7 @@ class ResidentModel final {
                               class SchedulerSession*, class SchedulerWorkspace*,
                               float*, std::size_t, float*, std::size_t,
                               float*, const EvalControl*,
-                              RuntimeTimings*) noexcept;
+                              RuntimeTimings*, PointwisePath) noexcept;
 };
 
 class SchedulerSession final {
@@ -179,7 +184,7 @@ class SchedulerSession final {
                               SchedulerSession*, class SchedulerWorkspace*,
                               float*, std::size_t, float*, std::size_t,
                               float*, const EvalControl*,
-                              RuntimeTimings*) noexcept;
+                              RuntimeTimings*, PointwisePath) noexcept;
   friend Status sync_tokens(const ResidentModel&, const std::size_t*,
                             std::size_t, SchedulerSession*,
                             class SchedulerWorkspace*, float*, std::size_t,
@@ -236,7 +241,7 @@ class SchedulerWorkspace final {
                               SchedulerSession*, SchedulerWorkspace*, float*,
                               std::size_t, float*, std::size_t,
                               float*, const EvalControl*,
-                              RuntimeTimings*) noexcept;
+                              RuntimeTimings*, PointwisePath) noexcept;
   friend Status sync_tokens(const ResidentModel&, const std::size_t*,
                             std::size_t, SchedulerSession*, SchedulerWorkspace*,
                             float*, std::size_t, float*, std::size_t,
@@ -249,7 +254,9 @@ Status execute_token(const ResidentModel& model, std::size_t token,
                      float* host_hidden, std::size_t hidden_count,
                      float* elapsed_milliseconds,
                      const EvalControl* control = nullptr,
-                     RuntimeTimings* timings = nullptr) noexcept;
+                     RuntimeTimings* timings = nullptr,
+                     PointwisePath pointwise_path =
+                         PointwisePath::kFused) noexcept;
 
 Status greedy_sample(const SchedulerSession& session,
                      std::size_t* token,
