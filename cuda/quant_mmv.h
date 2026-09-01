@@ -21,6 +21,9 @@ std::size_t q8_workspace_bytes(std::size_t columns) noexcept;
 std::size_t q8_prompt_workspace_bytes(std::size_t prompt_rows,
                                       std::size_t columns) noexcept;
 
+unsigned int selected_mmv_warps(std::size_t rows) noexcept;
+unsigned int selected_mmq_prompt_tile(std::size_t prompt_rows) noexcept;
+
 cudaError_t launch_quant_mmv(QuantKind kind, const std::uint8_t* weights,
                              std::size_t rows, std::size_t columns,
                              const __nv_bfloat16* activation,
@@ -32,6 +35,18 @@ cudaError_t launch_quant_mmq(QuantKind kind, const std::uint8_t* weights,
                              const __nv_bfloat16* prompt,
                              std::size_t prompt_rows, Q8Block* q8_workspace,
                              float* output, cudaStream_t stream) noexcept;
+
+cudaError_t launch_quant_mmv_variant(
+    QuantKind kind, const std::uint8_t* weights, std::size_t rows,
+    std::size_t columns, const __nv_bfloat16* activation,
+    Q8Block* q8_workspace, float* output, unsigned int warps,
+    cudaStream_t stream) noexcept;
+
+cudaError_t launch_quant_mmq_variant(
+    QuantKind kind, const std::uint8_t* weights, std::size_t output_rows,
+    std::size_t columns, const __nv_bfloat16* prompt,
+    std::size_t prompt_rows, Q8Block* q8_workspace, float* output,
+    unsigned int prompt_tile, cudaStream_t stream) noexcept;
 
 cudaError_t launch_quant_row_decode(QuantKind kind,
                                     const std::uint8_t* weights,

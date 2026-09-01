@@ -356,6 +356,20 @@ int run_prompt_case(qw38::cuda::QuantKind kind, const char* name,
 }  // namespace
 
 int main() {
+  if (qw38::cuda::selected_mmv_warps(48) != 4 ||
+      qw38::cuda::selected_mmv_warps(1024) != 8 ||
+      qw38::cuda::selected_mmv_warps(5120) != 16 ||
+      qw38::cuda::selected_mmv_warps(10240) != 8 ||
+      qw38::cuda::selected_mmv_warps(12288) != 4 ||
+      qw38::cuda::selected_mmv_warps(17408) != 8 ||
+      qw38::cuda::selected_mmv_warps(248320) != 4 ||
+      qw38::cuda::selected_mmq_prompt_tile(1) != 1 ||
+      qw38::cuda::selected_mmq_prompt_tile(2) != 2 ||
+      qw38::cuda::selected_mmq_prompt_tile(4) != 4 ||
+      qw38::cuda::selected_mmq_prompt_tile(64) != 8) {
+    std::fprintf(stderr, "dispatch table selection failed\n");
+    return 1;
+  }
   if (qw38::cuda::q8_workspace_bytes(255) != 0 ||
       qw38::cuda::q8_workspace_bytes(256) !=
           8 * sizeof(qw38::cuda::Q8Block)) {

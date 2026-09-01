@@ -79,7 +79,8 @@ for language and host portability decisions.
 52. [Profiler-led pointwise fusion](52-profiler-led-fusion.md): launch overhead, Nsight evidence, fused/unfused boundaries, rejected work assignment, bit-exact admission, and paired A/B samples.
 53. [Stable-address CUDA graphs](53-stable-address-cuda-graphs.md): capture, instantiate, upload, replay, pointer lifetime, dynamic exclusions, equality, launch attribution, and graph memory.
 54. [Final post-graph 128K memory ledger](54-post-graph-128k-memory.md): all simultaneous owners, uploaded graph bytes, allocator reconciliation, free reserve, admission, and proof limits.
-55. [Source and evidence ledger](sources.md).
+55. [Offline CUDA dispatch tuning](55-offline-dispatch-tuning.md): launch shapes, row buckets, prompt tiles, warmups, samples, selection, retained losers, reproducibility, and proof limits.
+56. [Source and evidence ledger](sources.md).
 
 Claims use four labels: **Measured** (this exact artifact and hardware),
 **External** (a linked source), **Estimated** (reproducible arithmetic), and

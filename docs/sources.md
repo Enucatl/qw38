@@ -284,6 +284,15 @@ DSpark are explicitly rejected as Qwen model semantics.
   [`fixtures/cuda_memory_fit_post_graph.json`](../fixtures/cuda_memory_fit_post_graph.json);
   the earlier pre-graph fixture remains historical evidence rather than being
   overwritten.
+- OPT-004 uses no copied implementation. Quartz specializes its existing MMV
+  and MMQ kernels with compile-time launch candidates, then selects the checked-in
+  SM120 dispatch table from the local RTX 5090 sweep. Source identities and the
+  selection rule are authenticated in
+  [`pins/cuda_dispatch_tuning_contract.json`](../pins/cuda_dispatch_tuning_contract.json);
+  candidate means are retained in
+  [`fixtures/cuda_dispatch_tuning.json`](../fixtures/cuda_dispatch_tuning.json)
+  and individual samples in
+  [`evidence/profiling/opt004-dispatch-sweep-raw.txt`](../evidence/profiling/opt004-dispatch-sweep-raw.txt).
 
 ## Specialization and hardware references
 

@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "task": "OPT-004",
+  "target": "sm_120",
+  "toolkit": "CUDA 13.0.2",
+  "device": "NVIDIA GeForce RTX 5090",
+  "candidates": {
+    "mmv_warps_per_block": [4, 8, 16],
+    "mmq_prompt_rows_per_tile": [1, 2, 4, 8],
+    "prompt_rows": [1, 2, 4, 8, 16, 32, 64],
+    "warmups": 3,
+    "samples": 30,
+    "replicates": 3
+  },
+  "selection": {
+    "rule": "lowest arithmetic mean across three replicates at each admitted shape",
+    "mmv_rows_to_warps": {"48": 4, "1024": 8, "5120": 16, "6144": 8, "10240": 8, "12288": 4, "17408": 8, "248320": 4},
+    "mmq_prompt_rows_to_tile": {"1": 1, "2": 2, "4": 4, "8": 8, "16": 8, "32": 8, "64": 8}
+  },
+  "correctness": {
+    "per_output_warp_arithmetic_order": "unchanged",
+    "production_quant_fixture": "frozen numeric gates",
+    "full_scheduler": "frozen trace, logits, and greedy gates"
+  },
+  "local_sources": {
+    "Makefile": "418a122a652134533f1b300fb2772b8b98d3ef1cf26d356cee97d3ff4ef7417e",
+    "cuda/quant_mmv.cu": "85eaf6f6f4dbc9e229f085f7eb18f8c2536df15b833923527a39ec7c90788347",
+    "cuda/quant_mmv.h": "7996383bc93b87e92c45aa6d379b9c7a075cf19a13a82516259f45e727f62538",
+    "cuda/quant_mmv_test.cu": "3e59c5f458b161bdf94ae087369ca8faee069d7a039242f8fa945e6d1f12a5b0",
+    "cuda/dispatch_tuning_test.cu": "8a8d0aec94a0782fb309634c82245f9dbd343e0cae8b919a5efa6c289a8ed412",
+    "evidence/profiling/opt004-dispatch-sweep-raw.txt": "15b5174cbe0c75b708e07f0af51b01616b011d70207fb5154960b8487395b484"
+  }
+}

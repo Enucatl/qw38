@@ -7,7 +7,6 @@ namespace {
 
 constexpr int kWarpSize = 32;
 constexpr int kThreads = 256;
-constexpr int kPromptRowsPerTile = 4;
 constexpr std::size_t kValuesPerWeightBlock = 256;
 constexpr std::size_t kQ4KBytes = 144;
 constexpr std::size_t kQ6KBytes = 210;
@@ -96,14 +95,14 @@ __global__ void quantize_bf16_q8(const __nv_bfloat16* input, Q8Block* output,
   }
 }
 
-template <QuantKind Kind>
+template <QuantKind Kind, int Warps>
 __global__ void quant_mmv(const std::uint8_t* weights, std::size_t rows,
                           std::size_t columns, const Q8Block* activation,
                           float* output) {
   const int warp = threadIdx.x / kWarpSize;
   const int lane = threadIdx.x & (kWarpSize - 1);
   const std::size_t row =
-      static_cast<std::size_t>(blockIdx.x) * (kThreads / kWarpSize) + warp;
+      static_cast<std::size_t>(blockIdx.x) * Warps + warp;
   if (row >= rows) return;
 
   constexpr std::size_t kWeightBytes =
@@ -132,7 +131,7 @@ __global__ void quant_mmv(const std::uint8_t* weights, std::size_t rows,
   if (lane == 0) output[row] = sum;
 }
 
-template <QuantKind Kind>
+template <QuantKind Kind, int PromptRowsPerTile>
 __global__ void quant_mmq(const std::uint8_t* weights, std::size_t output_rows,
                           std::size_t columns, const Q8Block* prompt,
                           std::size_t prompt_rows, float* output) {
@@ -141,7 +140,7 @@ __global__ void quant_mmq(const std::uint8_t* weights, std::size_t output_rows,
   const std::size_t output_row =
       static_cast<std::size_t>(blockIdx.x) * (kThreads / kWarpSize) + warp;
   const std::size_t prompt_start =
-      static_cast<std::size_t>(blockIdx.y) * kPromptRowsPerTile;
+      static_cast<std::size_t>(blockIdx.y) * PromptRowsPerTile;
   if (output_row >= output_rows) return;
 
   constexpr std::size_t kWeightBytes =
@@ -153,14 +152,14 @@ __global__ void quant_mmq(const std::uint8_t* weights, std::size_t output_rows,
   const std::size_t q8_blocks_per_row = columns / kWarpSize;
   const std::uint8_t* row_weights =
       weights + output_row * (columns / kWeightValues) * kWeightBytes;
-  float sums[kPromptRowsPerTile] = {0.0F, 0.0F, 0.0F, 0.0F};
+  float sums[PromptRowsPerTile] = {};
   for (std::size_t column = lane; column < columns; column += kWarpSize) {
     const std::size_t weight_block = column / kWeightValues;
     const int within = static_cast<int>(column % kWeightValues);
     const std::uint8_t* block = row_weights + weight_block * kWeightBytes;
     const float weight = decode_weight<Kind>(block, within);
 #pragma unroll
-    for (int prompt_offset = 0; prompt_offset < kPromptRowsPerTile;
+    for (int prompt_offset = 0; prompt_offset < PromptRowsPerTile;
          ++prompt_offset) {
       const std::size_t prompt_row = prompt_start + prompt_offset;
       if (prompt_row < prompt_rows) {
@@ -174,7 +173,7 @@ __global__ void quant_mmq(const std::uint8_t* weights, std::size_t output_rows,
     }
   }
 #pragma unroll
-  for (int prompt_offset = 0; prompt_offset < kPromptRowsPerTile;
+  for (int prompt_offset = 0; prompt_offset < PromptRowsPerTile;
        ++prompt_offset) {
     for (int offset = 16; offset > 0; offset /= 2) {
       sums[prompt_offset] = __fadd_rn(
@@ -223,14 +222,56 @@ std::size_t q8_prompt_workspace_bytes(std::size_t prompt_rows,
   return prompt_rows * (columns / kWarpSize) * sizeof(Q8Block);
 }
 
-cudaError_t launch_quant_mmv(QuantKind kind, const std::uint8_t* weights,
-                             std::size_t rows, std::size_t columns,
-                             const __nv_bfloat16* activation,
-                             Q8Block* q8_workspace, float* output,
-                             cudaStream_t stream) noexcept {
+unsigned int selected_mmv_warps(std::size_t rows) noexcept {
+  if (rows <= 48) return 4;
+  if (rows <= 1024) return 8;
+  if (rows <= 5120) return 16;
+  if (rows <= 10240) return 8;
+  if (rows <= 12288) return 4;
+  if (rows <= 17408) return 8;
+  return 4;
+}
+
+unsigned int selected_mmq_prompt_tile(std::size_t prompt_rows) noexcept {
+  if (prompt_rows <= 1) return 1;
+  if (prompt_rows <= 2) return 2;
+  if (prompt_rows <= 4) return 4;
+  return 8;
+}
+
+template <int Warps>
+cudaError_t launch_mmv_kernel(QuantKind kind, const std::uint8_t* weights,
+                              std::size_t rows, std::size_t columns,
+                              const Q8Block* activation, float* output,
+                              cudaStream_t stream) noexcept {
+  constexpr int kLaunchThreads = Warps * kWarpSize;
+  const unsigned int row_blocks =
+      static_cast<unsigned int>((rows + Warps - 1) / Warps);
+  if (kind == QuantKind::kQ4K) {
+    quant_mmv<QuantKind::kQ4K, Warps>
+        <<<row_blocks, kLaunchThreads, 0, stream>>>(
+            weights, rows, columns, activation, output);
+  } else if (kind == QuantKind::kQ6K) {
+    quant_mmv<QuantKind::kQ6K, Warps>
+        <<<row_blocks, kLaunchThreads, 0, stream>>>(
+            weights, rows, columns, activation, output);
+  } else {
+    quant_mmv<QuantKind::kQ8_0, Warps>
+        <<<row_blocks, kLaunchThreads, 0, stream>>>(
+            weights, rows, columns, activation, output);
+  }
+  return cudaPeekAtLastError();
+}
+
+cudaError_t launch_quant_mmv_variant(
+    QuantKind kind, const std::uint8_t* weights, std::size_t rows,
+    std::size_t columns, const __nv_bfloat16* activation,
+    Q8Block* q8_workspace, float* output, unsigned int warps,
+    cudaStream_t stream) noexcept {
   if (weights == nullptr || activation == nullptr || q8_workspace == nullptr ||
       output == nullptr || rows == 0 || columns == 0 ||
       columns % kValuesPerWeightBlock != 0 ||
+      (warps != 4 && warps != 8 && warps != 16) ||
       (kind != QuantKind::kQ4K && kind != QuantKind::kQ6K &&
        kind != QuantKind::kQ8_0)) {
     return cudaErrorInvalidValue;
@@ -241,29 +282,59 @@ cudaError_t launch_quant_mmv(QuantKind kind, const std::uint8_t* weights,
       activation, q8_workspace, columns);
   cudaError_t error = cudaPeekAtLastError();
   if (error != cudaSuccess) return error;
-  const unsigned int row_blocks = static_cast<unsigned int>(
-      (rows + (kThreads / kWarpSize) - 1) / (kThreads / kWarpSize));
+  if (warps == 4) {
+    return launch_mmv_kernel<4>(kind, weights, rows, columns, q8_workspace,
+                                output, stream);
+  }
+  if (warps == 8) {
+    return launch_mmv_kernel<8>(kind, weights, rows, columns, q8_workspace,
+                                output, stream);
+  }
+  return launch_mmv_kernel<16>(kind, weights, rows, columns, q8_workspace,
+                                output, stream);
+}
+
+cudaError_t launch_quant_mmv(QuantKind kind, const std::uint8_t* weights,
+                             std::size_t rows, std::size_t columns,
+                             const __nv_bfloat16* activation,
+                             Q8Block* q8_workspace, float* output,
+                             cudaStream_t stream) noexcept {
+  return launch_quant_mmv_variant(kind, weights, rows, columns, activation,
+                                  q8_workspace, output,
+                                  selected_mmv_warps(rows), stream);
+}
+
+template <int PromptTile>
+cudaError_t launch_mmq_kernel(QuantKind kind, const std::uint8_t* weights,
+                              std::size_t output_rows, std::size_t columns,
+                              const Q8Block* prompt, std::size_t prompt_rows,
+                              float* output, cudaStream_t stream) noexcept {
+  const dim3 grid(
+      static_cast<unsigned int>((output_rows + 7) / 8),
+      static_cast<unsigned int>((prompt_rows + PromptTile - 1) / PromptTile));
   if (kind == QuantKind::kQ4K) {
-    quant_mmv<QuantKind::kQ4K><<<row_blocks, kThreads, 0, stream>>>(
-        weights, rows, columns, q8_workspace, output);
+    quant_mmq<QuantKind::kQ4K, PromptTile><<<grid, kThreads, 0, stream>>>(
+        weights, output_rows, columns, prompt, prompt_rows, output);
   } else if (kind == QuantKind::kQ6K) {
-    quant_mmv<QuantKind::kQ6K><<<row_blocks, kThreads, 0, stream>>>(
-        weights, rows, columns, q8_workspace, output);
+    quant_mmq<QuantKind::kQ6K, PromptTile><<<grid, kThreads, 0, stream>>>(
+        weights, output_rows, columns, prompt, prompt_rows, output);
   } else {
-    quant_mmv<QuantKind::kQ8_0><<<row_blocks, kThreads, 0, stream>>>(
-        weights, rows, columns, q8_workspace, output);
+    quant_mmq<QuantKind::kQ8_0, PromptTile><<<grid, kThreads, 0, stream>>>(
+        weights, output_rows, columns, prompt, prompt_rows, output);
   }
   return cudaPeekAtLastError();
 }
 
-cudaError_t launch_quant_mmq(QuantKind kind, const std::uint8_t* weights,
-                             std::size_t output_rows, std::size_t columns,
-                             const __nv_bfloat16* prompt,
-                             std::size_t prompt_rows, Q8Block* q8_workspace,
-                             float* output, cudaStream_t stream) noexcept {
+cudaError_t launch_quant_mmq_variant(
+    QuantKind kind, const std::uint8_t* weights, std::size_t output_rows,
+    std::size_t columns, const __nv_bfloat16* prompt,
+    std::size_t prompt_rows, Q8Block* q8_workspace, float* output,
+    unsigned int prompt_tile, cudaStream_t stream) noexcept {
   if (weights == nullptr || prompt == nullptr || q8_workspace == nullptr ||
       output == nullptr || output_rows == 0 || columns == 0 ||
       prompt_rows == 0 || columns % kValuesPerWeightBlock != 0 ||
+      (prompt_tile != 1 && prompt_tile != 2 && prompt_tile != 4 &&
+       prompt_tile != 8) ||
       (kind != QuantKind::kQ4K && kind != QuantKind::kQ6K &&
        kind != QuantKind::kQ8_0)) {
     return cudaErrorInvalidValue;
@@ -275,23 +346,30 @@ cudaError_t launch_quant_mmq(QuantKind kind, const std::uint8_t* weights,
       prompt, q8_workspace, prompt_values);
   cudaError_t error = cudaPeekAtLastError();
   if (error != cudaSuccess) return error;
-  const dim3 grid(
-      static_cast<unsigned int>(
-          (output_rows + (kThreads / kWarpSize) - 1) /
-          (kThreads / kWarpSize)),
-      static_cast<unsigned int>((prompt_rows + kPromptRowsPerTile - 1) /
-                                kPromptRowsPerTile));
-  if (kind == QuantKind::kQ4K) {
-    quant_mmq<QuantKind::kQ4K><<<grid, kThreads, 0, stream>>>(
-        weights, output_rows, columns, q8_workspace, prompt_rows, output);
-  } else if (kind == QuantKind::kQ6K) {
-    quant_mmq<QuantKind::kQ6K><<<grid, kThreads, 0, stream>>>(
-        weights, output_rows, columns, q8_workspace, prompt_rows, output);
-  } else {
-    quant_mmq<QuantKind::kQ8_0><<<grid, kThreads, 0, stream>>>(
-        weights, output_rows, columns, q8_workspace, prompt_rows, output);
+  if (prompt_tile == 1) {
+    return launch_mmq_kernel<1>(kind, weights, output_rows, columns,
+                                q8_workspace, prompt_rows, output, stream);
   }
-  return cudaPeekAtLastError();
+  if (prompt_tile == 2) {
+    return launch_mmq_kernel<2>(kind, weights, output_rows, columns,
+                                q8_workspace, prompt_rows, output, stream);
+  }
+  if (prompt_tile == 4) {
+    return launch_mmq_kernel<4>(kind, weights, output_rows, columns,
+                                q8_workspace, prompt_rows, output, stream);
+  }
+  return launch_mmq_kernel<8>(kind, weights, output_rows, columns, q8_workspace,
+                              prompt_rows, output, stream);
+}
+
+cudaError_t launch_quant_mmq(QuantKind kind, const std::uint8_t* weights,
+                             std::size_t output_rows, std::size_t columns,
+                             const __nv_bfloat16* prompt,
+                             std::size_t prompt_rows, Q8Block* q8_workspace,
+                             float* output, cudaStream_t stream) noexcept {
+  return launch_quant_mmq_variant(
+      kind, weights, output_rows, columns, prompt, prompt_rows, q8_workspace,
+      output, selected_mmq_prompt_tile(prompt_rows), stream);
 }
 
 cudaError_t launch_quant_row_decode(QuantKind kind,

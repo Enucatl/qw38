@@ -62,7 +62,7 @@ are repository-relative unless stated otherwise.
 | OPT-001 | Add synchronized timings, NVTX, and attribution | SCH-001 | done | Component/end-to-end measurements expose every named time category | [`cuda/full_scheduler.cu`](cuda/full_scheduler.cu); [`cuda/timing_test.cu`](cuda/timing_test.cu); [`fixtures/cuda_timing.json`](fixtures/cuda_timing.json); tests; log 2026-08-31T20:00:28Z |
 | OPT-002 | Profile and implement justified fusions | OPT-001, ORA-001 | done | Nsight evidence justifies each fusion; fused/unfused boundaries pass frozen gates | [`cuda/full_scheduler.cu`](cuda/full_scheduler.cu); [`fixtures/cuda_fusion.json`](fixtures/cuda_fusion.json); [`evidence/profiling/opt002-nsight-compute.txt`](evidence/profiling/opt002-nsight-compute.txt); tests; log 2026-09-01T05:44:16Z |
 | OPT-003 | Implement stable-address CUDA graphs | OPT-002 | done | Graph/non-graph equivalence passes and graph allocations are in MEM-001 | [`cuda/full_scheduler.cu`](cuda/full_scheduler.cu); [`fixtures/cuda_graph.json`](fixtures/cuda_graph.json); [`tests/test_cuda_graph.py`](tests/test_cuda_graph.py); log 2026-09-01T07:08:29Z |
-| OPT-004 | Tune row buckets/chunks and check in dispatch evidence | OPT-003 | pending | Offline RTX 5090 sweep selects a reproducible table from retained raw results | — |
+| OPT-004 | Tune row buckets/chunks and check in dispatch evidence | OPT-003 | done | Offline RTX 5090 sweep selects a reproducible table from retained raw results | [`cuda/quant_mmv.cu`](cuda/quant_mmv.cu); [`fixtures/cuda_dispatch_tuning.json`](fixtures/cuda_dispatch_tuning.json); [`evidence/profiling/opt004-dispatch-sweep-raw.txt`](evidence/profiling/opt004-dispatch-sweep-raw.txt); [`tests/test_cuda_dispatch_tuning.py`](tests/test_cuda_dispatch_tuning.py); log 2026-09-01T07:30:51Z |
 | CLI-001 | Implement interactive `qw38` text CLI | TOK-002, SES-003 | pending | Interactive generation, reasoning, stops, sampling, and persistence pass smoke tests | — |
 | SRV-001 | Implement single-flight HTTP server core and queue | API-001 | pending | Health/models endpoints, cancellation, queue timing, and one GPU session pass tests | — |
 | SRV-002 | Implement Chat Completions API | TOK-002, SES-002, SRV-001 | pending | Supported roles/tools/streaming/sampling/stops pass; exclusions reject explicitly | — |
@@ -113,6 +113,7 @@ are repository-relative unless stated otherwise.
 | EDU-037 | Explain synchronized GPU timing, NVTX ranges, attribution categories, and profiler evidence for beginners | OPT-001, DOC-001 | done | CPU clocks versus CUDA events, asynchronous work, synchronization, ranges, category sums, unavailable boundaries, perturbation, and Nsight proof limits are code-linked and worked | [`docs/51-runtime-timing-and-nvtx.md`](docs/51-runtime-timing-and-nvtx.md); [`tests/test_cuda_timing.py`](tests/test_cuda_timing.py); log 2026-08-31T20:00:28Z |
 | EDU-038 | Explain profiler-led fusion and fused/unfused admission for beginners | OPT-002, DOC-001 | done | Kernel launch cost, utilization, fusion boundary, retained reference path, exact/numeric comparison, A/B samples, rejected candidates, and proof limits are code-linked and worked | [`docs/52-profiler-led-fusion.md`](docs/52-profiler-led-fusion.md); [`tests/test_cuda_fusion.py`](tests/test_cuda_fusion.py); log 2026-09-01T05:44:16Z |
 | EDU-039 | Explain stable-address CUDA graph capture, replay, ownership, and dynamic-boundary limits for beginners | OPT-003, DOC-001 | done | Capture/instantiate/replay, stable pointers, FFN graph scope, dynamic attention exclusion, retained non-graph path, equivalence, memory ownership, and proof limits are code-linked and worked | [`docs/53-stable-address-cuda-graphs.md`](docs/53-stable-address-cuda-graphs.md); [`tests/test_cuda_graph.py`](tests/test_cuda_graph.py); log 2026-09-01T07:08:29Z |
+| EDU-040 | Explain offline CUDA dispatch tuning, row buckets, prompt tiles, and selection limits for beginners | OPT-004, DOC-001 | done | Candidate launch shapes, row buckets, prompt tiles/chunks, warmups, samples, selection rule, retained negatives, checked-in table, and proof limits are code-linked and worked | [`docs/55-offline-dispatch-tuning.md`](docs/55-offline-dispatch-tuning.md); [`tests/test_cuda_dispatch_tuning.py`](tests/test_cuda_dispatch_tuning.py); log 2026-09-01T07:30:51Z |
 | REL-001 | Publish reproducible release evidence bundle | CMP-003, QLT-001, DOC-001 | pending | Builds, hashes, raw results, reports, and documentation claims reconcile | — |
 
 ## Delivery-Gate Mapping
@@ -2800,6 +2801,63 @@ are repository-relative unless stated otherwise.
   seconds.
 - Marked OPT-003, MEM-001, and EDU-039 done. OPT-004 offline RTX 5090 row-bucket
   and chunk-size tuning is the next executable task.
+
+### 2026-09-01T07:10:55Z — OPT-004 and EDU-040 started
+
+- Began the pinned RTX 5090 dispatch sweep and added EDU-040 before changing
+  production kernels. The existing quantized decode MMV always launches 256
+  threads (eight output-row warps) per block, and prompt MMQ always reuses each
+  decoded weight across four prompt rows. Those constants are correct but have
+  not been selected from retained measurements.
+- Scoped the sweep to the production Q4_K/Q6_K/Q8_0 projection boundary: compare
+  candidate output-row warp buckets and prompt-row tile sizes at actual model
+  widths, retain raw warmup/sample results and losing candidates, and check in a
+  small explicit dispatch table. Numeric order within each output remains
+  unchanged. Full-token chunk scheduling is not silently added to this kernel
+  task and remains a separate scheduler concern.
+
+### 2026-09-01T07:30:51Z — OPT-004 and EDU-040 accepted
+
+- Specialized the quantized MMV kernel at 4, 8, and 16 output-row warps per
+  block and the prompt MMQ kernel at 1, 2, 4, and 8 prompt rows per weight reuse
+  tile. Candidate launch APIs reject all other values. The selected production
+  table is a small ordered conditional, not a runtime autotuner; one warp still
+  owns and reduces each output in the frozen arithmetic order.
+- Swept the eight exact Qwen output-row shapes (48, 1,024, 5,120, 6,144, 10,240,
+  12,288, 17,408, and 248,320) and every power-of-two prompt chunk from 1 through
+  64. Each candidate received three warm-ups and 30 CUDA-event samples in each
+  of three independent runs. The lowest cross-replicate arithmetic mean selected
+  MMV warps 4/8/16/8/8/4/8/4 at those shapes and prompt tiles 1/2/4/8/8/8/8.
+- Retained all 156 candidate/replicate means, including losers, in
+  `fixtures/cuda_dispatch_tuning.json` and all 1,560 individual samples from the
+  admitted run in `evidence/profiling/opt004-dispatch-sweep-raw.txt`. The 64-row
+  prompt case averaged about 11.06 ms at tile 1 versus 4.17 ms at tile 8. Close
+  MMV results remain visible: the 17,408-row case averaged about 0.1567 ms at four
+  warps and 0.1561 ms at eight, so this is not generalized into a portable speed
+  claim.
+- Resolved an evidence-design negative before admission. The first sweep covered
+  prompt sizes 1, 4, 16, and 64, but the draft table inferred a two-row bucket
+  without measuring it. Expanded the diagnostic to 1, 2, 4, 8, 16, 32, and 64,
+  discarded the incomplete draft evidence, and reran all three replicates. Also
+  corrected one manual full-scheduler invocation that omitted its required llama
+  logits argument; the proper real-model gate subsequently passed.
+- Zero-filled synthetic weights isolate launch scheduling while retaining real
+  shapes, instruction paths, allocation sizes, and memory traffic. They are not
+  used as numeric authority. The nonzero quant diagnostic passed its frozen
+  Q4_K/Q6_K/Q8_0 gates, and the focused real tuning/quant/full-scheduler suite
+  passed seven tests in 51.19 seconds. Chapter 55 explains launch shapes, warps,
+  buckets, tiles, selection, reproducibility, and this proof boundary for a new
+  reader.
+- `uv run ruff format .` reformatted one Python file. The ordinary suite passed
+  135 tests with fifteen expected exclusive-GPU skips in 161.61 seconds. A clean
+  pinned CUDA 13.0.2 build compiled all four host products and sixteen native
+  SM120 diagnostics. The complete RTX 5090 suite passed all 150 tests in 263.17
+  seconds, including graph replay and the post-graph 128K reserve gate.
+- The first staged diff audit rejected one extra blank line at the end of the raw
+  sweep file. Removed that line, updated its authenticated SHA-256, and reran the
+  focused contract checks; no measurement value or source code changed.
+- Marked OPT-004 and EDU-040 done. The profiler/optimization delivery sequence
+  is complete; CLI-001 is the next executable product task.
 
 ## Decisions and Negative Results
 
