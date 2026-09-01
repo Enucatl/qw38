@@ -306,54 +306,55 @@ bool remap_common(const internal::CommonLayerWeights& source,
 cudaError_t matrix_vector(const DeviceTensor& matrix,
                           const __nv_bfloat16* activation,
                           SchedulerWorkspace* workspace,
-                          float* output) noexcept {
+                          float* output, cudaStream_t stream) noexcept {
   if (matrix.kind == QuantKind::kQ8_0) {
     const unsigned int blocks = static_cast<unsigned int>(
         (matrix.rows + (kThreads / kWarpSize) - 1) /
         (kThreads / kWarpSize));
-    q8_mmv_bf16<<<blocks, kThreads>>>(matrix.data, matrix.rows, matrix.columns,
-                                     activation, output);
+    q8_mmv_bf16<<<blocks, kThreads, 0, stream>>>(
+        matrix.data, matrix.rows, matrix.columns, activation, output);
     return cudaPeekAtLastError();
   }
   return launch_quant_mmv(matrix.kind, matrix.data, matrix.rows,
                           matrix.columns, activation, workspace->q8_, output,
-                          nullptr);
+                          stream);
 }
 
 cudaError_t execute_ffn(const DeviceCommonLayer& layer,
                         const float* residual,
                         SchedulerWorkspace* workspace,
                         float* output, const float* next_input_norm,
-                        PointwisePath pointwise_path) noexcept {
-  rms_norm_fp32_to_bf16<<<1, kThreads>>>(
+                        PointwisePath pointwise_path,
+                        cudaStream_t stream) noexcept {
+  rms_norm_fp32_to_bf16<<<1, kThreads, 0, stream>>>(
       residual, layer.ffn_norm, internal::kResidualWidth,
       workspace->normalized_);
   cudaError_t error = cudaPeekAtLastError();
   if (error == cudaSuccess) {
     error = matrix_vector(layer.ffn_gate, workspace->normalized_, workspace,
-                          workspace->projection_a_);
+                          workspace->projection_a_, stream);
   }
   if (error == cudaSuccess) {
     error = matrix_vector(layer.ffn_up, workspace->normalized_, workspace,
-                          workspace->projection_b_);
+                          workspace->projection_b_, stream);
   }
   if (error == cudaSuccess) {
     error = launch_swiglu_bf16(
         workspace->projection_a_, workspace->projection_b_,
-        internal::kFfnWidth, workspace->ffn_activated_, nullptr);
+        internal::kFfnWidth, workspace->ffn_activated_, stream);
   }
   if (error == cudaSuccess) {
     error = matrix_vector(layer.ffn_down, workspace->ffn_activated_, workspace,
-                          workspace->mixer_output_);
+                          workspace->mixer_output_, stream);
   }
   if (error == cudaSuccess) {
     if (pointwise_path == PointwisePath::kFused &&
         next_input_norm != nullptr) {
-      residual_add_norm_fp32_to_bf16<<<1, kThreads>>>(
+      residual_add_norm_fp32_to_bf16<<<1, kThreads, 0, stream>>>(
           residual, workspace->mixer_output_, next_input_norm,
           internal::kResidualWidth, output, workspace->normalized_);
     } else {
-      residual_add_fp32<<<20, kThreads>>>(
+      residual_add_fp32<<<20, kThreads, 0, stream>>>(
           residual, workspace->mixer_output_, internal::kResidualWidth, output);
     }
     error = cudaPeekAtLastError();
@@ -490,6 +491,115 @@ std::size_t ResidentModel::resident_bytes() const noexcept {
 }
 
 float ResidentModel::upload_milliseconds() const noexcept { return upload_ms_; }
+
+SchedulerGraphs::SchedulerGraphs() noexcept = default;
+SchedulerGraphs::~SchedulerGraphs() { release(); }
+
+SchedulerGraphs::SchedulerGraphs(SchedulerGraphs&& other) noexcept {
+  *this = std::move(other);
+}
+
+SchedulerGraphs& SchedulerGraphs::operator=(SchedulerGraphs&& other) noexcept {
+  if (this == &other) return *this;
+  release();
+  graphs_ = other.graphs_;
+  executions_ = other.executions_;
+  model_ = other.model_;
+  workspace_ = other.workspace_;
+  graph_count_ = other.graph_count_;
+  allocated_bytes_ = other.allocated_bytes_;
+  other.graphs_ = {};
+  other.executions_ = {};
+  other.model_ = nullptr;
+  other.workspace_ = nullptr;
+  other.graph_count_ = 0;
+  other.allocated_bytes_ = 0;
+  return *this;
+}
+
+void SchedulerGraphs::release() noexcept {
+  for (std::size_t index = 0; index < executions_.size(); ++index) {
+    if (executions_[index] != nullptr) cudaGraphExecDestroy(executions_[index]);
+    if (graphs_[index] != nullptr) cudaGraphDestroy(graphs_[index]);
+    executions_[index] = nullptr;
+    graphs_[index] = nullptr;
+  }
+  model_ = nullptr;
+  workspace_ = nullptr;
+  graph_count_ = 0;
+  allocated_bytes_ = 0;
+}
+
+Status SchedulerGraphs::create(const ResidentModel& model,
+                               SchedulerWorkspace* workspace) noexcept {
+  const NvtxRange range("qw38.graph_create");
+  if (graph_count_ != 0 || model.blob_ == nullptr || workspace == nullptr ||
+      workspace->capacity_ == 0) {
+    return {StatusCode::kInvalidArgument,
+            "CUDA scheduler graph creation input is invalid"};
+  }
+  std::size_t free_before = 0;
+  std::size_t total = 0;
+  cudaError_t error = cudaMemGetInfo(&free_before, &total);
+  cudaStream_t stream = nullptr;
+  if (error == cudaSuccess) {
+    error = cudaStreamCreateWithFlags(&stream, cudaStreamNonBlocking);
+  }
+  for (std::size_t layer_index = 0;
+       error == cudaSuccess && layer_index < model.layers_.size();
+       ++layer_index) {
+    error = cudaStreamBeginCapture(stream, cudaStreamCaptureModeThreadLocal);
+    cudaError_t enqueue_error = error;
+    if (enqueue_error == cudaSuccess) {
+      const float* next_input_norm =
+          layer_index + 1 < model.layers_.size()
+              ? model.layers_[layer_index + 1].common.input_norm
+              : nullptr;
+      enqueue_error = execute_ffn(
+          model.layers_[layer_index].common, workspace->residual_b_, workspace,
+          workspace->residual_a_, next_input_norm, PointwisePath::kFused,
+          stream);
+    }
+    cudaError_t capture_error = cudaStreamEndCapture(
+        stream, &graphs_[layer_index]);
+    error = enqueue_error != cudaSuccess ? enqueue_error : capture_error;
+    if (error == cudaSuccess) {
+      error = cudaGraphInstantiate(&executions_[layer_index],
+                                   graphs_[layer_index], nullptr, nullptr, 0);
+    }
+    if (error == cudaSuccess) {
+      error = cudaGraphUpload(executions_[layer_index], stream);
+    }
+    if (error == cudaSuccess) ++graph_count_;
+  }
+  if (error == cudaSuccess) error = cudaStreamSynchronize(stream);
+  std::size_t free_after = 0;
+  if (error == cudaSuccess) error = cudaMemGetInfo(&free_after, &total);
+  if (stream != nullptr) cudaStreamDestroy(stream);
+  if (error != cudaSuccess) {
+    release();
+    return cuda_status(error, "cannot capture CUDA scheduler FFN graphs");
+  }
+  model_ = &model;
+  workspace_ = workspace;
+  allocated_bytes_ = free_before >= free_after ? free_before - free_after : 0;
+  return Status::ok();
+}
+
+std::size_t SchedulerGraphs::graph_count() const noexcept {
+  return graph_count_;
+}
+
+std::size_t SchedulerGraphs::allocated_bytes() const noexcept {
+  return allocated_bytes_;
+}
+
+bool SchedulerGraphs::matches(
+    const ResidentModel& model,
+    const SchedulerWorkspace* workspace) const noexcept {
+  return graph_count_ == internal::kModelLayerCount && model_ == &model &&
+         workspace_ == workspace;
+}
 
 SchedulerSession::SchedulerSession() noexcept = default;
 SchedulerSession::~SchedulerSession() { release(); }
@@ -874,7 +984,8 @@ Status execute_token(const ResidentModel& model, std::size_t token,
                      float* elapsed_milliseconds,
                      const EvalControl* control,
                      RuntimeTimings* timings,
-                     PointwisePath pointwise_path) noexcept {
+                     PointwisePath pointwise_path,
+                     SchedulerGraphs* graphs) noexcept {
   if (model.blob_ == nullptr || token >= internal::kVocabularySize ||
       session == nullptr || workspace == nullptr ||
       session->capacity_ == 0 || session->frontier_ >= session->capacity_ ||
@@ -883,7 +994,10 @@ Status execute_token(const ResidentModel& model, std::size_t token,
       hidden_count != internal::kResidualWidth ||
       elapsed_milliseconds == nullptr ||
       (pointwise_path != PointwisePath::kFused &&
-       pointwise_path != PointwisePath::kUnfused)) {
+       pointwise_path != PointwisePath::kUnfused) ||
+      (graphs != nullptr &&
+       (pointwise_path != PointwisePath::kFused ||
+        !graphs->matches(model, workspace)))) {
     return {StatusCode::kInvalidArgument,
             "CUDA token scheduler input, state, or output is invalid"};
   }
@@ -953,19 +1067,19 @@ Status execute_token(const ResidentModel& model, std::size_t token,
     if (layer.kind == internal::LayerKind::kGdn) {
       if (error == cudaSuccess) {
         error = matrix_vector(layer.gdn.packed_qkv, workspace->normalized_,
-                              workspace, workspace->projection_a_);
+                              workspace, workspace->projection_a_, nullptr);
       }
       if (error == cudaSuccess) {
         error = matrix_vector(layer.gdn.value_gate, workspace->normalized_,
-                              workspace, workspace->projection_b_);
+                              workspace, workspace->projection_b_, nullptr);
       }
       if (error == cudaSuccess) {
         error = matrix_vector(layer.gdn.alpha, workspace->normalized_,
-                              workspace, workspace->projection_c_);
+                              workspace, workspace->projection_c_, nullptr);
       }
       if (error == cudaSuccess) {
         error = matrix_vector(layer.gdn.beta, workspace->normalized_, workspace,
-                              workspace->projection_d_);
+                              workspace->projection_d_, nullptr);
       }
       if (error == cudaSuccess) {
         error = launch_prepare_gdn_gates(
@@ -997,22 +1111,22 @@ Status execute_token(const ResidentModel& model, std::size_t token,
       }
       if (error == cudaSuccess) {
         error = matrix_vector(layer.gdn.output, workspace->projected_bf16_,
-                              workspace, workspace->mixer_output_);
+                              workspace, workspace->mixer_output_, nullptr);
       }
       ++gdn_slot;
     } else {
       if (error == cudaSuccess) {
         error = matrix_vector(layer.attention.query_gate,
                               workspace->normalized_, workspace,
-                              workspace->projection_a_);
+                              workspace->projection_a_, nullptr);
       }
       if (error == cudaSuccess) {
         error = matrix_vector(layer.attention.key, workspace->normalized_,
-                              workspace, workspace->projection_c_);
+                              workspace, workspace->projection_c_, nullptr);
       }
       if (error == cudaSuccess) {
         error = matrix_vector(layer.attention.value, workspace->normalized_,
-                              workspace, workspace->projection_d_);
+                              workspace, workspace->projection_d_, nullptr);
       }
       if (error == cudaSuccess) {
         error = launch_split_attention_query_gate(
@@ -1049,7 +1163,7 @@ Status execute_token(const ResidentModel& model, std::size_t token,
       if (error == cudaSuccess) {
         error = matrix_vector(layer.attention.output,
                               workspace->projected_bf16_, workspace,
-                              workspace->mixer_output_);
+                              workspace->mixer_output_, nullptr);
       }
       ++attention_slot;
     }
@@ -1066,12 +1180,26 @@ Status execute_token(const ResidentModel& model, std::size_t token,
                           timings == nullptr ? nullptr : &timings->ffn);
     }
     if (error == cudaSuccess) {
-      const float* next_input_norm =
-          layer_index + 1 < model.layers_.size()
-              ? model.layers_[layer_index + 1].common.input_norm
-              : nullptr;
-      error = execute_ffn(layer.common, next, workspace, residual,
-                          next_input_norm, pointwise_path);
+      if (graphs != nullptr) {
+        const auto graph_started = std::chrono::steady_clock::now();
+        nvtxRangePushA("qw38.graph_launch");
+        error = cudaGraphLaunch(graphs->executions_[layer_index], nullptr);
+        nvtxRangePop();
+        if (timings != nullptr) {
+          timings->graph_launch.milliseconds += static_cast<float>(
+              std::chrono::duration<double, std::milli>(
+                  std::chrono::steady_clock::now() - graph_started)
+                  .count());
+          timings->graph_launch.measured = true;
+        }
+      } else {
+        const float* next_input_norm =
+            layer_index + 1 < model.layers_.size()
+                ? model.layers_[layer_index + 1].common.input_norm
+                : nullptr;
+        error = execute_ffn(layer.common, next, workspace, residual,
+                            next_input_norm, pointwise_path, nullptr);
+      }
     }
     if (error == cudaSuccess) error = end_phase(categories);
     nvtxRangePop();
@@ -1110,7 +1238,7 @@ Status execute_token(const ResidentModel& model, std::size_t token,
   }
   if (error == cudaSuccess && !interrupted) {
     error = matrix_vector(model.output_, workspace->normalized_, workspace,
-                          workspace->logits_);
+                          workspace->logits_, nullptr);
   }
   if (error == cudaSuccess && !interrupted) {
     bf16_to_fp32<<<20, kThreads>>>(

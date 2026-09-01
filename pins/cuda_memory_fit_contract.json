@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "task": "MEM-001-pre-graph",
+  "task": "MEM-001",
   "target": "sm_120",
   "toolkit": "CUDA 13.0.2",
   "capacity": 131072,
@@ -11,15 +11,15 @@
     "workspace": ["all-layer atomic GDN candidate", "16 candidate K/V rows", "maximum attention scores", "projections, residuals, logits, trace taps"],
     "runtime_context": "CUDA memory used before Quartz allocations",
     "allocator_delta": "measured CUDA free-memory delta minus exact Quartz owner bytes",
-    "graphs": "unavailable until OPT-003"
+    "graphs": "64 uploaded stable-address FFN graph executables"
   },
   "admission": {
     "pre_graph_physical_allocation": "passed",
-    "post_graph_MEM_001": "pending OPT-003",
-    "reason": "the approved acceptance condition requires reserve measurement after graph creation"
+    "post_graph_MEM_001": "passed",
+    "reason": "the complete owner set leaves at least 1.5 GiB free after graph upload"
   },
   "local_sources": {
-    "Makefile": "9fc0f9f3119dafd6fdab9b100175bf60083c714e602f126955bb132b48ad3a8e",
-    "cuda/memory_fit_test.cu": "b39c909c5383b071ef750f9bd729e8ef1161be52bb144f8df181949358e3ad55"
+    "Makefile": "3134bf1cbdfd0fccae27edda75bc8a607137396aafcb73925a506f9bd331ceaf",
+    "cuda/memory_fit_test.cu": "705a2154a8035a45dbb9693a885d0edeebd1cdbac601a056ab744777152d1b20"
   }
 }

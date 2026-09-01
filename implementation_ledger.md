@@ -58,10 +58,10 @@ are repository-relative unless stated otherwise.
 | SES-001 | Implement exact common-prefix sync/reuse | SCH-001 | done | Reuse and full replay produce the same committed state and logits | [`cuda/full_scheduler.cu`](cuda/full_scheduler.cu); [`fixtures/cuda_prefix_sync.json`](fixtures/cuda_prefix_sync.json); [`tests/test_cuda_prefix_sync.py`](tests/test_cuda_prefix_sync.py); log 2026-08-31T13:45:38Z |
 | SES-002 | Implement atomic eval/sample/commit semantics | SCH-001 | done | Sampling is separate; cancellation/error cannot partially commit state | [`cuda/full_scheduler.cu`](cuda/full_scheduler.cu); [`fixtures/cuda_atomic_eval.json`](fixtures/cuda_atomic_eval.json); [`tests/test_cuda_atomic_eval.py`](tests/test_cuda_atomic_eval.py); log 2026-08-31T17:55:34Z |
 | SES-003 | Implement atomic checkpoint save/restore | SES-001, SES-002 | done | All state and compatibility hashes persist; resumed continuation is exact | [`cuda/checkpoint.cu`](cuda/checkpoint.cu); [`fixtures/cuda_checkpoint.json`](fixtures/cuda_checkpoint.json); [`tests/test_cuda_checkpoint.py`](tests/test_cuda_checkpoint.py); log 2026-08-31T19:09:54Z |
-| MEM-001 | Demonstrate 131,072-token fit with 1.5 GiB reserve | BLD-003, SCH-001 | in_progress | Post-graph measured ledger includes 8 GiB KV and every named allocation on RTX 5090 | Pre-graph evidence: [`cuda/memory_fit_test.cu`](cuda/memory_fit_test.cu); [`fixtures/cuda_memory_fit_pre_graph.json`](fixtures/cuda_memory_fit_pre_graph.json); [`tests/test_cuda_memory_fit.py`](tests/test_cuda_memory_fit.py); final admission pending OPT-003 |
+| MEM-001 | Demonstrate 131,072-token fit with 1.5 GiB reserve | BLD-003, SCH-001 | done | Post-graph measured ledger includes 8 GiB KV and every named allocation on RTX 5090 | [`cuda/memory_fit_test.cu`](cuda/memory_fit_test.cu); [`fixtures/cuda_memory_fit_post_graph.json`](fixtures/cuda_memory_fit_post_graph.json); [`docs/54-post-graph-128k-memory.md`](docs/54-post-graph-128k-memory.md); [`tests/test_cuda_memory_fit.py`](tests/test_cuda_memory_fit.py); log 2026-09-01T07:08:29Z |
 | OPT-001 | Add synchronized timings, NVTX, and attribution | SCH-001 | done | Component/end-to-end measurements expose every named time category | [`cuda/full_scheduler.cu`](cuda/full_scheduler.cu); [`cuda/timing_test.cu`](cuda/timing_test.cu); [`fixtures/cuda_timing.json`](fixtures/cuda_timing.json); tests; log 2026-08-31T20:00:28Z |
 | OPT-002 | Profile and implement justified fusions | OPT-001, ORA-001 | done | Nsight evidence justifies each fusion; fused/unfused boundaries pass frozen gates | [`cuda/full_scheduler.cu`](cuda/full_scheduler.cu); [`fixtures/cuda_fusion.json`](fixtures/cuda_fusion.json); [`evidence/profiling/opt002-nsight-compute.txt`](evidence/profiling/opt002-nsight-compute.txt); tests; log 2026-09-01T05:44:16Z |
-| OPT-003 | Implement stable-address CUDA graphs | OPT-002 | pending | Graph/non-graph equivalence passes and graph allocations are in MEM-001 | — |
+| OPT-003 | Implement stable-address CUDA graphs | OPT-002 | done | Graph/non-graph equivalence passes and graph allocations are in MEM-001 | [`cuda/full_scheduler.cu`](cuda/full_scheduler.cu); [`fixtures/cuda_graph.json`](fixtures/cuda_graph.json); [`tests/test_cuda_graph.py`](tests/test_cuda_graph.py); log 2026-09-01T07:08:29Z |
 | OPT-004 | Tune row buckets/chunks and check in dispatch evidence | OPT-003 | pending | Offline RTX 5090 sweep selects a reproducible table from retained raw results | — |
 | CLI-001 | Implement interactive `qw38` text CLI | TOK-002, SES-003 | pending | Interactive generation, reasoning, stops, sampling, and persistence pass smoke tests | — |
 | SRV-001 | Implement single-flight HTTP server core and queue | API-001 | pending | Health/models endpoints, cancellation, queue timing, and one GPU session pass tests | — |
@@ -112,6 +112,7 @@ are repository-relative unless stated otherwise.
 | EDU-036 | Explain the complete pre-graph 128K GPU allocation ledger and remaining graph gate for beginners | MEM-001, DOC-001 | done | GiB versus GB, resident/session/workspace categories, KV arithmetic, runtime/allocator deltas, reserve calculation, physical allocation, and why post-graph admission remains open are code-linked and worked | [`docs/50-pre-graph-128k-memory.md`](docs/50-pre-graph-128k-memory.md); [`tests/test_cuda_memory_fit.py`](tests/test_cuda_memory_fit.py); log 2026-08-31T19:17:33Z |
 | EDU-037 | Explain synchronized GPU timing, NVTX ranges, attribution categories, and profiler evidence for beginners | OPT-001, DOC-001 | done | CPU clocks versus CUDA events, asynchronous work, synchronization, ranges, category sums, unavailable boundaries, perturbation, and Nsight proof limits are code-linked and worked | [`docs/51-runtime-timing-and-nvtx.md`](docs/51-runtime-timing-and-nvtx.md); [`tests/test_cuda_timing.py`](tests/test_cuda_timing.py); log 2026-08-31T20:00:28Z |
 | EDU-038 | Explain profiler-led fusion and fused/unfused admission for beginners | OPT-002, DOC-001 | done | Kernel launch cost, utilization, fusion boundary, retained reference path, exact/numeric comparison, A/B samples, rejected candidates, and proof limits are code-linked and worked | [`docs/52-profiler-led-fusion.md`](docs/52-profiler-led-fusion.md); [`tests/test_cuda_fusion.py`](tests/test_cuda_fusion.py); log 2026-09-01T05:44:16Z |
+| EDU-039 | Explain stable-address CUDA graph capture, replay, ownership, and dynamic-boundary limits for beginners | OPT-003, DOC-001 | done | Capture/instantiate/replay, stable pointers, FFN graph scope, dynamic attention exclusion, retained non-graph path, equivalence, memory ownership, and proof limits are code-linked and worked | [`docs/53-stable-address-cuda-graphs.md`](docs/53-stable-address-cuda-graphs.md); [`tests/test_cuda_graph.py`](tests/test_cuda_graph.py); log 2026-09-01T07:08:29Z |
 | REL-001 | Publish reproducible release evidence bundle | CMP-003, QLT-001, DOC-001 | pending | Builds, hashes, raw results, reports, and documentation claims reconcile | — |
 
 ## Delivery-Gate Mapping
@@ -2733,6 +2734,72 @@ are repository-relative unless stated otherwise.
 - Marked OPT-002 and EDU-038 done. OPT-003 stable-address CUDA graphs is now the
   next executable task, followed immediately by the final post-graph MEM-001
   reserve measurement.
+
+### 2026-09-01T06:50:53Z — OPT-003 and EDU-039 started
+
+- Began stable-address graph work and added EDU-039 before implementation. The
+  current full token cannot be captured once and replayed unchanged: RoPE,
+  causal attention loop bounds, and K/V commit destinations depend on the host
+  session frontier, while GDN state owners swap after atomic commit.
+- Selected the 64 per-layer FFN branches as the first honest graph boundary.
+  Their layer weights and workspace residual/projection addresses remain stable
+  for the lifetime of a resident model/workspace pair, and OPT-002 already made
+  the next-layer norm boundary stable and exact. Attention, GDN state ownership,
+  output copies, cancellation polls, and atomic commit remain outside capture.
+- The graph owner will capture and instantiate each FFN once, fail closed if
+  replay is attempted with different model/workspace addresses, retain ordinary
+  fused execution for comparison/fallback, expose graph-launch attribution, and
+  report its measured allocation while graph objects are alive. This scoped
+  graph design must pass end-to-end state/logit equality; it is not presented as
+  a whole-token graph.
+
+### 2026-09-01T07:08:29Z — OPT-003, MEM-001, and EDU-039 accepted
+
+- Added move-only `SchedulerGraphs` ownership for 64 per-layer FFN graph
+  definitions and executable instances. Creation captures on a non-blocking
+  stream, instantiates, uploads, and cleans up the complete set on partial
+  failure. Replay requires the exact bound resident-model and workspace object
+  addresses and the admitted fused pointwise path; a mismatch is rejected before
+  session mutation. The ordinary fused launch path remains the equivalence
+  oracle and fallback.
+- Kept token-varying embedding lookup, attention position/causal/KV work, GDN
+  pointer publication, host copies, cancellation polling, and atomic commit
+  outside capture. This is an intentional 64-FFN graph boundary, not a claim of
+  whole-token capture. Beginner Chapter 53 explains capture, instantiation,
+  upload, replay, stable pointer lifetime, dynamic exclusions, timing, ownership,
+  and proof limits.
+- Across the same 33-token frontier, graph and ordinary execution produced
+  byte-exact FP32 logits, final hidden values, selected trace taps, complete GDN
+  and KV session state, token/frontier state, and greedy output. After three
+  warm-ups, 30 alternating pairs averaged 65.5711594 ms graphed versus
+  65.9345779 ms ordinary, a 1.0055424x improvement. Two additional replicates
+  measured 1.00516605x and 1.00516462x. The diagnostic attributed 0.149828002 ms
+  of CPU submission time to 64 graph launches. Raw samples and exact-equality
+  results remain in `fixtures/cuda_graph.json`; this local A/B is not a product
+  throughput claim.
+- Measured all 64 uploaded graph executables at 6,291,456 device bytes. The final
+  simultaneous 131,072-token allocation was 18,973,870,432 resident-model bytes,
+  8,748,793,856 session bytes including the independent 8 GiB KV cache,
+  172,963,328 workspace bytes, and 6,291,456 graph bytes. With CUDA runtime and
+  allocator ownership reconciled, 5,234,753,536 bytes remained free against the
+  1,610,612,736-byte requirement, a 3,624,140,800-byte margin. MEM-001 is now
+  admitted; Chapter 54 preserves the provisional pre-graph reading and explains
+  GiB/GB units, each owner, arithmetic, reserve, and proof boundary.
+- Preserved two finalization negatives. The first static memory test still summed
+  only model, session, and workspace, so it failed after graph bytes became an
+  explicit owner; adding the graph term fixed the stale test equation without a
+  runtime change. The next run found that the new beginner chapter described the
+  concepts but omitted exact contract phrases for GiB versus GB, resident model,
+  and GDN state; the prose and measured pre/post graph comparison were made
+  explicit rather than weakening the documentation gate.
+- `uv run ruff format .` reformatted two Python files. The ordinary suite passed
+  134 tests with fourteen expected exclusive-GPU skips in 161.56 seconds. A clean
+  pinned CUDA 13.0.2 build compiled all four host products and fifteen native
+  SM120 diagnostics. The complete RTX 5090 suite passed all 148 tests in 252.83
+  seconds; the focused real graph/final-memory pair passed four tests in 9.99
+  seconds.
+- Marked OPT-003, MEM-001, and EDU-039 done. OPT-004 offline RTX 5090 row-bucket
+  and chunk-size tuning is the next executable task.
 
 ## Decisions and Negative Results
 

@@ -90,6 +90,14 @@ int main(int argc, char** argv) {
     status = {qw38::StatusCode::kInternal,
               "cannot measure memory after workspace allocation"};
   }
+  qw38::cuda::SchedulerGraphs graphs;
+  if (status.is_ok()) status = graphs.create(model, &workspace);
+  std::size_t free_after_graphs = 0;
+  if (status.is_ok() &&
+      cudaMemGetInfo(&free_after_graphs, &total) != cudaSuccess) {
+    status = {qw38::StatusCode::kInternal,
+              "cannot measure memory after graph creation"};
+  }
   if (!status.is_ok()) return fail_status(status);
 
   const std::size_t gdn_bytes =
@@ -100,21 +108,23 @@ int main(int argc, char** argv) {
   const std::size_t kv_bytes =
       kAttentionLayers * kCapacity * qw38::internal::kAttentionKvWidth *
       sizeof(__nv_bfloat16) * 2;
-  const std::size_t explicit_bytes = model.resident_bytes() +
-                                     session.allocated_bytes() +
-                                     workspace.allocated_bytes();
-  const std::size_t measured_delta = free_baseline - free_after_workspace;
+  const std::size_t graph_bytes = graphs.allocated_bytes();
+  const std::size_t explicit_bytes =
+      model.resident_bytes() + session.allocated_bytes() +
+      workspace.allocated_bytes() + graph_bytes;
+  const std::size_t measured_delta = free_baseline - free_after_graphs;
   const std::size_t allocator_delta =
       measured_delta >= explicit_bytes ? measured_delta - explicit_bytes : 0;
   const std::size_t runtime_bytes = total - free_baseline;
   const std::size_t host_rss = resident_host_bytes();
   const bool arithmetic =
       session.allocated_bytes() == gdn_bytes + kv_bytes &&
-      explicit_bytes == 27895627616ULL &&
+      graph_bytes == free_after_workspace - free_after_graphs &&
+      graph_bytes > 0 && graphs.graph_count() == 64 &&
       model.resident_bytes() == 18973870432ULL &&
       workspace.allocated_bytes() == 172963328ULL;
   const bool passed = arithmetic && session.capacity() == kCapacity &&
-                      free_after_workspace >= kReserveBytes;
+                      free_after_graphs >= kReserveBytes;
 
   std::printf("memory_owner=runtime_context bytes=%zu\n", runtime_bytes);
   std::printf("memory_owner=resident_model bytes=%zu delta=%zu\n",
@@ -127,15 +137,17 @@ int main(int argc, char** argv) {
               workspace.allocated_bytes(),
               free_after_session - free_after_workspace);
   std::printf("memory_owner=allocator_delta bytes=%zu\n", allocator_delta);
-  std::printf("memory_owner=graphs bytes=unavailable status=pending_OPT-003\n");
+  std::printf("memory_owner=graphs bytes=%zu count=%zu\n", graph_bytes,
+              graphs.graph_count());
   std::printf("memory_host=rss bytes=%zu\n", host_rss);
-  std::printf("memory_fit=pre_graph capacity=%zu explicit_bytes=%zu "
+  std::printf("memory_fit=post_graph capacity=%zu explicit_bytes=%zu "
               "measured_delta=%zu free_bytes=%zu reserve_required=%zu "
               "total_bytes=%zu arithmetic=%s passed=%s\n",
-              kCapacity, explicit_bytes, measured_delta, free_after_workspace,
+              kCapacity, explicit_bytes, measured_delta, free_after_graphs,
               kReserveBytes, total, arithmetic ? "true" : "false",
               passed ? "true" : "false");
-  std::printf("memory_admission=post_graph passed=false reason=OPT-003_pending\n");
+  std::printf("memory_admission=post_graph passed=%s\n",
+              passed ? "true" : "false");
   std::printf("status=%s\n", passed ? "passed" : "failed");
   return passed ? 0 : 1;
 }

@@ -17,8 +17,8 @@
     "nsight_compute": "2025.3.1 installed; GPU performance counters denied by host ERR_NVGPUCTRPERM"
   },
   "local_sources": {
-    "cuda/full_scheduler.h": "5bec20700fc7a184c98f7c2b012e006669609b1ec1e4de6dd3b592e0e28a826f",
-    "cuda/full_scheduler.cu": "1b5a9d8a67b9bafc85980248bf3828fa4314082111d4d65703f246824b284914",
+    "cuda/full_scheduler.h": "3cd111c8903cbe996a49724cdd020f57ccd62b168a8794118cb881ce1071c06e",
+    "cuda/full_scheduler.cu": "745c1dcd933e20c7fea2475184b2f203622723a86d30b3cf93884c861c35e431",
     "cuda/checkpoint.cu": "2c3c03a47b401be8635bd5e5df8cf2b889fa720285e2e18772d86a42043680f9",
     "cuda/timing_test.cu": "1dc203b7e11c9e32e0e19fb96d1915e959138488cf483d8607e23750ea7557dd"
   }

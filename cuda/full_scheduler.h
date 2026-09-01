@@ -109,6 +109,7 @@ enum class PointwisePath : std::uint8_t {
 };
 
 class SchedulerWorkspace;
+class SchedulerGraphs;
 
 class ResidentModel final {
  public:
@@ -139,7 +140,9 @@ class ResidentModel final {
                               class SchedulerSession*, class SchedulerWorkspace*,
                               float*, std::size_t, float*, std::size_t,
                               float*, const EvalControl*,
-                              RuntimeTimings*, PointwisePath) noexcept;
+                              RuntimeTimings*, PointwisePath,
+                              SchedulerGraphs*) noexcept;
+  friend class SchedulerGraphs;
 };
 
 class SchedulerSession final {
@@ -184,7 +187,8 @@ class SchedulerSession final {
                               SchedulerSession*, class SchedulerWorkspace*,
                               float*, std::size_t, float*, std::size_t,
                               float*, const EvalControl*,
-                              RuntimeTimings*, PointwisePath) noexcept;
+                              RuntimeTimings*, PointwisePath,
+                              SchedulerGraphs*) noexcept;
   friend Status sync_tokens(const ResidentModel&, const std::size_t*,
                             std::size_t, SchedulerSession*,
                             class SchedulerWorkspace*, float*, std::size_t,
@@ -241,11 +245,45 @@ class SchedulerWorkspace final {
                               SchedulerSession*, SchedulerWorkspace*, float*,
                               std::size_t, float*, std::size_t,
                               float*, const EvalControl*,
-                              RuntimeTimings*, PointwisePath) noexcept;
+                              RuntimeTimings*, PointwisePath,
+                              SchedulerGraphs*) noexcept;
   friend Status sync_tokens(const ResidentModel&, const std::size_t*,
                             std::size_t, SchedulerSession*, SchedulerWorkspace*,
                             float*, std::size_t, float*, std::size_t,
                             SyncResult*) noexcept;
+  friend class SchedulerGraphs;
+};
+
+class SchedulerGraphs final {
+ public:
+  SchedulerGraphs() noexcept;
+  ~SchedulerGraphs();
+  SchedulerGraphs(SchedulerGraphs&& other) noexcept;
+  SchedulerGraphs& operator=(SchedulerGraphs&& other) noexcept;
+  SchedulerGraphs(const SchedulerGraphs&) = delete;
+  SchedulerGraphs& operator=(const SchedulerGraphs&) = delete;
+
+  Status create(const ResidentModel& model,
+                SchedulerWorkspace* workspace) noexcept;
+  std::size_t graph_count() const noexcept;
+  std::size_t allocated_bytes() const noexcept;
+
+ private:
+  void release() noexcept;
+  bool matches(const ResidentModel& model,
+               const SchedulerWorkspace* workspace) const noexcept;
+  std::array<cudaGraph_t, internal::kModelLayerCount> graphs_{};
+  std::array<cudaGraphExec_t, internal::kModelLayerCount> executions_{};
+  const ResidentModel* model_ = nullptr;
+  const SchedulerWorkspace* workspace_ = nullptr;
+  std::size_t graph_count_ = 0;
+  std::size_t allocated_bytes_ = 0;
+
+  friend Status execute_token(const ResidentModel&, std::size_t,
+                              SchedulerSession*, SchedulerWorkspace*, float*,
+                              std::size_t, float*, std::size_t, float*,
+                              const EvalControl*, RuntimeTimings*,
+                              PointwisePath, SchedulerGraphs*) noexcept;
 };
 
 Status execute_token(const ResidentModel& model, std::size_t token,
@@ -256,7 +294,8 @@ Status execute_token(const ResidentModel& model, std::size_t token,
                      const EvalControl* control = nullptr,
                      RuntimeTimings* timings = nullptr,
                      PointwisePath pointwise_path =
-                         PointwisePath::kFused) noexcept;
+                         PointwisePath::kFused,
+                     SchedulerGraphs* graphs = nullptr) noexcept;
 
 Status greedy_sample(const SchedulerSession& session,
                      std::size_t* token,

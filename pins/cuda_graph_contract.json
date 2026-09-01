@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "task": "OPT-003",
+  "target": "sm_120",
+  "toolkit": "CUDA 13.0.2",
+  "scope": {
+    "graphs": 64,
+    "boundary": "one stable-address fused FFN graph per decoder layer",
+    "included": ["FFN input norm", "gate projection", "up projection", "SwiGLU", "down projection", "fused residual/next-input norm"],
+    "excluded_dynamic": ["embedding token row", "GDN state-owner swap", "attention position and causal extent", "KV destination", "host output copies", "atomic commit"]
+  },
+  "ownership": {
+    "binding": "exact ResidentModel and SchedulerWorkspace object addresses",
+    "production_path": "graph",
+    "retained_reference": "ordinary fused launches",
+    "mismatch_policy": "fail before execution"
+  },
+  "admission": {
+    "logits_exact": true,
+    "hidden_exact": true,
+    "trace_taps_exact": true,
+    "session_state_exact": true,
+    "greedy_exact": true,
+    "minimum_warmups": 3,
+    "minimum_paired_samples": 30,
+    "graph_allocation_must_be_measured": true
+  },
+  "local_sources": {
+    "Makefile": "3134bf1cbdfd0fccae27edda75bc8a607137396aafcb73925a506f9bd331ceaf",
+    "cuda/full_scheduler.h": "3cd111c8903cbe996a49724cdd020f57ccd62b168a8794118cb881ce1071c06e",
+    "cuda/full_scheduler.cu": "745c1dcd933e20c7fea2475184b2f203622723a86d30b3cf93884c861c35e431",
+    "cuda/graph_test.cu": "54ff361ba6f5d3a40bbc5d45920ea78767ac8e505f5a38c488ac2b385424af55"
+  }
+}

@@ -272,6 +272,18 @@ DSpark are explicitly rejected as Qwen model semantics.
   raw A/B samples, profiler metrics, the balanced-MMV rejection, and the slower
   serialized-fusion negative are retained in
   [`fixtures/cuda_fusion.json`](../fixtures/cuda_fusion.json).
+- OPT-003 uses CUDA 13.0.2 stream-capture, graph instantiate/upload, and graph
+  launch APIs; no external implementation code is copied. The stable-address
+  FFN boundary and source identities are authenticated in
+  [`pins/cuda_graph_contract.json`](../pins/cuda_graph_contract.json), with raw
+  paired replay samples, graph allocation, launch attribution, and exact state
+  evidence retained in [`fixtures/cuda_graph.json`](../fixtures/cuda_graph.json).
+- MEM-001's final increment reuses the local allocation arithmetic from its
+  provisional gate and adds the live OPT-003 graph owner. The final simultaneous
+  owner/free-memory/RSS readings are retained in
+  [`fixtures/cuda_memory_fit_post_graph.json`](../fixtures/cuda_memory_fit_post_graph.json);
+  the earlier pre-graph fixture remains historical evidence rather than being
+  overwritten.
 
 ## Specialization and hardware references
 

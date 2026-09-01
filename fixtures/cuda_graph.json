@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "task": "OPT-003",
+  "device": "NVIDIA GeForce RTX 5090",
+  "compute_capability": "12.0",
+  "toolkit": "CUDA 13.0.2",
+  "graphs": 64,
+  "graph_device_bytes": 6291456,
+  "graph_launch_cpu_ms_diagnostic": 0.149828002,
+  "admitted_run": {
+    "warmups": 3,
+    "samples": 30,
+    "alternating_first_path": true,
+    "graph_ms": [63.7216644, 64.2070389, 64.4066849, 64.5280991, 64.69104, 64.7558365, 64.8905945, 64.9625244, 65.0607376, 65.1075211, 65.2927704, 65.3911972, 65.5136642, 65.5708771, 65.6430435, 65.7575378, 65.7627487, 65.8705902, 65.8718109, 65.9825592, 66.0536346, 66.1602554, 66.1879044, 66.3123856, 66.3400955, 66.4570847, 66.4794846, 66.6633911, 66.6864319, 66.805954],
+    "ordinary_ms": [63.5991364, 64.4946213, 64.8054733, 64.8743668, 65.0447693, 65.116127, 65.3436127, 65.2305908, 65.3479996, 65.5764771, 65.6760635, 65.9136963, 65.9292831, 65.9604492, 66.0492783, 66.1297302, 66.2242203, 66.2242584, 66.2832336, 66.330368, 66.4697571, 66.459137, 66.5965118, 66.7516479, 66.7237091, 66.7955551, 66.8895645, 67.000061, 67.0640335, 67.1336975],
+    "graph_mean_ms": 65.5711594,
+    "ordinary_mean_ms": 65.9345779,
+    "graph_median_ms": 65.7002869,
+    "ordinary_median_ms": 66.0895081,
+    "speedup": 1.0055424,
+    "exact": {"logits": true, "hidden": true, "trace_taps": true, "session_state": true, "greedy": true}
+  },
+  "replicate_speedups": [1.00516605, 1.00516462],
+  "claim": "stable-address FFN subgraphs with raw paired samples; not a whole-token graph or comparative product benchmark"
+}
