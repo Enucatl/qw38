@@ -12,7 +12,7 @@
   },
   "availability": {
     "graph_launch": "unavailable until OPT-003",
-    "queueing": "unavailable until SRV-001",
+    "queueing": "unavailable in scheduler record; SRV-001 records HTTP gate timing separately",
     "nsight_systems": "not installed in the pinned CUDA image",
     "nsight_compute": "2025.3.1 installed; GPU performance counters denied by host ERR_NVGPUCTRPERM"
   },

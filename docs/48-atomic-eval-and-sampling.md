@@ -93,4 +93,7 @@ the retained cases are in
 [`cuda_atomic_eval.json`](../fixtures/cuda_atomic_eval.json). The proof boundary
 is one-token CUDA evaluation. Multi-token request rollback, stochastic sampler
 policy, checkpoint persistence, public host `Engine` integration, 128K fit,
-graphs, server cancellation plumbing, and throughput remain later gates.
+graphs, active-request CUDA cancellation, and throughput remain later gates.
+SRV-001 separately proves cancellation while a request is waiting in the
+single-flight server queue; it does not yet connect an HTTP generation request
+to this one-token transaction.

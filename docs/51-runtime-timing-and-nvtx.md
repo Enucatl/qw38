@@ -61,7 +61,7 @@ boundary exists yet.
 | state commit | Copy 16 candidate K/V rows into committed cache storage |
 | idle gaps | Token stream span not covered by the named GPU categories |
 | graph launch | Unavailable until OPT-003 implements graphs |
-| queueing | Unavailable until SRV-001 implements the single-flight server queue |
+| queueing | Unavailable in this scheduler-local record; SRV-001 measures the HTTP gate separately |
 
 The token total starts before embedding and ends after device commit. `idle gaps`
 is the non-negative remainder after subtracting embedding, GDN, attention, FFN,
@@ -91,14 +91,16 @@ ordinary scheduler retains only its existing whole-compute timing. Optimization
 benchmarks must quantify instrumentation overhead and use an appropriate mode.
 
 If creating, recording, synchronizing, or reading an event fails, the diagnostic
-returns an explicit status. A missing graph or server queue is represented as
-unavailable, never fabricated as zero. NVTX ranges are balanced on successful
-and error paths so a profiler timeline does not accidentally swallow later work.
+returns an explicit status. A missing graph measurement or a queue value outside
+this scheduler boundary is represented as unavailable, never fabricated as
+zero. NVTX ranges are balanced on successful and error paths so a profiler
+timeline does not accidentally swallow later work.
 
 ## Proof boundary
 
 OPT-001 proves category exposure, synchronized ordering, NVTX range placement,
 sampling/persistence timing, and explicit unavailable values on this runtime.
 It does not prove a fusion is beneficial, provide an Nsight report, measure CUDA
-graphs or server queueing, establish p50/p95 latency, or pass the comparative
-speed gate. Those belong to OPT-002 through OPT-004, SRV-001, BEN-001, and CMP.
+graphs, merge the separately measured SRV-001 queue delay into an end-to-end
+request record, establish p50/p95 latency, or pass the comparative speed gate.
+Those belong to OPT-002 through OPT-004, SRV-002, BEN-001, and CMP.

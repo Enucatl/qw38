@@ -46,10 +46,13 @@
       "type": "backend",
       "label": "qw38-server",
       "sublabel": "single-flight HTTP boundary",
-      "tag": "planned / fail-closed",
+      "tag": "control plane admitted",
       "pos": [260, 315],
       "size": [180, 72],
-      "sources": [{"path": "src/server.cpp", "line": 3, "label": "server stub"}]
+      "sources": [
+        {"path": "src/server.cpp", "line": 196, "label": "HTTP control routes"},
+        {"path": "src/server_core.cpp", "line": 8, "label": "single-flight queue"}
+      ]
     },
     {
       "id": "request",

@@ -7,9 +7,10 @@ engine for the pinned Qwen3.8-27B Q4_K_M artifact on one RTX 5090. The approved
 scope is in [plan.md](plan.md), and implementation claims and evidence are in
 [implementation_ledger.md](implementation_ledger.md).
 
-The CUDA text CLI is usable now. The OpenAI-compatible server, comparative
-benchmarks, and release quality gate are still under construction; unfinished
-product binaries continue to fail closed.
+The CUDA text CLI is usable now. The server's health/model control plane is
+also admitted, while Chat Completions, Responses, comparative benchmarks, and
+the release quality gate remain under construction; unfinished operations
+continue to fail closed.
 
 ## Chat with Quartz now
 
@@ -59,6 +60,31 @@ The complete beginner explanation is
 authentication still reads the complete artifact but now uses hardware-
 accelerated SHA-256 where available; see
 [Hardware-accelerated model authentication](docs/57-hardware-sha256.md).
+
+## Start the server control plane
+
+The CUDA server currently exposes `GET /health` and `GET /v1/models`. Start it
+with host networking so its loopback-only default is reachable from the host:
+
+```sh
+docker run --rm --network host --gpus all \
+  --user "$(id -u):$(id -g)" \
+  -v "$PWD:/workspace" \
+  qw38-cuda:13.0.2 \
+  ./build/cuda/qw38-server models/Qwen3.8-27B-Q4_K_M.gguf
+```
+
+Then inspect readiness and the admitted model from another terminal:
+
+```sh
+curl http://127.0.0.1:8080/health
+curl http://127.0.0.1:8080/v1/models
+```
+
+Generation endpoints are not available yet, so Codex cannot use this server as
+a provider until SRV-002 and SRV-003 pass. See the
+[single-flight server chapter](docs/58-http-server-core.md) for the HTTP parser,
+queue, cancellation, lifecycle, and proof boundary.
 
 The beginner-oriented [implementation handbook](docs/README.md) explains each
 admitted concept and links it to code, fixtures, failures, and evidence. The
@@ -149,8 +175,9 @@ The [pre-graph 128K memory chapter](docs/50-pre-graph-128k-memory.md) records th
 first simultaneous full-capacity allocation and remaining reserve while keeping
 the final post-graph MEM-001 admission explicitly open.
 Chapters 51–55 cover timing, fusion, CUDA graphs, the final admitted 128K
-allocation, and offline RTX 5090 dispatch tuning. Chapters 56–57 cover the
-working interactive CLI and accelerated model authentication.
+allocation, and offline RTX 5090 dispatch tuning. Chapters 56–58 cover the
+working interactive CLI, accelerated model authentication, and admitted HTTP
+control plane.
 
 ## Build
 

@@ -311,6 +311,13 @@ DSpark are explicitly rejected as Qwen model semantics.
   [`fixtures/sha256_acceleration.json`](../fixtures/sha256_acceleration.json).
   The distinction between artifact identity and ZFS block integrity follows
   OpenZFS's [checksum documentation](https://openzfs.github.io/openzfs-docs/Basic%20Concepts/Data%20Storage/Checksums.html).
+- SRV-001 and EDU-043 use Linux/POSIX socket, signal, and C++17 synchronization
+  interfaces supplied by the pinned host/container toolchain; no HTTP server or
+  queue implementation is copied. The exact parser/routes, FIFO ownership,
+  cancellation, lifecycle, and source identities are authenticated in
+  [`pins/server_core_contract.json`](../pins/server_core_contract.json), with
+  native concurrency and real CUDA route evidence retained in
+  [`fixtures/server_core.json`](../fixtures/server_core.json).
 
 ## Specialization and hardware references
 

@@ -23,8 +23,8 @@
     "concurrent_gpu_sessions": true
   },
   "local_sources": {
-    "README.md": "8da62fcd1e36bb54fe48cfc4c754e292a3341b5a3bb13c0d0ae5ee8cf15761ab",
-    "Makefile": "cd8390ecf1869e47e763cbbcd6d0eb3b9716bfd32a8a43681ac04bb4007fc21a",
+    "README.md": "153fdbe127b48b7d3d19c397eb6c29630af69f7c161e1b3ea8c9624a8a63dc49",
+    "Makefile": "f014e1a0081e061f283fe90cfa877e462314fee5fb93f01705e94c81d1a3d149",
     "include/qw38/engine.h": "35477862c4a057ffbf5f7e17bbff60c94c1906eba16a260efdbedb1a7c6eec4f",
     "src/engine.cpp": "e4dc7608ff7af8ca6c52cd15dc80256f2742d5c1228c19fab8c11c44d7a6da15",
     "src/cli.cpp": "80a3afa8655882fddc94c445538e656b80be07e1c7c2213bc551b9881e01c947",
@@ -36,6 +36,6 @@
     "cuda/full_scheduler.h": "95bc5d1ef877bfc493b0f9444c9034e6b1fc021be2853f3615c0a9b4c2854147",
     "tests/test_cli.py": "aa708b624f600723674c4e1ba057343942230de4bc1754614314368855f2d8b9",
     "fixtures/cli_smoke.json": "6c9683758af5d0392727f17bada2c2c0030887cf7514c6645e7cfe457c863bcb",
-    "docs/56-interactive-text-cli.md": "dea87b13eb62159e6b24f13ca0c54324be176ec140c8d08a66fb598531b5a6b6"
+    "docs/56-interactive-text-cli.md": "9c0c5f8ba7ecc03a8ba332885a4d66c22c1be6c888546aa5e83ffde3ede01ef7"
   }
 }

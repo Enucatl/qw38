@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "task": "SRV-001",
+  "model_id": "qwen3.8-27b-q4_k_m",
+  "model_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+  "production_binary": "build/cuda/qw38-server",
+  "host_binary_scope": "validation_only",
+  "default_bind": "127.0.0.1:8080",
+  "maximum_header_bytes": 65536,
+  "receive_timeout_seconds": 5,
+  "requests_per_connection": 1,
+  "gpu_sessions": 1,
+  "public_routes": ["GET /health", "GET /v1/models"],
+  "errors": {
+    "malformed": 400,
+    "unknown_get": 404,
+    "unsupported_method": 405
+  },
+  "queue": {
+    "policy": "fifo",
+    "maximum_active": 1,
+    "clock": "steady_monotonic",
+    "poll_milliseconds": 5,
+    "records_depth_on_arrival": true,
+    "records_wait_microseconds": true,
+    "queued_cancellation": "remove_ticket_and_notify",
+    "shutdown": "wake_all_with_cancelled"
+  },
+  "deferred": [
+    "chat_completions",
+    "responses",
+    "request_json",
+    "streaming",
+    "tools",
+    "authentication",
+    "active_cuda_cancellation",
+    "tls",
+    "persistent_connections"
+  ],
+  "local_sources": {
+    "Makefile": "f014e1a0081e061f283fe90cfa877e462314fee5fb93f01705e94c81d1a3d149",
+    "README.md": "153fdbe127b48b7d3d19c397eb6c29630af69f7c161e1b3ea8c9624a8a63dc49",
+    ".gitignore": "961084adb4dd1a3c4bde4776aa337d8fa66e2d66e87d98f0f9e75a7e7bfa00ad",
+    "src/server.cpp": "0b9cfa54fca085611c0a775f1ae1e52732d64b5cbe4f29a89f380d6219abfd70",
+    "src/server_core.cpp": "94b2df61560d8aa0fa777cd8588faa30a16b658e4ed2faaf57279160671f3db2",
+    "src/server_core.h": "930a8e8ac6914f80a77e7194fa47023ff0b333bdff759279306220707fa870e8",
+    "src/server_core_test.cpp": "754796d5836452e1fa80924676325e34f0f524996e9b848040469e639288d518",
+    "tests/test_server.py": "08c39597b0c996d176d90611eeaec15c1f61513fd4280a3f0a372504466101ad",
+    "fixtures/server_core.json": "344292f1ac6b13099bbe1f6e7c9b1b254a856cd7c787049b2e6a5614d0cf6924",
+    "docs/58-http-server-core.md": "5d5b71dc248c01e7c1483a17e4400a9113ca26fc690566b5e3e0f7ccb1a39b6c",
+    "docs/architecture/architecture.architecture.json": "26c5f7bfbad655dd803deb8f61c392baec33eaf799d2dfda0fe8c674d935cd64",
+    "docs/architecture/qw38-runtime-architecture.svg": "040e8fe9dab540c5b1260fd10ee5dd395013d3786a3af4bf2d2e9bade54b00b9",
+    "docs/architecture/architecture.html": "e37735edab0ebcbf0b9c4d0fd915e82b90898bb650b5ebba65b0afb0adb27f62"
+  }
+}

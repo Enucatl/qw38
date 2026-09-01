@@ -190,6 +190,8 @@ an assistant history block open, serializing tools in unstable key order,
 wrapping each tool result as an unrelated user turn, accepting vision in text-only
 v1, or confusing template completion with API/server completion.
 
-TOK-002 covers deterministic rendering only. HTTP validation, structured request
-parsing, streaming, cancellation, `previous_response_id`, and response objects
-belong to SRV-001–SRV-003 and remain unfinished.
+TOK-002 covers deterministic rendering only. SRV-001 now supplies the bounded
+HTTP listener, health/model discovery routes, and a cancellable single-flight
+queue. Structured generation-request parsing, streaming, active CUDA
+cancellation, `previous_response_id`, and response objects remain SRV-002 and
+SRV-003 work.

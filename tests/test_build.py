@@ -27,11 +27,14 @@ def test_all_product_binaries_exist_and_fail_closed() -> None:
     assert "usage: qw38 MODEL [options]" in cli.stderr
     assert "--reasoning MODE" in cli.stderr
 
-    for name in ("qw38-server", "qw38-bench"):
-        result = run_binary(name)
-        assert result.returncode == 2
-        assert BRAND in result.stdout
-        assert "has not passed its delivery gate" in result.stderr
+    server = run_binary("qw38-server")
+    assert server.returncode == 2
+    assert "usage: qw38-server MODEL" in server.stderr
+
+    bench = run_binary("qw38-bench")
+    assert bench.returncode == 2
+    assert BRAND in bench.stdout
+    assert "has not passed its delivery gate" in bench.stderr
 
 
 def test_cli_help_does_not_require_a_model() -> None:
@@ -39,6 +42,11 @@ def test_cli_help_does_not_require_a_model() -> None:
     assert result.returncode == 0
     assert "usage: qw38 MODEL [options]" in result.stdout
     assert "interactive commands:" in result.stdout
+
+    server = run_binary("qw38-server", "--help")
+    assert server.returncode == 0
+    assert "usage: qw38-server MODEL" in server.stdout
+    assert "--host IPV4" in server.stdout
 
 
 def test_eval_reports_pinned_build_identity() -> None:

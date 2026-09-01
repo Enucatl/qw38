@@ -65,7 +65,7 @@ are repository-relative unless stated otherwise.
 | OPT-003 | Implement stable-address CUDA graphs | OPT-002 | done | Graph/non-graph equivalence passes and graph allocations are in MEM-001 | [`cuda/full_scheduler.cu`](cuda/full_scheduler.cu); [`fixtures/cuda_graph.json`](fixtures/cuda_graph.json); [`tests/test_cuda_graph.py`](tests/test_cuda_graph.py); log 2026-09-01T07:08:29Z |
 | OPT-004 | Tune row buckets/chunks and check in dispatch evidence | OPT-003 | done | Offline RTX 5090 sweep selects a reproducible table from retained raw results | [`cuda/quant_mmv.cu`](cuda/quant_mmv.cu); [`fixtures/cuda_dispatch_tuning.json`](fixtures/cuda_dispatch_tuning.json); [`evidence/profiling/opt004-dispatch-sweep-raw.txt`](evidence/profiling/opt004-dispatch-sweep-raw.txt); [`tests/test_cuda_dispatch_tuning.py`](tests/test_cuda_dispatch_tuning.py); log 2026-09-01T07:30:51Z |
 | CLI-001 | Implement interactive `qw38` text CLI | TOK-002, SES-003 | done | Interactive generation, reasoning, stops, sampling, and persistence pass smoke tests | [`src/cli.cpp`](src/cli.cpp); [`src/engine.cpp`](src/engine.cpp); [`fixtures/cli_smoke.json`](fixtures/cli_smoke.json); [`tests/test_cli.py`](tests/test_cli.py); log 2026-09-01T11:56:52Z |
-| SRV-001 | Implement single-flight HTTP server core and queue | API-001 | pending | Health/models endpoints, cancellation, queue timing, and one GPU session pass tests | — |
+| SRV-001 | Implement single-flight HTTP server core and queue | API-001 | done | Health/models endpoints, cancellation, queue timing, and one GPU session pass tests | [`src/server.cpp`](src/server.cpp); [`src/server_core.cpp`](src/server_core.cpp); [`fixtures/server_core.json`](fixtures/server_core.json); [`tests/test_server.py`](tests/test_server.py); log 2026-09-01T18:19:42Z |
 | SRV-002 | Implement Chat Completions API | TOK-002, SES-002, SRV-001 | pending | Supported roles/tools/streaming/sampling/stops pass; exclusions reject explicitly | — |
 | SRV-003 | Implement Responses API and continuation | TOK-002, SES-003, SRV-001 | pending | Streaming/tools/`previous_response_id` and exclusions pass API fixtures | — |
 | BEN-001 | Implement `qw38-bench` component/end-to-end harness | OPT-001 | pending | Warmups/samples, telemetry, raw samples, failures, and environment metadata are retained | — |
@@ -117,6 +117,7 @@ are repository-relative unless stated otherwise.
 | EDU-040 | Explain offline CUDA dispatch tuning, row buckets, prompt tiles, and selection limits for beginners | OPT-004, DOC-001 | done | Candidate launch shapes, row buckets, prompt tiles/chunks, warmups, samples, selection rule, retained negatives, checked-in table, and proof limits are code-linked and worked | [`docs/55-offline-dispatch-tuning.md`](docs/55-offline-dispatch-tuning.md); [`tests/test_cuda_dispatch_tuning.py`](tests/test_cuda_dispatch_tuning.py); log 2026-09-01T07:30:51Z |
 | EDU-041 | Explain the interactive CLI, public runtime ownership, generation loop, sampling, stops, and persistence for beginners | CLI-001, DOC-001 | done | Terminal input, chat rendering, encode/decode, sync/eval/sample separation, reasoning display, stop tokens, checkpoint commands, CUDA-only production build, and proof limits are code-linked and worked | [`docs/56-interactive-text-cli.md`](docs/56-interactive-text-cli.md); [`README.md`](README.md); log 2026-09-01T11:56:52Z |
 | EDU-042 | Explain artifact hashing, SHA-NI dispatch, fallback, and cold/warm storage limits for beginners | MDL-003, DOC-001 | done | Whole-file identity versus ZFS block integrity, CPU instructions, runtime dispatch, exact digest equality, cache/storage limits, measurements, and proof boundaries are code-linked and worked | [`docs/57-hardware-sha256.md`](docs/57-hardware-sha256.md); [`fixtures/sha256_acceleration.json`](fixtures/sha256_acceleration.json); log 2026-09-01T11:56:52Z |
+| EDU-043 | Explain the HTTP listener, routes, single-flight queue, cancellation, and server lifecycle for beginners | SRV-001, DOC-001 | done | Sockets, HTTP requests/responses, loopback binding, health/models payloads, queue tickets/timing, cancellation, one-session ownership, shutdown, exclusions, and proof limits are code-linked and worked | [`docs/58-http-server-core.md`](docs/58-http-server-core.md); [`pins/server_core_contract.json`](pins/server_core_contract.json); [`fixtures/server_core.json`](fixtures/server_core.json); log 2026-09-01T18:19:42Z |
 | REL-001 | Publish reproducible release evidence bundle | CMP-003, QLT-001, DOC-001 | pending | Builds, hashes, raw results, reports, and documentation claims reconcile | — |
 
 ## Delivery-Gate Mapping
@@ -2962,6 +2963,77 @@ are repository-relative unless stated otherwise.
 - Marked CLI-001, MDL-003, EDU-041, and EDU-042 done. SRV-001, the single-flight
   HTTP server core, is the next executable product task; the CLI is usable now
   but is not presented as a Codex/OpenAI-compatible provider.
+
+### 2026-09-01T12:04:17Z — SRV-001 and EDU-043 started
+
+- Audited the server boundary after CLI admission. `src/server.cpp` remains a
+  three-line fail-closed stub, there is no HTTP/JSON dependency, and the Makefile
+  links only a host server. The CUDA `Engine` now supplies the exact one-session
+  owner required by the gate, but Chat Completions and Responses parsing remain
+  explicitly owned by SRV-002 and SRV-003.
+- Scoped SRV-001 to a narrow Linux socket listener with bounded HTTP/1.1 parsing,
+  one request per connection, explicit JSON responses, loopback default binding,
+  graceful process shutdown, and public `GET /health` plus `GET /v1/models`.
+  A reusable FIFO single-flight gate will admit at most one future GPU handler,
+  measure queue delay, remove cancelled waiters, and wake all waiters on
+  shutdown. Focused native concurrency tests will exercise this gate without a
+  model; a real CUDA smoke must prove that the production server authenticates
+  the model, allocates exactly one session, and serves both routes.
+- Request bodies, Chat Completions, Responses, streaming, tools, API keys, and
+  request-to-CUDA cancellation are not silently pulled into the core gate. The
+  queue cancellation contract covers a client that disconnects while waiting;
+  active generation cancellation is completed with the inference routes in
+  SRV-002. The existing untracked `checkpoints/` directory is preserved and
+  will be ignored as runtime state rather than committed.
+
+### 2026-09-01T12:13:07Z — SRV-001 readiness-harness negative
+
+- The first real CUDA server smoke allocated 27,110 MiB and printed a valid
+  ephemeral listener at `127.0.0.1:42209`, but the test timed out before making
+  requests. Diagnosis: text-mode `readline()` had pulled the readiness line into
+  Python's internal buffer while `select()` watched only the empty kernel pipe;
+  the timeout path then blocked reading stderr from the still-running server.
+  Stopped the specifically named test container, retained the 137.51-second
+  failure, and changed readiness detection to raw `os.read` bytes with no
+  blocking stderr read. No server behavior or expected route payload changed.
+
+### 2026-09-01T18:19:42Z — SRV-001 and EDU-043 accepted
+
+- Replaced the fail-closed server stub with a bounded Linux IPv4 HTTP/1.1
+  listener. The production CUDA binary authenticates the pinned GGUF, prepares
+  resident weights, creates exactly one session, and only then reports ready.
+  It serves exact `GET /health` and `GET /v1/models` control-plane responses;
+  malformed requests, unknown routes, and unsupported methods return explicit
+  400, 404, and 405 JSON errors. The 65,536-byte header cap, five-second receive
+  timeout, one request per connection, loopback default, and graceful
+  SIGINT/SIGTERM shutdown keep this first protocol boundary deliberately small.
+- Added a reusable FIFO single-flight gate with stable ticket order, monotonic
+  microsecond queue delay, arrival-depth capture, one active owner, queued
+  cancellation, and shutdown wake-up. The native concurrency diagnostic measured
+  a second-arrival depth of one, at least 30,000 microseconds of wait, and a
+  maximum of one active owner; it also proved that cancelled waiters are removed
+  and shutdown wakes a blocked waiter. Generation routes do not exist yet, so
+  active CUDA cancellation and request-to-gate integration remain SRV-002 work.
+- The corrected live CUDA smoke passed in 11.56 seconds: it observed one session,
+  exact health/model payloads, every error route, an ephemeral loopback port,
+  27,110 MiB of GPU use, and process exit zero after SIGTERM. The earlier
+  137.51-second readiness-harness failure remains preserved above and in
+  [`fixtures/server_core.json`](fixtures/server_core.json).
+- Added beginner Chapter 58 explaining TCP sockets, addresses and ports,
+  loopback, HTTP messages, CRLF framing, JSON and `Content-Length`, bounded
+  parsing, control versus data planes, FIFO queueing, queue depth/delay,
+  cancellation, one-session ownership, and graceful shutdown. Reconciled older
+  tokenizer, atomic-eval, timing, and CLI chapters so they distinguish the now
+  admitted control plane from still-pending Chat Completions and Responses.
+- Verification before this acceptance update: `uv run ruff format .` left 65
+  Python files unchanged; focused build/server/timing tests passed 17 tests with
+  one expected opt-in skip; the ordinary suite passed 143 tests with seventeen
+  expected GPU skips in 173.73 seconds. A clean pinned CUDA 13.0.2 container build
+  compiled four host products, the native queue diagnostic, both CUDA products,
+  and sixteen SM120 diagnostics with warnings as errors. The complete exclusive
+  RTX 5090 suite passed all 160 tests in 275.58 seconds.
+- Marked SRV-001 and EDU-043 done. SRV-002, the Chat Completions request,
+  generation, streaming, and cancellation boundary, is the next product task.
 
 ## Decisions and Negative Results
 

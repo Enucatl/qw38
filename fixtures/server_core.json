@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "task": "SRV-001",
+  "measured_at_utc": "2026-09-01T12:15:25Z",
+  "queue": {
+    "policy": "fifo_single_flight",
+    "depth_on_second_arrival": 1,
+    "minimum_observed_wait_microseconds": 30000,
+    "maximum_active": 1,
+    "cancelled_waiter_removed": true,
+    "shutdown_wakes_waiters": true
+  },
+  "cuda_smoke": {
+    "container": "qw38-cuda:13.0.2",
+    "gpu": "NVIDIA GeForce RTX 5090",
+    "model_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+    "observed_gpu_memory_mib": 27110,
+    "sessions": 1,
+    "ephemeral_port": true,
+    "pytest_elapsed_seconds": 11.56,
+    "graceful_sigterm_exit_code": 0,
+    "passed": true
+  },
+  "routes": {
+    "GET /health": {
+      "status": 200,
+      "body": {"status": "ok", "ready": true, "model": "qwen3.8-27b-q4_k_m", "single_flight": true, "sessions": 1, "queue_active": false, "queue_depth": 0}
+    },
+    "GET /v1/models": {
+      "status": 200,
+      "object": "list",
+      "model_id": "qwen3.8-27b-q4_k_m"
+    },
+    "missing": {"status": 404, "code": "not_found"},
+    "wrong_method": {"status": 405, "code": "method_not_allowed"},
+    "malformed": {"status": 400, "code": "bad_request"}
+  },
+  "negative_runs": [
+    {
+      "elapsed_seconds": 137.51,
+      "cause": "text-mode readiness reader buffered the listening line beyond select visibility",
+      "server_became_ready": true,
+      "resolved": true
+    }
+  ],
+  "scope": "Control-plane and queue-core evidence; no generation endpoint"
+}
