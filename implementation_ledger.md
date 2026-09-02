@@ -57,6 +57,7 @@ are repository-relative unless stated otherwise.
 | ATN-001 | Implement grouped-query attention and partial RoPE | CUD-001, CPU-003 | done | Decode, causality, KV grouping, and layers 3/7/63 pass | [`cuda/attention_decode.cu`](cuda/attention_decode.cu); [`fixtures/cuda_attention_decode.json`](fixtures/cuda_attention_decode.json); [`tests/test_cuda_attention.py`](tests/test_cuda_attention.py); log 2026-08-31T06:57:49Z |
 | ATN-002 | Implement memory-bounded causal attention prefill | ATN-001, CUD-002 | done | Chunked prompt fixtures and 131,072 capacity boundary pass | [`cuda/attention_decode.cu`](cuda/attention_decode.cu); [`fixtures/cuda_attention_prefill.json`](fixtures/cuda_attention_prefill.json); [`tests/test_cuda_attention_prefill.py`](tests/test_cuda_attention_prefill.py); log 2026-08-31T09:33:05Z |
 | SCH-001 | Implement hybrid 64-layer CUDA scheduler and FP32 logits | GDN-002, ATN-002, CUD-003 | done | Full traces/logits and greedy continuations meet frozen gates | [`cuda/full_scheduler.cu`](cuda/full_scheduler.cu); [`fixtures/cuda_full_scheduler.json`](fixtures/cuda_full_scheduler.json); [`tests/test_cuda_full_scheduler.py`](tests/test_cuda_full_scheduler.py); log 2026-08-31T12:13:55Z |
+| SCH-002 | Integrate chunked prompt execution into the full CUDA scheduler | SCH-001, GDN-002, ATN-002, CUD-002, BEN-001 | pending | End-to-end prefill uses prompt-row MMQ and chunked GDN/attention paths, remains token-wise equivalent, and no longer dispatches one complete decode token at a time | log 2026-09-02T14:48:00Z |
 | SES-001 | Implement exact common-prefix sync/reuse | SCH-001 | done | Reuse and full replay produce the same committed state and logits | [`cuda/full_scheduler.cu`](cuda/full_scheduler.cu); [`fixtures/cuda_prefix_sync.json`](fixtures/cuda_prefix_sync.json); [`tests/test_cuda_prefix_sync.py`](tests/test_cuda_prefix_sync.py); log 2026-08-31T13:45:38Z |
 | SES-002 | Implement atomic eval/sample/commit semantics | SCH-001 | done | Sampling is separate; cancellation/error cannot partially commit state | [`cuda/full_scheduler.cu`](cuda/full_scheduler.cu); [`fixtures/cuda_atomic_eval.json`](fixtures/cuda_atomic_eval.json); [`tests/test_cuda_atomic_eval.py`](tests/test_cuda_atomic_eval.py); log 2026-08-31T17:55:34Z |
 | SES-003 | Implement atomic checkpoint save/restore | SES-001, SES-002 | done | All state and compatibility hashes persist; resumed continuation is exact | [`cuda/checkpoint.cu`](cuda/checkpoint.cu); [`fixtures/cuda_checkpoint.json`](fixtures/cuda_checkpoint.json); [`tests/test_cuda_checkpoint.py`](tests/test_cuda_checkpoint.py); log 2026-08-31T19:09:54Z |
@@ -71,7 +72,8 @@ are repository-relative unless stated otherwise.
 | SRV-002 | Implement Chat Completions API | TOK-002, SES-002, SRV-001 | done | Supported roles/tools/streaming/sampling/stops pass; exclusions reject explicitly | [`src/server.cpp`](src/server.cpp); [`src/server_generation.cpp`](src/server_generation.cpp); [`fixtures/chat_completions.json`](fixtures/chat_completions.json); [`tests/test_server.py`](tests/test_server.py); log 2026-09-01T19:00:04Z |
 | SRV-003 | Implement Responses API and continuation | TOK-002, SES-003, SRV-001 | done | Streaming/tools/`previous_response_id` and exclusions pass API fixtures | [`src/server.cpp`](src/server.cpp); [`fixtures/responses.json`](fixtures/responses.json); [`tests/test_server.py`](tests/test_server.py); log 2026-09-02T14:27:35Z |
 | API-003 | Implement strict Responses request and event mapping | API-002, SRV-002 | done | Text inputs, reasoning, function calls/results, sampling, response objects, ordered SSE events, and explicit exclusions pass native fixtures | [`src/responses_api.cpp`](src/responses_api.cpp); [`src/responses_api_test.cpp`](src/responses_api_test.cpp); [`pins/responses_contract.json`](pins/responses_contract.json); log 2026-09-02T14:27:35Z |
-| BEN-001 | Implement `qw38-bench` component/end-to-end harness | OPT-001 | pending | Warmups/samples, telemetry, raw samples, failures, and environment metadata are retained | — |
+| BEN-001 | Implement `qw38-bench` component/end-to-end harness | OPT-001 | done | Warmups/samples, telemetry, raw samples, failures, and environment metadata are retained | `pins/benchmark_contract.json`; `fixtures/benchmark_harness.json`; `evidence/benchmark/`; `tests/test_benchmark.py`; log 2026-09-02T15:24:00Z |
+| BEN-002 | Preserve the product-wide no-argument usage exit contract in `qw38-bench` | BEN-001, BLD-001 | done | Invoking the benchmark with no arguments prints usage and returns exit code 2 without creating output | `tests/test_build.py`; log 2026-09-02T15:24:00Z |
 | EVAL-001 | Implement `qw38-eval` logits/traces/checkpoints harness | ORA-001, SES-003 | pending | Focused native diagnostics are driven by typed pytest helpers | — |
 | QLT-001 | Pass held-out NLL, continuation, recurrence, retrieval, and task quality | EVAL-001, MEM-001 | pending | Admitted artifact passes every documented threshold and 128K retrieval fixture | — |
 | CMP-001 | Pin and validate comparable baseline artifacts | PIN-001, PIN-002, QLT-001 | pending | llama/Ollama share GGUF; vLLM difference and <=1% NLL admission are explicit | — |
@@ -123,6 +125,7 @@ are repository-relative unless stated otherwise.
 | EDU-043 | Explain the HTTP listener, routes, single-flight queue, cancellation, and server lifecycle for beginners | SRV-001, DOC-001 | done | Sockets, HTTP requests/responses, loopback binding, health/models payloads, queue tickets/timing, cancellation, one-session ownership, shutdown, exclusions, and proof limits are code-linked and worked | [`docs/58-http-server-core.md`](docs/58-http-server-core.md); [`pins/server_core_contract.json`](pins/server_core_contract.json); [`fixtures/server_core.json`](fixtures/server_core.json); log 2026-09-01T18:19:42Z |
 | EDU-044 | Explain JSON, Chat Completions, SSE streaming, tools, stops, usage, queueing, and cancellation for beginners | SRV-002, API-002, DOC-001 | done | Request/response fields, validation, token generation, reasoning/content separation, function calls, stream events, stop behavior, session reuse, and proof limits are code-linked and worked | [`docs/59-chat-completions.md`](docs/59-chat-completions.md); [`pins/chat_completions_contract.json`](pins/chat_completions_contract.json); [`fixtures/chat_completions.json`](fixtures/chat_completions.json); log 2026-09-01T19:00:04Z |
 | EDU-045 | Explain Responses objects, typed items, events, storage, and exact continuation for beginners | SRV-003, SES-004, API-003, DOC-001 | done | A reader new to APIs can follow input items through tokens and output items, distinguish IDs from state, understand atomic records and exact prefixes, and identify every supported/rejected boundary | [`docs/60-responses-and-continuation.md`](docs/60-responses-and-continuation.md); [`pins/responses_contract.json`](pins/responses_contract.json); [`fixtures/responses.json`](fixtures/responses.json); log 2026-09-02T14:27:35Z |
+| EDU-046 | Explain benchmark workloads, samples, percentiles, throughput, telemetry, and evidence limits for beginners | BEN-001, OPT-001, DOC-001 | done | A new reader can distinguish warm-ups/runs/tokens, prefill/decode/TTFT/ITL, p50/p95, raw versus summary data, process/device telemetry, unavailable values, and benchmark versus comparison claims | `docs/61-benchmark-harness.md`; `docs/README.md`; log 2026-09-02T15:24:00Z |
 | REL-001 | Publish reproducible release evidence bundle | CMP-003, QLT-001, DOC-001 | pending | Builds, hashes, raw results, reports, and documentation claims reconcile | — |
 
 ## Delivery-Gate Mapping
@@ -3227,6 +3230,113 @@ are repository-relative unless stated otherwise.
   OpenAI text API envelopes are now implemented; BEN-001, the benchmark harness,
   is the next delivery task. Broader SDK compatibility, authentication, remote
   serving, structured output, and multimodal inputs remain outside this gate.
+
+### 2026-09-02T14:35:00Z — BEN-001 and EDU-046 started
+
+- Began replacing the fail-closed `qw38-bench` stub and added EDU-046 before
+  source changes. The executable will run one explicit workload/case per
+  invocation so orchestration can enforce one large GPU process and preserve a
+  result even when another case fails.
+- The admitted primary modes are prefill and batch-one decode. Callers provide
+  exact prompt text, expected token count, output-token count, cache policy,
+  at least three warm-ups, at least thirty measured runs, and an output path.
+  Smaller counts remain available only under an explicit smoke flag and cannot
+  be mistaken for release evidence.
+- Every run will reset the session before primary measurement, retain raw wall
+  timings and per-token latencies, and calculate prompt tokens/s, TTFT, p50/p95
+  inter-token latency, and output tokens/s from those raw values. An explicitly
+  labeled reuse mode is separate. No synthetic confidence interval or baseline
+  comparison belongs to BEN-001; CMP-002/CMP-003 own those gates.
+- Added a narrow public timing result for `sample`/`eval` so the product harness
+  can retain the already-admitted CUDA loading, embedding, GDN, attention, FFN,
+  logits, sampling, graph-launch, queueing, persistence, idle-gap, commit, and
+  token-total categories without exposing tensors or device layouts. Missing
+  boundaries serialize as JSON `null`.
+- Environment evidence will include UTC time, source revision, pinned model
+  identity, build flags, host/kernel, container image name, CUDA runtime/driver,
+  GPU identity, clocks, power, temperature, device memory, process RSS, prompt
+  bytes/hash/token IDs, requested cache policy, and raw successful or failed
+  runs. `nvidia-smi` telemetry is observational and will fail closed if the
+  production CUDA benchmark cannot obtain it.
+
+### 2026-09-02T14:48:00Z — BEN-001 exposed missing scheduler prefill integration
+
+- The first real harness smoke succeeded but measured only about 16 prompt
+  tokens/s for a 17-token prompt. Inspection confirmed `sync_tokens` still calls
+  the complete one-token scheduler in a loop. The separately admitted tiled MMQ,
+  64-token GDN scan, and memory-bounded attention chunk primitives are not wired
+  into a layer-major full-prompt schedule.
+- Added SCH-002 before any attempted fix. Earlier GDN-002 and ATN-002 claims
+  remain valid at their focused primitive boundaries, and SCH-001 remains the
+  admitted one-token full scheduler; none is silently relabeled as optimized
+  end-to-end prefill. This negative makes the eventual comparative prefill gate
+  unattainable until SCH-002 is completed.
+
+### 2026-09-02T15:14:00Z — BEN-002 product exit-code regression discovered
+
+- The first repository-wide host verification for BEN-001 stopped in
+  `tests/test_build.py`: invoking `qw38-bench` with no arguments returned 1,
+  while the established product boundary requires usage exit code 2.
+- Added BEN-002 before changing the executable. This is a compatibility fix
+  inside the benchmark delivery gate, not a new product feature; the failed
+  `uv run pytest -q` / focused `uv run pytest -x -q` results remain recorded.
+- The first BEN-002 fix restored exit code 2 but its focused rerun exposed the
+  second half of the same established contract: the brand line must remain on
+  stdout. The run was `13 passed, 2 failed`; the source-hash failure is expected
+  until the behavior fix is final and the BEN-001 contract is refreshed.
+- After restoring the brand, the product test still asserted the superseded
+  benchmark-stub message (`has not passed its delivery gate`). BEN-001 is the
+  delivery of that gate, so BEN-002 also updates this assertion to the real
+  harness usage contract while retaining the no-argument fail-closed behavior.
+
+### 2026-09-02T15:24:00Z — BEN-001, BEN-002, and EDU-046 completed
+
+- Replaced the benchmark stub with the CUDA `qw38-bench` product. One invocation
+  runs one explicit prefill or fixed-length decode case through only the public
+  Engine/Session boundary, retains every warm-up and measured sample, records
+  generated tokens and per-token wall times, and publishes JSON with
+  file-and-directory synchronization plus atomic rename.
+- Release mode fails closed unless it receives at least three warm-ups, 30
+  samples, an exact expected rendered-token count, a context label, an explicit
+  source revision, and `source-state=clean`. `--smoke` is always marked
+  `admission_eligible=false`; runtime failures are retained after valid argument
+  parsing. Primary samples reset to an empty token history, while separately
+  labelled `agent-reuse` samples report reused-prefix and evaluated-suffix token
+  counts independently.
+- Added public optional timing overloads without changing existing callers.
+  Detailed CUDA event attribution runs as one separate component probe marked as
+  perturbing execution and excluded from throughput summaries. Unavailable
+  queue/persistence values remain JSON `null`, not fabricated zeroes.
+- Raw RTX 5090 smoke results are retained and authenticated in
+  `evidence/benchmark/`: cold prefill p50 was 16.1989587 prompt tokens/s; cold
+  decode p50 was 16.1515444 prompt tokens/s and 15.8418326 output tokens/s; the
+  second agent-reuse sample reused 20 exact prefix tokens. All three used the
+  pinned model/container and are explicitly dirty-worktree, non-admission
+  evidence. The separate focused CUDA benchmark test passed in 17.90 s.
+- Preserved the measured negative result: end-to-end prompt execution remains a
+  loop over complete one-token scheduler calls. SCH-002 remains pending to
+  connect the already-admitted MMQ and chunked GDN/attention primitives; no
+  release or comparative throughput claim is made from these smoke numbers.
+- Added the beginner-facing benchmark chapter, README example, source/provenance
+  entry, machine-readable contract, authenticated fixture, and tests. It defines
+  workload/run/warm-up/sample, prefill/decode, TTFT/ITL, throughput, p50/p95,
+  raw versus summary records, cache policy, telemetry limitations, null values,
+  source identity, atomic publication, and the proof boundary.
+- First full host command: `uv run pytest -q` — failed at the pre-existing
+  no-argument product assertion because the new harness returned 1. BEN-002 was
+  added before the fix. Its next two focused runs exposed and retained the brand
+  and obsolete-stub-assertion portions of the same contract; both were resolved.
+- Final commands: `uv run ruff format .` — 66 files unchanged;
+  `uv run ruff check .` — passed; `uv run pytest -q` — 150 passed, 18 skipped in
+  159.16 s; `QW38_RUN_CUDA_TESTS=1 uv run pytest -q` — 168 passed in 350.46 s.
+  Marked BEN-001, BEN-002, and EDU-046 done. The next performance-critical
+  implementation task is SCH-002, while EVAL-001 remains the next product-tool
+  gate if delivery order is followed strictly.
+- The smoke also showed why detailed attribution cannot run inside every timed
+  output token: its many CUDA event pairs perturb product throughput. The harness
+  now uses ordinary graph execution for warm-up/measured distributions and runs
+  one separately labeled component probe with `perturbs_execution=true` and
+  `used_for_throughput_summary=false`.
 
 ## Decisions and Negative Results
 

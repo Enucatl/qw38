@@ -199,7 +199,33 @@ the final post-graph MEM-001 admission explicitly open.
 Chapters 51–55 cover timing, fusion, CUDA graphs, the final admitted 128K
 allocation, and offline RTX 5090 dispatch tuning. Chapters 56–58 cover the
 working interactive CLI, accelerated model authentication, the HTTP control
-plane, and Chat Completions data plane.
+plane, and Chat Completions data plane. Chapters 59–61 cover Chat Completions,
+Responses continuation, and the benchmark harness.
+
+## Measure a local smoke workload
+
+`qw38-bench` records raw runs, summaries, environment identity, telemetry, and
+failures in an atomic JSON result. This short example validates the harness; its
+`--smoke` result is deliberately not release-admission evidence:
+
+```sh
+revision="$(git rev-parse HEAD)"
+state=clean
+test -z "$(git status --porcelain)" || state=dirty
+docker run --rm --gpus all --user "$(id -u):$(id -g)" \
+  -v "$PWD:/workspace" qw38-cuda:13.0.2 \
+  ./build/cuda/qw38-bench models/Qwen3.8-27B-Q4_K_M.gguf \
+  --workload decode --prompt "Quartz benchmark prompt." \
+  --context-label smoke --output-tokens 2 --warmups 1 --samples 2 \
+  --cache-policy disabled --source-revision "$revision" \
+  --source-state "$state" --smoke \
+  --output evidence/benchmark/local-decode-smoke.json
+```
+
+Release runs omit `--smoke`, require a clean source revision, an exact expected
+prompt-token count, at least three warm-ups, and at least 30 samples. See
+[The benchmark harness](docs/61-benchmark-harness.md) for every term, metric,
+limitation, and the current SCH-002 prompt-throughput boundary.
 
 ## Build
 

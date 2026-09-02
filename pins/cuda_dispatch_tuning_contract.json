@@ -23,7 +23,7 @@
     "full_scheduler": "frozen trace, logits, and greedy gates"
   },
   "local_sources": {
-    "Makefile": "0f61014952b8595cf1911363cc2377b87abeef1fe65dd85651deae06cc24a2f2",
+    "Makefile": "efb21653c65c291fc15c8b816c1c62ecebec703b2d14370b3850f626b7f1c941",
     "cuda/quant_mmv.cu": "85eaf6f6f4dbc9e229f085f7eb18f8c2536df15b833923527a39ec7c90788347",
     "cuda/quant_mmv.h": "7996383bc93b87e92c45aa6d379b9c7a075cf19a13a82516259f45e727f62538",
     "cuda/quant_mmv_test.cu": "3e59c5f458b161bdf94ae087369ca8faee069d7a039242f8fa945e6d1f12a5b0",

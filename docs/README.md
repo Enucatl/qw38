@@ -85,7 +85,8 @@ for language and host portability decisions.
 58. [Single-flight HTTP server core](58-http-server-core.md): sockets, bounded HTTP, health/models routes, FIFO queueing, cancellation, and shutdown.
 59. [Chat Completions](59-chat-completions.md): bounded JSON, roles, reasoning, generation, SSE streaming, tools, stops, queueing, and active cancellation.
 60. [Responses objects and exact continuation](60-responses-and-continuation.md): typed input/output items, shared generation mapping, SSE events, atomic token-prefix records, restart replay, and explicit exclusions.
-61. [Source and evidence ledger](sources.md).
+61. [Benchmark harness](61-benchmark-harness.md): workloads, warm-ups, samples, percentiles, telemetry, cache policy, atomic results, and proof limits.
+62. [Source and evidence ledger](sources.md).
 
 Claims use four labels: **Measured** (this exact artifact and hardware),
 **External** (a linked source), **Estimated** (reproducible arithmetic), and

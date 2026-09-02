@@ -24,7 +24,7 @@
   "restore_preflight": ["magic/version", "model/layout hashes", "capacity/frontier", "sampler bounds", "section arithmetic", "exact file size", "SHA-256 footer", "token bounds"],
   "logical_attention_state": "only rows below frontier; file size grows by 65536 bytes per committed token",
   "local_sources": {
-    "Makefile": "0f61014952b8595cf1911363cc2377b87abeef1fe65dd85651deae06cc24a2f2",
+    "Makefile": "efb21653c65c291fc15c8b816c1c62ecebec703b2d14370b3850f626b7f1c941",
     "cuda/checkpoint.cu": "2c3c03a47b401be8635bd5e5df8cf2b889fa720285e2e18772d86a42043680f9",
     "cuda/checkpoint_test.cu": "b54eff76501d89a2a3be91d023f26582a50cb18c2af9f1f22ea97595a4532b43",
     "cuda/full_scheduler.cu": "64235c4fca1f303b40b9068d34750f9b89068e2e353f8ca1510460d0ae157877",

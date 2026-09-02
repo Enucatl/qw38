@@ -23,9 +23,11 @@ Quartz uses two clocks for two different jobs:
   for greedy sampling and saving a checkpoint. “Monotonic” means the clock only
   advances, so a wall-clock correction cannot produce a negative interval.
 
-These numbers must not be casually added across different requests. They become
-comparable benchmark statistics only after BEN-001 supplies warm-ups, repeated
-samples, percentile reporting, and controlled machine conditions.
+These numbers must not be casually added across different requests. BEN-001 now
+supplies warm-ups, repeated samples, percentile reporting, and controlled
+machine identity as explained in
+[`61-benchmark-harness.md`](61-benchmark-harness.md). Controlled cross-runtime
+comparison remains CMP-002/CMP-003 work.
 
 ## What NVTX contributes
 
@@ -103,5 +105,6 @@ sampling/persistence timing, and explicit unavailable values on this runtime.
 It does not prove a fusion is beneficial, provide an Nsight report, measure CUDA
 graphs, establish p50/p95 request latency, or pass the comparative speed gate.
 SRV-002 now exposes separately measured queue depth/delay on Chat Completions
-responses; merging repeated queue and engine samples into benchmark statistics
-belongs to OPT-002 through OPT-004, BEN-001, and CMP.
+responses. BEN-001 retains repeated engine samples and keeps its unavailable
+queue field explicit; server queue experiments and cross-runtime statistical
+comparison remain CMP work.

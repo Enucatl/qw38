@@ -21,6 +21,27 @@ struct SamplerConfig final {
   std::uint64_t seed = 0;
 };
 
+struct TimingValue final {
+  float milliseconds = 0.0F;
+  bool measured = false;
+};
+
+struct RuntimeTimings final {
+  TimingValue loading;
+  TimingValue embedding;
+  TimingValue gdn;
+  TimingValue attention;
+  TimingValue ffn;
+  TimingValue logits;
+  TimingValue sampling;
+  TimingValue graph_launch;
+  TimingValue queueing;
+  TimingValue persistence;
+  TimingValue idle_gaps;
+  TimingValue state_commit;
+  TimingValue token_total;
+};
+
 enum class ChatRole : std::uint8_t {
   kSystem,
   kDeveloper,
@@ -61,8 +82,13 @@ class Session final {
               const std::atomic<bool>* cancelled) noexcept;
   Status logits(std::vector<float>* output) const noexcept;
   Status sample(const SamplerConfig& config, Token* token) const noexcept;
+  Status sample(const SamplerConfig& config, Token* token,
+                RuntimeTimings* timings) const noexcept;
   Status eval(Token token) noexcept;
+  Status eval(Token token, RuntimeTimings* timings) noexcept;
   Status eval(Token token, const std::atomic<bool>* cancelled) noexcept;
+  Status eval(Token token, const std::atomic<bool>* cancelled,
+              RuntimeTimings* timings) noexcept;
   Status save(const std::string& path) const noexcept;
   Status restore(const std::string& path) noexcept;
   Status tokens(std::vector<Token>* output) const noexcept;

@@ -337,6 +337,16 @@ DSpark are explicitly rejected as Qwen model semantics.
   authenticated in [`pins/responses_contract.json`](../pins/responses_contract.json)
   and measured behavior is retained in
   [`fixtures/responses.json`](../fixtures/responses.json).
+- BEN-001 and EDU-046 use an original C++17 measurement harness around the
+  admitted public Engine/Session boundary. Percentile arithmetic, result JSON,
+  failure retention, cache-policy control, and POSIX atomic publication are
+  local code. CUDA runtime version queries provide build/runtime identity;
+  `nvidia-smi` supplies explicitly snapshot-based device telemetry. The protocol
+  and proof limits are authenticated in
+  [`pins/benchmark_contract.json`](../pins/benchmark_contract.json), with smoke
+  evidence in [`fixtures/benchmark_harness.json`](../fixtures/benchmark_harness.json)
+  and [`evidence/benchmark`](../evidence/benchmark). No benchmark-framework or
+  competing-runtime implementation is copied.
 
 ## Specialization and hardware references
 

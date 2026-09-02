@@ -34,7 +34,8 @@ def test_all_product_binaries_exist_and_fail_closed() -> None:
     bench = run_binary("qw38-bench")
     assert bench.returncode == 2
     assert BRAND in bench.stdout
-    assert "has not passed its delivery gate" in bench.stderr
+    assert "usage: qw38-bench MODEL" in bench.stderr
+    assert "--workload prefill|decode" in bench.stderr
 
 
 def test_cli_help_does_not_require_a_model() -> None:
