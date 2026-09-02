@@ -69,14 +69,14 @@
     "unsupported_values_are_null": true
   },
   "local_sources": {
-    "README.md": "d70dfab9923a2a0b2f6e5c8d7dceeb5e0e3470fb1f54f067803941f16f2a5b08",
-    "Makefile": "efb21653c65c291fc15c8b816c1c62ecebec703b2d14370b3850f626b7f1c941",
+    "README.md": "bbdb8f6bd00246195c90355225ccb666c7651f2d21b26114196208cb5576bad6",
+    "Makefile": "87f6c86514813b1a6887dfe45a27789507c86e3862343e44a32d373c466db272",
     "include/qw38/engine.h": "1657c1154ea45f8b0a2f3ae5e5fab77dfb8d16e1b96602ab106dba9607b47e10",
     "src/engine.cpp": "03166fd07383462166541c96142c05c96efec90b5fde19d044ed5d2a4866e996",
     "src/bench.cpp": "ee0ecf4db7a894134acedd83dbca64095b00eadb80f4beaac80ea4d589ba3751",
-    "tests/test_benchmark.py": "7b2a59495bfc2b41a440b659b511984be19011eb39d2503af7603141859bdf4c",
+    "tests/test_benchmark.py": "c60b1248b01f69850d7a5bfde9e06704129744f4c9760ff9b0e0f2ebbb136ef1",
     "tests/test_build.py": "899aa2a4434fffa530cd5d1dad2dd1023774ce5c6603d01915821e7abbf56f97",
-    "fixtures/benchmark_harness.json": "05a8c163a994a332dfeb37380ee8737a5c7557af97d26c03bd59b7f4feee37ab",
-    "docs/61-benchmark-harness.md": "52d80a052df790d3256a0f68841f81a53b5e91c9a8f72da7c8ac320916badc20"
+    "fixtures/benchmark_harness.json": "784c842d579cbd49b80f92dfe680e3416ac326905f4e7fc86aa38e590571502f",
+    "docs/61-benchmark-harness.md": "38ea16e03119b97aecff542c5230437c3fb48c5957d1f8a254f7ddcd4b21a933"
   }
 }

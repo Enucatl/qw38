@@ -23,8 +23,8 @@
     "concurrent_gpu_sessions": true
   },
   "local_sources": {
-    "README.md": "d70dfab9923a2a0b2f6e5c8d7dceeb5e0e3470fb1f54f067803941f16f2a5b08",
-    "Makefile": "efb21653c65c291fc15c8b816c1c62ecebec703b2d14370b3850f626b7f1c941",
+    "README.md": "bbdb8f6bd00246195c90355225ccb666c7651f2d21b26114196208cb5576bad6",
+    "Makefile": "87f6c86514813b1a6887dfe45a27789507c86e3862343e44a32d373c466db272",
     "include/qw38/engine.h": "1657c1154ea45f8b0a2f3ae5e5fab77dfb8d16e1b96602ab106dba9607b47e10",
     "src/engine.cpp": "03166fd07383462166541c96142c05c96efec90b5fde19d044ed5d2a4866e996",
     "src/cli.cpp": "8c06875e62e6bf8423b47181d702efca38d922453236e86e596908fc53de2477",
@@ -32,8 +32,8 @@
     "src/tokenizer.h": "9d5c648f830fc07af941a7a1fe4b12ca633ec39347425ce074d7a4fff06b45a3",
     "src/template.cpp": "6ad0963b5649850c3b2d7b028485c11d4cbf19b2935734e5d39eeaf663242ec5",
     "src/template.h": "3b90f10837353ef018751fa270a664623cf46587687c87bb15a8293390488cef",
-    "cuda/full_scheduler.cu": "64235c4fca1f303b40b9068d34750f9b89068e2e353f8ca1510460d0ae157877",
-    "cuda/full_scheduler.h": "c7e9118b189c547fc11d3fd2f77e8301b9f9c5af72b32f41553bbed55be04485",
+    "cuda/full_scheduler.cu": "cc360396a6566cc277c8774f62b261380f51654480b08958df1eebf125bf1b9a",
+    "cuda/full_scheduler.h": "a6e4ed2e7a7e848dfbdf49539aa00c29f3423e956d6d383c3501d7fe94462c1c",
     "tests/test_cli.py": "aa708b624f600723674c4e1ba057343942230de4bc1754614314368855f2d8b9",
     "fixtures/cli_smoke.json": "6c9683758af5d0392727f17bada2c2c0030887cf7514c6645e7cfe457c863bcb",
     "docs/56-interactive-text-cli.md": "254e8a01017827e78d9586658b6ce49338c756a2da1625bddac9e33df8a62597"

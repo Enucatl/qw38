@@ -119,7 +119,11 @@ int main(int argc, char** argv) {
   const bool append_exact =
       state_equal && exact_outputs(primary_logits, reference_logits,
                                    primary_hidden, reference_hidden);
-  std::printf("prefix_exact=append_vs_fresh passed=%s\n",
+  const bool output_equal = exact_outputs(primary_logits, reference_logits,
+                                          primary_hidden, reference_hidden);
+  std::printf("prefix_exact=append_vs_fresh state=%s outputs=%s passed=%s\n",
+              state_equal ? "true" : "false",
+              output_equal ? "true" : "false",
               append_exact ? "true" : "false");
   passed = append_exact && passed;
 

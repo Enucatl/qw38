@@ -21,7 +21,7 @@ def test_atomic_eval_contract_fixture_and_handbook_are_connected() -> None:
     assert contract["transaction"]["unit"] == "one token"
     assert contract["transaction"]["publication_order"][-1] == "frontier last"
     assert contract["sampling"]["mutation"] == "none"
-    assert fixture["workspace_bytes_at_capacity_3"] == 160_380_704
+    assert fixture["workspace_bytes_at_capacity_3"] == 186_300_192
     assert all(case["passed"] for case in fixture["cases"])
     for relative, expected in contract["local_sources"].items():
         assert hashlib.sha256((ROOT / relative).read_bytes()).hexdigest() == expected
@@ -36,7 +36,7 @@ def test_atomic_eval_contract_fixture_and_handbook_are_connected() -> None:
         "injected error",
         "sampling",
         "read-only",
-        "160.38 mb",
+        "186.30 mb",
         "proof boundary",
     ]:
         assert term in chapter
@@ -86,6 +86,6 @@ def test_atomic_eval_cancel_error_commit_and_sample() -> None:
         in lines
     )
     assert (
-        "atomic_run=complete workspace_bytes=160380704 frontier=2 passed=true" in lines
+        "atomic_run=complete workspace_bytes=186300192 frontier=2 passed=true" in lines
     )
     assert "status=passed" in lines

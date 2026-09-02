@@ -23,14 +23,17 @@
     "ordinary stochastic controls": "deferred to product sampler integration"
   },
   "memory": {
-    "capacity_3_workspace_bytes": 160380704,
+    "capacity_3_workspace_bytes": 186300192,
     "candidate_is_per_workspace_not_per_token": true,
     "duplicate_128k_kv_cache": "rejected"
   },
   "local_sources": {
-    "Makefile": "efb21653c65c291fc15c8b816c1c62ecebec703b2d14370b3850f626b7f1c941",
+    "Makefile": "87f6c86514813b1a6887dfe45a27789507c86e3862343e44a32d373c466db272",
     "cuda/atomic_eval_test.cu": "d7815b43173f8a6828e59d10731de3a691238daf5ebef61bf27c1895dc11be77",
-    "cuda/full_scheduler.cu": "64235c4fca1f303b40b9068d34750f9b89068e2e353f8ca1510460d0ae157877",
-    "cuda/full_scheduler.h": "c7e9118b189c547fc11d3fd2f77e8301b9f9c5af72b32f41553bbed55be04485"
+    "cuda/full_scheduler.cu": "cc360396a6566cc277c8774f62b261380f51654480b08958df1eebf125bf1b9a",
+    "cuda/full_scheduler.h": "a6e4ed2e7a7e848dfbdf49539aa00c29f3423e956d6d383c3501d7fe94462c1c",
+    "tests/test_cuda_atomic_eval.py": "3f1a1609b3cb221713525d733760c819c5161dfdd776f8f11fe6622eacf33323",
+    "fixtures/cuda_atomic_eval.json": "0dcca23db8f08754b9a96263a3f72fb954d8570e7c4d388e1c58c1fc81f9a2f9",
+    "docs/48-atomic-eval-and-sampling.md": "8b97e05a3832120d336917453b7297f73ffd78f017a0bb05121e22fdc45b7105"
   }
 }

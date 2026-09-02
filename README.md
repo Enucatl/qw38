@@ -225,7 +225,12 @@ docker run --rm --gpus all --user "$(id -u):$(id -g)" \
 Release runs omit `--smoke`, require a clean source revision, an exact expected
 prompt-token count, at least three warm-ups, and at least 30 samples. See
 [The benchmark harness](docs/61-benchmark-harness.md) for every term, metric,
-limitation, and the current SCH-002 prompt-throughput boundary.
+limitation, and the BEN-001 measurement that led to SCH-002.
+
+SCH-002 now connects 64-row prompt MMQ and recurrent/attention chunks while
+preserving byte-exact one-token results. The focused 17-token smoke is faster,
+but it is not a release comparison; see
+[Chunked full-model CUDA prefill](docs/62-cuda-full-prefill.md).
 
 ## Build
 

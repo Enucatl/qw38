@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "task": "MEM-001",
+  "tasks": ["MEM-001", "MEM-002"],
   "device": "NVIDIA GeForce RTX 5090",
   "compute_capability": "12.0",
   "toolkit": "CUDA 13.0.2",
@@ -12,18 +12,18 @@
     "gdn_state_bytes": 158859264,
     "attention_kv_bytes": 8589934592,
     "session_total_bytes": 8748793856,
-    "workspace_bytes": 172963328,
+    "workspace_bytes": 198882816,
     "graph_count": 64,
     "graph_bytes": 6291456,
-    "explicit_quartz_bytes": 27901919072,
-    "allocator_delta_bytes": 2785440
+    "explicit_quartz_bytes": 27927838560,
+    "allocator_delta_bytes": 12517536
   },
-  "measured_quartz_delta_bytes": 27904704512,
-  "free_after_graph_creation_bytes": 5234753536,
+  "measured_quartz_delta_bytes": 27940356096,
+  "free_after_graph_creation_bytes": 5199101952,
   "required_reserve_bytes": 1610612736,
-  "reserve_margin_bytes": 3624140800,
-  "host_rss_bytes": 19113730048,
+  "reserve_margin_bytes": 3588489216,
+  "host_rss_bytes": 19114557440,
   "arithmetic_exact": true,
   "post_graph_admitted": true,
-  "claim": "real simultaneous 128K allocation and reserve after 64 graph executables are uploaded; not 128K quality, retrieval, or throughput evidence"
+  "claim": "real simultaneous 128K allocation, fixed 64-row prompt scratch, and reserve after 64 graph executables are uploaded; not 128K quality, retrieval, or throughput evidence"
 }

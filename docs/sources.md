@@ -347,6 +347,15 @@ DSpark are explicitly rejected as Qwen model semantics.
   evidence in [`fixtures/benchmark_harness.json`](../fixtures/benchmark_harness.json)
   and [`evidence/benchmark`](../evidence/benchmark). No benchmark-framework or
   competing-runtime implementation is copied.
+- SCH-002, MEM-002, and EDU-047 introduce no new external implementation
+  source. The full prompt path composes Quartz's already admitted MMQ, GDN scan,
+  causal attention prefill, pointwise, session, and memory-ledger boundaries.
+  Its direct Q8_0-by-BF16 prompt kernel is a local batching of the existing
+  scheduler arithmetic, retained specifically to avoid an extra activation
+  requantization. Exact differential, cancellation, memory, and smoke evidence
+  is authenticated in
+  [`pins/cuda_prompt_scheduler_contract.json`](../pins/cuda_prompt_scheduler_contract.json)
+  and [`fixtures/cuda_prompt_scheduler.json`](../fixtures/cuda_prompt_scheduler.json).
 
 ## Specialization and hardware references
 

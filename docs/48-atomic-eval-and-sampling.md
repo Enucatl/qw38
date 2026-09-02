@@ -76,10 +76,13 @@ sampling.
 ## Memory and measured evidence
 
 The candidate is reusable per workspace, not accumulated per token. At capacity
-three, the complete correctness workspace is **160.38 MB**. This is about
-155.6 MB larger than the earlier scratch-only workspace because it contains the
+three, the complete workspace is now **186.30 MB**, including the fixed 64-row
+prompt scratch added by SCH-002. The one-token atomic candidate remains reusable
+and is not duplicated per token; its earlier increase was about 155.6 MB over
+the scratch-only workspace because it contains the
 all-layer GDN transaction buffer and 16 candidate KV rows. It remains a named
-input to MEM-001 rather than an unrecorded allocation.
+input to MEM-001 and its SCH-002 revalidation MEM-002 rather than an unrecorded
+allocation.
 
 **Measured local:** cancellation, injected error, successful exact commit,
 separate greedy sampling, and invalid-token preflight passed on the RTX 5090

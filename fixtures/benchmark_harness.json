@@ -29,10 +29,11 @@
     }
   },
   "negative": {
-    "full_scheduler_prompt_path_is_token_wise": true,
+    "historical_full_scheduler_prompt_path_was_token_wise": true,
     "observed_prompt_tokens_per_second": 16.2,
     "follow_up_task": "SCH-002",
-    "release_throughput_claim": false
+    "release_throughput_claim": false,
+    "resolved_by": "SCH-002"
   },
   "notes": [
     "Smoke mode deliberately uses fewer than three warm-ups and thirty measured samples.",

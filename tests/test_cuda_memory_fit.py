@@ -49,11 +49,11 @@ def test_post_graph_memory_contract_fixture_and_handbook_are_connected() -> None
         "workspace",
         "runtime context",
         "allocator delta",
-        "5,241,044,992",
+        "5,205,393,408",
         "1.5 gib",
         "6,291,456",
-        "5,234,753,536",
-        "3,624,140,800",
+        "5,199,101,952",
+        "3,588,489,216",
         "admitted",
         "proof boundary",
     ]:
@@ -99,7 +99,7 @@ def test_real_128k_post_graph_allocation_preserves_reserve() -> None:
     fit = next(line for line in lines if line.startswith("memory_fit=post_graph"))
     fields = dict(field.split("=", 1) for field in fit.split())
     assert fields["capacity"] == "131072"
-    assert fields["explicit_bytes"] == "27901919072"
+    assert fields["explicit_bytes"] == "27927838560"
     assert int(fields["free_bytes"]) >= int(fields["reserve_required"])
     assert fields["arithmetic"] == "true"
     assert fields["passed"] == "true"

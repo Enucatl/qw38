@@ -57,12 +57,13 @@ are repository-relative unless stated otherwise.
 | ATN-001 | Implement grouped-query attention and partial RoPE | CUD-001, CPU-003 | done | Decode, causality, KV grouping, and layers 3/7/63 pass | [`cuda/attention_decode.cu`](cuda/attention_decode.cu); [`fixtures/cuda_attention_decode.json`](fixtures/cuda_attention_decode.json); [`tests/test_cuda_attention.py`](tests/test_cuda_attention.py); log 2026-08-31T06:57:49Z |
 | ATN-002 | Implement memory-bounded causal attention prefill | ATN-001, CUD-002 | done | Chunked prompt fixtures and 131,072 capacity boundary pass | [`cuda/attention_decode.cu`](cuda/attention_decode.cu); [`fixtures/cuda_attention_prefill.json`](fixtures/cuda_attention_prefill.json); [`tests/test_cuda_attention_prefill.py`](tests/test_cuda_attention_prefill.py); log 2026-08-31T09:33:05Z |
 | SCH-001 | Implement hybrid 64-layer CUDA scheduler and FP32 logits | GDN-002, ATN-002, CUD-003 | done | Full traces/logits and greedy continuations meet frozen gates | [`cuda/full_scheduler.cu`](cuda/full_scheduler.cu); [`fixtures/cuda_full_scheduler.json`](fixtures/cuda_full_scheduler.json); [`tests/test_cuda_full_scheduler.py`](tests/test_cuda_full_scheduler.py); log 2026-08-31T12:13:55Z |
-| SCH-002 | Integrate chunked prompt execution into the full CUDA scheduler | SCH-001, GDN-002, ATN-002, CUD-002, BEN-001 | pending | End-to-end prefill uses prompt-row MMQ and chunked GDN/attention paths, remains token-wise equivalent, and no longer dispatches one complete decode token at a time | log 2026-09-02T14:48:00Z |
+| SCH-002 | Integrate chunked prompt execution into the full CUDA scheduler | SCH-001, GDN-002, ATN-002, CUD-002, BEN-001 | done | End-to-end prefill uses prompt-row MMQ and chunked GDN/attention paths, remains token-wise equivalent, and no longer dispatches one complete decode token at a time | [`cuda/full_scheduler.cu`](cuda/full_scheduler.cu); [`fixtures/cuda_prompt_scheduler.json`](fixtures/cuda_prompt_scheduler.json); [`tests/test_cuda_prompt_scheduler.py`](tests/test_cuda_prompt_scheduler.py); log 2026-09-02T16:25:43Z |
 | SES-001 | Implement exact common-prefix sync/reuse | SCH-001 | done | Reuse and full replay produce the same committed state and logits | [`cuda/full_scheduler.cu`](cuda/full_scheduler.cu); [`fixtures/cuda_prefix_sync.json`](fixtures/cuda_prefix_sync.json); [`tests/test_cuda_prefix_sync.py`](tests/test_cuda_prefix_sync.py); log 2026-08-31T13:45:38Z |
 | SES-002 | Implement atomic eval/sample/commit semantics | SCH-001 | done | Sampling is separate; cancellation/error cannot partially commit state | [`cuda/full_scheduler.cu`](cuda/full_scheduler.cu); [`fixtures/cuda_atomic_eval.json`](fixtures/cuda_atomic_eval.json); [`tests/test_cuda_atomic_eval.py`](tests/test_cuda_atomic_eval.py); log 2026-08-31T17:55:34Z |
 | SES-003 | Implement atomic checkpoint save/restore | SES-001, SES-002 | done | All state and compatibility hashes persist; resumed continuation is exact | [`cuda/checkpoint.cu`](cuda/checkpoint.cu); [`fixtures/cuda_checkpoint.json`](fixtures/cuda_checkpoint.json); [`tests/test_cuda_checkpoint.py`](tests/test_cuda_checkpoint.py); log 2026-08-31T19:09:54Z |
 | SES-004 | Implement atomic Responses continuation records | SES-001, SES-003, API-003 | done | A completed stored response atomically records its exact committed token prefix and compatible tool contract; missing, malformed, incompatible, cancelled, and `store=false` responses cannot be continued | [`src/response_store.cpp`](src/response_store.cpp); [`fixtures/responses.json`](fixtures/responses.json); [`tests/test_server.py`](tests/test_server.py); log 2026-09-02T14:27:35Z |
 | MEM-001 | Demonstrate 131,072-token fit with 1.5 GiB reserve | BLD-003, SCH-001 | done | Post-graph measured ledger includes 8 GiB KV and every named allocation on RTX 5090 | [`cuda/memory_fit_test.cu`](cuda/memory_fit_test.cu); [`fixtures/cuda_memory_fit_post_graph.json`](fixtures/cuda_memory_fit_post_graph.json); [`docs/54-post-graph-128k-memory.md`](docs/54-post-graph-128k-memory.md); [`tests/test_cuda_memory_fit.py`](tests/test_cuda_memory_fit.py); log 2026-09-01T07:08:29Z |
+| MEM-002 | Revalidate 128K reserve after adding fixed prompt-chunk scratch | MEM-001, SCH-002 | done | Full session, decode workspace, prompt workspace, and uploaded graphs still leave at least 1.5 GiB free with allocator deltas reconciled | [`fixtures/cuda_memory_fit_post_graph.json`](fixtures/cuda_memory_fit_post_graph.json); [`tests/test_cuda_memory_fit.py`](tests/test_cuda_memory_fit.py); log 2026-09-02T16:25:43Z |
 | OPT-001 | Add synchronized timings, NVTX, and attribution | SCH-001 | done | Component/end-to-end measurements expose every named time category | [`cuda/full_scheduler.cu`](cuda/full_scheduler.cu); [`cuda/timing_test.cu`](cuda/timing_test.cu); [`fixtures/cuda_timing.json`](fixtures/cuda_timing.json); tests; log 2026-08-31T20:00:28Z |
 | OPT-002 | Profile and implement justified fusions | OPT-001, ORA-001 | done | Nsight evidence justifies each fusion; fused/unfused boundaries pass frozen gates | [`cuda/full_scheduler.cu`](cuda/full_scheduler.cu); [`fixtures/cuda_fusion.json`](fixtures/cuda_fusion.json); [`evidence/profiling/opt002-nsight-compute.txt`](evidence/profiling/opt002-nsight-compute.txt); tests; log 2026-09-01T05:44:16Z |
 | OPT-003 | Implement stable-address CUDA graphs | OPT-002 | done | Graph/non-graph equivalence passes and graph allocations are in MEM-001 | [`cuda/full_scheduler.cu`](cuda/full_scheduler.cu); [`fixtures/cuda_graph.json`](fixtures/cuda_graph.json); [`tests/test_cuda_graph.py`](tests/test_cuda_graph.py); log 2026-09-01T07:08:29Z |
@@ -126,6 +127,7 @@ are repository-relative unless stated otherwise.
 | EDU-044 | Explain JSON, Chat Completions, SSE streaming, tools, stops, usage, queueing, and cancellation for beginners | SRV-002, API-002, DOC-001 | done | Request/response fields, validation, token generation, reasoning/content separation, function calls, stream events, stop behavior, session reuse, and proof limits are code-linked and worked | [`docs/59-chat-completions.md`](docs/59-chat-completions.md); [`pins/chat_completions_contract.json`](pins/chat_completions_contract.json); [`fixtures/chat_completions.json`](fixtures/chat_completions.json); log 2026-09-01T19:00:04Z |
 | EDU-045 | Explain Responses objects, typed items, events, storage, and exact continuation for beginners | SRV-003, SES-004, API-003, DOC-001 | done | A reader new to APIs can follow input items through tokens and output items, distinguish IDs from state, understand atomic records and exact prefixes, and identify every supported/rejected boundary | [`docs/60-responses-and-continuation.md`](docs/60-responses-and-continuation.md); [`pins/responses_contract.json`](pins/responses_contract.json); [`fixtures/responses.json`](fixtures/responses.json); log 2026-09-02T14:27:35Z |
 | EDU-046 | Explain benchmark workloads, samples, percentiles, throughput, telemetry, and evidence limits for beginners | BEN-001, OPT-001, DOC-001 | done | A new reader can distinguish warm-ups/runs/tokens, prefill/decode/TTFT/ITL, p50/p95, raw versus summary data, process/device telemetry, unavailable values, and benchmark versus comparison claims | `docs/61-benchmark-harness.md`; `docs/README.md`; log 2026-09-02T15:24:00Z |
+| EDU-047 | Explain layer-major chunked prefill, scratch reuse, atomic chunk commit, and its decode/reference boundary | SCH-002, MEM-002, DOC-001 | done | A new reader can follow 64 prompt rows through embeddings, MMQ, GDN/attention state, FFN, final logits, commit, and equivalence/performance evidence | [`docs/62-cuda-full-prefill.md`](docs/62-cuda-full-prefill.md); log 2026-09-02T16:25:43Z |
 | REL-001 | Publish reproducible release evidence bundle | CMP-003, QLT-001, DOC-001 | pending | Builds, hashes, raw results, reports, and documentation claims reconcile | — |
 
 ## Delivery-Gate Mapping
@@ -3337,6 +3339,109 @@ are repository-relative unless stated otherwise.
   now uses ordinary graph execution for warm-up/measured distributions and runs
   one separately labeled component probe with `perturbs_execution=true` and
   `used_for_throughput_summary=false`.
+
+### 2026-09-02T15:31:00Z — SCH-002, MEM-002, and EDU-047 started
+
+- Began SCH-002 after BEN-001 measured the production `Session::sync` path at
+  about 16 prompt tokens/s and confirmed that it dispatched one complete decode
+  token at a time. The semantic target remains the admitted SCH-001 token path;
+  the optimization may not relax its numeric or state gates.
+- Selected fixed 64-row prompt chunks. Each chunk will flow layer-major through
+  token-row embedding lookup, per-row normalization, prompt MMQ projections,
+  the already-admitted chunked GDN/attention recurrence, prompt-row FFNs, and a
+  final-row logits projection. Decode and one-token evaluation retain the
+  stable-address graph path.
+- The chunk owns candidate GDN state and attention KV rows until every layer and
+  the final output complete. Only then may it publish state, tokens, last hidden,
+  logits, and frontier. Cancellation is polled between layers. A retained
+  token-wise synchronization entry point will provide direct differential
+  evidence rather than making the optimized path its own oracle.
+- Added MEM-002 before allocating permanent 64-row scratch because the final
+  128K reserve proof must include it. Added EDU-047 before documentation work;
+  it will explain row-major versus layer-major execution, scratch aliases,
+  candidate versus committed state, the 64-row choice, and proof limits.
+- First compiled two-row integration run: `qw38-cuda-prefix-sync-test` reached
+  the optimized fresh-prompt path but `append_vs_fresh` was not byte exact;
+  no-op, divergent replay, shorter replay, and invalid-input preservation still
+  passed. This negative is retained before diagnosis. No optimized path is
+  admitted until output and persistent-state differences are isolated and the
+  existing SES-001 exactness contract passes again.
+- After the optimized path passed, the first focused documentation-contract run
+  failed because `tests/test_cuda_memory_fit.py` still required the historical
+  pre-prompt-scratch free-memory number `5,241,044,992`. MEM-002 replaces that
+  simultaneous-owner measurement, so the assertion must follow the new measured
+  pre-graph value `5,205,393,408`; the old MEM-001 result remains in ledger
+  history rather than being presented as current.
+- Full CUDA command `QW38_RUN_CUDA_TESTS=1 uv run pytest -q` completed with 169
+  passed and one failed allocation assertion. All five atomic-eval behavior
+  cases passed; the test still expected the pre-SCH-002 capacity-three workspace
+  size. Direct rerun measured 186,300,192 bytes. This is the fixed prompt scratch
+  added under MEM-002, so the atomic contract/fixture/docs and exact assertion
+  are updated without changing any atomic semantic gate.
+- The first focused rerun found the fixture-value assertion duplicated in the
+  contract test; the live binary gate passed. Updated that second stale value as
+  part of the same MEM-002 reconciliation. Its next rerun found the same old
+  number in the handbook-term list; that final duplicate is also updated.
+
+### 2026-09-02T16:25:43Z — SCH-002, MEM-002, and EDU-047 completed
+
+- Implemented a fixed 64-row, layer-major full-model prompt path. Q4_K/Q6_K
+  projections use the admitted prompt MMQ, GDN layers use tiled 64-row scans,
+  attention layers read committed prior chunks plus causal candidate rows, and
+  FFNs process all prompt rows before the next layer. Only the final prompt row
+  computes output logits; one-token evaluation and CUDA graphs are unchanged.
+- Added permanent prompt scratch to `SchedulerWorkspace`: token-major FP32
+  residuals, BF16 projection inputs, transient Q8 rows, projections, mixer/GDN
+  intermediates, and 16 layers of 64 candidate K/V rows. The workspace remains
+  move-only, stable-addressed, counted, and released with the existing owners.
+- Retained the first failed two-token differential. Diagnosis found Q8_0 model
+  weights had been routed through generic MMQ, adding activation requantization
+  absent from SCH-001. Replaced only that format with batched direct Q8_0×BF16
+  arithmetic using the same warp accumulation order as decode. The existing
+  prefix suite then restored byte-exact append/fresh state and outputs.
+- Measured the 65-token `[64, 1]` boundary against repeated SCH-001 execution:
+  optimized 1,417.114341 ms, token-wise 4,204.655779 ms, 2.967055× faster. Every
+  committed GDN/KV byte, token/frontier, last hidden value, and logit was exact.
+  A forced cancellation after a synchronized layer left frontier zero and the
+  committed session byte-equal to empty. Focused prompt/prefix/memory tests
+  passed together (`3 passed in 14.53s`).
+- BEN-001's 17-token smoke was repeated through the product harness: p50 prefill
+  fell to 415.068169 ms and rose to 40.9571794 prompt tokens/s. Its two samples,
+  dirty source identity, and `admission_eligible=false` record are retained at
+  `evidence/prefill/sch002-prefill-smoke.json`; this is not a release matrix or
+  comparative claim.
+- MEM-002 measured the simultaneous 131,072-token state, resident model,
+  198,882,816-byte workspace, and 64 uploaded graphs. Explicit Quartz ownership
+  is 27,927,838,560 bytes; 5,199,101,952 bytes remained free, leaving a
+  3,588,489,216-byte margin over the unchanged 1.5 GiB requirement. The first
+  run failed only the old exact workspace equation; the updated arithmetic run
+  passed.
+- The first full GPU suite retained a second stale allocation expectation in
+  the atomic-eval test: 169 tests passed and one expected the old workspace
+  bytes, while all five atomic behavior cases passed. The exact assertion,
+  fixture, contract, and handbook were reconciled; two focused reruns exposed
+  and removed duplicate stale values without changing semantic gates.
+- Added the beginner chapter for token-major storage, layer-major execution,
+  MMQ, Q8_0 arithmetic, causal state, scratch, cancellation, commit, memory, and
+  proof limits. Refreshed historical BEN/MEM/SES contracts without erasing their
+  earlier results.
+- Final verification: `uv run ruff format .` — one file reformatted, then 67
+  files unchanged; `uv run ruff check .` — passed; host `uv run pytest -q` —
+  151 passed, 19 skipped in 159.27 s; final
+  `QW38_RUN_CUDA_TESTS=1 uv run pytest -q` — 170 passed in 320.44 s. Marked
+  SCH-002, MEM-002, and EDU-047 done.
+- A final API review added whole-chunk token-ID validation before any prompt
+  GPU work. The first validation command used the nonexistent phony target
+  `make qw38-cuda-prompt-scheduler-test` and failed immediately. The actual
+  Makefile target is `build/qw38-cuda-prompt-scheduler-test`, already invoked
+  by the pytest gate; no build or test failure was concealed.
+- Final-source revalidation at 2026-09-02T16:35:39Z: focused
+  `QW38_RUN_CUDA_TESTS=1 uv run pytest -q tests/test_cuda_prompt_scheduler.py`
+  passed 2 tests in 11.63 s; complete
+  `QW38_RUN_CUDA_TESTS=1 uv run pytest -q` passed all 170 tests in 334.07 s.
+  `ruff format`, `ruff check`, JSON parsing, `git diff --check`, and the complete
+  `local_sources` SHA-256 audit also passed. These results cover the exact bytes
+  being committed, including the final token-ID preflight.
 
 ## Decisions and Negative Results
 

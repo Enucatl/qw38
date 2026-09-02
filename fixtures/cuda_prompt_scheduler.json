@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "task": "SCH-002",
+  "measured_at_utc": "2026-09-02T15:54:00Z",
+  "device": "NVIDIA GeForce RTX 5090",
+  "toolkit": "CUDA 13.0.2",
+  "model_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+  "chunk_rows": 64,
+  "boundary_case": {
+    "tokens": 65,
+    "chunks": [64, 1],
+    "evaluated_tokens": 65,
+    "final_frontier": 65,
+    "state_byte_equal": true,
+    "last_outputs_byte_equal": true,
+    "optimized_wall_ms": 1417.114341,
+    "tokenwise_wall_ms": 4204.655779,
+    "speedup": 2.967055
+  },
+  "cancellation_case": {
+    "requested_tokens": 64,
+    "status": "cancelled",
+    "committed_frontier": 0,
+    "committed_state_equal_to_empty": true
+  },
+  "workspace_bytes_at_capacity_65": 186306144,
+  "benchmark_smoke": {
+    "prompt_tokens": 17,
+    "prefill_ms_p50": 415.068169,
+    "prompt_tokens_per_second_p50": 40.9571794,
+    "admission_eligible": false,
+    "raw_result": "evidence/prefill/sch002-prefill-smoke.json",
+    "raw_result_sha256": "35cfe0e0a9a36363c7fcabbe10348fdcb9a80ad49330f8cee89308e0d706aa41"
+  },
+  "proof_limit": "exact 65-token native differential, cancellation, memory, and short smoke evidence; not the 2K/8K release matrix or comparative speed gate"
+}

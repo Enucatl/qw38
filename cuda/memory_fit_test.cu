@@ -122,7 +122,7 @@ int main(int argc, char** argv) {
       graph_bytes == free_after_workspace - free_after_graphs &&
       graph_bytes > 0 && graphs.graph_count() == 64 &&
       model.resident_bytes() == 18973870432ULL &&
-      workspace.allocated_bytes() == 172963328ULL;
+      workspace.allocated_bytes() == 198882816ULL;
   const bool passed = arithmetic && session.capacity() == kCapacity &&
                       free_after_graphs >= kReserveBytes;
 

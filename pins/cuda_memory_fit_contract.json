@@ -8,7 +8,7 @@
   "owners": {
     "resident_model": "one exact canonical GGUF device allocation",
     "session": ["48 FP32 GDN convolution rings", "48 FP32 GDN recurrent matrices", "16 complete BF16 K caches", "16 complete BF16 V caches"],
-    "workspace": ["all-layer atomic GDN candidate", "16 candidate K/V rows", "maximum attention scores", "projections, residuals, logits, trace taps"],
+    "workspace": ["all-layer atomic GDN candidate", "16 decode candidate K/V rows", "64-row prompt residual/projection/GDN scratch", "16 by 64 prompt candidate K/V rows", "maximum attention scores", "logits and trace taps"],
     "runtime_context": "CUDA memory used before Quartz allocations",
     "allocator_delta": "measured CUDA free-memory delta minus exact Quartz owner bytes",
     "graphs": "64 uploaded stable-address FFN graph executables"
@@ -16,10 +16,16 @@
   "admission": {
     "pre_graph_physical_allocation": "passed",
     "post_graph_MEM_001": "passed",
+    "post_prompt_scratch_MEM_002": "passed",
     "reason": "the complete owner set leaves at least 1.5 GiB free after graph upload"
   },
   "local_sources": {
-    "Makefile": "efb21653c65c291fc15c8b816c1c62ecebec703b2d14370b3850f626b7f1c941",
-    "cuda/memory_fit_test.cu": "705a2154a8035a45dbb9693a885d0edeebd1cdbac601a056ab744777152d1b20"
+    "Makefile": "87f6c86514813b1a6887dfe45a27789507c86e3862343e44a32d373c466db272",
+    "cuda/memory_fit_test.cu": "5bda5e6af27a56aee6ed2c01cec88cbc4947e73a6efcfd177fd31f5ee0963b3f",
+    "cuda/full_scheduler.cu": "cc360396a6566cc277c8774f62b261380f51654480b08958df1eebf125bf1b9a",
+    "cuda/full_scheduler.h": "a6e4ed2e7a7e848dfbdf49539aa00c29f3423e956d6d383c3501d7fe94462c1c",
+    "tests/test_cuda_memory_fit.py": "daee0b3f6e794facc43aa57e293d9b47d0a7539e86596a62d14cb7f7ab0104e8",
+    "fixtures/cuda_memory_fit_post_graph.json": "0890051f5558638bdbabdd837fb73c9ea49b4c6286b153187efa0e05d67f93e9",
+    "docs/54-post-graph-128k-memory.md": "bbb4a5c80932a4cae333b94dcd656a9319861d4097746def83ce79edf4cef06e"
   }
 }

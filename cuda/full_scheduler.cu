@@ -149,6 +149,35 @@ __global__ void q8_mmv_bf16(const std::uint8_t* weights, std::size_t rows,
   if (lane == 0) output[row] = sum;
 }
 
+__global__ void q8_mmq_bf16(const std::uint8_t* weights, std::size_t rows,
+                            std::size_t columns,
+                            const __nv_bfloat16* activation,
+                            std::size_t prompt_rows, float* output) {
+  const int warp = threadIdx.x / kWarpSize;
+  const int lane = threadIdx.x & (kWarpSize - 1);
+  const std::size_t row =
+      static_cast<std::size_t>(blockIdx.x) * (kThreads / kWarpSize) + warp;
+  const std::size_t prompt_row = blockIdx.y;
+  if (row >= rows || prompt_row >= prompt_rows) return;
+  const std::uint8_t* row_weights = weights + row * (columns / 32) * 34;
+  const __nv_bfloat16* row_activation =
+      activation + prompt_row * columns;
+  float sum = 0.0F;
+  for (std::size_t column = lane; column < columns; column += kWarpSize) {
+    const std::uint8_t* block = row_weights + (column / 32) * 34;
+    const float weight =
+        read_q8_half(block) *
+        static_cast<float>(static_cast<std::int8_t>(block[2 + column % 32]));
+    sum = __fadd_rn(
+        sum, __fmul_rn(weight, __bfloat162float(row_activation[column])));
+  }
+  for (int offset = 16; offset > 0; offset /= 2) {
+    sum = __fadd_rn(
+        sum, __shfl_down_sync(0xFFFFFFFFU, sum, offset, kWarpSize));
+  }
+  if (lane == 0) output[prompt_row * rows + row] = sum;
+}
+
 __global__ void bf16_to_fp32(const __nv_bfloat16* input, std::size_t count,
                              float* output) {
   const std::size_t index =
@@ -175,6 +204,29 @@ __global__ void rms_norm_fp32_to_bf16(const float* input, const float* scale,
   }
 }
 
+__global__ void rms_norm_rows_fp32_to_bf16(
+    const float* input, const float* scale, std::size_t width,
+    __nv_bfloat16* output) {
+  const std::size_t row = blockIdx.x;
+  const float* row_input = input + row * width;
+  __nv_bfloat16* row_output = output + row * width;
+  __shared__ float inverse;
+  if (threadIdx.x == 0) {
+    float sum = 0.0F;
+    for (std::size_t index = 0; index < width; ++index) {
+      sum = __fadd_rn(sum,
+                      __fmul_rn(row_input[index], row_input[index]));
+    }
+    inverse = 1.0F / sqrtf(sum / static_cast<float>(width) + 1.0e-6F);
+  }
+  __syncthreads();
+  for (std::size_t index = threadIdx.x; index < width;
+       index += blockDim.x) {
+    row_output[index] = __float2bfloat16_rn(
+        __fmul_rn(__fmul_rn(row_input[index], inverse), scale[index]));
+  }
+}
+
 __global__ void residual_add_fp32(const float* residual,
                                   const float* correction,
                                   std::size_t count, float* output) {
@@ -183,6 +235,83 @@ __global__ void residual_add_fp32(const float* residual,
   if (index < count) {
     output[index] = __fadd_rn(residual[index], correction[index]);
   }
+}
+
+__global__ void prepare_gdn_gate_rows(
+    const float* alpha, const float* beta, const float* folded_a,
+    const float* dt_bias, std::size_t key_heads, std::size_t replicas,
+    float* log_decay, float* update) {
+  const std::size_t row = blockIdx.x;
+  const std::size_t grouped = threadIdx.x;
+  const std::size_t count = key_heads * replicas;
+  if (grouped >= count) return;
+  const std::size_t key = grouped / replicas;
+  const std::size_t replica = grouped % replicas;
+  const std::size_t tiled = replica * key_heads + key;
+  const float gate = alpha[row * count + tiled] + dt_bias[tiled];
+  const float softplus =
+      gate > 20.0F ? gate : gate < -20.0F ? expf(gate) : log1pf(expf(gate));
+  log_decay[row * count + grouped] = __fmul_rn(folded_a[tiled], softplus);
+  const float beta_value = beta[row * count + tiled];
+  update[row * count + grouped] =
+      beta_value >= 0.0F
+          ? 1.0F / (1.0F + expf(-beta_value))
+          : expf(beta_value) / (1.0F + expf(beta_value));
+}
+
+__global__ void gdn_gated_output_rows(
+    const float* recurrent, const float* gate_tiled, const float* norm,
+    std::size_t key_heads, std::size_t replicas, std::size_t head_width,
+    __nv_bfloat16* output_tiled) {
+  const std::size_t row = blockIdx.y;
+  const std::size_t grouped_head = blockIdx.x;
+  const std::size_t lane = threadIdx.x;
+  const std::size_t heads = key_heads * replicas;
+  const std::size_t grouped_base =
+      (row * heads + grouped_head) * head_width;
+  __shared__ float inverse;
+  if (lane == 0) {
+    float sum = 0.0F;
+    for (std::size_t index = 0; index < head_width; ++index) {
+      const float value = recurrent[grouped_base + index];
+      sum = __fadd_rn(sum, __fmul_rn(value, value));
+    }
+    inverse = 1.0F /
+              sqrtf(sum / static_cast<float>(head_width) + 1.0e-6F);
+  }
+  __syncthreads();
+  if (lane < head_width) {
+    const std::size_t key = grouped_head / replicas;
+    const std::size_t replica = grouped_head % replicas;
+    const std::size_t tiled_head = replica * key_heads + key;
+    const std::size_t tiled_base =
+        (row * heads + tiled_head) * head_width;
+    const float gate = gate_tiled[tiled_base + lane];
+    const float silu = gate / (1.0F + expf(-gate));
+    const float value = __fmul_rn(
+        __fmul_rn(recurrent[grouped_base + lane], inverse), norm[lane]);
+    output_tiled[tiled_base + lane] =
+        __float2bfloat16_rn(__fmul_rn(value, silu));
+  }
+}
+
+__global__ void split_attention_rows(const float* packed,
+                                     std::size_t query_values,
+                                     std::size_t head_width,
+                                     std::size_t token_count, float* query,
+                                     float* gate) {
+  const std::size_t index =
+      static_cast<std::size_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+  const std::size_t count = token_count * query_values;
+  if (index >= count) return;
+  const std::size_t row = index / query_values;
+  const std::size_t within = index % query_values;
+  const std::size_t head = within / head_width;
+  const std::size_t lane = within % head_width;
+  const std::size_t packed_base =
+      row * query_values * 2 + head * head_width * 2;
+  query[index] = packed[packed_base + lane];
+  gate[index] = packed[packed_base + head_width + lane];
 }
 
 __global__ void residual_add_norm_fp32_to_bf16(
@@ -318,6 +447,26 @@ cudaError_t matrix_vector(const DeviceTensor& matrix,
   return launch_quant_mmv(matrix.kind, matrix.data, matrix.rows,
                           matrix.columns, activation, workspace->q8_, output,
                           stream);
+}
+
+cudaError_t matrix_prompt(const DeviceTensor& matrix,
+                          const __nv_bfloat16* activation,
+                          std::size_t prompt_rows,
+                          SchedulerWorkspace* workspace, float* output,
+                          cudaStream_t stream) noexcept {
+  if (matrix.kind == QuantKind::kQ8_0) {
+    const dim3 blocks(
+        static_cast<unsigned int>((matrix.rows + (kThreads / kWarpSize) - 1) /
+                                  (kThreads / kWarpSize)),
+        static_cast<unsigned int>(prompt_rows));
+    q8_mmq_bf16<<<blocks, kThreads, 0, stream>>>(
+        matrix.data, matrix.rows, matrix.columns, activation, prompt_rows,
+        output);
+    return cudaPeekAtLastError();
+  }
+  return launch_quant_mmq(matrix.kind, matrix.data, matrix.rows,
+                          matrix.columns, activation, prompt_rows,
+                          workspace->prompt_q8_, output, stream);
 }
 
 cudaError_t execute_ffn(const DeviceCommonLayer& layer,
@@ -889,6 +1038,22 @@ SchedulerWorkspace& SchedulerWorkspace::operator=(
   QW38_MOVE_POINTER(trace_taps_);
   QW38_MOVE_POINTER(candidate_logits_host_);
   QW38_MOVE_POINTER(candidate_hidden_host_);
+  QW38_MOVE_POINTER(prompt_residual_a_);
+  QW38_MOVE_POINTER(prompt_residual_b_);
+  QW38_MOVE_POINTER(prompt_normalized_);
+  QW38_MOVE_POINTER(prompt_projected_bf16_);
+  QW38_MOVE_POINTER(prompt_q8_);
+  QW38_MOVE_POINTER(prompt_projection_a_);
+  QW38_MOVE_POINTER(prompt_projection_b_);
+  QW38_MOVE_POINTER(prompt_projection_c_);
+  QW38_MOVE_POINTER(prompt_projection_d_);
+  QW38_MOVE_POINTER(prompt_mixer_output_);
+  QW38_MOVE_POINTER(prompt_gdn_decay_);
+  QW38_MOVE_POINTER(prompt_gdn_update_);
+  QW38_MOVE_POINTER(prompt_gdn_convolved_);
+  QW38_MOVE_POINTER(prompt_gdn_recurrent_output_);
+  QW38_MOVE_POINTER(prompt_attention_candidate_key_);
+  QW38_MOVE_POINTER(prompt_attention_candidate_value_);
 #undef QW38_MOVE_POINTER
   capacity_ = other.capacity_;
   allocated_bytes_ = other.allocated_bytes_;
@@ -903,6 +1068,22 @@ void SchedulerWorkspace::release() noexcept {
   candidate_hidden_host_ = nullptr;
   candidate_logits_host_ = nullptr;
 #define QW38_FREE(name) if (name != nullptr) cudaFree(name); name = nullptr
+  QW38_FREE(prompt_attention_candidate_value_);
+  QW38_FREE(prompt_attention_candidate_key_);
+  QW38_FREE(prompt_gdn_recurrent_output_);
+  QW38_FREE(prompt_gdn_convolved_);
+  QW38_FREE(prompt_gdn_update_);
+  QW38_FREE(prompt_gdn_decay_);
+  QW38_FREE(prompt_mixer_output_);
+  QW38_FREE(prompt_projection_d_);
+  QW38_FREE(prompt_projection_c_);
+  QW38_FREE(prompt_projection_b_);
+  QW38_FREE(prompt_projection_a_);
+  QW38_FREE(prompt_q8_);
+  QW38_FREE(prompt_projected_bf16_);
+  QW38_FREE(prompt_normalized_);
+  QW38_FREE(prompt_residual_b_);
+  QW38_FREE(prompt_residual_a_);
   QW38_FREE(trace_taps_);
   QW38_FREE(logits_);
   QW38_FREE(attention_scores_);
@@ -977,6 +1158,40 @@ Status SchedulerWorkspace::create(std::size_t capacity) noexcept {
   QW38_ALLOCATE(attention_scores_, 24 * capacity);
   QW38_ALLOCATE(logits_, internal::kVocabularySize);
   QW38_ALLOCATE(trace_taps_, kTraceTapCount * internal::kResidualWidth);
+  QW38_ALLOCATE(prompt_residual_a_,
+                kPromptChunkRows * internal::kResidualWidth);
+  QW38_ALLOCATE(prompt_residual_b_,
+                kPromptChunkRows * internal::kResidualWidth);
+  QW38_ALLOCATE(prompt_normalized_,
+                kPromptChunkRows * internal::kResidualWidth);
+  QW38_ALLOCATE(prompt_projected_bf16_,
+                kPromptChunkRows * internal::kFfnWidth);
+  QW38_ALLOCATE(prompt_q8_,
+                kPromptChunkRows * internal::kFfnWidth / 32);
+  QW38_ALLOCATE(prompt_projection_a_,
+                kPromptChunkRows * kMaximumProjection);
+  QW38_ALLOCATE(prompt_projection_b_,
+                kPromptChunkRows * kMaximumProjection);
+  QW38_ALLOCATE(prompt_projection_c_,
+                kPromptChunkRows * internal::kAttentionKvWidth);
+  QW38_ALLOCATE(prompt_projection_d_,
+                kPromptChunkRows * internal::kAttentionKvWidth);
+  QW38_ALLOCATE(prompt_mixer_output_,
+                kPromptChunkRows * internal::kResidualWidth);
+  QW38_ALLOCATE(prompt_gdn_decay_,
+                kPromptChunkRows * internal::kGdnGateCount);
+  QW38_ALLOCATE(prompt_gdn_update_,
+                kPromptChunkRows * internal::kGdnGateCount);
+  QW38_ALLOCATE(prompt_gdn_convolved_,
+                kPromptChunkRows * internal::kGdnPackedQkvWidth);
+  QW38_ALLOCATE(prompt_gdn_recurrent_output_,
+                kPromptChunkRows * internal::kGdnValueWidth);
+  QW38_ALLOCATE(prompt_attention_candidate_key_,
+                kAttentionLayers * kPromptChunkRows *
+                    internal::kAttentionKvWidth);
+  QW38_ALLOCATE(prompt_attention_candidate_value_,
+                kAttentionLayers * kPromptChunkRows *
+                    internal::kAttentionKvWidth);
 #undef QW38_ALLOCATE
   if (error != cudaSuccess) {
     release();
@@ -1366,6 +1581,320 @@ Status execute_token(const ResidentModel& model, std::size_t token,
   return Status::ok();
 }
 
+Status execute_prompt_chunk(
+    const ResidentModel& model, const std::size_t* tokens,
+    std::size_t token_count, SchedulerSession* session,
+    SchedulerWorkspace* workspace, float* host_logits,
+    std::size_t logits_count, float* host_hidden, std::size_t hidden_count,
+    const EvalControl* control) noexcept {
+  if (model.blob_ == nullptr || tokens == nullptr || token_count < 2 ||
+      token_count > kPromptChunkRows || session == nullptr ||
+      workspace == nullptr || session->capacity_ == 0 ||
+      token_count > session->capacity_ - session->frontier_ ||
+      workspace->capacity_ != session->capacity_ || host_logits == nullptr ||
+      logits_count != internal::kVocabularySize || host_hidden == nullptr ||
+      hidden_count != internal::kResidualWidth) {
+    return {StatusCode::kInvalidArgument,
+            "CUDA prompt chunk input, state, or output is invalid"};
+  }
+  for (std::size_t row = 0; row < token_count; ++row) {
+    if (tokens[row] >= internal::kVocabularySize) {
+      return {StatusCode::kInvalidArgument,
+              "CUDA prompt chunk contains an invalid token"};
+    }
+  }
+  const NvtxRange chunk_range("qw38.prefill_chunk");
+  cudaError_t error = cudaSuccess;
+  for (std::size_t row = 0; error == cudaSuccess && row < token_count; ++row) {
+    error = launch_quant_row_decode(
+        model.embedding_.kind, model.embedding_.data, model.embedding_.rows,
+        model.embedding_.columns, tokens[row],
+        workspace->prompt_normalized_ + row * internal::kResidualWidth,
+        nullptr);
+  }
+  if (error == cudaSuccess) {
+    bf16_to_fp32<<<
+        static_cast<unsigned int>((token_count * internal::kResidualWidth +
+                                   kThreads - 1) /
+                                  kThreads),
+        kThreads>>>(workspace->prompt_normalized_,
+                    token_count * internal::kResidualWidth,
+                    workspace->prompt_residual_a_);
+    error = cudaPeekAtLastError();
+  }
+  float* residual = workspace->prompt_residual_a_;
+  float* after_mixer = workspace->prompt_residual_b_;
+  std::size_t gdn_slot = 0;
+  std::size_t attention_slot = 0;
+  Status poll_status = Status::ok();
+  for (std::size_t layer_index = 0;
+       error == cudaSuccess && poll_status.is_ok() &&
+       layer_index < model.layers_.size();
+       ++layer_index) {
+    const DeviceLayer& layer = model.layers_[layer_index];
+    rms_norm_rows_fp32_to_bf16<<<
+        static_cast<unsigned int>(token_count), kThreads>>>(
+        residual, layer.common.input_norm, internal::kResidualWidth,
+        workspace->prompt_normalized_);
+    error = cudaPeekAtLastError();
+    if (layer.kind == internal::LayerKind::kGdn) {
+      if (error == cudaSuccess) {
+        error = matrix_prompt(layer.gdn.packed_qkv,
+                              workspace->prompt_normalized_, token_count,
+                              workspace, workspace->prompt_projection_a_,
+                              nullptr);
+      }
+      if (error == cudaSuccess) {
+        error = matrix_prompt(layer.gdn.value_gate,
+                              workspace->prompt_normalized_, token_count,
+                              workspace, workspace->prompt_projection_b_,
+                              nullptr);
+      }
+      if (error == cudaSuccess) {
+        error = matrix_prompt(layer.gdn.alpha, workspace->prompt_normalized_,
+                              token_count, workspace,
+                              workspace->prompt_projection_c_, nullptr);
+      }
+      if (error == cudaSuccess) {
+        error = matrix_prompt(layer.gdn.beta, workspace->prompt_normalized_,
+                              token_count, workspace,
+                              workspace->prompt_projection_d_, nullptr);
+      }
+      if (error == cudaSuccess) {
+        prepare_gdn_gate_rows<<<static_cast<unsigned int>(token_count),
+                                kThreads>>>(
+            workspace->prompt_projection_c_,
+            workspace->prompt_projection_d_, layer.gdn.folded_a,
+            layer.gdn.dt_bias, 16, 3, workspace->prompt_gdn_decay_,
+            workspace->prompt_gdn_update_);
+        error = cudaPeekAtLastError();
+      }
+      const GdnState committed{
+          session->gdn_convolution_ +
+              gdn_slot * internal::kGdnConvolutionValues,
+          session->gdn_recurrent_ +
+              gdn_slot * internal::kGdnRecurrentStateValues};
+      const GdnState candidate{
+          workspace->gdn_candidate_convolution_ +
+              gdn_slot * internal::kGdnConvolutionValues,
+          workspace->gdn_candidate_recurrent_ +
+              gdn_slot * internal::kGdnRecurrentStateValues};
+      if (error == cudaSuccess) {
+        error = launch_gdn_prepare_chunk_tiled(
+            kGdnConfig, workspace->prompt_projection_a_,
+            layer.gdn.convolution, workspace->prompt_gdn_decay_,
+            workspace->prompt_gdn_update_, token_count, committed, candidate,
+            workspace->prompt_gdn_convolved_,
+            workspace->prompt_gdn_recurrent_output_, nullptr);
+      }
+      if (error == cudaSuccess) {
+        const dim3 grid(static_cast<unsigned int>(internal::kGdnGateCount),
+                        static_cast<unsigned int>(token_count));
+        gdn_gated_output_rows<<<grid, kThreads>>>(
+            workspace->prompt_gdn_recurrent_output_,
+            workspace->prompt_projection_b_, layer.gdn.norm, 16, 3, 128,
+            workspace->prompt_projected_bf16_);
+        error = cudaPeekAtLastError();
+      }
+      if (error == cudaSuccess) {
+        error = matrix_prompt(layer.gdn.output,
+                              workspace->prompt_projected_bf16_, token_count,
+                              workspace, workspace->prompt_mixer_output_,
+                              nullptr);
+      }
+      ++gdn_slot;
+    } else {
+      if (error == cudaSuccess) {
+        error = matrix_prompt(layer.attention.query_gate,
+                              workspace->prompt_normalized_, token_count,
+                              workspace, workspace->prompt_projection_a_,
+                              nullptr);
+      }
+      if (error == cudaSuccess) {
+        error = matrix_prompt(layer.attention.key,
+                              workspace->prompt_normalized_, token_count,
+                              workspace, workspace->prompt_projection_c_,
+                              nullptr);
+      }
+      if (error == cudaSuccess) {
+        error = matrix_prompt(layer.attention.value,
+                              workspace->prompt_normalized_, token_count,
+                              workspace, workspace->prompt_projection_d_,
+                              nullptr);
+      }
+      if (error == cudaSuccess) {
+        const std::size_t values =
+            token_count * internal::kAttentionQueryWidth;
+        split_attention_rows<<<
+            static_cast<unsigned int>((values + kThreads - 1) / kThreads),
+            kThreads>>>(workspace->prompt_projection_a_,
+                        internal::kAttentionQueryWidth, 256, token_count,
+                        workspace->prompt_gdn_convolved_,
+                        workspace->prompt_projection_b_);
+        error = cudaPeekAtLastError();
+      }
+      const AttentionConfig config{
+          24, 4, 256, 64, static_cast<std::uint32_t>(session->capacity_)};
+      const std::size_t cache_stride =
+          session->capacity_ * internal::kAttentionKvWidth;
+      const AttentionCache committed{
+          session->attention_key_ + attention_slot * cache_stride,
+          session->attention_value_ + attention_slot * cache_stride};
+      const std::size_t candidate_stride =
+          kPromptChunkRows * internal::kAttentionKvWidth;
+      const AttentionCache candidate{
+          workspace->prompt_attention_candidate_key_ +
+              attention_slot * candidate_stride,
+          workspace->prompt_attention_candidate_value_ +
+              attention_slot * candidate_stride};
+      if (error == cudaSuccess) {
+        error = launch_attention_prepare_chunk(
+            config, session->frontier_, token_count,
+            workspace->prompt_gdn_convolved_,
+            workspace->prompt_projection_c_,
+            workspace->prompt_projection_d_, layer.attention.query_norm,
+            layer.attention.key_norm, workspace->prompt_projection_b_,
+            committed, candidate, workspace->attention_normalized_query_,
+            workspace->attention_normalized_key_, workspace->attention_scores_,
+            workspace->prompt_gdn_recurrent_output_, nullptr);
+      }
+      if (error == cudaSuccess) {
+        error = launch_fp32_to_bf16(
+            workspace->prompt_gdn_recurrent_output_,
+            token_count * internal::kAttentionQueryWidth,
+            workspace->prompt_projected_bf16_, nullptr);
+      }
+      if (error == cudaSuccess) {
+        error = matrix_prompt(layer.attention.output,
+                              workspace->prompt_projected_bf16_, token_count,
+                              workspace, workspace->prompt_mixer_output_,
+                              nullptr);
+      }
+      ++attention_slot;
+    }
+    if (error == cudaSuccess) {
+      residual_add_fp32<<<
+          static_cast<unsigned int>((token_count * internal::kResidualWidth +
+                                     kThreads - 1) /
+                                    kThreads),
+          kThreads>>>(residual, workspace->prompt_mixer_output_,
+                      token_count * internal::kResidualWidth, after_mixer);
+      error = cudaPeekAtLastError();
+    }
+    if (error == cudaSuccess) {
+      rms_norm_rows_fp32_to_bf16<<<
+          static_cast<unsigned int>(token_count), kThreads>>>(
+          after_mixer, layer.common.ffn_norm, internal::kResidualWidth,
+          workspace->prompt_normalized_);
+      error = cudaPeekAtLastError();
+    }
+    if (error == cudaSuccess) {
+      error = matrix_prompt(layer.common.ffn_gate,
+                            workspace->prompt_normalized_, token_count,
+                            workspace, workspace->prompt_projection_a_,
+                            nullptr);
+    }
+    if (error == cudaSuccess) {
+      error = matrix_prompt(layer.common.ffn_up,
+                            workspace->prompt_normalized_, token_count,
+                            workspace, workspace->prompt_projection_b_,
+                            nullptr);
+    }
+    if (error == cudaSuccess) {
+      error = launch_swiglu_bf16(
+          workspace->prompt_projection_a_, workspace->prompt_projection_b_,
+          token_count * internal::kFfnWidth,
+          workspace->prompt_projected_bf16_, nullptr);
+    }
+    if (error == cudaSuccess) {
+      error = matrix_prompt(layer.common.ffn_down,
+                            workspace->prompt_projected_bf16_, token_count,
+                            workspace, workspace->prompt_mixer_output_,
+                            nullptr);
+    }
+    if (error == cudaSuccess) {
+      residual_add_fp32<<<
+          static_cast<unsigned int>((token_count * internal::kResidualWidth +
+                                     kThreads - 1) /
+                                    kThreads),
+          kThreads>>>(after_mixer, workspace->prompt_mixer_output_,
+                      token_count * internal::kResidualWidth, residual);
+      error = cudaPeekAtLastError();
+    }
+    if (error == cudaSuccess && control != nullptr &&
+        control->poll != nullptr) {
+      error = cudaDeviceSynchronize();
+      if (error == cudaSuccess) poll_status = control->poll(control->context);
+    }
+  }
+  if (!poll_status.is_ok()) return poll_status;
+  if (error == cudaSuccess &&
+      (gdn_slot != kGdnLayers || attention_slot != kAttentionLayers)) {
+    error = cudaErrorInvalidValue;
+  }
+  const float* final_hidden =
+      residual + (token_count - 1) * internal::kResidualWidth;
+  if (error == cudaSuccess) {
+    rms_norm_fp32_to_bf16<<<1, kThreads>>>(
+        final_hidden, model.output_norm_, internal::kResidualWidth,
+        workspace->normalized_);
+    error = cudaPeekAtLastError();
+  }
+  if (error == cudaSuccess) {
+    error = matrix_vector(model.output_, workspace->normalized_, workspace,
+                          workspace->logits_, nullptr);
+  }
+  if (error == cudaSuccess) {
+    error = cudaMemcpy(workspace->candidate_logits_host_, workspace->logits_,
+                       logits_count * sizeof(float), cudaMemcpyDeviceToHost);
+  }
+  if (error == cudaSuccess) {
+    error = cudaMemcpy(workspace->candidate_hidden_host_, final_hidden,
+                       hidden_count * sizeof(float), cudaMemcpyDeviceToHost);
+  }
+  const std::size_t cache_stride =
+      session->capacity_ * internal::kAttentionKvWidth;
+  const std::size_t candidate_stride =
+      kPromptChunkRows * internal::kAttentionKvWidth;
+  const std::size_t target =
+      session->frontier_ * internal::kAttentionKvWidth;
+  for (std::size_t slot = 0; error == cudaSuccess && slot < kAttentionLayers;
+       ++slot) {
+    error = cudaMemcpyAsync(
+        session->attention_key_ + slot * cache_stride + target,
+        workspace->prompt_attention_candidate_key_ + slot * candidate_stride,
+        token_count * internal::kAttentionKvWidth * sizeof(__nv_bfloat16),
+        cudaMemcpyDeviceToDevice);
+    if (error == cudaSuccess) {
+      error = cudaMemcpyAsync(
+          session->attention_value_ + slot * cache_stride + target,
+          workspace->prompt_attention_candidate_value_ +
+              slot * candidate_stride,
+          token_count * internal::kAttentionKvWidth * sizeof(__nv_bfloat16),
+          cudaMemcpyDeviceToDevice);
+    }
+  }
+  if (error == cudaSuccess) error = cudaDeviceSynchronize();
+  if (error != cudaSuccess) {
+    return cuda_status(error, "CUDA hybrid prompt chunk failed");
+  }
+  std::swap(session->gdn_convolution_,
+            workspace->gdn_candidate_convolution_);
+  std::swap(session->gdn_recurrent_, workspace->gdn_candidate_recurrent_);
+  std::memcpy(session->tokens_ + session->frontier_, tokens,
+              token_count * sizeof(std::size_t));
+  std::memcpy(session->last_logits_, workspace->candidate_logits_host_,
+              logits_count * sizeof(float));
+  std::memcpy(session->last_hidden_, workspace->candidate_hidden_host_,
+              hidden_count * sizeof(float));
+  std::memcpy(host_logits, workspace->candidate_logits_host_,
+              logits_count * sizeof(float));
+  std::memcpy(host_hidden, workspace->candidate_hidden_host_,
+              hidden_count * sizeof(float));
+  session->frontier_ += token_count;
+  return Status::ok();
+}
+
 Status greedy_sample(const SchedulerSession& session,
                      std::size_t* token, RuntimeTimings* timings) noexcept {
   const NvtxRange range("qw38.sampling");
@@ -1438,11 +1967,19 @@ Status sync_tokens(const ResidentModel& model, const std::size_t* tokens,
     return Status::ok();
   }
   float elapsed = 0.0F;
-  for (std::size_t index = start; index < token_count; ++index) {
-    const Status status = execute_token(
-        model, tokens[index], session, workspace, host_logits, logits_count,
-        host_hidden, hidden_count, &elapsed, control);
+  for (std::size_t index = start; index < token_count;) {
+    const std::size_t remaining = token_count - index;
+    const std::size_t chunk = std::min(kPromptChunkRows, remaining);
+    const Status status =
+        chunk == 1
+            ? execute_token(model, tokens[index], session, workspace,
+                            host_logits, logits_count, host_hidden,
+                            hidden_count, &elapsed, control)
+            : execute_prompt_chunk(model, tokens + index, chunk, session,
+                                   workspace, host_logits, logits_count,
+                                   host_hidden, hidden_count, control);
     if (!status.is_ok()) return status;
+    index += chunk;
   }
   return Status::ok();
 }

@@ -104,7 +104,11 @@ def test_benchmark_contract_fixture_and_handbook_are_connected() -> None:
     assert contract["workloads"]["decode_output_tokens"] == 256
     assert fixture["smoke"]["passed"] is True
     assert fixture["smoke"]["admission_eligible"] is False
-    assert fixture["negative"]["full_scheduler_prompt_path_is_token_wise"] is True
+    assert (
+        fixture["negative"]["historical_full_scheduler_prompt_path_was_token_wise"]
+        is True
+    )
+    assert fixture["negative"]["resolved_by"] == "SCH-002"
     for relative, expected in fixture["smoke"]["raw_result_sha256"].items():
         raw_path = ROOT / relative
         assert hashlib.sha256(raw_path.read_bytes()).hexdigest() == expected

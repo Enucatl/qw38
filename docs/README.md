@@ -86,7 +86,8 @@ for language and host portability decisions.
 59. [Chat Completions](59-chat-completions.md): bounded JSON, roles, reasoning, generation, SSE streaming, tools, stops, queueing, and active cancellation.
 60. [Responses objects and exact continuation](60-responses-and-continuation.md): typed input/output items, shared generation mapping, SSE events, atomic token-prefix records, restart replay, and explicit exclusions.
 61. [Benchmark harness](61-benchmark-harness.md): workloads, warm-ups, samples, percentiles, telemetry, cache policy, atomic results, and proof limits.
-62. [Source and evidence ledger](sources.md).
+62. [Chunked full-model CUDA prefill](62-cuda-full-prefill.md): token-major rows, layer-major work, exact MMQ/GDN/attention chunks, atomic commit, scratch, and measured boundaries.
+63. [Source and evidence ledger](sources.md).
 
 Claims use four labels: **Measured** (this exact artifact and hardware),
 **External** (a linked source), **Estimated** (reproducible arithmetic), and

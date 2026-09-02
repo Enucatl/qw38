@@ -15,6 +15,8 @@
 
 namespace qw38::cuda {
 
+constexpr std::size_t kPromptChunkRows = 64;
+
 struct DeviceTensor final {
   const std::uint8_t* data = nullptr;
   std::size_t columns = 0;
@@ -142,6 +144,15 @@ class ResidentModel final {
                               float*, const EvalControl*,
                               RuntimeTimings*, PointwisePath,
                               SchedulerGraphs*) noexcept;
+  friend Status sync_tokens(const ResidentModel&, const std::size_t*,
+                            std::size_t, class SchedulerSession*,
+                            class SchedulerWorkspace*, float*, std::size_t,
+                            float*, std::size_t, SyncResult*,
+                            const EvalControl*) noexcept;
+  friend Status execute_prompt_chunk(
+      const ResidentModel&, const std::size_t*, std::size_t,
+      class SchedulerSession*, class SchedulerWorkspace*, float*,
+      std::size_t, float*, std::size_t, const EvalControl*) noexcept;
   friend class SchedulerGraphs;
 };
 
@@ -199,6 +210,10 @@ class SchedulerSession final {
                             class SchedulerWorkspace*, float*, std::size_t,
                             float*, std::size_t, SyncResult*,
                             const EvalControl*) noexcept;
+  friend Status execute_prompt_chunk(
+      const ResidentModel&, const std::size_t*, std::size_t,
+      SchedulerSession*, class SchedulerWorkspace*, float*, std::size_t,
+      float*, std::size_t, const EvalControl*) noexcept;
   friend Status greedy_sample(const SchedulerSession&, std::size_t*,
                               RuntimeTimings*) noexcept;
 };
@@ -244,6 +259,22 @@ class SchedulerWorkspace final {
   float* trace_taps_ = nullptr;
   float* candidate_logits_host_ = nullptr;
   float* candidate_hidden_host_ = nullptr;
+  float* prompt_residual_a_ = nullptr;
+  float* prompt_residual_b_ = nullptr;
+  __nv_bfloat16* prompt_normalized_ = nullptr;
+  __nv_bfloat16* prompt_projected_bf16_ = nullptr;
+  Q8Block* prompt_q8_ = nullptr;
+  float* prompt_projection_a_ = nullptr;
+  float* prompt_projection_b_ = nullptr;
+  float* prompt_projection_c_ = nullptr;
+  float* prompt_projection_d_ = nullptr;
+  float* prompt_mixer_output_ = nullptr;
+  float* prompt_gdn_decay_ = nullptr;
+  float* prompt_gdn_update_ = nullptr;
+  float* prompt_gdn_convolved_ = nullptr;
+  float* prompt_gdn_recurrent_output_ = nullptr;
+  __nv_bfloat16* prompt_attention_candidate_key_ = nullptr;
+  __nv_bfloat16* prompt_attention_candidate_value_ = nullptr;
   std::size_t capacity_ = 0;
   std::size_t allocated_bytes_ = 0;
 
@@ -257,6 +288,10 @@ class SchedulerWorkspace final {
                             std::size_t, SchedulerSession*, SchedulerWorkspace*,
                             float*, std::size_t, float*, std::size_t,
                             SyncResult*, const EvalControl*) noexcept;
+  friend Status execute_prompt_chunk(
+      const ResidentModel&, const std::size_t*, std::size_t,
+      SchedulerSession*, SchedulerWorkspace*, float*, std::size_t, float*,
+      std::size_t, const EvalControl*) noexcept;
   friend class SchedulerGraphs;
 };
 
@@ -302,6 +337,13 @@ Status execute_token(const ResidentModel& model, std::size_t token,
                      PointwisePath pointwise_path =
                          PointwisePath::kFused,
                      SchedulerGraphs* graphs = nullptr) noexcept;
+
+Status execute_prompt_chunk(
+    const ResidentModel& model, const std::size_t* tokens,
+    std::size_t token_count, SchedulerSession* session,
+    SchedulerWorkspace* workspace, float* host_logits,
+    std::size_t logits_count, float* host_hidden, std::size_t hidden_count,
+    const EvalControl* control = nullptr) noexcept;
 
 Status greedy_sample(const SchedulerSession& session,
                      std::size_t* token,

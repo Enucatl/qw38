@@ -128,11 +128,12 @@ runtime failures after validation are retained as failed results.
 
 **Measured smoke, RTX 5090:** the first BEN-001 smoke executions successfully
 recorded prefill, decode, agent reuse, component attribution, and telemetry.
-They observed about 16.2 prompt tokens/s. Inspection showed that
-`Session::sync` currently invokes a complete one-token scheduler execution for
+They observed about 16.2 prompt tokens/s. Inspection showed that, at BEN-001
+completion, `Session::sync` invoked a complete one-token scheduler execution for
 each prompt token. The already-admitted MMQ and chunked GDN/attention primitives
-are not yet connected to the full scheduler. Task **SCH-002** records that
-missing integration before any optimization attempt.
+were not connected to the full scheduler. Task **SCH-002** recorded that missing
+integration before the later optimization; chapter 62 documents its resolution
+without rewriting this historical benchmark evidence.
 
 This result proves that BEN-001 can execute workloads, enforce release
 minimums, preserve raw successes and failures, summarize samples, distinguish
@@ -140,7 +141,7 @@ cache policies, and publish a self-describing result. It does not prove release
 throughput, the full workload matrix, stable thermal conditions, comparative
 speed, or statistical superiority. The checked-in smoke runs are explicitly
 not admission eligible. CMP-002 and CMP-003 own the controlled comparison and
-confidence gates after SCH-002 and the remaining quality work are complete.
+confidence gates after the remaining quality work is complete.
 
 ## Reproduce a smoke safely
 
