@@ -216,6 +216,32 @@ Status Engine::render_user_turn(const std::string& content,
   return impl_->tokenizer.encode(rendered, tokens);
 }
 
+Status Engine::render_followup(const std::vector<ChatMessage>& messages,
+                               bool enable_thinking,
+                               std::vector<Token>* tokens) const noexcept {
+  if (!impl_ || tokens == nullptr) {
+    return {StatusCode::kInvalidArgument,
+            "open engine and rendered token output are required"};
+  }
+  std::vector<internal::Message> converted;
+  converted.reserve(messages.size());
+  for (const ChatMessage& message : messages) {
+    internal::Message item;
+    item.role = message.role == ChatRole::kUser
+                    ? internal::MessageRole::kUser
+                    : message.role == ChatRole::kTool
+                          ? internal::MessageRole::kTool
+                          : internal::MessageRole::kAssistant;
+    item.content = message.content;
+    converted.push_back(std::move(item));
+  }
+  std::string rendered;
+  Status status =
+      internal::render_followup(converted, enable_thinking, &rendered);
+  if (!status.is_ok()) return status;
+  return impl_->tokenizer.encode(rendered, tokens);
+}
+
 Session::Session() noexcept = default;
 Session::~Session() = default;
 Session::Session(std::unique_ptr<Impl> impl) noexcept : impl_(std::move(impl)) {}

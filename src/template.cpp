@@ -236,4 +236,35 @@ Status render_user_turn(const std::string& content, bool enable_thinking,
   return Status::ok();
 }
 
+Status render_followup(const std::vector<Message>& messages,
+                       bool enable_thinking,
+                       std::string* rendered) noexcept {
+  if (rendered == nullptr) {
+    return {StatusCode::kInvalidArgument, "rendered follow-up is required"};
+  }
+  rendered->clear();
+  if (messages.empty()) {
+    return {StatusCode::kInvalidArgument, "follow-up input cannot be empty"};
+  }
+  if (messages.size() == 1 && messages.front().role == MessageRole::kUser) {
+    return render_user_turn(messages.front().content, enable_thinking, rendered);
+  }
+  for (const Message& message : messages) {
+    if (message.role != MessageRole::kTool) {
+      return {StatusCode::kInvalidArgument,
+              "continued input must be one user message or function outputs"};
+    }
+    const std::string content = trim(message.content);
+    if (content.empty()) {
+      return {StatusCode::kInvalidArgument,
+              "function output cannot be empty"};
+    }
+    if (rendered->empty()) *rendered = "<|im_start|>user";
+    *rendered += "\n<tool_response>\n" + content + "\n</tool_response>";
+  }
+  *rendered += "<|im_end|>\n<|im_start|>assistant\n";
+  *rendered += enable_thinking ? "<think>\n" : "<think>\n\n</think>\n\n";
+  return Status::ok();
+}
+
 }  // namespace qw38::internal

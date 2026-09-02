@@ -94,6 +94,9 @@ class Engine final {
                      std::vector<Token>* tokens) const noexcept;
   Status render_user_turn(const std::string& content, bool enable_thinking,
                           std::vector<Token>* tokens) const noexcept;
+  Status render_followup(const std::vector<ChatMessage>& messages,
+                         bool enable_thinking,
+                         std::vector<Token>* tokens) const noexcept;
 
  private:
   struct Impl;

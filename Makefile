@@ -12,7 +12,7 @@ LIB_SOURCES := src/status.cpp src/sha256.cpp src/model.cpp src/tokenizer.cpp src
 LIB_OBJECTS := $(LIB_SOURCES:src/%.cpp=$(BUILD_DIR)/%.o)
 THIRD_PARTY_OBJECTS := $(BUILD_DIR)/utf8proc.o
 BINARIES := $(BUILD_DIR)/qw38 $(BUILD_DIR)/qw38-server $(BUILD_DIR)/qw38-bench $(BUILD_DIR)/qw38-eval
-HOST_DIAGNOSTICS := $(BUILD_DIR)/qw38-server-core-test $(BUILD_DIR)/qw38-server-api-test
+HOST_DIAGNOSTICS := $(BUILD_DIR)/qw38-server-core-test $(BUILD_DIR)/qw38-server-api-test $(BUILD_DIR)/qw38-responses-api-test
 CUDA_IMAGE := qw38-cuda:13.0.2
 
 .PHONY: all clean test diagnostic cuda-image cuda-build cuda-native cuda-products
@@ -37,7 +37,7 @@ $(BUILD_DIR)/utf8proc.o: third_party/utf8proc/utf8proc.c | $(BUILD_DIR)
 $(BUILD_DIR)/qw38: $(LIB_OBJECTS) $(THIRD_PARTY_OBJECTS) $(BUILD_DIR)/cli.o
 	$(CXX) $(CXXFLAGS) $^ -o $@
 
-SERVER_OBJECTS := $(BUILD_DIR)/server_core.o $(BUILD_DIR)/server_json.o $(BUILD_DIR)/server_api.o $(BUILD_DIR)/server_generation.o
+SERVER_OBJECTS := $(BUILD_DIR)/server_core.o $(BUILD_DIR)/server_json.o $(BUILD_DIR)/server_api.o $(BUILD_DIR)/server_generation.o $(BUILD_DIR)/responses_api.o $(BUILD_DIR)/response_store.o
 
 $(BUILD_DIR)/qw38-server: $(LIB_OBJECTS) $(THIRD_PARTY_OBJECTS) $(SERVER_OBJECTS) $(BUILD_DIR)/server.o
 	$(CXX) $(CXXFLAGS) $^ -o $@
@@ -46,6 +46,9 @@ $(BUILD_DIR)/qw38-server-core-test: $(BUILD_DIR)/status.o $(BUILD_DIR)/server_co
 	$(CXX) $(CXXFLAGS) $^ -o $@
 
 $(BUILD_DIR)/qw38-server-api-test: $(BUILD_DIR)/status.o $(THIRD_PARTY_OBJECTS) $(BUILD_DIR)/server_json.o $(BUILD_DIR)/server_api.o $(BUILD_DIR)/server_api_test.o
+	$(CXX) $(CXXFLAGS) $^ -o $@
+
+$(BUILD_DIR)/qw38-responses-api-test: $(BUILD_DIR)/status.o $(THIRD_PARTY_OBJECTS) $(BUILD_DIR)/server_json.o $(BUILD_DIR)/server_api.o $(BUILD_DIR)/responses_api.o $(BUILD_DIR)/response_store.o $(BUILD_DIR)/responses_api_test.o
 	$(CXX) $(CXXFLAGS) $^ -o $@
 
 $(BUILD_DIR)/qw38-bench: $(LIB_OBJECTS) $(THIRD_PARTY_OBJECTS) $(BUILD_DIR)/bench.o

@@ -48,23 +48,23 @@
     "concurrent_gpu_sessions"
   ],
   "local_sources": {
-    "Makefile": "688547d2d47384ddb4eed5eb983caf874f5df7bd3d126c64a0e741e1c7c79ece",
-    "README.md": "c1ffb0a208ee1d99dd64761a584dac69a93b352d693cd6ddb84aa9dfb754e3cd",
-    "include/qw38/engine.h": "83b0609536eb90cf2bfc163fb15d787126c340866c1245fdd0514c56c8590f68",
-    "src/engine.cpp": "8066df09e9dfbe1ee962b0b03881c087e0ccfdc826c0ef795bf78885a223018e",
+    "Makefile": "0f61014952b8595cf1911363cc2377b87abeef1fe65dd85651deae06cc24a2f2",
+    "README.md": "f3637c6287cddcf630b3f53617a9c86d810f53deff6ca0b56f6807c86f3b797d",
+    "include/qw38/engine.h": "1b305fc339aba277ec839a0fc13742facc1aae7ca50a05340004f9c592730001",
+    "src/engine.cpp": "3c0f8a38b34198ed3eb35a27126f49984735eb85045a5e147e9883991868c828",
     "cuda/full_scheduler.h": "c7e9118b189c547fc11d3fd2f77e8301b9f9c5af72b32f41553bbed55be04485",
     "cuda/full_scheduler.cu": "64235c4fca1f303b40b9068d34750f9b89068e2e353f8ca1510460d0ae157877",
-    "src/server.cpp": "2ebed4026d06edb57f858dc34ec897a96f517e228eee5beabffdca9f6382b62c",
+    "src/server.cpp": "47724d77c527dd6ff61885cc4e912998b7022a9e2a040cd2705dd420d7190770",
     "src/server_core.cpp": "94b2df61560d8aa0fa777cd8588faa30a16b658e4ed2faaf57279160671f3db2",
     "src/server_json.cpp": "309b30bf962b4a16923ea72db0c8999283368463cb497576ed25d908aec27092",
     "src/server_json.h": "01badae842f77e79a97b35215cbe740baee1e93538e8e815ac71b795f37933e5",
     "src/server_api.cpp": "4eaf0d187d1dfe50a9438ac3c8d6e6fcca16ca1e863b0c0e6ae11151ee0c60c6",
-    "src/server_api.h": "44ecd63e016ad90e2dc2918281e2db143983d6ef20492191e80d0890e22bcb5d",
-    "src/server_generation.cpp": "39ba868ae264e1b2438db15a083e6d243192b6224ea58cd63045dd64719e335f",
+    "src/server_api.h": "4f174a71ba2014d6253175ed9a49bccbf107e3039cc949449c39193dc328555f",
+    "src/server_generation.cpp": "a8d3877247103252eb0415bd3aece2b8dc1e9dcebfa1fb5ccb8527b0cc9a2367",
     "src/server_generation.h": "3d2b7e863bba5308b93c8c6cc310fd0c54448d7775f1e533c23986573f2c50ed",
     "src/server_api_test.cpp": "fce443d661891a2cac935d4dce21615b9fab06462653877dbca032bd818ce5ea",
-    "tests/test_server.py": "64ef5b681debc508b8c64351d6a5cd17f0c67e3c3e14b808dfaff3e3b055036c",
+    "tests/test_server.py": "d4b9e6c6ad140e6b182785bab1e09cd9ec097e1726685b94b775e3a68a9fc399",
     "fixtures/chat_completions.json": "7aa9cca171425e6e38449b9d17260502d109063d3b136873cb97d226e0d4d30c",
-    "docs/59-chat-completions.md": "02fc2070a40eb5ee874e47aae820792e0295ca3374c2f86d0832b9efdd317dc4"
+    "docs/59-chat-completions.md": "5cd7165728e74b7020bf780319285c496b9f1de7bd07edb1e773545aeeca83c7"
   }
 }

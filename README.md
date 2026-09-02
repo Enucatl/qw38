@@ -7,9 +7,9 @@ engine for the pinned Qwen3.8-27B Q4_K_M artifact on one RTX 5090. The approved
 scope is in [plan.md](plan.md), and implementation claims and evidence are in
 [implementation_ledger.md](implementation_ledger.md).
 
-The CUDA text CLI and OpenAI Chat Completions endpoint are usable now. Responses,
-comparative benchmarks, and the release quality gate remain under construction;
-unfinished operations continue to fail closed.
+The CUDA text CLI plus OpenAI Chat Completions and Responses endpoints are usable
+now. Comparative benchmarks and the release quality gate remain under
+construction; unfinished operations continue to fail closed.
 
 ## Chat with Quartz now
 
@@ -60,11 +60,11 @@ authentication still reads the complete artifact but now uses hardware-
 accelerated SHA-256 where available; see
 [Hardware-accelerated model authentication](docs/57-hardware-sha256.md).
 
-## Start the Chat Completions server
+## Start the OpenAI-compatible server
 
-The CUDA server exposes `GET /health`, `GET /v1/models`, and
-`POST /v1/chat/completions`. Start it with host networking so its loopback-only
-default is reachable from the host:
+The CUDA server exposes `GET /health`, `GET /v1/models`,
+`POST /v1/chat/completions`, and `POST /v1/responses`. Start it with host
+networking so its loopback-only default is reachable from the host:
 
 ```sh
 docker run --rm --network host --gpus all \
@@ -92,9 +92,21 @@ curl http://127.0.0.1:8080/v1/chat/completions \
 Add `"stream":true` and use `curl -N` for token streaming. Chat Completions
 supports text roles, reasoning, function tools/results and choice, ordinary
 sampling controls, stops, usage, FIFO queueing, and disconnect cancellation.
-Codex still cannot use Quartz as its full provider because the Responses API is
-the separate SRV-003 gate. See the [server-core chapter](docs/58-http-server-core.md)
-and [Chat Completions chapter](docs/59-chat-completions.md).
+The Responses equivalent stores an exact continuation record by default:
+
+```sh
+curl http://127.0.0.1:8080/v1/responses \
+  -H 'Content-Type: application/json' \
+  -d '{"model":"qwen3.8-27b-q4_k_m","input":"Reply with exactly: hello","reasoning":{"effort":"none"},"temperature":0}'
+```
+
+Pass the returned `id` as `previous_response_id` with a new `input` to continue
+the exact token prefix. Add `"store":false` when no later continuation is
+needed. Records live in `checkpoints/responses`; override that location with
+`--response-dir DIR`. Add `"stream":true` and use `curl -N` for named Responses
+events. See the [server-core chapter](docs/58-http-server-core.md),
+[Chat Completions chapter](docs/59-chat-completions.md), and
+[Responses/continuation chapter](docs/60-responses-and-continuation.md).
 
 The beginner-oriented [implementation handbook](docs/README.md) explains each
 admitted concept and links it to code, fixtures, failures, and evidence. The

@@ -329,6 +329,14 @@ DSpark are explicitly rejected as Qwen model semantics.
   behavior are authenticated by
   [`pins/chat_completions_contract.json`](../pins/chat_completions_contract.json)
   and [`fixtures/chat_completions.json`](../fixtures/chat_completions.json).
+- API-003, SES-004, SRV-003, and EDU-045 use original Responses-to-Chat mapping,
+  exact incremental template rendering, response event serialization, and an
+  atomic POSIX continuation-record implementation. No OpenAI SDK, protocol
+  server, storage library, or serving-runtime code is copied. The public shape
+  follows the Responses vocabulary, while the narrow supported boundary is
+  authenticated in [`pins/responses_contract.json`](../pins/responses_contract.json)
+  and measured behavior is retained in
+  [`fixtures/responses.json`](../fixtures/responses.json).
 
 ## Specialization and hardware references
 

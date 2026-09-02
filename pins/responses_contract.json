@@ -1,0 +1,35 @@
+{
+  "schema": "qw38.responses-contract.v1",
+  "route": "POST /v1/responses",
+  "model_id": "qwen3.8-27b-q4_k_m",
+  "continuation_schema": "qw38.responses-prefix.v1",
+  "default_store": true,
+  "default_response_directory": "checkpoints/responses",
+  "record_limit_bytes": 16777216,
+  "continuation": {
+    "stored_identity": "exact committed token IDs",
+    "same_process": "common-prefix GPU reuse",
+    "after_restart": "deterministic token replay",
+    "expiry": "none",
+    "automatic_deletion": false
+  },
+  "supported_input_items": [
+    "message",
+    "function_call",
+    "function_call_output"
+  ],
+  "unsupported": [
+    "image",
+    "audio",
+    "file",
+    "structured output",
+    "parallel tool calls",
+    "background mode"
+  ],
+  "local_sources": {
+    "src/responses_api.cpp": "d46e97c061f7737c143771f08b26770feebdfda3b43f2c85ccf8aba6ff7709eb",
+    "src/response_store.cpp": "b7d22cf6ddc209f8cda2c8228b9edde75d57f112e0977c4ae5910d36988c6092",
+    "src/server.cpp": "47724d77c527dd6ff61885cc4e912998b7022a9e2a040cd2705dd420d7190770",
+    "src/template.cpp": "6ad0963b5649850c3b2d7b028485c11d4cbf19b2935734e5d39eeaf663242ec5"
+  }
+}

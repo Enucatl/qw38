@@ -2390,6 +2390,22 @@ int render_template_case(const std::string& name) {
     std::cout << rendered;
     return 0;
   }
+  if (name == "followup_tool_results" || name == "followup_mixed_invalid") {
+    std::vector<Message> messages = {
+        {MessageRole::kTool, "18 C"}, {MessageRole::kTool, "sunny"}};
+    if (name == "followup_mixed_invalid") {
+      messages.push_back({MessageRole::kUser, "Thanks"});
+    }
+    std::string rendered;
+    const qw38::Status status =
+        qw38::internal::render_followup(messages, false, &rendered);
+    if (!status.is_ok()) {
+      std::cerr << status.message() << '\n';
+      return 1;
+    }
+    std::cout << rendered;
+    return 0;
+  }
   qw38::internal::TemplateInput input;
   if (name == "user_no_thinking") {
     input.messages = {{MessageRole::kUser, "Hello"}};

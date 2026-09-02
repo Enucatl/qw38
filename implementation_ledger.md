@@ -60,6 +60,7 @@ are repository-relative unless stated otherwise.
 | SES-001 | Implement exact common-prefix sync/reuse | SCH-001 | done | Reuse and full replay produce the same committed state and logits | [`cuda/full_scheduler.cu`](cuda/full_scheduler.cu); [`fixtures/cuda_prefix_sync.json`](fixtures/cuda_prefix_sync.json); [`tests/test_cuda_prefix_sync.py`](tests/test_cuda_prefix_sync.py); log 2026-08-31T13:45:38Z |
 | SES-002 | Implement atomic eval/sample/commit semantics | SCH-001 | done | Sampling is separate; cancellation/error cannot partially commit state | [`cuda/full_scheduler.cu`](cuda/full_scheduler.cu); [`fixtures/cuda_atomic_eval.json`](fixtures/cuda_atomic_eval.json); [`tests/test_cuda_atomic_eval.py`](tests/test_cuda_atomic_eval.py); log 2026-08-31T17:55:34Z |
 | SES-003 | Implement atomic checkpoint save/restore | SES-001, SES-002 | done | All state and compatibility hashes persist; resumed continuation is exact | [`cuda/checkpoint.cu`](cuda/checkpoint.cu); [`fixtures/cuda_checkpoint.json`](fixtures/cuda_checkpoint.json); [`tests/test_cuda_checkpoint.py`](tests/test_cuda_checkpoint.py); log 2026-08-31T19:09:54Z |
+| SES-004 | Implement atomic Responses continuation records | SES-001, SES-003, API-003 | done | A completed stored response atomically records its exact committed token prefix and compatible tool contract; missing, malformed, incompatible, cancelled, and `store=false` responses cannot be continued | [`src/response_store.cpp`](src/response_store.cpp); [`fixtures/responses.json`](fixtures/responses.json); [`tests/test_server.py`](tests/test_server.py); log 2026-09-02T14:27:35Z |
 | MEM-001 | Demonstrate 131,072-token fit with 1.5 GiB reserve | BLD-003, SCH-001 | done | Post-graph measured ledger includes 8 GiB KV and every named allocation on RTX 5090 | [`cuda/memory_fit_test.cu`](cuda/memory_fit_test.cu); [`fixtures/cuda_memory_fit_post_graph.json`](fixtures/cuda_memory_fit_post_graph.json); [`docs/54-post-graph-128k-memory.md`](docs/54-post-graph-128k-memory.md); [`tests/test_cuda_memory_fit.py`](tests/test_cuda_memory_fit.py); log 2026-09-01T07:08:29Z |
 | OPT-001 | Add synchronized timings, NVTX, and attribution | SCH-001 | done | Component/end-to-end measurements expose every named time category | [`cuda/full_scheduler.cu`](cuda/full_scheduler.cu); [`cuda/timing_test.cu`](cuda/timing_test.cu); [`fixtures/cuda_timing.json`](fixtures/cuda_timing.json); tests; log 2026-08-31T20:00:28Z |
 | OPT-002 | Profile and implement justified fusions | OPT-001, ORA-001 | done | Nsight evidence justifies each fusion; fused/unfused boundaries pass frozen gates | [`cuda/full_scheduler.cu`](cuda/full_scheduler.cu); [`fixtures/cuda_fusion.json`](fixtures/cuda_fusion.json); [`evidence/profiling/opt002-nsight-compute.txt`](evidence/profiling/opt002-nsight-compute.txt); tests; log 2026-09-01T05:44:16Z |
@@ -68,7 +69,8 @@ are repository-relative unless stated otherwise.
 | CLI-001 | Implement interactive `qw38` text CLI | TOK-002, SES-003 | done | Interactive generation, reasoning, stops, sampling, and persistence pass smoke tests | [`src/cli.cpp`](src/cli.cpp); [`src/engine.cpp`](src/engine.cpp); [`fixtures/cli_smoke.json`](fixtures/cli_smoke.json); [`tests/test_cli.py`](tests/test_cli.py); log 2026-09-01T11:56:52Z |
 | SRV-001 | Implement single-flight HTTP server core and queue | API-001 | done | Health/models endpoints, cancellation, queue timing, and one GPU session pass tests | [`src/server.cpp`](src/server.cpp); [`src/server_core.cpp`](src/server_core.cpp); [`fixtures/server_core.json`](fixtures/server_core.json); [`tests/test_server.py`](tests/test_server.py); log 2026-09-01T18:19:42Z |
 | SRV-002 | Implement Chat Completions API | TOK-002, SES-002, SRV-001 | done | Supported roles/tools/streaming/sampling/stops pass; exclusions reject explicitly | [`src/server.cpp`](src/server.cpp); [`src/server_generation.cpp`](src/server_generation.cpp); [`fixtures/chat_completions.json`](fixtures/chat_completions.json); [`tests/test_server.py`](tests/test_server.py); log 2026-09-01T19:00:04Z |
-| SRV-003 | Implement Responses API and continuation | TOK-002, SES-003, SRV-001 | pending | Streaming/tools/`previous_response_id` and exclusions pass API fixtures | — |
+| SRV-003 | Implement Responses API and continuation | TOK-002, SES-003, SRV-001 | done | Streaming/tools/`previous_response_id` and exclusions pass API fixtures | [`src/server.cpp`](src/server.cpp); [`fixtures/responses.json`](fixtures/responses.json); [`tests/test_server.py`](tests/test_server.py); log 2026-09-02T14:27:35Z |
+| API-003 | Implement strict Responses request and event mapping | API-002, SRV-002 | done | Text inputs, reasoning, function calls/results, sampling, response objects, ordered SSE events, and explicit exclusions pass native fixtures | [`src/responses_api.cpp`](src/responses_api.cpp); [`src/responses_api_test.cpp`](src/responses_api_test.cpp); [`pins/responses_contract.json`](pins/responses_contract.json); log 2026-09-02T14:27:35Z |
 | BEN-001 | Implement `qw38-bench` component/end-to-end harness | OPT-001 | pending | Warmups/samples, telemetry, raw samples, failures, and environment metadata are retained | — |
 | EVAL-001 | Implement `qw38-eval` logits/traces/checkpoints harness | ORA-001, SES-003 | pending | Focused native diagnostics are driven by typed pytest helpers | — |
 | QLT-001 | Pass held-out NLL, continuation, recurrence, retrieval, and task quality | EVAL-001, MEM-001 | pending | Admitted artifact passes every documented threshold and 128K retrieval fixture | — |
@@ -120,6 +122,7 @@ are repository-relative unless stated otherwise.
 | EDU-042 | Explain artifact hashing, SHA-NI dispatch, fallback, and cold/warm storage limits for beginners | MDL-003, DOC-001 | done | Whole-file identity versus ZFS block integrity, CPU instructions, runtime dispatch, exact digest equality, cache/storage limits, measurements, and proof boundaries are code-linked and worked | [`docs/57-hardware-sha256.md`](docs/57-hardware-sha256.md); [`fixtures/sha256_acceleration.json`](fixtures/sha256_acceleration.json); log 2026-09-01T11:56:52Z |
 | EDU-043 | Explain the HTTP listener, routes, single-flight queue, cancellation, and server lifecycle for beginners | SRV-001, DOC-001 | done | Sockets, HTTP requests/responses, loopback binding, health/models payloads, queue tickets/timing, cancellation, one-session ownership, shutdown, exclusions, and proof limits are code-linked and worked | [`docs/58-http-server-core.md`](docs/58-http-server-core.md); [`pins/server_core_contract.json`](pins/server_core_contract.json); [`fixtures/server_core.json`](fixtures/server_core.json); log 2026-09-01T18:19:42Z |
 | EDU-044 | Explain JSON, Chat Completions, SSE streaming, tools, stops, usage, queueing, and cancellation for beginners | SRV-002, API-002, DOC-001 | done | Request/response fields, validation, token generation, reasoning/content separation, function calls, stream events, stop behavior, session reuse, and proof limits are code-linked and worked | [`docs/59-chat-completions.md`](docs/59-chat-completions.md); [`pins/chat_completions_contract.json`](pins/chat_completions_contract.json); [`fixtures/chat_completions.json`](fixtures/chat_completions.json); log 2026-09-01T19:00:04Z |
+| EDU-045 | Explain Responses objects, typed items, events, storage, and exact continuation for beginners | SRV-003, SES-004, API-003, DOC-001 | done | A reader new to APIs can follow input items through tokens and output items, distinguish IDs from state, understand atomic records and exact prefixes, and identify every supported/rejected boundary | [`docs/60-responses-and-continuation.md`](docs/60-responses-and-continuation.md); [`pins/responses_contract.json`](pins/responses_contract.json); [`fixtures/responses.json`](fixtures/responses.json); log 2026-09-02T14:27:35Z |
 | REL-001 | Publish reproducible release evidence bundle | CMP-003, QLT-001, DOC-001 | pending | Builds, hashes, raw results, reports, and documentation claims reconcile | — |
 
 ## Delivery-Gate Mapping
@@ -3143,6 +3146,87 @@ are repository-relative unless stated otherwise.
   streaming, tools, continuation storage, and `previous_response_id`—is the next
   API product task. Authentication and remote-deployment concerns remain outside
   the approved local v1 boundary.
+
+### 2026-09-01T19:24:00Z — SRV-003 continuation boundary started
+
+- Began SRV-003 and added discovered tasks API-003, SES-004, and EDU-045 before
+  source changes. Responses has a different public envelope from Chat
+  Completions, but both will map into the same validated `ChatRequest` and
+  generation loop so model semantics do not fork.
+- Exact continuation cannot be derived safely from assistant text: trimming,
+  reasoning delimiters, tool XML, and tokenizer boundaries can change a
+  re-rendered prefix. SES-004 therefore stores the token IDs copied from the
+  session only after generation commits. A later request appends a separately
+  rendered user/tool-result suffix to those exact IDs.
+- The continuation record is a compact, versioned JSON control record rather
+  than a duplicate 8 GiB KV/checkpoint image. Atomic temporary-file write,
+  `fsync`, rename, and directory `fsync` protect publication. In-process reuse
+  retains the GPU prefix; a restart deterministically replays the stored tokens.
+  Records have no silent expiry or automatic deletion in v1. `store=false`,
+  cancellations, errors, malformed records, and incompatible model/schema
+  versions deliberately publish no continuable response.
+- API-003 will admit text messages, instructions, function declarations,
+  function calls/results, ordinary sampling, stops, reasoning effort, and
+  ordered Responses SSE events. Image, audio, file, structured-output, parallel
+  tool-call, and unknown features remain explicit errors rather than ignored
+  fields. EDU-045 owns the beginner explanation and code/fixture links.
+
+### 2026-09-02T00:12:00Z — SRV-003 full-suite pin mismatch
+
+- The first full ordinary suite completed with 147 passes, seventeen expected
+  CUDA skips, and one failure in 161.20 seconds. The response implementation
+  and functional tests passed; the failure was the expected source-identity
+  mismatch for `src/eval.cpp` in the older MDL-003 contract after adding the
+  new exact follow-up template diagnostic.
+- Updated only that authenticated source digest after confirming a repository-
+  wide contract audit found no other mismatch. This was a bookkeeping failure,
+  not a SHA-256 implementation or runtime failure; the rerun remains required
+  before admission.
+
+### 2026-09-02T14:27:35Z — SRV-003, API-003, SES-004, and EDU-045 accepted
+
+- Added the strict `POST /v1/responses` adapter. Plain text and typed message,
+  function-call, and function-output items map to the shared `ChatRequest`;
+  instructions, reasoning effort, ordinary sampling, stops, tools, tool choice,
+  and streaming retain the same model semantics as Chat Completions. Media,
+  files, structured output, parallel calls, background mode, unknown fields,
+  and unsafe continuation mutations fail explicitly.
+- Added Responses objects and ordered named SSE events with consecutive sequence
+  numbers, reasoning/text deltas, function-argument events, typed output items,
+  completed/incomplete status, usage, cancellation, and single-flight timing.
+- Added exact incremental rendering for one user turn or grouped function
+  outputs. Durable continuation records retain committed token IDs and compatible
+  tool schemas, validate a safe ID/model/schema/token range, cap records at
+  16 MiB, and publish with temporary write, file `fsync`, rename, and directory
+  `fsync`. `store=false`, missing, corrupt, incompatible, cancelled, and failed
+  responses cannot be continued. Records do not expire or delete themselves.
+- **Measured host:** the native Responses diagnostic passed request/tool/
+  reasoning mapping, function-output continuation, explicit exclusions, atomic
+  record round-trip, missing lookup, and corrupt-record rejection. Six template
+  tests passed, including byte-exact grouped tool-result suffixes and mixed-item
+  rejection.
+- **Measured RTX 5090:** the integrated server produced exact non-streaming text,
+  continued from a stored response, preserved the first record's full token
+  array as a prefix, rejected continuation of `store=false`, emitted an ordered
+  SSE lifecycle whose deltas equalled final text, then stopped and successfully
+  continued the original ID from a fresh server process. The focused case passed
+  in 61.30 seconds.
+- Added beginner Chapter 60 explaining APIs, typed items, shared mapping, tokens,
+  response IDs versus state, output items, exact prefix equality, incremental
+  suffixes, atomic disk publication, restart replay, storage ownership, SSE
+  events, exclusions, failures, and proof limits. Updated README commands,
+  handbook navigation/provenance, earlier API proof boundaries, and architecture
+  status.
+- A clean pinned CUDA 13.0.2 build compiled all host products, three native
+  server diagnostics, both CUDA products, and all sixteen SM120 diagnostics with
+  warnings as errors. After resolving and retaining the one stale-pin negative,
+  the full ordinary suite passed 148 tests with seventeen expected GPU skips in
+  159.35 seconds. The complete exclusive RTX 5090 suite passed all 165 tests in
+  322.46 seconds.
+- Marked SRV-003, API-003, SES-004, and EDU-045 done. The approved CLI plus both
+  OpenAI text API envelopes are now implemented; BEN-001, the benchmark harness,
+  is the next delivery task. Broader SDK compatibility, authentication, remote
+  serving, structured output, and multimodal inputs remain outside this gate.
 
 ## Decisions and Negative Results
 

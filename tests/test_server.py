@@ -6,6 +6,7 @@ import json
 import os
 import re
 import select
+import shutil
 import socket
 import subprocess
 import time
@@ -21,6 +22,7 @@ IMAGE = "qw38-cuda:13.0.2"
 MODEL = ROOT / "models" / "Qwen3.8-27B-Q4_K_M.gguf"
 CORE_TEST = ROOT / "build" / "qw38-server-core-test"
 API_TEST = ROOT / "build" / "qw38-server-api-test"
+RESPONSES_API_TEST = ROOT / "build" / "qw38-responses-api-test"
 
 
 def test_server_contract_fixture_and_handbook_are_connected() -> None:
@@ -134,6 +136,68 @@ def test_chat_completions_contract_fixture_and_handbook_are_connected() -> None:
         assert term in handbook
 
 
+def test_responses_api_mapping_storage_and_handbook_are_connected() -> None:
+    result = subprocess.run(
+        [str(RESPONSES_API_TEST)], check=False, capture_output=True, text=True
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert result.stdout.splitlines() == [
+        "request_case=text_tools_reasoning_stream passed=true",
+        "continuation_case=function_output_store_false passed=true",
+        "rejection_case=media_structured_instruction passed=true",
+        "store_case=atomic_missing_corrupt passed=true",
+        "status=passed",
+    ]
+
+    contract = json.loads((ROOT / "pins" / "responses_contract.json").read_text())
+    fixture = json.loads((ROOT / "fixtures" / "responses.json").read_text())
+    assert contract["route"] == "POST /v1/responses"
+    assert contract["continuation"]["stored_identity"] == "exact committed token IDs"
+    assert contract["continuation"]["expiry"] == "none"
+    assert contract["record_limit_bytes"] == 16_777_216
+    assert fixture["native"] == {
+        "request_mapping": True,
+        "function_output_continuation": True,
+        "media_rejected": True,
+        "structured_output_rejected": True,
+        "instruction_replacement_rejected": True,
+        "atomic_record_roundtrip": True,
+        "missing_record_rejected": True,
+        "corrupt_record_rejected": True,
+        "exact_tool_result_suffix": True,
+    }
+    assert fixture["cuda_smoke"]["passed"] is True
+    assert fixture["cuda_smoke"]["non_streaming_response"] is True
+    assert fixture["cuda_smoke"]["ordered_stream_events"] is True
+    assert fixture["cuda_smoke"]["previous_response_id_exact_prefix"] is True
+    assert fixture["cuda_smoke"]["store_false_not_continuable"] is True
+    assert fixture["cuda_smoke"]["restart_replay"] is True
+    for relative, expected in contract["local_sources"].items():
+        assert hashlib.sha256((ROOT / relative).read_bytes()).hexdigest() == expected
+
+    handbook = (
+        (ROOT / "docs" / "60-responses-and-continuation.md").read_text().casefold()
+    )
+    for term in [
+        "typed",
+        "input item",
+        "output item",
+        "previous_response_id",
+        "exact prefix",
+        "token ids",
+        "atomic",
+        "temporary file",
+        "fsync",
+        "rename",
+        "store:false",
+        "server-sent events",
+        "sequence_number",
+        "restart",
+        "proof boundary",
+    ]:
+        assert term in handbook
+
+
 def _wait_for_server(
     process: subprocess.Popen[bytes], timeout: float
 ) -> tuple[int, list[str]]:
@@ -166,10 +230,10 @@ def _request(url: str, method: str = "GET") -> tuple[int, dict[str, object]]:
 
 
 def _post_json(
-    base: str, body: dict[str, object]
+    base: str, body: dict[str, object], path: str = "/v1/chat/completions"
 ) -> tuple[int, dict[str, object], dict[str, str]]:
     request = urllib.request.Request(
-        base + "/v1/chat/completions",
+        base + path,
         data=json.dumps(body).encode(),
         headers={"Content-Type": "application/json"},
         method="POST",
@@ -186,6 +250,7 @@ def test_cuda_server_owns_one_session_and_serves_control_routes() -> None:
     if os.environ.get("QW38_RUN_CUDA_TESTS") != "1":
         pytest.skip("set QW38_RUN_CUDA_TESTS=1 for the exclusive RTX 5090 gate")
     name = f"qw38-server-test-{os.getpid()}"
+    response_directory = ROOT / "checkpoints" / f"responses-test-{os.getpid()}"
     common = [
         "docker",
         "run",
@@ -231,6 +296,8 @@ def test_cuda_server_owns_one_session_and_serves_control_routes() -> None:
             "127.0.0.1",
             "--port",
             "0",
+            "--response-dir",
+            str(response_directory.relative_to(ROOT)),
         ],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
@@ -356,6 +423,114 @@ def test_cuda_server_owns_one_session_and_serves_control_routes() -> None:
         assert status == 200
         assert stopped["choices"][0]["message"]["content"] == "hello"
         assert stopped["choices"][0]["finish_reason"] == "stop"
+
+        status, first_response, _ = _post_json(
+            base,
+            {
+                "model": "qwen3.8-27b-q4_k_m",
+                "input": "Reply with exactly: first",
+                "reasoning": {"effort": "none"},
+                "temperature": 0,
+                "max_output_tokens": 8,
+            },
+            "/v1/responses",
+        )
+        assert status == 200
+        assert first_response["object"] == "response"
+        assert first_response["status"] == "completed"
+        assert first_response["store"] is True
+        assert first_response["output"][0]["content"][0]["text"] == "first"
+        first_id = first_response["id"]
+        first_record = json.loads((response_directory / f"{first_id}.json").read_text())
+
+        status, continued, _ = _post_json(
+            base,
+            {
+                "model": "qwen3.8-27b-q4_k_m",
+                "previous_response_id": first_id,
+                "input": "Reply with exactly: second",
+                "reasoning": {"effort": "none"},
+                "temperature": 0,
+                "max_output_tokens": 8,
+            },
+            "/v1/responses",
+        )
+        assert status == 200
+        assert continued["previous_response_id"] == first_id
+        assert continued["output"][0]["content"][0]["text"] == "second"
+        continued_record = json.loads(
+            (response_directory / f"{continued['id']}.json").read_text()
+        )
+        assert (
+            continued_record["tokens"][: len(first_record["tokens"])]
+            == first_record["tokens"]
+        )
+
+        status, transient, _ = _post_json(
+            base,
+            {
+                "model": "qwen3.8-27b-q4_k_m",
+                "input": "Reply with exactly: transient",
+                "reasoning": {"effort": "none"},
+                "temperature": 0,
+                "max_output_tokens": 8,
+                "store": False,
+            },
+            "/v1/responses",
+        )
+        assert status == 200
+        assert transient["store"] is False
+        assert not (response_directory / f"{transient['id']}.json").exists()
+        status, unavailable, _ = _post_json(
+            base,
+            {
+                "model": "qwen3.8-27b-q4_k_m",
+                "previous_response_id": transient["id"],
+                "input": "continue",
+            },
+            "/v1/responses",
+        )
+        assert status == 400
+        assert "not found or was not stored" in unavailable["error"]["message"]
+
+        connection = http.client.HTTPConnection("127.0.0.1", port, timeout=30)
+        connection.request(
+            "POST",
+            "/v1/responses",
+            body=json.dumps(
+                {
+                    "model": "qwen3.8-27b-q4_k_m",
+                    "input": "Reply with exactly: events",
+                    "reasoning": {"effort": "none"},
+                    "temperature": 0,
+                    "max_output_tokens": 8,
+                    "stream": True,
+                }
+            ),
+            headers={"Content-Type": "application/json"},
+        )
+        response = connection.getresponse()
+        assert response.status == 200
+        lines = [line.decode().strip() for line in response.readlines()]
+        connection.close()
+        event_names = [line[7:] for line in lines if line.startswith("event: ")]
+        event_data = [
+            json.loads(line[6:]) for line in lines if line.startswith("data: ")
+        ]
+        assert event_names[:2] == ["response.created", "response.in_progress"]
+        assert event_names[-1] == "response.completed"
+        assert [event["sequence_number"] for event in event_data] == list(
+            range(len(event_data))
+        )
+        streamed_text = "".join(
+            event.get("delta", "")
+            for event in event_data
+            if event["type"] == "response.output_text.delta"
+        )
+        assert streamed_text == "events"
+        assert event_data[-1]["response"]["output"][0]["content"][0]["text"] == (
+            "events"
+        )
 
         connection = http.client.HTTPConnection("127.0.0.1", port, timeout=30)
         connection.request(
@@ -495,3 +670,57 @@ def test_cuda_server_owns_one_session_and_serves_control_routes() -> None:
         )
         process.wait(timeout=20)
     assert process.returncode == 0
+
+    restart_name = name + "-restart"
+    restart_common = list(common)
+    restart_common[restart_common.index(name)] = restart_name
+    restart_process = subprocess.Popen(
+        [
+            *restart_common,
+            "./build/cuda/qw38-server",
+            "models/Qwen3.8-27B-Q4_K_M.gguf",
+            "--host",
+            "127.0.0.1",
+            "--port",
+            "0",
+            "--response-dir",
+            str(response_directory.relative_to(ROOT)),
+        ],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    try:
+        restart_port, _ = _wait_for_server(restart_process, 90)
+        restart_base = f"http://127.0.0.1:{restart_port}"
+        status, restarted, _ = _post_json(
+            restart_base,
+            {
+                "model": "qwen3.8-27b-q4_k_m",
+                "previous_response_id": first_id,
+                "input": "Reply with exactly: restarted",
+                "reasoning": {"effort": "none"},
+                "temperature": 0,
+                "max_output_tokens": 8,
+            },
+            "/v1/responses",
+        )
+        assert status == 200
+        assert restarted["previous_response_id"] == first_id
+        assert restarted["output"][0]["content"][0]["text"] == "restarted"
+        restart_record = json.loads(
+            (response_directory / f"{restarted['id']}.json").read_text()
+        )
+        assert (
+            restart_record["tokens"][: len(first_record["tokens"])]
+            == first_record["tokens"]
+        )
+    finally:
+        subprocess.run(
+            ["docker", "stop", "--timeout", "10", restart_name],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        restart_process.wait(timeout=20)
+        shutil.rmtree(response_directory, ignore_errors=True)
+    assert restart_process.returncode == 0
