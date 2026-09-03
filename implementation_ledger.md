@@ -80,7 +80,7 @@ are repository-relative unless stated otherwise.
 | CMP-001 | Pin and validate comparable baseline artifacts | PIN-001, PIN-002, QLT-001 | pending | llama/Ollama share GGUF; vLLM difference and <=1% NLL admission are explicit | — |
 | CMP-002 | Run controlled 30-sample comparative matrix | BEN-001, OPT-004, CMP-001 | pending | All contexts/metrics/environment data and negative runs are retained | — |
 | CMP-003 | Pass prefill/decode statistical speed gates | CMP-002 | pending | Paired bootstrap lower bounds exceed 1.05 and no workload is >5% slower | — |
-| DOC-001 | Maintain code-linked handbook and provenance ledger | BLD-001 | pending | Each implemented concept has claim labels, invariants, failures, task IDs, and evidence | — |
+| DOC-001 | Maintain code-linked handbook and provenance ledger | BLD-001 | done | Each implemented concept has claim labels, invariants, failures, task IDs, and evidence | [`docs/65-documentation-audit.md`](docs/65-documentation-audit.md); [`tests/test_documentation.py`](tests/test_documentation.py); log 2026-09-03T13:21:51Z |
 | EDU-001 | Explain tokenizer concepts for readers with no prior background | TOK-001, DOC-001 | done | NFC, Unicode splitting, byte mapping, BPE, fixtures, and equality gates have worked examples linked to code/evidence | [`docs/15-tokenizer-authority.md`](docs/15-tokenizer-authority.md); tests; log 2026-08-29T11:02:00Z |
 | EDU-002 | Explain chat-template concepts and policy ownership for beginners | TOK-002, DOC-001 | done | Roles, delimiters, reasoning, tools, results, mapping, and byte-equality gates have worked examples linked to code/evidence | [`docs/16-chat-template.md`](docs/16-chat-template.md); tests; log 2026-08-29T11:39:57Z |
 | EDU-003 | Explain scalar quantization and numeric equality for beginners | CPU-001, DOC-001 | done | Bits/bytes, FP16/FP32, blocks, Q4_K/Q6_K packing, decoding, dot products, accumulation, fixtures, and numeric metrics have worked examples linked to code/evidence | [`docs/17-quantization.md`](docs/17-quantization.md); [`tests/test_quant.py`](tests/test_quant.py); log 2026-08-29T12:05:00Z |
@@ -3548,3 +3548,25 @@ are repository-relative unless stated otherwise.
   allocator delta, graph count, and required free reserve.
 - Marked BLD-003 done. Its dependent MEM-001 and MEM-002 gates were already
   admitted and remain the authoritative physical allocation evidence.
+
+### 2026-09-03T12:52:46Z — DOC-001 started
+
+- Selected DOC-001 as the first eligible pending task in ledger order; BLD-001
+  was done, the worktree was clean, and `main` tracked `origin/main`.
+- Planning fixed the boundary at handbook/provenance reconciliation and a
+  deterministic documentation audit gate. No runtime, fixture, pin, or plan
+  changes are in scope. Evidence: [`tasks/DOC-001.md`](tasks/DOC-001.md).
+
+### 2026-09-03T13:21:51Z — DOC-001 completed
+
+- Reconciled handbook chapters 49, 50, 63, and 64; added the task coverage and
+  provenance audit in Chapter 65; and added the repository-local documentation
+  coverage/link test. The four authorized README source digests were refreshed
+  to authenticate the final README bytes.
+- Acceptance evidence: verification attempt 3 passed focused documentation and
+  contract tests (8 total), Ruff format/check, `make clean`, `make -j2`,
+  `make diagnostic`, full pytest (161 passed, 19 skipped), and `git diff --check`.
+  Historical MEM-001 and partial/blocked EVAL-001 boundaries remain explicit.
+- First-pass acceptance: no; two independent verification attempts failed only
+  on stale README digests, followed by one bounded repair and passing attempt 3.
+  No remaining risk identified within DOC-001 scope.

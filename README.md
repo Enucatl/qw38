@@ -120,6 +120,10 @@ events. See the [server-core chapter](docs/58-http-server-core.md),
 
 The beginner-oriented [implementation handbook](docs/README.md) explains each
 admitted concept and links it to code, fixtures, failures, and evidence. The
+handbook's [documentation audit](docs/65-documentation-audit.md) reconciles
+implemented task coverage and provenance. EVAL-001 remains blocked/partial;
+quality (QLT-001), comparison (CMP-001–CMP-003), and release (REL-001) work
+remain unfinished.
 latest chapter covers [GGUF parameter conversion](docs/22-gguf-conversion.md),
 including folded decay, RMSNorm scales, squeezed shapes, and GDN head order.
 The following [typed-weight chapter](docs/23-typed-model-weights.md) explains how

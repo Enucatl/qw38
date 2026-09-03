@@ -3,6 +3,11 @@
 [Index](README.md) · Implementation task: TRC-004 in
 [`implementation_ledger.md`](../implementation_ledger.md)
 
+Evidence links: [`cuda/full_scheduler.cu`](../cuda/full_scheduler.cu) ·
+[`tests/test_cuda_trace.py`](../tests/test_cuda_trace.py) ·
+[`pins/cuda_trace_contract.json`](../pins/cuda_trace_contract.json) ·
+[`fixtures/cuda_trace.json`](../fixtures/cuda_trace.json)
+
 This chapter explains how the CUDA scheduler exposes a small, stable set of
 diagnostic tensors without putting tracing into the release execution path. A
 trace is an inspection aid: it is compiled with `QW38_DIAGNOSTIC_TRACE`, uses
@@ -47,7 +52,7 @@ diagnostic entry point nor the stable tap literals.
 
 ## Measured token-42 evidence
 
-The authenticated result is [`fixtures/cuda_trace.json`](../fixtures/cuda_trace.json),
+**Measured.** The authenticated result is [`fixtures/cuda_trace.json`](../fixtures/cuda_trace.json),
 captured in the pinned CUDA 13.0.2 / SM120 environment on an RTX 5090. Every
 row below has 5,120 elements except logits, which has 248,320. The values are
 full-tensor comparisons against the existing scalar/oracle admissions; they

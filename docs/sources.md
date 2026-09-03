@@ -375,6 +375,11 @@ DSpark are explicitly rejected as Qwen model semantics.
   explanation is [`docs/64-eval-harness.md`](64-eval-harness.md). The fixture
   marks this as logits-only partial implementation: no CUDA checkpoint or
   trace smoke has run, and nothing here is QLT-001 quality evidence.
+- DOC-001 introduces no copied source or external dependency. Its human-readable
+  coverage record is [`docs/65-documentation-audit.md`](65-documentation-audit.md),
+  and its mechanical link/coverage gate is [`tests/test_documentation.py`](../tests/test_documentation.py).
+  The audit links the implementation ledger, retained fixtures, contracts, and
+  source locations; documentation claims remain bounded by those records.
 
 ## Specialization and hardware references
 
@@ -404,9 +409,11 @@ DSpark are explicitly rejected as Qwen model semantics.
 - FFN elements/FLOPs, BF16/4-bit lower bounds, 144 MiB recurrence, 7.5 MiB
   convolution storage, and 64 KiB/token KV are **Estimated** from displayed
   formulas and official shapes.
-- Weight artifact size, runtime allocations, quant quality, context capacity,
-  RTX 5090 throughput, and every optimization result are **Proposed** until the
-  milestone protocol emits named logs and fixtures.
+- Unevidenced future results (including new weight, quality, context, throughput,
+  or optimization claims) are **Proposed** until the milestone protocol emits
+  named logs and fixtures. Named retained measurements in the chapters and
+  fixtures keep their **Measured** label, including historical or partial
+  results; they are not converted to Proposed by this general note.
 - No q27 measurement is evidence for DwarfStar or for the proposed engine.
 
 ## Review checklist

@@ -5,7 +5,8 @@ text-first inference engine for Qwen3.8-27B on a 32 GiB RTX 5090. It is a design
 and implementation guide, not Qwen support for DwarfStar and not a promise of a
 particular speed. That is the primary optimization target; the architecture also
 supports DGX Spark, Apple Silicon, and CPU-only hosts at lower support tiers.
-DwarfStar is a worked systems case study.
+DwarfStar is a worked systems case study. Non-CUDA platforms are future handbook
+design discussion and portability targets, not supported v1 products.
 
 ## Authority and evidence
 
@@ -89,7 +90,9 @@ for language and host portability decisions.
 62. [Chunked full-model CUDA prefill](62-cuda-full-prefill.md): token-major rows, layer-major work, exact MMQ/GDN/attention chunks, atomic commit, scratch, and measured boundaries.
 63. [CUDA diagnostic traces](63-cuda-diagnostic-traces.md): five stable CUDA boundaries, exact filters, full-tensor scalar gates, failure atomicity, and diagnostic-build isolation.
 64. [Evaluation harness](64-eval-harness.md): raw-token requests, typed helpers, authenticated logits records, planned checkpoint/trace boundaries, and current partial status.
-65. [Source and evidence ledger](sources.md).
+65. [Documentation audit](65-documentation-audit.md): task coverage, claim labels,
+    invariants, proof boundaries, and repository evidence.
+66. [Source and evidence ledger](sources.md).
 
 Claims use four labels: **Measured** (this exact artifact and hardware),
 **External** (a linked source), **Estimated** (reproducible arithmetic), and
@@ -118,6 +121,7 @@ data belongs to the session. V1 excludes vision and MTP.
 
 ## Chapter contract
 
-Each technical chapter covers motivation, concepts, worked shapes, a DwarfStar
-example, transfer boundaries, concrete work, failure modes, and a verification
-exercise with an expected result.
+Each implementation chapter identifies its task ID, claim class, actual
+invariant and failure or proof boundary, and repository evidence. Educational
+chapters may use worked examples; the documentation audit chapter is the coverage
+record for implemented non-educational concepts.

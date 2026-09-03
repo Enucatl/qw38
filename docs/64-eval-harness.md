@@ -1,5 +1,13 @@
 # The evaluation harness boundary
 
+[Index](README.md) · Implementation task: EVAL-001 (**blocked; partial**) ·
+[`implementation_ledger.md`](../implementation_ledger.md)
+
+Evidence links: [`tools/qw38_eval.py`](../tools/qw38_eval.py) ·
+[`pins/eval_contract.json`](../pins/eval_contract.json) ·
+[`fixtures/eval_harness.json`](../fixtures/eval_harness.json) ·
+[`tests/test_eval.py`](../tests/test_eval.py)
+
 `qw38-eval` is the machine-readable evaluation entry point planned for
 logits, checkpoint, and CUDA trace evidence. It is intentionally separate from
 quality admission: QLT-001 will choose prompts and thresholds later. This
@@ -27,7 +35,7 @@ qw38-eval-diagnostic MODEL --mode trace --tokens CSV --output DIR \
   --source-revision REV --source-state clean|dirty --trace-filter LAYER:TAP
 ```
 
-The current native executable accepts and validates the high-level request
+**Measured (partial).** The current native executable accepts and validates the high-level request
 shape and implements the logits publication path. It does not yet provide the
 checkpoint or CUDA trace capture paths. Therefore the checked-in
 [`fixtures/eval_harness.json`](../fixtures/eval_harness.json) labels all three
@@ -43,9 +51,9 @@ tuple. The native result is expected to retain the model/tool identities,
 positions, committed frontier, and deterministic greedy choice with lower-ID
 tie breaking.
 
-Checkpoint evidence will retain an authenticated prefix checkpoint and the
+**Proposed.** Checkpoint evidence will retain an authenticated prefix checkpoint and the
 continuation row, comparing tokens and FP32 logits after sequential save,
-destroy, restore, and evaluation. Trace evidence will use only the diagnostic
+destroy, restore, and evaluation. **Proposed.** Trace evidence will use only the diagnostic
 CUDA build and the five filters frozen by the contract, publishing the existing
 `qw38.trace` v1 manifest/blob format. Neither path is implemented in this
 increment, so no checkpoint or trace acceptance claim is made here.
@@ -66,4 +74,3 @@ request exit contracts are covered in
 CUDA logits, checkpoint, trace, quality, NLL, recurrence, retrieval, or task
 thresholds. Those claims remain pending until the missing native paths and
 RTX 5090 evidence are produced.
-

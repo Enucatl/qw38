@@ -47,7 +47,7 @@
     "concurrent_gpu_sessions": true
   },
   "local_sources": {
-    "README.md": "940b54a4f18f5a86e408e8816df39ab975bda2985a80b6bfc27b83c308c062b0",
+    "README.md": "445d65c01ac97acabea509bdf7083d90b8a7eacbf3b8546c453278d86bebec8f",
     "Makefile": "4516bad582a86fcb5323aec25fd42431b62f9825f6633988d3f8a7fab25268dd",
     "include/qw38/engine.h": "1657c1154ea45f8b0a2f3ae5e5fab77dfb8d16e1b96602ab106dba9607b47e10",
     "src/engine.cpp": "03166fd07383462166541c96142c05c96efec90b5fde19d044ed5d2a4866e996",
