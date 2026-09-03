@@ -15,6 +15,15 @@ stage fresh context (`fork_turns: "none"`) containing only the task ID, dossier
 path, role, repository constraints, and output contract. Do not perform stage
 work in the coordinator. Skip a stage when it has no real work.
 
+After each stage completes, run the deterministic
+[`account_usage.py`](scripts/account_usage.py) helper against the local Codex
+session directory. Filter by the child agent path when known, capture its JSON
+record, and append the model, effort, elapsed time, and final cumulative token
+fields to that stage's dossier record. If no matching token event exists, record
+`telemetry_unavailable` with the session path; do not invent or ask the stage to
+estimate usage. This helper reads runtime-owned JSONL as an operational aid, so
+missing or changed fields are a recorded limitation rather than a run failure.
+
 ## Admission
 
 Inspect the repository before mutation. Accept zero or one task ID:
