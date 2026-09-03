@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+import re
 import struct
 import subprocess
 from dataclasses import dataclass
@@ -114,6 +115,7 @@ class CheckpointResult:
 class TraceResult:
     """Validated qw38.trace v1 evidence returned by a diagnostic run."""
 
+    record: dict[str, object]
     manifest: LoadedTrace
 
 
@@ -127,16 +129,35 @@ def _exact(value: object, keys: set[str], label: str) -> dict[str, object]:
     return value
 
 
-def _identity(value: object, label: str) -> dict[str, object]:
-    result = _exact(value, {"name", "revision", "sha256", "byte_count"}, label)
+def _model_identity(value: object) -> dict[str, object]:
+    result = _exact(value, {"name", "revision", "sha256", "byte_count"}, "model")
     if not isinstance(result["name"], str) or not result["name"]:
-        raise EvalError(f"{label} name is invalid")
+        raise EvalError("model name is invalid")
     if not isinstance(result["revision"], str) or not result["revision"]:
-        raise EvalError(f"{label} revision is invalid")
+        raise EvalError("model revision is invalid")
     if not isinstance(result["sha256"], str) or len(result["sha256"]) != 64:
-        raise EvalError(f"{label} SHA-256 is invalid")
+        raise EvalError("model SHA-256 is invalid")
     if not isinstance(result["byte_count"], int) or result["byte_count"] < 0:
-        raise EvalError(f"{label} byte count is invalid")
+        raise EvalError("model byte count is invalid")
+    if not isinstance(result["sha256"], str) or not re.fullmatch(
+        r"[0-9a-f]{64}", result["sha256"]
+    ):
+        raise EvalError("model SHA-256 is invalid")
+    return result
+
+
+def _tool_identity(value: object) -> dict[str, object]:
+    result = _exact(value, {"name", "revision", "source_state", "sha256"}, "tool")
+    if not isinstance(result["name"], str) or not result["name"]:
+        raise EvalError("tool name is invalid")
+    if not isinstance(result["revision"], str) or not result["revision"]:
+        raise EvalError("tool revision is invalid")
+    if result["source_state"] not in {"clean", "dirty"}:
+        raise EvalError("tool source state is invalid")
+    if not isinstance(result["sha256"], str) or not re.fullmatch(
+        r"[0-9a-f]{64}", result["sha256"]
+    ):
+        raise EvalError("tool SHA-256 is invalid")
     return result
 
 
@@ -229,8 +250,8 @@ def read_logits_result(directory: Path) -> LogitsResult:
         or top["status"] != "ok"
     ):
         raise EvalError("unsupported logits result")
-    _identity(top["model"], "model")
-    _identity(top["tool"], "tool")
+    _model_identity(top["model"])
+    _tool_identity(top["tool"])
     _runtime(top["runtime"])
     tokens = top["tokens"]
     positions = top["positions"]
@@ -305,8 +326,8 @@ def read_checkpoint_result(directory: Path) -> CheckpointResult:
         or top["status"] != "ok"
     ):
         raise EvalError("unsupported checkpoint result")
-    _identity(top["model"], "model")
-    _identity(top["tool"], "tool")
+    _model_identity(top["model"])
+    _tool_identity(top["tool"])
     _runtime(top["runtime"])
     for label in ("prefix_tokens", "continuation_tokens"):
         values = top[label]
@@ -366,6 +387,84 @@ def read_checkpoint_result(directory: Path) -> CheckpointResult:
     return CheckpointResult(record=top, logits=logits)
 
 
+def read_trace_result(directory: Path) -> TraceResult:
+    """Validate the eval envelope and the frozen trace bundle it names."""
+    try:
+        record = json.loads((directory / "result.json").read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise EvalError(f"cannot read trace result: {error}") from error
+    top = _exact(
+        record,
+        {
+            "schema",
+            "version",
+            "mode",
+            "status",
+            "model",
+            "tool",
+            "runtime",
+            "tokens",
+            "positions",
+            "frontier",
+            "trace",
+        },
+        "trace result",
+    )
+    if (top["schema"], top["version"], top["mode"], top["status"]) != (
+        "qw38.eval-result",
+        1,
+        "trace",
+        "ok",
+    ):
+        raise EvalError("unsupported trace result")
+    _model_identity(top["model"])
+    _tool_identity(top["tool"])
+    _runtime(top["runtime"])
+    tokens = top["tokens"]
+    positions = top["positions"]
+    if not isinstance(tokens, list) or not isinstance(positions, list):
+        raise EvalError("trace token metadata is invalid")
+    parse_tokens(",".join(str(value) for value in tokens))
+    if positions != list(range(len(tokens))) or top["frontier"] != len(tokens):
+        raise EvalError("trace frontier metadata is invalid")
+    trace = _exact(
+        top["trace"], {"manifest", "blob", "filters", "tensor_names"}, "trace"
+    )
+    for key, expected in (("manifest", "manifest.json"), ("blob", "tensors.f32le.bin")):
+        item = _exact(trace[key], {"file", "byte_count", "sha256"}, f"trace {key}")
+        try:
+            data = (directory / expected).read_bytes()
+        except OSError as error:
+            raise EvalError(f"cannot read trace {key}: {error}") from error
+        if (
+            item["file"] != expected
+            or item["byte_count"] != len(data)
+            or item["sha256"] != _sha256(data)
+        ):
+            raise EvalError(f"trace {key} identity does not match bytes")
+    filters = trace["filters"]
+    names = trace["tensor_names"]
+    if (
+        not isinstance(filters, list)
+        or not isinstance(names, list)
+        or len(filters) != len(names)
+        or not filters
+        or any(not isinstance(value, str) for value in filters)
+        or any(not isinstance(value, str) or not value for value in names)
+        or len(set(filters)) != len(filters)
+        or len(set(names)) != len(names)
+        or any(value not in TRACE_FILTERS for value in filters)
+    ):
+        raise EvalError("trace filter metadata is invalid")
+    try:
+        loaded = read_trace_bundle(directory)
+    except TraceError as error:
+        raise EvalError(f"malformed trace bundle: {error}") from error
+    if list(loaded.tensors) != names:
+        raise EvalError("trace tensor names do not match bundle")
+    return TraceResult(record=top, manifest=loaded)
+
+
 def run_native(
     request: EvalRequest, *, binary: Path
 ) -> LogitsResult | CheckpointResult | TraceResult:
@@ -404,7 +503,7 @@ def run_native(
             return read_logits_result(request.output)
         if isinstance(request, CheckpointRequest):
             return read_checkpoint_result(request.output)
-        return TraceResult(read_trace_bundle(request.output))
+        return read_trace_result(request.output)
     except (EvalError, TraceError) as error:
         raise EvalError(
             f"native process produced malformed evidence: {error}"
@@ -422,6 +521,7 @@ __all__ = [
     "parse_tokens",
     "read_logits_result",
     "read_checkpoint_result",
+    "read_trace_result",
     "read_trace_bundle",
     "run_native",
 ]

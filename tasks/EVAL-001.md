@@ -5,7 +5,7 @@
 - Primary ID: `EVAL-001`
 - Coupled IDs: `none`
 - Dependencies: `ORA-001`, `SES-003`; both were `done` at planning inspection
-- Status: `pending`
+- Status: `done`
 - Ledger acceptance: Focused native diagnostics are driven by typed pytest helpers
 
 ## Goal and boundaries
@@ -899,3 +899,336 @@ partial fixture. No plan or inference-arithmetic change is authorized.
   outcomes, a `complete` harness-only fixture, current documentation/hashes, and
   all focused/repository gates passing. At that point EVAL-001 alone can move
   from `in_progress` to `done`.
+
+#### Reopened admission — 2026-09-03T15:44:53Z
+
+- Agent/model: fresh planning/reconciliation agent, Codex
+- Admission evidence: `rg -c '^\| <ID> \|' implementation_ledger.md` returned
+  exactly one row for each of EVAL-001, ORA-001, SES-003, and QLT-001;
+  EVAL-001 was `pending`, while dependencies ORA-001 and SES-003 were `done`.
+  `git status --porcelain=v1` returned no paths; the current branch is `main`
+  with configured upstream `origin/main`. HEAD `de3823c` contains recovery
+  commit `6a5408ba9b457aa489bf842d90d24ce1870147b4` (`Fix CUDA eval build and
+  evidence hashes`).
+- Scope evidence: `plan.md:34`, `plan.md:79`, `plan.md:94`, and
+  `plan.md:104` admit the eval product, checkpoint restore, versioned trace
+  bundle, and diagnostic-only tracing. Current `Makefile:87-99` provides the
+  separate release and diagnostic CUDA eval object graphs. Current
+  `src/eval.cpp:306-343` exposes the three admitted modes, and
+  `tools/qw38_eval.py:71-114` defines their typed requests/results. These
+  checks support the reopened recovery boundary without a `plan.md` or
+  architecture change.
+- Coupling and decisions: coupled IDs remain `none`; QLT-001 is a downstream
+  quality gate depending on EVAL-001, not inseparable documentation/evidence.
+  The exact changed-file allowlist and exclusions above are complete. The nine
+  authoritative recovery decisions and exact acceptance gates above remain
+  applicable; unresolved decisions are `none`.
+- Outcome: admitted EVAL-001 alone and changed its dossier and ledger status
+  from `pending` to `in_progress`. No implementation, documentation, fixture,
+  contract, `Makefile`, or `plan.md` content was changed.
+- UTC/time/tokens/cost: 2026-09-03T15:44:53Z; elapsed time, token telemetry, and
+  cost unavailable in this stage context. `account_usage.py` returned `[]` when
+  filtered for child agent path `01a067f1-226c-7f92-af3e-d3e30dacbb36`;
+    telemetry_unavailable (session root:
+    `/home/user/.codex/sessions`).
+
+### Implementation recovery — 2026-09-03
+
+- Agent/model: implementation agent, `gpt-5.6-luna`, medium reasoning
+- Changed paths: `src/eval.cpp`, `tools/qw38_eval.py`, `tests/test_eval.py`,
+  `pins/eval_contract.json`, `pins/sha256_acceleration_contract.json`,
+  `fixtures/eval_harness.json`, and this dossier. Existing user changes in
+  `implementation_ledger.md` were preserved. `Makefile`, `plan.md`, trace
+  readers/contracts/tolerances, and inference sources were not changed.
+- Changes: completed common model/tool/runtime envelopes and finite FP32 blob
+  summaries for logits/checkpoint; added sequential checkpoint prefix/final
+  frontier and byte-exact equality evidence; added typed trace-result envelope
+  validation and request coverage; used Linux no-replace atomic publication;
+  added trace-request tests and synchronized allowlisted source hashes. The
+  checked-in fixture remains explicitly partial because the retained fixture
+  does not yet contain the complete negative-case evidence record.
+- Commands and exact outcomes:
+  - `uv run ruff format .` — passed; 72 files left unchanged.
+  - `uv run ruff check .` — passed; all checks passed.
+  - `make -j2 build/qw38-eval diagnostic` — passed.
+  - `python -m json.tool pins/eval_contract.json >/dev/null` — passed.
+  - `python -m json.tool fixtures/eval_harness.json >/dev/null` — passed.
+  - `uv run pytest -q tests/test_eval.py tests/test_build.py tests/test_trace.py tests/test_cuda_trace.py tests/test_cuda_checkpoint.py` — passed; 37 passed, 1 skipped.
+  - `uv run pytest -q` — passed; 162 passed, 19 skipped.
+  - Pinned CUDA container `make cuda-products` — passed; both CUDA eval
+    products compiled and linked.
+  - Object-scoped `nm`/`strings` release-vs-diagnostic isolation checks —
+    passed.
+  - RTX 5090 CUDA logits smoke with typed reader — passed; one-token row,
+    frontier 1, greedy token 5328.
+  - RTX 5090 CUDA checkpoint smoke with typed reader — passed; prefix/final
+    frontiers 1/2 and `{tokens: true, logits: true}`.
+  - RTX 5090 CUDA five-filter trace smoke with typed reader — passed; tensor
+    names `layer.0.layer_residual`, `layer.3.layer_residual`,
+    `layer.63.layer_residual`, `final_norm`, `logits`.
+  - `git diff --check` — passed.
+- Failed/intermediate outcome: the first post-change checkpoint smoke exposed
+  an extra JSON delimiter; it was corrected and the typed checkpoint smoke was
+  rerun successfully. No unresolved implementation failure remains.
+- Unresolved evidence: `fixtures/eval_harness.json` is still
+  `partial-logits-only`; complete retained negative-case/no-publication
+  evidence and the independent delivery verification remain outstanding.
+- UTC/time/tokens/cost: telemetry unavailable in this stage context; no child
+  session token event was exposed. `account_usage.py` returned `[]` when
+  filtered for child agent path `01a067f3-1f7f-7860-9c0f-cec59c74c921`;
+  telemetry_unavailable (session root: `/home/user/.codex/sessions`).
+
+## Documentation/evidence
+
+- Agent/role: documentation/evidence agent, run-ledger-task stage 3.
+- Typed hardware command: `uv run python - <<'PY'` running
+  `tools.qw38_eval.run_native` against `build/cuda/qw38-eval` and
+  `build/cuda/qw38-eval-diagnostic`, with model
+  `models/Qwen3.8-27B-Q4_K_M.gguf`, tokens `(1,)`, continuation `(2,)`, and
+  filters `0:layer_residual`, `3:layer_residual`, `63:layer_residual`,
+  `global:final_norm`, `global:logits`; outcome: passed. Outputs were created
+  under `/tmp/qw38-eval-stage3-shtifvz0` and were not added to the repository.
+- RTX 5090 result: runtime `cuda`, target `sm_120`, CUDA runtime `13000`,
+  driver `13010`, capability `12.0`, device `NVIDIA GeForce RTX 5090`.
+  Logits passed with frontier `1`, greedy token `5328`, and blob byte count
+  `993280`, SHA-256
+  `ccfb42780f80d7d4e294a04ebfa7c3f3cacd8ae3d820d579e5ae9d1a5710a001`.
+  Checkpoint passed with frontiers `{prefix: 1, uninterrupted_final: 2,
+  restored_prefix: 1, restored_final: 2}`, equality `{tokens: true, logits:
+  true}`, checkpoint byte count `159938876`, SHA-256
+  `f8f8a6bb0b22b13e813f5a4eea325e659c9eab7cedb7de758bb43de4a0f6fc17`, and
+  continuation-logit SHA-256
+  `7cb9fac06f91b567585b7add1aeb28b67c5090e06b408d9b839c22a9cb08780e`.
+  Trace passed all five filters with tensor names
+  `layer.0.layer_residual`, `layer.3.layer_residual`,
+  `layer.63.layer_residual`, `final_norm`, `logits`; manifest byte count `3035`
+  and SHA-256 `08da0faa2bd20bf282dce35612508a0b060a597c1b0a6601b987b522d7307b4a`;
+  tensor blob byte count `1075200` and SHA-256
+  `81f1e4699c22600e969b525e4628f10bacf05a0acf26d92e09499df26b82c572`.
+- Negative cases used the same binaries and explicit `--source-revision
+  de3823c58a7a015735791cb283e6e754e83c134b --source-state dirty`: malformed
+  `--tokens 1,,2` and missing checkpoint continuation each exited `2` with
+  `invalid_argument: malformed evaluation request` and no output; release trace
+  request exited `2` with the same error and no output; duplicate diagnostic
+  filter exited `2` with `invalid_argument: malformed diagnostic trace filters`
+  and no output; an existing destination exited `2` with
+  `invalid_argument: output already exists` and preserved the pre-existing
+  directory; a regular-file parent exited `1` and published no output.
+- Promoted [`fixtures/eval_harness.json`](../fixtures/eval_harness.json) to
+  `complete` while preserving `harness_wiring_only: true` and
+  `quality_admission: false`; reconciled the authorized handbook, audit,
+  README, sources, and contract/hash files. No plan, Makefile, trace
+  contract/tolerance, inference arithmetic, or generated model output changed.
+- Validation: `python -m json.tool pins/eval_contract.json >/dev/null`,
+  `python -m json.tool fixtures/eval_harness.json >/dev/null`, `git diff --check`,
+  and final `sha256sum` checks passed. The fixture is complete for the admitted
+  harness-only evidence boundary; independent stage-4 verification remains
+  outstanding and quality admission remains deferred to QLT-001.
+- Evidence links: [`fixtures/eval_harness.json`](../fixtures/eval_harness.json),
+  [`docs/64-eval-harness.md`](../docs/64-eval-harness.md), and
+  [`docs/65-documentation-audit.md`](../docs/65-documentation-audit.md).
+- UTC/time/tokens/cost: telemetry unavailable in this stage context.
+  `account_usage.py` returned `[]` when filtered for child agent path
+  `01a06801-71c9-7b03-90b9-1830f7a027ae`; telemetry_unavailable (session root:
+  `/home/user/.codex/sessions`).
+
+### Verification
+
+- Attempt: 4 (fresh independent integration verification after recovery implementation and evidence stages)
+- Agent/model: independent integration verifier, Codex; medium reasoning; UTC 2026-09-03T16:18:23Z
+- Diff review: reviewed the complete worktree diff against this dossier, `plan.md`,
+  `implementation_ledger.md`, the reopened exact allowlist, and prohibited
+  scope exclusions. Changed paths are exactly the allowlisted README/docs,
+  fixture/ledger/pins, `src/eval.cpp`, this dossier, `tests/test_eval.py`, and
+  `tools/qw38_eval.py`. No `plan.md`, `Makefile`, frozen trace contract or
+  tolerance, inference source, or unrelated path changed. The fixture is
+  `complete` and retains `harness_wiring_only: true` and
+  `quality_admission: false`.
+- Commands and exact outcomes:
+  - `python -m json.tool pins/eval_contract.json >/dev/null` — passed (exit 0).
+  - `python -m json.tool fixtures/eval_harness.json >/dev/null` — passed (exit 0).
+  - `make -j2 build/qw38-eval diagnostic` — passed (exit 0).
+  - `uv run ruff format .` — passed (exit 0); `72 files left unchanged`.
+  - `uv run ruff check .` — passed (exit 0); `All checks passed!`.
+  - `uv run pytest -q tests/test_eval.py tests/test_build.py tests/test_trace.py tests/test_cuda_trace.py tests/test_cuda_checkpoint.py` — passed (`37 passed, 1 skipped`).
+  - `git diff --check` — passed (exit 0).
+  - `docker run --rm --gpus all --user "$(id -u):$(id -g)" -v "$(pwd):/workspace" qw38-cuda:13.0.2 make clean all diagnostic cuda-products cuda-native` — passed (exit 0); CUDA 13.0.2, SM120, both CUDA eval products, and all native CUDA targets built.
+  - Release object/binary `nm` filters for `execute_token_traced|validate_trace_filter|trace_filter_matches|emit_trace_tensor|TraceSink` — passed isolation (no release matches).
+  - `strings -a build/eval.cuda.o build/full_scheduler.cuda.o | rg -x 'layer_residual|final_norm'` — passed isolation (no release matches).
+  - Diagnostic object `nm` filter for `execute_token_traced|validate_trace_filter|trace_filter_matches|emit_trace_tensor` — passed (required symbols present).
+  - Diagnostic object `strings` filter for `layer_residual|final_norm` — passed (required literals present).
+  - `strings -a build/model.o | rg -x 'final_norm'` — passed (legitimate model metadata present).
+  - `docker run --rm --gpus all --user "$(id -u):$(id -g)" -e QW38_RUN_CUDA_TESTS=1 -v "$(pwd):/workspace" qw38-cuda:13.0.2 uv run pytest -q tests/test_eval.py tests/test_cuda_trace.py tests/test_cuda_checkpoint.py` — failed before pytest (exit 127); the pinned image has no `uv` (`exec: uv: not found`).
+  - `QW38_RUN_CUDA_TESTS=1 uv run pytest -q tests/test_eval.py tests/test_cuda_trace.py tests/test_cuda_checkpoint.py` — passed (`9 passed` in 3.65s); host-side typed CUDA tests exercised the available RTX 5090 evidence and negative cases.
+  - Repository-wide sequence `uv run ruff format .`; `uv run ruff check .`; `make clean`; `make -j2`; `make diagnostic`; `uv run pytest -q`; `git diff --check` — passed; `72 files left unchanged`, full suite `162 passed, 19 skipped in 168.67s`, and diff-check exit 0.
+  - Allowlist comparison using `git diff --name-only` — passed; no unexpected changed paths.
+  - Prohibited-scope diff check for `Makefile`, `plan.md`, `tools/qw38_trace.py`, frozen trace/tolerance pins, and inference sources — passed; no paths changed.
+- Formatting changed files: none. Ruff reported all 72 files unchanged; no
+  affected-test rerun was required for formatting changes.
+- Failed gate and diagnosis: the exact containerized typed RTX 5090 pytest
+  command is not runnable because `uv` is absent from `qw38-cuda:13.0.2`.
+  The host-side equivalent passed, and the pinned CUDA build plus all object
+  isolation checks passed. No semantic repair was made.
+- Verdict: **FAIL** — the exact required containerized typed-test command
+  failed due to the image tooling limitation, so stage 4 cannot authorize
+  delivery. All runnable focused, build, repository-wide, typed host CUDA,
+  fixture/hash/scope, and object-isolation gates passed.
+- Remaining risk: rerun the exact containerized typed pytest gate in an image
+  that provides the repository’s `uv` executable (or an explicitly approved
+  equivalent invocation), then record its exit 0 without changing the
+  implementation or fixture evidence. No semantic implementation failure was
+  observed in the host-side RTX 5090 run.
+- UTC/time/tokens/cost: telemetry unavailable in this stage context; no child
+  session was spawned. `account_usage.py` returned `[]` when filtered for child
+  agent path `01a0680a-de33-7581-a9fe-477519f15cbd`; telemetry_unavailable
+  (session root: `/home/user/.codex/sessions`).
+
+### Repair
+
+- Scope: repaired only the typed-test container invocation. No implementation,
+  inference, build-graph, contract, fixture, or frozen-trace change was made.
+- Recovery decision: `qw38-cuda:13.0.2` does not contain `uv`, so the repository
+  virtualenv interpreter was used directly as the documented equivalent:
+  `.venv/bin/python -m pytest`. The checkpoint hardware test itself launches a
+  nested Docker container; therefore the invocation also bind-mounts the host
+  Docker client and socket, adds the socket's group, and mounts the repository
+  at its host path so the nested bind mount resolves. These are run-time
+  invocation accommodations only; no Dockerfile or image architecture changed.
+- Commands and exact outcomes:
+  - Prescribed command,
+    `docker run --rm --gpus all --user "$(id -u):$(id -g)" -e
+    QW38_RUN_CUDA_TESTS=1 -v "$(pwd):/workspace"
+    qw38-cuda:13.0.2 uv run pytest -q tests/test_eval.py
+    tests/test_cuda_trace.py tests/test_cuda_checkpoint.py` — failed before
+    pytest (exit 127), `exec: uv: not found`.
+  - First direct-interpreter probe,
+    `docker run --rm --gpus all --user "$(id -u):$(id -g)" -e
+    QW38_RUN_CUDA_TESTS=1 -v "$(pwd):/workspace"
+    qw38-cuda:13.0.2 .venv/bin/python -m pytest -q tests/test_eval.py
+    tests/test_cuda_trace.py tests/test_cuda_checkpoint.py` — entered the
+    pinned container and ran 8 tests, but failed one checkpoint test because
+    the image has no `docker` executable for its nested build.
+  - Recovered in-container gate,
+    `docker run --rm --gpus all --user "$(id -u):$(id -g)" --group-add
+    "$(stat -c '%g' /var/run/docker.sock)" -e QW38_RUN_CUDA_TESTS=1 -v
+    "$(pwd):$(pwd)" -w "$(pwd)" -v /usr/bin/docker:/usr/bin/docker:ro -v
+    /var/run/docker.sock:/var/run/docker.sock qw38-cuda:13.0.2
+    .venv/bin/python -m pytest -q tests/test_eval.py tests/test_cuda_trace.py
+    tests/test_cuda_checkpoint.py` — passed; `9 passed in 12.30s` (exit 0).
+- Containerized typed RTX 5090 tests: **passed**. The successful run used the
+  pinned image, GPU, repository virtualenv interpreter, and
+  `QW38_RUN_CUDA_TESTS=1`; the nested checkpoint build/smoke also completed.
+- Changed paths: `tasks/EVAL-001.md` only. No commit or push.
+- UTC/time/tokens/cost: telemetry unavailable in this stage context.
+  `account_usage.py` returned `[]` when filtered for child agent path
+  `01a06812-2ae0-7670-a2ed-a717564d7e46`; telemetry_unavailable (session root:
+  `/home/user/.codex/sessions`).
+
+### Independent verification after repair attempt 1
+
+- Attempt: 5 (fresh independent integration verifier after repair attempt 1)
+- Agent/model: Codex; UTC `2026-09-03T16:44:53Z`
+- Diff and scope review: reviewed the complete worktree diff against this
+  dossier, `plan.md`, `implementation_ledger.md`, the reopened allowlist, and
+  prohibited scope exclusions. `git diff --name-only` contained exactly the
+  17 allowlisted paths. No `Makefile`, `plan.md`, `tools/qw38_trace.py`, frozen
+  trace/tolerance pin, or inference source changed. `git diff --check` passed.
+- Focused commands and outcomes:
+  - `python -m json.tool pins/eval_contract.json >/dev/null && python -m
+    json.tool fixtures/eval_harness.json >/dev/null` — passed (exit 0).
+  - `make -j2 build/qw38-eval diagnostic` — passed (exit 0).
+  - `uv run pytest -q tests/test_eval.py tests/test_build.py tests/test_trace.py
+    tests/test_cuda_trace.py tests/test_cuda_checkpoint.py` — passed (`37
+    passed, 1 skipped`).
+- Pinned CUDA/build and isolation commands and outcomes:
+  - `docker run --rm --gpus all --user "$(id -u):$(id -g)" -v
+    "$(pwd):/workspace" qw38-cuda:13.0.2 make clean all diagnostic
+    cuda-products cuda-native` — passed (exit 0); CUDA 13.0.2, SM120, both
+    CUDA eval products, and all native CUDA targets built.
+  - `set -o pipefail; if nm -C --defined-only build/eval.cuda.o
+    build/full_scheduler.cuda.o build/cuda/qw38-eval | rg
+    'execute_token_traced|validate_trace_filter|trace_filter_matches|emit_trace_tensor|TraceSink';
+    then exit 1; else test $? -eq 1; fi` — passed; no release trace symbols.
+  - `set -o pipefail; if strings -a build/eval.cuda.o
+    build/full_scheduler.cuda.o | rg -x 'layer_residual|final_norm'; then exit
+    1; else test $? -eq 1; fi` — passed; no release trace literals.
+  - `nm -C --defined-only build/eval.trace.cuda.o
+    build/full_scheduler.trace.cuda.o build/diagnostic/diagnostic_trace.o | rg
+    'execute_token_traced|validate_trace_filter|trace_filter_matches|emit_trace_tensor'` —
+    passed; all required diagnostic symbols present.
+  - `strings -a build/eval.trace.cuda.o build/full_scheduler.trace.cuda.o
+    build/diagnostic/diagnostic_trace.o | rg -x 'layer_residual|final_norm'` —
+    passed; diagnostic literals present.
+  - `strings -a build/model.o | rg -x 'final_norm'` — passed; legitimate model
+    metadata is present in the model object.
+- Repaired containerized typed RTX 5090 command and outcome:
+  - `docker run --rm --gpus all --user "$(id -u):$(id -g)" --group-add
+    "$(stat -c '%g' /var/run/docker.sock)" -e QW38_RUN_CUDA_TESTS=1 -v
+    "$(pwd):$(pwd)" -w "$(pwd)" -v /usr/bin/docker:/usr/bin/docker:ro -v
+    /var/run/docker.sock:/var/run/docker.sock qw38-cuda:13.0.2
+    .venv/bin/python -m pytest -q tests/test_eval.py tests/test_cuda_trace.py
+    tests/test_cuda_checkpoint.py` — passed (`9 passed in 3.66s`, exit 0).
+    The pinned image, GPU, repository virtualenv interpreter, host-path mount,
+    Docker client/socket mounts, and nested checkpoint smoke all worked.
+- Direct typed RTX 5090 command and outcome:
+  - `uv run python - <<'PY'` importing `CheckpointRequest`, `LogitsRequest`,
+    `TraceRequest`, and `run_native`, then invoking `build/cuda/qw38-eval` for
+    `(tokens=(1,))` logits and sequential `(tokens=(1,), continuation=(2,))`
+    checkpoint, and `build/cuda/qw38-eval-diagnostic` for filters
+    `0:layer_residual`, `3:layer_residual`, `63:layer_residual`,
+    `global:final_norm`, `global:logits` — passed (exit 0). Runtime was CUDA,
+    target `sm_120`, CUDA runtime `13000`, driver `13010`, device NVIDIA
+    GeForce RTX 5090, capability `12.0`; logits had 248,320 values, frontier 1,
+    greedy token 5328; checkpoint frontiers were 1/2 with token/logit equality
+    true; trace names were `layer.0.layer_residual`,
+    `layer.3.layer_residual`, `layer.63.layer_residual`, `final_norm`, and
+    `logits`. Temporary outputs were not retained.
+- Direct negative publication command and outcome:
+  - `uv run python - <<'PY'` invoking both native binaries with malformed empty
+    token field, missing checkpoint continuation, release trace mode, duplicate
+    diagnostic filter, existing destination, and regular-file parent — passed
+    (exit 0). The first four returned exit 2 with the documented errors and no
+    output; the existing destination returned exit 2 and preserved its
+    sentinel; the regular-file parent returned exit 1 with no child output.
+- Repository-wide commands and outcomes:
+  - `uv run ruff format .` — passed; `72 files left unchanged`.
+  - `uv run ruff check .` — passed; `All checks passed!`.
+  - `make clean` — passed (exit 0).
+  - `make -j2` — passed (exit 0).
+  - `make diagnostic` — passed (exit 0).
+  - `uv run pytest -q` — passed (`162 passed, 19 skipped in 168.47s`).
+  - `git diff --check` — passed (exit 0).
+  - Allowlist comparison using `git diff --name-only` — passed; no unexpected
+    paths.
+  - Prohibited-scope check over `Makefile`, `plan.md`, `tools/qw38_trace.py`,
+    frozen trace/tolerance pins, and inference sources — passed; no paths
+    changed.
+- Formatting changed files: none; no affected-test rerun was required.
+- Verdict: **PASS** — all stage-4 focused, pinned CUDA/build/native diagnostic,
+  object-scoped isolation, containerized typed RTX 5090, direct typed logits/
+  checkpoint/five-filter trace, negative no-publication, repository-wide, and
+  allowlist gates passed. The fixture remains `complete`,
+  `harness_wiring_only: true`, and `quality_admission: false`.
+- No semantic changes, commit, or push were made.
+- UTC/time/tokens/cost: telemetry unavailable in this stage context.
+  `account_usage.py` returned `[]` when filtered for child agent path
+  `01a06822-63b9-7900-b913-a74802acf656`; telemetry_unavailable (session root:
+  `/home/user/.codex/sessions`).
+
+## Final outcome — 2026-09-03T17:01:54Z
+
+- Status: `done`; coupled IDs: `none`.
+- Acceptance evidence: verification attempt 5 passed all focused, pinned CUDA
+  build/native, release-vs-diagnostic isolation, containerized typed RTX 5090,
+  direct logits/checkpoint/five-filter trace, negative no-publication,
+  repository-wide, and allowlist gates. Exact outcomes are recorded above,
+  including focused tests `37 passed, 1 skipped`, full suite `162 passed, 19
+  skipped`, containerized typed tests `9 passed`, and the direct hardware
+  smokes for logits, sequential checkpoint equality, and all five trace
+  filters.
+- Scope confirmation: the complete diff is within the 17-path allowlist;
+  `plan.md` is unchanged; no generated model outputs are included; and QLT-001
+  remains the separate quality-admission boundary.
+- Delivery outcome: authorized for one commit and push of current `main` to
+  its configured `origin/main` upstream; no semantic changes were made at
+  delivery.

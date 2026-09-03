@@ -75,7 +75,7 @@ are repository-relative unless stated otherwise.
 | API-003 | Implement strict Responses request and event mapping | API-002, SRV-002 | done | Text inputs, reasoning, function calls/results, sampling, response objects, ordered SSE events, and explicit exclusions pass native fixtures | [`src/responses_api.cpp`](src/responses_api.cpp); [`src/responses_api_test.cpp`](src/responses_api_test.cpp); [`pins/responses_contract.json`](pins/responses_contract.json); log 2026-09-02T14:27:35Z |
 | BEN-001 | Implement `qw38-bench` component/end-to-end harness | OPT-001 | done | Warmups/samples, telemetry, raw samples, failures, and environment metadata are retained | `pins/benchmark_contract.json`; `fixtures/benchmark_harness.json`; `evidence/benchmark/`; `tests/test_benchmark.py`; log 2026-09-02T15:24:00Z |
 | BEN-002 | Preserve the product-wide no-argument usage exit contract in `qw38-bench` | BEN-001, BLD-001 | done | Invoking the benchmark with no arguments prints usage and returns exit code 2 without creating output | `tests/test_build.py`; log 2026-09-02T15:24:00Z |
-| EVAL-001 | Implement `qw38-eval` logits/traces/checkpoints harness | ORA-001, SES-003 | pending | Focused native diagnostics are driven by typed pytest helpers | [`tasks/EVAL-001.md`](tasks/EVAL-001.md); reopened 2026-09-03T14:00:00Z after build/hash repair; trace/checkpoint acceptance remains |
+| EVAL-001 | Implement `qw38-eval` logits/traces/checkpoints harness | ORA-001, SES-003 | done | Focused native diagnostics are driven by typed pytest helpers | [`tasks/EVAL-001.md`](tasks/EVAL-001.md); reopened 2026-09-03T14:00:00Z after build/hash repair; recovery readmitted 2026-09-03T15:44:53Z; completed 2026-09-03T17:01:54Z |
 | QLT-001 | Pass held-out NLL, continuation, recurrence, retrieval, and task quality | EVAL-001, MEM-001 | pending | Admitted artifact passes every documented threshold and 128K retrieval fixture | — |
 | CMP-001 | Pin and validate comparable baseline artifacts | PIN-001, PIN-002, QLT-001 | pending | llama/Ollama share GGUF; vLLM difference and <=1% NLL admission are explicit | — |
 | CMP-002 | Run controlled 30-sample comparative matrix | BEN-001, OPT-004, CMP-001 | pending | All contexts/metrics/environment data and negative runs are retained | — |
@@ -3580,3 +3580,36 @@ are repository-relative unless stated otherwise.
 - First-pass acceptance: no; two independent verification attempts failed only
   on stale README digests, followed by one bounded repair and passing attempt 3.
   No remaining risk identified within DOC-001 scope.
+
+### 2026-09-03T15:44:53Z — EVAL-001 recovery readmitted
+
+- Explicit admission found exactly one EVAL-001 ledger row in `pending` state;
+  its listed dependencies ORA-001 and SES-003 each occurred exactly once and
+  were `done`. The worktree was clean, `main` tracked `origin/main`, and the
+  recovery commit `6a5408b` was present at HEAD ancestor `de3823c`.
+- Reconciled the reopened dossier against the approved eval, checkpoint, trace,
+  diagnostic-isolation, quality-separation, and documentation boundaries in
+  `plan.md`; no plan or architecture change is required. Current eval source,
+  typed helper, and separate CUDA release/diagnostic build rules support the
+  recorded recovery scope.
+- Coupled IDs are `none`; QLT-001 remains a dependent quality gate. The dossier
+  fixes the exact changed-file allowlist, nine implementation decisions,
+  focused/CUDA/hardware/isolation/repository gates, and definition of done, with
+  no unresolved decisions. Marked only EVAL-001 `in_progress`; no code,
+  documentation, fixture, contract, `Makefile`, or `plan.md` content changed.
+
+### 2026-09-03T17:01:54Z — EVAL-001 completed
+
+- Verification attempt 5 passed the focused JSON/build/pytest gates, pinned
+  CUDA 13.0.2 build and native targets, release-vs-diagnostic object
+  isolation, containerized typed RTX 5090 tests, direct logits/checkpoint and
+  five-filter trace smokes, negative no-publication cases, repository-wide
+  formatting/lint/build/test gates, and `git diff --check`.
+- Acceptance evidence retained in [`fixtures/eval_harness.json`](fixtures/eval_harness.json)
+  and documented in [`docs/64-eval-harness.md`](docs/64-eval-harness.md):
+  complete FP32 logits, sequential checkpoint equality, all five diagnostic
+  trace filters, authenticated metadata, and failure/no-publication behavior.
+  The fixture remains harness-only; quality admission remains QLT-001 scope.
+- Confirmed the complete diff is within the dossier allowlist, `plan.md` is
+  unchanged, and no generated model outputs are included. Marked only
+  EVAL-001 `done`; coupled IDs remain `none`.

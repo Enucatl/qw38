@@ -369,12 +369,13 @@ DSpark are explicitly rejected as Qwen model semantics.
   records, native command boundary, and logits evidence reader are local code;
   they reuse the public Engine/Session contract and existing trace-v1 reader.
   The shape is frozen in [`pins/eval_contract.json`](../pins/eval_contract.json),
-  with current wiring/negative evidence in
+  with retained RTX 5090 wiring and negative evidence in
   [`fixtures/eval_harness.json`](../fixtures/eval_harness.json) and focused
   tests in [`tests/test_eval.py`](../tests/test_eval.py). The beginner
   explanation is [`docs/64-eval-harness.md`](64-eval-harness.md). The fixture
-  marks this as logits-only partial implementation: no CUDA checkpoint or
-  trace smoke has run, and nothing here is QLT-001 quality evidence.
+  records complete harness-only logits/checkpoint/trace wiring and negative
+  publication evidence; generated outputs remain uncommitted and nothing here
+  is QLT-001 quality evidence.
 - DOC-001 introduces no copied source or external dependency. Its human-readable
   coverage record is [`docs/65-documentation-audit.md`](65-documentation-audit.md),
   and its mechanical link/coverage gate is [`tests/test_documentation.py`](../tests/test_documentation.py).

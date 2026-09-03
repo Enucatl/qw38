@@ -1,17 +1,25 @@
 {
   "schema": "qw38.eval-harness.v1",
   "purpose": "harness wiring smoke evidence; not quality evidence",
-  "implementation_status": "partial-logits-only",
-  "evidence_links": {
-    "contract": "pins/eval_contract.json",
-    "handbook": "docs/64-eval-harness.md",
-    "typed_helpers": "tools/qw38_eval.py",
-    "focused_tests": "tests/test_eval.py"
-  },
+  "implementation_status": "complete",
+  "harness_wiring_only": true,
+  "quality_admission": false,
+  "evidence_status": "complete",
+  "hardware": {"device_name": "NVIDIA GeForce RTX 5090", "compute_capability": "12.0", "cuda_target": "sm_120", "cuda_runtime_version": 13000, "cuda_driver_version": 13010, "container_image": "qw38-cuda:13.0.2", "source_revision": "de3823c58a7a015735791cb283e6e754e83c134b", "source_state": "dirty", "model": {"name": "qwen3.8-27b-q4_k_m", "revision": "0669b98607d47046c7c2b3f801011d54a08cfccf", "sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34", "byte_count": 18973870432}, "binaries": {"build/cuda/qw38-eval": "56b2a72957777733047f85354e96da5687c6228fa51aba16197df55f3363c319", "build/cuda/qw38-eval-diagnostic": "c2f111774f201f25a85c6f022e20f18c05c895c2f72cae05dceacbc17cebac01"}},
+  "requests": {"tokens": [1], "continuation": [2], "trace_filters": ["0:layer_residual", "3:layer_residual", "63:layer_residual", "global:final_norm", "global:logits"]},
   "modes": {
-    "logits": {"status": "smoke-not-run"},
-    "checkpoint": {"status": "smoke-not-run"},
-    "trace": {"status": "smoke-not-run"}
+    "logits": {"status": "passed", "frontier": 1, "greedy_token": 5328, "blob": {"file": "logits.f32le.bin", "byte_count": 993280, "sha256": "ccfb42780f80d7d4e294a04ebfa7c3f3cacd8ae3d820d579e5ae9d1a5710a001"}, "tool_sha256": "56b2a72957777733047f85354e96da5687c6228fa51aba16197df55f3363c319"},
+    "checkpoint": {"status": "passed", "frontiers": {"prefix": 1, "uninterrupted_final": 2, "restored_prefix": 1, "restored_final": 2}, "greedy_token": 220, "checkpoint": {"file": "checkpoint.qw38", "byte_count": 159938876, "sha256": "f8f8a6bb0b22b13e813f5a4eea325e659c9eab7cedb7de758bb43de4a0f6fc17"}, "continuation_logits": {"file": "continuation_logits.f32le.bin", "byte_count": 993280, "sha256": "7cb9fac06f91b567585b7add1aeb28b67c5090e06b408d9b839c22a9cb08780e"}, "equality": {"tokens": true, "logits": true}, "tool_sha256": "56b2a72957777733047f85354e96da5687c6228fa51aba16197df55f3363c319"},
+    "trace": {"status": "passed", "frontier": 1, "filters": ["0:layer_residual", "3:layer_residual", "63:layer_residual", "global:final_norm", "global:logits"], "tensor_names": ["layer.0.layer_residual", "layer.3.layer_residual", "layer.63.layer_residual", "final_norm", "logits"], "manifest": {"file": "manifest.json", "byte_count": 3035, "sha256": "08da0faa2bd20bf282dce35612508a0b060a597c1b0a6601b987b522d7307b4a"}, "blob": {"file": "tensors.f32le.bin", "byte_count": 1075200, "sha256": "81f1e4699c22600e969b525e4628f10bacf05a0acf26d92e09499df26b82c572"}, "tool_sha256": "c2f111774f201f25a85c6f022e20f18c05c895c2f72cae05dceacbc17cebac01"}
   },
-  "malformed_requests_publish_nothing": true
+  "negative_cases": [
+    {"case": "malformed_empty_token_field", "exit": 2, "stderr": "invalid_argument: malformed evaluation request", "output_absent": true},
+    {"case": "checkpoint_missing_continuation", "exit": 2, "stderr": "invalid_argument: malformed evaluation request", "output_absent": true},
+    {"case": "trace_unsupported_release", "exit": 2, "stderr": "invalid_argument: malformed evaluation request", "output_absent": true},
+    {"case": "trace_duplicate_filter", "exit": 2, "stderr": "invalid_argument: malformed diagnostic trace filters", "output_absent": true},
+    {"case": "existing_destination", "exit": 2, "stderr": "invalid_argument: output already exists", "output_absent": false, "preexisting_destination_preserved": true},
+    {"case": "regular_file_parent_no_publication", "exit": 1, "stderr": "", "output_absent": true}
+  ],
+  "malformed_requests_publish_nothing": true,
+  "evidence_links": {"contract": "pins/eval_contract.json", "handbook": "docs/64-eval-harness.md", "typed_helpers": "tools/qw38_eval.py", "focused_tests": "tests/test_eval.py", "run_record": "tasks/EVAL-001.md#documentation-evidence"}
 }

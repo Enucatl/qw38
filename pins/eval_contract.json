@@ -12,6 +12,21 @@
     "clean",
     "dirty"
   ],
+  "model": {
+    "name": "qwen3.8-27b-q4_k_m",
+    "revision": "0669b98607d47046c7c2b3f801011d54a08cfccf",
+    "sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+    "byte_count": 18973870432
+  },
+  "blob_record": ["file", "dtype", "shape", "byte_count", "sha256", "summary"],
+  "summary": ["count", "finite_count", "nan_count", "positive_infinity_count", "negative_infinity_count", "minimum", "maximum", "mean", "root_mean_square"],
+  "publication": "atomic-absent-destination",
+  "isolation": {
+    "release_objects": ["build/eval.cuda.o", "build/full_scheduler.cuda.o"],
+    "diagnostic_objects": ["build/eval.trace.cuda.o", "build/full_scheduler.trace.cuda.o", "build/diagnostic/diagnostic_trace.o"],
+    "forbidden_release_symbols": ["execute_token_traced", "validate_trace_filter", "trace_filter_matches", "emit_trace_tensor", "TraceSink"],
+    "forbidden_release_literals": ["layer_residual", "final_norm"]
+  },
   "trace_filters": [
     "0:layer_residual",
     "3:layer_residual",
@@ -21,14 +36,9 @@
   ],
   "publication": "atomic-absent-destination",
   "local_sources": {
-    "Makefile": "4516bad582a86fcb5323aec25fd42431b62f9825f6633988d3f8a7fab25268dd",
-    "src/eval.cpp": "f88716ad2e2e23e0f98eedc3bbdcaef9fc233cb7d72fd7400d9f4681548e1d07",
-    "tools/qw38_eval.py": "71d193d386dd0be1ff9a3d6b586479c3279ef65ce46a6486f89644883089f3a6",
-    "tests/test_eval.py": "7d5116a0aa10af826dca3b17d0ee1aadd7d080fc7b3f40e0797e8094f113578a",
-    "tests/test_build.py": "899aa2a4434fffa530cd5d1dad2dd1023774ce5c6603d01915821e7abbf56f97",
-    "docs/64-eval-harness.md": "caeb2e49f981fd2bfc04ae38c347606fbc5262e3c69a7335d324d2d8424f60aa",
-    "README.md": "940b54a4f18f5a86e408e8816df39ab975bda2985a80b6bfc27b83c308c062b0",
-    "docs/README.md": "3bf7bec2d42bbfaaba5bdc24d97d19268050f0e0cb1c00289b0b64b85118c87e",
-    "docs/sources.md": "79ea3db6c36254f578518807516f132e095c864bba23176160ba1b041c35b2f6"
+    "src/eval.cpp": "a6d0e7c9b87e0ec7176cc478066072ce00250ba67141a0e9c175ff33c7178bbc",
+    "tools/qw38_eval.py": "4bd3fb784e7a39137af10fc49f8d303779941c11dce1956877a692d12dad9658",
+    "tests/test_eval.py": "5b2171b9d5422883f71134fa460ff3d209a2f7713e00f86e5f4d90400c0564d5",
+    "tests/test_build.py": "899aa2a4434fffa530cd5d1dad2dd1023774ce5c6603d01915821e7abbf56f97"
   }
 }

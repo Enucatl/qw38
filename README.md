@@ -13,9 +13,9 @@ construction; unfinished operations continue to fail closed.
 
 ## Evaluation harness status
 
-The typed evaluation boundary is under construction. The current increment
-validates raw-token requests and logits evidence readers; checkpoint publication
-and diagnostic CUDA trace capture remain unavailable. See the
+The typed evaluation boundary is complete for harness wiring. Retained RTX 5090
+evidence covers raw-token logits, sequential checkpoint equality, diagnostic CUDA
+traces, and negative no-publication cases. See the
 [evaluation harness chapter](docs/64-eval-harness.md),
 [`pins/eval_contract.json`](pins/eval_contract.json), and
 [`fixtures/eval_harness.json`](fixtures/eval_harness.json). This wiring
@@ -121,7 +121,8 @@ events. See the [server-core chapter](docs/58-http-server-core.md),
 The beginner-oriented [implementation handbook](docs/README.md) explains each
 admitted concept and links it to code, fixtures, failures, and evidence. The
 handbook's [documentation audit](docs/65-documentation-audit.md) reconciles
-implemented task coverage and provenance. EVAL-001 remains blocked/partial;
+implemented task coverage and provenance. EVAL-001 is complete as harness-only
+wiring;
 quality (QLT-001), comparison (CMP-001–CMP-003), and release (REL-001) work
 remain unfinished.
 latest chapter covers [GGUF parameter conversion](docs/22-gguf-conversion.md),

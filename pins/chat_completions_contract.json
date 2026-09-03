@@ -92,7 +92,7 @@
   ],
   "local_sources": {
     "Makefile": "4516bad582a86fcb5323aec25fd42431b62f9825f6633988d3f8a7fab25268dd",
-    "README.md": "445d65c01ac97acabea509bdf7083d90b8a7eacbf3b8546c453278d86bebec8f",
+    "README.md": "ac90047aca905bef8bf46b6dbc7d862e83662806d957a46ef0bf5c90891ded4c",
     "include/qw38/engine.h": "1657c1154ea45f8b0a2f3ae5e5fab77dfb8d16e1b96602ab106dba9607b47e10",
     "src/engine.cpp": "03166fd07383462166541c96142c05c96efec90b5fde19d044ed5d2a4866e996",
     "cuda/full_scheduler.h": "56eb77134617f033b7863402c6e2a1a2c93e70bcfc8d508c745b78297d3967a4",

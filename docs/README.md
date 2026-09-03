@@ -89,7 +89,7 @@ for language and host portability decisions.
 61. [Benchmark harness](61-benchmark-harness.md): workloads, warm-ups, samples, percentiles, telemetry, cache policy, atomic results, and proof limits.
 62. [Chunked full-model CUDA prefill](62-cuda-full-prefill.md): token-major rows, layer-major work, exact MMQ/GDN/attention chunks, atomic commit, scratch, and measured boundaries.
 63. [CUDA diagnostic traces](63-cuda-diagnostic-traces.md): five stable CUDA boundaries, exact filters, full-tensor scalar gates, failure atomicity, and diagnostic-build isolation.
-64. [Evaluation harness](64-eval-harness.md): raw-token requests, typed helpers, authenticated logits records, planned checkpoint/trace boundaries, and current partial status.
+64. [Evaluation harness](64-eval-harness.md): raw-token requests, typed helpers, authenticated logits/checkpoint/trace records, atomic negative cases, and the QLT-001 proof boundary.
 65. [Documentation audit](65-documentation-audit.md): task coverage, claim labels,
     invariants, proof boundaries, and repository evidence.
 66. [Source and evidence ledger](sources.md).
