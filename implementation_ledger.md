@@ -75,7 +75,7 @@ are repository-relative unless stated otherwise.
 | API-003 | Implement strict Responses request and event mapping | API-002, SRV-002 | done | Text inputs, reasoning, function calls/results, sampling, response objects, ordered SSE events, and explicit exclusions pass native fixtures | [`src/responses_api.cpp`](src/responses_api.cpp); [`src/responses_api_test.cpp`](src/responses_api_test.cpp); [`pins/responses_contract.json`](pins/responses_contract.json); log 2026-09-02T14:27:35Z |
 | BEN-001 | Implement `qw38-bench` component/end-to-end harness | OPT-001 | done | Warmups/samples, telemetry, raw samples, failures, and environment metadata are retained | `pins/benchmark_contract.json`; `fixtures/benchmark_harness.json`; `evidence/benchmark/`; `tests/test_benchmark.py`; log 2026-09-02T15:24:00Z |
 | BEN-002 | Preserve the product-wide no-argument usage exit contract in `qw38-bench` | BEN-001, BLD-001 | done | Invoking the benchmark with no arguments prints usage and returns exit code 2 without creating output | `tests/test_build.py`; log 2026-09-02T15:24:00Z |
-| EVAL-001 | Implement `qw38-eval` logits/traces/checkpoints harness | ORA-001, SES-003 | blocked | Focused native diagnostics are driven by typed pytest helpers | [`tasks/EVAL-001.md`](tasks/EVAL-001.md); partial implementation/evidence only; blocked log 2026-09-03T11:55:08Z |
+| EVAL-001 | Implement `qw38-eval` logits/traces/checkpoints harness | ORA-001, SES-003 | pending | Focused native diagnostics are driven by typed pytest helpers | [`tasks/EVAL-001.md`](tasks/EVAL-001.md); reopened 2026-09-03T14:00:00Z after build/hash repair; trace/checkpoint acceptance remains |
 | QLT-001 | Pass held-out NLL, continuation, recurrence, retrieval, and task quality | EVAL-001, MEM-001 | pending | Admitted artifact passes every documented threshold and 128K retrieval fixture | — |
 | CMP-001 | Pin and validate comparable baseline artifacts | PIN-001, PIN-002, QLT-001 | pending | llama/Ollama share GGUF; vLLM difference and <=1% NLL admission are explicit | — |
 | CMP-002 | Run controlled 30-sample comparative matrix | BEN-001, OPT-004, CMP-001 | pending | All contexts/metrics/environment data and negative runs are retained | — |
@@ -3539,6 +3539,16 @@ are repository-relative unless stated otherwise.
   CUDA gates, validate all three modes through typed helpers on the RTX 5090,
   and promote the retained fixture only after those checks succeed.
 - No commit or push was created. Evidence: [`tasks/EVAL-001.md`](tasks/EVAL-001.md).
+
+### 2026-09-03T14:00:00Z — EVAL-001 reopened for recovery
+
+- Commit `6a5408b` repaired the recorded CUDA `-Icuda` compile omission and
+  refreshed the affected `src/eval.cpp` integrity hashes.
+- Reopened the task as `pending` for the remaining admitted scope: complete
+  checkpoint and diagnostic trace publication, repair diagnostic scheduler
+  object wiring and object-scoped isolation checks, run the RTX 5090 smokes,
+  and reconcile the typed schemas/fixture evidence. `plan.md` and inference
+  arithmetic remain out of scope.
 
 ### 2026-09-03T12:50:48Z — BLD-003 status reconciled
 

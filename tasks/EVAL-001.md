@@ -5,7 +5,7 @@
 - Primary ID: `EVAL-001`
 - Coupled IDs: `none`
 - Dependencies: `ORA-001`, `SES-003`; both were `done` at planning inspection
-- Status: `blocked`
+- Status: `pending`
 - Ledger acceptance: Focused native diagnostics are driven by typed pytest helpers
 
 ## Goal and boundaries
@@ -367,6 +367,15 @@ behavior, and the QLT-001 proof boundary.
   negative-publication smokes on the RTX 5090, and promote
   `fixtures/eval_harness.json` from partial only after typed validation passes.
 
+### Reopen reconciliation — 2026-09-03
+
+Commit `6a5408b` repaired the previously recorded CUDA include-path and stale
+source-hash failures. The active recovery scope is now limited to completing
+the checkpoint and diagnostic trace paths, fixing diagnostic scheduler object
+linkage and valid object-scoped release isolation checks, then running the
+focused, repository-wide, and RTX 5090 acceptance gates and promoting the
+partial fixture. No plan or inference-arithmetic change is authorized.
+
 ### Verification
 
 - Attempt: 2 (fresh independent integration verification after repair retry 1)
@@ -469,7 +478,7 @@ behavior, and the QLT-001 proof boundary.
    tensor names are `layer.0.layer_residual`, `layer.3.layer_residual`,
    `layer.63.layer_residual`, `global.final_norm`, and `global.logits`.
 
-#### Final repair plan (authoritative for the next implementation retry)
+#### Historical repair plan (superseded by reopened recovery planning)
 
 1. **Finish request validation before model/output work (`src/eval.cpp`).**
    Reject duplicate single-value options, options illegal for the selected mode,
@@ -696,3 +705,197 @@ behavior, and the QLT-001 proof boundary.
 - Verdict: **FAIL**. EVAL-001 is not delivery-ready and cannot be authorized.
 - UTC/time/tokens/cost: 396.928 s; 1,365,035 total tokens (1,359,957 input,
   1,284,864 cached input, 5,078 output, 944 reasoning output); cost unavailable.
+
+### Reopened recovery planning — 2026-09-03
+
+- Agent/model: fresh planning/reconciliation agent, Codex
+- Scope inspected: current `plan.md`, ledger row/history, this dossier, commit
+  `6a5408b`, the current eval C++/Python/schema/fixture/documentation paths, the
+  public session boundary, the diagnostic scheduler boundary, and both CUDA eval
+  products. This section supersedes the historical repair plan above wherever
+  current repository evidence differs.
+- Current evidence:
+  - The pinned CUDA 13.0.2 container now compiles and links
+    `build/cuda/qw38-eval` and `build/cuda/qw38-eval-diagnostic`. The diagnostic
+    link contains diagnostic host objects (including `scalar_runtime.o` and
+    `diagnostic_trace.o`), the CUDA engine, `eval.trace.cuda.o`, and
+    `full_scheduler.trace.cuda.o`; it does not link
+    `full_scheduler.cuda.o`. No Makefile repair is presently required.
+  - Release `eval.cuda.o`, `full_scheduler.cuda.o`, and the release eval binary
+    have no `execute_token_traced`, `validate_trace_filter`,
+    `trace_filter_matches`, `emit_trace_tensor`, or `TraceSink` symbol. Release
+    instrumentation-bearing objects contain neither exact `layer_residual` nor
+    exact `final_norm` strings. Diagnostic objects contain the trace symbols and
+    admitted literals. `build/model.o` legitimately contains `final_norm`.
+  - A one-token RTX 5090 checkpoint invocation exits zero and writes the
+    checkpoint/logit files, but `read_checkpoint_result` rejects its sparse JSON
+    because it omits the common identities/runtime, positions/frontiers, blob
+    record/summary, greedy token, and nested equality object.
+  - A five-filter RTX 5090 trace invocation produces a bundle accepted by the
+    generic `read_trace_bundle`, but its `tool.sha256` incorrectly equals the
+    tensor-blob hash rather than `/proc/self/exe`; the generic reader does not
+    prove the requested filters, exact token/frontier relationship, pinned
+    identities, or cross-run logit equality. The checked-in fixture remains
+    `partial-logits-only` and is not acceptance evidence.
+
+#### Authoritative implementation decisions
+
+1. **Keep the current object graph and prove it.** `Makefile` is not a semantic
+   change target. `tests/test_eval.py` will run `make -Bn
+   build/cuda/qw38-eval-diagnostic` and require diagnostic host
+   `scalar_runtime.o`/`diagnostic_trace.o`, CUDA `engine.o`,
+   `eval.trace.cuda.o`, and `full_scheduler.trace.cuda.o`, while rejecting
+   `full_scheduler.cuda.o`. The CUDA build and the symbol/string gates below are
+   the final linkage proof.
+
+2. **Finish one exact common envelope in `src/eval.cpp`,
+   `tools/qw38_eval.py`, and `pins/eval_contract.json`.** Every mode publishes
+   `result.json` with exactly `schema`, `version`, `mode`, `status`, `model`,
+   `tool`, `runtime`, plus its mode fields. `schema` is `qw38.eval-result`,
+   `version` is `1`, and `status` is `ok`. `model` is exactly `name`, `revision`,
+   `sha256`, `byte_count`, using the pinned values and 18,973,870,432 bytes.
+   `tool` is exactly `name`, `revision`, `source_state`, `sha256`; it uses the
+   requested revision/state and SHA-256 of resolved `/proc/self/exe`.
+   `runtime` is exactly `backend`, `cuda_target`, `cuda_runtime_version`,
+   `cuda_driver_version`, `device_name`, `compute_capability`; successful
+   product evidence requires `backend="cuda"`, target `sm_120`, integer CUDA
+   API versions, a non-empty device name, and capability `12.0`. CUDA query or
+   binary hashing failure publishes nothing. Separate Python validators replace
+   the current shared identity validator so `model` and `tool` enforce their
+   different exact keys.
+
+3. **Complete logits and checkpoint publication in `src/eval.cpp`.** Logits
+   keeps fields `tokens`, `positions`, `frontier`, `logits`, `greedy_token`.
+   Checkpoint keeps `prefix_tokens`, `continuation_tokens`, `prefix_positions`,
+   `continuation_positions`, `frontiers`, `checkpoint`,
+   `continuation_logits`, `greedy_token`, `equality`. Blob records are exactly
+   `file`, `dtype`, `shape`, `byte_count`, `sha256`, `summary`; summaries use the
+   nine fields already required by the Python reader and all native values must
+   be finite. Checkpoint execution records and verifies the prefix tokens before
+   save, destroys the uninterrupted session before creating the restore
+   session, verifies restored prefix tokens before continuation, and compares
+   final tokens and complete logits byte-for-byte with `memcmp`. The four
+   frontiers are prefix, uninterrupted final, restored prefix, restored final.
+   Corrupt retained bytes are a Python-reader negative; lower-level SES-003
+   remains the native corrupt-restore authority, so no failure-injection option
+   is added.
+
+4. **Preserve `qw38.trace` v1 and add its eval envelope.** Trace mode publishes
+   `result.json`, `manifest.json`, and `tensors.f32le.bin`. The trace result
+   envelope adds exactly `tokens`, `positions`, `frontier`, and `trace` to the
+   common fields. `trace` is exactly `manifest`, `blob`, `filters`, and
+   `tensor_names`; `manifest` and `blob` are each exactly `file`, `byte_count`,
+   and `sha256`, naming and authenticating the two frozen bundle files. Filters
+   and tensor names are retained in request order. The unchanged v1
+   manifest keeps its exact three-field model/tool identities, empty prompt
+   bytes, raw token IDs/positions, frontiers `0` and token count, and empty state
+   digest maps. Its global tensor names remain the already-frozen raw names
+   `final_norm` and `logits`; only duplicate layer taps are qualified as
+   `layer.0.layer_residual`, `layer.3.layer_residual`, and
+   `layer.63.layer_residual`. This corrects the historical `global.*` proposal
+   without changing `tools/qw38_trace.py` or the trace schema.
+
+5. **Strengthen diagnostic execution without changing inference math.** Before
+   mapping/uploading the model or creating output, validate every option and
+   require each distinct trace filter to be one of the five pinned values. Trace
+   authenticates the exact pinned model size/hash. For each filter in request
+   order it creates a fresh session/workspace, executes prefix tokens unfused
+   without graphs, traces only the final token, requires exactly one callback
+   with the expected raw tap/layer/shape, copies and verifies committed tokens,
+   rejects non-finite tensors/logits, and requires complete final logits to be
+   byte-identical across all fresh runs. The sink copies the borrowed view
+   immediately. `read_trace_result` first validates the common envelope and its
+   requested relationships, then delegates the frozen bundle to
+   `read_trace_bundle` and checks exact tensor order/roles/layers/shapes.
+
+6. **Use no-replace atomic publication for all modes.** Fully validate the
+   request first, create a unique same-parent temporary directory, write binary
+   and JSON files with truncation and checked flush/close, then commit with
+   Linux `renameat2(RENAME_NOREPLACE)`. Any validation, runtime, capture, hash,
+   write, or rename failure removes only that exact temporary directory and
+   leaves the requested final path absent. Existing destinations remain usage
+   errors. JSON-escape every caller-, path-, revision-, and device-derived
+   string. No production failure-injection switch is added; tests use an
+   existing destination and a parent path that is a regular file.
+
+7. **Make typed tests cover the contract, not the partial implementation.**
+   `tests/test_eval.py` adds valid synthetic results for all three modes;
+   exact-key/type/range/identity/runtime/summary/hash/file-name/frontier/
+   position/greedy/equality/filter/tensor validation negatives; typed
+   `run_native` success and process-versus-evidence failures; Make graph and
+   object-isolation checks; malformed/duplicate/illegal-mode/existing-output/
+   unwritable-parent no-publication cases; and the exclusive RTX 5090 logits,
+   sequential checkpoint, and one five-filter trace smoke. `tests/test_build.py`
+   adds release and diagnostic help/no-argument exit checks while preserving
+   all legacy switch coverage. Hardware tests skip only when
+   `QW38_RUN_CUDA_TESTS` is not `1` or the pinned GGUF is genuinely absent.
+
+8. **Promote evidence only from a successful hardware run.**
+   `fixtures/eval_harness.json` becomes `complete` only after typed validation
+   on the repository RTX 5090. It records GPU/capability, toolkit/runtime/driver,
+   container image, source revision/state, model and both binary hashes, exact
+   request cases, per-mode file sizes/hashes/frontiers/greedy IDs, all five
+   trace identities, and every negative exit/no-publication outcome. It retains
+   `harness_wiring_only: true` and `quality_admission: false`; generated
+   checkpoint/logit/trace blobs remain uncommitted.
+
+9. **Reconcile documentation and hashes last.** Replace partial/blocked prose in
+   `README.md`, `docs/README.md`, `docs/64-eval-harness.md`,
+   `docs/sources.md`, and the EVAL-001 row in
+   `docs/65-documentation-audit.md` (adding that row if absent) only after
+   hardware evidence passes. Refresh
+   `pins/eval_contract.json`, `pins/sha256_acceleration_contract.json`, and the
+   README digests in `pins/benchmark_contract.json`,
+   `pins/chat_completions_contract.json`, `pins/cli_contract.json`, and
+   `pins/server_core_contract.json` from final bytes. Only EVAL-001 status,
+   evidence, and chronological result are changed in
+   `implementation_ledger.md`; `plan.md` remains unchanged.
+
+- Exact anticipated changed files: `src/eval.cpp`, `tools/qw38_eval.py`,
+  `tests/test_eval.py`, `tests/test_build.py`, `pins/eval_contract.json`,
+  `pins/sha256_acceleration_contract.json`, `fixtures/eval_harness.json`,
+  `docs/64-eval-harness.md`, `docs/65-documentation-audit.md`, `README.md`,
+  `docs/README.md`, `docs/sources.md`, `pins/benchmark_contract.json`,
+  `pins/chat_completions_contract.json`, `pins/cli_contract.json`,
+  `pins/server_core_contract.json`, `implementation_ledger.md`, and this dossier.
+  `Makefile`, `tools/qw38_trace.py`, frozen trace contracts/tolerances,
+  inference sources, and `plan.md` do not change.
+- Coupled IDs: `none`; QLT-001 remains a dependent quality task, not coupled
+  evidence for this harness recovery.
+- Unresolved decisions: `none`.
+- Architecture impact: `none`; normal modes remain on public `Engine`/`Session`,
+  trace remains on the existing diagnostic scheduler boundary, and the frozen
+  trace bundle remains compatible.
+
+#### Reopened acceptance and exact gates
+
+- Focused host: `python -m json.tool pins/eval_contract.json >/dev/null`;
+  `python -m json.tool fixtures/eval_harness.json >/dev/null`;
+  `make -j2 build/qw38-eval diagnostic`;
+  `uv run pytest -q tests/test_eval.py tests/test_build.py tests/test_trace.py
+  tests/test_cuda_trace.py tests/test_cuda_checkpoint.py`.
+- CUDA build: `docker run --rm --gpus all --user "$(id -u):$(id -g)" -v
+  "$(pwd):/workspace" qw38-cuda:13.0.2 make clean all diagnostic cuda-products
+  cuda-native`.
+- RTX 5090 typed evidence: `docker run --rm --gpus all --user
+  "$(id -u):$(id -g)" -e QW38_RUN_CUDA_TESTS=1 -v "$(pwd):/workspace"
+  qw38-cuda:13.0.2 uv run pytest -q tests/test_eval.py tests/test_cuda_trace.py
+  tests/test_cuda_checkpoint.py`.
+- Release isolation: `nm -C --defined-only build/eval.cuda.o
+  build/full_scheduler.cuda.o` and `nm -C build/cuda/qw38-eval` must have no
+  exact trace API/helper symbols; `strings -a build/eval.cuda.o
+  build/full_scheduler.cuda.o | rg -x 'layer_residual|final_norm'` must have no
+  match. Diagnostic `nm` must find `execute_token_traced`,
+  `validate_trace_filter`, `trace_filter_matches`, and `emit_trace_tensor` in
+  `build/eval.trace.cuda.o`, `build/full_scheduler.trace.cuda.o`, or
+  `build/diagnostic/diagnostic_trace.o`; diagnostic `strings` must find both
+  admitted literals. `strings -a build/model.o | rg -x 'final_norm'` must match
+  to preserve the documented object-scoping rationale.
+- Repository-wide: `uv run ruff format .`; `uv run ruff check .`; `make clean`;
+  `make -j2`; `make diagnostic`; `uv run pytest -q`; `git diff --check`.
+- Definition of done: the independent verifier observes a successful pinned
+  CUDA build, all object-scoped isolation/linkage checks, typed RTX 5090 results
+  for logits/checkpoint/all-five-filter trace, retained negative-publication
+  outcomes, a `complete` harness-only fixture, current documentation/hashes, and
+  all focused/repository gates passing. At that point EVAL-001 alone can move
+  from `in_progress` to `done`.
