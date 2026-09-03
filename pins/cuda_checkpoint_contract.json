@@ -19,12 +19,34 @@
     "last committed FP32 logits",
     "last committed FP32 hidden vector"
   ],
-  "sampler_fields": ["temperature", "top_p", "top_k", "seed", "rng_state"],
-  "save_publication": ["adjacent .tmp write", "close", "SHA-256 footer", "file fsync", "same-directory rename", "directory fsync"],
-  "restore_preflight": ["magic/version", "model/layout hashes", "capacity/frontier", "sampler bounds", "section arithmetic", "exact file size", "SHA-256 footer", "token bounds"],
+  "sampler_fields": [
+    "temperature",
+    "top_p",
+    "top_k",
+    "seed",
+    "rng_state"
+  ],
+  "save_publication": [
+    "adjacent .tmp write",
+    "close",
+    "SHA-256 footer",
+    "file fsync",
+    "same-directory rename",
+    "directory fsync"
+  ],
+  "restore_preflight": [
+    "magic/version",
+    "model/layout hashes",
+    "capacity/frontier",
+    "sampler bounds",
+    "section arithmetic",
+    "exact file size",
+    "SHA-256 footer",
+    "token bounds"
+  ],
   "logical_attention_state": "only rows below frontier; file size grows by 65536 bytes per committed token",
   "local_sources": {
-    "Makefile": "e0dbdc5cbbcdd890292e687dd1b45bbc3141c5539961c142cf3cfb419951d3e5",
+    "Makefile": "4516bad582a86fcb5323aec25fd42431b62f9825f6633988d3f8a7fab25268dd",
     "cuda/checkpoint.cu": "2c3c03a47b401be8635bd5e5df8cf2b889fa720285e2e18772d86a42043680f9",
     "cuda/checkpoint_test.cu": "b54eff76501d89a2a3be91d023f26582a50cb18c2af9f1f22ea97595a4532b43",
     "cuda/full_scheduler.cu": "68d41bb8d231cccbc7727d2433598bf13503dba0d539e38a1548d44b1ee4ed3a",

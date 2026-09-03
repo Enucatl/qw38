@@ -11,6 +11,16 @@ The CUDA text CLI plus OpenAI Chat Completions and Responses endpoints are usabl
 now. Comparative benchmarks and the release quality gate remain under
 construction; unfinished operations continue to fail closed.
 
+## Evaluation harness status
+
+The typed evaluation boundary is under construction. The current increment
+validates raw-token requests and logits evidence readers; checkpoint publication
+and diagnostic CUDA trace capture remain unavailable. See the
+[evaluation harness chapter](docs/64-eval-harness.md),
+[`pins/eval_contract.json`](pins/eval_contract.json), and
+[`fixtures/eval_harness.json`](fixtures/eval_harness.json). This wiring
+evidence is not QLT-001 quality admission.
+
 ## Chat with Quartz now
 
 Prerequisites are Linux/x86-64, Docker with NVIDIA GPU access, one RTX 5090,

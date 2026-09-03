@@ -1,0 +1,17 @@
+{
+  "schema": "qw38.eval-harness.v1",
+  "purpose": "harness wiring smoke evidence; not quality evidence",
+  "implementation_status": "partial-logits-only",
+  "evidence_links": {
+    "contract": "pins/eval_contract.json",
+    "handbook": "docs/64-eval-harness.md",
+    "typed_helpers": "tools/qw38_eval.py",
+    "focused_tests": "tests/test_eval.py"
+  },
+  "modes": {
+    "logits": {"status": "smoke-not-run"},
+    "checkpoint": {"status": "smoke-not-run"},
+    "trace": {"status": "smoke-not-run"}
+  },
+  "malformed_requests_publish_nothing": true
+}

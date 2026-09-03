@@ -6,8 +6,22 @@
   "scope": {
     "graphs": 64,
     "boundary": "one stable-address fused FFN graph per decoder layer",
-    "included": ["FFN input norm", "gate projection", "up projection", "SwiGLU", "down projection", "fused residual/next-input norm"],
-    "excluded_dynamic": ["embedding token row", "GDN state-owner swap", "attention position and causal extent", "KV destination", "host output copies", "atomic commit"]
+    "included": [
+      "FFN input norm",
+      "gate projection",
+      "up projection",
+      "SwiGLU",
+      "down projection",
+      "fused residual/next-input norm"
+    ],
+    "excluded_dynamic": [
+      "embedding token row",
+      "GDN state-owner swap",
+      "attention position and causal extent",
+      "KV destination",
+      "host output copies",
+      "atomic commit"
+    ]
   },
   "ownership": {
     "binding": "exact ResidentModel and SchedulerWorkspace object addresses",
@@ -26,7 +40,7 @@
     "graph_allocation_must_be_measured": true
   },
   "local_sources": {
-    "Makefile": "e0dbdc5cbbcdd890292e687dd1b45bbc3141c5539961c142cf3cfb419951d3e5",
+    "Makefile": "4516bad582a86fcb5323aec25fd42431b62f9825f6633988d3f8a7fab25268dd",
     "cuda/full_scheduler.h": "56eb77134617f033b7863402c6e2a1a2c93e70bcfc8d508c745b78297d3967a4",
     "cuda/full_scheduler.cu": "68d41bb8d231cccbc7727d2433598bf13503dba0d539e38a1548d44b1ee4ed3a",
     "cuda/graph_test.cu": "54ff361ba6f5d3a40bbc5d45920ea78767ac8e505f5a38c488ac2b385424af55"

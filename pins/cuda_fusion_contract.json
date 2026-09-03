@@ -10,7 +10,12 @@
     "production_default": "fused",
     "retained_reference": "unfused",
     "removed_launches_per_token": 63,
-    "visible_boundaries": ["layer residual", "next BF16 normalized input", "logits", "session state"]
+    "visible_boundaries": [
+      "layer residual",
+      "next BF16 normalized input",
+      "logits",
+      "session state"
+    ]
   },
   "admission": {
     "logits_exact": true,
@@ -27,7 +32,7 @@
     "sha256": "97a88c6b9c48fd7f1d493eca67ab748af71ea228d7fa6986bc09c992a053a4a9"
   },
   "local_sources": {
-    "Makefile": "e0dbdc5cbbcdd890292e687dd1b45bbc3141c5539961c142cf3cfb419951d3e5",
+    "Makefile": "4516bad582a86fcb5323aec25fd42431b62f9825f6633988d3f8a7fab25268dd",
     "cuda/full_scheduler.h": "56eb77134617f033b7863402c6e2a1a2c93e70bcfc8d508c745b78297d3967a4",
     "cuda/full_scheduler.cu": "68d41bb8d231cccbc7727d2433598bf13503dba0d539e38a1548d44b1ee4ed3a",
     "cuda/fusion_test.cu": "40cbb6b8e9721141e7b6fa6f38bd6fefbf5ea015935338ea1a42e531ef4588e8"

@@ -1,0 +1,34 @@
+{
+  "schema": "qw38.eval-result",
+  "version": 1,
+  "vocabulary_size": 248320,
+  "dtype": "f32-le",
+  "modes": [
+    "logits",
+    "checkpoint",
+    "trace"
+  ],
+  "source_states": [
+    "clean",
+    "dirty"
+  ],
+  "trace_filters": [
+    "0:layer_residual",
+    "3:layer_residual",
+    "63:layer_residual",
+    "global:final_norm",
+    "global:logits"
+  ],
+  "publication": "atomic-absent-destination",
+  "local_sources": {
+    "Makefile": "4516bad582a86fcb5323aec25fd42431b62f9825f6633988d3f8a7fab25268dd",
+    "src/eval.cpp": "dd6e1fcc410a4a86893f907faa249a8adf536693ddb0c481d276528f1ac5cf87",
+    "tools/qw38_eval.py": "71d193d386dd0be1ff9a3d6b586479c3279ef65ce46a6486f89644883089f3a6",
+    "tests/test_eval.py": "7d5116a0aa10af826dca3b17d0ee1aadd7d080fc7b3f40e0797e8094f113578a",
+    "tests/test_build.py": "899aa2a4434fffa530cd5d1dad2dd1023774ce5c6603d01915821e7abbf56f97",
+    "docs/64-eval-harness.md": "caeb2e49f981fd2bfc04ae38c347606fbc5262e3c69a7335d324d2d8424f60aa",
+    "README.md": "940b54a4f18f5a86e408e8816df39ab975bda2985a80b6bfc27b83c308c062b0",
+    "docs/README.md": "3bf7bec2d42bbfaaba5bdc24d97d19268050f0e0cb1c00289b0b64b85118c87e",
+    "docs/sources.md": "79ea3db6c36254f578518807516f132e095c864bba23176160ba1b041c35b2f6"
+  }
+}

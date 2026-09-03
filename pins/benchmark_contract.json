@@ -10,8 +10,18 @@
   "primary_cache_policy": "disabled",
   "separate_cache_policy": "agent-reuse",
   "workloads": {
-    "prefill": [128, 2048, 8192],
-    "decode_context": [128, 2048, 8192, 32768, 131072],
+    "prefill": [
+      128,
+      2048,
+      8192
+    ],
+    "decode_context": [
+      128,
+      2048,
+      8192,
+      32768,
+      131072
+    ],
     "decode_output_tokens": 256,
     "maximum_decode_prompt_tokens": 130815
   },
@@ -69,8 +79,8 @@
     "unsupported_values_are_null": true
   },
   "local_sources": {
-    "README.md": "866d3a7a199090103fa5ec7c54897ed9f7bfcea070903fa68e73fd6bda0e2d8c",
-    "Makefile": "e0dbdc5cbbcdd890292e687dd1b45bbc3141c5539961c142cf3cfb419951d3e5",
+    "README.md": "940b54a4f18f5a86e408e8816df39ab975bda2985a80b6bfc27b83c308c062b0",
+    "Makefile": "4516bad582a86fcb5323aec25fd42431b62f9825f6633988d3f8a7fab25268dd",
     "include/qw38/engine.h": "1657c1154ea45f8b0a2f3ae5e5fab77dfb8d16e1b96602ab106dba9607b47e10",
     "src/engine.cpp": "03166fd07383462166541c96142c05c96efec90b5fde19d044ed5d2a4866e996",
     "src/bench.cpp": "ee0ecf4db7a894134acedd83dbca64095b00eadb80f4beaac80ea4d589ba3751",

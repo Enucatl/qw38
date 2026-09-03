@@ -75,7 +75,7 @@ are repository-relative unless stated otherwise.
 | API-003 | Implement strict Responses request and event mapping | API-002, SRV-002 | done | Text inputs, reasoning, function calls/results, sampling, response objects, ordered SSE events, and explicit exclusions pass native fixtures | [`src/responses_api.cpp`](src/responses_api.cpp); [`src/responses_api_test.cpp`](src/responses_api_test.cpp); [`pins/responses_contract.json`](pins/responses_contract.json); log 2026-09-02T14:27:35Z |
 | BEN-001 | Implement `qw38-bench` component/end-to-end harness | OPT-001 | done | Warmups/samples, telemetry, raw samples, failures, and environment metadata are retained | `pins/benchmark_contract.json`; `fixtures/benchmark_harness.json`; `evidence/benchmark/`; `tests/test_benchmark.py`; log 2026-09-02T15:24:00Z |
 | BEN-002 | Preserve the product-wide no-argument usage exit contract in `qw38-bench` | BEN-001, BLD-001 | done | Invoking the benchmark with no arguments prints usage and returns exit code 2 without creating output | `tests/test_build.py`; log 2026-09-02T15:24:00Z |
-| EVAL-001 | Implement `qw38-eval` logits/traces/checkpoints harness | ORA-001, SES-003 | pending | Focused native diagnostics are driven by typed pytest helpers | — |
+| EVAL-001 | Implement `qw38-eval` logits/traces/checkpoints harness | ORA-001, SES-003 | blocked | Focused native diagnostics are driven by typed pytest helpers | [`tasks/EVAL-001.md`](tasks/EVAL-001.md); partial implementation/evidence only; blocked log 2026-09-03T11:55:08Z |
 | QLT-001 | Pass held-out NLL, continuation, recurrence, retrieval, and task quality | EVAL-001, MEM-001 | pending | Admitted artifact passes every documented threshold and 128K retrieval fixture | — |
 | CMP-001 | Pin and validate comparable baseline artifacts | PIN-001, PIN-002, QLT-001 | pending | llama/Ollama share GGUF; vLLM difference and <=1% NLL admission are explicit | — |
 | CMP-002 | Run controlled 30-sample comparative matrix | BEN-001, OPT-004, CMP-001 | pending | All contexts/metrics/environment data and negative runs are retained | — |
@@ -3479,6 +3479,23 @@ are repository-relative unless stated otherwise.
   `pins/scalar_trace_contract.json`, and
   `pins/scalar_oracle_tolerances.json` remained unchanged.
 
+### 2026-09-03T11:40:00Z — EVAL-001 documentation/evidence recorded
+
+- Added [`docs/64-eval-harness.md`](docs/64-eval-harness.md), linked the chapter
+  from [`README.md`](README.md) and [`docs/README.md`](docs/README.md), and
+  recorded local provenance in [`docs/sources.md`](docs/sources.md).
+- Updated [`pins/eval_contract.json`](pins/eval_contract.json) with current
+  local-source identities and expanded [`fixtures/eval_harness.json`](fixtures/eval_harness.json)
+  with explicit partial-status and evidence links. Refreshed the existing
+  SHA-256 contract identity for the changed `src/eval.cpp`.
+- The implementation remains `in_progress`: typed request validation and the
+  logits evidence reader exist, but checkpoint publication and diagnostic CUDA
+  trace capture have not run or been accepted. No checkpoint, trace, or
+  QLT-001 quality claim is made.
+- Documentation/evidence checks: `python -m json.tool pins/eval_contract.json
+  >/dev/null`, `python -m json.tool fixtures/eval_harness.json >/dev/null`, and
+  `git diff --check` passed.
+
 ## Decisions and Negative Results
 
 - **2026-08-29 / BLD-002:** Host `nvcc` is absent. Resolved for reproducibility
@@ -3509,3 +3526,16 @@ are repository-relative unless stated otherwise.
   root; after fixing that harness issue, the admitted-row oracle decoded only
   the first block of a multi-block Q4 row. Walking every block resolved the
   mismatch without changing native tensor code or expected arithmetic order.
+
+### 2026-09-03T11:55:08Z — EVAL-001 blocked
+
+- The bounded run completed three independent verification attempts, two Luna
+  repairs, and one Sol diagnostic without reaching CUDA acceptance.
+- Final failure evidence: the CUDA 13.0.2 build stops because the release eval
+  compile rule omits the `cuda/` include path; amended `src/eval.cpp` hashes are
+  stale across source-integrity contracts; therefore RTX 5090 logits,
+  checkpoint, trace, isolation, and negative-publication smokes did not run.
+- Recovery: apply the dossier's remaining build/hash repairs, pass all host and
+  CUDA gates, validate all three modes through typed helpers on the RTX 5090,
+  and promote the retained fixture only after those checks succeed.
+- No commit or push was created. Evidence: [`tasks/EVAL-001.md`](tasks/EVAL-001.md).

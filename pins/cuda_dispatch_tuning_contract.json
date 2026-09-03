@@ -5,17 +5,51 @@
   "toolkit": "CUDA 13.0.2",
   "device": "NVIDIA GeForce RTX 5090",
   "candidates": {
-    "mmv_warps_per_block": [4, 8, 16],
-    "mmq_prompt_rows_per_tile": [1, 2, 4, 8],
-    "prompt_rows": [1, 2, 4, 8, 16, 32, 64],
+    "mmv_warps_per_block": [
+      4,
+      8,
+      16
+    ],
+    "mmq_prompt_rows_per_tile": [
+      1,
+      2,
+      4,
+      8
+    ],
+    "prompt_rows": [
+      1,
+      2,
+      4,
+      8,
+      16,
+      32,
+      64
+    ],
     "warmups": 3,
     "samples": 30,
     "replicates": 3
   },
   "selection": {
     "rule": "lowest arithmetic mean across three replicates at each admitted shape",
-    "mmv_rows_to_warps": {"48": 4, "1024": 8, "5120": 16, "6144": 8, "10240": 8, "12288": 4, "17408": 8, "248320": 4},
-    "mmq_prompt_rows_to_tile": {"1": 1, "2": 2, "4": 4, "8": 8, "16": 8, "32": 8, "64": 8}
+    "mmv_rows_to_warps": {
+      "48": 4,
+      "1024": 8,
+      "5120": 16,
+      "6144": 8,
+      "10240": 8,
+      "12288": 4,
+      "17408": 8,
+      "248320": 4
+    },
+    "mmq_prompt_rows_to_tile": {
+      "1": 1,
+      "2": 2,
+      "4": 4,
+      "8": 8,
+      "16": 8,
+      "32": 8,
+      "64": 8
+    }
   },
   "correctness": {
     "per_output_warp_arithmetic_order": "unchanged",
@@ -23,7 +57,7 @@
     "full_scheduler": "frozen trace, logits, and greedy gates"
   },
   "local_sources": {
-    "Makefile": "e0dbdc5cbbcdd890292e687dd1b45bbc3141c5539961c142cf3cfb419951d3e5",
+    "Makefile": "4516bad582a86fcb5323aec25fd42431b62f9825f6633988d3f8a7fab25268dd",
     "cuda/quant_mmv.cu": "85eaf6f6f4dbc9e229f085f7eb18f8c2536df15b833923527a39ec7c90788347",
     "cuda/quant_mmv.h": "7996383bc93b87e92c45aa6d379b9c7a075cf19a13a82516259f45e727f62538",
     "cuda/quant_mmv_test.cu": "3e59c5f458b161bdf94ae087369ca8faee069d7a039242f8fa945e6d1f12a5b0",

@@ -6,14 +6,38 @@
   "cuda_architecture": "sm_120",
   "context_capacity": 131072,
   "model_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
-  "generation_order": ["sample", "eval", "publish"],
+  "generation_order": [
+    "sample",
+    "eval",
+    "publish"
+  ],
   "supported": {
     "interactive_turns": true,
     "one_shot_prompt": true,
-    "reasoning_modes": ["off", "low", "medium", "xhigh"],
-    "sampling": ["temperature", "top_p", "top_k", "seed"],
-    "stops": ["im_end_token", "custom_text", "maximum_tokens"],
-    "commands": ["help", "save", "load", "reset", "quit"],
+    "reasoning_modes": [
+      "off",
+      "low",
+      "medium",
+      "xhigh"
+    ],
+    "sampling": [
+      "temperature",
+      "top_p",
+      "top_k",
+      "seed"
+    ],
+    "stops": [
+      "im_end_token",
+      "custom_text",
+      "maximum_tokens"
+    ],
+    "commands": [
+      "help",
+      "save",
+      "load",
+      "reset",
+      "quit"
+    ],
     "atomic_checkpoint": true
   },
   "excluded": {
@@ -23,8 +47,8 @@
     "concurrent_gpu_sessions": true
   },
   "local_sources": {
-    "README.md": "866d3a7a199090103fa5ec7c54897ed9f7bfcea070903fa68e73fd6bda0e2d8c",
-    "Makefile": "e0dbdc5cbbcdd890292e687dd1b45bbc3141c5539961c142cf3cfb419951d3e5",
+    "README.md": "940b54a4f18f5a86e408e8816df39ab975bda2985a80b6bfc27b83c308c062b0",
+    "Makefile": "4516bad582a86fcb5323aec25fd42431b62f9825f6633988d3f8a7fab25268dd",
     "include/qw38/engine.h": "1657c1154ea45f8b0a2f3ae5e5fab77dfb8d16e1b96602ab106dba9607b47e10",
     "src/engine.cpp": "03166fd07383462166541c96142c05c96efec90b5fde19d044ed5d2a4866e996",
     "src/cli.cpp": "8c06875e62e6bf8423b47181d702efca38d922453236e86e596908fc53de2477",

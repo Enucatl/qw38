@@ -365,6 +365,16 @@ DSpark are explicitly rejected as Qwen model semantics.
   [`fixtures/cuda_trace.json`](../fixtures/cuda_trace.json). The beginner
   explanation is [`docs/63-cuda-diagnostic-traces.md`](63-cuda-diagnostic-traces.md).
   No CUDA trace code or tolerance is copied from an external project.
+- EVAL-001 introduces no new external implementation source. The typed request
+  records, native command boundary, and logits evidence reader are local code;
+  they reuse the public Engine/Session contract and existing trace-v1 reader.
+  The shape is frozen in [`pins/eval_contract.json`](../pins/eval_contract.json),
+  with current wiring/negative evidence in
+  [`fixtures/eval_harness.json`](../fixtures/eval_harness.json) and focused
+  tests in [`tests/test_eval.py`](../tests/test_eval.py). The beginner
+  explanation is [`docs/64-eval-harness.md`](64-eval-harness.md). The fixture
+  marks this as logits-only partial implementation: no CUDA checkpoint or
+  trace smoke has run, and nothing here is QLT-001 quality evidence.
 
 ## Specialization and hardware references
 

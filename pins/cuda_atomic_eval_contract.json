@@ -10,11 +10,19 @@
     "attention_prepare": "one candidate key row and value row for each of 16 attention layers",
     "attention_publish": "copy candidate rows at the uncommitted frontier, synchronize, then publish the frontier",
     "logical_kv_state": "rows strictly below the committed frontier",
-    "publication_order": ["attention rows", "GDN pointer swap", "token and output copies", "frontier last"]
+    "publication_order": [
+      "attention rows",
+      "GDN pointer swap",
+      "token and output copies",
+      "frontier last"
+    ]
   },
   "interruption": {
     "interface": "caller status poll after a synchronized layer boundary",
-    "statuses_tested": ["cancelled", "internal"],
+    "statuses_tested": [
+      "cancelled",
+      "internal"
+    ],
     "invariant": "a non-ok poll status returns without publishing candidate state"
   },
   "sampling": {
@@ -28,7 +36,7 @@
     "duplicate_128k_kv_cache": "rejected"
   },
   "local_sources": {
-    "Makefile": "e0dbdc5cbbcdd890292e687dd1b45bbc3141c5539961c142cf3cfb419951d3e5",
+    "Makefile": "4516bad582a86fcb5323aec25fd42431b62f9825f6633988d3f8a7fab25268dd",
     "cuda/atomic_eval_test.cu": "d7815b43173f8a6828e59d10731de3a691238daf5ebef61bf27c1895dc11be77",
     "cuda/full_scheduler.cu": "68d41bb8d231cccbc7727d2433598bf13503dba0d539e38a1548d44b1ee4ed3a",
     "cuda/full_scheduler.h": "56eb77134617f033b7863402c6e2a1a2c93e70bcfc8d508c745b78297d3967a4",

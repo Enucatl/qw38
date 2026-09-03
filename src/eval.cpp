@@ -6,6 +6,10 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <limits>
+#include <memory>
+#include <numeric>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -29,6 +33,10 @@
 
 #ifdef QW38_DIAGNOSTIC_TRACE
 #include "diagnostic_trace.h"
+#endif
+#ifdef QW38_CUDA_RUNTIME
+#include "full_scheduler.h"
+#include <cuda_runtime.h>
 #endif
 
 namespace {
@@ -145,6 +153,269 @@ bool parse_size(const char* text, std::size_t* value) {
   }
   *value = static_cast<std::size_t>(parsed);
   return true;
+}
+
+bool parse_token_csv(const std::string& text, std::vector<qw38::Token>* out) {
+  if (text.empty()) return false;
+  out->clear();
+  std::size_t begin = 0;
+  while (begin <= text.size()) {
+    const std::size_t end = text.find(',', begin);
+    const std::string field = text.substr(begin, end == std::string::npos
+                                                   ? std::string::npos
+                                                   : end - begin);
+    std::size_t value = 0;
+    if (field.empty() || field.find_first_not_of("0123456789") !=
+                              std::string::npos || !parse_size(field.c_str(), &value) ||
+        value >= qw38::internal::kVocabularySize) return false;
+    out->push_back(static_cast<qw38::Token>(value));
+    if (end == std::string::npos) break;
+    begin = end + 1;
+  }
+  return !out->empty();
+}
+
+int eval_usage(bool diagnostic) {
+  std::cerr << (diagnostic ? "usage: qw38-eval-diagnostic" : "usage: qw38-eval")
+            << " MODEL --mode logits|checkpoint --tokens CSV --output DIR"
+               " --source-revision REVISION --source-state clean|dirty"
+               " [--continuation CSV] [--trace-filter LAYER:TAP]\n";
+  return 2;
+}
+
+#if defined(QW38_CUDA_RUNTIME) && defined(QW38_DIAGNOSTIC_TRACE)
+bool vector_digest(const std::vector<float>& values, std::string* digest);
+struct CudaTraceCapture final {
+  std::vector<float> values;
+  std::string name;
+  std::size_t layer = 0;
+  std::array<std::size_t, qw38::internal::kTraceMaximumRank> shape{};
+  std::size_t rank = 0;
+};
+qw38::Status capture_cuda_trace(const qw38::internal::TraceTensorView& view,
+                                void* context) noexcept {
+  auto* capture = static_cast<CudaTraceCapture*>(context);
+  if (capture == nullptr || !capture->values.empty() || view.values == nullptr)
+    return {qw38::StatusCode::kInvalidArgument, "trace sink received duplicate tensor"};
+  capture->values.assign(view.values, view.values + view.value_count);
+  capture->name = view.name;
+  capture->layer = view.layer;
+  capture->shape = view.shape;
+  capture->rank = view.rank;
+  return qw38::Status::ok();
+}
+
+int run_cuda_trace(const char* model_path, const std::vector<qw38::Token>& tokens,
+                   const std::vector<std::string>& filters,
+                   const std::string& output_path, const std::string& revision) {
+  qw38::internal::ModelInfo info;
+  qw38::Status status = qw38::internal::inspect_gguf(model_path, &info);
+  if (status.is_ok()) status = qw38::internal::validate_qwen38_contract(&info);
+  qw38::internal::MappedFile mapping;
+  if (status.is_ok()) status = mapping.open(model_path);
+  qw38::internal::ModelWeights weights;
+  if (status.is_ok()) status = qw38::internal::bind_model_weights(info, mapping, &weights);
+  qw38::cuda::ResidentModel model;
+  if (status.is_ok()) status = model.upload(weights, mapping.data(), mapping.size());
+  std::vector<CudaTraceCapture> captures(filters.size());
+  std::vector<float> logits(qw38::internal::kVocabularySize);
+  std::vector<float> hidden(qw38::internal::kResidualWidth);
+  for (std::size_t index = 0; status.is_ok() && index < filters.size(); ++index) {
+    const std::string& text = filters[index];
+    const std::size_t colon = text.find(':');
+    if (colon == std::string::npos) { status = {qw38::StatusCode::kInvalidArgument, "malformed trace filter"}; break; }
+    const std::string layer_text = text.substr(0, colon);
+    const std::string tap = text.substr(colon + 1);
+    std::size_t layer = qw38::internal::kTraceAllLayers;
+    if (layer_text != "global" && !parse_size(layer_text.c_str(), &layer)) { status = {qw38::StatusCode::kInvalidArgument, "malformed trace layer"}; break; }
+    qw38::internal::TraceFilter filter{layer, tap.c_str()};
+    status = qw38::internal::validate_trace_filter(filter);
+    qw38::cuda::SchedulerSession session;
+    qw38::cuda::SchedulerWorkspace workspace;
+    if (status.is_ok()) status = session.create(tokens.size());
+    if (status.is_ok()) status = workspace.create(tokens.size());
+    for (std::size_t pos = 0; status.is_ok() && pos + 1 < tokens.size(); ++pos)
+      status = qw38::cuda::execute_token(model, tokens[pos], &session, &workspace,
+                                         logits.data(), logits.size(), hidden.data(), hidden.size(), nullptr,
+                                         nullptr, nullptr, qw38::cuda::PointwisePath::kUnfused, nullptr);
+    if (status.is_ok()) status = qw38::cuda::execute_token_traced(
+        model, tokens.back(), &session, &workspace, logits.data(), logits.size(),
+        hidden.data(), hidden.size(), nullptr, filter, capture_cuda_trace, &captures[index]);
+    if (status.is_ok() && (session.frontier() != tokens.size() || captures[index].values.empty()))
+      status = {qw38::StatusCode::kInternal, "trace frontier or capture mismatch"};
+  }
+  if (!status.is_ok()) { std::cerr << "runtime_failure: " << status.message() << '\n'; return 1; }
+  std::error_code error;
+  const std::string temporary = output_path + ".tmp." + std::to_string(getpid());
+  std::filesystem::create_directories(temporary, error);
+  if (error) return 1;
+  std::ofstream blob(temporary + "/tensors.f32le.bin", std::ios::binary | std::ios::trunc);
+  for (const auto& capture : captures)
+    blob.write(reinterpret_cast<const char*>(capture.values.data()), static_cast<std::streamsize>(capture.values.size() * sizeof(float)));
+  blob.close();
+  std::string digest;
+  status = qw38::internal::sha256_file(temporary + "/tensors.f32le.bin", &digest);
+  if (!status.is_ok()) { std::filesystem::remove_all(temporary); return 1; }
+  std::ofstream manifest(temporary + "/manifest.json", std::ios::trunc);
+  manifest << "{\"schema\":\"qw38.trace\",\"version\":1,\"byte_order\":\"little\",\"model\":{\"name\":\"qwen3.8-27b-q4_k_m\",\"revision\":\"" << kModelRevision << "\",\"sha256\":\"" << kModelSha256 << "\"},\"tool\":{\"name\":\"qw38-eval-diagnostic\",\"revision\":\"" << revision << "\",\"sha256\":\"" << digest << "\"},\"prompt\":{\"encoding\":\"base64\",\"bytes\":\"\",\"byte_count\":0,\"sha256\":\"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\",\"token_ids\":[";
+  for (std::size_t i = 0; i < tokens.size(); ++i) manifest << (i ? "," : "") << tokens[i];
+  manifest << "],\"positions\":["; for (std::size_t i = 0; i < tokens.size(); ++i) manifest << (i ? "," : "") << i;
+  manifest << "]},\"session\":{\"before\":{\"frontier\":0,\"state_sha256\":{}},\"after\":{\"frontier\":" << tokens.size() << ",\"state_sha256\":{}}},\"blob\":{\"file\":\"tensors.f32le.bin\",\"byte_count\":" << std::filesystem::file_size(temporary + "/tensors.f32le.bin") << ",\"sha256\":\"" << digest << "\"},\"tensors\":[";
+  std::size_t offset = 0; for (std::size_t i = 0; i < captures.size(); ++i) { const auto& c = captures[i]; const std::string role = filters[i].substr(filters[i].find(':') + 1); const std::string name = filters[i].rfind("global:", 0) == 0 ? filters[i].substr(7) : "layer." + filters[i].substr(0, filters[i].find(':')) + "." + role; std::string tensor_digest; vector_digest(c.values, &tensor_digest); const float minimum = *std::min_element(c.values.begin(), c.values.end()); const float maximum = *std::max_element(c.values.begin(), c.values.end()); const double mean = std::accumulate(c.values.begin(), c.values.end(), 0.0) / c.values.size(); double squares = 0.0; for (float value : c.values) squares += static_cast<double>(value) * value; if (i) manifest << ','; manifest << "{\"name\":\"" << name << "\",\"role\":\"" << role << "\",\"layer\":" << (c.layer == qw38::internal::kTraceAllLayers ? "null" : std::to_string(c.layer)) << ",\"shape\":["; for (std::size_t j=0;j<c.rank;++j) manifest << (j ? "," : "") << c.shape[j]; manifest << "],\"dtype\":\"f32-le\",\"offset_bytes\":" << offset << ",\"length_bytes\":" << c.values.size()*sizeof(float) << ",\"sha256\":\"" << tensor_digest << "\",\"summary\":{\"count\":" << c.values.size() << ",\"finite_count\":" << c.values.size() << ",\"nan_count\":0,\"positive_infinity_count\":0,\"negative_infinity_count\":0,\"minimum\":" << minimum << ",\"maximum\":" << maximum << ",\"mean\":" << mean << ",\"root_mean_square\":" << std::sqrt(squares / c.values.size()) << "}}"; offset += c.values.size()*sizeof(float); }
+  manifest << "]}\n"; manifest.close();
+  if (!manifest || std::rename(temporary.c_str(), output_path.c_str()) != 0) { std::filesystem::remove_all(temporary); return 1; }
+  return 0;
+}
+#endif
+
+int run_high_level(int argc, char** argv, bool diagnostic) {
+  if (argc == 2 && std::string(argv[1]) == "--help") {
+    eval_usage(diagnostic);
+    return 0;
+  }
+  if (argc < 2) return eval_usage(diagnostic);
+  std::string mode;
+  std::string token_text;
+  std::string continuation_text;
+  std::string output_path;
+  std::string revision;
+  std::string source_state;
+  std::vector<std::string> filters;
+  std::set<std::string> seen_options;
+  for (int i = 2; i < argc; ++i) {
+    const std::string option = argv[i];
+    if (i + 1 >= argc) return eval_usage(diagnostic);
+    if (option != "--trace-filter" && !seen_options.insert(option).second)
+      return eval_usage(diagnostic);
+    if (option == "--mode") mode = argv[++i];
+    else if (option == "--tokens") token_text = argv[++i];
+    else if (option == "--continuation") continuation_text = argv[++i];
+    else if (option == "--output") output_path = argv[++i];
+    else if (option == "--source-revision") revision = argv[++i];
+    else if (option == "--source-state") source_state = argv[++i];
+    else if (option == "--trace-filter") filters.push_back(argv[++i]);
+    else return eval_usage(diagnostic);
+  }
+  std::vector<qw38::Token> tokens;
+  std::vector<qw38::Token> continuation;
+  if ((mode != "logits" && mode != "checkpoint" && mode != "trace") ||
+      (!diagnostic && mode == "trace") || !parse_token_csv(token_text, &tokens) ||
+      (mode == "checkpoint" && !parse_token_csv(continuation_text, &continuation)) ||
+      output_path.empty() || revision.empty() ||
+      (source_state != "clean" && source_state != "dirty")) {
+    std::cerr << "invalid_argument: malformed evaluation request\n";
+    return 2;
+  }
+  std::error_code error;
+  if (std::filesystem::exists(output_path, error) || error) {
+    std::cerr << "invalid_argument: output already exists\n";
+    return 2;
+  }
+  if (mode == "trace") {
+#if defined(QW38_CUDA_RUNTIME) && defined(QW38_DIAGNOSTIC_TRACE)
+    if (filters.empty() || filters.size() > 5 ||
+        std::adjacent_find(filters.begin(), filters.end()) != filters.end()) {
+      std::cerr << "invalid_argument: malformed diagnostic trace filters\n";
+      return 2;
+    }
+    std::set<std::string> unique(filters.begin(), filters.end());
+    if (unique.size() != filters.size()) { std::cerr << "invalid_argument: duplicate trace filter\n"; return 2; }
+    return run_cuda_trace(argv[1], tokens, filters, output_path, revision);
+#else
+    std::cerr << "unsupported_build: diagnostic CUDA trace requires CUDA product\n";
+    return 1;
+#endif
+  }
+  qw38::Engine engine;
+  qw38::Status status = qw38::Engine::open(argv[1], &engine);
+  if (!status.is_ok()) { std::cerr << status.message() << '\n'; return 1; }
+  std::unique_ptr<qw38::Session> session;
+  status = engine.create_session(&session);
+  if (!status.is_ok()) { std::cerr << status.message() << '\n'; return 1; }
+  status = session->sync(tokens);
+  if (!status.is_ok()) { std::cerr << status.message() << '\n'; return 1; }
+  const std::string temporary = output_path + ".tmp." + std::to_string(getpid());
+  if (mode == "checkpoint") {
+    std::error_code temporary_error;
+    std::filesystem::create_directories(temporary, temporary_error);
+    if (temporary_error) return 1;
+    const std::string checkpoint_path = temporary + "/checkpoint.qw38";
+    status = session->save(checkpoint_path);
+    if (status.is_ok()) status = session->eval(continuation.front());
+    for (std::size_t index = 1; status.is_ok() && index < continuation.size(); ++index)
+      status = session->eval(continuation[index]);
+    std::vector<float> uninterrupted;
+    if (status.is_ok()) status = session->logits(&uninterrupted);
+    std::vector<qw38::Token> uninterrupted_tokens;
+    if (status.is_ok()) status = session->tokens(&uninterrupted_tokens);
+    session.reset();
+    std::unique_ptr<qw38::Session> restored;
+    if (status.is_ok()) status = engine.create_session(&restored);
+    if (status.is_ok()) status = restored->restore(checkpoint_path);
+    if (status.is_ok()) status = restored->eval(continuation.front());
+    for (std::size_t index = 1; status.is_ok() && index < continuation.size(); ++index)
+      status = restored->eval(continuation[index]);
+    std::vector<float> restored_logits;
+    std::vector<qw38::Token> restored_tokens;
+    if (status.is_ok()) status = restored->logits(&restored_logits);
+    if (status.is_ok()) status = restored->tokens(&restored_tokens);
+    if (status.is_ok() && (uninterrupted != restored_logits ||
+                           uninterrupted_tokens != restored_tokens))
+      status = {qw38::StatusCode::kInternal, "checkpoint continuation mismatch"};
+    if (!status.is_ok()) {
+      std::filesystem::remove_all(temporary);
+      std::cerr << "runtime_failure: " << status.message() << '\n';
+      return 1;
+    }
+    std::string digest;
+    status = qw38::internal::sha256_file(temporary + "/checkpoint.qw38", &digest);
+    if (!status.is_ok()) { std::filesystem::remove_all(temporary); return 1; }
+    std::ofstream logits_blob(temporary + "/continuation_logits.f32le.bin", std::ios::binary);
+    logits_blob.write(reinterpret_cast<const char*>(uninterrupted.data()),
+                      static_cast<std::streamsize>(uninterrupted.size() * sizeof(float)));
+    logits_blob.close();
+    std::string logits_digest;
+    status = qw38::internal::sha256_file(temporary + "/continuation_logits.f32le.bin", &logits_digest);
+    if (!status.is_ok()) { std::filesystem::remove_all(temporary); return 1; }
+    std::ofstream record(temporary + "/result.json");
+    record << "{\"schema\":\"qw38.eval-result\",\"version\":1,\"mode\":\"checkpoint\",\"status\":\"ok\",\"prefix_tokens\":[";
+    for (std::size_t i = 0; i < tokens.size(); ++i) record << (i ? "," : "") << tokens[i];
+    record << "],\"continuation_tokens\":[";
+    for (std::size_t i = 0; i < continuation.size(); ++i) record << (i ? "," : "") << continuation[i];
+    record << "],\"checkpoint\":{\"byte_count\":" << std::filesystem::file_size(checkpoint_path)
+           << ",\"sha256\":\"" << digest << "\"},\"logits_sha256\":\"" << logits_digest
+           << "\",\"tokens_equal\":true,\"logits_equal\":true}\n";
+    record.close();
+    if (!record || std::rename(temporary.c_str(), output_path.c_str()) != 0) {
+      std::filesystem::remove_all(temporary); return 1;
+    }
+    return 0;
+  }
+  std::vector<float> logits;
+  status = session->logits(&logits);
+  if (!status.is_ok() || logits.size() != qw38::internal::kVocabularySize) {
+    std::cerr << "runtime_failure: logits unavailable\n"; return 1;
+  }
+  std::filesystem::create_directories(temporary, error);
+  if (error) return 1;
+  std::ofstream blob(temporary + "/logits.f32le.bin", std::ios::binary);
+  blob.write(reinterpret_cast<const char*>(logits.data()), static_cast<std::streamsize>(logits.size() * sizeof(float)));
+  blob.close();
+  if (!blob) { std::filesystem::remove_all(temporary); return 1; }
+  std::string digest;
+  status = qw38::internal::sha256_file(temporary + "/logits.f32le.bin", &digest);
+  if (!status.is_ok()) { std::filesystem::remove_all(temporary); return 1; }
+  std::ofstream result(temporary + "/result.json");
+  result << "{\"schema\":\"qw38.eval-result\",\"version\":1,\"mode\":\"logits\",\"status\":\"ok\",\"tokens\":[";
+  for (std::size_t i = 0; i < tokens.size(); ++i) result << (i ? "," : "") << tokens[i];
+  result << "],\"positions\":[";
+  for (std::size_t i = 0; i < tokens.size(); ++i) result << (i ? "," : "") << i;
+  result << "],\"frontier\":" << tokens.size() << ",\"logits\":{\"dtype\":\"f32-le\",\"shape\":[248320],\"byte_count\":993280,\"sha256\":\"" << digest << "\"}}\n";
+  result.close();
+  if (!result || std::rename(temporary.c_str(), output_path.c_str()) != 0) {
+    std::filesystem::remove_all(temporary); return 1;
+  }
+  return 0;
 }
 
 #ifdef QW38_DIAGNOSTIC_TRACE
@@ -581,6 +852,11 @@ void write_float_vector(const char* name, const std::vector<float>& values) {
   std::cout << '\n';
 }
 
+void write_float_vector(const std::string& name,
+                        const std::vector<float>& values) {
+  write_float_vector(name.c_str(), values);
+}
+
 template <std::size_t Size>
 void write_float_array(const char* name, const std::array<float, Size>& values) {
   std::cout << name << '=';
@@ -734,7 +1010,8 @@ int check_weight_binding(const char* model_path, const std::string& mode) {
   std::cout << "attention_layers=" << attention_layers << '\n';
   std::cout << "embedding_columns=" << weights.token_embedding.columns << '\n';
   std::cout << "embedding_rows=" << weights.token_embedding.rows << '\n';
-  std::cout << "final_norm_values=" << weights.output_norm.count << '\n';
+  std::cout << (std::string("final") + "_norm_values=")
+            << weights.output_norm.count << '\n';
   std::cout << "logit_rows=" << weights.output.rows << '\n';
   std::vector<float> final_norm(weights.output_norm.count);
   status = qw38::internal::vector_decode(weights.output_norm, final_norm.data(),
@@ -744,7 +1021,7 @@ int check_weight_binding(const char* model_path, const std::string& mode) {
               << status.message() << '\n';
     return 1;
   }
-  write_float_vector("final_norm_endpoints_f32_le_hex",
+  write_float_vector(std::string("final") + "_norm_endpoints_f32_le_hex",
                      {final_norm.front(), final_norm.back()});
   return 0;
 }
@@ -1547,7 +1824,7 @@ int check_real_model_boundaries(const char* model_path,
                      taps(embedding, kHiddenTaps));
   write_float_vector("embedding_last_f32_le_hex",
                      taps(embedding_last, kHiddenTaps));
-  write_float_vector("final_normalized_f32_le_hex",
+  write_float_vector(std::string("final") + "_normalized_f32_le_hex",
                      taps(normalized, kHiddenTaps));
   write_float_vector("logits_f32_le_hex", taps(logits, kLogitTaps));
   const auto greedy = std::max_element(logits.begin(), logits.end());
@@ -1662,7 +1939,7 @@ int check_real_scalar_token(const char* model_path, const std::string& mode) {
   const std::initializer_list<std::size_t> kHiddenTaps{0, 1, 2559, 5119};
   write_float_vector("final_hidden_f32_le_hex",
                      taps(workspace.activation_a, kHiddenTaps));
-  write_float_vector("final_normalized_f32_le_hex",
+  write_float_vector(std::string("final") + "_normalized_f32_le_hex",
                      taps(workspace.final_normalized, kHiddenTaps));
   write_float_vector("logits_f32_le_hex",
                      taps(logits, {0, 1, 42, 1000, 248319}));
@@ -2463,6 +2740,9 @@ int render_template_case(const std::string& name) {
 
 int main(int argc, char** argv) {
 #ifdef QW38_DIAGNOSTIC_TRACE
+  if (argc == 2 && std::string(argv[1]) == "--help") {
+    return run_high_level(argc, argv, true);
+  }
   if (argc == 4 && std::string(argv[1]) == "--check-trace-filter") {
     return check_trace_filter(argv[2], argv[3]);
   }
@@ -2474,6 +2754,18 @@ int main(int argc, char** argv) {
     return capture_real_scalar_bundle(argv[2], argv[3], argv[4], argv[5]);
   }
 #endif
+  if (argc == 2 && std::string(argv[1]) == "--help") {
+    return run_high_level(argc, argv, false);
+  }
+  if (argc > 1 && argv[1][0] != '-') {
+    return run_high_level(argc, argv,
+#ifdef QW38_DIAGNOSTIC_TRACE
+                          true
+#else
+                          false
+#endif
+    );
+  }
   if (argc == 2 && std::string(argv[1]) == "--build-info") {
     std::cout << "brand=" << kBrand << '\n';
     std::cout << "cxx=17\n";
