@@ -5,6 +5,7 @@
 #include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <iomanip>
 #include <iostream>
 #include <limits>
 #include <memory>
@@ -220,6 +221,7 @@ int run_cuda_trace(const char* model_path, const std::vector<qw38::Token>& token
   std::vector<CudaTraceCapture> captures(filters.size());
   std::vector<float> logits(qw38::internal::kVocabularySize);
   std::vector<float> hidden(qw38::internal::kResidualWidth);
+  float elapsed_milliseconds = 0.0F;
   for (std::size_t index = 0; status.is_ok() && index < filters.size(); ++index) {
     const std::string& text = filters[index];
     const std::size_t colon = text.find(':');
@@ -236,11 +238,13 @@ int run_cuda_trace(const char* model_path, const std::vector<qw38::Token>& token
     if (status.is_ok()) status = workspace.create(tokens.size());
     for (std::size_t pos = 0; status.is_ok() && pos + 1 < tokens.size(); ++pos)
       status = qw38::cuda::execute_token(model, tokens[pos], &session, &workspace,
-                                         logits.data(), logits.size(), hidden.data(), hidden.size(), nullptr,
+                                         logits.data(), logits.size(), hidden.data(), hidden.size(),
+                                         &elapsed_milliseconds,
                                          nullptr, nullptr, qw38::cuda::PointwisePath::kUnfused, nullptr);
     if (status.is_ok()) status = qw38::cuda::execute_token_traced(
         model, tokens.back(), &session, &workspace, logits.data(), logits.size(),
-        hidden.data(), hidden.size(), nullptr, filter, capture_cuda_trace, &captures[index]);
+        hidden.data(), hidden.size(), &elapsed_milliseconds, filter,
+        capture_cuda_trace, &captures[index]);
     if (status.is_ok() && (session.frontier() != tokens.size() || captures[index].values.empty()))
       status = {qw38::StatusCode::kInternal, "trace frontier or capture mismatch"};
   }
@@ -257,6 +261,7 @@ int run_cuda_trace(const char* model_path, const std::vector<qw38::Token>& token
   status = qw38::internal::sha256_file(temporary + "/tensors.f32le.bin", &digest);
   if (!status.is_ok()) { std::filesystem::remove_all(temporary); return 1; }
   std::ofstream manifest(temporary + "/manifest.json", std::ios::trunc);
+  manifest << std::setprecision(17);
   manifest << "{\"schema\":\"qw38.trace\",\"version\":1,\"byte_order\":\"little\",\"model\":{\"name\":\"qwen3.8-27b-q4_k_m\",\"revision\":\"" << kModelRevision << "\",\"sha256\":\"" << kModelSha256 << "\"},\"tool\":{\"name\":\"qw38-eval-diagnostic\",\"revision\":\"" << revision << "\",\"sha256\":\"" << digest << "\"},\"prompt\":{\"encoding\":\"base64\",\"bytes\":\"\",\"byte_count\":0,\"sha256\":\"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\",\"token_ids\":[";
   for (std::size_t i = 0; i < tokens.size(); ++i) manifest << (i ? "," : "") << tokens[i];
   manifest << "],\"positions\":["; for (std::size_t i = 0; i < tokens.size(); ++i) manifest << (i ? "," : "") << i;

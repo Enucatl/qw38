@@ -5,6 +5,19 @@
     "layout": "contiguous_in_manifest_order"
   },
   "comparison": {
+    "summary_exact_fields": [
+      "count",
+      "finite_count",
+      "nan_count",
+      "positive_infinity_count",
+      "negative_infinity_count",
+      "minimum",
+      "maximum"
+    ],
+    "summary_numeric_fields": {
+      "mean": {"absolute_tolerance": 2e-6, "relative_tolerance": 2e-6},
+      "root_mean_square": {"absolute_tolerance": 2e-6, "relative_tolerance": 2e-6}
+    },
     "cosine_for_non_finite_or_zero_norm": null,
     "finite_failure_rule": "absolute_error > absolute_tolerance AND relative_error > relative_tolerance",
     "non_finite_rule": "any NaN, +Inf, or -Inf fails admission",
