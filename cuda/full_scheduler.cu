@@ -21,13 +21,39 @@
 namespace qw38::cuda {
 namespace {
 
+Status cuda_status(cudaError_t error, const char* message) noexcept;
+
 constexpr std::size_t kGdnLayers = 48;
 constexpr std::size_t kAttentionLayers = 16;
 constexpr std::size_t kMaximumProjection = internal::kFfnWidth;
+#ifdef QW38_DIAGNOSTIC_TRACE
 constexpr std::size_t kTraceTapCount = 4;
+#endif
 constexpr GdnConfig kGdnConfig{16, 48, 128, 128, 4};
 constexpr int kThreads = 256;
 constexpr int kWarpSize = 32;
+
+#ifdef QW38_DIAGNOSTIC_TRACE
+struct TraceContext final {
+  const internal::TraceFilter* filter = nullptr;
+  internal::TraceSink sink = nullptr;
+  void* context = nullptr;
+};
+thread_local TraceContext* active_trace = nullptr;
+
+Status emit_cuda_trace(const internal::TraceFilter& filter,
+                       internal::TraceSink sink, void* context,
+                       const char* name, std::size_t layer,
+                       const float* device_values, std::size_t count,
+                       float* host_values) noexcept {
+  cudaError_t error = cudaMemcpy(host_values, device_values,
+                                 count * sizeof(float), cudaMemcpyDeviceToHost);
+  if (error != cudaSuccess) return cuda_status(error, "cannot copy CUDA trace tensor");
+  internal::TraceTensorView view{name, layer, host_values, count,
+                                 {count, 0, 0}, 1};
+  return internal::emit_trace_tensor(filter, sink, context, view);
+}
+#endif
 
 class NvtxRange final {
  public:
@@ -1035,7 +1061,9 @@ SchedulerWorkspace& SchedulerWorkspace::operator=(
   QW38_MOVE_POINTER(attention_normalized_key_);
   QW38_MOVE_POINTER(attention_scores_);
   QW38_MOVE_POINTER(logits_);
+#ifdef QW38_DIAGNOSTIC_TRACE
   QW38_MOVE_POINTER(trace_taps_);
+#endif
   QW38_MOVE_POINTER(candidate_logits_host_);
   QW38_MOVE_POINTER(candidate_hidden_host_);
   QW38_MOVE_POINTER(prompt_residual_a_);
@@ -1084,7 +1112,9 @@ void SchedulerWorkspace::release() noexcept {
   QW38_FREE(prompt_normalized_);
   QW38_FREE(prompt_residual_b_);
   QW38_FREE(prompt_residual_a_);
+#ifdef QW38_DIAGNOSTIC_TRACE
   QW38_FREE(trace_taps_);
+#endif
   QW38_FREE(logits_);
   QW38_FREE(attention_scores_);
   QW38_FREE(attention_normalized_key_);
@@ -1157,7 +1187,9 @@ Status SchedulerWorkspace::create(std::size_t capacity) noexcept {
   QW38_ALLOCATE(attention_normalized_key_, internal::kAttentionKvWidth);
   QW38_ALLOCATE(attention_scores_, 24 * capacity);
   QW38_ALLOCATE(logits_, internal::kVocabularySize);
+#ifdef QW38_DIAGNOSTIC_TRACE
   QW38_ALLOCATE(trace_taps_, kTraceTapCount * internal::kResidualWidth);
+#endif
   QW38_ALLOCATE(prompt_residual_a_,
                 kPromptChunkRows * internal::kResidualWidth);
   QW38_ALLOCATE(prompt_residual_b_,
@@ -1205,6 +1237,7 @@ std::size_t SchedulerWorkspace::allocated_bytes() const noexcept {
   return allocated_bytes_;
 }
 
+#ifdef QW38_DIAGNOSTIC_TRACE
 Status SchedulerWorkspace::copy_trace_taps(float* output,
                                            std::size_t count) const noexcept {
   if (trace_taps_ == nullptr || output == nullptr ||
@@ -1217,6 +1250,7 @@ Status SchedulerWorkspace::copy_trace_taps(float* output,
                  cudaMemcpyDeviceToHost),
       "cannot copy CUDA scheduler trace taps");
 }
+#endif
 
 Status execute_token(const ResidentModel& model, std::size_t token,
                      SchedulerSession* session, SchedulerWorkspace* workspace,
@@ -1444,15 +1478,21 @@ Status execute_token(const ResidentModel& model, std::size_t token,
     }
     if (error == cudaSuccess) error = end_phase(categories);
     nvtxRangePop();
-    std::size_t tap = kTraceTapCount;
-    if (layer_index == 0) tap = 0;
-    if (layer_index == 3) tap = 1;
-    if (layer_index == 63) tap = 2;
-    if (error == cudaSuccess && tap < kTraceTapCount) {
-      error = cudaMemcpyAsync(
-          workspace->trace_taps_ + tap * internal::kResidualWidth, residual,
-          internal::kResidualWidth * sizeof(float), cudaMemcpyDeviceToDevice);
+#ifdef QW38_DIAGNOSTIC_TRACE
+    if (error == cudaSuccess && active_trace != nullptr &&
+        (layer_index == 0 || layer_index == 3 || layer_index == 63) &&
+        internal::trace_filter_matches(*active_trace->filter, layer_index,
+                                       "layer_residual")) {
+      error = cudaDeviceSynchronize();
+      if (error == cudaSuccess) {
+        const Status trace_status = emit_cuda_trace(
+            *active_trace->filter, active_trace->sink, active_trace->context,
+            "layer_residual", layer_index, residual,
+            internal::kResidualWidth, workspace->candidate_hidden_host_);
+        if (!trace_status.is_ok()) return trace_status;
+      }
     }
+#endif
     if (error == cudaSuccess && control != nullptr &&
         control->poll != nullptr) {
       error = cudaDeviceSynchronize();
@@ -1481,12 +1521,24 @@ Status execute_token(const ResidentModel& model, std::size_t token,
     error = matrix_vector(model.output_, workspace->normalized_, workspace,
                           workspace->logits_, nullptr);
   }
-  if (error == cudaSuccess && !interrupted) {
-    bf16_to_fp32<<<20, kThreads>>>(
-        workspace->normalized_, internal::kResidualWidth,
-        workspace->trace_taps_ + 3 * internal::kResidualWidth);
+#ifdef QW38_DIAGNOSTIC_TRACE
+  if (error == cudaSuccess && !interrupted && active_trace != nullptr &&
+      internal::trace_filter_matches(*active_trace->filter,
+                                     internal::kTraceAllLayers, "final_norm")) {
+    bf16_to_fp32<<<20, kThreads>>>(workspace->normalized_,
+                                   internal::kResidualWidth,
+                                   workspace->residual_b_);
     error = cudaPeekAtLastError();
+    if (error == cudaSuccess) error = cudaDeviceSynchronize();
+    if (error == cudaSuccess) {
+      const Status trace_status = emit_cuda_trace(
+          *active_trace->filter, active_trace->sink, active_trace->context,
+          "final_norm", internal::kTraceAllLayers, workspace->residual_b_,
+          internal::kResidualWidth, workspace->candidate_hidden_host_);
+      if (!trace_status.is_ok()) return trace_status;
+    }
   }
+#endif
   if (error == cudaSuccess && !interrupted) error = cudaEventRecord(stop);
   if (error == cudaSuccess && !interrupted) error = cudaEventSynchronize(stop);
   if (error == cudaSuccess && !interrupted) {
@@ -1496,6 +1548,17 @@ Status execute_token(const ResidentModel& model, std::size_t token,
     error = cudaMemcpy(workspace->candidate_logits_host_, workspace->logits_,
                        logits_count * sizeof(float), cudaMemcpyDeviceToHost);
   }
+#ifdef QW38_DIAGNOSTIC_TRACE
+  if (error == cudaSuccess && !interrupted && active_trace != nullptr &&
+      internal::trace_filter_matches(*active_trace->filter,
+                                     internal::kTraceAllLayers, "logits")) {
+    const Status trace_status = internal::emit_trace_tensor(
+        *active_trace->filter, active_trace->sink, active_trace->context,
+        {"logits", internal::kTraceAllLayers, workspace->candidate_logits_host_,
+         logits_count, {logits_count, 0, 0}, 1});
+    if (!trace_status.is_ok()) return trace_status;
+  }
+#endif
   if (error == cudaSuccess && !interrupted) {
     error = cudaMemcpy(workspace->candidate_hidden_host_, residual,
                        hidden_count * sizeof(float),
@@ -1580,6 +1643,38 @@ Status execute_token(const ResidentModel& model, std::size_t token,
   ++session->frontier_;
   return Status::ok();
 }
+
+#ifdef QW38_DIAGNOSTIC_TRACE
+Status execute_token_traced(const ResidentModel& model, std::size_t token,
+                            SchedulerSession* session,
+                            SchedulerWorkspace* workspace, float* host_logits,
+                            std::size_t logits_count, float* host_hidden,
+                            std::size_t hidden_count,
+                            float* elapsed_milliseconds,
+                            const internal::TraceFilter& filter,
+                            internal::TraceSink sink, void* context) noexcept {
+  Status status = internal::validate_trace_filter(filter);
+  const bool layer_tap = std::strcmp(filter.tap, "layer_residual") == 0;
+  const bool global_tap = std::strcmp(filter.tap, "final_norm") == 0 ||
+                          std::strcmp(filter.tap, "logits") == 0;
+  if (!status.is_ok() || sink == nullptr ||
+      ((!layer_tap || (filter.layer != 0 && filter.layer != 3 &&
+                       filter.layer != 63)) &&
+       (!global_tap || filter.layer != internal::kTraceAllLayers))) {
+    return {StatusCode::kInvalidArgument,
+            "CUDA diagnostic trace filter is not an admitted boundary"};
+  }
+  TraceContext trace{&filter, sink, context};
+  TraceContext* previous = active_trace;
+  active_trace = &trace;
+  status = execute_token(model, token, session, workspace, host_logits,
+                         logits_count, host_hidden, hidden_count,
+                         elapsed_milliseconds, nullptr, nullptr,
+                         PointwisePath::kUnfused, nullptr);
+  active_trace = previous;
+  return status;
+}
+#endif
 
 Status execute_prompt_chunk(
     const ResidentModel& model, const std::size_t* tokens,

@@ -356,6 +356,15 @@ DSpark are explicitly rejected as Qwen model semantics.
   is authenticated in
   [`pins/cuda_prompt_scheduler_contract.json`](../pins/cuda_prompt_scheduler_contract.json)
   and [`fixtures/cuda_prompt_scheduler.json`](../fixtures/cuda_prompt_scheduler.json).
+- TRC-004 introduces no new external implementation source. It composes the
+  existing CUDA scheduler, backend-neutral diagnostic sink, scalar trace
+  contract, and immutable three-authority tolerances. The exact five-filter
+  subset, diagnostic-build isolation rule, and source identities are frozen in
+  [`pins/cuda_trace_contract.json`](../pins/cuda_trace_contract.json); full
+  token-42 metrics, greedy equality, and failure-path evidence are retained in
+  [`fixtures/cuda_trace.json`](../fixtures/cuda_trace.json). The beginner
+  explanation is [`docs/63-cuda-diagnostic-traces.md`](63-cuda-diagnostic-traces.md).
+  No CUDA trace code or tolerance is copied from an external project.
 
 ## Specialization and hardware references
 

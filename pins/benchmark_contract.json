@@ -69,8 +69,8 @@
     "unsupported_values_are_null": true
   },
   "local_sources": {
-    "README.md": "bbdb8f6bd00246195c90355225ccb666c7651f2d21b26114196208cb5576bad6",
-    "Makefile": "87f6c86514813b1a6887dfe45a27789507c86e3862343e44a32d373c466db272",
+    "README.md": "866d3a7a199090103fa5ec7c54897ed9f7bfcea070903fa68e73fd6bda0e2d8c",
+    "Makefile": "e0dbdc5cbbcdd890292e687dd1b45bbc3141c5539961c142cf3cfb419951d3e5",
     "include/qw38/engine.h": "1657c1154ea45f8b0a2f3ae5e5fab77dfb8d16e1b96602ab106dba9607b47e10",
     "src/engine.cpp": "03166fd07383462166541c96142c05c96efec90b5fde19d044ed5d2a4866e996",
     "src/bench.cpp": "ee0ecf4db7a894134acedd83dbca64095b00eadb80f4beaac80ea4d589ba3751",

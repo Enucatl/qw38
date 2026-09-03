@@ -200,7 +200,9 @@ Chapters 51–55 cover timing, fusion, CUDA graphs, the final admitted 128K
 allocation, and offline RTX 5090 dispatch tuning. Chapters 56–58 cover the
 working interactive CLI, accelerated model authentication, the HTTP control
 plane, and Chat Completions data plane. Chapters 59–61 cover Chat Completions,
-Responses continuation, and the benchmark harness.
+Responses continuation, and the benchmark harness. [CUDA diagnostic traces](docs/63-cuda-diagnostic-traces.md)
+then documents the five stable diagnostic boundaries, frozen scalar gates,
+failure atomicity, and diagnostic-build isolation.
 
 ## Measure a local smoke workload
 

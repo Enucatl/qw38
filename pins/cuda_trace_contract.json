@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "task": "TRC-004",
+  "toolkit": "CUDA 13.0.2",
+  "target": "sm_120",
+  "token": 42,
+  "filters": [
+    {"layer": 0, "tap": "layer_residual", "shape": [5120]},
+    {"layer": 3, "tap": "layer_residual", "shape": [5120]},
+    {"layer": 63, "tap": "layer_residual", "shape": [5120]},
+    {"layer": 64, "tap": "final_norm", "shape": [5120]},
+    {"layer": 64, "tap": "logits", "shape": [248320]}
+  ],
+  "scalar_contract": "pins/scalar_trace_contract.json",
+  "scalar_tolerances": "pins/scalar_oracle_tolerances.json",
+  "build_isolation": "QW38_DIAGNOSTIC_TRACE compiles the traced CUDA object; normal scheduler objects omit trace entry points and literals",
+  "source_identities": {
+    "model": "Qwen3.8-27B-Q4_K_M.gguf",
+    "device": "NVIDIA GeForce RTX 5090",
+    "compute_capability": "12.0"
+  }
+}

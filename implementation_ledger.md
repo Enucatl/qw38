@@ -44,7 +44,7 @@ are repository-relative unless stated otherwise.
 | TRC-001 | Define versioned trace bundle and typed comparison metrics | PIN-002 | done | Manifest/blob schema, checksums, summaries, session frontiers, and metric reporter pass tests | [`pins/trace_contract.json`](pins/trace_contract.json); [`tools/qw38_trace.py`](tools/qw38_trace.py); [`tests/test_trace.py`](tests/test_trace.py); log 2026-08-30T07:13:12Z |
 | TRC-003 | Add build-isolated backend-neutral trace sink and exact filters | TRC-001 | done | Diagnostic build accepts validated layer/name filters and emits typed views; release objects contain no trace API or tap names | [`src/diagnostic_trace.h`](src/diagnostic_trace.h); [`tests/test_diagnostic_trace.py`](tests/test_diagnostic_trace.py); log 2026-08-30T07:19:17Z |
 | TRC-002 | Add diagnostic-only stable scalar taps | TRC-003, CPU-016 | done | Required scalar taps use the backend-neutral sink, emit through the v1 bundle, and match filtered native scalar evidence | [`pins/scalar_trace_contract.json`](pins/scalar_trace_contract.json); [`src/scalar_runtime.cpp`](src/scalar_runtime.cpp); [`tests/test_real_scalar_trace.py`](tests/test_real_scalar_trace.py); log 2026-08-30T07:32:39Z |
-| TRC-004 | Add diagnostic-only stable CUDA taps | TRC-002, CUD-001 | pending | CUDA visible boundaries use pinned scalar tap names/shapes and pass frozen scalar/oracle comparison gates | — |
+| TRC-004 | Add diagnostic-only stable CUDA taps | TRC-002, CUD-001 | done | CUDA visible boundaries use pinned scalar tap names/shapes and pass frozen scalar/oracle comparison gates | [`cuda/full_scheduler.cu`](cuda/full_scheduler.cu); [`pins/cuda_trace_contract.json`](pins/cuda_trace_contract.json); [`fixtures/cuda_trace.json`](fixtures/cuda_trace.json); [`tests/test_cuda_trace.py`](tests/test_cuda_trace.py); [`docs/63-cuda-diagnostic-traces.md`](docs/63-cuda-diagnostic-traces.md); log 2026-09-03T10:27:00Z |
 | ORA-002 | Build and validate pinned llama.cpp same-GGUF authority harness | PIN-001, PIN-002, CPU-004 | done | Exact revision builds reproducibly; identical tokens/template run on the pinned GGUF; logits/continuation metadata and source identity are retained | [`pins/llama_authority_contract.json`](pins/llama_authority_contract.json); [`fixtures/llama_scalar_authority.json`](fixtures/llama_scalar_authority.json); [`tests/test_llama_authority.py`](tests/test_llama_authority.py); log 2026-08-30T12:27:27Z |
 | ORA-003 | Build pinned Transformers eager/offload semantic trace authority | PIN-002, TRC-002 | done | Exact source/model revisions execute within host/GPU limits and emit required taps, or an evidenced infeasibility creates an approved replacement task | [`pins/transformers_authority_contract.json`](pins/transformers_authority_contract.json); [`fixtures/transformers_scalar_authority.json`](fixtures/transformers_scalar_authority.json); [`tools/run_transformers_authority.py`](tools/run_transformers_authority.py); [`tests/test_transformers_authority.py`](tests/test_transformers_authority.py); log 2026-08-30T17:38:10Z |
 | ORA-004 | Freeze three-authority scalar fixtures and per-tap tolerances | ORA-002, ORA-003, TRC-002, CPU-004 | done | Attributed bundles compare every required tap/logit; tolerances and genuine greedy near-ties are immutable | [`fixtures/scalar_authority_alignment.json`](fixtures/scalar_authority_alignment.json); [`pins/scalar_oracle_tolerances.json`](pins/scalar_oracle_tolerances.json); [`tests/test_scalar_authority_alignment.py`](tests/test_scalar_authority_alignment.py); log 2026-08-30T18:16:04Z |
@@ -3442,6 +3442,42 @@ are repository-relative unless stated otherwise.
   `ruff format`, `ruff check`, JSON parsing, `git diff --check`, and the complete
   `local_sources` SHA-256 audit also passed. These results cover the exact bytes
   being committed, including the final token-ID preflight.
+
+### 2026-09-03T10:01:35Z — TRC-004 documentation started
+
+- Began the documentation/evidence stage for TRC-004 after the CUDA
+  implementation and token-42 fixture were present. The task remains
+  `in_progress`; no coupled task or plan change was introduced.
+- The documentation boundary is a beginner chapter covering the five exact
+  CUDA filters, scalar-pinned shapes, full-tensor metrics, greedy equality,
+  filter/sink failure atomicity, diagnostic-only build isolation, and explicit
+  non-goals. README and handbook indexes and the provenance ledger will link
+  the chapter, contract, fixture, and focused tests.
+
+### 2026-09-03T10:05:00Z — TRC-004 documentation evidence recorded
+
+- Added [`docs/63-cuda-diagnostic-traces.md`](docs/63-cuda-diagnostic-traces.md),
+  updated [`README.md`](README.md) and [`docs/README.md`](docs/README.md), and
+  added the TRC-004 provenance/evidence entry to [`docs/sources.md`](docs/sources.md).
+- Reconciled the TRC-004 row with implementation, contract, fixture, focused
+  test, and documentation evidence while preserving status `in_progress`.
+- Documentation checks: `python -m json.tool pins/cuda_trace_contract.json
+  >/dev/null` and `python -m json.tool fixtures/cuda_trace.json >/dev/null`
+  passed; `uv run pytest -q tests/test_cuda_trace.py` passed (3 tests);
+  `git diff --check` passed. CUDA device/build gates remain recorded by the
+  implementation stage and are not rerun by this documentation stage.
+
+### 2026-09-03T10:27:00Z — TRC-004 delivered
+
+- Independent verification attempt 2 passed focused trace tests, the full
+  pytest suite, clean native/diagnostic builds, pinned CUDA 13.0.2 builds,
+  RTX 5090 token-42 comparison, provenance audit, frozen scalar-gate checks,
+  and normal-object symbol/string isolation.
+- Attempt 1's provenance and diagnostic-test linkage failures were repaired
+  within scope; first-pass acceptance is `no`, with one repair retry.
+- Marked only TRC-004 `done`; there are no coupled IDs. `plan.md`,
+  `pins/scalar_trace_contract.json`, and
+  `pins/scalar_oracle_tolerances.json` remained unchanged.
 
 ## Decisions and Negative Results
 

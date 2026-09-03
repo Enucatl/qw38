@@ -12,6 +12,9 @@
 #include "qw38/status.h"
 #include "weights.h"
 #include "quant_mmv.h"
+#ifdef QW38_DIAGNOSTIC_TRACE
+#include "diagnostic_trace.h"
+#endif
 
 namespace qw38::cuda {
 
@@ -229,7 +232,9 @@ class SchedulerWorkspace final {
 
   Status create(std::size_t capacity) noexcept;
   std::size_t allocated_bytes() const noexcept;
+#ifdef QW38_DIAGNOSTIC_TRACE
   Status copy_trace_taps(float* output, std::size_t count) const noexcept;
+#endif
 
  public:
   void release() noexcept;
@@ -256,7 +261,9 @@ class SchedulerWorkspace final {
   float* attention_normalized_key_ = nullptr;
   float* attention_scores_ = nullptr;
   float* logits_ = nullptr;
+#ifdef QW38_DIAGNOSTIC_TRACE
   float* trace_taps_ = nullptr;
+#endif
   float* candidate_logits_host_ = nullptr;
   float* candidate_hidden_host_ = nullptr;
   float* prompt_residual_a_ = nullptr;
@@ -337,6 +344,17 @@ Status execute_token(const ResidentModel& model, std::size_t token,
                      PointwisePath pointwise_path =
                          PointwisePath::kFused,
                      SchedulerGraphs* graphs = nullptr) noexcept;
+
+#ifdef QW38_DIAGNOSTIC_TRACE
+Status execute_token_traced(const ResidentModel& model, std::size_t token,
+                            SchedulerSession* session,
+                            SchedulerWorkspace* workspace, float* host_logits,
+                            std::size_t logits_count, float* host_hidden,
+                            std::size_t hidden_count,
+                            float* elapsed_milliseconds,
+                            const internal::TraceFilter& filter,
+                            internal::TraceSink sink, void* context) noexcept;
+#endif
 
 Status execute_prompt_chunk(
     const ResidentModel& model, const std::size_t* tokens,

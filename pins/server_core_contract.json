@@ -38,8 +38,8 @@
     "features": ["chat_completions", "request_json", "streaming", "tools", "active_cuda_cancellation"]
   },
   "local_sources": {
-    "Makefile": "87f6c86514813b1a6887dfe45a27789507c86e3862343e44a32d373c466db272",
-    "README.md": "bbdb8f6bd00246195c90355225ccb666c7651f2d21b26114196208cb5576bad6",
+    "Makefile": "e0dbdc5cbbcdd890292e687dd1b45bbc3141c5539961c142cf3cfb419951d3e5",
+    "README.md": "866d3a7a199090103fa5ec7c54897ed9f7bfcea070903fa68e73fd6bda0e2d8c",
     ".gitignore": "961084adb4dd1a3c4bde4776aa337d8fa66e2d66e87d98f0f9e75a7e7bfa00ad",
     "src/server.cpp": "47724d77c527dd6ff61885cc4e912998b7022a9e2a040cd2705dd420d7190770",
     "src/server_core.cpp": "94b2df61560d8aa0fa777cd8588faa30a16b658e4ed2faaf57279160671f3db2",
