@@ -1,6 +1,6 @@
 ---
 name: run-ledger-task
-description: Execute one repository implementation-ledger task through fresh planning, implementation, documentation, independent verification, and authorized delivery agents. Use for requests to run a task ID from implementation_ledger.md; do not use for ad hoc changes that are not tracked there.
+description: Execute the next eligible or an explicitly selected repository implementation-ledger task through fresh planning, implementation, documentation, independent verification, and authorized delivery agents. Use for requests to advance implementation_ledger.md; do not use for ad hoc changes that are not tracked there.
 ---
 
 # Run Ledger Task
@@ -17,8 +17,17 @@ work in the coordinator. Skip a stage when it has no real work.
 
 ## Admission
 
-Parse one task ID from the request and inspect the repository before mutation.
-Reject the run without changing files unless all of these hold:
+Inspect the repository before mutation. Accept zero or one task ID:
+
+- With an explicit ID, use that task.
+- Without an ID, scan the `Gates and Tasks` table from top to bottom and select
+  the first `pending` task whose listed dependencies are all `done`. Ledger row
+  order is the deterministic priority; do not infer a different priority from
+  task names or perceived importance. Report the selected ID before mutation.
+- If more than one ID was supplied, or no eligible pending task exists, reject
+  the run without changing files.
+
+Continue only when all of these hold:
 
 - The ID occurs exactly once in the ledger, has status `pending`, and all listed
   dependencies have status `done`.
@@ -26,7 +35,7 @@ Reject the run without changing files unless all of these hold:
 - The current branch has a configured upstream.
 - The task does not require an unapproved change to `plan.md`.
 
-Also reject missing or extra IDs, unknown IDs, and terminal or already-active
+Also reject unknown IDs and terminal or already-active explicitly selected
 tasks. Report the exact failed gate and the evidence inspected.
 
 ## Stages
