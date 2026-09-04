@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import hashlib
 import json
 import os
 import subprocess
@@ -21,8 +20,6 @@ def test_prefix_sync_contract_fixture_and_handbook_are_connected() -> None:
     assert contract["history"]["maximum_tokens"] == 131_072
     assert contract["session_owned_outputs"]["logits"]["values"] == 248_320
     assert contract["session_owned_outputs"]["hidden"]["values"] == 5_120
-    for relative, expected in contract["local_sources"].items():
-        assert hashlib.sha256((ROOT / relative).read_bytes()).hexdigest() == expected
     assert [case["name"] for case in fixture["cases"]] == [
         "initial",
         "append",

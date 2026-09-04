@@ -30,8 +30,6 @@ def test_prompt_scheduler_contract_fixture_and_handbook_are_connected() -> None:
         hashlib.sha256(raw.read_bytes()).hexdigest()
         == (fixture["benchmark_smoke"]["raw_result_sha256"])
     )
-    for relative, expected in contract["local_sources"].items():
-        assert hashlib.sha256((ROOT / relative).read_bytes()).hexdigest() == expected
     chapter = (ROOT / "docs" / "62-cuda-full-prefill.md").read_text().casefold()
     for term in [
         "layer-major",

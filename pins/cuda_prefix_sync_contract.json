@@ -44,11 +44,5 @@
     "atomic rollback after CUDA failure or cancellation (completed by SES-002)",
     "disk checkpoint save and restore (SES-003)",
     "128K simultaneous fit proof (MEM-001)"
-  ],
-  "local_sources": {
-    "Makefile": "4516bad582a86fcb5323aec25fd42431b62f9825f6633988d3f8a7fab25268dd",
-    "cuda/full_scheduler.cu": "68d41bb8d231cccbc7727d2433598bf13503dba0d539e38a1548d44b1ee4ed3a",
-    "cuda/full_scheduler.h": "56eb77134617f033b7863402c6e2a1a2c93e70bcfc8d508c745b78297d3967a4",
-    "cuda/prefix_sync_test.cu": "a791c82702333187316e932956d9e65429c49317a6bb36468607142a1f9429f3"
-  }
+  ]
 }

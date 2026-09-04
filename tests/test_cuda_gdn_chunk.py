@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import hashlib
 import json
 import os
 import subprocess
@@ -19,8 +18,6 @@ def test_cuda_gdn_chunk_contract_fixture_and_handbook_are_connected() -> None:
     assert contract["scan_window_tokens"] == 64
     assert contract["admission"]["maximum_absolute_error"] == 5.0e-8
     assert contract["admission"]["maximum_rms_error"] == 5.0e-9
-    for relative, expected in contract["local_sources"].items():
-        assert hashlib.sha256((ROOT / relative).read_bytes()).hexdigest() == expected
     assert [(case["tokens"], case["windows"]) for case in fixture["cases"]] == [
         (3, 1),
         (64, 1),

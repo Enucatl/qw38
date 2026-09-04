@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import hashlib
 import json
 from pathlib import Path
 
@@ -33,11 +32,3 @@ def test_normal_scheduler_source_has_no_trace_entry_point() -> None:
     assert "execute_token_traced" in source
     guarded = source.split("#ifdef QW38_DIAGNOSTIC_TRACE", 1)[1]
     assert "execute_token_traced" in guarded
-
-
-def test_cuda_scheduler_hashes_match_current_sources() -> None:
-    contract = json.loads((ROOT / "pins/cuda_scheduler_contract.json").read_text())
-    for relative, digest in contract["local_sources"].items():
-        if relative == "cuda/full_scheduler_test.cu":
-            continue
-        assert hashlib.sha256((ROOT / relative).read_bytes()).hexdigest() == digest

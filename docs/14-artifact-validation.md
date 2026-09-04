@@ -6,6 +6,13 @@ The model file is executable input, so Quartz admits it as a versioned binary
 contract rather than accepting any file that happens to parse as GGUF. This
 implements ledger tasks PIN-001, MDL-001, and MDL-002.
 
+Feature contracts authenticate models, datasets, containers, generated
+evidence, and other external artifacts at their real admission boundaries.
+Source-file hashes are release provenance rather than feature contracts. Use
+`make release-provenance` to emit Git, build, container, and selected evidence
+identity at release time. Source edits are validated through behavior, builds,
+and semantic fixtures.
+
 ## Admission sequence
 
 `Engine::open` in [`src/engine.cpp`](../src/engine.cpp) checks the canonical byte

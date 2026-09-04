@@ -28,16 +28,5 @@
     "cancelled_chunk_leaves_frontier_and_state_unchanged": true,
     "optimized_wall_time_below_tokenwise_wall_time": true,
     "decode_graph_path_unchanged": true
-  },
-  "local_sources": {
-    "Makefile": "4516bad582a86fcb5323aec25fd42431b62f9825f6633988d3f8a7fab25268dd",
-    "cuda/full_scheduler.cu": "68d41bb8d231cccbc7727d2433598bf13503dba0d539e38a1548d44b1ee4ed3a",
-    "cuda/full_scheduler.h": "56eb77134617f033b7863402c6e2a1a2c93e70bcfc8d508c745b78297d3967a4",
-    "cuda/gdn_step.cu": "afae68c1f069d3fdd9100b94ba011142b199f61aeb07158f01ddbc6fd7dd0720",
-    "cuda/gdn_step.h": "a5230238b02a192b3060ae9eb1a46f5214a73c5fb8a32471f4a38de54c8ef615",
-    "cuda/prompt_scheduler_test.cu": "895a7cfa902f53ec43cb573fc3526d0e654d900bbbbdc227253bae4f8e25a4fa",
-    "tests/test_cuda_prompt_scheduler.py": "15c370cd1a852541419477a43ce30e9e5be66fad9f3d0851716f15a4bcbe3c93",
-    "fixtures/cuda_prompt_scheduler.json": "12745a101505a112e6e8cff4f1c154b7aa7b0ac7857f120ba35865b2974e35a6",
-    "docs/62-cuda-full-prefill.md": "304bc5a8b0fceb6fee20afca16d196e656b5ecb2a725b97a9d00d5c56811f18a"
   }
 }

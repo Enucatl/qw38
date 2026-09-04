@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import hashlib
 import json
 import os
 import subprocess
@@ -49,8 +48,6 @@ def test_dispatch_contract_fixture_and_handbook_are_connected() -> None:
     assert (
         sum(line.startswith("tune=") for line in raw.read_text().splitlines()) == 1560
     )
-    for relative, expected in contract["local_sources"].items():
-        assert hashlib.sha256((ROOT / relative).read_bytes()).hexdigest() == expected
     chapter = (ROOT / "docs" / "55-offline-dispatch-tuning.md").read_text().casefold()
     for term in [
         "dispatch table",

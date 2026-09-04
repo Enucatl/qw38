@@ -55,13 +55,5 @@
     "per_output_warp_arithmetic_order": "unchanged",
     "production_quant_fixture": "frozen numeric gates",
     "full_scheduler": "frozen trace, logits, and greedy gates"
-  },
-  "local_sources": {
-    "Makefile": "4516bad582a86fcb5323aec25fd42431b62f9825f6633988d3f8a7fab25268dd",
-    "cuda/quant_mmv.cu": "85eaf6f6f4dbc9e229f085f7eb18f8c2536df15b833923527a39ec7c90788347",
-    "cuda/quant_mmv.h": "7996383bc93b87e92c45aa6d379b9c7a075cf19a13a82516259f45e727f62538",
-    "cuda/quant_mmv_test.cu": "3e59c5f458b161bdf94ae087369ca8faee069d7a039242f8fa945e6d1f12a5b0",
-    "cuda/dispatch_tuning_test.cu": "8a8d0aec94a0782fb309634c82245f9dbd343e0cae8b919a5efa6c289a8ed412",
-    "evidence/profiling/opt004-dispatch-sweep-raw.txt": "15b5174cbe0c75b708e07f0af51b01616b011d70207fb5154960b8487395b484"
   }
 }

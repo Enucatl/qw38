@@ -39,8 +39,6 @@ def test_fusion_contract_fixture_and_handbook_are_connected() -> None:
         hashlib.sha256((ROOT / report["path"]).read_bytes()).hexdigest()
         == report["sha256"]
     )
-    for relative, expected in contract["local_sources"].items():
-        assert hashlib.sha256((ROOT / relative).read_bytes()).hexdigest() == expected
     chapter = (ROOT / "docs" / "52-profiler-led-fusion.md").read_text().casefold()
     for term in [
         "kernel launch",

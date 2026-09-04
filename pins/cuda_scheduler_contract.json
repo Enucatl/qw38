@@ -52,10 +52,5 @@
     "sha256": "03d747c8291b07f44ac47649c317a71fea633886f48e9dfbd4da6bb27ae74513",
     "numeric_envelope_result": "reported negative: token 1 cosine misses the scalar-derived envelope by approximately 0.0000028",
     "greedy_equality": true
-  },
-  "local_sources": {
-    "cuda/full_scheduler.cu": "68d41bb8d231cccbc7727d2433598bf13503dba0d539e38a1548d44b1ee4ed3a",
-    "cuda/full_scheduler.h": "56eb77134617f033b7863402c6e2a1a2c93e70bcfc8d508c745b78297d3967a4",
-    "cuda/full_scheduler_test.cu": "fa6df815c5e9df77392a090f767536db44fb301812a64539aea17be66889ddc3"
   }
 }

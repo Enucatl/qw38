@@ -33,14 +33,5 @@
     "attention_split_exact": true,
     "gdn_tiled_grouped_exact": true,
     "nonfinite_count": 0
-  },
-  "local_sources": {
-    "cuda/quant_mmv.cu": "85eaf6f6f4dbc9e229f085f7eb18f8c2536df15b833923527a39ec7c90788347",
-    "cuda/quant_mmv.h": "7996383bc93b87e92c45aa6d379b9c7a075cf19a13a82516259f45e727f62538",
-    "cuda/gdn_step.cu": "afae68c1f069d3fdd9100b94ba011142b199f61aeb07158f01ddbc6fd7dd0720",
-    "cuda/gdn_step.h": "a5230238b02a192b3060ae9eb1a46f5214a73c5fb8a32471f4a38de54c8ef615",
-    "cuda/scheduler_primitives.cu": "bbebdaceb1eac48e8d02ef8a898452eba4f9ba8c9128f1bc29f9258094154b76",
-    "cuda/scheduler_primitives.h": "a0d5033702d8e425672a3beae548a4333fb481fd4525bc347e93ac6238573f24",
-    "cuda/scheduler_primitives_test.cu": "85e292a5da3c4d0924e22dde5ee59847dffb097646f3d49a7a7dfe124da380cf"
   }
 }

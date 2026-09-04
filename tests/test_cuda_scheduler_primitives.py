@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import hashlib
 import json
 import os
 import subprocess
@@ -23,8 +22,6 @@ def test_scheduler_primitives_contract_fixture_and_handbook_are_connected() -> N
     assert shape["residual_width"] == 5_120
     assert shape["ffn_width"] == 17_408
     assert contract["resident_weight_formats"] == ["Q4_K", "Q6_K", "Q8_0"]
-    for relative, expected in contract["local_sources"].items():
-        assert hashlib.sha256((ROOT / relative).read_bytes()).hexdigest() == expected
     assert all(
         case["transient_q8_exact"] and case["nonfinite"] == 0
         for case in fixture["q8_0_mmv"]

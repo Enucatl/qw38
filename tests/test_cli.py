@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import hashlib
 import json
 import os
 import subprocess
@@ -21,8 +20,6 @@ def test_cli_contract_and_beginner_handbook_are_connected() -> None:
     assert contract["production_binary"] == "build/cuda/qw38"
     assert contract["host_binary_scope"] == "validation_only"
     assert contract["generation_order"] == ["sample", "eval", "publish"]
-    for relative, expected in contract["local_sources"].items():
-        assert hashlib.sha256((ROOT / relative).read_bytes()).hexdigest() == expected
     assert fixture["environment"]["model_sha256"] == contract["model_sha256"]
     assert fixture["result"]["passed"] is True
     assert fixture["result"]["visible_answer"] == "hello"

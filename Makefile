@@ -187,4 +187,7 @@ $(BUILD_DIR)/qw38-cuda-graph-test: cuda/graph_test.cu $(BUILD_DIR)/full_schedule
 clean:
 	rm -rf $(BUILD_DIR)
 
+release-provenance:
+	uv run python tools/release_provenance.py --require-clean
+
 -include $(LIB_OBJECTS:.o=.d) $(DIAGNOSTIC_OBJECTS:.o=.d) $(THIRD_PARTY_OBJECTS:.o=.d) $(BUILD_DIR)/cli.d $(BUILD_DIR)/server.d $(BUILD_DIR)/bench.d $(BUILD_DIR)/eval.d

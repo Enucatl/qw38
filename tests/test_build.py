@@ -142,8 +142,6 @@ def test_accelerated_sha256_evidence_and_handbook_are_connected() -> None:
         (ROOT / "pins" / "sha256_acceleration_contract.json").read_text()
     )
     fixture = json.loads((ROOT / "fixtures" / "sha256_acceleration.json").read_text())
-    for relative, expected in contract["local_sources"].items():
-        assert hashlib.sha256((ROOT / relative).read_bytes()).hexdigest() == expected
     assert contract["identity"]["changed"] is False
     assert contract["identity"]["expected_digest"] == fixture["model"]["sha256"]
     assert (

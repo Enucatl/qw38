@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import hashlib
 import json
 import os
 import subprocess
@@ -23,8 +22,6 @@ def test_atomic_eval_contract_fixture_and_handbook_are_connected() -> None:
     assert contract["sampling"]["mutation"] == "none"
     assert fixture["workspace_bytes_at_capacity_3"] == 186_300_192
     assert all(case["passed"] for case in fixture["cases"])
-    for relative, expected in contract["local_sources"].items():
-        assert hashlib.sha256((ROOT / relative).read_bytes()).hexdigest() == expected
     chapter = (ROOT / "docs" / "48-atomic-eval-and-sampling.md").read_text().casefold()
     for term in [
         "transaction",

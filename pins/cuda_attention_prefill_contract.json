@@ -42,10 +42,5 @@
     "complete 16-layer KV allocation with model weights and graphs",
     "1.5 GiB post-graph free reserve",
     "request-level atomicity across all 64 layers"
-  ],
-  "local_sources": {
-    "cuda/attention_decode.cu": "0824a9afb4f9b5fdb0dfea1d2d4a7a01919035dc3bc796e10ffcfb0703d61406",
-    "cuda/attention_decode.h": "9e38fce3691ec22a59e5595c62628d7cd4a8dca5747865c56c85cd2e78aaca81",
-    "cuda/attention_chunk_test.cu": "b5e768967a49cd9c4f25ce37110edb37a0cc2502a5ba509a1fe6642060527c72"
-  }
+  ]
 }

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import hashlib
 import json
 import os
 import subprocess
@@ -38,8 +37,6 @@ def test_full_scheduler_contract_fixture_and_handbook_are_connected() -> None:
         ],
         "nonfinite": 0,
     }
-    for relative, expected in contract["local_sources"].items():
-        assert hashlib.sha256((ROOT / relative).read_bytes()).hexdigest() == expected
     assert all(case["passed"] for case in fixture["scalar_logit_comparisons"])
     assert all(case["passed"] for case in fixture["scalar_tap_comparisons"])
     assert fixture["greedy"] == [3_649, 1_277]

@@ -45,21 +45,5 @@
     "http_protocol": true,
     "codex_provider": true,
     "concurrent_gpu_sessions": true
-  },
-  "local_sources": {
-    "README.md": "ac90047aca905bef8bf46b6dbc7d862e83662806d957a46ef0bf5c90891ded4c",
-    "Makefile": "4516bad582a86fcb5323aec25fd42431b62f9825f6633988d3f8a7fab25268dd",
-    "include/qw38/engine.h": "1657c1154ea45f8b0a2f3ae5e5fab77dfb8d16e1b96602ab106dba9607b47e10",
-    "src/engine.cpp": "03166fd07383462166541c96142c05c96efec90b5fde19d044ed5d2a4866e996",
-    "src/cli.cpp": "8c06875e62e6bf8423b47181d702efca38d922453236e86e596908fc53de2477",
-    "src/tokenizer.cpp": "83a11e2b283e5ede080fb5614811b29e1b90b0ed60db34451005315140961a05",
-    "src/tokenizer.h": "9d5c648f830fc07af941a7a1fe4b12ca633ec39347425ce074d7a4fff06b45a3",
-    "src/template.cpp": "6ad0963b5649850c3b2d7b028485c11d4cbf19b2935734e5d39eeaf663242ec5",
-    "src/template.h": "3b90f10837353ef018751fa270a664623cf46587687c87bb15a8293390488cef",
-    "cuda/full_scheduler.cu": "68d41bb8d231cccbc7727d2433598bf13503dba0d539e38a1548d44b1ee4ed3a",
-    "cuda/full_scheduler.h": "56eb77134617f033b7863402c6e2a1a2c93e70bcfc8d508c745b78297d3967a4",
-    "tests/test_cli.py": "aa708b624f600723674c4e1ba057343942230de4bc1754614314368855f2d8b9",
-    "fixtures/cli_smoke.json": "6c9683758af5d0392727f17bada2c2c0030887cf7514c6645e7cfe457c863bcb",
-    "docs/56-interactive-text-cli.md": "254e8a01017827e78d9586658b6ce49338c756a2da1625bddac9e33df8a62597"
   }
 }

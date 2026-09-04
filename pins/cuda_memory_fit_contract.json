@@ -30,14 +30,5 @@
     "post_graph_MEM_001": "passed",
     "post_prompt_scratch_MEM_002": "passed",
     "reason": "the complete owner set leaves at least 1.5 GiB free after graph upload"
-  },
-  "local_sources": {
-    "Makefile": "4516bad582a86fcb5323aec25fd42431b62f9825f6633988d3f8a7fab25268dd",
-    "cuda/memory_fit_test.cu": "5bda5e6af27a56aee6ed2c01cec88cbc4947e73a6efcfd177fd31f5ee0963b3f",
-    "cuda/full_scheduler.cu": "68d41bb8d231cccbc7727d2433598bf13503dba0d539e38a1548d44b1ee4ed3a",
-    "cuda/full_scheduler.h": "56eb77134617f033b7863402c6e2a1a2c93e70bcfc8d508c745b78297d3967a4",
-    "tests/test_cuda_memory_fit.py": "daee0b3f6e794facc43aa57e293d9b47d0a7539e86596a62d14cb7f7ab0104e8",
-    "fixtures/cuda_memory_fit_post_graph.json": "0890051f5558638bdbabdd837fb73c9ea49b4c6286b153187efa0e05d67f93e9",
-    "docs/54-post-graph-128k-memory.md": "bbb4a5c80932a4cae333b94dcd656a9319861d4097746def83ce79edf4cef06e"
   }
 }

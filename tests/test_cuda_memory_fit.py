@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import hashlib
 import json
 import os
 import subprocess
@@ -37,8 +36,6 @@ def test_post_graph_memory_contract_fixture_and_handbook_are_connected() -> None
     assert fixture["owners"]["graph_bytes"] == 6_291_456
     assert pre_graph["owners"]["graph_bytes"] is None
     assert not pre_graph["post_graph_admitted"]
-    for relative, expected in contract["local_sources"].items():
-        assert hashlib.sha256((ROOT / relative).read_bytes()).hexdigest() == expected
     chapter = (ROOT / "docs" / "54-post-graph-128k-memory.md").read_text().casefold()
     for term in [
         "131,072",

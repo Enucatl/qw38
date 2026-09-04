@@ -45,20 +45,5 @@
       "tools",
       "active_cuda_cancellation"
     ]
-  },
-  "local_sources": {
-    "Makefile": "4516bad582a86fcb5323aec25fd42431b62f9825f6633988d3f8a7fab25268dd",
-    "README.md": "ac90047aca905bef8bf46b6dbc7d862e83662806d957a46ef0bf5c90891ded4c",
-    ".gitignore": "961084adb4dd1a3c4bde4776aa337d8fa66e2d66e87d98f0f9e75a7e7bfa00ad",
-    "src/server.cpp": "47724d77c527dd6ff61885cc4e912998b7022a9e2a040cd2705dd420d7190770",
-    "src/server_core.cpp": "94b2df61560d8aa0fa777cd8588faa30a16b658e4ed2faaf57279160671f3db2",
-    "src/server_core.h": "930a8e8ac6914f80a77e7194fa47023ff0b333bdff759279306220707fa870e8",
-    "src/server_core_test.cpp": "754796d5836452e1fa80924676325e34f0f524996e9b848040469e639288d518",
-    "tests/test_server.py": "d4b9e6c6ad140e6b182785bab1e09cd9ec097e1726685b94b775e3a68a9fc399",
-    "fixtures/server_core.json": "50c404ede9cfeac92551736273ab3e4b3b25508f972e4c50549dfcf4c52584ec",
-    "docs/58-http-server-core.md": "6246b7296a13f9d2c15de5ba8153299530dc267886c8f3d5740b78503158485b",
-    "docs/architecture/architecture.architecture.json": "99ee92f84eab813a47331431663f7d524d8687945858dbc712ae6c0f582614d2",
-    "docs/architecture/qw38-runtime-architecture.svg": "f5bbe0ad2e0fb9bba78e139b541a8e9bcf28e9fd209b3780b5f6e3e835d16e26",
-    "docs/architecture/architecture.html": "dd122b613436f57004c8a12fcf5c92404dcbf61ba8cf38b2bc98d6c2622d76b4"
   }
 }

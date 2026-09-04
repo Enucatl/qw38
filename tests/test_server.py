@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import hashlib
 import http.client
 import json
 import os
@@ -42,8 +41,6 @@ def test_server_contract_fixture_and_handbook_are_connected() -> None:
     assert fixture["routes"]["GET /health"]["status"] == 200
     assert fixture["routes"]["GET /v1/models"]["status"] == 200
     assert fixture["routes"]["malformed"]["status"] == 400
-    for relative, expected in contract["local_sources"].items():
-        assert hashlib.sha256((ROOT / relative).read_bytes()).hexdigest() == expected
 
     handbook = (ROOT / "docs" / "58-http-server-core.md").read_text().casefold()
     for term in [
@@ -114,8 +111,6 @@ def test_chat_completions_contract_fixture_and_handbook_are_connected() -> None:
     assert fixture["cuda_smoke"]["second_request_queue_depth"] == 1
     assert fixture["cuda_smoke"]["active_disconnect_cancelled"] is True
     assert fixture["cuda_smoke"]["healthy_after_cancellation"] is True
-    for relative, expected in contract["local_sources"].items():
-        assert hashlib.sha256((ROOT / relative).read_bytes()).hexdigest() == expected
 
     handbook = (ROOT / "docs" / "59-chat-completions.md").read_text().casefold()
     for term in [
@@ -172,8 +167,6 @@ def test_responses_api_mapping_storage_and_handbook_are_connected() -> None:
     assert fixture["cuda_smoke"]["previous_response_id_exact_prefix"] is True
     assert fixture["cuda_smoke"]["store_false_not_continuable"] is True
     assert fixture["cuda_smoke"]["restart_replay"] is True
-    for relative, expected in contract["local_sources"].items():
-        assert hashlib.sha256((ROOT / relative).read_bytes()).hexdigest() == expected
 
     handbook = (
         (ROOT / "docs" / "60-responses-and-continuation.md").read_text().casefold()

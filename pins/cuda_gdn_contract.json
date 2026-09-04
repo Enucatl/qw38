@@ -28,10 +28,5 @@
     "nonfinite_count": 0,
     "prepare_preserves_committed_bytes": true,
     "commit_matches_candidate_bytes": true
-  },
-  "local_sources": {
-    "cuda/gdn_step.cu": "afae68c1f069d3fdd9100b94ba011142b199f61aeb07158f01ddbc6fd7dd0720",
-    "cuda/gdn_step.h": "a5230238b02a192b3060ae9eb1a46f5214a73c5fb8a32471f4a38de54c8ef615",
-    "cuda/gdn_step_test.cu": "c5fe6296904f2933e29b0ebf794d43ec2606ed6741d0821ba681f11c0e69e312"
   }
 }

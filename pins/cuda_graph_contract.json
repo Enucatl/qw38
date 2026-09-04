@@ -38,11 +38,5 @@
     "minimum_warmups": 3,
     "minimum_paired_samples": 30,
     "graph_allocation_must_be_measured": true
-  },
-  "local_sources": {
-    "Makefile": "4516bad582a86fcb5323aec25fd42431b62f9825f6633988d3f8a7fab25268dd",
-    "cuda/full_scheduler.h": "56eb77134617f033b7863402c6e2a1a2c93e70bcfc8d508c745b78297d3967a4",
-    "cuda/full_scheduler.cu": "68d41bb8d231cccbc7727d2433598bf13503dba0d539e38a1548d44b1ee4ed3a",
-    "cuda/graph_test.cu": "54ff361ba6f5d3a40bbc5d45920ea78767ac8e505f5a38c488ac2b385424af55"
   }
 }

@@ -121,8 +121,6 @@ def test_benchmark_contract_fixture_and_handbook_are_connected() -> None:
     )
     assert reuse["cache_policy"] == "agent-reuse"
     assert reuse["samples"][1]["reused_prefix_tokens"] > 0
-    for relative, expected in contract["local_sources"].items():
-        assert hashlib.sha256((ROOT / relative).read_bytes()).hexdigest() == expected
 
     chapter = (ROOT / "docs" / "61-benchmark-harness.md").read_text().casefold()
     for term in [

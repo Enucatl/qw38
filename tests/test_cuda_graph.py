@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import hashlib
 import json
 import math
 import os
@@ -30,8 +29,6 @@ def test_graph_contract_fixture_and_handbook_are_connected() -> None:
     assert run["graph_mean_ms"] < run["ordinary_mean_ms"]
     assert all(run["exact"].values())
     assert all(speedup > 1.0 for speedup in fixture["replicate_speedups"])
-    for relative, expected in contract["local_sources"].items():
-        assert hashlib.sha256((ROOT / relative).read_bytes()).hexdigest() == expected
     chapter = (
         (ROOT / "docs" / "53-stable-address-cuda-graphs.md").read_text().casefold()
     )

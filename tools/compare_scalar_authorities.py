@@ -439,19 +439,6 @@ def compare(args: argparse.Namespace) -> dict[str, Any]:
                 "quartz_sha256": sha256(args.quartz_blob),
                 "llama_cpp_sha256": sha256(args.llama_blob),
             },
-            "local_sources": {
-                name: sha256(ROOT / name)
-                for name in (
-                    "src/attention.cpp",
-                    "src/conversion.cpp",
-                    "src/gdn.cpp",
-                    "src/mixer.cpp",
-                    "src/scalar_runtime.cpp",
-                    "tools/compare_scalar_authorities.py",
-                    "tools/llama_authority/token_oracle.cpp",
-                    "tools/transformers_taps.py",
-                )
-            },
         },
         "comparisons": rows,
     }

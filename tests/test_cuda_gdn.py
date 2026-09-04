@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import hashlib
 import json
 import os
 import subprocess
@@ -19,8 +18,6 @@ def test_cuda_gdn_contract_fixture_and_handbook_are_connected() -> None:
     assert contract["production_shape"]["recurrent_state_values"] == 786_432
     assert contract["admission"]["maximum_absolute_error"] == 5.0e-8
     assert contract["admission"]["maximum_rms_error"] == 5.0e-9
-    for relative, expected in contract["local_sources"].items():
-        assert hashlib.sha256((ROOT / relative).read_bytes()).hexdigest() == expected
     assert [case["name"] for case in fixture["cases"]] == ["small", "production"]
     assert all(
         case["prepare_atomic"] and case["commit_exact"] and case["nonfinite"] == 0

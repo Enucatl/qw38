@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import hashlib
 import json
 import os
 import subprocess
@@ -21,8 +20,6 @@ def test_checkpoint_contract_fixture_and_handbook_are_connected() -> None:
     assert fixture["checkpoint_bytes"] == sum(fixture["section_bytes"].values())
     assert fixture["checkpoint_bytes"] == 160_004_416
     assert all(case["passed"] for case in fixture["cases"])
-    for relative, expected in contract["local_sources"].items():
-        assert hashlib.sha256((ROOT / relative).read_bytes()).hexdigest() == expected
     chapter = (ROOT / "docs" / "49-cuda-checkpoints.md").read_text().casefold()
     for term in [
         "checkpoint",

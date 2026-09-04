@@ -25,11 +25,5 @@
     "structured output",
     "parallel tool calls",
     "background mode"
-  ],
-  "local_sources": {
-    "src/responses_api.cpp": "d46e97c061f7737c143771f08b26770feebdfda3b43f2c85ccf8aba6ff7709eb",
-    "src/response_store.cpp": "b7d22cf6ddc209f8cda2c8228b9edde75d57f112e0977c4ae5910d36988c6092",
-    "src/server.cpp": "47724d77c527dd6ff61885cc4e912998b7022a9e2a040cd2705dd420d7190770",
-    "src/template.cpp": "6ad0963b5649850c3b2d7b028485c11d4cbf19b2935734e5d39eeaf663242ec5"
-  }
+  ]
 }

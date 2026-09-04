@@ -37,10 +37,5 @@
     "arbitrary multi-token causal prefill",
     "memory-bounded score tiling",
     "131072-token capacity boundary"
-  ],
-  "local_sources": {
-    "cuda/attention_decode.cu": "0824a9afb4f9b5fdb0dfea1d2d4a7a01919035dc3bc796e10ffcfb0703d61406",
-    "cuda/attention_decode.h": "9e38fce3691ec22a59e5595c62628d7cd4a8dca5747865c56c85cd2e78aaca81",
-    "cuda/attention_decode_test.cu": "488270606495875d4176fdf8fdcacfeb6decb0fbbc9dd758f98e0629812bf417"
-  }
+  ]
 }

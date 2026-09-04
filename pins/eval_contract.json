@@ -35,11 +35,5 @@
     "global:final_norm",
     "global:logits"
   ],
-  "publication": "atomic-absent-destination",
-  "local_sources": {
-    "src/eval.cpp": "a6d0e7c9b87e0ec7176cc478066072ce00250ba67141a0e9c175ff33c7178bbc",
-    "tools/qw38_eval.py": "4bd3fb784e7a39137af10fc49f8d303779941c11dce1956877a692d12dad9658",
-    "tests/test_eval.py": "5b2171b9d5422883f71134fa460ff3d209a2f7713e00f86e5f4d90400c0564d5",
-    "tests/test_build.py": "899aa2a4434fffa530cd5d1dad2dd1023774ce5c6603d01915821e7abbf56f97"
-  }
+  "publication": "atomic-absent-destination"
 }
