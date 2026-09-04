@@ -28,6 +28,9 @@ def test_cpu_laptop_contract_matches_geometry_and_handbook() -> None:
     assert contract["host"]["default_context"] == 4096
     assert contract["host"]["maximum_context"] == 8192
     assert contract["host"]["required_isa"] == "AVX2"
+    assert contract["host"]["threads_max"] == 8
+    assert contract["host"]["threads_policy"] == "hw.logicalcpu capped at 8"
+    assert "threads" not in contract["host"]
     handbook = (ROOT / "docs" / "66-cpu-laptop-2b.md").read_text()
     for term in (
         "tied",
@@ -36,11 +39,16 @@ def test_cpu_laptop_contract_matches_geometry_and_handbook() -> None:
         "Qwen3.5-2B",
         "does not replace v1",
         "measured",
+        "Intel MacBook + AVX2",
+        "hw.logicalcpu",
+        "this SKU",
     ):
         assert term in handbook
     readme = (ROOT / "README.md").read_text()
     assert "Chat on a CPU MacBook" in readme
+    assert "Intel MacBook + AVX2" in readme
     assert "Qwen3.5-2B-Q4_K_M.gguf" in readme
+    assert "apple_silicon" in contract["excluded"]
 
 
 def test_cpu_pin_is_recorded_without_committing_weights() -> None:

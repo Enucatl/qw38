@@ -248,6 +248,20 @@ Still excluded from this track: Linux/Windows CPU product builds, Apple Silicon,
 AVX-512, BLAS, Iris/Metal, 4B/9B/27B-on-CPU, vision, MTP, and 128K laptop
 context. A later change note is required before generalizing to any CPU laptop.
 
+### 2026-09-04 — Darwin/x86_64 AVX2 class (not one SKU)
+
+This is an additive clarification of the Darwin Qwen3.5-2B host path. It does
+not replace v1 CUDA, admit Apple Silicon, or change the pinned 2B GGUF.
+
+The supported class is Intel MacBook + AVX2, not the measured i7-8569U SKU.
+Host matvec workers are `hw.logicalcpu` clamped to `[1, 8]` so this 4c/8t
+laptop stays at eight workers. Darwin/x86_64 builds fail closed without AVX2
+at compile time; host `Engine::open` fails closed without AVX2 at runtime.
+Throughput numbers remain measured on this SKU, not a portable SLO.
+
+Apple Silicon, NEON, Metal, raising the eight-worker cap, 27B-on-CPU, and
+Linux/Windows CPU product remain excluded.
+
 ### 2026-09-02 — Additive 2B load/forward numeric gates
 
 This is an additive numeric-proof track for the Darwin Qwen3.5-2B host path. It

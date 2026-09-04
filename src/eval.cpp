@@ -3121,7 +3121,7 @@ int measure_host_decode(const char* model_path, std::size_t prompt_tokens,
                                        : 0.0)
             << '\n';
   std::cout << "rss_bytes=" << rss_bytes << '\n';
-  std::cout << "threads=8\n";
+  std::cout << "threads=" << qw38::internal::matvec_worker_count() << '\n';
   std::cout << "sha256_backend=" << qw38::internal::sha256_backend_name()
             << '\n';
   return 0;

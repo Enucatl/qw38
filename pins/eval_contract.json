@@ -68,7 +68,7 @@
     "global:logits"
   ],
   "local_sources": {
-    "src/eval.cpp": "5051b435bf22bf61c5c6162d453a4749f70df44ac46373a3fc6f9053679a7bf3",
+    "src/eval.cpp": "7ff903e62f60ede43d5db01c6a949bb84e70ea6923b0c270e9bd26c1a2a2e96b",
     "tools/qw38_eval.py": "4bd3fb784e7a39137af10fc49f8d303779941c11dce1956877a692d12dad9658",
     "tests/test_eval.py": "5b2171b9d5422883f71134fa460ff3d209a2f7713e00f86e5f4d90400c0564d5",
     "tests/test_build.py": "71cecc34ce21d6c19b162d8a4ddc9044fa17bda84760a7a5c6d85541659dcf52"

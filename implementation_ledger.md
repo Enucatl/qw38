@@ -144,6 +144,8 @@ are repository-relative unless stated otherwise.
 | MAC-012 | Freeze 2B bind, tokenizer, GDN, attention, FFN, and full-token structural taps | MAC-003, MAC-004, MAC-011 | done | Skip-if-missing pytest compares live `qw38-eval` to frozen 2B fixtures; 27B real-* tests still skip without 27B | [`tests/test_cpu_numeric.py`](tests/test_cpu_numeric.py); log 2026-09-02T10:35:00Z |
 | MAC-013 | Compare 2B scalar logits to Darwin CPU llama.cpp on the same GGUF | MAC-012, ORA-002 | done | Checked-in metrics retain vocab, greedy IDs, and error envelopes; pytest does not rebuild llama.cpp | [`fixtures/cpu_llama_scalar_authority.json`](fixtures/cpu_llama_scalar_authority.json); [`tools/build_llama_cpu_oracle.sh`](tools/build_llama_cpu_oracle.sh); log 2026-09-02T10:35:00Z |
 | DOC-CPU-002 | Document the 2B numeric proof ladder in the CPU laptop handbook | MAC-013, DOC-CPU-001 | done | Scalar vs AVX2, llama same-GGUF, skip-if-missing, and GGUF-load vs HF-Transformers limits are code-linked | [`docs/66-cpu-laptop-2b.md`](docs/66-cpu-laptop-2b.md); log 2026-09-02T10:35:00Z |
+| MAC-014 | Clamp host matvec workers to `hw.logicalcpu` capped at 8; fail closed without AVX2 | MAC-007, MAC-005 | done | This 4c/8t i7 still uses 8 workers; Darwin/x86_64 `#error` without AVX2; host `Engine::open` rejects missing AVX2 via CPUID | [`src/tensor.cpp`](src/tensor.cpp); [`src/engine.cpp`](src/engine.cpp); log 2026-09-04T04:11:11Z |
+| DOC-CPU-003 | Document the Intel MacBook + AVX2 class vs this SKU’s measured numbers | MAC-014, DOC-CPU-001 | done | Handbook and README state the class, keep i7-8569U tok/s as measured-on-this-SKU, and leave Apple Silicon excluded | [`docs/66-cpu-laptop-2b.md`](docs/66-cpu-laptop-2b.md); [`README.md`](README.md); log 2026-09-04T04:11:11Z |
 
 ## Delivery-Gate Mapping
 
@@ -161,7 +163,7 @@ are repository-relative unless stated otherwise.
 | 10. Product tools/API/quality | CLI-001, SRV-001–SRV-003, BEN-001, EVAL-001, QLT-001 |
 | 11. Comparative speed | CMP-001–CMP-003 |
 | 12. Documentation/release | DOC-001, REL-001 |
-| Additive Darwin 2B CPU laptop | MAC-001–MAC-013, DOC-CPU-001, DOC-CPU-002 |
+| Additive Darwin 2B CPU laptop | MAC-001–MAC-014, DOC-CPU-001–DOC-CPU-003 |
 
 ## Chronological UTC Log
 
@@ -3679,3 +3681,24 @@ are repository-relative unless stated otherwise.
 - Confirmed the complete diff is within the dossier allowlist, `plan.md` is
   unchanged, and no generated model outputs are included. Marked only
   EVAL-001 `done`; coupled IDs remain `none`.
+
+### 2026-09-04T04:01:00Z — Darwin/x86_64 AVX2 class track opened
+
+- Recorded a plan.md change note: the 2B host path is an Intel MacBook + AVX2
+  class, not the measured i7-8569U SKU. Workers are `hw.logicalcpu` capped at
+  8. Apple Silicon, 27B-on-CPU, and Linux/Windows CPU product stay excluded.
+- Entered MAC-014 and DOC-CPU-003 as pending before implementation.
+- No CUDA task status changed. Frozen 2B numeric fixtures are not regenerated.
+
+### 2026-09-04T04:11:11Z — MAC-014 and DOC-CPU-003 done
+
+- Host matvec pool cap remains 8. `start_matvec_pool` spawns
+  `clamp(hw.logicalcpu, 1, 8)` workers and slices rows by that live count.
+  `qw38-eval` prints the live `threads=` value. Darwin/x86_64 `#error` without
+  AVX2; host `Engine::open` fail-closes 2B without CPUID AVX2. No brand-string
+  check.
+- Pin `threads` became `threads_max` plus `threads_policy`. Handbook/README
+  state the Intel MacBook + AVX2 class; i7-8569U 5.61 tok/s stays measured on
+  this SKU. `apple_silicon` remains excluded.
+- Host `make` and pytest: 132 passed, 65 skipped. No CUDA task status changed.
+  Frozen 2B numeric fixtures were not regenerated.

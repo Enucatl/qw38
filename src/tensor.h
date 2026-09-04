@@ -46,6 +46,7 @@ Status tensor_row_dot(const TensorView& view, std::size_t row,
 Status tensor_matvec(const TensorView& view, const float* activation,
                      std::size_t activation_count, float* output,
                      std::size_t output_count) noexcept;
+std::size_t matvec_worker_count() noexcept;
 
 }  // namespace qw38::internal
 

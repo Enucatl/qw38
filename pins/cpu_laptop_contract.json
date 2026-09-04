@@ -17,7 +17,8 @@
     "os": "Darwin",
     "arch": "x86_64",
     "required_isa": "AVX2",
-    "threads": 8,
+    "threads_max": 8,
+    "threads_policy": "hw.logicalcpu capped at 8",
     "default_context": 4096,
     "maximum_context": 8192,
     "rss_budget_bytes": 10737418240

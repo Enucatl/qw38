@@ -1,5 +1,9 @@
 #include "qw38/engine.h"
 
+#if defined(__APPLE__) && defined(__x86_64__) && !defined(__AVX2__)
+#error "Darwin/x86_64 host inference requires AVX2 (-mavx2)"
+#endif
+
 #include <algorithm>
 #include <chrono>
 #include <cmath>
@@ -9,6 +13,12 @@
 #include <memory>
 #include <numeric>
 #include <utility>
+
+#ifndef QW38_CUDA_RUNTIME
+#if defined(__x86_64__) || defined(_M_X64)
+#include <cpuid.h>
+#endif
+#endif
 
 #include "model.h"
 #include "scalar_runtime.h"
@@ -47,6 +57,22 @@ constexpr const char* kPinnedCpuModelSha256 =
 Status unavailable(const char* operation) noexcept {
   return {StatusCode::kUnimplemented,
           std::string(operation) + " has not passed its delivery gate"};
+}
+
+bool host_cpu_has_avx2() noexcept {
+#if defined(__AVX2__) && (defined(__x86_64__) || defined(_M_X64))
+  unsigned int eax = 0;
+  unsigned int ebx = 0;
+  unsigned int ecx = 0;
+  unsigned int edx = 0;
+  if (__get_cpuid_count(7, 0, &eax, &ebx, &ecx, &edx) == 0) {
+    return false;
+  }
+  constexpr unsigned int kAvx2Bit = 1u << 5;
+  return (ebx & kAvx2Bit) != 0;
+#else
+  return false;
+#endif
 }
 #endif
 
@@ -123,6 +149,13 @@ Status Engine::open(const std::string& model_path, std::size_t context,
   if (!status.is_ok()) {
     return status;
   }
+#ifndef QW38_CUDA_RUNTIME
+  if (geometry.identity == internal::kGeometryQwen35_2B &&
+      !host_cpu_has_avx2()) {
+    return {StatusCode::kUnimplemented,
+            "Qwen3.5-2B host inference requires AVX2"};
+  }
+#endif
   if (geometry.identity == internal::kGeometryQwen38_27B) {
     if (bytes != kPinnedModelBytes) {
       return {StatusCode::kIncompatibleArtifact,

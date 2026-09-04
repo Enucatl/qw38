@@ -1,12 +1,21 @@
 #include "tensor.h"
 
+#if defined(__APPLE__) && defined(__x86_64__) && !defined(__AVX2__)
+#error "Darwin/x86_64 host inference requires AVX2 (-mavx2)"
+#endif
+
 #include <algorithm>
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
 #include <limits>
 #include <pthread.h>
+#include <thread>
 #include <vector>
+
+#if defined(__APPLE__)
+#include <sys/sysctl.h>
+#endif
 
 #if defined(__AVX2__)
 #include <immintrin.h>
@@ -524,7 +533,7 @@ Status quantized_row_dot(const TensorView& view, std::size_t row,
 }
 #endif
 
-constexpr std::size_t kMatvecThreadCount = 8;
+constexpr std::size_t kMatvecThreadCap = 8;
 constexpr std::size_t kMatvecThreadThreshold = 256;
 
 struct MatvecSlice final {
@@ -540,9 +549,10 @@ struct MatvecPool final {
   pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
   pthread_cond_t wake = PTHREAD_COND_INITIALIZER;
   pthread_cond_t done = PTHREAD_COND_INITIALIZER;
-  pthread_t threads[kMatvecThreadCount]{};
-  std::size_t worker_index[kMatvecThreadCount]{};
-  MatvecSlice slices[kMatvecThreadCount]{};
+  pthread_t threads[kMatvecThreadCap]{};
+  std::size_t worker_index[kMatvecThreadCap]{};
+  MatvecSlice slices[kMatvecThreadCap]{};
+  std::size_t workers = 0;
   int generation = 0;
   int busy = 0;
   int errors = 0;
@@ -551,6 +561,30 @@ struct MatvecPool final {
 
 MatvecPool g_matvec_pool;
 pthread_once_t g_matvec_once = PTHREAD_ONCE_INIT;
+
+std::size_t logical_cpu_count() noexcept {
+#if defined(__APPLE__)
+  int value = 0;
+  std::size_t size = sizeof(value);
+  if (sysctlbyname("hw.logicalcpu", &value, &size, nullptr, 0) == 0 &&
+      value > 0) {
+    return static_cast<std::size_t>(value);
+  }
+#endif
+  const unsigned hardware = std::thread::hardware_concurrency();
+  if (hardware == 0) {
+    return 1;
+  }
+  return static_cast<std::size_t>(hardware);
+}
+
+std::size_t choose_matvec_workers() noexcept {
+  const std::size_t logical = logical_cpu_count();
+  if (logical == 0) {
+    return 1;
+  }
+  return logical > kMatvecThreadCap ? kMatvecThreadCap : logical;
+}
 
 void* matvec_pool_worker(void* argument) {
   const std::size_t index = *static_cast<const std::size_t*>(argument);
@@ -606,7 +640,8 @@ void* matvec_pool_worker(void* argument) {
 }
 
 void start_matvec_pool() {
-  for (std::size_t index = 0; index < kMatvecThreadCount; ++index) {
+  g_matvec_pool.workers = choose_matvec_workers();
+  for (std::size_t index = 0; index < g_matvec_pool.workers; ++index) {
     g_matvec_pool.worker_index[index] = index;
     pthread_create(&g_matvec_pool.threads[index], nullptr, matvec_pool_worker,
                    &g_matvec_pool.worker_index[index]);
@@ -617,6 +652,7 @@ Status parallel_matvec(const TensorView& view, const float* activation,
                        std::size_t activation_count, float* output) noexcept {
   (void)activation_count;
   pthread_once(&g_matvec_once, start_matvec_pool);
+  const std::size_t workers = g_matvec_pool.workers;
   const void* quantized_pointer = nullptr;
 #if defined(__AVX2__)
   std::vector<ActQ8Block> quantized;
@@ -628,16 +664,14 @@ Status parallel_matvec(const TensorView& view, const float* activation,
 #endif
   pthread_mutex_lock(&g_matvec_pool.mutex);
   g_matvec_pool.errors = 0;
-  g_matvec_pool.busy = static_cast<int>(kMatvecThreadCount);
-  for (std::size_t index = 0; index < kMatvecThreadCount; ++index) {
+  g_matvec_pool.busy = static_cast<int>(workers);
+  for (std::size_t index = 0; index < workers; ++index) {
     g_matvec_pool.slices[index].view = &view;
     g_matvec_pool.slices[index].activation = activation;
     g_matvec_pool.slices[index].quantized = quantized_pointer;
     g_matvec_pool.slices[index].output = output;
-    g_matvec_pool.slices[index].begin =
-        view.rows * index / kMatvecThreadCount;
-    g_matvec_pool.slices[index].end =
-        view.rows * (index + 1) / kMatvecThreadCount;
+    g_matvec_pool.slices[index].begin = view.rows * index / workers;
+    g_matvec_pool.slices[index].end = view.rows * (index + 1) / workers;
   }
   ++g_matvec_pool.generation;
   pthread_cond_broadcast(&g_matvec_pool.wake);
@@ -653,6 +687,8 @@ Status parallel_matvec(const TensorView& view, const float* activation,
 }
 
 }  // namespace
+
+std::size_t matvec_worker_count() noexcept { return choose_matvec_workers(); }
 
 Status make_tensor_view(const std::uint8_t* data, std::size_t storage_bytes,
                         std::uint32_t type, std::size_t columns,

@@ -1,18 +1,19 @@
 # CPU laptop inference for Qwen3.5-2B
 
 This chapter explains the additive Darwin/x86_64 host path that chats with one
-pinned Qwen3.5-2B Q4_K_M artifact on an Intel MacBook. It corresponds to
-MAC-001–MAC-013 and DOC-CPU-001/DOC-CPU-002 in the
+pinned Qwen3.5-2B Q4_K_M artifact on the **Intel MacBook + AVX2** class. It
+corresponds to MAC-001–MAC-014 and DOC-CPU-001–DOC-CPU-003 in the
 [implementation ledger](../implementation_ledger.md). It does not replace v1
-CUDA, the RTX 5090 gate, or the pinned Qwen3.8-27B identity.
+CUDA, the RTX 5090 gate, or the pinned Qwen3.8-27B identity. Apple Silicon is
+not in this class.
 
 ## What this track admits
 
 The public `Engine` / `Session` API is unchanged. On a host build without
 `QW38_CUDA_RUNTIME`, `Engine::open` accepts the 2B pin after GGUF contract
-validation and whole-file SHA-256. Sessions run the parameterized scalar GDN
-runtime. The 27B file still fails closed here with a message that it needs the
-CUDA production build.
+validation, whole-file SHA-256, and an AVX2 CPUID check. Sessions run the
+parameterized scalar GDN runtime. The 27B file still fails closed here with a
+message that it needs the CUDA production build.
 
 Default context is **4096** tokens (`--ctx`, hard cap 8192). GDN recurrence is
 fixed-size; KV grows only on the six attention layers. Allocations that would
@@ -42,13 +43,16 @@ output tensor.
 
 Quant decode remains the scalar oracle used by `--check-quant`. Host matvec
 rows ≥ 256 quantize the activation to Q8 and use AVX2 integer dots for
-Q4_K/Q5_K/Q6_K/Q8_0, with eight SMT pthread workers on this quad-core i7.
-Small synthetic rows still use the decode-then-dot path so frozen 27B fixtures
-stay bit-exact on Linux. Those kernels are a laptop speed path, not a
-bit-exact substitute for the frozen 27B scalar-oracle blobs. Numeric claims
-for 2B must be labeled **measured** on this machine.
+Q4_K/Q5_K/Q6_K/Q8_0. Darwin/x86_64 builds `#error` without AVX2. Host
+`Engine::open` also fail-closes unless CPUID reports AVX2. The worker pool
+spawns `hw.logicalcpu` threads, capped at 8, so a 4c/8t Intel MacBook stays at
+eight workers and a dual-core Intel MacBook does not oversubscribe. Small
+synthetic rows still use the decode-then-dot path so frozen 27B fixtures stay
+bit-exact on Linux. Those kernels are a laptop speed path, not a bit-exact
+substitute for the frozen 27B scalar-oracle blobs. Numeric claims for 2B must
+be labeled **measured** on a named SKU.
 
-## Measured on this MacBook (MAC-010)
+## Measured on this SKU (MAC-010)
 
 Hardware: Intel Core i7-8569U @ 2.80 GHz, 4 cores / 8 threads, AVX2, 16 GiB
 LPDDR3. Compiler: Apple Clang 17.0.0. SHA-256 backend: `commoncrypto`. Artifact:
@@ -67,13 +71,15 @@ LPDDR3. Compiler: Apple Clang 17.0.0. SHA-256 backend: `commoncrypto`. Artifact:
 The proposed ≥ 8 tok/s decode gate was not reached after AVX2 integer dots and
 eight workers. The frozen laptop speed claim is the **measured** 5.61 tok/s
 above, not the proposal. 512-token TTFT was not timed; 128-token TTFT scales
-at about 0.20 s/token on this machine.
+at about 0.20 s/token on this machine. These numbers are **this SKU only**, not
+a portable SLO for every Intel MacBook + AVX2 machine.
 
 ## Proof boundary
 
 This chapter does not claim Linux/Windows CPU product binaries, Apple Silicon,
 Metal, 4B/9B, 27B-on-CPU, vision, MTP, or 128K laptop context. Those need a
-later change note. The table above is **measured** on this MacBook only.
+later change note. The table above is **measured** on this SKU only. The
+supported class is Intel MacBook + AVX2.
 
 ## 2B numeric proof ladder
 
