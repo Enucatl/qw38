@@ -19,7 +19,7 @@ are repository-relative unless stated otherwise.
 | BLD-001 | Establish brand, repository layout, and C++17 build | ART-002 | done | Literal brand appears in user-facing tools; Makefile builds restricted host targets | [`Makefile`](Makefile), [`include/qw38/engine.h`](include/qw38/engine.h), pytest log 2026-08-29T09:52:00Z |
 | BLD-002 | Add pinned CUDA 13.0 SM120 build path | PIN-003, BLD-001 | done | Diagnostic and release CUDA builds target `sm_120` with recorded flags | [`Makefile`](Makefile); [`pins/cuda_quant_contract.json`](pins/cuda_quant_contract.json); log 2026-08-31T06:05:47Z |
 | BLD-003 | Define and enforce the device allocation ledger | PIN-001 | done | All persistent/transient allocations and 128K budgets are enumerated and checked | [`docs/13-allocation-ledger.md`](docs/13-allocation-ledger.md); [`docs/54-post-graph-128k-memory.md`](docs/54-post-graph-128k-memory.md); [`cuda/memory_fit_test.cu`](cuda/memory_fit_test.cu); [`tests/test_cuda_memory_fit.py`](tests/test_cuda_memory_fit.py); log 2026-09-03T12:50:48Z |
-| BLD-004 | Reconcile diagnostic CUDA target linkage and workspace accounting | PIN-004, BLD-002, BLD-003, EVAL-001 | pending | Diagnostic scheduler consumers link trace-enabled objects and prompt and memory byte accounting agree exactly | Discovery in [`tasks/OPT-005.md`](tasks/OPT-005.md); PIN-004 boundary; log 2026-09-04T06:59:41Z |
+| BLD-004 | Reconcile diagnostic CUDA target linkage and workspace accounting | PIN-004, BLD-002, BLD-003, EVAL-001 | done | Diagnostic scheduler consumers link trace-enabled objects and prompt and memory byte accounting agree exactly | [`tasks/BLD-004.md`](tasks/BLD-004.md); clean CUDA verification 2026-09-04T12:25:31Z |
 | API-001 | Implement explicit `Status` and move-only Engine/Session boundary | BLD-001 | done | Public header compiles without exceptions/RTTI and exposes the approved operations | [`include/qw38/engine.h`](include/qw38/engine.h), build log 2026-08-29T09:52:00Z |
 | API-002 | Implement bounded JSON parsing and canonical serialization for the server | SRV-001 | done | Valid JSON, Unicode escapes, depth/body limits, canonical tool JSON, and malformed inputs pass native fixtures without a general JSON dependency | [`src/server_json.cpp`](src/server_json.cpp); [`src/server_api_test.cpp`](src/server_api_test.cpp); [`pins/chat_completions_contract.json`](pins/chat_completions_contract.json); log 2026-09-01T19:00:04Z |
 | MDL-001 | Parse, mmap, inventory, and fail-closed validate GGUF | PIN-001, API-001 | done | Exact tensor metadata/ranges/roles are checked; malformed fixtures pass pytest | [`pins/tensor_inventory.json`](pins/tensor_inventory.json), [`src/model.cpp`](src/model.cpp); log 2026-08-29T10:35:51Z |
@@ -58,6 +58,7 @@ are repository-relative unless stated otherwise.
 | GDN-002 | Implement chunked GDN prefill with 64-token scans | GDN-001, CUD-002 | done | Arbitrary chunks equal token-wise execution under frozen gates | [`cuda/gdn_step.cu`](cuda/gdn_step.cu); [`fixtures/cuda_gdn_chunk.json`](fixtures/cuda_gdn_chunk.json); [`tests/test_cuda_gdn_chunk.py`](tests/test_cuda_gdn_chunk.py); log 2026-08-31T06:42:29Z |
 | ATN-001 | Implement grouped-query attention and partial RoPE | CUD-001, CPU-003 | done | Decode, causality, KV grouping, and layers 3/7/63 pass | [`cuda/attention_decode.cu`](cuda/attention_decode.cu); [`fixtures/cuda_attention_decode.json`](fixtures/cuda_attention_decode.json); [`tests/test_cuda_attention.py`](tests/test_cuda_attention.py); log 2026-08-31T06:57:49Z |
 | ATN-002 | Implement memory-bounded causal attention prefill | ATN-001, CUD-002 | done | Chunked prompt fixtures and 131,072 capacity boundary pass | [`cuda/attention_decode.cu`](cuda/attention_decode.cu); [`fixtures/cuda_attention_prefill.json`](fixtures/cuda_attention_prefill.json); [`tests/test_cuda_attention_prefill.py`](tests/test_cuda_attention_prefill.py); log 2026-08-31T09:33:05Z |
+| ATN-003 | Repair OPT-005 normalized-key head indexing regression | ATN-002 | done | Retained attention oracle passes after every KV head writes its own normalized-key range | [`cuda/attention_decode.cu`](cuda/attention_decode.cu); [`tests/test_cuda_attention.py`](tests/test_cuda_attention.py); clean CUDA verification 2026-09-04T12:25:31Z |
 | SCH-001 | Implement hybrid 64-layer CUDA scheduler and FP32 logits | GDN-002, ATN-002, CUD-003 | done | Full traces/logits and greedy continuations meet frozen gates | [`cuda/full_scheduler.cu`](cuda/full_scheduler.cu); [`fixtures/cuda_full_scheduler.json`](fixtures/cuda_full_scheduler.json); [`tests/test_cuda_full_scheduler.py`](tests/test_cuda_full_scheduler.py); log 2026-08-31T12:13:55Z |
 | SCH-002 | Integrate chunked prompt execution into the full CUDA scheduler | SCH-001, GDN-002, ATN-002, CUD-002, BEN-001 | done | End-to-end prefill uses prompt-row MMQ and chunked GDN/attention paths, remains token-wise equivalent, and no longer dispatches one complete decode token at a time | [`cuda/full_scheduler.cu`](cuda/full_scheduler.cu); [`fixtures/cuda_prompt_scheduler.json`](fixtures/cuda_prompt_scheduler.json); [`tests/test_cuda_prompt_scheduler.py`](tests/test_cuda_prompt_scheduler.py); log 2026-09-02T16:25:43Z |
 | SES-001 | Implement exact common-prefix sync/reuse | SCH-001 | done | Reuse and full replay produce the same committed state and logits | [`cuda/full_scheduler.cu`](cuda/full_scheduler.cu); [`fixtures/cuda_prefix_sync.json`](fixtures/cuda_prefix_sync.json); [`tests/test_cuda_prefix_sync.py`](tests/test_cuda_prefix_sync.py); log 2026-08-31T13:45:38Z |
@@ -3671,3 +3672,39 @@ are repository-relative unless stated otherwise.
   one authentic OPT-005 diagnostic record with every claimed predicate and raw
   sample, regenerating its fixture, and passing fresh ordinary and CUDA suites.
   Full evidence and commands are retained in [`tasks/OPT-005.md`](tasks/OPT-005.md).
+
+### 2026-09-04T11:06:40Z — ATN-003 discovered during BLD-004 verification
+
+- Two clean BLD-004 verification passes reproduced the retained layer-3
+  attention failure while every BLD-004 object-linkage and allocation check
+  passed.
+- Escalation traced the regression to blocked OPT-005 commit `d0511a0`:
+  `stage_chunk_rows` writes `normalized_key[lane]` instead of the per-head
+  `normalized_key[base + lane]` range in `cuda/attention_decode.cu`.
+- Registered ATN-003 before any source repair. It is separate recovery work,
+  not coupled BLD-004 documentation/evidence; BLD-004 still requires a clean
+  repository-wide CUDA pass before delivery. Evidence: [`tasks/BLD-004.md`](tasks/BLD-004.md).
+
+### 2026-09-04T11:27:32Z — BLD-004 and ATN-003 blocked after bounded verification
+
+- BLD-004 object linkage, exact diagnostic workspace accounting, focused CUDA
+  tests, pinned builds, and all native gates passed. The registered ATN-003
+  one-line normalized-key repair also passed all four retained attention cases.
+- Final ordinary and full CUDA pytest each failed only the documentation audit
+  because active ATN-003 had no audit-table row. The bounded workflow exhausted
+  its repair and escalation allowance; no commit or push was made.
+- Recovery requires adding an accurate non-final ATN-003 row to
+  `docs/65-documentation-audit.md`, then rerunning ordinary pytest and the full
+  clean CUDA suite. Evidence and all commands are in [`tasks/BLD-004.md`](tasks/BLD-004.md).
+
+### 2026-09-04T12:25:31Z — BLD-004 and ATN-003 completed after recovery
+
+- Added the required non-final ATN-003 documentation-audit row, then confirmed
+  the audit with `uv run pytest -q tests/test_documentation.py` (4 passed).
+- `uv run pytest -q` passed with 169 tests and 20 skips. A clean pinned CUDA
+  13.0.2 `sm_120` rebuild of `cuda-products cuda-native` passed, followed by
+  the complete CUDA-enabled suite with 189 tests passed.
+- The diagnostic targets now use layout-compatible trace engine, scheduler,
+  and checkpoint objects with exact prompt and memory accounting. Every KV head
+  writes its own normalized-key range and the retained attention oracle passes.
+  Marked BLD-004 and ATN-003 done; no `plan.md` change was required.

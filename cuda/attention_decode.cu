@@ -217,7 +217,7 @@ __global__ void stage_chunk_rows(
   }
   __syncthreads();
   if (lane < width) {
-    if (token_count == 1) normalized_key[lane] = normalized[lane];
+    if (token_count == 1) normalized_key[base + lane] = normalized[lane];
     candidate_key[base + lane] = __float2bfloat16_rn(normalized[lane]);
     candidate_value[base + lane] = __float2bfloat16_rn(value[base + lane]);
   }

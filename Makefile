@@ -80,6 +80,9 @@ $(CUDA_BUILD_DIR):
 $(CUDA_BUILD_DIR)/engine.o: src/engine.cpp include/qw38/engine.h cuda/full_scheduler.h | $(CUDA_BUILD_DIR)
 	$(NVCC) $(NVCCFLAGS) $(CPPFLAGS) -DQW38_CUDA_RUNTIME -Icuda -c $< -o $@
 
+$(CUDA_BUILD_DIR)/engine.trace.o: src/engine.cpp include/qw38/engine.h cuda/full_scheduler.h | $(CUDA_BUILD_DIR)
+	$(NVCC) $(NVCCFLAGS) $(CPPFLAGS) -DQW38_CUDA_RUNTIME -DQW38_DIAGNOSTIC_TRACE -Icuda -c $< -o $@
+
 CUDA_ENGINE_OBJECTS := $(filter-out $(BUILD_DIR)/engine.o,$(LIB_OBJECTS)) $(CUDA_BUILD_DIR)/engine.o $(THIRD_PARTY_OBJECTS)
 
 cuda-products: $(CUDA_BUILD_DIR)/qw38 $(CUDA_BUILD_DIR)/qw38-server $(CUDA_BUILD_DIR)/qw38-bench $(CUDA_BUILD_DIR)/qw38-eval $(CUDA_BUILD_DIR)/qw38-eval-diagnostic
@@ -93,9 +96,9 @@ $(BUILD_DIR)/eval.trace.cuda.o: src/eval.cpp include/qw38/engine.h src/diagnosti
 $(CUDA_BUILD_DIR)/qw38-eval: $(CUDA_ENGINE_OBJECTS) $(BUILD_DIR)/eval.cuda.o $(BUILD_DIR)/checkpoint.cuda.o $(BUILD_DIR)/full_scheduler.cuda.o $(BUILD_DIR)/scheduler_primitives.cuda.o $(BUILD_DIR)/quant_mmv.cuda.o $(BUILD_DIR)/gdn_step.cuda.o $(BUILD_DIR)/attention_decode.cuda.o | $(CUDA_BUILD_DIR)
 	$(NVCC) $(NVCCFLAGS) $^ -o $@
 
-CUDA_DIAGNOSTIC_ENGINE_OBJECTS := $(filter-out $(DIAGNOSTIC_DIR)/engine.o,$(DIAGNOSTIC_LIB_OBJECTS)) $(CUDA_BUILD_DIR)/engine.o $(THIRD_PARTY_OBJECTS)
+CUDA_DIAGNOSTIC_ENGINE_OBJECTS := $(filter-out $(DIAGNOSTIC_DIR)/engine.o,$(DIAGNOSTIC_LIB_OBJECTS)) $(CUDA_BUILD_DIR)/engine.trace.o $(THIRD_PARTY_OBJECTS)
 
-$(CUDA_BUILD_DIR)/qw38-eval-diagnostic: $(CUDA_DIAGNOSTIC_ENGINE_OBJECTS) $(BUILD_DIR)/eval.trace.cuda.o $(BUILD_DIR)/checkpoint.cuda.o $(BUILD_DIR)/full_scheduler.trace.cuda.o $(BUILD_DIR)/scheduler_primitives.cuda.o $(BUILD_DIR)/quant_mmv.cuda.o $(BUILD_DIR)/gdn_step.cuda.o $(BUILD_DIR)/attention_decode.cuda.o | $(CUDA_BUILD_DIR)
+$(CUDA_BUILD_DIR)/qw38-eval-diagnostic: $(CUDA_DIAGNOSTIC_ENGINE_OBJECTS) $(BUILD_DIR)/eval.trace.cuda.o $(BUILD_DIR)/checkpoint.trace.cuda.o $(BUILD_DIR)/full_scheduler.trace.cuda.o $(BUILD_DIR)/scheduler_primitives.cuda.o $(BUILD_DIR)/quant_mmv.cuda.o $(BUILD_DIR)/gdn_step.cuda.o $(BUILD_DIR)/attention_decode.cuda.o | $(CUDA_BUILD_DIR)
 	$(NVCC) $(NVCCFLAGS) $^ -o $@
 
 $(CUDA_BUILD_DIR)/qw38: $(CUDA_ENGINE_OBJECTS) $(BUILD_DIR)/cli.o $(BUILD_DIR)/checkpoint.cuda.o $(BUILD_DIR)/full_scheduler.cuda.o $(BUILD_DIR)/scheduler_primitives.cuda.o $(BUILD_DIR)/quant_mmv.cuda.o $(BUILD_DIR)/gdn_step.cuda.o $(BUILD_DIR)/attention_decode.cuda.o | $(CUDA_BUILD_DIR)
@@ -154,28 +157,31 @@ $(BUILD_DIR)/full_scheduler.trace.cuda.o: cuda/full_scheduler.cu cuda/full_sched
 $(BUILD_DIR)/checkpoint.cuda.o: cuda/checkpoint.cu cuda/full_scheduler.h | $(BUILD_DIR)
 	$(NVCC) $(NVCCFLAGS) $(CPPFLAGS) -Icuda -c $< -o $@
 
+$(BUILD_DIR)/checkpoint.trace.cuda.o: cuda/checkpoint.cu cuda/full_scheduler.h | $(BUILD_DIR)
+	$(NVCC) $(NVCCFLAGS) $(CPPFLAGS) -DQW38_DIAGNOSTIC_TRACE -Icuda -c $< -o $@
+
 $(BUILD_DIR)/qw38-cuda-scheduler-primitives-test: cuda/scheduler_primitives_test.cu $(BUILD_DIR)/scheduler_primitives.cuda.o $(BUILD_DIR)/quant_mmv.cuda.o $(BUILD_DIR)/gdn_step.cuda.o $(BUILD_DIR)/quant.o $(BUILD_DIR)/status.o | $(BUILD_DIR)
 	$(NVCC) $(NVCCFLAGS) $(CPPFLAGS) -Icuda $^ -o $@
 
 $(BUILD_DIR)/qw38-cuda-full-scheduler-test: cuda/full_scheduler_test.cu $(BUILD_DIR)/full_scheduler.trace.cuda.o $(BUILD_DIR)/scheduler_primitives.cuda.o $(BUILD_DIR)/quant_mmv.cuda.o $(BUILD_DIR)/gdn_step.cuda.o $(BUILD_DIR)/attention_decode.cuda.o $(DIAGNOSTIC_LIB_OBJECTS) $(THIRD_PARTY_OBJECTS) | $(BUILD_DIR)
 	$(NVCC) $(NVCCFLAGS) $(CPPFLAGS) -DQW38_DIAGNOSTIC_TRACE -Icuda $^ -o $@
 
-$(BUILD_DIR)/qw38-cuda-prefix-sync-test: cuda/prefix_sync_test.cu $(BUILD_DIR)/full_scheduler.cuda.o $(BUILD_DIR)/scheduler_primitives.cuda.o $(BUILD_DIR)/quant_mmv.cuda.o $(BUILD_DIR)/gdn_step.cuda.o $(BUILD_DIR)/attention_decode.cuda.o $(DIAGNOSTIC_LIB_OBJECTS) $(THIRD_PARTY_OBJECTS) | $(BUILD_DIR)
+$(BUILD_DIR)/qw38-cuda-prefix-sync-test: cuda/prefix_sync_test.cu $(BUILD_DIR)/full_scheduler.trace.cuda.o $(BUILD_DIR)/scheduler_primitives.cuda.o $(BUILD_DIR)/quant_mmv.cuda.o $(BUILD_DIR)/gdn_step.cuda.o $(BUILD_DIR)/attention_decode.cuda.o $(DIAGNOSTIC_LIB_OBJECTS) $(THIRD_PARTY_OBJECTS) | $(BUILD_DIR)
 	$(NVCC) $(NVCCFLAGS) $(CPPFLAGS) -DQW38_DIAGNOSTIC_TRACE -Icuda $^ -o $@
 
-$(BUILD_DIR)/qw38-cuda-prompt-scheduler-test: cuda/prompt_scheduler_test.cu $(BUILD_DIR)/full_scheduler.cuda.o $(BUILD_DIR)/scheduler_primitives.cuda.o $(BUILD_DIR)/quant_mmv.cuda.o $(BUILD_DIR)/gdn_step.cuda.o $(BUILD_DIR)/attention_decode.cuda.o $(DIAGNOSTIC_LIB_OBJECTS) $(THIRD_PARTY_OBJECTS) | $(BUILD_DIR)
+$(BUILD_DIR)/qw38-cuda-prompt-scheduler-test: cuda/prompt_scheduler_test.cu $(BUILD_DIR)/full_scheduler.trace.cuda.o $(BUILD_DIR)/scheduler_primitives.cuda.o $(BUILD_DIR)/quant_mmv.cuda.o $(BUILD_DIR)/gdn_step.cuda.o $(BUILD_DIR)/attention_decode.cuda.o $(DIAGNOSTIC_LIB_OBJECTS) $(THIRD_PARTY_OBJECTS) | $(BUILD_DIR)
 	$(NVCC) $(NVCCFLAGS) $(CPPFLAGS) -DQW38_DIAGNOSTIC_TRACE -Icuda $^ -o $@
 
-$(BUILD_DIR)/qw38-cuda-atomic-eval-test: cuda/atomic_eval_test.cu $(BUILD_DIR)/full_scheduler.cuda.o $(BUILD_DIR)/scheduler_primitives.cuda.o $(BUILD_DIR)/quant_mmv.cuda.o $(BUILD_DIR)/gdn_step.cuda.o $(BUILD_DIR)/attention_decode.cuda.o $(DIAGNOSTIC_LIB_OBJECTS) $(THIRD_PARTY_OBJECTS) | $(BUILD_DIR)
+$(BUILD_DIR)/qw38-cuda-atomic-eval-test: cuda/atomic_eval_test.cu $(BUILD_DIR)/full_scheduler.trace.cuda.o $(BUILD_DIR)/scheduler_primitives.cuda.o $(BUILD_DIR)/quant_mmv.cuda.o $(BUILD_DIR)/gdn_step.cuda.o $(BUILD_DIR)/attention_decode.cuda.o $(DIAGNOSTIC_LIB_OBJECTS) $(THIRD_PARTY_OBJECTS) | $(BUILD_DIR)
 	$(NVCC) $(NVCCFLAGS) $(CPPFLAGS) -DQW38_DIAGNOSTIC_TRACE -Icuda $^ -o $@
 
-$(BUILD_DIR)/qw38-cuda-checkpoint-test: cuda/checkpoint_test.cu $(BUILD_DIR)/checkpoint.cuda.o $(BUILD_DIR)/full_scheduler.cuda.o $(BUILD_DIR)/scheduler_primitives.cuda.o $(BUILD_DIR)/quant_mmv.cuda.o $(BUILD_DIR)/gdn_step.cuda.o $(BUILD_DIR)/attention_decode.cuda.o $(DIAGNOSTIC_LIB_OBJECTS) $(THIRD_PARTY_OBJECTS) | $(BUILD_DIR)
+$(BUILD_DIR)/qw38-cuda-checkpoint-test: cuda/checkpoint_test.cu $(BUILD_DIR)/checkpoint.trace.cuda.o $(BUILD_DIR)/full_scheduler.trace.cuda.o $(BUILD_DIR)/scheduler_primitives.cuda.o $(BUILD_DIR)/quant_mmv.cuda.o $(BUILD_DIR)/gdn_step.cuda.o $(BUILD_DIR)/attention_decode.cuda.o $(DIAGNOSTIC_LIB_OBJECTS) $(THIRD_PARTY_OBJECTS) | $(BUILD_DIR)
 	$(NVCC) $(NVCCFLAGS) $(CPPFLAGS) -DQW38_DIAGNOSTIC_TRACE -Icuda $^ -o $@
 
-$(BUILD_DIR)/qw38-cuda-memory-fit-test: cuda/memory_fit_test.cu $(BUILD_DIR)/full_scheduler.cuda.o $(BUILD_DIR)/scheduler_primitives.cuda.o $(BUILD_DIR)/quant_mmv.cuda.o $(BUILD_DIR)/gdn_step.cuda.o $(BUILD_DIR)/attention_decode.cuda.o $(DIAGNOSTIC_LIB_OBJECTS) $(THIRD_PARTY_OBJECTS) | $(BUILD_DIR)
+$(BUILD_DIR)/qw38-cuda-memory-fit-test: cuda/memory_fit_test.cu $(BUILD_DIR)/full_scheduler.trace.cuda.o $(BUILD_DIR)/scheduler_primitives.cuda.o $(BUILD_DIR)/quant_mmv.cuda.o $(BUILD_DIR)/gdn_step.cuda.o $(BUILD_DIR)/attention_decode.cuda.o $(DIAGNOSTIC_LIB_OBJECTS) $(THIRD_PARTY_OBJECTS) | $(BUILD_DIR)
 	$(NVCC) $(NVCCFLAGS) $(CPPFLAGS) -DQW38_DIAGNOSTIC_TRACE -Icuda $^ -o $@
 
-$(BUILD_DIR)/qw38-cuda-timing-test: cuda/timing_test.cu $(BUILD_DIR)/checkpoint.cuda.o $(BUILD_DIR)/full_scheduler.cuda.o $(BUILD_DIR)/scheduler_primitives.cuda.o $(BUILD_DIR)/quant_mmv.cuda.o $(BUILD_DIR)/gdn_step.cuda.o $(BUILD_DIR)/attention_decode.cuda.o $(DIAGNOSTIC_LIB_OBJECTS) $(THIRD_PARTY_OBJECTS) | $(BUILD_DIR)
+$(BUILD_DIR)/qw38-cuda-timing-test: cuda/timing_test.cu $(BUILD_DIR)/checkpoint.trace.cuda.o $(BUILD_DIR)/full_scheduler.trace.cuda.o $(BUILD_DIR)/scheduler_primitives.cuda.o $(BUILD_DIR)/quant_mmv.cuda.o $(BUILD_DIR)/gdn_step.cuda.o $(BUILD_DIR)/attention_decode.cuda.o $(DIAGNOSTIC_LIB_OBJECTS) $(THIRD_PARTY_OBJECTS) | $(BUILD_DIR)
 	$(NVCC) $(NVCCFLAGS) $(CPPFLAGS) -DQW38_DIAGNOSTIC_TRACE -Icuda $^ -o $@
 
 $(BUILD_DIR)/qw38-cuda-fusion-test: cuda/fusion_test.cu $(BUILD_DIR)/full_scheduler.trace.cuda.o $(BUILD_DIR)/scheduler_primitives.cuda.o $(BUILD_DIR)/quant_mmv.cuda.o $(BUILD_DIR)/gdn_step.cuda.o $(BUILD_DIR)/attention_decode.cuda.o $(DIAGNOSTIC_LIB_OBJECTS) $(THIRD_PARTY_OBJECTS) | $(BUILD_DIR)
