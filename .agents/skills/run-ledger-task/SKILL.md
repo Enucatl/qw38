@@ -57,21 +57,30 @@ tasks. Report the exact failed gate and the evidence inspected.
    Then mark the primary and coupled tasks `in_progress`. Do not continue if any
    implementation choice remains unresolved or the dossier is inconsistent with
    the ledger or plan.
-2. Spawn a `gpt-5.6-luna` agent at medium reasoning to implement only the
-   dossier's code, tests, and fixtures and run focused validation. It must append
-   its changes and exact command outcomes to the dossier, without committing.
+2. Spawn a `gpt-5.6-terra` agent at medium reasoning to implement only the
+   dossier's code, tests, and fixtures and run focused validation. Use Luna
+   medium instead only when the planning dossier explicitly classifies every
+   implementation change as mechanical. Use Sol low instead when implementation
+   involves CUDA kernels, concurrency, memory ownership, numerical invariants,
+   security boundaries, or designing new acceptance evidence. The agent must
+   append its changes and exact command outcomes to the dossier, without
+   committing.
 3. If documentation or evidence changes are required, spawn a fresh Luna agent
-   at medium reasoning to make them, including applicable handbook, README,
-   evidence links, and ledger-history updates. It records its work in the
-   dossier and does not commit.
-4. Spawn a fresh Luna integration verifier at medium reasoning. It independently
-   reviews the complete diff against the dossier, ledger acceptance condition,
-   `plan.md`, and repository boundaries. It may run formatting but makes no
-   semantic fixes. It runs the dossier's focused and repository-wide gates,
-   including `uv run ruff format .`, Ruff checks, required pytest selections,
-   native builds/tests, and named CUDA or hardware gates. If formatting changes
-   files, it reruns affected tests. It appends exact commands, outcomes, and a
-   clear pass/fail verdict to the dossier.
+   at medium reasoning for prose, links, and mechanical index updates. Use Terra
+   medium when the stage creates or interprets fixtures, measurements, hashes,
+   contracts, pins, ledger history, or acceptance claims. It records its work in
+   the dossier and does not commit.
+4. Spawn a fresh `gpt-5.6-sol` integration verifier at low reasoning. It
+   independently reviews the complete diff against the dossier, ledger
+   acceptance condition, `plan.md`, and repository boundaries. It may run
+   formatting but makes no semantic fixes. It runs the dossier's focused and
+   repository-wide gates, including `uv run ruff format .`, Ruff checks,
+   required pytest selections, native builds/tests, and named CUDA or hardware
+   gates. It must trace every acceptance claim to an executed assertion or an
+   independently inspected artifact; stdout labels, fixture status fields, and
+   dossier claims are not sufficient evidence by themselves. If formatting
+   changes files, it reruns affected tests. It appends exact commands, outcomes,
+   and a clear pass/fail verdict to the dossier.
 5. Only after a passing verification, spawn a fresh Luna delivery agent at
    medium reasoning. It confirms scope and acceptance evidence, changes the
    primary and every coupled task from `in_progress` to `done`, adds the final
@@ -91,12 +100,12 @@ spawning the delivery agent. Neither form authorizes a `plan.md` change.
 
 Keep retries bounded and record every attempt in the dossier:
 
-- After the first ordinary verification failure, spawn one fresh Luna
+- After the first ordinary verification failure, spawn one fresh Terra medium
   implementation repair agent using the dossier and verifier findings, then
-  verify again with a fresh Luna agent.
+  verify again with a fresh Sol low agent.
 - For a repeated failure, or an architectural failure on any attempt, spawn one
   Sol medium diagnostic agent to amend an inadequate dossier, then one fresh
-  Luna repair and one fresh Luna verification pass.
+  Terra medium repair and one fresh Sol low verification pass.
 - On any further failure, unavailable dependency, material ambiguity, or needed
   architecture change, set the primary and applicable coupled tasks to
   `blocked`, add the reason and recovery condition to the dossier and ledger,
