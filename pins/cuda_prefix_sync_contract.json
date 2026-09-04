@@ -17,8 +17,14 @@
     "invalid_input_rule": "validate the complete request before reset or execution"
   },
   "session_owned_outputs": {
-    "logits": {"dtype": "FP32", "values": 248320},
-    "hidden": {"dtype": "FP32", "values": 5120},
+    "logits": {
+      "dtype": "FP32",
+      "values": 248320
+    },
+    "hidden": {
+      "dtype": "FP32",
+      "values": 5120
+    },
     "reason": "a no-op sync is independent of which scratch workspace the caller supplies"
   },
   "exact_admission": [
@@ -40,9 +46,9 @@
     "128K simultaneous fit proof (MEM-001)"
   ],
   "local_sources": {
-    "Makefile": "67913fa289fcce8acd39ae371c0632ba45931a85e6172f1c5e8d88f6cf28af0e",
-    "cuda/full_scheduler.cu": "64235c4fca1f303b40b9068d34750f9b89068e2e353f8ca1510460d0ae157877",
-    "cuda/full_scheduler.h": "c7e9118b189c547fc11d3fd2f77e8301b9f9c5af72b32f41553bbed55be04485",
-    "cuda/prefix_sync_test.cu": "4a292e07fc47353439f5a1a766be445fd1714df955ae1d09f39cd807b8bd4c19"
+    "Makefile": "81a349ee8558efc0122a11a0c05ed9280f5534c3eab8e7dca6393c41a22de324",
+    "cuda/full_scheduler.cu": "68d41bb8d231cccbc7727d2433598bf13503dba0d539e38a1548d44b1ee4ed3a",
+    "cuda/full_scheduler.h": "56eb77134617f033b7863402c6e2a1a2c93e70bcfc8d508c745b78297d3967a4",
+    "cuda/prefix_sync_test.cu": "a791c82702333187316e932956d9e65429c49317a6bb36468607142a1f9429f3"
   }
 }

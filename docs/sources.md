@@ -329,6 +329,58 @@ DSpark are explicitly rejected as Qwen model semantics.
   behavior are authenticated by
   [`pins/chat_completions_contract.json`](../pins/chat_completions_contract.json)
   and [`fixtures/chat_completions.json`](../fixtures/chat_completions.json).
+- API-003, SES-004, SRV-003, and EDU-045 use original Responses-to-Chat mapping,
+  exact incremental template rendering, response event serialization, and an
+  atomic POSIX continuation-record implementation. No OpenAI SDK, protocol
+  server, storage library, or serving-runtime code is copied. The public shape
+  follows the Responses vocabulary, while the narrow supported boundary is
+  authenticated in [`pins/responses_contract.json`](../pins/responses_contract.json)
+  and measured behavior is retained in
+  [`fixtures/responses.json`](../fixtures/responses.json).
+- BEN-001 and EDU-046 use an original C++17 measurement harness around the
+  admitted public Engine/Session boundary. Percentile arithmetic, result JSON,
+  failure retention, cache-policy control, and POSIX atomic publication are
+  local code. CUDA runtime version queries provide build/runtime identity;
+  `nvidia-smi` supplies explicitly snapshot-based device telemetry. The protocol
+  and proof limits are authenticated in
+  [`pins/benchmark_contract.json`](../pins/benchmark_contract.json), with smoke
+  evidence in [`fixtures/benchmark_harness.json`](../fixtures/benchmark_harness.json)
+  and [`evidence/benchmark`](../evidence/benchmark). No benchmark-framework or
+  competing-runtime implementation is copied.
+- SCH-002, MEM-002, and EDU-047 introduce no new external implementation
+  source. The full prompt path composes Quartz's already admitted MMQ, GDN scan,
+  causal attention prefill, pointwise, session, and memory-ledger boundaries.
+  Its direct Q8_0-by-BF16 prompt kernel is a local batching of the existing
+  scheduler arithmetic, retained specifically to avoid an extra activation
+  requantization. Exact differential, cancellation, memory, and smoke evidence
+  is authenticated in
+  [`pins/cuda_prompt_scheduler_contract.json`](../pins/cuda_prompt_scheduler_contract.json)
+  and [`fixtures/cuda_prompt_scheduler.json`](../fixtures/cuda_prompt_scheduler.json).
+- TRC-004 introduces no new external implementation source. It composes the
+  existing CUDA scheduler, backend-neutral diagnostic sink, scalar trace
+  contract, and immutable three-authority tolerances. The exact five-filter
+  subset, diagnostic-build isolation rule, and source identities are frozen in
+  [`pins/cuda_trace_contract.json`](../pins/cuda_trace_contract.json); full
+  token-42 metrics, greedy equality, and failure-path evidence are retained in
+  [`fixtures/cuda_trace.json`](../fixtures/cuda_trace.json). The beginner
+  explanation is [`docs/63-cuda-diagnostic-traces.md`](63-cuda-diagnostic-traces.md).
+  No CUDA trace code or tolerance is copied from an external project.
+- EVAL-001 introduces no new external implementation source. The typed request
+  records, native command boundary, and logits evidence reader are local code;
+  they reuse the public Engine/Session contract and existing trace-v1 reader.
+  The shape is frozen in [`pins/eval_contract.json`](../pins/eval_contract.json),
+  with retained RTX 5090 wiring and negative evidence in
+  [`fixtures/eval_harness.json`](../fixtures/eval_harness.json) and focused
+  tests in [`tests/test_eval.py`](../tests/test_eval.py). The beginner
+  explanation is [`docs/64-eval-harness.md`](64-eval-harness.md). The fixture
+  records complete harness-only logits/checkpoint/trace wiring and negative
+  publication evidence; generated outputs remain uncommitted and nothing here
+  is QLT-001 quality evidence.
+- DOC-001 introduces no copied source or external dependency. Its human-readable
+  coverage record is [`docs/65-documentation-audit.md`](65-documentation-audit.md),
+  and its mechanical link/coverage gate is [`tests/test_documentation.py`](../tests/test_documentation.py).
+  The audit links the implementation ledger, retained fixtures, contracts, and
+  source locations; documentation claims remain bounded by those records.
 
 ## Specialization and hardware references
 
@@ -358,9 +410,11 @@ DSpark are explicitly rejected as Qwen model semantics.
 - FFN elements/FLOPs, BF16/4-bit lower bounds, 144 MiB recurrence, 7.5 MiB
   convolution storage, and 64 KiB/token KV are **Estimated** from displayed
   formulas and official shapes.
-- Weight artifact size, runtime allocations, quant quality, context capacity,
-  RTX 5090 throughput, and every optimization result are **Proposed** until the
-  milestone protocol emits named logs and fixtures.
+- Unevidenced future results (including new weight, quality, context, throughput,
+  or optimization claims) are **Proposed** until the milestone protocol emits
+  named logs and fixtures. Named retained measurements in the chapters and
+  fixtures keep their **Measured** label, including historical or partial
+  results; they are not converted to Proposed by this general note.
 - No q27 measurement is evidence for DwarfStar or for the proposed engine.
 
 ## Review checklist

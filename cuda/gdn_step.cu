@@ -224,6 +224,18 @@ cudaError_t launch_gdn_prepare_chunk(
       stream, false);
 }
 
+cudaError_t launch_gdn_prepare_chunk_tiled(
+    const GdnConfig& config, const float* convolution_input,
+    const float* convolution_weights, const float* log_decay,
+    const float* beta, std::size_t token_count, const GdnState& committed,
+    const GdnState& candidate, float* convolution_output,
+    float* recurrent_output, cudaStream_t stream) noexcept {
+  return launch_gdn_prepare_chunk_layout(
+      config, convolution_input, convolution_weights, log_decay, beta,
+      token_count, committed, candidate, convolution_output, recurrent_output,
+      stream, true);
+}
+
 namespace {
 
 cudaError_t launch_gdn_prepare_chunk_layout(

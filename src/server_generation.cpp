@@ -103,8 +103,11 @@ Status generate_chat(const Engine& engine, Session* session,
             "generation session, cancellation, and output are required"};
   }
   *result = {};
-  std::vector<Token> prompt;
-  Status status = engine.render_chat(request.messages, request.chat, &prompt);
+  std::vector<Token> prompt = request.prepared_prompt;
+  Status status = Status::ok();
+  if (prompt.empty()) {
+    status = engine.render_chat(request.messages, request.chat, &prompt);
+  }
   if (!status.is_ok()) return status;
   result->prompt_tokens = prompt.size();
   if (prompt.size() + request.maximum_tokens + 1 > kContextCapacity) {

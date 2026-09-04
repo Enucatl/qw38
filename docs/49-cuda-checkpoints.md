@@ -75,7 +75,7 @@ in ordinary evaluation.
 
 ## Exact continuation evidence
 
-The measured two-token file is 160,004,416 bytes. Its largest section is the
+**Measured.** The retained two-token file is 160,004,416 bytes. Its largest section is the
 150,994,944-byte recurrent state; the GDN convolution section is 7,864,320
 bytes. At frontier two, keys and values each need 65,536 bytes. Tokens need
 eight bytes, logits 993,280, hidden state 20,480, and framing/digest 312.

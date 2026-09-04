@@ -6,14 +6,38 @@
   "cuda_architecture": "sm_120",
   "context_capacity": 131072,
   "model_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
-  "generation_order": ["sample", "eval", "publish"],
+  "generation_order": [
+    "sample",
+    "eval",
+    "publish"
+  ],
   "supported": {
     "interactive_turns": true,
     "one_shot_prompt": true,
-    "reasoning_modes": ["off", "low", "medium", "xhigh"],
-    "sampling": ["temperature", "top_p", "top_k", "seed"],
-    "stops": ["im_end_token", "custom_text", "maximum_tokens"],
-    "commands": ["help", "save", "load", "reset", "quit"],
+    "reasoning_modes": [
+      "off",
+      "low",
+      "medium",
+      "xhigh"
+    ],
+    "sampling": [
+      "temperature",
+      "top_p",
+      "top_k",
+      "seed"
+    ],
+    "stops": [
+      "im_end_token",
+      "custom_text",
+      "maximum_tokens"
+    ],
+    "commands": [
+      "help",
+      "save",
+      "load",
+      "reset",
+      "quit"
+    ],
     "atomic_checkpoint": true
   },
   "excluded": {
@@ -23,17 +47,17 @@
     "concurrent_gpu_sessions": true
   },
   "local_sources": {
-    "README.md": "b2d8f4d064311c5f84545bcc7fa1c9c1f528746daa7e99684c0b90bdf9230e73",
-    "Makefile": "67913fa289fcce8acd39ae371c0632ba45931a85e6172f1c5e8d88f6cf28af0e",
-    "include/qw38/engine.h": "81145844a56dcf6733c8b43918aa93a072192addbf82cb4d5f2933ed6c08da28",
-    "src/engine.cpp": "e1786a63ecb8a91e36c13639b08db652b77f9fd02e5206aeaf20ad5aff3d9f43",
+    "README.md": "a0f30df9e1ecbf5ba7db921c9e06ff7128cad598f24d1eaab0e56b79913ea737",
+    "Makefile": "81a349ee8558efc0122a11a0c05ed9280f5534c3eab8e7dca6393c41a22de324",
+    "include/qw38/engine.h": "9fd1355e77386c19c21bc66cc772fe64c2103b7f89ea849d9a35cfa8f1f431a1",
+    "src/engine.cpp": "9638f137fd25b13df170df15015db0aa1e4f3c855ebc0d9198fc0f0cf8e21e9c",
     "src/cli.cpp": "9fb89c8fc3ada2d1e2d0e488311131bf7bd67ee421628b639435722ba5b57634",
     "src/tokenizer.cpp": "83a11e2b283e5ede080fb5614811b29e1b90b0ed60db34451005315140961a05",
     "src/tokenizer.h": "9d5c648f830fc07af941a7a1fe4b12ca633ec39347425ce074d7a4fff06b45a3",
-    "src/template.cpp": "4703f9a46dd2a0259ddfb7a73e4f454f82b8d9d654f04819cb8a9bb6b6b3770f",
-    "src/template.h": "516642294cb3086d84e0d16becfd58d3b451b31ab9782652efa2611768806a32",
-    "cuda/full_scheduler.cu": "64235c4fca1f303b40b9068d34750f9b89068e2e353f8ca1510460d0ae157877",
-    "cuda/full_scheduler.h": "c7e9118b189c547fc11d3fd2f77e8301b9f9c5af72b32f41553bbed55be04485",
+    "src/template.cpp": "6ad0963b5649850c3b2d7b028485c11d4cbf19b2935734e5d39eeaf663242ec5",
+    "src/template.h": "3b90f10837353ef018751fa270a664623cf46587687c87bb15a8293390488cef",
+    "cuda/full_scheduler.cu": "68d41bb8d231cccbc7727d2433598bf13503dba0d539e38a1548d44b1ee4ed3a",
+    "cuda/full_scheduler.h": "56eb77134617f033b7863402c6e2a1a2c93e70bcfc8d508c745b78297d3967a4",
     "tests/test_cli.py": "aa708b624f600723674c4e1ba057343942230de4bc1754614314368855f2d8b9",
     "fixtures/cli_smoke.json": "6c9683758af5d0392727f17bada2c2c0030887cf7514c6645e7cfe457c863bcb",
     "docs/56-interactive-text-cli.md": "254e8a01017827e78d9586658b6ce49338c756a2da1625bddac9e33df8a62597"

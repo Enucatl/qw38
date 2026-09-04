@@ -1,0 +1,92 @@
+{
+  "schema": "qw38.benchmark-contract.v1",
+  "task": "BEN-001",
+  "production_binary": "build/cuda/qw38-bench",
+  "host_binary_scope": "argument, statistics, and failure-record validation",
+  "cuda_architecture": "sm_120",
+  "model_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+  "minimum_warmups": 3,
+  "minimum_samples": 30,
+  "primary_cache_policy": "disabled",
+  "separate_cache_policy": "agent-reuse",
+  "workloads": {
+    "prefill": [
+      128,
+      2048,
+      8192
+    ],
+    "decode_context": [
+      128,
+      2048,
+      8192,
+      32768,
+      131072
+    ],
+    "decode_output_tokens": 256,
+    "maximum_decode_prompt_tokens": 130815
+  },
+  "required_identity": [
+    "model SHA-256",
+    "prompt SHA-256",
+    "rendered token IDs",
+    "expected prompt-token count",
+    "source revision",
+    "clean source state",
+    "container digest",
+    "CUDA versions",
+    "GPU identity"
+  ],
+  "required_raw_data": [
+    "every warm-up outcome",
+    "every measured sample outcome",
+    "per-token decode wall times",
+    "generated token IDs",
+    "telemetry snapshots",
+    "failed-run status and error"
+  ],
+  "summary_metrics": [
+    "prefill milliseconds p50/p95",
+    "prompt tokens/second p50/p95",
+    "time to first token p50/p95",
+    "inter-token latency p50/p95",
+    "output tokens/second p50/p95",
+    "peak observed device memory",
+    "peak host RSS"
+  ],
+  "component_probe": {
+    "separate_from_throughput_samples": true,
+    "perturbs_execution": true,
+    "categories": [
+      "loading",
+      "embedding",
+      "GDN",
+      "attention",
+      "FFN",
+      "logits",
+      "sampling",
+      "graph launch",
+      "queueing",
+      "persistence",
+      "idle gaps",
+      "state commit",
+      "token total"
+    ]
+  },
+  "admission": {
+    "smoke_mode_is_eligible": false,
+    "failed_runs_are_retained": true,
+    "atomic_result_publication": true,
+    "unsupported_values_are_null": true
+  },
+  "local_sources": {
+    "README.md": "a0f30df9e1ecbf5ba7db921c9e06ff7128cad598f24d1eaab0e56b79913ea737",
+    "Makefile": "81a349ee8558efc0122a11a0c05ed9280f5534c3eab8e7dca6393c41a22de324",
+    "include/qw38/engine.h": "9fd1355e77386c19c21bc66cc772fe64c2103b7f89ea849d9a35cfa8f1f431a1",
+    "src/engine.cpp": "9638f137fd25b13df170df15015db0aa1e4f3c855ebc0d9198fc0f0cf8e21e9c",
+    "src/bench.cpp": "ee0ecf4db7a894134acedd83dbca64095b00eadb80f4beaac80ea4d589ba3751",
+    "tests/test_benchmark.py": "c60b1248b01f69850d7a5bfde9e06704129744f4c9760ff9b0e0f2ebbb136ef1",
+    "tests/test_build.py": "71cecc34ce21d6c19b162d8a4ddc9044fa17bda84760a7a5c6d85541659dcf52",
+    "fixtures/benchmark_harness.json": "784c842d579cbd49b80f92dfe680e3416ac326905f4e7fc86aa38e590571502f",
+    "docs/61-benchmark-harness.md": "38ea16e03119b97aecff542c5230437c3fb48c5957d1f8a254f7ddcd4b21a933"
+  }
+}

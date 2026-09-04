@@ -21,6 +21,7 @@ enum class ToolChoice {
 
 struct ChatRequest final {
   std::vector<ChatMessage> messages;
+  std::vector<Token> prepared_prompt;
   ChatOptions chat;
   SamplerConfig sampler;
   std::vector<std::string> stops;

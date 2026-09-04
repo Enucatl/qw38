@@ -82,13 +82,13 @@ local startup probes.
 
 This returns the OpenAI-style list envelope and the one admitted model ID,
 `qwen3.8-27b-q4_k_m`. Reporting a model does not imply that every OpenAI
-endpoint is implemented. Chat Completions was subsequently admitted by SRV-002;
-Responses remains the later SRV-003 gate.
+endpoint is implemented. Chat Completions was subsequently admitted by SRV-002,
+and Responses plus durable continuation by SRV-003.
 
-The **data plane** now includes `POST /v1/chat/completions`, which tokenizes,
-synchronizes the session, runs CUDA, and generates output. SRV-001's focused
-proof remains the ownership mechanism and control routes; SRV-002 owns the
-generation behavior.
+The **data plane** now includes `POST /v1/chat/completions` and
+`POST /v1/responses`. Both tokenize, synchronize the session, run CUDA, and
+generate output. SRV-001's focused proof remains the ownership mechanism and
+control routes; SRV-002 and SRV-003 own the two generation envelopes.
 
 ## Why single-flight exists
 
@@ -161,9 +161,9 @@ uses raw pipe reads. That negative remains in the fixture and ledger.
 
 **Proof boundary:** SRV-001 proves the socket lifecycle, bounded header
 parser, exact control routes, one-session allocation, FIFO exclusion, queue
-timing, queued cancellation, and graceful shutdown. It does not prove Chat
-Completions, Responses, request JSON, streaming, tools, authentication, active
+timing, queued cancellation, and graceful shutdown. It does not itself prove
+either generation API, request JSON, streaming, tools, authentication, active
 CUDA cancellation, TLS, persistent HTTP connections, remote deployment safety,
-or concurrent GPU sessions. Chat Completions, JSON, streaming, tools, and active
-cancellation were subsequently admitted by SRV-002 without changing this gate's
+or concurrent GPU sessions. Chat Completions was subsequently admitted by
+SRV-002 and Responses/continuation by SRV-003 without changing this gate's
 historical measurements.

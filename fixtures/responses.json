@@ -1,0 +1,23 @@
+{
+  "schema": "qw38.responses-fixture.v1",
+  "native": {
+    "request_mapping": true,
+    "function_output_continuation": true,
+    "media_rejected": true,
+    "structured_output_rejected": true,
+    "instruction_replacement_rejected": true,
+    "atomic_record_roundtrip": true,
+    "missing_record_rejected": true,
+    "corrupt_record_rejected": true,
+    "exact_tool_result_suffix": true
+  },
+  "cuda_smoke": {
+    "passed": true,
+    "non_streaming_response": true,
+    "ordered_stream_events": true,
+    "previous_response_id_exact_prefix": true,
+    "restart_replay": true,
+    "store_false_not_continuable": true,
+    "elapsed_seconds": 61.3
+  }
+}

@@ -178,8 +178,10 @@ mean of finite values
 root-mean-square magnitude of finite values
 ```
 
-The reader recomputes this summary from the blob and requires exact agreement
-with the manifest. A summary helps a person spot an exploded activation or an
+The reader recomputes this summary from the blob. Structural counts and extrema
+must agree exactly; mean and root-mean-square use fixed absolute and relative
+ tolerances of `2e-6` to accommodate harmless accumulation-order differences
+between C++ and Python. A summary helps a person spot an exploded activation or an
 all-zero output without loading the full array. It cannot replace element-wise
 comparison: arrays `[1, 3]` and `[3, 1]` have identical summaries but different
 meaning.

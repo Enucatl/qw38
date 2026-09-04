@@ -39,6 +39,40 @@ struct ScalarTapCapture final {
   float* output;
 };
 
+struct CudaTapCapture final {
+  float* output;
+  float* logits;
+  std::size_t token_row;
+};
+
+qw38::Status capture_cuda_tap(
+    const qw38::internal::TraceTensorView& tensor, void* context) noexcept {
+  auto* capture = static_cast<CudaTapCapture*>(context);
+  std::size_t tap = kTraceRows;
+  if (std::strcmp(tensor.name, "layer_residual") == 0) {
+    if (tensor.layer == 0) tap = 0;
+    if (tensor.layer == 3) tap = 1;
+    if (tensor.layer == 63) tap = 2;
+  } else if (std::strcmp(tensor.name, "final_norm") == 0) {
+    tap = 3;
+  } else if (std::strcmp(tensor.name, "logits") == 0) {
+    std::copy(tensor.values, tensor.values + tensor.value_count,
+              capture->logits + capture->token_row *
+                                    qw38::internal::kVocabularySize);
+    return qw38::Status::ok();
+  }
+  if (tap < kTraceRows) {
+    std::copy(tensor.values, tensor.values + tensor.value_count,
+              capture->output + (capture->token_row * kTraceRows + tap) *
+                                  qw38::internal::kResidualWidth);
+  }
+  return qw38::Status::ok();
+}
+
+qw38::Status reject_cuda_tap(const qw38::internal::TraceTensorView&, void*) noexcept {
+  return {qw38::StatusCode::kInternal, "deliberate CUDA trace sink failure"};
+}
+
 qw38::Status capture_scalar_tap(
     const qw38::internal::TraceTensorView& tensor, void* context) noexcept {
   auto* capture = static_cast<ScalarTapCapture*>(context);
@@ -155,25 +189,70 @@ int main(int argc, char** argv) {
   if (status.is_ok()) status = workspace.create(2);
   if (!status.is_ok()) return fail_status(status);
 
+  std::array<float, qw38::internal::kVocabularySize> check_logits{};
+  std::array<float, qw38::internal::kResidualWidth> check_hidden{};
+  float check_ms = 0.0F;
+  const qw38::internal::TraceFilter wildcard{
+      qw38::internal::kTraceAllLayers, "*"};
+  status = qw38::cuda::execute_token_traced(
+      model, 42, &session, &workspace, check_logits.data(), check_logits.size(),
+      check_hidden.data(), check_hidden.size(), &check_ms, wildcard,
+      reject_cuda_tap, nullptr);
+  if (status.code() != qw38::StatusCode::kInvalidArgument ||
+      session.frontier() != 0) {
+    std::fprintf(stderr, "invalid CUDA trace filter was not rejected atomically\n");
+    return 1;
+  }
+  const qw38::internal::TraceFilter valid_filter{0, "layer_residual"};
+  status = qw38::cuda::execute_token_traced(
+      model, 42, &session, &workspace, check_logits.data(), check_logits.size(),
+      check_hidden.data(), check_hidden.size(), &check_ms, valid_filter,
+      reject_cuda_tap, nullptr);
+  if (status.is_ok() || session.frontier() != 0) {
+    std::fprintf(stderr, "failing CUDA trace sink advanced frontier\n");
+    return 1;
+  }
+
   constexpr std::array<std::size_t, 2> kTokens{42, 3649};
   std::vector<float> cuda_logits(kTokens.size() * qw38::internal::kVocabularySize);
   std::array<float, qw38::internal::kResidualWidth> cuda_hidden{};
   std::array<float, kTokens.size()> cuda_ms{};
   std::vector<float> cuda_taps(kTokens.size() * kTraceRows *
                                qw38::internal::kResidualWidth);
+  constexpr std::array<qw38::internal::TraceFilter, 5> kCudaFilters{{
+      {0, "layer_residual"}, {3, "layer_residual"},
+      {63, "layer_residual"}, {qw38::internal::kTraceAllLayers, "final_norm"},
+      {qw38::internal::kTraceAllLayers, "logits"}}};
   for (std::size_t row = 0; row < kTokens.size(); ++row) {
+    for (const auto& filter : kCudaFilters) {
+      status = session.reset();
+      if (!status.is_ok()) return fail_status(status);
+      for (std::size_t prefix = 0; status.is_ok() && prefix < row; ++prefix) {
+        status = qw38::cuda::execute_token(
+            model, kTokens[prefix], &session, &workspace, cuda_logits.data(),
+            qw38::internal::kVocabularySize, cuda_hidden.data(),
+            cuda_hidden.size(), &cuda_ms[0]);
+      }
+      if (!status.is_ok()) return fail_status(status);
+      CudaTapCapture capture{cuda_taps.data(), cuda_logits.data(), row};
+      status = qw38::cuda::execute_token_traced(
+          model, kTokens[row], &session, &workspace,
+          cuda_logits.data() + row * qw38::internal::kVocabularySize,
+          qw38::internal::kVocabularySize, cuda_hidden.data(),
+          cuda_hidden.size(), &cuda_ms[row], filter, capture_cuda_tap,
+          &capture);
+      if (!status.is_ok()) return fail_status(status);
+    }
+  }
+  status = session.reset();
+  for (std::size_t row = 0; status.is_ok() && row < kTokens.size(); ++row) {
     status = qw38::cuda::execute_token(
         model, kTokens[row], &session, &workspace,
         cuda_logits.data() + row * qw38::internal::kVocabularySize,
         qw38::internal::kVocabularySize, cuda_hidden.data(),
         cuda_hidden.size(), &cuda_ms[row]);
-    if (!status.is_ok()) return fail_status(status);
-    status = workspace.copy_trace_taps(
-        cuda_taps.data() +
-            row * kTraceRows * qw38::internal::kResidualWidth,
-        kTraceRows * qw38::internal::kResidualWidth);
-    if (!status.is_ok()) return fail_status(status);
   }
+  if (!status.is_ok()) return fail_status(status);
 
   qw38::internal::ScalarModelParameters parameters;
   status = qw38::internal::prepare_scalar_model_parameters(weights, &parameters);

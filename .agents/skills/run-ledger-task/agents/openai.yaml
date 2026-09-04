@@ -1,0 +1,4 @@
+interface:
+  display_name: "Run Ledger Task"
+  short_description: "Execute one ledger task through gated agents"
+  default_prompt: "Use $run-ledger-task to execute the next eligible ledger task through verification and delivery."

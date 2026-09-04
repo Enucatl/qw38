@@ -1,6 +1,9 @@
 {
   "schema_version": 1,
-  "tasks": ["API-002", "SRV-002"],
+  "tasks": [
+    "API-002",
+    "SRV-002"
+  ],
   "route": "POST /v1/chat/completions",
   "model_id": "qwen3.8-27b-q4_k_m",
   "model_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
@@ -16,14 +19,54 @@
     "context_tokens": 131072
   },
   "supported": {
-    "roles": ["system", "developer", "user", "assistant", "tool"],
-    "content": ["string", "text_parts"],
-    "reasoning_effort": ["none", "low", "medium", "high", "xhigh"],
-    "sampling": ["temperature", "top_p", "top_k", "seed"],
-    "stops": ["im_end_token", "custom_text", "maximum_tokens"],
-    "tools": ["definitions", "assistant_history", "results", "auto", "none", "required", "named"],
-    "responses": ["json", "sse", "usage"],
-    "cancellation": ["queued_disconnect", "active_disconnect", "shutdown"]
+    "roles": [
+      "system",
+      "developer",
+      "user",
+      "assistant",
+      "tool"
+    ],
+    "content": [
+      "string",
+      "text_parts"
+    ],
+    "reasoning_effort": [
+      "none",
+      "low",
+      "medium",
+      "high",
+      "xhigh"
+    ],
+    "sampling": [
+      "temperature",
+      "top_p",
+      "top_k",
+      "seed"
+    ],
+    "stops": [
+      "im_end_token",
+      "custom_text",
+      "maximum_tokens"
+    ],
+    "tools": [
+      "definitions",
+      "assistant_history",
+      "results",
+      "auto",
+      "none",
+      "required",
+      "named"
+    ],
+    "responses": [
+      "json",
+      "sse",
+      "usage"
+    ],
+    "cancellation": [
+      "queued_disconnect",
+      "active_disconnect",
+      "shutdown"
+    ]
   },
   "rejected": [
     "image",
@@ -48,23 +91,23 @@
     "concurrent_gpu_sessions"
   ],
   "local_sources": {
-    "Makefile": "67913fa289fcce8acd39ae371c0632ba45931a85e6172f1c5e8d88f6cf28af0e",
-    "README.md": "b2d8f4d064311c5f84545bcc7fa1c9c1f528746daa7e99684c0b90bdf9230e73",
-    "include/qw38/engine.h": "81145844a56dcf6733c8b43918aa93a072192addbf82cb4d5f2933ed6c08da28",
-    "src/engine.cpp": "e1786a63ecb8a91e36c13639b08db652b77f9fd02e5206aeaf20ad5aff3d9f43",
-    "cuda/full_scheduler.h": "c7e9118b189c547fc11d3fd2f77e8301b9f9c5af72b32f41553bbed55be04485",
-    "cuda/full_scheduler.cu": "64235c4fca1f303b40b9068d34750f9b89068e2e353f8ca1510460d0ae157877",
-    "src/server.cpp": "698460efd77edd5ead3b710c6dcdf61b1609b688596f40c651cee2e922a2cd43",
+    "Makefile": "81a349ee8558efc0122a11a0c05ed9280f5534c3eab8e7dca6393c41a22de324",
+    "README.md": "a0f30df9e1ecbf5ba7db921c9e06ff7128cad598f24d1eaab0e56b79913ea737",
+    "include/qw38/engine.h": "9fd1355e77386c19c21bc66cc772fe64c2103b7f89ea849d9a35cfa8f1f431a1",
+    "src/engine.cpp": "9638f137fd25b13df170df15015db0aa1e4f3c855ebc0d9198fc0f0cf8e21e9c",
+    "cuda/full_scheduler.h": "56eb77134617f033b7863402c6e2a1a2c93e70bcfc8d508c745b78297d3967a4",
+    "cuda/full_scheduler.cu": "68d41bb8d231cccbc7727d2433598bf13503dba0d539e38a1548d44b1ee4ed3a",
+    "src/server.cpp": "329fff0c5dce5ef9f733554f26e8ae18d484b630650cf7b15ac2b1f55f9c2ac4",
     "src/server_core.cpp": "94b2df61560d8aa0fa777cd8588faa30a16b658e4ed2faaf57279160671f3db2",
     "src/server_json.cpp": "309b30bf962b4a16923ea72db0c8999283368463cb497576ed25d908aec27092",
     "src/server_json.h": "01badae842f77e79a97b35215cbe740baee1e93538e8e815ac71b795f37933e5",
     "src/server_api.cpp": "cf2ccae340139e39dde8cdbbdd363928f4a84bdc814a5074dde5ad82007f02d4",
-    "src/server_api.h": "a4876b079a9ae0ec2153346e8e57a53b2ab3f61b75821567ea51f839bc3f276e",
-    "src/server_generation.cpp": "39ba868ae264e1b2438db15a083e6d243192b6224ea58cd63045dd64719e335f",
+    "src/server_api.h": "2a3701f082b664ccd9c8f1570b3dc787cd8f4c4d8e7dead72e959cc1c7da2e6b",
+    "src/server_generation.cpp": "a8d3877247103252eb0415bd3aece2b8dc1e9dcebfa1fb5ccb8527b0cc9a2367",
     "src/server_generation.h": "3d2b7e863bba5308b93c8c6cc310fd0c54448d7775f1e533c23986573f2c50ed",
     "src/server_api_test.cpp": "fce443d661891a2cac935d4dce21615b9fab06462653877dbca032bd818ce5ea",
-    "tests/test_server.py": "64ef5b681debc508b8c64351d6a5cd17f0c67e3c3e14b808dfaff3e3b055036c",
+    "tests/test_server.py": "d4b9e6c6ad140e6b182785bab1e09cd9ec097e1726685b94b775e3a68a9fc399",
     "fixtures/chat_completions.json": "7aa9cca171425e6e38449b9d17260502d109063d3b136873cb97d226e0d4d30c",
-    "docs/59-chat-completions.md": "02fc2070a40eb5ee874e47aae820792e0295ca3374c2f86d0832b9efdd317dc4"
+    "docs/59-chat-completions.md": "5cd7165728e74b7020bf780319285c496b9f1de7bd07edb1e773545aeeca83c7"
   }
 }

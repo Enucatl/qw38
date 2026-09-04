@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "task": "TRC-004",
+  "device": "NVIDIA GeForce RTX 5090",
+  "compute_capability": "12.0",
+  "toolkit": "CUDA 13.0.2",
+  "token": 42,
+  "filters": [
+    {"layer": 0, "tap": "layer_residual", "count": 5120, "max_abs": 0.00811195374, "rms": 0.000325656829, "cosine": 0.999999276, "passed": true},
+    {"layer": 3, "tap": "layer_residual", "count": 5120, "max_abs": 0.037525177, "rms": 0.000961786042, "cosine": 0.999998908, "passed": true},
+    {"layer": 63, "tap": "layer_residual", "count": 5120, "max_abs": 0.755096436, "rms": 0.112812462, "cosine": 0.999936634, "passed": true},
+    {"layer": 64, "tap": "final_norm", "count": 5120, "max_abs": 0.12295723, "rms": 0.0220696393, "cosine": 0.999932363, "passed": true},
+    {"layer": 64, "tap": "logits", "count": 248320, "max_abs": 0.13822341, "rms": 0.0272042993, "cosine": 0.999871596, "passed": true}
+  ],
+  "greedy": {"cuda": 3649, "scalar": 3649, "equal": true},
+  "failure_path": {"invalid_filter_rejected": true, "sink_failure_rejected": true, "frontier_after_failure": 0},
+  "proof_limits": {"nonfinite": 0, "uses_scalar_tolerances": true, "tolerances_modified": false},
+  "status": "passed"
+}

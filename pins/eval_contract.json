@@ -1,0 +1,76 @@
+{
+  "schema": "qw38.eval-result",
+  "version": 1,
+  "vocabulary_size": 248320,
+  "dtype": "f32-le",
+  "modes": [
+    "logits",
+    "checkpoint",
+    "trace"
+  ],
+  "source_states": [
+    "clean",
+    "dirty"
+  ],
+  "model": {
+    "name": "qwen3.8-27b-q4_k_m",
+    "revision": "0669b98607d47046c7c2b3f801011d54a08cfccf",
+    "sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+    "byte_count": 18973870432
+  },
+  "blob_record": [
+    "file",
+    "dtype",
+    "shape",
+    "byte_count",
+    "sha256",
+    "summary"
+  ],
+  "summary": [
+    "count",
+    "finite_count",
+    "nan_count",
+    "positive_infinity_count",
+    "negative_infinity_count",
+    "minimum",
+    "maximum",
+    "mean",
+    "root_mean_square"
+  ],
+  "publication": "atomic-absent-destination",
+  "isolation": {
+    "release_objects": [
+      "build/eval.cuda.o",
+      "build/full_scheduler.cuda.o"
+    ],
+    "diagnostic_objects": [
+      "build/eval.trace.cuda.o",
+      "build/full_scheduler.trace.cuda.o",
+      "build/diagnostic/diagnostic_trace.o"
+    ],
+    "forbidden_release_symbols": [
+      "execute_token_traced",
+      "validate_trace_filter",
+      "trace_filter_matches",
+      "emit_trace_tensor",
+      "TraceSink"
+    ],
+    "forbidden_release_literals": [
+      "layer_residual",
+      "final_norm"
+    ]
+  },
+  "trace_filters": [
+    "0:layer_residual",
+    "3:layer_residual",
+    "63:layer_residual",
+    "global:final_norm",
+    "global:logits"
+  ],
+  "local_sources": {
+    "src/eval.cpp": "5051b435bf22bf61c5c6162d453a4749f70df44ac46373a3fc6f9053679a7bf3",
+    "tools/qw38_eval.py": "4bd3fb784e7a39137af10fc49f8d303779941c11dce1956877a692d12dad9658",
+    "tests/test_eval.py": "5b2171b9d5422883f71134fa460ff3d209a2f7713e00f86e5f4d90400c0564d5",
+    "tests/test_build.py": "71cecc34ce21d6c19b162d8a4ddc9044fa17bda84760a7a5c6d85541659dcf52"
+  }
+}

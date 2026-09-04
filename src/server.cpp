@@ -20,6 +20,8 @@
 #include <thread>
 
 #include "qw38/engine.h"
+#include "response_store.h"
+#include "responses_api.h"
 #include "server_api.h"
 #include "server_core.h"
 #include "server_generation.h"
@@ -41,6 +43,7 @@ struct Options final {
   std::string model;
   std::string host = "127.0.0.1";
   std::uint16_t port = 8080;
+  std::string response_dir = "checkpoints/responses";
 };
 
 struct Request final {
@@ -63,6 +66,7 @@ struct RouteContext final {
   qw38::server::SingleFlightGate* gate = nullptr;
   std::atomic<std::uint64_t>* cancelled_requests = nullptr;
   std::string model_id = kModelId;
+  qw38::server::ResponseStore* response_store = nullptr;
 };
 
 class ConnectionTracker final {
@@ -153,9 +157,10 @@ class DisconnectMonitor final {
 };
 
 void usage(std::ostream& output) {
-  output << "usage: qw38-server MODEL [--host IPV4] [--port PORT]\n"
+  output << "usage: qw38-server MODEL [--host IPV4] [--port PORT] [--response-dir DIR]\n"
          << "  --host IPV4   listen address (default 127.0.0.1)\n"
-         << "  --port PORT   TCP port; 0 asks the OS to choose (default 8080)\n";
+         << "  --port PORT   TCP port; 0 asks the OS to choose (default 8080)\n"
+         << "  --response-dir DIR  atomic continuation records (default checkpoints/responses)\n";
 }
 
 bool parse_port(const char* text, std::uint16_t* port) {
@@ -184,13 +189,14 @@ bool parse_options(int argc, char** argv, Options* options) {
     if (index + 1 >= argc) return false;
     const char* value = argv[++index];
     if (argument == "--host") options->host = value;
+    else if (argument == "--response-dir") options->response_dir = value;
     else if (argument == "--port") {
       if (!parse_port(value, &options->port)) return false;
     } else {
       return false;
     }
   }
-  return !options->host.empty();
+  return !options->host.empty() && !options->response_dir.empty();
 }
 
 void stop_server(int) {
@@ -417,6 +423,16 @@ std::string response_id() {
   return "chatcmpl-qw38-" + std::to_string(value);
 }
 
+std::string responses_id() {
+  const std::uint64_t value =
+      g_response_counter.fetch_add(1, std::memory_order_relaxed);
+  const std::int64_t micros = std::chrono::duration_cast<std::chrono::microseconds>(
+                                  std::chrono::system_clock::now().time_since_epoch())
+                                  .count();
+  return "resp_qw38_" + std::to_string(micros) + "_" +
+         std::to_string(value);
+}
+
 std::int64_t unix_seconds() {
   return std::chrono::duration_cast<std::chrono::seconds>(
              std::chrono::system_clock::now().time_since_epoch())
@@ -433,6 +449,70 @@ std::string usage_json(const qw38::server::GenerationResult& result) {
          std::to_string(result.prompt_tokens) + ",\"completion_tokens\":" +
          std::to_string(result.completion_tokens) + ",\"total_tokens\":" +
          std::to_string(result.prompt_tokens + result.completion_tokens) + "}";
+}
+
+std::string responses_usage_json(
+    const qw38::server::GenerationResult& result) {
+  return std::string("{\"input_tokens\":") +
+         std::to_string(result.prompt_tokens) +
+         ",\"input_tokens_details\":{\"cached_tokens\":0},\"output_tokens\":" +
+         std::to_string(result.completion_tokens) +
+         ",\"output_tokens_details\":{\"reasoning_tokens\":0},\"total_tokens\":" +
+         std::to_string(result.prompt_tokens + result.completion_tokens) + "}";
+}
+
+std::string responses_output_json(
+    const std::string& id, const qw38::server::AssistantOutput& output) {
+  std::string json = "[";
+  bool comma = false;
+  if (!output.reasoning.empty()) {
+    json += "{\"id\":" + qw38::server::quote_json("rs_" + id.substr(5)) +
+            ",\"type\":\"reasoning\",\"summary\":[{\"type\":\"summary_text\",\"text\":" +
+            qw38::server::quote_json(output.reasoning) + "}]}";
+    comma = true;
+  }
+  if (!output.content.empty() || output.tool_calls.empty()) {
+    if (comma) json += ',';
+    json += "{\"id\":" + qw38::server::quote_json("msg_" + id.substr(5)) +
+            ",\"type\":\"message\",\"status\":\"completed\",\"role\":\"assistant\",\"content\":[{\"type\":\"output_text\",\"text\":" +
+            qw38::server::quote_json(output.content) +
+            ",\"annotations\":[]}]}";
+    comma = true;
+  }
+  for (std::size_t index = 0; index < output.tool_calls.size(); ++index) {
+    if (comma) json += ',';
+    const std::string suffix = id.substr(5) + "_" + std::to_string(index);
+    json += "{\"id\":" + qw38::server::quote_json("fc_" + suffix) +
+            ",\"type\":\"function_call\",\"status\":\"completed\",\"call_id\":" +
+            qw38::server::quote_json("call_" + suffix) + ",\"name\":" +
+            qw38::server::quote_json(output.tool_calls[index].name) +
+            ",\"arguments\":" +
+            qw38::server::quote_json(output.tool_calls[index].arguments_json) +
+            "}";
+    comma = true;
+  }
+  return json + "]";
+}
+
+std::string responses_json(
+    const std::string& id, std::int64_t created,
+    const std::string& previous_response_id, bool store,
+    const qw38::server::GenerationResult& result) {
+  const bool incomplete = result.finish_reason == "length";
+  return "{\"id\":" + qw38::server::quote_json(id) +
+         ",\"object\":\"response\",\"created_at\":" +
+         std::to_string(created) + ",\"status\":\"" +
+         (incomplete ? "incomplete" : "completed") +
+         "\",\"error\":null,\"incomplete_details\":" +
+         (incomplete ? "{\"reason\":\"max_output_tokens\"}" : "null") +
+         ",\"model\":\"" + kModelId + "\",\"output\":" +
+         responses_output_json(id, result.output) +
+         ",\"parallel_tool_calls\":false,\"previous_response_id\":" +
+         (previous_response_id.empty()
+              ? "null"
+              : qw38::server::quote_json(previous_response_id)) +
+         ",\"store\":" + (store ? "true" : "false") +
+         ",\"usage\":" + responses_usage_json(result) + "}";
 }
 
 std::string tool_calls_json(const std::string& id,
@@ -526,6 +606,88 @@ bool stream_delta(void* opaque, qw38::server::DeltaKind kind,
   const std::string delta = std::string("{\"") + field + "\":" +
                             qw38::server::quote_json(bytes) + "}";
   return send_sse(context->socket, chunk_json(*context, delta, nullptr));
+}
+
+struct ResponsesStreamContext final {
+  int socket = -1;
+  std::string id;
+  std::uint64_t sequence = 0;
+  std::size_t next_output_index = 0;
+  std::size_t reasoning_index = 0;
+  std::size_t message_index = 0;
+  bool reasoning_started = false;
+  bool message_started = false;
+};
+
+bool response_event(ResponsesStreamContext* context, const std::string& type,
+                    const std::string& fields) noexcept {
+  const std::string json = "{\"type\":" + qw38::server::quote_json(type) +
+                           ",\"sequence_number\":" +
+                           std::to_string(context->sequence++) +
+                           (fields.empty() ? "" : "," + fields) + "}";
+  return send_all(context->socket, "event: " + type + "\ndata: " + json +
+                                       "\n\n");
+}
+
+bool responses_stream_delta(void* opaque, qw38::server::DeltaKind kind,
+                            const std::string& bytes) noexcept {
+  auto* context = static_cast<ResponsesStreamContext*>(opaque);
+  if (kind == qw38::server::DeltaKind::kReasoning) {
+    if (!context->reasoning_started) {
+      context->reasoning_started = true;
+      context->reasoning_index = context->next_output_index++;
+      const std::string item =
+          "{\"id\":" + qw38::server::quote_json("rs_" + context->id.substr(5)) +
+          ",\"type\":\"reasoning\",\"summary\":[]}";
+      if (!response_event(context, "response.output_item.added",
+                          "\"output_index\":" +
+                              std::to_string(context->reasoning_index) +
+                              ",\"item\":" + item) ||
+          !response_event(context, "response.reasoning_summary_part.added",
+                          "\"item_id\":" +
+                              qw38::server::quote_json("rs_" +
+                                                       context->id.substr(5)) +
+                              ",\"output_index\":" +
+                              std::to_string(context->reasoning_index) +
+                              ",\"summary_index\":0,\"part\":{\"type\":\"summary_text\",\"text\":\"\"}")) {
+        return false;
+      }
+    }
+    return response_event(
+        context, "response.reasoning_summary_text.delta",
+        "\"item_id\":" +
+            qw38::server::quote_json("rs_" + context->id.substr(5)) +
+            ",\"output_index\":" + std::to_string(context->reasoning_index) +
+            ",\"summary_index\":0,\"delta\":" +
+            qw38::server::quote_json(bytes));
+  }
+  if (!context->message_started) {
+    context->message_started = true;
+    context->message_index = context->next_output_index++;
+    const std::string item =
+        "{\"id\":" + qw38::server::quote_json("msg_" + context->id.substr(5)) +
+        ",\"type\":\"message\",\"status\":\"in_progress\",\"role\":\"assistant\",\"content\":[]}";
+    if (!response_event(context, "response.output_item.added",
+                        "\"output_index\":" +
+                            std::to_string(context->message_index) +
+                            ",\"item\":" + item) ||
+        !response_event(context, "response.content_part.added",
+                        "\"item_id\":" +
+                            qw38::server::quote_json("msg_" +
+                                                     context->id.substr(5)) +
+                            ",\"output_index\":" +
+                            std::to_string(context->message_index) +
+                            ",\"content_index\":0,\"part\":{\"type\":\"output_text\",\"text\":\"\",\"annotations\":[]}")) {
+      return false;
+    }
+  }
+  return response_event(
+      context, "response.output_text.delta",
+      "\"item_id\":" +
+          qw38::server::quote_json("msg_" + context->id.substr(5)) +
+          ",\"output_index\":" + std::to_string(context->message_index) +
+          ",\"content_index\":0,\"delta\":" +
+          qw38::server::quote_json(bytes));
 }
 
 int status_for(const qw38::Status& status) noexcept {
@@ -646,6 +808,282 @@ void serve_chat(int socket, const Request& request,
   monitor.stop();
 }
 
+bool same_tools(const std::vector<qw38::server::Json>& left,
+                const std::vector<qw38::server::Json>& right) {
+  if (left.size() != right.size()) return false;
+  for (std::size_t index = 0; index < left.size(); ++index) {
+    if (qw38::server::dump_json(left[index], true) !=
+        qw38::server::dump_json(right[index], true)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+qw38::Status prepare_continuation(
+    const RouteContext& context,
+    qw38::server::ResponsesRequest* response) noexcept {
+  if (response->previous_response_id.empty()) return qw38::Status::ok();
+  qw38::server::ResponseRecord previous;
+  qw38::Status status =
+      context.response_store->load(response->previous_response_id, &previous);
+  if (!status.is_ok()) return status;
+  auto& generation = response->generation;
+  if (!generation.tool_schemas.empty() &&
+      !same_tools(generation.tool_schemas, previous.tool_schemas)) {
+    return {qw38::StatusCode::kInvalidArgument,
+            "tools must be omitted or exactly match the stored response"};
+  }
+  if (generation.tool_schemas.empty()) {
+    generation.tool_schemas = previous.tool_schemas;
+    generation.chat.canonical_tools.clear();
+    for (const qw38::server::Json& tool : previous.tool_schemas) {
+      generation.chat.canonical_tools.push_back(
+          qw38::server::dump_json(tool, true));
+    }
+  }
+  if (generation.tool_choice != qw38::server::ToolChoice::kAuto) {
+    return {qw38::StatusCode::kUnimplemented,
+            "continued requests support tool_choice=auto only"};
+  }
+  std::vector<qw38::Token> suffix;
+  status = context.engine->render_followup(
+      generation.messages, generation.chat.enable_thinking, &suffix);
+  if (!status.is_ok()) return status;
+  generation.prepared_prompt = std::move(previous.tokens);
+  generation.prepared_prompt.insert(generation.prepared_prompt.end(),
+                                    suffix.begin(), suffix.end());
+  return qw38::Status::ok();
+}
+
+bool finish_responses_stream(
+    ResponsesStreamContext* stream,
+    const qw38::server::GenerationResult& result) noexcept {
+  if (stream->reasoning_started) {
+    const std::string base =
+        "\"item_id\":" +
+        qw38::server::quote_json("rs_" + stream->id.substr(5)) +
+        ",\"output_index\":" + std::to_string(stream->reasoning_index) +
+        ",\"summary_index\":0";
+    if (!response_event(stream, "response.reasoning_summary_text.done",
+                        base + ",\"text\":" +
+                                   qw38::server::quote_json(
+                                       result.output.reasoning)) ||
+        !response_event(
+            stream, "response.reasoning_summary_part.done",
+            base + ",\"part\":{\"type\":\"summary_text\",\"text\":" +
+                qw38::server::quote_json(result.output.reasoning) + "}")) {
+      return false;
+    }
+    const std::string item =
+        "{\"id\":" +
+        qw38::server::quote_json("rs_" + stream->id.substr(5)) +
+        ",\"type\":\"reasoning\",\"summary\":[{\"type\":\"summary_text\",\"text\":" +
+        qw38::server::quote_json(result.output.reasoning) + "}]}";
+    if (!response_event(stream, "response.output_item.done",
+                        "\"output_index\":" +
+                            std::to_string(stream->reasoning_index) +
+                            ",\"item\":" + item)) {
+      return false;
+    }
+  }
+  if (stream->message_started) {
+    const std::string base =
+        "\"item_id\":" +
+        qw38::server::quote_json("msg_" + stream->id.substr(5)) +
+        ",\"output_index\":" + std::to_string(stream->message_index) +
+        ",\"content_index\":0";
+    if (!response_event(stream, "response.output_text.done",
+                        base + ",\"text\":" +
+                                   qw38::server::quote_json(
+                                       result.output.content)) ||
+        !response_event(
+            stream, "response.content_part.done",
+            base + ",\"part\":{\"type\":\"output_text\",\"text\":" +
+                qw38::server::quote_json(result.output.content) +
+                ",\"annotations\":[]}")) {
+      return false;
+    }
+    const std::string item =
+        "{\"id\":" +
+        qw38::server::quote_json("msg_" + stream->id.substr(5)) +
+        ",\"type\":\"message\",\"status\":\"completed\",\"role\":\"assistant\",\"content\":[{\"type\":\"output_text\",\"text\":" +
+        qw38::server::quote_json(result.output.content) +
+        ",\"annotations\":[]}]}";
+    if (!response_event(stream, "response.output_item.done",
+                        "\"output_index\":" +
+                            std::to_string(stream->message_index) +
+                            ",\"item\":" + item)) {
+      return false;
+    }
+  }
+  for (std::size_t index = 0; index < result.output.tool_calls.size(); ++index) {
+    const std::size_t output_index = stream->next_output_index++;
+    const std::string suffix = stream->id.substr(5) + "_" + std::to_string(index);
+    const auto& call = result.output.tool_calls[index];
+    const std::string pending =
+        "{\"id\":" + qw38::server::quote_json("fc_" + suffix) +
+        ",\"type\":\"function_call\",\"status\":\"in_progress\",\"call_id\":" +
+        qw38::server::quote_json("call_" + suffix) + ",\"name\":" +
+        qw38::server::quote_json(call.name) + ",\"arguments\":\"\"}";
+    const std::string base =
+        "\"item_id\":" + qw38::server::quote_json("fc_" + suffix) +
+        ",\"output_index\":" + std::to_string(output_index);
+    if (!response_event(stream, "response.output_item.added",
+                        "\"output_index\":" + std::to_string(output_index) +
+                            ",\"item\":" + pending) ||
+        !response_event(stream, "response.function_call_arguments.delta",
+                        base + ",\"delta\":" +
+                                   qw38::server::quote_json(
+                                       call.arguments_json)) ||
+        !response_event(stream, "response.function_call_arguments.done",
+                        base + ",\"arguments\":" +
+                                   qw38::server::quote_json(
+                                       call.arguments_json))) {
+      return false;
+    }
+    const std::string done =
+        "{\"id\":" + qw38::server::quote_json("fc_" + suffix) +
+        ",\"type\":\"function_call\",\"status\":\"completed\",\"call_id\":" +
+        qw38::server::quote_json("call_" + suffix) + ",\"name\":" +
+        qw38::server::quote_json(call.name) + ",\"arguments\":" +
+        qw38::server::quote_json(call.arguments_json) + "}";
+    if (!response_event(stream, "response.output_item.done",
+                        "\"output_index\":" + std::to_string(output_index) +
+                            ",\"item\":" + done)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+void serve_responses(int socket, const Request& request,
+                     const RouteContext& context) noexcept {
+  const auto content_type = request.headers.find("content-type");
+  if (content_type == request.headers.end() ||
+      lower_ascii(content_type->second).find("application/json") != 0) {
+    write_response(socket,
+                   {400,
+                    error_body("Content-Type must be application/json.",
+                               "invalid_content_type"),
+                    std::string()});
+    return;
+  }
+  qw38::server::Json root;
+  qw38::Status status = qw38::server::parse_json(request.body, 64, &root);
+  qw38::server::ResponsesRequest response;
+  if (status.is_ok()) {
+    status = qw38::server::parse_responses_request(root, &response);
+  }
+  if (!status.is_ok()) {
+    write_response(socket,
+                   {400, error_body(status.message(),
+                                    qw38::status_code_name(status.code())),
+                    std::string()});
+    return;
+  }
+
+  DisconnectMonitor monitor(socket);
+  qw38::server::QueueTiming timing;
+  status = context.gate->acquire(monitor.cancelled(), &timing);
+  const bool acquired = status.is_ok();
+  if (status.is_ok()) status = prepare_continuation(context, &response);
+  if (!status.is_ok()) {
+    if (acquired) context.gate->release();
+    if (status.code() == qw38::StatusCode::kCancelled) {
+      context.cancelled_requests->fetch_add(1, std::memory_order_relaxed);
+    }
+    monitor.stop();
+    if (!monitor.cancelled()->load(std::memory_order_relaxed)) {
+      write_response(socket,
+                     {status_for(status),
+                      error_body(status.message(),
+                                 qw38::status_code_name(status.code())),
+                      queue_headers(timing)});
+    }
+    return;
+  }
+
+  const std::string id = responses_id();
+  const std::int64_t created = unix_seconds();
+  ResponsesStreamContext stream{socket, id};
+  bool stream_started = false;
+  if (response.generation.stream) {
+    stream_started = write_headers(socket, 200, "text/event-stream",
+                                   "Cache-Control: no-cache\r\n" +
+                                       queue_headers(timing),
+                                   nullptr);
+    const std::string pending =
+        "{\"id\":" + qw38::server::quote_json(id) +
+        ",\"object\":\"response\",\"created_at\":" +
+        std::to_string(created) +
+        ",\"status\":\"in_progress\",\"error\":null,\"incomplete_details\":null,\"model\":\"" +
+        kModelId + "\",\"output\":[],\"parallel_tool_calls\":false,\"previous_response_id\":" +
+        (response.previous_response_id.empty()
+             ? "null"
+             : qw38::server::quote_json(response.previous_response_id)) +
+        ",\"store\":" + (response.store ? "true" : "false") + "}";
+    if (stream_started) {
+      stream_started = response_event(&stream, "response.created",
+                                      "\"response\":" + pending) &&
+                       response_event(&stream, "response.in_progress",
+                                      "\"response\":" + pending);
+    }
+    if (!stream_started) monitor.cancelled()->store(true, std::memory_order_relaxed);
+  }
+
+  qw38::server::GenerationResult result;
+  if (!response.generation.stream || stream_started) {
+    status = qw38::server::generate_chat(
+        *context.engine, context.session, response.generation, context.end_token,
+        monitor.cancelled(),
+        response.generation.stream ? responses_stream_delta : nullptr,
+        response.generation.stream ? static_cast<void*>(&stream) : nullptr,
+        &result);
+  }
+  if (status.is_ok() && response.store) {
+    qw38::server::ResponseRecord record;
+    status = context.session->tokens(&record.tokens);
+    record.tool_schemas = response.generation.tool_schemas;
+    if (status.is_ok()) status = context.response_store->save(id, record);
+  }
+  const qw38::Status release_status = context.gate->release();
+  if (status.is_ok() && !release_status.is_ok()) status = release_status;
+  if (status.code() == qw38::StatusCode::kCancelled) {
+    context.cancelled_requests->fetch_add(1, std::memory_order_relaxed);
+  }
+
+  const std::string completed = responses_json(
+      id, created, response.previous_response_id, response.store, result);
+  if (response.generation.stream && stream_started) {
+    if (status.is_ok()) {
+      if (finish_responses_stream(&stream, result)) {
+        response_event(&stream, result.finish_reason == "length"
+                                    ? "response.incomplete"
+                                    : "response.completed",
+                       "\"response\":" + completed);
+      }
+    } else if (!monitor.cancelled()->load(std::memory_order_relaxed)) {
+      response_event(&stream, "error",
+                     "\"error\":{\"message\":" +
+                         qw38::server::quote_json(status.message()) +
+                         ",\"type\":\"invalid_request_error\",\"code\":" +
+                         qw38::server::quote_json(
+                             qw38::status_code_name(status.code())) +
+                         "}");
+    }
+  } else if (status.is_ok()) {
+    write_response(socket, {200, completed, queue_headers(timing)});
+  } else if (!monitor.cancelled()->load(std::memory_order_relaxed)) {
+    write_response(socket,
+                   {status_for(status),
+                    error_body(status.message(),
+                               qw38::status_code_name(status.code())),
+                    queue_headers(timing)});
+  }
+  monitor.stop();
+}
+
 void handle_connection(int socket, const RouteContext& context,
                        ConnectionTracker* tracker) noexcept {
   ConnectionOwner owner(socket, tracker);
@@ -670,6 +1108,18 @@ void handle_connection(int socket, const RouteContext& context,
                       "Allow: POST\r\n"});
     } else {
       serve_chat(socket, request, context);
+    }
+    return;
+  }
+  if (path == "/v1/responses") {
+    if (request.method != "POST") {
+      write_response(socket,
+                     {405,
+                      error_body("Responses requires POST.",
+                                 "method_not_allowed"),
+                      "Allow: POST\r\n"});
+    } else {
+      serve_responses(socket, request, context);
     }
     return;
   }
@@ -724,7 +1174,9 @@ int main(int argc, char** argv) {
   }
 
   qw38::Engine engine;
-  qw38::Status status = qw38::Engine::open(options.model, &engine);
+  qw38::server::ResponseStore response_store(options.response_dir);
+  qw38::Status status = response_store.open();
+  if (status.is_ok()) status = qw38::Engine::open(options.model, &engine);
   std::string model_id = kModelId;
   if (status.is_ok()) status = engine.admitted_model(&model_id);
   std::unique_ptr<qw38::Session> session;
@@ -749,7 +1201,7 @@ int main(int argc, char** argv) {
   qw38::server::SingleFlightGate gate;
   std::atomic<std::uint64_t> cancelled_requests{0};
   RouteContext context{&engine, session.get(), end_tokens[0], &gate,
-                       &cancelled_requests, model_id};
+                       &cancelled_requests, model_id, &response_store};
   ConnectionTracker tracker;
   struct sigaction action {};
   action.sa_handler = stop_server;
@@ -758,7 +1210,8 @@ int main(int argc, char** argv) {
   sigaction(SIGTERM, &action, nullptr);
   g_listener = listener;
   std::cout << "listening=http://" << options.host << ':' << bound_port
-            << " model=" << model_id << " sessions=1\n"
+            << " model=" << model_id << " sessions=1 response_dir="
+            << response_store.directory() << "\n"
             << std::flush;
 
   while (!g_stop) {

@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "task": "BEN-001",
+  "measured_at_utc": "2026-09-02T15:10:18Z",
+  "environment": {
+    "container": "qw38-cuda:13.0.2",
+    "gpu": "NVIDIA GeForce RTX 5090",
+    "model_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34"
+  },
+  "native_checks": {
+    "statistics_self_test": true,
+    "release_minimums_fail_closed": true,
+    "failed_result_is_retained": true,
+    "result_schema": "qw38.benchmark-result.v1"
+  },
+  "smoke": {
+    "passed": true,
+    "admission_eligible": false,
+    "workloads": ["prefill", "decode", "agent-reuse"],
+    "raw_results": [
+      "evidence/benchmark/ben001-prefill-smoke.json",
+      "evidence/benchmark/ben001-decode-smoke.json",
+      "evidence/benchmark/ben001-reuse-smoke.json"
+    ],
+    "raw_result_sha256": {
+      "evidence/benchmark/ben001-prefill-smoke.json": "5b655edcf150f63e83ae95b9ed6eab6567c600a202d7c880d7e5a1caf745c144",
+      "evidence/benchmark/ben001-decode-smoke.json": "859fb0d1423e8804aa9d6b2665b2d083d0a8187f3d1d1171d6e5a1233ddd9ae1",
+      "evidence/benchmark/ben001-reuse-smoke.json": "15b83ab22af18b9e6b7991c1f0e06aee34e49869ee257ab756bd29c714d55da9"
+    }
+  },
+  "negative": {
+    "historical_full_scheduler_prompt_path_was_token_wise": true,
+    "observed_prompt_tokens_per_second": 16.2,
+    "follow_up_task": "SCH-002",
+    "release_throughput_claim": false,
+    "resolved_by": "SCH-002"
+  },
+  "notes": [
+    "Smoke mode deliberately uses fewer than three warm-ups and thirty measured samples.",
+    "The component probe is kept out of throughput summaries because detailed CUDA event attribution perturbs execution.",
+    "The observed prompt rate diagnoses missing full-scheduler chunk integration; it is not a comparative benchmark result."
+  ]
+}

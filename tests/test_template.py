@@ -51,3 +51,19 @@ def test_incremental_user_turn_rejects_empty_input() -> None:
     result = render("empty_user_turn")
     assert result.returncode == 1
     assert b"user turn cannot be empty" in result.stderr
+
+
+def test_responses_tool_results_have_exact_followup_boundaries() -> None:
+    result = render("followup_tool_results")
+    assert result.returncode == 0
+    assert result.stdout == (
+        b"<|im_start|>user\n<tool_response>\n18 C\n</tool_response>"
+        b"\n<tool_response>\nsunny\n</tool_response><|im_end|>\n"
+        b"<|im_start|>assistant\n<think>\n\n</think>\n\n"
+    )
+
+
+def test_responses_followup_rejects_mixed_user_and_tool_items() -> None:
+    result = render("followup_mixed_invalid")
+    assert result.returncode == 1
+    assert b"one user message or function outputs" in result.stderr

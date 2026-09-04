@@ -13,6 +13,6 @@
     {"name": "separate_sampling", "sampled_token": 1277, "frontier_before": 2, "frontier_after": 2, "state_equal_after_sampling": true, "passed": true},
     {"name": "preflight_error", "token": 248320, "status": "invalid_argument", "frontier_before": 2, "frontier_after": 2, "state_equal_after_error": true, "passed": true}
   ],
-  "workspace_bytes_at_capacity_3": 160380704,
+  "workspace_bytes_at_capacity_3": 186300192,
   "claim": "one-token CUDA transaction, cancellation/error preservation, successful exact commit, and greedy sampling purity; not multi-token request rollback, stochastic sampling, checkpointing, 128K fit, or throughput evidence"
 }

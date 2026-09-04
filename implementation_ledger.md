@@ -17,7 +17,7 @@ are repository-relative unless stated otherwise.
 | ENV-001 | Capture and validate the local production-toolchain prerequisites | ART-002 | done | GPU/driver/toolkit/container availability is recorded; unavailable prerequisites have explicit follow-up | CUDA probe log 2026-08-29T09:55:00Z |
 | BLD-001 | Establish brand, repository layout, and C++17 build | ART-002 | done | Literal brand appears in user-facing tools; Makefile builds restricted host targets | [`Makefile`](Makefile), [`include/qw38/engine.h`](include/qw38/engine.h), pytest log 2026-08-29T09:52:00Z |
 | BLD-002 | Add pinned CUDA 13.0 SM120 build path | PIN-003, BLD-001 | done | Diagnostic and release CUDA builds target `sm_120` with recorded flags | [`Makefile`](Makefile); [`pins/cuda_quant_contract.json`](pins/cuda_quant_contract.json); log 2026-08-31T06:05:47Z |
-| BLD-003 | Define and enforce the device allocation ledger | PIN-001 | in_progress | All persistent/transient allocations and 128K budgets are enumerated and checked | — |
+| BLD-003 | Define and enforce the device allocation ledger | PIN-001 | done | All persistent/transient allocations and 128K budgets are enumerated and checked | [`docs/13-allocation-ledger.md`](docs/13-allocation-ledger.md); [`docs/54-post-graph-128k-memory.md`](docs/54-post-graph-128k-memory.md); [`cuda/memory_fit_test.cu`](cuda/memory_fit_test.cu); [`tests/test_cuda_memory_fit.py`](tests/test_cuda_memory_fit.py); log 2026-09-03T12:50:48Z |
 | API-001 | Implement explicit `Status` and move-only Engine/Session boundary | BLD-001 | done | Public header compiles without exceptions/RTTI and exposes the approved operations | [`include/qw38/engine.h`](include/qw38/engine.h), build log 2026-08-29T09:52:00Z |
 | API-002 | Implement bounded JSON parsing and canonical serialization for the server | SRV-001 | done | Valid JSON, Unicode escapes, depth/body limits, canonical tool JSON, and malformed inputs pass native fixtures without a general JSON dependency | [`src/server_json.cpp`](src/server_json.cpp); [`src/server_api_test.cpp`](src/server_api_test.cpp); [`pins/chat_completions_contract.json`](pins/chat_completions_contract.json); log 2026-09-01T19:00:04Z |
 | MDL-001 | Parse, mmap, inventory, and fail-closed validate GGUF | PIN-001, API-001 | done | Exact tensor metadata/ranges/roles are checked; malformed fixtures pass pytest | [`pins/tensor_inventory.json`](pins/tensor_inventory.json), [`src/model.cpp`](src/model.cpp); log 2026-08-29T10:35:51Z |
@@ -44,7 +44,7 @@ are repository-relative unless stated otherwise.
 | TRC-001 | Define versioned trace bundle and typed comparison metrics | PIN-002 | done | Manifest/blob schema, checksums, summaries, session frontiers, and metric reporter pass tests | [`pins/trace_contract.json`](pins/trace_contract.json); [`tools/qw38_trace.py`](tools/qw38_trace.py); [`tests/test_trace.py`](tests/test_trace.py); log 2026-08-30T07:13:12Z |
 | TRC-003 | Add build-isolated backend-neutral trace sink and exact filters | TRC-001 | done | Diagnostic build accepts validated layer/name filters and emits typed views; release objects contain no trace API or tap names | [`src/diagnostic_trace.h`](src/diagnostic_trace.h); [`tests/test_diagnostic_trace.py`](tests/test_diagnostic_trace.py); log 2026-08-30T07:19:17Z |
 | TRC-002 | Add diagnostic-only stable scalar taps | TRC-003, CPU-016 | done | Required scalar taps use the backend-neutral sink, emit through the v1 bundle, and match filtered native scalar evidence | [`pins/scalar_trace_contract.json`](pins/scalar_trace_contract.json); [`src/scalar_runtime.cpp`](src/scalar_runtime.cpp); [`tests/test_real_scalar_trace.py`](tests/test_real_scalar_trace.py); log 2026-08-30T07:32:39Z |
-| TRC-004 | Add diagnostic-only stable CUDA taps | TRC-002, CUD-001 | pending | CUDA visible boundaries use pinned scalar tap names/shapes and pass frozen scalar/oracle comparison gates | — |
+| TRC-004 | Add diagnostic-only stable CUDA taps | TRC-002, CUD-001 | done | CUDA visible boundaries use pinned scalar tap names/shapes and pass frozen scalar/oracle comparison gates | [`cuda/full_scheduler.cu`](cuda/full_scheduler.cu); [`pins/cuda_trace_contract.json`](pins/cuda_trace_contract.json); [`fixtures/cuda_trace.json`](fixtures/cuda_trace.json); [`tests/test_cuda_trace.py`](tests/test_cuda_trace.py); [`docs/63-cuda-diagnostic-traces.md`](docs/63-cuda-diagnostic-traces.md); log 2026-09-03T10:27:00Z |
 | ORA-002 | Build and validate pinned llama.cpp same-GGUF authority harness | PIN-001, PIN-002, CPU-004 | done | Exact revision builds reproducibly; identical tokens/template run on the pinned GGUF; logits/continuation metadata and source identity are retained | [`pins/llama_authority_contract.json`](pins/llama_authority_contract.json); [`fixtures/llama_scalar_authority.json`](fixtures/llama_scalar_authority.json); [`tests/test_llama_authority.py`](tests/test_llama_authority.py); log 2026-08-30T12:27:27Z |
 | ORA-003 | Build pinned Transformers eager/offload semantic trace authority | PIN-002, TRC-002 | done | Exact source/model revisions execute within host/GPU limits and emit required taps, or an evidenced infeasibility creates an approved replacement task | [`pins/transformers_authority_contract.json`](pins/transformers_authority_contract.json); [`fixtures/transformers_scalar_authority.json`](fixtures/transformers_scalar_authority.json); [`tools/run_transformers_authority.py`](tools/run_transformers_authority.py); [`tests/test_transformers_authority.py`](tests/test_transformers_authority.py); log 2026-08-30T17:38:10Z |
 | ORA-004 | Freeze three-authority scalar fixtures and per-tap tolerances | ORA-002, ORA-003, TRC-002, CPU-004 | done | Attributed bundles compare every required tap/logit; tolerances and genuine greedy near-ties are immutable | [`fixtures/scalar_authority_alignment.json`](fixtures/scalar_authority_alignment.json); [`pins/scalar_oracle_tolerances.json`](pins/scalar_oracle_tolerances.json); [`tests/test_scalar_authority_alignment.py`](tests/test_scalar_authority_alignment.py); log 2026-08-30T18:16:04Z |
@@ -57,10 +57,13 @@ are repository-relative unless stated otherwise.
 | ATN-001 | Implement grouped-query attention and partial RoPE | CUD-001, CPU-003 | done | Decode, causality, KV grouping, and layers 3/7/63 pass | [`cuda/attention_decode.cu`](cuda/attention_decode.cu); [`fixtures/cuda_attention_decode.json`](fixtures/cuda_attention_decode.json); [`tests/test_cuda_attention.py`](tests/test_cuda_attention.py); log 2026-08-31T06:57:49Z |
 | ATN-002 | Implement memory-bounded causal attention prefill | ATN-001, CUD-002 | done | Chunked prompt fixtures and 131,072 capacity boundary pass | [`cuda/attention_decode.cu`](cuda/attention_decode.cu); [`fixtures/cuda_attention_prefill.json`](fixtures/cuda_attention_prefill.json); [`tests/test_cuda_attention_prefill.py`](tests/test_cuda_attention_prefill.py); log 2026-08-31T09:33:05Z |
 | SCH-001 | Implement hybrid 64-layer CUDA scheduler and FP32 logits | GDN-002, ATN-002, CUD-003 | done | Full traces/logits and greedy continuations meet frozen gates | [`cuda/full_scheduler.cu`](cuda/full_scheduler.cu); [`fixtures/cuda_full_scheduler.json`](fixtures/cuda_full_scheduler.json); [`tests/test_cuda_full_scheduler.py`](tests/test_cuda_full_scheduler.py); log 2026-08-31T12:13:55Z |
+| SCH-002 | Integrate chunked prompt execution into the full CUDA scheduler | SCH-001, GDN-002, ATN-002, CUD-002, BEN-001 | done | End-to-end prefill uses prompt-row MMQ and chunked GDN/attention paths, remains token-wise equivalent, and no longer dispatches one complete decode token at a time | [`cuda/full_scheduler.cu`](cuda/full_scheduler.cu); [`fixtures/cuda_prompt_scheduler.json`](fixtures/cuda_prompt_scheduler.json); [`tests/test_cuda_prompt_scheduler.py`](tests/test_cuda_prompt_scheduler.py); log 2026-09-02T16:25:43Z |
 | SES-001 | Implement exact common-prefix sync/reuse | SCH-001 | done | Reuse and full replay produce the same committed state and logits | [`cuda/full_scheduler.cu`](cuda/full_scheduler.cu); [`fixtures/cuda_prefix_sync.json`](fixtures/cuda_prefix_sync.json); [`tests/test_cuda_prefix_sync.py`](tests/test_cuda_prefix_sync.py); log 2026-08-31T13:45:38Z |
 | SES-002 | Implement atomic eval/sample/commit semantics | SCH-001 | done | Sampling is separate; cancellation/error cannot partially commit state | [`cuda/full_scheduler.cu`](cuda/full_scheduler.cu); [`fixtures/cuda_atomic_eval.json`](fixtures/cuda_atomic_eval.json); [`tests/test_cuda_atomic_eval.py`](tests/test_cuda_atomic_eval.py); log 2026-08-31T17:55:34Z |
 | SES-003 | Implement atomic checkpoint save/restore | SES-001, SES-002 | done | All state and compatibility hashes persist; resumed continuation is exact | [`cuda/checkpoint.cu`](cuda/checkpoint.cu); [`fixtures/cuda_checkpoint.json`](fixtures/cuda_checkpoint.json); [`tests/test_cuda_checkpoint.py`](tests/test_cuda_checkpoint.py); log 2026-08-31T19:09:54Z |
+| SES-004 | Implement atomic Responses continuation records | SES-001, SES-003, API-003 | done | A completed stored response atomically records its exact committed token prefix and compatible tool contract; missing, malformed, incompatible, cancelled, and `store=false` responses cannot be continued | [`src/response_store.cpp`](src/response_store.cpp); [`fixtures/responses.json`](fixtures/responses.json); [`tests/test_server.py`](tests/test_server.py); log 2026-09-02T14:27:35Z |
 | MEM-001 | Demonstrate 131,072-token fit with 1.5 GiB reserve | BLD-003, SCH-001 | done | Post-graph measured ledger includes 8 GiB KV and every named allocation on RTX 5090 | [`cuda/memory_fit_test.cu`](cuda/memory_fit_test.cu); [`fixtures/cuda_memory_fit_post_graph.json`](fixtures/cuda_memory_fit_post_graph.json); [`docs/54-post-graph-128k-memory.md`](docs/54-post-graph-128k-memory.md); [`tests/test_cuda_memory_fit.py`](tests/test_cuda_memory_fit.py); log 2026-09-01T07:08:29Z |
+| MEM-002 | Revalidate 128K reserve after adding fixed prompt-chunk scratch | MEM-001, SCH-002 | done | Full session, decode workspace, prompt workspace, and uploaded graphs still leave at least 1.5 GiB free with allocator deltas reconciled | [`fixtures/cuda_memory_fit_post_graph.json`](fixtures/cuda_memory_fit_post_graph.json); [`tests/test_cuda_memory_fit.py`](tests/test_cuda_memory_fit.py); log 2026-09-02T16:25:43Z |
 | OPT-001 | Add synchronized timings, NVTX, and attribution | SCH-001 | done | Component/end-to-end measurements expose every named time category | [`cuda/full_scheduler.cu`](cuda/full_scheduler.cu); [`cuda/timing_test.cu`](cuda/timing_test.cu); [`fixtures/cuda_timing.json`](fixtures/cuda_timing.json); tests; log 2026-08-31T20:00:28Z |
 | OPT-002 | Profile and implement justified fusions | OPT-001, ORA-001 | done | Nsight evidence justifies each fusion; fused/unfused boundaries pass frozen gates | [`cuda/full_scheduler.cu`](cuda/full_scheduler.cu); [`fixtures/cuda_fusion.json`](fixtures/cuda_fusion.json); [`evidence/profiling/opt002-nsight-compute.txt`](evidence/profiling/opt002-nsight-compute.txt); tests; log 2026-09-01T05:44:16Z |
 | OPT-003 | Implement stable-address CUDA graphs | OPT-002 | done | Graph/non-graph equivalence passes and graph allocations are in MEM-001 | [`cuda/full_scheduler.cu`](cuda/full_scheduler.cu); [`fixtures/cuda_graph.json`](fixtures/cuda_graph.json); [`tests/test_cuda_graph.py`](tests/test_cuda_graph.py); log 2026-09-01T07:08:29Z |
@@ -68,14 +71,16 @@ are repository-relative unless stated otherwise.
 | CLI-001 | Implement interactive `qw38` text CLI | TOK-002, SES-003 | done | Interactive generation, reasoning, stops, sampling, and persistence pass smoke tests | [`src/cli.cpp`](src/cli.cpp); [`src/engine.cpp`](src/engine.cpp); [`fixtures/cli_smoke.json`](fixtures/cli_smoke.json); [`tests/test_cli.py`](tests/test_cli.py); log 2026-09-01T11:56:52Z |
 | SRV-001 | Implement single-flight HTTP server core and queue | API-001 | done | Health/models endpoints, cancellation, queue timing, and one GPU session pass tests | [`src/server.cpp`](src/server.cpp); [`src/server_core.cpp`](src/server_core.cpp); [`fixtures/server_core.json`](fixtures/server_core.json); [`tests/test_server.py`](tests/test_server.py); log 2026-09-01T18:19:42Z |
 | SRV-002 | Implement Chat Completions API | TOK-002, SES-002, SRV-001 | done | Supported roles/tools/streaming/sampling/stops pass; exclusions reject explicitly | [`src/server.cpp`](src/server.cpp); [`src/server_generation.cpp`](src/server_generation.cpp); [`fixtures/chat_completions.json`](fixtures/chat_completions.json); [`tests/test_server.py`](tests/test_server.py); log 2026-09-01T19:00:04Z |
-| SRV-003 | Implement Responses API and continuation | TOK-002, SES-003, SRV-001 | pending | Streaming/tools/`previous_response_id` and exclusions pass API fixtures | — |
-| BEN-001 | Implement `qw38-bench` component/end-to-end harness | OPT-001 | pending | Warmups/samples, telemetry, raw samples, failures, and environment metadata are retained | — |
-| EVAL-001 | Implement `qw38-eval` logits/traces/checkpoints harness | ORA-001, SES-003 | pending | Focused native diagnostics are driven by typed pytest helpers | — |
+| SRV-003 | Implement Responses API and continuation | TOK-002, SES-003, SRV-001 | done | Streaming/tools/`previous_response_id` and exclusions pass API fixtures | [`src/server.cpp`](src/server.cpp); [`fixtures/responses.json`](fixtures/responses.json); [`tests/test_server.py`](tests/test_server.py); log 2026-09-02T14:27:35Z |
+| API-003 | Implement strict Responses request and event mapping | API-002, SRV-002 | done | Text inputs, reasoning, function calls/results, sampling, response objects, ordered SSE events, and explicit exclusions pass native fixtures | [`src/responses_api.cpp`](src/responses_api.cpp); [`src/responses_api_test.cpp`](src/responses_api_test.cpp); [`pins/responses_contract.json`](pins/responses_contract.json); log 2026-09-02T14:27:35Z |
+| BEN-001 | Implement `qw38-bench` component/end-to-end harness | OPT-001 | done | Warmups/samples, telemetry, raw samples, failures, and environment metadata are retained | `pins/benchmark_contract.json`; `fixtures/benchmark_harness.json`; `evidence/benchmark/`; `tests/test_benchmark.py`; log 2026-09-02T15:24:00Z |
+| BEN-002 | Preserve the product-wide no-argument usage exit contract in `qw38-bench` | BEN-001, BLD-001 | done | Invoking the benchmark with no arguments prints usage and returns exit code 2 without creating output | `tests/test_build.py`; log 2026-09-02T15:24:00Z |
+| EVAL-001 | Implement `qw38-eval` logits/traces/checkpoints harness | ORA-001, SES-003 | done | Focused native diagnostics are driven by typed pytest helpers | [`tasks/EVAL-001.md`](tasks/EVAL-001.md); reopened 2026-09-03T14:00:00Z after build/hash repair; recovery readmitted 2026-09-03T15:44:53Z; completed 2026-09-03T17:01:54Z |
 | QLT-001 | Pass held-out NLL, continuation, recurrence, retrieval, and task quality | EVAL-001, MEM-001 | pending | Admitted artifact passes every documented threshold and 128K retrieval fixture | — |
 | CMP-001 | Pin and validate comparable baseline artifacts | PIN-001, PIN-002, QLT-001 | pending | llama/Ollama share GGUF; vLLM difference and <=1% NLL admission are explicit | — |
 | CMP-002 | Run controlled 30-sample comparative matrix | BEN-001, OPT-004, CMP-001 | pending | All contexts/metrics/environment data and negative runs are retained | — |
 | CMP-003 | Pass prefill/decode statistical speed gates | CMP-002 | pending | Paired bootstrap lower bounds exceed 1.05 and no workload is >5% slower | — |
-| DOC-001 | Maintain code-linked handbook and provenance ledger | BLD-001 | pending | Each implemented concept has claim labels, invariants, failures, task IDs, and evidence | — |
+| DOC-001 | Maintain code-linked handbook and provenance ledger | BLD-001 | done | Each implemented concept has claim labels, invariants, failures, task IDs, and evidence | [`docs/65-documentation-audit.md`](docs/65-documentation-audit.md); [`tests/test_documentation.py`](tests/test_documentation.py); log 2026-09-03T13:21:51Z |
 | EDU-001 | Explain tokenizer concepts for readers with no prior background | TOK-001, DOC-001 | done | NFC, Unicode splitting, byte mapping, BPE, fixtures, and equality gates have worked examples linked to code/evidence | [`docs/15-tokenizer-authority.md`](docs/15-tokenizer-authority.md); tests; log 2026-08-29T11:02:00Z |
 | EDU-002 | Explain chat-template concepts and policy ownership for beginners | TOK-002, DOC-001 | done | Roles, delimiters, reasoning, tools, results, mapping, and byte-equality gates have worked examples linked to code/evidence | [`docs/16-chat-template.md`](docs/16-chat-template.md); tests; log 2026-08-29T11:39:57Z |
 | EDU-003 | Explain scalar quantization and numeric equality for beginners | CPU-001, DOC-001 | done | Bits/bytes, FP16/FP32, blocks, Q4_K/Q6_K packing, decoding, dot products, accumulation, fixtures, and numeric metrics have worked examples linked to code/evidence | [`docs/17-quantization.md`](docs/17-quantization.md); [`tests/test_quant.py`](tests/test_quant.py); log 2026-08-29T12:05:00Z |
@@ -120,6 +125,9 @@ are repository-relative unless stated otherwise.
 | EDU-042 | Explain artifact hashing, SHA-NI dispatch, fallback, and cold/warm storage limits for beginners | MDL-003, DOC-001 | done | Whole-file identity versus ZFS block integrity, CPU instructions, runtime dispatch, exact digest equality, cache/storage limits, measurements, and proof boundaries are code-linked and worked | [`docs/57-hardware-sha256.md`](docs/57-hardware-sha256.md); [`fixtures/sha256_acceleration.json`](fixtures/sha256_acceleration.json); log 2026-09-01T11:56:52Z |
 | EDU-043 | Explain the HTTP listener, routes, single-flight queue, cancellation, and server lifecycle for beginners | SRV-001, DOC-001 | done | Sockets, HTTP requests/responses, loopback binding, health/models payloads, queue tickets/timing, cancellation, one-session ownership, shutdown, exclusions, and proof limits are code-linked and worked | [`docs/58-http-server-core.md`](docs/58-http-server-core.md); [`pins/server_core_contract.json`](pins/server_core_contract.json); [`fixtures/server_core.json`](fixtures/server_core.json); log 2026-09-01T18:19:42Z |
 | EDU-044 | Explain JSON, Chat Completions, SSE streaming, tools, stops, usage, queueing, and cancellation for beginners | SRV-002, API-002, DOC-001 | done | Request/response fields, validation, token generation, reasoning/content separation, function calls, stream events, stop behavior, session reuse, and proof limits are code-linked and worked | [`docs/59-chat-completions.md`](docs/59-chat-completions.md); [`pins/chat_completions_contract.json`](pins/chat_completions_contract.json); [`fixtures/chat_completions.json`](fixtures/chat_completions.json); log 2026-09-01T19:00:04Z |
+| EDU-045 | Explain Responses objects, typed items, events, storage, and exact continuation for beginners | SRV-003, SES-004, API-003, DOC-001 | done | A reader new to APIs can follow input items through tokens and output items, distinguish IDs from state, understand atomic records and exact prefixes, and identify every supported/rejected boundary | [`docs/60-responses-and-continuation.md`](docs/60-responses-and-continuation.md); [`pins/responses_contract.json`](pins/responses_contract.json); [`fixtures/responses.json`](fixtures/responses.json); log 2026-09-02T14:27:35Z |
+| EDU-046 | Explain benchmark workloads, samples, percentiles, throughput, telemetry, and evidence limits for beginners | BEN-001, OPT-001, DOC-001 | done | A new reader can distinguish warm-ups/runs/tokens, prefill/decode/TTFT/ITL, p50/p95, raw versus summary data, process/device telemetry, unavailable values, and benchmark versus comparison claims | `docs/61-benchmark-harness.md`; `docs/README.md`; log 2026-09-02T15:24:00Z |
+| EDU-047 | Explain layer-major chunked prefill, scratch reuse, atomic chunk commit, and its decode/reference boundary | SCH-002, MEM-002, DOC-001 | done | A new reader can follow 64 prompt rows through embeddings, MMQ, GDN/attention state, FFN, final logits, commit, and equivalence/performance evidence | [`docs/62-cuda-full-prefill.md`](docs/62-cuda-full-prefill.md); log 2026-09-02T16:25:43Z |
 | REL-001 | Publish reproducible release evidence bundle | CMP-003, QLT-001, DOC-001 | pending | Builds, hashes, raw results, reports, and documentation claims reconcile | — |
 | MAC-001 | Make the restricted host build and pytest suite green on Darwin/x86_64 without the 27B GGUF | BLD-001, MDL-003 | done | `make` and host pytest pass on the Intel MacBook with Clang; SHA-256 backend is explicit; CUDA tests remain skipped | [`Makefile`](Makefile); [`src/sha256.cpp`](src/sha256.cpp); [`tests/test_build.py`](tests/test_build.py); log 2026-09-02T16:40:00Z |
 | MAC-002 | Pin official Qwen3.5-2B Q4_K_M identity, contract, and tensor inventory | PIN-001, MAC-001 | done | Source revision, filename, bytes, SHA-256, 2B shapes, tied embeddings, and admitted tensor roles are checked in; weights are not committed | [`pins/cpu_laptop_contract.json`](pins/cpu_laptop_contract.json); [`pins/cpu_tensor_inventory.json`](pins/cpu_tensor_inventory.json); [`pins/artifacts.lock.json`](pins/artifacts.lock.json); log 2026-09-02T16:40:00Z |
@@ -130,12 +138,12 @@ are repository-relative unless stated otherwise.
 | MAC-007 | Add AVX2 Q4_K/Q8_0 dots and 4-thread matvec; keep scalar decode as the numeric oracle | MAC-005, CPU-001 | done | SIMD/threaded matvec matches scalar dots within frozen tolerances; decode throughput is measured on this MacBook | [`src/tensor.cpp`](src/tensor.cpp); [`src/quant.cpp`](src/quant.cpp); log 2026-09-02T16:40:00Z |
 | MAC-008 | Implement host session checkpoints distinct from the CUDA checkpoint blob | MAC-005, SES-003 | done | Atomic save/restore round-trips tokens, GDN state, KV, and sampler fields for the 2B host session | [`src/host_checkpoint.cpp`](src/host_checkpoint.cpp); log 2026-09-02T16:40:00Z |
 | MAC-009 | Enable the text CLI and Chat Completions model id on the 2B host runtime | MAC-005, MAC-008, CLI-001 | done | `qw38` chats with `--ctx 4096`; server admits `qwen3.5-2b-q4_k_m` only when that artifact is open | [`src/cli.cpp`](src/cli.cpp); [`src/server.cpp`](src/server.cpp); [`tests/test_cpu_laptop.py`](tests/test_cpu_laptop.py); log 2026-09-02T16:40:00Z |
-| MAC-010 | Record measured load/TTFT/decode/RSS evidence on the Intel MacBook | MAC-006, MAC-007, MAC-009 | done | Ledger retains compiler, CPU, RAM, hashes, tok/s, and RSS; claims are labeled measured | [`docs/60-cpu-laptop-2b.md`](docs/60-cpu-laptop-2b.md); log 2026-09-02T16:40:00Z |
-| DOC-CPU-001 | Document the Darwin 2B CPU laptop track in the handbook and README | MAC-010, DOC-001 | done | Geometry, tied embeddings, 4K budget, AVX2 proof limits, and this MacBook’s measurements are code-linked | [`docs/60-cpu-laptop-2b.md`](docs/60-cpu-laptop-2b.md); [`README.md`](README.md); log 2026-09-02T16:40:00Z |
+| MAC-010 | Record measured load/TTFT/decode/RSS evidence on the Intel MacBook | MAC-006, MAC-007, MAC-009 | done | Ledger retains compiler, CPU, RAM, hashes, tok/s, and RSS; claims are labeled measured | [`docs/66-cpu-laptop-2b.md`](docs/66-cpu-laptop-2b.md); log 2026-09-02T16:40:00Z |
+| DOC-CPU-001 | Document the Darwin 2B CPU laptop track in the handbook and README | MAC-010, DOC-001 | done | Geometry, tied embeddings, 4K budget, AVX2 proof limits, and this MacBook’s measurements are code-linked | [`docs/66-cpu-laptop-2b.md`](docs/66-cpu-laptop-2b.md); [`README.md`](README.md); log 2026-09-02T16:40:00Z |
 | MAC-011 | Pin Q5_K decode/dot and AVX2-vs-scalar matvec tolerances for 2B widths | MAC-007, CPU-001 | done | Q5_K fixtures pass `--check-quant`; rows≥256 Q8-activation matvec matches scalar within frozen max-abs/RMS | [`fixtures/cpu_q5_k_authority.json`](fixtures/cpu_q5_k_authority.json); [`fixtures/cpu_avx2_matvec_tolerance.json`](fixtures/cpu_avx2_matvec_tolerance.json); log 2026-09-02T10:35:00Z |
 | MAC-012 | Freeze 2B bind, tokenizer, GDN, attention, FFN, and full-token structural taps | MAC-003, MAC-004, MAC-011 | done | Skip-if-missing pytest compares live `qw38-eval` to frozen 2B fixtures; 27B real-* tests still skip without 27B | [`tests/test_cpu_numeric.py`](tests/test_cpu_numeric.py); log 2026-09-02T10:35:00Z |
 | MAC-013 | Compare 2B scalar logits to Darwin CPU llama.cpp on the same GGUF | MAC-012, ORA-002 | done | Checked-in metrics retain vocab, greedy IDs, and error envelopes; pytest does not rebuild llama.cpp | [`fixtures/cpu_llama_scalar_authority.json`](fixtures/cpu_llama_scalar_authority.json); [`tools/build_llama_cpu_oracle.sh`](tools/build_llama_cpu_oracle.sh); log 2026-09-02T10:35:00Z |
-| DOC-CPU-002 | Document the 2B numeric proof ladder in the CPU laptop handbook | MAC-013, DOC-CPU-001 | done | Scalar vs AVX2, llama same-GGUF, skip-if-missing, and GGUF-load vs HF-Transformers limits are code-linked | [`docs/60-cpu-laptop-2b.md`](docs/60-cpu-laptop-2b.md); log 2026-09-02T10:35:00Z |
+| DOC-CPU-002 | Document the 2B numeric proof ladder in the CPU laptop handbook | MAC-013, DOC-CPU-001 | done | Scalar vs AVX2, llama same-GGUF, skip-if-missing, and GGUF-load vs HF-Transformers limits are code-linked | [`docs/66-cpu-laptop-2b.md`](docs/66-cpu-laptop-2b.md); log 2026-09-02T10:35:00Z |
 
 ## Delivery-Gate Mapping
 
@@ -3160,6 +3168,350 @@ are repository-relative unless stated otherwise.
   API product task. Authentication and remote-deployment concerns remain outside
   the approved local v1 boundary.
 
+### 2026-09-01T19:24:00Z — SRV-003 continuation boundary started
+
+- Began SRV-003 and added discovered tasks API-003, SES-004, and EDU-045 before
+  source changes. Responses has a different public envelope from Chat
+  Completions, but both will map into the same validated `ChatRequest` and
+  generation loop so model semantics do not fork.
+- Exact continuation cannot be derived safely from assistant text: trimming,
+  reasoning delimiters, tool XML, and tokenizer boundaries can change a
+  re-rendered prefix. SES-004 therefore stores the token IDs copied from the
+  session only after generation commits. A later request appends a separately
+  rendered user/tool-result suffix to those exact IDs.
+- The continuation record is a compact, versioned JSON control record rather
+  than a duplicate 8 GiB KV/checkpoint image. Atomic temporary-file write,
+  `fsync`, rename, and directory `fsync` protect publication. In-process reuse
+  retains the GPU prefix; a restart deterministically replays the stored tokens.
+  Records have no silent expiry or automatic deletion in v1. `store=false`,
+  cancellations, errors, malformed records, and incompatible model/schema
+  versions deliberately publish no continuable response.
+- API-003 will admit text messages, instructions, function declarations,
+  function calls/results, ordinary sampling, stops, reasoning effort, and
+  ordered Responses SSE events. Image, audio, file, structured-output, parallel
+  tool-call, and unknown features remain explicit errors rather than ignored
+  fields. EDU-045 owns the beginner explanation and code/fixture links.
+
+### 2026-09-02T00:12:00Z — SRV-003 full-suite pin mismatch
+
+- The first full ordinary suite completed with 147 passes, seventeen expected
+  CUDA skips, and one failure in 161.20 seconds. The response implementation
+  and functional tests passed; the failure was the expected source-identity
+  mismatch for `src/eval.cpp` in the older MDL-003 contract after adding the
+  new exact follow-up template diagnostic.
+- Updated only that authenticated source digest after confirming a repository-
+  wide contract audit found no other mismatch. This was a bookkeeping failure,
+  not a SHA-256 implementation or runtime failure; the rerun remains required
+  before admission.
+
+### 2026-09-02T14:27:35Z — SRV-003, API-003, SES-004, and EDU-045 accepted
+
+- Added the strict `POST /v1/responses` adapter. Plain text and typed message,
+  function-call, and function-output items map to the shared `ChatRequest`;
+  instructions, reasoning effort, ordinary sampling, stops, tools, tool choice,
+  and streaming retain the same model semantics as Chat Completions. Media,
+  files, structured output, parallel calls, background mode, unknown fields,
+  and unsafe continuation mutations fail explicitly.
+- Added Responses objects and ordered named SSE events with consecutive sequence
+  numbers, reasoning/text deltas, function-argument events, typed output items,
+  completed/incomplete status, usage, cancellation, and single-flight timing.
+- Added exact incremental rendering for one user turn or grouped function
+  outputs. Durable continuation records retain committed token IDs and compatible
+  tool schemas, validate a safe ID/model/schema/token range, cap records at
+  16 MiB, and publish with temporary write, file `fsync`, rename, and directory
+  `fsync`. `store=false`, missing, corrupt, incompatible, cancelled, and failed
+  responses cannot be continued. Records do not expire or delete themselves.
+- **Measured host:** the native Responses diagnostic passed request/tool/
+  reasoning mapping, function-output continuation, explicit exclusions, atomic
+  record round-trip, missing lookup, and corrupt-record rejection. Six template
+  tests passed, including byte-exact grouped tool-result suffixes and mixed-item
+  rejection.
+- **Measured RTX 5090:** the integrated server produced exact non-streaming text,
+  continued from a stored response, preserved the first record's full token
+  array as a prefix, rejected continuation of `store=false`, emitted an ordered
+  SSE lifecycle whose deltas equalled final text, then stopped and successfully
+  continued the original ID from a fresh server process. The focused case passed
+  in 61.30 seconds.
+- Added beginner Chapter 60 explaining APIs, typed items, shared mapping, tokens,
+  response IDs versus state, output items, exact prefix equality, incremental
+  suffixes, atomic disk publication, restart replay, storage ownership, SSE
+  events, exclusions, failures, and proof limits. Updated README commands,
+  handbook navigation/provenance, earlier API proof boundaries, and architecture
+  status.
+- A clean pinned CUDA 13.0.2 build compiled all host products, three native
+  server diagnostics, both CUDA products, and all sixteen SM120 diagnostics with
+  warnings as errors. After resolving and retaining the one stale-pin negative,
+  the full ordinary suite passed 148 tests with seventeen expected GPU skips in
+  159.35 seconds. The complete exclusive RTX 5090 suite passed all 165 tests in
+  322.46 seconds.
+- Marked SRV-003, API-003, SES-004, and EDU-045 done. The approved CLI plus both
+  OpenAI text API envelopes are now implemented; BEN-001, the benchmark harness,
+  is the next delivery task. Broader SDK compatibility, authentication, remote
+  serving, structured output, and multimodal inputs remain outside this gate.
+
+### 2026-09-02T14:35:00Z — BEN-001 and EDU-046 started
+
+- Began replacing the fail-closed `qw38-bench` stub and added EDU-046 before
+  source changes. The executable will run one explicit workload/case per
+  invocation so orchestration can enforce one large GPU process and preserve a
+  result even when another case fails.
+- The admitted primary modes are prefill and batch-one decode. Callers provide
+  exact prompt text, expected token count, output-token count, cache policy,
+  at least three warm-ups, at least thirty measured runs, and an output path.
+  Smaller counts remain available only under an explicit smoke flag and cannot
+  be mistaken for release evidence.
+- Every run will reset the session before primary measurement, retain raw wall
+  timings and per-token latencies, and calculate prompt tokens/s, TTFT, p50/p95
+  inter-token latency, and output tokens/s from those raw values. An explicitly
+  labeled reuse mode is separate. No synthetic confidence interval or baseline
+  comparison belongs to BEN-001; CMP-002/CMP-003 own those gates.
+- Added a narrow public timing result for `sample`/`eval` so the product harness
+  can retain the already-admitted CUDA loading, embedding, GDN, attention, FFN,
+  logits, sampling, graph-launch, queueing, persistence, idle-gap, commit, and
+  token-total categories without exposing tensors or device layouts. Missing
+  boundaries serialize as JSON `null`.
+- Environment evidence will include UTC time, source revision, pinned model
+  identity, build flags, host/kernel, container image name, CUDA runtime/driver,
+  GPU identity, clocks, power, temperature, device memory, process RSS, prompt
+  bytes/hash/token IDs, requested cache policy, and raw successful or failed
+  runs. `nvidia-smi` telemetry is observational and will fail closed if the
+  production CUDA benchmark cannot obtain it.
+
+### 2026-09-02T14:48:00Z — BEN-001 exposed missing scheduler prefill integration
+
+- The first real harness smoke succeeded but measured only about 16 prompt
+  tokens/s for a 17-token prompt. Inspection confirmed `sync_tokens` still calls
+  the complete one-token scheduler in a loop. The separately admitted tiled MMQ,
+  64-token GDN scan, and memory-bounded attention chunk primitives are not wired
+  into a layer-major full-prompt schedule.
+- Added SCH-002 before any attempted fix. Earlier GDN-002 and ATN-002 claims
+  remain valid at their focused primitive boundaries, and SCH-001 remains the
+  admitted one-token full scheduler; none is silently relabeled as optimized
+  end-to-end prefill. This negative makes the eventual comparative prefill gate
+  unattainable until SCH-002 is completed.
+
+### 2026-09-02T15:14:00Z — BEN-002 product exit-code regression discovered
+
+- The first repository-wide host verification for BEN-001 stopped in
+  `tests/test_build.py`: invoking `qw38-bench` with no arguments returned 1,
+  while the established product boundary requires usage exit code 2.
+- Added BEN-002 before changing the executable. This is a compatibility fix
+  inside the benchmark delivery gate, not a new product feature; the failed
+  `uv run pytest -q` / focused `uv run pytest -x -q` results remain recorded.
+- The first BEN-002 fix restored exit code 2 but its focused rerun exposed the
+  second half of the same established contract: the brand line must remain on
+  stdout. The run was `13 passed, 2 failed`; the source-hash failure is expected
+  until the behavior fix is final and the BEN-001 contract is refreshed.
+- After restoring the brand, the product test still asserted the superseded
+  benchmark-stub message (`has not passed its delivery gate`). BEN-001 is the
+  delivery of that gate, so BEN-002 also updates this assertion to the real
+  harness usage contract while retaining the no-argument fail-closed behavior.
+
+### 2026-09-02T15:24:00Z — BEN-001, BEN-002, and EDU-046 completed
+
+- Replaced the benchmark stub with the CUDA `qw38-bench` product. One invocation
+  runs one explicit prefill or fixed-length decode case through only the public
+  Engine/Session boundary, retains every warm-up and measured sample, records
+  generated tokens and per-token wall times, and publishes JSON with
+  file-and-directory synchronization plus atomic rename.
+- Release mode fails closed unless it receives at least three warm-ups, 30
+  samples, an exact expected rendered-token count, a context label, an explicit
+  source revision, and `source-state=clean`. `--smoke` is always marked
+  `admission_eligible=false`; runtime failures are retained after valid argument
+  parsing. Primary samples reset to an empty token history, while separately
+  labelled `agent-reuse` samples report reused-prefix and evaluated-suffix token
+  counts independently.
+- Added public optional timing overloads without changing existing callers.
+  Detailed CUDA event attribution runs as one separate component probe marked as
+  perturbing execution and excluded from throughput summaries. Unavailable
+  queue/persistence values remain JSON `null`, not fabricated zeroes.
+- Raw RTX 5090 smoke results are retained and authenticated in
+  `evidence/benchmark/`: cold prefill p50 was 16.1989587 prompt tokens/s; cold
+  decode p50 was 16.1515444 prompt tokens/s and 15.8418326 output tokens/s; the
+  second agent-reuse sample reused 20 exact prefix tokens. All three used the
+  pinned model/container and are explicitly dirty-worktree, non-admission
+  evidence. The separate focused CUDA benchmark test passed in 17.90 s.
+- Preserved the measured negative result: end-to-end prompt execution remains a
+  loop over complete one-token scheduler calls. SCH-002 remains pending to
+  connect the already-admitted MMQ and chunked GDN/attention primitives; no
+  release or comparative throughput claim is made from these smoke numbers.
+- Added the beginner-facing benchmark chapter, README example, source/provenance
+  entry, machine-readable contract, authenticated fixture, and tests. It defines
+  workload/run/warm-up/sample, prefill/decode, TTFT/ITL, throughput, p50/p95,
+  raw versus summary records, cache policy, telemetry limitations, null values,
+  source identity, atomic publication, and the proof boundary.
+- First full host command: `uv run pytest -q` — failed at the pre-existing
+  no-argument product assertion because the new harness returned 1. BEN-002 was
+  added before the fix. Its next two focused runs exposed and retained the brand
+  and obsolete-stub-assertion portions of the same contract; both were resolved.
+- Final commands: `uv run ruff format .` — 66 files unchanged;
+  `uv run ruff check .` — passed; `uv run pytest -q` — 150 passed, 18 skipped in
+  159.16 s; `QW38_RUN_CUDA_TESTS=1 uv run pytest -q` — 168 passed in 350.46 s.
+  Marked BEN-001, BEN-002, and EDU-046 done. The next performance-critical
+  implementation task is SCH-002, while EVAL-001 remains the next product-tool
+  gate if delivery order is followed strictly.
+- The smoke also showed why detailed attribution cannot run inside every timed
+  output token: its many CUDA event pairs perturb product throughput. The harness
+  now uses ordinary graph execution for warm-up/measured distributions and runs
+  one separately labeled component probe with `perturbs_execution=true` and
+  `used_for_throughput_summary=false`.
+
+### 2026-09-02T15:31:00Z — SCH-002, MEM-002, and EDU-047 started
+
+- Began SCH-002 after BEN-001 measured the production `Session::sync` path at
+  about 16 prompt tokens/s and confirmed that it dispatched one complete decode
+  token at a time. The semantic target remains the admitted SCH-001 token path;
+  the optimization may not relax its numeric or state gates.
+- Selected fixed 64-row prompt chunks. Each chunk will flow layer-major through
+  token-row embedding lookup, per-row normalization, prompt MMQ projections,
+  the already-admitted chunked GDN/attention recurrence, prompt-row FFNs, and a
+  final-row logits projection. Decode and one-token evaluation retain the
+  stable-address graph path.
+- The chunk owns candidate GDN state and attention KV rows until every layer and
+  the final output complete. Only then may it publish state, tokens, last hidden,
+  logits, and frontier. Cancellation is polled between layers. A retained
+  token-wise synchronization entry point will provide direct differential
+  evidence rather than making the optimized path its own oracle.
+- Added MEM-002 before allocating permanent 64-row scratch because the final
+  128K reserve proof must include it. Added EDU-047 before documentation work;
+  it will explain row-major versus layer-major execution, scratch aliases,
+  candidate versus committed state, the 64-row choice, and proof limits.
+- First compiled two-row integration run: `qw38-cuda-prefix-sync-test` reached
+  the optimized fresh-prompt path but `append_vs_fresh` was not byte exact;
+  no-op, divergent replay, shorter replay, and invalid-input preservation still
+  passed. This negative is retained before diagnosis. No optimized path is
+  admitted until output and persistent-state differences are isolated and the
+  existing SES-001 exactness contract passes again.
+- After the optimized path passed, the first focused documentation-contract run
+  failed because `tests/test_cuda_memory_fit.py` still required the historical
+  pre-prompt-scratch free-memory number `5,241,044,992`. MEM-002 replaces that
+  simultaneous-owner measurement, so the assertion must follow the new measured
+  pre-graph value `5,205,393,408`; the old MEM-001 result remains in ledger
+  history rather than being presented as current.
+- Full CUDA command `QW38_RUN_CUDA_TESTS=1 uv run pytest -q` completed with 169
+  passed and one failed allocation assertion. All five atomic-eval behavior
+  cases passed; the test still expected the pre-SCH-002 capacity-three workspace
+  size. Direct rerun measured 186,300,192 bytes. This is the fixed prompt scratch
+  added under MEM-002, so the atomic contract/fixture/docs and exact assertion
+  are updated without changing any atomic semantic gate.
+- The first focused rerun found the fixture-value assertion duplicated in the
+  contract test; the live binary gate passed. Updated that second stale value as
+  part of the same MEM-002 reconciliation. Its next rerun found the same old
+  number in the handbook-term list; that final duplicate is also updated.
+
+### 2026-09-02T16:25:43Z — SCH-002, MEM-002, and EDU-047 completed
+
+- Implemented a fixed 64-row, layer-major full-model prompt path. Q4_K/Q6_K
+  projections use the admitted prompt MMQ, GDN layers use tiled 64-row scans,
+  attention layers read committed prior chunks plus causal candidate rows, and
+  FFNs process all prompt rows before the next layer. Only the final prompt row
+  computes output logits; one-token evaluation and CUDA graphs are unchanged.
+- Added permanent prompt scratch to `SchedulerWorkspace`: token-major FP32
+  residuals, BF16 projection inputs, transient Q8 rows, projections, mixer/GDN
+  intermediates, and 16 layers of 64 candidate K/V rows. The workspace remains
+  move-only, stable-addressed, counted, and released with the existing owners.
+- Retained the first failed two-token differential. Diagnosis found Q8_0 model
+  weights had been routed through generic MMQ, adding activation requantization
+  absent from SCH-001. Replaced only that format with batched direct Q8_0×BF16
+  arithmetic using the same warp accumulation order as decode. The existing
+  prefix suite then restored byte-exact append/fresh state and outputs.
+- Measured the 65-token `[64, 1]` boundary against repeated SCH-001 execution:
+  optimized 1,417.114341 ms, token-wise 4,204.655779 ms, 2.967055× faster. Every
+  committed GDN/KV byte, token/frontier, last hidden value, and logit was exact.
+  A forced cancellation after a synchronized layer left frontier zero and the
+  committed session byte-equal to empty. Focused prompt/prefix/memory tests
+  passed together (`3 passed in 14.53s`).
+- BEN-001's 17-token smoke was repeated through the product harness: p50 prefill
+  fell to 415.068169 ms and rose to 40.9571794 prompt tokens/s. Its two samples,
+  dirty source identity, and `admission_eligible=false` record are retained at
+  `evidence/prefill/sch002-prefill-smoke.json`; this is not a release matrix or
+  comparative claim.
+- MEM-002 measured the simultaneous 131,072-token state, resident model,
+  198,882,816-byte workspace, and 64 uploaded graphs. Explicit Quartz ownership
+  is 27,927,838,560 bytes; 5,199,101,952 bytes remained free, leaving a
+  3,588,489,216-byte margin over the unchanged 1.5 GiB requirement. The first
+  run failed only the old exact workspace equation; the updated arithmetic run
+  passed.
+- The first full GPU suite retained a second stale allocation expectation in
+  the atomic-eval test: 169 tests passed and one expected the old workspace
+  bytes, while all five atomic behavior cases passed. The exact assertion,
+  fixture, contract, and handbook were reconciled; two focused reruns exposed
+  and removed duplicate stale values without changing semantic gates.
+- Added the beginner chapter for token-major storage, layer-major execution,
+  MMQ, Q8_0 arithmetic, causal state, scratch, cancellation, commit, memory, and
+  proof limits. Refreshed historical BEN/MEM/SES contracts without erasing their
+  earlier results.
+- Final verification: `uv run ruff format .` — one file reformatted, then 67
+  files unchanged; `uv run ruff check .` — passed; host `uv run pytest -q` —
+  151 passed, 19 skipped in 159.27 s; final
+  `QW38_RUN_CUDA_TESTS=1 uv run pytest -q` — 170 passed in 320.44 s. Marked
+  SCH-002, MEM-002, and EDU-047 done.
+- A final API review added whole-chunk token-ID validation before any prompt
+  GPU work. The first validation command used the nonexistent phony target
+  `make qw38-cuda-prompt-scheduler-test` and failed immediately. The actual
+  Makefile target is `build/qw38-cuda-prompt-scheduler-test`, already invoked
+  by the pytest gate; no build or test failure was concealed.
+- Final-source revalidation at 2026-09-02T16:35:39Z: focused
+  `QW38_RUN_CUDA_TESTS=1 uv run pytest -q tests/test_cuda_prompt_scheduler.py`
+  passed 2 tests in 11.63 s; complete
+  `QW38_RUN_CUDA_TESTS=1 uv run pytest -q` passed all 170 tests in 334.07 s.
+  `ruff format`, `ruff check`, JSON parsing, `git diff --check`, and the complete
+  `local_sources` SHA-256 audit also passed. These results cover the exact bytes
+  being committed, including the final token-ID preflight.
+
+### 2026-09-03T10:01:35Z — TRC-004 documentation started
+
+- Began the documentation/evidence stage for TRC-004 after the CUDA
+  implementation and token-42 fixture were present. The task remains
+  `in_progress`; no coupled task or plan change was introduced.
+- The documentation boundary is a beginner chapter covering the five exact
+  CUDA filters, scalar-pinned shapes, full-tensor metrics, greedy equality,
+  filter/sink failure atomicity, diagnostic-only build isolation, and explicit
+  non-goals. README and handbook indexes and the provenance ledger will link
+  the chapter, contract, fixture, and focused tests.
+
+### 2026-09-03T10:05:00Z — TRC-004 documentation evidence recorded
+
+- Added [`docs/63-cuda-diagnostic-traces.md`](docs/63-cuda-diagnostic-traces.md),
+  updated [`README.md`](README.md) and [`docs/README.md`](docs/README.md), and
+  added the TRC-004 provenance/evidence entry to [`docs/sources.md`](docs/sources.md).
+- Reconciled the TRC-004 row with implementation, contract, fixture, focused
+  test, and documentation evidence while preserving status `in_progress`.
+- Documentation checks: `python -m json.tool pins/cuda_trace_contract.json
+  >/dev/null` and `python -m json.tool fixtures/cuda_trace.json >/dev/null`
+  passed; `uv run pytest -q tests/test_cuda_trace.py` passed (3 tests);
+  `git diff --check` passed. CUDA device/build gates remain recorded by the
+  implementation stage and are not rerun by this documentation stage.
+
+### 2026-09-03T10:27:00Z — TRC-004 delivered
+
+- Independent verification attempt 2 passed focused trace tests, the full
+  pytest suite, clean native/diagnostic builds, pinned CUDA 13.0.2 builds,
+  RTX 5090 token-42 comparison, provenance audit, frozen scalar-gate checks,
+  and normal-object symbol/string isolation.
+- Attempt 1's provenance and diagnostic-test linkage failures were repaired
+  within scope; first-pass acceptance is `no`, with one repair retry.
+- Marked only TRC-004 `done`; there are no coupled IDs. `plan.md`,
+  `pins/scalar_trace_contract.json`, and
+  `pins/scalar_oracle_tolerances.json` remained unchanged.
+
+### 2026-09-03T11:40:00Z — EVAL-001 documentation/evidence recorded
+
+- Added [`docs/64-eval-harness.md`](docs/64-eval-harness.md), linked the chapter
+  from [`README.md`](README.md) and [`docs/README.md`](docs/README.md), and
+  recorded local provenance in [`docs/sources.md`](docs/sources.md).
+- Updated [`pins/eval_contract.json`](pins/eval_contract.json) with current
+  local-source identities and expanded [`fixtures/eval_harness.json`](fixtures/eval_harness.json)
+  with explicit partial-status and evidence links. Refreshed the existing
+  SHA-256 contract identity for the changed `src/eval.cpp`.
+- The implementation remains `in_progress`: typed request validation and the
+  logits evidence reader exist, but checkpoint publication and diagnostic CUDA
+  trace capture have not run or been accepted. No checkpoint, trace, or
+  QLT-001 quality claim is made.
+- Documentation/evidence checks: `python -m json.tool pins/eval_contract.json
+  >/dev/null`, `python -m json.tool fixtures/eval_harness.json >/dev/null`, and
+  `git diff --check` passed.
+
 ## Decisions and Negative Results
 
 - **2026-08-29 / BLD-002:** Host `nvcc` is absent. Resolved for reproducibility
@@ -3241,3 +3593,89 @@ are repository-relative unless stated otherwise.
   not rebuild llama.cpp.
 - Handbook proof ladder records scalar vs AVX2, llama same-GGUF, skip-if-missing,
   and Transformers-on-HF out of scope. No CUDA task status changed.
+### 2026-09-03T11:55:08Z — EVAL-001 blocked
+
+- The bounded run completed three independent verification attempts, two Luna
+  repairs, and one Sol diagnostic without reaching CUDA acceptance.
+- Final failure evidence: the CUDA 13.0.2 build stops because the release eval
+  compile rule omits the `cuda/` include path; amended `src/eval.cpp` hashes are
+  stale across source-integrity contracts; therefore RTX 5090 logits,
+  checkpoint, trace, isolation, and negative-publication smokes did not run.
+- Recovery: apply the dossier's remaining build/hash repairs, pass all host and
+  CUDA gates, validate all three modes through typed helpers on the RTX 5090,
+  and promote the retained fixture only after those checks succeed.
+- No commit or push was created. Evidence: [`tasks/EVAL-001.md`](tasks/EVAL-001.md).
+
+### 2026-09-03T14:00:00Z — EVAL-001 reopened for recovery
+
+- Commit `6a5408b` repaired the recorded CUDA `-Icuda` compile omission and
+  refreshed the affected `src/eval.cpp` integrity hashes.
+- Reopened the task as `pending` for the remaining admitted scope: complete
+  checkpoint and diagnostic trace publication, repair diagnostic scheduler
+  object wiring and object-scoped isolation checks, run the RTX 5090 smokes,
+  and reconcile the typed schemas/fixture evidence. `plan.md` and inference
+  arithmetic remain out of scope.
+
+### 2026-09-03T12:50:48Z — BLD-003 status reconciled
+
+- Reconciled the stale task row with the existing implementation and evidence.
+  The runtime reports model, session, workspace, and graph ownership; the
+  post-graph 131,072-token diagnostic checks the explicit ledger arithmetic,
+  allocator delta, graph count, and required free reserve.
+- Marked BLD-003 done. Its dependent MEM-001 and MEM-002 gates were already
+  admitted and remain the authoritative physical allocation evidence.
+
+### 2026-09-03T12:52:46Z — DOC-001 started
+
+- Selected DOC-001 as the first eligible pending task in ledger order; BLD-001
+  was done, the worktree was clean, and `main` tracked `origin/main`.
+- Planning fixed the boundary at handbook/provenance reconciliation and a
+  deterministic documentation audit gate. No runtime, fixture, pin, or plan
+  changes are in scope. Evidence: [`tasks/DOC-001.md`](tasks/DOC-001.md).
+
+### 2026-09-03T13:21:51Z — DOC-001 completed
+
+- Reconciled handbook chapters 49, 50, 63, and 64; added the task coverage and
+  provenance audit in Chapter 65; and added the repository-local documentation
+  coverage/link test. The four authorized README source digests were refreshed
+  to authenticate the final README bytes.
+- Acceptance evidence: verification attempt 3 passed focused documentation and
+  contract tests (8 total), Ruff format/check, `make clean`, `make -j2`,
+  `make diagnostic`, full pytest (161 passed, 19 skipped), and `git diff --check`.
+  Historical MEM-001 and partial/blocked EVAL-001 boundaries remain explicit.
+- First-pass acceptance: no; two independent verification attempts failed only
+  on stale README digests, followed by one bounded repair and passing attempt 3.
+  No remaining risk identified within DOC-001 scope.
+
+### 2026-09-03T15:44:53Z — EVAL-001 recovery readmitted
+
+- Explicit admission found exactly one EVAL-001 ledger row in `pending` state;
+  its listed dependencies ORA-001 and SES-003 each occurred exactly once and
+  were `done`. The worktree was clean, `main` tracked `origin/main`, and the
+  recovery commit `6a5408b` was present at HEAD ancestor `de3823c`.
+- Reconciled the reopened dossier against the approved eval, checkpoint, trace,
+  diagnostic-isolation, quality-separation, and documentation boundaries in
+  `plan.md`; no plan or architecture change is required. Current eval source,
+  typed helper, and separate CUDA release/diagnostic build rules support the
+  recorded recovery scope.
+- Coupled IDs are `none`; QLT-001 remains a dependent quality gate. The dossier
+  fixes the exact changed-file allowlist, nine implementation decisions,
+  focused/CUDA/hardware/isolation/repository gates, and definition of done, with
+  no unresolved decisions. Marked only EVAL-001 `in_progress`; no code,
+  documentation, fixture, contract, `Makefile`, or `plan.md` content changed.
+
+### 2026-09-03T17:01:54Z — EVAL-001 completed
+
+- Verification attempt 5 passed the focused JSON/build/pytest gates, pinned
+  CUDA 13.0.2 build and native targets, release-vs-diagnostic object
+  isolation, containerized typed RTX 5090 tests, direct logits/checkpoint and
+  five-filter trace smokes, negative no-publication cases, repository-wide
+  formatting/lint/build/test gates, and `git diff --check`.
+- Acceptance evidence retained in [`fixtures/eval_harness.json`](fixtures/eval_harness.json)
+  and documented in [`docs/64-eval-harness.md`](docs/64-eval-harness.md):
+  complete FP32 logits, sequential checkpoint equality, all five diagnostic
+  trace filters, authenticated metadata, and failure/no-publication behavior.
+  The fixture remains harness-only; quality admission remains QLT-001 scope.
+- Confirmed the complete diff is within the dossier allowlist, `plan.md` is
+  unchanged, and no generated model outputs are included. Marked only
+  EVAL-001 `done`; coupled IDs remain `none`.

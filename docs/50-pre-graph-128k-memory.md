@@ -6,8 +6,9 @@
 Supporting a 131,072-token context is partly a semantics problem and partly a
 physical question: can every allocation exist at the same time on the 32 GiB
 RTX 5090? This chapter records the first complete physical allocation. It is a
-pre-graph milestone, so MEM-001 remains **in progress** until OPT-003 creates
-CUDA graphs and the same measurement is repeated.
+pre-graph milestone. **Measured (historical).** MEM-001 was subsequently admitted
+after the post-graph measurement in [Chapter 54](54-post-graph-128k-memory.md);
+this chapter retains the earlier fixture and its original proof boundary.
 
 ## GiB versus GB
 
@@ -60,13 +61,13 @@ This complements Chapter 44, which executed attention at final legal position
 131,071 for one layer. It does not execute the complete 27B model at a filled
 128K history; quality/retrieval and performance gates own those separate claims.
 
-## Why MEM-001 is not done
+## Historical status and proof boundary
 
-The approved plan requires at least 1.5 GiB free **after graph creation**. CUDA
+The approved plan required at least 1.5 GiB free **after graph creation**. CUDA
 graphs can allocate executable metadata or pin addresses and lifetimes. Today
 there is no production graph, so “graph bytes = zero” would confuse absence with
-a measurement. The fixture instead stores `null`, the diagnostic prints
-`pending_OPT-003`, and the implementation ledger keeps MEM-001 in progress.
+a measurement. The fixture instead stores `null` and the diagnostic prints
+`pending_OPT-003`; the later admitted result is linked above.
 
 When OPT-003 is complete, this same diagnostic must instantiate the admitted
 stable-address graphs, add their measured category, and recheck the reserve.

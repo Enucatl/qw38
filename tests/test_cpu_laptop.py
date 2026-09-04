@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import hashlib
 import json
 import os
 import subprocess
@@ -29,7 +28,7 @@ def test_cpu_laptop_contract_matches_geometry_and_handbook() -> None:
     assert contract["host"]["default_context"] == 4096
     assert contract["host"]["maximum_context"] == 8192
     assert contract["host"]["required_isa"] == "AVX2"
-    handbook = (ROOT / "docs" / "60-cpu-laptop-2b.md").read_text()
+    handbook = (ROOT / "docs" / "66-cpu-laptop-2b.md").read_text()
     for term in (
         "tied",
         "4096",
@@ -58,12 +57,16 @@ def test_cpu_pin_is_recorded_without_committing_weights() -> None:
         assert MODEL.stat().st_size == cpu["bytes"]
 
 
-@pytest.mark.skipif(not INVENTORY.exists(), reason="2B inventory is generated from the pinned GGUF")
+@pytest.mark.skipif(
+    not INVENTORY.exists(), reason="2B inventory is generated from the pinned GGUF"
+)
 def test_cpu_tensor_inventory_matches_tied_2b_contract() -> None:
     inventory = json.loads(INVENTORY.read_text())
     contract = json.loads(CONTRACT.read_text())
     pins = json.loads((ROOT / "pins" / "artifacts.lock.json").read_text())
-    assert inventory["tensor_count"] == contract["geometry"]["expected_tensor_count_tied"]
+    assert (
+        inventory["tensor_count"] == contract["geometry"]["expected_tensor_count_tied"]
+    )
     assert inventory["model_sha256"] == pins["cpu_model"]["sha256"]
     names = {tensor["name"] for tensor in inventory["tensors"]}
     assert "token_embd.weight" in names

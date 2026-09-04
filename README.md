@@ -7,9 +7,19 @@ engine for the pinned Qwen3.8-27B Q4_K_M artifact on one RTX 5090. The approved
 scope is in [plan.md](plan.md), and implementation claims and evidence are in
 [implementation_ledger.md](implementation_ledger.md).
 
-The CUDA text CLI and OpenAI Chat Completions endpoint are usable now. Responses,
-comparative benchmarks, and the release quality gate remain under construction;
-unfinished operations continue to fail closed.
+The CUDA text CLI plus OpenAI Chat Completions and Responses endpoints are usable
+now. Comparative benchmarks and the release quality gate remain under
+construction; unfinished operations continue to fail closed.
+
+## Evaluation harness status
+
+The typed evaluation boundary is complete for harness wiring. Retained RTX 5090
+evidence covers raw-token logits, sequential checkpoint equality, diagnostic CUDA
+traces, and negative no-publication cases. See the
+[evaluation harness chapter](docs/64-eval-harness.md),
+[`pins/eval_contract.json`](pins/eval_contract.json), and
+[`fixtures/eval_harness.json`](fixtures/eval_harness.json). This wiring
+evidence is not QLT-001 quality admission.
 
 ## Chat with Quartz now
 
@@ -79,13 +89,13 @@ MacBook (i7-8569U, 16 GiB): load 8.57 s, greedy decode 5.61 tok/s at prompt 64 /
 ctx 512, peak RSS 1.27 GiB. The 27B CUDA CLI remains the production path
 above. Geometry, tied embeddings, the 4K RSS budget, and the full measured
 table are in
-[CPU laptop inference for Qwen3.5-2B](docs/60-cpu-laptop-2b.md).
+[CPU laptop inference for Qwen3.5-2B](docs/66-cpu-laptop-2b.md).
 
-## Start the Chat Completions server
+## Start the OpenAI-compatible server
 
-The CUDA server exposes `GET /health`, `GET /v1/models`, and
-`POST /v1/chat/completions`. Start it with host networking so its loopback-only
-default is reachable from the host:
+The CUDA server exposes `GET /health`, `GET /v1/models`,
+`POST /v1/chat/completions`, and `POST /v1/responses`. Start it with host
+networking so its loopback-only default is reachable from the host:
 
 ```sh
 docker run --rm --network host --gpus all \
@@ -113,12 +123,29 @@ curl http://127.0.0.1:8080/v1/chat/completions \
 Add `"stream":true` and use `curl -N` for token streaming. Chat Completions
 supports text roles, reasoning, function tools/results and choice, ordinary
 sampling controls, stops, usage, FIFO queueing, and disconnect cancellation.
-Codex still cannot use Quartz as its full provider because the Responses API is
-the separate SRV-003 gate. See the [server-core chapter](docs/58-http-server-core.md)
-and [Chat Completions chapter](docs/59-chat-completions.md).
+The Responses equivalent stores an exact continuation record by default:
+
+```sh
+curl http://127.0.0.1:8080/v1/responses \
+  -H 'Content-Type: application/json' \
+  -d '{"model":"qwen3.8-27b-q4_k_m","input":"Reply with exactly: hello","reasoning":{"effort":"none"},"temperature":0}'
+```
+
+Pass the returned `id` as `previous_response_id` with a new `input` to continue
+the exact token prefix. Add `"store":false` when no later continuation is
+needed. Records live in `checkpoints/responses`; override that location with
+`--response-dir DIR`. Add `"stream":true` and use `curl -N` for named Responses
+events. See the [server-core chapter](docs/58-http-server-core.md),
+[Chat Completions chapter](docs/59-chat-completions.md), and
+[Responses/continuation chapter](docs/60-responses-and-continuation.md).
 
 The beginner-oriented [implementation handbook](docs/README.md) explains each
 admitted concept and links it to code, fixtures, failures, and evidence. The
+handbook's [documentation audit](docs/65-documentation-audit.md) reconciles
+implemented task coverage and provenance. EVAL-001 is complete as harness-only
+wiring;
+quality (QLT-001), comparison (CMP-001–CMP-003), and release (REL-001) work
+remain unfinished.
 latest chapter covers [GGUF parameter conversion](docs/22-gguf-conversion.md),
 including folded decay, RMSNorm scales, squeezed shapes, and GDN head order.
 The following [typed-weight chapter](docs/23-typed-model-weights.md) explains how
@@ -208,7 +235,40 @@ the final post-graph MEM-001 admission explicitly open.
 Chapters 51–55 cover timing, fusion, CUDA graphs, the final admitted 128K
 allocation, and offline RTX 5090 dispatch tuning. Chapters 56–58 cover the
 working interactive CLI, accelerated model authentication, the HTTP control
-plane, and Chat Completions data plane.
+plane, and Chat Completions data plane. Chapters 59–61 cover Chat Completions,
+Responses continuation, and the benchmark harness. [CUDA diagnostic traces](docs/63-cuda-diagnostic-traces.md)
+then documents the five stable diagnostic boundaries, frozen scalar gates,
+failure atomicity, and diagnostic-build isolation.
+
+## Measure a local smoke workload
+
+`qw38-bench` records raw runs, summaries, environment identity, telemetry, and
+failures in an atomic JSON result. This short example validates the harness; its
+`--smoke` result is deliberately not release-admission evidence:
+
+```sh
+revision="$(git rev-parse HEAD)"
+state=clean
+test -z "$(git status --porcelain)" || state=dirty
+docker run --rm --gpus all --user "$(id -u):$(id -g)" \
+  -v "$PWD:/workspace" qw38-cuda:13.0.2 \
+  ./build/cuda/qw38-bench models/Qwen3.8-27B-Q4_K_M.gguf \
+  --workload decode --prompt "Quartz benchmark prompt." \
+  --context-label smoke --output-tokens 2 --warmups 1 --samples 2 \
+  --cache-policy disabled --source-revision "$revision" \
+  --source-state "$state" --smoke \
+  --output evidence/benchmark/local-decode-smoke.json
+```
+
+Release runs omit `--smoke`, require a clean source revision, an exact expected
+prompt-token count, at least three warm-ups, and at least 30 samples. See
+[The benchmark harness](docs/61-benchmark-harness.md) for every term, metric,
+limitation, and the BEN-001 measurement that led to SCH-002.
+
+SCH-002 now connects 64-row prompt MMQ and recurrent/attention chunks while
+preserving byte-exact one-token results. The focused 17-token smoke is faster,
+but it is not a release comparison; see
+[Chunked full-model CUDA prefill](docs/62-cuda-full-prefill.md).
 
 ## Build
 

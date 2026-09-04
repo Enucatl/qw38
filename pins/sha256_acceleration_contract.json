@@ -21,8 +21,8 @@
   "local_sources": {
     "src/sha256.cpp": "254a51fe78645aa6bfa5f418f6a6bf1988037512c818fe802ee6525a74305ec4",
     "src/sha256.h": "ef3dc912fe13f9f94203135be982ad20f44b607c49ed4dea8faa3b1ed8f573fc",
-    "src/eval.cpp": "936e4ea41153e0bc6736917d2df6ff902cb2bd967a30fe1742a1ca4b4baf1a9e",
-    "tests/test_build.py": "7920e838cf23bb7c3e884b6274230023aaadf5881d4228783f58d0feee762059",
+    "src/eval.cpp": "5051b435bf22bf61c5c6162d453a4749f70df44ac46373a3fc6f9053679a7bf3",
+    "tests/test_build.py": "71cecc34ce21d6c19b162d8a4ddc9044fa17bda84760a7a5c6d85541659dcf52",
     "fixtures/sha256_acceleration.json": "a594b7a0fe0a7de1ebfcdedf72407b32fdcd572bda20c5d48199a38103ff3009",
     "docs/57-hardware-sha256.md": "1231ec4c67076526f75b4fcdff8c099adcc525a6c23ef50047d8871f8b4e8aaf",
     "docker/cuda.Dockerfile": "27af293315faba9979972af5871253f099890b11e3dcde4ef28d014e32582b65"

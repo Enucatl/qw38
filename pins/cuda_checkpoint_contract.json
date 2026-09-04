@@ -19,16 +19,38 @@
     "last committed FP32 logits",
     "last committed FP32 hidden vector"
   ],
-  "sampler_fields": ["temperature", "top_p", "top_k", "seed", "rng_state"],
-  "save_publication": ["adjacent .tmp write", "close", "SHA-256 footer", "file fsync", "same-directory rename", "directory fsync"],
-  "restore_preflight": ["magic/version", "model/layout hashes", "capacity/frontier", "sampler bounds", "section arithmetic", "exact file size", "SHA-256 footer", "token bounds"],
+  "sampler_fields": [
+    "temperature",
+    "top_p",
+    "top_k",
+    "seed",
+    "rng_state"
+  ],
+  "save_publication": [
+    "adjacent .tmp write",
+    "close",
+    "SHA-256 footer",
+    "file fsync",
+    "same-directory rename",
+    "directory fsync"
+  ],
+  "restore_preflight": [
+    "magic/version",
+    "model/layout hashes",
+    "capacity/frontier",
+    "sampler bounds",
+    "section arithmetic",
+    "exact file size",
+    "SHA-256 footer",
+    "token bounds"
+  ],
   "logical_attention_state": "only rows below frontier; file size grows by 65536 bytes per committed token",
   "local_sources": {
-    "Makefile": "67913fa289fcce8acd39ae371c0632ba45931a85e6172f1c5e8d88f6cf28af0e",
+    "Makefile": "81a349ee8558efc0122a11a0c05ed9280f5534c3eab8e7dca6393c41a22de324",
     "cuda/checkpoint.cu": "2c3c03a47b401be8635bd5e5df8cf2b889fa720285e2e18772d86a42043680f9",
     "cuda/checkpoint_test.cu": "b54eff76501d89a2a3be91d023f26582a50cb18c2af9f1f22ea97595a4532b43",
-    "cuda/full_scheduler.cu": "64235c4fca1f303b40b9068d34750f9b89068e2e353f8ca1510460d0ae157877",
-    "cuda/full_scheduler.h": "c7e9118b189c547fc11d3fd2f77e8301b9f9c5af72b32f41553bbed55be04485",
+    "cuda/full_scheduler.cu": "68d41bb8d231cccbc7727d2433598bf13503dba0d539e38a1548d44b1ee4ed3a",
+    "cuda/full_scheduler.h": "56eb77134617f033b7863402c6e2a1a2c93e70bcfc8d508c745b78297d3967a4",
     "src/sha256.cpp": "254a51fe78645aa6bfa5f418f6a6bf1988037512c818fe802ee6525a74305ec4",
     "src/sha256.h": "ef3dc912fe13f9f94203135be982ad20f44b607c49ed4dea8faa3b1ed8f573fc"
   }

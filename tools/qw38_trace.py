@@ -392,7 +392,39 @@ def read_trace_bundle(directory: Path) -> LoadedTrace:
         if _checked_sha256(record["sha256"], f"tensor {name}") != _sha256(raw):
             raise TraceError(f"tensor {name} checksum does not match")
         values = struct.unpack(f"<{count}f", raw)
-        if record["summary"] != _summary(values):
+        expected_summary = _summary(values)
+        actual_summary = record["summary"]
+        if not isinstance(actual_summary, dict) or set(actual_summary) != set(
+            expected_summary
+        ):
+            raise TraceError(f"tensor {name} summary does not match")
+        exact_summary_keys = {
+            "count",
+            "finite_count",
+            "nan_count",
+            "positive_infinity_count",
+            "negative_infinity_count",
+        }
+        if any(
+            actual_summary[key] != expected_summary[key] for key in exact_summary_keys
+        ):
+            raise TraceError(f"tensor {name} summary does not match")
+        if any(
+            actual_summary[key] != expected_summary[key]
+            for key in ("minimum", "maximum")
+        ):
+            raise TraceError(f"tensor {name} summary does not match")
+        if any(
+            not isinstance(actual_summary[key], (int, float))
+            or not isinstance(expected_summary[key], (int, float))
+            or not math.isclose(
+                float(actual_summary[key]),
+                float(expected_summary[key]),
+                rel_tol=2e-6,
+                abs_tol=2e-6,
+            )
+            for key in ("mean", "root_mean_square")
+        ):
             raise TraceError(f"tensor {name} summary does not match")
         loaded[name] = values
         next_offset = end

@@ -208,6 +208,8 @@ client disconnected, remained healthy, and exited cleanly. Measurements are in
 [`chat_completions.json`](../fixtures/chat_completions.json).
 
 **Proof boundary:** SRV-002 proves text Chat Completions for one GPU session. It
-does not prove Responses, `previous_response_id`, authentication, TLS, persistent
-connections, remote deployment safety, continuous batching, concurrent GPU
-sessions, structured output, multimodal input, quality, or comparative speed.
+does not itself prove Responses or `previous_response_id`; those were
+subsequently admitted by SRV-003 and are explained in Chapter 60. Neither API
+gate proves authentication, TLS, persistent connections, remote deployment
+safety, continuous batching, concurrent GPU sessions, structured output,
+multimodal input, quality, or comparative speed.

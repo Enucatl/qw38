@@ -1,6 +1,7 @@
 #include "qw38/engine.h"
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -334,6 +335,32 @@ Status Engine::render_user_turn(const std::string& content,
   return impl_->tokenizer.encode(rendered, tokens);
 }
 
+Status Engine::render_followup(const std::vector<ChatMessage>& messages,
+                               bool enable_thinking,
+                               std::vector<Token>* tokens) const noexcept {
+  if (!impl_ || tokens == nullptr) {
+    return {StatusCode::kInvalidArgument,
+            "open engine and rendered token output are required"};
+  }
+  std::vector<internal::Message> converted;
+  converted.reserve(messages.size());
+  for (const ChatMessage& message : messages) {
+    internal::Message item;
+    item.role = message.role == ChatRole::kUser
+                    ? internal::MessageRole::kUser
+                    : message.role == ChatRole::kTool
+                          ? internal::MessageRole::kTool
+                          : internal::MessageRole::kAssistant;
+    item.content = message.content;
+    converted.push_back(std::move(item));
+  }
+  std::string rendered;
+  Status status =
+      internal::render_followup(converted, enable_thinking, &rendered);
+  if (!status.is_ok()) return status;
+  return impl_->tokenizer.encode(rendered, tokens);
+}
+
 Session::Session() noexcept = default;
 Session::~Session() = default;
 Session::Session(std::unique_ptr<Impl> impl) noexcept : impl_(std::move(impl)) {}
@@ -446,10 +473,16 @@ Status Session::logits(std::vector<float>* output) const noexcept {
 #endif
 }
 Status Session::sample(const SamplerConfig& config, Token* token) const noexcept {
+  return sample(config, token, nullptr);
+}
+
+Status Session::sample(const SamplerConfig& config, Token* token,
+                       RuntimeTimings* timings) const noexcept {
   if (token == nullptr) {
     return {StatusCode::kInvalidArgument, "sample output is required"};
   }
 #ifdef QW38_CUDA_RUNTIME
+  if (timings != nullptr) *timings = {};
   if (!impl_ || impl_->session.frontier() == 0 ||
       !std::isfinite(config.temperature) || config.temperature < 0.0F ||
       !std::isfinite(config.top_p) || config.top_p <= 0.0F ||
@@ -458,14 +491,21 @@ Status Session::sample(const SamplerConfig& config, Token* token) const noexcept
   }
   if (config.temperature == 0.0F) {
     std::size_t selected = 0;
-    Status status = cuda::greedy_sample(impl_->session, &selected);
+    cuda::RuntimeTimings measured;
+    Status status = cuda::greedy_sample(
+        impl_->session, &selected, timings == nullptr ? nullptr : &measured);
     if (status.is_ok()) {
       impl_->has_pending_sampler = false;
       *token = static_cast<Token>(selected);
+      if (timings != nullptr) {
+        timings->sampling = {measured.sampling.milliseconds,
+                             measured.sampling.measured};
+      }
     }
     return status;
   }
   cuda::SamplerState state = impl_->session.sampler_state();
+  const auto sampling_started = std::chrono::steady_clock::now();
   if (state.temperature != config.temperature || state.top_p != config.top_p ||
       state.top_k != config.top_k || state.seed != config.seed ||
       state.rng_state == 0) {
@@ -530,8 +570,17 @@ Status Session::sample(const SamplerConfig& config, Token* token) const noexcept
   impl_->pending_sampler = state;
   impl_->has_pending_sampler = true;
   *token = impl_->pending_token;
+  if (timings != nullptr) {
+    timings->sampling = {
+        static_cast<float>(std::chrono::duration<double, std::milli>(
+                               std::chrono::steady_clock::now() -
+                               sampling_started)
+                               .count()),
+        true};
+  }
   return Status::ok();
 #else
+  (void)timings;
   if (!impl_ || impl_->history.empty() ||
       !std::isfinite(config.temperature) || config.temperature < 0.0F ||
       !std::isfinite(config.top_p) || config.top_p <= 0.0F ||
@@ -621,22 +670,51 @@ Status Session::sample(const SamplerConfig& config, Token* token) const noexcept
 #endif
 }
 Status Session::eval(Token token) noexcept {
-  return eval(token, nullptr);
+  return eval(token, static_cast<const std::atomic<bool>*>(nullptr), nullptr);
+}
+
+Status Session::eval(Token token, RuntimeTimings* timings) noexcept {
+  return eval(token, static_cast<const std::atomic<bool>*>(nullptr), timings);
 }
 
 Status Session::eval(Token token,
                      const std::atomic<bool>* cancelled) noexcept {
+  return eval(token, cancelled, nullptr);
+}
+
+Status Session::eval(Token token, const std::atomic<bool>* cancelled,
+                     RuntimeTimings* timings) noexcept {
 #ifdef QW38_CUDA_RUNTIME
   if (!impl_) return {StatusCode::kInvalidArgument, "session is not initialized"};
   float elapsed = 0.0F;
   const cuda::EvalControl control{poll_cancelled,
                                   const_cast<std::atomic<bool>*>(cancelled)};
+  cuda::RuntimeTimings measured;
   Status status = cuda::execute_token(
       *impl_->model, token, &impl_->session, &impl_->workspace,
       impl_->logits.data(), impl_->logits.size(), impl_->hidden.data(),
       impl_->hidden.size(), &elapsed,
-      cancelled == nullptr ? nullptr : &control, nullptr,
+      cancelled == nullptr ? nullptr : &control,
+      timings == nullptr ? nullptr : &measured,
       cuda::PointwisePath::kFused, &impl_->graphs);
+  if (status.is_ok() && timings != nullptr) {
+    const auto copy = [](const cuda::TimingValue& value) {
+      return TimingValue{value.milliseconds, value.measured};
+    };
+    timings->loading = copy(measured.loading);
+    timings->embedding = copy(measured.embedding);
+    timings->gdn = copy(measured.gdn);
+    timings->attention = copy(measured.attention);
+    timings->ffn = copy(measured.ffn);
+    timings->logits = copy(measured.logits);
+    timings->sampling = copy(measured.sampling);
+    timings->graph_launch = copy(measured.graph_launch);
+    timings->queueing = copy(measured.queueing);
+    timings->persistence = copy(measured.persistence);
+    timings->idle_gaps = copy(measured.idle_gaps);
+    timings->state_commit = copy(measured.state_commit);
+    timings->token_total = copy(measured.token_total);
+  }
   if (status.is_ok() && impl_->has_pending_sampler &&
       impl_->pending_token == token) {
     status = impl_->session.set_sampler_state(impl_->pending_sampler);
@@ -644,6 +722,7 @@ Status Session::eval(Token token,
   impl_->has_pending_sampler = false;
   return status;
 #else
+  (void)timings;
   if (!impl_ || impl_->weights == nullptr) {
     return {StatusCode::kInvalidArgument, "session is not initialized"};
   }
