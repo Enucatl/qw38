@@ -237,6 +237,19 @@ DSpark are explicitly rejected as Qwen model semantics.
   transactions or end-to-end performance evidence:
   [`fixtures/cuda_gqa_attention.json`](../fixtures/cuda_gqa_attention.json).
   No external kernel implementation was copied or adapted.
+- OPT-007 introduces no new external implementation source. It is a local
+  two-query-row ownership change over admitted ATN-001/ATN-002 and OPT-006
+  arithmetic: a `(KV head, query-row tile)` block stages each 32-row BF16 K/V
+  tile once for its two rows and six mapped query heads, while per-row causal
+  admission preserves the retained one-row operation order. The local
+  schema-1 contract freezes the two-row shape, exact semantic predicates,
+  launch topology, and resource limits in
+  [`pins/cuda_query_row_attention_contract.json`](../pins/cuda_query_row_attention_contract.json).
+  One pinned RTX 5090 fixture retains exact short/chunk-boundary and captured
+  launch/occupancy evidence; it is component-only and explicitly not a
+  speedup or end-to-end measurement:
+  [`fixtures/cuda_query_row_attention.json`](../fixtures/cuda_query_row_attention.json).
+  No external kernel implementation was copied or adapted.
 - CUD-003 introduces no new external implementation source. GGUF Q8_0 decoding
   follows the format already admitted by the pinned scalar decoder, and the
   pointwise/layout equations come from the pinned model contract and scalar

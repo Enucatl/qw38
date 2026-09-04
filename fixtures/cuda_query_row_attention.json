@@ -1,0 +1,197 @@
+{
+  "schema_version": 1,
+  "task": "OPT-007",
+  "status": "measured",
+  "device": "NVIDIA GeForce RTX 5090",
+  "compute_capability": "12.0",
+  "driver": "13.1",
+  "runtime": "13.0",
+  "toolkit": "CUDA 13.0.2",
+  "pinned_image": "qw38-cuda:13.0.2",
+  "measurement_utc": "2026-09-04T17:34:07Z",
+  "production_shape": {
+    "query_heads": 24,
+    "kv_heads": 4,
+    "head_width": 256,
+    "rotary_width": 64,
+    "chunk_rows": 64,
+    "kv_tile_rows": 32,
+    "query_rows_per_block": 2,
+    "threads": 256,
+    "group_size": 6
+  },
+  "semantic": {
+    "production_reference_output_exact": true,
+    "candidate_bf16_exact": true,
+    "finite_output": true,
+    "prepare_cache_unchanged": true,
+    "prepare_frontier_unchanged": true,
+    "score_scratch_unchanged": true,
+    "invalid_input_rejected": true,
+    "chunk_65_equals_64_plus_1_output": true,
+    "chunk_65_equals_64_plus_1_cache": true,
+    "chunk_65_equals_64_plus_1_frontier": true
+  },
+  "launches": [
+    {
+      "rows": 1,
+      "kernel_nodes": 2,
+      "staging_grid": [
+        4,
+        1,
+        1
+      ],
+      "staging_block": [
+        256,
+        1,
+        1
+      ],
+      "attention_grid": [
+        4,
+        1,
+        1
+      ],
+      "attention_block": [
+        256,
+        1,
+        1
+      ],
+      "dynamic_shared_bytes": 33792
+    },
+    {
+      "rows": 2,
+      "kernel_nodes": 2,
+      "staging_grid": [
+        4,
+        2,
+        1
+      ],
+      "staging_block": [
+        256,
+        1,
+        1
+      ],
+      "attention_grid": [
+        4,
+        1,
+        1
+      ],
+      "attention_block": [
+        256,
+        1,
+        1
+      ],
+      "dynamic_shared_bytes": 33792
+    },
+    {
+      "rows": 3,
+      "kernel_nodes": 2,
+      "staging_grid": [
+        4,
+        3,
+        1
+      ],
+      "staging_block": [
+        256,
+        1,
+        1
+      ],
+      "attention_grid": [
+        4,
+        2,
+        1
+      ],
+      "attention_block": [
+        256,
+        1,
+        1
+      ],
+      "dynamic_shared_bytes": 33792
+    },
+    {
+      "rows": 63,
+      "kernel_nodes": 2,
+      "staging_grid": [
+        4,
+        63,
+        1
+      ],
+      "staging_block": [
+        256,
+        1,
+        1
+      ],
+      "attention_grid": [
+        4,
+        32,
+        1
+      ],
+      "attention_block": [
+        256,
+        1,
+        1
+      ],
+      "dynamic_shared_bytes": 33792
+    },
+    {
+      "rows": 64,
+      "kernel_nodes": 2,
+      "staging_grid": [
+        4,
+        64,
+        1
+      ],
+      "staging_block": [
+        256,
+        1,
+        1
+      ],
+      "attention_grid": [
+        4,
+        32,
+        1
+      ],
+      "attention_block": [
+        256,
+        1,
+        1
+      ],
+      "dynamic_shared_bytes": 33792
+    },
+    {
+      "rows": 65,
+      "kernel_nodes": 2,
+      "staging_grid": [
+        4,
+        65,
+        1
+      ],
+      "staging_block": [
+        256,
+        1,
+        1
+      ],
+      "attention_grid": [
+        4,
+        33,
+        1
+      ],
+      "attention_block": [
+        256,
+        1,
+        1
+      ],
+      "dynamic_shared_bytes": 33792
+    }
+  ],
+  "kernel_attributes": {
+    "registers": 38,
+    "static_shared_bytes": 16,
+    "local_bytes_per_thread": 224,
+    "maximum_dynamic_shared_bytes": 49136,
+    "active_blocks_per_sm": 2,
+    "sm_count": 170,
+    "launch_blocks": 128
+  },
+  "proof_limit": "component-only exact semantic and launch evidence; no end-to-end performance or speedup claim"
+}

@@ -73,7 +73,7 @@ are repository-relative unless stated otherwise.
 | OPT-004 | Tune row buckets/chunks and check in dispatch evidence | OPT-003 | done | Offline RTX 5090 sweep selects a reproducible table from retained raw results | [`cuda/quant_mmv.cu`](cuda/quant_mmv.cu); [`fixtures/cuda_dispatch_tuning.json`](fixtures/cuda_dispatch_tuning.json); [`evidence/profiling/opt004-dispatch-sweep-raw.txt`](evidence/profiling/opt004-dispatch-sweep-raw.txt); [`tests/test_cuda_dispatch_tuning.py`](tests/test_cuda_dispatch_tuning.py); log 2026-09-01T07:30:51Z |
 | OPT-005 | Implement exact tiled causal prompt attention with online softmax | OPT-004, SCH-002, ATN-002 | done | Multi-row attention tiles preserve full causal semantics and frozen outputs while eliminating per-token QK/softmax/value launches | [`tasks/OPT-005.md`](tasks/OPT-005.md); recovery accepted and delivered 2026-09-04T13:09:32Z |
 | OPT-006 | Reuse tiled KV loads across grouped query heads | OPT-005 | done | Each shared KV head is loaded once per tile for its six query heads; exact GQA outputs pass and measured KV traffic falls | [`tasks/OPT-006.md`](tasks/OPT-006.md); [`cuda/gqa_attention_test.cu`](cuda/gqa_attention_test.cu); [`fixtures/cuda_gqa_attention.json`](fixtures/cuda_gqa_attention.json); log 2026-09-04T15:54:44Z |
-| OPT-007 | Execute multiple prompt query rows per CUDA block | OPT-006 | pending | Prompt attention maps query-row tiles to occupied blocks with bounded scratch and passes short/chunk boundary equivalence | — |
+| OPT-007 | Execute multiple prompt query rows per CUDA block | OPT-006 | done | Prompt attention maps query-row tiles to occupied blocks with bounded scratch and passes short/chunk boundary equivalence | [`tasks/OPT-007.md`](tasks/OPT-007.md); [`cuda/query_row_attention_test.cu`](cuda/query_row_attention_test.cu); [`tests/test_cuda_query_row_attention.py`](tests/test_cuda_query_row_attention.py); [`pins/cuda_query_row_attention_contract.json`](pins/cuda_query_row_attention_contract.json); [`fixtures/cuda_query_row_attention.json`](fixtures/cuda_query_row_attention.json); log 2026-09-04T17:43:02Z |
 | OPT-008 | Make 4,096 tokens the default prompt chunk | OPT-007, MEM-002 | pending | Default prefill chunks are 4,096 tokens with bounded fallback for tails/capacity; atomic commit, cancellation, and 128K reserve gates pass | — |
 | OPT-009 | Implement true batched Q8_0/Q4_K/Q6_K prompt MMQ | OPT-004, SCH-002 | pending | Prompt projections reuse weight tiles across rows, select measured SM120 kernels, and preserve frozen numeric envelopes | — |
 | OPT-010 | Tile KV layout for coalesced exact GQA access | OPT-007, SES-003 | pending | KV storage supports coalesced tile loads without changing logical values, checkpoint compatibility, prefix reuse, or capacity | — |
@@ -3750,3 +3750,18 @@ are repository-relative unless stated otherwise.
 - Marked OPT-006 `done`; delivery changes are limited to the verified task
   scope plus this ledger/audit bookkeeping. `plan.md` and `Makefile` remain
   unchanged.
+
+### 2026-09-04T17:43:02Z — OPT-007 delivered
+
+- Independent verification attempt 2 passed the exact two-row/one-row semantic,
+  causal, transaction, launch-topology, bounded-resource, and 65-versus-64+1
+  boundary acceptance on the pinned RTX 5090, including full captured grid and
+  block tuples and fail-closed negative validator cases.
+- The schema-1 contract, measured fixture, native diagnostic, Python validator,
+  and prefill documentation provide the acceptance evidence. The proof remains
+  component-only and makes no speedup, end-to-end, or complete-model-memory
+  claim; OPT-008 and OPT-010 remain pending. `plan.md` and `Makefile` are
+  unchanged.
+- Marked OPT-007 `done`; the native diagnostic's repeated ignored cleanup calls
+  are non-blocking test hygiene and do not affect production semantics or
+  emitted evidence.

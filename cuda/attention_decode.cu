@@ -319,7 +319,7 @@ __global__ void per_query_tiled_chunk_attention(
 }
 
 template <bool CountLoads>
-__global__ void grouped_tiled_chunk_attention(
+__global__ void one_row_grouped_tiled_chunk_attention(
     AttentionConfig config, std::size_t start_position, std::size_t token_count,
     const float* query, const float* query_scale, const float* gate,
     const __nv_bfloat16* committed_key, const __nv_bfloat16* committed_value,
@@ -449,6 +449,152 @@ __global__ void grouped_tiled_chunk_attention(
     if (local_loads != 0)
       atomicAdd(reinterpret_cast<unsigned long long*>(kv_load_values),
                 static_cast<unsigned long long>(local_loads));
+  }
+}
+
+__global__ void two_row_grouped_tiled_chunk_attention(
+    AttentionConfig config, std::size_t start_position, std::size_t token_count,
+    const float* query, const float* query_scale, const float* gate,
+    const __nv_bfloat16* committed_key, const __nv_bfloat16* committed_value,
+    const __nv_bfloat16* candidate_key, const __nv_bfloat16* candidate_value,
+    float* output, float* normalized_query) {
+  constexpr std::uint32_t kMaximumGroup =
+      kMaximumQueryHeads / kMaximumKvHeads;
+  constexpr std::size_t kQueryRowsPerBlock = 2;
+  const std::uint32_t kv_head = blockIdx.x;
+  const std::size_t first_token = kQueryRowsPerBlock * blockIdx.y;
+  const std::uint32_t lane = threadIdx.x;
+  if (first_token >= token_count) return;
+  const std::size_t active_rows =
+      token_count - first_token < kQueryRowsPerBlock
+          ? token_count - first_token
+          : kQueryRowsPerBlock;
+  const std::size_t width = config.head_width;
+  const std::size_t row_values = config.kv_heads * width;
+  const std::uint32_t group = config.query_heads / config.kv_heads;
+  const std::uint32_t first_head = kv_head * group;
+  extern __shared__ unsigned char raw[];
+  float* scratch = reinterpret_cast<float*>(raw);
+  __nv_bfloat16* keys =
+      reinterpret_cast<__nv_bfloat16*>(scratch + kMaximumHeadWidth);
+  __nv_bfloat16* values = keys + 32 * kMaximumHeadWidth;
+  __shared__ float inverse[kQueryRowsPerBlock];
+  __shared__ float score;
+  float q[kQueryRowsPerBlock][kMaximumGroup]{};
+  float maximum[kQueryRowsPerBlock][kMaximumGroup];
+  float denominator[kQueryRowsPerBlock][kMaximumGroup]{};
+  float accumulator[kQueryRowsPerBlock][kMaximumGroup]{};
+  const std::uint32_t half = config.rotary_width / 2;
+  for (std::size_t row = 0; row < active_rows; ++row) {
+    const std::size_t token = first_token + row;
+    for (std::uint32_t member = 0; member < group; ++member) {
+      const std::uint32_t query_head = first_head + member;
+      const std::size_t qbase =
+          token * config.query_heads * width + query_head * width;
+      if (lane == 0) {
+        float sum = 0.0F;
+        for (std::uint32_t i = 0; i < config.head_width; ++i) {
+          const float item = query[qbase + i];
+          sum = __fadd_rn(sum, item * item);
+        }
+        inverse[row] =
+            1.0F / sqrtf(sum / static_cast<float>(width) + kRmsEpsilon);
+      }
+      __syncthreads();
+      if (lane < width)
+        scratch[lane] = query[qbase + lane] * inverse[row] * query_scale[lane];
+      __syncthreads();
+      if (lane < half) {
+        const float first = scratch[lane], second = scratch[half + lane];
+        const float exponent = static_cast<float>(lane * 2) / config.rotary_width;
+        const float angle = static_cast<float>(start_position + token) /
+                            powf(kRopeTheta, exponent);
+        const float c = cosf(angle), s = sinf(angle);
+        scratch[lane] = first * c - second * s;
+        scratch[half + lane] = second * c + first * s;
+      }
+      __syncthreads();
+      if (lane < width) {
+        q[row][member] = scratch[lane];
+        if (token_count == 1)
+          normalized_query[query_head * width + lane] = q[row][member];
+      }
+      maximum[row][member] = -INFINITY;
+      __syncthreads();
+    }
+  }
+  const std::size_t last_position =
+      start_position + first_token + active_rows - 1;
+  for (std::size_t tile = 0; tile <= last_position; tile += 32) {
+    const std::size_t rows =
+        (last_position + 1 - tile) < 32 ? (last_position + 1 - tile) : 32;
+    for (std::size_t tile_row = 0; tile_row < rows; ++tile_row) {
+      const std::size_t absolute = tile + tile_row;
+      const __nv_bfloat16* ksrc =
+          absolute < start_position
+              ? committed_key + absolute * row_values + kv_head * width
+              : candidate_key + (absolute - start_position) * row_values +
+                    kv_head * width;
+      const __nv_bfloat16* vsrc =
+          absolute < start_position
+              ? committed_value + absolute * row_values + kv_head * width
+              : candidate_value + (absolute - start_position) * row_values +
+                    kv_head * width;
+      if (lane < width) {
+        keys[tile_row * kMaximumHeadWidth + lane] = ksrc[lane];
+        values[tile_row * kMaximumHeadWidth + lane] = vsrc[lane];
+      }
+    }
+    __syncthreads();
+    for (std::size_t tile_row = 0; tile_row < rows; ++tile_row) {
+      const std::size_t absolute = tile + tile_row;
+      for (std::size_t row = 0; row < active_rows; ++row) {
+        if (absolute > start_position + first_token + row) continue;
+        for (std::uint32_t member = 0; member < group; ++member) {
+          if (lane < width)
+            scratch[lane] =
+                q[row][member] * __bfloat162float(
+                                      keys[tile_row * kMaximumHeadWidth + lane]);
+          __syncthreads();
+          if (lane == 0) {
+            float dot = 0.0F;
+            for (std::uint32_t i = 0; i < config.head_width; ++i)
+              dot = __fadd_rn(dot, scratch[i]);
+            score = dot / sqrtf(static_cast<float>(width));
+          }
+          __syncthreads();
+          const float old_max = maximum[row][member];
+          maximum[row][member] = fmaxf(maximum[row][member], score);
+          const float rescale = old_max == -INFINITY
+                                    ? 0.0F
+                                    : expf(old_max - maximum[row][member]);
+          denominator[row][member] =
+              denominator[row][member] * rescale +
+              expf(score - maximum[row][member]);
+          accumulator[row][member] =
+              accumulator[row][member] * rescale +
+              expf(score - maximum[row][member]) *
+                  __bfloat162float(
+                      values[tile_row * kMaximumHeadWidth + lane]);
+          __syncthreads();
+        }
+      }
+    }
+  }
+  if (lane < width) {
+    for (std::size_t row = 0; row < active_rows; ++row) {
+      const std::size_t token = first_token + row;
+      for (std::uint32_t member = 0; member < group; ++member) {
+        const std::uint32_t query_head = first_head + member;
+        const std::size_t qbase =
+            token * config.query_heads * width + query_head * width;
+        const float g = gate[qbase + lane];
+        const float sigmoid = g >= 0.0F ? 1.0F / (1.0F + expf(-g))
+                                        : expf(g) / (1.0F + expf(g));
+        output[qbase + lane] =
+            (accumulator[row][member] / denominator[row][member]) * sigmoid;
+      }
+    }
   }
 }
 
@@ -591,13 +737,14 @@ cudaError_t launch_attention_prepare_chunk(
       candidate_rows.key, candidate_rows.value, normalized_key);
   cudaError_t error = cudaPeekAtLastError();
   if (error != cudaSuccess) return error;
-  dim3 attention(config.kv_heads, static_cast<unsigned>(token_count), 1);
+  dim3 attention(config.kv_heads,
+                 static_cast<unsigned>((token_count + 1) / 2), 1);
   const std::size_t shared = (2 * 32 * kMaximumHeadWidth) * sizeof(__nv_bfloat16) +
                              kMaximumHeadWidth * sizeof(float);
-  grouped_tiled_chunk_attention<false><<<attention, kThreads, shared, stream>>>(
+  two_row_grouped_tiled_chunk_attention<<<attention, kThreads, shared, stream>>>(
       config, start_position, token_count, query, query_norm_scale, output_gate,
       committed.key, committed.value, candidate_rows.key, candidate_rows.value,
-      output, normalized_query, nullptr);
+      output, normalized_query);
   error = cudaPeekAtLastError();
   if (error != cudaSuccess) return error;
   (void)qvalues;
@@ -639,7 +786,8 @@ cudaError_t launch_instrumented_tiled(
   dim3 attention(Grouped ? config.kv_heads : config.query_heads,
                  static_cast<unsigned>(token_count), 1);
   if constexpr (Grouped) {
-    grouped_tiled_chunk_attention<true><<<attention, kThreads, shared, stream>>>(
+    one_row_grouped_tiled_chunk_attention<true>
+        <<<attention, kThreads, shared, stream>>>(
         config, start_position, token_count, query, query_norm_scale,
         output_gate, committed.key, committed.value, candidate_rows.key,
         candidate_rows.value, output, normalized_query, kv_load_values);

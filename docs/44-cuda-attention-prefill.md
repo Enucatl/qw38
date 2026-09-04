@@ -63,8 +63,8 @@ leaves global score scratch byte-for-byte untouched.
 
 The production launch has exactly two kernel launches per positive chunk: KV
 staging on a `(kv_head, token)` grid, followed by grouped attention on a
-`(kv_head, token)` grid. This is launch topology evidence, not a complete
-model or end-to-end speed result.
+`(kv_head, ceil(token_count / 2))` grid. This is launch topology evidence, not
+a complete model or end-to-end speed result.
 
 ## Whole-chunk prepare, commit, and cancellation
 
@@ -129,20 +129,46 @@ score storage, whole-chunk state isolation, and the final legal one-layer
 position. It does not prove complete-model memory fit, tuned long-context speed,
 full-layer projections, or 64-layer scheduling.
 
-## OPT-005 and OPT-006 tiled attention evidence
+## OPT-005 through OPT-007 tiled attention evidence
 
 The implementation preserves strict causal visibility: committed rows are used
 below `start_position`, candidate rows at or above it, and each query row masks
 positions after its absolute position. Candidate rows and the frontier remain
-provisional until the existing chunk commit. Each block owns exactly one query
-row. OPT-006 changes that block's other owner from one query head to one KV
-head: with 24 query heads and four KV heads, it handles the six query heads
-`kv_head * 6 .. kv_head * 6 + 5`. The block loads each causal 32-row BF16 K/V
-tile into shared memory once, synchronizes, and consumes every row for those
-six query heads. Query normalization/RoPE, lane-order dot reduction,
-online-softmax update, and gated output stay serial per query head, preserving
-their prior operation order. OPT-007 remains deferred: it is the separate work
-to assign multiple query rows to a block.
+provisional until the existing chunk commit. OPT-006 changed block ownership
+from one query head to one KV head: with 24 query heads and four KV heads, it
+handles the six query heads `kv_head * 6 .. kv_head * 6 + 5`. It loads each
+causal 32-row BF16 K/V tile into shared memory once and consumes that tile for
+all six mapped query heads.
+
+OPT-007 extends that owner to `(KV head, query-row tile)`, with exactly two
+consecutive query rows per attention block. Block `y` owns relative rows
+`2*y` and `2*y + 1`; an odd-sized chunk activates only the first row of its
+last block. The block stages each K/V tile through the later owned row, then
+admits a context to a row only when the context is at or before that row's
+absolute position. Thus the earlier row may see a staged later context but
+never incorporates it. Each row keeps its own query, maximum, denominator, and
+value accumulator, while its normalization/RoPE, lane-order dot reduction,
+online-softmax update, and gated output retain the one-row order.
+
+The fixed shared layout remains 33,792 dynamic bytes: FP32 scratch plus
+32-by-256 BF16 K/V tiles. The row state is compile-time bounded, so it does not
+grow with prompt length; global score scratch remains untouched. The measured
+fixture captured two kernel nodes for every 1/2/3/63/64/65-row case, staging
+grids/blocks `[4, rows, 1]` / `[256, 1, 1]`, and attention grids/blocks
+`[4, ceil(rows / 2), 1]` / `[256, 1, 1]`. On its
+pinned RTX 5090 record, the attention kernel used 38 registers, 16 static
+shared bytes, 224 local bytes per thread, and 33,792 launch dynamic shared
+bytes; CUDA reported two active blocks per SM (170 SMs) for the 64-row capture.
+
+The same record requires byte-exact production versus retained one-row output
+and candidate BF16 K/V for all six row cases, finite output, prepare isolation,
+untouched score scratch, and invalid-input rejection. It also requires a
+65-row prepare/commit sequence to be byte-exact to 64 rows followed by one row
+for output, committed cache, and final frontier. This is component-only exact
+semantic and launch evidence: it makes no throughput, speedup, end-to-end, or
+complete-model memory claim. The contract and retained measured record are
+[`pins/cuda_query_row_attention_contract.json`](../pins/cuda_query_row_attention_contract.json)
+and [`fixtures/cuda_query_row_attention.json`](../fixtures/cuda_query_row_attention.json).
 
 The regenerated OPT-005 fixture records finite 3-row output with
 `max_abs=8.94069672e-08`, `rms=1.06907114e-08`, and cosine `1`, and finite
