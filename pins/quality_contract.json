@@ -1,0 +1,9 @@
+{
+  "schema": "qw38.quality-contract",
+  "version": 1,
+  "dataset": {"repository": "Salesforce/wikitext", "revision": "b08601e04326c79dfdd32d625aee71d232d685c3", "file": "wikitext-2-raw-v1/test-00000-of-00001.parquet", "sha256": "5f1bea067869d04849c0f975a2b29c4ff47d867f484f5010ea5e861eab246d91", "byte_count": 732610},
+  "tokenizer": {"sha256": "0997f410c57a1f4e53b09e4be8f4a172d90edd9564368fb0847030937229b9f3"},
+  "limits": {"context": 131072, "nll_targets": 1024},
+  "thresholds": {"nll_ppl_ratio": 1.05, "continuation_positions": 64, "recurrence_ppl_ratio": 1.05, "recurrence_incremental_nll": 0.02, "retrieval_frontier": 131072},
+  "tasks": ["wikitext_nll", "continuation_2048", "continuation_4096", "continuation_6144", "continuation_8192", "recurrence_short", "recurrence_long", "retrieval_128k", "task_arithmetic", "task_python_len", "task_inference", "task_minutes", "task_sort", "task_json", "task_reading", "task_sequence"]
+}

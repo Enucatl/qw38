@@ -6,7 +6,8 @@
   "modes": [
     "logits",
     "checkpoint",
-    "trace"
+    "trace",
+    "score"
   ],
   "source_states": [
     "clean",

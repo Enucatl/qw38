@@ -8,6 +8,7 @@ import math
 import re
 import struct
 import subprocess
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from tools.qw38_trace import LoadedTrace, TraceError, read_trace_bundle
@@ -81,6 +82,38 @@ class CheckpointRequest(EvalRequest):
         super().__post_init__()
         if not self.continuation:
             raise EvalError("continuation must be non-empty")
+
+
+@dataclass(frozen=True)
+class ScoreRequest(EvalRequest):
+    """Teacher-forced scoring request."""
+
+    continuation: tuple[int, ...]
+
+    def __post_init__(self) -> None:
+        super().__post_init__()
+        if not self.continuation:
+            raise EvalError("continuation must be non-empty")
+        if len(self.tokens) + len(self.continuation) > 131072:
+            raise EvalError("context and continuation exceed 131072 tokens")
+
+
+@dataclass(frozen=True)
+class ScoreStep:
+    position: int
+    target_token: int
+    log_probability: float
+    greedy_token: int
+    greedy_logit: float
+    runner_up_token: int
+    runner_up_logit: float
+    margin: float
+
+
+@dataclass(frozen=True)
+class ScoreResult:
+    record: dict[str, object]
+    steps: tuple[ScoreStep, ...]
 
 
 @dataclass(frozen=True)
@@ -465,15 +498,151 @@ def read_trace_result(directory: Path) -> TraceResult:
     return TraceResult(record=top, manifest=loaded)
 
 
+def read_score_result(directory: Path) -> ScoreResult:
+    """Validate compact teacher-forced score evidence (without logits blobs)."""
+    try:
+        top = json.loads((directory / "result.json").read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise EvalError(f"cannot read score result: {error}") from error
+    top = _exact(
+        top,
+        {
+            "schema",
+            "version",
+            "mode",
+            "status",
+            "model",
+            "tool",
+            "runtime",
+            "context_tokens",
+            "target_tokens",
+            "context_positions",
+            "target_positions",
+            "frontiers",
+            "steps",
+            "mean_nll",
+            "perplexity",
+        },
+        "score result",
+    )
+    if (top["schema"], top["version"], top["mode"], top["status"]) != (
+        "qw38.eval-result",
+        1,
+        "score",
+        "ok",
+    ):
+        raise EvalError("unsupported score result")
+    _model_identity(top["model"])
+    _tool_identity(top["tool"])
+    _runtime(top["runtime"])
+    context = top["context_tokens"]
+    target = top["target_tokens"]
+    if (
+        not isinstance(context, list)
+        or not isinstance(target, list)
+        or not context
+        or not target
+        or len(context) + len(target) > 131072
+    ):
+        raise EvalError("score token metadata is invalid")
+    parse_tokens(",".join(str(value) for value in context), label="context_tokens")
+    parse_tokens(",".join(str(value) for value in target), label="target_tokens")
+    if top["context_positions"] != list(range(len(context))):
+        raise EvalError("score context positions are invalid")
+    expected_target_positions = list(range(len(context), len(context) + len(target)))
+    if top["target_positions"] != expected_target_positions:
+        raise EvalError("score target positions are invalid")
+    frontiers = _exact(top["frontiers"], {"context", "final"}, "score frontiers")
+    if frontiers != {"context": len(context), "final": len(context) + len(target)}:
+        raise EvalError("score frontiers are invalid")
+    raw_steps = top["steps"]
+    if not isinstance(raw_steps, list) or len(raw_steps) != len(target):
+        raise EvalError("score steps are invalid")
+    steps: list[ScoreStep] = []
+    for index, raw in enumerate(raw_steps):
+        item = _exact(
+            raw,
+            {
+                "position",
+                "target_token",
+                "log_probability",
+                "greedy_token",
+                "greedy_logit",
+                "runner_up_token",
+                "runner_up_logit",
+                "margin",
+            },
+            f"score step {index}",
+        )
+        numbers = (
+            item["log_probability"],
+            item["greedy_logit"],
+            item["runner_up_logit"],
+            item["margin"],
+        )
+        if (
+            item["position"] != expected_target_positions[index]
+            or item["target_token"] != target[index]
+        ):
+            raise EvalError("score step position or target mismatch")
+        if any(
+            not isinstance(value, (int, float))
+            or isinstance(value, bool)
+            or not math.isfinite(float(value))
+            for value in numbers
+        ):
+            raise EvalError("score step contains non-finite metric")
+        for key in ("target_token", "greedy_token", "runner_up_token"):
+            if (
+                not isinstance(item[key], int)
+                or isinstance(item[key], bool)
+                or not 0 <= item[key] < TOKEN_LIMIT
+            ):
+                raise EvalError("score token identity is invalid")
+        if (
+            item["greedy_token"] > item["runner_up_token"]
+            and item["greedy_logit"] == item["runner_up_logit"]
+        ):
+            raise EvalError("score ties must prefer lower token ID")
+        if item["greedy_logit"] < item["runner_up_logit"]:
+            raise EvalError("score top-two logits are unordered")
+        if item["margin"] != item["greedy_logit"] - item["runner_up_logit"]:
+            raise EvalError("score margin does not match logits")
+        steps.append(
+            ScoreStep(**{key: item[key] for key in ScoreStep.__dataclass_fields__})
+        )
+    mean_nll = math.fsum(-step.log_probability for step in steps) / len(steps)
+    if (
+        not isinstance(top["mean_nll"], (int, float))
+        or not math.isfinite(float(top["mean_nll"]))
+        or not math.isclose(
+            float(top["mean_nll"]), mean_nll, rel_tol=2e-6, abs_tol=2e-6
+        )
+    ):
+        raise EvalError("score mean NLL does not match steps")
+    perplexity = math.exp(mean_nll)
+    if (
+        not isinstance(top["perplexity"], (int, float))
+        or not math.isfinite(float(top["perplexity"]))
+        or not math.isclose(
+            float(top["perplexity"]), perplexity, rel_tol=2e-6, abs_tol=2e-6
+        )
+    ):
+        raise EvalError("score perplexity does not match steps")
+    return ScoreResult(record=top, steps=tuple(steps))
+
+
 def run_native(
     request: EvalRequest, *, binary: Path
-) -> LogitsResult | CheckpointResult | TraceResult:
+) -> LogitsResult | CheckpointResult | TraceResult | ScoreResult:
     """Run a request without shell interpolation."""
     mode = (
         "logits"
         if isinstance(request, LogitsRequest)
         else "checkpoint"
         if isinstance(request, CheckpointRequest)
+        else "score"
+        if isinstance(request, ScoreRequest)
         else "trace"
     )
     argv = [
@@ -490,12 +659,43 @@ def run_native(
         "--source-state",
         request.source_state,
     ]
-    if isinstance(request, CheckpointRequest):
+    temporary_request: tempfile.TemporaryDirectory[str] | None = None
+    if (
+        isinstance(request, ScoreRequest)
+        and len(request.tokens) + len(request.continuation) > 4096
+    ):
+        temporary_request = tempfile.TemporaryDirectory(prefix="qw38-score-")
+        token_payload = ",".join(map(str, request.tokens)).encode("ascii")
+        continuation_payload = ",".join(map(str, request.continuation)).encode("ascii")
+        token_path = Path(temporary_request.name) / "context.tokens"
+        continuation_path = Path(temporary_request.name) / "target.tokens"
+        token_path.write_bytes(token_payload)
+        continuation_path.write_bytes(continuation_payload)
+        token_index = argv.index("--tokens")
+        argv[token_index : token_index + 2] = ["--tokens-file", str(token_path)]
+        digest = (
+            hashlib.sha256(token_payload).hexdigest()
+            + hashlib.sha256(continuation_payload).hexdigest()
+        )
+        argv += [
+            "--continuation-file",
+            str(continuation_path),
+            "--request-sha256",
+            digest,
+        ]
+    if (
+        isinstance(request, (CheckpointRequest, ScoreRequest))
+        and temporary_request is None
+    ):
         argv += ["--continuation", ",".join(map(str, request.continuation))]
     if isinstance(request, TraceRequest):
         for trace_filter in request.trace_filters:
             argv += ["--trace-filter", trace_filter]
-    result = subprocess.run(argv, check=False, capture_output=True, text=True)
+    try:
+        result = subprocess.run(argv, check=False, capture_output=True, text=True)
+    finally:
+        if temporary_request is not None:
+            temporary_request.cleanup()
     if result.returncode != 0:
         raise EvalProcessError(result)
     try:
@@ -503,6 +703,8 @@ def run_native(
             return read_logits_result(request.output)
         if isinstance(request, CheckpointRequest):
             return read_checkpoint_result(request.output)
+        if isinstance(request, ScoreRequest):
+            return read_score_result(request.output)
         return read_trace_result(request.output)
     except (EvalError, TraceError) as error:
         raise EvalError(
@@ -517,10 +719,14 @@ __all__ = [
     "LogitsRequest",
     "LogitsResult",
     "CheckpointResult",
+    "ScoreRequest",
+    "ScoreStep",
+    "ScoreResult",
     "TraceRequest",
     "parse_tokens",
     "read_logits_result",
     "read_checkpoint_result",
+    "read_score_result",
     "read_trace_result",
     "read_trace_bundle",
     "run_native",

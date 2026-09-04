@@ -68,6 +68,15 @@ are repository-relative unless stated otherwise.
 | OPT-002 | Profile and implement justified fusions | OPT-001, ORA-001 | done | Nsight evidence justifies each fusion; fused/unfused boundaries pass frozen gates | [`cuda/full_scheduler.cu`](cuda/full_scheduler.cu); [`fixtures/cuda_fusion.json`](fixtures/cuda_fusion.json); [`evidence/profiling/opt002-nsight-compute.txt`](evidence/profiling/opt002-nsight-compute.txt); tests; log 2026-09-01T05:44:16Z |
 | OPT-003 | Implement stable-address CUDA graphs | OPT-002 | done | Graph/non-graph equivalence passes and graph allocations are in MEM-001 | [`cuda/full_scheduler.cu`](cuda/full_scheduler.cu); [`fixtures/cuda_graph.json`](fixtures/cuda_graph.json); [`tests/test_cuda_graph.py`](tests/test_cuda_graph.py); log 2026-09-01T07:08:29Z |
 | OPT-004 | Tune row buckets/chunks and check in dispatch evidence | OPT-003 | done | Offline RTX 5090 sweep selects a reproducible table from retained raw results | [`cuda/quant_mmv.cu`](cuda/quant_mmv.cu); [`fixtures/cuda_dispatch_tuning.json`](fixtures/cuda_dispatch_tuning.json); [`evidence/profiling/opt004-dispatch-sweep-raw.txt`](evidence/profiling/opt004-dispatch-sweep-raw.txt); [`tests/test_cuda_dispatch_tuning.py`](tests/test_cuda_dispatch_tuning.py); log 2026-09-01T07:30:51Z |
+| OPT-005 | Implement exact tiled causal prompt attention with online softmax | OPT-004, SCH-002, ATN-002 | pending | Multi-row attention tiles preserve full causal semantics and frozen outputs while eliminating per-token QK/softmax/value launches | — |
+| OPT-006 | Reuse tiled KV loads across grouped query heads | OPT-005 | pending | Each shared KV head is loaded once per tile for its six query heads; exact GQA outputs pass and measured KV traffic falls | — |
+| OPT-007 | Execute multiple prompt query rows per CUDA block | OPT-006 | pending | Prompt attention maps query-row tiles to occupied blocks with bounded scratch and passes short/chunk boundary equivalence | — |
+| OPT-008 | Make 4,096 tokens the default prompt chunk | OPT-007, MEM-002 | pending | Default prefill chunks are 4,096 tokens with bounded fallback for tails/capacity; atomic commit, cancellation, and 128K reserve gates pass | — |
+| OPT-009 | Implement true batched Q8_0/Q4_K/Q6_K prompt MMQ | OPT-004, SCH-002 | pending | Prompt projections reuse weight tiles across rows, select measured SM120 kernels, and preserve frozen numeric envelopes | — |
+| OPT-010 | Tile KV layout for coalesced exact GQA access | OPT-007, SES-003 | pending | KV storage supports coalesced tile loads without changing logical values, checkpoint compatibility, prefix reuse, or capacity | — |
+| OPT-011 | Pipeline and fuse prompt execution and chunk commit | OPT-008, OPT-009, OPT-010 | pending | Justified fusion/overlap removes avoidable copies, launches, and barriers while preserving cancellation and atomic publication | — |
+| OPT-012 | Add stable-address prompt CUDA graphs | OPT-003, OPT-011 | pending | Common 4,096-token prompt paths replay from stable addresses with graph/non-graph equality and reconciled memory | — |
+| OPT-013 | Implement associative block-parallel GDN prompt scan | GDN-002, OPT-011 | pending | Parallel GDN scan preserves recurrence/frontier tolerances across chunk boundaries and demonstrates measured prompt speedup | — |
 | CLI-001 | Implement interactive `qw38` text CLI | TOK-002, SES-003 | done | Interactive generation, reasoning, stops, sampling, and persistence pass smoke tests | [`src/cli.cpp`](src/cli.cpp); [`src/engine.cpp`](src/engine.cpp); [`fixtures/cli_smoke.json`](fixtures/cli_smoke.json); [`tests/test_cli.py`](tests/test_cli.py); log 2026-09-01T11:56:52Z |
 | SRV-001 | Implement single-flight HTTP server core and queue | API-001 | done | Health/models endpoints, cancellation, queue timing, and one GPU session pass tests | [`src/server.cpp`](src/server.cpp); [`src/server_core.cpp`](src/server_core.cpp); [`fixtures/server_core.json`](fixtures/server_core.json); [`tests/test_server.py`](tests/test_server.py); log 2026-09-01T18:19:42Z |
 | SRV-002 | Implement Chat Completions API | TOK-002, SES-002, SRV-001 | done | Supported roles/tools/streaming/sampling/stops pass; exclusions reject explicitly | [`src/server.cpp`](src/server.cpp); [`src/server_generation.cpp`](src/server_generation.cpp); [`fixtures/chat_completions.json`](fixtures/chat_completions.json); [`tests/test_server.py`](tests/test_server.py); log 2026-09-01T19:00:04Z |
@@ -76,7 +85,7 @@ are repository-relative unless stated otherwise.
 | BEN-001 | Implement `qw38-bench` component/end-to-end harness | OPT-001 | done | Warmups/samples, telemetry, raw samples, failures, and environment metadata are retained | `pins/benchmark_contract.json`; `fixtures/benchmark_harness.json`; `evidence/benchmark/`; `tests/test_benchmark.py`; log 2026-09-02T15:24:00Z |
 | BEN-002 | Preserve the product-wide no-argument usage exit contract in `qw38-bench` | BEN-001, BLD-001 | done | Invoking the benchmark with no arguments prints usage and returns exit code 2 without creating output | `tests/test_build.py`; log 2026-09-02T15:24:00Z |
 | EVAL-001 | Implement `qw38-eval` logits/traces/checkpoints harness | ORA-001, SES-003 | done | Focused native diagnostics are driven by typed pytest helpers | [`tasks/EVAL-001.md`](tasks/EVAL-001.md); reopened 2026-09-03T14:00:00Z after build/hash repair; recovery readmitted 2026-09-03T15:44:53Z; completed 2026-09-03T17:01:54Z |
-| QLT-001 | Pass held-out NLL, continuation, recurrence, retrieval, and task quality | EVAL-001, MEM-001 | pending | Admitted artifact passes every documented threshold and 128K retrieval fixture | — |
+| QLT-001 | Pass held-out NLL, continuation, recurrence, retrieval, and task quality | EVAL-001, MEM-001, OPT-012, OPT-013 | blocked | Admitted artifact passes every documented threshold and 128K retrieval fixture | [`tasks/QLT-001.md`](tasks/QLT-001.md); blocked 2026-09-04T06:09:51Z pending prompt optimization chain |
 | CMP-001 | Pin and validate comparable baseline artifacts | PIN-001, PIN-002, QLT-001 | pending | llama/Ollama share GGUF; vLLM difference and <=1% NLL admission are explicit | — |
 | CMP-002 | Run controlled 30-sample comparative matrix | BEN-001, OPT-004, CMP-001 | pending | All contexts/metrics/environment data and negative runs are retained | — |
 | CMP-003 | Pass prefill/decode statistical speed gates | CMP-002 | pending | Paired bootstrap lower bounds exceed 1.05 and no workload is >5% slower | — |
@@ -142,7 +151,7 @@ are repository-relative unless stated otherwise.
 | 6. CUDA primitives | CUD-001–CUD-003 |
 | 7. GDN/attention/scheduler | GDN-001–GDN-002, ATN-001–ATN-002, SCH-001 |
 | 8. Sessions and 128K | SES-001–SES-003, MEM-001 |
-| 9. Profiling/optimization | OPT-001–OPT-004 |
+| 9. Profiling/optimization | OPT-001–OPT-013 |
 | 10. Product tools/API/quality | CLI-001, SRV-001–SRV-003, BEN-001, EVAL-001, QLT-001 |
 | 11. Comparative speed | CMP-001–CMP-003 |
 | 12. Documentation/release | DOC-001, REL-001 |
@@ -3613,3 +3622,23 @@ are repository-relative unless stated otherwise.
 - Confirmed the complete diff is within the dossier allowlist, `plan.md` is
   unchanged, and no generated model outputs are included. Marked only
   EVAL-001 `done`; coupled IDs remain `none`.
+
+### 2026-09-04T06:09:51Z — QLT-001 blocked on prompt performance
+
+- Stopped the unpublished 131,072-token Quartz retrieval run after more than
+  eight hours at approximately 4.2 tokens/s. The completed pinned same-GGUF
+  llama.cpp reference and shorter Quartz evidence were preserved; no 128K
+  retrieval result or passing quality report was published.
+- Source and bounded-profile diagnosis ranked untiled per-token full attention,
+  missing grouped-query KV reuse, row-wise prompt GEMV, 64-token chunks, about
+  8.99 million launches, repeated copies/barriers, and serial GDN scans as the
+  recovery boundary. Full causal attention semantics remain mandatory; sparse
+  attention is not authorized.
+- Added OPT-005 through OPT-013 before implementation. They cover exact tiled
+  online-softmax attention, GQA KV reuse, multi-row query blocks, a 4,096-token
+  default prompt chunk, batched quantized MMQ, tiled KV layout, prompt
+  pipelining/fusion, prompt graphs, and block-parallel GDN scan.
+- Marked QLT-001 blocked. Recovery requires OPT-012 and OPT-013 done, which
+  transitively requires the complete optimization chain, followed by bounded
+  2K/8K/32K scaling evidence and a fresh 128K quality retry. Evidence:
+  [`tasks/QLT-001.md`](tasks/QLT-001.md).

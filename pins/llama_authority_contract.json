@@ -20,7 +20,8 @@
     "script": "tools/build_llama_authority.sh",
     "targets": [
       "llama-eval-callback",
-      "qw38-llama-token-oracle"
+      "qw38-llama-token-oracle",
+      "qw38-llama-quality-oracle"
     ]
   },
   "diagnostic": {

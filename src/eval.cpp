@@ -183,9 +183,9 @@ bool parse_token_csv(const std::string& text, std::vector<qw38::Token>* out) {
 
 int eval_usage(bool diagnostic) {
   std::cerr << (diagnostic ? "usage: qw38-eval-diagnostic" : "usage: qw38-eval")
-            << " MODEL --mode logits|checkpoint --tokens CSV --output DIR"
+            << " MODEL --mode logits|checkpoint|score --tokens CSV --output DIR"
                " --source-revision REVISION --source-state clean|dirty"
-               " [--continuation CSV] [--trace-filter LAYER:TAP]\n";
+               " [--continuation CSV] [--tokens-file FILE --continuation-file FILE --request-sha256 HASH] [--trace-filter LAYER:TAP]\n";
   return 2;
 }
 
@@ -433,6 +433,9 @@ int run_high_level(int argc, char** argv, bool diagnostic) {
   std::string mode;
   std::string token_text;
   std::string continuation_text;
+  std::string tokens_file;
+  std::string continuation_file;
+  std::string request_sha256;
   std::string output_path;
   std::string revision;
   std::string source_state;
@@ -446,6 +449,9 @@ int run_high_level(int argc, char** argv, bool diagnostic) {
     if (option == "--mode") mode = argv[++i];
     else if (option == "--tokens") token_text = argv[++i];
     else if (option == "--continuation") continuation_text = argv[++i];
+    else if (option == "--tokens-file") tokens_file = argv[++i];
+    else if (option == "--continuation-file") continuation_file = argv[++i];
+    else if (option == "--request-sha256") request_sha256 = argv[++i];
     else if (option == "--output") output_path = argv[++i];
     else if (option == "--source-revision") revision = argv[++i];
     else if (option == "--source-state") source_state = argv[++i];
@@ -454,9 +460,40 @@ int run_high_level(int argc, char** argv, bool diagnostic) {
   }
   std::vector<qw38::Token> tokens;
   std::vector<qw38::Token> continuation;
-  if ((mode != "logits" && mode != "checkpoint" && mode != "trace") ||
+  if (mode == "score" && !tokens_file.empty() && !continuation_file.empty() &&
+      token_text.empty() && continuation_text.empty()) {
+    std::string token_payload;
+    std::string continuation_payload;
+    std::ifstream token_stream(tokens_file, std::ios::binary);
+    std::ifstream continuation_stream(continuation_file, std::ios::binary);
+    if (token_stream && continuation_stream) {
+      token_payload.assign(std::istreambuf_iterator<char>(token_stream), {});
+      continuation_payload.assign(std::istreambuf_iterator<char>(continuation_stream), {});
+    }
+    std::string token_digest;
+    std::string continuation_digest;
+    if (!token_payload.empty() && !continuation_payload.empty() &&
+        qw38::internal::sha256_bytes(
+            reinterpret_cast<const std::uint8_t*>(token_payload.data()),
+            token_payload.size(), &token_digest).is_ok() &&
+        qw38::internal::sha256_bytes(
+            reinterpret_cast<const std::uint8_t*>(continuation_payload.data()),
+            continuation_payload.size(), &continuation_digest).is_ok() &&
+        request_sha256 == token_digest + continuation_digest &&
+        parse_token_csv(token_payload, &tokens) &&
+        parse_token_csv(continuation_payload, &continuation)) {
+      token_text = token_payload;
+      continuation_text = continuation_payload;
+    }
+  }
+  if ((mode != "logits" && mode != "checkpoint" && mode != "score" && mode != "trace") ||
       (!diagnostic && mode == "trace") || !parse_token_csv(token_text, &tokens) ||
       (mode == "checkpoint" && !parse_token_csv(continuation_text, &continuation)) ||
+      (mode == "score" && !parse_token_csv(continuation_text, &continuation)) ||
+      (mode == "score" && tokens.size() + continuation.size() > 131072) ||
+      (mode == "score" && ((!tokens_file.empty() || !continuation_file.empty()) &&
+                            (tokens_file.empty() || continuation_file.empty() ||
+                             token_text.empty() || continuation_text.empty()))) ||
       output_path.empty() || revision.empty() ||
       (source_state != "clean" && source_state != "dirty")) {
     std::cerr << "invalid_argument: malformed evaluation request\n";
@@ -491,6 +528,41 @@ int run_high_level(int argc, char** argv, bool diagnostic) {
   status = session->sync(tokens);
   if (!status.is_ok()) { std::cerr << status.message() << '\n'; return 1; }
   const std::string temporary = output_path + ".tmp." + std::to_string(getpid());
+  if (mode == "score") {
+    std::vector<float> current;
+    std::vector<std::array<double, 8>> steps;
+    for (std::size_t index = 0; status.is_ok() && index < continuation.size(); ++index) {
+      status = session->logits(&current);
+      if (!status.is_ok() || !finite_logits(current)) break;
+      std::size_t first = 0, second = 1;
+      for (std::size_t token = 1; token < current.size(); ++token) {
+        if (current[token] > current[first] || (current[token] == current[first] && token < first)) { second = first; first = token; }
+        else if (token != first && (current[token] > current[second] || (current[token] == current[second] && token < second))) second = token;
+      }
+      double maximum = *std::max_element(current.begin(), current.end());
+      double sum = 0.0; for (float value : current) sum += std::exp(static_cast<double>(value) - maximum);
+      const double log_probability = static_cast<double>(current[continuation[index]]) - maximum - std::log(sum);
+      steps.push_back({static_cast<double>(tokens.size() + index), static_cast<double>(continuation[index]), log_probability, static_cast<double>(first), current[first], static_cast<double>(second), current[second], static_cast<double>(current[first] - current[second])});
+      status = session->eval(continuation[index]);
+    }
+    if (!status.is_ok()) { std::cerr << "runtime_failure: score unavailable\n"; return 1; }
+    std::error_code score_error; std::filesystem::create_directories(temporary, score_error);
+    if (score_error) return 1;
+    std::ofstream record(temporary + "/result.json");
+    const std::string tool = tool_identity_json("qw38-eval", revision, source_state);
+    const std::string runtime = runtime_json();
+    double nll = 0.0; for (const auto& step : steps) nll -= step[2]; nll /= steps.size();
+    record << std::setprecision(17) << "{\"schema\":\"qw38.eval-result\",\"version\":1,\"mode\":\"score\",\"status\":\"ok\",\"model\":" << model_identity_json() << ",\"tool\":" << tool << ",\"runtime\":" << runtime << ",\"context_tokens\":[";
+    for (std::size_t i=0;i<tokens.size();++i) record << (i?",":"") << tokens[i];
+    record << "],\"target_tokens\":["; for (std::size_t i=0;i<continuation.size();++i) record << (i?",":"") << continuation[i];
+    record << "],\"context_positions\":["; for (std::size_t i=0;i<tokens.size();++i) record << (i?",":"") << i;
+    record << "],\"target_positions\":["; for (std::size_t i=0;i<continuation.size();++i) record << (i?",":"") << tokens.size()+i;
+    record << "],\"frontiers\":{\"context\":" << tokens.size() << ",\"final\":" << tokens.size()+continuation.size() << "},\"steps\":[";
+    for (std::size_t i=0;i<steps.size();++i) { const auto& s=steps[i]; if(i) record << ','; record << "{\"position\":" << static_cast<std::size_t>(s[0]) << ",\"target_token\":" << static_cast<std::size_t>(s[1]) << ",\"log_probability\":" << s[2] << ",\"greedy_token\":" << static_cast<std::size_t>(s[3]) << ",\"greedy_logit\":" << s[4] << ",\"runner_up_token\":" << static_cast<std::size_t>(s[5]) << ",\"runner_up_logit\":" << s[6] << ",\"margin\":" << s[7] << "}"; }
+    record << "],\"mean_nll\":" << nll << ",\"perplexity\":" << std::exp(nll) << "}\n"; record.close();
+    if (!record || !publish_noreplace(temporary, output_path)) { std::filesystem::remove_all(temporary); return 1; }
+    return 0;
+  }
   if (mode == "checkpoint") {
     std::error_code temporary_error;
     std::filesystem::create_directories(temporary, temporary_error);
