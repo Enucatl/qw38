@@ -1,0 +1,93 @@
+{
+  "schema_version": 1,
+  "task": "OPT-006",
+  "status": "measured",
+  "device": "NVIDIA GeForce RTX 5090",
+  "compute_capability": "12.0",
+  "driver": "13.1",
+  "runtime": "13.0",
+  "toolkit": "CUDA 13.0.2",
+  "pinned_image": "qw38-cuda:13.0.2",
+  "measurement_utc": "2026-09-04T15:42:33Z",
+  "production_shape": {
+    "query_heads": 24,
+    "kv_heads": 4,
+    "head_width": 256,
+    "rotary_width": 64,
+    "chunk_rows": 64,
+    "kv_tile_rows": 32,
+    "threads": 256,
+    "group_size": 6
+  },
+  "semantic": {
+    "predicates": {
+      "grouped_per_query_output_exact": true,
+      "candidate_bf16_exact": true,
+      "finite_output": true,
+      "prepare_cache_unchanged": true,
+      "prepare_frontier_unchanged": true,
+      "commit_cache_exact": true,
+      "commit_frontier_exact": true,
+      "future_committed_excluded": true,
+      "later_candidate_excluded": true,
+      "scratch_unchanged": true,
+      "invalid_input_rejected": true,
+      "production_two_kernel_nodes": true
+    },
+    "untiled_metrics": {
+      "1": {
+        "max_abs": 5.96046448e-08,
+        "rms": 3.97332123e-09,
+        "cosine": 1
+      },
+      "3": {
+        "max_abs": 1.1920929e-07,
+        "rms": 1.1860859e-08,
+        "cosine": 1
+      },
+      "9": {
+        "max_abs": 1.49011612e-07,
+        "rms": 1.50660302e-08,
+        "cosine": 1
+      },
+      "64": {
+        "max_abs": 2.08616257e-07,
+        "rms": 1.23316877e-08,
+        "cosine": 1
+      }
+    }
+  },
+  "traffic": [
+    {
+      "start_position": 2048,
+      "token_count": 64,
+      "contexts": 133152,
+      "per_query_values": 1636171776,
+      "grouped_values": 272695296,
+      "per_query_bytes": 3272343552,
+      "grouped_bytes": 545390592,
+      "ratio": 6
+    },
+    {
+      "start_position": 8192,
+      "token_count": 64,
+      "contexts": 526368,
+      "per_query_values": 6468009984,
+      "grouped_values": 1078001664,
+      "per_query_bytes": 12936019968,
+      "grouped_bytes": 2156003328,
+      "ratio": 6
+    },
+    {
+      "start_position": 32768,
+      "token_count": 64,
+      "contexts": 2099232,
+      "per_query_values": 25795362816,
+      "grouped_values": 4299227136,
+      "per_query_bytes": 51590725632,
+      "grouped_bytes": 8598454272,
+      "ratio": 6
+    }
+  ],
+  "proof_limit": "executed BF16 global-load requests only; excludes physical DRAM transactions and end-to-end performance"
+}

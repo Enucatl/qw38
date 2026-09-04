@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "task": "OPT-006",
+  "target": "sm_120",
+  "toolkit": "CUDA 13.0.2",
+  "pinned_image": "qw38-cuda:13.0.2",
+  "production_shape": {"query_heads": 24, "kv_heads": 4, "head_width": 256, "rotary_width": 64, "chunk_rows": 64, "kv_tile_rows": 32, "threads": 256, "group_size": 6},
+  "traffic_prefixes": [2048, 8192, 32768],
+  "proof_limits": {"bf16_max_abs": 0.00005, "bf16_rms": 0.000005, "oracle_max_abs": 0.051, "oracle_rms": 0.0016, "oracle_cosine": 0.999424},
+  "semantic_predicates": ["grouped_per_query_output_exact", "candidate_bf16_exact", "finite_output", "prepare_cache_unchanged", "prepare_frontier_unchanged", "commit_cache_exact", "commit_frontier_exact", "future_committed_excluded", "later_candidate_excluded", "scratch_unchanged", "invalid_input_rejected", "production_two_kernel_nodes"],
+  "metadata_required": ["device", "compute_capability", "driver", "runtime", "toolkit", "pinned_image", "measurement_utc", "proof_limit"]
+}

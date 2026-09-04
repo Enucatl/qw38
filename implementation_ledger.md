@@ -72,7 +72,7 @@ are repository-relative unless stated otherwise.
 | OPT-003 | Implement stable-address CUDA graphs | OPT-002 | done | Graph/non-graph equivalence passes and graph allocations are in MEM-001 | [`cuda/full_scheduler.cu`](cuda/full_scheduler.cu); [`fixtures/cuda_graph.json`](fixtures/cuda_graph.json); [`tests/test_cuda_graph.py`](tests/test_cuda_graph.py); log 2026-09-01T07:08:29Z |
 | OPT-004 | Tune row buckets/chunks and check in dispatch evidence | OPT-003 | done | Offline RTX 5090 sweep selects a reproducible table from retained raw results | [`cuda/quant_mmv.cu`](cuda/quant_mmv.cu); [`fixtures/cuda_dispatch_tuning.json`](fixtures/cuda_dispatch_tuning.json); [`evidence/profiling/opt004-dispatch-sweep-raw.txt`](evidence/profiling/opt004-dispatch-sweep-raw.txt); [`tests/test_cuda_dispatch_tuning.py`](tests/test_cuda_dispatch_tuning.py); log 2026-09-01T07:30:51Z |
 | OPT-005 | Implement exact tiled causal prompt attention with online softmax | OPT-004, SCH-002, ATN-002 | done | Multi-row attention tiles preserve full causal semantics and frozen outputs while eliminating per-token QK/softmax/value launches | [`tasks/OPT-005.md`](tasks/OPT-005.md); recovery accepted and delivered 2026-09-04T13:09:32Z |
-| OPT-006 | Reuse tiled KV loads across grouped query heads | OPT-005 | pending | Each shared KV head is loaded once per tile for its six query heads; exact GQA outputs pass and measured KV traffic falls | — |
+| OPT-006 | Reuse tiled KV loads across grouped query heads | OPT-005 | done | Each shared KV head is loaded once per tile for its six query heads; exact GQA outputs pass and measured KV traffic falls | [`tasks/OPT-006.md`](tasks/OPT-006.md); [`cuda/gqa_attention_test.cu`](cuda/gqa_attention_test.cu); [`fixtures/cuda_gqa_attention.json`](fixtures/cuda_gqa_attention.json); log 2026-09-04T15:54:44Z |
 | OPT-007 | Execute multiple prompt query rows per CUDA block | OPT-006 | pending | Prompt attention maps query-row tiles to occupied blocks with bounded scratch and passes short/chunk boundary equivalence | — |
 | OPT-008 | Make 4,096 tokens the default prompt chunk | OPT-007, MEM-002 | pending | Default prefill chunks are 4,096 tokens with bounded fallback for tails/capacity; atomic commit, cancellation, and 128K reserve gates pass | — |
 | OPT-009 | Implement true batched Q8_0/Q4_K/Q6_K prompt MMQ | OPT-004, SCH-002 | pending | Prompt projections reuse weight tiles across rows, select measured SM120 kernels, and preserve frozen numeric envelopes | — |
@@ -3734,3 +3734,19 @@ are repository-relative unless stated otherwise.
   one successful diagnostic, strengthen evidence validation, and rerun all gates.
 - Marked OPT-005 `pending` for fresh workflow admission. No architecture or
   `plan.md` change is required.
+
+### 2026-09-04T15:54:44Z — OPT-006 delivered
+
+- Independent verification passed the grouped CUDA attention acceptance: exact
+  grouped/per-query outputs, inherited causal/transaction/scratch/validation/
+  capacity/two-node predicates, frozen untiled metrics, and executed device
+  K/V request counters at 2K/8K/32K prefixes. Grouped requests and bytes are
+  exactly one sixth of the retained per-query path.
+- The schema-1 contract, pinned RTX 5090 fixture, shared fail-closed validator,
+  and attention-prefill documentation record the evidence and explicitly limit
+  it to executed BF16 global-load requests, excluding physical DRAM, latency,
+  throughput, and end-to-end claims. Full ordinary and CUDA-enabled suites
+  passed (`172 passed, 21 skipped` and `193 passed`).
+- Marked OPT-006 `done`; delivery changes are limited to the verified task
+  scope plus this ledger/audit bookkeeping. `plan.md` and `Makefile` remain
+  unchanged.

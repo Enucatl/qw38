@@ -62,8 +62,8 @@ prompt-sized score rectangle is allocated, and the production multi-row path
 leaves global score scratch byte-for-byte untouched.
 
 The production launch has exactly two kernel launches per positive chunk: KV
-staging on a `(kv_head, token)` grid, followed by attention on a
-`(query_head, token)` grid. This is launch topology evidence, not a complete
+staging on a `(kv_head, token)` grid, followed by grouped attention on a
+`(kv_head, token)` grid. This is launch topology evidence, not a complete
 model or end-to-end speed result.
 
 ## Whole-chunk prepare, commit, and cancellation
@@ -129,15 +129,20 @@ score storage, whole-chunk state isolation, and the final legal one-layer
 position. It does not prove complete-model memory fit, tuned long-context speed,
 full-layer projections, or 64-layer scheduling.
 
-## OPT-005 evidence boundary and deferred seams
+## OPT-005 and OPT-006 tiled attention evidence
 
 The implementation preserves strict causal visibility: committed rows are used
 below `start_position`, candidate rows at or above it, and each query row masks
 positions after its absolute position. Candidate rows and the frontier remain
-provisional until the existing chunk commit. Each block still reloads tiles for
-its query head and owns exactly one query row. Sharing one tile across the six
-query heads in a GQA group is deferred to OPT-006; assigning multiple query rows
-to a block is deferred to OPT-007.
+provisional until the existing chunk commit. Each block owns exactly one query
+row. OPT-006 changes that block's other owner from one query head to one KV
+head: with 24 query heads and four KV heads, it handles the six query heads
+`kv_head * 6 .. kv_head * 6 + 5`. The block loads each causal 32-row BF16 K/V
+tile into shared memory once, synchronizes, and consumes every row for those
+six query heads. Query normalization/RoPE, lane-order dot reduction,
+online-softmax update, and gated output stay serial per query head, preserving
+their prior operation order. OPT-007 remains deferred: it is the separate work
+to assign multiple query rows to a block.
 
 The regenerated OPT-005 fixture records finite 3-row output with
 `max_abs=8.94069672e-08`, `rms=1.06907114e-08`, and cosine `1`, and finite
@@ -152,3 +157,35 @@ speedups are `31.5449048x`, `31.5937743x`, and `51.7797723x`. The fixture
 contains 30 tiled and three retained-reference samples for each case. These are
 post-projection, production-shape component measurements only: they exclude
 projections, scheduler work, and end-to-end recovery.
+
+OPT-006's separate pinned RTX 5090 fixture compares the grouped production
+kernel with the retained per-query-head tiled diagnostic. Their production-GQA
+outputs are byte-exact; candidate BF16 rows, prepare/commit isolation,
+causality, scratch preservation, invalid-input rejection, and the two-node
+production graph also pass. Against the untiled reference, the maximum absolute
+errors for 1, 3, 9, and 64 rows are `5.96046448e-08`, `1.1920929e-07`,
+`1.49011612e-07`, and `2.08616257e-07`; the corresponding RMS errors are
+`3.97332123e-09`, `1.1860859e-08`, `1.50660302e-08`, and
+`1.23316877e-08`, with cosine `1` in every case.
+
+For traffic evidence, instrumented diagnostic specializations increment a
+device counter alongside every global BF16 K and V source load, then atomically
+publish the block total. For a 64-row chunk, `contexts = sum(start + token + 1)`
+and the expected requested values are
+`24 * contexts * 256 * 2` for retained per-query tiles versus
+`4 * contexts * 256 * 2` for grouped tiles. At prefixes 2,048, 8,192, and
+32,768, the measured retained/grouped counts are
+`1,636,171,776/272,695,296`, `6,468,009,984/1,078,001,664`, and
+`25,795,362,816/4,299,227,136` values; multiplying by the two-byte BF16
+element size gives `3,272,343,552/545,390,592`,
+`12,936,019,968/2,156,003,328`, and
+`51,590,725,632/8,598,454,272` requested bytes. Each case is exactly six to
+one, matching the GQA group size.
+
+These are executed kernel global-load *requests*, not physical DRAM
+transactions: the counters do not establish cache behavior, coalescing, or
+hardware bytes transferred. They also do not measure latency, throughput, or
+end-to-end performance. The retained evidence is
+[`fixtures/cuda_gqa_attention.json`](../fixtures/cuda_gqa_attention.json),
+validated against
+[`pins/cuda_gqa_attention_contract.json`](../pins/cuda_gqa_attention_contract.json).
