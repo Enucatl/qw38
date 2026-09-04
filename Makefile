@@ -1,14 +1,26 @@
+UNAME_S := $(shell uname -s)
+UNAME_M := $(shell uname -m)
+ifeq ($(UNAME_S),Darwin)
+CXX ?= clang++
+CC ?= clang
+else
 CXX ?= g++
 CC ?= cc
+endif
 NVCC ?= nvcc
 CXXFLAGS := -std=c++17 -O2 -Wall -Wextra -Wpedantic -Werror -fno-exceptions -fno-rtti -ffp-contract=off -pthread
+ifeq ($(UNAME_S),Darwin)
+ifeq ($(UNAME_M),x86_64)
+CXXFLAGS += -mavx2 -mfma
+endif
+endif
 CFLAGS := -std=c11 -O2 -Wall -Wextra -Wpedantic -Werror
 NVCCFLAGS := -std=c++17 -O2 -arch=sm_120 --expt-relaxed-constexpr --fmad=false -Xcompiler=-Wall,-Wextra,-Werror,-fno-exceptions,-fno-rtti,-ffp-contract=off,-pthread
 CPPFLAGS := -Iinclude -Isrc -Ithird_party/utf8proc
 BUILD_DIR := build
 CUDA_BUILD_DIR := $(BUILD_DIR)/cuda
 DIAGNOSTIC_DIR := $(BUILD_DIR)/diagnostic
-LIB_SOURCES := src/status.cpp src/sha256.cpp src/model.cpp src/tokenizer.cpp src/template.cpp src/quant.cpp src/tensor.cpp src/conversion.cpp src/projection.cpp src/weights.cpp src/mixer.cpp src/scheduler.cpp src/scalar_runtime.cpp src/gdn.cpp src/attention.cpp src/engine.cpp
+LIB_SOURCES := src/status.cpp src/sha256.cpp src/model.cpp src/tokenizer.cpp src/template.cpp src/quant.cpp src/tensor.cpp src/conversion.cpp src/projection.cpp src/weights.cpp src/mixer.cpp src/scheduler.cpp src/scalar_runtime.cpp src/gdn.cpp src/attention.cpp src/host_checkpoint.cpp src/engine.cpp
 LIB_OBJECTS := $(LIB_SOURCES:src/%.cpp=$(BUILD_DIR)/%.o)
 THIRD_PARTY_OBJECTS := $(BUILD_DIR)/utf8proc.o
 BINARIES := $(BUILD_DIR)/qw38 $(BUILD_DIR)/qw38-server $(BUILD_DIR)/qw38-bench $(BUILD_DIR)/qw38-eval

@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "mode": "valid",
+  "fields": {
+    "final_hidden_f32_le_hex": "1ee32ebff3ef0b3e0f1ee8bea43b173f",
+    "final_normalized_f32_le_hex": "1d8452c076a6253febcd08c03a933a40",
+    "logits_f32_le_hex": "36c36d40807d6f40fd978f401617fc3ff1a236c0",
+    "gdn_state_f32_le_hex": "a43387be12f16335c2736fbe033f173a7aa076beb39140b8",
+    "attention_state_f32_le_hex": "4561a13fe432c5bc53f6163c98a44cbe000000006d920cc1",
+    "greedy_token": "261",
+    "gdn_slots_mutated": "18",
+    "attention_slots_mutated": "6",
+    "frontier": "1",
+    "layers_completed": "24",
+    "logit_count": "248320",
+    "prepared_values": "548672",
+    "state_values": "5167104",
+    "workspace_values": "81025"
+  }
+}

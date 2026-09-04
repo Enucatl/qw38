@@ -84,7 +84,11 @@ class Engine final {
   Engine& operator=(const Engine&) = delete;
 
   static Status open(const std::string& model_path, Engine* engine) noexcept;
+  static Status open(const std::string& model_path, std::size_t context,
+                     Engine* engine) noexcept;
   Status create_session(std::unique_ptr<Session>* session) const noexcept;
+  Status admitted_model(std::string* identity) const noexcept;
+  Status context_capacity(std::size_t* capacity) const noexcept;
   Status encode(const std::string& utf8,
                 std::vector<Token>* tokens) const noexcept;
   Status decode(const std::vector<Token>& tokens, bool skip_special_tokens,

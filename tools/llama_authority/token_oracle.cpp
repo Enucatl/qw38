@@ -246,7 +246,10 @@ int main(int argc, char** argv) {
   llama_backend_init();
 
   llama_model_params model_params = llama_model_default_params();
-  model_params.n_gpu_layers = -1;
+  const char* gpu_layers = std::getenv("QW38_LLAMA_N_GPU_LAYERS");
+  model_params.n_gpu_layers = gpu_layers == nullptr || *gpu_layers == '\0'
+                                  ? -1
+                                  : std::atoi(gpu_layers);
   model_params.check_tensors = true;
   const char* model_path = argv[trace_mode ? 2 : 1];
   const char* output_path = argv[trace_mode ? 3 : 2];

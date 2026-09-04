@@ -60,6 +60,27 @@ authentication still reads the complete artifact but now uses hardware-
 accelerated SHA-256 where available; see
 [Hardware-accelerated model authentication](docs/57-hardware-sha256.md).
 
+## Chat on a CPU MacBook
+
+This is an additive host path, not the v1 CUDA product. It runs the official
+Qwen3.5-2B Q4_K_M pin on Darwin/x86_64 with AVX2. It does not run Qwen3.8-27B,
+and the build never downloads weights. Place the converted GGUF at
+`models/Qwen3.5-2B-Q4_K_M.gguf` (see `pins/artifacts.lock.json` `cpu_model`).
+
+```sh
+make
+./build/qw38 models/Qwen3.5-2B-Q4_K_M.gguf \
+  --reasoning off --temperature 0 --ctx 4096 --max-tokens 64 \
+  --prompt "Reply with exactly: hello"
+```
+
+Default context is 4096 tokens (max 8192). **Measured** on this Intel
+MacBook (i7-8569U, 16 GiB): load 8.57 s, greedy decode 5.61 tok/s at prompt 64 /
+ctx 512, peak RSS 1.27 GiB. The 27B CUDA CLI remains the production path
+above. Geometry, tied embeddings, the 4K RSS budget, and the full measured
+table are in
+[CPU laptop inference for Qwen3.5-2B](docs/60-cpu-laptop-2b.md).
+
 ## Start the Chat Completions server
 
 The CUDA server exposes `GET /health`, `GET /v1/models`, and

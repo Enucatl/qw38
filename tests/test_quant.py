@@ -69,9 +69,9 @@ def test_quant_diagnostic_rejects_wrong_sizes_kinds_and_hex() -> None:
     assert wrong_size.returncode == 1
     assert "quant block has the wrong byte size" in wrong_size.stderr
 
-    wrong_kind = run_quant("q5_k", "00" * 144)
+    wrong_kind = run_quant("q3_k", "00" * 144)
     assert wrong_kind.returncode == 1
-    assert "quant kind must be q4_k, q6_k, or q8_0" in wrong_kind.stderr
+    assert "quant kind must be q4_k, q5_k, q6_k, or q8_0" in wrong_kind.stderr
 
     invalid_hex = run_quant("q4_k", "not-hex")
     assert invalid_hex.returncode == 1

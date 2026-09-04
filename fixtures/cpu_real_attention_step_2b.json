@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "mode": "valid",
+  "fields": {
+    "normalized_f32_le_hex": "d009a2bfb22c213ef2f4d73f29bfdebf",
+    "query_f32_le_hex": "3843b2be40675dbeba67d9bfb61b9abe6f8647bfaa770dbf788411bf",
+    "gate_f32_le_hex": "f1e42ebe147032beae6d0ebfebc0a73f1e5a0cc09d2fb9beb95427bf",
+    "key_cache_f32_le_hex": "9153fcbed346cdbffbc6bdbe884a31bfe6858bbf7ebc00bf5ffa2d3f81435ac0f4a5513f3652533d40ce293c92923e3f4af9e83fc370a93d64ba9cbe403777bf",
+    "value_cache_f32_le_hex": "64b7b6be9a88d0be1641c03e24b01c3eabe761bf1d84163f243cf2beea5884bd42f44ebe76d1933ea46db73de0cb2c3e135382bebc93483d5f2233bf8e170c3e",
+    "attention_output_f32_le_hex": "1f04dbbd40c49a3d6df60ebefb85003ebe88adbc797611beccbd3f3d",
+    "first_output_f32_le_hex": "2c679ebf414e09bfb4292f3fbad89a3f",
+    "mixer_output_f32_le_hex": "576ca03d07e8f23dc285a43dfdfde3bd",
+    "residual_output_f32_le_hex": "75f273bf0474793e5c48ba3fe03fbebf",
+    "kv_values": "2048"
+  }
+}

@@ -44,6 +44,8 @@ struct AssistantOutput final {
 };
 
 Status parse_chat_request(const Json& root, ChatRequest* request) noexcept;
+Status parse_chat_request(const Json& root, const char* model_id,
+                          ChatRequest* request) noexcept;
 AssistantOutput parse_assistant_output(const std::string& decoded,
                                        bool thinking,
                                        const std::vector<Json>* tool_schemas);

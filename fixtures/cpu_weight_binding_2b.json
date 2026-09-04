@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "fields": {
+    "bound_tensors": "320",
+    "gdn_layers": "18",
+    "attention_layers": "6",
+    "embedding_columns": "2048",
+    "embedding_rows": "248320",
+    "final_norm_values": "2048",
+    "logit_rows": "248320",
+    "tied_output": "1",
+    "output_shares_embedding": "1",
+    "final_norm_endpoints_f32_le_hex": "0000714000007740"
+  }
+}

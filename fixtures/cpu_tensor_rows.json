@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "model_sha256": "aaf42c8b7c3cab2bf3d69c355048d4a0ee9973d48f16c731c0520ee914699223",
+  "cases": [
+    {
+      "name": "token_embd.weight",
+      "row": 42,
+      "dtype": "Q6_K",
+      "columns": 2048,
+      "rows": 248320,
+      "row_bytes": 1680,
+      "row_sha256": "f3cf759b1fcfb01b9867e3d177c7a3d1aa69e04d2355079249c7e42fd87ca8f6",
+      "dot_f32_le_hex": "a6b9363e"
+    },
+    {
+      "name": "blk.0.attn_qkv.weight",
+      "row": 0,
+      "dtype": "Q5_K",
+      "columns": 2048,
+      "rows": 6144,
+      "row_bytes": 1408,
+      "row_sha256": "211795691f65ac6385e2eeedb4587fc2cea365f8fb17ff3231aad2bdefeae275",
+      "dot_f32_le_hex": "10359bbe"
+    },
+    {
+      "name": "blk.0.ffn_gate.weight",
+      "row": 0,
+      "dtype": "Q4_K",
+      "columns": 2048,
+      "rows": 6144,
+      "row_bytes": 1152,
+      "row_sha256": "23032b458dabc496c70af14276f2f724f314f6ef9d87e72de2ddb6a03c300d4f",
+      "dot_f32_le_hex": "fe0b11be"
+    }
+  ]
+}

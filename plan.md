@@ -232,4 +232,30 @@ Against both eligible llama.cpp and vLLM baselines, v1 requires:
 
 ## Approved Change Notes
 
-None.
+### 2026-09-02 — Additive Darwin/x86_64 CPU laptop track for Qwen3.5-2B
+
+This is an additive track. It does not replace v1 CUDA, loosen any RTX 5090
+gate, or change the pinned Qwen3.8-27B Q4_K_M identity.
+
+V1 remains Linux/x86-64 `sm_120` on one RTX 5090. In addition, Quartz may admit
+one second pinned dense `qwen35` artifact — official Qwen3.5-2B Q4_K_M — on the
+host scalar runtime for Darwin/x86_64 laptops without a GPU. The first measured
+target is a 16 GiB Intel Core i7 MacBook (AVX2, no Metal/OpenCL). Default host
+context is 4096 tokens. Tied embeddings are required. CUDA kernels stay
+27B-specialized.
+
+Still excluded from this track: Linux/Windows CPU product builds, Apple Silicon,
+AVX-512, BLAS, Iris/Metal, 4B/9B/27B-on-CPU, vision, MTP, and 128K laptop
+context. A later change note is required before generalizing to any CPU laptop.
+
+### 2026-09-02 — Additive 2B load/forward numeric gates
+
+This is an additive numeric-proof track for the Darwin Qwen3.5-2B host path. It
+does not change v1 CUDA, the RTX 5090 gates, or frozen 27B tap hex / llama
+fixtures.
+
+Quartz may freeze skip-if-missing 2B checks for GGUF bind, tokenizer IDs, one
+GDN layer, one attention layer, one FFN, one scalar token, AVX2-vs-scalar
+matvec, Q5_K decode, and a Darwin CPU llama.cpp same-GGUF logit comparison.
+Transformers-on-HF remains out of scope (it cannot catch GGUF load bugs).
+CUDA tasks are unchanged.

@@ -9054,10 +9054,10 @@
       "src/attention.cpp": "ff50aa9702a3eda3531e223d5d34be83fc771bdbec9075cf0068db7207497207",
       "src/conversion.cpp": "1610ed48b00fbae0fb68fded79c2f98f816da01e15175e75eb04f3a0199f0994",
       "src/gdn.cpp": "a59b4b5afff4bbef37ac1a652a0b940e57991d5f0b417d5db848afef2e2380b9",
-      "src/mixer.cpp": "f3f0cdea9707a9f8424d35f4f2354a5d9e774b79f4382d0d0073ed323c49d150",
-      "src/scalar_runtime.cpp": "1360353a67bba35ffb7401583bde0abe6c8ff1d2297d12d5a2a84497c99df2b0",
+      "src/mixer.cpp": "28c8de673ade76d83eca3eaa4a8e908702c50d064f56990637d914e76285a688",
+      "src/scalar_runtime.cpp": "77c002d52133399e01e9bb64b0369b63ddf506fcad1a3016097306fe208be3cd",
       "tools/compare_scalar_authorities.py": "f78a6dc6d947b8160a3bad564fa1c378a878cd1f47a04fc25ae0ee9bbc69f108",
-      "tools/llama_authority/token_oracle.cpp": "263b56873b804a799c33e8777757a3cceabc6574b204cf3bd9244baca352df76",
+      "tools/llama_authority/token_oracle.cpp": "7c95ad8a122b564a723d50bd4ca3757c3c2280a971538784a37c02952af709c4",
       "tools/transformers_taps.py": "519744f2863ab247e43eeafd20a7ffb01796e23c7ade51d7f735bdc8e6967bd6"
     },
     "model_gguf_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",

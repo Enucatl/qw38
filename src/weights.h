@@ -4,13 +4,14 @@
 #include <array>
 #include <cstddef>
 
+#include "geometry.h"
 #include "model.h"
 #include "qw38/status.h"
 #include "tensor.h"
 
 namespace qw38::internal {
 
-constexpr std::size_t kModelLayerCount = 64;
+constexpr std::size_t kModelLayerCount = kMaximumLayerCount;
 
 enum class LayerKind { kGdn, kAttention };
 
@@ -45,17 +46,20 @@ struct AttentionLayerWeights final {
 
 struct LayerWeights final {
   LayerKind kind = LayerKind::kGdn;
+  ModelGeometry geometry{};
   CommonLayerWeights common;
   GdnLayerWeights gdn;
   AttentionLayerWeights attention;
 };
 
 struct ModelWeights final {
+  ModelGeometry geometry{};
   TensorView token_embedding;
   VectorView output_norm;
   TensorView output;
   std::array<LayerWeights, kModelLayerCount> layers;
   std::size_t bound_tensor_count = 0;
+  std::size_t bound_layers = 0;
 };
 
 Status bind_model_weights(const ModelInfo& info, const MappedFile& mapping,

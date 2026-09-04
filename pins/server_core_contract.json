@@ -38,10 +38,10 @@
     "features": ["chat_completions", "request_json", "streaming", "tools", "active_cuda_cancellation"]
   },
   "local_sources": {
-    "Makefile": "688547d2d47384ddb4eed5eb983caf874f5df7bd3d126c64a0e741e1c7c79ece",
-    "README.md": "c1ffb0a208ee1d99dd64761a584dac69a93b352d693cd6ddb84aa9dfb754e3cd",
+    "Makefile": "67913fa289fcce8acd39ae371c0632ba45931a85e6172f1c5e8d88f6cf28af0e",
+    "README.md": "b2d8f4d064311c5f84545bcc7fa1c9c1f528746daa7e99684c0b90bdf9230e73",
     ".gitignore": "961084adb4dd1a3c4bde4776aa337d8fa66e2d66e87d98f0f9e75a7e7bfa00ad",
-    "src/server.cpp": "2ebed4026d06edb57f858dc34ec897a96f517e228eee5beabffdca9f6382b62c",
+    "src/server.cpp": "698460efd77edd5ead3b710c6dcdf61b1609b688596f40c651cee2e922a2cd43",
     "src/server_core.cpp": "94b2df61560d8aa0fa777cd8588faa30a16b658e4ed2faaf57279160671f3db2",
     "src/server_core.h": "930a8e8ac6914f80a77e7194fa47023ff0b333bdff759279306220707fa870e8",
     "src/server_core_test.cpp": "754796d5836452e1fa80924676325e34f0f524996e9b848040469e639288d518",

@@ -169,9 +169,9 @@ def main() -> None:
     parser.add_argument("--native-stdout", type=Path, required=True)
     parser.add_argument("--llama-stdout", type=Path, required=True)
     parser.add_argument("--contract", type=Path, required=True)
-    parser.add_argument("--template-bytes", type=Path, required=True)
-    parser.add_argument("--native-template-ids", type=Path, required=True)
-    parser.add_argument("--llama-template-stdout", type=Path, required=True)
+    parser.add_argument("--template-bytes", type=Path, default=None)
+    parser.add_argument("--native-template-ids", type=Path, default=None)
+    parser.add_argument("--llama-template-stdout", type=Path, default=None)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     document = compare(

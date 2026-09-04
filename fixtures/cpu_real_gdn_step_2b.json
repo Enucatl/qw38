@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "mode": "valid",
+  "fields": {
+    "normalized_f32_le_hex": "6c1ae5bfae0df1be8398d83db606bd3f",
+    "convolved_f32_le_hex": "93b2073c8fb48f3caf8f21bb2acb3b3a0fc03bb9b3acd0bc1dc3833b213be1ba6c5957bacf895039",
+    "value_grouped_f32_le_hex": "0fc03bb9b3acd0bc6c5957bacf895039ea9563baf7b3bbbb",
+    "gate_controls_f32_le_hex": "281480bee464bf3f9f00febe4d13a4bf",
+    "log_decay_f32_le_hex": "1d4f2cc0ae5ee5bae63e8ac0b1a22aba",
+    "update_gate_f32_le_hex": "ae6c073f6bd2033f88e05e3f6c0eaf3e",
+    "recurrent_output_f32_le_hex": "869205b3717594b6bbb197b47fe592338aa12a37aeba8c38",
+    "gated_grouped_f32_le_hex": "86015736d4061b3a9ce86538f293a8b6c2429c3b9b584c3d",
+    "mixer_output_f32_le_hex": "5aafa83b2c810ebc97f520bc960eb2bb",
+    "residual_output_f32_le_hex": "5157c7bf0974d4be2a7c553ff14d9f3f",
+    "convolution_state_f32_le_hex": "0000000000000000000000008c0d9ebe0000000000000000000000001006f43d",
+    "recurrent_state_f32_le_hex": "506099353d782a39032646b836a1bbb79b7b9bb26f8b5c379ee7beb9"
+  }
+}

@@ -127,6 +127,49 @@ Status decode_q4_k(const std::uint8_t* block, std::size_t block_bytes,
   return Status::ok();
 }
 
+Status decode_q5_k(const std::uint8_t* block, std::size_t block_bytes,
+                   float* output, std::size_t output_count) noexcept {
+  Status status =
+      validate(block, block_bytes, kQ5KBlockBytes, output, output_count,
+               kQuantBlockValues);
+  if (!status.is_ok()) return status;
+  const float d = half_to_float(read_u16_le(block));
+  const float dmin = half_to_float(read_u16_le(block + 2));
+  const std::uint8_t* packed = block + 4;
+  const std::uint8_t* high = block + 16;
+  const std::uint8_t* quants = block + 48;
+  std::uint8_t low_bit = 1;
+  std::uint8_t high_bit = 2;
+  std::size_t output_offset = 0;
+  for (std::size_t group = 0; group < 4; ++group) {
+    std::uint8_t low_scale = 0;
+    std::uint8_t low_minimum = 0;
+    std::uint8_t high_scale = 0;
+    std::uint8_t high_minimum = 0;
+    q4_scale_min(packed, group * 2, &low_scale, &low_minimum);
+    q4_scale_min(packed, group * 2 + 1, &high_scale, &high_minimum);
+    const float low_d = d * static_cast<float>(low_scale);
+    const float low_min = dmin * static_cast<float>(low_minimum);
+    const float high_d = d * static_cast<float>(high_scale);
+    const float high_min = dmin * static_cast<float>(high_minimum);
+    for (std::size_t lane = 0; lane < 32; ++lane) {
+      const int low_quant = static_cast<int>(quants[lane] & 15U) +
+                            ((high[lane] & low_bit) != 0 ? 16 : 0);
+      const int high_quant = static_cast<int>(quants[lane] >> 4U) +
+                             ((high[lane] & high_bit) != 0 ? 16 : 0);
+      output[output_offset + lane] =
+          low_d * static_cast<float>(low_quant) - low_min;
+      output[output_offset + 32 + lane] =
+          high_d * static_cast<float>(high_quant) - high_min;
+    }
+    quants += 32;
+    output_offset += 64;
+    low_bit = static_cast<std::uint8_t>(low_bit << 2U);
+    high_bit = static_cast<std::uint8_t>(high_bit << 2U);
+  }
+  return Status::ok();
+}
+
 Status decode_q6_k(const std::uint8_t* block, std::size_t block_bytes,
                    float* output, std::size_t output_count) noexcept {
   Status status =
@@ -195,6 +238,16 @@ Status dot_q4_k(const std::uint8_t* block, std::size_t block_bytes,
                 float* output) noexcept {
   std::array<float, kQuantBlockValues> values{};
   Status status = decode_q4_k(block, block_bytes, values.data(), values.size());
+  if (!status.is_ok()) return status;
+  return dot_decoded(values.data(), activation, activation_count,
+                     kQuantBlockValues, output);
+}
+
+Status dot_q5_k(const std::uint8_t* block, std::size_t block_bytes,
+                const float* activation, std::size_t activation_count,
+                float* output) noexcept {
+  std::array<float, kQuantBlockValues> values{};
+  Status status = decode_q5_k(block, block_bytes, values.data(), values.size());
   if (!status.is_ok()) return status;
   return dot_decoded(values.data(), activation, activation_count,
                      kQuantBlockValues, output);

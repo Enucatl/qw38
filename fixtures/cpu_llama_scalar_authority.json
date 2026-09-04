@@ -1,0 +1,152 @@
+{
+  "admission_status": "reporting_only_tolerances_frozen_for_2b_cpu",
+  "authority": "pinned llama.cpp same-GGUF independent oracle",
+  "comparison_direction": {
+    "actual": "Quartz scalar CPU (QW38_SCALAR_MATVEC=1)",
+    "expected": "llama.cpp Darwin CPU"
+  },
+  "comparisons": [
+    {
+      "input_token": 42,
+      "llama_greedy_token": 261,
+      "metrics": {
+        "actual_non_finite": {
+          "nan": 0,
+          "negative_infinity": 0,
+          "positive_infinity": 0
+        },
+        "cosine_similarity": 0.9982703794728327,
+        "count": 248320,
+        "expected_non_finite": {
+          "nan": 0,
+          "negative_infinity": 0,
+          "positive_infinity": 0
+        },
+        "first_failing_index": 0,
+        "maximum_absolute_error": 0.6563644409179688,
+        "maximum_absolute_error_index": 13708,
+        "maximum_relative_error": 5655.688679245283,
+        "maximum_relative_error_index": 188931,
+        "passed": false,
+        "root_mean_square_error": 0.1315520481341049,
+        "top_logits": {
+          "actual_token_ids": [
+            261,
+            75,
+            1322,
+            299,
+            46649,
+            308,
+            273,
+            570,
+            985,
+            505
+          ],
+          "common_token_count": 10,
+          "exact_order": false,
+          "expected_token_ids": [
+            261,
+            75,
+            1322,
+            299,
+            985,
+            308,
+            273,
+            46649,
+            505,
+            570
+          ],
+          "k": 10,
+          "largest_union_delta": 0.4307527542114258,
+          "largest_union_delta_token_id": 1322
+        }
+      },
+      "position": 0,
+      "quartz_greedy_token": 261
+    },
+    {
+      "input_token": 3649,
+      "llama_greedy_token": 8454,
+      "metrics": {
+        "actual_non_finite": {
+          "nan": 0,
+          "negative_infinity": 0,
+          "positive_infinity": 0
+        },
+        "cosine_similarity": 0.998576896022499,
+        "count": 248320,
+        "expected_non_finite": {
+          "nan": 0,
+          "negative_infinity": 0,
+          "positive_infinity": 0
+        },
+        "first_failing_index": 0,
+        "maximum_absolute_error": 0.545793890953064,
+        "maximum_absolute_error_index": 231138,
+        "maximum_relative_error": 3677.8579234972676,
+        "maximum_relative_error_index": 128551,
+        "passed": false,
+        "root_mean_square_error": 0.11069185894137161,
+        "top_logits": {
+          "actual_token_ids": [
+            8454,
+            8808,
+            88,
+            1917,
+            2481,
+            1277,
+            78645,
+            3031,
+            6368,
+            7509
+          ],
+          "common_token_count": 8,
+          "exact_order": false,
+          "expected_token_ids": [
+            8454,
+            88,
+            8808,
+            1917,
+            2481,
+            1277,
+            78645,
+            3031,
+            198883,
+            1134
+          ],
+          "k": 10,
+          "largest_union_delta": 0.2770843505859375,
+          "largest_union_delta_token_id": 8454
+        }
+      },
+      "position": 1,
+      "quartz_greedy_token": 8454
+    }
+  ],
+  "input_tokens": [
+    42,
+    3649
+  ],
+  "llama_source": {
+    "license": "MIT",
+    "repository": "https://github.com/ggml-org/llama.cpp.git",
+    "revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328"
+  },
+  "llama_version": "0.3.0-dev",
+  "logits": {
+    "dtype": "float32",
+    "endianness": "little",
+    "llama_sha256": "cff03959d7285581ab4e13ec3f6917431cef5ed6408febf5517eca11d0a10577",
+    "native_sha256": "95fa183a0ffc8888a91e2ed5cc025e0f3939472455b525bdd86afc1d22b7471b",
+    "row_count": 2,
+    "row_width": 248320
+  },
+  "model": {
+    "bytes": 1280835840,
+    "filename": "Qwen3.5-2B-Q4_K_M.gguf",
+    "sha256": "aaf42c8b7c3cab2bf3d69c355048d4a0ee9973d48f16c731c0520ee914699223"
+  },
+  "proof_limit": "independent same-GGUF logits and greedy continuation only; Transformers semantic authority and frozen tolerances remain ORA-003/ORA-004",
+  "schema_version": 1,
+  "vocabulary_size": 248320
+}

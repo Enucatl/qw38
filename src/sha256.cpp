@@ -11,6 +11,10 @@
 
 #include <dlfcn.h>
 
+#if defined(__APPLE__)
+#include <CommonCrypto/CommonDigest.h>
+#endif
+
 namespace qw38::internal {
 namespace {
 
@@ -171,17 +175,32 @@ struct CryptoApi final {
   using DigestFinal = int (*)(void*, unsigned char*, unsigned int*);
 
   CryptoApi() noexcept {
-    handle = dlopen("libcrypto.so.3", RTLD_NOW | RTLD_LOCAL);
-    if (handle == nullptr) return;
-    available = load_symbol(handle, "EVP_MD_CTX_new", &context_new) &&
-                load_symbol(handle, "EVP_MD_CTX_free", &context_free) &&
-                load_symbol(handle, "EVP_sha256", &sha256) &&
-                load_symbol(handle, "EVP_DigestInit_ex", &digest_init) &&
-                load_symbol(handle, "EVP_DigestUpdate", &digest_update) &&
-                load_symbol(handle, "EVP_DigestFinal_ex", &digest_final);
-    if (!available) {
+    static const char* const kCandidates[] = {
+#if defined(__APPLE__)
+        nullptr
+#else
+        "libcrypto.so.3"
+#endif
+    };
+    for (const char* name : kCandidates) {
+      if (name == nullptr) break;
+      handle = dlopen(name, RTLD_NOW | RTLD_LOCAL);
+      if (handle == nullptr) continue;
+      available = load_symbol(handle, "EVP_MD_CTX_new", &context_new) &&
+                  load_symbol(handle, "EVP_MD_CTX_free", &context_free) &&
+                  load_symbol(handle, "EVP_sha256", &sha256) &&
+                  load_symbol(handle, "EVP_DigestInit_ex", &digest_init) &&
+                  load_symbol(handle, "EVP_DigestUpdate", &digest_update) &&
+                  load_symbol(handle, "EVP_DigestFinal_ex", &digest_final);
+      if (available) return;
       dlclose(handle);
       handle = nullptr;
+      context_new = nullptr;
+      context_free = nullptr;
+      sha256 = nullptr;
+      digest_init = nullptr;
+      digest_update = nullptr;
+      digest_final = nullptr;
     }
   }
 
@@ -214,16 +233,25 @@ bool force_portable() noexcept {
 
 class Sha256 final {
  public:
+  enum class Backend : std::uint8_t { kPortable, kOpenSsl, kCommonCrypto };
+
   Sha256() noexcept : api_(&crypto_api()) {
-    if (force_portable() || !api_->available) return;
-    context_ = api_->context_new();
-    if (context_ != nullptr &&
-        api_->digest_init(context_, api_->sha256(), nullptr) == 1) {
-      accelerated_ = true;
-      return;
+    if (force_portable()) return;
+    if (api_->available) {
+      context_ = api_->context_new();
+      if (context_ != nullptr &&
+          api_->digest_init(context_, api_->sha256(), nullptr) == 1) {
+        backend_ = Backend::kOpenSsl;
+        return;
+      }
+      if (context_ != nullptr) api_->context_free(context_);
+      context_ = nullptr;
     }
-    if (context_ != nullptr) api_->context_free(context_);
-    context_ = nullptr;
+#if defined(__APPLE__)
+    if (CC_SHA256_Init(&common_crypto_) == 1) {
+      backend_ = Backend::kCommonCrypto;
+    }
+#endif
   }
 
   ~Sha256() {
@@ -234,33 +262,53 @@ class Sha256 final {
   Sha256& operator=(const Sha256&) = delete;
 
   bool update(const unsigned char* data, std::size_t size) noexcept {
-    if (accelerated_) return api_->digest_update(context_, data, size) == 1;
+    if (backend_ == Backend::kOpenSsl) {
+      return api_->digest_update(context_, data, size) == 1;
+    }
+#if defined(__APPLE__)
+    if (backend_ == Backend::kCommonCrypto) {
+      return CC_SHA256_Update(&common_crypto_, data,
+                              static_cast<CC_LONG>(size)) == 1;
+    }
+#endif
     portable_.update(data, size);
     return true;
   }
 
   bool finish(std::string* digest) noexcept {
-    if (!accelerated_) {
+    if (backend_ == Backend::kPortable) {
       *digest = hex_digest(portable_.finish());
       return true;
     }
     std::array<unsigned char, 32> bytes{};
-    unsigned int size = 0;
-    if (api_->digest_final(context_, bytes.data(), &size) != 1 ||
-        size != bytes.size()) {
-      return false;
+    if (backend_ == Backend::kOpenSsl) {
+      unsigned int size = 0;
+      if (api_->digest_final(context_, bytes.data(), &size) != 1 ||
+          size != bytes.size()) {
+        return false;
+      }
+      *digest = hex_digest(bytes.data(), bytes.size());
+      return true;
     }
+#if defined(__APPLE__)
+    if (CC_SHA256_Final(bytes.data(), &common_crypto_) != 1) return false;
     *digest = hex_digest(bytes.data(), bytes.size());
     return true;
+#else
+    return false;
+#endif
   }
 
-  bool accelerated() const noexcept { return accelerated_; }
+  Backend backend() const noexcept { return backend_; }
 
  private:
   CryptoApi* api_;
   void* context_ = nullptr;
-  bool accelerated_ = false;
+  Backend backend_ = Backend::kPortable;
   PortableSha256 portable_;
+#if defined(__APPLE__)
+  CC_SHA256_CTX common_crypto_{};
+#endif
 };
 
 }  // namespace
@@ -338,7 +386,9 @@ Status sha256_bytes(const unsigned char* data, std::size_t size,
 
 const char* sha256_backend_name() noexcept {
   Sha256 hash;
-  return hash.accelerated() ? "openssl-evp" : "portable";
+  if (hash.backend() == Sha256::Backend::kOpenSsl) return "openssl-evp";
+  if (hash.backend() == Sha256::Backend::kCommonCrypto) return "commoncrypto";
+  return "portable";
 }
 
 }  // namespace qw38::internal

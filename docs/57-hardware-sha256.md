@@ -63,6 +63,12 @@ The production container includes OpenSSL 3.0.13 through its immutable base
 image. Quartz dynamically resolves the ABI, so CPU-only compilation does not
 require OpenSSL development headers.
 
+On Darwin/x86_64 host builds, the same diagnostic may report `commoncrypto`
+(Apple Common Crypto) or `openssl-evp` if Homebrew `libcrypto` is present.
+`QW38_SHA256_FORCE_PORTABLE=1` still selects the portable fallback. That Darwin
+path authenticates the additive Qwen3.5-2B laptop pin; it does not replace the
+Linux container measurement in this chapter.
+
 ## Portable fallback
 
 The self-contained implementation remains a **portable fallback**. It is used

@@ -25,6 +25,7 @@ struct ScalarModelParameters final {
   ScalarModelParameters(ScalarModelParameters&&) noexcept = default;
   ScalarModelParameters& operator=(ScalarModelParameters&&) noexcept = default;
 
+  ModelGeometry geometry{};
   std::vector<float> input_norms;
   std::vector<float> ffn_norms;
   std::vector<float> gdn_convolution;
@@ -47,6 +48,7 @@ struct ScalarSessionState final {
   ScalarSessionState(ScalarSessionState&&) noexcept = default;
   ScalarSessionState& operator=(ScalarSessionState&&) noexcept = default;
 
+  ModelGeometry geometry{};
   std::vector<float> gdn_convolution;
   std::vector<float> gdn_recurrent;
   std::vector<float> attention_key;
@@ -64,6 +66,7 @@ struct ScalarWorkspace final {
   ScalarWorkspace(ScalarWorkspace&&) noexcept = default;
   ScalarWorkspace& operator=(ScalarWorkspace&&) noexcept = default;
 
+  ModelGeometry geometry{};
   std::vector<float> activation_a;
   std::vector<float> activation_b;
   std::vector<float> post_mixer;
@@ -123,8 +126,14 @@ Status prepare_scalar_model_parameters(
 
 Status create_scalar_session_state(std::size_t capacity,
                                    ScalarSessionState* state) noexcept;
+Status create_scalar_session_state(const ModelGeometry& geometry,
+                                   std::size_t capacity,
+                                   ScalarSessionState* state) noexcept;
 
 Status create_scalar_workspace(std::size_t capacity,
+                               ScalarWorkspace* workspace) noexcept;
+Status create_scalar_workspace(const ModelGeometry& geometry,
+                               std::size_t capacity,
                                ScalarWorkspace* workspace) noexcept;
 
 Status execute_scalar_token(const ModelWeights& weights,

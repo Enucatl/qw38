@@ -121,6 +121,21 @@ are repository-relative unless stated otherwise.
 | EDU-043 | Explain the HTTP listener, routes, single-flight queue, cancellation, and server lifecycle for beginners | SRV-001, DOC-001 | done | Sockets, HTTP requests/responses, loopback binding, health/models payloads, queue tickets/timing, cancellation, one-session ownership, shutdown, exclusions, and proof limits are code-linked and worked | [`docs/58-http-server-core.md`](docs/58-http-server-core.md); [`pins/server_core_contract.json`](pins/server_core_contract.json); [`fixtures/server_core.json`](fixtures/server_core.json); log 2026-09-01T18:19:42Z |
 | EDU-044 | Explain JSON, Chat Completions, SSE streaming, tools, stops, usage, queueing, and cancellation for beginners | SRV-002, API-002, DOC-001 | done | Request/response fields, validation, token generation, reasoning/content separation, function calls, stream events, stop behavior, session reuse, and proof limits are code-linked and worked | [`docs/59-chat-completions.md`](docs/59-chat-completions.md); [`pins/chat_completions_contract.json`](pins/chat_completions_contract.json); [`fixtures/chat_completions.json`](fixtures/chat_completions.json); log 2026-09-01T19:00:04Z |
 | REL-001 | Publish reproducible release evidence bundle | CMP-003, QLT-001, DOC-001 | pending | Builds, hashes, raw results, reports, and documentation claims reconcile | — |
+| MAC-001 | Make the restricted host build and pytest suite green on Darwin/x86_64 without the 27B GGUF | BLD-001, MDL-003 | done | `make` and host pytest pass on the Intel MacBook with Clang; SHA-256 backend is explicit; CUDA tests remain skipped | [`Makefile`](Makefile); [`src/sha256.cpp`](src/sha256.cpp); [`tests/test_build.py`](tests/test_build.py); log 2026-09-02T16:40:00Z |
+| MAC-002 | Pin official Qwen3.5-2B Q4_K_M identity, contract, and tensor inventory | PIN-001, MAC-001 | done | Source revision, filename, bytes, SHA-256, 2B shapes, tied embeddings, and admitted tensor roles are checked in; weights are not committed | [`pins/cpu_laptop_contract.json`](pins/cpu_laptop_contract.json); [`pins/cpu_tensor_inventory.json`](pins/cpu_tensor_inventory.json); [`pins/artifacts.lock.json`](pins/artifacts.lock.json); log 2026-09-02T16:40:00Z |
+| MAC-003 | Parameterize the host scalar stack with ModelGeometry while leaving CUDA 27B kernels untouched | MAC-002, CPU-016 | done | 27B scalar/CUDA paths keep their frozen sizes; 2B GDN/attention/FFN/logits execute from geometry; host-only sources change | [`src/geometry.h`](src/geometry.h); [`src/scalar_runtime.cpp`](src/scalar_runtime.cpp); [`src/mixer.cpp`](src/mixer.cpp); log 2026-09-02T16:40:00Z |
+| MAC-004 | Bind tied output projections when `output.weight` is absent | MAC-003 | done | 2B logits use `token_embd.weight`; 27B continues to require a separate output tensor | [`src/weights.cpp`](src/weights.cpp); [`pins/cpu_tensor_inventory.json`](pins/cpu_tensor_inventory.json); log 2026-09-02T16:40:00Z |
+| MAC-005 | Implement host Engine/Session on the scalar runtime for the 2B pin | MAC-003, MAC-004, API-001 | done | `open`/`create_session`/`sync`/`eval`/`sample`/`logits` work on Darwin for the 2B artifact; 27B host sessions stay unimplemented | [`src/engine.cpp`](src/engine.cpp); [`include/qw38/engine.h`](include/qw38/engine.h); log 2026-09-02T16:40:00Z |
+| MAC-006 | Enforce a 4K host memory budget and fail closed above the laptop RSS reserve | MAC-005 | done | Host sessions allocate at most 4096 context; documented budget leaves macOS headroom; 128K host KV is rejected | [`src/engine.cpp`](src/engine.cpp); [`src/geometry.h`](src/geometry.h); log 2026-09-02T16:40:00Z |
+| MAC-007 | Add AVX2 Q4_K/Q8_0 dots and 4-thread matvec; keep scalar decode as the numeric oracle | MAC-005, CPU-001 | done | SIMD/threaded matvec matches scalar dots within frozen tolerances; decode throughput is measured on this MacBook | [`src/tensor.cpp`](src/tensor.cpp); [`src/quant.cpp`](src/quant.cpp); log 2026-09-02T16:40:00Z |
+| MAC-008 | Implement host session checkpoints distinct from the CUDA checkpoint blob | MAC-005, SES-003 | done | Atomic save/restore round-trips tokens, GDN state, KV, and sampler fields for the 2B host session | [`src/host_checkpoint.cpp`](src/host_checkpoint.cpp); log 2026-09-02T16:40:00Z |
+| MAC-009 | Enable the text CLI and Chat Completions model id on the 2B host runtime | MAC-005, MAC-008, CLI-001 | done | `qw38` chats with `--ctx 4096`; server admits `qwen3.5-2b-q4_k_m` only when that artifact is open | [`src/cli.cpp`](src/cli.cpp); [`src/server.cpp`](src/server.cpp); [`tests/test_cpu_laptop.py`](tests/test_cpu_laptop.py); log 2026-09-02T16:40:00Z |
+| MAC-010 | Record measured load/TTFT/decode/RSS evidence on the Intel MacBook | MAC-006, MAC-007, MAC-009 | done | Ledger retains compiler, CPU, RAM, hashes, tok/s, and RSS; claims are labeled measured | [`docs/60-cpu-laptop-2b.md`](docs/60-cpu-laptop-2b.md); log 2026-09-02T16:40:00Z |
+| DOC-CPU-001 | Document the Darwin 2B CPU laptop track in the handbook and README | MAC-010, DOC-001 | done | Geometry, tied embeddings, 4K budget, AVX2 proof limits, and this MacBook’s measurements are code-linked | [`docs/60-cpu-laptop-2b.md`](docs/60-cpu-laptop-2b.md); [`README.md`](README.md); log 2026-09-02T16:40:00Z |
+| MAC-011 | Pin Q5_K decode/dot and AVX2-vs-scalar matvec tolerances for 2B widths | MAC-007, CPU-001 | done | Q5_K fixtures pass `--check-quant`; rows≥256 Q8-activation matvec matches scalar within frozen max-abs/RMS | [`fixtures/cpu_q5_k_authority.json`](fixtures/cpu_q5_k_authority.json); [`fixtures/cpu_avx2_matvec_tolerance.json`](fixtures/cpu_avx2_matvec_tolerance.json); log 2026-09-02T10:35:00Z |
+| MAC-012 | Freeze 2B bind, tokenizer, GDN, attention, FFN, and full-token structural taps | MAC-003, MAC-004, MAC-011 | done | Skip-if-missing pytest compares live `qw38-eval` to frozen 2B fixtures; 27B real-* tests still skip without 27B | [`tests/test_cpu_numeric.py`](tests/test_cpu_numeric.py); log 2026-09-02T10:35:00Z |
+| MAC-013 | Compare 2B scalar logits to Darwin CPU llama.cpp on the same GGUF | MAC-012, ORA-002 | done | Checked-in metrics retain vocab, greedy IDs, and error envelopes; pytest does not rebuild llama.cpp | [`fixtures/cpu_llama_scalar_authority.json`](fixtures/cpu_llama_scalar_authority.json); [`tools/build_llama_cpu_oracle.sh`](tools/build_llama_cpu_oracle.sh); log 2026-09-02T10:35:00Z |
+| DOC-CPU-002 | Document the 2B numeric proof ladder in the CPU laptop handbook | MAC-013, DOC-CPU-001 | done | Scalar vs AVX2, llama same-GGUF, skip-if-missing, and GGUF-load vs HF-Transformers limits are code-linked | [`docs/60-cpu-laptop-2b.md`](docs/60-cpu-laptop-2b.md); log 2026-09-02T10:35:00Z |
 
 ## Delivery-Gate Mapping
 
@@ -138,6 +153,7 @@ are repository-relative unless stated otherwise.
 | 10. Product tools/API/quality | CLI-001, SRV-001–SRV-003, BEN-001, EVAL-001, QLT-001 |
 | 11. Comparative speed | CMP-001–CMP-003 |
 | 12. Documentation/release | DOC-001, REL-001 |
+| Additive Darwin 2B CPU laptop | MAC-001–MAC-013, DOC-CPU-001, DOC-CPU-002 |
 
 ## Chronological UTC Log
 
@@ -3174,3 +3190,54 @@ are repository-relative unless stated otherwise.
   root; after fixing that harness issue, the admitted-row oracle decoded only
   the first block of a multi-block Q4 row. Walking every block resolved the
   mismatch without changing native tensor code or expected arithmetic order.
+
+### 2026-09-02T02:29:04Z — Additive Darwin/x86_64 Qwen3.5-2B CPU laptop track opened
+
+- Recorded an approved plan.md change note: v1 CUDA/27B is unchanged; a second
+  pinned official Qwen3.5-2B Q4_K_M artifact may run on the host scalar runtime
+  for this Intel MacBook (16 GiB, AVX2). Default host context is 4096.
+- Entered MAC-001–MAC-010 and DOC-CPU-001 as pending before implementation.
+- No CUDA task status changed. 27B tests remain skip-if-missing.
+
+### 2026-09-02T16:40:00Z — MAC-001–MAC-010 and DOC-CPU-001 done
+
+- Darwin/x86_64 host `make` and pytest are green without the 27B GGUF (Apple
+  Clang 17.0.0, SHA-256 backend `commoncrypto`, CUDA tests skipped).
+- Pinned `models/Qwen3.5-2B-Q4_K_M.gguf` is not committed: 1280835840 bytes,
+  SHA-256 `aaf42c8b7c3cab2bf3d69c355048d4a0ee9973d48f16c731c0520ee914699223`,
+  source `Qwen/Qwen3.5-2B` revision `15852e8c16360a2fea060d615a32b45270f8a8fc`.
+  The admitted file is an Unsloth Q4_K_M mix that includes Q5_K; mmproj is
+  rejected. Inventory: 320 tensors, tied embeddings, no `output.weight`.
+- Host `Engine`/`Session` run the parameterized scalar stack for geometry
+  identity 2. 27B still fails closed on Darwin. CUDA `.cu` kernels were not
+  changed. Host checkpoints use magic `QW38CPU1`.
+- **Measured** on Intel Core i7-8569U @ 2.80 GHz, 4 cores / 8 threads, 16 GiB,
+  AVX2: load 8.57 s, TTFT 11.83 s at 64 prompt tokens and 25.49 s at 128,
+  greedy decode **5.61 tok/s** (prompt 64, 16 generated, ctx 512), peak RSS
+  1366302720 bytes. Eight SMT matvec workers. The proposed ≥ 8 tok/s decode
+  gate was not reached; the frozen laptop claim is this measured 5.61 tok/s.
+- CLI smoke (`QW38_RUN_CPU_SMOKE=1`) returned `assistant> hello`. No CUDA
+  task status changed.
+
+### 2026-09-02T10:05:00Z — Additive 2B load/forward numeric gates opened
+
+- Recorded a plan.md change note: freeze skip-if-missing 2B bind/tokenizer/
+  GDN/attention/FFN/token taps, Q5_K and AVX2-vs-scalar matvec, and Darwin CPU
+  llama.cpp same-GGUF logits. Transformers-on-HF stays out of scope.
+- Entered MAC-011–MAC-013 and DOC-CPU-002 as pending before implementation.
+- No CUDA task status changed. Frozen 27B tap hex is not regenerated.
+
+### 2026-09-02T10:35:00Z — MAC-011–MAC-013 and DOC-CPU-002 done
+
+- Q5_K `--check-quant` and rows≥256 AVX2-vs-scalar matvec envelopes are frozen.
+  Inventory row SHA/dots cover token_embd Q6_K, GDN Q5_K, and FFN Q4_K.
+- Skip-if-missing 2B bind (320 tensors, tied output), tokenizer IDs, GDN 0,
+  attention 3, FFN 0, and one scalar token (`layers_completed=24`,
+  `logit_count=248320`) compare live `qw38-eval` (`QW38_SCALAR_MATVEC=1`) to
+  frozen hex. 27B real-* tests still skip without the 27B GGUF.
+- Darwin CPU llama.cpp (`GGML_CUDA=OFF`, pin `cc83d7b…`) same-GGUF logits on
+  tokens `[42, 3649]` match Quartz scalar greedy IDs 261 and 8454. Cosine
+  ≈ 0.998. Pytest reads `fixtures/cpu_llama_scalar_authority.json` and does
+  not rebuild llama.cpp.
+- Handbook proof ladder records scalar vs AVX2, llama same-GGUF, skip-if-missing,
+  and Transformers-on-HF out of scope. No CUDA task status changed.

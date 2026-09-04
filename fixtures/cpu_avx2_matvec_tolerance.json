@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "path": "AVX2 Q8-activation matvec versus scalar tensor_row_dot",
+  "force_scalar_environment": "QW38_SCALAR_MATVEC=1",
+  "cases": [
+    {
+      "kind": "q4_k",
+      "columns": 2048,
+      "rows": 256,
+      "maximum_absolute_error": 7.1363525390625,
+      "root_mean_square_error": 7.1363525390625
+    },
+    {
+      "kind": "q5_k",
+      "columns": 2048,
+      "rows": 256,
+      "maximum_absolute_error": 17.34197998046875,
+      "root_mean_square_error": 17.34197998046875
+    },
+    {
+      "kind": "q6_k",
+      "columns": 2048,
+      "rows": 256,
+      "maximum_absolute_error": 29.88818359375,
+      "root_mean_square_error": 29.88818359375
+    },
+    {
+      "kind": "q4_k",
+      "columns": 6144,
+      "rows": 256,
+      "maximum_absolute_error": 7.49310302734375,
+      "root_mean_square_error": 7.49310302734375
+    },
+    {
+      "kind": "q5_k",
+      "columns": 6144,
+      "rows": 256,
+      "maximum_absolute_error": 76.90875244140625,
+      "root_mean_square_error": 76.90875244140625
+    }
+  ]
+}

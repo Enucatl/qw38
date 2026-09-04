@@ -1,0 +1,38 @@
+{
+  "version": 1,
+  "build": {
+    "cmake": {
+      "CMAKE_BUILD_TYPE": "Release",
+      "GGML_CUDA": false,
+      "GGML_METAL": false,
+      "GGML_BLAS": false,
+      "GGML_NATIVE": true,
+      "LLAMA_BUILD_EXAMPLES": true,
+      "LLAMA_BUILD_TESTS": false,
+      "LLAMA_CURL": false
+    },
+    "script": "tools/build_llama_cpu_oracle.sh",
+    "targets": [
+      "llama-eval-callback",
+      "qw38-llama-token-oracle"
+    ],
+    "n_gpu_layers_environment": "QW38_LLAMA_N_GPU_LAYERS=0"
+  },
+  "diagnostic": {
+    "input_tokens": [42, 3649],
+    "logits_dtype": "float32",
+    "logits_endianness": "little",
+    "source": "tools/llama_authority/token_oracle.cpp",
+    "scalar_matvec_environment": "QW38_SCALAR_MATVEC=1"
+  },
+  "model": {
+    "bytes": 1280835840,
+    "filename": "Qwen3.5-2B-Q4_K_M.gguf",
+    "sha256": "aaf42c8b7c3cab2bf3d69c355048d4a0ee9973d48f16c731c0520ee914699223"
+  },
+  "source": {
+    "license": "MIT",
+    "repository": "https://github.com/ggml-org/llama.cpp.git",
+    "revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328"
+  }
+}

@@ -24,6 +24,7 @@ struct Options final {
   qw38::ChatOptions chat;
   qw38::SamplerConfig sampler;
   std::size_t max_tokens = 256;
+  std::size_t context = 0;
 };
 
 void usage(std::ostream& output) {
@@ -33,6 +34,7 @@ void usage(std::ostream& output) {
       << "  --system TEXT          initial system instruction\n"
       << "  --reasoning MODE       off, low, medium, or xhigh\n"
       << "  --max-tokens N         generated token limit (default 256)\n"
+      << "  --ctx N                host context tokens (default 4096, max 8192)\n"
       << "  --temperature F        0 selects greedy decoding (default 0)\n"
       << "  --top-p F              nucleus probability in (0,1] (default 1)\n"
       << "  --top-k N              candidate limit; 0 means unlimited\n"
@@ -93,6 +95,11 @@ bool parse_options(int argc, char** argv, Options* options) {
     else if (argument == "--stop") options->stops.emplace_back(value);
     else if (argument == "--max-tokens") {
       if (!parse_size(value, &options->max_tokens) || options->max_tokens == 0) {
+        return false;
+      }
+    } else if (argument == "--ctx") {
+      if (!parse_size(value, &options->context) || options->context == 0 ||
+          options->context > 8192) {
         return false;
       }
     } else if (argument == "--temperature") {
@@ -240,7 +247,8 @@ int main(int argc, char** argv) {
   }
   std::cout << kBrand << '\n';
   qw38::Engine engine;
-  qw38::Status status = qw38::Engine::open(options.model, &engine);
+  qw38::Status status =
+      qw38::Engine::open(options.model, options.context, &engine);
   if (!status.is_ok()) return report(status);
   std::unique_ptr<qw38::Session> session;
   status = engine.create_session(&session);

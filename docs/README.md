@@ -84,7 +84,8 @@ for language and host portability decisions.
 57. [Hardware-accelerated SHA-256](57-hardware-sha256.md): whole-file identity, SHA-NI runtime dispatch, portable fallback, and storage-cache limits.
 58. [Single-flight HTTP server core](58-http-server-core.md): sockets, bounded HTTP, health/models routes, FIFO queueing, cancellation, and shutdown.
 59. [Chat Completions](59-chat-completions.md): bounded JSON, roles, reasoning, generation, SSE streaming, tools, stops, queueing, and active cancellation.
-60. [Source and evidence ledger](sources.md).
+60. [CPU laptop inference for Qwen3.5-2B](60-cpu-laptop-2b.md): Darwin/x86_64 host path, tied embeddings, 4K budget, AVX2, skip-if-missing 2B numeric gates, and measured MacBook numbers.
+61. [Source and evidence ledger](sources.md).
 
 Claims use four labels: **Measured** (this exact artifact and hardware),
 **External** (a linked source), **Estimated** (reproducible arithmetic), and

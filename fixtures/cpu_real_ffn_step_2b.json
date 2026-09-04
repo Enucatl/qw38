@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "mode": "valid",
+  "fields": {
+    "normalized_f32_le_hex": "9d6ce2bff01ce9be1a0f753f0a34b23f",
+    "gate_f32_le_hex": "a46b18be9d59773e497591bd5962763e5896a9be",
+    "up_f32_le_hex": "0a1026bf942608bdc319e43e585ecc3cf83fe13e",
+    "activated_f32_le_hex": "180e373d975c93bba7027abcd73d5c3bcf7479bd",
+    "correction_f32_le_hex": "85da94bd94bb113dec9a83bd7090ffbc",
+    "residual_output_f32_le_hex": "a84dd1bf8ec8bdbea28c473fbe019c3f",
+    "workspace_values": "22528"
+  }
+}

@@ -2,12 +2,18 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstddef>
+#include <cstdint>
 #include <filesystem>
 #include <memory>
 #include <numeric>
 #include <utility>
 
 #include "model.h"
+#include "scalar_runtime.h"
+#ifndef QW38_CUDA_RUNTIME
+#include "host_checkpoint.h"
+#endif
 #include "sha256.h"
 #include "template.h"
 #include "tokenizer.h"
@@ -24,9 +30,17 @@ constexpr std::uintmax_t kPinnedModelBytes = 18973870432ULL;
 constexpr const char* kPinnedModelSha256 =
     "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34";
 constexpr std::size_t kSessionCapacity = 131072;
+#ifdef QW38_CUDA_RUNTIME
 constexpr std::size_t kVocabularySize = 248320;
 constexpr std::size_t kResidualWidth = 5120;
+#endif
 constexpr std::uint64_t kDefaultSeed = 0x5157385357495353ULL;
+constexpr const char* kCudaModelId = "qwen3.8-27b-q4_k_m";
+constexpr const char* kHostModelId = "qwen3.5-2b-q4_k_m";
+constexpr std::size_t kHostRssBudgetBytes = 10ULL * 1024ULL * 1024ULL * 1024ULL;
+constexpr std::uintmax_t kPinnedCpuModelBytes = 1280835840ULL;
+constexpr const char* kPinnedCpuModelSha256 =
+    "aaf42c8b7c3cab2bf3d69c355048d4a0ee9973d48f16c731c0520ee914699223";
 
 #ifndef QW38_CUDA_RUNTIME
 Status unavailable(const char* operation) noexcept {
@@ -39,12 +53,17 @@ Status unavailable(const char* operation) noexcept {
 
 struct Engine::Impl final {
   std::string model_path;
+  std::string model_id;
+  std::size_t context = 0;
   internal::ModelInfo model;
   internal::MappedFile mapping;
   internal::Tokenizer tokenizer;
 #ifdef QW38_CUDA_RUNTIME
   internal::ModelWeights weights;
   std::shared_ptr<cuda::ResidentModel> resident;
+#else
+  internal::ModelWeights weights;
+  internal::ScalarModelParameters parameters;
 #endif
 };
 
@@ -59,6 +78,17 @@ struct Session::Impl final {
   mutable bool has_pending_sampler = false;
   mutable Token pending_token = 0;
   mutable cuda::SamplerState pending_sampler;
+#else
+  const internal::ModelWeights* weights = nullptr;
+  const internal::ScalarModelParameters* parameters = nullptr;
+  std::size_t context = 0;
+  internal::ScalarSessionState state;
+  internal::ScalarWorkspace workspace;
+  std::vector<float> logits;
+  std::vector<Token> history;
+  mutable bool has_pending_sampler = false;
+  mutable Token pending_token = 0;
+  mutable internal::HostSamplerState pending_sampler;
 #endif
 };
 
@@ -69,6 +99,11 @@ Engine::Engine(Engine&&) noexcept = default;
 Engine& Engine::operator=(Engine&&) noexcept = default;
 
 Status Engine::open(const std::string& model_path, Engine* engine) noexcept {
+  return open(model_path, 0, engine);
+}
+
+Status Engine::open(const std::string& model_path, std::size_t context,
+                    Engine* engine) noexcept {
   if (engine == nullptr || model_path.empty()) {
     return {StatusCode::kInvalidArgument, "model path and engine are required"};
   }
@@ -77,28 +112,48 @@ Status Engine::open(const std::string& model_path, Engine* engine) noexcept {
   if (error) {
     return {StatusCode::kIoError, "cannot stat model: " + error.message()};
   }
-  if (bytes != kPinnedModelBytes) {
-    return {StatusCode::kIncompatibleArtifact,
-            "model byte size does not match the pinned artifact"};
-  }
   internal::ModelInfo model;
   Status status = internal::inspect_gguf(model_path, &model);
   if (!status.is_ok()) {
     return status;
   }
-  status = internal::validate_qwen38_contract(&model);
+  internal::ModelGeometry geometry;
+  status = internal::admit_pinned_geometry(&model, &geometry);
   if (!status.is_ok()) {
     return status;
+  }
+  if (geometry.identity == internal::kGeometryQwen38_27B) {
+    if (bytes != kPinnedModelBytes) {
+      return {StatusCode::kIncompatibleArtifact,
+              "model byte size does not match the pinned artifact"};
+    }
   }
   std::string digest;
   status = internal::sha256_file(model_path, &digest);
   if (!status.is_ok()) {
     return status;
   }
-  if (digest != kPinnedModelSha256) {
+  if (geometry.identity == internal::kGeometryQwen38_27B &&
+      digest != kPinnedModelSha256) {
     return {StatusCode::kIncompatibleArtifact,
             "model SHA-256 does not match the pinned artifact"};
   }
+  if (geometry.identity == internal::kGeometryQwen35_2B) {
+    if (kPinnedCpuModelBytes != 0 && bytes != kPinnedCpuModelBytes) {
+      return {StatusCode::kIncompatibleArtifact,
+              "2B model byte size does not match the pinned laptop artifact"};
+    }
+    if (kPinnedCpuModelSha256[0] != '\0' && digest != kPinnedCpuModelSha256) {
+      return {StatusCode::kIncompatibleArtifact,
+              "2B model SHA-256 does not match the pinned laptop artifact"};
+    }
+  }
+#ifndef QW38_CUDA_RUNTIME
+  if (geometry.identity == internal::kGeometryQwen38_27B) {
+    return {StatusCode::kUnimplemented,
+            "Qwen3.8-27B requires the CUDA production build"};
+  }
+#endif
   auto impl = std::make_unique<Impl>();
   status = impl->mapping.open(model_path);
   if (!status.is_ok()) {
@@ -106,6 +161,18 @@ Status Engine::open(const std::string& model_path, Engine* engine) noexcept {
   }
   impl->model_path = model_path;
   impl->model = std::move(model);
+  impl->model_id = geometry.identity == internal::kGeometryQwen35_2B
+                       ? kHostModelId
+                       : kCudaModelId;
+  if (geometry.identity == internal::kGeometryQwen35_2B) {
+    impl->context = context == 0 ? internal::kHostDefaultContext : context;
+    if (impl->context == 0 || impl->context > internal::kHostMaximumContext) {
+      return {StatusCode::kInvalidArgument,
+              "host context must be between 1 and 8192 tokens"};
+    }
+  } else {
+    impl->context = kSessionCapacity;
+  }
   status = impl->tokenizer.build(impl->model);
   if (!status.is_ok()) {
     return status;
@@ -118,6 +185,23 @@ Status Engine::open(const std::string& model_path, Engine* engine) noexcept {
   status = impl->resident->upload(impl->weights, impl->mapping.data(),
                                   impl->mapping.size());
   if (!status.is_ok()) return status;
+#else
+  status = internal::bind_model_weights(impl->model, impl->mapping,
+                                        &impl->weights);
+  if (!status.is_ok()) return status;
+  status = internal::prepare_scalar_model_parameters(impl->weights,
+                                                     &impl->parameters);
+  if (!status.is_ok()) return status;
+  const std::size_t estimated =
+      impl->mapping.size() +
+      geometry.gdn_layer_count * geometry.gdn_recurrent_values() * sizeof(float) +
+      geometry.attention_layer_count * impl->context *
+          geometry.attention_kv_width() * 2 * sizeof(float) +
+      geometry.vocabulary * sizeof(float) * 2;
+  if (estimated > kHostRssBudgetBytes) {
+    return {StatusCode::kResourceExhausted,
+            "host session would exceed the 10 GiB laptop RSS budget"};
+  }
 #endif
   *engine = Engine(std::move(impl));
   return Status::ok();
@@ -145,8 +229,42 @@ Status Engine::create_session(std::unique_ptr<Session>* session) const noexcept 
   *session = std::unique_ptr<Session>(new Session(std::move(session_impl)));
   return Status::ok();
 #else
-  return unavailable("session creation");
+  if (impl_->weights.geometry.identity != internal::kGeometryQwen35_2B) {
+    return unavailable("session creation");
+  }
+  auto session_impl = std::make_unique<Session::Impl>();
+  session_impl->weights = &impl_->weights;
+  session_impl->parameters = &impl_->parameters;
+  session_impl->context = impl_->context;
+  session_impl->logits.assign(impl_->weights.geometry.vocabulary, 0.0F);
+  Status status = internal::create_scalar_session_state(
+      impl_->weights.geometry, impl_->context, &session_impl->state);
+  if (status.is_ok()) {
+    status = internal::create_scalar_workspace(
+        impl_->weights.geometry, impl_->context, &session_impl->workspace);
+  }
+  if (!status.is_ok()) return status;
+  *session = std::unique_ptr<Session>(new Session(std::move(session_impl)));
+  return Status::ok();
 #endif
+}
+
+Status Engine::admitted_model(std::string* identity) const noexcept {
+  if (identity == nullptr) {
+    return {StatusCode::kInvalidArgument, "model identity output is required"};
+  }
+  if (!impl_) return {StatusCode::kInvalidArgument, "engine is not open"};
+  *identity = impl_->model_id;
+  return Status::ok();
+}
+
+Status Engine::context_capacity(std::size_t* capacity) const noexcept {
+  if (capacity == nullptr) {
+    return {StatusCode::kInvalidArgument, "context capacity output is required"};
+  }
+  if (!impl_) return {StatusCode::kInvalidArgument, "engine is not open"};
+  *capacity = impl_->context;
+  return Status::ok();
 }
 
 Status Engine::encode(const std::string& utf8,
@@ -234,6 +352,12 @@ Status poll_cancelled(void* context) noexcept {
              ? Status(StatusCode::kCancelled, "request was cancelled")
              : Status::ok();
 }
+#else
+Status host_cancelled(const std::atomic<bool>* cancelled) noexcept {
+  return cancelled != nullptr && cancelled->load(std::memory_order_relaxed)
+             ? Status(StatusCode::kCancelled, "request was cancelled")
+             : Status::ok();
+}
 #endif
 }  // namespace
 
@@ -258,9 +382,49 @@ Status Session::sync(const std::vector<Token>& tokens,
       &impl_->workspace, impl_->logits.data(), impl_->logits.size(),
       impl_->hidden.data(), impl_->hidden.size(), &result, control_pointer);
 #else
-  (void)tokens;
-  (void)cancelled;
-  return unavailable("prefix synchronization");
+  if (!impl_ || impl_->weights == nullptr) {
+    return {StatusCode::kInvalidArgument, "session is not initialized"};
+  }
+  impl_->has_pending_sampler = false;
+  Status status = host_cancelled(cancelled);
+  if (!status.is_ok()) return status;
+  std::size_t common = 0;
+  const std::size_t limit =
+      std::min(impl_->history.size(), tokens.size());
+  while (common < limit && impl_->history[common] == tokens[common]) {
+    ++common;
+  }
+  if (tokens.empty() || common < impl_->history.size()) {
+    status = internal::create_scalar_session_state(
+        impl_->weights->geometry, impl_->context, &impl_->state);
+    if (status.is_ok()) {
+      status = internal::create_scalar_workspace(
+          impl_->weights->geometry, impl_->context,
+          &impl_->workspace);
+    }
+    if (!status.is_ok()) return status;
+    impl_->history.clear();
+    impl_->logits.assign(impl_->weights->geometry.vocabulary, 0.0F);
+    common = 0;
+  }
+  if (tokens.size() > impl_->context) {
+    return {StatusCode::kInvalidArgument,
+            "prompt exceeds the host context capacity"};
+  }
+  if (tokens.size() == common) {
+    return Status::ok();
+  }
+  for (std::size_t index = common; index < tokens.size(); ++index) {
+    status = host_cancelled(cancelled);
+    if (!status.is_ok()) return status;
+    status = internal::execute_scalar_token(
+        *impl_->weights, *impl_->parameters, tokens[index],
+        &impl_->state, &impl_->workspace, impl_->logits.data(),
+        impl_->logits.size());
+    if (!status.is_ok()) return status;
+  }
+  impl_->history.assign(tokens.begin(), tokens.end());
+  return host_cancelled(cancelled);
 #endif
 }
 Status Session::logits(std::vector<float>* output) const noexcept {
@@ -274,7 +438,11 @@ Status Session::logits(std::vector<float>* output) const noexcept {
   *output = impl_->logits;
   return Status::ok();
 #else
-  return unavailable("logits");
+  if (!impl_ || impl_->history.empty()) {
+    return {StatusCode::kInvalidArgument, "session has no committed logits"};
+  }
+  *output = impl_->logits;
+  return Status::ok();
 #endif
 }
 Status Session::sample(const SamplerConfig& config, Token* token) const noexcept {
@@ -364,8 +532,92 @@ Status Session::sample(const SamplerConfig& config, Token* token) const noexcept
   *token = impl_->pending_token;
   return Status::ok();
 #else
-  (void)config;
-  return unavailable("sampling");
+  if (!impl_ || impl_->history.empty() ||
+      !std::isfinite(config.temperature) || config.temperature < 0.0F ||
+      !std::isfinite(config.top_p) || config.top_p <= 0.0F ||
+      config.top_p > 1.0F ||
+      config.top_k > impl_->weights->geometry.vocabulary) {
+    return {StatusCode::kInvalidArgument, "sampler configuration is invalid"};
+  }
+  const std::size_t vocabulary = impl_->logits.size();
+  if (config.temperature == 0.0F) {
+    std::size_t selected = 0;
+    float best = impl_->logits[0];
+    for (std::size_t index = 1; index < vocabulary; ++index) {
+      if (impl_->logits[index] > best) {
+        best = impl_->logits[index];
+        selected = index;
+      }
+    }
+    impl_->has_pending_sampler = false;
+    *token = static_cast<Token>(selected);
+    return Status::ok();
+  }
+  internal::HostSamplerState state = impl_->pending_sampler;
+  if (state.temperature != config.temperature || state.top_p != config.top_p ||
+      state.top_k != config.top_k || state.seed != config.seed ||
+      state.rng_state == 0) {
+    state = {config.temperature, config.top_p, config.top_k, config.seed,
+             config.seed == 0 ? kDefaultSeed : config.seed};
+  }
+  std::vector<std::size_t> candidates(vocabulary);
+  std::iota(candidates.begin(), candidates.end(), 0);
+  const bool ordered = config.top_k > 0 || config.top_p < 1.0F;
+  if (ordered) {
+    const std::size_t retained =
+        config.top_k == 0 ? candidates.size()
+                          : std::min<std::size_t>(config.top_k,
+                                                  candidates.size());
+    std::partial_sort(
+        candidates.begin(), candidates.begin() + retained, candidates.end(),
+        [this](std::size_t left, std::size_t right) {
+          return impl_->logits[left] > impl_->logits[right];
+        });
+    candidates.resize(retained);
+  }
+  float maximum = -INFINITY;
+  for (std::size_t index : candidates) {
+    maximum = std::max(maximum, impl_->logits[index]);
+  }
+  std::vector<double> weights(candidates.size());
+  double total = 0.0;
+  for (std::size_t index = 0; index < candidates.size(); ++index) {
+    weights[index] = std::exp(static_cast<double>(
+        (impl_->logits[candidates[index]] - maximum) / config.temperature));
+    total += weights[index];
+  }
+  if (ordered && config.top_p < 1.0F) {
+    const double threshold = total * config.top_p;
+    double cumulative = 0.0;
+    std::size_t retained = 0;
+    do {
+      cumulative += weights[retained++];
+    } while (retained < weights.size() && cumulative < threshold);
+    candidates.resize(retained);
+    weights.resize(retained);
+    total = cumulative;
+  }
+  state.rng_state ^= state.rng_state >> 12U;
+  state.rng_state ^= state.rng_state << 25U;
+  state.rng_state ^= state.rng_state >> 27U;
+  const std::uint64_t random = state.rng_state * 0x2545F4914F6CDD1DULL;
+  const double unit = static_cast<double>(random >> 11U) /
+                      static_cast<double>(1ULL << 53U);
+  const double target = unit * total;
+  double cumulative = 0.0;
+  std::size_t selected = candidates.size() - 1;
+  for (std::size_t index = 0; index < candidates.size(); ++index) {
+    cumulative += weights[index];
+    if (target < cumulative) {
+      selected = index;
+      break;
+    }
+  }
+  impl_->pending_token = static_cast<Token>(candidates[selected]);
+  impl_->pending_sampler = state;
+  impl_->has_pending_sampler = true;
+  *token = impl_->pending_token;
+  return Status::ok();
 #endif
 }
 Status Session::eval(Token token) noexcept {
@@ -392,9 +644,18 @@ Status Session::eval(Token token,
   impl_->has_pending_sampler = false;
   return status;
 #else
-  (void)token;
-  (void)cancelled;
-  return unavailable("evaluation");
+  if (!impl_ || impl_->weights == nullptr) {
+    return {StatusCode::kInvalidArgument, "session is not initialized"};
+  }
+  Status status = host_cancelled(cancelled);
+  if (!status.is_ok()) return status;
+  status = internal::execute_scalar_token(
+      *impl_->weights, *impl_->parameters, token, &impl_->state,
+      &impl_->workspace, impl_->logits.data(), impl_->logits.size());
+  if (!status.is_ok()) return status;
+  impl_->history.push_back(token);
+  impl_->has_pending_sampler = false;
+  return host_cancelled(cancelled);
 #endif
 }
 Status Session::save(const std::string& path) const noexcept {
@@ -402,8 +663,12 @@ Status Session::save(const std::string& path) const noexcept {
   if (!impl_) return {StatusCode::kInvalidArgument, "session is not initialized"};
   return impl_->session.save_checkpoint(path);
 #else
-  (void)path;
-  return unavailable("checkpoint save");
+  if (!impl_ || impl_->weights == nullptr) {
+    return {StatusCode::kInvalidArgument, "session is not initialized"};
+  }
+  return internal::save_host_checkpoint(
+      path, impl_->weights->geometry, impl_->state, impl_->history,
+      impl_->logits, impl_->pending_sampler);
 #endif
 }
 Status Session::restore(const std::string& path) noexcept {
@@ -418,8 +683,13 @@ Status Session::restore(const std::string& path) noexcept {
   }
   return status;
 #else
-  (void)path;
-  return unavailable("checkpoint restore");
+  if (!impl_ || impl_->weights == nullptr) {
+    return {StatusCode::kInvalidArgument, "session is not initialized"};
+  }
+  impl_->has_pending_sampler = false;
+  return internal::restore_host_checkpoint(
+      path, impl_->weights->geometry, &impl_->state, &impl_->history,
+      &impl_->logits, &impl_->pending_sampler);
 #endif
 }
 
@@ -435,7 +705,9 @@ Status Session::tokens(std::vector<Token>* output) const noexcept {
   output->assign(widened.begin(), widened.end());
   return Status::ok();
 #else
-  return unavailable("token history");
+  if (!impl_) return {StatusCode::kInvalidArgument, "session is not initialized"};
+  *output = impl_->history;
+  return Status::ok();
 #endif
 }
 

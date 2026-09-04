@@ -1,14 +1,20 @@
 #include <algorithm>
 #include <array>
+#include <chrono>
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <iterator>
+#include <limits>
+#include <memory>
 #include <string>
 #include <vector>
 
+#include <sys/resource.h>
 #include <unistd.h>
 
 #include "qw38/engine.h"
@@ -54,7 +60,10 @@ int write_inventory(const char* model_path, const char* output_path) {
   }
   qw38::internal::ModelInfo info;
   status = qw38::internal::inspect_gguf(model_path, &info);
-  if (status.is_ok()) status = qw38::internal::validate_qwen38_contract(&info);
+  qw38::internal::ModelGeometry geometry;
+  if (status.is_ok()) {
+    status = qw38::internal::admit_pinned_geometry(&info, &geometry);
+  }
   qw38::internal::MappedFile mapping;
   if (status.is_ok()) status = mapping.open(model_path);
   if (!status.is_ok()) {
@@ -70,8 +79,16 @@ int write_inventory(const char* model_path, const char* output_path) {
     std::cerr << "cannot create inventory output\n";
     return 1;
   }
+  std::string digest;
+  status = qw38::internal::sha256_file(model_path, &digest);
+  if (!status.is_ok()) {
+    std::cerr << qw38::status_code_name(status.code()) << ": "
+              << status.message() << '\n';
+    return 1;
+  }
   output << "{\n  \"schema_version\": 1,\n";
-  output << "  \"model_sha256\": \"" << kModelSha256 << "\",\n";
+  output << "  \"model_sha256\": \"" << digest << "\",\n";
+  output << "  \"geometry_identity\": " << geometry.identity << ",\n";
   output << "  \"gguf_version\": " << info.gguf_version << ",\n";
   output << "  \"data_offset\": " << info.data_offset << ",\n";
   output << "  \"tensor_count\": " << info.tensors.size() << ",\n";
@@ -136,6 +153,17 @@ bool parse_hex(const std::string& hex, std::vector<std::uint8_t>* bytes) {
   return true;
 }
 
+bool load_bytes_argument(const std::string& spec, std::vector<std::uint8_t>* bytes) {
+  if (!spec.empty() && spec.front() == '@') {
+    std::ifstream input(spec.substr(1), std::ios::binary);
+    if (!input) return false;
+    bytes->assign(std::istreambuf_iterator<char>(input),
+                  std::istreambuf_iterator<char>());
+    return true;
+  }
+  return parse_hex(spec, bytes);
+}
+
 bool parse_size(const char* text, std::size_t* value) {
   if (text == nullptr || *text == '\0') return false;
   char* end = nullptr;
@@ -145,6 +173,92 @@ bool parse_size(const char* text, std::size_t* value) {
   }
   *value = static_cast<std::size_t>(parsed);
   return true;
+}
+
+qw38::Status admit_gguf(const char* model_path, qw38::internal::ModelInfo* info) {
+  qw38::Status status = qw38::internal::inspect_gguf(model_path, info);
+  qw38::internal::ModelGeometry geometry;
+  if (status.is_ok()) {
+    status = qw38::internal::admit_pinned_geometry(info, &geometry);
+  }
+  return status;
+}
+
+qw38::Status load_admitted_weights(const char* model_path,
+                                   qw38::internal::ModelInfo* info,
+                                   qw38::internal::MappedFile* mapping,
+                                   qw38::internal::ModelWeights* weights) {
+  qw38::Status status = admit_gguf(model_path, info);
+  if (status.is_ok()) status = mapping->open(model_path);
+  if (status.is_ok()) {
+    status = qw38::internal::bind_model_weights(*info, *mapping, weights);
+  }
+  return status;
+}
+
+std::vector<float> tap_values(const std::vector<float>& values,
+                              const std::vector<std::size_t>& indices) {
+  std::vector<float> selected;
+  selected.reserve(indices.size());
+  for (std::size_t index : indices) selected.push_back(values[index]);
+  return selected;
+}
+
+bool is_qwen38_27b(const qw38::internal::ModelGeometry& geometry) {
+  return geometry.identity == qw38::internal::kGeometryQwen38_27B;
+}
+
+std::vector<std::size_t> residual_taps(
+    const qw38::internal::ModelGeometry& geometry) {
+  if (is_qwen38_27b(geometry)) return {0, 1, 2559, 5119};
+  return {0, 1, geometry.residual_width / 2 - 1, geometry.residual_width - 1};
+}
+
+std::vector<std::size_t> residual_end_taps(
+    const qw38::internal::ModelGeometry& geometry) {
+  if (is_qwen38_27b(geometry)) return {0, 1, 5118, 5119};
+  return {0, 1, geometry.residual_width - 2, geometry.residual_width - 1};
+}
+
+std::vector<std::size_t> ffn_taps(const qw38::internal::ModelGeometry& geometry) {
+  if (is_qwen38_27b(geometry)) return {0, 1, 8703, 8704, 17407};
+  return {0, 1, geometry.ffn_width / 2 - 1, geometry.ffn_width / 2,
+          geometry.ffn_width - 1};
+}
+
+std::vector<std::size_t> gdn_gate_taps(
+    const qw38::internal::ModelGeometry& geometry) {
+  if (is_qwen38_27b(geometry)) return {0, 1, 3, 47};
+  return {0, 1, 3, geometry.gdn_value_heads - 1};
+}
+
+std::vector<std::size_t> gdn_convolved_taps(
+    const qw38::internal::ModelGeometry& geometry) {
+  if (is_qwen38_27b(geometry)) {
+    return {0, 127, 2048, 2175, 4096, 4223, 6144, 6271, 4224, 4351};
+  }
+  return {0, 127, 2048, 2175, 4096, 4223, geometry.gdn_packed_qkv() - 128,
+          geometry.gdn_packed_qkv() - 1, 4224, 4351};
+}
+
+std::vector<std::size_t> attention_head_taps(
+    const qw38::internal::ModelGeometry& geometry) {
+  if (is_qwen38_27b(geometry)) {
+    return {0, 63, 64, 255, 5 * 256, 6 * 256, 23 * 256 + 255};
+  }
+  const std::size_t last = geometry.attention_query_width() - 1;
+  return {0, 63, 64, 255, 256, 512, last};
+}
+
+std::vector<std::size_t> attention_cache_taps(
+    const qw38::internal::ModelGeometry& geometry) {
+  const std::size_t stride = geometry.attention_kv_width();
+  if (is_qwen38_27b(geometry)) {
+    return {0, 31, 32, 63, 64, 255, 256, 511, stride, stride + 31, stride + 32,
+            stride + 63, stride + 64, stride + 255, stride + 256, stride + 511};
+  }
+  return {0, 31, 32, 63, 64, 255, 256, 511, stride, stride + 31, stride + 32,
+          stride + 63, stride + 64, stride + 255, stride + 256, stride + 511};
 }
 
 #ifdef QW38_DIAGNOSTIC_TRACE
@@ -550,6 +664,14 @@ int check_quant(const std::string& kind, const std::string& hex) {
                                         activation.data(), activation.size(),
                                         &dot);
     }
+  } else if (kind == "q5_k") {
+    status = qw38::internal::decode_q5_k(block.data(), block.size(),
+                                         decoded.data(), decoded.size());
+    if (status.is_ok()) {
+      status = qw38::internal::dot_q5_k(block.data(), block.size(),
+                                        activation.data(), activation.size(),
+                                        &dot);
+    }
   } else if (kind == "q8_0") {
     status = qw38::internal::decode_q8_0(block.data(), block.size(),
                                          decoded.data(), decoded.size());
@@ -559,7 +681,7 @@ int check_quant(const std::string& kind, const std::string& hex) {
                                         &dot);
     }
   } else {
-    std::cerr << "invalid_argument: quant kind must be q4_k, q6_k, or q8_0\n";
+    std::cerr << "invalid_argument: quant kind must be q4_k, q5_k, q6_k, or q8_0\n";
     return 1;
   }
   if (!status.is_ok()) {
@@ -686,8 +808,7 @@ int check_conversion(const std::string& component) {
 
 int check_weight_binding(const char* model_path, const std::string& mode) {
   qw38::internal::ModelInfo info;
-  qw38::Status status = qw38::internal::inspect_gguf(model_path, &info);
-  if (status.is_ok()) status = qw38::internal::validate_qwen38_contract(&info);
+  qw38::Status status = admit_gguf(model_path, &info);
   qw38::internal::MappedFile mapping;
   if (status.is_ok()) status = mapping.open(model_path);
   if (!status.is_ok()) {
@@ -722,8 +843,8 @@ int check_weight_binding(const char* model_path, const std::string& mode) {
   }
   std::size_t gdn_layers = 0;
   std::size_t attention_layers = 0;
-  for (const qw38::internal::LayerWeights& layer : weights.layers) {
-    if (layer.kind == qw38::internal::LayerKind::kGdn) {
+  for (std::size_t layer = 0; layer < weights.geometry.layer_count; ++layer) {
+    if (weights.layers[layer].kind == qw38::internal::LayerKind::kGdn) {
       ++gdn_layers;
     } else {
       ++attention_layers;
@@ -736,6 +857,11 @@ int check_weight_binding(const char* model_path, const std::string& mode) {
   std::cout << "embedding_rows=" << weights.token_embedding.rows << '\n';
   std::cout << "final_norm_values=" << weights.output_norm.count << '\n';
   std::cout << "logit_rows=" << weights.output.rows << '\n';
+  if (weights.geometry.tied_embeddings) {
+    std::cout << "tied_output=1\noutput_shares_embedding="
+              << (weights.output.data == weights.token_embedding.data ? 1 : 0)
+              << '\n';
+  }
   std::vector<float> final_norm(weights.output_norm.count);
   status = qw38::internal::vector_decode(weights.output_norm, final_norm.data(),
                                          final_norm.size());
@@ -931,30 +1057,27 @@ int check_mixer_projections(const char* model_path, const std::string& mode) {
 
 int check_real_gdn_step(const char* model_path, const std::string& mode) {
   qw38::internal::ModelInfo info;
-  qw38::Status status = qw38::internal::inspect_gguf(model_path, &info);
-  if (status.is_ok()) status = qw38::internal::validate_qwen38_contract(&info);
   qw38::internal::MappedFile mapping;
-  if (status.is_ok()) status = mapping.open(model_path);
   qw38::internal::ModelWeights weights;
-  if (status.is_ok()) {
-    status = qw38::internal::bind_model_weights(info, mapping, &weights);
-  }
+  qw38::Status status =
+      load_admitted_weights(model_path, &info, &mapping, &weights);
+  const qw38::internal::ModelGeometry& geometry = weights.geometry;
   if (!status.is_ok()) {
     std::cerr << qw38::status_code_name(status.code()) << ": "
               << status.message() << '\n';
     return 1;
   }
 
-  std::vector<float> input_norm(qw38::internal::kResidualWidth);
-  std::vector<float> convolution(qw38::internal::kGdnConvolutionValues);
-  std::vector<float> folded_a(qw38::internal::kGdnGateCount);
-  std::vector<float> dt_bias(qw38::internal::kGdnGateCount);
-  std::vector<float> recurrent_norm(qw38::internal::kGdnHeadWidth);
+  std::vector<float> input_norm(geometry.residual_width);
+  std::vector<float> convolution(geometry.gdn_conv_values());
+  std::vector<float> folded_a(geometry.gdn_value_heads);
+  std::vector<float> dt_bias(geometry.gdn_value_heads);
+  std::vector<float> recurrent_norm(geometry.gdn_head_width);
   const qw38::internal::GdnScalarParameters parameters{
       input_norm.data(), input_norm.size(), convolution.data(),
       convolution.size(), folded_a.data(), folded_a.size(), dt_bias.data(),
       dt_bias.size(), recurrent_norm.data(), recurrent_norm.size()};
-  std::vector<float> ffn_norm(qw38::internal::kResidualWidth);
+  std::vector<float> ffn_norm(geometry.residual_width);
   const qw38::internal::FfnScalarParameters ffn_parameters{ffn_norm.data(),
                                                            ffn_norm.size()};
   const bool layer_mode = mode == "layer" || mode == "layer_invalid_ffn";
@@ -973,47 +1096,47 @@ int check_real_gdn_step(const char* model_path, const std::string& mode) {
     return 1;
   }
 
-  std::vector<float> residual(qw38::internal::kResidualWidth);
+  std::vector<float> residual(geometry.residual_width);
   for (std::size_t index = 0; index < residual.size(); ++index) {
     residual[index] = static_cast<float>(
                           static_cast<int>((index * 37) % 101) - 50) /
                       32.0F;
   }
-  std::vector<float> conv_state(qw38::internal::kGdnConvolutionValues);
+  std::vector<float> conv_state(geometry.gdn_conv_values());
   std::vector<float> recurrent_state(
-      qw38::internal::kGdnRecurrentStateValues);
+      geometry.gdn_recurrent_values());
   qw38::internal::GdnLayerStateView state{
       conv_state.data(), conv_state.size(), recurrent_state.data(),
       recurrent_state.size()};
 
-  std::vector<float> normalized(qw38::internal::kResidualWidth, NAN);
-  std::vector<float> packed(qw38::internal::kGdnPackedQkvWidth, NAN);
-  std::vector<float> projected_gate(qw38::internal::kGdnValueWidth, NAN);
-  std::vector<float> projected_alpha(qw38::internal::kGdnGateCount, NAN);
-  std::vector<float> projected_beta(qw38::internal::kGdnGateCount, NAN);
-  std::vector<float> convolved(qw38::internal::kGdnPackedQkvWidth, NAN);
-  std::vector<float> query(qw38::internal::kGdnKeyWidth, NAN);
-  std::vector<float> key(qw38::internal::kGdnKeyWidth, NAN);
-  std::vector<float> value_tiled(qw38::internal::kGdnValueWidth, NAN);
-  std::vector<float> value_grouped(qw38::internal::kGdnValueWidth, NAN);
-  std::vector<float> gate_grouped(qw38::internal::kGdnValueWidth, NAN);
-  std::vector<float> alpha_grouped(qw38::internal::kGdnGateCount, NAN);
-  std::vector<float> beta_grouped(qw38::internal::kGdnGateCount, NAN);
-  std::vector<float> folded_grouped(qw38::internal::kGdnGateCount, NAN);
-  std::vector<float> dt_grouped(qw38::internal::kGdnGateCount, NAN);
-  std::vector<float> log_decay(qw38::internal::kGdnGateCount, NAN);
-  std::vector<float> update_gate(qw38::internal::kGdnGateCount, NAN);
-  std::vector<float> recurrent_output(qw38::internal::kGdnValueWidth, NAN);
-  std::vector<float> gated_grouped(qw38::internal::kGdnValueWidth, NAN);
-  std::vector<float> gated_tiled(qw38::internal::kGdnValueWidth, NAN);
-  std::vector<float> mixer_output(qw38::internal::kResidualWidth, NAN);
-  std::vector<float> post_mixer(qw38::internal::kResidualWidth, NAN);
-  std::vector<float> ffn_normalized(qw38::internal::kResidualWidth, NAN);
-  std::vector<float> ffn_gate(qw38::internal::kFfnWidth, NAN);
-  std::vector<float> ffn_up(qw38::internal::kFfnWidth, NAN);
-  std::vector<float> ffn_activated(qw38::internal::kFfnWidth, NAN);
-  std::vector<float> ffn_correction(qw38::internal::kResidualWidth, NAN);
-  std::vector<float> output(qw38::internal::kResidualWidth, NAN);
+  std::vector<float> normalized(geometry.residual_width, NAN);
+  std::vector<float> packed(geometry.gdn_packed_qkv(), NAN);
+  std::vector<float> projected_gate(geometry.gdn_value_width(), NAN);
+  std::vector<float> projected_alpha(geometry.gdn_value_heads, NAN);
+  std::vector<float> projected_beta(geometry.gdn_value_heads, NAN);
+  std::vector<float> convolved(geometry.gdn_packed_qkv(), NAN);
+  std::vector<float> query(geometry.gdn_key_width(), NAN);
+  std::vector<float> key(geometry.gdn_key_width(), NAN);
+  std::vector<float> value_tiled(geometry.gdn_value_width(), NAN);
+  std::vector<float> value_grouped(geometry.gdn_value_width(), NAN);
+  std::vector<float> gate_grouped(geometry.gdn_value_width(), NAN);
+  std::vector<float> alpha_grouped(geometry.gdn_value_heads, NAN);
+  std::vector<float> beta_grouped(geometry.gdn_value_heads, NAN);
+  std::vector<float> folded_grouped(geometry.gdn_value_heads, NAN);
+  std::vector<float> dt_grouped(geometry.gdn_value_heads, NAN);
+  std::vector<float> log_decay(geometry.gdn_value_heads, NAN);
+  std::vector<float> update_gate(geometry.gdn_value_heads, NAN);
+  std::vector<float> recurrent_output(geometry.gdn_value_width(), NAN);
+  std::vector<float> gated_grouped(geometry.gdn_value_width(), NAN);
+  std::vector<float> gated_tiled(geometry.gdn_value_width(), NAN);
+  std::vector<float> mixer_output(geometry.residual_width, NAN);
+  std::vector<float> post_mixer(geometry.residual_width, NAN);
+  std::vector<float> ffn_normalized(geometry.residual_width, NAN);
+  std::vector<float> ffn_gate(geometry.ffn_width, NAN);
+  std::vector<float> ffn_up(geometry.ffn_width, NAN);
+  std::vector<float> ffn_activated(geometry.ffn_width, NAN);
+  std::vector<float> ffn_correction(geometry.residual_width, NAN);
+  std::vector<float> output(geometry.residual_width, NAN);
   const qw38::internal::GdnProjectionWorkspace projection_workspace{
       packed.data(), packed.size(), projected_gate.data(), projected_gate.size(),
       projected_alpha.data(), projected_alpha.size(), projected_beta.data(),
@@ -1087,39 +1210,38 @@ int check_real_gdn_step(const char* model_path, const std::string& mode) {
     return selected;
   };
   write_float_vector("normalized_f32_le_hex",
-                     taps(normalized, {0, 1, 5118, 5119}));
+                     tap_values(normalized, residual_end_taps(geometry)));
   write_float_vector("convolved_f32_le_hex",
-                     taps(convolved, {0, 127, 2048, 2175, 4096, 4223, 6144,
-                                      6271, 4224, 4351}));
+                     tap_values(convolved, gdn_convolved_taps(geometry)));
   write_float_vector("value_grouped_f32_le_hex",
                      taps(value_grouped, {0, 127, 128, 255, 384, 511}));
   write_float_vector("gate_controls_f32_le_hex",
-                     taps(alpha_grouped, {0, 1, 3, 47}));
+                     tap_values(alpha_grouped, gdn_gate_taps(geometry)));
   write_float_vector("log_decay_f32_le_hex",
-                     taps(log_decay, {0, 1, 3, 47}));
+                     tap_values(log_decay, gdn_gate_taps(geometry)));
   write_float_vector("update_gate_f32_le_hex",
-                     taps(update_gate, {0, 1, 3, 47}));
+                     tap_values(update_gate, gdn_gate_taps(geometry)));
   write_float_vector("recurrent_output_f32_le_hex",
                      taps(recurrent_output, {0, 127, 128, 255, 384, 511}));
   write_float_vector("gated_grouped_f32_le_hex",
                      taps(gated_grouped, {0, 127, 128, 255, 384, 511}));
   write_float_vector("mixer_output_f32_le_hex",
-                     taps(mixer_output, {0, 1, 2559, 5119}));
+                     tap_values(mixer_output, residual_taps(geometry)));
   write_float_vector("residual_output_f32_le_hex",
-                     taps(output, {0, 1, 2559, 5119}));
+                     tap_values(output, residual_taps(geometry)));
   if (layer_mode) {
     write_float_vector("post_mixer_f32_le_hex",
-                       taps(post_mixer, {0, 1, 2559, 5119}));
+                       tap_values(post_mixer, residual_taps(geometry)));
     write_float_vector("ffn_normalized_f32_le_hex",
-                       taps(ffn_normalized, {0, 1, 2559, 5119}));
+                       tap_values(ffn_normalized, residual_taps(geometry)));
     write_float_vector("ffn_gate_f32_le_hex",
-                       taps(ffn_gate, {0, 1, 8703, 8704, 17407}));
+                       tap_values(ffn_gate, ffn_taps(geometry)));
     write_float_vector("ffn_up_f32_le_hex",
-                       taps(ffn_up, {0, 1, 8703, 8704, 17407}));
+                       tap_values(ffn_up, ffn_taps(geometry)));
     write_float_vector("ffn_activated_f32_le_hex",
-                       taps(ffn_activated, {0, 1, 8703, 8704, 17407}));
+                       tap_values(ffn_activated, ffn_taps(geometry)));
     write_float_vector("ffn_correction_f32_le_hex",
-                       taps(ffn_correction, {0, 1, 2559, 5119}));
+                       tap_values(ffn_correction, residual_taps(geometry)));
   }
   write_float_vector("convolution_state_f32_le_hex",
                      taps(conv_state, {0, 1, 2, 3, 16384, 16385, 16386,
@@ -1132,21 +1254,18 @@ int check_real_gdn_step(const char* model_path, const std::string& mode) {
 
 int check_real_ffn_step(const char* model_path, const std::string& mode) {
   qw38::internal::ModelInfo info;
-  qw38::Status status = qw38::internal::inspect_gguf(model_path, &info);
-  if (status.is_ok()) status = qw38::internal::validate_qwen38_contract(&info);
   qw38::internal::MappedFile mapping;
-  if (status.is_ok()) status = mapping.open(model_path);
   qw38::internal::ModelWeights weights;
-  if (status.is_ok()) {
-    status = qw38::internal::bind_model_weights(info, mapping, &weights);
-  }
+  qw38::Status status =
+      load_admitted_weights(model_path, &info, &mapping, &weights);
+  const qw38::internal::ModelGeometry& geometry = weights.geometry;
   if (!status.is_ok()) {
     std::cerr << qw38::status_code_name(status.code()) << ": "
               << status.message() << '\n';
     return 1;
   }
 
-  std::vector<float> norm(qw38::internal::kResidualWidth);
+  std::vector<float> norm(geometry.residual_width);
   const qw38::internal::FfnScalarParameters parameters{norm.data(), norm.size()};
   status = qw38::internal::prepare_ffn_scalar_parameters(
       weights.layers[0].common, parameters);
@@ -1155,18 +1274,18 @@ int check_real_ffn_step(const char* model_path, const std::string& mode) {
               << status.message() << '\n';
     return 1;
   }
-  std::vector<float> residual(qw38::internal::kResidualWidth);
+  std::vector<float> residual(geometry.residual_width);
   for (std::size_t index = 0; index < residual.size(); ++index) {
     residual[index] = static_cast<float>(
                           static_cast<int>((index * 37) % 101) - 50) /
                       32.0F;
   }
-  std::vector<float> normalized(qw38::internal::kResidualWidth, NAN);
-  std::vector<float> gate(qw38::internal::kFfnWidth, NAN);
-  std::vector<float> up(qw38::internal::kFfnWidth, NAN);
-  std::vector<float> activated(qw38::internal::kFfnWidth, NAN);
-  std::vector<float> correction(qw38::internal::kResidualWidth, NAN);
-  std::vector<float> output(qw38::internal::kResidualWidth, NAN);
+  std::vector<float> normalized(geometry.residual_width, NAN);
+  std::vector<float> gate(geometry.ffn_width, NAN);
+  std::vector<float> up(geometry.ffn_width, NAN);
+  std::vector<float> activated(geometry.ffn_width, NAN);
+  std::vector<float> correction(geometry.residual_width, NAN);
+  std::vector<float> output(geometry.residual_width, NAN);
   qw38::internal::FfnStepWorkspace workspace{
       normalized.data(), normalized.size(), gate.data(), gate.size(), up.data(),
       up.size(), activated.data(), activated.size(), correction.data(),
@@ -1199,22 +1318,13 @@ int check_real_ffn_step(const char* model_path, const std::string& mode) {
     std::cerr << "internal: FFN left a nonfinite workspace value\n";
     return 1;
   }
-  const auto taps = [](const std::vector<float>& values,
-                       std::initializer_list<std::size_t> indices) {
-    std::vector<float> selected;
-    selected.reserve(indices.size());
-    for (std::size_t index : indices) selected.push_back(values[index]);
-    return selected;
-  };
-  const std::initializer_list<std::size_t> kWideTaps{0, 1, 8703, 8704, 17407};
-  const std::initializer_list<std::size_t> kResidualTaps{0, 1, 2559, 5119};
   write_float_vector("normalized_f32_le_hex",
-                     taps(normalized, kResidualTaps));
-  write_float_vector("gate_f32_le_hex", taps(gate, kWideTaps));
-  write_float_vector("up_f32_le_hex", taps(up, kWideTaps));
-  write_float_vector("activated_f32_le_hex", taps(activated, kWideTaps));
-  write_float_vector("correction_f32_le_hex", taps(correction, kResidualTaps));
-  write_float_vector("residual_output_f32_le_hex", taps(output, kResidualTaps));
+                     tap_values(normalized, residual_taps(geometry)));
+  write_float_vector("gate_f32_le_hex", tap_values(gate, ffn_taps(geometry)));
+  write_float_vector("up_f32_le_hex", tap_values(up, ffn_taps(geometry)));
+  write_float_vector("activated_f32_le_hex", tap_values(activated, ffn_taps(geometry)));
+  write_float_vector("correction_f32_le_hex", tap_values(correction, residual_taps(geometry)));
+  write_float_vector("residual_output_f32_le_hex", tap_values(output, residual_taps(geometry)));
   std::cout << "workspace_values="
             << normalized.size() + gate.size() + up.size() + activated.size() +
                    correction.size()
@@ -1224,14 +1334,11 @@ int check_real_ffn_step(const char* model_path, const std::string& mode) {
 
 int check_real_attention_step(const char* model_path, const std::string& mode) {
   qw38::internal::ModelInfo info;
-  qw38::Status status = qw38::internal::inspect_gguf(model_path, &info);
-  if (status.is_ok()) status = qw38::internal::validate_qwen38_contract(&info);
   qw38::internal::MappedFile mapping;
-  if (status.is_ok()) status = mapping.open(model_path);
   qw38::internal::ModelWeights weights;
-  if (status.is_ok()) {
-    status = qw38::internal::bind_model_weights(info, mapping, &weights);
-  }
+  qw38::Status status =
+      load_admitted_weights(model_path, &info, &mapping, &weights);
+  const qw38::internal::ModelGeometry& geometry = weights.geometry;
   if (!status.is_ok()) {
     std::cerr << qw38::status_code_name(status.code()) << ": "
               << status.message() << '\n';
@@ -1239,13 +1346,13 @@ int check_real_attention_step(const char* model_path, const std::string& mode) {
   }
 
   constexpr std::size_t kCapacity = 2;
-  std::vector<float> input_norm(qw38::internal::kResidualWidth);
-  std::vector<float> query_norm(qw38::internal::kAttentionHeadWidth);
-  std::vector<float> key_norm(qw38::internal::kAttentionHeadWidth);
+  std::vector<float> input_norm(geometry.residual_width);
+  std::vector<float> query_norm(geometry.attention_head_width);
+  std::vector<float> key_norm(geometry.attention_head_width);
   const qw38::internal::AttentionScalarParameters parameters{
       input_norm.data(), input_norm.size(), query_norm.data(),
       query_norm.size(), key_norm.data(), key_norm.size()};
-  std::vector<float> ffn_norm(qw38::internal::kResidualWidth);
+  std::vector<float> ffn_norm(geometry.residual_width);
   const qw38::internal::FfnScalarParameters ffn_parameters{ffn_norm.data(),
                                                            ffn_norm.size()};
   const bool layer_mode = mode == "layer" || mode == "layer_invalid_ffn";
@@ -1264,33 +1371,33 @@ int check_real_attention_step(const char* model_path, const std::string& mode) {
     return 1;
   }
 
-  std::vector<float> normalized(qw38::internal::kResidualWidth, NAN);
+  std::vector<float> normalized(geometry.residual_width, NAN);
   std::vector<float> packed_query_gate(
-      qw38::internal::kAttentionPackedQueryGateWidth, NAN);
-  std::vector<float> query(qw38::internal::kAttentionQueryWidth, NAN);
-  std::vector<float> gate(qw38::internal::kAttentionQueryWidth, NAN);
-  std::vector<float> key(qw38::internal::kAttentionKvWidth, NAN);
-  std::vector<float> value(qw38::internal::kAttentionKvWidth, NAN);
-  std::vector<float> attention_output(qw38::internal::kAttentionQueryWidth,
+      geometry.attention_packed_query_gate(), NAN);
+  std::vector<float> query(geometry.attention_query_width(), NAN);
+  std::vector<float> gate(geometry.attention_query_width(), NAN);
+  std::vector<float> key(geometry.attention_kv_width(), NAN);
+  std::vector<float> value(geometry.attention_kv_width(), NAN);
+  std::vector<float> attention_output(geometry.attention_query_width(),
                                       NAN);
   std::vector<float> scores(kCapacity, NAN);
-  std::vector<float> mixer_output(qw38::internal::kResidualWidth, NAN);
+  std::vector<float> mixer_output(geometry.residual_width, NAN);
 #ifdef QW38_DIAGNOSTIC_TRACE
-  std::vector<float> rope_query(qw38::internal::kAttentionQueryWidth, NAN);
-  std::vector<float> rope_key(qw38::internal::kAttentionKvWidth, NAN);
+  std::vector<float> rope_query(geometry.attention_query_width(), NAN);
+  std::vector<float> rope_key(geometry.attention_kv_width(), NAN);
 #endif
-  std::vector<float> post_mixer(qw38::internal::kResidualWidth, NAN);
-  std::vector<float> ffn_normalized(qw38::internal::kResidualWidth, NAN);
-  std::vector<float> ffn_gate(qw38::internal::kFfnWidth, NAN);
-  std::vector<float> ffn_up(qw38::internal::kFfnWidth, NAN);
-  std::vector<float> ffn_activated(qw38::internal::kFfnWidth, NAN);
-  std::vector<float> ffn_correction(qw38::internal::kResidualWidth, NAN);
-  std::vector<float> key_cache(kCapacity * qw38::internal::kAttentionKvWidth,
+  std::vector<float> post_mixer(geometry.residual_width, NAN);
+  std::vector<float> ffn_normalized(geometry.residual_width, NAN);
+  std::vector<float> ffn_gate(geometry.ffn_width, NAN);
+  std::vector<float> ffn_up(geometry.ffn_width, NAN);
+  std::vector<float> ffn_activated(geometry.ffn_width, NAN);
+  std::vector<float> ffn_correction(geometry.residual_width, NAN);
+  std::vector<float> key_cache(kCapacity * geometry.attention_kv_width(),
                                NAN);
   std::vector<float> value_cache(
-      kCapacity * qw38::internal::kAttentionKvWidth, NAN);
-  std::vector<float> output(qw38::internal::kResidualWidth, NAN);
-  std::vector<float> first_output(qw38::internal::kResidualWidth, NAN);
+      kCapacity * geometry.attention_kv_width(), NAN);
+  std::vector<float> output(geometry.residual_width, NAN);
+  std::vector<float> first_output(geometry.residual_width, NAN);
   qw38::internal::AttentionStepWorkspace workspace{
       normalized.data(),
       normalized.size(),
@@ -1332,7 +1439,7 @@ int check_real_attention_step(const char* model_path, const std::string& mode) {
                            32.0F;
     }
   };
-  std::vector<float> residual(qw38::internal::kResidualWidth);
+  std::vector<float> residual(geometry.residual_width);
   fill_residual(&residual, 0);
   const std::size_t first_position = mode == "capacity" ? kCapacity : 0;
   const qw38::internal::AttentionLayerScalarParameters layer_parameters{
@@ -1395,47 +1502,33 @@ int check_real_attention_step(const char* model_path, const std::string& mode) {
     std::cerr << "internal: attention left a nonfinite value\n";
     return 1;
   }
-  const auto taps = [](const std::vector<float>& values,
-                       std::initializer_list<std::size_t> indices) {
-    std::vector<float> selected;
-    selected.reserve(indices.size());
-    for (std::size_t index : indices) selected.push_back(values[index]);
-    return selected;
-  };
-  const std::initializer_list<std::size_t> kResidualTaps{0, 1, 2559, 5119};
-  const std::initializer_list<std::size_t> kHeadTaps{
-      0, 63, 64, 255, 5 * 256, 6 * 256, 23 * 256 + 255};
-  const std::initializer_list<std::size_t> kCacheTaps{
-      0, 31, 32, 63, 64, 255, 256, 511,
-      1024, 1024 + 31, 1024 + 32, 1024 + 63, 1024 + 64, 1024 + 255,
-      1024 + 256, 1024 + 511};
   write_float_vector("normalized_f32_le_hex",
-                     taps(normalized, kResidualTaps));
-  write_float_vector("query_f32_le_hex", taps(query, kHeadTaps));
-  write_float_vector("gate_f32_le_hex", taps(gate, kHeadTaps));
-  write_float_vector("key_cache_f32_le_hex", taps(key_cache, kCacheTaps));
-  write_float_vector("value_cache_f32_le_hex", taps(value_cache, kCacheTaps));
+                     tap_values(normalized, residual_taps(geometry)));
+  write_float_vector("query_f32_le_hex", tap_values(query, attention_head_taps(geometry)));
+  write_float_vector("gate_f32_le_hex", tap_values(gate, attention_head_taps(geometry)));
+  write_float_vector("key_cache_f32_le_hex", tap_values(key_cache, attention_cache_taps(geometry)));
+  write_float_vector("value_cache_f32_le_hex", tap_values(value_cache, attention_cache_taps(geometry)));
   write_float_vector("attention_output_f32_le_hex",
-                     taps(attention_output, kHeadTaps));
+                     tap_values(attention_output, attention_head_taps(geometry)));
   write_float_vector("first_output_f32_le_hex",
-                     taps(first_output, kResidualTaps));
+                     tap_values(first_output, residual_taps(geometry)));
   write_float_vector("mixer_output_f32_le_hex",
-                     taps(mixer_output, kResidualTaps));
+                     tap_values(mixer_output, residual_taps(geometry)));
   write_float_vector("residual_output_f32_le_hex",
-                     taps(output, kResidualTaps));
+                     tap_values(output, residual_taps(geometry)));
   if (layer_mode) {
     write_float_vector("post_mixer_f32_le_hex",
-                       taps(post_mixer, kResidualTaps));
+                       tap_values(post_mixer, residual_taps(geometry)));
     write_float_vector("ffn_normalized_f32_le_hex",
-                       taps(ffn_normalized, kResidualTaps));
+                       tap_values(ffn_normalized, residual_taps(geometry)));
     write_float_vector("ffn_gate_f32_le_hex",
-                       taps(ffn_gate, {0, 1, 8703, 8704, 17407}));
+                       tap_values(ffn_gate, ffn_taps(geometry)));
     write_float_vector("ffn_up_f32_le_hex",
-                       taps(ffn_up, {0, 1, 8703, 8704, 17407}));
+                       tap_values(ffn_up, ffn_taps(geometry)));
     write_float_vector("ffn_activated_f32_le_hex",
-                       taps(ffn_activated, {0, 1, 8703, 8704, 17407}));
+                       tap_values(ffn_activated, ffn_taps(geometry)));
     write_float_vector("ffn_correction_f32_le_hex",
-                       taps(ffn_correction, kResidualTaps));
+                       tap_values(ffn_correction, residual_taps(geometry)));
   }
   std::cout << "kv_values=" << key_cache.size() + value_cache.size() << '\n';
   return 0;
@@ -1444,14 +1537,11 @@ int check_real_attention_step(const char* model_path, const std::string& mode) {
 int check_real_model_boundaries(const char* model_path,
                                 const std::string& mode) {
   qw38::internal::ModelInfo info;
-  qw38::Status status = qw38::internal::inspect_gguf(model_path, &info);
-  if (status.is_ok()) status = qw38::internal::validate_qwen38_contract(&info);
   qw38::internal::MappedFile mapping;
-  if (status.is_ok()) status = mapping.open(model_path);
   qw38::internal::ModelWeights weights;
-  if (status.is_ok()) {
-    status = qw38::internal::bind_model_weights(info, mapping, &weights);
-  }
+  qw38::Status status =
+      load_admitted_weights(model_path, &info, &mapping, &weights);
+  const qw38::internal::ModelGeometry& geometry = weights.geometry;
   if (!status.is_ok()) {
     std::cerr << qw38::status_code_name(status.code()) << ": "
               << status.message() << '\n';
@@ -1463,12 +1553,12 @@ int check_real_model_boundaries(const char* model_path,
     return 1;
   }
 
-  std::vector<float> embedding_zero(qw38::internal::kResidualWidth, NAN);
-  std::vector<float> embedding(qw38::internal::kResidualWidth, NAN);
-  std::vector<float> embedding_last(qw38::internal::kResidualWidth, NAN);
+  std::vector<float> embedding_zero(geometry.residual_width, NAN);
+  std::vector<float> embedding(geometry.residual_width, NAN);
+  std::vector<float> embedding_last(geometry.residual_width, NAN);
   if (mode == "invalid_token") {
     status = qw38::internal::embed_token(
-        weights, qw38::internal::kVocabularySize, embedding.data(),
+        weights, geometry.vocabulary, embedding.data(),
         embedding.size());
     const bool untouched = std::all_of(
         embedding.begin(), embedding.end(),
@@ -1486,19 +1576,19 @@ int check_real_model_boundaries(const char* model_path,
   }
   if (status.is_ok()) {
     status = qw38::internal::embed_token(
-        weights, qw38::internal::kVocabularySize - 1, embedding_last.data(),
+        weights, geometry.vocabulary - 1, embedding_last.data(),
         embedding_last.size());
   }
 
-  std::vector<float> output_norm(qw38::internal::kResidualWidth);
+  std::vector<float> output_norm(geometry.residual_width);
   const qw38::internal::OutputScalarParameters parameters{output_norm.data(),
                                                            output_norm.size()};
   if (status.is_ok()) {
     status =
         qw38::internal::prepare_output_scalar_parameters(weights, parameters);
   }
-  std::vector<float> normalized(qw38::internal::kResidualWidth, NAN);
-  std::vector<float> logits(qw38::internal::kVocabularySize, NAN);
+  std::vector<float> normalized(geometry.residual_width, NAN);
+  std::vector<float> logits(geometry.vocabulary, NAN);
   qw38::internal::OutputWorkspace workspace{normalized.data(),
                                             normalized.size()};
   if (mode == "invalid_workspace") --workspace.normalized_count;
@@ -1532,24 +1622,15 @@ int check_real_model_boundaries(const char* model_path,
     std::cerr << "internal: model boundary left a nonfinite value\n";
     return 1;
   }
-  const auto taps = [](const std::vector<float>& values,
-                       std::initializer_list<std::size_t> indices) {
-    std::vector<float> selected;
-    selected.reserve(indices.size());
-    for (std::size_t index : indices) selected.push_back(values[index]);
-    return selected;
-  };
-  const std::initializer_list<std::size_t> kHiddenTaps{0, 1, 2559, 5119};
-  const std::initializer_list<std::size_t> kLogitTaps{0, 1, 42, 1000, 248319};
   write_float_vector("embedding_0_f32_le_hex",
-                     taps(embedding_zero, kHiddenTaps));
+                     tap_values(embedding_zero, residual_taps(geometry)));
   write_float_vector("embedding_42_f32_le_hex",
-                     taps(embedding, kHiddenTaps));
+                     tap_values(embedding, residual_taps(geometry)));
   write_float_vector("embedding_last_f32_le_hex",
-                     taps(embedding_last, kHiddenTaps));
+                     tap_values(embedding_last, residual_taps(geometry)));
   write_float_vector("final_normalized_f32_le_hex",
-                     taps(normalized, kHiddenTaps));
-  write_float_vector("logits_f32_le_hex", taps(logits, kLogitTaps));
+                     tap_values(normalized, residual_taps(geometry)));
+  write_float_vector("logits_f32_le_hex", tap_values(logits, {0, 1, 42, 1000, geometry.vocabulary - 1}));
   const auto greedy = std::max_element(logits.begin(), logits.end());
   std::cout << "greedy_token=" << std::distance(logits.begin(), greedy) << '\n';
   std::cout << "logit_count=" << logits.size() << '\n';
@@ -1558,14 +1639,11 @@ int check_real_model_boundaries(const char* model_path,
 
 int check_real_scalar_token(const char* model_path, const std::string& mode) {
   qw38::internal::ModelInfo info;
-  qw38::Status status = qw38::internal::inspect_gguf(model_path, &info);
-  if (status.is_ok()) status = qw38::internal::validate_qwen38_contract(&info);
   qw38::internal::MappedFile mapping;
-  if (status.is_ok()) status = mapping.open(model_path);
   qw38::internal::ModelWeights weights;
-  if (status.is_ok()) {
-    status = qw38::internal::bind_model_weights(info, mapping, &weights);
-  }
+  qw38::Status status =
+      load_admitted_weights(model_path, &info, &mapping, &weights);
+  const qw38::internal::ModelGeometry& geometry = weights.geometry;
   if (!status.is_ok()) {
     std::cerr << qw38::status_code_name(status.code()) << ": "
               << status.message() << '\n';
@@ -1580,18 +1658,18 @@ int check_real_scalar_token(const char* model_path, const std::string& mode) {
   status = qw38::internal::prepare_scalar_model_parameters(weights, &parameters);
   qw38::internal::ScalarSessionState state;
   if (status.is_ok()) {
-    status = qw38::internal::create_scalar_session_state(1, &state);
+    status = qw38::internal::create_scalar_session_state(weights.geometry, 1, &state);
   }
   qw38::internal::ScalarWorkspace workspace;
   if (status.is_ok()) {
-    status = qw38::internal::create_scalar_workspace(1, &workspace);
+    status = qw38::internal::create_scalar_workspace(weights.geometry, 1, &workspace);
   }
   if (!status.is_ok()) {
     std::cerr << qw38::status_code_name(status.code()) << ": "
               << status.message() << '\n';
     return 1;
   }
-  std::vector<float> logits(qw38::internal::kVocabularySize, NAN);
+  std::vector<float> logits(geometry.vocabulary, NAN);
   if (mode == "invalid_workspace") workspace.ffn_activated.pop_back();
   status = qw38::internal::execute_scalar_token(
       weights, parameters, 42, &state, &workspace, logits.data(), logits.size());
@@ -1630,7 +1708,7 @@ int check_real_scalar_token(const char* model_path, const std::string& mode) {
   }
   std::size_t gdn_mutated = 0;
   std::size_t attention_mutated = 0;
-  for (std::size_t layer = 0; layer < qw38::internal::kModelLayerCount;
+  for (std::size_t layer = 0; layer < geometry.layer_count;
        ++layer) {
     if (layer % 4 == 3) {
       const auto& view = state.attention[layer];
@@ -1652,30 +1730,22 @@ int check_real_scalar_token(const char* model_path, const std::string& mode) {
       if (changed) ++gdn_mutated;
     }
   }
-  const auto taps = [](const std::vector<float>& values,
-                       std::initializer_list<std::size_t> indices) {
-    std::vector<float> selected;
-    selected.reserve(indices.size());
-    for (std::size_t index : indices) selected.push_back(values[index]);
-    return selected;
-  };
-  const std::initializer_list<std::size_t> kHiddenTaps{0, 1, 2559, 5119};
   write_float_vector("final_hidden_f32_le_hex",
-                     taps(workspace.activation_a, kHiddenTaps));
+                     tap_values(workspace.activation_a, residual_taps(geometry)));
   write_float_vector("final_normalized_f32_le_hex",
-                     taps(workspace.final_normalized, kHiddenTaps));
+                     tap_values(workspace.final_normalized, residual_taps(geometry)));
   write_float_vector("logits_f32_le_hex",
-                     taps(logits, {0, 1, 42, 1000, 248319}));
+                     tap_values(logits, {0, 1, 42, 1000, geometry.vocabulary - 1}));
   write_float_vector(
       "gdn_state_f32_le_hex",
       {state.gdn[0].convolution[3], state.gdn[0].recurrent[0],
        state.gdn[1].convolution[3], state.gdn[1].recurrent[0],
-       state.gdn[62].convolution[3], state.gdn[62].recurrent[0]});
+       state.gdn[geometry.layer_count - 2].convolution[3], state.gdn[geometry.layer_count - 2].recurrent[0]});
   write_float_vector(
       "attention_state_f32_le_hex",
       {state.attention[3].key_cache[0], state.attention[3].value_cache[0],
        state.attention[7].key_cache[0], state.attention[7].value_cache[0],
-       state.attention[63].key_cache[0], state.attention[63].value_cache[0]});
+       state.attention[geometry.layer_count - 1].key_cache[0], state.attention[geometry.layer_count - 1].value_cache[0]});
   const auto greedy = std::max_element(logits.begin(), logits.end());
   std::cout << "greedy_token=" << std::distance(logits.begin(), greedy) << '\n';
   std::cout << "gdn_slots_mutated=" << gdn_mutated << '\n';
@@ -1745,14 +1815,11 @@ int check_real_scalar_chunk(const char* model_path, const std::string& mode) {
     return 1;
   }
   qw38::internal::ModelInfo info;
-  qw38::Status status = qw38::internal::inspect_gguf(model_path, &info);
-  if (status.is_ok()) status = qw38::internal::validate_qwen38_contract(&info);
   qw38::internal::MappedFile mapping;
-  if (status.is_ok()) status = mapping.open(model_path);
   qw38::internal::ModelWeights weights;
-  if (status.is_ok()) {
-    status = qw38::internal::bind_model_weights(info, mapping, &weights);
-  }
+  qw38::Status status =
+      load_admitted_weights(model_path, &info, &mapping, &weights);
+  const qw38::internal::ModelGeometry& geometry = weights.geometry;
   qw38::internal::ScalarModelParameters parameters;
   if (status.is_ok()) {
     status = qw38::internal::prepare_scalar_model_parameters(weights, &parameters);
@@ -1761,21 +1828,21 @@ int check_real_scalar_chunk(const char* model_path, const std::string& mode) {
   const std::size_t capacity = mode == "insufficient_capacity" ? 1 : 2;
   qw38::internal::ScalarSessionState chunk_state;
   if (status.is_ok()) {
-    status = qw38::internal::create_scalar_session_state(capacity, &chunk_state);
+    status = qw38::internal::create_scalar_session_state(weights.geometry, capacity, &chunk_state);
   }
   qw38::internal::ScalarWorkspace chunk_workspace;
   if (status.is_ok()) {
-    status = qw38::internal::create_scalar_workspace(capacity, &chunk_workspace);
+    status = qw38::internal::create_scalar_workspace(weights.geometry, capacity, &chunk_workspace);
   }
   if (!status.is_ok()) {
     std::cerr << qw38::status_code_name(status.code()) << ": "
               << status.message() << '\n';
     return 1;
   }
-  std::vector<float> chunk_logits(tokens.size() * qw38::internal::kVocabularySize,
+  std::vector<float> chunk_logits(tokens.size() * geometry.vocabulary,
                                   NAN);
   std::array<std::size_t, 2> attempted = tokens;
-  if (mode == "invalid_token") attempted[1] = qw38::internal::kVocabularySize;
+  if (mode == "invalid_token") attempted[1] = geometry.vocabulary;
   std::size_t logits_count = chunk_logits.size();
   if (mode == "invalid_logits") --logits_count;
   status = qw38::internal::execute_scalar_chunk(
@@ -1812,17 +1879,17 @@ int check_real_scalar_chunk(const char* model_path, const std::string& mode) {
   }
 
   qw38::internal::ScalarSessionState token_state;
-  status = qw38::internal::create_scalar_session_state(2, &token_state);
+  status = qw38::internal::create_scalar_session_state(weights.geometry, 2, &token_state);
   qw38::internal::ScalarWorkspace token_workspace;
   if (status.is_ok()) {
-    status = qw38::internal::create_scalar_workspace(2, &token_workspace);
+    status = qw38::internal::create_scalar_workspace(weights.geometry, 2, &token_workspace);
   }
   std::vector<float> token_logits(chunk_logits.size(), NAN);
   for (std::size_t index = 0; status.is_ok() && index < tokens.size(); ++index) {
     status = qw38::internal::execute_scalar_token(
         weights, parameters, tokens[index], &token_state, &token_workspace,
-        token_logits.data() + index * qw38::internal::kVocabularySize,
-        qw38::internal::kVocabularySize);
+        token_logits.data() + index * geometry.vocabulary,
+        geometry.vocabulary);
   }
   if (!status.is_ok()) {
     std::cerr << qw38::status_code_name(status.code()) << ": "
@@ -1841,54 +1908,51 @@ int check_real_scalar_chunk(const char* model_path, const std::string& mode) {
     std::cerr << "internal: scalar chunk differs from repeated token execution\n";
     return 1;
   }
-  const auto taps = [](const std::vector<float>& values, std::size_t row) {
-    const std::size_t base = row * qw38::internal::kVocabularySize;
+  const auto taps = [&geometry](const std::vector<float>& values, std::size_t row) {
+    const std::size_t base = row * geometry.vocabulary;
     return std::vector<float>{values[base], values[base + 1],
                               values[base + 42], values[base + 1000],
-                              values[base + 248319]};
+                              values[base + geometry.vocabulary - 1]};
   };
   write_float_vector("token0_logits_f32_le_hex", taps(chunk_logits, 0));
   write_float_vector("token1_logits_f32_le_hex", taps(chunk_logits, 1));
   for (std::size_t row = 0; row < tokens.size(); ++row) {
     const auto begin = chunk_logits.begin() +
                        static_cast<std::ptrdiff_t>(
-                           row * qw38::internal::kVocabularySize);
+                           row * geometry.vocabulary);
     const auto greedy = std::max_element(
-        begin, begin + qw38::internal::kVocabularySize);
+        begin, begin + geometry.vocabulary);
     std::cout << "token" << row << "_greedy="
               << std::distance(begin, greedy) << '\n';
   }
   std::cout << "equivalent=1\ntoken_count=2\nfrontier=" << chunk_state.frontier
             << "\nlayers_completed=" << chunk_workspace.layers_completed
             << "\nlogit_rows=2\nlogit_stride="
-            << qw38::internal::kVocabularySize << '\n';
+            << geometry.vocabulary << '\n';
   return 0;
 }
 
 int dump_real_scalar_logits(const char* model_path, const char* output_path) {
   qw38::internal::ModelInfo info;
-  qw38::Status status = qw38::internal::inspect_gguf(model_path, &info);
-  if (status.is_ok()) status = qw38::internal::validate_qwen38_contract(&info);
   qw38::internal::MappedFile mapping;
-  if (status.is_ok()) status = mapping.open(model_path);
   qw38::internal::ModelWeights weights;
-  if (status.is_ok()) {
-    status = qw38::internal::bind_model_weights(info, mapping, &weights);
-  }
+  qw38::Status status =
+      load_admitted_weights(model_path, &info, &mapping, &weights);
+  const qw38::internal::ModelGeometry& geometry = weights.geometry;
   qw38::internal::ScalarModelParameters parameters;
   if (status.is_ok()) {
     status = qw38::internal::prepare_scalar_model_parameters(weights, &parameters);
   }
   qw38::internal::ScalarSessionState state;
   if (status.is_ok()) {
-    status = qw38::internal::create_scalar_session_state(2, &state);
+    status = qw38::internal::create_scalar_session_state(weights.geometry, 2, &state);
   }
   qw38::internal::ScalarWorkspace workspace;
   if (status.is_ok()) {
-    status = qw38::internal::create_scalar_workspace(2, &workspace);
+    status = qw38::internal::create_scalar_workspace(weights.geometry, 2, &workspace);
   }
   const std::array<std::size_t, 2> tokens{42, 3649};
-  std::vector<float> logits(tokens.size() * qw38::internal::kVocabularySize);
+  std::vector<float> logits(tokens.size() * geometry.vocabulary);
   if (status.is_ok()) {
     status = qw38::internal::execute_scalar_chunk(
         weights, parameters, tokens.data(), tokens.size(), &state, &workspace,
@@ -1912,12 +1976,12 @@ int dump_real_scalar_logits(const char* model_path, const char* output_path) {
     return 1;
   }
   std::cout << "schema_version=1\ntoken_count=" << tokens.size()
-            << "\nvocabulary_size=" << qw38::internal::kVocabularySize
+            << "\nvocabulary_size=" << geometry.vocabulary
             << "\ntoken_0=" << tokens[0] << "\ntoken_1=" << tokens[1];
   for (std::size_t row = 0; row < tokens.size(); ++row) {
-    const float* begin = logits.data() + row * qw38::internal::kVocabularySize;
+    const float* begin = logits.data() + row * geometry.vocabulary;
     const float* greedy =
-        std::max_element(begin, begin + qw38::internal::kVocabularySize);
+        std::max_element(begin, begin + geometry.vocabulary);
     std::cout << "\ngreedy_" << row << '=' << greedy - begin;
   }
   std::cout << "\nlogits_bytes=" << logits.size() * sizeof(float) << '\n';
@@ -2257,6 +2321,8 @@ int check_matvec(const std::string& kind, const char* columns_text,
     type = 8;
   } else if (kind == "q4_k") {
     type = 12;
+  } else if (kind == "q5_k") {
+    type = 13;
   } else if (kind == "q6_k") {
     type = 14;
   } else {
@@ -2265,9 +2331,21 @@ int check_matvec(const std::string& kind, const char* columns_text,
   }
   std::vector<std::uint8_t> payload;
   std::vector<float> activation;
+  const bool payload_ok = load_bytes_argument(payload_hex, &payload);
+  bool activation_ok = false;
+  if (!activation_hex.empty() && activation_hex.front() == '@') {
+    std::vector<std::uint8_t> raw;
+    activation_ok = load_bytes_argument(activation_hex, &raw) &&
+                    raw.size() % 4 == 0;
+    if (activation_ok) {
+      activation.resize(raw.size() / 4);
+      std::memcpy(activation.data(), raw.data(), raw.size());
+    }
+  } else {
+    activation_ok = parse_float_hex(activation_hex, &activation);
+  }
   if (!parse_size(columns_text, &columns) || !parse_size(rows_text, &rows) ||
-      !parse_hex(payload_hex, &payload) ||
-      !parse_float_hex(activation_hex, &activation)) {
+      !payload_ok || !activation_ok) {
     std::cerr << "invalid_argument: malformed matrix dimensions or hex\n";
     return 1;
   }
@@ -2305,7 +2383,10 @@ int check_tensor_row(const char* model_path, const std::string& name,
   }
   qw38::internal::ModelInfo info;
   qw38::Status status = qw38::internal::inspect_gguf(model_path, &info);
-  if (status.is_ok()) status = qw38::internal::validate_qwen38_contract(&info);
+  if (status.is_ok()) {
+    qw38::internal::ModelGeometry geometry;
+    status = qw38::internal::admit_pinned_geometry(&info, &geometry);
+  }
   qw38::internal::MappedFile mapping;
   if (status.is_ok()) status = mapping.open(model_path);
   qw38::internal::TensorView view;
@@ -2356,7 +2437,10 @@ int tokenize_hex(const char* model_path, const std::string& hex) {
   }
   qw38::internal::ModelInfo info;
   qw38::Status status = qw38::internal::inspect_gguf(model_path, &info);
-  if (status.is_ok()) status = qw38::internal::validate_qwen38_contract(&info);
+  if (status.is_ok()) {
+    qw38::internal::ModelGeometry geometry;
+    status = qw38::internal::admit_pinned_geometry(&info, &geometry);
+  }
   qw38::internal::Tokenizer tokenizer;
   if (status.is_ok()) status = tokenizer.build(info);
   std::vector<std::uint32_t> ids;
@@ -2443,6 +2527,96 @@ int render_template_case(const std::string& name) {
   std::cout << rendered;
   return 0;
 }
+
+int measure_host_decode(const char* model_path, std::size_t prompt_tokens,
+                        std::size_t decode_tokens) {
+  if (prompt_tokens == 0 || decode_tokens == 0) {
+    std::cerr << "prompt and decode token counts must be positive\n";
+    return 1;
+  }
+  qw38::Engine engine;
+  const auto load_begin = std::chrono::steady_clock::now();
+  qw38::Status status = qw38::Engine::open(model_path, 512, &engine);
+  const auto load_end = std::chrono::steady_clock::now();
+  if (!status.is_ok()) {
+    std::cerr << qw38::status_code_name(status.code()) << ": "
+              << status.message() << '\n';
+    return 1;
+  }
+  std::unique_ptr<qw38::Session> session;
+  status = engine.create_session(&session);
+  if (!status.is_ok()) {
+    std::cerr << qw38::status_code_name(status.code()) << ": "
+              << status.message() << '\n';
+    return 1;
+  }
+  std::string prompt;
+  prompt.reserve(prompt_tokens * 6);
+  for (std::size_t index = 0; index < prompt_tokens; ++index) {
+    prompt += "hello ";
+  }
+  std::vector<qw38::Token> encoded;
+  status = engine.encode(prompt, &encoded);
+  if (!status.is_ok()) {
+    std::cerr << qw38::status_code_name(status.code()) << ": "
+              << status.message() << '\n';
+    return 1;
+  }
+  if (encoded.size() > prompt_tokens) encoded.resize(prompt_tokens);
+  while (encoded.size() < prompt_tokens) {
+    encoded.push_back(encoded.empty() ? 1U : encoded.back());
+  }
+  const auto prefill_begin = std::chrono::steady_clock::now();
+  status = session->sync(encoded);
+  const auto prefill_end = std::chrono::steady_clock::now();
+  if (!status.is_ok()) {
+    std::cerr << qw38::status_code_name(status.code()) << ": "
+              << status.message() << '\n';
+    return 1;
+  }
+  qw38::SamplerConfig sampler;
+  sampler.temperature = 0.0F;
+  const auto decode_begin = std::chrono::steady_clock::now();
+  for (std::size_t index = 0; index < decode_tokens; ++index) {
+    qw38::Token token = 0;
+    status = session->sample(sampler, &token);
+    if (status.is_ok()) status = session->eval(token);
+    if (!status.is_ok()) {
+      std::cerr << qw38::status_code_name(status.code()) << ": "
+                << status.message() << '\n';
+      return 1;
+    }
+  }
+  const auto decode_end = std::chrono::steady_clock::now();
+  rusage usage{};
+  getrusage(RUSAGE_SELF, &usage);
+#if defined(__APPLE__)
+  const std::uint64_t rss_bytes = static_cast<std::uint64_t>(usage.ru_maxrss);
+#else
+  const std::uint64_t rss_bytes =
+      static_cast<std::uint64_t>(usage.ru_maxrss) * 1024ULL;
+#endif
+  const double load_seconds =
+      std::chrono::duration<double>(load_end - load_begin).count();
+  const double ttft_seconds =
+      std::chrono::duration<double>(prefill_end - prefill_begin).count();
+  const double decode_seconds =
+      std::chrono::duration<double>(decode_end - decode_begin).count();
+  std::cout << "load_seconds=" << load_seconds << '\n';
+  std::cout << "ttft_seconds=" << ttft_seconds << '\n';
+  std::cout << "prompt_tokens=" << prompt_tokens << '\n';
+  std::cout << "decode_tokens=" << decode_tokens << '\n';
+  std::cout << "decode_seconds=" << decode_seconds << '\n';
+  std::cout << "decode_tok_s=" << (decode_seconds > 0.0
+                                       ? decode_tokens / decode_seconds
+                                       : 0.0)
+            << '\n';
+  std::cout << "rss_bytes=" << rss_bytes << '\n';
+  std::cout << "threads=8\n";
+  std::cout << "sha256_backend=" << qw38::internal::sha256_backend_name()
+            << '\n';
+  return 0;
+}
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -2465,6 +2639,13 @@ int main(int argc, char** argv) {
     std::cout << "model_revision=" << kModelRevision << '\n';
     std::cout << "model_sha256=" << kModelSha256 << '\n';
     return 0;
+  }
+  if (argc >= 3 && std::string(argv[1]) == "--measure-host-decode") {
+    std::size_t prompt_tokens = 64;
+    std::size_t decode_tokens = 16;
+    if (argc >= 4) prompt_tokens = static_cast<std::size_t>(std::atoi(argv[3]));
+    if (argc >= 5) decode_tokens = static_cast<std::size_t>(std::atoi(argv[4]));
+    return measure_host_decode(argv[2], prompt_tokens, decode_tokens);
   }
   if (argc == 3 && std::string(argv[1]) == "--inspect-gguf") {
     qw38::internal::ModelInfo info;
@@ -2508,25 +2689,32 @@ int main(int argc, char** argv) {
   }
   if (argc == 3 && std::string(argv[1]) == "--verify-model") {
     qw38::Engine engine;
-    const qw38::Status status = qw38::Engine::open(argv[2], &engine);
+    qw38::Status status = qw38::Engine::open(argv[2], &engine);
+    std::string identity;
+    if (status.is_ok()) status = engine.admitted_model(&identity);
     if (!status.is_ok()) {
       std::cerr << qw38::status_code_name(status.code()) << ": "
                 << status.message() << '\n';
       return 1;
     }
-    std::cout << "verified=pinned-qwen3.8-27b-q4_k_m\n";
+    std::cout << "verified=" << identity << '\n';
     return 0;
   }
   if (argc == 3 && std::string(argv[1]) == "--check-contract") {
     qw38::internal::ModelInfo info;
     qw38::Status status = qw38::internal::inspect_gguf(argv[2], &info);
-    if (status.is_ok()) status = qw38::internal::validate_qwen38_contract(&info);
+    qw38::internal::ModelGeometry geometry;
+    if (status.is_ok()) status = qw38::internal::admit_pinned_geometry(&info, &geometry);
     if (!status.is_ok()) {
       std::cerr << qw38::status_code_name(status.code()) << ": "
                 << status.message() << '\n';
       return 1;
     }
-    std::cout << "contract=qwen3.8-27b-q4_k_m\n";
+    std::cout << "contract="
+              << (geometry.identity == qw38::internal::kGeometryQwen35_2B
+                      ? "qwen3.5-2b-q4_k_m"
+                      : "qwen3.8-27b-q4_k_m")
+              << '\n';
     return 0;
   }
   if (argc == 4 && std::string(argv[1]) == "--inventory-gguf") {

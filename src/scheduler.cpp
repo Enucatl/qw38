@@ -10,7 +10,8 @@ Status validate_layer_ffn(const FfnScalarParameters& parameters,
                           float* post_mixer,
                           std::size_t post_mixer_count, float* output,
                           std::size_t output_count) noexcept {
-  if (post_mixer == nullptr || post_mixer_count != kResidualWidth) {
+  if (post_mixer == nullptr ||
+      post_mixer_count != parameters.norm_count) {
     return {StatusCode::kInvalidArgument,
             "layer post-mixer buffer is invalid"};
   }
@@ -22,8 +23,8 @@ Status validate_layer_ffn(const FfnScalarParameters& parameters,
 
 Status embed_token(const ModelWeights& weights, std::size_t token,
                    float* output, std::size_t output_count) noexcept {
-  if (token >= kVocabularySize || output == nullptr ||
-      output_count != kResidualWidth) {
+  if (token >= weights.geometry.vocabulary || output == nullptr ||
+      output_count != weights.geometry.residual_width) {
     return {StatusCode::kInvalidArgument,
             "token ID or embedding output is invalid"};
   }
@@ -34,7 +35,8 @@ Status embed_token(const ModelWeights& weights, std::size_t token,
 Status prepare_output_scalar_parameters(
     const ModelWeights& weights,
     const OutputScalarParameters& parameters) noexcept {
-  if (parameters.norm == nullptr || parameters.norm_count != kResidualWidth) {
+  if (parameters.norm == nullptr ||
+      parameters.norm_count != weights.geometry.residual_width) {
     return {StatusCode::kInvalidArgument,
             "output scalar parameter buffer is invalid"};
   }
@@ -47,11 +49,12 @@ Status project_logits(const ModelWeights& weights,
                       const float* hidden, std::size_t hidden_count,
                       const OutputWorkspace& workspace, float* logits,
                       std::size_t logits_count) noexcept {
-  if (parameters.norm == nullptr || parameters.norm_count != kResidualWidth ||
-      hidden == nullptr || hidden_count != kResidualWidth ||
+  if (parameters.norm == nullptr ||
+      parameters.norm_count != weights.geometry.residual_width ||
+      hidden == nullptr || hidden_count != weights.geometry.residual_width ||
       workspace.normalized == nullptr ||
-      workspace.normalized_count != kResidualWidth || logits == nullptr ||
-      logits_count != kVocabularySize) {
+      workspace.normalized_count != weights.geometry.residual_width ||
+      logits == nullptr || logits_count != weights.geometry.vocabulary) {
     return {StatusCode::kInvalidArgument,
             "final hidden, output workspace, or logits are invalid"};
   }

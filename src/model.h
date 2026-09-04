@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 
+#include "geometry.h"
 #include "qw38/status.h"
 
 namespace qw38::internal {
@@ -62,6 +63,8 @@ struct ModelInfo final {
 
 Status inspect_gguf(const std::string& path, ModelInfo* info) noexcept;
 Status validate_qwen38_contract(ModelInfo* info) noexcept;
+Status validate_qwen35_2b_contract(ModelInfo* info) noexcept;
+Status admit_pinned_geometry(ModelInfo* info, ModelGeometry* geometry) noexcept;
 const char* ggml_type_name(std::uint32_t type) noexcept;
 
 }  // namespace qw38::internal

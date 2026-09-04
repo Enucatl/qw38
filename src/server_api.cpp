@@ -449,6 +449,11 @@ bool parse_tool_xml(const std::string& value,
 }  // namespace
 
 Status parse_chat_request(const Json& root, ChatRequest* request) noexcept {
+  return parse_chat_request(root, kModelId, request);
+}
+
+Status parse_chat_request(const Json& root, const char* model_id,
+                          ChatRequest* request) noexcept {
   if (request == nullptr || root.kind != JsonKind::kObject) {
     return invalid("Chat Completions request must be a JSON object");
   }
@@ -466,9 +471,10 @@ Status parse_chat_request(const Json& root, ChatRequest* request) noexcept {
   *request = {};
   request->sampler.temperature = 1.0F;
   const Json* model = root.find("model");
+  const char* expected = model_id == nullptr ? kModelId : model_id;
   if (model == nullptr || model->kind != JsonKind::kString ||
-      model->text != kModelId) {
-    return invalid("model must be qwen3.8-27b-q4_k_m");
+      model->text != expected) {
+    return invalid(std::string("model must be ") + expected);
   }
   Status status = parse_messages(root.find("messages"), &request->messages);
   if (!status.is_ok()) return status;

@@ -62,6 +62,7 @@ struct RouteContext final {
   qw38::Token end_token = 0;
   qw38::server::SingleFlightGate* gate = nullptr;
   std::atomic<std::uint64_t>* cancelled_requests = nullptr;
+  std::string model_id = kModelId;
 };
 
 class ConnectionTracker final {
@@ -391,7 +392,7 @@ Response control_route(const Request& request, const RouteContext& context) {
     const bool active = context.gate->active();
     return {200,
             std::string("{\"status\":\"ok\",\"ready\":true,\"model\":\"") +
-                kModelId + "\",\"single_flight\":true,\"sessions\":1," +
+                context.model_id + "\",\"single_flight\":true,\"sessions\":1," +
                 "\"queue_active\":" + (active ? "true" : "false") +
                 ",\"queue_depth\":" + std::to_string(queued) +
                 ",\"cancelled_requests\":" +
@@ -402,7 +403,7 @@ Response control_route(const Request& request, const RouteContext& context) {
   if (path == "/v1/models") {
     return {200,
             std::string("{\"object\":\"list\",\"data\":[{\"id\":\"") +
-                kModelId +
+                context.model_id +
                 "\",\"object\":\"model\",\"created\":0,\"owned_by\":"
                 "\"quartz-watch-38\"}]}",
             std::string()};
@@ -468,6 +469,7 @@ std::string stream_tool_calls_json(
 }
 
 std::string completion_json(const std::string& id, std::int64_t created,
+                            const std::string& model_id,
                             const qw38::server::GenerationResult& result) {
   std::string message = "{\"role\":\"assistant\",\"content\":";
   message += result.output.tool_calls.empty()
@@ -483,7 +485,7 @@ std::string completion_json(const std::string& id, std::int64_t created,
   message += "}";
   return "{\"id\":" + qw38::server::quote_json(id) +
          ",\"object\":\"chat.completion\",\"created\":" +
-         std::to_string(created) + ",\"model\":\"" + kModelId +
+         std::to_string(created) + ",\"model\":\"" + model_id +
          "\",\"choices\":[{\"index\":0,\"message\":" + message +
          ",\"finish_reason\":" +
          qw38::server::quote_json(result.finish_reason) +
@@ -495,6 +497,7 @@ struct StreamContext final {
   int socket = -1;
   std::string id;
   std::int64_t created = 0;
+  std::string model_id;
 };
 
 bool send_sse(int socket, const std::string& json) noexcept {
@@ -506,7 +509,7 @@ std::string chunk_json(const StreamContext& context,
                        const char* finish_reason) {
   return "{\"id\":" + qw38::server::quote_json(context.id) +
          ",\"object\":\"chat.completion.chunk\",\"created\":" +
-         std::to_string(context.created) + ",\"model\":\"" + kModelId +
+         std::to_string(context.created) + ",\"model\":\"" + context.model_id +
          "\",\"choices\":[{\"index\":0,\"delta\":" + delta +
          ",\"finish_reason\":" +
          (finish_reason == nullptr ? "null"
@@ -547,7 +550,10 @@ void serve_chat(int socket, const Request& request,
   qw38::server::Json root;
   qw38::Status status = qw38::server::parse_json(request.body, 64, &root);
   qw38::server::ChatRequest chat;
-  if (status.is_ok()) status = qw38::server::parse_chat_request(root, &chat);
+  if (status.is_ok()) {
+    status = qw38::server::parse_chat_request(root, context.model_id.c_str(),
+                                              &chat);
+  }
   if (!status.is_ok()) {
     write_response(socket,
                    {400, error_body(status.message(),
@@ -576,7 +582,7 @@ void serve_chat(int socket, const Request& request,
 
   const std::string id = response_id();
   const std::int64_t created = unix_seconds();
-  StreamContext stream{socket, id, created};
+  StreamContext stream{socket, id, created, context.model_id};
   bool stream_started = false;
   if (chat.stream) {
     stream_started = write_headers(socket, 200, "text/event-stream",
@@ -616,7 +622,7 @@ void serve_chat(int socket, const Request& request,
         const std::string usage =
             "{\"id\":" + qw38::server::quote_json(id) +
             ",\"object\":\"chat.completion.chunk\",\"created\":" +
-            std::to_string(created) + ",\"model\":\"" + kModelId +
+            std::to_string(created) + ",\"model\":\"" + context.model_id +
             "\",\"choices\":[],\"usage\":" + usage_json(result) + "}";
         send_sse(socket, usage);
       }
@@ -627,7 +633,8 @@ void serve_chat(int socket, const Request& request,
     }
     send_all(socket, "data: [DONE]\n\n");
   } else if (status.is_ok()) {
-    const std::string body = completion_json(id, created, result);
+    const std::string body =
+        completion_json(id, created, context.model_id, result);
     write_response(socket, {200, body, queue_headers(timing)});
   } else if (!monitor.cancelled()->load(std::memory_order_relaxed)) {
     write_response(socket,
@@ -718,6 +725,8 @@ int main(int argc, char** argv) {
 
   qw38::Engine engine;
   qw38::Status status = qw38::Engine::open(options.model, &engine);
+  std::string model_id = kModelId;
+  if (status.is_ok()) status = engine.admitted_model(&model_id);
   std::unique_ptr<qw38::Session> session;
   if (status.is_ok()) status = engine.create_session(&session);
   std::vector<qw38::Token> end_tokens;
@@ -740,7 +749,7 @@ int main(int argc, char** argv) {
   qw38::server::SingleFlightGate gate;
   std::atomic<std::uint64_t> cancelled_requests{0};
   RouteContext context{&engine, session.get(), end_tokens[0], &gate,
-                       &cancelled_requests};
+                       &cancelled_requests, model_id};
   ConnectionTracker tracker;
   struct sigaction action {};
   action.sa_handler = stop_server;
@@ -749,7 +758,7 @@ int main(int argc, char** argv) {
   sigaction(SIGTERM, &action, nullptr);
   g_listener = listener;
   std::cout << "listening=http://" << options.host << ':' << bound_port
-            << " model=" << kModelId << " sessions=1\n"
+            << " model=" << model_id << " sessions=1\n"
             << std::flush;
 
   while (!g_stop) {

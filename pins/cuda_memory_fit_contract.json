@@ -19,7 +19,7 @@
     "reason": "the complete owner set leaves at least 1.5 GiB free after graph upload"
   },
   "local_sources": {
-    "Makefile": "688547d2d47384ddb4eed5eb983caf874f5df7bd3d126c64a0e741e1c7c79ece",
+    "Makefile": "67913fa289fcce8acd39ae371c0632ba45931a85e6172f1c5e8d88f6cf28af0e",
     "cuda/memory_fit_test.cu": "705a2154a8035a45dbb9693a885d0edeebd1cdbac601a056ab744777152d1b20"
   }
 }

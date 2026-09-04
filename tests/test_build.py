@@ -5,6 +5,7 @@ import hashlib
 import os
 import struct
 import subprocess
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -41,7 +42,7 @@ def test_cli_help_does_not_require_a_model() -> None:
     result = run_binary("qw38", "--help")
     assert result.returncode == 0
     assert "usage: qw38 MODEL [options]" in result.stdout
-    assert "interactive commands:" in result.stdout
+    assert "--ctx N" in result.stdout
 
     server = run_binary("qw38-server", "--help")
     assert server.returncode == 0
@@ -121,7 +122,11 @@ def test_native_sha256_matches_standard_library(tmp_path: Path) -> None:
 def test_sha256_backend_is_explicit_and_fallback_is_selectable() -> None:
     accelerated = run_binary("qw38-eval", "--sha256-backend")
     assert accelerated.returncode == 0
-    assert accelerated.stdout.strip() == "openssl-evp"
+    backend = accelerated.stdout.strip()
+    if sys.platform == "darwin":
+        assert backend in {"portable", "openssl-evp", "commoncrypto"}
+    else:
+        assert backend == "openssl-evp"
 
     environment = os.environ.copy()
     environment["QW38_SHA256_FORCE_PORTABLE"] = "1"

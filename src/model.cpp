@@ -229,6 +229,10 @@ bool tensor_storage_bytes(const TensorInfo& tensor,
       block_elements = 256;
       block_bytes = 144;
       break;
+    case 13:  // Q5_K
+      block_elements = 256;
+      block_bytes = 176;
+      break;
     case 14:  // Q6_K
       block_elements = 256;
       block_bytes = 210;
@@ -273,6 +277,35 @@ Status admit_tensor(std::vector<TensorInfo>* tensors,
   }
   match->semantic_role = expected.role;
   admitted->insert(expected.name);
+  return Status::ok();
+}
+
+bool is_quant_type(std::uint32_t type) noexcept {
+  return type == 8 || type == 12 || type == 13 || type == 14;
+}
+
+Status admit_named(std::vector<TensorInfo>* tensors,
+                   std::set<std::string>* admitted, const std::string& name,
+                   const std::vector<std::uint64_t>& dimensions,
+                   bool quant_matrix, const char* role) noexcept {
+  const auto match = std::find_if(
+      tensors->begin(), tensors->end(),
+      [&name](const TensorInfo& tensor) { return tensor.name == name; });
+  if (match == tensors->end() || match->dimensions != dimensions) {
+    return {StatusCode::kIncompatibleArtifact,
+            "tensor contract mismatch: " + name};
+  }
+  if (quant_matrix) {
+    if (!is_quant_type(match->type)) {
+      return {StatusCode::kIncompatibleArtifact,
+              "tensor contract mismatch: " + name};
+    }
+  } else if (match->type != 0) {
+    return {StatusCode::kIncompatibleArtifact,
+            "tensor contract mismatch: " + name};
+  }
+  match->semantic_role = role;
+  admitted->insert(name);
   return Status::ok();
 }
 
@@ -557,6 +590,158 @@ Status validate_qwen38_contract(ModelInfo* info) noexcept {
   return Status::ok();
 }
 
+Status validate_qwen35_2b_contract(ModelInfo* info) noexcept {
+  if (info == nullptr) {
+    return {StatusCode::kInvalidArgument, "model contract output is required"};
+  }
+  const ModelGeometry geometry = qwen35_2b_geometry();
+  const bool has_output = std::any_of(
+      info->tensors.begin(), info->tensors.end(), [](const TensorInfo& tensor) {
+        return tensor.name == "output.weight";
+      });
+  const std::size_t expected_tensors =
+      geometry.expected_tensor_count + (has_output ? 1 : 0);
+  if (info->architecture != "qwen35" || info->block_count != 24 ||
+      info->embedding_length != 2048 || info->query_heads != 8 ||
+      info->kv_heads != 2 || info->rope_dimensions != 64 ||
+      info->tensors.size() != expected_tensors ||
+      info->tokenizer_model != "gpt2" ||
+      info->tokenizer_tokens.size() != 248320 ||
+      info->tokenizer_token_types.size() != info->tokenizer_tokens.size() ||
+      info->tokenizer_merges.size() != 247587) {
+    return {StatusCode::kIncompatibleArtifact,
+            "GGUF does not match the admitted Qwen3.5-2B contract"};
+  }
+  std::set<std::string> admitted;
+  Status status = admit_named(&info->tensors, &admitted, "token_embd.weight",
+                              {2048, 248320}, true, "token_embedding");
+  if (status.is_ok()) {
+    status = admit_named(&info->tensors, &admitted, "output_norm.weight", {2048},
+                         false, "final_norm");
+  }
+  if (status.is_ok() && has_output) {
+    status = admit_named(&info->tensors, &admitted, "output.weight",
+                         {2048, 248320}, true, "output_projection");
+  }
+  for (std::uint32_t layer = 0; status.is_ok() && layer < 24; ++layer) {
+    const std::string prefix = "blk." + std::to_string(layer) + ".";
+    const bool attention = layer % 4 == 3;
+    status = admit_named(&info->tensors, &admitted, prefix + "attn_norm.weight",
+                         {2048}, false, "input_norm");
+    if (status.is_ok()) {
+      status = admit_named(&info->tensors, &admitted, prefix + "ffn_down.weight",
+                           {6144, 2048}, true, "ffn_down");
+    }
+    if (status.is_ok()) {
+      status = admit_named(&info->tensors, &admitted, prefix + "ffn_gate.weight",
+                           {2048, 6144}, true, "ffn_gate");
+    }
+    if (status.is_ok()) {
+      status = admit_named(&info->tensors, &admitted, prefix + "ffn_up.weight",
+                           {2048, 6144}, true, "ffn_up");
+    }
+    if (status.is_ok()) {
+      status = admit_named(&info->tensors, &admitted,
+                           prefix + "post_attention_norm.weight", {2048}, false,
+                           "ffn_norm");
+    }
+    if (!status.is_ok()) break;
+    if (attention) {
+      status = admit_named(&info->tensors, &admitted, prefix + "attn_k.weight",
+                           {2048, 512}, true, "attention_k");
+      if (status.is_ok()) {
+        status = admit_named(&info->tensors, &admitted,
+                             prefix + "attn_k_norm.weight", {256}, false,
+                             "attention_k_norm");
+      }
+      if (status.is_ok()) {
+        status = admit_named(&info->tensors, &admitted,
+                             prefix + "attn_output.weight", {2048, 2048}, true,
+                             "attention_output");
+      }
+      if (status.is_ok()) {
+        status = admit_named(&info->tensors, &admitted, prefix + "attn_q.weight",
+                             {2048, 4096}, true, "attention_q_gate");
+      }
+      if (status.is_ok()) {
+        status = admit_named(&info->tensors, &admitted,
+                             prefix + "attn_q_norm.weight", {256}, false,
+                             "attention_q_norm");
+      }
+      if (status.is_ok()) {
+        status = admit_named(&info->tensors, &admitted, prefix + "attn_v.weight",
+                             {2048, 512}, true, "attention_v");
+      }
+    } else {
+      status = admit_named(&info->tensors, &admitted, prefix + "attn_gate.weight",
+                           {2048, 2048}, true, "gdn_value_gate");
+      if (status.is_ok()) {
+        status = admit_named(&info->tensors, &admitted,
+                             prefix + "attn_qkv.weight", {2048, 6144}, true,
+                             "gdn_packed_qkv");
+      }
+      if (status.is_ok()) {
+        status = admit_named(&info->tensors, &admitted, prefix + "ssm_a", {16},
+                             false, "gdn_decay");
+      }
+      if (status.is_ok()) {
+        status = admit_named(&info->tensors, &admitted,
+                             prefix + "ssm_alpha.weight", {2048, 16}, true,
+                             "gdn_alpha");
+      }
+      if (status.is_ok()) {
+        status = admit_named(&info->tensors, &admitted,
+                             prefix + "ssm_beta.weight", {2048, 16}, true,
+                             "gdn_beta");
+      }
+      if (status.is_ok()) {
+        status = admit_named(&info->tensors, &admitted,
+                             prefix + "ssm_conv1d.weight", {4, 6144}, false,
+                             "gdn_convolution");
+      }
+      if (status.is_ok()) {
+        status = admit_named(&info->tensors, &admitted, prefix + "ssm_dt.bias",
+                             {16}, false, "gdn_dt_bias");
+      }
+      if (status.is_ok()) {
+        status = admit_named(&info->tensors, &admitted,
+                             prefix + "ssm_norm.weight", {128}, false,
+                             "gdn_norm");
+      }
+      if (status.is_ok()) {
+        status = admit_named(&info->tensors, &admitted, prefix + "ssm_out.weight",
+                             {2048, 2048}, true, "gdn_output");
+      }
+    }
+  }
+  if (!status.is_ok()) return status;
+  if (admitted.size() != info->tensors.size()) {
+    return {StatusCode::kIncompatibleArtifact,
+            "GGUF contains unrecognized or duplicate tensors"};
+  }
+  return Status::ok();
+}
+
+Status admit_pinned_geometry(ModelInfo* info, ModelGeometry* geometry) noexcept {
+  if (info == nullptr || geometry == nullptr) {
+    return {StatusCode::kInvalidArgument,
+            "model info and geometry output are required"};
+  }
+  Status status = validate_qwen38_contract(info);
+  if (status.is_ok()) {
+    *geometry = qwen38_27b_geometry();
+    return status;
+  }
+  status = validate_qwen35_2b_contract(info);
+  if (!status.is_ok()) return status;
+  *geometry = qwen35_2b_geometry();
+  if (info->tensors.size() == geometry->expected_tensor_count + 1) {
+    geometry->expected_tensor_count += 1;
+    geometry->tied_embeddings = false;
+  }
+  return Status::ok();
+}
+
 const char* ggml_type_name(std::uint32_t type) noexcept {
   switch (type) {
     case 0:
@@ -565,6 +750,8 @@ const char* ggml_type_name(std::uint32_t type) noexcept {
       return "Q8_0";
     case 12:
       return "Q4_K";
+    case 13:
+      return "Q5_K";
     case 14:
       return "Q6_K";
     default:
