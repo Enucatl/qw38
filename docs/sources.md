@@ -219,8 +219,10 @@ DSpark are explicitly rejected as Qwen model semantics.
   reference boundary are local derivations over admitted ATN-001/ATN-002
   arithmetic. The boundary and local source digests are frozen in
   [`pins/cuda_tiled_attention_contract.json`](../pins/cuda_tiled_attention_contract.json).
-  The dedicated fixture is a measured pinned RTX 5090 component record with
-  raw timing samples and recomputed speedups:
+  The dedicated fixture is one measured pinned RTX 5090 component record
+  (`CUDA 13.0.2`, `sm_120`) with 30 tiled and three retained-reference raw
+  timing samples per prefix and recomputed speedups; it is not an end-to-end
+  recovery measurement:
   [`fixtures/cuda_tiled_attention.json`](../fixtures/cuda_tiled_attention.json).
   No external kernel implementation was copied or adapted.
 - CUD-003 introduces no new external implementation source. GGUF Q8_0 decoding

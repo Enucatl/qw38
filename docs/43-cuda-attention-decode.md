@@ -153,6 +153,12 @@ claim. The production tiled path does not read or write global prompt-score
 scratch for multi-row work; one-row calls still populate normalized Q/K
 diagnostic buffers as required by ATN-001.
 
-The OPT-005 native diagnostic passed with finite output and
-`max_abs=1.19209e-07`; the measured fixture records the 3/9/64 launch captures
-and the 2K/8K/32K component timing gate.
+The regenerated OPT-005 fixture records finite 3-row output with
+`max_abs=8.94069672e-08`, `rms=1.06907114e-08`, and cosine `1`, and finite
+9-row output with `max_abs=1.1920929e-07`, `rms=1.41810235e-08`, and cosine
+`1`. Its captured production graphs contain two kernel nodes for 1, 3, 9, and
+64 rows; the retained reference contains 3, 9, 27, and 192 nodes respectively.
+The fixture also records exact BF16 candidate bytes, prepare/commit isolation,
+causal sentinel exclusion, unchanged score scratch, invalid-input rejection,
+and final-position execution. This is component-level diagnostic evidence; it
+does not establish projections, scheduler performance, or end-to-end recovery.

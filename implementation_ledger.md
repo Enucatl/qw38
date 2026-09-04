@@ -71,7 +71,7 @@ are repository-relative unless stated otherwise.
 | OPT-002 | Profile and implement justified fusions | OPT-001, ORA-001 | done | Nsight evidence justifies each fusion; fused/unfused boundaries pass frozen gates | [`cuda/full_scheduler.cu`](cuda/full_scheduler.cu); [`fixtures/cuda_fusion.json`](fixtures/cuda_fusion.json); [`evidence/profiling/opt002-nsight-compute.txt`](evidence/profiling/opt002-nsight-compute.txt); tests; log 2026-09-01T05:44:16Z |
 | OPT-003 | Implement stable-address CUDA graphs | OPT-002 | done | Graph/non-graph equivalence passes and graph allocations are in MEM-001 | [`cuda/full_scheduler.cu`](cuda/full_scheduler.cu); [`fixtures/cuda_graph.json`](fixtures/cuda_graph.json); [`tests/test_cuda_graph.py`](tests/test_cuda_graph.py); log 2026-09-01T07:08:29Z |
 | OPT-004 | Tune row buckets/chunks and check in dispatch evidence | OPT-003 | done | Offline RTX 5090 sweep selects a reproducible table from retained raw results | [`cuda/quant_mmv.cu`](cuda/quant_mmv.cu); [`fixtures/cuda_dispatch_tuning.json`](fixtures/cuda_dispatch_tuning.json); [`evidence/profiling/opt004-dispatch-sweep-raw.txt`](evidence/profiling/opt004-dispatch-sweep-raw.txt); [`tests/test_cuda_dispatch_tuning.py`](tests/test_cuda_dispatch_tuning.py); log 2026-09-01T07:30:51Z |
-| OPT-005 | Implement exact tiled causal prompt attention with online softmax | OPT-004, SCH-002, ATN-002 | pending | Multi-row attention tiles preserve full causal semantics and frozen outputs while eliminating per-token QK/softmax/value launches | [`tasks/OPT-005.md`](tasks/OPT-005.md); recovery reopened 2026-09-04T12:30:16Z |
+| OPT-005 | Implement exact tiled causal prompt attention with online softmax | OPT-004, SCH-002, ATN-002 | done | Multi-row attention tiles preserve full causal semantics and frozen outputs while eliminating per-token QK/softmax/value launches | [`tasks/OPT-005.md`](tasks/OPT-005.md); recovery accepted and delivered 2026-09-04T13:09:32Z |
 | OPT-006 | Reuse tiled KV loads across grouped query heads | OPT-005 | pending | Each shared KV head is loaded once per tile for its six query heads; exact GQA outputs pass and measured KV traffic falls | — |
 | OPT-007 | Execute multiple prompt query rows per CUDA block | OPT-006 | pending | Prompt attention maps query-row tiles to occupied blocks with bounded scratch and passes short/chunk boundary equivalence | — |
 | OPT-008 | Make 4,096 tokens the default prompt chunk | OPT-007, MEM-002 | pending | Default prefill chunks are 4,096 tokens with bounded fallback for tails/capacity; atomic commit, cancellation, and 128K reserve gates pass | — |
@@ -80,6 +80,20 @@ are repository-relative unless stated otherwise.
 | OPT-011 | Pipeline and fuse prompt execution and chunk commit | OPT-008, OPT-009, OPT-010 | pending | Justified fusion/overlap removes avoidable copies, launches, and barriers while preserving cancellation and atomic publication | — |
 | OPT-012 | Add stable-address prompt CUDA graphs | OPT-003, OPT-011 | pending | Common 4,096-token prompt paths replay from stable addresses with graph/non-graph equality and reconciled memory | — |
 | OPT-013 | Implement associative block-parallel GDN prompt scan | GDN-002, OPT-011 | pending | Parallel GDN scan preserves recurrence/frontier tolerances across chunk boundaries and demonstrates measured prompt speedup | — |
+
+### 2026-09-04T13:09:32Z — OPT-005 delivered
+
+- Fresh recovery attempt 1 independently passed: focused contract/validator,
+  pinned native diagnostic, focused integration, ordinary pytest (`170 passed,
+  20 skipped`), and CUDA-enabled pytest (`190 passed`) all passed.
+- Acceptance evidence is the regenerated fixture and matching documentation;
+  the component-only timing boundary and remaining end-to-end risk are recorded
+  in [`tasks/OPT-005.md`](tasks/OPT-005.md).
+- Marked OPT-005 `done`; delivery is limited to the already-verified recovery
+  allowlist plus workflow bookkeeping. `plan.md` and semantic implementation
+  evidence are unchanged by delivery.
+- Final checks: `uv run pytest -q tests/test_documentation.py` and
+  `git diff --check` passed. Commit and push follow this bookkeeping entry.
 | CLI-001 | Implement interactive `qw38` text CLI | TOK-002, SES-003 | done | Interactive generation, reasoning, stops, sampling, and persistence pass smoke tests | [`src/cli.cpp`](src/cli.cpp); [`src/engine.cpp`](src/engine.cpp); [`fixtures/cli_smoke.json`](fixtures/cli_smoke.json); [`tests/test_cli.py`](tests/test_cli.py); log 2026-09-01T11:56:52Z |
 | SRV-001 | Implement single-flight HTTP server core and queue | API-001 | done | Health/models endpoints, cancellation, queue timing, and one GPU session pass tests | [`src/server.cpp`](src/server.cpp); [`src/server_core.cpp`](src/server_core.cpp); [`fixtures/server_core.json`](fixtures/server_core.json); [`tests/test_server.py`](tests/test_server.py); log 2026-09-01T18:19:42Z |
 | SRV-002 | Implement Chat Completions API | TOK-002, SES-002, SRV-001 | done | Supported roles/tools/streaming/sampling/stops pass; exclusions reject explicitly | [`src/server.cpp`](src/server.cpp); [`src/server_generation.cpp`](src/server_generation.cpp); [`fixtures/chat_completions.json`](fixtures/chat_completions.json); [`tests/test_server.py`](tests/test_server.py); log 2026-09-01T19:00:04Z |

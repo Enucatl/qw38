@@ -139,11 +139,16 @@ its query head and owns exactly one query row. Sharing one tile across the six
 query heads in a GQA group is deferred to OPT-006; assigning multiple query rows
 to a block is deferred to OPT-007.
 
-The native OPT-005 diagnostic is finite and reports `max_abs=1.19209e-07`,
-`rms=1.4181e-08`, and cosine `1.0`. Captured production graphs contain two
-kernel nodes for 3, 9, and 64 rows; the retained reference contains 9, 27, and
-192 nodes respectively. On the pinned RTX 5090, measured tiled/reference means
-at 2K, 8K, and 32K committed prefixes are 28.247217/975.214091 ms,
-120.261546/4264.227214 ms, and 548.076208/13876.639323 ms (speedups 34.524254x,
-35.457944x, and 25.318814x). These are component measurements only; they
-exclude projections and end-to-end recovery.
+The regenerated OPT-005 fixture records finite 3-row output with
+`max_abs=8.94069672e-08`, `rms=1.06907114e-08`, and cosine `1`, and finite
+9-row output with `max_abs=1.1920929e-07`, `rms=1.41810235e-08`, and cosine
+`1`. Captured production graphs contain two kernel nodes for 1, 3, 9, and 64
+rows; the retained reference contains 3, 9, 27, and 192 nodes respectively.
+
+On the pinned RTX 5090, the fixture's tiled/reference means at 2,048, 8,192,
+and 32,768 committed-prefix rows are `14.7988598/466.828623 ms`,
+`58.3420746/1843.24634 ms`, and `267.752901/13864.1842 ms`; the corresponding
+speedups are `31.5449048x`, `31.5937743x`, and `51.7797723x`. The fixture
+contains 30 tiled and three retained-reference samples for each case. These are
+post-projection, production-shape component measurements only: they exclude
+projections, scheduler work, and end-to-end recovery.

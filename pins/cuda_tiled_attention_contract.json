@@ -1,10 +1,17 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "task": "OPT-005",
   "target": "sm_120",
   "toolkit": "CUDA 13.0.2",
+  "pinned_image": "qw38-cuda:13.0.2",
   "production_shape": {"query_heads": 24, "kv_heads": 4, "head_width": 256, "rotary_width": 64, "chunk_rows": 64, "kv_tile_rows": 32, "threads": 256},
   "launches": {"staging": "kv_head_by_token", "attention": "query_head_by_token", "production_kernels_per_chunk": 2, "reference_kernels_per_row": 3},
   "proof_limits": {"bf16_max_abs": 0.00005, "bf16_rms": 0.000005, "oracle_max_abs": 0.051, "oracle_rms": 0.0016, "oracle_cosine": 0.999424},
-  "memory_boundary": {"score_workspace_touched": false, "online_softmax": true, "tile_rows": 32}
+  "memory_boundary": {"score_workspace_touched": false, "online_softmax": true, "tile_rows": 32},
+  "semantic_predicates": ["finite_output", "candidate_bf16_exact", "chunk_repeated_output_exact", "chunk_repeated_candidate_exact", "prepare_cache_unchanged", "prepare_frontier_unchanged", "commit_cache_exact", "commit_frontier_exact", "future_committed_excluded", "later_candidate_excluded", "scratch_unchanged", "zero_count_rejected", "capacity_overflow_rejected", "candidate_alias_rejected", "last_position_executed", "normalized_qk_one_row_equal", "graphs_executed"],
+  "graph_kernel_nodes": {"production": {"1": 2, "3": 2, "9": 2, "64": 2}, "reference": {"1": 3, "3": 9, "9": 27, "64": 192}},
+  "scaling_prefixes": [2048, 8192, 32768],
+  "samples": {"tiled": 30, "reference": 3},
+  "warmups": {"tiled": 3, "reference": 1},
+  "metadata_required": ["device", "compute_capability", "driver", "runtime", "toolkit", "pinned_image", "measurement_utc", "claim"]
 }
