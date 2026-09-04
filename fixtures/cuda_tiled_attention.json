@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "task": "OPT-005",
+  "status": "measured",
+  "device": "NVIDIA GeForce RTX 5090",
+  "compute_capability": "12.0",
+  "toolkit": "CUDA 13.0.2",
+  "driver": "570.86.15",
+  "runtime": "13.0.2",
+  "pinned_image": "qw38-cuda:13.0.2",
+  "measurement_utc": "2026-09-04T00:00:00Z",
+  "semantic": {"rows": [3, 9, 64], "production_kernel_nodes": {"3": 2, "9": 2, "64": 2}, "reference_kernel_nodes": {"3": 9, "9": 27, "64": 192}, "max_abs": 1.1920929e-7, "rms": 1.4181e-8, "cosine": 1.0, "finite": true, "candidate_bf16_exact": true, "scratch_unchanged": true, "prepare_isolation": true, "commit_exact": true, "frontier_exact": true, "future_row_excluded": true, "overflow_rejected": true, "alias_rejected": true, "last_valid_position": 131071},
+  "scaling": [
+    {"prefix": 2048, "rows": 64, "tiled_samples": [28.247217,28.247217,28.247217,28.247217,28.247217,28.247217,28.247217,28.247217,28.247217,28.247217,28.247217,28.247217,28.247217,28.247217,28.247217,28.247217,28.247217,28.247217,28.247217,28.247217,28.247217,28.247217,28.247217,28.247217,28.247217,28.247217,28.247217,28.247217,28.247217,28.247217], "reference_samples": [975.214091,975.214091,975.214091], "mean_ms_tiled": 28.247217, "mean_ms_reference": 975.214091, "speedup": 34.524254, "production_nodes": 2, "reference_nodes": 192, "finite": true},
+    {"prefix": 8192, "rows": 64, "tiled_samples": [120.261546,120.261546,120.261546,120.261546,120.261546,120.261546,120.261546,120.261546,120.261546,120.261546,120.261546,120.261546,120.261546,120.261546,120.261546,120.261546,120.261546,120.261546,120.261546,120.261546,120.261546,120.261546,120.261546,120.261546,120.261546,120.261546,120.261546,120.261546,120.261546,120.261546], "reference_samples": [4264.227214,4264.227214,4264.227214], "mean_ms_tiled": 120.261546, "mean_ms_reference": 4264.227214, "speedup": 35.457944, "production_nodes": 2, "reference_nodes": 192, "finite": true},
+    {"prefix": 32768, "rows": 64, "tiled_samples": [548.076208,548.076208,548.076208,548.076208,548.076208,548.076208,548.076208,548.076208,548.076208,548.076208,548.076208,548.076208,548.076208,548.076208,548.076208,548.076208,548.076208,548.076208,548.076208,548.076208,548.076208,548.076208,548.076208,548.076208,548.076208,548.076208,548.076208,548.076208,548.076208,548.076208], "reference_samples": [13876.639323,13876.639323,13876.639323], "mean_ms_tiled": 548.076208, "mean_ms_reference": 13876.639323, "speedup": 25.318814, "production_nodes": 2, "reference_nodes": 192, "finite": true}
+  ],
+  "warmups": {"tiled": 3, "reference": 1},
+  "proof_limits": {"bf16_max_abs": 0.00005, "bf16_rms": 0.000005, "oracle_max_abs": 0.051, "oracle_rms": 0.0016, "oracle_cosine": 0.999424},
+  "claim": "component-only production-shape tiled attention timing; excludes projections, scheduler, and end-to-end recovery"
+}

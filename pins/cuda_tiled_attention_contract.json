@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "task": "OPT-005",
+  "target": "sm_120",
+  "toolkit": "CUDA 13.0.2",
+  "production_shape": {"query_heads": 24, "kv_heads": 4, "head_width": 256, "rotary_width": 64, "chunk_rows": 64, "kv_tile_rows": 32, "threads": 256},
+  "launches": {"staging": "kv_head_by_token", "attention": "query_head_by_token", "production_kernels_per_chunk": 2, "reference_kernels_per_row": 3},
+  "proof_limits": {"bf16_max_abs": 0.00005, "bf16_rms": 0.000005, "oracle_max_abs": 0.051, "oracle_rms": 0.0016, "oracle_cosine": 0.999424},
+  "memory_boundary": {"score_workspace_touched": false, "online_softmax": true, "tile_rows": 32},
+  "local_sources": {
+    "Makefile": "4516bad582a86fcb5323aec25fd42431b62f9825f6633988d3f8a7fab25268dd",
+    "cuda/attention_decode.cu": "0824a9afb4f9b5fdb0dfea1d2d4a7a01919035dc3bc796e10ffcfb0703d61406",
+    "cuda/attention_decode.h": "9e38fce3691ec22a59e5595c62628d7cd4a8dca5747865c56c85cd2e78aaca81",
+    "cuda/tiled_attention_test.cu": "314947b9c764b41be89c25caa1c141bd470512795abe4018bcda55be7509734d"
+  }
+}

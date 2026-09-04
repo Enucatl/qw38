@@ -18,6 +18,7 @@ are repository-relative unless stated otherwise.
 | BLD-001 | Establish brand, repository layout, and C++17 build | ART-002 | done | Literal brand appears in user-facing tools; Makefile builds restricted host targets | [`Makefile`](Makefile), [`include/qw38/engine.h`](include/qw38/engine.h), pytest log 2026-08-29T09:52:00Z |
 | BLD-002 | Add pinned CUDA 13.0 SM120 build path | PIN-003, BLD-001 | done | Diagnostic and release CUDA builds target `sm_120` with recorded flags | [`Makefile`](Makefile); [`pins/cuda_quant_contract.json`](pins/cuda_quant_contract.json); log 2026-08-31T06:05:47Z |
 | BLD-003 | Define and enforce the device allocation ledger | PIN-001 | done | All persistent/transient allocations and 128K budgets are enumerated and checked | [`docs/13-allocation-ledger.md`](docs/13-allocation-ledger.md); [`docs/54-post-graph-128k-memory.md`](docs/54-post-graph-128k-memory.md); [`cuda/memory_fit_test.cu`](cuda/memory_fit_test.cu); [`tests/test_cuda_memory_fit.py`](tests/test_cuda_memory_fit.py); log 2026-09-03T12:50:48Z |
+| BLD-004 | Reconcile diagnostic CUDA target linkage and historical source digests | BLD-002, BLD-003, EVAL-001 | pending | Diagnostic scheduler consumers link trace-enabled objects, prompt and memory byte accounting agree exactly, and all affected historical local-source digests pass repository-wide CUDA gates | Discovery in [`tasks/OPT-005.md`](tasks/OPT-005.md); log 2026-09-04T06:59:41Z |
 | API-001 | Implement explicit `Status` and move-only Engine/Session boundary | BLD-001 | done | Public header compiles without exceptions/RTTI and exposes the approved operations | [`include/qw38/engine.h`](include/qw38/engine.h), build log 2026-08-29T09:52:00Z |
 | API-002 | Implement bounded JSON parsing and canonical serialization for the server | SRV-001 | done | Valid JSON, Unicode escapes, depth/body limits, canonical tool JSON, and malformed inputs pass native fixtures without a general JSON dependency | [`src/server_json.cpp`](src/server_json.cpp); [`src/server_api_test.cpp`](src/server_api_test.cpp); [`pins/chat_completions_contract.json`](pins/chat_completions_contract.json); log 2026-09-01T19:00:04Z |
 | MDL-001 | Parse, mmap, inventory, and fail-closed validate GGUF | PIN-001, API-001 | done | Exact tensor metadata/ranges/roles are checked; malformed fixtures pass pytest | [`pins/tensor_inventory.json`](pins/tensor_inventory.json), [`src/model.cpp`](src/model.cpp); log 2026-08-29T10:35:51Z |
@@ -68,7 +69,7 @@ are repository-relative unless stated otherwise.
 | OPT-002 | Profile and implement justified fusions | OPT-001, ORA-001 | done | Nsight evidence justifies each fusion; fused/unfused boundaries pass frozen gates | [`cuda/full_scheduler.cu`](cuda/full_scheduler.cu); [`fixtures/cuda_fusion.json`](fixtures/cuda_fusion.json); [`evidence/profiling/opt002-nsight-compute.txt`](evidence/profiling/opt002-nsight-compute.txt); tests; log 2026-09-01T05:44:16Z |
 | OPT-003 | Implement stable-address CUDA graphs | OPT-002 | done | Graph/non-graph equivalence passes and graph allocations are in MEM-001 | [`cuda/full_scheduler.cu`](cuda/full_scheduler.cu); [`fixtures/cuda_graph.json`](fixtures/cuda_graph.json); [`tests/test_cuda_graph.py`](tests/test_cuda_graph.py); log 2026-09-01T07:08:29Z |
 | OPT-004 | Tune row buckets/chunks and check in dispatch evidence | OPT-003 | done | Offline RTX 5090 sweep selects a reproducible table from retained raw results | [`cuda/quant_mmv.cu`](cuda/quant_mmv.cu); [`fixtures/cuda_dispatch_tuning.json`](fixtures/cuda_dispatch_tuning.json); [`evidence/profiling/opt004-dispatch-sweep-raw.txt`](evidence/profiling/opt004-dispatch-sweep-raw.txt); [`tests/test_cuda_dispatch_tuning.py`](tests/test_cuda_dispatch_tuning.py); log 2026-09-01T07:30:51Z |
-| OPT-005 | Implement exact tiled causal prompt attention with online softmax | OPT-004, SCH-002, ATN-002 | pending | Multi-row attention tiles preserve full causal semantics and frozen outputs while eliminating per-token QK/softmax/value launches | — |
+| OPT-005 | Implement exact tiled causal prompt attention with online softmax | OPT-004, SCH-002, ATN-002 | blocked | Multi-row attention tiles preserve full causal semantics and frozen outputs while eliminating per-token QK/softmax/value launches | [`tasks/OPT-005.md`](tasks/OPT-005.md); log 2026-09-04T07:53:56Z |
 | OPT-006 | Reuse tiled KV loads across grouped query heads | OPT-005 | pending | Each shared KV head is loaded once per tile for its six query heads; exact GQA outputs pass and measured KV traffic falls | — |
 | OPT-007 | Execute multiple prompt query rows per CUDA block | OPT-006 | pending | Prompt attention maps query-row tiles to occupied blocks with bounded scratch and passes short/chunk boundary equivalence | — |
 | OPT-008 | Make 4,096 tokens the default prompt chunk | OPT-007, MEM-002 | pending | Default prefill chunks are 4,096 tokens with bounded fallback for tails/capacity; atomic commit, cancellation, and 128K reserve gates pass | — |
@@ -3642,3 +3643,30 @@ are repository-relative unless stated otherwise.
   transitively requires the complete optimization chain, followed by bounded
   2K/8K/32K scaling evidence and a fresh 128K quality retry. Evidence:
   [`tasks/QLT-001.md`](tasks/QLT-001.md).
+
+### 2026-09-04T06:59:41Z — BLD-004 discovered during OPT-005
+
+- Independent OPT-005 verification exposed a pre-existing diagnostic build
+  mismatch: prompt, prefix, atomic, checkpoint, memory-fit, and timing targets
+  link the non-trace scheduler object while their accounting expects the
+  81,920-byte diagnostic trace workspace.
+- The same audit found historical Makefile-owning contract hashes and two
+  eval/SHA source hashes that require coordinated evidence reconciliation.
+  This work is outside OPT-005's tiled-attention boundary and was registered
+  before resuming its bounded repair. Evidence and exact affected files are in
+  [`tasks/OPT-005.md`](tasks/OPT-005.md).
+
+### 2026-09-04T07:53:56Z — OPT-005 blocked after bounded verification
+
+- Three independent verification attempts and two bounded repairs did not
+  produce admissible final evidence. The latest native diagnostic exited zero
+  but omitted computed semantic predicates claimed by its fixture, and the
+  checked-in timing arrays were synthetic repetitions rather than independent
+  samples. The retained attention oracle also failed in the final native pass.
+- Repository-wide acceptance remains red: ordinary pytest had one stale
+  eval/SHA hash failure, and the CUDA suite had that failure plus four
+  diagnostic linkage/workspace failures tracked by BLD-004.
+- No commit or push was made. Recovery requires completing BLD-004, generating
+  one authentic OPT-005 diagnostic record with every claimed predicate and raw
+  sample, regenerating its fixture, and passing fresh ordinary and CUDA suites.
+  Full evidence and commands are retained in [`tasks/OPT-005.md`](tasks/OPT-005.md).

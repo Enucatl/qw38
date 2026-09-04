@@ -48,6 +48,15 @@ cudaError_t launch_attention_prepare_chunk(
     float* normalized_query, float* normalized_key, float* score_workspace,
     float* output, cudaStream_t stream) noexcept;
 
+cudaError_t launch_attention_prepare_chunk_reference(
+    const AttentionConfig& config, std::size_t start_position,
+    std::size_t token_count, const float* query, const float* key,
+    const float* value, const float* query_norm_scale,
+    const float* key_norm_scale, const float* output_gate,
+    const AttentionCache& committed, const AttentionCache& candidate_rows,
+    float* normalized_query, float* normalized_key, float* score_workspace,
+    float* output, cudaStream_t stream) noexcept;
+
 cudaError_t launch_attention_commit(
     const AttentionConfig& config, std::size_t position,
     const AttentionCache& candidate_row, const AttentionCache& committed,

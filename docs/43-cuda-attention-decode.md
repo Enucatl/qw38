@@ -1,6 +1,6 @@
 # 43. CUDA grouped-query attention for one decoded token
 
-[Index](README.md) · Implementation tasks: ATN-001 and EDU-029 in
+[Index](README.md) · Implementation tasks: ATN-001, OPT-005, and EDU-029 in
 [`implementation_ledger.md`](../implementation_ledger.md)
 
 Chapter 19 introduced attention with small scalar examples. This chapter follows
@@ -133,6 +133,26 @@ post-projection core.
 
 These timings exclude Q/K/V projections, output projection, residual and FFN
 work, graph launch, and long-context memory traffic. ATN-001 proves one-token
-decode semantics and state publication. ATN-002 must still implement arbitrary
-causal prompt chunks, memory-bounded score processing, and the 131,072-token
-capacity boundary.
+decode semantics and state publication. The arbitrary-chunk, memory-bounded,
+and 131,072-token boundaries are documented under ATN-002; OPT-005's scaling
+measurements remain a separate pending gate.
+
+## OPT-005 shared arithmetic and retained reference
+
+The production `launch_attention_prepare_chunk` uses the same tiled arithmetic
+for one row and every positive multi-row chunk. A staging grid maps
+`(kv_head, token)` and writes normalized/RoPE keys and values as BF16; a second
+grid maps `(query_head, token)`. Each block owns one query row/head, uses a
+32-row KV tile, and accumulates scores and values in FP32 with online stable
+softmax.
+
+The former three-launch-per-row implementation remains available only through
+the CUDA-internal `launch_attention_prepare_chunk_reference` test boundary. It
+is a retained correctness baseline, not a scheduler path or production speed
+claim. The production tiled path does not read or write global prompt-score
+scratch for multi-row work; one-row calls still populate normalized Q/K
+diagnostic buffers as required by ATN-001.
+
+The OPT-005 native diagnostic passed with finite output and
+`max_abs=1.19209e-07`; the measured fixture records the 3/9/64 launch captures
+and the 2K/8K/32K component timing gate.

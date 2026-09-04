@@ -214,6 +214,15 @@ DSpark are explicitly rejected as Qwen model semantics.
   [`pins/cuda_attention_prefill_contract.json`](../pins/cuda_attention_prefill_contract.json).
   Chunk-equivalence and final-position RTX 5090 evidence are retained in
   [`fixtures/cuda_attention_prefill.json`](../fixtures/cuda_attention_prefill.json).
+- OPT-005 introduces no new external implementation source. Its tiled online
+  softmax, 32-row shared-memory tile, two-grid launch topology, and retained
+  reference boundary are local derivations over admitted ATN-001/ATN-002
+  arithmetic. The boundary and local source digests are frozen in
+  [`pins/cuda_tiled_attention_contract.json`](../pins/cuda_tiled_attention_contract.json).
+  The dedicated fixture is a measured pinned RTX 5090 component record with
+  raw timing samples and recomputed speedups:
+  [`fixtures/cuda_tiled_attention.json`](../fixtures/cuda_tiled_attention.json).
+  No external kernel implementation was copied or adapted.
 - CUD-003 introduces no new external implementation source. GGUF Q8_0 decoding
   follows the format already admitted by the pinned scalar decoder, and the
   pointwise/layout equations come from the pinned model contract and scalar

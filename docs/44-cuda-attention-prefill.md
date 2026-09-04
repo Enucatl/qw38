@@ -8,8 +8,9 @@ processes a known prompt containing many tokens. The same causal rule applies:
 prompt token 20 can use tokens 0 through 20, but not token 21.
 
 ATN-002 extends the post-projection CUDA boundary to arbitrary positive chunks.
-It prioritizes an inspectable state and memory contract. It is not yet the tuned
-prefill kernel used for the final speed gate.
+It prioritizes an inspectable state and memory contract. OPT-005 replaces its
+production per-row launch loop with a fixed-memory tiled path; the former loop
+remains available as a test-only reference for differential measurements.
 
 ## Token-major input and output
 
@@ -53,16 +54,17 @@ for every prompt token and one column for every context token. For `T` new
 tokens and context `C`, that consumes roughly `T × C` scores and becomes
 quadratic when `T` and `C` grow together.
 
-Quartz instead launches tokens in causal order and reuses one score slab:
+Quartz's OPT-005 attention grid streams contexts through compile-time 32-row KV
+tiles. It keeps each tile's BF16 K/V and FP32 scores in shared memory and carries
+running maximum, denominator, and weighted-value state in FP32. When a new tile
+has a larger maximum, the previous state is rescaled before accumulation. No
+prompt-sized score rectangle is allocated, and the production multi-row path
+leaves global score scratch byte-for-byte untouched.
 
-```text
-24 query heads × (start position + chunk tokens) FP32 scores
-```
-
-Memory therefore grows linearly with the largest context, not with
-`chunk_tokens × context_tokens`. The current implementation still performs the
-expected causal compute work, and its sequential token launches are explicitly
-untuned. “Memory-bounded” describes the allocation shape, not fast execution.
+The production launch has exactly two kernel launches per positive chunk: KV
+staging on a `(kv_head, token)` grid, followed by attention on a
+`(query_head, token)` grid. This is launch topology evidence, not a complete
+model or end-to-end speed result.
 
 ## Whole-chunk prepare, commit, and cancellation
 
@@ -126,3 +128,22 @@ ATN-002 proves causal chunk continuity, exact token-wise equivalence, linear
 score storage, whole-chunk state isolation, and the final legal one-layer
 position. It does not prove complete-model memory fit, tuned long-context speed,
 full-layer projections, or 64-layer scheduling.
+
+## OPT-005 evidence boundary and deferred seams
+
+The implementation preserves strict causal visibility: committed rows are used
+below `start_position`, candidate rows at or above it, and each query row masks
+positions after its absolute position. Candidate rows and the frontier remain
+provisional until the existing chunk commit. Each block still reloads tiles for
+its query head and owns exactly one query row. Sharing one tile across the six
+query heads in a GQA group is deferred to OPT-006; assigning multiple query rows
+to a block is deferred to OPT-007.
+
+The native OPT-005 diagnostic is finite and reports `max_abs=1.19209e-07`,
+`rms=1.4181e-08`, and cosine `1.0`. Captured production graphs contain two
+kernel nodes for 3, 9, and 64 rows; the retained reference contains 9, 27, and
+192 nodes respectively. On the pinned RTX 5090, measured tiled/reference means
+at 2K, 8K, and 32K committed prefixes are 28.247217/975.214091 ms,
+120.261546/4264.227214 ms, and 548.076208/13876.639323 ms (speedups 34.524254x,
+35.457944x, and 25.318814x). These are component measurements only; they
+exclude projections and end-to-end recovery.
