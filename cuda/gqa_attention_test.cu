@@ -58,14 +58,17 @@ void seed(Buffers& b, const AttentionConfig& c, std::size_t rows,
   std::vector<__nv_bfloat16> hc(cache);
   for (std::size_t i = 0; i < hc.size(); ++i)
     hc[i] = __float2bfloat16_rn(static_cast<float>(static_cast<int>(i % 31) - 15) * .015625F);
+  std::vector<__nv_bfloat16> physical(cache);
+  qw38::cuda::attention_kv_copy_logical_to_physical(
+      hc.data(), physical.data(), c.kv_heads, c.capacity, c.head_width);
   cudaMemcpy(b.q, hq.data(), hq.size() * sizeof(float), cudaMemcpyHostToDevice);
   cudaMemcpy(b.k, hk.data(), hk.size() * sizeof(float), cudaMemcpyHostToDevice);
   cudaMemcpy(b.v, hv.data(), hv.size() * sizeof(float), cudaMemcpyHostToDevice);
   cudaMemcpy(b.gate, hg.data(), hg.size() * sizeof(float), cudaMemcpyHostToDevice);
   cudaMemcpy(b.qs, scale.data(), scale.size() * sizeof(float), cudaMemcpyHostToDevice);
   cudaMemcpy(b.ks, scale.data(), scale.size() * sizeof(float), cudaMemcpyHostToDevice);
-  cudaMemcpy(b.ck, hc.data(), hc.size() * sizeof(hc[0]), cudaMemcpyHostToDevice);
-  cudaMemcpy(b.cv, hc.data(), hc.size() * sizeof(hc[0]), cudaMemcpyHostToDevice);
+  cudaMemcpy(b.ck, physical.data(), physical.size() * sizeof(physical[0]), cudaMemcpyHostToDevice);
+  cudaMemcpy(b.cv, physical.data(), physical.size() * sizeof(physical[0]), cudaMemcpyHostToDevice);
   cudaMemset(b.score, 0xA5,
              qw38::cuda::attention_chunk_score_values(c, start, rows) * sizeof(float));
 }

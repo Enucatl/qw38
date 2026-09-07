@@ -18,6 +18,8 @@
 
 #include "scheduler.h"
 #include "sha256.h"
+#include "attention_decode.h"
+#include "mixer.h"
 
 namespace qw38::cuda {
 namespace {
@@ -158,6 +160,56 @@ bool sync_path(const std::string& path, bool directory) noexcept {
   return synced && closed;
 }
 
+Status write_packed_kv(std::ofstream* output, const __nv_bfloat16* physical,
+                       std::size_t capacity, std::size_t frontier,
+                       __nv_bfloat16* staging,
+                       std::vector<unsigned char>* buffer) noexcept {
+  if (frontier == 0) return Status::ok();
+  const AttentionConfig config{24, 4, 256, 64,
+                               static_cast<std::uint32_t>(capacity)};
+  const std::size_t tokens_per_chunk =
+      kChunkBytes / (internal::kAttentionKvWidth * sizeof(__nv_bfloat16));
+  for (std::size_t token = 0; token < frontier;) {
+    const std::size_t count = std::min(tokens_per_chunk, frontier - token);
+    const cudaError_t error = launch_pack_committed_kv(
+        config, token, count, physical, staging, nullptr);
+    if (error != cudaSuccess) {
+      return {StatusCode::kInternal, "cannot pack CUDA checkpoint KV"};
+    }
+    const Status status = write_device(
+        output, staging,
+        count * internal::kAttentionKvWidth * sizeof(__nv_bfloat16), buffer);
+    if (!status.is_ok()) return status;
+    token += count;
+  }
+  return Status::ok();
+}
+
+Status read_unpacked_kv(std::ifstream* input, __nv_bfloat16* physical,
+                        std::size_t capacity, std::size_t frontier,
+                        __nv_bfloat16* staging,
+                        std::vector<unsigned char>* buffer) noexcept {
+  if (frontier == 0) return Status::ok();
+  const AttentionConfig config{24, 4, 256, 64,
+                               static_cast<std::uint32_t>(capacity)};
+  const std::size_t tokens_per_chunk =
+      kChunkBytes / (internal::kAttentionKvWidth * sizeof(__nv_bfloat16));
+  for (std::size_t token = 0; token < frontier;) {
+    const std::size_t count = std::min(tokens_per_chunk, frontier - token);
+    const std::size_t bytes =
+        count * internal::kAttentionKvWidth * sizeof(__nv_bfloat16);
+    Status status = read_device(input, staging, bytes, buffer);
+    if (!status.is_ok()) return status;
+    const cudaError_t error = launch_unpack_committed_kv(
+        config, token, count, staging, physical, nullptr);
+    if (error != cudaSuccess) {
+      return {StatusCode::kInternal, "cannot unpack CUDA checkpoint KV"};
+    }
+    token += count;
+  }
+  return Status::ok();
+}
+
 }  // namespace
 
 Status SchedulerSession::save_checkpoint(const std::string& path,
@@ -226,19 +278,25 @@ Status SchedulerSession::save_checkpoint(const std::string& path,
   if (status.is_ok()) {
     status = write_device(&output, gdn_recurrent_, recurrent_bytes, &buffer);
   }
+  __nv_bfloat16* kv_staging = nullptr;
+  if (status.is_ok() && frontier_ > 0) {
+    const cudaError_t error = cudaMalloc(&kv_staging, kChunkBytes);
+    if (error != cudaSuccess) {
+      status = {StatusCode::kInternal, "cannot allocate CUDA checkpoint KV staging"};
+    }
+  }
   const std::size_t cache_stride = capacity_ * internal::kAttentionKvWidth;
-  const std::size_t layer_bytes =
-      frontier_ * internal::kAttentionKvWidth * sizeof(__nv_bfloat16);
   for (std::size_t layer = 0; status.is_ok() && layer < kAttentionLayers;
        ++layer) {
-    status = write_device(&output, attention_key_ + layer * cache_stride,
-                          layer_bytes, &buffer);
+    status = write_packed_kv(&output, attention_key_ + layer * cache_stride,
+                             capacity_, frontier_, kv_staging, &buffer);
   }
   for (std::size_t layer = 0; status.is_ok() && layer < kAttentionLayers;
        ++layer) {
-    status = write_device(&output, attention_value_ + layer * cache_stride,
-                          layer_bytes, &buffer);
+    status = write_packed_kv(&output, attention_value_ + layer * cache_stride,
+                             capacity_, frontier_, kv_staging, &buffer);
   }
+  if (kv_staging != nullptr) cudaFree(kv_staging);
   if (status.is_ok() && logits_bytes != 0) {
     output.write(reinterpret_cast<const char*>(last_logits_), logits_bytes);
     if (!output) status = {StatusCode::kIoError, "cannot write checkpoint logits"};
@@ -436,19 +494,25 @@ Status SchedulerSession::restore_checkpoint(
     status = read_device(&input, workspace->gdn_candidate_recurrent_,
                          expected_recurrent, &buffer);
   }
+  __nv_bfloat16* kv_staging = nullptr;
+  if (status.is_ok() && frontier > 0) {
+    const cudaError_t error = cudaMalloc(&kv_staging, kChunkBytes);
+    if (error != cudaSuccess) {
+      status = {StatusCode::kInternal, "cannot allocate CUDA checkpoint KV staging"};
+    }
+  }
   const std::size_t cache_stride = capacity_ * internal::kAttentionKvWidth;
-  const std::size_t layer_bytes =
-      frontier * internal::kAttentionKvWidth * sizeof(__nv_bfloat16);
   for (std::size_t layer = 0; status.is_ok() && layer < kAttentionLayers;
        ++layer) {
-    status = read_device(&input, attention_key_ + layer * cache_stride,
-                         layer_bytes, &buffer);
+    status = read_unpacked_kv(&input, attention_key_ + layer * cache_stride,
+                              capacity_, frontier, kv_staging, &buffer);
   }
   for (std::size_t layer = 0; status.is_ok() && layer < kAttentionLayers;
        ++layer) {
-    status = read_device(&input, attention_value_ + layer * cache_stride,
-                         layer_bytes, &buffer);
+    status = read_unpacked_kv(&input, attention_value_ + layer * cache_stride,
+                              capacity_, frontier, kv_staging, &buffer);
   }
+  if (kv_staging != nullptr) cudaFree(kv_staging);
   if (status.is_ok() && expected_logits != 0) {
     input.read(reinterpret_cast<char*>(workspace->candidate_logits_host_),
                expected_logits);

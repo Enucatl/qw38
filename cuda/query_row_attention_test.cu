@@ -26,7 +26,7 @@ bool allocate(Buffers& b, const AttentionConfig& c, std::size_t rows,
               std::size_t start) {
   const std::size_t q = qw38::cuda::attention_query_values(c);
   const std::size_t r = qw38::cuda::attention_kv_row_values(c);
-  b.cache_values = (start + rows + 1) * r;
+  b.cache_values = qw38::cuda::attention_cache_values(c);
   const std::size_t scores =
       qw38::cuda::attention_chunk_score_values(c, start, rows);
 #define ALLOCATE(field, count)                                             \
@@ -56,18 +56,24 @@ void seed(Buffers& b, const AttentionConfig& c, std::size_t rows,
     hk[i] = cosf(static_cast<float>(i) * .003F);
     hv[i] = sinf(static_cast<float>(i) * .004F);
   }
-  std::vector<__nv_bfloat16> hc(b.cache_values);
-  for (std::size_t i = 0; i < hc.size(); ++i)
-    hc[i] = __float2bfloat16_rn(
+  const std::size_t prefix_tokens = start + rows + 1;
+  std::vector<__nv_bfloat16> logical(prefix_tokens * r);
+  for (std::size_t i = 0; i < logical.size(); ++i)
+    logical[i] = __float2bfloat16_rn(
         static_cast<float>(static_cast<int>(i % 31) - 15) * .015625F);
+  std::vector<__nv_bfloat16> physical(b.cache_values);
+  std::memset(physical.data(), 0, physical.size() * sizeof(physical[0]));
+  qw38::cuda::attention_kv_scatter_logical_rows(
+      logical.data(), physical.data(), 0, prefix_tokens, c.kv_heads,
+      c.capacity, c.head_width);
   cudaMemcpy(b.q, hq.data(), hq.size() * sizeof(float), cudaMemcpyHostToDevice);
   cudaMemcpy(b.k, hk.data(), hk.size() * sizeof(float), cudaMemcpyHostToDevice);
   cudaMemcpy(b.v, hv.data(), hv.size() * sizeof(float), cudaMemcpyHostToDevice);
   cudaMemcpy(b.gate, hg.data(), hg.size() * sizeof(float), cudaMemcpyHostToDevice);
   cudaMemcpy(b.qs, scale.data(), scale.size() * sizeof(float), cudaMemcpyHostToDevice);
   cudaMemcpy(b.ks, scale.data(), scale.size() * sizeof(float), cudaMemcpyHostToDevice);
-  cudaMemcpy(b.ck, hc.data(), hc.size() * sizeof(hc[0]), cudaMemcpyHostToDevice);
-  cudaMemcpy(b.cv, hc.data(), hc.size() * sizeof(hc[0]), cudaMemcpyHostToDevice);
+  cudaMemcpy(b.ck, physical.data(), physical.size() * sizeof(physical[0]), cudaMemcpyHostToDevice);
+  cudaMemcpy(b.cv, physical.data(), physical.size() * sizeof(physical[0]), cudaMemcpyHostToDevice);
   cudaMemset(b.score, 0xA5,
              qw38::cuda::attention_chunk_score_values(c, start, rows) *
                  sizeof(float));
@@ -246,13 +252,33 @@ int main() {
           {split.tk + 64 * r, split.tv + 64 * r}, {split.ck, split.cv}, 96,
           split_frontier, nullptr) == cudaSuccess && cudaDeviceSynchronize() == cudaSuccess;
   std::vector<float> one_out(65 * q), split_out(65 * q);
+  std::vector<__nv_bfloat16> one_physical(single.cache_values),
+      split_physical(split.cache_values);
   std::vector<__nv_bfloat16> one_cache(65 * r * 2), split_cache(65 * r * 2);
   cudaMemcpy(one_out.data(), single.out, one_out.size() * sizeof(float), cudaMemcpyDeviceToHost);
   cudaMemcpy(split_out.data(), split.out, split_out.size() * sizeof(float), cudaMemcpyDeviceToHost);
-  cudaMemcpy(one_cache.data(), single.ck + 31 * r, 65 * r * sizeof(__nv_bfloat16), cudaMemcpyDeviceToHost);
-  cudaMemcpy(one_cache.data() + 65 * r, single.cv + 31 * r, 65 * r * sizeof(__nv_bfloat16), cudaMemcpyDeviceToHost);
-  cudaMemcpy(split_cache.data(), split.ck + 31 * r, 65 * r * sizeof(__nv_bfloat16), cudaMemcpyDeviceToHost);
-  cudaMemcpy(split_cache.data() + 65 * r, split.cv + 31 * r, 65 * r * sizeof(__nv_bfloat16), cudaMemcpyDeviceToHost);
+  cudaMemcpy(one_physical.data(), single.ck,
+             one_physical.size() * sizeof(one_physical[0]), cudaMemcpyDeviceToHost);
+  cudaMemcpy(split_physical.data(), split.ck,
+             split_physical.size() * sizeof(split_physical[0]),
+             cudaMemcpyDeviceToHost);
+  qw38::cuda::attention_kv_gather_logical_rows(
+      one_physical.data(), one_cache.data(), 31, 65, c.kv_heads, c.capacity,
+      c.head_width);
+  qw38::cuda::attention_kv_gather_logical_rows(
+      split_physical.data(), split_cache.data(), 31, 65, c.kv_heads, c.capacity,
+      c.head_width);
+  cudaMemcpy(one_physical.data(), single.cv,
+             one_physical.size() * sizeof(one_physical[0]), cudaMemcpyDeviceToHost);
+  cudaMemcpy(split_physical.data(), split.cv,
+             split_physical.size() * sizeof(split_physical[0]),
+             cudaMemcpyDeviceToHost);
+  qw38::cuda::attention_kv_gather_logical_rows(
+      one_physical.data(), one_cache.data() + 65 * r, 31, 65, c.kv_heads,
+      c.capacity, c.head_width);
+  qw38::cuda::attention_kv_gather_logical_rows(
+      split_physical.data(), split_cache.data() + 65 * r, 31, 65, c.kv_heads,
+      c.capacity, c.head_width);
   cudaMemcpy(&one_value, one_frontier, sizeof(one_value), cudaMemcpyDeviceToHost);
   cudaMemcpy(&split_value, split_frontier, sizeof(split_value), cudaMemcpyDeviceToHost);
   boundary &= one_out == split_out && one_cache == split_cache &&

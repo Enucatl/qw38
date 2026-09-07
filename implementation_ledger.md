@@ -76,7 +76,7 @@ are repository-relative unless stated otherwise.
 | OPT-007 | Execute multiple prompt query rows per CUDA block | OPT-006 | done | Prompt attention maps query-row tiles to occupied blocks with bounded scratch and passes short/chunk boundary equivalence | [`tasks/OPT-007.md`](tasks/OPT-007.md); [`cuda/query_row_attention_test.cu`](cuda/query_row_attention_test.cu); [`tests/test_cuda_query_row_attention.py`](tests/test_cuda_query_row_attention.py); [`pins/cuda_query_row_attention_contract.json`](pins/cuda_query_row_attention_contract.json); [`fixtures/cuda_query_row_attention.json`](fixtures/cuda_query_row_attention.json); log 2026-09-04T17:43:02Z |
 | OPT-008 | Make 4,096 tokens the default prompt chunk | OPT-007, MEM-002 | done | Default prefill chunks are 4,096 tokens with bounded fallback for tails/capacity; atomic commit, cancellation, and 128K reserve gates pass | [`tasks/OPT-008.md`](tasks/OPT-008.md); [`cuda/full_scheduler.h`](cuda/full_scheduler.h); [`cuda/prompt_scheduler_test.cu`](cuda/prompt_scheduler_test.cu); [`pins/cuda_prompt_scheduler_contract.json`](pins/cuda_prompt_scheduler_contract.json); [`fixtures/cuda_prompt_scheduler.json`](fixtures/cuda_prompt_scheduler.json); [`fixtures/cuda_memory_fit_post_graph.json`](fixtures/cuda_memory_fit_post_graph.json); log 2026-09-07T13:08:07Z |
 | OPT-009 | Implement true batched Q8_0/Q4_K/Q6_K prompt MMQ | OPT-004, SCH-002 | done | Prompt projections reuse weight tiles across rows, select measured SM120 kernels, and preserve frozen numeric envelopes | [`tasks/OPT-009.md`](tasks/OPT-009.md); [`cuda/quant_mmv.cu`](cuda/quant_mmv.cu); [`cuda/prompt_mmq_test.cu`](cuda/prompt_mmq_test.cu); [`pins/cuda_prompt_mmq_contract.json`](pins/cuda_prompt_mmq_contract.json); [`fixtures/cuda_prompt_mmq.json`](fixtures/cuda_prompt_mmq.json); [`evidence/profiling/opt009-mmq-tile-sweep-raw.txt`](evidence/profiling/opt009-mmq-tile-sweep-raw.txt); log 2026-09-07T15:11:00Z |
-| OPT-010 | Tile KV layout for coalesced exact GQA access | OPT-007, SES-003 | pending | KV storage supports coalesced tile loads without changing logical values, checkpoint compatibility, prefix reuse, or capacity | — |
+| OPT-010 | Tile KV layout for coalesced exact GQA access | OPT-007, SES-003 | done | KV storage supports coalesced tile loads without changing logical values, checkpoint compatibility, prefix reuse, or capacity | [`tasks/OPT-010.md`](tasks/OPT-010.md); [`cuda/attention_decode.cu`](cuda/attention_decode.cu); [`cuda/kv_tile_layout_test.cu`](cuda/kv_tile_layout_test.cu); [`pins/cuda_kv_tile_layout_contract.json`](pins/cuda_kv_tile_layout_contract.json); [`fixtures/cuda_kv_tile_layout.json`](fixtures/cuda_kv_tile_layout.json); log 2026-09-07T16:55:25Z |
 | OPT-011 | Pipeline and fuse prompt execution and chunk commit | OPT-008, OPT-009, OPT-010 | pending | Justified fusion/overlap removes avoidable copies, launches, and barriers while preserving cancellation and atomic publication | — |
 | OPT-012 | Add stable-address prompt CUDA graphs | OPT-003, OPT-011 | pending | Common 4,096-token prompt paths replay from stable addresses with graph/non-graph equality and reconciled memory | — |
 | OPT-013 | Implement associative block-parallel GDN prompt scan | GDN-002, OPT-011 | pending | Parallel GDN scan preserves recurrence/frontier tolerances across chunk boundaries and demonstrates measured prompt speedup | — |
@@ -3829,4 +3829,36 @@ are repository-relative unless stated otherwise.
   quality recovery. `plan.md` and `Makefile` are unchanged. OPT-010 through
   OPT-013 remain pending; QLT-001 remains blocked.
 - Marked OPT-009 `done`; delivery is limited to the verified task scope plus
+  this ledger/audit bookkeeping.
+
+### 2026-09-07T15:32:39Z — OPT-010 started
+
+- Admitted OPT-010 as the first pending ledger row whose dependencies are done;
+  the worktree was clean and `main` tracked `origin/main`.
+- Planning stores committed K/V as head-major token-contiguous physical layout
+  with logical SES-003 checkpoint pack/unpack, scatter commit, and coalesced
+  32-row tile-span evidence. No coupled task or `plan.md` change is required.
+- Evidence: [`tasks/OPT-010.md`](tasks/OPT-010.md).
+
+### 2026-09-07T16:55:25Z — OPT-010 delivered
+
+- Independent verification attempt 1 passed coalesced 32×256 committed-tile
+  pointer spans, logical pack/unpack round-trip, production versus one-row
+  exact GQA outputs, SES-003 checkpoint size/hash/continuation, prefix reuse,
+  and the unchanged 8 GiB 16-layer KV capacity on the pinned RTX 5090.
+- Acceptance evidence: [`tasks/OPT-010.md`](tasks/OPT-010.md);
+  [`cuda/attention_decode.h`](cuda/attention_decode.h);
+  [`cuda/attention_decode.cu`](cuda/attention_decode.cu);
+  [`cuda/full_scheduler.cu`](cuda/full_scheduler.cu);
+  [`cuda/checkpoint.cu`](cuda/checkpoint.cu);
+  [`cuda/kv_tile_layout_test.cu`](cuda/kv_tile_layout_test.cu);
+  [`pins/cuda_kv_tile_layout_contract.json`](pins/cuda_kv_tile_layout_contract.json);
+  [`fixtures/cuda_kv_tile_layout.json`](fixtures/cuda_kv_tile_layout.json);
+  [`docs/43-cuda-attention-decode.md`](docs/43-cuda-attention-decode.md);
+  [`docs/44-cuda-attention-prefill.md`](docs/44-cuda-attention-prefill.md);
+  [`docs/49-cuda-checkpoints.md`](docs/49-cuda-checkpoints.md).
+  The proof remains pointer-span / exact-value evidence and excludes Nsight
+  DRAM, latency, and end-to-end recovery. `plan.md` and `Makefile` are
+  unchanged. OPT-011 through OPT-013 remain pending; QLT-001 remains blocked.
+- Marked OPT-010 `done`; delivery is limited to the verified task scope plus
   this ledger/audit bookkeeping.

@@ -1,6 +1,6 @@
 # 44. Memory-bounded CUDA attention prefill at 128K
 
-[Index](README.md) · Implementation tasks: ATN-002 and EDU-030 in
+[Index](README.md) · Implementation tasks: ATN-002, OPT-010, and EDU-030 in
 [`implementation_ledger.md`](../implementation_ledger.md)
 
 [Chapter 43](43-cuda-attention-decode.md) processed one new token. **Prefill**
@@ -23,6 +23,9 @@ order:
 [token 1 query heads and lanes]
 ...
 ```
+
+Committed device K/V use the shared physical layout in
+[Chapter 43](43-cuda-attention-decode.md). Candidate chunk rows stay token-major.
 
 The normalization workspaces hold only the current token: 6,144 FP32 query
 values and 1,024 FP32 key values at production shape. They are reused after each
@@ -73,10 +76,10 @@ candidate K/V row and token-major output while leaving the committed cache and
 frontier unchanged. If any later layer fails or a request is cancelled, the
 caller discards all candidate rows.
 
-[`launch_attention_commit_chunk`](../cuda/attention_decode.cu) copies the
-contiguous candidate range into its final cache positions. One block
-synchronizes after copying both K and V, then advances the frontier. No partial
-chunk becomes visible through that frontier.
+[`launch_attention_commit_chunk`](../cuda/attention_decode.cu) scatters each
+token-major candidate value into its physical cache address. One block
+synchronizes after scattering both K and V, then advances the frontier. No
+partial chunk becomes visible through that frontier.
 
 Request-level atomicity still belongs to SES-002 because a real request must
 publish GDN, all 16 attention caches, tokens, and sampler state together.
@@ -215,3 +218,43 @@ end-to-end performance. The retained evidence is
 [`fixtures/cuda_gqa_attention.json`](../fixtures/cuda_gqa_attention.json),
 validated against
 [`pins/cuda_gqa_attention_contract.json`](../pins/cuda_gqa_attention_contract.json).
+
+## OPT-010 committed tile contiguity
+
+OPT-007 reused each 32-row K/V tile for two query rows, but consecutive tokens
+of one KV head still strode by 1,024 BF16 values in committed storage. OPT-010
+stores committed K/V with the shared physical formula from
+[Chapter 43](43-cuda-attention-decode.md). Decode and prefill read that same
+layout.
+
+When every row of a 32-row tile lies below `start_position`, the production
+kernel takes one `tile_base` pointer per KV head and loads:
+
+```text
+keys[row * 256 + lane]   = tile_base[row * width + lane]
+values[row * 256 + lane] = tile_base_v[row * width + lane]
+```
+
+That global span is `32 × 256` consecutive BF16 values. An instrumented
+specialization of the production load helper records the device pointers of
+`tile_base` and `tile_base + rows * width - 1` and requires
+`last - first == (rows * width - 1) * sizeof(__nv_bfloat16)` with `rows == 32`
+for those full committed tiles. Production
+[`launch_attention_prepare_chunk`](../cuda/attention_decode.cu) stays
+uninstrumented.
+
+Mixed tiles, where some rows are already committed and some are still
+candidates, load committed rows from the corresponding physical addresses and
+candidate rows from token-major candidate storage. They are not one coalesced
+region and are not counted as coalesced failures.
+
+The retained diagnostic also requires a bijection of the physical index onto
+the unchanged `attention_cache_values` product, byte-exact logical pack/unpack
+round-trips, byte-exact production versus retained one-row GQA outputs and
+candidate BF16 rows, commit-scatter plus pack equal to the logical candidate
+prefix, two captured kernel nodes with 33,792 dynamic shared bytes, and a
+16-layer K+V product of 8,589,934,592 bytes. This is executed pointer-span and
+exact-value evidence, not Nsight DRAM transactions, latency, throughput, or
+end-to-end recovery. The contract and retained record are
+[`pins/cuda_kv_tile_layout_contract.json`](../pins/cuda_kv_tile_layout_contract.json)
+and [`fixtures/cuda_kv_tile_layout.json`](../fixtures/cuda_kv_tile_layout.json).

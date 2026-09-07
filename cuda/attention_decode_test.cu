@@ -230,6 +230,14 @@ int run_case(const char* name, std::uint32_t layer,
   }
   const std::vector<__nv_bfloat16> original_key = committed_key;
   const std::vector<__nv_bfloat16> original_value = committed_value;
+  std::vector<__nv_bfloat16> physical_key(cache_values);
+  std::vector<__nv_bfloat16> physical_value(cache_values);
+  qw38::cuda::attention_kv_copy_logical_to_physical(
+      committed_key.data(), physical_key.data(), config.kv_heads,
+      config.capacity, config.head_width);
+  qw38::cuda::attention_kv_copy_logical_to_physical(
+      committed_value.data(), physical_value.data(), config.kv_heads,
+      config.capacity, config.head_width);
   std::vector<float> expected_query;
   std::vector<float> expected_key;
   std::vector<__nv_bfloat16> expected_candidate_key;
@@ -294,8 +302,8 @@ int run_case(const char* name, std::uint32_t layer,
   QW38_COPY(device_gate, gate);
   QW38_COPY(device_query_scale, query_scale);
   QW38_COPY(device_key_scale, key_scale);
-  QW38_COPY(device_committed_key, committed_key);
-  QW38_COPY(device_committed_value, committed_value);
+  QW38_COPY(device_committed_key, physical_key);
+  QW38_COPY(device_committed_value, physical_value);
 #undef QW38_COPY
   const std::uint64_t initial_frontier = position;
   if (error == cudaSuccess) {
@@ -356,14 +364,20 @@ int run_case(const char* name, std::uint32_t layer,
   QW38_READ(actual_output, device_output);
   QW38_READ(actual_candidate_key, device_candidate_key);
   QW38_READ(actual_candidate_value, device_candidate_value);
-  QW38_READ(committed_key, device_committed_key);
-  QW38_READ(committed_value, device_committed_value);
+  QW38_READ(physical_key, device_committed_key);
+  QW38_READ(physical_value, device_committed_value);
   std::uint64_t actual_frontier = 0;
   if (error == cudaSuccess) {
     error = cudaMemcpy(&actual_frontier, device_frontier,
                        sizeof(actual_frontier), cudaMemcpyDeviceToHost);
   }
   if (error != cudaSuccess) return fail_cuda("attention cudaMemcpy D2H", error);
+  qw38::cuda::attention_kv_copy_physical_to_logical(
+      physical_key.data(), committed_key.data(), config.kv_heads,
+      config.capacity, config.head_width);
+  qw38::cuda::attention_kv_copy_physical_to_logical(
+      physical_value.data(), committed_value.data(), config.kv_heads,
+      config.capacity, config.head_width);
   const bool prepare_atomic = bf16_equal(committed_key, original_key) &&
                               bf16_equal(committed_value, original_value) &&
                               actual_frontier == initial_frontier;
@@ -387,14 +401,20 @@ int run_case(const char* name, std::uint32_t layer,
       nullptr);
   if (error == cudaSuccess) error = cudaDeviceSynchronize();
   if (error != cudaSuccess) return fail_cuda("attention commit", error);
-  QW38_READ(committed_key, device_committed_key);
-  QW38_READ(committed_value, device_committed_value);
+  QW38_READ(physical_key, device_committed_key);
+  QW38_READ(physical_value, device_committed_value);
 #undef QW38_READ
   if (error == cudaSuccess) {
     error = cudaMemcpy(&actual_frontier, device_frontier,
                        sizeof(actual_frontier), cudaMemcpyDeviceToHost);
   }
   if (error != cudaSuccess) return fail_cuda("attention committed read", error);
+  qw38::cuda::attention_kv_copy_physical_to_logical(
+      physical_key.data(), committed_key.data(), config.kv_heads,
+      config.capacity, config.head_width);
+  qw38::cuda::attention_kv_copy_physical_to_logical(
+      physical_value.data(), committed_value.data(), config.kv_heads,
+      config.capacity, config.head_width);
   bool commit_exact = actual_frontier == position + 1;
   for (std::size_t context = 0; context < config.capacity; ++context) {
     for (std::size_t index = 0; index < row_values; ++index) {

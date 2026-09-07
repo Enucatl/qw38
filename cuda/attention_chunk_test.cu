@@ -130,6 +130,15 @@ int run_chunk_case(const char* name,
         static_cast<float>(static_cast<int>(index % 41) - 20) * 0.015625F);
   }
 
+  std::vector<__nv_bfloat16> physical_key(cache_values);
+  std::vector<__nv_bfloat16> physical_value(cache_values);
+  qw38::cuda::attention_kv_copy_logical_to_physical(
+      initial_key.data(), physical_key.data(), config.kv_heads, config.capacity,
+      config.head_width);
+  qw38::cuda::attention_kv_copy_logical_to_physical(
+      initial_value.data(), physical_value.data(), config.kv_heads,
+      config.capacity, config.head_width);
+
   DeviceBuffers chunk;
   DeviceBuffers tokenwise;
   cudaError_t error =
@@ -148,16 +157,16 @@ int run_chunk_case(const char* name,
   QW38_COPY(chunk.gate, gate);
   QW38_COPY(chunk.query_scale, query_scale);
   QW38_COPY(chunk.key_scale, key_scale);
-  QW38_COPY(chunk.committed_key, initial_key);
-  QW38_COPY(chunk.committed_value, initial_value);
+  QW38_COPY(chunk.committed_key, physical_key);
+  QW38_COPY(chunk.committed_value, physical_value);
   QW38_COPY(tokenwise.query, query);
   QW38_COPY(tokenwise.key, key);
   QW38_COPY(tokenwise.value, value);
   QW38_COPY(tokenwise.gate, gate);
   QW38_COPY(tokenwise.query_scale, query_scale);
   QW38_COPY(tokenwise.key_scale, key_scale);
-  QW38_COPY(tokenwise.committed_key, initial_key);
-  QW38_COPY(tokenwise.committed_value, initial_value);
+  QW38_COPY(tokenwise.committed_key, physical_key);
+  QW38_COPY(tokenwise.committed_value, physical_value);
 #undef QW38_COPY
   const std::uint64_t initial_frontier = start_position;
   if (error == cudaSuccess) {
@@ -206,14 +215,20 @@ int run_chunk_case(const char* name,
   error = cudaMemcpy((destination).data(), (pointer),                         \
                      (destination).size() * sizeof((destination)[0]),         \
                      cudaMemcpyDeviceToHost)
-  QW38_READ(actual_committed_key, chunk.committed_key);
-  QW38_READ(actual_committed_value, chunk.committed_value);
+  QW38_READ(physical_key, chunk.committed_key);
+  QW38_READ(physical_value, chunk.committed_value);
   std::uint64_t actual_frontier = 0;
   if (error == cudaSuccess) {
     error = cudaMemcpy(&actual_frontier, chunk.frontier,
                        sizeof(actual_frontier), cudaMemcpyDeviceToHost);
   }
   if (error != cudaSuccess) return fail_cuda("chunk atomic read", error);
+  qw38::cuda::attention_kv_copy_physical_to_logical(
+      physical_key.data(), actual_committed_key.data(), config.kv_heads,
+      config.capacity, config.head_width);
+  qw38::cuda::attention_kv_copy_physical_to_logical(
+      physical_value.data(), actual_committed_value.data(), config.kv_heads,
+      config.capacity, config.head_width);
   const bool prepare_atomic = bf16_equal(actual_committed_key, initial_key) &&
                               bf16_equal(actual_committed_value, initial_value) &&
                               actual_frontier == initial_frontier;
@@ -249,9 +264,15 @@ int run_chunk_case(const char* name,
   QW38_READ(token_output, tokenwise.output);
   QW38_READ(chunk_candidate_key, chunk.candidate_key);
   QW38_READ(chunk_candidate_value, chunk.candidate_value);
-  QW38_READ(actual_committed_key, tokenwise.committed_key);
-  QW38_READ(actual_committed_value, tokenwise.committed_value);
+  QW38_READ(physical_key, tokenwise.committed_key);
+  QW38_READ(physical_value, tokenwise.committed_value);
   if (error != cudaSuccess) return fail_cuda("token-wise read", error);
+  qw38::cuda::attention_kv_copy_physical_to_logical(
+      physical_key.data(), actual_committed_key.data(), config.kv_heads,
+      config.capacity, config.head_width);
+  qw38::cuda::attention_kv_copy_physical_to_logical(
+      physical_value.data(), actual_committed_value.data(), config.kv_heads,
+      config.capacity, config.head_width);
   bool tokenwise_equal = chunk_output == token_output;
   for (std::size_t token = 0; token < token_count; ++token) {
     const std::size_t cache_base = (start_position + token) * row_values;
@@ -272,14 +293,20 @@ int run_chunk_case(const char* name,
   if (error != cudaSuccess) return fail_cuda("chunk commit", error);
   std::vector<__nv_bfloat16> chunk_final_key(cache_values);
   std::vector<__nv_bfloat16> chunk_final_value(cache_values);
-  QW38_READ(chunk_final_key, chunk.committed_key);
-  QW38_READ(chunk_final_value, chunk.committed_value);
+  QW38_READ(physical_key, chunk.committed_key);
+  QW38_READ(physical_value, chunk.committed_value);
 #undef QW38_READ
   if (error == cudaSuccess) {
     error = cudaMemcpy(&actual_frontier, chunk.frontier,
                        sizeof(actual_frontier), cudaMemcpyDeviceToHost);
   }
   if (error != cudaSuccess) return fail_cuda("chunk final read", error);
+  qw38::cuda::attention_kv_copy_physical_to_logical(
+      physical_key.data(), chunk_final_key.data(), config.kv_heads,
+      config.capacity, config.head_width);
+  qw38::cuda::attention_kv_copy_physical_to_logical(
+      physical_value.data(), chunk_final_value.data(), config.kv_heads,
+      config.capacity, config.head_width);
   const bool commit_exact =
       bf16_equal(chunk_final_key, actual_committed_key) &&
       bf16_equal(chunk_final_value, actual_committed_value) &&

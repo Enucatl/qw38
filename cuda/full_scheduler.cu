@@ -924,13 +924,21 @@ Status SchedulerSession::state_equals(const SchedulerSession& other,
   compare(gdn_recurrent_, other.gdn_recurrent_,
           kGdnLayers * internal::kGdnRecurrentStateValues * sizeof(float));
   const std::size_t cache_stride = capacity_ * internal::kAttentionKvWidth;
-  const std::size_t committed_bytes =
-      frontier_ * internal::kAttentionKvWidth * sizeof(__nv_bfloat16);
+  const std::size_t head_span_bytes =
+      frontier_ * internal::kAttentionHeadWidth * sizeof(__nv_bfloat16);
+  const std::size_t kv_heads =
+      internal::kAttentionKvWidth / internal::kAttentionHeadWidth;
   for (std::size_t layer = 0; layer < kAttentionLayers; ++layer) {
-    compare(attention_key_ + layer * cache_stride,
-            other.attention_key_ + layer * cache_stride, committed_bytes);
-    compare(attention_value_ + layer * cache_stride,
-            other.attention_value_ + layer * cache_stride, committed_bytes);
+    for (std::size_t kv_head = 0; kv_head < kv_heads; ++kv_head) {
+      const std::size_t head_offset =
+          kv_head * capacity_ * internal::kAttentionHeadWidth;
+      compare(attention_key_ + layer * cache_stride + head_offset,
+              other.attention_key_ + layer * cache_stride + head_offset,
+              head_span_bytes);
+      compare(attention_value_ + layer * cache_stride + head_offset,
+              other.attention_value_ + layer * cache_stride + head_offset,
+              head_span_bytes);
+    }
   }
   unsigned int host_mismatch = 1;
   if (error == cudaSuccess) {
@@ -1550,24 +1558,20 @@ Status execute_token(const ResidentModel& model, std::size_t token,
                       timings == nullptr ? nullptr : &timings->state_commit);
   const std::size_t cache_stride =
       session->capacity_ * internal::kAttentionKvWidth;
-  const std::size_t target =
-      session->frontier_ * internal::kAttentionKvWidth;
+  const AttentionConfig commit_config{
+      24, 4, 256, 64, static_cast<std::uint32_t>(session->capacity_)};
   for (std::size_t slot = 0; error == cudaSuccess && slot < kAttentionLayers;
        ++slot) {
-    error = cudaMemcpyAsync(
-        session->attention_key_ + slot * cache_stride + target,
+    const AttentionCache committed{
+        session->attention_key_ + slot * cache_stride,
+        session->attention_value_ + slot * cache_stride};
+    const AttentionCache candidate{
         workspace->attention_candidate_key_ +
             slot * internal::kAttentionKvWidth,
-        internal::kAttentionKvWidth * sizeof(__nv_bfloat16),
-        cudaMemcpyDeviceToDevice);
-    if (error == cudaSuccess) {
-      error = cudaMemcpyAsync(
-          session->attention_value_ + slot * cache_stride + target,
-          workspace->attention_candidate_value_ +
-              slot * internal::kAttentionKvWidth,
-          internal::kAttentionKvWidth * sizeof(__nv_bfloat16),
-          cudaMemcpyDeviceToDevice);
-    }
+        workspace->attention_candidate_value_ +
+            slot * internal::kAttentionKvWidth};
+    error = launch_attention_scatter_chunk(
+        commit_config, session->frontier_, 1, candidate, committed, nullptr);
   }
   if (error == cudaSuccess) error = cudaDeviceSynchronize();
   if (error == cudaSuccess) error = end_phase(categories);
@@ -1921,23 +1925,20 @@ Status execute_prompt_chunk(
       session->capacity_ * internal::kAttentionKvWidth;
   const std::size_t candidate_stride =
       workspace->prompt_chunk_rows_ * internal::kAttentionKvWidth;
-  const std::size_t target =
-      session->frontier_ * internal::kAttentionKvWidth;
+  const AttentionConfig commit_config{
+      24, 4, 256, 64, static_cast<std::uint32_t>(session->capacity_)};
   for (std::size_t slot = 0; error == cudaSuccess && slot < kAttentionLayers;
        ++slot) {
-    error = cudaMemcpyAsync(
-        session->attention_key_ + slot * cache_stride + target,
+    const AttentionCache committed{
+        session->attention_key_ + slot * cache_stride,
+        session->attention_value_ + slot * cache_stride};
+    const AttentionCache candidate{
         workspace->prompt_attention_candidate_key_ + slot * candidate_stride,
-        token_count * internal::kAttentionKvWidth * sizeof(__nv_bfloat16),
-        cudaMemcpyDeviceToDevice);
-    if (error == cudaSuccess) {
-      error = cudaMemcpyAsync(
-          session->attention_value_ + slot * cache_stride + target,
-          workspace->prompt_attention_candidate_value_ +
-              slot * candidate_stride,
-          token_count * internal::kAttentionKvWidth * sizeof(__nv_bfloat16),
-          cudaMemcpyDeviceToDevice);
-    }
+        workspace->prompt_attention_candidate_value_ +
+            slot * candidate_stride};
+    error = launch_attention_scatter_chunk(
+        commit_config, session->frontier_, token_count, candidate, committed,
+        nullptr);
   }
   if (error == cudaSuccess) error = cudaDeviceSynchronize();
   if (error != cudaSuccess) {

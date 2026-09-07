@@ -1,7 +1,7 @@
 # 43. CUDA grouped-query attention for one decoded token
 
-[Index](README.md) · Implementation tasks: ATN-001, OPT-005, and EDU-029 in
-[`implementation_ledger.md`](../implementation_ledger.md)
+[Index](README.md) · Implementation tasks: ATN-001, OPT-005, OPT-010, and
+EDU-029 in [`implementation_ledger.md`](../implementation_ledger.md)
 
 Chapter 19 introduced attention with small scalar examples. This chapter follows
 the first CUDA decode implementation. “Decode” means processing one new token
@@ -70,6 +70,34 @@ candidate row. Attention therefore compares against the values that will
 actually persist, rather than silently using an FP32 row for the current token
 and BF16 rows later.
 
+## Physical committed KV layout
+
+Logical `(token, kv_head, lane)` BF16 values are unchanged. On the device,
+committed K and V are stored **head-major and token-contiguous**: all tokens
+for KV head 0 occupy one region, then head 1, and so on. The address of one
+BF16 value is:
+
+```text
+physical(token, kv_head, lane) =
+    (kv_head * capacity + token) * head_width + lane
+```
+
+[`attention_kv_physical_index`](../cuda/attention_decode.h) implements that
+formula. Decode and prefill share it: one-token kernels and chunked kernels
+read the same committed cache. Candidate chunk rows stay **token-major**:
+
+```text
+logical(token, kv_head, lane) =
+    token * kv_heads * head_width + kv_head * head_width + lane
+```
+
+Production capacity `131,072` is a multiple of the 32-row tile, so a full
+committed tile for one KV head is `32 × 256` consecutive BF16 values without
+padding. The product `kv_heads × head_width × capacity` stays 134,217,728
+values per array; 16 layers of K and V remain 8 GiB. Commit scatters each
+token-major candidate value into the physical index rather than copying a
+contiguous token-major slab.
+
 ## Causal scoring and stable softmax
 
 For each query head, [`grouped_attention`](../cuda/attention_decode.cu) computes
@@ -92,13 +120,14 @@ committed rows 0..2 + new position 3
               |
               v
 prepare -> distinct candidate K/V row + output
-commit  -> copy candidate into row 3 -> advance frontier to 4
+commit  -> scatter candidate into physical row 3 -> advance frontier to 4
 ```
 
 The committed cache and frontier remain byte-identical during prepare. Commit
-copies both BF16 arrays, synchronizes the block, and advances the frontier last.
-Cancellation discards the candidate row without calling commit. Full-request
-atomicity across all 64 layers still belongs to SES-002.
+scatters both BF16 arrays into physical `(token, kv_head, lane)` addresses,
+synchronizes the block, and advances the frontier last. Cancellation discards
+the candidate row without calling commit. Full-request atomicity across all 64
+layers still belongs to SES-002.
 
 ## Two references and the failed tight gate
 

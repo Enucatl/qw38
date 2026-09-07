@@ -1,6 +1,6 @@
 # 49. Versioned atomic CUDA checkpoints
 
-[Index](README.md) · Implementation tasks: SES-003 and EDU-035 in
+[Index](README.md) · Implementation tasks: SES-003, OPT-010, and EDU-035 in
 [`implementation_ledger.md`](../implementation_ledger.md)
 
 A session disappears when its process exits unless its state is written to
@@ -32,6 +32,18 @@ Only **committed KV rows** below the frontier belong to the conversation. Empty
 capacity is omitted, so checkpoint KV storage grows by exactly 65,536 bytes per
 token rather than always consuming 8 GiB.
 
+Device attention stores those rows in the physical head-major layout from
+[Chapter 43](43-cuda-attention-decode.md). The on-disk KV sections remain
+**logical token-major prefixes**. Save packs device physical bytes through a
+transient 1 MiB staging buffer with
+[`launch_pack_committed_kv`](../cuda/attention_decode.cu); restore unpacks the
+same logical payload with
+[`launch_unpack_committed_kv`](../cuda/attention_decode.cu). That staging buffer
+is allocated inside save/restore and is not a session, workspace, or
+prompt-sized allocation. Checkpoint magic `QW38CKP1`, version `1`, header size
+`248`, model hash, and layout hash stay byte-identical; OPT-010 does not bump
+the SES-003 compatibility identity.
+
 A final 64 ASCII characters hold the SHA-256 **payload digest** over the header
 and every payload byte. A digest is a compact fingerprint: changing even one
 tested byte changes the expected fingerprint. It detects damage; it is not
@@ -61,7 +73,8 @@ section size, exact total file size, the payload digest, and every token ID.
 Only after all these checks pass does it copy state toward the GPU.
 
 GDN bytes load into the existing SES-002 candidate workspace and become active
-through pointer swaps. KV data is copied only for the saved prefix, outputs and
+through pointer swaps. KV data is unpacked from the logical token-major prefix
+into physical device addresses only for the saved frontier, outputs and
 sampler fields are restored, and the frontier is published last. A corrupt
 payload and a deliberately changed compatibility hash both return
 `incompatible_artifact` without changing the already valid target session.

@@ -250,6 +250,21 @@ DSpark are explicitly rejected as Qwen model semantics.
   speedup or end-to-end measurement:
   [`fixtures/cuda_query_row_attention.json`](../fixtures/cuda_query_row_attention.json).
   No external kernel implementation was copied or adapted.
+- OPT-010 introduces no new external implementation source. It is a local
+  committed-KV layout change over admitted ATN-001/ATN-002 and OPT-007
+  arithmetic: device K/V become head-major token-contiguous so a full 32-row
+  committed tile is one contiguous BF16 span per KV head, while candidate
+  rows stay token-major and checkpoints keep the SES-003 logical token-major
+  payload under the same magic, version, and layout hash. The schema-1
+  contract freezes the physical index, tile-span predicates, exact GQA
+  equality, and capacity product in
+  [`pins/cuda_kv_tile_layout_contract.json`](../pins/cuda_kv_tile_layout_contract.json).
+  One pinned RTX 5090 fixture retains bijection, pack round-trip, full-tile
+  pointer spans, byte-exact production versus one-row outputs, and the
+  explicit pointer-span / exact-value proof limit; it is not Nsight DRAM,
+  latency, or end-to-end evidence:
+  [`fixtures/cuda_kv_tile_layout.json`](../fixtures/cuda_kv_tile_layout.json).
+  No external kernel implementation was copied or adapted.
 - CUD-003 introduces no new external implementation source. GGUF Q8_0 decoding
   follows the format already admitted by the pinned scalar decoder, and the
   pointwise/layout equations come from the pinned model contract and scalar
