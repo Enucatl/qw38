@@ -77,7 +77,7 @@ are repository-relative unless stated otherwise.
 | OPT-008 | Make 4,096 tokens the default prompt chunk | OPT-007, MEM-002 | done | Default prefill chunks are 4,096 tokens with bounded fallback for tails/capacity; atomic commit, cancellation, and 128K reserve gates pass | [`tasks/OPT-008.md`](tasks/OPT-008.md); [`cuda/full_scheduler.h`](cuda/full_scheduler.h); [`cuda/prompt_scheduler_test.cu`](cuda/prompt_scheduler_test.cu); [`pins/cuda_prompt_scheduler_contract.json`](pins/cuda_prompt_scheduler_contract.json); [`fixtures/cuda_prompt_scheduler.json`](fixtures/cuda_prompt_scheduler.json); [`fixtures/cuda_memory_fit_post_graph.json`](fixtures/cuda_memory_fit_post_graph.json); log 2026-09-07T13:08:07Z |
 | OPT-009 | Implement true batched Q8_0/Q4_K/Q6_K prompt MMQ | OPT-004, SCH-002 | done | Prompt projections reuse weight tiles across rows, select measured SM120 kernels, and preserve frozen numeric envelopes | [`tasks/OPT-009.md`](tasks/OPT-009.md); [`cuda/quant_mmv.cu`](cuda/quant_mmv.cu); [`cuda/prompt_mmq_test.cu`](cuda/prompt_mmq_test.cu); [`pins/cuda_prompt_mmq_contract.json`](pins/cuda_prompt_mmq_contract.json); [`fixtures/cuda_prompt_mmq.json`](fixtures/cuda_prompt_mmq.json); [`evidence/profiling/opt009-mmq-tile-sweep-raw.txt`](evidence/profiling/opt009-mmq-tile-sweep-raw.txt); log 2026-09-07T15:11:00Z |
 | OPT-010 | Tile KV layout for coalesced exact GQA access | OPT-007, SES-003 | done | KV storage supports coalesced tile loads without changing logical values, checkpoint compatibility, prefix reuse, or capacity | [`tasks/OPT-010.md`](tasks/OPT-010.md); [`cuda/attention_decode.cu`](cuda/attention_decode.cu); [`cuda/kv_tile_layout_test.cu`](cuda/kv_tile_layout_test.cu); [`pins/cuda_kv_tile_layout_contract.json`](pins/cuda_kv_tile_layout_contract.json); [`fixtures/cuda_kv_tile_layout.json`](fixtures/cuda_kv_tile_layout.json); log 2026-09-07T16:55:25Z |
-| OPT-011 | Pipeline and fuse prompt execution and chunk commit | OPT-008, OPT-009, OPT-010 | pending | Justified fusion/overlap removes avoidable copies, launches, and barriers while preserving cancellation and atomic publication | — |
+| OPT-011 | Pipeline and fuse prompt execution and chunk commit | OPT-008, OPT-009, OPT-010 | done | Justified fusion/overlap removes avoidable copies, launches, and barriers while preserving cancellation and atomic publication | [`tasks/OPT-011.md`](tasks/OPT-011.md); [`cuda/full_scheduler.cu`](cuda/full_scheduler.cu); [`cuda/prompt_pipeline_test.cu`](cuda/prompt_pipeline_test.cu); [`pins/cuda_prompt_pipeline_contract.json`](pins/cuda_prompt_pipeline_contract.json); [`fixtures/cuda_prompt_pipeline.json`](fixtures/cuda_prompt_pipeline.json); log 2026-09-07T18:12:37Z |
 | OPT-012 | Add stable-address prompt CUDA graphs | OPT-003, OPT-011 | pending | Common 4,096-token prompt paths replay from stable addresses with graph/non-graph equality and reconciled memory | — |
 | OPT-013 | Implement associative block-parallel GDN prompt scan | GDN-002, OPT-011 | pending | Parallel GDN scan preserves recurrence/frontier tolerances across chunk boundaries and demonstrates measured prompt speedup | — |
 
@@ -3861,4 +3861,33 @@ are repository-relative unless stated otherwise.
   DRAM, latency, and end-to-end recovery. `plan.md` and `Makefile` are
   unchanged. OPT-011 through OPT-013 remain pending; QLT-001 remains blocked.
 - Marked OPT-010 `done`; delivery is limited to the verified task scope plus
+  this ledger/audit bookkeeping.
+
+### 2026-09-07T18:12:37Z — OPT-011 delivered
+
+- Independent verification attempt 1 passed batched embedding (`grid.y` =
+  token count), 127 fused residual-add-norm launches plus one last FFN add,
+  one all-layer multi-block scatter (`grid.y` = 16), two async D2H copies
+  overlapping that scatter then two stream joins, fused/unfused 2/3/64/65-row
+  byte equality, poll-8 cancellation with no publication, fused CUDA-event
+  mean strictly below unfused, and inherited scheduler/atomic/prefix/checkpoint/
+  graph/memory/MMQ/KV-layout gates on the pinned RTX 5090.
+- Acceptance evidence: [`tasks/OPT-011.md`](tasks/OPT-011.md);
+  [`cuda/full_scheduler.h`](cuda/full_scheduler.h);
+  [`cuda/full_scheduler.cu`](cuda/full_scheduler.cu);
+  [`cuda/quant_mmv.h`](cuda/quant_mmv.h);
+  [`cuda/quant_mmv.cu`](cuda/quant_mmv.cu);
+  [`cuda/attention_decode.h`](cuda/attention_decode.h);
+  [`cuda/attention_decode.cu`](cuda/attention_decode.cu);
+  [`cuda/prompt_pipeline_test.cu`](cuda/prompt_pipeline_test.cu);
+  [`pins/cuda_prompt_pipeline_contract.json`](pins/cuda_prompt_pipeline_contract.json);
+  [`fixtures/cuda_prompt_pipeline.json`](fixtures/cuda_prompt_pipeline.json);
+  [`docs/62-cuda-full-prefill.md`](docs/62-cuda-full-prefill.md);
+  [`docs/52-profiler-led-fusion.md`](docs/52-profiler-led-fusion.md);
+  [`docs/48-atomic-eval-and-sampling.md`](docs/48-atomic-eval-and-sampling.md).
+  The proof remains component-only launch/barrier and CUDA-event A/B evidence
+  and excludes a Nsight Systems overlap screenshot, end-to-end prefill/decode
+  speedup, and 128K quality recovery. `plan.md` and `Makefile` are unchanged.
+  OPT-012 and OPT-013 remain pending; QLT-001 remains blocked.
+- Marked OPT-011 `done`; delivery is limited to the verified task scope plus
   this ledger/audit bookkeeping.

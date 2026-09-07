@@ -72,6 +72,14 @@ cudaError_t launch_quant_row_decode(QuantKind kind,
                                     std::size_t row, __nv_bfloat16* output,
                                     cudaStream_t stream) noexcept;
 
+cudaError_t launch_quant_rows_decode_widen(QuantKind kind,
+                                           const std::uint8_t* weights,
+                                           std::size_t rows, std::size_t columns,
+                                           const std::size_t* token_ids,
+                                           std::size_t token_count,
+                                           float* output,
+                                           cudaStream_t stream) noexcept;
+
 }  // namespace qw38::cuda
 
 #endif  // QW38_CUDA_QUANT_MMV_H_

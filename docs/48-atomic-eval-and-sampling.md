@@ -1,6 +1,6 @@
 # 48. Atomic CUDA evaluation and separate sampling
 
-[Index](README.md) · Implementation tasks: SES-002 and EDU-034 in
+[Index](README.md) · Implementation tasks: SES-002, OPT-011, and EDU-034 in
 [`implementation_ledger.md`](../implementation_ledger.md)
 
 Evaluation changes a conversation. If it fails halfway through 64 layers, a
@@ -37,6 +37,14 @@ data, and finally the frontier are published. **Frontier last** means no caller
 can interpret candidate bytes as a committed token before every prerequisite
 has succeeded.
 
+A prompt chunk is the same transaction at a larger grain. OPT-011 may overlap
+two asynchronous last-row logits/hidden D2H copies with one all-layer KV scatter,
+but that overlap is unpublished candidate work. Host GDN pointer swaps, token
+memcpy, caller-buffer writes, and frontier advance still run only after both the
+prompt compute stream and the prompt copy stream have joined. Decode
+`execute_token` may call the all-layer scatter launcher; it still copies logits
+and hidden with blocking D2H and `cudaDeviceSynchronize` before publication.
+
 Duplicating the entire 128K KV cache would cost another 8 GiB and threaten the
 32 GiB product budget, so this row-staging design is intentional.
 
@@ -46,7 +54,10 @@ An optional status poll runs after a synchronized layer boundary. Returning OK
 continues. Returning `cancelled`, `internal`, or any other non-OK status stops
 before publication and returns that exact status to the caller. Synchronizing
 before the poll also surfaces asynchronous CUDA failures while state is still
-candidate-only.
+candidate-only. On a fused prompt chunk the wait is `cudaStreamSynchronize` of
+the compute stream rather than `cudaDeviceSynchronize`; the poll still runs only
+after the finished layer is visible, and a non-OK poll still publishes nothing
+and launches no scatter.
 
 The diagnostic cancels after eight completed layers and injects an internal
 error after 31. In both cases, frontier remains one, caller outputs remain
@@ -99,6 +110,11 @@ the retained cases are in
 is one-token CUDA evaluation. Multi-token request rollback, stochastic sampler
 policy, checkpoint persistence, public host `Engine` integration, 128K fit,
 graphs, active-request CUDA cancellation, and throughput remain later gates.
-SRV-001 separately proves cancellation while a request is waiting in the
-single-flight server queue; it does not yet connect an HTTP generation request
-to this one-token transaction.
+OPT-011 extends whole-chunk atomic publication with copy/compute overlap; its
+component-only launch/barrier evidence is
+[`pins/cuda_prompt_pipeline_contract.json`](../pins/cuda_prompt_pipeline_contract.json)
+and [`fixtures/cuda_prompt_pipeline.json`](../fixtures/cuda_prompt_pipeline.json).
+That increment does not claim a Nsight Systems overlap screenshot or end-to-end
+prefill speedup. SRV-001 separately proves cancellation while a request is
+waiting in the single-flight server queue; it does not yet connect an HTTP
+generation request to this one-token transaction.

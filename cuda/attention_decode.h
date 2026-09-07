@@ -211,6 +211,15 @@ cudaError_t launch_attention_scatter_chunk(
     std::size_t token_count, const AttentionCache& candidate_rows,
     const AttentionCache& committed, cudaStream_t stream) noexcept;
 
+cudaError_t launch_attention_scatter_layers(
+    const AttentionConfig& config, std::size_t start_position,
+    std::size_t token_count, std::size_t layer_count,
+    const __nv_bfloat16* candidate_key_base,
+    const __nv_bfloat16* candidate_value_base,
+    std::size_t candidate_layer_stride, __nv_bfloat16* committed_key_base,
+    __nv_bfloat16* committed_value_base, std::size_t committed_layer_stride,
+    cudaStream_t stream) noexcept;
+
 }  // namespace qw38::cuda
 
 #endif  // QW38_CUDA_ATTENTION_DECODE_H_

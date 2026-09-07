@@ -283,6 +283,30 @@ __global__ void quant_row_decode(const std::uint8_t* weights,
       decode_weight<Kind>(block, static_cast<int>(column % kWeightValues)));
 }
 
+template <QuantKind Kind>
+__global__ void quant_rows_decode_widen(const std::uint8_t* weights,
+                                        std::size_t columns,
+                                        const std::size_t* token_ids,
+                                        float* output) {
+  const std::size_t column =
+      static_cast<std::size_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+  if (column >= columns) return;
+  const std::size_t row = blockIdx.y;
+  constexpr std::size_t kWeightBytes =
+      Kind == QuantKind::kQ4K ? kQ4KBytes
+      : Kind == QuantKind::kQ6K ? kQ6KBytes
+                               : kQ80Bytes;
+  constexpr std::size_t kWeightValues =
+      Kind == QuantKind::kQ8_0 ? kWarpSize : kValuesPerWeightBlock;
+  const std::size_t row_bytes = columns / kWeightValues * kWeightBytes;
+  const std::size_t token = token_ids[row];
+  const std::uint8_t* block =
+      weights + token * row_bytes + column / kWeightValues * kWeightBytes;
+  const __nv_bfloat16 rounded = __float2bfloat16_rn(
+      decode_weight<Kind>(block, static_cast<int>(column % kWeightValues)));
+  output[row * columns + column] = __bfloat162float(rounded);
+}
+
 }  // namespace
 
 std::size_t q8_workspace_bytes(std::size_t columns) noexcept {
@@ -581,6 +605,35 @@ cudaError_t launch_quant_row_decode(QuantKind kind,
   } else {
     quant_row_decode<QuantKind::kQ8_0><<<blocks, kThreads, 0, stream>>>(
         weights, columns, row, output);
+  }
+  return cudaPeekAtLastError();
+}
+
+cudaError_t launch_quant_rows_decode_widen(QuantKind kind,
+                                           const std::uint8_t* weights,
+                                           std::size_t rows, std::size_t columns,
+                                           const std::size_t* token_ids,
+                                           std::size_t token_count,
+                                           float* output,
+                                           cudaStream_t stream) noexcept {
+  if (weights == nullptr || token_ids == nullptr || output == nullptr ||
+      rows == 0 || columns == 0 || token_count == 0 || token_count > rows ||
+      columns % kValuesPerWeightBlock != 0 ||
+      (kind != QuantKind::kQ4K && kind != QuantKind::kQ6K &&
+       kind != QuantKind::kQ8_0)) {
+    return cudaErrorInvalidValue;
+  }
+  const dim3 grid(static_cast<unsigned int>((columns + kThreads - 1) / kThreads),
+                  static_cast<unsigned int>(token_count));
+  if (kind == QuantKind::kQ4K) {
+    quant_rows_decode_widen<QuantKind::kQ4K>
+        <<<grid, kThreads, 0, stream>>>(weights, columns, token_ids, output);
+  } else if (kind == QuantKind::kQ6K) {
+    quant_rows_decode_widen<QuantKind::kQ6K>
+        <<<grid, kThreads, 0, stream>>>(weights, columns, token_ids, output);
+  } else {
+    quant_rows_decode_widen<QuantKind::kQ8_0>
+        <<<grid, kThreads, 0, stream>>>(weights, columns, token_ids, output);
   }
   return cudaPeekAtLastError();
 }

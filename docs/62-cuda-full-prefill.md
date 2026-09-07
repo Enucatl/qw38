@@ -1,9 +1,11 @@
 # Chunked full-model CUDA prefill
 
-[Index](README.md) · Implementation tasks: SCH-002, MEM-002, OPT-008, OPT-009, and EDU-047 in
-[`implementation_ledger.md`](../implementation_ledger.md) · Contract:
-[`pins/cuda_prompt_scheduler_contract.json`](../pins/cuda_prompt_scheduler_contract.json)
-· Evidence: [`fixtures/cuda_prompt_scheduler.json`](../fixtures/cuda_prompt_scheduler.json)
+[Index](README.md) · Implementation tasks: SCH-002, MEM-002, OPT-008, OPT-009, OPT-011, and EDU-047 in
+[`implementation_ledger.md`](../implementation_ledger.md) · Contracts:
+[`pins/cuda_prompt_scheduler_contract.json`](../pins/cuda_prompt_scheduler_contract.json),
+[`pins/cuda_prompt_pipeline_contract.json`](../pins/cuda_prompt_pipeline_contract.json)
+· Evidence: [`fixtures/cuda_prompt_scheduler.json`](../fixtures/cuda_prompt_scheduler.json),
+[`fixtures/cuda_prompt_pipeline.json`](../fixtures/cuda_prompt_pipeline.json)
 
 ## Why prompt execution differs from decode
 
@@ -32,14 +34,19 @@ prompt rows while its weights are already being used.
 
 For one chunk the path is:
 
-1. Decode every token's embedding row into BF16 and widen the residuals to FP32.
-2. Normalize each residual row independently.
+1. Decode every token's embedding row. Production uses one batched kernel that
+   still round-trips through BF16 into the FP32 residual. The retained unfused
+   path launches one decode per token and a separate widen.
+2. Normalize each residual row independently at layer 0. Later layers receive
+   that input norm from the previous fused residual-add-norm.
 3. Use MMQ to project all rows for the layer's mixer.
 4. Apply either the GDN recurrence or causal grouped-query attention.
-5. Add the mixer residual, run the three prompt-row FFN projections, and add the
-   FFN residual.
+5. Fuse mixer residual-plus-FFN-norm, run the three prompt-row FFN projections,
+   and fuse FFN residual-plus-next-input-norm (layer 63's last FFN add stays
+   standalone).
 6. After layer 63, compute final normalization and logits only for the last row.
-7. Publish every persistent state row and advance the frontier.
+7. Overlap last-row logits/hidden D2H with one all-layer KV scatter, join both
+   prompt streams, then publish persistent state and advance the frontier.
 
 Only the last logits are needed because `Session::sync` promises the state from
 which generation continues, not one logit matrix for every prompt position.
@@ -99,6 +106,63 @@ arithmetic. For a smaller session, the reusable allocation and selected prompt
 chunk are bounded by its capacity: a capacity-65 session executes `[65]` as one
 prompt transaction rather than allocating or dispatching 4,096 rows.
 
+## Prompt pipeline fusion
+
+After OPT-008's 4,096-row transactions, OPT-009's weight-reusing MMQ, and
+OPT-010's physical KV scatter, avoidable cost remained in prompt *orchestration*:
+one embedding kernel per token, unfused residual/norm pairs, sixteen one-block
+scatter launches, and a blocking last-row copy before those copies.
+
+OPT-011 keeps MMQ, GDN, and attention arithmetic. It changes how
+`execute_prompt_chunk` launches and commits them. Production is
+`PromptPipelinePath::kFusedOverlapped`. `PromptPipelinePath::kUnfusedSerial`
+retains the previous serial path as the exactness reference, not a second
+supported product backend.
+
+**Batched embedding.** Production copies the chunk's token IDs into unused
+prompt-Q8 scratch (no extra `cudaMalloc`) and launches one
+`launch_quant_rows_decode_widen` kernel. Captured graphs show `grid.y` equal to
+the token count: `[20, 64, 1]` at 64 rows and `[20, 4096, 1]` at 4,096 rows,
+each with 256 threads. Thread `(column, row)` decodes `token_ids[row]` with the
+existing weight decoder, stores `__float2bfloat16_rn`, then writes
+`__bfloat162float` of that BF16 into the FP32 residual. That is the old
+decode-then-widen round-trip without a global BF16 embedding store. The unfused
+path still loops `launch_quant_row_decode` and one `bf16_to_fp32`.
+
+**Residual-add-norm on prompt rows.** Decode already fused FFN residual add with
+the next layer's input RMSNorm (OPT-002). Production prompt now uses a row-wise
+kernel of the same class: `token_count` blocks of 256 threads, parallel
+`__fadd_rn` into the residual, the same ordered FP32 sum-of-squares on thread 0,
+then scaled BF16 stores. After each mixer: fused add into `after_mixer` plus
+FFN-norm. After FFN of layers 0–62: fused add into `residual` plus the next
+layer's input-norm. That is **127** fused launches per 64-layer chunk plus **one**
+standalone last FFN residual add on layer 63. Layer 0 still has a standalone
+input RMSNorm. SwiGLU, GDN gate prep, attention split, and post-attention BF16
+conversion stay unfused so OPT-009/OPT-007 kernels do not change.
+
+**All-layer scatter.** A 4,096-row layer is 4,194,304 BF16 pairs. The old scatter
+walked that in **one** 256-thread block. Production now launches
+`launch_attention_scatter_layers` once: `grid.y` is the 16 attention layers, and
+`grid.x` is `min(2048, ceil(values / 256))`. Captured graphs are `[256, 16, 1]`
+at 64 rows and `[2048, 16, 1]` at 4,096 rows, each one kernel node. Physical
+index math is unchanged. Decode `execute_token` also calls this launcher for one
+token; it still uses blocking D2H and `cudaDeviceSynchronize`. The one-layer
+wrapper remains so OPT-010 diagnostics stay valid.
+
+**Copy/compute overlap.** After all 64 layers and last logits enqueue on the
+prompt compute stream, the scheduler records a compute-done event, waits that
+event on a second copy stream, and issues **two** asynchronous D2H copies of last
+logits and last hidden on the copy stream while the all-layer scatter runs on
+compute. Publication waits until both streams join, then host-swaps GDN
+pointers, copies tokens and outputs, and advances the frontier last. The unfused
+path keeps two blocking `cudaMemcpy`s, sixteen one-layer scatters, and one
+`cudaDeviceSynchronize`. Workspace streams and the event are driver handles; the
+OPT-008 byte formula `160,380,416 + 96*C + 404,992*R` is unchanged.
+
+These launch and barrier counts are executed increments next to the CUDA calls.
+The pinned image still has no Nsight Systems, so overlap is not claimed from a
+Systems timeline.
+
 ## Candidate state, committed state, and cancellation
 
 **Committed** state is the conversation callers are allowed to observe.
@@ -108,11 +172,21 @@ in all 16 attention layers, bounded by session capacity. Tokens, last hidden
 state, logits, and frontier also remain
 unchanged during calculation.
 
-After every layer, an optional cancellation callback is polled. If cancellation
-arrives, the function returns `cancelled` and does not swap GDN state, copy KV
-rows, copy tokens, or advance the frontier. The measured 4,096-row cancellation
-case remained byte-equal to an empty session with frontier zero. Only after all
-64 layers and the last logits succeed does the chunk commit.
+After every layer, an optional cancellation callback is polled. The fused path
+`cudaStreamSynchronize`s the compute stream at that boundary; the unfused path
+keeps `cudaDeviceSynchronize`. If cancellation arrives, the function returns
+`cancelled` and does not enqueue later layers, logits, D2H, or scatter, and does
+not swap GDN state, copy KV rows, copy tokens, or advance the frontier. The
+measured 4,096-row cancellation case remained byte-equal to an empty session
+with frontier zero. A 64-row fused cancel at poll 8 likewise published nothing
+and launched no scatter.
+
+Only after all 64 layers and the last logits succeed does the chunk commit.
+Async D2H overlapping scatter is still candidate work. Host GDN pointer swaps,
+token memcpy, caller-buffer writes, and frontier advance run only after both
+prompt streams join. If logits, the copies, scatter, or either join fails, the
+function returns without that host publication. Staging buffers may hold
+candidate bytes; that is not publication.
 
 ## Fixed scratch and the 128K budget
 
@@ -142,8 +216,24 @@ These focused native checks prove the chunk policy, its tail and capacity
 fallbacks, exact differential, cancellation before commit, and physical 128K
 allocation reserve. OPT-009 adds component-only MMQ evidence: production
 weight-tile reuse, measured SM120 kind×bucket selection, and frozen numeric
-envelopes. The **proof boundary** excludes comparative speed claims, 2K/8K
-sustained prefill, execution of a 128K prefill, 128K retrieval quality,
-thermal stability, and superiority to llama.cpp/vLLM. BEN-001 provides the
-harness; CMP-002/CMP-003 still own the 30-sample comparative gate. QLT-001
-remains blocked.
+envelopes.
+
+OPT-011 adds component-only pipeline evidence in
+[`fixtures/cuda_prompt_pipeline.json`](../fixtures/cuda_prompt_pipeline.json).
+**Measured, RTX 5090:** fused versus unfused chunks at 2, 3, 64, and 65 rows
+were byte-equal in committed GDN/KV, tokens, frontier, last hidden, and logits.
+Fused 64-row counters were one embedding launch, zero widen, one scatter, zero
+blocking D2H, two async D2H, zero `cudaDeviceSynchronize`, 127 fused
+residual-add-norm launches, and one last FFN residual add. Unfused counters were
+64 embeddings, one widen, 16 scatters, two blocking D2H, and one device
+synchronize. A 64-row fused CUDA-event mean of 1297.02747 ms was strictly below
+the unfused mean of 1298.96277 ms over 30 paired samples after three warm-ups.
+That A/B is an orchestration predicate, not an end-to-end prefill claim. The
+fixture states the proof limit: component-only orchestration evidence, no Nsight
+Systems overlap screenshot, and no end-to-end prefill/decode speedup.
+
+The **proof boundary** excludes comparative speed claims, 2K/8K sustained
+prefill, execution of a 128K prefill, 128K retrieval quality, thermal stability,
+superiority to llama.cpp/vLLM, and a Nsight Systems overlap timeline. BEN-001
+provides the harness; CMP-002/CMP-003 still own the 30-sample comparative gate.
+QLT-001 remains blocked. Prompt CUDA graphs remain OPT-012.

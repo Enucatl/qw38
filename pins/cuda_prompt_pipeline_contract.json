@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "task": "OPT-011",
+  "target": "sm_120",
+  "toolkit": "CUDA 13.0.2",
+  "pinned_image": "qw38-cuda:13.0.2",
+  "threads": 256,
+  "attention_layers": 16,
+  "row_counts": [2, 3, 64, 65],
+  "cancel_poll": 8,
+  "timing_warmups": 3,
+  "timing_samples": 30,
+  "fused_residual_norm_launches": 127,
+  "last_ffn_residual_adds": 1,
+  "embedding_grid_x": 20,
+  "scatter_min_grid_x_64": 2,
+  "scatter_min_grid_x_4096": 16,
+  "scatter_grid_y": 16,
+  "fused_counters": {
+    "embedding_kernel_launches": 1,
+    "widen_kernel_launches": 0,
+    "scatter_kernel_launches": 1,
+    "blocking_d2h_copies": 0,
+    "async_d2h_copies": 2,
+    "device_synchronizes": 0,
+    "fused_residual_norm_kernel_launches": 127,
+    "residual_add_kernel_launches": 1
+  },
+  "unfused_counters": {
+    "embedding_kernel_launches": 64,
+    "widen_kernel_launches": 1,
+    "scatter_kernel_launches": 16,
+    "blocking_d2h_copies": 2,
+    "device_synchronizes": 1
+  },
+  "semantic_predicates": [
+    "fused_unfused_exact_2",
+    "fused_unfused_exact_3",
+    "fused_unfused_exact_64",
+    "fused_unfused_exact_65",
+    "cancellation_poll_8_publishes_nothing",
+    "cancellation_no_scatter",
+    "invalid_input_rejected",
+    "fused_embedding_one_kernel",
+    "fused_scatter_one_kernel",
+    "fused_scatter_multi_block",
+    "fused_mean_below_unfused",
+    "fused_counters_match",
+    "unfused_counters_match"
+  ],
+  "metadata_required": [
+    "device",
+    "compute_capability",
+    "driver",
+    "runtime",
+    "toolkit",
+    "pinned_image",
+    "measurement_utc",
+    "proof_limit"
+  ]
+}

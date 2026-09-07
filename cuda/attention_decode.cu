@@ -659,15 +659,39 @@ __global__ void two_row_grouped_tiled_chunk_attention(
   }
 }
 
+unsigned scatter_block_count(std::size_t values) noexcept {
+  const std::size_t needed =
+      (values + static_cast<std::size_t>(kThreads) - 1) /
+      static_cast<std::size_t>(kThreads);
+  if (needed == 0) return 1U;
+  constexpr std::size_t kMaxBlocks = 2048;
+  return static_cast<unsigned>(needed < kMaxBlocks ? needed : kMaxBlocks);
+}
+
 __global__ void scatter_committed_rows(
-    const __nv_bfloat16* candidate_key, const __nv_bfloat16* candidate_value,
-    __nv_bfloat16* committed_key, __nv_bfloat16* committed_value,
-    std::size_t start_position, std::size_t token_count,
-    std::uint32_t kv_heads, std::uint32_t capacity, std::uint32_t head_width,
-    std::uint64_t new_frontier, std::uint64_t* committed_frontier) {
+    const __nv_bfloat16* candidate_key_base,
+    const __nv_bfloat16* candidate_value_base, __nv_bfloat16* committed_key_base,
+    __nv_bfloat16* committed_value_base, std::size_t candidate_layer_stride,
+    std::size_t committed_layer_stride, std::size_t start_position,
+    std::size_t token_count, std::uint32_t kv_heads, std::uint32_t capacity,
+    std::uint32_t head_width, std::uint64_t new_frontier,
+    std::uint64_t* committed_frontier) {
+  const std::size_t layer = blockIdx.y;
+  const __nv_bfloat16* candidate_key =
+      candidate_key_base + layer * candidate_layer_stride;
+  const __nv_bfloat16* candidate_value =
+      candidate_value_base + layer * candidate_layer_stride;
+  __nv_bfloat16* committed_key =
+      committed_key_base + layer * committed_layer_stride;
+  __nv_bfloat16* committed_value =
+      committed_value_base + layer * committed_layer_stride;
   const std::size_t values =
       token_count * static_cast<std::size_t>(kv_heads) * head_width;
-  for (std::size_t index = threadIdx.x; index < values; index += blockDim.x) {
+  const std::size_t stride =
+      static_cast<std::size_t>(blockDim.x) * gridDim.x;
+  for (std::size_t index =
+           static_cast<std::size_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+       index < values; index += stride) {
     const std::size_t row_values =
         static_cast<std::size_t>(kv_heads) * head_width;
     const std::size_t rel_token = index / row_values;
@@ -681,8 +705,8 @@ __global__ void scatter_committed_rows(
     committed_key[destination] = candidate_key[index];
     committed_value[destination] = candidate_value[index];
   }
-  __syncthreads();
-  if (committed_frontier != nullptr && threadIdx.x == 0) {
+  if (committed_frontier != nullptr && blockIdx.x == 0 && blockIdx.y == 0 &&
+      threadIdx.x == 0) {
     *committed_frontier = new_frontier;
   }
 }
@@ -1039,25 +1063,41 @@ cudaError_t launch_attention_commit(
       committed_frontier, stream);
 }
 
+cudaError_t launch_attention_scatter_layers(
+    const AttentionConfig& config, std::size_t start_position,
+    std::size_t token_count, std::size_t layer_count,
+    const __nv_bfloat16* candidate_key_base,
+    const __nv_bfloat16* candidate_value_base,
+    std::size_t candidate_layer_stride, __nv_bfloat16* committed_key_base,
+    __nv_bfloat16* committed_value_base, std::size_t committed_layer_stride,
+    cudaStream_t stream) noexcept {
+  const std::size_t row_values = attention_kv_row_values(config);
+  if (row_values == 0 || token_count == 0 || layer_count == 0 ||
+      start_position >= config.capacity ||
+      token_count > config.capacity - start_position ||
+      candidate_key_base == nullptr || candidate_value_base == nullptr ||
+      committed_key_base == nullptr || committed_value_base == nullptr ||
+      candidate_key_base == committed_key_base ||
+      candidate_value_base == committed_value_base) {
+    return cudaErrorInvalidValue;
+  }
+  const unsigned blocks = scatter_block_count(token_count * row_values);
+  const dim3 grid(blocks, static_cast<unsigned>(layer_count));
+  scatter_committed_rows<<<grid, kThreads, 0, stream>>>(
+      candidate_key_base, candidate_value_base, committed_key_base,
+      committed_value_base, candidate_layer_stride, committed_layer_stride,
+      start_position, token_count, config.kv_heads, config.capacity,
+      config.head_width, 0, nullptr);
+  return cudaPeekAtLastError();
+}
+
 cudaError_t launch_attention_scatter_chunk(
     const AttentionConfig& config, std::size_t start_position,
     std::size_t token_count, const AttentionCache& candidate_rows,
     const AttentionCache& committed, cudaStream_t stream) noexcept {
-  const std::size_t row_values = attention_kv_row_values(config);
-  if (row_values == 0 || token_count == 0 ||
-      start_position >= config.capacity ||
-      token_count > config.capacity - start_position ||
-      candidate_rows.key == nullptr || candidate_rows.value == nullptr ||
-      committed.key == nullptr || committed.value == nullptr ||
-      candidate_rows.key == committed.key ||
-      candidate_rows.value == committed.value) {
-    return cudaErrorInvalidValue;
-  }
-  scatter_committed_rows<<<1, kThreads, 0, stream>>>(
-      candidate_rows.key, candidate_rows.value, committed.key, committed.value,
-      start_position, token_count, config.kv_heads, config.capacity,
-      config.head_width, 0, nullptr);
-  return cudaPeekAtLastError();
+  return launch_attention_scatter_layers(
+      config, start_position, token_count, 1, candidate_rows.key,
+      candidate_rows.value, 0, committed.key, committed.value, 0, stream);
 }
 
 cudaError_t launch_attention_commit_chunk(
@@ -1075,9 +1115,10 @@ cudaError_t launch_attention_commit_chunk(
       candidate_rows.value == committed.value) {
     return cudaErrorInvalidValue;
   }
-  scatter_committed_rows<<<1, kThreads, 0, stream>>>(
+  const unsigned blocks = scatter_block_count(token_count * row_values);
+  scatter_committed_rows<<<dim3(blocks, 1), kThreads, 0, stream>>>(
       candidate_rows.key, candidate_rows.value, committed.key, committed.value,
-      start_position, token_count, config.kv_heads, config.capacity,
+      0, 0, start_position, token_count, config.kv_heads, config.capacity,
       config.head_width, new_frontier, committed_frontier);
   return cudaPeekAtLastError();
 }

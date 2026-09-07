@@ -113,6 +113,25 @@ enum class PointwisePath : std::uint8_t {
   kUnfused = 1,
 };
 
+enum class PromptPipelinePath : std::uint8_t {
+  kFusedOverlapped = 0,
+  kUnfusedSerial = 1,
+};
+
+struct PromptPipelineCounters final {
+  std::uint32_t embedding_kernel_launches = 0;
+  std::uint32_t widen_kernel_launches = 0;
+  std::uint32_t residual_add_kernel_launches = 0;
+  std::uint32_t rms_norm_kernel_launches = 0;
+  std::uint32_t fused_residual_norm_kernel_launches = 0;
+  std::uint32_t scatter_kernel_launches = 0;
+  std::uint32_t blocking_d2h_copies = 0;
+  std::uint32_t async_d2h_copies = 0;
+  std::uint32_t device_synchronizes = 0;
+  std::uint32_t stream_synchronizes = 0;
+  std::uint32_t layer_polls = 0;
+};
+
 class SchedulerWorkspace;
 class SchedulerGraphs;
 
@@ -155,7 +174,8 @@ class ResidentModel final {
   friend Status execute_prompt_chunk(
       const ResidentModel&, const std::size_t*, std::size_t,
       class SchedulerSession*, class SchedulerWorkspace*, float*,
-      std::size_t, float*, std::size_t, const EvalControl*) noexcept;
+      std::size_t, float*, std::size_t, const EvalControl*,
+      PromptPipelinePath, PromptPipelineCounters*) noexcept;
   friend class SchedulerGraphs;
 };
 
@@ -216,7 +236,8 @@ class SchedulerSession final {
   friend Status execute_prompt_chunk(
       const ResidentModel&, const std::size_t*, std::size_t,
       SchedulerSession*, class SchedulerWorkspace*, float*, std::size_t,
-      float*, std::size_t, const EvalControl*) noexcept;
+      float*, std::size_t, const EvalControl*, PromptPipelinePath,
+      PromptPipelineCounters*) noexcept;
   friend Status greedy_sample(const SchedulerSession&, std::size_t*,
                               RuntimeTimings*) noexcept;
 };
@@ -285,6 +306,9 @@ class SchedulerWorkspace final {
   std::size_t capacity_ = 0;
   std::size_t prompt_chunk_rows_ = 0;
   std::size_t allocated_bytes_ = 0;
+  cudaStream_t prompt_compute_stream_ = nullptr;
+  cudaStream_t prompt_copy_stream_ = nullptr;
+  cudaEvent_t prompt_compute_done_ = nullptr;
 
   friend Status execute_token(const ResidentModel&, std::size_t,
                               SchedulerSession*, SchedulerWorkspace*, float*,
@@ -299,7 +323,8 @@ class SchedulerWorkspace final {
   friend Status execute_prompt_chunk(
       const ResidentModel&, const std::size_t*, std::size_t,
       SchedulerSession*, SchedulerWorkspace*, float*, std::size_t, float*,
-      std::size_t, const EvalControl*) noexcept;
+      std::size_t, const EvalControl*, PromptPipelinePath,
+      PromptPipelineCounters*) noexcept;
   friend class SchedulerGraphs;
 };
 
@@ -357,12 +382,31 @@ Status execute_token_traced(const ResidentModel& model, std::size_t token,
                             internal::TraceSink sink, void* context) noexcept;
 #endif
 
+cudaError_t launch_residual_add_fp32(const float* residual,
+                                     const float* correction, std::size_t count,
+                                     float* output,
+                                     cudaStream_t stream) noexcept;
+
+cudaError_t launch_rms_norm_rows_fp32_to_bf16(const float* input,
+                                              const float* scale,
+                                              std::size_t width,
+                                              std::size_t token_count,
+                                              __nv_bfloat16* output,
+                                              cudaStream_t stream) noexcept;
+
+cudaError_t launch_residual_add_norm_rows_fp32_to_bf16(
+    const float* residual, const float* correction, const float* scale,
+    std::size_t width, std::size_t token_count, float* output,
+    __nv_bfloat16* normalized, cudaStream_t stream) noexcept;
+
 Status execute_prompt_chunk(
     const ResidentModel& model, const std::size_t* tokens,
     std::size_t token_count, SchedulerSession* session,
     SchedulerWorkspace* workspace, float* host_logits,
     std::size_t logits_count, float* host_hidden, std::size_t hidden_count,
-    const EvalControl* control = nullptr) noexcept;
+    const EvalControl* control = nullptr,
+    PromptPipelinePath path = PromptPipelinePath::kFusedOverlapped,
+    PromptPipelineCounters* counters = nullptr) noexcept;
 
 Status greedy_sample(const SchedulerSession& session,
                      std::size_t* token,

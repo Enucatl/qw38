@@ -1,0 +1,216 @@
+{
+  "schema_version": 1,
+  "task": "OPT-011",
+  "status": "measured",
+  "device": "NVIDIA GeForce RTX 5090",
+  "compute_capability": "12.0",
+  "driver": "13.1",
+  "runtime": "13.0",
+  "toolkit": "CUDA 13.0.2",
+  "pinned_image": "qw38-cuda:13.0.2",
+  "measurement_utc": "2026-09-07T17:43:07Z",
+  "threads": 256,
+  "semantic": {
+    "fused_unfused_exact_2": true,
+    "fused_unfused_exact_3": true,
+    "fused_unfused_exact_64": true,
+    "fused_unfused_exact_65": true,
+    "cancellation_poll_8_publishes_nothing": true,
+    "cancellation_no_scatter": true,
+    "invalid_input_rejected": true,
+    "fused_embedding_one_kernel": true,
+    "fused_scatter_one_kernel": true,
+    "fused_scatter_multi_block": true,
+    "fused_mean_below_unfused": true,
+    "fused_counters_match": true,
+    "unfused_counters_match": true
+  },
+  "equality": {
+    "row_counts": [
+      2,
+      3,
+      64,
+      65
+    ],
+    "state_hidden_logits_exact": [
+      true,
+      true,
+      true,
+      true
+    ]
+  },
+  "cancellation": {
+    "polls": 8,
+    "frontier": 0,
+    "scatter_kernel_launches": 0,
+    "outputs_unchanged": true,
+    "state_equals_empty": true
+  },
+  "launch": {
+    "fused_embedding_64": {
+      "kernel_nodes": 1,
+      "grid": [
+        20,
+        64,
+        1
+      ],
+      "block": [
+        256,
+        1,
+        1
+      ]
+    },
+    "fused_embedding_4096": {
+      "kernel_nodes": 1,
+      "grid": [
+        20,
+        4096,
+        1
+      ],
+      "block": [
+        256,
+        1,
+        1
+      ]
+    },
+    "unfused_embedding_64": {
+      "kernel_nodes": 64
+    },
+    "fused_residual_norm": {
+      "kernel_nodes": 1,
+      "grid": [
+        64,
+        1,
+        1
+      ],
+      "block": [
+        256,
+        1,
+        1
+      ]
+    },
+    "unfused_residual_norm": {
+      "kernel_nodes": 2
+    },
+    "fused_scatter_64": {
+      "kernel_nodes": 1,
+      "grid": [
+        256,
+        16,
+        1
+      ],
+      "block": [
+        256,
+        1,
+        1
+      ]
+    },
+    "fused_scatter_4096": {
+      "kernel_nodes": 1,
+      "grid": [
+        2048,
+        16,
+        1
+      ],
+      "block": [
+        256,
+        1,
+        1
+      ]
+    },
+    "unfused_scatter_64": {
+      "kernel_nodes": 16
+    }
+  },
+  "counters": {
+    "fused": {
+      "embedding_kernel_launches": 1,
+      "widen_kernel_launches": 0,
+      "scatter_kernel_launches": 1,
+      "blocking_d2h_copies": 0,
+      "async_d2h_copies": 2,
+      "device_synchronizes": 0,
+      "fused_residual_norm_kernel_launches": 127,
+      "residual_add_kernel_launches": 1
+    },
+    "unfused": {
+      "embedding_kernel_launches": 64,
+      "widen_kernel_launches": 1,
+      "scatter_kernel_launches": 16,
+      "blocking_d2h_copies": 2,
+      "async_d2h_copies": 0,
+      "device_synchronizes": 1
+    }
+  },
+  "timing": {
+    "warmups": 3,
+    "samples": 30,
+    "fused_mean_ms": 1287.08789,
+    "unfused_mean_ms": 1291.73047,
+    "fused_ms": [
+      1118.20129,
+      1132.21497,
+      1141.47241,
+      1154.63806,
+      1165.43018,
+      1179.42542,
+      1186.47473,
+      1198.69543,
+      1214.20081,
+      1222.17676,
+      1238.07812,
+      1248.83862,
+      1259.3717,
+      1271.61523,
+      1283.97546,
+      1294.89307,
+      1305.22473,
+      1316.24524,
+      1327.43237,
+      1336.73169,
+      1348.7323,
+      1362.02771,
+      1374.57129,
+      1383.17444,
+      1394.24915,
+      1406.45874,
+      1418.13,
+      1429.97266,
+      1443.2019,
+      1456.78223
+    ],
+    "unfused_ms": [
+      1126.34558,
+      1138.34473,
+      1148.77759,
+      1160.62146,
+      1170.37805,
+      1182.92761,
+      1194.48877,
+      1205.35938,
+      1217.69849,
+      1226.06946,
+      1241.5874,
+      1252.73669,
+      1262.70508,
+      1277.16492,
+      1287.69263,
+      1294.57324,
+      1307.36304,
+      1321.92981,
+      1332.74475,
+      1341.14709,
+      1352.55469,
+      1367.00781,
+      1378.51831,
+      1386.73279,
+      1398.21509,
+      1410.82678,
+      1421.96619,
+      1435.10718,
+      1448.29565,
+      1462.03857
+    ]
+  },
+  "proof_limit": "component-only orchestration evidence; no Nsight Systems overlap screenshot; no end-to-end prefill/decode speedup"
+}

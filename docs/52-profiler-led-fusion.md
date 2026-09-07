@@ -1,6 +1,6 @@
 # Profiler-led pointwise fusion
 
-[Index](README.md) · Implementation tasks: OPT-002 and EDU-038 in
+[Index](README.md) · Implementation tasks: OPT-002, OPT-011, and EDU-038 in
 [`implementation_ledger.md`](../implementation_ledger.md) · Evidence:
 [`cuda/full_scheduler.cu`](../cuda/full_scheduler.cu),
 [`cuda/fusion_test.cu`](../cuda/fusion_test.cu),
@@ -8,6 +8,9 @@
 [`fixtures/cuda_fusion.json`](../fixtures/cuda_fusion.json). The targeted raw
 profiler summary is
 [`evidence/profiling/opt002-nsight-compute.txt`](../evidence/profiling/opt002-nsight-compute.txt).
+OPT-011 prompt-pipeline evidence is
+[`pins/cuda_prompt_pipeline_contract.json`](../pins/cuda_prompt_pipeline_contract.json)
+and [`fixtures/cuda_prompt_pipeline.json`](../fixtures/cuda_prompt_pipeline.json).
 
 ## What fusion means
 
@@ -63,6 +66,29 @@ state, cancellation semantics, and final output.
 `PointwisePath::kFused` by default. This is a diagnostic switch, not a promise
 of two separately supported production backends.
 
+## Prompt residual-add-norm
+
+OPT-011 applies the same admitted fusion class to prompt rows. It does not open
+a new Nsight Compute campaign: QLT recovery and the ledger already named prompt
+norm/residual fusion. The prompt kernel `residual_add_norm_rows_fp32_to_bf16`
+uses one 256-thread block per row, parallel residual writes, the same ordered
+FP32 sum-of-squares on thread 0, then scaled BF16 stores. Mixer residual plus
+FFN-norm and FFN residual plus next-input-norm follow the decode schedule,
+including the unfused layer-0 input norm and layer-63 last FFN add.
+
+`PromptPipelinePath::kUnfusedSerial` retains the unfused pointwise sequence per
+layer (input RMSNorm, mixer residual, FFN RMSNorm, FFN residual) as the readable
+reference. Finished fused and unfused prompt chunks that succeed are byte-exact
+at the committed GDN/KV, token, frontier, last-hidden, and logits boundaries.
+
+Prompt fusion is justified with executed launch/barrier counters and a 64-row
+paired CUDA-event A/B (three warm-ups, 30 alternating samples, fused mean
+strictly below unfused). Nsight Systems remains absent from the pinned image, so
+OPT-011 does not claim a Systems overlap screenshot. Batched embedding,
+all-layer scatter, and async D2H/scatter overlap live on the same fused path;
+their launch-count evidence is in
+[`62-cuda-full-prefill.md`](62-cuda-full-prefill.md).
+
 ## A failed fusion that remains evidence
 
 The first version assigned every residual addition and store to thread zero so
@@ -107,3 +133,10 @@ A/B improvement. It does not prove product throughput, prefill performance,
 statistical comparative gates, a complete Nsight Systems timeline, or graph
 speed. CUDA graphs remain OPT-003; dispatch tuning and formal product benchmarks
 remain OPT-004 and BEN/CMP.
+
+OPT-011 proves that the same residual-add-norm class, plus batched embedding and
+all-layer scatter, is byte-exact against the retained unfused serial prompt path
+and that fused 64-row CUDA-event time is strictly below unfused. That proof is
+component-only launch/barrier and CUDA-event evidence. It does not prove a
+Nsight Systems overlap timeline, end-to-end prefill or decode speedup, or 128K
+quality recovery. Prompt CUDA graphs remain OPT-012.

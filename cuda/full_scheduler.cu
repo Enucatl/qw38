@@ -334,6 +334,34 @@ __global__ void residual_add_norm_fp32_to_bf16(
   }
 }
 
+__global__ void residual_add_norm_rows_fp32_to_bf16(
+    const float* residual, const float* correction, const float* scale,
+    std::size_t width, float* output, __nv_bfloat16* normalized) {
+  const std::size_t row = blockIdx.x;
+  const float* row_residual = residual + row * width;
+  const float* row_correction = correction + row * width;
+  float* row_output = output + row * width;
+  __nv_bfloat16* row_normalized = normalized + row * width;
+  __shared__ float inverse;
+  for (std::size_t index = threadIdx.x; index < width; index += blockDim.x) {
+    row_output[index] = __fadd_rn(row_residual[index], row_correction[index]);
+  }
+  __syncthreads();
+  if (threadIdx.x == 0) {
+    float sum = 0.0F;
+    for (std::size_t index = 0; index < width; ++index) {
+      const float value = row_output[index];
+      sum = __fadd_rn(sum, __fmul_rn(value, value));
+    }
+    inverse = 1.0F / sqrtf(sum / static_cast<float>(width) + 1.0e-6F);
+  }
+  __syncthreads();
+  for (std::size_t index = threadIdx.x; index < width; index += blockDim.x) {
+    row_normalized[index] = __float2bfloat16_rn(
+        __fmul_rn(__fmul_rn(row_output[index], inverse), scale[index]));
+  }
+}
+
 __global__ void compare_bytes(const std::uint8_t* left,
                               const std::uint8_t* right,
                               std::size_t count,
@@ -502,7 +530,56 @@ cudaError_t execute_ffn(const DeviceCommonLayer& layer,
   return error;
 }
 
+void bump(PromptPipelineCounters* counters,
+          std::uint32_t PromptPipelineCounters::* field) noexcept {
+  if (counters != nullptr) ++(counters->*field);
+}
+
 }  // namespace
+
+cudaError_t launch_residual_add_fp32(const float* residual,
+                                     const float* correction, std::size_t count,
+                                     float* output,
+                                     cudaStream_t stream) noexcept {
+  if (residual == nullptr || correction == nullptr || output == nullptr ||
+      count == 0) {
+    return cudaErrorInvalidValue;
+  }
+  residual_add_fp32<<<static_cast<unsigned int>((count + kThreads - 1) / kThreads),
+                      kThreads, 0, stream>>>(residual, correction, count,
+                                             output);
+  return cudaPeekAtLastError();
+}
+
+cudaError_t launch_rms_norm_rows_fp32_to_bf16(const float* input,
+                                              const float* scale,
+                                              std::size_t width,
+                                              std::size_t token_count,
+                                              __nv_bfloat16* output,
+                                              cudaStream_t stream) noexcept {
+  if (input == nullptr || scale == nullptr || output == nullptr || width == 0 ||
+      token_count == 0) {
+    return cudaErrorInvalidValue;
+  }
+  rms_norm_rows_fp32_to_bf16<<<static_cast<unsigned int>(token_count), kThreads,
+                               0, stream>>>(input, scale, width, output);
+  return cudaPeekAtLastError();
+}
+
+cudaError_t launch_residual_add_norm_rows_fp32_to_bf16(
+    const float* residual, const float* correction, const float* scale,
+    std::size_t width, std::size_t token_count, float* output,
+    __nv_bfloat16* normalized, cudaStream_t stream) noexcept {
+  if (residual == nullptr || correction == nullptr || scale == nullptr ||
+      output == nullptr || normalized == nullptr || width == 0 ||
+      token_count == 0) {
+    return cudaErrorInvalidValue;
+  }
+  residual_add_norm_rows_fp32_to_bf16<<<static_cast<unsigned int>(token_count),
+                                        kThreads, 0, stream>>>(
+      residual, correction, scale, width, output, normalized);
+  return cudaPeekAtLastError();
+}
 
 ResidentModel::ResidentModel() noexcept = default;
 ResidentModel::~ResidentModel() { release(); }
@@ -1059,9 +1136,15 @@ SchedulerWorkspace& SchedulerWorkspace::operator=(
   capacity_ = other.capacity_;
   prompt_chunk_rows_ = other.prompt_chunk_rows_;
   allocated_bytes_ = other.allocated_bytes_;
+  prompt_compute_stream_ = other.prompt_compute_stream_;
+  prompt_copy_stream_ = other.prompt_copy_stream_;
+  prompt_compute_done_ = other.prompt_compute_done_;
   other.capacity_ = 0;
   other.prompt_chunk_rows_ = 0;
   other.allocated_bytes_ = 0;
+  other.prompt_compute_stream_ = nullptr;
+  other.prompt_copy_stream_ = nullptr;
+  other.prompt_compute_done_ = nullptr;
   return *this;
 }
 
@@ -1114,6 +1197,18 @@ void SchedulerWorkspace::release() noexcept {
   QW38_FREE(residual_b_);
   QW38_FREE(residual_a_);
 #undef QW38_FREE
+  if (prompt_compute_done_ != nullptr) {
+    cudaEventDestroy(prompt_compute_done_);
+    prompt_compute_done_ = nullptr;
+  }
+  if (prompt_compute_stream_ != nullptr) {
+    cudaStreamDestroy(prompt_compute_stream_);
+    prompt_compute_stream_ = nullptr;
+  }
+  if (prompt_copy_stream_ != nullptr) {
+    cudaStreamDestroy(prompt_copy_stream_);
+    prompt_copy_stream_ = nullptr;
+  }
   capacity_ = 0;
   prompt_chunk_rows_ = 0;
   allocated_bytes_ = 0;
@@ -1202,6 +1297,20 @@ Status SchedulerWorkspace::create(std::size_t capacity) noexcept {
                 kAttentionLayers * prompt_chunk_rows_ *
                     internal::kAttentionKvWidth);
 #undef QW38_ALLOCATE
+  if (error != cudaSuccess) {
+    release();
+    return cuda_status(error, "cannot allocate CUDA scheduler workspace");
+  }
+  error = cudaStreamCreateWithFlags(&prompt_compute_stream_,
+                                    cudaStreamNonBlocking);
+  if (error == cudaSuccess) {
+    error = cudaStreamCreateWithFlags(&prompt_copy_stream_,
+                                      cudaStreamNonBlocking);
+  }
+  if (error == cudaSuccess) {
+    error = cudaEventCreateWithFlags(&prompt_compute_done_,
+                                     cudaEventDisableTiming);
+  }
   if (error != cudaSuccess) {
     release();
     return cuda_status(error, "cannot allocate CUDA scheduler workspace");
@@ -1560,19 +1669,11 @@ Status execute_token(const ResidentModel& model, std::size_t token,
       session->capacity_ * internal::kAttentionKvWidth;
   const AttentionConfig commit_config{
       24, 4, 256, 64, static_cast<std::uint32_t>(session->capacity_)};
-  for (std::size_t slot = 0; error == cudaSuccess && slot < kAttentionLayers;
-       ++slot) {
-    const AttentionCache committed{
-        session->attention_key_ + slot * cache_stride,
-        session->attention_value_ + slot * cache_stride};
-    const AttentionCache candidate{
-        workspace->attention_candidate_key_ +
-            slot * internal::kAttentionKvWidth,
-        workspace->attention_candidate_value_ +
-            slot * internal::kAttentionKvWidth};
-    error = launch_attention_scatter_chunk(
-        commit_config, session->frontier_, 1, candidate, committed, nullptr);
-  }
+  error = launch_attention_scatter_layers(
+      commit_config, session->frontier_, 1, kAttentionLayers,
+      workspace->attention_candidate_key_, workspace->attention_candidate_value_,
+      internal::kAttentionKvWidth, session->attention_key_,
+      session->attention_value_, cache_stride, nullptr);
   if (error == cudaSuccess) error = cudaDeviceSynchronize();
   if (error == cudaSuccess) error = end_phase(categories);
   nvtxRangePop();
@@ -1654,15 +1755,21 @@ Status execute_prompt_chunk(
     std::size_t token_count, SchedulerSession* session,
     SchedulerWorkspace* workspace, float* host_logits,
     std::size_t logits_count, float* host_hidden, std::size_t hidden_count,
-    const EvalControl* control) noexcept {
+    const EvalControl* control, PromptPipelinePath path,
+    PromptPipelineCounters* counters) noexcept {
+  const bool fused = path == PromptPipelinePath::kFusedOverlapped;
   if (model.blob_ == nullptr || tokens == nullptr || token_count < 2 ||
-      session == nullptr ||
-      workspace == nullptr || session->capacity_ == 0 ||
+      session == nullptr || workspace == nullptr || session->capacity_ == 0 ||
       token_count > workspace->prompt_chunk_rows_ ||
       token_count > session->capacity_ - session->frontier_ ||
       workspace->capacity_ != session->capacity_ || host_logits == nullptr ||
       logits_count != internal::kVocabularySize || host_hidden == nullptr ||
-      hidden_count != internal::kResidualWidth) {
+      hidden_count != internal::kResidualWidth ||
+      (path != PromptPipelinePath::kFusedOverlapped &&
+       path != PromptPipelinePath::kUnfusedSerial) ||
+      (fused && (workspace->prompt_compute_stream_ == nullptr ||
+                 workspace->prompt_copy_stream_ == nullptr ||
+                 workspace->prompt_compute_done_ == nullptr))) {
     return {StatusCode::kInvalidArgument,
             "CUDA prompt chunk input, state, or output is invalid"};
   }
@@ -1673,23 +1780,46 @@ Status execute_prompt_chunk(
     }
   }
   const NvtxRange chunk_range("qw38.prefill_chunk");
+  cudaStream_t stream = fused ? workspace->prompt_compute_stream_ : nullptr;
   cudaError_t error = cudaSuccess;
-  for (std::size_t row = 0; error == cudaSuccess && row < token_count; ++row) {
-    error = launch_quant_row_decode(
-        model.embedding_.kind, model.embedding_.data, model.embedding_.rows,
-        model.embedding_.columns, tokens[row],
-        workspace->prompt_normalized_ + row * internal::kResidualWidth,
-        nullptr);
-  }
-  if (error == cudaSuccess) {
-    bf16_to_fp32<<<
-        static_cast<unsigned int>((token_count * internal::kResidualWidth +
-                                   kThreads - 1) /
-                                  kThreads),
-        kThreads>>>(workspace->prompt_normalized_,
-                    token_count * internal::kResidualWidth,
-                    workspace->prompt_residual_a_);
-    error = cudaPeekAtLastError();
+  if (fused) {
+    error = cudaMemcpyAsync(reinterpret_cast<std::size_t*>(workspace->prompt_q8_),
+                            tokens, token_count * sizeof(std::size_t),
+                            cudaMemcpyHostToDevice, stream);
+    if (error == cudaSuccess) {
+      error = launch_quant_rows_decode_widen(
+          model.embedding_.kind, model.embedding_.data, model.embedding_.rows,
+          model.embedding_.columns,
+          reinterpret_cast<const std::size_t*>(workspace->prompt_q8_),
+          token_count, workspace->prompt_residual_a_, stream);
+      if (error == cudaSuccess) {
+        bump(counters, &PromptPipelineCounters::embedding_kernel_launches);
+      }
+    }
+  } else {
+    for (std::size_t row = 0; error == cudaSuccess && row < token_count; ++row) {
+      error = launch_quant_row_decode(
+          model.embedding_.kind, model.embedding_.data, model.embedding_.rows,
+          model.embedding_.columns, tokens[row],
+          workspace->prompt_normalized_ + row * internal::kResidualWidth,
+          stream);
+      if (error == cudaSuccess) {
+        bump(counters, &PromptPipelineCounters::embedding_kernel_launches);
+      }
+    }
+    if (error == cudaSuccess) {
+      bf16_to_fp32<<<
+          static_cast<unsigned int>((token_count * internal::kResidualWidth +
+                                     kThreads - 1) /
+                                    kThreads),
+          kThreads, 0, stream>>>(workspace->prompt_normalized_,
+                                 token_count * internal::kResidualWidth,
+                                 workspace->prompt_residual_a_);
+      error = cudaPeekAtLastError();
+      if (error == cudaSuccess) {
+        bump(counters, &PromptPipelineCounters::widen_kernel_launches);
+      }
+    }
   }
   float* residual = workspace->prompt_residual_a_;
   float* after_mixer = workspace->prompt_residual_b_;
@@ -1701,37 +1831,40 @@ Status execute_prompt_chunk(
        layer_index < model.layers_.size();
        ++layer_index) {
     const DeviceLayer& layer = model.layers_[layer_index];
-    rms_norm_rows_fp32_to_bf16<<<
-        static_cast<unsigned int>(token_count), kThreads>>>(
-        residual, layer.common.input_norm, internal::kResidualWidth,
-        workspace->prompt_normalized_);
-    error = cudaPeekAtLastError();
+    if (!fused || layer_index == 0) {
+      error = launch_rms_norm_rows_fp32_to_bf16(
+          residual, layer.common.input_norm, internal::kResidualWidth,
+          token_count, workspace->prompt_normalized_, stream);
+      if (error == cudaSuccess) {
+        bump(counters, &PromptPipelineCounters::rms_norm_kernel_launches);
+      }
+    }
     if (layer.kind == internal::LayerKind::kGdn) {
       if (error == cudaSuccess) {
         error = matrix_prompt(layer.gdn.packed_qkv,
                               workspace->prompt_normalized_, token_count,
                               workspace, workspace->prompt_projection_a_,
-                              nullptr);
+                              stream);
       }
       if (error == cudaSuccess) {
         error = matrix_prompt(layer.gdn.value_gate,
                               workspace->prompt_normalized_, token_count,
                               workspace, workspace->prompt_projection_b_,
-                              nullptr);
+                              stream);
       }
       if (error == cudaSuccess) {
         error = matrix_prompt(layer.gdn.alpha, workspace->prompt_normalized_,
                               token_count, workspace,
-                              workspace->prompt_projection_c_, nullptr);
+                              workspace->prompt_projection_c_, stream);
       }
       if (error == cudaSuccess) {
         error = matrix_prompt(layer.gdn.beta, workspace->prompt_normalized_,
                               token_count, workspace,
-                              workspace->prompt_projection_d_, nullptr);
+                              workspace->prompt_projection_d_, stream);
       }
       if (error == cudaSuccess) {
         prepare_gdn_gate_rows<<<static_cast<unsigned int>(token_count),
-                                kThreads>>>(
+                                kThreads, 0, stream>>>(
             workspace->prompt_projection_c_,
             workspace->prompt_projection_d_, layer.gdn.folded_a,
             layer.gdn.dt_bias, 16, 3, workspace->prompt_gdn_decay_,
@@ -1754,12 +1887,12 @@ Status execute_prompt_chunk(
             layer.gdn.convolution, workspace->prompt_gdn_decay_,
             workspace->prompt_gdn_update_, token_count, committed, candidate,
             workspace->prompt_gdn_convolved_,
-            workspace->prompt_gdn_recurrent_output_, nullptr);
+            workspace->prompt_gdn_recurrent_output_, stream);
       }
       if (error == cudaSuccess) {
         const dim3 grid(static_cast<unsigned int>(internal::kGdnGateCount),
                         static_cast<unsigned int>(token_count));
-        gdn_gated_output_rows<<<grid, kThreads>>>(
+        gdn_gated_output_rows<<<grid, kThreads, 0, stream>>>(
             workspace->prompt_gdn_recurrent_output_,
             workspace->prompt_projection_b_, layer.gdn.norm, 16, 3, 128,
             workspace->prompt_projected_bf16_);
@@ -1769,7 +1902,7 @@ Status execute_prompt_chunk(
         error = matrix_prompt(layer.gdn.output,
                               workspace->prompt_projected_bf16_, token_count,
                               workspace, workspace->prompt_mixer_output_,
-                              nullptr);
+                              stream);
       }
       ++gdn_slot;
     } else {
@@ -1777,29 +1910,30 @@ Status execute_prompt_chunk(
         error = matrix_prompt(layer.attention.query_gate,
                               workspace->prompt_normalized_, token_count,
                               workspace, workspace->prompt_projection_a_,
-                              nullptr);
+                              stream);
       }
       if (error == cudaSuccess) {
         error = matrix_prompt(layer.attention.key,
                               workspace->prompt_normalized_, token_count,
                               workspace, workspace->prompt_projection_c_,
-                              nullptr);
+                              stream);
       }
       if (error == cudaSuccess) {
         error = matrix_prompt(layer.attention.value,
                               workspace->prompt_normalized_, token_count,
                               workspace, workspace->prompt_projection_d_,
-                              nullptr);
+                              stream);
       }
       if (error == cudaSuccess) {
         const std::size_t values =
             token_count * internal::kAttentionQueryWidth;
         split_attention_rows<<<
             static_cast<unsigned int>((values + kThreads - 1) / kThreads),
-            kThreads>>>(workspace->prompt_projection_a_,
-                        internal::kAttentionQueryWidth, 256, token_count,
-                        workspace->prompt_gdn_convolved_,
-                        workspace->prompt_projection_b_);
+            kThreads, 0, stream>>>(workspace->prompt_projection_a_,
+                                   internal::kAttentionQueryWidth, 256,
+                                   token_count,
+                                   workspace->prompt_gdn_convolved_,
+                                   workspace->prompt_projection_b_);
         error = cudaPeekAtLastError();
       }
       const AttentionConfig config{
@@ -1825,75 +1959,110 @@ Status execute_prompt_chunk(
             layer.attention.key_norm, workspace->prompt_projection_b_,
             committed, candidate, workspace->attention_normalized_query_,
             workspace->attention_normalized_key_, workspace->attention_scores_,
-            workspace->prompt_gdn_recurrent_output_, nullptr);
+            workspace->prompt_gdn_recurrent_output_, stream);
       }
       if (error == cudaSuccess) {
         error = launch_fp32_to_bf16(
             workspace->prompt_gdn_recurrent_output_,
             token_count * internal::kAttentionQueryWidth,
-            workspace->prompt_projected_bf16_, nullptr);
+            workspace->prompt_projected_bf16_, stream);
       }
       if (error == cudaSuccess) {
         error = matrix_prompt(layer.attention.output,
                               workspace->prompt_projected_bf16_, token_count,
                               workspace, workspace->prompt_mixer_output_,
-                              nullptr);
+                              stream);
       }
       ++attention_slot;
     }
     if (error == cudaSuccess) {
-      residual_add_fp32<<<
-          static_cast<unsigned int>((token_count * internal::kResidualWidth +
-                                     kThreads - 1) /
-                                    kThreads),
-          kThreads>>>(residual, workspace->prompt_mixer_output_,
-                      token_count * internal::kResidualWidth, after_mixer);
-      error = cudaPeekAtLastError();
-    }
-    if (error == cudaSuccess) {
-      rms_norm_rows_fp32_to_bf16<<<
-          static_cast<unsigned int>(token_count), kThreads>>>(
-          after_mixer, layer.common.ffn_norm, internal::kResidualWidth,
-          workspace->prompt_normalized_);
-      error = cudaPeekAtLastError();
+      if (fused) {
+        error = launch_residual_add_norm_rows_fp32_to_bf16(
+            residual, workspace->prompt_mixer_output_, layer.common.ffn_norm,
+            internal::kResidualWidth, token_count, after_mixer,
+            workspace->prompt_normalized_, stream);
+        if (error == cudaSuccess) {
+          bump(counters,
+               &PromptPipelineCounters::fused_residual_norm_kernel_launches);
+        }
+      } else {
+        error = launch_residual_add_fp32(
+            residual, workspace->prompt_mixer_output_,
+            token_count * internal::kResidualWidth, after_mixer, stream);
+        if (error == cudaSuccess) {
+          bump(counters, &PromptPipelineCounters::residual_add_kernel_launches);
+        }
+        if (error == cudaSuccess) {
+          error = launch_rms_norm_rows_fp32_to_bf16(
+              after_mixer, layer.common.ffn_norm, internal::kResidualWidth,
+              token_count, workspace->prompt_normalized_, stream);
+          if (error == cudaSuccess) {
+            bump(counters, &PromptPipelineCounters::rms_norm_kernel_launches);
+          }
+        }
+      }
     }
     if (error == cudaSuccess) {
       error = matrix_prompt(layer.common.ffn_gate,
                             workspace->prompt_normalized_, token_count,
                             workspace, workspace->prompt_projection_a_,
-                            nullptr);
+                            stream);
     }
     if (error == cudaSuccess) {
       error = matrix_prompt(layer.common.ffn_up,
                             workspace->prompt_normalized_, token_count,
                             workspace, workspace->prompt_projection_b_,
-                            nullptr);
+                            stream);
     }
     if (error == cudaSuccess) {
       error = launch_swiglu_bf16(
           workspace->prompt_projection_a_, workspace->prompt_projection_b_,
           token_count * internal::kFfnWidth,
-          workspace->prompt_projected_bf16_, nullptr);
+          workspace->prompt_projected_bf16_, stream);
     }
     if (error == cudaSuccess) {
       error = matrix_prompt(layer.common.ffn_down,
                             workspace->prompt_projected_bf16_, token_count,
                             workspace, workspace->prompt_mixer_output_,
-                            nullptr);
+                            stream);
     }
     if (error == cudaSuccess) {
-      residual_add_fp32<<<
-          static_cast<unsigned int>((token_count * internal::kResidualWidth +
-                                     kThreads - 1) /
-                                    kThreads),
-          kThreads>>>(after_mixer, workspace->prompt_mixer_output_,
-                      token_count * internal::kResidualWidth, residual);
-      error = cudaPeekAtLastError();
+      if (fused && layer_index + 1 < model.layers_.size()) {
+        error = launch_residual_add_norm_rows_fp32_to_bf16(
+            after_mixer, workspace->prompt_mixer_output_,
+            model.layers_[layer_index + 1].common.input_norm,
+            internal::kResidualWidth, token_count, residual,
+            workspace->prompt_normalized_, stream);
+        if (error == cudaSuccess) {
+          bump(counters,
+               &PromptPipelineCounters::fused_residual_norm_kernel_launches);
+        }
+      } else {
+        error = launch_residual_add_fp32(
+            after_mixer, workspace->prompt_mixer_output_,
+            token_count * internal::kResidualWidth, residual, stream);
+        if (error == cudaSuccess) {
+          bump(counters, &PromptPipelineCounters::residual_add_kernel_launches);
+        }
+      }
     }
     if (error == cudaSuccess && control != nullptr &&
         control->poll != nullptr) {
-      error = cudaDeviceSynchronize();
-      if (error == cudaSuccess) poll_status = control->poll(control->context);
+      if (fused) {
+        error = cudaStreamSynchronize(stream);
+        if (error == cudaSuccess) {
+          bump(counters, &PromptPipelineCounters::stream_synchronizes);
+        }
+      } else {
+        error = cudaDeviceSynchronize();
+        if (error == cudaSuccess) {
+          bump(counters, &PromptPipelineCounters::device_synchronizes);
+        }
+      }
+      if (error == cudaSuccess) {
+        poll_status = control->poll(control->context);
+        bump(counters, &PromptPipelineCounters::layer_polls);
+      }
     }
   }
   if (!poll_status.is_ok()) return poll_status;
@@ -1904,22 +2073,17 @@ Status execute_prompt_chunk(
   const float* final_hidden =
       residual + (token_count - 1) * internal::kResidualWidth;
   if (error == cudaSuccess) {
-    rms_norm_fp32_to_bf16<<<1, kThreads>>>(
+    rms_norm_fp32_to_bf16<<<1, kThreads, 0, stream>>>(
         final_hidden, model.output_norm_, internal::kResidualWidth,
         workspace->normalized_);
     error = cudaPeekAtLastError();
+    if (error == cudaSuccess) {
+      bump(counters, &PromptPipelineCounters::rms_norm_kernel_launches);
+    }
   }
   if (error == cudaSuccess) {
     error = matrix_vector(model.output_, workspace->normalized_, workspace,
-                          workspace->logits_, nullptr);
-  }
-  if (error == cudaSuccess) {
-    error = cudaMemcpy(workspace->candidate_logits_host_, workspace->logits_,
-                       logits_count * sizeof(float), cudaMemcpyDeviceToHost);
-  }
-  if (error == cudaSuccess) {
-    error = cudaMemcpy(workspace->candidate_hidden_host_, final_hidden,
-                       hidden_count * sizeof(float), cudaMemcpyDeviceToHost);
+                          workspace->logits_, stream);
   }
   const std::size_t cache_stride =
       session->capacity_ * internal::kAttentionKvWidth;
@@ -1927,21 +2091,102 @@ Status execute_prompt_chunk(
       workspace->prompt_chunk_rows_ * internal::kAttentionKvWidth;
   const AttentionConfig commit_config{
       24, 4, 256, 64, static_cast<std::uint32_t>(session->capacity_)};
-  for (std::size_t slot = 0; error == cudaSuccess && slot < kAttentionLayers;
-       ++slot) {
-    const AttentionCache committed{
-        session->attention_key_ + slot * cache_stride,
-        session->attention_value_ + slot * cache_stride};
-    const AttentionCache candidate{
-        workspace->prompt_attention_candidate_key_ + slot * candidate_stride,
-        workspace->prompt_attention_candidate_value_ +
-            slot * candidate_stride};
-    error = launch_attention_scatter_chunk(
-        commit_config, session->frontier_, token_count, candidate, committed,
-        nullptr);
+  if (fused) {
+    if (error == cudaSuccess) {
+      error = cudaEventRecord(workspace->prompt_compute_done_, stream);
+    }
+    if (error == cudaSuccess) {
+      error = cudaStreamWaitEvent(workspace->prompt_copy_stream_,
+                                  workspace->prompt_compute_done_, 0);
+    }
+    if (error == cudaSuccess) {
+      error = cudaMemcpyAsync(
+          workspace->candidate_logits_host_, workspace->logits_,
+          logits_count * sizeof(float), cudaMemcpyDeviceToHost,
+          workspace->prompt_copy_stream_);
+      if (error == cudaSuccess) {
+        bump(counters, &PromptPipelineCounters::async_d2h_copies);
+      }
+    }
+    if (error == cudaSuccess) {
+      error = cudaMemcpyAsync(
+          workspace->candidate_hidden_host_, final_hidden,
+          hidden_count * sizeof(float), cudaMemcpyDeviceToHost,
+          workspace->prompt_copy_stream_);
+      if (error == cudaSuccess) {
+        bump(counters, &PromptPipelineCounters::async_d2h_copies);
+      }
+    }
+    if (error == cudaSuccess) {
+      error = launch_attention_scatter_layers(
+          commit_config, session->frontier_, token_count, kAttentionLayers,
+          workspace->prompt_attention_candidate_key_,
+          workspace->prompt_attention_candidate_value_, candidate_stride,
+          session->attention_key_, session->attention_value_, cache_stride,
+          stream);
+      if (error == cudaSuccess) {
+        bump(counters, &PromptPipelineCounters::scatter_kernel_launches);
+      }
+    }
+    if (error == cudaSuccess) {
+      error = cudaStreamSynchronize(workspace->prompt_copy_stream_);
+      if (error == cudaSuccess) {
+        bump(counters, &PromptPipelineCounters::stream_synchronizes);
+      }
+    }
+    if (error == cudaSuccess) {
+      error = cudaStreamSynchronize(stream);
+      if (error == cudaSuccess) {
+        bump(counters, &PromptPipelineCounters::stream_synchronizes);
+      }
+    }
+  } else {
+    if (error == cudaSuccess) {
+      error = cudaMemcpy(workspace->candidate_logits_host_, workspace->logits_,
+                         logits_count * sizeof(float), cudaMemcpyDeviceToHost);
+      if (error == cudaSuccess) {
+        bump(counters, &PromptPipelineCounters::blocking_d2h_copies);
+      }
+    }
+    if (error == cudaSuccess) {
+      error = cudaMemcpy(workspace->candidate_hidden_host_, final_hidden,
+                         hidden_count * sizeof(float), cudaMemcpyDeviceToHost);
+      if (error == cudaSuccess) {
+        bump(counters, &PromptPipelineCounters::blocking_d2h_copies);
+      }
+    }
+    for (std::size_t slot = 0; error == cudaSuccess && slot < kAttentionLayers;
+         ++slot) {
+      const AttentionCache committed{
+          session->attention_key_ + slot * cache_stride,
+          session->attention_value_ + slot * cache_stride};
+      const AttentionCache candidate{
+          workspace->prompt_attention_candidate_key_ + slot * candidate_stride,
+          workspace->prompt_attention_candidate_value_ +
+              slot * candidate_stride};
+      error = launch_attention_scatter_chunk(
+          commit_config, session->frontier_, token_count, candidate, committed,
+          stream);
+      if (error == cudaSuccess) {
+        bump(counters, &PromptPipelineCounters::scatter_kernel_launches);
+      }
+    }
+    if (error == cudaSuccess) {
+      error = cudaDeviceSynchronize();
+      if (error == cudaSuccess) {
+        bump(counters, &PromptPipelineCounters::device_synchronizes);
+      }
+    }
   }
-  if (error == cudaSuccess) error = cudaDeviceSynchronize();
   if (error != cudaSuccess) {
+    if (fused) {
+      if (workspace->prompt_copy_stream_ != nullptr) {
+        cudaStreamSynchronize(workspace->prompt_copy_stream_);
+      }
+      if (workspace->prompt_compute_stream_ != nullptr) {
+        cudaStreamSynchronize(workspace->prompt_compute_stream_);
+      }
+    }
     return cuda_status(error, "CUDA hybrid prompt chunk failed");
   }
   std::swap(session->gdn_convolution_,

@@ -265,6 +265,25 @@ DSpark are explicitly rejected as Qwen model semantics.
   latency, or end-to-end evidence:
   [`fixtures/cuda_kv_tile_layout.json`](../fixtures/cuda_kv_tile_layout.json).
   No external kernel implementation was copied or adapted.
+- OPT-011 introduces no new external implementation source. It is a local
+  prompt-orchestration change over admitted SCH-002/OPT-008 chunks, OPT-002
+  residual-add-norm fusion, OPT-009 MMQ, and OPT-010 physical KV scatter: one
+  batched embedding kernel that preserves the BF16 round-trip, a row-wise
+  residual-add-norm on mixer and next-input residuals, one multi-block all-layer
+  scatter, and two async last-row D2H copies overlapped with that scatter before
+  host publication. `PromptPipelinePath::kUnfusedSerial` is the retained
+  exactness reference. The schema-1 contract freezes launch/barrier counters,
+  captured grids, fused-versus-unfused predicates, and the component-only proof
+  limit in
+  [`pins/cuda_prompt_pipeline_contract.json`](../pins/cuda_prompt_pipeline_contract.json).
+  One pinned RTX 5090 fixture retains exact fused/unfused equality, poll-8
+  cancellation with no scatter, executed counters, and paired CUDA-event
+  samples; it is not a Nsight Systems overlap screenshot or an end-to-end
+  speedup:
+  [`fixtures/cuda_prompt_pipeline.json`](../fixtures/cuda_prompt_pipeline.json).
+  The beginner explanation is
+  [`docs/62-cuda-full-prefill.md`](62-cuda-full-prefill.md).
+  No external kernel implementation was copied or adapted.
 - CUD-003 introduces no new external implementation source. GGUF Q8_0 decoding
   follows the format already admitted by the pinned scalar decoder, and the
   pointwise/layout equations come from the pinned model contract and scalar
@@ -426,7 +445,10 @@ DSpark are explicitly rejected as Qwen model semantics.
   4,096-row outer policy while retaining the internal 64-row GDN scan; its
   allocation is bounded by session capacity. OPT-009 later replaces production
   Q8_0 with weight-reusing tiles and remeasures Q4_K/Q6_K tiles through 64; that
-  increment is documented separately and remains component-only. Exact
+  increment is documented separately and remains component-only. OPT-011 later
+  fuses prompt embedding, residual-add-norm, all-layer scatter, and commit
+  D2H/scatter overlap; that increment is also documented separately and remains
+  component-only, with no Nsight Systems overlap claim. Exact
   `[4096, 1]` differential, capacity fallback, cancellation, and memory
   evidence is authenticated in
   [`pins/cuda_prompt_scheduler_contract.json`](../pins/cuda_prompt_scheduler_contract.json)
