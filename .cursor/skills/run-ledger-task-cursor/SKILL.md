@@ -24,7 +24,10 @@ This skill is the Cursor port of `.agents/skills/run-ledger-task`. Differences:
 
 - Spawn stages with the Cursor **Task** tool, not Codex native subagents.
 - Use model slug `cursor-grok-4.6-high` for **every** stage, repair, and
-  diagnostic agent. Do not substitute another family or effort.
+  diagnostic agent. Do not substitute another family, effort, or the
+  `cursor-grok-4.6-high-fast` variant. Never use a `-fast` model for this
+  skill. If `cursor-grok-4.6-high` is unavailable or rejected, stop and report
+  the failure to the user; do not fall back.
 - Prefer `subagent_type: "generalPurpose"` unless a stage is pure codebase
   exploration, in which case `explore` is allowed for planning-only reads.
 - Give each stage **fresh context**: do not `resume` a prior agent; pass a
@@ -37,10 +40,6 @@ This skill is the Cursor port of `.agents/skills/run-ledger-task`. Differences:
   record `model: cursor-grok-4.6-high` and `telemetry_unavailable` (Cursor
   session) in the dossier unless the runtime clearly exposes token/cost
   fields; never invent usage.
-
-If the Task tool rejects `cursor-grok-4.6-high` and the session allowlist only
-exposes `cursor-grok-4.6-high-fast`, use that slug once, record the actual
-model in the dossier, and continue. Do not fall back to any other model.
 
 ## Admission
 
@@ -67,8 +66,7 @@ tasks. Report the exact failed gate and the evidence inspected.
 
 ## Stages
 
-Every spawn below uses Task with `model: "cursor-grok-4.6-high"` (or the
-allowlisted `cursor-grok-4.6-high-fast` fallback above).
+Every spawn below uses Task with `model: "cursor-grok-4.6-high"` only.
 
 1. Spawn a planning agent to inspect the repository and create a
    decision-complete dossier. Its output contract is the dossier path, coupled
@@ -136,6 +134,5 @@ resuming; do not silently expand scope.
 
 Report the task and coupled IDs, final status, commit and push result, verifier
 commands, retries, and dossier path. Also report per-stage model
-(`cursor-grok-4.6-high` or the recorded fallback), elapsed time when known,
-retry count, first-pass acceptance, and token/cost data only when the runtime
-exposes them.
+(`cursor-grok-4.6-high`), elapsed time when known, retry count, first-pass
+acceptance, and token/cost data only when the runtime exposes them.
