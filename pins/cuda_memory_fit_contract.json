@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "tasks": ["MEM-001", "MEM-002", "OPT-008"],
+  "tasks": ["MEM-001", "MEM-002", "OPT-008", "OPT-012"],
   "target": "sm_120",
   "toolkit": "CUDA 13.0.2",
   "capacity": 131072,
@@ -23,7 +23,7 @@
     ],
     "runtime_context": "CUDA memory used before Quartz allocations",
     "allocator_delta": "measured CUDA free-memory delta minus exact Quartz owner bytes",
-    "graphs": "64 uploaded stable-address FFN graph executables"
+    "graphs": "64 decode plus 64 prompt uploaded stable-address FFN graph executables"
   },
   "admission": {
     "pre_graph_physical_allocation": "passed",

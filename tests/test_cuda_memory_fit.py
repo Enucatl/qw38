@@ -22,6 +22,7 @@ def test_post_graph_memory_contract_fixture_and_handbook_are_connected() -> None
     )
     assert contract["capacity"] == 131_072
     assert "OPT-008" in fixture["tasks"]
+    assert "OPT-012" in fixture["tasks"]
     assert fixture["owners"]["workspace_bytes"] == 1_831_810_560
     assert fixture["owners"]["attention_kv_bytes"] == 8_589_934_592
     assert fixture["owners"]["explicit_quartz_bytes"] == (
@@ -34,8 +35,11 @@ def test_post_graph_memory_contract_fixture_and_handbook_are_connected() -> None
         fixture["free_after_graph_creation_bytes"] >= fixture["required_reserve_bytes"]
     )
     assert fixture["post_graph_admitted"]
-    assert fixture["owners"]["graph_count"] == 64
-    assert fixture["owners"]["graph_bytes"] == 6_291_456
+    assert fixture["owners"]["graph_count"] == 128
+    assert fixture["owners"]["decode_graph_count"] == 64
+    assert fixture["owners"]["prompt_graph_count"] == 64
+    assert fixture["owners"]["prompt_graph_rows"] == 4096
+    assert fixture["owners"]["graph_bytes"] > 0
     assert pre_graph["owners"]["graph_bytes"] is None
     assert not pre_graph["post_graph_admitted"]
     chapter = (ROOT / "docs" / "54-post-graph-128k-memory.md").read_text().casefold()
@@ -48,11 +52,11 @@ def test_post_graph_memory_contract_fixture_and_handbook_are_connected() -> None
         "workspace",
         "runtime context",
         "allocator delta",
-        "3,573,809,152",
+        f"{fixture['owners']['explicit_quartz_bytes']:,}",
         "1.5 gib",
-        "6,291,456",
-        "3,573,809,152",
-        "1,963,196,416",
+        f"{fixture['owners']['graph_bytes']:,}",
+        f"{fixture['free_after_graph_creation_bytes']:,}",
+        f"{fixture['reserve_margin_bytes']:,}",
         "admitted",
         "proof boundary",
     ]:
@@ -94,14 +98,21 @@ def test_real_128k_post_graph_allocation_preserves_reserve() -> None:
         text=True,
     )
     assert run.returncode == 0, run.stdout + run.stderr
+    fixture = json.loads(
+        (ROOT / "fixtures" / "cuda_memory_fit_post_graph.json").read_text()
+    )
     lines = run.stdout.splitlines()
     fit = next(line for line in lines if line.startswith("memory_fit=post_graph"))
     fields = dict(field.split("=", 1) for field in fit.split())
     assert fields["capacity"] == "131072"
-    assert fields["explicit_bytes"] == "29560766304"
+    assert fields["explicit_bytes"] == str(fixture["owners"]["explicit_quartz_bytes"])
     assert int(fields["free_bytes"]) >= int(fields["reserve_required"])
     assert fields["arithmetic"] == "true"
     assert fields["passed"] == "true"
-    assert "memory_owner=graphs bytes=6291456 count=64" in lines
+    graph_line = (
+        f"memory_owner=graphs bytes={fixture['owners']['graph_bytes']} "
+        "count=128 decode=64 prompt=64"
+    )
+    assert graph_line in lines
     assert "memory_admission=post_graph passed=true" in lines
     assert "status=passed" in lines

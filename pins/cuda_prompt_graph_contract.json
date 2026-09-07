@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "task": "OPT-012",
+  "target": "sm_120",
+  "toolkit": "CUDA 13.0.2",
+  "pinned_image": "qw38-cuda:13.0.2",
+  "threads": 256,
+  "capacity_4096": {
+    "decode_graph_count": 64,
+    "prompt_graph_count": 64,
+    "prompt_graph_rows": 4096,
+    "graph_count": 128
+  },
+  "capacity_65": {
+    "decode_graph_count": 64,
+    "prompt_graph_count": 0,
+    "prompt_graph_rows": 0,
+    "graph_count": 64
+  },
+  "min_kernel_nodes": 6,
+  "rowwise_grid_x": 4096,
+  "rowwise_block_x": 256,
+  "cancel_poll": 8,
+  "fallback_rows": 64,
+  "graph_counters": {
+    "prompt_graph_launches": 64,
+    "embedding_kernel_launches": 1,
+    "scatter_kernel_launches": 1,
+    "blocking_d2h_copies": 0,
+    "async_d2h_copies": 2,
+    "device_synchronizes": 0
+  },
+  "ordinary_counters": {
+    "prompt_graph_launches": 0,
+    "fused_residual_norm_kernel_launches": 127,
+    "residual_add_kernel_launches": 1
+  },
+  "semantic_predicates": [
+    "capacity_4096_owns_128_graphs",
+    "capacity_65_skips_prompt_graphs",
+    "prompt_ffn_kernel_nodes",
+    "prompt_ffn_rowwise_grid",
+    "mismatch_fail_closed",
+    "unfused_fail_closed",
+    "graph_ordinary_exact_4096",
+    "fallback_exact_64",
+    "cancellation_poll_8_publishes_nothing",
+    "graph_counters_match",
+    "ordinary_counters_match"
+  ],
+  "metadata_required": [
+    "device",
+    "compute_capability",
+    "driver",
+    "runtime",
+    "toolkit",
+    "pinned_image",
+    "measurement_utc",
+    "proof_limit"
+  ]
+}

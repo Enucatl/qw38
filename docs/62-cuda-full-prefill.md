@@ -1,11 +1,13 @@
 # Chunked full-model CUDA prefill
 
-[Index](README.md) · Implementation tasks: SCH-002, MEM-002, OPT-008, OPT-009, OPT-011, and EDU-047 in
+[Index](README.md) · Implementation tasks: SCH-002, MEM-002, OPT-008, OPT-009, OPT-011, OPT-012, and EDU-047 in
 [`implementation_ledger.md`](../implementation_ledger.md) · Contracts:
 [`pins/cuda_prompt_scheduler_contract.json`](../pins/cuda_prompt_scheduler_contract.json),
-[`pins/cuda_prompt_pipeline_contract.json`](../pins/cuda_prompt_pipeline_contract.json)
+[`pins/cuda_prompt_pipeline_contract.json`](../pins/cuda_prompt_pipeline_contract.json),
+[`pins/cuda_prompt_graph_contract.json`](../pins/cuda_prompt_graph_contract.json)
 · Evidence: [`fixtures/cuda_prompt_scheduler.json`](../fixtures/cuda_prompt_scheduler.json),
-[`fixtures/cuda_prompt_pipeline.json`](../fixtures/cuda_prompt_pipeline.json)
+[`fixtures/cuda_prompt_pipeline.json`](../fixtures/cuda_prompt_pipeline.json),
+[`fixtures/cuda_prompt_graph.json`](../fixtures/cuda_prompt_graph.json)
 
 ## Why prompt execution differs from decode
 
@@ -163,6 +165,38 @@ These launch and barrier counts are executed increments next to the CUDA calls.
 The pinned image still has no Nsight Systems, so overlap is not claimed from a
 Systems timeline.
 
+## Prompt FFN CUDA graphs
+
+After OPT-011 fusion, production 4,096-row fused chunks replay 64 stable-address
+prompt FFN graphs on `prompt_compute_stream_`. Capture and ordinary fused FFN
+share `execute_prompt_ffn`, so the graph records the same mixer residual-plus-
+FFN-norm, gate/up/down MMQ, SwiGLU, and next-input residual-add-norm sequence.
+Mixer GDN/attention, embedding, logits, D2H, scatter, and commit stay ordinary
+launches because those pointers and extents still change per chunk.
+
+Replay is exact-geometry only. A full 4,096-token fused chunk with graphs bound
+to that workspace `cudaGraphLaunch`es each layer after the mixer writes
+`prompt_mixer_output_`. Tails and any `token_count != 4096` keep ordinary fused
+FFN on the same helper. Workspaces with `prompt_chunk_rows_ != 4096` never create
+the prompt set, so their fused chunks also stay ordinary. One-row remainders
+replay the existing decode FFN graphs through `execute_token`.
+
+Equality is graph versus ordinary fused, not a new unfused gate. Graphs bound to
+another workspace, or combined with the unfused serial path, fail before
+publication. Cancellation still waits for the finished layer, including a graph
+replay, then polls; a stop at poll 8 publishes nothing and launches no later
+graphs, logits, D2H, or scatter.
+
+**Measured, RTX 5090:** a 4,096-row fused graph chunk was byte-exact to a
+4,096-row ordinary fused chunk in committed GDN/KV, tokens, frontier, last
+hidden, and logits. Graph counters recorded 64 prompt graph launches; the
+ordinary fused pair recorded zero, plus the inherited 127 fused residual-add-norm
+launches and one last residual add. A 64-row fused fallback on the 4096-bound
+object was also byte-exact. Capacity-65 create kept 64 decode graphs and skipped
+prompt graphs. Proof is component-only FFN-subgraph evidence; it is not a
+whole-chunk graph, Nsight Systems claim, end-to-end speedup, or 128K quality
+recovery.
+
 ## Candidate state, committed state, and cancellation
 
 **Committed** state is the conversation callers are allowed to observe.
@@ -198,10 +232,13 @@ intermediates, and per-layer candidate KV rows. This fixed, capacity-bounded
 allocation avoids request-sized allocator activity and leaves the decode graph's
 addresses unchanged.
 
-At capacity 131,072, the diagnostic workspace is 1,831,810,560 bytes. MEM-002
-reran the simultaneous 131,072-token session plus resident model plus 64 uploaded
-graphs. **Measured, RTX 5090:** 3,573,809,152 bytes remained free, leaving
-1,963,196,416 bytes above the required 1.5 GiB reserve.
+At capacity 131,072, the diagnostic workspace is 1,831,810,560 bytes. That
+requested size is unchanged by prompt graphs: they are additional CUDA graph
+objects, not extra scratch. The live simultaneous 131,072-token session plus
+resident model plus 128 uploaded graphs is in
+[Chapter 54](54-post-graph-128k-memory.md). **Measured, RTX 5090:** 3,521,118,208
+bytes remained free after 64 decode plus 64 prompt executables, leaving
+1,910,505,472 bytes above the required 1.5 GiB reserve.
 
 ## Measured result and proof boundary
 
@@ -236,4 +273,5 @@ The **proof boundary** excludes comparative speed claims, 2K/8K sustained
 prefill, execution of a 128K prefill, 128K retrieval quality, thermal stability,
 superiority to llama.cpp/vLLM, and a Nsight Systems overlap timeline. BEN-001
 provides the harness; CMP-002/CMP-003 still own the 30-sample comparative gate.
-QLT-001 remains blocked. Prompt CUDA graphs remain OPT-012.
+QLT-001 remains blocked. OPT-012's prompt graphs are FFN subgraphs only: not a
+whole-chunk graph, not a speedup gate, and not 128K quality recovery.

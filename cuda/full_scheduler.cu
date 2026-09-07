@@ -537,6 +537,51 @@ void bump(PromptPipelineCounters* counters,
 
 }  // namespace
 
+cudaError_t execute_prompt_ffn(
+    const DeviceCommonLayer& layer, const float* residual,
+    SchedulerWorkspace* workspace, float* after_mixer, float* output,
+    const float* next_input_norm, std::size_t token_count,
+    cudaStream_t stream) noexcept {
+  cudaError_t error = launch_residual_add_norm_rows_fp32_to_bf16(
+      residual, workspace->prompt_mixer_output_, layer.ffn_norm,
+      internal::kResidualWidth, token_count, after_mixer,
+      workspace->prompt_normalized_, stream);
+  if (error == cudaSuccess) {
+    error = matrix_prompt(layer.ffn_gate, workspace->prompt_normalized_,
+                          token_count, workspace,
+                          workspace->prompt_projection_a_, stream);
+  }
+  if (error == cudaSuccess) {
+    error = matrix_prompt(layer.ffn_up, workspace->prompt_normalized_,
+                          token_count, workspace,
+                          workspace->prompt_projection_b_, stream);
+  }
+  if (error == cudaSuccess) {
+    error = launch_swiglu_bf16(
+        workspace->prompt_projection_a_, workspace->prompt_projection_b_,
+        token_count * internal::kFfnWidth, workspace->prompt_projected_bf16_,
+        stream);
+  }
+  if (error == cudaSuccess) {
+    error = matrix_prompt(layer.ffn_down, workspace->prompt_projected_bf16_,
+                          token_count, workspace,
+                          workspace->prompt_mixer_output_, stream);
+  }
+  if (error == cudaSuccess) {
+    if (next_input_norm != nullptr) {
+      error = launch_residual_add_norm_rows_fp32_to_bf16(
+          after_mixer, workspace->prompt_mixer_output_, next_input_norm,
+          internal::kResidualWidth, token_count, output,
+          workspace->prompt_normalized_, stream);
+    } else {
+      error = launch_residual_add_fp32(
+          after_mixer, workspace->prompt_mixer_output_,
+          token_count * internal::kResidualWidth, output, stream);
+    }
+  }
+  return error;
+}
+
 cudaError_t launch_residual_add_fp32(const float* residual,
                                      const float* correction, std::size_t count,
                                      float* output,
@@ -721,15 +766,23 @@ SchedulerGraphs& SchedulerGraphs::operator=(SchedulerGraphs&& other) noexcept {
   release();
   graphs_ = other.graphs_;
   executions_ = other.executions_;
+  prompt_graphs_ = other.prompt_graphs_;
+  prompt_executions_ = other.prompt_executions_;
   model_ = other.model_;
   workspace_ = other.workspace_;
-  graph_count_ = other.graph_count_;
+  decode_graph_count_ = other.decode_graph_count_;
+  prompt_graph_count_ = other.prompt_graph_count_;
+  prompt_rows_ = other.prompt_rows_;
   allocated_bytes_ = other.allocated_bytes_;
   other.graphs_ = {};
   other.executions_ = {};
+  other.prompt_graphs_ = {};
+  other.prompt_executions_ = {};
   other.model_ = nullptr;
   other.workspace_ = nullptr;
-  other.graph_count_ = 0;
+  other.decode_graph_count_ = 0;
+  other.prompt_graph_count_ = 0;
+  other.prompt_rows_ = 0;
   other.allocated_bytes_ = 0;
   return *this;
 }
@@ -741,16 +794,27 @@ void SchedulerGraphs::release() noexcept {
     executions_[index] = nullptr;
     graphs_[index] = nullptr;
   }
+  for (std::size_t index = 0; index < prompt_executions_.size(); ++index) {
+    if (prompt_executions_[index] != nullptr) {
+      cudaGraphExecDestroy(prompt_executions_[index]);
+    }
+    if (prompt_graphs_[index] != nullptr) cudaGraphDestroy(prompt_graphs_[index]);
+    prompt_executions_[index] = nullptr;
+    prompt_graphs_[index] = nullptr;
+  }
   model_ = nullptr;
   workspace_ = nullptr;
-  graph_count_ = 0;
+  decode_graph_count_ = 0;
+  prompt_graph_count_ = 0;
+  prompt_rows_ = 0;
   allocated_bytes_ = 0;
 }
 
 Status SchedulerGraphs::create(const ResidentModel& model,
                                SchedulerWorkspace* workspace) noexcept {
   const NvtxRange range("qw38.graph_create");
-  if (graph_count_ != 0 || model.blob_ == nullptr || workspace == nullptr ||
+  if (decode_graph_count_ != 0 || prompt_graph_count_ != 0 ||
+      model.blob_ == nullptr || workspace == nullptr ||
       workspace->capacity_ == 0) {
     return {StatusCode::kInvalidArgument,
             "CUDA scheduler graph creation input is invalid"};
@@ -787,7 +851,43 @@ Status SchedulerGraphs::create(const ResidentModel& model,
     if (error == cudaSuccess) {
       error = cudaGraphUpload(executions_[layer_index], stream);
     }
-    if (error == cudaSuccess) ++graph_count_;
+    if (error == cudaSuccess) ++decode_graph_count_;
+  }
+  if (error == cudaSuccess &&
+      workspace->prompt_chunk_rows_ == kPromptChunkRows) {
+    for (std::size_t layer_index = 0;
+         error == cudaSuccess && layer_index < model.layers_.size();
+         ++layer_index) {
+      error = cudaStreamBeginCapture(stream, cudaStreamCaptureModeThreadLocal);
+      cudaError_t enqueue_error = error;
+      if (enqueue_error == cudaSuccess) {
+        const float* next_input_norm =
+            layer_index + 1 < model.layers_.size()
+                ? model.layers_[layer_index + 1].common.input_norm
+                : nullptr;
+        enqueue_error = execute_prompt_ffn(
+            model.layers_[layer_index].common, workspace->prompt_residual_a_,
+            workspace, workspace->prompt_residual_b_,
+            workspace->prompt_residual_a_, next_input_norm, kPromptChunkRows,
+            stream);
+      }
+      cudaError_t capture_error =
+          cudaStreamEndCapture(stream, &prompt_graphs_[layer_index]);
+      error = enqueue_error != cudaSuccess ? enqueue_error : capture_error;
+      if (error == cudaSuccess) {
+        error = cudaGraphInstantiate(&prompt_executions_[layer_index],
+                                     prompt_graphs_[layer_index], nullptr,
+                                     nullptr, 0);
+      }
+      if (error == cudaSuccess) {
+        error = cudaGraphUpload(prompt_executions_[layer_index], stream);
+      }
+      if (error == cudaSuccess) ++prompt_graph_count_;
+    }
+    if (error == cudaSuccess &&
+        prompt_graph_count_ == internal::kModelLayerCount) {
+      prompt_rows_ = kPromptChunkRows;
+    }
   }
   if (error == cudaSuccess) error = cudaStreamSynchronize(stream);
   std::size_t free_after = 0;
@@ -804,7 +904,19 @@ Status SchedulerGraphs::create(const ResidentModel& model,
 }
 
 std::size_t SchedulerGraphs::graph_count() const noexcept {
-  return graph_count_;
+  return decode_graph_count_ + prompt_graph_count_;
+}
+
+std::size_t SchedulerGraphs::decode_graph_count() const noexcept {
+  return decode_graph_count_;
+}
+
+std::size_t SchedulerGraphs::prompt_graph_count() const noexcept {
+  return prompt_graph_count_;
+}
+
+std::size_t SchedulerGraphs::prompt_graph_rows() const noexcept {
+  return prompt_rows_;
 }
 
 std::size_t SchedulerGraphs::allocated_bytes() const noexcept {
@@ -814,8 +926,8 @@ std::size_t SchedulerGraphs::allocated_bytes() const noexcept {
 bool SchedulerGraphs::matches(
     const ResidentModel& model,
     const SchedulerWorkspace* workspace) const noexcept {
-  return graph_count_ == internal::kModelLayerCount && model_ == &model &&
-         workspace_ == workspace;
+  return decode_graph_count_ == internal::kModelLayerCount &&
+         model_ == &model && workspace_ == workspace;
 }
 
 SchedulerSession::SchedulerSession() noexcept = default;
@@ -1756,7 +1868,7 @@ Status execute_prompt_chunk(
     SchedulerWorkspace* workspace, float* host_logits,
     std::size_t logits_count, float* host_hidden, std::size_t hidden_count,
     const EvalControl* control, PromptPipelinePath path,
-    PromptPipelineCounters* counters) noexcept {
+    PromptPipelineCounters* counters, SchedulerGraphs* graphs) noexcept {
   const bool fused = path == PromptPipelinePath::kFusedOverlapped;
   if (model.blob_ == nullptr || tokens == nullptr || token_count < 2 ||
       session == nullptr || workspace == nullptr || session->capacity_ == 0 ||
@@ -1769,7 +1881,10 @@ Status execute_prompt_chunk(
        path != PromptPipelinePath::kUnfusedSerial) ||
       (fused && (workspace->prompt_compute_stream_ == nullptr ||
                  workspace->prompt_copy_stream_ == nullptr ||
-                 workspace->prompt_compute_done_ == nullptr))) {
+                 workspace->prompt_compute_done_ == nullptr)) ||
+      (graphs != nullptr &&
+       (path != PromptPipelinePath::kFusedOverlapped ||
+        !graphs->matches(model, workspace)))) {
     return {StatusCode::kInvalidArgument,
             "CUDA prompt chunk input, state, or output is invalid"};
   }
@@ -1975,15 +2090,33 @@ Status execute_prompt_chunk(
       }
       ++attention_slot;
     }
+    const bool replay_prompt_ffn =
+        graphs != nullptr &&
+        graphs->prompt_graph_count() == internal::kModelLayerCount &&
+        token_count == graphs->prompt_graph_rows();
     if (error == cudaSuccess) {
-      if (fused) {
-        error = launch_residual_add_norm_rows_fp32_to_bf16(
-            residual, workspace->prompt_mixer_output_, layer.common.ffn_norm,
-            internal::kResidualWidth, token_count, after_mixer,
-            workspace->prompt_normalized_, stream);
+      if (replay_prompt_ffn) {
+        error = cudaGraphLaunch(graphs->prompt_executions_[layer_index], stream);
+        if (error == cudaSuccess) {
+          bump(counters, &PromptPipelineCounters::prompt_graph_launches);
+        }
+      } else if (fused) {
+        const float* next_input_norm =
+            layer_index + 1 < model.layers_.size()
+                ? model.layers_[layer_index + 1].common.input_norm
+                : nullptr;
+        error = execute_prompt_ffn(
+            layer.common, residual, workspace, after_mixer, residual,
+            next_input_norm, token_count, stream);
         if (error == cudaSuccess) {
           bump(counters,
                &PromptPipelineCounters::fused_residual_norm_kernel_launches);
+          if (next_input_norm != nullptr) {
+            bump(counters,
+                 &PromptPipelineCounters::fused_residual_norm_kernel_launches);
+          } else {
+            bump(counters, &PromptPipelineCounters::residual_add_kernel_launches);
+          }
         }
       } else {
         error = launch_residual_add_fp32(
@@ -2000,49 +2133,37 @@ Status execute_prompt_chunk(
             bump(counters, &PromptPipelineCounters::rms_norm_kernel_launches);
           }
         }
-      }
-    }
-    if (error == cudaSuccess) {
-      error = matrix_prompt(layer.common.ffn_gate,
-                            workspace->prompt_normalized_, token_count,
-                            workspace, workspace->prompt_projection_a_,
-                            stream);
-    }
-    if (error == cudaSuccess) {
-      error = matrix_prompt(layer.common.ffn_up,
-                            workspace->prompt_normalized_, token_count,
-                            workspace, workspace->prompt_projection_b_,
-                            stream);
-    }
-    if (error == cudaSuccess) {
-      error = launch_swiglu_bf16(
-          workspace->prompt_projection_a_, workspace->prompt_projection_b_,
-          token_count * internal::kFfnWidth,
-          workspace->prompt_projected_bf16_, stream);
-    }
-    if (error == cudaSuccess) {
-      error = matrix_prompt(layer.common.ffn_down,
-                            workspace->prompt_projected_bf16_, token_count,
-                            workspace, workspace->prompt_mixer_output_,
-                            stream);
-    }
-    if (error == cudaSuccess) {
-      if (fused && layer_index + 1 < model.layers_.size()) {
-        error = launch_residual_add_norm_rows_fp32_to_bf16(
-            after_mixer, workspace->prompt_mixer_output_,
-            model.layers_[layer_index + 1].common.input_norm,
-            internal::kResidualWidth, token_count, residual,
-            workspace->prompt_normalized_, stream);
         if (error == cudaSuccess) {
-          bump(counters,
-               &PromptPipelineCounters::fused_residual_norm_kernel_launches);
+          error = matrix_prompt(layer.common.ffn_gate,
+                                workspace->prompt_normalized_, token_count,
+                                workspace, workspace->prompt_projection_a_,
+                                stream);
         }
-      } else {
-        error = launch_residual_add_fp32(
-            after_mixer, workspace->prompt_mixer_output_,
-            token_count * internal::kResidualWidth, residual, stream);
         if (error == cudaSuccess) {
-          bump(counters, &PromptPipelineCounters::residual_add_kernel_launches);
+          error = matrix_prompt(layer.common.ffn_up,
+                                workspace->prompt_normalized_, token_count,
+                                workspace, workspace->prompt_projection_b_,
+                                stream);
+        }
+        if (error == cudaSuccess) {
+          error = launch_swiglu_bf16(
+              workspace->prompt_projection_a_, workspace->prompt_projection_b_,
+              token_count * internal::kFfnWidth,
+              workspace->prompt_projected_bf16_, stream);
+        }
+        if (error == cudaSuccess) {
+          error = matrix_prompt(layer.common.ffn_down,
+                                workspace->prompt_projected_bf16_, token_count,
+                                workspace, workspace->prompt_mixer_output_,
+                                stream);
+        }
+        if (error == cudaSuccess) {
+          error = launch_residual_add_fp32(
+              after_mixer, workspace->prompt_mixer_output_,
+              token_count * internal::kResidualWidth, residual, stream);
+          if (error == cudaSuccess) {
+            bump(counters, &PromptPipelineCounters::residual_add_kernel_launches);
+          }
         }
       }
     }
@@ -2235,7 +2356,7 @@ Status sync_tokens(const ResidentModel& model, const std::size_t* tokens,
                    SchedulerWorkspace* workspace, float* host_logits,
                    std::size_t logits_count, float* host_hidden,
                    std::size_t hidden_count, SyncResult* result,
-                   const EvalControl* control) noexcept {
+                   const EvalControl* control, SchedulerGraphs* graphs) noexcept {
   if (session == nullptr || workspace == nullptr || result == nullptr ||
       model.resident_bytes() == 0 || session->capacity_ == 0 ||
       workspace->capacity_ != session->capacity_ ||
@@ -2286,10 +2407,13 @@ Status sync_tokens(const ResidentModel& model, const std::size_t* tokens,
         chunk == 1
             ? execute_token(model, tokens[index], session, workspace,
                             host_logits, logits_count, host_hidden,
-                            hidden_count, &elapsed, control)
+                            hidden_count, &elapsed, control, nullptr,
+                            PointwisePath::kFused, graphs)
             : execute_prompt_chunk(model, tokens + index, chunk, session,
                                    workspace, host_logits, logits_count,
-                                   host_hidden, hidden_count, control);
+                                   host_hidden, hidden_count, control,
+                                   PromptPipelinePath::kFusedOverlapped,
+                                   nullptr, graphs);
     if (!status.is_ok()) return status;
     index += chunk;
   }

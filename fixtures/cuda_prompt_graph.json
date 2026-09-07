@@ -1,0 +1,95 @@
+{
+  "schema_version": 1,
+  "task": "OPT-012",
+  "status": "measured",
+  "device": "NVIDIA GeForce RTX 5090",
+  "compute_capability": "12.0",
+  "driver": "13.1",
+  "runtime": "13.0",
+  "toolkit": "CUDA 13.0.2",
+  "pinned_image": "qw38-cuda:13.0.2",
+  "measurement_utc": "2026-09-07T19:51:37Z",
+  "semantic": {
+    "capacity_4096_owns_128_graphs": true,
+    "capacity_65_skips_prompt_graphs": true,
+    "prompt_ffn_kernel_nodes": true,
+    "prompt_ffn_rowwise_grid": true,
+    "mismatch_fail_closed": true,
+    "unfused_fail_closed": true,
+    "graph_ordinary_exact_4096": true,
+    "fallback_exact_64": true,
+    "cancellation_poll_8_publishes_nothing": true,
+    "graph_counters_match": true,
+    "ordinary_counters_match": true
+  },
+  "graphs": {
+    "capacity_4096": {
+      "decode_graph_count": 64,
+      "prompt_graph_count": 64,
+      "prompt_graph_rows": 4096,
+      "graph_count": 128,
+      "allocated_bytes": 16777216
+    },
+    "capacity_65": {
+      "decode_graph_count": 64,
+      "prompt_graph_count": 0,
+      "prompt_graph_rows": 0,
+      "graph_count": 64
+    }
+  },
+  "launch": {
+    "kernel_nodes": 9,
+    "has_rowwise_residual_add_norm": true,
+    "grid": [
+      4096,
+      1,
+      1
+    ],
+    "block": [
+      256,
+      1,
+      1
+    ]
+  },
+  "fail_closed": {
+    "mismatch": true,
+    "unfused": true,
+    "mismatch_frontier": 0
+  },
+  "equality": {
+    "state_equals": true,
+    "hidden_memcmp": true,
+    "logits_memcmp": true,
+    "frontier": 4096,
+    "graph_ms": 89558.8516,
+    "ordinary_ms": 91184.0391
+  },
+  "fallback": {
+    "state_hidden_logits_exact": true,
+    "rows": 64
+  },
+  "cancellation": {
+    "polls": 8,
+    "frontier": 0,
+    "scatter_kernel_launches": 0,
+    "prompt_graph_launches": 8,
+    "outputs_unchanged": true,
+    "state_equals_empty": true
+  },
+  "counters": {
+    "graph": {
+      "prompt_graph_launches": 64,
+      "embedding_kernel_launches": 1,
+      "scatter_kernel_launches": 1,
+      "blocking_d2h_copies": 0,
+      "async_d2h_copies": 2,
+      "device_synchronizes": 0
+    },
+    "ordinary": {
+      "prompt_graph_launches": 0,
+      "fused_residual_norm_kernel_launches": 127,
+      "residual_add_kernel_launches": 1
+    }
+  },
+  "proof_limit": "component-only prompt FFN subgraph evidence; not a whole-chunk graph; Nsight Systems is not claimed; end-to-end prefill/decode speedup and 128K quality are not claimed"
+}

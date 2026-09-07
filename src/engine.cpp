@@ -276,14 +276,15 @@ Status Session::sync(const std::vector<Token>& tokens,
   const cuda::EvalControl* control_pointer =
       cancelled == nullptr ? nullptr : &control;
   if (widened.empty()) {
-    return cuda::sync_tokens(*impl_->model, nullptr, 0, &impl_->session,
+  return cuda::sync_tokens(*impl_->model, nullptr, 0, &impl_->session,
                              &impl_->workspace, nullptr, 0, nullptr, 0,
-                             &result, control_pointer);
+                             &result, control_pointer, &impl_->graphs);
   }
   return cuda::sync_tokens(
       *impl_->model, widened.data(), widened.size(), &impl_->session,
       &impl_->workspace, impl_->logits.data(), impl_->logits.size(),
-      impl_->hidden.data(), impl_->hidden.size(), &result, control_pointer);
+      impl_->hidden.data(), impl_->hidden.size(), &result, control_pointer,
+      &impl_->graphs);
 #else
   (void)tokens;
   (void)cancelled;

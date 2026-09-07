@@ -120,7 +120,9 @@ int main(int argc, char** argv) {
   const bool arithmetic =
       session.allocated_bytes() == gdn_bytes + kv_bytes &&
       graph_bytes == free_after_workspace - free_after_graphs &&
-      graph_bytes > 0 && graphs.graph_count() == 64 &&
+      graph_bytes > 0 && graphs.decode_graph_count() == 64 &&
+      graphs.prompt_graph_count() == 64 && graphs.prompt_graph_rows() == 4096 &&
+      graphs.graph_count() == 128 &&
       model.resident_bytes() == 18973870432ULL &&
       workspace.allocated_bytes() == 1831810560ULL;
   const bool passed = arithmetic && session.capacity() == kCapacity &&
@@ -137,8 +139,9 @@ int main(int argc, char** argv) {
               workspace.allocated_bytes(),
               free_after_session - free_after_workspace);
   std::printf("memory_owner=allocator_delta bytes=%zu\n", allocator_delta);
-  std::printf("memory_owner=graphs bytes=%zu count=%zu\n", graph_bytes,
-              graphs.graph_count());
+  std::printf("memory_owner=graphs bytes=%zu count=%zu decode=%zu prompt=%zu\n",
+              graph_bytes, graphs.graph_count(), graphs.decode_graph_count(),
+              graphs.prompt_graph_count());
   std::printf("memory_host=rss bytes=%zu\n", host_rss);
   std::printf("memory_fit=post_graph capacity=%zu explicit_bytes=%zu "
               "measured_delta=%zu free_bytes=%zu reserve_required=%zu "

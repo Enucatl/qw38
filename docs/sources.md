@@ -284,6 +284,29 @@ DSpark are explicitly rejected as Qwen model semantics.
   The beginner explanation is
   [`docs/62-cuda-full-prefill.md`](62-cuda-full-prefill.md).
   No external kernel implementation was copied or adapted.
+- OPT-012 introduces no new external implementation source. It uses CUDA 13.0.2
+  stream-capture, graph instantiate/upload, and graph launch APIs already used
+  by OPT-003; no external graph implementation is copied. Production workspaces
+  with `prompt_chunk_rows_ == 4096` capture a second 64-graph fused prompt FFN
+  set from stable prompt-scratch and weight addresses. Capture is skipped when
+  `prompt_chunk_rows_ != 4096`. Replay is `cudaGraphLaunch` on the prompt compute
+  stream only when `token_count == 4096`; tails keep ordinary fused
+  `execute_prompt_ffn`. Mixer GDN/attention, embedding, KV destination, host
+  copies, and commit stay outside the graph. The schema-1 contract freezes the
+  128-graph production counts, capacity-65 skip, kernel-node/grid predicates,
+  fail-closed mismatch/unfused rules, graph-versus-ordinary fused equality, 64-row
+  fallback, poll-8 cancellation, executed counters, and the component-only proof
+  limit in
+  [`pins/cuda_prompt_graph_contract.json`](../pins/cuda_prompt_graph_contract.json).
+  One pinned RTX 5090 fixture retains those executed results and CUDA-event
+  times; it is not a whole-chunk graph, Nsight Systems, end-to-end speedup, or
+  128K quality claim:
+  [`fixtures/cuda_prompt_graph.json`](../fixtures/cuda_prompt_graph.json).
+  The 128K owner remeasure after 128 uploads is retained in
+  [`fixtures/cuda_memory_fit_post_graph.json`](../fixtures/cuda_memory_fit_post_graph.json).
+  The beginner explanation is
+  [`docs/53-stable-address-cuda-graphs.md`](53-stable-address-cuda-graphs.md).
+  No external kernel implementation was copied or adapted.
 - CUD-003 introduces no new external implementation source. GGUF Q8_0 decoding
   follows the format already admitted by the pinned scalar decoder, and the
   pointwise/layout equations come from the pinned model contract and scalar
@@ -349,8 +372,10 @@ DSpark are explicitly rejected as Qwen model semantics.
   paired replay samples, graph allocation, launch attribution, and exact state
   evidence retained in [`fixtures/cuda_graph.json`](../fixtures/cuda_graph.json).
 - MEM-001's final increment reuses the local allocation arithmetic from its
-  provisional gate and adds the live OPT-003 graph owner. The final simultaneous
-  owner/free-memory/RSS readings are retained in
+  provisional gate and adds the live OPT-003 graph owner. OPT-012 later
+  remeasures that same post-graph fixture after uploading 64 decode plus 64
+  prompt executables. The live simultaneous owner/free-memory/RSS readings are
+  retained in
   [`fixtures/cuda_memory_fit_post_graph.json`](../fixtures/cuda_memory_fit_post_graph.json);
   the earlier pre-graph fixture remains historical evidence rather than being
   overwritten.
@@ -448,7 +473,9 @@ DSpark are explicitly rejected as Qwen model semantics.
   increment is documented separately and remains component-only. OPT-011 later
   fuses prompt embedding, residual-add-norm, all-layer scatter, and commit
   D2H/scatter overlap; that increment is also documented separately and remains
-  component-only, with no Nsight Systems overlap claim. Exact
+  component-only, with no Nsight Systems overlap claim. OPT-012 later captures
+  4,096-row prompt FFN graphs beside the decode set; that increment is documented
+  separately and remains component-only, not a whole-chunk graph. Exact
   `[4096, 1]` differential, capacity fallback, cancellation, and memory
   evidence is authenticated in
   [`pins/cuda_prompt_scheduler_contract.json`](../pins/cuda_prompt_scheduler_contract.json)

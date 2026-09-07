@@ -130,6 +130,7 @@ struct PromptPipelineCounters final {
   std::uint32_t device_synchronizes = 0;
   std::uint32_t stream_synchronizes = 0;
   std::uint32_t layer_polls = 0;
+  std::uint32_t prompt_graph_launches = 0;
 };
 
 class SchedulerWorkspace;
@@ -149,6 +150,16 @@ class ResidentModel final {
                 std::size_t mapped_bytes) noexcept;
   std::size_t resident_bytes() const noexcept;
   float upload_milliseconds() const noexcept;
+#ifdef QW38_DIAGNOSTIC_TRACE
+  const DeviceCommonLayer& common_layer(std::size_t layer_index) const noexcept {
+    return layers_[layer_index].common;
+  }
+  const float* next_input_norm(std::size_t layer_index) const noexcept {
+    return layer_index + 1 < layers_.size()
+               ? layers_[layer_index + 1].common.input_norm
+               : nullptr;
+  }
+#endif
 
  private:
   void release() noexcept;
@@ -170,12 +181,13 @@ class ResidentModel final {
                             std::size_t, class SchedulerSession*,
                             class SchedulerWorkspace*, float*, std::size_t,
                             float*, std::size_t, SyncResult*,
-                            const EvalControl*) noexcept;
+                            const EvalControl*, SchedulerGraphs*) noexcept;
   friend Status execute_prompt_chunk(
       const ResidentModel&, const std::size_t*, std::size_t,
       class SchedulerSession*, class SchedulerWorkspace*, float*,
       std::size_t, float*, std::size_t, const EvalControl*,
-      PromptPipelinePath, PromptPipelineCounters*) noexcept;
+      PromptPipelinePath, PromptPipelineCounters*,
+      SchedulerGraphs*) noexcept;
   friend class SchedulerGraphs;
 };
 
@@ -232,12 +244,12 @@ class SchedulerSession final {
                             std::size_t, SchedulerSession*,
                             class SchedulerWorkspace*, float*, std::size_t,
                             float*, std::size_t, SyncResult*,
-                            const EvalControl*) noexcept;
+                            const EvalControl*, SchedulerGraphs*) noexcept;
   friend Status execute_prompt_chunk(
       const ResidentModel&, const std::size_t*, std::size_t,
       SchedulerSession*, class SchedulerWorkspace*, float*, std::size_t,
       float*, std::size_t, const EvalControl*, PromptPipelinePath,
-      PromptPipelineCounters*) noexcept;
+      PromptPipelineCounters*, SchedulerGraphs*) noexcept;
   friend Status greedy_sample(const SchedulerSession&, std::size_t*,
                               RuntimeTimings*) noexcept;
 };
@@ -319,12 +331,13 @@ class SchedulerWorkspace final {
   friend Status sync_tokens(const ResidentModel&, const std::size_t*,
                             std::size_t, SchedulerSession*, SchedulerWorkspace*,
                             float*, std::size_t, float*, std::size_t,
-                            SyncResult*, const EvalControl*) noexcept;
+                            SyncResult*, const EvalControl*,
+                            SchedulerGraphs*) noexcept;
   friend Status execute_prompt_chunk(
       const ResidentModel&, const std::size_t*, std::size_t,
       SchedulerSession*, SchedulerWorkspace*, float*, std::size_t, float*,
       std::size_t, const EvalControl*, PromptPipelinePath,
-      PromptPipelineCounters*) noexcept;
+      PromptPipelineCounters*, SchedulerGraphs*) noexcept;
   friend class SchedulerGraphs;
 };
 
@@ -340,6 +353,9 @@ class SchedulerGraphs final {
   Status create(const ResidentModel& model,
                 SchedulerWorkspace* workspace) noexcept;
   std::size_t graph_count() const noexcept;
+  std::size_t decode_graph_count() const noexcept;
+  std::size_t prompt_graph_count() const noexcept;
+  std::size_t prompt_graph_rows() const noexcept;
   std::size_t allocated_bytes() const noexcept;
 
  private:
@@ -348,9 +364,13 @@ class SchedulerGraphs final {
                const SchedulerWorkspace* workspace) const noexcept;
   std::array<cudaGraph_t, internal::kModelLayerCount> graphs_{};
   std::array<cudaGraphExec_t, internal::kModelLayerCount> executions_{};
+  std::array<cudaGraph_t, internal::kModelLayerCount> prompt_graphs_{};
+  std::array<cudaGraphExec_t, internal::kModelLayerCount> prompt_executions_{};
   const ResidentModel* model_ = nullptr;
   const SchedulerWorkspace* workspace_ = nullptr;
-  std::size_t graph_count_ = 0;
+  std::size_t decode_graph_count_ = 0;
+  std::size_t prompt_graph_count_ = 0;
+  std::size_t prompt_rows_ = 0;
   std::size_t allocated_bytes_ = 0;
 
   friend Status execute_token(const ResidentModel&, std::size_t,
@@ -358,6 +378,11 @@ class SchedulerGraphs final {
                               std::size_t, float*, std::size_t, float*,
                               const EvalControl*, RuntimeTimings*,
                               PointwisePath, SchedulerGraphs*) noexcept;
+  friend Status execute_prompt_chunk(
+      const ResidentModel&, const std::size_t*, std::size_t,
+      SchedulerSession*, SchedulerWorkspace*, float*, std::size_t, float*,
+      std::size_t, const EvalControl*, PromptPipelinePath,
+      PromptPipelineCounters*, SchedulerGraphs*) noexcept;
 };
 
 Status execute_token(const ResidentModel& model, std::size_t token,
@@ -399,6 +424,12 @@ cudaError_t launch_residual_add_norm_rows_fp32_to_bf16(
     std::size_t width, std::size_t token_count, float* output,
     __nv_bfloat16* normalized, cudaStream_t stream) noexcept;
 
+cudaError_t execute_prompt_ffn(
+    const DeviceCommonLayer& layer, const float* residual,
+    SchedulerWorkspace* workspace, float* after_mixer, float* output,
+    const float* next_input_norm, std::size_t token_count,
+    cudaStream_t stream) noexcept;
+
 Status execute_prompt_chunk(
     const ResidentModel& model, const std::size_t* tokens,
     std::size_t token_count, SchedulerSession* session,
@@ -406,7 +437,8 @@ Status execute_prompt_chunk(
     std::size_t logits_count, float* host_hidden, std::size_t hidden_count,
     const EvalControl* control = nullptr,
     PromptPipelinePath path = PromptPipelinePath::kFusedOverlapped,
-    PromptPipelineCounters* counters = nullptr) noexcept;
+    PromptPipelineCounters* counters = nullptr,
+    SchedulerGraphs* graphs = nullptr) noexcept;
 
 Status greedy_sample(const SchedulerSession& session,
                      std::size_t* token,
@@ -417,7 +449,8 @@ Status sync_tokens(const ResidentModel& model, const std::size_t* tokens,
                    SchedulerWorkspace* workspace, float* host_logits,
                    std::size_t logits_count, float* host_hidden,
                    std::size_t hidden_count, SyncResult* result,
-                   const EvalControl* control = nullptr) noexcept;
+                   const EvalControl* control = nullptr,
+                   SchedulerGraphs* graphs = nullptr) noexcept;
 
 }  // namespace qw38::cuda
 
