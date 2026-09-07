@@ -31,7 +31,7 @@
     "ordinary stochastic controls": "deferred to product sampler integration"
   },
   "memory": {
-    "capacity_3_workspace_bytes": 186300192,
+    "capacity_3_workspace_bytes": 161595680,
     "candidate_is_per_workspace_not_per_token": true,
     "duplicate_128k_kv_cache": "rejected"
   }

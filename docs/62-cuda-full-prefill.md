@@ -1,6 +1,6 @@
 # Chunked full-model CUDA prefill
 
-[Index](README.md) · Implementation tasks: SCH-002, MEM-002, and EDU-047 in
+[Index](README.md) · Implementation tasks: SCH-002, MEM-002, OPT-008, and EDU-047 in
 [`implementation_ledger.md`](../implementation_ledger.md) · Contract:
 [`pins/cuda_prompt_scheduler_contract.json`](../pins/cuda_prompt_scheduler_contract.json)
 · Evidence: [`fixtures/cuda_prompt_scheduler.json`](../fixtures/cuda_prompt_scheduler.json)
@@ -21,7 +21,7 @@ the BEN-001 smoke exposed it at only about 16.2 prompt tokens/s.
 ## Token-major storage and layer-major work
 
 Quartz stores a chunk in **token-major** order: all 5,120 residual values for
-token 0, then all values for token 1, and so on. If `R` is a 64 × 5,120
+token 0, then all values for token 1, and so on. If `R` is a 4,096 × 5,120
 residual matrix, row `t` begins at `R[t * 5120]`.
 
 Execution is **layer-major**. The scheduler carries all rows through layer 0,
@@ -73,49 +73,55 @@ Attention also visits chunk rows in order. A row may read all committed KV rows
 from earlier chunks and candidate rows earlier in its current chunk, never a
 future row. Partial RoPE uses the absolute position `old frontier + row`.
 
-The scheduler chooses 64 rows because this matches the existing GDN scan window
-and the tuned MMQ dispatch range. A 65-token prompt is deliberately split into
-`[64, 1]`; the final single row uses the established decode arithmetic.
+OPT-008 sets the outer scheduler policy to 4,096 rows. The GDN primitive still
+uses its unchanged internal 64-row scan windows. A 4,097-token prompt therefore
+executes as `[4096, 1]`, with the final single row using the established decode
+arithmetic. For a smaller session, the reusable allocation and selected prompt
+chunk are bounded by its capacity: a capacity-65 session executes `[65]` as one
+prompt transaction rather than allocating or dispatching 4,096 rows.
 
 ## Candidate state, committed state, and cancellation
 
 **Committed** state is the conversation callers are allowed to observe.
 **Candidate** state is temporary work that might still fail. Each prompt chunk
-uses separate candidate storage for all 48 GDN layers and for 64 KV rows in all
-16 attention layers. Tokens, last hidden state, logits, and frontier also remain
+uses separate candidate storage for all 48 GDN layers and for up to 4,096 KV rows
+in all 16 attention layers, bounded by session capacity. Tokens, last hidden
+state, logits, and frontier also remain
 unchanged during calculation.
 
 After every layer, an optional cancellation callback is polled. If cancellation
 arrives, the function returns `cancelled` and does not swap GDN state, copy KV
-rows, copy tokens, or advance the frontier. The measured 64-row cancellation
+rows, copy tokens, or advance the frontier. The measured 4,096-row cancellation
 case remained byte-equal to an empty session with frontier zero. Only after all
 64 layers and the last logits succeed does the chunk commit.
 
 ## Fixed scratch and the 128K budget
 
 **Scratch** is reusable temporary memory whose contents have no meaning after an
-operation. The workspace permanently owns buffers for at most 64 prompt rows:
-two FP32 residual matrices, BF16 normalized/projected rows, Q8 activations,
-projection and mixer outputs, GDN intermediates, and per-layer candidate KV
-rows. Fixed allocation avoids allocator activity in each request and leaves the
-decode graph's addresses unchanged.
+operation. The workspace permanently owns buffers for
+`min(4096, session capacity)` prompt rows: two FP32 residual matrices, BF16
+normalized/projected rows, Q8 activations, projection and mixer outputs, GDN
+intermediates, and per-layer candidate KV rows. This fixed, capacity-bounded
+allocation avoids request-sized allocator activity and leaves the decode graph's
+addresses unchanged.
 
-This raises the complete workspace from 172,963,328 to 198,882,816 bytes. MEM-002
+At capacity 131,072, the diagnostic workspace is 1,831,810,560 bytes. MEM-002
 reran the simultaneous 131,072-token session plus resident model plus 64 uploaded
-graphs. **Measured, RTX 5090:** 5,199,101,952 bytes remained free, leaving
-3,588,489,216 bytes above the required 1.5 GiB reserve.
+graphs. **Measured, RTX 5090:** 3,573,809,152 bytes remained free, leaving
+1,963,196,416 bytes above the required 1.5 GiB reserve.
 
 ## Measured result and proof boundary
 
-**Measured, RTX 5090:** a 65-token deterministic history crossed the chunk
-boundary in 1,417.114 ms versus 4,204.656 ms through repeated one-token
-execution, a 2.967× speedup. All committed GDN/KV bytes, the token frontier,
-last hidden vector, and logits were byte equal. A separate 17-token benchmark
-smoke improved from the earlier 16.20 to 40.96 prompt tokens/s.
+**Measured, RTX 5090:** a deterministic 4,097-token history executed as
+`[4096, 1]` and was byte-equal in committed GDN/KV state, frontier, last hidden
+vector, and logits to explicit 64-row chunks followed by one decode row. The
+capacity-65 fallback executed as one 65-row transaction with 64 layer polls and
+was byte-equal to an explicit `[64, 1]` reference. Cancelling a 4,096-row chunk
+at a layer boundary left the empty session and caller outputs unchanged.
 
-These are focused local measurements, not the release performance matrix. They
-prove exact native equivalence at the 64/65 boundary, cancellation before
-commit, actual MMQ/chunk dispatch, improved wall time, and continued 128K memory
-fit. The **proof boundary** does not include 2K/8K sustained prefill, 128K
-retrieval quality, thermal stability, or superiority to llama.cpp/vLLM. BEN-001
-provides the harness; CMP-002/CMP-003 still own the 30-sample comparative gate.
+These focused native checks prove the chunk policy, its tail and capacity
+fallbacks, exact differential, cancellation before commit, and physical 128K
+allocation reserve. The **proof boundary** excludes comparative speed claims,
+2K/8K sustained prefill, execution of a 128K prefill, 128K retrieval quality,
+thermal stability, and superiority to llama.cpp/vLLM. BEN-001 provides the
+harness; CMP-002/CMP-003 still own the 30-sample comparative gate.

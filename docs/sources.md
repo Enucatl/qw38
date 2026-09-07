@@ -383,15 +383,19 @@ DSpark are explicitly rejected as Qwen model semantics.
   evidence in [`fixtures/benchmark_harness.json`](../fixtures/benchmark_harness.json)
   and [`evidence/benchmark`](../evidence/benchmark). No benchmark-framework or
   competing-runtime implementation is copied.
-- SCH-002, MEM-002, and EDU-047 introduce no new external implementation
+- SCH-002, MEM-002, OPT-008, and EDU-047 introduce no new external implementation
   source. The full prompt path composes Quartz's already admitted MMQ, GDN scan,
   causal attention prefill, pointwise, session, and memory-ledger boundaries.
   Its direct Q8_0-by-BF16 prompt kernel is a local batching of the existing
   scheduler arithmetic, retained specifically to avoid an extra activation
-  requantization. Exact differential, cancellation, memory, and smoke evidence
-  is authenticated in
+  requantization. OPT-008 sets the 4,096-row outer policy while retaining the
+  internal 64-row GDN scan; its allocation is bounded by session capacity.
+  Exact `[4096, 1]` differential, capacity fallback, cancellation, and memory
+  evidence is authenticated in
   [`pins/cuda_prompt_scheduler_contract.json`](../pins/cuda_prompt_scheduler_contract.json)
-  and [`fixtures/cuda_prompt_scheduler.json`](../fixtures/cuda_prompt_scheduler.json).
+  and [`fixtures/cuda_prompt_scheduler.json`](../fixtures/cuda_prompt_scheduler.json),
+  with the live 128K owner/reserve measurement retained in
+  [`fixtures/cuda_memory_fit_post_graph.json`](../fixtures/cuda_memory_fit_post_graph.json).
 - TRC-004 introduces no new external implementation source. It composes the
   existing CUDA scheduler, backend-neutral diagnostic sink, scalar trace
   contract, and immutable three-authority tolerances. The exact five-filter

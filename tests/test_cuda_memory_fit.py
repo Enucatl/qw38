@@ -21,6 +21,8 @@ def test_post_graph_memory_contract_fixture_and_handbook_are_connected() -> None
         (ROOT / "fixtures" / "cuda_memory_fit_post_graph.json").read_text()
     )
     assert contract["capacity"] == 131_072
+    assert "OPT-008" in fixture["tasks"]
+    assert fixture["owners"]["workspace_bytes"] == 1_831_810_560
     assert fixture["owners"]["attention_kv_bytes"] == 8_589_934_592
     assert fixture["owners"]["explicit_quartz_bytes"] == (
         fixture["owners"]["resident_model_bytes"]
@@ -46,11 +48,11 @@ def test_post_graph_memory_contract_fixture_and_handbook_are_connected() -> None
         "workspace",
         "runtime context",
         "allocator delta",
-        "5,205,393,408",
+        "3,573,809,152",
         "1.5 gib",
         "6,291,456",
-        "5,199,101,952",
-        "3,588,489,216",
+        "3,573,809,152",
+        "1,963,196,416",
         "admitted",
         "proof boundary",
     ]:
@@ -96,7 +98,7 @@ def test_real_128k_post_graph_allocation_preserves_reserve() -> None:
     fit = next(line for line in lines if line.startswith("memory_fit=post_graph"))
     fields = dict(field.split("=", 1) for field in fit.split())
     assert fields["capacity"] == "131072"
-    assert fields["explicit_bytes"] == "27927838560"
+    assert fields["explicit_bytes"] == "29560766304"
     assert int(fields["free_bytes"]) >= int(fields["reserve_required"])
     assert fields["arithmetic"] == "true"
     assert fields["passed"] == "true"

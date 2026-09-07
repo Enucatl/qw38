@@ -18,12 +18,16 @@ def test_prompt_scheduler_contract_fixture_and_handbook_are_connected() -> None:
         (ROOT / "pins" / "cuda_prompt_scheduler_contract.json").read_text()
     )
     fixture = json.loads((ROOT / "fixtures" / "cuda_prompt_scheduler.json").read_text())
-    assert contract["prompt_chunk_rows"] == 64
-    assert contract["admission"]["state_byte_equal_to_tokenwise"]
-    assert fixture["boundary_case"]["chunks"] == [64, 1]
+    assert contract["prompt_chunk_rows"] == 4096
+    assert contract["admission"]["state_byte_equal_to_64_row_reference"]
+    assert fixture["tasks"] == ["SCH-002", "OPT-008"]
+    assert fixture["boundary_case"]["chunks"] == [4096, 1]
     assert fixture["boundary_case"]["state_byte_equal"]
     assert fixture["boundary_case"]["last_outputs_byte_equal"]
-    assert fixture["boundary_case"]["speedup"] > 1.0
+    assert fixture["capacity_fallback_case"]["chunks"] == [65]
+    assert fixture["capacity_fallback_case"]["layer_poll_calls"] == 64
+    assert fixture["capacity_fallback_case"]["state_byte_equal"]
+    assert fixture["capacity_fallback_case"]["last_outputs_byte_equal"]
     assert fixture["cancellation_case"]["committed_state_equal_to_empty"]
     raw = ROOT / fixture["benchmark_smoke"]["raw_result"]
     assert (
@@ -34,7 +38,7 @@ def test_prompt_scheduler_contract_fixture_and_handbook_are_connected() -> None:
     for term in [
         "layer-major",
         "token-major",
-        "64",
+        "4,096",
         "mmq",
         "q8_0",
         "candidate",
@@ -48,7 +52,7 @@ def test_prompt_scheduler_contract_fixture_and_handbook_are_connected() -> None:
 
 
 @pytest.mark.skipif(not MODEL.exists(), reason="the pinned GGUF is required")
-def test_chunked_full_prompt_is_exact_atomic_and_faster() -> None:
+def test_chunked_full_prompt_is_exact_atomic_and_bounded() -> None:
     if os.environ.get("QW38_RUN_CUDA_TESTS") != "1":
         pytest.skip("set QW38_RUN_CUDA_TESTS=1 for the exclusive RTX 5090 gate")
     common = [
@@ -84,15 +88,25 @@ def test_chunked_full_prompt_is_exact_atomic_and_faster() -> None:
     lines = run.stdout.splitlines()
     chunk = next(line for line in lines if line.startswith("prompt_chunk="))
     fields = dict(field.split("=", 1) for field in chunk.split())
-    assert fields["prompt_chunk"] == "tokens_65"
-    assert fields["rows_per_chunk"] == "64"
-    assert fields["evaluated"] == "65"
-    assert fields["frontier"] == "65"
+    assert fields["prompt_chunk"] == "tokens_4097"
+    assert fields["rows_per_chunk"] == "4096"
+    assert fields["chunks"] == "4096,1"
+    assert fields["evaluated"] == "4097"
+    assert fields["frontier"] == "4097"
     assert fields["state_exact"] == "true"
     assert fields["outputs_exact"] == "true"
-    assert float(fields["speedup"]) > 1.0
+    assert fields["passed"] == "true"
     assert (
-        "prompt_cancel=before_commit status=cancelled frontier=0 passed=true" in lines
+        "prompt_capacity_fallback=65 chunks=65 poll_calls=64 evaluated=65 "
+        "frontier=65 state_exact=true outputs_exact=true passed=true" in lines
     )
-    assert "prompt_workspace_bytes=186306144" in lines
+    assert "prompt_bounds=4097 status=invalid_argument frontier=0 passed=true" in lines
+    assert (
+        "prompt_cancel=layer_boundary rows=4096 poll_calls=8 status=cancelled "
+        "frontier=0 state_exact=true outputs_unchanged=true passed=true" in lines
+    )
+    assert (
+        "prompt_workspace_bytes capacity_3=161595680 capacity_65=186711136 "
+        "capacity_4097=1819620960 passed=true" in lines
+    )
     assert "status=passed" in lines

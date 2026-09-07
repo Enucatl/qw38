@@ -18,7 +18,7 @@
 
 namespace qw38::cuda {
 
-constexpr std::size_t kPromptChunkRows = 64;
+constexpr std::size_t kPromptChunkRows = 4096;
 
 struct DeviceTensor final {
   const std::uint8_t* data = nullptr;
@@ -283,6 +283,7 @@ class SchedulerWorkspace final {
   __nv_bfloat16* prompt_attention_candidate_key_ = nullptr;
   __nv_bfloat16* prompt_attention_candidate_value_ = nullptr;
   std::size_t capacity_ = 0;
+  std::size_t prompt_chunk_rows_ = 0;
   std::size_t allocated_bytes_ = 0;
 
   friend Status execute_token(const ResidentModel&, std::size_t,

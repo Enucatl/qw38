@@ -20,7 +20,7 @@ def test_atomic_eval_contract_fixture_and_handbook_are_connected() -> None:
     assert contract["transaction"]["unit"] == "one token"
     assert contract["transaction"]["publication_order"][-1] == "frontier last"
     assert contract["sampling"]["mutation"] == "none"
-    assert fixture["workspace_bytes_at_capacity_3"] == 186_300_192
+    assert fixture["workspace_bytes_at_capacity_3"] == 161_595_680
     assert all(case["passed"] for case in fixture["cases"])
     chapter = (ROOT / "docs" / "48-atomic-eval-and-sampling.md").read_text().casefold()
     for term in [
@@ -33,7 +33,7 @@ def test_atomic_eval_contract_fixture_and_handbook_are_connected() -> None:
         "injected error",
         "sampling",
         "read-only",
-        "186.30 mb",
+        "160.35 mb",
         "proof boundary",
     ]:
         assert term in chapter
@@ -83,6 +83,6 @@ def test_atomic_eval_cancel_error_commit_and_sample() -> None:
         in lines
     )
     assert (
-        "atomic_run=complete workspace_bytes=186300192 frontier=2 passed=true" in lines
+        "atomic_run=complete workspace_bytes=161595680 frontier=2 passed=true" in lines
     )
     assert "status=passed" in lines

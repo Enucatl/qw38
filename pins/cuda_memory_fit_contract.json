@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "task": "MEM-001",
+  "tasks": ["MEM-001", "MEM-002", "OPT-008"],
   "target": "sm_120",
   "toolkit": "CUDA 13.0.2",
   "capacity": 131072,
@@ -16,8 +16,8 @@
     "workspace": [
       "all-layer atomic GDN candidate",
       "16 decode candidate K/V rows",
-      "64-row prompt residual/projection/GDN scratch",
-      "16 by 64 prompt candidate K/V rows",
+      "4,096-row prompt residual/projection/GDN scratch",
+      "16 by 4,096 prompt candidate K/V rows",
       "maximum attention scores",
       "logits and trace taps"
     ],

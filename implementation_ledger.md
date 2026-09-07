@@ -74,7 +74,7 @@ are repository-relative unless stated otherwise.
 | OPT-005 | Implement exact tiled causal prompt attention with online softmax | OPT-004, SCH-002, ATN-002 | done | Multi-row attention tiles preserve full causal semantics and frozen outputs while eliminating per-token QK/softmax/value launches | [`tasks/OPT-005.md`](tasks/OPT-005.md); recovery accepted and delivered 2026-09-04T13:09:32Z |
 | OPT-006 | Reuse tiled KV loads across grouped query heads | OPT-005 | done | Each shared KV head is loaded once per tile for its six query heads; exact GQA outputs pass and measured KV traffic falls | [`tasks/OPT-006.md`](tasks/OPT-006.md); [`cuda/gqa_attention_test.cu`](cuda/gqa_attention_test.cu); [`fixtures/cuda_gqa_attention.json`](fixtures/cuda_gqa_attention.json); log 2026-09-04T15:54:44Z |
 | OPT-007 | Execute multiple prompt query rows per CUDA block | OPT-006 | done | Prompt attention maps query-row tiles to occupied blocks with bounded scratch and passes short/chunk boundary equivalence | [`tasks/OPT-007.md`](tasks/OPT-007.md); [`cuda/query_row_attention_test.cu`](cuda/query_row_attention_test.cu); [`tests/test_cuda_query_row_attention.py`](tests/test_cuda_query_row_attention.py); [`pins/cuda_query_row_attention_contract.json`](pins/cuda_query_row_attention_contract.json); [`fixtures/cuda_query_row_attention.json`](fixtures/cuda_query_row_attention.json); log 2026-09-04T17:43:02Z |
-| OPT-008 | Make 4,096 tokens the default prompt chunk | OPT-007, MEM-002 | pending | Default prefill chunks are 4,096 tokens with bounded fallback for tails/capacity; atomic commit, cancellation, and 128K reserve gates pass | — |
+| OPT-008 | Make 4,096 tokens the default prompt chunk | OPT-007, MEM-002 | done | Default prefill chunks are 4,096 tokens with bounded fallback for tails/capacity; atomic commit, cancellation, and 128K reserve gates pass | [`tasks/OPT-008.md`](tasks/OPT-008.md); [`cuda/full_scheduler.h`](cuda/full_scheduler.h); [`cuda/prompt_scheduler_test.cu`](cuda/prompt_scheduler_test.cu); [`pins/cuda_prompt_scheduler_contract.json`](pins/cuda_prompt_scheduler_contract.json); [`fixtures/cuda_prompt_scheduler.json`](fixtures/cuda_prompt_scheduler.json); [`fixtures/cuda_memory_fit_post_graph.json`](fixtures/cuda_memory_fit_post_graph.json); log 2026-09-07T13:08:07Z |
 | OPT-009 | Implement true batched Q8_0/Q4_K/Q6_K prompt MMQ | OPT-004, SCH-002 | pending | Prompt projections reuse weight tiles across rows, select measured SM120 kernels, and preserve frozen numeric envelopes | — |
 | OPT-010 | Tile KV layout for coalesced exact GQA access | OPT-007, SES-003 | pending | KV storage supports coalesced tile loads without changing logical values, checkpoint compatibility, prefix reuse, or capacity | — |
 | OPT-011 | Pipeline and fuse prompt execution and chunk commit | OPT-008, OPT-009, OPT-010 | pending | Justified fusion/overlap removes avoidable copies, launches, and barriers while preserving cancellation and atomic publication | — |
@@ -3765,3 +3765,35 @@ are repository-relative unless stated otherwise.
 - Marked OPT-007 `done`; the native diagnostic's repeated ignored cleanup calls
   are non-blocking test hygiene and do not affect production semantics or
   emitted evidence.
+
+### 2026-09-04T17:59:04Z — OPT-008 started
+
+- Admitted OPT-008 as the first pending ledger row whose dependencies are done;
+  the worktree was clean and `main` tracked `origin/main`.
+- Planning fixed the default outer prompt transaction at 4,096 rows with
+  capacity-bounded scratch, a `[4096, 1]` tail, retained 64-row GDN scans,
+  atomic cancellation, exact differential evidence, and a live 128K reserve
+  measurement. No coupled task or `plan.md` change is required.
+- Evidence: [`tasks/OPT-008.md`](tasks/OPT-008.md).
+
+### 2026-09-07T13:08:07Z — OPT-008 delivered
+
+- Independent verification attempt 1 passed the 4,096-row default, `[4096, 1]`
+  tail, capacity-bounded fallback, exact 64-row reference equality, 4,096-row
+  cancellation, diagnostic workspace totals, and live 128K owner/reserve gates
+  on the pinned RTX 5090.
+- Acceptance evidence: [`tasks/OPT-008.md`](tasks/OPT-008.md);
+  [`cuda/full_scheduler.h`](cuda/full_scheduler.h);
+  [`cuda/full_scheduler.cu`](cuda/full_scheduler.cu);
+  [`cuda/prompt_scheduler_test.cu`](cuda/prompt_scheduler_test.cu);
+  [`pins/cuda_prompt_scheduler_contract.json`](pins/cuda_prompt_scheduler_contract.json);
+  [`fixtures/cuda_prompt_scheduler.json`](fixtures/cuda_prompt_scheduler.json);
+  [`fixtures/cuda_atomic_eval.json`](fixtures/cuda_atomic_eval.json);
+  [`fixtures/cuda_memory_fit_post_graph.json`](fixtures/cuda_memory_fit_post_graph.json);
+  [`docs/62-cuda-full-prefill.md`](docs/62-cuda-full-prefill.md);
+  [`docs/54-post-graph-128k-memory.md`](docs/54-post-graph-128k-memory.md).
+  The proof excludes comparative speed and 128K prefill execution. `plan.md`
+  and `Makefile` are unchanged. OPT-009 through OPT-013 remain pending;
+  QLT-001 remains blocked.
+- Marked OPT-008 `done`; delivery is limited to the verified task scope plus
+  this ledger/audit bookkeeping.

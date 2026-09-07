@@ -1084,8 +1084,10 @@ SchedulerWorkspace& SchedulerWorkspace::operator=(
   QW38_MOVE_POINTER(prompt_attention_candidate_value_);
 #undef QW38_MOVE_POINTER
   capacity_ = other.capacity_;
+  prompt_chunk_rows_ = other.prompt_chunk_rows_;
   allocated_bytes_ = other.allocated_bytes_;
   other.capacity_ = 0;
+  other.prompt_chunk_rows_ = 0;
   other.allocated_bytes_ = 0;
   return *this;
 }
@@ -1140,6 +1142,7 @@ void SchedulerWorkspace::release() noexcept {
   QW38_FREE(residual_a_);
 #undef QW38_FREE
   capacity_ = 0;
+  prompt_chunk_rows_ = 0;
   allocated_bytes_ = 0;
 }
 
@@ -1157,6 +1160,7 @@ Status SchedulerWorkspace::create(std::size_t capacity) noexcept {
     return {StatusCode::kResourceExhausted,
             "cannot allocate CUDA scheduler host candidate output"};
   }
+  prompt_chunk_rows_ = std::min(kPromptChunkRows, capacity);
   cudaError_t error = allocate(&residual_a_, internal::kResidualWidth,
                                &allocated_bytes_);
 #define QW38_ALLOCATE(name, count)                                           \
@@ -1191,38 +1195,38 @@ Status SchedulerWorkspace::create(std::size_t capacity) noexcept {
   QW38_ALLOCATE(trace_taps_, kTraceTapCount * internal::kResidualWidth);
 #endif
   QW38_ALLOCATE(prompt_residual_a_,
-                kPromptChunkRows * internal::kResidualWidth);
+                prompt_chunk_rows_ * internal::kResidualWidth);
   QW38_ALLOCATE(prompt_residual_b_,
-                kPromptChunkRows * internal::kResidualWidth);
+                prompt_chunk_rows_ * internal::kResidualWidth);
   QW38_ALLOCATE(prompt_normalized_,
-                kPromptChunkRows * internal::kResidualWidth);
+                prompt_chunk_rows_ * internal::kResidualWidth);
   QW38_ALLOCATE(prompt_projected_bf16_,
-                kPromptChunkRows * internal::kFfnWidth);
+                prompt_chunk_rows_ * internal::kFfnWidth);
   QW38_ALLOCATE(prompt_q8_,
-                kPromptChunkRows * internal::kFfnWidth / 32);
+                prompt_chunk_rows_ * internal::kFfnWidth / 32);
   QW38_ALLOCATE(prompt_projection_a_,
-                kPromptChunkRows * kMaximumProjection);
+                prompt_chunk_rows_ * kMaximumProjection);
   QW38_ALLOCATE(prompt_projection_b_,
-                kPromptChunkRows * kMaximumProjection);
+                prompt_chunk_rows_ * kMaximumProjection);
   QW38_ALLOCATE(prompt_projection_c_,
-                kPromptChunkRows * internal::kAttentionKvWidth);
+                prompt_chunk_rows_ * internal::kAttentionKvWidth);
   QW38_ALLOCATE(prompt_projection_d_,
-                kPromptChunkRows * internal::kAttentionKvWidth);
+                prompt_chunk_rows_ * internal::kAttentionKvWidth);
   QW38_ALLOCATE(prompt_mixer_output_,
-                kPromptChunkRows * internal::kResidualWidth);
+                prompt_chunk_rows_ * internal::kResidualWidth);
   QW38_ALLOCATE(prompt_gdn_decay_,
-                kPromptChunkRows * internal::kGdnGateCount);
+                prompt_chunk_rows_ * internal::kGdnGateCount);
   QW38_ALLOCATE(prompt_gdn_update_,
-                kPromptChunkRows * internal::kGdnGateCount);
+                prompt_chunk_rows_ * internal::kGdnGateCount);
   QW38_ALLOCATE(prompt_gdn_convolved_,
-                kPromptChunkRows * internal::kGdnPackedQkvWidth);
+                prompt_chunk_rows_ * internal::kGdnPackedQkvWidth);
   QW38_ALLOCATE(prompt_gdn_recurrent_output_,
-                kPromptChunkRows * internal::kGdnValueWidth);
+                prompt_chunk_rows_ * internal::kGdnValueWidth);
   QW38_ALLOCATE(prompt_attention_candidate_key_,
-                kAttentionLayers * kPromptChunkRows *
+                kAttentionLayers * prompt_chunk_rows_ *
                     internal::kAttentionKvWidth);
   QW38_ALLOCATE(prompt_attention_candidate_value_,
-                kAttentionLayers * kPromptChunkRows *
+                kAttentionLayers * prompt_chunk_rows_ *
                     internal::kAttentionKvWidth);
 #undef QW38_ALLOCATE
   if (error != cudaSuccess) {
@@ -1683,8 +1687,9 @@ Status execute_prompt_chunk(
     std::size_t logits_count, float* host_hidden, std::size_t hidden_count,
     const EvalControl* control) noexcept {
   if (model.blob_ == nullptr || tokens == nullptr || token_count < 2 ||
-      token_count > kPromptChunkRows || session == nullptr ||
+      session == nullptr ||
       workspace == nullptr || session->capacity_ == 0 ||
+      token_count > workspace->prompt_chunk_rows_ ||
       token_count > session->capacity_ - session->frontier_ ||
       workspace->capacity_ != session->capacity_ || host_logits == nullptr ||
       logits_count != internal::kVocabularySize || host_hidden == nullptr ||
@@ -1836,7 +1841,7 @@ Status execute_prompt_chunk(
           session->attention_key_ + attention_slot * cache_stride,
           session->attention_value_ + attention_slot * cache_stride};
       const std::size_t candidate_stride =
-          kPromptChunkRows * internal::kAttentionKvWidth;
+          workspace->prompt_chunk_rows_ * internal::kAttentionKvWidth;
       const AttentionCache candidate{
           workspace->prompt_attention_candidate_key_ +
               attention_slot * candidate_stride,
@@ -1950,7 +1955,7 @@ Status execute_prompt_chunk(
   const std::size_t cache_stride =
       session->capacity_ * internal::kAttentionKvWidth;
   const std::size_t candidate_stride =
-      kPromptChunkRows * internal::kAttentionKvWidth;
+      workspace->prompt_chunk_rows_ * internal::kAttentionKvWidth;
   const std::size_t target =
       session->frontier_ * internal::kAttentionKvWidth;
   for (std::size_t slot = 0; error == cudaSuccess && slot < kAttentionLayers;
@@ -2064,7 +2069,8 @@ Status sync_tokens(const ResidentModel& model, const std::size_t* tokens,
   float elapsed = 0.0F;
   for (std::size_t index = start; index < token_count;) {
     const std::size_t remaining = token_count - index;
-    const std::size_t chunk = std::min(kPromptChunkRows, remaining);
+    const std::size_t chunk =
+        std::min(workspace->prompt_chunk_rows_, remaining);
     const Status status =
         chunk == 1
             ? execute_token(model, tokens[index], session, workspace,

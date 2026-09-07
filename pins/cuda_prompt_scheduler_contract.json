@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
-  "task": "SCH-002",
+  "tasks": ["SCH-002", "OPT-008"],
   "target": "sm_120",
   "toolkit": "CUDA 13.0.2",
   "model_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
-  "prompt_chunk_rows": 64,
+  "prompt_chunk_rows": 4096,
   "execution_order": [
     "embedding rows",
     "64 layers in model order",
@@ -22,9 +22,10 @@
     "activation_storage": "BF16 at quantized projection inputs; FP32 residual and recurrent state"
   },
   "admission": {
-    "65_tokens_crosses_chunk_boundary": true,
-    "state_byte_equal_to_tokenwise": true,
-    "last_hidden_and_logits_byte_equal_to_tokenwise": true,
+    "4097_tokens_crosses_chunk_boundary": true,
+    "state_byte_equal_to_64_row_reference": true,
+    "last_hidden_and_logits_byte_equal_to_64_row_reference": true,
+    "capacity_65_executes_as_one_prompt_chunk": true,
     "cancelled_chunk_leaves_frontier_and_state_unchanged": true,
     "optimized_wall_time_below_tokenwise_wall_time": true,
     "decode_graph_path_unchanged": true

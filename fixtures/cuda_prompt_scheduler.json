@@ -1,29 +1,47 @@
 {
   "schema_version": 1,
-  "task": "SCH-002",
-  "measured_at_utc": "2026-09-02T15:54:00Z",
+  "tasks": ["SCH-002", "OPT-008"],
+  "measured_at_utc": "2026-09-04T21:42:02Z",
   "device": "NVIDIA GeForce RTX 5090",
   "toolkit": "CUDA 13.0.2",
   "model_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
-  "chunk_rows": 64,
+  "chunk_rows": 4096,
   "boundary_case": {
-    "tokens": 65,
-    "chunks": [64, 1],
+    "tokens": 4097,
+    "chunks": [4096, 1],
+    "evaluated_tokens": 4097,
+    "final_frontier": 4097,
+    "state_byte_equal": true,
+    "last_outputs_byte_equal": true,
+    "reference": "64-row prompt chunks followed by one decode row"
+  },
+  "capacity_fallback_case": {
+    "capacity": 65,
+    "chunks": [65],
+    "layer_poll_calls": 64,
     "evaluated_tokens": 65,
     "final_frontier": 65,
     "state_byte_equal": true,
-    "last_outputs_byte_equal": true,
-    "optimized_wall_ms": 1417.114341,
-    "tokenwise_wall_ms": 4204.655779,
-    "speedup": 2.967055
+    "last_outputs_byte_equal": true
   },
   "cancellation_case": {
-    "requested_tokens": 64,
+    "requested_tokens": 4096,
+    "layer_poll_calls": 8,
     "status": "cancelled",
     "committed_frontier": 0,
-    "committed_state_equal_to_empty": true
+    "committed_state_equal_to_empty": true,
+    "caller_outputs_unchanged": true
   },
-  "workspace_bytes_at_capacity_65": 186306144,
+  "bounds_case": {
+    "requested_tokens": 4097,
+    "status": "invalid_argument",
+    "committed_frontier": 0
+  },
+  "workspace_bytes": {
+    "capacity_3": 161595680,
+    "capacity_65": 186711136,
+    "capacity_4097": 1819620960
+  },
   "benchmark_smoke": {
     "prompt_tokens": 17,
     "prefill_ms_p50": 415.068169,
@@ -32,5 +50,5 @@
     "raw_result": "evidence/prefill/sch002-prefill-smoke.json",
     "raw_result_sha256": "35cfe0e0a9a36363c7fcabbe10348fdcb9a80ad49330f8cee89308e0d706aa41"
   },
-  "proof_limit": "exact 65-token native differential, cancellation, memory, and short smoke evidence; not the 2K/8K release matrix or comparative speed gate"
+  "proof_limit": "exact 4,097-token native differential, capacity fallback, cancellation, memory, and short smoke evidence; not the 2K/8K release matrix or comparative speed gate"
 }
