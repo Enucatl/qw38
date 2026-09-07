@@ -1,6 +1,6 @@
 # 40. Tiled CUDA multiplication for prompt rows
 
-[Index](README.md) · Implementation tasks: CUD-002 and EDU-026 in
+[Index](README.md) · Implementation tasks: CUD-002, OPT-009, and EDU-026 in
 [`implementation_ledger.md`](../implementation_ledger.md)
 
 [Chapter 39](39-cuda-quant-mmv.md) multiplied one activation vector by a packed
@@ -45,14 +45,16 @@ many as four prompt activations before moving to the next column. This is
 **weight reuse**: the packed byte interpretation is paid once for several dot
 products instead of once per prompt token.
 
-The tile dimensions are a semantic starting point, not a claim that `8 × 4` is
-fastest. Later profiling will test production dimensions, register pressure,
-memory traffic, and larger row buckets before choosing tuned dispatches.
+The CUD-002 tile is a semantic starting point, not a claim that `8 × 4` is
+fastest. OPT-009 later measured production dimensions, register pressure,
+memory traffic, and larger row buckets on SM120, then froze kind-specific
+dispatch tables. Those tables are component launch evidence, not an end-to-end
+prefill claim.
 
 ## Shared staging, separate prompt rows
 
-Every prompt row uses the same BF16-to-Q8 rule admitted by CUD-001. Its Q8 blocks
-are stored consecutively:
+Q4_K and Q6_K prompt rows use the same BF16-to-Q8 rule admitted by CUD-001. Their
+Q8 blocks are stored consecutively:
 
 ```text
 row 0 Q8 blocks | row 1 Q8 blocks | row 2 Q8 blocks | ...
@@ -62,6 +64,8 @@ row 0 Q8 blocks | row 1 Q8 blocks | row 2 Q8 blocks | ...
 scratch allocation. It returns zero for zero prompt rows or a column count that
 cannot contain whole 256-value Q4_K/Q6_K blocks. The scratch is transient: it is
 not model weight storage, KV history, GDN recurrence, or session state.
+Production Q8_0 prompt rows skip it: OPT-009 multiplies packed Q8_0 weights
+directly by BF16 activations.
 
 ## Tails are ordinary inputs
 
@@ -112,6 +116,89 @@ production prefill throughput.
 
 CUD-002 proves arbitrary positive prompt-row counts, token-major output layout,
 tail safety, exact staging, and scalar-equivalent Q4_K/Q6_K results for the
-tested shapes. It does not yet prove full model projections, causal scheduling,
-GDN scans, attention prefill, production dispatch choices, 128K capacity, or a
-speed advantage. Those claims remain separate implementation-ledger gates.
+tested shapes. It does not by itself prove full model projections, causal
+scheduling, GDN scans, attention prefill, production dispatch choices, 128K
+capacity, or a speed advantage.
+
+## OPT-009 production weight-tile reuse
+
+Production `matrix_prompt` now launches true multi-row tiles instead of rereading
+the packed matrix once per prompt row.
+
+**Q8_0 stays BF16.** SCH-002 introduced a Q8_0-by-BF16 kernel specifically
+because sending those weights through Q8-staged `launch_quant_mmq` changed
+persistent state and logits. That first kernel still mapped `blockIdx.y` to one
+prompt row, so `grid.y` equalled `prompt_rows` and each output-row warp reread
+every weight. OPT-009 moves the row-wise kernel to test-only
+[`launch_q8_mmq_bf16_reference`](../cuda/quant_mmv.cu) and replaces production
+with templated `q8_mmq_bf16_tiled`. A 256-thread block still uses eight warps,
+one warp per output row. `blockIdx.y` now owns a prompt-row tile. For each
+column in the existing lane stride, the warp decodes the Q8_0 weight once and
+applies that scalar to every in-range prompt row with the decode
+`__fmul_rn(weight, __bfloat162float(activation))` and `__fadd_rn` chain. Each
+prompt row is warp-shuffle-reduced independently in the 16…1 order. Token-major
+layout and tail guards are unchanged. Production never requantizes Q8_0
+activations.
+
+**Q4_K and Q6_K keep the CUD-002 path.** They still stage transient Q8 blocks
+and call `launch_quant_mmq`. OPT-009 only extends the compile-time tiles from
+`{1,2,4,8}` to `{1,2,4,8,16,32,64}` and remeasures which tile wins. Illegal
+tiles fail closed with `cudaErrorInvalidValue`.
+
+**Selection is kind-specific.** `selected_mmq_prompt_tile(kind, prompt_rows)` is
+a pure function of those two arguments. The one-argument wrapper still returns
+the Q4_K table so CUD-002 assertions stay in one place. OPT-004's eight-row
+ceiling remains historical MMQ evidence; it is not the production table.
+
+The exclusive RTX 5090 sweep used CUDA 13.0.2, `sm_120`, and image
+`qw38-cuda:13.0.2`. Each candidate had three unrecorded warm-ups, 30
+synchronized CUDA-event samples, and three replicates. The winner is the lowest
+arithmetic mean among candidates that launch, keep
+`cudaOccupancyMaxActiveBlocksPerMultiprocessor >= 1`, and write only zeros on
+the synthetic sweep. Prompt-row buckets are `1, 2, 4, 8, 16, 32, 64, 256,
+4096`. Q8_0 winners come from attention Q/gate `12288 × 5120`. Q4_K winners
+minimize the sum of FFN gate/up `17408 × 5120` and down `5120 × 17408`. Q6_K
+winners come from attention output `5120 × 6144`.
+
+Regenerated fixture winners:
+
+| Kind | Prompt-row buckets | Selected tile |
+|---|---:|---:|
+| Q8_0 | 1 | 1 |
+| Q8_0 | 2 | 2 |
+| Q8_0 | 4, 8, 16, 32, 64, 256, 4096 | 4 |
+| Q4_K | 1 | 1 |
+| Q4_K | 2 | 2 |
+| Q4_K | 4, 8 | 4 |
+| Q4_K | 16, 32, 64, 256 | 8 |
+| Q4_K | 4096 | 4 |
+| Q6_K | 1 | 1 |
+| Q6_K | 2 | 2 |
+| Q6_K | 4 | 4 |
+| Q6_K | 8, 16, 32, 64, 256, 4096 | 8 |
+
+Q4_K's 4,096-row winner is tile 4 because that tile minimizes the joint sum of
+the two FFN shapes. Tile 8 is faster on `17408 × 5120` alone and is not the
+production choice.
+
+On the retained 2026-09-07 RTX 5090 record, production Q8_0 graphs used
+`grid.y = ceil(prompt_rows / 4)`: 16 at 64 rows and 1,024 at 4,096 rows. The
+reference graphs used `grid.y = prompt_rows`. Occupancy was at least one active
+block per SM (Q8_0 5, Q4_K 3, Q6_K 2) with 0 compiler-reported local bytes per
+thread. Component means: Q8_0 `12288 × 5120` 64-row 1.12 ms versus reference
+2.59 ms; 256-row 4.62 ms versus 11.79 ms; Q4_K joint 4,096-row selected 614.2 ms
+versus tile-8 706.1 ms.
+
+Q8_0 outputs stay byte-identical to the retained row-wise kernel. Q4_K/Q6_K
+keep the frozen CUD-002 envelope: maximum absolute error `5e-4`, RMS `2.5e-4`,
+exact Q8 staging, and zero non-finites.
+
+**Measured component evidence, OPT-009:** weight-tile reuse, measured SM120
+kind×bucket selection, occupancy, Q8_0 byte equality, Q4_K/Q6_K frozen
+envelopes, and those component timing predicates. This is not an end-to-end
+prefill or decode speedup, not the comparative 5% gate, not execution of a 128K
+prefill, and not 128K retrieval quality. QLT-001 remains blocked. Contract,
+fixture, and raw sweep:
+[`pins/cuda_prompt_mmq_contract.json`](../pins/cuda_prompt_mmq_contract.json),
+[`fixtures/cuda_prompt_mmq.json`](../fixtures/cuda_prompt_mmq.json), and
+[`evidence/profiling/opt009-mmq-tile-sweep-raw.txt`](../evidence/profiling/opt009-mmq-tile-sweep-raw.txt).

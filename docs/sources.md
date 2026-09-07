@@ -186,8 +186,8 @@ DSpark are explicitly rejected as Qwen model semantics.
   [`pins/cuda_mmq_contract.json`](../pins/cuda_mmq_contract.json) freezes its
   layout and limits. Arbitrary prompt-row and tail evidence is retained in
   [`fixtures/cuda_quant_mmq.json`](../fixtures/cuda_quant_mmq.json). Production
-  tile selection remains profiler work rather than an externally borrowed
-  performance claim.
+  MMQ tile selection is later OPT-009 work rather than an externally borrowed
+  performance claim. CUD-002 remains the Q4_K/Q6_K numeric envelope.
 - GDN-001 uses the already pinned Transformers Qwen3.5 GDN equations and local
   CPU-002 scalar implementation as its semantic references; it introduces no
   new external source. [`pins/cuda_gdn_contract.json`](../pins/cuda_gdn_contract.json)
@@ -329,6 +329,25 @@ DSpark are explicitly rejected as Qwen model semantics.
   [`fixtures/cuda_dispatch_tuning.json`](../fixtures/cuda_dispatch_tuning.json)
   and individual samples in
   [`evidence/profiling/opt004-dispatch-sweep-raw.txt`](../evidence/profiling/opt004-dispatch-sweep-raw.txt).
+  That fixture remains the MMV-bucket and historical ≤64-row Q4_K MMQ authority.
+  OPT-009 supersedes production MMQ prompt-tile selection and does not mutate
+  the OPT-004 contract or fixture.
+- OPT-009 introduces no new external implementation source. It does not copy
+  llama.cpp, DwarfStar, or cuBLAS GEMM. Production Q8_0 prompt MMQ keeps the
+  local decode `q8_mmv_bf16` multiply, `__fadd_rn` / `__fmul_rn` column walk,
+  and warp shuffle reduction, applied independently to each prompt row inside a
+  CUD-002-style weight-reusing tile. Q4_K/Q6_K remain on the admitted
+  `launch_quant_mmq` path with legal tiles `{1,2,4,8,16,32,64}`. Kind-specific
+  SM120 winners, occupancy, Q8_0 byte equality to the retained row-wise
+  reference, frozen CUD-002 envelopes, and component timing predicates are
+  authenticated in
+  [`pins/cuda_prompt_mmq_contract.json`](../pins/cuda_prompt_mmq_contract.json)
+  and [`fixtures/cuda_prompt_mmq.json`](../fixtures/cuda_prompt_mmq.json), with
+  every sweep sample in
+  [`evidence/profiling/opt009-mmq-tile-sweep-raw.txt`](../evidence/profiling/opt009-mmq-tile-sweep-raw.txt).
+  The proof is component-only: it is not an end-to-end speedup or 128K quality
+  claim. The beginner explanation is
+  [`docs/40-cuda-prompt-mmq.md`](40-cuda-prompt-mmq.md).
 - CLI-001 and EDU-041 use no copied implementation. The public CUDA runtime,
   inverse tokenizer byte map, incremental chat suffix, seeded sampler, and
   terminal loop are local Quartz code. Their ownership and command contract is
@@ -386,11 +405,14 @@ DSpark are explicitly rejected as Qwen model semantics.
 - SCH-002, MEM-002, OPT-008, and EDU-047 introduce no new external implementation
   source. The full prompt path composes Quartz's already admitted MMQ, GDN scan,
   causal attention prefill, pointwise, session, and memory-ledger boundaries.
-  Its direct Q8_0-by-BF16 prompt kernel is a local batching of the existing
-  scheduler arithmetic, retained specifically to avoid an extra activation
-  requantization. OPT-008 sets the 4,096-row outer policy while retaining the
-  internal 64-row GDN scan; its allocation is bounded by session capacity.
-  Exact `[4096, 1]` differential, capacity fallback, cancellation, and memory
+  SCH-002 retained a local Q8_0-by-BF16 prompt kernel specifically to avoid an
+  extra activation requantization; that first kernel batched launches
+  (`grid.y = prompt_rows`) rather than reusing weights. OPT-008 sets the
+  4,096-row outer policy while retaining the internal 64-row GDN scan; its
+  allocation is bounded by session capacity. OPT-009 later replaces production
+  Q8_0 with weight-reusing tiles and remeasures Q4_K/Q6_K tiles through 64; that
+  increment is documented separately and remains component-only. Exact
+  `[4096, 1]` differential, capacity fallback, cancellation, and memory
   evidence is authenticated in
   [`pins/cuda_prompt_scheduler_contract.json`](../pins/cuda_prompt_scheduler_contract.json)
   and [`fixtures/cuda_prompt_scheduler.json`](../fixtures/cuda_prompt_scheduler.json),

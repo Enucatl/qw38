@@ -366,7 +366,26 @@ int main() {
       qw38::cuda::selected_mmq_prompt_tile(1) != 1 ||
       qw38::cuda::selected_mmq_prompt_tile(2) != 2 ||
       qw38::cuda::selected_mmq_prompt_tile(4) != 4 ||
-      qw38::cuda::selected_mmq_prompt_tile(64) != 8) {
+      qw38::cuda::selected_mmq_prompt_tile(8) != 4 ||
+      qw38::cuda::selected_mmq_prompt_tile(64) != 8 ||
+      qw38::cuda::selected_mmq_prompt_tile(4096) != 4 ||
+      qw38::cuda::selected_mmq_prompt_tile(qw38::cuda::QuantKind::kQ8_0, 1) !=
+          1 ||
+      qw38::cuda::selected_mmq_prompt_tile(qw38::cuda::QuantKind::kQ8_0, 2) !=
+          2 ||
+      qw38::cuda::selected_mmq_prompt_tile(qw38::cuda::QuantKind::kQ8_0, 4) !=
+          4 ||
+      qw38::cuda::selected_mmq_prompt_tile(qw38::cuda::QuantKind::kQ8_0, 64) !=
+          4 ||
+      qw38::cuda::selected_mmq_prompt_tile(qw38::cuda::QuantKind::kQ8_0, 4096) !=
+          4 ||
+      qw38::cuda::selected_mmq_prompt_tile(qw38::cuda::QuantKind::kQ6K, 1) != 1 ||
+      qw38::cuda::selected_mmq_prompt_tile(qw38::cuda::QuantKind::kQ6K, 4) != 4 ||
+      qw38::cuda::selected_mmq_prompt_tile(qw38::cuda::QuantKind::kQ6K, 8) != 8 ||
+      qw38::cuda::selected_mmq_prompt_tile(qw38::cuda::QuantKind::kQ6K, 64) !=
+          8 ||
+      qw38::cuda::selected_mmq_prompt_tile(qw38::cuda::QuantKind::kQ6K, 4096) !=
+          8) {
     std::fprintf(stderr, "dispatch table selection failed\n");
     return 1;
   }

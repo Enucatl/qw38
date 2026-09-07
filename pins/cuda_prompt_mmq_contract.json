@@ -1,0 +1,81 @@
+{
+  "schema_version": 1,
+  "task": "OPT-009",
+  "target": "sm_120",
+  "toolkit": "CUDA 13.0.2",
+  "pinned_image": "qw38-cuda:13.0.2",
+  "threads": 256,
+  "output_rows_per_block": 8,
+  "legal_tiles": [1, 2, 4, 8, 16, 32, 64],
+  "prompt_row_buckets": [1, 2, 4, 8, 16, 32, 64, 256, 4096],
+  "maximum_local_bytes_per_thread": 1024,
+  "admission": {
+    "q8_bf16_reference_exact": true,
+    "q4k_q6k_tile_exact": true,
+    "maximum_absolute_error": 0.0005,
+    "maximum_rms_error": 0.00025,
+    "q8_staging_exact": true,
+    "nonfinite_count": 0
+  },
+  "selection": {
+    "rule": "lowest arithmetic mean across three replicates at each admitted shape; occupancy >= 1; launch success; zero synthetic output; tile >= 2 when prompt_rows >= 2. Q8_0 uses 12288x5120 BF16. Q4_K minimizes the sum of 17408x5120 and 5120x17408 means. Q6_K uses 5120x6144.",
+    "q8_0": {
+      "1": 1,
+      "2": 2,
+      "4": 4,
+      "8": 4,
+      "16": 4,
+      "32": 4,
+      "64": 4,
+      "256": 4,
+      "4096": 4
+    },
+    "q4_k": {
+      "1": 1,
+      "2": 2,
+      "4": 4,
+      "8": 4,
+      "16": 8,
+      "32": 8,
+      "64": 8,
+      "256": 8,
+      "4096": 4
+    },
+    "q6_k": {
+      "1": 1,
+      "2": 2,
+      "4": 4,
+      "8": 8,
+      "16": 8,
+      "32": 8,
+      "64": 8,
+      "256": 8,
+      "4096": 8
+    }
+  },
+  "semantic_predicates": [
+    "q8_production_reference_exact",
+    "q4k_tiles_byte_identical",
+    "q6k_tiles_byte_identical",
+    "q4k_q6k_cud002_envelope",
+    "q8_staging_exact",
+    "invalid_input_rejected",
+    "q8_grid_reuses_weight_tiles",
+    "q8_reference_grid_is_row_wise",
+    "q4k_q6k_grid_matches_selected_tile",
+    "occupancy_admitted",
+    "q8_64_faster_than_reference",
+    "q8_256_faster_than_reference",
+    "q4k_4096_selected_not_slower_than_tile8"
+  ],
+  "metadata_required": [
+    "device",
+    "compute_capability",
+    "driver",
+    "runtime",
+    "toolkit",
+    "pinned_image",
+    "measurement_utc",
+    "proof_limit"
+  ]
+}

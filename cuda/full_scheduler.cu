@@ -175,35 +175,6 @@ __global__ void q8_mmv_bf16(const std::uint8_t* weights, std::size_t rows,
   if (lane == 0) output[row] = sum;
 }
 
-__global__ void q8_mmq_bf16(const std::uint8_t* weights, std::size_t rows,
-                            std::size_t columns,
-                            const __nv_bfloat16* activation,
-                            std::size_t prompt_rows, float* output) {
-  const int warp = threadIdx.x / kWarpSize;
-  const int lane = threadIdx.x & (kWarpSize - 1);
-  const std::size_t row =
-      static_cast<std::size_t>(blockIdx.x) * (kThreads / kWarpSize) + warp;
-  const std::size_t prompt_row = blockIdx.y;
-  if (row >= rows || prompt_row >= prompt_rows) return;
-  const std::uint8_t* row_weights = weights + row * (columns / 32) * 34;
-  const __nv_bfloat16* row_activation =
-      activation + prompt_row * columns;
-  float sum = 0.0F;
-  for (std::size_t column = lane; column < columns; column += kWarpSize) {
-    const std::uint8_t* block = row_weights + (column / 32) * 34;
-    const float weight =
-        read_q8_half(block) *
-        static_cast<float>(static_cast<std::int8_t>(block[2 + column % 32]));
-    sum = __fadd_rn(
-        sum, __fmul_rn(weight, __bfloat162float(row_activation[column])));
-  }
-  for (int offset = 16; offset > 0; offset /= 2) {
-    sum = __fadd_rn(
-        sum, __shfl_down_sync(0xFFFFFFFFU, sum, offset, kWarpSize));
-  }
-  if (lane == 0) output[prompt_row * rows + row] = sum;
-}
-
 __global__ void bf16_to_fp32(const __nv_bfloat16* input, std::size_t count,
                              float* output) {
   const std::size_t index =
@@ -481,14 +452,8 @@ cudaError_t matrix_prompt(const DeviceTensor& matrix,
                           SchedulerWorkspace* workspace, float* output,
                           cudaStream_t stream) noexcept {
   if (matrix.kind == QuantKind::kQ8_0) {
-    const dim3 blocks(
-        static_cast<unsigned int>((matrix.rows + (kThreads / kWarpSize) - 1) /
-                                  (kThreads / kWarpSize)),
-        static_cast<unsigned int>(prompt_rows));
-    q8_mmq_bf16<<<blocks, kThreads, 0, stream>>>(
-        matrix.data, matrix.rows, matrix.columns, activation, prompt_rows,
-        output);
-    return cudaPeekAtLastError();
+    return launch_q8_mmq_bf16(matrix.data, matrix.rows, matrix.columns,
+                              activation, prompt_rows, output, stream);
   }
   return launch_quant_mmq(matrix.kind, matrix.data, matrix.rows,
                           matrix.columns, activation, prompt_rows,

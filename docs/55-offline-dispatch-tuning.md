@@ -1,11 +1,14 @@
 # Offline CUDA dispatch tuning
 
-[Index](README.md) · Implementation tasks: OPT-004 and EDU-040 in
+[Index](README.md) · Implementation tasks: OPT-004, OPT-009, and EDU-040 in
 [`implementation_ledger.md`](../implementation_ledger.md) · Evidence:
 [`cuda/quant_mmv.cu`](../cuda/quant_mmv.cu),
 [`cuda/dispatch_tuning_test.cu`](../cuda/dispatch_tuning_test.cu),
 [`fixtures/cuda_dispatch_tuning.json`](../fixtures/cuda_dispatch_tuning.json),
-and the [raw sweep](../evidence/profiling/opt004-dispatch-sweep-raw.txt)
+the [OPT-004 raw sweep](../evidence/profiling/opt004-dispatch-sweep-raw.txt),
+[`pins/cuda_prompt_mmq_contract.json`](../pins/cuda_prompt_mmq_contract.json),
+[`fixtures/cuda_prompt_mmq.json`](../fixtures/cuda_prompt_mmq.json),
+and the [OPT-009 raw sweep](../evidence/profiling/opt009-mmq-tile-sweep-raw.txt)
 
 ## What a dispatch table does
 
@@ -48,15 +51,48 @@ SM120/Qwen3.8 choices, not portable advice for another model or GPU.
 
 MMQ means matrix-matrix multiplication here: several prompt activation rows use
 the same weight matrix. A **prompt tile** lets one warp decode a weight once and
-reuse it across 1, 2, 4, or 8 prompt rows. More reuse reduces weight decoding,
-but also increases per-thread registers and wastes work when the prompt is
-smaller than the tile.
+reuse it across several prompt rows. More reuse reduces weight decoding, but
+also increases per-thread registers and wastes work when the prompt is smaller
+than the tile.
 
-The sweep measured prompt chunks of 1, 2, 4, 8, 16, 32, and 64 rows. Each of the
-first three selected its matching tile; every chunk of eight or more selected
-tile 8. Production therefore uses tiles 1, 2, 4, then 8 for all larger chunks.
-This tile is an internal projection choice. It does not change token order or
-claim that the complete 64-layer scheduler now has a new prefill chunk policy.
+OPT-004 measured Q4_K MMQ tiles `{1,2,4,8}` on prompt chunks of 1, 2, 4, 8, 16,
+32, and 64 rows for the FFN gate/up shape `17408 × 5120` only. Each of the first
+three selected its matching tile; every chunk of eight or more selected tile 8.
+That table is historical evidence. It is not mutated, and it is not the
+production MMQ authority once chunks can be 4,096 rows and Q8_0/Q6_K also need
+kind-specific winners.
+
+OPT-009 remeasures production MMQ tiles on exclusive RTX 5090 hardware. Legal
+compile-time tiles are `{1,2,4,8,16,32,64}`. Prompt-row buckets are `1, 2, 4, 8,
+16, 32, 64, 256, 4096`. Q8_0 winners come from BF16 attention Q/gate
+`12288 × 5120`. Q4_K winners minimize the sum of FFN gate/up `17408 × 5120` and
+down `5120 × 17408`. Q6_K winners come from attention output `5120 × 6144`. A
+candidate that fails to launch, writes a non-zero synthetic output, or reports
+occupancy 0 cannot win.
+
+The regenerated fixture winners are:
+
+| Kind | Prompt-row buckets | Selected tile |
+|---|---:|---:|
+| Q8_0 | 1 | 1 |
+| Q8_0 | 2 | 2 |
+| Q8_0 | 4 and above | 4 |
+| Q4_K | 1 | 1 |
+| Q4_K | 2 | 2 |
+| Q4_K | 4, 8 | 4 |
+| Q4_K | 16, 32, 64, 256 | 8 |
+| Q4_K | 4096 | 4 |
+| Q6_K | 1 | 1 |
+| Q6_K | 2 | 2 |
+| Q6_K | 4 | 4 |
+| Q6_K | 8 and above | 8 |
+
+Q4_K's 4,096-row winner is tile 4 because that tile minimizes the joint sum of
+the two FFN shapes; tile 8 is faster on `17408 × 5120` alone. Production
+`selected_mmq_prompt_tile(kind, prompt_rows)` hard-codes those buckets. This
+tile is an internal projection choice. It does not change token order, the
+OPT-008 4,096-row outer chunk, or claim that the complete 64-layer scheduler now
+has a new prefill throughput.
 
 ## How selection was measured
 
@@ -72,11 +108,20 @@ decoding instructions, and output grids. This is valid for launch-shape timing,
 not a numeric authority. Existing nonzero Q4_K/Q6_K/Q8_0 fixtures and the real
 full-model scheduler remain the correctness authorities.
 
-The prompt result is large and stable. For example, the three-replicate mean for
-64 rows was about 11.06 ms at tile 1 versus 4.17 ms at tile 8. Some MMV choices
-are close: the 17,408-row three-replicate means were about 0.1567 ms at four
-warps and 0.1561 ms at eight. The raw values are retained rather than describing
-small differences as universal speedups.
+The OPT-004 prompt result is large and stable. For example, the three-replicate
+mean for 64 Q4_K rows was about 11.06 ms at tile 1 versus 4.17 ms at tile 8.
+Some MMV choices are close: the 17,408-row three-replicate means were about
+0.1567 ms at four warps and 0.1561 ms at eight. The raw values are retained
+rather than describing small differences as universal speedups.
+
+OPT-009 uses the same warm-up/sample/replicate rule on the four production
+shapes and writes every sample to
+[`evidence/profiling/opt009-mmq-tile-sweep-raw.txt`](../evidence/profiling/opt009-mmq-tile-sweep-raw.txt).
+The dedicated diagnostic also times production versus the retained row-wise
+Q8_0 reference at 64 and 256 rows, and the selected Q4_K joint 4,096-row tile
+versus tile 8. Those component means are retained in
+[`fixtures/cuda_prompt_mmq.json`](../fixtures/cuda_prompt_mmq.json) and are not
+end-to-end prefill measurements.
 
 ## Reproducibility and failure modes
 
@@ -91,8 +136,16 @@ small differences as universal speedups.
 
 ## Proof boundary
 
-**Measured:** OPT-004 selects reproducible MMV row buckets and MMQ prompt tiles
-for the pinned RTX 5090, CUDA 13.0.2, SM120 kernels, and Qwen3.8 shapes. It proves
-component launch selection and preserved correctness gates. It does not prove
-end-to-end prefill/decode throughput, another GPU, a complete prompt scheduler,
-or the comparative 5% release gate. BEN-001 and CMP-002/CMP-003 own those claims.
+**Measured:** OPT-004 selects reproducible MMV row buckets and historical ≤64-row
+Q4_K MMQ prompt tiles for the pinned RTX 5090, CUDA 13.0.2, SM120 kernels, and
+Qwen3.8 shapes. It proves component launch selection and preserved correctness
+gates.
+
+**Measured component evidence, OPT-009:** production MMQ prompt-tile selection
+is the kind-specific SM120 table above. It proves weight-tile reuse
+(`grid.y = ceil(prompt_rows / selected_tile)`), occupancy, Q8_0 byte equality to
+the retained row-wise kernel, frozen CUD-002 Q4_K/Q6_K envelopes, and the
+component timing predicates in the prompt-MMQ fixture. It does not prove
+end-to-end prefill/decode throughput, 128K quality recovery, another GPU, or the
+comparative 5% release gate. BEN-001 and CMP-002/CMP-003 own those claims;
+QLT-001 remains blocked.
