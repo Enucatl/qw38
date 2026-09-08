@@ -69,8 +69,9 @@ int main(int argc, char** argv) {
 
   const bool measured =
       category_measured(attribution.embedding) &&
-      category_measured(attribution.gdn) &&
-      category_measured(attribution.attention) &&
+      category_measured(attribution.mixer_mmq) &&
+      category_measured(attribution.gdn_core) &&
+      category_measured(attribution.attention_core) &&
       category_measured(attribution.ffn_mmq) &&
       category_measured(attribution.logits) &&
       category_measured(attribution.commit_sync) &&
@@ -81,6 +82,9 @@ int main(int argc, char** argv) {
       attribution.evaluated_tokens != kPromptTokens ||
       attribution.chunk_count != 1 ||
       attribution.prompt_graph_launches != 0 ||
+      attribution.mixer_mmq.milliseconds <= 0.0F ||
+      attribution.gdn_core.milliseconds <= 0.0F ||
+      attribution.attention_core.milliseconds <= 0.0F ||
       graphs.prompt_graph_rows() != qw38::cuda::kPromptChunkRows ||
       session.frontier() != kPromptTokens) {
     std::fprintf(stderr, "prefill attribution record is incomplete\n");
@@ -88,10 +92,12 @@ int main(int argc, char** argv) {
   }
 
   const float attributed =
-      attribution.embedding.milliseconds + attribution.gdn.milliseconds +
-      attribution.attention.milliseconds + attribution.ffn_mmq.milliseconds +
-      attribution.logits.milliseconds + attribution.commit_sync.milliseconds +
-      attribution.graph.milliseconds + attribution.other_idle.milliseconds;
+      attribution.embedding.milliseconds + attribution.mixer_mmq.milliseconds +
+      attribution.gdn_core.milliseconds +
+      attribution.attention_core.milliseconds +
+      attribution.ffn_mmq.milliseconds + attribution.logits.milliseconds +
+      attribution.commit_sync.milliseconds + attribution.graph.milliseconds +
+      attribution.other_idle.milliseconds;
   const float wall_ms = attribution.wall.milliseconds;
   const float tok_s =
       wall_ms > 0.0F ? static_cast<float>(kPromptTokens) * 1000.0F / wall_ms
@@ -111,23 +117,26 @@ int main(int argc, char** argv) {
   gmtime_r(&now, &tm);
   std::strftime(utc, sizeof(utc), "%Y-%m-%dT%H:%M:%SZ", &tm);
   std::printf(
-      "QW38_PREFILL_ATTRIBUTION_RESULT={\"schema_version\":1,\"task\":\"OPT-014\","
+      "QW38_PREFILL_ATTRIBUTION_RESULT={\"schema_version\":1,\"task\":\"OPT-020\","
       "\"status\":\"measured\",\"device\":\"%s\",\"compute_capability\":\"%d.%d\","
       "\"driver\":\"%d.%d\",\"runtime\":\"%d.%d\",\"toolkit\":\"CUDA 13.0.2\","
       "\"pinned_image\":\"qw38-cuda:13.0.2\",\"measurement_utc\":\"%s\","
       "\"prompt_tokens\":%zu,\"evaluated_tokens\":%zu,\"chunk_count\":%zu,"
       "\"prompt_graph_launches\":%u,\"cold\":true,\"cache_policy\":\"disabled\","
-      "\"categories_ms\":{\"embedding\":%.9g,\"gdn\":%.9g,\"attention\":%.9g,"
-      "\"ffn_mmq\":%.9g,\"logits\":%.9g,\"commit_sync\":%.9g,\"graph\":%.9g,"
-      "\"other_idle\":%.9g},\"attributed_sum_ms\":%.9g,\"wall_ms\":%.9g,"
-      "\"tok_s\":%.9g,\"nsight_systems\":\"not_used\",\"nsight_compute\":\"not_used\","
+      "\"categories_ms\":{\"embedding\":%.9g,\"mixer_mmq\":%.9g,\"gdn_core\":%.9g,"
+      "\"attention_core\":%.9g,\"ffn_mmq\":%.9g,\"logits\":%.9g,"
+      "\"commit_sync\":%.9g,\"graph\":%.9g,\"other_idle\":%.9g},"
+      "\"attributed_sum_ms\":%.9g,\"wall_ms\":%.9g,\"tok_s\":%.9g,"
+      "\"nsight_systems\":\"not_used\",\"nsight_compute\":\"not_used\","
       "\"proof_limit\":\"live CUDA-event attribution; 2048-token cold prefill; "
-      "no Nsight capture; not a throughput gate; not llama.cpp parity\"}\n",
+      "no Nsight capture; not a throughput gate; not llama.cpp parity; "
+      "mixer versus core split\"}\n",
       prop.name, prop.major, prop.minor, driver / 1000, (driver % 1000) / 10,
       runtime / 1000, (runtime % 1000) / 10, utc, attribution.prompt_tokens,
       attribution.evaluated_tokens, attribution.chunk_count,
       attribution.prompt_graph_launches, attribution.embedding.milliseconds,
-      attribution.gdn.milliseconds, attribution.attention.milliseconds,
+      attribution.mixer_mmq.milliseconds, attribution.gdn_core.milliseconds,
+      attribution.attention_core.milliseconds,
       attribution.ffn_mmq.milliseconds, attribution.logits.milliseconds,
       attribution.commit_sync.milliseconds, attribution.graph.milliseconds,
       attribution.other_idle.milliseconds, attributed, wall_ms, tok_s);

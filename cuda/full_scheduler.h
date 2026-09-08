@@ -111,8 +111,9 @@ struct RuntimeTimings final {
 
 struct PrefillAttribution final {
   TimingValue embedding;
-  TimingValue gdn;
-  TimingValue attention;
+  TimingValue mixer_mmq;
+  TimingValue gdn_core;
+  TimingValue attention_core;
   TimingValue ffn_mmq;
   TimingValue logits;
   TimingValue commit_sync;

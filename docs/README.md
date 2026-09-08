@@ -76,7 +76,7 @@ for language and host portability decisions.
 48. [Atomic CUDA evaluation and separate sampling](48-atomic-eval-and-sampling.md): committed versus candidate state, pointer publication, frontier-last visibility, cancellation/errors, and read-only token choice.
 49. [Versioned atomic CUDA checkpoints](49-cuda-checkpoints.md): complete logical state, little-endian framing, compatibility and payload hashes, durable rename publication, validation, and exact continuation.
 50. [The pre-graph 128K memory ledger](50-pre-graph-128k-memory.md): raw-byte ownership, 8 GiB KV arithmetic, runtime/allocator deltas, measured reserve, and the still-open post-graph gate.
-51. [Synchronized runtime timing and NVTX attribution](51-runtime-timing-and-nvtx.md): asynchronous launches, CUDA events, CPU clocks, named ranges, decode and 2K prefill attribution, remainder other/idle, unavailable boundaries, overhead, and profiler limits.
+51. [Synchronized runtime timing and NVTX attribution](51-runtime-timing-and-nvtx.md): asynchronous launches, CUDA events, CPU clocks, named ranges, decode and 2K prefill attribution, mixer-projection MMQ versus gdn_core/attention_core, remainder other/idle, unavailable boundaries, overhead, and profiler limits.
 52. [Profiler-led pointwise fusion](52-profiler-led-fusion.md): launch overhead, Nsight evidence, fused/unfused boundaries, rejected work assignment, bit-exact admission, and paired A/B samples.
 53. [Stable-address CUDA graphs](53-stable-address-cuda-graphs.md): capture, instantiate, upload, replay, pointer lifetime, decode and 4,096-row prompt FFN graphs, dynamic exclusions, equality, launch attribution, and graph memory.
 54. [Final post-graph 128K memory ledger](54-post-graph-128k-memory.md): all simultaneous owners, uploaded graph bytes, allocator reconciliation, free reserve, admission, and proof limits.
@@ -87,7 +87,7 @@ for language and host portability decisions.
 59. [Chat Completions](59-chat-completions.md): bounded JSON, roles, reasoning, generation, SSE streaming, tools, stops, queueing, and active cancellation.
 60. [Responses objects and exact continuation](60-responses-and-continuation.md): typed input/output items, shared generation mapping, SSE events, atomic token-prefix records, restart replay, and explicit exclusions.
 61. [Benchmark harness](61-benchmark-harness.md): workloads, warm-ups, samples, percentiles, telemetry, cache policy, atomic results, and proof limits.
-62. [Chunked full-model CUDA prefill](62-cuda-full-prefill.md): token-major rows, layer-major work, exact MMQ/GDN/attention chunks, atomic commit, scratch, measured 2K attribution, ranked recovery, GDN/attention core remasurement, and proof boundaries.
+62. [Chunked full-model CUDA prefill](62-cuda-full-prefill.md): token-major rows, layer-major work, exact MMQ/GDN/attention chunks, atomic commit, scratch, measured 2K attribution, mixer versus core split, ranked recovery, GDN/attention core remasurement, and proof boundaries.
 63. [CUDA diagnostic traces](63-cuda-diagnostic-traces.md): five stable CUDA boundaries, exact filters, full-tensor scalar gates, failure atomicity, and diagnostic-build isolation.
 64. [Evaluation harness](64-eval-harness.md): raw-token requests, typed helpers, authenticated logits/checkpoint/trace records, atomic negative cases, and the QLT-001 proof boundary.
 65. [Documentation audit](65-documentation-audit.md): task coverage, claim labels,

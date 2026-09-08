@@ -1,6 +1,6 @@
 # Chunked full-model CUDA prefill
 
-[Index](README.md) · Implementation tasks: SCH-002, MEM-002, OPT-008, OPT-009, OPT-011, OPT-012, OPT-013, OPT-014, OPT-015, OPT-017, OPT-018, OPT-019, and EDU-047 in
+[Index](README.md) · Implementation tasks: SCH-002, MEM-002, OPT-008, OPT-009, OPT-011, OPT-012, OPT-013, OPT-014, OPT-015, OPT-017, OPT-018, OPT-019, OPT-020, and EDU-047 in
 [`implementation_ledger.md`](../implementation_ledger.md) · Contracts:
 [`pins/cuda_prompt_scheduler_contract.json`](../pins/cuda_prompt_scheduler_contract.json),
 [`pins/cuda_prompt_pipeline_contract.json`](../pins/cuda_prompt_pipeline_contract.json),
@@ -10,7 +10,8 @@
 [`pins/opt015_recovery_contract.json`](../pins/opt015_recovery_contract.json),
 [`pins/opt017_mixer_mma_contract.json`](../pins/opt017_mixer_mma_contract.json),
 [`pins/opt018_ffn_mma_contract.json`](../pins/opt018_ffn_mma_contract.json),
-[`pins/opt019_core_recovery_contract.json`](../pins/opt019_core_recovery_contract.json)
+[`pins/opt019_core_recovery_contract.json`](../pins/opt019_core_recovery_contract.json),
+[`pins/opt020_prefill_split_contract.json`](../pins/opt020_prefill_split_contract.json)
 · Evidence: [`fixtures/cuda_prompt_scheduler.json`](../fixtures/cuda_prompt_scheduler.json),
 [`fixtures/cuda_prompt_pipeline.json`](../fixtures/cuda_prompt_pipeline.json),
 [`fixtures/cuda_prompt_graph.json`](../fixtures/cuda_prompt_graph.json),
@@ -20,6 +21,7 @@
 [`fixtures/opt017_mixer_mma.json`](../fixtures/opt017_mixer_mma.json),
 [`fixtures/opt018_ffn_mma.json`](../fixtures/opt018_ffn_mma.json),
 [`fixtures/opt019_core_recovery.json`](../fixtures/opt019_core_recovery.json),
+[`fixtures/opt020_prefill_split.json`](../fixtures/opt020_prefill_split.json),
 [`evidence/optimization/opt015-2k-recovery/REPORT.md`](../evidence/optimization/opt015-2k-recovery/REPORT.md),
 [`evidence/optimization/opt017-mixer-q8-mma/REPORT.md`](../evidence/optimization/opt017-mixer-q8-mma/REPORT.md),
 [`evidence/optimization/opt018-ffn-mma-quality/REPORT.md`](../evidence/optimization/opt018-ffn-mma-quality/REPORT.md),
@@ -422,6 +424,24 @@ and is not an 8K/32K/128K throughput claim. Artifacts:
 [`pins/opt019_core_recovery_contract.json`](../pins/opt019_core_recovery_contract.json),
 and [`fixtures/opt019_core_recovery.json`](../fixtures/opt019_core_recovery.json).
 
+OPT-020 splits mixer-projection MMQ out of the former composite GDN and
+attention buckets. **Measured, RTX 5090:** one cold empty-session 2048-token
+production `sync_tokens` (capacity 131072, fused overlapped, production fused
+GDN, graphs created) took 2086.2561 ms host wall (~981.66 tok/s) at
+2026-09-08T21:12:38Z. Exclusive CUDA events on the prompt compute stream
+recorded mixer-projection MMQ 1199.25122 ms, FFN/MMQ 397.254333 ms,
+attention_core 273.986725 ms, gdn_core 212.156006 ms, logits 2.33337593 ms,
+commit/sync 0.590431988 ms, and embedding 0.0736320019 ms. Graph was measured
+0 ms with zero prompt-graph launches. The other/idle remainder was
+0.610351562 ms, so the nine named categories reconstruct wall within
+`rel_tol = 1e-4` and `abs_tol_ms = 0.05`. Nsight Systems and Nsight Compute were
+`not_used`. This is instrumentation of that timed run, not a throughput gate
+and not llama.cpp parity. The historical eight-category snapshot remains
+[`fixtures/cuda_prefill_attribution.json`](../fixtures/cuda_prefill_attribution.json).
+Chapter 51 owns the live category definitions. Artifacts:
+[`pins/opt020_prefill_split_contract.json`](../pins/opt020_prefill_split_contract.json)
+and [`fixtures/opt020_prefill_split.json`](../fixtures/opt020_prefill_split.json).
+
 The **proof boundary** excludes comparative speed claims, 2K/8K sustained
 prefill throughput, execution of a 128K prefill, 128K retrieval quality, thermal
 stability, superiority to llama.cpp/vLLM, and a Nsight Systems overlap timeline.
@@ -432,7 +452,9 @@ and not a throughput gate. OPT-017 records mixer Q8_0 MMA admission plus a
 live exact-2048 remasurement and re-attribution. OPT-018 records Q4_K/Q6_K
 quality MMA plus live FFN remasurement. OPT-019 records warp-column GDN and
 fattn-mma attention core quality plus live GDN/attention remasurement and
-re-attribution; it does not pass or own the 2K tok/s gate. BEN-001
+re-attribution; it does not pass or own the 2K tok/s gate. OPT-020 records
+the mixer versus core split of those composite GDN and attention buckets; it
+is instrumentation, not a throughput gate, and not llama.cpp parity. BEN-001
 provides the harness; CMP-002/CMP-003 still own the 30-sample comparative gate.
 QLT-001 remains blocked. OPT-012's prompt graphs are FFN subgraphs only: not a
 whole-chunk graph, not a speedup gate, and not 128K quality recovery.

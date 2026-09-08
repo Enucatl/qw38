@@ -290,8 +290,14 @@ exact-2048 Quartz `sync_tokens` replicates mean **375.743988** tok/s (walls
 `llama-bench` avg_ts **3203.276277**. `owns_opt016_parity_gate` is false;
 `would_pass_opt016` is informational false. One post-remasurement OPT-014
 attribution reconstructed wall 5383.53369 ms: `ffn_mmq` 2525.01465 ms,
-`gdn` 1647.58936 ms, `attention` 1207.48132 ms. Mixer Q8_0 time stays inside
-`gdn` and `attention` until OPT-020.
+`gdn` 1647.58936 ms, `attention` 1207.48132 ms. Mixer Q8_0 time stayed inside
+those composite buckets on that remasurement. Live nine-category attribution
+now reports mixer-projection MMQ as exclusive `mixer_mmq` versus `gdn_core`
+and `attention_core` in
+[`fixtures/opt020_prefill_split.json`](../fixtures/opt020_prefill_split.json)
+(`mixer_mmq` 1199.25122 ms, `gdn_core` 212.156006 ms, `attention_core`
+273.986725 ms of wall 2086.2561 ms). That split is instrumentation, not a
+throughput gate.
 
 **External:** llama.cpp revision `cc83d7b4824f73cfdda4dfbb47ee39804f71b328`
 Q8_0 MMQ MMA in `mmq.cuh`, `mma.cuh`, `mmq-config-ampere.cuh`,

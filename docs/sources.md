@@ -445,6 +445,28 @@ baseline.
   tiled attention remains the reference; parity gate owner remains blocked;
   not an end-to-end 2K tok/s gate; no 8K/32K/128K throughput gate; mixer
   versus core split is not this increment.
+- OPT-020 introduces no new external implementation source. CUDA events and
+  NVTX ranges are already used by OPT-001 and OPT-014; this increment splits
+  mixer-projection MMQ out of the former composite GDN and attention buckets on
+  the prompt compute stream. No Nsight Systems or Nsight Compute capture is
+  required or performed. The schema-1 contract freezes the nine summing
+  categories, 2048-token geometry, remainder tolerance copied from the historical
+  eight-category contract, measured-zero graph-at-2048, and
+  `nsight: not_required` in
+  [`pins/opt020_prefill_split_contract.json`](../pins/opt020_prefill_split_contract.json).
+  One pinned RTX 5090 fixture retains the live cold 2048-token split report
+  from the timed diagnostic (`wall_ms` 2086.2561, `mixer_mmq` 1199.25122,
+  `gdn_core` 212.156006, `attention_core` 273.986725, `graph` 0, `nsight_*`
+  `not_used`); it is instrumentation, not a throughput gate, Nsight
+  capture, or llama.cpp parity claim:
+  [`fixtures/opt020_prefill_split.json`](../fixtures/opt020_prefill_split.json).
+  The beginner explanation is
+  [`docs/51-runtime-timing-and-nvtx.md`](51-runtime-timing-and-nvtx.md).
+  The prefill proof boundary is
+  [`docs/62-cuda-full-prefill.md`](62-cuda-full-prefill.md).
+  The historical eight-category snapshot remains
+  [`fixtures/cuda_prefill_attribution.json`](../fixtures/cuda_prefill_attribution.json).
+  No external profiler workflow or kernel implementation was copied or adapted.
 - CUD-003 introduces no new external implementation source. GGUF Q8_0 decoding
   follows the format already admitted by the pinned scalar decoder, and the
   pointwise/layout equations come from the pinned model contract and scalar
@@ -627,7 +649,10 @@ baseline.
   claim. OPT-017 later admits production mixer Q8_0 MMA behind
   `launch_q8_mmq_bf16` for `prompt_rows >= 8`, keeping the OPT-009 tiled kernel
   as the unloosened byte-exact reference; that increment is documented separately,
-  is Measured component recovery, and is not the OPT-016 2K parity gate. Exact
+  is Measured component recovery, and is not the OPT-016 2K parity gate.
+  OPT-020 later splits mixer-projection MMQ out of the composite GDN and
+  attention buckets; that increment is documented separately and is
+  instrumentation, not a throughput gate. Exact
   `[4096, 1]` differential, capacity fallback, cancellation, and memory
   evidence is authenticated in
   [`pins/cuda_prompt_scheduler_contract.json`](../pins/cuda_prompt_scheduler_contract.json)

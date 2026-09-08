@@ -158,6 +158,12 @@ recorded; `would_pass_opt016` is informational false. This is **not** the
 OPT-016 gate. **OPT-016 remains the parity gate owner.** Report:
 [`evidence/optimization/opt019-gdn-attention-core/REPORT.md`](../evidence/optimization/opt019-gdn-attention-core/REPORT.md).
 
+**Measured, RTX 5090:** live cold exact-2048 attribution reports exclusive
+`mixer_mmq` 1199.25122 ms, `gdn_core` 212.156006 ms, and `attention_core`
+273.986725 ms of wall 2086.2561 ms in
+[`fixtures/opt020_prefill_split.json`](../fixtures/opt020_prefill_split.json).
+Nsight was not used. This is instrumentation, not a throughput gate.
+
 ## DwarfStar transfer boundary
 
 Reuse MMV/MMQ phase split, quant block tests, explicit unavailable paths, stable

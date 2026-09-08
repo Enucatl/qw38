@@ -86,7 +86,7 @@ are repository-relative unless stated otherwise.
 | OPT-017 | Admit production mixer Q8_0 MMA MMQ without loosening OPT-009 | OPT-009, OPT-015 | done | Production mixer Q8_0 prompt MMQ uses an MMA path while `launch_q8_mmq_bf16_reference` (or the existing OPT-009 byte-exact kernel) remains the visible unloosened reference; CUD-002/OPT-009 envelopes stay unloosened; a live exact-2048 re-attribution and unperturbed 2K remasurement are checked in (OPT-016 remains the parity gate owner) | [`tasks/OPT-017.md`](tasks/OPT-017.md); [`pins/opt017_mixer_mma_contract.json`](pins/opt017_mixer_mma_contract.json); [`fixtures/opt017_mixer_mma.json`](fixtures/opt017_mixer_mma.json); [`evidence/optimization/opt017-mixer-q8-mma/REPORT.md`](evidence/optimization/opt017-mixer-q8-mma/REPORT.md); verification 2026-09-08T14:31:30Z |
 | OPT-018 | Close Q4_K/Q6_K MMA MMQ quality gap versus pinned llama.cpp | OPT-009, OPT-015 | done | Production Q4_K/Q6_K prompt MMA MMQ is brought to llama-competitive 2K FFN time on the same GGUF and RTX 5090 under unloosened CUD-002 envelopes, with retained variant reference, measured before/after FFN category time, and file-level llama.cpp/`plan.md` provenance; does not substitute for the OPT-016 end-to-end gate | [`tasks/OPT-018.md`](tasks/OPT-018.md); [`pins/opt018_ffn_mma_contract.json`](pins/opt018_ffn_mma_contract.json); [`fixtures/opt018_ffn_mma.json`](fixtures/opt018_ffn_mma.json); [`evidence/optimization/opt018-ffn-mma-quality/REPORT.md`](evidence/optimization/opt018-ffn-mma-quality/REPORT.md); verification 2026-09-08T18:55:28Z |
 | OPT-019 | Close residual GDN and attention core time after mixer Q8_0 MMA | OPT-017, OPT-015 | done | After mixer projections are on MMA, remaining non-projection GDN scan/recurrence and causal attention core paths are brought down under frozen GDN/attention envelopes with retained references; live 2K re-attribution shows the residual sinks addressed; does not substitute for the OPT-016 end-to-end gate | [`tasks/OPT-019.md`](tasks/OPT-019.md); [`pins/opt019_core_recovery_contract.json`](pins/opt019_core_recovery_contract.json); [`fixtures/opt019_core_recovery.json`](fixtures/opt019_core_recovery.json); [`evidence/optimization/opt019-gdn-attention-core/REPORT.md`](evidence/optimization/opt019-gdn-attention-core/REPORT.md); verification 2026-09-08T20:54:21Z |
-| OPT-020 | Split 2K attribution into mixer MMQ versus core GDN/attention | OPT-014 | pending | Cold exact-2048 attribution exposes separate mixer-projection MMQ time versus GDN-core and attention-core time (plus existing FFN/logits/commit/graph/idle), reconstructs wall within the OPT-014 tolerance, and is retained for OPT-017–OPT-019 steering; not a throughput gate | — |
+| OPT-020 | Split 2K attribution into mixer MMQ versus core GDN/attention | OPT-014 | done | Cold exact-2048 attribution exposes separate mixer-projection MMQ time versus GDN-core and attention-core time (plus existing FFN/logits/commit/graph/idle), reconstructs wall within the OPT-014 tolerance, and is retained for OPT-017–OPT-019 steering; not a throughput gate | [`tasks/OPT-020.md`](tasks/OPT-020.md); [`pins/opt020_prefill_split_contract.json`](pins/opt020_prefill_split_contract.json); [`fixtures/opt020_prefill_split.json`](fixtures/opt020_prefill_split.json); verification 2026-09-08T21:29:30Z |
 
 ### 2026-09-04T13:09:32Z — OPT-005 delivered
 
@@ -4244,3 +4244,37 @@ are repository-relative unless stated otherwise.
 - Marked OPT-019 `done`; delivery is limited to the verified task scope plus
   this ledger/audit bookkeeping. OPT-016 stays `blocked`. OPT-020 remains
   the next eligible pending by ledger row order.
+
+### 2026-09-08T21:01:34Z — OPT-020 planning admitted
+
+- Planning produced decision-complete dossier [`tasks/OPT-020.md`](tasks/OPT-020.md).
+- Coupled IDs: none. Plan impact `none`. Composite OPT-014 `gdn`/`attention`
+  become exclusive `mixer_mmq`, `gdn_core`, and `attention_core`; historical
+  OPT-014 contract/fixture stay frozen.
+- Marked OPT-020 `in_progress`.
+
+### 2026-09-08T21:29:30Z — OPT-020 delivered
+
+- Independent verification attempt 1 passed. Cold exact-2048 production
+  `sync_tokens` on exclusive RTX 5090 emits exclusive mixer-projection MMQ
+  versus GDN-core and attention-core (plus existing FFN/logits/commit/graph/
+  idle), reconstructs host wall within the frozen remainder tolerance
+  (`rel_tol=1e-4`, `abs_tol_ms=0.05`), and is retained in
+  [`fixtures/opt020_prefill_split.json`](fixtures/opt020_prefill_split.json)
+  (`measurement_utc` 2026-09-08T21:21:53Z; `mixer_mmq` 1200.74377,
+  `gdn_core` 212.581161, `attention_core` 274.870209, `wall_ms` 2089.4812).
+  Historical eight-category contract/fixture stay frozen. Coupled IDs:
+  none. Delivery re-check: `uv run pytest -q tests/test_documentation.py
+  tests/test_opt020_prefill_split.py tests/test_cuda_prefill_attribution.py`
+  passed.
+- Acceptance evidence: [`tasks/OPT-020.md`](tasks/OPT-020.md);
+  [`pins/opt020_prefill_split_contract.json`](pins/opt020_prefill_split_contract.json);
+  [`fixtures/opt020_prefill_split.json`](fixtures/opt020_prefill_split.json);
+  [`cuda/full_scheduler.cu`](cuda/full_scheduler.cu);
+  [`docs/51-runtime-timing-and-nvtx.md`](docs/51-runtime-timing-and-nvtx.md);
+  [`docs/62-cuda-full-prefill.md`](docs/62-cuda-full-prefill.md).
+  Proof is mixer-versus-core instrumentation, not an end-to-end 2K tok/s
+  gate.
+- Marked OPT-020 `done`; delivery is limited to the verified task scope plus
+  this ledger/audit bookkeeping. OPT-016 stays `blocked`. No remaining
+  pending task is dependency-eligible (CMP-001 waits on blocked QLT-001).

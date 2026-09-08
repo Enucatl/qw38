@@ -90,13 +90,15 @@ logits, sampling, graph-launch, state-commit, idle-gap, loading, queueing, and
 persistence categories. It is marked `perturbs_execution: true` and
 `used_for_throughput_summary: false`.
 
-That decode-token probe is not a 2K prefill breakdown. OPT-014's attributed
-prefill report is a separate opt-in `PrefillAttribution` collected on
-production `sync_tokens` and retained in
-[`fixtures/cuda_prefill_attribution.json`](../fixtures/cuda_prefill_attribution.json).
-Default `qw38-bench` throughput samples stay unattributed wall times. Chapter 51
-owns the live 2K categories, remainder other/idle, and the no-Nsight proof
-boundary.
+That decode-token probe is not a 2K prefill breakdown. The historical
+eight-category prefill report and the later nine-category mixer versus core
+split are separate opt-in `PrefillAttribution` records collected on production
+`sync_tokens`, retained in
+[`fixtures/cuda_prefill_attribution.json`](../fixtures/cuda_prefill_attribution.json)
+and [`fixtures/opt020_prefill_split.json`](../fixtures/opt020_prefill_split.json).
+Neither report is a BEN-001 `qw38-bench` result. Default `qw38-bench`
+throughput samples stay unattributed wall times. Chapter 51 owns the live 2K
+categories, remainder other/idle, and the no-Nsight proof boundary.
 
 The 2026-09-08 scaling `llama-bench` JSON
 [`evidence/quality/scaling-2026-09-08/llama-bench-prefill-2k-8k-32k.json`](../evidence/quality/scaling-2026-09-08/llama-bench-prefill-2k-8k-32k.json)
