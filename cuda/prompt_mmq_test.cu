@@ -330,9 +330,11 @@ bool run_q8_exact() {
       }
       cudaMemcpy(device_prompt, prompt.data(),
                  prompt.size() * sizeof(prompt[0]), cudaMemcpyHostToDevice);
-      const cudaError_t produced = qw38::cuda::launch_q8_mmq_bf16(
+      const unsigned tile = qw38::cuda::selected_mmq_prompt_tile(
+          qw38::cuda::QuantKind::kQ8_0, prompt_rows);
+      const cudaError_t produced = qw38::cuda::launch_q8_mmq_bf16_variant(
           device_weights, shape.output_rows, shape.columns, device_prompt,
-          prompt_rows, device_prod, nullptr);
+          prompt_rows, device_prod, tile, nullptr);
       const cudaError_t referenced = qw38::cuda::launch_q8_mmq_bf16_reference(
           device_weights, shape.output_rows, shape.columns, device_prompt,
           prompt_rows, device_ref, nullptr);
@@ -795,16 +797,20 @@ int main(int argc, char** argv) {
   LaunchInfo q6_4096{};
   const cudaError_t cap_q8_64 = capture_mmq(
       [&](cudaStream_t stream) {
-        return qw38::cuda::launch_q8_mmq_bf16(q8_weights, q8_rows, q8_cols,
-                                              q8_prompt, 64, q8_output,
-                                              stream);
+        return qw38::cuda::launch_q8_mmq_bf16_variant(
+            q8_weights, q8_rows, q8_cols, q8_prompt, 64, q8_output,
+            qw38::cuda::selected_mmq_prompt_tile(qw38::cuda::QuantKind::kQ8_0,
+                                                 64),
+            stream);
       },
       q8_rows, &q8_prod_64);
   const cudaError_t cap_q8_4096 = capture_mmq(
       [&](cudaStream_t stream) {
-        return qw38::cuda::launch_q8_mmq_bf16(q8_weights, q8_rows, q8_cols,
-                                              q8_prompt, 4096, q8_output,
-                                              stream);
+        return qw38::cuda::launch_q8_mmq_bf16_variant(
+            q8_weights, q8_rows, q8_cols, q8_prompt, 4096, q8_output,
+            qw38::cuda::selected_mmq_prompt_tile(qw38::cuda::QuantKind::kQ8_0,
+                                                 4096),
+            stream);
       },
       q8_rows, &q8_prod_4096);
   const cudaError_t cap_q8_ref_64 = capture_mmq(

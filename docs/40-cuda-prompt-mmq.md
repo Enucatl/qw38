@@ -1,6 +1,6 @@
 # 40. Tiled CUDA multiplication for prompt rows
 
-[Index](README.md) · Implementation tasks: CUD-002, OPT-009, OPT-015, and EDU-026 in
+[Index](README.md) · Implementation tasks: CUD-002, OPT-009, OPT-015, OPT-017, and EDU-026 in
 [`implementation_ledger.md`](../implementation_ledger.md)
 
 [Chapter 39](39-cuda-quant-mmv.md) multiplied one activation vector by a packed
@@ -64,8 +64,11 @@ row 0 Q8 blocks | row 1 Q8 blocks | row 2 Q8 blocks | ...
 scratch allocation. It returns zero for zero prompt rows or a column count that
 cannot contain whole 256-value Q4_K/Q6_K blocks. The scratch is transient: it is
 not model weight storage, KV history, GDN recurrence, or session state.
-Production Q8_0 prompt rows skip it: OPT-009 multiplies packed Q8_0 weights
-directly by BF16 activations.
+Production Q8_0 prompt rows skip that Q8Block workspace. Tiny prompts
+(`prompt_rows < 8`) still multiply packed Q8_0 weights directly by BF16
+activations on the OPT-009 tiled kernel. MMA production (`prompt_rows >= 8`)
+stages activations to Q8_1 shared memory inside the kernel and still does not
+call `launch_quant_mmq`.
 
 ## Tails are ordinary inputs
 
@@ -125,20 +128,22 @@ capacity, or a speed advantage.
 Production `matrix_prompt` now launches true multi-row tiles instead of rereading
 the packed matrix once per prompt row.
 
-**Q8_0 stays BF16.** SCH-002 introduced a Q8_0-by-BF16 kernel specifically
-because sending those weights through Q8-staged `launch_quant_mmq` changed
-persistent state and logits. That first kernel still mapped `blockIdx.y` to one
-prompt row, so `grid.y` equalled `prompt_rows` and each output-row warp reread
-every weight. OPT-009 moves the row-wise kernel to test-only
-[`launch_q8_mmq_bf16_reference`](../cuda/quant_mmv.cu) and replaces production
-with templated `q8_mmq_bf16_tiled`. A 256-thread block still uses eight warps,
-one warp per output row. `blockIdx.y` now owns a prompt-row tile. For each
-column in the existing lane stride, the warp decodes the Q8_0 weight once and
-applies that scalar to every in-range prompt row with the decode
-`__fmul_rn(weight, __bfloat162float(activation))` and `__fadd_rn` chain. Each
-prompt row is warp-shuffle-reduced independently in the 16…1 order. Token-major
-layout and tail guards are unchanged. Production never requantizes Q8_0
-activations.
+**Q8_0 tiled path stays BF16.** SCH-002 introduced a Q8_0-by-BF16 kernel
+specifically because sending those weights through Q8-staged `launch_quant_mmq`
+changed persistent state and logits. That first kernel still mapped `blockIdx.y`
+to one prompt row, so `grid.y` equalled `prompt_rows` and each output-row warp
+reread every weight. OPT-009 moved the row-wise kernel to test-only
+[`launch_q8_mmq_bf16_reference`](../cuda/quant_mmv.cu) and introduced templated
+`q8_mmq_bf16_tiled` as [`launch_q8_mmq_bf16_variant`](../cuda/quant_mmv.cu). A
+256-thread block still uses eight warps, one warp per output row. `blockIdx.y`
+owns a prompt-row tile. For each column in the existing lane stride, the warp
+decodes the Q8_0 weight once and applies that scalar to every in-range prompt
+row with the decode `__fmul_rn(weight, __bfloat162float(activation))` and
+`__fadd_rn` chain. Each prompt row is warp-shuffle-reduced independently in the
+16…1 order. Token-major layout and tail guards are unchanged. The tiled
+variant never requantizes Q8_0 activations through `launch_quant_mmq`. After
+OPT-017, that variant is the visible unloosened byte-exact reference, not
+production for `prompt_rows >= 8`.
 
 **Q4_K and Q6_K keep the CUD-002 path.** They still stage transient Q8 blocks
 and call `launch_quant_mmq`. OPT-009 only extends the compile-time tiles from
@@ -181,7 +186,7 @@ Q4_K's 4,096-row winner is tile 4 because that tile minimizes the joint sum of
 the two FFN shapes. Tile 8 is faster on `17408 × 5120` alone and is not the
 production choice.
 
-On the retained 2026-09-07 RTX 5090 record, production Q8_0 graphs used
+On the retained 2026-09-07 RTX 5090 OPT-009 record, the tiled Q8_0 graphs used
 `grid.y = ceil(prompt_rows / 4)`: 16 at 64 rows and 1,024 at 4,096 rows. The
 reference graphs used `grid.y = prompt_rows`. Occupancy was at least one active
 block per SM (Q8_0 5, Q4_K 3, Q6_K 2) with 0 compiler-reported local bytes per
@@ -189,8 +194,9 @@ thread. Component means: Q8_0 `12288 × 5120` 64-row 1.12 ms versus reference
 2.59 ms; 256-row 4.62 ms versus 11.79 ms; Q4_K joint 4,096-row selected 614.2 ms
 versus tile-8 706.1 ms.
 
-Q8_0 outputs stay byte-identical to the retained row-wise kernel. Q4_K/Q6_K
-keep the frozen CUD-002 envelope: maximum absolute error `5e-4`, RMS `2.5e-4`,
+`launch_q8_mmq_bf16_variant` outputs stay byte-identical to the retained
+row-wise kernel. That OPT-009 admitting gate is unloosened. Q4_K/Q6_K keep
+the frozen CUD-002 envelope: maximum absolute error `5e-4`, RMS `2.5e-4`,
 exact Q8 staging, and zero non-finites.
 
 **Measured component evidence, OPT-009:** weight-tile reuse, measured SM120
@@ -234,3 +240,64 @@ and not llama.cpp parity:
 [`evidence/optimization/opt015-2k-recovery/REPORT.md`](../evidence/optimization/opt015-2k-recovery/REPORT.md),
 [`pins/opt015_recovery_contract.json`](../pins/opt015_recovery_contract.json),
 and [`fixtures/opt015_recovery.json`](../fixtures/opt015_recovery.json).
+
+## OPT-017 mixer Q8_0 MMA
+
+Production mixer Q8_0 prompt MMQ (`matrix_prompt` → `launch_q8_mmq_bf16`)
+uses an MMA/shared-memory path on `sm_120` when `prompt_rows >= 8`. Smaller
+mixer prompts keep the OPT-009 tiled variant at
+`selected_mmq_prompt_tile(kQ8_0, prompt_rows)`. Decode `q8_mmv_bf16` is
+unchanged. Production Q8_0 still does not go through `launch_quant_mmq` or
+`launch_quant_mmq_mma`.
+
+The MMA kernel reuses the Q4_K/Q6_K geometry: 256 threads, 128 output rows, and
+prompt-tile J in `{32, 64, 128}`. Each K-step of 32 columns is one GGUF Q8_0
+block (34 bytes, FP16 scale, signed int8 values). Activations are staged to
+Q8_1 shared memory with the existing warp-max / 127 rule. That SRAM layout is
+not Quartz `Q8Block` and uses no extra `cudaMalloc`. The integer MMA is
+`mma.sync.aligned.m16n8k32` then `acc += dA * dB * float(C)`. Output remains
+token-major FP32. Partial prompt and output tiles are guarded.
+
+**Visible unloosened OPT-009 references.**
+`launch_q8_mmq_bf16_variant` versus `launch_q8_mmq_bf16_reference` remains
+byte-exact on the existing prompt-row and shape set. Production MMA is not
+memcmp'd to those BF16 kernels. `pins/cuda_prompt_mmq_contract.json`
+`q8_bf16_reference_exact` stays `true`.
+
+**CUD-002 admission versus staged Q8.** MMA is admitted against GPU staged Q8
+MMQ: diagnostic `launch_quant_mmq_variant` with `kQ8_0` and a test-only
+`Q8Block` workspace. Frozen CUD-002 numbers are unchanged: maximum absolute
+error `5e-4`, RMS `2.5e-4`, and zero non-finites. Versus unstaged BF16
+`launch_q8_mmq_bf16_variant` is informational only; INT8 MMA stages activations,
+so that BF16 delta is not a pass/fail gate and is not a loosened envelope.
+
+**Measured, RTX 5090, 2026-09-08:** mixer-shape J sweep at 2048 prompt rows on
+`12288×5120`, `10240×5120`, and `5120×6144` (3 CUDA-event replicates, 0
+warm-ups) pinned `q8_mma_prompt_tile_2048 = 128` with occupancy 2 and
+shape-mean 21.80 ms. Component speed at 2048 rows on `12288×5120`: MMA 8.89 ms
+versus tiled variant 42.97 ms. Worst staged-Q8 envelope on the component cases
+was `gpu_staged_max_abs = 0.000282287598`, `gpu_staged_rms = 7.70256956e-05`,
+zero non-finites.
+
+**Measured remasurement, not the OPT-016 gate:** three cold unperturbed
+exact-2048 Quartz `sync_tokens` replicates mean **375.743988** tok/s (walls
+5453.1001 / 5449.18408 / 5449.27734 ms) versus live llama.cpp `cc83d7b`
+`llama-bench` avg_ts **3203.276277**. `owns_opt016_parity_gate` is false;
+`would_pass_opt016` is informational false. One post-remasurement OPT-014
+attribution reconstructed wall 5383.53369 ms: `ffn_mmq` 2525.01465 ms,
+`gdn` 1647.58936 ms, `attention` 1207.48132 ms. Mixer Q8_0 time stays inside
+`gdn` and `attention` until OPT-020.
+
+**External:** llama.cpp revision `cc83d7b4824f73cfdda4dfbb47ee39804f71b328`
+Q8_0 MMQ MMA in `mmq.cuh`, `mma.cuh`, `mmq-config-ampere.cuh`,
+`mmq-load-tiles.cuh`, and `mmq-vec-dot.cuh` (MIT, The ggml authors). ds4
+`cuda/mmq` is the ggml-free launcher pattern only; it is not vendored and is
+not a same-GGUF baseline.
+
+**Proof boundary:** numeric envelopes unloosened; OPT-009 Q8_0 reference
+remains byte-exact; **OPT-016 remains the parity gate owner**; this is not an
+end-to-end 2K tok/s gate and not an 8K/32K/128K throughput gate. Contract,
+fixture, and report:
+[`pins/opt017_mixer_mma_contract.json`](../pins/opt017_mixer_mma_contract.json),
+[`fixtures/opt017_mixer_mma.json`](../fixtures/opt017_mixer_mma.json), and
+[`evidence/optimization/opt017-mixer-q8-mma/REPORT.md`](../evidence/optimization/opt017-mixer-q8-mma/REPORT.md).

@@ -1,20 +1,23 @@
 # Chunked full-model CUDA prefill
 
-[Index](README.md) · Implementation tasks: SCH-002, MEM-002, OPT-008, OPT-009, OPT-011, OPT-012, OPT-013, OPT-014, OPT-015, and EDU-047 in
+[Index](README.md) · Implementation tasks: SCH-002, MEM-002, OPT-008, OPT-009, OPT-011, OPT-012, OPT-013, OPT-014, OPT-015, OPT-017, and EDU-047 in
 [`implementation_ledger.md`](../implementation_ledger.md) · Contracts:
 [`pins/cuda_prompt_scheduler_contract.json`](../pins/cuda_prompt_scheduler_contract.json),
 [`pins/cuda_prompt_pipeline_contract.json`](../pins/cuda_prompt_pipeline_contract.json),
 [`pins/cuda_prompt_graph_contract.json`](../pins/cuda_prompt_graph_contract.json),
 [`pins/cuda_gdn_scan_contract.json`](../pins/cuda_gdn_scan_contract.json),
 [`pins/cuda_prefill_attribution_contract.json`](../pins/cuda_prefill_attribution_contract.json),
-[`pins/opt015_recovery_contract.json`](../pins/opt015_recovery_contract.json)
+[`pins/opt015_recovery_contract.json`](../pins/opt015_recovery_contract.json),
+[`pins/opt017_mixer_mma_contract.json`](../pins/opt017_mixer_mma_contract.json)
 · Evidence: [`fixtures/cuda_prompt_scheduler.json`](../fixtures/cuda_prompt_scheduler.json),
 [`fixtures/cuda_prompt_pipeline.json`](../fixtures/cuda_prompt_pipeline.json),
 [`fixtures/cuda_prompt_graph.json`](../fixtures/cuda_prompt_graph.json),
 [`fixtures/cuda_gdn_scan.json`](../fixtures/cuda_gdn_scan.json),
 [`fixtures/cuda_prefill_attribution.json`](../fixtures/cuda_prefill_attribution.json),
 [`fixtures/opt015_recovery.json`](../fixtures/opt015_recovery.json),
-[`evidence/optimization/opt015-2k-recovery/REPORT.md`](../evidence/optimization/opt015-2k-recovery/REPORT.md)
+[`fixtures/opt017_mixer_mma.json`](../fixtures/opt017_mixer_mma.json),
+[`evidence/optimization/opt015-2k-recovery/REPORT.md`](../evidence/optimization/opt015-2k-recovery/REPORT.md),
+[`evidence/optimization/opt017-mixer-q8-mma/REPORT.md`](../evidence/optimization/opt017-mixer-q8-mma/REPORT.md)
 
 ## Why prompt execution differs from decode
 
@@ -77,16 +80,27 @@ requantized those activations. The result was numerically close but changed
 persistent state and last logits. The failed `append_vs_fresh` run is retained
 in the ledger.
 
-Quartz therefore keeps a Q8_0-by-BF16 kernel. SCH-002's first version processed
-multiple rows by mapping `blockIdx.y` to one prompt row (`grid.y = prompt_rows`).
-That batched launches without reusing weights: each output-row warp reread the
-entire packed matrix. OPT-009 replaces production with `launch_q8_mmq_bf16`.
-`blockIdx.y` owns a prompt-row tile, one Q8_0 weight is decoded per column, and
-that scalar is applied to every in-range prompt row with the decode
-`__fmul_rn` / `__fadd_rn` walk. Activations stay BF16. The row-wise kernel is
-retained only as `launch_q8_mmq_bf16_reference`. Captured graphs at 64 and 4,096
-prompt rows show production `grid.y` of 16 and 1,024 (selected tile 4) versus
-reference `grid.y` equal to the prompt-row count.
+Quartz therefore keeps a Q8_0-by-BF16 kernel family. SCH-002's first version
+processed multiple rows by mapping `blockIdx.y` to one prompt row
+(`grid.y = prompt_rows`). That batched launches without reusing weights: each
+output-row warp reread the entire packed matrix. OPT-009 introduced
+`launch_q8_mmq_bf16_variant`: `blockIdx.y` owns a prompt-row tile, one Q8_0
+weight is decoded per column, and that scalar is applied to every in-range
+prompt row with the decode `__fmul_rn` / `__fadd_rn` walk. Activations stay
+BF16. The row-wise kernel is retained as `launch_q8_mmq_bf16_reference`.
+Captured OPT-009 graphs at 64 and 4,096 prompt rows show tiled `grid.y` of 16
+and 1,024 (selected tile 4) versus reference `grid.y` equal to the prompt-row
+count.
+
+OPT-017 production `launch_q8_mmq_bf16` dispatches MMA when `prompt_rows >= 8`
+(J=128) and the tiled variant otherwise. Mixer projections listed in
+[`src/weights.cpp`](../src/weights.cpp) (GDN packed_qkv, value_gate, alpha/beta,
+output; attention query_gate, key, value) follow that mixer Q8_0 path.
+Attention output remains Q6_K `launch_quant_mmq`. Production still does not
+send Q8_0 through `launch_quant_mmq` Q8Block staging. MMA is admitted at frozen
+CUD-002 numbers versus diagnostic `launch_quant_mmq_variant` `kQ8_0`, not
+versus the unstaged BF16 tiled kernel. The OPT-009 byte-exact pair stays
+variant versus reference.
 
 The two-token prefix test and the 65-token boundary test then returned
 byte-equal state, hidden output, and logits. OPT-008's `[4096, 1]` exact-state
@@ -352,13 +366,29 @@ it. Artifacts:
 [`pins/opt015_recovery_contract.json`](../pins/opt015_recovery_contract.json),
 and [`fixtures/opt015_recovery.json`](../fixtures/opt015_recovery.json).
 
+OPT-017 admits production mixer Q8_0 MMA behind the existing
+`launch_q8_mmq_bf16` name. **Measured, RTX 5090:** CUD-002 versus
+`launch_quant_mmq_variant` `kQ8_0` stays inside max abs `5e-4` and RMS
+`2.5e-4` with zero non-finites; J is pinned at 128; OPT-009
+variant-versus-reference byte equality is unloosened. A live unperturbed
+exact-2048 remasurement mean was 375.743988 tok/s versus live llama.cpp
+3203.276277 tok/s. Post-remasurement attribution wall 5383.53369 ms had
+`gdn` 1647.58936 ms, `attention` 1207.48132 ms, and `ffn_mmq` 2525.01465 ms.
+**OPT-016 remains the 2K parity owner.** This remasurement is not that gate
+and is not an 8K/32K/128K throughput claim. Artifacts:
+[`evidence/optimization/opt017-mixer-q8-mma/REPORT.md`](../evidence/optimization/opt017-mixer-q8-mma/REPORT.md),
+[`pins/opt017_mixer_mma_contract.json`](../pins/opt017_mixer_mma_contract.json),
+and [`fixtures/opt017_mixer_mma.json`](../fixtures/opt017_mixer_mma.json).
+
 The **proof boundary** excludes comparative speed claims, 2K/8K sustained
 prefill throughput, execution of a 128K prefill, 128K retrieval quality, thermal
 stability, superiority to llama.cpp/vLLM, and a Nsight Systems overlap timeline.
 OPT-014 measures named categories on one cold 2048-token timed run; it does not
 convert that instrumentation into a sustained-prefill or speed admission.
 OPT-015 explains the 2K gap and ranks recoveries; it is not llama.cpp parity
-and not a throughput gate. BEN-001
+and not a throughput gate. OPT-017 records mixer Q8_0 MMA admission plus a
+live exact-2048 remasurement and re-attribution; **OPT-016 remains the parity
+gate owner**. BEN-001
 provides the harness; CMP-002/CMP-003 still own the 30-sample comparative gate.
 QLT-001 remains blocked. OPT-012's prompt graphs are FFN subgraphs only: not a
 whole-chunk graph, not a speedup gate, and not 128K quality recovery.

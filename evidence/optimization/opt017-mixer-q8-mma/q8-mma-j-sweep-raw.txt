@@ -1,0 +1,58 @@
+q8_mma_case=q8_0_mma_8x17x256 prompt_rows=8 output_rows=17 columns=256 tile=128 max_abs=1.32513428 rms=0.461005569 nonfinite=0 staged_max_abs=6.86645508e-05 staged_rms=1.88070317e-05 staged_nonfinite=0 gpu_staged_max_abs=2.28881836e-05 gpu_staged_rms=1.04260134e-05 gpu_staged_nonfinite=0
+q8_mma_case=q8_0_mma_9x17x256 prompt_rows=9 output_rows=17 columns=256 tile=128 max_abs=1.32513428 rms=0.468062282 nonfinite=0 staged_max_abs=6.86645508e-05 staged_rms=1.8965542e-05 staged_nonfinite=0 gpu_staged_max_abs=2.28881836e-05 gpu_staged_rms=1.06917887e-05 gpu_staged_nonfinite=0
+q8_mma_case=q8_0_mma_64x17x256 prompt_rows=64 output_rows=17 columns=256 tile=128 max_abs=1.66461945 rms=0.479499847 nonfinite=0 staged_max_abs=9.91821289e-05 staged_rms=1.93779852e-05 staged_nonfinite=0 gpu_staged_max_abs=4.57763672e-05 gpu_staged_rms=1.14716086e-05 gpu_staged_nonfinite=0
+q8_mma_case=q8_0_mma_65x17x256 prompt_rows=65 output_rows=17 columns=256 tile=128 max_abs=1.66461945 rms=0.483969957 nonfinite=0 staged_max_abs=9.91821289e-05 staged_rms=1.94070235e-05 staged_nonfinite=0 gpu_staged_max_abs=4.57763672e-05 gpu_staged_rms=1.14318709e-05 gpu_staged_nonfinite=0
+q8_mma_case=q8_0_mma_8x1024x5120 prompt_rows=8 output_rows=1024 columns=5120 tile=128 max_abs=5.60675621 rms=1.95541298 nonfinite=0 staged_max_abs=0.000408172607 staged_rms=0.000108266839 staged_nonfinite=0 gpu_staged_max_abs=0.000213623047 gpu_staged_rms=7.53726927e-05 gpu_staged_nonfinite=0
+q8_mma_case=q8_0_mma_9x1024x5120 prompt_rows=9 output_rows=1024 columns=5120 tile=128 max_abs=5.60675621 rms=1.92048728 nonfinite=0 staged_max_abs=0.000408172607 staged_rms=0.000106403713 staged_nonfinite=0 gpu_staged_max_abs=0.00025177002 gpu_staged_rms=7.61499177e-05 gpu_staged_nonfinite=0
+q8_mma_case=q8_0_mma_64x1024x5120 prompt_rows=64 output_rows=1024 columns=5120 tile=128 max_abs=7.06074333 rms=2.18841648 nonfinite=0 staged_max_abs=0.000679016113 staged_rms=0.000108441964 staged_nonfinite=0 gpu_staged_max_abs=0.000282287598 gpu_staged_rms=7.7024124e-05 gpu_staged_nonfinite=0
+q8_mma_case=q8_0_mma_65x1024x5120 prompt_rows=65 output_rows=1024 columns=5120 tile=128 max_abs=9.15351868 rms=2.258744 nonfinite=0 staged_max_abs=0.000679016113 staged_rms=0.000108359913 staged_nonfinite=0 gpu_staged_max_abs=0.000282287598 gpu_staged_rms=7.70256956e-05 gpu_staged_nonfinite=0
+q8_mma_case=q8_0_mma_9x48x256 prompt_rows=9 output_rows=48 columns=256 tile=128 max_abs=1.32513428 rms=0.463562459 nonfinite=0 staged_max_abs=6.86645508e-05 staged_rms=1.74074521e-05 staged_nonfinite=0 gpu_staged_max_abs=3.81469727e-05 gpu_staged_rms=1.11880572e-05 gpu_staged_nonfinite=0
+q8_mma_admission_reference=launch_quant_mmq_variant_kQ8_0 q8_mma_bf16_delta=informational_only
+q8_mma_case=q8_0_mma_elig_8x17x256 prompt_rows=8 output_rows=17 columns=256 tile=32 max_abs=1.32513428 rms=0.461005569 nonfinite=0 staged_max_abs=6.86645508e-05 staged_rms=1.88070317e-05 staged_nonfinite=0 gpu_staged_max_abs=2.28881836e-05 gpu_staged_rms=1.04260134e-05 gpu_staged_nonfinite=0
+q8_mma_tune output_rows=12288 columns=5120 prompt_rows=2048 tile=32 sample=0 ms=16.8226242 occupancy=2
+q8_mma_tune output_rows=12288 columns=5120 prompt_rows=2048 tile=32 sample=1 ms=16.8756809 occupancy=2
+q8_mma_tune output_rows=12288 columns=5120 prompt_rows=2048 tile=32 sample=2 ms=16.8731194 occupancy=2
+q8_mma_tune_mean output_rows=12288 columns=5120 prompt_rows=2048 tile=32 mean_ms=16.8571415 occupancy=2 nonfinite=0
+q8_mma_tune output_rows=10240 columns=5120 prompt_rows=2048 tile=32 sample=0 ms=14.1231041 occupancy=2
+q8_mma_tune output_rows=10240 columns=5120 prompt_rows=2048 tile=32 sample=1 ms=14.1515198 occupancy=2
+q8_mma_tune output_rows=10240 columns=5120 prompt_rows=2048 tile=32 sample=2 ms=14.1474562 occupancy=2
+q8_mma_tune_mean output_rows=10240 columns=5120 prompt_rows=2048 tile=32 mean_ms=14.1406937 occupancy=2 nonfinite=0
+q8_mma_tune output_rows=5120 columns=6144 prompt_rows=2048 tile=32 sample=0 ms=12.7524481 occupancy=2
+q8_mma_tune output_rows=5120 columns=6144 prompt_rows=2048 tile=32 sample=1 ms=12.7523842 occupancy=2
+q8_mma_tune output_rows=5120 columns=6144 prompt_rows=2048 tile=32 sample=2 ms=12.7864323 occupancy=2
+q8_mma_tune_mean output_rows=5120 columns=6144 prompt_rows=2048 tile=32 mean_ms=12.7637558 occupancy=2 nonfinite=0
+q8_mma_tune_shape_mean tile=32 mean_ms=43.7615891 occupancy=2 eligible=true
+q8_mma_case=q8_0_mma_elig_8x17x256 prompt_rows=8 output_rows=17 columns=256 tile=64 max_abs=1.32513428 rms=0.461005569 nonfinite=0 staged_max_abs=6.86645508e-05 staged_rms=1.88070317e-05 staged_nonfinite=0 gpu_staged_max_abs=2.28881836e-05 gpu_staged_rms=1.04260134e-05 gpu_staged_nonfinite=0
+q8_mma_tune output_rows=12288 columns=5120 prompt_rows=2048 tile=64 sample=0 ms=11.0913916 occupancy=2
+q8_mma_tune output_rows=12288 columns=5120 prompt_rows=2048 tile=64 sample=1 ms=11.0925436 occupancy=2
+q8_mma_tune output_rows=12288 columns=5120 prompt_rows=2048 tile=64 sample=2 ms=11.1356802 occupancy=2
+q8_mma_tune_mean output_rows=12288 columns=5120 prompt_rows=2048 tile=64 mean_ms=11.1065378 occupancy=2 nonfinite=0
+q8_mma_tune output_rows=10240 columns=5120 prompt_rows=2048 tile=64 sample=0 ms=9.39216042 occupancy=2
+q8_mma_tune output_rows=10240 columns=5120 prompt_rows=2048 tile=64 sample=1 ms=9.34943962 occupancy=2
+q8_mma_tune output_rows=10240 columns=5120 prompt_rows=2048 tile=64 sample=2 ms=9.4017601 occupancy=2
+q8_mma_tune_mean output_rows=10240 columns=5120 prompt_rows=2048 tile=64 mean_ms=9.38111973 occupancy=2 nonfinite=0
+q8_mma_tune output_rows=5120 columns=6144 prompt_rows=2048 tile=64 sample=0 ms=7.86153603 occupancy=2
+q8_mma_tune output_rows=5120 columns=6144 prompt_rows=2048 tile=64 sample=1 ms=7.901824 occupancy=2
+q8_mma_tune output_rows=5120 columns=6144 prompt_rows=2048 tile=64 sample=2 ms=7.89328003 occupancy=2
+q8_mma_tune_mean output_rows=5120 columns=6144 prompt_rows=2048 tile=64 mean_ms=7.88554621 occupancy=2 nonfinite=0
+q8_mma_tune_shape_mean tile=64 mean_ms=28.3732033 occupancy=2 eligible=true
+q8_mma_case=q8_0_mma_elig_8x17x256 prompt_rows=8 output_rows=17 columns=256 tile=128 max_abs=1.32513428 rms=0.461005569 nonfinite=0 staged_max_abs=6.86645508e-05 staged_rms=1.88070317e-05 staged_nonfinite=0 gpu_staged_max_abs=2.28881836e-05 gpu_staged_rms=1.04260134e-05 gpu_staged_nonfinite=0
+q8_mma_tune output_rows=12288 columns=5120 prompt_rows=2048 tile=128 sample=0 ms=8.86614418 occupancy=2
+q8_mma_tune output_rows=12288 columns=5120 prompt_rows=2048 tile=128 sample=1 ms=8.84547234 occupancy=2
+q8_mma_tune output_rows=12288 columns=5120 prompt_rows=2048 tile=128 sample=2 ms=8.86796761 occupancy=2
+q8_mma_tune_mean output_rows=12288 columns=5120 prompt_rows=2048 tile=128 mean_ms=8.85986137 occupancy=2 nonfinite=0
+q8_mma_tune output_rows=10240 columns=5120 prompt_rows=2048 tile=128 sample=0 ms=7.29167986 occupancy=2
+q8_mma_tune output_rows=10240 columns=5120 prompt_rows=2048 tile=128 sample=1 ms=7.30233622 occupancy=2
+q8_mma_tune output_rows=10240 columns=5120 prompt_rows=2048 tile=128 sample=2 ms=7.2881279 occupancy=2
+q8_mma_tune_mean output_rows=10240 columns=5120 prompt_rows=2048 tile=128 mean_ms=7.29404831 occupancy=2 nonfinite=0
+q8_mma_tune output_rows=5120 columns=6144 prompt_rows=2048 tile=128 sample=0 ms=5.6332159 occupancy=2
+q8_mma_tune output_rows=5120 columns=6144 prompt_rows=2048 tile=128 sample=1 ms=5.62422419 occupancy=2
+q8_mma_tune output_rows=5120 columns=6144 prompt_rows=2048 tile=128 sample=2 ms=5.62150383 occupancy=2
+q8_mma_tune_mean output_rows=5120 columns=6144 prompt_rows=2048 tile=128 mean_ms=5.62631464 occupancy=2 nonfinite=0
+q8_mma_tune_shape_mean tile=128 mean_ms=21.7802238 occupancy=2 eligible=true
+q8_mma_prompt_tile_2048=128 mean_ms=21.7802238 pinned=128 occupancy=2
+q8_mma_tune output_rows=12288 columns=5120 prompt_rows=2048 tile=128 sample=0 ms=8.92764759 occupancy=2
+q8_mma_tune output_rows=12288 columns=5120 prompt_rows=2048 tile=128 sample=1 ms=8.81203175 occupancy=2
+q8_mma_tune output_rows=12288 columns=5120 prompt_rows=2048 tile=128 sample=2 ms=8.82140827 occupancy=2
+q8_mma_tune_mean output_rows=12288 columns=5120 prompt_rows=2048 tile=128 mean_ms=8.85369587 occupancy=2 nonfinite=0
+q8_mma_speed_2048_12288x5120 mma_ms=8.85369587 variant_ms=42.9801064 occupancy=2

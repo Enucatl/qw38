@@ -1,13 +1,18 @@
 #pragma once
 
-// Q4_K / Q6_K prompt MMQ with Ampere-style MMA tiles for Quartz OPT-016.
-// Geometry: 256 threads, 128 output rows per block, prompt tile J in
-// {32, 64, 128} (llama.cpp Ampere J set intersected with sm_120 shared
-// memory). Internal activation staging is llama.cpp Q8_1 in shared memory
-// from token-major BF16; this layout is not Quartz Q8Block and uses no extra
-// cudaMalloc. Output is token-major FP32 [prompt_rows, output_rows].
+// Q4_K / Q6_K / Q8_0 prompt MMQ with Ampere-style MMA tiles for Quartz
+// OPT-016 (Q4_K/Q6_K) and OPT-017 (mixer Q8_0). Geometry: 256 threads,
+// 128 output rows per block, prompt tile J in {32, 64, 128} (llama.cpp
+// Ampere J set intersected with sm_120 shared memory). Internal activation
+// staging is llama.cpp Q8_1 in shared memory from token-major BF16; this
+// layout is not Quartz Q8Block and uses no extra cudaMalloc. Output is
+// token-major FP32 [prompt_rows, output_rows]. Q8_0 uses GGUF 34-byte /
+// 32-value blocks (FP16 scale, signed int8 values); each K-step of 32
+// columns is one block. Production Q8_0 is launched via launch_q8_mmq_mma,
+// not launch_quant_mmq.
 //
-// Provenance: llama.cpp mmq.cuh / mma.cuh / mmq-config-ampere.cuh at
+// Provenance: llama.cpp mmq.cuh / mma.cuh / mmq-config-ampere.cuh /
+// mmq-load-tiles.cuh / mmq-vec-dot.cuh at
 // cc83d7b4824f73cfdda4dfbb47ee39804f71b328 (MIT, The ggml authors).
 // ds4 cuda/mmq is the ggml-free launcher pattern only; this file does not
 // copy ../ds4/cuda/mmq/ and does not include ggml headers.
@@ -26,7 +31,9 @@ constexpr int kMmaOutputRows = 128;
 constexpr int kMmaK = 32;
 constexpr std::size_t kMmaQ4Bytes = 144;
 constexpr std::size_t kMmaQ6Bytes = 210;
+constexpr std::size_t kMmaQ8Bytes = 34;
 constexpr std::size_t kMmaBlockValues = 256;
+constexpr std::size_t kMmaQ8Values = 32;
 
 __device__ float mma_read_half(const std::uint8_t* bytes) {
   const unsigned short bits = static_cast<unsigned short>(bytes[0]) |
@@ -67,6 +74,16 @@ __device__ void mma_decode_q4_group32(const std::uint8_t* block, int index0,
   }
   *d_scale = mma_read_half(block) * static_cast<float>(scale);
   *neg_dmin = -mma_read_half(block + 2) * static_cast<float>(minimum);
+}
+
+__device__ void mma_decode_q8_group32(const std::uint8_t* block, int values[32],
+                                      float* d_scale) {
+  *d_scale = mma_read_half(block);
+#pragma unroll
+  for (int lane = 0; lane < 32; ++lane) {
+    values[lane] =
+        static_cast<int>(static_cast<std::int8_t>(block[2 + lane]));
+  }
 }
 
 __device__ void mma_decode_q6_group32(const std::uint8_t* block, int index0,
@@ -131,8 +148,12 @@ __global__ void __launch_bounds__(kMmaThreads, 2)
   const std::size_t prompt0 =
       static_cast<std::size_t>(blockIdx.y) * PromptTile;
   constexpr std::size_t kWeightBytes =
-      Kind == QuantKind::kQ4K ? kMmaQ4Bytes : kMmaQ6Bytes;
-  const std::size_t row_stride = (columns / kMmaBlockValues) * kWeightBytes;
+      Kind == QuantKind::kQ4K ? kMmaQ4Bytes
+      : Kind == QuantKind::kQ6K ? kMmaQ6Bytes
+                               : kMmaQ8Bytes;
+  constexpr std::size_t kWeightValues =
+      Kind == QuantKind::kQ8_0 ? kMmaQ8Values : kMmaBlockValues;
+  const std::size_t row_stride = (columns / kWeightValues) * kWeightBytes;
 
   float acc[kNTiles][4];
 #pragma unroll
@@ -152,12 +173,15 @@ __global__ void __launch_bounds__(kMmaThreads, 2)
     if (global_row < output_rows) {
       const std::uint8_t* block =
           weights + global_row * row_stride +
-          (k / kMmaBlockValues) * kWeightBytes;
-      const int within = static_cast<int>(k % kMmaBlockValues);
-      if constexpr (Kind == QuantKind::kQ4K) {
-        mma_decode_q4_group32(block, within, decoded, &d_scale, &neg_dmin);
+          (k / kWeightValues) * kWeightBytes;
+      if constexpr (Kind == QuantKind::kQ8_0) {
+        mma_decode_q8_group32(block, decoded, &d_scale);
+      } else if constexpr (Kind == QuantKind::kQ4K) {
+        mma_decode_q4_group32(block, static_cast<int>(k % kWeightValues),
+                              decoded, &d_scale, &neg_dmin);
       } else {
-        mma_decode_q6_group32(block, within, decoded, q6_scales);
+        mma_decode_q6_group32(block, static_cast<int>(k % kWeightValues),
+                              decoded, q6_scales);
       }
     } else {
 #pragma unroll
@@ -220,19 +244,7 @@ __global__ void __launch_bounds__(kMmaThreads, 2)
         const int j = mma::tile8x8_j(lane, l);
         B[l] = y_qs[(nt * 8 + n) * 8 + j];
       }
-      if constexpr (Kind == QuantKind::kQ4K) {
-        int C[4] = {0, 0, 0, 0};
-        mma::mma_m16n8k32_s8(C, A, B);
-#pragma unroll
-        for (int l = 0; l < 4; ++l) {
-          const int i = mma::tile16x8_i(lane, l);
-          const int j = mma::tile16x8_j(lane, l);
-          const float2 dmA = x_dm[row0 + i];
-          const float2 dsB = y_ds[nt * 8 + j];
-          acc[nt][l] += dmA.x * dsB.x * static_cast<float>(C[l]) +
-                        dmA.y * dsB.y;
-        }
-      } else {
+      if constexpr (Kind == QuantKind::kQ6K) {
         int A0[2];
         int A1[2];
         {
@@ -257,6 +269,22 @@ __global__ void __launch_bounds__(kMmaThreads, 2)
           const float2 dsB = y_ds[nt * 8 + j];
           acc[nt][l] += dsB.x * (sc.x * static_cast<float>(C0[l]) +
                                  sc.y * static_cast<float>(C1[l]));
+        }
+      } else {
+        int C[4] = {0, 0, 0, 0};
+        mma::mma_m16n8k32_s8(C, A, B);
+#pragma unroll
+        for (int l = 0; l < 4; ++l) {
+          const int i = mma::tile16x8_i(lane, l);
+          const int j = mma::tile16x8_j(lane, l);
+          const float2 dmA = x_dm[row0 + i];
+          const float2 dsB = y_ds[nt * 8 + j];
+          if constexpr (Kind == QuantKind::kQ8_0) {
+            acc[nt][l] += dmA.x * dsB.x * static_cast<float>(C[l]);
+          } else {
+            acc[nt][l] += dmA.x * dsB.x * static_cast<float>(C[l]) +
+                          dmA.y * dsB.y;
+          }
         }
       }
     }
@@ -377,6 +405,59 @@ cudaError_t launch_quant_mmq_mma_tile(
   }
   return launch_mma_tile<QuantKind::kQ6K, 64>(
       weights, output_rows, columns, prompt, prompt_rows, output, stream);
+}
+
+unsigned int selected_q8_mma_mmq_prompt_tile() noexcept { return 128U; }
+
+int q8_mma_mmq_occupancy(unsigned int prompt_tile) noexcept {
+  int occupancy = 0;
+  cudaError_t error = cudaErrorInvalidValue;
+  if (prompt_tile == 32) {
+    error = cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+        &occupancy, quant_mmq_mma_kernel<QuantKind::kQ8_0, 32>, kMmaThreads,
+        mma_mmq_shared_bytes(32));
+  } else if (prompt_tile == 64) {
+    error = cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+        &occupancy, quant_mmq_mma_kernel<QuantKind::kQ8_0, 64>, kMmaThreads,
+        mma_mmq_shared_bytes(64));
+  } else if (prompt_tile == 128) {
+    error = cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+        &occupancy, quant_mmq_mma_kernel<QuantKind::kQ8_0, 128>, kMmaThreads,
+        mma_mmq_shared_bytes(128));
+  }
+  return error == cudaSuccess ? occupancy : 0;
+}
+
+cudaError_t launch_q8_mmq_mma_tile(
+    const std::uint8_t* weights, std::size_t output_rows, std::size_t columns,
+    const __nv_bfloat16* prompt, std::size_t prompt_rows, float* output,
+    unsigned int prompt_tile, cudaStream_t stream) noexcept {
+  if (weights == nullptr || prompt == nullptr || output == nullptr ||
+      output_rows == 0 || columns == 0 || prompt_rows == 0 ||
+      columns % kMmaQ8Values != 0 ||
+      (prompt_tile != 32 && prompt_tile != 64 && prompt_tile != 128)) {
+    return cudaErrorInvalidValue;
+  }
+  if (prompt_tile == 32) {
+    return launch_mma_tile<QuantKind::kQ8_0, 32>(
+        weights, output_rows, columns, prompt, prompt_rows, output, stream);
+  }
+  if (prompt_tile == 128) {
+    return launch_mma_tile<QuantKind::kQ8_0, 128>(
+        weights, output_rows, columns, prompt, prompt_rows, output, stream);
+  }
+  return launch_mma_tile<QuantKind::kQ8_0, 64>(
+      weights, output_rows, columns, prompt, prompt_rows, output, stream);
+}
+
+cudaError_t launch_q8_mmq_mma(const std::uint8_t* weights,
+                              std::size_t output_rows, std::size_t columns,
+                              const __nv_bfloat16* prompt,
+                              std::size_t prompt_rows, float* output,
+                              cudaStream_t stream) noexcept {
+  return launch_q8_mmq_mma_tile(weights, output_rows, columns, prompt,
+                                prompt_rows, output,
+                                selected_q8_mma_mmq_prompt_tile(), stream);
 }
 
 }  // namespace qw38::cuda

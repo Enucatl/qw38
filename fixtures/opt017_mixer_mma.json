@@ -1,0 +1,81 @@
+{
+  "schema_version": 1,
+  "task": "OPT-017",
+  "status": "measured",
+  "measurement_utc": "2026-09-08T14:31:04Z",
+  "device": "NVIDIA GeForce RTX 5090",
+  "compute_capability": "12.0",
+  "llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+  "gguf_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+  "q8_0_production": "mma_for_prompt_rows_ge_8",
+  "q8_mma_prompt_tile_2048": 128,
+  "owns_opt016_parity_gate": false,
+  "opt016_status": "blocked",
+  "envelopes_unloosened": true,
+  "quartz": {
+    "prompt_tokens": 2048,
+    "replicates": 3,
+    "wall_ms": [
+      5451.81201,
+      5454.271,
+      5453.04346
+    ],
+    "tok_s": [
+      375.654907,
+      375.485565,
+      375.570099
+    ],
+    "mean_tok_s": 375.57019,
+    "cold": true,
+    "cache_policy": "disabled",
+    "attribution": null
+  },
+  "llama_cpp": {
+    "avg_ts": 3208.29056,
+    "avg_ns": 638437427,
+    "n_prompt": 2048,
+    "n_ubatch": 512,
+    "flash_attn": -1,
+    "build_commit": "cc83d7b",
+    "test_time": "2026-09-08T14:30:58Z"
+  },
+  "would_pass_opt016": false,
+  "attribution": {
+    "schema_version": 1,
+    "task": "OPT-014",
+    "status": "measured",
+    "device": "NVIDIA GeForce RTX 5090",
+    "compute_capability": "12.0",
+    "driver": "13.1",
+    "runtime": "13.0",
+    "toolkit": "CUDA 13.0.2",
+    "pinned_image": "qw38-cuda:13.0.2",
+    "measurement_utc": "2026-09-08T14:31:30Z",
+    "prompt_tokens": 2048,
+    "evaluated_tokens": 2048,
+    "chunk_count": 1,
+    "prompt_graph_launches": 0,
+    "cold": true,
+    "cache_policy": "disabled",
+    "categories_ms": {
+      "embedding": 0.0675840005,
+      "gdn": 1646.56665,
+      "attention": 1208.98462,
+      "ffn_mmq": 2524.67725,
+      "logits": 2.40710402,
+      "commit_sync": 0.581023991,
+      "graph": 0,
+      "other_idle": 0.457519531
+    },
+    "attributed_sum_ms": 5383.7417,
+    "wall_ms": 5383.7417,
+    "tok_s": 380.404572,
+    "nsight_systems": "not_used",
+    "nsight_compute": "not_used",
+    "proof_limit": "live CUDA-event attribution; 2048-token cold prefill; no Nsight capture; not a throughput gate; not llama.cpp parity"
+  },
+  "nsight_systems": "not_used",
+  "nsight_compute": "not_used",
+  "proof_limit": "envelopes unloosened; OPT-009 Q8_0 reference remains byte-exact; OPT-016 remains the parity gate owner; not an end-to-end 2K tok/s gate; no 8K/32K/128K throughput gate",
+  "report_path": "evidence/optimization/opt017-mixer-q8-mma/REPORT.md"
+}

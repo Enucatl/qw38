@@ -22,9 +22,11 @@ setup for a small row count but cannot reuse each weight tile across many rows.
 An **MMQ** kernel computes a matrix times a matrix. It spends more effort
 tiling, but a weight tile can serve many prompt rows and often maps to tensor
 cores. The names describe the operation, not a promise that one is always
-faster. Quartz production Q4_K/Q6_K prompt MMQ is still scalar FMA
-(`__fmul_rn`/`__fadd_rn` weight-tile reuse). Tensor-core **MMA** is a later
-kernel family, not the admitted path.
+faster. Quartz production Q4_K/Q6_K prompt MMQ uses tensor-core MMA for
+`prompt_rows >= 8`. Mixer Q8_0 prompt MMQ also uses MMA for `prompt_rows >= 8`
+(OPT-017). Decode stays MMV. Tiny mixer prompts keep the OPT-009 tiled
+`__fmul_rn`/`__fadd_rn` kernel. MMA here is Measured component recovery, not
+the OPT-016 2K llama.cpp parity gate.
 
 For a decode projection, all output threads need the same input vector but
 different weight rows. A useful MMV kernel keeps pieces of the input available
@@ -107,6 +109,16 @@ tok/s versus that revision's scaling `llama-bench` 2K mean 3114.049476 tok/s.
 provenance, keeping the CUD-002 reference and frozen envelope. That map is not
 a 2K throughput gate and not llama.cpp parity:
 [`evidence/optimization/opt015-2k-recovery/REPORT.md`](../evidence/optimization/opt015-2k-recovery/REPORT.md).
+
+## Mixer Q8_0 MMA (OPT-017)
+
+**Measured, RTX 5090:** production mixer Q8_0 prompt MMQ is MMA at J=128 when
+`prompt_rows >= 8`. CUD-002 versus `launch_quant_mmq_variant` `kQ8_0` stays at
+max abs `5e-4` / RMS `2.5e-4` with zero non-finites. OPT-009 tiled-versus-row-wise
+byte equality is unloosened. Live exact-2048 remasurement mean 375.743988 tok/s
+versus llama.cpp 3203.276277 tok/s is recorded and is **not** the OPT-016 gate.
+**OPT-016 remains the parity gate owner.** Report:
+[`evidence/optimization/opt017-mixer-q8-mma/REPORT.md`](../evidence/optimization/opt017-mixer-q8-mma/REPORT.md).
 
 ## DwarfStar transfer boundary
 

@@ -221,14 +221,13 @@ def validate_result(result: Any) -> None:
             tile = launch["selected_tile"]
             if launch["kernel_nodes"] == 1:
                 mma_tile = 128
-                assert launch["grid"][1] == (
-                    launch["prompt_rows"] + mma_tile - 1
-                ) // mma_tile
+                assert (
+                    launch["grid"][1]
+                    == (launch["prompt_rows"] + mma_tile - 1) // mma_tile
+                )
             else:
                 assert launch["kernel_nodes"] == 2
-                assert launch["grid"][1] == (
-                    launch["prompt_rows"] + tile - 1
-                ) // tile
+                assert launch["grid"][1] == (launch["prompt_rows"] + tile - 1) // tile
     for kind in ("q8_0", "q4_k", "q6_k"):
         attributes = result["kernel_attributes"][kind]
         assert attributes["registers"] > 0

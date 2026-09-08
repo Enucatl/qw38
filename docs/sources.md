@@ -367,6 +367,27 @@ baseline.
   The 2K comparison and ranked map are
   [`docs/62-cuda-full-prefill.md`](62-cuda-full-prefill.md).
   Proof limit: not a throughput gate, not llama.cpp parity.
+- OPT-017 adapts llama.cpp revision
+  `cc83d7b4824f73cfdda4dfbb47ee39804f71b328` (MIT, The ggml authors) Q8_0 MMQ
+  MMA from `mmq.cuh`, `mma.cuh`, `mmq-config-ampere.cuh`, `mmq-load-tiles.cuh`,
+  and `mmq-vec-dot.cuh`. Geometry is 256 threads × 128 output rows × J in
+  `{32, 64, 128}` with Q8_1 shared-memory staging and
+  `mma.sync.aligned.m16n8k32`. ds4 `cuda/mmq` is the ggml-free launcher pattern
+  only; this increment does not copy `../ds4/cuda/mmq/` and does not include
+  ggml headers. Production mixer Q8_0 uses `launch_q8_mmq_mma` behind
+  `launch_q8_mmq_bf16` when `prompt_rows >= 8`; it does not route Q8_0 through
+  `launch_quant_mmq`. The OPT-009 tiled kernel remains the unloosened
+  byte-exact reference versus `launch_q8_mmq_bf16_reference`. MMA numeric
+  admission is frozen CUD-002 versus diagnostic `launch_quant_mmq_variant`
+  `kQ8_0`. The schema-1 contract, measured fixture, and report are
+  [`pins/opt017_mixer_mma_contract.json`](../pins/opt017_mixer_mma_contract.json),
+  [`fixtures/opt017_mixer_mma.json`](../fixtures/opt017_mixer_mma.json), and
+  [`evidence/optimization/opt017-mixer-q8-mma/REPORT.md`](../evidence/optimization/opt017-mixer-q8-mma/REPORT.md).
+  The beginner explanation is
+  [`docs/40-cuda-prompt-mmq.md`](40-cuda-prompt-mmq.md).
+  Proof limit: envelopes unloosened; OPT-009 Q8_0 reference remains
+  byte-exact; OPT-016 remains the parity gate owner; not an end-to-end 2K
+  tok/s gate; no 8K/32K/128K throughput gate.
 - CUD-003 introduces no new external implementation source. GGUF Q8_0 decoding
   follows the format already admitted by the pinned scalar decoder, and the
   pointwise/layout equations come from the pinned model contract and scalar
@@ -452,7 +473,7 @@ baseline.
   OPT-009 supersedes production MMQ prompt-tile selection and does not mutate
   the OPT-004 contract or fixture.
 - OPT-009 introduces no new external implementation source. It does not copy
-  llama.cpp, DwarfStar, or cuBLAS GEMM. Production Q8_0 prompt MMQ keeps the
+  llama.cpp, DwarfStar, or cuBLAS GEMM. The tiled Q8_0 path keeps the
   local decode `q8_mmv_bf16` multiply, `__fadd_rn` / `__fmul_rn` column walk,
   and warp shuffle reduction, applied independently to each prompt row inside a
   CUD-002-style weight-reusing tile. Q4_K/Q6_K remain on the admitted
@@ -465,7 +486,9 @@ baseline.
   every sweep sample in
   [`evidence/profiling/opt009-mmq-tile-sweep-raw.txt`](../evidence/profiling/opt009-mmq-tile-sweep-raw.txt).
   The proof is component-only: it is not an end-to-end speedup or 128K quality
-  claim. The beginner explanation is
+  claim. After OPT-017, this fixture remains the tiled-versus-reference
+  authority; production mixer Q8_0 MMA is a later increment. The beginner
+  explanation is
   [`docs/40-cuda-prompt-mmq.md`](40-cuda-prompt-mmq.md).
 - CLI-001 and EDU-041 use no copied implementation. The public CUDA runtime,
   inverse tokenizer byte map, incremental chat suffix, seeded sampler, and
@@ -544,7 +567,10 @@ baseline.
   or Nsight claim. OPT-015 later cites that 2K attribution plus the scaling
   `llama-bench` 2K JSON as a host-tested recovery map; that increment is
   documented separately and is not a throughput gate or llama.cpp parity
-  claim. Exact
+  claim. OPT-017 later admits production mixer Q8_0 MMA behind
+  `launch_q8_mmq_bf16` for `prompt_rows >= 8`, keeping the OPT-009 tiled kernel
+  as the unloosened byte-exact reference; that increment is documented separately,
+  is Measured component recovery, and is not the OPT-016 2K parity gate. Exact
   `[4096, 1]` differential, capacity fallback, cancellation, and memory
   evidence is authenticated in
   [`pins/cuda_prompt_scheduler_contract.json`](../pins/cuda_prompt_scheduler_contract.json)
