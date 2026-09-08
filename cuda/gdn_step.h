@@ -24,6 +24,7 @@ struct GdnState {
 enum class GdnScanPath : std::uint8_t {
   kSequentialWindows = 0,
   kParallelAssociative = 1,
+  kFusedTokenLoop = 2,
 };
 
 std::size_t gdn_convolution_channels(const GdnConfig& config) noexcept;

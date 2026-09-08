@@ -461,6 +461,42 @@ int main() {
     envelope.prepare_atomic = committed_unchanged(
         seq_committed_conv, seq_committed_rec, initial_convolution,
         initial_recurrent, frontier);
+    error = restore_committed(&device, initial_convolution, initial_recurrent);
+    if (error == cudaSuccess) {
+      error = launch_path(config, device, token_count,
+                           qw38::cuda::GdnScanPath::kFusedTokenLoop, tiled,
+                           nullptr);
+    }
+    if (error == cudaSuccess) error = cudaDeviceSynchronize();
+    std::vector<float> fused_cconv(convolution_values),
+        fused_crec(recurrent_values), fused_conv(token_count * channels),
+        fused_rec(token_count * output_values);
+    std::uint64_t fused_frontier = 0;
+    std::vector<float> fused_committed_conv(convolution_values),
+        fused_committed_rec(recurrent_values);
+    if (error == cudaSuccess) {
+      error = read_outputs(device, &fused_cconv, &fused_crec, &fused_conv,
+                           &fused_rec, &fused_committed_conv,
+                           &fused_committed_rec, &fused_frontier);
+    }
+    Envelope fused_vs_seq;
+    if (error == cudaSuccess) {
+      compare_four(fused_conv, fused_rec, fused_cconv, fused_crec, seq_conv,
+                   seq_rec, seq_cconv, seq_crec, &fused_vs_seq);
+      envelope.max_abs = std::max(envelope.max_abs, fused_vs_seq.max_abs);
+      envelope.rms = std::max(envelope.rms, fused_vs_seq.rms);
+      envelope.nonfinite += fused_vs_seq.nonfinite;
+      envelope.prepare_atomic =
+          envelope.prepare_atomic &&
+          committed_unchanged(fused_committed_conv, fused_committed_rec,
+                              initial_convolution, initial_recurrent,
+                              fused_frontier);
+    } else {
+      envelope.passed = false;
+      fail_cuda(name, error);
+      release(&device);
+      return envelope;
+    }
     if (want_tokenwise) {
       error = restore_committed(&device, initial_convolution, initial_recurrent);
       for (std::size_t token = 0; token < token_count && error == cudaSuccess;
@@ -840,7 +876,7 @@ int main() {
       qw38::cuda::GdnScanPath::kParallelAssociative, fail_buffers.scratch,
       qw38::cuda::gdn_scan_scratch_floats(small, 8), 0, false);
   const bool fail_invalid_path = fail_closed_case(
-      static_cast<qw38::cuda::GdnScanPath>(2), fail_buffers.scratch,
+      static_cast<qw38::cuda::GdnScanPath>(3), fail_buffers.scratch,
       qw38::cuda::gdn_scan_scratch_floats(small, 8), 8, false);
   const bool fail_closed_ok = fail_null_scratch && fail_zero_scratch &&
                               fail_alias && fail_zero_tokens &&
@@ -920,6 +956,67 @@ int main() {
     } else {
       fail_cuda("speedup", error);
     }
+  }
+
+  float fused_mean = 0.0F;
+  float fused_seq_mean = 0.0F;
+  float fused_par_mean = 0.0F;
+  bool fused_faster = false;
+  {
+    cudaEvent_t start = nullptr;
+    cudaEvent_t stop = nullptr;
+    error = restore_committed(&geometry, g_conv, g_rec);
+    if (error == cudaSuccess) error = cudaEventCreate(&start);
+    if (error == cudaSuccess) error = cudaEventCreate(&stop);
+    auto time_path2048 = [&](qw38::cuda::GdnScanPath path, float* milliseconds) {
+      cudaError_t timed = restore_committed(&geometry, g_conv, g_rec);
+      if (timed == cudaSuccess) timed = cudaEventRecord(start);
+      if (timed == cudaSuccess) {
+        timed = launch_path(production, geometry, 2048, path, false, nullptr);
+      }
+      if (timed == cudaSuccess) timed = cudaEventRecord(stop);
+      if (timed == cudaSuccess) timed = cudaEventSynchronize(stop);
+      if (timed == cudaSuccess) {
+        timed = cudaEventElapsedTime(milliseconds, start, stop);
+      }
+      return timed;
+    };
+    for (int warmup = 0; warmup < 1 && error == cudaSuccess; ++warmup) {
+      float ignore = 0.0F;
+      error = time_path2048(qw38::cuda::GdnScanPath::kFusedTokenLoop, &ignore);
+    }
+    for (int sample = 0; sample < 3 && error == cudaSuccess; ++sample) {
+      float fused_ms = 0.0F;
+      float seq_ms = 0.0F;
+      float par_ms = 0.0F;
+      error = time_path2048(qw38::cuda::GdnScanPath::kFusedTokenLoop, &fused_ms);
+      if (error == cudaSuccess) {
+        error = time_path2048(qw38::cuda::GdnScanPath::kSequentialWindows,
+                              &seq_ms);
+      }
+      if (error == cudaSuccess) {
+        error = time_path2048(qw38::cuda::GdnScanPath::kParallelAssociative,
+                              &par_ms);
+      }
+      fused_mean += fused_ms;
+      fused_seq_mean += seq_ms;
+      fused_par_mean += par_ms;
+    }
+    if (start != nullptr) cudaEventDestroy(start);
+    if (stop != nullptr) cudaEventDestroy(stop);
+    if (error == cudaSuccess) {
+      fused_mean /= 3.0F;
+      fused_seq_mean /= 3.0F;
+      fused_par_mean /= 3.0F;
+      fused_faster = fused_mean > 0.0F && fused_mean < fused_seq_mean &&
+                     fused_mean < fused_par_mean;
+    } else {
+      fail_cuda("fused A/B", error);
+    }
+    std::printf("fused_ab fused_ms=%.9g sequential_ms=%.9g overlay_ms=%.9g "
+                "faster=%s\n",
+                fused_mean, fused_seq_mean, fused_par_mean,
+                fused_faster ? "true" : "false");
   }
   release(&geometry);
 
@@ -1044,6 +1141,7 @@ int main() {
 
   const bool passed = sequential_ok && parallel_ok && chunk_boundaries_ok &&
                        tiled_ok && launch_geometry_ok && fail_closed_ok &&
-                       overlay_ok && speedup_ok && launch_counts_ok;
+                       overlay_ok && speedup_ok && launch_counts_ok &&
+                       fused_faster;
   return passed ? 0 : 1;
 }

@@ -50,6 +50,18 @@ cudaError_t launch_quant_mmq_variant(
     std::size_t prompt_rows, Q8Block* q8_workspace, float* output,
     unsigned int prompt_tile, cudaStream_t stream) noexcept;
 
+unsigned int selected_mma_mmq_prompt_tile() noexcept;
+
+cudaError_t launch_quant_mmq_mma(
+    QuantKind kind, const std::uint8_t* weights, std::size_t output_rows,
+    std::size_t columns, const __nv_bfloat16* prompt, std::size_t prompt_rows,
+    float* output, cudaStream_t stream) noexcept;
+
+cudaError_t launch_quant_mmq_mma_tile(
+    QuantKind kind, const std::uint8_t* weights, std::size_t output_rows,
+    std::size_t columns, const __nv_bfloat16* prompt, std::size_t prompt_rows,
+    float* output, unsigned int prompt_tile, cudaStream_t stream) noexcept;
+
 cudaError_t launch_q8_mmq_bf16(const std::uint8_t* weights,
                                std::size_t output_rows, std::size_t columns,
                                const __nv_bfloat16* prompt,

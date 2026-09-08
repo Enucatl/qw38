@@ -192,7 +192,9 @@ cudaError_t capture_mmq(Fn launch, std::size_t output_rows, LaunchInfo* info) {
       error = cudaErrorInvalidValue;
       break;
     }
-    if (params.gridDim.x == static_cast<unsigned>((output_rows + 7) / 8)) {
+    if (params.gridDim.x == static_cast<unsigned>((output_rows + 7) / 8) ||
+        params.gridDim.x ==
+            static_cast<unsigned>((output_rows + 127) / 128)) {
       info->grid = params.gridDim;
       info->block = params.blockDim;
       info->grid_x = params.gridDim.x;
@@ -206,9 +208,16 @@ cudaError_t capture_mmq(Fn launch, std::size_t output_rows, LaunchInfo* info) {
     info->registers = attr.numRegs;
     info->local_bytes = static_cast<int>(attr.localSizeBytes);
     info->static_shared = static_cast<int>(attr.sharedSizeBytes);
+    const unsigned mma_grid_x =
+        static_cast<unsigned>((output_rows + 127) / 128);
+    const std::size_t dynamic =
+        info->grid_x == mma_grid_x
+            ? (128U * 8U * sizeof(int) + 128U * sizeof(float2) * 2U +
+               128U * 8U * sizeof(int) + 128U * sizeof(float2))
+            : 0;
     if (error == cudaSuccess) {
       error = cudaOccupancyMaxActiveBlocksPerMultiprocessor(
-          &info->active_blocks, function, kThreads, 0);
+          &info->active_blocks, function, kThreads, dynamic);
     }
   }
   if (graph != nullptr) cudaGraphDestroy(graph);
@@ -864,18 +873,21 @@ int main(int argc, char** argv) {
       q8_ref_64.nodes == 1 && q8_ref_4096.nodes == 1 &&
       q8_ref_64.grid_y == 64 && q8_ref_4096.grid_y == 4096 &&
       q8_ref_64.grid_x == (q8_rows + 7) / 8;
+  const unsigned mma_tile = qw38::cuda::selected_mma_mmq_prompt_tile();
   const bool q4_grid =
       cap_q4_64 == cudaSuccess && cap_q4_4096 == cudaSuccess &&
-      q4_64.nodes == 2 && q4_4096.nodes == 2 &&
-      q4_64.grid_x == (q4_rows + 7) / 8 &&
-      q4_64.grid_y == (64 + q4_tile_64 - 1) / q4_tile_64 &&
-      q4_4096.grid_y == (4096 + q4_tile_4096 - 1) / q4_tile_4096;
+      q4_64.nodes == 1 && q4_4096.nodes == 1 &&
+      q4_64.grid_x == (q4_rows + 127) / 128 &&
+      q4_4096.grid_x == (q4_rows + 127) / 128 &&
+      q4_64.grid_y == (64 + mma_tile - 1) / mma_tile &&
+      q4_4096.grid_y == (4096 + mma_tile - 1) / mma_tile;
   const bool q6_grid =
       cap_q6_64 == cudaSuccess && cap_q6_4096 == cudaSuccess &&
-      q6_64.nodes == 2 && q6_4096.nodes == 2 &&
-      q6_64.grid_x == (q6_rows + 7) / 8 &&
-      q6_64.grid_y == (64 + q6_tile_64 - 1) / q6_tile_64 &&
-      q6_4096.grid_y == (4096 + q6_tile_4096 - 1) / q6_tile_4096;
+      q6_64.nodes == 1 && q6_4096.nodes == 1 &&
+      q6_64.grid_x == (q6_rows + 127) / 128 &&
+      q6_4096.grid_x == (q6_rows + 127) / 128 &&
+      q6_64.grid_y == (64 + mma_tile - 1) / mma_tile &&
+      q6_4096.grid_y == (4096 + mma_tile - 1) / mma_tile;
   const bool occupancy_ok =
       q8_prod_64.active_blocks >= 1 && q8_prod_64.registers > 0 &&
       q8_prod_64.local_bytes <= 1024 && q4_64.active_blocks >= 1 &&

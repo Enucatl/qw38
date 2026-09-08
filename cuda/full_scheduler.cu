@@ -2095,18 +2095,34 @@ Status execute_prompt_chunk(
         float* overlay = reinterpret_cast<float*>(
             workspace->prompt_projected_bf16_);
         GdnScanPath scan = gdn_scan;
-        if (scan == GdnScanPath::kParallelAssociative &&
-            gdn_scratch_floats < gdn_recurrent_values(kGdnConfig) +
-                                     gdn_scan_operator_values(kGdnConfig)) {
-          scan = GdnScanPath::kSequentialWindows;
+        if (scan == GdnScanPath::kFusedTokenLoop) {
+          error = launch_gdn_prepare_chunk_tiled(
+              kGdnConfig, workspace->prompt_projection_a_,
+              layer.gdn.convolution, workspace->prompt_gdn_decay_,
+              workspace->prompt_gdn_update_, token_count, committed, candidate,
+              workspace->prompt_gdn_convolved_,
+              workspace->prompt_gdn_recurrent_output_, stream, scan, overlay,
+              gdn_scratch_floats);
+          if (error == cudaErrorInvalidValue) {
+            scan = GdnScanPath::kParallelAssociative;
+          }
         }
-        error = launch_gdn_prepare_chunk_tiled(
-            kGdnConfig, workspace->prompt_projection_a_,
-            layer.gdn.convolution, workspace->prompt_gdn_decay_,
-            workspace->prompt_gdn_update_, token_count, committed, candidate,
-            workspace->prompt_gdn_convolved_,
-            workspace->prompt_gdn_recurrent_output_, stream, scan, overlay,
-            gdn_scratch_floats);
+        if (error == cudaSuccess || error == cudaErrorInvalidValue) {
+          if (scan == GdnScanPath::kParallelAssociative &&
+              gdn_scratch_floats < gdn_recurrent_values(kGdnConfig) +
+                                       gdn_scan_operator_values(kGdnConfig)) {
+            scan = GdnScanPath::kSequentialWindows;
+          }
+          if (scan != GdnScanPath::kFusedTokenLoop) {
+            error = launch_gdn_prepare_chunk_tiled(
+                kGdnConfig, workspace->prompt_projection_a_,
+                layer.gdn.convolution, workspace->prompt_gdn_decay_,
+                workspace->prompt_gdn_update_, token_count, committed,
+                candidate, workspace->prompt_gdn_convolved_,
+                workspace->prompt_gdn_recurrent_output_, stream, scan, overlay,
+                gdn_scratch_floats);
+          }
+        }
       }
       if (error == cudaSuccess) {
         const dim3 grid(static_cast<unsigned int>(internal::kGdnGateCount),

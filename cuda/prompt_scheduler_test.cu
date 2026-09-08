@@ -129,16 +129,14 @@ int main(int argc, char** argv) {
   qw38::cuda::SyncResult small_result;
   status = qw38::cuda::sync_tokens(model, tokens.data(), kSmallCapacity, &small,
       &small_workspace, optimized_logits.data(), optimized_logits.size(),
-      optimized_hidden.data(), optimized_hidden.size(), &small_result, &small_control);
+      optimized_hidden.data(), optimized_hidden.size(), &small_result,
+      &small_control, nullptr, qw38::cuda::GdnScanPath::kSequentialWindows);
   if (!status.is_ok()) return fail_status(status);
-  status = qw38::cuda::execute_prompt_chunk(model, tokens.data(), 64,
+  status = qw38::cuda::execute_prompt_chunk(model, tokens.data(), kSmallCapacity,
       &small_reference, &small_reference_workspace, reference_logits.data(),
-      reference_logits.size(), reference_hidden.data(), reference_hidden.size());
-  if (status.is_ok()) {
-    status = qw38::cuda::execute_token(model, tokens[64], &small_reference,
-        &small_reference_workspace, reference_logits.data(), reference_logits.size(),
-        reference_hidden.data(), reference_hidden.size(), &token_ms);
-  }
+      reference_logits.size(), reference_hidden.data(), reference_hidden.size(),
+      nullptr, qw38::cuda::PromptPipelinePath::kFusedOverlapped, nullptr, nullptr,
+      qw38::cuda::GdnScanPath::kSequentialWindows);
   if (!status.is_ok()) return fail_status(status);
   bool small_state_equal = false;
   status = small.state_equals(small_reference, &small_state_equal);

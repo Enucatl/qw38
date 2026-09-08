@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "task": "OPT-016",
+  "status": "measured",
+  "measurement_utc": "2026-09-08T12:59:39Z",
+  "device": "NVIDIA GeForce RTX 5090",
+  "compute_capability": "12.0",
+  "llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+  "gguf_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+  "ranks_landed": [
+    "q4k_q6k_mma_mmq",
+    "gdn_fused_token_loop",
+    "causal_mma_attention"
+  ],
+  "mmq_prompt_tile_2048": 128,
+  "quartz": {
+    "prompt_tokens": 2048,
+    "replicates": 3,
+    "wall_ms": [
+      9748.28125,
+      9825.80566,
+      9857.68262
+    ],
+    "tok_s": [
+      210.088318,
+      208.43074,
+      207.756744
+    ],
+    "mean_tok_s": 208.758591,
+    "cold": true,
+    "cache_policy": "disabled",
+    "attribution": null
+  },
+  "llama_cpp": {
+    "avg_ts": 3183.528255,
+    "avg_ns": 643416735,
+    "n_prompt": 2048,
+    "n_ubatch": 512,
+    "flash_attn": -1,
+    "build_commit": "cc83d7b",
+    "test_time": "2026-09-08T12:59:33Z"
+  },
+  "llama_cpp_historical_avg_ts": 3114.049476,
+  "gate_passed": false,
+  "nsight_systems": "not_used",
+  "nsight_compute": "not_used",
+  "proof_limit": "2K yardstick only; envelopes unloosened; no 8K/32K/128K throughput gate; Q8_0 remains byte-exact",
+  "report_path": "evidence/optimization/opt016-2k-parity/REPORT.md"
+}

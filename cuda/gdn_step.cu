@@ -166,6 +166,94 @@ __global__ void prepare_recurrence_window(
   }
 }
 
+__global__ void prepare_recurrence_fused_token_loop(
+    GdnConfig config, const float* convolution_output,
+    const float* log_decay, const float* beta, const float* source,
+    float* candidate, float* output, std::size_t token_count,
+    bool value_is_tiled) {
+  const std::uint32_t value_head = blockIdx.x;
+  const std::uint32_t lane = threadIdx.x;
+  if (value_head >= config.value_heads || lane >= config.value_width) return;
+  const std::uint32_t reuse = config.value_heads / config.key_heads;
+  const std::uint32_t key_head = value_head / reuse;
+  const std::size_t query_count =
+      static_cast<std::size_t>(config.key_heads) * config.key_width;
+  __shared__ float query_inverse;
+  __shared__ float key_inverse;
+  const std::size_t head_base =
+      static_cast<std::size_t>(value_head) * config.key_width *
+      config.value_width;
+  const std::size_t channels = 2 * query_count +
+                               static_cast<std::size_t>(config.value_heads) *
+                                   config.value_width;
+  float state[kMaximumWidth];
+  for (std::uint32_t key_lane = 0; key_lane < config.key_width; ++key_lane) {
+    const std::size_t index =
+        head_base + static_cast<std::size_t>(key_lane) * config.value_width +
+        lane;
+    state[key_lane] = source[index];
+  }
+  for (std::size_t token = 0; token < token_count; ++token) {
+    const float* token_convolution = convolution_output + token * channels;
+    const float* query = token_convolution + key_head * config.key_width;
+    const float* key = token_convolution + query_count +
+                       key_head * config.key_width;
+    const std::uint32_t replica = value_head % reuse;
+    const std::uint32_t tiled_head = replica * config.key_heads + key_head;
+    const std::uint32_t source_head = value_is_tiled ? tiled_head : value_head;
+    const float* value = token_convolution + 2 * query_count +
+                         source_head * config.value_width;
+    if (lane == 0) {
+      float query_squares = 0.0F;
+      float key_squares = 0.0F;
+      for (std::uint32_t index = 0; index < config.key_width; ++index) {
+        query_squares = __fadd_rn(
+            query_squares, __fmul_rn(query[index], query[index]));
+        key_squares =
+            __fadd_rn(key_squares, __fmul_rn(key[index], key[index]));
+      }
+      query_inverse =
+          1.0F / sqrtf(query_squares + kL2Epsilon) /
+          sqrtf(static_cast<float>(config.key_width));
+      key_inverse = 1.0F / sqrtf(key_squares + kL2Epsilon);
+    }
+    __syncthreads();
+
+    const float decay =
+        expf(log_decay[token * config.value_heads + value_head]);
+    float prediction = 0.0F;
+    for (std::uint32_t key_lane = 0; key_lane < config.key_width; ++key_lane) {
+      const float decayed = __fmul_rn(state[key_lane], decay);
+      prediction = __fadd_rn(
+          prediction,
+          __fmul_rn(__fmul_rn(key[key_lane], key_inverse), decayed));
+    }
+    const float delta = __fmul_rn(
+        value[lane] - prediction,
+        beta[token * config.value_heads + value_head]);
+    float result = 0.0F;
+    for (std::uint32_t key_lane = 0; key_lane < config.key_width; ++key_lane) {
+      const float decayed = __fmul_rn(state[key_lane], decay);
+      const float updated = __fadd_rn(
+          decayed,
+          __fmul_rn(__fmul_rn(key[key_lane], key_inverse), delta));
+      state[key_lane] = updated;
+      result = __fadd_rn(
+          result,
+          __fmul_rn(__fmul_rn(query[key_lane], query_inverse), updated));
+    }
+    output[(token * config.value_heads + value_head) * config.value_width +
+           lane] = result;
+    __syncthreads();
+  }
+  for (std::uint32_t key_lane = 0; key_lane < config.key_width; ++key_lane) {
+    const std::size_t index =
+        head_base + static_cast<std::size_t>(key_lane) * config.value_width +
+        lane;
+    candidate[index] = state[key_lane];
+  }
+}
+
 template <int kFixedWidth>
 __global__ void prepare_recurrence_windows_zero(
     GdnConfig config, const float* convolution_output, const float* log_decay,
@@ -670,6 +758,32 @@ cudaError_t launch_sequential_windows(
   return cudaSuccess;
 }
 
+cudaError_t launch_fused_token_loop(
+    const GdnConfig& config, const float* convolution_input,
+    const float* convolution_weights, const float* log_decay,
+    const float* beta, std::size_t token_count, const GdnState& committed,
+    const GdnState& candidate, float* convolution_output,
+    float* recurrent_output, cudaStream_t stream,
+    bool value_is_tiled) noexcept {
+  const std::size_t channels = gdn_convolution_channels(config);
+  const dim3 conv_grid(
+      static_cast<unsigned int>((channels + kConvolutionThreads - 1) /
+                                kConvolutionThreads),
+      static_cast<unsigned int>(token_count));
+  prepare_convolution_chunk_parallel<<<conv_grid, kConvolutionThreads, 0,
+                                        stream>>>(
+      convolution_input, convolution_weights, committed.convolution,
+      candidate.convolution, convolution_output, channels,
+      config.convolution_width, token_count);
+  cudaError_t error = cudaPeekAtLastError();
+  if (error != cudaSuccess) return error;
+  prepare_recurrence_fused_token_loop<<<config.value_heads, kThreads, 0,
+                                        stream>>>(
+      config, convolution_output, log_decay, beta, committed.recurrent,
+      candidate.recurrent, recurrent_output, token_count, value_is_tiled);
+  return cudaPeekAtLastError();
+}
+
 cudaError_t launch_parallel_associative(
     const GdnConfig& config, const float* convolution_input,
     const float* convolution_weights, const float* log_decay,
@@ -759,8 +873,15 @@ cudaError_t launch_gdn_prepare_chunk_layout(
     return cudaErrorInvalidValue;
   }
   if (path != GdnScanPath::kSequentialWindows &&
-      path != GdnScanPath::kParallelAssociative) {
+      path != GdnScanPath::kParallelAssociative &&
+      path != GdnScanPath::kFusedTokenLoop) {
     return cudaErrorInvalidValue;
+  }
+  if (path == GdnScanPath::kFusedTokenLoop) {
+    return launch_fused_token_loop(
+        config, convolution_input, convolution_weights, log_decay, beta,
+        token_count, committed, candidate, convolution_output,
+        recurrent_output, stream, value_is_tiled);
   }
   if (path == GdnScanPath::kParallelAssociative) {
     if (scratch == nullptr ||

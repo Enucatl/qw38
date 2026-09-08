@@ -279,9 +279,10 @@ int run_prompt_case(qw38::cuda::QuantKind kind, const char* name,
   if (error != cudaSuccess) return fail_cuda("MMQ cudaMemcpy H2D", error);
 
   for (int warmup = 0; warmup < 3 && error == cudaSuccess; ++warmup) {
-    error = qw38::cuda::launch_quant_mmq(
+    error = qw38::cuda::launch_quant_mmq_variant(
         kind, device_weights, output_rows, columns, device_prompt, prompt_rows,
-        device_staged, device_output, nullptr);
+        device_staged, device_output,
+        qw38::cuda::selected_mmq_prompt_tile(kind, prompt_rows), nullptr);
   }
   cudaEvent_t start = nullptr;
   cudaEvent_t stop = nullptr;
@@ -289,9 +290,10 @@ int run_prompt_case(qw38::cuda::QuantKind kind, const char* name,
   if (error == cudaSuccess) error = cudaEventCreate(&stop);
   if (error == cudaSuccess) error = cudaEventRecord(start);
   for (int sample = 0; sample < 30 && error == cudaSuccess; ++sample) {
-    error = qw38::cuda::launch_quant_mmq(
+    error = qw38::cuda::launch_quant_mmq_variant(
         kind, device_weights, output_rows, columns, device_prompt, prompt_rows,
-        device_staged, device_output, nullptr);
+        device_staged, device_output,
+        qw38::cuda::selected_mmq_prompt_tile(kind, prompt_rows), nullptr);
   }
   if (error == cudaSuccess) error = cudaEventRecord(stop);
   if (error == cudaSuccess) error = cudaEventSynchronize(stop);
@@ -351,6 +353,183 @@ int run_prompt_case(qw38::cuda::QuantKind kind, const char* name,
                  rms <= 2.5e-4F
              ? 0
              : 1;
+}
+
+int run_mma_case(qw38::cuda::QuantKind kind, const char* name,
+                 std::size_t output_rows, std::size_t columns,
+                 std::size_t prompt_rows, unsigned int tile) {
+  std::vector<std::uint8_t> weights;
+  fill_weights(kind, output_rows, columns, &weights);
+  std::vector<__nv_bfloat16> prompt;
+  std::vector<qw38::cuda::Q8Block> staged;
+  prompt.resize(prompt_rows * columns);
+  staged.resize(prompt_rows * (columns / 32));
+  std::vector<float> expected(prompt_rows * output_rows);
+  for (std::size_t prompt_row = 0; prompt_row < prompt_rows; ++prompt_row) {
+    std::vector<__nv_bfloat16> row_activation;
+    std::vector<qw38::cuda::Q8Block> row_staged;
+    make_activation(columns, &row_activation, &row_staged, prompt_row);
+    std::copy(row_activation.begin(), row_activation.end(),
+              prompt.begin() + prompt_row * columns);
+    std::copy(row_staged.begin(), row_staged.end(),
+              staged.begin() + prompt_row * (columns / 32));
+    std::vector<float> row_expected;
+    if (!reference(kind, weights, output_rows, columns, row_staged,
+                   &row_expected)) {
+      return 1;
+    }
+    std::copy(row_expected.begin(), row_expected.end(),
+              expected.begin() + prompt_row * output_rows);
+  }
+
+  std::uint8_t* device_weights = nullptr;
+  __nv_bfloat16* device_prompt = nullptr;
+  qw38::cuda::Q8Block* device_staged = nullptr;
+  float* device_mma = nullptr;
+  float* device_variant = nullptr;
+  cudaError_t error = cudaMalloc(&device_weights, weights.size());
+  if (error == cudaSuccess) {
+    error = cudaMalloc(&device_prompt, prompt.size() * sizeof(prompt[0]));
+  }
+  if (error == cudaSuccess) {
+    error = cudaMalloc(&device_staged, staged.size() * sizeof(staged[0]));
+  }
+  if (error == cudaSuccess) {
+    error = cudaMalloc(&device_mma, expected.size() * sizeof(expected[0]));
+  }
+  if (error == cudaSuccess) {
+    error = cudaMalloc(&device_variant, expected.size() * sizeof(expected[0]));
+  }
+  if (error != cudaSuccess) return fail_cuda("MMA cudaMalloc", error);
+  error = cudaMemcpy(device_weights, weights.data(), weights.size(),
+                     cudaMemcpyHostToDevice);
+  if (error == cudaSuccess) {
+    error = cudaMemcpy(device_prompt, prompt.data(),
+                       prompt.size() * sizeof(prompt[0]), cudaMemcpyHostToDevice);
+  }
+  if (error != cudaSuccess) return fail_cuda("MMA cudaMemcpy H2D", error);
+
+  error = qw38::cuda::launch_quant_mmq_variant(
+      kind, device_weights, output_rows, columns, device_prompt, prompt_rows,
+      device_staged, device_variant,
+      qw38::cuda::selected_mmq_prompt_tile(kind, prompt_rows), nullptr);
+  if (error == cudaSuccess) {
+    error = qw38::cuda::launch_quant_mmq_mma_tile(
+        kind, device_weights, output_rows, columns, device_prompt, prompt_rows,
+        device_mma, tile, nullptr);
+  }
+  if (error == cudaSuccess) error = cudaDeviceSynchronize();
+  if (error != cudaSuccess) return fail_cuda("MMA execution", error);
+
+  std::vector<float> mma(expected.size());
+  std::vector<float> variant(expected.size());
+  error = cudaMemcpy(mma.data(), device_mma, mma.size() * sizeof(mma[0]),
+                     cudaMemcpyDeviceToHost);
+  if (error == cudaSuccess) {
+    error = cudaMemcpy(variant.data(), device_variant,
+                       variant.size() * sizeof(variant[0]),
+                       cudaMemcpyDeviceToHost);
+  }
+  if (error != cudaSuccess) return fail_cuda("MMA cudaMemcpy D2H", error);
+
+  float maximum_absolute = 0.0F;
+  double squared = 0.0;
+  std::size_t nonfinite = 0;
+  for (std::size_t index = 0; index < mma.size(); ++index) {
+    if (!std::isfinite(mma[index]) || !std::isfinite(variant[index])) {
+      ++nonfinite;
+    }
+    const float absolute = std::fabs(mma[index] - variant[index]);
+    maximum_absolute = std::max(maximum_absolute, absolute);
+    squared += static_cast<double>(absolute) * absolute;
+  }
+  const float rms =
+      static_cast<float>(std::sqrt(squared / static_cast<double>(mma.size())));
+  std::printf("mma_case=%s prompt_rows=%zu output_rows=%zu columns=%zu tile=%u "
+              "max_abs=%.9g rms=%.9g nonfinite=%zu\n",
+              name, prompt_rows, output_rows, columns, tile, maximum_absolute,
+              rms, nonfinite);
+  cudaFree(device_variant);
+  cudaFree(device_mma);
+  cudaFree(device_staged);
+  cudaFree(device_prompt);
+  cudaFree(device_weights);
+  return nonfinite == 0 && maximum_absolute <= 5.0e-4F && rms <= 2.5e-4F ? 0
+                                                                         : 1;
+}
+
+int time_mma_tile(qw38::cuda::QuantKind kind, std::size_t output_rows,
+                  std::size_t columns, std::size_t prompt_rows,
+                  unsigned int tile, float* mean_ms, int* occupancy) {
+  std::vector<std::uint8_t> weights;
+  fill_weights(kind, output_rows, columns, &weights);
+  std::vector<__nv_bfloat16> prompt(prompt_rows * columns);
+  for (std::size_t index = 0; index < prompt.size(); ++index) {
+    prompt[index] = __float2bfloat16_rn(
+        std::sin(static_cast<float>(index) * 0.01F) * 0.25F);
+  }
+  std::uint8_t* device_weights = nullptr;
+  __nv_bfloat16* device_prompt = nullptr;
+  float* device_output = nullptr;
+  cudaError_t error = cudaMalloc(&device_weights, weights.size());
+  if (error == cudaSuccess) {
+    error = cudaMalloc(&device_prompt, prompt.size() * sizeof(prompt[0]));
+  }
+  if (error == cudaSuccess) {
+    error = cudaMalloc(&device_output,
+                       prompt_rows * output_rows * sizeof(float));
+  }
+  if (error != cudaSuccess) return fail_cuda("MMA sweep cudaMalloc", error);
+  error = cudaMemcpy(device_weights, weights.data(), weights.size(),
+                     cudaMemcpyHostToDevice);
+  if (error == cudaSuccess) {
+    error = cudaMemcpy(device_prompt, prompt.data(),
+                       prompt.size() * sizeof(prompt[0]), cudaMemcpyHostToDevice);
+  }
+  if (error != cudaSuccess) return fail_cuda("MMA sweep H2D", error);
+  *occupancy = 1;
+  error = qw38::cuda::launch_quant_mmq_mma_tile(
+      kind, device_weights, output_rows, columns, device_prompt, prompt_rows,
+      device_output, tile, nullptr);
+  if (error == cudaSuccess) error = cudaDeviceSynchronize();
+  if (error != cudaSuccess) {
+    cudaFree(device_output);
+    cudaFree(device_prompt);
+    cudaFree(device_weights);
+    return fail_cuda("MMA sweep launch", error);
+  }
+  cudaEvent_t start = nullptr;
+  cudaEvent_t stop = nullptr;
+  error = cudaEventCreate(&start);
+  if (error == cudaSuccess) error = cudaEventCreate(&stop);
+  float total = 0.0F;
+  for (int sample = 0; sample < 3 && error == cudaSuccess; ++sample) {
+    error = cudaEventRecord(start);
+    if (error == cudaSuccess) {
+      error = qw38::cuda::launch_quant_mmq_mma_tile(
+          kind, device_weights, output_rows, columns, device_prompt,
+          prompt_rows, device_output, tile, nullptr);
+    }
+    if (error == cudaSuccess) error = cudaEventRecord(stop);
+    if (error == cudaSuccess) error = cudaEventSynchronize(stop);
+    float milliseconds = 0.0F;
+    if (error == cudaSuccess) {
+      error = cudaEventElapsedTime(&milliseconds, start, stop);
+    }
+    total += milliseconds;
+  }
+  cudaEventDestroy(start);
+  cudaEventDestroy(stop);
+  cudaFree(device_output);
+  cudaFree(device_prompt);
+  cudaFree(device_weights);
+  if (error != cudaSuccess) return fail_cuda("MMA sweep time", error);
+  *mean_ms = total / 3.0F;
+  std::printf("mma_tune kind=%s output_rows=%zu columns=%zu prompt_rows=%zu "
+              "tile=%u mean_ms=%.9g occupancy=%d\n",
+              kind == qw38::cuda::QuantKind::kQ4K ? "q4_k" : "q6_k",
+              output_rows, columns, prompt_rows, tile, *mean_ms, *occupancy);
+  return 0;
 }
 
 }  // namespace
@@ -424,6 +603,42 @@ int main() {
                       256, 3) != 0) {
     return 1;
   }
+  if (qw38::cuda::selected_mma_mmq_prompt_tile() != 128U ||
+      run_mma_case(qw38::cuda::QuantKind::kQ4K, "q4_k_mma_9x64x256", 64, 256,
+                   9, 128) != 0 ||
+      run_mma_case(qw38::cuda::QuantKind::kQ4K, "q4_k_mma_17x128x256", 128,
+                   256, 17, 128) != 0 ||
+      run_mma_case(qw38::cuda::QuantKind::kQ6K, "q6_k_mma_9x64x256", 64, 256,
+                   9, 128) != 0 ||
+      run_mma_case(qw38::cuda::QuantKind::kQ6K, "q6_k_mma_17x128x256", 128,
+                   256, 17, 128) != 0) {
+    return 1;
+  }
+  unsigned int winner = 128;
+  float best = 1.0e30F;
+  const unsigned int tiles[3] = {32U, 64U, 128U};
+  const std::size_t shapes[2][2] = {{17408, 5120}, {5120, 17408}};
+  for (unsigned int tile : tiles) {
+    float mean = 0.0F;
+    bool eligible = true;
+    for (const auto& shape : shapes) {
+      float part = 0.0F;
+      int occ = 0;
+      if (time_mma_tile(qw38::cuda::QuantKind::kQ4K, shape[0], shape[1], 2048,
+                        tile, &part, &occ) != 0 ||
+          occ < 1) {
+        eligible = false;
+        break;
+      }
+      mean += part;
+    }
+    if (eligible && mean < best) {
+      best = mean;
+      winner = tile;
+    }
+  }
+  std::printf("mma_prompt_tile_2048=%u mean_ms=%.9g pinned=%u\n", winner, best,
+              qw38::cuda::selected_mma_mmq_prompt_tile());
   std::printf("status=passed\n");
   return 0;
 }

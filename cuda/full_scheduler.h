@@ -462,7 +462,7 @@ Status execute_prompt_chunk(
     PromptPipelinePath path = PromptPipelinePath::kFusedOverlapped,
     PromptPipelineCounters* counters = nullptr,
     SchedulerGraphs* graphs = nullptr,
-    GdnScanPath gdn_scan = GdnScanPath::kParallelAssociative,
+    GdnScanPath gdn_scan = GdnScanPath::kFusedTokenLoop,
     PrefillAttribution* attribution = nullptr) noexcept;
 
 Status greedy_sample(const SchedulerSession& session,
@@ -476,7 +476,7 @@ Status sync_tokens(const ResidentModel& model, const std::size_t* tokens,
                    std::size_t hidden_count, SyncResult* result,
                    const EvalControl* control = nullptr,
                    SchedulerGraphs* graphs = nullptr,
-                   GdnScanPath gdn_scan = GdnScanPath::kParallelAssociative,
+                   GdnScanPath gdn_scan = GdnScanPath::kFusedTokenLoop,
                    PrefillAttribution* attribution = nullptr) noexcept;
 
 }  // namespace qw38::cuda
