@@ -84,10 +84,19 @@ CUDA work is asynchronous, so
 synchronized CUDA events are needed. Recording events around every model stage
 also adds work and can change the timing. The harness therefore uses ordinary
 wall times for its throughput samples and performs one separate
-`component_probe`. That probe exposes embedding, GDN, attention, FFN, logits,
-sampling, graph-launch, state-commit, idle-gap, loading, queueing, and persistence
-categories. It is marked `perturbs_execution: true` and
+`component_probe`. That probe first prefills without category attribution, then
+attributes one decode `sample`/`eval`. It exposes embedding, GDN, attention, FFN,
+logits, sampling, graph-launch, state-commit, idle-gap, loading, queueing, and
+persistence categories. It is marked `perturbs_execution: true` and
 `used_for_throughput_summary: false`.
+
+That decode-token probe is not a 2K prefill breakdown. OPT-014's attributed
+prefill report is a separate opt-in `PrefillAttribution` collected on
+production `sync_tokens` and retained in
+[`fixtures/cuda_prefill_attribution.json`](../fixtures/cuda_prefill_attribution.json).
+Default `qw38-bench` throughput samples stay unattributed wall times. Chapter 51
+owns the live 2K categories, remainder other/idle, and the no-Nsight proof
+boundary.
 
 An unavailable measurement is JSON `null`, not zero. Zero would mean an event
 was measured and took no representable time. Queue time is `null` because this

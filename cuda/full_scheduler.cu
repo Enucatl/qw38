@@ -78,15 +78,16 @@ class GpuPhaseRecorder final {
   GpuPhaseRecorder(const GpuPhaseRecorder&) = delete;
   GpuPhaseRecorder& operator=(const GpuPhaseRecorder&) = delete;
 
-  cudaError_t begin(TimingValue* destination) noexcept {
+  cudaError_t begin(TimingValue* destination, cudaStream_t stream) noexcept {
     if (destination == nullptr || active_ || count_ == phases_.size()) {
       return cudaErrorInvalidValue;
     }
     Phase& phase = phases_[count_];
     phase.destination = destination;
+    phase.stream = stream;
     cudaError_t error = cudaEventCreate(&phase.start);
     if (error == cudaSuccess) error = cudaEventCreate(&phase.stop);
-    if (error == cudaSuccess) error = cudaEventRecord(phase.start);
+    if (error == cudaSuccess) error = cudaEventRecord(phase.start, stream);
     if (error != cudaSuccess) {
       if (phase.stop != nullptr) cudaEventDestroy(phase.stop);
       if (phase.start != nullptr) cudaEventDestroy(phase.start);
@@ -99,7 +100,8 @@ class GpuPhaseRecorder final {
 
   cudaError_t end() noexcept {
     if (!active_) return cudaErrorInvalidValue;
-    cudaError_t error = cudaEventRecord(phases_[count_].stop);
+    Phase& phase = phases_[count_];
+    cudaError_t error = cudaEventRecord(phase.stop, phase.stream);
     if (error == cudaSuccess) {
       ++count_;
       active_ = false;
@@ -123,10 +125,25 @@ class GpuPhaseRecorder final {
     return cudaSuccess;
   }
 
+  cudaError_t reset() noexcept {
+    if (active_) return cudaErrorInvalidValue;
+    for (std::size_t index = 0; index < count_; ++index) {
+      if (phases_[index].stop != nullptr) cudaEventDestroy(phases_[index].stop);
+      if (phases_[index].start != nullptr) {
+        cudaEventDestroy(phases_[index].start);
+      }
+      phases_[index] = {};
+    }
+    count_ = 0;
+    active_ = false;
+    return cudaSuccess;
+  }
+
  private:
   struct Phase final {
     cudaEvent_t start = nullptr;
     cudaEvent_t stop = nullptr;
+    cudaStream_t stream = nullptr;
     TimingValue* destination = nullptr;
   };
   // token total + embedding + 64 mixers + 64 FFNs + logits + commit.
@@ -135,9 +152,10 @@ class GpuPhaseRecorder final {
   bool active_ = false;
 };
 
-cudaError_t begin_phase(GpuPhaseRecorder* recorder,
-                        TimingValue* destination) noexcept {
-  return recorder == nullptr ? cudaSuccess : recorder->begin(destination);
+cudaError_t begin_phase(GpuPhaseRecorder* recorder, TimingValue* destination,
+                        cudaStream_t stream = nullptr) noexcept {
+  return recorder == nullptr ? cudaSuccess
+                             : recorder->begin(destination, stream);
 }
 
 cudaError_t end_phase(GpuPhaseRecorder* recorder) noexcept {
@@ -379,6 +397,53 @@ Status cuda_status(cudaError_t error, const char* message) noexcept {
   return error == cudaSuccess
              ? Status::ok()
              : Status{StatusCode::kInternal, message};
+}
+
+constexpr float kPrefillAbsTolMs = 0.05F;
+constexpr float kPrefillRelTol = 1.0e-4F;
+
+bool prefill_timings_close(float left, float right) noexcept {
+  const float difference = std::fabs(left - right);
+  return difference <= std::max(kPrefillRelTol * std::max(std::fabs(left),
+                                                            std::fabs(right)),
+                                 kPrefillAbsTolMs);
+}
+
+Status finish_prefill_attribution(
+    PrefillAttribution* attribution,
+    std::chrono::steady_clock::time_point started) noexcept {
+  if (attribution == nullptr) return Status::ok();
+  attribution->wall = {
+      static_cast<float>(std::chrono::duration<double, std::milli>(
+                             std::chrono::steady_clock::now() - started)
+                             .count()),
+      true};
+  attribution->graph.measured = true;
+  const TimingValue* required[] = {
+      &attribution->embedding, &attribution->gdn, &attribution->attention,
+      &attribution->ffn_mmq,  &attribution->logits, &attribution->commit_sync,
+      &attribution->graph,      &attribution->wall};
+  for (const TimingValue* value : required) {
+    if (!value->measured) {
+      return {StatusCode::kInternal,
+              "CUDA prefill attribution left a category unmeasured"};
+    }
+  }
+  const float exclusive = attribution->embedding.milliseconds +
+                           attribution->gdn.milliseconds +
+                           attribution->attention.milliseconds +
+                           attribution->ffn_mmq.milliseconds +
+                           attribution->logits.milliseconds +
+                           attribution->commit_sync.milliseconds +
+                           attribution->graph.milliseconds;
+  if (exclusive > attribution->wall.milliseconds &&
+      !prefill_timings_close(exclusive, attribution->wall.milliseconds)) {
+    return {StatusCode::kInternal,
+            "CUDA prefill attribution exclusive sum exceeds wall time"};
+  }
+  attribution->other_idle = {
+      std::max(0.0F, attribution->wall.milliseconds - exclusive), true};
+  return Status::ok();
 }
 
 template <typename T>
@@ -1869,7 +1934,7 @@ Status execute_prompt_chunk(
     std::size_t logits_count, float* host_hidden, std::size_t hidden_count,
     const EvalControl* control, PromptPipelinePath path,
     PromptPipelineCounters* counters, SchedulerGraphs* graphs,
-    GdnScanPath gdn_scan) noexcept {
+    GdnScanPath gdn_scan, PrefillAttribution* attribution) noexcept {
   const bool fused = path == PromptPipelinePath::kFusedOverlapped;
   if (model.blob_ == nullptr || tokens == nullptr || token_count < 2 ||
       session == nullptr || workspace == nullptr || session->capacity_ == 0 ||
@@ -1896,46 +1961,59 @@ Status execute_prompt_chunk(
     }
   }
   const NvtxRange chunk_range("qw38.prefill_chunk");
+  GpuPhaseRecorder attribution_recorder;
+  GpuPhaseRecorder* categories =
+      attribution == nullptr ? nullptr : &attribution_recorder;
   cudaStream_t stream = fused ? workspace->prompt_compute_stream_ : nullptr;
   cudaError_t error = cudaSuccess;
-  if (fused) {
-    error = cudaMemcpyAsync(reinterpret_cast<std::size_t*>(workspace->prompt_q8_),
-                            tokens, token_count * sizeof(std::size_t),
-                            cudaMemcpyHostToDevice, stream);
-    if (error == cudaSuccess) {
-      error = launch_quant_rows_decode_widen(
-          model.embedding_.kind, model.embedding_.data, model.embedding_.rows,
-          model.embedding_.columns,
-          reinterpret_cast<const std::size_t*>(workspace->prompt_q8_),
-          token_count, workspace->prompt_residual_a_, stream);
+  {
+    const NvtxRange embedding_range("qw38.embedding");
+    error = begin_phase(categories,
+                         attribution == nullptr ? nullptr
+                                                : &attribution->embedding,
+                         stream);
+    if (fused) {
       if (error == cudaSuccess) {
-        bump(counters, &PromptPipelineCounters::embedding_kernel_launches);
+        error = cudaMemcpyAsync(
+            reinterpret_cast<std::size_t*>(workspace->prompt_q8_), tokens,
+            token_count * sizeof(std::size_t), cudaMemcpyHostToDevice, stream);
+      }
+      if (error == cudaSuccess) {
+        error = launch_quant_rows_decode_widen(
+            model.embedding_.kind, model.embedding_.data, model.embedding_.rows,
+            model.embedding_.columns,
+            reinterpret_cast<const std::size_t*>(workspace->prompt_q8_),
+            token_count, workspace->prompt_residual_a_, stream);
+        if (error == cudaSuccess) {
+          bump(counters, &PromptPipelineCounters::embedding_kernel_launches);
+        }
+      }
+    } else {
+      for (std::size_t row = 0; error == cudaSuccess && row < token_count; ++row) {
+        error = launch_quant_row_decode(
+            model.embedding_.kind, model.embedding_.data, model.embedding_.rows,
+            model.embedding_.columns, tokens[row],
+            workspace->prompt_normalized_ + row * internal::kResidualWidth,
+            stream);
+        if (error == cudaSuccess) {
+          bump(counters, &PromptPipelineCounters::embedding_kernel_launches);
+        }
+      }
+      if (error == cudaSuccess) {
+        bf16_to_fp32<<<
+            static_cast<unsigned int>((token_count * internal::kResidualWidth +
+                                       kThreads - 1) /
+                                      kThreads),
+            kThreads, 0, stream>>>(workspace->prompt_normalized_,
+                                   token_count * internal::kResidualWidth,
+                                   workspace->prompt_residual_a_);
+        error = cudaPeekAtLastError();
+        if (error == cudaSuccess) {
+          bump(counters, &PromptPipelineCounters::widen_kernel_launches);
+        }
       }
     }
-  } else {
-    for (std::size_t row = 0; error == cudaSuccess && row < token_count; ++row) {
-      error = launch_quant_row_decode(
-          model.embedding_.kind, model.embedding_.data, model.embedding_.rows,
-          model.embedding_.columns, tokens[row],
-          workspace->prompt_normalized_ + row * internal::kResidualWidth,
-          stream);
-      if (error == cudaSuccess) {
-        bump(counters, &PromptPipelineCounters::embedding_kernel_launches);
-      }
-    }
-    if (error == cudaSuccess) {
-      bf16_to_fp32<<<
-          static_cast<unsigned int>((token_count * internal::kResidualWidth +
-                                     kThreads - 1) /
-                                    kThreads),
-          kThreads, 0, stream>>>(workspace->prompt_normalized_,
-                                 token_count * internal::kResidualWidth,
-                                 workspace->prompt_residual_a_);
-      error = cudaPeekAtLastError();
-      if (error == cudaSuccess) {
-        bump(counters, &PromptPipelineCounters::widen_kernel_launches);
-      }
-    }
+    if (error == cudaSuccess) error = end_phase(categories);
   }
   float* residual = workspace->prompt_residual_a_;
   float* after_mixer = workspace->prompt_residual_b_;
@@ -1947,12 +2025,25 @@ Status execute_prompt_chunk(
        layer_index < model.layers_.size();
        ++layer_index) {
     const DeviceLayer& layer = model.layers_[layer_index];
+    nvtxRangePushA(layer.kind == internal::LayerKind::kGdn ? "qw38.gdn"
+                                                           : "qw38.attention");
+    if (error == cudaSuccess) {
+      error = begin_phase(categories,
+                           attribution == nullptr
+                               ? nullptr
+                               : (layer.kind == internal::LayerKind::kGdn
+                                      ? &attribution->gdn
+                                      : &attribution->attention),
+                           stream);
+    }
     if (!fused || layer_index == 0) {
-      error = launch_rms_norm_rows_fp32_to_bf16(
-          residual, layer.common.input_norm, internal::kResidualWidth,
-          token_count, workspace->prompt_normalized_, stream);
       if (error == cudaSuccess) {
-        bump(counters, &PromptPipelineCounters::rms_norm_kernel_launches);
+        error = launch_rms_norm_rows_fp32_to_bf16(
+            residual, layer.common.input_norm, internal::kResidualWidth,
+            token_count, workspace->prompt_normalized_, stream);
+        if (error == cudaSuccess) {
+          bump(counters, &PromptPipelineCounters::rms_norm_kernel_launches);
+        }
       }
     }
     if (layer.kind == internal::LayerKind::kGdn) {
@@ -2103,15 +2194,35 @@ Status execute_prompt_chunk(
       }
       ++attention_slot;
     }
+    if (error == cudaSuccess) error = end_phase(categories);
+    nvtxRangePop();
+    nvtxRangePushA("qw38.ffn");
+    if (error == cudaSuccess) {
+      error = begin_phase(categories,
+                           attribution == nullptr ? nullptr
+                                                  : &attribution->ffn_mmq,
+                           stream);
+    }
     const bool replay_prompt_ffn =
         graphs != nullptr &&
         graphs->prompt_graph_count() == internal::kModelLayerCount &&
         token_count == graphs->prompt_graph_rows();
     if (error == cudaSuccess) {
       if (replay_prompt_ffn) {
+        const auto graph_started = std::chrono::steady_clock::now();
+        nvtxRangePushA("qw38.graph_launch");
         error = cudaGraphLaunch(graphs->prompt_executions_[layer_index], stream);
+        nvtxRangePop();
         if (error == cudaSuccess) {
           bump(counters, &PromptPipelineCounters::prompt_graph_launches);
+          if (attribution != nullptr) {
+            attribution->graph.milliseconds += static_cast<float>(
+                std::chrono::duration<double, std::milli>(
+                    std::chrono::steady_clock::now() - graph_started)
+                    .count());
+            attribution->graph.measured = true;
+            ++attribution->prompt_graph_launches;
+          }
         }
       } else if (fused) {
         const float* next_input_norm =
@@ -2180,6 +2291,8 @@ Status execute_prompt_chunk(
         }
       }
     }
+    if (error == cudaSuccess) error = end_phase(categories);
+    nvtxRangePop();
     if (error == cudaSuccess && control != nullptr &&
         control->poll != nullptr) {
       if (fused) {
@@ -2206,6 +2319,12 @@ Status execute_prompt_chunk(
   }
   const float* final_hidden =
       residual + (token_count - 1) * internal::kResidualWidth;
+  nvtxRangePushA("qw38.logits");
+  if (error == cudaSuccess) {
+    error = begin_phase(categories,
+                          attribution == nullptr ? nullptr : &attribution->logits,
+                          stream);
+  }
   if (error == cudaSuccess) {
     rms_norm_fp32_to_bf16<<<1, kThreads, 0, stream>>>(
         final_hidden, model.output_norm_, internal::kResidualWidth,
@@ -2219,13 +2338,22 @@ Status execute_prompt_chunk(
     error = matrix_vector(model.output_, workspace->normalized_, workspace,
                           workspace->logits_, stream);
   }
+  if (error == cudaSuccess) error = end_phase(categories);
+  nvtxRangePop();
   const std::size_t cache_stride =
       session->capacity_ * internal::kAttentionKvWidth;
   const std::size_t candidate_stride =
       workspace->prompt_chunk_rows_ * internal::kAttentionKvWidth;
   const AttentionConfig commit_config{
       24, 4, 256, 64, static_cast<std::uint32_t>(session->capacity_)};
+  nvtxRangePushA("qw38.state_commit");
   if (fused) {
+    if (error == cudaSuccess) {
+      error = begin_phase(categories,
+                            attribution == nullptr ? nullptr
+                                                   : &attribution->commit_sync,
+                            stream);
+    }
     if (error == cudaSuccess) {
       error = cudaEventRecord(workspace->prompt_compute_done_, stream);
     }
@@ -2274,6 +2402,7 @@ Status execute_prompt_chunk(
         bump(counters, &PromptPipelineCounters::stream_synchronizes);
       }
     }
+    if (error == cudaSuccess) error = end_phase(categories);
   } else {
     if (error == cudaSuccess) {
       error = cudaMemcpy(workspace->candidate_logits_host_, workspace->logits_,
@@ -2288,6 +2417,12 @@ Status execute_prompt_chunk(
       if (error == cudaSuccess) {
         bump(counters, &PromptPipelineCounters::blocking_d2h_copies);
       }
+    }
+    if (error == cudaSuccess) {
+      error = begin_phase(categories,
+                            attribution == nullptr ? nullptr
+                                                   : &attribution->commit_sync,
+                            stream);
     }
     for (std::size_t slot = 0; error == cudaSuccess && slot < kAttentionLayers;
          ++slot) {
@@ -2311,7 +2446,9 @@ Status execute_prompt_chunk(
         bump(counters, &PromptPipelineCounters::device_synchronizes);
       }
     }
+    if (error == cudaSuccess) error = end_phase(categories);
   }
+  nvtxRangePop();
   if (error != cudaSuccess) {
     if (fused) {
       if (workspace->prompt_copy_stream_ != nullptr) {
@@ -2322,6 +2459,13 @@ Status execute_prompt_chunk(
       }
     }
     return cuda_status(error, "CUDA hybrid prompt chunk failed");
+  }
+  if (categories != nullptr) {
+    error = categories->collect();
+    if (error == cudaSuccess) error = categories->reset();
+    if (error != cudaSuccess) {
+      return cuda_status(error, "cannot collect CUDA prefill attribution");
+    }
   }
   std::swap(session->gdn_convolution_,
             workspace->gdn_candidate_convolution_);
@@ -2370,7 +2514,8 @@ Status sync_tokens(const ResidentModel& model, const std::size_t* tokens,
                    std::size_t logits_count, float* host_hidden,
                    std::size_t hidden_count, SyncResult* result,
                    const EvalControl* control, SchedulerGraphs* graphs,
-                   GdnScanPath gdn_scan) noexcept {
+                   GdnScanPath gdn_scan,
+                   PrefillAttribution* attribution) noexcept {
   if (session == nullptr || workspace == nullptr || result == nullptr ||
       model.resident_bytes() == 0 || session->capacity_ == 0 ||
       workspace->capacity_ != session->capacity_ ||
@@ -2384,6 +2529,10 @@ Status sync_tokens(const ResidentModel& model, const std::size_t* tokens,
         host_hidden != nullptr || hidden_count != 0))) {
     return {StatusCode::kInvalidArgument,
             "CUDA token synchronization input, state, or output is invalid"};
+  }
+  if (attribution != nullptr) {
+    *attribution = {};
+    attribution->prompt_tokens = token_count;
   }
   for (std::size_t index = 0; index < token_count; ++index) {
     if (tokens[index] >= internal::kVocabularySize) {
@@ -2412,6 +2561,7 @@ Status sync_tokens(const ResidentModel& model, const std::size_t* tokens,
                 internal::kResidualWidth * sizeof(float));
     return Status::ok();
   }
+  const auto wall_started = std::chrono::steady_clock::now();
   float elapsed = 0.0F;
   for (std::size_t index = start; index < token_count;) {
     const std::size_t remaining = token_count - index;
@@ -2427,11 +2577,15 @@ Status sync_tokens(const ResidentModel& model, const std::size_t* tokens,
                                    workspace, host_logits, logits_count,
                                    host_hidden, hidden_count, control,
                                    PromptPipelinePath::kFusedOverlapped,
-                                   nullptr, graphs, gdn_scan);
+                                   nullptr, graphs, gdn_scan, attribution);
     if (!status.is_ok()) return status;
+    if (attribution != nullptr) {
+      attribution->evaluated_tokens += chunk;
+      ++attribution->chunk_count;
+    }
     index += chunk;
   }
-  return Status::ok();
+  return finish_prefill_attribution(attribution, wall_started);
 }
 
 }  // namespace qw38::cuda

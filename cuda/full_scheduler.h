@@ -109,6 +109,22 @@ struct RuntimeTimings final {
   TimingValue token_total;
 };
 
+struct PrefillAttribution final {
+  TimingValue embedding;
+  TimingValue gdn;
+  TimingValue attention;
+  TimingValue ffn_mmq;
+  TimingValue logits;
+  TimingValue commit_sync;
+  TimingValue graph;
+  TimingValue other_idle;
+  TimingValue wall;
+  std::size_t prompt_tokens = 0;
+  std::size_t evaluated_tokens = 0;
+  std::size_t chunk_count = 0;
+  std::uint32_t prompt_graph_launches = 0;
+};
+
 enum class PointwisePath : std::uint8_t {
   kFused = 0,
   kUnfused = 1,
@@ -183,13 +199,13 @@ class ResidentModel final {
                             class SchedulerWorkspace*, float*, std::size_t,
                             float*, std::size_t, SyncResult*,
                             const EvalControl*, SchedulerGraphs*,
-                            GdnScanPath) noexcept;
+                            GdnScanPath, PrefillAttribution*) noexcept;
   friend Status execute_prompt_chunk(
       const ResidentModel&, const std::size_t*, std::size_t,
       class SchedulerSession*, class SchedulerWorkspace*, float*,
       std::size_t, float*, std::size_t, const EvalControl*,
       PromptPipelinePath, PromptPipelineCounters*,
-      SchedulerGraphs*, GdnScanPath) noexcept;
+      SchedulerGraphs*, GdnScanPath, PrefillAttribution*) noexcept;
   friend class SchedulerGraphs;
 };
 
@@ -247,12 +263,13 @@ class SchedulerSession final {
                             class SchedulerWorkspace*, float*, std::size_t,
                             float*, std::size_t, SyncResult*,
                             const EvalControl*, SchedulerGraphs*,
-                            GdnScanPath) noexcept;
+                            GdnScanPath, PrefillAttribution*) noexcept;
   friend Status execute_prompt_chunk(
       const ResidentModel&, const std::size_t*, std::size_t,
       SchedulerSession*, class SchedulerWorkspace*, float*, std::size_t,
       float*, std::size_t, const EvalControl*, PromptPipelinePath,
-      PromptPipelineCounters*, SchedulerGraphs*, GdnScanPath) noexcept;
+      PromptPipelineCounters*, SchedulerGraphs*, GdnScanPath,
+      PrefillAttribution*) noexcept;
   friend Status greedy_sample(const SchedulerSession&, std::size_t*,
                               RuntimeTimings*) noexcept;
 };
@@ -335,12 +352,14 @@ class SchedulerWorkspace final {
                             std::size_t, SchedulerSession*, SchedulerWorkspace*,
                             float*, std::size_t, float*, std::size_t,
                             SyncResult*, const EvalControl*,
-                            SchedulerGraphs*, GdnScanPath) noexcept;
+                            SchedulerGraphs*, GdnScanPath,
+                            PrefillAttribution*) noexcept;
   friend Status execute_prompt_chunk(
       const ResidentModel&, const std::size_t*, std::size_t,
       SchedulerSession*, SchedulerWorkspace*, float*, std::size_t, float*,
       std::size_t, const EvalControl*, PromptPipelinePath,
-      PromptPipelineCounters*, SchedulerGraphs*, GdnScanPath) noexcept;
+      PromptPipelineCounters*, SchedulerGraphs*, GdnScanPath,
+      PrefillAttribution*) noexcept;
   friend class SchedulerGraphs;
 };
 
@@ -385,7 +404,8 @@ class SchedulerGraphs final {
       const ResidentModel&, const std::size_t*, std::size_t,
       SchedulerSession*, SchedulerWorkspace*, float*, std::size_t, float*,
       std::size_t, const EvalControl*, PromptPipelinePath,
-      PromptPipelineCounters*, SchedulerGraphs*, GdnScanPath) noexcept;
+      PromptPipelineCounters*, SchedulerGraphs*, GdnScanPath,
+      PrefillAttribution*) noexcept;
 };
 
 Status execute_token(const ResidentModel& model, std::size_t token,
@@ -442,7 +462,8 @@ Status execute_prompt_chunk(
     PromptPipelinePath path = PromptPipelinePath::kFusedOverlapped,
     PromptPipelineCounters* counters = nullptr,
     SchedulerGraphs* graphs = nullptr,
-    GdnScanPath gdn_scan = GdnScanPath::kParallelAssociative) noexcept;
+    GdnScanPath gdn_scan = GdnScanPath::kParallelAssociative,
+    PrefillAttribution* attribution = nullptr) noexcept;
 
 Status greedy_sample(const SchedulerSession& session,
                      std::size_t* token,
@@ -455,8 +476,8 @@ Status sync_tokens(const ResidentModel& model, const std::size_t* tokens,
                    std::size_t hidden_count, SyncResult* result,
                    const EvalControl* control = nullptr,
                    SchedulerGraphs* graphs = nullptr,
-                   GdnScanPath gdn_scan =
-                       GdnScanPath::kParallelAssociative) noexcept;
+                   GdnScanPath gdn_scan = GdnScanPath::kParallelAssociative,
+                   PrefillAttribution* attribution = nullptr) noexcept;
 
 }  // namespace qw38::cuda
 

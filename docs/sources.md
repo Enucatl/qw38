@@ -326,6 +326,24 @@ DSpark are explicitly rejected as Qwen model semantics.
   [`fixtures/cuda_gdn_scan.json`](../fixtures/cuda_gdn_scan.json).
   The beginner explanation is
   [`docs/42-cuda-gdn-chunks.md`](42-cuda-gdn-chunks.md).
+- OPT-014 introduces no new external implementation source. CUDA events and
+  NVTX ranges are already used by OPT-001; this increment records synchronized
+  events on the prompt compute stream for an opt-in `PrefillAttribution` during
+  production `sync_tokens`. No Nsight Systems or Nsight Compute capture is
+  required or performed. The schema-1 contract freezes the eight summing
+  categories, 2048-token geometry, remainder tolerance, measured-zero
+  graph-at-2048, and `nsight: not_required` in
+  [`pins/cuda_prefill_attribution_contract.json`](../pins/cuda_prefill_attribution_contract.json).
+  One pinned RTX 5090 fixture retains the live cold 2048-token report from the
+  timed diagnostic (`wall_ms` 41963.8828, `graph` 0, `nsight_*` `not_used`); it
+  is instrumentation, not a throughput gate, Nsight capture, or llama.cpp
+  parity claim:
+  [`fixtures/cuda_prefill_attribution.json`](../fixtures/cuda_prefill_attribution.json).
+  The beginner explanation is
+  [`docs/51-runtime-timing-and-nvtx.md`](51-runtime-timing-and-nvtx.md).
+  The prefill proof boundary is
+  [`docs/62-cuda-full-prefill.md`](62-cuda-full-prefill.md).
+  No external profiler workflow or kernel implementation was copied or adapted.
 - CUD-003 introduces no new external implementation source. GGUF Q8_0 decoding
   follows the format already admitted by the pinned scalar decoder, and the
   pointwise/layout equations come from the pinned model contract and scalar
@@ -497,7 +515,10 @@ DSpark are explicitly rejected as Qwen model semantics.
   separately and remains component-only, not a whole-chunk graph. OPT-013 later
   replaces sequential prompt GDN windows with an associative scan when overlay
   scratch fits; that increment is documented separately and remains
-  component-only. Exact
+  component-only. OPT-014 later adds opt-in live 2048-token prefill attribution
+  from prompt-compute-stream CUDA events plus a host-wall remainder; that
+  increment is documented separately and is instrumentation, not a throughput
+  or Nsight claim. Exact
   `[4096, 1]` differential, capacity fallback, cancellation, and memory
   evidence is authenticated in
   [`pins/cuda_prompt_scheduler_contract.json`](../pins/cuda_prompt_scheduler_contract.json)

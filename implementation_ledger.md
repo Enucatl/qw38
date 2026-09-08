@@ -80,7 +80,7 @@ are repository-relative unless stated otherwise.
 | OPT-011 | Pipeline and fuse prompt execution and chunk commit | OPT-008, OPT-009, OPT-010 | done | Justified fusion/overlap removes avoidable copies, launches, and barriers while preserving cancellation and atomic publication | [`tasks/OPT-011.md`](tasks/OPT-011.md); [`cuda/full_scheduler.cu`](cuda/full_scheduler.cu); [`cuda/prompt_pipeline_test.cu`](cuda/prompt_pipeline_test.cu); [`pins/cuda_prompt_pipeline_contract.json`](pins/cuda_prompt_pipeline_contract.json); [`fixtures/cuda_prompt_pipeline.json`](fixtures/cuda_prompt_pipeline.json); log 2026-09-07T18:12:37Z |
 | OPT-012 | Add stable-address prompt CUDA graphs | OPT-003, OPT-011 | done | Common 4,096-token prompt paths replay from stable addresses with graph/non-graph equality and reconciled memory | [`tasks/OPT-012.md`](tasks/OPT-012.md); verification 2026-09-07T20:27:06Z |
 | OPT-013 | Implement associative block-parallel GDN prompt scan | GDN-002, OPT-011 | done | Parallel GDN scan preserves recurrence/frontier tolerances across chunk boundaries and demonstrates measured prompt speedup | [`tasks/OPT-013.md`](tasks/OPT-013.md); [`pins/cuda_gdn_scan_contract.json`](pins/cuda_gdn_scan_contract.json); [`fixtures/cuda_gdn_scan.json`](fixtures/cuda_gdn_scan.json); verification 2026-09-08T08:58:06Z |
-| OPT-014 | Instrument attributed 2K prefill time breakdown | BEN-001, OPT-013 | pending | A cold 2K Quartz prefill emits a retained live attribution report whose named categories (at least embedding, GDN, attention, FFN/MMQ, logits, commit/sync, graph, other/idle) sum to the measured prefill wall time within a documented tolerance; the report is produced from the timed run itself without requiring a separate Nsight capture | — |
+| OPT-014 | Instrument attributed 2K prefill time breakdown | BEN-001, OPT-013 | done | A cold 2K Quartz prefill emits a retained live attribution report whose named categories (at least embedding, GDN, attention, FFN/MMQ, logits, commit/sync, graph, other/idle) sum to the measured prefill wall time within a documented tolerance; the report is produced from the timed run itself without requiring a separate Nsight capture | [`tasks/OPT-014.md`](tasks/OPT-014.md); [`pins/cuda_prefill_attribution_contract.json`](pins/cuda_prefill_attribution_contract.json); [`fixtures/cuda_prefill_attribution.json`](fixtures/cuda_prefill_attribution.json); verification 2026-09-08T11:06:41Z |
 | OPT-015 | Compare Quartz 2K prefill to llama.cpp; mine ds4 for techniques | OPT-013, PIN-002 | pending | Checked-in report explains what pushes pinned same-GGUF llama.cpp into thousands of tok/s at 2K, uses `../ds4` only as MIT-licensed technique inspiration (ds4 cannot run this Qwen GGUF; no ds4 same-model baseline), separates transferable methods under `plan.md` provenance from non-transferable ds4 model policies such as sparse/compressed attention, maps each major Quartz 2K time sink to a faster path, and proposes a ranked recovery sequence | — |
 | OPT-016 | Reach 2K prefill throughput at or above pinned llama.cpp | OPT-014, OPT-015 | pending | On the same GGUF and RTX 5090, cold 2K Quartz prefill tok/s is ≥ pinned llama.cpp `llama-bench` 2K under a frozen protocol; until this passes, performance work and speed claims use the 2K yardstick only (no 8K/32K/128K throughput or QLT 128K attempts as speed gates); numeric/state envelopes remain unloosened | — |
 
@@ -3987,3 +3987,35 @@ are repository-relative unless stated otherwise.
 - Next eligible pending task for `/run-ledger-task-cursor` is OPT-014 (BEN-001
   and OPT-013 are done). OPT-015 is also eligible in parallel dependency terms
   after OPT-013/PIN-002; ledger row order still prefers OPT-014 first.
+
+### 2026-09-08T10:35:03Z — OPT-014 planning admitted
+
+- Planning produced decision-complete dossier [`tasks/OPT-014.md`](tasks/OPT-014.md).
+- Coupled IDs: none. Plan impact: none.
+- Marked OPT-014 `in_progress`.
+
+### 2026-09-08T11:06:41Z — OPT-014 delivered
+
+- Independent verification attempt 1 passed a cold empty-session 2048-token
+  production `sync_tokens` on exclusive RTX 5090: eight measured CUDA-event
+  plus remainder categories reconstruct host wall within `rel_tol=1e-4` /
+  `abs_tol_ms=0.05`; `graph` is measured zero with `prompt_graph_launches == 0`;
+  `chunk_count` is 1; `nsight_*` are `not_used`. The retained report is
+  [`fixtures/cuda_prefill_attribution.json`](fixtures/cuda_prefill_attribution.json)
+  from the timed diagnostic, not a Nsight capture. Null-pointer prompt
+  execution creates no extra CUDA events. `plan.md`, `Makefile`, public Engine
+  / CLI / server / `qw38-bench` schemas, and BEN-001 throughput JSON are
+  unchanged. OPT-015 remains pending; OPT-016 remains pending on OPT-014 and
+  OPT-015; QLT-001 remains blocked.
+- Acceptance evidence: [`tasks/OPT-014.md`](tasks/OPT-014.md);
+  [`cuda/full_scheduler.h`](cuda/full_scheduler.h);
+  [`cuda/full_scheduler.cu`](cuda/full_scheduler.cu);
+  [`cuda/prefill_attribution_test.cu`](cuda/prefill_attribution_test.cu);
+  [`pins/cuda_prefill_attribution_contract.json`](pins/cuda_prefill_attribution_contract.json);
+  [`fixtures/cuda_prefill_attribution.json`](fixtures/cuda_prefill_attribution.json);
+  [`docs/51-runtime-timing-and-nvtx.md`](docs/51-runtime-timing-and-nvtx.md);
+  [`docs/61-benchmark-harness.md`](docs/61-benchmark-harness.md);
+  [`docs/62-cuda-full-prefill.md`](docs/62-cuda-full-prefill.md).
+  Proof is live instrumentation, not a throughput gate or llama.cpp parity.
+- Marked OPT-014 `done`; delivery is limited to the verified task scope plus
+  this ledger/audit bookkeeping.

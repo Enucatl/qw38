@@ -1,15 +1,17 @@
 # Chunked full-model CUDA prefill
 
-[Index](README.md) · Implementation tasks: SCH-002, MEM-002, OPT-008, OPT-009, OPT-011, OPT-012, OPT-013, and EDU-047 in
+[Index](README.md) · Implementation tasks: SCH-002, MEM-002, OPT-008, OPT-009, OPT-011, OPT-012, OPT-013, OPT-014, and EDU-047 in
 [`implementation_ledger.md`](../implementation_ledger.md) · Contracts:
 [`pins/cuda_prompt_scheduler_contract.json`](../pins/cuda_prompt_scheduler_contract.json),
 [`pins/cuda_prompt_pipeline_contract.json`](../pins/cuda_prompt_pipeline_contract.json),
 [`pins/cuda_prompt_graph_contract.json`](../pins/cuda_prompt_graph_contract.json),
-[`pins/cuda_gdn_scan_contract.json`](../pins/cuda_gdn_scan_contract.json)
+[`pins/cuda_gdn_scan_contract.json`](../pins/cuda_gdn_scan_contract.json),
+[`pins/cuda_prefill_attribution_contract.json`](../pins/cuda_prefill_attribution_contract.json)
 · Evidence: [`fixtures/cuda_prompt_scheduler.json`](../fixtures/cuda_prompt_scheduler.json),
 [`fixtures/cuda_prompt_pipeline.json`](../fixtures/cuda_prompt_pipeline.json),
 [`fixtures/cuda_prompt_graph.json`](../fixtures/cuda_prompt_graph.json),
-[`fixtures/cuda_gdn_scan.json`](../fixtures/cuda_gdn_scan.json)
+[`fixtures/cuda_gdn_scan.json`](../fixtures/cuda_gdn_scan.json),
+[`fixtures/cuda_prefill_attribution.json`](../fixtures/cuda_prefill_attribution.json)
 
 ## Why prompt execution differs from decode
 
@@ -298,9 +300,26 @@ CUDA-event samples measured sequential mean `38.7084427 ms` and parallel mean
 GDN-prepare predicate, not an end-to-end prefill claim. Sequential 64-token
 windows remain the byte-exact reference. Nsight Systems is not claimed.
 
+OPT-014 adds live 2048-token category exposure in
+[`fixtures/cuda_prefill_attribution.json`](../fixtures/cuda_prefill_attribution.json).
+**Measured, RTX 5090:** one cold empty-session 2048-token production
+`sync_tokens` (capacity 131072, fused overlapped, parallel GDN scan, graphs
+created) took 41963.8828 ms host wall (~48.80 tok/s). Exclusive CUDA events on
+the prompt compute stream recorded FFN/MMQ 32294.9512 ms, GDN 5300.55371 ms,
+attention 4364.3335 ms, logits 2.86684799 ms, commit/sync 0.576767981 ms, and
+embedding 0.076063998 ms. Graph was measured 0 ms with zero prompt-graph
+launches, because a 2048-token chunk does not replay 4096-row FFN graphs. The
+other/idle remainder was 0.5234375 ms, so the eight named categories reconstruct
+wall within `rel_tol = 1e-4` and `abs_tol_ms = 0.05`. Nsight Systems and Nsight
+Compute were `not_used`. This is instrumentation of that timed run, not a
+throughput gate and not llama.cpp parity. Chapter 51 owns the category
+definitions.
+
 The **proof boundary** excludes comparative speed claims, 2K/8K sustained
-prefill, execution of a 128K prefill, 128K retrieval quality, thermal stability,
-superiority to llama.cpp/vLLM, and a Nsight Systems overlap timeline. BEN-001
+prefill throughput, execution of a 128K prefill, 128K retrieval quality, thermal
+stability, superiority to llama.cpp/vLLM, and a Nsight Systems overlap timeline.
+OPT-014 measures named categories on one cold 2048-token timed run; it does not
+convert that instrumentation into a sustained-prefill or speed admission. BEN-001
 provides the harness; CMP-002/CMP-003 still own the 30-sample comparative gate.
 QLT-001 remains blocked. OPT-012's prompt graphs are FFN subgraphs only: not a
 whole-chunk graph, not a speedup gate, and not 128K quality recovery.
