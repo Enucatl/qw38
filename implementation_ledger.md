@@ -82,8 +82,11 @@ are repository-relative unless stated otherwise.
 | OPT-013 | Implement associative block-parallel GDN prompt scan | GDN-002, OPT-011 | done | Parallel GDN scan preserves recurrence/frontier tolerances across chunk boundaries and demonstrates measured prompt speedup | [`tasks/OPT-013.md`](tasks/OPT-013.md); [`pins/cuda_gdn_scan_contract.json`](pins/cuda_gdn_scan_contract.json); [`fixtures/cuda_gdn_scan.json`](fixtures/cuda_gdn_scan.json); verification 2026-09-08T08:58:06Z |
 | OPT-014 | Instrument attributed 2K prefill time breakdown | BEN-001, OPT-013 | done | A cold 2K Quartz prefill emits a retained live attribution report whose named categories (at least embedding, GDN, attention, FFN/MMQ, logits, commit/sync, graph, other/idle) sum to the measured prefill wall time within a documented tolerance; the report is produced from the timed run itself without requiring a separate Nsight capture | [`tasks/OPT-014.md`](tasks/OPT-014.md); [`pins/cuda_prefill_attribution_contract.json`](pins/cuda_prefill_attribution_contract.json); [`fixtures/cuda_prefill_attribution.json`](fixtures/cuda_prefill_attribution.json); verification 2026-09-08T11:06:41Z |
 | OPT-015 | Compare Quartz 2K prefill to llama.cpp; mine ds4 for techniques | OPT-013, PIN-002 | done | Checked-in report explains what pushes pinned same-GGUF llama.cpp into thousands of tok/s at 2K, uses `../ds4` only as MIT-licensed technique inspiration (ds4 cannot run this Qwen GGUF; no ds4 same-model baseline), separates transferable methods under `plan.md` provenance from non-transferable ds4 model policies such as sparse/compressed attention, maps each major Quartz 2K time sink to a faster path, and proposes a ranked recovery sequence | [`tasks/OPT-015.md`](tasks/OPT-015.md); [`evidence/optimization/opt015-2k-recovery/REPORT.md`](evidence/optimization/opt015-2k-recovery/REPORT.md); [`pins/opt015_recovery_contract.json`](pins/opt015_recovery_contract.json); [`fixtures/opt015_recovery.json`](fixtures/opt015_recovery.json); verification 2026-09-08T11:39:48Z |
-| OPT-016 | Reach 2K prefill throughput at or above pinned llama.cpp | OPT-014, OPT-015 | blocked | On the same GGUF and RTX 5090, cold 2K Quartz prefill tok/s is ≥ pinned llama.cpp `llama-bench` 2K under a frozen protocol; until this passes, performance work and speed claims use the 2K yardstick only (no 8K/32K/128K throughput or QLT 128K attempts as speed gates); numeric/state envelopes remain unloosened | [`tasks/OPT-016.md`](tasks/OPT-016.md); blocked 2026-09-08T13:09:00Z after Ranks 1–3; recovery requires `OPT-017` done then re-pass frozen 2K gate |
-| OPT-017 | Admit production mixer Q8_0 MMA MMQ without loosening OPT-009 | OPT-009, OPT-015 | pending | Production mixer Q8_0 prompt MMQ uses an MMA path while `launch_q8_mmq_bf16_reference` (or the existing OPT-009 byte-exact kernel) remains the visible unloosened reference; then re-run the OPT-016 frozen exact-2048 protocol so cold Quartz mean tok/s ≥ live pinned llama.cpp `llama-bench` 2K on the same GGUF and RTX 5090 | — |
+| OPT-016 | Reach 2K prefill throughput at or above pinned llama.cpp | OPT-014, OPT-015 | blocked | On the same GGUF and RTX 5090, cold 2K Quartz prefill tok/s is ≥ pinned llama.cpp `llama-bench` 2K under a frozen protocol; until this passes, performance work and speed claims use the 2K yardstick only (no 8K/32K/128K throughput or QLT 128K attempts as speed gates); numeric/state envelopes remain unloosened | [`tasks/OPT-016.md`](tasks/OPT-016.md); blocked 2026-09-08T13:09:00Z after Ranks 1–3; recovery requires `OPT-017`–`OPT-019` as needed then re-pass frozen 2K gate |
+| OPT-017 | Admit production mixer Q8_0 MMA MMQ without loosening OPT-009 | OPT-009, OPT-015 | pending | Production mixer Q8_0 prompt MMQ uses an MMA path while `launch_q8_mmq_bf16_reference` (or the existing OPT-009 byte-exact kernel) remains the visible unloosened reference; CUD-002/OPT-009 envelopes stay unloosened; a live exact-2048 re-attribution and unperturbed 2K remasurement are checked in (OPT-016 remains the parity gate owner) | — |
+| OPT-018 | Close Q4_K/Q6_K MMA MMQ quality gap versus pinned llama.cpp | OPT-009, OPT-015 | pending | Production Q4_K/Q6_K prompt MMA MMQ is brought to llama-competitive 2K FFN time on the same GGUF and RTX 5090 under unloosened CUD-002 envelopes, with retained variant reference, measured before/after FFN category time, and file-level llama.cpp/`plan.md` provenance; does not substitute for the OPT-016 end-to-end gate | — |
+| OPT-019 | Close residual GDN and attention core time after mixer Q8_0 MMA | OPT-017, OPT-015 | pending | After mixer projections are on MMA, remaining non-projection GDN scan/recurrence and causal attention core paths are brought down under frozen GDN/attention envelopes with retained references; live 2K re-attribution shows the residual sinks addressed; does not substitute for the OPT-016 end-to-end gate | — |
+| OPT-020 | Split 2K attribution into mixer MMQ versus core GDN/attention | OPT-014 | pending | Cold exact-2048 attribution exposes separate mixer-projection MMQ time versus GDN-core and attention-core time (plus existing FFN/logits/commit/graph/idle), reconstructs wall within the OPT-014 tolerance, and is retained for OPT-017–OPT-019 steering; not a throughput gate | — |
 
 ### 2026-09-04T13:09:32Z — OPT-005 delivered
 
@@ -106,7 +109,7 @@ are repository-relative unless stated otherwise.
 | BEN-001 | Implement `qw38-bench` component/end-to-end harness | OPT-001 | done | Warmups/samples, telemetry, raw samples, failures, and environment metadata are retained | `pins/benchmark_contract.json`; `fixtures/benchmark_harness.json`; `evidence/benchmark/`; `tests/test_benchmark.py`; log 2026-09-02T15:24:00Z |
 | BEN-002 | Preserve the product-wide no-argument usage exit contract in `qw38-bench` | BEN-001, BLD-001 | done | Invoking the benchmark with no arguments prints usage and returns exit code 2 without creating output | `tests/test_build.py`; log 2026-09-02T15:24:00Z |
 | EVAL-001 | Implement `qw38-eval` logits/traces/checkpoints harness | ORA-001, SES-003 | done | Focused native diagnostics are driven by typed pytest helpers | [`tasks/EVAL-001.md`](tasks/EVAL-001.md); reopened 2026-09-03T14:00:00Z after build/hash repair; recovery readmitted 2026-09-03T15:44:53Z; completed 2026-09-03T17:01:54Z |
-| QLT-001 | Pass held-out NLL, continuation, recurrence, retrieval, and task quality | EVAL-001, MEM-001, OPT-012, OPT-013, OPT-016 | blocked | Admitted artifact passes every documented threshold and 128K retrieval fixture | [`tasks/QLT-001.md`](tasks/QLT-001.md); blocked 2026-09-08T10:22:44Z pending 2K llama.cpp prefill parity (`OPT-016`); OPT-016 blocked 2026-09-08T13:09:00Z pending `OPT-017` then gate re-pass; prior scaling report [`evidence/quality/scaling-2026-09-08/REPORT.md`](evidence/quality/scaling-2026-09-08/REPORT.md) |
+| QLT-001 | Pass held-out NLL, continuation, recurrence, retrieval, and task quality | EVAL-001, MEM-001, OPT-012, OPT-013, OPT-016 | blocked | Admitted artifact passes every documented threshold and 128K retrieval fixture | [`tasks/QLT-001.md`](tasks/QLT-001.md); blocked 2026-09-08T10:22:44Z pending 2K llama.cpp prefill parity (`OPT-016`); OPT-016 recovery via `OPT-017`–`OPT-019` then gate re-pass; prior scaling report [`evidence/quality/scaling-2026-09-08/REPORT.md`](evidence/quality/scaling-2026-09-08/REPORT.md) |
 | CMP-001 | Pin and validate comparable baseline artifacts | PIN-001, PIN-002, QLT-001 | pending | llama/Ollama share GGUF; vLLM difference and <=1% NLL admission are explicit | — |
 | CMP-002 | Run controlled 30-sample comparative matrix | BEN-001, OPT-004, CMP-001 | pending | All contexts/metrics/environment data and negative runs are retained | — |
 | CMP-003 | Pass prefill/decode statistical speed gates | CMP-002 | pending | Paired bootstrap lower bounds exceed 1.05 and no workload is >5% slower | — |
@@ -172,7 +175,7 @@ are repository-relative unless stated otherwise.
 | 6. CUDA primitives | CUD-001–CUD-003 |
 | 7. GDN/attention/scheduler | GDN-001–GDN-002, ATN-001–ATN-002, SCH-001 |
 | 8. Sessions and 128K | SES-001–SES-003, MEM-001 |
-| 9. Profiling/optimization | OPT-001–OPT-017 |
+| 9. Profiling/optimization | OPT-001–OPT-020 |
 | 10. Product tools/API/quality | CLI-001, SRV-001–SRV-003, BEN-001, EVAL-001, QLT-001 |
 | 11. Comparative speed | CMP-001–CMP-003 |
 | 12. Documentation/release | DOC-001, REL-001 |
@@ -4069,3 +4072,21 @@ are repository-relative unless stated otherwise.
 - Evidence: [`tasks/OPT-016.md`](tasks/OPT-016.md);
   [`fixtures/opt016_parity.json`](fixtures/opt016_parity.json);
   [`evidence/optimization/opt016-2k-parity/REPORT.md`](evidence/optimization/opt016-2k-parity/REPORT.md).
+
+### 2026-09-08T13:28:15Z — OPT-018–OPT-020 admitted for 2K recovery ladder
+
+- After Rank 1–3 WIP showed ~15× remaining gap (FFN MMA still ~2.55 s alone;
+  `gdn`+`attention` still dominated by non-MMA mixer Q8_0), admitted follow-on
+  pending tasks so the ledger covers the full recovery path without waiting for
+  another discovery stop:
+  - OPT-017 (amended): mixer Q8_0 MMA with unloosened OPT-009 reference plus
+    live 2K remasurement/attribution; **not** the end-to-end parity gate.
+  - OPT-018: llama-competitive Q4_K/Q6_K MMA MMQ quality under CUD-002.
+  - OPT-019: residual GDN/attention core time after OPT-017 (depends on OPT-017).
+  - OPT-020: split 2K attribution into mixer MMQ versus GDN/attention core.
+- OPT-016 remains `blocked` and remains the sole ≥ llama.cpp 2K gate owner.
+  Recovery is OPT-017–OPT-019 as needed, then re-pass the frozen gate. QLT-001
+  still blocked on OPT-016. `plan.md` unchanged.
+- Next eligible pending by ledger row order: OPT-017 (deps OPT-009, OPT-015
+  done). OPT-018 and OPT-020 are also dependency-eligible; row order prefers
+  OPT-017.
