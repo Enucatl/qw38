@@ -1868,7 +1868,8 @@ Status execute_prompt_chunk(
     SchedulerWorkspace* workspace, float* host_logits,
     std::size_t logits_count, float* host_hidden, std::size_t hidden_count,
     const EvalControl* control, PromptPipelinePath path,
-    PromptPipelineCounters* counters, SchedulerGraphs* graphs) noexcept {
+    PromptPipelineCounters* counters, SchedulerGraphs* graphs,
+    GdnScanPath gdn_scan) noexcept {
   const bool fused = path == PromptPipelinePath::kFusedOverlapped;
   if (model.blob_ == nullptr || tokens == nullptr || token_count < 2 ||
       session == nullptr || workspace == nullptr || session->capacity_ == 0 ||
@@ -1997,12 +1998,24 @@ Status execute_prompt_chunk(
           workspace->gdn_candidate_recurrent_ +
               gdn_slot * internal::kGdnRecurrentStateValues};
       if (error == cudaSuccess) {
+        const std::size_t gdn_scratch_floats =
+            workspace->prompt_chunk_rows_ * internal::kFfnWidth *
+            sizeof(__nv_bfloat16) / sizeof(float);
+        float* overlay = reinterpret_cast<float*>(
+            workspace->prompt_projected_bf16_);
+        GdnScanPath scan = gdn_scan;
+        if (scan == GdnScanPath::kParallelAssociative &&
+            gdn_scratch_floats < gdn_recurrent_values(kGdnConfig) +
+                                     gdn_scan_operator_values(kGdnConfig)) {
+          scan = GdnScanPath::kSequentialWindows;
+        }
         error = launch_gdn_prepare_chunk_tiled(
             kGdnConfig, workspace->prompt_projection_a_,
             layer.gdn.convolution, workspace->prompt_gdn_decay_,
             workspace->prompt_gdn_update_, token_count, committed, candidate,
             workspace->prompt_gdn_convolved_,
-            workspace->prompt_gdn_recurrent_output_, stream);
+            workspace->prompt_gdn_recurrent_output_, stream, scan, overlay,
+            gdn_scratch_floats);
       }
       if (error == cudaSuccess) {
         const dim3 grid(static_cast<unsigned int>(internal::kGdnGateCount),
@@ -2356,7 +2369,8 @@ Status sync_tokens(const ResidentModel& model, const std::size_t* tokens,
                    SchedulerWorkspace* workspace, float* host_logits,
                    std::size_t logits_count, float* host_hidden,
                    std::size_t hidden_count, SyncResult* result,
-                   const EvalControl* control, SchedulerGraphs* graphs) noexcept {
+                   const EvalControl* control, SchedulerGraphs* graphs,
+                   GdnScanPath gdn_scan) noexcept {
   if (session == nullptr || workspace == nullptr || result == nullptr ||
       model.resident_bytes() == 0 || session->capacity_ == 0 ||
       workspace->capacity_ != session->capacity_ ||
@@ -2413,7 +2427,7 @@ Status sync_tokens(const ResidentModel& model, const std::size_t* tokens,
                                    workspace, host_logits, logits_count,
                                    host_hidden, hidden_count, control,
                                    PromptPipelinePath::kFusedOverlapped,
-                                   nullptr, graphs);
+                                   nullptr, graphs, gdn_scan);
     if (!status.is_ok()) return status;
     index += chunk;
   }

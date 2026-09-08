@@ -1,13 +1,15 @@
 # Chunked full-model CUDA prefill
 
-[Index](README.md) · Implementation tasks: SCH-002, MEM-002, OPT-008, OPT-009, OPT-011, OPT-012, and EDU-047 in
+[Index](README.md) · Implementation tasks: SCH-002, MEM-002, OPT-008, OPT-009, OPT-011, OPT-012, OPT-013, and EDU-047 in
 [`implementation_ledger.md`](../implementation_ledger.md) · Contracts:
 [`pins/cuda_prompt_scheduler_contract.json`](../pins/cuda_prompt_scheduler_contract.json),
 [`pins/cuda_prompt_pipeline_contract.json`](../pins/cuda_prompt_pipeline_contract.json),
-[`pins/cuda_prompt_graph_contract.json`](../pins/cuda_prompt_graph_contract.json)
+[`pins/cuda_prompt_graph_contract.json`](../pins/cuda_prompt_graph_contract.json),
+[`pins/cuda_gdn_scan_contract.json`](../pins/cuda_gdn_scan_contract.json)
 · Evidence: [`fixtures/cuda_prompt_scheduler.json`](../fixtures/cuda_prompt_scheduler.json),
 [`fixtures/cuda_prompt_pipeline.json`](../fixtures/cuda_prompt_pipeline.json),
-[`fixtures/cuda_prompt_graph.json`](../fixtures/cuda_prompt_graph.json)
+[`fixtures/cuda_prompt_graph.json`](../fixtures/cuda_prompt_graph.json),
+[`fixtures/cuda_gdn_scan.json`](../fixtures/cuda_gdn_scan.json)
 
 ## Why prompt execution differs from decode
 
@@ -92,21 +94,37 @@ claim end-to-end prefill or decode speedup, or 128K quality recovery.
 
 ## GDN and attention remain causal
 
-Batching projections does not make recurrence parallel. Within each GDN layer,
-the chunk primitive visits prompt rows in strict order. Its internal scan window
-is at most 64 tokens, carries the convolution ring and FP32 recurrent matrix
-forward, and produces a final candidate state for that layer.
+Batching projections does not remove recurrence. Within each GDN layer the
+internal scan window is still at most 64 tokens, carries the convolution ring
+and FP32 recurrent matrix forward, and produces a final candidate state for that
+layer.
+
+Production prompt chunks use OPT-013's associative parallel scan when overlay
+scratch on `prompt_projected_bf16_` can hold one `(A_w, B_w)` pair. At
+`prompt_chunk_rows_ == 4096` that overlay fits `W_fit = 22` windows, so a
+4,096-token layer batches `22 + 22 + 20`: zero-state intra windows, a 48-block
+`A S + B` prefix, then parallel from-state replay of sequential window
+arithmetic. Tails with one window (`2 ≤ token_count ≤ 64`) keep sequential
+recurrence after a single 2D convolution. Capacity-65 cannot overlay one pair
+(`W_fit = 0`) and falls back to sequential windows. Decode one-token GDN stays
+sequential. Prompt FFN graphs still exclude GDN.
+
+OPT-008's 4,096-versus-64-row memcmp remains a **sequential** GDN gate: that
+comparison pins `GdnScanPath::kSequentialWindows` rather than loosening
+byte equality to tolerances. Parallel cross-boundary proof is the OPT-013
+diagnostic at the frozen GDN-002 envelopes (`5e-8` / `5e-9` / zero non-finite),
+including 4,096 parallel tokens versus 64 sequential windows.
 
 Attention also visits chunk rows in order. A row may read all committed KV rows
 from earlier chunks and candidate rows earlier in its current chunk, never a
 future row. Partial RoPE uses the absolute position `old frontier + row`.
 
-OPT-008 sets the outer scheduler policy to 4,096 rows. The GDN primitive still
-uses its unchanged internal 64-row scan windows. A 4,097-token prompt therefore
-executes as `[4096, 1]`, with the final single row using the established decode
-arithmetic. For a smaller session, the reusable allocation and selected prompt
-chunk are bounded by its capacity: a capacity-65 session executes `[65]` as one
-prompt transaction rather than allocating or dispatching 4,096 rows.
+OPT-008 sets the outer scheduler policy to 4,096 rows. A 4,097-token prompt
+therefore executes as `[4096, 1]`, with the final single row using the
+established decode arithmetic. For a smaller session, the reusable allocation
+and selected prompt chunk are bounded by its capacity: a capacity-65 session
+executes `[65]` as one prompt transaction rather than allocating or dispatching
+4,096 rows.
 
 ## Prompt pipeline fusion
 
@@ -269,9 +287,21 @@ That A/B is an orchestration predicate, not an end-to-end prefill claim. The
 fixture states the proof limit: component-only orchestration evidence, no Nsight
 Systems overlap screenshot, and no end-to-end prefill/decode speedup.
 
+OPT-013 adds component-only GDN-prepare evidence in
+[`fixtures/cuda_gdn_scan.json`](../fixtures/cuda_gdn_scan.json).
+**Measured, RTX 5090:** parallel versus sequential production 4,096-token
+prepare stayed inside `max_abs = 1.49011612e-08` and `rms = 1.02587529e-10`
+with zero non-finite values, including the 4,096-versus-64-window split.
+Overlay `W_fit(4096) = 22` and `W_fit(65) = 0`. After three warm-ups, 30 paired
+CUDA-event samples measured sequential mean `38.7084427 ms` and parallel mean
+`31.2641716 ms` on diagnostic 64-window scratch. That A/B is a component
+GDN-prepare predicate, not an end-to-end prefill claim. Sequential 64-token
+windows remain the byte-exact reference. Nsight Systems is not claimed.
+
 The **proof boundary** excludes comparative speed claims, 2K/8K sustained
 prefill, execution of a 128K prefill, 128K retrieval quality, thermal stability,
 superiority to llama.cpp/vLLM, and a Nsight Systems overlap timeline. BEN-001
 provides the harness; CMP-002/CMP-003 still own the 30-sample comparative gate.
 QLT-001 remains blocked. OPT-012's prompt graphs are FFN subgraphs only: not a
 whole-chunk graph, not a speedup gate, and not 128K quality recovery.
+OPT-013 does not claim those gates either.

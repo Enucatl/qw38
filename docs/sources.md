@@ -307,6 +307,25 @@ DSpark are explicitly rejected as Qwen model semantics.
   The beginner explanation is
   [`docs/53-stable-address-cuda-graphs.md`](53-stable-address-cuda-graphs.md).
   No external kernel implementation was copied or adapted.
+- OPT-013 introduces no new external implementation source. It is a local
+  derivation of the already admitted GDN-002 sequential 64-token windows: each
+  window's gated-delta map is stored as a dense affine operator `(A_w, B_w)`, a
+  48-block `A S + B` prefix produces incoming window state, and a parallel
+  from-state grid replays sequential window arithmetic. No Flash Linear
+  Attention, Triton, or vendor GDN kernel is copied or adapted. Overlay scratch
+  uses existing `prompt_projected_bf16_` (`W_fit(4096) = 22`); there is no extra
+  session `cudaMalloc`. The schema-1 contract freezes envelopes, overlay
+  `W_fit`, launch geometry, fail-closed rules, and the component-only proof
+  limit in
+  [`pins/cuda_gdn_scan_contract.json`](../pins/cuda_gdn_scan_contract.json).
+  One pinned RTX 5090 fixture retains sequential byte-exact regression,
+  parallel-versus-sequential envelopes, the 4,096-versus-64-window split,
+  captured intra/prefix/from-state nodes, overlay arithmetic, and 30 paired
+  CUDA-event samples; it is not Nsight Systems, end-to-end prefill/decode
+  speedup, or 128K quality evidence:
+  [`fixtures/cuda_gdn_scan.json`](../fixtures/cuda_gdn_scan.json).
+  The beginner explanation is
+  [`docs/42-cuda-gdn-chunks.md`](42-cuda-gdn-chunks.md).
 - CUD-003 introduces no new external implementation source. GGUF Q8_0 decoding
   follows the format already admitted by the pinned scalar decoder, and the
   pointwise/layout equations come from the pinned model contract and scalar
@@ -475,7 +494,10 @@ DSpark are explicitly rejected as Qwen model semantics.
   D2H/scatter overlap; that increment is also documented separately and remains
   component-only, with no Nsight Systems overlap claim. OPT-012 later captures
   4,096-row prompt FFN graphs beside the decode set; that increment is documented
-  separately and remains component-only, not a whole-chunk graph. Exact
+  separately and remains component-only, not a whole-chunk graph. OPT-013 later
+  replaces sequential prompt GDN windows with an associative scan when overlay
+  scratch fits; that increment is documented separately and remains
+  component-only. Exact
   `[4096, 1]` differential, capacity fallback, cancellation, and memory
   evidence is authenticated in
   [`pins/cuda_prompt_scheduler_contract.json`](../pins/cuda_prompt_scheduler_contract.json)

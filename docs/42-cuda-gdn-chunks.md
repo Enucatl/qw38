@@ -1,12 +1,20 @@
 # 42. Chunked CUDA GDN prefill in 64-token windows
 
-[Index](README.md) · Implementation tasks: GDN-002 and EDU-028 in
+[Index](README.md) · Implementation tasks: GDN-002, OPT-013, and EDU-028 in
 [`implementation_ledger.md`](../implementation_ledger.md)
+· Contracts:
+[`pins/cuda_gdn_chunk_contract.json`](../pins/cuda_gdn_chunk_contract.json),
+[`pins/cuda_gdn_scan_contract.json`](../pins/cuda_gdn_scan_contract.json)
+· Evidence:
+[`fixtures/cuda_gdn_chunk.json`](../fixtures/cuda_gdn_chunk.json),
+[`fixtures/cuda_gdn_scan.json`](../fixtures/cuda_gdn_scan.json)
 
 [Chapter 41](41-cuda-gdn-step.md) prepared one token of GDN state. A prompt has
 many tokens, and processing those known input tokens is called **prefill**.
 GDN-002 accepts an arbitrary positive prompt chunk while retaining exactly the
 same causal convolution and recurrent mutation order as repeated one-token work.
+OPT-013 keeps that internal **64-token window** and adds an associative parallel
+scan for production prompt chunks.
 
 ## Chunk input and output
 
@@ -42,10 +50,12 @@ much per-launch sequential work one block owns. It does not reset state at a
 window boundary. Window zero reads committed state and writes candidate state;
 every later window continues from that same candidate.
 
-The current implementation is a correctness-first sequential recurrence, not
-an associative parallel scan. “Scan” here names the bounded state-carrying
-window. A future parallel formulation must still compare with these exact
-visible results before replacing it.
+The sequential path is still the byte-exact reference: one convolution kernel
+and one recurrence kernel per window, in **strict token order**, writing only
+**candidate state**. The parallel path uses the same 64-token windows and must
+stay inside the frozen GDN-002 envelopes against those visible sequential
+results. It is not required to be byte-exact, because composing dense window
+operators reorders FP32 reductions.
 
 ## Strict token order inside a window
 
@@ -64,6 +74,53 @@ The causal convolution follows the same **strict token order**. Each channel
 loads its four committed or candidate history values into a small local ring,
 advances the ring for every token in the window, writes each activated output,
 and finally stores the ending candidate history.
+
+## Associative parallel prompt scan
+
+One gated-delta step is an affine map of the recurrent matrix. For one value
+head, normalized key `k`, scalar `α = exp(log_decay)`, scalar `β`, and value
+row `v`:
+
+```text
+S_t = α (I − β k kᵀ) S_{t−1} + β k vᵀ
+y_t = qᵀ S_t
+```
+
+Writing `(A, B) = (α(I − βkkᵀ), βkvᵀ)`, two maps compose as
+`(A2, B2) ∘ (A1, B1) = (A2 A1, A2 B1 + B2)`. That associativity lets every
+window of a prompt chunk run the existing gated-delta arithmetic from a **zero**
+initial state in parallel, store its window operator `(A_w, B_w)`, then combine
+those operators instead of walking every token serially across the chunk.
+
+`GdnScanPath::kParallelAssociative` does four launches per overlay batch:
+
+1. **Convolution.** One data-parallel FIR over the whole chunk
+   (`grid.y == token_count`, production `grid.x == 40`, 256 threads). This is
+   not a scan; each token's four causal inputs are the same values the
+   sequential ring would see.
+2. **Intra windows.** Grid `[value_heads, W]` (production with 64-window
+   scratch: `[48, 64, 1]`, 128 threads). Each block runs the existing sequential
+   gated-delta loop from zero and stores dense `A_w`
+   (`value_heads × key_width × key_width` FP32; production `48 × 128 × 128`)
+   plus `B_w` (that window's ending zero-state matrix).
+3. **Prefix.** Grid `[value_heads]` (`[48, 1, 1]`). One `A_w S + B_w` matvec per
+   window produces each window's incoming `S_in`. This is not a 4,096-token
+   homogeneous replay of every token with `v = 0`.
+4. **From-state replay.** Grid `[value_heads, W]` again. Each block replays the
+   sequential window body from that `S_in` so outputs use sequential-window FMA
+   order.
+
+Scratch overlays `prompt_projected_bf16_` only during prepare. One `(A, B)` pair
+is 1,572,864 FP32 values. At `R = 4096` the overlay holds `W_fit = 22` windows,
+so a production 4,096-token layer batches `22 + 22 + 20`. A capacity-65 overlay
+cannot hold one pair (`W_fit = 0`) and falls back to sequential windows. Tails
+with a single window (`2 ≤ token_count ≤ 64`) keep the existing recurrence
+kernel after the 2D convolution. Decode one-token GDN stays sequential. There is
+no extra session `cudaMalloc`; the workspace byte formula is unchanged.
+
+Prepare still does not publish committed convolution or recurrent bytes, or the
+frontier. The first parallel batch reads committed recurrent state; later
+batches continue from candidate.
 
 ## Whole-chunk candidate state
 
@@ -115,7 +172,29 @@ small 65-token case and `0.500 ms` for the production-state 65-token core.
 case. These measurements exclude projections, normalization/output projection,
 FFN, attention, and scheduler overhead and are not full prefill throughput.
 
+**Measured, RTX 5090, component-only:** the OPT-013 diagnostic on CUDA 13.0.2
+kept sequential GDN-002 chunk-versus-tokenwise byte equality, then compared
+parallel versus sequential at production 64, 65, 129, 256, and 4,096 tokens
+inside maximum absolute error `5e-8`, maximum RMS `5e-9`, and zero non-finite
+values. Production 4,096 parallel versus sequential recorded
+`max_abs = 1.49011612e-08` and `rms = 1.02587529e-10`, including the
+4,096-versus-64-window split. Overlay arithmetic is `W_fit(4096) = 22` and
+`W_fit(65) = 0`. Captured 4,096-token geometry with 64-window scratch is one
+convolution node `[40, 4096, 256]`, one intra `[48, 64, 128]`, one prefix
+`[48, 1, 128]`, and one from-state `[48, 64, 128]`. After three warm-ups, 30
+paired CUDA-event samples at 4,096 tokens measured sequential mean
+`38.7084427 ms` and parallel mean `31.2641716 ms`
+(`measurement_utc=2026-09-08T08:09:51Z`). That A/B uses diagnostic scratch sized
+for all 64 windows in one batch; production overlay batches `22 + 22 + 20`.
+[`fixtures/cuda_gdn_scan.json`](../fixtures/cuda_gdn_scan.json) retains every
+raw sample. The proof limit is component-only GDN-prepare evidence. Sequential
+windows remain the byte-exact reference. Nsight Systems is not claimed.
+End-to-end prefill/decode speedup and 128K quality are not claimed.
+
 GDN-002 proves arbitrary chunk sizes, internal-window continuity, exact CUDA
-token-wise equivalence, and whole-chunk candidate isolation. It does not yet
-prove a parallel scan, complete GDN layers, the 64-layer scheduler, long-context
-quality, tuned dispatch, or request-level atomicity.
+token-wise equivalence, and whole-chunk candidate isolation. OPT-013 proves the
+associative intra / `A S + B` prefix / from-state scan against those sequential
+windows at the frozen envelopes, overlay `W_fit`, sequential fallback, launch
+geometry, and the component 4,096-token CUDA-event gate. Neither task proves
+complete GDN layers as a speedup claim, the comparative 5% prefill/decode
+gates, long-context quality, or request-level atomicity.

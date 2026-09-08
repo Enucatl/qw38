@@ -217,9 +217,9 @@ token 0 state → token 1 state → token 2 state → ...
 
 Splitting five tokens as `[5]`, `[2, 1, 2]`, or `[1, 1, 1, 1, 1]` must not reset,
 skip, or duplicate state. **Measured:** the CPU-002 diagnostic produces
-byte-identical outputs and final states for all three splits. This focused scalar
-test does not admit the future 64-token parallel scan; GDN-002 must prove that
-optimized chunk algorithm against token-wise execution.
+byte-identical outputs and final states for all three splits. CUDA prompt scan
+now has an associative parallel path admitted at the GDN-002 envelopes; this
+scalar CPU-002 test remains the byte-exact chunk-split authority.
 
 ## Fixtures, tolerances, and authority labels
 

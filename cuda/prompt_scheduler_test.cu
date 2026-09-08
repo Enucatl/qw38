@@ -83,13 +83,16 @@ int main(int argc, char** argv) {
   qw38::cuda::SyncResult sync_result;
   status = qw38::cuda::sync_tokens(model, tokens.data(), tokens.size(), &optimized,
       &optimized_workspace, optimized_logits.data(), optimized_logits.size(),
-      optimized_hidden.data(), optimized_hidden.size(), &sync_result);
+      optimized_hidden.data(), optimized_hidden.size(), &sync_result, nullptr,
+      nullptr, qw38::cuda::GdnScanPath::kSequentialWindows);
   if (!status.is_ok()) return fail_status(status);
 
   for (std::size_t index = 0; index < qw38::cuda::kPromptChunkRows; index += 64) {
     status = qw38::cuda::execute_prompt_chunk(model, tokens.data() + index, 64,
         &reference, &reference_workspace, reference_logits.data(),
-        reference_logits.size(), reference_hidden.data(), reference_hidden.size());
+        reference_logits.size(), reference_hidden.data(), reference_hidden.size(),
+        nullptr, qw38::cuda::PromptPipelinePath::kFusedOverlapped, nullptr, nullptr,
+        qw38::cuda::GdnScanPath::kSequentialWindows);
     if (!status.is_ok()) return fail_status(status);
   }
   float token_ms = 0.0F;

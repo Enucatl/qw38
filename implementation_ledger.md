@@ -79,7 +79,7 @@ are repository-relative unless stated otherwise.
 | OPT-010 | Tile KV layout for coalesced exact GQA access | OPT-007, SES-003 | done | KV storage supports coalesced tile loads without changing logical values, checkpoint compatibility, prefix reuse, or capacity | [`tasks/OPT-010.md`](tasks/OPT-010.md); [`cuda/attention_decode.cu`](cuda/attention_decode.cu); [`cuda/kv_tile_layout_test.cu`](cuda/kv_tile_layout_test.cu); [`pins/cuda_kv_tile_layout_contract.json`](pins/cuda_kv_tile_layout_contract.json); [`fixtures/cuda_kv_tile_layout.json`](fixtures/cuda_kv_tile_layout.json); log 2026-09-07T16:55:25Z |
 | OPT-011 | Pipeline and fuse prompt execution and chunk commit | OPT-008, OPT-009, OPT-010 | done | Justified fusion/overlap removes avoidable copies, launches, and barriers while preserving cancellation and atomic publication | [`tasks/OPT-011.md`](tasks/OPT-011.md); [`cuda/full_scheduler.cu`](cuda/full_scheduler.cu); [`cuda/prompt_pipeline_test.cu`](cuda/prompt_pipeline_test.cu); [`pins/cuda_prompt_pipeline_contract.json`](pins/cuda_prompt_pipeline_contract.json); [`fixtures/cuda_prompt_pipeline.json`](fixtures/cuda_prompt_pipeline.json); log 2026-09-07T18:12:37Z |
 | OPT-012 | Add stable-address prompt CUDA graphs | OPT-003, OPT-011 | done | Common 4,096-token prompt paths replay from stable addresses with graph/non-graph equality and reconciled memory | [`tasks/OPT-012.md`](tasks/OPT-012.md); verification 2026-09-07T20:27:06Z |
-| OPT-013 | Implement associative block-parallel GDN prompt scan | GDN-002, OPT-011 | pending | Parallel GDN scan preserves recurrence/frontier tolerances across chunk boundaries and demonstrates measured prompt speedup | — |
+| OPT-013 | Implement associative block-parallel GDN prompt scan | GDN-002, OPT-011 | done | Parallel GDN scan preserves recurrence/frontier tolerances across chunk boundaries and demonstrates measured prompt speedup | [`tasks/OPT-013.md`](tasks/OPT-013.md); [`pins/cuda_gdn_scan_contract.json`](pins/cuda_gdn_scan_contract.json); [`fixtures/cuda_gdn_scan.json`](fixtures/cuda_gdn_scan.json); verification 2026-09-08T08:58:06Z |
 
 ### 2026-09-04T13:09:32Z — OPT-005 delivered
 
@@ -3915,4 +3915,31 @@ are repository-relative unless stated otherwise.
   `plan.md` and `Makefile` are unchanged. OPT-013 remains pending; QLT-001
   remains blocked.
 - Marked OPT-012 `done`; delivery is limited to the verified task scope plus
+  this ledger/audit bookkeeping.
+
+### 2026-09-08T08:58:06Z — OPT-013 delivered
+
+- Independent verification attempt 2 passed sequential GDN-002
+  chunk-versus-tokenwise byte equality, parallel-versus-sequential envelopes
+  (max abs `5e-8`, RMS `5e-9`, zero non-finite) across window and
+  4,096-versus-64-window boundaries, overlay `W_fit(4096)=22` with sequential
+  fallback when one `(A, B)` pair cannot overlay, captured intra/prefix/
+  from-state geometry, fail-closed isolation, and a component-only 4,096-token
+  CUDA-event parallel mean strictly below sequential on the pinned RTX 5090.
+- Acceptance evidence: [`tasks/OPT-013.md`](tasks/OPT-013.md);
+  [`cuda/gdn_step.h`](cuda/gdn_step.h);
+  [`cuda/gdn_step.cu`](cuda/gdn_step.cu);
+  [`cuda/full_scheduler.h`](cuda/full_scheduler.h);
+  [`cuda/full_scheduler.cu`](cuda/full_scheduler.cu);
+  [`cuda/prompt_scheduler_test.cu`](cuda/prompt_scheduler_test.cu);
+  [`cuda/gdn_scan_test.cu`](cuda/gdn_scan_test.cu);
+  [`pins/cuda_gdn_scan_contract.json`](pins/cuda_gdn_scan_contract.json);
+  [`fixtures/cuda_gdn_scan.json`](fixtures/cuda_gdn_scan.json);
+  [`docs/42-cuda-gdn-chunks.md`](docs/42-cuda-gdn-chunks.md);
+  [`docs/62-cuda-full-prefill.md`](docs/62-cuda-full-prefill.md);
+  [`docs/18-gated-delta-network.md`](docs/18-gated-delta-network.md).
+  The proof remains component-only and excludes Nsight Systems, end-to-end
+  prefill/decode speedup, and 128K quality recovery. `plan.md` and `Makefile`
+  are unchanged. QLT-001 remains blocked.
+- Marked OPT-013 `done`; delivery is limited to the verified task scope plus
   this ledger/audit bookkeeping.

@@ -21,10 +21,19 @@ struct GdnState {
   float* recurrent;
 };
 
+enum class GdnScanPath : std::uint8_t {
+  kSequentialWindows = 0,
+  kParallelAssociative = 1,
+};
+
 std::size_t gdn_convolution_channels(const GdnConfig& config) noexcept;
 std::size_t gdn_convolution_values(const GdnConfig& config) noexcept;
 std::size_t gdn_recurrent_values(const GdnConfig& config) noexcept;
 std::size_t gdn_output_values(const GdnConfig& config) noexcept;
+std::size_t gdn_scan_window_count(std::size_t token_count) noexcept;
+std::size_t gdn_scan_operator_values(const GdnConfig& config) noexcept;
+std::size_t gdn_scan_scratch_floats(const GdnConfig& config,
+                                    std::size_t token_count) noexcept;
 
 cudaError_t launch_gdn_prepare(
     const GdnConfig& config, const float* convolution_input,
@@ -45,14 +54,18 @@ cudaError_t launch_gdn_prepare_chunk(
     const float* convolution_weights, const float* log_decay,
     const float* beta, std::size_t token_count, const GdnState& committed,
     const GdnState& candidate, float* convolution_output,
-    float* recurrent_output, cudaStream_t stream) noexcept;
+    float* recurrent_output, cudaStream_t stream,
+    GdnScanPath path = GdnScanPath::kSequentialWindows,
+    float* scratch = nullptr, std::size_t scratch_floats = 0) noexcept;
 
 cudaError_t launch_gdn_prepare_chunk_tiled(
     const GdnConfig& config, const float* convolution_input,
     const float* convolution_weights, const float* log_decay,
     const float* beta, std::size_t token_count, const GdnState& committed,
     const GdnState& candidate, float* convolution_output,
-    float* recurrent_output, cudaStream_t stream) noexcept;
+    float* recurrent_output, cudaStream_t stream,
+    GdnScanPath path = GdnScanPath::kSequentialWindows,
+    float* scratch = nullptr, std::size_t scratch_floats = 0) noexcept;
 
 cudaError_t launch_gdn_commit(const GdnConfig& config,
                               const GdnState& candidate,

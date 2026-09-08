@@ -1,0 +1,374 @@
+{
+  "schema_version": 1,
+  "task": "OPT-013",
+  "status": "measured",
+  "device": "NVIDIA GeForce RTX 5090",
+  "compute_capability": "12.0",
+  "driver": "13.1",
+  "runtime": "13.0",
+  "toolkit": "CUDA 13.0.2",
+  "pinned_image": "qw38-cuda:13.0.2",
+  "measurement_utc": "2026-09-08T08:22:26Z",
+  "semantic": {
+    "sequential_regression": true,
+    "parallel_vs_sequential": true,
+    "chunk_boundaries": true,
+    "tiled_layout": true,
+    "launch_geometry": true,
+    "fail_closed": true,
+    "overlay_capacity": true,
+    "speedup": true,
+    "launch_counts": true
+  },
+  "sequential_regression": [
+    {
+      "name": "small_3",
+      "tokens": 3,
+      "max_abs": 7.4505806e-09,
+      "rms": 5.97767558e-10,
+      "nonfinite": 0,
+      "prepare_atomic": true,
+      "tokenwise_equal": true,
+      "conv_memcmp": true,
+      "vs_scalar": true,
+      "passed": true
+    },
+    {
+      "name": "small_64",
+      "tokens": 64,
+      "max_abs": 1.86264515e-08,
+      "rms": 1.37352818e-09,
+      "nonfinite": 0,
+      "prepare_atomic": true,
+      "tokenwise_equal": true,
+      "conv_memcmp": true,
+      "vs_scalar": true,
+      "passed": true
+    },
+    {
+      "name": "small_65",
+      "tokens": 65,
+      "max_abs": 1.86264515e-08,
+      "rms": 1.40372503e-09,
+      "nonfinite": 0,
+      "prepare_atomic": true,
+      "tokenwise_equal": true,
+      "conv_memcmp": true,
+      "vs_scalar": true,
+      "passed": true
+    },
+    {
+      "name": "small_129",
+      "tokens": 129,
+      "max_abs": 1.86264515e-08,
+      "rms": 1.32703004e-09,
+      "nonfinite": 0,
+      "prepare_atomic": true,
+      "tokenwise_equal": true,
+      "conv_memcmp": true,
+      "vs_scalar": true,
+      "passed": true
+    },
+    {
+      "name": "production_65",
+      "tokens": 65,
+      "max_abs": 2.42143869e-08,
+      "rms": 1.87799953e-09,
+      "nonfinite": 0,
+      "prepare_atomic": true,
+      "tokenwise_equal": true,
+      "conv_memcmp": true,
+      "vs_scalar": true,
+      "passed": true
+    }
+  ],
+  "parallel_vs_sequential": [
+    {
+      "name": "small_3",
+      "tokens": 3,
+      "max_abs": 7.4505806e-09,
+      "rms": 5.97767558e-10,
+      "nonfinite": 0,
+      "prepare_atomic": true,
+      "tokenwise_equal": true,
+      "conv_memcmp": true,
+      "vs_scalar": true,
+      "passed": true
+    },
+    {
+      "name": "small_64",
+      "tokens": 64,
+      "max_abs": 1.86264515e-08,
+      "rms": 1.37352818e-09,
+      "nonfinite": 0,
+      "prepare_atomic": true,
+      "tokenwise_equal": true,
+      "conv_memcmp": true,
+      "vs_scalar": true,
+      "passed": true
+    },
+    {
+      "name": "small_65",
+      "tokens": 65,
+      "max_abs": 1.86264515e-08,
+      "rms": 1.40372503e-09,
+      "nonfinite": 0,
+      "prepare_atomic": true,
+      "tokenwise_equal": true,
+      "conv_memcmp": true,
+      "vs_scalar": true,
+      "passed": true
+    },
+    {
+      "name": "small_129",
+      "tokens": 129,
+      "max_abs": 1.86264515e-08,
+      "rms": 1.32703004e-09,
+      "nonfinite": 0,
+      "prepare_atomic": true,
+      "tokenwise_equal": true,
+      "conv_memcmp": true,
+      "vs_scalar": true,
+      "passed": true
+    },
+    {
+      "name": "production_64",
+      "tokens": 64,
+      "max_abs": 2.23517418e-08,
+      "rms": 1.78977122e-09,
+      "nonfinite": 0,
+      "prepare_atomic": true,
+      "tokenwise_equal": true,
+      "conv_memcmp": true,
+      "vs_scalar": true,
+      "passed": true
+    },
+    {
+      "name": "production_65",
+      "tokens": 65,
+      "max_abs": 2.42143869e-08,
+      "rms": 1.87799953e-09,
+      "nonfinite": 0,
+      "prepare_atomic": true,
+      "tokenwise_equal": true,
+      "conv_memcmp": true,
+      "vs_scalar": true,
+      "passed": true
+    },
+    {
+      "name": "production_129",
+      "tokens": 129,
+      "max_abs": 2.60770321e-08,
+      "rms": 1.3430842e-09,
+      "nonfinite": 0,
+      "prepare_atomic": true,
+      "tokenwise_equal": true,
+      "conv_memcmp": true,
+      "vs_scalar": true,
+      "passed": true
+    },
+    {
+      "name": "production_256",
+      "tokens": 256,
+      "max_abs": 1.49011612e-08,
+      "rms": 2.98916336e-10,
+      "nonfinite": 0,
+      "prepare_atomic": true,
+      "tokenwise_equal": true,
+      "conv_memcmp": true,
+      "vs_scalar": true,
+      "passed": true
+    },
+    {
+      "name": "production_4096",
+      "tokens": 4096,
+      "max_abs": 1.49011612e-08,
+      "rms": 1.02587529e-10,
+      "nonfinite": 0,
+      "prepare_atomic": true,
+      "tokenwise_equal": true,
+      "conv_memcmp": true,
+      "vs_scalar": true,
+      "passed": true
+    }
+  ],
+  "chunk_boundaries": {
+    "production_65": true,
+    "production_129": true,
+    "production_4096_vs_64_windows": {
+      "max_abs": 1.49011612e-08,
+      "rms": 1.02587529e-10,
+      "nonfinite": 0,
+      "prepare_atomic": true,
+      "passed": true
+    }
+  },
+  "tiled": {
+    "name": "production_65_tiled",
+    "tokens": 65,
+    "max_abs": 2.23517418e-08,
+    "rms": 9.59857305e-10,
+    "nonfinite": 0,
+    "prepare_atomic": true,
+    "passed": true
+  },
+  "launch": {
+    "conv_64": {
+      "kernel_nodes": 1,
+      "grid": [
+        40,
+        64,
+        1
+      ],
+      "block": [
+        256,
+        1,
+        1
+      ]
+    },
+    "conv_4096": {
+      "kernel_nodes": 1,
+      "grid": [
+        40,
+        4096,
+        1
+      ],
+      "block": [
+        256,
+        1,
+        1
+      ]
+    },
+    "intra_4096": {
+      "kernel_nodes": 1,
+      "grid": [
+        48,
+        64,
+        1
+      ],
+      "block": [
+        128,
+        1,
+        1
+      ]
+    },
+    "prefix_4096": {
+      "kernel_nodes": 1,
+      "grid": [
+        48,
+        1,
+        1
+      ],
+      "block": [
+        128,
+        1,
+        1
+      ]
+    },
+    "from_state_4096": {
+      "kernel_nodes": 1,
+      "grid": [
+        48,
+        64,
+        1
+      ],
+      "block": [
+        128,
+        1,
+        1
+      ]
+    },
+    "sequential_4096_recurrence_nodes": 64
+  },
+  "fail_closed": {
+    "null_scratch": true,
+    "zero_scratch_floats": true,
+    "aliased": true,
+    "token_count_0": true,
+    "invalid_path": true
+  },
+  "overlay": {
+    "w_fit_4096": 22,
+    "w_fit_65": 0
+  },
+  "speedup": {
+    "warmups": 3,
+    "samples": 30,
+    "sequential_mean_ms": 38.6643753,
+    "parallel_mean_ms": 31.2521954,
+    "parallel_below_sequential": true,
+    "sequential_ms": [
+      38.6609612,
+      38.6699829,
+      38.6780167,
+      38.6521263,
+      38.6677132,
+      38.6638069,
+      38.6546249,
+      38.6663361,
+      38.6564178,
+      38.6736946,
+      38.6571846,
+      38.6605759,
+      38.659584,
+      38.6786232,
+      38.6770897,
+      38.644001,
+      38.6554222,
+      38.6539536,
+      38.6757431,
+      38.6660461,
+      38.672863,
+      38.6744957,
+      38.6697273,
+      38.6536942,
+      38.6725426,
+      38.6520653,
+      38.6843185,
+      38.6664658,
+      38.6681938,
+      38.6449928
+    ],
+    "parallel_ms": [
+      31.2490883,
+      31.2132797,
+      31.2869129,
+      31.1681271,
+      31.2626877,
+      31.3932476,
+      31.2146568,
+      31.2868481,
+      31.2012482,
+      31.3042564,
+      31.1774082,
+      31.2720318,
+      31.2387848,
+      31.2193279,
+      31.1975994,
+      31.2174072,
+      31.316576,
+      31.2370243,
+      31.2277126,
+      31.2402554,
+      31.2009277,
+      31.2388477,
+      31.2813759,
+      31.2815685,
+      31.247776,
+      31.3425598,
+      31.2034874,
+      31.3177929,
+      31.3012486,
+      31.2256966
+    ]
+  },
+  "launch_counts": {
+    "parallel_convolution": 1,
+    "parallel_intra": 1,
+    "parallel_prefix": 1,
+    "parallel_from_state": 1,
+    "sequential_convolution": 64,
+    "sequential_recurrence": 64
+  },
+  "proof_limit": "component-only GDN-prepare evidence; sequential GDN-002 windows remain the byte-exact reference; Nsight Systems is not claimed; end-to-end prefill/decode speedup and 128K quality are not claimed"
+}

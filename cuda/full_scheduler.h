@@ -12,6 +12,7 @@
 #include "qw38/status.h"
 #include "weights.h"
 #include "quant_mmv.h"
+#include "gdn_step.h"
 #ifdef QW38_DIAGNOSTIC_TRACE
 #include "diagnostic_trace.h"
 #endif
@@ -181,13 +182,14 @@ class ResidentModel final {
                             std::size_t, class SchedulerSession*,
                             class SchedulerWorkspace*, float*, std::size_t,
                             float*, std::size_t, SyncResult*,
-                            const EvalControl*, SchedulerGraphs*) noexcept;
+                            const EvalControl*, SchedulerGraphs*,
+                            GdnScanPath) noexcept;
   friend Status execute_prompt_chunk(
       const ResidentModel&, const std::size_t*, std::size_t,
       class SchedulerSession*, class SchedulerWorkspace*, float*,
       std::size_t, float*, std::size_t, const EvalControl*,
       PromptPipelinePath, PromptPipelineCounters*,
-      SchedulerGraphs*) noexcept;
+      SchedulerGraphs*, GdnScanPath) noexcept;
   friend class SchedulerGraphs;
 };
 
@@ -244,12 +246,13 @@ class SchedulerSession final {
                             std::size_t, SchedulerSession*,
                             class SchedulerWorkspace*, float*, std::size_t,
                             float*, std::size_t, SyncResult*,
-                            const EvalControl*, SchedulerGraphs*) noexcept;
+                            const EvalControl*, SchedulerGraphs*,
+                            GdnScanPath) noexcept;
   friend Status execute_prompt_chunk(
       const ResidentModel&, const std::size_t*, std::size_t,
       SchedulerSession*, class SchedulerWorkspace*, float*, std::size_t,
       float*, std::size_t, const EvalControl*, PromptPipelinePath,
-      PromptPipelineCounters*, SchedulerGraphs*) noexcept;
+      PromptPipelineCounters*, SchedulerGraphs*, GdnScanPath) noexcept;
   friend Status greedy_sample(const SchedulerSession&, std::size_t*,
                               RuntimeTimings*) noexcept;
 };
@@ -332,12 +335,12 @@ class SchedulerWorkspace final {
                             std::size_t, SchedulerSession*, SchedulerWorkspace*,
                             float*, std::size_t, float*, std::size_t,
                             SyncResult*, const EvalControl*,
-                            SchedulerGraphs*) noexcept;
+                            SchedulerGraphs*, GdnScanPath) noexcept;
   friend Status execute_prompt_chunk(
       const ResidentModel&, const std::size_t*, std::size_t,
       SchedulerSession*, SchedulerWorkspace*, float*, std::size_t, float*,
       std::size_t, const EvalControl*, PromptPipelinePath,
-      PromptPipelineCounters*, SchedulerGraphs*) noexcept;
+      PromptPipelineCounters*, SchedulerGraphs*, GdnScanPath) noexcept;
   friend class SchedulerGraphs;
 };
 
@@ -382,7 +385,7 @@ class SchedulerGraphs final {
       const ResidentModel&, const std::size_t*, std::size_t,
       SchedulerSession*, SchedulerWorkspace*, float*, std::size_t, float*,
       std::size_t, const EvalControl*, PromptPipelinePath,
-      PromptPipelineCounters*, SchedulerGraphs*) noexcept;
+      PromptPipelineCounters*, SchedulerGraphs*, GdnScanPath) noexcept;
 };
 
 Status execute_token(const ResidentModel& model, std::size_t token,
@@ -438,7 +441,8 @@ Status execute_prompt_chunk(
     const EvalControl* control = nullptr,
     PromptPipelinePath path = PromptPipelinePath::kFusedOverlapped,
     PromptPipelineCounters* counters = nullptr,
-    SchedulerGraphs* graphs = nullptr) noexcept;
+    SchedulerGraphs* graphs = nullptr,
+    GdnScanPath gdn_scan = GdnScanPath::kParallelAssociative) noexcept;
 
 Status greedy_sample(const SchedulerSession& session,
                      std::size_t* token,
@@ -450,7 +454,9 @@ Status sync_tokens(const ResidentModel& model, const std::size_t* tokens,
                    std::size_t logits_count, float* host_hidden,
                    std::size_t hidden_count, SyncResult* result,
                    const EvalControl* control = nullptr,
-                   SchedulerGraphs* graphs = nullptr) noexcept;
+                   SchedulerGraphs* graphs = nullptr,
+                   GdnScanPath gdn_scan =
+                       GdnScanPath::kParallelAssociative) noexcept;
 
 }  // namespace qw38::cuda
 

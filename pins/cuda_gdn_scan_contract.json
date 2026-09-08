@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "task": "OPT-013",
+  "target": "sm_120",
+  "toolkit": "CUDA 13.0.2",
+  "pinned_image": "qw38-cuda:13.0.2",
+  "scan_window_tokens": 64,
+  "admission": {
+    "maximum_absolute_error": 5.0e-8,
+    "maximum_rms_error": 5.0e-9,
+    "nonfinite_count": 0
+  },
+  "overlay": {
+    "w_fit_4096": 22,
+    "w_fit_65": 0
+  },
+  "launch": {
+    "conv_block_x": 256,
+    "conv_grid_x": 40,
+    "intra_grid": [48, 64, 1],
+    "intra_block": [128, 1, 1],
+    "prefix_grid": [48, 1, 1],
+    "from_state_grid": [48, 64, 1],
+    "sequential_4096_recurrence_nodes": 64
+  },
+  "speedup_samples": 30,
+  "semantic_predicates": [
+    "sequential_regression",
+    "parallel_vs_sequential",
+    "chunk_boundaries",
+    "tiled_layout",
+    "launch_geometry",
+    "fail_closed",
+    "overlay_capacity",
+    "speedup",
+    "launch_counts"
+  ],
+  "metadata_required": [
+    "device",
+    "compute_capability",
+    "driver",
+    "runtime",
+    "toolkit",
+    "pinned_image",
+    "measurement_utc",
+    "proof_limit"
+  ]
+}
