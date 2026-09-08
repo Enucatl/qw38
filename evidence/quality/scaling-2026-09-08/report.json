@@ -1,0 +1,109 @@
+{
+  "schema": "qw38.qlt001-scaling-report.v1",
+  "measured_at_utc_range": [
+    "2026-09-08T09:25:11Z",
+    "2026-09-08T09:52:31Z"
+  ],
+  "purpose": "QLT-001 readmission gate: 2K/8K/32K runtime vs pinned llama.cpp before 128K retrieval",
+  "admission_eligible": false,
+  "methodology": {
+    "quartz": "qw38-bench --workload prefill --smoke --warmups 0 --samples 1; chat-rendered user prompt; RTX 5090; qw38-cuda:13.0.2; binary build/cuda/qw38-bench @ 35295d5",
+    "llama": "llama-bench -p 2048,8192,32768 -n 0 -r 3 --no-warmup -ngl 99; pinned cc83d7b; same GGUF; qw38-llama-authority:cuda-13.0.2",
+    "notes": [
+      "Quartz token counts are chat-rendered (~target+4); llama-bench uses exact -p sizes.",
+      "Single Quartz sample per size: forecasting evidence, not CMP-002/003 admission.",
+      "Historical stopped 128K attempt reported ~4.2 tok/s before OPT-005..013."
+    ]
+  },
+  "quartz_prefill": [
+    {
+      "label": "2K",
+      "tokens": 2052,
+      "seconds": 41.6646971,
+      "tok_s": 49.2503281,
+      "peak_mib": 28750
+    },
+    {
+      "label": "8K",
+      "tokens": 8196,
+      "seconds": 204.074243,
+      "tok_s": 40.1618542,
+      "peak_mib": 28750
+    },
+    {
+      "label": "32K",
+      "tokens": 32772,
+      "seconds": 1306.15633,
+      "tok_s": 25.0904117,
+      "peak_mib": 28750
+    }
+  ],
+  "llama_prefill": [
+    {
+      "tokens": 2048,
+      "seconds": 0.657690797,
+      "tok_s": 3114.049476,
+      "stddev_tok_s": 24.036134,
+      "repetitions": 3
+    },
+    {
+      "tokens": 8192,
+      "seconds": 2.705895905,
+      "tok_s": 3027.488384,
+      "stddev_tok_s": 10.724366,
+      "repetitions": 3
+    },
+    {
+      "tokens": 32768,
+      "seconds": 12.476610402,
+      "tok_s": 2626.395053,
+      "stddev_tok_s": 12.669922,
+      "repetitions": 3
+    }
+  ],
+  "fit": {
+    "model": "seconds = a*tokens + b*tokens^2",
+    "a_seconds_per_token": 0.019829611687127876,
+    "b_seconds_per_token2": 6.111013860955516e-07,
+    "residuals_seconds": [
+      -1.5988331328244811,
+      0.500366884540739,
+      -0.02502750509938778
+    ]
+  },
+  "forecast_128k": {
+    "tokens": 131072,
+    "quadratic_seconds": 13097.748734337878,
+    "quadratic_hours": 3.638263537316077,
+    "from_32k_constant_rate_hours": 1.4511076710984732,
+    "from_8k_constant_rate_hours": 0.9065539829804194,
+    "from_2k_constant_rate_hours": 0.7392618545598866,
+    "historical_4p2_tok_s_hours": 8.668783068783068
+  },
+  "comparison": [
+    {
+      "approx_context": "2K",
+      "quartz_tok_s": 49.2503281,
+      "llama_tok_s": 3114.049476,
+      "llama_over_quartz": 63.22900975760201,
+      "quartz_seconds": 41.6646971,
+      "llama_seconds": 0.657690797
+    },
+    {
+      "approx_context": "8K",
+      "quartz_tok_s": 40.1618542,
+      "llama_tok_s": 3027.488384,
+      "llama_over_quartz": 75.38218651269344,
+      "quartz_seconds": 204.074243,
+      "llama_seconds": 2.705895905
+    },
+    {
+      "approx_context": "32K",
+      "quartz_tok_s": 25.0904117,
+      "llama_tok_s": 2626.395053,
+      "llama_over_quartz": 104.67724023037853,
+      "quartz_seconds": 1306.15633,
+      "llama_seconds": 12.476610402
+    }
+  ]
+}

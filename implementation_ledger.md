@@ -80,6 +80,9 @@ are repository-relative unless stated otherwise.
 | OPT-011 | Pipeline and fuse prompt execution and chunk commit | OPT-008, OPT-009, OPT-010 | done | Justified fusion/overlap removes avoidable copies, launches, and barriers while preserving cancellation and atomic publication | [`tasks/OPT-011.md`](tasks/OPT-011.md); [`cuda/full_scheduler.cu`](cuda/full_scheduler.cu); [`cuda/prompt_pipeline_test.cu`](cuda/prompt_pipeline_test.cu); [`pins/cuda_prompt_pipeline_contract.json`](pins/cuda_prompt_pipeline_contract.json); [`fixtures/cuda_prompt_pipeline.json`](fixtures/cuda_prompt_pipeline.json); log 2026-09-07T18:12:37Z |
 | OPT-012 | Add stable-address prompt CUDA graphs | OPT-003, OPT-011 | done | Common 4,096-token prompt paths replay from stable addresses with graph/non-graph equality and reconciled memory | [`tasks/OPT-012.md`](tasks/OPT-012.md); verification 2026-09-07T20:27:06Z |
 | OPT-013 | Implement associative block-parallel GDN prompt scan | GDN-002, OPT-011 | done | Parallel GDN scan preserves recurrence/frontier tolerances across chunk boundaries and demonstrates measured prompt speedup | [`tasks/OPT-013.md`](tasks/OPT-013.md); [`pins/cuda_gdn_scan_contract.json`](pins/cuda_gdn_scan_contract.json); [`fixtures/cuda_gdn_scan.json`](fixtures/cuda_gdn_scan.json); verification 2026-09-08T08:58:06Z |
+| OPT-014 | Instrument attributed 2K prefill time breakdown | BEN-001, OPT-013 | pending | A cold 2K Quartz prefill emits a retained live attribution report whose named categories (at least embedding, GDN, attention, FFN/MMQ, logits, commit/sync, graph, other/idle) sum to the measured prefill wall time within a documented tolerance; the report is produced from the timed run itself without requiring a separate Nsight capture | — |
+| OPT-015 | Compare Quartz 2K prefill to llama.cpp; mine ds4 for techniques | OPT-013, PIN-002 | pending | Checked-in report explains what pushes pinned same-GGUF llama.cpp into thousands of tok/s at 2K, uses `../ds4` only as MIT-licensed technique inspiration (ds4 cannot run this Qwen GGUF; no ds4 same-model baseline), separates transferable methods under `plan.md` provenance from non-transferable ds4 model policies such as sparse/compressed attention, maps each major Quartz 2K time sink to a faster path, and proposes a ranked recovery sequence | — |
+| OPT-016 | Reach 2K prefill throughput at or above pinned llama.cpp | OPT-014, OPT-015 | pending | On the same GGUF and RTX 5090, cold 2K Quartz prefill tok/s is ≥ pinned llama.cpp `llama-bench` 2K under a frozen protocol; until this passes, performance work and speed claims use the 2K yardstick only (no 8K/32K/128K throughput or QLT 128K attempts as speed gates); numeric/state envelopes remain unloosened | — |
 
 ### 2026-09-04T13:09:32Z — OPT-005 delivered
 
@@ -102,7 +105,7 @@ are repository-relative unless stated otherwise.
 | BEN-001 | Implement `qw38-bench` component/end-to-end harness | OPT-001 | done | Warmups/samples, telemetry, raw samples, failures, and environment metadata are retained | `pins/benchmark_contract.json`; `fixtures/benchmark_harness.json`; `evidence/benchmark/`; `tests/test_benchmark.py`; log 2026-09-02T15:24:00Z |
 | BEN-002 | Preserve the product-wide no-argument usage exit contract in `qw38-bench` | BEN-001, BLD-001 | done | Invoking the benchmark with no arguments prints usage and returns exit code 2 without creating output | `tests/test_build.py`; log 2026-09-02T15:24:00Z |
 | EVAL-001 | Implement `qw38-eval` logits/traces/checkpoints harness | ORA-001, SES-003 | done | Focused native diagnostics are driven by typed pytest helpers | [`tasks/EVAL-001.md`](tasks/EVAL-001.md); reopened 2026-09-03T14:00:00Z after build/hash repair; recovery readmitted 2026-09-03T15:44:53Z; completed 2026-09-03T17:01:54Z |
-| QLT-001 | Pass held-out NLL, continuation, recurrence, retrieval, and task quality | EVAL-001, MEM-001, OPT-012, OPT-013 | blocked | Admitted artifact passes every documented threshold and 128K retrieval fixture | [`tasks/QLT-001.md`](tasks/QLT-001.md); blocked 2026-09-04T06:09:51Z pending prompt optimization chain |
+| QLT-001 | Pass held-out NLL, continuation, recurrence, retrieval, and task quality | EVAL-001, MEM-001, OPT-012, OPT-013, OPT-016 | blocked | Admitted artifact passes every documented threshold and 128K retrieval fixture | [`tasks/QLT-001.md`](tasks/QLT-001.md); blocked 2026-09-08T10:22:44Z pending 2K llama.cpp prefill parity (`OPT-016`); prior scaling report [`evidence/quality/scaling-2026-09-08/REPORT.md`](evidence/quality/scaling-2026-09-08/REPORT.md) |
 | CMP-001 | Pin and validate comparable baseline artifacts | PIN-001, PIN-002, QLT-001 | pending | llama/Ollama share GGUF; vLLM difference and <=1% NLL admission are explicit | — |
 | CMP-002 | Run controlled 30-sample comparative matrix | BEN-001, OPT-004, CMP-001 | pending | All contexts/metrics/environment data and negative runs are retained | — |
 | CMP-003 | Pass prefill/decode statistical speed gates | CMP-002 | pending | Paired bootstrap lower bounds exceed 1.05 and no workload is >5% slower | — |
@@ -168,7 +171,7 @@ are repository-relative unless stated otherwise.
 | 6. CUDA primitives | CUD-001–CUD-003 |
 | 7. GDN/attention/scheduler | GDN-001–GDN-002, ATN-001–ATN-002, SCH-001 |
 | 8. Sessions and 128K | SES-001–SES-003, MEM-001 |
-| 9. Profiling/optimization | OPT-001–OPT-013 |
+| 9. Profiling/optimization | OPT-001–OPT-016 |
 | 10. Product tools/API/quality | CLI-001, SRV-001–SRV-003, BEN-001, EVAL-001, QLT-001 |
 | 11. Comparative speed | CMP-001–CMP-003 |
 | 12. Documentation/release | DOC-001, REL-001 |
@@ -3943,3 +3946,44 @@ are repository-relative unless stated otherwise.
   are unchanged. QLT-001 remains blocked.
 - Marked OPT-013 `done`; delivery is limited to the verified task scope plus
   this ledger/audit bookkeeping.
+
+### 2026-09-08T09:21:04Z — QLT-001 readmitted after OPT chain
+
+- OPT-012 and OPT-013 are `done`, satisfying the 2026-09-04T06:09:51Z recovery
+  dependency on the prompt optimization chain.
+- Marked QLT-001 `pending` (not `in_progress`). Coupled IDs remain `none`.
+- User gate before any 131,072-token retrieval retry: publish a full 2K/8K/32K
+  scaling report with Quartz wall-clock/runtime, plain pinned-llama.cpp
+  comparison on the same GGUF/RTX 5090, and an explicit 128K completion-time
+  forecast. Do not start the 128K quality run until that report is reviewed.
+- Evidence dossier: [`tasks/QLT-001.md`](tasks/QLT-001.md).
+
+### 2026-09-08T09:53:29Z — QLT-001 2K/8K/32K scaling report
+
+- Published forecast-only prefill scaling evidence before any 128K quality
+  retry: [`evidence/quality/scaling-2026-09-08/REPORT.md`](evidence/quality/scaling-2026-09-08/REPORT.md).
+- Quartz cold prefill: ~49 / 40 / 25 tok/s at ~2K / 8K / 32K; pinned llama.cpp
+  same-GGUF `llama-bench` ~3114 / 3027 / 2626 tok/s.
+- Preferred 128K Quartz prefill forecast from quadratic fit: ~3.64 h
+  (budget ~3.6–4.7 h). QLT-001 remains `pending` until the report is accepted
+  and a later ledger run starts implementation.
+
+### 2026-09-08T10:22:44Z — 2K llama.cpp parity gate admitted
+
+- After the 2K/8K/32K scaling report showed Quartz still ~63–105× behind pinned
+  llama.cpp, admitted OPT-014 through OPT-016 before further long-context or
+  quality retries:
+  - OPT-014: live attributed 2K prefill time breakdown report.
+  - OPT-015: explain thousand-tok/s same-GGUF llama.cpp 2K prefill and mine
+    `../ds4` only for transferable technique inspiration (ds4 cannot run this
+    Qwen GGUF; not a same-model baseline; sparse/compressed attention remains
+    non-transferable), then rank recoveries with `plan.md` provenance.
+  - OPT-016: reach cold 2K Quartz prefill ≥ pinned llama.cpp on the same GGUF
+    and RTX 5090; until then the performance yardstick is **2K only**.
+- Marked QLT-001 `blocked` again. Recovery now requires OPT-016 done (and its
+  deps), then the previously required bounded long-context/quality retry path.
+  `plan.md` is unchanged: this is an operational recovery gate ahead of the
+  existing CMP matrix and QLT 128K admission.
+- Next eligible pending task for `/run-ledger-task-cursor` is OPT-014 (BEN-001
+  and OPT-013 are done). OPT-015 is also eligible in parallel dependency terms
+  after OPT-013/PIN-002; ledger row order still prefers OPT-014 first.
