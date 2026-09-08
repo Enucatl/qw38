@@ -85,7 +85,7 @@ are repository-relative unless stated otherwise.
 | OPT-016 | Reach 2K prefill throughput at or above pinned llama.cpp | OPT-014, OPT-015 | blocked | On the same GGUF and RTX 5090, cold 2K Quartz prefill tok/s is ≥ pinned llama.cpp `llama-bench` 2K under a frozen protocol; until this passes, performance work and speed claims use the 2K yardstick only (no 8K/32K/128K throughput or QLT 128K attempts as speed gates); numeric/state envelopes remain unloosened | [`tasks/OPT-016.md`](tasks/OPT-016.md); blocked 2026-09-08T13:09:00Z after Ranks 1–3; recovery requires `OPT-017`–`OPT-019` as needed then re-pass frozen 2K gate |
 | OPT-017 | Admit production mixer Q8_0 MMA MMQ without loosening OPT-009 | OPT-009, OPT-015 | done | Production mixer Q8_0 prompt MMQ uses an MMA path while `launch_q8_mmq_bf16_reference` (or the existing OPT-009 byte-exact kernel) remains the visible unloosened reference; CUD-002/OPT-009 envelopes stay unloosened; a live exact-2048 re-attribution and unperturbed 2K remasurement are checked in (OPT-016 remains the parity gate owner) | [`tasks/OPT-017.md`](tasks/OPT-017.md); [`pins/opt017_mixer_mma_contract.json`](pins/opt017_mixer_mma_contract.json); [`fixtures/opt017_mixer_mma.json`](fixtures/opt017_mixer_mma.json); [`evidence/optimization/opt017-mixer-q8-mma/REPORT.md`](evidence/optimization/opt017-mixer-q8-mma/REPORT.md); verification 2026-09-08T14:31:30Z |
 | OPT-018 | Close Q4_K/Q6_K MMA MMQ quality gap versus pinned llama.cpp | OPT-009, OPT-015 | done | Production Q4_K/Q6_K prompt MMA MMQ is brought to llama-competitive 2K FFN time on the same GGUF and RTX 5090 under unloosened CUD-002 envelopes, with retained variant reference, measured before/after FFN category time, and file-level llama.cpp/`plan.md` provenance; does not substitute for the OPT-016 end-to-end gate | [`tasks/OPT-018.md`](tasks/OPT-018.md); [`pins/opt018_ffn_mma_contract.json`](pins/opt018_ffn_mma_contract.json); [`fixtures/opt018_ffn_mma.json`](fixtures/opt018_ffn_mma.json); [`evidence/optimization/opt018-ffn-mma-quality/REPORT.md`](evidence/optimization/opt018-ffn-mma-quality/REPORT.md); verification 2026-09-08T18:55:28Z |
-| OPT-019 | Close residual GDN and attention core time after mixer Q8_0 MMA | OPT-017, OPT-015 | pending | After mixer projections are on MMA, remaining non-projection GDN scan/recurrence and causal attention core paths are brought down under frozen GDN/attention envelopes with retained references; live 2K re-attribution shows the residual sinks addressed; does not substitute for the OPT-016 end-to-end gate | — |
+| OPT-019 | Close residual GDN and attention core time after mixer Q8_0 MMA | OPT-017, OPT-015 | done | After mixer projections are on MMA, remaining non-projection GDN scan/recurrence and causal attention core paths are brought down under frozen GDN/attention envelopes with retained references; live 2K re-attribution shows the residual sinks addressed; does not substitute for the OPT-016 end-to-end gate | [`tasks/OPT-019.md`](tasks/OPT-019.md); [`pins/opt019_core_recovery_contract.json`](pins/opt019_core_recovery_contract.json); [`fixtures/opt019_core_recovery.json`](fixtures/opt019_core_recovery.json); [`evidence/optimization/opt019-gdn-attention-core/REPORT.md`](evidence/optimization/opt019-gdn-attention-core/REPORT.md); verification 2026-09-08T20:54:21Z |
 | OPT-020 | Split 2K attribution into mixer MMQ versus core GDN/attention | OPT-014 | pending | Cold exact-2048 attribution exposes separate mixer-projection MMQ time versus GDN-core and attention-core time (plus existing FFN/logits/commit/graph/idle), reconstructs wall within the OPT-014 tolerance, and is retained for OPT-017–OPT-019 steering; not a throughput gate | — |
 
 ### 2026-09-04T13:09:32Z — OPT-005 delivered
@@ -4213,3 +4213,34 @@ are repository-relative unless stated otherwise.
 - Marked OPT-018 `done`; delivery is limited to the verified task scope plus
   this ledger/audit bookkeeping. OPT-016 stays `blocked`. OPT-019 is next
   eligible pending by ledger row order.
+
+### 2026-09-08T20:54:21Z — OPT-019 delivered
+
+- Independent verification attempt 2 passed after attempt 1 failed (live
+  OPT-018 writer overwrote the locked before snapshot). Production prompt
+  GDN recurrence (`kFusedTokenLoop`) is warp-column quality; sequential
+  remains the unloosened GDN-002/OPT-013 reference; Rank-2 fused is
+  retained for A/B. Production prompt attention (`token_count >= 16`) is
+  fattn-mma quality (`ncols1=16`); tiled remains the unloosened OPT-005
+  reference; Rank-3 MMA is retained for A/B. Live exact-2048 `gdn`
+  **1212.50647** ms and `attention` **477.650085** ms meet the locked
+  85%/85%/70% addressed rule versus the immutable before copy
+  (`measurement_utc` 2026-09-08T18:33:22Z; `gdn` 1643.46082,
+  `attention` 1148.47461, combined 2791.93543). Combined after
+  **1690.156555** ms. Quartz mean 978.756592 tok/s does not claim the
+  end-to-end 2K tok/s gate (`would_pass_opt016` false;
+  `owns_opt016_parity_gate` false). Coupled IDs:   none. Delivery re-check: `uv run pytest -q tests/test_documentation.py
+  tests/test_opt019_core_recovery.py` passed (6 passed, 1 skipped).
+- Acceptance evidence: [`tasks/OPT-019.md`](tasks/OPT-019.md);
+  [`pins/opt019_core_recovery_contract.json`](pins/opt019_core_recovery_contract.json);
+  [`fixtures/opt019_core_recovery.json`](fixtures/opt019_core_recovery.json);
+  [`evidence/optimization/opt019-gdn-attention-core/REPORT.md`](evidence/optimization/opt019-gdn-attention-core/REPORT.md);
+  [`cuda/gdn_fused_quality.cuh`](cuda/gdn_fused_quality.cuh);
+  [`cuda/fattn_mma_f16.cuh`](cuda/fattn_mma_f16.cuh);
+  [`docs/42-cuda-gdn-chunks.md`](docs/42-cuda-gdn-chunks.md);
+  [`docs/44-cuda-attention-prefill.md`](docs/44-cuda-attention-prefill.md).
+  Proof is residual GDN/attention core recovery after mixer MMA, not an
+  end-to-end 2K tok/s gate.
+- Marked OPT-019 `done`; delivery is limited to the verified task scope plus
+  this ledger/audit bookkeeping. OPT-016 stays `blocked`. OPT-020 remains
+  the next eligible pending by ledger row order.

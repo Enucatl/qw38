@@ -1,20 +1,26 @@
 # 42. Chunked CUDA GDN prefill in 64-token windows
 
-[Index](README.md) · Implementation tasks: GDN-002, OPT-013, and EDU-028 in
+[Index](README.md) · Implementation tasks: GDN-002, OPT-013, OPT-019, and EDU-028 in
 [`implementation_ledger.md`](../implementation_ledger.md)
 · Contracts:
 [`pins/cuda_gdn_chunk_contract.json`](../pins/cuda_gdn_chunk_contract.json),
-[`pins/cuda_gdn_scan_contract.json`](../pins/cuda_gdn_scan_contract.json)
+[`pins/cuda_gdn_scan_contract.json`](../pins/cuda_gdn_scan_contract.json),
+[`pins/opt019_core_recovery_contract.json`](../pins/opt019_core_recovery_contract.json)
 · Evidence:
 [`fixtures/cuda_gdn_chunk.json`](../fixtures/cuda_gdn_chunk.json),
-[`fixtures/cuda_gdn_scan.json`](../fixtures/cuda_gdn_scan.json)
+[`fixtures/cuda_gdn_scan.json`](../fixtures/cuda_gdn_scan.json),
+[`fixtures/opt019_core_recovery.json`](../fixtures/opt019_core_recovery.json),
+[`evidence/optimization/opt019-gdn-attention-core/REPORT.md`](../evidence/optimization/opt019-gdn-attention-core/REPORT.md)
 
 [Chapter 41](41-cuda-gdn-step.md) prepared one token of GDN state. A prompt has
 many tokens, and processing those known input tokens is called **prefill**.
 GDN-002 accepts an arbitrary positive prompt chunk while retaining exactly the
 same causal convolution and recurrent mutation order as repeated one-token work.
 OPT-013 keeps that internal **64-token window** and adds an associative parallel
-scan for production prompt chunks.
+scan as a retained overlay alternate. OPT-019 makes production prompt recurrence
+(`GdnScanPath::kFusedTokenLoop`) the warp-column fused quality path. Sequential
+64-token windows remain the unloosened GDN-002/OPT-013 numeric and exact-state
+reference.
 
 ## Chunk input and output
 
@@ -112,7 +118,7 @@ those operators instead of walking every token serially across the chunk.
 
 Scratch overlays `prompt_projected_bf16_` only during prepare. One `(A, B)` pair
 is 1,572,864 FP32 values. At `R = 4096` the overlay holds `W_fit = 22` windows,
-so a production 4,096-token layer batches `22 + 22 + 20`. A capacity-65 overlay
+so a 4,096-token overlay layer batches `22 + 22 + 20`. A capacity-65 overlay
 cannot hold one pair (`W_fit = 0`) and falls back to sequential windows. Tails
 with a single window (`2 ≤ token_count ≤ 64`) keep the existing recurrence
 kernel after the 2D convolution. Decode one-token GDN stays sequential. There is
@@ -120,7 +126,27 @@ no extra session `cudaMalloc`; the workspace byte formula is unchanged.
 
 Prepare still does not publish committed convolution or recurrent bytes, or the
 frontier. The first parallel batch reads committed recurrent state; later
-batches continue from candidate.
+batches continue from candidate. The overlay path remains
+`GdnScanPath::kParallelAssociative`. It is not the production default after
+OPT-019.
+
+## Warp-column fused production recurrence
+
+Production `kFusedTokenLoop` still launches the existing parallel convolution,
+then a warp-column fused recurrence adapted from llama.cpp `gated_delta_net.cu`
+at `cc83d7b4824f73cfdda4dfbb47ee39804f71b328` (MIT, The ggml authors). ds4 has
+no GDN analog. Production shape `GdnConfig{16, 48, 128, 128, 4}` uses grid
+`(48, 1, 32)` and block `(32, 4)`: each warp owns one value column with
+`s_shard[4]` FP32 state. There is no `__syncthreads()` in the token loop.
+Rank-2 fused (`float state[128]` per thread) remains `launch_gdn_fused_rank2`
+for component A/B only; it is not production. Decode one-token GDN is unchanged.
+Partial configs other than 128-wide stay on Rank-2 fused.
+
+Quality versus sequential stays inside maximum absolute error `5e-8`, maximum
+RMS `5e-9`, and zero non-finites. Association differs, so quality is not
+memcmp-equal to sequential. OPT-008's 4,096-versus-64 memcmp stays on
+`kSequentialWindows`. Prepare still does not mutate committed convolution or
+recurrent bytes.
 
 ## Whole-chunk candidate state
 
@@ -191,10 +217,25 @@ raw sample. The proof limit is component-only GDN-prepare evidence. Sequential
 windows remain the byte-exact reference. Nsight Systems is not claimed.
 End-to-end prefill/decode speedup and 128K quality are not claimed.
 
+**Measured, RTX 5090, component-only (OPT-019):** quality fused versus sequential
+at 2048 tokens recorded `max_abs=1.58324838e-08`, `rms=1.28841632e-10`, zero
+non-finites, and prepare isolation. CUDA-event means (3 replicates, 0 warm-ups)
+were quality `4.01747179 ms`, Rank-2 `13.941781 ms`, sequential `19.3479786 ms`,
+and overlay `14.6024103 ms`, occupancy 9. Live exact-2048 category `gdn` after
+this increment is **1205.38806** ms versus the locked before snapshot
+**1643.46082** ms. Sequential windows remain the unloosened reference. This is
+not an end-to-end 2K tok/s gate. Artifacts:
+[`fixtures/opt019_core_recovery.json`](../fixtures/opt019_core_recovery.json)
+and
+[`evidence/optimization/opt019-gdn-attention-core/REPORT.md`](../evidence/optimization/opt019-gdn-attention-core/REPORT.md).
+
 GDN-002 proves arbitrary chunk sizes, internal-window continuity, exact CUDA
 token-wise equivalence, and whole-chunk candidate isolation. OPT-013 proves the
 associative intra / `A S + B` prefix / from-state scan against those sequential
 windows at the frozen envelopes, overlay `W_fit`, sequential fallback, launch
-geometry, and the component 4,096-token CUDA-event gate. Neither task proves
-complete GDN layers as a speedup claim, the comparative 5% prefill/decode
-gates, long-context quality, or request-level atomicity.
+geometry, and the component 4,096-token CUDA-event gate. OPT-019 proves
+production fused recurrence is the warp-column quality path inside those same
+envelopes, plus the live exact-2048 `gdn` category drop under the locked
+addressed rule. None of these tasks prove complete GDN layers as a speedup
+claim, the comparative 5% prefill/decode gates, long-context quality,
+request-level atomicity, or llama.cpp 2K tok/s parity.

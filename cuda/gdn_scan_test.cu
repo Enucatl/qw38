@@ -959,9 +959,21 @@ int main() {
   }
 
   float fused_mean = 0.0F;
+  float fused_rank2_mean = 0.0F;
   float fused_seq_mean = 0.0F;
   float fused_par_mean = 0.0F;
   bool fused_faster = false;
+  const int quality_occupancy = qw38::cuda::gdn_fused_quality_occupancy();
+  Envelope opt019_gdn_2048 =
+      run_prepare("opt019_gdn_2048", production, 2048, false, false, false,
+                  false);
+  std::printf("opt019_gdn_occupancy=%d\n", quality_occupancy);
+  std::printf("opt019_gdn_2048 max_abs=%.9g rms=%.9g nonfinite=%zu "
+              "prepare_atomic=%s passed=%s\n",
+              opt019_gdn_2048.max_abs, opt019_gdn_2048.rms,
+              opt019_gdn_2048.nonfinite,
+              json_bool(opt019_gdn_2048.prepare_atomic),
+              json_bool(opt019_gdn_2048.passed));
   {
     cudaEvent_t start = nullptr;
     cudaEvent_t stop = nullptr;
@@ -981,15 +993,30 @@ int main() {
       }
       return timed;
     };
-    for (int warmup = 0; warmup < 1 && error == cudaSuccess; ++warmup) {
-      float ignore = 0.0F;
-      error = time_path2048(qw38::cuda::GdnScanPath::kFusedTokenLoop, &ignore);
-    }
+    auto time_rank2_2048 = [&](float* milliseconds) {
+      cudaError_t timed = restore_committed(&geometry, g_conv, g_rec);
+      if (timed == cudaSuccess) timed = cudaEventRecord(start);
+      if (timed == cudaSuccess) {
+        timed = qw38::cuda::launch_gdn_fused_rank2(
+            production, geometry.input, geometry.weights, geometry.log_decay,
+            geometry.beta, 2048, committed_state(geometry),
+            candidate_state(geometry), geometry.convolution_output,
+            geometry.recurrent_output, nullptr, false);
+      }
+      if (timed == cudaSuccess) timed = cudaEventRecord(stop);
+      if (timed == cudaSuccess) timed = cudaEventSynchronize(stop);
+      if (timed == cudaSuccess) {
+        timed = cudaEventElapsedTime(milliseconds, start, stop);
+      }
+      return timed;
+    };
     for (int sample = 0; sample < 3 && error == cudaSuccess; ++sample) {
       float fused_ms = 0.0F;
+      float rank2_ms = 0.0F;
       float seq_ms = 0.0F;
       float par_ms = 0.0F;
       error = time_path2048(qw38::cuda::GdnScanPath::kFusedTokenLoop, &fused_ms);
+      if (error == cudaSuccess) error = time_rank2_2048(&rank2_ms);
       if (error == cudaSuccess) {
         error = time_path2048(qw38::cuda::GdnScanPath::kSequentialWindows,
                               &seq_ms);
@@ -999,24 +1026,30 @@ int main() {
                               &par_ms);
       }
       fused_mean += fused_ms;
+      fused_rank2_mean += rank2_ms;
       fused_seq_mean += seq_ms;
       fused_par_mean += par_ms;
+      std::printf("opt019_gdn_ab sample=%d quality_ms=%.9g rank2_ms=%.9g "
+                  "sequential_ms=%.9g overlay_ms=%.9g\n",
+                  sample, fused_ms, rank2_ms, seq_ms, par_ms);
     }
     if (start != nullptr) cudaEventDestroy(start);
     if (stop != nullptr) cudaEventDestroy(stop);
     if (error == cudaSuccess) {
       fused_mean /= 3.0F;
+      fused_rank2_mean /= 3.0F;
       fused_seq_mean /= 3.0F;
       fused_par_mean /= 3.0F;
-      fused_faster = fused_mean > 0.0F && fused_mean < fused_seq_mean &&
-                     fused_mean < fused_par_mean;
+      fused_faster = fused_mean > 0.0F && fused_mean < fused_rank2_mean &&
+                     fused_mean < fused_seq_mean &&
+                     fused_mean < fused_par_mean && quality_occupancy >= 1;
     } else {
       fail_cuda("fused A/B", error);
     }
-    std::printf("fused_ab fused_ms=%.9g sequential_ms=%.9g overlay_ms=%.9g "
-                "faster=%s\n",
-                fused_mean, fused_seq_mean, fused_par_mean,
-                fused_faster ? "true" : "false");
+    std::printf("fused_ab fused_ms=%.9g rank2_ms=%.9g sequential_ms=%.9g "
+                "overlay_ms=%.9g occupancy=%d faster=%s\n",
+                fused_mean, fused_rank2_mean, fused_seq_mean, fused_par_mean,
+                quality_occupancy, fused_faster ? "true" : "false");
   }
   release(&geometry);
 
@@ -1142,6 +1175,7 @@ int main() {
   const bool passed = sequential_ok && parallel_ok && chunk_boundaries_ok &&
                        tiled_ok && launch_geometry_ok && fail_closed_ok &&
                        overlay_ok && speedup_ok && launch_counts_ok &&
-                       fused_faster;
+                       fused_faster && opt019_gdn_2048.passed &&
+                       quality_occupancy >= 1;
   return passed ? 0 : 1;
 }

@@ -8,7 +8,7 @@
   "runtime": "13.0",
   "toolkit": "CUDA 13.0.2",
   "pinned_image": "qw38-cuda:13.0.2",
-  "measurement_utc": "2026-09-04T17:34:07Z",
+  "measurement_utc": "2026-09-08T19:43:05Z",
   "production_shape": {
     "query_heads": 24,
     "kv_heads": 4,
@@ -123,15 +123,15 @@
       ],
       "attention_grid": [
         4,
-        32,
+        4,
         1
       ],
       "attention_block": [
-        256,
+        128,
         1,
         1
       ],
-      "dynamic_shared_bytes": 33792
+      "dynamic_shared_bytes": 73088
     },
     {
       "rows": 64,
@@ -148,15 +148,15 @@
       ],
       "attention_grid": [
         4,
-        32,
+        4,
         1
       ],
       "attention_block": [
-        256,
+        128,
         1,
         1
       ],
-      "dynamic_shared_bytes": 33792
+      "dynamic_shared_bytes": 73088
     },
     {
       "rows": 65,
@@ -173,25 +173,25 @@
       ],
       "attention_grid": [
         4,
-        33,
+        5,
         1
       ],
       "attention_block": [
-        256,
+        128,
         1,
         1
       ],
-      "dynamic_shared_bytes": 33792
+      "dynamic_shared_bytes": 73088
     }
   ],
   "kernel_attributes": {
-    "registers": 38,
-    "static_shared_bytes": 16,
-    "local_bytes_per_thread": 224,
-    "maximum_dynamic_shared_bytes": 49136,
-    "active_blocks_per_sm": 2,
+    "registers": 83,
+    "static_shared_bytes": 0,
+    "local_bytes_per_thread": 32,
+    "maximum_dynamic_shared_bytes": 73088,
+    "active_blocks_per_sm": 1,
     "sm_count": 170,
-    "launch_blocks": 128
+    "launch_blocks": 16
   },
   "proof_limit": "component-only exact semantic and launch evidence; no end-to-end performance or speedup claim"
 }

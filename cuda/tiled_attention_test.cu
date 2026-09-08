@@ -23,6 +23,35 @@ void scatter_logical_row(__nv_bfloat16* device,const std::vector<__nv_bfloat16>&
 cudaError_t invoke(const AttentionConfig& c,size_t start,size_t rows,B& b,bool ref,cudaStream_t stream){AttentionCache committed{b.ck,b.cv},candidate{b.tk,b.tv};return ref?qw38::cuda::launch_attention_prepare_chunk_reference(c,start,rows,b.q,b.k,b.v,b.qs,b.ks,b.g,committed,candidate,b.nq,b.nk,b.score,b.out,stream):qw38::cuda::launch_attention_prepare_chunk(c,start,rows,b.q,b.k,b.v,b.qs,b.ks,b.g,committed,candidate,b.nq,b.nk,b.score,b.out,stream);}
 int capture(const AttentionConfig& c,size_t start,size_t rows,B& b,bool ref){cudaStream_t s{};cudaGraph_t g{};cudaGraphExec_t e{};if(cudaStreamCreateWithFlags(&s,cudaStreamNonBlocking)!=cudaSuccess)return -1;if(cudaStreamBeginCapture(s,cudaStreamCaptureModeGlobal)!=cudaSuccess)return -1;cudaError_t x=invoke(c,start,rows,b,ref,s);if(x==cudaSuccess)x=cudaStreamEndCapture(s,&g);if(x!=cudaSuccess){cudaStreamDestroy(s);return -1;}size_t n=0;std::vector<cudaGraphNode_t> nodes;if(x==cudaSuccess)x=cudaGraphGetNodes(g,nullptr,&n);if(x==cudaSuccess){nodes.resize(n);x=cudaGraphGetNodes(g,nodes.data(),&n);}if(x==cudaSuccess)x=cudaGraphInstantiate(&e,g,nullptr,nullptr,0);if(x==cudaSuccess)x=cudaGraphLaunch(e,s);if(x==cudaSuccess)x=cudaStreamSynchronize(s);int k=0;for(auto node:nodes){cudaGraphNodeType t{};if(cudaGraphNodeGetType(node,&t)==cudaSuccess&&t==cudaGraphNodeTypeKernel)++k;}cudaGraphExecDestroy(e);cudaGraphDestroy(g);cudaStreamDestroy(s);return x==cudaSuccess?k:-1;}
 float maxabs(const std::vector<float>&a,const std::vector<float>&b){float m=0;for(size_t i=0;i<a.size();++i)m=fmaxf(m,fabsf(a[i]-b[i]));return m;}float rms(const std::vector<float>&a,const std::vector<float>&b){double s=0;for(size_t i=0;i<a.size();++i){double d=a[i]-b[i];s+=d*d;}return sqrtf(float(s/a.size()));}float cosine(const std::vector<float>&a,const std::vector<float>&b){double ab=0,aa=0,bb=0;for(size_t i=0;i<a.size();++i){ab+=a[i]*b[i];aa+=a[i]*a[i];bb+=b[i]*b[i];}return float(ab/sqrt(aa*bb));}
+bool envelope_ok(const std::vector<float>& a, const std::vector<float>& b) {
+  return maxabs(a, b) <= 5e-5f && rms(a, b) <= 5e-6f;
+}
+bool finite_vec(const std::vector<float>& values) {
+  for (float value : values)
+    if (!std::isfinite(value)) return false;
+  return true;
+}
+cudaError_t invoke_tiled(const AttentionConfig& c, size_t start, size_t rows,
+                         B& b) {
+  AttentionCache committed{b.ck, b.cv}, candidate{b.tk, b.tv};
+  return qw38::cuda::launch_attention_prepare_chunk_tiled(
+      c, start, rows, b.q, b.k, b.v, b.qs, b.ks, b.g, committed, candidate,
+      b.nq, b.nk, b.score, b.out, nullptr);
+}
+cudaError_t invoke_rank3(const AttentionConfig& c, size_t start, size_t rows,
+                         B& b) {
+  AttentionCache committed{b.ck, b.cv}, candidate{b.tk, b.tv};
+  return qw38::cuda::launch_attention_prepare_chunk_mma_rank3(
+      c, start, rows, b.q, b.k, b.v, b.qs, b.ks, b.g, committed, candidate,
+      b.nq, b.nk, b.score, b.out, nullptr);
+}
+cudaError_t invoke_ncols1(const AttentionConfig& c, size_t start, size_t rows,
+                          B& b, int ncols1) {
+  AttentionCache committed{b.ck, b.cv}, candidate{b.tk, b.tv};
+  return qw38::cuda::launch_attention_prepare_chunk_mma_ncols1(
+      c, start, rows, b.q, b.k, b.v, b.qs, b.ks, b.g, committed, candidate,
+      b.nq, b.nk, b.score, b.out, ncols1, nullptr);
+}
 }
 int main(){
   AttentionConfig c{24,4,256,64,131072}; size_t rows=9,start=5,q=qw38::cuda::attention_query_values(c),kv=qw38::cuda::attention_kv_row_values(c),cache=qw38::cuda::attention_cache_values(c),s=qw38::cuda::attention_chunk_score_values(c,start,rows); B t{},r{},repeated{},future{},later{},commit_check{};
@@ -45,6 +74,138 @@ int main(){
   bool commit_prepared=invoke(c,start,rows,commit_check,false,nullptr)==cudaSuccess&&cudaDeviceSynchronize()==cudaSuccess;std::vector<__nv_bfloat16>commit_candidate_key(rows*kv),commit_candidate_value(rows*kv);cudaMemcpy(commit_candidate_key.data(),commit_check.tk,commit_candidate_key.size()*sizeof(commit_candidate_key[0]),cudaMemcpyDeviceToHost);cudaMemcpy(commit_candidate_value.data(),commit_check.tv,commit_candidate_value.size()*sizeof(commit_candidate_value[0]),cudaMemcpyDeviceToHost);bool commit_ok=commit_prepared&&qw38::cuda::launch_attention_commit_chunk(c,start,rows,{commit_check.tk,commit_check.tv},{commit_check.ck,commit_check.cv},start+rows,frontier,nullptr)==cudaSuccess&&cudaDeviceSynchronize()==cudaSuccess;cudaMemcpy(&frontier_after,frontier,sizeof(frontier_after),cudaMemcpyDeviceToHost);std::vector<__nv_bfloat16> committed_key(rows*kv),committed_value(rows*kv);gather_logical_rows(commit_check.ck,&committed_key,start,rows,c);gather_logical_rows(commit_check.cv,&committed_value,start,rows,c);bool commit_exact=commit_ok&&memcmp(committed_key.data(),commit_candidate_key.data(),committed_key.size()*sizeof(committed_key[0]))==0&&memcmp(committed_value.data(),commit_candidate_value.data(),committed_value.size()*sizeof(committed_value[0]))==0;bool commit_frontier=frontier_after==start+rows;cudaFree(frontier);
   release(t);release(r);release(repeated);release(future);release(later);release(commit_check);
   B mma64{},tiled64{};if(!allocate(mma64,c,64,start)||!allocate(tiled64,c,64,start))return 5;seed(mma64,c,64,start);seed(tiled64,c,64,start);cudaError_t mma_err=invoke(c,start,64,mma64,false,nullptr);cudaError_t mma_sync=cudaDeviceSynchronize();if(mma_err!=cudaSuccess||mma_sync!=cudaSuccess){fprintf(stderr,"mma 64-row launch failed err=%s sync=%s\n",cudaGetErrorString(mma_err),cudaGetErrorString(mma_sync));return 6;}AttentionCache tiled_committed{tiled64.ck,tiled64.cv},tiled_candidate{tiled64.tk,tiled64.tv};cudaError_t tiled_err=qw38::cuda::launch_attention_prepare_chunk_tiled(c,start,64,tiled64.q,tiled64.k,tiled64.v,tiled64.qs,tiled64.ks,tiled64.g,tiled_committed,tiled_candidate,tiled64.nq,tiled64.nk,tiled64.score,tiled64.out,nullptr);cudaError_t tiled_sync=cudaDeviceSynchronize();if(tiled_err!=cudaSuccess||tiled_sync!=cudaSuccess){fprintf(stderr,"tiled 64-row launch failed err=%s sync=%s\n",cudaGetErrorString(tiled_err),cudaGetErrorString(tiled_sync));return 6;}std::vector<float>mma_out(64*q),tiled_out(64*q);cudaMemcpy(mma_out.data(),mma64.out,mma_out.size()*sizeof(float),cudaMemcpyDeviceToHost);cudaMemcpy(tiled_out.data(),tiled64.out,tiled_out.size()*sizeof(float),cudaMemcpyDeviceToHost);float ma64=maxabs(mma_out,tiled_out),rr64=rms(mma_out,tiled_out);bool mma_envelope=ma64<=5e-5f&&rr64<=5e-6f;release(mma64);release(tiled64);if(!mma_envelope){fprintf(stderr,"mma vs tiled 64-row envelope failed max_abs=%.9g rms=%.9g\n",ma64,rr64);return 6;}
+  std::printf("opt019_attention_64 max_abs=%.9g rms=%.9g occupancy=%d shared=%zu selected_ncols1=%d\n",
+              ma64, rr64, qw38::cuda::attention_mma_quality_occupancy(),
+              qw38::cuda::attention_mma_quality_shared_bytes(),
+              qw38::cuda::selected_attention_mma_query_rows());
+  {
+    const size_t rows2048 = 2048;
+    const size_t start2048 = 5;
+    B quality{}, tiled{}, rank3{};
+    if (!allocate(quality, c, rows2048, start2048) ||
+        !allocate(tiled, c, rows2048, start2048) ||
+        !allocate(rank3, c, rows2048, start2048))
+      return 5;
+    seed(quality, c, rows2048, start2048);
+    seed(tiled, c, rows2048, start2048);
+    seed(rank3, c, rows2048, start2048);
+    if (invoke_tiled(c, start2048, rows2048, tiled) != cudaSuccess ||
+        cudaDeviceSynchronize() != cudaSuccess)
+      return 6;
+    std::vector<float> tiled_host(rows2048 * q);
+    cudaMemcpy(tiled_host.data(), tiled.out, tiled_host.size() * sizeof(float),
+               cudaMemcpyDeviceToHost);
+    const int legal[3] = {8, 16, 32};
+    int winner = 0;
+    float winner_ms = 1.0e30f;
+    cudaEvent_t e0{}, e1{};
+    cudaEventCreate(&e0);
+    cudaEventCreate(&e1);
+    for (int ncols1 : legal) {
+      seed(quality, c, rows2048, start2048);
+      cudaError_t launched =
+          invoke_ncols1(c, start2048, rows2048, quality, ncols1);
+      cudaError_t synced = cudaDeviceSynchronize();
+      std::vector<float> host(rows2048 * q);
+      if (launched == cudaSuccess && synced == cudaSuccess) {
+        cudaMemcpy(host.data(), quality.out, host.size() * sizeof(float),
+                   cudaMemcpyDeviceToHost);
+      }
+      const bool finite = launched == cudaSuccess && synced == cudaSuccess &&
+                          finite_vec(host);
+      const bool env = finite && envelope_ok(host, tiled_host);
+      const int occupancy = qw38::cuda::attention_mma_quality_occupancy_for(ncols1);
+      float samples[3] = {0, 0, 0};
+      bool timed_ok = env && occupancy >= 1;
+      for (int sample = 0; sample < 3 && timed_ok; ++sample) {
+        cudaEventRecord(e0);
+        timed_ok = invoke_ncols1(c, start2048, rows2048, quality, ncols1) ==
+                       cudaSuccess;
+        cudaEventRecord(e1);
+        timed_ok = timed_ok && cudaEventSynchronize(e1) == cudaSuccess;
+        if (timed_ok) cudaEventElapsedTime(&samples[sample], e0, e1);
+      }
+      const float mean =
+          timed_ok ? (samples[0] + samples[1] + samples[2]) / 3.0f : 0.0f;
+      std::printf("opt019_attention_ncols1 ncols1=%d launch=%s finite=%s "
+                  "envelope=%s occupancy=%d sample0=%.9g sample1=%.9g "
+                  "sample2=%.9g mean_ms=%.9g\n",
+                  ncols1, launched == cudaSuccess ? "ok" : "fail",
+                  finite ? "true" : "false", env ? "true" : "false", occupancy,
+                  samples[0], samples[1], samples[2], mean);
+      if (timed_ok && mean > 0.0f && mean < winner_ms) {
+        winner_ms = mean;
+        winner = ncols1;
+      }
+    }
+    seed(quality, c, rows2048, start2048);
+    if (invoke(c, start2048, rows2048, quality, false, nullptr) != cudaSuccess ||
+        cudaDeviceSynchronize() != cudaSuccess)
+      return 6;
+    std::vector<float> quality_host(rows2048 * q);
+    cudaMemcpy(quality_host.data(), quality.out,
+               quality_host.size() * sizeof(float), cudaMemcpyDeviceToHost);
+    const float ma2048 = maxabs(quality_host, tiled_host);
+    const float rr2048 = rms(quality_host, tiled_host);
+    const bool env2048 = envelope_ok(quality_host, tiled_host) &&
+                         finite_vec(quality_host);
+    std::printf("opt019_attention_2048 max_abs=%.9g rms=%.9g passed=%s "
+                "winner_ncols1=%d selected_ncols1=%d\n",
+                ma2048, rr2048, env2048 ? "true" : "false", winner,
+                qw38::cuda::selected_attention_mma_query_rows());
+    float quality_samples[3] = {0, 0, 0};
+    float tiled_samples[3] = {0, 0, 0};
+    float rank3_samples[3] = {0, 0, 0};
+    bool speed_ok = env2048;
+    for (int sample = 0; sample < 3 && speed_ok; ++sample) {
+      cudaEventRecord(e0);
+      speed_ok = invoke(c, start2048, rows2048, quality, false, nullptr) ==
+                 cudaSuccess;
+      cudaEventRecord(e1);
+      speed_ok = speed_ok && cudaEventSynchronize(e1) == cudaSuccess;
+      if (speed_ok) cudaEventElapsedTime(&quality_samples[sample], e0, e1);
+      cudaEventRecord(e0);
+      speed_ok = speed_ok &&
+                 invoke_tiled(c, start2048, rows2048, tiled) == cudaSuccess;
+      cudaEventRecord(e1);
+      speed_ok = speed_ok && cudaEventSynchronize(e1) == cudaSuccess;
+      if (speed_ok) cudaEventElapsedTime(&tiled_samples[sample], e0, e1);
+      cudaEventRecord(e0);
+      speed_ok = speed_ok &&
+                 invoke_rank3(c, start2048, rows2048, rank3) == cudaSuccess;
+      cudaEventRecord(e1);
+      speed_ok = speed_ok && cudaEventSynchronize(e1) == cudaSuccess;
+      if (speed_ok) cudaEventElapsedTime(&rank3_samples[sample], e0, e1);
+    }
+    cudaEventDestroy(e0);
+    cudaEventDestroy(e1);
+    const float quality_mean =
+        (quality_samples[0] + quality_samples[1] + quality_samples[2]) / 3.0f;
+    const float tiled_mean =
+        (tiled_samples[0] + tiled_samples[1] + tiled_samples[2]) / 3.0f;
+    const float rank3_mean =
+        (rank3_samples[0] + rank3_samples[1] + rank3_samples[2]) / 3.0f;
+    const bool faster = speed_ok && quality_mean > 0.0f &&
+                        quality_mean < tiled_mean && quality_mean < rank3_mean &&
+                        qw38::cuda::attention_mma_quality_occupancy() >= 1;
+    std::printf("opt019_attention_ab quality_ms=%.9g tiled_ms=%.9g rank3_ms=%.9g "
+                "faster=%s occupancy=%d samples_q=%.9g,%.9g,%.9g "
+                "samples_t=%.9g,%.9g,%.9g samples_r=%.9g,%.9g,%.9g\n",
+                quality_mean, tiled_mean, rank3_mean, faster ? "true" : "false",
+                qw38::cuda::attention_mma_quality_occupancy(),
+                quality_samples[0], quality_samples[1], quality_samples[2],
+                tiled_samples[0], tiled_samples[1], tiled_samples[2],
+                rank3_samples[0], rank3_samples[1], rank3_samples[2]);
+    release(quality);
+    release(tiled);
+    release(rank3);
+    if (!env2048 || !faster || winner == 0) {
+      fprintf(stderr,
+              "opt019 attention 2048 failed envelope=%d faster=%d winner=%d\n",
+              env2048, faster, winner);
+      return 6;
+    }
+  }
   B graph{};if(!allocate(graph,c,64,start))return 5;seed(graph,c,64,start);int p1=capture(c,start,1,graph,false),p3=capture(c,start,3,graph,false),p9=capture(c,start,9,graph,false),p64=capture(c,start,64,graph,false),r1=capture(c,start,1,graph,true),r3=capture(c,start,3,graph,true),r9=capture(c,start,9,graph,true),r64=capture(c,start,64,graph,true);release(graph);bool graphs=p1==2&&p3==2&&p9==2&&p64==2&&r1==3&&r3==9&&r9==27&&r64==192;
   bool semantic=finite&&candidate_exact&&chunk_output&&chunk_candidate&&cache_unchanged&&frontier_unchanged&&commit_exact&&commit_frontier&&future_excluded&&later_excluded&&scratch&&zero_rejected&&overflow_rejected&&alias_rejected&&last_position&&normalized_equal&&graphs&&ma<=5e-5f&&rr<=5e-6f&&co>=.999424f&&ma3<=5e-5f&&rr3<=5e-6f&&co3>=.999424f;if(!semantic){fprintf(stderr,"semantic failure finite=%d candidate=%d repeated_output=%d repeated_candidate=%d cache=%d frontier=%d commit=%d commit_frontier=%d future=%d later=%d scratch=%d zero=%d overflow=%d alias=%d last=%d normalized=%d graphs=%d metrics9=%d metrics3=%d\n",finite,candidate_exact,chunk_output,chunk_candidate,cache_unchanged,frontier_unchanged,commit_exact,commit_frontier,future_excluded,later_excluded,scratch,zero_rejected,overflow_rejected,alias_rejected,last_position,normalized_equal,graphs,ma<=5e-5f&&rr<=5e-6f&&co>=.999424f,ma3<=5e-5f&&rr3<=5e-6f&&co3>=.999424f);return 6;}
   struct Scale{size_t prefix;std::vector<float>tiled,reference;double tm,rm;};std::vector<Scale> scales;

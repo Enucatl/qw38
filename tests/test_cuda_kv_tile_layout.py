@@ -17,6 +17,27 @@ CONTRACT = ROOT / "pins/cuda_kv_tile_layout_contract.json"
 FIXTURE = ROOT / "fixtures/cuda_kv_tile_layout.json"
 
 
+def _opt019() -> dict[str, Any]:
+    return json.loads(
+        (ROOT / "pins" / "opt019_core_recovery_contract.json").read_text()
+    )
+
+
+def _fattn_shared_bytes(ncols1: int) -> int:
+    ncols = ncols1 * 2
+    nthreads = 64 if ncols1 <= 8 else 128
+    nwarps = nthreads // 32
+    dual = ncols1 != 32
+    kv = 2 * 32 * 256 * 2
+    q = ncols * 256 * 2 * (2 if dual else 1)
+    scores = ncols * 32 * 4
+    stats = ncols * 2 * 4
+    scratch = 256 * 4
+    cparts = nwarps * 32 * 4 * 4
+    rescale = ncols * 4
+    return kv + q + scores + stats + scratch + cparts + rescale
+
+
 def _contract() -> dict[str, Any]:
     return json.loads(CONTRACT.read_text())
 
@@ -82,10 +103,12 @@ def validate_result(result: Any) -> None:
     }
     assert launch["kernel_nodes"] == 2
     assert launch["staging_grid"] == [4, 64, 1]
-    assert launch["attention_grid"] == [4, 32, 1]
+    ncols1 = int(_opt019()["attention_mma_query_rows_2048"])
+    threads = 64 if ncols1 <= 8 else 128
+    assert launch["attention_grid"] == [4, (64 + ncols1 - 1) // ncols1, 1]
     assert launch["staging_block"] == [256, 1, 1]
-    assert launch["attention_block"] == [256, 1, 1]
-    assert launch["dynamic_shared_bytes"] == contract["dynamic_shared_bytes"]
+    assert launch["attention_block"] == [threads, 1, 1]
+    assert launch["dynamic_shared_bytes"] == _fattn_shared_bytes(ncols1)
 
 
 def _common() -> list[str]:

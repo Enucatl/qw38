@@ -1,6 +1,6 @@
 # Chunked full-model CUDA prefill
 
-[Index](README.md) · Implementation tasks: SCH-002, MEM-002, OPT-008, OPT-009, OPT-011, OPT-012, OPT-013, OPT-014, OPT-015, OPT-017, OPT-018, and EDU-047 in
+[Index](README.md) · Implementation tasks: SCH-002, MEM-002, OPT-008, OPT-009, OPT-011, OPT-012, OPT-013, OPT-014, OPT-015, OPT-017, OPT-018, OPT-019, and EDU-047 in
 [`implementation_ledger.md`](../implementation_ledger.md) · Contracts:
 [`pins/cuda_prompt_scheduler_contract.json`](../pins/cuda_prompt_scheduler_contract.json),
 [`pins/cuda_prompt_pipeline_contract.json`](../pins/cuda_prompt_pipeline_contract.json),
@@ -9,7 +9,8 @@
 [`pins/cuda_prefill_attribution_contract.json`](../pins/cuda_prefill_attribution_contract.json),
 [`pins/opt015_recovery_contract.json`](../pins/opt015_recovery_contract.json),
 [`pins/opt017_mixer_mma_contract.json`](../pins/opt017_mixer_mma_contract.json),
-[`pins/opt018_ffn_mma_contract.json`](../pins/opt018_ffn_mma_contract.json)
+[`pins/opt018_ffn_mma_contract.json`](../pins/opt018_ffn_mma_contract.json),
+[`pins/opt019_core_recovery_contract.json`](../pins/opt019_core_recovery_contract.json)
 · Evidence: [`fixtures/cuda_prompt_scheduler.json`](../fixtures/cuda_prompt_scheduler.json),
 [`fixtures/cuda_prompt_pipeline.json`](../fixtures/cuda_prompt_pipeline.json),
 [`fixtures/cuda_prompt_graph.json`](../fixtures/cuda_prompt_graph.json),
@@ -18,9 +19,11 @@
 [`fixtures/opt015_recovery.json`](../fixtures/opt015_recovery.json),
 [`fixtures/opt017_mixer_mma.json`](../fixtures/opt017_mixer_mma.json),
 [`fixtures/opt018_ffn_mma.json`](../fixtures/opt018_ffn_mma.json),
+[`fixtures/opt019_core_recovery.json`](../fixtures/opt019_core_recovery.json),
 [`evidence/optimization/opt015-2k-recovery/REPORT.md`](../evidence/optimization/opt015-2k-recovery/REPORT.md),
 [`evidence/optimization/opt017-mixer-q8-mma/REPORT.md`](../evidence/optimization/opt017-mixer-q8-mma/REPORT.md),
-[`evidence/optimization/opt018-ffn-mma-quality/REPORT.md`](../evidence/optimization/opt018-ffn-mma-quality/REPORT.md)
+[`evidence/optimization/opt018-ffn-mma-quality/REPORT.md`](../evidence/optimization/opt018-ffn-mma-quality/REPORT.md),
+[`evidence/optimization/opt019-gdn-attention-core/REPORT.md`](../evidence/optimization/opt019-gdn-attention-core/REPORT.md)
 
 ## Why prompt execution differs from decode
 
@@ -121,15 +124,17 @@ internal scan window is still at most 64 tokens, carries the convolution ring
 and FP32 recurrent matrix forward, and produces a final candidate state for that
 layer.
 
-Production prompt chunks use OPT-013's associative parallel scan when overlay
-scratch on `prompt_projected_bf16_` can hold one `(A_w, B_w)` pair. At
-`prompt_chunk_rows_ == 4096` that overlay fits `W_fit = 22` windows, so a
-4,096-token layer batches `22 + 22 + 20`: zero-state intra windows, a 48-block
-`A S + B` prefix, then parallel from-state replay of sequential window
-arithmetic. Tails with one window (`2 ≤ token_count ≤ 64`) keep sequential
-recurrence after a single 2D convolution. Capacity-65 cannot overlay one pair
-(`W_fit = 0`) and falls back to sequential windows. Decode one-token GDN stays
-sequential. Prompt FFN graphs still exclude GDN.
+Production prompt chunks use `GdnScanPath::kFusedTokenLoop`: the existing
+parallel convolution, then OPT-019 warp-column fused quality recurrence
+(`dim3(32, 4)`, grid z=32 for width 128). Sequential 64-token windows remain
+the unloosened GDN-002/OPT-013 reference. OPT-013's associative overlay
+(`kParallelAssociative`) is retained: at `prompt_chunk_rows_ == 4096` that
+overlay fits `W_fit = 22` windows, so a 4,096-token layer batches
+`22 + 22 + 20` when that path is selected. Tails with one window
+(`2 ≤ token_count ≤ 64`) keep sequential recurrence after a single 2D
+convolution on the overlay/sequential paths. Rank-2 fused remains for
+component A/B only. Decode one-token GDN stays sequential. Prompt FFN graphs
+still exclude GDN.
 
 OPT-008's 4,096-versus-64-row memcmp remains a **sequential** GDN gate: that
 comparison pins `GdnScanPath::kSequentialWindows` rather than loosening
@@ -137,7 +142,11 @@ byte equality to tolerances. Parallel cross-boundary proof is the OPT-013
 diagnostic at the frozen GDN-002 envelopes (`5e-8` / `5e-9` / zero non-finite),
 including 4,096 parallel tokens versus 64 sequential windows.
 
-Attention also visits chunk rows in order. A row may read all committed KV rows
+Attention also visits chunk rows in order. Production
+`launch_attention_prepare_chunk` uses fattn-mma quality when `token_count >= 16`
+(ncols1=16, ncols2=2) and the two-row tiled path otherwise. The tiled path
+remains the unloosened OPT-005 numeric reference. Rank-3 warp-0 MMA is retained
+for A/B. A row may read all committed KV rows
 from earlier chunks and candidate rows earlier in its current chunk, never a
 future row. Partial RoPE uses the absolute position `old frontier + row`.
 
@@ -397,6 +406,22 @@ is not that gate and is not an 8K/32K/128K throughput claim. Artifacts:
 [`pins/opt018_ffn_mma_contract.json`](../pins/opt018_ffn_mma_contract.json),
 and [`fixtures/opt018_ffn_mma.json`](../fixtures/opt018_ffn_mma.json).
 
+OPT-019 closes residual non-projection GDN scan/recurrence and causal attention
+core time. **Measured, RTX 5090:** quality GDN versus sequential at 2048 tokens
+stayed inside `max_abs=1.58324838e-08` and `rms=1.28841632e-10` with zero
+non-finites; quality attention versus tiled stayed inside
+`max_abs=3.16649675e-06` and `rms=1.31638146e-07`. ncols1 pin is 16. Live
+exact-2048 `gdn` **1205.38806** ms and `attention` **475.116028** ms versus
+locked befores **1643.46082** / **1148.47461** ms (combined **1680.504088** ms
+versus **2791.93543** ms) meet the 85%/85%/70% addressed rule. Unperturbed
+Quartz mean 978.151855 tok/s versus live llama.cpp 3197.246224 tok/s.
+`owns_opt016_parity_gate` is false; `would_pass_opt016` is informational false.
+**OPT-016 remains the 2K parity owner.** This remasurement is not that gate
+and is not an 8K/32K/128K throughput claim. Artifacts:
+[`evidence/optimization/opt019-gdn-attention-core/REPORT.md`](../evidence/optimization/opt019-gdn-attention-core/REPORT.md),
+[`pins/opt019_core_recovery_contract.json`](../pins/opt019_core_recovery_contract.json),
+and [`fixtures/opt019_core_recovery.json`](../fixtures/opt019_core_recovery.json).
+
 The **proof boundary** excludes comparative speed claims, 2K/8K sustained
 prefill throughput, execution of a 128K prefill, 128K retrieval quality, thermal
 stability, superiority to llama.cpp/vLLM, and a Nsight Systems overlap timeline.
@@ -405,7 +430,9 @@ convert that instrumentation into a sustained-prefill or speed admission.
 OPT-015 explains the 2K gap and ranks recoveries; it is not llama.cpp parity
 and not a throughput gate. OPT-017 records mixer Q8_0 MMA admission plus a
 live exact-2048 remasurement and re-attribution. OPT-018 records Q4_K/Q6_K
-quality MMA plus live FFN remasurement. BEN-001
+quality MMA plus live FFN remasurement. OPT-019 records warp-column GDN and
+fattn-mma attention core quality plus live GDN/attention remasurement and
+re-attribution; it does not pass or own the 2K tok/s gate. BEN-001
 provides the harness; CMP-002/CMP-003 still own the 30-sample comparative gate.
 QLT-001 remains blocked. OPT-012's prompt graphs are FFN subgraphs only: not a
 whole-chunk graph, not a speedup gate, and not 128K quality recovery.

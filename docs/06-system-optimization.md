@@ -26,7 +26,11 @@ faster. Quartz production Q4_K/Q6_K prompt MMQ uses tensor-core MMA for
 `prompt_rows >= 8`. Mixer Q8_0 prompt MMQ also uses MMA for `prompt_rows >= 8`
 (OPT-017). Decode stays MMV. Tiny mixer prompts keep the OPT-009 tiled
 `__fmul_rn`/`__fadd_rn` kernel. MMA here is Measured component recovery, not
-the OPT-016 2K llama.cpp parity gate.
+the OPT-016 2K llama.cpp parity gate. Production prompt GDN recurrence is the
+warp-column fused quality path; sequential windows remain the unloosened
+reference. Production prompt attention (`token_count >= 16`) is the fattn-mma
+analog; tiled attention remains the unloosened reference. Those core-quality
+paths are also Measured component recovery, not the 2K parity gate.
 
 For a decode projection, all output threads need the same input vector but
 different weight rows. A useful MMV kernel keeps pieces of the input available
@@ -68,6 +72,8 @@ dot; Q/K normalization and 3x head mapping; FP32 decay/prediction/delta/outer
 update; gated RMSNorm; output projection. Preserve exact update order. Prefill
 may process chunks (the official reference uses 64) but the final recurrent and
 convolution state must equal token-by-token execution for arbitrary chunk splits.
+Production prompt recurrence (`kFusedTokenLoop`) is the warp-column fused quality
+path; sequential 64-token windows remain the unloosened numeric reference.
 
 The `[48,128,128]` matrices expose parallel heads and tiles but each token
 depends on the previous matrix. Avoid materializing repeated Q/K heads; map
@@ -84,7 +90,9 @@ and 65 distinguish the ordinary path, an exact chunk, and a one-row tail.
 
 Attention decode reads growing KV from 16 layers; use grouped-query mapping
 without physical sixfold copies. Prefill must be causal and handle partial RoPE
-on exactly 64 dimensions. Dense FFNs dominate weights: MMV for one/few rows,
+on exactly 64 dimensions. Production prompt attention (`token_count >= 16`) is
+the fattn-mma analog; the two-row tiled path remains the unloosened numeric
+reference. Dense FFNs dominate weights: MMV for one/few rows,
 MMQ for prompt or batched rows. Fusion is accepted only when the unfused path
 remains a differential oracle and profiler data attributes a wall-time win.
 
@@ -134,6 +142,21 @@ Live exact-2048 `ffn_mmq` is **399.287018** ms versus the before snapshot
 versus llama.cpp 3219.6604 tok/s is recorded and is **not** the OPT-016 gate.
 **OPT-016 remains the parity gate owner.** Report:
 [`evidence/optimization/opt018-ffn-mma-quality/REPORT.md`](../evidence/optimization/opt018-ffn-mma-quality/REPORT.md).
+
+## GDN and attention core quality (OPT-019)
+
+**Measured, RTX 5090:** production prompt GDN recurrence is warp-column fused
+quality (`dim3(32, 4)`, grid z=32, `s_shard[4]`). Sequential windows remain the
+unloosened reference (`5e-8` / `5e-9`). Production prompt attention
+(`token_count >= 16`) is the fattn-mma analog with pinned ncols1=16 and
+ncols2=2. Tiled attention remains the unloosened OPT-005 reference
+(`5e-5` / `5e-6`). Live exact-2048 `gdn` **1205.38806** ms and `attention`
+**475.116028** ms versus locked befores **1643.46082** / **1148.47461** ms
+meet the 85%/85%/70% addressed rule (`combined_after` **1680.504088** ms).
+Quartz mean **978.151855** tok/s versus llama.cpp **3197.246224** tok/s is
+recorded; `would_pass_opt016` is informational false. This is **not** the
+OPT-016 gate. **OPT-016 remains the parity gate owner.** Report:
+[`evidence/optimization/opt019-gdn-attention-core/REPORT.md`](../evidence/optimization/opt019-gdn-attention-core/REPORT.md).
 
 ## DwarfStar transfer boundary
 

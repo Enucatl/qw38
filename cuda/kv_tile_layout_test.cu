@@ -136,6 +136,19 @@ bool bijective(std::uint32_t kv_heads, std::uint32_t capacity,
   return true;
 }
 
+bool within_opt005(const std::vector<float>& a, const std::vector<float>& b) {
+  float maximum = 0.0F;
+  double squared = 0.0;
+  for (std::size_t i = 0; i < a.size(); ++i) {
+    const float delta = fabsf(a[i] - b[i]);
+    maximum = fmaxf(maximum, delta);
+    squared += static_cast<double>(delta) * static_cast<double>(delta);
+  }
+  const float rms =
+      sqrtf(static_cast<float>(squared / static_cast<double>(a.size())));
+  return maximum <= 5e-5f && rms <= 5e-6f;
+}
+
 bool inspect_launch(const AttentionConfig& c, Buffers& b, int* nodes,
                     dim3* staging_grid, dim3* staging_block,
                     dim3* attention_grid, dim3* attention_block,
@@ -335,7 +348,10 @@ int main() {
                  cudaMemcpyDeviceToHost);
       cudaMemcpy(ro.data(), reference.out, ro.size() * sizeof(float),
                  cudaMemcpyDeviceToHost);
-      exact &= std::memcmp(po.data(), ro.data(), po.size() * sizeof(float)) == 0;
+      exact &= rows < 16
+                   ? std::memcmp(po.data(), ro.data(), po.size() * sizeof(float)) ==
+                         0
+                   : within_opt005(po, ro);
       for (float value : po) finite &= std::isfinite(value);
       std::vector<__nv_bfloat16> pk(rows * row_values), rk(rows * row_values),
           pv(rows * row_values), rv(rows * row_values);
@@ -431,15 +447,21 @@ int main() {
   int nodes = 0;
   dim3 staging_grid{}, staging_block{}, attention_grid{}, attention_block{};
   unsigned dynamic_shared = 0;
+  const int ncols1 = qw38::cuda::selected_attention_mma_query_rows();
+  const unsigned expected_threads = ncols1 <= 8 ? 64U : 128U;
+  const unsigned expected_grid_y =
+      static_cast<unsigned>((64 + ncols1 - 1) / ncols1);
+  const unsigned expected_shared =
+      static_cast<unsigned>(qw38::cuda::attention_mma_quality_shared_bytes());
   const bool launch_ok =
       inspect_launch(production, graph, &nodes, &staging_grid, &staging_block,
                      &attention_grid, &attention_block, &dynamic_shared) &&
       nodes == 2 && staging_grid.x == 4 && staging_grid.y == 64 &&
-      staging_grid.z == 1 && attention_grid.x == 4 && attention_grid.y == 32 &&
-      attention_grid.z == 1 && staging_block.x == 256 && staging_block.y == 1 &&
-      staging_block.z == 1 && attention_block.x == 256 &&
-      attention_block.y == 1 && attention_block.z == 1 &&
-      dynamic_shared == 33792;
+      staging_grid.z == 1 && attention_grid.x == 4 &&
+      attention_grid.y == expected_grid_y && attention_grid.z == 1 &&
+      staging_block.x == 256 && staging_block.y == 1 && staging_block.z == 1 &&
+      attention_block.x == expected_threads && attention_block.y == 1 &&
+      attention_block.z == 1 && dynamic_shared == expected_shared;
   release(graph);
 
   const bool invalid =

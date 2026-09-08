@@ -68,6 +68,16 @@ cudaError_t launch_gdn_prepare_chunk_tiled(
     GdnScanPath path = GdnScanPath::kSequentialWindows,
     float* scratch = nullptr, std::size_t scratch_floats = 0) noexcept;
 
+cudaError_t launch_gdn_fused_rank2(
+    const GdnConfig& config, const float* convolution_input,
+    const float* convolution_weights, const float* log_decay,
+    const float* beta, std::size_t token_count, const GdnState& committed,
+    const GdnState& candidate, float* convolution_output,
+    float* recurrent_output, cudaStream_t stream,
+    bool value_is_tiled) noexcept;
+
+int gdn_fused_quality_occupancy() noexcept;
+
 cudaError_t launch_gdn_commit(const GdnConfig& config,
                               const GdnState& candidate,
                               const GdnState& committed,

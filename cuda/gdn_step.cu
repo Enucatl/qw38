@@ -1,4 +1,5 @@
 #include "gdn_step.h"
+#include "gdn_fused_quality.cuh"
 
 #include <algorithm>
 #include <cmath>
@@ -758,13 +759,13 @@ cudaError_t launch_sequential_windows(
   return cudaSuccess;
 }
 
-cudaError_t launch_fused_token_loop(
+cudaError_t launch_convolution_then_recurrence(
     const GdnConfig& config, const float* convolution_input,
     const float* convolution_weights, const float* log_decay,
     const float* beta, std::size_t token_count, const GdnState& committed,
     const GdnState& candidate, float* convolution_output,
-    float* recurrent_output, cudaStream_t stream,
-    bool value_is_tiled) noexcept {
+    float* recurrent_output, cudaStream_t stream, bool value_is_tiled,
+    bool quality) noexcept {
   const std::size_t channels = gdn_convolution_channels(config);
   const dim3 conv_grid(
       static_cast<unsigned int>((channels + kConvolutionThreads - 1) /
@@ -777,11 +778,30 @@ cudaError_t launch_fused_token_loop(
       config.convolution_width, token_count);
   cudaError_t error = cudaPeekAtLastError();
   if (error != cudaSuccess) return error;
+  if (quality && config.key_width == 128 && config.value_width == 128) {
+    return launch_gdn_quality_recurrence(
+        config, convolution_output, log_decay, beta, committed.recurrent,
+        candidate.recurrent, recurrent_output, token_count, value_is_tiled,
+        stream);
+  }
   prepare_recurrence_fused_token_loop<<<config.value_heads, kThreads, 0,
                                         stream>>>(
       config, convolution_output, log_decay, beta, committed.recurrent,
       candidate.recurrent, recurrent_output, token_count, value_is_tiled);
   return cudaPeekAtLastError();
+}
+
+cudaError_t launch_fused_token_loop(
+    const GdnConfig& config, const float* convolution_input,
+    const float* convolution_weights, const float* log_decay,
+    const float* beta, std::size_t token_count, const GdnState& committed,
+    const GdnState& candidate, float* convolution_output,
+    float* recurrent_output, cudaStream_t stream,
+    bool value_is_tiled) noexcept {
+  return launch_convolution_then_recurrence(
+      config, convolution_input, convolution_weights, log_decay, beta,
+      token_count, committed, candidate, convolution_output, recurrent_output,
+      stream, value_is_tiled, true);
 }
 
 cudaError_t launch_parallel_associative(
@@ -901,6 +921,37 @@ cudaError_t launch_gdn_prepare_chunk_layout(
 }
 
 }  // namespace
+
+cudaError_t launch_gdn_fused_rank2(
+    const GdnConfig& config, const float* convolution_input,
+    const float* convolution_weights, const float* log_decay,
+    const float* beta, std::size_t token_count, const GdnState& committed,
+    const GdnState& candidate, float* convolution_output,
+    float* recurrent_output, cudaStream_t stream,
+    bool value_is_tiled) noexcept {
+  const std::size_t channels = gdn_convolution_channels(config);
+  if (channels == 0 || token_count == 0 || convolution_input == nullptr ||
+      convolution_weights == nullptr || log_decay == nullptr ||
+      beta == nullptr || committed.convolution == nullptr ||
+      committed.recurrent == nullptr || candidate.convolution == nullptr ||
+      candidate.recurrent == nullptr || convolution_output == nullptr ||
+      recurrent_output == nullptr ||
+      committed.convolution == candidate.convolution ||
+      committed.recurrent == candidate.recurrent) {
+    return cudaErrorInvalidValue;
+  }
+  return launch_convolution_then_recurrence(
+      config, convolution_input, convolution_weights, log_decay, beta,
+      token_count, committed, candidate, convolution_output, recurrent_output,
+      stream, value_is_tiled, false);
+}
+
+int gdn_fused_quality_occupancy() noexcept {
+  int occupancy = 0;
+  const cudaError_t error = cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+      &occupancy, prepare_recurrence_fused_warp_column, kGdnQualityThreads, 0);
+  return error == cudaSuccess ? occupancy : 0;
+}
 
 cudaError_t launch_gdn_commit(const GdnConfig& config,
                               const GdnState& candidate,

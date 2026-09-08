@@ -1,0 +1,6 @@
+opt019_gdn_occupancy=9
+opt019_gdn_2048 max_abs=1.58324838e-08 rms=1.28841632e-10 nonfinite=0 prepare_atomic=true passed=true
+opt019_gdn_ab sample=0 quality_ms=4.07974386 rank2_ms=13.9283838 sequential_ms=19.3504639 overlay_ms=14.6421118
+opt019_gdn_ab sample=1 quality_ms=4.03731203 rank2_ms=13.9152641 sequential_ms=19.3539524 overlay_ms=14.617568
+opt019_gdn_ab sample=2 quality_ms=4.0281601 rank2_ms=13.9257278 sequential_ms=19.4216957 overlay_ms=14.6359997
+fused_ab fused_ms=4.04840517 rank2_ms=13.9231253 sequential_ms=19.37537 overlay_ms=14.6318932 occupancy=9 faster=true

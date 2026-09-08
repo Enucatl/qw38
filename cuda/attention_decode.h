@@ -162,6 +162,29 @@ cudaError_t launch_attention_prepare_chunk_reference(
     float* normalized_query, float* normalized_key, float* score_workspace,
     float* output, cudaStream_t stream) noexcept;
 
+cudaError_t launch_attention_prepare_chunk_mma_rank3(
+    const AttentionConfig& config, std::size_t start_position,
+    std::size_t token_count, const float* query, const float* key,
+    const float* value, const float* query_norm_scale,
+    const float* key_norm_scale, const float* output_gate,
+    const AttentionCache& committed, const AttentionCache& candidate_rows,
+    float* normalized_query, float* normalized_key, float* score_workspace,
+    float* output, cudaStream_t stream) noexcept;
+
+cudaError_t launch_attention_prepare_chunk_mma_ncols1(
+    const AttentionConfig& config, std::size_t start_position,
+    std::size_t token_count, const float* query, const float* key,
+    const float* value, const float* query_norm_scale,
+    const float* key_norm_scale, const float* output_gate,
+    const AttentionCache& committed, const AttentionCache& candidate_rows,
+    float* normalized_query, float* normalized_key, float* score_workspace,
+    float* output, int ncols1, cudaStream_t stream) noexcept;
+
+int selected_attention_mma_query_rows() noexcept;
+int attention_mma_quality_occupancy() noexcept;
+int attention_mma_quality_occupancy_for(int ncols1) noexcept;
+std::size_t attention_mma_quality_shared_bytes() noexcept;
+
 cudaError_t launch_attention_prepare_chunk_grouped_instrumented(
     const AttentionConfig& config, std::size_t start_position,
     std::size_t token_count, const float* query, const float* key,

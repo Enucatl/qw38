@@ -1,0 +1,6 @@
+opt019_attention_64 max_abs=3.16649675e-06 rms=3.91778912e-07 occupancy=1 shared=73088 selected_ncols1=16
+opt019_attention_ncols1 ncols1=8 launch=ok finite=true envelope=true occupancy=1 sample0=20.1692486 sample1=20.1532478 sample2=20.1505604 mean_ms=20.1576843
+opt019_attention_ncols1 ncols1=16 launch=ok finite=true envelope=true occupancy=1 sample0=17.2064648 sample1=17.1925125 sample2=17.1909122 mean_ms=17.1966305
+opt019_attention_ncols1 ncols1=32 launch=ok finite=true envelope=false occupancy=1 sample0=0 sample1=0 sample2=0 mean_ms=0
+opt019_attention_2048 max_abs=3.16649675e-06 rms=1.31638146e-07 passed=true winner_ncols1=16 selected_ncols1=16
+opt019_attention_ab quality_ms=17.2483196 tiled_ms=169.305527 rank3_ms=60.3077354 faster=true occupancy=1 samples_q=17.215168,17.2649918,17.2647991 samples_t=169.389343,169.239655,169.287582 samples_r=61.1546555,59.8166733,59.9518738

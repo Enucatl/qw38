@@ -8,7 +8,7 @@
   "runtime": "13.0",
   "toolkit": "CUDA 13.0.2",
   "pinned_image": "qw38-cuda:13.0.2",
-  "measurement_utc": "2026-09-07T16:02:40Z",
+  "measurement_utc": "2026-09-08T19:43:30Z",
   "production_shape": {
     "query_heads": 24,
     "kv_heads": 4,
@@ -75,7 +75,7 @@
     ],
     "attention_grid": [
       4,
-      32,
+      4,
       1
     ],
     "staging_block": [
@@ -84,11 +84,11 @@
       1
     ],
     "attention_block": [
-      256,
+      128,
       1,
       1
     ],
-    "dynamic_shared_bytes": 33792
+    "dynamic_shared_bytes": 73088
   },
   "proof_limit": "executed pointer-span / exact-value evidence, not Nsight DRAM transactions, latency, or end-to-end recovery"
 }

@@ -1,4 +1,5 @@
 #include "attention_decode.h"
+#include "fattn_mma_f16.cuh"
 #include "mma.cuh"
 
 #include <cmath>
@@ -1108,7 +1109,7 @@ cudaError_t launch_attention_prepare_chunk_tiled(
   return cudaPeekAtLastError();
 }
 
-cudaError_t launch_attention_prepare_chunk(
+cudaError_t launch_attention_prepare_chunk_mma_rank3(
     const AttentionConfig& config, std::size_t start_position,
     std::size_t token_count, const float* query, const float* key,
     const float* value, const float* query_norm_scale,
@@ -1116,13 +1117,6 @@ cudaError_t launch_attention_prepare_chunk(
     const AttentionCache& committed, const AttentionCache& candidate_rows,
     float* normalized_query, float* normalized_key, float* score_workspace,
     float* output, cudaStream_t stream) noexcept {
-  if (token_count < 16) {
-    return launch_attention_prepare_chunk_tiled(
-        config, start_position, token_count, query, key, value,
-        query_norm_scale, key_norm_scale, output_gate, committed,
-        candidate_rows, normalized_query, normalized_key, score_workspace,
-        output, stream);
-  }
   cudaError_t error = stage_and_validate_chunk(
       config, start_position, token_count, query, key, value, query_norm_scale,
       key_norm_scale, output_gate, committed, candidate_rows, normalized_query,
@@ -1146,6 +1140,64 @@ cudaError_t launch_attention_prepare_chunk(
           output_gate, committed.key, committed.value, candidate_rows.key,
           candidate_rows.value, output, normalized_query);
   return cudaPeekAtLastError();
+}
+
+cudaError_t launch_attention_prepare_chunk_mma_ncols1(
+    const AttentionConfig& config, std::size_t start_position,
+    std::size_t token_count, const float* query, const float* key,
+    const float* value, const float* query_norm_scale,
+    const float* key_norm_scale, const float* output_gate,
+    const AttentionCache& committed, const AttentionCache& candidate_rows,
+    float* normalized_query, float* normalized_key, float* score_workspace,
+    float* output, int ncols1, cudaStream_t stream) noexcept {
+  cudaError_t error = stage_and_validate_chunk(
+      config, start_position, token_count, query, key, value, query_norm_scale,
+      key_norm_scale, output_gate, committed, candidate_rows, normalized_query,
+      normalized_key, score_workspace, output, stream);
+  if (error != cudaSuccess) return error;
+  return launch_fattn_mma_quality(
+      config, start_position, token_count, query, query_norm_scale, output_gate,
+      committed.key, committed.value, candidate_rows.key, candidate_rows.value,
+      output, normalized_query, ncols1, stream);
+}
+
+int selected_attention_mma_query_rows() noexcept {
+  return kSelectedAttentionMmaQueryRows;
+}
+
+int attention_mma_quality_occupancy_for(int ncols1) noexcept {
+  return fattn_occupancy_for(ncols1);
+}
+
+int attention_mma_quality_occupancy() noexcept {
+  return fattn_occupancy_for(kSelectedAttentionMmaQueryRows);
+}
+
+std::size_t attention_mma_quality_shared_bytes() noexcept {
+  return fattn_quality_shared_bytes(kSelectedAttentionMmaQueryRows,
+                                    kSelectedAttentionMmaQueryRows != 32);
+}
+
+cudaError_t launch_attention_prepare_chunk(
+    const AttentionConfig& config, std::size_t start_position,
+    std::size_t token_count, const float* query, const float* key,
+    const float* value, const float* query_norm_scale,
+    const float* key_norm_scale, const float* output_gate,
+    const AttentionCache& committed, const AttentionCache& candidate_rows,
+    float* normalized_query, float* normalized_key, float* score_workspace,
+    float* output, cudaStream_t stream) noexcept {
+  if (token_count < 16) {
+    return launch_attention_prepare_chunk_tiled(
+        config, start_position, token_count, query, key, value,
+        query_norm_scale, key_norm_scale, output_gate, committed,
+        candidate_rows, normalized_query, normalized_key, score_workspace,
+        output, stream);
+  }
+  return launch_attention_prepare_chunk_mma_ncols1(
+      config, start_position, token_count, query, key, value, query_norm_scale,
+      key_norm_scale, output_gate, committed, candidate_rows, normalized_query,
+      normalized_key, score_workspace, output, kSelectedAttentionMmaQueryRows,
+      stream);
 }
 
 template <bool Grouped>

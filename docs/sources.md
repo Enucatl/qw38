@@ -414,6 +414,37 @@ baseline.
   association gate; fixed abs/rms retired for Q4_K/Q6_K MMQ admission;
   variant retained with exact Q8 staging; parity gate owner remains
   blocked; not an end-to-end 2K tok/s gate; no 8K/32K/128K throughput gate.
+- OPT-019 adapts llama.cpp revision
+  `cc83d7b4824f73cfdda4dfbb47ee39804f71b328` (MIT, The ggml authors) warp-column
+  fused GDN from `gated_delta_net.cu` / `gated_delta_net.cuh` and Ampere
+  fattn-mma-f16 from `fattn.cu`, `fattn-mma-f16.cuh`, and `mma.cuh`. Production
+  GDN fused recurrence is grid `(value_heads, 1, value_width/4)` and block
+  `(32, 4)` with `s_shard[4]` FP32 column state. Production prompt attention
+  (`token_count >= 16`) uses `ncols2 = 2` and pinned `ncols1 = 16`. This
+  increment does not vendor those llama.cpp files, does not copy `../ds4`, and
+  does not include ggml headers. ds4 has no GDN analog and is mentioned only
+  for multi-row online attention structure. Sequential `kSequentialWindows`
+  remains the unloosened GDN-002/OPT-013 reference. Tiled
+  `launch_attention_prepare_chunk_tiled` remains the unloosened OPT-005
+  reference. Rank-2 fused GDN and Rank-3 warp-0 MMA stay for component A/B.
+  **Measured, RTX 5090:** quality GDN versus sequential at 2048 tokens
+  `max_abs=1.58324838e-08` / `rms=1.28841632e-10`; quality attention versus
+  tiled `max_abs=3.16649675e-06` / `rms=1.31638146e-07`; ncols1 pin 16; live
+  exact-2048 `gdn` 1205.38806 ms and `attention` 475.116028 ms versus locked
+  befores 1643.46082 / 1148.47461 ms; Quartz mean 978.151855 tok/s versus
+  llama.cpp 3197.246224 tok/s; `would_pass_opt016` informational false. The
+  schema-1 contract, measured fixture, and report are
+  [`pins/opt019_core_recovery_contract.json`](../pins/opt019_core_recovery_contract.json),
+  [`fixtures/opt019_core_recovery.json`](../fixtures/opt019_core_recovery.json),
+  and
+  [`evidence/optimization/opt019-gdn-attention-core/REPORT.md`](../evidence/optimization/opt019-gdn-attention-core/REPORT.md).
+  The beginner explanations are
+  [`docs/42-cuda-gdn-chunks.md`](42-cuda-gdn-chunks.md) and
+  [`docs/44-cuda-attention-prefill.md`](44-cuda-attention-prefill.md).
+  Proof limit: envelopes unloosened; sequential GDN remains the reference;
+  tiled attention remains the reference; parity gate owner remains blocked;
+  not an end-to-end 2K tok/s gate; no 8K/32K/128K throughput gate; mixer
+  versus core split is not this increment.
 - CUD-003 introduces no new external implementation source. GGUF Q8_0 decoding
   follows the format already admitted by the pinned scalar decoder, and the
   pointwise/layout equations come from the pinned model contract and scalar

@@ -59,10 +59,12 @@ int main(int argc, char** argv) {
   std::array<float, qw38::internal::kResidualWidth> hidden{};
   qw38::cuda::SyncResult result{};
   qw38::cuda::PrefillAttribution attribution;
+  // Production prompt GDN path (warp-column quality). Overlay remains the
+  // OPT-013 alternate and is not used for OPT-019 core-after attribution.
   status = qw38::cuda::sync_tokens(
       model, tokens.data(), tokens.size(), &session, &workspace, logits.data(),
       logits.size(), hidden.data(), hidden.size(), &result, nullptr, &graphs,
-      qw38::cuda::GdnScanPath::kParallelAssociative, &attribution);
+      qw38::cuda::GdnScanPath::kFusedTokenLoop, &attribution);
   if (!status.is_ok()) return fail_status(status);
 
   const bool measured =

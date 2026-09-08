@@ -1,7 +1,12 @@
 # 44. Memory-bounded CUDA attention prefill at 128K
 
-[Index](README.md) · Implementation tasks: ATN-002, OPT-010, and EDU-030 in
+[Index](README.md) · Implementation tasks: ATN-002, OPT-010, OPT-019, and EDU-030 in
 [`implementation_ledger.md`](../implementation_ledger.md)
+· Contracts:
+[`pins/opt019_core_recovery_contract.json`](../pins/opt019_core_recovery_contract.json)
+· Evidence:
+[`fixtures/opt019_core_recovery.json`](../fixtures/opt019_core_recovery.json),
+[`evidence/optimization/opt019-gdn-attention-core/REPORT.md`](../evidence/optimization/opt019-gdn-attention-core/REPORT.md)
 
 [Chapter 43](43-cuda-attention-decode.md) processed one new token. **Prefill**
 processes a known prompt containing many tokens. The same causal rule applies:
@@ -9,8 +14,12 @@ prompt token 20 can use tokens 0 through 20, but not token 21.
 
 ATN-002 extends the post-projection CUDA boundary to arbitrary positive chunks.
 It prioritizes an inspectable state and memory contract. OPT-005 replaces its
-production per-row launch loop with a fixed-memory tiled path; the former loop
-remains available as a test-only reference for differential measurements.
+per-row launch loop with a fixed-memory tiled path; the former loop remains
+available as a test-only reference for differential measurements. OPT-019 makes
+production `launch_attention_prepare_chunk` the fattn-mma-f16 analog when
+`token_count >= 16`. The two-row tiled path remains the unloosened OPT-005
+numeric reference and is still used when `token_count < 16`. Rank-3 warp-0 MMA
+is retained for component A/B only.
 
 ## Token-major input and output
 
@@ -61,13 +70,15 @@ Quartz's OPT-005 attention grid streams contexts through compile-time 32-row KV
 tiles. It keeps each tile's BF16 K/V and FP32 scores in shared memory and carries
 running maximum, denominator, and weighted-value state in FP32. When a new tile
 has a larger maximum, the previous state is rescaled before accumulation. No
-prompt-sized score rectangle is allocated, and the production multi-row path
-leaves global score scratch byte-for-byte untouched.
+prompt-sized score rectangle is allocated, and both the tiled reference and
+the quality MMA path leave global score scratch byte-for-byte untouched.
 
-The production launch has exactly two kernel launches per positive chunk: KV
-staging on a `(kv_head, token)` grid, followed by grouped attention on a
+The tiled reference launch has exactly two kernel launches per positive chunk:
+KV staging on a `(kv_head, token)` grid, followed by grouped attention on a
 `(kv_head, ceil(token_count / 2))` grid. This is launch topology evidence, not
-a complete model or end-to-end speed result.
+a complete model or end-to-end speed result. Production quality MMA
+(`token_count >= 16`) uses the fattn-mma analog with pinned ncols1=16 and
+ncols2=2.
 
 ## Whole-chunk prepare, commit, and cancellation
 
@@ -258,3 +269,38 @@ exact-value evidence, not Nsight DRAM transactions, latency, throughput, or
 end-to-end recovery. The contract and retained record are
 [`pins/cuda_kv_tile_layout_contract.json`](../pins/cuda_kv_tile_layout_contract.json)
 and [`fixtures/cuda_kv_tile_layout.json`](../fixtures/cuda_kv_tile_layout.json).
+
+## OPT-019 fattn-mma quality production
+
+Production `launch_attention_prepare_chunk` for `token_count >= 16` is the
+fattn-mma-f16 analog adapted from llama.cpp `fattn.cu` / `fattn-mma-f16.cuh` /
+`mma.cuh` at `cc83d7b4824f73cfdda4dfbb47ee39804f71b328` (MIT, The ggml authors).
+ds4 is mentioned only for multi-row online structure; this increment does not
+copy `../ds4` and does not include ggml headers. Geometry is DKQ=DV=256 with
+GQA group size 6: `ncols2 = 2` so each KV-head block walks the six query heads
+as three subgroups and loads each KV tile once per tile for the group.
+`ncols1` was swept at 2048 query rows in `{8, 16, 32}`; ncols1=8 and 16 met
+OPT-005 versus tiled with dual-F16 KQ, ncols1=32 missed the envelope (single
+F16), and the winner pin is `attention_mma_query_rows_2048 = 16`. That pin is
+used for every production quality launch with `token_count >= 16`, including
+4,096-row chunks. All warps participate in `mma.sync` m16n8k16. Online softmax
+stays in registers. Decode `launch_attention_prepare` is unchanged.
+
+Quality versus `launch_attention_prepare_chunk_tiled` stays inside OPT-005
+BF16 max abs `5e-5`, RMS `5e-6`, zero non-finites, and exact candidate K/V.
+Rank-3 `launch_attention_prepare_chunk_mma_rank3` remains for A/B; it is not
+production. OPT-007 `query_rows_per_block = 2` is still the tiled pin, not the
+quality MMA tile.
+
+**Measured, RTX 5090, component-only:** at 2048 rows, quality versus tiled
+recorded `max_abs=3.16649675e-06`, `rms=1.31638146e-07`, `passed=true`,
+winner ncols1=16. CUDA-event means were quality `17.1602116 ms`, tiled
+`168.421204 ms`, Rank-3 `59.7287598 ms`, occupancy 1. ncols1 sweep means were
+8: `20.1653976 ms` (envelope true), 16: `17.1821537 ms` (envelope true), 32:
+envelope false. Live exact-2048 category `attention` after this increment is
+**475.116028** ms versus the locked before snapshot **1148.47461** ms. Tiled
+attention remains the unloosened reference. This is not an end-to-end 2K tok/s
+gate. Artifacts:
+[`fixtures/opt019_core_recovery.json`](../fixtures/opt019_core_recovery.json)
+and
+[`evidence/optimization/opt019-gdn-attention-core/REPORT.md`](../evidence/optimization/opt019-gdn-attention-core/REPORT.md).

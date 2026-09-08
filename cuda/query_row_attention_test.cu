@@ -111,6 +111,22 @@ struct Launch {
       active_blocks{};
   void* function{};
 };
+float max_abs(const std::vector<float>& a, const std::vector<float>& b) {
+  float m = 0.0F;
+  for (std::size_t i = 0; i < a.size(); ++i) m = fmaxf(m, fabsf(a[i] - b[i]));
+  return m;
+}
+float rms_err(const std::vector<float>& a, const std::vector<float>& b) {
+  double s = 0.0;
+  for (std::size_t i = 0; i < a.size(); ++i) {
+    const double d = a[i] - b[i];
+    s += d * d;
+  }
+  return sqrtf(static_cast<float>(s / static_cast<double>(a.size())));
+}
+bool within_opt005(const std::vector<float>& a, const std::vector<float>& b) {
+  return max_abs(a, b) <= 5e-5f && rms_err(a, b) <= 5e-6f;
+}
 bool inspect(const AttentionConfig& c, std::size_t rows, Buffers& b,
              Launch& result) {
   cudaStream_t stream{};
@@ -145,10 +161,21 @@ bool inspect(const AttentionConfig& c, std::size_t rows, Buffers& b,
       result.attention_block = params.blockDim;
       result.attention_dynamic_shared = params.sharedMemBytes;
       result.function = params.func;
-      if (params.sharedMemBytes != 33792)
-        error = cudaErrorInvalidConfiguration;
     }
   }
+  const bool quality = rows >= 16;
+  const int ncols1 = qw38::cuda::selected_attention_mma_query_rows();
+  const unsigned expected_threads =
+      quality ? (ncols1 <= 8 ? 64U : 128U) : 256U;
+  const unsigned expected_grid_y =
+      quality ? static_cast<unsigned>((rows + static_cast<std::size_t>(ncols1) - 1) /
+                                      static_cast<std::size_t>(ncols1))
+              : static_cast<unsigned>((rows + 1) / 2);
+  const unsigned expected_shared =
+      quality ? static_cast<unsigned>(qw38::cuda::attention_mma_quality_shared_bytes())
+              : 33792U;
+  if (error == cudaSuccess && result.attention_dynamic_shared != expected_shared)
+    error = cudaErrorInvalidConfiguration;
   if (error == cudaSuccess && result.function != nullptr && rows == 64) {
     cudaFuncAttributes attr{};
     error = cudaFuncGetAttributes(&attr, result.function);
@@ -157,19 +184,24 @@ bool inspect(const AttentionConfig& c, std::size_t rows, Buffers& b,
     result.local_bytes = static_cast<int>(attr.localSizeBytes);
     result.max_dynamic = attr.maxDynamicSharedSizeBytes;
     if (error == cudaSuccess)
+      error = cudaFuncSetAttribute(
+          result.function, cudaFuncAttributeMaxDynamicSharedMemorySize,
+          static_cast<int>(expected_shared));
+    if (error == cudaSuccess)
       error = cudaOccupancyMaxActiveBlocksPerMultiprocessor(
-          &result.active_blocks, result.function, 256, 33792);
+          &result.active_blocks, result.function,
+          static_cast<int>(expected_threads), expected_shared);
   }
   if (graph != nullptr) cudaGraphDestroy(graph);
   cudaStreamDestroy(stream);
   return error == cudaSuccess && result.nodes == 2 &&
          result.staging_grid.x == c.kv_heads && result.staging_grid.y == rows &&
          result.staging_grid.z == 1 && result.attention_grid.x == c.kv_heads &&
-         result.attention_grid.y == (rows + 1) / 2 &&
+         result.attention_grid.y == expected_grid_y &&
          result.attention_grid.z == 1 && result.staging_block.x == 256 &&
          result.staging_block.y == 1 && result.staging_block.z == 1 &&
-         result.attention_block.x == 256 && result.attention_block.y == 1 &&
-         result.attention_block.z == 1;
+         result.attention_block.x == expected_threads &&
+         result.attention_block.y == 1 && result.attention_block.z == 1;
 }
 }  // namespace
 
@@ -208,7 +240,9 @@ int main() {
     std::vector<float> po(cases[n] * q), ro(cases[n] * q);
     cudaMemcpy(po.data(), production.out, po.size() * sizeof(float), cudaMemcpyDeviceToHost);
     cudaMemcpy(ro.data(), reference.out, ro.size() * sizeof(float), cudaMemcpyDeviceToHost);
-    exact &= memcmp(po.data(), ro.data(), po.size() * sizeof(float)) == 0;
+    exact &= cases[n] < 16
+                 ? memcmp(po.data(), ro.data(), po.size() * sizeof(float)) == 0
+                 : within_opt005(po, ro);
     for (float value : po) finite &= std::isfinite(value);
     std::vector<__nv_bfloat16> pk(cases[n] * r), rk(cases[n] * r),
         pv(cases[n] * r), rv(cases[n] * r);
@@ -281,7 +315,7 @@ int main() {
       c.capacity, c.head_width);
   cudaMemcpy(&one_value, one_frontier, sizeof(one_value), cudaMemcpyDeviceToHost);
   cudaMemcpy(&split_value, split_frontier, sizeof(split_value), cudaMemcpyDeviceToHost);
-  boundary &= one_out == split_out && one_cache == split_cache &&
+  boundary &= within_opt005(one_out, split_out) && one_cache == split_cache &&
               one_value == 96 && split_value == 96;
   cudaFree(one_frontier); cudaFree(split_frontier); release(single); release(split);
   const bool invalid = qw38::cuda::launch_attention_prepare_chunk(
