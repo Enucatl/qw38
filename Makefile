@@ -118,7 +118,7 @@ cuda-native: $(BUILD_DIR)/qw38-cuda-probe $(BUILD_DIR)/qw38-cuda-quant-test $(BU
 $(BUILD_DIR)/qw38-cuda-probe: cuda/device_probe.cu | $(BUILD_DIR)
 	$(NVCC) $(NVCCFLAGS) $< -o $@
 
-$(BUILD_DIR)/quant_mmv.cuda.o: cuda/quant_mmv.cu cuda/quant_mmv.h | $(BUILD_DIR)
+$(BUILD_DIR)/quant_mmv.cuda.o: cuda/quant_mmv.cu cuda/quant_mmv.h cuda/quant_mmq_mma.cuh cuda/mma.cuh | $(BUILD_DIR)
 	$(NVCC) $(NVCCFLAGS) -Icuda -c $< -o $@
 
 $(BUILD_DIR)/qw38-cuda-quant-test: cuda/quant_mmv_test.cu $(BUILD_DIR)/quant_mmv.cuda.o $(BUILD_DIR)/quant.o $(BUILD_DIR)/status.o | $(BUILD_DIR)

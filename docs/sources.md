@@ -388,6 +388,32 @@ baseline.
   Proof limit: envelopes unloosened; OPT-009 Q8_0 reference remains
   byte-exact; OPT-016 remains the parity gate owner; not an end-to-end 2K
   tok/s gate; no 8K/32K/128K throughput gate.
+- OPT-018 adapts llama.cpp revision
+  `cc83d7b4824f73cfdda4dfbb47ee39804f71b328` (MIT, The ggml authors) Q4_K/Q6_K
+  MMQ MMA from `mmq.cuh`, `mma.cuh`, `mmq-config-ampere.cuh`,
+  `mmq-load-tiles.cuh`, `mmq-vec-dot.cuh`, and `quantize.cu`. Geometry is
+  `MMQ_ITER_K=256`, packed load-tiles, Q8_1 MMQ Y in the existing prompt
+  workspace, and `dim3(32, 8)`. Inner-loop repair uses float accumulators,
+  Q4_K DS4 Y, half2 X at SRAM stride 76, and `__launch_bounds__(256, 1)`.
+  ds4 `cuda/mmq` is the ggml-free launcher pattern; Q4_K/Q6_K numeric
+  admission follows ds4 `cuda/mmq/test/test_mmq_parity.cu` (option C; CPU
+  dequant GEMM; `abs > 0.20*sqrt(K)` and `rel > 0.05`). This increment does
+  not copy `../ds4/cuda/mmq/` and does not include ggml headers. Production
+  `launch_quant_mmq` uses quality MMA when `prompt_rows >= 8`. **Measured,
+  RTX 5090:** live exact-2048 `ffn_mmq` 399.287018 ms versus before
+  2524.67725 ms and llama.cpp 2K wall 636.184782 ms (`avg_ts` 3219.6604);
+  Quartz mean 625.792114 tok/s; `llama_competitive` true;
+  `would_pass_opt016` informational false. The schema-1 contract,
+  measured fixture, and report are
+  [`pins/opt018_ffn_mma_contract.json`](../pins/opt018_ffn_mma_contract.json),
+  [`fixtures/opt018_ffn_mma.json`](../fixtures/opt018_ffn_mma.json), and
+  [`evidence/optimization/opt018-ffn-mma-quality/REPORT.md`](../evidence/optimization/opt018-ffn-mma-quality/REPORT.md).
+  The beginner explanation is
+  [`docs/40-cuda-prompt-mmq.md`](40-cuda-prompt-mmq.md).
+  Proof limit: Q4_K/Q6_K MMQ vs CPU dequant GEMM uses ds4 Q4_K parity
+  association gate; fixed abs/rms retired for Q4_K/Q6_K MMQ admission;
+  variant retained with exact Q8 staging; parity gate owner remains
+  blocked; not an end-to-end 2K tok/s gate; no 8K/32K/128K throughput gate.
 - CUD-003 introduces no new external implementation source. GGUF Q8_0 decoding
   follows the format already admitted by the pinned scalar decoder, and the
   pointwise/layout equations come from the pinned model contract and scalar

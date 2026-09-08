@@ -55,6 +55,44 @@ inline __device__ void mma_m16n8k32_s8(
       : "r"(a[0]), "r"(a[1]), "r"(a[2]), "r"(a[3]), "r"(b[0]), "r"(b[1]));
 }
 
+// ldmatrix helpers for llama.cpp MMQ tiles (Turing/Ampere layout).
+// Pointers must be 16-byte aligned shared memory.
+inline __device__ void ldmatrix_x4(int a[4], const int* xs) {
+  asm volatile("ldmatrix.sync.aligned.m8n8.x4.b16 {%0, %1, %2, %3}, [%4];"
+               : "=r"(a[0]), "=r"(a[1]), "=r"(a[2]), "=r"(a[3])
+               : "l"(xs));
+}
+
+inline __device__ void ldmatrix_x2(int a[2], const int* xs) {
+  asm volatile("ldmatrix.sync.aligned.m8n8.x2.b16 {%0, %1}, [%2];"
+               : "=r"(a[0]), "=r"(a[1])
+               : "l"(xs));
+}
+
+inline __device__ void load_a_m16k32(int a[4], const int* xs0, int stride) {
+  const int* xs = xs0 + (threadIdx.x % 16) * stride + (threadIdx.x / 16) * 4;
+  ldmatrix_x4(a, xs);
+}
+
+inline __device__ void load_a_m16k16(int a[2], const int* xs0, int stride) {
+  const int* xs = xs0 + (threadIdx.x % 16) * stride;
+  ldmatrix_x2(a, xs);
+}
+
+inline __device__ void load_b_generic_k32(int b[2], const int* xs0,
+                                          int stride) {
+  const int lane = threadIdx.x & 31;
+#pragma unroll
+  for (int l = 0; l < 2; ++l) {
+    b[l] = xs0[tile8x8_i(lane, l) * stride + tile8x8_j(lane, l)];
+  }
+}
+
+inline __device__ void load_b_generic_k16(int* b, const int* xs0, int stride) {
+  const int lane = threadIdx.x & 31;
+  *b = xs0[(lane / 4) * stride + (lane % 4)];
+}
+
 // FP16 MMA with FP32 accumulation for causal attention (m16n8k16).
 inline __device__ void mma_m16n8k16_f16_f32(
     float d[4], const std::uint32_t a[4], const std::uint32_t b[2]) {

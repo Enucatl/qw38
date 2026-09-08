@@ -15,7 +15,7 @@
     "q8_production_reference_exact": true,
     "q4k_tiles_byte_identical": true,
     "q6k_tiles_byte_identical": true,
-    "q4k_q6k_cud002_envelope": true,
+    "q4k_q6k_ds4_association": true,
     "q8_staging_exact": true,
     "invalid_input_rejected": true,
     "q8_grid_reuses_weight_tiles": true,
@@ -131,13 +131,13 @@
       "prompt_rows": 64,
       "kernel_nodes": 2,
       "grid": [
-        2176,
-        8,
+        136,
+        1,
         1
       ],
       "block": [
-        256,
-        1,
+        32,
+        8,
         1
       ],
       "selected_tile": 8
@@ -147,13 +147,13 @@
       "prompt_rows": 4096,
       "kernel_nodes": 2,
       "grid": [
-        2176,
-        1024,
+        136,
+        32,
         1
       ],
       "block": [
-        256,
-        1,
+        32,
+        8,
         1
       ],
       "selected_tile": 4
@@ -163,13 +163,13 @@
       "prompt_rows": 64,
       "kernel_nodes": 2,
       "grid": [
-        640,
-        8,
+        40,
+        1,
         1
       ],
       "block": [
-        256,
-        1,
+        32,
+        8,
         1
       ],
       "selected_tile": 8
@@ -179,13 +179,13 @@
       "prompt_rows": 4096,
       "kernel_nodes": 2,
       "grid": [
-        640,
-        512,
+        40,
+        32,
         1
       ],
       "block": [
-        256,
-        1,
+        32,
+        8,
         1
       ],
       "selected_tile": 8

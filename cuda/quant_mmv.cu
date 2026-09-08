@@ -504,7 +504,7 @@ cudaError_t launch_quant_mmq(QuantKind kind, const std::uint8_t* weights,
   if ((kind == QuantKind::kQ4K || kind == QuantKind::kQ6K) &&
       prompt_rows >= 8) {
     return launch_quant_mmq_mma(kind, weights, output_rows, columns, prompt,
-                                prompt_rows, output, stream);
+                                prompt_rows, q8_workspace, output, stream);
   }
   return launch_quant_mmq_variant(
       kind, weights, output_rows, columns, prompt, prompt_rows, q8_workspace,

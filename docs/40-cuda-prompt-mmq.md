@@ -1,6 +1,6 @@
 # 40. Tiled CUDA multiplication for prompt rows
 
-[Index](README.md) · Implementation tasks: CUD-002, OPT-009, OPT-015, OPT-017, and EDU-026 in
+[Index](README.md) · Implementation tasks: CUD-002, OPT-009, OPT-015, OPT-017, OPT-018, and EDU-026 in
 [`implementation_ledger.md`](../implementation_ledger.md)
 
 [Chapter 39](39-cuda-quant-mmv.md) multiplied one activation vector by a packed
@@ -97,16 +97,21 @@ against the readable CPU-001 decoder and sequential FP32 dot product.
 MMQ retains the CUD-001 staging rule but owns a separate reduction boundary. The
 first draft reused MMV's output limits and rejected the larger Q4_K fixture:
 its maximum absolute error was only `0.000427246094`, but that exceeded the MMV
-ceiling of `0.0003`. Before optimization, CUD-002 therefore froze:
+ceiling of `0.0003`. CUD-002 originally froze fixed abs/RMS (`5e-4` /
+`2.5e-4`). Those fixed numbers are **retired as the Q4_K/Q6_K MMQ admitting
+envelope**. Q4_K/Q6_K prompt MMQ (scalar variant and production MMA) is now
+admitted against a host CPU dequant-weight × BF16→float activation GEMM under
+the ds4 Q4_K association rule:
 
-- maximum absolute error at `5e-4`;
-- maximum RMS error at `2.5e-4`;
+- an element fails only when both `abs_error > 0.20 * sqrt(K)` and
+  `rel_error > 0.05` (`K` = weight columns);
 - zero non-finite outputs; and
-- exact transient Q8 staging.
+- exact transient Q8 staging on the scalar variant path.
 
-Relative error remains report-only because outputs near zero can turn a tiny
-absolute difference into a large ratio. The immutable contract is
-[`pins/cuda_mmq_contract.json`](../pins/cuda_mmq_contract.json).
+Legacy `maximum_absolute_error` / `maximum_rms_error` keys remain in
+[`pins/cuda_mmq_contract.json`](../pins/cuda_mmq_contract.json) for Q8_0 and
+historical OPT-016/OPT-017 pin equality only. Relative error remains part of
+the association gate (not report-only) for Q4_K/Q6_K.
 
 ## Measured evidence and boundary
 
@@ -301,3 +306,49 @@ fixture, and report:
 [`pins/opt017_mixer_mma_contract.json`](../pins/opt017_mixer_mma_contract.json),
 [`fixtures/opt017_mixer_mma.json`](../fixtures/opt017_mixer_mma.json), and
 [`evidence/optimization/opt017-mixer-q8-mma/REPORT.md`](../evidence/optimization/opt017-mixer-q8-mma/REPORT.md).
+
+## OPT-018 Q4_K/Q6_K MMA quality
+
+Production Q4_K/Q6_K prompt MMQ (`launch_quant_mmq`) uses the quality MMA path
+when `prompt_rows >= 8`: `MMQ_ITER_K=256`, packed load-tiles, Q8_1 MMQ Y in the
+existing prompt workspace, and block `dim3(32, 8)`. Smaller prompts keep
+`launch_quant_mmq_variant`. Decode `launch_quant_mmv` is unchanged. Mixer Q8_0
+stays on `launch_q8_mmq_bf16` (OPT-017).
+
+**Admission (ds4 option C).** Q4_K/Q6_K MMA and the retained scalar variant are
+admitted against host CPU dequant-weight × BF16→float activation GEMM. An
+element fails only when both `abs_error > 0.20 * sqrt(K)` and
+`rel_error > 0.05` (`K` = weight columns), with zero non-finites. Fixed
+`5e-4` / `2.5e-4` are retired as the Q4_K/Q6_K MMQ admitting envelope. Exact
+Q8 staging remains a structural check on the variant. Provenance: ds4
+`cuda/mmq/test/test_mmq_parity.cu`; llama.cpp MMQ as the production technique
+source. Inner-loop repair: float accumulators, Q4_K DS4 Y, half2 X at SRAM
+stride 76, and `__launch_bounds__(256, 1)`.
+
+**Measured, RTX 5090, 2026-09-08T18:33:04Z:** FFN-shape J sweep pinned
+`mmq_prompt_tile_2048 = 128` (occupancy 1). Component speed at 2048 rows on
+`17408×5120`: MMA 1.64595187 ms versus scalar variant 155.836014 ms.
+
+**Measured llama-competitive FFN bar, not the OPT-016 gate:** live exact-2048
+`ffn_mmq` **399.287018** ms versus the OPT-017 before snapshot **2524.67725** ms
+and live llama.cpp `cc83d7b` 2K wall **636.184782** ms (`avg_ts` **3219.6604**).
+`llama_competitive` is true. Three cold unperturbed Quartz `sync_tokens`
+replicates mean **625.792114** tok/s (walls 3272 / 3275.05591 / 3270.90405 ms).
+`owns_opt016_parity_gate` is false; `would_pass_opt016` is informational false.
+One post-remasurement OPT-014 attribution reconstructed wall 3194.70337 ms:
+`ffn_mmq` 399.287018 ms, `gdn` 1643.46082 ms, `attention` 1148.47461 ms.
+
+**External:** llama.cpp revision `cc83d7b4824f73cfdda4dfbb47ee39804f71b328`
+Q4_K/Q6_K MMQ in `mmq.cuh`, `mma.cuh`, `mmq-config-ampere.cuh`,
+`mmq-load-tiles.cuh`, `mmq-vec-dot.cuh`, and `quantize.cu` (MIT, The ggml
+authors). ds4 `cuda/mmq` is the ggml-free launcher pattern and association-gate
+source only; it is not vendored and is not a same-GGUF baseline.
+
+**Proof boundary:** Q4_K/Q6_K MMQ versus CPU dequant GEMM uses the ds4 Q4_K
+parity association gate; fixed abs/rms retired for Q4_K/Q6_K MMQ admission;
+variant retained with exact Q8 staging; **OPT-016 remains the parity gate
+owner**; this is not an end-to-end 2K tok/s gate and not an 8K/32K/128K
+throughput gate. Contract, fixture, and report:
+[`pins/opt018_ffn_mma_contract.json`](../pins/opt018_ffn_mma_contract.json),
+[`fixtures/opt018_ffn_mma.json`](../fixtures/opt018_ffn_mma.json), and
+[`evidence/optimization/opt018-ffn-mma-quality/REPORT.md`](../evidence/optimization/opt018-ffn-mma-quality/REPORT.md).

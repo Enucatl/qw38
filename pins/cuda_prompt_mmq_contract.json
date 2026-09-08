@@ -12,8 +12,11 @@
   "admission": {
     "q8_bf16_reference_exact": true,
     "q4k_q6k_tile_exact": true,
-    "maximum_absolute_error": 0.0005,
-    "maximum_rms_error": 0.00025,
+    "q4k_q6k_reference": "cpu_dequant_f32_gemm_from_bf16_prompt",
+    "q4k_q6k_association_gate": "ds4_q4k_parity",
+    "q4k_q6k_abs_scale": 0.2,
+    "q4k_q6k_rel_tol": 0.05,
+    "legacy_fixed_abs_rms_retired_for_q4k_q6k_mmq": true,
     "q8_staging_exact": true,
     "nonfinite_count": 0
   },
@@ -57,7 +60,7 @@
     "q8_production_reference_exact",
     "q4k_tiles_byte_identical",
     "q6k_tiles_byte_identical",
-    "q4k_q6k_cud002_envelope",
+    "q4k_q6k_ds4_association",
     "q8_staging_exact",
     "invalid_input_rejected",
     "q8_grid_reuses_weight_tiles",

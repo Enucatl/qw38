@@ -1,6 +1,6 @@
 # Chunked full-model CUDA prefill
 
-[Index](README.md) · Implementation tasks: SCH-002, MEM-002, OPT-008, OPT-009, OPT-011, OPT-012, OPT-013, OPT-014, OPT-015, OPT-017, and EDU-047 in
+[Index](README.md) · Implementation tasks: SCH-002, MEM-002, OPT-008, OPT-009, OPT-011, OPT-012, OPT-013, OPT-014, OPT-015, OPT-017, OPT-018, and EDU-047 in
 [`implementation_ledger.md`](../implementation_ledger.md) · Contracts:
 [`pins/cuda_prompt_scheduler_contract.json`](../pins/cuda_prompt_scheduler_contract.json),
 [`pins/cuda_prompt_pipeline_contract.json`](../pins/cuda_prompt_pipeline_contract.json),
@@ -8,7 +8,8 @@
 [`pins/cuda_gdn_scan_contract.json`](../pins/cuda_gdn_scan_contract.json),
 [`pins/cuda_prefill_attribution_contract.json`](../pins/cuda_prefill_attribution_contract.json),
 [`pins/opt015_recovery_contract.json`](../pins/opt015_recovery_contract.json),
-[`pins/opt017_mixer_mma_contract.json`](../pins/opt017_mixer_mma_contract.json)
+[`pins/opt017_mixer_mma_contract.json`](../pins/opt017_mixer_mma_contract.json),
+[`pins/opt018_ffn_mma_contract.json`](../pins/opt018_ffn_mma_contract.json)
 · Evidence: [`fixtures/cuda_prompt_scheduler.json`](../fixtures/cuda_prompt_scheduler.json),
 [`fixtures/cuda_prompt_pipeline.json`](../fixtures/cuda_prompt_pipeline.json),
 [`fixtures/cuda_prompt_graph.json`](../fixtures/cuda_prompt_graph.json),
@@ -16,8 +17,10 @@
 [`fixtures/cuda_prefill_attribution.json`](../fixtures/cuda_prefill_attribution.json),
 [`fixtures/opt015_recovery.json`](../fixtures/opt015_recovery.json),
 [`fixtures/opt017_mixer_mma.json`](../fixtures/opt017_mixer_mma.json),
+[`fixtures/opt018_ffn_mma.json`](../fixtures/opt018_ffn_mma.json),
 [`evidence/optimization/opt015-2k-recovery/REPORT.md`](../evidence/optimization/opt015-2k-recovery/REPORT.md),
-[`evidence/optimization/opt017-mixer-q8-mma/REPORT.md`](../evidence/optimization/opt017-mixer-q8-mma/REPORT.md)
+[`evidence/optimization/opt017-mixer-q8-mma/REPORT.md`](../evidence/optimization/opt017-mixer-q8-mma/REPORT.md),
+[`evidence/optimization/opt018-ffn-mma-quality/REPORT.md`](../evidence/optimization/opt018-ffn-mma-quality/REPORT.md)
 
 ## Why prompt execution differs from decode
 
@@ -380,6 +383,20 @@ and is not an 8K/32K/128K throughput claim. Artifacts:
 [`pins/opt017_mixer_mma_contract.json`](../pins/opt017_mixer_mma_contract.json),
 and [`fixtures/opt017_mixer_mma.json`](../fixtures/opt017_mixer_mma.json).
 
+OPT-018 closes the Q4_K/Q6_K production MMQ quality path. **Measured, RTX 5090:**
+admission is host CPU dequant GEMM under the ds4 Q4_K association rule
+(option C); fixed abs/rms are retired for that Q4_K/Q6_K MMQ gate; the scalar
+variant keeps exact Q8 staging. J is pinned at 128. Component Q4
+`2048×17408×5120` MMA 1.64595187 ms versus variant 155.836014 ms. Live
+exact-2048 `ffn_mmq` **399.287018** ms versus before **2524.67725** ms and live
+llama.cpp 2K wall **636.184782** ms (`avg_ts` 3219.6604). Unperturbed Quartz
+mean 625.792114 tok/s. `llama_competitive` is true; `would_pass_opt016` is
+informational false. **OPT-016 remains the 2K parity owner.** This remasurement
+is not that gate and is not an 8K/32K/128K throughput claim. Artifacts:
+[`evidence/optimization/opt018-ffn-mma-quality/REPORT.md`](../evidence/optimization/opt018-ffn-mma-quality/REPORT.md),
+[`pins/opt018_ffn_mma_contract.json`](../pins/opt018_ffn_mma_contract.json),
+and [`fixtures/opt018_ffn_mma.json`](../fixtures/opt018_ffn_mma.json).
+
 The **proof boundary** excludes comparative speed claims, 2K/8K sustained
 prefill throughput, execution of a 128K prefill, 128K retrieval quality, thermal
 stability, superiority to llama.cpp/vLLM, and a Nsight Systems overlap timeline.
@@ -387,8 +404,8 @@ OPT-014 measures named categories on one cold 2048-token timed run; it does not
 convert that instrumentation into a sustained-prefill or speed admission.
 OPT-015 explains the 2K gap and ranks recoveries; it is not llama.cpp parity
 and not a throughput gate. OPT-017 records mixer Q8_0 MMA admission plus a
-live exact-2048 remasurement and re-attribution; **OPT-016 remains the parity
-gate owner**. BEN-001
+live exact-2048 remasurement and re-attribution. OPT-018 records Q4_K/Q6_K
+quality MMA plus live FFN remasurement. BEN-001
 provides the harness; CMP-002/CMP-003 still own the 30-sample comparative gate.
 QLT-001 remains blocked. OPT-012's prompt graphs are FFN subgraphs only: not a
 whole-chunk graph, not a speedup gate, and not 128K quality recovery.

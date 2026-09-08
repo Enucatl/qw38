@@ -84,7 +84,7 @@ are repository-relative unless stated otherwise.
 | OPT-015 | Compare Quartz 2K prefill to llama.cpp; mine ds4 for techniques | OPT-013, PIN-002 | done | Checked-in report explains what pushes pinned same-GGUF llama.cpp into thousands of tok/s at 2K, uses `../ds4` only as MIT-licensed technique inspiration (ds4 cannot run this Qwen GGUF; no ds4 same-model baseline), separates transferable methods under `plan.md` provenance from non-transferable ds4 model policies such as sparse/compressed attention, maps each major Quartz 2K time sink to a faster path, and proposes a ranked recovery sequence | [`tasks/OPT-015.md`](tasks/OPT-015.md); [`evidence/optimization/opt015-2k-recovery/REPORT.md`](evidence/optimization/opt015-2k-recovery/REPORT.md); [`pins/opt015_recovery_contract.json`](pins/opt015_recovery_contract.json); [`fixtures/opt015_recovery.json`](fixtures/opt015_recovery.json); verification 2026-09-08T11:39:48Z |
 | OPT-016 | Reach 2K prefill throughput at or above pinned llama.cpp | OPT-014, OPT-015 | blocked | On the same GGUF and RTX 5090, cold 2K Quartz prefill tok/s is ≥ pinned llama.cpp `llama-bench` 2K under a frozen protocol; until this passes, performance work and speed claims use the 2K yardstick only (no 8K/32K/128K throughput or QLT 128K attempts as speed gates); numeric/state envelopes remain unloosened | [`tasks/OPT-016.md`](tasks/OPT-016.md); blocked 2026-09-08T13:09:00Z after Ranks 1–3; recovery requires `OPT-017`–`OPT-019` as needed then re-pass frozen 2K gate |
 | OPT-017 | Admit production mixer Q8_0 MMA MMQ without loosening OPT-009 | OPT-009, OPT-015 | done | Production mixer Q8_0 prompt MMQ uses an MMA path while `launch_q8_mmq_bf16_reference` (or the existing OPT-009 byte-exact kernel) remains the visible unloosened reference; CUD-002/OPT-009 envelopes stay unloosened; a live exact-2048 re-attribution and unperturbed 2K remasurement are checked in (OPT-016 remains the parity gate owner) | [`tasks/OPT-017.md`](tasks/OPT-017.md); [`pins/opt017_mixer_mma_contract.json`](pins/opt017_mixer_mma_contract.json); [`fixtures/opt017_mixer_mma.json`](fixtures/opt017_mixer_mma.json); [`evidence/optimization/opt017-mixer-q8-mma/REPORT.md`](evidence/optimization/opt017-mixer-q8-mma/REPORT.md); verification 2026-09-08T14:31:30Z |
-| OPT-018 | Close Q4_K/Q6_K MMA MMQ quality gap versus pinned llama.cpp | OPT-009, OPT-015 | pending | Production Q4_K/Q6_K prompt MMA MMQ is brought to llama-competitive 2K FFN time on the same GGUF and RTX 5090 under unloosened CUD-002 envelopes, with retained variant reference, measured before/after FFN category time, and file-level llama.cpp/`plan.md` provenance; does not substitute for the OPT-016 end-to-end gate | — |
+| OPT-018 | Close Q4_K/Q6_K MMA MMQ quality gap versus pinned llama.cpp | OPT-009, OPT-015 | done | Production Q4_K/Q6_K prompt MMA MMQ is brought to llama-competitive 2K FFN time on the same GGUF and RTX 5090 under unloosened CUD-002 envelopes, with retained variant reference, measured before/after FFN category time, and file-level llama.cpp/`plan.md` provenance; does not substitute for the OPT-016 end-to-end gate | [`tasks/OPT-018.md`](tasks/OPT-018.md); [`pins/opt018_ffn_mma_contract.json`](pins/opt018_ffn_mma_contract.json); [`fixtures/opt018_ffn_mma.json`](fixtures/opt018_ffn_mma.json); [`evidence/optimization/opt018-ffn-mma-quality/REPORT.md`](evidence/optimization/opt018-ffn-mma-quality/REPORT.md); verification 2026-09-08T18:55:28Z |
 | OPT-019 | Close residual GDN and attention core time after mixer Q8_0 MMA | OPT-017, OPT-015 | pending | After mixer projections are on MMA, remaining non-projection GDN scan/recurrence and causal attention core paths are brought down under frozen GDN/attention envelopes with retained references; live 2K re-attribution shows the residual sinks addressed; does not substitute for the OPT-016 end-to-end gate | — |
 | OPT-020 | Split 2K attribution into mixer MMQ versus core GDN/attention | OPT-014 | pending | Cold exact-2048 attribution exposes separate mixer-projection MMQ time versus GDN-core and attention-core time (plus existing FFN/logits/commit/graph/idle), reconstructs wall within the OPT-014 tolerance, and is retained for OPT-017–OPT-019 steering; not a throughput gate | — |
 
@@ -4117,3 +4117,99 @@ are repository-relative unless stated otherwise.
 - Marked OPT-017 `done`; delivery is limited to the verified task scope plus
   this ledger/audit bookkeeping. OPT-018 is next eligible pending by ledger
   row order.
+
+### 2026-09-08T15:30:58Z — OPT-018 planning admitted
+
+- Planning produced decision-complete dossier [`tasks/OPT-018.md`](tasks/OPT-018.md).
+- Coupled IDs: none. Plan impact: none.
+- Marked OPT-018 `in_progress`.
+
+### 2026-09-08T16:41:28Z — OPT-018 blocked
+
+- Implementation built Q4_K/Q6_K quality MMA (`MMQ_ITER_K=256`, packed
+  load-tiles, Q8_1 MMQ Y, `dim3(32,8)`). Q4_K through `8×1024×5120` met
+  unloosened CUD-002; required Q6_K `64×5120×6144` failed
+  (`max_abs=0.000946044922`, `rms=0.000258449378` vs `5e-4` / `2.5e-4`).
+- Diagnostic (cursor-grok-4.6-high): miss is K-linear INT8-MMA versus
+  variant per-element FP association, not a leftover packed-tile bug.
+  In-scope epilogue tweaks rejected; pins not loosened; no stream-K; no
+  extra `cudaMalloc`; `plan.md` unchanged.
+- Marked OPT-018 `blocked`. No verification, commit, or push.
+- Recovery: measured Q6 quality kernel under locked geometry meeting CUD-002
+  on `64×5120×6144` and `2048×5120×6144`, or approved `plan.md` change
+  before any envelope change / Q6 shape drop / splitting Q6 off production
+  quality MMA. Evidence: [`tasks/OPT-018.md`](tasks/OPT-018.md).
+
+### 2026-09-08T16:58:43Z — OPT-018 re-admitted under ds4 association gate
+
+- User authorized adopting the ds4 MMQ parity association gate for Q4_K/Q6_K
+  MMA versus the scalar variant (element fails only when both
+  `abs > 0.20*sqrt(K)` and `rel > 0.05`), matching
+  `../ds4/cuda/mmq/test/test_mmq_parity.cu` Q4_K / `check_close`.
+- `plan.md` Correctness policy gains an INT8 MMA association exception;
+  CUD-002 fixed `5e-4` / `2.5e-4` remain mandatory and unloosened for
+  `launch_quant_mmq_variant`.
+- Pins/tests: `pins/opt018_ffn_mma_contract.json`,
+  `cuda/quant_mmv_test.cu` `run_mma_case`, host OPT-018 fixture/test.
+- Marked OPT-018 `in_progress` again to finish J-sweep, live FFN bar, and
+  evidence under the new gate. Evidence: [`tasks/OPT-018.md`](tasks/OPT-018.md).
+
+### 2026-09-08T17:15:19Z — OPT-018 option C: ds4 CPU-dequant MMQ admission
+
+- User selected full ds4 parity (option C): Q4_K/Q6_K MMQ (variant and MMA)
+  admitted against host CPU dequant-weight × BF16→float GEMM under
+  `abs > 0.20*sqrt(K)` AND `rel > 0.05`; fixed `5e-4`/`2.5e-4` retired as the
+  Q4_K/Q6_K MMQ admitting envelope (`plan.md` Correctness policy).
+- Pins: `pins/cuda_mmq_contract.json`, `pins/cuda_prompt_mmq_contract.json`,
+  `pins/opt018_ffn_mma_contract.json`. Legacy abs/rms keys retained only for
+  Q8_0 / OPT-016–017 pin equality.
+- Tests: `cuda/quant_mmv_test.cu`, `cuda/prompt_mmq_test.cu`.
+- OPT-018 remains `in_progress` (live FFN evidence still pending).
+
+### 2026-09-08T18:00:59Z — OPT-018 FFN-bar diagnostic (verdict A)
+
+- Live exact-2048 attribution: `ffn_mmq` **9188.24902** ms vs OPT-017 before
+  2524.67725 ms and llama.cpp 2K wall 637.874802 ms. Association gate
+  (ds4 option C vs CPU dequant) passes (`mma_bad=0`). J=128. Component
+  Q4 `2048×17408×5120` 46.099 ms; Q4 kernel 255 regs / 224 B local /
+  occupancy 1.
+- Independent compare of `cuda/quant_mmq_mma.cuh` quality kernel vs
+  Rank-1 K=32 MMA vs llama.cpp `cc83d7b` `mmq.cuh` /
+  `mmq-vec-dot.cuh` / `mmq-load-tiles.cuh` / `quantize.cu`: quality is
+  Ampere-shaped but uses `double` accumulators, D4 Y plus inner-loop
+  `quality_sum_i8x32` instead of Q4 DS4, and float2 X scales at stride 84
+  instead of half2 stride 76. Occupancy 1 matches llama.cpp Ampere Q4_K
+  and is not the stop. Stream-K remains rejected.
+- Verdict **A** (fixable repair). Status stays `in_progress`. Locked
+  repair plan in [`tasks/OPT-018.md`](tasks/OPT-018.md). No commit/push.
+  OPT-016 remains blocked and is not this increment.
+
+### 2026-09-08T18:55:28Z — OPT-018 delivered
+
+- Independent verification after inner-loop repair and coordinator ruff
+  F841 fix: production Q4_K/Q6_K prompt MMQ (`launch_quant_mmq`,
+  `prompt_rows >= 8`) is quality MMA (`MMQ_ITER_K=256`, packed load-tiles,
+  Q8_1 MMQ Y in existing workspace, J=128); `launch_quant_mmq_variant`
+  remains the retained scalar reference; Q4_K/Q6_K MMA uses the ds4 option
+  C association gate versus CPU dequant GEMM (`mma_bad=0`). Live exact-2048
+  `ffn_mmq` **399.287018** ms is strictly below the OPT-017 before snapshot
+  **2524.67725** ms and live llama.cpp 2K wall **636.184782** ms
+  (`llama_competitive` true). Quartz mean 625.792114 tok/s does not claim
+  the end-to-end 2K tok/s gate (`would_pass_opt016` false;
+  `owns_opt016_parity_gate` false). OPT-016 remains `blocked`. Coupled IDs:
+  none. Delivery re-check: `uv run ruff check .` passed; `uv run pytest -q
+  tests/test_documentation.py tests/test_opt018_ffn_mma.py` passed (6
+  passed, 1 skipped).
+- Acceptance evidence: [`tasks/OPT-018.md`](tasks/OPT-018.md);
+  [`pins/opt018_ffn_mma_contract.json`](pins/opt018_ffn_mma_contract.json);
+  [`fixtures/opt018_ffn_mma.json`](fixtures/opt018_ffn_mma.json);
+  [`evidence/optimization/opt018-ffn-mma-quality/REPORT.md`](evidence/optimization/opt018-ffn-mma-quality/REPORT.md);
+  [`cuda/quant_mmq_mma.cuh`](cuda/quant_mmq_mma.cuh);
+  [`cuda/quant_mmv.cu`](cuda/quant_mmv.cu);
+  [`docs/40-cuda-prompt-mmq.md`](docs/40-cuda-prompt-mmq.md);
+  [`docs/62-cuda-full-prefill.md`](docs/62-cuda-full-prefill.md).
+  Proof is llama-competitive 2K FFN MMA quality, not an end-to-end 2K tok/s
+  gate.
+- Marked OPT-018 `done`; delivery is limited to the verified task scope plus
+  this ledger/audit bookkeeping. OPT-016 stays `blocked`. OPT-019 is next
+  eligible pending by ledger row order.

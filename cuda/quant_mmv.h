@@ -51,16 +51,19 @@ cudaError_t launch_quant_mmq_variant(
     unsigned int prompt_tile, cudaStream_t stream) noexcept;
 
 unsigned int selected_mma_mmq_prompt_tile() noexcept;
+std::size_t mma_mmq_shared_bytes(unsigned int prompt_tile) noexcept;
+int mma_mmq_occupancy(QuantKind kind, unsigned int prompt_tile) noexcept;
 
 cudaError_t launch_quant_mmq_mma(
     QuantKind kind, const std::uint8_t* weights, std::size_t output_rows,
     std::size_t columns, const __nv_bfloat16* prompt, std::size_t prompt_rows,
-    float* output, cudaStream_t stream) noexcept;
+    Q8Block* q8_workspace, float* output, cudaStream_t stream) noexcept;
 
 cudaError_t launch_quant_mmq_mma_tile(
     QuantKind kind, const std::uint8_t* weights, std::size_t output_rows,
     std::size_t columns, const __nv_bfloat16* prompt, std::size_t prompt_rows,
-    float* output, unsigned int prompt_tile, cudaStream_t stream) noexcept;
+    Q8Block* q8_workspace, float* output, unsigned int prompt_tile,
+    cudaStream_t stream) noexcept;
 
 unsigned int selected_q8_mma_mmq_prompt_tile() noexcept;
 int q8_mma_mmq_occupancy(unsigned int prompt_tile) noexcept;

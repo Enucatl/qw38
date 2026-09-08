@@ -120,6 +120,18 @@ Correctness policy:
   first-failing-index, and top-logit differences.
 - Freeze per-tap tolerances during the scalar milestone, before CUDA
   optimization. An optimization cannot loosen the tolerance used to admit it.
+- Exception for Q4_K/Q6_K prompt MMQ (CUD-002 and later MMA quality paths):
+  admit production and retained scalar MMQ against a host CPU dequant-weight ×
+  BF16→float activation GEMM under the ds4
+  `cuda/mmq/test/test_mmq_parity.cu` Q4_K association rule — an element fails
+  only when both `abs_error > 0.20 * sqrt(K)` and `rel_error > 0.05`, with
+  zero non-finites (`K` = weight columns). Fixed absolute/RMS numbers
+  (`5e-4` / `2.5e-4`) are retired as the Q4_K/Q6_K MMQ admitting envelope;
+  they are not the MMQ correctness gate. Exact Q8 staging remains a
+  structural check on the scalar variant path. Provenance: ds4 MIT parity
+  tests; llama.cpp MMQ as the production technique source. Decode MMV
+  (CUD-001) and Q8_0 byte-exact / staged references stay on their own
+  contracts.
 - Require greedy continuation equality unless a stored fixture demonstrates a
   genuine near-tie; tensor and logit gates remain mandatory.
 

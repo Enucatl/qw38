@@ -65,7 +65,7 @@ for language and host portability decisions.
 37. [Official-checkpoint Transformers authority](37-transformers-authority.md): original versus GGUF weights, Safetensors shards, eager offload, hooks/taps, real logits, and proof limits.
 38. [Three-authority scalar tolerances](38-scalar-authority-tolerances.md): comparable boundaries, exact layout normalization, error metrics, greedy margins, and immutable pre-CUDA gates.
 39. [The first CUDA matrix-vector kernel](39-cuda-quant-mmv.md): BF16-to-Q8 staging, packed Q4_K/Q6_K rows, warp ownership, FP32 reduction, device gates, and measured proof limits.
-40. [Tiled CUDA multiplication for prompt rows](40-cuda-prompt-mmq.md): prompt matrices, token-major output, two-dimensional tiles, packed-weight reuse, tails, scalar/device gates, the 2K FFN/MMQ sink, mixer Q8_0 MMA MMQ, and the unowned 2K parity boundary.
+40. [Tiled CUDA multiplication for prompt rows](40-cuda-prompt-mmq.md): prompt matrices, token-major output, two-dimensional tiles, packed-weight reuse, tails, scalar/device gates, the 2K FFN/MMQ sink, mixer Q8_0 MMA MMQ, Q4_K/Q6_K quality MMA MMQ, and the unowned 2K parity boundary.
 41. [One CUDA GDN step and atomic state staging](41-cuda-gdn-step.md): production recurrence, causal convolution, candidate state, cancellation, commit, and frontier publication.
 42. [Chunked CUDA GDN prefill](42-cuda-gdn-chunks.md): token-major chunks, strict recurrence order, 64-token windows, associative prompt scan, candidate continuity, cancellation, and token-wise equivalence.
 43. [CUDA grouped-query attention decode](43-cuda-attention-decode.md): heads and KV sharing, normalization, partial RoPE, BF16 cache rows, causal stable softmax, candidate commit, and frozen numeric gates.

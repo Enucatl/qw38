@@ -13,9 +13,16 @@
   },
   "admission": {
     "q8_staging_exact": true,
+    "q4k_q6k_reference": "cpu_dequant_f32_gemm_from_bf16_prompt",
+    "q4k_q6k_association_gate": "ds4_q4k_parity",
+    "q4k_q6k_association_provenance": "ds4 cuda/mmq/test/test_mmq_parity.cu run_q4_K / check_close",
+    "q4k_q6k_abs_scale": 0.2,
+    "q4k_q6k_rel_tol": 0.05,
+    "q4k_q6k_association_rule": "element fails only when abs_error > abs_scale*sqrt(K) AND rel_error > rel_tol; K = weight columns; zero non-finites required",
+    "legacy_fixed_abs_rms_retired_for_q4k_q6k_mmq": true,
     "maximum_absolute_error": 0.0005,
     "maximum_rms_error": 0.00025,
-    "relative_error": "report_only",
+    "maximum_absolute_error_applies_to": "q8_0_mmq_and_historical_opt016_opt017_pin_equality_only",
     "nonfinite_count": 0
   }
 }

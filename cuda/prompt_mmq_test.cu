@@ -106,11 +106,12 @@ void make_activation(std::size_t columns, std::size_t prompt_row,
   }
 }
 
-bool reference_mmq(qw38::cuda::QuantKind kind,
-                   const std::vector<std::uint8_t>& weights,
-                   std::size_t output_rows, std::size_t columns,
-                   const std::vector<qw38::cuda::Q8Block>& staged,
-                   std::size_t prompt_rows, std::vector<float>* output) {
+bool reference_dequant_gemm_mmq(qw38::cuda::QuantKind kind,
+                                const std::vector<std::uint8_t>& weights,
+                                std::size_t output_rows, std::size_t columns,
+                                const std::vector<__nv_bfloat16>& prompt,
+                                std::size_t prompt_rows,
+                                std::vector<float>* output) {
   const std::size_t block_bytes =
       kind == qw38::cuda::QuantKind::kQ4K
           ? 144
@@ -119,15 +120,13 @@ bool reference_mmq(qw38::cuda::QuantKind kind,
       kind == qw38::cuda::QuantKind::kQ8_0 ? 32 : 256;
   output->assign(prompt_rows * output_rows, 0.0F);
   std::vector<float> decoded(block_values);
-  for (std::size_t prompt_row = 0; prompt_row < prompt_rows; ++prompt_row) {
-    const qw38::cuda::Q8Block* row_staged =
-        staged.data() + prompt_row * (columns / 32);
-    for (std::size_t row = 0; row < output_rows; ++row) {
+  for (std::size_t out = 0; out < output_rows; ++out) {
+    for (std::size_t prompt_row = 0; prompt_row < prompt_rows; ++prompt_row) {
       float sum = 0.0F;
       for (std::size_t block = 0; block < columns / block_values; ++block) {
         const std::uint8_t* packed =
             weights.data() +
-            (row * (columns / block_values) + block) * block_bytes;
+            (out * (columns / block_values) + block) * block_bytes;
         const qw38::Status status =
             kind == qw38::cuda::QuantKind::kQ4K
                 ? qw38::internal::decode_q4_k(packed, block_bytes,
@@ -140,13 +139,28 @@ bool reference_mmq(qw38::cuda::QuantKind kind,
         if (!status.is_ok()) return false;
         for (std::size_t within = 0; within < block_values; ++within) {
           const std::size_t column = block * block_values + within;
-          const auto& q8 = row_staged[column / 32];
-          sum += decoded[within] *
-                 (q8.scale * static_cast<float>(q8.values[column % 32]));
+          sum += decoded[within] * __bfloat162float(
+                     prompt[prompt_row * columns + column]);
         }
       }
-      (*output)[prompt_row * output_rows + row] = sum;
+      (*output)[prompt_row * output_rows + out] = sum;
     }
+  }
+  return true;
+}
+
+bool ds4_q4k_association_ok(const std::vector<float>& got,
+                            const std::vector<float>& ref, std::size_t columns) {
+  constexpr float kAbsScale = 0.20F;
+  constexpr float kRelTol = 0.05F;
+  const float abs_tol = kAbsScale * std::sqrt(static_cast<float>(columns));
+  for (std::size_t index = 0; index < got.size(); ++index) {
+    if (!std::isfinite(got[index]) || !std::isfinite(ref[index])) return false;
+    const float absolute = std::fabs(got[index] - ref[index]);
+    const float relative =
+        ref[index] != 0.0F ? absolute / std::fabs(ref[index])
+                           : (absolute > 0.0F ? INFINITY : 0.0F);
+    if (absolute > abs_tol && relative > kRelTol) return false;
   }
   return true;
 }
@@ -212,12 +226,15 @@ cudaError_t capture_mmq(Fn launch, std::size_t output_rows, LaunchInfo* info) {
         static_cast<unsigned>((output_rows + 127) / 128);
     const std::size_t dynamic =
         info->grid_x == mma_grid_x
-            ? (128U * 8U * sizeof(int) + 128U * sizeof(float2) * 2U +
-               128U * 8U * sizeof(int) + 128U * sizeof(float2))
+            ? qw38::cuda::mma_mmq_shared_bytes(
+                  qw38::cuda::selected_mma_mmq_prompt_tile())
             : 0;
+    const int occupancy_threads =
+        info->block.x * info->block.y * info->block.z;
     if (error == cudaSuccess) {
       error = cudaOccupancyMaxActiveBlocksPerMultiprocessor(
-          &info->active_blocks, function, kThreads, dynamic);
+          &info->active_blocks, function,
+          occupancy_threads == 0 ? kThreads : occupancy_threads, dynamic);
     }
   }
   if (graph != nullptr) cudaGraphDestroy(graph);
@@ -269,22 +286,6 @@ bool q8_blocks_equal(const std::vector<qw38::cuda::Q8Block>& left,
     }
   }
   return true;
-}
-
-void envelope(const std::vector<float>& actual, const std::vector<float>& expected,
-              float* max_abs, float* rms, std::size_t* nonfinite) {
-  *max_abs = 0.0F;
-  double squared = 0.0;
-  *nonfinite = 0;
-  for (std::size_t index = 0; index < actual.size(); ++index) {
-    if (!std::isfinite(actual[index])) ++*nonfinite;
-    const float absolute = std::fabs(actual[index] - expected[index]);
-    *max_abs = std::max(*max_abs, absolute);
-    squared += static_cast<double>(absolute) * absolute;
-  }
-  *rms = actual.empty()
-             ? 0.0F
-             : static_cast<float>(std::sqrt(squared / actual.size()));
 }
 
 bool run_q8_exact() {
@@ -378,8 +379,8 @@ bool run_quant_tiles(qw38::cuda::QuantKind kind, std::size_t output_rows,
               staged.begin() + row * (columns / 32));
   }
   std::vector<float> expected;
-  if (!reference_mmq(kind, weights, output_rows, columns, staged, prompt_rows,
-                     &expected)) {
+  if (!reference_dequant_gemm_mmq(kind, weights, output_rows, columns, prompt,
+                                  prompt_rows, &expected)) {
     return false;
   }
   std::uint8_t* device_weights = nullptr;
@@ -433,11 +434,7 @@ bool run_quant_tiles(qw38::cuda::QuantKind kind, std::size_t output_rows,
       identical = false;
     }
     if (!q8_blocks_equal(actual_staged, staged)) *staging_ok = false;
-    float max_abs = 0.0F;
-    float rms = 0.0F;
-    std::size_t nonfinite = 0;
-    envelope(actual, expected, &max_abs, &rms, &nonfinite);
-    if (nonfinite != 0 || max_abs > 5.0e-4F || rms > 2.5e-4F) {
+    if (!ds4_q4k_association_ok(actual, expected, columns)) {
       *envelope_ok = false;
     }
   }
@@ -882,14 +879,19 @@ int main(int argc, char** argv) {
   const unsigned mma_tile = qw38::cuda::selected_mma_mmq_prompt_tile();
   const bool q4_grid =
       cap_q4_64 == cudaSuccess && cap_q4_4096 == cudaSuccess &&
-      q4_64.nodes == 1 && q4_4096.nodes == 1 &&
+      q4_64.nodes == 2 && q4_4096.nodes == 2 &&
+      q4_64.block.x == 32 && q4_64.block.y == 8 &&
+      q4_4096.block.x == 32 && q4_4096.block.y == 8 &&
+      q4_64.block.x * q4_64.block.y == 256 &&
       q4_64.grid_x == (q4_rows + 127) / 128 &&
       q4_4096.grid_x == (q4_rows + 127) / 128 &&
       q4_64.grid_y == (64 + mma_tile - 1) / mma_tile &&
       q4_4096.grid_y == (4096 + mma_tile - 1) / mma_tile;
   const bool q6_grid =
       cap_q6_64 == cudaSuccess && cap_q6_4096 == cudaSuccess &&
-      q6_64.nodes == 1 && q6_4096.nodes == 1 &&
+      q6_64.nodes == 2 && q6_4096.nodes == 2 &&
+      q6_64.block.x == 32 && q6_64.block.y == 8 &&
+      q6_4096.block.x == 32 && q6_4096.block.y == 8 &&
       q6_64.grid_x == (q6_rows + 127) / 128 &&
       q6_4096.grid_x == (q6_rows + 127) / 128 &&
       q6_64.grid_y == (64 + mma_tile - 1) / mma_tile &&
@@ -899,7 +901,10 @@ int main(int argc, char** argv) {
       q8_prod_64.local_bytes <= 1024 && q4_64.active_blocks >= 1 &&
       q4_64.registers > 0 && q4_64.local_bytes <= 1024 &&
       q6_64.active_blocks >= 1 && q6_64.registers > 0 &&
-      q6_64.local_bytes <= 1024;
+      q6_64.local_bytes <= 1024 &&
+      qw38::cuda::mma_mmq_occupancy(qw38::cuda::QuantKind::kQ4K, mma_tile) >=
+          1 &&
+      qw38::cuda::mma_mmq_occupancy(qw38::cuda::QuantKind::kQ6K, mma_tile) >= 1;
 
   cudaError_t timing_error = cudaSuccess;
   TimingCtx q8_prod{};
@@ -986,7 +991,7 @@ int main(int argc, char** argv) {
       "\"threads\":256,\"output_rows_per_block\":8,"
       "\"semantic\":{\"q8_production_reference_exact\":%s,"
       "\"q4k_tiles_byte_identical\":%s,\"q6k_tiles_byte_identical\":%s,"
-      "\"q4k_q6k_cud002_envelope\":%s,\"q8_staging_exact\":%s,"
+      "\"q4k_q6k_ds4_association\":%s,\"q8_staging_exact\":%s,"
       "\"invalid_input_rejected\":%s,\"q8_grid_reuses_weight_tiles\":%s,"
       "\"q8_reference_grid_is_row_wise\":%s,"
       "\"q4k_q6k_grid_matches_selected_tile\":%s,\"occupancy_admitted\":%s,"
@@ -1008,13 +1013,13 @@ int main(int argc, char** argv) {
       "{\"kind\":\"q8_0_reference\",\"prompt_rows\":4096,\"kernel_nodes\":%d,"
       "\"grid\":[%u,%u,1],\"block\":[256,1,1],\"selected_tile\":1},"
       "{\"kind\":\"q4_k\",\"prompt_rows\":64,\"kernel_nodes\":%d,"
-      "\"grid\":[%u,%u,1],\"block\":[256,1,1],\"selected_tile\":%u},"
+      "\"grid\":[%u,%u,1],\"block\":[%u,%u,1],\"selected_tile\":%u},"
       "{\"kind\":\"q4_k\",\"prompt_rows\":4096,\"kernel_nodes\":%d,"
-      "\"grid\":[%u,%u,1],\"block\":[256,1,1],\"selected_tile\":%u},"
+      "\"grid\":[%u,%u,1],\"block\":[%u,%u,1],\"selected_tile\":%u},"
       "{\"kind\":\"q6_k\",\"prompt_rows\":64,\"kernel_nodes\":%d,"
-      "\"grid\":[%u,%u,1],\"block\":[256,1,1],\"selected_tile\":%u},"
+      "\"grid\":[%u,%u,1],\"block\":[%u,%u,1],\"selected_tile\":%u},"
       "{\"kind\":\"q6_k\",\"prompt_rows\":4096,\"kernel_nodes\":%d,"
-      "\"grid\":[%u,%u,1],\"block\":[256,1,1],\"selected_tile\":%u}],"
+      "\"grid\":[%u,%u,1],\"block\":[%u,%u,1],\"selected_tile\":%u}],"
       "\"kernel_attributes\":{\"q8_0\":{\"registers\":%d,"
       "\"local_bytes_per_thread\":%d,\"active_blocks_per_sm\":%d},"
       "\"q4_k\":{\"registers\":%d,\"local_bytes_per_thread\":%d,"
@@ -1070,9 +1075,11 @@ int main(int argc, char** argv) {
       q8_tile_64, q8_prod_4096.nodes, q8_prod_4096.grid_x, q8_prod_4096.grid_y,
       q8_tile_4096, q8_ref_64.nodes, q8_ref_64.grid_x, q8_ref_64.grid_y,
       q8_ref_4096.nodes, q8_ref_4096.grid_x, q8_ref_4096.grid_y, q4_64.nodes,
-      q4_64.grid_x, q4_64.grid_y, q4_tile_64, q4_4096.nodes, q4_4096.grid_x,
-      q4_4096.grid_y, q4_tile_4096, q6_64.nodes, q6_64.grid_x, q6_64.grid_y,
-      q6_tile_64, q6_4096.nodes, q6_4096.grid_x, q6_4096.grid_y, q6_tile_4096,
+      q4_64.grid_x, q4_64.grid_y, q4_64.block.x, q4_64.block.y, q4_tile_64,
+      q4_4096.nodes, q4_4096.grid_x, q4_4096.grid_y, q4_4096.block.x,
+      q4_4096.block.y, q4_tile_4096, q6_64.nodes, q6_64.grid_x, q6_64.grid_y,
+      q6_64.block.x, q6_64.block.y, q6_tile_64, q6_4096.nodes, q6_4096.grid_x,
+      q6_4096.grid_y, q6_4096.block.x, q6_4096.block.y, q6_tile_4096,
       q8_prod_64.registers, q8_prod_64.local_bytes, q8_prod_64.active_blocks,
       q4_64.registers, q4_64.local_bytes, q4_64.active_blocks,
       q6_64.registers, q6_64.local_bytes, q6_64.active_blocks, q8_64_prod,

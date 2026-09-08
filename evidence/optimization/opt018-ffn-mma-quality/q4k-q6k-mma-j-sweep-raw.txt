@@ -1,0 +1,50 @@
+mma_case=q4_k_mma_8x17x256 prompt_rows=8 output_rows=17 columns=256 tile=128 mma_max_abs=1.72076416 mma_max_rel=5.01634073 mma_rms=0.684218645 mma_bad=0 mma_nonfinite=0 variant_max_abs=1.68141937 variant_max_rel=4.97017145 variant_bad=0 gate=ds4_q4k_parity ref=cpu_dequant_gemm
+mma_case=q4_k_mma_9x17x256 prompt_rows=9 output_rows=17 columns=256 tile=128 mma_max_abs=1.72076416 mma_max_rel=5.01634073 mma_rms=0.664340556 mma_bad=0 mma_nonfinite=0 variant_max_abs=1.68141937 variant_max_rel=4.97017145 variant_bad=0 gate=ds4_q4k_parity ref=cpu_dequant_gemm
+mma_case=q4_k_mma_64x17x256 prompt_rows=64 output_rows=17 columns=256 tile=128 mma_max_abs=2.10072327 mma_max_rel=5.01634073 mma_rms=0.642445385 mma_bad=0 mma_nonfinite=0 variant_max_abs=1.99702454 variant_max_rel=4.97017145 variant_bad=0 gate=ds4_q4k_parity ref=cpu_dequant_gemm
+mma_case=q4_k_mma_65x17x256 prompt_rows=65 output_rows=17 columns=256 tile=128 mma_max_abs=2.10072327 mma_max_rel=5.01634073 mma_rms=0.645681262 mma_bad=0 mma_nonfinite=0 variant_max_abs=1.99702454 variant_max_rel=4.97017145 variant_bad=0 gate=ds4_q4k_parity ref=cpu_dequant_gemm
+mma_case=q4_k_mma_9x64x256 prompt_rows=9 output_rows=64 columns=256 tile=128 mma_max_abs=1.72076416 mma_max_rel=5.01634073 mma_rms=0.66425705 mma_bad=0 mma_nonfinite=0 variant_max_abs=1.68141937 variant_max_rel=4.97017145 variant_bad=0 gate=ds4_q4k_parity ref=cpu_dequant_gemm
+mma_case=q4_k_mma_17x128x256 prompt_rows=17 output_rows=128 columns=256 tile=128 mma_max_abs=2.10072327 mma_max_rel=5.01634073 mma_rms=0.704248905 mma_bad=0 mma_nonfinite=0 variant_max_abs=1.99702454 variant_max_rel=4.97017145 variant_bad=0 gate=ds4_q4k_parity ref=cpu_dequant_gemm
+mma_case=q4_k_mma_8x1024x5120 prompt_rows=8 output_rows=1024 columns=5120 tile=128 mma_max_abs=6.43017578 mma_max_rel=0.0458564311 mma_rms=3.36870766 mma_bad=0 mma_nonfinite=0 variant_max_abs=6.53765869 variant_max_rel=0.0446480662 variant_bad=0 gate=ds4_q4k_parity ref=cpu_dequant_gemm
+mma_case=q6_k_mma_8x17x256 prompt_rows=8 output_rows=17 columns=256 tile=128 mma_max_abs=2.07613754 mma_max_rel=0.90969187 mma_rms=0.720790803 mma_bad=0 mma_nonfinite=0 variant_max_abs=2.07614899 variant_max_rel=0.909696162 variant_bad=0 gate=ds4_q4k_parity ref=cpu_dequant_gemm
+mma_case=q6_k_mma_9x64x256 prompt_rows=9 output_rows=64 columns=256 tile=128 mma_max_abs=2.61872864 mma_max_rel=0.90969187 mma_rms=0.676777303 mma_bad=0 mma_nonfinite=0 variant_max_abs=2.61872101 variant_max_rel=0.909696162 variant_bad=0 gate=ds4_q4k_parity ref=cpu_dequant_gemm
+mma_case=q6_k_mma_17x128x256 prompt_rows=17 output_rows=128 columns=256 tile=128 mma_max_abs=2.61872864 mma_max_rel=20.8647404 mma_rms=0.661861718 mma_bad=0 mma_nonfinite=0 variant_max_abs=2.61872101 variant_max_rel=20.8653393 variant_bad=0 gate=ds4_q4k_parity ref=cpu_dequant_gemm
+mma_case=q6_k_mma_64x5120x6144 prompt_rows=64 output_rows=5120 columns=6144 tile=128 mma_max_abs=12.930481 mma_max_rel=13.1627407 mma_rms=3.10008526 mma_bad=0 mma_nonfinite=0 variant_max_abs=12.9303284 variant_max_rel=13.1641722 variant_bad=0 gate=ds4_q4k_parity ref=cpu_dequant_gemm
+mma_case=q4_k_mma_elig_8x17x256 prompt_rows=8 output_rows=17 columns=256 tile=32 mma_max_abs=1.72076416 mma_max_rel=5.01634073 mma_rms=0.684218645 mma_bad=0 mma_nonfinite=0 variant_max_abs=1.68141937 variant_max_rel=4.97017145 variant_bad=0 gate=ds4_q4k_parity ref=cpu_dequant_gemm
+opt018_j_sample kind=q4_k output_rows=17408 columns=5120 prompt_rows=2048 tile=32 replicate=0 ms=2.21695995 occupancy=1
+opt018_j_sample kind=q4_k output_rows=17408 columns=5120 prompt_rows=2048 tile=32 replicate=1 ms=2.2191999 occupancy=1
+opt018_j_sample kind=q4_k output_rows=17408 columns=5120 prompt_rows=2048 tile=32 replicate=2 ms=2.22121596 occupancy=1
+mma_tune kind=q4_k output_rows=17408 columns=5120 prompt_rows=2048 tile=32 mean_ms=2.21912551 occupancy=1
+opt018_j_sample kind=q4_k output_rows=5120 columns=17408 prompt_rows=2048 tile=32 replicate=0 ms=2.38963199 occupancy=1
+opt018_j_sample kind=q4_k output_rows=5120 columns=17408 prompt_rows=2048 tile=32 replicate=1 ms=2.39840007 occupancy=1
+opt018_j_sample kind=q4_k output_rows=5120 columns=17408 prompt_rows=2048 tile=32 replicate=2 ms=2.39507198 occupancy=1
+mma_tune kind=q4_k output_rows=5120 columns=17408 prompt_rows=2048 tile=32 mean_ms=2.39436793 occupancy=1
+opt018_j_mean tile=32 mean_ms=4.61349344 eligible=true occupancy=1
+mma_case=q4_k_mma_elig_8x17x256 prompt_rows=8 output_rows=17 columns=256 tile=64 mma_max_abs=1.72076416 mma_max_rel=5.01634073 mma_rms=0.684218645 mma_bad=0 mma_nonfinite=0 variant_max_abs=1.68141937 variant_max_rel=4.97017145 variant_bad=0 gate=ds4_q4k_parity ref=cpu_dequant_gemm
+opt018_j_sample kind=q4_k output_rows=17408 columns=5120 prompt_rows=2048 tile=64 replicate=0 ms=1.83648002 occupancy=1
+opt018_j_sample kind=q4_k output_rows=17408 columns=5120 prompt_rows=2048 tile=64 replicate=1 ms=1.83721602 occupancy=1
+opt018_j_sample kind=q4_k output_rows=17408 columns=5120 prompt_rows=2048 tile=64 replicate=2 ms=1.83580804 occupancy=1
+mma_tune kind=q4_k output_rows=17408 columns=5120 prompt_rows=2048 tile=64 mean_ms=1.83650148 occupancy=1
+opt018_j_sample kind=q4_k output_rows=5120 columns=17408 prompt_rows=2048 tile=64 replicate=0 ms=2.10777593 occupancy=1
+opt018_j_sample kind=q4_k output_rows=5120 columns=17408 prompt_rows=2048 tile=64 replicate=1 ms=2.11039996 occupancy=1
+opt018_j_sample kind=q4_k output_rows=5120 columns=17408 prompt_rows=2048 tile=64 replicate=2 ms=2.11254406 occupancy=1
+mma_tune kind=q4_k output_rows=5120 columns=17408 prompt_rows=2048 tile=64 mean_ms=2.11023998 occupancy=1
+opt018_j_mean tile=64 mean_ms=3.94674158 eligible=true occupancy=1
+mma_case=q4_k_mma_elig_8x17x256 prompt_rows=8 output_rows=17 columns=256 tile=128 mma_max_abs=1.72076416 mma_max_rel=5.01634073 mma_rms=0.684218645 mma_bad=0 mma_nonfinite=0 variant_max_abs=1.68141937 variant_max_rel=4.97017145 variant_bad=0 gate=ds4_q4k_parity ref=cpu_dequant_gemm
+opt018_j_sample kind=q4_k output_rows=17408 columns=5120 prompt_rows=2048 tile=128 replicate=0 ms=1.63958395 occupancy=1
+opt018_j_sample kind=q4_k output_rows=17408 columns=5120 prompt_rows=2048 tile=128 replicate=1 ms=1.63622403 occupancy=1
+opt018_j_sample kind=q4_k output_rows=17408 columns=5120 prompt_rows=2048 tile=128 replicate=2 ms=1.63788795 occupancy=1
+mma_tune kind=q4_k output_rows=17408 columns=5120 prompt_rows=2048 tile=128 mean_ms=1.63789856 occupancy=1
+opt018_j_sample kind=q4_k output_rows=5120 columns=17408 prompt_rows=2048 tile=128 replicate=0 ms=2.12281609 occupancy=1
+opt018_j_sample kind=q4_k output_rows=5120 columns=17408 prompt_rows=2048 tile=128 replicate=1 ms=2.11702394 occupancy=1
+opt018_j_sample kind=q4_k output_rows=5120 columns=17408 prompt_rows=2048 tile=128 replicate=2 ms=2.10556793 occupancy=1
+mma_tune kind=q4_k output_rows=5120 columns=17408 prompt_rows=2048 tile=128 mean_ms=2.11513591 occupancy=1
+opt018_j_mean tile=128 mean_ms=3.75303459 eligible=true occupancy=1
+mma_prompt_tile_2048=128 mean_ms=3.75303459 pinned=128 occupancy=1
+mma_case=q4_k_mma_2048x17408x5120 prompt_rows=2048 output_rows=17408 columns=5120 tile=128 mma_max_abs=8.52618408 mma_max_rel=0.92512548 mma_rms=2.31869221 mma_bad=0 mma_nonfinite=0 variant_max_abs=7.80053711 variant_max_rel=0.639403164 variant_bad=0 gate=ds4_q4k_parity ref=cpu_dequant_gemm
+mma_case=q4_k_mma_2048x5120x17408 prompt_rows=2048 output_rows=5120 columns=17408 tile=128 mma_max_abs=15.3637695 mma_max_rel=10.5929165 mma_rms=4.50216961 mma_bad=0 mma_nonfinite=0 variant_max_abs=15.234375 variant_max_rel=10.4615555 variant_bad=0 gate=ds4_q4k_parity ref=cpu_dequant_gemm
+mma_case=q6_k_mma_2048x5120x6144 prompt_rows=2048 output_rows=5120 columns=6144 tile=128 mma_max_abs=12.930481 mma_max_rel=105.825157 mma_rms=3.03586507 mma_bad=0 mma_nonfinite=0 variant_max_abs=12.9303284 variant_max_rel=105.831116 variant_bad=0 gate=ds4_q4k_parity ref=cpu_dequant_gemm
+opt018_j_sample kind=q4_k output_rows=17408 columns=5120 prompt_rows=2048 tile=128 replicate=0 ms=1.65382397 occupancy=1
+opt018_j_sample kind=q4_k output_rows=17408 columns=5120 prompt_rows=2048 tile=128 replicate=1 ms=1.64233601 occupancy=1
+opt018_j_sample kind=q4_k output_rows=17408 columns=5120 prompt_rows=2048 tile=128 replicate=2 ms=1.64169598 occupancy=1
+mma_tune kind=q4_k output_rows=17408 columns=5120 prompt_rows=2048 tile=128 mean_ms=1.64595187 occupancy=1
+mma_speed_2048_17408x5120 mma_ms=1.64595187 variant_ms=155.836014 occupancy=1

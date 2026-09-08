@@ -207,27 +207,25 @@ def validate_result(result: Any) -> None:
         assert _str_keys(result["selected_tiles"][kind]) == _str_keys(table)
     assert len(result["launches"]) == 8
     for launch in result["launches"]:
-        assert launch["block"] == [256, 1, 1]
         assert launch["grid"][0] > 0 and launch["grid"][2] == 1
         if launch["kind"].endswith("reference"):
+            assert launch["block"] == [256, 1, 1]
             assert launch["kernel_nodes"] == 1
             assert launch["grid"][1] == launch["prompt_rows"]
         elif launch["kind"] == "q8_0":
             tile = launch["selected_tile"]
+            assert launch["block"] == [256, 1, 1]
             assert tile >= 2 and launch["prompt_rows"] >= 2
             assert launch["kernel_nodes"] == 1
             assert launch["grid"][1] == (launch["prompt_rows"] + tile - 1) // tile
         else:
-            tile = launch["selected_tile"]
-            if launch["kernel_nodes"] == 1:
-                mma_tile = 128
-                assert (
-                    launch["grid"][1]
-                    == (launch["prompt_rows"] + mma_tile - 1) // mma_tile
-                )
-            else:
-                assert launch["kernel_nodes"] == 2
-                assert launch["grid"][1] == (launch["prompt_rows"] + tile - 1) // tile
+            assert launch["block"][0] * launch["block"][1] == 256
+            assert launch["block"][0] == 32 and launch["block"][1] == 8
+            assert launch["kernel_nodes"] == 2
+            mma_tile = 128
+            assert launch["grid"][1] == (
+                (launch["prompt_rows"] + mma_tile - 1) // mma_tile
+            )
     for kind in ("q8_0", "q4_k", "q6_k"):
         attributes = result["kernel_attributes"][kind]
         assert attributes["registers"] > 0

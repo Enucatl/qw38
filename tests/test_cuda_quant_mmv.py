@@ -40,8 +40,15 @@ def test_cuda_mmq_contract_and_handbook_are_connected() -> None:
         "threads": 256,
         "ownership": "one warp owns one output row and up to four prompt rows",
     }
+    assert contract["admission"]["q4k_q6k_association_gate"] == "ds4_q4k_parity"
+    assert contract["admission"]["q4k_q6k_abs_scale"] == 0.2
+    assert contract["admission"]["q4k_q6k_rel_tol"] == 0.05
+    assert contract["admission"]["legacy_fixed_abs_rms_retired_for_q4k_q6k_mmq"] is True
     assert contract["admission"]["maximum_absolute_error"] == 5.0e-4
     assert contract["admission"]["maximum_rms_error"] == 2.5e-4
+    assert contract["admission"]["maximum_absolute_error_applies_to"].startswith(
+        "q8_0_mmq"
+    )
     assert [case["prompt_rows"] for case in fixture["cases"]] == [3, 5, 1, 9]
     assert all(case["q8_equal"] and case["nonfinite"] == 0 for case in fixture["cases"])
     chapter = (ROOT / "docs" / "40-cuda-prompt-mmq.md").read_text().casefold()

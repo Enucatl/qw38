@@ -120,6 +120,21 @@ versus llama.cpp 3203.276277 tok/s is recorded and is **not** the OPT-016 gate.
 **OPT-016 remains the parity gate owner.** Report:
 [`evidence/optimization/opt017-mixer-q8-mma/REPORT.md`](../evidence/optimization/opt017-mixer-q8-mma/REPORT.md).
 
+## Q4_K/Q6_K MMA quality (OPT-018)
+
+**Measured, RTX 5090:** production Q4_K/Q6_K prompt MMQ is quality MMA
+(`MMQ_ITER_K=256`, packed load-tiles, Q8_1 MMQ Y in the existing workspace,
+J=128) when `prompt_rows >= 8`. Admission is against host CPU dequant-weight ×
+BF16→float GEMM under the ds4 Q4_K association rule (option C; element fails
+only when both `abs > 0.20*sqrt(K)` and `rel > 0.05`). Fixed abs/rms are retired
+for Q4_K/Q6_K MMQ admission; the scalar variant remains with exact Q8 staging.
+Live exact-2048 `ffn_mmq` is **399.287018** ms versus the before snapshot
+**2524.67725** ms and live llama.cpp 2K wall **636.184782** ms (`avg_ts`
+3219.6604); `llama_competitive` is true. Quartz mean **625.792114** tok/s
+versus llama.cpp 3219.6604 tok/s is recorded and is **not** the OPT-016 gate.
+**OPT-016 remains the parity gate owner.** Report:
+[`evidence/optimization/opt018-ffn-mma-quality/REPORT.md`](../evidence/optimization/opt018-ffn-mma-quality/REPORT.md).
+
 ## DwarfStar transfer boundary
 
 Reuse MMV/MMQ phase split, quant block tests, explicit unavailable paths, stable
