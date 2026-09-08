@@ -1,0 +1,108 @@
+{
+  "schema_version": 1,
+  "task": "OPT-015",
+  "status": "source_inspected",
+  "measurement_utc": "2026-09-08T10:46:11Z",
+  "llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+  "dwarfstar_pin": "c1d4597a80e300b803dc642519718f2c999589da",
+  "ds4_inspected_head": "c238077a87186381bf626cc531bccffe1fef79e7",
+  "ds4_license": "MIT",
+  "ds4_can_run_qwen_gguf": false,
+  "ds4_same_model_baseline": false,
+  "quartz": {
+    "wall_ms": 41963.8828,
+    "tok_s": 48.8038712,
+    "categories_ms": {
+      "embedding": 0.076063998,
+      "gdn": 5300.55371,
+      "attention": 4364.3335,
+      "ffn_mmq": 32294.9512,
+      "logits": 2.86684799,
+      "commit_sync": 0.576767981,
+      "graph": 0,
+      "other_idle": 0.5234375
+    },
+    "prompt_tokens": 2048,
+    "measurement_utc": "2026-09-08T10:46:11Z"
+  },
+  "llama_cpp": {
+    "avg_ts": 3114.049476,
+    "avg_ns": 657690797,
+    "n_prompt": 2048,
+    "n_ubatch": 512,
+    "flash_attn": -1,
+    "build_commit": "cc83d7b",
+    "test_time": "2026-09-08T09:51:43Z"
+  },
+  "gap": {
+    "ratio": 63.80742755505018,
+    "ffn_only_tok_s_ceiling": 63.415485204387
+  },
+  "categories": [
+    "embedding",
+    "gdn",
+    "attention",
+    "ffn_mmq",
+    "logits",
+    "commit_sync",
+    "graph",
+    "other_idle"
+  ],
+  "transferable": [
+    "mma_shared_memory_quantized_mmq",
+    "fused_per_head_gdn_token_loop",
+    "full_causal_mma_tiled_attention",
+    "layer_major_chunk_allocation_graph_capture"
+  ],
+  "non_transferable": [
+    "compressed_attention",
+    "sparse_indexer",
+    "moe_streaming",
+    "mhc",
+    "dspark",
+    "dwarfstar_fork",
+    "cublas_production_dependency"
+  ],
+  "ranked_recovery": [
+    "q4k_q6k_mma_mmq",
+    "gdn_fused_token_loop",
+    "causal_mma_attention",
+    "optional_2048_prompt_graphs"
+  ],
+  "category_map": {
+    "ffn_mmq": {
+      "path": "q4k_q6k_mma_mmq",
+      "rank": 1
+    },
+    "gdn": {
+      "path": "gdn_fused_token_loop",
+      "rank": 2
+    },
+    "attention": {
+      "path": "causal_mma_attention",
+      "rank": 3
+    },
+    "logits": {
+      "path": "keep",
+      "rank": null
+    },
+    "commit_sync": {
+      "path": "keep",
+      "rank": null
+    },
+    "embedding": {
+      "path": "keep",
+      "rank": null
+    },
+    "graph": {
+      "path": "optional_2048_prompt_graphs",
+      "rank": 4
+    },
+    "other_idle": {
+      "path": "keep",
+      "rank": null
+    }
+  },
+  "proof_limit": "source inspection of pinned llama.cpp cc83d7b and local ../ds4; copied OPT-014 and scaling llama-bench timings; not a throughput gate; not llama.cpp parity; ds4 cannot run this Qwen GGUF; no ds4 same-model baseline",
+  "report_path": "evidence/optimization/opt015-2k-recovery/REPORT.md"
+}

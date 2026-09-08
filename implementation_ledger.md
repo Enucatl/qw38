@@ -81,7 +81,7 @@ are repository-relative unless stated otherwise.
 | OPT-012 | Add stable-address prompt CUDA graphs | OPT-003, OPT-011 | done | Common 4,096-token prompt paths replay from stable addresses with graph/non-graph equality and reconciled memory | [`tasks/OPT-012.md`](tasks/OPT-012.md); verification 2026-09-07T20:27:06Z |
 | OPT-013 | Implement associative block-parallel GDN prompt scan | GDN-002, OPT-011 | done | Parallel GDN scan preserves recurrence/frontier tolerances across chunk boundaries and demonstrates measured prompt speedup | [`tasks/OPT-013.md`](tasks/OPT-013.md); [`pins/cuda_gdn_scan_contract.json`](pins/cuda_gdn_scan_contract.json); [`fixtures/cuda_gdn_scan.json`](fixtures/cuda_gdn_scan.json); verification 2026-09-08T08:58:06Z |
 | OPT-014 | Instrument attributed 2K prefill time breakdown | BEN-001, OPT-013 | done | A cold 2K Quartz prefill emits a retained live attribution report whose named categories (at least embedding, GDN, attention, FFN/MMQ, logits, commit/sync, graph, other/idle) sum to the measured prefill wall time within a documented tolerance; the report is produced from the timed run itself without requiring a separate Nsight capture | [`tasks/OPT-014.md`](tasks/OPT-014.md); [`pins/cuda_prefill_attribution_contract.json`](pins/cuda_prefill_attribution_contract.json); [`fixtures/cuda_prefill_attribution.json`](fixtures/cuda_prefill_attribution.json); verification 2026-09-08T11:06:41Z |
-| OPT-015 | Compare Quartz 2K prefill to llama.cpp; mine ds4 for techniques | OPT-013, PIN-002 | pending | Checked-in report explains what pushes pinned same-GGUF llama.cpp into thousands of tok/s at 2K, uses `../ds4` only as MIT-licensed technique inspiration (ds4 cannot run this Qwen GGUF; no ds4 same-model baseline), separates transferable methods under `plan.md` provenance from non-transferable ds4 model policies such as sparse/compressed attention, maps each major Quartz 2K time sink to a faster path, and proposes a ranked recovery sequence | — |
+| OPT-015 | Compare Quartz 2K prefill to llama.cpp; mine ds4 for techniques | OPT-013, PIN-002 | done | Checked-in report explains what pushes pinned same-GGUF llama.cpp into thousands of tok/s at 2K, uses `../ds4` only as MIT-licensed technique inspiration (ds4 cannot run this Qwen GGUF; no ds4 same-model baseline), separates transferable methods under `plan.md` provenance from non-transferable ds4 model policies such as sparse/compressed attention, maps each major Quartz 2K time sink to a faster path, and proposes a ranked recovery sequence | [`tasks/OPT-015.md`](tasks/OPT-015.md); [`evidence/optimization/opt015-2k-recovery/REPORT.md`](evidence/optimization/opt015-2k-recovery/REPORT.md); [`pins/opt015_recovery_contract.json`](pins/opt015_recovery_contract.json); [`fixtures/opt015_recovery.json`](fixtures/opt015_recovery.json); verification 2026-09-08T11:39:48Z |
 | OPT-016 | Reach 2K prefill throughput at or above pinned llama.cpp | OPT-014, OPT-015 | pending | On the same GGUF and RTX 5090, cold 2K Quartz prefill tok/s is ≥ pinned llama.cpp `llama-bench` 2K under a frozen protocol; until this passes, performance work and speed claims use the 2K yardstick only (no 8K/32K/128K throughput or QLT 128K attempts as speed gates); numeric/state envelopes remain unloosened | — |
 
 ### 2026-09-04T13:09:32Z — OPT-005 delivered
@@ -4018,4 +4018,33 @@ are repository-relative unless stated otherwise.
   [`docs/62-cuda-full-prefill.md`](docs/62-cuda-full-prefill.md).
   Proof is live instrumentation, not a throughput gate or llama.cpp parity.
 - Marked OPT-014 `done`; delivery is limited to the verified task scope plus
+  this ledger/audit bookkeeping.
+
+### 2026-09-08T11:19:55Z — OPT-015 planning admitted
+
+- Planning produced decision-complete dossier [`tasks/OPT-015.md`](tasks/OPT-015.md).
+- Coupled IDs: none. Plan impact: none.
+- Marked OPT-015 `in_progress`.
+
+### 2026-09-08T11:41:40Z — OPT-015 delivered
+
+- Independent verification attempt 1 passed: host-tested citation report
+  explains thousand-tok/s same-GGUF llama.cpp 2K prefill from OPT-014
+  exact-2048 attribution and the scaling `llama-bench` 2K JSON; `../ds4` is
+  MIT technique inspiration only (`ds4 cannot run this Qwen GGUF`; no ds4
+  same-model baseline); transferable MMA MMQ / fused GDN / causal MMA
+  attention are separated from non-transferable sparse/compressed
+  attention; every OPT-014 category is mapped; ranked recovery is
+  Proposed, not OPT-016. `plan.md`, `Makefile`, and production kernels are
+  unchanged. OPT-016 remains pending on OPT-014 and OPT-015; QLT-001
+  remains blocked.
+- Acceptance evidence: [`tasks/OPT-015.md`](tasks/OPT-015.md);
+  [`evidence/optimization/opt015-2k-recovery/REPORT.md`](evidence/optimization/opt015-2k-recovery/REPORT.md);
+  [`pins/opt015_recovery_contract.json`](pins/opt015_recovery_contract.json);
+  [`fixtures/opt015_recovery.json`](fixtures/opt015_recovery.json);
+  [`tests/test_opt015_recovery.py`](tests/test_opt015_recovery.py);
+  [`docs/40-cuda-prompt-mmq.md`](docs/40-cuda-prompt-mmq.md);
+  [`docs/62-cuda-full-prefill.md`](docs/62-cuda-full-prefill.md).
+  Proof is a citation report, not a throughput gate or llama.cpp parity.
+- Marked OPT-015 `done`; delivery is limited to the verified task scope plus
   this ledger/audit bookkeeping.

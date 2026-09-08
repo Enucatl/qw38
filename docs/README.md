@@ -65,7 +65,7 @@ for language and host portability decisions.
 37. [Official-checkpoint Transformers authority](37-transformers-authority.md): original versus GGUF weights, Safetensors shards, eager offload, hooks/taps, real logits, and proof limits.
 38. [Three-authority scalar tolerances](38-scalar-authority-tolerances.md): comparable boundaries, exact layout normalization, error metrics, greedy margins, and immutable pre-CUDA gates.
 39. [The first CUDA matrix-vector kernel](39-cuda-quant-mmv.md): BF16-to-Q8 staging, packed Q4_K/Q6_K rows, warp ownership, FP32 reduction, device gates, and measured proof limits.
-40. [Tiled CUDA multiplication for prompt rows](40-cuda-prompt-mmq.md): prompt matrices, token-major output, two-dimensional tiles, packed-weight reuse, tails, and scalar/device gates.
+40. [Tiled CUDA multiplication for prompt rows](40-cuda-prompt-mmq.md): prompt matrices, token-major output, two-dimensional tiles, packed-weight reuse, tails, scalar/device gates, the 2K FFN/MMQ sink, and proposed MMA MMQ.
 41. [One CUDA GDN step and atomic state staging](41-cuda-gdn-step.md): production recurrence, causal convolution, candidate state, cancellation, commit, and frontier publication.
 42. [Chunked CUDA GDN prefill](42-cuda-gdn-chunks.md): token-major chunks, strict recurrence order, 64-token windows, associative prompt scan, candidate continuity, cancellation, and token-wise equivalence.
 43. [CUDA grouped-query attention decode](43-cuda-attention-decode.md): heads and KV sharing, normalization, partial RoPE, BF16 cache rows, causal stable softmax, candidate commit, and frozen numeric gates.
@@ -87,7 +87,7 @@ for language and host portability decisions.
 59. [Chat Completions](59-chat-completions.md): bounded JSON, roles, reasoning, generation, SSE streaming, tools, stops, queueing, and active cancellation.
 60. [Responses objects and exact continuation](60-responses-and-continuation.md): typed input/output items, shared generation mapping, SSE events, atomic token-prefix records, restart replay, and explicit exclusions.
 61. [Benchmark harness](61-benchmark-harness.md): workloads, warm-ups, samples, percentiles, telemetry, cache policy, atomic results, and proof limits.
-62. [Chunked full-model CUDA prefill](62-cuda-full-prefill.md): token-major rows, layer-major work, exact MMQ/GDN/attention chunks, atomic commit, scratch, measured 2K attribution, and proof boundaries.
+62. [Chunked full-model CUDA prefill](62-cuda-full-prefill.md): token-major rows, layer-major work, exact MMQ/GDN/attention chunks, atomic commit, scratch, measured 2K attribution, the ranked recovery map, and proof boundaries.
 63. [CUDA diagnostic traces](63-cuda-diagnostic-traces.md): five stable CUDA boundaries, exact filters, full-tensor scalar gates, failure atomicity, and diagnostic-build isolation.
 64. [Evaluation harness](64-eval-harness.md): raw-token requests, typed helpers, authenticated logits/checkpoint/trace records, atomic negative cases, and the QLT-001 proof boundary.
 65. [Documentation audit](65-documentation-audit.md): task coverage, claim labels,

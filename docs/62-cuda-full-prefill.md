@@ -1,17 +1,20 @@
 # Chunked full-model CUDA prefill
 
-[Index](README.md) · Implementation tasks: SCH-002, MEM-002, OPT-008, OPT-009, OPT-011, OPT-012, OPT-013, OPT-014, and EDU-047 in
+[Index](README.md) · Implementation tasks: SCH-002, MEM-002, OPT-008, OPT-009, OPT-011, OPT-012, OPT-013, OPT-014, OPT-015, and EDU-047 in
 [`implementation_ledger.md`](../implementation_ledger.md) · Contracts:
 [`pins/cuda_prompt_scheduler_contract.json`](../pins/cuda_prompt_scheduler_contract.json),
 [`pins/cuda_prompt_pipeline_contract.json`](../pins/cuda_prompt_pipeline_contract.json),
 [`pins/cuda_prompt_graph_contract.json`](../pins/cuda_prompt_graph_contract.json),
 [`pins/cuda_gdn_scan_contract.json`](../pins/cuda_gdn_scan_contract.json),
-[`pins/cuda_prefill_attribution_contract.json`](../pins/cuda_prefill_attribution_contract.json)
+[`pins/cuda_prefill_attribution_contract.json`](../pins/cuda_prefill_attribution_contract.json),
+[`pins/opt015_recovery_contract.json`](../pins/opt015_recovery_contract.json)
 · Evidence: [`fixtures/cuda_prompt_scheduler.json`](../fixtures/cuda_prompt_scheduler.json),
 [`fixtures/cuda_prompt_pipeline.json`](../fixtures/cuda_prompt_pipeline.json),
 [`fixtures/cuda_prompt_graph.json`](../fixtures/cuda_prompt_graph.json),
 [`fixtures/cuda_gdn_scan.json`](../fixtures/cuda_gdn_scan.json),
-[`fixtures/cuda_prefill_attribution.json`](../fixtures/cuda_prefill_attribution.json)
+[`fixtures/cuda_prefill_attribution.json`](../fixtures/cuda_prefill_attribution.json),
+[`fixtures/opt015_recovery.json`](../fixtures/opt015_recovery.json),
+[`evidence/optimization/opt015-2k-recovery/REPORT.md`](../evidence/optimization/opt015-2k-recovery/REPORT.md)
 
 ## Why prompt execution differs from decode
 
@@ -315,11 +318,47 @@ Compute were `not_used`. This is instrumentation of that timed run, not a
 throughput gate and not llama.cpp parity. Chapter 51 owns the category
 definitions.
 
+OPT-015 maps those eight categories to a ranked recovery sequence. It copies
+the OPT-014 exact-2048 attribution and the scaling `llama-bench` 2K object in
+[`evidence/quality/scaling-2026-09-08/llama-bench-prefill-2k-8k-32k.json`](../evidence/quality/scaling-2026-09-08/llama-bench-prefill-2k-8k-32k.json).
+**Measured:** Quartz 41963.8828 ms (~48.80 tok/s) versus llama.cpp `cc83d7b`
+mean 3114.049476 tok/s (`n_ubatch` 512, `flash_attn` -1). **Estimated** gap:
+`3114.049476 / 48.8038712 ≈ 63.8×`. **External:** llama.cpp reaches thousands
+of tok/s on this same GGUF because Q4_K MMQ is MMA/tensor-core (J up to 128),
+GDN is a fused per-head token loop, and `flash_attn` auto selects MMA F16.
+Quartz 2K `graph` is measured 0 ms, so CUDA graphs are not the present gap.
+`../ds4` is MIT inspiration only; ds4 cannot run this Qwen GGUF, and there is
+no ds4 same-model baseline.
+
+Exclusive category map (shares of OPT-014 `wall_ms` 41963.8828 ms):
+
+| Category | Share | Faster path or keep | Rank |
+|---|---:|---|---:|
+| `ffn_mmq` | 77.0% | Q4_K/Q6_K MMA MMQ; keep CUD-002 reference | 1 `q4k_q6k_mma_mmq` |
+| `gdn` | 12.6% | Fused per-head GDN token loop after Rank 1 | 2 `gdn_fused_token_loop` |
+| `attention` | 10.4% | Full-causal MMA/tiled attention; not sparse | 3 `causal_mma_attention` |
+| `logits` | ~0.007% | Keep | — |
+| `commit_sync` | ~0.001% | Keep OPT-011 overlap | — |
+| `embedding` | ~0.0002% | Keep | — |
+| `graph` | 0% | Optional 2048-row FFN graphs after Rank 1 | 4 `optional_2048_prompt_graphs` |
+| `other_idle` | ~0.001% | Keep remainder | — |
+
+**Proposed** sequence: `q4k_q6k_mma_mmq`, `gdn_fused_token_loop`,
+`causal_mma_attention`, `optional_2048_prompt_graphs`. Rank 1 is mandatory
+because the **Estimated** FFN-only ceiling is ~63 tok/s. OPT-016 remains the
+later 2K throughput gate; this report does not claim that sequence will pass
+it. Artifacts:
+[`evidence/optimization/opt015-2k-recovery/REPORT.md`](../evidence/optimization/opt015-2k-recovery/REPORT.md),
+[`pins/opt015_recovery_contract.json`](../pins/opt015_recovery_contract.json),
+and [`fixtures/opt015_recovery.json`](../fixtures/opt015_recovery.json).
+
 The **proof boundary** excludes comparative speed claims, 2K/8K sustained
 prefill throughput, execution of a 128K prefill, 128K retrieval quality, thermal
 stability, superiority to llama.cpp/vLLM, and a Nsight Systems overlap timeline.
 OPT-014 measures named categories on one cold 2048-token timed run; it does not
-convert that instrumentation into a sustained-prefill or speed admission. BEN-001
+convert that instrumentation into a sustained-prefill or speed admission.
+OPT-015 explains the 2K gap and ranks recoveries; it is not llama.cpp parity
+and not a throughput gate. BEN-001
 provides the harness; CMP-002/CMP-003 still own the 30-sample comparative gate.
 QLT-001 remains blocked. OPT-012's prompt graphs are FFN subgraphs only: not a
 whole-chunk graph, not a speedup gate, and not 128K quality recovery.

@@ -27,7 +27,10 @@ Relevant reusable evidence lives in `ds4_shape`, `model_open`,
 capture. These are **source-verified patterns**, not Qwen support or 5090 results.
 
 DeepSeek compressed attention, sparse indexer, MoE expert streaming, mHC, and
-DSpark are explicitly rejected as Qwen model semantics.
+DSpark are explicitly rejected as Qwen model semantics. OPT-015 inspects local
+`../ds4` as MIT technique inspiration only (PIN-002 pin `c1d4597`, inspected
+HEAD `c238077`); ds4 cannot run this Qwen GGUF, and there is no ds4 same-model
+baseline.
 
 ## Focused implementation dependencies
 
@@ -344,6 +347,26 @@ DSpark are explicitly rejected as Qwen model semantics.
   The prefill proof boundary is
   [`docs/62-cuda-full-prefill.md`](62-cuda-full-prefill.md).
   No external profiler workflow or kernel implementation was copied or adapted.
+- OPT-015 introduces no new external implementation source beyond already-pinned
+  authorities. It inspects llama.cpp revision
+  `cc83d7b4824f73cfdda4dfbb47ee39804f71b328` (MIT) as the same-GGUF 2K
+  explanation—MMA MMQ, fused GDN token loop, MMA flash attention—and inspects
+  local `../ds4` HEAD `c238077a87186381bf626cc531bccffe1fef79e7` as MIT
+  technique inspiration (PIN-002 pin
+  `c1d4597a80e300b803dc642519718f2c999589da`). ds4 cannot run this Qwen GGUF;
+  there is no ds4 same-model baseline. Sparse/compressed attention, MoE
+  streaming, mHC, DSpark, a DwarfStar fork, and a production cuBLAS dependency
+  remain non-transferable. Copied timings are the OPT-014 fixture and the
+  2026-09-08 scaling `llama-bench` 2K JSON; this increment does not re-run
+  those GPU jobs. The schema-1 contract, claim index, and report are
+  [`pins/opt015_recovery_contract.json`](../pins/opt015_recovery_contract.json),
+  [`fixtures/opt015_recovery.json`](../fixtures/opt015_recovery.json), and
+  [`evidence/optimization/opt015-2k-recovery/REPORT.md`](../evidence/optimization/opt015-2k-recovery/REPORT.md).
+  The beginner explanation is
+  [`docs/40-cuda-prompt-mmq.md`](40-cuda-prompt-mmq.md).
+  The 2K comparison and ranked map are
+  [`docs/62-cuda-full-prefill.md`](62-cuda-full-prefill.md).
+  Proof limit: not a throughput gate, not llama.cpp parity.
 - CUD-003 introduces no new external implementation source. GGUF Q8_0 decoding
   follows the format already admitted by the pinned scalar decoder, and the
   pointwise/layout equations come from the pinned model contract and scalar
@@ -518,7 +541,10 @@ DSpark are explicitly rejected as Qwen model semantics.
   component-only. OPT-014 later adds opt-in live 2048-token prefill attribution
   from prompt-compute-stream CUDA events plus a host-wall remainder; that
   increment is documented separately and is instrumentation, not a throughput
-  or Nsight claim. Exact
+  or Nsight claim. OPT-015 later cites that 2K attribution plus the scaling
+  `llama-bench` 2K JSON as a host-tested recovery map; that increment is
+  documented separately and is not a throughput gate or llama.cpp parity
+  claim. Exact
   `[4096, 1]` differential, capacity fallback, cancellation, and memory
   evidence is authenticated in
   [`pins/cuda_prompt_scheduler_contract.json`](../pins/cuda_prompt_scheduler_contract.json)

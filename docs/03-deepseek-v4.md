@@ -179,6 +179,21 @@ Reuse DwarfStar validation, ownership, allocation accounting, and differential
 testing. Adapt serialization and hybrid scheduling. Reject compressed attention,
 sparse indexing, MoE routing/streaming, mHC, and DSpark equations.
 
+OPT-015 restates that split for 2K recovery. `plan.md:66-68` allows focused
+MIT-licensed llama.cpp and DwarfStar kernel techniques with file-level
+provenance; it does not allow forking DwarfStar or translating DeepSeek/GLM
+model machinery. Transferable later work is MMA/shared-memory quantized MMQ, a
+fused per-head GDN token loop, and full-causal MMA/tiled multi-row attention.
+Non-transferable ds4 model policies remain Compressed Sparse Attention /
+Heavily Compressed Attention (CSA/HCA), sparse indexing, sliding-window-only
+layers as a KV substitute, MoE expert routing/streaming, mHC, DSpark, treating
+ds4 throughput as a same-GGUF baseline, and a production cuBLAS/cuDNN
+dependency. Full causal attention and FP32 GDN recurrence stay mandatory.
+**External:** ds4 cannot run this Qwen GGUF (`qwen35` architecture), so there
+is no ds4 same-model baseline. The ranked sequence is **Proposed**, not a 2K
+throughput gate:
+[`evidence/optimization/opt015-2k-recovery/REPORT.md`](../evidence/optimization/opt015-2k-recovery/REPORT.md).
+
 ## Failure modes and exercise
 
 Common errors are wrong head expansion, gate order, conventional RMS weights,

@@ -1,0 +1,79 @@
+{
+  "schema_version": 1,
+  "task": "OPT-015",
+  "primary_tokens": 2048,
+  "quartz_source": "fixtures/cuda_prefill_attribution.json",
+  "llama_source": "evidence/quality/scaling-2026-09-08/llama-bench-prefill-2k-8k-32k.json",
+  "llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+  "dwarfstar_pin": "c1d4597a80e300b803dc642519718f2c999589da",
+  "ds4_role": "technique_inspiration_only",
+  "ds4_same_model_baseline": false,
+  "ds4_can_run_qwen_gguf": false,
+  "opt016_in_scope": false,
+  "nsight": "not_required",
+  "categories": [
+    "embedding",
+    "gdn",
+    "attention",
+    "ffn_mmq",
+    "logits",
+    "commit_sync",
+    "graph",
+    "other_idle"
+  ],
+  "ranked_recovery": [
+    "q4k_q6k_mma_mmq",
+    "gdn_fused_token_loop",
+    "causal_mma_attention",
+    "optional_2048_prompt_graphs"
+  ],
+  "non_transferable": [
+    "compressed_attention",
+    "sparse_indexer",
+    "moe_streaming",
+    "mhc",
+    "dspark",
+    "dwarfstar_fork",
+    "cublas_production_dependency"
+  ],
+  "proof_limit": [
+    "not a throughput gate",
+    "not llama.cpp parity",
+    "ds4 cannot run this Qwen GGUF",
+    "no ds4 same-model baseline"
+  ],
+  "required_fixture_keys": [
+    "schema_version",
+    "task",
+    "status",
+    "measurement_utc",
+    "llama_revision",
+    "dwarfstar_pin",
+    "ds4_inspected_head",
+    "ds4_license",
+    "ds4_can_run_qwen_gguf",
+    "ds4_same_model_baseline",
+    "quartz",
+    "llama_cpp",
+    "gap",
+    "categories",
+    "transferable",
+    "non_transferable",
+    "ranked_recovery",
+    "category_map",
+    "proof_limit",
+    "report_path"
+  ],
+  "report_path": "evidence/optimization/opt015-2k-recovery/REPORT.md",
+  "report_headings": [
+    "# OPT-015 — 2K prefill recovery report",
+    "## Claim labels and proof limits",
+    "## Measured 2K comparison",
+    "## What pushes pinned llama.cpp into thousands of tok/s",
+    "## ds4 license, cannot-run, and inspiration boundary",
+    "## Transferable methods",
+    "## Non-transferable ds4 model policies",
+    "## Quartz 2K category map",
+    "## Ranked recovery sequence"
+  ]
+}

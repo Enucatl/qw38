@@ -1,6 +1,6 @@
 # Synchronized runtime timing and NVTX attribution
 
-[Index](README.md) · Implementation tasks: OPT-001, OPT-014, and EDU-037 in
+[Index](README.md) · Implementation tasks: OPT-001, OPT-014, OPT-015, and EDU-037 in
 [`implementation_ledger.md`](../implementation_ledger.md) · Contracts:
 [`pins/cuda_timing_contract.json`](../pins/cuda_timing_contract.json),
 [`pins/cuda_prefill_attribution_contract.json`](../pins/cuda_prefill_attribution_contract.json)
@@ -135,6 +135,13 @@ tolerance. Nsight Systems and Nsight Compute were `not_used`. This is
 instrumentation of that timed run, not a throughput gate and not llama.cpp
 parity.
 
+OPT-015 consumes those eight OPT-014 percentages as the exclusive 2K category
+map. It does not re-time the GPU and does not require Nsight. Rank 1 is
+`ffn_mmq` (77.0%), then `gdn` (12.6%), then `attention` (10.4%); `graph` is
+measured 0 ms. The ranked sequence is **Proposed** and is not a throughput
+gate:
+[`evidence/optimization/opt015-2k-recovery/REPORT.md`](../evidence/optimization/opt015-2k-recovery/REPORT.md).
+
 **Measured negative result:** the pinned CUDA 13.0.2 image contains Nsight
 Compute 2025.3.1, but the host denied performance-counter access with
 `ERR_NVGPUCTRPERM`. Nsight Systems (`nsys`) is not installed in that image.
@@ -164,9 +171,11 @@ OPT-001 proves decode category exposure, synchronized ordering, NVTX range
 placement, sampling/persistence timing, and explicit unavailable values on this
 runtime. OPT-014 records live 2K prefill attribution from stream-aware CUDA
 events plus a host-wall other/idle remainder, with graph-at-2048 measured zero,
-without requiring a separate Nsight capture. Neither increment proves a fusion
-is beneficial, provides an Nsight report, establishes p50/p95 request latency,
-or passes the comparative speed gate. SRV-002 now exposes separately measured
-queue depth/delay on Chat Completions responses. BEN-001 retains repeated engine
-samples and keeps its unavailable queue field explicit; server queue experiments
-and cross-runtime statistical comparison remain CMP work.
+without requiring a separate Nsight capture. OPT-015 cites those percentages as
+the recovery map; it does not emit a new timed run. None of those increments
+proves a fusion is beneficial, provides an Nsight report, establishes p50/p95
+request latency, or passes the comparative speed gate. SRV-002 now exposes
+separately measured queue depth/delay on Chat Completions responses. BEN-001
+retains repeated engine samples and keeps its unavailable queue field explicit;
+server queue experiments and cross-runtime statistical comparison remain CMP
+work.

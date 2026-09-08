@@ -98,6 +98,14 @@ Default `qw38-bench` throughput samples stay unattributed wall times. Chapter 51
 owns the live 2K categories, remainder other/idle, and the no-Nsight proof
 boundary.
 
+The 2026-09-08 scaling `llama-bench` JSON
+[`evidence/quality/scaling-2026-09-08/llama-bench-prefill-2k-8k-32k.json`](../evidence/quality/scaling-2026-09-08/llama-bench-prefill-2k-8k-32k.json)
+is a pinned same-GGUF citation. OPT-015 copies its first object for exact-2048
+llama.cpp 2K (**Measured** mean 3114.049476 tok/s, `n_ubatch` 512,
+`flash_attn` -1, `build_commit` `cc83d7b`). That file is not a BEN-001
+`qw38-bench` result, not a new GPU sample in this increment, and not the later
+2K throughput gate. CMP-002/CMP-003 still own the 30-sample comparative matrix.
+
 An unavailable measurement is JSON `null`, not zero. Zero would mean an event
 was measured and took no representable time. Queue time is `null` because this
 single-process harness has no HTTP queue. Persistence is `null` when no save or
@@ -150,7 +158,9 @@ cache policies, and publish a self-describing result. It does not prove release
 throughput, the full workload matrix, stable thermal conditions, comparative
 speed, or statistical superiority. The checked-in smoke runs are explicitly
 not admission eligible. CMP-002 and CMP-003 own the controlled comparison and
-confidence gates after the remaining quality work is complete.
+confidence gates after the remaining quality work is complete. OPT-015 cites
+the scaling `llama-bench` 2K object as an independent same-GGUF denominator; it
+does not change this harness, its JSON schema, or admit 2K llama.cpp parity.
 
 ## Reproduce a smoke safely
 

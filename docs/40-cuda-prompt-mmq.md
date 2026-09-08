@@ -1,6 +1,6 @@
 # 40. Tiled CUDA multiplication for prompt rows
 
-[Index](README.md) · Implementation tasks: CUD-002, OPT-009, and EDU-026 in
+[Index](README.md) · Implementation tasks: CUD-002, OPT-009, OPT-015, and EDU-026 in
 [`implementation_ledger.md`](../implementation_ledger.md)
 
 [Chapter 39](39-cuda-quant-mmv.md) multiplied one activation vector by a packed
@@ -202,3 +202,35 @@ fixture, and raw sweep:
 [`pins/cuda_prompt_mmq_contract.json`](../pins/cuda_prompt_mmq_contract.json),
 [`fixtures/cuda_prompt_mmq.json`](../fixtures/cuda_prompt_mmq.json), and
 [`evidence/profiling/opt009-mmq-tile-sweep-raw.txt`](../evidence/profiling/opt009-mmq-tile-sweep-raw.txt).
+
+## OPT-015 and the 2K FFN/MMQ sink
+
+**Measured, RTX 5090, OPT-014:** one cold exact-2048 production `sync_tokens`
+spent 32294.9512 ms in `ffn_mmq`, 77.0% of 41963.8828 ms host wall
+(~48.80 tok/s). Those numbers are copied from
+[`fixtures/cuda_prefill_attribution.json`](../fixtures/cuda_prefill_attribution.json);
+this chapter does not add a new GPU sample.
+
+At 2048 prompt rows, production Q4_K MMQ selects tile 4 because
+`prompt_rows > 256` returns 4. The OPT-009 table has no 2048 bucket: tile 8
+wins Q4_K at 16–256 rows, and tile 4 is the measured 4096-row winner for the
+joint FFN shapes. 2048 therefore reuses each decoded weight across only four
+prompt rows. The kernel remains scalar `__fmul_rn`/`__fadd_rn` weight-tile
+reuse on 256-thread blocks. Occupancy is admitted; this is not tensor-core
+MMA.
+
+**External:** pinned llama.cpp `cc83d7b` Q4_K MMQ uses 256 threads × 128
+output rows × prompt-tile J in `{8…128}`, Q8_1 shared-memory staging, and MMA
+tensor-core dots. **Estimated** from that OPT-014 `ffn_mmq` interval: if GDN
+and attention became free, Quartz would still be
+`2048 / (32294.9512 / 1000) ≈ 63.4` tok/s versus the scaling `llama-bench`
+exact-2048 mean 3114.049476 tok/s.
+
+**Proposed** Rank 1 for the later 2K throughput gate is llama.cpp-style
+Q4_K/Q6_K MMA MMQ under `plan.md:66-68` file-level provenance, keeping
+`launch_quant_mmq` / CUD-002 as the visible reference and the frozen CUD-002
+envelope. That sequence is the checked-in recovery map, not a throughput gate
+and not llama.cpp parity:
+[`evidence/optimization/opt015-2k-recovery/REPORT.md`](../evidence/optimization/opt015-2k-recovery/REPORT.md),
+[`pins/opt015_recovery_contract.json`](../pins/opt015_recovery_contract.json),
+and [`fixtures/opt015_recovery.json`](../fixtures/opt015_recovery.json).

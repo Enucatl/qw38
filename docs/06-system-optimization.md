@@ -22,7 +22,9 @@ setup for a small row count but cannot reuse each weight tile across many rows.
 An **MMQ** kernel computes a matrix times a matrix. It spends more effort
 tiling, but a weight tile can serve many prompt rows and often maps to tensor
 cores. The names describe the operation, not a promise that one is always
-faster.
+faster. Quartz production Q4_K/Q6_K prompt MMQ is still scalar FMA
+(`__fmul_rn`/`__fadd_rn` weight-tile reuse). Tensor-core **MMA** is a later
+kernel family, not the admitted path.
 
 For a decode projection, all output threads need the same input vector but
 different weight rows. A useful MMV kernel keeps pieces of the input available
@@ -90,11 +92,29 @@ without writing each intermediate vector to global memory. The cost is more
 complex code, longer-lived registers, and fewer reusable debugging boundaries.
 Fusion is therefore a measured optimization after the component operations pass.
 
+## 2K MMQ versus MMA (OPT-015)
+
+**Measured, OPT-014:** `ffn_mmq` is 77.0% of cold exact-2048 wall (32294.9512 ms
+of 41963.8828 ms, ~48.80 tok/s). At 2048 prompt rows, OPT-009 Q4_K selects
+tile 4 because there is no 2048 bucket and `prompt_rows > 256` returns 4, so
+each decoded weight serves only four rows.
+
+**External:** pinned llama.cpp `cc83d7b` Q4_K MMQ is MMA with prompt-tile J up
+to 128. **Estimated** FFN-only ceiling: `2048 / (32294.9512 / 1000) ≈ 63.4`
+tok/s versus that revision's scaling `llama-bench` 2K mean 3114.049476 tok/s.
+
+**Proposed** Rank 1 recovery is llama.cpp-style MMA MMQ under MIT file-level
+provenance, keeping the CUD-002 reference and frozen envelope. That map is not
+a 2K throughput gate and not llama.cpp parity:
+[`evidence/optimization/opt015-2k-recovery/REPORT.md`](../evidence/optimization/opt015-2k-recovery/REPORT.md).
+
 ## DwarfStar transfer boundary
 
 Reuse MMV/MMQ phase split, quant block tests, explicit unavailable paths, stable
 scratch, tail tests, and graph-capture discipline. Adapt dispatch shapes and
-fusion. Discard sparse attention and MoE kernels.
+fusion. Discard sparse attention and MoE kernels. OPT-015 keeps that rejection:
+compressed attention, sparse indexing, MoE streaming, mHC, and DSpark stay
+non-transferable Qwen-policy boundaries, not 2K recovery levers.
 
 ## Common failures and verification
 
