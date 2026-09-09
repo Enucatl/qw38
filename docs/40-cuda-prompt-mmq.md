@@ -1,6 +1,6 @@
 # 40. Tiled CUDA multiplication for prompt rows
 
-[Index](README.md) · Implementation tasks: CUD-002, OPT-009, OPT-015, OPT-017, OPT-018, OPT-022, OPT-023, and EDU-026 in
+[Index](README.md) · Implementation tasks: CUD-002, OPT-009, OPT-015, OPT-017, OPT-018, OPT-022, OPT-023, OPT-024, and EDU-026 in
 [`implementation_ledger.md`](../implementation_ledger.md)
 
 [Chapter 39](39-cuda-quant-mmv.md) multiplied one activation vector by a packed
@@ -491,3 +491,50 @@ fixture, and report:
 [`fixtures/opt023_skinny_mixer.json`](../fixtures/opt023_skinny_mixer.json),
 and
 [`evidence/optimization/opt023-skinny-mixer/REPORT.md`](../evidence/optimization/opt023-skinny-mixer/REPORT.md).
+
+## OPT-024 large-mixer aligned SoA D2R
+
+Large mixer Q8_0 GEMMs (`output_rows >= 128`) were A/B'd against a Quartz-native
+aligned-SoA D2R / int8 MMA path inspired by ds4 kind-5 / dense Q8 D2R
+(row-major `[half d][int8 qs]`, aligned int8 loads, `mma.m16n8k32.s8`, D4 Y).
+`../ds4/cuda/mmq/` is not vendored. Skinny α/β stay `mma_i32_j128`. Decode
+`q8_mmv_bf16` stays on GGUF 34-byte blocks. Production Q8_0 still does not go
+through `launch_quant_mmq`.
+
+**A/B.** Exclusive RTX 5090, 0 warm-ups, 3 CUDA-event replicates, occupancy ≥ 1,
+zero non-finites, Q8 association. Candidates: `quality_mma` (I=128 J=128 GGUF
+baseline on prequantized D4 Y) versus `d2r_soa` (prebuilt SoA, same Y). D2R
+install requires a strictly faster mean on every timed large shape
+(`packed_qkv`, `query_gate`, `value_gate`, `gdn_output`, `key`). Raw samples
+stay in
+[`evidence/optimization/opt024-mixer-q8-d2r/d2r-ab-raw.txt`](../evidence/optimization/opt024-mixer-q8-d2r/d2r-ab-raw.txt);
+this chapter does not replace them. Winner: `quality_mma` (`win=false`;
+D2R did not strictly beat quality MMA on every timed large shape). Production large mixers
+remain I=128 / J=128 quality MMA. D2R launchers stay as non-production
+symbols.
+
+**Measured 4K reject, RTX 5090:** live exclusive sitting, llama.cpp first then
+Quartz. Cold exact-4096 Quartz mean is not strictly greater than the frozen
+OPT-023 successor oracle **1687.86169**. Reject: `reverted` true,
+`successor_oracle` false, `production_d2r` false, A/B winner `quality_mma`.
+`quartz_meets_llama` is informational false and is not this gate. Live
+numbers stay in the report; this chapter does not replace them:
+[`evidence/optimization/opt024-mixer-q8-d2r/REPORT.md`](../evidence/optimization/opt024-mixer-q8-d2r/REPORT.md).
+
+**External:** ds4 MIT dense Q8 D2R / kind-5 aligned SoA
+(`proto_gemm_dense_q8_d2r.cu`, `ds4_mmq_d2r.cu` comments) as technique
+inspiration only. llama.cpp `mma.sync.aligned.m16n8k32` remains the int8 MMA
+primitive already used by quality MMA (MIT, The ggml authors). This increment
+does not copy `../ds4/cuda/mmq/` and does not include ggml headers.
+
+**Proof boundary:** aligned-SoA D2R for large mixer Q8_0 under the Q8
+association rule when it beats quality MMQ; 4K keep/reject versus the current
+successor oracle **1687.86169**; OPT-009 Q8_0 tiled-versus-reference remains
+byte-exact; CUD-002 numbers unloosened; workspace formula unloosened; no extra
+persistent `cudaMalloc`; skinny α/β unchanged; **does not substitute for the
+2K llama.cpp parity gate**. Contract, fixture, report, and rejection:
+[`pins/opt024_mixer_q8_d2r_contract.json`](../pins/opt024_mixer_q8_d2r_contract.json),
+[`fixtures/opt024_mixer_q8_d2r.json`](../fixtures/opt024_mixer_q8_d2r.json),
+[`evidence/optimization/opt024-mixer-q8-d2r/REPORT.md`](../evidence/optimization/opt024-mixer-q8-d2r/REPORT.md),
+and
+[`evidence/optimization/opt024-mixer-q8-d2r/REJECTION.md`](../evidence/optimization/opt024-mixer-q8-d2r/REJECTION.md).

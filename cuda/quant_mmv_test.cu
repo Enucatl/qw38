@@ -1687,6 +1687,282 @@ int run_skinny_ab() {
   return baseline_ok ? 0 : 1;
 }
 
+int run_q8_d2r_case(const char* name, std::size_t output_rows,
+                    std::size_t columns, std::size_t prompt_rows) {
+  std::vector<std::uint8_t> weights;
+  fill_q8_quality_weights(output_rows, columns, &weights);
+  std::vector<__nv_bfloat16> prompt;
+  prompt.resize(prompt_rows * columns);
+  for (std::size_t prompt_row = 0; prompt_row < prompt_rows; ++prompt_row) {
+    std::vector<__nv_bfloat16> row_activation;
+    make_q8_quality_activation(columns, &row_activation, prompt_row);
+    std::copy(row_activation.begin(), row_activation.end(),
+              prompt.begin() + prompt_row * columns);
+  }
+  std::vector<float> expected;
+  if (!reference_dequant_gemm(qw38::cuda::QuantKind::kQ8_0, weights, output_rows,
+                              columns, prompt, prompt_rows, &expected)) {
+    return 1;
+  }
+  std::uint8_t* device_weights = nullptr;
+  std::uint8_t* device_soa = nullptr;
+  __nv_bfloat16* device_prompt = nullptr;
+  qw38::cuda::Q8Block* device_workspace = nullptr;
+  float* device_output = nullptr;
+  const std::size_t soa_bytes =
+      qw38::cuda::q8_aligned_soa_bytes(output_rows, columns);
+  cudaError_t error = cudaMalloc(&device_weights, weights.size());
+  if (error == cudaSuccess) error = cudaMalloc(&device_soa, soa_bytes);
+  if (error == cudaSuccess) {
+    error = cudaMalloc(&device_prompt, prompt.size() * sizeof(prompt[0]));
+  }
+  if (error == cudaSuccess) {
+    error = cudaMalloc(
+        &device_workspace,
+        qw38::cuda::q8_prompt_workspace_bytes(prompt_rows, columns));
+  }
+  if (error == cudaSuccess) {
+    error = cudaMalloc(&device_output, expected.size() * sizeof(expected[0]));
+  }
+  if (error != cudaSuccess) return fail_cuda("Q8 D2R cudaMalloc", error);
+  error = cudaMemcpy(device_weights, weights.data(), weights.size(),
+                     cudaMemcpyHostToDevice);
+  if (error == cudaSuccess) {
+    error = cudaMemcpy(device_prompt, prompt.data(),
+                       prompt.size() * sizeof(prompt[0]), cudaMemcpyHostToDevice);
+  }
+  if (error != cudaSuccess) return fail_cuda("Q8 D2R H2D", error);
+  error = qw38::cuda::launch_repack_q8_0_aligned(
+      device_weights, output_rows, columns, device_soa, nullptr);
+  if (error == cudaSuccess) {
+    error = qw38::cuda::launch_quantize_mmq_q8_1(
+        qw38::cuda::QuantKind::kQ8_0, device_prompt, prompt_rows, columns,
+        device_workspace, nullptr);
+  }
+  if (error == cudaSuccess) {
+    error = qw38::cuda::launch_q8_mmq_d2r(
+        device_soa, output_rows, columns, device_workspace, prompt_rows,
+        device_output, nullptr);
+  }
+  if (error == cudaSuccess) error = cudaDeviceSynchronize();
+  if (error != cudaSuccess) return fail_cuda("Q8 D2R launch", error);
+  std::vector<float> actual(expected.size());
+  error = cudaMemcpy(actual.data(), device_output,
+                     actual.size() * sizeof(actual[0]), cudaMemcpyDeviceToHost);
+  if (error != cudaSuccess) return fail_cuda("Q8 D2R D2H", error);
+  float max_abs = 0.0F;
+  float max_rel = 0.0F;
+  float rms = 0.0F;
+  std::size_t bad = 0;
+  std::size_t nonfinite = 0;
+  const bool ok = ds4_q8_association_ok(actual, expected, columns, &max_abs,
+                                        &max_rel, &rms, &bad, &nonfinite);
+  std::printf("q8_d2r_case=%s prompt_rows=%zu output_rows=%zu columns=%zu "
+              "mma_max_abs=%.9g mma_max_rel=%.9g mma_rms=%.9g mma_bad=%zu "
+              "mma_nonfinite=%zu gate=ds4_q8_association ref=cpu_dequant_gemm "
+              "occupancy=%d\n",
+              name, prompt_rows, output_rows, columns, max_abs, max_rel, rms,
+              bad, nonfinite, qw38::cuda::q8_d2r_occupancy(128));
+  cudaFree(device_output);
+  cudaFree(device_workspace);
+  cudaFree(device_prompt);
+  cudaFree(device_soa);
+  cudaFree(device_weights);
+  return ok ? 0 : 1;
+}
+
+void ensure_opt024_evidence_dir() {
+  mkdir("evidence", 0755);
+  mkdir("evidence/optimization", 0755);
+  mkdir("evidence/optimization/opt024-mixer-q8-d2r", 0755);
+}
+
+int run_d2r_ab() {
+  if (qw38::cuda::q8_d2r_occupancy(128) < 1 ||
+      qw38::cuda::q8_quality_mmq_occupancy(128) < 1) {
+    std::fprintf(stderr, "D2R occupancy < 1\n");
+    return 1;
+  }
+  struct Shape {
+    const char* id;
+    std::size_t output_rows;
+    std::size_t columns;
+  };
+  const Shape shapes[] = {
+      {"packed_qkv", 10240, 5120},
+      {"query_gate", 12288, 5120},
+      {"value_gate", 6144, 5120},
+      {"gdn_output", 5120, 6144},
+      {"key", 1024, 5120},
+  };
+  constexpr std::size_t kPrompt = 4096;
+  ensure_opt024_evidence_dir();
+  FILE* raw = std::fopen(
+      "evidence/optimization/opt024-mixer-q8-d2r/d2r-ab-raw.txt", "w");
+  if (raw == nullptr) {
+    std::fprintf(stderr, "D2R A/B fopen failed\n");
+    return 1;
+  }
+  bool all_win = true;
+  const char* first_loss = "none";
+  for (const Shape& shape : shapes) {
+    std::vector<std::uint8_t> weights;
+    fill_q8_quality_weights(shape.output_rows, shape.columns, &weights);
+    std::vector<__nv_bfloat16> prompt(kPrompt * shape.columns);
+    for (std::size_t prompt_row = 0; prompt_row < kPrompt; ++prompt_row) {
+      std::vector<__nv_bfloat16> row_activation;
+      make_q8_quality_activation(shape.columns, &row_activation, prompt_row);
+      std::copy(row_activation.begin(), row_activation.end(),
+                prompt.begin() + prompt_row * shape.columns);
+    }
+    std::uint8_t* device_weights = nullptr;
+    std::uint8_t* device_soa = nullptr;
+    __nv_bfloat16* device_prompt = nullptr;
+    qw38::cuda::Q8Block* device_y = nullptr;
+    float* device_output = nullptr;
+    const std::size_t soa_bytes =
+        qw38::cuda::q8_aligned_soa_bytes(shape.output_rows, shape.columns);
+    const std::size_t out_bytes = kPrompt * shape.output_rows * sizeof(float);
+    cudaError_t error = cudaMalloc(&device_weights, weights.size());
+    if (error == cudaSuccess) error = cudaMalloc(&device_soa, soa_bytes);
+    if (error == cudaSuccess) {
+      error = cudaMalloc(&device_prompt, prompt.size() * sizeof(prompt[0]));
+    }
+    if (error == cudaSuccess) {
+      error = cudaMalloc(
+          &device_y,
+          qw38::cuda::q8_prompt_workspace_bytes(kPrompt, shape.columns));
+    }
+    if (error == cudaSuccess) error = cudaMalloc(&device_output, out_bytes);
+    if (error != cudaSuccess) {
+      std::fclose(raw);
+      return fail_cuda("D2R A/B cudaMalloc", error);
+    }
+    error = cudaMemcpy(device_weights, weights.data(), weights.size(),
+                       cudaMemcpyHostToDevice);
+    if (error == cudaSuccess) {
+      error = cudaMemcpy(device_prompt, prompt.data(),
+                         prompt.size() * sizeof(prompt[0]),
+                         cudaMemcpyHostToDevice);
+    }
+    if (error != cudaSuccess) {
+      std::fclose(raw);
+      return fail_cuda("D2R A/B H2D", error);
+    }
+    error = qw38::cuda::launch_quantize_mmq_q8_1(
+        qw38::cuda::QuantKind::kQ8_0, device_prompt, kPrompt, shape.columns,
+        device_y, nullptr);
+    if (error == cudaSuccess) {
+      error = qw38::cuda::launch_repack_q8_0_aligned(
+          device_weights, shape.output_rows, shape.columns, device_soa,
+          nullptr);
+    }
+    if (error == cudaSuccess) error = cudaDeviceSynchronize();
+    if (error != cudaSuccess) {
+      std::fclose(raw);
+      return fail_cuda("D2R A/B prepare", error);
+    }
+    float means[2]{};
+    std::size_t nonfinites[2]{};
+    bool eligible[2]{};
+    const char* ids[2] = {"quality_mma", "d2r_soa"};
+    std::vector<float> host(kPrompt * shape.output_rows);
+    for (int c = 0; c < 2; ++c) {
+      cudaEvent_t start = nullptr;
+      cudaEvent_t stop = nullptr;
+      error = cudaEventCreate(&start);
+      if (error == cudaSuccess) error = cudaEventCreate(&stop);
+      float total = 0.0F;
+      for (int sample = 0; sample < 3 && error == cudaSuccess; ++sample) {
+        error = cudaEventRecord(start);
+        if (error == cudaSuccess) {
+          if (c == 0) {
+            error = qw38::cuda::launch_q8_mmq_quality_mma(
+                device_weights, shape.output_rows, shape.columns, device_y,
+                kPrompt, device_output, nullptr);
+          } else {
+            error = qw38::cuda::launch_q8_mmq_d2r(
+                device_soa, shape.output_rows, shape.columns, device_y,
+                kPrompt, device_output, nullptr);
+          }
+        }
+        if (error == cudaSuccess) error = cudaEventRecord(stop);
+        if (error == cudaSuccess) error = cudaEventSynchronize(stop);
+        float milliseconds = 0.0F;
+        if (error == cudaSuccess) {
+          error = cudaEventElapsedTime(&milliseconds, start, stop);
+        }
+        if (error == cudaSuccess) {
+          total += milliseconds;
+          std::fprintf(raw,
+                       "d2r_ab shape=%s id=%s sample=%d ms=%.9g occupancy=%d\n",
+                       shape.id, ids[c], sample, milliseconds,
+                       c == 0 ? qw38::cuda::q8_quality_mmq_occupancy(128)
+                              : qw38::cuda::q8_d2r_occupancy(128));
+          std::printf("d2r_ab shape=%s id=%s sample=%d ms=%.9g\n", shape.id,
+                      ids[c], sample, milliseconds);
+        }
+      }
+      cudaEventDestroy(start);
+      cudaEventDestroy(stop);
+      if (error != cudaSuccess) {
+        std::fclose(raw);
+        return fail_cuda("D2R A/B time", error);
+      }
+      means[c] = total / 3.0F;
+      error = cudaMemcpy(host.data(), device_output, out_bytes,
+                         cudaMemcpyDeviceToHost);
+      if (error != cudaSuccess) {
+        std::fclose(raw);
+        return fail_cuda("D2R A/B D2H", error);
+      }
+      nonfinites[c] = 0;
+      for (float value : host) {
+        if (!std::isfinite(value)) ++nonfinites[c];
+      }
+      eligible[c] = nonfinites[c] == 0;
+      std::fprintf(raw,
+                   "d2r_ab_mean shape=%s id=%s mean_ms=%.9g nonfinite=%zu "
+                   "eligible=%s\n",
+                   shape.id, ids[c], means[c], nonfinites[c],
+                   eligible[c] ? "true" : "false");
+      std::printf("d2r_ab_mean shape=%s id=%s mean_ms=%.9g nonfinite=%zu "
+                  "eligible=%s\n",
+                  shape.id, ids[c], means[c], nonfinites[c],
+                  eligible[c] ? "true" : "false");
+    }
+    const bool win =
+        eligible[0] && eligible[1] && means[1] < means[0];
+    std::fprintf(raw,
+                 "d2r_ab_shape_winner shape=%s winner=%s quality_ms=%.9g "
+                 "d2r_ms=%.9g win=%s\n",
+                 shape.id, win ? "d2r_soa" : "quality_mma", means[0], means[1],
+                 win ? "true" : "false");
+    std::printf("d2r_ab_shape_winner shape=%s winner=%s quality_ms=%.9g "
+                "d2r_ms=%.9g win=%s\n",
+                shape.id, win ? "d2r_soa" : "quality_mma", means[0], means[1],
+                win ? "true" : "false");
+    if (!win) {
+      all_win = false;
+      if (std::strcmp(first_loss, "none") == 0) first_loss = shape.id;
+    }
+    cudaFree(device_output);
+    cudaFree(device_y);
+    cudaFree(device_prompt);
+    cudaFree(device_soa);
+    cudaFree(device_weights);
+  }
+  std::fprintf(raw,
+               "d2r_ab_winner id=%s win=%s first_loss=%s selected_path=%s\n",
+               all_win ? "d2r_soa" : "quality_mma", all_win ? "true" : "false",
+               first_loss, qw38::cuda::selected_large_mixer_q8_path());
+  std::printf("d2r_ab_winner id=%s win=%s first_loss=%s selected_path=%s\n",
+              all_win ? "d2r_soa" : "quality_mma", all_win ? "true" : "false",
+              first_loss, qw38::cuda::selected_large_mixer_q8_path());
+  std::fclose(raw);
+  return 0;
+}
+
 int run_q8_quality_suite() {
   if (qw38::cuda::selected_q8_quality_mmq_prompt_tile() != 128U ||
       qw38::cuda::q8_quality_mmq_occupancy(128) < 1 ||
@@ -1704,7 +1980,19 @@ int run_q8_quality_suite() {
           cudaErrorInvalidValue ||
       qw38::cuda::launch_q8_mmq_quality_mma_i(nullptr, 17, 256, nullptr, 8,
                                               nullptr, 32, nullptr) !=
-          cudaErrorInvalidValue) {
+          cudaErrorInvalidValue ||
+      !qw38::cuda::large_mixer_q8_output_rows(128) ||
+      !qw38::cuda::large_mixer_q8_output_rows(1024) ||
+      qw38::cuda::large_mixer_q8_output_rows(48) ||
+      qw38::cuda::large_mixer_q8_output_rows(0) ||
+      qw38::cuda::q8_d2r_occupancy(128) < 1 ||
+      qw38::cuda::q8_aligned_soa_bytes(0, 256) != 0 ||
+      qw38::cuda::q8_aligned_soa_bytes(128, 255) != 0 ||
+      qw38::cuda::launch_repack_q8_0_aligned(nullptr, 128, 256, nullptr,
+                                             nullptr) !=
+          cudaErrorInvalidValue ||
+      qw38::cuda::launch_q8_mmq_d2r(nullptr, 128, 256, nullptr, 8, nullptr,
+                                    nullptr) != cudaErrorInvalidValue) {
     std::fprintf(stderr, "Q8 quality launcher rejects failed\n");
     return 1;
   }
@@ -1724,7 +2012,11 @@ int run_q8_quality_suite() {
       run_q8_quality_i_case("q8_0_quality_i64_64x48x5120", 48, 5120, 64, 64) !=
           0 ||
       run_mmv_tiled_j1_exact() != 0 || run_q8_shared_y_identity() != 0 ||
-      run_skinny_ab() != 0) {
+      run_skinny_ab() != 0 ||
+      run_q8_d2r_case("q8_0_d2r_8x256x256", 256, 256, 8) != 0 ||
+      run_q8_d2r_case("q8_0_d2r_64x1024x5120", 1024, 5120, 64) != 0 ||
+      run_q8_d2r_case("q8_0_d2r_8x5120x6144", 5120, 6144, 8) != 0 ||
+      run_d2r_ab() != 0) {
     return 1;
   }
   return 0;

@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "task": "OPT-024",
+  "status": "measured",
+  "device": "NVIDIA GeForce RTX 5090",
+  "compute_capability": "12.0",
+  "measurement_utc": "2026-09-09T04:20:55Z",
+  "prompt_tokens": 4096,
+  "replicates": 3,
+  "wall_ms": [
+    2427.84814,
+    2431.31372,
+    2433.62549
+  ],
+  "tok_s": [
+    1687.0907,
+    1684.68591,
+    1683.08557
+  ],
+  "mean_tok_s": 1684.9541,
+  "cold": true,
+  "cache_policy": "disabled",
+  "attribution": null,
+  "graphs_created": true,
+  "prompt_graph_rows": 4096,
+  "nsight_systems": "not_used",
+  "nsight_compute": "not_used"
+}

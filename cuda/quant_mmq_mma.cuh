@@ -9,7 +9,10 @@
 // and packed Q8_0 load-tiles; Rank-1 remains the visible fused reference
 // and the reject restore path. OPT-023 may dispatch skinny mixer Q8_0
 // (output_rows < 128) through I=32 or I=64 quality MMA when a paired
-// CUDA-event A/B strictly beats I=128. Output is token-major FP32
+// CUDA-event A/B strictly beats I=128. OPT-024 may dispatch large mixer
+// Q8_0 (output_rows >= 128) through an aligned-SoA D2R / int8 MMA path
+// when a paired CUDA-event A/B strictly beats quality MMA; otherwise
+// large GEMMs stay I=128 quality MMA. Output is token-major FP32
 // [prompt_rows, output_rows]. Production Q8_0 is launched via
 // launch_q8_mmq_bf16, not launch_quant_mmq.
 //
@@ -381,6 +384,44 @@ constexpr std::size_t quality_shared_ints(int prompt_tile,
          static_cast<std::size_t>(quality_i) * kQualitySramMax;
 }
 
+constexpr std::size_t soa_dq_bytes(std::size_t output_rows,
+                                   std::size_t columns) noexcept {
+  return output_rows * (columns / 32) * sizeof(half);
+}
+
+constexpr std::size_t soa_pad_bytes(std::size_t dq_bytes) noexcept {
+  return (64U - (dq_bytes % 64U)) % 64U;
+}
+
+constexpr std::size_t soa_total_bytes(std::size_t output_rows,
+                                      std::size_t columns) noexcept {
+  const std::size_t dq = soa_dq_bytes(output_rows, columns);
+  return dq + soa_pad_bytes(dq) + output_rows * columns;
+}
+
+__global__ void repack_q8_0_aligned_kernel(const std::uint8_t* weights,
+                                           std::size_t output_rows,
+                                           std::size_t columns,
+                                           std::uint8_t* soa) {
+  const std::size_t nb = columns / 32;
+  const std::size_t nblk = output_rows * nb;
+  const std::size_t index =
+      static_cast<std::size_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+  if (index >= nblk) return;
+  const std::size_t row = index / nb;
+  const std::size_t kb = index % nb;
+  const std::uint8_t* src = weights + index * kMmaQ8Bytes;
+  const std::size_t dq = soa_dq_bytes(output_rows, columns);
+  const std::size_t pad = soa_pad_bytes(dq);
+  reinterpret_cast<half*>(soa)[index] = *reinterpret_cast<const half*>(src);
+  std::int8_t* qs = reinterpret_cast<std::int8_t*>(soa + dq + pad) +
+                    row * columns + kb * 32;
+#pragma unroll
+  for (int lane = 0; lane < 32; ++lane) {
+    qs[lane] = static_cast<std::int8_t>(src[2 + lane]);
+  }
+}
+
 constexpr int quality_rows_per_warp(int prompt_tile) {
   return prompt_tile >= 48 && prompt_tile % 16 == 0 ? 32 : 16;
 }
@@ -427,7 +468,8 @@ __global__ void quantize_mmq_q8_1_bf16(const __nv_bfloat16* prompt,
   }
 }
 
-template <QuantKind Kind, int PromptTile, bool Fallback, int QualityI = kQualityI>
+template <QuantKind Kind, int PromptTile, bool Fallback, int QualityI = kQualityI,
+          bool SoaWeights = false>
 __global__ void __launch_bounds__(256, 1) quant_mmq_mma_quality_kernel(
     const std::uint8_t* weights, std::size_t output_rows, std::size_t columns,
     const int* y, std::size_t prompt_rows, float* output) {
@@ -442,6 +484,8 @@ __global__ void __launch_bounds__(256, 1) quant_mmq_mma_quality_kernel(
                 "warp I coverage must be 16-row MMA tiles");
   static_assert((PromptTile * QualityI) % (kQualityNwarps * 32) == 0,
                 "kSum must be integral");
+  static_assert(!SoaWeights || Kind == QuantKind::kQ8_0,
+                "aligned SoA D2R is Q8_0 only");
   constexpr int kSram =
       Kind == QuantKind::kQ4K ? kQualitySramQ4
       : Kind == QuantKind::kQ6K ? kQualitySramQ6
@@ -453,6 +497,14 @@ __global__ void __launch_bounds__(256, 1) quant_mmq_mma_quality_kernel(
   constexpr std::size_t kWeightValues =
       Kind == QuantKind::kQ8_0 ? kMmaQ8Values : kMmaBlockValues;
   const std::size_t row_stride = (columns / kWeightValues) * kWeightBytes;
+  const half* soa_d = nullptr;
+  const std::int8_t* soa_q = nullptr;
+  if constexpr (SoaWeights) {
+    const std::size_t dq = soa_dq_bytes(output_rows, columns);
+    soa_d = reinterpret_cast<const half*>(weights);
+    soa_q = reinterpret_cast<const std::int8_t*>(
+        weights + dq + soa_pad_bytes(dq));
+  }
   const std::size_t out0 =
       static_cast<std::size_t>(blockIdx.x) * QualityI;
   const std::size_t prompt0 =
@@ -596,12 +648,23 @@ __global__ void __launch_bounds__(256, 1) quant_mmq_mma_quality_kernel(
         int qs0 = 0;
         int qs1 = 0;
         if (!Fallback || global_row < output_rows) {
-          const std::uint8_t* row =
-              weights + global_row * row_stride +
-              kb0 * 8 * kWeightBytes;
-          qs0 = quality_get_int_b2(row + kbx * kWeightBytes + 2, kqsx);
-          qs1 = quality_get_int_b2(
-              row + (4 + kbx) * kWeightBytes + 2, kqsx);
+          if constexpr (SoaWeights) {
+            const std::int8_t* row0 =
+                soa_q + global_row * columns +
+                (kb0 * 8 + static_cast<std::size_t>(kbx)) * 32;
+            const std::int8_t* row1 =
+                soa_q + global_row * columns +
+                (kb0 * 8 + 4 + static_cast<std::size_t>(kbx)) * 32;
+            qs0 = reinterpret_cast<const int*>(row0)[kqsx];
+            qs1 = reinterpret_cast<const int*>(row1)[kqsx];
+          } else {
+            const std::uint8_t* row =
+                weights + global_row * row_stride +
+                kb0 * 8 * kWeightBytes;
+            qs0 = quality_get_int_b2(row + kbx * kWeightBytes + 2, kqsx);
+            qs1 = quality_get_int_b2(
+                row + (4 + kbx) * kWeightBytes + 2, kqsx);
+          }
         }
         x_qs[i * kSram + lane] = qs0;
         x_qs[i * kSram + kMmqTileNeK + lane] = qs1;
@@ -614,10 +677,16 @@ __global__ void __launch_bounds__(256, 1) quant_mmq_mma_quality_kernel(
         const int kbxd = lane % 8;
         float scale = 0.0F;
         if (!Fallback || global_row < output_rows) {
-          const std::uint8_t* block =
-              weights + global_row * row_stride +
-              (kb0 * 8 + static_cast<std::size_t>(kbxd)) * kWeightBytes;
-          scale = mma_read_half(block);
+          if constexpr (SoaWeights) {
+            scale = __half2float(
+                soa_d[global_row * (columns / 32) + kb0 * 8 +
+                      static_cast<std::size_t>(kbxd)]);
+          } else {
+            const std::uint8_t* block =
+                weights + global_row * row_stride +
+                (kb0 * 8 + static_cast<std::size_t>(kbxd)) * kWeightBytes;
+            scale = mma_read_half(block);
+          }
         }
         x_df[i * kSram + kbxd] = scale;
       }
@@ -873,7 +942,8 @@ __global__ void __launch_bounds__(256, 1) quant_mmq_mma_quality_kernel(
   }
 }
 
-template <QuantKind Kind, int PromptTile, bool Fallback, int QualityI = kQualityI>
+template <QuantKind Kind, int PromptTile, bool Fallback, int QualityI = kQualityI,
+          bool SoaWeights = false>
 cudaError_t launch_quality_mma(
     const std::uint8_t* weights, std::size_t output_rows, std::size_t columns,
     const int* y, std::size_t prompt_rows, float* output,
@@ -885,12 +955,13 @@ cudaError_t launch_quality_mma(
   const std::size_t shared =
       quality_shared_ints(PromptTile, QualityI) * sizeof(int);
   cudaError_t error = cudaFuncSetAttribute(
-      quant_mmq_mma_quality_kernel<Kind, PromptTile, Fallback, QualityI>,
+      quant_mmq_mma_quality_kernel<Kind, PromptTile, Fallback, QualityI,
+                                  SoaWeights>,
       cudaFuncAttributeMaxDynamicSharedMemorySize,
       static_cast<int>(shared));
   if (error != cudaSuccess) return error;
   if constexpr (Kind == QuantKind::kQ4K && PromptTile == 128 &&
-                QualityI == kQualityI) {
+                QualityI == kQualityI && !SoaWeights) {
     static bool printed_q4_attrs = false;
     if (!printed_q4_attrs) {
       cudaFuncAttributes attr{};
@@ -906,7 +977,7 @@ cudaError_t launch_quality_mma(
       printed_q4_attrs = true;
     }
   }
-  quant_mmq_mma_quality_kernel<Kind, PromptTile, Fallback, QualityI>
+  quant_mmq_mma_quality_kernel<Kind, PromptTile, Fallback, QualityI, SoaWeights>
       <<<grid, block, shared, stream>>>(weights, output_rows, columns, y,
                                        prompt_rows, output);
   return cudaPeekAtLastError();
@@ -962,16 +1033,17 @@ int mma_mmq_occupancy(QuantKind kind, unsigned int prompt_tile) noexcept {
   return error == cudaSuccess ? occupancy : 0;
 }
 
-template <QuantKind Kind, int PromptTile, int QualityI = kQualityI>
+template <QuantKind Kind, int PromptTile, int QualityI = kQualityI,
+          bool SoaWeights = false>
 cudaError_t launch_quality_dispatch(
     const std::uint8_t* weights, std::size_t output_rows, std::size_t columns,
     const int* y, std::size_t prompt_rows, float* output,
     cudaStream_t stream) noexcept {
   if (output_rows % QualityI == 0 && prompt_rows % PromptTile == 0) {
-    return launch_quality_mma<Kind, PromptTile, false, QualityI>(
+    return launch_quality_mma<Kind, PromptTile, false, QualityI, SoaWeights>(
         weights, output_rows, columns, y, prompt_rows, output, stream);
   }
-  return launch_quality_mma<Kind, PromptTile, true, QualityI>(
+  return launch_quality_mma<Kind, PromptTile, true, QualityI, SoaWeights>(
       weights, output_rows, columns, y, prompt_rows, output, stream);
 }
 
@@ -1229,6 +1301,71 @@ cudaError_t launch_q8_mmq_quality(const std::uint8_t* weights,
   if (error != cudaSuccess) return error;
   return launch_q8_mmq_quality_mma(weights, output_rows, columns, q8_workspace,
                                    prompt_rows, output, stream);
+}
+
+constexpr const char kSelectedLargeMixerQ8Path[] = "quality_mma";
+
+bool large_mixer_q8_output_rows(std::size_t output_rows) noexcept {
+  return output_rows >= static_cast<std::size_t>(kQualityI);
+}
+
+std::size_t q8_aligned_soa_bytes(std::size_t output_rows,
+                                 std::size_t columns) noexcept {
+  if (output_rows == 0 || columns == 0 || columns % 32 != 0) return 0;
+  return soa_total_bytes(output_rows, columns);
+}
+
+const char* selected_large_mixer_q8_path() noexcept {
+  return kSelectedLargeMixerQ8Path;
+}
+
+int q8_d2r_occupancy(unsigned int prompt_tile) noexcept {
+  int occupancy = 0;
+  cudaError_t error = cudaErrorInvalidValue;
+  const std::size_t shared =
+      quality_shared_ints(static_cast<int>(prompt_tile), kQualityI) *
+      sizeof(int);
+  if (shared == 0 || prompt_tile != 128) return 0;
+  auto kernel =
+      quant_mmq_mma_quality_kernel<QuantKind::kQ8_0, 128, true, kQualityI, true>;
+  error = cudaFuncSetAttribute(kernel,
+                               cudaFuncAttributeMaxDynamicSharedMemorySize,
+                               static_cast<int>(shared));
+  if (error != cudaSuccess) return 0;
+  error = cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+      &occupancy, kernel, kMmaThreads, shared);
+  return error == cudaSuccess ? occupancy : 0;
+}
+
+cudaError_t launch_repack_q8_0_aligned(const std::uint8_t* weights,
+                                       std::size_t output_rows,
+                                       std::size_t columns, std::uint8_t* soa,
+                                       cudaStream_t stream) noexcept {
+  if (weights == nullptr || soa == nullptr || output_rows == 0 ||
+      columns == 0 || columns % 32 != 0) {
+    return cudaErrorInvalidValue;
+  }
+  const std::size_t nblk = output_rows * (columns / 32);
+  const unsigned int blocks = static_cast<unsigned int>(
+      (nblk + static_cast<std::size_t>(kQualityQuantThreads) - 1) /
+      static_cast<std::size_t>(kQualityQuantThreads));
+  repack_q8_0_aligned_kernel<<<blocks, kQualityQuantThreads, 0, stream>>>(
+      weights, output_rows, columns, soa);
+  return cudaPeekAtLastError();
+}
+
+cudaError_t launch_q8_mmq_d2r(const std::uint8_t* soa, std::size_t output_rows,
+                              std::size_t columns, const Q8Block* y,
+                              std::size_t prompt_rows, float* output,
+                              cudaStream_t stream) noexcept {
+  if (soa == nullptr || y == nullptr || output == nullptr ||
+      output_rows == 0 || columns == 0 || prompt_rows == 0 ||
+      columns % kMmaBlockValues != 0) {
+    return cudaErrorInvalidValue;
+  }
+  const int* packed = reinterpret_cast<const int*>(y);
+  return launch_quality_dispatch<QuantKind::kQ8_0, 128, kQualityI, true>(
+      soa, output_rows, columns, packed, prompt_rows, output, stream);
 }
 
 }  // namespace qw38::cuda

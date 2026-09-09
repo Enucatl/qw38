@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "task": "OPT-024",
+  "status": "rejected",
+  "measurement_utc": "2026-09-09T04:20:55Z",
+  "device": "NVIDIA GeForce RTX 5090",
+  "compute_capability": "12.0",
+  "llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+  "gguf_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+  "quartz": {
+    "prompt_tokens": 4096,
+    "replicates": 3,
+    "wall_ms": [
+      2427.84814,
+      2431.31372,
+      2433.62549
+    ],
+    "tok_s": [
+      1687.0907,
+      1684.68591,
+      1683.08557
+    ],
+    "mean_tok_s": 1684.9541,
+    "cold": true,
+    "cache_policy": "disabled",
+    "attribution": null,
+    "graphs_created": true,
+    "prompt_graph_rows": 4096
+  },
+  "llama_cpp": {
+    "avg_ts": 3207.633195,
+    "avg_ns": 1277028847,
+    "n_prompt": 4096,
+    "n_batch": 2048,
+    "n_ubatch": 512,
+    "flash_attn": -1,
+    "build_commit": "cc83d7b",
+    "test_time": "2026-09-09T04:20:46Z"
+  },
+  "opt023_quartz_mean_tok_s": 1687.86169,
+  "quartz_meets_llama": false,
+  "owns_opt016_parity_gate": false,
+  "substitutes_for_opt016": false,
+  "reverted": true,
+  "successor_oracle": false,
+  "selected_large_mixer_q8_path": "quality_mma",
+  "ab_winner": "quality_mma",
+  "ab_win": false,
+  "production_d2r": false,
+  "shared_residual_y": true,
+  "skinny_mixer_unchanged": true,
+  "decode_mmv_gguf_layout": true,
+  "nsight_systems": "not_used",
+  "nsight_compute": "not_used",
+  "proof_limit": "aligned-SoA D2R for large mixer Q8_0; Q8 association; 4K keep/reject; envelopes unloosened; does not substitute for the 2K llama.cpp parity gate; OPT-009 byte-exact reference retained",
+  "report_path": "evidence/optimization/opt024-mixer-q8-d2r/REPORT.md"
+}

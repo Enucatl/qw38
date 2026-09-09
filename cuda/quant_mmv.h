@@ -87,6 +87,22 @@ int q8_quality_mmq_occupancy_i(unsigned int prompt_tile,
 bool skinny_mixer_q8_output_rows(std::size_t output_rows) noexcept;
 const char* selected_skinny_mixer_path() noexcept;
 
+bool large_mixer_q8_output_rows(std::size_t output_rows) noexcept;
+std::size_t q8_aligned_soa_bytes(std::size_t output_rows,
+                                 std::size_t columns) noexcept;
+const char* selected_large_mixer_q8_path() noexcept;
+int q8_d2r_occupancy(unsigned int prompt_tile) noexcept;
+
+cudaError_t launch_repack_q8_0_aligned(const std::uint8_t* weights,
+                                       std::size_t output_rows,
+                                       std::size_t columns, std::uint8_t* soa,
+                                       cudaStream_t stream) noexcept;
+
+cudaError_t launch_q8_mmq_d2r(const std::uint8_t* soa, std::size_t output_rows,
+                              std::size_t columns, const Q8Block* y,
+                              std::size_t prompt_rows, float* output,
+                              cudaStream_t stream) noexcept;
+
 cudaError_t launch_q8_mmq_quality_mma_i(const std::uint8_t* weights,
                                         std::size_t output_rows,
                                         std::size_t columns, const Q8Block* y,

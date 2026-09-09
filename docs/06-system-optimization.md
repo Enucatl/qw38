@@ -27,7 +27,9 @@ faster. Quartz production Q4_K/Q6_K prompt MMQ uses tensor-core MMA for
 load-tiles, `MMQ_ITER_K=256`) for `prompt_rows >= 8`, and mixer GEMMs that
 share the residual activation share one D4 Y per layer (OPT-022). Mixer Q8_0
 GEMMs with `output_rows < 128` (GDN α/β) dispatch the A/B-winning small-I
-quality MMA path (OPT-023). Decode stays MMV. Tiny mixer prompts keep the
+quality MMA path (OPT-023). Large mixer Q8_0 D2R was A/B'd and not
+installed (OPT-024); those GEMMs stay I=128 quality MMA. Decode stays MMV.
+Tiny mixer prompts keep the
 OPT-009 tiled `__fmul_rn`/`__fadd_rn` kernel.
 Rank-1 fused MMA remains a non-production kernel. MMA here is Measured
 component recovery plus a 4K keep versus the frozen oracle baseline, not the
@@ -219,6 +221,21 @@ dispatch was not reverted. `quartz_meets_llama` is informational and is
 not this gate. This is **not** the 2K llama.cpp parity gate. Live numbers
 stay in the report; this chapter does not replace them:
 [`evidence/optimization/opt023-skinny-mixer/REPORT.md`](../evidence/optimization/opt023-skinny-mixer/REPORT.md).
+
+## Large-mixer aligned SoA D2R (OPT-024)
+
+**Measured, RTX 5090:** large mixer Q8_0 GEMMs (`output_rows >= 128`) were
+A/B'd against a ds4-inspired aligned-SoA D2R / int8 MMA path. The paired
+CUDA-event A/B did not strictly beat quality MMA on every timed large shape.
+Production large mixers remain I=128 / J=128
+quality MMA with shared residual D4 Y. Skinny α/β stay `mma_i32_j128`. Decode
+`q8_mmv_bf16` is unchanged. The tiled-versus-row-wise Q8_0 pair remains
+byte-exact. Live exclusive RTX-5090 cold exact-4096 **reject:** Quartz mean
+is not strictly greater than the frozen OPT-023 successor oracle
+**1687.86169**. Production D2R was not installed. `quartz_meets_llama` is
+informational and is not this gate. This is **not** the 2K llama.cpp parity
+gate. Live numbers stay in the report; this chapter does not replace them:
+[`evidence/optimization/opt024-mixer-q8-d2r/REPORT.md`](../evidence/optimization/opt024-mixer-q8-d2r/REPORT.md).
 
 ## DwarfStar transfer boundary
 

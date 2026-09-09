@@ -1,6 +1,6 @@
 # Chunked full-model CUDA prefill
 
-[Index](README.md) · Implementation tasks: SCH-002, MEM-002, OPT-008, OPT-009, OPT-011, OPT-012, OPT-013, OPT-014, OPT-015, OPT-017, OPT-018, OPT-019, OPT-020, OPT-021, OPT-022, OPT-023, and EDU-047 in
+[Index](README.md) · Implementation tasks: SCH-002, MEM-002, OPT-008, OPT-009, OPT-011, OPT-012, OPT-013, OPT-014, OPT-015, OPT-017, OPT-018, OPT-019, OPT-020, OPT-021, OPT-022, OPT-023, OPT-024, and EDU-047 in
 [`implementation_ledger.md`](../implementation_ledger.md) · Contracts:
 [`pins/cuda_prompt_scheduler_contract.json`](../pins/cuda_prompt_scheduler_contract.json),
 [`pins/cuda_prompt_pipeline_contract.json`](../pins/cuda_prompt_pipeline_contract.json),
@@ -14,7 +14,8 @@
 [`pins/opt020_prefill_split_contract.json`](../pins/opt020_prefill_split_contract.json),
 [`pins/opt021_oracle_contract.json`](../pins/opt021_oracle_contract.json),
 [`pins/opt022_mixer_q8_quality_contract.json`](../pins/opt022_mixer_q8_quality_contract.json),
-[`pins/opt023_skinny_mixer_contract.json`](../pins/opt023_skinny_mixer_contract.json)
+[`pins/opt023_skinny_mixer_contract.json`](../pins/opt023_skinny_mixer_contract.json),
+[`pins/opt024_mixer_q8_d2r_contract.json`](../pins/opt024_mixer_q8_d2r_contract.json)
 · Evidence: [`fixtures/cuda_prompt_scheduler.json`](../fixtures/cuda_prompt_scheduler.json),
 [`fixtures/cuda_prompt_pipeline.json`](../fixtures/cuda_prompt_pipeline.json),
 [`fixtures/cuda_prompt_graph.json`](../fixtures/cuda_prompt_graph.json),
@@ -28,13 +29,15 @@
 [`fixtures/opt021_oracle.json`](../fixtures/opt021_oracle.json),
 [`fixtures/opt022_mixer_q8_quality.json`](../fixtures/opt022_mixer_q8_quality.json),
 [`fixtures/opt023_skinny_mixer.json`](../fixtures/opt023_skinny_mixer.json),
+[`fixtures/opt024_mixer_q8_d2r.json`](../fixtures/opt024_mixer_q8_d2r.json),
 [`evidence/optimization/opt015-2k-recovery/REPORT.md`](../evidence/optimization/opt015-2k-recovery/REPORT.md),
 [`evidence/optimization/opt017-mixer-q8-mma/REPORT.md`](../evidence/optimization/opt017-mixer-q8-mma/REPORT.md),
 [`evidence/optimization/opt018-ffn-mma-quality/REPORT.md`](../evidence/optimization/opt018-ffn-mma-quality/REPORT.md),
 [`evidence/optimization/opt019-gdn-attention-core/REPORT.md`](../evidence/optimization/opt019-gdn-attention-core/REPORT.md),
 [`evidence/optimization/opt021-4k-oracle/REPORT.md`](../evidence/optimization/opt021-4k-oracle/REPORT.md),
 [`evidence/optimization/opt022-mixer-q8-quality/REPORT.md`](../evidence/optimization/opt022-mixer-q8-quality/REPORT.md),
-[`evidence/optimization/opt023-skinny-mixer/REPORT.md`](../evidence/optimization/opt023-skinny-mixer/REPORT.md)
+[`evidence/optimization/opt023-skinny-mixer/REPORT.md`](../evidence/optimization/opt023-skinny-mixer/REPORT.md),
+[`evidence/optimization/opt024-mixer-q8-d2r/REPORT.md`](../evidence/optimization/opt024-mixer-q8-d2r/REPORT.md)
 
 ## Why prompt execution differs from decode
 
@@ -117,7 +120,9 @@ J=128) and shares one residual D4 Y per layer for mixer GEMMs that read
 [`src/weights.cpp`](../src/weights.cpp) (GDN packed_qkv, value_gate, alpha/beta,
 output; attention query_gate, key, value) follow that mixer Q8_0 path.
 OPT-023 later templates quality I=32 for mixer Q8_0 `output_rows < 128`
-(GDN α/β) when that A/B wins; large mixer GEMMs stay I=128.
+(GDN α/β) when that A/B wins. OPT-024 A/B'd aligned-SoA D2R for large mixer
+Q8_0 (`output_rows >= 128`) and did not install it; large mixer GEMMs stay
+I=128 quality MMA.
 Attention output remains Q6_K `launch_quant_mmq`. Production still does not
 send Q8_0 through `launch_quant_mmq` Q8Block staging. Quality MMA is admitted
 under the Q8 association rule versus host CPU dequant GEMM. Rank-1 CUD-002
@@ -507,6 +512,26 @@ numbers stay in the report:
 [`pins/opt023_skinny_mixer_contract.json`](../pins/opt023_skinny_mixer_contract.json),
 and [`fixtures/opt023_skinny_mixer.json`](../fixtures/opt023_skinny_mixer.json).
 
+OPT-024 A/B'd a ds4-inspired aligned-SoA D2R / int8 MMA path for mixer Q8_0
+`output_rows >= 128`. **Measured, RTX 5090:** paired CUDA-event A/B on the
+five production large mixer shapes among `quality_mma` and `d2r_soa`; D2R
+did not strictly beat quality MMA on every timed shape. Production large
+mixers remain I=128 / J=128 quality MMA with
+shared residual D4 Y. Skinny α/β stay `mma_i32_j128`. Decode MMV stays on
+GGUF 34-byte blocks. The OPT-009 tiled-versus-reference pair remains
+byte-exact. Live exclusive sitting **reject:** Quartz mean is not strictly
+greater than the frozen successor-oracle baseline **1687.86169**;
+`reverted` true; `successor_oracle` false; `production_d2r` false; A/B
+winner `quality_mma`. `quartz_meets_llama` is informational and is not this
+gate. **The 2K parity owner remains the blocked dedicated gate.** This
+reject does not substitute for that gate and does not claim Quartz ≥
+llama.cpp. Live numbers stay in the report:
+[`evidence/optimization/opt024-mixer-q8-d2r/REPORT.md`](../evidence/optimization/opt024-mixer-q8-d2r/REPORT.md),
+[`pins/opt024_mixer_q8_d2r_contract.json`](../pins/opt024_mixer_q8_d2r_contract.json),
+[`fixtures/opt024_mixer_q8_d2r.json`](../fixtures/opt024_mixer_q8_d2r.json),
+and
+[`evidence/optimization/opt024-mixer-q8-d2r/REJECTION.md`](../evidence/optimization/opt024-mixer-q8-d2r/REJECTION.md).
+
 The **proof boundary** excludes comparative speed claims, 2K/8K sustained
 prefill throughput, execution of a 128K prefill, 128K retrieval quality, thermal
 stability, superiority to llama.cpp/vLLM, and a Nsight Systems overlap timeline.
@@ -526,7 +551,9 @@ BEN-001 `qw38-bench` result. OPT-022 records mixer Q8_0 quality MMQ plus
 shared residual Y and a live 4K keep versus that frozen oracle baseline; it
 does not own or pass the 2K tok/s gate. OPT-023 records skinny-M mixer
 dispatch for small `output_rows` and a live 4K keep versus the post-OPT-022
-oracle baseline; it does not own or pass the 2K tok/s gate. BEN-001
+oracle baseline; it does not own or pass the 2K tok/s gate. OPT-024 records
+aligned-SoA D2R for large mixer Q8_0 and a live 4K reject versus the current
+successor-oracle baseline; it does not own or pass the 2K tok/s gate. BEN-001
 provides the harness; CMP-002/CMP-003 still own the 30-sample comparative gate.
 QLT-001 remains blocked. OPT-012's prompt graphs are FFN subgraphs only: not a
 whole-chunk graph, not a speedup gate, and not 128K quality recovery.

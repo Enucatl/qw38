@@ -551,6 +551,39 @@ baseline.
   unloosened; OPT-009 Q8_0 reference remains byte-exact; OPT-016 remains
   the parity gate owner; does not substitute for the 2K llama.cpp
   parity gate; Quartz ≥ llama.cpp is not this gate.
+- OPT-024 adapts ds4 MIT dense Q8 D2R / kind-5 aligned SoA technique
+  (`proto_gemm_dense_q8_d2r.cu`, `ds4_mmq_d2r.cu` comments at inspected
+  `../ds4` HEAD) as inspiration only: row-major `[half d][int8 qs]` with
+  64-byte scale-plane pad, aligned int8 loads, `mma.m16n8k32.s8`, D4 Y,
+  float fold `acc += C * d_w * d_y`. Quality MMA numeric admission remains
+  ds4 `cuda/mmq/test/test_mmq_parity.cu` Q8 association
+  (`abs > 0.05*sqrt(K)` AND `rel > 0.05`). This increment does not copy
+  `../ds4/cuda/mmq/` and does not include ggml headers. Production large
+  mixer Q8_0 (`output_rows >= 128`) remains I=128 / J=128 quality MMA on
+  the shared residual D4 Y; skinny α/β stay `mma_i32_j128`; decode
+  `q8_mmv_bf16` stays on GGUF 34-byte blocks. D2R launchers remain
+  non-production symbols. The OPT-009 tiled kernel remains the unloosened
+  byte-exact reference versus `launch_q8_mmq_bf16_reference`. **Measured,
+  RTX 5090:** A/B winner `quality_mma` (`win=false`; D2R did not strictly
+  beat quality MMA on every timed large shape); live exclusive cold
+  exact-4096 reject
+  versus the frozen successor-oracle baseline 1687.86169; `reverted`
+  true; `successor_oracle` false; `production_d2r` false. Live numbers
+  stay in the report; this ledger does not replace them. The schema-1
+  contract, rejected fixture, report, and rejection are
+  [`pins/opt024_mixer_q8_d2r_contract.json`](../pins/opt024_mixer_q8_d2r_contract.json),
+  [`fixtures/opt024_mixer_q8_d2r.json`](../fixtures/opt024_mixer_q8_d2r.json),
+  [`evidence/optimization/opt024-mixer-q8-d2r/REPORT.md`](../evidence/optimization/opt024-mixer-q8-d2r/REPORT.md),
+  and
+  [`evidence/optimization/opt024-mixer-q8-d2r/REJECTION.md`](../evidence/optimization/opt024-mixer-q8-d2r/REJECTION.md).
+  The beginner explanation is
+  [`docs/40-cuda-prompt-mmq.md`](40-cuda-prompt-mmq.md).
+  Proof limit: aligned-SoA D2R for large mixer Q8_0 under the Q8
+  association rule when it beats quality MMQ; 4K keep/reject versus the
+  current successor-oracle baseline; envelopes unloosened; OPT-009 Q8_0
+  reference remains byte-exact; OPT-016 remains the parity gate owner;
+  does not substitute for the 2K llama.cpp parity gate; Quartz ≥ llama.cpp
+  is not this gate.
 - CUD-003 introduces no new external implementation source. GGUF Q8_0 decoding
   follows the format already admitted by the pinned scalar decoder, and the
   pointwise/layout equations come from the pinned model contract and scalar
@@ -750,6 +783,12 @@ baseline.
   the OPT-009 tiled kernel as the unloosened byte-exact reference; that
   increment is documented separately, is Measured 4K keep plus External
   llama.cpp Ampere Q8_0 I/J and MMVQ-not-for-prefill provenance, and is
+  not the OPT-016 2K parity gate.
+  OPT-024 later A/Bs aligned-SoA D2R for mixer Q8_0 `output_rows >= 128`
+  when that path beats quality MMA, keeping skinny α/β on I=32 quality MMA
+  and the OPT-009 tiled kernel as the unloosened byte-exact reference; that
+  increment is documented separately, is Measured 4K reject plus External
+  ds4 kind-5 / dense Q8 D2R technique provenance (not a vendor), and is
   not the OPT-016 2K parity gate.
   Exact
   `[4096, 1]` differential, capacity fallback, cancellation, and memory
