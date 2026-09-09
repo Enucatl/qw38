@@ -7,7 +7,9 @@
 // the existing prompt workspace, block dim3(32, 8). OPT-022 production
 // mixer Q8_0 (keep) is the same quality stack with D4 quantize_mmq_q8_1
 // and packed Q8_0 load-tiles; Rank-1 remains the visible fused reference
-// and the reject restore path. Output is token-major FP32
+// and the reject restore path. OPT-023 may dispatch skinny mixer Q8_0
+// (output_rows < 128) through I=32 or I=64 quality MMA when a paired
+// CUDA-event A/B strictly beats I=128. Output is token-major FP32
 // [prompt_rows, output_rows]. Production Q8_0 is launched via
 // launch_q8_mmq_bf16, not launch_quant_mmq.
 //
@@ -21,6 +23,7 @@
 #include "quant_mmv.h"
 
 #include <cstdio>
+#include <cstring>
 #include <cuda_bf16.h>
 #include <cuda_fp16.h>
 
@@ -370,11 +373,12 @@ constexpr std::size_t quality_pad_ints(std::size_t count) noexcept {
   return ((count + 255) / 256) * 256;
 }
 
-constexpr std::size_t quality_shared_ints(int prompt_tile) noexcept {
+constexpr std::size_t quality_shared_ints(int prompt_tile,
+                                         int quality_i = kQualityI) noexcept {
   return static_cast<std::size_t>(prompt_tile) +
          quality_pad_ints(static_cast<std::size_t>(prompt_tile) *
                            kMmqTileYk) +
-         static_cast<std::size_t>(kQualityI) * kQualitySramMax;
+         static_cast<std::size_t>(quality_i) * kQualitySramMax;
 }
 
 constexpr int quality_rows_per_warp(int prompt_tile) {
@@ -423,12 +427,21 @@ __global__ void quantize_mmq_q8_1_bf16(const __nv_bfloat16* prompt,
   }
 }
 
-template <QuantKind Kind, int PromptTile, bool Fallback>
+template <QuantKind Kind, int PromptTile, bool Fallback, int QualityI = kQualityI>
 __global__ void __launch_bounds__(256, 1) quant_mmq_mma_quality_kernel(
     const std::uint8_t* weights, std::size_t output_rows, std::size_t columns,
     const int* y, std::size_t prompt_rows, float* output) {
-  constexpr int kNtx = quality_rows_per_warp(PromptTile) / 16;
   constexpr int kRowsPerWarp = quality_rows_per_warp(PromptTile);
+  constexpr int kNtx = kQualityNwarps * kRowsPerWarp / QualityI;
+  constexpr int kNi = kRowsPerWarp / 16;
+  static_assert(QualityI > 0 && QualityI % 16 == 0,
+                "QualityI must be a multiple of 16");
+  static_assert(kNtx > 0 && (kQualityNwarps * kRowsPerWarp) % QualityI == 0,
+                "QualityI must tile the warp I mapping");
+  static_assert(kNi > 0 && kRowsPerWarp % 16 == 0,
+                "warp I coverage must be 16-row MMA tiles");
+  static_assert((PromptTile * QualityI) % (kQualityNwarps * 32) == 0,
+                "kSum must be integral");
   constexpr int kSram =
       Kind == QuantKind::kQ4K ? kQualitySramQ4
       : Kind == QuantKind::kQ6K ? kQualitySramQ6
@@ -441,11 +454,11 @@ __global__ void __launch_bounds__(256, 1) quant_mmq_mma_quality_kernel(
       Kind == QuantKind::kQ8_0 ? kMmaQ8Values : kMmaBlockValues;
   const std::size_t row_stride = (columns / kWeightValues) * kWeightBytes;
   const std::size_t out0 =
-      static_cast<std::size_t>(blockIdx.x) * kQualityI;
+      static_cast<std::size_t>(blockIdx.x) * QualityI;
   const std::size_t prompt0 =
       static_cast<std::size_t>(blockIdx.y) * PromptTile;
   const int i_max =
-      Fallback ? static_cast<int>(output_rows - out0) - 1 : kQualityI - 1;
+      Fallback ? static_cast<int>(output_rows - out0) - 1 : QualityI - 1;
   const int j_max =
       Fallback ? static_cast<int>(prompt_rows - prompt0) - 1 : PromptTile - 1;
 
@@ -463,7 +476,7 @@ __global__ void __launch_bounds__(256, 1) quant_mmq_mma_quality_kernel(
     }
   }
 
-  constexpr int kSum = PromptTile * kQualityI / (kQualityNwarps * 32);
+  constexpr int kSum = PromptTile * QualityI / (kQualityNwarps * 32);
   float sum[kSum];
 #pragma unroll
   for (int s = 0; s < kSum; ++s) sum[s] = 0.0F;
@@ -474,7 +487,7 @@ __global__ void __launch_bounds__(256, 1) quant_mmq_mma_quality_kernel(
   for (std::size_t kb0 = 0; kb0 < columns / kMmaBlockValues; ++kb0) {
     if constexpr (Kind == QuantKind::kQ4K) {
 #pragma unroll
-      for (int i0 = 0; i0 < kQualityI; i0 += kQualityNwarps) {
+      for (int i0 = 0; i0 < QualityI; i0 += kQualityNwarps) {
         int i = i0 + threadIdx.y;
         if (Fallback) i = min(i, max(i_max, 0));
         const std::size_t global_row = out0 + static_cast<std::size_t>(i);
@@ -490,8 +503,8 @@ __global__ void __launch_bounds__(256, 1) quant_mmq_mma_quality_kernel(
             (qs0 >> 4) & 0x0F0F0F0F;
       }
 #pragma unroll
-      for (int i0 = 0; i0 < kQualityI; i0 += kQualityNwarps * 16) {
-        int i = (i0 + threadIdx.y * 16 + lane / 2) % kQualityI;
+      for (int i0 = 0; i0 < QualityI; i0 += kQualityNwarps * 16) {
+        int i = (i0 + threadIdx.y * 16 + lane / 2) % QualityI;
         if (Fallback) i = min(i, max(i_max, 0));
         const std::size_t global_row = out0 + static_cast<std::size_t>(i);
         half2* dm = reinterpret_cast<half2*>(
@@ -521,7 +534,7 @@ __global__ void __launch_bounds__(256, 1) quant_mmq_mma_quality_kernel(
       }
     } else if constexpr (Kind == QuantKind::kQ6K) {
 #pragma unroll
-      for (int i0 = 0; i0 < kQualityI; i0 += kQualityNwarps) {
+      for (int i0 = 0; i0 < QualityI; i0 += kQualityNwarps) {
         int i = i0 + threadIdx.y;
         if (Fallback) i = min(i, max(i_max, 0));
         const std::size_t global_row = out0 + static_cast<std::size_t>(i);
@@ -547,8 +560,8 @@ __global__ void __launch_bounds__(256, 1) quant_mmq_mma_quality_kernel(
         x_qs[i * kSram + kq1] = __vsubss4(ql1 | qh1, 0x20202020);
       }
 #pragma unroll
-      for (int i0 = 0; i0 < kQualityI; i0 += kQualityNwarps * 32) {
-        int i = (i0 + threadIdx.y * 32 + lane) % kQualityI;
+      for (int i0 = 0; i0 < QualityI; i0 += kQualityNwarps * 32) {
+        int i = (i0 + threadIdx.y * 32 + lane) % QualityI;
         if (Fallback) i = min(i, max(i_max, 0));
         const std::size_t global_row = out0 + static_cast<std::size_t>(i);
         float d = 0.0F;
@@ -560,8 +573,8 @@ __global__ void __launch_bounds__(256, 1) quant_mmq_mma_quality_kernel(
         x_df[i * kSram] = d;
       }
 #pragma unroll
-      for (int i0 = 0; i0 < kQualityI; i0 += kQualityNwarps * 8) {
-        int i = (i0 + threadIdx.y * 8 + lane / 4) % kQualityI;
+      for (int i0 = 0; i0 < QualityI; i0 += kQualityNwarps * 8) {
+        int i = (i0 + threadIdx.y * 8 + lane / 4) % QualityI;
         if (Fallback) i = min(i, max(i_max, 0));
         const std::size_t global_row = out0 + static_cast<std::size_t>(i);
         int sc = 0;
@@ -576,7 +589,7 @@ __global__ void __launch_bounds__(256, 1) quant_mmq_mma_quality_kernel(
       const int kbx = lane / kQi80;
       const int kqsx = lane % kQi80;
 #pragma unroll
-      for (int i0 = 0; i0 < kQualityI; i0 += kQualityNwarps) {
+      for (int i0 = 0; i0 < QualityI; i0 += kQualityNwarps) {
         int i = i0 + threadIdx.y;
         if (Fallback) i = min(i, max(i_max, 0));
         const std::size_t global_row = out0 + static_cast<std::size_t>(i);
@@ -594,7 +607,7 @@ __global__ void __launch_bounds__(256, 1) quant_mmq_mma_quality_kernel(
         x_qs[i * kSram + kMmqTileNeK + lane] = qs1;
       }
 #pragma unroll
-      for (int i0 = 0; i0 < kQualityI; i0 += kQualityNwarps * 4) {
+      for (int i0 = 0; i0 < QualityI; i0 += kQualityNwarps * 4) {
         int i = i0 + threadIdx.y * 4 + lane / 8;
         if (Fallback) i = min(i, max(i_max, 0));
         const std::size_t global_row = out0 + static_cast<std::size_t>(i);
@@ -648,10 +661,10 @@ __global__ void __launch_bounds__(256, 1) quant_mmq_mma_quality_kernel(
 
       if constexpr (Kind == QuantKind::kQ4K) {
         const half2* y_dm = reinterpret_cast<const half2*>(y_tile);
-        int A[kNtx][4][4];
-        float2 dmA[kNtx][2][4];
+        int A[kNi][4][4];
+        float2 dmA[kNi][2][4];
 #pragma unroll
-        for (int n = 0; n < kNtx; ++n) {
+        for (int n = 0; n < kNi; ++n) {
 #pragma unroll
           for (int k01 = 0; k01 < kMmqTileNeK; k01 += kQi81) {
             const int k0 = k00 + k01;
@@ -685,12 +698,12 @@ __global__ void __launch_bounds__(256, 1) quant_mmq_mma_quality_kernel(
               dsB[l] = __half22float2(y_dm[j * kMmqTileYk + k01 / kQi81]);
             }
 #pragma unroll
-            for (int n = 0; n < kNtx; ++n) {
+            for (int n = 0; n < kNi; ++n) {
               int C[4] = {0, 0, 0, 0};
               mma::mma_m16n8k32_s8(C, A[n][k01 / kQi81], B);
 #pragma unroll
               for (int l = 0; l < 4; ++l) {
-                sum[(j0 / 8 + n) * 4 + l] +=
+                sum[(j0 / (kNtx * 8) * kNi + n) * 4 + l] +=
                     dmA[n][l / 2][k01 / kQi81].x * dsB[l % 2].x *
                         static_cast<float>(C[l]) +
                     dmA[n][l / 2][k01 / kQi81].y * dsB[l % 2].y;
@@ -700,11 +713,11 @@ __global__ void __launch_bounds__(256, 1) quant_mmq_mma_quality_kernel(
         }
       } else if constexpr (Kind == QuantKind::kQ6K) {
         const float* y_df = reinterpret_cast<const float*>(y_tile);
-        int A[kNtx][8][2];
-        int scA[kNtx][2][8];
-        float dA[kNtx][2];
+        int A[kNi][8][2];
+        int scA[kNi][2][8];
+        float dA[kNi][2];
 #pragma unroll
-        for (int n = 0; n < kNtx; ++n) {
+        for (int n = 0; n < kNi; ++n) {
 #pragma unroll
           for (int k01 = 0; k01 < kMmqTileNeK; k01 += 8) {
             const int k0 = k00 + k01;
@@ -739,9 +752,9 @@ __global__ void __launch_bounds__(256, 1) quant_mmq_mma_quality_kernel(
         }
 #pragma unroll
         for (int j0 = 0; j0 < PromptTile; j0 += kNtx * 8) {
-          float tmp[kNtx][4];
+          float tmp[kNi][4];
 #pragma unroll
-          for (int n = 0; n < kNtx; ++n) {
+          for (int n = 0; n < kNi; ++n) {
 #pragma unroll
             for (int l = 0; l < 4; ++l) tmp[n][l] = 0.0F;
           }
@@ -760,7 +773,7 @@ __global__ void __launch_bounds__(256, 1) quant_mmq_mma_quality_kernel(
               dB[l] = y_df[j * kMmqTileYk + k01 / kQi81];
             }
 #pragma unroll
-            for (int n = 0; n < kNtx; ++n) {
+            for (int n = 0; n < kNi; ++n) {
               int C0[4] = {0, 0, 0, 0};
               int C1[4] = {0, 0, 0, 0};
               mma::mma_m16n8k16_s8(C0, A[n][k01 / 4 + 0], B0);
@@ -775,19 +788,19 @@ __global__ void __launch_bounds__(256, 1) quant_mmq_mma_quality_kernel(
             }
           }
 #pragma unroll
-          for (int n = 0; n < kNtx; ++n) {
+          for (int n = 0; n < kNi; ++n) {
 #pragma unroll
             for (int l = 0; l < 4; ++l) {
-              sum[(j0 / 8 + n) * 4 + l] += tmp[n][l] * dA[n][l / 2];
+              sum[(j0 / (kNtx * 8) * kNi + n) * 4 + l] += tmp[n][l] * dA[n][l / 2];
             }
           }
         }
       } else {
         const float* y_df = reinterpret_cast<const float*>(y_tile);
-        int A[kNtx][4][4];
-        float dA[kNtx][2][4];
+        int A[kNi][4][4];
+        float dA[kNi][2][4];
 #pragma unroll
-        for (int n = 0; n < kNtx; ++n) {
+        for (int n = 0; n < kNi; ++n) {
 #pragma unroll
           for (int k01 = 0; k01 < kMmqTileNeK; k01 += kQi80) {
             const int k0 = k00 + k01;
@@ -819,12 +832,12 @@ __global__ void __launch_bounds__(256, 1) quant_mmq_mma_quality_kernel(
               dB[l] = y_df[j * kMmqTileYk + k01 / kQi81];
             }
 #pragma unroll
-            for (int n = 0; n < kNtx; ++n) {
+            for (int n = 0; n < kNi; ++n) {
               int C[4] = {0, 0, 0, 0};
               mma::mma_m16n8k32_s8(C, A[n][k01 / kQi80], B);
 #pragma unroll
               for (int l = 0; l < 4; ++l) {
-                sum[(j0 / 8 + n) * 4 + l] +=
+                sum[(j0 / (kNtx * 8) * kNi + n) * 4 + l] +=
                     static_cast<float>(C[l]) * dA[n][l / 2][k01 / kQi80] *
                     dB[l % 2];
               }
@@ -839,7 +852,7 @@ __global__ void __launch_bounds__(256, 1) quant_mmq_mma_quality_kernel(
 #pragma unroll
   for (int j0 = 0; j0 < PromptTile; j0 += kNtx * 8) {
 #pragma unroll
-    for (int n = 0; n < kNtx; ++n) {
+    for (int n = 0; n < kNi; ++n) {
 #pragma unroll
       for (int l = 0; l < 4; ++l) {
         const int j =
@@ -853,36 +866,37 @@ __global__ void __launch_bounds__(256, 1) quant_mmq_mma_quality_kernel(
             prompt0 + static_cast<std::size_t>(j);
         if (out_row < output_rows && prompt_row < prompt_rows) {
           output[prompt_row * output_rows + out_row] =
-              sum[(j0 / 8 + n) * 4 + l];
+              sum[(j0 / (kNtx * 8) * kNi + n) * 4 + l];
         }
       }
     }
   }
 }
 
-template <QuantKind Kind, int PromptTile, bool Fallback>
+template <QuantKind Kind, int PromptTile, bool Fallback, int QualityI = kQualityI>
 cudaError_t launch_quality_mma(
     const std::uint8_t* weights, std::size_t output_rows, std::size_t columns,
     const int* y, std::size_t prompt_rows, float* output,
     cudaStream_t stream) noexcept {
   const dim3 grid(
-      static_cast<unsigned int>((output_rows + kQualityI - 1) / kQualityI),
+      static_cast<unsigned int>((output_rows + QualityI - 1) / QualityI),
       static_cast<unsigned int>((prompt_rows + PromptTile - 1) / PromptTile));
   const dim3 block(32, 8);
   const std::size_t shared =
-      quality_shared_ints(PromptTile) * sizeof(int);
+      quality_shared_ints(PromptTile, QualityI) * sizeof(int);
   cudaError_t error = cudaFuncSetAttribute(
-      quant_mmq_mma_quality_kernel<Kind, PromptTile, Fallback>,
+      quant_mmq_mma_quality_kernel<Kind, PromptTile, Fallback, QualityI>,
       cudaFuncAttributeMaxDynamicSharedMemorySize,
       static_cast<int>(shared));
   if (error != cudaSuccess) return error;
-  if constexpr (Kind == QuantKind::kQ4K && PromptTile == 128) {
+  if constexpr (Kind == QuantKind::kQ4K && PromptTile == 128 &&
+                QualityI == kQualityI) {
     static bool printed_q4_attrs = false;
     if (!printed_q4_attrs) {
       cudaFuncAttributes attr{};
       if (cudaFuncGetAttributes(
-              &attr, quant_mmq_mma_quality_kernel<Kind, PromptTile, Fallback>) ==
-          cudaSuccess) {
+              &attr, quant_mmq_mma_quality_kernel<Kind, PromptTile, Fallback,
+                                                  QualityI>) == cudaSuccess) {
         std::printf(
             "mma_quality_q4_attrs fallback=%d regs=%d local=%zu const=%zu "
             "shared=%zu maxThreadsPerBlock=%d\n",
@@ -892,7 +906,7 @@ cudaError_t launch_quality_mma(
       printed_q4_attrs = true;
     }
   }
-  quant_mmq_mma_quality_kernel<Kind, PromptTile, Fallback>
+  quant_mmq_mma_quality_kernel<Kind, PromptTile, Fallback, QualityI>
       <<<grid, block, shared, stream>>>(weights, output_rows, columns, y,
                                        prompt_rows, output);
   return cudaPeekAtLastError();
@@ -948,16 +962,16 @@ int mma_mmq_occupancy(QuantKind kind, unsigned int prompt_tile) noexcept {
   return error == cudaSuccess ? occupancy : 0;
 }
 
-template <QuantKind Kind, int PromptTile>
+template <QuantKind Kind, int PromptTile, int QualityI = kQualityI>
 cudaError_t launch_quality_dispatch(
     const std::uint8_t* weights, std::size_t output_rows, std::size_t columns,
     const int* y, std::size_t prompt_rows, float* output,
     cudaStream_t stream) noexcept {
-  if (output_rows % kQualityI == 0 && prompt_rows % PromptTile == 0) {
-    return launch_quality_mma<Kind, PromptTile, false>(
+  if (output_rows % QualityI == 0 && prompt_rows % PromptTile == 0) {
+    return launch_quality_mma<Kind, PromptTile, false, QualityI>(
         weights, output_rows, columns, y, prompt_rows, output, stream);
   }
-  return launch_quality_mma<Kind, PromptTile, true>(
+  return launch_quality_mma<Kind, PromptTile, true, QualityI>(
       weights, output_rows, columns, y, prompt_rows, output, stream);
 }
 
@@ -1101,8 +1115,70 @@ cudaError_t launch_q8_mmq_mma(const std::uint8_t* weights,
 
 unsigned int selected_q8_quality_mmq_prompt_tile() noexcept { return 128U; }
 
+constexpr const char kSelectedSkinnyMixerPath[] = "mma_i32_j128";
+
+bool skinny_mixer_q8_output_rows(std::size_t output_rows) noexcept {
+  return output_rows > 0 && output_rows < static_cast<std::size_t>(kQualityI);
+}
+
+const char* selected_skinny_mixer_path() noexcept {
+  return kSelectedSkinnyMixerPath;
+}
+
+int q8_quality_mmq_occupancy_i(unsigned int prompt_tile,
+                               unsigned int quality_i) noexcept {
+  int occupancy = 0;
+  cudaError_t error = cudaErrorInvalidValue;
+  const std::size_t shared =
+      quality_shared_ints(static_cast<int>(prompt_tile),
+                         static_cast<int>(quality_i)) *
+      sizeof(int);
+  if (shared == 0) return 0;
+  auto query = [&](auto kernel) -> cudaError_t {
+    cudaError_t set = cudaFuncSetAttribute(
+        kernel, cudaFuncAttributeMaxDynamicSharedMemorySize,
+        static_cast<int>(shared));
+    if (set != cudaSuccess) return set;
+    return cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+        &occupancy, kernel, kMmaThreads, shared);
+  };
+  if (prompt_tile == 128 && quality_i == 32) {
+    error = query(quant_mmq_mma_quality_kernel<QuantKind::kQ8_0, 128, true, 32>);
+  } else if (prompt_tile == 128 && quality_i == 64) {
+    error = query(quant_mmq_mma_quality_kernel<QuantKind::kQ8_0, 128, true, 64>);
+  } else if (quality_i == 128) {
+    return mma_mmq_occupancy(QuantKind::kQ8_0, prompt_tile);
+  }
+  return error == cudaSuccess ? occupancy : 0;
+}
+
 int q8_quality_mmq_occupancy(unsigned int prompt_tile) noexcept {
-  return mma_mmq_occupancy(QuantKind::kQ8_0, prompt_tile);
+  return q8_quality_mmq_occupancy_i(prompt_tile, kQualityI);
+}
+
+cudaError_t launch_q8_mmq_quality_mma_i(const std::uint8_t* weights,
+                                        std::size_t output_rows,
+                                        std::size_t columns, const Q8Block* y,
+                                        std::size_t prompt_rows, float* output,
+                                        unsigned int quality_i,
+                                        cudaStream_t stream) noexcept {
+  if (weights == nullptr || y == nullptr || output == nullptr ||
+      output_rows == 0 || columns == 0 || prompt_rows == 0 ||
+      columns % kMmaBlockValues != 0 ||
+      (quality_i != 32 && quality_i != 64 && quality_i != 128)) {
+    return cudaErrorInvalidValue;
+  }
+  const int* packed = reinterpret_cast<const int*>(y);
+  if (quality_i == 32) {
+    return launch_quality_dispatch<QuantKind::kQ8_0, 128, 32>(
+        weights, output_rows, columns, packed, prompt_rows, output, stream);
+  }
+  if (quality_i == 64) {
+    return launch_quality_dispatch<QuantKind::kQ8_0, 128, 64>(
+        weights, output_rows, columns, packed, prompt_rows, output, stream);
+  }
+  return launch_quality_dispatch<QuantKind::kQ8_0, 128, 128>(
+      weights, output_rows, columns, packed, prompt_rows, output, stream);
 }
 
 cudaError_t launch_q8_mmq_quality_mma(const std::uint8_t* weights,
@@ -1116,6 +1192,17 @@ cudaError_t launch_q8_mmq_quality_mma(const std::uint8_t* weights,
     return cudaErrorInvalidValue;
   }
   const unsigned int prompt_tile = selected_q8_quality_mmq_prompt_tile();
+  if (skinny_mixer_q8_output_rows(output_rows) && prompt_rows >= 8) {
+    const char* path = selected_skinny_mixer_path();
+    if (std::strcmp(path, "mma_i32_j128") == 0) {
+      return launch_q8_mmq_quality_mma_i(weights, output_rows, columns, y,
+                                         prompt_rows, output, 32, stream);
+    }
+    if (std::strcmp(path, "mma_i64_j128") == 0) {
+      return launch_q8_mmq_quality_mma_i(weights, output_rows, columns, y,
+                                         prompt_rows, output, 64, stream);
+    }
+  }
   const int* packed = reinterpret_cast<const int*>(y);
   if (prompt_tile == 32) {
     return launch_quality_dispatch<QuantKind::kQ8_0, 32>(

@@ -81,6 +81,18 @@ cudaError_t launch_q8_mmq_mma_tile(
 
 unsigned int selected_q8_quality_mmq_prompt_tile() noexcept;
 int q8_quality_mmq_occupancy(unsigned int prompt_tile) noexcept;
+int q8_quality_mmq_occupancy_i(unsigned int prompt_tile,
+                               unsigned int quality_i) noexcept;
+
+bool skinny_mixer_q8_output_rows(std::size_t output_rows) noexcept;
+const char* selected_skinny_mixer_path() noexcept;
+
+cudaError_t launch_q8_mmq_quality_mma_i(const std::uint8_t* weights,
+                                        std::size_t output_rows,
+                                        std::size_t columns, const Q8Block* y,
+                                        std::size_t prompt_rows, float* output,
+                                        unsigned int quality_i,
+                                        cudaStream_t stream) noexcept;
 
 cudaError_t launch_quantize_mmq_q8_1(QuantKind kind, const __nv_bfloat16* prompt,
                                      std::size_t prompt_rows,

@@ -208,7 +208,11 @@ cudaError_t capture_mmq(Fn launch, std::size_t output_rows, LaunchInfo* info) {
     }
     if (params.gridDim.x == static_cast<unsigned>((output_rows + 7) / 8) ||
         params.gridDim.x ==
-            static_cast<unsigned>((output_rows + 127) / 128)) {
+            static_cast<unsigned>((output_rows + 127) / 128) ||
+        params.gridDim.x ==
+            static_cast<unsigned>((output_rows + 63) / 64) ||
+        params.gridDim.x ==
+            static_cast<unsigned>((output_rows + 31) / 32)) {
       info->grid = params.gridDim;
       info->block = params.blockDim;
       info->grid_x = params.gridDim.x;
@@ -920,6 +924,52 @@ int main(int argc, char** argv) {
               q8_quality_4096.nodes, q8_quality_4096.block.x,
               q8_quality_4096.block.y, q8_quality_4096.grid_x,
               q8_quality_4096.grid_y);
+  const char* skinny_path = qw38::cuda::selected_skinny_mixer_path();
+  const cudaError_t skinny_quant = qw38::cuda::launch_quantize_mmq_q8_1(
+      qw38::cuda::QuantKind::kQ8_0, q8_prompt, 64, q8_cols, q8_staged, nullptr);
+  LaunchInfo skinny_mma{};
+  cudaError_t cap_skinny = cudaErrorInvalidValue;
+  if (skinny_quant == cudaSuccess) {
+    cap_skinny = capture_mmq(
+        [&](cudaStream_t stream) {
+          return qw38::cuda::launch_q8_mmq_quality_mma(
+              q8_weights, 48, q8_cols, q8_staged, 64, q8_output, stream);
+        },
+        48, &skinny_mma);
+  }
+  LaunchInfo skinny_mmv{};
+  const cudaError_t cap_skinny_mmv = capture_mmq(
+      [&](cudaStream_t stream) {
+        return qw38::cuda::launch_q8_mmq_bf16_variant(
+            q8_weights, 48, q8_cols, q8_prompt, 64, q8_output, 1, stream);
+      },
+      48, &skinny_mmv);
+  unsigned expected_skinny_grid_x = (48U + 127U) / 128U;
+  if (std::strcmp(skinny_path, "mma_i32_j128") == 0) {
+    expected_skinny_grid_x = (48U + 31U) / 32U;
+  } else if (std::strcmp(skinny_path, "mma_i64_j128") == 0) {
+    expected_skinny_grid_x = (48U + 63U) / 64U;
+  } else if (std::strcmp(skinny_path, "mmv_tiled_j1") == 0) {
+    expected_skinny_grid_x = (48U + 7U) / 8U;
+  }
+  const bool skinny_mmv_path = std::strcmp(skinny_path, "mmv_tiled_j1") == 0;
+  const bool skinny_launch_ok =
+      qw38::cuda::skinny_mixer_q8_output_rows(48) &&
+      (skinny_mmv_path
+           ? (cap_skinny_mmv == cudaSuccess && skinny_mmv.nodes == 1 &&
+              skinny_mmv.grid_x == expected_skinny_grid_x)
+           : (cap_skinny == cudaSuccess && skinny_mma.nodes == 1 &&
+              skinny_mma.grid_x == expected_skinny_grid_x &&
+              skinny_mma.block.x == 32 && skinny_mma.block.y == 8));
+  std::printf("opt023_skinny_launch path=%s kernel_nodes=%d grid=[%u,%u,1] "
+              "block=[%u,%u,1] ok=%s\n",
+              skinny_path,
+              skinny_mmv_path ? skinny_mmv.nodes : skinny_mma.nodes,
+              skinny_mmv_path ? skinny_mmv.grid_x : skinny_mma.grid_x,
+              skinny_mmv_path ? skinny_mmv.grid_y : skinny_mma.grid_y,
+              skinny_mmv_path ? skinny_mmv.block.x : skinny_mma.block.x,
+              skinny_mmv_path ? skinny_mmv.block.y : skinny_mma.block.y,
+              skinny_launch_ok ? "true" : "false");
   const bool q4_grid =
       cap_q4_64 == cudaSuccess && cap_q4_4096 == cudaSuccess &&
       q4_64.nodes == 2 && q4_4096.nodes == 2 &&
@@ -1026,7 +1076,7 @@ int main(int argc, char** argv) {
   const bool passed =
       q8_exact && q4_identical && q6_identical && envelope_ok && staging_ok &&
       invalid && q8_grid && q8_ref_grid && q4_grid && q6_grid && occupancy_ok &&
-      q8_faster && q4_not_slower && q8_quality_grid;
+      q8_faster && q4_not_slower && q8_quality_grid && skinny_launch_ok;
   std::printf(
       "QW38_PROMPT_MMQ_RESULT={\"schema_version\":1,\"task\":\"OPT-009\","
       "\"status\":\"%s\",\"device\":\"%s\",\"compute_capability\":\"%d.%d\","

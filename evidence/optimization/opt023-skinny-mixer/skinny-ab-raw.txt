@@ -1,0 +1,17 @@
+skinny_ab id=mma_i128_j128 sample=0 ms=0.229824007 occupancy=1
+skinny_ab id=mma_i128_j128 sample=1 ms=0.223711997 occupancy=1
+skinny_ab id=mma_i128_j128 sample=2 ms=0.230560005 occupancy=1
+skinny_ab_mean id=mma_i128_j128 mean_ms=0.228031993 occupancy=1 nonfinite=0 eligible=true
+skinny_ab id=mma_i32_j128 sample=0 ms=0.133407995 occupancy=1
+skinny_ab id=mma_i32_j128 sample=1 ms=0.133696005 occupancy=1
+skinny_ab id=mma_i32_j128 sample=2 ms=0.132863998 occupancy=1
+skinny_ab_mean id=mma_i32_j128 mean_ms=0.133322671 occupancy=1 nonfinite=0 eligible=true
+skinny_ab id=mma_i64_j128 sample=0 ms=0.155392006 occupancy=1
+skinny_ab id=mma_i64_j128 sample=1 ms=0.160991997 occupancy=1
+skinny_ab id=mma_i64_j128 sample=2 ms=0.155392006 occupancy=1
+skinny_ab_mean id=mma_i64_j128 mean_ms=0.157258675 occupancy=1 nonfinite=0 eligible=true
+skinny_ab id=mmv_tiled_j1 sample=0 ms=0.669247985 occupancy=1
+skinny_ab id=mmv_tiled_j1 sample=1 ms=0.697215974 occupancy=1
+skinny_ab id=mmv_tiled_j1 sample=2 ms=0.703743994 occupancy=1
+skinny_ab_mean id=mmv_tiled_j1 mean_ms=0.690069258 occupancy=1 nonfinite=0 eligible=true
+skinny_ab_winner id=mma_i32_j128 mean_ms=0.133322671 baseline_id=mma_i128_j128 baseline_ms=0.228031993 win=true

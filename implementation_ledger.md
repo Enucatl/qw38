@@ -89,7 +89,7 @@ are repository-relative unless stated otherwise.
 | OPT-020 | Split 2K attribution into mixer MMQ versus core GDN/attention | OPT-014 | done | Cold exact-2048 attribution exposes separate mixer-projection MMQ time versus GDN-core and attention-core time (plus existing FFN/logits/commit/graph/idle), reconstructs wall within the OPT-014 tolerance, and is retained for OPT-017–OPT-019 steering; not a throughput gate | [`tasks/OPT-020.md`](tasks/OPT-020.md); [`pins/opt020_prefill_split_contract.json`](pins/opt020_prefill_split_contract.json); [`fixtures/opt020_prefill_split.json`](fixtures/opt020_prefill_split.json); verification 2026-09-08T21:29:30Z |
 | OPT-021 | Pin cold 4K prefill oracle protocol and baseline | OPT-020 | done | Frozen protocol and checked-in report compare cold exact-4096 Quartz `sync_tokens` (3 replicates, attribution null, graphs created, production path) to same-sitting llama.cpp `llama-bench -p 4096 -n 0 --no-warmup -r 3 -ngl 99` on the pinned GGUF and RTX 5090; baseline Quartz/llama tok/s are retained as the OPT-022+ keep/reject oracle; does not substitute for OPT-016 | [`tasks/OPT-021.md`](tasks/OPT-021.md); [`pins/opt021_oracle_contract.json`](pins/opt021_oracle_contract.json); [`fixtures/opt021_oracle.json`](fixtures/opt021_oracle.json); [`evidence/optimization/opt021-4k-oracle/REPORT.md`](evidence/optimization/opt021-4k-oracle/REPORT.md); verification 2026-09-09T01:11:06Z |
 | OPT-022 | Mixer Q8_0 quality MMQ with shared residual Y | OPT-017, OPT-018, OPT-021 | done | Production mixer Q8_0 prompt MMQ uses a llama/ds4-style quality stack (D4 `quantize_mmq_q8_1`, packed load-tiles, `MMQ_ITER_K=256`, shared residual Y across mixer GEMMs that share the same activation) under the plan.md Q8 association rule while OPT-009 byte-exact reference stays visible; cold exact-4096 mean tok/s strictly beats the OPT-021 Quartz baseline or the change is reverted with a retained rejection; does not substitute for OPT-016 | [`tasks/OPT-022.md`](tasks/OPT-022.md); [`pins/opt022_mixer_q8_quality_contract.json`](pins/opt022_mixer_q8_quality_contract.json); [`fixtures/opt022_mixer_q8_quality.json`](fixtures/opt022_mixer_q8_quality.json); [`evidence/optimization/opt022-mixer-q8-quality/REPORT.md`](evidence/optimization/opt022-mixer-q8-quality/REPORT.md); verification 2026-09-09T03:03:00Z |
-| OPT-023 | Skinny-M mixer dispatch for small output rows | OPT-022 | pending | Mixer projections with small `output_rows` (at least GDN α/β) dispatch through MMV or small-tile paths instead of J=128 MMA when that wins a paired CUDA-event A/B; cold exact-4096 mean tok/s strictly beats the post-OPT-022 oracle baseline or the change is reverted with a retained rejection; does not substitute for OPT-016 | — |
+| OPT-023 | Skinny-M mixer dispatch for small output rows | OPT-022 | done | Mixer projections with small `output_rows` (at least GDN α/β) dispatch through MMV or small-tile paths instead of J=128 MMA when that wins a paired CUDA-event A/B; cold exact-4096 mean tok/s strictly beats the post-OPT-022 oracle baseline or the change is reverted with a retained rejection; does not substitute for OPT-016 | [`tasks/OPT-023.md`](tasks/OPT-023.md); [`pins/opt023_skinny_mixer_contract.json`](pins/opt023_skinny_mixer_contract.json); [`fixtures/opt023_skinny_mixer.json`](fixtures/opt023_skinny_mixer.json); [`evidence/optimization/opt023-skinny-mixer/REPORT.md`](evidence/optimization/opt023-skinny-mixer/REPORT.md); verification 2026-09-09T03:57:39Z |
 | OPT-024 | Blackwell-aligned Q8_0 D2R for large mixer GEMMs | OPT-022 | pending | Large mixer Q8_0 GEMMs use a ds4-inspired aligned SoA D2R / int8 MMA path (technique inspiration, not wholesale `../ds4/cuda/mmq` vendoring) under the plan.md Q8 association rule when it beats quality MMQ on those shapes; cold exact-4096 mean tok/s strictly beats the post-OPT-022 oracle baseline or the change is reverted with a retained rejection; does not substitute for OPT-016 | — |
 | OPT-025 | Dense FFN shared-Y and SwiGLU-into-down Q8 | OPT-018, OPT-021 | pending | Dense FFN reuses one Q8_1 of the FFN input for gate and up and writes down-leg Y from SwiGLU without an extra BF16 mid materialize where a paired A/B wins; cold exact-4096 mean tok/s strictly beats the then-current oracle baseline or the change is reverted with a retained rejection; does not substitute for OPT-016 | — |
 | OPT-026 | Attention fattn stream-K occupancy | OPT-019, OPT-021 | pending | Production fattn-mma prompt attention enables Ada+ stream-K (or equivalent occupancy fixup) under frozen OPT-019 envelopes when a paired A/B wins; cold exact-4096 mean tok/s strictly beats the then-current oracle baseline or the change is reverted with a retained rejection; does not substitute for OPT-016 | — |
@@ -4390,3 +4390,48 @@ are repository-relative unless stated otherwise.
 - Marked OPT-022 `done`; delivery is limited to the verified task scope plus
   this ledger/audit bookkeeping. `plan.md` is unchanged. OPT-016 stays
   `blocked`. Next eligible pending by ledger row order: **OPT-023**.
+
+### 2026-09-09T03:07:00Z — OPT-023 planning admitted
+
+- Planning produced decision-complete dossier [`tasks/OPT-023.md`](tasks/OPT-023.md).
+- Coupled IDs: none. Plan impact `none`. Skinny predicate is mixer Q8_0
+  `output_rows < 128` (GDN α/β at 48). Paired CUDA-event A/B on
+  `4096×48×5120` compares `mma_i128_j128` (current Fallback baseline)
+  against small-I quality MMA `mma_i32_j128` / `mma_i64_j128` (shared D4 Y)
+  and prompt-MMV `mmv_tiled_j1` (`launch_q8_mmq_bf16_variant` tile 1 from
+  BF16). Install skinny iff a skinny id is strictly faster. Keep iff cold
+  exact-4096 mean tok/s is strictly greater than the post-OPT-022 successor
+  oracle **1680.80627**; otherwise revert α/β to OPT-022 I=128 J=128 quality
+  MMA and retain rejection evidence. OPT-016 remains the blocked 2K parity
+  owner. Decode `q8_mmv_bf16` unchanged. Large mixer GEMMs unchanged.
+- Marked OPT-023 `in_progress`.
+
+### 2026-09-09T03:57:39Z — OPT-023 delivered
+
+- Independent verification attempt 1 passed. Production mixer Q8_0
+  projections with `output_rows < 128` (GDN α/β) dispatch `mma_i32_j128`
+  quality MMA on the shared residual D4 Y. Large mixer Q8 remains I=128
+  quality MMA with shared Y. OPT-009 tiled-versus-reference stays
+  byte-exact. Exclusive RTX 5090 sitting wrote
+  [`fixtures/opt023_skinny_mixer.json`](fixtures/opt023_skinny_mixer.json)
+  (`measurement_utc` 2026-09-09T03:49:04Z; Quartz mean **1687.86169**
+  tok/s versus frozen OPT-022 **1680.80627**; llama.cpp `avg_ts`
+  **3232.279094**; `quartz_meets_llama` false informational; `reverted`
+  false; `successor_oracle` true; A/B winner `mma_i32_j128`). Native test
+  does not require Quartz ≥ llama.cpp. Coupled IDs: none. Delivery re-check:
+  `uv run pytest -q tests/test_documentation.py tests/test_opt023_skinny_mixer.py`
+  passed.
+- Acceptance evidence: [`tasks/OPT-023.md`](tasks/OPT-023.md);
+  [`pins/opt023_skinny_mixer_contract.json`](pins/opt023_skinny_mixer_contract.json);
+  [`fixtures/opt023_skinny_mixer.json`](fixtures/opt023_skinny_mixer.json);
+  [`cuda/prefill_4k_skinny_test.cu`](cuda/prefill_4k_skinny_test.cu);
+  [`evidence/optimization/opt023-skinny-mixer/REPORT.md`](evidence/optimization/opt023-skinny-mixer/REPORT.md);
+  [`docs/06-system-optimization.md`](docs/06-system-optimization.md);
+  [`docs/40-cuda-prompt-mmq.md`](docs/40-cuda-prompt-mmq.md);
+  [`docs/62-cuda-full-prefill.md`](docs/62-cuda-full-prefill.md).
+  Proof is skinny-M mixer dispatch under the Q8 association rule and a
+  4K keep versus the post-OPT-022 oracle baseline, not the 2K llama.cpp
+  parity gate.
+- Marked OPT-023 `done`; delivery is limited to the verified task scope plus
+  this ledger/audit bookkeeping. `plan.md` is unchanged. OPT-016 stays
+  `blocked`. Next eligible pending by ledger row order: **OPT-024**.

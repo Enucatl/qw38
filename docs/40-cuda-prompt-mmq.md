@@ -1,6 +1,6 @@
 # 40. Tiled CUDA multiplication for prompt rows
 
-[Index](README.md) · Implementation tasks: CUD-002, OPT-009, OPT-015, OPT-017, OPT-018, OPT-022, and EDU-026 in
+[Index](README.md) · Implementation tasks: CUD-002, OPT-009, OPT-015, OPT-017, OPT-018, OPT-022, OPT-023, and EDU-026 in
 [`implementation_ledger.md`](../implementation_ledger.md)
 
 [Chapter 39](39-cuda-quant-mmv.md) multiplied one activation vector by a packed
@@ -423,3 +423,71 @@ substitute for the 2K llama.cpp parity gate**. Contract, fixture, and report:
 [`fixtures/opt022_mixer_q8_quality.json`](../fixtures/opt022_mixer_q8_quality.json),
 and
 [`evidence/optimization/opt022-mixer-q8-quality/REPORT.md`](../evidence/optimization/opt022-mixer-q8-quality/REPORT.md).
+
+## OPT-023 skinny-M mixer dispatch
+
+Production mixer Q8_0 GEMMs whose `output_rows` are smaller than the quality
+MMA I-tile 128 dispatch a small-I quality path when a paired CUDA-event A/B
+strictly beats I=128 Fallback. The predicate is shape-based, not name-based:
+
+```text
+output_rows > 0 && output_rows < 128 && prompt_rows >= 8 && kind == kQ8_0
+```
+
+Production hits are GDN α and β (`output_rows=48`, `columns=5120`). Attention
+key/value at 1024 stay on I=128. Decode `q8_mmv_bf16` / `launch_quant_mmv` are
+unchanged. Large mixer Q8 GEMMs (packed_qkv, value_gate, GDN output, attention
+query_gate/key/value) remain I=128 / J=128 quality MMA with shared residual
+D4 Y. Production Q8_0 still does not go through `launch_quant_mmq`.
+
+**A/B.** Exclusive RTX 5090, production α/β shape `4096×48×5120`, 0 warm-ups,
+3 CUDA-event replicates, occupancy ≥ 1, zero non-finites. Candidates:
+`mma_i128_j128` (I=128 Fallback baseline on prequantized D4 Y),
+`mma_i32_j128`, `mma_i64_j128`, and prompt-MMV `mmv_tiled_j1`
+(`launch_q8_mmq_bf16_variant` `prompt_tile=1` from BF16). A skinny id wins
+only when its arithmetic mean is strictly less than the baseline. MMA
+candidates use Q8 association versus host CPU dequant GEMM
+(`abs > 0.05√K` AND `rel > 0.05` fails an element; `K=5120`).
+`mmv_tiled_j1` keeps OPT-009 byte-exact versus
+`launch_q8_mmq_bf16_reference`. Raw samples stay in
+[`evidence/optimization/opt023-skinny-mixer/skinny-ab-raw.txt`](../evidence/optimization/opt023-skinny-mixer/skinny-ab-raw.txt);
+this chapter does not replace them. Winner: `mma_i32_j128`.
+
+**Production path after keep.** `launch_q8_mmq_quality_mma` templates I=32
+for skinny `output_rows` on the caller-supplied D4 Y. Shared residual Y is
+unchanged; the scheduler does not take a BF16 MMV branch. Hard-coded
+`selected_skinny_mixer_path()` is `mma_i32_j128`. Default production I for
+`output_rows >= 128` stays 128. `dim3(32, 8)`, `__launch_bounds__(256, 1)`,
+and `MMQ_ITER_K=256` are unchanged.
+
+**Visible unloosened OPT-009 references.**
+`launch_q8_mmq_bf16_variant` versus `launch_q8_mmq_bf16_reference` remains
+byte-exact. Small-I quality MMA is not memcmp'd to those BF16 kernels.
+`pins/cuda_prompt_mmq_contract.json` `q8_bf16_reference_exact` stays `true`.
+
+**Measured 4K keep, RTX 5090:** live exclusive sitting, llama.cpp first then
+Quartz. Cold exact-4096 Quartz mean is strictly greater than the frozen
+post-OPT-022 oracle baseline **1680.80627**. Keep: `reverted` false,
+`successor_oracle` true, `production_skinny` true, A/B winner
+`mma_i32_j128`. `quartz_meets_llama` is informational false and is not this
+gate. Live numbers stay in the report; this chapter does not replace them:
+[`evidence/optimization/opt023-skinny-mixer/REPORT.md`](../evidence/optimization/opt023-skinny-mixer/REPORT.md).
+
+**External:** llama.cpp revision `cc83d7b4824f73cfdda4dfbb47ee39804f71b328`
+Ampere Q8_0 MMQ keeps I=128 and J in `{8…128}` (`mmq-config-ampere.cuh`).
+MMVQ (`mmvq.cu` `ggml_cuda_should_use_mmvq`) is for small `ne11` (token
+batch), not small `nrows`. Prefill 4096 is MMQ, not MMVQ. Quartz therefore
+A/Bs small-I MMA and prompt-MMV (`tiled<1>`), not decode MMV loops and not
+llama.cpp MMVQ (MIT, The ggml authors). ds4 is not vendored.
+
+**Proof boundary:** skinny-M mixer dispatch under the Q8 association rule;
+4K keep/reject versus the post-OPT-022 oracle baseline **1680.80627**;
+OPT-009 Q8_0 tiled-versus-reference remains byte-exact; CUD-002 numbers
+unloosened; workspace formula unloosened; no extra persistent `cudaMalloc`;
+decode MMV unchanged; large mixer Q8 remains quality MMA + shared Y;
+**does not substitute for the 2K llama.cpp parity gate**. Contract,
+fixture, and report:
+[`pins/opt023_skinny_mixer_contract.json`](../pins/opt023_skinny_mixer_contract.json),
+[`fixtures/opt023_skinny_mixer.json`](../fixtures/opt023_skinny_mixer.json),
+and
+[`evidence/optimization/opt023-skinny-mixer/REPORT.md`](../evidence/optimization/opt023-skinny-mixer/REPORT.md).

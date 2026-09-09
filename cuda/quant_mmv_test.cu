@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
+#include <sys/stat.h>
 #include <vector>
 
 #include <cuda_fp16.h>
@@ -1364,14 +1365,345 @@ int run_q8_mma_case(const char* name, std::size_t output_rows,
                                                                         : 1;
 }
 
+int run_q8_quality_i_case(const char* name, std::size_t output_rows,
+                          std::size_t columns, std::size_t prompt_rows,
+                          unsigned int quality_i) {
+  std::vector<std::uint8_t> weights;
+  fill_q8_quality_weights(output_rows, columns, &weights);
+  std::vector<__nv_bfloat16> prompt;
+  prompt.resize(prompt_rows * columns);
+  for (std::size_t prompt_row = 0; prompt_row < prompt_rows; ++prompt_row) {
+    std::vector<__nv_bfloat16> row_activation;
+    make_q8_quality_activation(columns, &row_activation, prompt_row);
+    std::copy(row_activation.begin(), row_activation.end(),
+              prompt.begin() + prompt_row * columns);
+  }
+  std::vector<float> expected;
+  if (!reference_dequant_gemm(qw38::cuda::QuantKind::kQ8_0, weights, output_rows,
+                              columns, prompt, prompt_rows, &expected)) {
+    return 1;
+  }
+
+  std::uint8_t* device_weights = nullptr;
+  __nv_bfloat16* device_prompt = nullptr;
+  qw38::cuda::Q8Block* device_workspace = nullptr;
+  float* device_output = nullptr;
+  cudaError_t error = cudaMalloc(&device_weights, weights.size());
+  if (error == cudaSuccess) {
+    error = cudaMalloc(&device_prompt, prompt.size() * sizeof(prompt[0]));
+  }
+  if (error == cudaSuccess) {
+    error = cudaMalloc(
+        &device_workspace,
+        qw38::cuda::q8_prompt_workspace_bytes(prompt_rows, columns));
+  }
+  if (error == cudaSuccess) {
+    error = cudaMalloc(&device_output, expected.size() * sizeof(expected[0]));
+  }
+  if (error != cudaSuccess) return fail_cuda("Q8 quality-i cudaMalloc", error);
+  error = cudaMemcpy(device_weights, weights.data(), weights.size(),
+                     cudaMemcpyHostToDevice);
+  if (error == cudaSuccess) {
+    error = cudaMemcpy(device_prompt, prompt.data(),
+                       prompt.size() * sizeof(prompt[0]), cudaMemcpyHostToDevice);
+  }
+  if (error != cudaSuccess) return fail_cuda("Q8 quality-i H2D", error);
+  error = qw38::cuda::launch_quantize_mmq_q8_1(
+      qw38::cuda::QuantKind::kQ8_0, device_prompt, prompt_rows, columns,
+      device_workspace, nullptr);
+  if (error == cudaSuccess) {
+    error = qw38::cuda::launch_q8_mmq_quality_mma_i(
+        device_weights, output_rows, columns, device_workspace, prompt_rows,
+        device_output, quality_i, nullptr);
+  }
+  if (error == cudaSuccess) error = cudaDeviceSynchronize();
+  if (error != cudaSuccess) return fail_cuda("Q8 quality-i launch", error);
+
+  std::vector<float> actual(expected.size());
+  error = cudaMemcpy(actual.data(), device_output,
+                     actual.size() * sizeof(actual[0]), cudaMemcpyDeviceToHost);
+  if (error != cudaSuccess) return fail_cuda("Q8 quality-i D2H", error);
+
+  float max_abs = 0.0F;
+  float max_rel = 0.0F;
+  float rms = 0.0F;
+  std::size_t bad = 0;
+  std::size_t nonfinite = 0;
+  const bool ok = ds4_q8_association_ok(actual, expected, columns, &max_abs,
+                                        &max_rel, &rms, &bad, &nonfinite);
+  std::printf("q8_quality_i_case=%s prompt_rows=%zu output_rows=%zu columns=%zu "
+              "quality_i=%u mma_max_abs=%.9g mma_max_rel=%.9g mma_rms=%.9g "
+              "mma_bad=%zu mma_nonfinite=%zu gate=ds4_q8_association "
+              "ref=cpu_dequant_gemm occupancy=%d\n",
+              name, prompt_rows, output_rows, columns, quality_i, max_abs,
+              max_rel, rms, bad, nonfinite,
+              qw38::cuda::q8_quality_mmq_occupancy_i(128, quality_i));
+  cudaFree(device_output);
+  cudaFree(device_workspace);
+  cudaFree(device_prompt);
+  cudaFree(device_weights);
+  return ok ? 0 : 1;
+}
+
+int run_mmv_tiled_j1_exact() {
+  constexpr std::size_t kPrompt = 8;
+  constexpr std::size_t kOut = 48;
+  constexpr std::size_t kCols = 5120;
+  std::vector<std::uint8_t> weights;
+  fill_weights(qw38::cuda::QuantKind::kQ8_0, kOut, kCols, &weights);
+  std::vector<__nv_bfloat16> prompt(kPrompt * kCols);
+  for (std::size_t prompt_row = 0; prompt_row < kPrompt; ++prompt_row) {
+    std::vector<__nv_bfloat16> row_activation;
+    std::vector<qw38::cuda::Q8Block> staged;
+    make_activation(kCols, &row_activation, &staged, prompt_row);
+    std::copy(row_activation.begin(), row_activation.end(),
+              prompt.begin() + prompt_row * kCols);
+  }
+  std::uint8_t* device_weights = nullptr;
+  __nv_bfloat16* device_prompt = nullptr;
+  float* device_variant = nullptr;
+  float* device_reference = nullptr;
+  const std::size_t bytes = kPrompt * kOut * sizeof(float);
+  cudaError_t error = cudaMalloc(&device_weights, weights.size());
+  if (error == cudaSuccess) {
+    error = cudaMalloc(&device_prompt, prompt.size() * sizeof(prompt[0]));
+  }
+  if (error == cudaSuccess) error = cudaMalloc(&device_variant, bytes);
+  if (error == cudaSuccess) error = cudaMalloc(&device_reference, bytes);
+  if (error != cudaSuccess) return fail_cuda("MMV exact cudaMalloc", error);
+  error = cudaMemcpy(device_weights, weights.data(), weights.size(),
+                     cudaMemcpyHostToDevice);
+  if (error == cudaSuccess) {
+    error = cudaMemcpy(device_prompt, prompt.data(),
+                       prompt.size() * sizeof(prompt[0]),
+                       cudaMemcpyHostToDevice);
+  }
+  if (error != cudaSuccess) return fail_cuda("MMV exact H2D", error);
+  error = qw38::cuda::launch_q8_mmq_bf16_variant(
+      device_weights, kOut, kCols, device_prompt, kPrompt, device_variant, 1,
+      nullptr);
+  if (error == cudaSuccess) {
+    error = qw38::cuda::launch_q8_mmq_bf16_reference(
+        device_weights, kOut, kCols, device_prompt, kPrompt, device_reference,
+        nullptr);
+  }
+  if (error == cudaSuccess) error = cudaDeviceSynchronize();
+  if (error != cudaSuccess) return fail_cuda("MMV exact launch", error);
+  std::vector<float> variant(kPrompt * kOut);
+  std::vector<float> reference(kPrompt * kOut);
+  error = cudaMemcpy(variant.data(), device_variant, bytes,
+                     cudaMemcpyDeviceToHost);
+  if (error == cudaSuccess) {
+    error = cudaMemcpy(reference.data(), device_reference, bytes,
+                       cudaMemcpyDeviceToHost);
+  }
+  if (error != cudaSuccess) return fail_cuda("MMV exact D2H", error);
+  const bool equal =
+      std::memcmp(variant.data(), reference.data(), bytes) == 0;
+  std::printf("mmv_tiled_j1_exact prompt_rows=%zu output_rows=%zu columns=%zu "
+              "byte_identical=%s\n",
+              kPrompt, kOut, kCols, equal ? "true" : "false");
+  cudaFree(device_reference);
+  cudaFree(device_variant);
+  cudaFree(device_prompt);
+  cudaFree(device_weights);
+  return equal ? 0 : 1;
+}
+
+void ensure_opt023_evidence_dir() {
+  mkdir("evidence", 0755);
+  mkdir("evidence/optimization", 0755);
+  mkdir("evidence/optimization/opt023-skinny-mixer", 0755);
+}
+
+int run_skinny_ab() {
+  constexpr std::size_t kPrompt = 4096;
+  constexpr std::size_t kOut = 48;
+  constexpr std::size_t kCols = 5120;
+  if (qw38::cuda::q8_quality_mmq_occupancy_i(128, 32) < 1 ||
+      qw38::cuda::q8_quality_mmq_occupancy_i(128, 64) < 1 ||
+      qw38::cuda::q8_quality_mmq_occupancy_i(128, 128) < 1) {
+    std::fprintf(stderr, "skinny MMA occupancy < 1\n");
+    return 1;
+  }
+  std::vector<std::uint8_t> weights;
+  fill_q8_quality_weights(kOut, kCols, &weights);
+  std::vector<__nv_bfloat16> prompt(kPrompt * kCols);
+  for (std::size_t prompt_row = 0; prompt_row < kPrompt; ++prompt_row) {
+    std::vector<__nv_bfloat16> row_activation;
+    make_q8_quality_activation(kCols, &row_activation, prompt_row);
+    std::copy(row_activation.begin(), row_activation.end(),
+              prompt.begin() + prompt_row * kCols);
+  }
+  std::uint8_t* device_weights = nullptr;
+  __nv_bfloat16* device_prompt = nullptr;
+  qw38::cuda::Q8Block* device_y = nullptr;
+  float* device_output = nullptr;
+  const std::size_t out_bytes = kPrompt * kOut * sizeof(float);
+  cudaError_t error = cudaMalloc(&device_weights, weights.size());
+  if (error == cudaSuccess) {
+    error = cudaMalloc(&device_prompt, prompt.size() * sizeof(prompt[0]));
+  }
+  if (error == cudaSuccess) {
+    error = cudaMalloc(&device_y,
+                       qw38::cuda::q8_prompt_workspace_bytes(kPrompt, kCols));
+  }
+  if (error == cudaSuccess) error = cudaMalloc(&device_output, out_bytes);
+  if (error != cudaSuccess) return fail_cuda("skinny A/B cudaMalloc", error);
+  error = cudaMemcpy(device_weights, weights.data(), weights.size(),
+                     cudaMemcpyHostToDevice);
+  if (error == cudaSuccess) {
+    error = cudaMemcpy(device_prompt, prompt.data(),
+                       prompt.size() * sizeof(prompt[0]),
+                       cudaMemcpyHostToDevice);
+  }
+  if (error != cudaSuccess) return fail_cuda("skinny A/B H2D", error);
+  error = qw38::cuda::launch_quantize_mmq_q8_1(
+      qw38::cuda::QuantKind::kQ8_0, device_prompt, kPrompt, kCols, device_y,
+      nullptr);
+  if (error == cudaSuccess) error = cudaDeviceSynchronize();
+  if (error != cudaSuccess) return fail_cuda("skinny A/B quantize Y", error);
+
+  struct Candidate {
+    const char* id;
+    unsigned int quality_i;
+    bool mmv;
+  };
+  const Candidate candidates[] = {
+      {"mma_i128_j128", 128, false},
+      {"mma_i32_j128", 32, false},
+      {"mma_i64_j128", 64, false},
+      {"mmv_tiled_j1", 0, true},
+  };
+
+  ensure_opt023_evidence_dir();
+  FILE* raw = std::fopen(
+      "evidence/optimization/opt023-skinny-mixer/skinny-ab-raw.txt", "w");
+  if (raw == nullptr) {
+    std::fprintf(stderr, "skinny A/B fopen failed\n");
+    return 1;
+  }
+
+  float means[4]{};
+  int occupancies[4]{};
+  std::size_t nonfinites[4]{};
+  bool eligible[4]{};
+  std::vector<float> host(kPrompt * kOut);
+
+  for (int c = 0; c < 4; ++c) {
+    const Candidate& cand = candidates[c];
+    occupancies[c] =
+        cand.mmv ? 1 : qw38::cuda::q8_quality_mmq_occupancy_i(128, cand.quality_i);
+    eligible[c] = occupancies[c] >= 1;
+    cudaEvent_t start = nullptr;
+    cudaEvent_t stop = nullptr;
+    error = cudaEventCreate(&start);
+    if (error == cudaSuccess) error = cudaEventCreate(&stop);
+    float total = 0.0F;
+    for (int sample = 0; sample < 3 && error == cudaSuccess; ++sample) {
+      error = cudaEventRecord(start);
+      if (error == cudaSuccess) {
+        if (cand.mmv) {
+          error = qw38::cuda::launch_q8_mmq_bf16_variant(
+              device_weights, kOut, kCols, device_prompt, kPrompt,
+              device_output, 1, nullptr);
+        } else {
+          error = qw38::cuda::launch_q8_mmq_quality_mma_i(
+              device_weights, kOut, kCols, device_y, kPrompt, device_output,
+              cand.quality_i, nullptr);
+        }
+      }
+      if (error == cudaSuccess) error = cudaEventRecord(stop);
+      if (error == cudaSuccess) error = cudaEventSynchronize(stop);
+      float milliseconds = 0.0F;
+      if (error == cudaSuccess) {
+        error = cudaEventElapsedTime(&milliseconds, start, stop);
+      }
+      if (error == cudaSuccess) {
+        total += milliseconds;
+        std::fprintf(raw,
+                     "skinny_ab id=%s sample=%d ms=%.9g occupancy=%d\n",
+                     cand.id, sample, milliseconds, occupancies[c]);
+        std::printf("skinny_ab id=%s sample=%d ms=%.9g occupancy=%d\n", cand.id,
+                    sample, milliseconds, occupancies[c]);
+      }
+    }
+    cudaEventDestroy(start);
+    cudaEventDestroy(stop);
+    if (error != cudaSuccess) {
+      std::fclose(raw);
+      return fail_cuda("skinny A/B time", error);
+    }
+    means[c] = total / 3.0F;
+    error = cudaMemcpy(host.data(), device_output, out_bytes,
+                       cudaMemcpyDeviceToHost);
+    if (error != cudaSuccess) {
+      std::fclose(raw);
+      return fail_cuda("skinny A/B D2H", error);
+    }
+    nonfinites[c] = 0;
+    for (float value : host) {
+      if (!std::isfinite(value)) ++nonfinites[c];
+    }
+    eligible[c] = eligible[c] && nonfinites[c] == 0 && error == cudaSuccess;
+    std::fprintf(raw,
+                 "skinny_ab_mean id=%s mean_ms=%.9g occupancy=%d nonfinite=%zu "
+                 "eligible=%s\n",
+                 cand.id, means[c], occupancies[c], nonfinites[c],
+                 eligible[c] ? "true" : "false");
+    std::printf("skinny_ab_mean id=%s mean_ms=%.9g occupancy=%d nonfinite=%zu "
+                "eligible=%s\n",
+                cand.id, means[c], occupancies[c], nonfinites[c],
+                eligible[c] ? "true" : "false");
+  }
+
+  const bool baseline_ok = eligible[0];
+  int winner = 0;
+  if (baseline_ok) {
+    for (int c = 1; c < 4; ++c) {
+      if (eligible[c] && means[c] < means[winner]) winner = c;
+    }
+    if (winner != 0 && !(means[winner] < means[0])) winner = 0;
+    if (winner != 0 && !(eligible[winner] && means[winner] < means[0])) {
+      winner = 0;
+    }
+  }
+  const bool ab_win = baseline_ok && winner != 0 && means[winner] < means[0];
+  std::fprintf(raw,
+               "skinny_ab_winner id=%s mean_ms=%.9g baseline_id=mma_i128_j128 "
+               "baseline_ms=%.9g win=%s\n",
+               candidates[winner].id, means[winner], means[0],
+               ab_win ? "true" : "false");
+  std::printf("skinny_ab_winner id=%s mean_ms=%.9g baseline_id=mma_i128_j128 "
+              "baseline_ms=%.9g win=%s selected_path=%s\n",
+              candidates[winner].id, means[winner], means[0],
+              ab_win ? "true" : "false",
+              qw38::cuda::selected_skinny_mixer_path());
+  std::fclose(raw);
+  cudaFree(device_output);
+  cudaFree(device_y);
+  cudaFree(device_prompt);
+  cudaFree(device_weights);
+  return baseline_ok ? 0 : 1;
+}
+
 int run_q8_quality_suite() {
   if (qw38::cuda::selected_q8_quality_mmq_prompt_tile() != 128U ||
       qw38::cuda::q8_quality_mmq_occupancy(128) < 1 ||
+      qw38::cuda::q8_quality_mmq_occupancy_i(128, 32) < 1 ||
+      qw38::cuda::q8_quality_mmq_occupancy_i(128, 64) < 1 ||
+      !qw38::cuda::skinny_mixer_q8_output_rows(48) ||
+      qw38::cuda::skinny_mixer_q8_output_rows(128) ||
+      qw38::cuda::skinny_mixer_q8_output_rows(1024) ||
+      qw38::cuda::skinny_mixer_q8_output_rows(0) ||
       qw38::cuda::launch_quantize_mmq_q8_1(
           qw38::cuda::QuantKind::kQ8_0, nullptr, 8, 255, nullptr, nullptr) !=
           cudaErrorInvalidValue ||
       qw38::cuda::launch_q8_mmq_quality_mma(nullptr, 17, 256, nullptr, 8,
                                             nullptr, nullptr) !=
+          cudaErrorInvalidValue ||
+      qw38::cuda::launch_q8_mmq_quality_mma_i(nullptr, 17, 256, nullptr, 8,
+                                              nullptr, 32, nullptr) !=
           cudaErrorInvalidValue) {
     std::fprintf(stderr, "Q8 quality launcher rejects failed\n");
     return 1;
@@ -1380,9 +1712,19 @@ int run_q8_quality_suite() {
       run_q8_quality_case("q8_0_quality_8x256x256", 256, 256, 8) != 0 ||
       run_q8_quality_case("q8_0_quality_64x1024x512", 1024, 512, 64) != 0 ||
       run_q8_quality_case("q8_0_quality_8x48x5120", 48, 5120, 8) != 0 ||
+      run_q8_quality_case("q8_0_quality_64x48x5120", 48, 5120, 64) != 0 ||
       run_q8_quality_case("q8_0_quality_64x1024x5120", 1024, 5120, 64) != 0 ||
       run_q8_quality_case("q8_0_quality_8x5120x6144", 5120, 6144, 8) != 0 ||
-      run_q8_shared_y_identity() != 0) {
+      run_q8_quality_i_case("q8_0_quality_i32_8x48x5120", 48, 5120, 8, 32) !=
+          0 ||
+      run_q8_quality_i_case("q8_0_quality_i64_8x48x5120", 48, 5120, 8, 64) !=
+          0 ||
+      run_q8_quality_i_case("q8_0_quality_i32_64x48x5120", 48, 5120, 64, 32) !=
+          0 ||
+      run_q8_quality_i_case("q8_0_quality_i64_64x48x5120", 48, 5120, 64, 64) !=
+          0 ||
+      run_mmv_tiled_j1_exact() != 0 || run_q8_shared_y_identity() != 0 ||
+      run_skinny_ab() != 0) {
     return 1;
   }
   return 0;

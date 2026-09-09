@@ -518,6 +518,39 @@ baseline.
   envelopes unloosened; OPT-009 Q8_0 reference remains byte-exact; OPT-016
   remains the parity gate owner; does not substitute for the 2K llama.cpp
   parity gate; Quartz ≥ llama.cpp is not this gate.
+- OPT-023 adapts llama.cpp revision
+  `cc83d7b4824f73cfdda4dfbb47ee39804f71b328` (MIT, The ggml authors) Ampere
+  Q8_0 MMQ I/J geometry from `mmq-config-ampere.cuh` (I=128; J in
+  `{8…128}`) as the reason not to treat small `output_rows` as llama.cpp
+  MMVQ. `mmvq.cu` `ggml_cuda_should_use_mmvq` is small `ne11` (token
+  batch), not small `nrows`; a 4096-token prefill is MMQ. Quartz therefore
+  A/Bs small-I quality MMA (`mma_i32_j128` / `mma_i64_j128`) and prompt-MMV
+  `launch_q8_mmq_bf16_variant` tile 1 against I=128 Fallback, and does not
+  loop decode `q8_mmv_bf16` or vendor llama.cpp MMVQ. Quality MMA numeric
+  admission remains ds4 `cuda/mmq/test/test_mmq_parity.cu` Q8 association
+  (`abs > 0.05*sqrt(K)` AND `rel > 0.05`). This increment does not copy
+  `../ds4/cuda/mmq/` and does not include ggml headers. Production mixer
+  Q8_0 with `output_rows < 128` (GDN α/β) dispatches templated I=32 quality
+  MMA on the shared residual D4 Y; large mixer GEMMs stay I=128 / J=128
+  quality MMA with shared Y. Decode `q8_mmv_bf16` is unchanged. The OPT-009
+  tiled kernel remains the unloosened byte-exact reference versus
+  `launch_q8_mmq_bf16_reference`. **Measured, RTX 5090:** A/B winner
+  `mma_i32_j128`; live exclusive cold exact-4096 keep versus the frozen
+  post-OPT-022 oracle baseline 1680.80627; `reverted` false;
+  `successor_oracle` true; `production_skinny` true. Live numbers stay in
+  the report; this ledger does not replace them. The schema-1 contract,
+  measured fixture, and report are
+  [`pins/opt023_skinny_mixer_contract.json`](../pins/opt023_skinny_mixer_contract.json),
+  [`fixtures/opt023_skinny_mixer.json`](../fixtures/opt023_skinny_mixer.json),
+  and
+  [`evidence/optimization/opt023-skinny-mixer/REPORT.md`](../evidence/optimization/opt023-skinny-mixer/REPORT.md).
+  The beginner explanation is
+  [`docs/40-cuda-prompt-mmq.md`](40-cuda-prompt-mmq.md).
+  Proof limit: skinny-M mixer dispatch under the Q8 association rule; 4K
+  keep/reject versus the post-OPT-022 oracle baseline; envelopes
+  unloosened; OPT-009 Q8_0 reference remains byte-exact; OPT-016 remains
+  the parity gate owner; does not substitute for the 2K llama.cpp
+  parity gate; Quartz ≥ llama.cpp is not this gate.
 - CUD-003 introduces no new external implementation source. GGUF Q8_0 decoding
   follows the format already admitted by the pinned scalar decoder, and the
   pointwise/layout equations come from the pinned model contract and scalar
@@ -712,6 +745,12 @@ baseline.
   byte-exact reference; that increment is documented separately, is Measured
   4K keep plus External llama.cpp Q8_0 MMQ / ds4 Q8 association provenance,
   and is not the OPT-016 2K parity gate.
+  OPT-023 later templates quality I=32 for mixer Q8_0 `output_rows < 128`
+  when that A/B wins, keeping large mixer GEMMs on I=128 quality MMA and
+  the OPT-009 tiled kernel as the unloosened byte-exact reference; that
+  increment is documented separately, is Measured 4K keep plus External
+  llama.cpp Ampere Q8_0 I/J and MMVQ-not-for-prefill provenance, and is
+  not the OPT-016 2K parity gate.
   Exact
   `[4096, 1]` differential, capacity fallback, cancellation, and memory
   evidence is authenticated in

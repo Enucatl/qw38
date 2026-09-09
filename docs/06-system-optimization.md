@@ -25,8 +25,10 @@ cores. The names describe the operation, not a promise that one is always
 faster. Quartz production Q4_K/Q6_K prompt MMQ uses tensor-core MMA for
 `prompt_rows >= 8`. Mixer Q8_0 prompt MMQ uses quality MMA (D4 Y, packed
 load-tiles, `MMQ_ITER_K=256`) for `prompt_rows >= 8`, and mixer GEMMs that
-share the residual activation share one D4 Y per layer (OPT-022). Decode stays
-MMV. Tiny mixer prompts keep the OPT-009 tiled `__fmul_rn`/`__fadd_rn` kernel.
+share the residual activation share one D4 Y per layer (OPT-022). Mixer Q8_0
+GEMMs with `output_rows < 128` (GDN α/β) dispatch the A/B-winning small-I
+quality MMA path (OPT-023). Decode stays MMV. Tiny mixer prompts keep the
+OPT-009 tiled `__fmul_rn`/`__fadd_rn` kernel.
 Rank-1 fused MMA remains a non-production kernel. MMA here is Measured
 component recovery plus a 4K keep versus the frozen oracle baseline, not the
 OPT-016 2K llama.cpp parity gate. Production prompt GDN recurrence is the
@@ -200,6 +202,23 @@ retained and is not production. Live exclusive-RTX-5090 cold exact-4096
 informational and is not this gate. This is **not** the 2K llama.cpp parity
 gate. Live numbers stay in the report; this chapter does not replace them:
 [`evidence/optimization/opt022-mixer-q8-quality/REPORT.md`](../evidence/optimization/opt022-mixer-q8-quality/REPORT.md).
+
+## Skinny-M mixer dispatch (OPT-023)
+
+**Measured, RTX 5090:** mixer Q8_0 projections with `output_rows < 128`
+(GDN α/β at 48) dispatch through the A/B-winning small-I quality MMA path
+`mma_i32_j128` instead of I=128 Fallback. Large mixer Q8 GEMMs remain
+I=128 / J=128 quality MMA with shared residual D4 Y. Decode `q8_mmv_bf16`
+is unchanged. Paired CUDA-event A/B on `4096×48×5120` retained the winner
+`mma_i32_j128`; raw samples stay in
+[`evidence/optimization/opt023-skinny-mixer/skinny-ab-raw.txt`](../evidence/optimization/opt023-skinny-mixer/skinny-ab-raw.txt).
+The tiled-versus-row-wise Q8_0 pair remains byte-exact. Live exclusive
+RTX-5090 cold exact-4096 **keep:** Quartz mean strictly greater than the
+frozen post-OPT-022 oracle baseline **1680.80627**. Production skinny
+dispatch was not reverted. `quartz_meets_llama` is informational and is
+not this gate. This is **not** the 2K llama.cpp parity gate. Live numbers
+stay in the report; this chapter does not replace them:
+[`evidence/optimization/opt023-skinny-mixer/REPORT.md`](../evidence/optimization/opt023-skinny-mixer/REPORT.md).
 
 ## DwarfStar transfer boundary
 
