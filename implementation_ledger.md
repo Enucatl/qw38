@@ -96,9 +96,9 @@ are repository-relative unless stated otherwise.
 | OPT-027 | Persistent Ada+ fattn stream-K | OPT-026 | done | Replace OPT-026 `grid.z=2` KV bipartition with llama.cpp Ada+ persistent stream-K (`nsm × occupancy` linearized tiles + efficiency rounding) under frozen OPT-005 envelopes when a paired A/B wins; cold exact-4096 mean tok/s strictly beats the then-current oracle baseline or the change is reverted with a retained rejection; does not substitute for OPT-016 | [`tasks/OPT-027.md`](tasks/OPT-027.md); [`pins/opt027_persistent_fattn_contract.json`](pins/opt027_persistent_fattn_contract.json); [`fixtures/opt027_persistent_fattn.json`](fixtures/opt027_persistent_fattn.json); [`cuda/prefill_4k_persistent_fattn_test.cu`](cuda/prefill_4k_persistent_fattn_test.cu); [`evidence/optimization/opt027-persistent-fattn/REPORT.md`](evidence/optimization/opt027-persistent-fattn/REPORT.md); [`evidence/optimization/opt027-persistent-fattn/REJECTION.md`](evidence/optimization/opt027-persistent-fattn/REJECTION.md); verification 2026-09-09T07:05:46Z |
 | OPT-028 | Q4_K/Q6_K MMQ stream-K | OPT-018, OPT-021 | done | Production quality MMA MMQ uses llama.cpp-style stream-K tile decomposition plus optional fixup under frozen Q4_K/Q6_K (and Q8 association where touched) envelopes when a paired A/B wins; recapture 4096 FFN graphs if nodes change; cold exact-4096 mean tok/s strictly beats the then-current oracle baseline or the change is reverted with a retained rejection; does not substitute for OPT-016 | [`tasks/OPT-028.md`](tasks/OPT-028.md); [`pins/opt028_mmq_streamk_contract.json`](pins/opt028_mmq_streamk_contract.json); [`fixtures/opt028_mmq_streamk.json`](fixtures/opt028_mmq_streamk.json); [`cuda/prefill_4k_mmq_streamk_test.cu`](cuda/prefill_4k_mmq_streamk_test.cu); [`evidence/optimization/opt028-mmq-streamk/REPORT.md`](evidence/optimization/opt028-mmq-streamk/REPORT.md); [`evidence/optimization/opt028-mmq-streamk/REJECTION.md`](evidence/optimization/opt028-mmq-streamk/REJECTION.md); verification 2026-09-09T10:06:27Z |
 | OPT-029 | Fuse GDN conv and gated output | OPT-019, OPT-021 | done | Collapse tiled causal conv and/or gated-output into the warp-column fused GDN token loop under frozen GDN-002 envelopes when a paired A/B wins; cold exact-4096 mean tok/s strictly beats the then-current oracle baseline or the change is reverted with a retained rejection; does not substitute for OPT-016 | [`tasks/OPT-029.md`](tasks/OPT-029.md); [`pins/opt029_gdn_fuse_contract.json`](pins/opt029_gdn_fuse_contract.json); [`fixtures/opt029_gdn_fuse.json`](fixtures/opt029_gdn_fuse.json); [`cuda/prefill_4k_gdn_fuse_test.cu`](cuda/prefill_4k_gdn_fuse_test.cu); [`evidence/optimization/opt029-gdn-fuse/REPORT.md`](evidence/optimization/opt029-gdn-fuse/REPORT.md); [`evidence/optimization/opt029-gdn-fuse/REJECTION.md`](evidence/optimization/opt029-gdn-fuse/REJECTION.md); verification 2026-09-09T10:50:03Z |
-| OPT-030 | Hopper/Blackwell PDL prompt launches | OPT-021 | in_progress | Successive prompt kernels use programmatic dependent launch (PDL) serialization on sm_120 where a paired A/B wins versus current stream launches; arithmetic and graph-vs-fused byte equality stay; cold exact-4096 mean tok/s strictly beats the then-current oracle baseline or the change is reverted with a retained rejection; does not substitute for OPT-016 | [`tasks/OPT-030.md`](tasks/OPT-030.md) |
+| OPT-030 | Hopper/Blackwell PDL prompt launches | OPT-021 | done | Successive prompt kernels use programmatic dependent launch (PDL) serialization on sm_120 where a paired A/B wins versus current stream launches; arithmetic and graph-vs-fused byte equality stay; cold exact-4096 mean tok/s strictly beats the then-current oracle baseline or the change is reverted with a retained rejection; does not substitute for OPT-016 | [`tasks/OPT-030.md`](tasks/OPT-030.md); [`pins/opt030_pdl_launches_contract.json`](pins/opt030_pdl_launches_contract.json); [`fixtures/opt030_pdl_launches.json`](fixtures/opt030_pdl_launches.json); [`cuda/prefill_4k_pdl_test.cu`](cuda/prefill_4k_pdl_test.cu); [`evidence/optimization/opt030-pdl-launches/REPORT.md`](evidence/optimization/opt030-pdl-launches/REPORT.md); [`evidence/optimization/opt030-pdl-launches/REJECTION.md`](evidence/optimization/opt030-pdl-launches/REJECTION.md); verification 2026-09-09T11:34:14Z |
 | OPT-031 | Mixer and GDN 4096 prompt graphs | OPT-012, OPT-021 | pending | Capture stable-address mixer Q8 and fused GDN prompt subgraphs beside existing FFN graphs and replay when `token_count == 4096`; attention KV stays outside; graph-vs-fused byte equality; cold exact-4096 mean tok/s strictly beats the then-current oracle baseline or the change is reverted with a retained rejection; does not substitute for OPT-016 | — |
-| OPT-032 | Freeze decode oracle and refresh sink attribution | BEN-001, OPT-020, OPT-026 | pending | Extend diagnostics with fresh P, D128, and D2048 baselines, exclusive decode categories, and matched pinned llama.cpp measurements; accept complete reproducible evidence and a recorded next-task order; this task claims no performance improvement | — |
+| OPT-032 | Freeze decode oracle and refresh sink attribution | BEN-001, OPT-020, OPT-026 | in_progress | Extend diagnostics with fresh P, D128, and D2048 baselines, exclusive decode categories, and matched pinned llama.cpp measurements; accept complete reproducible evidence and a recorded next-task order; this task claims no performance improvement | [`tasks/OPT-032.md`](tasks/OPT-032.md) |
 | OPT-033 | Retain attention value sums in registers | OPT-032, OPT-026 | pending | A/B full 4096-row attention including combine; keep register-resident value accumulation only with byte-equal output, lower component time, improved P, and the cross-workload guard; otherwise reject | — |
 | OPT-034 | Packed blockwise Q4_K/Q6_K MMV loads | OPT-032, CUD-001 | pending | A/B production batch-1 projection shapes with unchanged packed staging and FP32 lane/reduction order; keep only with byte equality, lower weighted MMV time, improved D2048, and the cross-workload guard; otherwise reject | — |
 | OPT-035 | MMA attention probability times V | OPT-033 | pending | A/B full 4096-row attention using dual-F16 probability×V MMA; retain frozen attention envelopes, lower component time, improved P, and the cross-workload guard; otherwise reject | — |
@@ -4726,3 +4726,58 @@ are repository-relative unless stated otherwise.
   supplied dependencies, acceptance conditions, and cross-workload guard.
 - Planning only: no implementation, benchmark, task dossier, commit, or push
   was performed. Existing OPT-030 worktree state is preserved.
+
+### 2026-09-09T12:23:50Z — OPT-032 planning admitted
+
+- Planning produced decision-complete dossier [`tasks/OPT-032.md`](tasks/OPT-032.md).
+- Coupled IDs: none. Plan impact `none`. This increment claims no
+  performance improvement. P reuses the frozen OPT-021 protocol on a
+  fresh exclusive sitting. D128/D2048 freeze batch-1, exact 128/2048
+  prefix tokens, 256 predetermined one-token evaluations, 3 warm-ups
+  and 30 measured runs, graphs enabled, prefix excluded from the timed
+  region. Matched llama.cpp decode uses a new public-API driver;
+  `llama-bench -p 0 -n 256 -d 2048` is informational. Exclusive decode
+  categories are opt-in `DecodeAttribution` (`mixer_mmv`, `gdn_core`,
+  `attention_core`, `ffn_mmv`); public `RuntimeTimings` stays composite.
+  Next-task order is recorded from live P versus D2048 gaps and the
+  D2048 MMV-versus-attention_core ranking. Historical 4K successor
+  oracle remains [`fixtures/opt026_fattn_streamk.json`](fixtures/opt026_fattn_streamk.json)
+  **1746.71973** tok/s until the live sitting publishes a fresh P without
+  a speedup claim. OPT-030 left `in_progress` and unmutated. OPT-016
+  remains the blocked 2K parity owner.
+- Marked OPT-032 `in_progress`.
+
+### 2026-09-09T16:12:00Z — OPT-030 delivered (reject)
+
+- Independent verification attempt 1 had already passed; this entry closes
+  deferred delivery bookkeeping after evidence landed in
+  `e8cc8b7475c2849fe188d8164c83874b9e17bb32`. Production ungraphed prompt
+  launches remain ordinary `<<<>>>` (`kSelectedPdlPath = off`). PDL wrapper
+  and A/B diagnostic remain non-production. A/B winner was `pdl`
+  (`win=true`; `off` 76.1488266 ms, `pdl_host` 76.1686554 ms, `pdl`
+  76.0484467 ms; byte-equal), but exclusive RTX 5090 cold exact-4096 mean
+  tok/s **1734.4137** did not strictly beat frozen OPT-026
+  [`fixtures/opt026_fattn_streamk.json`](fixtures/opt026_fattn_streamk.json)
+  **1746.71973**. Fixture
+  [`fixtures/opt030_pdl_launches.json`](fixtures/opt030_pdl_launches.json)
+  (`measurement_utc` 2026-09-09T11:34:14Z; `status` rejected; `reverted`
+  true; `successor_oracle` false; `production_pdl_installed` false;
+  llama.cpp `avg_ts` **3202.544049**; `ladder_exhausted` false).
+  Throughput delta: baseline **1746.71973** → measured post **1734.4137**;
+  speedup `0` (reverted/not installed). Coupled IDs: none. Delivery
+  re-check: `uv run pytest -q tests/test_documentation.py tests/test_opt030_pdl_launches.py`.
+- Acceptance evidence: [`tasks/OPT-030.md`](tasks/OPT-030.md);
+  [`pins/opt030_pdl_launches_contract.json`](pins/opt030_pdl_launches_contract.json);
+  [`fixtures/opt030_pdl_launches.json`](fixtures/opt030_pdl_launches.json);
+  [`cuda/prefill_4k_pdl_test.cu`](cuda/prefill_4k_pdl_test.cu);
+  [`evidence/optimization/opt030-pdl-launches/REPORT.md`](evidence/optimization/opt030-pdl-launches/REPORT.md);
+  [`evidence/optimization/opt030-pdl-launches/REJECTION.md`](evidence/optimization/opt030-pdl-launches/REJECTION.md);
+  [`docs/06-system-optimization.md`](docs/06-system-optimization.md);
+  [`docs/53-stable-address-cuda-graphs.md`](docs/53-stable-address-cuda-graphs.md);
+  [`docs/62-cuda-full-prefill.md`](docs/62-cuda-full-prefill.md).
+  Proof is PDL keep/reject versus the then-current successor-oracle
+  baseline with retained rejection, not the 2K llama.cpp parity gate.
+- Marked OPT-030 `done`; delivery is limited to this ledger/audit
+  bookkeeping on top of the already-committed reject evidence. `plan.md`
+  is unchanged. OPT-016 stays `blocked`. OPT-032 remains independently
+  `in_progress`.
