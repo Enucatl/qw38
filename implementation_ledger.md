@@ -98,6 +98,12 @@ are repository-relative unless stated otherwise.
 | OPT-029 | Fuse GDN conv and gated output | OPT-019, OPT-021 | done | Collapse tiled causal conv and/or gated-output into the warp-column fused GDN token loop under frozen GDN-002 envelopes when a paired A/B wins; cold exact-4096 mean tok/s strictly beats the then-current oracle baseline or the change is reverted with a retained rejection; does not substitute for OPT-016 | [`tasks/OPT-029.md`](tasks/OPT-029.md); [`pins/opt029_gdn_fuse_contract.json`](pins/opt029_gdn_fuse_contract.json); [`fixtures/opt029_gdn_fuse.json`](fixtures/opt029_gdn_fuse.json); [`cuda/prefill_4k_gdn_fuse_test.cu`](cuda/prefill_4k_gdn_fuse_test.cu); [`evidence/optimization/opt029-gdn-fuse/REPORT.md`](evidence/optimization/opt029-gdn-fuse/REPORT.md); [`evidence/optimization/opt029-gdn-fuse/REJECTION.md`](evidence/optimization/opt029-gdn-fuse/REJECTION.md); verification 2026-09-09T10:50:03Z |
 | OPT-030 | Hopper/Blackwell PDL prompt launches | OPT-021 | pending | Successive prompt kernels use programmatic dependent launch (PDL) serialization on sm_120 where a paired A/B wins versus current stream launches; arithmetic and graph-vs-fused byte equality stay; cold exact-4096 mean tok/s strictly beats the then-current oracle baseline or the change is reverted with a retained rejection; does not substitute for OPT-016 | — |
 | OPT-031 | Mixer and GDN 4096 prompt graphs | OPT-012, OPT-021 | pending | Capture stable-address mixer Q8 and fused GDN prompt subgraphs beside existing FFN graphs and replay when `token_count == 4096`; attention KV stays outside; graph-vs-fused byte equality; cold exact-4096 mean tok/s strictly beats the then-current oracle baseline or the change is reverted with a retained rejection; does not substitute for OPT-016 | — |
+| OPT-032 | Freeze decode oracle and refresh sink attribution | BEN-001, OPT-020, OPT-026 | pending | Extend diagnostics with fresh P, D128, and D2048 baselines, exclusive decode categories, and matched pinned llama.cpp measurements; accept complete reproducible evidence and a recorded next-task order; this task claims no performance improvement | — |
+| OPT-033 | Retain attention value sums in registers | OPT-032, OPT-026 | pending | A/B full 4096-row attention including combine; keep register-resident value accumulation only with byte-equal output, lower component time, improved P, and the cross-workload guard; otherwise reject | — |
+| OPT-034 | Packed blockwise Q4_K/Q6_K MMV loads | OPT-032, CUD-001 | pending | A/B production batch-1 projection shapes with unchanged packed staging and FP32 lane/reduction order; keep only with byte equality, lower weighted MMV time, improved D2048, and the cross-workload guard; otherwise reject | — |
+| OPT-035 | MMA attention probability times V | OPT-033 | pending | A/B full 4096-row attention using dual-F16 probability×V MMA; retain frozen attention envelopes, lower component time, improved P, and the cross-workload guard; otherwise reject | — |
+| OPT-036 | Partition KV for vector decode attention | OPT-032, OPT-026 | pending | A/B one-token vector attention at 1/4/8/16 KV partitions for D128/D2048 with deterministic partial-statistic merge; keep only with frozen attention envelopes, lower component time, improved D2048, and the cross-workload guard; otherwise reject | — |
+| OPT-037 | Select 4K FFN tiles per projection | OPT-032, OPT-025 | pending | Sweep quality-MMQ I={64,128}, J={32,64,128} independently for 4096-row gate/up/down, preserve shared-Y and recapture graphs; keep only with admitted component wins, improved P, frozen MMQ envelopes, and the cross-workload guard; otherwise reject | — |
 
 ### 2026-09-04T13:09:32Z — OPT-005 delivered
 
@@ -4711,3 +4717,12 @@ are repository-relative unless stated otherwise.
 - Marked OPT-029 `done`; delivery is limited to the verified task scope plus
   this ledger/audit bookkeeping. `plan.md` is unchanged. OPT-016 stays
   `blocked`. Next eligible pending by ledger row order: **OPT-030**.
+
+### 2026-09-09T00:00:00Z — speedup plan drafted
+
+- Replaced [`speedup-plan.md`](speedup-plan.md) with the measurement-led
+  post-OPT-026 ladder and its frozen P/D128/D2048 protocols.
+- Added six independent pending rows, OPT-032 through OPT-037, with the
+  supplied dependencies, acceptance conditions, and cross-workload guard.
+- Planning only: no implementation, benchmark, task dossier, commit, or push
+  was performed. Existing OPT-030 worktree state is preserved.
