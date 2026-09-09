@@ -1,0 +1,9 @@
+fattn_ab id=stream_k sample=0 ms=53.6040955 occupancy=1 nsm=170 nblocks=170
+fattn_ab id=stream_k sample=1 ms=53.701313 occupancy=1
+fattn_ab id=stream_k sample=2 ms=53.6712952 occupancy=1
+fattn_ab_mean id=stream_k mean_ms=53.6589012 occupancy=1 envelope=true scratch=true eligible=true nsm=170 nblocks=170
+fattn_ab id=persistent sample=0 ms=93.4475861 occupancy=1 nsm=170 nblocks=170
+fattn_ab id=persistent sample=1 ms=93.4622726 occupancy=1
+fattn_ab id=persistent sample=2 ms=93.4734421 occupancy=1
+fattn_ab_mean id=persistent mean_ms=93.4610977 occupancy=1 envelope=true scratch=true eligible=true nsm=170 nblocks=170
+fattn_ab_winner id=stream_k win=false stream_k_ms=53.6589012 winner_ms=53.6589012

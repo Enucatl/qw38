@@ -31,7 +31,8 @@ quality MMA path (OPT-023). Large mixer Q8_0 D2R was A/B'd and not
 installed (OPT-024); those GEMMs stay I=128 quality MMA. Dense prompt FFN
 Q4_K shares one DS4 Y for gate/up and writes down-leg Y from SwiGLU
 (OPT-025). Production prompt attention uses Ada+ stream-K fattn after the
-OPT-026 keep. Decode stays MMV.
+OPT-026 keep; persistent stream-K was A/B-lost and not installed
+(OPT-027). Decode stays MMV.
 Tiny mixer prompts keep the
 OPT-009 tiled `__fmul_rn`/`__fadd_rn` kernel.
 Rank-1 fused MMA remains a non-production kernel. MMA here is Measured
@@ -39,7 +40,8 @@ component recovery plus a 4K keep versus the frozen oracle baseline, not the
 OPT-016 2K llama.cpp parity gate. Production prompt GDN recurrence is the
 warp-column fused quality path; sequential windows remain the unloosened
 reference. Production prompt attention (`token_count >= 16`) is the fattn-mma
-analog with Ada+ stream-K after the OPT-026 keep; tiled attention remains the
+analog with Ada+ stream-K after the OPT-026 keep; persistent stream-K
+was measured and rejected (OPT-027); tiled attention remains the
 unloosened reference. Those core-quality paths are also Measured component
 recovery plus a 4K keep versus the frozen oracle baseline, not the 2K parity
 gate.
@@ -103,7 +105,8 @@ and 65 distinguish the ordinary path, an exact chunk, and a one-row tail.
 Attention decode reads growing KV from 16 layers; use grouped-query mapping
 without physical sixfold copies. Prefill must be causal and handle partial RoPE
 on exactly 64 dimensions. Production prompt attention (`token_count >= 16`) is
-the fattn-mma analog with Ada+ stream-K for prompt tiles; the two-row tiled
+the fattn-mma analog with Ada+ stream-K for prompt tiles; persistent
+stream-K was A/B-lost and not installed. The two-row tiled
 path remains the unloosened numeric reference. Dense FFNs dominate weights: MMV for one/few rows,
 MMQ for prompt or batched rows. Fusion is accepted only when the unfused path
 remains a differential oracle and profiler data attributes a wall-time win.
@@ -163,7 +166,8 @@ quality (`dim3(32, 4)`, grid z=32, `s_shard[4]`). Sequential windows remain the
 unloosened reference (`5e-8` / `5e-9`). Production prompt attention
 (`token_count >= 16`) is the fattn-mma analog with pinned ncols1=16 and
 ncols2=2. Production prompt attention uses Ada+ stream-K after the OPT-026
-keep. Tiled attention remains the unloosened OPT-005 reference
+keep; persistent stream-K was A/B-lost and not installed (OPT-027).
+Tiled attention remains the unloosened OPT-005 reference
 (`5e-5` / `5e-6`). Live exact-2048 `gdn` **1205.38806** ms and `attention`
 **475.116028** ms versus locked befores **1643.46082** / **1148.47461** ms
 meet the 85%/85%/70% addressed rule (`combined_after` **1680.504088** ms).
@@ -265,10 +269,31 @@ production objects, cold exact-4096, graphs=64) attributes wall **2348.33** ms
 as `attention_core` **36.9%**, `ffn_mmq` **31.4%**, `gdn_core` **19.3%**,
 `mixer_mmq` **12.2%**. Oracle-length next pick is attention. Second keep/reject
 ladder: OPT-027–OPT-031 (persistent Ada+ fattn stream-K, MMQ stream-K, GDN
-fuse, PDL, mixer/GDN graphs). Evidence:
+fuse, PDL, mixer/GDN graphs). OPT-027 retained a reject: persistent did
+not strictly beat production `stream_k`, so production fattn stays
+OPT-026 Ada+ stream-K (`grid.z=2`). Remaining second-ladder picks are
+OPT-028–OPT-031. Evidence:
 [`evidence/optimization/speedup-loop-post026/REPORT.md`](../evidence/optimization/speedup-loop-post026/REPORT.md);
 method: [`speedup-loop.md`](../speedup-loop.md). This is instrumentation and
 task admission, **not** the 2K llama.cpp parity gate.
+
+## Persistent Ada+ fattn stream-K (OPT-027)
+
+**Measured, RTX 5090:** persistent Ada+ fattn stream-K (`nsm × occupancy`
+linearized tiles, 5% efficiency rounding, uniform/general fixup) was
+A/B'd against production `stream_k` (`grid.z=2`). Persistent did not
+strictly beat `stream_k`. Production prompt attention remains OPT-026
+Ada+ stream-K. Persistent kernels remain as non-production symbols.
+`kSelectedFattnPath` stays `"stream_k"`; `kSelectedPersistentFattnPath`
+is `off`. Mixer Q8 quality, skinny `mma_i32_j128`, and FFN
+`shared_y_swiglu_q8` stay. Decode attention is unchanged. ncols1 stays
+16. Tiled attention remains the unloosened reference. Live exclusive
+RTX-5090 cold exact-4096 **reject:** Quartz mean is not strictly greater
+than the frozen successor-oracle baseline **1746.71973**. Production
+persistent was not installed. `quartz_meets_llama` is informational and
+is not this gate. This is **not** the 2K llama.cpp parity gate. Live
+numbers stay in the report; this chapter does not replace them:
+[`evidence/optimization/opt027-persistent-fattn/REPORT.md`](../evidence/optimization/opt027-persistent-fattn/REPORT.md).
 
 ## DwarfStar transfer boundary
 

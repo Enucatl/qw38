@@ -4,7 +4,7 @@
 #include <cstdio>
 #include <cstring>
 #include <ctime>
-#include <string>
+#include <sys/stat.h>
 #include <vector>
 
 namespace {
@@ -334,6 +334,160 @@ int main(){
     }
     if (!eligible[0]) {
       fprintf(stderr, "fattn baseline 4096 is not eligible\n");
+      return 6;
+    }
+  }
+  {
+    const size_t rows4096 = 4096;
+    const size_t start4096 = 0;
+    B tiled4096{}, cand{};
+    if (!allocate(tiled4096, c, rows4096, start4096) ||
+        !allocate(cand, c, rows4096, start4096))
+      return 5;
+    seed(tiled4096, c, rows4096, start4096);
+    if (invoke_tiled(c, start4096, rows4096, tiled4096) != cudaSuccess ||
+        cudaDeviceSynchronize() != cudaSuccess)
+      return 6;
+    std::vector<float> tiled_host(rows4096 * q);
+    cudaMemcpy(tiled_host.data(), tiled4096.out,
+               tiled_host.size() * sizeof(float), cudaMemcpyDeviceToHost);
+    float* partial = nullptr;
+    float* meta = nullptr;
+    const size_t partial_n =
+        qw38::cuda::fattn_stream_k_partial_values(c, rows4096);
+    const int nsm = qw38::cuda::fattn_persistent_nsm();
+    const int occupancy_p =
+        qw38::cuda::attention_mma_quality_occupancy_for_path("persistent");
+    const int ntiles_x = static_cast<int>((rows4096 + 15) / 16);
+    const int ntiles_z_gqa = 3;
+    const int ntiles_dst = ntiles_x * ntiles_z_gqa * static_cast<int>(c.kv_heads);
+    const int ntiles_kv = static_cast<int>((rows4096 + 31) / 32);
+    const int nblocks = qw38::cuda::fattn_persistent_nblocks(
+        nsm, occupancy_p, ntiles_dst, ntiles_kv);
+    const size_t persist_n =
+        qw38::cuda::fattn_persistent_fixup_values(nblocks);
+    const size_t meta_n = qw38::cuda::fattn_stream_k_meta_values(c, rows4096);
+    const size_t meta_bytes =
+        (persist_n > meta_n ? persist_n : meta_n) * sizeof(float);
+    if (cudaMalloc(reinterpret_cast<void**>(&partial),
+                   partial_n * sizeof(float)) != cudaSuccess ||
+        cudaMalloc(reinterpret_cast<void**>(&meta), meta_bytes) !=
+            cudaSuccess)
+      return 5;
+    mkdir("evidence/optimization/opt027-persistent-fattn", 0755);
+    FILE* raw = fopen(
+        "evidence/optimization/opt027-persistent-fattn/fattn-ab-raw.txt", "w");
+    const char* ids[2] = {"stream_k", "persistent"};
+    float means[2] = {1.0e30f, 1.0e30f};
+    bool eligible[2] = {false, false};
+    cudaEvent_t e0{}, e1{};
+    cudaEventCreate(&e0);
+    cudaEventCreate(&e1);
+    for (int i = 0; i < 2; ++i) {
+      seed(cand, c, rows4096, start4096);
+      cudaMemset(partial, 0, partial_n * sizeof(float));
+      cudaMemset(meta, 0, meta_bytes);
+      std::vector<unsigned char> score_before(
+          qw38::cuda::attention_chunk_score_values(c, start4096, rows4096) *
+          sizeof(float));
+      cudaMemcpy(score_before.data(), cand.score, score_before.size(),
+                 cudaMemcpyDeviceToHost);
+      AttentionCache committed{cand.ck, cand.cv}, candidate{cand.tk, cand.tv};
+      cudaError_t launched =
+          qw38::cuda::launch_attention_prepare_chunk_fattn_path(
+              c, start4096, rows4096, cand.q, cand.k, cand.v, cand.qs, cand.ks,
+              cand.g, committed, candidate, cand.nq, cand.nk, cand.score,
+              cand.out, ids[i], partial, meta, nullptr);
+      cudaError_t synced = cudaDeviceSynchronize();
+      std::vector<float> host(rows4096 * q);
+      if (launched == cudaSuccess && synced == cudaSuccess)
+        cudaMemcpy(host.data(), cand.out, host.size() * sizeof(float),
+                   cudaMemcpyDeviceToHost);
+      std::vector<unsigned char> score_after(score_before.size());
+      cudaMemcpy(score_after.data(), cand.score, score_after.size(),
+                 cudaMemcpyDeviceToHost);
+      const bool scratch = score_before == score_after;
+      const bool finite = launched == cudaSuccess && synced == cudaSuccess &&
+                          finite_vec(host);
+      const bool env = finite && envelope_ok(host, tiled_host);
+      const int occupancy =
+          qw38::cuda::attention_mma_quality_occupancy_for_path(ids[i]);
+      const int live_nblocks =
+          i == 1 ? nblocks
+                 : qw38::cuda::fattn_persistent_nblocks(
+                       nsm, occupancy, ntiles_dst, ntiles_kv);
+      (void)live_nblocks;
+      float samples[3] = {0, 0, 0};
+      bool timed_ok = env && scratch && occupancy >= 1;
+      if (i == 1)
+        timed_ok = timed_ok && occupancy_p >= 1 && nblocks > 0 &&
+                   nblocks == qw38::cuda::fattn_persistent_nblocks(
+                                  nsm, occupancy, ntiles_dst, ntiles_kv);
+      for (int sample = 0; sample < 3 && timed_ok; ++sample) {
+        cudaEventRecord(e0);
+        timed_ok =
+            qw38::cuda::launch_attention_prepare_chunk_fattn_path(
+                c, start4096, rows4096, cand.q, cand.k, cand.v, cand.qs,
+                cand.ks, cand.g, committed, candidate, cand.nq, cand.nk,
+                cand.score, cand.out, ids[i], partial, meta, nullptr) ==
+            cudaSuccess;
+        cudaEventRecord(e1);
+        timed_ok = timed_ok && cudaEventSynchronize(e1) == cudaSuccess;
+        if (timed_ok) cudaEventElapsedTime(&samples[sample], e0, e1);
+      }
+      const float mean =
+          timed_ok ? (samples[0] + samples[1] + samples[2]) / 3.0f : 0.0f;
+      eligible[i] = timed_ok && mean > 0.0f;
+      means[i] = mean;
+      if (raw)
+        fprintf(raw,
+                "fattn_ab id=%s sample=%d ms=%.9g occupancy=%d nsm=%d "
+                "nblocks=%d\n"
+                "fattn_ab id=%s sample=%d ms=%.9g occupancy=%d\n"
+                "fattn_ab id=%s sample=%d ms=%.9g occupancy=%d\n",
+                ids[i], 0, samples[0], occupancy, nsm, nblocks, ids[i], 1,
+                samples[1], occupancy, ids[i], 2, samples[2], occupancy);
+      std::printf("opt027_fattn_ab id=%s launch=%s finite=%s envelope=%s "
+                  "scratch=%s occupancy=%d nsm=%d nblocks=%d sample0=%.9g "
+                  "sample1=%.9g sample2=%.9g mean_ms=%.9g eligible=%s\n",
+                  ids[i], launched == cudaSuccess ? "ok" : "fail",
+                  finite ? "true" : "false", env ? "true" : "false",
+                  scratch ? "true" : "false", occupancy, nsm, nblocks,
+                  samples[0], samples[1], samples[2], mean,
+                  eligible[i] ? "true" : "false");
+      if (raw)
+        fprintf(raw,
+                "fattn_ab_mean id=%s mean_ms=%.9g occupancy=%d envelope=%s "
+                "scratch=%s eligible=%s nsm=%d nblocks=%d\n",
+                ids[i], mean, occupancy, env ? "true" : "false",
+                scratch ? "true" : "false", eligible[i] ? "true" : "false",
+                nsm, nblocks);
+    }
+    cudaEventDestroy(e0);
+    cudaEventDestroy(e1);
+    cudaFree(partial);
+    cudaFree(meta);
+    release(tiled4096);
+    release(cand);
+    int winner_i = 0;
+    bool win = false;
+    if (eligible[0] && eligible[1] && means[1] < means[0]) {
+      winner_i = 1;
+      win = true;
+    }
+    std::printf("opt027_fattn_ab_winner id=%s win=%s stream_k_ms=%.9g "
+                "winner_ms=%.9g\n",
+                ids[winner_i], win ? "true" : "false", means[0],
+                means[winner_i]);
+    if (raw) {
+      fprintf(raw,
+              "fattn_ab_winner id=%s win=%s stream_k_ms=%.9g winner_ms=%.9g\n",
+              ids[winner_i], win ? "true" : "false", means[0],
+              means[winner_i]);
+      fclose(raw);
+    }
+    if (!eligible[0]) {
+      fprintf(stderr, "opt027 stream_k 4096 is not eligible\n");
       return 6;
     }
   }

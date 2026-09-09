@@ -29,6 +29,9 @@ constexpr int kSelectedAttentionMmaQueryRows = 16;
 // OPT-026 A/B winner. Legal values: baseline, occ2, stream_k.
 constexpr char kSelectedFattnPath[] = "stream_k";
 
+// OPT-027 A/B winner. Legal values: off, persistent.
+constexpr char kSelectedPersistentFattnPath[] = "off";
+
 inline __device__ float fattn_block_sum(float local, float* scratch, int tid,
                                        int nthreads) {
   float value = local;
@@ -76,6 +79,72 @@ constexpr std::size_t fattn_quality_shared_bytes(int ncols1, bool dual_f16) {
                              sizeof(float);
   const std::size_t rescale = static_cast<std::size_t>(ncols) * sizeof(float);
   return kv + q + scores + stats + scratch + cparts + rescale;
+}
+
+inline int fattn_persistent_ntiles_x(std::size_t token_count) noexcept {
+  return static_cast<int>((token_count +
+                           static_cast<std::size_t>(kSelectedAttentionMmaQueryRows) -
+                           1U) /
+                          static_cast<std::size_t>(kSelectedAttentionMmaQueryRows));
+}
+
+inline int fattn_persistent_ntiles_z_gqa(const AttentionConfig& config) noexcept {
+  const int gqa = static_cast<int>(config.query_heads / config.kv_heads);
+  return (gqa + kFattnNcols2 - 1) / kFattnNcols2;
+}
+
+inline int fattn_persistent_ntiles_dst(const AttentionConfig& config,
+                                         std::size_t token_count) noexcept {
+  return fattn_persistent_ntiles_x(token_count) *
+         fattn_persistent_ntiles_z_gqa(config) *
+         static_cast<int>(config.kv_heads);
+}
+
+inline int fattn_persistent_ntiles_kv(std::size_t start_position,
+                                        std::size_t token_count) noexcept {
+  const std::size_t kv_len = start_position + token_count;
+  return static_cast<int>((kv_len + static_cast<std::size_t>(kFattnNbatchFa) -
+                            1U) /
+                          static_cast<std::size_t>(kFattnNbatchFa));
+}
+
+inline int fattn_compute_persistent_nblocks(int nsm, int occupancy,
+                                              int ntiles_dst,
+                                              int ntiles_kv) noexcept {
+  if (nsm <= 0 || occupancy <= 0 || ntiles_dst <= 0 || ntiles_kv <= 0)
+    return 0;
+  const int max_blocks = occupancy * nsm;
+  const int total = ntiles_kv * ntiles_dst;
+  const int nblocks_raw = max_blocks < total ? max_blocks : total;
+  const int nblocks_rounded = (nblocks_raw / ntiles_dst) * ntiles_dst;
+  const int loss =
+      nblocks_rounded > 0
+          ? 100 * (nblocks_raw - nblocks_rounded) / nblocks_raw
+          : 100;
+  return loss <= 5 ? nblocks_rounded : nblocks_raw;
+}
+
+inline std::size_t fattn_compute_persistent_fixup_values(int nblocks) noexcept {
+  constexpr int kNcols = kSelectedAttentionMmaQueryRows * kFattnNcols2;
+  if (nblocks <= 0) return 0;
+  return static_cast<std::size_t>(nblocks) * static_cast<std::size_t>(kNcols) *
+         (4ull + static_cast<std::size_t>(kFattnHeadWidth));
+}
+
+inline __device__ float fattn_output_gate(float g) {
+  return g >= 0.0F ? 1.0F / (1.0F + expf(-g)) : expf(g) / (1.0F + expf(g));
+}
+
+inline __device__ void fattn_persistent_decode(int index, int ntiles_kv,
+                                                 int ntiles_x, int ntiles_z_gqa,
+                                                 int* z_KV, int* zt_gqa,
+                                                 int* jt) {
+  const int dest = ntiles_kv == 0 ? 0 : index / ntiles_kv;
+  const int span = ntiles_x * ntiles_z_gqa;
+  *z_KV = span == 0 ? 0 : dest / span;
+  const int rem = dest - (*z_KV) * span;
+  *zt_gqa = ntiles_x == 0 ? 0 : rem / ntiles_x;
+  *jt = rem - (*zt_gqa) * ntiles_x;
 }
 
 template <int Ncols1, bool DualF16, int Occupancy, int KvParts>
@@ -448,6 +517,626 @@ __global__ void fattn_stream_k_combine_kernel(
   output[index] = attn * sigmoid;
 }
 
+// Packed dst_tmp_meta (floats): needs max/den, is_fixup max/den, then VKQ.
+// Adapted from llama.cpp fattn-common.cuh / fattn-mma-f16.cuh at
+// cc83d7b4824f73cfdda4dfbb47ee39804f71b328 (MIT). Not a vendor of those files.
+inline __device__ float* fattn_persist_needs_meta(float* meta, int nblocks,
+                                                 int qcol) {
+  constexpr int kNcols = kSelectedAttentionMmaQueryRows * kFattnNcols2;
+  (void)nblocks;
+  return meta + (static_cast<int>(blockIdx.x) * kNcols + qcol) * 2;
+}
+
+inline __device__ float* fattn_persist_is_meta(float* meta, int nblocks,
+                                                int qcol) {
+  constexpr int kNcols = kSelectedAttentionMmaQueryRows * kFattnNcols2;
+  return meta + ((nblocks + static_cast<int>(blockIdx.x)) * kNcols + qcol) * 2;
+}
+
+inline __device__ float* fattn_persist_vkq_data(float* meta, int nblocks,
+                                                int qcol) {
+  constexpr int kNcols = kSelectedAttentionMmaQueryRows * kFattnNcols2;
+  constexpr int kWidth = kFattnHeadWidth;
+  return meta + nblocks * kNcols * 4 +
+         (static_cast<int>(blockIdx.x) * kNcols + qcol) * kWidth;
+}
+
+template <int Ncols1, bool DualF16>
+__device__ void fattn_persistent_process_tile(
+    AttentionConfig config, std::size_t start_position, std::size_t token_count,
+    const float* query, const float* query_scale, const float* gate,
+    const __nv_bfloat16* committed_key, const __nv_bfloat16* committed_value,
+    const __nv_bfloat16* candidate_key, const __nv_bfloat16* candidate_value,
+    float* output, float* normalized_query, float* meta, int nblocks, int jt,
+    int zt_gqa, int z_KV, int kb0_start, int kb0_stop, bool needs_fixup,
+    bool is_fixup, float* scratch, __nv_bfloat16* keys, __nv_bfloat16* values,
+    __half* q_f16, __half* q_lo, float* scores, float* qmax, float* qden,
+    float* rescale, float* cparts) {
+  constexpr int kNcols = Ncols1 * kFattnNcols2;
+  constexpr int kNthreads = Ncols1 <= 8 ? 64 : 128;
+  constexpr int kNwarps = kNthreads / 32;
+  constexpr int kWidth = kFattnHeadWidth;
+  const std::size_t first_row = static_cast<std::size_t>(Ncols1) * jt;
+  if (first_row >= token_count) return;
+  const int active_rows = static_cast<int>(
+      token_count - first_row < static_cast<std::size_t>(Ncols1)
+          ? token_count - first_row
+          : static_cast<std::size_t>(Ncols1));
+  const int tid = static_cast<int>(threadIdx.x);
+  const int warp = tid / 32;
+  const int lane = tid % 32;
+  const std::uint32_t kv_head = static_cast<std::uint32_t>(z_KV);
+  const std::uint32_t first_head =
+      kv_head * (config.query_heads / config.kv_heads);
+  const std::size_t width = config.head_width;
+  const std::size_t row_values =
+      static_cast<std::size_t>(config.kv_heads) * width;
+  const std::uint32_t half = config.rotary_width / 2;
+  const float attn_scale = 1.0F / sqrtf(static_cast<float>(width));
+  const std::size_t last_position =
+      start_position + first_row + static_cast<std::size_t>(active_rows) - 1U;
+  const std::size_t kv_span = last_position + 1U;
+  const std::size_t kv_begin =
+      static_cast<std::size_t>(kb0_start) * kFattnNbatchFa;
+  const std::size_t kv_end =
+      static_cast<std::size_t>(kb0_stop) * kFattnNbatchFa;
+  const std::size_t kv_stop = kv_end < kv_span ? kv_end : kv_span;
+  float* vkq = is_fixup ? nullptr : output;
+  (void)vkq;
+  const int subgroup = zt_gqa;
+
+  for (int member = 0; member < kFattnNcols2; ++member) {
+    const std::uint32_t query_head =
+        first_head + static_cast<std::uint32_t>(subgroup * kFattnNcols2 +
+                                                member);
+    for (int row = 0; row < Ncols1; ++row) {
+      const int qcol = member * Ncols1 + row;
+      const bool live = row < active_rows;
+      const std::size_t qbase =
+          live ? (first_row + static_cast<std::size_t>(row)) *
+                       config.query_heads * width +
+                     query_head * width
+               : 0;
+      float local = 0.0F;
+      if (live) {
+        for (int dim = tid; dim < static_cast<int>(width); dim += kNthreads) {
+          const float item = query[qbase + static_cast<std::size_t>(dim)];
+          local = __fadd_rn(local, __fmul_rn(item, item));
+        }
+      }
+      const float sum = fattn_block_sum(local, scratch, tid, kNthreads);
+      const float inverse =
+          1.0F / sqrtf(sum / static_cast<float>(width) + kFattnRmsEpsilon);
+      for (int dim = tid; dim < static_cast<int>(width); dim += kNthreads) {
+        scratch[dim] =
+            live ? query[qbase + static_cast<std::size_t>(dim)] * inverse *
+                       query_scale[dim]
+                 : 0.0F;
+      }
+      __syncthreads();
+      if (tid < static_cast<int>(half)) {
+        const float first = scratch[tid];
+        const float second = scratch[half + tid];
+        const float exponent = static_cast<float>(tid * 2) /
+                               static_cast<float>(config.rotary_width);
+        const float angle =
+            live ? static_cast<float>(start_position + first_row +
+                                      static_cast<std::size_t>(row)) /
+                       powf(kFattnRopeTheta, exponent)
+                 : 0.0F;
+        const float cosine = cosf(angle);
+        const float sine = sinf(angle);
+        scratch[tid] = first * cosine - second * sine;
+        scratch[half + tid] = second * cosine + first * sine;
+      }
+      __syncthreads();
+      for (int dim = tid; dim < static_cast<int>(width); dim += kNthreads) {
+        const float value = scratch[dim];
+        const __half hi = __float2half_rn(value);
+        q_f16[qcol * kWidth + dim] = hi;
+        if constexpr (DualF16) {
+          q_lo[qcol * kWidth + dim] =
+              __float2half_rn(value - __half2float(hi));
+        }
+        if (token_count == 1 && live)
+          normalized_query[query_head * width + dim] = value;
+        if (live) {
+          if (is_fixup) {
+            fattn_persist_vkq_data(meta, nblocks, qcol)[dim] = 0.0F;
+          } else {
+            vkq[qbase + static_cast<std::size_t>(dim)] = 0.0F;
+          }
+        }
+      }
+      __syncthreads();
+    }
+  }
+
+  for (int qcol = tid; qcol < kNcols; qcol += kNthreads) {
+    qmax[qcol] = -INFINITY;
+    qden[qcol] = 0.0F;
+  }
+  __syncthreads();
+
+  for (std::size_t tile = kv_begin; tile < kv_stop; tile += kFattnNbatchFa) {
+    const int rows = static_cast<int>(
+        (kv_span - tile) < static_cast<std::size_t>(kFattnNbatchFa)
+            ? (kv_span - tile)
+            : static_cast<std::size_t>(kFattnNbatchFa));
+    for (int row = 0; row < kFattnNbatchFa; ++row) {
+      const bool in_tile = row < rows;
+      const std::size_t absolute = tile + static_cast<std::size_t>(row);
+      const __nv_bfloat16* ksrc = nullptr;
+      const __nv_bfloat16* vsrc = nullptr;
+      if (in_tile) {
+        if (absolute < start_position) {
+          const std::size_t packed = attention_kv_physical_index(
+              absolute, kv_head, 0, config.capacity, config.head_width);
+          ksrc = committed_key + packed;
+          vsrc = committed_value + packed;
+        } else {
+          ksrc = candidate_key + (absolute - start_position) * row_values +
+                 kv_head * width;
+          vsrc = candidate_value + (absolute - start_position) * row_values +
+                 kv_head * width;
+        }
+      }
+      for (int dim = tid; dim < static_cast<int>(width); dim += kNthreads) {
+        keys[row * kWidth + dim] =
+            in_tile ? ksrc[dim] : __float2bfloat16_rn(0.0F);
+        values[row * kWidth + dim] =
+            in_tile ? vsrc[dim] : __float2bfloat16_rn(0.0F);
+      }
+    }
+    __syncthreads();
+
+    for (int m0 = 0; m0 < kNcols; m0 += 16) {
+      for (int n0 = 0; n0 < kFattnNbatchFa; n0 += 8) {
+        float cfrag[4] = {0.0F, 0.0F, 0.0F, 0.0F};
+        float cfrag_lo[4] = {0.0F, 0.0F, 0.0F, 0.0F};
+        for (int k0 = warp * 16; k0 < kWidth; k0 += kNwarps * 16) {
+          std::uint32_t a[4];
+          std::uint32_t a_lo[4] = {0, 0, 0, 0};
+          std::uint32_t b[2];
+#pragma unroll
+          for (int item = 0; item < 4; ++item) {
+            const int i = mma::tile16x8_half2_i(lane, item);
+            const int j = mma::tile16x8_half2_j(lane, item);
+            const int qcol = m0 + i;
+            __half pair[2] = {__float2half_rn(0.0F), __float2half_rn(0.0F)};
+            __half pair_lo[2] = {__float2half_rn(0.0F),
+                                 __float2half_rn(0.0F)};
+            if (qcol < kNcols) {
+              const int offset = qcol * kWidth + k0 + j * 2;
+              pair[0] = q_f16[offset];
+              pair[1] = q_f16[offset + 1];
+              if constexpr (DualF16) {
+                pair_lo[0] = q_lo[offset];
+                pair_lo[1] = q_lo[offset + 1];
+              }
+            }
+            a[item] = *reinterpret_cast<std::uint32_t*>(pair);
+            if constexpr (DualF16) {
+              a_lo[item] = *reinterpret_cast<std::uint32_t*>(pair_lo);
+            }
+          }
+#pragma unroll
+          for (int item = 0; item < 2; ++item) {
+            const int n = mma::tile8x8_i(lane, item);
+            const int j = mma::tile8x8_j(lane, item);
+            const int krow = n0 + n;
+            __half pair[2] = {__float2half_rn(0.0F), __float2half_rn(0.0F)};
+            if (krow < rows) {
+              pair[0] = __float2half_rn(__bfloat162float(
+                  keys[krow * kWidth + k0 + j * 2]));
+              pair[1] = __float2half_rn(__bfloat162float(
+                  keys[krow * kWidth + k0 + j * 2 + 1]));
+            }
+            b[item] = *reinterpret_cast<std::uint32_t*>(pair);
+          }
+          mma::mma_m16n8k16_f16_f32(cfrag, a, b);
+          if constexpr (DualF16) {
+            mma::mma_m16n8k16_f16_f32(cfrag_lo, a_lo, b);
+          }
+        }
+#pragma unroll
+        for (int item = 0; item < 4; ++item)
+          cparts[(warp * 32 + lane) * 4 + item] =
+              cfrag[item] + cfrag_lo[item];
+        __syncthreads();
+        if (warp == 0) {
+          float reduced[4] = {0.0F, 0.0F, 0.0F, 0.0F};
+          for (int other = 0; other < kNwarps; ++other) {
+#pragma unroll
+            for (int item = 0; item < 4; ++item)
+              reduced[item] += cparts[(other * 32 + lane) * 4 + item];
+          }
+#pragma unroll
+          for (int item = 0; item < 4; ++item) {
+            const int i = mma::tile16x8_i(lane, item);
+            const int j = mma::tile16x8_j(lane, item);
+            const int qcol = m0 + i;
+            const int krow = n0 + j;
+            if (qcol < kNcols && krow < kFattnNbatchFa)
+              scores[qcol * kFattnNbatchFa + krow] =
+                  reduced[item] * attn_scale;
+          }
+        }
+        __syncthreads();
+      }
+    }
+
+    for (int qcol = tid; qcol < kNcols; qcol += kNthreads) {
+      const int row = qcol % Ncols1;
+      const std::size_t qpos =
+          start_position + first_row + static_cast<std::size_t>(row);
+      float tile_max = -INFINITY;
+      for (int krow = 0; krow < rows; ++krow) {
+        const std::size_t absolute = tile + static_cast<std::size_t>(krow);
+        float score = scores[qcol * kFattnNbatchFa + krow];
+        if (row >= active_rows || absolute > qpos) score = -INFINITY;
+        scores[qcol * kFattnNbatchFa + krow] = score;
+        tile_max = fmaxf(tile_max, score);
+      }
+      const float old_max = qmax[qcol];
+      const float new_max = fmaxf(old_max, tile_max);
+      const float factor =
+          old_max == -INFINITY ? 0.0F : expf(old_max - new_max);
+      float denominator = qden[qcol] * factor;
+      for (int krow = 0; krow < rows; ++krow) {
+        const float score = scores[qcol * kFattnNbatchFa + krow];
+        const float weight =
+            score == -INFINITY ? 0.0F : expf(score - new_max);
+        scores[qcol * kFattnNbatchFa + krow] = weight;
+        denominator += weight;
+      }
+      qmax[qcol] = new_max;
+      qden[qcol] = denominator;
+      rescale[qcol] = factor;
+    }
+    __syncthreads();
+
+    for (int member = 0; member < kFattnNcols2; ++member) {
+      const std::uint32_t query_head =
+          first_head + static_cast<std::uint32_t>(subgroup * kFattnNcols2 +
+                                                  member);
+      for (int row = 0; row < active_rows; ++row) {
+        const int qcol = member * Ncols1 + row;
+        const std::size_t qbase =
+            (first_row + static_cast<std::size_t>(row)) *
+                config.query_heads * width +
+            query_head * width;
+        const float factor = rescale[qcol];
+        for (int dim = tid; dim < static_cast<int>(width); dim += kNthreads) {
+          float* slot =
+              is_fixup ? fattn_persist_vkq_data(meta, nblocks, qcol) + dim
+                       : vkq + qbase + static_cast<std::size_t>(dim);
+          float total = (*slot) * factor;
+          for (int krow = 0; krow < rows; ++krow) {
+            total += scores[qcol * kFattnNbatchFa + krow] *
+                     __bfloat162float(values[krow * kWidth + dim]);
+          }
+          *slot = total;
+        }
+      }
+    }
+    __syncthreads();
+  }
+
+  for (int member = 0; member < kFattnNcols2; ++member) {
+    const std::uint32_t query_head =
+        first_head + static_cast<std::uint32_t>(subgroup * kFattnNcols2 +
+                                                member);
+    for (int row = 0; row < active_rows; ++row) {
+      const int qcol = member * Ncols1 + row;
+      const std::size_t qbase =
+          (first_row + static_cast<std::size_t>(row)) * config.query_heads *
+              width +
+          query_head * width;
+      const float denominator = qden[qcol];
+      if (!needs_fixup && !is_fixup) {
+        for (int dim = tid; dim < static_cast<int>(width); dim += kNthreads) {
+          const float g = gate[qbase + static_cast<std::size_t>(dim)];
+          const float attn =
+              denominator == 0.0F
+                  ? 0.0F
+                  : output[qbase + static_cast<std::size_t>(dim)] / denominator;
+          output[qbase + static_cast<std::size_t>(dim)] =
+              attn * fattn_output_gate(g);
+        }
+      } else if (tid == 0) {
+        float* packed = needs_fixup
+                            ? fattn_persist_needs_meta(meta, nblocks, qcol)
+                            : fattn_persist_is_meta(meta, nblocks, qcol);
+        packed[0] = qmax[qcol];
+        packed[1] = denominator;
+      }
+    }
+  }
+  __syncthreads();
+}
+
+template <int Ncols1, bool DualF16, int Occupancy>
+__global__ void __launch_bounds__(Ncols1 <= 8 ? 64 : 128, Occupancy)
+fattn_mma_persistent_kernel(
+    AttentionConfig config, std::size_t start_position, std::size_t token_count,
+    const float* query, const float* query_scale, const float* gate,
+    const __nv_bfloat16* committed_key, const __nv_bfloat16* committed_value,
+    const __nv_bfloat16* candidate_key, const __nv_bfloat16* candidate_value,
+    float* output, float* normalized_query, float* meta, int ntiles_kv,
+    int ntiles_x, int ntiles_z_gqa) {
+  constexpr int kNthreads = Ncols1 <= 8 ? 64 : 128;
+  constexpr int kWidth = kFattnHeadWidth;
+  constexpr int kNcols = Ncols1 * kFattnNcols2;
+  constexpr int kNwarps = kNthreads / 32;
+  (void)kNthreads;
+  (void)kNwarps;
+  const int nblocks = static_cast<int>(gridDim.x);
+  const int total_work =
+      ntiles_kv * ntiles_x * ntiles_z_gqa * static_cast<int>(config.kv_heads);
+  int kbc = static_cast<int>(static_cast<long long>(blockIdx.x) * total_work /
+                                 nblocks);
+  const int kbc_stop = static_cast<int>(
+      static_cast<long long>(blockIdx.x + 1) * total_work / nblocks);
+
+  extern __shared__ unsigned char raw[];
+  float* scratch = reinterpret_cast<float*>(raw);
+  __nv_bfloat16* keys = reinterpret_cast<__nv_bfloat16*>(scratch + kWidth);
+  __nv_bfloat16* values = keys + kFattnNbatchFa * kWidth;
+  __half* q_f16 = reinterpret_cast<__half*>(values + kFattnNbatchFa * kWidth);
+  __half* q_lo = q_f16 + kNcols * kWidth;
+  float* scores = reinterpret_cast<float*>(
+      DualF16 ? reinterpret_cast<__half*>(q_lo + kNcols * kWidth) : q_lo);
+  float* qmax = scores + kNcols * kFattnNbatchFa;
+  float* qden = qmax + kNcols;
+  float* rescale = qden + kNcols;
+  float* cparts = rescale + kNcols;
+  (void)kNwarps;
+
+  int kb0_start = ntiles_kv == 0 ? 0 : kbc % ntiles_kv;
+  int kb0_stop = ntiles_kv < kb0_start + kbc_stop - kbc
+                      ? ntiles_kv
+                      : kb0_start + kbc_stop - kbc;
+
+  while (kbc < kbc_stop && kb0_stop == ntiles_kv) {
+    int z_KV = 0, zt_gqa = 0, jt = 0;
+    fattn_persistent_decode(kbc, ntiles_kv, ntiles_x, ntiles_z_gqa, &z_KV,
+                             &zt_gqa, &jt);
+    const bool needs_fixup = kb0_start != 0;
+    fattn_persistent_process_tile<Ncols1, DualF16>(
+        config, start_position, token_count, query, query_scale, gate,
+        committed_key, committed_value, candidate_key, candidate_value, output,
+        normalized_query, meta, nblocks, jt, zt_gqa, z_KV, kb0_start,
+        kb0_stop, needs_fixup, false, scratch, keys, values, q_f16, q_lo,
+        scores, qmax, qden, rescale, cparts);
+    kbc += ntiles_kv;
+    kbc -= kbc % ntiles_kv;
+    kb0_start = 0;
+    kb0_stop = ntiles_kv < kbc_stop - kbc ? ntiles_kv : kbc_stop - kbc;
+  }
+
+  if (kbc >= kbc_stop) return;
+  int z_KV = 0, zt_gqa = 0, jt = 0;
+  fattn_persistent_decode(kbc, ntiles_kv, ntiles_x, ntiles_z_gqa, &z_KV,
+                           &zt_gqa, &jt);
+  fattn_persistent_process_tile<Ncols1, DualF16>(
+      config, start_position, token_count, query, query_scale, gate,
+      committed_key, committed_value, candidate_key, candidate_value, output,
+      normalized_query, meta, nblocks, jt, zt_gqa, z_KV, kb0_start, kb0_stop,
+      false, true, scratch, keys, values, q_f16, q_lo, scores, qmax, qden,
+      rescale, cparts);
+}
+
+__global__ void fattn_persistent_uniform_fixup(
+    AttentionConfig config, std::size_t token_count, const float* gate,
+    float* output, const float* meta, int nblocks, int ntiles_x,
+    int ntiles_z_gqa) {
+  constexpr int kNcols = kSelectedAttentionMmaQueryRows * kFattnNcols2;
+  constexpr int kNcols1 = kSelectedAttentionMmaQueryRows;
+  const std::size_t width = config.head_width;
+  const std::size_t values =
+      token_count * static_cast<std::size_t>(config.query_heads) * width;
+  const std::size_t index = static_cast<std::size_t>(blockIdx.x) *
+                                static_cast<std::size_t>(blockDim.x) +
+                            static_cast<std::size_t>(threadIdx.x);
+  if (index >= values) return;
+  const std::size_t row_values =
+      static_cast<std::size_t>(config.query_heads) * width;
+  const std::size_t row = index / row_values;
+  const std::size_t in_row = index % row_values;
+  const int head = static_cast<int>(in_row / width);
+  const int dim = static_cast<int>(in_row % width);
+  const int gqa = static_cast<int>(config.query_heads / config.kv_heads);
+  const int kv_head = head / gqa;
+  const int gqa_off = head % gqa;
+  const int zt_gqa = gqa_off / kFattnNcols2;
+  const int member = gqa_off % kFattnNcols2;
+  const int jt = static_cast<int>(row) / kNcols1;
+  const int row_in = static_cast<int>(row) % kNcols1;
+  const int qcol = member * kNcols1 + row_in;
+  const int ntiles_dst = ntiles_x * ntiles_z_gqa * static_cast<int>(config.kv_heads);
+  const int bpt = nblocks / ntiles_dst;
+  const int dest_id =
+      (kv_head * ntiles_z_gqa + zt_gqa) * ntiles_x + jt;
+  const int b_first = dest_id * bpt;
+  const int b_last = b_first + bpt - 1;
+  float vkq = output[index];
+  const float* last_meta = meta + (b_last * kNcols + qcol) * 2;
+  float mx = last_meta[0];
+  float den = last_meta[1];
+  const float* data = meta + nblocks * kNcols * 4;
+  for (int bidx = b_last - 1; bidx >= b_first; --bidx) {
+    const float add = data[(bidx * kNcols + qcol) * static_cast<int>(width) + dim];
+    const float* add_meta = meta + ((nblocks + bidx) * kNcols + qcol) * 2;
+    const float mx_add = add_meta[0];
+    const float den_add = add_meta[1];
+    const float new_max = fmaxf(mx, mx_add);
+    const float scale0 = mx == -INFINITY ? 0.0F : expf(mx - new_max);
+    const float scale1 = mx_add == -INFINITY ? 0.0F : expf(mx_add - new_max);
+    vkq = vkq * scale0 + add * scale1;
+    den = den * scale0 + den_add * scale1;
+    mx = new_max;
+  }
+  const float attn = den == 0.0F ? 0.0F : vkq / den;
+  output[index] = attn * fattn_output_gate(gate[index]);
+}
+
+__global__ void fattn_persistent_general_fixup(
+    AttentionConfig config, std::size_t token_count, const float* gate,
+    float* output, const float* meta, int ntiles_kv, int ntiles_x,
+    int ntiles_z_gqa, int total_work) {
+  constexpr int kNcols = kSelectedAttentionMmaQueryRows * kFattnNcols2;
+  constexpr int kNcols1 = kSelectedAttentionMmaQueryRows;
+  const int nblocks = static_cast<int>(gridDim.x);
+  const int bidx0 = static_cast<int>(blockIdx.x);
+  const int j = static_cast<int>(blockIdx.y);
+  const int c = static_cast<int>(blockIdx.z);
+  const int qcol = c * kNcols1 + j;
+  const int tid = static_cast<int>(threadIdx.x);
+  const int width = static_cast<int>(config.head_width);
+  if (tid >= width) return;
+  const int kbc0 = static_cast<int>(
+      static_cast<long long>(bidx0) * total_work / nblocks);
+  const int kbc0_stop = static_cast<int>(
+      static_cast<long long>(bidx0 + 1) * total_work / nblocks);
+  const bool did_not_have_any_data = kbc0 == kbc0_stop;
+  const bool wrote_beginning_of_tile =
+      ntiles_kv > 0 && kbc0 % ntiles_kv == 0;
+  const bool did_not_write_last =
+      ntiles_kv > 0 && kbc0 / ntiles_kv == kbc0_stop / ntiles_kv &&
+      kbc0_stop % ntiles_kv != 0;
+  if (did_not_have_any_data || wrote_beginning_of_tile || did_not_write_last)
+    return;
+  const int dest = kbc0 / ntiles_kv;
+  const int span = ntiles_x * ntiles_z_gqa;
+  const int z_KV = dest / span;
+  const int rem = dest - z_KV * span;
+  const int zt_gqa = rem / ntiles_x;
+  const int jt = rem - zt_gqa * ntiles_x;
+  const int gqa = static_cast<int>(config.query_heads / config.kv_heads);
+  if (jt * kNcols1 + j >= static_cast<int>(token_count) ||
+      zt_gqa * kFattnNcols2 + c >= gqa)
+    return;
+  const int head = z_KV * gqa + zt_gqa * kFattnNcols2 + c;
+  const int row = jt * kNcols1 + j;
+  const std::size_t index =
+      (static_cast<std::size_t>(row) *
+           static_cast<std::size_t>(config.query_heads) +
+       static_cast<std::size_t>(head)) *
+          static_cast<std::size_t>(width) +
+      static_cast<std::size_t>(tid);
+  float vkq = output[index];
+  const float* last_meta = meta + (bidx0 * kNcols + qcol) * 2;
+  float mx = last_meta[0];
+  float den = last_meta[1];
+  const float* data = meta + nblocks * kNcols * 4;
+  const int tile_kbc0 = kbc0 / ntiles_kv;
+  int bidx = bidx0 - 1;
+  int kbc_stop = kbc0;
+  while (bidx >= 0) {
+    const int kbc = static_cast<int>(
+        static_cast<long long>(bidx) * total_work / nblocks);
+    if (kbc == kbc_stop) {
+      --bidx;
+      kbc_stop = kbc;
+      continue;
+    }
+    const float add =
+        data[(bidx * kNcols + qcol) * width + tid];
+    const float* add_meta = meta + ((nblocks + bidx) * kNcols + qcol) * 2;
+    const float mx_add = add_meta[0];
+    const float den_add = add_meta[1];
+    const float new_max = fmaxf(mx, mx_add);
+    const float scale0 = mx == -INFINITY ? 0.0F : expf(mx - new_max);
+    const float scale1 = mx_add == -INFINITY ? 0.0F : expf(mx_add - new_max);
+    vkq = vkq * scale0 + add * scale1;
+    den = den * scale0 + den_add * scale1;
+    mx = new_max;
+    if (kbc % ntiles_kv == 0 || kbc / ntiles_kv < tile_kbc0) break;
+    --bidx;
+    kbc_stop = kbc;
+  }
+  const float attn = den == 0.0F ? 0.0F : vkq / den;
+  output[index] = attn * fattn_output_gate(gate[index]);
+}
+
+template <int Ncols1, bool DualF16, int Occupancy>
+inline int fattn_persistent_occupancy_typed() noexcept {
+  int occupancy = 0;
+  const int threads = fattn_nthreads_for_ncols1(Ncols1);
+  const std::size_t shared = fattn_quality_shared_bytes(Ncols1, DualF16);
+  cudaError_t error = cudaFuncSetAttribute(
+      fattn_mma_persistent_kernel<Ncols1, DualF16, Occupancy>,
+      cudaFuncAttributeMaxDynamicSharedMemorySize, static_cast<int>(shared));
+  if (error == cudaSuccess)
+    error = cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+        &occupancy, fattn_mma_persistent_kernel<Ncols1, DualF16, Occupancy>,
+        threads, shared);
+  return error == cudaSuccess ? occupancy : 0;
+}
+
+inline cudaError_t launch_fattn_mma_persistent_impl(
+    const AttentionConfig& config, std::size_t start_position,
+    std::size_t token_count, const float* query, const float* query_scale,
+    const float* gate, const __nv_bfloat16* committed_key,
+    const __nv_bfloat16* committed_value, const __nv_bfloat16* candidate_key,
+    const __nv_bfloat16* candidate_value, float* output,
+    float* normalized_query, float* meta, cudaStream_t stream) noexcept {
+  constexpr int Ncols1 = 16;
+  constexpr bool DualF16 = true;
+  constexpr int Occupancy = 2;
+  constexpr int kNthreads = 128;
+  if (meta == nullptr || token_count < 16) return cudaErrorInvalidValue;
+  const int ntiles_x = fattn_persistent_ntiles_x(token_count);
+  const int ntiles_z_gqa = fattn_persistent_ntiles_z_gqa(config);
+  const int ntiles_dst = fattn_persistent_ntiles_dst(config, token_count);
+  const int ntiles_kv = fattn_persistent_ntiles_kv(start_position, token_count);
+  const std::size_t shared = fattn_quality_shared_bytes(Ncols1, DualF16);
+  cudaError_t error = cudaFuncSetAttribute(
+      fattn_mma_persistent_kernel<Ncols1, DualF16, Occupancy>,
+      cudaFuncAttributeMaxDynamicSharedMemorySize, static_cast<int>(shared));
+  if (error != cudaSuccess) return error;
+  int occupancy = 0;
+  error = cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+      &occupancy, fattn_mma_persistent_kernel<Ncols1, DualF16, Occupancy>,
+      kNthreads, shared);
+  if (error != cudaSuccess || occupancy < 1) return cudaErrorInvalidValue;
+  int device = 0;
+  cudaDeviceProp prop{};
+  error = cudaGetDevice(&device);
+  if (error != cudaSuccess) return error;
+  error = cudaGetDeviceProperties(&prop, device);
+  if (error != cudaSuccess) return error;
+  const int nblocks = fattn_compute_persistent_nblocks(
+      prop.multiProcessorCount, occupancy, ntiles_dst, ntiles_kv);
+  if (nblocks <= 0) return cudaErrorInvalidValue;
+  fattn_mma_persistent_kernel<Ncols1, DualF16, Occupancy>
+      <<<dim3(nblocks, 1, 1), kNthreads, shared, stream>>>(
+          config, start_position, token_count, query, query_scale, gate,
+          committed_key, committed_value, candidate_key, candidate_value, output,
+          normalized_query, meta, ntiles_kv, ntiles_x, ntiles_z_gqa);
+  error = cudaPeekAtLastError();
+  if (error != cudaSuccess) return error;
+  const int total_work = ntiles_kv * ntiles_dst;
+  if (nblocks % ntiles_dst == 0 && nblocks > ntiles_dst) {
+    const std::size_t values =
+        token_count * static_cast<std::size_t>(config.query_heads) *
+        config.head_width;
+    const unsigned threads = 256;
+    const unsigned blocks =
+        static_cast<unsigned>((values + threads - 1) / threads);
+    fattn_persistent_uniform_fixup<<<blocks, threads, 0, stream>>>(
+        config, token_count, gate, output, meta, nblocks, ntiles_x,
+        ntiles_z_gqa);
+  } else if (ntiles_dst % nblocks != 0) {
+    fattn_persistent_general_fixup<<<dim3(nblocks, Ncols1, kFattnNcols2),
+                                     256, 0, stream>>>(
+        config, token_count, gate, output, meta, ntiles_kv, ntiles_x,
+        ntiles_z_gqa, total_work);
+  }
+  return cudaPeekAtLastError();
+}
+
 template <int Ncols1, bool DualF16, int Occupancy, int KvParts>
 inline cudaError_t launch_fattn_mma_quality_typed(
     const AttentionConfig& config, std::size_t start_position,
@@ -492,8 +1181,16 @@ inline cudaError_t launch_fattn_mma_quality_path(
     const __nv_bfloat16* candidate_value, float* output,
     float* normalized_query, int ncols1, const char* path, float* partial,
     float* meta, cudaStream_t stream) noexcept {
+  const bool persistent = path != nullptr && path[0] == 'p';
   const bool stream_k = path != nullptr && path[0] == 's';
   const bool occ2 = stream_k || (path != nullptr && path[0] == 'o');
+  if (persistent) {
+    if (meta == nullptr || ncols1 != 16) return cudaErrorInvalidValue;
+    return launch_fattn_mma_persistent_impl(
+        config, start_position, token_count, query, query_scale, gate,
+        committed_key, committed_value, candidate_key, candidate_value,
+        output, normalized_query, meta, stream);
+  }
   if (stream_k && (partial == nullptr || meta == nullptr))
     return cudaErrorInvalidValue;
   if (ncols1 == 16 && stream_k) {
@@ -552,6 +1249,12 @@ inline cudaError_t launch_fattn_mma_stream_k(
     const __nv_bfloat16* candidate_value, float* output,
     float* normalized_query, float* partial, float* meta,
     cudaStream_t stream) noexcept {
+  if (kSelectedPersistentFattnPath[0] == 'p') {
+    return launch_fattn_mma_persistent_impl(
+        config, start_position, token_count, query, query_scale, gate,
+        committed_key, committed_value, candidate_key, candidate_value, output,
+        normalized_query, meta, stream);
+  }
   return launch_fattn_mma_quality_path(
       config, start_position, token_count, query, query_scale, gate,
       committed_key, committed_value, candidate_key, candidate_value, output,
@@ -587,6 +1290,8 @@ inline int fattn_occupancy_for(int ncols1) noexcept {
 }
 
 inline int fattn_occupancy_for_path(const char* path) noexcept {
+  if (path != nullptr && path[0] == 'p')
+    return fattn_persistent_occupancy_typed<16, true, 2>();
   if (path != nullptr && path[0] == 's')
     return fattn_occupancy_typed<16, true, 2, 2>();
   if (path != nullptr && path[0] == 'o')

@@ -202,6 +202,20 @@ std::size_t fattn_stream_k_partial_values(const AttentionConfig& config,
                                           std::size_t token_count) noexcept;
 std::size_t fattn_stream_k_meta_values(const AttentionConfig& config,
                                        std::size_t token_count) noexcept;
+const char* selected_persistent_fattn_path() noexcept;
+bool fattn_uses_persistent_stream_k() noexcept;
+int fattn_persistent_nsm() noexcept;
+int fattn_persistent_nblocks(int nsm, int occupancy, int ntiles_dst,
+                             int ntiles_kv) noexcept;
+std::size_t fattn_persistent_fixup_values(int nblocks) noexcept;
+
+cudaError_t launch_fattn_mma_persistent(
+    const AttentionConfig& config, std::size_t start_position,
+    std::size_t token_count, const float* query, const float* query_scale,
+    const float* gate, const __nv_bfloat16* committed_key,
+    const __nv_bfloat16* committed_value, const __nv_bfloat16* candidate_key,
+    const __nv_bfloat16* candidate_value, float* output,
+    float* normalized_query, float* meta, cudaStream_t stream) noexcept;
 
 cudaError_t launch_attention_prepare_chunk_stream_k(
     const AttentionConfig& config, std::size_t start_position,

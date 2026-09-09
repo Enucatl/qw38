@@ -644,6 +644,40 @@ baseline.
   envelopes unloosened; tiled attention remains the reference; OPT-016
   remains the parity gate owner; does not substitute for the 2K llama.cpp
   parity gate; Quartz ≥ llama.cpp is not this gate.
+- OPT-027 adapts llama.cpp revision
+  `cc83d7b4824f73cfdda4dfbb47ee39804f71b328` (MIT, The ggml authors)
+  Ada+ persistent stream-K from `fattn-common.cuh` (`nblocks_stream_k`,
+  5% occupancy-loss efficiency rounding, uniform/general fixup) and
+  `fattn-mma-f16.cuh` linearized `kbc` / `kbc_stop` tiles. This increment
+  does not vendor those llama.cpp files, does not copy `../ds4`, and does
+  not include ggml headers. Persistent `dst_tmp_meta` would alias existing
+  `prompt_q8_` / `prompt_projected_bf16_`; score scratch stays untouched;
+  no extra `cudaMalloc`. Production prompt attention remains OPT-026
+  Ada+ stream-K (`grid.z=2`) after the paired A/B loss. Persistent kernels
+  remain as non-production symbols. `kSelectedFattnPath` stays
+  `"stream_k"`; `kSelectedPersistentFattnPath` is `off`. Mixer Q8 quality,
+  skinny `mma_i32_j128`, and FFN `shared_y_swiglu_q8` stay. Decode
+  attention stays one-token. Tiled `launch_attention_prepare_chunk_tiled`
+  remains the unloosened OPT-005 reference. **Measured, RTX 5090:** A/B
+  winner `stream_k` (`win=false`; persistent did not strictly beat
+  `stream_k`); live exclusive cold exact-4096 reject versus the frozen
+  successor-oracle baseline 1746.71973; `reverted` true;
+  `successor_oracle` false; `production_persistent_installed` false;
+  `ladder_exhausted` false. Live numbers stay in the report; this ledger
+  does not replace them. The schema-1 contract, rejected fixture, report,
+  and rejection are
+  [`pins/opt027_persistent_fattn_contract.json`](../pins/opt027_persistent_fattn_contract.json),
+  [`fixtures/opt027_persistent_fattn.json`](../fixtures/opt027_persistent_fattn.json),
+  [`evidence/optimization/opt027-persistent-fattn/REPORT.md`](../evidence/optimization/opt027-persistent-fattn/REPORT.md),
+  and
+  [`evidence/optimization/opt027-persistent-fattn/REJECTION.md`](../evidence/optimization/opt027-persistent-fattn/REJECTION.md).
+  The beginner explanation is
+  [`docs/44-cuda-attention-prefill.md`](44-cuda-attention-prefill.md).
+  Proof limit: persistent Ada+ fattn stream-K under unloosened OPT-005
+  envelopes; 4K keep/reject versus the then-current oracle baseline;
+  envelopes unloosened; tiled attention remains the reference; OPT-016
+  remains the parity gate owner; does not substitute for the 2K llama.cpp
+  parity gate; Quartz ≥ llama.cpp is not this gate.
 - CUD-003 introduces no new external implementation source. GGUF Q8_0 decoding
   follows the format already admitted by the pinned scalar decoder, and the
   pointwise/layout equations come from the pinned model contract and scalar

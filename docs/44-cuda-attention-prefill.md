@@ -1,15 +1,19 @@
 # 44. Memory-bounded CUDA attention prefill at 128K
 
-[Index](README.md) · Implementation tasks: ATN-002, OPT-010, OPT-019, OPT-026, and EDU-030 in
+[Index](README.md) · Implementation tasks: ATN-002, OPT-010, OPT-019, OPT-026, OPT-027, and EDU-030 in
 [`implementation_ledger.md`](../implementation_ledger.md)
 · Contracts:
 [`pins/opt019_core_recovery_contract.json`](../pins/opt019_core_recovery_contract.json),
-[`pins/opt026_fattn_streamk_contract.json`](../pins/opt026_fattn_streamk_contract.json)
+[`pins/opt026_fattn_streamk_contract.json`](../pins/opt026_fattn_streamk_contract.json),
+[`pins/opt027_persistent_fattn_contract.json`](../pins/opt027_persistent_fattn_contract.json)
 · Evidence:
 [`fixtures/opt019_core_recovery.json`](../fixtures/opt019_core_recovery.json),
 [`evidence/optimization/opt019-gdn-attention-core/REPORT.md`](../evidence/optimization/opt019-gdn-attention-core/REPORT.md),
 [`fixtures/opt026_fattn_streamk.json`](../fixtures/opt026_fattn_streamk.json),
-[`evidence/optimization/opt026-fattn-streamk/REPORT.md`](../evidence/optimization/opt026-fattn-streamk/REPORT.md)
+[`evidence/optimization/opt026-fattn-streamk/REPORT.md`](../evidence/optimization/opt026-fattn-streamk/REPORT.md),
+[`fixtures/opt027_persistent_fattn.json`](../fixtures/opt027_persistent_fattn.json),
+[`evidence/optimization/opt027-persistent-fattn/REPORT.md`](../evidence/optimization/opt027-persistent-fattn/REPORT.md),
+[`evidence/optimization/opt027-persistent-fattn/REJECTION.md`](../evidence/optimization/opt027-persistent-fattn/REJECTION.md)
 
 [Chapter 43](43-cuda-attention-decode.md) processed one new token. **Prefill**
 processes a known prompt containing many tokens. The same causal rule applies:
@@ -85,9 +89,15 @@ ncols2=2. OPT-026 keeps Ada+ stream-K (KV bipartition plus softmax combine)
 after a paired A/B win versus occupancy-1 whole-tile; occupancy-2 whole-tile
 was eligible but slower than stream-K. The scheduler aliases existing
 `prompt_projected_bf16_` and `prompt_q8_` for the combine buffers. Score
-scratch stays untouched. The two-row tiled path remains the unloosened
-OPT-005 numeric reference. Live 4K keep/reject numbers stay in
-[`evidence/optimization/opt026-fattn-streamk/REPORT.md`](../evidence/optimization/opt026-fattn-streamk/REPORT.md).
+scratch stays untouched. OPT-027 measured llama.cpp Ada+ persistent
+stream-K (`nsm × occupancy` linearized tiles plus 5% efficiency rounding)
+against that production path and did not install it after an A/B loss.
+Production prompt fattn therefore remains OPT-026 `stream_k` (`grid.z=2`).
+The two-row tiled path remains the unloosened OPT-005 numeric reference.
+Live 4K keep/reject numbers stay in
+[`evidence/optimization/opt026-fattn-streamk/REPORT.md`](../evidence/optimization/opt026-fattn-streamk/REPORT.md)
+and
+[`evidence/optimization/opt027-persistent-fattn/REPORT.md`](../evidence/optimization/opt027-persistent-fattn/REPORT.md).
 
 ## Whole-chunk prepare, commit, and cancellation
 
@@ -313,3 +323,39 @@ gate. Artifacts:
 [`fixtures/opt019_core_recovery.json`](../fixtures/opt019_core_recovery.json)
 and
 [`evidence/optimization/opt019-gdn-attention-core/REPORT.md`](../evidence/optimization/opt019-gdn-attention-core/REPORT.md).
+
+## OPT-027 persistent Ada+ fattn stream-K
+
+OPT-027 measured llama.cpp Ada+ **persistent** stream-K for prompt
+attention: launch `nsm × occupancy` blocks over linearized
+KV×destination-tile work, apply 5% occupancy-loss efficiency rounding,
+and combine fractional tiles with uniform or general softmax fixup plus
+the existing output-gate. Persistent fixup would alias existing
+`prompt_q8_` / `prompt_projected_bf16_` (no extra `cudaMalloc`). Score
+scratch stays untouched. `kSelectedFattnPath` stays `"stream_k"` so the
+OPT-026 host pin remains valid. Persistent selection is a separate
+enumerator `kSelectedPersistentFattnPath`.
+
+**Measured, RTX 5090:** paired CUDA-event A/B on production 4096-row fattn
+among `stream_k` (occupancy-2 plus `grid.z=2` KV bipartition) and
+`persistent`. Winner `stream_k`; `persistent` did not strictly beat that
+baseline under frozen OPT-005 envelopes with score scratch untouched.
+Raw A/B samples stay in
+[`evidence/optimization/opt027-persistent-fattn/fattn-ab-raw.txt`](../evidence/optimization/opt027-persistent-fattn/fattn-ab-raw.txt).
+Production therefore stays OPT-026 `stream_k` (`grid.z=2`). Persistent
+kernels remain as non-production symbols. ncols1 stays 16. Tiled
+`launch_attention_prepare_chunk_tiled` remains the unloosened OPT-005
+reference. Decode attention is unchanged. Mixer Q8 quality, skinny
+`mma_i32_j128`, and FFN `shared_y_swiglu_q8` stay. Live exclusive sitting
+**reject:** Quartz mean is not strictly greater than the frozen
+successor-oracle baseline **1746.71973**; `reverted` true;
+`successor_oracle` false; `production_persistent_installed` false; A/B
+winner `stream_k`; `ladder_exhausted` false. `quartz_meets_llama` is
+informational and is not this gate. **The 2K parity owner remains the
+blocked dedicated gate.** This reject does not substitute for that gate
+and does not claim Quartz ≥ llama.cpp. Live numbers stay in the report:
+[`evidence/optimization/opt027-persistent-fattn/REPORT.md`](../evidence/optimization/opt027-persistent-fattn/REPORT.md),
+[`pins/opt027_persistent_fattn_contract.json`](../pins/opt027_persistent_fattn_contract.json),
+[`fixtures/opt027_persistent_fattn.json`](../fixtures/opt027_persistent_fattn.json),
+and
+[`evidence/optimization/opt027-persistent-fattn/REJECTION.md`](../evidence/optimization/opt027-persistent-fattn/REJECTION.md).

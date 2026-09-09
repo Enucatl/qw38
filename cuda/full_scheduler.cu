@@ -2274,6 +2274,9 @@ Status execute_prompt_chunk(
                 workspace->prompt_gdn_recurrent_output_,
                 reinterpret_cast<float*>(workspace->prompt_projected_bf16_),
                 reinterpret_cast<float*>(workspace->prompt_q8_), stream);
+            // Persistent stream-K aliases prompt_q8_ for packed dst_tmp_meta
+            // (fits; no extra cudaMalloc). prompt_projected_bf16_ remains the
+            // OPT-026 partial_vkq alias when persistent is off.
           } else {
             error = launch_attention_prepare_chunk(
                 config, session->frontier_, token_count,
