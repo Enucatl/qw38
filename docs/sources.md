@@ -844,6 +844,39 @@ baseline.
   P D128 D2048 are the keep denominators; does not substitute for the 2K
   llama.cpp parity gate; Quartz ≥ llama.cpp is not this gate. Envelopes
   unloosened; Nsight is not used.
+- OPT-035 is a local derivation over admitted Ada+ stream-K fattn with
+  register-resident value sums. It replaces the scalar register-resident
+  probability×V inner product with dual-F16 probability × F16 V MMA into
+  FP32 C while keeping FP32 online max/denominator. File-level provenance
+  for VKQ MMA is already External: pinned llama.cpp revision
+  `cc83d7b4824f73cfdda4dfbb47ee39804f71b328` (MIT, The ggml authors)
+  `fattn-mma-f16.cuh`. This increment does not vendor that file, does not
+  include ggml headers, and does not copy `../ds4`. Dual-F16 V is out of
+  scope. Production prompt attention keeps ncols1=16, ncols2=2, KV tile 32,
+  dual-F16 Q, `grid.z=2`, and register VKQ. The stream-K combine stays.
+  Score scratch stays untouched; no extra `cudaMalloc`. Combine buffers
+  continue to alias existing `prompt_projected_bf16_` / `prompt_q8_`. Decode
+  attention stays on its partitioned one-token path. Keep denominators are
+  the frozen then-current accepted P / D128 / D2048 means and p95s copied
+  into the contract (P 1745.10315, D128 15.1528101, D2048 13.5596962), not
+  historical 4K successor-oracle 1746.71973, not stale sitting 1637.58594,
+  and not 1644.04822. **Measured, RTX 5090:** A/B winner `mma`; production
+  pin `mma`; `reverted` false; `keep_sitting_skipped` false; `status`
+  measured. Live tok/s stay in the report; this ledger does not replace
+  them. The schema-1 contract, measured fixture, and report are
+  [`pins/opt035_pv_mma_contract.json`](../pins/opt035_pv_mma_contract.json),
+  [`fixtures/opt035_pv_mma.json`](../fixtures/opt035_pv_mma.json),
+  and
+  [`evidence/optimization/opt035-pv-mma/REPORT.md`](../evidence/optimization/opt035-pv-mma/REPORT.md).
+  The beginner explanations are
+  [`docs/44-cuda-attention-prefill.md`](44-cuda-attention-prefill.md),
+  [`docs/62-cuda-full-prefill.md`](62-cuda-full-prefill.md), and
+  [`docs/06-system-optimization.md`](06-system-optimization.md).
+  Proof limit: frozen attention envelopes; lower component time; improved
+  P; cross-workload guard; then-current accepted P D128 D2048 are the keep
+  denominators; does not substitute for the 2K llama.cpp parity gate;
+  Quartz ≥ llama.cpp is not this gate. Byte equality versus scalar is not
+  this keep predicate. Envelopes unloosened; Nsight is not used.
 - OPT-036 is a local derivation over admitted ATN-001 tiled one-token decode.
   It splits the legal KV range into contiguous partitions `{1, 4, 8, 16}`,
   keeps candidate `1` as today's tiled kernel, and merges FP32 partial max /

@@ -1,12 +1,13 @@
 # 44. Memory-bounded CUDA attention prefill at 128K
 
-[Index](README.md) · Implementation tasks: ATN-002, OPT-010, OPT-019, OPT-026, OPT-027, OPT-033, and EDU-030 in
+[Index](README.md) · Implementation tasks: ATN-002, OPT-010, OPT-019, OPT-026, OPT-027, OPT-033, OPT-035, and EDU-030 in
 [`implementation_ledger.md`](../implementation_ledger.md)
 · Contracts:
 [`pins/opt019_core_recovery_contract.json`](../pins/opt019_core_recovery_contract.json),
 [`pins/opt026_fattn_streamk_contract.json`](../pins/opt026_fattn_streamk_contract.json),
 [`pins/opt027_persistent_fattn_contract.json`](../pins/opt027_persistent_fattn_contract.json),
-[`pins/opt033_register_vkq_contract.json`](../pins/opt033_register_vkq_contract.json)
+[`pins/opt033_register_vkq_contract.json`](../pins/opt033_register_vkq_contract.json),
+[`pins/opt035_pv_mma_contract.json`](../pins/opt035_pv_mma_contract.json)
 · Evidence:
 [`fixtures/opt019_core_recovery.json`](../fixtures/opt019_core_recovery.json),
 [`evidence/optimization/opt019-gdn-attention-core/REPORT.md`](../evidence/optimization/opt019-gdn-attention-core/REPORT.md),
@@ -16,7 +17,9 @@
 [`evidence/optimization/opt027-persistent-fattn/REPORT.md`](../evidence/optimization/opt027-persistent-fattn/REPORT.md),
 [`evidence/optimization/opt027-persistent-fattn/REJECTION.md`](../evidence/optimization/opt027-persistent-fattn/REJECTION.md),
 [`fixtures/opt033_register_vkq.json`](../fixtures/opt033_register_vkq.json),
-[`evidence/optimization/opt033-register-vkq/REPORT.md`](../evidence/optimization/opt033-register-vkq/REPORT.md)
+[`evidence/optimization/opt033-register-vkq/REPORT.md`](../evidence/optimization/opt033-register-vkq/REPORT.md),
+[`fixtures/opt035_pv_mma.json`](../fixtures/opt035_pv_mma.json),
+[`evidence/optimization/opt035-pv-mma/REPORT.md`](../evidence/optimization/opt035-pv-mma/REPORT.md)
 
 [Chapter 43](43-cuda-attention-decode.md) processed one new token. **Prefill**
 processes a known prompt containing many tokens. The same causal rule applies:
@@ -97,15 +100,17 @@ stream-K (`nsm × occupancy` linearized tiles plus 5% efficiency rounding)
 against that production path and did not install it after an A/B loss.
 OPT-033 then kept register-resident value accumulation on that same
 stream-K grid: each thread holds the running FP32 value sum across 32-row
-KV tiles and stores once after the KV loop. Production prompt fattn
+KV tiles and stores once after the KV loop. OPT-035 then kept dual-F16
+probability×V MMA on that register-resident path. Production prompt fattn
 therefore remains OPT-026 `stream_k` (`grid.z=2`) with the OPT-033
-`registers` pin. Decode `launch_attention_prepare` partitions stay.
-The two-row tiled path remains the unloosened OPT-005 numeric reference.
-Live 4K keep/reject numbers stay in
+`registers` pin and the OPT-035 `mma` pin. Decode `launch_attention_prepare`
+partitions stay. The two-row tiled path remains the unloosened OPT-005
+numeric reference. Live 4K keep/reject numbers stay in
 [`evidence/optimization/opt026-fattn-streamk/REPORT.md`](../evidence/optimization/opt026-fattn-streamk/REPORT.md),
 [`evidence/optimization/opt027-persistent-fattn/REPORT.md`](../evidence/optimization/opt027-persistent-fattn/REPORT.md),
+[`evidence/optimization/opt033-register-vkq/REPORT.md`](../evidence/optimization/opt033-register-vkq/REPORT.md),
 and
-[`evidence/optimization/opt033-register-vkq/REPORT.md`](../evidence/optimization/opt033-register-vkq/REPORT.md).
+[`evidence/optimization/opt035-pv-mma/REPORT.md`](../evidence/optimization/opt035-pv-mma/REPORT.md).
 
 ## Whole-chunk prepare, commit, and cancellation
 
@@ -399,4 +404,39 @@ false. Live means, p95s, and per-candidate samples stay in the report;
 this chapter does not replace them:
 [`evidence/optimization/opt033-register-vkq/REPORT.md`](../evidence/optimization/opt033-register-vkq/REPORT.md).
 This is a register-resident prefill value-sum keep/reject under frozen
+envelopes, not the 2K llama.cpp parity gate and not Quartz ≥ llama.cpp.
+
+## Dual-F16 probability×V MMA (OPT-035)
+
+Production stream-K quality still scores KV in 32-row tiles with
+register-resident VKQ. Q×K already uses dual-F16 Q MMA into FP32 C. The
+previous path accumulated probability×V as a scalar register inner
+product. OPT-035 converts softmax weights to two F16 probability
+components on the fly, converts BF16 V to single F16, and accumulates
+with existing `mma_m16n8k16_f16_f32` into FP32 C. Online max/denominator
+stay FP32. The stream-K combine kernel is unchanged. Ncols1=16, Ncols2=2,
+KV tile 32, dual-F16 Q, `__launch_bounds__(128, 2)`, `grid.z=2`, and
+register VKQ stay frozen. Score scratch stays untouched. Combine buffers
+continue to alias existing `prompt_projected_bf16_` / `prompt_q8_`. There
+is no extra persistent `cudaMalloc`. Dual-F16 V is out of scope. Decode
+attention stays on its partitioned one-token path.
+
+`launch_attention_prepare_chunk_stream_k` honors compile-time
+`kSelectedVkqAccum` (`registers`) and `kSelectedPvPath`. Both `scalar`
+and `mma` remain launchable so the paired A/B can compare them. Byte
+equality versus scalar is not the keep predicate; MMA reassociation plus
+the F16 probability split will not match scalar lane products. OPT-005
+envelopes versus tiled remain the numeric gate.
+
+**Measured, RTX 5090:** paired 3-warm / 30-alternating CUDA-event A/B at
+4096 rows including combine selected **mma**. Occupancy met the
+eligibility floor, frozen OPT-005 envelopes versus tiled held, and the
+component mean was strictly lower than scalar. Keep also required live P
+tok/s strictly above the frozen then-current accepted P denominator
+**1745.10315** and the cross-workload D128/D2048 guard. D2048 tok/s
+improvement is not required for this prefill keep. Production pin is
+`mma`. `reverted` is false. Live means, p95s, and per-candidate samples
+stay in the report; this chapter does not replace them:
+[`evidence/optimization/opt035-pv-mma/REPORT.md`](../evidence/optimization/opt035-pv-mma/REPORT.md).
+This is a dual-F16 probability×V MMA prefill keep/reject under frozen
 envelopes, not the 2K llama.cpp parity gate and not Quartz ≥ llama.cpp.

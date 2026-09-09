@@ -1,6 +1,6 @@
 # Chunked full-model CUDA prefill
 
-[Index](README.md) · Implementation tasks: SCH-002, MEM-002, OPT-008, OPT-009, OPT-011, OPT-012, OPT-013, OPT-014, OPT-015, OPT-017, OPT-018, OPT-019, OPT-020, OPT-021, OPT-022, OPT-023, OPT-024, OPT-025, OPT-026, OPT-027, OPT-028, OPT-029, OPT-030, OPT-032, OPT-033, and EDU-047 in
+[Index](README.md) · Implementation tasks: SCH-002, MEM-002, OPT-008, OPT-009, OPT-011, OPT-012, OPT-013, OPT-014, OPT-015, OPT-017, OPT-018, OPT-019, OPT-020, OPT-021, OPT-022, OPT-023, OPT-024, OPT-025, OPT-026, OPT-027, OPT-028, OPT-029, OPT-030, OPT-032, OPT-033, OPT-035, and EDU-047 in
 [`implementation_ledger.md`](../implementation_ledger.md) · Contracts:
 [`pins/cuda_prompt_scheduler_contract.json`](../pins/cuda_prompt_scheduler_contract.json),
 [`pins/cuda_prompt_pipeline_contract.json`](../pins/cuda_prompt_pipeline_contract.json),
@@ -23,7 +23,8 @@
 [`pins/opt029_gdn_fuse_contract.json`](../pins/opt029_gdn_fuse_contract.json),
 [`pins/opt030_pdl_launches_contract.json`](../pins/opt030_pdl_launches_contract.json),
 [`pins/opt032_decode_oracle_contract.json`](../pins/opt032_decode_oracle_contract.json),
-[`pins/opt033_register_vkq_contract.json`](../pins/opt033_register_vkq_contract.json)
+[`pins/opt033_register_vkq_contract.json`](../pins/opt033_register_vkq_contract.json),
+[`pins/opt035_pv_mma_contract.json`](../pins/opt035_pv_mma_contract.json)
 · Evidence: [`fixtures/cuda_prompt_scheduler.json`](../fixtures/cuda_prompt_scheduler.json),
 [`fixtures/cuda_prompt_pipeline.json`](../fixtures/cuda_prompt_pipeline.json),
 [`fixtures/cuda_prompt_graph.json`](../fixtures/cuda_prompt_graph.json),
@@ -46,6 +47,7 @@
 [`fixtures/opt030_pdl_launches.json`](../fixtures/opt030_pdl_launches.json),
 [`fixtures/opt032_decode_oracle.json`](../fixtures/opt032_decode_oracle.json),
 [`fixtures/opt033_register_vkq.json`](../fixtures/opt033_register_vkq.json),
+[`fixtures/opt035_pv_mma.json`](../fixtures/opt035_pv_mma.json),
 [`evidence/optimization/opt015-2k-recovery/REPORT.md`](../evidence/optimization/opt015-2k-recovery/REPORT.md),
 [`evidence/optimization/opt017-mixer-q8-mma/REPORT.md`](../evidence/optimization/opt017-mixer-q8-mma/REPORT.md),
 [`evidence/optimization/opt018-ffn-mma-quality/REPORT.md`](../evidence/optimization/opt018-ffn-mma-quality/REPORT.md),
@@ -65,7 +67,8 @@
 [`evidence/optimization/opt030-pdl-launches/REPORT.md`](../evidence/optimization/opt030-pdl-launches/REPORT.md),
 [`evidence/optimization/opt030-pdl-launches/REJECTION.md`](../evidence/optimization/opt030-pdl-launches/REJECTION.md),
 [`evidence/optimization/opt032-decode-oracle/REPORT.md`](../evidence/optimization/opt032-decode-oracle/REPORT.md),
-[`evidence/optimization/opt033-register-vkq/REPORT.md`](../evidence/optimization/opt033-register-vkq/REPORT.md)
+[`evidence/optimization/opt033-register-vkq/REPORT.md`](../evidence/optimization/opt033-register-vkq/REPORT.md),
+[`evidence/optimization/opt035-pv-mma/REPORT.md`](../evidence/optimization/opt035-pv-mma/REPORT.md)
 
 ## Why prompt execution differs from decode
 
@@ -198,10 +201,12 @@ Attention also visits chunk rows in order. Production
 (ncols1=16, ncols2=2) and the two-row tiled path otherwise. Prompt scheduler
 attention uses Ada+ stream-K after the OPT-026 A/B win, aliasing existing
 workspace for the softmax combine, with register-resident value sums after
-the OPT-033 keep. OPT-027 measured persistent stream-K
-against that path and did not install it; production remains
-`stream_k` (`grid.z=2`) with `kSelectedVkqAccum = "registers"`. The tiled path remains the unloosened
-OPT-005 numeric reference. Rank-3 warp-0 MMA is retained for A/B. A row may read all committed KV rows
+the OPT-033 keep and dual-F16 probability×V MMA after the OPT-035 keep.
+OPT-027 measured persistent stream-K against that path and did not install
+it; production remains `stream_k` (`grid.z=2`) with
+`kSelectedVkqAccum = "registers"` and `kSelectedPvPath = "mma"`. The tiled
+path remains the unloosened OPT-005 numeric reference. Rank-3 warp-0 MMA is
+retained for A/B. A row may read all committed KV rows
 from earlier chunks and candidate rows earlier in its current chunk, never a
 future row. Partial RoPE uses the absolute position `old frontier + row`.
 
@@ -752,6 +757,29 @@ numbers stay in the report:
 [`pins/opt033_register_vkq_contract.json`](../pins/opt033_register_vkq_contract.json),
 and [`fixtures/opt033_register_vkq.json`](../fixtures/opt033_register_vkq.json).
 
+OPT-035 keeps dual-F16 probability×V MMA on production 4096-row fattn-mma
+stream-K including combine, on top of register-resident VKQ. **Measured,
+RTX 5090:** paired CUDA-event A/B among `scalar` and `mma`; winner `mma`
+with frozen OPT-005 envelopes versus tiled and strictly lower component
+time. Production `kSelectedPvPath` is `mma`. Ncols1 stays 16, Ncols2 stays
+2, KV tile stays 32, dual-F16 Q stays, `grid.z` stays 2, and register VKQ
+stays. Dual-F16 V is out of scope. The combine kernel stays. Decode 16/16
+partitions stay. Mixer Q8 quality, skinny `mma_i32_j128`, FFN
+`shared_y_swiglu_q8`, and GDN warp-column stay. Tiled
+`launch_attention_prepare_chunk_tiled` remains the unloosened OPT-005
+reference. Byte equality versus scalar is not this keep predicate. Live
+exclusive sitting **keep:** Quartz P strictly greater than the frozen
+then-current accepted denominator **1745.10315**; D128/D2048 throughput
+and p95 guards held; `reverted` false; `keep_sitting_skipped` false;
+`status` measured. D2048 tok/s improvement is not required for this
+prefill keep. `quartz_meets_llama` is informational and is not this gate.
+**The 2K parity owner remains the blocked dedicated gate.** This keep does
+not substitute for that gate and does not claim Quartz ≥ llama.cpp. Live
+numbers stay in the report:
+[`evidence/optimization/opt035-pv-mma/REPORT.md`](../evidence/optimization/opt035-pv-mma/REPORT.md),
+[`pins/opt035_pv_mma_contract.json`](../pins/opt035_pv_mma_contract.json),
+and [`fixtures/opt035_pv_mma.json`](../fixtures/opt035_pv_mma.json).
+
 The **proof boundary** excludes comparative speed claims, 2K/8K sustained
 prefill throughput, execution of a 128K prefill, 128K retrieval quality, thermal
 stability, superiority to llama.cpp/vLLM, and a Nsight Systems overlap timeline.
@@ -800,7 +828,12 @@ gate, not Quartz ≥ llama.cpp, and not a BEN-001 `qw38-bench` result. OPT-033
 records register-resident prefill attention value sums and a live 4K keep
 versus the then-current accepted P denominator with the D128/D2048 guard;
 production fattn remains `stream_k` (`grid.z=2`) with `registers` value
-accumulation; it does not own or pass the 2K tok/s gate. BEN-001
+accumulation; it does not own or pass the 2K tok/s gate. OPT-035 records
+dual-F16 probability×V MMA on that register-resident path and a live 4K
+keep versus the then-current accepted P denominator with the D128/D2048
+guard; production fattn remains `stream_k` (`grid.z=2`) with `registers`
+value accumulation and `mma` probability×V; it does not own or pass the
+2K tok/s gate. BEN-001
 provides the harness; CMP-002/CMP-003 still own the 30-sample comparative gate.
 QLT-001 remains blocked. OPT-012's prompt graphs are FFN subgraphs only: not a
 whole-chunk graph, not a speedup gate, and not 128K quality recovery.

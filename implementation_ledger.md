@@ -101,7 +101,7 @@ are repository-relative unless stated otherwise.
 | OPT-032 | Freeze decode oracle and refresh sink attribution | BEN-001, OPT-020, OPT-026 | done | Extend diagnostics with fresh P, D128, and D2048 baselines, exclusive decode categories, and matched pinned llama.cpp measurements; accept complete reproducible evidence and a recorded next-task order; this task claims no performance improvement | [`tasks/OPT-032.md`](tasks/OPT-032.md); [`pins/opt032_decode_oracle_contract.json`](pins/opt032_decode_oracle_contract.json); [`fixtures/opt032_decode_oracle.json`](fixtures/opt032_decode_oracle.json); [`evidence/optimization/opt032-decode-oracle/REPORT.md`](evidence/optimization/opt032-decode-oracle/REPORT.md); verification 2026-09-09T16:08:20Z |
 | OPT-033 | Retain attention value sums in registers | OPT-032, OPT-026 | done | A/B full 4096-row attention including combine; keep register-resident value accumulation only with byte-equal output, lower component time, improved P, and the cross-workload guard; otherwise reject | [`tasks/OPT-033.md`](tasks/OPT-033.md); [`pins/opt033_register_vkq_contract.json`](pins/opt033_register_vkq_contract.json); [`fixtures/opt033_register_vkq.json`](fixtures/opt033_register_vkq.json); [`cuda/fattn_register_vkq_ab_test.cu`](cuda/fattn_register_vkq_ab_test.cu); [`evidence/optimization/opt033-register-vkq/REPORT.md`](evidence/optimization/opt033-register-vkq/REPORT.md); verification 2026-09-09T18:39:00Z |
 | OPT-034 | Packed blockwise Q4_K/Q6_K MMV loads | OPT-032, CUD-001 | pending | A/B production batch-1 projection shapes with unchanged packed staging and FP32 lane/reduction order; keep only with byte equality, lower weighted MMV time, improved D2048, and the cross-workload guard; otherwise reject | — |
-| OPT-035 | MMA attention probability times V | OPT-033 | pending | A/B full 4096-row attention using dual-F16 probability×V MMA; retain frozen attention envelopes, lower component time, improved P, and the cross-workload guard; otherwise reject | — |
+| OPT-035 | MMA attention probability times V | OPT-033 | done | A/B full 4096-row attention using dual-F16 probability×V MMA; retain frozen attention envelopes, lower component time, improved P, and the cross-workload guard; otherwise reject | [`tasks/OPT-035.md`](tasks/OPT-035.md); [`pins/opt035_pv_mma_contract.json`](pins/opt035_pv_mma_contract.json); [`fixtures/opt035_pv_mma.json`](fixtures/opt035_pv_mma.json); [`cuda/fattn_pv_mma_ab_test.cu`](cuda/fattn_pv_mma_ab_test.cu); [`evidence/optimization/opt035-pv-mma/REPORT.md`](evidence/optimization/opt035-pv-mma/REPORT.md); verification 2026-09-09T19:58:00Z |
 | OPT-036 | Partition KV for vector decode attention | OPT-032, OPT-026 | done | A/B one-token vector attention at 1/4/8/16 KV partitions for D128/D2048 with deterministic partial-statistic merge; keep only with frozen attention envelopes, lower component time, improved D2048, and the cross-workload guard; otherwise reject | [`tasks/OPT-036.md`](tasks/OPT-036.md); [`pins/opt036_decode_kv_partition_contract.json`](pins/opt036_decode_kv_partition_contract.json); [`fixtures/opt036_decode_kv_partition.json`](fixtures/opt036_decode_kv_partition.json); [`cuda/decode_kv_partition_ab_test.cu`](cuda/decode_kv_partition_ab_test.cu); [`evidence/optimization/opt036-decode-kv-partition/REPORT.md`](evidence/optimization/opt036-decode-kv-partition/REPORT.md); verification 2026-09-09T17:32:00Z |
 | OPT-037 | Select 4K FFN tiles per projection | OPT-032, OPT-025 | pending | Sweep quality-MMQ I={64,128}, J={32,64,128} independently for 4096-row gate/up/down, preserve shared-Y and recapture graphs; keep only with admitted component wins, improved P, frozen MMQ envelopes, and the cross-workload guard; otherwise reject | — |
 
@@ -4923,3 +4923,56 @@ are repository-relative unless stated otherwise.
   stays `blocked`. OPT-034, OPT-035, and OPT-037 remain `pending` and
   are not started. Next eligible pending by ledger row order:
   **OPT-031**.
+
+### 2026-09-09T18:47:00Z — OPT-035 planning admitted
+
+- Planning produced decision-complete dossier [`tasks/OPT-035.md`](tasks/OPT-035.md).
+- Coupled IDs: none. Plan impact `none`. Chosen sink is prefill
+  `attention_core`. Keep denominators are OPT-033 post-keep P
+  **1745.10315**, D128 **15.1528101**, D2048 **13.5596962** (and the
+  recorded p95s), not historical OPT-026 P **1746.71973**. A/B is
+  `scalar` versus `mma` at 4096 rows including combine, 3 warm +
+  30 alternating, dual-F16 probability × F16 V MMA with FP32 C,
+  FP32 online max/denominator, frozen Ncols1=16, Ncols2=2, KV tile 32,
+  dual-F16 Q, `grid.z=2`, register VKQ. Keep only with frozen
+  envelopes versus tiled, strictly lower component time, improved P,
+  and the cross-workload guard; otherwise revert with retained
+  evidence. Byte equality versus scalar is not the keep predicate.
+  Spills or occupancy loss that erase the A/B win are a reject.
+- Marked OPT-035 `in_progress`. OPT-034 and OPT-037 remain `pending`
+  and are not started. Non-final audit row inserted. No commit.
+  `plan.md` is unchanged.
+
+### 2026-09-09T20:00:00Z — OPT-035 delivered (KEEP)
+
+- Independent verification attempt 1 passed. Production prompt stream-K
+  installs dual-F16 probability×V MMA (`kSelectedPvPath = "mma"`) after
+  the 4096-row A/B including combine: `mma` meets frozen OPT-005 envelopes
+  versus tiled and is strictly faster (scalar **44.8905029** ms → mma
+  **35.445816** ms). Exclusive RTX 5090 sitting wrote
+  [`fixtures/opt035_pv_mma.json`](fixtures/opt035_pv_mma.json)
+  (`measurement_utc` 2026-09-09T19:20:04Z; P Quartz **1745.10315** →
+  **1865.21155** tok/s; D128 Quartz **15.1528101** → **15.0562878**;
+  D2048 Quartz **13.5596962** → **13.5411425**; D128 all-token p95
+  66.5563431 → 66.6085587 and run-mean p95 66.0279617 → 66.06633;
+  D2048 all-token p95 74.2697372 → 74.366951 and run-mean p95
+  73.807579 → 73.9000702; occupancy 1 on both; OPT-005 vs tiled
+  max_abs 9.76026058e-07, rms 2.94235409e-08; `reverted` false;
+  `status` measured). Cross-workload guard held. Native test does not
+  require Quartz ≥ llama.cpp. Coupled IDs: none. Delivery re-check:
+  `uv run pytest -q tests/test_documentation.py tests/test_opt035_pv_mma.py`.
+- Acceptance evidence: [`tasks/OPT-035.md`](tasks/OPT-035.md);
+  [`pins/opt035_pv_mma_contract.json`](pins/opt035_pv_mma_contract.json);
+  [`fixtures/opt035_pv_mma.json`](fixtures/opt035_pv_mma.json);
+  [`cuda/fattn_pv_mma_ab_test.cu`](cuda/fattn_pv_mma_ab_test.cu);
+  [`evidence/optimization/opt035-pv-mma/REPORT.md`](evidence/optimization/opt035-pv-mma/REPORT.md);
+  [`docs/06-system-optimization.md`](docs/06-system-optimization.md);
+  [`docs/44-cuda-attention-prefill.md`](docs/44-cuda-attention-prefill.md);
+  [`docs/62-cuda-full-prefill.md`](docs/62-cuda-full-prefill.md).
+  Proof is dual-F16 probability×V MMA under frozen envelopes versus
+  then-current accepted P/D128/D2048 denominators, not the 2K llama.cpp
+  parity gate.
+- Marked OPT-035 `done`; delivery is limited to the verified task scope
+  plus this ledger/audit bookkeeping. `plan.md` is unchanged. OPT-016
+  stays `blocked`. OPT-034 and OPT-037 remain `pending` and are not
+  started. Next eligible pending by ledger row order: **OPT-031**.
