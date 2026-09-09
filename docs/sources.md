@@ -467,6 +467,24 @@ baseline.
   The historical eight-category snapshot remains
   [`fixtures/cuda_prefill_attribution.json`](../fixtures/cuda_prefill_attribution.json).
   No external profiler workflow or kernel implementation was copied or adapted.
+- OPT-021 introduces no new external implementation source. Pinned llama.cpp
+  revision `cc83d7b4824f73cfdda4dfbb47ee39804f71b328` `llama-bench` is already
+  the External same-GGUF authority. This increment freezes a local exclusive-
+  RTX-5090 exact-4096 keep/reject protocol: three cold production
+  `sync_tokens` walls with attribution null and graphs created, compared to
+  same-sitting `llama-bench -p 4096 -n 0 --no-warmup -r 3 -ngl 99`. The
+  schema-1 contract, retained live fixture, and claim-labeled report are
+  [`pins/opt021_oracle_contract.json`](../pins/opt021_oracle_contract.json),
+  [`fixtures/opt021_oracle.json`](../fixtures/opt021_oracle.json), and
+  [`evidence/optimization/opt021-4k-oracle/REPORT.md`](../evidence/optimization/opt021-4k-oracle/REPORT.md).
+  The beginner explanations are
+  [`docs/61-benchmark-harness.md`](61-benchmark-harness.md),
+  [`docs/62-cuda-full-prefill.md`](62-cuda-full-prefill.md), and
+  [`docs/06-system-optimization.md`](06-system-optimization.md).
+  Proof limit: 4K keep/reject oracle; envelopes unloosened; does not
+  substitute for the 2K llama.cpp parity gate; attribution null; graphs
+  created; scout sitting is not the retained fixture. Quartz ≥ llama.cpp is
+  not this gate. No kernel implementation was copied or adapted.
 - CUD-003 introduces no new external implementation source. GGUF Q8_0 decoding
   follows the format already admitted by the pinned scalar decoder, and the
   pointwise/layout equations come from the pinned model contract and scalar
@@ -652,7 +670,11 @@ baseline.
   is Measured component recovery, and is not the OPT-016 2K parity gate.
   OPT-020 later splits mixer-projection MMQ out of the composite GDN and
   attention buckets; that increment is documented separately and is
-  instrumentation, not a throughput gate. Exact
+  instrumentation, not a throughput gate. OPT-021 later pins the exclusive
+  exact-4096 keep/reject oracle against same-sitting `llama-bench` 4K; that
+  increment is documented separately, is Measured protocol/baseline plus
+  External `llama-bench` provenance, and is not the OPT-016 2K parity gate.
+  Exact
   `[4096, 1]` differential, capacity fallback, cancellation, and memory
   evidence is authenticated in
   [`pins/cuda_prompt_scheduler_contract.json`](../pins/cuda_prompt_scheduler_contract.json)

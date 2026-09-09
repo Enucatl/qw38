@@ -87,7 +87,7 @@ are repository-relative unless stated otherwise.
 | OPT-018 | Close Q4_K/Q6_K MMA MMQ quality gap versus pinned llama.cpp | OPT-009, OPT-015 | done | Production Q4_K/Q6_K prompt MMA MMQ is brought to llama-competitive 2K FFN time on the same GGUF and RTX 5090 under unloosened CUD-002 envelopes, with retained variant reference, measured before/after FFN category time, and file-level llama.cpp/`plan.md` provenance; does not substitute for the OPT-016 end-to-end gate | [`tasks/OPT-018.md`](tasks/OPT-018.md); [`pins/opt018_ffn_mma_contract.json`](pins/opt018_ffn_mma_contract.json); [`fixtures/opt018_ffn_mma.json`](fixtures/opt018_ffn_mma.json); [`evidence/optimization/opt018-ffn-mma-quality/REPORT.md`](evidence/optimization/opt018-ffn-mma-quality/REPORT.md); verification 2026-09-08T18:55:28Z |
 | OPT-019 | Close residual GDN and attention core time after mixer Q8_0 MMA | OPT-017, OPT-015 | done | After mixer projections are on MMA, remaining non-projection GDN scan/recurrence and causal attention core paths are brought down under frozen GDN/attention envelopes with retained references; live 2K re-attribution shows the residual sinks addressed; does not substitute for the OPT-016 end-to-end gate | [`tasks/OPT-019.md`](tasks/OPT-019.md); [`pins/opt019_core_recovery_contract.json`](pins/opt019_core_recovery_contract.json); [`fixtures/opt019_core_recovery.json`](fixtures/opt019_core_recovery.json); [`evidence/optimization/opt019-gdn-attention-core/REPORT.md`](evidence/optimization/opt019-gdn-attention-core/REPORT.md); verification 2026-09-08T20:54:21Z |
 | OPT-020 | Split 2K attribution into mixer MMQ versus core GDN/attention | OPT-014 | done | Cold exact-2048 attribution exposes separate mixer-projection MMQ time versus GDN-core and attention-core time (plus existing FFN/logits/commit/graph/idle), reconstructs wall within the OPT-014 tolerance, and is retained for OPT-017–OPT-019 steering; not a throughput gate | [`tasks/OPT-020.md`](tasks/OPT-020.md); [`pins/opt020_prefill_split_contract.json`](pins/opt020_prefill_split_contract.json); [`fixtures/opt020_prefill_split.json`](fixtures/opt020_prefill_split.json); verification 2026-09-08T21:29:30Z |
-| OPT-021 | Pin cold 4K prefill oracle protocol and baseline | OPT-020 | pending | Frozen protocol and checked-in report compare cold exact-4096 Quartz `sync_tokens` (3 replicates, attribution null, graphs created, production path) to same-sitting llama.cpp `llama-bench -p 4096 -n 0 --no-warmup -r 3 -ngl 99` on the pinned GGUF and RTX 5090; baseline Quartz/llama tok/s are retained as the OPT-022+ keep/reject oracle; does not substitute for OPT-016 | — |
+| OPT-021 | Pin cold 4K prefill oracle protocol and baseline | OPT-020 | done | Frozen protocol and checked-in report compare cold exact-4096 Quartz `sync_tokens` (3 replicates, attribution null, graphs created, production path) to same-sitting llama.cpp `llama-bench -p 4096 -n 0 --no-warmup -r 3 -ngl 99` on the pinned GGUF and RTX 5090; baseline Quartz/llama tok/s are retained as the OPT-022+ keep/reject oracle; does not substitute for OPT-016 | [`tasks/OPT-021.md`](tasks/OPT-021.md); [`pins/opt021_oracle_contract.json`](pins/opt021_oracle_contract.json); [`fixtures/opt021_oracle.json`](fixtures/opt021_oracle.json); [`evidence/optimization/opt021-4k-oracle/REPORT.md`](evidence/optimization/opt021-4k-oracle/REPORT.md); verification 2026-09-09T01:11:06Z |
 | OPT-022 | Mixer Q8_0 quality MMQ with shared residual Y | OPT-017, OPT-018, OPT-021 | pending | Production mixer Q8_0 prompt MMQ uses a llama/ds4-style quality stack (D4 `quantize_mmq_q8_1`, packed load-tiles, `MMQ_ITER_K=256`, shared residual Y across mixer GEMMs that share the same activation) under the plan.md Q8 association rule while OPT-009 byte-exact reference stays visible; cold exact-4096 mean tok/s strictly beats the OPT-021 Quartz baseline or the change is reverted with a retained rejection; does not substitute for OPT-016 | — |
 | OPT-023 | Skinny-M mixer dispatch for small output rows | OPT-022 | pending | Mixer projections with small `output_rows` (at least GDN α/β) dispatch through MMV or small-tile paths instead of J=128 MMA when that wins a paired CUDA-event A/B; cold exact-4096 mean tok/s strictly beats the post-OPT-022 oracle baseline or the change is reverted with a retained rejection; does not substitute for OPT-016 | — |
 | OPT-024 | Blackwell-aligned Q8_0 D2R for large mixer GEMMs | OPT-022 | pending | Large mixer Q8_0 GEMMs use a ds4-inspired aligned SoA D2R / int8 MMA path (technique inspiration, not wholesale `../ds4/cuda/mmq` vendoring) under the plan.md Q8 association rule when it beats quality MMQ on those shapes; cold exact-4096 mean tok/s strictly beats the post-OPT-022 oracle baseline or the change is reverted with a retained rejection; does not substitute for OPT-016 | — |
@@ -4308,3 +4308,43 @@ are repository-relative unless stated otherwise.
   tok/s ≥ same-protocol llama.cpp. OPT-016 remains `blocked` and remains the
   sole ≥ llama.cpp **2K** gate owner. QLT-001 remains blocked on OPT-016.
 - Next eligible pending by ledger row order: **OPT-021** (deps OPT-020 done).
+
+### 2026-09-09T00:48:00Z — OPT-021 planning admitted
+
+- Planning produced decision-complete dossier [`tasks/OPT-021.md`](tasks/OPT-021.md).
+- Coupled IDs: none. Plan impact `none`. Frozen cold exact-4096 protocol
+  mirrors OPT-016 measurement mechanics (`qw38-cuda:13.0.2` /
+  `qw38-llama-authority:cuda-13.0.2`, 3 unperturbed replicates, graphs
+  created, llama.cpp `llama-bench -p 4096 -n 0 --no-warmup -r 3 -ngl 99`
+  first in the same sitting). Scout 965.204895 / 3182.476587 tok/s are
+  not the retained fixture. Keep/reject for OPT-022+ is strictly greater
+  Quartz mean tok/s; Quartz ≥ llama.cpp is informational and is not this
+  gate. OPT-016 remains the blocked 2K parity owner.
+- Marked OPT-021 `in_progress`.
+
+### 2026-09-09T01:11:06Z — OPT-021 delivered
+
+- Independent verification attempt 1 passed. Frozen cold exact-4096
+  protocol and same-sitting llama.cpp `llama-bench -p 4096 -n 0
+  --no-warmup -r 3 -ngl 99` are retained as the OPT-022+ keep/reject
+  oracle. Exclusive RTX 5090 sitting wrote
+  [`fixtures/opt021_oracle.json`](fixtures/opt021_oracle.json)
+  (`measurement_utc` 2026-09-09T01:03:49Z; Quartz mean **967.267761**
+  tok/s; llama.cpp `avg_ts` **3243.626016**; `quartz_meets_llama` false
+  informational). Attribution null, graphs created, production path.
+  Native test does not require Quartz ≥ llama.cpp. Scout `/tmp/oracle4k/`
+  is not the fixture. Coupled IDs: none. Delivery re-check:
+  `uv run pytest -q tests/test_documentation.py tests/test_opt021_oracle.py`
+  passed.
+- Acceptance evidence: [`tasks/OPT-021.md`](tasks/OPT-021.md);
+  [`pins/opt021_oracle_contract.json`](pins/opt021_oracle_contract.json);
+  [`fixtures/opt021_oracle.json`](fixtures/opt021_oracle.json);
+  [`cuda/prefill_4k_oracle_test.cu`](cuda/prefill_4k_oracle_test.cu);
+  [`evidence/optimization/opt021-4k-oracle/REPORT.md`](evidence/optimization/opt021-4k-oracle/REPORT.md);
+  [`docs/06-system-optimization.md`](docs/06-system-optimization.md);
+  [`docs/61-benchmark-harness.md`](docs/61-benchmark-harness.md);
+  [`docs/62-cuda-full-prefill.md`](docs/62-cuda-full-prefill.md).
+  Proof is a 4K keep/reject oracle, not the 2K llama.cpp parity gate.
+- Marked OPT-021 `done`; delivery is limited to the verified task scope plus
+  this ledger/audit bookkeeping. `plan.md` is unchanged. OPT-016 stays
+  `blocked`. Next eligible pending by ledger row order: **OPT-022**.

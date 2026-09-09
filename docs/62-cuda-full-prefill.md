@@ -1,6 +1,6 @@
 # Chunked full-model CUDA prefill
 
-[Index](README.md) · Implementation tasks: SCH-002, MEM-002, OPT-008, OPT-009, OPT-011, OPT-012, OPT-013, OPT-014, OPT-015, OPT-017, OPT-018, OPT-019, OPT-020, and EDU-047 in
+[Index](README.md) · Implementation tasks: SCH-002, MEM-002, OPT-008, OPT-009, OPT-011, OPT-012, OPT-013, OPT-014, OPT-015, OPT-017, OPT-018, OPT-019, OPT-020, OPT-021, and EDU-047 in
 [`implementation_ledger.md`](../implementation_ledger.md) · Contracts:
 [`pins/cuda_prompt_scheduler_contract.json`](../pins/cuda_prompt_scheduler_contract.json),
 [`pins/cuda_prompt_pipeline_contract.json`](../pins/cuda_prompt_pipeline_contract.json),
@@ -11,7 +11,8 @@
 [`pins/opt017_mixer_mma_contract.json`](../pins/opt017_mixer_mma_contract.json),
 [`pins/opt018_ffn_mma_contract.json`](../pins/opt018_ffn_mma_contract.json),
 [`pins/opt019_core_recovery_contract.json`](../pins/opt019_core_recovery_contract.json),
-[`pins/opt020_prefill_split_contract.json`](../pins/opt020_prefill_split_contract.json)
+[`pins/opt020_prefill_split_contract.json`](../pins/opt020_prefill_split_contract.json),
+[`pins/opt021_oracle_contract.json`](../pins/opt021_oracle_contract.json)
 · Evidence: [`fixtures/cuda_prompt_scheduler.json`](../fixtures/cuda_prompt_scheduler.json),
 [`fixtures/cuda_prompt_pipeline.json`](../fixtures/cuda_prompt_pipeline.json),
 [`fixtures/cuda_prompt_graph.json`](../fixtures/cuda_prompt_graph.json),
@@ -22,10 +23,12 @@
 [`fixtures/opt018_ffn_mma.json`](../fixtures/opt018_ffn_mma.json),
 [`fixtures/opt019_core_recovery.json`](../fixtures/opt019_core_recovery.json),
 [`fixtures/opt020_prefill_split.json`](../fixtures/opt020_prefill_split.json),
+[`fixtures/opt021_oracle.json`](../fixtures/opt021_oracle.json),
 [`evidence/optimization/opt015-2k-recovery/REPORT.md`](../evidence/optimization/opt015-2k-recovery/REPORT.md),
 [`evidence/optimization/opt017-mixer-q8-mma/REPORT.md`](../evidence/optimization/opt017-mixer-q8-mma/REPORT.md),
 [`evidence/optimization/opt018-ffn-mma-quality/REPORT.md`](../evidence/optimization/opt018-ffn-mma-quality/REPORT.md),
-[`evidence/optimization/opt019-gdn-attention-core/REPORT.md`](../evidence/optimization/opt019-gdn-attention-core/REPORT.md)
+[`evidence/optimization/opt019-gdn-attention-core/REPORT.md`](../evidence/optimization/opt019-gdn-attention-core/REPORT.md),
+[`evidence/optimization/opt021-4k-oracle/REPORT.md`](../evidence/optimization/opt021-4k-oracle/REPORT.md)
 
 ## Why prompt execution differs from decode
 
@@ -442,6 +445,24 @@ Chapter 51 owns the live category definitions. Artifacts:
 [`pins/opt020_prefill_split_contract.json`](../pins/opt020_prefill_split_contract.json)
 and [`fixtures/opt020_prefill_split.json`](../fixtures/opt020_prefill_split.json).
 
+OPT-021 pins the exclusive-RTX-5090 **4K keep/reject oracle**. Production
+prompt FFN graphs replay only when `token_count == 4096` and created graphs
+are passed into `sync_tokens`; exact-2048 does not replay those 4096-row
+graphs. **Measured, RTX 5090:** one exclusive sitting, llama.cpp first then
+Quartz, records three cold exact-4096 unperturbed `sync_tokens` walls
+(attribution null, graphs created, production fused GDN and overlapped path)
+and live `llama-bench -p 4096 -n 0 --no-warmup -r 3 -ngl 99`. Quartz mean
+**966.039062** tok/s versus llama.cpp **3224.522433** tok/s is the retained
+baseline. Later production changes keep only when cold exact-4096 mean tok/s
+is strictly greater than that Quartz mean. `quartz_meets_llama` is
+informational and is not this gate. **OPT-016 remains the 2K parity owner.**
+This oracle does not substitute for that gate and does not claim Quartz ≥
+llama.cpp. Scout sitting 965.204895 / 3182.476587 tok/s is **not** the
+retained fixture. Live numbers stay in the report:
+[`evidence/optimization/opt021-4k-oracle/REPORT.md`](../evidence/optimization/opt021-4k-oracle/REPORT.md),
+[`pins/opt021_oracle_contract.json`](../pins/opt021_oracle_contract.json),
+and [`fixtures/opt021_oracle.json`](../fixtures/opt021_oracle.json).
+
 The **proof boundary** excludes comparative speed claims, 2K/8K sustained
 prefill throughput, execution of a 128K prefill, 128K retrieval quality, thermal
 stability, superiority to llama.cpp/vLLM, and a Nsight Systems overlap timeline.
@@ -454,7 +475,10 @@ quality MMA plus live FFN remasurement. OPT-019 records warp-column GDN and
 fattn-mma attention core quality plus live GDN/attention remasurement and
 re-attribution; it does not pass or own the 2K tok/s gate. OPT-020 records
 the mixer versus core split of those composite GDN and attention buckets; it
-is instrumentation, not a throughput gate, and not llama.cpp parity. BEN-001
+is instrumentation, not a throughput gate, and not llama.cpp parity. OPT-021
+records the frozen exact-4096 keep/reject protocol and same-sitting llama.cpp
+4K `avg_ts`; it is not the 2K parity gate, not Quartz ≥ llama.cpp, and not a
+BEN-001 `qw38-bench` result. BEN-001
 provides the harness; CMP-002/CMP-003 still own the 30-sample comparative gate.
 QLT-001 remains blocked. OPT-012's prompt graphs are FFN subgraphs only: not a
 whole-chunk graph, not a speedup gate, and not 128K quality recovery.

@@ -31,7 +31,7 @@ for language and host portability decisions.
 3. [The Qwen model contract](03-deepseek-v4.md): the forward pass and state.
 4. [Scalar oracle](04-numerics.md): reference implementation and differential tests.
 5. [Weights and the 32 GiB ledger](05-gpu-implementation.md): conversion and quantization.
-6. [CUDA decode and prefill](06-system-optimization.md): MMV, MMQ, GDN, attention, mixer/FFN MMA, and GDN/attention core quality.
+6. [CUDA decode and prefill](06-system-optimization.md): MMV, MMQ, GDN, attention, mixer/FFN MMA, GDN/attention core quality, and the 4K keep/reject oracle.
 7. [Hybrid sessions](07-engineering-method.md): checkpointing, reuse, batching, graphs.
 8. [RTX 5090 optimization](08-rtx-5090.md): profiler-led sequencing.
 9. [Gated implementation roadmap](09-engine-comparison.md): twelve acceptance milestones.
@@ -86,8 +86,8 @@ for language and host portability decisions.
 58. [Single-flight HTTP server core](58-http-server-core.md): sockets, bounded HTTP, health/models routes, FIFO queueing, cancellation, and shutdown.
 59. [Chat Completions](59-chat-completions.md): bounded JSON, roles, reasoning, generation, SSE streaming, tools, stops, queueing, and active cancellation.
 60. [Responses objects and exact continuation](60-responses-and-continuation.md): typed input/output items, shared generation mapping, SSE events, atomic token-prefix records, restart replay, and explicit exclusions.
-61. [Benchmark harness](61-benchmark-harness.md): workloads, warm-ups, samples, percentiles, telemetry, cache policy, atomic results, and proof limits.
-62. [Chunked full-model CUDA prefill](62-cuda-full-prefill.md): token-major rows, layer-major work, exact MMQ/GDN/attention chunks, atomic commit, scratch, measured 2K attribution, mixer versus core split, ranked recovery, GDN/attention core remasurement, and proof boundaries.
+61. [Benchmark harness](61-benchmark-harness.md): workloads, warm-ups, samples, percentiles, telemetry, cache policy, atomic results, the frozen 4K keep/reject oracle versus this harness, and proof limits.
+62. [Chunked full-model CUDA prefill](62-cuda-full-prefill.md): token-major rows, layer-major work, exact MMQ/GDN/attention chunks, atomic commit, scratch, measured 2K attribution, mixer versus core split, ranked recovery, GDN/attention core remasurement, 4K keep/reject oracle, and proof boundaries.
 63. [CUDA diagnostic traces](63-cuda-diagnostic-traces.md): five stable CUDA boundaries, exact filters, full-tensor scalar gates, failure atomicity, and diagnostic-build isolation.
 64. [Evaluation harness](64-eval-harness.md): raw-token requests, typed helpers, authenticated logits/checkpoint/trace records, atomic negative cases, and the QLT-001 proof boundary.
 65. [Documentation audit](65-documentation-audit.md): task coverage, claim labels,

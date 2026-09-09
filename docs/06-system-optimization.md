@@ -164,6 +164,22 @@ OPT-016 gate. **OPT-016 remains the parity gate owner.** Report:
 [`fixtures/opt020_prefill_split.json`](../fixtures/opt020_prefill_split.json).
 Nsight was not used. This is instrumentation, not a throughput gate.
 
+## 4K keep/reject oracle (OPT-021)
+
+**Measured protocol/baseline, RTX 5090:** one exclusive sitting records three
+cold exact-4096 production `sync_tokens` tok/s (attribution null, graphs
+created, production fused GDN and overlapped path) and same-sitting llama.cpp
+`llama-bench -p 4096 -n 0 --no-warmup -r 3 -ngl 99` `avg_ts`. Live means from
+that sitting are Quartz **966.039062** tok/s versus llama.cpp **3224.522433**
+tok/s. Later production changes keep only when cold exact-4096 mean tok/s is
+strictly greater than that retained Quartz baseline. This is **not** a
+throughput gate versus llama.cpp and **does not substitute for the 2K
+llama.cpp parity gate.** OPT-016 remains the 2K parity owner. Scout sitting
+965.204895 / 3182.476587 tok/s is contract transparency only and is **not**
+the retained fixture. Live numbers stay in the report; this chapter does not
+replace them:
+[`evidence/optimization/opt021-4k-oracle/REPORT.md`](../evidence/optimization/opt021-4k-oracle/REPORT.md).
+
 ## DwarfStar transfer boundary
 
 Reuse MMV/MMQ phase split, quant block tests, explicit unavailable paths, stable

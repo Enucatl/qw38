@@ -108,6 +108,18 @@ llama.cpp 2K (**Measured** mean 3114.049476 tok/s, `n_ubatch` 512,
 `qw38-bench` result, not a new GPU sample in this increment, and not the later
 2K throughput gate. CMP-002/CMP-003 still own the 30-sample comparative matrix.
 
+OPT-021 is a frozen exclusive-RTX-5090 **4K keep/reject oracle**, not a
+BEN-001 `qw38-bench` result and not a change to this harness or its JSON
+schema. It compares three cold exact-4096 production `sync_tokens` walls
+(attribution null, graphs created) to same-sitting pinned llama.cpp
+`llama-bench -p 4096 -n 0 --no-warmup -r 3 -ngl 99`. That yardstick is not the
+OPT-016 exact-2048 2K parity gate, and it is not the 2026-09-08 scaling
+citation above (2K/8K/32K objects). Exact 4096 is the production FFN
+graph-replay length; exact 2048 is not. A 2026-09-09 scout sitting under
+`/tmp/oracle4k/` is contract transparency only and is **not** the retained
+fixture. Live same-sitting numbers stay in
+[`evidence/optimization/opt021-4k-oracle/REPORT.md`](../evidence/optimization/opt021-4k-oracle/REPORT.md).
+
 An unavailable measurement is JSON `null`, not zero. Zero would mean an event
 was measured and took no representable time. Queue time is `null` because this
 single-process harness has no HTTP queue. Persistence is `null` when no save or
@@ -163,6 +175,9 @@ not admission eligible. CMP-002 and CMP-003 own the controlled comparison and
 confidence gates after the remaining quality work is complete. OPT-015 cites
 the scaling `llama-bench` 2K object as an independent same-GGUF denominator; it
 does not change this harness, its JSON schema, or admit 2K llama.cpp parity.
+OPT-021 likewise leaves this harness unchanged: the 4K keep/reject oracle is a
+separate diagnostic sitting, not a BEN-001 workload, not the 2K parity gate,
+and not an admission of Quartz ≥ llama.cpp.
 
 ## Reproduce a smoke safely
 
