@@ -30,7 +30,8 @@ GEMMs with `output_rows < 128` (GDN α/β) dispatch the A/B-winning small-I
 quality MMA path (OPT-023). Large mixer Q8_0 D2R was A/B'd and not
 installed (OPT-024); those GEMMs stay I=128 quality MMA. Dense prompt FFN
 Q4_K shares one DS4 Y for gate/up and writes down-leg Y from SwiGLU
-(OPT-025). Decode stays MMV.
+(OPT-025). Production prompt attention uses Ada+ stream-K fattn after the
+OPT-026 keep. Decode stays MMV.
 Tiny mixer prompts keep the
 OPT-009 tiled `__fmul_rn`/`__fadd_rn` kernel.
 Rank-1 fused MMA remains a non-production kernel. MMA here is Measured
@@ -38,8 +39,10 @@ component recovery plus a 4K keep versus the frozen oracle baseline, not the
 OPT-016 2K llama.cpp parity gate. Production prompt GDN recurrence is the
 warp-column fused quality path; sequential windows remain the unloosened
 reference. Production prompt attention (`token_count >= 16`) is the fattn-mma
-analog; tiled attention remains the unloosened reference. Those core-quality
-paths are also Measured component recovery, not the 2K parity gate.
+analog with Ada+ stream-K after the OPT-026 keep; tiled attention remains the
+unloosened reference. Those core-quality paths are also Measured component
+recovery plus a 4K keep versus the frozen oracle baseline, not the 2K parity
+gate.
 
 For a decode projection, all output threads need the same input vector but
 different weight rows. A useful MMV kernel keeps pieces of the input available
@@ -100,8 +103,8 @@ and 65 distinguish the ordinary path, an exact chunk, and a one-row tail.
 Attention decode reads growing KV from 16 layers; use grouped-query mapping
 without physical sixfold copies. Prefill must be causal and handle partial RoPE
 on exactly 64 dimensions. Production prompt attention (`token_count >= 16`) is
-the fattn-mma analog; the two-row tiled path remains the unloosened numeric
-reference. Dense FFNs dominate weights: MMV for one/few rows,
+the fattn-mma analog with Ada+ stream-K for prompt tiles; the two-row tiled
+path remains the unloosened numeric reference. Dense FFNs dominate weights: MMV for one/few rows,
 MMQ for prompt or batched rows. Fusion is accepted only when the unfused path
 remains a differential oracle and profiler data attributes a wall-time win.
 
@@ -159,7 +162,8 @@ versus llama.cpp 3219.6604 tok/s is recorded and is **not** the OPT-016 gate.
 quality (`dim3(32, 4)`, grid z=32, `s_shard[4]`). Sequential windows remain the
 unloosened reference (`5e-8` / `5e-9`). Production prompt attention
 (`token_count >= 16`) is the fattn-mma analog with pinned ncols1=16 and
-ncols2=2. Tiled attention remains the unloosened OPT-005 reference
+ncols2=2. Production prompt attention uses Ada+ stream-K after the OPT-026
+keep. Tiled attention remains the unloosened OPT-005 reference
 (`5e-5` / `5e-6`). Live exact-2048 `gdn` **1205.38806** ms and `attention`
 **475.116028** ms versus locked befores **1643.46082** / **1148.47461** ms
 meet the 85%/85%/70% addressed rule (`combined_after` **1680.504088** ms).

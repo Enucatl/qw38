@@ -92,7 +92,7 @@ are repository-relative unless stated otherwise.
 | OPT-023 | Skinny-M mixer dispatch for small output rows | OPT-022 | done | Mixer projections with small `output_rows` (at least GDN α/β) dispatch through MMV or small-tile paths instead of J=128 MMA when that wins a paired CUDA-event A/B; cold exact-4096 mean tok/s strictly beats the post-OPT-022 oracle baseline or the change is reverted with a retained rejection; does not substitute for OPT-016 | [`tasks/OPT-023.md`](tasks/OPT-023.md); [`pins/opt023_skinny_mixer_contract.json`](pins/opt023_skinny_mixer_contract.json); [`fixtures/opt023_skinny_mixer.json`](fixtures/opt023_skinny_mixer.json); [`evidence/optimization/opt023-skinny-mixer/REPORT.md`](evidence/optimization/opt023-skinny-mixer/REPORT.md); verification 2026-09-09T03:57:39Z |
 | OPT-024 | Blackwell-aligned Q8_0 D2R for large mixer GEMMs | OPT-022 | done | Large mixer Q8_0 GEMMs use a ds4-inspired aligned SoA D2R / int8 MMA path (technique inspiration, not wholesale `../ds4/cuda/mmq` vendoring) under the plan.md Q8 association rule when it beats quality MMQ on those shapes; cold exact-4096 mean tok/s strictly beats the post-OPT-022 oracle baseline or the change is reverted with a retained rejection; does not substitute for OPT-016 | [`tasks/OPT-024.md`](tasks/OPT-024.md); [`pins/opt024_mixer_q8_d2r_contract.json`](pins/opt024_mixer_q8_d2r_contract.json); [`fixtures/opt024_mixer_q8_d2r.json`](fixtures/opt024_mixer_q8_d2r.json); [`evidence/optimization/opt024-mixer-q8-d2r/REPORT.md`](evidence/optimization/opt024-mixer-q8-d2r/REPORT.md); [`evidence/optimization/opt024-mixer-q8-d2r/REJECTION.md`](evidence/optimization/opt024-mixer-q8-d2r/REJECTION.md); verification 2026-09-09T04:37:09Z |
 | OPT-025 | Dense FFN shared-Y and SwiGLU-into-down Q8 | OPT-018, OPT-021 | done | Dense FFN reuses one Q8_1 of the FFN input for gate and up and writes down-leg Y from SwiGLU without an extra BF16 mid materialize where a paired A/B wins; cold exact-4096 mean tok/s strictly beats the then-current oracle baseline or the change is reverted with a retained rejection; does not substitute for OPT-016 | [`tasks/OPT-025.md`](tasks/OPT-025.md); [`pins/opt025_ffn_shared_y_contract.json`](pins/opt025_ffn_shared_y_contract.json); [`fixtures/opt025_ffn_shared_y.json`](fixtures/opt025_ffn_shared_y.json); [`cuda/prefill_4k_ffn_test.cu`](cuda/prefill_4k_ffn_test.cu); [`evidence/optimization/opt025-ffn-shared-y/REPORT.md`](evidence/optimization/opt025-ffn-shared-y/REPORT.md); verification 2026-09-09T05:25:00Z |
-| OPT-026 | Attention fattn stream-K occupancy | OPT-019, OPT-021 | pending | Production fattn-mma prompt attention enables Ada+ stream-K (or equivalent occupancy fixup) under frozen OPT-019 envelopes when a paired A/B wins; cold exact-4096 mean tok/s strictly beats the then-current oracle baseline or the change is reverted with a retained rejection; does not substitute for OPT-016 | — |
+| OPT-026 | Attention fattn stream-K occupancy | OPT-019, OPT-021 | done | Production fattn-mma prompt attention enables Ada+ stream-K (or equivalent occupancy fixup) under frozen OPT-019 envelopes when a paired A/B wins; cold exact-4096 mean tok/s strictly beats the then-current oracle baseline or the change is reverted with a retained rejection; does not substitute for OPT-016 | [`tasks/OPT-026.md`](tasks/OPT-026.md); [`pins/opt026_fattn_streamk_contract.json`](pins/opt026_fattn_streamk_contract.json); [`fixtures/opt026_fattn_streamk.json`](fixtures/opt026_fattn_streamk.json); [`cuda/prefill_4k_fattn_test.cu`](cuda/prefill_4k_fattn_test.cu); [`evidence/optimization/opt026-fattn-streamk/REPORT.md`](evidence/optimization/opt026-fattn-streamk/REPORT.md); verification 2026-09-09T05:54:24Z |
 
 ### 2026-09-04T13:09:32Z — OPT-005 delivered
 
@@ -4523,3 +4523,50 @@ are repository-relative unless stated otherwise.
 - Marked OPT-025 `done`; delivery is limited to the verified task scope plus
   this ledger/audit bookkeeping. `plan.md` is unchanged. OPT-016 stays
   `blocked`. Next eligible pending by ledger row order: **OPT-026**.
+
+### 2026-09-09T05:30:00Z — OPT-026 planning admitted
+
+- Planning produced decision-complete dossier [`tasks/OPT-026.md`](tasks/OPT-026.md).
+- Coupled IDs: none. Plan impact `none`. Then-current oracle denominator
+  OPT-025 Quartz mean **1709.21912**. A/B on production 4096-row fattn
+  among `baseline`, `occ2`, `stream_k`; install iff an optimized id is
+  strictly faster under frozen OPT-005. Keep iff cold exact-4096 mean
+  tok/s > **1709.21912** else revert and retain rejection. Last 4K
+  idea-ladder task (`ladder_exhausted` true either way). OPT-016 remains
+  the blocked 2K parity owner.
+- Marked OPT-026 `in_progress`.
+
+### 2026-09-09T05:55:00Z — OPT-026 delivered
+
+- Independent verification attempt 1 passed. Production prompt fattn uses
+  Ada+ stream-K KV bipartition plus softmax combine
+  (`kSelectedFattnPath = stream_k`) after a paired A/B win versus
+  occupancy-1 whole-tile. Occupancy-2 whole-tile was eligible but slower
+  than stream-K. Mixer Q8 remains quality MMA plus skinny `mma_i32_j128`.
+  FFN remains `shared_y_swiglu_q8`. Decode attention stays one-token.
+  Tiled attention remains the unloosened reference. Exclusive RTX 5090
+  sitting wrote
+  [`fixtures/opt026_fattn_streamk.json`](fixtures/opt026_fattn_streamk.json)
+  (`measurement_utc` 2026-09-09T05:51:48Z; Quartz mean **1746.71973**
+  tok/s versus frozen OPT-025 **1709.21912**; llama.cpp `avg_ts`
+  **3253.993621**; `quartz_meets_llama` false informational; `reverted`
+  false; `successor_oracle` true; A/B winner `stream_k`;
+  `ladder_exhausted` true). Native test does not require Quartz ≥
+  llama.cpp. Coupled IDs: none. Delivery re-check:
+  `uv run pytest -q tests/test_documentation.py tests/test_opt026_fattn_streamk.py`.
+- Acceptance evidence: [`tasks/OPT-026.md`](tasks/OPT-026.md);
+  [`pins/opt026_fattn_streamk_contract.json`](pins/opt026_fattn_streamk_contract.json);
+  [`fixtures/opt026_fattn_streamk.json`](fixtures/opt026_fattn_streamk.json);
+  [`cuda/prefill_4k_fattn_test.cu`](cuda/prefill_4k_fattn_test.cu);
+  [`evidence/optimization/opt026-fattn-streamk/REPORT.md`](evidence/optimization/opt026-fattn-streamk/REPORT.md);
+  [`docs/06-system-optimization.md`](docs/06-system-optimization.md);
+  [`docs/44-cuda-attention-prefill.md`](docs/44-cuda-attention-prefill.md);
+  [`docs/62-cuda-full-prefill.md`](docs/62-cuda-full-prefill.md).
+  Proof is fattn occupancy / stream-K under unloosened envelopes and a
+  4K keep versus the OPT-025 oracle baseline, not the 2K llama.cpp
+  parity gate. The 4K idea ladder is exhausted; Quartz 4K still does not
+  beat llama.cpp.
+- Marked OPT-026 `done`; delivery is limited to the verified task scope
+  plus this ledger/audit bookkeeping. `plan.md` is unchanged. OPT-016
+  stays `blocked`. No further OPT-022–OPT-026 tasks. Next pending by
+  ledger row order remains CMP-001, still blocked on QLT-001.

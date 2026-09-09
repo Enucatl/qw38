@@ -1,0 +1,13 @@
+fattn_ab id=baseline sample=0 ms=56.7697906 occupancy=1
+fattn_ab id=baseline sample=1 ms=56.8243523 occupancy=1
+fattn_ab id=baseline sample=2 ms=56.804287 occupancy=1
+fattn_ab_mean id=baseline mean_ms=56.7994804 occupancy=1 envelope=true scratch=true eligible=true
+fattn_ab id=occ2 sample=0 ms=56.7509766 occupancy=1
+fattn_ab id=occ2 sample=1 ms=56.8299828 occupancy=1
+fattn_ab id=occ2 sample=2 ms=56.8214073 occupancy=1
+fattn_ab_mean id=occ2 mean_ms=56.8007927 occupancy=1 envelope=true scratch=true eligible=true
+fattn_ab id=stream_k sample=0 ms=53.5136948 occupancy=1
+fattn_ab id=stream_k sample=1 ms=53.618721 occupancy=1
+fattn_ab id=stream_k sample=2 ms=53.6788483 occupancy=1
+fattn_ab_mean id=stream_k mean_ms=53.603756 occupancy=1 envelope=true scratch=true eligible=true
+fattn_ab_winner id=stream_k win=true baseline_ms=56.7994804 winner_ms=53.603756

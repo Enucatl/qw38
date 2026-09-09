@@ -2261,15 +2261,31 @@ Status execute_prompt_chunk(
             workspace->prompt_attention_candidate_value_ +
                 attention_slot * candidate_stride};
         if (error == cudaSuccess) {
-          error = launch_attention_prepare_chunk(
-              config, session->frontier_, token_count,
-              workspace->prompt_gdn_convolved_,
-              workspace->prompt_projection_c_,
-              workspace->prompt_projection_d_, layer.attention.query_norm,
-              layer.attention.key_norm, workspace->prompt_projection_b_,
-              committed, candidate, workspace->attention_normalized_query_,
-              workspace->attention_normalized_key_, workspace->attention_scores_,
-              workspace->prompt_gdn_recurrent_output_, stream);
+          if (fattn_uses_stream_k()) {
+            error = launch_attention_prepare_chunk_stream_k(
+                config, session->frontier_, token_count,
+                workspace->prompt_gdn_convolved_,
+                workspace->prompt_projection_c_,
+                workspace->prompt_projection_d_, layer.attention.query_norm,
+                layer.attention.key_norm, workspace->prompt_projection_b_,
+                committed, candidate, workspace->attention_normalized_query_,
+                workspace->attention_normalized_key_,
+                workspace->attention_scores_,
+                workspace->prompt_gdn_recurrent_output_,
+                reinterpret_cast<float*>(workspace->prompt_projected_bf16_),
+                reinterpret_cast<float*>(workspace->prompt_q8_), stream);
+          } else {
+            error = launch_attention_prepare_chunk(
+                config, session->frontier_, token_count,
+                workspace->prompt_gdn_convolved_,
+                workspace->prompt_projection_c_,
+                workspace->prompt_projection_d_, layer.attention.query_norm,
+                layer.attention.key_norm, workspace->prompt_projection_b_,
+                committed, candidate, workspace->attention_normalized_query_,
+                workspace->attention_normalized_key_,
+                workspace->attention_scores_,
+                workspace->prompt_gdn_recurrent_output_, stream);
+          }
         }
         if (error == cudaSuccess) {
           error = launch_fp32_to_bf16(

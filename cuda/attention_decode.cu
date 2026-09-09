@@ -1161,12 +1161,90 @@ cudaError_t launch_attention_prepare_chunk_mma_ncols1(
       output, normalized_query, ncols1, stream);
 }
 
+cudaError_t launch_attention_prepare_chunk_fattn_path(
+    const AttentionConfig& config, std::size_t start_position,
+    std::size_t token_count, const float* query, const float* key,
+    const float* value, const float* query_norm_scale,
+    const float* key_norm_scale, const float* output_gate,
+    const AttentionCache& committed, const AttentionCache& candidate_rows,
+    float* normalized_query, float* normalized_key, float* score_workspace,
+    float* output, const char* path, float* partial_vkq, float* meta,
+    cudaStream_t stream) noexcept {
+  if (token_count < 16) {
+    return launch_attention_prepare_chunk_tiled(
+        config, start_position, token_count, query, key, value,
+        query_norm_scale, key_norm_scale, output_gate, committed,
+        candidate_rows, normalized_query, normalized_key, score_workspace,
+        output, stream);
+  }
+  cudaError_t error = stage_and_validate_chunk(
+      config, start_position, token_count, query, key, value, query_norm_scale,
+      key_norm_scale, output_gate, committed, candidate_rows, normalized_query,
+      normalized_key, score_workspace, output, stream);
+  if (error != cudaSuccess) return error;
+  return launch_fattn_mma_quality_path(
+      config, start_position, token_count, query, query_norm_scale, output_gate,
+      committed.key, committed.value, candidate_rows.key, candidate_rows.value,
+      output, normalized_query, kSelectedAttentionMmaQueryRows, path,
+      partial_vkq, meta, stream);
+}
+
+cudaError_t launch_attention_prepare_chunk_stream_k(
+    const AttentionConfig& config, std::size_t start_position,
+    std::size_t token_count, const float* query, const float* key,
+    const float* value, const float* query_norm_scale,
+    const float* key_norm_scale, const float* output_gate,
+    const AttentionCache& committed, const AttentionCache& candidate_rows,
+    float* normalized_query, float* normalized_key, float* score_workspace,
+    float* output, float* partial_vkq, float* meta,
+    cudaStream_t stream) noexcept {
+  if (token_count < 16) {
+    return launch_attention_prepare_chunk_tiled(
+        config, start_position, token_count, query, key, value,
+        query_norm_scale, key_norm_scale, output_gate, committed,
+        candidate_rows, normalized_query, normalized_key, score_workspace,
+        output, stream);
+  }
+  cudaError_t error = stage_and_validate_chunk(
+      config, start_position, token_count, query, key, value, query_norm_scale,
+      key_norm_scale, output_gate, committed, candidate_rows, normalized_query,
+      normalized_key, score_workspace, output, stream);
+  if (error != cudaSuccess) return error;
+  return launch_fattn_mma_stream_k(
+      config, start_position, token_count, query, query_norm_scale, output_gate,
+      committed.key, committed.value, candidate_rows.key, candidate_rows.value,
+      output, normalized_query, partial_vkq, meta, stream);
+}
+
 int selected_attention_mma_query_rows() noexcept {
   return kSelectedAttentionMmaQueryRows;
 }
 
+const char* selected_fattn_path() noexcept { return kSelectedFattnPath; }
+
+bool fattn_uses_occupancy2() noexcept {
+  return kSelectedFattnPath[0] == 'o' || kSelectedFattnPath[0] == 's';
+}
+
+bool fattn_uses_stream_k() noexcept { return kSelectedFattnPath[0] == 's'; }
+
+std::size_t fattn_stream_k_partial_values(const AttentionConfig& config,
+                                          std::size_t token_count) noexcept {
+  return token_count * static_cast<std::size_t>(config.query_heads) *
+         config.head_width;
+}
+
+std::size_t fattn_stream_k_meta_values(const AttentionConfig& config,
+                                       std::size_t token_count) noexcept {
+  return 2U * token_count * static_cast<std::size_t>(config.query_heads) * 2U;
+}
+
 int attention_mma_quality_occupancy_for(int ncols1) noexcept {
   return fattn_occupancy_for(ncols1);
+}
+
+int attention_mma_quality_occupancy_for_path(const char* path) noexcept {
+  return fattn_occupancy_for_path(path);
 }
 
 int attention_mma_quality_occupancy() noexcept {

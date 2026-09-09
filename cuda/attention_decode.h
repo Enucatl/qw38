@@ -180,10 +180,38 @@ cudaError_t launch_attention_prepare_chunk_mma_ncols1(
     float* normalized_query, float* normalized_key, float* score_workspace,
     float* output, int ncols1, cudaStream_t stream) noexcept;
 
+cudaError_t launch_attention_prepare_chunk_fattn_path(
+    const AttentionConfig& config, std::size_t start_position,
+    std::size_t token_count, const float* query, const float* key,
+    const float* value, const float* query_norm_scale,
+    const float* key_norm_scale, const float* output_gate,
+    const AttentionCache& committed, const AttentionCache& candidate_rows,
+    float* normalized_query, float* normalized_key, float* score_workspace,
+    float* output, const char* path, float* partial_vkq, float* meta,
+    cudaStream_t stream) noexcept;
+
 int selected_attention_mma_query_rows() noexcept;
 int attention_mma_quality_occupancy() noexcept;
 int attention_mma_quality_occupancy_for(int ncols1) noexcept;
+int attention_mma_quality_occupancy_for_path(const char* path) noexcept;
 std::size_t attention_mma_quality_shared_bytes() noexcept;
+const char* selected_fattn_path() noexcept;
+bool fattn_uses_occupancy2() noexcept;
+bool fattn_uses_stream_k() noexcept;
+std::size_t fattn_stream_k_partial_values(const AttentionConfig& config,
+                                          std::size_t token_count) noexcept;
+std::size_t fattn_stream_k_meta_values(const AttentionConfig& config,
+                                       std::size_t token_count) noexcept;
+
+cudaError_t launch_attention_prepare_chunk_stream_k(
+    const AttentionConfig& config, std::size_t start_position,
+    std::size_t token_count, const float* query, const float* key,
+    const float* value, const float* query_norm_scale,
+    const float* key_norm_scale, const float* output_gate,
+    const AttentionCache& committed, const AttentionCache& candidate_rows,
+    float* normalized_query, float* normalized_key, float* score_workspace,
+    float* output, float* partial_vkq, float* meta,
+    cudaStream_t stream) noexcept;
 
 cudaError_t launch_attention_prepare_chunk_grouped_instrumented(
     const AttentionConfig& config, std::size_t start_position,

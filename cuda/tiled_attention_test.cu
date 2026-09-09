@@ -206,6 +206,137 @@ int main(){
       return 6;
     }
   }
+  {
+    const size_t rows4096 = 4096;
+    const size_t start4096 = 0;
+    B tiled4096{}, cand{};
+    if (!allocate(tiled4096, c, rows4096, start4096) ||
+        !allocate(cand, c, rows4096, start4096))
+      return 5;
+    seed(tiled4096, c, rows4096, start4096);
+    if (invoke_tiled(c, start4096, rows4096, tiled4096) != cudaSuccess ||
+        cudaDeviceSynchronize() != cudaSuccess)
+      return 6;
+    std::vector<float> tiled_host(rows4096 * q);
+    cudaMemcpy(tiled_host.data(), tiled4096.out,
+               tiled_host.size() * sizeof(float), cudaMemcpyDeviceToHost);
+    float* partial = nullptr;
+    float* meta = nullptr;
+    const size_t partial_n =
+        qw38::cuda::fattn_stream_k_partial_values(c, rows4096);
+    const size_t meta_n = qw38::cuda::fattn_stream_k_meta_values(c, rows4096);
+    if (cudaMalloc(reinterpret_cast<void**>(&partial),
+                   partial_n * sizeof(float)) != cudaSuccess ||
+        cudaMalloc(reinterpret_cast<void**>(&meta), meta_n * sizeof(float)) !=
+            cudaSuccess)
+      return 5;
+    FILE* raw = fopen("evidence/optimization/opt026-fattn-streamk/fattn-ab-raw.txt",
+                      "w");
+    const char* ids[3] = {"baseline", "occ2", "stream_k"};
+    float means[3] = {1.0e30f, 1.0e30f, 1.0e30f};
+    bool eligible[3] = {false, false, false};
+    cudaEvent_t e0{}, e1{};
+    cudaEventCreate(&e0);
+    cudaEventCreate(&e1);
+    for (int i = 0; i < 3; ++i) {
+      seed(cand, c, rows4096, start4096);
+      cudaMemset(partial, 0, partial_n * sizeof(float));
+      cudaMemset(meta, 0, meta_n * sizeof(float));
+      std::vector<unsigned char> score_before(
+          qw38::cuda::attention_chunk_score_values(c, start4096, rows4096) *
+          sizeof(float));
+      cudaMemcpy(score_before.data(), cand.score, score_before.size(),
+                 cudaMemcpyDeviceToHost);
+      AttentionCache committed{cand.ck, cand.cv}, candidate{cand.tk, cand.tv};
+      cudaError_t launched = qw38::cuda::launch_attention_prepare_chunk_fattn_path(
+          c, start4096, rows4096, cand.q, cand.k, cand.v, cand.qs, cand.ks,
+          cand.g, committed, candidate, cand.nq, cand.nk, cand.score, cand.out,
+          ids[i], i == 2 ? partial : nullptr, i == 2 ? meta : nullptr, nullptr);
+      cudaError_t synced = cudaDeviceSynchronize();
+      std::vector<float> host(rows4096 * q);
+      if (launched == cudaSuccess && synced == cudaSuccess)
+        cudaMemcpy(host.data(), cand.out, host.size() * sizeof(float),
+                   cudaMemcpyDeviceToHost);
+      std::vector<unsigned char> score_after(score_before.size());
+      cudaMemcpy(score_after.data(), cand.score, score_after.size(),
+                 cudaMemcpyDeviceToHost);
+      const bool scratch = score_before == score_after;
+      const bool finite = launched == cudaSuccess && synced == cudaSuccess &&
+                          finite_vec(host);
+      const bool env = finite && envelope_ok(host, tiled_host);
+      const int occupancy =
+          qw38::cuda::attention_mma_quality_occupancy_for_path(ids[i]);
+      float samples[3] = {0, 0, 0};
+      bool timed_ok = env && scratch && occupancy >= 1;
+      for (int sample = 0; sample < 3 && timed_ok; ++sample) {
+        cudaEventRecord(e0);
+        timed_ok =
+            qw38::cuda::launch_attention_prepare_chunk_fattn_path(
+                c, start4096, rows4096, cand.q, cand.k, cand.v, cand.qs,
+                cand.ks, cand.g, committed, candidate, cand.nq, cand.nk,
+                cand.score, cand.out, ids[i], i == 2 ? partial : nullptr,
+                i == 2 ? meta : nullptr, nullptr) == cudaSuccess;
+        cudaEventRecord(e1);
+        timed_ok = timed_ok && cudaEventSynchronize(e1) == cudaSuccess;
+        if (timed_ok) cudaEventElapsedTime(&samples[sample], e0, e1);
+      }
+      const float mean =
+          timed_ok ? (samples[0] + samples[1] + samples[2]) / 3.0f : 0.0f;
+      eligible[i] = timed_ok && mean > 0.0f;
+      means[i] = mean;
+      if (raw)
+        fprintf(raw,
+                "fattn_ab id=%s sample=%d ms=%.9g occupancy=%d\n"
+                "fattn_ab id=%s sample=%d ms=%.9g occupancy=%d\n"
+                "fattn_ab id=%s sample=%d ms=%.9g occupancy=%d\n",
+                ids[i], 0, samples[0], occupancy, ids[i], 1, samples[1],
+                occupancy, ids[i], 2, samples[2], occupancy);
+      std::printf("fattn_ab id=%s launch=%s finite=%s envelope=%s scratch=%s "
+                  "occupancy=%d sample0=%.9g sample1=%.9g sample2=%.9g "
+                  "mean_ms=%.9g eligible=%s\n",
+                  ids[i], launched == cudaSuccess ? "ok" : "fail",
+                  finite ? "true" : "false", env ? "true" : "false",
+                  scratch ? "true" : "false", occupancy, samples[0], samples[1],
+                  samples[2], mean, eligible[i] ? "true" : "false");
+      if (raw)
+        fprintf(raw,
+                "fattn_ab_mean id=%s mean_ms=%.9g occupancy=%d envelope=%s "
+                "scratch=%s eligible=%s\n",
+                ids[i], mean, occupancy, env ? "true" : "false",
+                scratch ? "true" : "false", eligible[i] ? "true" : "false");
+    }
+    cudaEventDestroy(e0);
+    cudaEventDestroy(e1);
+    cudaFree(partial);
+    cudaFree(meta);
+    release(tiled4096);
+    release(cand);
+    int winner_i = 0;
+    bool win = false;
+    if (eligible[0]) {
+      float best = means[0];
+      for (int i = 1; i < 3; ++i) {
+        if (eligible[i] && means[i] < best) {
+          best = means[i];
+          winner_i = i;
+        }
+      }
+      win = winner_i != 0 && means[winner_i] < means[0];
+      if (!win) winner_i = 0;
+    }
+    std::printf("fattn_ab_winner id=%s win=%s baseline_ms=%.9g winner_ms=%.9g\n",
+                ids[winner_i], win ? "true" : "false", means[0],
+                means[winner_i]);
+    if (raw) {
+      fprintf(raw, "fattn_ab_winner id=%s win=%s baseline_ms=%.9g winner_ms=%.9g\n",
+              ids[winner_i], win ? "true" : "false", means[0], means[winner_i]);
+      fclose(raw);
+    }
+    if (!eligible[0]) {
+      fprintf(stderr, "fattn baseline 4096 is not eligible\n");
+      return 6;
+    }
+  }
   B graph{};if(!allocate(graph,c,64,start))return 5;seed(graph,c,64,start);int p1=capture(c,start,1,graph,false),p3=capture(c,start,3,graph,false),p9=capture(c,start,9,graph,false),p64=capture(c,start,64,graph,false),r1=capture(c,start,1,graph,true),r3=capture(c,start,3,graph,true),r9=capture(c,start,9,graph,true),r64=capture(c,start,64,graph,true);release(graph);bool graphs=p1==2&&p3==2&&p9==2&&p64==2&&r1==3&&r3==9&&r9==27&&r64==192;
   bool semantic=finite&&candidate_exact&&chunk_output&&chunk_candidate&&cache_unchanged&&frontier_unchanged&&commit_exact&&commit_frontier&&future_excluded&&later_excluded&&scratch&&zero_rejected&&overflow_rejected&&alias_rejected&&last_position&&normalized_equal&&graphs&&ma<=5e-5f&&rr<=5e-6f&&co>=.999424f&&ma3<=5e-5f&&rr3<=5e-6f&&co3>=.999424f;if(!semantic){fprintf(stderr,"semantic failure finite=%d candidate=%d repeated_output=%d repeated_candidate=%d cache=%d frontier=%d commit=%d commit_frontier=%d future=%d later=%d scratch=%d zero=%d overflow=%d alias=%d last=%d normalized=%d graphs=%d metrics9=%d metrics3=%d\n",finite,candidate_exact,chunk_output,chunk_candidate,cache_unchanged,frontier_unchanged,commit_exact,commit_frontier,future_excluded,later_excluded,scratch,zero_rejected,overflow_rejected,alias_rejected,last_position,normalized_equal,graphs,ma<=5e-5f&&rr<=5e-6f&&co>=.999424f,ma3<=5e-5f&&rr3<=5e-6f&&co3>=.999424f);return 6;}
   struct Scale{size_t prefix;std::vector<float>tiled,reference;double tm,rm;};std::vector<Scale> scales;

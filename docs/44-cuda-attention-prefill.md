@@ -1,12 +1,15 @@
 # 44. Memory-bounded CUDA attention prefill at 128K
 
-[Index](README.md) · Implementation tasks: ATN-002, OPT-010, OPT-019, and EDU-030 in
+[Index](README.md) · Implementation tasks: ATN-002, OPT-010, OPT-019, OPT-026, and EDU-030 in
 [`implementation_ledger.md`](../implementation_ledger.md)
 · Contracts:
-[`pins/opt019_core_recovery_contract.json`](../pins/opt019_core_recovery_contract.json)
+[`pins/opt019_core_recovery_contract.json`](../pins/opt019_core_recovery_contract.json),
+[`pins/opt026_fattn_streamk_contract.json`](../pins/opt026_fattn_streamk_contract.json)
 · Evidence:
 [`fixtures/opt019_core_recovery.json`](../fixtures/opt019_core_recovery.json),
-[`evidence/optimization/opt019-gdn-attention-core/REPORT.md`](../evidence/optimization/opt019-gdn-attention-core/REPORT.md)
+[`evidence/optimization/opt019-gdn-attention-core/REPORT.md`](../evidence/optimization/opt019-gdn-attention-core/REPORT.md),
+[`fixtures/opt026_fattn_streamk.json`](../fixtures/opt026_fattn_streamk.json),
+[`evidence/optimization/opt026-fattn-streamk/REPORT.md`](../evidence/optimization/opt026-fattn-streamk/REPORT.md)
 
 [Chapter 43](43-cuda-attention-decode.md) processed one new token. **Prefill**
 processes a known prompt containing many tokens. The same causal rule applies:
@@ -78,7 +81,13 @@ KV staging on a `(kv_head, token)` grid, followed by grouped attention on a
 `(kv_head, ceil(token_count / 2))` grid. This is launch topology evidence, not
 a complete model or end-to-end speed result. Production quality MMA
 (`token_count >= 16`) uses the fattn-mma analog with pinned ncols1=16 and
-ncols2=2.
+ncols2=2. OPT-026 keeps Ada+ stream-K (KV bipartition plus softmax combine)
+after a paired A/B win versus occupancy-1 whole-tile; occupancy-2 whole-tile
+was eligible but slower than stream-K. The scheduler aliases existing
+`prompt_projected_bf16_` and `prompt_q8_` for the combine buffers. Score
+scratch stays untouched. The two-row tiled path remains the unloosened
+OPT-005 numeric reference. Live 4K keep/reject numbers stay in
+[`evidence/optimization/opt026-fattn-streamk/REPORT.md`](../evidence/optimization/opt026-fattn-streamk/REPORT.md).
 
 ## Whole-chunk prepare, commit, and cancellation
 

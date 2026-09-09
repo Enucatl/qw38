@@ -26,6 +26,9 @@ constexpr float kFattnRopeTheta = 10000000.0F;
 // Pinned after the 2048-row ncols1 sweep. Legal values: 8, 16, 32.
 constexpr int kSelectedAttentionMmaQueryRows = 16;
 
+// OPT-026 A/B winner. Legal values: baseline, occ2, stream_k.
+constexpr char kSelectedFattnPath[] = "stream_k";
+
 inline __device__ float fattn_block_sum(float local, float* scratch, int tid,
                                        int nthreads) {
   float value = local;
@@ -75,14 +78,14 @@ constexpr std::size_t fattn_quality_shared_bytes(int ncols1, bool dual_f16) {
   return kv + q + scores + stats + scratch + cparts + rescale;
 }
 
-template <int Ncols1, bool DualF16>
-__global__ void __launch_bounds__(Ncols1 <= 8 ? 64 : 128, 1)
+template <int Ncols1, bool DualF16, int Occupancy, int KvParts>
+__global__ void __launch_bounds__(Ncols1 <= 8 ? 64 : 128, Occupancy)
 fattn_mma_quality_kernel(
     AttentionConfig config, std::size_t start_position, std::size_t token_count,
     const float* query, const float* query_scale, const float* gate,
     const __nv_bfloat16* committed_key, const __nv_bfloat16* committed_value,
     const __nv_bfloat16* candidate_key, const __nv_bfloat16* candidate_value,
-    float* output, float* normalized_query) {
+    float* output, float* normalized_query, float* partial, float* meta) {
   constexpr int kNcols = Ncols1 * kFattnNcols2;
   constexpr int kNthreads = Ncols1 <= 8 ? 64 : 128;
   constexpr int kNwarps = kNthreads / 32;
@@ -121,8 +124,24 @@ fattn_mma_quality_kernel(
   float* rescale = qden + kNcols;
   float* cparts = rescale + kNcols;
 
+  const int kv_z = KvParts > 1 ? static_cast<int>(blockIdx.z) : 0;
+  float* vkq = (KvParts > 1 && kv_z > 0) ? partial : output;
   const std::size_t last_position =
       start_position + first_row + static_cast<std::size_t>(active_rows) - 1U;
+  const std::size_t kv_span = last_position + 1U;
+  const std::size_t kv_tiles =
+      (kv_span + static_cast<std::size_t>(kFattnNbatchFa) - 1U) /
+      static_cast<std::size_t>(kFattnNbatchFa);
+  const std::size_t tiles_per_part =
+      KvParts > 1 ? (kv_tiles + static_cast<std::size_t>(KvParts) - 1U) /
+                        static_cast<std::size_t>(KvParts)
+                  : kv_tiles;
+  const std::size_t kv_begin =
+      tiles_per_part * static_cast<std::size_t>(kv_z) *
+      static_cast<std::size_t>(kFattnNbatchFa);
+  const std::size_t kv_end = kv_begin + tiles_per_part *
+                                           static_cast<std::size_t>(kFattnNbatchFa);
+  const std::size_t kv_stop = kv_end < kv_span ? kv_end : kv_span;
 
   for (int subgroup = 0; subgroup < kFattnSubgroups; ++subgroup) {
     for (int member = 0; member < kFattnNcols2; ++member) {
@@ -181,7 +200,7 @@ fattn_mma_quality_kernel(
           if (token_count == 1 && live)
             normalized_query[query_head * width + dim] = value;
           if (live)
-            output[qbase + static_cast<std::size_t>(dim)] = 0.0F;
+            vkq[qbase + static_cast<std::size_t>(dim)] = 0.0F;
         }
         __syncthreads();
       }
@@ -193,10 +212,10 @@ fattn_mma_quality_kernel(
     }
     __syncthreads();
 
-    for (std::size_t tile = 0; tile <= last_position; tile += kFattnNbatchFa) {
+    for (std::size_t tile = kv_begin; tile < kv_stop; tile += kFattnNbatchFa) {
       const int rows = static_cast<int>(
-          (last_position + 1 - tile) < static_cast<std::size_t>(kFattnNbatchFa)
-              ? (last_position + 1 - tile)
+          (kv_span - tile) < static_cast<std::size_t>(kFattnNbatchFa)
+              ? (kv_span - tile)
               : static_cast<std::size_t>(kFattnNbatchFa));
       for (int row = 0; row < kFattnNbatchFa; ++row) {
         const bool in_tile = row < rows;
@@ -343,12 +362,12 @@ fattn_mma_quality_kernel(
               query_head * width;
           const float factor = rescale[qcol];
           for (int dim = tid; dim < static_cast<int>(width); dim += kNthreads) {
-            float total = output[qbase + static_cast<std::size_t>(dim)] * factor;
+            float total = vkq[qbase + static_cast<std::size_t>(dim)] * factor;
             for (int krow = 0; krow < rows; ++krow) {
               total += scores[qcol * kFattnNbatchFa + krow] *
                        __bfloat162float(values[krow * kWidth + dim]);
             }
-            output[qbase + static_cast<std::size_t>(dim)] = total;
+            vkq[qbase + static_cast<std::size_t>(dim)] = total;
           }
         }
       }
@@ -366,15 +385,25 @@ fattn_mma_quality_kernel(
                 width +
             query_head * width;
         const float denominator = qden[qcol];
-        for (int dim = tid; dim < static_cast<int>(width); dim += kNthreads) {
-          const float g = gate[qbase + static_cast<std::size_t>(dim)];
-          const float sigmoid = g >= 0.0F ? 1.0F / (1.0F + expf(-g))
-                                          : expf(g) / (1.0F + expf(g));
-          const float attn =
-              denominator == 0.0F
-                  ? 0.0F
-                  : output[qbase + static_cast<std::size_t>(dim)] / denominator;
-          output[qbase + static_cast<std::size_t>(dim)] = attn * sigmoid;
+        if constexpr (KvParts == 1) {
+          for (int dim = tid; dim < static_cast<int>(width); dim += kNthreads) {
+            const float g = gate[qbase + static_cast<std::size_t>(dim)];
+            const float sigmoid = g >= 0.0F ? 1.0F / (1.0F + expf(-g))
+                                            : expf(g) / (1.0F + expf(g));
+            const float attn =
+                denominator == 0.0F
+                    ? 0.0F
+                    : vkq[qbase + static_cast<std::size_t>(dim)] / denominator;
+            output[qbase + static_cast<std::size_t>(dim)] = attn * sigmoid;
+          }
+        } else if (tid == 0) {
+          const std::size_t meta_index =
+              (static_cast<std::size_t>(kv_z) * token_count + first_row +
+               static_cast<std::size_t>(row)) *
+                  config.query_heads +
+              query_head;
+          meta[meta_index * 2U] = qmax[qcol];
+          meta[meta_index * 2U + 1U] = denominator;
         }
       }
     }
@@ -382,28 +411,122 @@ fattn_mma_quality_kernel(
   }
 }
 
-template <int Ncols1, bool DualF16>
+__global__ void fattn_stream_k_combine_kernel(
+    AttentionConfig config, std::size_t token_count, const float* gate,
+    float* output, const float* partial, const float* meta) {
+  const std::size_t width = config.head_width;
+  const std::size_t values =
+      token_count * static_cast<std::size_t>(config.query_heads) * width;
+  const std::size_t index = static_cast<std::size_t>(blockIdx.x) *
+                                static_cast<std::size_t>(blockDim.x) +
+                            static_cast<std::size_t>(threadIdx.x);
+  if (index >= values) return;
+  const std::size_t row_values =
+      static_cast<std::size_t>(config.query_heads) * width;
+  const std::size_t row = index / row_values;
+  const std::size_t in_row = index % row_values;
+  const std::uint32_t head = static_cast<std::uint32_t>(in_row / width);
+  const std::size_t meta0 =
+      (row * static_cast<std::size_t>(config.query_heads) + head) * 2U;
+  const std::size_t meta1 =
+      ((token_count + row) * static_cast<std::size_t>(config.query_heads) +
+       head) *
+      2U;
+  const float max0 = meta[meta0];
+  const float den0 = meta[meta0 + 1U];
+  const float max1 = meta[meta1];
+  const float den1 = meta[meta1 + 1U];
+  const float new_max = fmaxf(max0, max1);
+  const float scale0 = max0 == -INFINITY ? 0.0F : expf(max0 - new_max);
+  const float scale1 = max1 == -INFINITY ? 0.0F : expf(max1 - new_max);
+  const float vkq = output[index] * scale0 + partial[index] * scale1;
+  const float denominator = den0 * scale0 + den1 * scale1;
+  const float g = gate[index];
+  const float sigmoid =
+      g >= 0.0F ? 1.0F / (1.0F + expf(-g)) : expf(g) / (1.0F + expf(g));
+  const float attn = denominator == 0.0F ? 0.0F : vkq / denominator;
+  output[index] = attn * sigmoid;
+}
+
+template <int Ncols1, bool DualF16, int Occupancy, int KvParts>
 inline cudaError_t launch_fattn_mma_quality_typed(
     const AttentionConfig& config, std::size_t start_position,
     std::size_t token_count, const float* query, const float* query_scale,
     const float* gate, const __nv_bfloat16* committed_key,
     const __nv_bfloat16* committed_value, const __nv_bfloat16* candidate_key,
     const __nv_bfloat16* candidate_value, float* output,
-    float* normalized_query, cudaStream_t stream) noexcept {
+    float* normalized_query, float* partial, float* meta,
+    cudaStream_t stream) noexcept {
   constexpr int kNthreads = Ncols1 <= 8 ? 64 : 128;
   const std::size_t shared = fattn_quality_shared_bytes(Ncols1, DualF16);
   dim3 grid(config.kv_heads,
-            static_cast<unsigned>((token_count + Ncols1 - 1) / Ncols1), 1);
+            static_cast<unsigned>((token_count + Ncols1 - 1) / Ncols1),
+            KvParts > 1 ? 2U : 1U);
   cudaError_t error = cudaFuncSetAttribute(
-      fattn_mma_quality_kernel<Ncols1, DualF16>,
+      fattn_mma_quality_kernel<Ncols1, DualF16, Occupancy, KvParts>,
       cudaFuncAttributeMaxDynamicSharedMemorySize, static_cast<int>(shared));
   if (error != cudaSuccess) return error;
-  fattn_mma_quality_kernel<Ncols1, DualF16>
+  fattn_mma_quality_kernel<Ncols1, DualF16, Occupancy, KvParts>
       <<<grid, kNthreads, shared, stream>>>(
           config, start_position, token_count, query, query_scale, gate,
           committed_key, committed_value, candidate_key, candidate_value,
-          output, normalized_query);
+          output, normalized_query, partial, meta);
+  error = cudaPeekAtLastError();
+  if (error != cudaSuccess || KvParts == 1) return error;
+  const std::size_t values =
+      token_count * static_cast<std::size_t>(config.query_heads) *
+      config.head_width;
+  const unsigned threads = 256;
+  const unsigned blocks =
+      static_cast<unsigned>((values + threads - 1) / threads);
+  fattn_stream_k_combine_kernel<<<blocks, threads, 0, stream>>>(
+      config, token_count, gate, output, partial, meta);
   return cudaPeekAtLastError();
+}
+
+inline cudaError_t launch_fattn_mma_quality_path(
+    const AttentionConfig& config, std::size_t start_position,
+    std::size_t token_count, const float* query, const float* query_scale,
+    const float* gate, const __nv_bfloat16* committed_key,
+    const __nv_bfloat16* committed_value, const __nv_bfloat16* candidate_key,
+    const __nv_bfloat16* candidate_value, float* output,
+    float* normalized_query, int ncols1, const char* path, float* partial,
+    float* meta, cudaStream_t stream) noexcept {
+  const bool stream_k = path != nullptr && path[0] == 's';
+  const bool occ2 = stream_k || (path != nullptr && path[0] == 'o');
+  if (stream_k && (partial == nullptr || meta == nullptr))
+    return cudaErrorInvalidValue;
+  if (ncols1 == 16 && stream_k) {
+    return launch_fattn_mma_quality_typed<16, true, 2, 2>(
+        config, start_position, token_count, query, query_scale, gate,
+        committed_key, committed_value, candidate_key, candidate_value, output,
+        normalized_query, partial, meta, stream);
+  }
+  if (ncols1 == 16 && occ2) {
+    return launch_fattn_mma_quality_typed<16, true, 2, 1>(
+        config, start_position, token_count, query, query_scale, gate,
+        committed_key, committed_value, candidate_key, candidate_value, output,
+        normalized_query, nullptr, nullptr, stream);
+  }
+  switch (ncols1) {
+    case 8:
+      return launch_fattn_mma_quality_typed<8, true, 1, 1>(
+          config, start_position, token_count, query, query_scale, gate,
+          committed_key, committed_value, candidate_key, candidate_value,
+          output, normalized_query, nullptr, nullptr, stream);
+    case 16:
+      return launch_fattn_mma_quality_typed<16, true, 1, 1>(
+          config, start_position, token_count, query, query_scale, gate,
+          committed_key, committed_value, candidate_key, candidate_value,
+          output, normalized_query, nullptr, nullptr, stream);
+    case 32:
+      return launch_fattn_mma_quality_typed<32, false, 1, 1>(
+          config, start_position, token_count, query, query_scale, gate,
+          committed_key, committed_value, candidate_key, candidate_value,
+          output, normalized_query, nullptr, nullptr, stream);
+    default:
+      return cudaErrorInvalidValue;
+  }
 }
 
 inline cudaError_t launch_fattn_mma_quality(
@@ -413,56 +536,62 @@ inline cudaError_t launch_fattn_mma_quality(
     const __nv_bfloat16* committed_value, const __nv_bfloat16* candidate_key,
     const __nv_bfloat16* candidate_value, float* output,
     float* normalized_query, int ncols1, cudaStream_t stream) noexcept {
-  switch (ncols1) {
-    case 8:
-      return launch_fattn_mma_quality_typed<8, true>(
-          config, start_position, token_count, query, query_scale, gate,
-          committed_key, committed_value, candidate_key, candidate_value,
-          output, normalized_query, stream);
-    case 16:
-      return launch_fattn_mma_quality_typed<16, true>(
-          config, start_position, token_count, query, query_scale, gate,
-          committed_key, committed_value, candidate_key, candidate_value,
-          output, normalized_query, stream);
-    case 32:
-      return launch_fattn_mma_quality_typed<32, false>(
-          config, start_position, token_count, query, query_scale, gate,
-          committed_key, committed_value, candidate_key, candidate_value,
-          output, normalized_query, stream);
-    default:
-      return cudaErrorInvalidValue;
-  }
+  const char* path = kSelectedFattnPath;
+  if (path[0] == 's') path = "occ2";
+  return launch_fattn_mma_quality_path(
+      config, start_position, token_count, query, query_scale, gate,
+      committed_key, committed_value, candidate_key, candidate_value, output,
+      normalized_query, ncols1, path, nullptr, nullptr, stream);
+}
+
+inline cudaError_t launch_fattn_mma_stream_k(
+    const AttentionConfig& config, std::size_t start_position,
+    std::size_t token_count, const float* query, const float* query_scale,
+    const float* gate, const __nv_bfloat16* committed_key,
+    const __nv_bfloat16* committed_value, const __nv_bfloat16* candidate_key,
+    const __nv_bfloat16* candidate_value, float* output,
+    float* normalized_query, float* partial, float* meta,
+    cudaStream_t stream) noexcept {
+  return launch_fattn_mma_quality_path(
+      config, start_position, token_count, query, query_scale, gate,
+      committed_key, committed_value, candidate_key, candidate_value, output,
+      normalized_query, kSelectedAttentionMmaQueryRows, "stream_k", partial,
+      meta, stream);
+}
+
+template <int Ncols1, bool DualF16, int Occupancy, int KvParts>
+inline int fattn_occupancy_typed() noexcept {
+  int occupancy = 0;
+  const int threads = fattn_nthreads_for_ncols1(Ncols1);
+  const std::size_t shared = fattn_quality_shared_bytes(Ncols1, DualF16);
+  cudaError_t error = cudaFuncSetAttribute(
+      fattn_mma_quality_kernel<Ncols1, DualF16, Occupancy, KvParts>,
+      cudaFuncAttributeMaxDynamicSharedMemorySize, static_cast<int>(shared));
+  if (error == cudaSuccess)
+    error = cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+        &occupancy,
+        fattn_mma_quality_kernel<Ncols1, DualF16, Occupancy, KvParts>, threads,
+        shared);
+  return error == cudaSuccess ? occupancy : 0;
 }
 
 inline int fattn_occupancy_for(int ncols1) noexcept {
-  int occupancy = 0;
-  cudaError_t error = cudaErrorInvalidValue;
-  const int threads = fattn_nthreads_for_ncols1(ncols1);
-  const bool dual = ncols1 != 32;
-  const std::size_t shared = fattn_quality_shared_bytes(ncols1, dual);
-  if (ncols1 == 8) {
-    error = cudaFuncSetAttribute(
-        fattn_mma_quality_kernel<8, true>,
-        cudaFuncAttributeMaxDynamicSharedMemorySize, static_cast<int>(shared));
-    if (error == cudaSuccess)
-      error = cudaOccupancyMaxActiveBlocksPerMultiprocessor(
-          &occupancy, fattn_mma_quality_kernel<8, true>, threads, shared);
-  } else if (ncols1 == 16) {
-    error = cudaFuncSetAttribute(
-        fattn_mma_quality_kernel<16, true>,
-        cudaFuncAttributeMaxDynamicSharedMemorySize, static_cast<int>(shared));
-    if (error == cudaSuccess)
-      error = cudaOccupancyMaxActiveBlocksPerMultiprocessor(
-          &occupancy, fattn_mma_quality_kernel<16, true>, threads, shared);
-  } else if (ncols1 == 32) {
-    error = cudaFuncSetAttribute(
-        fattn_mma_quality_kernel<32, false>,
-        cudaFuncAttributeMaxDynamicSharedMemorySize, static_cast<int>(shared));
-    if (error == cudaSuccess)
-      error = cudaOccupancyMaxActiveBlocksPerMultiprocessor(
-          &occupancy, fattn_mma_quality_kernel<32, false>, threads, shared);
+  if (ncols1 == 8) return fattn_occupancy_typed<8, true, 1, 1>();
+  if (ncols1 == 16) {
+    if (kSelectedFattnPath[0] == 's' || kSelectedFattnPath[0] == 'o')
+      return fattn_occupancy_typed<16, true, 2, 1>();
+    return fattn_occupancy_typed<16, true, 1, 1>();
   }
-  return error == cudaSuccess ? occupancy : 0;
+  if (ncols1 == 32) return fattn_occupancy_typed<32, false, 1, 1>();
+  return 0;
+}
+
+inline int fattn_occupancy_for_path(const char* path) noexcept {
+  if (path != nullptr && path[0] == 's')
+    return fattn_occupancy_typed<16, true, 2, 2>();
+  if (path != nullptr && path[0] == 'o')
+    return fattn_occupancy_typed<16, true, 2, 1>();
+  return fattn_occupancy_typed<16, true, 1, 1>();
 }
 
 }  // namespace qw38::cuda

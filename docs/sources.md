@@ -613,6 +613,37 @@ baseline.
   baseline; envelopes unloosened; OPT-009 Q8_0 reference remains
   byte-exact; OPT-016 remains the parity gate owner; does not substitute
   for the 2K llama.cpp parity gate; Quartz ≥ llama.cpp is not this gate.
+- OPT-026 adapts llama.cpp revision
+  `cc83d7b4824f73cfdda4dfbb47ee39804f71b328` (MIT, The ggml authors)
+  Ada+ fattn stream-K occupancy from `fattn.cu` / `fattn-common.cuh`
+  (`cc >= ADA_LOVELACE` stream-K plus occupancy-2 `__launch_bounds__` for
+  Ampere DKQ=DV=256 ncols=32). This increment does not vendor
+  `fattn-mma-f16.cuh`, does not copy `../ds4`, and does not include ggml
+  headers. Production prompt attention keeps ncols1=16 and splits each
+  query tile's KV range across `grid.z=2`, then combines online-softmax
+  partials. Combine buffers alias existing `prompt_projected_bf16_` and
+  `prompt_q8_`; score scratch stays untouched; no extra `cudaMalloc`.
+  Occupancy-2 whole-tile was A/B-eligible and slower than stream-K.
+  Mixer Q8 quality, skinny `mma_i32_j128`, and FFN `shared_y_swiglu_q8`
+  stay. Decode attention stays one-token. Tiled
+  `launch_attention_prepare_chunk_tiled` remains the unloosened OPT-005
+  reference. **Measured, RTX 5090:** A/B winner `stream_k`; live exclusive
+  cold exact-4096 keep versus the frozen successor-oracle baseline
+  1709.21912; `reverted` false; `successor_oracle` true;
+  `production_fattn_optimized` true; `ladder_exhausted` true. Live
+  numbers stay in the report; this ledger does not replace them. The
+  schema-1 contract, measured fixture, and report are
+  [`pins/opt026_fattn_streamk_contract.json`](../pins/opt026_fattn_streamk_contract.json),
+  [`fixtures/opt026_fattn_streamk.json`](../fixtures/opt026_fattn_streamk.json),
+  and
+  [`evidence/optimization/opt026-fattn-streamk/REPORT.md`](../evidence/optimization/opt026-fattn-streamk/REPORT.md).
+  The beginner explanation is
+  [`docs/44-cuda-attention-prefill.md`](44-cuda-attention-prefill.md).
+  Proof limit: fattn occupancy / stream-K under unloosened OPT-005
+  envelopes; 4K keep/reject versus the then-current oracle baseline;
+  envelopes unloosened; tiled attention remains the reference; OPT-016
+  remains the parity gate owner; does not substitute for the 2K llama.cpp
+  parity gate; Quartz ≥ llama.cpp is not this gate.
 - CUD-003 introduces no new external implementation source. GGUF Q8_0 decoding
   follows the format already admitted by the pinned scalar decoder, and the
   pointwise/layout equations come from the pinned model contract and scalar
