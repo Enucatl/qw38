@@ -5,10 +5,12 @@ description: >-
   implementation-ledger task through Cursor Task subagents using
   cursor-grok-4.6-high for every stage (planning, implementation,
   documentation, verification, delivery). Use when advancing
-  implementation_ledger.md via Cursor Agent CLI; do not use for ad hoc
-  changes that are not tracked there. Prefer this over run-ledger-task
-  when running under Cursor rather than Codex.
-disable-model-invocation: true
+  implementation_ledger.md, running the next ledger task, continuing
+  ledger work, unblocking or delivering a pending ledger ID, or when
+  the user mentions run-ledger-task / run-ledger-task-cursor under
+  Cursor. Do not use for ad hoc changes that are not tracked in the
+  ledger. Prefer this over run-ledger-task when running under Cursor
+  rather than Codex.
 ---
 
 # Run Ledger Task (Cursor)
