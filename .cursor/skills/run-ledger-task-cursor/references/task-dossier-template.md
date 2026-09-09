@@ -86,9 +86,18 @@ after delivery as versioned evidence.
 
 - Status: `done` or `blocked`
 - Acceptance evidence: <links for primary and coupled IDs>
+- Throughput delta (when applicable): <baseline fixture + mean tok/s> →
+  <post mean tok/s>; delta `<post-baseline>` tok/s (`<post/baseline>×`);
+  on reject: measured post and `speedup 0 (reverted)`; optional same-sitting
+  llama.cpp tok/s
 - Commit: <hash and subject, not created, or local-only after push failure>
 - Push: <upstream and result, not attempted, or failure>
 - First-pass acceptance: <yes/no>
 - Total elapsed/tokens/cost: <values when exposed; otherwise unavailable>
 - Remaining risk or recovery condition: <text or none>
 ```
+
+When planning a throughput idea, cite the latest rebuilt attribution (or
+decode timing) sink ranking under Repository evidence and name which sink the
+increment targets. Do not rely on a prior ranked list once newer measurements
+exist.

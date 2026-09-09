@@ -20,6 +20,33 @@ repository's `plan.md` and `implementation_ledger.md` are authoritative. Keep a
 permanent dossier at `tasks/<PRIMARY-ID>.md`; read
 [the dossier template](references/task-dossier-template.md) before planning.
 
+## Performance steering (prefill/decode)
+
+When the increment is a throughput or recovery idea (OPT-* keep/reject,
+parity, or similar), do **not** pick the next idea from a stale ranked list
+alone. Guide selection and planning with live instrumentation:
+
+1. Prefer the current OPT-020-style exclusive CUDA-event attribution
+   (`mixer_mmq`, `gdn_core`, `attention_core`, `ffn_mmq`, plus existing
+   categories) on a rebuilt diagnostic against **current** production
+   objects. Stale binaries are not evidence.
+2. Rank sinks by measured milliseconds (and share of wall). Prefer the
+   largest Quartz-owned sink that still has a transferable llama.cpp/ds4
+   technique under `plan.md` provenance.
+3. When a same-protocol llama.cpp category or whole-prefill/decode comparison
+   exists, prefer ideas that close the largest Quartz-versus-llama gap, not
+   only the largest Quartz-internal share.
+4. Decode work uses decode timing / BEN-001 probes the same way: longest
+   Quartz-owned decode sink first.
+5. Record the chosen sink and the measured numbers in the planning dossier
+   (`Repository evidence` / `Implementation decisions`). If admitting a new
+   ledger task after a discovery stop, name the sink that justified it.
+
+Examples: after mixer quality lands, if attribution shows `ffn_mmq` then
+`attention_core` dominating, the next idea must target those—not a lower
+sink—unless a dossier proves the larger sinks are already llama-competitive
+or plan-forbidden.
+
 ## Runtime mapping
 
 This skill is the Cursor port of `.agents/skills/run-ledger-task`. Differences:
@@ -138,3 +165,17 @@ Report the task and coupled IDs, final status, commit and push result, verifier
 commands, retries, and dossier path. Also report per-stage model
 (`cursor-grok-4.6-high`), elapsed time when known, retry count, first-pass
 acceptance, and token/cost data only when the runtime exposes them.
+
+For throughput / keep-reject / oracle-steered tasks, always include a
+**tok/s delta versus the then-current baseline** at the end of the completion
+report (and in the dossier Final outcome / delivery ledger History entry):
+
+- Name the baseline (fixture path + mean tok/s) and the post-task mean tok/s.
+- Report absolute delta (`post - baseline`) and relative speedup
+  (`post / baseline`, or percent).
+- On a reject/revert, still report the measured post number and state that
+  speedup is `0` (baseline unchanged).
+- When an OPT-021-style llama.cpp same-sitting number exists, also report
+  Quartz-versus-llama tok/s (informational unless that task owns the gate).
+
+Example: `4K Quartz 1680.8 tok/s vs baseline 967.3 (+713.5, 1.74×); llama 3227.5`.

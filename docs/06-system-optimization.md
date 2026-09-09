@@ -255,6 +255,21 @@ parity gate. Live numbers stay in the report; this chapter does not replace
 them:
 [`evidence/optimization/opt025-ffn-shared-y/REPORT.md`](../evidence/optimization/opt025-ffn-shared-y/REPORT.md).
 
+## Post-OPT-026 4K attribution and second ladder
+
+The OPT-022–OPT-026 4K idea ladder is exhausted. Successor oracle Quartz mean
+**1746.71973** tok/s versus same-sitting llama.cpp **3253.993621** tok/s
+(`fixtures/opt026_fattn_streamk.json`); Quartz still does not meet llama.cpp
+at 4K. Live exclusive-RTX-5090 CUDA-event scout after OPT-026 (rebuilt
+production objects, cold exact-4096, graphs=64) attributes wall **2348.33** ms
+as `attention_core` **36.9%**, `ffn_mmq` **31.4%**, `gdn_core` **19.3%**,
+`mixer_mmq` **12.2%**. Oracle-length next pick is attention. Second keep/reject
+ladder: OPT-027–OPT-031 (persistent Ada+ fattn stream-K, MMQ stream-K, GDN
+fuse, PDL, mixer/GDN graphs). Evidence:
+[`evidence/optimization/speedup-loop-post026/REPORT.md`](../evidence/optimization/speedup-loop-post026/REPORT.md);
+method: [`speedup-loop.md`](../speedup-loop.md). This is instrumentation and
+task admission, **not** the 2K llama.cpp parity gate.
+
 ## DwarfStar transfer boundary
 
 Reuse MMV/MMQ phase split, quant block tests, explicit unavailable paths, stable

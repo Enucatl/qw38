@@ -1,0 +1,113 @@
+{
+  "schema_version": 1,
+  "task": "speedup-loop-post026",
+  "status": "measured",
+  "measurement_utc": "2026-09-09T06:11:25Z",
+  "oracle_fixture": "fixtures/opt026_fattn_streamk.json",
+  "oracle_quartz_mean_tok_s": 1746.71973,
+  "oracle_llama_avg_ts": 3253.993621,
+  "quartz_meets_llama": false,
+  "ladder_exhausted_opt022_026": true,
+  "attr_2k": {
+    "measurement_utc": "2026-09-09T06:10:33Z",
+    "wall_ms": 997.075439,
+    "tok_s": 2054.00708,
+    "prompt_graph_launches": 0,
+    "categories_ms": {
+      "embedding": 0.0709439963,
+      "mixer_mmq": 145.659805,
+      "gdn_core": 211.427628,
+      "attention_core": 245.942291,
+      "ffn_mmq": 390.441711,
+      "logits": 2.32108808,
+      "commit_sync": 0.624960005,
+      "graph": 0,
+      "other_idle": 0.586975098
+    },
+    "share_pct": {
+      "embedding": 0.01,
+      "mixer_mmq": 14.61,
+      "gdn_core": 21.2,
+      "attention_core": 24.67,
+      "ffn_mmq": 39.16,
+      "logits": 0.23,
+      "commit_sync": 0.06,
+      "graph": 0.0,
+      "other_idle": 0.06
+    }
+  },
+  "attr_4k": {
+    "measurement_utc": "2026-09-09T06:11:25Z",
+    "wall_ms": 2348.33276,
+    "tok_s": 1744.21619,
+    "prompt_graph_launches": 64,
+    "categories_ms": {
+      "embedding": 0.115840003,
+      "mixer_mmq": 285.685242,
+      "gdn_core": 453.225311,
+      "attention_core": 867.448792,
+      "ffn_mmq": 738.265869,
+      "logits": 2.32931209,
+      "commit_sync": 0.688063979,
+      "graph": 0.232223958,
+      "other_idle": 0.342285156
+    },
+    "share_pct": {
+      "embedding": 0.0,
+      "mixer_mmq": 12.17,
+      "gdn_core": 19.3,
+      "attention_core": 36.94,
+      "ffn_mmq": 31.44,
+      "logits": 0.1,
+      "commit_sync": 0.03,
+      "graph": 0.01,
+      "other_idle": 0.01
+    }
+  },
+  "ranked_sinks_4k": [
+    [
+      "attention_core",
+      867.448792
+    ],
+    [
+      "ffn_mmq",
+      738.265869
+    ],
+    [
+      "gdn_core",
+      453.225311
+    ],
+    [
+      "mixer_mmq",
+      285.685242
+    ],
+    [
+      "logits",
+      2.32931209
+    ],
+    [
+      "commit_sync",
+      0.688063979
+    ],
+    [
+      "other_idle",
+      0.342285156
+    ],
+    [
+      "graph",
+      0.232223958
+    ],
+    [
+      "embedding",
+      0.115840003
+    ]
+  ],
+  "next_pick": "attention_core",
+  "proposed_tasks": [
+    "OPT-027 persistent Ada+ fattn stream-K",
+    "OPT-028 MMQ stream-K (FFN/Q4_K)",
+    "OPT-029 fuse GDN conv+gated output",
+    "OPT-030 Hopper/Blackwell PDL",
+    "OPT-031 mixer+GDN 4096 graphs"
+  ]
+}
