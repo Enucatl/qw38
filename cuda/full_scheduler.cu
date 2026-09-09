@@ -2200,6 +2200,7 @@ Status execute_prompt_chunk(
                 gdn_slot * internal::kGdnConvolutionValues,
             workspace->gdn_candidate_recurrent_ +
                 gdn_slot * internal::kGdnRecurrentStateValues};
+        bool used_fused_gate = false;
         if (error == cudaSuccess) {
           const std::size_t gdn_scratch_floats =
               workspace->prompt_chunk_rows_ * internal::kFfnWidth *
@@ -2207,16 +2208,29 @@ Status execute_prompt_chunk(
           float* overlay = reinterpret_cast<float*>(
               workspace->prompt_projected_bf16_);
           GdnScanPath scan = gdn_scan;
+          float* conv_out = gdn_fuses_conv() ? nullptr
+                                            : workspace->prompt_gdn_convolved_;
           if (scan == GdnScanPath::kFusedTokenLoop) {
-            error = launch_gdn_prepare_chunk_tiled(
-                kGdnConfig, workspace->prompt_projection_a_,
-                layer.gdn.convolution, workspace->prompt_gdn_decay_,
-                workspace->prompt_gdn_update_, token_count, committed,
-                candidate, workspace->prompt_gdn_convolved_,
-                workspace->prompt_gdn_recurrent_output_, stream, scan, overlay,
-                gdn_scratch_floats);
+            if (gdn_fuses_gated_output()) {
+              error = launch_gdn_quality_fused(
+                  kGdnConfig, workspace->prompt_projection_a_,
+                  layer.gdn.convolution, workspace->prompt_gdn_decay_,
+                  workspace->prompt_gdn_update_, token_count, committed,
+                  candidate, conv_out, workspace->prompt_gdn_recurrent_output_,
+                  workspace->prompt_projection_b_, layer.gdn.norm,
+                  workspace->prompt_projected_bf16_, stream, true, nullptr);
+              if (error == cudaSuccess) used_fused_gate = true;
+            } else {
+              error = launch_gdn_prepare_chunk_tiled(
+                  kGdnConfig, workspace->prompt_projection_a_,
+                  layer.gdn.convolution, workspace->prompt_gdn_decay_,
+                  workspace->prompt_gdn_update_, token_count, committed,
+                  candidate, conv_out, workspace->prompt_gdn_recurrent_output_,
+                  stream, scan, overlay, gdn_scratch_floats);
+            }
             if (error == cudaErrorInvalidValue) {
               scan = GdnScanPath::kParallelAssociative;
+              used_fused_gate = false;
             }
           }
           if (error == cudaSuccess || error == cudaErrorInvalidValue) {
@@ -2236,7 +2250,7 @@ Status execute_prompt_chunk(
             }
           }
         }
-        if (error == cudaSuccess) {
+        if (error == cudaSuccess && !used_fused_gate) {
           const dim3 grid(static_cast<unsigned int>(internal::kGdnGateCount),
                           static_cast<unsigned int>(token_count));
           gdn_gated_output_rows<<<grid, kThreads, 0, stream>>>(

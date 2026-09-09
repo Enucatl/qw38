@@ -1,16 +1,19 @@
 # 42. Chunked CUDA GDN prefill in 64-token windows
 
-[Index](README.md) · Implementation tasks: GDN-002, OPT-013, OPT-019, and EDU-028 in
+[Index](README.md) · Implementation tasks: GDN-002, OPT-013, OPT-019, OPT-029, and EDU-028 in
 [`implementation_ledger.md`](../implementation_ledger.md)
 · Contracts:
 [`pins/cuda_gdn_chunk_contract.json`](../pins/cuda_gdn_chunk_contract.json),
 [`pins/cuda_gdn_scan_contract.json`](../pins/cuda_gdn_scan_contract.json),
-[`pins/opt019_core_recovery_contract.json`](../pins/opt019_core_recovery_contract.json)
+[`pins/opt019_core_recovery_contract.json`](../pins/opt019_core_recovery_contract.json),
+[`pins/opt029_gdn_fuse_contract.json`](../pins/opt029_gdn_fuse_contract.json)
 · Evidence:
 [`fixtures/cuda_gdn_chunk.json`](../fixtures/cuda_gdn_chunk.json),
 [`fixtures/cuda_gdn_scan.json`](../fixtures/cuda_gdn_scan.json),
 [`fixtures/opt019_core_recovery.json`](../fixtures/opt019_core_recovery.json),
-[`evidence/optimization/opt019-gdn-attention-core/REPORT.md`](../evidence/optimization/opt019-gdn-attention-core/REPORT.md)
+[`evidence/optimization/opt019-gdn-attention-core/REPORT.md`](../evidence/optimization/opt019-gdn-attention-core/REPORT.md),
+[`fixtures/opt029_gdn_fuse.json`](../fixtures/opt029_gdn_fuse.json),
+[`evidence/optimization/opt029-gdn-fuse/REPORT.md`](../evidence/optimization/opt029-gdn-fuse/REPORT.md)
 
 [Chapter 41](41-cuda-gdn-step.md) prepared one token of GDN state. A prompt has
 many tokens, and processing those known input tokens is called **prefill**.
@@ -148,6 +151,26 @@ memcmp-equal to sequential. OPT-008's 4,096-versus-64 memcmp stays on
 `kSequentialWindows`. Prepare still does not mutate committed convolution or
 recurrent bytes.
 
+## OPT-029 fused conv / gated-output
+
+OPT-029 measured collapsing tiled causal convolution and/or gated-output
+into that warp-column token loop. Candidates were `off` (split parallel
+conv + warp-column + `gdn_gated_output_rows`), `fuse_conv` (conv inside
+the 128-thread loop), `fuse_gate` (gated-output inside a 1024-thread
+one-block-per-head loop), and `fuse_both`. Sequential windows remain the
+unloosened numeric and exact-state reference. Eligible fused ids met the
+frozen `5e-8` / `5e-9` envelopes versus sequential on recurrent output
+and candidate state; gated BF16 versus the split gated-output kernel on
+the same recurrent also met that envelope. Occupancy was ≥ 1 on every
+id. The paired CUDA-event A/B on production 4096-token GDN core
+(conv + recurrence + gated-output, 0 warm-ups, 3 samples) did **not**
+find an optimized id strictly faster than `off`. Production therefore
+keeps the split sequence. `GdnScanPath::kFusedTokenLoop` stays the
+production scan enum. `kSelectedGdnFusePath` is `off`. Fused kernels
+remain as non-production symbols. Decode GDN is unchanged. Live 4K
+keep/reject numbers stay in the report and are not restated here:
+[`evidence/optimization/opt029-gdn-fuse/REPORT.md`](../evidence/optimization/opt029-gdn-fuse/REPORT.md).
+
 ## Whole-chunk candidate state
 
 Internal windows are not separate transactions. The candidate after window one
@@ -236,6 +259,9 @@ windows at the frozen envelopes, overlay `W_fit`, sequential fallback, launch
 geometry, and the component 4,096-token CUDA-event gate. OPT-019 proves
 production fused recurrence is the warp-column quality path inside those same
 envelopes, plus the live exact-2048 `gdn` category drop under the locked
-addressed rule. None of these tasks prove complete GDN layers as a speedup
-claim, the comparative 5% prefill/decode gates, long-context quality,
+addressed rule. OPT-029 proves fused conv and/or gated-output into that
+token loop under the same envelopes when a paired A/B wins, or retains
+the split sequence with rejection evidence when it does not. None of
+these tasks prove complete GDN layers as a speedup claim, the
+comparative 5% prefill/decode gates, long-context quality,
 request-level atomicity, or llama.cpp 2K tok/s parity.

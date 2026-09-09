@@ -711,6 +711,41 @@ baseline.
   unloosened; OPT-009 Q8_0 reference remains byte-exact; OPT-016 remains
   the parity gate owner; does not substitute for the 2K llama.cpp parity
   gate; Quartz ≥ llama.cpp is not this gate.
+- OPT-029 adapts llama.cpp revision
+  `cc83d7b4824f73cfdda4dfbb47ee39804f71b328` (MIT, The ggml authors)
+  warp-column GDN recurrence from `gated_delta_net.cu` (`S_v=128`,
+  grid `(H, n_seqs, S_v/4)`, block `(32, 4)`, register `s_shard`).
+  Quartz-owned causal conv and gated-output collapse into that token
+  loop; llama.cpp keeps causal conv as a separate op (chunked-kernel
+  TODO). This increment does not vendor `gated_delta_net.cu`, does not
+  copy `../ds4`, and does not include ggml headers. Production prompt
+  GDN remains split parallel conv + warp-column + `gdn_gated_output_rows`
+  after the paired A/B loss. Fused kernels remain as non-production
+  symbols. `kSelectedGdnFusePath` is `off`. `GdnScanPath::kFusedTokenLoop`
+  stays the production scan enum. Mixer Q8 quality, skinny
+  `mma_i32_j128`, FFN `shared_y_swiglu_q8`, and fattn Ada+ stream-K stay.
+  Decode GDN stays tiled prepare + `launch_gdn_gated_output`. Sequential
+  windows remain the unloosened GDN-002 reference. **Measured, RTX 5090:**
+  A/B winner `off` (`win=false`; no fuse id strictly beat split conv +
+  warp-column + gated-output); live exclusive cold exact-4096 reject
+  versus the frozen successor-oracle baseline 1746.71973; `reverted`
+  true; `successor_oracle` false; `production_gdn_fuse_installed` false;
+  `ladder_exhausted` false. Live numbers stay in the report; this ledger
+  does not replace them. The schema-1 contract, rejected fixture, report,
+  and rejection are
+  [`pins/opt029_gdn_fuse_contract.json`](../pins/opt029_gdn_fuse_contract.json),
+  [`fixtures/opt029_gdn_fuse.json`](../fixtures/opt029_gdn_fuse.json),
+  [`evidence/optimization/opt029-gdn-fuse/REPORT.md`](../evidence/optimization/opt029-gdn-fuse/REPORT.md),
+  and
+  [`evidence/optimization/opt029-gdn-fuse/REJECTION.md`](../evidence/optimization/opt029-gdn-fuse/REJECTION.md).
+  The beginner explanation is
+  [`docs/42-cuda-gdn-chunks.md`](42-cuda-gdn-chunks.md).
+  Proof limit: GDN conv and/or gated-output collapsed into the
+  warp-column token loop under unloosened GDN-002 envelopes when a
+  paired A/B wins; 4K keep/reject versus the then-current oracle
+  baseline; envelopes unloosened; sequential remains the reference;
+  OPT-016 remains the parity gate owner; does not substitute for the 2K
+  llama.cpp parity gate; Quartz ≥ llama.cpp is not this gate.
 - CUD-003 introduces no new external implementation source. GGUF Q8_0 decoding
   follows the format already admitted by the pinned scalar decoder, and the
   pointwise/layout equations come from the pinned model contract and scalar

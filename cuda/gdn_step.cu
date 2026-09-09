@@ -798,10 +798,10 @@ cudaError_t launch_fused_token_loop(
     const GdnState& candidate, float* convolution_output,
     float* recurrent_output, cudaStream_t stream,
     bool value_is_tiled) noexcept {
-  return launch_convolution_then_recurrence(
+  return launch_gdn_quality_fused(
       config, convolution_input, convolution_weights, log_decay, beta,
       token_count, committed, candidate, convolution_output, recurrent_output,
-      stream, value_is_tiled, true);
+      nullptr, nullptr, nullptr, stream, value_is_tiled, nullptr);
 }
 
 cudaError_t launch_parallel_associative(
@@ -882,11 +882,14 @@ cudaError_t launch_gdn_prepare_chunk_layout(
     float* recurrent_output, cudaStream_t stream, bool value_is_tiled,
     GdnScanPath path, float* scratch, std::size_t scratch_floats) noexcept {
   const std::size_t channels = gdn_convolution_channels(config);
+  const bool allow_null_conv =
+      path == GdnScanPath::kFusedTokenLoop && gdn_fuses_conv();
   if (channels == 0 || token_count == 0 || convolution_input == nullptr ||
       convolution_weights == nullptr || log_decay == nullptr ||
       beta == nullptr || committed.convolution == nullptr ||
       committed.recurrent == nullptr || candidate.convolution == nullptr ||
-      candidate.recurrent == nullptr || convolution_output == nullptr ||
+      candidate.recurrent == nullptr ||
+      (convolution_output == nullptr && !allow_null_conv) ||
       recurrent_output == nullptr ||
       committed.convolution == candidate.convolution ||
       committed.recurrent == candidate.recurrent) {
@@ -946,11 +949,111 @@ cudaError_t launch_gdn_fused_rank2(
       stream, value_is_tiled, false);
 }
 
+cudaError_t launch_gdn_quality_fused(
+    const GdnConfig& config, const float* convolution_input,
+    const float* convolution_weights, const float* log_decay,
+    const float* beta, std::size_t token_count, const GdnState& committed,
+    const GdnState& candidate, float* convolution_output,
+    float* recurrent_output, const float* gate_tiled, const float* norm,
+    __nv_bfloat16* output_bf16, cudaStream_t stream, bool value_is_tiled,
+    const char* path) noexcept {
+  const std::size_t channels = gdn_convolution_channels(config);
+  if (channels == 0 || token_count == 0 || log_decay == nullptr ||
+      beta == nullptr || committed.recurrent == nullptr ||
+      candidate.recurrent == nullptr || recurrent_output == nullptr ||
+      committed.recurrent == candidate.recurrent) {
+    return cudaErrorInvalidValue;
+  }
+  const char* selected = gdn_fuse_path_or_selected(path);
+  bool fuse_gate = gdn_path_eq(selected, "fuse_gate") ||
+                   gdn_path_eq(selected, "fuse_both");
+  const bool want_conv = gdn_path_eq(selected, "fuse_conv") ||
+                         gdn_path_eq(selected, "fuse_both");
+  if (want_conv && (convolution_input == nullptr ||
+                    convolution_weights == nullptr ||
+                    committed.convolution == nullptr ||
+                    candidate.convolution == nullptr)) {
+    selected = "off";
+    fuse_gate = false;
+  }
+  if (fuse_gate && (gate_tiled == nullptr || norm == nullptr ||
+                    output_bf16 == nullptr)) {
+    selected = "off";
+    fuse_gate = false;
+  }
+  if (config.key_width != 128 || config.value_width != 128 ||
+      config.convolution_width != 4) {
+    selected = "off";
+    fuse_gate = false;
+  }
+  const bool launch_split_gate =
+      !fuse_gate && gate_tiled != nullptr && norm != nullptr &&
+      output_bf16 != nullptr;
+  auto launch_parallel_conv = [&]() -> cudaError_t {
+    if (convolution_input == nullptr || convolution_weights == nullptr ||
+        committed.convolution == nullptr || candidate.convolution == nullptr ||
+        convolution_output == nullptr) {
+      return cudaErrorInvalidValue;
+    }
+    const dim3 conv_grid(
+        static_cast<unsigned int>((channels + kConvolutionThreads - 1) /
+                                  kConvolutionThreads),
+        static_cast<unsigned int>(token_count));
+    prepare_convolution_chunk_parallel<<<conv_grid, kConvolutionThreads, 0,
+                                          stream>>>(
+        convolution_input, convolution_weights, committed.convolution,
+        candidate.convolution, convolution_output, channels,
+        config.convolution_width, token_count);
+    return cudaPeekAtLastError();
+  };
+  cudaError_t error = cudaSuccess;
+  if (gdn_path_eq(selected, "fuse_both")) {
+    prepare_recurrence_fused_head<true>
+        <<<config.value_heads, dim3(32U, 32U, 1U), 0, stream>>>(
+            config, convolution_input, convolution_weights,
+            committed.convolution, candidate.convolution, convolution_output,
+            log_decay, beta, committed.recurrent, candidate.recurrent,
+            recurrent_output, gate_tiled, norm, output_bf16, token_count,
+            value_is_tiled);
+    error = cudaPeekAtLastError();
+  } else if (gdn_path_eq(selected, "fuse_gate")) {
+    error = launch_parallel_conv();
+    if (error == cudaSuccess) {
+      prepare_recurrence_fused_head<false>
+          <<<config.value_heads, dim3(32U, 32U, 1U), 0, stream>>>(
+              config, convolution_input, convolution_weights,
+              committed.convolution, candidate.convolution, convolution_output,
+              log_decay, beta, committed.recurrent, candidate.recurrent,
+              recurrent_output, gate_tiled, norm, output_bf16, token_count,
+              value_is_tiled);
+      error = cudaPeekAtLastError();
+    }
+  } else if (gdn_path_eq(selected, "fuse_conv")) {
+    const dim3 grid(config.value_heads, 1U, config.value_width / 4U);
+    const dim3 block(32U, 4U, 1U);
+    prepare_recurrence_fused_conv<<<grid, block, 0, stream>>>(
+        config, convolution_input, convolution_weights, committed.convolution,
+        candidate.convolution, convolution_output, log_decay, beta,
+        committed.recurrent, candidate.recurrent, recurrent_output, token_count,
+        value_is_tiled);
+    error = cudaPeekAtLastError();
+  } else {
+    error = launch_convolution_then_recurrence(
+        config, convolution_input, convolution_weights, log_decay, beta,
+        token_count, committed, candidate, convolution_output, recurrent_output,
+        stream, value_is_tiled, true);
+  }
+  if (error == cudaSuccess && launch_split_gate) {
+    error = launch_gdn_gated_output_rows(
+        recurrent_output, gate_tiled, norm, config.key_heads,
+        config.value_heads / config.key_heads, config.value_width, token_count,
+        output_bf16, stream);
+  }
+  return error;
+}
+
 int gdn_fused_quality_occupancy() noexcept {
-  int occupancy = 0;
-  const cudaError_t error = cudaOccupancyMaxActiveBlocksPerMultiprocessor(
-      &occupancy, prepare_recurrence_fused_warp_column, kGdnQualityThreads, 0);
-  return error == cudaSuccess ? occupancy : 0;
+  return gdn_fuse_occupancy("off");
 }
 
 cudaError_t launch_gdn_commit(const GdnConfig& config,

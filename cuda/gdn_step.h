@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <cstdint>
 
+#include <cuda_bf16.h>
 #include <cuda_runtime.h>
 
 namespace qw38::cuda {
@@ -77,6 +78,25 @@ cudaError_t launch_gdn_fused_rank2(
     bool value_is_tiled) noexcept;
 
 int gdn_fused_quality_occupancy() noexcept;
+const char* selected_gdn_fuse_path() noexcept;
+bool gdn_fuses_conv() noexcept;
+bool gdn_fuses_gated_output() noexcept;
+int gdn_fuse_occupancy(const char* path) noexcept;
+
+cudaError_t launch_gdn_quality_fused(
+    const GdnConfig& config, const float* convolution_input,
+    const float* convolution_weights, const float* log_decay,
+    const float* beta, std::size_t token_count, const GdnState& committed,
+    const GdnState& candidate, float* convolution_output,
+    float* recurrent_output, const float* gate_tiled, const float* norm,
+    __nv_bfloat16* output_bf16, cudaStream_t stream, bool value_is_tiled,
+    const char* path = nullptr) noexcept;
+
+cudaError_t launch_gdn_gated_output_rows(
+    const float* recurrent, const float* gate_tiled, const float* norm,
+    std::size_t key_heads, std::size_t replicas, std::size_t head_width,
+    std::size_t token_count, __nv_bfloat16* output_tiled,
+    cudaStream_t stream) noexcept;
 
 cudaError_t launch_gdn_commit(const GdnConfig& config,
                               const GdnState& candidate,

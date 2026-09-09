@@ -95,7 +95,7 @@ are repository-relative unless stated otherwise.
 | OPT-026 | Attention fattn stream-K occupancy | OPT-019, OPT-021 | done | Production fattn-mma prompt attention enables Ada+ stream-K (or equivalent occupancy fixup) under frozen OPT-019 envelopes when a paired A/B wins; cold exact-4096 mean tok/s strictly beats the then-current oracle baseline or the change is reverted with a retained rejection; does not substitute for OPT-016 | [`tasks/OPT-026.md`](tasks/OPT-026.md); [`pins/opt026_fattn_streamk_contract.json`](pins/opt026_fattn_streamk_contract.json); [`fixtures/opt026_fattn_streamk.json`](fixtures/opt026_fattn_streamk.json); [`cuda/prefill_4k_fattn_test.cu`](cuda/prefill_4k_fattn_test.cu); [`evidence/optimization/opt026-fattn-streamk/REPORT.md`](evidence/optimization/opt026-fattn-streamk/REPORT.md); verification 2026-09-09T05:54:24Z |
 | OPT-027 | Persistent Ada+ fattn stream-K | OPT-026 | done | Replace OPT-026 `grid.z=2` KV bipartition with llama.cpp Ada+ persistent stream-K (`nsm × occupancy` linearized tiles + efficiency rounding) under frozen OPT-005 envelopes when a paired A/B wins; cold exact-4096 mean tok/s strictly beats the then-current oracle baseline or the change is reverted with a retained rejection; does not substitute for OPT-016 | [`tasks/OPT-027.md`](tasks/OPT-027.md); [`pins/opt027_persistent_fattn_contract.json`](pins/opt027_persistent_fattn_contract.json); [`fixtures/opt027_persistent_fattn.json`](fixtures/opt027_persistent_fattn.json); [`cuda/prefill_4k_persistent_fattn_test.cu`](cuda/prefill_4k_persistent_fattn_test.cu); [`evidence/optimization/opt027-persistent-fattn/REPORT.md`](evidence/optimization/opt027-persistent-fattn/REPORT.md); [`evidence/optimization/opt027-persistent-fattn/REJECTION.md`](evidence/optimization/opt027-persistent-fattn/REJECTION.md); verification 2026-09-09T07:05:46Z |
 | OPT-028 | Q4_K/Q6_K MMQ stream-K | OPT-018, OPT-021 | done | Production quality MMA MMQ uses llama.cpp-style stream-K tile decomposition plus optional fixup under frozen Q4_K/Q6_K (and Q8 association where touched) envelopes when a paired A/B wins; recapture 4096 FFN graphs if nodes change; cold exact-4096 mean tok/s strictly beats the then-current oracle baseline or the change is reverted with a retained rejection; does not substitute for OPT-016 | [`tasks/OPT-028.md`](tasks/OPT-028.md); [`pins/opt028_mmq_streamk_contract.json`](pins/opt028_mmq_streamk_contract.json); [`fixtures/opt028_mmq_streamk.json`](fixtures/opt028_mmq_streamk.json); [`cuda/prefill_4k_mmq_streamk_test.cu`](cuda/prefill_4k_mmq_streamk_test.cu); [`evidence/optimization/opt028-mmq-streamk/REPORT.md`](evidence/optimization/opt028-mmq-streamk/REPORT.md); [`evidence/optimization/opt028-mmq-streamk/REJECTION.md`](evidence/optimization/opt028-mmq-streamk/REJECTION.md); verification 2026-09-09T10:06:27Z |
-| OPT-029 | Fuse GDN conv and gated output | OPT-019, OPT-021 | pending | Collapse tiled causal conv and/or gated-output into the warp-column fused GDN token loop under frozen GDN-002 envelopes when a paired A/B wins; cold exact-4096 mean tok/s strictly beats the then-current oracle baseline or the change is reverted with a retained rejection; does not substitute for OPT-016 | — |
+| OPT-029 | Fuse GDN conv and gated output | OPT-019, OPT-021 | done | Collapse tiled causal conv and/or gated-output into the warp-column fused GDN token loop under frozen GDN-002 envelopes when a paired A/B wins; cold exact-4096 mean tok/s strictly beats the then-current oracle baseline or the change is reverted with a retained rejection; does not substitute for OPT-016 | [`tasks/OPT-029.md`](tasks/OPT-029.md); [`pins/opt029_gdn_fuse_contract.json`](pins/opt029_gdn_fuse_contract.json); [`fixtures/opt029_gdn_fuse.json`](fixtures/opt029_gdn_fuse.json); [`cuda/prefill_4k_gdn_fuse_test.cu`](cuda/prefill_4k_gdn_fuse_test.cu); [`evidence/optimization/opt029-gdn-fuse/REPORT.md`](evidence/optimization/opt029-gdn-fuse/REPORT.md); [`evidence/optimization/opt029-gdn-fuse/REJECTION.md`](evidence/optimization/opt029-gdn-fuse/REJECTION.md); verification 2026-09-09T10:50:03Z |
 | OPT-030 | Hopper/Blackwell PDL prompt launches | OPT-021 | pending | Successive prompt kernels use programmatic dependent launch (PDL) serialization on sm_120 where a paired A/B wins versus current stream launches; arithmetic and graph-vs-fused byte equality stay; cold exact-4096 mean tok/s strictly beats the then-current oracle baseline or the change is reverted with a retained rejection; does not substitute for OPT-016 | — |
 | OPT-031 | Mixer and GDN 4096 prompt graphs | OPT-012, OPT-021 | pending | Capture stable-address mixer Q8 and fused GDN prompt subgraphs beside existing FFN graphs and replay when `token_count == 4096`; attention KV stays outside; graph-vs-fused byte equality; cold exact-4096 mean tok/s strictly beats the then-current oracle baseline or the change is reverted with a retained rejection; does not substitute for OPT-016 | — |
 
@@ -4674,3 +4674,40 @@ are repository-relative unless stated otherwise.
 - Marked OPT-028 `done`; delivery is limited to the verified task scope plus
   this ledger/audit bookkeeping. `plan.md` is unchanged. OPT-016 stays
   `blocked`. Next eligible pending by ledger row order: **OPT-029**.
+
+### 2026-09-09T10:53:00Z — OPT-029 delivered
+
+- Independent verification attempt 1 passed. Production prompt GDN remains
+  split parallel conv + warp-column + `gdn_gated_output_rows`
+  (`kSelectedGdnFusePath = off`). Fused kernels remain non-production
+  symbols. Mixer Q8 remains quality MMA plus skinny `mma_i32_j128`. FFN
+  remains `shared_y_swiglu_q8`. Fattn remains OPT-026 `stream_k`. Decode
+  GDN stays split tiled prepare + `launch_gdn_gated_output`. Exclusive
+  RTX 5090 sitting wrote
+  [`fixtures/opt029_gdn_fuse.json`](fixtures/opt029_gdn_fuse.json)
+  (`measurement_utc` 2026-09-09T10:38:37Z; Quartz mean **1725.36658** tok/s
+  versus frozen OPT-026 **1746.71973**; llama.cpp `avg_ts` **3187.39006**;
+  `quartz_meets_llama` false informational; `reverted` true;
+  `successor_oracle` false; `production_gdn_fuse_installed` false; A/B
+  winner `off` `win=false`; `ladder_exhausted` false). Throughput
+  delta: baseline [`fixtures/opt026_fattn_streamk.json`](fixtures/opt026_fattn_streamk.json)
+  **1746.71973** → measured post **1725.36658**; speedup `0`
+  (reverted/not installed). Native test does not require Quartz ≥
+  llama.cpp. Coupled IDs: none. Delivery re-check:
+  `uv run pytest -q tests/test_documentation.py tests/test_opt029_gdn_fuse.py`.
+- Acceptance evidence: [`tasks/OPT-029.md`](tasks/OPT-029.md);
+  [`pins/opt029_gdn_fuse_contract.json`](pins/opt029_gdn_fuse_contract.json);
+  [`fixtures/opt029_gdn_fuse.json`](fixtures/opt029_gdn_fuse.json);
+  [`cuda/prefill_4k_gdn_fuse_test.cu`](cuda/prefill_4k_gdn_fuse_test.cu);
+  [`evidence/optimization/opt029-gdn-fuse/REPORT.md`](evidence/optimization/opt029-gdn-fuse/REPORT.md);
+  [`evidence/optimization/opt029-gdn-fuse/REJECTION.md`](evidence/optimization/opt029-gdn-fuse/REJECTION.md);
+  [`docs/06-system-optimization.md`](docs/06-system-optimization.md);
+  [`docs/42-cuda-gdn-chunks.md`](docs/42-cuda-gdn-chunks.md);
+  [`docs/62-cuda-full-prefill.md`](docs/62-cuda-full-prefill.md).
+  Proof is fused GDN conv and/or gated-output under unloosened GDN-002
+  envelopes when a paired A/B wins, and a retained 4K reject versus the
+  then-current successor-oracle baseline, not the 2K llama.cpp parity
+  gate. The second 4K idea ladder is not exhausted.
+- Marked OPT-029 `done`; delivery is limited to the verified task scope plus
+  this ledger/audit bookkeeping. `plan.md` is unchanged. OPT-016 stays
+  `blocked`. Next eligible pending by ledger row order: **OPT-030**.

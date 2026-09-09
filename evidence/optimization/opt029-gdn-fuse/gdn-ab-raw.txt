@@ -1,0 +1,21 @@
+opt029_env id=off occupancy=9 max_abs=1.49011612e-08 rms=4.71603923e-10 nonfinite=0 prepare_atomic=true eligible=true
+opt029_env id=fuse_conv occupancy=4 max_abs=1.49011612e-08 rms=4.71603923e-10 nonfinite=0 prepare_atomic=true eligible=true
+opt029_env id=fuse_gate occupancy=1 max_abs=1.49011612e-08 rms=4.71603923e-10 nonfinite=0 prepare_atomic=true eligible=true
+opt029_env id=fuse_both occupancy=1 max_abs=1.49011612e-08 rms=4.71603923e-10 nonfinite=0 prepare_atomic=true eligible=true
+gdn_ab id=off sample=0 ms=9.37939167 occupancy=9
+gdn_ab id=off sample=1 ms=9.3610878 occupancy=9
+gdn_ab id=off sample=2 ms=9.38083172 occupancy=9
+gdn_ab_mean id=off mean_ms=9.37377071 occupancy=9 eligible=true
+gdn_ab id=fuse_conv sample=0 ms=33.5804482 occupancy=4
+gdn_ab id=fuse_conv sample=1 ms=33.6166077 occupancy=4
+gdn_ab id=fuse_conv sample=2 ms=33.6463051 occupancy=4
+gdn_ab_mean id=fuse_conv mean_ms=33.6144524 occupancy=4 eligible=true
+gdn_ab id=fuse_gate sample=0 ms=16.7221432 occupancy=1
+gdn_ab id=fuse_gate sample=1 ms=16.7288952 occupancy=1
+gdn_ab id=fuse_gate sample=2 ms=16.7332478 occupancy=1
+gdn_ab_mean id=fuse_gate mean_ms=16.728096 occupancy=1 eligible=true
+gdn_ab id=fuse_both sample=0 ms=43.7444153 occupancy=1
+gdn_ab id=fuse_both sample=1 ms=43.7335663 occupancy=1
+gdn_ab id=fuse_both sample=2 ms=43.7086411 occupancy=1
+gdn_ab_mean id=fuse_both mean_ms=43.7288704 occupancy=1 eligible=true
+gdn_ab_winner id=off mean_ms=9.37377071 baseline_id=off baseline_ms=9.37377071 win=false selected_path=off

@@ -6,6 +6,7 @@
 #include <cstdio>
 #include <cstring>
 #include <ctime>
+#include <sys/stat.h>
 #include <vector>
 
 #include <cuda_bf16.h>
@@ -1051,6 +1052,315 @@ int main() {
                 fused_mean, fused_rank2_mean, fused_seq_mean, fused_par_mean,
                 quality_occupancy, fused_faster ? "true" : "false");
   }
+
+  bool opt029_ok = true;
+  const char* fuse_ids[4] = {"off", "fuse_conv", "fuse_gate", "fuse_both"};
+  float fuse_mean_ms[4] = {0.0F, 0.0F, 0.0F, 0.0F};
+  int fuse_occ[4] = {0, 0, 0, 0};
+  bool fuse_eligible[4] = {false, false, false, false};
+  const char* opt029_winner = "off";
+  bool opt029_win = false;
+  {
+    mkdir("evidence", 0755);
+    mkdir("evidence/optimization", 0755);
+    mkdir("evidence/optimization/opt029-gdn-fuse", 0755);
+    std::FILE* raw = std::fopen(
+        "evidence/optimization/opt029-gdn-fuse/gdn-ab-raw.txt", "w");
+    if (raw == nullptr) {
+      std::fprintf(stderr, "opt029 A/B fopen failed\n");
+      opt029_ok = false;
+    }
+    const std::size_t env_tokens = 256;
+    const std::size_t env_heads = production.value_heads;
+    const std::size_t env_width = production.value_width;
+    const std::size_t env_gate = env_tokens * env_heads * env_width;
+    DeviceBuffers env{};
+    float* gate = nullptr;
+    float* norm = nullptr;
+    __nv_bfloat16* fused_bf16 = nullptr;
+    __nv_bfloat16* split_bf16 = nullptr;
+    cudaError_t env_error = allocate(&env, production, env_tokens);
+    if (env_error == cudaSuccess) {
+      env_error = cudaMalloc(&gate, env_gate * sizeof(float));
+    }
+    if (env_error == cudaSuccess) {
+      env_error = cudaMalloc(&norm, env_width * sizeof(float));
+    }
+    if (env_error == cudaSuccess) {
+      env_error = cudaMalloc(&fused_bf16, env_gate * sizeof(__nv_bfloat16));
+    }
+    if (env_error == cudaSuccess) {
+      env_error = cudaMalloc(&split_bf16, env_gate * sizeof(__nv_bfloat16));
+    }
+    std::vector<float> e_input, e_weights, e_decay, e_beta, e_conv, e_rec;
+    std::vector<float> host_gate(env_gate), host_norm(env_width);
+    if (env_error == cudaSuccess) {
+      fill_synthetic(production, env_tokens, &e_input, &e_weights, &e_decay,
+                     &e_beta, &e_conv, &e_rec);
+      for (std::size_t index = 0; index < env_gate; ++index) {
+        host_gate[index] =
+            std::sin(static_cast<float>(index) * 0.017F) * 0.5F;
+      }
+      for (std::size_t index = 0; index < env_width; ++index) {
+        host_norm[index] = 0.75F + 0.01F * static_cast<float>(index % 17);
+      }
+      env_error = copy_inputs(&env, e_input, e_weights, e_decay, e_beta, e_conv,
+                              e_rec);
+    }
+    if (env_error == cudaSuccess) {
+      env_error = cudaMemcpy(gate, host_gate.data(), env_gate * sizeof(float),
+                             cudaMemcpyHostToDevice);
+    }
+    if (env_error == cudaSuccess) {
+      env_error = cudaMemcpy(norm, host_norm.data(), env_width * sizeof(float),
+                             cudaMemcpyHostToDevice);
+    }
+    const std::size_t rec_values = qw38::cuda::gdn_output_values(production);
+    const std::size_t conv_state = qw38::cuda::gdn_convolution_values(production);
+    const std::size_t rec_state = qw38::cuda::gdn_recurrent_values(production);
+    std::vector<float> seq_rec(env_tokens * rec_values), seq_cconv(conv_state),
+        seq_crec(rec_state),
+        seq_conv(env_tokens * qw38::cuda::gdn_convolution_channels(production));
+    std::vector<float> dummy_cconv(conv_state), dummy_crec(rec_state);
+    std::uint64_t env_frontier = 0;
+    if (env_error == cudaSuccess) {
+      env_error = launch_path(production, env, env_tokens,
+                              qw38::cuda::GdnScanPath::kSequentialWindows, true,
+                              nullptr);
+    }
+    if (env_error == cudaSuccess) env_error = cudaDeviceSynchronize();
+    if (env_error == cudaSuccess) {
+      env_error = read_outputs(env, &seq_cconv, &seq_crec, &seq_conv, &seq_rec,
+                               &dummy_cconv, &dummy_crec, &env_frontier);
+    }
+    const bool seq_atomic =
+        env_error == cudaSuccess &&
+        committed_unchanged(dummy_cconv, dummy_crec, e_conv, e_rec,
+                            env_frontier);
+    for (int id = 0; id < 4 && env_error == cudaSuccess; ++id) {
+      fuse_occ[id] = qw38::cuda::gdn_fuse_occupancy(fuse_ids[id]);
+      env_error = restore_committed(&env, e_conv, e_rec);
+      if (env_error == cudaSuccess) {
+        env_error = qw38::cuda::launch_gdn_quality_fused(
+            production, env.input, env.weights, env.log_decay, env.beta,
+            env_tokens, committed_state(env), candidate_state(env),
+            env.convolution_output, env.recurrent_output, gate, norm,
+            fused_bf16, nullptr, true, fuse_ids[id]);
+      }
+      if (env_error == cudaSuccess) env_error = cudaDeviceSynchronize();
+      std::vector<float> act_rec(env_tokens * rec_values), act_cconv(conv_state),
+          act_crec(rec_state), act_conv(seq_conv.size());
+      std::uint64_t act_frontier = 0;
+      if (env_error == cudaSuccess) {
+        env_error = read_outputs(env, &act_cconv, &act_crec, &act_conv, &act_rec,
+                                 &dummy_cconv, &dummy_crec, &act_frontier);
+      }
+      Envelope fuse_env;
+      if (env_error == cudaSuccess) {
+        double squared = 0.0;
+        std::size_t count = 0;
+        accumulate(act_rec, seq_rec, &fuse_env.max_abs, &squared, &count,
+                   &fuse_env.nonfinite);
+        accumulate(act_cconv, seq_cconv, &fuse_env.max_abs, &squared, &count,
+                   &fuse_env.nonfinite);
+        accumulate(act_crec, seq_crec, &fuse_env.max_abs, &squared, &count,
+                   &fuse_env.nonfinite);
+        fuse_env.rms = static_cast<float>(
+            std::sqrt(squared / static_cast<double>(count)));
+        fuse_env.prepare_atomic =
+            seq_atomic && committed_unchanged(dummy_cconv, dummy_crec, e_conv,
+                                              e_rec, act_frontier);
+      }
+      bool gate_ok = true;
+      const bool fuses_gate = id == 2 || id == 3;
+      if (env_error == cudaSuccess && fuses_gate) {
+        env_error = qw38::cuda::launch_gdn_gated_output_rows(
+            env.recurrent_output, gate, norm, production.key_heads,
+            production.value_heads / production.key_heads,
+            production.value_width, env_tokens, split_bf16, nullptr);
+        if (env_error == cudaSuccess) env_error = cudaDeviceSynchronize();
+        std::vector<__nv_bfloat16> host_fused(env_gate), host_split(env_gate);
+        if (env_error == cudaSuccess) {
+          env_error = cudaMemcpy(host_fused.data(), fused_bf16,
+                                 env_gate * sizeof(__nv_bfloat16),
+                                 cudaMemcpyDeviceToHost);
+        }
+        if (env_error == cudaSuccess) {
+          env_error = cudaMemcpy(host_split.data(), split_bf16,
+                                 env_gate * sizeof(__nv_bfloat16),
+                                 cudaMemcpyDeviceToHost);
+        }
+        if (env_error == cudaSuccess) {
+          double squared = 0.0;
+          std::size_t count = 0;
+          float max_abs = 0.0F;
+          std::size_t nonfinite = 0;
+          for (std::size_t index = 0; index < env_gate; ++index) {
+            const float actual = __bfloat162float(host_fused[index]);
+            const float expected = __bfloat162float(host_split[index]);
+            if (!std::isfinite(actual) || !std::isfinite(expected)) ++nonfinite;
+            const float difference = std::fabs(actual - expected);
+            max_abs = std::max(max_abs, difference);
+            squared += static_cast<double>(difference) * difference;
+            ++count;
+          }
+          const float rms = static_cast<float>(
+              std::sqrt(squared / static_cast<double>(count)));
+          gate_ok = within_envelope(max_abs, rms, nonfinite);
+          std::printf("opt029_gate id=%s max_abs=%.9g rms=%.9g nonfinite=%zu "
+                      "ok=%s\n",
+                      fuse_ids[id], max_abs, rms, nonfinite,
+                      json_bool(gate_ok));
+        }
+      }
+      const bool numeric_ok =
+          env_error == cudaSuccess && fuse_env.prepare_atomic &&
+          within_envelope(fuse_env.max_abs, fuse_env.rms, fuse_env.nonfinite) &&
+          gate_ok;
+      fuse_eligible[id] = numeric_ok && fuse_occ[id] >= 1;
+      std::printf("opt029_env id=%s occupancy=%d max_abs=%.9g rms=%.9g "
+                  "nonfinite=%zu prepare_atomic=%s eligible=%s\n",
+                  fuse_ids[id], fuse_occ[id], fuse_env.max_abs, fuse_env.rms,
+                  fuse_env.nonfinite, json_bool(fuse_env.prepare_atomic),
+                  json_bool(fuse_eligible[id]));
+      if (raw != nullptr) {
+        std::fprintf(raw,
+                     "opt029_env id=%s occupancy=%d max_abs=%.9g rms=%.9g "
+                     "nonfinite=%zu prepare_atomic=%s eligible=%s\n",
+                     fuse_ids[id], fuse_occ[id], fuse_env.max_abs, fuse_env.rms,
+                     fuse_env.nonfinite, json_bool(fuse_env.prepare_atomic),
+                     json_bool(fuse_eligible[id]));
+      }
+    }
+    cudaFree(split_bf16);
+    cudaFree(fused_bf16);
+    cudaFree(norm);
+    cudaFree(gate);
+    release(&env);
+    if (env_error != cudaSuccess) {
+      fail_cuda("opt029 envelope", env_error);
+      opt029_ok = false;
+    }
+
+    const std::size_t ab_tokens = 4096;
+    const std::size_t ab_gate =
+        ab_tokens * production.value_heads * production.value_width;
+    float* ab_gate_buf = nullptr;
+    float* ab_norm = nullptr;
+    __nv_bfloat16* ab_bf16 = nullptr;
+    cudaError_t ab_error = cudaSuccess;
+    if (opt029_ok) {
+      ab_error = cudaMalloc(&ab_gate_buf, ab_gate * sizeof(float));
+      if (ab_error == cudaSuccess) {
+        ab_error = cudaMalloc(&ab_norm, production.value_width * sizeof(float));
+      }
+      if (ab_error == cudaSuccess) {
+        ab_error = cudaMalloc(&ab_bf16, ab_gate * sizeof(__nv_bfloat16));
+      }
+    }
+    std::vector<float> host_ab_gate(ab_gate), host_ab_norm(production.value_width);
+    if (ab_error == cudaSuccess) {
+      for (std::size_t index = 0; index < ab_gate; ++index) {
+        host_ab_gate[index] =
+            std::sin(static_cast<float>(index) * 0.017F) * 0.5F;
+      }
+      for (std::size_t index = 0; index < production.value_width; ++index) {
+        host_ab_norm[index] = 0.75F + 0.01F * static_cast<float>(index % 17);
+      }
+      ab_error = cudaMemcpy(ab_gate_buf, host_ab_gate.data(),
+                            ab_gate * sizeof(float), cudaMemcpyHostToDevice);
+      if (ab_error == cudaSuccess) {
+        ab_error = cudaMemcpy(ab_norm, host_ab_norm.data(),
+                              production.value_width * sizeof(float),
+                              cudaMemcpyHostToDevice);
+      }
+    }
+    cudaEvent_t start = nullptr;
+    cudaEvent_t stop = nullptr;
+    if (ab_error == cudaSuccess) ab_error = cudaEventCreate(&start);
+    if (ab_error == cudaSuccess) ab_error = cudaEventCreate(&stop);
+    for (int id = 0; id < 4 && ab_error == cudaSuccess && opt029_ok; ++id) {
+      if (fuse_occ[id] < 1) continue;
+      float samples[3] = {0.0F, 0.0F, 0.0F};
+      for (int sample = 0; sample < 3 && ab_error == cudaSuccess; ++sample) {
+        ab_error = restore_committed(&geometry, g_conv, g_rec);
+        if (ab_error == cudaSuccess) ab_error = cudaEventRecord(start);
+        if (ab_error == cudaSuccess) {
+          ab_error = qw38::cuda::launch_gdn_quality_fused(
+              production, geometry.input, geometry.weights, geometry.log_decay,
+              geometry.beta, ab_tokens, committed_state(geometry),
+              candidate_state(geometry), geometry.convolution_output,
+              geometry.recurrent_output, ab_gate_buf, ab_norm, ab_bf16, nullptr,
+              true, fuse_ids[id]);
+        }
+        if (ab_error == cudaSuccess) ab_error = cudaEventRecord(stop);
+        if (ab_error == cudaSuccess) ab_error = cudaEventSynchronize(stop);
+        if (ab_error == cudaSuccess) {
+          ab_error = cudaEventElapsedTime(&samples[sample], start, stop);
+        }
+        if (raw != nullptr && ab_error == cudaSuccess) {
+          std::fprintf(raw, "gdn_ab id=%s sample=%d ms=%.9g occupancy=%d\n",
+                       fuse_ids[id], sample, samples[sample], fuse_occ[id]);
+        }
+        std::printf("gdn_ab id=%s sample=%d ms=%.9g occupancy=%d\n", fuse_ids[id],
+                    sample, samples[sample], fuse_occ[id]);
+      }
+      if (ab_error == cudaSuccess) {
+        fuse_mean_ms[id] = (samples[0] + samples[1] + samples[2]) / 3.0F;
+        if (raw != nullptr) {
+          std::fprintf(raw,
+                       "gdn_ab_mean id=%s mean_ms=%.9g occupancy=%d "
+                       "eligible=%s\n",
+                       fuse_ids[id], fuse_mean_ms[id], fuse_occ[id],
+                       json_bool(fuse_eligible[id]));
+        }
+        std::printf("gdn_ab_mean id=%s mean_ms=%.9g occupancy=%d eligible=%s\n",
+                    fuse_ids[id], fuse_mean_ms[id], fuse_occ[id],
+                    json_bool(fuse_eligible[id]));
+      }
+    }
+    if (start != nullptr) cudaEventDestroy(start);
+    if (stop != nullptr) cudaEventDestroy(stop);
+    cudaFree(ab_bf16);
+    cudaFree(ab_norm);
+    cudaFree(ab_gate_buf);
+    if (ab_error != cudaSuccess) {
+      fail_cuda("opt029 A/B", ab_error);
+      opt029_ok = false;
+    }
+    if (opt029_ok && !fuse_eligible[0]) {
+      std::fprintf(stderr, "opt029 baseline off is not GDN-002 eligible\n");
+      opt029_ok = false;
+    }
+    float best_ms = fuse_mean_ms[0];
+    opt029_winner = "off";
+    opt029_win = false;
+    if (opt029_ok && fuse_mean_ms[0] > 0.0F) {
+      for (int id = 1; id < 4; ++id) {
+        if (!fuse_eligible[id] || fuse_mean_ms[id] <= 0.0F) continue;
+        if (fuse_mean_ms[id] < fuse_mean_ms[0] &&
+            (!opt029_win || fuse_mean_ms[id] < best_ms)) {
+          best_ms = fuse_mean_ms[id];
+          opt029_winner = fuse_ids[id];
+          opt029_win = true;
+        }
+      }
+    }
+    if (raw != nullptr) {
+      std::fprintf(raw,
+                   "gdn_ab_winner id=%s mean_ms=%.9g baseline_id=off "
+                   "baseline_ms=%.9g win=%s selected_path=%s\n",
+                   opt029_winner, opt029_win ? best_ms : fuse_mean_ms[0],
+                   fuse_mean_ms[0], json_bool(opt029_win),
+                   qw38::cuda::selected_gdn_fuse_path());
+      std::fclose(raw);
+    }
+    std::printf("gdn_ab_winner id=%s mean_ms=%.9g baseline_id=off "
+                "baseline_ms=%.9g win=%s selected_path=%s\n",
+                opt029_winner, opt029_win ? best_ms : fuse_mean_ms[0],
+                fuse_mean_ms[0], json_bool(opt029_win),
+                qw38::cuda::selected_gdn_fuse_path());
+  }
   release(&geometry);
 
   const bool small_65_ok = parallel_cases.size() > 2 && parallel_cases[2].passed;
@@ -1176,6 +1486,6 @@ int main() {
                        tiled_ok && launch_geometry_ok && fail_closed_ok &&
                        overlay_ok && speedup_ok && launch_counts_ok &&
                        fused_faster && opt019_gdn_2048.passed &&
-                       quality_occupancy >= 1;
+                       quality_occupancy >= 1 && opt029_ok;
   return passed ? 0 : 1;
 }
