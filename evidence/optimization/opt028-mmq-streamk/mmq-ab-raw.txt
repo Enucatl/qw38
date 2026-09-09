@@ -1,0 +1,13 @@
+mmq_ab id=off sample=0 ms=10.6935358 occupancy=1
+mmq_ab id=off sample=1 ms=10.6839361 occupancy=1
+mmq_ab id=off sample=2 ms=10.6807041 occupancy=1
+mmq_ab_mean id=off mean_ms=10.686058 occupancy=1 nonfinite=0 nblocks=0 eligible=true
+mmq_ab id=stream_k sample=0 ms=11.5560322 occupancy=1
+mmq_ab id=stream_k sample=1 ms=11.5179195 occupancy=1
+mmq_ab id=stream_k sample=2 ms=11.5377922 occupancy=1
+mmq_ab_mean id=stream_k mean_ms=11.5372477 occupancy=1 nonfinite=0 nblocks=4352 eligible=true
+mmq_ab id=stream_k_nsm sample=0 ms=14.6155844 occupancy=1
+mmq_ab id=stream_k_nsm sample=1 ms=14.5907516 occupancy=1
+mmq_ab id=stream_k_nsm sample=2 ms=14.6010237 occupancy=1
+mmq_ab_mean id=stream_k_nsm mean_ms=14.6024542 occupancy=1 nonfinite=0 nblocks=170 eligible=true
+mmq_ab_winner id=off mean_ms=10.686058 baseline_id=off baseline_ms=10.686058 win=false

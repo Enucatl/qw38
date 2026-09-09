@@ -500,11 +500,14 @@ cudaError_t launch_quant_mmq(QuantKind kind, const std::uint8_t* weights,
                              std::size_t output_rows, std::size_t columns,
                              const __nv_bfloat16* prompt,
                              std::size_t prompt_rows, Q8Block* q8_workspace,
-                             float* output, cudaStream_t stream) noexcept {
+                             float* output, cudaStream_t stream,
+                             float* tmp_fixup,
+                             std::size_t tmp_fixup_floats) noexcept {
   if ((kind == QuantKind::kQ4K || kind == QuantKind::kQ6K) &&
       prompt_rows >= 8) {
     return launch_quant_mmq_mma(kind, weights, output_rows, columns, prompt,
-                                prompt_rows, q8_workspace, output, stream);
+                                prompt_rows, q8_workspace, output, stream,
+                                tmp_fixup, tmp_fixup_floats);
   }
   return launch_quant_mmq_variant(
       kind, weights, output_rows, columns, prompt, prompt_rows, q8_workspace,

@@ -1983,6 +1983,391 @@ cudaError_t launch_ffn_candidate(
   return error;
 }
 
+void ensure_opt028_evidence_dir() {
+  mkdir("evidence", 0755);
+  mkdir("evidence/optimization", 0755);
+  mkdir("evidence/optimization/opt028-mmq-streamk", 0755);
+}
+
+int run_mmq_stream_k_helpers() {
+  if (std::strcmp(qw38::cuda::selected_mmq_stream_k_path(), "off") != 0 &&
+      std::strcmp(qw38::cuda::selected_mmq_stream_k_path(), "stream_k") != 0 &&
+      std::strcmp(qw38::cuda::selected_mmq_stream_k_path(), "stream_k_nsm") !=
+          0) {
+    std::fprintf(stderr, "selected_mmq_stream_k_path is not a legal enumerator\n");
+    return 1;
+  }
+  if (std::strcmp(qw38::cuda::selected_ffn_path(), "shared_y_swiglu_q8") != 0) {
+    std::fprintf(stderr, "kSelectedFfnPath must stay shared_y_swiglu_q8\n");
+    return 1;
+  }
+  const int nsm = qw38::cuda::mmq_stream_k_nsm();
+  if (nsm < 1) {
+    std::fprintf(stderr, "mmq_stream_k_nsm=%d\n", nsm);
+    return 1;
+  }
+  if (qw38::cuda::mmq_stream_k_nblocks(nsm, 4352, "stream_k") != 4352 ||
+      qw38::cuda::mmq_stream_k_nblocks(nsm, 1280, "stream_k") != 1280 ||
+      qw38::cuda::mmq_stream_k_nblocks(170, 136, "stream_k") != 170 ||
+      qw38::cuda::mmq_stream_k_nblocks(nsm, 4352, "stream_k_nsm") != nsm ||
+      qw38::cuda::mmq_stream_k_nblocks(nsm, 4352, "off") != 0 ||
+      qw38::cuda::mmq_stream_k_fixup_needed(4352, 4352) ||
+      !qw38::cuda::mmq_stream_k_fixup_needed(4352, 170) ||
+      qw38::cuda::mmq_stream_k_fixup_floats(170, 128, 128) !=
+          static_cast<std::size_t>(170) * 128U * 128U ||
+      qw38::cuda::mmq_stream_k_fixup_floats(4352, 128, 128) !=
+          static_cast<std::size_t>(4352) * 128U * 128U ||
+      qw38::cuda::mmq_stream_k_occupancy(qw38::cuda::QuantKind::kQ4K) < 1 ||
+      qw38::cuda::mmq_stream_k_occupancy(qw38::cuda::QuantKind::kQ6K) < 1 ||
+      qw38::cuda::mmq_stream_k_fixup_occupancy() < 1) {
+    std::fprintf(stderr, "MMQ stream-K helpers failed nsm=%d occ_q4=%d occ_q6=%d "
+                         "occ_fixup=%d\n",
+                 nsm,
+                 qw38::cuda::mmq_stream_k_occupancy(qw38::cuda::QuantKind::kQ4K),
+                 qw38::cuda::mmq_stream_k_occupancy(qw38::cuda::QuantKind::kQ6K),
+                 qw38::cuda::mmq_stream_k_fixup_occupancy());
+    return 1;
+  }
+  std::printf("mmq_stream_k_helpers nsm=%d path=%s uses=%s occ_q4=%d "
+              "occ_fixup=%d\n",
+              nsm, qw38::cuda::selected_mmq_stream_k_path(),
+              qw38::cuda::mmq_uses_stream_k() ? "true" : "false",
+              qw38::cuda::mmq_stream_k_occupancy(qw38::cuda::QuantKind::kQ4K),
+              qw38::cuda::mmq_stream_k_fixup_occupancy());
+  return 0;
+}
+
+int run_mma_stream_k_case(qw38::cuda::QuantKind kind, const char* name,
+                          std::size_t output_rows, std::size_t columns,
+                          std::size_t prompt_rows, const char* path) {
+  std::vector<std::uint8_t> weights;
+  fill_weights(kind, output_rows, columns, &weights);
+  std::vector<__nv_bfloat16> prompt;
+  prompt.resize(prompt_rows * columns);
+  for (std::size_t prompt_row = 0; prompt_row < prompt_rows; ++prompt_row) {
+    std::vector<__nv_bfloat16> row_activation;
+    std::vector<qw38::cuda::Q8Block> row_staged;
+    make_activation(columns, &row_activation, &row_staged, prompt_row);
+    std::copy(row_activation.begin(), row_activation.end(),
+              prompt.begin() + prompt_row * columns);
+  }
+  std::vector<float> expected;
+  if (!reference_dequant_gemm(kind, weights, output_rows, columns, prompt,
+                              prompt_rows, &expected)) {
+    return 1;
+  }
+  const int nty = static_cast<int>((output_rows + 127) / 128);
+  const int ntx = static_cast<int>((prompt_rows + 127) / 128);
+  const int ntiles = ntx * nty;
+  const int nsm = qw38::cuda::mmq_stream_k_nsm();
+  const int nblocks = qw38::cuda::mmq_stream_k_nblocks(nsm, ntiles, path);
+  const bool fixup = qw38::cuda::mmq_stream_k_fixup_needed(ntiles, nblocks);
+  const std::size_t fixup_floats =
+      fixup ? qw38::cuda::mmq_stream_k_fixup_floats(nblocks, 128, 128) : 0;
+  std::uint8_t* device_weights = nullptr;
+  __nv_bfloat16* device_prompt = nullptr;
+  qw38::cuda::Q8Block* device_y = nullptr;
+  float* device_out = nullptr;
+  float* device_fixup = nullptr;
+  cudaError_t error = cudaMalloc(&device_weights, weights.size());
+  if (error == cudaSuccess) {
+    error = cudaMalloc(&device_prompt, prompt.size() * sizeof(prompt[0]));
+  }
+  if (error == cudaSuccess) {
+    error = cudaMalloc(&device_y, qw38::cuda::q8_prompt_workspace_bytes(
+                                      prompt_rows, columns));
+  }
+  if (error == cudaSuccess) {
+    error = cudaMalloc(&device_out, expected.size() * sizeof(float));
+  }
+  if (error == cudaSuccess && fixup_floats > 0) {
+    error = cudaMalloc(&device_fixup, fixup_floats * sizeof(float));
+  }
+  if (error != cudaSuccess) return fail_cuda("stream-K MMA cudaMalloc", error);
+  error = cudaMemcpy(device_weights, weights.data(), weights.size(),
+                     cudaMemcpyHostToDevice);
+  if (error == cudaSuccess) {
+    error = cudaMemcpy(device_prompt, prompt.data(),
+                       prompt.size() * sizeof(prompt[0]), cudaMemcpyHostToDevice);
+  }
+  if (error == cudaSuccess) {
+    error = qw38::cuda::launch_quantize_mmq_q8_1(
+        kind, device_prompt, prompt_rows, columns, device_y, nullptr);
+  }
+  if (error == cudaSuccess) {
+    error = qw38::cuda::launch_quant_mmq_mma_y_path(
+        kind, device_weights, output_rows, columns, device_y, prompt_rows,
+        device_out, nullptr, path, device_fixup, fixup_floats);
+  }
+  if (error == cudaSuccess) error = cudaDeviceSynchronize();
+  if (error != cudaSuccess) return fail_cuda("stream-K MMA execution", error);
+  std::vector<float> actual(expected.size());
+  error = cudaMemcpy(actual.data(), device_out, actual.size() * sizeof(float),
+                     cudaMemcpyDeviceToHost);
+  if (error != cudaSuccess) return fail_cuda("stream-K MMA D2H", error);
+  float max_abs = 0.0F;
+  float max_rel = 0.0F;
+  float rms = 0.0F;
+  std::size_t bad = 0;
+  std::size_t nonfinite = 0;
+  const bool ok = ds4_q4k_association_ok(actual, expected, columns, &max_abs,
+                                         &max_rel, &rms, &bad, &nonfinite);
+  std::printf("mma_stream_k_case=%s path=%s prompt_rows=%zu output_rows=%zu "
+              "columns=%zu nblocks=%d fixup=%s max_abs=%.9g max_rel=%.9g "
+              "rms=%.9g bad=%zu nonfinite=%zu\n",
+              name, path, prompt_rows, output_rows, columns, nblocks,
+              fixup ? "true" : "false", max_abs, max_rel, rms, bad, nonfinite);
+  cudaFree(device_fixup);
+  cudaFree(device_out);
+  cudaFree(device_y);
+  cudaFree(device_prompt);
+  cudaFree(device_weights);
+  return ok ? 0 : 1;
+}
+
+cudaError_t launch_ffn_stream_k_candidate(
+    const char* path, const std::uint8_t* gate_w, const std::uint8_t* up_w,
+    const std::uint8_t* down_w, const __nv_bfloat16* prompt,
+    qw38::cuda::Q8Block* y, float* gate_out, float* up_out, float* down_out,
+    float* tmp_fixup, std::size_t tmp_fixup_floats, std::size_t prompt_rows) {
+  constexpr std::size_t kHidden = 5120;
+  constexpr std::size_t kFfn = 17408;
+  cudaError_t error = qw38::cuda::launch_quantize_mmq_q8_1(
+      qw38::cuda::QuantKind::kQ4K, prompt, prompt_rows, kHidden, y, nullptr);
+  if (error == cudaSuccess) {
+    error = qw38::cuda::launch_quant_mmq_mma_y_path(
+        qw38::cuda::QuantKind::kQ4K, gate_w, kFfn, kHidden, y, prompt_rows,
+        gate_out, nullptr, path, tmp_fixup, tmp_fixup_floats);
+  }
+  if (error == cudaSuccess) {
+    error = qw38::cuda::launch_quant_mmq_mma_y_path(
+        qw38::cuda::QuantKind::kQ4K, up_w, kFfn, kHidden, y, prompt_rows,
+        up_out, nullptr, path, tmp_fixup, tmp_fixup_floats);
+  }
+  if (error == cudaSuccess) {
+    error = qw38::cuda::launch_swiglu_quantize_mmq_q8_1(
+        gate_out, up_out, prompt_rows, kFfn, y, nullptr);
+  }
+  if (error == cudaSuccess) {
+    error = qw38::cuda::launch_quant_mmq_mma_y_path(
+        qw38::cuda::QuantKind::kQ4K, down_w, kHidden, kFfn, y, prompt_rows,
+        down_out, nullptr, path, tmp_fixup, tmp_fixup_floats);
+  }
+  return error;
+}
+
+int run_mmq_stream_k_ab() {
+  if (qw38::cuda::mmq_stream_k_occupancy(qw38::cuda::QuantKind::kQ4K) < 1 ||
+      qw38::cuda::mmq_stream_k_fixup_occupancy() < 1) {
+    std::fprintf(stderr, "MMQ stream-K occupancy < 1\n");
+    return 1;
+  }
+  constexpr std::size_t kPrompt = 4096;
+  constexpr std::size_t kHidden = 5120;
+  constexpr std::size_t kFfn = 17408;
+  std::vector<std::uint8_t> gate_w;
+  std::vector<std::uint8_t> up_w;
+  std::vector<std::uint8_t> down_w;
+  fill_weights(qw38::cuda::QuantKind::kQ4K, kFfn, kHidden, &gate_w);
+  fill_weights(qw38::cuda::QuantKind::kQ4K, kFfn, kHidden, &up_w);
+  fill_weights(qw38::cuda::QuantKind::kQ4K, kHidden, kFfn, &down_w);
+  std::vector<__nv_bfloat16> prompt(kPrompt * kHidden);
+  for (std::size_t row = 0; row < kPrompt; ++row) {
+    for (std::size_t col = 0; col < kHidden; ++col) {
+      prompt[row * kHidden + col] = __float2bfloat16_rn(
+          0.02F * unit_normal(
+              static_cast<std::uint32_t>(row * kHidden + col), 0xA5A5A5U));
+    }
+  }
+  const int nsm = qw38::cuda::mmq_stream_k_nsm();
+  const std::size_t fixup_floats =
+      qw38::cuda::mmq_stream_k_fixup_floats(nsm, 128, 128);
+  std::uint8_t* device_gate = nullptr;
+  std::uint8_t* device_up = nullptr;
+  std::uint8_t* device_down = nullptr;
+  __nv_bfloat16* device_prompt = nullptr;
+  qw38::cuda::Q8Block* device_y = nullptr;
+  float* device_gate_out = nullptr;
+  float* device_up_out = nullptr;
+  float* device_down_out = nullptr;
+  float* device_fixup = nullptr;
+  cudaError_t error = cudaMalloc(&device_gate, gate_w.size());
+  if (error == cudaSuccess) error = cudaMalloc(&device_up, up_w.size());
+  if (error == cudaSuccess) error = cudaMalloc(&device_down, down_w.size());
+  if (error == cudaSuccess) {
+    error = cudaMalloc(&device_prompt, prompt.size() * sizeof(prompt[0]));
+  }
+  if (error == cudaSuccess) {
+    error = cudaMalloc(&device_y,
+                       qw38::cuda::q8_prompt_workspace_bytes(kPrompt, kFfn));
+  }
+  if (error == cudaSuccess) {
+    error = cudaMalloc(&device_gate_out, kPrompt * kFfn * sizeof(float));
+  }
+  if (error == cudaSuccess) {
+    error = cudaMalloc(&device_up_out, kPrompt * kFfn * sizeof(float));
+  }
+  if (error == cudaSuccess) {
+    error = cudaMalloc(&device_down_out, kPrompt * kHidden * sizeof(float));
+  }
+  if (error == cudaSuccess) {
+    error = cudaMalloc(&device_fixup, fixup_floats * sizeof(float));
+  }
+  if (error != cudaSuccess) return fail_cuda("MMQ stream-K A/B cudaMalloc", error);
+  error = cudaMemcpy(device_gate, gate_w.data(), gate_w.size(),
+                     cudaMemcpyHostToDevice);
+  if (error == cudaSuccess) {
+    error = cudaMemcpy(device_up, up_w.data(), up_w.size(),
+                       cudaMemcpyHostToDevice);
+  }
+  if (error == cudaSuccess) {
+    error = cudaMemcpy(device_down, down_w.data(), down_w.size(),
+                       cudaMemcpyHostToDevice);
+  }
+  if (error == cudaSuccess) {
+    error = cudaMemcpy(device_prompt, prompt.data(),
+                       prompt.size() * sizeof(prompt[0]),
+                       cudaMemcpyHostToDevice);
+  }
+  if (error != cudaSuccess) return fail_cuda("MMQ stream-K A/B H2D", error);
+
+  const char* ids[] = {"off", "stream_k", "stream_k_nsm"};
+  ensure_opt028_evidence_dir();
+  FILE* raw = std::fopen(
+      "evidence/optimization/opt028-mmq-streamk/mmq-ab-raw.txt", "w");
+  if (raw == nullptr) {
+    std::fprintf(stderr, "MMQ stream-K A/B fopen failed\n");
+    return 1;
+  }
+  float means[3]{};
+  bool eligible[3]{};
+  std::size_t nonfinites[3]{};
+  std::vector<float> host(kPrompt * kHidden);
+  for (int c = 0; c < 3; ++c) {
+    cudaEvent_t start = nullptr;
+    cudaEvent_t stop = nullptr;
+    error = cudaEventCreate(&start);
+    if (error == cudaSuccess) error = cudaEventCreate(&stop);
+    float total = 0.0F;
+    for (int sample = 0; sample < 3 && error == cudaSuccess; ++sample) {
+      error = cudaEventRecord(start);
+      if (error == cudaSuccess) {
+        error = launch_ffn_stream_k_candidate(
+            ids[c], device_gate, device_up, device_down, device_prompt,
+            device_y, device_gate_out, device_up_out, device_down_out,
+            device_fixup, fixup_floats, kPrompt);
+      }
+      if (error == cudaSuccess) error = cudaEventRecord(stop);
+      if (error == cudaSuccess) error = cudaEventSynchronize(stop);
+      float milliseconds = 0.0F;
+      if (error == cudaSuccess) {
+        error = cudaEventElapsedTime(&milliseconds, start, stop);
+      }
+      if (error == cudaSuccess) {
+        total += milliseconds;
+        std::fprintf(raw, "mmq_ab id=%s sample=%d ms=%.9g occupancy=1\n",
+                     ids[c], sample, milliseconds);
+        std::printf("mmq_ab id=%s sample=%d ms=%.9g occupancy=1\n", ids[c],
+                    sample, milliseconds);
+      }
+    }
+    cudaEventDestroy(start);
+    cudaEventDestroy(stop);
+    if (error != cudaSuccess) {
+      std::fclose(raw);
+      return fail_cuda("MMQ stream-K A/B time", error);
+    }
+    means[c] = total / 3.0F;
+    error = cudaMemcpy(host.data(), device_down_out,
+                       host.size() * sizeof(float), cudaMemcpyDeviceToHost);
+    if (error != cudaSuccess) {
+      std::fclose(raw);
+      return fail_cuda("MMQ stream-K A/B D2H", error);
+    }
+    nonfinites[c] = 0;
+    for (float value : host) {
+      if (!std::isfinite(value)) ++nonfinites[c];
+    }
+    const int ntiles_gate = static_cast<int>((kFfn + 127) / 128) *
+                            static_cast<int>((kPrompt + 127) / 128);
+    const int nblocks =
+        qw38::cuda::mmq_stream_k_nblocks(nsm, ntiles_gate, ids[c]);
+    eligible[c] = nonfinites[c] == 0 &&
+                  (c == 0 || (nblocks > 0 &&
+                              qw38::cuda::mmq_stream_k_occupancy(
+                                  qw38::cuda::QuantKind::kQ4K) >= 1));
+    std::fprintf(raw,
+                 "mmq_ab_mean id=%s mean_ms=%.9g occupancy=1 nonfinite=%zu "
+                 "nblocks=%d eligible=%s\n",
+                 ids[c], means[c], nonfinites[c], nblocks,
+                 eligible[c] ? "true" : "false");
+    std::printf("mmq_ab_mean id=%s mean_ms=%.9g occupancy=1 nonfinite=%zu "
+                "nblocks=%d eligible=%s\n",
+                ids[c], means[c], nonfinites[c], nblocks,
+                eligible[c] ? "true" : "false");
+  }
+  int winner = 0;
+  if (eligible[0]) {
+    for (int c = 1; c < 3; ++c) {
+      if (eligible[c] && means[c] < means[winner]) winner = c;
+    }
+    if (winner != 0 && !(means[winner] < means[0])) winner = 0;
+  }
+  const bool ab_win = eligible[0] && winner != 0 && means[winner] < means[0];
+  std::fprintf(raw,
+               "mmq_ab_winner id=%s mean_ms=%.9g baseline_id=off "
+               "baseline_ms=%.9g win=%s\n",
+               ids[winner], means[winner], means[0],
+               ab_win ? "true" : "false");
+  std::printf("mmq_ab_winner id=%s mean_ms=%.9g baseline_id=off "
+              "baseline_ms=%.9g win=%s selected_path=%s\n",
+              ids[winner], means[winner], means[0],
+              ab_win ? "true" : "false",
+              qw38::cuda::selected_mmq_stream_k_path());
+  std::fclose(raw);
+  cudaFree(device_fixup);
+  cudaFree(device_down_out);
+  cudaFree(device_up_out);
+  cudaFree(device_gate_out);
+  cudaFree(device_y);
+  cudaFree(device_prompt);
+  cudaFree(device_down);
+  cudaFree(device_up);
+  cudaFree(device_gate);
+  return eligible[0] ? 0 : 1;
+}
+
+int run_mmq_stream_k_suite() {
+  if (run_mmq_stream_k_helpers() != 0) return 1;
+  if (run_mma_stream_k_case(qw38::cuda::QuantKind::kQ4K,
+                            "q4_k_sk_64x17408x5120", 17408, 5120, 64,
+                            "stream_k") != 0 ||
+      run_mma_stream_k_case(qw38::cuda::QuantKind::kQ4K,
+                            "q4_k_sknsm_64x17408x5120", 17408, 5120, 64,
+                            "stream_k_nsm") != 0 ||
+      run_mma_stream_k_case(qw38::cuda::QuantKind::kQ4K,
+                            "q4_k_sk_2048x17408x5120", 17408, 5120, 2048,
+                            "stream_k") != 0 ||
+      run_mma_stream_k_case(qw38::cuda::QuantKind::kQ6K,
+                            "q6_k_sk_64x5120x6144", 5120, 6144, 64,
+                            "stream_k") != 0 ||
+      run_mma_stream_k_case(qw38::cuda::QuantKind::kQ6K,
+                            "q6_k_sknsm_64x5120x6144", 5120, 6144, 64,
+                            "stream_k_nsm") != 0 ||
+      run_mma_stream_k_case(qw38::cuda::QuantKind::kQ6K,
+                            "q6_k_sk_2048x5120x6144", 5120, 6144, 2048,
+                            "stream_k") != 0 ||
+      run_mma_stream_k_case(qw38::cuda::QuantKind::kQ4K,
+                            "q4_k_sk_4096x5120x17408", 5120, 17408, 4096,
+                            "stream_k") != 0 ||
+      run_mma_stream_k_case(qw38::cuda::QuantKind::kQ4K,
+                            "q4_k_sknsm_4096x5120x17408", 5120, 17408, 4096,
+                            "stream_k_nsm") != 0) {
+    return 1;
+  }
+  return run_mmq_stream_k_ab();
+}
+
 void ensure_opt025_evidence_dir() {
   mkdir("evidence", 0755);
   mkdir("evidence/optimization", 0755);
@@ -2765,6 +3150,7 @@ int main() {
               mma_speed, variant_speed, speed_occ);
 
   if (run_q8_quality_suite() != 0) return 1;
+  if (run_mmq_stream_k_suite() != 0) return 1;
 
   std::printf("status=passed\n");
   return 0;

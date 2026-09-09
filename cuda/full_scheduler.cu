@@ -553,9 +553,12 @@ cudaError_t matrix_prompt(const DeviceTensor& matrix,
                               activation, prompt_rows, workspace->prompt_q8_,
                               output, stream);
   }
+  const std::size_t fixup_floats =
+      workspace->prompt_chunk_rows_ * kMaximumProjection;
   return launch_quant_mmq(matrix.kind, matrix.data, matrix.rows,
                           matrix.columns, activation, prompt_rows,
-                          workspace->prompt_q8_, output, stream);
+                          workspace->prompt_q8_, output, stream,
+                          workspace->prompt_projection_a_, fixup_floats);
 }
 
 cudaError_t matrix_prompt_q8_quality_mma(const DeviceTensor& matrix,
@@ -586,13 +589,19 @@ cudaError_t execute_prompt_ffn_projections(
       error = launch_quant_mmq_mma_y(
           layer.ffn_gate.kind, layer.ffn_gate.data, layer.ffn_gate.rows,
           layer.ffn_gate.columns, workspace->prompt_q8_, token_count,
-          workspace->prompt_projection_a_, stream);
+          workspace->prompt_projection_a_, stream,
+          reinterpret_cast<float*>(workspace->prompt_projected_bf16_),
+          workspace->prompt_chunk_rows_ * internal::kFfnWidth *
+              sizeof(__nv_bfloat16) / sizeof(float));
     }
     if (error == cudaSuccess) {
       error = launch_quant_mmq_mma_y(
           layer.ffn_up.kind, layer.ffn_up.data, layer.ffn_up.rows,
           layer.ffn_up.columns, workspace->prompt_q8_, token_count,
-          workspace->prompt_projection_b_, stream);
+          workspace->prompt_projection_b_, stream,
+          reinterpret_cast<float*>(workspace->prompt_projected_bf16_),
+          workspace->prompt_chunk_rows_ * internal::kFfnWidth *
+              sizeof(__nv_bfloat16) / sizeof(float));
     }
   } else {
     error = matrix_prompt(layer.ffn_gate, workspace->prompt_normalized_,
@@ -613,7 +622,10 @@ cudaError_t execute_prompt_ffn_projections(
         error = launch_quant_mmq_mma_y(
             layer.ffn_down.kind, layer.ffn_down.data, layer.ffn_down.rows,
             layer.ffn_down.columns, workspace->prompt_q8_, token_count,
-            workspace->prompt_mixer_output_, stream);
+            workspace->prompt_mixer_output_, stream,
+            reinterpret_cast<float*>(workspace->prompt_projected_bf16_),
+            workspace->prompt_chunk_rows_ * internal::kFfnWidth *
+                sizeof(__nv_bfloat16) / sizeof(float));
       }
     } else {
       error = launch_swiglu_bf16(

@@ -1,6 +1,6 @@
 # Chunked full-model CUDA prefill
 
-[Index](README.md) · Implementation tasks: SCH-002, MEM-002, OPT-008, OPT-009, OPT-011, OPT-012, OPT-013, OPT-014, OPT-015, OPT-017, OPT-018, OPT-019, OPT-020, OPT-021, OPT-022, OPT-023, OPT-024, OPT-025, OPT-026, OPT-027, and EDU-047 in
+[Index](README.md) · Implementation tasks: SCH-002, MEM-002, OPT-008, OPT-009, OPT-011, OPT-012, OPT-013, OPT-014, OPT-015, OPT-017, OPT-018, OPT-019, OPT-020, OPT-021, OPT-022, OPT-023, OPT-024, OPT-025, OPT-026, OPT-027, OPT-028, and EDU-047 in
 [`implementation_ledger.md`](../implementation_ledger.md) · Contracts:
 [`pins/cuda_prompt_scheduler_contract.json`](../pins/cuda_prompt_scheduler_contract.json),
 [`pins/cuda_prompt_pipeline_contract.json`](../pins/cuda_prompt_pipeline_contract.json),
@@ -18,7 +18,8 @@
 [`pins/opt024_mixer_q8_d2r_contract.json`](../pins/opt024_mixer_q8_d2r_contract.json),
 [`pins/opt025_ffn_shared_y_contract.json`](../pins/opt025_ffn_shared_y_contract.json),
 [`pins/opt026_fattn_streamk_contract.json`](../pins/opt026_fattn_streamk_contract.json),
-[`pins/opt027_persistent_fattn_contract.json`](../pins/opt027_persistent_fattn_contract.json)
+[`pins/opt027_persistent_fattn_contract.json`](../pins/opt027_persistent_fattn_contract.json),
+[`pins/opt028_mmq_streamk_contract.json`](../pins/opt028_mmq_streamk_contract.json)
 · Evidence: [`fixtures/cuda_prompt_scheduler.json`](../fixtures/cuda_prompt_scheduler.json),
 [`fixtures/cuda_prompt_pipeline.json`](../fixtures/cuda_prompt_pipeline.json),
 [`fixtures/cuda_prompt_graph.json`](../fixtures/cuda_prompt_graph.json),
@@ -36,6 +37,7 @@
 [`fixtures/opt025_ffn_shared_y.json`](../fixtures/opt025_ffn_shared_y.json),
 [`fixtures/opt026_fattn_streamk.json`](../fixtures/opt026_fattn_streamk.json),
 [`fixtures/opt027_persistent_fattn.json`](../fixtures/opt027_persistent_fattn.json),
+[`fixtures/opt028_mmq_streamk.json`](../fixtures/opt028_mmq_streamk.json),
 [`evidence/optimization/opt015-2k-recovery/REPORT.md`](../evidence/optimization/opt015-2k-recovery/REPORT.md),
 [`evidence/optimization/opt017-mixer-q8-mma/REPORT.md`](../evidence/optimization/opt017-mixer-q8-mma/REPORT.md),
 [`evidence/optimization/opt018-ffn-mma-quality/REPORT.md`](../evidence/optimization/opt018-ffn-mma-quality/REPORT.md),
@@ -47,7 +49,9 @@
 [`evidence/optimization/opt025-ffn-shared-y/REPORT.md`](../evidence/optimization/opt025-ffn-shared-y/REPORT.md),
 [`evidence/optimization/opt026-fattn-streamk/REPORT.md`](../evidence/optimization/opt026-fattn-streamk/REPORT.md),
 [`evidence/optimization/opt027-persistent-fattn/REPORT.md`](../evidence/optimization/opt027-persistent-fattn/REPORT.md),
-[`evidence/optimization/opt027-persistent-fattn/REJECTION.md`](../evidence/optimization/opt027-persistent-fattn/REJECTION.md)
+[`evidence/optimization/opt027-persistent-fattn/REJECTION.md`](../evidence/optimization/opt027-persistent-fattn/REJECTION.md),
+[`evidence/optimization/opt028-mmq-streamk/REPORT.md`](../evidence/optimization/opt028-mmq-streamk/REPORT.md),
+[`evidence/optimization/opt028-mmq-streamk/REJECTION.md`](../evidence/optimization/opt028-mmq-streamk/REJECTION.md)
 
 ## Why prompt execution differs from decode
 
@@ -133,7 +137,9 @@ OPT-023 later templates quality I=32 for mixer Q8_0 `output_rows < 128`
 (GDN α/β) when that A/B wins. OPT-024 A/B'd aligned-SoA D2R for large mixer
 Q8_0 (`output_rows >= 128`) and did not install it; large mixer GEMMs stay
 I=128 quality MMA.
-Attention output remains Q6_K `launch_quant_mmq`. Production still does not
+Attention output remains Q6_K `launch_quant_mmq`. OPT-028 A/B'd
+llama.cpp-style stream-K plus optional fixup for Q4_K/Q6_K quality MMA
+and did not install it; production remains 2D tiling. Production still does not
 send Q8_0 through `launch_quant_mmq` Q8Block staging. Quality MMA is admitted
 under the Q8 association rule versus host CPU dequant GEMM. Rank-1 CUD-002
 numbers stay the staged-Q8 Rank-1 gate and are not the quality-path gate.
@@ -608,6 +614,30 @@ Quartz ≥ llama.cpp. Live numbers stay in the report:
 and
 [`evidence/optimization/opt027-persistent-fattn/REJECTION.md`](../evidence/optimization/opt027-persistent-fattn/REJECTION.md).
 
+OPT-028 measured llama.cpp-style Q4_K/Q6_K MMQ stream-K (linearized `kbc`
+tile walk plus optional fixup). **Measured, RTX 5090:** paired CUDA-event
+A/B on one production 4096-row FFN among `off`, `stream_k`, and
+`stream_k_nsm`; winner `off` (`win=false`). Production quality MMA remains
+2D tiling. Stream-K kernels remain as non-production symbols.
+`kSelectedMmqStreamKPath` is `off`. `kSelectedFfnPath` stays
+`"shared_y_swiglu_q8"`. Mixer Q8 quality, skinny `mma_i32_j128`, and fattn
+Ada+ stream-K stay. Decode FFN stays MMV. J stays 128. Scheduler fixup
+aliases exist and are unused while the selected path is `off`. No extra
+persistent `cudaMalloc`. Prompt FFN graphs were not recaptured. Live
+exclusive sitting **reject:** Quartz mean is not strictly greater than the
+frozen successor-oracle baseline **1746.71973**, and the A/B lost;
+`reverted` true; `successor_oracle` false;
+`production_mmq_stream_k_installed` false; A/B winner `off`;
+`ladder_exhausted` false. `quartz_meets_llama` is informational and is
+not this gate. **The 2K parity owner remains the blocked dedicated
+gate.** This reject does not substitute for that gate and does not claim
+Quartz ≥ llama.cpp. Live numbers stay in the report:
+[`evidence/optimization/opt028-mmq-streamk/REPORT.md`](../evidence/optimization/opt028-mmq-streamk/REPORT.md),
+[`pins/opt028_mmq_streamk_contract.json`](../pins/opt028_mmq_streamk_contract.json),
+[`fixtures/opt028_mmq_streamk.json`](../fixtures/opt028_mmq_streamk.json),
+and
+[`evidence/optimization/opt028-mmq-streamk/REJECTION.md`](../evidence/optimization/opt028-mmq-streamk/REJECTION.md).
+
 The **proof boundary** excludes comparative speed claims, 2K/8K sustained
 prefill throughput, execution of a 128K prefill, 128K retrieval quality, thermal
 stability, superiority to llama.cpp/vLLM, and a Nsight Systems overlap timeline.
@@ -637,7 +667,10 @@ OPT-025 oracle baseline; it does not own or pass the 2K tok/s gate; the
 first 4K idea ladder is exhausted. OPT-027 records persistent Ada+ fattn
 stream-K and a live 4K reject versus the OPT-026 oracle baseline;
 production fattn remains `stream_k` (`grid.z=2`); it does not own or pass
-the 2K tok/s gate; the second 4K ladder is not exhausted. BEN-001
+the 2K tok/s gate; the second 4K ladder is not exhausted. OPT-028 records
+Q4_K/Q6_K MMQ stream-K and a live 4K reject versus the OPT-026 oracle
+baseline; production quality MMA remains 2D tiling; it does not own or
+pass the 2K tok/s gate; the second 4K ladder is not exhausted. BEN-001
 provides the harness; CMP-002/CMP-003 still own the 30-sample comparative gate.
 QLT-001 remains blocked. OPT-012's prompt graphs are FFN subgraphs only: not a
 whole-chunk graph, not a speedup gate, and not 128K quality recovery.

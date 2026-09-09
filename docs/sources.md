@@ -678,6 +678,39 @@ baseline.
   envelopes unloosened; tiled attention remains the reference; OPT-016
   remains the parity gate owner; does not substitute for the 2K llama.cpp
   parity gate; Quartz ≥ llama.cpp is not this gate.
+- OPT-028 adapts llama.cpp revision
+  `cc83d7b4824f73cfdda4dfbb47ee39804f71b328` (MIT, The ggml authors)
+  Q4_K/Q6_K MMQ stream-K from `mmq.cuh` (`mul_mat_q` kbc walk,
+  `mul_mat_q_stream_k_fixup`, 90% tile-efficiency launch rule). This
+  increment does not vendor `mmq.cuh`, does not copy `../ds4/cuda/mmq/`,
+  and does not include ggml headers. Production Q4_K/Q6_K quality MMA
+  remains 2D tiling after the paired A/B loss. Stream-K kernels remain as
+  non-production symbols. `kSelectedMmqStreamKPath` is `off`.
+  `kSelectedFfnPath` stays `"shared_y_swiglu_q8"`. Mixer Q8 quality,
+  skinny `mma_i32_j128`, and fattn Ada+ stream-K stay. Decode FFN stays
+  MMV. J stays 128. Scheduler fixup aliases exist and are unused while
+  the selected path is `off`; no extra `cudaMalloc`. Prompt FFN graphs
+  were not recaptured. **Measured, RTX 5090:** A/B winner `off`
+  (`win=false`; neither `stream_k` nor `stream_k_nsm` strictly beat 2D
+  tiling); live exclusive cold exact-4096 reject versus the frozen
+  successor-oracle baseline 1746.71973; `reverted` true;
+  `successor_oracle` false; `production_mmq_stream_k_installed` false;
+  `ladder_exhausted` false. Live numbers stay in the report; this ledger
+  does not replace them. The schema-1 contract, rejected fixture, report,
+  and rejection are
+  [`pins/opt028_mmq_streamk_contract.json`](../pins/opt028_mmq_streamk_contract.json),
+  [`fixtures/opt028_mmq_streamk.json`](../fixtures/opt028_mmq_streamk.json),
+  [`evidence/optimization/opt028-mmq-streamk/REPORT.md`](../evidence/optimization/opt028-mmq-streamk/REPORT.md),
+  and
+  [`evidence/optimization/opt028-mmq-streamk/REJECTION.md`](../evidence/optimization/opt028-mmq-streamk/REJECTION.md).
+  The beginner explanation is
+  [`docs/40-cuda-prompt-mmq.md`](40-cuda-prompt-mmq.md).
+  Proof limit: Q4_K/Q6_K MMQ stream-K under unloosened Q4_K association
+  when a paired A/B wins; 4096 FFN graph recapture if nodes change; 4K
+  keep/reject versus the then-current oracle baseline; envelopes
+  unloosened; OPT-009 Q8_0 reference remains byte-exact; OPT-016 remains
+  the parity gate owner; does not substitute for the 2K llama.cpp parity
+  gate; Quartz ≥ llama.cpp is not this gate.
 - CUD-003 introduces no new external implementation source. GGUF Q8_0 decoding
   follows the format already admitted by the pinned scalar decoder, and the
   pointwise/layout equations come from the pinned model contract and scalar

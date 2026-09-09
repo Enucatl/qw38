@@ -36,7 +36,9 @@ cudaError_t launch_quant_mmq(QuantKind kind, const std::uint8_t* weights,
                              std::size_t output_rows, std::size_t columns,
                              const __nv_bfloat16* prompt,
                              std::size_t prompt_rows, Q8Block* q8_workspace,
-                             float* output, cudaStream_t stream) noexcept;
+                             float* output, cudaStream_t stream,
+                             float* tmp_fixup = nullptr,
+                             std::size_t tmp_fixup_floats = 0) noexcept;
 
 cudaError_t launch_quant_mmv_variant(
     QuantKind kind, const std::uint8_t* weights, std::size_t rows,
@@ -54,16 +56,28 @@ unsigned int selected_mma_mmq_prompt_tile() noexcept;
 std::size_t mma_mmq_shared_bytes(unsigned int prompt_tile) noexcept;
 int mma_mmq_occupancy(QuantKind kind, unsigned int prompt_tile) noexcept;
 
+const char* selected_mmq_stream_k_path() noexcept;
+bool mmq_uses_stream_k() noexcept;
+int mmq_stream_k_nsm() noexcept;
+int mmq_stream_k_nblocks(int nsm, int ntiles_dst, const char* path) noexcept;
+std::size_t mmq_stream_k_fixup_floats(int nblocks, unsigned int i,
+                                     unsigned int j) noexcept;
+bool mmq_stream_k_fixup_needed(int ntiles_dst, int nblocks) noexcept;
+int mmq_stream_k_occupancy(QuantKind kind) noexcept;
+int mmq_stream_k_fixup_occupancy() noexcept;
+
 cudaError_t launch_quant_mmq_mma(
     QuantKind kind, const std::uint8_t* weights, std::size_t output_rows,
     std::size_t columns, const __nv_bfloat16* prompt, std::size_t prompt_rows,
-    Q8Block* q8_workspace, float* output, cudaStream_t stream) noexcept;
+    Q8Block* q8_workspace, float* output, cudaStream_t stream,
+    float* tmp_fixup = nullptr, std::size_t tmp_fixup_floats = 0) noexcept;
 
 cudaError_t launch_quant_mmq_mma_tile(
     QuantKind kind, const std::uint8_t* weights, std::size_t output_rows,
     std::size_t columns, const __nv_bfloat16* prompt, std::size_t prompt_rows,
     Q8Block* q8_workspace, float* output, unsigned int prompt_tile,
-    cudaStream_t stream) noexcept;
+    cudaStream_t stream, float* tmp_fixup = nullptr,
+    std::size_t tmp_fixup_floats = 0) noexcept;
 
 unsigned int selected_q8_mma_mmq_prompt_tile() noexcept;
 int q8_mma_mmq_occupancy(unsigned int prompt_tile) noexcept;
@@ -122,7 +136,14 @@ bool ffn_swiglu_writes_q8() noexcept;
 cudaError_t launch_quant_mmq_mma_y(
     QuantKind kind, const std::uint8_t* weights, std::size_t output_rows,
     std::size_t columns, const Q8Block* y, std::size_t prompt_rows,
-    float* output, cudaStream_t stream) noexcept;
+    float* output, cudaStream_t stream, float* tmp_fixup = nullptr,
+    std::size_t tmp_fixup_floats = 0) noexcept;
+
+cudaError_t launch_quant_mmq_mma_y_path(
+    QuantKind kind, const std::uint8_t* weights, std::size_t output_rows,
+    std::size_t columns, const Q8Block* y, std::size_t prompt_rows,
+    float* output, cudaStream_t stream, const char* path, float* tmp_fixup,
+    std::size_t tmp_fixup_floats) noexcept;
 
 cudaError_t launch_swiglu_quantize_mmq_q8_1(const float* gate, const float* up,
                                             std::size_t prompt_rows,

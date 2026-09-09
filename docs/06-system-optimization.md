@@ -32,7 +32,8 @@ installed (OPT-024); those GEMMs stay I=128 quality MMA. Dense prompt FFN
 Q4_K shares one DS4 Y for gate/up and writes down-leg Y from SwiGLU
 (OPT-025). Production prompt attention uses Ada+ stream-K fattn after the
 OPT-026 keep; persistent stream-K was A/B-lost and not installed
-(OPT-027). Decode stays MMV.
+(OPT-027). Q4_K/Q6_K MMQ stream-K was A/B-lost and not installed
+(OPT-028); production quality MMA stays 2D tiling. Decode stays MMV.
 Tiny mixer prompts keep the
 OPT-009 tiled `__fmul_rn`/`__fadd_rn` kernel.
 Rank-1 fused MMA remains a non-production kernel. MMA here is Measured
@@ -42,9 +43,10 @@ warp-column fused quality path; sequential windows remain the unloosened
 reference. Production prompt attention (`token_count >= 16`) is the fattn-mma
 analog with Ada+ stream-K after the OPT-026 keep; persistent stream-K
 was measured and rejected (OPT-027); tiled attention remains the
-unloosened reference. Those core-quality paths are also Measured component
-recovery plus a 4K keep versus the frozen oracle baseline, not the 2K parity
-gate.
+unloosened reference. Q4_K/Q6_K MMQ stream-K was measured and rejected
+(OPT-028); production quality MMA remains 2D tiling. Those core-quality
+paths are also Measured component recovery plus a 4K keep versus the frozen
+oracle baseline, not the 2K parity gate.
 
 For a decode projection, all output threads need the same input vector but
 different weight rows. A useful MMV kernel keeps pieces of the input available
@@ -271,8 +273,10 @@ as `attention_core` **36.9%**, `ffn_mmq` **31.4%**, `gdn_core` **19.3%**,
 ladder: OPT-027–OPT-031 (persistent Ada+ fattn stream-K, MMQ stream-K, GDN
 fuse, PDL, mixer/GDN graphs). OPT-027 retained a reject: persistent did
 not strictly beat production `stream_k`, so production fattn stays
-OPT-026 Ada+ stream-K (`grid.z=2`). Remaining second-ladder picks are
-OPT-028–OPT-031. Evidence:
+OPT-026 Ada+ stream-K (`grid.z=2`). OPT-028 retained a reject: Q4_K/Q6_K
+MMQ stream-K did not strictly beat 2D tiling, so production quality MMA
+stays 2D tiling (`kSelectedMmqStreamKPath` `off`). Remaining second-ladder
+picks are OPT-029–OPT-031. Evidence:
 [`evidence/optimization/speedup-loop-post026/REPORT.md`](../evidence/optimization/speedup-loop-post026/REPORT.md);
 method: [`speedup-loop.md`](../speedup-loop.md). This is instrumentation and
 task admission, **not** the 2K llama.cpp parity gate.
@@ -294,6 +298,24 @@ persistent was not installed. `quartz_meets_llama` is informational and
 is not this gate. This is **not** the 2K llama.cpp parity gate. Live
 numbers stay in the report; this chapter does not replace them:
 [`evidence/optimization/opt027-persistent-fattn/REPORT.md`](../evidence/optimization/opt027-persistent-fattn/REPORT.md).
+
+## Q4_K/Q6_K MMQ stream-K (OPT-028)
+
+**Measured, RTX 5090:** llama.cpp-style Q4_K/Q6_K MMQ stream-K (linearized
+`kbc` tile walk plus optional fixup) was A/B'd against production 2D
+tiling quality MMA. Neither `stream_k` nor `stream_k_nsm` strictly beat
+`off`. Production Q4_K/Q6_K MMA remains 2D tiling. Stream-K kernels remain
+as non-production symbols. `kSelectedMmqStreamKPath` is `off`.
+`kSelectedFfnPath` stays `"shared_y_swiglu_q8"`. Mixer Q8 quality, skinny
+`mma_i32_j128`, and fattn Ada+ stream-K stay. Decode FFN is unchanged. J
+stays 128. No extra persistent `cudaMalloc`. Prompt FFN graphs were not
+recaptured. Live exclusive RTX-5090 cold exact-4096 **reject:** Quartz mean
+is not strictly greater than the frozen successor-oracle baseline
+**1746.71973**, and the A/B lost. Production stream-K was not installed.
+`quartz_meets_llama` is informational and is not this gate. This is **not**
+the 2K llama.cpp parity gate. Live numbers stay in the report; this chapter
+does not replace them:
+[`evidence/optimization/opt028-mmq-streamk/REPORT.md`](../evidence/optimization/opt028-mmq-streamk/REPORT.md).
 
 ## DwarfStar transfer boundary
 

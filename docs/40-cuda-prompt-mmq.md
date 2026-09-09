@@ -1,6 +1,6 @@
 # 40. Tiled CUDA multiplication for prompt rows
 
-[Index](README.md) · Implementation tasks: CUD-002, OPT-009, OPT-015, OPT-017, OPT-018, OPT-022, OPT-023, OPT-024, OPT-025, and EDU-026 in
+[Index](README.md) · Implementation tasks: CUD-002, OPT-009, OPT-015, OPT-017, OPT-018, OPT-022, OPT-023, OPT-024, OPT-025, OPT-028, and EDU-026 in
 [`implementation_ledger.md`](../implementation_ledger.md)
 
 [Chapter 39](39-cuda-quant-mmv.md) multiplied one activation vector by a packed
@@ -579,3 +579,56 @@ fixture, and report:
 [`fixtures/opt025_ffn_shared_y.json`](../fixtures/opt025_ffn_shared_y.json),
 and
 [`evidence/optimization/opt025-ffn-shared-y/REPORT.md`](../evidence/optimization/opt025-ffn-shared-y/REPORT.md).
+
+## OPT-028 Q4_K/Q6_K MMQ stream-K
+
+Production Q4_K/Q6_K quality MMA (`launch_quant_mmq` /
+`launch_quant_mmq_mma_y`, `prompt_rows >= 8`) was A/B'd against
+llama.cpp-style stream-K tile decomposition plus optional fixup.
+Production remains 2D tiling (`grid(ceil(output_rows/128),
+ceil(prompt_rows/J))`, block `dim3(32, 8)`). `kSelectedMmqStreamKPath` is
+`off`. Stream-K kernels remain as non-production symbols so the A/B
+diagnostic still compiles. Mixer Q8_0 quality MMA, skinny `mma_i32_j128`,
+and FFN `shared_y_swiglu_q8` stay. Decode FFN stays MMV. J stays 128.
+Production Q8_0 still does not go through `launch_quant_mmq`. Scheduler
+fixup aliases (`prompt_projected_bf16_` on FFN MMA; `prompt_projection_a_`
+on attention-output Q6_K) exist and are unused while the selected path is
+`off`. No extra persistent `cudaMalloc`. Prompt FFN graphs were not
+recaptured: production MMA geometry is unchanged.
+
+**A/B.** Exclusive RTX 5090, 0 warm-ups, 3 CUDA-event replicates, occupancy ≥ 1,
+zero non-finites, ds4 Q4_K association versus CPU dequant GEMM. Candidates:
+`off` (current 2D tiling), `stream_k` (llama.cpp 90% NVIDIA nblocks rule plus
+optional fixup), `stream_k_nsm` (always nblocks = nsm plus optional fixup)
+on one production 4096-row FFN layer. Raw samples stay in
+[`evidence/optimization/opt028-mmq-streamk/mmq-ab-raw.txt`](../evidence/optimization/opt028-mmq-streamk/mmq-ab-raw.txt);
+this chapter does not replace them. Winner: `off` (`win=false`; neither
+optimized id strictly beat 2D tiling). Production MMA remains 2D tiling.
+
+**Measured 4K reject, RTX 5090:** live exclusive sitting, llama.cpp first then
+Quartz. Cold exact-4096 Quartz mean is not strictly greater than the frozen
+successor-oracle baseline **1746.71973**, and the A/B lost. Reject:
+`reverted` true, `successor_oracle` false,
+`production_mmq_stream_k_installed` false, A/B winner `off`.
+`quartz_meets_llama` is informational false and is not this gate. Live
+numbers stay in the report; this chapter does not replace them:
+[`evidence/optimization/opt028-mmq-streamk/REPORT.md`](../evidence/optimization/opt028-mmq-streamk/REPORT.md).
+
+**External:** llama.cpp revision `cc83d7b4824f73cfdda4dfbb47ee39804f71b328`
+`mmq.cuh` stream-K (`mul_mat_q` kbc walk) and `mul_mat_q_stream_k_fixup`
+(MIT, The ggml authors). This increment does not vendor `mmq.cuh`, does not
+copy `../ds4/cuda/mmq/`, and does not include ggml headers.
+
+**Proof boundary:** Q4_K/Q6_K MMQ stream-K under unloosened Q4_K association
+when a paired A/B wins; 4096 FFN graph recapture if nodes change; 4K
+keep/reject versus the then-current oracle baseline **1746.71973**; OPT-009
+Q8_0 tiled-versus-reference remains byte-exact; CUD-002 numbers unloosened;
+workspace formula unloosened; no extra persistent `cudaMalloc`; mixer Q8
+quality / skinny / FFN shared-Y / fattn stream-K unchanged; decode FFN
+unchanged; **does not substitute for the 2K llama.cpp parity gate**.
+Contract, fixture, report, and rejection:
+[`pins/opt028_mmq_streamk_contract.json`](../pins/opt028_mmq_streamk_contract.json),
+[`fixtures/opt028_mmq_streamk.json`](../fixtures/opt028_mmq_streamk.json),
+[`evidence/optimization/opt028-mmq-streamk/REPORT.md`](../evidence/optimization/opt028-mmq-streamk/REPORT.md),
+and
+[`evidence/optimization/opt028-mmq-streamk/REJECTION.md`](../evidence/optimization/opt028-mmq-streamk/REJECTION.md).
