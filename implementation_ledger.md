@@ -102,7 +102,7 @@ are repository-relative unless stated otherwise.
 | OPT-033 | Retain attention value sums in registers | OPT-032, OPT-026 | pending | A/B full 4096-row attention including combine; keep register-resident value accumulation only with byte-equal output, lower component time, improved P, and the cross-workload guard; otherwise reject | — |
 | OPT-034 | Packed blockwise Q4_K/Q6_K MMV loads | OPT-032, CUD-001 | pending | A/B production batch-1 projection shapes with unchanged packed staging and FP32 lane/reduction order; keep only with byte equality, lower weighted MMV time, improved D2048, and the cross-workload guard; otherwise reject | — |
 | OPT-035 | MMA attention probability times V | OPT-033 | pending | A/B full 4096-row attention using dual-F16 probability×V MMA; retain frozen attention envelopes, lower component time, improved P, and the cross-workload guard; otherwise reject | — |
-| OPT-036 | Partition KV for vector decode attention | OPT-032, OPT-026 | pending | A/B one-token vector attention at 1/4/8/16 KV partitions for D128/D2048 with deterministic partial-statistic merge; keep only with frozen attention envelopes, lower component time, improved D2048, and the cross-workload guard; otherwise reject | — |
+| OPT-036 | Partition KV for vector decode attention | OPT-032, OPT-026 | done | A/B one-token vector attention at 1/4/8/16 KV partitions for D128/D2048 with deterministic partial-statistic merge; keep only with frozen attention envelopes, lower component time, improved D2048, and the cross-workload guard; otherwise reject | [`tasks/OPT-036.md`](tasks/OPT-036.md); [`pins/opt036_decode_kv_partition_contract.json`](pins/opt036_decode_kv_partition_contract.json); [`fixtures/opt036_decode_kv_partition.json`](fixtures/opt036_decode_kv_partition.json); [`cuda/decode_kv_partition_ab_test.cu`](cuda/decode_kv_partition_ab_test.cu); [`evidence/optimization/opt036-decode-kv-partition/REPORT.md`](evidence/optimization/opt036-decode-kv-partition/REPORT.md); verification 2026-09-09T17:32:00Z |
 | OPT-037 | Select 4K FFN tiles per projection | OPT-032, OPT-025 | pending | Sweep quality-MMQ I={64,128}, J={32,64,128} independently for 4096-row gate/up/down, preserve shared-Y and recapture graphs; keep only with admitted component wins, improved P, frozen MMQ envelopes, and the cross-workload guard; otherwise reject | — |
 
 ### 2026-09-04T13:09:32Z — OPT-005 delivered
@@ -4817,3 +4817,56 @@ are repository-relative unless stated otherwise.
   plus this ledger/audit bookkeeping. `plan.md` is unchanged. OPT-016
   stays `blocked`. OPT-033–OPT-037 remain `pending`. Next eligible
   pending by ledger row order: **OPT-031**.
+
+### 2026-09-09T16:35:00Z — OPT-036 planning admitted
+
+- Planning produced decision-complete dossier [`tasks/OPT-036.md`](tasks/OPT-036.md).
+- Coupled IDs: none. Plan impact `none`. Chosen sink is D2048 decode
+  `attention_core` **201.241058 ms** from
+  [`fixtures/opt032_decode_oracle.json`](fixtures/opt032_decode_oracle.json).
+  Keep denominators are that fixture's P **1637.58594**, D128
+  **11.8731956**, D2048 **3.70951414** (and the recorded p95s), not
+  historical OPT-026 P **1746.71973**. A/B is 1/4/8/16 contiguous KV
+  partitions at positions 128 and 2048, 3 warm + 30 alternating,
+  deterministic ascending-part FP32 merge, independent selection including
+  the current one-partition kernel. Keep only with frozen attention
+  envelopes, strictly lower D2048 component time, improved D2048 tok/s,
+  and the cross-workload guard; otherwise revert with retained evidence.
+- Marked OPT-036 `in_progress`. OPT-033, OPT-034, OPT-035, and OPT-037
+  remain `pending` and are not started. Non-final audit row inserted.
+  No commit. `plan.md` is unchanged.
+
+### 2026-09-09T17:35:00Z — OPT-036 delivered (KEEP)
+
+- Independent verification attempt 1 passed. Production decode attention
+  installs 16 KV partitions below 2048 and at or above 2048
+  (`kSelectedDecodeKvPartsLow/High = 16/16`) after independent 1/4/8/16
+  A/B wins at positions 128 and 2048 with deterministic ascending-part
+  FP32 merge. Candidate `1` remains the tiled kernel. Prefill fattn
+  stream-K is unchanged. Exclusive RTX 5090 sitting wrote
+  [`fixtures/opt036_decode_kv_partition.json`](fixtures/opt036_decode_kv_partition.json)
+  (`measurement_utc` 2026-09-09T17:08:11Z; D2048 Quartz **3.70951414** →
+  **13.5282431** tok/s; D128 Quartz **11.8731956** → **15.200716**; P
+  Quartz **1637.58594** → **1644.04822**; D128 all-token p95 95.380661 →
+  66.3502579 and run-mean p95 84.2481613 → 65.8343124; D2048 all-token
+  p95 280.727844 → 74.4495544 and run-mean p95 269.61731 → 73.996994;
+  A/B winners 16/16; D2048 component 12.2984858 → 0.804042637 ms;
+  `reverted` false; `status` measured). Cross-workload guard held.
+  Native test does not require Quartz ≥ llama.cpp. Coupled IDs: none.
+  Delivery re-check:
+  `uv run pytest -q tests/test_documentation.py tests/test_opt036_decode_kv_partition.py`.
+- Acceptance evidence: [`tasks/OPT-036.md`](tasks/OPT-036.md);
+  [`pins/opt036_decode_kv_partition_contract.json`](pins/opt036_decode_kv_partition_contract.json);
+  [`fixtures/opt036_decode_kv_partition.json`](fixtures/opt036_decode_kv_partition.json);
+  [`cuda/decode_kv_partition_ab_test.cu`](cuda/decode_kv_partition_ab_test.cu);
+  [`evidence/optimization/opt036-decode-kv-partition/REPORT.md`](evidence/optimization/opt036-decode-kv-partition/REPORT.md);
+  [`docs/06-system-optimization.md`](docs/06-system-optimization.md);
+  [`docs/43-cuda-attention-decode.md`](docs/43-cuda-attention-decode.md).
+  Proof is partitioned decode attention under frozen envelopes and a
+  D2048 keep versus decode-oracle P/D128/D2048 denominators, not the 2K
+  llama.cpp parity gate.
+- Marked OPT-036 `done`; delivery is limited to the verified task scope
+  plus this ledger/audit bookkeeping. `plan.md` is unchanged. OPT-016
+  stays `blocked`. OPT-033, OPT-034, OPT-035, and OPT-037 remain
+  `pending` and are not started. Next eligible pending by ledger row
+  order: **OPT-031**.

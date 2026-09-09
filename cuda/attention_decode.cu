@@ -19,6 +19,21 @@ constexpr std::uint32_t kMaximumHeadWidth = 256;
 constexpr int kThreads = 256;
 constexpr float kRmsEpsilon = 1.0e-6F;
 constexpr float kRopeTheta = 10000000.0F;
+constexpr int kSelectedDecodeKvPartsLow = 16;
+constexpr int kSelectedDecodeKvPartsHigh = 16;
+constexpr std::size_t kDecodeKvPartitionThreshold = 2048;
+constexpr std::uint32_t kProductionQueryHeads = 24;
+constexpr std::uint32_t kProductionHeadWidth = 256;
+
+bool legal_decode_kv_parts(int n_parts) noexcept {
+  return n_parts == 1 || n_parts == 4 || n_parts == 8 || n_parts == 16;
+}
+
+std::size_t tiled_attention_shared_bytes() noexcept {
+  return (2 * kAttentionKvTileRows * kMaximumHeadWidth) *
+             sizeof(__nv_bfloat16) +
+         kMaximumHeadWidth * sizeof(float);
+}
 
 bool valid_config(const AttentionConfig& config) noexcept {
   return config.query_heads > 0 &&
@@ -671,6 +686,186 @@ __global__ void two_row_grouped_tiled_chunk_attention(
   }
 }
 
+// OPT-036 one-token contiguous KV partitions. Inner Q·K / V accumulation
+// matches the grouped tiled path. Gate is applied after the deterministic
+// ascending-part merge (llama.cpp fattn-common.cuh combine technique;
+// MIT inspiration only, not vendored).
+__global__ void partitioned_grouped_decode_attention(
+    AttentionConfig config, std::size_t position, int n_parts,
+    const float* query, const float* query_scale,
+    const __nv_bfloat16* committed_key, const __nv_bfloat16* committed_value,
+    const __nv_bfloat16* candidate_key, const __nv_bfloat16* candidate_value,
+    float* normalized_query, float* partial_vkq, float* meta) {
+  constexpr std::uint32_t kMaximumGroup =
+      kMaximumQueryHeads / kMaximumKvHeads;
+  const std::uint32_t kv_head = blockIdx.x;
+  const int part = static_cast<int>(blockIdx.y);
+  const std::uint32_t lane = threadIdx.x;
+  const std::size_t width = config.head_width;
+  const std::uint32_t group = config.query_heads / config.kv_heads;
+  const std::uint32_t first_head = kv_head * group;
+  const std::size_t L = position + 1;
+  const std::size_t part_begin =
+      (static_cast<std::size_t>(part) * L) / static_cast<std::size_t>(n_parts);
+  const std::size_t part_end =
+      (static_cast<std::size_t>(part + 1) * L) /
+      static_cast<std::size_t>(n_parts);
+  extern __shared__ unsigned char raw[];
+  float* scratch = reinterpret_cast<float*>(raw);
+  __nv_bfloat16* keys =
+      reinterpret_cast<__nv_bfloat16*>(scratch + kMaximumHeadWidth);
+  __nv_bfloat16* values = keys + kAttentionKvTileRows * kMaximumHeadWidth;
+  __shared__ float inverse;
+  __shared__ float score;
+  float q[kMaximumGroup]{};
+  float maximum[kMaximumGroup];
+  float denominator[kMaximumGroup]{};
+  float accumulator[kMaximumGroup]{};
+  const std::uint32_t half = config.rotary_width / 2;
+  for (std::uint32_t member = 0; member < group; ++member) {
+    const std::uint32_t query_head = first_head + member;
+    const std::size_t qbase =
+        static_cast<std::size_t>(query_head) * width;
+    if (lane == 0) {
+      float sum = 0.0F;
+      for (std::uint32_t i = 0; i < config.head_width; ++i) {
+        const float item = query[qbase + i];
+        sum = __fadd_rn(sum, item * item);
+      }
+      inverse = 1.0F / sqrtf(sum / static_cast<float>(width) + kRmsEpsilon);
+    }
+    __syncthreads();
+    if (lane < width)
+      scratch[lane] = query[qbase + lane] * inverse * query_scale[lane];
+    __syncthreads();
+    if (lane < half) {
+      const float first = scratch[lane], second = scratch[half + lane];
+      const float exponent =
+          static_cast<float>(lane * 2) / config.rotary_width;
+      const float angle =
+          static_cast<float>(position) / powf(kRopeTheta, exponent);
+      const float c = cosf(angle), s = sinf(angle);
+      scratch[lane] = first * c - second * s;
+      scratch[half + lane] = second * c + first * s;
+    }
+    __syncthreads();
+    if (lane < width) {
+      q[member] = scratch[lane];
+      if (part == 0)
+        normalized_query[query_head * width + lane] = q[member];
+    }
+    maximum[member] = -INFINITY;
+    __syncthreads();
+  }
+  if (part_begin != part_end) {
+    for (std::size_t tile = part_begin; tile < part_end;
+         tile += kAttentionKvTileRows) {
+      const std::size_t rows =
+          (part_end - tile) < kAttentionKvTileRows ? (part_end - tile)
+                                                  : kAttentionKvTileRows;
+      load_kv_tile_rows<false>(
+          config, position, tile, rows, kv_head, lane, committed_key,
+          committed_value, candidate_key, candidate_value, keys, values,
+          nullptr, nullptr, 0);
+      __syncthreads();
+      for (std::size_t tile_row = 0; tile_row < rows; ++tile_row) {
+        for (std::uint32_t member = 0; member < group; ++member) {
+          if (lane < width)
+            scratch[lane] =
+                q[member] * __bfloat162float(
+                                keys[tile_row * kMaximumHeadWidth + lane]);
+          __syncthreads();
+          if (lane == 0) {
+            float dot = 0.0F;
+            for (std::uint32_t i = 0; i < config.head_width; ++i)
+              dot = __fadd_rn(dot, scratch[i]);
+            score = dot / sqrtf(static_cast<float>(width));
+          }
+          __syncthreads();
+          const float old_max = maximum[member];
+          maximum[member] = fmaxf(maximum[member], score);
+          const float rescale = old_max == -INFINITY
+                                  ? 0.0F
+                                  : expf(old_max - maximum[member]);
+          denominator[member] = denominator[member] * rescale +
+                                expf(score - maximum[member]);
+          accumulator[member] =
+              accumulator[member] * rescale +
+              expf(score - maximum[member]) *
+                  __bfloat162float(
+                      values[tile_row * kMaximumHeadWidth + lane]);
+          __syncthreads();
+        }
+      }
+    }
+  }
+  for (std::uint32_t member = 0; member < group; ++member) {
+    const std::uint32_t query_head = first_head + member;
+    const std::size_t vkq_base =
+        (static_cast<std::size_t>(query_head) * static_cast<std::size_t>(n_parts) +
+         static_cast<std::size_t>(part)) *
+        width;
+    const std::size_t meta_base =
+        (static_cast<std::size_t>(query_head) * static_cast<std::size_t>(n_parts) +
+         static_cast<std::size_t>(part)) *
+        2U;
+    if (lane == 0) {
+      meta[meta_base] = maximum[member];
+      meta[meta_base + 1] = denominator[member];
+    }
+    if (lane < width) partial_vkq[vkq_base + lane] = accumulator[member];
+  }
+}
+
+__global__ void merge_decode_kv_parts(AttentionConfig config, int n_parts,
+                                       const float* partial_vkq,
+                                       const float* meta, const float* gate,
+                                       float* output) {
+  const std::uint32_t query_head = blockIdx.x;
+  const std::uint32_t lane = threadIdx.x;
+  const std::size_t width = config.head_width;
+  __shared__ float shared_meta[32];
+  const int meta_floats = n_parts * 2;
+  if (static_cast<int>(lane) < meta_floats) {
+    shared_meta[lane] =
+        meta[(static_cast<std::size_t>(query_head) *
+              static_cast<std::size_t>(n_parts)) *
+                 2U +
+             lane];
+  }
+  __syncthreads();
+  float global_max = -INFINITY;
+  for (int part = 0; part < n_parts; ++part)
+    global_max = fmaxf(global_max, shared_meta[part * 2]);
+  float numerator = 0.0F;
+  float denominator = 0.0F;
+  if (lane < width && global_max != -INFINITY) {
+    for (int part = 0; part < n_parts; ++part) {
+      const float scale = expf(shared_meta[part * 2] - global_max);
+      const std::size_t vkq_index =
+          (static_cast<std::size_t>(query_head) *
+               static_cast<std::size_t>(n_parts) +
+           static_cast<std::size_t>(part)) *
+              width +
+          lane;
+      numerator += scale * partial_vkq[vkq_index];
+      denominator += scale * shared_meta[part * 2 + 1];
+    }
+  }
+  if (lane < width) {
+    const std::size_t qbase =
+        static_cast<std::size_t>(query_head) * width;
+    const float ungated =
+        (global_max == -INFINITY || denominator == 0.0F)
+            ? 0.0F
+            : numerator / denominator;
+    const float g = gate[qbase + lane];
+    const float sigmoid = g >= 0.0F ? 1.0F / (1.0F + expf(-g))
+                                     : expf(g) / (1.0F + expf(g));
+    output[qbase + lane] = ungated * sigmoid;
+  }
+}
+
 template <int QueryRows>
 __global__ void mma_grouped_chunk_attention(
     AttentionConfig config, std::size_t start_position, std::size_t token_count,
@@ -1114,6 +1309,94 @@ cudaError_t launch_attention_prepare_chunk_tiled(
           config, start_position, token_count, query, query_norm_scale,
           output_gate, committed.key, committed.value, candidate_rows.key,
           candidate_rows.value, output, normalized_query, nullptr, nullptr, 0);
+  return cudaPeekAtLastError();
+}
+
+int selected_decode_kv_parts_below_2048() noexcept {
+  return kSelectedDecodeKvPartsLow;
+}
+
+int selected_decode_kv_parts_at_or_above_2048() noexcept {
+  return kSelectedDecodeKvPartsHigh;
+}
+
+int decode_kv_parts_for_position(std::size_t position) noexcept {
+  return position >= kDecodeKvPartitionThreshold
+             ? kSelectedDecodeKvPartsHigh
+             : kSelectedDecodeKvPartsLow;
+}
+
+std::size_t decode_kv_partial_vkq_values(int n_parts) noexcept {
+  if (!legal_decode_kv_parts(n_parts)) return 0;
+  return static_cast<std::size_t>(kProductionQueryHeads) *
+         static_cast<std::size_t>(n_parts) * kProductionHeadWidth;
+}
+
+std::size_t decode_kv_partial_meta_values(int n_parts) noexcept {
+  if (!legal_decode_kv_parts(n_parts)) return 0;
+  return static_cast<std::size_t>(kProductionQueryHeads) *
+         static_cast<std::size_t>(n_parts) * 2U;
+}
+
+int decode_kv_partition_occupancy(int n_parts) noexcept {
+  if (!legal_decode_kv_parts(n_parts)) return 0;
+  int blocks = 0;
+  const std::size_t shared = tiled_attention_shared_bytes();
+  cudaError_t error = cudaSuccess;
+  if (n_parts == 1) {
+    error = cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+        &blocks, two_row_grouped_tiled_chunk_attention<false>, kThreads,
+        shared);
+  } else {
+    error = cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+        &blocks, partitioned_grouped_decode_attention, kThreads, shared);
+  }
+  if (error != cudaSuccess) return 0;
+  return blocks;
+}
+
+int decode_kv_merge_occupancy(int n_parts) noexcept {
+  if (!legal_decode_kv_parts(n_parts) || n_parts == 1) return 1;
+  int blocks = 0;
+  const cudaError_t error = cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+      &blocks, merge_decode_kv_parts, kThreads, 0);
+  if (error != cudaSuccess) return 0;
+  return blocks;
+}
+
+cudaError_t launch_attention_prepare_partitioned(
+    const AttentionConfig& config, std::size_t position, const float* query,
+    const float* key, const float* value, const float* query_norm_scale,
+    const float* key_norm_scale, const float* output_gate,
+    const AttentionCache& committed, const AttentionCache& candidate_row,
+    float* normalized_query, float* normalized_key, float* score_workspace,
+    float* output, float* partial_vkq, float* meta, int n_parts,
+    cudaStream_t stream) noexcept {
+  if (!legal_decode_kv_parts(n_parts)) return cudaErrorInvalidValue;
+  if (n_parts == 1) {
+    (void)partial_vkq;
+    (void)meta;
+    return launch_attention_prepare(
+        config, position, query, key, value, query_norm_scale,
+        key_norm_scale, output_gate, committed, candidate_row, normalized_query,
+        normalized_key, score_workspace, output, stream);
+  }
+  if (partial_vkq == nullptr || meta == nullptr) return cudaErrorInvalidValue;
+  cudaError_t error = stage_and_validate_chunk(
+      config, position, 1, query, key, value, query_norm_scale, key_norm_scale,
+      output_gate, committed, candidate_row, normalized_query, normalized_key,
+      score_workspace, output, stream);
+  if (error != cudaSuccess) return error;
+  const std::size_t shared = tiled_attention_shared_bytes();
+  dim3 attention(config.kv_heads, static_cast<unsigned>(n_parts), 1);
+  partitioned_grouped_decode_attention<<<attention, kThreads, shared, stream>>>(
+      config, position, n_parts, query, query_norm_scale, committed.key,
+      committed.value, candidate_row.key, candidate_row.value,
+      normalized_query, partial_vkq, meta);
+  error = cudaPeekAtLastError();
+  if (error != cudaSuccess) return error;
+  merge_decode_kv_parts<<<config.query_heads, kThreads, 0, stream>>>(
+      config, n_parts, partial_vkq, meta, output_gate, output);
   return cudaPeekAtLastError();
 }
 

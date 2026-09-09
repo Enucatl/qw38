@@ -115,13 +115,16 @@ and 65 distinguish the ordinary path, an exact chunk, and a one-row tail.
 ## Attention and FFN kernels
 
 Attention decode reads growing KV from 16 layers; use grouped-query mapping
-without physical sixfold copies. Prefill must be causal and handle partial RoPE
-on exactly 64 dimensions. Production prompt attention (`token_count >= 16`) is
-the fattn-mma analog with Ada+ stream-K for prompt tiles; persistent
-stream-K was A/B-lost and not installed. The two-row tiled
-path remains the unloosened numeric reference. Dense FFNs dominate weights: MMV for one/few rows,
-MMQ for prompt or batched rows. Fusion is accepted only when the unfused path
-remains a differential oracle and profiler data attributes a wall-time win.
+without physical sixfold copies. Production one-token decode attention uses
+contiguous KV partitions after the OPT-036 keep (independent pins below 2048
+and at or above 2048; candidate `1` remains the tiled kernel). Prefill must
+be causal and handle partial RoPE on exactly 64 dimensions. Production prompt
+attention (`token_count >= 16`) is the fattn-mma analog with Ada+ stream-K
+for prompt tiles; persistent stream-K was A/B-lost and not installed. The
+two-row tiled path remains the unloosened numeric reference. Dense FFNs dominate
+weights: MMV for one/few rows, MMQ for prompt or batched rows. Fusion is accepted
+only when the unfused path remains a differential oracle and profiler data
+attributes a wall-time win.
 
 **Fusion** combines operations that would otherwise be separate launches. For
 example, a fused kernel might normalize a row, apply a gate, and add a residual
@@ -392,6 +395,28 @@ are opt-in diagnostics, not BEN-001 `qw38-bench` results. Recorded
 this chapter does not replace them:
 [`evidence/optimization/opt032-decode-oracle/REPORT.md`](../evidence/optimization/opt032-decode-oracle/REPORT.md)
 and [`fixtures/opt032_decode_oracle.json`](../fixtures/opt032_decode_oracle.json).
+
+## Decode KV partitions (OPT-036)
+
+**Measured, RTX 5090:** one-token production decode attention was A/B'd at
+contiguous KV partitions `{1, 4, 8, 16}` for positions 128 and 2048. Merge
+is deterministic ascending-part FP32 max / denominator / numerator; the gate
+runs after combine. Selection is independent below 2048 and at or above
+2048, including the current one-partition tiled kernel. Prefill fattn and
+tiled prefill for `token_count >= 2` are unchanged. Mixer Q8 quality, FFN
+shared-Y, GDN warp-column, and decode FFN graphs stay. Partials alias idle
+prompt workspace; score scratch is unused; no extra persistent `cudaMalloc`.
+The targeted sink is D2048 decode `attention_core`. Keep denominators are
+the frozen OPT-032 P / D128 / D2048 means and p95s copied into the contract
+(P **1637.58594**, D128 **11.8731956**, D2048 **3.70951414**), not historical
+OPT-026 P **1746.71973**. **Keep:** both regimes selected 16; production pins
+16/16; D2048 component time strictly improved; live D2048 tok/s strictly
+exceeds that frozen denominator; the cross-workload guard held (D128
+throughput and both D128/D2048 p95 flavors within 5%; P retain ≥95%). Frozen
+ATN-001 envelopes are unloosened. `reverted` is false. This increment does
+not own the 2K llama.cpp parity gate. Quartz ≥ llama.cpp is informational.
+Live tok/s stay in the report; this chapter does not replace them:
+[`evidence/optimization/opt036-decode-kv-partition/REPORT.md`](../evidence/optimization/opt036-decode-kv-partition/REPORT.md).
 
 ## DwarfStar transfer boundary
 

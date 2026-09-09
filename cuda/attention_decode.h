@@ -127,6 +127,14 @@ std::size_t attention_chunk_score_values(const AttentionConfig& config,
                                          std::size_t start_position,
                                          std::size_t token_count) noexcept;
 
+int selected_decode_kv_parts_below_2048() noexcept;
+int selected_decode_kv_parts_at_or_above_2048() noexcept;
+int decode_kv_parts_for_position(std::size_t position) noexcept;
+std::size_t decode_kv_partial_vkq_values(int n_parts) noexcept;
+std::size_t decode_kv_partial_meta_values(int n_parts) noexcept;
+int decode_kv_partition_occupancy(int n_parts) noexcept;
+int decode_kv_merge_occupancy(int n_parts) noexcept;
+
 cudaError_t launch_attention_prepare(
     const AttentionConfig& config, std::size_t position, const float* query,
     const float* key, const float* value, const float* query_norm_scale,
@@ -134,6 +142,15 @@ cudaError_t launch_attention_prepare(
     const AttentionCache& committed, const AttentionCache& candidate_row,
     float* normalized_query, float* normalized_key, float* score_workspace,
     float* output, cudaStream_t stream) noexcept;
+
+cudaError_t launch_attention_prepare_partitioned(
+    const AttentionConfig& config, std::size_t position, const float* query,
+    const float* key, const float* value, const float* query_norm_scale,
+    const float* key_norm_scale, const float* output_gate,
+    const AttentionCache& committed, const AttentionCache& candidate_row,
+    float* normalized_query, float* normalized_key, float* score_workspace,
+    float* output, float* partial_vkq, float* meta, int n_parts,
+    cudaStream_t stream) noexcept;
 
 cudaError_t launch_attention_prepare_chunk(
     const AttentionConfig& config, std::size_t start_position,

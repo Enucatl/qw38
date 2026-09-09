@@ -470,6 +470,281 @@ int run_case(const char* name, std::uint32_t layer,
              : 1;
 }
 
+int run_partitioned_position(const char* name, std::size_t position,
+                               int n_parts) {
+  const qw38::cuda::AttentionConfig config{
+      24, 4, 256, 64, static_cast<std::uint32_t>(position + 1)};
+  const std::size_t query_values =
+      qw38::cuda::attention_query_values(config);
+  const std::size_t row_values =
+      qw38::cuda::attention_kv_row_values(config);
+  const std::size_t cache_values =
+      qw38::cuda::attention_cache_values(config);
+  const std::size_t score_values =
+      qw38::cuda::attention_score_values(config, position);
+  const std::size_t vkq_values =
+      static_cast<std::size_t>(config.query_heads) *
+      static_cast<std::size_t>(n_parts) * config.head_width;
+  const std::size_t meta_values =
+      static_cast<std::size_t>(config.query_heads) *
+      static_cast<std::size_t>(n_parts) * 2U;
+  std::vector<float> query(query_values);
+  std::vector<float> key(row_values);
+  std::vector<float> value(row_values);
+  std::vector<float> gate(query_values);
+  std::vector<float> query_scale(config.head_width);
+  std::vector<float> key_scale(config.head_width);
+  for (std::size_t index = 0; index < query_values; ++index) {
+    query[index] = std::sin(static_cast<float>(index + 3) * 0.017F) * 0.75F;
+    gate[index] =
+        static_cast<float>(static_cast<int>((index + 3) % 17) - 8) * 0.0625F;
+  }
+  for (std::size_t index = 0; index < row_values; ++index) {
+    key[index] = std::cos(static_cast<float>(index + 9) * 0.023F);
+    value[index] =
+        static_cast<float>(static_cast<int>((index + 3) % 29) - 14) * 0.03125F;
+  }
+  for (std::uint32_t lane = 0; lane < config.head_width; ++lane) {
+    query_scale[lane] = 0.875F + static_cast<float>(lane % 9) * 0.03125F;
+    key_scale[lane] = 0.9375F + static_cast<float>(lane % 7) * 0.015625F;
+  }
+  std::vector<__nv_bfloat16> logical_key(cache_values);
+  std::vector<__nv_bfloat16> logical_value(cache_values);
+  for (std::size_t context = 0; context < config.capacity; ++context) {
+    for (std::size_t index = 0; index < row_values; ++index) {
+      const float key_item =
+          context > position
+              ? 1000.0F
+              : static_cast<float>(
+                    static_cast<int>((index + context * 5) % 31) - 15) *
+                    0.015625F;
+      const float value_item =
+          context > position
+              ? -1000.0F
+              : static_cast<float>(
+                    static_cast<int>((index + context * 7) % 37) - 18) *
+                    0.015625F;
+      logical_key[context * row_values + index] = __float2bfloat16_rn(key_item);
+      logical_value[context * row_values + index] =
+          __float2bfloat16_rn(value_item);
+    }
+  }
+  std::vector<__nv_bfloat16> physical_key(cache_values);
+  std::vector<__nv_bfloat16> physical_value(cache_values);
+  qw38::cuda::attention_kv_copy_logical_to_physical(
+      logical_key.data(), physical_key.data(), config.kv_heads, config.capacity,
+      config.head_width);
+  qw38::cuda::attention_kv_copy_logical_to_physical(
+      logical_value.data(), physical_value.data(), config.kv_heads,
+      config.capacity, config.head_width);
+  const std::vector<__nv_bfloat16> original_key = physical_key;
+  const std::vector<__nv_bfloat16> original_value = physical_value;
+  std::vector<float> sentinel(score_values, 123.456789F);
+
+  float* device_query = nullptr;
+  float* device_key = nullptr;
+  float* device_value = nullptr;
+  float* device_gate = nullptr;
+  float* device_query_scale = nullptr;
+  float* device_key_scale = nullptr;
+  float* device_normalized_query = nullptr;
+  float* device_normalized_key = nullptr;
+  float* device_scores = nullptr;
+  float* device_output = nullptr;
+  float* device_tiled = nullptr;
+  float* device_reference = nullptr;
+  float* device_partial = nullptr;
+  float* device_meta = nullptr;
+  __nv_bfloat16* device_committed_key = nullptr;
+  __nv_bfloat16* device_committed_value = nullptr;
+  __nv_bfloat16* device_candidate_key = nullptr;
+  __nv_bfloat16* device_candidate_value = nullptr;
+  cudaError_t error = cudaMalloc(&device_query, query_values * sizeof(float));
+#define QW38_ALLOC(pointer, count)                                            \
+  if (error == cudaSuccess)                                                   \
+  error = cudaMalloc(&(pointer), (count) * sizeof(*(pointer)))
+  QW38_ALLOC(device_key, row_values);
+  QW38_ALLOC(device_value, row_values);
+  QW38_ALLOC(device_gate, query_values);
+  QW38_ALLOC(device_query_scale, config.head_width);
+  QW38_ALLOC(device_key_scale, config.head_width);
+  QW38_ALLOC(device_normalized_query, query_values);
+  QW38_ALLOC(device_normalized_key, row_values);
+  QW38_ALLOC(device_scores, score_values);
+  QW38_ALLOC(device_output, query_values);
+  QW38_ALLOC(device_tiled, query_values);
+  QW38_ALLOC(device_reference, query_values);
+  QW38_ALLOC(device_partial, vkq_values);
+  QW38_ALLOC(device_meta, meta_values);
+  QW38_ALLOC(device_committed_key, cache_values);
+  QW38_ALLOC(device_committed_value, cache_values);
+  QW38_ALLOC(device_candidate_key, row_values);
+  QW38_ALLOC(device_candidate_value, row_values);
+#undef QW38_ALLOC
+  if (error != cudaSuccess) return fail_cuda("partition cudaMalloc", error);
+#define QW38_COPY(pointer, source)                                            \
+  if (error == cudaSuccess)                                                   \
+  error = cudaMemcpy((pointer), (source).data(),                              \
+                     (source).size() * sizeof((source)[0]), cudaMemcpyHostToDevice)
+  QW38_COPY(device_query, query);
+  QW38_COPY(device_key, key);
+  QW38_COPY(device_value, value);
+  QW38_COPY(device_gate, gate);
+  QW38_COPY(device_query_scale, query_scale);
+  QW38_COPY(device_key_scale, key_scale);
+  QW38_COPY(device_committed_key, physical_key);
+  QW38_COPY(device_committed_value, physical_value);
+  QW38_COPY(device_scores, sentinel);
+#undef QW38_COPY
+  if (error != cudaSuccess) return fail_cuda("partition H2D", error);
+  const qw38::cuda::AttentionCache committed{device_committed_key,
+                                            device_committed_value};
+  const qw38::cuda::AttentionCache candidate{device_candidate_key,
+                                            device_candidate_value};
+  if (qw38::cuda::launch_attention_prepare_partitioned(
+          config, position, device_query, device_key, device_value,
+          device_query_scale, device_key_scale, device_gate, committed,
+          committed, device_normalized_query, device_normalized_key,
+          device_scores, device_output, device_partial, device_meta, n_parts,
+          nullptr) != cudaErrorInvalidValue) {
+    std::fprintf(stderr, "%s: aliased candidate was not rejected\n", name);
+    return 1;
+  }
+  error = qw38::cuda::launch_attention_prepare(
+      config, position, device_query, device_key, device_value,
+      device_query_scale, device_key_scale, device_gate, committed, candidate,
+      device_normalized_query, device_normalized_key, device_scores,
+      device_tiled, nullptr);
+  if (error == cudaSuccess) error = cudaDeviceSynchronize();
+  if (error != cudaSuccess) return fail_cuda("partition tiled", error);
+  std::vector<__nv_bfloat16> tiled_candidate_key(row_values);
+  std::vector<__nv_bfloat16> tiled_candidate_value(row_values);
+  error = cudaMemcpy(tiled_candidate_key.data(), device_candidate_key,
+                     row_values * sizeof(__nv_bfloat16),
+                     cudaMemcpyDeviceToHost);
+  if (error == cudaSuccess) {
+    error = cudaMemcpy(tiled_candidate_value.data(), device_candidate_value,
+                       row_values * sizeof(__nv_bfloat16),
+                       cudaMemcpyDeviceToHost);
+  }
+  error = cudaMemcpy(device_committed_key, original_key.data(),
+                     cache_values * sizeof(__nv_bfloat16),
+                     cudaMemcpyHostToDevice);
+  if (error == cudaSuccess) {
+    error = cudaMemcpy(device_committed_value, original_value.data(),
+                       cache_values * sizeof(__nv_bfloat16),
+                       cudaMemcpyHostToDevice);
+  }
+  if (error == cudaSuccess) {
+    error = qw38::cuda::launch_attention_prepare_chunk_reference(
+        config, position, 1, device_query, device_key, device_value,
+        device_query_scale, device_key_scale, device_gate, committed,
+        candidate, device_normalized_query, device_normalized_key, device_scores,
+        device_reference, nullptr);
+  }
+  if (error == cudaSuccess) error = cudaDeviceSynchronize();
+  if (error != cudaSuccess) return fail_cuda("partition reference", error);
+  error = cudaMemcpy(device_committed_key, original_key.data(),
+                     cache_values * sizeof(__nv_bfloat16),
+                     cudaMemcpyHostToDevice);
+  if (error == cudaSuccess) {
+    error = cudaMemcpy(device_committed_value, original_value.data(),
+                       cache_values * sizeof(__nv_bfloat16),
+                       cudaMemcpyHostToDevice);
+  }
+  error = cudaMemcpy(device_scores, sentinel.data(),
+                     score_values * sizeof(float), cudaMemcpyHostToDevice);
+  if (error != cudaSuccess) return fail_cuda("partition sentinel", error);
+  const int occupancy =
+      qw38::cuda::decode_kv_partition_occupancy(n_parts);
+  const int merge_occupancy = qw38::cuda::decode_kv_merge_occupancy(n_parts);
+  error = qw38::cuda::launch_attention_prepare_partitioned(
+      config, position, device_query, device_key, device_value,
+      device_query_scale, device_key_scale, device_gate, committed, candidate,
+      device_normalized_query, device_normalized_key, device_scores,
+      device_output, device_partial, device_meta, n_parts, nullptr);
+  if (error == cudaSuccess) error = cudaDeviceSynchronize();
+  if (error != cudaSuccess) return fail_cuda("partition launch", error);
+
+  std::vector<float> actual(query_values);
+  std::vector<float> tiled(query_values);
+  std::vector<float> reference(query_values);
+  std::vector<float> scores(score_values);
+  std::vector<__nv_bfloat16> actual_candidate_key(row_values);
+  std::vector<__nv_bfloat16> actual_candidate_value(row_values);
+  std::vector<__nv_bfloat16> committed_key_out(cache_values);
+  std::vector<__nv_bfloat16> committed_value_out(cache_values);
+#define QW38_READ(destination, pointer)                                       \
+  if (error == cudaSuccess)                                                   \
+  error = cudaMemcpy((destination).data(), (pointer),                         \
+                     (destination).size() * sizeof((destination)[0]),         \
+                     cudaMemcpyDeviceToHost)
+  QW38_READ(actual, device_output);
+  QW38_READ(tiled, device_tiled);
+  QW38_READ(reference, device_reference);
+  QW38_READ(scores, device_scores);
+  QW38_READ(actual_candidate_key, device_candidate_key);
+  QW38_READ(actual_candidate_value, device_candidate_value);
+  QW38_READ(committed_key_out, device_committed_key);
+  QW38_READ(committed_value_out, device_committed_value);
+#undef QW38_READ
+  if (error != cudaSuccess) return fail_cuda("partition D2H", error);
+  Metrics tiled_metrics;
+  add_metrics(actual, tiled, &tiled_metrics);
+  const float tiled_rms = static_cast<float>(std::sqrt(
+      tiled_metrics.squared / static_cast<double>(tiled_metrics.count)));
+  Metrics ref_metrics;
+  add_metrics(actual, reference, &ref_metrics);
+  const float ref_rms = static_cast<float>(
+      std::sqrt(ref_metrics.squared / static_cast<double>(ref_metrics.count)));
+  const bool scratch_unchanged =
+      std::memcmp(scores.data(), sentinel.data(),
+                  score_values * sizeof(float)) == 0;
+  const bool committed_unchanged =
+      bf16_equal(committed_key_out, original_key) &&
+      bf16_equal(committed_value_out, original_value);
+  const bool candidate_exact =
+      bf16_equal(actual_candidate_key, tiled_candidate_key) &&
+      bf16_equal(actual_candidate_value, tiled_candidate_value);
+  std::printf(
+      "partition_case=%s position=%zu n_parts=%d occupancy=%d "
+      "merge_occupancy=%d tiled_max_abs=%.9g tiled_rms=%.9g "
+      "ref_max_abs=%.9g ref_rms=%.9g nonfinite=%zu scratch_unchanged=%s "
+      "committed_unchanged=%s candidate_exact=%s\n",
+      name, position, n_parts, occupancy, merge_occupancy,
+      tiled_metrics.maximum_absolute, tiled_rms, ref_metrics.maximum_absolute,
+      ref_rms, tiled_metrics.nonfinite, scratch_unchanged ? "true" : "false",
+      committed_unchanged ? "true" : "false",
+      candidate_exact ? "true" : "false");
+  cudaFree(device_candidate_value);
+  cudaFree(device_candidate_key);
+  cudaFree(device_committed_value);
+  cudaFree(device_committed_key);
+  cudaFree(device_meta);
+  cudaFree(device_partial);
+  cudaFree(device_reference);
+  cudaFree(device_tiled);
+  cudaFree(device_output);
+  cudaFree(device_scores);
+  cudaFree(device_normalized_key);
+  cudaFree(device_normalized_query);
+  cudaFree(device_key_scale);
+  cudaFree(device_query_scale);
+  cudaFree(device_gate);
+  cudaFree(device_value);
+  cudaFree(device_key);
+  cudaFree(device_query);
+  return occupancy >= 1 && merge_occupancy >= 1 &&
+                 tiled_metrics.nonfinite == 0 &&
+                 tiled_metrics.maximum_absolute <= 5.0e-5F &&
+                 tiled_rms <= 5.0e-6F && ref_metrics.nonfinite == 0 &&
+                 ref_metrics.maximum_absolute <= 5.0e-5F &&
+                 ref_rms <= 5.0e-6F && scratch_unchanged &&
+                 committed_unchanged && candidate_exact
+             ? 0
+             : 1;
+}
+
 }  // namespace
 
 int main() {
@@ -485,6 +760,24 @@ int main() {
       run_case("layer_63", 63, small) != 0 ||
       run_case("production_layer_3", 3, production) != 0) {
     return 1;
+  }
+  if (qw38::cuda::launch_attention_prepare_partitioned(
+          production, 3, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+          qw38::cuda::AttentionCache{}, qw38::cuda::AttentionCache{}, nullptr,
+          nullptr, nullptr, nullptr, nullptr, nullptr, 3, nullptr) !=
+      cudaErrorInvalidValue) {
+    std::fprintf(stderr, "illegal n_parts was accepted\n");
+    return 1;
+  }
+  const int parts[] = {4, 8, 16};
+  const std::size_t positions[] = {128, 2048};
+  for (std::size_t position : positions) {
+    for (int n_parts : parts) {
+      char name[64];
+      std::snprintf(name, sizeof(name), "partition_p%zu_n%d", position,
+                    n_parts);
+      if (run_partitioned_position(name, position, n_parts) != 0) return 1;
+    }
   }
   std::printf("status=passed\n");
   return 0;

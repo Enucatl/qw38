@@ -812,6 +812,36 @@ baseline.
   improvement; envelopes unloosened; does not substitute for the 2K llama.cpp
   parity gate; llama-bench random decode is informational. Quartz ≥ llama.cpp
   is not this gate. No kernel implementation was copied or adapted.
+- OPT-036 is a local derivation over admitted ATN-001 tiled one-token decode.
+  It splits the legal KV range into contiguous partitions `{1, 4, 8, 16}`,
+  keeps candidate `1` as today's tiled kernel, and merges FP32 partial max /
+  denominator / numerator in deterministic ascending-part order. File-level
+  provenance for the KV-split / combine technique is already External:
+  pinned llama.cpp revision `cc83d7b4824f73cfdda4dfbb47ee39804f71b328` (MIT,
+  The ggml authors) `fattn-vec.cuh` and `fattn-common.cuh`
+  (`flash_attn_combine_results`). This increment does not vendor those files,
+  does not include ggml headers, and does not copy `../ds4`. Production
+  decode attention installs independent compile-time pins below 2048 and at
+  or above 2048. Prefill fattn and tiled prefill for `token_count >= 2` stay.
+  Partials alias idle `prompt_projected_bf16_` / `prompt_q8_`; score scratch
+  stays unused; no extra `cudaMalloc`. Keep denominators are the frozen
+  decode-oracle P / D128 / D2048 means and p95s copied into the contract, not
+  historical 4K successor-oracle 1746.71973. **Measured, RTX 5090:** both
+  regimes selected 16; production pins 16/16; `reverted` false;
+  `keep_sitting_skipped` false; `status` measured. Live tok/s stay in the
+  report; this ledger does not replace them. The schema-1 contract, measured
+  fixture, and report are
+  [`pins/opt036_decode_kv_partition_contract.json`](../pins/opt036_decode_kv_partition_contract.json),
+  [`fixtures/opt036_decode_kv_partition.json`](../fixtures/opt036_decode_kv_partition.json),
+  and
+  [`evidence/optimization/opt036-decode-kv-partition/REPORT.md`](../evidence/optimization/opt036-decode-kv-partition/REPORT.md).
+  The beginner explanations are
+  [`docs/43-cuda-attention-decode.md`](43-cuda-attention-decode.md) and
+  [`docs/06-system-optimization.md`](06-system-optimization.md).
+  Proof limit: frozen attention envelopes; lower component time; improved
+  D2048; cross-workload guard; decode-oracle P D128 D2048 are the keep
+  denominators; does not substitute for the 2K llama.cpp parity gate; Quartz
+  ≥ llama.cpp is not this gate. Envelopes unloosened; Nsight is not used.
 - CUD-003 introduces no new external implementation source. GGUF Q8_0 decoding
   follows the format already admitted by the pinned scalar decoder, and the
   pointwise/layout equations come from the pinned model contract and scalar

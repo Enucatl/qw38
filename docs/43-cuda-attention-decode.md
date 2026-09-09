@@ -1,6 +1,6 @@
 # 43. CUDA grouped-query attention for one decoded token
 
-[Index](README.md) · Implementation tasks: ATN-001, OPT-005, OPT-010, and
+[Index](README.md) · Implementation tasks: ATN-001, OPT-005, OPT-010, OPT-036, and
 EDU-029 in [`implementation_ledger.md`](../implementation_ledger.md)
 
 Chapter 19 introduced attention with small scalar examples. This chapter follows
@@ -169,7 +169,8 @@ measurements remain a separate pending gate.
 ## OPT-005 shared arithmetic and retained reference
 
 The production `launch_attention_prepare_chunk` uses the same tiled arithmetic
-for one row and every positive multi-row chunk. A staging grid maps
+for every positive multi-row chunk with `token_count < 16`, and that tiled
+kernel remains the one-partition decode candidate. A staging grid maps
 `(kv_head, token)` and writes normalized/RoPE keys and values as BF16; a second
 grid maps `(query_head, token)`. Each block owns one query row/head, uses a
 32-row KV tile, and accumulates scores and values in FP32 with online stable
@@ -191,3 +192,38 @@ The fixture also records exact BF16 candidate bytes, prepare/commit isolation,
 causal sentinel exclusion, unchanged score scratch, invalid-input rejection,
 and final-position execution. This is component-level diagnostic evidence; it
 does not establish projections, scheduler performance, or end-to-end recovery.
+
+## One-token KV partitions (OPT-036)
+
+Decode (`token_count == 1`) can split the legal KV range into contiguous
+partitions so several blocks score different slices of the same cache in
+parallel. Prefill fattn (`token_count >= 16`) and two-row tiled prefill
+(`2 <= token_count < 16`) stay on their existing paths.
+
+Legal part counts are only `{1, 4, 8, 16}`. Candidate `1` is today's tiled
+[`launch_attention_prepare`](../cuda/attention_decode.cu) kernel and launches
+no merge. For 4, 8, or 16 parts, each block owns one GQA group and one
+partition. Empty partitions write `max = -INFINITY`, `den = 0`, and a zero
+numerator, then skip the KV loop. A second kernel merges FP32 partial
+max / denominator / numerator in deterministic ascending-part order, then
+applies the gate sigmoid **once**. Association of part sums is not
+byte-identical to the one-partition kernel; frozen ATN-001 envelopes versus
+tiled and versus the visible reference remain the numeric gate.
+
+Independent compile-time pins select the part count **below** position 2048
+and **at or above** 2048. Production `execute_token` calls
+[`decode_kv_parts_for_position`](../cuda/attention_decode.h) on the session
+frontier. When that count is greater than one, partials alias idle prompt
+workspace (`prompt_projected_bf16_` and `prompt_q8_`); score scratch stays
+unused. There is no extra persistent `cudaMalloc`.
+
+**Measured, RTX 5090:** paired 3-warm / 30-alternating CUDA-event A/B at
+positions 128 and 2048 selected **16** in both regimes. Production pins are
+therefore 16/16. Keep also required a strictly lower D2048 component mean
+than one-partition, live D2048 tok/s strictly above the frozen decode-oracle
+denominator, and the cross-workload P / D128 / D2048 guard. Live means, p95s,
+and per-candidate samples stay in the report; this chapter does not replace
+them:
+[`evidence/optimization/opt036-decode-kv-partition/REPORT.md`](../evidence/optimization/opt036-decode-kv-partition/REPORT.md).
+This is a partitioned-decode keep/reject under frozen envelopes, not the 2K
+llama.cpp parity gate and not Quartz ≥ llama.cpp.
