@@ -650,19 +650,21 @@ cudaError_t execute_prompt_ffn_projections(
         QuantKind::kQ4K, workspace->prompt_normalized_, token_count,
         internal::kResidualWidth, workspace->prompt_q8_, stream);
     if (error == cudaSuccess) {
-      error = launch_quant_mmq_mma_y(
+      error = launch_quant_mmq_mma_y_ij(
           layer.ffn_gate.kind, layer.ffn_gate.data, layer.ffn_gate.rows,
           layer.ffn_gate.columns, workspace->prompt_q8_, token_count,
-          workspace->prompt_projection_a_, stream,
+          workspace->prompt_projection_a_, selected_ffn_gate_quality_i(),
+          selected_ffn_gate_prompt_tile(), stream,
           reinterpret_cast<float*>(workspace->prompt_projected_bf16_),
           workspace->prompt_chunk_rows_ * internal::kFfnWidth *
               sizeof(__nv_bfloat16) / sizeof(float));
     }
     if (error == cudaSuccess) {
-      error = launch_quant_mmq_mma_y(
+      error = launch_quant_mmq_mma_y_ij(
           layer.ffn_up.kind, layer.ffn_up.data, layer.ffn_up.rows,
           layer.ffn_up.columns, workspace->prompt_q8_, token_count,
-          workspace->prompt_projection_b_, stream,
+          workspace->prompt_projection_b_, selected_ffn_up_quality_i(),
+          selected_ffn_up_prompt_tile(), stream,
           reinterpret_cast<float*>(workspace->prompt_projected_bf16_),
           workspace->prompt_chunk_rows_ * internal::kFfnWidth *
               sizeof(__nv_bfloat16) / sizeof(float));
@@ -683,10 +685,11 @@ cudaError_t execute_prompt_ffn_projections(
           workspace->prompt_projection_a_, workspace->prompt_projection_b_,
           token_count, internal::kFfnWidth, workspace->prompt_q8_, stream);
       if (error == cudaSuccess) {
-        error = launch_quant_mmq_mma_y(
+        error = launch_quant_mmq_mma_y_ij(
             layer.ffn_down.kind, layer.ffn_down.data, layer.ffn_down.rows,
             layer.ffn_down.columns, workspace->prompt_q8_, token_count,
-            workspace->prompt_mixer_output_, stream,
+            workspace->prompt_mixer_output_, selected_ffn_down_quality_i(),
+            selected_ffn_down_prompt_tile(), stream,
             reinterpret_cast<float*>(workspace->prompt_projected_bf16_),
             workspace->prompt_chunk_rows_ * internal::kFfnWidth *
                 sizeof(__nv_bfloat16) / sizeof(float));

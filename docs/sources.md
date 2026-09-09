@@ -711,6 +711,32 @@ baseline.
   unloosened; OPT-009 Q8_0 reference remains byte-exact; OPT-016 remains
   the parity gate owner; does not substitute for the 2K llama.cpp parity
   gate; Quartz ≥ llama.cpp is not this gate.
+- OPT-037 reuses the already-cited llama.cpp Ampere MMQ I/J geometry
+  (`mmq-config-ampere.cuh` / quality MMA `MMQ_ITER_K=256`, packed
+  load-tiles, block `dim3(32, 8)`) at revision
+  `cc83d7b4824f73cfdda4dfbb47ee39804f71b328` (MIT, The ggml authors).
+  This increment does not vendor ggml headers and does not copy
+  `../ds4/cuda/mmq/`. Production 4096-row Q4_K FFN quality MMA stays
+  I=128 / J=128 after the independent gate/up/down sweep. Shared-Y /
+  SwiGLU-into-Q8 stays. Stream-K stays `off`. Mixer skinny stays
+  `mma_i32_j128`. Global `selected_mma_mmq_prompt_tile()` stays 128.
+  Decode FFN stays MMV. Prompt FFN graphs were not recaptured. **Measured,
+  RTX 5090:** A/B winner `i128_j128` on every projection (`any_win=false`);
+  live tok/s sitting skipped; `reverted` true. Live numbers stay in the
+  report; this ledger does not replace them. The schema-1 contract,
+  rejected fixture, report, and rejection are
+  [`pins/opt037_ffn_tile_contract.json`](../pins/opt037_ffn_tile_contract.json),
+  [`fixtures/opt037_ffn_tiles.json`](../fixtures/opt037_ffn_tiles.json),
+  [`evidence/optimization/opt037-ffn-tiles/REPORT.md`](../evidence/optimization/opt037-ffn-tiles/REPORT.md),
+  and
+  [`evidence/optimization/opt037-ffn-tiles/REJECTION.md`](../evidence/optimization/opt037-ffn-tiles/REJECTION.md).
+  The beginner explanation is
+  [`docs/40-cuda-prompt-mmq.md`](40-cuda-prompt-mmq.md).
+  Proof limit: 4K FFN I/J per projection under unloosened Q4_K
+  association; keep requires admitted component wins, improved P, frozen
+  MMQ envelopes, and the cross-workload guard; envelopes unloosened;
+  OPT-016 remains the parity gate owner; does not substitute for the 2K
+  llama.cpp parity gate; Quartz ≥ llama.cpp is not this gate.
 - OPT-029 adapts llama.cpp revision
   `cc83d7b4824f73cfdda4dfbb47ee39804f71b328` (MIT, The ggml authors)
   warp-column GDN recurrence from `gated_delta_net.cu` (`S_v=128`,

@@ -1833,6 +1833,131 @@ cudaError_t launch_q8_mmq_d2r(const std::uint8_t* soa, std::size_t output_rows,
       soa, output_rows, columns, packed, prompt_rows, output, stream);
 }
 
+constexpr unsigned int kSelectedFfnGateQualityI = 128U;
+constexpr unsigned int kSelectedFfnGatePromptTile = 128U;
+constexpr unsigned int kSelectedFfnUpQualityI = 128U;
+constexpr unsigned int kSelectedFfnUpPromptTile = 128U;
+constexpr unsigned int kSelectedFfnDownQualityI = 128U;
+constexpr unsigned int kSelectedFfnDownPromptTile = 128U;
+
+bool legal_ffn_quality_i(unsigned int quality_i) noexcept {
+  return quality_i == 64 || quality_i == 128;
+}
+
+bool legal_ffn_prompt_tile(unsigned int prompt_tile) noexcept {
+  return prompt_tile == 32 || prompt_tile == 64 || prompt_tile == 128;
+}
+
+unsigned int selected_ffn_gate_quality_i() noexcept {
+  return kSelectedFfnGateQualityI;
+}
+
+unsigned int selected_ffn_gate_prompt_tile() noexcept {
+  return kSelectedFfnGatePromptTile;
+}
+
+unsigned int selected_ffn_up_quality_i() noexcept {
+  return kSelectedFfnUpQualityI;
+}
+
+unsigned int selected_ffn_up_prompt_tile() noexcept {
+  return kSelectedFfnUpPromptTile;
+}
+
+unsigned int selected_ffn_down_quality_i() noexcept {
+  return kSelectedFfnDownQualityI;
+}
+
+unsigned int selected_ffn_down_prompt_tile() noexcept {
+  return kSelectedFfnDownPromptTile;
+}
+
+int mma_mmq_occupancy_ij(QuantKind kind, unsigned int prompt_tile,
+                         unsigned int quality_i) noexcept {
+  if (!legal_ffn_prompt_tile(prompt_tile) || !legal_ffn_quality_i(quality_i)) {
+    return 0;
+  }
+  if (quality_i == 128) {
+    return mma_mmq_occupancy(kind, prompt_tile);
+  }
+  if (kind != QuantKind::kQ4K) return 0;
+  int occupancy = 0;
+  cudaError_t error = cudaErrorInvalidValue;
+  const std::size_t shared =
+      quality_shared_ints(static_cast<int>(prompt_tile),
+                         static_cast<int>(quality_i)) *
+      sizeof(int);
+  auto query = [&](auto kernel) -> cudaError_t {
+    cudaError_t set = cudaFuncSetAttribute(
+        kernel, cudaFuncAttributeMaxDynamicSharedMemorySize,
+        static_cast<int>(shared));
+    if (set != cudaSuccess) return set;
+    return cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+        &occupancy, kernel, kMmaThreads, shared);
+  };
+  if (prompt_tile == 32) {
+    error = query(quant_mmq_mma_quality_kernel<QuantKind::kQ4K, 32, true, 64>);
+  } else if (prompt_tile == 64) {
+    error = query(quant_mmq_mma_quality_kernel<QuantKind::kQ4K, 64, true, 64>);
+  } else {
+    error = query(quant_mmq_mma_quality_kernel<QuantKind::kQ4K, 128, true, 64>);
+  }
+  return error == cudaSuccess ? occupancy : 0;
+}
+
+cudaError_t launch_quant_mmq_mma_y_ij(
+    QuantKind kind, const std::uint8_t* weights, std::size_t output_rows,
+    std::size_t columns, const Q8Block* y, std::size_t prompt_rows,
+    float* output, unsigned int quality_i, unsigned int prompt_tile,
+    cudaStream_t stream, float* tmp_fixup,
+    std::size_t tmp_fixup_floats) noexcept {
+  (void)tmp_fixup;
+  (void)tmp_fixup_floats;
+  if (weights == nullptr || y == nullptr || output == nullptr ||
+      output_rows == 0 || columns == 0 || prompt_rows == 0 ||
+      columns % kMmaBlockValues != 0 || !legal_ffn_quality_i(quality_i) ||
+      !legal_ffn_prompt_tile(prompt_tile) ||
+      (kind != QuantKind::kQ4K && kind != QuantKind::kQ6K) ||
+      (kind == QuantKind::kQ6K && quality_i != 128)) {
+    return cudaErrorInvalidValue;
+  }
+  const int* packed = reinterpret_cast<const int*>(y);
+  if (kind == QuantKind::kQ4K && quality_i == 64) {
+    if (prompt_tile == 32) {
+      return launch_quality_dispatch<QuantKind::kQ4K, 32, 64>(
+          weights, output_rows, columns, packed, prompt_rows, output, stream);
+    }
+    if (prompt_tile == 64) {
+      return launch_quality_dispatch<QuantKind::kQ4K, 64, 64>(
+          weights, output_rows, columns, packed, prompt_rows, output, stream);
+    }
+    return launch_quality_dispatch<QuantKind::kQ4K, 128, 64>(
+        weights, output_rows, columns, packed, prompt_rows, output, stream);
+  }
+  if (kind == QuantKind::kQ4K) {
+    if (prompt_tile == 32) {
+      return launch_quality_dispatch<QuantKind::kQ4K, 32>(
+          weights, output_rows, columns, packed, prompt_rows, output, stream);
+    }
+    if (prompt_tile == 64) {
+      return launch_quality_dispatch<QuantKind::kQ4K, 64>(
+          weights, output_rows, columns, packed, prompt_rows, output, stream);
+    }
+    return launch_quality_dispatch<QuantKind::kQ4K, 128>(
+        weights, output_rows, columns, packed, prompt_rows, output, stream);
+  }
+  if (prompt_tile == 32) {
+    return launch_quality_dispatch<QuantKind::kQ6K, 32>(
+        weights, output_rows, columns, packed, prompt_rows, output, stream);
+  }
+  if (prompt_tile == 64) {
+    return launch_quality_dispatch<QuantKind::kQ6K, 64>(
+        weights, output_rows, columns, packed, prompt_rows, output, stream);
+  }
+  return launch_quality_dispatch<QuantKind::kQ6K, 128>(
+      weights, output_rows, columns, packed, prompt_rows, output, stream);
+}
+
 constexpr const char kSelectedFfnPath[] = "shared_y_swiglu_q8";
 
 const char* selected_ffn_path() noexcept { return kSelectedFfnPath; }

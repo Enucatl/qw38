@@ -773,6 +773,126 @@ int run_mma_case(qw38::cuda::QuantKind kind, const char* name,
   return mma_ok && variant_ok ? 0 : 1;
 }
 
+int run_mma_ij_case(const char* name, std::size_t output_rows,
+                    std::size_t columns, std::size_t prompt_rows,
+                    unsigned int quality_i, unsigned int prompt_tile) {
+  std::vector<std::uint8_t> weights;
+  fill_weights(qw38::cuda::QuantKind::kQ4K, output_rows, columns, &weights);
+  std::vector<__nv_bfloat16> prompt(prompt_rows * columns);
+  for (std::size_t prompt_row = 0; prompt_row < prompt_rows; ++prompt_row) {
+    std::vector<__nv_bfloat16> row_activation;
+    std::vector<qw38::cuda::Q8Block> row_staged;
+    make_activation(columns, &row_activation, &row_staged, prompt_row);
+    std::copy(row_activation.begin(), row_activation.end(),
+              prompt.begin() + prompt_row * columns);
+  }
+  std::vector<float> expected;
+  if (!reference_dequant_gemm(qw38::cuda::QuantKind::kQ4K, weights, output_rows,
+                              columns, prompt, prompt_rows, &expected)) {
+    return 1;
+  }
+  std::uint8_t* device_weights = nullptr;
+  __nv_bfloat16* device_prompt = nullptr;
+  qw38::cuda::Q8Block* device_y = nullptr;
+  float* device_out = nullptr;
+  cudaError_t error = cudaMalloc(&device_weights, weights.size());
+  if (error == cudaSuccess) {
+    error = cudaMalloc(&device_prompt, prompt.size() * sizeof(prompt[0]));
+  }
+  if (error == cudaSuccess) {
+    error = cudaMalloc(&device_y, qw38::cuda::q8_prompt_workspace_bytes(
+                                      prompt_rows, columns));
+  }
+  if (error == cudaSuccess) {
+    error = cudaMalloc(&device_out, expected.size() * sizeof(float));
+  }
+  if (error != cudaSuccess) return fail_cuda("MMA I/J cudaMalloc", error);
+  error = cudaMemcpy(device_weights, weights.data(), weights.size(),
+                     cudaMemcpyHostToDevice);
+  if (error == cudaSuccess) {
+    error = cudaMemcpy(device_prompt, prompt.data(),
+                       prompt.size() * sizeof(prompt[0]), cudaMemcpyHostToDevice);
+  }
+  if (error == cudaSuccess) {
+    error = qw38::cuda::launch_quantize_mmq_q8_1(
+        qw38::cuda::QuantKind::kQ4K, device_prompt, prompt_rows, columns,
+        device_y, nullptr);
+  }
+  if (error == cudaSuccess) {
+    error = qw38::cuda::launch_quant_mmq_mma_y_ij(
+        qw38::cuda::QuantKind::kQ4K, device_weights, output_rows, columns,
+        device_y, prompt_rows, device_out, quality_i, prompt_tile, nullptr);
+  }
+  if (error == cudaSuccess) error = cudaDeviceSynchronize();
+  if (error != cudaSuccess) return fail_cuda("MMA I/J launch", error);
+  std::vector<float> actual(expected.size());
+  error = cudaMemcpy(actual.data(), device_out, actual.size() * sizeof(float),
+                     cudaMemcpyDeviceToHost);
+  if (error != cudaSuccess) return fail_cuda("MMA I/J D2H", error);
+  float max_abs = 0.0F;
+  float max_rel = 0.0F;
+  float rms = 0.0F;
+  std::size_t bad = 0;
+  std::size_t nonfinite = 0;
+  const bool ok = ds4_q4k_association_ok(actual, expected, columns, &max_abs,
+                                         &max_rel, &rms, &bad, &nonfinite);
+  const int occ = qw38::cuda::mma_mmq_occupancy_ij(
+      qw38::cuda::QuantKind::kQ4K, prompt_tile, quality_i);
+  std::printf("mma_ij_case=%s prompt_rows=%zu output_rows=%zu columns=%zu "
+              "quality_i=%u prompt_tile=%u occupancy=%d max_abs=%.9g "
+              "max_rel=%.9g rms=%.9g bad=%zu nonfinite=%zu\n",
+              name, prompt_rows, output_rows, columns, quality_i, prompt_tile,
+              occ, max_abs, max_rel, rms, bad, nonfinite);
+  cudaFree(device_out);
+  cudaFree(device_y);
+  cudaFree(device_prompt);
+  cudaFree(device_weights);
+  return ok && occ >= 1 ? 0 : 1;
+}
+
+int run_ffn_tile_pin_suite() {
+  if (!qw38::cuda::legal_ffn_quality_i(
+          qw38::cuda::selected_ffn_gate_quality_i()) ||
+      !qw38::cuda::legal_ffn_prompt_tile(
+          qw38::cuda::selected_ffn_gate_prompt_tile()) ||
+      !qw38::cuda::legal_ffn_quality_i(
+          qw38::cuda::selected_ffn_up_quality_i()) ||
+      !qw38::cuda::legal_ffn_prompt_tile(
+          qw38::cuda::selected_ffn_up_prompt_tile()) ||
+      !qw38::cuda::legal_ffn_quality_i(
+          qw38::cuda::selected_ffn_down_quality_i()) ||
+      !qw38::cuda::legal_ffn_prompt_tile(
+          qw38::cuda::selected_ffn_down_prompt_tile())) {
+    std::fprintf(stderr, "FFN tile pins must be I in {64,128} J in {32,64,128}\n");
+    return 1;
+  }
+  if (qw38::cuda::legal_ffn_quality_i(32) || qw38::cuda::legal_ffn_quality_i(16) ||
+      qw38::cuda::legal_ffn_prompt_tile(16) ||
+      qw38::cuda::legal_ffn_prompt_tile(256)) {
+    std::fprintf(stderr, "FFN tile legality rejected unexpected I/J\n");
+    return 1;
+  }
+  if (qw38::cuda::launch_quant_mmq_mma_y_ij(
+          qw38::cuda::QuantKind::kQ4K, nullptr, 256, 256, nullptr, 64, nullptr,
+          32, 128, nullptr) != cudaErrorInvalidValue ||
+      qw38::cuda::launch_quant_mmq_mma_y_ij(
+          qw38::cuda::QuantKind::kQ6K, nullptr, 256, 256, nullptr, 64, nullptr,
+          64, 128, nullptr) != cudaErrorInvalidValue) {
+    std::fprintf(stderr, "launch_quant_mmq_mma_y_ij must reject illegal I/J\n");
+    return 1;
+  }
+  const unsigned quality_i[2] = {64U, 128U};
+  const unsigned prompt_tile[3] = {32U, 64U, 128U};
+  for (unsigned i : quality_i) {
+    for (unsigned j : prompt_tile) {
+      char name[64];
+      std::snprintf(name, sizeof(name), "q4_k_mma_ij_%ux%u", i, j);
+      if (run_mma_ij_case(name, 256, 256, 64, i, j) != 0) return 1;
+    }
+  }
+  return 0;
+}
+
 int run_q8_quality_case(const char* name, std::size_t output_rows,
                         std::size_t columns, std::size_t prompt_rows) {
   std::vector<std::uint8_t> weights;
@@ -3267,6 +3387,7 @@ int main() {
 
   if (run_q8_quality_suite() != 0) return 1;
   if (run_mmq_stream_k_suite() != 0) return 1;
+  if (run_ffn_tile_pin_suite() != 0) return 1;
 
   std::printf("status=passed\n");
   return 0;

@@ -1,0 +1,129 @@
+{
+  "schema_version": 1,
+  "task": "OPT-037",
+  "yardstick": "prefill_ffn_4k_tiles",
+  "opt034_quartz_p_mean_tok_s": 1869.84412,
+  "opt034_quartz_d128_mean_tok_s": 25.3816128,
+  "opt034_quartz_d2048_mean_tok_s": 20.169548,
+  "opt034_quartz_d128_token_latency_p95_ms": 39.9736366,
+  "opt034_quartz_d128_run_mean_token_latency_p95_ms": 39.4155655,
+  "opt034_quartz_d2048_token_latency_p95_ms": 50.2872772,
+  "opt034_quartz_d2048_run_mean_token_latency_p95_ms": 49.590683,
+  "historical_opt026_quartz_mean_tok_s": 1746.71973,
+  "opt032_quartz_p_mean_tok_s": 1637.58594,
+  "opt033_quartz_p_mean_tok_s": 1745.10315,
+  "opt035_quartz_p_mean_tok_s": 1865.21155,
+  "opt036_quartz_p_mean_tok_s": 1644.04822,
+  "use_as_keep_denominator": false,
+  "llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+  "gguf_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+  "device_substring": "RTX 5090",
+  "selected_ffn_gate_quality_i": 128,
+  "selected_ffn_gate_prompt_tile": 128,
+  "selected_ffn_up_quality_i": 128,
+  "selected_ffn_up_prompt_tile": 128,
+  "selected_ffn_down_quality_i": 128,
+  "selected_ffn_down_prompt_tile": 128,
+  "selected_ffn_path": "shared_y_swiglu_q8",
+  "selected_mma_mmq_prompt_tile": 128,
+  "selected_mmq_stream_k_path": "off",
+  "selected_skinny_mixer_path": "mma_i32_j128",
+  "quality_i_set": [
+    64,
+    128
+  ],
+  "prompt_tile_set": [
+    32,
+    64,
+    128
+  ],
+  "ab": {
+    "projections": [
+      "gate",
+      "up",
+      "down"
+    ],
+    "candidates": [
+      "i64_j32",
+      "i64_j64",
+      "i64_j128",
+      "i128_j32",
+      "i128_j64",
+      "i128_j128"
+    ],
+    "warmups": 3,
+    "measured_runs": 30,
+    "baseline_id": "i128_j128",
+    "ties_retain": "i128_j128",
+    "byte_equal_required": false,
+    "envelope_vs_cpu_dequant_required": true,
+    "time_mma_only": true,
+    "prompt_rows": 4096,
+    "shapes": [
+      {
+        "id": "gate",
+        "kind": "q4_k",
+        "rows": 17408,
+        "columns": 5120
+      },
+      {
+        "id": "up",
+        "kind": "q4_k",
+        "rows": 17408,
+        "columns": 5120
+      },
+      {
+        "id": "down",
+        "kind": "q4_k",
+        "rows": 5120,
+        "columns": 17408
+      }
+    ]
+  },
+  "cud002": {
+    "q4k_q6k_abs_scale": 0.2,
+    "q4k_q6k_rel_tol": 0.05,
+    "nonfinite_count": 0
+  },
+  "owns_opt016_parity_gate": false,
+  "substitutes_for_opt016": false,
+  "llama_bench_is_informational": true,
+  "llama_bench_decode_is_informational": true,
+  "required_fixture_keys": [
+    "schema_version",
+    "task",
+    "status",
+    "measurement_utc",
+    "device",
+    "compute_capability",
+    "llama_revision",
+    "gguf_sha256",
+    "reverted",
+    "selected_ffn_gate_quality_i",
+    "selected_ffn_gate_prompt_tile",
+    "selected_ffn_up_quality_i",
+    "selected_ffn_up_prompt_tile",
+    "selected_ffn_down_quality_i",
+    "selected_ffn_down_prompt_tile",
+    "ab",
+    "keep_sitting_skipped",
+    "p",
+    "d128",
+    "d2048",
+    "owns_opt016_parity_gate",
+    "substitutes_for_opt016",
+    "nsight_systems",
+    "nsight_compute",
+    "proof_limit",
+    "report_path"
+  ],
+  "proof_limit": [
+    "admitted component wins",
+    "improved P",
+    "frozen MMQ envelopes",
+    "cross-workload guard",
+    "does not substitute for the 2K llama.cpp parity gate",
+    "OPT-034 P D128 D2048 are the keep denominators"
+  ],
+  "report_path": "evidence/optimization/opt037-ffn-tiles/REPORT.md"
+}

@@ -1,6 +1,6 @@
 # 40. Tiled CUDA multiplication for prompt rows
 
-[Index](README.md) · Implementation tasks: CUD-002, OPT-009, OPT-015, OPT-017, OPT-018, OPT-022, OPT-023, OPT-024, OPT-025, OPT-028, and EDU-026 in
+[Index](README.md) · Implementation tasks: CUD-002, OPT-009, OPT-015, OPT-017, OPT-018, OPT-022, OPT-023, OPT-024, OPT-025, OPT-028, OPT-037, and EDU-026 in
 [`implementation_ledger.md`](../implementation_ledger.md)
 
 [Chapter 39](39-cuda-quant-mmv.md) multiplied one activation vector by a packed
@@ -632,3 +632,42 @@ Contract, fixture, report, and rejection:
 [`evidence/optimization/opt028-mmq-streamk/REPORT.md`](../evidence/optimization/opt028-mmq-streamk/REPORT.md),
 and
 [`evidence/optimization/opt028-mmq-streamk/REJECTION.md`](../evidence/optimization/opt028-mmq-streamk/REJECTION.md).
+
+## OPT-037 4K FFN tiles per projection
+
+Production 4096-row Q4_K FFN quality MMA was swept independently for
+gate, up, and down over I∈{64,128} × J∈{32,64,128}. Shared-Y /
+SwiGLU-into-Q8 staging, 2D scheduling, and Fallback tail dispatch stay.
+`selected_mma_mmq_prompt_tile()` stays 128 for attention-output Q6_K.
+Stream-K stays `off`. Mixer skinny stays `mma_i32_j128`. Decode FFN
+stays MMV. No extra persistent `cudaMalloc`. Graphs were not recaptured:
+production I/J pins remain 128/128.
+
+**A/B.** Exclusive RTX 5090, 3 warm-ups, 30 measured CUDA-event rounds,
+MMA-only, occupancy ≥ 1, zero non-finites, ds4 Q4_K association versus
+CPU dequant GEMM. Baseline `i128_j128`. Ties and non-strict means retain
+production. Raw samples stay in
+[`evidence/optimization/opt037-ffn-tiles/ffn-tile-ab-raw.txt`](../evidence/optimization/opt037-ffn-tiles/ffn-tile-ab-raw.txt);
+this chapter does not replace them. Every projection selected `i128_j128`
+(`any_win=false`).
+
+**Measured reject, RTX 5090:** no admitted component win, so the 4K / D128 /
+D2048 tok/s sitting was skipped. Production FFN tiles remain I=128 / J=128
+on every leg. `reverted` true. Shared-Y stays installed. Keep denominators
+are the frozen OPT-034 P / D128 / D2048 oracles; this chapter does not
+replace live numbers:
+[`evidence/optimization/opt037-ffn-tiles/REPORT.md`](../evidence/optimization/opt037-ffn-tiles/REPORT.md).
+
+**Proof boundary:** 4K FFN I/J per projection under unloosened Q4_K
+association when a paired A/B wins; 4096 FFN graph recapture if tiles
+change; keep requires admitted component wins, improved P versus
+**1869.84412**, frozen MMQ envelopes, and the OPT-034 cross-workload
+guard; OPT-009 Q8_0 tiled-versus-reference remains byte-exact; CUD-002
+numbers unloosened; workspace formula unloosened; **does not substitute
+for the 2K llama.cpp parity gate**. Contract, fixture, report, and
+rejection:
+[`pins/opt037_ffn_tile_contract.json`](../pins/opt037_ffn_tile_contract.json),
+[`fixtures/opt037_ffn_tiles.json`](../fixtures/opt037_ffn_tiles.json),
+[`evidence/optimization/opt037-ffn-tiles/REPORT.md`](../evidence/optimization/opt037-ffn-tiles/REPORT.md),
+and
+[`evidence/optimization/opt037-ffn-tiles/REJECTION.md`](../evidence/optimization/opt037-ffn-tiles/REJECTION.md).

@@ -134,10 +134,6 @@ def scalar_register_path_retained() -> bool:
     )
 
 
-def opt037_not_started() -> bool:
-    return not (ROOT / "pins/opt037_ffn_tile_contract.json").is_file()
-
-
 def _ab_candidate(result: dict[str, Any], ident: str) -> None:
     cand = result["ab"]["candidates"][ident]
     assert cand["id"] == ident
@@ -276,7 +272,6 @@ def validate_result(result: Any) -> None:
     assert ffn_shared_y_unchanged()
     assert no_dual_f16_v()
     assert scalar_register_path_retained()
-    assert opt037_not_started()
     if result["ab"]["winner"] == "scalar":
         assert pin == "scalar"
         assert result["reverted"] is True
@@ -380,7 +375,6 @@ def test_opt035_contract_and_source_pins() -> None:
     assert decode_16_16_unchanged()
     assert scalar_register_path_retained()
     assert no_dual_f16_v()
-    assert opt037_not_started()
 
 
 def test_opt035_validator_rejects_inadmissible_evidence() -> None:

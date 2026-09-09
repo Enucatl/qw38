@@ -30,7 +30,9 @@ GEMMs with `output_rows < 128` (GDN α/β) dispatch the A/B-winning small-I
 quality MMA path (OPT-023). Large mixer Q8_0 D2R was A/B'd and not
 installed (OPT-024); those GEMMs stay I=128 quality MMA. Dense prompt FFN
 Q4_K shares one DS4 Y for gate/up and writes down-leg Y from SwiGLU
-(OPT-025). Production prompt attention uses Ada+ stream-K fattn after the
+(OPT-025). Independent 4K FFN quality-MMA I/J retuning was A/B-lost
+and not installed (OPT-037); production stays I=128 / J=128.
+Production prompt attention uses Ada+ stream-K fattn after the
 OPT-026 keep, with register-resident value sums after the OPT-033 keep
 and dual-F16 probability×V MMA after the OPT-035 keep;
 persistent stream-K was A/B-lost and not installed
@@ -501,6 +503,26 @@ does not own the 2K llama.cpp parity gate. Quartz ≥ llama.cpp is
 informational. Live tok/s stay in the report; this chapter does not
 replace them:
 [`evidence/optimization/opt034-packed-mmv/REPORT.md`](../evidence/optimization/opt034-packed-mmv/REPORT.md).
+
+## 4K FFN tiles per projection (OPT-037)
+
+**Measured, RTX 5090:** production 4096-row Q4_K FFN quality MMA was A/B'd
+independently for gate, up, and down over I∈{64,128} × J∈{32,64,128}
+against production I=128 / J=128. Shared-Y / SwiGLU-into-Q8 staging, 2D
+scheduling, and Fallback tail dispatch stay. Mixer Q8 quality, skinny
+`mma_i32_j128`, packed decode MMV, fattn stream-K, register VKQ, P×V MMA,
+and decode 16/16 KV partitions stay. No extra persistent `cudaMalloc`.
+The targeted sink is prefill FFN MMQ. Keep denominators are the frozen
+OPT-034 P / D128 / D2048 means and p95s copied into the contract
+(P **1869.84412**, D128 **25.3816128**, D2048 **20.169548**), not
+historical OPT-026 P **1746.71973**. **Reject:** every projection
+selected `i128_j128`; no admitted component win; tok/s sitting skipped;
+production pins remain 128/128; graphs were not recaptured; `reverted`
+is true. Frozen CUD-002 envelopes are unloosened. This increment does
+not own the 2K llama.cpp parity gate. Quartz ≥ llama.cpp is
+informational. Live numbers stay in the report; this chapter does not
+replace them:
+[`evidence/optimization/opt037-ffn-tiles/REPORT.md`](../evidence/optimization/opt037-ffn-tiles/REPORT.md).
 
 ## DwarfStar transfer boundary
 

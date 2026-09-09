@@ -148,6 +148,24 @@ cudaError_t launch_quant_mmq_mma_y(
     float* output, cudaStream_t stream, float* tmp_fixup = nullptr,
     std::size_t tmp_fixup_floats = 0) noexcept;
 
+bool legal_ffn_quality_i(unsigned int quality_i) noexcept;
+bool legal_ffn_prompt_tile(unsigned int prompt_tile) noexcept;
+unsigned int selected_ffn_gate_quality_i() noexcept;
+unsigned int selected_ffn_gate_prompt_tile() noexcept;
+unsigned int selected_ffn_up_quality_i() noexcept;
+unsigned int selected_ffn_up_prompt_tile() noexcept;
+unsigned int selected_ffn_down_quality_i() noexcept;
+unsigned int selected_ffn_down_prompt_tile() noexcept;
+int mma_mmq_occupancy_ij(QuantKind kind, unsigned int prompt_tile,
+                         unsigned int quality_i) noexcept;
+
+cudaError_t launch_quant_mmq_mma_y_ij(
+    QuantKind kind, const std::uint8_t* weights, std::size_t output_rows,
+    std::size_t columns, const Q8Block* y, std::size_t prompt_rows,
+    float* output, unsigned int quality_i, unsigned int prompt_tile,
+    cudaStream_t stream, float* tmp_fixup = nullptr,
+    std::size_t tmp_fixup_floats = 0) noexcept;
+
 cudaError_t launch_quant_mmq_mma_y_path(
     QuantKind kind, const std::uint8_t* weights, std::size_t output_rows,
     std::size_t columns, const Q8Block* y, std::size_t prompt_rows,

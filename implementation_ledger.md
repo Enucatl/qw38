@@ -103,7 +103,7 @@ are repository-relative unless stated otherwise.
 | OPT-034 | Packed blockwise Q4_K/Q6_K MMV loads | OPT-032, CUD-001 | done | A/B production batch-1 projection shapes with unchanged packed staging and FP32 lane/reduction order; keep only with byte equality, lower weighted MMV time, improved D2048, and the cross-workload guard; otherwise reject | [`tasks/OPT-034.md`](tasks/OPT-034.md); [`pins/opt034_packed_mmv_contract.json`](pins/opt034_packed_mmv_contract.json); [`fixtures/opt034_packed_mmv.json`](fixtures/opt034_packed_mmv.json); [`cuda/packed_mmv_ab_test.cu`](cuda/packed_mmv_ab_test.cu); [`evidence/optimization/opt034-packed-mmv/REPORT.md`](evidence/optimization/opt034-packed-mmv/REPORT.md); verification 2026-09-09T21:41:35Z |
 | OPT-035 | MMA attention probability times V | OPT-033 | done | A/B full 4096-row attention using dual-F16 probability×V MMA; retain frozen attention envelopes, lower component time, improved P, and the cross-workload guard; otherwise reject | [`tasks/OPT-035.md`](tasks/OPT-035.md); [`pins/opt035_pv_mma_contract.json`](pins/opt035_pv_mma_contract.json); [`fixtures/opt035_pv_mma.json`](fixtures/opt035_pv_mma.json); [`cuda/fattn_pv_mma_ab_test.cu`](cuda/fattn_pv_mma_ab_test.cu); [`evidence/optimization/opt035-pv-mma/REPORT.md`](evidence/optimization/opt035-pv-mma/REPORT.md); verification 2026-09-09T19:58:00Z |
 | OPT-036 | Partition KV for vector decode attention | OPT-032, OPT-026 | done | A/B one-token vector attention at 1/4/8/16 KV partitions for D128/D2048 with deterministic partial-statistic merge; keep only with frozen attention envelopes, lower component time, improved D2048, and the cross-workload guard; otherwise reject | [`tasks/OPT-036.md`](tasks/OPT-036.md); [`pins/opt036_decode_kv_partition_contract.json`](pins/opt036_decode_kv_partition_contract.json); [`fixtures/opt036_decode_kv_partition.json`](fixtures/opt036_decode_kv_partition.json); [`cuda/decode_kv_partition_ab_test.cu`](cuda/decode_kv_partition_ab_test.cu); [`evidence/optimization/opt036-decode-kv-partition/REPORT.md`](evidence/optimization/opt036-decode-kv-partition/REPORT.md); verification 2026-09-09T17:32:00Z |
-| OPT-037 | Select 4K FFN tiles per projection | OPT-032, OPT-025 | pending | Sweep quality-MMQ I={64,128}, J={32,64,128} independently for 4096-row gate/up/down, preserve shared-Y and recapture graphs; keep only with admitted component wins, improved P, frozen MMQ envelopes, and the cross-workload guard; otherwise reject | — |
+| OPT-037 | Select 4K FFN tiles per projection | OPT-032, OPT-025 | done | Sweep quality-MMQ I={64,128}, J={32,64,128} independently for 4096-row gate/up/down, preserve shared-Y and recapture graphs; keep only with admitted component wins, improved P, frozen MMQ envelopes, and the cross-workload guard; otherwise reject | [`tasks/OPT-037.md`](tasks/OPT-037.md); [`pins/opt037_ffn_tile_contract.json`](pins/opt037_ffn_tile_contract.json); [`fixtures/opt037_ffn_tiles.json`](fixtures/opt037_ffn_tiles.json); [`cuda/ffn_tile_ab_test.cu`](cuda/ffn_tile_ab_test.cu); [`tests/test_opt037_ffn_tiles.py`](tests/test_opt037_ffn_tiles.py); [`evidence/optimization/opt037-ffn-tiles/REPORT.md`](evidence/optimization/opt037-ffn-tiles/REPORT.md); [`evidence/optimization/opt037-ffn-tiles/REJECTION.md`](evidence/optimization/opt037-ffn-tiles/REJECTION.md); verification 2026-09-09T23:03:58Z |
 
 ### 2026-09-04T13:09:32Z — OPT-005 delivered
 
@@ -5027,4 +5027,58 @@ are repository-relative unless stated otherwise.
   plus this ledger/audit bookkeeping. `plan.md` is unchanged. OPT-016
   stays `blocked`. OPT-037 remains `pending` and is not started. Next
   eligible pending by ledger row order: **OPT-031**.
+
+### 2026-09-09T21:47:38Z — OPT-037 planning admitted
+
+- Planning produced decision-complete dossier [`tasks/OPT-037.md`](tasks/OPT-037.md).
+  Coupled IDs: none. Unresolved decisions: none. Plan impact: none.
+- Then-current keep denominators copied from
+  [`fixtures/opt034_packed_mmv.json`](fixtures/opt034_packed_mmv.json): Quartz P
+  **1869.84412**, D128 **25.3816128**, D2048 **20.169548**, D128
+  all-token p95 **39.9736366** / run-mean p95 **39.4155655**, D2048
+  all-token p95 **50.2872772** / run-mean p95 **49.590683**. P must
+  strictly improve. D2048 tok/s improvement is not required for this
+  prefill keep.
+- Chosen sink: 4096-row Q4_K FFN quality MMA I/J per projection (gate,
+  up, down independently) with shared-Y preserved, 2D scheduling, and
+  graph recapture if tiles change. Mixer Q8 and global
+  `selected_mma_mmq_prompt_tile()` stay 128. Stream-K stays off.
+- Marked OPT-037 `in_progress`. Non-final audit row inserted. No commit.
+  `plan.md` is unchanged.
+
+### 2026-09-09T23:03:58Z — OPT-037 delivered (reject)
+
+- Independent verification attempt 1 passed. Production 4096-row Q4_K FFN
+  quality MMA remains I=128 / J=128 on every projection
+  (`kSelectedFfn{Gate,Up,Down}{QualityI,PromptTile}` = 128). Shared-Y /
+  SwiGLU-into-Q8 stays. 2D scheduling stays. Mixer Q8 remains quality MMA
+  plus skinny `mma_i32_j128`. Global `selected_mma_mmq_prompt_tile()`
+  stays 128. Stream-K stays `off`. Packed MMV stays `packed`. Prompt FFN
+  graphs were not recaptured. Exclusive RTX 5090 sitting wrote
+  [`fixtures/opt037_ffn_tiles.json`](fixtures/opt037_ffn_tiles.json)
+  (`measurement_utc` 2026-09-09T22:23:11Z; `any_win=false`; gate/up/down
+  winners `i128_j128`; `keep_sitting_skipped` true; `reverted` true;
+  `status` rejected). Throughput delta: P **1869.84412** → **1869.84412**;
+  D128 **25.3816128** → **25.3816128**; D2048 **20.169548** →
+  **20.169548** (tok/s sitting skipped; keep denominators unchanged).
+  Native test does not require Quartz ≥ llama.cpp. Coupled IDs: none.
+  Delivery re-check: `uv run pytest -q tests/test_documentation.py
+  tests/test_opt037_ffn_tiles.py`.
+- Acceptance evidence: [`tasks/OPT-037.md`](tasks/OPT-037.md);
+  [`pins/opt037_ffn_tile_contract.json`](pins/opt037_ffn_tile_contract.json);
+  [`fixtures/opt037_ffn_tiles.json`](fixtures/opt037_ffn_tiles.json);
+  [`cuda/ffn_tile_ab_test.cu`](cuda/ffn_tile_ab_test.cu);
+  [`tests/test_opt037_ffn_tiles.py`](tests/test_opt037_ffn_tiles.py);
+  [`evidence/optimization/opt037-ffn-tiles/REPORT.md`](evidence/optimization/opt037-ffn-tiles/REPORT.md);
+  [`evidence/optimization/opt037-ffn-tiles/REJECTION.md`](evidence/optimization/opt037-ffn-tiles/REJECTION.md);
+  [`docs/06-system-optimization.md`](docs/06-system-optimization.md);
+  [`docs/40-cuda-prompt-mmq.md`](docs/40-cuda-prompt-mmq.md);
+  [`docs/62-cuda-full-prefill.md`](docs/62-cuda-full-prefill.md).
+  Proof is 4K FFN I/J per projection under unloosened Q4_K association
+  when a paired A/B wins, and a retained reject with production 128/128
+  pins versus then-current accepted P/D128/D2048 denominators, not the 2K
+  llama.cpp parity gate.
+- Marked OPT-037 `done`; delivery is limited to the verified task scope
+  plus this ledger/audit bookkeeping. `plan.md` is unchanged. OPT-016
+  stays `blocked`. Next eligible pending by ledger row order: **OPT-031**.
 

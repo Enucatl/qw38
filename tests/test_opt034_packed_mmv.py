@@ -145,10 +145,6 @@ def ffn_shared_y_unchanged() -> bool:
     return 'kSelectedFfnPath[] = "shared_y_swiglu_q8"' in text
 
 
-def opt037_not_started() -> bool:
-    return not (ROOT / "pins/opt037_ffn_tile_contract.json").is_file()
-
-
 def _shape_candidate(shape: dict[str, Any], ident: str, *, probe: bool) -> None:
     cand = shape["candidates"][ident]
     assert cand["id"] == ident
@@ -296,7 +292,6 @@ def validate_result(result: Any) -> None:
     assert fattn_pins_unchanged()
     assert skinny_path_unchanged()
     assert ffn_shared_y_unchanged()
-    assert opt037_not_started()
     if result["ab"]["winner"] == "elementwise":
         assert pin == "elementwise"
         assert result["reverted"] is True
@@ -432,7 +427,6 @@ def test_opt034_contract_and_source_pins() -> None:
     assert fp32_lane_order_unchanged()
     assert decode_16_16_unchanged()
     assert fattn_pins_unchanged()
-    assert opt037_not_started()
 
 
 def test_opt034_validator_rejects_inadmissible_evidence() -> None:

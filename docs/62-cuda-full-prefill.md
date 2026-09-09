@@ -1,6 +1,6 @@
 # Chunked full-model CUDA prefill
 
-[Index](README.md) · Implementation tasks: SCH-002, MEM-002, OPT-008, OPT-009, OPT-011, OPT-012, OPT-013, OPT-014, OPT-015, OPT-017, OPT-018, OPT-019, OPT-020, OPT-021, OPT-022, OPT-023, OPT-024, OPT-025, OPT-026, OPT-027, OPT-028, OPT-029, OPT-030, OPT-032, OPT-033, OPT-035, and EDU-047 in
+[Index](README.md) · Implementation tasks: SCH-002, MEM-002, OPT-008, OPT-009, OPT-011, OPT-012, OPT-013, OPT-014, OPT-015, OPT-017, OPT-018, OPT-019, OPT-020, OPT-021, OPT-022, OPT-023, OPT-024, OPT-025, OPT-026, OPT-027, OPT-028, OPT-029, OPT-030, OPT-032, OPT-033, OPT-035, OPT-037, and EDU-047 in
 [`implementation_ledger.md`](../implementation_ledger.md) · Contracts:
 [`pins/cuda_prompt_scheduler_contract.json`](../pins/cuda_prompt_scheduler_contract.json),
 [`pins/cuda_prompt_pipeline_contract.json`](../pins/cuda_prompt_pipeline_contract.json),
@@ -594,6 +594,24 @@ does not claim Quartz ≥ llama.cpp. Live numbers stay in the report:
 [`evidence/optimization/opt025-ffn-shared-y/REPORT.md`](../evidence/optimization/opt025-ffn-shared-y/REPORT.md),
 [`pins/opt025_ffn_shared_y_contract.json`](../pins/opt025_ffn_shared_y_contract.json),
 and [`fixtures/opt025_ffn_shared_y.json`](../fixtures/opt025_ffn_shared_y.json).
+
+OPT-037 swept 4096-row Q4_K FFN quality MMA I∈{64,128} × J∈{32,64,128}
+independently for gate, up, and down while keeping shared-Y /
+SwiGLU-into-Q8 and 2D scheduling. **Measured, RTX 5090:** paired
+CUDA-event A/B (3 warm-ups, 30 measured rounds, MMA only) selected
+`i128_j128` on every projection (`any_win=false`). Production pins stay
+I=128 / J=128. Prompt FFN graphs were not recaptured. Mixer Q8 quality,
+skinny `mma_i32_j128`, packed decode MMV, and fattn stream-K stay.
+Decode FFN stays MMV. Live exclusive sitting **reject:** no admitted
+component win; tok/s sitting skipped; `reverted` true. Keep denominators
+are the frozen OPT-034 P / D128 / D2048 oracles. `quartz_meets_llama` is
+informational and is not this gate. **The 2K parity owner remains the
+blocked dedicated gate.** Live numbers stay in the report:
+[`evidence/optimization/opt037-ffn-tiles/REPORT.md`](../evidence/optimization/opt037-ffn-tiles/REPORT.md),
+[`pins/opt037_ffn_tile_contract.json`](../pins/opt037_ffn_tile_contract.json),
+[`fixtures/opt037_ffn_tiles.json`](../fixtures/opt037_ffn_tiles.json),
+and
+[`evidence/optimization/opt037-ffn-tiles/REJECTION.md`](../evidence/optimization/opt037-ffn-tiles/REJECTION.md).
 
 OPT-026 lands Ada+ fattn stream-K occupancy for prompt attention. **Measured,
 RTX 5090:** paired CUDA-event A/B on production 4096-row fattn among
