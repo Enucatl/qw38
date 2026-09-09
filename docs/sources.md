@@ -485,6 +485,39 @@ baseline.
   substitute for the 2K llama.cpp parity gate; attribution null; graphs
   created; scout sitting is not the retained fixture. Quartz ≥ llama.cpp is
   not this gate. No kernel implementation was copied or adapted.
+- OPT-022 adapts llama.cpp revision
+  `cc83d7b4824f73cfdda4dfbb47ee39804f71b328` (MIT, The ggml authors) Q8_0
+  quality MMQ from `quantize.cu` (`quantize_mmq_q8_1` D4),
+  `mmq-load-tiles.cuh` packed `ggml_cuda_mmq_load_tiles_q8_0`,
+  `mmq-vec-dot.cuh` `ggml_cuda_mmq_vec_dot_q8_0_q8_1_mma`, and Ampere
+  `mmq-config-ampere.cuh`. Geometry is `MMQ_ITER_K=256`, packed load-tiles,
+  D4 Y in existing `prompt_q8_`, and `dim3(32, 8)`. ds4 `cuda/mmq` is the
+  ggml-free launcher pattern; Q8_0 numeric admission follows ds4
+  `cuda/mmq/test/test_mmq_parity.cu` `run_q8_0` / `check_close` (CPU dequant
+  GEMM; an element fails only when both `abs > 0.05*sqrt(K)` and
+  `rel > 0.05`). This increment does not copy `../ds4/cuda/mmq/` and does
+  not include ggml headers. Production mixer Q8_0 uses quality MMA behind
+  `launch_q8_mmq_bf16` when `prompt_rows >= 8`; mixer GEMMs that share the
+  residual activation share one D4 Y per layer. Production still does not
+  route Q8_0 through `launch_quant_mmq`. The OPT-009 tiled kernel remains
+  the unloosened byte-exact reference versus `launch_q8_mmq_bf16_reference`.
+  Rank-1 `launch_q8_mmq_mma` is retained and is not production. **Measured,
+  RTX 5090:** live exclusive cold exact-4096 keep Quartz mean 1680.38025
+  tok/s versus the frozen oracle baseline 967.267761; `reverted` false;
+  `successor_oracle` true; `production_q8` `quality_mma_shared_y`. Live
+  numbers stay in the report; this ledger does not replace them. The
+  schema-1 contract, measured fixture, and report are
+  [`pins/opt022_mixer_q8_quality_contract.json`](../pins/opt022_mixer_q8_quality_contract.json),
+  [`fixtures/opt022_mixer_q8_quality.json`](../fixtures/opt022_mixer_q8_quality.json),
+  and
+  [`evidence/optimization/opt022-mixer-q8-quality/REPORT.md`](../evidence/optimization/opt022-mixer-q8-quality/REPORT.md).
+  The beginner explanation is
+  [`docs/40-cuda-prompt-mmq.md`](40-cuda-prompt-mmq.md).
+  Proof limit: mixer Q8 quality plus shared residual Y under the Q8
+  association rule; 4K keep/reject versus the frozen oracle baseline;
+  envelopes unloosened; OPT-009 Q8_0 reference remains byte-exact; OPT-016
+  remains the parity gate owner; does not substitute for the 2K llama.cpp
+  parity gate; Quartz ≥ llama.cpp is not this gate.
 - CUD-003 introduces no new external implementation source. GGUF Q8_0 decoding
   follows the format already admitted by the pinned scalar decoder, and the
   pointwise/layout equations come from the pinned model contract and scalar
@@ -674,6 +707,11 @@ baseline.
   exact-4096 keep/reject oracle against same-sitting `llama-bench` 4K; that
   increment is documented separately, is Measured protocol/baseline plus
   External `llama-bench` provenance, and is not the OPT-016 2K parity gate.
+  OPT-022 later replaces production mixer Q8_0 Rank-1 MMA with quality MMA
+  and shared residual Y, keeping the OPT-009 tiled kernel as the unloosened
+  byte-exact reference; that increment is documented separately, is Measured
+  4K keep plus External llama.cpp Q8_0 MMQ / ds4 Q8 association provenance,
+  and is not the OPT-016 2K parity gate.
   Exact
   `[4096, 1]` differential, capacity fallback, cancellation, and memory
   evidence is authenticated in

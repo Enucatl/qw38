@@ -550,11 +550,20 @@ cudaError_t matrix_prompt(const DeviceTensor& matrix,
                           cudaStream_t stream) noexcept {
   if (matrix.kind == QuantKind::kQ8_0) {
     return launch_q8_mmq_bf16(matrix.data, matrix.rows, matrix.columns,
-                              activation, prompt_rows, output, stream);
+                              activation, prompt_rows, workspace->prompt_q8_,
+                              output, stream);
   }
   return launch_quant_mmq(matrix.kind, matrix.data, matrix.rows,
                           matrix.columns, activation, prompt_rows,
                           workspace->prompt_q8_, output, stream);
+}
+
+cudaError_t matrix_prompt_q8_quality_mma(const DeviceTensor& matrix,
+                                         const Q8Block* y,
+                                         std::size_t prompt_rows, float* output,
+                                         cudaStream_t stream) noexcept {
+  return launch_q8_mmq_quality_mma(matrix.data, matrix.rows, matrix.columns, y,
+                                   prompt_rows, output, stream);
 }
 
 cudaError_t execute_ffn(const DeviceCommonLayer& layer,
@@ -2062,47 +2071,47 @@ Status execute_prompt_chunk(
       if (error == cudaSuccess) {
         error = begin_phase(categories, mixer_mmq, stream);
       }
+      if (error == cudaSuccess) {
+        error = launch_quantize_mmq_q8_1(
+            QuantKind::kQ8_0, workspace->prompt_normalized_, token_count,
+            internal::kResidualWidth, workspace->prompt_q8_, stream);
+      }
       if (gdn_layer) {
         if (error == cudaSuccess) {
-          error = matrix_prompt(layer.gdn.packed_qkv,
-                                workspace->prompt_normalized_, token_count,
-                                workspace, workspace->prompt_projection_a_,
-                                stream);
+          error = matrix_prompt_q8_quality_mma(
+              layer.gdn.packed_qkv, workspace->prompt_q8_, token_count,
+              workspace->prompt_projection_a_, stream);
         }
         if (error == cudaSuccess) {
-          error = matrix_prompt(layer.gdn.value_gate,
-                                workspace->prompt_normalized_, token_count,
-                                workspace, workspace->prompt_projection_b_,
-                                stream);
+          error = matrix_prompt_q8_quality_mma(
+              layer.gdn.value_gate, workspace->prompt_q8_, token_count,
+              workspace->prompt_projection_b_, stream);
         }
         if (error == cudaSuccess) {
-          error = matrix_prompt(layer.gdn.alpha, workspace->prompt_normalized_,
-                                token_count, workspace,
-                                workspace->prompt_projection_c_, stream);
+          error = matrix_prompt_q8_quality_mma(
+              layer.gdn.alpha, workspace->prompt_q8_, token_count,
+              workspace->prompt_projection_c_, stream);
         }
         if (error == cudaSuccess) {
-          error = matrix_prompt(layer.gdn.beta, workspace->prompt_normalized_,
-                                token_count, workspace,
-                                workspace->prompt_projection_d_, stream);
+          error = matrix_prompt_q8_quality_mma(
+              layer.gdn.beta, workspace->prompt_q8_, token_count,
+              workspace->prompt_projection_d_, stream);
         }
       } else {
         if (error == cudaSuccess) {
-          error = matrix_prompt(layer.attention.query_gate,
-                                workspace->prompt_normalized_, token_count,
-                                workspace, workspace->prompt_projection_a_,
-                                stream);
+          error = matrix_prompt_q8_quality_mma(
+              layer.attention.query_gate, workspace->prompt_q8_, token_count,
+              workspace->prompt_projection_a_, stream);
         }
         if (error == cudaSuccess) {
-          error = matrix_prompt(layer.attention.key,
-                                workspace->prompt_normalized_, token_count,
-                                workspace, workspace->prompt_projection_c_,
-                                stream);
+          error = matrix_prompt_q8_quality_mma(
+              layer.attention.key, workspace->prompt_q8_, token_count,
+              workspace->prompt_projection_c_, stream);
         }
         if (error == cudaSuccess) {
-          error = matrix_prompt(layer.attention.value,
-                                workspace->prompt_normalized_, token_count,
-                                workspace, workspace->prompt_projection_d_,
-                                stream);
+          error = matrix_prompt_q8_quality_mma(
+              layer.attention.value, workspace->prompt_q8_, token_count,
+              workspace->prompt_projection_d_, stream);
         }
       }
       if (error == cudaSuccess) error = end_phase(categories);
@@ -2231,10 +2240,14 @@ Status execute_prompt_chunk(
       }
       if (gdn_layer) {
         if (error == cudaSuccess) {
-          error = matrix_prompt(layer.gdn.output,
-                                workspace->prompt_projected_bf16_, token_count,
-                                workspace, workspace->prompt_mixer_output_,
-                                stream);
+          error = launch_quantize_mmq_q8_1(
+              QuantKind::kQ8_0, workspace->prompt_projected_bf16_, token_count,
+              internal::kGdnValueWidth, workspace->prompt_q8_, stream);
+        }
+        if (error == cudaSuccess) {
+          error = matrix_prompt_q8_quality_mma(
+              layer.gdn.output, workspace->prompt_q8_, token_count,
+              workspace->prompt_mixer_output_, stream);
         }
         ++gdn_slot;
       } else {

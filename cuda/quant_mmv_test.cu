@@ -4,7 +4,10 @@
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
+#include <cstring>
 #include <vector>
+
+#include <cuda_fp16.h>
 
 #include "quant.h"
 
@@ -46,6 +49,77 @@ void fill_weights(qw38::cuda::QuantKind kind, std::size_t rows,
             static_cast<std::int8_t>(static_cast<int>((lane * 11 + offset) % 63) - 31));
       }
     }
+  }
+}
+
+float unit_normal(std::uint32_t index, std::uint32_t seed) {
+  std::uint32_t x = index * 747796405U + seed;
+  x ^= x >> 16U;
+  x *= 0x7feb352dU;
+  x ^= x >> 15U;
+  x *= 0x846ca68bU;
+  x ^= x >> 16U;
+  const float u1 =
+      (static_cast<float>(x & 0x00FFFFFFU) + 1.0F) / 16777217.0F;
+  x = x * 1664525U + 1013904223U;
+  const float u2 =
+      static_cast<float>(x & 0x00FFFFFFU) / 16777216.0F;
+  return std::sqrt(-2.0F * std::log(u1)) *
+         std::cos(6.283185307179586F * u2);
+}
+
+std::uint16_t float_to_fp16_bits(float value) {
+  const __half half = __float2half_rn(value);
+  std::uint16_t bits = 0;
+  std::memcpy(&bits, &half, sizeof(bits));
+  return bits;
+}
+
+void quantize_row_q8_0(const float* src, std::uint8_t* dst, std::size_t n) {
+  for (std::size_t block = 0; block < n / 32; ++block) {
+    float amax = 0.0F;
+    for (int lane = 0; lane < 32; ++lane) {
+      amax = std::max(
+          amax, std::fabs(src[block * 32 + static_cast<std::size_t>(lane)]));
+    }
+    const float scale = amax / 127.0F;
+    write_u16(dst, float_to_fp16_bits(scale));
+    for (int lane = 0; lane < 32; ++lane) {
+      int quant = 0;
+      if (scale != 0.0F) {
+        quant = static_cast<int>(std::round(
+            src[block * 32 + static_cast<std::size_t>(lane)] / scale));
+        if (quant > 127) quant = 127;
+        if (quant < -127) quant = -127;
+      }
+      dst[2 + lane] =
+          static_cast<std::uint8_t>(static_cast<std::int8_t>(quant));
+    }
+    dst += 34;
+  }
+}
+
+void fill_q8_quality_weights(std::size_t rows, std::size_t columns,
+                             std::vector<std::uint8_t>* weights) {
+  weights->assign(rows * (columns / 32) * 34, 0);
+  std::vector<float> row(columns);
+  for (std::size_t out = 0; out < rows; ++out) {
+    for (std::size_t column = 0; column < columns; ++column) {
+      row[column] = unit_normal(
+          static_cast<std::uint32_t>(out * columns + column), 0xC0FFEEU);
+    }
+    quantize_row_q8_0(row.data(),
+                      weights->data() + out * (columns / 32) * 34, columns);
+  }
+}
+
+void make_q8_quality_activation(std::size_t columns,
+                                std::vector<__nv_bfloat16>* activation,
+                                std::size_t prompt_row) {
+  activation->resize(columns);
+  for (std::size_t index = 0; index < columns; ++index) {
+    (*activation)[index] = __float2bfloat16_rn(unit_normal(
+        static_cast<std::uint32_t>(prompt_row * columns + index), 0xA5A5A5U));
   }
 }
 
@@ -177,6 +251,40 @@ bool ds4_q4k_association_ok(const std::vector<float>& got,
                             std::size_t* association_bad,
                             std::size_t* nonfinite) {
   constexpr float kAbsScale = 0.20F;
+  constexpr float kRelTol = 0.05F;
+  const float abs_tol = kAbsScale * std::sqrt(static_cast<float>(columns));
+  *max_abs = 0.0F;
+  *max_rel = 0.0F;
+  *association_bad = 0;
+  *nonfinite = 0;
+  double squared = 0.0;
+  for (std::size_t index = 0; index < got.size(); ++index) {
+    if (!std::isfinite(got[index]) || !std::isfinite(ref[index])) {
+      ++*nonfinite;
+      continue;
+    }
+    const float absolute = std::fabs(got[index] - ref[index]);
+    const float relative =
+        ref[index] != 0.0F ? absolute / std::fabs(ref[index])
+                           : (absolute > 0.0F ? INFINITY : 0.0F);
+    *max_abs = std::max(*max_abs, absolute);
+    if (std::isfinite(relative)) *max_rel = std::max(*max_rel, relative);
+    squared += static_cast<double>(absolute) * absolute;
+    if (absolute > abs_tol && relative > kRelTol) ++*association_bad;
+  }
+  *rms = got.empty()
+             ? 0.0F
+             : static_cast<float>(std::sqrt(squared / got.size()));
+  return *nonfinite == 0 && *association_bad == 0;
+}
+
+// ds4 Q8_0 check_close: fail only when both abs and rel exceed (abs scale 0.05).
+bool ds4_q8_association_ok(const std::vector<float>& got,
+                           const std::vector<float>& ref, std::size_t columns,
+                           float* max_abs, float* max_rel, float* rms,
+                           std::size_t* association_bad,
+                           std::size_t* nonfinite) {
+  constexpr float kAbsScale = 0.05F;
   constexpr float kRelTol = 0.05F;
   const float abs_tol = kAbsScale * std::sqrt(static_cast<float>(columns));
   *max_abs = 0.0F;
@@ -568,6 +676,213 @@ int run_mma_case(qw38::cuda::QuantKind kind, const char* name,
   cudaFree(device_prompt);
   cudaFree(device_weights);
   return mma_ok && variant_ok ? 0 : 1;
+}
+
+int run_q8_quality_case(const char* name, std::size_t output_rows,
+                        std::size_t columns, std::size_t prompt_rows) {
+  std::vector<std::uint8_t> weights;
+  fill_q8_quality_weights(output_rows, columns, &weights);
+  std::vector<__nv_bfloat16> prompt;
+  prompt.resize(prompt_rows * columns);
+  for (std::size_t prompt_row = 0; prompt_row < prompt_rows; ++prompt_row) {
+    std::vector<__nv_bfloat16> row_activation;
+    make_q8_quality_activation(columns, &row_activation, prompt_row);
+    std::copy(row_activation.begin(), row_activation.end(),
+              prompt.begin() + prompt_row * columns);
+  }
+  std::vector<float> expected;
+  if (!reference_dequant_gemm(qw38::cuda::QuantKind::kQ8_0, weights, output_rows,
+                              columns, prompt, prompt_rows, &expected)) {
+    return 1;
+  }
+
+  std::uint8_t* device_weights = nullptr;
+  __nv_bfloat16* device_prompt = nullptr;
+  qw38::cuda::Q8Block* device_workspace = nullptr;
+  float* device_output = nullptr;
+  cudaError_t error = cudaMalloc(&device_weights, weights.size());
+  if (error == cudaSuccess) {
+    error = cudaMalloc(&device_prompt, prompt.size() * sizeof(prompt[0]));
+  }
+  if (error == cudaSuccess) {
+    error = cudaMalloc(
+        &device_workspace,
+        qw38::cuda::q8_prompt_workspace_bytes(prompt_rows, columns));
+  }
+  if (error == cudaSuccess) {
+    error = cudaMalloc(&device_output, expected.size() * sizeof(expected[0]));
+  }
+  if (error != cudaSuccess) return fail_cuda("Q8 quality cudaMalloc", error);
+  error = cudaMemcpy(device_weights, weights.data(), weights.size(),
+                     cudaMemcpyHostToDevice);
+  if (error == cudaSuccess) {
+    error = cudaMemcpy(device_prompt, prompt.data(),
+                       prompt.size() * sizeof(prompt[0]), cudaMemcpyHostToDevice);
+  }
+  if (error != cudaSuccess) return fail_cuda("Q8 quality H2D", error);
+  error = qw38::cuda::launch_q8_mmq_quality(
+      device_weights, output_rows, columns, device_prompt, prompt_rows,
+      device_workspace, device_output, nullptr);
+  if (error == cudaSuccess) error = cudaDeviceSynchronize();
+  if (error != cudaSuccess) return fail_cuda("Q8 quality launch", error);
+
+  std::vector<float> actual(expected.size());
+  error = cudaMemcpy(actual.data(), device_output,
+                     actual.size() * sizeof(actual[0]), cudaMemcpyDeviceToHost);
+  if (error != cudaSuccess) return fail_cuda("Q8 quality D2H", error);
+
+  float max_abs = 0.0F;
+  float max_rel = 0.0F;
+  float rms = 0.0F;
+  std::size_t bad = 0;
+  std::size_t nonfinite = 0;
+  const bool ok = ds4_q8_association_ok(actual, expected, columns, &max_abs,
+                                        &max_rel, &rms, &bad, &nonfinite);
+  std::printf("q8_quality_case=%s prompt_rows=%zu output_rows=%zu columns=%zu "
+              "mma_max_abs=%.9g mma_max_rel=%.9g mma_rms=%.9g mma_bad=%zu "
+              "mma_nonfinite=%zu gate=ds4_q8_association ref=cpu_dequant_gemm "
+              "tile=%u occupancy=%d\n",
+              name, prompt_rows, output_rows, columns, max_abs, max_rel, rms,
+              bad, nonfinite, qw38::cuda::selected_q8_quality_mmq_prompt_tile(),
+              qw38::cuda::q8_quality_mmq_occupancy(
+                  qw38::cuda::selected_q8_quality_mmq_prompt_tile()));
+  cudaFree(device_output);
+  cudaFree(device_workspace);
+  cudaFree(device_prompt);
+  cudaFree(device_weights);
+  return ok ? 0 : 1;
+}
+
+int run_q8_shared_y_identity() {
+  constexpr std::size_t kPrompt = 8;
+  constexpr std::size_t kOut = 1024;
+  constexpr std::size_t kCols = 5120;
+  std::vector<std::uint8_t> weights_a;
+  std::vector<std::uint8_t> weights_b;
+  fill_weights(qw38::cuda::QuantKind::kQ8_0, kOut, kCols, &weights_a);
+  fill_weights(qw38::cuda::QuantKind::kQ8_0, kOut, kCols, &weights_b);
+  for (std::size_t index = 0; index < weights_b.size(); ++index) {
+    weights_b[index] = static_cast<std::uint8_t>(weights_b[index] ^ 0x5AU);
+  }
+  for (std::size_t offset = 0; offset < weights_b.size(); offset += 34) {
+    write_u16(weights_b.data() + offset, 0x3400U);
+    for (std::size_t lane = 0; lane < 32; ++lane) {
+      weights_b[offset + 2 + lane] = static_cast<std::uint8_t>(
+          static_cast<std::int8_t>(static_cast<int>((lane * 7 + offset) % 63) -
+                                   31));
+    }
+  }
+  std::vector<__nv_bfloat16> prompt(kPrompt * kCols);
+  for (std::size_t prompt_row = 0; prompt_row < kPrompt; ++prompt_row) {
+    std::vector<__nv_bfloat16> row_activation;
+    std::vector<qw38::cuda::Q8Block> row_staged;
+    make_activation(kCols, &row_activation, &row_staged, prompt_row);
+    std::copy(row_activation.begin(), row_activation.end(),
+              prompt.begin() + prompt_row * kCols);
+  }
+
+  std::uint8_t* device_a = nullptr;
+  std::uint8_t* device_b = nullptr;
+  __nv_bfloat16* device_prompt = nullptr;
+  qw38::cuda::Q8Block* shared_y = nullptr;
+  qw38::cuda::Q8Block* independent_y = nullptr;
+  float* shared_out_a = nullptr;
+  float* shared_out_b = nullptr;
+  float* independent_out_a = nullptr;
+  float* independent_out_b = nullptr;
+  const std::size_t bytes = kPrompt * kOut * sizeof(float);
+  cudaError_t error = cudaMalloc(&device_a, weights_a.size());
+  if (error == cudaSuccess) error = cudaMalloc(&device_b, weights_b.size());
+  if (error == cudaSuccess) {
+    error = cudaMalloc(&device_prompt, prompt.size() * sizeof(prompt[0]));
+  }
+  if (error == cudaSuccess) {
+    error = cudaMalloc(&shared_y,
+                       qw38::cuda::q8_prompt_workspace_bytes(kPrompt, kCols));
+  }
+  if (error == cudaSuccess) {
+    error = cudaMalloc(
+        &independent_y, qw38::cuda::q8_prompt_workspace_bytes(kPrompt, kCols));
+  }
+  if (error == cudaSuccess) error = cudaMalloc(&shared_out_a, bytes);
+  if (error == cudaSuccess) error = cudaMalloc(&shared_out_b, bytes);
+  if (error == cudaSuccess) error = cudaMalloc(&independent_out_a, bytes);
+  if (error == cudaSuccess) error = cudaMalloc(&independent_out_b, bytes);
+  if (error != cudaSuccess) return fail_cuda("shared-Y cudaMalloc", error);
+  error = cudaMemcpy(device_a, weights_a.data(), weights_a.size(),
+                     cudaMemcpyHostToDevice);
+  if (error == cudaSuccess) {
+    error = cudaMemcpy(device_b, weights_b.data(), weights_b.size(),
+                       cudaMemcpyHostToDevice);
+  }
+  if (error == cudaSuccess) {
+    error = cudaMemcpy(device_prompt, prompt.data(),
+                       prompt.size() * sizeof(prompt[0]),
+                       cudaMemcpyHostToDevice);
+  }
+  if (error != cudaSuccess) return fail_cuda("shared-Y H2D", error);
+
+  error = qw38::cuda::launch_quantize_mmq_q8_1(
+      qw38::cuda::QuantKind::kQ8_0, device_prompt, kPrompt, kCols, shared_y,
+      nullptr);
+  if (error == cudaSuccess) {
+    error = qw38::cuda::launch_q8_mmq_quality_mma(
+        device_a, kOut, kCols, shared_y, kPrompt, shared_out_a, nullptr);
+  }
+  if (error == cudaSuccess) {
+    error = qw38::cuda::launch_q8_mmq_quality_mma(
+        device_b, kOut, kCols, shared_y, kPrompt, shared_out_b, nullptr);
+  }
+  if (error == cudaSuccess) {
+    error = qw38::cuda::launch_q8_mmq_quality(device_a, kOut, kCols,
+                                              device_prompt, kPrompt,
+                                              independent_y, independent_out_a,
+                                              nullptr);
+  }
+  if (error == cudaSuccess) {
+    error = qw38::cuda::launch_q8_mmq_quality(device_b, kOut, kCols,
+                                              device_prompt, kPrompt,
+                                              independent_y, independent_out_b,
+                                              nullptr);
+  }
+  if (error == cudaSuccess) error = cudaDeviceSynchronize();
+  if (error != cudaSuccess) return fail_cuda("shared-Y launch", error);
+
+  std::vector<float> shared_a(kPrompt * kOut);
+  std::vector<float> shared_b(kPrompt * kOut);
+  std::vector<float> independent_a(kPrompt * kOut);
+  std::vector<float> independent_b(kPrompt * kOut);
+  error = cudaMemcpy(shared_a.data(), shared_out_a, bytes,
+                     cudaMemcpyDeviceToHost);
+  if (error == cudaSuccess) {
+    error = cudaMemcpy(shared_b.data(), shared_out_b, bytes,
+                       cudaMemcpyDeviceToHost);
+  }
+  if (error == cudaSuccess) {
+    error = cudaMemcpy(independent_a.data(), independent_out_a, bytes,
+                       cudaMemcpyDeviceToHost);
+  }
+  if (error == cudaSuccess) {
+    error = cudaMemcpy(independent_b.data(), independent_out_b, bytes,
+                       cudaMemcpyDeviceToHost);
+  }
+  if (error != cudaSuccess) return fail_cuda("shared-Y D2H", error);
+
+  const bool identical =
+      shared_a == independent_a && shared_b == independent_b;
+  std::printf("q8_shared_y_identity prompt_rows=%zu output_rows=%zu columns=%zu "
+              "byte_identical=%s\n",
+              kPrompt, kOut, kCols, identical ? "true" : "false");
+  cudaFree(independent_out_b);
+  cudaFree(independent_out_a);
+  cudaFree(shared_out_b);
+  cudaFree(shared_out_a);
+  cudaFree(independent_y);
+  cudaFree(shared_y);
+  cudaFree(device_prompt);
+  cudaFree(device_b);
+  cudaFree(device_a);
+  return identical ? 0 : 1;
 }
 
 int time_mma_tile(qw38::cuda::QuantKind kind, std::size_t output_rows,
@@ -1049,6 +1364,30 @@ int run_q8_mma_case(const char* name, std::size_t output_rows,
                                                                         : 1;
 }
 
+int run_q8_quality_suite() {
+  if (qw38::cuda::selected_q8_quality_mmq_prompt_tile() != 128U ||
+      qw38::cuda::q8_quality_mmq_occupancy(128) < 1 ||
+      qw38::cuda::launch_quantize_mmq_q8_1(
+          qw38::cuda::QuantKind::kQ8_0, nullptr, 8, 255, nullptr, nullptr) !=
+          cudaErrorInvalidValue ||
+      qw38::cuda::launch_q8_mmq_quality_mma(nullptr, 17, 256, nullptr, 8,
+                                            nullptr, nullptr) !=
+          cudaErrorInvalidValue) {
+    std::fprintf(stderr, "Q8 quality launcher rejects failed\n");
+    return 1;
+  }
+  if (run_q8_quality_case("q8_0_quality_128x256x256", 256, 256, 128) != 0 ||
+      run_q8_quality_case("q8_0_quality_8x256x256", 256, 256, 8) != 0 ||
+      run_q8_quality_case("q8_0_quality_64x1024x512", 1024, 512, 64) != 0 ||
+      run_q8_quality_case("q8_0_quality_8x48x5120", 48, 5120, 8) != 0 ||
+      run_q8_quality_case("q8_0_quality_64x1024x5120", 1024, 5120, 64) != 0 ||
+      run_q8_quality_case("q8_0_quality_8x5120x6144", 5120, 6144, 8) != 0 ||
+      run_q8_shared_y_identity() != 0) {
+    return 1;
+  }
+  return 0;
+}
+
 }  // namespace
 
 int main() {
@@ -1305,6 +1644,9 @@ int main() {
   std::printf("q8_mma_speed_2048_12288x5120 mma_ms=%.9g variant_ms=%.9g "
               "occupancy=%d\n",
               mma_speed, variant_speed, speed_occ);
+
+  if (run_q8_quality_suite() != 0) return 1;
+
   std::printf("status=passed\n");
   return 0;
 }

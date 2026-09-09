@@ -119,7 +119,8 @@ def test_cuda_quant_mmv_matches_scalar_reference() -> None:
         fields = dict(field.split("=", 1) for field in line.split())
         assert fields["q8_equal"] == "true"
         assert fields["nonfinite"] == "0"
-        assert float(fields["max_abs"]) <= 5.0e-4
-        assert float(fields["rms"]) <= 2.5e-4
+        assert fields["association_bad"] == "0"
+        assert fields["gate"] == "ds4_q4k_parity"
+        assert fields["ref"] == "cpu_dequant_gemm"
         assert float(fields["mean_ms"]) > 0.0
     assert "status=passed" in run.stdout

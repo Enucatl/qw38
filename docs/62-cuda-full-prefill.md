@@ -1,6 +1,6 @@
 # Chunked full-model CUDA prefill
 
-[Index](README.md) · Implementation tasks: SCH-002, MEM-002, OPT-008, OPT-009, OPT-011, OPT-012, OPT-013, OPT-014, OPT-015, OPT-017, OPT-018, OPT-019, OPT-020, OPT-021, and EDU-047 in
+[Index](README.md) · Implementation tasks: SCH-002, MEM-002, OPT-008, OPT-009, OPT-011, OPT-012, OPT-013, OPT-014, OPT-015, OPT-017, OPT-018, OPT-019, OPT-020, OPT-021, OPT-022, and EDU-047 in
 [`implementation_ledger.md`](../implementation_ledger.md) · Contracts:
 [`pins/cuda_prompt_scheduler_contract.json`](../pins/cuda_prompt_scheduler_contract.json),
 [`pins/cuda_prompt_pipeline_contract.json`](../pins/cuda_prompt_pipeline_contract.json),
@@ -12,7 +12,8 @@
 [`pins/opt018_ffn_mma_contract.json`](../pins/opt018_ffn_mma_contract.json),
 [`pins/opt019_core_recovery_contract.json`](../pins/opt019_core_recovery_contract.json),
 [`pins/opt020_prefill_split_contract.json`](../pins/opt020_prefill_split_contract.json),
-[`pins/opt021_oracle_contract.json`](../pins/opt021_oracle_contract.json)
+[`pins/opt021_oracle_contract.json`](../pins/opt021_oracle_contract.json),
+[`pins/opt022_mixer_q8_quality_contract.json`](../pins/opt022_mixer_q8_quality_contract.json)
 · Evidence: [`fixtures/cuda_prompt_scheduler.json`](../fixtures/cuda_prompt_scheduler.json),
 [`fixtures/cuda_prompt_pipeline.json`](../fixtures/cuda_prompt_pipeline.json),
 [`fixtures/cuda_prompt_graph.json`](../fixtures/cuda_prompt_graph.json),
@@ -24,11 +25,13 @@
 [`fixtures/opt019_core_recovery.json`](../fixtures/opt019_core_recovery.json),
 [`fixtures/opt020_prefill_split.json`](../fixtures/opt020_prefill_split.json),
 [`fixtures/opt021_oracle.json`](../fixtures/opt021_oracle.json),
+[`fixtures/opt022_mixer_q8_quality.json`](../fixtures/opt022_mixer_q8_quality.json),
 [`evidence/optimization/opt015-2k-recovery/REPORT.md`](../evidence/optimization/opt015-2k-recovery/REPORT.md),
 [`evidence/optimization/opt017-mixer-q8-mma/REPORT.md`](../evidence/optimization/opt017-mixer-q8-mma/REPORT.md),
 [`evidence/optimization/opt018-ffn-mma-quality/REPORT.md`](../evidence/optimization/opt018-ffn-mma-quality/REPORT.md),
 [`evidence/optimization/opt019-gdn-attention-core/REPORT.md`](../evidence/optimization/opt019-gdn-attention-core/REPORT.md),
-[`evidence/optimization/opt021-4k-oracle/REPORT.md`](../evidence/optimization/opt021-4k-oracle/REPORT.md)
+[`evidence/optimization/opt021-4k-oracle/REPORT.md`](../evidence/optimization/opt021-4k-oracle/REPORT.md),
+[`evidence/optimization/opt022-mixer-q8-quality/REPORT.md`](../evidence/optimization/opt022-mixer-q8-quality/REPORT.md)
 
 ## Why prompt execution differs from decode
 
@@ -103,15 +106,18 @@ Captured OPT-009 graphs at 64 and 4,096 prompt rows show tiled `grid.y` of 16
 and 1,024 (selected tile 4) versus reference `grid.y` equal to the prompt-row
 count.
 
-OPT-017 production `launch_q8_mmq_bf16` dispatches MMA when `prompt_rows >= 8`
-(J=128) and the tiled variant otherwise. Mixer projections listed in
+OPT-017 admitted Rank-1 fused MMA behind `launch_q8_mmq_bf16` when
+`prompt_rows >= 8`. OPT-022 replaces that production body with quality MMA
+(D4 `quantize_mmq_q8_1`, packed load-tiles, `MMQ_ITER_K=256`, `dim3(32, 8)`,
+J=128) and shares one residual D4 Y per layer for mixer GEMMs that read
+`prompt_normalized_`. Mixer projections listed in
 [`src/weights.cpp`](../src/weights.cpp) (GDN packed_qkv, value_gate, alpha/beta,
 output; attention query_gate, key, value) follow that mixer Q8_0 path.
 Attention output remains Q6_K `launch_quant_mmq`. Production still does not
-send Q8_0 through `launch_quant_mmq` Q8Block staging. MMA is admitted at frozen
-CUD-002 numbers versus diagnostic `launch_quant_mmq_variant` `kQ8_0`, not
-versus the unstaged BF16 tiled kernel. The OPT-009 byte-exact pair stays
-variant versus reference.
+send Q8_0 through `launch_quant_mmq` Q8Block staging. Quality MMA is admitted
+under the Q8 association rule versus host CPU dequant GEMM. Rank-1 CUD-002
+numbers stay the staged-Q8 Rank-1 gate and are not the quality-path gate.
+The OPT-009 byte-exact pair stays variant versus reference.
 
 The two-token prefix test and the 65-token boundary test then returned
 byte-equal state, hidden output, and logits. OPT-008's `[4096, 1]` exact-state
@@ -463,6 +469,21 @@ retained fixture. Live numbers stay in the report:
 [`pins/opt021_oracle_contract.json`](../pins/opt021_oracle_contract.json),
 and [`fixtures/opt021_oracle.json`](../fixtures/opt021_oracle.json).
 
+OPT-022 lands production mixer Q8_0 quality MMQ with shared residual Y.
+**Measured, RTX 5090:** D4 `quantize_mmq_q8_1`, packed load-tiles,
+`MMQ_ITER_K=256`, `dim3(32, 8)`, J=128 when `prompt_rows >= 8`; mixer inputs
+share one residual D4 Y per layer; GDN output requantizes at K=6144 into the
+same `prompt_q8_`. Quality MMA versus CPU dequant GEMM uses the Q8 association
+rule. The OPT-009 tiled-versus-reference pair remains byte-exact. Live
+exclusive sitting keep: Quartz mean **1680.38025** tok/s versus the frozen
+oracle baseline **967.267761**; `reverted` false; `successor_oracle` true.
+`quartz_meets_llama` is informational and is not this gate. **OPT-016 remains
+the 2K parity owner.** This keep does not substitute for that gate and does
+not claim Quartz ≥ llama.cpp. Live numbers stay in the report:
+[`evidence/optimization/opt022-mixer-q8-quality/REPORT.md`](../evidence/optimization/opt022-mixer-q8-quality/REPORT.md),
+[`pins/opt022_mixer_q8_quality_contract.json`](../pins/opt022_mixer_q8_quality_contract.json),
+and [`fixtures/opt022_mixer_q8_quality.json`](../fixtures/opt022_mixer_q8_quality.json).
+
 The **proof boundary** excludes comparative speed claims, 2K/8K sustained
 prefill throughput, execution of a 128K prefill, 128K retrieval quality, thermal
 stability, superiority to llama.cpp/vLLM, and a Nsight Systems overlap timeline.
@@ -478,7 +499,9 @@ the mixer versus core split of those composite GDN and attention buckets; it
 is instrumentation, not a throughput gate, and not llama.cpp parity. OPT-021
 records the frozen exact-4096 keep/reject protocol and same-sitting llama.cpp
 4K `avg_ts`; it is not the 2K parity gate, not Quartz ≥ llama.cpp, and not a
-BEN-001 `qw38-bench` result. BEN-001
+BEN-001 `qw38-bench` result. OPT-022 records mixer Q8_0 quality MMQ plus
+shared residual Y and a live 4K keep versus that frozen oracle baseline; it
+does not own or pass the 2K tok/s gate. BEN-001
 provides the harness; CMP-002/CMP-003 still own the 30-sample comparative gate.
 QLT-001 remains blocked. OPT-012's prompt graphs are FFN subgraphs only: not a
 whole-chunk graph, not a speedup gate, and not 128K quality recovery.

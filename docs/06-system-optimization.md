@@ -23,10 +23,13 @@ An **MMQ** kernel computes a matrix times a matrix. It spends more effort
 tiling, but a weight tile can serve many prompt rows and often maps to tensor
 cores. The names describe the operation, not a promise that one is always
 faster. Quartz production Q4_K/Q6_K prompt MMQ uses tensor-core MMA for
-`prompt_rows >= 8`. Mixer Q8_0 prompt MMQ also uses MMA for `prompt_rows >= 8`
-(OPT-017). Decode stays MMV. Tiny mixer prompts keep the OPT-009 tiled
-`__fmul_rn`/`__fadd_rn` kernel. MMA here is Measured component recovery, not
-the OPT-016 2K llama.cpp parity gate. Production prompt GDN recurrence is the
+`prompt_rows >= 8`. Mixer Q8_0 prompt MMQ uses quality MMA (D4 Y, packed
+load-tiles, `MMQ_ITER_K=256`) for `prompt_rows >= 8`, and mixer GEMMs that
+share the residual activation share one D4 Y per layer (OPT-022). Decode stays
+MMV. Tiny mixer prompts keep the OPT-009 tiled `__fmul_rn`/`__fadd_rn` kernel.
+Rank-1 fused MMA remains a non-production kernel. MMA here is Measured
+component recovery plus a 4K keep versus the frozen oracle baseline, not the
+OPT-016 2K llama.cpp parity gate. Production prompt GDN recurrence is the
 warp-column fused quality path; sequential windows remain the unloosened
 reference. Production prompt attention (`token_count >= 16`) is the fattn-mma
 analog; tiled attention remains the unloosened reference. Those core-quality
@@ -125,7 +128,8 @@ a 2K throughput gate and not llama.cpp parity:
 max abs `5e-4` / RMS `2.5e-4` with zero non-finites. OPT-009 tiled-versus-row-wise
 byte equality is unloosened. Live exact-2048 remasurement mean 375.743988 tok/s
 versus llama.cpp 3203.276277 tok/s is recorded and is **not** the OPT-016 gate.
-**OPT-016 remains the parity gate owner.** Report:
+**OPT-016 remains the parity gate owner.** OPT-022 later replaced this Rank-1
+production body with quality MMA. Report:
 [`evidence/optimization/opt017-mixer-q8-mma/REPORT.md`](../evidence/optimization/opt017-mixer-q8-mma/REPORT.md).
 
 ## Q4_K/Q6_K MMA quality (OPT-018)
@@ -179,6 +183,23 @@ llama.cpp parity gate.** OPT-016 remains the 2K parity owner. Scout sitting
 the retained fixture. Live numbers stay in the report; this chapter does not
 replace them:
 [`evidence/optimization/opt021-4k-oracle/REPORT.md`](../evidence/optimization/opt021-4k-oracle/REPORT.md).
+
+## Mixer Q8_0 quality MMQ (OPT-022)
+
+**Measured, RTX 5090:** production mixer Q8_0 prompt MMQ is the quality stack
+(D4 `quantize_mmq_q8_1`, packed load-tiles, `MMQ_ITER_K=256`, block
+`dim3(32, 8)`, J=128) when `prompt_rows >= 8`. Mixer GEMMs that share the
+residual activation reuse one D4 Y in existing `prompt_q8_` per layer; GDN
+output requantizes at K=6144 into the same workspace. No extra persistent
+`cudaMalloc`. Admission versus host CPU dequant GEMM uses the Q8 association
+rule (an element fails only when both `abs > 0.05*sqrt(K)` and `rel > 0.05`).
+The tiled-versus-row-wise Q8_0 pair remains byte-exact. Rank-1 fused MMA is
+retained and is not production. Live exclusive-RTX-5090 cold exact-4096
+**keep:** Quartz mean **1680.38025** tok/s versus the frozen oracle baseline
+**967.267761**. Production was not reverted. `quartz_meets_llama` is
+informational and is not this gate. This is **not** the 2K llama.cpp parity
+gate. Live numbers stay in the report; this chapter does not replace them:
+[`evidence/optimization/opt022-mixer-q8-quality/REPORT.md`](../evidence/optimization/opt022-mixer-q8-quality/REPORT.md).
 
 ## DwarfStar transfer boundary
 

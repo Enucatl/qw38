@@ -470,7 +470,7 @@ cudaError_t timing_body(void* context) {
     if (ctx->tile == 0) {
       return qw38::cuda::launch_q8_mmq_bf16(
           ctx->weights, ctx->output_rows, ctx->columns, ctx->prompt,
-          ctx->prompt_rows, ctx->output, nullptr);
+          ctx->prompt_rows, ctx->staged, ctx->output, nullptr);
     }
     return qw38::cuda::launch_q8_mmq_bf16_variant(
         ctx->weights, ctx->output_rows, ctx->columns, ctx->prompt,
@@ -717,7 +717,7 @@ int main(int argc, char** argv) {
 
   const bool invalid =
       qw38::cuda::launch_q8_mmq_bf16(nullptr, 17, 256, nullptr, 1, nullptr,
-                                     nullptr) == cudaErrorInvalidValue &&
+                                     nullptr, nullptr) == cudaErrorInvalidValue &&
       qw38::cuda::launch_q8_mmq_bf16_variant(
           nullptr, 17, 256, nullptr, 1, nullptr, 3, nullptr) ==
           cudaErrorInvalidValue &&
@@ -730,6 +730,7 @@ int main(int argc, char** argv) {
 
   std::uint8_t* q8_weights = nullptr;
   __nv_bfloat16* q8_prompt = nullptr;
+  qw38::cuda::Q8Block* q8_staged = nullptr;
   float* q8_output = nullptr;
   std::uint8_t* q4_weights = nullptr;
   __nv_bfloat16* q4_prompt = nullptr;
@@ -752,6 +753,8 @@ int main(int argc, char** argv) {
   cudaMalloc(&q8_weights,
              weight_bytes(qw38::cuda::QuantKind::kQ8_0, q8_rows, q8_cols));
   cudaMalloc(&q8_prompt, 4096 * q8_cols * sizeof(__nv_bfloat16));
+  cudaMalloc(&q8_staged,
+             qw38::cuda::q8_prompt_workspace_bytes(4096, q8_cols));
   cudaMalloc(&q8_output, 4096 * q8_rows * sizeof(float));
   cudaMalloc(&q4_weights,
              weight_bytes(qw38::cuda::QuantKind::kQ4K, q4_rows, q4_cols));
@@ -877,6 +880,46 @@ int main(int argc, char** argv) {
       q8_ref_64.grid_y == 64 && q8_ref_4096.grid_y == 4096 &&
       q8_ref_64.grid_x == (q8_rows + 7) / 8;
   const unsigned mma_tile = qw38::cuda::selected_mma_mmq_prompt_tile();
+  const unsigned q8_quality_tile =
+      qw38::cuda::selected_q8_quality_mmq_prompt_tile();
+  LaunchInfo q8_quality_64{};
+  LaunchInfo q8_quality_4096{};
+  const cudaError_t cap_q8_quality_64 = capture_mmq(
+      [&](cudaStream_t stream) {
+        return qw38::cuda::launch_q8_mmq_bf16(
+            q8_weights, q8_rows, q8_cols, q8_prompt, 64, q8_staged, q8_output,
+            stream);
+      },
+      q8_rows, &q8_quality_64);
+  const cudaError_t cap_q8_quality_4096 = capture_mmq(
+      [&](cudaStream_t stream) {
+        return qw38::cuda::launch_q8_mmq_bf16(q8_weights, q8_rows, q8_cols,
+                                              q8_prompt, 4096, q8_staged,
+                                              q8_output, stream);
+      },
+      q8_rows, &q8_quality_4096);
+  const bool q8_quality_grid =
+      cap_q8_quality_64 == cudaSuccess && cap_q8_quality_4096 == cudaSuccess &&
+      q8_quality_64.nodes == 2 && q8_quality_4096.nodes == 2 &&
+      q8_quality_64.block.x == 32 && q8_quality_64.block.y == 8 &&
+      q8_quality_4096.block.x == 32 && q8_quality_4096.block.y == 8 &&
+      q8_quality_tile == 128 &&
+      q8_quality_64.grid_x == (q8_rows + 127) / 128 &&
+      q8_quality_4096.grid_x == (q8_rows + 127) / 128 &&
+      q8_quality_64.grid_y == (64 + q8_quality_tile - 1) / q8_quality_tile &&
+      q8_quality_4096.grid_y ==
+          (4096 + q8_quality_tile - 1) / q8_quality_tile &&
+      qw38::cuda::q8_quality_mmq_occupancy(q8_quality_tile) >= 1;
+  std::printf("opt022_q8_quality_launch prompt_rows=64 kernel_nodes=%d "
+              "block=[%u,%u,1] grid=[%u,%u,1] occupancy=%d\n",
+              q8_quality_64.nodes, q8_quality_64.block.x,
+              q8_quality_64.block.y, q8_quality_64.grid_x, q8_quality_64.grid_y,
+              qw38::cuda::q8_quality_mmq_occupancy(q8_quality_tile));
+  std::printf("opt022_q8_quality_launch prompt_rows=4096 kernel_nodes=%d "
+              "block=[%u,%u,1] grid=[%u,%u,1]\n",
+              q8_quality_4096.nodes, q8_quality_4096.block.x,
+              q8_quality_4096.block.y, q8_quality_4096.grid_x,
+              q8_quality_4096.grid_y);
   const bool q4_grid =
       cap_q4_64 == cudaSuccess && cap_q4_4096 == cudaSuccess &&
       q4_64.nodes == 2 && q4_4096.nodes == 2 &&
@@ -913,6 +956,7 @@ int main(int argc, char** argv) {
   q8_prod.columns = q8_cols;
   q8_prod.prompt = q8_prompt;
   q8_prod.output = q8_output;
+  q8_prod.staged = q8_staged;
   q8_prod.q8_bf16 = true;
   q8_prod.tile = 0;
   q8_prod.prompt_rows = 64;
@@ -982,7 +1026,7 @@ int main(int argc, char** argv) {
   const bool passed =
       q8_exact && q4_identical && q6_identical && envelope_ok && staging_ok &&
       invalid && q8_grid && q8_ref_grid && q4_grid && q6_grid && occupancy_ok &&
-      q8_faster && q4_not_slower;
+      q8_faster && q4_not_slower && q8_quality_grid;
   std::printf(
       "QW38_PROMPT_MMQ_RESULT={\"schema_version\":1,\"task\":\"OPT-009\","
       "\"status\":\"%s\",\"device\":\"%s\",\"compute_capability\":\"%d.%d\","
@@ -1100,6 +1144,7 @@ int main(int argc, char** argv) {
   cudaFree(q4_prompt);
   cudaFree(q4_weights);
   cudaFree(q8_output);
+  cudaFree(q8_staged);
   cudaFree(q8_prompt);
   cudaFree(q8_weights);
   return passed ? 0 : 1;

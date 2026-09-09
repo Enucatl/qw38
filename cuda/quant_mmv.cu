@@ -566,16 +566,16 @@ cudaError_t launch_q8_mmq_bf16_variant(
 cudaError_t launch_q8_mmq_bf16(const std::uint8_t* weights,
                                std::size_t output_rows, std::size_t columns,
                                const __nv_bfloat16* prompt,
-                               std::size_t prompt_rows, float* output,
-                               cudaStream_t stream) noexcept {
+                               std::size_t prompt_rows, Q8Block* q8_workspace,
+                               float* output, cudaStream_t stream) noexcept {
   if (weights == nullptr || prompt == nullptr || output == nullptr ||
       output_rows == 0 || columns == 0 || prompt_rows == 0 ||
       columns % kValuesPerWeightBlock != 0) {
     return cudaErrorInvalidValue;
   }
   if (prompt_rows >= 8) {
-    return launch_q8_mmq_mma(weights, output_rows, columns, prompt, prompt_rows,
-                             output, stream);
+    return launch_q8_mmq_quality(weights, output_rows, columns, prompt,
+                                 prompt_rows, q8_workspace, output, stream);
   }
   return launch_q8_mmq_bf16_variant(
       weights, output_rows, columns, prompt, prompt_rows, output,

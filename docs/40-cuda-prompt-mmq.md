@@ -1,6 +1,6 @@
 # 40. Tiled CUDA multiplication for prompt rows
 
-[Index](README.md) · Implementation tasks: CUD-002, OPT-009, OPT-015, OPT-017, OPT-018, and EDU-026 in
+[Index](README.md) · Implementation tasks: CUD-002, OPT-009, OPT-015, OPT-017, OPT-018, OPT-022, and EDU-026 in
 [`implementation_ledger.md`](../implementation_ledger.md)
 
 [Chapter 39](39-cuda-quant-mmv.md) multiplied one activation vector by a packed
@@ -253,7 +253,8 @@ uses an MMA/shared-memory path on `sm_120` when `prompt_rows >= 8`. Smaller
 mixer prompts keep the OPT-009 tiled variant at
 `selected_mmq_prompt_tile(kQ8_0, prompt_rows)`. Decode `q8_mmv_bf16` is
 unchanged. Production Q8_0 still does not go through `launch_quant_mmq` or
-`launch_quant_mmq_mma`.
+`launch_quant_mmq_mma`. OPT-022 later replaced this Rank-1 production body
+with quality MMA; Rank-1 remains a callable non-production kernel.
 
 The MMA kernel reuses the Q4_K/Q6_K geometry: 256 threads, 128 output rows, and
 prompt-tile J in `{32, 64, 128}`. Each K-step of 32 columns is one GGUF Q8_0
@@ -319,7 +320,8 @@ Production Q4_K/Q6_K prompt MMQ (`launch_quant_mmq`) uses the quality MMA path
 when `prompt_rows >= 8`: `MMQ_ITER_K=256`, packed load-tiles, Q8_1 MMQ Y in the
 existing prompt workspace, and block `dim3(32, 8)`. Smaller prompts keep
 `launch_quant_mmq_variant`. Decode `launch_quant_mmv` is unchanged. Mixer Q8_0
-stays on `launch_q8_mmq_bf16` (OPT-017).
+stays on `launch_q8_mmq_bf16`; OPT-022 later replaced the production Rank-1
+body with quality MMA.
 
 **Admission (ds4 option C).** Q4_K/Q6_K MMA and the retained scalar variant are
 admitted against host CPU dequant-weight × BF16→float activation GEMM. An
@@ -358,3 +360,66 @@ throughput gate. Contract, fixture, and report:
 [`pins/opt018_ffn_mma_contract.json`](../pins/opt018_ffn_mma_contract.json),
 [`fixtures/opt018_ffn_mma.json`](../fixtures/opt018_ffn_mma.json), and
 [`evidence/optimization/opt018-ffn-mma-quality/REPORT.md`](../evidence/optimization/opt018-ffn-mma-quality/REPORT.md).
+
+## OPT-022 mixer Q8_0 quality MMQ
+
+Production mixer Q8_0 prompt MMQ (`matrix_prompt` → `launch_q8_mmq_bf16`, and
+the scheduler mixer-input path) uses a llama.cpp/ds4-style quality stack when
+`prompt_rows >= 8`: D4 `quantize_mmq_q8_1` into existing `prompt_q8_`, packed
+Q8_0 load-tiles, `MMQ_ITER_K=256`, and block `dim3(32, 8)`. Production J is
+128. Smaller mixer prompts keep the OPT-009 tiled variant. Decode
+`q8_mmv_bf16` is unchanged. Production Q8_0 still does not go through
+`launch_quant_mmq` or `launch_quant_mmq_mma`. Rank-1 `launch_q8_mmq_mma` stays
+callable and is not production after this keep.
+
+**Shared residual Y.** After mixer RMSNorm writes `prompt_normalized_`, the
+scheduler quantizes that residual once (K=5120) into `prompt_q8_` inside the
+existing `qw38.mixer_mmq` interval. GDN packed_qkv, value_gate, alpha, and
+beta, and attention query_gate, key, and value, all consume that Y via
+`launch_q8_mmq_quality_mma`. After GDN core, the same workspace is overwritten
+with a D4 Y of `prompt_projected_bf16_` at K=6144 for the GDN output GEMM.
+Attention output remains Q6_K `launch_quant_mmq`. Residual and GDN-output Y
+fit in the existing FFN-sized `prompt_q8_` allocation; there is no extra
+persistent `cudaMalloc`. Shared-Y identity: one shared quantize plus two MMA
+launches is byte-identical to two independent `launch_q8_mmq_quality` launches.
+The same sharing applies on the fused and unfused prompt paths.
+
+**Admission (Q8 association).** Quality MMA is admitted against host CPU
+dequant-weight × BF16→float GEMM. An element fails only when both
+`abs_error > 0.05 * sqrt(K)` and `rel_error > 0.05` (`K` = weight columns),
+with zero non-finites. CUD-002 `5e-4` / `2.5e-4` remain the Rank-1 staged-Q8
+admission numbers and are not this quality-path gate. Production quality MMA
+is not memcmp'd to the BF16 tiled or row-wise kernels.
+
+**Visible unloosened OPT-009 references.**
+`launch_q8_mmq_bf16_variant` versus `launch_q8_mmq_bf16_reference` remains
+byte-exact. `pins/cuda_prompt_mmq_contract.json` `q8_bf16_reference_exact`
+stays `true`.
+
+**Measured 4K keep, RTX 5090:** live exclusive sitting, llama.cpp first then
+Quartz. Cold exact-4096 Quartz mean **1680.38025** tok/s versus the frozen
+oracle baseline **967.267761**. Keep: strictly greater, `reverted` false,
+`successor_oracle` true, `production_q8` `quality_mma_shared_y`,
+`kernel_nodes=2`, `block=[32, 8, 1]`. `quartz_meets_llama` is informational
+false and is not this gate. Live numbers stay in the report; this chapter
+does not replace them:
+[`evidence/optimization/opt022-mixer-q8-quality/REPORT.md`](../evidence/optimization/opt022-mixer-q8-quality/REPORT.md).
+
+**External:** llama.cpp revision `cc83d7b4824f73cfdda4dfbb47ee39804f71b328`
+Q8_0 MMQ: `quantize.cu` `quantize_mmq_q8_1` D4, `mmq-load-tiles.cuh` packed
+`ggml_cuda_mmq_load_tiles_q8_0`, `mmq-vec-dot.cuh`
+`ggml_cuda_mmq_vec_dot_q8_0_q8_1_mma`, Ampere config in
+`mmq-config-ampere.cuh` (MIT, The ggml authors). ds4
+`cuda/mmq/test/test_mmq_parity.cu` `run_q8_0` / `check_close` is the Q8
+association-gate source (`abs_scale=0.05`); ds4 is not vendored and is not a
+same-GGUF baseline.
+
+**Proof boundary:** mixer Q8 quality plus shared residual Y under the Q8
+association rule; 4K keep/reject versus the frozen oracle baseline; OPT-009
+Q8_0 tiled-versus-reference remains byte-exact; CUD-002 numbers unloosened;
+workspace formula unloosened; no extra persistent `cudaMalloc`; **does not
+substitute for the 2K llama.cpp parity gate**. Contract, fixture, and report:
+[`pins/opt022_mixer_q8_quality_contract.json`](../pins/opt022_mixer_q8_quality_contract.json),
+[`fixtures/opt022_mixer_q8_quality.json`](../fixtures/opt022_mixer_q8_quality.json),
+and
+[`evidence/optimization/opt022-mixer-q8-quality/REPORT.md`](../evidence/optimization/opt022-mixer-q8-quality/REPORT.md).
