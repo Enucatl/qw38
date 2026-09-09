@@ -369,6 +369,30 @@ and is not this gate. This is **not** the 2K llama.cpp parity gate.
 Live numbers stay in the report; this chapter does not replace them:
 [`evidence/optimization/opt030-pdl-launches/REPORT.md`](../evidence/optimization/opt030-pdl-launches/REPORT.md).
 
+## Decode P, D128, and D2048 oracles (OPT-032)
+
+**Measured protocol/baseline, RTX 5090:** one exclusive sitting freezes the
+exact-4096 P oracle (attribution null, graphs created; same protocol as
+OPT-021) together with D128 and D2048 decode oracles. Decode runs use
+production `execute_token` on predetermined tokens (no sampling): prefix 128
+or 2048, then 256 timed one-token evaluations, 3 warm-ups and 30 measured
+runs. Matched llama.cpp decode uses the pinned public `llama.h` driver
+`qw38-llama-decode-oracle` and `llama_time_us()`, not `llama_perf_context`.
+Random-token `llama-bench -p 0 -n 256 -d 128` / `-d 2048` in the same sitting
+is informational and is not the keep/reject denominator. Production kernels
+were not changed. This increment **claims no performance improvement**.
+Sitting P versus the historical successor-oracle mean **1746.71973** tok/s is
+informational variance, not a keep. Quartz ≥ llama.cpp is not this gate.
+This is **not** the 2K llama.cpp parity gate. Exclusive decode categories and
+a refreshed 4K prefill attribution reconstruct their attributed walls; they
+are opt-in diagnostics, not BEN-001 `qw38-bench` results. Recorded
+`next_task_order` from the frozen P-versus-D2048 gap algorithm is
+`["OPT-036", "OPT-033", "OPT-035", "OPT-034", "OPT-037"]` (`next_task`
+`OPT-036`). Live tok/s, gaps, and exclusive milliseconds stay in the report;
+this chapter does not replace them:
+[`evidence/optimization/opt032-decode-oracle/REPORT.md`](../evidence/optimization/opt032-decode-oracle/REPORT.md)
+and [`fixtures/opt032_decode_oracle.json`](../fixtures/opt032_decode_oracle.json).
+
 ## DwarfStar transfer boundary
 
 Reuse MMV/MMQ phase split, quant block tests, explicit unavailable paths, stable

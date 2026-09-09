@@ -1,19 +1,23 @@
 # Synchronized runtime timing and NVTX attribution
 
-[Index](README.md) · Implementation tasks: OPT-001, OPT-014, OPT-015, OPT-020, and EDU-037 in
+[Index](README.md) · Implementation tasks: OPT-001, OPT-014, OPT-015, OPT-020, OPT-032, and EDU-037 in
 [`implementation_ledger.md`](../implementation_ledger.md) · Contracts:
 [`pins/cuda_timing_contract.json`](../pins/cuda_timing_contract.json),
 [`pins/cuda_prefill_attribution_contract.json`](../pins/cuda_prefill_attribution_contract.json),
-[`pins/opt020_prefill_split_contract.json`](../pins/opt020_prefill_split_contract.json)
+[`pins/opt020_prefill_split_contract.json`](../pins/opt020_prefill_split_contract.json),
+[`pins/opt032_decode_oracle_contract.json`](../pins/opt032_decode_oracle_contract.json)
 · Evidence:
 [`cuda/timing_test.cu`](../cuda/timing_test.cu),
 [`cuda/prefill_attribution_test.cu`](../cuda/prefill_attribution_test.cu),
 [`tests/test_cuda_timing.py`](../tests/test_cuda_timing.py),
 [`tests/test_cuda_prefill_attribution.py`](../tests/test_cuda_prefill_attribution.py),
 [`tests/test_opt020_prefill_split.py`](../tests/test_opt020_prefill_split.py),
+[`tests/test_opt032_decode_oracle.py`](../tests/test_opt032_decode_oracle.py),
 [`fixtures/cuda_timing.json`](../fixtures/cuda_timing.json),
-[`fixtures/cuda_prefill_attribution.json`](../fixtures/cuda_prefill_attribution.json), and
-[`fixtures/opt020_prefill_split.json`](../fixtures/opt020_prefill_split.json)
+[`fixtures/cuda_prefill_attribution.json`](../fixtures/cuda_prefill_attribution.json),
+[`fixtures/opt020_prefill_split.json`](../fixtures/opt020_prefill_split.json),
+[`fixtures/opt032_decode_oracle.json`](../fixtures/opt032_decode_oracle.json), and
+[`evidence/optimization/opt032-decode-oracle/REPORT.md`](../evidence/optimization/opt032-decode-oracle/REPORT.md)
 
 ## Why a normal stopwatch is misleading
 
@@ -175,6 +179,57 @@ measured 0 ms. The ranked sequence is **Proposed** and is not a throughput
 gate:
 [`evidence/optimization/opt015-2k-recovery/REPORT.md`](../evidence/optimization/opt015-2k-recovery/REPORT.md).
 
+## Exclusive decode attribution
+
+`DecodeAttribution` sits beside `PrefillAttribution` and `RuntimeTimings`. It
+does **not** rewrite public decode field ownership. Production
+`RuntimeTimings.gdn` / `.attention` / `.ffn` stay composite, and BEN-001
+`component_probe` keeps that same composite bracketing. `execute_token` takes an
+optional trailing `DecodeAttribution*` that defaults to null. A null pointer
+creates no extra CUDA events on the decode path.
+
+When the pointer is set, one production token records nine exclusive summing
+categories from CUDA events on the default stream (plus a host monotonic clock
+around each decode `cudaGraphLaunch`):
+
+| Category | Decode ownership |
+|---|---|
+| embedding | Quant row decode plus BF16→FP32 widen |
+| mixer_mmv | Every mixer-block `matrix_vector`: GDN packed_qkv, value_gate, alpha, beta, output; attention query_gate, key, value, output. FFN gate/up/down stay in `ffn_mmv` |
+| gdn_core | GDN-layer mixer RMSNorm when it actually launches here, GDN prepare/gated-output, and the mixer residual add on GDN layers |
+| attention_core | Attention-layer mixer RMSNorm when it actually launches here, attention prepare/query-gate split, FP32-to-BF16 convert, and the mixer residual add on attention layers |
+| ffn_mmv | `execute_ffn` or decode graph replay of that FFN |
+| logits | Final RMSNorm, vocabulary `matrix_vector`, and D2H of logits/hidden that currently sit in the logits phase |
+| state_commit | Attention scatter plus the `cudaDeviceSynchronize` that publishes committed KV |
+| graph | Host monotonic time around each decode `cudaGraphLaunch` (same ownership as `RuntimeTimings.graph_launch`). Zero is legal if graphs did not launch |
+| other/idle | Non-negative remainder `max(0, wall − exclusive named work)` |
+
+Per GDN or attention layer the path records input-projection `mixer_mmv`, then
+`gdn_core` or `attention_core`, then output-projection `mixer_mmv`. Skip a phase
+that has no launches. Collect once at the end of the attributed token. If
+decode-graph host time overlaps GPU CUDA events, attributed wall is raised so
+the nine categories still reconstruct. Contract and tests copy the prefill
+remainder rule: `rel_tol = 1e-4` and `abs_tol_ms = 0.05`. If exclusive sum
+exceeds wall beyond that, the diagnostic fails closed. Nested NVTX labels
+`qw38.mixer_mmv` and `qw38.gdn_core` / `qw38.attention_core` may always emit;
+they are labels, not stopwatches.
+
+When both `RuntimeTimings*` and `DecodeAttribution*` are non-null, exclusive
+events go only to `DecodeAttribution`; composite `gdn` / `attention` / `ffn` are
+derived sums after collect. Attribution diagnostics pass `DecodeAttribution*`
+only. Do not drive these exclusive decode categories through `qw38-bench`.
+
+**Measured, RTX 5090:** one exclusive sitting records one attributed production
+decode token after a D128 prefix and after a D2048 prefix, plus a refreshed 4K
+prefill exclusive report. Those runs perturb execution and are not tok/s
+oracles. Live exclusive milliseconds stay in
+[`fixtures/opt032_decode_oracle.json`](../fixtures/opt032_decode_oracle.json)
+and
+[`evidence/optimization/opt032-decode-oracle/REPORT.md`](../evidence/optimization/opt032-decode-oracle/REPORT.md);
+this chapter does not replace them. Nsight Systems and Nsight Compute were
+`not_used`. This is instrumentation, not a throughput gate and not llama.cpp
+parity.
+
 **Measured negative result:** the pinned CUDA 13.0.2 image contains Nsight
 Compute 2025.3.1, but the host denied performance-counter access with
 `ERR_NVGPUCTRPERM`. Nsight Systems (`nsys`) is not installed in that image.
@@ -210,7 +265,10 @@ eight composite categories. OPT-020 splits mixer-projection MMQ out of those
 composite GDN and attention buckets into exclusive `mixer_mmq`, `gdn_core`,
 and `attention_core`; it is retained for mixer-versus-core steering and is not
 a throughput gate. OPT-015 cites the historical eight-category percentages as
-the recovery map; it does not emit a new timed run. None of those increments
+the recovery map; it does not emit a new timed run. OPT-032 adds opt-in
+exclusive decode categories on `DecodeAttribution` without splitting public
+`RuntimeTimings`; it is instrumentation for D128/D2048 steering, not a
+throughput gate and not llama.cpp parity. None of those increments
 proves a fusion is beneficial, provides an Nsight report, establishes p50/p95
 request latency, or passes the comparative speed gate. SRV-002 now exposes
 separately measured queue depth/delay on Chat Completions responses. BEN-001

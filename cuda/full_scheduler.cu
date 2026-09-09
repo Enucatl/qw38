@@ -471,6 +471,49 @@ Status finish_prefill_attribution(
   return Status::ok();
 }
 
+Status finish_decode_attribution(
+    DecodeAttribution* attribution,
+    std::chrono::steady_clock::time_point started) noexcept {
+  if (attribution == nullptr) return Status::ok();
+  attribution->wall = {
+      static_cast<float>(std::chrono::duration<double, std::milli>(
+                             std::chrono::steady_clock::now() - started)
+                             .count()),
+      true};
+  attribution->graph.measured = true;
+  const TimingValue* required[] = {
+      &attribution->embedding,       &attribution->mixer_mmv,
+      &attribution->gdn_core,        &attribution->attention_core,
+      &attribution->ffn_mmv,         &attribution->logits,
+      &attribution->state_commit,    &attribution->graph,
+      &attribution->wall};
+  for (const TimingValue* value : required) {
+    if (!value->measured) {
+      return {StatusCode::kInternal,
+              "CUDA decode attribution left a category unmeasured"};
+    }
+  }
+  const float cuda_sum = attribution->embedding.milliseconds +
+                          attribution->mixer_mmv.milliseconds +
+                          attribution->gdn_core.milliseconds +
+                          attribution->attention_core.milliseconds +
+                          attribution->ffn_mmv.milliseconds +
+                          attribution->logits.milliseconds +
+                          attribution->state_commit.milliseconds;
+  const float exclusive = cuda_sum + attribution->graph.milliseconds;
+  if (cuda_sum > attribution->wall.milliseconds &&
+      !prefill_timings_close(cuda_sum, attribution->wall.milliseconds)) {
+    return {StatusCode::kInternal,
+            "CUDA decode attribution exclusive sum exceeds wall time"};
+  }
+  if (exclusive > attribution->wall.milliseconds) {
+    attribution->wall.milliseconds = exclusive;
+  }
+  attribution->other_idle = {
+      std::max(0.0F, attribution->wall.milliseconds - exclusive), true};
+  return Status::ok();
+}
+
 template <typename T>
 cudaError_t allocate(T** pointer, std::size_t count,
                      std::size_t* total) noexcept {
@@ -1649,7 +1692,8 @@ Status execute_token(const ResidentModel& model, std::size_t token,
                      const EvalControl* control,
                      RuntimeTimings* timings,
                      PointwisePath pointwise_path,
-                     SchedulerGraphs* graphs) noexcept {
+                     SchedulerGraphs* graphs,
+                     DecodeAttribution* decode_attribution) noexcept {
   if (model.blob_ == nullptr || token >= internal::kVocabularySize ||
       session == nullptr || workspace == nullptr ||
       session->capacity_ == 0 || session->frontier_ >= session->capacity_ ||
@@ -1666,9 +1710,14 @@ Status execute_token(const ResidentModel& model, std::size_t token,
             "CUDA token scheduler input, state, or output is invalid"};
   }
   const NvtxRange token_range("qw38.token");
+  const auto attribution_started = std::chrono::steady_clock::now();
+  if (decode_attribution != nullptr) *decode_attribution = {};
   GpuPhaseRecorder category_recorder;
   GpuPhaseRecorder total_recorder;
-  GpuPhaseRecorder* categories = timings == nullptr ? nullptr : &category_recorder;
+  const bool record_categories =
+      timings != nullptr || decode_attribution != nullptr;
+  GpuPhaseRecorder* categories =
+      record_categories ? &category_recorder : nullptr;
   GpuPhaseRecorder* total = timings == nullptr ? nullptr : &total_recorder;
   if (timings != nullptr) {
     *timings = {};
@@ -1684,8 +1733,10 @@ Status execute_token(const ResidentModel& model, std::size_t token,
                                                   : &timings->token_total);
   }
   if (error == cudaSuccess) {
-    error = begin_phase(categories, timings == nullptr ? nullptr
-                                                       : &timings->embedding);
+    error = begin_phase(categories,
+                        decode_attribution == nullptr
+                            ? (timings == nullptr ? nullptr : &timings->embedding)
+                            : &decode_attribution->embedding);
   }
   nvtxRangePushA("qw38.embedding");
   if (error == cudaSuccess) {
@@ -1712,136 +1763,185 @@ Status execute_token(const ResidentModel& model, std::size_t token,
        layer_index < model.layers_.size();
        ++layer_index) {
     const DeviceLayer& layer = model.layers_[layer_index];
-    nvtxRangePushA(layer.kind == internal::LayerKind::kGdn ? "qw38.gdn"
-                                                           : "qw38.attention");
-    if (error == cudaSuccess) {
-      error = begin_phase(categories, timings == nullptr
-                                          ? nullptr
-                                          : (layer.kind == internal::LayerKind::kGdn
-                                                 ? &timings->gdn
-                                                 : &timings->attention));
+    const bool gdn_layer = layer.kind == internal::LayerKind::kGdn;
+    const bool exclusive = decode_attribution != nullptr;
+    TimingValue* mixer_composite =
+        timings == nullptr ? nullptr
+                           : (gdn_layer ? &timings->gdn : &timings->attention);
+    TimingValue* mixer_mmv =
+        exclusive ? &decode_attribution->mixer_mmv : nullptr;
+    TimingValue* core =
+        exclusive ? (gdn_layer ? &decode_attribution->gdn_core
+                               : &decode_attribution->attention_core)
+                  : nullptr;
+    const char* core_nvtx = gdn_layer ? "qw38.gdn_core" : "qw38.attention_core";
+    nvtxRangePushA(gdn_layer ? "qw38.gdn" : "qw38.attention");
+    if (!exclusive && error == cudaSuccess) {
+      error = begin_phase(categories, mixer_composite);
     }
-    if (error == cudaSuccess &&
-        (layer_index == 0 || pointwise_path == PointwisePath::kUnfused)) {
-      rms_norm_fp32_to_bf16<<<1, kThreads>>>(
-          residual, layer.common.input_norm, internal::kResidualWidth,
-          workspace->normalized_);
-      error = cudaPeekAtLastError();
+    const bool launch_rms =
+        layer_index == 0 || pointwise_path == PointwisePath::kUnfused;
+    if (launch_rms) {
+      const NvtxRange core_range(core_nvtx);
+      if (exclusive && error == cudaSuccess) {
+        error = begin_phase(categories, core);
+      }
+      if (error == cudaSuccess) {
+        rms_norm_fp32_to_bf16<<<1, kThreads>>>(
+            residual, layer.common.input_norm, internal::kResidualWidth,
+            workspace->normalized_);
+        error = cudaPeekAtLastError();
+      }
+      if (exclusive && error == cudaSuccess) error = end_phase(categories);
     }
-    if (layer.kind == internal::LayerKind::kGdn) {
-      if (error == cudaSuccess) {
-        error = matrix_vector(layer.gdn.packed_qkv, workspace->normalized_,
-                              workspace, workspace->projection_a_, nullptr);
+    {
+      const NvtxRange mixer_range("qw38.mixer_mmv");
+      if (exclusive && error == cudaSuccess) {
+        error = begin_phase(categories, mixer_mmv);
       }
-      if (error == cudaSuccess) {
-        error = matrix_vector(layer.gdn.value_gate, workspace->normalized_,
-                              workspace, workspace->projection_b_, nullptr);
+      if (gdn_layer) {
+        if (error == cudaSuccess) {
+          error = matrix_vector(layer.gdn.packed_qkv, workspace->normalized_,
+                                workspace, workspace->projection_a_, nullptr);
+        }
+        if (error == cudaSuccess) {
+          error = matrix_vector(layer.gdn.value_gate, workspace->normalized_,
+                                workspace, workspace->projection_b_, nullptr);
+        }
+        if (error == cudaSuccess) {
+          error = matrix_vector(layer.gdn.alpha, workspace->normalized_,
+                                workspace, workspace->projection_c_, nullptr);
+        }
+        if (error == cudaSuccess) {
+          error = matrix_vector(layer.gdn.beta, workspace->normalized_,
+                                workspace, workspace->projection_d_, nullptr);
+        }
+      } else {
+        if (error == cudaSuccess) {
+          error = matrix_vector(layer.attention.query_gate,
+                                workspace->normalized_, workspace,
+                                workspace->projection_a_, nullptr);
+        }
+        if (error == cudaSuccess) {
+          error = matrix_vector(layer.attention.key, workspace->normalized_,
+                                workspace, workspace->projection_c_, nullptr);
+        }
+        if (error == cudaSuccess) {
+          error = matrix_vector(layer.attention.value, workspace->normalized_,
+                                workspace, workspace->projection_d_, nullptr);
+        }
       }
-      if (error == cudaSuccess) {
-        error = matrix_vector(layer.gdn.alpha, workspace->normalized_,
-                              workspace, workspace->projection_c_, nullptr);
-      }
-      if (error == cudaSuccess) {
-        error = matrix_vector(layer.gdn.beta, workspace->normalized_, workspace,
-                              workspace->projection_d_, nullptr);
-      }
-      if (error == cudaSuccess) {
-        error = launch_prepare_gdn_gates(
-            workspace->projection_c_, workspace->projection_d_,
-            layer.gdn.folded_a, layer.gdn.dt_bias, 16, 3,
-            workspace->gdn_decay_, workspace->gdn_update_, nullptr);
-      }
-      const GdnState committed{
-          session->gdn_convolution_ +
-              gdn_slot * internal::kGdnConvolutionValues,
-          session->gdn_recurrent_ +
-              gdn_slot * internal::kGdnRecurrentStateValues};
-      const GdnState candidate{
-          workspace->gdn_candidate_convolution_ +
-              gdn_slot * internal::kGdnConvolutionValues,
-          workspace->gdn_candidate_recurrent_ +
-              gdn_slot * internal::kGdnRecurrentStateValues};
-      if (error == cudaSuccess) {
-        error = launch_gdn_prepare_tiled(
-            kGdnConfig, workspace->projection_a_, layer.gdn.convolution,
-            workspace->gdn_decay_, workspace->gdn_update_, committed,
-            candidate, workspace->gdn_convolved_,
-            workspace->gdn_recurrent_output_, nullptr);
-      }
-      if (error == cudaSuccess) {
-        error = launch_gdn_gated_output(
-            workspace->gdn_recurrent_output_, workspace->projection_b_,
-            layer.gdn.norm, 16, 3, 128, workspace->projected_bf16_, nullptr);
-      }
-      if (error == cudaSuccess) {
-        error = matrix_vector(layer.gdn.output, workspace->projected_bf16_,
-                              workspace, workspace->mixer_output_, nullptr);
-      }
-      ++gdn_slot;
-    } else {
-      if (error == cudaSuccess) {
-        error = matrix_vector(layer.attention.query_gate,
-                              workspace->normalized_, workspace,
-                              workspace->projection_a_, nullptr);
-      }
-      if (error == cudaSuccess) {
-        error = matrix_vector(layer.attention.key, workspace->normalized_,
-                              workspace, workspace->projection_c_, nullptr);
-      }
-      if (error == cudaSuccess) {
-        error = matrix_vector(layer.attention.value, workspace->normalized_,
-                              workspace, workspace->projection_d_, nullptr);
-      }
-      if (error == cudaSuccess) {
-        error = launch_split_attention_query_gate(
-            workspace->projection_a_, 24, 256, workspace->gdn_convolved_,
-            workspace->projection_b_, nullptr);
-      }
-      const AttentionConfig config{24, 4, 256, 64,
-                                   static_cast<std::uint32_t>(session->capacity_)};
-      const std::size_t cache_stride =
-          session->capacity_ * internal::kAttentionKvWidth;
-      const AttentionCache committed{
-          session->attention_key_ + attention_slot * cache_stride,
-          session->attention_value_ + attention_slot * cache_stride};
-      const AttentionCache candidate{
-          workspace->attention_candidate_key_ +
-              attention_slot * internal::kAttentionKvWidth,
-          workspace->attention_candidate_value_ +
-              attention_slot * internal::kAttentionKvWidth};
-      if (error == cudaSuccess) {
-        error = launch_attention_prepare(
-            config, session->frontier_, workspace->gdn_convolved_,
-            workspace->projection_c_, workspace->projection_d_,
-            layer.attention.query_norm, layer.attention.key_norm,
-            workspace->projection_b_, committed, candidate,
-            workspace->attention_normalized_query_,
-            workspace->attention_normalized_key_, workspace->attention_scores_,
-            workspace->gdn_recurrent_output_, nullptr);
-      }
-      if (error == cudaSuccess) {
-        error = launch_fp32_to_bf16(
-            workspace->gdn_recurrent_output_, internal::kAttentionQueryWidth,
-            workspace->projected_bf16_, nullptr);
-      }
-      if (error == cudaSuccess) {
-        error = matrix_vector(layer.attention.output,
-                              workspace->projected_bf16_, workspace,
-                              workspace->mixer_output_, nullptr);
-      }
-      ++attention_slot;
+      if (exclusive && error == cudaSuccess) error = end_phase(categories);
     }
-    if (error == cudaSuccess) {
-      residual_add_fp32<<<20, kThreads>>>(
-          residual, workspace->mixer_output_, internal::kResidualWidth, next);
-      error = cudaPeekAtLastError();
+    {
+      const NvtxRange core_range(core_nvtx);
+      if (exclusive && error == cudaSuccess) {
+        error = begin_phase(categories, core);
+      }
+      if (gdn_layer) {
+        if (error == cudaSuccess) {
+          error = launch_prepare_gdn_gates(
+              workspace->projection_c_, workspace->projection_d_,
+              layer.gdn.folded_a, layer.gdn.dt_bias, 16, 3,
+              workspace->gdn_decay_, workspace->gdn_update_, nullptr);
+        }
+        const GdnState committed{
+            session->gdn_convolution_ +
+                gdn_slot * internal::kGdnConvolutionValues,
+            session->gdn_recurrent_ +
+                gdn_slot * internal::kGdnRecurrentStateValues};
+        const GdnState candidate{
+            workspace->gdn_candidate_convolution_ +
+                gdn_slot * internal::kGdnConvolutionValues,
+            workspace->gdn_candidate_recurrent_ +
+                gdn_slot * internal::kGdnRecurrentStateValues};
+        if (error == cudaSuccess) {
+          error = launch_gdn_prepare_tiled(
+              kGdnConfig, workspace->projection_a_, layer.gdn.convolution,
+              workspace->gdn_decay_, workspace->gdn_update_, committed,
+              candidate, workspace->gdn_convolved_,
+              workspace->gdn_recurrent_output_, nullptr);
+        }
+        if (error == cudaSuccess) {
+          error = launch_gdn_gated_output(
+              workspace->gdn_recurrent_output_, workspace->projection_b_,
+              layer.gdn.norm, 16, 3, 128, workspace->projected_bf16_, nullptr);
+        }
+      } else {
+        if (error == cudaSuccess) {
+          error = launch_split_attention_query_gate(
+              workspace->projection_a_, 24, 256, workspace->gdn_convolved_,
+              workspace->projection_b_, nullptr);
+        }
+        const AttentionConfig config{
+            24, 4, 256, 64, static_cast<std::uint32_t>(session->capacity_)};
+        const std::size_t cache_stride =
+            session->capacity_ * internal::kAttentionKvWidth;
+        const AttentionCache committed{
+            session->attention_key_ + attention_slot * cache_stride,
+            session->attention_value_ + attention_slot * cache_stride};
+        const AttentionCache candidate{
+            workspace->attention_candidate_key_ +
+                attention_slot * internal::kAttentionKvWidth,
+            workspace->attention_candidate_value_ +
+                attention_slot * internal::kAttentionKvWidth};
+        if (error == cudaSuccess) {
+          error = launch_attention_prepare(
+              config, session->frontier_, workspace->gdn_convolved_,
+              workspace->projection_c_, workspace->projection_d_,
+              layer.attention.query_norm, layer.attention.key_norm,
+              workspace->projection_b_, committed, candidate,
+              workspace->attention_normalized_query_,
+              workspace->attention_normalized_key_,
+              workspace->attention_scores_, workspace->gdn_recurrent_output_,
+              nullptr);
+        }
+        if (error == cudaSuccess) {
+          error = launch_fp32_to_bf16(
+              workspace->gdn_recurrent_output_, internal::kAttentionQueryWidth,
+              workspace->projected_bf16_, nullptr);
+        }
+      }
+      if (exclusive && error == cudaSuccess) error = end_phase(categories);
     }
-    if (error == cudaSuccess) error = end_phase(categories);
+    {
+      const NvtxRange mixer_range("qw38.mixer_mmv");
+      if (exclusive && error == cudaSuccess) {
+        error = begin_phase(categories, mixer_mmv);
+      }
+      if (gdn_layer) {
+        if (error == cudaSuccess) {
+          error = matrix_vector(layer.gdn.output, workspace->projected_bf16_,
+                                workspace, workspace->mixer_output_, nullptr);
+        }
+        ++gdn_slot;
+      } else {
+        if (error == cudaSuccess) {
+          error = matrix_vector(layer.attention.output,
+                                workspace->projected_bf16_, workspace,
+                                workspace->mixer_output_, nullptr);
+        }
+        ++attention_slot;
+      }
+      {
+        const NvtxRange core_range(core_nvtx);
+        if (error == cudaSuccess) {
+          residual_add_fp32<<<20, kThreads>>>(
+              residual, workspace->mixer_output_, internal::kResidualWidth,
+              next);
+          error = cudaPeekAtLastError();
+        }
+      }
+      if (exclusive && error == cudaSuccess) error = end_phase(categories);
+    }
+    if (!exclusive && error == cudaSuccess) error = end_phase(categories);
     nvtxRangePop();
     nvtxRangePushA("qw38.ffn");
     if (error == cudaSuccess) {
       error = begin_phase(categories,
-                          timings == nullptr ? nullptr : &timings->ffn);
+                          exclusive ? &decode_attribution->ffn_mmv
+                                    : (timings == nullptr ? nullptr
+                                                          : &timings->ffn));
     }
     if (error == cudaSuccess) {
       if (graphs != nullptr) {
@@ -1849,12 +1949,17 @@ Status execute_token(const ResidentModel& model, std::size_t token,
         nvtxRangePushA("qw38.graph_launch");
         error = cudaGraphLaunch(graphs->executions_[layer_index], nullptr);
         nvtxRangePop();
+        const float graph_ms = static_cast<float>(
+            std::chrono::duration<double, std::milli>(
+                std::chrono::steady_clock::now() - graph_started)
+                .count());
         if (timings != nullptr) {
-          timings->graph_launch.milliseconds += static_cast<float>(
-              std::chrono::duration<double, std::milli>(
-                  std::chrono::steady_clock::now() - graph_started)
-                  .count());
+          timings->graph_launch.milliseconds += graph_ms;
           timings->graph_launch.measured = true;
+        }
+        if (decode_attribution != nullptr) {
+          decode_attribution->graph.milliseconds += graph_ms;
+          decode_attribution->graph.measured = true;
         }
       } else {
         const float* next_input_norm =
@@ -1898,7 +2003,9 @@ Status execute_token(const ResidentModel& model, std::size_t token,
   nvtxRangePushA("qw38.logits");
   if (error == cudaSuccess && !interrupted) {
     error = begin_phase(categories,
-                        timings == nullptr ? nullptr : &timings->logits);
+                        decode_attribution == nullptr
+                            ? (timings == nullptr ? nullptr : &timings->logits)
+                            : &decode_attribution->logits);
   }
   if (error == cudaSuccess && !interrupted) {
     rms_norm_fp32_to_bf16<<<1, kThreads>>>(
@@ -1967,7 +2074,9 @@ Status execute_token(const ResidentModel& model, std::size_t token,
   }
   nvtxRangePushA("qw38.state_commit");
   error = begin_phase(categories,
-                      timings == nullptr ? nullptr : &timings->state_commit);
+                      decode_attribution == nullptr
+                          ? (timings == nullptr ? nullptr : &timings->state_commit)
+                          : &decode_attribution->state_commit);
   const std::size_t cache_stride =
       session->capacity_ * internal::kAttentionKvWidth;
   const AttentionConfig commit_config{
@@ -1994,6 +2103,20 @@ Status execute_token(const ResidentModel& model, std::size_t token,
   if (start != nullptr) cudaEventDestroy(start);
   if (error != cudaSuccess) {
     return cuda_status(error, "cannot collect CUDA token attribution");
+  }
+  if (decode_attribution != nullptr) {
+    const Status attribution_status =
+        finish_decode_attribution(decode_attribution, attribution_started);
+    if (!attribution_status.is_ok()) return attribution_status;
+  }
+  if (timings != nullptr && decode_attribution != nullptr) {
+    timings->embedding = decode_attribution->embedding;
+    timings->logits = decode_attribution->logits;
+    timings->state_commit = decode_attribution->state_commit;
+    timings->graph_launch = decode_attribution->graph;
+    timings->gdn = decode_attribution->gdn_core;
+    timings->attention = decode_attribution->attention_core;
+    timings->ffn = decode_attribution->ffn_mmv;
   }
   if (timings != nullptr) {
     const float attributed = timings->embedding.milliseconds +

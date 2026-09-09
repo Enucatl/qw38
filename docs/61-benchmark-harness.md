@@ -1,10 +1,14 @@
 # The benchmark harness
 
-[Index](README.md) · Implementation tasks: BEN-001, EDU-046, and SCH-002 in
-[`implementation_ledger.md`](../implementation_ledger.md) · Contract:
-[`pins/benchmark_contract.json`](../pins/benchmark_contract.json) · Evidence:
-[`fixtures/benchmark_harness.json`](../fixtures/benchmark_harness.json) and
-[`evidence/benchmark`](../evidence/benchmark)
+[Index](README.md) · Implementation tasks: BEN-001, OPT-032, EDU-046, and SCH-002 in
+[`implementation_ledger.md`](../implementation_ledger.md) · Contracts:
+[`pins/benchmark_contract.json`](../pins/benchmark_contract.json),
+[`pins/opt032_decode_oracle_contract.json`](../pins/opt032_decode_oracle_contract.json)
+· Evidence:
+[`fixtures/benchmark_harness.json`](../fixtures/benchmark_harness.json),
+[`evidence/benchmark`](../evidence/benchmark),
+[`fixtures/opt032_decode_oracle.json`](../fixtures/opt032_decode_oracle.json), and
+[`evidence/optimization/opt032-decode-oracle/REPORT.md`](../evidence/optimization/opt032-decode-oracle/REPORT.md)
 
 ## What a benchmark is
 
@@ -120,6 +124,26 @@ graph-replay length; exact 2048 is not. A 2026-09-09 scout sitting under
 fixture. Live same-sitting numbers stay in
 [`evidence/optimization/opt021-4k-oracle/REPORT.md`](../evidence/optimization/opt021-4k-oracle/REPORT.md).
 
+OPT-032 is a frozen exclusive-RTX-5090 **P, D128, and D2048 oracle sitting**,
+not a BEN-001 `qw38-bench` result and not a change to this harness or its JSON
+schema. P reuses the 4K keep/reject protocol (exact 4096, attribution null,
+graphs created, three cold replicates versus same-sitting `llama-bench -p 4096
+-n 0 --no-warmup -r 3 -ngl 99`). D128 and D2048 are operational decode
+steering oracles: prefix exactly 128 or 2048 committed tokens, then 256
+predetermined one-token evaluations (no sampling), 3 warm-ups and 30 measured
+runs, host `steady_clock` around each full production `execute_token`. The
+matched llama.cpp denominator is `qw38-llama-decode-oracle MODEL.gguf PREFIX`
+through pinned `llama.h` and `llama_time_us()` (`PREFIX` 128 or 2048). Random-
+token `llama-bench -p 0 -n 256 -d 128` and `-d 2048` in the same sitting are
+informational only; they are not the keep/reject denominator. BEN-001
+`--smoke` decode (short chat-rendered prompts, two generated tokens, composite
+`component_probe`) is inadmissible as D128/D2048. Public `RuntimeTimings` /
+`component_probe` stay composite. This sitting **claims no performance
+improvement**, does not substitute for the 2K llama.cpp parity gate, and does
+not require Quartz ≥ llama.cpp. Live tok/s stay in
+[`evidence/optimization/opt032-decode-oracle/REPORT.md`](../evidence/optimization/opt032-decode-oracle/REPORT.md)
+and [`fixtures/opt032_decode_oracle.json`](../fixtures/opt032_decode_oracle.json).
+
 An unavailable measurement is JSON `null`, not zero. Zero would mean an event
 was measured and took no representable time. Queue time is `null` because this
 single-process harness has no HTTP queue. Persistence is `null` when no save or
@@ -177,7 +201,10 @@ the scaling `llama-bench` 2K object as an independent same-GGUF denominator; it
 does not change this harness, its JSON schema, or admit 2K llama.cpp parity.
 OPT-021 likewise leaves this harness unchanged: the 4K keep/reject oracle is a
 separate diagnostic sitting, not a BEN-001 workload, not the 2K parity gate,
-and not an admission of Quartz ≥ llama.cpp.
+and not an admission of Quartz ≥ llama.cpp. OPT-032 likewise leaves this
+harness unchanged: the P/D128/D2048 oracles and the pinned `llama.h` decode
+driver are separate diagnostics; random llama-bench decode is informational;
+exclusive decode categories are not `component_probe` fields.
 
 ## Reproduce a smoke safely
 

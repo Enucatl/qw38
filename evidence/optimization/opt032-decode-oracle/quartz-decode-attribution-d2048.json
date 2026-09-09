@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "task": "OPT-032",
+  "status": "measured",
+  "device": "NVIDIA GeForce RTX 5090",
+  "compute_capability": "12.0",
+  "driver": "13.1",
+  "runtime": "13.0",
+  "toolkit": "CUDA 13.0.2",
+  "pinned_image": "qw38-cuda:13.0.2",
+  "measurement_utc": "2026-09-09T16:07:10Z",
+  "prefix": 2048,
+  "graphs_created": true,
+  "categories_ms": {
+    "embedding": 0.0416320004,
+    "mixer_mmv": 11.8714857,
+    "gdn_core": 2.06646395,
+    "attention_core": 201.241058,
+    "ffn_mmv": 41.7385025,
+    "logits": 2.52643204,
+    "state_commit": 0.0249920003,
+    "graph": 0.47685203,
+    "other_idle": 0
+  },
+  "attributed_sum_ms": 259.987396,
+  "wall_ms": 259.987396,
+  "nsight_systems": "not_used",
+  "nsight_compute": "not_used"
+}

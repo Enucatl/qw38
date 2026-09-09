@@ -98,7 +98,7 @@ are repository-relative unless stated otherwise.
 | OPT-029 | Fuse GDN conv and gated output | OPT-019, OPT-021 | done | Collapse tiled causal conv and/or gated-output into the warp-column fused GDN token loop under frozen GDN-002 envelopes when a paired A/B wins; cold exact-4096 mean tok/s strictly beats the then-current oracle baseline or the change is reverted with a retained rejection; does not substitute for OPT-016 | [`tasks/OPT-029.md`](tasks/OPT-029.md); [`pins/opt029_gdn_fuse_contract.json`](pins/opt029_gdn_fuse_contract.json); [`fixtures/opt029_gdn_fuse.json`](fixtures/opt029_gdn_fuse.json); [`cuda/prefill_4k_gdn_fuse_test.cu`](cuda/prefill_4k_gdn_fuse_test.cu); [`evidence/optimization/opt029-gdn-fuse/REPORT.md`](evidence/optimization/opt029-gdn-fuse/REPORT.md); [`evidence/optimization/opt029-gdn-fuse/REJECTION.md`](evidence/optimization/opt029-gdn-fuse/REJECTION.md); verification 2026-09-09T10:50:03Z |
 | OPT-030 | Hopper/Blackwell PDL prompt launches | OPT-021 | done | Successive prompt kernels use programmatic dependent launch (PDL) serialization on sm_120 where a paired A/B wins versus current stream launches; arithmetic and graph-vs-fused byte equality stay; cold exact-4096 mean tok/s strictly beats the then-current oracle baseline or the change is reverted with a retained rejection; does not substitute for OPT-016 | [`tasks/OPT-030.md`](tasks/OPT-030.md); [`pins/opt030_pdl_launches_contract.json`](pins/opt030_pdl_launches_contract.json); [`fixtures/opt030_pdl_launches.json`](fixtures/opt030_pdl_launches.json); [`cuda/prefill_4k_pdl_test.cu`](cuda/prefill_4k_pdl_test.cu); [`evidence/optimization/opt030-pdl-launches/REPORT.md`](evidence/optimization/opt030-pdl-launches/REPORT.md); [`evidence/optimization/opt030-pdl-launches/REJECTION.md`](evidence/optimization/opt030-pdl-launches/REJECTION.md); verification 2026-09-09T11:34:14Z |
 | OPT-031 | Mixer and GDN 4096 prompt graphs | OPT-012, OPT-021 | pending | Capture stable-address mixer Q8 and fused GDN prompt subgraphs beside existing FFN graphs and replay when `token_count == 4096`; attention KV stays outside; graph-vs-fused byte equality; cold exact-4096 mean tok/s strictly beats the then-current oracle baseline or the change is reverted with a retained rejection; does not substitute for OPT-016 | — |
-| OPT-032 | Freeze decode oracle and refresh sink attribution | BEN-001, OPT-020, OPT-026 | in_progress | Extend diagnostics with fresh P, D128, and D2048 baselines, exclusive decode categories, and matched pinned llama.cpp measurements; accept complete reproducible evidence and a recorded next-task order; this task claims no performance improvement | [`tasks/OPT-032.md`](tasks/OPT-032.md) |
+| OPT-032 | Freeze decode oracle and refresh sink attribution | BEN-001, OPT-020, OPT-026 | done | Extend diagnostics with fresh P, D128, and D2048 baselines, exclusive decode categories, and matched pinned llama.cpp measurements; accept complete reproducible evidence and a recorded next-task order; this task claims no performance improvement | [`tasks/OPT-032.md`](tasks/OPT-032.md); [`pins/opt032_decode_oracle_contract.json`](pins/opt032_decode_oracle_contract.json); [`fixtures/opt032_decode_oracle.json`](fixtures/opt032_decode_oracle.json); [`evidence/optimization/opt032-decode-oracle/REPORT.md`](evidence/optimization/opt032-decode-oracle/REPORT.md); verification 2026-09-09T16:08:20Z |
 | OPT-033 | Retain attention value sums in registers | OPT-032, OPT-026 | pending | A/B full 4096-row attention including combine; keep register-resident value accumulation only with byte-equal output, lower component time, improved P, and the cross-workload guard; otherwise reject | — |
 | OPT-034 | Packed blockwise Q4_K/Q6_K MMV loads | OPT-032, CUD-001 | pending | A/B production batch-1 projection shapes with unchanged packed staging and FP32 lane/reduction order; keep only with byte equality, lower weighted MMV time, improved D2048, and the cross-workload guard; otherwise reject | — |
 | OPT-035 | MMA attention probability times V | OPT-033 | pending | A/B full 4096-row attention using dual-F16 probability×V MMA; retain frozen attention envelopes, lower component time, improved P, and the cross-workload guard; otherwise reject | — |
@@ -4781,3 +4781,39 @@ are repository-relative unless stated otherwise.
   bookkeeping on top of the already-committed reject evidence. `plan.md`
   is unchanged. OPT-016 stays `blocked`. OPT-032 remains independently
   `in_progress`.
+
+### 2026-09-09T16:28:45Z — OPT-032 delivered (measurement; no speedup)
+
+- Independent verification attempt 1 passed. This increment installs no
+  production kernel and claims no performance improvement
+  (`claims_performance_improvement` false; speedup N/A). Exclusive RTX
+  5090 sitting `measurement_utc` 2026-09-09T15:07:45Z wrote
+  [`fixtures/opt032_decode_oracle.json`](fixtures/opt032_decode_oracle.json)
+  with complete P, D128, and D2048 protocols, exclusive decode
+  categories, matched pinned llama.cpp public-API measurements, and a
+  host-recomputed `next_task_order`. Historical OPT-026 P
+  [`fixtures/opt026_fattn_streamk.json`](fixtures/opt026_fattn_streamk.json)
+  **1746.71973** tok/s → fresh P Quartz **1637.58594** (llama.cpp
+  `avg_ts` **3139.909678**). D128 Quartz **11.8731956** vs llama.cpp
+  **68.506172**. D2048 Quartz **3.70951414** vs llama.cpp **66.9333082**.
+  `p_gap` 1.9174014635225802; `d2048_gap` 18.04368595829102;
+  `decode_deficit_larger` true. `next_task_order`
+  `["OPT-036", "OPT-033", "OPT-035", "OPT-034", "OPT-037"]`. Native test
+  does not require Quartz ≥ llama.cpp. Coupled IDs: none. Delivery
+  re-check:
+  `uv run pytest -q tests/test_documentation.py tests/test_opt032_decode_oracle.py`.
+- Acceptance evidence: [`tasks/OPT-032.md`](tasks/OPT-032.md);
+  [`pins/opt032_decode_oracle_contract.json`](pins/opt032_decode_oracle_contract.json);
+  [`fixtures/opt032_decode_oracle.json`](fixtures/opt032_decode_oracle.json);
+  [`evidence/optimization/opt032-decode-oracle/REPORT.md`](evidence/optimization/opt032-decode-oracle/REPORT.md);
+  [`docs/06-system-optimization.md`](docs/06-system-optimization.md);
+  [`docs/51-runtime-timing-and-nvtx.md`](docs/51-runtime-timing-and-nvtx.md);
+  [`docs/61-benchmark-harness.md`](docs/61-benchmark-harness.md);
+  [`docs/62-cuda-full-prefill.md`](docs/62-cuda-full-prefill.md).
+  Proof is frozen P/D128/D2048 oracles, exclusive decode attribution,
+  matched llama.cpp measurements, and a recorded next-task order, not a
+  throughput keep and not the 2K llama.cpp parity gate.
+- Marked OPT-032 `done`; delivery is limited to the verified task scope
+  plus this ledger/audit bookkeeping. `plan.md` is unchanged. OPT-016
+  stays `blocked`. OPT-033–OPT-037 remain `pending`. Next eligible
+  pending by ledger row order: **OPT-031**.

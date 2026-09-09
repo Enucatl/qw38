@@ -786,6 +786,32 @@ baseline.
   baseline; envelopes unloosened; OPT-016 remains the parity gate
   owner; does not substitute for the 2K llama.cpp parity gate; Quartz
   ≥ llama.cpp is not this gate.
+- OPT-032 introduces no new external implementation source. Pinned llama.cpp
+  revision `cc83d7b4824f73cfdda4dfbb47ee39804f71b328` is already the External
+  same-GGUF authority (`llama-bench` for P; public `llama.h` /
+  `llama_time_us()` for D128/D2048). This increment freezes a local exclusive-
+  RTX-5090 P/D128/D2048 oracle sitting: exact-4096 production `sync_tokens`
+  with attribution null and graphs created, plus prefix-128 and prefix-2048
+  decode (256 predetermined tokens, 3 warm + 30 measured) matched by
+  `qw38-llama-decode-oracle`. Random-token `llama-bench` decode is
+  informational. Exclusive decode categories live on opt-in
+  `DecodeAttribution`; public `RuntimeTimings` stay composite. The schema-1
+  contract, retained live fixture, and claim-labeled report are
+  [`pins/opt032_decode_oracle_contract.json`](../pins/opt032_decode_oracle_contract.json),
+  [`fixtures/opt032_decode_oracle.json`](../fixtures/opt032_decode_oracle.json),
+  and
+  [`evidence/optimization/opt032-decode-oracle/REPORT.md`](../evidence/optimization/opt032-decode-oracle/REPORT.md).
+  Live tok/s stay in that report; this ledger does not replace them. The
+  beginner explanations are
+  [`docs/61-benchmark-harness.md`](61-benchmark-harness.md),
+  [`docs/51-runtime-timing-and-nvtx.md`](51-runtime-timing-and-nvtx.md),
+  [`docs/06-system-optimization.md`](06-system-optimization.md), and
+  [`docs/62-cuda-full-prefill.md`](62-cuda-full-prefill.md).
+  Proof limit: D128 and D2048 oracles; exclusive decode categories; matched
+  pinned llama.cpp; recorded next-task order; claims no performance
+  improvement; envelopes unloosened; does not substitute for the 2K llama.cpp
+  parity gate; llama-bench random decode is informational. Quartz ≥ llama.cpp
+  is not this gate. No kernel implementation was copied or adapted.
 - CUD-003 introduces no new external implementation source. GGUF Q8_0 decoding
   follows the format already admitted by the pinned scalar decoder, and the
   pointwise/layout equations come from the pinned model contract and scalar

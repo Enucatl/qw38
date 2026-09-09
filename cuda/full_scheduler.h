@@ -127,6 +127,19 @@ struct PrefillAttribution final {
   std::uint32_t prompt_graph_launches = 0;
 };
 
+struct DecodeAttribution final {
+  TimingValue embedding;
+  TimingValue mixer_mmv;
+  TimingValue gdn_core;
+  TimingValue attention_core;
+  TimingValue ffn_mmv;
+  TimingValue logits;
+  TimingValue state_commit;
+  TimingValue graph;
+  TimingValue other_idle;
+  TimingValue wall;
+};
+
 enum class PointwisePath : std::uint8_t {
   kFused = 0,
   kUnfused = 1,
@@ -200,7 +213,7 @@ class ResidentModel final {
                               float*, std::size_t, float*, std::size_t,
                               float*, const EvalControl*,
                               RuntimeTimings*, PointwisePath,
-                              SchedulerGraphs*) noexcept;
+                              SchedulerGraphs*, DecodeAttribution*) noexcept;
   friend Status sync_tokens(const ResidentModel&, const std::size_t*,
                             std::size_t, class SchedulerSession*,
                             class SchedulerWorkspace*, float*, std::size_t,
@@ -264,7 +277,7 @@ class SchedulerSession final {
                               float*, std::size_t, float*, std::size_t,
                               float*, const EvalControl*,
                               RuntimeTimings*, PointwisePath,
-                              SchedulerGraphs*) noexcept;
+                              SchedulerGraphs*, DecodeAttribution*) noexcept;
   friend Status sync_tokens(const ResidentModel&, const std::size_t*,
                             std::size_t, SchedulerSession*,
                             class SchedulerWorkspace*, float*, std::size_t,
@@ -354,7 +367,7 @@ class SchedulerWorkspace final {
                               std::size_t, float*, std::size_t,
                               float*, const EvalControl*,
                               RuntimeTimings*, PointwisePath,
-                              SchedulerGraphs*) noexcept;
+                              SchedulerGraphs*, DecodeAttribution*) noexcept;
   friend Status sync_tokens(const ResidentModel&, const std::size_t*,
                             std::size_t, SchedulerSession*, SchedulerWorkspace*,
                             float*, std::size_t, float*, std::size_t,
@@ -406,7 +419,8 @@ class SchedulerGraphs final {
                               SchedulerSession*, SchedulerWorkspace*, float*,
                               std::size_t, float*, std::size_t, float*,
                               const EvalControl*, RuntimeTimings*,
-                              PointwisePath, SchedulerGraphs*) noexcept;
+                              PointwisePath, SchedulerGraphs*,
+                              DecodeAttribution*) noexcept;
   friend Status execute_prompt_chunk(
       const ResidentModel&, const std::size_t*, std::size_t,
       SchedulerSession*, SchedulerWorkspace*, float*, std::size_t, float*,
@@ -424,7 +438,8 @@ Status execute_token(const ResidentModel& model, std::size_t token,
                      RuntimeTimings* timings = nullptr,
                      PointwisePath pointwise_path =
                          PointwisePath::kFused,
-                     SchedulerGraphs* graphs = nullptr) noexcept;
+                     SchedulerGraphs* graphs = nullptr,
+                     DecodeAttribution* decode_attribution = nullptr) noexcept;
 
 #ifdef QW38_DIAGNOSTIC_TRACE
 Status execute_token_traced(const ResidentModel& model, std::size_t token,
