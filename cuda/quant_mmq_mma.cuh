@@ -12,7 +12,10 @@
 // CUDA-event A/B strictly beats I=128. OPT-024 may dispatch large mixer
 // Q8_0 (output_rows >= 128) through an aligned-SoA D2R / int8 MMA path
 // when a paired CUDA-event A/B strictly beats quality MMA; otherwise
-// large GEMMs stay I=128 quality MMA. Output is token-major FP32
+// large GEMMs stay I=128 quality MMA. OPT-025 may reuse one Q4_K DS4 Q8_1
+// of the FFN input for gate and up and write down-leg Y from SwiGLU
+// without a global BF16 mid store when a paired CUDA-event A/B strictly
+// beats per-GEMM quantize. Output is token-major FP32
 // [prompt_rows, output_rows]. Production Q8_0 is launched via
 // launch_q8_mmq_bf16, not launch_quant_mmq.
 //
@@ -449,6 +452,53 @@ __global__ void quantize_mmq_q8_1_bf16(const __nv_bfloat16* prompt,
   }
   const int q =
       scale == 0.0F ? 0 : static_cast<int>(roundf(value / scale));
+  if (index >= count) return;
+  const std::size_t row = index / columns;
+  const std::size_t col = index % columns;
+  const std::size_t k32 = col / 32;
+  const std::size_t k_block = k32 / 4;
+  const std::size_t group = k32 % 4;
+  std::uint8_t* block =
+      y + (k_block * prompt_rows + row) * (kMmqTileYk * sizeof(int));
+  reinterpret_cast<std::int8_t*>(block + 16)[group * 32 + lane] =
+      static_cast<std::int8_t>(q);
+  if (lane == 0) {
+    if constexpr (Kind == QuantKind::kQ4K) {
+      reinterpret_cast<half2*>(block)[group] = make_half2(scale, prequant_sum);
+    } else {
+      reinterpret_cast<float*>(block)[group] = scale;
+    }
+  }
+}
+
+template <QuantKind Kind>
+__global__ void quantize_mmq_q8_1_swiglu(const float* gate, const float* up,
+                                         std::size_t prompt_rows,
+                                         std::size_t columns, std::uint8_t* y) {
+  const std::size_t index =
+      static_cast<std::size_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+  const int lane = threadIdx.x & 31;
+  const std::size_t count = prompt_rows * columns;
+  float activated = 0.0F;
+  if (index < count) {
+    const float g = gate[index];
+    activated = (g / (1.0F + expf(-g))) * up[index];
+  }
+  const float value =
+      index < count ? __bfloat162float(__float2bfloat16_rn(activated)) : 0.0F;
+  float maximum = fabsf(value);
+  for (int offset = 16; offset > 0; offset /= 2) {
+    maximum = fmaxf(maximum, __shfl_xor_sync(0xFFFFFFFFU, maximum, offset, 32));
+  }
+  const float scale = maximum == 0.0F ? 0.0F : maximum / 127.0F;
+  float prequant_sum = 0.0F;
+  if constexpr (Kind == QuantKind::kQ4K) {
+    prequant_sum = value;
+    for (int offset = 16; offset > 0; offset /= 2) {
+      prequant_sum += __shfl_xor_sync(0xFFFFFFFFU, prequant_sum, offset, 32);
+    }
+  }
+  const int q = scale == 0.0F ? 0 : static_cast<int>(roundf(value / scale));
   if (index >= count) return;
   const std::size_t row = index / columns;
   const std::size_t col = index % columns;
@@ -1083,6 +1133,60 @@ cudaError_t launch_quantize_mmq_q8_1(QuantKind kind, const __nv_bfloat16* prompt
   return cudaPeekAtLastError();
 }
 
+cudaError_t launch_quant_mmq_mma_y(
+    QuantKind kind, const std::uint8_t* weights, std::size_t output_rows,
+    std::size_t columns, const Q8Block* y, std::size_t prompt_rows,
+    float* output, cudaStream_t stream) noexcept {
+  if (weights == nullptr || y == nullptr || output == nullptr ||
+      output_rows == 0 || columns == 0 || prompt_rows == 0 ||
+      columns % kMmaBlockValues != 0 ||
+      (kind != QuantKind::kQ4K && kind != QuantKind::kQ6K)) {
+    return cudaErrorInvalidValue;
+  }
+  const unsigned int prompt_tile = selected_mma_mmq_prompt_tile();
+  const int* packed = reinterpret_cast<const int*>(y);
+  if (kind == QuantKind::kQ4K) {
+    if (prompt_tile == 32) {
+      return launch_quality_dispatch<QuantKind::kQ4K, 32>(
+          weights, output_rows, columns, packed, prompt_rows, output, stream);
+    }
+    if (prompt_tile == 128) {
+      return launch_quality_dispatch<QuantKind::kQ4K, 128>(
+          weights, output_rows, columns, packed, prompt_rows, output, stream);
+    }
+    return launch_quality_dispatch<QuantKind::kQ4K, 64>(
+        weights, output_rows, columns, packed, prompt_rows, output, stream);
+  }
+  if (prompt_tile == 32) {
+    return launch_quality_dispatch<QuantKind::kQ6K, 32>(
+        weights, output_rows, columns, packed, prompt_rows, output, stream);
+  }
+  if (prompt_tile == 128) {
+    return launch_quality_dispatch<QuantKind::kQ6K, 128>(
+        weights, output_rows, columns, packed, prompt_rows, output, stream);
+  }
+  return launch_quality_dispatch<QuantKind::kQ6K, 64>(
+      weights, output_rows, columns, packed, prompt_rows, output, stream);
+}
+
+cudaError_t launch_swiglu_quantize_mmq_q8_1(const float* gate, const float* up,
+                                            std::size_t prompt_rows,
+                                            std::size_t columns, Q8Block* y,
+                                            cudaStream_t stream) noexcept {
+  if (gate == nullptr || up == nullptr || y == nullptr || prompt_rows == 0 ||
+      columns == 0 || columns % kMmaBlockValues != 0) {
+    return cudaErrorInvalidValue;
+  }
+  const std::size_t count = prompt_rows * columns;
+  const unsigned int blocks = static_cast<unsigned int>(
+      (count + static_cast<std::size_t>(kQualityQuantThreads) - 1) /
+      static_cast<std::size_t>(kQualityQuantThreads));
+  quantize_mmq_q8_1_swiglu<QuantKind::kQ4K>
+      <<<blocks, kQualityQuantThreads, 0, stream>>>(
+          gate, up, prompt_rows, columns, reinterpret_cast<std::uint8_t*>(y));
+  return cudaPeekAtLastError();
+}
+
 cudaError_t launch_quant_mmq_mma_tile(
     QuantKind kind, const std::uint8_t* weights, std::size_t output_rows,
     std::size_t columns, const __nv_bfloat16* prompt, std::size_t prompt_rows,
@@ -1098,29 +1202,33 @@ cudaError_t launch_quant_mmq_mma_tile(
   cudaError_t error = launch_quantize_mmq_q8_1(
       kind, prompt, prompt_rows, columns, q8_workspace, stream);
   if (error != cudaSuccess) return error;
-  const int* y = reinterpret_cast<const int*>(q8_workspace);
-  if (kind == QuantKind::kQ4K) {
-    if (prompt_tile == 32) {
-      error = launch_quality_dispatch<QuantKind::kQ4K, 32>(
-          weights, output_rows, columns, y, prompt_rows, output, stream);
-    } else if (prompt_tile == 128) {
-      error = launch_quality_dispatch<QuantKind::kQ4K, 128>(
-          weights, output_rows, columns, y, prompt_rows, output, stream);
-    } else {
-      error = launch_quality_dispatch<QuantKind::kQ4K, 64>(
-          weights, output_rows, columns, y, prompt_rows, output, stream);
+  if (prompt_tile != selected_mma_mmq_prompt_tile()) {
+    const int* packed = reinterpret_cast<const int*>(q8_workspace);
+    if (kind == QuantKind::kQ4K) {
+      if (prompt_tile == 32) {
+        return launch_quality_dispatch<QuantKind::kQ4K, 32>(
+            weights, output_rows, columns, packed, prompt_rows, output, stream);
+      }
+      if (prompt_tile == 128) {
+        return launch_quality_dispatch<QuantKind::kQ4K, 128>(
+            weights, output_rows, columns, packed, prompt_rows, output, stream);
+      }
+      return launch_quality_dispatch<QuantKind::kQ4K, 64>(
+          weights, output_rows, columns, packed, prompt_rows, output, stream);
     }
-  } else if (prompt_tile == 32) {
-    error = launch_quality_dispatch<QuantKind::kQ6K, 32>(
-        weights, output_rows, columns, y, prompt_rows, output, stream);
-  } else if (prompt_tile == 128) {
-    error = launch_quality_dispatch<QuantKind::kQ6K, 128>(
-        weights, output_rows, columns, y, prompt_rows, output, stream);
-  } else {
-    error = launch_quality_dispatch<QuantKind::kQ6K, 64>(
-        weights, output_rows, columns, y, prompt_rows, output, stream);
+    if (prompt_tile == 32) {
+      return launch_quality_dispatch<QuantKind::kQ6K, 32>(
+          weights, output_rows, columns, packed, prompt_rows, output, stream);
+    }
+    if (prompt_tile == 128) {
+      return launch_quality_dispatch<QuantKind::kQ6K, 128>(
+          weights, output_rows, columns, packed, prompt_rows, output, stream);
+    }
+    return launch_quality_dispatch<QuantKind::kQ6K, 64>(
+        weights, output_rows, columns, packed, prompt_rows, output, stream);
   }
-  return error;
+  return launch_quant_mmq_mma_y(kind, weights, output_rows, columns,
+                                q8_workspace, prompt_rows, output, stream);
 }
 
 cudaError_t launch_quant_mmq_mma(
@@ -1366,6 +1474,20 @@ cudaError_t launch_q8_mmq_d2r(const std::uint8_t* soa, std::size_t output_rows,
   const int* packed = reinterpret_cast<const int*>(y);
   return launch_quality_dispatch<QuantKind::kQ8_0, 128, kQualityI, true>(
       soa, output_rows, columns, packed, prompt_rows, output, stream);
+}
+
+constexpr const char kSelectedFfnPath[] = "shared_y_swiglu_q8";
+
+const char* selected_ffn_path() noexcept { return kSelectedFfnPath; }
+
+bool ffn_shares_gate_up_y() noexcept {
+  return std::strcmp(kSelectedFfnPath, "shared_y") == 0 ||
+         std::strcmp(kSelectedFfnPath, "shared_y_swiglu_q8") == 0;
+}
+
+bool ffn_swiglu_writes_q8() noexcept {
+  return std::strcmp(kSelectedFfnPath, "swiglu_q8") == 0 ||
+         std::strcmp(kSelectedFfnPath, "shared_y_swiglu_q8") == 0;
 }
 
 }  // namespace qw38::cuda

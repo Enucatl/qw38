@@ -532,6 +532,25 @@ llama.cpp. Live numbers stay in the report:
 and
 [`evidence/optimization/opt024-mixer-q8-d2r/REJECTION.md`](../evidence/optimization/opt024-mixer-q8-d2r/REJECTION.md).
 
+OPT-025 lands dense prompt FFN shared-Y and SwiGLU-into-down Q8 for Q4_K
+gate/up/down. **Measured, RTX 5090:** paired CUDA-event A/B on the production
+FFN shapes among `baseline`, `shared_y`, `swiglu_q8`, and
+`shared_y_swiglu_q8`; winner `shared_y_swiglu_q8` is strictly faster than
+per-GEMM quantize plus BF16 SwiGLU. Production `execute_prompt_ffn` (fused
+graphs and unfused) quantizes the FFN-norm activation once for gate and up
+and writes down-leg DS4 Y from SwiGLU without a global BF16 mid store.
+Mixer Q8 quality MMA, skinny `mma_i32_j128`, and the D2R reject stay.
+Decode FFN stays MMV. The OPT-009 tiled-versus-reference pair remains
+byte-exact. Live exclusive sitting keep: Quartz mean strictly greater than
+the frozen successor-oracle baseline **1687.86169**; `reverted` false;
+`successor_oracle` true; `production_ffn_optimized` true. `quartz_meets_llama`
+is informational and is not this gate. **The 2K parity owner remains the
+blocked dedicated gate.** This keep does not substitute for that gate and
+does not claim Quartz ≥ llama.cpp. Live numbers stay in the report:
+[`evidence/optimization/opt025-ffn-shared-y/REPORT.md`](../evidence/optimization/opt025-ffn-shared-y/REPORT.md),
+[`pins/opt025_ffn_shared_y_contract.json`](../pins/opt025_ffn_shared_y_contract.json),
+and [`fixtures/opt025_ffn_shared_y.json`](../fixtures/opt025_ffn_shared_y.json).
+
 The **proof boundary** excludes comparative speed claims, 2K/8K sustained
 prefill throughput, execution of a 128K prefill, 128K retrieval quality, thermal
 stability, superiority to llama.cpp/vLLM, and a Nsight Systems overlap timeline.

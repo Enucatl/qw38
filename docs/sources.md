@@ -584,6 +584,35 @@ baseline.
   reference remains byte-exact; OPT-016 remains the parity gate owner;
   does not substitute for the 2K llama.cpp parity gate; Quartz ≥ llama.cpp
   is not this gate.
+- OPT-025 adapts llama.cpp revision
+  `cc83d7b4824f73cfdda4dfbb47ee39804f71b328` (MIT, The ggml authors)
+  `quantize.cu` `quantize_mmq_q8_1` DS4 `block_q8_1_mmq` packing as the
+  shared gate/up Y and SwiGLU-into-down Y layout. Q4_K MMA numeric
+  admission remains ds4 `cuda/mmq/test/test_mmq_parity.cu` Q4_K parity
+  association. This increment does not copy `../ds4/cuda/mmq/` and does
+  not include ggml headers. Production prompt FFN Q4_K reuses one DS4
+  Q8_1 of the FFN-norm activation for gate and up and writes down-leg Y
+  from SwiGLU with a register BF16 round-trip and no global BF16 mid
+  store. Mixer Q8_0 quality MMA, skinny `mma_i32_j128`, and the D2R
+  reject stay. Decode FFN stays MMV. The OPT-009 tiled kernel remains the
+  unloosened byte-exact reference versus `launch_q8_mmq_bf16_reference`.
+  **Measured, RTX 5090:** A/B winner `shared_y_swiglu_q8`; live exclusive
+  cold exact-4096 keep versus the frozen successor-oracle baseline
+  1687.86169; `reverted` false; `successor_oracle` true;
+  `production_ffn_optimized` true. Live numbers stay in the report; this
+  ledger does not replace them. The schema-1 contract, measured fixture,
+  and report are
+  [`pins/opt025_ffn_shared_y_contract.json`](../pins/opt025_ffn_shared_y_contract.json),
+  [`fixtures/opt025_ffn_shared_y.json`](../fixtures/opt025_ffn_shared_y.json),
+  and
+  [`evidence/optimization/opt025-ffn-shared-y/REPORT.md`](../evidence/optimization/opt025-ffn-shared-y/REPORT.md).
+  The beginner explanation is
+  [`docs/40-cuda-prompt-mmq.md`](40-cuda-prompt-mmq.md).
+  Proof limit: dense FFN shared-Y and SwiGLU-into-down Q8 under unloosened
+  Q4_K association; 4K keep/reject versus the then-current oracle
+  baseline; envelopes unloosened; OPT-009 Q8_0 reference remains
+  byte-exact; OPT-016 remains the parity gate owner; does not substitute
+  for the 2K llama.cpp parity gate; Quartz ≥ llama.cpp is not this gate.
 - CUD-003 introduces no new external implementation source. GGUF Q8_0 decoding
   follows the format already admitted by the pinned scalar decoder, and the
   pointwise/layout equations come from the pinned model contract and scalar

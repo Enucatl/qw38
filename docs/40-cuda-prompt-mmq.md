@@ -1,6 +1,6 @@
 # 40. Tiled CUDA multiplication for prompt rows
 
-[Index](README.md) · Implementation tasks: CUD-002, OPT-009, OPT-015, OPT-017, OPT-018, OPT-022, OPT-023, OPT-024, and EDU-026 in
+[Index](README.md) · Implementation tasks: CUD-002, OPT-009, OPT-015, OPT-017, OPT-018, OPT-022, OPT-023, OPT-024, OPT-025, and EDU-026 in
 [`implementation_ledger.md`](../implementation_ledger.md)
 
 [Chapter 39](39-cuda-quant-mmv.md) multiplied one activation vector by a packed
@@ -538,3 +538,44 @@ persistent `cudaMalloc`; skinny α/β unchanged; **does not substitute for the
 [`evidence/optimization/opt024-mixer-q8-d2r/REPORT.md`](../evidence/optimization/opt024-mixer-q8-d2r/REPORT.md),
 and
 [`evidence/optimization/opt024-mixer-q8-d2r/REJECTION.md`](../evidence/optimization/opt024-mixer-q8-d2r/REJECTION.md).
+
+## OPT-025 dense FFN shared-Y and SwiGLU-into-down Q8
+
+Prompt Q4_K FFN gate and up share one DS4 Q8_1 of the post-mixer FFN-norm
+activation. SwiGLU writes down-leg Q8_1 MMQ Y from FP32 gate×up with a
+register BF16 round-trip and no global BF16 mid store. `launch_swiglu_bf16`
+and `launch_quant_mmq_mma` remain the visible references. Mixer Q8_0 quality
+MMA, skinny `mma_i32_j128`, and the D2R reject stay. Decode FFN stays MMV.
+Production Q8_0 still does not go through `launch_quant_mmq`.
+
+**A/B.** Exclusive RTX 5090, 0 warm-ups, 3 CUDA-event replicates, occupancy ≥ 1,
+zero non-finites, shared-Y and SwiGLU-Q8 identity, Q4_K association. Candidates:
+`baseline`, `shared_y`, `swiglu_q8`, `shared_y_swiglu_q8` on
+`4096×17408×5120` gate/up and `4096×5120×17408` down. Raw samples stay in
+[`evidence/optimization/opt025-ffn-shared-y/ffn-ab-raw.txt`](../evidence/optimization/opt025-ffn-shared-y/ffn-ab-raw.txt);
+this chapter does not replace them. Winner: `shared_y_swiglu_q8` (`win=true`).
+
+**Measured 4K keep, RTX 5090:** live exclusive sitting, llama.cpp first then
+Quartz. Cold exact-4096 Quartz mean is strictly greater than the frozen
+OPT-023 successor oracle **1687.86169**. Keep: `reverted` false,
+`successor_oracle` true, `production_ffn_optimized` true, A/B winner
+`shared_y_swiglu_q8`. `quartz_meets_llama` is informational false and is not
+this gate. Live numbers stay in the report; this chapter does not replace them:
+[`evidence/optimization/opt025-ffn-shared-y/REPORT.md`](../evidence/optimization/opt025-ffn-shared-y/REPORT.md).
+
+**External:** llama.cpp `quantize_mmq_q8_1` DS4 `block_q8_1_mmq` Y layout
+(`quantize.cu`, MIT, The ggml authors) as the shared gate/up and
+SwiGLU-into-down packing rule. This increment does not copy `../ds4/cuda/mmq/`
+and does not include ggml headers.
+
+**Proof boundary:** dense FFN shared-Y and SwiGLU-into-down Q8 under unloosened
+Q4_K association; 4K keep/reject versus the then-current oracle baseline
+**1687.86169**; OPT-009 Q8_0 tiled-versus-reference remains byte-exact;
+CUD-002 numbers unloosened; workspace formula unloosened; no extra persistent
+`cudaMalloc`; mixer Q8 quality / skinny / D2R reject unchanged; decode FFN
+unchanged; **does not substitute for the 2K llama.cpp parity gate**. Contract,
+fixture, and report:
+[`pins/opt025_ffn_shared_y_contract.json`](../pins/opt025_ffn_shared_y_contract.json),
+[`fixtures/opt025_ffn_shared_y.json`](../fixtures/opt025_ffn_shared_y.json),
+and
+[`evidence/optimization/opt025-ffn-shared-y/REPORT.md`](../evidence/optimization/opt025-ffn-shared-y/REPORT.md).

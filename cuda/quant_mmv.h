@@ -115,6 +115,20 @@ cudaError_t launch_quantize_mmq_q8_1(QuantKind kind, const __nv_bfloat16* prompt
                                      std::size_t columns, Q8Block* workspace,
                                      cudaStream_t stream) noexcept;
 
+const char* selected_ffn_path() noexcept;
+bool ffn_shares_gate_up_y() noexcept;
+bool ffn_swiglu_writes_q8() noexcept;
+
+cudaError_t launch_quant_mmq_mma_y(
+    QuantKind kind, const std::uint8_t* weights, std::size_t output_rows,
+    std::size_t columns, const Q8Block* y, std::size_t prompt_rows,
+    float* output, cudaStream_t stream) noexcept;
+
+cudaError_t launch_swiglu_quantize_mmq_q8_1(const float* gate, const float* up,
+                                            std::size_t prompt_rows,
+                                            std::size_t columns, Q8Block* y,
+                                            cudaStream_t stream) noexcept;
+
 cudaError_t launch_q8_mmq_quality_mma(const std::uint8_t* weights,
                                       std::size_t output_rows,
                                       std::size_t columns, const Q8Block* y,

@@ -566,6 +566,70 @@ cudaError_t matrix_prompt_q8_quality_mma(const DeviceTensor& matrix,
                                    prompt_rows, output, stream);
 }
 
+cudaError_t execute_prompt_ffn_projections(
+    const DeviceCommonLayer& layer, SchedulerWorkspace* workspace,
+    std::size_t token_count, cudaStream_t stream) noexcept {
+  cudaError_t error = cudaSuccess;
+  const bool share_y = ffn_shares_gate_up_y() &&
+                       layer.ffn_gate.kind == QuantKind::kQ4K &&
+                       layer.ffn_up.kind == QuantKind::kQ4K &&
+                       layer.ffn_gate.columns == internal::kResidualWidth &&
+                       layer.ffn_up.columns == internal::kResidualWidth;
+  const bool swiglu_q8 = ffn_swiglu_writes_q8() &&
+                         layer.ffn_down.kind == QuantKind::kQ4K &&
+                         layer.ffn_down.columns == internal::kFfnWidth;
+  if (share_y) {
+    error = launch_quantize_mmq_q8_1(
+        QuantKind::kQ4K, workspace->prompt_normalized_, token_count,
+        internal::kResidualWidth, workspace->prompt_q8_, stream);
+    if (error == cudaSuccess) {
+      error = launch_quant_mmq_mma_y(
+          layer.ffn_gate.kind, layer.ffn_gate.data, layer.ffn_gate.rows,
+          layer.ffn_gate.columns, workspace->prompt_q8_, token_count,
+          workspace->prompt_projection_a_, stream);
+    }
+    if (error == cudaSuccess) {
+      error = launch_quant_mmq_mma_y(
+          layer.ffn_up.kind, layer.ffn_up.data, layer.ffn_up.rows,
+          layer.ffn_up.columns, workspace->prompt_q8_, token_count,
+          workspace->prompt_projection_b_, stream);
+    }
+  } else {
+    error = matrix_prompt(layer.ffn_gate, workspace->prompt_normalized_,
+                          token_count, workspace,
+                          workspace->prompt_projection_a_, stream);
+    if (error == cudaSuccess) {
+      error = matrix_prompt(layer.ffn_up, workspace->prompt_normalized_,
+                            token_count, workspace,
+                            workspace->prompt_projection_b_, stream);
+    }
+  }
+  if (error == cudaSuccess) {
+    if (swiglu_q8) {
+      error = launch_swiglu_quantize_mmq_q8_1(
+          workspace->prompt_projection_a_, workspace->prompt_projection_b_,
+          token_count, internal::kFfnWidth, workspace->prompt_q8_, stream);
+      if (error == cudaSuccess) {
+        error = launch_quant_mmq_mma_y(
+            layer.ffn_down.kind, layer.ffn_down.data, layer.ffn_down.rows,
+            layer.ffn_down.columns, workspace->prompt_q8_, token_count,
+            workspace->prompt_mixer_output_, stream);
+      }
+    } else {
+      error = launch_swiglu_bf16(
+          workspace->prompt_projection_a_, workspace->prompt_projection_b_,
+          token_count * internal::kFfnWidth, workspace->prompt_projected_bf16_,
+          stream);
+      if (error == cudaSuccess) {
+        error = matrix_prompt(layer.ffn_down, workspace->prompt_projected_bf16_,
+                              token_count, workspace,
+                              workspace->prompt_mixer_output_, stream);
+      }
+    }
+  }
+  return error;
+}
+
 cudaError_t execute_ffn(const DeviceCommonLayer& layer,
                         const float* residual,
                         SchedulerWorkspace* workspace,
@@ -625,25 +689,8 @@ cudaError_t execute_prompt_ffn(
       internal::kResidualWidth, token_count, after_mixer,
       workspace->prompt_normalized_, stream);
   if (error == cudaSuccess) {
-    error = matrix_prompt(layer.ffn_gate, workspace->prompt_normalized_,
-                          token_count, workspace,
-                          workspace->prompt_projection_a_, stream);
-  }
-  if (error == cudaSuccess) {
-    error = matrix_prompt(layer.ffn_up, workspace->prompt_normalized_,
-                          token_count, workspace,
-                          workspace->prompt_projection_b_, stream);
-  }
-  if (error == cudaSuccess) {
-    error = launch_swiglu_bf16(
-        workspace->prompt_projection_a_, workspace->prompt_projection_b_,
-        token_count * internal::kFfnWidth, workspace->prompt_projected_bf16_,
-        stream);
-  }
-  if (error == cudaSuccess) {
-    error = matrix_prompt(layer.ffn_down, workspace->prompt_projected_bf16_,
-                          token_count, workspace,
-                          workspace->prompt_mixer_output_, stream);
+    error = execute_prompt_ffn_projections(layer, workspace, token_count,
+                                           stream);
   }
   if (error == cudaSuccess) {
     if (next_input_norm != nullptr) {
@@ -2324,28 +2371,8 @@ Status execute_prompt_chunk(
           }
         }
         if (error == cudaSuccess) {
-          error = matrix_prompt(layer.common.ffn_gate,
-                                workspace->prompt_normalized_, token_count,
-                                workspace, workspace->prompt_projection_a_,
-                                stream);
-        }
-        if (error == cudaSuccess) {
-          error = matrix_prompt(layer.common.ffn_up,
-                                workspace->prompt_normalized_, token_count,
-                                workspace, workspace->prompt_projection_b_,
-                                stream);
-        }
-        if (error == cudaSuccess) {
-          error = launch_swiglu_bf16(
-              workspace->prompt_projection_a_, workspace->prompt_projection_b_,
-              token_count * internal::kFfnWidth,
-              workspace->prompt_projected_bf16_, stream);
-        }
-        if (error == cudaSuccess) {
-          error = matrix_prompt(layer.common.ffn_down,
-                                workspace->prompt_projected_bf16_, token_count,
-                                workspace, workspace->prompt_mixer_output_,
-                                stream);
+          error = execute_prompt_ffn_projections(
+              layer.common, workspace, token_count, stream);
         }
         if (error == cudaSuccess) {
           error = launch_residual_add_fp32(

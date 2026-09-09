@@ -1687,6 +1687,478 @@ int run_skinny_ab() {
   return baseline_ok ? 0 : 1;
 }
 
+__global__ void test_swiglu_bf16(const float* gate, const float* up,
+                                 std::size_t count, __nv_bfloat16* output) {
+  const std::size_t index =
+      static_cast<std::size_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+  if (index < count) {
+    const float g = gate[index];
+    output[index] = __float2bfloat16_rn((g / (1.0F + expf(-g))) * up[index]);
+  }
+}
+
+cudaError_t launch_test_swiglu_bf16(const float* gate, const float* up,
+                                    std::size_t count, __nv_bfloat16* output) {
+  const unsigned int blocks =
+      static_cast<unsigned int>((count + 255) / 256);
+  test_swiglu_bf16<<<blocks, 256>>>(gate, up, count, output);
+  return cudaPeekAtLastError();
+}
+
+int run_ffn_shared_y_identity() {
+  constexpr std::size_t kPrompt = 64;
+  constexpr std::size_t kHidden = 5120;
+  constexpr std::size_t kFfn = 17408;
+  std::vector<std::uint8_t> gate_w;
+  std::vector<std::uint8_t> up_w;
+  fill_weights(qw38::cuda::QuantKind::kQ4K, kFfn, kHidden, &gate_w);
+  fill_weights(qw38::cuda::QuantKind::kQ4K, kFfn, kHidden, &up_w);
+  std::vector<__nv_bfloat16> prompt(kPrompt * kHidden);
+  for (std::size_t row = 0; row < kPrompt; ++row) {
+    for (std::size_t col = 0; col < kHidden; ++col) {
+      prompt[row * kHidden + col] = __float2bfloat16_rn(unit_normal(
+          static_cast<std::uint32_t>(row * kHidden + col), 0xA5A5A5U));
+    }
+  }
+  const std::size_t y_bytes =
+      qw38::cuda::q8_prompt_workspace_bytes(kPrompt, kHidden);
+  const std::size_t out_bytes = kPrompt * kFfn * sizeof(float);
+  std::uint8_t* device_gate = nullptr;
+  std::uint8_t* device_up = nullptr;
+  __nv_bfloat16* device_prompt = nullptr;
+  qw38::cuda::Q8Block* device_y_a = nullptr;
+  qw38::cuda::Q8Block* device_y_b = nullptr;
+  float* device_gate_a = nullptr;
+  float* device_gate_b = nullptr;
+  float* device_up_a = nullptr;
+  float* device_up_b = nullptr;
+  cudaError_t error = cudaMalloc(&device_gate, gate_w.size());
+  if (error == cudaSuccess) error = cudaMalloc(&device_up, up_w.size());
+  if (error == cudaSuccess) {
+    error = cudaMalloc(&device_prompt, prompt.size() * sizeof(prompt[0]));
+  }
+  if (error == cudaSuccess) error = cudaMalloc(&device_y_a, y_bytes);
+  if (error == cudaSuccess) error = cudaMalloc(&device_y_b, y_bytes);
+  if (error == cudaSuccess) error = cudaMalloc(&device_gate_a, out_bytes);
+  if (error == cudaSuccess) error = cudaMalloc(&device_gate_b, out_bytes);
+  if (error == cudaSuccess) error = cudaMalloc(&device_up_a, out_bytes);
+  if (error == cudaSuccess) error = cudaMalloc(&device_up_b, out_bytes);
+  if (error != cudaSuccess) return fail_cuda("FFN shared-Y cudaMalloc", error);
+  error = cudaMemcpy(device_gate, gate_w.data(), gate_w.size(),
+                     cudaMemcpyHostToDevice);
+  if (error == cudaSuccess) {
+    error = cudaMemcpy(device_up, up_w.data(), up_w.size(),
+                       cudaMemcpyHostToDevice);
+  }
+  if (error == cudaSuccess) {
+    error = cudaMemcpy(device_prompt, prompt.data(),
+                       prompt.size() * sizeof(prompt[0]),
+                       cudaMemcpyHostToDevice);
+  }
+  if (error != cudaSuccess) return fail_cuda("FFN shared-Y H2D", error);
+  error = qw38::cuda::launch_quant_mmq_mma(
+      qw38::cuda::QuantKind::kQ4K, device_gate, kFfn, kHidden, device_prompt,
+      kPrompt, device_y_a, device_gate_a, nullptr);
+  if (error == cudaSuccess) {
+    error = qw38::cuda::launch_quant_mmq_mma(
+        qw38::cuda::QuantKind::kQ4K, device_up, kFfn, kHidden, device_prompt,
+        kPrompt, device_y_a, device_up_a, nullptr);
+  }
+  if (error == cudaSuccess) {
+    error = qw38::cuda::launch_quantize_mmq_q8_1(
+        qw38::cuda::QuantKind::kQ4K, device_prompt, kPrompt, kHidden, device_y_b,
+        nullptr);
+  }
+  if (error == cudaSuccess) {
+    error = qw38::cuda::launch_quant_mmq_mma_y(
+        qw38::cuda::QuantKind::kQ4K, device_gate, kFfn, kHidden, device_y_b,
+        kPrompt, device_gate_b, nullptr);
+  }
+  if (error == cudaSuccess) {
+    error = qw38::cuda::launch_quant_mmq_mma_y(
+        qw38::cuda::QuantKind::kQ4K, device_up, kFfn, kHidden, device_y_b,
+        kPrompt, device_up_b, nullptr);
+  }
+  if (error == cudaSuccess) error = cudaDeviceSynchronize();
+  if (error != cudaSuccess) return fail_cuda("FFN shared-Y launch", error);
+  std::vector<float> gate_a(kPrompt * kFfn);
+  std::vector<float> gate_b(kPrompt * kFfn);
+  std::vector<float> up_a(kPrompt * kFfn);
+  std::vector<float> up_b(kPrompt * kFfn);
+  error = cudaMemcpy(gate_a.data(), device_gate_a, out_bytes,
+                     cudaMemcpyDeviceToHost);
+  if (error == cudaSuccess) {
+    error = cudaMemcpy(gate_b.data(), device_gate_b, out_bytes,
+                       cudaMemcpyDeviceToHost);
+  }
+  if (error == cudaSuccess) {
+    error = cudaMemcpy(up_a.data(), device_up_a, out_bytes,
+                       cudaMemcpyDeviceToHost);
+  }
+  if (error == cudaSuccess) {
+    error = cudaMemcpy(up_b.data(), device_up_b, out_bytes,
+                       cudaMemcpyDeviceToHost);
+  }
+  if (error != cudaSuccess) return fail_cuda("FFN shared-Y D2H", error);
+  const bool gate_eq =
+      std::memcmp(gate_a.data(), gate_b.data(), out_bytes) == 0;
+  const bool up_eq = std::memcmp(up_a.data(), up_b.data(), out_bytes) == 0;
+  std::printf("ffn_shared_y_identity prompt_rows=%zu output_rows=%zu columns=%zu "
+              "gate_byte_identical=%s up_byte_identical=%s\n",
+              kPrompt, kFfn, kHidden, gate_eq ? "true" : "false",
+              up_eq ? "true" : "false");
+  cudaFree(device_up_b);
+  cudaFree(device_up_a);
+  cudaFree(device_gate_b);
+  cudaFree(device_gate_a);
+  cudaFree(device_y_b);
+  cudaFree(device_y_a);
+  cudaFree(device_prompt);
+  cudaFree(device_up);
+  cudaFree(device_gate);
+  return gate_eq && up_eq ? 0 : 1;
+}
+
+int run_ffn_swiglu_q8_identity() {
+  constexpr std::size_t kPrompt = 64;
+  constexpr std::size_t kFfn = 17408;
+  constexpr std::size_t kHidden = 5120;
+  std::vector<float> gate(kPrompt * kFfn);
+  std::vector<float> up(kPrompt * kFfn);
+  for (std::size_t index = 0; index < gate.size(); ++index) {
+    gate[index] = unit_normal(static_cast<std::uint32_t>(index), 0x111111U);
+    up[index] = unit_normal(static_cast<std::uint32_t>(index), 0x222222U);
+  }
+  std::vector<std::uint8_t> down_w;
+  fill_weights(qw38::cuda::QuantKind::kQ4K, kHidden, kFfn, &down_w);
+  const std::size_t y_bytes =
+      qw38::cuda::q8_prompt_workspace_bytes(kPrompt, kFfn);
+  const std::size_t mid_bytes = kPrompt * kFfn * sizeof(__nv_bfloat16);
+  const std::size_t out_bytes = kPrompt * kHidden * sizeof(float);
+  float* device_gate = nullptr;
+  float* device_up = nullptr;
+  __nv_bfloat16* device_mid = nullptr;
+  qw38::cuda::Q8Block* device_y_ref = nullptr;
+  qw38::cuda::Q8Block* device_y_fused = nullptr;
+  std::uint8_t* device_down = nullptr;
+  float* device_out_ref = nullptr;
+  float* device_out_fused = nullptr;
+  cudaError_t error = cudaMalloc(&device_gate, gate.size() * sizeof(float));
+  if (error == cudaSuccess) {
+    error = cudaMalloc(&device_up, up.size() * sizeof(float));
+  }
+  if (error == cudaSuccess) error = cudaMalloc(&device_mid, mid_bytes);
+  if (error == cudaSuccess) error = cudaMalloc(&device_y_ref, y_bytes);
+  if (error == cudaSuccess) error = cudaMalloc(&device_y_fused, y_bytes);
+  if (error == cudaSuccess) error = cudaMalloc(&device_down, down_w.size());
+  if (error == cudaSuccess) error = cudaMalloc(&device_out_ref, out_bytes);
+  if (error == cudaSuccess) error = cudaMalloc(&device_out_fused, out_bytes);
+  if (error != cudaSuccess) return fail_cuda("FFN SwiGLU-Q8 cudaMalloc", error);
+  error = cudaMemcpy(device_gate, gate.data(), gate.size() * sizeof(float),
+                     cudaMemcpyHostToDevice);
+  if (error == cudaSuccess) {
+    error = cudaMemcpy(device_up, up.data(), up.size() * sizeof(float),
+                       cudaMemcpyHostToDevice);
+  }
+  if (error == cudaSuccess) {
+    error = cudaMemcpy(device_down, down_w.data(), down_w.size(),
+                       cudaMemcpyHostToDevice);
+  }
+  if (error != cudaSuccess) return fail_cuda("FFN SwiGLU-Q8 H2D", error);
+  error = launch_test_swiglu_bf16(device_gate, device_up, kPrompt * kFfn,
+                                  device_mid);
+  if (error == cudaSuccess) {
+    error = qw38::cuda::launch_quantize_mmq_q8_1(
+        qw38::cuda::QuantKind::kQ4K, device_mid, kPrompt, kFfn, device_y_ref,
+        nullptr);
+  }
+  if (error == cudaSuccess) {
+    error = qw38::cuda::launch_swiglu_quantize_mmq_q8_1(
+        device_gate, device_up, kPrompt, kFfn, device_y_fused, nullptr);
+  }
+  if (error == cudaSuccess) {
+    error = qw38::cuda::launch_quant_mmq_mma_y(
+        qw38::cuda::QuantKind::kQ4K, device_down, kHidden, kFfn, device_y_ref,
+        kPrompt, device_out_ref, nullptr);
+  }
+  if (error == cudaSuccess) {
+    error = qw38::cuda::launch_quant_mmq_mma_y(
+        qw38::cuda::QuantKind::kQ4K, device_down, kHidden, kFfn, device_y_fused,
+        kPrompt, device_out_fused, nullptr);
+  }
+  if (error == cudaSuccess) error = cudaDeviceSynchronize();
+  if (error != cudaSuccess) return fail_cuda("FFN SwiGLU-Q8 launch", error);
+  std::vector<std::uint8_t> y_ref(y_bytes);
+  std::vector<std::uint8_t> y_fused(y_bytes);
+  std::vector<float> out_ref(kPrompt * kHidden);
+  std::vector<float> out_fused(kPrompt * kHidden);
+  error = cudaMemcpy(y_ref.data(), device_y_ref, y_bytes, cudaMemcpyDeviceToHost);
+  if (error == cudaSuccess) {
+    error = cudaMemcpy(y_fused.data(), device_y_fused, y_bytes,
+                       cudaMemcpyDeviceToHost);
+  }
+  if (error == cudaSuccess) {
+    error = cudaMemcpy(out_ref.data(), device_out_ref, out_bytes,
+                       cudaMemcpyDeviceToHost);
+  }
+  if (error == cudaSuccess) {
+    error = cudaMemcpy(out_fused.data(), device_out_fused, out_bytes,
+                       cudaMemcpyDeviceToHost);
+  }
+  if (error != cudaSuccess) return fail_cuda("FFN SwiGLU-Q8 D2H", error);
+  const bool y_eq = std::memcmp(y_ref.data(), y_fused.data(), y_bytes) == 0;
+  const bool out_eq =
+      std::memcmp(out_ref.data(), out_fused.data(), out_bytes) == 0;
+  std::size_t nonfinite = 0;
+  for (float value : out_fused) {
+    if (!std::isfinite(value)) ++nonfinite;
+  }
+  std::printf("ffn_swiglu_q8_identity prompt_rows=%zu columns=%zu "
+              "y_byte_identical=%s out_byte_identical=%s nonfinite=%zu\n",
+              kPrompt, kFfn, y_eq ? "true" : "false",
+              out_eq ? "true" : "false", nonfinite);
+  cudaFree(device_out_fused);
+  cudaFree(device_out_ref);
+  cudaFree(device_down);
+  cudaFree(device_y_fused);
+  cudaFree(device_y_ref);
+  cudaFree(device_mid);
+  cudaFree(device_up);
+  cudaFree(device_gate);
+  return y_eq && out_eq && nonfinite == 0 ? 0 : 1;
+}
+
+cudaError_t launch_ffn_candidate(
+    const char* id, const std::uint8_t* gate_w, const std::uint8_t* up_w,
+    const std::uint8_t* down_w, const __nv_bfloat16* prompt,
+    qw38::cuda::Q8Block* y, float* gate_out, float* up_out, float* down_out,
+    __nv_bfloat16* mid, std::size_t prompt_rows) {
+  constexpr std::size_t kHidden = 5120;
+  constexpr std::size_t kFfn = 17408;
+  const bool share = std::strcmp(id, "shared_y") == 0 ||
+                     std::strcmp(id, "shared_y_swiglu_q8") == 0;
+  const bool swiglu = std::strcmp(id, "swiglu_q8") == 0 ||
+                      std::strcmp(id, "shared_y_swiglu_q8") == 0;
+  cudaError_t error = cudaSuccess;
+  if (share) {
+    error = qw38::cuda::launch_quantize_mmq_q8_1(
+        qw38::cuda::QuantKind::kQ4K, prompt, prompt_rows, kHidden, y, nullptr);
+    if (error == cudaSuccess) {
+      error = qw38::cuda::launch_quant_mmq_mma_y(
+          qw38::cuda::QuantKind::kQ4K, gate_w, kFfn, kHidden, y, prompt_rows,
+          gate_out, nullptr);
+    }
+    if (error == cudaSuccess) {
+      error = qw38::cuda::launch_quant_mmq_mma_y(
+          qw38::cuda::QuantKind::kQ4K, up_w, kFfn, kHidden, y, prompt_rows,
+          up_out, nullptr);
+    }
+  } else {
+    error = qw38::cuda::launch_quant_mmq_mma(
+        qw38::cuda::QuantKind::kQ4K, gate_w, kFfn, kHidden, prompt, prompt_rows,
+        y, gate_out, nullptr);
+    if (error == cudaSuccess) {
+      error = qw38::cuda::launch_quant_mmq_mma(
+          qw38::cuda::QuantKind::kQ4K, up_w, kFfn, kHidden, prompt, prompt_rows,
+          y, up_out, nullptr);
+    }
+  }
+  if (error != cudaSuccess) return error;
+  if (swiglu) {
+    error = qw38::cuda::launch_swiglu_quantize_mmq_q8_1(
+        gate_out, up_out, prompt_rows, kFfn, y, nullptr);
+    if (error == cudaSuccess) {
+      error = qw38::cuda::launch_quant_mmq_mma_y(
+          qw38::cuda::QuantKind::kQ4K, down_w, kHidden, kFfn, y, prompt_rows,
+          down_out, nullptr);
+    }
+    return error;
+  }
+  error = launch_test_swiglu_bf16(gate_out, up_out, prompt_rows * kFfn, mid);
+  if (error == cudaSuccess) {
+    error = qw38::cuda::launch_quant_mmq_mma(
+        qw38::cuda::QuantKind::kQ4K, down_w, kHidden, kFfn, mid, prompt_rows, y,
+        down_out, nullptr);
+  }
+  return error;
+}
+
+void ensure_opt025_evidence_dir() {
+  mkdir("evidence", 0755);
+  mkdir("evidence/optimization", 0755);
+  mkdir("evidence/optimization/opt025-ffn-shared-y", 0755);
+}
+
+int run_ffn_ab() {
+  if (qw38::cuda::mma_mmq_occupancy(qw38::cuda::QuantKind::kQ4K, 128) < 1) {
+    std::fprintf(stderr, "FFN MMA occupancy < 1\n");
+    return 1;
+  }
+  constexpr std::size_t kPrompt = 4096;
+  constexpr std::size_t kHidden = 5120;
+  constexpr std::size_t kFfn = 17408;
+  std::vector<std::uint8_t> gate_w;
+  std::vector<std::uint8_t> up_w;
+  std::vector<std::uint8_t> down_w;
+  fill_weights(qw38::cuda::QuantKind::kQ4K, kFfn, kHidden, &gate_w);
+  fill_weights(qw38::cuda::QuantKind::kQ4K, kFfn, kHidden, &up_w);
+  fill_weights(qw38::cuda::QuantKind::kQ4K, kHidden, kFfn, &down_w);
+  std::vector<__nv_bfloat16> prompt(kPrompt * kHidden);
+  for (std::size_t row = 0; row < kPrompt; ++row) {
+    for (std::size_t col = 0; col < kHidden; ++col) {
+      prompt[row * kHidden + col] = __float2bfloat16_rn(
+          0.02F * unit_normal(
+              static_cast<std::uint32_t>(row * kHidden + col), 0xA5A5A5U));
+    }
+  }
+  std::uint8_t* device_gate = nullptr;
+  std::uint8_t* device_up = nullptr;
+  std::uint8_t* device_down = nullptr;
+  __nv_bfloat16* device_prompt = nullptr;
+  __nv_bfloat16* device_mid = nullptr;
+  qw38::cuda::Q8Block* device_y = nullptr;
+  float* device_gate_out = nullptr;
+  float* device_up_out = nullptr;
+  float* device_down_out = nullptr;
+  cudaError_t error = cudaMalloc(&device_gate, gate_w.size());
+  if (error == cudaSuccess) error = cudaMalloc(&device_up, up_w.size());
+  if (error == cudaSuccess) error = cudaMalloc(&device_down, down_w.size());
+  if (error == cudaSuccess) {
+    error = cudaMalloc(&device_prompt, prompt.size() * sizeof(prompt[0]));
+  }
+  if (error == cudaSuccess) {
+    error = cudaMalloc(&device_mid, kPrompt * kFfn * sizeof(__nv_bfloat16));
+  }
+  if (error == cudaSuccess) {
+    error = cudaMalloc(&device_y,
+                       qw38::cuda::q8_prompt_workspace_bytes(kPrompt, kFfn));
+  }
+  if (error == cudaSuccess) {
+    error = cudaMalloc(&device_gate_out, kPrompt * kFfn * sizeof(float));
+  }
+  if (error == cudaSuccess) {
+    error = cudaMalloc(&device_up_out, kPrompt * kFfn * sizeof(float));
+  }
+  if (error == cudaSuccess) {
+    error = cudaMalloc(&device_down_out, kPrompt * kHidden * sizeof(float));
+  }
+  if (error != cudaSuccess) return fail_cuda("FFN A/B cudaMalloc", error);
+  error = cudaMemcpy(device_gate, gate_w.data(), gate_w.size(),
+                     cudaMemcpyHostToDevice);
+  if (error == cudaSuccess) {
+    error = cudaMemcpy(device_up, up_w.data(), up_w.size(),
+                       cudaMemcpyHostToDevice);
+  }
+  if (error == cudaSuccess) {
+    error = cudaMemcpy(device_down, down_w.data(), down_w.size(),
+                       cudaMemcpyHostToDevice);
+  }
+  if (error == cudaSuccess) {
+    error = cudaMemcpy(device_prompt, prompt.data(),
+                       prompt.size() * sizeof(prompt[0]),
+                       cudaMemcpyHostToDevice);
+  }
+  if (error != cudaSuccess) return fail_cuda("FFN A/B H2D", error);
+
+  const char* ids[] = {"baseline", "shared_y", "swiglu_q8",
+                       "shared_y_swiglu_q8"};
+  ensure_opt025_evidence_dir();
+  FILE* raw = std::fopen(
+      "evidence/optimization/opt025-ffn-shared-y/ffn-ab-raw.txt", "w");
+  if (raw == nullptr) {
+    std::fprintf(stderr, "FFN A/B fopen failed\n");
+    return 1;
+  }
+  float means[4]{};
+  bool eligible[4]{};
+  std::size_t nonfinites[4]{};
+  std::vector<float> host(kPrompt * kHidden);
+  for (int c = 0; c < 4; ++c) {
+    cudaEvent_t start = nullptr;
+    cudaEvent_t stop = nullptr;
+    error = cudaEventCreate(&start);
+    if (error == cudaSuccess) error = cudaEventCreate(&stop);
+    float total = 0.0F;
+    for (int sample = 0; sample < 3 && error == cudaSuccess; ++sample) {
+      error = cudaEventRecord(start);
+      if (error == cudaSuccess) {
+        error = launch_ffn_candidate(
+            ids[c], device_gate, device_up, device_down, device_prompt,
+            device_y, device_gate_out, device_up_out, device_down_out,
+            device_mid, kPrompt);
+      }
+      if (error == cudaSuccess) error = cudaEventRecord(stop);
+      if (error == cudaSuccess) error = cudaEventSynchronize(stop);
+      float milliseconds = 0.0F;
+      if (error == cudaSuccess) {
+        error = cudaEventElapsedTime(&milliseconds, start, stop);
+      }
+      if (error == cudaSuccess) {
+        total += milliseconds;
+        std::fprintf(raw, "ffn_ab id=%s sample=%d ms=%.9g occupancy=1\n",
+                     ids[c], sample, milliseconds);
+        std::printf("ffn_ab id=%s sample=%d ms=%.9g occupancy=1\n", ids[c],
+                    sample, milliseconds);
+      }
+    }
+    cudaEventDestroy(start);
+    cudaEventDestroy(stop);
+    if (error != cudaSuccess) {
+      std::fclose(raw);
+      return fail_cuda("FFN A/B time", error);
+    }
+    means[c] = total / 3.0F;
+    error = cudaMemcpy(host.data(), device_down_out,
+                       host.size() * sizeof(float), cudaMemcpyDeviceToHost);
+    if (error != cudaSuccess) {
+      std::fclose(raw);
+      return fail_cuda("FFN A/B D2H", error);
+    }
+    nonfinites[c] = 0;
+    for (float value : host) {
+      if (!std::isfinite(value)) ++nonfinites[c];
+    }
+    eligible[c] = nonfinites[c] == 0;
+    std::fprintf(raw,
+                 "ffn_ab_mean id=%s mean_ms=%.9g occupancy=1 nonfinite=%zu "
+                 "eligible=%s\n",
+                 ids[c], means[c], nonfinites[c],
+                 eligible[c] ? "true" : "false");
+    std::printf("ffn_ab_mean id=%s mean_ms=%.9g occupancy=1 nonfinite=%zu "
+                "eligible=%s\n",
+                ids[c], means[c], nonfinites[c],
+                eligible[c] ? "true" : "false");
+  }
+  int winner = 0;
+  if (eligible[0]) {
+    for (int c = 1; c < 4; ++c) {
+      if (eligible[c] && means[c] < means[winner]) winner = c;
+    }
+    if (winner != 0 && !(means[winner] < means[0])) winner = 0;
+  }
+  const bool ab_win = eligible[0] && winner != 0 && means[winner] < means[0];
+  std::fprintf(raw,
+               "ffn_ab_winner id=%s mean_ms=%.9g baseline_id=baseline "
+               "baseline_ms=%.9g win=%s\n",
+               ids[winner], means[winner], means[0],
+               ab_win ? "true" : "false");
+  std::printf("ffn_ab_winner id=%s mean_ms=%.9g baseline_id=baseline "
+              "baseline_ms=%.9g win=%s selected_path=%s\n",
+              ids[winner], means[winner], means[0],
+              ab_win ? "true" : "false", qw38::cuda::selected_ffn_path());
+  std::fclose(raw);
+  cudaFree(device_down_out);
+  cudaFree(device_up_out);
+  cudaFree(device_gate_out);
+  cudaFree(device_y);
+  cudaFree(device_mid);
+  cudaFree(device_prompt);
+  cudaFree(device_down);
+  cudaFree(device_up);
+  cudaFree(device_gate);
+  return eligible[0] ? 0 : 1;
+}
+
 int run_q8_d2r_case(const char* name, std::size_t output_rows,
                     std::size_t columns, std::size_t prompt_rows) {
   std::vector<std::uint8_t> weights;
@@ -2013,6 +2485,19 @@ int run_q8_quality_suite() {
           0 ||
       run_mmv_tiled_j1_exact() != 0 || run_q8_shared_y_identity() != 0 ||
       run_skinny_ab() != 0 ||
+      qw38::cuda::launch_quant_mmq_mma_y(
+          qw38::cuda::QuantKind::kQ4K, nullptr, 17, 256, nullptr, 8, nullptr,
+          nullptr) != cudaErrorInvalidValue ||
+      qw38::cuda::launch_swiglu_quantize_mmq_q8_1(nullptr, nullptr, 8, 256,
+                                                 nullptr, nullptr) !=
+          cudaErrorInvalidValue ||
+      (std::strcmp(qw38::cuda::selected_ffn_path(), "baseline") != 0 &&
+       std::strcmp(qw38::cuda::selected_ffn_path(), "shared_y") != 0 &&
+       std::strcmp(qw38::cuda::selected_ffn_path(), "swiglu_q8") != 0 &&
+       std::strcmp(qw38::cuda::selected_ffn_path(), "shared_y_swiglu_q8") !=
+           0) ||
+      run_ffn_shared_y_identity() != 0 || run_ffn_swiglu_q8_identity() != 0 ||
+      run_ffn_ab() != 0 ||
       run_q8_d2r_case("q8_0_d2r_8x256x256", 256, 256, 8) != 0 ||
       run_q8_d2r_case("q8_0_d2r_64x1024x5120", 1024, 5120, 64) != 0 ||
       run_q8_d2r_case("q8_0_d2r_8x5120x6144", 5120, 6144, 8) != 0 ||

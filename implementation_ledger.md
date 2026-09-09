@@ -91,7 +91,7 @@ are repository-relative unless stated otherwise.
 | OPT-022 | Mixer Q8_0 quality MMQ with shared residual Y | OPT-017, OPT-018, OPT-021 | done | Production mixer Q8_0 prompt MMQ uses a llama/ds4-style quality stack (D4 `quantize_mmq_q8_1`, packed load-tiles, `MMQ_ITER_K=256`, shared residual Y across mixer GEMMs that share the same activation) under the plan.md Q8 association rule while OPT-009 byte-exact reference stays visible; cold exact-4096 mean tok/s strictly beats the OPT-021 Quartz baseline or the change is reverted with a retained rejection; does not substitute for OPT-016 | [`tasks/OPT-022.md`](tasks/OPT-022.md); [`pins/opt022_mixer_q8_quality_contract.json`](pins/opt022_mixer_q8_quality_contract.json); [`fixtures/opt022_mixer_q8_quality.json`](fixtures/opt022_mixer_q8_quality.json); [`evidence/optimization/opt022-mixer-q8-quality/REPORT.md`](evidence/optimization/opt022-mixer-q8-quality/REPORT.md); verification 2026-09-09T03:03:00Z |
 | OPT-023 | Skinny-M mixer dispatch for small output rows | OPT-022 | done | Mixer projections with small `output_rows` (at least GDN α/β) dispatch through MMV or small-tile paths instead of J=128 MMA when that wins a paired CUDA-event A/B; cold exact-4096 mean tok/s strictly beats the post-OPT-022 oracle baseline or the change is reverted with a retained rejection; does not substitute for OPT-016 | [`tasks/OPT-023.md`](tasks/OPT-023.md); [`pins/opt023_skinny_mixer_contract.json`](pins/opt023_skinny_mixer_contract.json); [`fixtures/opt023_skinny_mixer.json`](fixtures/opt023_skinny_mixer.json); [`evidence/optimization/opt023-skinny-mixer/REPORT.md`](evidence/optimization/opt023-skinny-mixer/REPORT.md); verification 2026-09-09T03:57:39Z |
 | OPT-024 | Blackwell-aligned Q8_0 D2R for large mixer GEMMs | OPT-022 | done | Large mixer Q8_0 GEMMs use a ds4-inspired aligned SoA D2R / int8 MMA path (technique inspiration, not wholesale `../ds4/cuda/mmq` vendoring) under the plan.md Q8 association rule when it beats quality MMQ on those shapes; cold exact-4096 mean tok/s strictly beats the post-OPT-022 oracle baseline or the change is reverted with a retained rejection; does not substitute for OPT-016 | [`tasks/OPT-024.md`](tasks/OPT-024.md); [`pins/opt024_mixer_q8_d2r_contract.json`](pins/opt024_mixer_q8_d2r_contract.json); [`fixtures/opt024_mixer_q8_d2r.json`](fixtures/opt024_mixer_q8_d2r.json); [`evidence/optimization/opt024-mixer-q8-d2r/REPORT.md`](evidence/optimization/opt024-mixer-q8-d2r/REPORT.md); [`evidence/optimization/opt024-mixer-q8-d2r/REJECTION.md`](evidence/optimization/opt024-mixer-q8-d2r/REJECTION.md); verification 2026-09-09T04:37:09Z |
-| OPT-025 | Dense FFN shared-Y and SwiGLU-into-down Q8 | OPT-018, OPT-021 | pending | Dense FFN reuses one Q8_1 of the FFN input for gate and up and writes down-leg Y from SwiGLU without an extra BF16 mid materialize where a paired A/B wins; cold exact-4096 mean tok/s strictly beats the then-current oracle baseline or the change is reverted with a retained rejection; does not substitute for OPT-016 | — |
+| OPT-025 | Dense FFN shared-Y and SwiGLU-into-down Q8 | OPT-018, OPT-021 | done | Dense FFN reuses one Q8_1 of the FFN input for gate and up and writes down-leg Y from SwiGLU without an extra BF16 mid materialize where a paired A/B wins; cold exact-4096 mean tok/s strictly beats the then-current oracle baseline or the change is reverted with a retained rejection; does not substitute for OPT-016 | [`tasks/OPT-025.md`](tasks/OPT-025.md); [`pins/opt025_ffn_shared_y_contract.json`](pins/opt025_ffn_shared_y_contract.json); [`fixtures/opt025_ffn_shared_y.json`](fixtures/opt025_ffn_shared_y.json); [`cuda/prefill_4k_ffn_test.cu`](cuda/prefill_4k_ffn_test.cu); [`evidence/optimization/opt025-ffn-shared-y/REPORT.md`](evidence/optimization/opt025-ffn-shared-y/REPORT.md); verification 2026-09-09T05:25:00Z |
 | OPT-026 | Attention fattn stream-K occupancy | OPT-019, OPT-021 | pending | Production fattn-mma prompt attention enables Ada+ stream-K (or equivalent occupancy fixup) under frozen OPT-019 envelopes when a paired A/B wins; cold exact-4096 mean tok/s strictly beats the then-current oracle baseline or the change is reverted with a retained rejection; does not substitute for OPT-016 | — |
 
 ### 2026-09-04T13:09:32Z — OPT-005 delivered
@@ -4482,3 +4482,44 @@ are repository-relative unless stated otherwise.
 - Marked OPT-024 `done`; delivery is limited to the verified task scope plus
   this ledger/audit bookkeeping. `plan.md` is unchanged. OPT-016 stays
   `blocked`. Next eligible pending by ledger row order: **OPT-025**.
+
+### 2026-09-09T04:40:00Z — OPT-025 planning admitted
+
+- Planning produced decision-complete dossier [`tasks/OPT-025.md`](tasks/OPT-025.md).
+- Coupled IDs: none. Plan impact `none`. Then-current oracle denominator is
+  OPT-023 Quartz mean **1687.86169** (`fixtures/opt023_skinny_mixer.json`;
+  OPT-024 rejected, `successor_oracle` false). A/B candidates: `baseline`,
+  `shared_y`, `swiglu_q8`, `shared_y_swiglu_q8`. Keep iff cold exact-4096
+  mean tok/s strictly beats **1687.86169**; else revert and retain rejection.
+- Marked OPT-025 `in_progress`.
+
+### 2026-09-09T05:25:00Z — OPT-025 delivered
+
+- Independent verification attempt 1 passed. Production prompt FFN Q4_K
+  shares one DS4 Q8_1 of the FFN-norm activation for gate and up and writes
+  down-leg Y from SwiGLU without a global BF16 mid store
+  (`kSelectedFfnPath = shared_y_swiglu_q8`). Mixer Q8 remains quality MMA
+  plus skinny `mma_i32_j128`. Decode FFN stays MMV. OPT-009
+  tiled-versus-reference stays byte-exact. Exclusive RTX 5090 sitting wrote
+  [`fixtures/opt025_ffn_shared_y.json`](fixtures/opt025_ffn_shared_y.json)
+  (`measurement_utc` 2026-09-09T05:14:45Z; Quartz mean **1709.21912**
+  tok/s versus frozen OPT-023 **1687.86169**; llama.cpp `avg_ts`
+  **3266.276516**; `quartz_meets_llama` false informational; `reverted`
+  false; `successor_oracle` true; A/B winner `shared_y_swiglu_q8`). Native
+  test does not require Quartz ≥ llama.cpp. Coupled IDs: none. Delivery
+  re-check:
+  `uv run pytest -q tests/test_documentation.py tests/test_opt025_ffn_shared_y.py`.
+- Acceptance evidence: [`tasks/OPT-025.md`](tasks/OPT-025.md);
+  [`pins/opt025_ffn_shared_y_contract.json`](pins/opt025_ffn_shared_y_contract.json);
+  [`fixtures/opt025_ffn_shared_y.json`](fixtures/opt025_ffn_shared_y.json);
+  [`cuda/prefill_4k_ffn_test.cu`](cuda/prefill_4k_ffn_test.cu);
+  [`evidence/optimization/opt025-ffn-shared-y/REPORT.md`](evidence/optimization/opt025-ffn-shared-y/REPORT.md);
+  [`docs/06-system-optimization.md`](docs/06-system-optimization.md);
+  [`docs/40-cuda-prompt-mmq.md`](docs/40-cuda-prompt-mmq.md);
+  [`docs/62-cuda-full-prefill.md`](docs/62-cuda-full-prefill.md).
+  Proof is dense FFN shared-Y and SwiGLU-into-down Q8 under the Q4_K
+  association rule and a 4K keep versus the OPT-023 oracle baseline, not
+  the 2K llama.cpp parity gate.
+- Marked OPT-025 `done`; delivery is limited to the verified task scope plus
+  this ledger/audit bookkeeping. `plan.md` is unchanged. OPT-016 stays
+  `blocked`. Next eligible pending by ledger row order: **OPT-026**.

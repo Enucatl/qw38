@@ -28,7 +28,9 @@ load-tiles, `MMQ_ITER_K=256`) for `prompt_rows >= 8`, and mixer GEMMs that
 share the residual activation share one D4 Y per layer (OPT-022). Mixer Q8_0
 GEMMs with `output_rows < 128` (GDN α/β) dispatch the A/B-winning small-I
 quality MMA path (OPT-023). Large mixer Q8_0 D2R was A/B'd and not
-installed (OPT-024); those GEMMs stay I=128 quality MMA. Decode stays MMV.
+installed (OPT-024); those GEMMs stay I=128 quality MMA. Dense prompt FFN
+Q4_K shares one DS4 Y for gate/up and writes down-leg Y from SwiGLU
+(OPT-025). Decode stays MMV.
 Tiny mixer prompts keep the
 OPT-009 tiled `__fmul_rn`/`__fadd_rn` kernel.
 Rank-1 fused MMA remains a non-production kernel. MMA here is Measured
@@ -236,6 +238,18 @@ is not strictly greater than the frozen OPT-023 successor oracle
 informational and is not this gate. This is **not** the 2K llama.cpp parity
 gate. Live numbers stay in the report; this chapter does not replace them:
 [`evidence/optimization/opt024-mixer-q8-d2r/REPORT.md`](../evidence/optimization/opt024-mixer-q8-d2r/REPORT.md).
+
+Dense prompt FFN Q4_K gate/up share one DS4 Q8_1 of the FFN-norm activation
+and SwiGLU writes down-leg Y without a global BF16 mid store when that A/B
+wins. **Measured, RTX 5090:** A/B winner `shared_y_swiglu_q8`. Mixer Q8
+quality MMA, skinny `mma_i32_j128`, and the D2R reject stay. Decode FFN
+stays MMV. The tiled-versus-row-wise Q8_0 pair remains byte-exact. Live
+exclusive RTX-5090 cold exact-4096 **keep:** Quartz mean strictly greater
+than the frozen OPT-023 successor oracle **1687.86169**. `quartz_meets_llama`
+is informational and is not this gate. This is **not** the 2K llama.cpp
+parity gate. Live numbers stay in the report; this chapter does not replace
+them:
+[`evidence/optimization/opt025-ffn-shared-y/REPORT.md`](../evidence/optimization/opt025-ffn-shared-y/REPORT.md).
 
 ## DwarfStar transfer boundary
 
