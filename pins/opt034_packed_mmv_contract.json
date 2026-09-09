@@ -1,0 +1,143 @@
+{
+  "schema_version": 1,
+  "task": "OPT-034",
+  "yardstick": "d2048_decode_packed_q4k_q6k_mmv",
+  "opt035_quartz_p_mean_tok_s": 1865.21155,
+  "opt035_quartz_d128_mean_tok_s": 15.0562878,
+  "opt035_quartz_d2048_mean_tok_s": 13.5411425,
+  "opt035_quartz_d128_token_latency_p95_ms": 66.6085587,
+  "opt035_quartz_d128_run_mean_token_latency_p95_ms": 66.06633,
+  "opt035_quartz_d2048_token_latency_p95_ms": 74.366951,
+  "opt035_quartz_d2048_run_mean_token_latency_p95_ms": 73.9000702,
+  "historical_opt026_quartz_mean_tok_s": 1746.71973,
+  "opt032_quartz_p_mean_tok_s": 1637.58594,
+  "opt033_quartz_p_mean_tok_s": 1745.10315,
+  "opt036_quartz_p_mean_tok_s": 1644.04822,
+  "use_as_keep_denominator": false,
+  "llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+  "gguf_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+  "device_substring": "RTX 5090",
+  "selected_mmv_load_path": "packed",
+  "q8_staging_unchanged": true,
+  "fp32_lane_reduction_order_unchanged": true,
+  "warp_count_dispatch_unchanged": true,
+  "q8_0_direct_bf16_out_of_scope": true,
+  "dp4a_out_of_scope": true,
+  "ab": {
+    "candidates": [
+      "elementwise",
+      "packed"
+    ],
+    "warmups": 3,
+    "measured_runs": 30,
+    "alternating_order": [
+      "elementwise",
+      "packed"
+    ],
+    "byte_equal_required": true,
+    "q8_staging_unchanged": true,
+    "fp32_lane_reduction_order_unchanged": true,
+    "ties_retain": "elementwise",
+    "shapes": [
+      {
+        "id": "q4k_gate_up",
+        "kind": "q4_k",
+        "rows": 17408,
+        "columns": 5120,
+        "warps": 8,
+        "weight": 128
+      },
+      {
+        "id": "q4k_down",
+        "kind": "q4_k",
+        "rows": 5120,
+        "columns": 17408,
+        "warps": 16,
+        "weight": 64
+      },
+      {
+        "id": "q6k_attn_out",
+        "kind": "q6_k",
+        "rows": 5120,
+        "columns": 6144,
+        "warps": 16,
+        "weight": 16
+      },
+      {
+        "id": "q6k_logits",
+        "kind": "q6_k",
+        "rows": 248320,
+        "columns": 5120,
+        "warps": 4,
+        "weight": 1
+      }
+    ],
+    "probes": [
+      {
+        "id": "q4_k_17x256",
+        "kind": "q4_k",
+        "rows": 17,
+        "columns": 256
+      },
+      {
+        "id": "q4_k_257x512",
+        "kind": "q4_k",
+        "rows": 257,
+        "columns": 512
+      },
+      {
+        "id": "q6_k_17x256",
+        "kind": "q6_k",
+        "rows": 17,
+        "columns": 256
+      },
+      {
+        "id": "q6_k_257x512",
+        "kind": "q6_k",
+        "rows": 257,
+        "columns": 512
+      }
+    ]
+  },
+  "cud001": {
+    "maximum_absolute_error": 0.0003,
+    "maximum_rms_error": 0.0002,
+    "q8_staging_exact": true
+  },
+  "owns_opt016_parity_gate": false,
+  "substitutes_for_opt016": false,
+  "llama_bench_is_informational": true,
+  "llama_bench_decode_is_informational": true,
+  "required_fixture_keys": [
+    "schema_version",
+    "task",
+    "status",
+    "measurement_utc",
+    "device",
+    "compute_capability",
+    "llama_revision",
+    "gguf_sha256",
+    "reverted",
+    "selected_mmv_load_path",
+    "ab",
+    "keep_sitting_skipped",
+    "p",
+    "d128",
+    "d2048",
+    "owns_opt016_parity_gate",
+    "substitutes_for_opt016",
+    "nsight_systems",
+    "nsight_compute",
+    "proof_limit",
+    "report_path"
+  ],
+  "proof_limit": [
+    "byte equality",
+    "lower weighted MMV time",
+    "improved D2048",
+    "cross-workload guard",
+    "does not substitute for the 2K llama.cpp parity gate",
+    "OPT-035 P D128 D2048 are the keep denominators"
+  ],
+  "report_path": "evidence/optimization/opt034-packed-mmv/REPORT.md"
+}

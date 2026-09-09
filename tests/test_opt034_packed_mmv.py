@@ -12,36 +12,44 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 IMAGE = "qw38-cuda:13.0.2"
 LLAMA_IMAGE = "qw38-llama-authority:cuda-13.0.2"
-CONTRACT = ROOT / "pins/opt035_pv_mma_contract.json"
-FIXTURE = ROOT / "fixtures/opt035_pv_mma.json"
-OPT033_FIXTURE = ROOT / "fixtures/opt033_register_vkq.json"
-EVIDENCE = ROOT / "evidence/optimization/opt035-pv-mma"
+CONTRACT = ROOT / "pins/opt034_packed_mmv_contract.json"
+FIXTURE = ROOT / "fixtures/opt034_packed_mmv.json"
+OPT035_FIXTURE = ROOT / "fixtures/opt035_pv_mma.json"
+EVIDENCE = ROOT / "evidence/optimization/opt034-packed-mmv"
 REPORT = EVIDENCE / "REPORT.md"
 REJECTION = EVIDENCE / "REJECTION.md"
-AB_RAW = EVIDENCE / "pv-mma-ab-raw.txt"
+AB_RAW = EVIDENCE / "mmv-ab-raw.txt"
 MODEL = ROOT / "models" / "Qwen3.8-27B-Q4_K_M.gguf"
 GGUF_SHA = "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34"
 LLAMA_REV = "cc83d7b4824f73cfdda4dfbb47ee39804f71b328"
-AB_PREFIX = "QW38_FATTN_PV_MMA_AB_RESULT="
+AB_PREFIX = "QW38_PACKED_MMV_AB_RESULT="
 P_PREFIX = "QW38_PREFILL_4K_ORACLE_RESULT="
 DECODE_PREFIX = "QW38_DECODE_ORACLE_RESULT="
 LLAMA_DECODE_PREFIX = "QW38_LLAMA_DECODE_ORACLE_RESULT="
-OPT033_P = 1745.10315
-OPT033_D128 = 15.1528101
-OPT033_D2048 = 13.5596962
-OPT033_D128_P95 = 66.5563431
-OPT033_D128_RUN_P95 = 66.0279617
-OPT033_D2048_P95 = 74.2697372
-OPT033_D2048_RUN_P95 = 73.807579
+OPT035_P = 1865.21155
+OPT035_D128 = 15.0562878
+OPT035_D2048 = 13.5411425
+OPT035_D128_P95 = 66.6085587
+OPT035_D128_RUN_P95 = 66.06633
+OPT035_D2048_P95 = 74.366951
+OPT035_D2048_RUN_P95 = 73.9000702
 HISTORICAL_P = 1746.71973
 OPT032_P = 1637.58594
+OPT033_P = 1745.10315
 OPT036_P = 1644.04822
-LEGAL_PV = {"scalar", "mma"}
+LEGAL_PATHS = {"elementwise", "packed"}
+PRODUCTION_SHAPES = ("q4k_gate_up", "q4k_down", "q6k_attn_out", "q6k_logits")
+PROBE_SHAPES = ("q4_k_17x256", "q4_k_257x512", "q6_k_17x256", "q6_k_257x512")
 PROOF = (
-    "frozen attention envelopes; lower component time; improved P; "
+    "byte equality; lower weighted MMV time; improved D2048; "
     "cross-workload guard; does not substitute for the 2K llama.cpp parity gate; "
-    "OPT-033 P D128 D2048 are the keep denominators"
+    "OPT-035 P D128 D2048 are the keep denominators"
 )
+AB_OBJECTS = [
+    "build/quant_mmv.cuda.o",
+    "build/quant.o",
+    "build/status.o",
+]
 NVCC_OBJECTS = [
     "build/full_scheduler.trace.cuda.o",
     "build/scheduler_primitives.cuda.o",
@@ -73,33 +81,40 @@ def _contract() -> dict[str, Any]:
     return json.loads(CONTRACT.read_text())
 
 
-def selected_pv_from_source() -> str:
-    text = (ROOT / "cuda/fattn_mma_f16.cuh").read_text()
-    match = re.search(r'kSelectedPvPath\[\] = "([^"]+)"', text)
+def selected_path_from_source() -> str:
+    text = (ROOT / "cuda/quant_mmv.cu").read_text()
+    match = re.search(r'kSelectedMmvLoadPath\[\] = "([^"]+)"', text)
     assert match is not None
     return match.group(1)
 
 
-def selected_vkq_from_source() -> str:
-    text = (ROOT / "cuda/fattn_mma_f16.cuh").read_text()
-    match = re.search(r'kSelectedVkqAccum\[\] = "([^"]+)"', text)
-    assert match is not None
-    return match.group(1)
-
-
-def frozen_envelopes_unchanged() -> bool:
-    text = (ROOT / "cuda/fattn_mma_f16.cuh").read_text()
+def warp_buckets_unchanged() -> bool:
+    text = (ROOT / "cuda/quant_mmv.cu").read_text()
     return (
-        'kSelectedFattnPath[] = "stream_k"' in text
-        and "kSelectedAttentionMmaQueryRows = 16" in text
-        and "kFattnNcols2 = 2" in text
-        and "kFattnNbatchFa = 32" in text
-        and 'kSelectedVkqAccum[] = "registers"' in text
-        and "fattn_mma_quality_typed<16, true, 2, 2, true, true>" in text
-        and "fattn_mma_quality_typed<16, true, 2, 2, true, false>" in text
-        and "__float2half_rn(w0 - __half2float(pair[0]))" in text
-        and "mma_m16n8k16_f16_f32(c_acc[m_tile][n_local], a, b)" in text
-        and "fattn_stream_k_combine_kernel" in text
+        "if (rows <= 48) return 4;" in text
+        and "if (rows <= 1024) return 8;" in text
+        and "if (rows <= 5120) return 16;" in text
+        and "if (rows <= 17408) return 8;" in text
+    )
+
+
+def q8_staging_unchanged() -> bool:
+    text = (ROOT / "cuda/quant_mmv.cu").read_text()
+    return (
+        "__global__ void quantize_bf16_q8" in text
+        and "maximum / 127.0F" in text
+        and "roundf(value / scale)" in text
+    )
+
+
+def fp32_lane_order_unchanged() -> bool:
+    text = (ROOT / "cuda/quant_mmv.cu").read_text()
+    return (
+        "sum = __fadd_rn(sum, __fmul_rn(weight, value));" in text
+        and "__shfl_down_sync(0xFFFFFFFFU, sum, offset, kWarpSize)" in text
+        and "d * static_cast<float>(scales[i] * quant)" in text
+        and "DP4A" not in text
+        and "dp4a" not in text
     )
 
 
@@ -108,6 +123,15 @@ def decode_16_16_unchanged() -> bool:
     return (
         "kSelectedDecodeKvPartsLow = 16" in text
         and "kSelectedDecodeKvPartsHigh = 16" in text
+    )
+
+
+def fattn_pins_unchanged() -> bool:
+    text = (ROOT / "cuda/fattn_mma_f16.cuh").read_text()
+    return (
+        'kSelectedFattnPath[] = "stream_k"' in text
+        and 'kSelectedVkqAccum[] = "registers"' in text
+        and 'kSelectedPvPath[] = "mma"' in text
     )
 
 
@@ -121,100 +145,105 @@ def ffn_shared_y_unchanged() -> bool:
     return 'kSelectedFfnPath[] = "shared_y_swiglu_q8"' in text
 
 
-def no_dual_f16_v() -> bool:
-    text = (ROOT / "cuda/fattn_mma_f16.cuh").read_text()
-    return "V_hi" not in text and "four MMA" not in text
-
-
-def scalar_register_path_retained() -> bool:
-    text = (ROOT / "cuda/fattn_mma_f16.cuh").read_text()
-    return (
-        "acc[idx] += scores[qcol * kFattnNbatchFa + krow] *" in text
-        and 'kSelectedVkqAccum[] = "registers"' in text
-    )
-
-
 def opt037_not_started() -> bool:
     return not (ROOT / "pins/opt037_ffn_tile_contract.json").is_file()
 
 
-def _ab_candidate(result: dict[str, Any], ident: str) -> None:
-    cand = result["ab"]["candidates"][ident]
+def _shape_candidate(shape: dict[str, Any], ident: str, *, probe: bool) -> None:
+    cand = shape["candidates"][ident]
     assert cand["id"] == ident
     assert len(cand["samples"]) == 30
     assert len(cand["warmup_ms"]) == 3
     mean = sum(float(v) for v in cand["samples"]) / 30.0
     assert cand["mean_ms"] == pytest.approx(mean, rel=1e-6, abs=1e-6)
     assert cand["occupancy"] >= 0
-    assert cand["vs_tiled"]["nonfinite"] == 0
-    assert cand["include_combine"] is True
-    assert "vs_scalar" in cand
+    assert cand["q8_equal"] is True
     if cand["eligible"]:
         assert cand["occupancy"] >= 1
-        assert cand["vs_tiled"]["max_abs"] <= 5.0e-5
-        assert cand["vs_tiled"]["rms"] <= 5.0e-6
-        assert cand["scratch_unchanged"] is True
-        assert cand["committed_unchanged"] is True
-        assert cand["candidate_exact"] is True
+        assert cand["launch_ok"] is True
+        if ident == "packed":
+            assert cand["byte_equal"] is True
+        if probe:
+            assert cand["vs_host"]["nonfinite"] == 0
+            assert cand["vs_host"]["max_abs"] <= 3.0e-4
+            assert cand["vs_host"]["rms"] <= 2.0e-4
 
 
 def _select_winner(result: dict[str, Any]) -> str:
-    scalar = result["ab"]["candidates"]["scalar"]
-    mma = result["ab"]["candidates"]["mma"]
-    if mma["eligible"] and float(mma["mean_ms"]) < float(scalar["mean_ms"]):
-        return "mma"
-    return "scalar"
+    packed_ok = True
+    weighted = {"elementwise": 0.0, "packed": 0.0}
+    weight_sum = 0
+    for ident in PRODUCTION_SHAPES:
+        shape = result["ab"]["shapes"][ident]
+        packed_ok = packed_ok and shape["candidates"]["packed"]["eligible"]
+        weight = int(shape["weight"])
+        weight_sum += weight
+        for path in ("elementwise", "packed"):
+            weighted[path] += weight * float(shape["candidates"][path]["mean_ms"])
+    for ident in PROBE_SHAPES:
+        packed_ok = (
+            packed_ok
+            and result["ab"]["shapes"][ident]["candidates"]["packed"]["eligible"]
+        )
+    if not packed_ok or weight_sum == 0:
+        return "elementwise"
+    packed_mean = weighted["packed"] / weight_sum
+    elementwise_mean = weighted["elementwise"] / weight_sum
+    if packed_mean < elementwise_mean:
+        return "packed"
+    return "elementwise"
 
 
 def _keep_predicates(result: dict[str, Any]) -> bool:
     contract = _contract()
-    if result["selected_pv_path"] != "mma":
-        return False
-    if result["selected_vkq_accum"] != "registers":
+    if result["selected_mmv_load_path"] != "packed":
         return False
     if result["reverted"] is True or result["keep_sitting_skipped"] is True:
         return False
     if result["status"] != "measured":
         return False
-    if result["ab"]["winner"] != "mma" or result["ab"]["win"] is not True:
+    if result["ab"]["winner"] != "packed" or result["ab"]["win"] is not True:
         return False
-    mma = result["ab"]["candidates"]["mma"]
-    scalar = result["ab"]["candidates"]["scalar"]
-    if mma["eligible"] is not True:
-        return False
-    if not (float(mma["mean_ms"]) < float(scalar["mean_ms"])):
+    if not (
+        float(result["ab"]["weighted_mean_ms"]["packed"])
+        < float(result["ab"]["weighted_mean_ms"]["elementwise"])
+    ):
         return False
     if result["p"] is None or result["d128"] is None or result["d2048"] is None:
         return False
     if (
         float(result["p"]["quartz"]["mean_tok_s"])
-        <= contract["opt033_quartz_p_mean_tok_s"]
+        < 0.95 * contract["opt035_quartz_p_mean_tok_s"]
     ):
         return False
-    quartz_d128 = float(result["d128"]["quartz"]["mean_tok_s"])
-    if quartz_d128 < 0.95 * contract["opt033_quartz_d128_mean_tok_s"]:
+    if (
+        float(result["d128"]["quartz"]["mean_tok_s"])
+        < 0.95 * contract["opt035_quartz_d128_mean_tok_s"]
+    ):
         return False
     if (
         result["d128"]["quartz"]["token_latency_p95_ms"]
-        > 1.05 * contract["opt033_quartz_d128_token_latency_p95_ms"]
+        > 1.05 * contract["opt035_quartz_d128_token_latency_p95_ms"]
     ):
         return False
     if (
         result["d128"]["quartz"]["run_mean_token_latency_p95_ms"]
-        > 1.05 * contract["opt033_quartz_d128_run_mean_token_latency_p95_ms"]
+        > 1.05 * contract["opt035_quartz_d128_run_mean_token_latency_p95_ms"]
     ):
         return False
-    quartz_d2048 = float(result["d2048"]["quartz"]["mean_tok_s"])
-    if quartz_d2048 < 0.95 * contract["opt033_quartz_d2048_mean_tok_s"]:
+    if (
+        float(result["d2048"]["quartz"]["mean_tok_s"])
+        <= contract["opt035_quartz_d2048_mean_tok_s"]
+    ):
         return False
     if (
         result["d2048"]["quartz"]["token_latency_p95_ms"]
-        > 1.05 * contract["opt033_quartz_d2048_token_latency_p95_ms"]
+        > 1.05 * contract["opt035_quartz_d2048_token_latency_p95_ms"]
     ):
         return False
     if (
         result["d2048"]["quartz"]["run_mean_token_latency_p95_ms"]
-        > 1.05 * contract["opt033_quartz_d2048_run_mean_token_latency_p95_ms"]
+        > 1.05 * contract["opt035_quartz_d2048_run_mean_token_latency_p95_ms"]
     ):
         return False
     return True
@@ -225,15 +254,16 @@ def validate_result(result: Any) -> None:
     assert isinstance(result, dict) and set(result) == set(
         contract["required_fixture_keys"]
     )
-    assert result["schema_version"] == 1 and result["task"] == "OPT-035"
+    assert result["schema_version"] == 1 and result["task"] == "OPT-034"
     assert result["status"] in ("measured", "rejected")
     assert result["status"] not in ("scout", "source_inspected")
-    assert contract["yardstick"] == "prefill_attention_pv_mma"
-    assert contract["opt033_quartz_p_mean_tok_s"] == OPT033_P
-    assert contract["opt033_quartz_d128_mean_tok_s"] == OPT033_D128
-    assert contract["opt033_quartz_d2048_mean_tok_s"] == OPT033_D2048
+    assert contract["yardstick"] == "d2048_decode_packed_q4k_q6k_mmv"
+    assert contract["opt035_quartz_p_mean_tok_s"] == OPT035_P
+    assert contract["opt035_quartz_d128_mean_tok_s"] == OPT035_D128
+    assert contract["opt035_quartz_d2048_mean_tok_s"] == OPT035_D2048
     assert contract["historical_opt026_quartz_mean_tok_s"] == HISTORICAL_P
     assert contract["opt032_quartz_p_mean_tok_s"] == OPT032_P
+    assert contract["opt033_quartz_p_mean_tok_s"] == OPT033_P
     assert contract["opt036_quartz_p_mean_tok_s"] == OPT036_P
     assert contract["use_as_keep_denominator"] is False
     assert result["llama_revision"] == LLAMA_REV == contract["llama_revision"]
@@ -244,41 +274,31 @@ def validate_result(result: Any) -> None:
     assert result["substitutes_for_opt016"] is False
     assert result["nsight_systems"] == "not_used"
     assert result["nsight_compute"] == "not_used"
-    assert contract["opt005"]["bf16_max_abs"] == 0.00005
-    assert contract["opt005"]["bf16_rms"] == 0.000005
-    assert contract["ab"]["include_combine"] is True
-    assert contract["ab"]["byte_equal_required"] is False
-    assert contract["ab"]["envelope_vs_tiled_required"] is True
-    assert contract["ab"]["candidates"] == ["scalar", "mma"]
-    assert contract["attention_mma_query_rows"] == 16
-    assert contract["ncols2"] == 2
-    assert contract["kv_tile"] == 32
-    assert contract["dual_f16_q"] is True
-    assert contract["dual_f16_probability"] is True
-    assert contract["dual_f16_v"] is False
-    assert contract["fp32_mma_c"] is True
-    assert contract["fp32_online_max_den"] is True
-    assert contract["grid_z"] == 2
-    assert contract["kSelectedVkqAccum"] == "registers"
-    pin = result["selected_pv_path"]
-    assert pin in LEGAL_PV
-    assert selected_pv_from_source() == pin == contract["selected_pv_path"]
-    assert result["selected_vkq_accum"] == "registers"
-    assert selected_vkq_from_source() == "registers"
-    assert result["ab"]["include_combine"] is True
-    assert set(result["ab"]["candidates"]) == {"scalar", "mma"}
-    _ab_candidate(result, "scalar")
-    _ab_candidate(result, "mma")
+    assert contract["cud001"]["maximum_absolute_error"] == 0.0003
+    assert contract["cud001"]["maximum_rms_error"] == 0.0002
+    assert contract["ab"]["byte_equal_required"] is True
+    assert contract["ab"]["candidates"] == ["elementwise", "packed"]
+    pin = result["selected_mmv_load_path"]
+    assert pin in LEGAL_PATHS
+    assert selected_path_from_source() == pin == contract["selected_mmv_load_path"]
+    assert set(result["ab"]["shapes"]) == set(PRODUCTION_SHAPES + PROBE_SHAPES)
+    for ident in PRODUCTION_SHAPES:
+        _shape_candidate(result["ab"]["shapes"][ident], "elementwise", probe=False)
+        _shape_candidate(result["ab"]["shapes"][ident], "packed", probe=False)
+    for ident in PROBE_SHAPES:
+        _shape_candidate(result["ab"]["shapes"][ident], "elementwise", probe=True)
+        _shape_candidate(result["ab"]["shapes"][ident], "packed", probe=True)
     assert _select_winner(result) == result["ab"]["winner"]
-    assert frozen_envelopes_unchanged()
+    assert warp_buckets_unchanged()
+    assert q8_staging_unchanged()
+    assert fp32_lane_order_unchanged()
     assert decode_16_16_unchanged()
+    assert fattn_pins_unchanged()
     assert skinny_path_unchanged()
     assert ffn_shared_y_unchanged()
-    assert no_dual_f16_v()
-    assert scalar_register_path_retained()
     assert opt037_not_started()
-    if result["ab"]["winner"] == "scalar":
-        assert pin == "scalar"
+    if result["ab"]["winner"] == "elementwise":
+        assert pin == "elementwise"
         assert result["reverted"] is True
         assert result["keep_sitting_skipped"] is True
         assert result["status"] == "rejected"
@@ -287,19 +307,18 @@ def validate_result(result: Any) -> None:
         assert keep
         assert result["reverted"] is False
         assert result["keep_sitting_skipped"] is False
-        assert pin == "mma"
-        assert result["p"]["quartz"]["mean_tok_s"] > OPT033_P
+        assert pin == "packed"
+        assert result["d2048"]["quartz"]["mean_tok_s"] > OPT035_D2048
         assert not REJECTION.is_file()
     else:
         assert not keep
         assert result["reverted"] is True
-        assert pin == "scalar"
-        assert result["selected_vkq_accum"] == "registers"
+        assert pin == "elementwise"
         assert REJECTION.is_file()
         rejection = REJECTION.read_text()
-        assert "scalar" in rejection
+        assert "elementwise" in rejection
         if result["keep_sitting_skipped"] is False:
-            assert str(result["p"]["quartz"]["mean_tok_s"]) in rejection
+            assert str(result["d2048"]["quartz"]["mean_tok_s"]) in rejection
         else:
             assert result["p"] is None and result["d128"] is None
             assert result["d2048"] is None
@@ -314,14 +333,14 @@ def validate_result(result: Any) -> None:
     for phrase in contract["proof_limit"]:
         assert phrase in report
     assert AB_RAW.is_file()
-    opt033 = json.loads(OPT033_FIXTURE.read_text())
-    assert opt033["p"]["quartz"]["mean_tok_s"] == OPT033_P
-    assert opt033["d128"]["quartz"]["mean_tok_s"] == OPT033_D128
-    assert opt033["d2048"]["quartz"]["mean_tok_s"] == OPT033_D2048
+    opt035 = json.loads(OPT035_FIXTURE.read_text())
+    assert opt035["p"]["quartz"]["mean_tok_s"] == OPT035_P
+    assert opt035["d128"]["quartz"]["mean_tok_s"] == OPT035_D128
+    assert opt035["d2048"]["quartz"]["mean_tok_s"] == OPT035_D2048
 
 
 def _candidate_stub(
-    ident: str, mean: float, *, eligible: bool = True
+    ident: str, mean: float, *, eligible: bool = True, byte_equal: bool = True
 ) -> dict[str, Any]:
     return {
         "id": ident,
@@ -331,62 +350,95 @@ def _candidate_stub(
         "occupancy": 2,
         "launch_ok": True,
         "eligible": eligible,
-        "scratch_unchanged": True,
-        "committed_unchanged": True,
-        "candidate_exact": True,
-        "include_combine": True,
-        "vs_tiled": {"max_abs": 0.0, "rms": 0.0, "nonfinite": 0},
-        "vs_scalar": {"max_abs": 0.0, "rms": 0.0, "nonfinite": 0},
+        "byte_equal": byte_equal,
+        "q8_equal": True,
+        "vs_host": {"max_abs": 0.0, "rms": 0.0, "nonfinite": 0},
     }
 
 
-def _ab_stub(winner: str, scalar_ms: float, mma_ms: float) -> dict[str, Any]:
-    mma_win = winner == "mma"
+def _shape_stub(
+    ident: str,
+    *,
+    weight: int,
+    probe: bool,
+    elementwise_ms: float,
+    packed_ms: float,
+    packed_equal: bool = True,
+) -> dict[str, Any]:
     return {
-        "winner": winner,
-        "win": mma_win,
-        "include_combine": True,
+        "id": ident,
+        "weight": weight,
+        "probe": probe,
         "candidates": {
-            "scalar": _candidate_stub("scalar", scalar_ms),
-            "mma": _candidate_stub("mma", mma_ms, eligible=True),
+            "elementwise": _candidate_stub("elementwise", elementwise_ms),
+            "packed": _candidate_stub(
+                "packed", packed_ms, eligible=packed_equal, byte_equal=packed_equal
+            ),
         },
     }
 
 
-def test_opt035_contract_and_source_pins() -> None:
+def _ab_stub(winner: str) -> dict[str, Any]:
+    packed_faster = winner == "packed"
+    packed_ms = 0.8 if packed_faster else 1.2
+    shapes = {}
+    for ident, weight in (
+        ("q4k_gate_up", 128),
+        ("q4k_down", 64),
+        ("q6k_attn_out", 16),
+        ("q6k_logits", 1),
+    ):
+        shapes[ident] = _shape_stub(
+            ident, weight=weight, probe=False, elementwise_ms=1.0, packed_ms=packed_ms
+        )
+    for ident in PROBE_SHAPES:
+        shapes[ident] = _shape_stub(
+            ident, weight=0, probe=True, elementwise_ms=0.01, packed_ms=0.008
+        )
+    return {
+        "winner": winner,
+        "win": packed_faster,
+        "weighted_mean_ms": {
+            "elementwise": 1.0,
+            "packed": packed_ms,
+        },
+        "shapes": shapes,
+    }
+
+
+def test_opt034_contract_and_source_pins() -> None:
     contract = _contract()
-    opt033 = json.loads(OPT033_FIXTURE.read_text())
-    assert opt033["p"]["quartz"]["mean_tok_s"] == OPT033_P
-    assert opt033["d128"]["quartz"]["mean_tok_s"] == OPT033_D128
-    assert opt033["d2048"]["quartz"]["mean_tok_s"] == OPT033_D2048
-    assert contract["opt033_quartz_p_mean_tok_s"] == OPT033_P
+    opt035 = json.loads(OPT035_FIXTURE.read_text())
+    assert opt035["p"]["quartz"]["mean_tok_s"] == OPT035_P
+    assert opt035["d128"]["quartz"]["mean_tok_s"] == OPT035_D128
+    assert opt035["d2048"]["quartz"]["mean_tok_s"] == OPT035_D2048
+    assert contract["opt035_quartz_p_mean_tok_s"] == OPT035_P
     assert contract["historical_opt026_quartz_mean_tok_s"] == HISTORICAL_P
     assert contract["opt032_quartz_p_mean_tok_s"] == OPT032_P
+    assert contract["opt033_quartz_p_mean_tok_s"] == OPT033_P
     assert contract["opt036_quartz_p_mean_tok_s"] == OPT036_P
     assert contract["use_as_keep_denominator"] is False
-    assert contract["ab"]["candidates"] == ["scalar", "mma"]
-    assert contract["ab"]["include_combine"] is True
-    assert contract["ab"]["byte_equal_required"] is False
+    assert contract["ab"]["candidates"] == ["elementwise", "packed"]
+    assert contract["ab"]["byte_equal_required"] is True
     assert contract["owns_opt016_parity_gate"] is False
-    assert contract["dual_f16_v"] is False
-    assert contract["fp32_mma_c"] is True
-    assert contract["fp32_online_max_den"] is True
-    tiled = json.loads((ROOT / "pins/cuda_tiled_attention_contract.json").read_text())
-    assert tiled["proof_limits"]["bf16_max_abs"] == 0.00005
-    assert tiled["proof_limits"]["bf16_rms"] == 0.000005
-    assert selected_pv_from_source() in LEGAL_PV
-    assert selected_vkq_from_source() == "registers"
-    assert frozen_envelopes_unchanged()
+    assert contract["q8_0_direct_bf16_out_of_scope"] is True
+    assert contract["dp4a_out_of_scope"] is True
+    quant = json.loads((ROOT / "pins/cuda_quant_contract.json").read_text())
+    assert quant["admission"]["maximum_absolute_error"] == 0.0003
+    assert quant["admission"]["maximum_rms_error"] == 0.0002
+    assert selected_path_from_source() in LEGAL_PATHS
+    assert warp_buckets_unchanged()
+    assert q8_staging_unchanged()
+    assert fp32_lane_order_unchanged()
     assert decode_16_16_unchanged()
-    assert scalar_register_path_retained()
-    assert no_dual_f16_v()
+    assert fattn_pins_unchanged()
     assert opt037_not_started()
 
 
-def test_opt035_validator_rejects_inadmissible_evidence() -> None:
+def test_opt034_validator_rejects_inadmissible_evidence() -> None:
     fixture = {
         "schema_version": 1,
-        "task": "OPT-035",
+        "task": "OPT-034",
         "status": "rejected",
         "measurement_utc": "2026-09-09T00:00:00Z",
         "device": "NVIDIA GeForce RTX 5090",
@@ -394,9 +446,8 @@ def test_opt035_validator_rejects_inadmissible_evidence() -> None:
         "llama_revision": LLAMA_REV,
         "gguf_sha256": GGUF_SHA,
         "reverted": True,
-        "selected_pv_path": "scalar",
-        "selected_vkq_accum": "registers",
-        "ab": _ab_stub("scalar", 1.0, 1.5),
+        "selected_mmv_load_path": "elementwise",
+        "ab": _ab_stub("elementwise"),
         "keep_sitting_skipped": True,
         "p": None,
         "d128": None,
@@ -406,22 +457,20 @@ def test_opt035_validator_rejects_inadmissible_evidence() -> None:
         "nsight_systems": "not_used",
         "nsight_compute": "not_used",
         "proof_limit": PROOF,
-        "report_path": "evidence/optimization/opt035-pv-mma/REPORT.md",
+        "report_path": "evidence/optimization/opt034-packed-mmv/REPORT.md",
     }
     mutations: list[dict[str, Any]] = []
     for mutate in (
         lambda x: x.__setitem__("substitutes_for_opt016", True),
         lambda x: x.__setitem__("owns_opt016_parity_gate", True),
         lambda x: x.__setitem__("nsight_systems", "/tmp/capture.nsys-rep"),
-        lambda x: x.__setitem__("report_path", "/tmp/opt035/REPORT.md"),
+        lambda x: x.__setitem__("report_path", "/tmp/opt034/REPORT.md"),
         lambda x: x.__setitem__("status", "source_inspected"),
-        lambda x: x.__setitem__("task", "OPT-034"),
-        lambda x: x["ab"].__setitem__("winner", "mma"),
-        lambda x: x.__setitem__("selected_pv_path", "mma"),
-        lambda x: x.__setitem__("selected_vkq_accum", "global"),
+        lambda x: x.__setitem__("task", "OPT-037"),
+        lambda x: x["ab"].__setitem__("winner", "packed"),
+        lambda x: x.__setitem__("selected_mmv_load_path", "packed"),
         lambda x: x.__setitem__("keep_sitting_skipped", False),
         lambda x: x.__setitem__("reverted", False),
-        lambda x: x["ab"].__setitem__("include_combine", False),
     ):
         changed = json.loads(json.dumps(fixture))
         mutate(changed)
@@ -430,49 +479,40 @@ def test_opt035_validator_rejects_inadmissible_evidence() -> None:
     equality["status"] = "measured"
     equality["reverted"] = False
     equality["keep_sitting_skipped"] = False
-    equality["selected_pv_path"] = "mma"
-    equality["ab"] = _ab_stub("mma", 2.0, 1.0)
-    equality["p"] = {"quartz": {"mean_tok_s": OPT033_P}}
+    equality["selected_mmv_load_path"] = "packed"
+    equality["ab"] = _ab_stub("packed")
+    equality["p"] = {"quartz": {"mean_tok_s": OPT035_P * 0.96}}
     equality["d128"] = {
         "quartz": {
-            "mean_tok_s": OPT033_D128,
-            "token_latency_p95_ms": OPT033_D128_P95,
-            "run_mean_token_latency_p95_ms": OPT033_D128_RUN_P95,
+            "mean_tok_s": OPT035_D128,
+            "token_latency_p95_ms": OPT035_D128_P95,
+            "run_mean_token_latency_p95_ms": OPT035_D128_RUN_P95,
         }
     }
     equality["d2048"] = {
         "quartz": {
-            "mean_tok_s": OPT033_D2048,
-            "token_latency_p95_ms": OPT033_D2048_P95,
-            "run_mean_token_latency_p95_ms": OPT033_D2048_RUN_P95,
+            "mean_tok_s": OPT035_D2048,
+            "token_latency_p95_ms": OPT035_D2048_P95,
+            "run_mean_token_latency_p95_ms": OPT035_D2048_RUN_P95,
         }
     }
     mutations.append(equality)
-    loosened = json.loads(json.dumps(fixture))
-    loosened["ab"]["candidates"]["mma"]["vs_tiled"]["max_abs"] = 0.1
-    loosened["ab"]["candidates"]["mma"]["eligible"] = True
-    loosened["ab"]["winner"] = "mma"
-    mutations.append(loosened)
-    skip_combine = json.loads(json.dumps(fixture))
-    skip_combine["ab"]["candidates"]["scalar"]["include_combine"] = False
-    mutations.append(skip_combine)
-    no_envelope = json.loads(json.dumps(equality))
-    no_envelope["ab"]["candidates"]["mma"]["eligible"] = False
-    mutations.append(no_envelope)
     EVIDENCE.mkdir(parents=True, exist_ok=True)
     report_prev = REPORT.read_text() if REPORT.is_file() else None
     raw_prev = AB_RAW.read_text() if AB_RAW.is_file() else None
     rejection_prev = REJECTION.read_text() if REJECTION.is_file() else None
-    if report_prev is None:
-        REPORT.write_text(PROOF + "\n")
-    if raw_prev is None:
-        AB_RAW.write_text("placeholder\n")
-    if rejection_prev is None:
-        REJECTION.write_text("rejected placeholder scalar\n")
+    REPORT.write_text(
+        "byte equality lower weighted MMV time improved D2048 "
+        "cross-workload guard does not substitute for the 2K "
+        "llama.cpp parity gate OPT-035 P D128 D2048 are the keep "
+        "denominators\n"
+    )
+    AB_RAW.write_text("raw\n")
+    REJECTION.write_text("elementwise\n")
     try:
-        for mutation in mutations:
+        for changed in mutations:
             with pytest.raises(AssertionError):
-                validate_result(mutation)
+                validate_result(changed)
     finally:
         if report_prev is None:
             REPORT.unlink(missing_ok=True)
@@ -488,43 +528,38 @@ def test_opt035_validator_rejects_inadmissible_evidence() -> None:
             REJECTION.write_text(rejection_prev)
 
 
-def test_opt035_fixture_connected() -> None:
+def test_opt034_fixture_connected() -> None:
     if not FIXTURE.is_file():
-        pytest.skip("OPT-035 fixture is written by the exclusive CUDA sitting")
+        pytest.skip("OPT-034 fixture is written by the exclusive CUDA sitting")
     validate_result(json.loads(FIXTURE.read_text()))
 
 
-def test_opt035_rejects_historical_p_as_keep_denominator() -> None:
+def test_opt034_rejects_historical_p_as_keep_denominator() -> None:
     contract = _contract()
-    assert contract["opt033_quartz_p_mean_tok_s"] == OPT033_P
+    assert contract["opt035_quartz_p_mean_tok_s"] == OPT035_P
     assert contract["historical_opt026_quartz_mean_tok_s"] == HISTORICAL_P
     assert contract["opt032_quartz_p_mean_tok_s"] == OPT032_P
+    assert contract["opt033_quartz_p_mean_tok_s"] == OPT033_P
     assert contract["opt036_quartz_p_mean_tok_s"] == OPT036_P
     assert contract["use_as_keep_denominator"] is False
-    assert HISTORICAL_P != OPT033_P
-    assert OPT032_P != OPT033_P
-    assert OPT036_P != OPT033_P
     keep_denominators = {
-        contract["opt033_quartz_p_mean_tok_s"],
-        contract["opt033_quartz_d128_mean_tok_s"],
-        contract["opt033_quartz_d2048_mean_tok_s"],
+        contract["opt035_quartz_p_mean_tok_s"],
+        contract["opt035_quartz_d128_mean_tok_s"],
+        contract["opt035_quartz_d2048_mean_tok_s"],
     }
     assert HISTORICAL_P not in keep_denominators
     assert OPT032_P not in keep_denominators
+    assert OPT033_P not in keep_denominators
     assert OPT036_P not in keep_denominators
-    opt033 = json.loads(OPT033_FIXTURE.read_text())
-    assert opt033["p"]["quartz"]["mean_tok_s"] == OPT033_P
-    assert opt033["d128"]["quartz"]["mean_tok_s"] == OPT033_D128
-    assert opt033["d2048"]["quartz"]["mean_tok_s"] == OPT033_D2048
-    contract = _contract()
-    assert contract["opt033_quartz_p_mean_tok_s"] == opt033["p"]["quartz"]["mean_tok_s"]
+    opt035 = json.loads(OPT035_FIXTURE.read_text())
+    assert contract["opt035_quartz_p_mean_tok_s"] == opt035["p"]["quartz"]["mean_tok_s"]
     assert (
-        contract["opt033_quartz_d128_mean_tok_s"]
-        == opt033["d128"]["quartz"]["mean_tok_s"]
+        contract["opt035_quartz_d128_mean_tok_s"]
+        == opt035["d128"]["quartz"]["mean_tok_s"]
     )
     assert (
-        contract["opt033_quartz_d2048_mean_tok_s"]
-        == opt033["d2048"]["quartz"]["mean_tok_s"]
+        contract["opt035_quartz_d2048_mean_tok_s"]
+        == opt035["d2048"]["quartz"]["mean_tok_s"]
     )
 
 
@@ -581,17 +616,17 @@ def _parse_prefixed(text: str, prefix: str) -> dict[str, Any]:
     raise AssertionError(f"{prefix} was not found\n{text}")
 
 
-def _set_pin(pv_path: str) -> None:
-    source = ROOT / "cuda/fattn_mma_f16.cuh"
+def _set_pin(path: str) -> None:
+    source = ROOT / "cuda/quant_mmv.cu"
     text = source.read_text()
     text = re.sub(
-        r'kSelectedPvPath\[\] = "[^"]+"',
-        f'kSelectedPvPath[] = "{pv_path}"',
+        r'kSelectedMmvLoadPath\[\] = "[^"]+"',
+        f'kSelectedMmvLoadPath[] = "{path}"',
         text,
     )
     source.write_text(text)
     contract = _contract()
-    contract["selected_pv_path"] = pv_path
+    contract["selected_mmv_load_path"] = path
     CONTRACT.write_text(json.dumps(contract, indent=2) + "\n")
 
 
@@ -603,27 +638,28 @@ def _write_report(fixture: dict[str, Any]) -> None:
     quartz_d2048 = (
         fixture["d2048"]["quartz"]["mean_tok_s"] if fixture["d2048"] else "n/a"
     )
-    scalar_ms = fixture["ab"]["candidates"]["scalar"]["mean_ms"]
-    mma_ms = fixture["ab"]["candidates"]["mma"]["mean_ms"]
-    text = f"""# OPT-035 — MMA attention probability times V
+    elementwise_ms = fixture["ab"]["weighted_mean_ms"]["elementwise"]
+    packed_ms = fixture["ab"]["weighted_mean_ms"]["packed"]
+    text = f"""# OPT-034 — Packed blockwise Q4_K/Q6_K MMV loads
 
 ## Claim labels and proof limits
 
-Live exclusive-RTX-5090 A/B of 4096-row production stream-K attention including
-combine, candidates `scalar` versus `mma` dual-F16 probability×V MMA. Keep
-requires **frozen attention envelopes**, **lower component time**, **improved P**,
-and the **cross-workload guard**. This increment does not substitute for the 2K llama.cpp parity gate. The OPT-033 P D128 D2048 are the keep denominators
-(P {OPT033_P}, D128 {OPT033_D128}, D2048 {OPT033_D2048}), not
-historical OPT-026 {HISTORICAL_P}, not OPT-032 {OPT032_P}, and not OPT-036 {OPT036_P}.
+Live exclusive-RTX-5090 A/B of production batch-1 Q4_K/Q6_K decode MMV with
+unchanged packed Q8 staging and FP32 lane/reduction order, candidates
+`elementwise` versus `packed` blockwise field/scale loads. Keep requires
+**byte equality**, **lower weighted MMV time**, **improved D2048**,
+and the **cross-workload guard**. This increment does not substitute for the 2K llama.cpp parity gate. The OPT-035 P D128 D2048 are the keep denominators
+(P {OPT035_P}, D128 {OPT035_D128}, D2048 {OPT035_D2048}), not
+historical OPT-026 {HISTORICAL_P}, not OPT-032 {OPT032_P}, not OPT-033 {OPT033_P},
+and not OPT-036 {OPT036_P}.
 
 ## Decision
 
 **{decision}** — `reverted`={json.dumps(fixture["reverted"])};
 `keep_sitting_skipped`={json.dumps(fixture["keep_sitting_skipped"])};
-selected_pv_path={fixture["selected_pv_path"]};
-selected_vkq_accum={fixture["selected_vkq_accum"]};
-A/B winner {fixture["ab"]["winner"]} (scalar mean {scalar_ms} ms,
-mma mean {mma_ms} ms);
+selected_mmv_load_path={fixture["selected_mmv_load_path"]};
+A/B winner {fixture["ab"]["winner"]} (elementwise weighted mean {elementwise_ms} ms,
+packed weighted mean {packed_ms} ms);
 tok/s sitting {sitting}.
 
 ## Protocol
@@ -635,7 +671,7 @@ tok/s sitting {sitting}.
 | Quartz image | `qw38-cuda:13.0.2` |
 | llama.cpp image | `qw38-llama-authority:cuda-13.0.2` |
 | llama.cpp revision | `{LLAMA_REV}` |
-| A/B | 4096 rows, scalar vs mma, 3 warm + 30 alternating, include combine |
+| A/B | production batch-1 Q4_K/Q6_K MMV shapes, elementwise vs packed, 3 warm + 30 alternating, byte-equal, Q8 staging unchanged |
 | P / D128 / D2048 | OPT-021 / OPT-032 protocols, unchanged diagnostics |
 | Nsight | not_used |
 
@@ -643,9 +679,9 @@ tok/s sitting {sitting}.
 
 - Device: {fixture["device"]} compute {fixture["compute_capability"]}
 - measurement_utc: {fixture["measurement_utc"]}
-- P Quartz mean tok/s: {quartz_p} versus OPT-033 {OPT033_P}
-- D128 Quartz mean tok/s: {quartz_d128} versus OPT-033 {OPT033_D128}
-- D2048 Quartz mean tok/s: {quartz_d2048} versus OPT-033 {OPT033_D2048}
+- P Quartz mean tok/s: {quartz_p} versus OPT-035 {OPT035_P} (retain ≥95%)
+- D128 Quartz mean tok/s: {quartz_d128} versus OPT-035 {OPT035_D128}
+- D2048 Quartz mean tok/s: {quartz_d2048} versus OPT-035 {OPT035_D2048} (must improve)
 - owns_opt016_parity_gate: false
 - substitutes_for_opt016: false
 """
@@ -656,28 +692,26 @@ tok/s sitting {sitting}.
 def _write_rejection(fixture: dict[str, Any]) -> None:
     ab = fixture["ab"]
     reason = (
-        "component A/B retained scalar register probability times V"
+        "component A/B retained elementwise per-column Q4_K/Q6_K MMV loads"
         if fixture["keep_sitting_skipped"]
-        else "keep sitting failed P improvement or the cross-workload guard"
+        else "keep sitting failed D2048 improvement or the cross-workload guard"
     )
     tok = (
         ""
         if fixture["keep_sitting_skipped"]
-        else f"\n- P Quartz mean tok/s: {fixture['p']['quartz']['mean_tok_s']}\n"
-        f"- OPT-033 P baseline: {OPT033_P}\n"
-        f"- D128 Quartz mean tok/s: {fixture['d128']['quartz']['mean_tok_s']}\n"
-        f"- D2048 Quartz mean tok/s: {fixture['d2048']['quartz']['mean_tok_s']}"
+        else f"\n- D2048 Quartz mean tok/s: {fixture['d2048']['quartz']['mean_tok_s']}\n"
+        f"- OPT-035 D2048 baseline: {OPT035_D2048}\n"
+        f"- P Quartz mean tok/s: {fixture['p']['quartz']['mean_tok_s']}\n"
+        f"- D128 Quartz mean tok/s: {fixture['d128']['quartz']['mean_tok_s']}"
     )
-    text = f"""# OPT-035 rejection
+    text = f"""# OPT-034 rejection
 
-{reason}. Production probability×V is scalar
-(`selected_pv_path=scalar`). Register-resident VKQ stays
-(`selected_vkq_accum=registers`).
+{reason}. Production MMV loads are elementwise
+(`selected_mmv_load_path=elementwise`).
 
 - A/B winner: {ab["winner"]}
-- scalar mean_ms: {ab["candidates"]["scalar"]["mean_ms"]}
-- mma mean_ms: {ab["candidates"]["mma"]["mean_ms"]}
-- mma eligible: {json.dumps(ab["candidates"]["mma"]["eligible"])}
+- elementwise weighted mean_ms: {ab["weighted_mean_ms"]["elementwise"]}
+- packed weighted mean_ms: {ab["weighted_mean_ms"]["packed"]}
 - keep_sitting_skipped: {json.dumps(fixture["keep_sitting_skipped"])}
 - measurement_utc: {fixture["measurement_utc"]}{tok}
 """
@@ -688,24 +722,24 @@ def _flatten_ab(record: dict[str, Any]) -> dict[str, Any]:
     return {
         "winner": record["winner"],
         "win": record["win"],
-        "include_combine": record.get("include_combine", True),
-        "candidates": record["candidates"],
+        "weighted_mean_ms": record["weighted_mean_ms"],
+        "shapes": record["shapes"],
     }
 
 
 def _run_ab() -> dict[str, Any]:
     EVIDENCE.mkdir(parents=True, exist_ok=True)
     commands = [
-        [*_common(IMAGE), "make", "build/qw38-cuda-timing-test"],
+        [*_common(IMAGE), "make", "build/qw38-cuda-quant-test"],
         _nvcc(
-            "cuda/fattn_pv_mma_ab_test.cu",
-            "build/qw38-cuda-fattn-pv-mma-ab-test",
-            ["build/attention_decode.cuda.o"],
+            "cuda/packed_mmv_ab_test.cu",
+            "build/qw38-cuda-packed-mmv-ab-test",
+            AB_OBJECTS,
         ),
         [
             *_common(IMAGE),
-            "./build/qw38-cuda-fattn-pv-mma-ab-test",
-            "evidence/optimization/opt035-pv-mma/pv-mma-ab-raw.txt",
+            "./build/qw38-cuda-packed-mmv-ab-test",
+            "evidence/optimization/opt034-packed-mmv/mmv-ab-raw.txt",
         ],
     ]
     outputs: list[str] = []
@@ -821,7 +855,7 @@ def _engine_block(record: dict[str, Any], sidecar: str | None = None) -> dict[st
         path = EVIDENCE / sidecar
         path.write_text(json.dumps(record["token_latency_ms"]) + "\n")
         block["token_latency_sidecar"] = (
-            f"evidence/optimization/opt035-pv-mma/{sidecar}"
+            f"evidence/optimization/opt034-packed-mmv/{sidecar}"
         )
     for key in ("n_gpu_layers", "n_ctx", "n_batch", "n_ubatch"):
         if key in record:
@@ -829,7 +863,7 @@ def _engine_block(record: dict[str, Any], sidecar: str | None = None) -> dict[st
     return block
 
 
-def test_opt035_native_keep_reject() -> None:
+def test_opt034_native_keep_reject() -> None:
     if os.environ.get("QW38_RUN_CUDA_TESTS") != "1":
         pytest.skip("set QW38_RUN_CUDA_TESTS=1 for the exclusive RTX 5090 gate")
     if not MODEL.exists():
@@ -842,11 +876,11 @@ def test_opt035_native_keep_reject() -> None:
 
     ab = _run_ab()
     winner = ab["winner"]
-    if winner == "scalar":
-        _set_pin("scalar")
+    if winner == "elementwise":
+        _set_pin("elementwise")
         fixture = {
             "schema_version": 1,
-            "task": "OPT-035",
+            "task": "OPT-034",
             "status": "rejected",
             "measurement_utc": ab["measurement_utc"],
             "device": ab["device"],
@@ -854,8 +888,7 @@ def test_opt035_native_keep_reject() -> None:
             "llama_revision": LLAMA_REV,
             "gguf_sha256": GGUF_SHA,
             "reverted": True,
-            "selected_pv_path": "scalar",
-            "selected_vkq_accum": "registers",
+            "selected_mmv_load_path": "elementwise",
             "ab": _flatten_ab(ab),
             "keep_sitting_skipped": True,
             "p": None,
@@ -866,7 +899,7 @@ def test_opt035_native_keep_reject() -> None:
             "nsight_systems": "not_used",
             "nsight_compute": "not_used",
             "proof_limit": PROOF,
-            "report_path": "evidence/optimization/opt035-pv-mma/REPORT.md",
+            "report_path": "evidence/optimization/opt034-packed-mmv/REPORT.md",
         }
         _write_report(fixture)
         _write_rejection(fixture)
@@ -874,8 +907,8 @@ def test_opt035_native_keep_reject() -> None:
         validate_result(fixture)
         return
 
-    _set_pin("mma")
-    _run([*_common(IMAGE), "make", "build/qw38-cuda-timing-test"])
+    _set_pin("packed")
+    _run([*_common(IMAGE), "make", "build/qw38-cuda-quant-test"])
     llama_p = _run_llama_bench_p()
     quartz_p = _run_quartz_p()
     llama_d128 = _run_llama_decode(128)
@@ -884,7 +917,7 @@ def test_opt035_native_keep_reject() -> None:
     quartz_d2048 = _run_quartz_decode(2048)
     fixture = {
         "schema_version": 1,
-        "task": "OPT-035",
+        "task": "OPT-034",
         "status": "measured",
         "measurement_utc": quartz_d2048.get("measurement_utc", ab["measurement_utc"]),
         "device": ab["device"],
@@ -892,8 +925,7 @@ def test_opt035_native_keep_reject() -> None:
         "llama_revision": LLAMA_REV,
         "gguf_sha256": GGUF_SHA,
         "reverted": False,
-        "selected_pv_path": "mma",
-        "selected_vkq_accum": "registers",
+        "selected_mmv_load_path": "packed",
         "ab": _flatten_ab(ab),
         "keep_sitting_skipped": False,
         "p": {
@@ -933,20 +965,20 @@ def test_opt035_native_keep_reject() -> None:
         "nsight_systems": "not_used",
         "nsight_compute": "not_used",
         "proof_limit": PROOF,
-        "report_path": "evidence/optimization/opt035-pv-mma/REPORT.md",
+        "report_path": "evidence/optimization/opt034-packed-mmv/REPORT.md",
     }
     keep = _keep_predicates(fixture)
     if not keep:
-        _set_pin("scalar")
+        _set_pin("elementwise")
         fixture["status"] = "rejected"
         fixture["reverted"] = True
-        fixture["selected_pv_path"] = "scalar"
+        fixture["selected_mmv_load_path"] = "elementwise"
         _write_report(fixture)
         _write_rejection(fixture)
-        _run([*_common(IMAGE), "make", "build/qw38-cuda-timing-test"])
+        _run([*_common(IMAGE), "make", "build/qw38-cuda-quant-test"])
     else:
         if REJECTION.is_file():
             REJECTION.unlink()
         _write_report(fixture)
     FIXTURE.write_text(json.dumps(fixture, indent=2) + "\n")
-    validate_result(json.loads(FIXTURE.read_text()))
+    validate_result(fixture)

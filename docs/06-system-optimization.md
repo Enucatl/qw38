@@ -40,7 +40,8 @@ gated-output into the warp-column token loop was A/B-lost and not
 installed (OPT-029); production GDN core stays split parallel conv +
 warp-column + gated-output. Hopper/Blackwell PDL on ungraphed prompt
 launches was A/B-won then 4K-rejected (OPT-030); production stays
-ordinary `<<<>>>`. Decode stays MMV.
+ordinary `<<<>>>`. Decode stays MMV, with packed blockwise Q4_K/Q6_K
+loads after the OPT-034 keep.
 Tiny mixer prompts keep the
 OPT-009 tiled `__fmul_rn`/`__fadd_rn` kernel.
 Rank-1 fused MMA remains a non-production kernel. MMA here is Measured
@@ -474,6 +475,32 @@ This increment does not own the 2K llama.cpp parity gate. Quartz ≥
 llama.cpp is informational. Live tok/s stay in the report; this chapter
 does not replace them:
 [`evidence/optimization/opt035-pv-mma/REPORT.md`](../evidence/optimization/opt035-pv-mma/REPORT.md).
+
+## Packed blockwise Q4_K/Q6_K MMV loads (OPT-034)
+
+**Measured, RTX 5090:** production batch-1 Q4_K/Q6_K decode MMV was A/B'd
+between per-column packed-field re-decode and one load of packed fields
+and scales per 256-weight block, consuming each lane's eight values in
+the existing column order. Transient Q8 staging, warp-count dispatch,
+and FP32 `__fmul_rn`/`__fadd_rn` plus the five-step warp tree stay.
+Q8_0 MMV stays per-column. Integer-dot reassociation is out of scope.
+Mixer Q8 quality, FFN shared-Y, GDN warp-column, prompt FFN graphs,
+decode FFN graphs, fattn stream-K, register VKQ, P×V MMA, and decode
+16/16 KV partitions stay. No extra persistent `cudaMalloc`. The targeted
+sink is decode Q4_K/Q6_K MMV. Keep denominators are the frozen
+then-current accepted P / D128 / D2048 means and p95s copied into the
+contract (P **1865.21155**, D128 **15.0562878**, D2048 **13.5411425**),
+not historical OPT-026 P **1746.71973**, not OPT-032 P **1637.58594**,
+not OPT-033 P **1745.10315**, and not OPT-036 P **1644.04822**. **Keep:**
+A/B winner `packed` with byte-equal outputs and strictly lower weighted
+MMV time; production pin `packed`; live D2048 tok/s strictly exceeds
+that frozen D2048 denominator; the cross-workload guard held (D128/D2048
+throughput and both p95 flavors within 5%; P retain ≥95%). Frozen
+CUD-001 envelopes are unloosened. `reverted` is false. This increment
+does not own the 2K llama.cpp parity gate. Quartz ≥ llama.cpp is
+informational. Live tok/s stay in the report; this chapter does not
+replace them:
+[`evidence/optimization/opt034-packed-mmv/REPORT.md`](../evidence/optimization/opt034-packed-mmv/REPORT.md).
 
 ## DwarfStar transfer boundary
 

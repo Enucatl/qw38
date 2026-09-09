@@ -418,6 +418,100 @@ int run_case(qw38::cuda::QuantKind kind, const char* name, std::size_t rows,
              : 1;
 }
 
+int run_packed_byte_equal(qw38::cuda::QuantKind kind, const char* name,
+                          std::size_t rows, std::size_t columns) {
+  std::vector<std::uint8_t> weights;
+  fill_weights(kind, rows, columns, &weights);
+  std::vector<__nv_bfloat16> activation(columns);
+  for (std::size_t column = 0; column < columns; ++column) {
+    activation[column] = __float2bfloat16_rn(
+        unit_normal(static_cast<std::uint32_t>(column), 0xC0FFEEu));
+  }
+  std::vector<qw38::cuda::Q8Block> staged(
+      columns / 32, qw38::cuda::Q8Block{0.0F, {}});
+  std::uint8_t* device_weights = nullptr;
+  __nv_bfloat16* device_activation = nullptr;
+  qw38::cuda::Q8Block* device_staged_a = nullptr;
+  qw38::cuda::Q8Block* device_staged_b = nullptr;
+  float* device_elementwise = nullptr;
+  float* device_packed = nullptr;
+  cudaError_t error = cudaMalloc(&device_weights, weights.size());
+  if (error == cudaSuccess) {
+    error = cudaMalloc(&device_activation,
+                       activation.size() * sizeof(activation[0]));
+  }
+  if (error == cudaSuccess) {
+    error = cudaMalloc(&device_staged_a,
+                       staged.size() * sizeof(qw38::cuda::Q8Block));
+  }
+  if (error == cudaSuccess) {
+    error = cudaMalloc(&device_staged_b,
+                       staged.size() * sizeof(qw38::cuda::Q8Block));
+  }
+  if (error == cudaSuccess) error = cudaMalloc(&device_elementwise, rows * 4);
+  if (error == cudaSuccess) error = cudaMalloc(&device_packed, rows * 4);
+  if (error != cudaSuccess) return fail_cuda("packed memcmp cudaMalloc", error);
+  error = cudaMemcpy(device_weights, weights.data(), weights.size(),
+                     cudaMemcpyHostToDevice);
+  if (error == cudaSuccess) {
+    error = cudaMemcpy(device_activation, activation.data(),
+                       activation.size() * sizeof(activation[0]),
+                       cudaMemcpyHostToDevice);
+  }
+  if (error == cudaSuccess) {
+    error = qw38::cuda::launch_quant_mmv_path(
+        kind, device_weights, rows, columns, device_activation,
+        device_staged_a, device_elementwise, "elementwise", nullptr);
+  }
+  if (error == cudaSuccess) {
+    error = qw38::cuda::launch_quant_mmv_path(
+        kind, device_weights, rows, columns, device_activation,
+        device_staged_b, device_packed, "packed", nullptr);
+  }
+  if (error != cudaSuccess) return fail_cuda("packed memcmp launch", error);
+  error = cudaDeviceSynchronize();
+  if (error != cudaSuccess) return fail_cuda("packed memcmp sync", error);
+  std::vector<float> elementwise(rows);
+  std::vector<float> packed(rows);
+  std::vector<qw38::cuda::Q8Block> staged_a(staged.size());
+  std::vector<qw38::cuda::Q8Block> staged_b(staged.size());
+  error = cudaMemcpy(elementwise.data(), device_elementwise, rows * 4,
+                     cudaMemcpyDeviceToHost);
+  if (error == cudaSuccess) {
+    error = cudaMemcpy(packed.data(), device_packed, rows * 4,
+                       cudaMemcpyDeviceToHost);
+  }
+  if (error == cudaSuccess) {
+    error = cudaMemcpy(staged_a.data(), device_staged_a,
+                       staged.size() * sizeof(staged[0]),
+                       cudaMemcpyDeviceToHost);
+  }
+  if (error == cudaSuccess) {
+    error = cudaMemcpy(staged_b.data(), device_staged_b,
+                       staged.size() * sizeof(staged[0]),
+                       cudaMemcpyDeviceToHost);
+  }
+  if (error != cudaSuccess) return fail_cuda("packed memcmp D2H", error);
+  const bool output_eq =
+      std::memcmp(elementwise.data(), packed.data(), rows * 4) == 0;
+  const bool q8_eq =
+      std::memcmp(staged_a.data(), staged_b.data(),
+                  staged.size() * sizeof(staged[0])) == 0;
+  std::printf("packed_byte_equal case=%s rows=%zu columns=%zu output_eq=%s "
+              "q8_eq=%s occupancy=%d\n",
+              name, rows, columns, output_eq ? "true" : "false",
+              q8_eq ? "true" : "false",
+              qw38::cuda::mmv_packed_occupancy(
+                  kind, qw38::cuda::selected_mmv_warps(rows)));
+  cudaFree(device_packed);
+  cudaFree(device_elementwise);
+  cudaFree(device_staged_b);
+  cudaFree(device_staged_a);
+  cudaFree(device_activation);
+  cudaFree(device_weights);
+  return output_eq && q8_eq ? 0 : 1;
+}
+
 int run_prompt_case(qw38::cuda::QuantKind kind, const char* name,
                     std::size_t output_rows, std::size_t columns,
                     std::size_t prompt_rows) {
@@ -2928,6 +3022,11 @@ int main() {
     std::fprintf(stderr, "dispatch table selection failed\n");
     return 1;
   }
+  if (std::strcmp(qw38::cuda::selected_mmv_load_path(), "elementwise") != 0 &&
+      std::strcmp(qw38::cuda::selected_mmv_load_path(), "packed") != 0) {
+    std::fprintf(stderr, "mmv load path pin is not legal\n");
+    return 1;
+  }
   if (qw38::cuda::q8_workspace_bytes(255) != 0 ||
       qw38::cuda::q8_workspace_bytes(256) !=
           8 * sizeof(qw38::cuda::Q8Block)) {
@@ -2940,12 +3039,29 @@ int main() {
     std::fprintf(stderr, "invalid launch was not rejected\n");
     return 1;
   }
+  if (qw38::cuda::launch_quant_mmv_path(
+          qw38::cuda::QuantKind::kQ4K, nullptr, 1, 256, nullptr, nullptr,
+          nullptr, "packed", nullptr) != cudaErrorInvalidValue ||
+      qw38::cuda::launch_quant_mmv_path(
+          qw38::cuda::QuantKind::kQ4K, nullptr, 1, 256, nullptr, nullptr,
+          nullptr, "dp4a", nullptr) != cudaErrorInvalidValue) {
+    std::fprintf(stderr, "invalid packed-path launch was not rejected\n");
+    return 1;
+  }
   if (run_case(qw38::cuda::QuantKind::kQ4K, "q4_k_17x256", 17, 256) != 0 ||
       run_case(qw38::cuda::QuantKind::kQ4K, "q4_k_257x512", 257, 512) != 0 ||
       run_case(qw38::cuda::QuantKind::kQ6K, "q6_k_17x256", 17, 256) != 0 ||
       run_case(qw38::cuda::QuantKind::kQ6K, "q6_k_257x512", 257, 512) != 0 ||
       run_case(qw38::cuda::QuantKind::kQ8_0, "q8_0_17x256", 17, 256) != 0 ||
-      run_case(qw38::cuda::QuantKind::kQ8_0, "q8_0_257x512", 257, 512) != 0) {
+      run_case(qw38::cuda::QuantKind::kQ8_0, "q8_0_257x512", 257, 512) != 0 ||
+      run_packed_byte_equal(qw38::cuda::QuantKind::kQ4K, "q4_k_17x256", 17,
+                            256) != 0 ||
+      run_packed_byte_equal(qw38::cuda::QuantKind::kQ4K, "q4_k_257x512", 257,
+                            512) != 0 ||
+      run_packed_byte_equal(qw38::cuda::QuantKind::kQ6K, "q6_k_17x256", 17,
+                            256) != 0 ||
+      run_packed_byte_equal(qw38::cuda::QuantKind::kQ6K, "q6_k_257x512", 257,
+                            512) != 0) {
     return 1;
   }
   if (qw38::cuda::q8_prompt_workspace_bytes(3, 256) !=

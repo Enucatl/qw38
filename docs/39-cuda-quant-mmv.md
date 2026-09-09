@@ -61,6 +61,32 @@ both a partly occupied final block and multiple blocks. Column counts must be a
 multiple of the 256-value Q4_K/Q6_K block size and invalid pointers, zero sizes,
 or incompatible columns fail before launch.
 
+## Packed blockwise Q4_K/Q6_K loads
+
+The first kernel decoded each column independently: lane `lane` walked
+`lane`, `lane + 32`, `lane + 64`, and so on, and each visit re-read that
+column's packed scales and nibbles from the same 256-value weight block.
+Production decode Q4_K/Q6_K MMV now has a second path that still owns one
+warp per row and still uses the same column order, but loads each block's
+fields and scales **once**, then consumes the lane's eight values as
+`lane + i*32` for `i = 0..7`. Products stay FP32 `__fmul_rn` /
+`__fadd_rn`. The five-step warp tree is unchanged. Transient Q8 staging
+(`quantize_bf16_q8`) and warp-count dispatch (`selected_mmv_warps`) stay.
+Q8_0 MMV stays on the per-column decoder. Integer-dot (DP4A) reassociation
+is out of scope.
+
+The production pin is `kSelectedMmvLoadPath` in `{elementwise, packed}`.
+**Keep:** A/B winner `packed` with byte-equal outputs versus the
+per-column kernel and a strictly lower decode-occurrence-weighted
+CUDA-event mean; production pin `packed`; live D2048 tok/s strictly
+exceeds the frozen then-current accepted denominator; the cross-workload
+guard held (D128/D2048 throughput and both p95 flavors within 5%; P
+retain ≥95%). `reverted` is false. This increment does not own the 2K
+llama.cpp parity gate. Quartz ≥ llama.cpp is informational. Live
+exclusive A/B milliseconds and P / D128 / D2048 tok/s stay in the
+report; this chapter does not replace them:
+[`evidence/optimization/opt034-packed-mmv/REPORT.md`](../evidence/optimization/opt034-packed-mmv/REPORT.md).
+
 ## What is compared
 
 [`cuda/quant_mmv_test.cu`](../cuda/quant_mmv_test.cu) builds deterministic packed

@@ -877,6 +877,37 @@ baseline.
   denominators; does not substitute for the 2K llama.cpp parity gate;
   Quartz ≥ llama.cpp is not this gate. Byte equality versus scalar is not
   this keep predicate. Envelopes unloosened; Nsight is not used.
+- OPT-034 is a local derivation over admitted CUD-001 Q4_K/Q6_K CUDA
+  vector-dot decoding. It loads packed fields and scales once per
+  256-weight block, then consumes each lane's eight values in the existing
+  column order with the existing FP32 products and five-step warp tree.
+  File-level provenance for packed-field loads is already External: pinned
+  llama.cpp revision `cc83d7b4824f73cfdda4dfbb47ee39804f71b328` (MIT, The
+  ggml authors) `vecdotq.cuh`. This increment does not vendor that file,
+  does not include ggml headers, and does not copy `../ds4`. Integer-dot
+  reassociation is out of scope. Q8_0 MMV stays on the per-column decoder.
+  Transient Q8 staging and warp-count dispatch stay. Production decode MMV
+  stays behind `launch_quant_mmv`. No extra `cudaMalloc`. Keep denominators
+  are the frozen then-current accepted P / D128 / D2048 means and p95s
+  copied into the contract (P 1865.21155, D128 15.0562878, D2048
+  13.5411425), not historical 4K successor-oracle 1746.71973, not stale
+  sitting 1637.58594, not 1745.10315, and not 1644.04822. **Measured, RTX
+  5090:** A/B winner `packed`; production pin `packed`; `reverted` false;
+  `keep_sitting_skipped` false; `status` measured. Live tok/s stay in the
+  report; this ledger does not replace them. The schema-1 contract,
+  measured fixture, and report are
+  [`pins/opt034_packed_mmv_contract.json`](../pins/opt034_packed_mmv_contract.json),
+  [`fixtures/opt034_packed_mmv.json`](../fixtures/opt034_packed_mmv.json),
+  and
+  [`evidence/optimization/opt034-packed-mmv/REPORT.md`](../evidence/optimization/opt034-packed-mmv/REPORT.md).
+  The beginner explanations are
+  [`docs/39-cuda-quant-mmv.md`](39-cuda-quant-mmv.md) and
+  [`docs/06-system-optimization.md`](06-system-optimization.md).
+  Proof limit: byte equality; lower weighted MMV time; improved D2048;
+  cross-workload guard; then-current accepted P D128 D2048 are the keep
+  denominators; does not substitute for the 2K llama.cpp parity gate;
+  Quartz ≥ llama.cpp is not this gate. Envelopes unloosened; Nsight is not
+  used.
 - OPT-036 is a local derivation over admitted ATN-001 tiled one-token decode.
   It splits the legal KV range into contiguous partitions `{1, 4, 8, 16}`,
   keeps candidate `1` as today's tiled kernel, and merges FP32 partial max /

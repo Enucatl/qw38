@@ -1,6 +1,8 @@
 #include "quant_mmv.h"
 #include "quant_mmq_mma.cuh"
 
+#include <cstring>
+
 #include <cuda_fp16.h>
 
 QW38_PDL_REGISTER_DEVICE_OPS()
@@ -98,7 +100,7 @@ __global__ void quantize_bf16_q8(const __nv_bfloat16* input, Q8Block* output,
   }
 }
 
-template <QuantKind Kind, int Warps>
+template <QuantKind Kind, int Warps, bool PackedLoads = false>
 __global__ void quant_mmv(const std::uint8_t* weights, std::size_t rows,
                           std::size_t columns, const Q8Block* activation,
                           float* output) {
@@ -117,15 +119,89 @@ __global__ void quant_mmv(const std::uint8_t* weights, std::size_t rows,
   const std::uint8_t* row_weights =
       weights + row * (columns / kWeightValues) * kWeightBytes;
   float sum = 0.0F;
-  for (std::size_t column = lane; column < columns; column += kWarpSize) {
-    const std::size_t weight_block = column / kWeightValues;
-    const int within = static_cast<int>(column % kWeightValues);
-    const std::uint8_t* block = row_weights + weight_block * kWeightBytes;
-    const float weight = decode_weight<Kind>(block, within);
-    const Q8Block& q8 = activation[column / kWarpSize];
-    const float value =
-        q8.scale * static_cast<float>(q8.values[column % kWarpSize]);
-    sum = __fadd_rn(sum, __fmul_rn(weight, value));
+  if constexpr (PackedLoads && Kind == QuantKind::kQ4K) {
+    const std::size_t n_blocks = columns / kValuesPerWeightBlock;
+    for (std::size_t weight_block = 0; weight_block < n_blocks;
+         ++weight_block) {
+      const std::uint8_t* block =
+          row_weights + weight_block * kQ4KBytes;
+      const float d = read_half(block);
+      const float dmin = read_half(block + 2);
+      int scales[8];
+      int mins[8];
+#pragma unroll
+      for (int smi = 0; smi < 8; ++smi) {
+        q4_scale_min(block + 4, smi, &scales[smi], &mins[smi]);
+      }
+      std::uint8_t qs[4];
+#pragma unroll
+      for (int group = 0; group < 4; ++group) {
+        qs[group] = block[16 + group * 32 + lane];
+      }
+#pragma unroll
+      for (int i = 0; i < 8; ++i) {
+        const int group = i / 2;
+        const int high = i & 1;
+        const int quant = high == 0 ? qs[group] & 15 : qs[group] >> 4;
+        const float weight = d * static_cast<float>(scales[i] * quant) -
+                             dmin * static_cast<float>(mins[i]);
+        const std::size_t column =
+            weight_block * kValuesPerWeightBlock +
+            static_cast<std::size_t>(lane + i * kWarpSize);
+        const Q8Block& q8 = activation[column / kWarpSize];
+        const float value =
+            q8.scale * static_cast<float>(q8.values[column % kWarpSize]);
+        sum = __fadd_rn(sum, __fmul_rn(weight, value));
+      }
+    }
+  } else if constexpr (PackedLoads && Kind == QuantKind::kQ6K) {
+    const std::size_t n_blocks = columns / kValuesPerWeightBlock;
+    for (std::size_t weight_block = 0; weight_block < n_blocks;
+         ++weight_block) {
+      const std::uint8_t* block =
+          row_weights + weight_block * kQ6KBytes;
+      const float d = read_half(block + 208);
+      int scales[16];
+#pragma unroll
+      for (int s = 0; s < 16; ++s) {
+        const std::uint8_t scale_byte = block[192 + s];
+        scales[s] = scale_byte < 128 ? static_cast<int>(scale_byte)
+                                     : static_cast<int>(scale_byte) - 256;
+      }
+      const std::uint8_t ql[4] = {
+          block[lane], block[32 + lane], block[64 + lane],
+          block[96 + lane]};
+      const std::uint8_t qh[2] = {block[128 + lane], block[160 + lane]};
+#pragma unroll
+      for (int i = 0; i < 8; ++i) {
+        const int half = i / 4;
+        const int group = i % 4;
+        const std::uint8_t low = ql[half * 2 + (group & 1)];
+        const int low_four = group < 2 ? low & 15 : low >> 4;
+        const int high_two = (qh[half] >> (group * 2)) & 3;
+        const int quant = (low_four | (high_two << 4)) - 32;
+        const int scale = scales[half * 8 + (lane / 16) + group * 2];
+        const float weight = d * static_cast<float>(scale * quant);
+        const std::size_t column =
+            weight_block * kValuesPerWeightBlock +
+            static_cast<std::size_t>(lane + i * kWarpSize);
+        const Q8Block& q8 = activation[column / kWarpSize];
+        const float value =
+            q8.scale * static_cast<float>(q8.values[column % kWarpSize]);
+        sum = __fadd_rn(sum, __fmul_rn(weight, value));
+      }
+    }
+  } else {
+    for (std::size_t column = lane; column < columns; column += kWarpSize) {
+      const std::size_t weight_block = column / kWeightValues;
+      const int within = static_cast<int>(column % kWeightValues);
+      const std::uint8_t* block = row_weights + weight_block * kWeightBytes;
+      const float weight = decode_weight<Kind>(block, within);
+      const Q8Block& q8 = activation[column / kWarpSize];
+      const float value =
+          q8.scale * static_cast<float>(q8.values[column % kWarpSize]);
+      sum = __fadd_rn(sum, __fmul_rn(weight, value));
+    }
   }
   for (int offset = 16; offset > 0; offset /= 2) {
     sum = __fadd_rn(
@@ -324,6 +400,8 @@ std::size_t q8_prompt_workspace_bytes(std::size_t prompt_rows,
   return prompt_rows * (columns / kWarpSize) * sizeof(Q8Block);
 }
 
+constexpr const char kSelectedMmvLoadPath[] = "packed";
+
 unsigned int selected_mmv_warps(std::size_t rows) noexcept {
   if (rows <= 48) return 4;
   if (rows <= 1024) return 8;
@@ -332,6 +410,48 @@ unsigned int selected_mmv_warps(std::size_t rows) noexcept {
   if (rows <= 12288) return 4;
   if (rows <= 17408) return 8;
   return 4;
+}
+
+const char* selected_mmv_load_path() noexcept { return kSelectedMmvLoadPath; }
+
+bool mmv_uses_packed_loads() noexcept {
+  return std::strcmp(kSelectedMmvLoadPath, "packed") == 0;
+}
+
+bool legal_mmv_load_path(const char* load_path) noexcept {
+  return load_path != nullptr &&
+         (std::strcmp(load_path, "elementwise") == 0 ||
+          std::strcmp(load_path, "packed") == 0);
+}
+
+bool mmv_path_is_packed(const char* load_path) noexcept {
+  return load_path != nullptr && std::strcmp(load_path, "packed") == 0;
+}
+
+int mmv_packed_occupancy(QuantKind kind, unsigned int warps) noexcept {
+  int occupancy = 0;
+  cudaError_t error = cudaErrorInvalidValue;
+  if (kind == QuantKind::kQ4K && warps == 4) {
+    error = cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+        &occupancy, quant_mmv<QuantKind::kQ4K, 4, true>, 128, 0);
+  } else if (kind == QuantKind::kQ4K && warps == 8) {
+    error = cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+        &occupancy, quant_mmv<QuantKind::kQ4K, 8, true>, 256, 0);
+  } else if (kind == QuantKind::kQ4K && warps == 16) {
+    error = cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+        &occupancy, quant_mmv<QuantKind::kQ4K, 16, true>, 512, 0);
+  } else if (kind == QuantKind::kQ6K && warps == 4) {
+    error = cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+        &occupancy, quant_mmv<QuantKind::kQ6K, 4, true>, 128, 0);
+  } else if (kind == QuantKind::kQ6K && warps == 8) {
+    error = cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+        &occupancy, quant_mmv<QuantKind::kQ6K, 8, true>, 256, 0);
+  } else if (kind == QuantKind::kQ6K && warps == 16) {
+    error = cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+        &occupancy, quant_mmv<QuantKind::kQ6K, 16, true>, 512, 0);
+  }
+  if (error != cudaSuccess) return 0;
+  return occupancy;
 }
 
 bool legal_mmq_prompt_tile(unsigned int prompt_tile) noexcept {
@@ -364,7 +484,7 @@ unsigned int selected_mmq_prompt_tile(std::size_t prompt_rows) noexcept {
   return selected_mmq_prompt_tile(QuantKind::kQ4K, prompt_rows);
 }
 
-template <int Warps>
+template <int Warps, bool PackedLoads>
 cudaError_t launch_mmv_kernel(QuantKind kind, const std::uint8_t* weights,
                               std::size_t rows, std::size_t columns,
                               const Q8Block* activation, float* output,
@@ -373,19 +493,48 @@ cudaError_t launch_mmv_kernel(QuantKind kind, const std::uint8_t* weights,
   const unsigned int row_blocks =
       static_cast<unsigned int>((rows + Warps - 1) / Warps);
   if (kind == QuantKind::kQ4K) {
-    quant_mmv<QuantKind::kQ4K, Warps>
+    quant_mmv<QuantKind::kQ4K, Warps, PackedLoads>
         <<<row_blocks, kLaunchThreads, 0, stream>>>(
             weights, rows, columns, activation, output);
   } else if (kind == QuantKind::kQ6K) {
-    quant_mmv<QuantKind::kQ6K, Warps>
+    quant_mmv<QuantKind::kQ6K, Warps, PackedLoads>
         <<<row_blocks, kLaunchThreads, 0, stream>>>(
             weights, rows, columns, activation, output);
   } else {
-    quant_mmv<QuantKind::kQ8_0, Warps>
+    quant_mmv<QuantKind::kQ8_0, Warps, false>
         <<<row_blocks, kLaunchThreads, 0, stream>>>(
             weights, rows, columns, activation, output);
   }
   return cudaPeekAtLastError();
+}
+
+cudaError_t launch_mmv_after_quant(QuantKind kind, const std::uint8_t* weights,
+                                   std::size_t rows, std::size_t columns,
+                                   const Q8Block* activation, float* output,
+                                   unsigned int warps, bool packed,
+                                   cudaStream_t stream) noexcept {
+  if (packed) {
+    if (warps == 4) {
+      return launch_mmv_kernel<4, true>(kind, weights, rows, columns,
+                                        activation, output, stream);
+    }
+    if (warps == 8) {
+      return launch_mmv_kernel<8, true>(kind, weights, rows, columns,
+                                        activation, output, stream);
+    }
+    return launch_mmv_kernel<16, true>(kind, weights, rows, columns, activation,
+                                       output, stream);
+  }
+  if (warps == 4) {
+    return launch_mmv_kernel<4, false>(kind, weights, rows, columns, activation,
+                                       output, stream);
+  }
+  if (warps == 8) {
+    return launch_mmv_kernel<8, false>(kind, weights, rows, columns, activation,
+                                       output, stream);
+  }
+  return launch_mmv_kernel<16, false>(kind, weights, rows, columns, activation,
+                                      output, stream);
 }
 
 cudaError_t launch_quant_mmv_variant(
@@ -393,12 +542,35 @@ cudaError_t launch_quant_mmv_variant(
     std::size_t columns, const __nv_bfloat16* activation,
     Q8Block* q8_workspace, float* output, unsigned int warps,
     cudaStream_t stream) noexcept {
+  return launch_quant_mmv_path(kind, weights, rows, columns, activation,
+                               q8_workspace, output, kSelectedMmvLoadPath,
+                               stream, warps);
+}
+
+cudaError_t launch_quant_mmv(QuantKind kind, const std::uint8_t* weights,
+                             std::size_t rows, std::size_t columns,
+                             const __nv_bfloat16* activation,
+                             Q8Block* q8_workspace, float* output,
+                             cudaStream_t stream) noexcept {
+  return launch_quant_mmv_path(kind, weights, rows, columns, activation,
+                               q8_workspace, output, kSelectedMmvLoadPath,
+                               stream);
+}
+
+cudaError_t launch_quant_mmv_path(
+    QuantKind kind, const std::uint8_t* weights, std::size_t rows,
+    std::size_t columns, const __nv_bfloat16* activation,
+    Q8Block* q8_workspace, float* output, const char* load_path,
+    cudaStream_t stream, unsigned int warps) noexcept {
+  const unsigned int selected_warps =
+      warps == 0 ? selected_mmv_warps(rows) : warps;
   if (weights == nullptr || activation == nullptr || q8_workspace == nullptr ||
       output == nullptr || rows == 0 || columns == 0 ||
       columns % kValuesPerWeightBlock != 0 ||
-      (warps != 4 && warps != 8 && warps != 16) ||
+      (selected_warps != 4 && selected_warps != 8 && selected_warps != 16) ||
       (kind != QuantKind::kQ4K && kind != QuantKind::kQ6K &&
-       kind != QuantKind::kQ8_0)) {
+       kind != QuantKind::kQ8_0) ||
+      !legal_mmv_load_path(load_path)) {
     return cudaErrorInvalidValue;
   }
   const unsigned int quant_blocks =
@@ -407,26 +579,10 @@ cudaError_t launch_quant_mmv_variant(
       activation, q8_workspace, columns);
   cudaError_t error = cudaPeekAtLastError();
   if (error != cudaSuccess) return error;
-  if (warps == 4) {
-    return launch_mmv_kernel<4>(kind, weights, rows, columns, q8_workspace,
-                                output, stream);
-  }
-  if (warps == 8) {
-    return launch_mmv_kernel<8>(kind, weights, rows, columns, q8_workspace,
-                                output, stream);
-  }
-  return launch_mmv_kernel<16>(kind, weights, rows, columns, q8_workspace,
-                                output, stream);
-}
-
-cudaError_t launch_quant_mmv(QuantKind kind, const std::uint8_t* weights,
-                             std::size_t rows, std::size_t columns,
-                             const __nv_bfloat16* activation,
-                             Q8Block* q8_workspace, float* output,
-                             cudaStream_t stream) noexcept {
-  return launch_quant_mmv_variant(kind, weights, rows, columns, activation,
-                                  q8_workspace, output,
-                                  selected_mmv_warps(rows), stream);
+  const bool packed =
+      mmv_path_is_packed(load_path) && kind != QuantKind::kQ8_0;
+  return launch_mmv_after_quant(kind, weights, rows, columns, q8_workspace,
+                                output, selected_warps, packed, stream);
 }
 
 template <int PromptTile>
