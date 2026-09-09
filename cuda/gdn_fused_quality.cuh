@@ -10,6 +10,7 @@
 // --fmad=false stays unchanged.
 
 #include "gdn_step.h"
+#include "pdl_launch.cuh"
 
 #include <cstdint>
 #include <cstring>
@@ -101,10 +102,14 @@ prepare_recurrence_fused_warp_column(
     GdnConfig config, const float* convolution_output, const float* log_decay,
     const float* beta, const float* source, float* candidate, float* output,
     std::size_t token_count, bool value_is_tiled) {
+  quartz_pdl_sync();
   const std::uint32_t value_head = blockIdx.x;
   const int lane = static_cast<int>(threadIdx.x);
   const std::uint32_t col = blockIdx.z * 4U + threadIdx.y;
-  if (value_head >= config.value_heads || col >= config.value_width) return;
+  if (value_head >= config.value_heads || col >= config.value_width) {
+    quartz_pdl_lc();
+    return;
+  }
 
   const std::uint32_t reuse = config.value_heads / config.key_heads;
   const std::uint32_t key_head = value_head / reuse;
@@ -195,6 +200,7 @@ prepare_recurrence_fused_warp_column(
                               config.value_width +
               col] = s_shard[row];
   }
+  quartz_pdl_lc();
 }
 
 // fuse_conv: inline width-4 causal conv + SiLU into the warp-column loop.
@@ -584,6 +590,7 @@ __global__ void gdn_gated_output_rows_split(
     const float* recurrent, const float* gate_tiled, const float* norm,
     std::size_t key_heads, std::size_t replicas, std::size_t head_width,
     __nv_bfloat16* output_tiled) {
+  quartz_pdl_sync();
   const std::size_t row = blockIdx.y;
   const std::size_t grouped_head = blockIdx.x;
   const std::size_t lane = threadIdx.x;
@@ -614,6 +621,7 @@ __global__ void gdn_gated_output_rows_split(
     output_tiled[tiled_base + lane] =
         __float2bfloat16_rn(__fmul_rn(value, silu));
   }
+  quartz_pdl_lc();
 }
 
 inline cudaError_t launch_gdn_quality_recurrence(
@@ -623,10 +631,10 @@ inline cudaError_t launch_gdn_quality_recurrence(
     bool value_is_tiled, cudaStream_t stream) noexcept {
   const dim3 grid(config.value_heads, 1U, config.value_width / 4U);
   const dim3 block(32U, 4U, 1U);
-  prepare_recurrence_fused_warp_column<<<grid, block, 0, stream>>>(
-      config, convolution_output, log_decay, beta, source, candidate, output,
+  return quartz_launch_kernel(
+      prepare_recurrence_fused_warp_column, grid, block, 0, stream, config,
+      convolution_output, log_decay, beta, source, candidate, output,
       token_count, value_is_tiled);
-  return cudaPeekAtLastError();
 }
 
 cudaError_t launch_gdn_gated_output_rows(
@@ -641,10 +649,9 @@ cudaError_t launch_gdn_gated_output_rows(
   }
   const dim3 grid(static_cast<unsigned int>(key_heads * replicas),
                   static_cast<unsigned int>(token_count));
-  gdn_gated_output_rows_split<<<grid, 256, 0, stream>>>(
-      recurrent, gate_tiled, norm, key_heads, replicas, head_width,
-      output_tiled);
-  return cudaPeekAtLastError();
+  return quartz_launch_kernel(
+      gdn_gated_output_rows_split, grid, dim3(256), 0, stream, recurrent,
+      gate_tiled, norm, key_heads, replicas, head_width, output_tiled);
 }
 
 int gdn_fuse_occupancy(const char* path) noexcept {

@@ -1,6 +1,6 @@
 # Stable-address CUDA graphs
 
-[Index](README.md) · Implementation tasks: OPT-003, OPT-012, and EDU-039 in
+[Index](README.md) · Implementation tasks: OPT-003, OPT-012, OPT-030, and EDU-039 in
 [`implementation_ledger.md`](../implementation_ledger.md) · Evidence:
 [`cuda/full_scheduler.cu`](../cuda/full_scheduler.cu),
 [`cuda/graph_test.cu`](../cuda/graph_test.cu),
@@ -70,7 +70,13 @@ weight pointers (`prompt_mixer_output_`, `prompt_normalized_`, prompt residuals,
 and layer norms) instead of decode-scratch addresses. Mixer GDN/attention,
 embedding token rows, attention position or causal extent, KV destination, host
 output copies, and atomic commit stay ordinary launches around those FFN graph
-launches.
+launches. OPT-030 may wrap those ungraphed mixer/GDN/attention launches in a
+Hopper/Blackwell PDL `cudaLaunchKernelEx` path when a paired A/B wins. PDL is
+**forbidden during FFN capture**: while `execute_prompt_ffn` is being captured,
+the wrapper takes the ordinary `<<<>>>` branch so graph nodes stay ordinary
+kernel launches without programmatic-stream-serialization attributes.
+Graph-versus-ordinary fused logits/hidden remain **byte-equal**. Production
+PDL was not installed after the 4K reject (`kSelectedPdlPath` `off`).
 
 ## Prompt FFN graphs at 4,096 rows
 
@@ -187,3 +193,9 @@ fused byte equality, 64-row ordinary fallback, poll-8 cancellation, and the
 parameter updates, Nsight Systems overlap, end-to-end prefill/decode speedup, or
 128K quality. Equality is graph versus ordinary fused FFN, not a new unfused
 gate. QLT-001 remains blocked.
+
+OPT-030 proves PDL is forbidden during FFN capture and that
+graph-versus-ordinary fused byte equality stays after the PDL wrapper is
+present. FFN graphs were not recaptured and are not PDL-attributed.
+Production stays ordinary `<<<>>>` after the 4K reject. It does not apply
+PDL inside captured FFN graphs and does not own mixer/GDN graph capture.

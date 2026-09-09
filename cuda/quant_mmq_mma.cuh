@@ -30,6 +30,7 @@
 // copy ../ds4/cuda/mmq/ and does not include ggml headers.
 
 #include "mma.cuh"
+#include "pdl_launch.cuh"
 #include "quant_mmv.h"
 
 #include <cstdio>
@@ -438,6 +439,7 @@ template <QuantKind Kind>
 __global__ void quantize_mmq_q8_1_bf16(const __nv_bfloat16* prompt,
                                         std::size_t prompt_rows,
                                         std::size_t columns, std::uint8_t* y) {
+  quartz_pdl_sync();
   const std::size_t index =
       static_cast<std::size_t>(blockIdx.x) * blockDim.x + threadIdx.x;
   const int lane = threadIdx.x & 31;
@@ -457,7 +459,10 @@ __global__ void quantize_mmq_q8_1_bf16(const __nv_bfloat16* prompt,
   }
   const int q =
       scale == 0.0F ? 0 : static_cast<int>(roundf(value / scale));
-  if (index >= count) return;
+  if (index >= count) {
+    quartz_pdl_lc();
+    return;
+  }
   const std::size_t row = index / columns;
   const std::size_t col = index % columns;
   const std::size_t k32 = col / 32;
@@ -474,6 +479,7 @@ __global__ void quantize_mmq_q8_1_bf16(const __nv_bfloat16* prompt,
       reinterpret_cast<float*>(block)[group] = scale;
     }
   }
+  quartz_pdl_lc();
 }
 
 template <QuantKind Kind>
@@ -1003,6 +1009,7 @@ template <QuantKind Kind, int PromptTile, bool Fallback, int QualityI = kQuality
 __global__ void __launch_bounds__(256, 1) quant_mmq_mma_quality_kernel(
     const std::uint8_t* weights, std::size_t output_rows, std::size_t columns,
     const int* y, std::size_t prompt_rows, float* output) {
+  quartz_pdl_sync();
   const std::size_t out0 =
       static_cast<std::size_t>(blockIdx.x) * QualityI;
   const std::size_t prompt0 =
@@ -1015,6 +1022,7 @@ __global__ void __launch_bounds__(256, 1) quant_mmq_mma_quality_kernel(
       weights, output_rows, columns, y, prompt_rows, output, nullptr, out0,
       prompt0, i_max, j_max, 0, static_cast<int>(columns / kMmaBlockValues),
       false);
+  quartz_pdl_lc();
 }
 
 template <QuantKind Kind, int PromptTile, bool Fallback, int QualityI = kQualityI>
@@ -1288,10 +1296,11 @@ cudaError_t launch_quality_mma(
       printed_q4_attrs = true;
     }
   }
-  quant_mmq_mma_quality_kernel<Kind, PromptTile, Fallback, QualityI, SoaWeights>
-      <<<grid, block, shared, stream>>>(weights, output_rows, columns, y,
-                                       prompt_rows, output);
-  return cudaPeekAtLastError();
+  return quartz_launch_kernel(
+      quant_mmq_mma_quality_kernel<Kind, PromptTile, Fallback, QualityI,
+                                  SoaWeights>,
+      grid, block, shared, stream, weights, output_rows, columns, y,
+      prompt_rows, output);
 }
 
 }  // namespace
@@ -1446,22 +1455,20 @@ cudaError_t launch_quantize_mmq_q8_1(QuantKind kind, const __nv_bfloat16* prompt
       (count + static_cast<std::size_t>(kQualityQuantThreads) - 1) /
       static_cast<std::size_t>(kQualityQuantThreads));
   if (kind == QuantKind::kQ4K) {
-    quantize_mmq_q8_1_bf16<QuantKind::kQ4K>
-        <<<blocks, kQualityQuantThreads, 0, stream>>>(
-            prompt, prompt_rows, columns,
-            reinterpret_cast<std::uint8_t*>(workspace));
+    return quartz_launch_kernel(quantize_mmq_q8_1_bf16<QuantKind::kQ4K>,
+                                dim3(blocks), dim3(kQualityQuantThreads), 0,
+                                stream, prompt, prompt_rows, columns,
+                                reinterpret_cast<std::uint8_t*>(workspace));
   } else if (kind == QuantKind::kQ6K) {
-    quantize_mmq_q8_1_bf16<QuantKind::kQ6K>
-        <<<blocks, kQualityQuantThreads, 0, stream>>>(
-            prompt, prompt_rows, columns,
-            reinterpret_cast<std::uint8_t*>(workspace));
-  } else {
-    quantize_mmq_q8_1_bf16<QuantKind::kQ8_0>
-        <<<blocks, kQualityQuantThreads, 0, stream>>>(
-            prompt, prompt_rows, columns,
-            reinterpret_cast<std::uint8_t*>(workspace));
+    return quartz_launch_kernel(quantize_mmq_q8_1_bf16<QuantKind::kQ6K>,
+                                dim3(blocks), dim3(kQualityQuantThreads), 0,
+                                stream, prompt, prompt_rows, columns,
+                                reinterpret_cast<std::uint8_t*>(workspace));
   }
-  return cudaPeekAtLastError();
+  return quartz_launch_kernel(quantize_mmq_q8_1_bf16<QuantKind::kQ8_0>,
+                              dim3(blocks), dim3(kQualityQuantThreads), 0,
+                              stream, prompt, prompt_rows, columns,
+                              reinterpret_cast<std::uint8_t*>(workspace));
 }
 
 cudaError_t launch_quant_mmq_mma_y_path(

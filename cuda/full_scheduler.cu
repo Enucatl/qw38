@@ -15,8 +15,11 @@
 #include "attention_decode.h"
 #include "gdn_step.h"
 #include "mixer.h"
+#include "pdl_launch.cuh"
 #include "scheduler.h"
 #include "scheduler_primitives.h"
+
+QW38_PDL_REGISTER_DEVICE_OPS()
 
 namespace qw38::cuda {
 namespace {
@@ -204,6 +207,7 @@ __global__ void bf16_to_fp32(const __nv_bfloat16* input, std::size_t count,
 __global__ void rms_norm_fp32_to_bf16(const float* input, const float* scale,
                                       std::size_t count,
                                       __nv_bfloat16* output) {
+  quartz_pdl_sync();
   __shared__ float inverse;
   if (threadIdx.x == 0) {
     float sum = 0.0F;
@@ -218,11 +222,13 @@ __global__ void rms_norm_fp32_to_bf16(const float* input, const float* scale,
         __float2bfloat16_rn(__fmul_rn(__fmul_rn(input[index], inverse),
                                      scale[index]));
   }
+  quartz_pdl_lc();
 }
 
 __global__ void rms_norm_rows_fp32_to_bf16(
     const float* input, const float* scale, std::size_t width,
     __nv_bfloat16* output) {
+  quartz_pdl_sync();
   const std::size_t row = blockIdx.x;
   const float* row_input = input + row * width;
   __nv_bfloat16* row_output = output + row * width;
@@ -241,26 +247,33 @@ __global__ void rms_norm_rows_fp32_to_bf16(
     row_output[index] = __float2bfloat16_rn(
         __fmul_rn(__fmul_rn(row_input[index], inverse), scale[index]));
   }
+  quartz_pdl_lc();
 }
 
 __global__ void residual_add_fp32(const float* residual,
                                   const float* correction,
                                   std::size_t count, float* output) {
+  quartz_pdl_sync();
   const std::size_t index =
       static_cast<std::size_t>(blockIdx.x) * blockDim.x + threadIdx.x;
   if (index < count) {
     output[index] = __fadd_rn(residual[index], correction[index]);
   }
+  quartz_pdl_lc();
 }
 
 __global__ void prepare_gdn_gate_rows(
     const float* alpha, const float* beta, const float* folded_a,
     const float* dt_bias, std::size_t key_heads, std::size_t replicas,
     float* log_decay, float* update) {
+  quartz_pdl_sync();
   const std::size_t row = blockIdx.x;
   const std::size_t grouped = threadIdx.x;
   const std::size_t count = key_heads * replicas;
-  if (grouped >= count) return;
+  if (grouped >= count) {
+    quartz_pdl_lc();
+    return;
+  }
   const std::size_t key = grouped / replicas;
   const std::size_t replica = grouped % replicas;
   const std::size_t tiled = replica * key_heads + key;
@@ -273,12 +286,14 @@ __global__ void prepare_gdn_gate_rows(
       beta_value >= 0.0F
           ? 1.0F / (1.0F + expf(-beta_value))
           : expf(beta_value) / (1.0F + expf(beta_value));
+  quartz_pdl_lc();
 }
 
 __global__ void gdn_gated_output_rows(
     const float* recurrent, const float* gate_tiled, const float* norm,
     std::size_t key_heads, std::size_t replicas, std::size_t head_width,
     __nv_bfloat16* output_tiled) {
+  quartz_pdl_sync();
   const std::size_t row = blockIdx.y;
   const std::size_t grouped_head = blockIdx.x;
   const std::size_t lane = threadIdx.x;
@@ -309,6 +324,7 @@ __global__ void gdn_gated_output_rows(
     output_tiled[tiled_base + lane] =
         __float2bfloat16_rn(__fmul_rn(value, silu));
   }
+  quartz_pdl_lc();
 }
 
 __global__ void split_attention_rows(const float* packed,
@@ -316,10 +332,14 @@ __global__ void split_attention_rows(const float* packed,
                                      std::size_t head_width,
                                      std::size_t token_count, float* query,
                                      float* gate) {
+  quartz_pdl_sync();
   const std::size_t index =
       static_cast<std::size_t>(blockIdx.x) * blockDim.x + threadIdx.x;
   const std::size_t count = token_count * query_values;
-  if (index >= count) return;
+  if (index >= count) {
+    quartz_pdl_lc();
+    return;
+  }
   const std::size_t row = index / query_values;
   const std::size_t within = index % query_values;
   const std::size_t head = within / head_width;
@@ -328,6 +348,7 @@ __global__ void split_attention_rows(const float* packed,
       row * query_values * 2 + head * head_width * 2;
   query[index] = packed[packed_base + lane];
   gate[index] = packed[packed_base + head_width + lane];
+  quartz_pdl_lc();
 }
 
 __global__ void residual_add_norm_fp32_to_bf16(
@@ -534,9 +555,9 @@ cudaError_t matrix_vector(const DeviceTensor& matrix,
     const unsigned int blocks = static_cast<unsigned int>(
         (matrix.rows + (kThreads / kWarpSize) - 1) /
         (kThreads / kWarpSize));
-    q8_mmv_bf16<<<blocks, kThreads, 0, stream>>>(
-        matrix.data, matrix.rows, matrix.columns, activation, output);
-    return cudaPeekAtLastError();
+    return quartz_launch_kernel(
+        q8_mmv_bf16, dim3(blocks), dim3(kThreads), 0, stream, matrix.data,
+        matrix.rows, matrix.columns, activation, output);
   }
   return launch_quant_mmv(matrix.kind, matrix.data, matrix.rows,
                           matrix.columns, activation, workspace->q8_, output,
@@ -719,6 +740,38 @@ cudaError_t execute_prompt_ffn(
   return error;
 }
 
+cudaError_t launch_prepare_gdn_gate_rows(
+    const float* alpha, const float* beta, const float* folded_a,
+    const float* dt_bias, std::size_t key_heads, std::size_t replicas,
+    std::size_t token_count, float* log_decay, float* update,
+    cudaStream_t stream) noexcept {
+  if (alpha == nullptr || beta == nullptr || folded_a == nullptr ||
+      dt_bias == nullptr || log_decay == nullptr || update == nullptr ||
+      key_heads == 0 || replicas == 0 || token_count == 0) {
+    return cudaErrorInvalidValue;
+  }
+  return quartz_launch_kernel(
+      prepare_gdn_gate_rows, dim3(static_cast<unsigned int>(token_count)),
+      dim3(kThreads), 0, stream, alpha, beta, folded_a, dt_bias, key_heads,
+      replicas, log_decay, update);
+}
+
+cudaError_t launch_split_attention_rows_prompt(
+    const float* packed, std::size_t query_values, std::size_t head_width,
+    std::size_t token_count, float* query, float* gate,
+    cudaStream_t stream) noexcept {
+  if (packed == nullptr || query == nullptr || gate == nullptr ||
+      query_values == 0 || head_width == 0 || token_count == 0) {
+    return cudaErrorInvalidValue;
+  }
+  const std::size_t values = token_count * query_values;
+  return quartz_launch_kernel(
+      split_attention_rows,
+      dim3(static_cast<unsigned int>((values + kThreads - 1) / kThreads)),
+      dim3(kThreads), 0, stream, packed, query_values, head_width, token_count,
+      query, gate);
+}
+
 cudaError_t launch_residual_add_fp32(const float* residual,
                                      const float* correction, std::size_t count,
                                      float* output,
@@ -727,10 +780,10 @@ cudaError_t launch_residual_add_fp32(const float* residual,
       count == 0) {
     return cudaErrorInvalidValue;
   }
-  residual_add_fp32<<<static_cast<unsigned int>((count + kThreads - 1) / kThreads),
-                      kThreads, 0, stream>>>(residual, correction, count,
-                                             output);
-  return cudaPeekAtLastError();
+  return quartz_launch_kernel(
+      residual_add_fp32,
+      dim3(static_cast<unsigned int>((count + kThreads - 1) / kThreads)),
+      dim3(kThreads), 0, stream, residual, correction, count, output);
 }
 
 cudaError_t launch_rms_norm_rows_fp32_to_bf16(const float* input,
@@ -743,9 +796,10 @@ cudaError_t launch_rms_norm_rows_fp32_to_bf16(const float* input,
       token_count == 0) {
     return cudaErrorInvalidValue;
   }
-  rms_norm_rows_fp32_to_bf16<<<static_cast<unsigned int>(token_count), kThreads,
-                               0, stream>>>(input, scale, width, output);
-  return cudaPeekAtLastError();
+  return quartz_launch_kernel(rms_norm_rows_fp32_to_bf16,
+                              dim3(static_cast<unsigned int>(token_count)),
+                              dim3(kThreads), 0, stream, input, scale, width,
+                              output);
 }
 
 cudaError_t launch_residual_add_norm_rows_fp32_to_bf16(
@@ -2039,6 +2093,7 @@ Status execute_prompt_chunk(
   cudaStream_t stream = fused ? workspace->prompt_compute_stream_ : nullptr;
   cudaError_t error = cudaSuccess;
   {
+    const PdlScope pdl;
     const NvtxRange embedding_range("qw38.embedding");
     error = begin_phase(categories,
                          attribution == nullptr ? nullptr
@@ -2072,14 +2127,14 @@ Status execute_prompt_chunk(
         }
       }
       if (error == cudaSuccess) {
-        bf16_to_fp32<<<
-            static_cast<unsigned int>((token_count * internal::kResidualWidth +
-                                       kThreads - 1) /
-                                      kThreads),
-            kThreads, 0, stream>>>(workspace->prompt_normalized_,
-                                   token_count * internal::kResidualWidth,
-                                   workspace->prompt_residual_a_);
-        error = cudaPeekAtLastError();
+        error = quartz_launch_kernel(
+            bf16_to_fp32,
+            dim3(static_cast<unsigned int>(
+                (token_count * internal::kResidualWidth + kThreads - 1) /
+                kThreads)),
+            dim3(kThreads), 0, stream, workspace->prompt_normalized_,
+            token_count * internal::kResidualWidth,
+            workspace->prompt_residual_a_);
         if (error == cudaSuccess) {
           bump(counters, &PromptPipelineCounters::widen_kernel_launches);
         }
@@ -2099,6 +2154,8 @@ Status execute_prompt_chunk(
     const DeviceLayer& layer = model.layers_[layer_index];
     const bool gdn_layer = layer.kind == internal::LayerKind::kGdn;
     nvtxRangePushA(gdn_layer ? "qw38.gdn" : "qw38.attention");
+    {
+    const PdlScope pdl;
     TimingValue* mixer_mmq =
         attribution == nullptr ? nullptr : &attribution->mixer_mmq;
     TimingValue* core = attribution == nullptr
@@ -2182,13 +2239,13 @@ Status execute_prompt_chunk(
       }
       if (gdn_layer) {
         if (error == cudaSuccess) {
-          prepare_gdn_gate_rows<<<static_cast<unsigned int>(token_count),
-                                  kThreads, 0, stream>>>(
-              workspace->prompt_projection_c_,
+          error = quartz_launch_kernel(
+              prepare_gdn_gate_rows, dim3(static_cast<unsigned int>(token_count)),
+              dim3(kThreads), 0, stream, workspace->prompt_projection_c_,
               workspace->prompt_projection_d_, layer.gdn.folded_a,
-              layer.gdn.dt_bias, 16, 3, workspace->prompt_gdn_decay_,
+              layer.gdn.dt_bias, static_cast<std::size_t>(16),
+              static_cast<std::size_t>(3), workspace->prompt_gdn_decay_,
               workspace->prompt_gdn_update_);
-          error = cudaPeekAtLastError();
         }
         const GdnState committed{
             session->gdn_convolution_ +
@@ -2253,24 +2310,24 @@ Status execute_prompt_chunk(
         if (error == cudaSuccess && !used_fused_gate) {
           const dim3 grid(static_cast<unsigned int>(internal::kGdnGateCount),
                           static_cast<unsigned int>(token_count));
-          gdn_gated_output_rows<<<grid, kThreads, 0, stream>>>(
+          error = quartz_launch_kernel(
+              gdn_gated_output_rows, grid, dim3(kThreads), 0, stream,
               workspace->prompt_gdn_recurrent_output_,
-              workspace->prompt_projection_b_, layer.gdn.norm, 16, 3, 128,
-              workspace->prompt_projected_bf16_);
-          error = cudaPeekAtLastError();
+              workspace->prompt_projection_b_, layer.gdn.norm,
+              static_cast<std::size_t>(16), static_cast<std::size_t>(3),
+              static_cast<std::size_t>(128), workspace->prompt_projected_bf16_);
         }
       } else {
         if (error == cudaSuccess) {
           const std::size_t values =
               token_count * internal::kAttentionQueryWidth;
-          split_attention_rows<<<
-              static_cast<unsigned int>((values + kThreads - 1) / kThreads),
-              kThreads, 0, stream>>>(workspace->prompt_projection_a_,
-                                     internal::kAttentionQueryWidth, 256,
-                                     token_count,
-                                     workspace->prompt_gdn_convolved_,
-                                     workspace->prompt_projection_b_);
-          error = cudaPeekAtLastError();
+          error = quartz_launch_kernel(
+              split_attention_rows,
+              dim3(static_cast<unsigned int>((values + kThreads - 1) / kThreads)),
+              dim3(kThreads), 0, stream, workspace->prompt_projection_a_,
+              internal::kAttentionQueryWidth, static_cast<std::size_t>(256),
+              token_count, workspace->prompt_gdn_convolved_,
+              workspace->prompt_projection_b_);
         }
         const AttentionConfig config{
             24, 4, 256, 64, static_cast<std::uint32_t>(session->capacity_)};
@@ -2353,6 +2410,7 @@ Status execute_prompt_chunk(
       }
       if (error == cudaSuccess) error = end_phase(categories);
     }
+    }  // PdlScope: mixer + core + output mixer only
     nvtxRangePop();
     nvtxRangePushA("qw38.ffn");
     if (error == cudaSuccess) {
@@ -2458,16 +2516,17 @@ Status execute_prompt_chunk(
   const float* final_hidden =
       residual + (token_count - 1) * internal::kResidualWidth;
   nvtxRangePushA("qw38.logits");
+  {
+    const PdlScope pdl;
   if (error == cudaSuccess) {
     error = begin_phase(categories,
                           attribution == nullptr ? nullptr : &attribution->logits,
                           stream);
   }
   if (error == cudaSuccess) {
-    rms_norm_fp32_to_bf16<<<1, kThreads, 0, stream>>>(
-        final_hidden, model.output_norm_, internal::kResidualWidth,
-        workspace->normalized_);
-    error = cudaPeekAtLastError();
+    error = quartz_launch_kernel(
+        rms_norm_fp32_to_bf16, dim3(1), dim3(kThreads), 0, stream, final_hidden,
+        model.output_norm_, internal::kResidualWidth, workspace->normalized_);
     if (error == cudaSuccess) {
       bump(counters, &PromptPipelineCounters::rms_norm_kernel_launches);
     }
@@ -2477,6 +2536,7 @@ Status execute_prompt_chunk(
                           workspace->logits_, stream);
   }
   if (error == cudaSuccess) error = end_phase(categories);
+  }
   nvtxRangePop();
   const std::size_t cache_stride =
       session->capacity_ * internal::kAttentionKvWidth;

@@ -13,6 +13,7 @@
 #include "weights.h"
 #include "quant_mmv.h"
 #include "gdn_step.h"
+#include "pdl_launch.cuh"
 #ifdef QW38_DIAGNOSTIC_TRACE
 #include "diagnostic_trace.h"
 #endif
@@ -168,6 +169,11 @@ class ResidentModel final {
                 std::size_t mapped_bytes) noexcept;
   std::size_t resident_bytes() const noexcept;
   float upload_milliseconds() const noexcept;
+  std::size_t layer_count() const noexcept { return layers_.size(); }
+  const DeviceLayer& layer(std::size_t index) const noexcept {
+    return layers_[index];
+  }
+  const DeviceTensor& embedding() const noexcept { return embedding_; }
 #ifdef QW38_DIAGNOSTIC_TRACE
   const DeviceCommonLayer& common_layer(std::size_t layer_index) const noexcept {
     return layers_[layer_index].common;
@@ -435,6 +441,17 @@ cudaError_t launch_residual_add_fp32(const float* residual,
                                      const float* correction, std::size_t count,
                                      float* output,
                                      cudaStream_t stream) noexcept;
+
+cudaError_t launch_prepare_gdn_gate_rows(
+    const float* alpha, const float* beta, const float* folded_a,
+    const float* dt_bias, std::size_t key_heads, std::size_t replicas,
+    std::size_t token_count, float* log_decay, float* update,
+    cudaStream_t stream) noexcept;
+
+cudaError_t launch_split_attention_rows_prompt(
+    const float* packed, std::size_t query_values, std::size_t head_width,
+    std::size_t token_count, float* query, float* gate,
+    cudaStream_t stream) noexcept;
 
 cudaError_t launch_rms_norm_rows_fp32_to_bf16(const float* input,
                                               const float* scale,

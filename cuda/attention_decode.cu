@@ -1,11 +1,14 @@
 #include "attention_decode.h"
 #include "fattn_mma_f16.cuh"
 #include "mma.cuh"
+#include "pdl_launch.cuh"
 
 #include <cmath>
 #include <cstdint>
 
 #include <cuda_fp16.h>
+
+QW38_PDL_REGISTER_DEVICE_OPS()
 
 namespace qw38::cuda {
 namespace {
@@ -193,10 +196,14 @@ __global__ void stage_chunk_rows(
     const float* key, const float* value, const float* scale,
     __nv_bfloat16* candidate_key, __nv_bfloat16* candidate_value,
     float* normalized_key) {
+  quartz_pdl_sync();
   const std::uint32_t kv_head = blockIdx.x;
   const std::size_t token = blockIdx.y;
   const std::uint32_t lane = threadIdx.x;
-  if (token >= token_count) return;
+  if (token >= token_count) {
+    quartz_pdl_lc();
+    return;
+  }
   const std::size_t width = config.head_width;
   const std::size_t base = token * config.kv_heads * width + kv_head * width;
   __shared__ float normalized[kMaximumHeadWidth];
@@ -228,6 +235,7 @@ __global__ void stage_chunk_rows(
     candidate_key[base + lane] = __float2bfloat16_rn(normalized[lane]);
     candidate_value[base + lane] = __float2bfloat16_rn(value[base + lane]);
   }
+  quartz_pdl_lc();
 }
 
 template <bool RecordSpans>
@@ -1075,10 +1083,10 @@ cudaError_t stage_and_validate_chunk(
     return cudaErrorInvalidValue;
   }
   dim3 staging(config.kv_heads, static_cast<unsigned>(token_count), 1);
-  stage_chunk_rows<<<staging, kThreads, 0, stream>>>(
-      config, start_position, token_count, key, value, key_norm_scale,
+  return quartz_launch_kernel(
+      stage_chunk_rows, staging, dim3(kThreads), 0, stream, config,
+      start_position, token_count, key, value, key_norm_scale,
       candidate_rows.key, candidate_rows.value, normalized_key);
-  return cudaPeekAtLastError();
 }
 
 }  // namespace

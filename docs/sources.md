@@ -746,6 +746,46 @@ baseline.
   baseline; envelopes unloosened; sequential remains the reference;
   OPT-016 remains the parity gate owner; does not substitute for the 2K
   llama.cpp parity gate; Quartz ≥ llama.cpp is not this gate.
+- OPT-030 adapts llama.cpp revision
+  `cc83d7b4824f73cfdda4dfbb47ee39804f71b328` (MIT, The ggml authors)
+  Hopper/Blackwell programmatic dependent launch from
+  `ggml/src/ggml-cuda/common.cuh` (`ggml_cuda_kernel_launch` /
+  `ggml_cuda_pdl_config` / `ggml_cuda_kernel_can_use_pdl` /
+  `ggml_cuda_pdl_sync` / `ggml_cuda_pdl_lc`): host
+  `cudaLaunchKernelEx` with one
+  `cudaLaunchAttributeProgrammaticStreamSerialization` attribute
+  (`programmaticStreamSerializationAllowed = 1`) when `ptxVersion >=
+  90`, plus device `cudaGridDependencySynchronize` /
+  `cudaTriggerProgrammaticLaunchCompletion` for `__CUDA_ARCH__ >=
+  900`. This increment does not vendor `common.cuh`, does not include
+  ggml headers, and does not honor `GGML_CUDA_PDL`. Quartz uses a
+  compile-time enumerator plus a paired A/B. PDL is forbidden while a
+  stream is capturing; FFN graphs stay ordinary kernel nodes.
+  Production stays ordinary `<<<>>>` after the 4K reject.
+  `kSelectedPdlPath` is `off`. Mixer Q8 quality, skinny
+  `mma_i32_j128`, FFN `shared_y_swiglu_q8`, fattn Ada+ stream-K, and
+  split GDN core stay. Decode launches are unchanged. **Measured, RTX
+  5090:** A/B winner `pdl` (`win=true`; `pdl` strictly beat `off`;
+  `pdl_host` did not); live exclusive cold exact-4096 reject versus
+  the frozen successor-oracle baseline 1746.71973; `reverted` true;
+  `successor_oracle` false; `production_pdl_installed` false;
+  `ladder_exhausted` false. Live numbers stay in the report; this
+  ledger does not replace them. The schema-1 contract, rejected
+  fixture, report, and rejection are
+  [`pins/opt030_pdl_launches_contract.json`](../pins/opt030_pdl_launches_contract.json),
+  [`fixtures/opt030_pdl_launches.json`](../fixtures/opt030_pdl_launches.json),
+  [`evidence/optimization/opt030-pdl-launches/REPORT.md`](../evidence/optimization/opt030-pdl-launches/REPORT.md),
+  and
+  [`evidence/optimization/opt030-pdl-launches/REJECTION.md`](../evidence/optimization/opt030-pdl-launches/REJECTION.md).
+  The beginner explanation is
+  [`docs/62-cuda-full-prefill.md`](62-cuda-full-prefill.md).
+  Proof limit: Hopper/Blackwell PDL serialization of ungraphed
+  mixer/GDN/attention prompt launches on sm_120 when a paired A/B
+  wins; arithmetic and graph-vs-fused byte equality retained; FFN
+  graphs stay non-PDL; 4K keep/reject versus the then-current oracle
+  baseline; envelopes unloosened; OPT-016 remains the parity gate
+  owner; does not substitute for the 2K llama.cpp parity gate; Quartz
+  ≥ llama.cpp is not this gate.
 - CUD-003 introduces no new external implementation source. GGUF Q8_0 decoding
   follows the format already admitted by the pinned scalar decoder, and the
   pointwise/layout equations come from the pinned model contract and scalar

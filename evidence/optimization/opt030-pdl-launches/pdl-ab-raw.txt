@@ -1,0 +1,15 @@
+pdl_occupancy ok=true gdn=8 q8=1 fattn=1 ptx=true
+pdl_capture ordinary=true used_ex=false
+pdl_ab id=off sample=0 ms=76.109314 occupancy=1
+pdl_ab id=off sample=1 ms=76.2245102 occupancy=1
+pdl_ab id=off sample=2 ms=76.1126404 occupancy=1
+pdl_ab_mean id=off mean_ms=76.1488266 occupancy=1 eligible=true byte_equal=true
+pdl_ab id=pdl_host sample=0 ms=75.9787216 occupancy=1
+pdl_ab id=pdl_host sample=1 ms=76.2581787 occupancy=1
+pdl_ab id=pdl_host sample=2 ms=76.2690582 occupancy=1
+pdl_ab_mean id=pdl_host mean_ms=76.1686554 occupancy=1 eligible=true byte_equal=true
+pdl_ab id=pdl sample=0 ms=76.0615005 occupancy=1
+pdl_ab id=pdl sample=1 ms=76.0687332 occupancy=1
+pdl_ab id=pdl sample=2 ms=76.0151062 occupancy=1
+pdl_ab_mean id=pdl mean_ms=76.0484467 occupancy=1 eligible=true byte_equal=true
+pdl_ab_winner id=pdl mean_ms=76.0484467 baseline_id=off baseline_ms=76.1488266 win=true selected_path=off

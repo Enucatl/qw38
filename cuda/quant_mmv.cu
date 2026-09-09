@@ -3,6 +3,8 @@
 
 #include <cuda_fp16.h>
 
+QW38_PDL_REGISTER_DEVICE_OPS()
+
 namespace qw38::cuda {
 namespace {
 
@@ -644,16 +646,18 @@ cudaError_t launch_quant_rows_decode_widen(QuantKind kind,
   const dim3 grid(static_cast<unsigned int>((columns + kThreads - 1) / kThreads),
                   static_cast<unsigned int>(token_count));
   if (kind == QuantKind::kQ4K) {
-    quant_rows_decode_widen<QuantKind::kQ4K>
-        <<<grid, kThreads, 0, stream>>>(weights, columns, token_ids, output);
-  } else if (kind == QuantKind::kQ6K) {
-    quant_rows_decode_widen<QuantKind::kQ6K>
-        <<<grid, kThreads, 0, stream>>>(weights, columns, token_ids, output);
-  } else {
-    quant_rows_decode_widen<QuantKind::kQ8_0>
-        <<<grid, kThreads, 0, stream>>>(weights, columns, token_ids, output);
+    return quartz_launch_kernel(quant_rows_decode_widen<QuantKind::kQ4K>, grid,
+                                dim3(kThreads), 0, stream, weights, columns,
+                                token_ids, output);
   }
-  return cudaPeekAtLastError();
+  if (kind == QuantKind::kQ6K) {
+    return quartz_launch_kernel(quant_rows_decode_widen<QuantKind::kQ6K>, grid,
+                                dim3(kThreads), 0, stream, weights, columns,
+                                token_ids, output);
+  }
+  return quartz_launch_kernel(quant_rows_decode_widen<QuantKind::kQ8_0>, grid,
+                              dim3(kThreads), 0, stream, weights, columns,
+                              token_ids, output);
 }
 
 }  // namespace qw38::cuda

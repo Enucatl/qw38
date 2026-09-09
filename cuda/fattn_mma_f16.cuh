@@ -9,6 +9,7 @@
 
 #include "attention_decode.h"
 #include "mma.cuh"
+#include "pdl_launch.cuh"
 
 #include <cstdint>
 
@@ -155,6 +156,7 @@ fattn_mma_quality_kernel(
     const __nv_bfloat16* committed_key, const __nv_bfloat16* committed_value,
     const __nv_bfloat16* candidate_key, const __nv_bfloat16* candidate_value,
     float* output, float* normalized_query, float* partial, float* meta) {
+  quartz_pdl_sync();
   constexpr int kNcols = Ncols1 * kFattnNcols2;
   constexpr int kNthreads = Ncols1 <= 8 ? 64 : 128;
   constexpr int kNwarps = kNthreads / 32;
@@ -163,7 +165,10 @@ fattn_mma_quality_kernel(
   const std::uint32_t kv_head = blockIdx.x;
   const std::size_t first_row =
       static_cast<std::size_t>(Ncols1) * blockIdx.y;
-  if (first_row >= token_count) return;
+  if (first_row >= token_count) {
+    quartz_pdl_lc();
+    return;
+  }
   const int active_rows = static_cast<int>(
       token_count - first_row < static_cast<std::size_t>(Ncols1)
           ? token_count - first_row
@@ -478,18 +483,23 @@ fattn_mma_quality_kernel(
     }
     __syncthreads();
   }
+  quartz_pdl_lc();
 }
 
 __global__ void fattn_stream_k_combine_kernel(
     AttentionConfig config, std::size_t token_count, const float* gate,
     float* output, const float* partial, const float* meta) {
+  quartz_pdl_sync();
   const std::size_t width = config.head_width;
   const std::size_t values =
       token_count * static_cast<std::size_t>(config.query_heads) * width;
   const std::size_t index = static_cast<std::size_t>(blockIdx.x) *
                                 static_cast<std::size_t>(blockDim.x) +
                             static_cast<std::size_t>(threadIdx.x);
-  if (index >= values) return;
+  if (index >= values) {
+    quartz_pdl_lc();
+    return;
+  }
   const std::size_t row_values =
       static_cast<std::size_t>(config.query_heads) * width;
   const std::size_t row = index / row_values;
@@ -515,6 +525,7 @@ __global__ void fattn_stream_k_combine_kernel(
       g >= 0.0F ? 1.0F / (1.0F + expf(-g)) : expf(g) / (1.0F + expf(g));
   const float attn = denominator == 0.0F ? 0.0F : vkq / denominator;
   output[index] = attn * sigmoid;
+  quartz_pdl_lc();
 }
 
 // Packed dst_tmp_meta (floats): needs max/den, is_fixup max/den, then VKQ.
@@ -1155,12 +1166,11 @@ inline cudaError_t launch_fattn_mma_quality_typed(
       fattn_mma_quality_kernel<Ncols1, DualF16, Occupancy, KvParts>,
       cudaFuncAttributeMaxDynamicSharedMemorySize, static_cast<int>(shared));
   if (error != cudaSuccess) return error;
-  fattn_mma_quality_kernel<Ncols1, DualF16, Occupancy, KvParts>
-      <<<grid, kNthreads, shared, stream>>>(
-          config, start_position, token_count, query, query_scale, gate,
-          committed_key, committed_value, candidate_key, candidate_value,
-          output, normalized_query, partial, meta);
-  error = cudaPeekAtLastError();
+  error = quartz_launch_kernel(
+      fattn_mma_quality_kernel<Ncols1, DualF16, Occupancy, KvParts>, grid,
+      dim3(kNthreads), shared, stream, config, start_position, token_count,
+      query, query_scale, gate, committed_key, committed_value, candidate_key,
+      candidate_value, output, normalized_query, partial, meta);
   if (error != cudaSuccess || KvParts == 1) return error;
   const std::size_t values =
       token_count * static_cast<std::size_t>(config.query_heads) *
@@ -1168,9 +1178,9 @@ inline cudaError_t launch_fattn_mma_quality_typed(
   const unsigned threads = 256;
   const unsigned blocks =
       static_cast<unsigned>((values + threads - 1) / threads);
-  fattn_stream_k_combine_kernel<<<blocks, threads, 0, stream>>>(
+  return quartz_launch_kernel(
+      fattn_stream_k_combine_kernel, dim3(blocks), dim3(threads), 0, stream,
       config, token_count, gate, output, partial, meta);
-  return cudaPeekAtLastError();
 }
 
 inline cudaError_t launch_fattn_mma_quality_path(

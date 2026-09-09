@@ -1,6 +1,6 @@
 # Chunked full-model CUDA prefill
 
-[Index](README.md) · Implementation tasks: SCH-002, MEM-002, OPT-008, OPT-009, OPT-011, OPT-012, OPT-013, OPT-014, OPT-015, OPT-017, OPT-018, OPT-019, OPT-020, OPT-021, OPT-022, OPT-023, OPT-024, OPT-025, OPT-026, OPT-027, OPT-028, OPT-029, and EDU-047 in
+[Index](README.md) · Implementation tasks: SCH-002, MEM-002, OPT-008, OPT-009, OPT-011, OPT-012, OPT-013, OPT-014, OPT-015, OPT-017, OPT-018, OPT-019, OPT-020, OPT-021, OPT-022, OPT-023, OPT-024, OPT-025, OPT-026, OPT-027, OPT-028, OPT-029, OPT-030, and EDU-047 in
 [`implementation_ledger.md`](../implementation_ledger.md) · Contracts:
 [`pins/cuda_prompt_scheduler_contract.json`](../pins/cuda_prompt_scheduler_contract.json),
 [`pins/cuda_prompt_pipeline_contract.json`](../pins/cuda_prompt_pipeline_contract.json),
@@ -20,7 +20,8 @@
 [`pins/opt026_fattn_streamk_contract.json`](../pins/opt026_fattn_streamk_contract.json),
 [`pins/opt027_persistent_fattn_contract.json`](../pins/opt027_persistent_fattn_contract.json),
 [`pins/opt028_mmq_streamk_contract.json`](../pins/opt028_mmq_streamk_contract.json),
-[`pins/opt029_gdn_fuse_contract.json`](../pins/opt029_gdn_fuse_contract.json)
+[`pins/opt029_gdn_fuse_contract.json`](../pins/opt029_gdn_fuse_contract.json),
+[`pins/opt030_pdl_launches_contract.json`](../pins/opt030_pdl_launches_contract.json)
 · Evidence: [`fixtures/cuda_prompt_scheduler.json`](../fixtures/cuda_prompt_scheduler.json),
 [`fixtures/cuda_prompt_pipeline.json`](../fixtures/cuda_prompt_pipeline.json),
 [`fixtures/cuda_prompt_graph.json`](../fixtures/cuda_prompt_graph.json),
@@ -40,6 +41,7 @@
 [`fixtures/opt027_persistent_fattn.json`](../fixtures/opt027_persistent_fattn.json),
 [`fixtures/opt028_mmq_streamk.json`](../fixtures/opt028_mmq_streamk.json),
 [`fixtures/opt029_gdn_fuse.json`](../fixtures/opt029_gdn_fuse.json),
+[`fixtures/opt030_pdl_launches.json`](../fixtures/opt030_pdl_launches.json),
 [`evidence/optimization/opt015-2k-recovery/REPORT.md`](../evidence/optimization/opt015-2k-recovery/REPORT.md),
 [`evidence/optimization/opt017-mixer-q8-mma/REPORT.md`](../evidence/optimization/opt017-mixer-q8-mma/REPORT.md),
 [`evidence/optimization/opt018-ffn-mma-quality/REPORT.md`](../evidence/optimization/opt018-ffn-mma-quality/REPORT.md),
@@ -55,7 +57,9 @@
 [`evidence/optimization/opt028-mmq-streamk/REPORT.md`](../evidence/optimization/opt028-mmq-streamk/REPORT.md),
 [`evidence/optimization/opt028-mmq-streamk/REJECTION.md`](../evidence/optimization/opt028-mmq-streamk/REJECTION.md),
 [`evidence/optimization/opt029-gdn-fuse/REPORT.md`](../evidence/optimization/opt029-gdn-fuse/REPORT.md),
-[`evidence/optimization/opt029-gdn-fuse/REJECTION.md`](../evidence/optimization/opt029-gdn-fuse/REJECTION.md)
+[`evidence/optimization/opt029-gdn-fuse/REJECTION.md`](../evidence/optimization/opt029-gdn-fuse/REJECTION.md),
+[`evidence/optimization/opt030-pdl-launches/REPORT.md`](../evidence/optimization/opt030-pdl-launches/REPORT.md),
+[`evidence/optimization/opt030-pdl-launches/REJECTION.md`](../evidence/optimization/opt030-pdl-launches/REJECTION.md)
 
 ## Why prompt execution differs from decode
 
@@ -265,7 +269,12 @@ prompt FFN graphs on `prompt_compute_stream_`. Capture and ordinary fused FFN
 share `execute_prompt_ffn`, so the graph records the same mixer residual-plus-
 FFN-norm, gate/up/down MMQ, SwiGLU, and next-input residual-add-norm sequence.
 Mixer GDN/attention, embedding, logits, D2H, scatter, and commit stay ordinary
-launches because those pointers and extents still change per chunk.
+launches because those pointers and extents still change per chunk. OPT-030
+does not apply Hopper/Blackwell PDL inside those captured FFN graphs and does
+not recapture them. While a stream is capturing, the PDL wrapper takes the
+ordinary `<<<>>>` branch so graph nodes stay unattributed kernel launches.
+Graph-versus-ordinary fused byte equality is unloosened. Production PDL
+remains off after the 4K reject (`kSelectedPdlPath` `off`).
 
 Replay is exact-geometry only. A full 4,096-token fused chunk with graphs bound
 to that workspace `cudaGraphLaunch`es each layer after the mixer writes
@@ -670,6 +679,35 @@ Quartz ≥ llama.cpp. Live numbers stay in the report:
 and
 [`evidence/optimization/opt029-gdn-fuse/REJECTION.md`](../evidence/optimization/opt029-gdn-fuse/REJECTION.md).
 
+OPT-030 measured Hopper/Blackwell programmatic dependent launch (PDL)
+serialization of successive ungraphed mixer/GDN/attention prompt kernels
+on `prompt_compute_stream_`. Candidates were `off` (ordinary `<<<>>>`),
+`pdl_host` (`cudaLaunchKernelEx` plus programmatic stream
+serialization), and `pdl` (PSS plus device grid-dependency sync/LC).
+Eligible candidates were byte-identical versus `off` on the ungraphed
+chain. Occupancy was ≥ 1. Capture of `execute_prompt_ffn` stayed ordinary
+kernel nodes (`used_ex=false`). The paired CUDA-event A/B on one
+4096-token GDN layer plus one 4096-token attention layer ungraphed chain
+won with `pdl` (`win=true`). Production did not install that path.
+`kSelectedPdlPath` is `off`. The PDL wrapper remains as a non-production
+symbol. Mixer Q8 quality, skinny `mma_i32_j128`, FFN `shared_y_swiglu_q8`,
+fattn Ada+ stream-K, and split GDN core stay. Decode launches are
+unchanged. FFN graphs were not recaptured and are not PDL-attributed.
+No extra persistent `cudaMalloc`. Live exclusive sitting **reject:**
+Quartz mean is not strictly greater than the frozen successor-oracle
+baseline **1746.71973**; A/B won but keep requires both an A/B win and
+a strictly greater 4K mean; `reverted` true; `successor_oracle` false;
+`production_pdl_installed` false; A/B winner `pdl`;
+`ladder_exhausted` false. `quartz_meets_llama` is informational and is
+not this gate. **The 2K parity owner remains the blocked dedicated
+gate.** This reject does not substitute for that gate and does not claim
+Quartz ≥ llama.cpp. Live numbers stay in the report:
+[`evidence/optimization/opt030-pdl-launches/REPORT.md`](../evidence/optimization/opt030-pdl-launches/REPORT.md),
+[`pins/opt030_pdl_launches_contract.json`](../pins/opt030_pdl_launches_contract.json),
+[`fixtures/opt030_pdl_launches.json`](../fixtures/opt030_pdl_launches.json),
+and
+[`evidence/optimization/opt030-pdl-launches/REJECTION.md`](../evidence/optimization/opt030-pdl-launches/REJECTION.md).
+
 The **proof boundary** excludes comparative speed claims, 2K/8K sustained
 prefill throughput, execution of a 128K prefill, 128K retrieval quality, thermal
 stability, superiority to llama.cpp/vLLM, and a Nsight Systems overlap timeline.
@@ -706,7 +744,11 @@ pass the 2K tok/s gate; the second 4K ladder is not exhausted. OPT-029
 records fused GDN conv/gated-output and a live 4K reject versus the
 OPT-026 oracle baseline; production GDN core remains the split sequence;
 it does not own or pass the 2K tok/s gate; the second 4K ladder is not
-exhausted. BEN-001
+exhausted. OPT-030 records Hopper/Blackwell PDL serialization of
+ungraphed mixer/GDN/attention prompt launches and a live 4K reject
+versus the OPT-026 oracle baseline; production stays ordinary `<<<>>>`;
+FFN graphs stay non-PDL; it does not own or pass the 2K tok/s gate; the
+second 4K ladder is not exhausted. BEN-001
 provides the harness; CMP-002/CMP-003 still own the 30-sample comparative gate.
 QLT-001 remains blocked. OPT-012's prompt graphs are FFN subgraphs only: not a
 whole-chunk graph, not a speedup gate, and not 128K quality recovery.

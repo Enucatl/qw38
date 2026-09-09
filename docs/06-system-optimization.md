@@ -36,7 +36,9 @@ OPT-026 keep; persistent stream-K was A/B-lost and not installed
 (OPT-028); production quality MMA stays 2D tiling. Fusing GDN conv and
 gated-output into the warp-column token loop was A/B-lost and not
 installed (OPT-029); production GDN core stays split parallel conv +
-warp-column + gated-output. Decode stays MMV.
+warp-column + gated-output. Hopper/Blackwell PDL on ungraphed prompt
+launches was A/B-won then 4K-rejected (OPT-030); production stays
+ordinary `<<<>>>`. Decode stays MMV.
 Tiny mixer prompts keep the
 OPT-009 tiled `__fmul_rn`/`__fadd_rn` kernel.
 Rank-1 fused MMA remains a non-production kernel. MMA here is Measured
@@ -50,7 +52,9 @@ unloosened reference. Q4_K/Q6_K MMQ stream-K was measured and rejected
 (OPT-028); production quality MMA remains 2D tiling. Fusing GDN conv and
 gated-output into the warp-column token loop was measured and rejected
 (OPT-029); production GDN core remains split conv + warp-column +
-gated-output. Those core-quality
+gated-output. Hopper/Blackwell PDL serialization of ungraphed mixer/GDN/
+attention launches was measured and rejected (OPT-030); production
+stays ordinary `<<<>>>`. Those core-quality
 paths are also Measured component recovery plus a 4K keep versus the frozen
 oracle baseline, not the 2K parity gate.
 
@@ -281,10 +285,14 @@ fuse, PDL, mixer/GDN graphs). OPT-027 retained a reject: persistent did
 not strictly beat production `stream_k`, so production fattn stays
 OPT-026 Ada+ stream-K (`grid.z=2`). OPT-028 retained a reject: Q4_K/Q6_K
 MMQ stream-K did not strictly beat 2D tiling, so production quality MMA
-stays 2D tiling (`kSelectedMmqStreamKPath` `off`). Remaining second-ladder
-picks after the GDN-fuse reject are OPT-030–OPT-031. Evidence:
+stays 2D tiling (`kSelectedMmqStreamKPath` `off`). OPT-029 retained a
+reject: GDN fuse did not strictly beat split conv + warp-column +
+gated-output. OPT-030 retained a reject: PDL A/B won (`pdl`) but cold
+exact-4096 mean tok/s did not strictly beat the OPT-026 oracle, so
+production stays ordinary `<<<>>>` (`kSelectedPdlPath` `off`). Remaining
+second-ladder pick after the PDL reject is OPT-031. Evidence:
 [`evidence/optimization/speedup-loop-post026/REPORT.md`](../evidence/optimization/speedup-loop-post026/REPORT.md);
-method: [`speedup-loop.md`](../speedup-loop.md). This is instrumentation and
+method: [`speedup-plan.md`](../speedup-plan.md). This is instrumentation and
 task admission, **not** the 2K llama.cpp parity gate.
 
 ## Persistent Ada+ fattn stream-K (OPT-027)
@@ -341,6 +349,25 @@ fusion was not installed. `quartz_meets_llama` is informational and
 is not this gate. This is **not** the 2K llama.cpp parity gate. Live
 numbers stay in the report; this chapter does not replace them:
 [`evidence/optimization/opt029-gdn-fuse/REPORT.md`](../evidence/optimization/opt029-gdn-fuse/REPORT.md).
+
+## Hopper/Blackwell PDL prompt launches (OPT-030)
+
+**Measured, RTX 5090:** successive ungraphed mixer/GDN/attention prompt
+kernels on `prompt_compute_stream_` were A/B'd among ordinary `<<<>>>`
+(`off`), host `cudaLaunchKernelEx` plus programmatic stream
+serialization (`pdl_host`), and PSS plus device grid-dependency
+sync/LC (`pdl`). Eligible candidates were byte-identical versus `off`.
+A/B winner `pdl` (`win=true`). Production did not install that path
+because the live exclusive RTX-5090 cold exact-4096 sitting did not
+strictly beat the frozen successor-oracle baseline **1746.71973**.
+`kSelectedPdlPath` is `off`. The PDL wrapper remains as a non-production
+symbol; FFN graphs stay ordinary kernel nodes (PDL is forbidden while
+capturing). Mixer Q8 quality, skinny `mma_i32_j128`, FFN
+`shared_y_swiglu_q8`, fattn Ada+ stream-K, and split GDN core stay.
+Decode launches are unchanged. `quartz_meets_llama` is informational
+and is not this gate. This is **not** the 2K llama.cpp parity gate.
+Live numbers stay in the report; this chapter does not replace them:
+[`evidence/optimization/opt030-pdl-launches/REPORT.md`](../evidence/optimization/opt030-pdl-launches/REPORT.md).
 
 ## DwarfStar transfer boundary
 

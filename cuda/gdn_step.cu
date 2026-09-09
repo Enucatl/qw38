@@ -1,8 +1,11 @@
 #include "gdn_step.h"
 #include "gdn_fused_quality.cuh"
+#include "pdl_launch.cuh"
 
 #include <algorithm>
 #include <cmath>
+
+QW38_PDL_REGISTER_DEVICE_OPS()
 
 namespace qw38::cuda {
 namespace {
@@ -60,10 +63,14 @@ __global__ void prepare_convolution_chunk_parallel(
     const float* input, const float* weights, const float* source,
     float* candidate, float* output, std::size_t channels, std::uint32_t width,
     std::size_t token_count) {
+  quartz_pdl_sync();
   const std::size_t channel =
       static_cast<std::size_t>(blockIdx.x) * blockDim.x + threadIdx.x;
   const std::size_t token = static_cast<std::size_t>(blockIdx.y);
-  if (channel >= channels || token >= token_count) return;
+  if (channel >= channels || token >= token_count) {
+    quartz_pdl_lc();
+    return;
+  }
   const std::size_t base = channel * width;
   float history[kMaximumConvolutionWidth];
   for (std::uint32_t index = 0; index < width; ++index) {
@@ -83,6 +90,7 @@ __global__ void prepare_convolution_chunk_parallel(
       candidate[base + index] = history[index];
     }
   }
+  quartz_pdl_lc();
 }
 
 __global__ void prepare_recurrence_window(
@@ -771,12 +779,11 @@ cudaError_t launch_convolution_then_recurrence(
       static_cast<unsigned int>((channels + kConvolutionThreads - 1) /
                                 kConvolutionThreads),
       static_cast<unsigned int>(token_count));
-  prepare_convolution_chunk_parallel<<<conv_grid, kConvolutionThreads, 0,
-                                        stream>>>(
-      convolution_input, convolution_weights, committed.convolution,
+  cudaError_t error = quartz_launch_kernel(
+      prepare_convolution_chunk_parallel, conv_grid, dim3(kConvolutionThreads),
+      0, stream, convolution_input, convolution_weights, committed.convolution,
       candidate.convolution, convolution_output, channels,
       config.convolution_width, token_count);
-  cudaError_t error = cudaPeekAtLastError();
   if (error != cudaSuccess) return error;
   if (quality && config.key_width == 128 && config.value_width == 128) {
     return launch_gdn_quality_recurrence(
@@ -817,12 +824,11 @@ cudaError_t launch_parallel_associative(
       static_cast<unsigned int>((channels + kConvolutionThreads - 1) /
                                 kConvolutionThreads),
       static_cast<unsigned int>(token_count));
-  prepare_convolution_chunk_parallel<<<conv_grid, kConvolutionThreads, 0,
-                                        stream>>>(
-      convolution_input, convolution_weights, committed.convolution,
+  cudaError_t error = quartz_launch_kernel(
+      prepare_convolution_chunk_parallel, conv_grid, dim3(kConvolutionThreads),
+      0, stream, convolution_input, convolution_weights, committed.convolution,
       candidate.convolution, convolution_output, channels,
       config.convolution_width, token_count);
-  cudaError_t error = cudaPeekAtLastError();
   if (error != cudaSuccess) return error;
   const std::size_t num_windows = gdn_scan_window_count(token_count);
   if (num_windows < 2) {
@@ -999,12 +1005,11 @@ cudaError_t launch_gdn_quality_fused(
         static_cast<unsigned int>((channels + kConvolutionThreads - 1) /
                                   kConvolutionThreads),
         static_cast<unsigned int>(token_count));
-    prepare_convolution_chunk_parallel<<<conv_grid, kConvolutionThreads, 0,
-                                          stream>>>(
-        convolution_input, convolution_weights, committed.convolution,
-        candidate.convolution, convolution_output, channels,
-        config.convolution_width, token_count);
-    return cudaPeekAtLastError();
+    return quartz_launch_kernel(
+        prepare_convolution_chunk_parallel, conv_grid,
+        dim3(kConvolutionThreads), 0, stream, convolution_input,
+        convolution_weights, committed.convolution, candidate.convolution,
+        convolution_output, channels, config.convolution_width, token_count);
   };
   cudaError_t error = cudaSuccess;
   if (gdn_path_eq(selected, "fuse_both")) {

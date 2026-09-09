@@ -1,6 +1,9 @@
 #include "scheduler_primitives.h"
+#include "pdl_launch.cuh"
 
 #include <cmath>
+
+QW38_PDL_REGISTER_DEVICE_OPS()
 
 namespace qw38::cuda {
 namespace {
@@ -29,9 +32,11 @@ __global__ void rms_norm(const __nv_bfloat16* input, const float* scale,
 
 __global__ void fp32_to_bf16(const float* input, std::size_t count,
                              __nv_bfloat16* output) {
+  quartz_pdl_sync();
   const std::size_t index =
       static_cast<std::size_t>(blockIdx.x) * blockDim.x + threadIdx.x;
   if (index < count) output[index] = __float2bfloat16_rn(input[index]);
+  quartz_pdl_lc();
 }
 
 __global__ void residual_add(const __nv_bfloat16* residual,
@@ -140,8 +145,8 @@ cudaError_t launch_fp32_to_bf16(const float* input, std::size_t count,
                                 cudaStream_t stream) noexcept {
   if (input == nullptr || output == nullptr || count == 0)
     return cudaErrorInvalidValue;
-  fp32_to_bf16<<<blocks_for(count), kThreads, 0, stream>>>(input, count, output);
-  return cudaPeekAtLastError();
+  return quartz_launch_kernel(fp32_to_bf16, dim3(blocks_for(count)),
+                              dim3(kThreads), 0, stream, input, count, output);
 }
 
 cudaError_t launch_residual_add_bf16(const __nv_bfloat16* residual,
