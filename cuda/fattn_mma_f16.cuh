@@ -12,6 +12,7 @@
 #include "pdl_launch.cuh"
 
 #include <cstdint>
+#include <cstring>
 
 #include <cuda_fp16.h>
 
@@ -32,6 +33,11 @@ constexpr char kSelectedFattnPath[] = "stream_k";
 
 // OPT-027 A/B winner. Legal values: off, persistent.
 constexpr char kSelectedPersistentFattnPath[] = "off";
+
+// OPT-033 A/B winner. Legal values: global, registers. Default until A/B: global.
+// Register-resident VKQ sums adapt llama.cpp fattn-mma-f16.cuh VKQ_C at
+// cc83d7b4824f73cfdda4dfbb47ee39804f71b328 (MIT). MMA probability×V is OPT-035.
+constexpr char kSelectedVkqAccum[] = "registers";
 
 inline __device__ float fattn_block_sum(float local, float* scratch, int tid,
                                        int nthreads) {
@@ -148,7 +154,8 @@ inline __device__ void fattn_persistent_decode(int index, int ntiles_kv,
   *jt = rem - (*zt_gqa) * ntiles_x;
 }
 
-template <int Ncols1, bool DualF16, int Occupancy, int KvParts>
+template <int Ncols1, bool DualF16, int Occupancy, int KvParts,
+          bool RegisterAcc = false>
 __global__ void __launch_bounds__(Ncols1 <= 8 ? 64 : 128, Occupancy)
 fattn_mma_quality_kernel(
     AttentionConfig config, std::size_t start_position, std::size_t token_count,
@@ -218,6 +225,12 @@ fattn_mma_quality_kernel(
   const std::size_t kv_stop = kv_end < kv_span ? kv_end : kv_span;
 
   for (int subgroup = 0; subgroup < kFattnSubgroups; ++subgroup) {
+    constexpr int kDimSlots = kWidth / kNthreads;
+    constexpr int kAccCount = kFattnNcols2 * Ncols1 * kDimSlots;
+    float acc[RegisterAcc ? kAccCount : 1];
+#pragma unroll
+    for (int slot = 0; slot < (RegisterAcc ? kAccCount : 1); ++slot)
+      acc[slot] = 0.0F;
     for (int member = 0; member < kFattnNcols2; ++member) {
       const std::uint32_t query_head =
           first_head + static_cast<std::uint32_t>(subgroup * kFattnNcols2 +
@@ -273,8 +286,10 @@ fattn_mma_quality_kernel(
           }
           if (token_count == 1 && live)
             normalized_query[query_head * width + dim] = value;
-          if (live)
-            vkq[qbase + static_cast<std::size_t>(dim)] = 0.0F;
+          if constexpr (!RegisterAcc) {
+            if (live)
+              vkq[qbase + static_cast<std::size_t>(dim)] = 0.0F;
+          }
         }
         __syncthreads();
       }
@@ -424,28 +439,73 @@ fattn_mma_quality_kernel(
       }
       __syncthreads();
 
-      for (int member = 0; member < kFattnNcols2; ++member) {
-        const std::uint32_t query_head =
-            first_head + static_cast<std::uint32_t>(subgroup * kFattnNcols2 +
-                                                    member);
-        for (int row = 0; row < active_rows; ++row) {
-          const int qcol = member * Ncols1 + row;
-          const std::size_t qbase =
-              (first_row + static_cast<std::size_t>(row)) *
-                  config.query_heads * width +
-              query_head * width;
-          const float factor = rescale[qcol];
-          for (int dim = tid; dim < static_cast<int>(width); dim += kNthreads) {
-            float total = vkq[qbase + static_cast<std::size_t>(dim)] * factor;
-            for (int krow = 0; krow < rows; ++krow) {
-              total += scores[qcol * kFattnNbatchFa + krow] *
-                       __bfloat162float(values[krow * kWidth + dim]);
+      if constexpr (RegisterAcc) {
+#pragma unroll
+        for (int member = 0; member < kFattnNcols2; ++member) {
+#pragma unroll
+          for (int row = 0; row < Ncols1; ++row) {
+            const int qcol = member * Ncols1 + row;
+            const float factor = rescale[qcol];
+#pragma unroll
+            for (int dim_slot = 0; dim_slot < kDimSlots; ++dim_slot) {
+              const int idx = (member * Ncols1 + row) * kDimSlots + dim_slot;
+              acc[idx] = acc[idx] * factor;
+              if (row < active_rows) {
+                const int dim = tid + dim_slot * kNthreads;
+                for (int krow = 0; krow < rows; ++krow) {
+                  acc[idx] += scores[qcol * kFattnNbatchFa + krow] *
+                              __bfloat162float(values[krow * kWidth + dim]);
+                }
+              }
             }
-            vkq[qbase + static_cast<std::size_t>(dim)] = total;
+          }
+        }
+      } else {
+        for (int member = 0; member < kFattnNcols2; ++member) {
+          const std::uint32_t query_head =
+              first_head + static_cast<std::uint32_t>(subgroup * kFattnNcols2 +
+                                                      member);
+          for (int row = 0; row < active_rows; ++row) {
+            const int qcol = member * Ncols1 + row;
+            const std::size_t qbase =
+                (first_row + static_cast<std::size_t>(row)) *
+                    config.query_heads * width +
+                query_head * width;
+            const float factor = rescale[qcol];
+            for (int dim = tid; dim < static_cast<int>(width); dim += kNthreads) {
+              float total = vkq[qbase + static_cast<std::size_t>(dim)] * factor;
+              for (int krow = 0; krow < rows; ++krow) {
+                total += scores[qcol * kFattnNbatchFa + krow] *
+                         __bfloat162float(values[krow * kWidth + dim]);
+              }
+              vkq[qbase + static_cast<std::size_t>(dim)] = total;
+            }
           }
         }
       }
       __syncthreads();
+    }
+    if constexpr (RegisterAcc) {
+#pragma unroll
+      for (int member = 0; member < kFattnNcols2; ++member) {
+        const std::uint32_t query_head =
+            first_head + static_cast<std::uint32_t>(subgroup * kFattnNcols2 +
+                                                  member);
+#pragma unroll
+        for (int row = 0; row < Ncols1; ++row) {
+          if (row >= active_rows) continue;
+          const std::size_t qbase =
+              (first_row + static_cast<std::size_t>(row)) *
+                  config.query_heads * width +
+              query_head * width;
+#pragma unroll
+          for (int dim_slot = 0; dim_slot < kDimSlots; ++dim_slot) {
+            const int dim = tid + dim_slot * kNthreads;
+            const int idx = (member * Ncols1 + row) * kDimSlots + dim_slot;
+            vkq[qbase + static_cast<std::size_t>(dim)] = acc[idx];
+          }
+        }
+      }
     }
 
     for (int member = 0; member < kFattnNcols2; ++member) {
@@ -1148,7 +1208,8 @@ inline cudaError_t launch_fattn_mma_persistent_impl(
   return cudaPeekAtLastError();
 }
 
-template <int Ncols1, bool DualF16, int Occupancy, int KvParts>
+template <int Ncols1, bool DualF16, int Occupancy, int KvParts,
+          bool RegisterAcc = false>
 inline cudaError_t launch_fattn_mma_quality_typed(
     const AttentionConfig& config, std::size_t start_position,
     std::size_t token_count, const float* query, const float* query_scale,
@@ -1163,14 +1224,14 @@ inline cudaError_t launch_fattn_mma_quality_typed(
             static_cast<unsigned>((token_count + Ncols1 - 1) / Ncols1),
             KvParts > 1 ? 2U : 1U);
   cudaError_t error = cudaFuncSetAttribute(
-      fattn_mma_quality_kernel<Ncols1, DualF16, Occupancy, KvParts>,
+      fattn_mma_quality_kernel<Ncols1, DualF16, Occupancy, KvParts, RegisterAcc>,
       cudaFuncAttributeMaxDynamicSharedMemorySize, static_cast<int>(shared));
   if (error != cudaSuccess) return error;
   error = quartz_launch_kernel(
-      fattn_mma_quality_kernel<Ncols1, DualF16, Occupancy, KvParts>, grid,
-      dim3(kNthreads), shared, stream, config, start_position, token_count,
-      query, query_scale, gate, committed_key, committed_value, candidate_key,
-      candidate_value, output, normalized_query, partial, meta);
+      fattn_mma_quality_kernel<Ncols1, DualF16, Occupancy, KvParts, RegisterAcc>,
+      grid, dim3(kNthreads), shared, stream, config, start_position,
+      token_count, query, query_scale, gate, committed_key, committed_value,
+      candidate_key, candidate_value, output, normalized_query, partial, meta);
   if (error != cudaSuccess || KvParts == 1) return error;
   const std::size_t values =
       token_count * static_cast<std::size_t>(config.query_heads) *
@@ -1181,6 +1242,14 @@ inline cudaError_t launch_fattn_mma_quality_typed(
   return quartz_launch_kernel(
       fattn_stream_k_combine_kernel, dim3(blocks), dim3(threads), 0, stream,
       config, token_count, gate, output, partial, meta);
+}
+
+inline bool fattn_vkq_is_registers(const char* vkq_accum) noexcept {
+  return vkq_accum != nullptr && std::strcmp(vkq_accum, "registers") == 0;
+}
+
+inline bool fattn_vkq_is_global(const char* vkq_accum) noexcept {
+  return vkq_accum != nullptr && std::strcmp(vkq_accum, "global") == 0;
 }
 
 inline cudaError_t launch_fattn_mma_quality_path(
@@ -1251,6 +1320,29 @@ inline cudaError_t launch_fattn_mma_quality(
       normalized_query, ncols1, path, nullptr, nullptr, stream);
 }
 
+inline cudaError_t launch_fattn_mma_stream_k_vkq(
+    const AttentionConfig& config, std::size_t start_position,
+    std::size_t token_count, const float* query, const float* query_scale,
+    const float* gate, const __nv_bfloat16* committed_key,
+    const __nv_bfloat16* committed_value, const __nv_bfloat16* candidate_key,
+    const __nv_bfloat16* candidate_value, float* output,
+    float* normalized_query, float* partial, float* meta, const char* vkq_accum,
+    cudaStream_t stream) noexcept {
+  if (fattn_vkq_is_registers(vkq_accum)) {
+    return launch_fattn_mma_quality_typed<16, true, 2, 2, true>(
+        config, start_position, token_count, query, query_scale, gate,
+        committed_key, committed_value, candidate_key, candidate_value, output,
+        normalized_query, partial, meta, stream);
+  }
+  if (fattn_vkq_is_global(vkq_accum)) {
+    return launch_fattn_mma_quality_typed<16, true, 2, 2, false>(
+        config, start_position, token_count, query, query_scale, gate,
+        committed_key, committed_value, candidate_key, candidate_value, output,
+        normalized_query, partial, meta, stream);
+  }
+  return cudaErrorInvalidValue;
+}
+
 inline cudaError_t launch_fattn_mma_stream_k(
     const AttentionConfig& config, std::size_t start_position,
     std::size_t token_count, const float* query, const float* query_scale,
@@ -1265,6 +1357,12 @@ inline cudaError_t launch_fattn_mma_stream_k(
         committed_key, committed_value, candidate_key, candidate_value, output,
         normalized_query, meta, stream);
   }
+  if (fattn_vkq_is_registers(kSelectedVkqAccum)) {
+    return launch_fattn_mma_stream_k_vkq(
+        config, start_position, token_count, query, query_scale, gate,
+        committed_key, committed_value, candidate_key, candidate_value, output,
+        normalized_query, partial, meta, kSelectedVkqAccum, stream);
+  }
   return launch_fattn_mma_quality_path(
       config, start_position, token_count, query, query_scale, gate,
       committed_key, committed_value, candidate_key, candidate_value, output,
@@ -1272,20 +1370,25 @@ inline cudaError_t launch_fattn_mma_stream_k(
       meta, stream);
 }
 
-template <int Ncols1, bool DualF16, int Occupancy, int KvParts>
+template <int Ncols1, bool DualF16, int Occupancy, int KvParts,
+          bool RegisterAcc = false>
 inline int fattn_occupancy_typed() noexcept {
   int occupancy = 0;
   const int threads = fattn_nthreads_for_ncols1(Ncols1);
   const std::size_t shared = fattn_quality_shared_bytes(Ncols1, DualF16);
   cudaError_t error = cudaFuncSetAttribute(
-      fattn_mma_quality_kernel<Ncols1, DualF16, Occupancy, KvParts>,
+      fattn_mma_quality_kernel<Ncols1, DualF16, Occupancy, KvParts, RegisterAcc>,
       cudaFuncAttributeMaxDynamicSharedMemorySize, static_cast<int>(shared));
   if (error == cudaSuccess)
     error = cudaOccupancyMaxActiveBlocksPerMultiprocessor(
         &occupancy,
-        fattn_mma_quality_kernel<Ncols1, DualF16, Occupancy, KvParts>, threads,
-        shared);
+        fattn_mma_quality_kernel<Ncols1, DualF16, Occupancy, KvParts, RegisterAcc>,
+        threads, shared);
   return error == cudaSuccess ? occupancy : 0;
+}
+
+inline int fattn_register_vkq_occupancy_typed() noexcept {
+  return fattn_occupancy_typed<16, true, 2, 2, true>();
 }
 
 inline int fattn_occupancy_for(int ncols1) noexcept {

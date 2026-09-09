@@ -1507,6 +1507,46 @@ cudaError_t launch_attention_prepare_chunk_stream_k(
       output, normalized_query, partial_vkq, meta, stream);
 }
 
+cudaError_t launch_attention_prepare_chunk_stream_k_vkq(
+    const AttentionConfig& config, std::size_t start_position,
+    std::size_t token_count, const float* query, const float* key,
+    const float* value, const float* query_norm_scale,
+    const float* key_norm_scale, const float* output_gate,
+    const AttentionCache& committed, const AttentionCache& candidate_rows,
+    float* normalized_query, float* normalized_key, float* score_workspace,
+    float* output, float* partial_vkq, float* meta, const char* vkq_accum,
+    cudaStream_t stream) noexcept {
+  if (!fattn_vkq_is_global(vkq_accum) && !fattn_vkq_is_registers(vkq_accum)) {
+    return cudaErrorInvalidValue;
+  }
+  if (token_count < 16) {
+    return launch_attention_prepare_chunk_tiled(
+        config, start_position, token_count, query, key, value,
+        query_norm_scale, key_norm_scale, output_gate, committed,
+        candidate_rows, normalized_query, normalized_key, score_workspace,
+        output, stream);
+  }
+  cudaError_t error = stage_and_validate_chunk(
+      config, start_position, token_count, query, key, value, query_norm_scale,
+      key_norm_scale, output_gate, committed, candidate_rows, normalized_query,
+      normalized_key, score_workspace, output, stream);
+  if (error != cudaSuccess) return error;
+  return launch_fattn_mma_stream_k_vkq(
+      config, start_position, token_count, query, query_norm_scale, output_gate,
+      committed.key, committed.value, candidate_rows.key, candidate_rows.value,
+      output, normalized_query, partial_vkq, meta, vkq_accum, stream);
+}
+
+const char* selected_vkq_accum() noexcept { return kSelectedVkqAccum; }
+
+bool fattn_uses_register_vkq() noexcept {
+  return fattn_vkq_is_registers(kSelectedVkqAccum);
+}
+
+int fattn_register_vkq_occupancy() noexcept {
+  return fattn_register_vkq_occupancy_typed();
+}
+
 int selected_attention_mma_query_rows() noexcept {
   return kSelectedAttentionMmaQueryRows;
 }

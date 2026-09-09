@@ -491,6 +491,92 @@ int main(){
       return 6;
     }
   }
+  {
+    const size_t rows4096 = 4096;
+    const size_t start4096 = 0;
+    B tiled4096{}, cand{};
+    if (!allocate(tiled4096, c, rows4096, start4096) ||
+        !allocate(cand, c, rows4096, start4096))
+      return 5;
+    seed(tiled4096, c, rows4096, start4096);
+    if (invoke_tiled(c, start4096, rows4096, tiled4096) != cudaSuccess ||
+        cudaDeviceSynchronize() != cudaSuccess)
+      return 6;
+    std::vector<float> tiled_host(rows4096 * q);
+    cudaMemcpy(tiled_host.data(), tiled4096.out,
+               tiled_host.size() * sizeof(float), cudaMemcpyDeviceToHost);
+    float* partial = nullptr;
+    float* meta = nullptr;
+    const size_t partial_n =
+        qw38::cuda::fattn_stream_k_partial_values(c, rows4096);
+    const size_t meta_n = qw38::cuda::fattn_stream_k_meta_values(c, rows4096);
+    if (cudaMalloc(reinterpret_cast<void**>(&partial),
+                   partial_n * sizeof(float)) != cudaSuccess ||
+        cudaMalloc(reinterpret_cast<void**>(&meta), meta_n * sizeof(float)) !=
+            cudaSuccess)
+      return 5;
+    seed(cand, c, rows4096, start4096);
+    std::vector<__nv_bfloat16> committed_key_before(
+        qw38::cuda::attention_cache_values(c));
+    std::vector<__nv_bfloat16> committed_value_before(committed_key_before.size());
+    cudaMemcpy(committed_key_before.data(), cand.ck,
+               committed_key_before.size() * sizeof(__nv_bfloat16),
+               cudaMemcpyDeviceToHost);
+    cudaMemcpy(committed_value_before.data(), cand.cv,
+               committed_value_before.size() * sizeof(__nv_bfloat16),
+               cudaMemcpyDeviceToHost);
+    std::vector<unsigned char> score_before(
+        qw38::cuda::attention_chunk_score_values(c, start4096, rows4096) *
+        sizeof(float));
+    cudaMemcpy(score_before.data(), cand.score, score_before.size(),
+               cudaMemcpyDeviceToHost);
+    AttentionCache committed{cand.ck, cand.cv}, candidate{cand.tk, cand.tv};
+    cudaError_t launched = qw38::cuda::launch_attention_prepare_chunk_stream_k_vkq(
+        c, start4096, rows4096, cand.q, cand.k, cand.v, cand.qs, cand.ks,
+        cand.g, committed, candidate, cand.nq, cand.nk, cand.score, cand.out,
+        partial, meta, "registers", nullptr);
+    cudaError_t synced = cudaDeviceSynchronize();
+    std::vector<float> host(rows4096 * q);
+    if (launched == cudaSuccess && synced == cudaSuccess)
+      cudaMemcpy(host.data(), cand.out, host.size() * sizeof(float),
+                 cudaMemcpyDeviceToHost);
+    std::vector<unsigned char> score_after(score_before.size());
+    cudaMemcpy(score_after.data(), cand.score, score_after.size(),
+               cudaMemcpyDeviceToHost);
+    std::vector<__nv_bfloat16> committed_key_after(committed_key_before.size());
+    std::vector<__nv_bfloat16> committed_value_after(committed_value_before.size());
+    cudaMemcpy(committed_key_after.data(), cand.ck,
+               committed_key_after.size() * sizeof(__nv_bfloat16),
+               cudaMemcpyDeviceToHost);
+    cudaMemcpy(committed_value_after.data(), cand.cv,
+               committed_value_after.size() * sizeof(__nv_bfloat16),
+               cudaMemcpyDeviceToHost);
+    const bool scratch = score_before == score_after;
+    const bool committed_unchanged =
+        memcmp(committed_key_before.data(), committed_key_after.data(),
+               committed_key_before.size() * sizeof(__nv_bfloat16)) == 0 &&
+        memcmp(committed_value_before.data(), committed_value_after.data(),
+               committed_value_before.size() * sizeof(__nv_bfloat16)) == 0;
+    const bool finite = launched == cudaSuccess && synced == cudaSuccess &&
+                        finite_vec(host);
+    const bool env = finite && envelope_ok(host, tiled_host);
+    const int occupancy = qw38::cuda::fattn_register_vkq_occupancy();
+    std::printf("opt033_register_vkq launch=%s finite=%s envelope=%s "
+                "scratch=%s committed=%s occupancy=%d max_abs=%.9g rms=%.9g\n",
+                launched == cudaSuccess ? "ok" : "fail",
+                finite ? "true" : "false", env ? "true" : "false",
+                scratch ? "true" : "false",
+                committed_unchanged ? "true" : "false", occupancy,
+                finite ? maxabs(host, tiled_host) : 0.0, finite ? rms(host, tiled_host) : 0.0);
+    cudaFree(partial);
+    cudaFree(meta);
+    release(tiled4096);
+    release(cand);
+    if (!env || !scratch || !committed_unchanged || occupancy < 1) {
+      fprintf(stderr, "opt033 register vkq 4096 failed envelope or isolation\n");
+      return 6;
+    }
+  }
   B graph{};if(!allocate(graph,c,64,start))return 5;seed(graph,c,64,start);int p1=capture(c,start,1,graph,false),p3=capture(c,start,3,graph,false),p9=capture(c,start,9,graph,false),p64=capture(c,start,64,graph,false),r1=capture(c,start,1,graph,true),r3=capture(c,start,3,graph,true),r9=capture(c,start,9,graph,true),r64=capture(c,start,64,graph,true);release(graph);bool graphs=p1==2&&p3==2&&p9==2&&p64==2&&r1==3&&r3==9&&r9==27&&r64==192;
   bool semantic=finite&&candidate_exact&&chunk_output&&chunk_candidate&&cache_unchanged&&frontier_unchanged&&commit_exact&&commit_frontier&&future_excluded&&later_excluded&&scratch&&zero_rejected&&overflow_rejected&&alias_rejected&&last_position&&normalized_equal&&graphs&&ma<=5e-5f&&rr<=5e-6f&&co>=.999424f&&ma3<=5e-5f&&rr3<=5e-6f&&co3>=.999424f;if(!semantic){fprintf(stderr,"semantic failure finite=%d candidate=%d repeated_output=%d repeated_candidate=%d cache=%d frontier=%d commit=%d commit_frontier=%d future=%d later=%d scratch=%d zero=%d overflow=%d alias=%d last=%d normalized=%d graphs=%d metrics9=%d metrics3=%d\n",finite,candidate_exact,chunk_output,chunk_candidate,cache_unchanged,frontier_unchanged,commit_exact,commit_frontier,future_excluded,later_excluded,scratch,zero_rejected,overflow_rejected,alias_rejected,last_position,normalized_equal,graphs,ma<=5e-5f&&rr<=5e-6f&&co>=.999424f,ma3<=5e-5f&&rr3<=5e-6f&&co3>=.999424f);return 6;}
   struct Scale{size_t prefix;std::vector<float>tiled,reference;double tm,rm;};std::vector<Scale> scales;

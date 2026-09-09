@@ -1,0 +1,79 @@
+{
+  "schema_version": 1,
+  "task": "OPT-033",
+  "yardstick": "prefill_attention_register_vkq",
+  "opt036_quartz_p_mean_tok_s": 1644.04822,
+  "opt036_quartz_d128_mean_tok_s": 15.200716,
+  "opt036_quartz_d2048_mean_tok_s": 13.5282431,
+  "opt036_quartz_d128_token_latency_p95_ms": 66.3502579,
+  "opt036_quartz_d128_run_mean_token_latency_p95_ms": 65.8343124,
+  "opt036_quartz_d2048_token_latency_p95_ms": 74.4495544,
+  "opt036_quartz_d2048_run_mean_token_latency_p95_ms": 73.996994,
+  "historical_opt026_quartz_mean_tok_s": 1746.71973,
+  "opt032_quartz_p_mean_tok_s": 1637.58594,
+  "use_as_keep_denominator": false,
+  "llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+  "gguf_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+  "device_substring": "RTX 5090",
+  "selected_vkq_accum": "registers",
+  "attention_mma_query_rows": 16,
+  "ncols2": 2,
+  "kv_tile": 32,
+  "dual_f16": true,
+  "grid_z": 2,
+  "kSelectedFattnPath": "stream_k",
+  "ab": {
+    "candidates": [
+      "global",
+      "registers"
+    ],
+    "warmups": 3,
+    "measured_runs": 30,
+    "alternating_order": [
+      "global",
+      "registers"
+    ],
+    "include_combine": true,
+    "byte_equal_required": true,
+    "ties_retain": "global"
+  },
+  "opt005": {
+    "bf16_max_abs": 5e-05,
+    "bf16_rms": 5e-06
+  },
+  "owns_opt016_parity_gate": false,
+  "substitutes_for_opt016": false,
+  "llama_bench_is_informational": true,
+  "required_fixture_keys": [
+    "schema_version",
+    "task",
+    "status",
+    "measurement_utc",
+    "device",
+    "compute_capability",
+    "llama_revision",
+    "gguf_sha256",
+    "reverted",
+    "selected_vkq_accum",
+    "ab",
+    "keep_sitting_skipped",
+    "p",
+    "d128",
+    "d2048",
+    "owns_opt016_parity_gate",
+    "substitutes_for_opt016",
+    "nsight_systems",
+    "nsight_compute",
+    "proof_limit",
+    "report_path"
+  ],
+  "proof_limit": [
+    "byte-equal output",
+    "lower component time",
+    "improved P",
+    "cross-workload guard",
+    "does not substitute for the 2K llama.cpp parity gate",
+    "OPT-036 P D128 D2048 are the keep denominators"
+  ],
+  "report_path": "evidence/optimization/opt033-register-vkq/REPORT.md"
+}

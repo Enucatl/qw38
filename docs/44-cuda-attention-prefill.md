@@ -1,11 +1,12 @@
 # 44. Memory-bounded CUDA attention prefill at 128K
 
-[Index](README.md) · Implementation tasks: ATN-002, OPT-010, OPT-019, OPT-026, OPT-027, and EDU-030 in
+[Index](README.md) · Implementation tasks: ATN-002, OPT-010, OPT-019, OPT-026, OPT-027, OPT-033, and EDU-030 in
 [`implementation_ledger.md`](../implementation_ledger.md)
 · Contracts:
 [`pins/opt019_core_recovery_contract.json`](../pins/opt019_core_recovery_contract.json),
 [`pins/opt026_fattn_streamk_contract.json`](../pins/opt026_fattn_streamk_contract.json),
-[`pins/opt027_persistent_fattn_contract.json`](../pins/opt027_persistent_fattn_contract.json)
+[`pins/opt027_persistent_fattn_contract.json`](../pins/opt027_persistent_fattn_contract.json),
+[`pins/opt033_register_vkq_contract.json`](../pins/opt033_register_vkq_contract.json)
 · Evidence:
 [`fixtures/opt019_core_recovery.json`](../fixtures/opt019_core_recovery.json),
 [`evidence/optimization/opt019-gdn-attention-core/REPORT.md`](../evidence/optimization/opt019-gdn-attention-core/REPORT.md),
@@ -13,7 +14,9 @@
 [`evidence/optimization/opt026-fattn-streamk/REPORT.md`](../evidence/optimization/opt026-fattn-streamk/REPORT.md),
 [`fixtures/opt027_persistent_fattn.json`](../fixtures/opt027_persistent_fattn.json),
 [`evidence/optimization/opt027-persistent-fattn/REPORT.md`](../evidence/optimization/opt027-persistent-fattn/REPORT.md),
-[`evidence/optimization/opt027-persistent-fattn/REJECTION.md`](../evidence/optimization/opt027-persistent-fattn/REJECTION.md)
+[`evidence/optimization/opt027-persistent-fattn/REJECTION.md`](../evidence/optimization/opt027-persistent-fattn/REJECTION.md),
+[`fixtures/opt033_register_vkq.json`](../fixtures/opt033_register_vkq.json),
+[`evidence/optimization/opt033-register-vkq/REPORT.md`](../evidence/optimization/opt033-register-vkq/REPORT.md)
 
 [Chapter 43](43-cuda-attention-decode.md) processed one new token. **Prefill**
 processes a known prompt containing many tokens. The same causal rule applies:
@@ -92,12 +95,17 @@ was eligible but slower than stream-K. The scheduler aliases existing
 scratch stays untouched. OPT-027 measured llama.cpp Ada+ persistent
 stream-K (`nsm × occupancy` linearized tiles plus 5% efficiency rounding)
 against that production path and did not install it after an A/B loss.
-Production prompt fattn therefore remains OPT-026 `stream_k` (`grid.z=2`).
+OPT-033 then kept register-resident value accumulation on that same
+stream-K grid: each thread holds the running FP32 value sum across 32-row
+KV tiles and stores once after the KV loop. Production prompt fattn
+therefore remains OPT-026 `stream_k` (`grid.z=2`) with the OPT-033
+`registers` pin. Decode `launch_attention_prepare` partitions stay.
 The two-row tiled path remains the unloosened OPT-005 numeric reference.
 Live 4K keep/reject numbers stay in
-[`evidence/optimization/opt026-fattn-streamk/REPORT.md`](../evidence/optimization/opt026-fattn-streamk/REPORT.md)
+[`evidence/optimization/opt026-fattn-streamk/REPORT.md`](../evidence/optimization/opt026-fattn-streamk/REPORT.md),
+[`evidence/optimization/opt027-persistent-fattn/REPORT.md`](../evidence/optimization/opt027-persistent-fattn/REPORT.md),
 and
-[`evidence/optimization/opt027-persistent-fattn/REPORT.md`](../evidence/optimization/opt027-persistent-fattn/REPORT.md).
+[`evidence/optimization/opt033-register-vkq/REPORT.md`](../evidence/optimization/opt033-register-vkq/REPORT.md).
 
 ## Whole-chunk prepare, commit, and cancellation
 
@@ -359,3 +367,36 @@ and does not claim Quartz ≥ llama.cpp. Live numbers stay in the report:
 [`fixtures/opt027_persistent_fattn.json`](../fixtures/opt027_persistent_fattn.json),
 and
 [`evidence/optimization/opt027-persistent-fattn/REJECTION.md`](../evidence/optimization/opt027-persistent-fattn/REJECTION.md).
+
+## Register-resident value sums (OPT-033)
+
+Production stream-K quality still scores KV in 32-row tiles with scalar
+probability×V. The previous path rescaled and stored the running value
+sum through global `vkq` on every tile. OPT-033 gives each thread a
+compile-time FP32 accumulator (production: 64 floats), rescales those
+registers, and writes live lanes once after the KV loop. The stream-K
+combine kernel is unchanged. Ncols1=16, Ncols2=2, KV tile 32, dual-F16 Q,
+`__launch_bounds__(128, 2)`, and `grid.z=2` stay frozen. Score scratch
+stays untouched. Combine buffers continue to alias existing
+`prompt_projected_bf16_` / `prompt_q8_`. There is no extra persistent
+`cudaMalloc`. MMA probability×V is out of scope. Decode attention stays
+on its partitioned one-token path.
+
+`launch_attention_prepare_chunk_stream_k` honors compile-time
+`kSelectedVkqAccum`. Both `global` and `registers` remain launchable so
+the paired A/B can compare them. Byte equality is versus current stream-K
+`global`, not versus tiled; OPT-005 envelopes versus tiled remain the
+numeric gate.
+
+**Measured, RTX 5090:** paired 3-warm / 30-alternating CUDA-event A/B at
+4096 rows including combine selected **registers**. Combined FP32 output
+was byte-equal to `global`, occupancy met the eligibility floor, and the
+component mean was strictly lower. Keep also required live P tok/s
+strictly above the frozen then-current accepted P denominator and the
+cross-workload D128/D2048 guard. D2048 tok/s improvement is not required
+for this prefill keep. Production pin is `registers`. `reverted` is
+false. Live means, p95s, and per-candidate samples stay in the report;
+this chapter does not replace them:
+[`evidence/optimization/opt033-register-vkq/REPORT.md`](../evidence/optimization/opt033-register-vkq/REPORT.md).
+This is a register-resident prefill value-sum keep/reject under frozen
+envelopes, not the 2K llama.cpp parity gate and not Quartz ≥ llama.cpp.

@@ -31,7 +31,8 @@ quality MMA path (OPT-023). Large mixer Q8_0 D2R was A/B'd and not
 installed (OPT-024); those GEMMs stay I=128 quality MMA. Dense prompt FFN
 Q4_K shares one DS4 Y for gate/up and writes down-leg Y from SwiGLU
 (OPT-025). Production prompt attention uses Ada+ stream-K fattn after the
-OPT-026 keep; persistent stream-K was A/B-lost and not installed
+OPT-026 keep, with register-resident value sums after the OPT-033 keep;
+persistent stream-K was A/B-lost and not installed
 (OPT-027). Q4_K/Q6_K MMQ stream-K was A/B-lost and not installed
 (OPT-028); production quality MMA stays 2D tiling. Fusing GDN conv and
 gated-output into the warp-column token loop was A/B-lost and not
@@ -46,7 +47,8 @@ component recovery plus a 4K keep versus the frozen oracle baseline, not the
 OPT-016 2K llama.cpp parity gate. Production prompt GDN recurrence is the
 warp-column fused quality path; sequential windows remain the unloosened
 reference. Production prompt attention (`token_count >= 16`) is the fattn-mma
-analog with Ada+ stream-K after the OPT-026 keep; persistent stream-K
+analog with Ada+ stream-K after the OPT-026 keep and register-resident
+value sums after the OPT-033 keep; persistent stream-K
 was measured and rejected (OPT-027); tiled attention remains the
 unloosened reference. Q4_K/Q6_K MMQ stream-K was measured and rejected
 (OPT-028); production quality MMA remains 2D tiling. Fusing GDN conv and
@@ -120,7 +122,8 @@ contiguous KV partitions after the OPT-036 keep (independent pins below 2048
 and at or above 2048; candidate `1` remains the tiled kernel). Prefill must
 be causal and handle partial RoPE on exactly 64 dimensions. Production prompt
 attention (`token_count >= 16`) is the fattn-mma analog with Ada+ stream-K
-for prompt tiles; persistent stream-K was A/B-lost and not installed. The
+for prompt tiles and register-resident value sums after the OPT-033 keep;
+persistent stream-K was A/B-lost and not installed. The
 two-row tiled path remains the unloosened numeric reference. Dense FFNs dominate
 weights: MMV for one/few rows, MMQ for prompt or batched rows. Fusion is accepted
 only when the unfused path remains a differential oracle and profiler data
@@ -181,7 +184,8 @@ quality (`dim3(32, 4)`, grid z=32, `s_shard[4]`). Sequential windows remain the
 unloosened reference (`5e-8` / `5e-9`). Production prompt attention
 (`token_count >= 16`) is the fattn-mma analog with pinned ncols1=16 and
 ncols2=2. Production prompt attention uses Ada+ stream-K after the OPT-026
-keep; persistent stream-K was A/B-lost and not installed (OPT-027).
+keep and register-resident value sums after the OPT-033 keep; persistent
+stream-K was A/B-lost and not installed (OPT-027).
 Tiled attention remains the unloosened OPT-005 reference
 (`5e-5` / `5e-6`). Live exact-2048 `gdn` **1205.38806** ms and `attention`
 **475.116028** ms versus locked befores **1643.46082** / **1148.47461** ms
@@ -417,6 +421,29 @@ ATN-001 envelopes are unloosened. `reverted` is false. This increment does
 not own the 2K llama.cpp parity gate. Quartz ≥ llama.cpp is informational.
 Live tok/s stay in the report; this chapter does not replace them:
 [`evidence/optimization/opt036-decode-kv-partition/REPORT.md`](../evidence/optimization/opt036-decode-kv-partition/REPORT.md).
+
+## Register-resident value sums (OPT-033)
+
+**Measured, RTX 5090:** production 4096-row fattn-mma stream-K attention
+including combine was A/B'd between global per-tile `vkq` stores and
+register-resident value accumulation. Ncols1=16, Ncols2=2, KV tile 32,
+dual-F16 Q, and `grid.z=2` stay frozen. Scalar probability×V and the
+combine kernel are unchanged. Decode 16/16 KV partitions stay. Mixer Q8
+quality, FFN shared-Y, GDN warp-column, and prompt FFN graphs stay. No
+extra persistent `cudaMalloc`. The targeted sink is prefill
+`attention_core`. Keep denominators are the frozen OPT-036 P / D128 /
+D2048 means and p95s copied into the contract (P **1644.04822**, D128
+**15.200716**, D2048 **13.5282431**), not historical OPT-026 P
+**1746.71973** and not OPT-032 P **1637.58594**. **Keep:** A/B winner
+`registers` with byte-equal combined output and strictly lower component
+time; production pin `registers`; live P tok/s strictly exceeds that
+frozen P denominator; the cross-workload guard held (D128/D2048
+throughput and both p95 flavors within 5%). D2048 tok/s improvement is
+not required for this prefill keep. Frozen OPT-005 envelopes are
+unloosened. `reverted` is false. This increment does not own the 2K
+llama.cpp parity gate. Quartz ≥ llama.cpp is informational. Live tok/s
+stay in the report; this chapter does not replace them:
+[`evidence/optimization/opt033-register-vkq/REPORT.md`](../evidence/optimization/opt033-register-vkq/REPORT.md).
 
 ## DwarfStar transfer boundary
 
