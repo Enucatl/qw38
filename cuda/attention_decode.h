@@ -5,6 +5,7 @@
 #include <cstdint>
 
 #include <cuda_bf16.h>
+#include <cuda_fp16.h>
 #include <cuda_runtime.h>
 
 namespace qw38::cuda {
@@ -254,7 +255,7 @@ cudaError_t launch_attention_prepare_chunk_stream_k(
     const AttentionCache& committed, const AttentionCache& candidate_rows,
     float* normalized_query, float* normalized_key, float* score_workspace,
     float* output, float* partial_vkq, float* meta,
-    cudaStream_t stream) noexcept;
+    cudaStream_t stream, const __half* prepared_q = nullptr) noexcept;
 
 const char* selected_vkq_accum() noexcept;
 bool fattn_uses_register_vkq() noexcept;
@@ -287,6 +288,30 @@ cudaError_t launch_attention_prepare_chunk_stream_k_pv(
 const char* selected_qk_path() noexcept;
 bool fattn_uses_warp_qk() noexcept;
 int fattn_warp_qk_occupancy() noexcept;
+const char* selected_query_prepare_path() noexcept;
+bool fattn_uses_prepared_query() noexcept;
+int fattn_prepared_query_occupancy() noexcept;
+int attention_prepare_query_occupancy() noexcept;
+std::size_t attention_prepared_query_bytes(const AttentionConfig& config,
+                                           std::size_t token_count) noexcept;
+bool query_prepare_is_hoisted(const char* path) noexcept;
+void set_query_prepare_path_override(const char* path) noexcept;
+void clear_query_prepare_path_override() noexcept;
+
+struct QueryPreparePathScope final {
+  explicit QueryPreparePathScope(const char* path) noexcept {
+    set_query_prepare_path_override(path);
+  }
+  ~QueryPreparePathScope() { clear_query_prepare_path_override(); }
+  QueryPreparePathScope(const QueryPreparePathScope&) = delete;
+  QueryPreparePathScope& operator=(const QueryPreparePathScope&) = delete;
+};
+
+cudaError_t launch_attention_prepare_prompt_queries(
+    const AttentionConfig& config, std::size_t start_position,
+    std::size_t token_count, const float* query, const float* query_norm_scale,
+    __half* prepared_q, float* normalized_query, const char* prepare_path,
+    cudaStream_t stream) noexcept;
 
 cudaError_t launch_attention_prepare_chunk_stream_k_qk(
     const AttentionConfig& config, std::size_t start_position,

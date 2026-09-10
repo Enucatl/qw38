@@ -150,7 +150,7 @@ $(BUILD_DIR)/qw38-cuda-gdn-test: cuda/gdn_step_test.cu $(BUILD_DIR)/gdn_step.cud
 $(BUILD_DIR)/qw38-cuda-gdn-chunk-test: cuda/gdn_chunk_test.cu $(BUILD_DIR)/gdn_step.cuda.o $(BUILD_DIR)/gdn.o $(BUILD_DIR)/status.o | $(BUILD_DIR)
 	$(NVCC) $(NVCCFLAGS) $(CPPFLAGS) -Icuda $^ -o $@
 
-$(BUILD_DIR)/attention_decode.cuda.o: cuda/attention_decode.cu cuda/attention_decode.h cuda/fattn_mma_f16.cuh cuda/mma.cuh cuda/pdl_launch.cuh | $(BUILD_DIR)
+$(BUILD_DIR)/attention_decode.cuda.o: cuda/attention_decode.cu cuda/attention_decode.h cuda/fattn_mma_f16.cuh cuda/mma.cuh cuda/pdl_launch.cuh cuda/rms_norm.cuh | $(BUILD_DIR)
 	$(NVCC) $(NVCCFLAGS) -Icuda -c $< -o $@
 
 $(BUILD_DIR)/qw38-cuda-attention-test: cuda/attention_decode_test.cu $(BUILD_DIR)/attention_decode.cuda.o $(BUILD_DIR)/attention.o $(BUILD_DIR)/status.o | $(BUILD_DIR)

@@ -1,0 +1,170 @@
+query_prep_ab id=in_kernel occupancy=1 launch_ok=true max_abs=0 rms=0 cosine=0 nonfinite=0 scratch=true committed=true candidate=true byte_equal=true prepared_q=true graph_eager=true eligible=true
+query_prep_ab id=hoisted occupancy=1 launch_ok=true max_abs=0 rms=0 cosine=-2.22044605e-16 nonfinite=0 scratch=true committed=true candidate=true byte_equal=true prepared_q=true graph_eager=true eligible=true
+query_prep_ab id=hoisted_fma occupancy=1 launch_ok=true max_abs=1.71363354e-07 rms=2.61700128e-09 cosine=1.29674049e-13 nonfinite=0 scratch=true committed=true candidate=true byte_equal=false prepared_q=true graph_eager=true eligible=true
+correctness start=0 tokens=1 launch_ok=true byte_equal=true eligible=true vs_in_kernel_max_abs=0 fma_max_abs=0
+correctness start=0 tokens=16 launch_ok=true byte_equal=true eligible=true vs_in_kernel_max_abs=0 fma_max_abs=1.69500709e-07
+correctness start=0 tokens=17 launch_ok=true byte_equal=true eligible=true vs_in_kernel_max_abs=0 fma_max_abs=1.69500709e-07
+correctness start=0 tokens=31 launch_ok=true byte_equal=true eligible=true vs_in_kernel_max_abs=0 fma_max_abs=1.69500709e-07
+correctness start=0 tokens=32 launch_ok=true byte_equal=true eligible=true vs_in_kernel_max_abs=0 fma_max_abs=1.69500709e-07
+correctness start=0 tokens=33 launch_ok=true byte_equal=true eligible=true vs_in_kernel_max_abs=0 fma_max_abs=1.69500709e-07
+correctness start=0 tokens=63 launch_ok=true byte_equal=true eligible=true vs_in_kernel_max_abs=0 fma_max_abs=1.69500709e-07
+correctness start=0 tokens=64 launch_ok=true byte_equal=true eligible=true vs_in_kernel_max_abs=0 fma_max_abs=1.69500709e-07
+correctness start=0 tokens=65 launch_ok=true byte_equal=true eligible=true vs_in_kernel_max_abs=0 fma_max_abs=1.69500709e-07
+correctness start=0 tokens=512 launch_ok=true byte_equal=true eligible=true vs_in_kernel_max_abs=0 fma_max_abs=1.71363354e-07
+correctness start=0 tokens=2048 launch_ok=true byte_equal=true eligible=true vs_in_kernel_max_abs=0 fma_max_abs=1.71363354e-07
+correctness start=0 tokens=4096 launch_ok=true byte_equal=true eligible=true vs_in_kernel_max_abs=0 fma_max_abs=1.71363354e-07
+correctness start=1 tokens=1 launch_ok=true byte_equal=true eligible=true vs_in_kernel_max_abs=0 fma_max_abs=0
+correctness start=1 tokens=16 launch_ok=true byte_equal=true eligible=true vs_in_kernel_max_abs=0 fma_max_abs=1.60187483e-07
+correctness start=1 tokens=17 launch_ok=true byte_equal=true eligible=true vs_in_kernel_max_abs=0 fma_max_abs=1.60187483e-07
+correctness start=1 tokens=31 launch_ok=true byte_equal=true eligible=true vs_in_kernel_max_abs=0 fma_max_abs=1.60187483e-07
+correctness start=1 tokens=32 launch_ok=true byte_equal=true eligible=true vs_in_kernel_max_abs=0 fma_max_abs=1.60187483e-07
+correctness start=1 tokens=33 launch_ok=true byte_equal=true eligible=true vs_in_kernel_max_abs=0 fma_max_abs=1.60187483e-07
+correctness start=1 tokens=63 launch_ok=true byte_equal=true eligible=true vs_in_kernel_max_abs=0 fma_max_abs=1.60187483e-07
+correctness start=1 tokens=64 launch_ok=true byte_equal=true eligible=true vs_in_kernel_max_abs=0 fma_max_abs=1.60187483e-07
+correctness start=1 tokens=65 launch_ok=true byte_equal=true eligible=true vs_in_kernel_max_abs=0 fma_max_abs=1.60187483e-07
+correctness start=1 tokens=512 launch_ok=true byte_equal=true eligible=true vs_in_kernel_max_abs=0 fma_max_abs=1.60187483e-07
+correctness start=1 tokens=2048 launch_ok=true byte_equal=true eligible=true vs_in_kernel_max_abs=0 fma_max_abs=1.63912773e-07
+correctness start=1 tokens=4096 launch_ok=true byte_equal=true eligible=true vs_in_kernel_max_abs=0 fma_max_abs=1.63912773e-07
+correctness start=31 tokens=1 launch_ok=true byte_equal=true eligible=true vs_in_kernel_max_abs=0 fma_max_abs=0
+correctness start=31 tokens=16 launch_ok=true byte_equal=true eligible=true vs_in_kernel_max_abs=0 fma_max_abs=2.08616257e-07
+correctness start=31 tokens=17 launch_ok=true byte_equal=true eligible=true vs_in_kernel_max_abs=0 fma_max_abs=2.08616257e-07
+correctness start=31 tokens=31 launch_ok=true byte_equal=true eligible=true vs_in_kernel_max_abs=0 fma_max_abs=2.08616257e-07
+correctness start=31 tokens=32 launch_ok=true byte_equal=true eligible=true vs_in_kernel_max_abs=0 fma_max_abs=2.08616257e-07
+correctness start=31 tokens=33 launch_ok=true byte_equal=true eligible=true vs_in_kernel_max_abs=0 fma_max_abs=2.08616257e-07
+correctness start=31 tokens=63 launch_ok=true byte_equal=true eligible=true vs_in_kernel_max_abs=0 fma_max_abs=2.08616257e-07
+correctness start=31 tokens=64 launch_ok=true byte_equal=true eligible=true vs_in_kernel_max_abs=0 fma_max_abs=2.08616257e-07
+correctness start=31 tokens=65 launch_ok=true byte_equal=true eligible=true vs_in_kernel_max_abs=0 fma_max_abs=2.08616257e-07
+correctness start=31 tokens=512 launch_ok=true byte_equal=true eligible=true vs_in_kernel_max_abs=0 fma_max_abs=2.25380063e-07
+correctness start=31 tokens=2048 launch_ok=true byte_equal=true eligible=true vs_in_kernel_max_abs=0 fma_max_abs=2.25380063e-07
+correctness start=31 tokens=4096 launch_ok=true byte_equal=true eligible=true vs_in_kernel_max_abs=0 fma_max_abs=2.25380063e-07
+correctness start=128 tokens=1 launch_ok=true byte_equal=true eligible=true vs_in_kernel_max_abs=0 fma_max_abs=0
+correctness start=128 tokens=16 launch_ok=true byte_equal=true eligible=true vs_in_kernel_max_abs=0 fma_max_abs=1.41561031e-07
+correctness start=128 tokens=17 launch_ok=true byte_equal=true eligible=true vs_in_kernel_max_abs=0 fma_max_abs=1.41561031e-07
+correctness start=128 tokens=31 launch_ok=true byte_equal=true eligible=true vs_in_kernel_max_abs=0 fma_max_abs=1.41561031e-07
+correctness start=128 tokens=32 launch_ok=true byte_equal=true eligible=true vs_in_kernel_max_abs=0 fma_max_abs=1.41561031e-07
+correctness start=128 tokens=33 launch_ok=true byte_equal=true eligible=true vs_in_kernel_max_abs=0 fma_max_abs=1.41561031e-07
+correctness start=128 tokens=63 launch_ok=true byte_equal=true eligible=true vs_in_kernel_max_abs=0 fma_max_abs=1.41561031e-07
+correctness start=128 tokens=64 launch_ok=true byte_equal=true eligible=true vs_in_kernel_max_abs=0 fma_max_abs=1.41561031e-07
+correctness start=128 tokens=65 launch_ok=true byte_equal=true eligible=true vs_in_kernel_max_abs=0 fma_max_abs=1.41561031e-07
+correctness start=128 tokens=512 launch_ok=true byte_equal=true eligible=true vs_in_kernel_max_abs=0 fma_max_abs=2.10944563e-07
+correctness start=128 tokens=2048 launch_ok=true byte_equal=true eligible=true vs_in_kernel_max_abs=0 fma_max_abs=2.10944563e-07
+correctness start=128 tokens=4096 launch_ok=true byte_equal=true eligible=true vs_in_kernel_max_abs=0 fma_max_abs=2.10944563e-07
+correctness start=2048 tokens=1 launch_ok=true byte_equal=true eligible=true vs_in_kernel_max_abs=0 fma_max_abs=0
+correctness start=2048 tokens=16 launch_ok=true byte_equal=true eligible=true vs_in_kernel_max_abs=0 fma_max_abs=1.49011612e-07
+correctness start=2048 tokens=17 launch_ok=true byte_equal=true eligible=true vs_in_kernel_max_abs=0 fma_max_abs=1.49011612e-07
+correctness start=2048 tokens=31 launch_ok=true byte_equal=true eligible=true vs_in_kernel_max_abs=0 fma_max_abs=1.49011612e-07
+correctness start=2048 tokens=32 launch_ok=true byte_equal=true eligible=true vs_in_kernel_max_abs=0 fma_max_abs=1.49011612e-07
+correctness start=2048 tokens=33 launch_ok=true byte_equal=true eligible=true vs_in_kernel_max_abs=0 fma_max_abs=1.49011612e-07
+correctness start=2048 tokens=63 launch_ok=true byte_equal=true eligible=true vs_in_kernel_max_abs=0 fma_max_abs=1.49011612e-07
+correctness start=2048 tokens=64 launch_ok=true byte_equal=true eligible=true vs_in_kernel_max_abs=0 fma_max_abs=1.49011612e-07
+correctness start=2048 tokens=65 launch_ok=true byte_equal=true eligible=true vs_in_kernel_max_abs=0 fma_max_abs=1.49011612e-07
+correctness start=2048 tokens=512 launch_ok=true byte_equal=true eligible=true vs_in_kernel_max_abs=0 fma_max_abs=2.12341547e-07
+correctness start=2048 tokens=2048 launch_ok=true byte_equal=true eligible=true vs_in_kernel_max_abs=0 fma_max_abs=2.12341547e-07
+correctness start=2048 tokens=4096 launch_ok=true byte_equal=true eligible=true vs_in_kernel_max_abs=0 fma_max_abs=2.12341547e-07
+query_prep_ab id=in_kernel warmup=0 ms=34.5869102 occupancy=1
+query_prep_ab id=hoisted warmup=0 ms=29.3394566 occupancy=1
+query_prep_ab id=hoisted_fma warmup=0 ms=29.3072319 occupancy=1
+query_prep_ab id=in_kernel warmup=1 ms=34.5852165 occupancy=1
+query_prep_ab id=hoisted warmup=1 ms=29.3508797 occupancy=1
+query_prep_ab id=hoisted_fma warmup=1 ms=29.4145279 occupancy=1
+query_prep_ab id=in_kernel warmup=2 ms=34.6136017 occupancy=1
+query_prep_ab id=hoisted warmup=2 ms=29.3840008 occupancy=1
+query_prep_ab id=hoisted_fma warmup=2 ms=29.2740154 occupancy=1
+query_prep_ab id=in_kernel sample=0 ms=34.5954247 occupancy=1
+query_prep_ab id=hoisted sample=0 ms=29.4112644 occupancy=1
+query_prep_ab id=hoisted_fma sample=0 ms=29.3934727 occupancy=1
+query_prep_ab id=in_kernel sample=1 ms=34.6031036 occupancy=1
+query_prep_ab id=hoisted sample=1 ms=29.3296318 occupancy=1
+query_prep_ab id=hoisted_fma sample=1 ms=29.3847046 occupancy=1
+query_prep_ab id=in_kernel sample=2 ms=34.5993271 occupancy=1
+query_prep_ab id=hoisted sample=2 ms=29.3890877 occupancy=1
+query_prep_ab id=hoisted_fma sample=2 ms=29.3109112 occupancy=1
+query_prep_ab id=in_kernel sample=3 ms=34.5936966 occupancy=1
+query_prep_ab id=hoisted sample=3 ms=29.3695049 occupancy=1
+query_prep_ab id=hoisted_fma sample=3 ms=29.3195515 occupancy=1
+query_prep_ab id=in_kernel sample=4 ms=34.6028786 occupancy=1
+query_prep_ab id=hoisted sample=4 ms=29.4024963 occupancy=1
+query_prep_ab id=hoisted_fma sample=4 ms=29.2807045 occupancy=1
+query_prep_ab id=in_kernel sample=5 ms=34.6033936 occupancy=1
+query_prep_ab id=hoisted sample=5 ms=29.3961277 occupancy=1
+query_prep_ab id=hoisted_fma sample=5 ms=29.4240952 occupancy=1
+query_prep_ab id=in_kernel sample=6 ms=34.6037445 occupancy=1
+query_prep_ab id=hoisted sample=6 ms=29.3649597 occupancy=1
+query_prep_ab id=hoisted_fma sample=6 ms=29.34832 occupancy=1
+query_prep_ab id=in_kernel sample=7 ms=34.6582413 occupancy=1
+query_prep_ab id=hoisted sample=7 ms=29.3391991 occupancy=1
+query_prep_ab id=hoisted_fma sample=7 ms=29.3700161 occupancy=1
+query_prep_ab id=in_kernel sample=8 ms=34.6114883 occupancy=1
+query_prep_ab id=hoisted sample=8 ms=29.3442554 occupancy=1
+query_prep_ab id=hoisted_fma sample=8 ms=29.3393917 occupancy=1
+query_prep_ab id=in_kernel sample=9 ms=34.6007996 occupancy=1
+query_prep_ab id=hoisted sample=9 ms=29.2901115 occupancy=1
+query_prep_ab id=hoisted_fma sample=9 ms=29.4215031 occupancy=1
+query_prep_ab id=in_kernel sample=10 ms=34.6089287 occupancy=1
+query_prep_ab id=hoisted sample=10 ms=29.2987518 occupancy=1
+query_prep_ab id=hoisted_fma sample=10 ms=29.3383999 occupancy=1
+query_prep_ab id=in_kernel sample=11 ms=34.5631371 occupancy=1
+query_prep_ab id=hoisted sample=11 ms=29.3018246 occupancy=1
+query_prep_ab id=hoisted_fma sample=11 ms=29.3325443 occupancy=1
+query_prep_ab id=in_kernel sample=12 ms=34.5999985 occupancy=1
+query_prep_ab id=hoisted sample=12 ms=29.3759365 occupancy=1
+query_prep_ab id=hoisted_fma sample=12 ms=29.4089279 occupancy=1
+query_prep_ab id=in_kernel sample=13 ms=34.5936966 occupancy=1
+query_prep_ab id=hoisted sample=13 ms=29.4442558 occupancy=1
+query_prep_ab id=hoisted_fma sample=13 ms=29.3701439 occupancy=1
+query_prep_ab id=in_kernel sample=14 ms=34.5748787 occupancy=1
+query_prep_ab id=hoisted sample=14 ms=29.4456959 occupancy=1
+query_prep_ab id=hoisted_fma sample=14 ms=29.3509769 occupancy=1
+query_prep_ab id=in_kernel sample=15 ms=34.5835838 occupancy=1
+query_prep_ab id=hoisted sample=15 ms=29.3490238 occupancy=1
+query_prep_ab id=hoisted_fma sample=15 ms=29.4117126 occupancy=1
+query_prep_ab id=in_kernel sample=16 ms=34.5278702 occupancy=1
+query_prep_ab id=hoisted sample=16 ms=29.4374714 occupancy=1
+query_prep_ab id=hoisted_fma sample=16 ms=29.3388157 occupancy=1
+query_prep_ab id=in_kernel sample=17 ms=34.6254082 occupancy=1
+query_prep_ab id=hoisted sample=17 ms=29.3843842 occupancy=1
+query_prep_ab id=hoisted_fma sample=17 ms=29.3892479 occupancy=1
+query_prep_ab id=in_kernel sample=18 ms=34.4899521 occupancy=1
+query_prep_ab id=hoisted sample=18 ms=29.3719673 occupancy=1
+query_prep_ab id=hoisted_fma sample=18 ms=29.4354553 occupancy=1
+query_prep_ab id=in_kernel sample=19 ms=34.4787827 occupancy=1
+query_prep_ab id=hoisted sample=19 ms=29.3964806 occupancy=1
+query_prep_ab id=hoisted_fma sample=19 ms=29.3733444 occupancy=1
+query_prep_ab id=in_kernel sample=20 ms=34.5831985 occupancy=1
+query_prep_ab id=hoisted sample=20 ms=29.3953609 occupancy=1
+query_prep_ab id=hoisted_fma sample=20 ms=29.32864 occupancy=1
+query_prep_ab id=in_kernel sample=21 ms=34.6107521 occupancy=1
+query_prep_ab id=hoisted sample=21 ms=29.3917122 occupancy=1
+query_prep_ab id=hoisted_fma sample=21 ms=29.2701111 occupancy=1
+query_prep_ab id=in_kernel sample=22 ms=34.6390724 occupancy=1
+query_prep_ab id=hoisted sample=22 ms=29.3018875 occupancy=1
+query_prep_ab id=hoisted_fma sample=22 ms=29.3562241 occupancy=1
+query_prep_ab id=in_kernel sample=23 ms=34.6133766 occupancy=1
+query_prep_ab id=hoisted sample=23 ms=29.3160954 occupancy=1
+query_prep_ab id=hoisted_fma sample=23 ms=29.3660793 occupancy=1
+query_prep_ab id=in_kernel sample=24 ms=34.6149445 occupancy=1
+query_prep_ab id=hoisted sample=24 ms=29.4122562 occupancy=1
+query_prep_ab id=hoisted_fma sample=24 ms=29.4170876 occupancy=1
+query_prep_ab id=in_kernel sample=25 ms=34.6114578 occupancy=1
+query_prep_ab id=hoisted sample=25 ms=29.2144966 occupancy=1
+query_prep_ab id=hoisted_fma sample=25 ms=29.3278713 occupancy=1
+query_prep_ab id=in_kernel sample=26 ms=34.6124153 occupancy=1
+query_prep_ab id=hoisted sample=26 ms=29.3455048 occupancy=1
+query_prep_ab id=hoisted_fma sample=26 ms=29.4120636 occupancy=1
+query_prep_ab id=in_kernel sample=27 ms=34.5963821 occupancy=1
+query_prep_ab id=hoisted sample=27 ms=29.4336319 occupancy=1
+query_prep_ab id=hoisted_fma sample=27 ms=29.4293442 occupancy=1
+query_prep_ab id=in_kernel sample=28 ms=34.5756798 occupancy=1
+query_prep_ab id=hoisted sample=28 ms=29.3040009 occupancy=1
+query_prep_ab id=hoisted_fma sample=28 ms=29.2915192 occupancy=1
+query_prep_ab id=in_kernel sample=29 ms=34.6197128 occupancy=1
+query_prep_ab id=hoisted sample=29 ms=29.3958073 occupancy=1
+query_prep_ab id=hoisted_fma sample=29 ms=29.4102077 occupancy=1
+query_prep_ab_mean id=in_kernel mean_ms=34.5931778 occupancy=1 eligible=true
+query_prep_ab_mean id=hoisted mean_ms=29.3651066 occupancy=1 eligible=true
+query_prep_ab_mean id=hoisted_fma mean_ms=29.3650455 occupancy=1 eligible=true
+layer id=layer3 tokens=64 ok=true hoisted_max_abs=0 fma_max_abs=3.05473804e-07
+layer id=layer31 tokens=64 ok=true hoisted_max_abs=0 fma_max_abs=7.15255737e-07
+layer id=layer63 tokens=64 ok=true hoisted_max_abs=0 fma_max_abs=6.61239028e-07
+query_prep_ab_winner id=hoisted_fma win=true mean_ms=29.3650455
+query_prep_ab_winner_tiebreak id=hoisted reason=like_arithmetic_within_1pct hoisted_ms=29.3651066 fma_ms=29.3650455

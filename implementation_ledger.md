@@ -116,7 +116,7 @@ are repository-relative unless stated otherwise.
 | OPT-047 | Accelerate Q8_0 mixer decode projections | OPT-044, OPT-046 | done | Shared activation staging and role-specific packed dots improve the complete mixer group and D2048; new activation approximation is documented and quality-tested, or retained rejection | [`tasks/OPT-047.md`](tasks/OPT-047.md); [`pins/opt047_q8_decode_contract.json`](pins/opt047_q8_decode_contract.json); [`fixtures/opt047_q8_decode.json`](fixtures/opt047_q8_decode.json); [`cuda/q8_decode_dots.cu`](cuda/q8_decode_dots.cu); [`cuda/q8_decode_path.cuh`](cuda/q8_decode_path.cuh); [`cuda/opt047_q8_decode_ab_test.cu`](cuda/opt047_q8_decode_ab_test.cu); [`tests/test_opt047_q8_decode.py`](tests/test_opt047_q8_decode.py); [`evidence/optimization/opt047-q8-decode/REPORT.md`](evidence/optimization/opt047-q8-decode/REPORT.md); verification 2026-09-10T19:42:58Z |
 | OPT-048 | Accelerate full Q6_K vocabulary projection | OPT-044, OPT-046 | done | Full 248320-row logits use admitted packed integer dots with complete output quality and end-to-end decode win, or retained rejection; no vocabulary pruning | [`tasks/OPT-048.md`](tasks/OPT-048.md); [`pins/opt048_q6_logits_contract.json`](pins/opt048_q6_logits_contract.json); [`fixtures/opt048_q6_logits.json`](fixtures/opt048_q6_logits.json); [`cuda/q6k_decode_dots.cu`](cuda/q6k_decode_dots.cu); [`cuda/q6k_decode_path.cuh`](cuda/q6k_decode_path.cuh); [`cuda/opt048_q6_logits_ab_test.cu`](cuda/opt048_q6_logits_ab_test.cu); [`tests/test_opt048_q6_logits.py`](tests/test_opt048_q6_logits.py); [`evidence/optimization/opt048-q6-logits/REPORT.md`](evidence/optimization/opt048-q6-logits/REPORT.md); verification 2026-09-10T20:27:00Z |
 | OPT-049 | Share decode FFN staging and fuse gate/up | OPT-046, OPT-047, OPT-048 | done | Complete FFN including staging/SwiGLU/down wins with admitted BF16 rounding and graph/eager equivalence, production quality and P/D guards, or retained rejection | [`tasks/OPT-049.md`](tasks/OPT-049.md); [`pins/opt049_decode_ffn_fusion_contract.json`](pins/opt049_decode_ffn_fusion_contract.json); [`fixtures/opt049_decode_ffn_fusion.json`](fixtures/opt049_decode_ffn_fusion.json); [`cuda/ffn_decode_path.cuh`](cuda/ffn_decode_path.cuh); [`cuda/opt049_decode_ffn_fusion_ab_test.cu`](cuda/opt049_decode_ffn_fusion_ab_test.cu); [`cuda/quant_mmv.cu`](cuda/quant_mmv.cu); [`cuda/full_scheduler.cu`](cuda/full_scheduler.cu); [`tests/test_opt049_decode_ffn_fusion.py`](tests/test_opt049_decode_ffn_fusion.py); [`evidence/optimization/opt049-decode-ffn-fusion/REPORT.md`](evidence/optimization/opt049-decode-ffn-fusion/REPORT.md); verification 2026-09-10T21:05:17Z |
-| OPT-050 | Prepare prompt Q normalization and RoPE once | OPT-044, OPT-045 | pending | Prepared queries are reused across attention KV partitions; preparation-inclusive P improves with tail/prefix correctness, quality and memory guards, or retained rejection | [Task](tasks/OPT-050.md) |
+| OPT-050 | Prepare prompt Q normalization and RoPE once | OPT-044, OPT-045 | done | Prepared queries are reused across attention KV partitions; preparation-inclusive P improves with tail/prefix correctness, quality and memory guards, or retained rejection | [`tasks/OPT-050.md`](tasks/OPT-050.md); [`pins/opt050_attention_query_prepare_contract.json`](pins/opt050_attention_query_prepare_contract.json); [`fixtures/opt050_attention_query_prepare.json`](fixtures/opt050_attention_query_prepare.json); [`cuda/attention_decode.cu`](cuda/attention_decode.cu); [`cuda/fattn_mma_f16.cuh`](cuda/fattn_mma_f16.cuh); [`cuda/opt050_attention_query_prepare_ab_test.cu`](cuda/opt050_attention_query_prepare_ab_test.cu); [`tests/test_opt050_attention_query_prepare.py`](tests/test_opt050_attention_query_prepare.py); [`evidence/optimization/opt050-attention-query-prepare/REPORT.md`](evidence/optimization/opt050-attention-query-prepare/REPORT.md); verification 2026-09-10T21:40:39Z |
 | OPT-051 | Pipeline prompt attention with register softmax | OPT-044, OPT-050 | pending | Staged admission of F16 operands, register reductions and tiled asynchronous loads reduces complete attention and P under documented quality and P/D guards, or retained rejection | [Task](tasks/OPT-051.md) |
 | OPT-052 | Remove redundant GDN arithmetic and state traffic | OPT-044, OPT-045 | pending | Hoisted scaled Q/K and decay plus admitted FMA improve complete GDN and P; optional conversion-inclusive state tiling wins where measured; recurrent quality and atomic state stay valid, or retained rejection | [Task](tasks/OPT-052.md) |
 | OPT-053 | Optimize MMQ scaling and tile staging | OPT-044, OPT-045 | pending | Existing quality MMA gains measured scaling/staging efficiency and full P speed under quality and memory guards, or a measured no-change result; no unchanged rejected tile/stream-K rerun | [Task](tasks/OPT-053.md) |
@@ -128,8 +128,8 @@ are repository-relative unless stated otherwise.
 
 The [2026-09-10 design](tasks/PERFORMANCE-RECOVERY-2026-09-10.md) compares the
 admitted Quartz, pinned llama.cpp and ds4 paths. It is source analysis and task
-design, not new performance evidence. **Next eligible recovery task: OPT-050**,
-then OPT-050–054 in row
+design, not new performance evidence. **Next eligible recovery task: OPT-051**,
+then OPT-051–054 in row
 order, measured remaining launch work in OPT-055, and the outcome gate OPT-056.
 Dependencies permit independent work but do not authorize subagents. The user
 accepts documented llama.cpp/ds4-like accuracy compromises; strict reference
@@ -5673,3 +5673,38 @@ statements below are historical, not the current execution order.
   Tok/s delta: P **2129.86** → **2130.80** (+0.94, 1.0004×); D128
   **35.97** → **37.25** (+1.29, 1.036×); D2048 **34.34** → **35.41**
   (+1.07, 1.031×).
+
+### 2026-09-10T21:40:39Z — OPT-050 delivered (KEEP)
+
+- Independent verification attempt 1 passed. Upstream prompt query
+  normalization and RoPE preparation (`hoisted`) were A/B'd against the
+  retained in-kernel per-CTA preparation control on complete
+  prepare+attention+combine. Exclusive RTX 5090 sitting wrote
+  [`fixtures/opt050_attention_query_prepare.json`](fixtures/opt050_attention_query_prepare.json)
+  (`measurement_utc` 2026-09-10T21:27:34Z; A/B winner `hoisted`
+  weighted complete attention **29.3651066** ms vs in_kernel
+  **34.5931778** ms, ~1.18×; sitting P Quartz **2221.82642**, D128
+  **37.4580574**, D2048 **35.7343941** tok/s; `status` measured;
+  `reverted` false; `keep_sitting_skipped` false;
+  `selected_query_prepare_path` hoisted). **Keep:** OPT-044
+  production-numerics budgets; OPT-049 keep P floor (strict P improvement)
+  and D128/D2048 ≥ 95% floors; decode p95 inside 105% of OPT-045.
+  Production `kSelectedQueryPreparePath` is `hoisted`. Prepared Q aliases
+  `prompt_projection_a_` (no extra persistent allocation). Decode
+  `warp_query` unchanged. Coupled IDs: none.
+- Acceptance evidence: [`tasks/OPT-050.md`](tasks/OPT-050.md);
+  [`pins/opt050_attention_query_prepare_contract.json`](pins/opt050_attention_query_prepare_contract.json);
+  [`fixtures/opt050_attention_query_prepare.json`](fixtures/opt050_attention_query_prepare.json);
+  [`cuda/attention_decode.cu`](cuda/attention_decode.cu);
+  [`cuda/fattn_mma_f16.cuh`](cuda/fattn_mma_f16.cuh);
+  [`cuda/opt050_attention_query_prepare_ab_test.cu`](cuda/opt050_attention_query_prepare_ab_test.cu);
+  [`tests/test_opt050_attention_query_prepare.py`](tests/test_opt050_attention_query_prepare.py);
+  [`evidence/optimization/opt050-attention-query-prepare/REPORT.md`](evidence/optimization/opt050-attention-query-prepare/REPORT.md).
+  Proof is hoisted upstream Q prepare with frozen OPT-044 numerics and
+  OPT-049 keep denominators, not the 2K llama.cpp parity gate.
+- Marked OPT-050 `done`; delivery is limited to the verified task scope
+  plus this ledger/audit bookkeeping. `plan.md` is unchanged. OPT-016
+  stays `blocked`. Next eligible pending by ledger row order: **OPT-051**.
+  Tok/s delta: P **2130.80** → **2221.83** (+91.03, 1.043×); D128
+  **37.25** → **37.46** (+0.20, 1.005×); D2048 **35.41** → **35.73**
+  (+0.33, 1.009×).

@@ -186,7 +186,10 @@ cudaError_t run_attention_chain(const qw38::cuda::DeviceLayer& layer,
         workspace->attention_normalized_key_, workspace->attention_scores_,
         workspace->prompt_gdn_recurrent_output_,
         reinterpret_cast<float*>(workspace->prompt_projected_bf16_),
-        reinterpret_cast<float*>(workspace->prompt_q8_), stream);
+        reinterpret_cast<float*>(workspace->prompt_q8_), stream,
+        qw38::cuda::fattn_uses_prepared_query()
+            ? reinterpret_cast<const __half*>(workspace->prompt_projection_a_)
+            : nullptr);
   }
   if (error == cudaSuccess) {
     error = qw38::cuda::launch_fp32_to_bf16(

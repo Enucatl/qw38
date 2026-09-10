@@ -3416,21 +3416,39 @@ Status execute_prompt_chunk(
                 attention_slot * candidate_stride};
         if (error == cudaSuccess) {
           if (fattn_uses_stream_k()) {
-            error = launch_attention_prepare_chunk_stream_k(
-                config, session->frontier_, token_count,
-                workspace->prompt_gdn_convolved_,
-                workspace->prompt_projection_c_,
-                workspace->prompt_projection_d_, layer.attention.query_norm,
-                layer.attention.key_norm, workspace->prompt_projection_b_,
-                committed, candidate, workspace->attention_normalized_query_,
-                workspace->attention_normalized_key_,
-                workspace->attention_scores_,
-                workspace->prompt_gdn_recurrent_output_,
-                reinterpret_cast<float*>(workspace->prompt_projected_bf16_),
-                reinterpret_cast<float*>(workspace->prompt_q8_), stream);
+            const __half* prepared_q = nullptr;
+            if (fattn_uses_prepared_query()) {
+              const std::size_t need =
+                  attention_prepared_query_bytes(config, token_count);
+              const std::size_t overlay_bytes =
+                  workspace->prompt_chunk_rows_ * kMaximumProjection *
+                  sizeof(float);
+              if (need == 0 || need > overlay_bytes) {
+                error = cudaErrorInvalidValue;
+              } else {
+                prepared_q = reinterpret_cast<const __half*>(
+                    workspace->prompt_projection_a_);
+              }
+            }
+            if (error == cudaSuccess) {
+              error = launch_attention_prepare_chunk_stream_k(
+                  config, session->frontier_, token_count,
+                  workspace->prompt_gdn_convolved_,
+                  workspace->prompt_projection_c_,
+                  workspace->prompt_projection_d_, layer.attention.query_norm,
+                  layer.attention.key_norm, workspace->prompt_projection_b_,
+                  committed, candidate, workspace->attention_normalized_query_,
+                  workspace->attention_normalized_key_,
+                  workspace->attention_scores_,
+                  workspace->prompt_gdn_recurrent_output_,
+                  reinterpret_cast<float*>(workspace->prompt_projected_bf16_),
+                  reinterpret_cast<float*>(workspace->prompt_q8_), stream,
+                  prepared_q);
+            }
             // Persistent stream-K aliases prompt_q8_ for packed dst_tmp_meta
             // (fits; no extra cudaMalloc). prompt_projected_bf16_ remains the
-            // OPT-026 partial_vkq alias when persistent is off.
+            // OPT-026 partial_vkq alias when persistent is off. Prepared Q
+            // aliases prompt_projection_a_ after split_attention_rows.
           } else {
             error = launch_attention_prepare_chunk(
                 config, session->frontier_, token_count,
