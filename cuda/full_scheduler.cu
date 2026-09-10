@@ -17,6 +17,7 @@
 #include "gdn_step.h"
 #include "mixer.h"
 #include "pdl_launch.cuh"
+#include "rms_norm.cuh"
 #include "scheduler.h"
 #include "scheduler_primitives.h"
 #include "sha256.h"
@@ -358,6 +359,36 @@ __global__ void rms_norm_rows_fp32_to_bf16(
   quartz_pdl_lc();
 }
 
+template <bool UseRsqrt>
+__global__ void rms_norm_fp32_to_bf16_parallel(const float* input,
+                                               const float* scale,
+                                               std::size_t count,
+                                               __nv_bfloat16* output) {
+  quartz_pdl_sync();
+  const float inverse = cooperative_rms_inverse_fp32<UseRsqrt>(input, count);
+  for (std::size_t index = threadIdx.x; index < count; index += blockDim.x) {
+    output[index] = rms_norm_store_bf16(input[index], inverse, scale[index]);
+  }
+  quartz_pdl_lc();
+}
+
+template <bool UseRsqrt>
+__global__ void rms_norm_rows_fp32_to_bf16_parallel(
+    const float* input, const float* scale, std::size_t width,
+    __nv_bfloat16* output) {
+  quartz_pdl_sync();
+  const std::size_t row = blockIdx.x;
+  const float* row_input = input + row * width;
+  __nv_bfloat16* row_output = output + row * width;
+  const float inverse =
+      cooperative_rms_inverse_fp32<UseRsqrt>(row_input, width);
+  for (std::size_t index = threadIdx.x; index < width; index += blockDim.x) {
+    row_output[index] =
+        rms_norm_store_bf16(row_input[index], inverse, scale[index]);
+  }
+  quartz_pdl_lc();
+}
+
 __global__ void residual_add_fp32(const float* residual,
                                   const float* correction,
                                   std::size_t count, float* output) {
@@ -425,6 +456,35 @@ __global__ void gdn_gated_output_rows(
     const std::size_t tiled_head = replica * key_heads + key;
     const std::size_t tiled_base =
         (row * heads + tiled_head) * head_width;
+    const float gate = gate_tiled[tiled_base + lane];
+    const float silu = gate / (1.0F + expf(-gate));
+    const float value = __fmul_rn(
+        __fmul_rn(recurrent[grouped_base + lane], inverse), norm[lane]);
+    output_tiled[tiled_base + lane] =
+        __float2bfloat16_rn(__fmul_rn(value, silu));
+  }
+  quartz_pdl_lc();
+}
+
+template <bool UseRsqrt>
+__global__ void gdn_gated_output_rows_parallel(
+    const float* recurrent, const float* gate_tiled, const float* norm,
+    std::size_t key_heads, std::size_t replicas, std::size_t head_width,
+    __nv_bfloat16* output_tiled) {
+  quartz_pdl_sync();
+  const std::size_t row = blockIdx.y;
+  const std::size_t grouped_head = blockIdx.x;
+  const std::size_t heads = key_heads * replicas;
+  const std::size_t grouped_base =
+      (row * heads + grouped_head) * head_width;
+  const float inverse = cooperative_rms_inverse_fp32<UseRsqrt>(
+      recurrent + grouped_base, head_width);
+  const std::size_t key = grouped_head / replicas;
+  const std::size_t replica = grouped_head % replicas;
+  const std::size_t tiled_head = replica * key_heads + key;
+  const std::size_t tiled_base = (row * heads + tiled_head) * head_width;
+  for (std::size_t lane = threadIdx.x; lane < head_width;
+       lane += blockDim.x) {
     const float gate = gate_tiled[tiled_base + lane];
     const float silu = gate / (1.0F + expf(-gate));
     const float value = __fmul_rn(
@@ -510,6 +570,41 @@ __global__ void residual_add_norm_rows_fp32_to_bf16(
   }
 }
 
+template <bool UseRsqrt>
+__global__ void residual_add_norm_fp32_to_bf16_parallel(
+    const float* residual, const float* correction, const float* scale,
+    std::size_t count, float* output, __nv_bfloat16* normalized) {
+  for (std::size_t index = threadIdx.x; index < count; index += blockDim.x) {
+    output[index] = __fadd_rn(residual[index], correction[index]);
+  }
+  __syncthreads();
+  const float inverse = cooperative_rms_inverse_fp32<UseRsqrt>(output, count);
+  for (std::size_t index = threadIdx.x; index < count; index += blockDim.x) {
+    normalized[index] =
+        rms_norm_store_bf16(output[index], inverse, scale[index]);
+  }
+}
+
+template <bool UseRsqrt>
+__global__ void residual_add_norm_rows_fp32_to_bf16_parallel(
+    const float* residual, const float* correction, const float* scale,
+    std::size_t width, float* output, __nv_bfloat16* normalized) {
+  const std::size_t row = blockIdx.x;
+  const float* row_residual = residual + row * width;
+  const float* row_correction = correction + row * width;
+  float* row_output = output + row * width;
+  __nv_bfloat16* row_normalized = normalized + row * width;
+  for (std::size_t index = threadIdx.x; index < width; index += blockDim.x) {
+    row_output[index] = __fadd_rn(row_residual[index], row_correction[index]);
+  }
+  __syncthreads();
+  const float inverse = cooperative_rms_inverse_fp32<UseRsqrt>(row_output, width);
+  for (std::size_t index = threadIdx.x; index < width; index += blockDim.x) {
+    row_normalized[index] =
+        rms_norm_store_bf16(row_output[index], inverse, scale[index]);
+  }
+}
+
 __global__ void compare_bytes(const std::uint8_t* left,
                               const std::uint8_t* right,
                               std::size_t count,
@@ -527,6 +622,127 @@ Status cuda_status(cudaError_t error, const char* message) noexcept {
   return error == cudaSuccess
              ? Status::ok()
              : Status{StatusCode::kInternal, message};
+}
+
+int rms_norm_block_threads() noexcept {
+  const int threads = effective_rms_norm_threads();
+  return legal_rms_norm_threads(threads) ? threads : kThreads;
+}
+
+int gdn_norm_block_threads() noexcept {
+  const int threads = effective_gdn_norm_threads();
+  return legal_rms_norm_threads(threads) ? threads : kThreads;
+}
+
+cudaError_t launch_rms_norm_fp32_dispatch(const float* input, const float* scale,
+                                          std::size_t count,
+                                          __nv_bfloat16* output,
+                                          cudaStream_t stream) noexcept {
+  if (rms_norm_uses_serial()) {
+    rms_norm_fp32_to_bf16<<<1, kThreads, 0, stream>>>(input, scale, count,
+                                                      output);
+    return cudaPeekAtLastError();
+  }
+  const dim3 block(static_cast<unsigned int>(rms_norm_block_threads()));
+  if (rms_norm_uses_rsqrt()) {
+    if (block.x == 128) {
+      return quartz_launch_kernel(rms_norm_fp32_to_bf16_parallel<true>, dim3(1),
+                                  block, 0, stream, input, scale, count,
+                                  output);
+    }
+    return quartz_launch_kernel(rms_norm_fp32_to_bf16_parallel<true>, dim3(1),
+                                block, 0, stream, input, scale, count, output);
+  }
+  if (block.x == 128) {
+    return quartz_launch_kernel(rms_norm_fp32_to_bf16_parallel<false>, dim3(1),
+                                block, 0, stream, input, scale, count, output);
+  }
+  return quartz_launch_kernel(rms_norm_fp32_to_bf16_parallel<false>, dim3(1),
+                              block, 0, stream, input, scale, count, output);
+}
+
+cudaError_t launch_rms_norm_rows_dispatch(const float* input, const float* scale,
+                                          std::size_t width,
+                                          std::size_t token_count,
+                                          __nv_bfloat16* output,
+                                          cudaStream_t stream) noexcept {
+  const dim3 grid(static_cast<unsigned int>(token_count));
+  if (rms_norm_uses_serial()) {
+    return quartz_launch_kernel(rms_norm_rows_fp32_to_bf16, grid, dim3(kThreads),
+                                0, stream, input, scale, width, output);
+  }
+  const dim3 block(static_cast<unsigned int>(rms_norm_block_threads()));
+  if (rms_norm_uses_rsqrt()) {
+    return quartz_launch_kernel(rms_norm_rows_fp32_to_bf16_parallel<true>, grid,
+                                block, 0, stream, input, scale, width, output);
+  }
+  return quartz_launch_kernel(rms_norm_rows_fp32_to_bf16_parallel<false>, grid,
+                              block, 0, stream, input, scale, width, output);
+}
+
+cudaError_t launch_residual_add_norm_fp32_dispatch(
+    const float* residual, const float* correction, const float* scale,
+    std::size_t count, float* output, __nv_bfloat16* normalized,
+    cudaStream_t stream) noexcept {
+  if (rms_norm_uses_serial()) {
+    residual_add_norm_fp32_to_bf16<<<1, kThreads, 0, stream>>>(
+        residual, correction, scale, count, output, normalized);
+    return cudaPeekAtLastError();
+  }
+  const dim3 block(static_cast<unsigned int>(rms_norm_block_threads()));
+  if (rms_norm_uses_rsqrt()) {
+    return quartz_launch_kernel(residual_add_norm_fp32_to_bf16_parallel<true>,
+                                dim3(1), block, 0, stream, residual, correction,
+                                scale, count, output, normalized);
+  }
+  return quartz_launch_kernel(residual_add_norm_fp32_to_bf16_parallel<false>,
+                              dim3(1), block, 0, stream, residual, correction,
+                              scale, count, output, normalized);
+}
+
+cudaError_t launch_residual_add_norm_rows_dispatch(
+    const float* residual, const float* correction, const float* scale,
+    std::size_t width, std::size_t token_count, float* output,
+    __nv_bfloat16* normalized, cudaStream_t stream) noexcept {
+  const dim3 grid(static_cast<unsigned int>(token_count));
+  if (rms_norm_uses_serial()) {
+    residual_add_norm_rows_fp32_to_bf16<<<static_cast<unsigned int>(token_count),
+                                          kThreads, 0, stream>>>(
+        residual, correction, scale, width, output, normalized);
+    return cudaPeekAtLastError();
+  }
+  const dim3 block(static_cast<unsigned int>(rms_norm_block_threads()));
+  if (rms_norm_uses_rsqrt()) {
+    return quartz_launch_kernel(
+        residual_add_norm_rows_fp32_to_bf16_parallel<true>, grid, block, 0,
+        stream, residual, correction, scale, width, output, normalized);
+  }
+  return quartz_launch_kernel(
+      residual_add_norm_rows_fp32_to_bf16_parallel<false>, grid, block, 0,
+      stream, residual, correction, scale, width, output, normalized);
+}
+
+cudaError_t launch_gdn_gated_output_rows_dispatch(
+    const float* recurrent, const float* gate_tiled, const float* norm,
+    std::size_t key_heads, std::size_t replicas, std::size_t head_width,
+    std::size_t token_count, __nv_bfloat16* output_tiled,
+    cudaStream_t stream) noexcept {
+  const dim3 grid(static_cast<unsigned int>(key_heads * replicas),
+                  static_cast<unsigned int>(token_count));
+  if (rms_norm_uses_serial()) {
+    return quartz_launch_kernel(gdn_gated_output_rows, grid, dim3(kThreads), 0,
+                                stream, recurrent, gate_tiled, norm, key_heads,
+                                replicas, head_width, output_tiled);
+  }
+  const dim3 block(static_cast<unsigned int>(gdn_norm_block_threads()));
+  if (rms_norm_uses_rsqrt()) {
+    return quartz_launch_kernel(gdn_gated_output_rows_parallel<true>, grid,
+                                block, 0, stream, recurrent, gate_tiled, norm,
+                                key_heads, replicas, head_width, output_tiled);
+  }
+  return quartz_launch_kernel(gdn_gated_output_rows_parallel<false>, grid, block,
+                              0, stream, recurrent, gate_tiled, norm,
+                              key_heads, replicas, head_width, output_tiled);
 }
 
 constexpr float kPrefillAbsTolMs = 0.05F;
@@ -909,10 +1125,16 @@ cudaError_t execute_ffn(const DeviceCommonLayer& layer,
       leaves, leaf_timings == nullptr ? nullptr : &leaf_timings->ffn_norm,
       stream);
   if (error == cudaSuccess) {
-    rms_norm_fp32_to_bf16<<<1, kThreads, 0, stream>>>(
-        residual, layer.ffn_norm, internal::kResidualWidth,
-        workspace->normalized_);
-    error = cudaPeekAtLastError();
+    if (rms_norm_uses_serial()) {
+      rms_norm_fp32_to_bf16<<<1, kThreads, 0, stream>>>(
+          residual, layer.ffn_norm, internal::kResidualWidth,
+          workspace->normalized_);
+      error = cudaPeekAtLastError();
+    } else {
+      error = launch_rms_norm_fp32_dispatch(
+          residual, layer.ffn_norm, internal::kResidualWidth,
+          workspace->normalized_, stream);
+    }
   }
   if (error == cudaSuccess) error = end_phase(leaves);
   if (error == cudaSuccess && capture != nullptr) {
@@ -972,14 +1194,21 @@ cudaError_t execute_ffn(const DeviceCommonLayer& layer,
   if (error == cudaSuccess) {
     if (pointwise_path == PointwisePath::kFused &&
         next_input_norm != nullptr) {
-      residual_add_norm_fp32_to_bf16<<<1, kThreads, 0, stream>>>(
-          residual, workspace->mixer_output_, next_input_norm,
-          internal::kResidualWidth, output, workspace->normalized_);
+      if (rms_norm_uses_serial()) {
+        residual_add_norm_fp32_to_bf16<<<1, kThreads, 0, stream>>>(
+            residual, workspace->mixer_output_, next_input_norm,
+            internal::kResidualWidth, output, workspace->normalized_);
+        error = cudaPeekAtLastError();
+      } else {
+        error = launch_residual_add_norm_fp32_dispatch(
+            residual, workspace->mixer_output_, next_input_norm,
+            internal::kResidualWidth, output, workspace->normalized_, stream);
+      }
     } else {
       residual_add_fp32<<<20, kThreads, 0, stream>>>(
           residual, workspace->mixer_output_, internal::kResidualWidth, output);
+      error = cudaPeekAtLastError();
     }
-    error = cudaPeekAtLastError();
   }
   if (error == cudaSuccess) error = end_phase(leaves);
   return error;
@@ -1126,10 +1355,8 @@ cudaError_t launch_rms_norm_rows_fp32_to_bf16(const float* input,
       token_count == 0) {
     return cudaErrorInvalidValue;
   }
-  return quartz_launch_kernel(rms_norm_rows_fp32_to_bf16,
-                              dim3(static_cast<unsigned int>(token_count)),
-                              dim3(kThreads), 0, stream, input, scale, width,
-                              output);
+  return launch_rms_norm_rows_dispatch(input, scale, width, token_count, output,
+                                       stream);
 }
 
 cudaError_t launch_residual_add_norm_rows_fp32_to_bf16(
@@ -1141,10 +1368,60 @@ cudaError_t launch_residual_add_norm_rows_fp32_to_bf16(
       token_count == 0) {
     return cudaErrorInvalidValue;
   }
-  residual_add_norm_rows_fp32_to_bf16<<<static_cast<unsigned int>(token_count),
-                                        kThreads, 0, stream>>>(
-      residual, correction, scale, width, output, normalized);
-  return cudaPeekAtLastError();
+  return launch_residual_add_norm_rows_dispatch(
+      residual, correction, scale, width, token_count, output, normalized,
+      stream);
+}
+
+cudaError_t launch_rms_norm_fp32_to_bf16(const float* input, const float* scale,
+                                         std::size_t count,
+                                         __nv_bfloat16* output,
+                                         cudaStream_t stream) noexcept {
+  if (input == nullptr || scale == nullptr || output == nullptr || count == 0) {
+    return cudaErrorInvalidValue;
+  }
+  return launch_rms_norm_fp32_dispatch(input, scale, count, output, stream);
+}
+
+cudaError_t launch_residual_add_norm_fp32_to_bf16(
+    const float* residual, const float* correction, const float* scale,
+    std::size_t count, float* output, __nv_bfloat16* normalized,
+    cudaStream_t stream) noexcept {
+  if (residual == nullptr || correction == nullptr || scale == nullptr ||
+      output == nullptr || normalized == nullptr || count == 0) {
+    return cudaErrorInvalidValue;
+  }
+  return launch_residual_add_norm_fp32_dispatch(
+      residual, correction, scale, count, output, normalized, stream);
+}
+
+int rms_norm_parallel_occupancy(int threads) noexcept {
+  int occupancy = 0;
+  if (threads == 128) {
+    cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+        &occupancy, rms_norm_rows_fp32_to_bf16_parallel<false>, 128, 0);
+  } else {
+    cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+        &occupancy, rms_norm_rows_fp32_to_bf16_parallel<false>, 256, 0);
+  }
+  return occupancy;
+}
+
+cudaError_t rms_norm_kernel_attributes(const char* path, int threads,
+                                       cudaFuncAttributes* attributes) noexcept {
+  if (attributes == nullptr || !legal_rms_norm_path(path) ||
+      !legal_rms_norm_threads(threads)) {
+    return cudaErrorInvalidValue;
+  }
+  if (rms_norm_path_is_serial(path)) {
+    return cudaFuncGetAttributes(attributes, rms_norm_rows_fp32_to_bf16);
+  }
+  if (rms_norm_path_is_rsqrt(path)) {
+    return cudaFuncGetAttributes(attributes,
+                                 rms_norm_rows_fp32_to_bf16_parallel<true>);
+  }
+  return cudaFuncGetAttributes(attributes,
+                               rms_norm_rows_fp32_to_bf16_parallel<false>);
 }
 
 ResidentModel::ResidentModel() noexcept = default;
@@ -2100,10 +2377,9 @@ Status execute_token(const ResidentModel& model, std::size_t token,
                                         : &leaf_timings->input_norm);
       }
       if (error == cudaSuccess) {
-        rms_norm_fp32_to_bf16<<<1, kThreads>>>(
+        error = launch_rms_norm_fp32_dispatch(
             residual, layer.common.input_norm, internal::kResidualWidth,
-            workspace->normalized_);
-        error = cudaPeekAtLastError();
+            workspace->normalized_, nullptr);
       }
       if (error == cudaSuccess) error = end_phase(leaves);
       if (exclusive && error == cudaSuccess) error = end_phase(categories);
@@ -2455,10 +2731,9 @@ Status execute_token(const ResidentModel& model, std::size_t token,
                                     : &leaf_timings->logits_norm);
   }
   if (error == cudaSuccess && !interrupted) {
-    rms_norm_fp32_to_bf16<<<1, kThreads>>>(
+    error = launch_rms_norm_fp32_dispatch(
         residual, model.output_norm_, internal::kResidualWidth,
-        workspace->normalized_);
-    error = cudaPeekAtLastError();
+        workspace->normalized_, nullptr);
   }
   if (error == cudaSuccess && !interrupted) error = end_phase(leaves);
   if (error == cudaSuccess && !interrupted && capture != nullptr) {
@@ -3020,14 +3295,12 @@ Status execute_prompt_chunk(
           }
         }
         if (error == cudaSuccess && !used_fused_gate) {
-          const dim3 grid(static_cast<unsigned int>(internal::kGdnGateCount),
-                          static_cast<unsigned int>(token_count));
-          error = quartz_launch_kernel(
-              gdn_gated_output_rows, grid, dim3(kThreads), 0, stream,
+          error = launch_gdn_gated_output_rows_dispatch(
               workspace->prompt_gdn_recurrent_output_,
               workspace->prompt_projection_b_, layer.gdn.norm,
               static_cast<std::size_t>(16), static_cast<std::size_t>(3),
-              static_cast<std::size_t>(128), workspace->prompt_projected_bf16_);
+              static_cast<std::size_t>(128), token_count,
+              workspace->prompt_projected_bf16_, stream);
         }
       } else {
         if (error == cudaSuccess) {
@@ -3268,9 +3541,9 @@ Status execute_prompt_chunk(
                         stream);
   }
   if (error == cudaSuccess) {
-    error = quartz_launch_kernel(
-        rms_norm_fp32_to_bf16, dim3(1), dim3(kThreads), 0, stream, final_hidden,
-        model.output_norm_, internal::kResidualWidth, workspace->normalized_);
+    error = launch_rms_norm_fp32_dispatch(
+        final_hidden, model.output_norm_, internal::kResidualWidth,
+        workspace->normalized_, stream);
     if (error == cudaSuccess) {
       bump(counters, &PromptPipelineCounters::rms_norm_kernel_launches);
     }

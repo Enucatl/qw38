@@ -1,5 +1,6 @@
 #include "scheduler_primitives.h"
 #include "pdl_launch.cuh"
+#include "rms_norm.cuh"
 
 #include <cmath>
 
@@ -27,6 +28,16 @@ __global__ void rms_norm(const __nv_bfloat16* input, const float* scale,
     output[index] = __float2bfloat16_rn(
         __fmul_rn(__fmul_rn(__bfloat162float(input[index]), inverse),
                    scale[index]));
+  }
+}
+
+template <bool UseRsqrt>
+__global__ void rms_norm_parallel(const __nv_bfloat16* input, const float* scale,
+                                  std::size_t count, __nv_bfloat16* output) {
+  const float inverse = cooperative_rms_inverse_bf16<UseRsqrt>(input, count);
+  for (std::size_t index = threadIdx.x; index < count; index += blockDim.x) {
+    output[index] = rms_norm_store_bf16(__bfloat162float(input[index]), inverse,
+                                        scale[index]);
   }
 }
 
@@ -124,6 +135,31 @@ __global__ void gated_output(const float* recurrent, const float* gate_tiled,
   }
 }
 
+template <bool UseRsqrt>
+__global__ void gated_output_parallel(const float* recurrent,
+                                      const float* gate_tiled,
+                                      const float* norm, std::size_t key_heads,
+                                      std::size_t replicas,
+                                      std::size_t head_width,
+                                      __nv_bfloat16* output_tiled) {
+  const std::size_t grouped_head = blockIdx.x;
+  const std::size_t grouped_base = grouped_head * head_width;
+  const float inverse = cooperative_rms_inverse_fp32<UseRsqrt>(
+      recurrent + grouped_base, head_width);
+  const std::size_t key = grouped_head / replicas;
+  const std::size_t replica = grouped_head % replicas;
+  const std::size_t tiled_head = replica * key_heads + key;
+  for (std::size_t lane = threadIdx.x; lane < head_width;
+       lane += blockDim.x) {
+    const float gate = gate_tiled[tiled_head * head_width + lane];
+    const float silu = gate / (1.0F + expf(-gate));
+    const float value = __fmul_rn(
+        __fmul_rn(recurrent[grouped_base + lane], inverse), norm[lane]);
+    output_tiled[tiled_head * head_width + lane] =
+        __float2bfloat16_rn(__fmul_rn(value, silu));
+  }
+}
+
 unsigned int blocks_for(std::size_t count) {
   return static_cast<unsigned int>((count + kThreads - 1) / kThreads);
 }
@@ -136,8 +172,20 @@ cudaError_t launch_rms_norm_bf16(const __nv_bfloat16* input,
                                  cudaStream_t stream) noexcept {
   if (input == nullptr || scale == nullptr || output == nullptr || count == 0 ||
       count > kMaximumNormWidth) return cudaErrorInvalidValue;
-  rms_norm<<<1, kThreads, 0, stream>>>(input, scale, count, output);
-  return cudaPeekAtLastError();
+  if (rms_norm_uses_serial()) {
+    rms_norm<<<1, kThreads, 0, stream>>>(input, scale, count, output);
+    return cudaPeekAtLastError();
+  }
+  const dim3 block(static_cast<unsigned int>(
+      legal_rms_norm_threads(effective_rms_norm_threads())
+          ? effective_rms_norm_threads()
+          : kThreads));
+  if (rms_norm_uses_rsqrt()) {
+    return quartz_launch_kernel(rms_norm_parallel<true>, dim3(1), block, 0,
+                                stream, input, scale, count, output);
+  }
+  return quartz_launch_kernel(rms_norm_parallel<false>, dim3(1), block, 0,
+                              stream, input, scale, count, output);
 }
 
 cudaError_t launch_fp32_to_bf16(const float* input, std::size_t count,
@@ -206,10 +254,26 @@ cudaError_t launch_gdn_gated_output(
       norm_scale == nullptr || output_tiled == nullptr || heads == 0 ||
       head_width == 0 || head_width > kThreads)
     return cudaErrorInvalidValue;
-  gated_output<<<static_cast<unsigned int>(heads), kThreads, 0, stream>>>(
-      recurrent_grouped, gate_tiled, norm_scale, key_heads, replicas,
-      head_width, output_tiled);
-  return cudaPeekAtLastError();
+  if (rms_norm_uses_serial()) {
+    gated_output<<<static_cast<unsigned int>(heads), kThreads, 0, stream>>>(
+        recurrent_grouped, gate_tiled, norm_scale, key_heads, replicas,
+        head_width, output_tiled);
+    return cudaPeekAtLastError();
+  }
+  const int threads = legal_rms_norm_threads(effective_gdn_norm_threads())
+                          ? effective_gdn_norm_threads()
+                          : kThreads;
+  const dim3 grid(static_cast<unsigned int>(heads));
+  const dim3 block(static_cast<unsigned int>(threads));
+  if (rms_norm_uses_rsqrt()) {
+    return quartz_launch_kernel(gated_output_parallel<true>, grid, block, 0,
+                                stream, recurrent_grouped, gate_tiled,
+                                norm_scale, key_heads, replicas, head_width,
+                                output_tiled);
+  }
+  return quartz_launch_kernel(gated_output_parallel<false>, grid, block, 0,
+                              stream, recurrent_grouped, gate_tiled, norm_scale,
+                              key_heads, replicas, head_width, output_tiled);
 }
 
 }  // namespace qw38::cuda

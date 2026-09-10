@@ -221,6 +221,8 @@ def _common(image: str) -> list[str]:
         "all",
         "--user",
         f"{os.getuid()}:{os.getgid()}",
+        "-e",
+        "QW38_CUDA_TEST_TIER=acceptance",
         "-v",
         f"{ROOT}:/workspace",
         "-w",

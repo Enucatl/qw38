@@ -2,13 +2,13 @@ from __future__ import annotations
 
 import json
 import os
-import subprocess
 from pathlib import Path
 
 import pytest
 
+from cuda_test_support import cuda_test_tier, run_cuda_suite
+
 ROOT = Path(__file__).resolve().parents[1]
-IMAGE = "qw38-cuda:13.0.2"
 
 
 def test_scheduler_primitives_contract_fixture_and_handbook_are_connected() -> None:
@@ -49,40 +49,10 @@ def test_scheduler_primitives_contract_fixture_and_handbook_are_connected() -> N
 def test_scheduler_primitives_match_device_references() -> None:
     if os.environ.get("QW38_RUN_CUDA_TESTS") != "1":
         pytest.skip("set QW38_RUN_CUDA_TESTS=1 for the exclusive RTX 5090 gate")
-    common = [
-        "docker",
-        "run",
-        "--rm",
-        "--gpus",
-        "all",
-        "--user",
-        f"{os.getuid()}:{os.getgid()}",
-        "-v",
-        f"{ROOT}:/workspace",
-        IMAGE,
-    ]
-    build = subprocess.run(
-        [
-            *common,
-            "make",
-            "build/qw38-cuda-quant-test",
-            "build/qw38-cuda-scheduler-primitives-test",
-        ],
-        check=False,
-        capture_output=True,
-        text=True,
-    )
-    assert build.returncode == 0, build.stdout + build.stderr
-    quant = subprocess.run(
-        [*common, "./build/qw38-cuda-quant-test"],
-        check=False,
-        capture_output=True,
-        text=True,
-    )
-    assert quant.returncode == 0, quant.stdout + quant.stderr
-    q8_mmv = [
-        line for line in quant.stdout.splitlines() if line.startswith("case=q8_0_")
-    ]
+    tier = cuda_test_tier()
+    outputs = run_cuda_suite(tier)
+    quant = outputs["quant"]
+    q8_mmv = [line for line in quant.splitlines() if line.startswith("case=q8_0_")]
     assert [line.split()[0] for line in q8_mmv] == [
         "case=q8_0_17x256",
         "case=q8_0_257x512",
@@ -95,7 +65,7 @@ def test_scheduler_primitives_match_device_references() -> None:
         assert float(fields["rms"]) <= 2.0e-4
         assert float(fields["mean_ms"]) > 0.0
     q8_mmq = next(
-        line for line in quant.stdout.splitlines() if line.startswith("mmq_case=q8_0_")
+        line for line in quant.splitlines() if line.startswith("mmq_case=q8_0_")
     )
     q8_mmq_fields = dict(field.split("=", 1) for field in q8_mmq.split())
     assert q8_mmq_fields["q8_equal"] == "true"
@@ -103,14 +73,8 @@ def test_scheduler_primitives_match_device_references() -> None:
     assert float(q8_mmq_fields["max_abs"]) <= 5.0e-4
     assert float(q8_mmq_fields["rms"]) <= 2.5e-4
 
-    run = subprocess.run(
-        [*common, "./build/qw38-cuda-scheduler-primitives-test"],
-        check=False,
-        capture_output=True,
-        text=True,
-    )
-    assert run.returncode == 0, run.stdout + run.stderr
-    lines = run.stdout.splitlines()
+    run = outputs["scheduler"]
+    lines = run.splitlines()
     pointwise = dict(
         field.split("=", 1)
         for field in next(
@@ -135,4 +99,5 @@ def test_scheduler_primitives_match_device_references() -> None:
     assert "scheduler_gdn=tiled_to_grouped exact=true" in lines
     assert any(line.startswith("production_numerics_path=strict") for line in lines)
     assert any("optimized_admitted=false" in line for line in lines)
+    assert f"test_tier={tier}" in lines
     assert "status=passed" in lines

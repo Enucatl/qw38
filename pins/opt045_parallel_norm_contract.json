@@ -1,0 +1,90 @@
+{
+  "schema_version": 1,
+  "task": "OPT-045",
+  "yardstick": "cooperative_parallel_rmsnorm",
+  "opt041_quartz_p_mean_tok_s": 2076.98315,
+  "opt041_quartz_d128_mean_tok_s": 26.1599541,
+  "opt041_quartz_d2048_mean_tok_s": 25.2924843,
+  "opt041_quartz_d128_token_latency_p95_ms": 38.3730087,
+  "opt041_quartz_d128_run_mean_token_latency_p95_ms": 38.2578201,
+  "opt041_quartz_d2048_token_latency_p95_ms": 39.6526222,
+  "opt041_quartz_d2048_run_mean_token_latency_p95_ms": 39.5695038,
+  "llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+  "gguf_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+  "device_substring": "RTX 5090",
+  "selected_rms_norm_path": "parallel_fma",
+  "selected_rms_norm_threads": 256,
+  "selected_gdn_norm_threads": 32,
+  "ab": {
+    "candidates": [
+      "serial",
+      "parallel_fma_t128",
+      "parallel_fma_t256",
+      "parallel_rsqrt_t128",
+      "parallel_rsqrt_t256"
+    ],
+    "warmups": 3,
+    "measured_runs": 30,
+    "prompt_rows": 4096,
+    "residual_width": 5120,
+    "gdn_head_width": 128,
+    "geometries_tested": [
+      128,
+      256
+    ],
+    "gdn_geometries_tested": [
+      32,
+      128,
+      256
+    ],
+    "second_ab": "sqrt_div_vs_rsqrt",
+    "ties_retain": "serial"
+  },
+  "opt044": {
+    "formula": "max(strict_reference_ceiling, 1.05 * measured_llama_error + 1e-6)",
+    "cosine_floor": 1e-07,
+    "nonfinite": 0,
+    "residual_fp32_exact": true,
+    "cross_path_exact_bits_required": false
+  },
+  "owns_opt016_parity_gate": false,
+  "substitutes_for_opt016": false,
+  "llama_bench_decode_is_informational": true,
+  "required_fixture_keys": [
+    "schema_version",
+    "task",
+    "status",
+    "measurement_utc",
+    "device",
+    "compute_capability",
+    "llama_revision",
+    "gguf_sha256",
+    "reverted",
+    "selected_rms_norm_path",
+    "selected_rms_norm_threads",
+    "selected_gdn_norm_threads",
+    "ab",
+    "production_numerics",
+    "keep_sitting_skipped",
+    "p",
+    "d128",
+    "d2048",
+    "owns_opt016_parity_gate",
+    "substitutes_for_opt016",
+    "nsight_systems",
+    "nsight_compute",
+    "proof_limit",
+    "report_path"
+  ],
+  "proof_limit": [
+    "OPT-044 production-numerics budgets",
+    "serial strict reference retained",
+    "cooperative fmaf reduction",
+    "sqrt/div vs rsqrt A/B",
+    "lower complete component time",
+    "95% throughput floors",
+    "105% p95 ceilings",
+    "does not substitute for the 2K llama.cpp parity gate"
+  ],
+  "report_path": "evidence/optimization/opt045-parallel-norm/REPORT.md"
+}

@@ -111,7 +111,7 @@ are repository-relative unless stated otherwise.
 | OPT-042 | Study integer decode MMV admissibility | OPT-038, OPT-034 | done | Retain paired FP32-packed versus Q4_K integer-dot diagnostic timings and complete numeric results using unchanged FP32-scale Q8 staging on synthetic and real FFN inputs, report fixed CUD-001 envelope eligibility and a promotion/rejection recommendation without changing production dispatch or keep denominators; `claims_performance_improvement: false` | [`tasks/OPT-042.md`](tasks/OPT-042.md); [`pins/opt042_mmv_integer_study_contract.json`](pins/opt042_mmv_integer_study_contract.json); [`fixtures/opt042_mmv_integer_study.json`](fixtures/opt042_mmv_integer_study.json); [`cuda/opt042_mmv_integer_study.cu`](cuda/opt042_mmv_integer_study.cu); [`tests/test_opt042_mmv_integer_study.py`](tests/test_opt042_mmv_integer_study.py); [`evidence/optimization/opt042-mmv-integer-study/REPORT.md`](evidence/optimization/opt042-mmv-integer-study/REPORT.md); verification 2026-09-10T12:09:20Z |
 | OPT-043 | Measure post-042 kernel gaps against pinned llama.cpp | OPT-041, OPT-042 | done | Fresh unperturbed P/D controls, exclusive leaf accounting, actual layer captures, matched complete components and dispatch evidence cover every major family; no production change; `claims_performance_improvement: false`; accepted keep denominators remain historical | [`tasks/OPT-043.md`](tasks/OPT-043.md); [`pins/opt043_component_gap_contract.json`](pins/opt043_component_gap_contract.json); [`fixtures/opt043_component_gap.json`](fixtures/opt043_component_gap.json); [`cuda/opt043_prefill_attribution_test.cu`](cuda/opt043_prefill_attribution_test.cu); [`cuda/opt043_decode_attribution_test.cu`](cuda/opt043_decode_attribution_test.cu); [`cuda/opt043_activation_capture_test.cu`](cuda/opt043_activation_capture_test.cu); [`tests/test_opt043_component_gap.py`](tests/test_opt043_component_gap.py); [`evidence/optimization/opt043-component-gap/REPORT.md`](evidence/optimization/opt043-component-gap/REPORT.md); verification 2026-09-10T14:23:30Z |
 | OPT-044 | Admit documented production arithmetic and quality budgets | OPT-043 | done | Freeze independent llama-calibrated primitive budgets and held-out model-quality gates before tuning; retain strict reference contracts and exact structural/session invariants; document user-authorized accuracy compromises; production selector remains strict; `claims_performance_improvement: false` | [`tasks/OPT-044.md`](tasks/OPT-044.md); [`pins/production_numerics_contract.json`](pins/production_numerics_contract.json); [`fixtures/opt044_production_numerics.json`](fixtures/opt044_production_numerics.json); [`tests/test_production_numerics.py`](tests/test_production_numerics.py); [`evidence/optimization/opt044-production-numerics/REPORT.md`](evidence/optimization/opt044-production-numerics/REPORT.md); verification 2026-09-10T16:25:35Z |
-| OPT-045 | Parallelize RMSNorm and admitted fused arithmetic | OPT-044 | pending | Cooperative residual/head normalization removes serial reductions with production quality, complete component and end-to-end wins, or retained measured rejection | [Task](tasks/OPT-045.md) |
+| OPT-045 | Parallelize RMSNorm and admitted fused arithmetic | OPT-044 | done | Cooperative residual/head normalization removes serial reductions with production quality, complete component and end-to-end wins, or retained measured rejection | [`tasks/OPT-045.md`](tasks/OPT-045.md); [`pins/opt045_parallel_norm_contract.json`](pins/opt045_parallel_norm_contract.json); [`fixtures/opt045_parallel_norm.json`](fixtures/opt045_parallel_norm.json); [`cuda/opt045_parallel_norm_ab_test.cu`](cuda/opt045_parallel_norm_ab_test.cu); [`cuda/rms_norm.cuh`](cuda/rms_norm.cuh); [`evidence/optimization/opt045-parallel-norm/REPORT.md`](evidence/optimization/opt045-parallel-norm/REPORT.md); verification 2026-09-10T17:35:00Z |
 | OPT-046 | Implement cooperative packed Q4_K decode dots | OPT-044, OPT-045 | pending | Packed integer dots, cooperative K reduction and admitted staging improve complete real FFN and D2048 under production quality and cross-workload guards, or retained rejection | [Task](tasks/OPT-046.md) |
 | OPT-047 | Accelerate Q8_0 mixer decode projections | OPT-044, OPT-046 | pending | Shared activation staging and role-specific packed dots improve the complete mixer group and D2048; new activation approximation is documented and quality-tested, or retained rejection | [Task](tasks/OPT-047.md) |
 | OPT-048 | Accelerate full Q6_K vocabulary projection | OPT-044, OPT-046 | pending | Full 248320-row logits use admitted packed integer dots with complete output quality and end-to-end decode win, or retained rejection; no vocabulary pruning | [Task](tasks/OPT-048.md) |
@@ -128,8 +128,8 @@ are repository-relative unless stated otherwise.
 
 The [2026-09-10 design](tasks/PERFORMANCE-RECOVERY-2026-09-10.md) compares the
 admitted Quartz, pinned llama.cpp and ds4 paths. It is source analysis and task
-design, not new performance evidence. **Next eligible recovery task: OPT-045**,
-then OPT-046–054 in row
+design, not new performance evidence. **Next eligible recovery task: OPT-046**,
+then OPT-047–054 in row
 order, measured remaining launch work in OPT-055, and the outcome gate OPT-056.
 Dependencies permit independent work but do not authorize subagents. The user
 accepts documented llama.cpp/ds4-like accuracy compromises; strict reference
@@ -5481,3 +5481,42 @@ statements below are historical, not the current execution order.
   plus this ledger/audit bookkeeping. User-authorized `plan.md` note added.
   OPT-016 stays `blocked`. Next eligible pending by ledger row order:
   **OPT-045**.
+
+### 2026-09-10T17:36:03Z — OPT-045 delivered (KEEP)
+
+- Independent verification attempt 1 passed. Production RMSNorm installs
+  cooperative fmaf parallel normalization (`kSelectedRmsNormPath =
+  "parallel_fma"`, residual threads **256**, GDN threads **32**) after
+  five-candidate A/B wins prompt-norm and decode RMS component time under
+  OPT-044 production-numerics budgets with retained serial references.
+  Exclusive RTX 5090 sitting wrote
+  [`fixtures/opt045_parallel_norm.json`](fixtures/opt045_parallel_norm.json)
+  (`measurement_utc` 2026-09-10T16:47:28Z; P Quartz **2076.98315** →
+  **2130.41089** tok/s; D128 **26.1599541** → **28.5522804**; D2048
+  **25.2924843** → **27.5438766**; D128 all-token p95 38.3730087 →
+  35.1905479 and run-mean p95 38.2578201 → 35.0761757; D2048 all-token
+  p95 39.6526222 → 36.4285774 and run-mean p95 39.5695038 → 36.3359795;
+  prompt-norm **0.341054976** → **0.197026104** ms; decode RMS
+  **0.0578549355** → **0.00944320019** ms; A/B winner `parallel_fma_t256`;
+  `reverted` false; `status` measured). Cross-workload guard held. MMV,
+  attention QK, and OPT-040 shared GDN inverse unchanged. Coupled IDs: none.
+  Delivery re-check: `uv run pytest -q tests/test_opt045_parallel_norm.py
+  -k "not exclusive" tests/test_documentation.py`.
+- Acceptance evidence: [`tasks/OPT-045.md`](tasks/OPT-045.md);
+  [`pins/opt045_parallel_norm_contract.json`](pins/opt045_parallel_norm_contract.json);
+  [`fixtures/opt045_parallel_norm.json`](fixtures/opt045_parallel_norm.json);
+  [`cuda/opt045_parallel_norm_ab_test.cu`](cuda/opt045_parallel_norm_ab_test.cu);
+  [`cuda/rms_norm.cuh`](cuda/rms_norm.cuh);
+  [`cuda/full_scheduler.cu`](cuda/full_scheduler.cu);
+  [`cuda/scheduler_primitives.cu`](cuda/scheduler_primitives.cu);
+  [`tests/test_opt045_parallel_norm.py`](tests/test_opt045_parallel_norm.py);
+  [`evidence/optimization/opt045-parallel-norm/REPORT.md`](evidence/optimization/opt045-parallel-norm/REPORT.md);
+  [`docs/65-documentation-audit.md`](docs/65-documentation-audit.md).
+  Proof is cooperative parallel RMSNorm under frozen OPT-044 numerics versus
+  then-current accepted OPT-041 P/D128/D2048 denominators, not the 2K
+  llama.cpp parity gate.
+- Marked OPT-045 `done`; delivery is limited to the verified task scope
+  plus this ledger/audit bookkeeping. `plan.md` is unchanged. OPT-016
+  stays `blocked`. Next eligible pending by ledger row order: **OPT-046**.
+  Tok/s delta P **2076.98** → **2130.41** (+53.4, 1.026×); D128 **26.16**
+  → **28.55**; D2048 **25.29** → **27.54**.

@@ -96,7 +96,11 @@ KernelGraph capture(Fn launch) {
       break;
     }
     ++info.kernel_nodes;
-    if (params.gridDim.x == kWideRows && params.blockDim.x == kThreads) {
+    const unsigned int norm_threads = static_cast<unsigned int>(
+        qw38::cuda::effective_rms_norm_threads());
+    if (params.gridDim.x == kWideRows &&
+        (params.blockDim.x == kThreads || params.blockDim.x == norm_threads ||
+         params.blockDim.x == 128U || params.blockDim.x == 256U)) {
       info.has_rowwise = true;
       info.grid = params.gridDim;
       info.block = params.blockDim;

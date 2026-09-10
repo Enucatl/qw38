@@ -11,6 +11,7 @@
 #include <cuda_fp16.h>
 
 #include "quant.h"
+#include "test_tier.h"
 
 namespace {
 
@@ -347,7 +348,9 @@ int run_case(qw38::cuda::QuantKind kind, const char* name, std::size_t rows,
   }
   if (error != cudaSuccess) return fail_cuda("cudaMemcpy H2D", error);
 
-  for (int warmup = 0; warmup < 3 && error == cudaSuccess; ++warmup) {
+  for (int warmup = 0; warmup < qw38::cuda::test_warmups() &&
+                       error == cudaSuccess;
+       ++warmup) {
     error = qw38::cuda::launch_quant_mmv(kind, device_weights, rows, columns,
                                          device_activation, device_staged,
                                          device_output, nullptr);
@@ -357,7 +360,9 @@ int run_case(qw38::cuda::QuantKind kind, const char* name, std::size_t rows,
   if (error == cudaSuccess) error = cudaEventCreate(&start);
   if (error == cudaSuccess) error = cudaEventCreate(&stop);
   if (error == cudaSuccess) error = cudaEventRecord(start);
-  for (int sample = 0; sample < 30 && error == cudaSuccess; ++sample) {
+  for (int sample = 0; sample < qw38::cuda::test_samples() &&
+                       error == cudaSuccess;
+       ++sample) {
     error = qw38::cuda::launch_quant_mmv(kind, device_weights, rows, columns,
                                          device_activation, device_staged,
                                          device_output, nullptr);
@@ -404,7 +409,8 @@ int run_case(qw38::cuda::QuantKind kind, const char* name, std::size_t rows,
   std::printf("case=%s rows=%zu columns=%zu max_abs=%.9g max_rel=%.9g "
               "rms=%.9g nonfinite=%zu q8_equal=%s mean_ms=%.9g\n",
               name, rows, columns, maximum_absolute, maximum_relative, rms,
-              nonfinite, q8_equal ? "true" : "false", milliseconds / 30.0F);
+              nonfinite, q8_equal ? "true" : "false",
+              milliseconds / qw38::cuda::test_samples());
 
   cudaEventDestroy(start);
   cudaEventDestroy(stop);
@@ -574,7 +580,9 @@ int run_prompt_case(qw38::cuda::QuantKind kind, const char* name,
   }
   if (error != cudaSuccess) return fail_cuda("MMQ cudaMemcpy H2D", error);
 
-  for (int warmup = 0; warmup < 3 && error == cudaSuccess; ++warmup) {
+  for (int warmup = 0; warmup < qw38::cuda::test_warmups() &&
+                       error == cudaSuccess;
+       ++warmup) {
     error = qw38::cuda::launch_quant_mmq_variant(
         kind, device_weights, output_rows, columns, device_prompt, prompt_rows,
         device_staged, device_output,
@@ -585,7 +593,9 @@ int run_prompt_case(qw38::cuda::QuantKind kind, const char* name,
   if (error == cudaSuccess) error = cudaEventCreate(&start);
   if (error == cudaSuccess) error = cudaEventCreate(&stop);
   if (error == cudaSuccess) error = cudaEventRecord(start);
-  for (int sample = 0; sample < 30 && error == cudaSuccess; ++sample) {
+  for (int sample = 0; sample < qw38::cuda::test_samples() &&
+                       error == cudaSuccess;
+       ++sample) {
     error = qw38::cuda::launch_quant_mmq_variant(
         kind, device_weights, output_rows, columns, device_prompt, prompt_rows,
         device_staged, device_output,
@@ -634,7 +644,8 @@ int run_prompt_case(qw38::cuda::QuantKind kind, const char* name,
                 "ref=cpu_dequant_gemm\n",
                 name, prompt_rows, output_rows, columns, maximum_absolute,
                 maximum_relative, rms, association_bad, nonfinite,
-                q8_equal ? "true" : "false", milliseconds / 30.0F);
+                q8_equal ? "true" : "false",
+                milliseconds / qw38::cuda::test_samples());
   } else {
     double squared = 0.0;
     for (std::size_t index = 0; index < actual.size(); ++index) {
@@ -655,7 +666,7 @@ int run_prompt_case(qw38::cuda::QuantKind kind, const char* name,
                 "q8_equal=%s mean_ms=%.9g\n",
                 name, prompt_rows, output_rows, columns, maximum_absolute,
                 maximum_relative, rms, nonfinite, q8_equal ? "true" : "false",
-                milliseconds / 30.0F);
+                milliseconds / qw38::cuda::test_samples());
   }
 
   cudaEventDestroy(start);
@@ -3109,6 +3120,12 @@ int run_q8_quality_suite() {
 }  // namespace
 
 int main() {
+  if (!qw38::cuda::test_tier_valid()) {
+    std::fprintf(stderr,
+                 "QW38_CUDA_TEST_TIER must be set to smoke, correctness, "
+                 "or acceptance\n");
+    return 2;
+  }
   if (qw38::cuda::selected_mmv_warps(48) != 4 ||
       qw38::cuda::selected_mmv_warps(1024) != 8 ||
       qw38::cuda::selected_mmv_warps(5120) != 16 ||
@@ -3199,6 +3216,16 @@ int main() {
                       256, 3) != 0) {
     return 1;
   }
+  if (qw38::cuda::test_tier() == qw38::cuda::TestTier::kSmoke) {
+    std::printf("test_tier=%s\n", qw38::cuda::test_tier_name());
+    std::printf("production_numerics_path=%s optimized_admitted=%s "
+                "strict_reference=retained\n",
+                qw38::cuda::selected_production_numerics_path(),
+                qw38::cuda::production_numerics_optimized_admitted() ? "true"
+                                                                    : "false");
+    std::printf("status=passed\n");
+    return 0;
+  }
   if (qw38::cuda::selected_mma_mmq_prompt_tile() != 128U ||
       qw38::cuda::mma_mmq_shared_bytes(128) == 0 ||
       qw38::cuda::launch_quant_mmq_mma(
@@ -3227,6 +3254,16 @@ int main() {
       run_mma_case(qw38::cuda::QuantKind::kQ6K, "q6_k_mma_64x5120x6144", 5120,
                    6144, 64, 128) != 0) {
     return 1;
+  }
+  if (qw38::cuda::test_tier() == qw38::cuda::TestTier::kCorrectness) {
+    std::printf("test_tier=%s\n", qw38::cuda::test_tier_name());
+    std::printf("production_numerics_path=%s optimized_admitted=%s "
+                "strict_reference=retained\n",
+                qw38::cuda::selected_production_numerics_path(),
+                qw38::cuda::production_numerics_optimized_admitted() ? "true"
+                                                                    : "false");
+    std::printf("status=passed\n");
+    return 0;
   }
   unsigned int winner = 128;
   float best = 1.0e30F;
@@ -3394,6 +3431,7 @@ int main() {
               qw38::cuda::selected_production_numerics_path(),
               qw38::cuda::production_numerics_optimized_admitted() ? "true"
                                                                   : "false");
+  std::printf("test_tier=%s\n", qw38::cuda::test_tier_name());
   std::printf("status=passed\n");
   return 0;
 }

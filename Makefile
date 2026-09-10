@@ -148,13 +148,13 @@ $(BUILD_DIR)/qw38-cuda-attention-test: cuda/attention_decode_test.cu $(BUILD_DIR
 $(BUILD_DIR)/qw38-cuda-attention-chunk-test: cuda/attention_chunk_test.cu $(BUILD_DIR)/attention_decode.cuda.o | $(BUILD_DIR)
 	$(NVCC) $(NVCCFLAGS) -Icuda $^ -o $@
 
-$(BUILD_DIR)/scheduler_primitives.cuda.o: cuda/scheduler_primitives.cu cuda/scheduler_primitives.h cuda/pdl_launch.cuh | $(BUILD_DIR)
+$(BUILD_DIR)/scheduler_primitives.cuda.o: cuda/scheduler_primitives.cu cuda/scheduler_primitives.h cuda/pdl_launch.cuh cuda/rms_norm.cuh | $(BUILD_DIR)
 	$(NVCC) $(NVCCFLAGS) -Icuda -c $< -o $@
 
-$(BUILD_DIR)/full_scheduler.cuda.o: cuda/full_scheduler.cu cuda/full_scheduler.h cuda/pdl_launch.cuh | $(BUILD_DIR)
+$(BUILD_DIR)/full_scheduler.cuda.o: cuda/full_scheduler.cu cuda/full_scheduler.h cuda/pdl_launch.cuh cuda/rms_norm.cuh | $(BUILD_DIR)
 	$(NVCC) $(NVCCFLAGS) $(CPPFLAGS) -Icuda -c $< -o $@
 
-$(BUILD_DIR)/full_scheduler.trace.cuda.o: cuda/full_scheduler.cu cuda/full_scheduler.h cuda/pdl_launch.cuh | $(BUILD_DIR)
+$(BUILD_DIR)/full_scheduler.trace.cuda.o: cuda/full_scheduler.cu cuda/full_scheduler.h cuda/pdl_launch.cuh cuda/rms_norm.cuh | $(BUILD_DIR)
 	$(NVCC) $(NVCCFLAGS) $(CPPFLAGS) -DQW38_DIAGNOSTIC_TRACE -Icuda -c $< -o $@
 
 $(BUILD_DIR)/checkpoint.cuda.o: cuda/checkpoint.cu cuda/full_scheduler.h | $(BUILD_DIR)

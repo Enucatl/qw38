@@ -1,17 +1,17 @@
-ffn_ab id=baseline sample=0 ms=10.8447361 occupancy=1
-ffn_ab id=baseline sample=1 ms=10.8457279 occupancy=1
-ffn_ab id=baseline sample=2 ms=10.8375359 occupancy=1
-ffn_ab_mean id=baseline mean_ms=10.8426666 occupancy=1 nonfinite=0 eligible=true
-ffn_ab id=shared_y sample=0 ms=10.8309441 occupancy=1
-ffn_ab id=shared_y sample=1 ms=10.8243523 occupancy=1
-ffn_ab id=shared_y sample=2 ms=10.7834883 occupancy=1
-ffn_ab_mean id=shared_y mean_ms=10.8129282 occupancy=1 nonfinite=0 eligible=true
-ffn_ab id=swiglu_q8 sample=0 ms=10.6412163 occupancy=1
-ffn_ab id=swiglu_q8 sample=1 ms=10.6107197 occupancy=1
-ffn_ab id=swiglu_q8 sample=2 ms=10.6011839 occupancy=1
-ffn_ab_mean id=swiglu_q8 mean_ms=10.6177063 occupancy=1 nonfinite=0 eligible=true
-ffn_ab id=shared_y_swiglu_q8 sample=0 ms=10.5869436 occupancy=1
-ffn_ab id=shared_y_swiglu_q8 sample=1 ms=10.560544 occupancy=1
-ffn_ab id=shared_y_swiglu_q8 sample=2 ms=10.5743361 occupancy=1
-ffn_ab_mean id=shared_y_swiglu_q8 mean_ms=10.5739412 occupancy=1 nonfinite=0 eligible=true
-ffn_ab_winner id=shared_y_swiglu_q8 mean_ms=10.5739412 baseline_id=baseline baseline_ms=10.8426666 win=true
+ffn_ab id=baseline sample=0 ms=10.9933119 occupancy=1
+ffn_ab id=baseline sample=1 ms=10.9809284 occupancy=1
+ffn_ab id=baseline sample=2 ms=11.0075521 occupancy=1
+ffn_ab_mean id=baseline mean_ms=10.9939308 occupancy=1 nonfinite=0 eligible=true
+ffn_ab id=shared_y sample=0 ms=10.9930563 occupancy=1
+ffn_ab id=shared_y sample=1 ms=10.953536 occupancy=1
+ffn_ab id=shared_y sample=2 ms=10.9565763 occupancy=1
+ffn_ab_mean id=shared_y mean_ms=10.9677229 occupancy=1 nonfinite=0 eligible=true
+ffn_ab id=swiglu_q8 sample=0 ms=10.7858877 occupancy=1
+ffn_ab id=swiglu_q8 sample=1 ms=10.7574081 occupancy=1
+ffn_ab id=swiglu_q8 sample=2 ms=10.7538557 occupancy=1
+ffn_ab_mean id=swiglu_q8 mean_ms=10.7657175 occupancy=1 nonfinite=0 eligible=true
+ffn_ab id=shared_y_swiglu_q8 sample=0 ms=10.7326717 occupancy=1
+ffn_ab id=shared_y_swiglu_q8 sample=1 ms=10.6929922 occupancy=1
+ffn_ab id=shared_y_swiglu_q8 sample=2 ms=10.7076797 occupancy=1
+ffn_ab_mean id=shared_y_swiglu_q8 mean_ms=10.7111139 occupancy=1 nonfinite=0 eligible=true
+ffn_ab_winner id=shared_y_swiglu_q8 mean_ms=10.7111139 baseline_id=baseline baseline_ms=10.9939308 win=true

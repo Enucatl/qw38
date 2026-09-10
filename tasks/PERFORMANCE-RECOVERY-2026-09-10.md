@@ -233,13 +233,19 @@ its individual dossier. No subagents or commits unless the user requests them.
    candidate stays diagnostic or is removed; retain a concise rejection report.
    Update runtime defaults only after acceptance, recapture affected graphs,
    and verify diagnostic selectors match the production selection.
-7. Run task-specific pytest and native CUDA checks listed in the dossier;
-   `QW38_RUN_CUDA_TESTS=1` enables the established hardware tests. Rebuild the
-   relevant objects in `qw38-cuda:13.0.2` with `-w /workspace` before native
-   testing. Run `tests/test_documentation.py` for documentation. If Python code
-   is touched use the Python skill, annotations, uv, and pytest. Broader checks
-   follow the changed interfaces; no hardware throughput claims from skipped
-   tests. Update existing chapters/sources and the task's audit row at delivery.
+7. Run task-specific pytest and native CUDA checks listed in the dossier.
+   For the shared quantization/scheduler gates,
+   `QW38_RUN_CUDA_TESTS=1 QW38_CUDA_TEST_TIER=smoke` is the recommended
+   implementation-loop command, `correctness` is the reduced numerical gate,
+   and `acceptance` is required before recording timing or performance claims.
+   Omitting `QW38_CUDA_TEST_TIER` fails closed with an actionable error.
+   The two gates share their Docker build and binary executions per pytest
+   process. Rebuild the relevant objects in `qw38-cuda:13.0.2` with
+   `-w /workspace` before native testing. Run `tests/test_documentation.py` for
+   documentation. If Python code is touched use the Python skill, annotations,
+   uv, and pytest. Broader checks follow the changed interfaces; no hardware
+   throughput claims from skipped or smoke-only tests. Update existing
+   chapters/sources and the task's audit row at delivery.
 
 Profilers are allowed by `plan.md`. Prior tasks' `nsight:not_used` records are
 historical facts, not a ban on future profiling. Use Nsight Systems for launch

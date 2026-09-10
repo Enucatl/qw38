@@ -15,6 +15,7 @@
 #include "quant_mmv.h"
 #include "gdn_step.h"
 #include "pdl_launch.cuh"
+#include "rms_norm.cuh"
 #ifdef QW38_DIAGNOSTIC_TRACE
 #include "diagnostic_trace.h"
 #endif
@@ -551,6 +552,20 @@ cudaError_t launch_split_attention_rows_prompt(
     const float* packed, std::size_t query_values, std::size_t head_width,
     std::size_t token_count, float* query, float* gate,
     cudaStream_t stream) noexcept;
+
+cudaError_t launch_rms_norm_fp32_to_bf16(const float* input, const float* scale,
+                                         std::size_t count,
+                                         __nv_bfloat16* output,
+                                         cudaStream_t stream) noexcept;
+
+cudaError_t launch_residual_add_norm_fp32_to_bf16(
+    const float* residual, const float* correction, const float* scale,
+    std::size_t count, float* output, __nv_bfloat16* normalized,
+    cudaStream_t stream) noexcept;
+
+int rms_norm_parallel_occupancy(int threads) noexcept;
+cudaError_t rms_norm_kernel_attributes(const char* path, int threads,
+                                       cudaFuncAttributes* attributes) noexcept;
 
 cudaError_t launch_rms_norm_rows_fp32_to_bf16(const float* input,
                                               const float* scale,

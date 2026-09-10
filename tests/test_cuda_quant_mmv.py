@@ -2,13 +2,13 @@ from __future__ import annotations
 
 import json
 import os
-import subprocess
 from pathlib import Path
 
 import pytest
 
+from cuda_test_support import cuda_test_tier, run_cuda_suite
+
 ROOT = Path(__file__).resolve().parents[1]
-IMAGE = "qw38-cuda:13.0.2"
 
 
 def test_cuda_quant_contract_and_handbook_are_connected() -> None:
@@ -63,35 +63,11 @@ def test_cuda_quant_mmv_matches_scalar_reference() -> None:
     if os.environ.get("QW38_RUN_CUDA_TESTS") != "1":
         pytest.skip("set QW38_RUN_CUDA_TESTS=1 for the exclusive RTX 5090 gate")
 
-    common = [
-        "docker",
-        "run",
-        "--rm",
-        "--gpus",
-        "all",
-        "--user",
-        f"{os.getuid()}:{os.getgid()}",
-        "-v",
-        f"{ROOT}:/workspace",
-        IMAGE,
-    ]
-    build = subprocess.run(
-        [*common, "make", "build/qw38-cuda-quant-test"],
-        check=False,
-        capture_output=True,
-        text=True,
-    )
-    assert build.returncode == 0, build.stdout + build.stderr
-    run = subprocess.run(
-        [*common, "./build/qw38-cuda-quant-test"],
-        check=False,
-        capture_output=True,
-        text=True,
-    )
-    assert run.returncode == 0, run.stdout + run.stderr
+    tier = cuda_test_tier()
+    run = run_cuda_suite(tier)["quant"]
     lines = [
         line
-        for line in run.stdout.splitlines()
+        for line in run.splitlines()
         if line.startswith(("case=q4_k_", "case=q6_k_"))
     ]
     assert [line.split()[0] for line in lines] == [
@@ -109,7 +85,7 @@ def test_cuda_quant_mmv_matches_scalar_reference() -> None:
         assert float(fields["mean_ms"]) > 0.0
     mmq_lines = [
         line
-        for line in run.stdout.splitlines()
+        for line in run.splitlines()
         if line.startswith(("mmq_case=q4_k_", "mmq_case=q6_k_"))
     ]
     assert [line.split()[0] for line in mmq_lines] == [
@@ -126,9 +102,8 @@ def test_cuda_quant_mmv_matches_scalar_reference() -> None:
         assert fields["gate"] == "ds4_q4k_parity"
         assert fields["ref"] == "cpu_dequant_gemm"
         assert float(fields["mean_ms"]) > 0.0
-    assert "status=passed" in run.stdout
-    assert "production_numerics_path=strict" in run.stdout
-    assert "optimized_admitted=false" in run.stdout
-    assert "strict_reference=retained" in run.stdout
-    assert "optimized_admitted=false" in run.stdout
-    assert "strict_reference=retained" in run.stdout
+    assert "status=passed" in run
+    assert f"test_tier={tier}" in run
+    assert "production_numerics_path=strict" in run
+    assert "optimized_admitted=false" in run
+    assert "strict_reference=retained" in run

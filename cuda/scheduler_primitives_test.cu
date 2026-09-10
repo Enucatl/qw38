@@ -10,6 +10,7 @@
 #include "quant.h"
 #include "gdn_step.h"
 #include "quant_mmv.h"
+#include "test_tier.h"
 
 namespace {
 
@@ -127,7 +128,8 @@ int run_pointwise() {
   if (error == cudaSuccess) error = cudaEventCreate(&start);
   if (error == cudaSuccess) error = cudaEventCreate(&stop);
   float total_ms = 0.0F;
-  for (int sample = -3; error == cudaSuccess && sample < 30; ++sample) {
+  for (int sample = -qw38::cuda::test_warmups();
+       error == cudaSuccess && sample < qw38::cuda::test_samples(); ++sample) {
     error = cudaEventRecord(start);
     if (error == cudaSuccess) {
       error = qw38::cuda::launch_rms_norm_bf16(
@@ -168,7 +170,8 @@ int run_pointwise() {
       std::sqrt(metrics.squared / static_cast<double>(metrics.count)));
   std::printf("scheduler_pointwise=bf16 max_abs=%.9g rms=%.9g nonfinite=%zu "
               "mean_ms=%.9g\n",
-              metrics.maximum, rms, metrics.nonfinite, total_ms / 30.0F);
+              metrics.maximum, rms, metrics.nonfinite,
+              total_ms / qw38::cuda::test_samples());
   cudaEventDestroy(stop);
   cudaEventDestroy(start);
   cudaFree(device_up);
@@ -524,6 +527,12 @@ int run_tiled_gdn() {
 }  // namespace
 
 int main() {
+  if (!qw38::cuda::test_tier_valid()) {
+    std::fprintf(stderr,
+                 "QW38_CUDA_TEST_TIER must be set to smoke, correctness, "
+                 "or acceptance\n");
+    return 2;
+  }
   if (run_pointwise() != 0 || run_layouts() != 0 || run_row_decode() != 0 ||
       run_tiled_gdn() != 0) {
     return 1;
@@ -533,6 +542,7 @@ int main() {
               qw38::cuda::selected_production_numerics_path(),
               qw38::cuda::production_numerics_optimized_admitted() ? "true"
                                                                   : "false");
+  std::printf("test_tier=%s\n", qw38::cuda::test_tier_name());
   std::printf("status=passed\n");
   return 0;
 }
