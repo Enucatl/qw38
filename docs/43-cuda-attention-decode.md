@@ -1,7 +1,7 @@
 # 43. CUDA grouped-query attention for one decoded token
 
-[Index](README.md) · Implementation tasks: ATN-001, OPT-005, OPT-010, OPT-036, OPT-038, and
-EDU-029 in [`implementation_ledger.md`](../implementation_ledger.md)
+[Index](README.md) · Implementation tasks: ATN-001, OPT-005, OPT-010, OPT-036, OPT-038,
+OPT-039, and EDU-029 in [`implementation_ledger.md`](../implementation_ledger.md)
 
 Chapter 19 introduced attention with small scalar examples. This chapter follows
 the first CUDA decode implementation. “Decode” means processing one new token
@@ -231,3 +231,40 @@ llama.cpp parity gate and not Quartz ≥ llama.cpp. Live exclusive decode
 are retained in
 [`fixtures/opt038_post_ladder_gap.json`](../fixtures/opt038_post_ladder_gap.json);
 this chapter does not replace the OPT-036 keep numbers above.
+
+## Warp-owned vector decode (OPT-039)
+
+After the 16/16 partition keep, production one-token decode attention can
+select a warp-owned query-head kernel instead of the CTA 16-partition kernel.
+Prefill fattn (`token_count >= 16`), two-row tiled prefill
+(`2 <= token_count < 16`), and the FP32 ascending-part
+[`merge_decode_kv_parts`](../cuda/attention_decode.cu) stay unchanged. The
+partition count stays 16/16; only ownership inside each `(query_head, part)`
+pair changes.
+
+Candidate `warp_query` uses grid `(24, 16)` and block `(32)`: one warp owns
+one query-head/partition pair. Each lane holds eight consecutive head
+dimensions; Q RMS and partial RoPE run once per warp at kernel start. Per KV
+row the eight lane-local products reduce with warp shuffles instead of the CTA
+kernel's lane-zero serial fold and `__syncthreads` in the KV loop. Register
+VKQ accumulators write the same partial layout; merge and gate sigmoid stay
+after combine. The CTA kernel remains the A/B baseline and non-production
+fallback. Byte equality between warp and CTA is not the gate; frozen ATN-001
+envelopes versus the CTA 16-partition path remain the numeric admission test.
+
+Production [`launch_attention_prepare_partitioned`](../cuda/attention_decode.cu)
+dispatches through a compile-time vec pin (`cta_group` or `warp_query`) for
+the production shape `24 × 256` at `n_parts == 16`. Partials still alias idle
+prompt workspace; score scratch stays unused; there is no extra persistent
+`cudaMalloc`.
+
+**Measured, RTX 5090:** paired 3-warm / 30-alternating CUDA-event A/B at
+positions 128 and 2048 selected **`warp_query`** at D2048 with strictly lower
+component mean than `cta_group`. Keep also required frozen ATN-001 envelopes,
+exact candidate KV and committed/score isolation, live D2048 tok/s strictly
+above the then-current accepted keep denominator, and the cross-workload P /
+D128 / D2048 guard. Live means, p95s, and per-candidate samples stay in the
+report; this chapter does not replace them:
+[`evidence/optimization/opt039-decode-warp/REPORT.md`](../evidence/optimization/opt039-decode-warp/REPORT.md).
+This is a warp-owned decode keep/reject under frozen envelopes, not the 2K
+llama.cpp parity gate and not Quartz ≥ llama.cpp.

@@ -1,0 +1,92 @@
+{
+  "schema_version": 1,
+  "task": "OPT-039",
+  "yardstick": "d2048_decode_attention_warp_query",
+  "opt034_quartz_p_mean_tok_s": 1869.84412,
+  "opt034_quartz_d128_mean_tok_s": 25.3816128,
+  "opt034_quartz_d2048_mean_tok_s": 20.169548,
+  "opt034_quartz_d128_token_latency_p95_ms": 39.9736366,
+  "opt034_quartz_d128_run_mean_token_latency_p95_ms": 39.4155655,
+  "opt034_quartz_d2048_token_latency_p95_ms": 50.2872772,
+  "opt034_quartz_d2048_run_mean_token_latency_p95_ms": 49.590683,
+  "llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+  "gguf_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+  "device_substring": "RTX 5090",
+  "selected_decode_attention_vec": "warp_query",
+  "ab": {
+    "candidates": [
+      "cta_group",
+      "warp_query"
+    ],
+    "warmups": 3,
+    "measured_runs": 30,
+    "alternating_order": [
+      "cta_group",
+      "warp_query"
+    ],
+    "timed_positions": [
+      128,
+      2048
+    ],
+    "correctness_positions": [
+      0,
+      1,
+      15,
+      16,
+      31,
+      32,
+      127,
+      128,
+      2047,
+      2048,
+      2303,
+      131071
+    ],
+    "ties_retain": "cta_group"
+  },
+  "atn001": {
+    "bf16_max_abs": 5e-05,
+    "bf16_rms": 5e-06,
+    "scalar_max_abs": 0.051,
+    "scalar_rms": 0.0016,
+    "cosine": 0.999424
+  },
+  "owns_opt016_parity_gate": false,
+  "substitutes_for_opt016": false,
+  "llama_bench_decode_is_informational": true,
+  "required_fixture_keys": [
+    "schema_version",
+    "task",
+    "status",
+    "measurement_utc",
+    "device",
+    "compute_capability",
+    "llama_revision",
+    "gguf_sha256",
+    "reverted",
+    "selected_decode_attention_vec",
+    "ab_d128",
+    "ab_d2048",
+    "correctness",
+    "keep_sitting_skipped",
+    "p",
+    "d128",
+    "d2048",
+    "owns_opt016_parity_gate",
+    "substitutes_for_opt016",
+    "nsight_systems",
+    "nsight_compute",
+    "proof_limit",
+    "report_path"
+  ],
+  "proof_limit": [
+    "frozen attention envelopes",
+    "exact candidate KV and state isolation",
+    "lower D2048 component time",
+    "improved D2048",
+    "95% throughput floors",
+    "105% p95 ceilings",
+    "does not substitute for the 2K llama.cpp parity gate"
+  ],
+  "report_path": "evidence/optimization/opt039-decode-warp/REPORT.md"
+}

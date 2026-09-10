@@ -124,7 +124,9 @@ and 65 distinguish the ordinary path, an exact chunk, and a one-row tail.
 Attention decode reads growing KV from 16 layers; use grouped-query mapping
 without physical sixfold copies. Production one-token decode attention uses
 contiguous KV partitions after the OPT-036 keep (independent pins below 2048
-and at or above 2048; candidate `1` remains the tiled kernel). Prefill must
+and at or above 2048; candidate `1` remains the tiled kernel) and a
+warp-owned query-head kernel after the OPT-039 keep when the vec pin is
+`warp_query`. Prefill must
 be causal and handle partial RoPE on exactly 64 dimensions. Production prompt
 attention (`token_count >= 16`) is the fattn-mma analog with Ada+ stream-K
 for prompt tiles, register-resident value sums after the OPT-033 keep, and
@@ -551,6 +553,28 @@ fields, and the order stay in the report; this chapter does not replace them:
 [`evidence/optimization/opt038-post-ladder-gap/COMPONENT-PROTOCOL.md`](../evidence/optimization/opt038-post-ladder-gap/COMPONENT-PROTOCOL.md),
 and
 [`fixtures/opt038_post_ladder_gap.json`](../fixtures/opt038_post_ladder_gap.json).
+
+## Warp-owned vector decode attention (OPT-039)
+
+**Measured, RTX 5090:** one-token production decode attention at fixed 16/16
+KV partitions was A/B'd between the accepted CTA 16-partition kernel
+(`cta_group`) and a warp-owned query-head kernel (`warp_query`) at positions
+128 and 2048. Merge is the retained deterministic ascending-part FP32 max /
+denominator / numerator; the gate runs after combine. Prefill fattn and tiled
+prefill for `token_count >= 2` are unchanged. Mixer Q8 quality, FFN shared-Y,
+GDN warp-column, decode FFN graphs, and 16/16 partition pins stay. Partials
+alias idle prompt workspace; score scratch is unused; no extra persistent
+`cudaMalloc`. The targeted sink is D2048 decode `attention_core`. Keep
+denominators are the frozen then-current accepted P / D128 / D2048 means and
+p95s copied into the contract (P **1869.84412**, D128 **25.3816128**, D2048
+**20.169548**). **Keep:** D2048 A/B winner `warp_query` with strictly lower
+component time; production pin `warp_query`; live D2048 tok/s strictly exceeds
+that frozen D2048 denominator; the cross-workload guard held (P/D128/D2048
+throughput and both p95 flavors within 5%). Frozen ATN-001 envelopes are
+unloosened. `reverted` is false. This increment does not own the 2K llama.cpp
+parity gate. Quartz ≥ llama.cpp is informational. Live tok/s stay in the
+report; this chapter does not replace them:
+[`evidence/optimization/opt039-decode-warp/REPORT.md`](../evidence/optimization/opt039-decode-warp/REPORT.md).
 
 ## DwarfStar transfer boundary
 

@@ -771,6 +771,35 @@ baseline.
   the 2K llama.cpp parity gate; llama-bench random decode is informational.
   Quartz ≥ llama.cpp is not this gate. No kernel implementation was copied or
   adapted.
+- OPT-039 is a local derivation over admitted 16/16 partitioned one-token decode.
+  It A/B's the accepted CTA 16-partition kernel against a warp-owned query-head
+  kernel at fixed partition count: grid `(24, 16)`, block `(32)`, eight
+  dimensions per lane, warp-shuffle QK reduction, register VKQ, and the
+  unchanged FP32 ascending-part merge. File-level provenance for register-
+  resident Q/KQ/VKQ and warp reductions is already External: pinned llama.cpp
+  revision `cc83d7b4824f73cfdda4dfbb47ee39804f71b328` (MIT, The ggml authors)
+  `fattn-vec.cuh`. This increment does not vendor `fattn-vec.cuh` or
+  `fattn-common.cuh`, does not include ggml headers, and does not copy
+  `../ds4`. Prefill fattn and tiled prefill for `token_count >= 2` stay.
+  Partials alias idle `prompt_projected_bf16_` / `prompt_q8_`; score scratch
+  stays unused; no extra `cudaMalloc`. Keep denominators are the frozen
+  then-current accepted P / D128 / D2048 means and p95s copied into the
+  contract. **Measured, RTX 5090:** D2048 A/B winner `warp_query`; production
+  pin `warp_query`; `reverted` false; `keep_sitting_skipped` false; `status`
+  measured. Live tok/s stay in the report; this ledger does not replace them.
+  The schema-1 contract, measured fixture, and report are
+  [`pins/opt039_decode_warp_contract.json`](../pins/opt039_decode_warp_contract.json),
+  [`fixtures/opt039_decode_warp.json`](../fixtures/opt039_decode_warp.json),
+  and
+  [`evidence/optimization/opt039-decode-warp/REPORT.md`](../evidence/optimization/opt039-decode-warp/REPORT.md).
+  The beginner explanations are
+  [`docs/43-cuda-attention-decode.md`](43-cuda-attention-decode.md) and
+  [`docs/06-system-optimization.md`](06-system-optimization.md).
+  Proof limit: frozen attention envelopes; exact candidate KV and state
+  isolation; lower D2048 component time; improved D2048; cross-workload guard;
+  then-current accepted P D128 D2048 are the keep denominators; does not
+  substitute for the 2K llama.cpp parity gate; Quartz ≥ llama.cpp is not this
+  gate. Envelopes unloosened; Nsight is not used.
 - OPT-029 adapts llama.cpp revision
   `cc83d7b4824f73cfdda4dfbb47ee39804f71b328` (MIT, The ggml authors)
   warp-column GDN recurrence from `gated_delta_net.cu` (`S_v=128`,

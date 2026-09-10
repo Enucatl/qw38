@@ -134,6 +134,9 @@ std::size_t decode_kv_partial_vkq_values(int n_parts) noexcept;
 std::size_t decode_kv_partial_meta_values(int n_parts) noexcept;
 int decode_kv_partition_occupancy(int n_parts) noexcept;
 int decode_kv_merge_occupancy(int n_parts) noexcept;
+const char* selected_decode_attention_vec() noexcept;
+bool decode_uses_warp_query() noexcept;
+int decode_kv_warp_query_occupancy() noexcept;
 
 cudaError_t launch_attention_prepare(
     const AttentionConfig& config, std::size_t position, const float* query,
@@ -151,6 +154,15 @@ cudaError_t launch_attention_prepare_partitioned(
     float* normalized_query, float* normalized_key, float* score_workspace,
     float* output, float* partial_vkq, float* meta, int n_parts,
     cudaStream_t stream) noexcept;
+
+cudaError_t launch_attention_prepare_partitioned_vec(
+    const AttentionConfig& config, std::size_t position, const float* query,
+    const float* key, const float* value, const float* query_norm_scale,
+    const float* key_norm_scale, const float* output_gate,
+    const AttentionCache& committed, const AttentionCache& candidate_row,
+    float* normalized_query, float* normalized_key, float* score_workspace,
+    float* output, float* partial_vkq, float* meta, int n_parts,
+    const char* vec_path, cudaStream_t stream) noexcept;
 
 cudaError_t launch_attention_prepare_chunk(
     const AttentionConfig& config, std::size_t start_position,

@@ -779,6 +779,31 @@ int main() {
       if (run_partitioned_position(name, position, n_parts) != 0) return 1;
     }
   }
+  if (qw38::cuda::decode_kv_warp_query_occupancy() < 1) {
+    std::fprintf(stderr, "warp query occupancy was zero\n");
+    return 1;
+  }
+  const char* vec = qw38::cuda::selected_decode_attention_vec();
+  if (std::strcmp(vec, "cta_group") != 0 && std::strcmp(vec, "warp_query") != 0) {
+    std::fprintf(stderr, "illegal selected decode attention vec\n");
+    return 1;
+  }
+  if (qw38::cuda::launch_attention_prepare_partitioned_vec(
+          production, 3, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+          qw38::cuda::AttentionCache{}, qw38::cuda::AttentionCache{}, nullptr,
+          nullptr, nullptr, nullptr, nullptr, nullptr, 16, "nope", nullptr) !=
+      cudaErrorInvalidValue) {
+    std::fprintf(stderr, "illegal vec path was accepted\n");
+    return 1;
+  }
+  if (qw38::cuda::launch_attention_prepare_partitioned_vec(
+          production, 3, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+          qw38::cuda::AttentionCache{}, qw38::cuda::AttentionCache{}, nullptr,
+          nullptr, nullptr, nullptr, nullptr, nullptr, 4, "warp_query",
+          nullptr) != cudaErrorInvalidValue) {
+    std::fprintf(stderr, "non-16 warp_query was accepted\n");
+    return 1;
+  }
   std::printf("status=passed\n");
   return 0;
 }

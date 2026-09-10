@@ -5,6 +5,7 @@
 
 #include <cmath>
 #include <cstdint>
+#include <cstring>
 
 #include <cuda_fp16.h>
 
@@ -21,12 +22,32 @@ constexpr float kRmsEpsilon = 1.0e-6F;
 constexpr float kRopeTheta = 10000000.0F;
 constexpr int kSelectedDecodeKvPartsLow = 16;
 constexpr int kSelectedDecodeKvPartsHigh = 16;
+constexpr const char kSelectedDecodeAttentionVec[] = "warp_query";
 constexpr std::size_t kDecodeKvPartitionThreshold = 2048;
 constexpr std::uint32_t kProductionQueryHeads = 24;
 constexpr std::uint32_t kProductionHeadWidth = 256;
+constexpr int kWarpThreads = 32;
+constexpr int kWarpDimsPerLane = 8;
 
 bool legal_decode_kv_parts(int n_parts) noexcept {
   return n_parts == 1 || n_parts == 4 || n_parts == 8 || n_parts == 16;
+}
+
+bool decode_vec_is_cta_group(const char* vec_path) noexcept {
+  return vec_path != nullptr && std::strcmp(vec_path, "cta_group") == 0;
+}
+
+bool decode_vec_is_warp_query(const char* vec_path) noexcept {
+  return vec_path != nullptr && std::strcmp(vec_path, "warp_query") == 0;
+}
+
+bool legal_decode_attention_vec(const char* vec_path) noexcept {
+  return decode_vec_is_cta_group(vec_path) || decode_vec_is_warp_query(vec_path);
+}
+
+bool production_warp_query_shape(const AttentionConfig& config) noexcept {
+  return config.query_heads == kProductionQueryHeads &&
+         config.head_width == kProductionHeadWidth;
 }
 
 std::size_t tiled_attention_shared_bytes() noexcept {
@@ -866,6 +887,145 @@ __global__ void merge_decode_kv_parts(AttentionConfig config, int n_parts,
   }
 }
 
+// OPT-039 warp-owned one-token vector attention. One warp owns one
+// query-head/partition pair. Q RMS stays the ordered FP32 sum-of-squares
+// from the CTA path; only the per-row QK fold uses warp shuffle reduction
+// (llama.cpp fattn-vec.cuh warp-owned Q/KQ/VKQ technique; MIT inspiration
+// only, not vendored).
+__global__ void warp_query_decode_attention(
+    AttentionConfig config, std::size_t position, int n_parts,
+    const float* query, const float* query_scale,
+    const __nv_bfloat16* committed_key, const __nv_bfloat16* committed_value,
+    const __nv_bfloat16* candidate_key, const __nv_bfloat16* candidate_value,
+    float* normalized_query, float* partial_vkq, float* meta) {
+  const std::uint32_t query_head = blockIdx.x;
+  const int part = static_cast<int>(blockIdx.y);
+  const std::uint32_t lane = threadIdx.x;
+  const std::size_t width = config.head_width;
+  const std::uint32_t group = config.query_heads / config.kv_heads;
+  const std::uint32_t kv_head = query_head / group;
+  const std::size_t qbase = static_cast<std::size_t>(query_head) * width;
+  const std::size_t L = position + 1;
+  const std::size_t part_begin =
+      (static_cast<std::size_t>(part) * L) / static_cast<std::size_t>(n_parts);
+  const std::size_t part_end =
+      (static_cast<std::size_t>(part + 1) * L) /
+      static_cast<std::size_t>(n_parts);
+  __shared__ float q_scratch[kProductionHeadWidth];
+  __shared__ float inverse;
+  float q[kWarpDimsPerLane];
+  float vkq[kWarpDimsPerLane]{};
+  float maximum = -INFINITY;
+  float denominator = 0.0F;
+  float inv = 0.0F;
+  if (lane == 0) {
+    float sum = 0.0F;
+    for (std::uint32_t i = 0; i < config.head_width; ++i) {
+      const float item = query[qbase + i];
+      sum = __fadd_rn(sum, item * item);
+    }
+    inverse = 1.0F / sqrtf(sum / static_cast<float>(width) + kRmsEpsilon);
+    inv = inverse;
+  }
+  inv = __shfl_sync(0xffffffff, inv, 0);
+#pragma unroll
+  for (int i = 0; i < kWarpDimsPerLane; ++i) {
+    const std::uint32_t dim =
+        lane * static_cast<std::uint32_t>(kWarpDimsPerLane) +
+        static_cast<std::uint32_t>(i);
+    q_scratch[dim] = query[qbase + dim] * inv * query_scale[dim];
+  }
+  __syncwarp();
+  const std::uint32_t half = config.rotary_width / 2;
+  for (std::uint32_t pair = lane; pair < half; pair += kWarpThreads) {
+    const float first = q_scratch[pair];
+    const float second = q_scratch[half + pair];
+    const float exponent =
+        static_cast<float>(pair * 2) / static_cast<float>(config.rotary_width);
+    const float angle =
+        static_cast<float>(position) / powf(kRopeTheta, exponent);
+    const float c = cosf(angle);
+    const float s = sinf(angle);
+    q_scratch[pair] = first * c - second * s;
+    q_scratch[half + pair] = second * c + first * s;
+  }
+  __syncwarp();
+#pragma unroll
+  for (int i = 0; i < kWarpDimsPerLane; ++i) {
+    const std::uint32_t dim =
+        lane * static_cast<std::uint32_t>(kWarpDimsPerLane) +
+        static_cast<std::uint32_t>(i);
+    q[i] = q_scratch[dim];
+    if (part == 0) normalized_query[qbase + dim] = q[i];
+  }
+  if (part_begin != part_end) {
+    const std::size_t row_values =
+        static_cast<std::size_t>(config.kv_heads) * width;
+    for (std::size_t token = part_begin; token < part_end; ++token) {
+      const __nv_bfloat16* ksrc;
+      const __nv_bfloat16* vsrc;
+      if (token < position) {
+        const std::size_t offset = attention_kv_physical_index(
+            token, kv_head, 0, config.capacity, config.head_width);
+        ksrc = committed_key + offset;
+        vsrc = committed_value + offset;
+      } else {
+        ksrc = candidate_key + (token - position) * row_values +
+               kv_head * width;
+        vsrc = candidate_value + (token - position) * row_values +
+               kv_head * width;
+      }
+      float local = 0.0F;
+      float v_reg[kWarpDimsPerLane];
+#pragma unroll
+      for (int i = 0; i < kWarpDimsPerLane; ++i) {
+        const std::uint32_t dim =
+            lane * static_cast<std::uint32_t>(kWarpDimsPerLane) +
+            static_cast<std::uint32_t>(i);
+        local = __fadd_rn(
+            local, __fmul_rn(q[i], __bfloat162float(ksrc[dim])));
+        v_reg[i] = __bfloat162float(vsrc[dim]);
+      }
+      local = __fadd_rn(local, __shfl_down_sync(0xffffffff, local, 16));
+      local = __fadd_rn(local, __shfl_down_sync(0xffffffff, local, 8));
+      local = __fadd_rn(local, __shfl_down_sync(0xffffffff, local, 4));
+      local = __fadd_rn(local, __shfl_down_sync(0xffffffff, local, 2));
+      local = __fadd_rn(local, __shfl_down_sync(0xffffffff, local, 1));
+      float score = local;
+      if (lane == 0) score = local / sqrtf(static_cast<float>(width));
+      score = __shfl_sync(0xffffffff, score, 0);
+      const float old_max = maximum;
+      maximum = fmaxf(maximum, score);
+      const float rescale =
+          old_max == -INFINITY ? 0.0F : expf(old_max - maximum);
+      const float weight = expf(score - maximum);
+      denominator = denominator * rescale + weight;
+#pragma unroll
+      for (int i = 0; i < kWarpDimsPerLane; ++i)
+        vkq[i] = vkq[i] * rescale + weight * v_reg[i];
+    }
+  }
+  const std::size_t vkq_base =
+      (static_cast<std::size_t>(query_head) * static_cast<std::size_t>(n_parts) +
+       static_cast<std::size_t>(part)) *
+      width;
+  const std::size_t meta_base =
+      (static_cast<std::size_t>(query_head) * static_cast<std::size_t>(n_parts) +
+       static_cast<std::size_t>(part)) *
+      2U;
+  if (lane == 0) {
+    meta[meta_base] = maximum;
+    meta[meta_base + 1] = denominator;
+  }
+#pragma unroll
+  for (int i = 0; i < kWarpDimsPerLane; ++i) {
+    const std::uint32_t dim =
+        lane * static_cast<std::uint32_t>(kWarpDimsPerLane) +
+        static_cast<std::uint32_t>(i);
+    partial_vkq[vkq_base + dim] = vkq[i];
+  }
+}
+
 template <int QueryRows>
 __global__ void mma_grouped_chunk_attention(
     AttentionConfig config, std::size_t start_position, std::size_t token_count,
@@ -1364,15 +1524,37 @@ int decode_kv_merge_occupancy(int n_parts) noexcept {
   return blocks;
 }
 
-cudaError_t launch_attention_prepare_partitioned(
+const char* selected_decode_attention_vec() noexcept {
+  return kSelectedDecodeAttentionVec;
+}
+
+bool decode_uses_warp_query() noexcept {
+  return decode_vec_is_warp_query(kSelectedDecodeAttentionVec);
+}
+
+int decode_kv_warp_query_occupancy() noexcept {
+  int blocks = 0;
+  const cudaError_t error = cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+      &blocks, warp_query_decode_attention, kWarpThreads, 0);
+  if (error != cudaSuccess) return 0;
+  return blocks;
+}
+
+cudaError_t launch_attention_prepare_partitioned_vec(
     const AttentionConfig& config, std::size_t position, const float* query,
     const float* key, const float* value, const float* query_norm_scale,
     const float* key_norm_scale, const float* output_gate,
     const AttentionCache& committed, const AttentionCache& candidate_row,
     float* normalized_query, float* normalized_key, float* score_workspace,
     float* output, float* partial_vkq, float* meta, int n_parts,
-    cudaStream_t stream) noexcept {
-  if (!legal_decode_kv_parts(n_parts)) return cudaErrorInvalidValue;
+    const char* vec_path, cudaStream_t stream) noexcept {
+  if (!legal_decode_kv_parts(n_parts) || !legal_decode_attention_vec(vec_path)) {
+    return cudaErrorInvalidValue;
+  }
+  if (decode_vec_is_warp_query(vec_path) &&
+      (n_parts != 16 || !production_warp_query_shape(config))) {
+    return cudaErrorInvalidValue;
+  }
   if (n_parts == 1) {
     (void)partial_vkq;
     (void)meta;
@@ -1387,17 +1569,45 @@ cudaError_t launch_attention_prepare_partitioned(
       output_gate, committed, candidate_row, normalized_query, normalized_key,
       score_workspace, output, stream);
   if (error != cudaSuccess) return error;
-  const std::size_t shared = tiled_attention_shared_bytes();
-  dim3 attention(config.kv_heads, static_cast<unsigned>(n_parts), 1);
-  partitioned_grouped_decode_attention<<<attention, kThreads, shared, stream>>>(
-      config, position, n_parts, query, query_norm_scale, committed.key,
-      committed.value, candidate_row.key, candidate_row.value,
-      normalized_query, partial_vkq, meta);
+  if (decode_vec_is_warp_query(vec_path)) {
+    dim3 attention(config.query_heads, static_cast<unsigned>(n_parts), 1);
+    warp_query_decode_attention<<<attention, kWarpThreads, 0, stream>>>(
+        config, position, n_parts, query, query_norm_scale, committed.key,
+        committed.value, candidate_row.key, candidate_row.value,
+        normalized_query, partial_vkq, meta);
+  } else {
+    const std::size_t shared = tiled_attention_shared_bytes();
+    dim3 attention(config.kv_heads, static_cast<unsigned>(n_parts), 1);
+    partitioned_grouped_decode_attention<<<attention, kThreads, shared,
+                                           stream>>>(
+        config, position, n_parts, query, query_norm_scale, committed.key,
+        committed.value, candidate_row.key, candidate_row.value,
+        normalized_query, partial_vkq, meta);
+  }
   error = cudaPeekAtLastError();
   if (error != cudaSuccess) return error;
   merge_decode_kv_parts<<<config.query_heads, kThreads, 0, stream>>>(
       config, n_parts, partial_vkq, meta, output_gate, output);
   return cudaPeekAtLastError();
+}
+
+cudaError_t launch_attention_prepare_partitioned(
+    const AttentionConfig& config, std::size_t position, const float* query,
+    const float* key, const float* value, const float* query_norm_scale,
+    const float* key_norm_scale, const float* output_gate,
+    const AttentionCache& committed, const AttentionCache& candidate_row,
+    float* normalized_query, float* normalized_key, float* score_workspace,
+    float* output, float* partial_vkq, float* meta, int n_parts,
+    cudaStream_t stream) noexcept {
+  const char* vec_path = selected_decode_attention_vec();
+  if (decode_uses_warp_query() &&
+      (n_parts != 16 || !production_warp_query_shape(config))) {
+    vec_path = "cta_group";
+  }
+  return launch_attention_prepare_partitioned_vec(
+      config, position, query, key, value, query_norm_scale, key_norm_scale,
+      output_gate, committed, candidate_row, normalized_query, normalized_key,
+      score_workspace, output, partial_vkq, meta, n_parts, vec_path, stream);
 }
 
 cudaError_t launch_attention_prepare_chunk_mma_rank3(
