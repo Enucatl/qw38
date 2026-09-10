@@ -104,6 +104,11 @@ are repository-relative unless stated otherwise.
 | OPT-035 | MMA attention probability times V | OPT-033 | done | A/B full 4096-row attention using dual-F16 probability×V MMA; retain frozen attention envelopes, lower component time, improved P, and the cross-workload guard; otherwise reject | [`tasks/OPT-035.md`](tasks/OPT-035.md); [`pins/opt035_pv_mma_contract.json`](pins/opt035_pv_mma_contract.json); [`fixtures/opt035_pv_mma.json`](fixtures/opt035_pv_mma.json); [`cuda/fattn_pv_mma_ab_test.cu`](cuda/fattn_pv_mma_ab_test.cu); [`evidence/optimization/opt035-pv-mma/REPORT.md`](evidence/optimization/opt035-pv-mma/REPORT.md); verification 2026-09-09T19:58:00Z |
 | OPT-036 | Partition KV for vector decode attention | OPT-032, OPT-026 | done | A/B one-token vector attention at 1/4/8/16 KV partitions for D128/D2048 with deterministic partial-statistic merge; keep only with frozen attention envelopes, lower component time, improved D2048, and the cross-workload guard; otherwise reject | [`tasks/OPT-036.md`](tasks/OPT-036.md); [`pins/opt036_decode_kv_partition_contract.json`](pins/opt036_decode_kv_partition_contract.json); [`fixtures/opt036_decode_kv_partition.json`](fixtures/opt036_decode_kv_partition.json); [`cuda/decode_kv_partition_ab_test.cu`](cuda/decode_kv_partition_ab_test.cu); [`evidence/optimization/opt036-decode-kv-partition/REPORT.md`](evidence/optimization/opt036-decode-kv-partition/REPORT.md); verification 2026-09-09T17:32:00Z |
 | OPT-037 | Select 4K FFN tiles per projection | OPT-032, OPT-025 | done | Sweep quality-MMQ I={64,128}, J={32,64,128} independently for 4096-row gate/up/down, preserve shared-Y and recapture graphs; keep only with admitted component wins, improved P, frozen MMQ envelopes, and the cross-workload guard; otherwise reject | [`tasks/OPT-037.md`](tasks/OPT-037.md); [`pins/opt037_ffn_tile_contract.json`](pins/opt037_ffn_tile_contract.json); [`fixtures/opt037_ffn_tiles.json`](fixtures/opt037_ffn_tiles.json); [`cuda/ffn_tile_ab_test.cu`](cuda/ffn_tile_ab_test.cu); [`tests/test_opt037_ffn_tiles.py`](tests/test_opt037_ffn_tiles.py); [`evidence/optimization/opt037-ffn-tiles/REPORT.md`](evidence/optimization/opt037-ffn-tiles/REPORT.md); [`evidence/optimization/opt037-ffn-tiles/REJECTION.md`](evidence/optimization/opt037-ffn-tiles/REJECTION.md); verification 2026-09-09T23:03:58Z |
+| OPT-038 | Refresh post-ladder attribution and source gap map | OPT-032, OPT-034, OPT-035, OPT-036, OPT-037 | pending | Retain fresh frozen-protocol P/D128/D2048 measurements, current subsystem breakdowns, independent raw host-wall accounting, pinned llama.cpp comparisons and matched-component experiment specifications, and a reproducible next-task order; `claims_performance_improvement: false`; accepted keep denominators remain unchanged | — |
+| OPT-039 | Warp-owned vector decode attention | OPT-038, OPT-036 | pending | A/B warp-owned query-head attention against accepted 16-partition decode attention; keep only with frozen attention envelopes, exact candidate KV and state isolation, lower D2048 component time, improved D2048 versus the then-current keep oracle, P/D128/D2048 throughput floors of 95%, and both decode p95 measures at most 105%; otherwise reject | — |
+| OPT-040 | Hoist prompt GDN inverse normalization | OPT-038, OPT-019 | pending | A/B shared per-token/key-head inverse norms against repeated warp-column normalization; keep only with byte-equal quality outputs/state, frozen sequential GDN gates, lower complete GDN component time, improved P versus the then-current keep oracle, D128/D2048 throughput at least 95%, and both decode p95 measures at most 105%; otherwise reject | — |
+| OPT-041 | Give prompt QK microtiles warp ownership | OPT-038, OPT-035 | pending | A/B warp-owned prompt QK microtiles preserving existing virtual-warp partial order against shared cparts reduction; keep only with byte-equal quality attention outputs, frozen attention gates, lower complete component time, improved P versus the then-current keep oracle, D128/D2048 throughput at least 95%, and both decode p95 measures at most 105%; otherwise reject | — |
+| OPT-042 | Study integer decode MMV admissibility | OPT-038, OPT-034 | pending | Retain paired FP32-packed versus Q4_K integer-dot diagnostic timings and complete numeric results using unchanged FP32-scale Q8 staging on synthetic and real FFN inputs, report fixed CUD-001 envelope eligibility and a promotion/rejection recommendation without changing production dispatch or keep denominators; `claims_performance_improvement: false` | — |
 
 ### 2026-09-04T13:09:32Z — OPT-005 delivered
 
@@ -5082,3 +5087,21 @@ are repository-relative unless stated otherwise.
   plus this ledger/audit bookkeeping. `plan.md` is unchanged. OPT-016
   stays `blocked`. Next eligible pending by ledger row order: **OPT-031**.
 
+### 2026-09-10T06:12:20Z — speedup-loop scout; OPT-038–OPT-042 admitted
+
+- Source-only post-OPT-037 planning; no CUDA implementation or benchmark was run.
+- Current accepted denominators remain OPT-034: P 1869.84412, D128 25.3816128,
+  D2048 20.169548 tok/s, with its recorded p95 values. OPT-037 rejected all
+  candidates and did not move the denominator.
+- OPT-038 records the required fresh attribution/source-gap study and explicitly
+  claims no performance improvement. OPT-039 covers warp-owned decode attention;
+  OPT-040 hoists prompt GDN inverse norms; OPT-041 gives prompt QK microtiles
+  warp ownership; OPT-042 is a diagnostic-only integer decode-MMV feasibility
+  study.
+- Prompt FFN quality MMA, shared-Y, stream-K, and I/J ideas are exhausted or
+  already installed; rejected OPT-024, OPT-027, OPT-028, OPT-029, OPT-030, and
+  OPT-037 variants are not reopened. OPT-031 remains pending and is not superseded.
+- Evidence: `evidence/optimization/speedup-loop-post037/`
+- Recommended explicit next task: OPT-038. Unchanged row order leaves OPT-031 as
+  the next eligible pending task for automatic ledger execution.
+- OPT-016 remains the blocked exact-2K parity owner; `plan.md` is unchanged.
