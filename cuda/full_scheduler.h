@@ -10,6 +10,7 @@
 #include <cuda_runtime.h>
 
 #include "qw38/status.h"
+#include "mixer.h"
 #include "weights.h"
 #include "quant_mmv.h"
 #include "gdn_step.h"
@@ -92,6 +93,83 @@ struct TimingValue final {
   bool measured = false;
 };
 
+// Exclusive GPU/host leaves used by OPT-043. Enclosing OPT-038 categories are
+// reconstructed as sums of these leaves. Overlapping host waits are recorded
+// separately and must not enter the exclusive reconstruction set.
+struct LeafTimings final {
+  TimingValue embedding;
+  TimingValue input_norm;
+  TimingValue residual_mixer;
+  TimingValue activation_staging_mixer;
+  TimingValue proj_packed_qkv;
+  TimingValue proj_value_gate;
+  TimingValue proj_alpha;
+  TimingValue proj_beta;
+  TimingValue proj_gdn_output;
+  TimingValue proj_query_gate;
+  TimingValue proj_key;
+  TimingValue proj_value;
+  TimingValue proj_attn_output;
+  TimingValue gdn_gate_prep;
+  TimingValue gdn_conv_qk_norm_recurrence;
+  TimingValue gdn_output_norm;
+  TimingValue attn_query_split;
+  TimingValue attn_qk_prep_softmax_pv_merge;
+  TimingValue attn_output_cast;
+  TimingValue ffn_norm;
+  TimingValue activation_staging_ffn;
+  TimingValue proj_ffn_gate;
+  TimingValue proj_ffn_up;
+  TimingValue swiglu;
+  TimingValue proj_ffn_down;
+  TimingValue residual_ffn;
+  TimingValue logits_norm;
+  TimingValue logits_projection;
+  TimingValue d2h;
+  TimingValue state_copies;
+  TimingValue host_graph_submit;
+  TimingValue host_submission_waits;
+  bool gdn_conv_fused_with_recurrence = false;
+  bool gdn_output_norm_fused_with_gate = false;
+  bool attention_prep_fused_with_core = false;
+  bool ffn_graph_fused = false;
+  bool ffn_staging_fused_into_mmv = false;
+  bool swiglu_fused_with_down_stage = false;
+  bool d2h_overlaps_state_copies = false;
+};
+
+struct ActivationCaptureSlot final {
+  std::size_t layer = 0;
+  const char* layer_kind = "";
+  bool mixer_captured = false;
+  bool ffn_captured = false;
+  std::array<float, internal::kResidualWidth> mixer_preprojection{};
+  std::array<float, internal::kResidualWidth> ffn_preprojection{};
+  std::array<float, 64> mixer_prefix{};
+  std::array<float, 64> ffn_prefix{};
+  char mixer_sha256[65]{};
+  char ffn_sha256[65]{};
+  char mixer_dtype[16]{};
+  char ffn_dtype[16]{};
+  std::array<std::size_t, 2> mixer_shape{};
+  std::array<std::size_t, 2> ffn_shape{};
+};
+
+struct ActivationCapture final {
+  const char* stage = "";
+  std::size_t position = 0;
+  std::array<std::size_t, 6> layers{0, 3, 31, 32, 62, 63};
+  std::array<ActivationCaptureSlot, 6> slots{};
+  bool final_norm_captured = false;
+  std::array<float, internal::kResidualWidth> final_norm{};
+  std::array<float, 64> final_norm_prefix{};
+  char final_norm_sha256[65]{};
+  bool output_captured = false;
+  std::array<float, 64> output_prefix{};
+  char output_sha256[65]{};
+  std::size_t output_count = 0;
+};
+
 // One request-level attribution record. A false `measured` flag means that the
 // runtime boundary does not exist yet; it must not be interpreted as zero work.
 struct RuntimeTimings final {
@@ -125,6 +203,9 @@ struct PrefillAttribution final {
   std::size_t evaluated_tokens = 0;
   std::size_t chunk_count = 0;
   std::uint32_t prompt_graph_launches = 0;
+  bool record_leaves = false;
+  LeafTimings leaves{};
+  ActivationCapture* capture = nullptr;
 };
 
 struct DecodeAttribution final {
@@ -138,6 +219,9 @@ struct DecodeAttribution final {
   TimingValue graph;
   TimingValue other_idle;
   TimingValue wall;
+  bool record_leaves = false;
+  LeafTimings leaves{};
+  ActivationCapture* capture = nullptr;
 };
 
 enum class PointwisePath : std::uint8_t {

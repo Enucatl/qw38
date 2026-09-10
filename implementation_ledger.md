@@ -109,7 +109,7 @@ are repository-relative unless stated otherwise.
 | OPT-040 | Hoist prompt GDN inverse normalization | OPT-038, OPT-019 | done | A/B shared per-token/key-head inverse norms against repeated warp-column normalization; keep only with byte-equal quality outputs/state, frozen sequential GDN gates, lower complete GDN component time, improved P versus the then-current keep oracle, D128/D2048 throughput at least 95%, and both decode p95 measures at most 105%; otherwise reject | [`tasks/OPT-040.md`](tasks/OPT-040.md); [`pins/opt040_gdn_shared_inverse_contract.json`](pins/opt040_gdn_shared_inverse_contract.json); [`fixtures/opt040_gdn_shared_inverse.json`](fixtures/opt040_gdn_shared_inverse.json); [`cuda/opt040_gdn_shared_inverse_ab_test.cu`](cuda/opt040_gdn_shared_inverse_ab_test.cu); [`evidence/optimization/opt040-gdn-shared-inverse/REPORT.md`](evidence/optimization/opt040-gdn-shared-inverse/REPORT.md); verification 2026-09-10T10:08:22Z |
 | OPT-041 | Give prompt QK microtiles warp ownership | OPT-038, OPT-035 | done | A/B warp-owned prompt QK microtiles preserving existing virtual-warp partial order against shared cparts reduction; keep only with byte-equal quality attention outputs, frozen attention gates, lower complete component time, improved P versus the then-current keep oracle, D128/D2048 throughput at least 95%, and both decode p95 measures at most 105%; otherwise reject | [`tasks/OPT-041.md`](tasks/OPT-041.md); [`pins/opt041_fattn_warp_qk_contract.json`](pins/opt041_fattn_warp_qk_contract.json); [`fixtures/opt041_fattn_warp_qk.json`](fixtures/opt041_fattn_warp_qk.json); [`cuda/opt041_fattn_warp_qk_ab_test.cu`](cuda/opt041_fattn_warp_qk_ab_test.cu); [`evidence/optimization/opt041-fattn-warp-qk/REPORT.md`](evidence/optimization/opt041-fattn-warp-qk/REPORT.md); verification 2026-09-10T11:35:00Z |
 | OPT-042 | Study integer decode MMV admissibility | OPT-038, OPT-034 | done | Retain paired FP32-packed versus Q4_K integer-dot diagnostic timings and complete numeric results using unchanged FP32-scale Q8 staging on synthetic and real FFN inputs, report fixed CUD-001 envelope eligibility and a promotion/rejection recommendation without changing production dispatch or keep denominators; `claims_performance_improvement: false` | [`tasks/OPT-042.md`](tasks/OPT-042.md); [`pins/opt042_mmv_integer_study_contract.json`](pins/opt042_mmv_integer_study_contract.json); [`fixtures/opt042_mmv_integer_study.json`](fixtures/opt042_mmv_integer_study.json); [`cuda/opt042_mmv_integer_study.cu`](cuda/opt042_mmv_integer_study.cu); [`tests/test_opt042_mmv_integer_study.py`](tests/test_opt042_mmv_integer_study.py); [`evidence/optimization/opt042-mmv-integer-study/REPORT.md`](evidence/optimization/opt042-mmv-integer-study/REPORT.md); verification 2026-09-10T12:09:20Z |
-| OPT-043 | Measure post-042 kernel gaps against pinned llama.cpp | OPT-041, OPT-042 | pending | Fresh unperturbed P/D controls, exclusive leaf accounting, actual layer captures, matched complete components and dispatch evidence cover every major family; no production change | [Task](tasks/OPT-043.md); [Recovery design](tasks/PERFORMANCE-RECOVERY-2026-09-10.md) |
+| OPT-043 | Measure post-042 kernel gaps against pinned llama.cpp | OPT-041, OPT-042 | done | Fresh unperturbed P/D controls, exclusive leaf accounting, actual layer captures, matched complete components and dispatch evidence cover every major family; no production change; `claims_performance_improvement: false`; accepted keep denominators remain historical | [`tasks/OPT-043.md`](tasks/OPT-043.md); [`pins/opt043_component_gap_contract.json`](pins/opt043_component_gap_contract.json); [`fixtures/opt043_component_gap.json`](fixtures/opt043_component_gap.json); [`cuda/opt043_prefill_attribution_test.cu`](cuda/opt043_prefill_attribution_test.cu); [`cuda/opt043_decode_attribution_test.cu`](cuda/opt043_decode_attribution_test.cu); [`cuda/opt043_activation_capture_test.cu`](cuda/opt043_activation_capture_test.cu); [`tests/test_opt043_component_gap.py`](tests/test_opt043_component_gap.py); [`evidence/optimization/opt043-component-gap/REPORT.md`](evidence/optimization/opt043-component-gap/REPORT.md); verification 2026-09-10T14:23:30Z |
 | OPT-044 | Admit documented production arithmetic and quality budgets | OPT-043 | pending | Freeze independent llama-calibrated primitive budgets and held-out model-quality gates before tuning; retain strict reference contracts and exact structural/session invariants; document user-authorized accuracy compromises | [Task](tasks/OPT-044.md) |
 | OPT-045 | Parallelize RMSNorm and admitted fused arithmetic | OPT-044 | pending | Cooperative residual/head normalization removes serial reductions with production quality, complete component and end-to-end wins, or retained measured rejection | [Task](tasks/OPT-045.md) |
 | OPT-046 | Implement cooperative packed Q4_K decode dots | OPT-044, OPT-045 | pending | Packed integer dots, cooperative K reduction and admitted staging improve complete real FFN and D2048 under production quality and cross-workload guards, or retained rejection | [Task](tasks/OPT-046.md) |
@@ -128,8 +128,8 @@ are repository-relative unless stated otherwise.
 
 The [2026-09-10 design](tasks/PERFORMANCE-RECOVERY-2026-09-10.md) compares the
 admitted Quartz, pinned llama.cpp and ds4 paths. It is source analysis and task
-design, not new performance evidence. **Next eligible recovery task: OPT-043**,
-then OPT-044's documented production-numerics policy, then OPT-045–054 in row
+design, not new performance evidence. **Next eligible recovery task: OPT-044**,
+then OPT-045–054 in row
 order, measured remaining launch work in OPT-055, and the outcome gate OPT-056.
 Dependencies permit independent work but do not authorize subagents. The user
 accepts documented llama.cpp/ds4-like accuracy compromises; strict reference
@@ -5416,3 +5416,36 @@ statements below are historical, not the current execution order.
   pass merely because all candidate experiments finished.
 - Current next recovery task is **OPT-043**. OPT-016 remains blocked under its
   unchanged original 2K gate. No claimed speedup from this documentation change.
+
+### 2026-09-10T14:24:30Z — OPT-043 delivered (component gap)
+
+- Independent verification attempt 1 passed. Measurement-only post-042
+  component-gap diagnostic retains fresh unperturbed P/D128/D2048 controls,
+  exclusive leaf intervals, activation captures, matched llama.cpp complete
+  components, and dispatch evidence per major family. Exclusive RTX 5090
+  sitting wrote
+  [`fixtures/opt043_component_gap.json`](fixtures/opt043_component_gap.json)
+  (`measurement_utc` 2026-09-10T14:02:32Z; P Quartz **2076.24** vs llama
+  **3195.83** tok/s; D128 **26.15** vs **68.72** tok/s; D2048 **25.30** vs
+  **67.05** tok/s; `claims_performance_improvement` false). Nsight Systems
+  unavailable; Nsight Compute counters not collected; no bandwidth- or
+  compute-bound claim. Production dispatch unchanged; accepted keep
+  denominators remain historical OPT-041 copies. Successor decisions for
+  OPT-044–056 recorded with recoverable bounds. Coupled IDs: none. Delivery
+  re-check: `uv run pytest -q tests/test_opt043_component_gap.py
+  tests/test_opt038_post_ladder_gap.py tests/test_documentation.py`.
+- Acceptance evidence: [`tasks/OPT-043.md`](tasks/OPT-043.md);
+  [`pins/opt043_component_gap_contract.json`](pins/opt043_component_gap_contract.json);
+  [`fixtures/opt043_component_gap.json`](fixtures/opt043_component_gap.json);
+  [`cuda/opt043_prefill_attribution_test.cu`](cuda/opt043_prefill_attribution_test.cu);
+  [`cuda/opt043_decode_attribution_test.cu`](cuda/opt043_decode_attribution_test.cu);
+  [`cuda/opt043_activation_capture_test.cu`](cuda/opt043_activation_capture_test.cu);
+  [`tools/llama_authority/component_gap.cpp`](tools/llama_authority/component_gap.cpp);
+  [`tests/test_opt043_component_gap.py`](tests/test_opt043_component_gap.py);
+  [`evidence/optimization/opt043-component-gap/REPORT.md`](evidence/optimization/opt043-component-gap/REPORT.md);
+  [`docs/65-documentation-audit.md`](docs/65-documentation-audit.md).
+  Proof is measured component gap and ranked successor decisions, not a
+  throughput keep, not 2K parity, not a successor oracle.
+- Marked OPT-043 `done`; delivery is limited to the verified task scope
+  plus this ledger/audit bookkeeping. `plan.md` is unchanged. OPT-016
+  stays `blocked`. Next eligible pending by ledger row order: **OPT-044**.

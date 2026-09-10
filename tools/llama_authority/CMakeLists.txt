@@ -46,3 +46,23 @@ set_target_properties(
   PROPERTIES
     BUILD_RPATH "\$ORIGIN"
     RUNTIME_OUTPUT_DIRECTORY "${LLAMA_BUILD}/bin")
+
+add_executable(qw38-llama-component-gap component_gap.cpp)
+target_compile_features(qw38-llama-component-gap PRIVATE cxx_std_17)
+target_compile_options(qw38-llama-component-gap PRIVATE -Wall -Wextra -Werror)
+find_package(CUDAToolkit REQUIRED)
+target_include_directories(
+  qw38-llama-component-gap
+  PRIVATE
+    "${LLAMA_SOURCE}/include"
+    "${LLAMA_SOURCE}/ggml/include"
+    "${CUDAToolkit_INCLUDE_DIRS}")
+target_link_directories(qw38-llama-component-gap PRIVATE "${LLAMA_BUILD}/bin")
+target_link_libraries(
+  qw38-llama-component-gap
+  PRIVATE llama ggml ggml-cuda ggml-base CUDA::cudart)
+set_target_properties(
+  qw38-llama-component-gap
+  PROPERTIES
+    BUILD_RPATH "\$ORIGIN"
+    RUNTIME_OUTPUT_DIRECTORY "${LLAMA_BUILD}/bin")
