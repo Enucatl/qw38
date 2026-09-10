@@ -22,6 +22,7 @@
 #include "scheduler_primitives.h"
 #include "sha256.h"
 #include "q8_decode_path.cuh"
+#include "ffn_decode_path.cuh"
 
 QW38_PDL_REGISTER_DEVICE_OPS()
 
@@ -1163,38 +1164,96 @@ cudaError_t execute_ffn(const DeviceCommonLayer& layer,
                                         capture_kind, workspace->normalized_,
                                         internal::kResidualWidth);
   }
+  const bool paired = ffn_decode_uses_paired();
+  const bool share_stage = ffn_decode_shares_stage();
   if (error == cudaSuccess) {
     error = begin_phase(
         leaves,
         leaf_timings == nullptr ? nullptr : &leaf_timings->proj_ffn_gate,
         stream);
   }
-  if (error == cudaSuccess) {
-    error = matrix_vector(layer.ffn_gate, workspace->normalized_, workspace,
-                          workspace->projection_a_, stream);
+  if (error == cudaSuccess && paired) {
+    if (share_stage) {
+      error = launch_quantize_bf16_q8(workspace->normalized_, workspace->q8_,
+                                      internal::kResidualWidth, stream);
+      workspace->q8_decode_staged_activation_ = nullptr;
+      workspace->q8_decode_staged_columns_ = 0;
+      if (error == cudaSuccess) {
+        error = launch_q4k_gate_up_swiglu_prequant(
+            layer.ffn_gate.data, layer.ffn_up.data, layer.ffn_gate.rows,
+            layer.ffn_gate.columns, workspace->q8_, workspace->ffn_activated_,
+            stream);
+      }
+    } else {
+      error = launch_q4k_gate_up_swiglu(
+          layer.ffn_gate.data, layer.ffn_up.data, layer.ffn_gate.rows,
+          layer.ffn_gate.columns, workspace->normalized_, workspace->q8_,
+          workspace->ffn_activated_, stream);
+    }
+    if (error == cudaSuccess) error = end_phase(leaves);
+  } else if (error == cudaSuccess && share_stage) {
+    error = launch_quantize_bf16_q8(workspace->normalized_, workspace->q8_,
+                                    internal::kResidualWidth, stream);
+    workspace->q8_decode_staged_activation_ = nullptr;
+    workspace->q8_decode_staged_columns_ = 0;
+    if (error == cudaSuccess) {
+      error = launch_quant_mmv_prequant(
+          layer.ffn_gate.kind, layer.ffn_gate.data, layer.ffn_gate.rows,
+          layer.ffn_gate.columns, workspace->q8_, workspace->projection_a_,
+          stream);
+    }
+    if (error == cudaSuccess) error = end_phase(leaves);
+    if (error == cudaSuccess) {
+      error = begin_phase(
+          leaves, leaf_timings == nullptr ? nullptr : &leaf_timings->proj_ffn_up,
+          stream);
+    }
+    if (error == cudaSuccess) {
+      error = launch_quant_mmv_prequant(
+          layer.ffn_up.kind, layer.ffn_up.data, layer.ffn_up.rows,
+          layer.ffn_up.columns, workspace->q8_, workspace->projection_b_,
+          stream);
+    }
+    if (error == cudaSuccess) error = end_phase(leaves);
+    if (error == cudaSuccess) {
+      error = begin_phase(
+          leaves, leaf_timings == nullptr ? nullptr : &leaf_timings->swiglu,
+          stream);
+    }
+    if (error == cudaSuccess) {
+      error = launch_swiglu_bf16(
+          workspace->projection_a_, workspace->projection_b_,
+          internal::kFfnWidth, workspace->ffn_activated_, stream);
+    }
+    if (error == cudaSuccess) error = end_phase(leaves);
+  } else {
+    if (error == cudaSuccess) {
+      error = matrix_vector(layer.ffn_gate, workspace->normalized_, workspace,
+                            workspace->projection_a_, stream);
+    }
+    if (error == cudaSuccess) error = end_phase(leaves);
+    if (error == cudaSuccess) {
+      error = begin_phase(
+          leaves, leaf_timings == nullptr ? nullptr : &leaf_timings->proj_ffn_up,
+          stream);
+    }
+    if (error == cudaSuccess) {
+      error = matrix_vector(layer.ffn_up, workspace->normalized_, workspace,
+                            workspace->projection_b_, stream);
+    }
+    if (error == cudaSuccess) error = end_phase(leaves);
+    if (error == cudaSuccess) {
+      error = begin_phase(
+          leaves, leaf_timings == nullptr ? nullptr : &leaf_timings->swiglu,
+          stream);
+    }
+    if (error == cudaSuccess) {
+      error = launch_swiglu_bf16(
+          workspace->projection_a_, workspace->projection_b_,
+          internal::kFfnWidth, workspace->ffn_activated_, stream);
+    }
+    if (error == cudaSuccess) error = end_phase(leaves);
   }
-  if (error == cudaSuccess) error = end_phase(leaves);
-  if (error == cudaSuccess) {
-    error = begin_phase(
-        leaves, leaf_timings == nullptr ? nullptr : &leaf_timings->proj_ffn_up,
-        stream);
-  }
-  if (error == cudaSuccess) {
-    error = matrix_vector(layer.ffn_up, workspace->normalized_, workspace,
-                          workspace->projection_b_, stream);
-  }
-  if (error == cudaSuccess) error = end_phase(leaves);
-  if (error == cudaSuccess) {
-    error = begin_phase(
-        leaves, leaf_timings == nullptr ? nullptr : &leaf_timings->swiglu,
-        stream);
-  }
-  if (error == cudaSuccess) {
-    error = launch_swiglu_bf16(
-        workspace->projection_a_, workspace->projection_b_,
-        internal::kFfnWidth, workspace->ffn_activated_, stream);
-  }
-  if (error == cudaSuccess) error = end_phase(leaves);
   if (error == cudaSuccess) {
     error = begin_phase(
         leaves,

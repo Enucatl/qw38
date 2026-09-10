@@ -121,7 +121,7 @@ cuda-native: $(BUILD_DIR)/qw38-cuda-probe $(BUILD_DIR)/qw38-cuda-quant-test $(BU
 $(BUILD_DIR)/qw38-cuda-probe: cuda/device_probe.cu | $(BUILD_DIR)
 	$(NVCC) $(NVCCFLAGS) $< -o $@
 
-$(BUILD_DIR)/quant_mmv.cuda.o: cuda/quant_mmv.cu cuda/quant_mmv.h cuda/quant_mmq_mma.cuh cuda/mma.cuh cuda/pdl_launch.cuh cuda/q4k_decode_path.cuh cuda/q6k_decode_path.cuh | $(BUILD_DIR)
+$(BUILD_DIR)/quant_mmv.cuda.o: cuda/quant_mmv.cu cuda/quant_mmv.h cuda/quant_mmq_mma.cuh cuda/mma.cuh cuda/pdl_launch.cuh cuda/q4k_decode_path.cuh cuda/q6k_decode_path.cuh cuda/ffn_decode_path.cuh | $(BUILD_DIR)
 	$(NVCC) $(NVCCFLAGS) -Icuda -c $< -o $@
 
 $(BUILD_DIR)/q4k_decode_dots.cuda.o: cuda/q4k_decode_dots.cu cuda/q4k_decode_dots.cuh cuda/q4k_decode_path.cuh cuda/quant_mmv.h | $(BUILD_DIR)
@@ -162,10 +162,10 @@ $(BUILD_DIR)/qw38-cuda-attention-chunk-test: cuda/attention_chunk_test.cu $(BUIL
 $(BUILD_DIR)/scheduler_primitives.cuda.o: cuda/scheduler_primitives.cu cuda/scheduler_primitives.h cuda/pdl_launch.cuh cuda/rms_norm.cuh | $(BUILD_DIR)
 	$(NVCC) $(NVCCFLAGS) -Icuda -c $< -o $@
 
-$(BUILD_DIR)/full_scheduler.cuda.o: cuda/full_scheduler.cu cuda/full_scheduler.h cuda/pdl_launch.cuh cuda/rms_norm.cuh cuda/q8_decode_path.cuh | $(BUILD_DIR)
+$(BUILD_DIR)/full_scheduler.cuda.o: cuda/full_scheduler.cu cuda/full_scheduler.h cuda/pdl_launch.cuh cuda/rms_norm.cuh cuda/q8_decode_path.cuh cuda/ffn_decode_path.cuh | $(BUILD_DIR)
 	$(NVCC) $(NVCCFLAGS) $(CPPFLAGS) -Icuda -c $< -o $@
 
-$(BUILD_DIR)/full_scheduler.trace.cuda.o: cuda/full_scheduler.cu cuda/full_scheduler.h cuda/pdl_launch.cuh cuda/rms_norm.cuh cuda/q8_decode_path.cuh | $(BUILD_DIR)
+$(BUILD_DIR)/full_scheduler.trace.cuda.o: cuda/full_scheduler.cu cuda/full_scheduler.h cuda/pdl_launch.cuh cuda/rms_norm.cuh cuda/q8_decode_path.cuh cuda/ffn_decode_path.cuh | $(BUILD_DIR)
 	$(NVCC) $(NVCCFLAGS) $(CPPFLAGS) -DQW38_DIAGNOSTIC_TRACE -Icuda -c $< -o $@
 
 $(BUILD_DIR)/checkpoint.cuda.o: cuda/checkpoint.cu cuda/full_scheduler.h | $(BUILD_DIR)

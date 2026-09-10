@@ -7,6 +7,7 @@
 #include <cuda_bf16.h>
 #include <cuda_runtime.h>
 
+#include "ffn_decode_path.cuh"
 #include "production_numerics.h"
 
 namespace qw38::cuda {
@@ -104,6 +105,22 @@ cudaError_t launch_quant_mmv_prequant(QuantKind kind,
                                       std::size_t rows, std::size_t columns,
                                       const Q8Block* q8, float* output,
                                       cudaStream_t stream) noexcept;
+
+int q4k_gate_up_swiglu_occupancy(unsigned int warps, bool staged) noexcept;
+void q4k_gate_up_swiglu_kernel_attributes(unsigned int warps, bool staged,
+                                          int* registers,
+                                          std::size_t* local_bytes,
+                                          int* occupancy) noexcept;
+
+cudaError_t launch_q4k_gate_up_swiglu_prequant(
+    const std::uint8_t* gate_weights, const std::uint8_t* up_weights,
+    std::size_t rows, std::size_t columns, const Q8Block* staged,
+    __nv_bfloat16* output, cudaStream_t stream) noexcept;
+
+cudaError_t launch_q4k_gate_up_swiglu(
+    const std::uint8_t* gate_weights, const std::uint8_t* up_weights,
+    std::size_t rows, std::size_t columns, const __nv_bfloat16* activation,
+    Q8Block* workspace, __nv_bfloat16* output, cudaStream_t stream) noexcept;
 
 cudaError_t launch_quant_mmq(QuantKind kind, const std::uint8_t* weights,
                              std::size_t output_rows, std::size_t columns,

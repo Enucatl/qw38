@@ -1,5 +1,6 @@
 #include "quant_mmv.h"
 #include "quant_mmq_mma.cuh"
+#include "ffn_decode_path.cuh"
 #include "q4k_decode_path.cuh"
 #include "q6k_decode_path.cuh"
 
@@ -210,6 +211,90 @@ __global__ void quant_mmv(const std::uint8_t* weights, std::size_t rows,
         sum, __shfl_down_sync(0xFFFFFFFFU, sum, offset, kWarpSize));
   }
   if (lane == 0) output[row] = sum;
+}
+
+__device__ __forceinline__ __nv_bfloat16 admitted_swiglu(float gate, float up) {
+  const float activated = gate / (1.0F + expf(-gate));
+  return __float2bfloat16_rn(__fmul_rn(activated, up));
+}
+
+// Two-pointer packed Q4_K gate/up: independent row pointers, one activation
+// load, separate accumulators, admitted SwiGLU in the epilogue. Gate and up
+// stay as distinct weight pointers.
+template <int Warps, bool UseStagedQ8>
+__global__ void quant_mmv_q4k_gate_up_swiglu(
+    const std::uint8_t* gate_weights, const std::uint8_t* up_weights,
+    std::size_t rows, std::size_t columns, const void* activation,
+    __nv_bfloat16* output) {
+  const int warp = threadIdx.x / kWarpSize;
+  const int lane = threadIdx.x & (kWarpSize - 1);
+  const std::size_t row =
+      static_cast<std::size_t>(blockIdx.x) * Warps + warp;
+  if (row >= rows) return;
+
+  const std::size_t n_blocks = columns / kValuesPerWeightBlock;
+  const std::uint8_t* gate_row =
+      gate_weights + row * n_blocks * kQ4KBytes;
+  const std::uint8_t* up_row = up_weights + row * n_blocks * kQ4KBytes;
+  float sum_g = 0.0F;
+  float sum_u = 0.0F;
+  for (std::size_t weight_block = 0; weight_block < n_blocks; ++weight_block) {
+    const std::uint8_t* gblock = gate_row + weight_block * kQ4KBytes;
+    const std::uint8_t* ublock = up_row + weight_block * kQ4KBytes;
+    const float gd = read_half(gblock);
+    const float gdmin = read_half(gblock + 2);
+    const float ud = read_half(ublock);
+    const float udmin = read_half(ublock + 2);
+    int gscales[8];
+    int gmins[8];
+    int uscales[8];
+    int umins[8];
+#pragma unroll
+    for (int smi = 0; smi < 8; ++smi) {
+      q4_scale_min(gblock + 4, smi, &gscales[smi], &gmins[smi]);
+      q4_scale_min(ublock + 4, smi, &uscales[smi], &umins[smi]);
+    }
+    std::uint8_t gqs[4];
+    std::uint8_t uqs[4];
+#pragma unroll
+    for (int group = 0; group < 4; ++group) {
+      gqs[group] = gblock[16 + group * 32 + lane];
+      uqs[group] = ublock[16 + group * 32 + lane];
+    }
+#pragma unroll
+    for (int i = 0; i < 8; ++i) {
+      const int group = i / 2;
+      const int high = i & 1;
+      const int gquant = high == 0 ? gqs[group] & 15 : gqs[group] >> 4;
+      const int uquant = high == 0 ? uqs[group] & 15 : uqs[group] >> 4;
+      const float gweight = gd * static_cast<float>(gscales[i] * gquant) -
+                            gdmin * static_cast<float>(gmins[i]);
+      const float uweight = ud * static_cast<float>(uscales[i] * uquant) -
+                            udmin * static_cast<float>(umins[i]);
+      const std::size_t column =
+          weight_block * kValuesPerWeightBlock +
+          static_cast<std::size_t>(lane + i * kWarpSize);
+      float value = 0.0F;
+      if constexpr (UseStagedQ8) {
+        const Q8Block* q8 = static_cast<const Q8Block*>(activation);
+        const Q8Block& block = q8[column / kWarpSize];
+        value = block.scale * static_cast<float>(block.values[column % kWarpSize]);
+      } else {
+        const __nv_bfloat16* act =
+            static_cast<const __nv_bfloat16*>(activation);
+        value = __bfloat162float(act[column]);
+      }
+      sum_g = __fadd_rn(sum_g, __fmul_rn(gweight, value));
+      sum_u = __fadd_rn(sum_u, __fmul_rn(uweight, value));
+    }
+  }
+  for (int offset = 16; offset > 0; offset /= 2) {
+    sum_g = __fadd_rn(
+        sum_g, __shfl_down_sync(0xFFFFFFFFU, sum_g, offset, kWarpSize));
+    sum_u = __fadd_rn(
+        sum_u, __shfl_down_sync(0xFFFFFFFFU, sum_u, offset, kWarpSize));
+  }
+  if (lane == 0) output[row] = admitted_swiglu(sum_g, sum_u);
 }
 
 template <QuantKind Kind, int PromptRowsPerTile>
@@ -617,6 +702,138 @@ cudaError_t launch_quant_mmv_prequant(QuantKind kind, const std::uint8_t* weight
   const bool packed = kind != QuantKind::kQ8_0;
   return launch_mmv_after_quant(kind, weights, rows, columns, q8, output, warps,
                                 packed, stream);
+}
+
+template <int Warps, bool UseStagedQ8>
+cudaError_t launch_gate_up_kernel(const std::uint8_t* gate_weights,
+                                  const std::uint8_t* up_weights,
+                                  std::size_t rows, std::size_t columns,
+                                  const void* activation,
+                                  __nv_bfloat16* output,
+                                  cudaStream_t stream) noexcept {
+  constexpr int kLaunchThreads = Warps * kWarpSize;
+  const unsigned int row_blocks =
+      static_cast<unsigned int>((rows + Warps - 1) / Warps);
+  quant_mmv_q4k_gate_up_swiglu<Warps, UseStagedQ8>
+      <<<row_blocks, kLaunchThreads, 0, stream>>>(
+          gate_weights, up_weights, rows, columns, activation, output);
+  return cudaPeekAtLastError();
+}
+
+template <bool UseStagedQ8>
+cudaError_t launch_gate_up_warps(const std::uint8_t* gate_weights,
+                                 const std::uint8_t* up_weights,
+                                 std::size_t rows, std::size_t columns,
+                                 const void* activation, __nv_bfloat16* output,
+                                 cudaStream_t stream) noexcept {
+  const unsigned int warps = selected_mmv_warps(rows);
+  if (warps == 4) {
+    return launch_gate_up_kernel<4, UseStagedQ8>(
+        gate_weights, up_weights, rows, columns, activation, output, stream);
+  }
+  if (warps == 8) {
+    return launch_gate_up_kernel<8, UseStagedQ8>(
+        gate_weights, up_weights, rows, columns, activation, output, stream);
+  }
+  return launch_gate_up_kernel<16, UseStagedQ8>(
+      gate_weights, up_weights, rows, columns, activation, output, stream);
+}
+
+cudaError_t launch_q4k_gate_up_swiglu_prequant(
+    const std::uint8_t* gate_weights, const std::uint8_t* up_weights,
+    std::size_t rows, std::size_t columns, const Q8Block* staged,
+    __nv_bfloat16* output, cudaStream_t stream) noexcept {
+  const unsigned int warps = selected_mmv_warps(rows);
+  if (gate_weights == nullptr || up_weights == nullptr || staged == nullptr ||
+      output == nullptr || rows == 0 || columns == 0 ||
+      columns % kValuesPerWeightBlock != 0 ||
+      (warps != 4 && warps != 8 && warps != 16)) {
+    return cudaErrorInvalidValue;
+  }
+  return launch_gate_up_warps<true>(gate_weights, up_weights, rows, columns,
+                                    staged, output, stream);
+}
+
+cudaError_t launch_q4k_gate_up_swiglu(
+    const std::uint8_t* gate_weights, const std::uint8_t* up_weights,
+    std::size_t rows, std::size_t columns, const __nv_bfloat16* activation,
+    Q8Block* workspace, __nv_bfloat16* output, cudaStream_t stream) noexcept {
+  (void)workspace;
+  const unsigned int warps = selected_mmv_warps(rows);
+  if (gate_weights == nullptr || up_weights == nullptr ||
+      activation == nullptr || output == nullptr || rows == 0 ||
+      columns == 0 || columns % kValuesPerWeightBlock != 0 ||
+      (warps != 4 && warps != 8 && warps != 16)) {
+    return cudaErrorInvalidValue;
+  }
+  return launch_gate_up_warps<false>(gate_weights, up_weights, rows, columns,
+                                     activation, output, stream);
+}
+
+int q4k_gate_up_swiglu_occupancy(unsigned int warps, bool staged) noexcept {
+  int occupancy = 0;
+  cudaError_t error = cudaErrorInvalidValue;
+  if (staged) {
+    if (warps == 4) {
+      error = cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+          &occupancy, quant_mmv_q4k_gate_up_swiglu<4, true>, 128, 0);
+    } else if (warps == 8) {
+      error = cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+          &occupancy, quant_mmv_q4k_gate_up_swiglu<8, true>, 256, 0);
+    } else if (warps == 16) {
+      error = cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+          &occupancy, quant_mmv_q4k_gate_up_swiglu<16, true>, 512, 0);
+    }
+  } else if (warps == 4) {
+    error = cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+        &occupancy, quant_mmv_q4k_gate_up_swiglu<4, false>, 128, 0);
+  } else if (warps == 8) {
+    error = cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+        &occupancy, quant_mmv_q4k_gate_up_swiglu<8, false>, 256, 0);
+  } else if (warps == 16) {
+    error = cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+        &occupancy, quant_mmv_q4k_gate_up_swiglu<16, false>, 512, 0);
+  }
+  if (error != cudaSuccess) return 0;
+  return occupancy;
+}
+
+void q4k_gate_up_swiglu_kernel_attributes(unsigned int warps, bool staged,
+                                          int* registers,
+                                          std::size_t* local_bytes,
+                                          int* occupancy) noexcept {
+  cudaFuncAttributes attrs{};
+  cudaError_t error = cudaErrorInvalidValue;
+  if (staged) {
+    if (warps == 4) {
+      error = cudaFuncGetAttributes(&attrs,
+                                    quant_mmv_q4k_gate_up_swiglu<4, true>);
+    } else if (warps == 8) {
+      error = cudaFuncGetAttributes(&attrs,
+                                    quant_mmv_q4k_gate_up_swiglu<8, true>);
+    } else if (warps == 16) {
+      error = cudaFuncGetAttributes(&attrs,
+                                    quant_mmv_q4k_gate_up_swiglu<16, true>);
+    }
+  } else if (warps == 4) {
+    error = cudaFuncGetAttributes(&attrs,
+                                  quant_mmv_q4k_gate_up_swiglu<4, false>);
+  } else if (warps == 8) {
+    error = cudaFuncGetAttributes(&attrs,
+                                  quant_mmv_q4k_gate_up_swiglu<8, false>);
+  } else if (warps == 16) {
+    error = cudaFuncGetAttributes(&attrs,
+                                  quant_mmv_q4k_gate_up_swiglu<16, false>);
+  }
+  if (registers != nullptr) *registers = error == cudaSuccess ? attrs.numRegs : 0;
+  if (local_bytes != nullptr) {
+    *local_bytes =
+        error == cudaSuccess ? static_cast<std::size_t>(attrs.localSizeBytes)
+                             : 0;
+  }
+  if (occupancy != nullptr) {
+    *occupancy = q4k_gate_up_swiglu_occupancy(warps, staged);
+  }
 }
 
 cudaError_t launch_quant_mmv_path(
