@@ -35,6 +35,16 @@ cudaError_t launch_quant_mmv(QuantKind kind, const std::uint8_t* weights,
                              Q8Block* q8_workspace, float* output,
                              cudaStream_t stream) noexcept;
 
+cudaError_t launch_quantize_bf16_q8(const __nv_bfloat16* activation,
+                                    Q8Block* q8, std::size_t columns,
+                                    cudaStream_t stream) noexcept;
+
+cudaError_t launch_quant_mmv_prequant(QuantKind kind,
+                                      const std::uint8_t* weights,
+                                      std::size_t rows, std::size_t columns,
+                                      const Q8Block* q8, float* output,
+                                      cudaStream_t stream) noexcept;
+
 cudaError_t launch_quant_mmq(QuantKind kind, const std::uint8_t* weights,
                              std::size_t output_rows, std::size_t columns,
                              const __nv_bfloat16* prompt,

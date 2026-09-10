@@ -108,7 +108,7 @@ are repository-relative unless stated otherwise.
 | OPT-039 | Warp-owned vector decode attention | OPT-038, OPT-036 | done | A/B warp-owned query-head attention against accepted 16-partition decode attention; keep only with frozen attention envelopes, exact candidate KV and state isolation, lower D2048 component time, improved D2048 versus the then-current keep oracle, P/D128/D2048 throughput floors of 95%, and both decode p95 measures at most 105%; otherwise reject | [`tasks/OPT-039.md`](tasks/OPT-039.md); [`pins/opt039_decode_warp_contract.json`](pins/opt039_decode_warp_contract.json); [`fixtures/opt039_decode_warp.json`](fixtures/opt039_decode_warp.json); [`cuda/opt039_decode_warp_ab_test.cu`](cuda/opt039_decode_warp_ab_test.cu); [`evidence/optimization/opt039-decode-warp/REPORT.md`](evidence/optimization/opt039-decode-warp/REPORT.md); verification 2026-09-10T09:13:29Z |
 | OPT-040 | Hoist prompt GDN inverse normalization | OPT-038, OPT-019 | done | A/B shared per-token/key-head inverse norms against repeated warp-column normalization; keep only with byte-equal quality outputs/state, frozen sequential GDN gates, lower complete GDN component time, improved P versus the then-current keep oracle, D128/D2048 throughput at least 95%, and both decode p95 measures at most 105%; otherwise reject | [`tasks/OPT-040.md`](tasks/OPT-040.md); [`pins/opt040_gdn_shared_inverse_contract.json`](pins/opt040_gdn_shared_inverse_contract.json); [`fixtures/opt040_gdn_shared_inverse.json`](fixtures/opt040_gdn_shared_inverse.json); [`cuda/opt040_gdn_shared_inverse_ab_test.cu`](cuda/opt040_gdn_shared_inverse_ab_test.cu); [`evidence/optimization/opt040-gdn-shared-inverse/REPORT.md`](evidence/optimization/opt040-gdn-shared-inverse/REPORT.md); verification 2026-09-10T10:08:22Z |
 | OPT-041 | Give prompt QK microtiles warp ownership | OPT-038, OPT-035 | done | A/B warp-owned prompt QK microtiles preserving existing virtual-warp partial order against shared cparts reduction; keep only with byte-equal quality attention outputs, frozen attention gates, lower complete component time, improved P versus the then-current keep oracle, D128/D2048 throughput at least 95%, and both decode p95 measures at most 105%; otherwise reject | [`tasks/OPT-041.md`](tasks/OPT-041.md); [`pins/opt041_fattn_warp_qk_contract.json`](pins/opt041_fattn_warp_qk_contract.json); [`fixtures/opt041_fattn_warp_qk.json`](fixtures/opt041_fattn_warp_qk.json); [`cuda/opt041_fattn_warp_qk_ab_test.cu`](cuda/opt041_fattn_warp_qk_ab_test.cu); [`evidence/optimization/opt041-fattn-warp-qk/REPORT.md`](evidence/optimization/opt041-fattn-warp-qk/REPORT.md); verification 2026-09-10T11:35:00Z |
-| OPT-042 | Study integer decode MMV admissibility | OPT-038, OPT-034 | pending | Retain paired FP32-packed versus Q4_K integer-dot diagnostic timings and complete numeric results using unchanged FP32-scale Q8 staging on synthetic and real FFN inputs, report fixed CUD-001 envelope eligibility and a promotion/rejection recommendation without changing production dispatch or keep denominators; `claims_performance_improvement: false` | — |
+| OPT-042 | Study integer decode MMV admissibility | OPT-038, OPT-034 | done | Retain paired FP32-packed versus Q4_K integer-dot diagnostic timings and complete numeric results using unchanged FP32-scale Q8 staging on synthetic and real FFN inputs, report fixed CUD-001 envelope eligibility and a promotion/rejection recommendation without changing production dispatch or keep denominators; `claims_performance_improvement: false` | [`tasks/OPT-042.md`](tasks/OPT-042.md); [`pins/opt042_mmv_integer_study_contract.json`](pins/opt042_mmv_integer_study_contract.json); [`fixtures/opt042_mmv_integer_study.json`](fixtures/opt042_mmv_integer_study.json); [`cuda/opt042_mmv_integer_study.cu`](cuda/opt042_mmv_integer_study.cu); [`tests/test_opt042_mmv_integer_study.py`](tests/test_opt042_mmv_integer_study.py); [`evidence/optimization/opt042-mmv-integer-study/REPORT.md`](evidence/optimization/opt042-mmv-integer-study/REPORT.md); verification 2026-09-10T12:09:20Z |
 
 ### 2026-09-04T13:09:32Z — OPT-005 delivered
 
@@ -5312,3 +5312,60 @@ are repository-relative unless stated otherwise.
 - Marked OPT-041 `done`; delivery is limited to the verified task scope
   plus this ledger/audit bookkeeping. `plan.md` is unchanged. OPT-016
   stays `blocked`. Next eligible pending by ledger row order: **OPT-042**.
+
+### 2026-09-10T11:44:18Z — OPT-042 planning admitted
+
+- Planning produced decision-complete dossier [`tasks/OPT-042.md`](tasks/OPT-042.md).
+  Coupled IDs: none. Unresolved decisions: none. Plan impact: none.
+- Diagnostic-only integer Q4_K decode-MMV feasibility study. Chosen sink
+  is live OPT-038 D2048 decode `ffn_mmv` **20.2506523** ms. Candidate
+  keeps Quartz FP32-scale `Q8Block` staging and pairs packed FP32 MMV
+  against subgroup `__dp4a` dots. Complete (stage+MMV) weighted means on
+  synthetic and real FFN inputs decide `eligible_and_faster` /
+  `numeric_reject` / `performance_reject` under frozen decode-MMV
+  envelope max abs `3e-4` / RMS `2e-4`. Production dispatch stays packed.
+  This increment does not publish a successor oracle.
+- Accepted keep denominators remain
+  [`fixtures/opt041_fattn_warp_qk.json`](fixtures/opt041_fattn_warp_qk.json):
+  Quartz P **2076.98315**, D128 **26.1599541**, D2048 **25.2924843**,
+  D128 all-token p95 **38.3730087** / run-mean p95 **38.2578201**,
+  D2048 all-token p95 **39.6526222** / run-mean p95 **39.5695038**.
+- Marked OPT-042 `in_progress`. Non-final audit row inserted. No commit.
+  `plan.md` is unchanged.
+
+### 2026-09-10T12:09:52Z — OPT-042 delivered (numeric_reject)
+
+- Independent verification attempt 1 passed. Diagnostic-only integer Q4_K
+  decode-MMV admissibility study pairs packed FP32 MMV against subgroup
+  `__dp4a` dots on unchanged FP32-scale `Q8Block` staging. Exclusive
+  RTX 5090 sitting wrote
+  [`fixtures/opt042_mmv_integer_study.json`](fixtures/opt042_mmv_integer_study.json)
+  (`measurement_utc` 2026-09-10T12:04:18Z; complete weighted means
+  synthetic packed **0.0666723549** ms vs integer **0.0607566237** ms;
+  real packed **0.0675881952** ms vs integer **0.061906416** ms;
+  `admissibility` `numeric_reject`; `promote_to_production_ab` false;
+  `selected_mmv_load_path` `packed`; `claims_performance_improvement`
+  false). Synthetic production shapes `q4k_gate_up` / `q4k_down` miss
+  frozen CUD-001 max abs `3e-4` / RMS `2e-4` for **both** candidates, so
+  the frozen rule rejects promotion even though integer complete means are
+  lower. Production `kSelectedMmvLoadPath` stays `packed`; OPT-041 keep
+  denominators unchanged. Coupled IDs: none. Delivery re-check:
+  `uv run pytest -q tests/test_opt042_mmv_integer_study.py
+  tests/test_documentation.py`.
+- Acceptance evidence: [`tasks/OPT-042.md`](tasks/OPT-042.md);
+  [`pins/opt042_mmv_integer_study_contract.json`](pins/opt042_mmv_integer_study_contract.json);
+  [`fixtures/opt042_mmv_integer_study.json`](fixtures/opt042_mmv_integer_study.json);
+  [`cuda/opt042_mmv_integer_study.cu`](cuda/opt042_mmv_integer_study.cu);
+  [`cuda/quant_mmv.cu`](cuda/quant_mmv.cu);
+  [`cuda/quant_mmv.h`](cuda/quant_mmv.h);
+  [`tests/test_opt042_mmv_integer_study.py`](tests/test_opt042_mmv_integer_study.py);
+  [`evidence/optimization/opt042-mmv-integer-study/REPORT.md`](evidence/optimization/opt042-mmv-integer-study/REPORT.md);
+  [`docs/39-cuda-quant-mmv.md`](docs/39-cuda-quant-mmv.md);
+  [`docs/06-system-optimization.md`](docs/06-system-optimization.md).
+  Proof is paired packed-versus-integer diagnostic timings and CUD-001
+  eligibility under the fixed decode-MMV envelope, not a throughput keep,
+  not 2K parity, not a successor oracle. Tok/s delta **0** (baseline
+  unchanged).
+- Marked OPT-042 `done`; delivery is limited to the verified task scope
+  plus this ledger/audit bookkeeping. `plan.md` is unchanged. OPT-016
+  stays `blocked`. Next eligible pending by ledger row order: **OPT-031**.

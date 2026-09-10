@@ -87,6 +87,29 @@ exclusive A/B milliseconds and P / D128 / D2048 tok/s stay in the
 report; this chapter does not replace them:
 [`evidence/optimization/opt034-packed-mmv/REPORT.md`](../evidence/optimization/opt034-packed-mmv/REPORT.md).
 
+## Integer-dot decode MMV admissibility study (OPT-042)
+
+**Measured diagnostic, RTX 5090:** a study-only Q4_K `__dp4a` integer-dot
+candidate on unchanged FP32-scale `Q8Block` staging was A/B'd against
+production packed FP32 MMV on CUD-001 probe shapes, synthetic production FFN
+gate/up (`17408×5120`) and down (`5120×17408`) shapes, and real layer-0/3/63
+gate/up/down with prefix-2048 `post_prefix_hidden` activations. Complete
+(stage+MMV) and prequant (MMV-only) views used 3 warm + 30 alternating pairs.
+Synthetic weighted complete means: packed **0.0666723549** ms, integer
+**0.0607566237** ms. Real weighted complete means: packed **0.0675881952** ms,
+integer **0.061906416** ms. Integer occupancy warps 4/8/16 → 12/6/3 (all ≥
+1); `staging_equal` true; candidate versus host-integer association is
+byte-equal on every case. **Reject (`numeric_reject`):** synthetic production
+shapes `q4k_gate_up` and `q4k_down` miss the frozen CUD-001 envelope (`3e-4`
+max abs, `2e-4` RMS) for **both** packed and integer (e.g. gate/up packed max
+abs **3.35693359e-4**, down packed max abs **2.31933594e-3**); probes and all
+real gate/up/down pass. Production pin stays `packed`; `legal_mmv_load_path`
+stays `{elementwise, packed}`. Integer-dot is not installed. This increment
+**claims no performance improvement** and does not publish a successor oracle.
+Accepted keep denominators remain unchanged. Live numbers stay in the report;
+this chapter does not replace them:
+[`evidence/optimization/opt042-mmv-integer-study/REPORT.md`](../evidence/optimization/opt042-mmv-integer-study/REPORT.md).
+
 ## What is compared
 
 [`cuda/quant_mmv_test.cu`](../cuda/quant_mmv_test.cu) builds deterministic packed

@@ -557,6 +557,37 @@ cudaError_t launch_quant_mmv(QuantKind kind, const std::uint8_t* weights,
                                stream);
 }
 
+cudaError_t launch_quantize_bf16_q8(const __nv_bfloat16* activation, Q8Block* q8,
+                                    std::size_t columns,
+                                    cudaStream_t stream) noexcept {
+  if (activation == nullptr || q8 == nullptr || columns == 0 ||
+      columns % kValuesPerWeightBlock != 0) {
+    return cudaErrorInvalidValue;
+  }
+  const unsigned int quant_blocks =
+      static_cast<unsigned int>((columns + kThreads - 1) / kThreads);
+  quantize_bf16_q8<<<quant_blocks, kThreads, 0, stream>>>(activation, q8,
+                                                          columns);
+  return cudaPeekAtLastError();
+}
+
+cudaError_t launch_quant_mmv_prequant(QuantKind kind, const std::uint8_t* weights,
+                                      std::size_t rows, std::size_t columns,
+                                      const Q8Block* q8, float* output,
+                                      cudaStream_t stream) noexcept {
+  const unsigned int warps = selected_mmv_warps(rows);
+  if (weights == nullptr || q8 == nullptr || output == nullptr || rows == 0 ||
+      columns == 0 || columns % kValuesPerWeightBlock != 0 ||
+      (warps != 4 && warps != 8 && warps != 16) ||
+      (kind != QuantKind::kQ4K && kind != QuantKind::kQ6K &&
+       kind != QuantKind::kQ8_0)) {
+    return cudaErrorInvalidValue;
+  }
+  const bool packed = kind != QuantKind::kQ8_0;
+  return launch_mmv_after_quant(kind, weights, rows, columns, q8, output, warps,
+                                packed, stream);
+}
+
 cudaError_t launch_quant_mmv_path(
     QuantKind kind, const std::uint8_t* weights, std::size_t rows,
     std::size_t columns, const __nv_bfloat16* activation,

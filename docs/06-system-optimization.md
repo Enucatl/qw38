@@ -625,6 +625,29 @@ llama.cpp is informational. Live tok/s stay in the report; this chapter does
 not replace them:
 [`evidence/optimization/opt041-fattn-warp-qk/REPORT.md`](../evidence/optimization/opt041-fattn-warp-qk/REPORT.md).
 
+## Integer-dot decode MMV admissibility (OPT-042)
+
+**Measured diagnostic, RTX 5090:** decode Q4_K FFN MMV behind production
+`launch_quant_mmv` (`packed`) was A/B'd against a study-only `__dp4a`
+integer-dot candidate that keeps Quartz FP32-scale `Q8Block` staging.
+Paired complete and prequant CUDA-event timings cover CUD-001 probes, synthetic
+production gate/up and down shapes, and real layer-0/3/63 gate/up/down with
+prefix-2048 activations. Synthetic weighted complete means: packed
+**0.0666723549** ms, integer **0.0607566237** ms. Real weighted complete
+means: packed **0.0675881952** ms, integer **0.061906416** ms. **Reject
+(`numeric_reject`):** synthetic production shapes miss the frozen CUD-001
+envelope for both packed and integer even though integer complete means are
+lower on both synthetic and real weighted views; probes and all real gate/up/down
+pass. Production dispatch, `kSelectedMmvLoadPath`, `quantize_bf16_q8`, decode
+FFN graphs, and public APIs stay unchanged. Mixer Q8_0 and Q6_K logits siblings
+were not run. Keep denominators are the frozen then-current accepted P and
+D128/D2048 means and p95s copied into the contract. This increment **claims no
+performance improvement** and does not publish a successor oracle. Frozen
+CUD-001 envelopes are unloosened. `reverted` is false. This increment does not
+own the 2K llama.cpp parity gate. Quartz ≥ llama.cpp is informational. Live
+numbers stay in the report; this chapter does not replace them:
+[`evidence/optimization/opt042-mmv-integer-study/REPORT.md`](../evidence/optimization/opt042-mmv-integer-study/REPORT.md).
+
 ## DwarfStar transfer boundary
 
 Reuse MMV/MMQ phase split, quant block tests, explicit unavailable paths, stable

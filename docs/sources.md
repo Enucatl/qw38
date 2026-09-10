@@ -872,6 +872,35 @@ baseline.
   lower complete component time; improved P; cross-workload guard; does not
   substitute for the 2K llama.cpp parity gate; Quartz ≥ llama.cpp is not this
   gate. Envelopes unloosened; Nsight is not used.
+- OPT-042 adapts the pinned llama.cpp revision
+  `cc83d7b4824f73cfdda4dfbb47ee39804f71b328` (MIT, The ggml authors)
+  `vecdotq.cuh` Q4_K `__dp4a` integer-dot technique (`vec_dot_q4_K_q8_1`)
+  against Quartz FP32-scale `Q8Block` staging, not `block_q8_1`. This increment
+  does not vendor `vecdotq.cuh` or `mmvq.cu`, does not include ggml headers,
+  and does not add `integer` to `legal_mmv_load_path`. The integer-dot kernel
+  lives only in `cuda/opt042_mmv_integer_study.cu`; production
+  `launch_quant_mmv` and `kSelectedMmvLoadPath = packed` stay. **Measured
+  diagnostic, RTX 5090:** paired complete and prequant A/B on CUD-001 probes,
+  synthetic production FFN gate/up and down shapes, and real layer-0/3/63
+  gate/up/down; synthetic weighted complete packed **0.0666723549** ms versus
+  integer **0.0607566237** ms; real weighted complete packed **0.0675881952**
+  ms versus integer **0.061906416** ms; `admissibility` `numeric_reject`
+  because synthetic production shapes miss the frozen CUD-001 envelope for both
+  candidates; `promote_to_production_ab` false; `claims_performance_improvement`
+  false; `selected_mmv_load_path` `packed`; `staging_equal` true. Live numbers
+  stay in the report; this ledger does not replace them. The schema-1 contract,
+  measured fixture, and report are
+  [`pins/opt042_mmv_integer_study_contract.json`](../pins/opt042_mmv_integer_study_contract.json),
+  [`fixtures/opt042_mmv_integer_study.json`](../fixtures/opt042_mmv_integer_study.json),
+  and
+  [`evidence/optimization/opt042-mmv-integer-study/REPORT.md`](../evidence/optimization/opt042-mmv-integer-study/REPORT.md).
+  The beginner explanations are
+  [`docs/39-cuda-quant-mmv.md`](39-cuda-quant-mmv.md) and
+  [`docs/06-system-optimization.md`](06-system-optimization.md).
+  Proof limit: claims no performance improvement; fixed CUD-001 envelope;
+  unchanged FP32-scale Q8 staging; production dispatch unchanged; accepted keep
+  denominators remain unchanged; does not substitute for the 2K llama.cpp parity
+  gate; integer-dot is diagnostic only. Envelopes unloosened; Nsight is not used.
 - OPT-029 adapts llama.cpp revision
   `cc83d7b4824f73cfdda4dfbb47ee39804f71b328` (MIT, The ggml authors)
   warp-column GDN recurrence from `gated_delta_net.cu` (`S_v=128`,
