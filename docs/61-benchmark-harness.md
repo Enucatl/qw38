@@ -1,14 +1,17 @@
 # The benchmark harness
 
-[Index](README.md) · Implementation tasks: BEN-001, OPT-032, EDU-046, and SCH-002 in
+[Index](README.md) · Implementation tasks: BEN-001, OPT-032, OPT-038, EDU-046, and SCH-002 in
 [`implementation_ledger.md`](../implementation_ledger.md) · Contracts:
 [`pins/benchmark_contract.json`](../pins/benchmark_contract.json),
-[`pins/opt032_decode_oracle_contract.json`](../pins/opt032_decode_oracle_contract.json)
+[`pins/opt032_decode_oracle_contract.json`](../pins/opt032_decode_oracle_contract.json),
+[`pins/opt038_post_ladder_gap_contract.json`](../pins/opt038_post_ladder_gap_contract.json)
 · Evidence:
 [`fixtures/benchmark_harness.json`](../fixtures/benchmark_harness.json),
 [`evidence/benchmark`](../evidence/benchmark),
-[`fixtures/opt032_decode_oracle.json`](../fixtures/opt032_decode_oracle.json), and
-[`evidence/optimization/opt032-decode-oracle/REPORT.md`](../evidence/optimization/opt032-decode-oracle/REPORT.md)
+[`fixtures/opt032_decode_oracle.json`](../fixtures/opt032_decode_oracle.json),
+[`fixtures/opt038_post_ladder_gap.json`](../fixtures/opt038_post_ladder_gap.json), and
+[`evidence/optimization/opt032-decode-oracle/REPORT.md`](../evidence/optimization/opt032-decode-oracle/REPORT.md),
+[`evidence/optimization/opt038-post-ladder-gap/REPORT.md`](../evidence/optimization/opt038-post-ladder-gap/REPORT.md)
 
 ## What a benchmark is
 
@@ -144,6 +147,25 @@ not require Quartz ≥ llama.cpp. Live tok/s stay in
 [`evidence/optimization/opt032-decode-oracle/REPORT.md`](../evidence/optimization/opt032-decode-oracle/REPORT.md)
 and [`fixtures/opt032_decode_oracle.json`](../fixtures/opt032_decode_oracle.json).
 
+OPT-038 is a frozen exclusive-RTX-5090 **post-ladder P, D128, and D2048 refresh**,
+not a BEN-001 `qw38-bench` result and not a change to this harness or its JSON
+schema. It reuses the OPT-021 P and OPT-032 D128/D2048 oracle executables
+unchanged (`task` stays `OPT-021` / `OPT-032` on those binaries) and adds
+separate OPT-038 attribution diagnostics with independent raw host-wall fields.
+Live measurements are retained from one same-sitting pass; accepted keep
+denominators remain the frozen OPT-034 copies (P **1869.84412**, D128
+**25.3816128**, D2048 **20.169548** tok/s). This increment **claims no
+performance improvement**, does not publish a successor oracle, does not
+substitute for the 2K llama.cpp parity gate, and does not require Quartz ≥
+llama.cpp. Random-token `llama-bench` decode stays informational. Recorded
+`next_task_order` and matched-component experiment specifications steer later
+transferable work; they are not keep/reject gates. Live tok/s, gaps, raw-wall
+accounting, and the order stay in the report; this chapter does not replace
+them:
+[`evidence/optimization/opt038-post-ladder-gap/REPORT.md`](../evidence/optimization/opt038-post-ladder-gap/REPORT.md)
+and
+[`fixtures/opt038_post_ladder_gap.json`](../fixtures/opt038_post_ladder_gap.json).
+
 An unavailable measurement is JSON `null`, not zero. Zero would mean an event
 was measured and took no representable time. Queue time is `null` because this
 single-process harness has no HTTP queue. Persistence is `null` when no save or
@@ -204,7 +226,11 @@ separate diagnostic sitting, not a BEN-001 workload, not the 2K parity gate,
 and not an admission of Quartz ≥ llama.cpp. OPT-032 likewise leaves this
 harness unchanged: the P/D128/D2048 oracles and the pinned `llama.h` decode
 driver are separate diagnostics; random llama-bench decode is informational;
-exclusive decode categories are not `component_probe` fields.
+exclusive decode categories are not `component_probe` fields. OPT-038 likewise
+leaves this harness unchanged: the post-ladder refresh reuses those oracle
+protocols, adds independent raw-wall attribution diagnostics, and records a
+host-recomputed next-task order without changing accepted keep denominators or
+public `component_probe` fields.
 
 ## Reproduce a smoke safely
 

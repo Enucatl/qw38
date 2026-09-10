@@ -1,6 +1,6 @@
 # Chunked full-model CUDA prefill
 
-[Index](README.md) · Implementation tasks: SCH-002, MEM-002, OPT-008, OPT-009, OPT-011, OPT-012, OPT-013, OPT-014, OPT-015, OPT-017, OPT-018, OPT-019, OPT-020, OPT-021, OPT-022, OPT-023, OPT-024, OPT-025, OPT-026, OPT-027, OPT-028, OPT-029, OPT-030, OPT-032, OPT-033, OPT-035, OPT-037, and EDU-047 in
+[Index](README.md) · Implementation tasks: SCH-002, MEM-002, OPT-008, OPT-009, OPT-011, OPT-012, OPT-013, OPT-014, OPT-015, OPT-017, OPT-018, OPT-019, OPT-020, OPT-021, OPT-022, OPT-023, OPT-024, OPT-025, OPT-026, OPT-027, OPT-028, OPT-029, OPT-030, OPT-032, OPT-033, OPT-035, OPT-037, OPT-038, and EDU-047 in
 [`implementation_ledger.md`](../implementation_ledger.md) · Contracts:
 [`pins/cuda_prompt_scheduler_contract.json`](../pins/cuda_prompt_scheduler_contract.json),
 [`pins/cuda_prompt_pipeline_contract.json`](../pins/cuda_prompt_pipeline_contract.json),
@@ -753,6 +753,27 @@ in the report:
 [`pins/opt032_decode_oracle_contract.json`](../pins/opt032_decode_oracle_contract.json),
 and [`fixtures/opt032_decode_oracle.json`](../fixtures/opt032_decode_oracle.json).
 
+OPT-038 refreshes live exclusive 4K prefill attribution on one cold
+exact-4096 production `sync_tokens` with graphs created on current production
+objects after the OPT-033–OPT-037 ladder. At 4096, prompt FFN graphs replay, so
+`graph` is measured and `prompt_graph_launches == 64`. The P throughput oracle
+in that sitting still uses attribution null and graphs created (the OPT-021
+protocol). New OPT-038 diagnostics additionally record independent
+`raw_host_wall_ms` alongside the unchanged `finish_prefill_attribution`
+adjusted reconstruction. Historical 2048-token mixer-versus-core
+[`fixtures/opt020_prefill_split.json`](../fixtures/opt020_prefill_split.json)
+and OPT-032 attribution fixtures are unchanged. Exclusive decode categories on
+one production token after D128 and D2048 prefixes are owned by chapter 51;
+decode exclusive milliseconds for the live sitting live in the post-ladder gap
+fixture. This increment **claims no performance improvement**, does not publish a
+successor oracle, and does not substitute for the 2K llama.cpp parity gate.
+Accepted keep denominators remain the frozen OPT-034 copies. Live tok/s and
+exclusive milliseconds stay in the report:
+[`evidence/optimization/opt038-post-ladder-gap/REPORT.md`](../evidence/optimization/opt038-post-ladder-gap/REPORT.md),
+[`pins/opt038_post_ladder_gap_contract.json`](../pins/opt038_post_ladder_gap_contract.json),
+and
+[`fixtures/opt038_post_ladder_gap.json`](../fixtures/opt038_post_ladder_gap.json).
+
 OPT-033 keeps register-resident value accumulation on production 4096-row
 fattn-mma stream-K including combine. **Measured, RTX 5090:** paired
 CUDA-event A/B among `global` and `registers`; winner `registers` with
@@ -842,7 +863,14 @@ second 4K ladder is not exhausted. OPT-032 records frozen P/D128/D2048
 oracles, exclusive decode categories, a 4K attribution refresh with graphs
 created, matched llama.cpp public-API decode measurements, and a recorded
 next-task order; it claims no performance improvement, is not the 2K parity
-gate, not Quartz ≥ llama.cpp, and not a BEN-001 `qw38-bench` result. OPT-033
+gate, not Quartz ≥ llama.cpp, and not a BEN-001 `qw38-bench` result. OPT-038
+records the post-ladder refresh of those oracles and attributions on current
+production objects, independent raw host-wall accounting, matched-component
+experiment specifications, and a host-recomputed next-task order over pending
+transferable IDs; it claims no performance improvement, does not publish a
+successor oracle, leaves accepted keep denominators unchanged, is not the 2K
+parity gate, not Quartz ≥ llama.cpp, and not a BEN-001 `qw38-bench` result.
+OPT-033
 records register-resident prefill attention value sums and a live 4K keep
 versus the then-current accepted P denominator with the D128/D2048 guard;
 production fattn remains `stream_k` (`grid.z=2`) with `registers` value

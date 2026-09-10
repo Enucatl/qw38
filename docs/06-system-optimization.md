@@ -305,9 +305,9 @@ gated-output. OPT-030 retained a reject: PDL A/B won (`pdl`) but cold
 exact-4096 mean tok/s did not strictly beat the OPT-026 oracle, so
 production stays ordinary `<<<>>>` (`kSelectedPdlPath` `off`). Remaining
 second-ladder pick after the PDL reject is OPT-031. Evidence:
-[`evidence/optimization/speedup-loop-post026/REPORT.md`](../evidence/optimization/speedup-loop-post026/REPORT.md);
-method: [`speedup-plan.md`](../speedup-plan.md). This is instrumentation and
-task admission, **not** the 2K llama.cpp parity gate.
+[`evidence/optimization/speedup-loop-post026/REPORT.md`](../evidence/optimization/speedup-loop-post026/REPORT.md).
+This is instrumentation and task admission, **not** the 2K llama.cpp parity
+gate.
 
 ## Persistent Ada+ fattn stream-K (OPT-027)
 
@@ -523,6 +523,34 @@ not own the 2K llama.cpp parity gate. Quartz ≥ llama.cpp is
 informational. Live numbers stay in the report; this chapter does not
 replace them:
 [`evidence/optimization/opt037-ffn-tiles/REPORT.md`](../evidence/optimization/opt037-ffn-tiles/REPORT.md).
+
+## Post-ladder attribution and source gap map (OPT-038)
+
+**Measured protocol/baseline, RTX 5090:** one exclusive sitting refreshes the
+frozen exact-4096 P oracle (attribution null, graphs created; same protocol as
+OPT-021) together with D128 and D2048 decode oracles (same protocol as OPT-032)
+on current production objects after the OPT-033–OPT-037 ladder. New OPT-038
+attribution diagnostics add independent `raw_host_wall_ms` alongside unchanged
+`finish_*_attribution` adjusted reconstruction; `finish_decode_attribution` may
+still raise decode wall when graph host time overlaps exclusive CUDA events.
+Exclusive decode categories and a refreshed 4K prefill attribution reconstruct
+their adjusted walls; `prompt_graph_launches == 64` at 4096. Matched pinned
+llama.cpp decode uses the public `llama.h` driver and `llama_time_us()`; random-
+token `llama-bench` decode is informational. Matched-component experiment
+specifications in `COMPONENT-PROTOCOL.md` were not run in this sitting.
+Production kernels were not changed. This increment **claims no performance
+improvement** and does not publish a successor oracle. Accepted keep
+denominators remain the frozen OPT-034 copies (P **1869.84412**, D128
+**25.3816128**, D2048 **20.169548** tok/s). Sitting P versus those copies is
+informational variance, not a keep. Quartz ≥ llama.cpp is not this gate. This is
+**not** the 2K llama.cpp parity gate. Recorded `next_task_order` from the
+frozen live-sink algorithm is `["OPT-042", "OPT-041", "OPT-040", "OPT-039"]`
+(`next_task` `OPT-042`). Live tok/s, gaps, exclusive milliseconds, raw-wall
+fields, and the order stay in the report; this chapter does not replace them:
+[`evidence/optimization/opt038-post-ladder-gap/REPORT.md`](../evidence/optimization/opt038-post-ladder-gap/REPORT.md),
+[`evidence/optimization/opt038-post-ladder-gap/COMPONENT-PROTOCOL.md`](../evidence/optimization/opt038-post-ladder-gap/COMPONENT-PROTOCOL.md),
+and
+[`fixtures/opt038_post_ladder_gap.json`](../fixtures/opt038_post_ladder_gap.json).
 
 ## DwarfStar transfer boundary
 

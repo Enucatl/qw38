@@ -104,7 +104,7 @@ are repository-relative unless stated otherwise.
 | OPT-035 | MMA attention probability times V | OPT-033 | done | A/B full 4096-row attention using dual-F16 probability×V MMA; retain frozen attention envelopes, lower component time, improved P, and the cross-workload guard; otherwise reject | [`tasks/OPT-035.md`](tasks/OPT-035.md); [`pins/opt035_pv_mma_contract.json`](pins/opt035_pv_mma_contract.json); [`fixtures/opt035_pv_mma.json`](fixtures/opt035_pv_mma.json); [`cuda/fattn_pv_mma_ab_test.cu`](cuda/fattn_pv_mma_ab_test.cu); [`evidence/optimization/opt035-pv-mma/REPORT.md`](evidence/optimization/opt035-pv-mma/REPORT.md); verification 2026-09-09T19:58:00Z |
 | OPT-036 | Partition KV for vector decode attention | OPT-032, OPT-026 | done | A/B one-token vector attention at 1/4/8/16 KV partitions for D128/D2048 with deterministic partial-statistic merge; keep only with frozen attention envelopes, lower component time, improved D2048, and the cross-workload guard; otherwise reject | [`tasks/OPT-036.md`](tasks/OPT-036.md); [`pins/opt036_decode_kv_partition_contract.json`](pins/opt036_decode_kv_partition_contract.json); [`fixtures/opt036_decode_kv_partition.json`](fixtures/opt036_decode_kv_partition.json); [`cuda/decode_kv_partition_ab_test.cu`](cuda/decode_kv_partition_ab_test.cu); [`evidence/optimization/opt036-decode-kv-partition/REPORT.md`](evidence/optimization/opt036-decode-kv-partition/REPORT.md); verification 2026-09-09T17:32:00Z |
 | OPT-037 | Select 4K FFN tiles per projection | OPT-032, OPT-025 | done | Sweep quality-MMQ I={64,128}, J={32,64,128} independently for 4096-row gate/up/down, preserve shared-Y and recapture graphs; keep only with admitted component wins, improved P, frozen MMQ envelopes, and the cross-workload guard; otherwise reject | [`tasks/OPT-037.md`](tasks/OPT-037.md); [`pins/opt037_ffn_tile_contract.json`](pins/opt037_ffn_tile_contract.json); [`fixtures/opt037_ffn_tiles.json`](fixtures/opt037_ffn_tiles.json); [`cuda/ffn_tile_ab_test.cu`](cuda/ffn_tile_ab_test.cu); [`tests/test_opt037_ffn_tiles.py`](tests/test_opt037_ffn_tiles.py); [`evidence/optimization/opt037-ffn-tiles/REPORT.md`](evidence/optimization/opt037-ffn-tiles/REPORT.md); [`evidence/optimization/opt037-ffn-tiles/REJECTION.md`](evidence/optimization/opt037-ffn-tiles/REJECTION.md); verification 2026-09-09T23:03:58Z |
-| OPT-038 | Refresh post-ladder attribution and source gap map | OPT-032, OPT-034, OPT-035, OPT-036, OPT-037 | pending | Retain fresh frozen-protocol P/D128/D2048 measurements, current subsystem breakdowns, independent raw host-wall accounting, pinned llama.cpp comparisons and matched-component experiment specifications, and a reproducible next-task order; `claims_performance_improvement: false`; accepted keep denominators remain unchanged | — |
+| OPT-038 | Refresh post-ladder attribution and source gap map | OPT-032, OPT-034, OPT-035, OPT-036, OPT-037 | done | Retain fresh frozen-protocol P/D128/D2048 measurements, current subsystem breakdowns, independent raw host-wall accounting, pinned llama.cpp comparisons and matched-component experiment specifications, and a reproducible next-task order; `claims_performance_improvement: false`; accepted keep denominators remain unchanged | [`tasks/OPT-038.md`](tasks/OPT-038.md); [`pins/opt038_post_ladder_gap_contract.json`](pins/opt038_post_ladder_gap_contract.json); [`fixtures/opt038_post_ladder_gap.json`](fixtures/opt038_post_ladder_gap.json); [`cuda/opt038_prefill_attribution_test.cu`](cuda/opt038_prefill_attribution_test.cu); [`cuda/opt038_decode_attribution_test.cu`](cuda/opt038_decode_attribution_test.cu); [`tests/test_opt038_post_ladder_gap.py`](tests/test_opt038_post_ladder_gap.py); [`evidence/optimization/opt038-post-ladder-gap/REPORT.md`](evidence/optimization/opt038-post-ladder-gap/REPORT.md); [`evidence/optimization/opt038-post-ladder-gap/COMPONENT-PROTOCOL.md`](evidence/optimization/opt038-post-ladder-gap/COMPONENT-PROTOCOL.md); verification 2026-09-10T08:17:30Z |
 | OPT-039 | Warp-owned vector decode attention | OPT-038, OPT-036 | pending | A/B warp-owned query-head attention against accepted 16-partition decode attention; keep only with frozen attention envelopes, exact candidate KV and state isolation, lower D2048 component time, improved D2048 versus the then-current keep oracle, P/D128/D2048 throughput floors of 95%, and both decode p95 measures at most 105%; otherwise reject | — |
 | OPT-040 | Hoist prompt GDN inverse normalization | OPT-038, OPT-019 | pending | A/B shared per-token/key-head inverse norms against repeated warp-column normalization; keep only with byte-equal quality outputs/state, frozen sequential GDN gates, lower complete GDN component time, improved P versus the then-current keep oracle, D128/D2048 throughput at least 95%, and both decode p95 measures at most 105%; otherwise reject | — |
 | OPT-041 | Give prompt QK microtiles warp ownership | OPT-038, OPT-035 | pending | A/B warp-owned prompt QK microtiles preserving existing virtual-warp partial order against shared cparts reduction; keep only with byte-equal quality attention outputs, frozen attention gates, lower complete component time, improved P versus the then-current keep oracle, D128/D2048 throughput at least 95%, and both decode p95 measures at most 105%; otherwise reject | — |
@@ -5105,3 +5105,66 @@ are repository-relative unless stated otherwise.
 - Recommended explicit next task: OPT-038. Unchanged row order leaves OPT-031 as
   the next eligible pending task for automatic ledger execution.
 - OPT-016 remains the blocked exact-2K parity owner; `plan.md` is unchanged.
+
+### 2026-09-10T07:06:45Z — OPT-038 planning admitted
+
+- Planning produced decision-complete dossier [`tasks/OPT-038.md`](tasks/OPT-038.md).
+  Coupled IDs: none. Unresolved decisions: none. Plan impact: none.
+- Measurement-only refresh. Reuse frozen P/D128/D2048 oracle executables.
+  New attribution diagnostics store independent raw host wall, GPU-event
+  sum, graph-host interval, and adjusted reconstruction as separate fields
+  without modifying `finish_decode_attribution`.
+- Accepted keep denominators remain
+  [`fixtures/opt034_packed_mmv.json`](fixtures/opt034_packed_mmv.json):
+  Quartz P **1869.84412**, D128 **25.3816128**, D2048 **20.169548**,
+  D128 all-token p95 **39.9736366** / run-mean p95 **39.4155655**,
+  D2048 all-token p95 **50.2872772** / run-mean p95 **49.590683**.
+  This increment does not publish a successor oracle.
+- Next-task order is a host-recomputed function of live P-versus-D2048
+  gaps and live exclusive milliseconds over the pending transferable
+  ideas after this map. Mixer/GDN prompt graphs stay pending under the
+  existing mixer/GDN graph task and are not inserted into that array.
+- Marked OPT-038 `in_progress`. Non-final audit row inserted. No commit.
+  `plan.md` is unchanged.
+
+### 2026-09-10T08:18:15Z — OPT-038 delivered (measurement; no speedup)
+
+- Independent verification attempt 1 passed. This increment installs no
+  production kernel and claims no performance improvement
+  (`claims_performance_improvement` false; speedup N/A). Exclusive RTX
+  5090 sitting `measurement_utc` 2026-09-10T07:55:02Z wrote
+  [`fixtures/opt038_post_ladder_gap.json`](fixtures/opt038_post_ladder_gap.json)
+  with fresh frozen-protocol P, D128, and D2048 measurements, exclusive
+  subsystem breakdowns, independent raw host-wall accounting, matched
+  pinned llama.cpp public-API measurements, matched-component experiment
+  specifications, and a host-recomputed `next_task_order`. Accepted keep
+  denominators remain OPT-034: P **1869.84412**, D128 **25.3816128**,
+  D2048 **20.169548** tok/s. Live sitting measurements: P Quartz
+  **1872.63806** (llama.cpp `avg_ts` **3241.632261**); D128 Quartz
+  **25.3562603** vs llama.cpp **68.8080723**; D2048 Quartz
+  **20.1668205** vs llama.cpp **67.0727771**. `p_gap` 1.731;
+  `d2048_gap` 3.326; `decode_deficit_larger` true. `next_task_order`
+  `["OPT-042", "OPT-041", "OPT-040", "OPT-039"]`. Native test does not
+  require Quartz ≥ llama.cpp. Coupled IDs: none. Delivery re-check:
+  `uv run pytest -q tests/test_documentation.py
+  tests/test_opt038_post_ladder_gap.py`.
+- Acceptance evidence: [`tasks/OPT-038.md`](tasks/OPT-038.md);
+  [`pins/opt038_post_ladder_gap_contract.json`](pins/opt038_post_ladder_gap_contract.json);
+  [`fixtures/opt038_post_ladder_gap.json`](fixtures/opt038_post_ladder_gap.json);
+  [`cuda/opt038_prefill_attribution_test.cu`](cuda/opt038_prefill_attribution_test.cu);
+  [`cuda/opt038_decode_attribution_test.cu`](cuda/opt038_decode_attribution_test.cu);
+  [`tests/test_opt038_post_ladder_gap.py`](tests/test_opt038_post_ladder_gap.py);
+  [`evidence/optimization/opt038-post-ladder-gap/REPORT.md`](evidence/optimization/opt038-post-ladder-gap/REPORT.md);
+  [`evidence/optimization/opt038-post-ladder-gap/COMPONENT-PROTOCOL.md`](evidence/optimization/opt038-post-ladder-gap/COMPONENT-PROTOCOL.md);
+  [`docs/06-system-optimization.md`](docs/06-system-optimization.md);
+  [`docs/43-cuda-attention-decode.md`](docs/43-cuda-attention-decode.md);
+  [`docs/51-runtime-timing-and-nvtx.md`](docs/51-runtime-timing-and-nvtx.md);
+  [`docs/61-benchmark-harness.md`](docs/61-benchmark-harness.md);
+  [`docs/62-cuda-full-prefill.md`](docs/62-cuda-full-prefill.md).
+  Proof is post-ladder P/D128/D2048 measurements, exclusive attribution,
+  independent raw-wall fields, matched llama.cpp measurements,
+  matched-component specs, and a recorded next-task order, not a throughput
+  keep and not the 2K llama.cpp parity gate.
+- Marked OPT-038 `done`; delivery is limited to the verified task scope
+  plus this ledger/audit bookkeeping. `plan.md` is unchanged. OPT-016
+  stays `blocked`. Next eligible pending by ledger row order: **OPT-031**.

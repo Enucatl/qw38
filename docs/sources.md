@@ -736,7 +736,41 @@ baseline.
   association; keep requires admitted component wins, improved P, frozen
   MMQ envelopes, and the cross-workload guard; envelopes unloosened;
   OPT-016 remains the parity gate owner; does not substitute for the 2K
-  llama.cpp parity gate; Quartz ≥ llama.cpp is not this gate.
+  llama.cpp parity   gate; Quartz ≥ llama.cpp is not this gate.
+- OPT-038 introduces no new external implementation source. Pinned llama.cpp
+  revision `cc83d7b4824f73cfdda4dfbb47ee39804f71b328` is already the External
+  same-GGUF authority (`llama-bench` for P; public `llama.h` /
+  `llama_time_us()` for D128/D2048). This increment freezes a local exclusive-
+  RTX-5090 post-ladder P/D128/D2048 refresh on current production objects:
+  exact-4096 production `sync_tokens` with attribution null and graphs created,
+  plus prefix-128 and prefix-2048 decode (256 predetermined tokens, 3 warm + 30
+  measured) matched by `qw38-llama-decode-oracle`, plus new OPT-038 attribution
+  diagnostics with independent `raw_host_wall_ms` alongside unchanged
+  `finish_*_attribution` adjusted reconstruction. Random-token `llama-bench`
+  decode is informational. Matched-component experiment specifications are
+  written but not run in this sitting. Exclusive decode categories live on
+  opt-in `DecodeAttribution`; public `RuntimeTimings` stay composite. The
+  schema-1 contract, retained live fixture, claim-labeled report, and component
+  protocol are
+  [`pins/opt038_post_ladder_gap_contract.json`](../pins/opt038_post_ladder_gap_contract.json),
+  [`fixtures/opt038_post_ladder_gap.json`](../fixtures/opt038_post_ladder_gap.json),
+  [`evidence/optimization/opt038-post-ladder-gap/REPORT.md`](../evidence/optimization/opt038-post-ladder-gap/REPORT.md),
+  and
+  [`evidence/optimization/opt038-post-ladder-gap/COMPONENT-PROTOCOL.md`](../evidence/optimization/opt038-post-ladder-gap/COMPONENT-PROTOCOL.md).
+  Live tok/s stay in that report; this ledger does not replace them. The
+  beginner explanations are
+  [`docs/61-benchmark-harness.md`](61-benchmark-harness.md),
+  [`docs/51-runtime-timing-and-nvtx.md`](51-runtime-timing-and-nvtx.md),
+  [`docs/06-system-optimization.md`](06-system-optimization.md), and
+  [`docs/62-cuda-full-prefill.md`](62-cuda-full-prefill.md).
+  Proof limit: post-ladder P/D128/D2048 measurements; exclusive subsystem
+  breakdowns; independent raw host-wall accounting; matched pinned llama.cpp;
+  matched-component experiment specifications; recorded next-task order; claims
+  no performance improvement; does not publish a successor oracle; accepted keep
+  denominators remain unchanged; envelopes unloosened; does not substitute for
+  the 2K llama.cpp parity gate; llama-bench random decode is informational.
+  Quartz ≥ llama.cpp is not this gate. No kernel implementation was copied or
+  adapted.
 - OPT-029 adapts llama.cpp revision
   `cc83d7b4824f73cfdda4dfbb47ee39804f71b328` (MIT, The ggml authors)
   warp-column GDN recurrence from `gated_delta_net.cu` (`S_v=128`,

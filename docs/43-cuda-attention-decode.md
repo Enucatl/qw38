@@ -1,6 +1,6 @@
 # 43. CUDA grouped-query attention for one decoded token
 
-[Index](README.md) · Implementation tasks: ATN-001, OPT-005, OPT-010, OPT-036, and
+[Index](README.md) · Implementation tasks: ATN-001, OPT-005, OPT-010, OPT-036, OPT-038, and
 EDU-029 in [`implementation_ledger.md`](../implementation_ledger.md)
 
 Chapter 19 introduced attention with small scalar examples. This chapter follows
@@ -226,4 +226,8 @@ and per-candidate samples stay in the report; this chapter does not replace
 them:
 [`evidence/optimization/opt036-decode-kv-partition/REPORT.md`](../evidence/optimization/opt036-decode-kv-partition/REPORT.md).
 This is a partitioned-decode keep/reject under frozen envelopes, not the 2K
-llama.cpp parity gate and not Quartz ≥ llama.cpp.
+llama.cpp parity gate and not Quartz ≥ llama.cpp. Live exclusive decode
+`attention_core` milliseconds for D128 and D2048 on current production objects
+are retained in
+[`fixtures/opt038_post_ladder_gap.json`](../fixtures/opt038_post_ladder_gap.json);
+this chapter does not replace the OPT-036 keep numbers above.

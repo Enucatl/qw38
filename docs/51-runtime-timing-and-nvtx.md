@@ -1,11 +1,12 @@
 # Synchronized runtime timing and NVTX attribution
 
-[Index](README.md) · Implementation tasks: OPT-001, OPT-014, OPT-015, OPT-020, OPT-032, and EDU-037 in
+[Index](README.md) · Implementation tasks: OPT-001, OPT-014, OPT-015, OPT-020, OPT-032, OPT-038, and EDU-037 in
 [`implementation_ledger.md`](../implementation_ledger.md) · Contracts:
 [`pins/cuda_timing_contract.json`](../pins/cuda_timing_contract.json),
 [`pins/cuda_prefill_attribution_contract.json`](../pins/cuda_prefill_attribution_contract.json),
 [`pins/opt020_prefill_split_contract.json`](../pins/opt020_prefill_split_contract.json),
-[`pins/opt032_decode_oracle_contract.json`](../pins/opt032_decode_oracle_contract.json)
+[`pins/opt032_decode_oracle_contract.json`](../pins/opt032_decode_oracle_contract.json),
+[`pins/opt038_post_ladder_gap_contract.json`](../pins/opt038_post_ladder_gap_contract.json)
 · Evidence:
 [`cuda/timing_test.cu`](../cuda/timing_test.cu),
 [`cuda/prefill_attribution_test.cu`](../cuda/prefill_attribution_test.cu),
@@ -16,8 +17,10 @@
 [`fixtures/cuda_timing.json`](../fixtures/cuda_timing.json),
 [`fixtures/cuda_prefill_attribution.json`](../fixtures/cuda_prefill_attribution.json),
 [`fixtures/opt020_prefill_split.json`](../fixtures/opt020_prefill_split.json),
-[`fixtures/opt032_decode_oracle.json`](../fixtures/opt032_decode_oracle.json), and
-[`evidence/optimization/opt032-decode-oracle/REPORT.md`](../evidence/optimization/opt032-decode-oracle/REPORT.md)
+[`fixtures/opt032_decode_oracle.json`](../fixtures/opt032_decode_oracle.json),
+[`fixtures/opt038_post_ladder_gap.json`](../fixtures/opt038_post_ladder_gap.json), and
+[`evidence/optimization/opt032-decode-oracle/REPORT.md`](../evidence/optimization/opt032-decode-oracle/REPORT.md),
+[`evidence/optimization/opt038-post-ladder-gap/REPORT.md`](../evidence/optimization/opt038-post-ladder-gap/REPORT.md)
 
 ## Why a normal stopwatch is misleading
 
@@ -268,7 +271,24 @@ a throughput gate. OPT-015 cites the historical eight-category percentages as
 the recovery map; it does not emit a new timed run. OPT-032 adds opt-in
 exclusive decode categories on `DecodeAttribution` without splitting public
 `RuntimeTimings`; it is instrumentation for D128/D2048 steering, not a
-throughput gate and not llama.cpp parity. None of those increments
+throughput gate and not llama.cpp parity. OPT-038 refreshes those exclusive
+categories on current production objects after the OPT-033–OPT-037 ladder and
+adds separate OPT-038 attribution diagnostics that store **independent raw
+host-wall** milliseconds alongside the unchanged `finish_*_attribution`
+adjusted reconstruction. On decode, `finish_decode_attribution` may still raise
+`attribution.wall` to `gpu_event_sum + graph` when exclusive CUDA events plus
+the host graph interval exceed the host wall; `other_idle` becomes zero after
+that raise. `raw_host_wall_ms` is a separate host `steady_clock` around the
+attributed `sync_tokens` / `execute_token` (including D2H and commit) and is
+never overloaded onto `wall_ms`. `gpu_event_sum_ms`, `graph_host_interval_ms`,
+`adjusted_reconstruction_ms`, `wall_raised`, and the nine exclusive
+`categories_ms` are stored as different fields. Throughput oracles keep
+`attribution: null`; raised or attributed walls are not tok/s denominators.
+`finish_decode_attribution` and `finish_prefill_attribution` were not modified.
+OPT-038 claims no performance improvement and is not llama.cpp parity. Live
+raw-wall identities stay in the report; this chapter does not replace them:
+[`evidence/optimization/opt038-post-ladder-gap/REPORT.md`](../evidence/optimization/opt038-post-ladder-gap/REPORT.md).
+None of those increments
 proves a fusion is beneficial, provides an Nsight report, establishes p50/p95
 request latency, or passes the comparative speed gate. SRV-002 now exposes
 separately measured queue depth/delay on Chat Completions responses. BEN-001
