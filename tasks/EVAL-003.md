@@ -37,18 +37,6 @@ compiles the decode oracle separately for each prefix.
    control policy, OPT-044 budgets, complete/prequant accounting, frequency
    weighting, and 95%/105% cross-workload guards.
 
-### Mandatory paragraph for every subsequent task dossier
-
-Every new task that adds or changes a test must include a **Test execution
-contract** paragraph in its own `tasks/TASK-ID.md`. The paragraph must name the
-fast implementation-loop command (`smoke`), the reduced numerical command
-(`correctness`), and the final evidence command (`acceptance`); state which
-phases, sample counts, model loads, and P/D oracles each tier runs; require
-`QW38_CUDA_TEST_TIER` and fail closed when it is missing; identify cached build
-or binary reuse; and state that only acceptance-tier results may support a
-performance claim. If a task has an optional deep or release-only run, it must
-be explicitly labeled and never selected by a default or an unspecified tier.
-
 ## Acceptance
 
 - Large host-reference evidence proves the deterministic sample policy,

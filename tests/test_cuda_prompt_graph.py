@@ -147,6 +147,7 @@ def _build_and_run() -> dict[str, Any]:
         "build/quant_mmv.cuda.o",
         "build/q4k_decode_dots.cuda.o",
         "build/q8_decode_dots.cuda.o",
+        "build/q6k_decode_dots.cuda.o",
         "build/gdn_step.cuda.o",
         "build/attention_decode.cuda.o",
         "build/diagnostic/status.o",

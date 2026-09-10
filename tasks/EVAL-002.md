@@ -21,9 +21,9 @@ unchanged and auditable.
      quality envelopes, and conditional end-to-end guards.
    Missing or invalid values fail closed with the required tier in the error;
    they must not silently select an expensive default.
-2. Keep the tier semantics in `tests/README.md`,
-   `tasks/PERFORMANCE-RECOVERY-2026-09-10.md`, and each task dossier. Remove
-   the exception that lets task-specific diagnostics retain an implicit,
+2. Keep the tier semantics in `tasks/TASK-TESTING-STRATEGY.md` and make the
+   shared performance protocol the required entry point for every task dossier.
+   Remove the exception that lets task-specific diagnostics retain an implicit,
    un-tiered protocol. A task may explicitly declare itself release-only, but
    that declaration must still fail closed unless selected deliberately.
 3. Add machine-readable phase telemetry to task-specific runners and native
@@ -38,18 +38,6 @@ unchanged and auditable.
    provenance, and rejection behavior. Tiered runs may not produce performance
    claims unless the acceptance tier has passed.
 
-### Mandatory paragraph for every subsequent task dossier
-
-Every new task that adds or changes a test must include a **Test execution
-contract** paragraph in its own `tasks/TASK-ID.md`. The paragraph must name the
-fast implementation-loop command (`smoke`), the reduced numerical command
-(`correctness`), and the final evidence command (`acceptance`); state which
-phases, sample counts, model loads, and P/D oracles each tier runs; require
-`QW38_CUDA_TEST_TIER` and fail closed when it is missing; identify cached build
-or binary reuse; and state that only acceptance-tier results may support a
-performance claim. If a task has an optional deep or release-only run, it must
-be explicitly labeled and never selected by a default or an unspecified tier.
-
 ## Acceptance
 
 - Omitting `QW38_CUDA_TEST_TIER` from every task-specific GPU entry point exits
@@ -63,9 +51,9 @@ be explicitly labeled and never selected by a default or an unspecified tier.
   and failure phase; a timing report is retained beside the task evidence.
 - Existing shared-gate and task-specific contract tests pass, and no
   production CUDA dispatch or numerical envelope changes are introduced.
-- The repository contains the canonical paragraph above, and every subsequent
-  task dossier that adds or changes tests repeats the paragraph (with its
-  task-specific phase details) before implementation begins.
+- The shared [task testing strategy](TASK-TESTING-STRATEGY.md) is the single
+  source of truth for tier complexity, sampling, reuse, telemetry, and proof
+  boundaries; no task-specific test silently bypasses it.
 
 ## Proof boundary
 

@@ -1,25 +1,13 @@
 # CUDA test tiers
 
-The shared quantization/scheduler CUDA pytest gates are opt-in with
-`QW38_RUN_CUDA_TESTS=1`. Those two gates require an explicit tier so an
-implementation loop cannot silently launch the expensive acceptance suite.
-Other task-specific CUDA diagnostics retain their existing protocols.
-The quantization and scheduler binaries also fail closed when run directly
-without `QW38_CUDA_TEST_TIER`.
+The canonical tier, complexity, sampling, reuse, and telemetry contract is
+[`tasks/TASK-TESTING-STRATEGY.md`](../tasks/TASK-TESTING-STRATEGY.md), as
+required by [`tasks/PERFORMANCE-RECOVERY-2026-09-10.md`](../tasks/PERFORMANCE-RECOVERY-2026-09-10.md).
+It applies to shared and task-specific CUDA pytest/native diagnostics. GPU
+tests are opt-in with `QW38_RUN_CUDA_TESTS=1` and must fail closed unless
+`QW38_CUDA_TEST_TIER` is explicitly set.
 
-Select a tier with `QW38_CUDA_TEST_TIER`:
-
-- `smoke`: one measured sample, no large MMA/Q8 admission sweeps.
-- `correctness`: small MMA coverage with three measured samples; no large
-  tuning or admission sweeps.
-- `acceptance`: the historical three-warmup/30-sample protocol and all
-  performance/admission checks. Large independent host references are sampled
-  deterministically at up to 32 rows and 32 prompt rows; small/boundary cases
-  remain full-reference. Use this before recording performance claims.
-
-Native diagnostics emit epoch-millisecond run timestamps, per-suite phase
-durations, and aggregate host-reference timing/counts. Capture stdout as the
-run evidence when investigating a new bottleneck.
+Capture stdout as the run evidence when investigating a new bottleneck.
 
 For example:
 

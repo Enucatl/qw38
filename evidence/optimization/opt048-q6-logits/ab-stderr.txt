@@ -1,0 +1,10 @@
+phase=start epoch=1789070727
+tier=acceptance warmups=3 samples=30 shapes=3
+phase=shapes epoch=1789070727
+phase=probe epoch=1789070727
+phase=probe epoch=1789070727
+phase=vocab epoch=1789070727
+phase=positions epoch=1789070727
+phase=reduce epoch=1789070728
+status=passed winner=integer_q8_1_w2 win=true layout_ok=true vocab=true
+phase=done epoch=1789070728

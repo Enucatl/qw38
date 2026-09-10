@@ -114,7 +114,7 @@ are repository-relative unless stated otherwise.
 | OPT-045 | Parallelize RMSNorm and admitted fused arithmetic | OPT-044 | done | Cooperative residual/head normalization removes serial reductions with production quality, complete component and end-to-end wins, or retained measured rejection | [`tasks/OPT-045.md`](tasks/OPT-045.md); [`pins/opt045_parallel_norm_contract.json`](pins/opt045_parallel_norm_contract.json); [`fixtures/opt045_parallel_norm.json`](fixtures/opt045_parallel_norm.json); [`cuda/opt045_parallel_norm_ab_test.cu`](cuda/opt045_parallel_norm_ab_test.cu); [`cuda/rms_norm.cuh`](cuda/rms_norm.cuh); [`evidence/optimization/opt045-parallel-norm/REPORT.md`](evidence/optimization/opt045-parallel-norm/REPORT.md); verification 2026-09-10T17:35:00Z |
 | OPT-046 | Implement cooperative packed Q4_K decode dots | OPT-044, OPT-045 | done | Packed integer dots, cooperative K reduction and admitted staging improve complete real FFN and D2048 under production quality and cross-workload guards, or retained rejection | [`tasks/OPT-046.md`](tasks/OPT-046.md); [`pins/opt046_q4_decode_contract.json`](pins/opt046_q4_decode_contract.json); [`fixtures/opt046_q4_decode.json`](fixtures/opt046_q4_decode.json); [`cuda/q4k_decode_dots.cu`](cuda/q4k_decode_dots.cu); [`cuda/q4k_decode_path.cuh`](cuda/q4k_decode_path.cuh); [`cuda/opt046_q4_decode_ab_test.cu`](cuda/opt046_q4_decode_ab_test.cu); [`tests/test_opt046_q4_decode.py`](tests/test_opt046_q4_decode.py); [`evidence/optimization/opt046-q4-decode/REPORT.md`](evidence/optimization/opt046-q4-decode/REPORT.md); verification 2026-09-10T19:01:30Z |
 | OPT-047 | Accelerate Q8_0 mixer decode projections | OPT-044, OPT-046 | done | Shared activation staging and role-specific packed dots improve the complete mixer group and D2048; new activation approximation is documented and quality-tested, or retained rejection | [`tasks/OPT-047.md`](tasks/OPT-047.md); [`pins/opt047_q8_decode_contract.json`](pins/opt047_q8_decode_contract.json); [`fixtures/opt047_q8_decode.json`](fixtures/opt047_q8_decode.json); [`cuda/q8_decode_dots.cu`](cuda/q8_decode_dots.cu); [`cuda/q8_decode_path.cuh`](cuda/q8_decode_path.cuh); [`cuda/opt047_q8_decode_ab_test.cu`](cuda/opt047_q8_decode_ab_test.cu); [`tests/test_opt047_q8_decode.py`](tests/test_opt047_q8_decode.py); [`evidence/optimization/opt047-q8-decode/REPORT.md`](evidence/optimization/opt047-q8-decode/REPORT.md); verification 2026-09-10T19:42:58Z |
-| OPT-048 | Accelerate full Q6_K vocabulary projection | OPT-044, OPT-046 | pending | Full 248320-row logits use admitted packed integer dots with complete output quality and end-to-end decode win, or retained rejection; no vocabulary pruning | [Task](tasks/OPT-048.md) |
+| OPT-048 | Accelerate full Q6_K vocabulary projection | OPT-044, OPT-046 | done | Full 248320-row logits use admitted packed integer dots with complete output quality and end-to-end decode win, or retained rejection; no vocabulary pruning | [`tasks/OPT-048.md`](tasks/OPT-048.md); [`pins/opt048_q6_logits_contract.json`](pins/opt048_q6_logits_contract.json); [`fixtures/opt048_q6_logits.json`](fixtures/opt048_q6_logits.json); [`cuda/q6k_decode_dots.cu`](cuda/q6k_decode_dots.cu); [`cuda/q6k_decode_path.cuh`](cuda/q6k_decode_path.cuh); [`cuda/opt048_q6_logits_ab_test.cu`](cuda/opt048_q6_logits_ab_test.cu); [`tests/test_opt048_q6_logits.py`](tests/test_opt048_q6_logits.py); [`evidence/optimization/opt048-q6-logits/REPORT.md`](evidence/optimization/opt048-q6-logits/REPORT.md); verification 2026-09-10T20:27:00Z |
 | OPT-049 | Share decode FFN staging and fuse gate/up | OPT-046, OPT-047, OPT-048 | pending | Complete FFN including staging/SwiGLU/down wins with admitted BF16 rounding and graph/eager equivalence, production quality and P/D guards, or retained rejection | [Task](tasks/OPT-049.md) |
 | OPT-050 | Prepare prompt Q normalization and RoPE once | OPT-044, OPT-045 | pending | Prepared queries are reused across attention KV partitions; preparation-inclusive P improves with tail/prefix correctness, quality and memory guards, or retained rejection | [Task](tasks/OPT-050.md) |
 | OPT-051 | Pipeline prompt attention with register softmax | OPT-044, OPT-050 | pending | Staged admission of F16 operands, register reductions and tiled asynchronous loads reduces complete attention and P under documented quality and P/D guards, or retained rejection | [Task](tasks/OPT-051.md) |
@@ -128,7 +128,7 @@ are repository-relative unless stated otherwise.
 
 The [2026-09-10 design](tasks/PERFORMANCE-RECOVERY-2026-09-10.md) compares the
 admitted Quartz, pinned llama.cpp and ds4 paths. It is source analysis and task
-design, not new performance evidence. **Next eligible recovery task: OPT-048**,
+design, not new performance evidence. **Next eligible recovery task: OPT-049**,
 then OPT-049–054 in row
 order, measured remaining launch work in OPT-055, and the outcome gate OPT-056.
 Dependencies permit independent work but do not authorize subagents. The user
@@ -159,8 +159,8 @@ statements below are historical, not the current execution order.
 | BEN-001 | Implement `qw38-bench` component/end-to-end harness | OPT-001 | done | Warmups/samples, telemetry, raw samples, failures, and environment metadata are retained | `pins/benchmark_contract.json`; `fixtures/benchmark_harness.json`; `evidence/benchmark/`; `tests/test_benchmark.py`; log 2026-09-02T15:24:00Z |
 | BEN-002 | Preserve the product-wide no-argument usage exit contract in `qw38-bench` | BEN-001, BLD-001 | done | Invoking the benchmark with no arguments prints usage and returns exit code 2 without creating output | `tests/test_build.py`; log 2026-09-02T15:24:00Z |
 | EVAL-001 | Implement `qw38-eval` logits/traces/checkpoints harness | ORA-001, SES-003 | done | Focused native diagnostics are driven by typed pytest helpers | [`tasks/EVAL-001.md`](tasks/EVAL-001.md); reopened 2026-09-03T14:00:00Z after build/hash repair; recovery readmitted 2026-09-03T15:44:53Z; completed 2026-09-03T17:01:54Z |
-| EVAL-002 | Tier and instrument task-specific CUDA oracles | EVAL-001, BEN-001 | pending | Every GPU oracle requires an explicit smoke/correctness/acceptance tier, fails closed when omitted, reuses builds/binaries where safe, emits phase timestamps without weakening final evidence, and requires the test-execution paragraph in subsequent task dossiers | [`tasks/EVAL-002.md`](tasks/EVAL-002.md) |
-| EVAL-003 | Make OPT-046 Q4 decode evidence representative and sampled | OPT-046, EVAL-002 | pending | Large host references use deterministic documented sampling with decoded-row reuse, production captures supplement probes, final survivor A/B and conditional P/D gates remain valid, redundant oracle compilation is removed, and the tier paragraph is carried into future task dossiers | [`tasks/EVAL-003.md`](tasks/EVAL-003.md) |
+| EVAL-002 | Tier and instrument task-specific CUDA oracles | EVAL-001, BEN-001 | pending | Every GPU oracle requires the shared task-testing strategy, fails closed when the tier is omitted, reuses builds/binaries where safe, emits phase timestamps without weakening final evidence, and bounds workload complexity | [`tasks/EVAL-002.md`](tasks/EVAL-002.md); [`tasks/TASK-TESTING-STRATEGY.md`](tasks/TASK-TESTING-STRATEGY.md) |
+| EVAL-003 | Make OPT-046 Q4 decode evidence representative and sampled | OPT-046, EVAL-002 | pending | Large host references use deterministic documented sampling with decoded-row reuse, production captures supplement probes, final survivor A/B and conditional P/D gates remain valid, redundant oracle compilation is removed, and the shared task-testing strategy is honored | [`tasks/EVAL-003.md`](tasks/EVAL-003.md); [`tasks/TASK-TESTING-STRATEGY.md`](tasks/TASK-TESTING-STRATEGY.md) |
 | QLT-001 | Pass held-out NLL, continuation, recurrence, retrieval, and task quality | EVAL-001, MEM-001, OPT-012, OPT-013, OPT-016 | blocked | Admitted artifact passes every documented threshold and 128K retrieval fixture | [`tasks/QLT-001.md`](tasks/QLT-001.md); blocked 2026-09-08T10:22:44Z pending 2K llama.cpp prefill parity (`OPT-016`); OPT-016 recovery via `OPT-017`–`OPT-019` then gate re-pass; prior scaling report [`evidence/quality/scaling-2026-09-08/REPORT.md`](evidence/quality/scaling-2026-09-08/REPORT.md) |
 | CMP-001 | Pin and validate comparable baseline artifacts | PIN-001, PIN-002, QLT-001 | pending | llama/Ollama share GGUF; vLLM difference and <=1% NLL admission are explicit | — |
 | CMP-002 | Run controlled 30-sample comparative matrix | BEN-001, OPT-004, CMP-001 | pending | All contexts/metrics/environment data and negative runs are retained | — |
@@ -5600,3 +5600,41 @@ statements below are historical, not the current execution order.
   Tok/s delta: P **2130.41** → **2128.54** (−1.87, 0.999×); D128
   **28.55** → **33.89** (+5.34, 1.19×); D2048 **27.54** → **32.39**
   (+4.85, 1.18×).
+
+### 2026-09-10T20:27:00Z — OPT-048 delivered (KEEP)
+
+- Independent verification attempt 1 passed. Cooperative DP4A Q6_K integer
+  vocabulary dots (`q6k_coop_mmv`, llama-style `vec_dot_q6k_q8`, 210-byte
+  unaligned word loads, K distributed across warps per row) were A/B'd against
+  the retained packed FP32 `quant_mmv` reference on the full 248320×5120
+  output matrix. Exclusive RTX 5090 sitting wrote
+  [`fixtures/opt048_q6_logits.json`](fixtures/opt048_q6_logits.json)
+  (`measurement_utc` 2026-09-10T20:05:28Z; A/B winner `integer_q8_1_w2`
+  weighted complete vocab **0.642994106** ms vs packed **1.56411517** ms,
+  ~2.43×; sitting P Quartz **2129.85938**, D128 **35.9651642**, D2048
+  **34.3371162** tok/s; `status` measured; `reverted` false;
+  `keep_sitting_skipped` false; `selected_q6_decode_path` integer_q8_1;
+  warps per row **2**; integer dispatch gated at `kQ6IntegerMinRows = 248320`).
+  **Keep:** OPT-044 production-numerics budgets; OPT-047 keep P/D128 floors
+  (P ≥ 95%, D128 ≥ 95%) and strict D2048 improvement versus **32.390007**
+  tok/s; decode p95 inside 105% of OPT-045. Production
+  `kSelectedQ6DecodePath` is `integer_q8_1`. OPT-046 packed Q4_K and OPT-047
+  DP4A Q8 unchanged. Coupled IDs: none.
+- Acceptance evidence: [`tasks/OPT-048.md`](tasks/OPT-048.md);
+  [`pins/opt048_q6_logits_contract.json`](pins/opt048_q6_logits_contract.json);
+  [`fixtures/opt048_q6_logits.json`](fixtures/opt048_q6_logits.json);
+  [`cuda/q6k_decode_dots.cu`](cuda/q6k_decode_dots.cu);
+  [`cuda/q6k_decode_dots.cuh`](cuda/q6k_decode_dots.cuh);
+  [`cuda/q6k_decode_path.cuh`](cuda/q6k_decode_path.cuh);
+  [`cuda/opt048_q6_logits_ab_test.cu`](cuda/opt048_q6_logits_ab_test.cu);
+  [`cuda/quant_mmv.cu`](cuda/quant_mmv.cu);
+  [`tests/test_opt048_q6_logits.py`](tests/test_opt048_q6_logits.py);
+  [`evidence/optimization/opt048-q6-logits/REPORT.md`](evidence/optimization/opt048-q6-logits/REPORT.md).
+  Proof is cooperative DP4A A/B with frozen OPT-044 numerics and OPT-047 keep
+  denominators, not the 2K llama.cpp parity gate.
+- Marked OPT-048 `done`; delivery is limited to the verified task scope
+  plus this ledger/audit bookkeeping. `plan.md` is unchanged. OPT-016
+  stays `blocked`. Next eligible pending by ledger row order: **OPT-049**.
+  Tok/s delta: P **2128.54** → **2129.86** (+1.32, 1.001×); D128
+  **33.89** → **35.97** (+2.08, 1.06×); D2048 **32.39** → **34.34**
+  (+1.95, 1.06×).

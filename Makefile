@@ -121,7 +121,7 @@ cuda-native: $(BUILD_DIR)/qw38-cuda-probe $(BUILD_DIR)/qw38-cuda-quant-test $(BU
 $(BUILD_DIR)/qw38-cuda-probe: cuda/device_probe.cu | $(BUILD_DIR)
 	$(NVCC) $(NVCCFLAGS) $< -o $@
 
-$(BUILD_DIR)/quant_mmv.cuda.o: cuda/quant_mmv.cu cuda/quant_mmv.h cuda/quant_mmq_mma.cuh cuda/mma.cuh cuda/pdl_launch.cuh cuda/q4k_decode_path.cuh | $(BUILD_DIR)
+$(BUILD_DIR)/quant_mmv.cuda.o: cuda/quant_mmv.cu cuda/quant_mmv.h cuda/quant_mmq_mma.cuh cuda/mma.cuh cuda/pdl_launch.cuh cuda/q4k_decode_path.cuh cuda/q6k_decode_path.cuh | $(BUILD_DIR)
 	$(NVCC) $(NVCCFLAGS) -Icuda -c $< -o $@
 
 $(BUILD_DIR)/q4k_decode_dots.cuda.o: cuda/q4k_decode_dots.cu cuda/q4k_decode_dots.cuh cuda/q4k_decode_path.cuh cuda/quant_mmv.h | $(BUILD_DIR)
@@ -130,7 +130,10 @@ $(BUILD_DIR)/q4k_decode_dots.cuda.o: cuda/q4k_decode_dots.cu cuda/q4k_decode_dot
 $(BUILD_DIR)/q8_decode_dots.cuda.o: cuda/q8_decode_dots.cu cuda/q8_decode_dots.cuh cuda/q8_decode_path.cuh cuda/q4k_decode_dots.cuh cuda/quant_mmv.h | $(BUILD_DIR)
 	$(NVCC) $(NVCCFLAGS) -Icuda -c $< -o $@
 
-QUANT_MMV_CUDA_OBJECTS := $(BUILD_DIR)/quant_mmv.cuda.o $(BUILD_DIR)/q4k_decode_dots.cuda.o $(BUILD_DIR)/q8_decode_dots.cuda.o
+$(BUILD_DIR)/q6k_decode_dots.cuda.o: cuda/q6k_decode_dots.cu cuda/q6k_decode_dots.cuh cuda/q6k_decode_path.cuh cuda/q4k_decode_dots.cuh cuda/quant_mmv.h | $(BUILD_DIR)
+	$(NVCC) $(NVCCFLAGS) -Icuda -c $< -o $@
+
+QUANT_MMV_CUDA_OBJECTS := $(BUILD_DIR)/quant_mmv.cuda.o $(BUILD_DIR)/q4k_decode_dots.cuda.o $(BUILD_DIR)/q8_decode_dots.cuda.o $(BUILD_DIR)/q6k_decode_dots.cuda.o
 
 $(BUILD_DIR)/qw38-cuda-quant-test: cuda/quant_mmv_test.cu $(QUANT_MMV_CUDA_OBJECTS) $(BUILD_DIR)/quant.o $(BUILD_DIR)/status.o | $(BUILD_DIR)
 	$(NVCC) $(NVCCFLAGS) $(CPPFLAGS) -Icuda $^ -o $@

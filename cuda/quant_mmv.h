@@ -60,6 +60,21 @@ cudaError_t launch_q4k_coop_mmv(
     const __nv_bfloat16* activation, void* workspace, float* output,
     unsigned int warps_per_row, bool q8_1, cudaStream_t stream) noexcept;
 
+int q6k_coop_occupancy(unsigned int warps_per_row, bool q8_1) noexcept;
+void q6k_coop_kernel_attributes(unsigned int warps_per_row, bool q8_1,
+                                int* registers, std::size_t* local_bytes,
+                                int* occupancy) noexcept;
+
+cudaError_t launch_q6k_coop_mmv_prequant(
+    const std::uint8_t* weights, std::size_t rows, std::size_t columns,
+    const void* staged, float* output, unsigned int warps_per_row, bool q8_1,
+    cudaStream_t stream) noexcept;
+
+cudaError_t launch_q6k_coop_mmv(
+    const std::uint8_t* weights, std::size_t rows, std::size_t columns,
+    const __nv_bfloat16* activation, void* workspace, float* output,
+    unsigned int warps_per_row, bool q8_1, cudaStream_t stream) noexcept;
+
 cudaError_t launch_q8_mmv_bf16(const std::uint8_t* weights, std::size_t rows,
                                std::size_t columns,
                                const __nv_bfloat16* activation, float* output,

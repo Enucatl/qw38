@@ -234,11 +234,14 @@ its individual dossier. No subagents or commits unless the user requests them.
    Update runtime defaults only after acceptance, recapture affected graphs,
    and verify diagnostic selectors match the production selection.
 7. Run task-specific pytest and native CUDA checks listed in the dossier.
-   For the shared quantization/scheduler gates,
-   `QW38_RUN_CUDA_TESTS=1 QW38_CUDA_TEST_TIER=smoke` is the recommended
-   implementation-loop command, `correctness` is the reduced numerical gate,
-   and `acceptance` is required before recording timing or performance claims.
-   Omitting `QW38_CUDA_TEST_TIER` fails closed with an actionable error.
+   Apply the [task testing strategy](TASK-TESTING-STRATEGY.md) to every shared
+   and task-specific GPU test. `QW38_RUN_CUDA_TESTS=1
+   QW38_CUDA_TEST_TIER=smoke` is the recommended implementation-loop command,
+   `correctness` is the reduced numerical gate, and `acceptance` is required
+   before recording timing or performance claims. Omitting
+   `QW38_CUDA_TEST_TIER` fails closed with an actionable error. The strategy
+   gives complexity bounds and timeout rules for each tier; a task may not
+   silently choose a larger workload.
    The two gates share their Docker build and binary executions per pytest
    process. Rebuild the relevant objects in `qw38-cuda:13.0.2` with
    `-w /workspace` before native testing. Run `tests/test_documentation.py` for

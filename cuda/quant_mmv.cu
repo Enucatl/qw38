@@ -1,6 +1,7 @@
 #include "quant_mmv.h"
 #include "quant_mmq_mma.cuh"
 #include "q4k_decode_path.cuh"
+#include "q6k_decode_path.cuh"
 
 #include <cstring>
 
@@ -576,6 +577,11 @@ cudaError_t launch_quant_mmv(QuantKind kind, const std::uint8_t* weights,
     return launch_q4k_coop_mmv(
         weights, rows, columns, activation, q8_workspace, output,
         effective_q4_decode_warps_per_row(), q4_decode_uses_q8_1(), stream);
+  }
+  if (kind == QuantKind::kQ6K && q6_decode_uses_integer_for_rows(rows)) {
+    return launch_q6k_coop_mmv(
+        weights, rows, columns, activation, q8_workspace, output,
+        effective_q6_decode_warps_per_row(), q6_decode_uses_q8_1(), stream);
   }
   return launch_quant_mmv_path(kind, weights, rows, columns, activation,
                                q8_workspace, output, kSelectedMmvLoadPath,
