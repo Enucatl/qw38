@@ -1,8 +1,14 @@
 # Task Dossier Template
 
-The planning agent creates `tasks/<PRIMARY-ID>.md` from this template. Replace
-all guidance; do not leave placeholders or unresolved choices. Keep the dossier
-after delivery as versioned evidence.
+Use this template when no dossier exists or when the failure loop requires a
+repair that needs extra structure. A compact pre-authored dossier with
+**Outcome**, **Implementation**, and **Acceptance** sections is valid for
+admission under `run-ledger-task-cursor` when decision-complete; do not expand
+it into this long form unless a repair truly needs the extra sections.
+
+When creating from this template, replace all guidance; do not leave
+placeholders or unresolved choices. Keep the dossier after delivery as versioned
+evidence.
 
 ```markdown
 # <PRIMARY-ID> — <ledger description>

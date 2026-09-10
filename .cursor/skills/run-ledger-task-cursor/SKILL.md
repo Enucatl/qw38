@@ -16,13 +16,44 @@ description: >-
 Act as a lightweight coordinator for exactly one primary ledger increment. The
 repository's `plan.md` and `implementation_ledger.md` are authoritative. Keep a
 permanent dossier at `tasks/<PRIMARY-ID>.md`; read
-[the dossier template](references/task-dossier-template.md) before planning.
+[the dossier template](references/task-dossier-template.md) when creating a new
+dossier or repairing an inadequate one.
 Before planning or implementation, check whether `tasks/<PRIMARY-ID>.md`
 already exists. When it exists, read it in full and use its resolved decisions,
 file boundaries, acceptance commands, non-goals, and run-record constraints as
 the implementation guide. Do not replace or silently weaken an existing
 dossier; amend it only when the failure loop explicitly permits a dossier
 repair.
+
+## Pre-authored dossiers
+
+Many recovery tasks (for example OPT-043–OPT-056) ship with a high-quality
+pre-authored dossier in compact form: **Outcome**, **Implementation**, and
+**Acceptance** sections with concrete paths, commands, and boundaries. Treat
+that format as authoritative when it is decision-complete.
+
+**Admit without a planning subagent** when the coordinator confirms all of:
+
+- Outcome states the observable deliverable and matches the ledger row.
+- Implementation names exact files, behaviors, and non-goals; no material
+  choice is left open.
+- Acceptance lists testable conditions, artifact paths, and focused commands.
+- No placeholders, `TBD`, or contradictory text versus `plan.md` or the ledger.
+- Coupled IDs are named explicitly or clearly `none`.
+- For throughput / keep-reject tasks whose dossier already cites a sink and
+  measured numbers, those numbers are current enough for this increment; when
+  the task itself produces the measurements (for example OPT-043), sink ranking
+  in the dossier is not required before implementation.
+
+On admission, the coordinator (not a subagent) appends a brief **Run record →
+Planning** entry (`skipped — pre-authored dossier admitted`), marks the primary
+and any coupled tasks `in_progress`, and proceeds directly to implementation.
+
+**Spawn a planning subagent only when** the dossier is missing, fails the
+checklist above, or the failure loop explicitly requires dossier repair.
+Planning repairs should amend the existing dossier minimally; do not rewrite a
+good pre-authored dossier into the long template unless the repair truly needs
+extra structure.
 
 ## Performance steering (prefill/decode)
 
@@ -105,15 +136,18 @@ tasks. Report the exact failed gate and the evidence inspected.
 
 ## Stages
 
-1. Spawn a planning agent with `model: "cursor-grok-4.6-high"` to inspect the repository
-   and create or, when it already exists, validate and amend a decision-complete
-   dossier. Its output contract is the dossier path, coupled
-   IDs, changed files, decisions made, and unresolved decisions. Verify that
-   every coupled ID exists, is `pending`, has satisfied dependencies, and
-   represents documentation or evidence inseparable from the primary increment.
-   Then mark the primary and coupled tasks `in_progress`. Do not continue if any
-   implementation choice remains unresolved or the dossier is inconsistent with
-   the ledger or plan.
+1. **Planning (conditional).** If `tasks/<PRIMARY-ID>.md` passes the
+   [pre-authored dossier](#pre-authored-dossiers) checklist, the coordinator
+   admits it, records the skipped planning entry, and marks the primary and
+   coupled tasks `in_progress`. Otherwise spawn a planning agent with
+   `model: "cursor-grok-4.6-high"` to inspect the repository and create or
+   amend a decision-complete dossier. A planning agent's output contract is the
+   dossier path, coupled IDs, changed files, decisions made, and unresolved
+   decisions. Verify that every coupled ID exists, is `pending`, has satisfied
+   dependencies, and represents documentation or evidence inseparable from the
+   primary increment. Then mark the primary and coupled tasks `in_progress`. Do
+   not continue if any implementation choice remains unresolved or the dossier
+   is inconsistent with the ledger or plan.
 2. Spawn an implementation agent with `model: "cursor-grok-4.6-high"` to implement only the dossier's code, tests,
    and fixtures and run focused validation. The agent must append its changes
    and exact command outcomes to the dossier, without committing.
@@ -172,10 +206,12 @@ resuming; do not silently expand scope.
 ## Completion Report
 
 Report the task and coupled IDs, final status, commit and push result, verifier
-commands, retries, and dossier path. Also report per-stage model (`cursor-grok-4.6-high`
-for planning/implementation and `composer-2.5` for documentation,
-verification/testing, and delivery), elapsed time when known, retry count, first-pass
-acceptance, and token/cost data only when the runtime exposes them.
+commands, retries, and dossier path. Note whether planning was skipped
+(pre-authored dossier admitted) or ran via subagent. Also report per-stage model
+(`cursor-grok-4.6-high` for planning/implementation and `composer-2.5` for
+documentation, verification/testing, and delivery), elapsed time when known,
+retry count, first-pass acceptance, and token/cost data only when the runtime
+exposes them.
 
 For throughput / keep-reject / oracle-steered tasks, always include a
 **tok/s delta versus the then-current baseline** at the end of the completion
