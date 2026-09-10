@@ -1,5 +1,6 @@
 #include "quant_mmv.h"
 #include "quant_mmq_mma.cuh"
+#include "q4k_decode_path.cuh"
 
 #include <cstring>
 
@@ -394,6 +395,10 @@ std::size_t q8_workspace_bytes(std::size_t columns) noexcept {
              : 0;
 }
 
+std::size_t q8_1_workspace_bytes(std::size_t columns) noexcept {
+  return q8_workspace_bytes(columns);
+}
+
 std::size_t q8_prompt_workspace_bytes(std::size_t prompt_rows,
                                       std::size_t columns) noexcept {
   if (prompt_rows == 0 || columns % kValuesPerWeightBlock != 0) return 0;
@@ -567,6 +572,11 @@ cudaError_t launch_quant_mmv(QuantKind kind, const std::uint8_t* weights,
                              const __nv_bfloat16* activation,
                              Q8Block* q8_workspace, float* output,
                              cudaStream_t stream) noexcept {
+  if (kind == QuantKind::kQ4K && q4_decode_uses_integer()) {
+    return launch_q4k_coop_mmv(
+        weights, rows, columns, activation, q8_workspace, output,
+        effective_q4_decode_warps_per_row(), q4_decode_uses_q8_1(), stream);
+  }
   return launch_quant_mmv_path(kind, weights, rows, columns, activation,
                                q8_workspace, output, kSelectedMmvLoadPath,
                                stream);

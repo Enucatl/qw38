@@ -20,6 +20,7 @@ struct Q8Block {
 static_assert(sizeof(Q8Block) == 36, "unexpected transient Q8 block padding");
 
 std::size_t q8_workspace_bytes(std::size_t columns) noexcept;
+std::size_t q8_1_workspace_bytes(std::size_t columns) noexcept;
 std::size_t q8_prompt_workspace_bytes(std::size_t prompt_rows,
                                       std::size_t columns) noexcept;
 
@@ -40,6 +41,21 @@ cudaError_t launch_quant_mmv(QuantKind kind, const std::uint8_t* weights,
 cudaError_t launch_quantize_bf16_q8(const __nv_bfloat16* activation,
                                     Q8Block* q8, std::size_t columns,
                                     cudaStream_t stream) noexcept;
+
+int q4k_coop_occupancy(unsigned int warps_per_row, bool q8_1) noexcept;
+void q4k_coop_kernel_attributes(unsigned int warps_per_row, bool q8_1,
+                                int* registers, std::size_t* local_bytes,
+                                int* occupancy) noexcept;
+
+cudaError_t launch_q4k_coop_mmv_prequant(
+    const std::uint8_t* weights, std::size_t rows, std::size_t columns,
+    const void* staged, float* output, unsigned int warps_per_row, bool q8_1,
+    cudaStream_t stream) noexcept;
+
+cudaError_t launch_q4k_coop_mmv(
+    const std::uint8_t* weights, std::size_t rows, std::size_t columns,
+    const __nv_bfloat16* activation, void* workspace, float* output,
+    unsigned int warps_per_row, bool q8_1, cudaStream_t stream) noexcept;
 
 cudaError_t launch_quant_mmv_prequant(QuantKind kind,
                                       const std::uint8_t* weights,
