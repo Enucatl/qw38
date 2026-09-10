@@ -1,19 +1,22 @@
 # 42. Chunked CUDA GDN prefill in 64-token windows
 
-[Index](README.md) · Implementation tasks: GDN-002, OPT-013, OPT-019, OPT-029, and EDU-028 in
+[Index](README.md) · Implementation tasks: GDN-002, OPT-013, OPT-019, OPT-029, OPT-040, and EDU-028 in
 [`implementation_ledger.md`](../implementation_ledger.md)
 · Contracts:
 [`pins/cuda_gdn_chunk_contract.json`](../pins/cuda_gdn_chunk_contract.json),
 [`pins/cuda_gdn_scan_contract.json`](../pins/cuda_gdn_scan_contract.json),
 [`pins/opt019_core_recovery_contract.json`](../pins/opt019_core_recovery_contract.json),
-[`pins/opt029_gdn_fuse_contract.json`](../pins/opt029_gdn_fuse_contract.json)
+[`pins/opt029_gdn_fuse_contract.json`](../pins/opt029_gdn_fuse_contract.json),
+[`pins/opt040_gdn_shared_inverse_contract.json`](../pins/opt040_gdn_shared_inverse_contract.json)
 · Evidence:
 [`fixtures/cuda_gdn_chunk.json`](../fixtures/cuda_gdn_chunk.json),
 [`fixtures/cuda_gdn_scan.json`](../fixtures/cuda_gdn_scan.json),
 [`fixtures/opt019_core_recovery.json`](../fixtures/opt019_core_recovery.json),
 [`evidence/optimization/opt019-gdn-attention-core/REPORT.md`](../evidence/optimization/opt019-gdn-attention-core/REPORT.md),
 [`fixtures/opt029_gdn_fuse.json`](../fixtures/opt029_gdn_fuse.json),
-[`evidence/optimization/opt029-gdn-fuse/REPORT.md`](../evidence/optimization/opt029-gdn-fuse/REPORT.md)
+[`evidence/optimization/opt029-gdn-fuse/REPORT.md`](../evidence/optimization/opt029-gdn-fuse/REPORT.md),
+[`fixtures/opt040_gdn_shared_inverse.json`](../fixtures/opt040_gdn_shared_inverse.json),
+[`evidence/optimization/opt040-gdn-shared-inverse/REPORT.md`](../evidence/optimization/opt040-gdn-shared-inverse/REPORT.md)
 
 [Chapter 41](41-cuda-gdn-step.md) prepared one token of GDN state. A prompt has
 many tokens, and processing those known input tokens is called **prefill**.
@@ -171,6 +174,53 @@ remain as non-production symbols. Decode GDN is unchanged. Live 4K
 keep/reject numbers stay in the report and are not restated here:
 [`evidence/optimization/opt029-gdn-fuse/REPORT.md`](../evidence/optimization/opt029-gdn-fuse/REPORT.md).
 
+## OPT-040 shared prompt Q/K inverse hoist
+
+OPT-040 adapts the focused MIT llama.cpp technique that L2-normalizes GDN Q/K
+once before the recurrent operator (`qwen35.cpp` `ggml_l2_norm` on `q_conv` /
+`k_conv`; recurrence in `gated_delta_net.cu` consumes already-normalized Q/K).
+Quartz previously folded the same warp-sum squares and `1/sqrtf` inverses inside
+every value-column warp of `prepare_recurrence_fused_warp_column`, recomputing
+each `(token, key_head)` pair `reuse` times per token. Production prompt GDN on
+`GdnScanPath::kFusedTokenLoop` with fuse path `off` now hoists that math:
+
+1. **Unchanged:** `prepare_convolution_chunk_parallel`, sequential
+   `kSequentialWindows`, decode `launch_gdn_prepare_tiled`, and
+   `gdn_gated_output_rows`.
+2. **`prepare_gdn_shared_inverses`:** grid `(key_heads, token_count)`; one warp
+   per `(token, key_head)` writes two FP32 values
+   (`query_inverse`, `key_inverse`) using the same device helper as the repeated
+   loop. Scratch aliases the existing `prompt_projected_bf16_` float overlay
+   between parallel conv and recurrence; gated-output overwrites it afterward.
+   No extra `cudaMalloc`.
+3. **`prepare_recurrence_fused_warp_column_shared`:** same `(48, 1, 32)` /
+   `(32, 4)` geometry as the quality warp-column kernel, but loads hoisted
+   inverses instead of recomputing squares.
+4. **`prepare_recurrence_fused_warp_column`:** retained as the A/B baseline and
+   as production when `token_count == 1`, scratch is short, fuse ≠ `off`, or
+   shape is non-production.
+
+`kSelectedGdnInversePath` is `shared`. `kSelectedGdnFusePath` stays `off`.
+Sequential 64-token windows remain the unloosened GDN-002/OPT-013 numeric
+reference. Byte equality is versus the repeated quality path, not sequential
+(warp-sum versus serial squares).
+
+**Measured, RTX 5090, component-only:** paired CUDA-event A/B on the complete
+4096-token GDN chain (parallel conv + optional shared-inverse kernel +
+warp-column recurrence + gated-output) selected `shared` with byte-equal
+inverses, recurrent output, candidate state, convolution, and gated BF16 versus
+`repeated`, frozen sequential envelopes, and occupancy ≥ 1 at every correctness
+token count and layer. Live exclusive sitting **keep:** production pin
+`shared`; cross-workload P and decode throughput/p95 guards held;
+`reverted` false. `quartz_meets_llama` is informational and is not this gate.
+**The 2K parity owner remains the blocked dedicated gate.** This keep does not
+substitute for that gate and does not claim Quartz ≥ llama.cpp. Live numbers
+stay in the report; this chapter does not replace them:
+[`evidence/optimization/opt040-gdn-shared-inverse/REPORT.md`](../evidence/optimization/opt040-gdn-shared-inverse/REPORT.md),
+[`pins/opt040_gdn_shared_inverse_contract.json`](../pins/opt040_gdn_shared_inverse_contract.json),
+and
+[`fixtures/opt040_gdn_shared_inverse.json`](../fixtures/opt040_gdn_shared_inverse.json).
+
 ## Whole-chunk candidate state
 
 Internal windows are not separate transactions. The candidate after window one
@@ -261,7 +311,12 @@ production fused recurrence is the warp-column quality path inside those same
 envelopes, plus the live exact-2048 `gdn` category drop under the locked
 addressed rule. OPT-029 proves fused conv and/or gated-output into that
 token loop under the same envelopes when a paired A/B wins, or retains
-the split sequence with rejection evidence when it does not. None of
+the split sequence with rejection evidence when it does not. OPT-040
+proves hoisted per-(token, key_head) Q/K inverses into existing prompt
+overlay scratch under byte-equal quality versus repeated warp-column L2,
+frozen sequential envelopes, and a component-only 4096-token CUDA-event
+keep with cross-workload P/decode guards when the A/B wins, or retains
+`repeated` with rejection evidence when it does not. None of
 these tasks prove complete GDN layers as a speedup claim, the
 comparative 5% prefill/decode gates, long-context quality,
 request-level atomicity, or llama.cpp 2K tok/s parity.

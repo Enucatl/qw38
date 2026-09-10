@@ -1,6 +1,6 @@
 # Chunked full-model CUDA prefill
 
-[Index](README.md) · Implementation tasks: SCH-002, MEM-002, OPT-008, OPT-009, OPT-011, OPT-012, OPT-013, OPT-014, OPT-015, OPT-017, OPT-018, OPT-019, OPT-020, OPT-021, OPT-022, OPT-023, OPT-024, OPT-025, OPT-026, OPT-027, OPT-028, OPT-029, OPT-030, OPT-032, OPT-033, OPT-035, OPT-037, OPT-038, and EDU-047 in
+[Index](README.md) · Implementation tasks: SCH-002, MEM-002, OPT-008, OPT-009, OPT-011, OPT-012, OPT-013, OPT-014, OPT-015, OPT-017, OPT-018, OPT-019, OPT-020, OPT-021, OPT-022, OPT-023, OPT-024, OPT-025, OPT-026, OPT-027, OPT-028, OPT-029, OPT-030, OPT-032, OPT-033, OPT-035, OPT-037, OPT-038, OPT-040, and EDU-047 in
 [`implementation_ledger.md`](../implementation_ledger.md) · Contracts:
 [`pins/cuda_prompt_scheduler_contract.json`](../pins/cuda_prompt_scheduler_contract.json),
 [`pins/cuda_prompt_pipeline_contract.json`](../pins/cuda_prompt_pipeline_contract.json),
@@ -24,7 +24,8 @@
 [`pins/opt030_pdl_launches_contract.json`](../pins/opt030_pdl_launches_contract.json),
 [`pins/opt032_decode_oracle_contract.json`](../pins/opt032_decode_oracle_contract.json),
 [`pins/opt033_register_vkq_contract.json`](../pins/opt033_register_vkq_contract.json),
-[`pins/opt035_pv_mma_contract.json`](../pins/opt035_pv_mma_contract.json)
+[`pins/opt035_pv_mma_contract.json`](../pins/opt035_pv_mma_contract.json),
+[`pins/opt040_gdn_shared_inverse_contract.json`](../pins/opt040_gdn_shared_inverse_contract.json)
 · Evidence: [`fixtures/cuda_prompt_scheduler.json`](../fixtures/cuda_prompt_scheduler.json),
 [`fixtures/cuda_prompt_pipeline.json`](../fixtures/cuda_prompt_pipeline.json),
 [`fixtures/cuda_prompt_graph.json`](../fixtures/cuda_prompt_graph.json),
@@ -68,7 +69,9 @@
 [`evidence/optimization/opt030-pdl-launches/REJECTION.md`](../evidence/optimization/opt030-pdl-launches/REJECTION.md),
 [`evidence/optimization/opt032-decode-oracle/REPORT.md`](../evidence/optimization/opt032-decode-oracle/REPORT.md),
 [`evidence/optimization/opt033-register-vkq/REPORT.md`](../evidence/optimization/opt033-register-vkq/REPORT.md),
-[`evidence/optimization/opt035-pv-mma/REPORT.md`](../evidence/optimization/opt035-pv-mma/REPORT.md)
+[`evidence/optimization/opt035-pv-mma/REPORT.md`](../evidence/optimization/opt035-pv-mma/REPORT.md),
+[`fixtures/opt040_gdn_shared_inverse.json`](../fixtures/opt040_gdn_shared_inverse.json),
+[`evidence/optimization/opt040-gdn-shared-inverse/REPORT.md`](../evidence/optimization/opt040-gdn-shared-inverse/REPORT.md)
 
 ## Why prompt execution differs from decode
 
@@ -179,8 +182,10 @@ and FP32 recurrent matrix forward, and produces a final candidate state for that
 layer.
 
 Production prompt chunks use `GdnScanPath::kFusedTokenLoop`: the existing
-parallel convolution, then OPT-019 warp-column fused quality recurrence
-(`dim3(32, 4)`, grid z=32 for width 128). Sequential 64-token windows remain
+parallel convolution, then optional hoisted per-(token, key_head) Q/K inverses
+in the `prompt_projected_bf16_` overlay (OPT-040), then OPT-019 warp-column
+fused quality recurrence (`dim3(32, 4)`, grid z=32 for width 128). Sequential
+64-token windows remain
 the unloosened GDN-002/OPT-013 reference. OPT-013's associative overlay
 (`kParallelAssociative`) is retained: at `prompt_chunk_rows_ == 4096` that
 overlay fits `W_fit = 22` windows, so a 4,096-token layer batches
@@ -819,6 +824,29 @@ numbers stay in the report:
 [`pins/opt035_pv_mma_contract.json`](../pins/opt035_pv_mma_contract.json),
 and [`fixtures/opt035_pv_mma.json`](../fixtures/opt035_pv_mma.json).
 
+OPT-040 hoists prompt GDN Q/K inverse normalization into existing overlay
+scratch. **Measured, RTX 5090:** paired CUDA-event A/B on the complete
+4096-token GDN component (parallel conv + optional shared-inverse kernel +
+warp-column recurrence + gated-output) among `repeated` and `shared`; winner
+`shared` with byte-equal quality versus `repeated` and frozen sequential
+GDN-002 envelopes. Inverse scratch aliases `prompt_projected_bf16_` as a float
+overlay between parallel conv and recurrence; gated-output overwrites that
+buffer afterward. Required floats are `2 * token_count * key_heads`; the
+OPT-008 workspace byte formula is unchanged. `token_count == 1` tails stay
+`repeated`. Decode sequential GDN and OPT-029 fuse `off` stay. Mixer Q8 quality,
+skinny `mma_i32_j128`, FFN `shared_y_swiglu_q8`, fattn stream-K, register VKQ,
+and P×V MMA stay. Live exclusive sitting **keep:** Quartz P strictly greater
+than the frozen then-current accepted P denominator; D128/D2048 throughput and
+p95 guards held; `reverted` false; `keep_sitting_skipped` false; `status`
+measured. `quartz_meets_llama` is informational and is not this gate. **The
+2K parity owner remains the blocked dedicated gate.** This keep does not
+substitute for that gate and does not claim Quartz ≥ llama.cpp. Live numbers
+stay in the report:
+[`evidence/optimization/opt040-gdn-shared-inverse/REPORT.md`](../evidence/optimization/opt040-gdn-shared-inverse/REPORT.md),
+[`pins/opt040_gdn_shared_inverse_contract.json`](../pins/opt040_gdn_shared_inverse_contract.json),
+and
+[`fixtures/opt040_gdn_shared_inverse.json`](../fixtures/opt040_gdn_shared_inverse.json).
+
 The **proof boundary** excludes comparative speed claims, 2K/8K sustained
 prefill throughput, execution of a 128K prefill, 128K retrieval quality, thermal
 stability, superiority to llama.cpp/vLLM, and a Nsight Systems overlap timeline.
@@ -879,7 +907,11 @@ dual-F16 probability×V MMA on that register-resident path and a live 4K
 keep versus the then-current accepted P denominator with the D128/D2048
 guard; production fattn remains `stream_k` (`grid.z=2`) with `registers`
 value accumulation and `mma` probability×V; it does not own or pass the
-2K tok/s gate. BEN-001
+2K tok/s gate. OPT-040 records hoisted prompt GDN Q/K inverses in existing
+overlay scratch and a live 4K keep versus the then-current accepted P
+denominator with the D128/D2048 guard; production inverse pin is `shared`;
+decode sequential GDN and fuse `off` stay; it does not own or pass the 2K
+tok/s gate. BEN-001
 provides the harness; CMP-002/CMP-003 still own the 30-sample comparative gate.
 QLT-001 remains blocked. OPT-012's prompt graphs are FFN subgraphs only: not a
 whole-chunk graph, not a speedup gate, and not 128K quality recovery.

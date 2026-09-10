@@ -803,12 +803,13 @@ cudaError_t launch_fused_token_loop(
     const float* convolution_weights, const float* log_decay,
     const float* beta, std::size_t token_count, const GdnState& committed,
     const GdnState& candidate, float* convolution_output,
-    float* recurrent_output, cudaStream_t stream,
-    bool value_is_tiled) noexcept {
+    float* recurrent_output, cudaStream_t stream, bool value_is_tiled,
+    float* scratch, std::size_t scratch_floats) noexcept {
   return launch_gdn_quality_fused(
       config, convolution_input, convolution_weights, log_decay, beta,
       token_count, committed, candidate, convolution_output, recurrent_output,
-      nullptr, nullptr, nullptr, stream, value_is_tiled, nullptr);
+      nullptr, nullptr, nullptr, stream, value_is_tiled, nullptr, nullptr,
+      scratch, scratch_floats);
 }
 
 cudaError_t launch_parallel_associative(
@@ -910,7 +911,7 @@ cudaError_t launch_gdn_prepare_chunk_layout(
     return launch_fused_token_loop(
         config, convolution_input, convolution_weights, log_decay, beta,
         token_count, committed, candidate, convolution_output,
-        recurrent_output, stream, value_is_tiled);
+        recurrent_output, stream, value_is_tiled, scratch, scratch_floats);
   }
   if (path == GdnScanPath::kParallelAssociative) {
     if (scratch == nullptr ||
@@ -962,7 +963,8 @@ cudaError_t launch_gdn_quality_fused(
     const GdnState& candidate, float* convolution_output,
     float* recurrent_output, const float* gate_tiled, const float* norm,
     __nv_bfloat16* output_bf16, cudaStream_t stream, bool value_is_tiled,
-    const char* path) noexcept {
+    const char* path, const char* inverse_path, float* inverse_scratch,
+    std::size_t inverse_scratch_floats) noexcept {
   const std::size_t channels = gdn_convolution_channels(config);
   if (channels == 0 || token_count == 0 || log_decay == nullptr ||
       beta == nullptr || committed.recurrent == nullptr ||
@@ -1042,6 +1044,20 @@ cudaError_t launch_gdn_quality_fused(
         committed.recurrent, candidate.recurrent, recurrent_output, token_count,
         value_is_tiled);
     error = cudaPeekAtLastError();
+  } else if (gdn_can_launch_shared_inverse(config, token_count, selected,
+                                          inverse_path, inverse_scratch,
+                                          inverse_scratch_floats)) {
+    error = launch_parallel_conv();
+    if (error == cudaSuccess) {
+      error = launch_gdn_shared_inverses(config, convolution_output,
+                                         token_count, inverse_scratch, stream);
+    }
+    if (error == cudaSuccess) {
+      error = launch_gdn_quality_recurrence_shared(
+          config, convolution_output, log_decay, beta, committed.recurrent,
+          candidate.recurrent, recurrent_output, inverse_scratch, token_count,
+          value_is_tiled, stream);
+    }
   } else {
     error = launch_convolution_then_recurrence(
         config, convolution_input, convolution_weights, log_decay, beta,

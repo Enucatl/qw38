@@ -800,6 +800,42 @@ baseline.
   then-current accepted P D128 D2048 are the keep denominators; does not
   substitute for the 2K llama.cpp parity gate; Quartz ≥ llama.cpp is not this
   gate. Envelopes unloosened; Nsight is not used.
+- OPT-040 is a local derivation over admitted warp-column prompt GDN quality.
+  It hoists per-(token, key_head) Q/K inverse normalization into existing
+  `prompt_projected_bf16_` float overlay scratch between parallel conv and
+  warp-column recurrence, using one shared device helper so association cannot
+  drift from the repeated in-loop path. File-level provenance for pre-loop Q/K
+  L2 is already External: pinned llama.cpp revision
+  `cc83d7b4824f73cfdda4dfbb47ee39804f71b328` (MIT, The ggml authors)
+  `qwen35.cpp` `ggml_l2_norm` on `q_conv`/`k_conv` before recurrent attention.
+  This increment does not vendor `qwen35.cpp` or `gated_delta_net.cu`, does not
+  include ggml headers, and does not copy `../ds4`. Production prompt GDN on
+  `GdnScanPath::kFusedTokenLoop` with fuse path `off` installs
+  `prepare_gdn_shared_inverses` plus
+  `prepare_recurrence_fused_warp_column_shared` when dispatch predicates hold;
+  `prepare_recurrence_fused_warp_column` remains the A/B baseline and
+  `token_count == 1` tails stay `repeated`. Decode sequential GDN,
+  `kSelectedGdnFusePath` `off`, and sequential windows stay. No extra persistent
+  `cudaMalloc`; the workspace byte formula is unchanged. Keep denominators are
+  the frozen then-current accepted P and D128/D2048 means and p95s copied into
+  the contract. **Measured, RTX 5090:** 4096 complete-GDN A/B winner `shared`;
+  live exclusive sitting keep; production pin `shared`; `reverted` false;
+  `keep_sitting_skipped` false; `status` measured. Live tok/s stay in the
+  report; this ledger does not replace them. The schema-1 contract, measured
+  fixture, and report are
+  [`pins/opt040_gdn_shared_inverse_contract.json`](../pins/opt040_gdn_shared_inverse_contract.json),
+  [`fixtures/opt040_gdn_shared_inverse.json`](../fixtures/opt040_gdn_shared_inverse.json),
+  and
+  [`evidence/optimization/opt040-gdn-shared-inverse/REPORT.md`](../evidence/optimization/opt040-gdn-shared-inverse/REPORT.md).
+  The beginner explanations are
+  [`docs/42-cuda-gdn-chunks.md`](42-cuda-gdn-chunks.md),
+  [`docs/41-cuda-gdn-step.md`](41-cuda-gdn-step.md),
+  [`docs/62-cuda-full-prefill.md`](62-cuda-full-prefill.md), and
+  [`docs/06-system-optimization.md`](06-system-optimization.md).
+  Proof limit: byte-equal quality outputs/state; frozen sequential GDN gates;
+  lower complete GDN component time; improved P; cross-workload guard; does not
+  substitute for the 2K llama.cpp parity gate; Quartz ≥ llama.cpp is not this
+  gate. Envelopes unloosened; Nsight is not used.
 - OPT-029 adapts llama.cpp revision
   `cc83d7b4824f73cfdda4dfbb47ee39804f71b328` (MIT, The ggml authors)
   warp-column GDN recurrence from `gated_delta_net.cu` (`S_v=128`,

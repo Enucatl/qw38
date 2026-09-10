@@ -2417,7 +2417,8 @@ Status execute_prompt_chunk(
                   workspace->prompt_gdn_update_, token_count, committed,
                   candidate, conv_out, workspace->prompt_gdn_recurrent_output_,
                   workspace->prompt_projection_b_, layer.gdn.norm,
-                  workspace->prompt_projected_bf16_, stream, true, nullptr);
+                  workspace->prompt_projected_bf16_, stream, true, nullptr,
+                  nullptr, nullptr, 0);
               if (error == cudaSuccess) used_fused_gate = true;
             } else {
               error = launch_gdn_prepare_chunk_tiled(

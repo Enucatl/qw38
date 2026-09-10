@@ -42,8 +42,10 @@ gated-output into the warp-column token loop was A/B-lost and not
 installed (OPT-029); production GDN core stays split parallel conv +
 warp-column + gated-output. Hopper/Blackwell PDL on ungraphed prompt
 launches was A/B-won then 4K-rejected (OPT-030); production stays
-ordinary `<<<>>>`. Decode stays MMV, with packed blockwise Q4_K/Q6_K
-loads after the OPT-034 keep.
+ordinary `<<<>>>`. Production prompt GDN may hoist per-(token, key_head)
+Q/K inverses into existing overlay scratch after the OPT-040 keep;
+decode sequential GDN is unchanged. Decode stays MMV, with packed
+blockwise Q4_K/Q6_K loads after the OPT-034 keep.
 Tiny mixer prompts keep the
 OPT-009 tiled `__fmul_rn`/`__fadd_rn` kernel.
 Rank-1 fused MMA remains a non-production kernel. MMA here is Measured
@@ -106,7 +108,8 @@ update; gated RMSNorm; output projection. Preserve exact update order. Prefill
 may process chunks (the official reference uses 64) but the final recurrent and
 convolution state must equal token-by-token execution for arbitrary chunk splits.
 Production prompt recurrence (`kFusedTokenLoop`) is the warp-column fused quality
-path; sequential 64-token windows remain the unloosened numeric reference.
+path with hoisted Q/K inverses when dispatch predicates hold; sequential
+64-token windows remain the unloosened numeric reference.
 
 The `[48,128,128]` matrices expose parallel heads and tiles but each token
 depends on the previous matrix. Avoid materializing repeated Q/K heads; map
@@ -575,6 +578,29 @@ unloosened. `reverted` is false. This increment does not own the 2K llama.cpp
 parity gate. Quartz ≥ llama.cpp is informational. Live tok/s stay in the
 report; this chapter does not replace them:
 [`evidence/optimization/opt039-decode-warp/REPORT.md`](../evidence/optimization/opt039-decode-warp/REPORT.md).
+
+## Shared prompt GDN Q/K inverse hoist (OPT-040)
+
+**Measured, RTX 5090:** production prompt GDN on `GdnScanPath::kFusedTokenLoop`
+with fuse path `off` was A/B'd between repeated in-loop warp-column L2 and a
+shared per-(token, key_head) inverse kernel writing into the existing
+`prompt_projected_bf16_` float overlay before warp-column recurrence loads those
+values. The paired CUDA-event A/B on the complete 4096-token GDN component
+(conv + optional inverse + warp-column + gated-output) selected `shared` with
+byte-equal quality outputs/state versus `repeated` and frozen sequential GDN-002
+envelopes. `kSelectedGdnInversePath` is `shared`. `kSelectedGdnFusePath` stays
+`off`. Decode sequential GDN, sequential windows, and OPT-029 split conv +
+warp-column + gated-output stay. `token_count == 1` prompt tails stay
+`repeated`. No extra persistent `cudaMalloc`. Keep denominators are the frozen
+then-current accepted P and D128/D2048 means and p95s copied into the
+contract. **Keep:** A/B winner `shared` with strictly lower 4096 complete-GDN
+mean; live P tok/s strictly exceeds that frozen P denominator; the
+cross-workload guard held (D128/D2048 throughput and both p95 flavors within
+5%). Frozen GDN-002 envelopes are unloosened. `reverted` is false. This
+increment does not own the 2K llama.cpp parity gate. Quartz ≥ llama.cpp is
+informational. Live tok/s stay in the report; this chapter does not replace
+them:
+[`evidence/optimization/opt040-gdn-shared-inverse/REPORT.md`](../evidence/optimization/opt040-gdn-shared-inverse/REPORT.md).
 
 ## DwarfStar transfer boundary
 

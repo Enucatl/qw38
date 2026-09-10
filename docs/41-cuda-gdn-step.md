@@ -72,6 +72,11 @@ cancel/error -> do not commit -> discard candidate, frontier stays unchanged
 This prepare/commit split makes cancellation understandable. There is no
 rollback algorithm: uncommitted work simply never becomes session state.
 
+Production prompt quality on `GdnScanPath::kFusedTokenLoop` may load
+hoisted per-(token, key_head) Q/K inverses from the `prompt_projected_bf16_`
+overlay after parallel convolution ([Chapter 42](42-cuda-gdn-chunks.md));
+decode one-token `launch_gdn_prepare` stays sequential and unchanged.
+
 ## Why commit uses one CUDA block
 
 [`launch_gdn_commit`](../cuda/gdn_step.cu) launches one 256-thread block. Its

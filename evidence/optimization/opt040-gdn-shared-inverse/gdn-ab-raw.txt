@@ -1,0 +1,98 @@
+correctness layer=0 tokens=1 launch_ok=true dispatched_shared=false inverses_eq=true recurrent_eq=true conv_eq=true state_eq=true gated_eq=true committed=true seq_max_abs=1.86264515e-09 seq_rms=1.30683533e-10 seq_nonfinite=0 eligible=true
+correctness layer=0 tokens=2 launch_ok=true dispatched_shared=true inverses_eq=true recurrent_eq=true conv_eq=true state_eq=true gated_eq=true committed=true seq_max_abs=2.32830644e-09 seq_rms=1.92246219e-10 seq_nonfinite=0 eligible=true
+correctness layer=0 tokens=3 launch_ok=true dispatched_shared=true inverses_eq=true recurrent_eq=true conv_eq=true state_eq=true gated_eq=true committed=true seq_max_abs=3.7252903e-09 seq_rms=2.40469838e-10 seq_nonfinite=0 eligible=true
+correctness layer=0 tokens=4 launch_ok=true dispatched_shared=true inverses_eq=true recurrent_eq=true conv_eq=true state_eq=true gated_eq=true committed=true seq_max_abs=3.7252903e-09 seq_rms=2.8296715e-10 seq_nonfinite=0 eligible=true
+correctness layer=0 tokens=63 launch_ok=true dispatched_shared=true inverses_eq=true recurrent_eq=true conv_eq=true state_eq=true gated_eq=true committed=true seq_max_abs=1.49011612e-08 seq_rms=6.84321377e-10 seq_nonfinite=0 eligible=true
+correctness layer=0 tokens=64 launch_ok=true dispatched_shared=true inverses_eq=true recurrent_eq=true conv_eq=true state_eq=true gated_eq=true committed=true seq_max_abs=1.49011612e-08 seq_rms=6.87258028e-10 seq_nonfinite=0 eligible=true
+correctness layer=0 tokens=65 launch_ok=true dispatched_shared=true inverses_eq=true recurrent_eq=true conv_eq=true state_eq=true gated_eq=true committed=true seq_max_abs=1.67638063e-08 seq_rms=6.85476231e-10 seq_nonfinite=0 eligible=true
+correctness layer=0 tokens=512 launch_ok=true dispatched_shared=true inverses_eq=true recurrent_eq=true conv_eq=true state_eq=true gated_eq=true committed=true seq_max_abs=1.49011612e-08 seq_rms=3.79308002e-10 seq_nonfinite=0 eligible=true
+correctness layer=0 tokens=2048 launch_ok=true dispatched_shared=true inverses_eq=true recurrent_eq=true conv_eq=true state_eq=true gated_eq=true committed=true seq_max_abs=1.49011612e-08 seq_rms=2.52833282e-10 seq_nonfinite=0 eligible=true
+correctness layer=0 tokens=4096 launch_ok=true dispatched_shared=true inverses_eq=true recurrent_eq=true conv_eq=true state_eq=true gated_eq=true committed=true seq_max_abs=1.49011612e-08 seq_rms=2.17561497e-10 seq_nonfinite=0 eligible=true
+correctness layer=1 tokens=1 launch_ok=true dispatched_shared=false inverses_eq=true recurrent_eq=true conv_eq=true state_eq=true gated_eq=true committed=true seq_max_abs=1.86264515e-09 seq_rms=1.36649345e-10 seq_nonfinite=0 eligible=true
+correctness layer=1 tokens=2 launch_ok=true dispatched_shared=true inverses_eq=true recurrent_eq=true conv_eq=true state_eq=true gated_eq=true committed=true seq_max_abs=1.86264515e-09 seq_rms=1.89833968e-10 seq_nonfinite=0 eligible=true
+correctness layer=1 tokens=3 launch_ok=true dispatched_shared=true inverses_eq=true recurrent_eq=true conv_eq=true state_eq=true gated_eq=true committed=true seq_max_abs=3.7252903e-09 seq_rms=2.37388775e-10 seq_nonfinite=0 eligible=true
+correctness layer=1 tokens=4 launch_ok=true dispatched_shared=true inverses_eq=true recurrent_eq=true conv_eq=true state_eq=true gated_eq=true committed=true seq_max_abs=3.7252903e-09 seq_rms=2.81588225e-10 seq_nonfinite=0 eligible=true
+correctness layer=1 tokens=63 launch_ok=true dispatched_shared=true inverses_eq=true recurrent_eq=true conv_eq=true state_eq=true gated_eq=true committed=true seq_max_abs=1.39698386e-08 seq_rms=6.89627744e-10 seq_nonfinite=0 eligible=true
+correctness layer=1 tokens=64 launch_ok=true dispatched_shared=true inverses_eq=true recurrent_eq=true conv_eq=true state_eq=true gated_eq=true committed=true seq_max_abs=1.39698386e-08 seq_rms=6.89971968e-10 seq_nonfinite=0 eligible=true
+correctness layer=1 tokens=65 launch_ok=true dispatched_shared=true inverses_eq=true recurrent_eq=true conv_eq=true state_eq=true gated_eq=true committed=true seq_max_abs=1.3038516e-08 seq_rms=6.91434299e-10 seq_nonfinite=0 eligible=true
+correctness layer=1 tokens=512 launch_ok=true dispatched_shared=true inverses_eq=true recurrent_eq=true conv_eq=true state_eq=true gated_eq=true committed=true seq_max_abs=1.58324838e-08 seq_rms=3.78735182e-10 seq_nonfinite=0 eligible=true
+correctness layer=1 tokens=2048 launch_ok=true dispatched_shared=true inverses_eq=true recurrent_eq=true conv_eq=true state_eq=true gated_eq=true committed=true seq_max_abs=1.67638063e-08 seq_rms=2.52596888e-10 seq_nonfinite=0 eligible=true
+correctness layer=1 tokens=4096 launch_ok=true dispatched_shared=true inverses_eq=true recurrent_eq=true conv_eq=true state_eq=true gated_eq=true committed=true seq_max_abs=1.86264515e-08 seq_rms=2.17223822e-10 seq_nonfinite=0 eligible=true
+correctness layer=62 tokens=1 launch_ok=true dispatched_shared=false inverses_eq=true recurrent_eq=true conv_eq=true state_eq=true gated_eq=true committed=true seq_max_abs=1.86264515e-09 seq_rms=1.38636894e-10 seq_nonfinite=0 eligible=true
+correctness layer=62 tokens=2 launch_ok=true dispatched_shared=true inverses_eq=true recurrent_eq=true conv_eq=true state_eq=true gated_eq=true committed=true seq_max_abs=1.86264515e-09 seq_rms=1.93908486e-10 seq_nonfinite=0 eligible=true
+correctness layer=62 tokens=3 launch_ok=true dispatched_shared=true inverses_eq=true recurrent_eq=true conv_eq=true state_eq=true gated_eq=true committed=true seq_max_abs=3.7252903e-09 seq_rms=2.40700182e-10 seq_nonfinite=0 eligible=true
+correctness layer=62 tokens=4 launch_ok=true dispatched_shared=true inverses_eq=true recurrent_eq=true conv_eq=true state_eq=true gated_eq=true committed=true seq_max_abs=3.7252903e-09 seq_rms=2.80833246e-10 seq_nonfinite=0 eligible=true
+correctness layer=62 tokens=63 launch_ok=true dispatched_shared=true inverses_eq=true recurrent_eq=true conv_eq=true state_eq=true gated_eq=true committed=true seq_max_abs=1.3038516e-08 seq_rms=6.88271218e-10 seq_nonfinite=0 eligible=true
+correctness layer=62 tokens=64 launch_ok=true dispatched_shared=true inverses_eq=true recurrent_eq=true conv_eq=true state_eq=true gated_eq=true committed=true seq_max_abs=1.3038516e-08 seq_rms=6.86825652e-10 seq_nonfinite=0 eligible=true
+correctness layer=62 tokens=65 launch_ok=true dispatched_shared=true inverses_eq=true recurrent_eq=true conv_eq=true state_eq=true gated_eq=true committed=true seq_max_abs=1.3038516e-08 seq_rms=6.86107449e-10 seq_nonfinite=0 eligible=true
+correctness layer=62 tokens=512 launch_ok=true dispatched_shared=true inverses_eq=true recurrent_eq=true conv_eq=true state_eq=true gated_eq=true committed=true seq_max_abs=1.49011612e-08 seq_rms=3.79747345e-10 seq_nonfinite=0 eligible=true
+correctness layer=62 tokens=2048 launch_ok=true dispatched_shared=true inverses_eq=true recurrent_eq=true conv_eq=true state_eq=true gated_eq=true committed=true seq_max_abs=1.67638063e-08 seq_rms=2.5244129e-10 seq_nonfinite=0 eligible=true
+correctness layer=62 tokens=4096 launch_ok=true dispatched_shared=true inverses_eq=true recurrent_eq=true conv_eq=true state_eq=true gated_eq=true committed=true seq_max_abs=1.49011612e-08 seq_rms=2.16615337e-10 seq_nonfinite=0 eligible=true
+correctness layer=0 tokens=4096 launch_ok=true dispatched_shared=true inverses_eq=true recurrent_eq=true conv_eq=true state_eq=true gated_eq=true committed=true seq_max_abs=1.49011612e-08 seq_rms=2.17561497e-10 seq_nonfinite=0 eligible=true
+warmup id=repeated sample=0 ms=11.9148159
+warmup id=shared sample=0 ms=7.65881586
+warmup id=repeated sample=1 ms=11.8883524
+warmup id=shared sample=1 ms=7.69446421
+warmup id=repeated sample=2 ms=11.8863039
+warmup id=shared sample=2 ms=7.6253438
+measured id=repeated sample=0 ms=11.8993282
+measured id=shared sample=0 ms=7.63238382
+measured id=repeated sample=1 ms=11.8866558
+measured id=shared sample=1 ms=7.66684818
+measured id=repeated sample=2 ms=11.8764162
+measured id=shared sample=2 ms=7.66953611
+measured id=repeated sample=3 ms=11.891264
+measured id=shared sample=3 ms=7.64979219
+measured id=repeated sample=4 ms=11.9276161
+measured id=shared sample=4 ms=7.66342402
+measured id=repeated sample=5 ms=11.9078398
+measured id=shared sample=5 ms=7.6693759
+measured id=repeated sample=6 ms=11.892992
+measured id=shared sample=6 ms=7.65193605
+measured id=repeated sample=7 ms=11.9188805
+measured id=shared sample=7 ms=7.64089584
+measured id=repeated sample=8 ms=11.8996162
+measured id=shared sample=8 ms=7.66780806
+measured id=repeated sample=9 ms=11.9106884
+measured id=shared sample=9 ms=7.66371202
+measured id=repeated sample=10 ms=11.9012804
+measured id=shared sample=10 ms=7.63833618
+measured id=repeated sample=11 ms=11.9340162
+measured id=shared sample=11 ms=7.65654421
+measured id=repeated sample=12 ms=11.9189444
+measured id=shared sample=12 ms=7.65593576
+measured id=repeated sample=13 ms=11.9045763
+measured id=shared sample=13 ms=7.68591976
+measured id=repeated sample=14 ms=11.9211197
+measured id=shared sample=14 ms=7.66201591
+measured id=repeated sample=15 ms=11.9204483
+measured id=shared sample=15 ms=7.67040014
+measured id=repeated sample=16 ms=11.9389763
+measured id=shared sample=16 ms=7.6688962
+measured id=repeated sample=17 ms=11.9041595
+measured id=shared sample=17 ms=7.64323187
+measured id=repeated sample=18 ms=11.9220476
+measured id=shared sample=18 ms=7.69094419
+measured id=repeated sample=19 ms=11.9487677
+measured id=shared sample=19 ms=7.69724798
+measured id=repeated sample=20 ms=11.919776
+measured id=shared sample=20 ms=7.67609596
+measured id=repeated sample=21 ms=11.9343681
+measured id=shared sample=21 ms=7.67283201
+measured id=repeated sample=22 ms=11.9195204
+measured id=shared sample=22 ms=7.67859221
+measured id=repeated sample=23 ms=11.9372797
+measured id=shared sample=23 ms=7.66175985
+measured id=repeated sample=24 ms=11.9228163
+measured id=shared sample=24 ms=7.66675186
+measured id=repeated sample=25 ms=11.9055996
+measured id=shared sample=25 ms=7.67075205
+measured id=repeated sample=26 ms=11.9410877
+measured id=shared sample=26 ms=7.67375994
+measured id=repeated sample=27 ms=11.9492483
+measured id=shared sample=27 ms=7.67193604
+measured id=repeated sample=28 ms=11.9246397
+measured id=shared sample=28 ms=7.6744318
+measured id=repeated sample=29 ms=11.91152
+measured id=shared sample=29 ms=7.66336012
+winner=shared win=true repeated_mean=11.9163837 shared_mean=7.66518307

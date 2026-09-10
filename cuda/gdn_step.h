@@ -82,6 +82,16 @@ const char* selected_gdn_fuse_path() noexcept;
 bool gdn_fuses_conv() noexcept;
 bool gdn_fuses_gated_output() noexcept;
 int gdn_fuse_occupancy(const char* path) noexcept;
+const char* selected_gdn_inverse_path() noexcept;
+bool gdn_uses_shared_inverse() noexcept;
+std::size_t gdn_shared_inverse_floats(std::size_t token_count,
+                                     std::uint32_t key_heads) noexcept;
+int gdn_shared_inverse_occupancy() noexcept;
+int gdn_shared_recurrence_occupancy() noexcept;
+
+cudaError_t launch_gdn_shared_inverses(
+    const GdnConfig& config, const float* convolution_output,
+    std::size_t token_count, float* inverses, cudaStream_t stream) noexcept;
 
 cudaError_t launch_gdn_quality_fused(
     const GdnConfig& config, const float* convolution_input,
@@ -90,7 +100,9 @@ cudaError_t launch_gdn_quality_fused(
     const GdnState& candidate, float* convolution_output,
     float* recurrent_output, const float* gate_tiled, const float* norm,
     __nv_bfloat16* output_bf16, cudaStream_t stream, bool value_is_tiled,
-    const char* path = nullptr) noexcept;
+    const char* path = nullptr, const char* inverse_path = nullptr,
+    float* inverse_scratch = nullptr,
+    std::size_t inverse_scratch_floats = 0) noexcept;
 
 cudaError_t launch_gdn_gated_output_rows(
     const float* recurrent, const float* gate_tiled, const float* norm,

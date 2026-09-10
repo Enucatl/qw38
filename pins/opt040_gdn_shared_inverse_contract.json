@@ -1,0 +1,91 @@
+{
+  "schema_version": 1,
+  "task": "OPT-040",
+  "yardstick": "prompt_gdn_shared_inverse",
+  "opt034_quartz_p_mean_tok_s": 1869.84412,
+  "opt039_quartz_d128_mean_tok_s": 26.1887932,
+  "opt039_quartz_d2048_mean_tok_s": 25.3357754,
+  "opt039_quartz_d128_token_latency_p95_ms": 38.3246689,
+  "opt039_quartz_d128_run_mean_token_latency_p95_ms": 38.2041283,
+  "opt039_quartz_d2048_token_latency_p95_ms": 39.5857964,
+  "opt039_quartz_d2048_run_mean_token_latency_p95_ms": 39.4975739,
+  "llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+  "gguf_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+  "device_substring": "RTX 5090",
+  "selected_gdn_inverse_path": "shared",
+  "ab": {
+    "candidates": [
+      "repeated",
+      "shared"
+    ],
+    "warmups": 3,
+    "measured_runs": 30,
+    "alternating_order": [
+      "repeated",
+      "shared"
+    ],
+    "timed_token_counts": [
+      4096
+    ],
+    "correctness_token_counts": [
+      1,
+      2,
+      3,
+      4,
+      63,
+      64,
+      65,
+      512,
+      2048,
+      4096
+    ],
+    "correctness_layers": [
+      0,
+      1,
+      62
+    ],
+    "ties_retain": "repeated"
+  },
+  "gdn002": {
+    "max_abs": 5e-08,
+    "rms": 5e-09,
+    "nonfinite": 0
+  },
+  "owns_opt016_parity_gate": false,
+  "substitutes_for_opt016": false,
+  "llama_bench_decode_is_informational": true,
+  "required_fixture_keys": [
+    "schema_version",
+    "task",
+    "status",
+    "measurement_utc",
+    "device",
+    "compute_capability",
+    "llama_revision",
+    "gguf_sha256",
+    "reverted",
+    "selected_gdn_inverse_path",
+    "ab_p4096",
+    "correctness",
+    "keep_sitting_skipped",
+    "p",
+    "d128",
+    "d2048",
+    "owns_opt016_parity_gate",
+    "substitutes_for_opt016",
+    "nsight_systems",
+    "nsight_compute",
+    "proof_limit",
+    "report_path"
+  ],
+  "proof_limit": [
+    "byte-equal quality outputs/state",
+    "frozen sequential GDN gates",
+    "lower complete GDN component time",
+    "improved P",
+    "95% throughput floors",
+    "105% p95 ceilings",
+    "does not substitute for the 2K llama.cpp parity gate"
+  ],
+  "report_path": "evidence/optimization/opt040-gdn-shared-inverse/REPORT.md"
+}

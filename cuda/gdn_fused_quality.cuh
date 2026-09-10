@@ -1,13 +1,14 @@
 #pragma once
 
-// Warp-column fused GDN recurrence for Quartz OPT-019 / OPT-029.
+// Warp-column fused GDN recurrence for Quartz OPT-019 / OPT-029 / OPT-040.
 // Adapted from llama.cpp ggml/src/ggml-cuda/gated_delta_net.cu and
 // gated_delta_net.cuh at cc83d7b4824f73cfdda4dfbb47ee39804f71b328
-// (MIT, The ggml authors). Not a vendor of that file. ds4 has no GDN analog.
+// (MIT, The ggml authors), plus qwen35.cpp pre-loop ggml_l2_norm on
+// q_conv/k_conv. Not a vendor of those files. ds4 has no GDN analog.
 // Causal conv / gated-output collapse into that token loop is Quartz-owned;
 // llama.cpp keeps conv as a separate op (chunked-kernel TODO).
 // Explicit expf/sqrtf are not compiler FMA contraction; Makefile NVCCFLAGS
-// --fmad=false stays unchanged.
+// --fmad=false stays unchanged. Do not use rsqrtf.
 
 #include "gdn_step.h"
 #include "pdl_launch.cuh"
@@ -29,8 +30,15 @@ constexpr float kGdnQualityL2Epsilon = 1.0e-6F;
 // OPT-029 A/B winner. Legal values: off, fuse_conv, fuse_gate, fuse_both.
 constexpr char kSelectedGdnFusePath[] = "off";
 
+// OPT-040 A/B winner. Legal values: repeated, shared. Default until A/B.
+constexpr char kSelectedGdnInversePath[] = "shared";
+
 inline const char* gdn_fuse_path_or_selected(const char* path) noexcept {
   return path == nullptr || path[0] == '\0' ? kSelectedGdnFusePath : path;
+}
+
+inline const char* gdn_inverse_path_or_selected(const char* path) noexcept {
+  return path == nullptr || path[0] == '\0' ? kSelectedGdnInversePath : path;
 }
 
 inline bool gdn_path_eq(const char* path, const char* want) noexcept {
@@ -49,6 +57,41 @@ bool gdn_fuses_gated_output() noexcept {
          gdn_path_eq(kSelectedGdnFusePath, "fuse_both");
 }
 
+const char* selected_gdn_inverse_path() noexcept {
+  return kSelectedGdnInversePath;
+}
+
+bool gdn_uses_shared_inverse() noexcept {
+  return gdn_path_eq(kSelectedGdnInversePath, "shared");
+}
+
+std::size_t gdn_shared_inverse_floats(std::size_t token_count,
+                                     std::uint32_t key_heads) noexcept {
+  if (token_count == 0 || key_heads == 0) return 0;
+  return 2 * token_count * static_cast<std::size_t>(key_heads);
+}
+
+inline bool gdn_production_inverse_shape(const GdnConfig& config) noexcept {
+  return config.key_heads == 16 && config.value_heads == 48 &&
+         config.key_width == 128 && config.value_width == 128 &&
+         config.convolution_width == 4;
+}
+
+inline bool gdn_can_launch_shared_inverse(
+    const GdnConfig& config, std::size_t token_count, const char* fuse_path,
+    const char* inverse_path, const float* inverse_scratch,
+    std::size_t inverse_scratch_floats) noexcept {
+  fuse_path = gdn_fuse_path_or_selected(fuse_path);
+  inverse_path = gdn_inverse_path_or_selected(inverse_path);
+  if (!gdn_path_eq(inverse_path, "shared") || !gdn_path_eq(fuse_path, "off") ||
+      token_count < 2 || !gdn_production_inverse_shape(config) ||
+      inverse_scratch == nullptr) {
+    return false;
+  }
+  return inverse_scratch_floats >=
+         gdn_shared_inverse_floats(token_count, config.key_heads);
+}
+
 // Warp sum with __fadd_rn. Butterfly association is admitted at OPT-013
 // 5e-8 / 5e-9; ordered lane fold is the documented first repair if that misses.
 inline __device__ float gdn_warp_sum(float value) {
@@ -56,6 +99,29 @@ inline __device__ float gdn_warp_sum(float value) {
     value = __fadd_rn(value, __shfl_xor_sync(0xffffffffU, value, mask));
   }
   return value;
+}
+
+// Quality Q/K inverse: 4-row unroll, interleaved squares, warp-sum, 1/sqrtf.
+// Shared by the hoisted inverse kernel and the repeated warp-column loop.
+inline __device__ void gdn_quality_load_qk_and_inverses(
+    const float* query, const float* key, std::uint32_t key_width, int lane,
+    float q_reg[4], float k_reg[4], float* query_inverse, float* key_inverse) {
+  float query_squares = 0.0F;
+  float key_squares = 0.0F;
+#pragma unroll
+  for (int row = 0; row < 4; ++row) {
+    const int index = row * 32 + lane;
+    q_reg[row] = query[index];
+    k_reg[row] = key[index];
+    query_squares =
+        __fadd_rn(query_squares, __fmul_rn(q_reg[row], q_reg[row]));
+    key_squares = __fadd_rn(key_squares, __fmul_rn(k_reg[row], k_reg[row]));
+  }
+  query_squares = gdn_warp_sum(query_squares);
+  key_squares = gdn_warp_sum(key_squares);
+  *query_inverse = 1.0F / sqrtf(query_squares + kGdnQualityL2Epsilon) /
+                   sqrtf(static_cast<float>(key_width));
+  *key_inverse = 1.0F / sqrtf(key_squares + kGdnQualityL2Epsilon);
 }
 
 inline __device__ void gdn_shift_hist(float hist[kGdnFuseConvWidth],
@@ -144,23 +210,150 @@ prepare_recurrence_fused_warp_column(
 
     float q_reg[4];
     float k_reg[4];
-    float query_squares = 0.0F;
-    float key_squares = 0.0F;
+    float query_inverse = 0.0F;
+    float key_inverse = 0.0F;
+    gdn_quality_load_qk_and_inverses(query, key, config.key_width, lane, q_reg,
+                                    k_reg, &query_inverse, &key_inverse);
+
+    const float decay =
+        expf(log_decay[token * config.value_heads + value_head]);
+    const float beta_val = beta[token * config.value_heads + value_head];
+
+    float kv_shard = 0.0F;
+#pragma unroll
+    for (int row = 0; row < 4; ++row) {
+      const float k_scale = __fmul_rn(k_reg[row], key_inverse);
+      kv_shard = __fadd_rn(kv_shard, __fmul_rn(s_shard[row], k_scale));
+    }
+    const float kv_acc = gdn_warp_sum(kv_shard);
+    const float delta =
+        __fmul_rn(value[col] - __fmul_rn(decay, kv_acc), beta_val);
+
+    float attn_shard = 0.0F;
+#pragma unroll
+    for (int row = 0; row < 4; ++row) {
+      const float k_scale = __fmul_rn(k_reg[row], key_inverse);
+      const float q_scale = __fmul_rn(q_reg[row], query_inverse);
+      s_shard[row] =
+          __fadd_rn(__fmul_rn(decay, s_shard[row]), __fmul_rn(k_scale, delta));
+      attn_shard = __fadd_rn(attn_shard, __fmul_rn(q_scale, s_shard[row]));
+    }
+    const float attn_acc = gdn_warp_sum(attn_shard);
+    if (lane == 0) {
+      output[(token * config.value_heads + value_head) * config.value_width +
+             col] = attn_acc;
+    }
+  }
+
+#pragma unroll
+  for (int row = 0; row < 4; ++row) {
+    const std::uint32_t key_lane =
+        static_cast<std::uint32_t>(row * 32 + lane);
+    candidate[head_base + static_cast<std::size_t>(key_lane) *
+                              config.value_width +
+              col] = s_shard[row];
+  }
+  quartz_pdl_lc();
+}
+
+// Grid (key_heads, token_count); block (32). One warp owns (token, key_head).
+__global__ void prepare_gdn_shared_inverses(GdnConfig config,
+                                           const float* convolution_output,
+                                           float* inverses,
+                                           std::size_t token_count) {
+  quartz_pdl_sync();
+  const std::uint32_t key_head = blockIdx.x;
+  const std::size_t token = static_cast<std::size_t>(blockIdx.y);
+  const int lane = static_cast<int>(threadIdx.x);
+  if (key_head >= config.key_heads || token >= token_count) {
+    quartz_pdl_lc();
+    return;
+  }
+  const std::size_t query_count =
+      static_cast<std::size_t>(config.key_heads) * config.key_width;
+  const std::size_t channels =
+      2 * query_count +
+      static_cast<std::size_t>(config.value_heads) * config.value_width;
+  const float* token_convolution = convolution_output + token * channels;
+  const float* query = token_convolution + key_head * config.key_width;
+  const float* key =
+      token_convolution + query_count + key_head * config.key_width;
+  float q_reg[4];
+  float k_reg[4];
+  float query_inverse = 0.0F;
+  float key_inverse = 0.0F;
+  gdn_quality_load_qk_and_inverses(query, key, config.key_width, lane, q_reg,
+                                  k_reg, &query_inverse, &key_inverse);
+  if (lane == 0) {
+    const std::size_t base =
+        token * static_cast<std::size_t>(config.key_heads) * 2U +
+        static_cast<std::size_t>(key_head) * 2U;
+    inverses[base] = query_inverse;
+    inverses[base + 1] = key_inverse;
+  }
+  quartz_pdl_lc();
+}
+
+// Same grid/block/S-update as prepare_recurrence_fused_warp_column; loads
+// hoisted per-(token, key_head) inverses instead of recomputing squares.
+__global__ void __launch_bounds__(kGdnQualityThreads, 2)
+prepare_recurrence_fused_warp_column_shared(
+    GdnConfig config, const float* convolution_output, const float* log_decay,
+    const float* beta, const float* source, float* candidate, float* output,
+    const float* inverses, std::size_t token_count, bool value_is_tiled) {
+  quartz_pdl_sync();
+  const std::uint32_t value_head = blockIdx.x;
+  const int lane = static_cast<int>(threadIdx.x);
+  const std::uint32_t col = blockIdx.z * 4U + threadIdx.y;
+  if (value_head >= config.value_heads || col >= config.value_width) {
+    quartz_pdl_lc();
+    return;
+  }
+
+  const std::uint32_t reuse = config.value_heads / config.key_heads;
+  const std::uint32_t key_head = value_head / reuse;
+  const std::size_t query_count =
+      static_cast<std::size_t>(config.key_heads) * config.key_width;
+  const std::size_t head_base = static_cast<std::size_t>(value_head) *
+                                config.key_width * config.value_width;
+  const std::size_t channels =
+      2 * query_count +
+      static_cast<std::size_t>(config.value_heads) * config.value_width;
+  const std::uint32_t replica = value_head % reuse;
+  const std::uint32_t tiled_head = replica * config.key_heads + key_head;
+  const std::uint32_t source_head = value_is_tiled ? tiled_head : value_head;
+
+  float s_shard[4];
+#pragma unroll
+  for (int row = 0; row < 4; ++row) {
+    const std::uint32_t key_lane =
+        static_cast<std::uint32_t>(row * 32 + lane);
+    s_shard[row] = source[head_base + static_cast<std::size_t>(key_lane) *
+                                          config.value_width +
+                          col];
+  }
+
+  for (std::size_t token = 0; token < token_count; ++token) {
+    const float* token_convolution = convolution_output + token * channels;
+    const float* query = token_convolution + key_head * config.key_width;
+    const float* key =
+        token_convolution + query_count + key_head * config.key_width;
+    const float* value = token_convolution + 2 * query_count +
+                         source_head * config.value_width;
+    const float* inv =
+        inverses + token * static_cast<std::size_t>(config.key_heads) * 2U +
+        static_cast<std::size_t>(key_head) * 2U;
+    const float query_inverse = inv[0];
+    const float key_inverse = inv[1];
+
+    float q_reg[4];
+    float k_reg[4];
 #pragma unroll
     for (int row = 0; row < 4; ++row) {
       const int index = row * 32 + lane;
       q_reg[row] = query[index];
       k_reg[row] = key[index];
-      query_squares =
-          __fadd_rn(query_squares, __fmul_rn(q_reg[row], q_reg[row]));
-      key_squares = __fadd_rn(key_squares, __fmul_rn(k_reg[row], k_reg[row]));
     }
-    query_squares = gdn_warp_sum(query_squares);
-    key_squares = gdn_warp_sum(key_squares);
-    const float query_inverse =
-        1.0F / sqrtf(query_squares + kGdnQualityL2Epsilon) /
-        sqrtf(static_cast<float>(config.key_width));
-    const float key_inverse = 1.0F / sqrtf(key_squares + kGdnQualityL2Epsilon);
 
     const float decay =
         expf(log_decay[token * config.value_heads + value_head]);
@@ -637,6 +830,33 @@ inline cudaError_t launch_gdn_quality_recurrence(
       token_count, value_is_tiled);
 }
 
+cudaError_t launch_gdn_shared_inverses(
+    const GdnConfig& config, const float* convolution_output,
+    std::size_t token_count, float* inverses, cudaStream_t stream) noexcept {
+  if (convolution_output == nullptr || inverses == nullptr ||
+      token_count == 0 || config.key_heads == 0) {
+    return cudaErrorInvalidValue;
+  }
+  const dim3 grid(config.key_heads, static_cast<unsigned int>(token_count));
+  return quartz_launch_kernel(prepare_gdn_shared_inverses, grid, dim3(32U), 0,
+                              stream, config, convolution_output, inverses,
+                              token_count);
+}
+
+inline cudaError_t launch_gdn_quality_recurrence_shared(
+    const GdnConfig& config, const float* convolution_output,
+    const float* log_decay, const float* beta, const float* source,
+    float* candidate, float* output, const float* inverses,
+    std::size_t token_count, bool value_is_tiled, cudaStream_t stream) noexcept {
+  if (inverses == nullptr) return cudaErrorInvalidValue;
+  const dim3 grid(config.value_heads, 1U, config.value_width / 4U);
+  const dim3 block(32U, 4U, 1U);
+  return quartz_launch_kernel(
+      prepare_recurrence_fused_warp_column_shared, grid, block, 0, stream,
+      config, convolution_output, log_decay, beta, source, candidate, output,
+      inverses, token_count, value_is_tiled);
+}
+
 cudaError_t launch_gdn_gated_output_rows(
     const float* recurrent, const float* gate_tiled, const float* norm,
     std::size_t key_heads, std::size_t replicas, std::size_t head_width,
@@ -674,6 +894,21 @@ int gdn_fuse_occupancy(const char* path) noexcept {
         &occupancy, prepare_recurrence_fused_warp_column, kGdnQualityThreads,
         0);
   }
+  return error == cudaSuccess ? occupancy : 0;
+}
+
+int gdn_shared_inverse_occupancy() noexcept {
+  int occupancy = 0;
+  const cudaError_t error = cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+      &occupancy, prepare_gdn_shared_inverses, 32, 0);
+  return error == cudaSuccess ? occupancy : 0;
+}
+
+int gdn_shared_recurrence_occupancy() noexcept {
+  int occupancy = 0;
+  const cudaError_t error = cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+      &occupancy, prepare_recurrence_fused_warp_column_shared,
+      kGdnQualityThreads, 0);
   return error == cudaSuccess ? occupancy : 0;
 }
 

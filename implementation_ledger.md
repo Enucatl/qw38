@@ -106,7 +106,7 @@ are repository-relative unless stated otherwise.
 | OPT-037 | Select 4K FFN tiles per projection | OPT-032, OPT-025 | done | Sweep quality-MMQ I={64,128}, J={32,64,128} independently for 4096-row gate/up/down, preserve shared-Y and recapture graphs; keep only with admitted component wins, improved P, frozen MMQ envelopes, and the cross-workload guard; otherwise reject | [`tasks/OPT-037.md`](tasks/OPT-037.md); [`pins/opt037_ffn_tile_contract.json`](pins/opt037_ffn_tile_contract.json); [`fixtures/opt037_ffn_tiles.json`](fixtures/opt037_ffn_tiles.json); [`cuda/ffn_tile_ab_test.cu`](cuda/ffn_tile_ab_test.cu); [`tests/test_opt037_ffn_tiles.py`](tests/test_opt037_ffn_tiles.py); [`evidence/optimization/opt037-ffn-tiles/REPORT.md`](evidence/optimization/opt037-ffn-tiles/REPORT.md); [`evidence/optimization/opt037-ffn-tiles/REJECTION.md`](evidence/optimization/opt037-ffn-tiles/REJECTION.md); verification 2026-09-09T23:03:58Z |
 | OPT-038 | Refresh post-ladder attribution and source gap map | OPT-032, OPT-034, OPT-035, OPT-036, OPT-037 | done | Retain fresh frozen-protocol P/D128/D2048 measurements, current subsystem breakdowns, independent raw host-wall accounting, pinned llama.cpp comparisons and matched-component experiment specifications, and a reproducible next-task order; `claims_performance_improvement: false`; accepted keep denominators remain unchanged | [`tasks/OPT-038.md`](tasks/OPT-038.md); [`pins/opt038_post_ladder_gap_contract.json`](pins/opt038_post_ladder_gap_contract.json); [`fixtures/opt038_post_ladder_gap.json`](fixtures/opt038_post_ladder_gap.json); [`cuda/opt038_prefill_attribution_test.cu`](cuda/opt038_prefill_attribution_test.cu); [`cuda/opt038_decode_attribution_test.cu`](cuda/opt038_decode_attribution_test.cu); [`tests/test_opt038_post_ladder_gap.py`](tests/test_opt038_post_ladder_gap.py); [`evidence/optimization/opt038-post-ladder-gap/REPORT.md`](evidence/optimization/opt038-post-ladder-gap/REPORT.md); [`evidence/optimization/opt038-post-ladder-gap/COMPONENT-PROTOCOL.md`](evidence/optimization/opt038-post-ladder-gap/COMPONENT-PROTOCOL.md); verification 2026-09-10T08:17:30Z |
 | OPT-039 | Warp-owned vector decode attention | OPT-038, OPT-036 | done | A/B warp-owned query-head attention against accepted 16-partition decode attention; keep only with frozen attention envelopes, exact candidate KV and state isolation, lower D2048 component time, improved D2048 versus the then-current keep oracle, P/D128/D2048 throughput floors of 95%, and both decode p95 measures at most 105%; otherwise reject | [`tasks/OPT-039.md`](tasks/OPT-039.md); [`pins/opt039_decode_warp_contract.json`](pins/opt039_decode_warp_contract.json); [`fixtures/opt039_decode_warp.json`](fixtures/opt039_decode_warp.json); [`cuda/opt039_decode_warp_ab_test.cu`](cuda/opt039_decode_warp_ab_test.cu); [`evidence/optimization/opt039-decode-warp/REPORT.md`](evidence/optimization/opt039-decode-warp/REPORT.md); verification 2026-09-10T09:13:29Z |
-| OPT-040 | Hoist prompt GDN inverse normalization | OPT-038, OPT-019 | pending | A/B shared per-token/key-head inverse norms against repeated warp-column normalization; keep only with byte-equal quality outputs/state, frozen sequential GDN gates, lower complete GDN component time, improved P versus the then-current keep oracle, D128/D2048 throughput at least 95%, and both decode p95 measures at most 105%; otherwise reject | — |
+| OPT-040 | Hoist prompt GDN inverse normalization | OPT-038, OPT-019 | done | A/B shared per-token/key-head inverse norms against repeated warp-column normalization; keep only with byte-equal quality outputs/state, frozen sequential GDN gates, lower complete GDN component time, improved P versus the then-current keep oracle, D128/D2048 throughput at least 95%, and both decode p95 measures at most 105%; otherwise reject | [`tasks/OPT-040.md`](tasks/OPT-040.md); [`pins/opt040_gdn_shared_inverse_contract.json`](pins/opt040_gdn_shared_inverse_contract.json); [`fixtures/opt040_gdn_shared_inverse.json`](fixtures/opt040_gdn_shared_inverse.json); [`cuda/opt040_gdn_shared_inverse_ab_test.cu`](cuda/opt040_gdn_shared_inverse_ab_test.cu); [`evidence/optimization/opt040-gdn-shared-inverse/REPORT.md`](evidence/optimization/opt040-gdn-shared-inverse/REPORT.md); verification 2026-09-10T10:08:22Z |
 | OPT-041 | Give prompt QK microtiles warp ownership | OPT-038, OPT-035 | pending | A/B warp-owned prompt QK microtiles preserving existing virtual-warp partial order against shared cparts reduction; keep only with byte-equal quality attention outputs, frozen attention gates, lower complete component time, improved P versus the then-current keep oracle, D128/D2048 throughput at least 95%, and both decode p95 measures at most 105%; otherwise reject | — |
 | OPT-042 | Study integer decode MMV admissibility | OPT-038, OPT-034 | pending | Retain paired FP32-packed versus Q4_K integer-dot diagnostic timings and complete numeric results using unchanged FP32-scale Q8 staging on synthetic and real FFN inputs, report fixed CUD-001 envelope eligibility and a promotion/rejection recommendation without changing production dispatch or keep denominators; `claims_performance_improvement: false` | — |
 
@@ -5217,5 +5217,43 @@ are repository-relative unless stated otherwise.
   then-current accepted OPT-034 P/D128/D2048 denominators, not the 2K
   llama.cpp parity gate.
 - Marked OPT-039 `done`; delivery is limited to the verified task scope
+  plus this ledger/audit bookkeeping. `plan.md` is unchanged. OPT-016
+  stays `blocked`. Next eligible pending by ledger row order: **OPT-031**.
+
+### 2026-09-10T10:09:04Z — OPT-040 delivered (KEEP)
+
+- Independent verification attempt 1 passed. Production prompt GDN installs
+  hoisted per-token/key-head Q/K inverse normalization
+  (`kSelectedGdnInversePath = "shared"`) in existing `prompt_projected_bf16_`
+  overlay scratch after two-way A/B wins at 4096 with byte-equal quality
+  versus repeated warp-column L2. Exclusive RTX 5090 sitting wrote
+  [`fixtures/opt040_gdn_shared_inverse.json`](fixtures/opt040_gdn_shared_inverse.json)
+  (`measurement_utc` 2026-09-10T09:47:19Z; P Quartz **1869.84412** →
+  **2060.62183** tok/s; D128 Quartz **26.1887932** → **26.1689129**; D2048
+  Quartz **25.3357754** → **25.2998886**; D128 all-token p95 38.3246689 →
+  38.350193 and run-mean p95 38.2041283 → 38.2333679; D2048 all-token p95
+  39.5857964 → 39.6363754 and run-mean p95 39.4975739 → 39.55233; 4096
+  complete-GDN component **11.9163837** → **7.66518307** ms; A/B winner
+  `shared`; `reverted` false; `status` measured). Cross-workload guard held.
+  Decode sequential GDN and OPT-029 fuse `off` unchanged. Coupled IDs: none.
+  Delivery re-check:
+  `uv run pytest -q tests/test_documentation.py
+  tests/test_opt040_gdn_shared_inverse.py`.
+- Acceptance evidence: [`tasks/OPT-040.md`](tasks/OPT-040.md);
+  [`pins/opt040_gdn_shared_inverse_contract.json`](pins/opt040_gdn_shared_inverse_contract.json);
+  [`fixtures/opt040_gdn_shared_inverse.json`](fixtures/opt040_gdn_shared_inverse.json);
+  [`cuda/opt040_gdn_shared_inverse_ab_test.cu`](cuda/opt040_gdn_shared_inverse_ab_test.cu);
+  [`cuda/gdn_fused_quality.cuh`](cuda/gdn_fused_quality.cuh);
+  [`cuda/gdn_step.cu`](cuda/gdn_step.cu);
+  [`cuda/gdn_step.h`](cuda/gdn_step.h);
+  [`evidence/optimization/opt040-gdn-shared-inverse/REPORT.md`](evidence/optimization/opt040-gdn-shared-inverse/REPORT.md);
+  [`docs/42-cuda-gdn-chunks.md`](docs/42-cuda-gdn-chunks.md);
+  [`docs/41-cuda-gdn-step.md`](docs/41-cuda-gdn-step.md);
+  [`docs/62-cuda-full-prefill.md`](docs/62-cuda-full-prefill.md);
+  [`docs/06-system-optimization.md`](docs/06-system-optimization.md).
+  Proof is hoisted prompt GDN inverse under frozen envelopes versus
+  then-current accepted OPT-034 P and OPT-039 D128/D2048 denominators, not
+  the 2K llama.cpp parity gate.
+- Marked OPT-040 `done`; delivery is limited to the verified task scope
   plus this ledger/audit bookkeeping. `plan.md` is unchanged. OPT-016
   stays `blocked`. Next eligible pending by ledger row order: **OPT-031**.
