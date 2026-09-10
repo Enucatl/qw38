@@ -1919,6 +1919,35 @@ void clear_query_prepare_path_override() noexcept {
   g_query_prepare_path_override = nullptr;
 }
 
+const char* selected_attention_pipeline_path() noexcept {
+  return kSelectedAttentionPipelinePath;
+}
+
+bool fattn_uses_attention_pipeline() noexcept {
+  return !fattn_pipeline_is_off(kSelectedAttentionPipelinePath);
+}
+
+int fattn_pipeline_occupancy() noexcept {
+  return fattn_pipeline_occupancy_for(effective_attention_pipeline_path());
+}
+
+int fattn_pipeline_occupancy_path(const char* path) noexcept {
+  if (fattn_pipeline_is_off(path)) return fattn_prepared_query_occupancy_typed();
+  return fattn_pipeline_occupancy_for(path);
+}
+
+void set_attention_pipeline_path_override(const char* path) noexcept {
+  g_attention_pipeline_path_override = path;
+}
+
+void clear_attention_pipeline_path_override() noexcept {
+  g_attention_pipeline_path_override = nullptr;
+}
+
+bool attention_pipeline_is_off(const char* path) noexcept {
+  return fattn_pipeline_is_off(path);
+}
+
 bool fattn_uses_warp_qk() noexcept {
   return fattn_qk_is_warp_microtile(kSelectedQKPath);
 }

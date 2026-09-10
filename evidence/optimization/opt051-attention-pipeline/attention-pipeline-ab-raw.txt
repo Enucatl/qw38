@@ -1,0 +1,311 @@
+pipeline_ab id=off occupancy=1 launch_ok=true max_abs=0 rms=0 cosine=0 nonfinite=0 scratch=true committed=true candidate=true byte_equal=true graph_eager=true eligible=true
+pipeline_ab id=f16 occupancy=1 launch_ok=true max_abs=5.4646749e-05 rms=1.86543673e-06 cosine=1.68297749e-08 nonfinite=0 scratch=true committed=true candidate=true byte_equal=false graph_eager=true eligible=true
+pipeline_ab id=dual_reg occupancy=1 launch_ok=true max_abs=1.86264515e-07 rms=3.05698e-09 cosine=5.28244115e-13 nonfinite=0 scratch=true committed=true candidate=true byte_equal=false graph_eager=true eligible=true
+pipeline_ab id=f16_reg occupancy=1 launch_ok=true max_abs=5.46462834e-05 rms=1.86543298e-06 cosine=1.68299756e-08 nonfinite=0 scratch=true committed=true candidate=true byte_equal=false graph_eager=true eligible=true
+pipeline_ab id=dual_async occupancy=0 launch_ok=false eligible=false skip=occupancy
+pipeline_ab id=f16_async occupancy=1 launch_ok=true max_abs=5.46462834e-05 rms=1.86543298e-06 cosine=1.68299756e-08 nonfinite=0 scratch=true committed=true candidate=true byte_equal=false graph_eager=true eligible=true
+pipeline_ab id=nbatch64 occupancy=1 launch_ok=true max_abs=5.46462834e-05 rms=1.92511015e-06 cosine=1.79234902e-08 nonfinite=0 scratch=true committed=true candidate=true byte_equal=false graph_eager=true eligible=true
+pipeline_ab id=gqa6 occupancy=1 launch_ok=true max_abs=5.46462834e-05 rms=1.86543298e-06 cosine=1.68299756e-08 nonfinite=0 scratch=true committed=true candidate=true byte_equal=false graph_eager=true eligible=true
+correctness start=0 tokens=1 launch_ok=true eligible=true vs_off_max_abs=0
+correctness start=0 tokens=16 launch_ok=true eligible=true vs_off_max_abs=5.28171659e-05
+correctness start=0 tokens=17 launch_ok=true eligible=true vs_off_max_abs=5.28171659e-05
+correctness start=0 tokens=31 launch_ok=true eligible=true vs_off_max_abs=5.4646749e-05
+correctness start=0 tokens=32 launch_ok=true eligible=true vs_off_max_abs=5.4646749e-05
+correctness start=0 tokens=33 launch_ok=true eligible=true vs_off_max_abs=5.4646749e-05
+correctness start=0 tokens=63 launch_ok=true eligible=true vs_off_max_abs=5.4646749e-05
+correctness start=0 tokens=64 launch_ok=true eligible=true vs_off_max_abs=5.4646749e-05
+correctness start=0 tokens=65 launch_ok=true eligible=true vs_off_max_abs=5.4646749e-05
+correctness start=0 tokens=512 launch_ok=true eligible=true vs_off_max_abs=5.4646749e-05
+correctness start=0 tokens=2048 launch_ok=true eligible=true vs_off_max_abs=5.4646749e-05
+correctness start=0 tokens=4096 launch_ok=true eligible=true vs_off_max_abs=5.4646749e-05
+correctness start=1 tokens=1 launch_ok=true eligible=true vs_off_max_abs=0
+correctness start=1 tokens=16 launch_ok=true eligible=true vs_off_max_abs=4.11495566e-05
+correctness start=1 tokens=17 launch_ok=true eligible=true vs_off_max_abs=4.11495566e-05
+correctness start=1 tokens=31 launch_ok=true eligible=true vs_off_max_abs=4.11495566e-05
+correctness start=1 tokens=32 launch_ok=true eligible=true vs_off_max_abs=4.11495566e-05
+correctness start=1 tokens=33 launch_ok=true eligible=true vs_off_max_abs=4.11495566e-05
+correctness start=1 tokens=63 launch_ok=true eligible=true vs_off_max_abs=9.90126282e-05
+correctness start=1 tokens=64 launch_ok=true eligible=true vs_off_max_abs=9.90126282e-05
+correctness start=1 tokens=65 launch_ok=true eligible=true vs_off_max_abs=9.90126282e-05
+correctness start=1 tokens=512 launch_ok=true eligible=true vs_off_max_abs=9.90126282e-05
+correctness start=1 tokens=2048 launch_ok=true eligible=true vs_off_max_abs=9.90126282e-05
+correctness start=1 tokens=4096 launch_ok=true eligible=true vs_off_max_abs=9.90126282e-05
+correctness start=31 tokens=1 launch_ok=true eligible=true vs_off_max_abs=0
+correctness start=31 tokens=16 launch_ok=true eligible=true vs_off_max_abs=4.00990248e-05
+correctness start=31 tokens=17 launch_ok=true eligible=true vs_off_max_abs=4.00990248e-05
+correctness start=31 tokens=31 launch_ok=true eligible=true vs_off_max_abs=4.00990248e-05
+correctness start=31 tokens=32 launch_ok=true eligible=true vs_off_max_abs=4.00990248e-05
+correctness start=31 tokens=33 launch_ok=true eligible=true vs_off_max_abs=4.00990248e-05
+correctness start=31 tokens=63 launch_ok=true eligible=true vs_off_max_abs=4.00990248e-05
+correctness start=31 tokens=64 launch_ok=true eligible=true vs_off_max_abs=4.00990248e-05
+correctness start=31 tokens=65 launch_ok=true eligible=true vs_off_max_abs=4.00990248e-05
+correctness start=31 tokens=512 launch_ok=true eligible=true vs_off_max_abs=5.18038869e-05
+correctness start=31 tokens=2048 launch_ok=true eligible=true vs_off_max_abs=5.18038869e-05
+correctness start=31 tokens=4096 launch_ok=true eligible=true vs_off_max_abs=5.18038869e-05
+correctness start=128 tokens=1 launch_ok=true eligible=true vs_off_max_abs=0
+correctness start=128 tokens=16 launch_ok=true eligible=true vs_off_max_abs=4.11942601e-05
+correctness start=128 tokens=17 launch_ok=true eligible=true vs_off_max_abs=4.11942601e-05
+correctness start=128 tokens=31 launch_ok=true eligible=true vs_off_max_abs=4.54038382e-05
+correctness start=128 tokens=32 launch_ok=true eligible=true vs_off_max_abs=4.54038382e-05
+correctness start=128 tokens=33 launch_ok=true eligible=true vs_off_max_abs=4.54038382e-05
+correctness start=128 tokens=63 launch_ok=true eligible=true vs_off_max_abs=4.73894179e-05
+correctness start=128 tokens=64 launch_ok=true eligible=true vs_off_max_abs=4.73894179e-05
+correctness start=128 tokens=65 launch_ok=true eligible=true vs_off_max_abs=4.73894179e-05
+correctness start=128 tokens=512 launch_ok=true eligible=true vs_off_max_abs=6.0338527e-05
+correctness start=128 tokens=2048 launch_ok=true eligible=true vs_off_max_abs=6.0338527e-05
+correctness start=128 tokens=4096 launch_ok=true eligible=true vs_off_max_abs=6.0338527e-05
+correctness start=2048 tokens=1 launch_ok=true eligible=true vs_off_max_abs=0
+correctness start=2048 tokens=16 launch_ok=true eligible=true vs_off_max_abs=4.89410013e-05
+correctness start=2048 tokens=17 launch_ok=true eligible=true vs_off_max_abs=4.89410013e-05
+correctness start=2048 tokens=31 launch_ok=true eligible=true vs_off_max_abs=4.89410013e-05
+correctness start=2048 tokens=32 launch_ok=true eligible=true vs_off_max_abs=4.89410013e-05
+correctness start=2048 tokens=33 launch_ok=true eligible=true vs_off_max_abs=4.89410013e-05
+correctness start=2048 tokens=63 launch_ok=true eligible=true vs_off_max_abs=4.89410013e-05
+correctness start=2048 tokens=64 launch_ok=true eligible=true vs_off_max_abs=4.89410013e-05
+correctness start=2048 tokens=65 launch_ok=true eligible=true vs_off_max_abs=6.02882355e-05
+correctness start=2048 tokens=512 launch_ok=true eligible=true vs_off_max_abs=9.80049372e-05
+correctness start=2048 tokens=2048 launch_ok=true eligible=true vs_off_max_abs=9.80049372e-05
+correctness start=2048 tokens=4096 launch_ok=true eligible=true vs_off_max_abs=9.80049372e-05
+pipeline_ab id=off warmup=0 ms=29.385088 occupancy=1
+pipeline_ab id=f16 warmup=0 ms=29.0854721 occupancy=1
+pipeline_ab id=dual_reg warmup=0 ms=28.4715519 occupancy=1
+pipeline_ab id=f16_reg warmup=0 ms=25.0539837 occupancy=1
+pipeline_ab id=f16_async warmup=0 ms=16.0277767 occupancy=1
+pipeline_ab id=nbatch64 warmup=0 ms=24.8898888 occupancy=1
+pipeline_ab id=gqa6 warmup=0 ms=19.8985596 occupancy=1
+pipeline_ab id=off warmup=1 ms=29.436512 occupancy=1
+pipeline_ab id=f16 warmup=1 ms=29.0744324 occupancy=1
+pipeline_ab id=dual_reg warmup=1 ms=28.4377594 occupancy=1
+pipeline_ab id=f16_reg warmup=1 ms=25.1373768 occupancy=1
+pipeline_ab id=f16_async warmup=1 ms=16.0200329 occupancy=1
+pipeline_ab id=nbatch64 warmup=1 ms=24.8572483 occupancy=1
+pipeline_ab id=gqa6 warmup=1 ms=19.7980804 occupancy=1
+pipeline_ab id=off warmup=2 ms=29.3658237 occupancy=1
+pipeline_ab id=f16 warmup=2 ms=29.1281929 occupancy=1
+pipeline_ab id=dual_reg warmup=2 ms=28.5099201 occupancy=1
+pipeline_ab id=f16_reg warmup=2 ms=25.0856953 occupancy=1
+pipeline_ab id=f16_async warmup=2 ms=16.0165119 occupancy=1
+pipeline_ab id=nbatch64 warmup=2 ms=24.8808632 occupancy=1
+pipeline_ab id=gqa6 warmup=2 ms=19.8613758 occupancy=1
+pipeline_ab id=off sample=0 ms=29.3593597 occupancy=1
+pipeline_ab id=f16 sample=0 ms=29.0015678 occupancy=1
+pipeline_ab id=dual_reg sample=0 ms=28.4487991 occupancy=1
+pipeline_ab id=f16_reg sample=0 ms=25.000864 occupancy=1
+pipeline_ab id=f16_async sample=0 ms=16.0232639 occupancy=1
+pipeline_ab id=nbatch64 sample=0 ms=24.9144001 occupancy=1
+pipeline_ab id=gqa6 sample=0 ms=19.8257275 occupancy=1
+pipeline_ab id=off sample=1 ms=29.3230724 occupancy=1
+pipeline_ab id=f16 sample=1 ms=29.138176 occupancy=1
+pipeline_ab id=dual_reg sample=1 ms=28.5534401 occupancy=1
+pipeline_ab id=f16_reg sample=1 ms=24.9953918 occupancy=1
+pipeline_ab id=f16_async sample=1 ms=16.0184956 occupancy=1
+pipeline_ab id=nbatch64 sample=1 ms=24.8912315 occupancy=1
+pipeline_ab id=gqa6 sample=1 ms=19.8445129 occupancy=1
+pipeline_ab id=off sample=2 ms=29.3017597 occupancy=1
+pipeline_ab id=f16 sample=2 ms=29.1117115 occupancy=1
+pipeline_ab id=dual_reg sample=2 ms=28.4270401 occupancy=1
+pipeline_ab id=f16_reg sample=2 ms=25.0647354 occupancy=1
+pipeline_ab id=f16_async sample=2 ms=16.0365448 occupancy=1
+pipeline_ab id=nbatch64 sample=2 ms=24.8777275 occupancy=1
+pipeline_ab id=gqa6 sample=2 ms=19.8183689 occupancy=1
+pipeline_ab id=off sample=3 ms=29.4163837 occupancy=1
+pipeline_ab id=f16 sample=3 ms=29.0435848 occupancy=1
+pipeline_ab id=dual_reg sample=3 ms=28.4408951 occupancy=1
+pipeline_ab id=f16_reg sample=3 ms=25.0727043 occupancy=1
+pipeline_ab id=f16_async sample=3 ms=16.0218239 occupancy=1
+pipeline_ab id=nbatch64 sample=3 ms=24.8986874 occupancy=1
+pipeline_ab id=gqa6 sample=3 ms=19.8047047 occupancy=1
+pipeline_ab id=off sample=4 ms=29.3827515 occupancy=1
+pipeline_ab id=f16 sample=4 ms=29.0997753 occupancy=1
+pipeline_ab id=dual_reg sample=4 ms=28.4793606 occupancy=1
+pipeline_ab id=f16_reg sample=4 ms=25.0484791 occupancy=1
+pipeline_ab id=f16_async sample=4 ms=16.0300484 occupancy=1
+pipeline_ab id=nbatch64 sample=4 ms=24.9679356 occupancy=1
+pipeline_ab id=gqa6 sample=4 ms=19.7974072 occupancy=1
+pipeline_ab id=off sample=5 ms=29.2865925 occupancy=1
+pipeline_ab id=f16 sample=5 ms=29.0662403 occupancy=1
+pipeline_ab id=dual_reg sample=5 ms=28.4701443 occupancy=1
+pipeline_ab id=f16_reg sample=5 ms=25.1079044 occupancy=1
+pipeline_ab id=f16_async sample=5 ms=16.0235519 occupancy=1
+pipeline_ab id=nbatch64 sample=5 ms=24.8721924 occupancy=1
+pipeline_ab id=gqa6 sample=5 ms=19.7987194 occupancy=1
+pipeline_ab id=off sample=6 ms=29.4392643 occupancy=1
+pipeline_ab id=f16 sample=6 ms=29.0620155 occupancy=1
+pipeline_ab id=dual_reg sample=6 ms=28.5151043 occupancy=1
+pipeline_ab id=f16_reg sample=6 ms=25.1053448 occupancy=1
+pipeline_ab id=f16_async sample=6 ms=16.0044479 occupancy=1
+pipeline_ab id=nbatch64 sample=6 ms=24.7875195 occupancy=1
+pipeline_ab id=gqa6 sample=6 ms=19.7726078 occupancy=1
+pipeline_ab id=off sample=7 ms=29.3666553 occupancy=1
+pipeline_ab id=f16 sample=7 ms=29.0372791 occupancy=1
+pipeline_ab id=dual_reg sample=7 ms=28.5655689 occupancy=1
+pipeline_ab id=f16_reg sample=7 ms=25.0679035 occupancy=1
+pipeline_ab id=f16_async sample=7 ms=16.0191689 occupancy=1
+pipeline_ab id=nbatch64 sample=7 ms=24.9086075 occupancy=1
+pipeline_ab id=gqa6 sample=7 ms=19.7970886 occupancy=1
+pipeline_ab id=off sample=8 ms=29.3700161 occupancy=1
+pipeline_ab id=f16 sample=8 ms=28.9326401 occupancy=1
+pipeline_ab id=dual_reg sample=8 ms=28.4566078 occupancy=1
+pipeline_ab id=f16_reg sample=8 ms=25.1135674 occupancy=1
+pipeline_ab id=f16_async sample=8 ms=16.0184631 occupancy=1
+pipeline_ab id=nbatch64 sample=8 ms=24.9122562 occupancy=1
+pipeline_ab id=gqa6 sample=8 ms=19.7876797 occupancy=1
+pipeline_ab id=off sample=9 ms=29.475296 occupancy=1
+pipeline_ab id=f16 sample=9 ms=29.0119686 occupancy=1
+pipeline_ab id=dual_reg sample=9 ms=28.5463352 occupancy=1
+pipeline_ab id=f16_reg sample=9 ms=25.0545273 occupancy=1
+pipeline_ab id=f16_async sample=9 ms=16.0280952 occupancy=1
+pipeline_ab id=nbatch64 sample=9 ms=24.8582401 occupancy=1
+pipeline_ab id=gqa6 sample=9 ms=19.8351364 occupancy=1
+pipeline_ab id=off sample=10 ms=29.3236809 occupancy=1
+pipeline_ab id=f16 sample=10 ms=29.1471672 occupancy=1
+pipeline_ab id=dual_reg sample=10 ms=28.6265278 occupancy=1
+pipeline_ab id=f16_reg sample=10 ms=25.0925121 occupancy=1
+pipeline_ab id=f16_async sample=10 ms=16.0245438 occupancy=1
+pipeline_ab id=nbatch64 sample=10 ms=24.9577274 occupancy=1
+pipeline_ab id=gqa6 sample=10 ms=19.7984009 occupancy=1
+pipeline_ab id=off sample=11 ms=29.3279362 occupancy=1
+pipeline_ab id=f16 sample=11 ms=29.1535034 occupancy=1
+pipeline_ab id=dual_reg sample=11 ms=28.5456963 occupancy=1
+pipeline_ab id=f16_reg sample=11 ms=25.0655041 occupancy=1
+pipeline_ab id=f16_async sample=11 ms=16.0307198 occupancy=1
+pipeline_ab id=nbatch64 sample=11 ms=24.8746567 occupancy=1
+pipeline_ab id=gqa6 sample=11 ms=19.8734398 occupancy=1
+pipeline_ab id=off sample=12 ms=29.4817924 occupancy=1
+pipeline_ab id=f16 sample=12 ms=29.0099525 occupancy=1
+pipeline_ab id=dual_reg sample=12 ms=28.4943676 occupancy=1
+pipeline_ab id=f16_reg sample=12 ms=25.0788155 occupancy=1
+pipeline_ab id=f16_async sample=12 ms=16.0355511 occupancy=1
+pipeline_ab id=nbatch64 sample=12 ms=24.8944645 occupancy=1
+pipeline_ab id=gqa6 sample=12 ms=19.8310394 occupancy=1
+pipeline_ab id=off sample=13 ms=29.3625927 occupancy=1
+pipeline_ab id=f16 sample=13 ms=29.0220795 occupancy=1
+pipeline_ab id=dual_reg sample=13 ms=28.5660152 occupancy=1
+pipeline_ab id=f16_reg sample=13 ms=25.1439686 occupancy=1
+pipeline_ab id=f16_async sample=13 ms=16.0193596 occupancy=1
+pipeline_ab id=nbatch64 sample=13 ms=24.9762249 occupancy=1
+pipeline_ab id=gqa6 sample=13 ms=19.7837124 occupancy=1
+pipeline_ab id=off sample=14 ms=29.4523525 occupancy=1
+pipeline_ab id=f16 sample=14 ms=29.2017918 occupancy=1
+pipeline_ab id=dual_reg sample=14 ms=28.5303688 occupancy=1
+pipeline_ab id=f16_reg sample=14 ms=25.1000328 occupancy=1
+pipeline_ab id=f16_async sample=14 ms=16.0230713 occupancy=1
+pipeline_ab id=nbatch64 sample=14 ms=24.9262409 occupancy=1
+pipeline_ab id=gqa6 sample=14 ms=19.8348484 occupancy=1
+pipeline_ab id=off sample=15 ms=29.4508476 occupancy=1
+pipeline_ab id=f16 sample=15 ms=29.1258564 occupancy=1
+pipeline_ab id=dual_reg sample=15 ms=28.4783993 occupancy=1
+pipeline_ab id=f16_reg sample=15 ms=25.0485115 occupancy=1
+pipeline_ab id=f16_async sample=15 ms=16.0170879 occupancy=1
+pipeline_ab id=nbatch64 sample=15 ms=24.9071674 occupancy=1
+pipeline_ab id=gqa6 sample=15 ms=19.8616962 occupancy=1
+pipeline_ab id=off sample=16 ms=29.3690872 occupancy=1
+pipeline_ab id=f16 sample=16 ms=29.075552 occupancy=1
+pipeline_ab id=dual_reg sample=16 ms=28.5753918 occupancy=1
+pipeline_ab id=f16_reg sample=16 ms=25.0463676 occupancy=1
+pipeline_ab id=f16_async sample=16 ms=16.0422726 occupancy=1
+pipeline_ab id=nbatch64 sample=16 ms=24.873312 occupancy=1
+pipeline_ab id=gqa6 sample=16 ms=19.7337284 occupancy=1
+pipeline_ab id=off sample=17 ms=29.4389114 occupancy=1
+pipeline_ab id=f16 sample=17 ms=29.1032639 occupancy=1
+pipeline_ab id=dual_reg sample=17 ms=28.5533447 occupancy=1
+pipeline_ab id=f16_reg sample=17 ms=25.1018887 occupancy=1
+pipeline_ab id=f16_async sample=17 ms=16.0291843 occupancy=1
+pipeline_ab id=nbatch64 sample=17 ms=24.9520969 occupancy=1
+pipeline_ab id=gqa6 sample=17 ms=19.8516159 occupancy=1
+pipeline_ab id=off sample=18 ms=29.3763847 occupancy=1
+pipeline_ab id=f16 sample=18 ms=29.218399 occupancy=1
+pipeline_ab id=dual_reg sample=18 ms=28.5394878 occupancy=1
+pipeline_ab id=f16_reg sample=18 ms=25.0524807 occupancy=1
+pipeline_ab id=f16_async sample=18 ms=16.0156479 occupancy=1
+pipeline_ab id=nbatch64 sample=18 ms=24.8746243 occupancy=1
+pipeline_ab id=gqa6 sample=18 ms=19.8382721 occupancy=1
+pipeline_ab id=off sample=19 ms=29.5066566 occupancy=1
+pipeline_ab id=f16 sample=19 ms=29.0888958 occupancy=1
+pipeline_ab id=dual_reg sample=19 ms=28.550848 occupancy=1
+pipeline_ab id=f16_reg sample=19 ms=25.0573769 occupancy=1
+pipeline_ab id=f16_async sample=19 ms=16.0467205 occupancy=1
+pipeline_ab id=nbatch64 sample=19 ms=24.8735676 occupancy=1
+pipeline_ab id=gqa6 sample=19 ms=19.7949753 occupancy=1
+pipeline_ab id=off sample=20 ms=29.3034878 occupancy=1
+pipeline_ab id=f16 sample=20 ms=29.1452808 occupancy=1
+pipeline_ab id=dual_reg sample=20 ms=28.6612167 occupancy=1
+pipeline_ab id=f16_reg sample=20 ms=25.1003208 occupancy=1
+pipeline_ab id=f16_async sample=20 ms=16.0159683 occupancy=1
+pipeline_ab id=nbatch64 sample=20 ms=24.9924793 occupancy=1
+pipeline_ab id=gqa6 sample=20 ms=19.792448 occupancy=1
+pipeline_ab id=off sample=21 ms=29.448864 occupancy=1
+pipeline_ab id=f16 sample=21 ms=29.1544647 occupancy=1
+pipeline_ab id=dual_reg sample=21 ms=28.5252151 occupancy=1
+pipeline_ab id=f16_reg sample=21 ms=25.0141125 occupancy=1
+pipeline_ab id=f16_async sample=21 ms=16.0390396 occupancy=1
+pipeline_ab id=nbatch64 sample=21 ms=24.8713913 occupancy=1
+pipeline_ab id=gqa6 sample=21 ms=19.85536 occupancy=1
+pipeline_ab id=off sample=22 ms=29.3904648 occupancy=1
+pipeline_ab id=f16 sample=22 ms=29.0377598 occupancy=1
+pipeline_ab id=dual_reg sample=22 ms=28.6125431 occupancy=1
+pipeline_ab id=f16_reg sample=22 ms=25.0333767 occupancy=1
+pipeline_ab id=f16_async sample=22 ms=16.0214081 occupancy=1
+pipeline_ab id=nbatch64 sample=22 ms=24.8936634 occupancy=1
+pipeline_ab id=gqa6 sample=22 ms=19.8299522 occupancy=1
+pipeline_ab id=off sample=23 ms=29.4595528 occupancy=1
+pipeline_ab id=f16 sample=23 ms=29.1674557 occupancy=1
+pipeline_ab id=dual_reg sample=23 ms=28.5506554 occupancy=1
+pipeline_ab id=f16_reg sample=23 ms=25.0815353 occupancy=1
+pipeline_ab id=f16_async sample=23 ms=16.0262394 occupancy=1
+pipeline_ab id=nbatch64 sample=23 ms=24.885664 occupancy=1
+pipeline_ab id=gqa6 sample=23 ms=19.8148804 occupancy=1
+pipeline_ab id=off sample=24 ms=29.4119682 occupancy=1
+pipeline_ab id=f16 sample=24 ms=29.1675835 occupancy=1
+pipeline_ab id=dual_reg sample=24 ms=28.5810871 occupancy=1
+pipeline_ab id=f16_reg sample=24 ms=25.0649605 occupancy=1
+pipeline_ab id=f16_async sample=24 ms=16.0309753 occupancy=1
+pipeline_ab id=nbatch64 sample=24 ms=24.9073925 occupancy=1
+pipeline_ab id=gqa6 sample=24 ms=19.8520317 occupancy=1
+pipeline_ab id=off sample=25 ms=29.4794559 occupancy=1
+pipeline_ab id=f16 sample=25 ms=29.0462074 occupancy=1
+pipeline_ab id=dual_reg sample=25 ms=28.4461765 occupancy=1
+pipeline_ab id=f16_reg sample=25 ms=25.0210876 occupancy=1
+pipeline_ab id=f16_async sample=25 ms=16.0146561 occupancy=1
+pipeline_ab id=nbatch64 sample=25 ms=24.8589764 occupancy=1
+pipeline_ab id=gqa6 sample=25 ms=19.7690563 occupancy=1
+pipeline_ab id=off sample=26 ms=29.4781761 occupancy=1
+pipeline_ab id=f16 sample=26 ms=29.011776 occupancy=1
+pipeline_ab id=dual_reg sample=26 ms=28.4803848 occupancy=1
+pipeline_ab id=f16_reg sample=26 ms=25.06464 occupancy=1
+pipeline_ab id=f16_async sample=26 ms=16.0146236 occupancy=1
+pipeline_ab id=nbatch64 sample=26 ms=24.9570885 occupancy=1
+pipeline_ab id=gqa6 sample=26 ms=19.8433285 occupancy=1
+pipeline_ab id=off sample=27 ms=29.4671993 occupancy=1
+pipeline_ab id=f16 sample=27 ms=29.1652794 occupancy=1
+pipeline_ab id=dual_reg sample=27 ms=28.6448631 occupancy=1
+pipeline_ab id=f16_reg sample=27 ms=25.0825596 occupancy=1
+pipeline_ab id=f16_async sample=27 ms=16.0531845 occupancy=1
+pipeline_ab id=nbatch64 sample=27 ms=24.9638729 occupancy=1
+pipeline_ab id=gqa6 sample=27 ms=19.8383369 occupancy=1
+pipeline_ab id=off sample=28 ms=29.4350395 occupancy=1
+pipeline_ab id=f16 sample=28 ms=29.1239357 occupancy=1
+pipeline_ab id=dual_reg sample=28 ms=28.5306568 occupancy=1
+pipeline_ab id=f16_reg sample=28 ms=25.0829449 occupancy=1
+pipeline_ab id=f16_async sample=28 ms=16.0221443 occupancy=1
+pipeline_ab id=nbatch64 sample=28 ms=24.9756489 occupancy=1
+pipeline_ab id=gqa6 sample=28 ms=19.8320312 occupancy=1
+pipeline_ab id=off sample=29 ms=29.3330231 occupancy=1
+pipeline_ab id=f16 sample=29 ms=29.0416965 occupancy=1
+pipeline_ab id=dual_reg sample=29 ms=28.5212479 occupancy=1
+pipeline_ab id=f16_reg sample=29 ms=25.0254402 occupancy=1
+pipeline_ab id=f16_async sample=29 ms=16.0913925 occupancy=1
+pipeline_ab id=nbatch64 sample=29 ms=25.0333118 occupancy=1
+pipeline_ab id=gqa6 sample=29 ms=19.8019199 occupancy=1
+pipeline_ab_mean id=off mean_ms=29.4006214 occupancy=1 eligible=true
+pipeline_ab_mean id=f16 mean_ms=29.0904293 occupancy=1 eligible=true
+pipeline_ab_mean id=dual_reg mean_ms=28.5305939 occupancy=1 eligible=true
+pipeline_ab_mean id=f16_reg mean_ms=25.066328 occupancy=1 eligible=true
+pipeline_ab_mean id=dual_async mean_ms=1.00000002e+30 occupancy=0 eligible=false
+pipeline_ab_mean id=f16_async mean_ms=16.0279236 occupancy=1 eligible=true
+pipeline_ab_mean id=nbatch64 mean_ms=24.9112797 occupancy=1 eligible=true
+pipeline_ab_mean id=gqa6 mean_ms=19.8171005 occupancy=1 eligible=true
+layer id=layer3 tokens=64 ok=true max_abs=8.00266862e-05
+layer id=layer31 tokens=64 ok=true max_abs=0.000117234886
+layer id=layer63 tokens=64 ok=true max_abs=0.000133059919
+pipeline_ab_winner id=f16_async win=true mean_ms=16.0279236 admit_f16=true admit_reg=true arithmetic=f16_reg

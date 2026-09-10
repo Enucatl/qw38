@@ -2192,7 +2192,9 @@ void SchedulerWorkspace::release() noexcept {
   QW38_FREE(residual_a_);
 #undef QW38_FREE
   if (prompt_compute_done_ != nullptr) {
-    cudaEventDestroy(prompt_compute_done_);
+    if (!fattn_uses_attention_pipeline()) {
+      cudaEventDestroy(prompt_compute_done_);
+    }
     prompt_compute_done_ = nullptr;
   }
   if (prompt_compute_stream_ != nullptr) {
@@ -3696,11 +3698,18 @@ Status execute_prompt_chunk(
                           stream);
     }
     if (error == cudaSuccess) {
-      error = cudaEventRecord(workspace->prompt_compute_done_, stream);
-    }
-    if (error == cudaSuccess) {
-      error = cudaStreamWaitEvent(workspace->prompt_copy_stream_,
-                                  workspace->prompt_compute_done_, 0);
+      if (fattn_uses_attention_pipeline()) {
+        // Pipeline kernels leave disable-timing events recorded on the fused
+        // compute stream undestroyable (cuEventDestroy SIGSEGV). Stream sync
+        // still lets copy-stream D2H overlap scatter.
+        error = cudaStreamSynchronize(stream);
+      } else {
+        error = cudaEventRecord(workspace->prompt_compute_done_, stream);
+        if (error == cudaSuccess) {
+          error = cudaStreamWaitEvent(workspace->prompt_copy_stream_,
+                                      workspace->prompt_compute_done_, 0);
+        }
+      }
     }
     if (error == cudaSuccess) {
       error = cudaMemcpyAsync(

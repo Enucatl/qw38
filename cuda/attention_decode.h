@@ -297,6 +297,13 @@ std::size_t attention_prepared_query_bytes(const AttentionConfig& config,
 bool query_prepare_is_hoisted(const char* path) noexcept;
 void set_query_prepare_path_override(const char* path) noexcept;
 void clear_query_prepare_path_override() noexcept;
+const char* selected_attention_pipeline_path() noexcept;
+bool fattn_uses_attention_pipeline() noexcept;
+int fattn_pipeline_occupancy() noexcept;
+int fattn_pipeline_occupancy_path(const char* path) noexcept;
+void set_attention_pipeline_path_override(const char* path) noexcept;
+void clear_attention_pipeline_path_override() noexcept;
+bool attention_pipeline_is_off(const char* path) noexcept;
 
 struct QueryPreparePathScope final {
   explicit QueryPreparePathScope(const char* path) noexcept {
@@ -305,6 +312,16 @@ struct QueryPreparePathScope final {
   ~QueryPreparePathScope() { clear_query_prepare_path_override(); }
   QueryPreparePathScope(const QueryPreparePathScope&) = delete;
   QueryPreparePathScope& operator=(const QueryPreparePathScope&) = delete;
+};
+
+struct AttentionPipelinePathScope final {
+  explicit AttentionPipelinePathScope(const char* path) noexcept {
+    set_attention_pipeline_path_override(path);
+  }
+  ~AttentionPipelinePathScope() { clear_attention_pipeline_path_override(); }
+  AttentionPipelinePathScope(const AttentionPipelinePathScope&) = delete;
+  AttentionPipelinePathScope& operator=(const AttentionPipelinePathScope&) =
+      delete;
 };
 
 cudaError_t launch_attention_prepare_prompt_queries(

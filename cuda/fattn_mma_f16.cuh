@@ -60,7 +60,13 @@ constexpr char kLegalQueryPrepareHoisted[] = "hoisted";
 constexpr char kLegalQueryPrepareHoistedFma[] = "hoisted_fma";
 constexpr char kSelectedQueryPreparePath[] = "hoisted";
 
+// OPT-051 A/B winner. Legal values: off, f16, dual_reg, f16_reg, dual_async,
+// f16_async, nbatch64, gqa6. Default until A/B: off. Sibling kernel in
+// fattn_mma_f16_pipeline.cuh. Not a vendor of llama.cpp fattn-mma-f16.cuh.
+constexpr char kSelectedAttentionPipelinePath[] = "f16_async";
+
 inline thread_local const char* g_query_prepare_path_override = nullptr;
+inline thread_local const char* g_attention_pipeline_path_override = nullptr;
 
 inline bool fattn_query_prepare_is_in_kernel(const char* path) noexcept {
   return path != nullptr && std::strcmp(path, kLegalQueryPrepareInKernel) == 0;
@@ -1515,6 +1521,8 @@ inline cudaError_t launch_fattn_mma_quality_typed(
       config, token_count, gate, output, partial, meta);
 }
 
+#include "fattn_mma_f16_pipeline.cuh"
+
 inline bool fattn_vkq_is_registers(const char* vkq_accum) noexcept {
   return vkq_accum != nullptr && std::strcmp(vkq_accum, "registers") == 0;
 }
@@ -1691,6 +1699,17 @@ inline cudaError_t launch_fattn_mma_stream_k(
         normalized_query, meta, stream);
   }
   const char* prep = effective_query_prepare_path();
+  const char* pipe = effective_attention_pipeline_path();
+  if (fattn_query_prepare_is_hoisted(prep) && prepared_q != nullptr &&
+      fattn_vkq_is_registers(kSelectedVkqAccum) &&
+      fattn_pv_is_mma(kSelectedPvPath) &&
+      fattn_qk_is_warp_microtile(kSelectedQKPath) &&
+      !fattn_pipeline_is_off(pipe) && legal_attention_pipeline_path(pipe)) {
+    return launch_fattn_mma_pipeline(
+        pipe, config, start_position, token_count, query, query_scale, gate,
+        committed_key, committed_value, candidate_key, candidate_value, output,
+        normalized_query, partial, meta, stream, prepared_q);
+  }
   if (fattn_query_prepare_is_hoisted(prep) && prepared_q != nullptr &&
       fattn_vkq_is_registers(kSelectedVkqAccum) &&
       fattn_pv_is_mma(kSelectedPvPath) &&
