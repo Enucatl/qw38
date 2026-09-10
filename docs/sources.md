@@ -836,6 +836,38 @@ baseline.
   lower complete GDN component time; improved P; cross-workload guard; does not
   substitute for the 2K llama.cpp parity gate; Quartz ≥ llama.cpp is not this
   gate. Envelopes unloosened; Nsight is not used.
+- OPT-052 is a local derivation over the production fused token-loop GDN scan
+  and the measured OPT-040 shared-inverse keep. The fused warp-column loop
+  still multiplied every value-column Q/K by the hoisted inverses and called
+  `expf(log_decay)` per token; this increment A/B's a preprocessing sibling
+  that writes L2-scaled Q/K once per `(token, key_head)` and decay once per
+  `(token, value_head)` into the existing `prompt_projected_bf16_` overlay,
+  then runs the same register recurrence. V stays on original convolved
+  columns. FMA and approximate exp are measured as separate variants. An
+  optional conversion-inclusive column-major state tile is also measured; the
+  canonical session layout is unchanged. Sequential 64-token windows, decode
+  GDN, and fuse `off` stay. **Measured, RTX 5090:** 4096 complete-GDN A/B
+  winner `transpose`; live exclusive sitting keep; production pin `transpose`;
+  `reverted` false; `keep_sitting_skipped` false; `status` measured. Live
+  tok/s stay in the report; this ledger does not replace them. The schema-1
+  contract, measured fixture, and report are
+  [`pins/opt052_gdn_arithmetic_contract.json`](../pins/opt052_gdn_arithmetic_contract.json),
+  [`fixtures/opt052_gdn_arithmetic.json`](../fixtures/opt052_gdn_arithmetic.json),
+  and
+  [`evidence/optimization/opt052-gdn-arithmetic/REPORT.md`](../evidence/optimization/opt052-gdn-arithmetic/REPORT.md).
+  The beginner explanations are
+  [`docs/42-cuda-gdn-chunks.md`](42-cuda-gdn-chunks.md),
+  [`docs/41-cuda-gdn-step.md`](41-cuda-gdn-step.md),
+  [`docs/62-cuda-full-prefill.md`](62-cuda-full-prefill.md), and
+  [`docs/06-system-optimization.md`](06-system-optimization.md).
+  Proof limit: OPT-044 production-numerics budgets; like-arithmetic shared
+  control remains OPT-040 hoisted inverses; conv+preprocessing+recurrence+gated
+  complete cost; hoisted scaled Q/K and decay; admitted FMA and approximate
+  exp as separate variants; optional conversion-inclusive state transpose;
+  nonzero incoming state and outer-chunk restore; same-path
+  transaction/restore exactness; 95% throughput floors versus OPT-051 keep;
+  105% p95 ceilings versus OPT-051; does not substitute for the 2K llama.cpp
+  parity gate. Envelopes unloosened; Nsight is not used.
 - OPT-041 is a local derivation over admitted Ada+ stream-K fattn with
   register-resident VKQ and dual-F16 probability×V MMA. It assigns each of
   eight 16×8 QK microtiles to one of four warps (`tile_id % 4`), lets the

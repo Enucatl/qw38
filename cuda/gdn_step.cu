@@ -964,7 +964,7 @@ cudaError_t launch_gdn_quality_fused(
     float* recurrent_output, const float* gate_tiled, const float* norm,
     __nv_bfloat16* output_bf16, cudaStream_t stream, bool value_is_tiled,
     const char* path, const char* inverse_path, float* inverse_scratch,
-    std::size_t inverse_scratch_floats) noexcept {
+    std::size_t inverse_scratch_floats, const char* preproc_path) noexcept {
   const std::size_t channels = gdn_convolution_channels(config);
   if (channels == 0 || token_count == 0 || log_decay == nullptr ||
       beta == nullptr || committed.recurrent == nullptr ||
@@ -1044,6 +1044,45 @@ cudaError_t launch_gdn_quality_fused(
         committed.recurrent, candidate.recurrent, recurrent_output, token_count,
         value_is_tiled);
     error = cudaPeekAtLastError();
+  } else if (gdn_can_launch_preproc(config, token_count, selected, preproc_path,
+                                   inverse_scratch, inverse_scratch_floats)) {
+    const char* preproc = gdn_preproc_path_or_selected(preproc_path);
+    error = launch_parallel_conv();
+    if (error == cudaSuccess) {
+      error = launch_gdn_scaled_qk(config, convolution_output, token_count,
+                                   inverse_scratch, stream);
+    }
+    if (error == cudaSuccess) {
+      error = launch_gdn_decay(
+          config, log_decay, token_count,
+          gdn_preproc_decay_ptr(inverse_scratch, token_count, config.key_heads,
+                                config.key_width),
+          gdn_preproc_uses_fast_exp(preproc), stream);
+    }
+    const bool transposed = gdn_preproc_uses_transpose(preproc);
+    const float* recurrence_source = committed.recurrent;
+    float* recurrence_candidate = candidate.recurrent;
+    if (error == cudaSuccess && transposed) {
+      float* state_t =
+          gdn_preproc_state_t_ptr(inverse_scratch, config, token_count);
+      error = launch_gdn_transpose_state_in(config, committed.recurrent, state_t,
+                                            stream);
+      recurrence_source = state_t;
+      recurrence_candidate = state_t;
+    }
+    if (error == cudaSuccess) {
+      error = launch_gdn_quality_recurrence_preproc(
+          config, convolution_output,
+          gdn_preproc_decay_ptr(inverse_scratch, token_count, config.key_heads,
+                                config.key_width),
+          beta, recurrence_source, recurrence_candidate, recurrent_output,
+          inverse_scratch, token_count, value_is_tiled,
+          gdn_preproc_uses_fma(preproc), transposed, stream);
+    }
+    if (error == cudaSuccess && transposed) {
+      error = launch_gdn_transpose_state_out(
+          config, recurrence_candidate, candidate.recurrent, stream);
+    }
   } else if (gdn_can_launch_shared_inverse(config, token_count, selected,
                                           inverse_path, inverse_scratch,
                                           inverse_scratch_floats)) {

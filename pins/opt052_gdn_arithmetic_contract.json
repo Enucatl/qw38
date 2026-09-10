@@ -1,0 +1,114 @@
+{
+  "schema_version": 1,
+  "task": "OPT-052",
+  "yardstick": "prompt_gdn_hoisted_scaled_qk_decay",
+  "opt051_quartz_p_mean_tok_s": 2489.33008,
+  "opt051_quartz_d128_mean_tok_s": 37.6655884,
+  "opt051_quartz_d2048_mean_tok_s": 35.7582932,
+  "opt051_quartz_d128_token_latency_p95_ms": 26.8204556,
+  "opt051_quartz_d128_run_mean_token_latency_p95_ms": 26.703701,
+  "opt051_quartz_d2048_token_latency_p95_ms": 28.0988483,
+  "opt051_quartz_d2048_run_mean_token_latency_p95_ms": 27.979435,
+  "llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+  "gguf_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+  "device_substring": "RTX 5090",
+  "selected_gdn_preproc_path": "transpose",
+  "selected_gdn_inverse_path": "shared",
+  "selected_gdn_fuse_path": "off",
+  "legal_gdn_preproc_paths": [
+    "off",
+    "preproc",
+    "preproc_fma",
+    "approx_exp",
+    "transpose"
+  ],
+  "ab": {
+    "candidates": [
+      "shared",
+      "preproc",
+      "preproc_fma",
+      "approx_exp",
+      "transpose"
+    ],
+    "warmups": 3,
+    "measured_runs": 30,
+    "timed_token_counts": [
+      4096
+    ],
+    "correctness_token_counts": [
+      1,
+      2,
+      3,
+      4,
+      63,
+      64,
+      65,
+      512,
+      2048,
+      4096
+    ],
+    "correctness_layers": [
+      0,
+      32,
+      62
+    ],
+    "include_conv_preproc_recurrence_gated": true,
+    "ties_retain": "shared",
+    "like_arithmetic_prefers_within_1pct": true
+  },
+  "opt044": {
+    "formula": "max(strict_reference_ceiling, 1.05 * measured_llama_error + 1e-6)",
+    "like_arithmetic_byte_equal": true,
+    "cross_arithmetic_abs": 0.0003,
+    "cross_arithmetic_rms": 0.0002
+  },
+  "gdn002": {
+    "max_abs": 5e-08,
+    "rms": 5e-09,
+    "nonfinite": 0
+  },
+  "opt051_keep_fixture": "fixtures/opt051_attention_pipeline.json",
+  "owns_opt016_parity_gate": false,
+  "substitutes_for_opt016": false,
+  "llama_bench_decode_is_informational": true,
+  "required_fixture_keys": [
+    "schema_version",
+    "task",
+    "status",
+    "measurement_utc",
+    "device",
+    "compute_capability",
+    "llama_revision",
+    "gguf_sha256",
+    "reverted",
+    "selected_gdn_preproc_path",
+    "selected_gdn_inverse_path",
+    "ab",
+    "correctness",
+    "production_numerics",
+    "keep_sitting_skipped",
+    "p",
+    "d128",
+    "d2048",
+    "owns_opt016_parity_gate",
+    "substitutes_for_opt016",
+    "nsight_systems",
+    "nsight_compute",
+    "proof_limit",
+    "report_path"
+  ],
+  "proof_limit": [
+    "OPT-044 production-numerics budgets",
+    "like-arithmetic shared control remains OPT-040 hoisted inverses",
+    "conv+preprocessing+recurrence+gated complete cost",
+    "hoisted scaled Q/K and decay",
+    "admitted FMA and approximate exp as separate variants",
+    "optional conversion-inclusive state transpose",
+    "nonzero incoming state and outer-chunk restore",
+    "same-path transaction/restore exactness",
+    "95% throughput floors versus OPT-051 keep",
+    "105% p95 ceilings versus OPT-051",
+    "does not substitute for the 2K llama.cpp parity gate"
+  ],
+  "report_path": "evidence/optimization/opt052-gdn-arithmetic/REPORT.md"
+}

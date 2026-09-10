@@ -1,0 +1,298 @@
+path=preproc layer=0 tokens=1 launch_ok=true dispatched=false recurrent_eq=true state_eq=true restore=true vs_shared_abs=0 vs_seq_abs=1.86264515e-09 eligible=true
+path=preproc_fma layer=0 tokens=1 launch_ok=true dispatched=false recurrent_eq=true state_eq=true restore=true vs_shared_abs=0 vs_seq_abs=1.86264515e-09 eligible=true
+path=approx_exp layer=0 tokens=1 launch_ok=true dispatched=false recurrent_eq=true state_eq=true restore=true vs_shared_abs=0 vs_seq_abs=1.86264515e-09 eligible=true
+path=transpose layer=0 tokens=1 launch_ok=true dispatched=false recurrent_eq=true state_eq=true restore=true vs_shared_abs=0 vs_seq_abs=1.86264515e-09 eligible=true
+path=preproc layer=0 tokens=2 launch_ok=true dispatched=true recurrent_eq=true state_eq=true restore=true vs_shared_abs=0 vs_seq_abs=2.32830644e-09 eligible=true
+path=preproc_fma layer=0 tokens=2 launch_ok=true dispatched=true recurrent_eq=false state_eq=false restore=true vs_shared_abs=1.86264515e-09 vs_seq_abs=2.32830644e-09 eligible=true
+path=approx_exp layer=0 tokens=2 launch_ok=true dispatched=true recurrent_eq=false state_eq=false restore=true vs_shared_abs=4.65661287e-09 vs_seq_abs=4.65661287e-09 eligible=true
+path=transpose layer=0 tokens=2 launch_ok=true dispatched=true recurrent_eq=true state_eq=true restore=true vs_shared_abs=0 vs_seq_abs=2.32830644e-09 eligible=true
+path=preproc layer=0 tokens=3 launch_ok=true dispatched=true recurrent_eq=true state_eq=true restore=true vs_shared_abs=0 vs_seq_abs=3.7252903e-09 eligible=true
+path=preproc_fma layer=0 tokens=3 launch_ok=true dispatched=true recurrent_eq=false state_eq=false restore=true vs_shared_abs=1.86264515e-09 vs_seq_abs=2.79396772e-09 eligible=true
+path=approx_exp layer=0 tokens=3 launch_ok=true dispatched=true recurrent_eq=false state_eq=false restore=true vs_shared_abs=4.65661287e-09 vs_seq_abs=5.58793545e-09 eligible=true
+path=transpose layer=0 tokens=3 launch_ok=true dispatched=true recurrent_eq=true state_eq=true restore=true vs_shared_abs=0 vs_seq_abs=3.7252903e-09 eligible=true
+path=preproc layer=0 tokens=4 launch_ok=true dispatched=true recurrent_eq=true state_eq=true restore=true vs_shared_abs=0 vs_seq_abs=3.7252903e-09 eligible=true
+path=preproc_fma layer=0 tokens=4 launch_ok=true dispatched=true recurrent_eq=false state_eq=false restore=true vs_shared_abs=3.7252903e-09 vs_seq_abs=3.7252903e-09 eligible=true
+path=approx_exp layer=0 tokens=4 launch_ok=true dispatched=true recurrent_eq=false state_eq=false restore=true vs_shared_abs=5.58793545e-09 vs_seq_abs=5.58793545e-09 eligible=true
+path=transpose layer=0 tokens=4 launch_ok=true dispatched=true recurrent_eq=true state_eq=true restore=true vs_shared_abs=0 vs_seq_abs=3.7252903e-09 eligible=true
+path=preproc layer=0 tokens=63 launch_ok=true dispatched=true recurrent_eq=true state_eq=true restore=true vs_shared_abs=0 vs_seq_abs=1.49011612e-08 eligible=true
+path=preproc_fma layer=0 tokens=63 launch_ok=true dispatched=true recurrent_eq=false state_eq=false restore=true vs_shared_abs=1.11758709e-08 vs_seq_abs=1.3038516e-08 eligible=true
+path=approx_exp layer=0 tokens=63 launch_ok=true dispatched=true recurrent_eq=false state_eq=false restore=true vs_shared_abs=2.98023224e-08 vs_seq_abs=3.35276127e-08 eligible=true
+path=transpose layer=0 tokens=63 launch_ok=true dispatched=true recurrent_eq=true state_eq=true restore=true vs_shared_abs=0 vs_seq_abs=1.49011612e-08 eligible=true
+path=preproc layer=0 tokens=64 launch_ok=true dispatched=true recurrent_eq=true state_eq=true restore=true vs_shared_abs=0 vs_seq_abs=1.49011612e-08 eligible=true
+path=preproc_fma layer=0 tokens=64 launch_ok=true dispatched=true recurrent_eq=false state_eq=false restore=true vs_shared_abs=1.11758709e-08 vs_seq_abs=1.49011612e-08 eligible=true
+path=approx_exp layer=0 tokens=64 launch_ok=true dispatched=true recurrent_eq=false state_eq=false restore=true vs_shared_abs=2.98023224e-08 vs_seq_abs=3.35276127e-08 eligible=true
+path=transpose layer=0 tokens=64 launch_ok=true dispatched=true recurrent_eq=true state_eq=true restore=true vs_shared_abs=0 vs_seq_abs=1.49011612e-08 eligible=true
+path=preproc layer=0 tokens=65 launch_ok=true dispatched=true recurrent_eq=true state_eq=true restore=true vs_shared_abs=0 vs_seq_abs=1.67638063e-08 eligible=true
+path=preproc_fma layer=0 tokens=65 launch_ok=true dispatched=true recurrent_eq=false state_eq=false restore=true vs_shared_abs=1.11758709e-08 vs_seq_abs=1.49011612e-08 eligible=true
+path=approx_exp layer=0 tokens=65 launch_ok=true dispatched=true recurrent_eq=false state_eq=false restore=true vs_shared_abs=2.98023224e-08 vs_seq_abs=2.98023224e-08 eligible=true
+path=transpose layer=0 tokens=65 launch_ok=true dispatched=true recurrent_eq=true state_eq=true restore=true vs_shared_abs=0 vs_seq_abs=1.67638063e-08 eligible=true
+chunks path=preproc n0=64 n1=1 ok=true
+chunks path=preproc_fma n0=64 n1=1 ok=true
+chunks path=approx_exp n0=64 n1=1 ok=true
+chunks path=transpose n0=64 n1=1 ok=true
+path=preproc layer=0 tokens=512 launch_ok=true dispatched=true recurrent_eq=true state_eq=true restore=true vs_shared_abs=0 vs_seq_abs=1.49011612e-08 eligible=true
+path=preproc_fma layer=0 tokens=512 launch_ok=true dispatched=true recurrent_eq=false state_eq=false restore=true vs_shared_abs=1.11758709e-08 vs_seq_abs=1.49011612e-08 eligible=true
+path=approx_exp layer=0 tokens=512 launch_ok=true dispatched=true recurrent_eq=false state_eq=false restore=true vs_shared_abs=2.23517418e-08 vs_seq_abs=2.23517418e-08 eligible=true
+path=transpose layer=0 tokens=512 launch_ok=true dispatched=true recurrent_eq=true state_eq=true restore=true vs_shared_abs=0 vs_seq_abs=1.49011612e-08 eligible=true
+chunks path=preproc n0=256 n1=256 ok=true
+chunks path=preproc_fma n0=256 n1=256 ok=true
+chunks path=approx_exp n0=256 n1=256 ok=true
+chunks path=transpose n0=256 n1=256 ok=true
+path=preproc layer=0 tokens=2048 launch_ok=true dispatched=true recurrent_eq=true state_eq=true restore=true vs_shared_abs=0 vs_seq_abs=1.49011612e-08 eligible=true
+path=preproc_fma layer=0 tokens=2048 launch_ok=true dispatched=true recurrent_eq=false state_eq=false restore=true vs_shared_abs=1.11758709e-08 vs_seq_abs=1.58324838e-08 eligible=true
+path=approx_exp layer=0 tokens=2048 launch_ok=true dispatched=true recurrent_eq=false state_eq=false restore=true vs_shared_abs=2.23517418e-08 vs_seq_abs=2.23517418e-08 eligible=true
+path=transpose layer=0 tokens=2048 launch_ok=true dispatched=true recurrent_eq=true state_eq=true restore=true vs_shared_abs=0 vs_seq_abs=1.49011612e-08 eligible=true
+path=preproc layer=0 tokens=4096 launch_ok=true dispatched=true recurrent_eq=true state_eq=true restore=true vs_shared_abs=0 vs_seq_abs=1.49011612e-08 eligible=true
+path=preproc_fma layer=0 tokens=4096 launch_ok=true dispatched=true recurrent_eq=false state_eq=false restore=true vs_shared_abs=9.31322575e-09 vs_seq_abs=1.49011612e-08 eligible=true
+path=approx_exp layer=0 tokens=4096 launch_ok=true dispatched=true recurrent_eq=false state_eq=false restore=true vs_shared_abs=2.42143869e-08 vs_seq_abs=2.04890966e-08 eligible=true
+path=transpose layer=0 tokens=4096 launch_ok=true dispatched=true recurrent_eq=true state_eq=true restore=true vs_shared_abs=0 vs_seq_abs=1.49011612e-08 eligible=true
+path=preproc layer=32 tokens=1 launch_ok=true dispatched=false recurrent_eq=true state_eq=true restore=true vs_shared_abs=0 vs_seq_abs=1.86264515e-09 eligible=true
+path=preproc_fma layer=32 tokens=1 launch_ok=true dispatched=false recurrent_eq=true state_eq=true restore=true vs_shared_abs=0 vs_seq_abs=1.86264515e-09 eligible=true
+path=approx_exp layer=32 tokens=1 launch_ok=true dispatched=false recurrent_eq=true state_eq=true restore=true vs_shared_abs=0 vs_seq_abs=1.86264515e-09 eligible=true
+path=transpose layer=32 tokens=1 launch_ok=true dispatched=false recurrent_eq=true state_eq=true restore=true vs_shared_abs=0 vs_seq_abs=1.86264515e-09 eligible=true
+path=preproc layer=32 tokens=2 launch_ok=true dispatched=true recurrent_eq=true state_eq=true restore=true vs_shared_abs=0 vs_seq_abs=3.7252903e-09 eligible=true
+path=preproc_fma layer=32 tokens=2 launch_ok=true dispatched=true recurrent_eq=false state_eq=false restore=true vs_shared_abs=1.86264515e-09 vs_seq_abs=3.7252903e-09 eligible=true
+path=approx_exp layer=32 tokens=2 launch_ok=true dispatched=true recurrent_eq=false state_eq=false restore=true vs_shared_abs=4.65661287e-09 vs_seq_abs=5.58793545e-09 eligible=true
+path=transpose layer=32 tokens=2 launch_ok=true dispatched=true recurrent_eq=true state_eq=true restore=true vs_shared_abs=0 vs_seq_abs=3.7252903e-09 eligible=true
+path=preproc layer=32 tokens=3 launch_ok=true dispatched=true recurrent_eq=true state_eq=true restore=true vs_shared_abs=0 vs_seq_abs=3.7252903e-09 eligible=true
+path=preproc_fma layer=32 tokens=3 launch_ok=true dispatched=true recurrent_eq=false state_eq=false restore=true vs_shared_abs=1.86264515e-09 vs_seq_abs=2.79396772e-09 eligible=true
+path=approx_exp layer=32 tokens=3 launch_ok=true dispatched=true recurrent_eq=false state_eq=false restore=true vs_shared_abs=5.58793545e-09 vs_seq_abs=5.58793545e-09 eligible=true
+path=transpose layer=32 tokens=3 launch_ok=true dispatched=true recurrent_eq=true state_eq=true restore=true vs_shared_abs=0 vs_seq_abs=3.7252903e-09 eligible=true
+path=preproc layer=32 tokens=4 launch_ok=true dispatched=true recurrent_eq=true state_eq=true restore=true vs_shared_abs=0 vs_seq_abs=3.7252903e-09 eligible=true
+path=preproc_fma layer=32 tokens=4 launch_ok=true dispatched=true recurrent_eq=false state_eq=false restore=true vs_shared_abs=3.7252903e-09 vs_seq_abs=3.7252903e-09 eligible=true
+path=approx_exp layer=32 tokens=4 launch_ok=true dispatched=true recurrent_eq=false state_eq=false restore=true vs_shared_abs=6.51925802e-09 vs_seq_abs=5.58793545e-09 eligible=true
+path=transpose layer=32 tokens=4 launch_ok=true dispatched=true recurrent_eq=true state_eq=true restore=true vs_shared_abs=0 vs_seq_abs=3.7252903e-09 eligible=true
+path=preproc layer=32 tokens=63 launch_ok=true dispatched=true recurrent_eq=true state_eq=true restore=true vs_shared_abs=0 vs_seq_abs=1.67638063e-08 eligible=true
+path=preproc_fma layer=32 tokens=63 launch_ok=true dispatched=true recurrent_eq=false state_eq=false restore=true vs_shared_abs=9.31322575e-09 vs_seq_abs=1.49011612e-08 eligible=true
+path=approx_exp layer=32 tokens=63 launch_ok=true dispatched=true recurrent_eq=false state_eq=false restore=true vs_shared_abs=3.16649675e-08 vs_seq_abs=3.35276127e-08 eligible=true
+path=transpose layer=32 tokens=63 launch_ok=true dispatched=true recurrent_eq=true state_eq=true restore=true vs_shared_abs=0 vs_seq_abs=1.67638063e-08 eligible=true
+path=preproc layer=32 tokens=64 launch_ok=true dispatched=true recurrent_eq=true state_eq=true restore=true vs_shared_abs=0 vs_seq_abs=1.86264515e-08 eligible=true
+path=preproc_fma layer=32 tokens=64 launch_ok=true dispatched=true recurrent_eq=false state_eq=false restore=true vs_shared_abs=9.31322575e-09 vs_seq_abs=1.67638063e-08 eligible=true
+path=approx_exp layer=32 tokens=64 launch_ok=true dispatched=true recurrent_eq=false state_eq=false restore=true vs_shared_abs=3.16649675e-08 vs_seq_abs=3.35276127e-08 eligible=true
+path=transpose layer=32 tokens=64 launch_ok=true dispatched=true recurrent_eq=true state_eq=true restore=true vs_shared_abs=0 vs_seq_abs=1.86264515e-08 eligible=true
+path=preproc layer=32 tokens=65 launch_ok=true dispatched=true recurrent_eq=true state_eq=true restore=true vs_shared_abs=0 vs_seq_abs=1.67638063e-08 eligible=true
+path=preproc_fma layer=32 tokens=65 launch_ok=true dispatched=true recurrent_eq=false state_eq=false restore=true vs_shared_abs=8.38190317e-09 vs_seq_abs=1.49011612e-08 eligible=true
+path=approx_exp layer=32 tokens=65 launch_ok=true dispatched=true recurrent_eq=false state_eq=false restore=true vs_shared_abs=3.16649675e-08 vs_seq_abs=3.35276127e-08 eligible=true
+path=transpose layer=32 tokens=65 launch_ok=true dispatched=true recurrent_eq=true state_eq=true restore=true vs_shared_abs=0 vs_seq_abs=1.67638063e-08 eligible=true
+path=preproc layer=32 tokens=512 launch_ok=true dispatched=true recurrent_eq=true state_eq=true restore=true vs_shared_abs=0 vs_seq_abs=1.49011612e-08 eligible=true
+path=preproc_fma layer=32 tokens=512 launch_ok=true dispatched=true recurrent_eq=false state_eq=false restore=true vs_shared_abs=1.11758709e-08 vs_seq_abs=1.49011612e-08 eligible=true
+path=approx_exp layer=32 tokens=512 launch_ok=true dispatched=true recurrent_eq=false state_eq=false restore=true vs_shared_abs=2.32830644e-08 vs_seq_abs=2.60770321e-08 eligible=true
+path=transpose layer=32 tokens=512 launch_ok=true dispatched=true recurrent_eq=true state_eq=true restore=true vs_shared_abs=0 vs_seq_abs=1.49011612e-08 eligible=true
+path=preproc layer=32 tokens=2048 launch_ok=true dispatched=true recurrent_eq=true state_eq=true restore=true vs_shared_abs=0 vs_seq_abs=1.49011612e-08 eligible=true
+path=preproc_fma layer=32 tokens=2048 launch_ok=true dispatched=true recurrent_eq=false state_eq=false restore=true vs_shared_abs=1.11758709e-08 vs_seq_abs=1.3038516e-08 eligible=true
+path=approx_exp layer=32 tokens=2048 launch_ok=true dispatched=true recurrent_eq=false state_eq=false restore=true vs_shared_abs=2.23517418e-08 vs_seq_abs=2.42143869e-08 eligible=true
+path=transpose layer=32 tokens=2048 launch_ok=true dispatched=true recurrent_eq=true state_eq=true restore=true vs_shared_abs=0 vs_seq_abs=1.49011612e-08 eligible=true
+path=preproc layer=32 tokens=4096 launch_ok=true dispatched=true recurrent_eq=true state_eq=true restore=true vs_shared_abs=0 vs_seq_abs=1.67638063e-08 eligible=true
+path=preproc_fma layer=32 tokens=4096 launch_ok=true dispatched=true recurrent_eq=false state_eq=false restore=true vs_shared_abs=9.31322575e-09 vs_seq_abs=1.58324838e-08 eligible=true
+path=approx_exp layer=32 tokens=4096 launch_ok=true dispatched=true recurrent_eq=false state_eq=false restore=true vs_shared_abs=2.42143869e-08 vs_seq_abs=2.23517418e-08 eligible=true
+path=transpose layer=32 tokens=4096 launch_ok=true dispatched=true recurrent_eq=true state_eq=true restore=true vs_shared_abs=0 vs_seq_abs=1.67638063e-08 eligible=true
+path=preproc layer=62 tokens=1 launch_ok=true dispatched=false recurrent_eq=true state_eq=true restore=true vs_shared_abs=0 vs_seq_abs=1.86264515e-09 eligible=true
+path=preproc_fma layer=62 tokens=1 launch_ok=true dispatched=false recurrent_eq=true state_eq=true restore=true vs_shared_abs=0 vs_seq_abs=1.86264515e-09 eligible=true
+path=approx_exp layer=62 tokens=1 launch_ok=true dispatched=false recurrent_eq=true state_eq=true restore=true vs_shared_abs=0 vs_seq_abs=1.86264515e-09 eligible=true
+path=transpose layer=62 tokens=1 launch_ok=true dispatched=false recurrent_eq=true state_eq=true restore=true vs_shared_abs=0 vs_seq_abs=1.86264515e-09 eligible=true
+path=preproc layer=62 tokens=2 launch_ok=true dispatched=true recurrent_eq=true state_eq=true restore=true vs_shared_abs=0 vs_seq_abs=1.86264515e-09 eligible=true
+path=preproc_fma layer=62 tokens=2 launch_ok=true dispatched=true recurrent_eq=false state_eq=false restore=true vs_shared_abs=1.86264515e-09 vs_seq_abs=1.86264515e-09 eligible=true
+path=approx_exp layer=62 tokens=2 launch_ok=true dispatched=true recurrent_eq=false state_eq=false restore=true vs_shared_abs=5.58793545e-09 vs_seq_abs=5.58793545e-09 eligible=true
+path=transpose layer=62 tokens=2 launch_ok=true dispatched=true recurrent_eq=true state_eq=true restore=true vs_shared_abs=0 vs_seq_abs=1.86264515e-09 eligible=true
+path=preproc layer=62 tokens=3 launch_ok=true dispatched=true recurrent_eq=true state_eq=true restore=true vs_shared_abs=0 vs_seq_abs=3.7252903e-09 eligible=true
+path=preproc_fma layer=62 tokens=3 launch_ok=true dispatched=true recurrent_eq=false state_eq=false restore=true vs_shared_abs=1.86264515e-09 vs_seq_abs=2.79396772e-09 eligible=true
+path=approx_exp layer=62 tokens=3 launch_ok=true dispatched=true recurrent_eq=false state_eq=false restore=true vs_shared_abs=5.58793545e-09 vs_seq_abs=6.51925802e-09 eligible=true
+path=transpose layer=62 tokens=3 launch_ok=true dispatched=true recurrent_eq=true state_eq=true restore=true vs_shared_abs=0 vs_seq_abs=3.7252903e-09 eligible=true
+path=preproc layer=62 tokens=4 launch_ok=true dispatched=true recurrent_eq=true state_eq=true restore=true vs_shared_abs=0 vs_seq_abs=3.7252903e-09 eligible=true
+path=preproc_fma layer=62 tokens=4 launch_ok=true dispatched=true recurrent_eq=false state_eq=false restore=true vs_shared_abs=3.7252903e-09 vs_seq_abs=3.7252903e-09 eligible=true
+path=approx_exp layer=62 tokens=4 launch_ok=true dispatched=true recurrent_eq=false state_eq=false restore=true vs_shared_abs=5.58793545e-09 vs_seq_abs=7.4505806e-09 eligible=true
+path=transpose layer=62 tokens=4 launch_ok=true dispatched=true recurrent_eq=true state_eq=true restore=true vs_shared_abs=0 vs_seq_abs=3.7252903e-09 eligible=true
+path=preproc layer=62 tokens=63 launch_ok=true dispatched=true recurrent_eq=true state_eq=true restore=true vs_shared_abs=0 vs_seq_abs=1.3038516e-08 eligible=true
+path=preproc_fma layer=62 tokens=63 launch_ok=true dispatched=true recurrent_eq=false state_eq=false restore=true vs_shared_abs=8.38190317e-09 vs_seq_abs=1.49011612e-08 eligible=true
+path=approx_exp layer=62 tokens=63 launch_ok=true dispatched=true recurrent_eq=false state_eq=false restore=true vs_shared_abs=2.98023224e-08 vs_seq_abs=2.98023224e-08 eligible=true
+path=transpose layer=62 tokens=63 launch_ok=true dispatched=true recurrent_eq=true state_eq=true restore=true vs_shared_abs=0 vs_seq_abs=1.3038516e-08 eligible=true
+path=preproc layer=62 tokens=64 launch_ok=true dispatched=true recurrent_eq=true state_eq=true restore=true vs_shared_abs=0 vs_seq_abs=1.3038516e-08 eligible=true
+path=preproc_fma layer=62 tokens=64 launch_ok=true dispatched=true recurrent_eq=false state_eq=false restore=true vs_shared_abs=9.31322575e-09 vs_seq_abs=1.49011612e-08 eligible=true
+path=approx_exp layer=62 tokens=64 launch_ok=true dispatched=true recurrent_eq=false state_eq=false restore=true vs_shared_abs=2.98023224e-08 vs_seq_abs=2.98023224e-08 eligible=true
+path=transpose layer=62 tokens=64 launch_ok=true dispatched=true recurrent_eq=true state_eq=true restore=true vs_shared_abs=0 vs_seq_abs=1.3038516e-08 eligible=true
+path=preproc layer=62 tokens=65 launch_ok=true dispatched=true recurrent_eq=true state_eq=true restore=true vs_shared_abs=0 vs_seq_abs=1.3038516e-08 eligible=true
+path=preproc_fma layer=62 tokens=65 launch_ok=true dispatched=true recurrent_eq=false state_eq=false restore=true vs_shared_abs=9.31322575e-09 vs_seq_abs=1.49011612e-08 eligible=true
+path=approx_exp layer=62 tokens=65 launch_ok=true dispatched=true recurrent_eq=false state_eq=false restore=true vs_shared_abs=2.98023224e-08 vs_seq_abs=2.98023224e-08 eligible=true
+path=transpose layer=62 tokens=65 launch_ok=true dispatched=true recurrent_eq=true state_eq=true restore=true vs_shared_abs=0 vs_seq_abs=1.3038516e-08 eligible=true
+path=preproc layer=62 tokens=512 launch_ok=true dispatched=true recurrent_eq=true state_eq=true restore=true vs_shared_abs=0 vs_seq_abs=1.49011612e-08 eligible=true
+path=preproc_fma layer=62 tokens=512 launch_ok=true dispatched=true recurrent_eq=false state_eq=false restore=true vs_shared_abs=9.31322575e-09 vs_seq_abs=1.39698386e-08 eligible=true
+path=approx_exp layer=62 tokens=512 launch_ok=true dispatched=true recurrent_eq=false state_eq=false restore=true vs_shared_abs=2.04890966e-08 vs_seq_abs=2.23517418e-08 eligible=true
+path=transpose layer=62 tokens=512 launch_ok=true dispatched=true recurrent_eq=true state_eq=true restore=true vs_shared_abs=0 vs_seq_abs=1.49011612e-08 eligible=true
+path=preproc layer=62 tokens=2048 launch_ok=true dispatched=true recurrent_eq=true state_eq=true restore=true vs_shared_abs=0 vs_seq_abs=1.67638063e-08 eligible=true
+path=preproc_fma layer=62 tokens=2048 launch_ok=true dispatched=true recurrent_eq=false state_eq=false restore=true vs_shared_abs=9.31322575e-09 vs_seq_abs=1.49011612e-08 eligible=true
+path=approx_exp layer=62 tokens=2048 launch_ok=true dispatched=true recurrent_eq=false state_eq=false restore=true vs_shared_abs=2.60770321e-08 vs_seq_abs=2.23517418e-08 eligible=true
+path=transpose layer=62 tokens=2048 launch_ok=true dispatched=true recurrent_eq=true state_eq=true restore=true vs_shared_abs=0 vs_seq_abs=1.67638063e-08 eligible=true
+path=preproc layer=62 tokens=4096 launch_ok=true dispatched=true recurrent_eq=true state_eq=true restore=true vs_shared_abs=0 vs_seq_abs=1.49011612e-08 eligible=true
+path=preproc_fma layer=62 tokens=4096 launch_ok=true dispatched=true recurrent_eq=false state_eq=false restore=true vs_shared_abs=9.31322575e-09 vs_seq_abs=2.04890966e-08 eligible=true
+path=approx_exp layer=62 tokens=4096 launch_ok=true dispatched=true recurrent_eq=false state_eq=false restore=true vs_shared_abs=2.23517418e-08 vs_seq_abs=2.42143869e-08 eligible=true
+path=transpose layer=62 tokens=4096 launch_ok=true dispatched=true recurrent_eq=true state_eq=true restore=true vs_shared_abs=0 vs_seq_abs=1.49011612e-08 eligible=true
+warmup id=shared sample=0 ms=26.9311676
+warmup id=preproc sample=0 ms=25.6447678
+warmup id=preproc_fma sample=0 ms=24.9624004
+warmup id=approx_exp sample=0 ms=25.100544
+warmup id=transpose sample=0 ms=22.2984009
+warmup id=shared sample=1 ms=26.0507202
+warmup id=preproc sample=1 ms=27.5745926
+warmup id=preproc_fma sample=1 ms=25.9368954
+warmup id=approx_exp sample=1 ms=25.1865597
+warmup id=transpose sample=1 ms=22.2954235
+warmup id=shared sample=2 ms=26.158144
+warmup id=preproc sample=2 ms=25.214304
+warmup id=preproc_fma sample=2 ms=24.9306889
+warmup id=approx_exp sample=2 ms=25.4504642
+warmup id=transpose sample=2 ms=22.5185928
+measured id=shared sample=0 ms=27.0968952
+measured id=preproc sample=0 ms=27.3856316
+measured id=preproc_fma sample=0 ms=25.2909756
+measured id=approx_exp sample=0 ms=25.1336956
+measured id=transpose sample=0 ms=22.3275528
+measured id=shared sample=1 ms=25.8528633
+measured id=preproc sample=1 ms=25.1123848
+measured id=preproc_fma sample=1 ms=24.4658566
+measured id=approx_exp sample=1 ms=25.8442879
+measured id=transpose sample=1 ms=22.3741436
+measured id=shared sample=2 ms=26.9160004
+measured id=preproc sample=2 ms=26.6874561
+measured id=preproc_fma sample=2 ms=24.8459206
+measured id=approx_exp sample=2 ms=24.7936649
+measured id=transpose sample=2 ms=21.9706879
+measured id=shared sample=3 ms=26.1293449
+measured id=preproc sample=3 ms=24.8372478
+measured id=preproc_fma sample=3 ms=24.9318714
+measured id=approx_exp sample=3 ms=24.8945274
+measured id=transpose sample=3 ms=22.7670403
+measured id=shared sample=4 ms=27.5762882
+measured id=preproc sample=4 ms=26.8319035
+measured id=preproc_fma sample=4 ms=24.9392319
+measured id=approx_exp sample=4 ms=25.1297913
+measured id=transpose sample=4 ms=22.0851841
+measured id=shared sample=5 ms=26.2012806
+measured id=preproc sample=5 ms=24.8532162
+measured id=preproc_fma sample=5 ms=24.6362877
+measured id=approx_exp sample=5 ms=25.2043514
+measured id=transpose sample=5 ms=22.4095993
+measured id=shared sample=6 ms=28.1303673
+measured id=preproc sample=6 ms=26.2098885
+measured id=preproc_fma sample=6 ms=24.9120312
+measured id=approx_exp sample=6 ms=25.0901127
+measured id=transpose sample=6 ms=22.161377
+measured id=shared sample=7 ms=25.5507832
+measured id=preproc sample=7 ms=24.8115196
+measured id=preproc_fma sample=7 ms=25.0113602
+measured id=approx_exp sample=7 ms=24.9647999
+measured id=transpose sample=7 ms=22.7245445
+measured id=shared sample=8 ms=27.3600311
+measured id=preproc sample=8 ms=28.3568325
+measured id=preproc_fma sample=8 ms=26.1190071
+measured id=approx_exp sample=8 ms=25.2823677
+measured id=transpose sample=8 ms=22.5039997
+measured id=shared sample=9 ms=25.4369926
+measured id=preproc sample=9 ms=25.3085117
+measured id=preproc_fma sample=9 ms=24.6600952
+measured id=approx_exp sample=9 ms=25.0508804
+measured id=transpose sample=9 ms=23.3833275
+measured id=shared sample=10 ms=28.7408638
+measured id=preproc sample=10 ms=26.0566082
+measured id=preproc_fma sample=10 ms=24.93536
+measured id=approx_exp sample=10 ms=24.9196796
+measured id=transpose sample=10 ms=22.2694073
+measured id=shared sample=11 ms=25.6408958
+measured id=preproc sample=11 ms=24.8878078
+measured id=preproc_fma sample=11 ms=25.0868473
+measured id=approx_exp sample=11 ms=24.9286404
+measured id=transpose sample=11 ms=23.4533119
+measured id=shared sample=12 ms=29.2285767
+measured id=preproc sample=12 ms=26.6879673
+measured id=preproc_fma sample=12 ms=25.2399044
+measured id=approx_exp sample=12 ms=25.0347843
+measured id=transpose sample=12 ms=22.5040646
+measured id=shared sample=13 ms=25.5164471
+measured id=preproc sample=13 ms=25.35536
+measured id=preproc_fma sample=13 ms=24.8939209
+measured id=approx_exp sample=13 ms=24.8626556
+measured id=transpose sample=13 ms=23.6673279
+measured id=shared sample=14 ms=27.5738239
+measured id=preproc sample=14 ms=25.1279049
+measured id=preproc_fma sample=14 ms=24.9408646
+measured id=approx_exp sample=14 ms=24.8706245
+measured id=transpose sample=14 ms=22.3340473
+measured id=shared sample=15 ms=25.6878719
+measured id=preproc sample=15 ms=25.3296642
+measured id=preproc_fma sample=15 ms=24.7818871
+measured id=approx_exp sample=15 ms=25.2617607
+measured id=transpose sample=15 ms=24.1752644
+measured id=shared sample=16 ms=27.7237434
+measured id=preproc sample=16 ms=25.1986237
+measured id=preproc_fma sample=16 ms=25.0246716
+measured id=approx_exp sample=16 ms=24.7903996
+measured id=transpose sample=16 ms=23.1293755
+measured id=shared sample=17 ms=25.5130234
+measured id=preproc sample=17 ms=24.8813763
+measured id=preproc_fma sample=17 ms=25.0796165
+measured id=approx_exp sample=17 ms=25.1645126
+measured id=transpose sample=17 ms=24.8127041
+measured id=shared sample=18 ms=27.5142727
+measured id=preproc sample=18 ms=25.3136959
+measured id=preproc_fma sample=18 ms=24.8969593
+measured id=approx_exp sample=18 ms=25.0686398
+measured id=transpose sample=18 ms=22.6856632
+measured id=shared sample=19 ms=25.607008
+measured id=preproc sample=19 ms=24.9962234
+measured id=preproc_fma sample=19 ms=25.0893116
+measured id=approx_exp sample=19 ms=25.5771847
+measured id=transpose sample=19 ms=25.5225277
+measured id=shared sample=20 ms=27.1781445
+measured id=preproc sample=20 ms=25.3337288
+measured id=preproc_fma sample=20 ms=24.9983044
+measured id=approx_exp sample=20 ms=25.0303364
+measured id=transpose sample=20 ms=22.6706562
+measured id=shared sample=21 ms=25.5381432
+measured id=preproc sample=21 ms=25.260128
+measured id=preproc_fma sample=21 ms=25.1912327
+measured id=approx_exp sample=21 ms=25.7755527
+measured id=transpose sample=21 ms=25.4615364
+measured id=shared sample=22 ms=25.8814716
+measured id=preproc sample=22 ms=25.3319683
+measured id=preproc_fma sample=22 ms=24.8499832
+measured id=approx_exp sample=22 ms=25.1143036
+measured id=transpose sample=22 ms=22.4117126
+measured id=shared sample=23 ms=26.2309761
+measured id=preproc sample=23 ms=24.8758087
+measured id=preproc_fma sample=23 ms=25.3654728
+measured id=approx_exp sample=23 ms=26.2455673
+measured id=transpose sample=23 ms=25.3717766
+measured id=shared sample=24 ms=26.5788155
+measured id=preproc sample=24 ms=26.2636166
+measured id=preproc_fma sample=24 ms=25.1916809
+measured id=approx_exp sample=24 ms=25.2181759
+measured id=transpose sample=24 ms=22.3740158
+measured id=shared sample=25 ms=25.7244473
+measured id=preproc sample=25 ms=25.1268806
+measured id=preproc_fma sample=25 ms=24.9769287
+measured id=approx_exp sample=25 ms=26.1677437
+measured id=transpose sample=25 ms=24.7815361
+measured id=shared sample=26 ms=26.4154243
+measured id=preproc sample=26 ms=25.0295353
+measured id=preproc_fma sample=26 ms=24.9125443
+measured id=approx_exp sample=26 ms=25.2015991
+measured id=transpose sample=26 ms=22.9515514
+measured id=shared sample=27 ms=25.6147518
+measured id=preproc sample=27 ms=25.3907528
+measured id=preproc_fma sample=27 ms=25.5109768
+measured id=approx_exp sample=27 ms=27.0266876
+measured id=transpose sample=27 ms=24.4586239
+measured id=shared sample=28 ms=25.7576962
+measured id=preproc sample=28 ms=26.0929928
+measured id=preproc_fma sample=28 ms=25.0899525
+measured id=approx_exp sample=28 ms=25.2605762
+measured id=transpose sample=28 ms=22.7590408
+measured id=shared sample=29 ms=25.5882874
+measured id=preproc sample=29 ms=25.5278072
+measured id=preproc_fma sample=29 ms=25.1494408
+measured id=approx_exp sample=29 ms=27.6539192
+measured id=transpose sample=29 ms=24.0371838
+path=preproc layer=0 tokens=4096 launch_ok=true dispatched=true recurrent_eq=true state_eq=true restore=true vs_shared_abs=0 vs_seq_abs=1.49011612e-08 eligible=true
+path=preproc_fma layer=0 tokens=4096 launch_ok=true dispatched=true recurrent_eq=false state_eq=false restore=true vs_shared_abs=9.31322575e-09 vs_seq_abs=1.49011612e-08 eligible=true
+path=approx_exp layer=0 tokens=4096 launch_ok=true dispatched=true recurrent_eq=false state_eq=false restore=true vs_shared_abs=2.42143869e-08 vs_seq_abs=2.04890966e-08 eligible=true
+path=transpose layer=0 tokens=4096 launch_ok=true dispatched=true recurrent_eq=true state_eq=true restore=true vs_shared_abs=0 vs_seq_abs=1.49011612e-08 eligible=true
+winner=transpose win=true

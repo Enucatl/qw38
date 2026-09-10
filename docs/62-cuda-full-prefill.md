@@ -1,6 +1,6 @@
 # Chunked full-model CUDA prefill
 
-[Index](README.md) · Implementation tasks: SCH-002, MEM-002, OPT-008, OPT-009, OPT-011, OPT-012, OPT-013, OPT-014, OPT-015, OPT-017, OPT-018, OPT-019, OPT-020, OPT-021, OPT-022, OPT-023, OPT-024, OPT-025, OPT-026, OPT-027, OPT-028, OPT-029, OPT-030, OPT-032, OPT-033, OPT-035, OPT-037, OPT-038, OPT-040, OPT-041, and EDU-047 in
+[Index](README.md) · Implementation tasks: SCH-002, MEM-002, OPT-008, OPT-009, OPT-011, OPT-012, OPT-013, OPT-014, OPT-015, OPT-017, OPT-018, OPT-019, OPT-020, OPT-021, OPT-022, OPT-023, OPT-024, OPT-025, OPT-026, OPT-027, OPT-028, OPT-029, OPT-030, OPT-032, OPT-033, OPT-035, OPT-037, OPT-038, OPT-040, OPT-041, OPT-052, and EDU-047 in
 [`implementation_ledger.md`](../implementation_ledger.md) · Contracts:
 [`pins/cuda_prompt_scheduler_contract.json`](../pins/cuda_prompt_scheduler_contract.json),
 [`pins/cuda_prompt_pipeline_contract.json`](../pins/cuda_prompt_pipeline_contract.json),
@@ -850,6 +850,25 @@ stay in the report:
 [`pins/opt040_gdn_shared_inverse_contract.json`](../pins/opt040_gdn_shared_inverse_contract.json),
 and
 [`fixtures/opt040_gdn_shared_inverse.json`](../fixtures/opt040_gdn_shared_inverse.json).
+
+OPT-052 hoists scaled Q/K and decay into the same overlay and measures a
+conversion-inclusive column-major state tile. **Measured, RTX 5090:** paired CUDA-event A/B on the complete 4096-token GDN component
+(parallel conv + preprocessing + warp-column recurrence + gated-output)
+among `shared`, `preproc`, `preproc_fma`, `approx_exp`, and `transpose`;
+winner `transpose` with byte-equal quality versus `shared` and frozen
+sequential GDN-002 envelopes. Production `kSelectedGdnPreprocPath` is
+`transpose`. Shared inverses, fuse `off`, sequential windows, and decode
+GDN stay. FMA and approximate exp remain separate measured variants, not
+silent replacements. Live exclusive sitting **keep:** Quartz P strictly
+greater than the copied OPT-051 keep; D128/D2048 throughput and p95
+guards held; `reverted` false; `keep_sitting_skipped` false; `status`
+measured. `quartz_meets_llama` is informational and is not this gate.
+**The 2K parity owner remains the blocked dedicated gate.** Live numbers
+stay in the report:
+[`evidence/optimization/opt052-gdn-arithmetic/REPORT.md`](../evidence/optimization/opt052-gdn-arithmetic/REPORT.md),
+[`pins/opt052_gdn_arithmetic_contract.json`](../pins/opt052_gdn_arithmetic_contract.json),
+and
+[`fixtures/opt052_gdn_arithmetic.json`](../fixtures/opt052_gdn_arithmetic.json).
 
 OPT-041 keeps warp-owned 16×8 prompt QK microtiles on production 4096-row
 fattn-mma stream-K including combine, on top of register-resident VKQ and

@@ -43,7 +43,9 @@ installed (OPT-029); production GDN core stays split parallel conv +
 warp-column + gated-output. Hopper/Blackwell PDL on ungraphed prompt
 launches was A/B-won then 4K-rejected (OPT-030); production stays
 ordinary `<<<>>>`. Production prompt GDN may hoist per-(token, key_head)
-Q/K inverses into existing overlay scratch after the OPT-040 keep;
+Q/K inverses into existing overlay scratch after the OPT-040 keep, and
+may hoist scaled Q/K and decay plus a conversion-inclusive column-major
+state tile after the OPT-052 keep;
 decode sequential GDN is unchanged. Decode stays MMV, with packed
 blockwise Q4_K/Q6_K loads after the OPT-034 keep.
 Tiny mixer prompts keep the
@@ -601,6 +603,23 @@ increment does not own the 2K llama.cpp parity gate. Quartz ≥ llama.cpp is
 informational. Live tok/s stay in the report; this chapter does not replace
 them:
 [`evidence/optimization/opt040-gdn-shared-inverse/REPORT.md`](../evidence/optimization/opt040-gdn-shared-inverse/REPORT.md).
+
+## Hoisted scaled Q/K, decay, and conversion-inclusive state transpose
+
+**Measured, RTX 5090:** production prompt GDN on
+`GdnScanPath::kFusedTokenLoop` with fuse path `off` and shared inverses was
+A/B'd against a preprocessing sibling that writes L2-scaled Q/K per
+`(token, key_head)` and `expf(log_decay)` per `(token, value_head)` into the
+existing `prompt_projected_bf16_` overlay, then runs the same FP32 register
+recurrence on those values. V still reads original convolved columns with the
+tiled-to-grouped map. Separate variants measured explicit `__fmaf_rn` updates
+and `__expf` decay. A conversion-inclusive temporary column-major state tile
+won the complete conv+preprocessing+recurrence+gated 4096-token component
+(23.218 ms vs shared 26.517 ms) with byte-equal quality outputs/state.
+Production pin `kSelectedGdnPreprocPath` is `transpose`. Sequential windows,
+decode GDN, and fuse `off` stay. Live tok/s stay in
+[`evidence/optimization/opt052-gdn-arithmetic/REPORT.md`](../evidence/optimization/opt052-gdn-arithmetic/REPORT.md).
+This increment does not own the 2K llama.cpp parity gate.
 
 ## Warp-owned prompt QK microtiles (OPT-041)
 

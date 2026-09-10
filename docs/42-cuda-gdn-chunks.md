@@ -1,6 +1,6 @@
 # 42. Chunked CUDA GDN prefill in 64-token windows
 
-[Index](README.md) · Implementation tasks: GDN-002, OPT-013, OPT-019, OPT-029, OPT-040, and EDU-028 in
+[Index](README.md) · Implementation tasks: GDN-002, OPT-013, OPT-019, OPT-029, OPT-040, OPT-052, and EDU-028 in
 [`implementation_ledger.md`](../implementation_ledger.md)
 · Contracts:
 [`pins/cuda_gdn_chunk_contract.json`](../pins/cuda_gdn_chunk_contract.json),
@@ -220,6 +220,30 @@ stay in the report; this chapter does not replace them:
 [`pins/opt040_gdn_shared_inverse_contract.json`](../pins/opt040_gdn_shared_inverse_contract.json),
 and
 [`fixtures/opt040_gdn_shared_inverse.json`](../fixtures/opt040_gdn_shared_inverse.json).
+
+## Hoisted scaled Q/K, decay, and conversion-inclusive transpose
+
+**Measured, RTX 5090:** after shared inverses, the fused warp-
+column loop still multiplied every value-column Q/K by those inverses and
+called `expf(log_decay)` per token. A preprocessing sibling writes L2-scaled
+Q/K once per `(token, key_head)` and decay once per `(token, value_head)` into
+the existing `prompt_projected_bf16_` overlay, then the recurrence reads those
+values. V stays on original convolved columns with the tiled-to-grouped map.
+FMA and approximate-exp variants are separate A/B candidates, not silent
+replacements. An optional conversion-inclusive column-major state tile is
+also measured; the canonical session layout is unchanged. Sequential 64-token
+windows, decode GDN, and fuse `off` stay.
+
+**Keep (live exclusive sitting):** complete 4096-token conv+preprocessing+
+recurrence+gated A/B winner `transpose` (byte-equal to shared); production
+pin `kSelectedGdnPreprocPath` is `transpose`; P improved vs the copied
+OPT-051 keep; D128/D2048 hold 95% throughput and 105% p95 ceilings;
+`reverted` false. `quartz_meets_llama` is informational. **The 2K parity
+owner remains the blocked dedicated gate.** Live numbers stay in
+[`evidence/optimization/opt052-gdn-arithmetic/REPORT.md`](../evidence/optimization/opt052-gdn-arithmetic/REPORT.md),
+[`pins/opt052_gdn_arithmetic_contract.json`](../pins/opt052_gdn_arithmetic_contract.json),
+and
+[`fixtures/opt052_gdn_arithmetic.json`](../fixtures/opt052_gdn_arithmetic.json).
 
 ## Whole-chunk candidate state
 

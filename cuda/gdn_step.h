@@ -88,6 +88,17 @@ std::size_t gdn_shared_inverse_floats(std::size_t token_count,
                                      std::uint32_t key_heads) noexcept;
 int gdn_shared_inverse_occupancy() noexcept;
 int gdn_shared_recurrence_occupancy() noexcept;
+const char* selected_gdn_preproc_path() noexcept;
+bool gdn_uses_preproc() noexcept;
+std::size_t gdn_preproc_floats(const GdnConfig& config,
+                               std::size_t token_count) noexcept;
+std::size_t gdn_preproc_transpose_floats(const GdnConfig& config,
+                                         std::size_t token_count) noexcept;
+int gdn_preproc_occupancy() noexcept;
+int gdn_preproc_decay_occupancy() noexcept;
+int gdn_preproc_recurrence_occupancy() noexcept;
+int gdn_preproc_fma_occupancy() noexcept;
+int gdn_preproc_transpose_occupancy() noexcept;
 
 cudaError_t launch_gdn_shared_inverses(
     const GdnConfig& config, const float* convolution_output,
@@ -102,7 +113,8 @@ cudaError_t launch_gdn_quality_fused(
     __nv_bfloat16* output_bf16, cudaStream_t stream, bool value_is_tiled,
     const char* path = nullptr, const char* inverse_path = nullptr,
     float* inverse_scratch = nullptr,
-    std::size_t inverse_scratch_floats = 0) noexcept;
+    std::size_t inverse_scratch_floats = 0,
+    const char* preproc_path = nullptr) noexcept;
 
 cudaError_t launch_gdn_gated_output_rows(
     const float* recurrent, const float* gate_tiled, const float* norm,
