@@ -402,6 +402,8 @@ class SchedulerWorkspace final {
   __nv_bfloat16* projected_bf16_ = nullptr;
   __nv_bfloat16* ffn_activated_ = nullptr;
   Q8Block* q8_ = nullptr;
+  const __nv_bfloat16* q8_decode_staged_activation_ = nullptr;
+  std::size_t q8_decode_staged_columns_ = 0;
   float* projection_a_ = nullptr;
   float* projection_b_ = nullptr;
   float* projection_c_ = nullptr;

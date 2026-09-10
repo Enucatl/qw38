@@ -21,6 +21,7 @@
 #include "scheduler.h"
 #include "scheduler_primitives.h"
 #include "sha256.h"
+#include "q8_decode_path.cuh"
 
 QW38_PDL_REGISTER_DEVICE_OPS()
 
@@ -924,12 +925,32 @@ cudaError_t matrix_vector(const DeviceTensor& matrix,
                           SchedulerWorkspace* workspace,
                           float* output, cudaStream_t stream) noexcept {
   if (matrix.kind == QuantKind::kQ8_0) {
+    if (q8_decode_uses_dp4a_for_rows(matrix.rows) &&
+        matrix.columns % 32 == 0 && workspace != nullptr &&
+        workspace->q8_ != nullptr) {
+      cudaError_t error = cudaSuccess;
+      if (workspace->q8_decode_staged_activation_ != activation ||
+          workspace->q8_decode_staged_columns_ != matrix.columns) {
+        error = launch_quantize_bf16_q8_1(activation, workspace->q8_,
+                                           matrix.columns, stream);
+        if (error != cudaSuccess) return error;
+        workspace->q8_decode_staged_activation_ = activation;
+        workspace->q8_decode_staged_columns_ = matrix.columns;
+      }
+      return launch_q8_coop_mmv_prequant(
+          matrix.data, matrix.rows, matrix.columns, workspace->q8_, output,
+          q8_decode_warps_for_rows(matrix.rows), stream);
+    }
     const unsigned int blocks = static_cast<unsigned int>(
         (matrix.rows + (kThreads / kWarpSize) - 1) /
         (kThreads / kWarpSize));
     return quartz_launch_kernel(
         q8_mmv_bf16, dim3(blocks), dim3(kThreads), 0, stream, matrix.data,
         matrix.rows, matrix.columns, activation, output);
+  }
+  if (workspace != nullptr) {
+    workspace->q8_decode_staged_activation_ = nullptr;
+    workspace->q8_decode_staged_columns_ = 0;
   }
   return launch_quant_mmv(matrix.kind, matrix.data, matrix.rows,
                           matrix.columns, activation, workspace->q8_, output,
@@ -2004,6 +2025,10 @@ SchedulerWorkspace& SchedulerWorkspace::operator=(
   QW38_MOVE_POINTER(projected_bf16_);
   QW38_MOVE_POINTER(ffn_activated_);
   QW38_MOVE_POINTER(q8_);
+  q8_decode_staged_activation_ = other.q8_decode_staged_activation_;
+  q8_decode_staged_columns_ = other.q8_decode_staged_columns_;
+  other.q8_decode_staged_activation_ = nullptr;
+  other.q8_decode_staged_columns_ = 0;
   QW38_MOVE_POINTER(projection_a_);
   QW38_MOVE_POINTER(projection_b_);
   QW38_MOVE_POINTER(projection_c_);
@@ -2122,6 +2147,8 @@ void SchedulerWorkspace::release() noexcept {
   capacity_ = 0;
   prompt_chunk_rows_ = 0;
   allocated_bytes_ = 0;
+  q8_decode_staged_activation_ = nullptr;
+  q8_decode_staged_columns_ = 0;
 }
 
 Status SchedulerWorkspace::create(std::size_t capacity) noexcept {

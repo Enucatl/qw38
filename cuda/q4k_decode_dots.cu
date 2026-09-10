@@ -12,16 +12,16 @@ constexpr std::size_t kValuesPerWeightBlock = 256;
 }  // namespace
 
 cudaError_t launch_quantize_bf16_q8_1(const __nv_bfloat16* activation,
-                                      Q8_1Block* q8, std::size_t columns,
+                                      void* q8, std::size_t columns,
                                       cudaStream_t stream) noexcept {
   if (activation == nullptr || q8 == nullptr || columns == 0 ||
-      columns % kValuesPerWeightBlock != 0) {
+      columns % kWarpSize != 0) {
     return cudaErrorInvalidValue;
   }
   const unsigned int blocks =
       static_cast<unsigned int>((columns + kThreads - 1) / kThreads);
   q4k_dots::quantize_bf16_q8_1<<<blocks, kThreads, 0, stream>>>(
-      activation, q8, columns);
+      activation, static_cast<Q8_1Block*>(q8), columns);
   return cudaPeekAtLastError();
 }
 

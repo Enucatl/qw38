@@ -29,7 +29,7 @@ struct Q8_1Block {
 static_assert(sizeof(Q8_1Block) == 36, "unexpected Q8_1 block padding");
 
 cudaError_t launch_quantize_bf16_q8_1(const __nv_bfloat16* activation,
-                                      Q8_1Block* q8, std::size_t columns,
+                                      void* q8, std::size_t columns,
                                       cudaStream_t stream) noexcept;
 
 #if defined(__CUDACC__) && !defined(QW38_SKIP_Q4K_DOT_KERNELS)

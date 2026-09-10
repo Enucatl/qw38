@@ -113,7 +113,7 @@ are repository-relative unless stated otherwise.
 | OPT-044 | Admit documented production arithmetic and quality budgets | OPT-043 | done | Freeze independent llama-calibrated primitive budgets and held-out model-quality gates before tuning; retain strict reference contracts and exact structural/session invariants; document user-authorized accuracy compromises; production selector remains strict; `claims_performance_improvement: false` | [`tasks/OPT-044.md`](tasks/OPT-044.md); [`pins/production_numerics_contract.json`](pins/production_numerics_contract.json); [`fixtures/opt044_production_numerics.json`](fixtures/opt044_production_numerics.json); [`tests/test_production_numerics.py`](tests/test_production_numerics.py); [`evidence/optimization/opt044-production-numerics/REPORT.md`](evidence/optimization/opt044-production-numerics/REPORT.md); verification 2026-09-10T16:25:35Z |
 | OPT-045 | Parallelize RMSNorm and admitted fused arithmetic | OPT-044 | done | Cooperative residual/head normalization removes serial reductions with production quality, complete component and end-to-end wins, or retained measured rejection | [`tasks/OPT-045.md`](tasks/OPT-045.md); [`pins/opt045_parallel_norm_contract.json`](pins/opt045_parallel_norm_contract.json); [`fixtures/opt045_parallel_norm.json`](fixtures/opt045_parallel_norm.json); [`cuda/opt045_parallel_norm_ab_test.cu`](cuda/opt045_parallel_norm_ab_test.cu); [`cuda/rms_norm.cuh`](cuda/rms_norm.cuh); [`evidence/optimization/opt045-parallel-norm/REPORT.md`](evidence/optimization/opt045-parallel-norm/REPORT.md); verification 2026-09-10T17:35:00Z |
 | OPT-046 | Implement cooperative packed Q4_K decode dots | OPT-044, OPT-045 | done | Packed integer dots, cooperative K reduction and admitted staging improve complete real FFN and D2048 under production quality and cross-workload guards, or retained rejection | [`tasks/OPT-046.md`](tasks/OPT-046.md); [`pins/opt046_q4_decode_contract.json`](pins/opt046_q4_decode_contract.json); [`fixtures/opt046_q4_decode.json`](fixtures/opt046_q4_decode.json); [`cuda/q4k_decode_dots.cu`](cuda/q4k_decode_dots.cu); [`cuda/q4k_decode_path.cuh`](cuda/q4k_decode_path.cuh); [`cuda/opt046_q4_decode_ab_test.cu`](cuda/opt046_q4_decode_ab_test.cu); [`tests/test_opt046_q4_decode.py`](tests/test_opt046_q4_decode.py); [`evidence/optimization/opt046-q4-decode/REPORT.md`](evidence/optimization/opt046-q4-decode/REPORT.md); verification 2026-09-10T19:01:30Z |
-| OPT-047 | Accelerate Q8_0 mixer decode projections | OPT-044, OPT-046 | pending | Shared activation staging and role-specific packed dots improve the complete mixer group and D2048; new activation approximation is documented and quality-tested, or retained rejection | [Task](tasks/OPT-047.md) |
+| OPT-047 | Accelerate Q8_0 mixer decode projections | OPT-044, OPT-046 | done | Shared activation staging and role-specific packed dots improve the complete mixer group and D2048; new activation approximation is documented and quality-tested, or retained rejection | [`tasks/OPT-047.md`](tasks/OPT-047.md); [`pins/opt047_q8_decode_contract.json`](pins/opt047_q8_decode_contract.json); [`fixtures/opt047_q8_decode.json`](fixtures/opt047_q8_decode.json); [`cuda/q8_decode_dots.cu`](cuda/q8_decode_dots.cu); [`cuda/q8_decode_path.cuh`](cuda/q8_decode_path.cuh); [`cuda/opt047_q8_decode_ab_test.cu`](cuda/opt047_q8_decode_ab_test.cu); [`tests/test_opt047_q8_decode.py`](tests/test_opt047_q8_decode.py); [`evidence/optimization/opt047-q8-decode/REPORT.md`](evidence/optimization/opt047-q8-decode/REPORT.md); verification 2026-09-10T19:42:58Z |
 | OPT-048 | Accelerate full Q6_K vocabulary projection | OPT-044, OPT-046 | pending | Full 248320-row logits use admitted packed integer dots with complete output quality and end-to-end decode win, or retained rejection; no vocabulary pruning | [Task](tasks/OPT-048.md) |
 | OPT-049 | Share decode FFN staging and fuse gate/up | OPT-046, OPT-047, OPT-048 | pending | Complete FFN including staging/SwiGLU/down wins with admitted BF16 rounding and graph/eager equivalence, production quality and P/D guards, or retained rejection | [Task](tasks/OPT-049.md) |
 | OPT-050 | Prepare prompt Q normalization and RoPE once | OPT-044, OPT-045 | pending | Prepared queries are reused across attention KV partitions; preparation-inclusive P improves with tail/prefix correctness, quality and memory guards, or retained rejection | [Task](tasks/OPT-050.md) |
@@ -128,8 +128,8 @@ are repository-relative unless stated otherwise.
 
 The [2026-09-10 design](tasks/PERFORMANCE-RECOVERY-2026-09-10.md) compares the
 admitted Quartz, pinned llama.cpp and ds4 paths. It is source analysis and task
-design, not new performance evidence. **Next eligible recovery task: OPT-047**,
-then OPT-048–054 in row
+design, not new performance evidence. **Next eligible recovery task: OPT-048**,
+then OPT-049–054 in row
 order, measured remaining launch work in OPT-055, and the outcome gate OPT-056.
 Dependencies permit independent work but do not authorize subagents. The user
 accepts documented llama.cpp/ds4-like accuracy compromises; strict reference
@@ -5563,3 +5563,40 @@ statements below are historical, not the current execution order.
   stays `blocked`. Next eligible pending by ledger row order: **OPT-047**.
   Tok/s delta **0** (baseline unchanged: P **2130.41**, D128 **28.55**,
   D2048 **27.54** tok/s).
+
+### 2026-09-10T19:42:58Z — OPT-047 delivered (KEEP)
+
+- Independent verification attempt 1 passed. Cooperative DP4A Q8_0×Q8_1
+  mixer decode (`q8_coop_mmv`, shared Q8_1 staging, K distributed across
+  warps per row) was A/B'd against the retained direct_bf16 reference.
+  Exclusive RTX 5090 sitting wrote
+  [`fixtures/opt047_q8_decode.json`](fixtures/opt047_q8_decode.json)
+  (`measurement_utc` 2026-09-10T19:22:46Z; A/B winner `dp4a_w4`
+  weighted complete mixer group **5.44419813** ms vs direct_bf16
+  **10.6800642** ms, ~1.96×; sitting P Quartz **2128.54175**, D128
+  **33.8896103**, D2048 **32.390007** tok/s; `status` measured;
+  `reverted` false; `keep_sitting_skipped` false;
+  `selected_q8_decode_path` dp4a_q8_1; warps skinny/medium/wide **4/4/4**).
+  **Keep:** OPT-044 Q8_1 activation approximation within documented
+  budgets; OPT-045 cross-workload guards pass (P ≥ 95%, D128/D2048 p95
+  ≤ 105%). Production `kSelectedQ8DecodePath` is `dp4a_q8_1`.
+  OPT-046 packed Q4_K unchanged. Coupled IDs: none.
+- Acceptance evidence: [`tasks/OPT-047.md`](tasks/OPT-047.md);
+  [`pins/opt047_q8_decode_contract.json`](pins/opt047_q8_decode_contract.json);
+  [`fixtures/opt047_q8_decode.json`](fixtures/opt047_q8_decode.json);
+  [`cuda/q8_decode_dots.cu`](cuda/q8_decode_dots.cu);
+  [`cuda/q8_decode_dots.cuh`](cuda/q8_decode_dots.cuh);
+  [`cuda/q8_decode_path.cuh`](cuda/q8_decode_path.cuh);
+  [`cuda/opt047_q8_decode_ab_test.cu`](cuda/opt047_q8_decode_ab_test.cu);
+  [`cuda/full_scheduler.cu`](cuda/full_scheduler.cu);
+  [`tests/test_opt047_q8_decode.py`](tests/test_opt047_q8_decode.py);
+  [`evidence/optimization/opt047-q8-decode/REPORT.md`](evidence/optimization/opt047-q8-decode/REPORT.md);
+  [`docs/65-documentation-audit.md`](docs/65-documentation-audit.md).
+  Proof is cooperative DP4A A/B with frozen OPT-044 numerics and OPT-045
+  cross-workload guards, not the 2K llama.cpp parity gate.
+- Marked OPT-047 `done`; delivery is limited to the verified task scope
+  plus this ledger/audit bookkeeping. `plan.md` is unchanged. OPT-016
+  stays `blocked`. Next eligible pending by ledger row order: **OPT-048**.
+  Tok/s delta: P **2130.41** → **2128.54** (−1.87, 0.999×); D128
+  **28.55** → **33.89** (+5.34, 1.19×); D2048 **27.54** → **32.39**
+  (+4.85, 1.18×).
