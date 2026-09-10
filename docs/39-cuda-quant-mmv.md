@@ -146,7 +146,11 @@ activation staging come from the pinned MIT-licensed llama.cpp files recorded in
 decoder instead of importing llama.cpp's generic dispatch system.
 
 CUD-001 proves a real SM120 device can stage BF16 activations and multiply Q4_K
-and Q6_K rows within frozen primitive limits. It does not yet prove prompt MMQ,
+and Q6_K rows within frozen primitive limits. Those 3e-4/2e-4 numbers remain the
+**strict reference** envelope. OPT-044 freezes a separate optimized-production
+budget versus independent FP64 dequant and pinned llama error; production still
+selects the strict path (`kSelectedProductionNumericsPath = strict`). CUD-001
+does not yet prove prompt MMQ,
 full production dimensions, resident model weights, diagnostic model taps,
 GDN/attention layers, 128K memory fit, end-to-end quality, or speed. Those remain
 separate ledger gates.

@@ -120,6 +120,17 @@ Correctness policy:
   first-failing-index, and top-logit differences.
 - Freeze per-tap tolerances during the scalar milestone, before CUDA
   optimization. An optimization cannot loosen the tolerance used to admit it.
+- Two arithmetic roles (OPT-044, user-authorized): a **strict reference** path
+  retains historical kernels and their original contracts; an **optimized
+  production** path may use documented llama.cpp/ds4-comparable approximations
+  (Q8_1 activation quantization, reordered FP32 reductions, explicit FMA, F16
+  MMA operands with FP32 accumulation, individually validated approximate
+  transcendental ops) only after satisfying
+  `pins/production_numerics_contract.json`. Production currently selects the
+  strict path. Unrepresented shapes stay on the strict path. Structural/session
+  exactness, graph-versus-eager equality on the same arithmetic path, and
+  finite-value validation are not accuracy compromises. Do not globally
+  fast-math host code, JSON, or strict reference objects.
 - Exception for Q4_K/Q6_K prompt MMQ (CUD-002 and later MMA quality paths):
   admit production and retained scalar MMQ against a host CPU dequant-weight ×
   BF16→float activation GEMM under the ds4
@@ -254,4 +265,10 @@ Against both eligible llama.cpp and vLLM baselines, v1 requires:
 
 ## Approved Change Notes
 
-None.
+### 2026-09-10 — Strict reference versus optimized production (OPT-044)
+
+The user authorized documented llama.cpp/ds4-comparable production arithmetic.
+`plan.md` now distinguishes a retained **strict reference** role from an
+**optimized production** role. Optimized production is not installed; the
+runtime selector remains `strict` until a later task validates a kernel against
+the frozen OPT-044 contract. This note does not rewrite earlier numeric pins.

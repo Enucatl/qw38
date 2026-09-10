@@ -7,6 +7,8 @@
 #include <cuda_bf16.h>
 #include <cuda_runtime.h>
 
+#include "production_numerics.h"
+
 namespace qw38::cuda {
 
 enum class QuantKind : std::uint8_t { kQ4K, kQ6K, kQ8_0 };

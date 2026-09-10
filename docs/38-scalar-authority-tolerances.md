@@ -226,6 +226,8 @@ all numeric summaries, exact mappings, and greedy margins.
   128K context proof, API test, or performance benchmark.
 - These scalar tolerances do not automatically admit CUDA. Each CUDA primitive
   and fused path must compare at its visible boundaries without loosening them.
+- OPT-044 adds a separate optimized-production budget; it does not loosen these
+  scalar-oracle numbers. Structural exactness remains exact.
 - A high cosine alone cannot excuse excessive absolute or RMS error.
 - The official and GGUF weights are different artifacts; exact floating-point
   equality between them is neither expected nor claimed.

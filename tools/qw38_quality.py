@@ -31,6 +31,22 @@ CASES = (
     "task_sequence",
 )
 
+PRODUCTION_OPTIMIZATION_CASES = (
+    "wikitext_nll",
+    "continuation_2048",
+    "continuation_4096",
+    "recurrence_short",
+    "recurrence_long",
+    "task_arithmetic",
+    "task_python_len",
+    "task_inference",
+    "task_minutes",
+    "task_sort",
+    "task_json",
+    "task_reading",
+    "task_sequence",
+)
+
 
 def sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
@@ -102,6 +118,78 @@ def verdicts(
     )
     verdict["tasks"] = {"pass": task_pass, "count": 8}
     verdict["all"] = all(item["pass"] for key, item in verdict.items() if key != "all")
+    return verdict
+
+
+def production_optimization_verdicts(
+    results: dict[str, ScoreResult],
+    authority: dict[str, Any],
+    inputs: dict[str, Any],
+    contract: dict[str, Any],
+    held_out: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Versioned production-optimization suite; does not overwrite QLT-001."""
+    from tools.production_numerics import (
+        PRODUCTION_PPL_RATIO,
+        RECURRENCE_INCREMENTAL_NLL,
+    )
+
+    verdict: dict[str, Any] = {"suite": "production-optimization"}
+    nll = results["wikitext_nll"]
+    auth_nll = float(authority["cases"]["wikitext_nll"]["mean_nll"])
+    ratio = math.exp(float(nll.record["mean_nll"]) - auth_nll)
+    verdict["wikitext_nll"] = {
+        "pass": len(nll.steps) == 1024
+        and _finite(ratio)
+        and ratio <= PRODUCTION_PPL_RATIO,
+        "ppl_ratio": ratio,
+    }
+    continuation = ("continuation_2048", "continuation_4096")
+    expected = [
+        token
+        for name in continuation
+        for token in authority["cases"][name].get("greedy_tokens", [])
+    ]
+    actual = [token for name in continuation for token in _greedy(results[name])]
+    verdict["continuation"] = {"pass": actual == expected, "positions": len(actual)}
+    short, long = results["recurrence_short"], results["recurrence_long"]
+    short_a, long_a = (
+        authority["cases"]["recurrence_short"],
+        authority["cases"]["recurrence_long"],
+    )
+    drift = (float(long.record["mean_nll"]) - float(long_a["mean_nll"])) - (
+        float(short.record["mean_nll"]) - float(short_a["mean_nll"])
+    )
+    verdict["recurrence"] = {
+        "pass": drift <= RECURRENCE_INCREMENTAL_NLL,
+        "incremental_nll": drift,
+    }
+    task_names = [
+        name for name in PRODUCTION_OPTIMIZATION_CASES if name.startswith("task_")
+    ]
+    task_pass = all(
+        name in results
+        and _greedy(results[name]) == inputs["cases"][name]["continuation"]
+        for name in task_names
+    )
+    verdict["tasks"] = {"pass": task_pass, "count": len(task_names)}
+    if held_out is not None and "held_out_wikitext_1024" in results:
+        held = results["held_out_wikitext_1024"]
+        held_ratio = math.exp(
+            float(held.record["mean_nll"]) - float(held_out["llama_mean_nll"])
+        )
+        verdict["held_out_wikitext_1024"] = {
+            "pass": len(held.steps) == 1024
+            and _finite(held_ratio)
+            and held_ratio <= PRODUCTION_PPL_RATIO,
+            "ppl_ratio": held_ratio,
+        }
+    verdict["legacy_thresholds_unchanged"] = contract["thresholds"]["nll_ppl_ratio"]
+    verdict["all"] = all(
+        item["pass"]
+        for key, item in verdict.items()
+        if isinstance(item, dict) and "pass" in item
+    )
     return verdict
 
 

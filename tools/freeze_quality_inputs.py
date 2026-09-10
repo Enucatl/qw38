@@ -65,6 +65,10 @@ def build_record(dataset: Path, tokenizer_path: Path) -> dict[str, Any]:
     stream = _encode(tokenizer, text)
     if len(stream) < 24576:
         raise ValueError("WikiText stream is too short for frozen offsets")
+    # OPT-044 held-out 1024-target span is recurrence_long.context[1:1025]
+    # (WikiText stream[16385:17409]), disjoint from wikitext_nll stream[1:1025].
+    # Do not add that span to this QLT-001 case map; it lives in the production
+    # numerics fixture so the frozen quality_inputs identity stays unchanged.
     cases: dict[str, dict[str, Any]] = {
         "wikitext_nll": {"context": stream[:1], "continuation": stream[1:1025]}
     }

@@ -528,6 +528,11 @@ int main() {
       run_tiled_gdn() != 0) {
     return 1;
   }
+  std::printf("production_numerics_path=%s optimized_admitted=%s "
+              "strict_reference=retained\n",
+              qw38::cuda::selected_production_numerics_path(),
+              qw38::cuda::production_numerics_optimized_admitted() ? "true"
+                                                                  : "false");
   std::printf("status=passed\n");
   return 0;
 }

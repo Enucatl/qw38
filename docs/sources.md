@@ -901,6 +901,22 @@ baseline.
   unchanged FP32-scale Q8 staging; production dispatch unchanged; accepted keep
   denominators remain unchanged; does not substitute for the 2K llama.cpp parity
   gate; integer-dot is diagnostic only. Envelopes unloosened; Nsight is not used.
+- OPT-044 does not vendor llama.cpp or ds4. It independently reproduces the
+  OPT-042 synthetic identities, measures Quartz Q8 and pinned llama Q8_1 against
+  FP64 dequantized weights, and freezes production family/shape ceilings plus a
+  1.01 production-optimization quality suite. Production still selects
+  `kSelectedProductionNumericsPath = strict`; no unvalidated fast kernel is
+  installed. The contract, fixture, host diagnostic, and report are
+  [`pins/production_numerics_contract.json`](../pins/production_numerics_contract.json),
+  [`fixtures/opt044_production_numerics.json`](../fixtures/opt044_production_numerics.json),
+  [`src/opt044_production_numerics.cpp`](../src/opt044_production_numerics.cpp),
+  and
+  [`evidence/optimization/opt044-production-numerics/REPORT.md`](../evidence/optimization/opt044-production-numerics/REPORT.md).
+  Beginner explanations are [`docs/04-numerics.md`](04-numerics.md) and
+  [`docs/06-system-optimization.md`](06-system-optimization.md).
+  Proof limit: claims no performance improvement; strict reference contracts
+  retained; OPT-042 numeric_reject unchanged; structural/session exactness is
+  not an accuracy compromise.
 - OPT-029 adapts llama.cpp revision
   `cc83d7b4824f73cfdda4dfbb47ee39804f71b328` (MIT, The ggml authors)
   warp-column GDN recurrence from `gated_delta_net.cu` (`S_v=128`,

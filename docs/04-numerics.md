@@ -113,6 +113,41 @@ both semantic authorities at every available boundary, greedy continuations are
 stable, and a save/restore at each tested position produces the uninterrupted
 result. Store fixtures with source hashes and generation commands.
 
+## Strict reference versus optimized production
+
+OPT-044 freezes two arithmetic roles before later kernel tuning.
+
+The **strict reference** path keeps the historical kernels, `--fmad=false` /
+`-ffp-contract=off`, and the original CUD-001/CUD-003, GDN, attention, graph,
+chunk-equivalence, trace, and scalar-oracle contracts. Structural and session
+checks stay exact: token identity, layout round-trips, graph-versus-eager
+equality on the *same* arithmetic path, and checkpoint isolation are not
+accuracy compromises.
+
+**Optimized production** may later use Q8_1 activation quantization, reordered
+FP32 reductions, explicit FMA, F16 MMA operands with FP32 accumulation, and
+individually validated approximate transcendentals (`fmaf`, `rsqrtf`, `__expf`).
+Those approximations are admitted only against
+[`pins/production_numerics_contract.json`](../pins/production_numerics_contract.json).
+Default family/shape abs and RMS ceilings are
+`max(strict_reference_ceiling, 1.05 * measured_llama_error + 1e-6)` versus
+independent FP64 dequantized arithmetic. Cosine uses `1-cosine` with the same
+construction and a `1e-7` floor. Zero-vector pairs use explicit norm/abs checks.
+If llama is nonfinite on a stress case, that shape stays on the strict path;
+ceilings are not inflated from pathological output. Unrepresented shapes stay
+strict until covered. Production dispatch is still the strict path: there is no
+unvalidated fast kernel.
+
+End-to-end production-optimization quality uses the existing WikiText/tokenizer
+pins, a 1.01 perplexity ratio versus pinned llama (stricter than the legacy 1.05
+QLT-001 gate), 0.02 recurrence NLL drift, functional answers, and a held-out
+1024-target span disjoint from calibration. Legacy QLT-001 verdicts stay
+alongside the new suite.
+
+Evidence: [`fixtures/opt044_production_numerics.json`](../fixtures/opt044_production_numerics.json)
+and [`evidence/optimization/opt044-production-numerics/REPORT.md`](../evidence/optimization/opt044-production-numerics/REPORT.md).
+This increment **claims no performance improvement**.
+
 ## Common failures
 
 - Comparing logits only, or loosening tolerance until a structural bug passes.

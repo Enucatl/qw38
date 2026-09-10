@@ -1,0 +1,1043 @@
+{
+  "schema": "qw38.production-numerics-contract",
+  "schema_version": 1,
+  "task": "OPT-044",
+  "claims_performance_improvement": false,
+  "llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+  "gguf_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+  "dataset_sha256": "5f1bea067869d04849c0f975a2b29c4ff47d867f484f5010ea5e861eab246d91",
+  "tokenizer_sha256": "0997f410c57a1f4e53b09e4be8f4a172d90edd9564368fb0847030937229b9f3",
+  "roles": {
+    "strict_reference": {
+      "purpose": "retained historical kernels and original numeric contracts",
+      "compiler": "Makefile NVCCFLAGS --fmad=false; host -ffp-contract=off",
+      "dispatch": "kSelectedProductionNumericsPath=strict"
+    },
+    "optimized_production": {
+      "purpose": "future llama.cpp/ds4-comparable approximations after per-family validation",
+      "admitted": false,
+      "permitted": [
+        "Q8_1 activation quantization",
+        "reordered FP32 reductions",
+        "explicit FMA / fmaf",
+        "F16 MMA operands with FP32 accumulation",
+        "individually validated approximate transcendental ops (rsqrtf, __expf)"
+      ]
+    }
+  },
+  "path_selection": {
+    "selected": "strict",
+    "legal": [
+      "strict",
+      "optimized"
+    ],
+    "optimized_admitted": false,
+    "unrepresented_shapes": "strict",
+    "diagnostics_may_select_either": true
+  },
+  "strict_reference_ceilings": {
+    "cud001_maximum_absolute_error": 0.0003,
+    "cud001_maximum_rms_error": 0.0002,
+    "one_minus_cosine_floor": 1e-07
+  },
+  "budget_rule": {
+    "abs_rms": "max(strict_reference_ceiling, 1.05 * measured_llama_error + 1e-6)",
+    "one_minus_cosine": "same construction with a 1e-7 floor",
+    "zero_vector": "explicit_norm_and_abs",
+    "nonfinite_or_pathological_llama": "retain_strict_do_not_inflate",
+    "do_not_adjust_after_candidate_failure": true
+  },
+  "storage": {
+    "residual_gdn_logits": "FP32",
+    "persistent_activation_kv": "BF16"
+  },
+  "families": {
+    "q4_k_17x256": {
+      "family": "q4_k",
+      "rows": 17,
+      "columns": 256,
+      "activation_source": "unit_normal",
+      "checksums": {
+        "weights": "c3e5a77701dfbaa8bab304ed8302d2701d9e17dc295da519a1f0fd9fde168761",
+        "activation": "f998029ad7dfe28151bc58089b33245f51452fe036701a71b7be7011ce1bf922",
+        "weights_bytes": 2448,
+        "activation_bytes": 512
+      },
+      "vs_fp64_original_bf16": {
+        "abs": {
+          "ceiling": 0.9217890416500001,
+          "source": "max(strict, 1.05*llama + 1e-6)",
+          "path": "optimized_eligible",
+          "llama_error": 0.877893373,
+          "nonfinite": 0
+        },
+        "rms": {
+          "ceiling": 0.37974584484999996,
+          "source": "max(strict, 1.05*llama + 1e-6)",
+          "path": "optimized_eligible",
+          "llama_error": 0.361661757,
+          "nonfinite": 0
+        },
+        "one_minus_cosine": {
+          "ceiling": 1.1525122090000001e-05,
+          "source": "max(strict, 1.05*llama + 1e-6)",
+          "path": "optimized_eligible",
+          "llama_error": 1.00239258e-05,
+          "nonfinite": 0
+        }
+      },
+      "vs_fp64_staged_activation": {
+        "abs": {
+          "ceiling": 0.0003,
+          "source": "max(strict, 1.05*llama + 1e-6)",
+          "path": "optimized_eligible",
+          "llama_error": 0.0,
+          "nonfinite": 0
+        },
+        "rms": {
+          "ceiling": 0.0002,
+          "source": "max(strict, 1.05*llama + 1e-6)",
+          "path": "optimized_eligible",
+          "llama_error": 0.0,
+          "nonfinite": 0
+        },
+        "one_minus_cosine": {
+          "ceiling": 1e-06,
+          "source": "max(strict, 1.05*llama + 1e-6)",
+          "path": "optimized_eligible",
+          "llama_error": 0.0,
+          "nonfinite": 0
+        }
+      },
+      "existing_strict_staged_miss": false,
+      "production_dispatch": "strict",
+      "nonfinite": 0,
+      "pathological_llama": false
+    },
+    "q4_k_257x512": {
+      "family": "q4_k",
+      "rows": 257,
+      "columns": 512,
+      "activation_source": "unit_normal",
+      "checksums": {
+        "weights": "5fbb816a047bdcf4123e843fd315ce8b9ffcf665de69ad0dae60149c96989156",
+        "activation": "62d5e16ca47ca3a67668b20166eea413542d2b082095974c0e9c8098ef287e7d",
+        "weights_bytes": 74016,
+        "activation_bytes": 1024
+      },
+      "vs_fp64_original_bf16": {
+        "abs": {
+          "ceiling": 0.9987166826500001,
+          "source": "max(strict, 1.05*llama + 1e-6)",
+          "path": "optimized_eligible",
+          "llama_error": 0.951157793,
+          "nonfinite": 0
+        },
+        "rms": {
+          "ceiling": 0.5239516867,
+          "source": "max(strict, 1.05*llama + 1e-6)",
+          "path": "optimized_eligible",
+          "llama_error": 0.499000654,
+          "nonfinite": 0
+        },
+        "one_minus_cosine": {
+          "ceiling": 2.4647783425000003e-05,
+          "source": "max(strict, 1.05*llama + 1e-6)",
+          "path": "optimized_eligible",
+          "llama_error": 2.25216985e-05,
+          "nonfinite": 0
+        }
+      },
+      "vs_fp64_staged_activation": {
+        "abs": {
+          "ceiling": 0.0003,
+          "source": "max(strict, 1.05*llama + 1e-6)",
+          "path": "optimized_eligible",
+          "llama_error": 0.0,
+          "nonfinite": 0
+        },
+        "rms": {
+          "ceiling": 0.0002,
+          "source": "max(strict, 1.05*llama + 1e-6)",
+          "path": "optimized_eligible",
+          "llama_error": 0.0,
+          "nonfinite": 0
+        },
+        "one_minus_cosine": {
+          "ceiling": 1.0000000002331468e-06,
+          "source": "max(strict, 1.05*llama + 1e-6)",
+          "path": "optimized_eligible",
+          "llama_error": 2.22044605e-16,
+          "nonfinite": 0
+        }
+      },
+      "existing_strict_staged_miss": false,
+      "production_dispatch": "strict",
+      "nonfinite": 0,
+      "pathological_llama": false
+    },
+    "q4k_gate_up": {
+      "family": "q4_k",
+      "rows": 17408,
+      "columns": 5120,
+      "activation_source": "unit_normal",
+      "checksums": {
+        "weights": "c8fcd0a56e495f5801b60b3be7380a6752e360c394318addf699cf87f0132c00",
+        "activation": "b53d734634448578199ff253879b9c0094ccf0345b7ae1dba85e8e333ac417a6",
+        "weights_bytes": 50135040,
+        "activation_bytes": 10240
+      },
+      "vs_fp64_original_bf16": {
+        "abs": {
+          "ceiling": 3.2748804085,
+          "source": "max(strict, 1.05*llama + 1e-6)",
+          "path": "optimized_eligible",
+          "llama_error": 3.11893277,
+          "nonfinite": 0
+        },
+        "rms": {
+          "ceiling": 1.8179482885,
+          "source": "max(strict, 1.05*llama + 1e-6)",
+          "path": "optimized_eligible",
+          "llama_error": 1.73137837,
+          "nonfinite": 0
+        },
+        "one_minus_cosine": {
+          "ceiling": 1.9707152065000003e-05,
+          "source": "max(strict, 1.05*llama + 1e-6)",
+          "path": "optimized_eligible",
+          "llama_error": 1.78163353e-05,
+          "nonfinite": 0
+        }
+      },
+      "vs_fp64_staged_activation": {
+        "abs": {
+          "ceiling": 0.0003,
+          "source": "max(strict, 1.05*llama + 1e-6)",
+          "path": "optimized_eligible",
+          "llama_error": 0.0,
+          "nonfinite": 0
+        },
+        "rms": {
+          "ceiling": 0.0002,
+          "source": "max(strict, 1.05*llama + 1e-6)",
+          "path": "optimized_eligible",
+          "llama_error": 0.0,
+          "nonfinite": 0
+        },
+        "one_minus_cosine": {
+          "ceiling": 1e-06,
+          "source": "max(strict, 1.05*llama + 1e-6)",
+          "path": "optimized_eligible",
+          "llama_error": 0.0,
+          "nonfinite": 0
+        }
+      },
+      "existing_strict_staged_miss": true,
+      "production_dispatch": "strict",
+      "nonfinite": 0,
+      "pathological_llama": false
+    },
+    "q4k_down": {
+      "family": "q4_k",
+      "rows": 5120,
+      "columns": 17408,
+      "activation_source": "unit_normal",
+      "checksums": {
+        "weights": "c8fcd0a56e495f5801b60b3be7380a6752e360c394318addf699cf87f0132c00",
+        "activation": "89e1ea294627b26e33d453a50f365fde76fc1950c001f8c40cf716974346f31c",
+        "weights_bytes": 50135040,
+        "activation_bytes": 34816
+      },
+      "vs_fp64_original_bf16": {
+        "abs": {
+          "ceiling": 3.1386423835000006,
+          "source": "max(strict, 1.05*llama + 1e-6)",
+          "path": "optimized_eligible",
+          "llama_error": 2.98918227,
+          "nonfinite": 0
+        },
+        "rms": {
+          "ceiling": 1.8447607735,
+          "source": "max(strict, 1.05*llama + 1e-6)",
+          "path": "optimized_eligible",
+          "llama_error": 1.75691407,
+          "nonfinite": 0
+        },
+        "one_minus_cosine": {
+          "ceiling": 5.472664756e-06,
+          "source": "max(strict, 1.05*llama + 1e-6)",
+          "path": "optimized_eligible",
+          "llama_error": 4.25968072e-06,
+          "nonfinite": 0
+        }
+      },
+      "vs_fp64_staged_activation": {
+        "abs": {
+          "ceiling": 0.0003,
+          "source": "max(strict, 1.05*llama + 1e-6)",
+          "path": "optimized_eligible",
+          "llama_error": 0.0,
+          "nonfinite": 0
+        },
+        "rms": {
+          "ceiling": 0.0002,
+          "source": "max(strict, 1.05*llama + 1e-6)",
+          "path": "optimized_eligible",
+          "llama_error": 0.0,
+          "nonfinite": 0
+        },
+        "one_minus_cosine": {
+          "ceiling": 1e-06,
+          "source": "max(strict, 1.05*llama + 1e-6)",
+          "path": "optimized_eligible",
+          "llama_error": 0.0,
+          "nonfinite": 0
+        }
+      },
+      "existing_strict_staged_miss": true,
+      "production_dispatch": "strict",
+      "nonfinite": 0,
+      "pathological_llama": false
+    },
+    "q4_k_17x256_zero": {
+      "family": "q4_k",
+      "rows": 17,
+      "columns": 256,
+      "activation_source": "zero",
+      "checksums": {
+        "weights": "c3e5a77701dfbaa8bab304ed8302d2701d9e17dc295da519a1f0fd9fde168761",
+        "activation": "076a27c79e5ace2a3d47f9dd2e83e4ff6ea8872b3c2218f66c92b89b55f36560",
+        "weights_bytes": 2448,
+        "activation_bytes": 512
+      },
+      "vs_fp64_original_bf16": {
+        "abs": {
+          "ceiling": 0.0003,
+          "source": "max(strict, 1.05*llama + 1e-6)",
+          "path": "optimized_eligible",
+          "llama_error": 0.0,
+          "nonfinite": 0
+        },
+        "rms": {
+          "ceiling": 0.0002,
+          "source": "max(strict, 1.05*llama + 1e-6)",
+          "path": "optimized_eligible",
+          "llama_error": 0.0,
+          "nonfinite": 0
+        },
+        "one_minus_cosine": {
+          "ceiling": 1.050001,
+          "source": "max(strict, 1.05*llama + 1e-6)",
+          "path": "strict",
+          "llama_error": 1.0,
+          "nonfinite": 0
+        },
+        "zero_vector": {
+          "rule": "explicit_norm_and_abs",
+          "abs_ok": true,
+          "candidate_norm": 0,
+          "reference_norm": 0,
+          "cosine_not_used": true
+        }
+      },
+      "vs_fp64_staged_activation": {
+        "abs": {
+          "ceiling": 0.0003,
+          "source": "max(strict, 1.05*llama + 1e-6)",
+          "path": "optimized_eligible",
+          "llama_error": 0.0,
+          "nonfinite": 0
+        },
+        "rms": {
+          "ceiling": 0.0002,
+          "source": "max(strict, 1.05*llama + 1e-6)",
+          "path": "optimized_eligible",
+          "llama_error": 0.0,
+          "nonfinite": 0
+        },
+        "one_minus_cosine": {
+          "ceiling": 1.050001,
+          "source": "max(strict, 1.05*llama + 1e-6)",
+          "path": "strict",
+          "llama_error": 1.0,
+          "nonfinite": 0
+        },
+        "zero_vector": {
+          "rule": "explicit_norm_and_abs",
+          "abs_ok": true,
+          "candidate_norm": 0,
+          "reference_norm": 0,
+          "cosine_not_used": true
+        }
+      },
+      "existing_strict_staged_miss": false,
+      "production_dispatch": "strict",
+      "nonfinite": 0,
+      "pathological_llama": false
+    },
+    "q4_k_17x256_alternating": {
+      "family": "q4_k",
+      "rows": 17,
+      "columns": 256,
+      "activation_source": "alternating",
+      "checksums": {
+        "weights": "c3e5a77701dfbaa8bab304ed8302d2701d9e17dc295da519a1f0fd9fde168761",
+        "activation": "21ad16a429389a8a3bde923e8c88255d5e12fb38becb3ca690d3491dbbbc7ccd",
+        "weights_bytes": 2448,
+        "activation_bytes": 512
+      },
+      "vs_fp64_original_bf16": {
+        "abs": {
+          "ceiling": 0.0029409871795000003,
+          "source": "max(strict, 1.05*llama + 1e-6)",
+          "path": "optimized_eligible",
+          "llama_error": 0.00279998779,
+          "nonfinite": 0
+        },
+        "rms": {
+          "ceiling": 0.0021984424885000005,
+          "source": "max(strict, 1.05*llama + 1e-6)",
+          "path": "optimized_eligible",
+          "llama_error": 0.00209280237,
+          "nonfinite": 0
+        },
+        "one_minus_cosine": {
+          "ceiling": 1e-06,
+          "source": "max(strict, 1.05*llama + 1e-6)",
+          "path": "optimized_eligible",
+          "llama_error": 0.0,
+          "nonfinite": 0
+        }
+      },
+      "vs_fp64_staged_activation": {
+        "abs": {
+          "ceiling": 0.0003,
+          "source": "max(strict, 1.05*llama + 1e-6)",
+          "path": "optimized_eligible",
+          "llama_error": 0.0,
+          "nonfinite": 0
+        },
+        "rms": {
+          "ceiling": 0.0002,
+          "source": "max(strict, 1.05*llama + 1e-6)",
+          "path": "optimized_eligible",
+          "llama_error": 0.0,
+          "nonfinite": 0
+        },
+        "one_minus_cosine": {
+          "ceiling": 1e-06,
+          "source": "max(strict, 1.05*llama + 1e-6)",
+          "path": "optimized_eligible",
+          "llama_error": 0.0,
+          "nonfinite": 0
+        }
+      },
+      "existing_strict_staged_miss": false,
+      "production_dispatch": "strict",
+      "nonfinite": 0,
+      "pathological_llama": false
+    },
+    "q4_k_17x256_cancellation": {
+      "family": "q4_k",
+      "rows": 17,
+      "columns": 256,
+      "activation_source": "cancellation",
+      "checksums": {
+        "weights": "c3e5a77701dfbaa8bab304ed8302d2701d9e17dc295da519a1f0fd9fde168761",
+        "activation": "756b14dfe8150ab42e4ba3f40060aa70f2ee1dcad562c4e91dd1f671fef50d70",
+        "weights_bytes": 2448,
+        "activation_bytes": 512
+      },
+      "vs_fp64_original_bf16": {
+        "abs": {
+          "ceiling": 3.0105478750000003,
+          "source": "max(strict, 1.05*llama + 1e-6)",
+          "path": "optimized_eligible",
+          "llama_error": 2.8671875,
+          "nonfinite": 0
+        },
+        "rms": {
+          "ceiling": 2.2501821010000005,
+          "source": "max(strict, 1.05*llama + 1e-6)",
+          "path": "optimized_eligible",
+          "llama_error": 2.14302962,
+          "nonfinite": 0
+        },
+        "one_minus_cosine": {
+          "ceiling": 1e-06,
+          "source": "max(strict, 1.05*llama + 1e-6)",
+          "path": "optimized_eligible",
+          "llama_error": 0.0,
+          "nonfinite": 0
+        }
+      },
+      "vs_fp64_staged_activation": {
+        "abs": {
+          "ceiling": 0.0003,
+          "source": "max(strict, 1.05*llama + 1e-6)",
+          "path": "optimized_eligible",
+          "llama_error": 0.0,
+          "nonfinite": 0
+        },
+        "rms": {
+          "ceiling": 0.0002,
+          "source": "max(strict, 1.05*llama + 1e-6)",
+          "path": "optimized_eligible",
+          "llama_error": 0.0,
+          "nonfinite": 0
+        },
+        "one_minus_cosine": {
+          "ceiling": 1e-06,
+          "source": "max(strict, 1.05*llama + 1e-6)",
+          "path": "optimized_eligible",
+          "llama_error": 0.0,
+          "nonfinite": 0
+        }
+      },
+      "existing_strict_staged_miss": false,
+      "production_dispatch": "strict",
+      "nonfinite": 0,
+      "pathological_llama": false
+    },
+    "q4_k_17x256_extremes": {
+      "family": "q4_k",
+      "rows": 17,
+      "columns": 256,
+      "activation_source": "extremes",
+      "checksums": {
+        "weights": "c3e5a77701dfbaa8bab304ed8302d2701d9e17dc295da519a1f0fd9fde168761",
+        "activation": "f3d62021a74b93379f1f38dafe1fba90e3608ec87750e93cfec1503afdc7a8a5",
+        "weights_bytes": 2448,
+        "activation_bytes": 512
+      },
+      "vs_fp64_original_bf16": {
+        "abs": {
+          "ceiling": 0.13809436660000002,
+          "source": "max(strict, 1.05*llama + 1e-6)",
+          "path": "optimized_eligible",
+          "llama_error": 0.131517492,
+          "nonfinite": 0
+        },
+        "rms": {
+          "ceiling": 0.081394465825,
+          "source": "max(strict, 1.05*llama + 1e-6)",
+          "path": "optimized_eligible",
+          "llama_error": 0.0775175865,
+          "nonfinite": 0
+        },
+        "one_minus_cosine": {
+          "ceiling": 1.0000000222655228e-06,
+          "source": "max(strict, 1.05*llama + 1e-6)",
+          "path": "optimized_eligible",
+          "llama_error": 2.12052598e-14,
+          "nonfinite": 0
+        }
+      },
+      "vs_fp64_staged_activation": {
+        "abs": {
+          "ceiling": 0.0003,
+          "source": "max(strict, 1.05*llama + 1e-6)",
+          "path": "optimized_eligible",
+          "llama_error": 0.0,
+          "nonfinite": 0
+        },
+        "rms": {
+          "ceiling": 0.0002,
+          "source": "max(strict, 1.05*llama + 1e-6)",
+          "path": "optimized_eligible",
+          "llama_error": 0.0,
+          "nonfinite": 0
+        },
+        "one_minus_cosine": {
+          "ceiling": 1.0000000001165733e-06,
+          "source": "max(strict, 1.05*llama + 1e-6)",
+          "path": "optimized_eligible",
+          "llama_error": 1.11022302e-16,
+          "nonfinite": 0
+        }
+      },
+      "existing_strict_staged_miss": false,
+      "production_dispatch": "strict",
+      "nonfinite": 0,
+      "pathological_llama": false
+    },
+    "q4_k_17x256_small": {
+      "family": "q4_k",
+      "rows": 17,
+      "columns": 256,
+      "activation_source": "small",
+      "checksums": {
+        "weights": "c3e5a77701dfbaa8bab304ed8302d2701d9e17dc295da519a1f0fd9fde168761",
+        "activation": "aa5d224d40803a18a4e2c286e18818f1752213ec6db6739ee8d464ff7c03b316",
+        "weights_bytes": 2448,
+        "activation_bytes": 512
+      },
+      "vs_fp64_original_bf16": {
+        "abs": {
+          "ceiling": 0.0003,
+          "source": "max(strict, 1.05*llama + 1e-6)",
+          "path": "optimized_eligible",
+          "llama_error": 7.92965293e-05,
+          "nonfinite": 0
+        },
+        "rms": {
+          "ceiling": 0.0002,
+          "source": "max(strict, 1.05*llama + 1e-6)",
+          "path": "optimized_eligible",
+          "llama_error": 5.9268817e-05,
+          "nonfinite": 0
+        },
+        "one_minus_cosine": {
+          "ceiling": 1e-06,
+          "source": "max(strict, 1.05*llama + 1e-6)",
+          "path": "optimized_eligible",
+          "llama_error": 0.0,
+          "nonfinite": 0
+        }
+      },
+      "vs_fp64_staged_activation": {
+        "abs": {
+          "ceiling": 0.0003,
+          "source": "max(strict, 1.05*llama + 1e-6)",
+          "path": "optimized_eligible",
+          "llama_error": 0.0,
+          "nonfinite": 0
+        },
+        "rms": {
+          "ceiling": 0.0002,
+          "source": "max(strict, 1.05*llama + 1e-6)",
+          "path": "optimized_eligible",
+          "llama_error": 0.0,
+          "nonfinite": 0
+        },
+        "one_minus_cosine": {
+          "ceiling": 1e-06,
+          "source": "max(strict, 1.05*llama + 1e-6)",
+          "path": "optimized_eligible",
+          "llama_error": 0.0,
+          "nonfinite": 0
+        }
+      },
+      "existing_strict_staged_miss": false,
+      "production_dispatch": "strict",
+      "nonfinite": 0,
+      "pathological_llama": false
+    },
+    "q6_k_17x256": {
+      "family": "q6_k",
+      "rows": 17,
+      "columns": 256,
+      "activation_source": "unit_normal",
+      "checksums": {
+        "weights": "5f116755eadf04e9783541599dbe276cb871dcfae0d5c7e37db63754ad26500c",
+        "activation": "f998029ad7dfe28151bc58089b33245f51452fe036701a71b7be7011ce1bf922",
+        "weights_bytes": 3570,
+        "activation_bytes": 512
+      },
+      "vs_fp64_original_bf16": {
+        "abs": {
+          "ceiling": 3224637.5280009997,
+          "source": "max(strict, 1.05*llama + 1e-6)",
+          "path": "optimized_eligible",
+          "llama_error": 3071083.36,
+          "nonfinite": 0
+        },
+        "rms": {
+          "ceiling": 783499.381351,
+          "source": "max(strict, 1.05*llama + 1e-6)",
+          "path": "optimized_eligible",
+          "llama_error": 746189.887,
+          "nonfinite": 0
+        },
+        "one_minus_cosine": {
+          "ceiling": 1.30230430615e-06,
+          "source": "max(strict, 1.05*llama + 1e-6)",
+          "path": "optimized_eligible",
+          "llama_error": 2.87908863e-07,
+          "nonfinite": 0
+        }
+      },
+      "vs_fp64_staged_activation": {
+        "abs": {
+          "ceiling": 0.0003,
+          "source": "max(strict, 1.05*llama + 1e-6)",
+          "path": "optimized_eligible",
+          "llama_error": 0.0,
+          "nonfinite": 0
+        },
+        "rms": {
+          "ceiling": 0.0002,
+          "source": "max(strict, 1.05*llama + 1e-6)",
+          "path": "optimized_eligible",
+          "llama_error": 0.0,
+          "nonfinite": 0
+        },
+        "one_minus_cosine": {
+          "ceiling": 1.0000000001165733e-06,
+          "source": "max(strict, 1.05*llama + 1e-6)",
+          "path": "optimized_eligible",
+          "llama_error": 1.11022302e-16,
+          "nonfinite": 0
+        }
+      },
+      "existing_strict_staged_miss": true,
+      "production_dispatch": "strict",
+      "nonfinite": 0,
+      "pathological_llama": false
+    },
+    "q6_k_257x512": {
+      "family": "q6_k",
+      "rows": 257,
+      "columns": 512,
+      "activation_source": "unit_normal",
+      "checksums": {
+        "weights": "ffd8f9a4e8991b9052e8d4472cf43fc85f207cb10b91dee52798e890f68f3ac0",
+        "activation": "62d5e16ca47ca3a67668b20166eea413542d2b082095974c0e9c8098ef287e7d",
+        "weights_bytes": 107940,
+        "activation_bytes": 1024
+      },
+      "vs_fp64_original_bf16": {
+        "abs": {
+          "ceiling": 0.0003,
+          "source": "strict_reference",
+          "path": "strict",
+          "llama_error": 5044445.26,
+          "nonfinite": 16
+        },
+        "rms": {
+          "ceiling": 0.0002,
+          "source": "strict_reference",
+          "path": "strict",
+          "llama_error": 1088826.5,
+          "nonfinite": 16
+        },
+        "one_minus_cosine": {
+          "ceiling": 1e-07,
+          "source": "strict_reference",
+          "path": "strict",
+          "llama_error": 6.59138413e-06,
+          "nonfinite": 16
+        }
+      },
+      "vs_fp64_staged_activation": {
+        "abs": {
+          "ceiling": 0.0003,
+          "source": "strict_reference",
+          "path": "strict",
+          "llama_error": 0,
+          "nonfinite": 16
+        },
+        "rms": {
+          "ceiling": 0.0002,
+          "source": "strict_reference",
+          "path": "strict",
+          "llama_error": 0,
+          "nonfinite": 16
+        },
+        "one_minus_cosine": {
+          "ceiling": 1e-07,
+          "source": "strict_reference",
+          "path": "strict",
+          "llama_error": 2.22044605e-16,
+          "nonfinite": 16
+        }
+      },
+      "existing_strict_staged_miss": true,
+      "production_dispatch": "strict",
+      "nonfinite": 16,
+      "pathological_llama": true
+    },
+    "q8_0_17x256": {
+      "family": "q8_0",
+      "rows": 17,
+      "columns": 256,
+      "activation_source": "unit_normal",
+      "checksums": {
+        "weights": "7d7867b33e7c1d36b4c8f6fbe04f38a00305b07f7956bd198ced5493617fd58f",
+        "activation": "f998029ad7dfe28151bc58089b33245f51452fe036701a71b7be7011ce1bf922",
+        "weights_bytes": 4624,
+        "activation_bytes": 512
+      },
+      "vs_fp64_original_bf16": {
+        "abs": {
+          "ceiling": 8.822089429,
+          "source": "max(strict, 1.05*llama + 1e-6)",
+          "path": "optimized_eligible",
+          "llama_error": 8.40198898,
+          "nonfinite": 0
+        },
+        "rms": {
+          "ceiling": 4.6501625335000005,
+          "source": "max(strict, 1.05*llama + 1e-6)",
+          "path": "optimized_eligible",
+          "llama_error": 4.42872527,
+          "nonfinite": 0
+        },
+        "one_minus_cosine": {
+          "ceiling": 4.837330126e-06,
+          "source": "max(strict, 1.05*llama + 1e-6)",
+          "path": "optimized_eligible",
+          "llama_error": 3.65460012e-06,
+          "nonfinite": 0
+        }
+      },
+      "vs_fp64_staged_activation": {
+        "abs": {
+          "ceiling": 0.0003,
+          "source": "max(strict, 1.05*llama + 1e-6)",
+          "path": "optimized_eligible",
+          "llama_error": 0.0,
+          "nonfinite": 0
+        },
+        "rms": {
+          "ceiling": 0.0002,
+          "source": "max(strict, 1.05*llama + 1e-6)",
+          "path": "optimized_eligible",
+          "llama_error": 0.0,
+          "nonfinite": 0
+        },
+        "one_minus_cosine": {
+          "ceiling": 1e-06,
+          "source": "max(strict, 1.05*llama + 1e-6)",
+          "path": "optimized_eligible",
+          "llama_error": 0.0,
+          "nonfinite": 0
+        }
+      },
+      "existing_strict_staged_miss": true,
+      "production_dispatch": "strict",
+      "nonfinite": 0,
+      "pathological_llama": false
+    },
+    "q8_0_257x512": {
+      "family": "q8_0",
+      "rows": 257,
+      "columns": 512,
+      "activation_source": "unit_normal",
+      "checksums": {
+        "weights": "1fc425494d5a87a82b0b8f299b22b635c295e6587f7d2f14c1842a7ffa425bc5",
+        "activation": "62d5e16ca47ca3a67668b20166eea413542d2b082095974c0e9c8098ef287e7d",
+        "weights_bytes": 139808,
+        "activation_bytes": 1024
+      },
+      "vs_fp64_original_bf16": {
+        "abs": {
+          "ceiling": 18.6608887,
+          "source": "max(strict, 1.05*llama + 1e-6)",
+          "path": "optimized_eligible",
+          "llama_error": 17.772274,
+          "nonfinite": 0
+        },
+        "rms": {
+          "ceiling": 8.139086730999999,
+          "source": "max(strict, 1.05*llama + 1e-6)",
+          "path": "optimized_eligible",
+          "llama_error": 7.75151022,
+          "nonfinite": 0
+        },
+        "one_minus_cosine": {
+          "ceiling": 8.571427969e-06,
+          "source": "max(strict, 1.05*llama + 1e-6)",
+          "path": "optimized_eligible",
+          "llama_error": 7.21088378e-06,
+          "nonfinite": 0
+        }
+      },
+      "vs_fp64_staged_activation": {
+        "abs": {
+          "ceiling": 0.0003,
+          "source": "max(strict, 1.05*llama + 1e-6)",
+          "path": "optimized_eligible",
+          "llama_error": 0.0,
+          "nonfinite": 0
+        },
+        "rms": {
+          "ceiling": 0.0002,
+          "source": "max(strict, 1.05*llama + 1e-6)",
+          "path": "optimized_eligible",
+          "llama_error": 0.0,
+          "nonfinite": 0
+        },
+        "one_minus_cosine": {
+          "ceiling": 1.0000000001165733e-06,
+          "source": "max(strict, 1.05*llama + 1e-6)",
+          "path": "optimized_eligible",
+          "llama_error": 1.11022302e-16,
+          "nonfinite": 0
+        }
+      },
+      "existing_strict_staged_miss": true,
+      "production_dispatch": "strict",
+      "nonfinite": 0,
+      "pathological_llama": false
+    }
+  },
+  "gate_inventory": [
+    {
+      "gate": "CUD-001",
+      "class": "retained-reference-arithmetic",
+      "notes": "Original 3e-4/2e-4 envelope stays on the strict MMV reference; production optimized kernels use this contract."
+    },
+    {
+      "gate": "CUD-003",
+      "class": "retained-reference-arithmetic",
+      "notes": "Q8_0 MMV and pointwise numeric envelopes remain strict-reference; embedding/layout exactness is structural."
+    },
+    {
+      "gate": "CUD-003-embedding-layout-gdn-map",
+      "class": "structural-exactness",
+      "notes": "BF16 embedding equality, attention split, and GDN tiled/grouped maps stay bit-exact."
+    },
+    {
+      "gate": "GDN-001",
+      "class": "retained-reference-arithmetic",
+      "notes": "Strict GDN step numeric envelope plus structural prepare/commit isolation."
+    },
+    {
+      "gate": "GDN-001-commit",
+      "class": "structural-exactness",
+      "notes": "Candidate/commit isolation and frontier publication remain exact."
+    },
+    {
+      "gate": "GDN-002",
+      "class": "retained-reference-arithmetic",
+      "notes": "Chunked GDN numeric envelope vs sequential reference."
+    },
+    {
+      "gate": "GDN-002-chunk-equivalence",
+      "class": "structural-exactness",
+      "notes": "Chunk vs repeated-token CUDA equality stays exact."
+    },
+    {
+      "gate": "ATN-001",
+      "class": "retained-reference-arithmetic",
+      "notes": "Decode attention numeric envelope vs scalar/BF16-aware references."
+    },
+    {
+      "gate": "ATN-001-commit",
+      "class": "structural-exactness",
+      "notes": "Candidate KV bytes and committed-row isolation stay exact."
+    },
+    {
+      "gate": "ATN-002",
+      "class": "retained-reference-arithmetic",
+      "notes": "Prefill attention numeric envelope vs tiled reference."
+    },
+    {
+      "gate": "ATN-002-chunk-equivalence",
+      "class": "structural-exactness",
+      "notes": "Token-wise vs chunked attention commit equality stays exact."
+    },
+    {
+      "gate": "OPT-003-graph",
+      "class": "structural-exactness",
+      "notes": "Graph vs eager equality is same-arithmetic-path only."
+    },
+    {
+      "gate": "SES-001-prefix",
+      "class": "structural-exactness",
+      "notes": "Token identity, prefix reuse, and checkpoint round-trips stay exact."
+    },
+    {
+      "gate": "TRC-004",
+      "class": "retained-reference-arithmetic",
+      "notes": "CUDA diagnostic taps use frozen scalar tolerances; identities stay exact."
+    },
+    {
+      "gate": "ORA-004",
+      "class": "retained-reference-arithmetic",
+      "notes": "Scalar-oracle tolerances remain frozen pre-CUDA reference contracts."
+    },
+    {
+      "gate": "QLT-001",
+      "class": "end-to-end-quality",
+      "notes": "Legacy 1.05 PPL suite is retained; production-optimization uses 1.01."
+    },
+    {
+      "gate": "OPT-044-primitive",
+      "class": "production-primitive-quality",
+      "notes": "Family/shape ceilings vs FP64 dequant and pinned llama error."
+    },
+    {
+      "gate": "OPT-044-e2e",
+      "class": "end-to-end-quality",
+      "notes": "Production-optimization suite: 1.01 PPL, 0.02 recurrence drift, functional answers."
+    }
+  ],
+  "permitted_production_approximations": [
+    "Q8_1 activation quantization",
+    "reordered FP32 reductions",
+    "explicit FMA / fmaf",
+    "F16 MMA operands with FP32 accumulation",
+    "individually validated approximate transcendental ops (rsqrtf, __expf)"
+  ],
+  "forbidden": [
+    "global host or JSON fast-math",
+    "fast-math on strict reference objects",
+    "sparse attention",
+    "weight requantization",
+    "reduced vocabulary",
+    "speculative decoding",
+    "unvalidated fast kernel in production"
+  ],
+  "quality_suite": {
+    "name": "production-optimization",
+    "version": 1,
+    "legacy_contract": "pins/quality_contract.json",
+    "legacy_nll_ppl_ratio": 1.05,
+    "nll_ppl_ratio": 1.01,
+    "recurrence_incremental_nll": 0.02,
+    "cases": [
+      "wikitext_nll",
+      "continuation_2048",
+      "continuation_4096",
+      "recurrence_short",
+      "recurrence_long",
+      "task_arithmetic",
+      "task_python_len",
+      "task_inference",
+      "task_minutes",
+      "task_sort",
+      "task_json",
+      "task_reading",
+      "task_sequence",
+      "held_out_wikitext_1024"
+    ],
+    "calibration_wikitext_1024": {
+      "stream_start": 1,
+      "stream_end": 1025,
+      "continuation_sha256": "ac3b4e182c3dbbd7ce77e6ab8ead90ff9af50045928ddb6c1cd839310449a4a4",
+      "target_count": 1024
+    },
+    "held_out_wikitext_1024": {
+      "stream_start": 16385,
+      "stream_end": 17409,
+      "continuation_sha256": "2caf15f66a602c0bcc1cc2f75c605d48032a29f7c814daa3dc4da5df9c115faa",
+      "target_count": 1024,
+      "disjoint_from_calibration": true
+    },
+    "continuation_top_two_margin": 0.0,
+    "require_functional_answers": true,
+    "require_zero_nonfinites": true,
+    "overwrite_legacy_verdicts": false
+  },
+  "required_fixture_keys": [
+    "schema_version",
+    "task",
+    "status",
+    "measurement_utc",
+    "claims_performance_improvement",
+    "production_numerics_path",
+    "optimized_admitted",
+    "llama_revision",
+    "gguf_sha256",
+    "host_fp64",
+    "opt042",
+    "opt043_captures",
+    "quality",
+    "opt042_numeric_reject_preserved",
+    "report_path"
+  ],
+  "report_path": "evidence/optimization/opt044-production-numerics/REPORT.md"
+}

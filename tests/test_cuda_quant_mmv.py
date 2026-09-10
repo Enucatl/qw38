@@ -19,6 +19,9 @@ def test_cuda_quant_contract_and_handbook_are_connected() -> None:
     assert contract["admission"]["maximum_rms_error"] == 2.0e-4
     assert len(fixture["cases"]) == 4
     assert all(case["q8_equal"] for case in fixture["cases"])
+    mmv = (ROOT / "cuda" / "quant_mmv.cu").read_text()
+    assert 'kSelectedProductionNumericsPath[] = "strict"' in mmv
+    assert "production_numerics_optimized_admitted() noexcept { return false; }" in mmv
     chapter = (ROOT / "docs" / "39-cuda-quant-mmv.md").read_text().casefold()
     for term in [
         "matrix-vector multiplication",
@@ -124,3 +127,8 @@ def test_cuda_quant_mmv_matches_scalar_reference() -> None:
         assert fields["ref"] == "cpu_dequant_gemm"
         assert float(fields["mean_ms"]) > 0.0
     assert "status=passed" in run.stdout
+    assert "production_numerics_path=strict" in run.stdout
+    assert "optimized_admitted=false" in run.stdout
+    assert "strict_reference=retained" in run.stdout
+    assert "optimized_admitted=false" in run.stdout
+    assert "strict_reference=retained" in run.stdout

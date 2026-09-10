@@ -69,3 +69,18 @@ def test_quality_contract_does_not_allow_post_run_exceptions() -> None:
     assert "near_tie" not in json.dumps(
         json.loads((ROOT / "pins/quality_contract.json").read_text())
     )
+
+
+def test_legacy_quality_thresholds_survive_production_optimization_suite() -> None:
+    from tools.qw38_quality import PRODUCTION_OPTIMIZATION_CASES
+    from tools.production_numerics import PRODUCTION_PPL_RATIO
+
+    contract = json.loads((ROOT / "pins/quality_contract.json").read_text())
+    production = json.loads(
+        (ROOT / "pins/production_numerics_contract.json").read_text()
+    )
+    assert contract["thresholds"]["nll_ppl_ratio"] == 1.05
+    assert production["quality_suite"]["nll_ppl_ratio"] == PRODUCTION_PPL_RATIO
+    assert production["quality_suite"]["overwrite_legacy_verdicts"] is False
+    assert production["quality_suite"]["legacy_nll_ppl_ratio"] == 1.05
+    assert set(PRODUCTION_OPTIMIZATION_CASES).issubset(set(contract["tasks"]))

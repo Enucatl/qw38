@@ -29,6 +29,8 @@ def test_scheduler_primitives_contract_fixture_and_handbook_are_connected() -> N
     assert fixture["embedding"]["bf16_exact"]
     assert fixture["layouts"]["attention_split_exact"]
     assert fixture["gdn"]["exact"]
+    primitives = (ROOT / "cuda" / "scheduler_primitives_test.cu").read_text()
+    assert "production_numerics_path" in primitives
     chapter = (ROOT / "docs" / "45-cuda-scheduler-primitives.md").read_text().casefold()
     for term in [
         "resident weights",
@@ -131,4 +133,6 @@ def test_scheduler_primitives_match_device_references() -> None:
     assert float(layout["rms"]) <= 1.0e-7
     assert "scheduler_embedding=q4_k bf16_exact=true" in lines
     assert "scheduler_gdn=tiled_to_grouped exact=true" in lines
+    assert any(line.startswith("production_numerics_path=strict") for line in lines)
+    assert any("optimized_admitted=false" in line for line in lines)
     assert "status=passed" in lines

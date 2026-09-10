@@ -110,7 +110,7 @@ are repository-relative unless stated otherwise.
 | OPT-041 | Give prompt QK microtiles warp ownership | OPT-038, OPT-035 | done | A/B warp-owned prompt QK microtiles preserving existing virtual-warp partial order against shared cparts reduction; keep only with byte-equal quality attention outputs, frozen attention gates, lower complete component time, improved P versus the then-current keep oracle, D128/D2048 throughput at least 95%, and both decode p95 measures at most 105%; otherwise reject | [`tasks/OPT-041.md`](tasks/OPT-041.md); [`pins/opt041_fattn_warp_qk_contract.json`](pins/opt041_fattn_warp_qk_contract.json); [`fixtures/opt041_fattn_warp_qk.json`](fixtures/opt041_fattn_warp_qk.json); [`cuda/opt041_fattn_warp_qk_ab_test.cu`](cuda/opt041_fattn_warp_qk_ab_test.cu); [`evidence/optimization/opt041-fattn-warp-qk/REPORT.md`](evidence/optimization/opt041-fattn-warp-qk/REPORT.md); verification 2026-09-10T11:35:00Z |
 | OPT-042 | Study integer decode MMV admissibility | OPT-038, OPT-034 | done | Retain paired FP32-packed versus Q4_K integer-dot diagnostic timings and complete numeric results using unchanged FP32-scale Q8 staging on synthetic and real FFN inputs, report fixed CUD-001 envelope eligibility and a promotion/rejection recommendation without changing production dispatch or keep denominators; `claims_performance_improvement: false` | [`tasks/OPT-042.md`](tasks/OPT-042.md); [`pins/opt042_mmv_integer_study_contract.json`](pins/opt042_mmv_integer_study_contract.json); [`fixtures/opt042_mmv_integer_study.json`](fixtures/opt042_mmv_integer_study.json); [`cuda/opt042_mmv_integer_study.cu`](cuda/opt042_mmv_integer_study.cu); [`tests/test_opt042_mmv_integer_study.py`](tests/test_opt042_mmv_integer_study.py); [`evidence/optimization/opt042-mmv-integer-study/REPORT.md`](evidence/optimization/opt042-mmv-integer-study/REPORT.md); verification 2026-09-10T12:09:20Z |
 | OPT-043 | Measure post-042 kernel gaps against pinned llama.cpp | OPT-041, OPT-042 | done | Fresh unperturbed P/D controls, exclusive leaf accounting, actual layer captures, matched complete components and dispatch evidence cover every major family; no production change; `claims_performance_improvement: false`; accepted keep denominators remain historical | [`tasks/OPT-043.md`](tasks/OPT-043.md); [`pins/opt043_component_gap_contract.json`](pins/opt043_component_gap_contract.json); [`fixtures/opt043_component_gap.json`](fixtures/opt043_component_gap.json); [`cuda/opt043_prefill_attribution_test.cu`](cuda/opt043_prefill_attribution_test.cu); [`cuda/opt043_decode_attribution_test.cu`](cuda/opt043_decode_attribution_test.cu); [`cuda/opt043_activation_capture_test.cu`](cuda/opt043_activation_capture_test.cu); [`tests/test_opt043_component_gap.py`](tests/test_opt043_component_gap.py); [`evidence/optimization/opt043-component-gap/REPORT.md`](evidence/optimization/opt043-component-gap/REPORT.md); verification 2026-09-10T14:23:30Z |
-| OPT-044 | Admit documented production arithmetic and quality budgets | OPT-043 | pending | Freeze independent llama-calibrated primitive budgets and held-out model-quality gates before tuning; retain strict reference contracts and exact structural/session invariants; document user-authorized accuracy compromises | [Task](tasks/OPT-044.md) |
+| OPT-044 | Admit documented production arithmetic and quality budgets | OPT-043 | done | Freeze independent llama-calibrated primitive budgets and held-out model-quality gates before tuning; retain strict reference contracts and exact structural/session invariants; document user-authorized accuracy compromises; production selector remains strict; `claims_performance_improvement: false` | [`tasks/OPT-044.md`](tasks/OPT-044.md); [`pins/production_numerics_contract.json`](pins/production_numerics_contract.json); [`fixtures/opt044_production_numerics.json`](fixtures/opt044_production_numerics.json); [`tests/test_production_numerics.py`](tests/test_production_numerics.py); [`evidence/optimization/opt044-production-numerics/REPORT.md`](evidence/optimization/opt044-production-numerics/REPORT.md); verification 2026-09-10T16:25:35Z |
 | OPT-045 | Parallelize RMSNorm and admitted fused arithmetic | OPT-044 | pending | Cooperative residual/head normalization removes serial reductions with production quality, complete component and end-to-end wins, or retained measured rejection | [Task](tasks/OPT-045.md) |
 | OPT-046 | Implement cooperative packed Q4_K decode dots | OPT-044, OPT-045 | pending | Packed integer dots, cooperative K reduction and admitted staging improve complete real FFN and D2048 under production quality and cross-workload guards, or retained rejection | [Task](tasks/OPT-046.md) |
 | OPT-047 | Accelerate Q8_0 mixer decode projections | OPT-044, OPT-046 | pending | Shared activation staging and role-specific packed dots improve the complete mixer group and D2048; new activation approximation is documented and quality-tested, or retained rejection | [Task](tasks/OPT-047.md) |
@@ -128,8 +128,8 @@ are repository-relative unless stated otherwise.
 
 The [2026-09-10 design](tasks/PERFORMANCE-RECOVERY-2026-09-10.md) compares the
 admitted Quartz, pinned llama.cpp and ds4 paths. It is source analysis and task
-design, not new performance evidence. **Next eligible recovery task: OPT-044**,
-then OPT-045–054 in row
+design, not new performance evidence. **Next eligible recovery task: OPT-045**,
+then OPT-046–054 in row
 order, measured remaining launch work in OPT-055, and the outcome gate OPT-056.
 Dependencies permit independent work but do not authorize subagents. The user
 accepts documented llama.cpp/ds4-like accuracy compromises; strict reference
@@ -5449,3 +5449,35 @@ statements below are historical, not the current execution order.
 - Marked OPT-043 `done`; delivery is limited to the verified task scope
   plus this ledger/audit bookkeeping. `plan.md` is unchanged. OPT-016
   stays `blocked`. Next eligible pending by ledger row order: **OPT-044**.
+
+### 2026-09-10T16:26:01Z — OPT-044 delivered (production numerics policy)
+
+- Independent verification attempt 1 passed. Policy task freezes separate
+  strict-reference and optimized-production arithmetic roles with independent
+  host FP64 / llama Q8_1 family/shape ceilings, a versioned 1.01
+  production-optimization quality suite, held-out 1024 span hashes, and gate
+  inventory across CUD/GDN/attention/graph/session/trace/oracle/QLT checks.
+  Production selector remains `strict`; `optimized_admitted=false`; no
+  unvalidated fast kernel; OPT-042 numeric reject and strict decode-MMV
+  contracts retained. `claims_performance_improvement: false`. Coupled IDs:
+  none. Delivery re-check: `uv run pytest -q tests/test_production_numerics.py
+  tests/test_quality.py tests/test_documentation.py`.
+- Acceptance evidence: [`tasks/OPT-044.md`](tasks/OPT-044.md);
+  [`pins/production_numerics_contract.json`](pins/production_numerics_contract.json);
+  [`fixtures/opt044_production_numerics.json`](fixtures/opt044_production_numerics.json);
+  [`tests/test_production_numerics.py`](tests/test_production_numerics.py);
+  [`tools/production_numerics.py`](tools/production_numerics.py);
+  [`tools/freeze_production_numerics.py`](tools/freeze_production_numerics.py);
+  [`src/opt044_production_numerics.cpp`](src/opt044_production_numerics.cpp);
+  [`cuda/production_numerics.h`](cuda/production_numerics.h);
+  [`evidence/optimization/opt044-production-numerics/REPORT.md`](evidence/optimization/opt044-production-numerics/REPORT.md);
+  [`docs/04-numerics.md`](docs/04-numerics.md);
+  [`docs/06-system-optimization.md`](docs/06-system-optimization.md);
+  [`docs/65-documentation-audit.md`](docs/65-documentation-audit.md).
+  Proof is frozen production-numerics policy and quality budgets, not a
+  throughput keep, not 2K parity, not a successor oracle. Tok/s delta **0**
+  (baseline unchanged).
+- Marked OPT-044 `done`; delivery is limited to the verified task scope
+  plus this ledger/audit bookkeeping. User-authorized `plan.md` note added.
+  OPT-016 stays `blocked`. Next eligible pending by ledger row order:
+  **OPT-045**.

@@ -12,7 +12,7 @@ LIB_SOURCES := src/status.cpp src/sha256.cpp src/model.cpp src/tokenizer.cpp src
 LIB_OBJECTS := $(LIB_SOURCES:src/%.cpp=$(BUILD_DIR)/%.o)
 THIRD_PARTY_OBJECTS := $(BUILD_DIR)/utf8proc.o
 BINARIES := $(BUILD_DIR)/qw38 $(BUILD_DIR)/qw38-server $(BUILD_DIR)/qw38-bench $(BUILD_DIR)/qw38-eval
-HOST_DIAGNOSTICS := $(BUILD_DIR)/qw38-server-core-test $(BUILD_DIR)/qw38-server-api-test $(BUILD_DIR)/qw38-responses-api-test
+HOST_DIAGNOSTICS := $(BUILD_DIR)/qw38-server-core-test $(BUILD_DIR)/qw38-server-api-test $(BUILD_DIR)/qw38-responses-api-test $(BUILD_DIR)/qw38-opt044-production-numerics
 CUDA_IMAGE := qw38-cuda:13.0.2
 
 .PHONY: all clean test diagnostic cuda-image cuda-build cuda-native cuda-products
@@ -56,6 +56,9 @@ $(BUILD_DIR)/qw38-bench: $(LIB_OBJECTS) $(THIRD_PARTY_OBJECTS) $(BUILD_DIR)/serv
 
 $(BUILD_DIR)/qw38-eval: $(LIB_OBJECTS) $(THIRD_PARTY_OBJECTS) $(BUILD_DIR)/eval.o
 	$(CXX) $(CXXFLAGS) $^ -o $@
+
+$(BUILD_DIR)/qw38-opt044-production-numerics: src/opt044_production_numerics.cpp $(BUILD_DIR)/quant.o $(BUILD_DIR)/status.o $(BUILD_DIR)/sha256.o | $(BUILD_DIR)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $^ -o $@
 
 DIAGNOSTIC_OBJECTS := $(LIB_SOURCES:src/%.cpp=$(DIAGNOSTIC_DIR)/%.o) $(DIAGNOSTIC_DIR)/diagnostic_trace.o $(DIAGNOSTIC_DIR)/eval.o
 DIAGNOSTIC_LIB_OBJECTS := $(LIB_SOURCES:src/%.cpp=$(DIAGNOSTIC_DIR)/%.o) $(DIAGNOSTIC_DIR)/diagnostic_trace.o

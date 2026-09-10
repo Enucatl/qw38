@@ -648,6 +648,22 @@ own the 2K llama.cpp parity gate. Quartz ≥ llama.cpp is informational. Live
 numbers stay in the report; this chapter does not replace them:
 [`evidence/optimization/opt042-mmv-integer-study/REPORT.md`](../evidence/optimization/opt042-mmv-integer-study/REPORT.md).
 
+## Production arithmetic policy (OPT-044)
+
+**Measured freeze, no production kernel change:** OPT-044 records separate
+strict-reference and optimized-production roles. Production still selects
+`kSelectedProductionNumericsPath = strict`. Independent host FP64 dequant and a
+pinned llama Q8_1 replica on the OPT-042 synthetic identities show that the
+large-shape CUD-001 miss is already present in serial FP32 versus FP64 staged
+accumulation, while Q8 quantization versus original BF16 is comparable to llama.
+Family/shape ceilings and the 1.01 production-optimization quality suite are
+frozen in
+[`pins/production_numerics_contract.json`](../pins/production_numerics_contract.json).
+CUD-001 3e-4/2e-4 and QLT-001 1.05 remain the strict/legacy gates. Live numbers
+stay in the report; this chapter does not replace them:
+[`evidence/optimization/opt044-production-numerics/REPORT.md`](../evidence/optimization/opt044-production-numerics/REPORT.md).
+This increment **claims no performance improvement**.
+
 ## DwarfStar transfer boundary
 
 Reuse MMV/MMQ phase split, quant block tests, explicit unavailable paths, stable

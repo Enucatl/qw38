@@ -401,6 +401,7 @@ std::size_t q8_prompt_workspace_bytes(std::size_t prompt_rows,
 }
 
 constexpr const char kSelectedMmvLoadPath[] = "packed";
+constexpr const char kSelectedProductionNumericsPath[] = "strict";
 
 unsigned int selected_mmv_warps(std::size_t rows) noexcept {
   if (rows <= 48) return 4;
@@ -414,8 +415,22 @@ unsigned int selected_mmv_warps(std::size_t rows) noexcept {
 
 const char* selected_mmv_load_path() noexcept { return kSelectedMmvLoadPath; }
 
+const char* selected_production_numerics_path() noexcept {
+  return kSelectedProductionNumericsPath;
+}
+
+bool production_numerics_optimized_admitted() noexcept { return false; }
+
 bool mmv_uses_packed_loads() noexcept {
   return std::strcmp(kSelectedMmvLoadPath, "packed") == 0;
+}
+
+const char* production_numerics_path_for_family(const char* family) noexcept {
+  (void)family;
+  if (production_numerics_optimized_admitted()) {
+    return kLegalProductionNumericsPathOptimized;
+  }
+  return kSelectedProductionNumericsPath;
 }
 
 bool legal_mmv_load_path(const char* load_path) noexcept {
