@@ -1763,6 +1763,46 @@ bool fattn_uses_pv_mma() noexcept { return fattn_pv_is_mma(kSelectedPvPath); }
 
 int fattn_pv_mma_occupancy() noexcept { return fattn_pv_mma_occupancy_typed(); }
 
+const char* selected_qk_path() noexcept { return kSelectedQKPath; }
+
+bool fattn_uses_warp_qk() noexcept {
+  return fattn_qk_is_warp_microtile(kSelectedQKPath);
+}
+
+int fattn_warp_qk_occupancy() noexcept {
+  return fattn_warp_qk_occupancy_typed();
+}
+
+cudaError_t launch_attention_prepare_chunk_stream_k_qk(
+    const AttentionConfig& config, std::size_t start_position,
+    std::size_t token_count, const float* query, const float* key,
+    const float* value, const float* query_norm_scale,
+    const float* key_norm_scale, const float* output_gate,
+    const AttentionCache& committed, const AttentionCache& candidate_rows,
+    float* normalized_query, float* normalized_key, float* score_workspace,
+    float* output, float* partial_vkq, float* meta, const char* qk_path,
+    cudaStream_t stream) noexcept {
+  if (!fattn_qk_is_cparts(qk_path) && !fattn_qk_is_warp_microtile(qk_path)) {
+    return cudaErrorInvalidValue;
+  }
+  if (token_count < 16) {
+    return launch_attention_prepare_chunk_tiled(
+        config, start_position, token_count, query, key, value,
+        query_norm_scale, key_norm_scale, output_gate, committed,
+        candidate_rows, normalized_query, normalized_key, score_workspace,
+        output, stream);
+  }
+  cudaError_t error = stage_and_validate_chunk(
+      config, start_position, token_count, query, key, value, query_norm_scale,
+      key_norm_scale, output_gate, committed, candidate_rows, normalized_query,
+      normalized_key, score_workspace, output, stream);
+  if (error != cudaSuccess) return error;
+  return launch_fattn_mma_stream_k_qk(
+      config, start_position, token_count, query, query_norm_scale, output_gate,
+      committed.key, committed.value, candidate_rows.key, candidate_rows.value,
+      output, normalized_query, partial_vkq, meta, qk_path, stream);
+}
+
 cudaError_t launch_attention_prepare_chunk_stream_k_pv(
     const AttentionConfig& config, std::size_t start_position,
     std::size_t token_count, const float* query, const float* key,

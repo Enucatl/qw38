@@ -1,0 +1,126 @@
+warp_qk_ab id=cparts occupancy=1 launch_ok=true max_abs=9.76026058e-07 rms=2.94235409e-08 nonfinite=0 vs_cparts_max_abs=0 vs_cparts_rms=0 scratch=true committed=true candidate=true byte_equal=true eligible=true
+warp_qk_ab id=warp_microtile occupancy=1 launch_ok=true max_abs=9.76026058e-07 rms=2.94235409e-08 nonfinite=0 vs_cparts_max_abs=0 vs_cparts_rms=0 scratch=true committed=true candidate=true byte_equal=true eligible=true
+correctness start=0 tokens=16 launch_ok=true byte_equal=true eligible=true vs_cparts_max_abs=0
+correctness start=0 tokens=17 launch_ok=true byte_equal=true eligible=true vs_cparts_max_abs=0
+correctness start=0 tokens=31 launch_ok=true byte_equal=true eligible=true vs_cparts_max_abs=0
+correctness start=0 tokens=32 launch_ok=true byte_equal=true eligible=true vs_cparts_max_abs=0
+correctness start=0 tokens=33 launch_ok=true byte_equal=true eligible=true vs_cparts_max_abs=0
+correctness start=0 tokens=63 launch_ok=true byte_equal=true eligible=true vs_cparts_max_abs=0
+correctness start=0 tokens=64 launch_ok=true byte_equal=true eligible=true vs_cparts_max_abs=0
+correctness start=0 tokens=65 launch_ok=true byte_equal=true eligible=true vs_cparts_max_abs=0
+correctness start=0 tokens=512 launch_ok=true byte_equal=true eligible=true vs_cparts_max_abs=0
+correctness start=0 tokens=2048 launch_ok=true byte_equal=true eligible=true vs_cparts_max_abs=0
+correctness start=0 tokens=4096 launch_ok=true byte_equal=true eligible=true vs_cparts_max_abs=0
+correctness start=1 tokens=16 launch_ok=true byte_equal=true eligible=true vs_cparts_max_abs=0
+correctness start=1 tokens=17 launch_ok=true byte_equal=true eligible=true vs_cparts_max_abs=0
+correctness start=1 tokens=31 launch_ok=true byte_equal=true eligible=true vs_cparts_max_abs=0
+correctness start=1 tokens=32 launch_ok=true byte_equal=true eligible=true vs_cparts_max_abs=0
+correctness start=1 tokens=33 launch_ok=true byte_equal=true eligible=true vs_cparts_max_abs=0
+correctness start=1 tokens=63 launch_ok=true byte_equal=true eligible=true vs_cparts_max_abs=0
+correctness start=1 tokens=64 launch_ok=true byte_equal=true eligible=true vs_cparts_max_abs=0
+correctness start=1 tokens=65 launch_ok=true byte_equal=true eligible=true vs_cparts_max_abs=0
+correctness start=1 tokens=512 launch_ok=true byte_equal=true eligible=true vs_cparts_max_abs=0
+correctness start=1 tokens=2048 launch_ok=true byte_equal=true eligible=true vs_cparts_max_abs=0
+correctness start=1 tokens=4096 launch_ok=true byte_equal=true eligible=true vs_cparts_max_abs=0
+correctness start=31 tokens=16 launch_ok=true byte_equal=true eligible=true vs_cparts_max_abs=0
+correctness start=31 tokens=17 launch_ok=true byte_equal=true eligible=true vs_cparts_max_abs=0
+correctness start=31 tokens=31 launch_ok=true byte_equal=true eligible=true vs_cparts_max_abs=0
+correctness start=31 tokens=32 launch_ok=true byte_equal=true eligible=true vs_cparts_max_abs=0
+correctness start=31 tokens=33 launch_ok=true byte_equal=true eligible=true vs_cparts_max_abs=0
+correctness start=31 tokens=63 launch_ok=true byte_equal=true eligible=true vs_cparts_max_abs=0
+correctness start=31 tokens=64 launch_ok=true byte_equal=true eligible=true vs_cparts_max_abs=0
+correctness start=31 tokens=65 launch_ok=true byte_equal=true eligible=true vs_cparts_max_abs=0
+correctness start=31 tokens=512 launch_ok=true byte_equal=true eligible=true vs_cparts_max_abs=0
+correctness start=31 tokens=2048 launch_ok=true byte_equal=true eligible=true vs_cparts_max_abs=0
+correctness start=31 tokens=4096 launch_ok=true byte_equal=true eligible=true vs_cparts_max_abs=0
+correctness start=128 tokens=16 launch_ok=true byte_equal=true eligible=true vs_cparts_max_abs=0
+correctness start=128 tokens=17 launch_ok=true byte_equal=true eligible=true vs_cparts_max_abs=0
+correctness start=128 tokens=31 launch_ok=true byte_equal=true eligible=true vs_cparts_max_abs=0
+correctness start=128 tokens=32 launch_ok=true byte_equal=true eligible=true vs_cparts_max_abs=0
+correctness start=128 tokens=33 launch_ok=true byte_equal=true eligible=true vs_cparts_max_abs=0
+correctness start=128 tokens=63 launch_ok=true byte_equal=true eligible=true vs_cparts_max_abs=0
+correctness start=128 tokens=64 launch_ok=true byte_equal=true eligible=true vs_cparts_max_abs=0
+correctness start=128 tokens=65 launch_ok=true byte_equal=true eligible=true vs_cparts_max_abs=0
+correctness start=128 tokens=512 launch_ok=true byte_equal=true eligible=true vs_cparts_max_abs=0
+correctness start=128 tokens=2048 launch_ok=true byte_equal=true eligible=true vs_cparts_max_abs=0
+correctness start=128 tokens=4096 launch_ok=true byte_equal=true eligible=true vs_cparts_max_abs=0
+correctness start=2048 tokens=16 launch_ok=true byte_equal=true eligible=true vs_cparts_max_abs=0
+correctness start=2048 tokens=17 launch_ok=true byte_equal=true eligible=true vs_cparts_max_abs=0
+correctness start=2048 tokens=31 launch_ok=true byte_equal=true eligible=true vs_cparts_max_abs=0
+correctness start=2048 tokens=32 launch_ok=true byte_equal=true eligible=true vs_cparts_max_abs=0
+correctness start=2048 tokens=33 launch_ok=true byte_equal=true eligible=true vs_cparts_max_abs=0
+correctness start=2048 tokens=63 launch_ok=true byte_equal=true eligible=true vs_cparts_max_abs=0
+correctness start=2048 tokens=64 launch_ok=true byte_equal=true eligible=true vs_cparts_max_abs=0
+correctness start=2048 tokens=65 launch_ok=true byte_equal=true eligible=true vs_cparts_max_abs=0
+correctness start=2048 tokens=512 launch_ok=true byte_equal=true eligible=true vs_cparts_max_abs=0
+correctness start=2048 tokens=2048 launch_ok=true byte_equal=true eligible=true vs_cparts_max_abs=0
+correctness start=2048 tokens=4096 launch_ok=true byte_equal=true eligible=true vs_cparts_max_abs=0
+warp_qk_ab id=cparts warmup=0 ms=35.5165138 occupancy=1
+warp_qk_ab id=warp_microtile warmup=0 ms=34.5798416 occupancy=1
+warp_qk_ab id=cparts warmup=1 ms=35.4982071 occupancy=1
+warp_qk_ab id=warp_microtile warmup=1 ms=34.593792 occupancy=1
+warp_qk_ab id=cparts warmup=2 ms=35.4331207 occupancy=1
+warp_qk_ab id=warp_microtile warmup=2 ms=34.5951042 occupancy=1
+warp_qk_ab id=cparts sample=0 ms=35.5292168 occupancy=1
+warp_qk_ab id=warp_microtile sample=0 ms=34.5932808 occupancy=1
+warp_qk_ab id=cparts sample=1 ms=35.4888306 occupancy=1
+warp_qk_ab id=warp_microtile sample=1 ms=34.604641 occupancy=1
+warp_qk_ab id=cparts sample=2 ms=35.5269127 occupancy=1
+warp_qk_ab id=warp_microtile sample=2 ms=34.6032639 occupancy=1
+warp_qk_ab id=cparts sample=3 ms=35.5067825 occupancy=1
+warp_qk_ab id=warp_microtile sample=3 ms=34.610527 occupancy=1
+warp_qk_ab id=cparts sample=4 ms=35.5037766 occupancy=1
+warp_qk_ab id=warp_microtile sample=4 ms=34.5717125 occupancy=1
+warp_qk_ab id=cparts sample=5 ms=35.5239029 occupancy=1
+warp_qk_ab id=warp_microtile sample=5 ms=34.4866562 occupancy=1
+warp_qk_ab id=cparts sample=6 ms=35.512001 occupancy=1
+warp_qk_ab id=warp_microtile sample=6 ms=34.5946884 occupancy=1
+warp_qk_ab id=cparts sample=7 ms=35.5287056 occupancy=1
+warp_qk_ab id=warp_microtile sample=7 ms=34.5797119 occupancy=1
+warp_qk_ab id=cparts sample=8 ms=35.3913612 occupancy=1
+warp_qk_ab id=warp_microtile sample=8 ms=34.5863342 occupancy=1
+warp_qk_ab id=cparts sample=9 ms=35.5104942 occupancy=1
+warp_qk_ab id=warp_microtile sample=9 ms=34.5813446 occupancy=1
+warp_qk_ab id=cparts sample=10 ms=35.5424957 occupancy=1
+warp_qk_ab id=warp_microtile sample=10 ms=34.6100159 occupancy=1
+warp_qk_ab id=cparts sample=11 ms=35.5443192 occupancy=1
+warp_qk_ab id=warp_microtile sample=11 ms=34.5743675 occupancy=1
+warp_qk_ab id=cparts sample=12 ms=35.5045433 occupancy=1
+warp_qk_ab id=warp_microtile sample=12 ms=34.5941429 occupancy=1
+warp_qk_ab id=cparts sample=13 ms=35.4956818 occupancy=1
+warp_qk_ab id=warp_microtile sample=13 ms=34.6094704 occupancy=1
+warp_qk_ab id=cparts sample=14 ms=35.5639038 occupancy=1
+warp_qk_ab id=warp_microtile sample=14 ms=34.6073608 occupancy=1
+warp_qk_ab id=cparts sample=15 ms=35.5013771 occupancy=1
+warp_qk_ab id=warp_microtile sample=15 ms=34.599617 occupancy=1
+warp_qk_ab id=cparts sample=16 ms=35.5143356 occupancy=1
+warp_qk_ab id=warp_microtile sample=16 ms=34.5722237 occupancy=1
+warp_qk_ab id=cparts sample=17 ms=35.5152969 occupancy=1
+warp_qk_ab id=warp_microtile sample=17 ms=34.5918083 occupancy=1
+warp_qk_ab id=cparts sample=18 ms=35.5049934 occupancy=1
+warp_qk_ab id=warp_microtile sample=18 ms=34.5870094 occupancy=1
+warp_qk_ab id=cparts sample=19 ms=35.5126076 occupancy=1
+warp_qk_ab id=warp_microtile sample=19 ms=34.5946236 occupancy=1
+warp_qk_ab id=cparts sample=20 ms=35.5051842 occupancy=1
+warp_qk_ab id=warp_microtile sample=20 ms=34.6031685 occupancy=1
+warp_qk_ab id=cparts sample=21 ms=35.4276161 occupancy=1
+warp_qk_ab id=warp_microtile sample=21 ms=34.6020164 occupancy=1
+warp_qk_ab id=cparts sample=22 ms=35.5400963 occupancy=1
+warp_qk_ab id=warp_microtile sample=22 ms=34.5953598 occupancy=1
+warp_qk_ab id=cparts sample=23 ms=35.5011826 occupancy=1
+warp_qk_ab id=warp_microtile sample=23 ms=34.6083527 occupancy=1
+warp_qk_ab id=cparts sample=24 ms=35.5100174 occupancy=1
+warp_qk_ab id=warp_microtile sample=24 ms=34.5786247 occupancy=1
+warp_qk_ab id=cparts sample=25 ms=35.5145912 occupancy=1
+warp_qk_ab id=warp_microtile sample=25 ms=34.6117134 occupancy=1
+warp_qk_ab id=cparts sample=26 ms=35.5053444 occupancy=1
+warp_qk_ab id=warp_microtile sample=26 ms=34.5722885 occupancy=1
+warp_qk_ab id=cparts sample=27 ms=35.5103378 occupancy=1
+warp_qk_ab id=warp_microtile sample=27 ms=34.6018867 occupancy=1
+warp_qk_ab id=cparts sample=28 ms=35.5198097 occupancy=1
+warp_qk_ab id=warp_microtile sample=28 ms=34.5989761 occupancy=1
+warp_qk_ab id=cparts sample=29 ms=35.5511055 occupancy=1
+warp_qk_ab id=warp_microtile sample=29 ms=34.6175041 occupancy=1
+warp_qk_ab_mean id=cparts mean_ms=35.5102272 occupancy=1 eligible=true
+warp_qk_ab_mean id=warp_microtile mean_ms=34.591423 occupancy=1 eligible=true
+warp_qk_ab_winner id=warp_microtile win=true cparts_ms=35.5102272 warp_microtile_ms=34.591423 include_combine=true all_eligible=true

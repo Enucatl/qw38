@@ -44,6 +44,13 @@ constexpr char kSelectedVkqAccum[] = "registers";
 // cc83d7b4824f73cfdda4dfbb47ee39804f71b328 (MIT). Not a vendor of that file.
 constexpr char kSelectedPvPath[] = "mma";
 
+// OPT-041 A/B winner. Legal values: cparts, warp_microtile. Default until A/B:
+// cparts. Warp-owned 16×8 QK microtiles adapt llama.cpp fattn-mma-f16.cuh KQ_C
+// ownership at cc83d7b4824f73cfdda4dfbb47ee39804f71b328 (MIT). Quartz still
+// visits K in the current virtual-warp order and folds in the current FP32
+// order. Not a vendor of that file.
+constexpr char kSelectedQKPath[] = "warp_microtile";
+
 inline __device__ float fattn_block_sum(float local, float* scratch, int tid,
                                        int nthreads) {
   float value = local;
@@ -159,8 +166,56 @@ inline __device__ void fattn_persistent_decode(int index, int ntiles_kv,
   *jt = rem - (*zt_gqa) * ntiles_x;
 }
 
+template <bool DualF16, int kNcols, int kWidth>
+inline __device__ void fattn_qk_mma_k16(
+    float cfrag[4], float cfrag_lo[4], const __half* q_f16, const __half* q_lo,
+    const __nv_bfloat16* keys, int m0, int n0, int k0, int rows, int lane) {
+  std::uint32_t a[4];
+  std::uint32_t a_lo[4] = {0, 0, 0, 0};
+  std::uint32_t b[2];
+#pragma unroll
+  for (int item = 0; item < 4; ++item) {
+    const int i = mma::tile16x8_half2_i(lane, item);
+    const int j = mma::tile16x8_half2_j(lane, item);
+    const int qcol = m0 + i;
+    __half pair[2] = {__float2half_rn(0.0F), __float2half_rn(0.0F)};
+    __half pair_lo[2] = {__float2half_rn(0.0F), __float2half_rn(0.0F)};
+    if (qcol < kNcols) {
+      const int offset = qcol * kWidth + k0 + j * 2;
+      pair[0] = q_f16[offset];
+      pair[1] = q_f16[offset + 1];
+      if constexpr (DualF16) {
+        pair_lo[0] = q_lo[offset];
+        pair_lo[1] = q_lo[offset + 1];
+      }
+    }
+    a[item] = *reinterpret_cast<std::uint32_t*>(pair);
+    if constexpr (DualF16) {
+      a_lo[item] = *reinterpret_cast<std::uint32_t*>(pair_lo);
+    }
+  }
+#pragma unroll
+  for (int item = 0; item < 2; ++item) {
+    const int n = mma::tile8x8_i(lane, item);
+    const int j = mma::tile8x8_j(lane, item);
+    const int krow = n0 + n;
+    __half pair[2] = {__float2half_rn(0.0F), __float2half_rn(0.0F)};
+    if (krow < rows) {
+      pair[0] = __float2half_rn(
+          __bfloat162float(keys[krow * kWidth + k0 + j * 2]));
+      pair[1] = __float2half_rn(
+          __bfloat162float(keys[krow * kWidth + k0 + j * 2 + 1]));
+    }
+    b[item] = *reinterpret_cast<std::uint32_t*>(pair);
+  }
+  mma::mma_m16n8k16_f16_f32(cfrag, a, b);
+  if constexpr (DualF16) {
+    mma::mma_m16n8k16_f16_f32(cfrag_lo, a_lo, b);
+  }
+}
+
 template <int Ncols1, bool DualF16, int Occupancy, int KvParts,
-          bool RegisterAcc = false, bool MmaPv = false>
+          bool RegisterAcc = false, bool MmaPv = false, bool WarpQK = false>
 __global__ void __launch_bounds__(Ncols1 <= 8 ? 64 : 128, Occupancy)
 fattn_mma_quality_kernel(
     AttentionConfig config, std::size_t start_position, std::size_t token_count,
@@ -177,6 +232,10 @@ fattn_mma_quality_kernel(
                 "OPT-035 MMA P×V requires register-resident VKQ");
   static_assert(!MmaPv || (kNcols % 16 == 0 && kWidth % (kNwarps * 8) == 0),
                 "OPT-035 MMA P×V needs 16-wide M tiles and warp N ownership");
+  static_assert(!WarpQK || (RegisterAcc && MmaPv && Ncols1 == 16 && DualF16 &&
+                            kNcols == 32 && kFattnNbatchFa == 32 &&
+                            kNwarps == 4),
+                "OPT-041 warp QK microtiles require production stream-K");
   constexpr int kPvMTiles = kNcols / 16;
   constexpr int kPvNTiles = kWidth / (kNwarps * 8);
 
@@ -214,7 +273,7 @@ fattn_mma_quality_kernel(
   float* qmax = scores + kNcols * kFattnNbatchFa;
   float* qden = qmax + kNcols;
   float* rescale = qden + kNcols;
-  float* cparts = rescale + kNcols;
+  [[maybe_unused]] float* cparts = rescale + kNcols;
 
   const int kv_z = KvParts > 1 ? static_cast<int>(blockIdx.z) : 0;
   float* vkq = (KvParts > 1 && kv_z > 0) ? partial : output;
@@ -357,66 +416,23 @@ fattn_mma_quality_kernel(
       }
       __syncthreads();
 
-      for (int m0 = 0; m0 < kNcols; m0 += 16) {
-        for (int n0 = 0; n0 < kFattnNbatchFa; n0 += 8) {
-          float cfrag[4] = {0.0F, 0.0F, 0.0F, 0.0F};
-          float cfrag_lo[4] = {0.0F, 0.0F, 0.0F, 0.0F};
-          for (int k0 = warp * 16; k0 < kWidth; k0 += kNwarps * 16) {
-            std::uint32_t a[4];
-            std::uint32_t a_lo[4] = {0, 0, 0, 0};
-            std::uint32_t b[2];
-#pragma unroll
-            for (int item = 0; item < 4; ++item) {
-              const int i = mma::tile16x8_half2_i(lane, item);
-              const int j = mma::tile16x8_half2_j(lane, item);
-              const int qcol = m0 + i;
-              __half pair[2] = {__float2half_rn(0.0F), __float2half_rn(0.0F)};
-              __half pair_lo[2] = {__float2half_rn(0.0F),
-                                   __float2half_rn(0.0F)};
-              if (qcol < kNcols) {
-                const int offset = qcol * kWidth + k0 + j * 2;
-                pair[0] = q_f16[offset];
-                pair[1] = q_f16[offset + 1];
-                if constexpr (DualF16) {
-                  pair_lo[0] = q_lo[offset];
-                  pair_lo[1] = q_lo[offset + 1];
-                }
-              }
-              a[item] = *reinterpret_cast<std::uint32_t*>(pair);
-              if constexpr (DualF16) {
-                a_lo[item] = *reinterpret_cast<std::uint32_t*>(pair_lo);
-              }
-            }
-#pragma unroll
-            for (int item = 0; item < 2; ++item) {
-              const int n = mma::tile8x8_i(lane, item);
-              const int j = mma::tile8x8_j(lane, item);
-              const int krow = n0 + n;
-              __half pair[2] = {__float2half_rn(0.0F), __float2half_rn(0.0F)};
-              if (krow < rows) {
-                pair[0] = __float2half_rn(__bfloat162float(
-                    keys[krow * kWidth + k0 + j * 2]));
-                pair[1] = __float2half_rn(__bfloat162float(
-                    keys[krow * kWidth + k0 + j * 2 + 1]));
-              }
-              b[item] = *reinterpret_cast<std::uint32_t*>(pair);
-            }
-            mma::mma_m16n8k16_f16_f32(cfrag, a, b);
-            if constexpr (DualF16) {
-              mma::mma_m16n8k16_f16_f32(cfrag_lo, a_lo, b);
-            }
-          }
-#pragma unroll
-          for (int item = 0; item < 4; ++item)
-            cparts[(warp * 32 + lane) * 4 + item] =
-                cfrag[item] + cfrag_lo[item];
-          __syncthreads();
-          if (warp == 0) {
+      if constexpr (WarpQK) {
+        for (int m0 = 0; m0 < kNcols; m0 += 16) {
+          for (int n0 = 0; n0 < kFattnNbatchFa; n0 += 8) {
+            const int tile_id = (m0 / 16) * 4 + (n0 / 8);
+            if (warp != tile_id % kNwarps) continue;
             float reduced[4] = {0.0F, 0.0F, 0.0F, 0.0F};
-            for (int other = 0; other < kNwarps; ++other) {
+            for (int vwarp = 0; vwarp < kNwarps; ++vwarp) {
+              float cfrag[4] = {0.0F, 0.0F, 0.0F, 0.0F};
+              float cfrag_lo[4] = {0.0F, 0.0F, 0.0F, 0.0F};
+              for (int k0 = vwarp * 16; k0 < kWidth; k0 += kNwarps * 16) {
+                fattn_qk_mma_k16<DualF16, kNcols, kWidth>(
+                    cfrag, cfrag_lo, q_f16, q_lo, keys, m0, n0, k0, rows,
+                    lane);
+              }
 #pragma unroll
               for (int item = 0; item < 4; ++item)
-                reduced[item] += cparts[(other * 32 + lane) * 4 + item];
+                reduced[item] += cfrag[item] + cfrag_lo[item];
             }
 #pragma unroll
             for (int item = 0; item < 4; ++item) {
@@ -429,7 +445,42 @@ fattn_mma_quality_kernel(
                     reduced[item] * attn_scale;
             }
           }
-          __syncthreads();
+        }
+        __syncthreads();
+      } else {
+        for (int m0 = 0; m0 < kNcols; m0 += 16) {
+          for (int n0 = 0; n0 < kFattnNbatchFa; n0 += 8) {
+            float cfrag[4] = {0.0F, 0.0F, 0.0F, 0.0F};
+            float cfrag_lo[4] = {0.0F, 0.0F, 0.0F, 0.0F};
+            for (int k0 = warp * 16; k0 < kWidth; k0 += kNwarps * 16) {
+              fattn_qk_mma_k16<DualF16, kNcols, kWidth>(
+                  cfrag, cfrag_lo, q_f16, q_lo, keys, m0, n0, k0, rows, lane);
+            }
+#pragma unroll
+            for (int item = 0; item < 4; ++item)
+              cparts[(warp * 32 + lane) * 4 + item] =
+                  cfrag[item] + cfrag_lo[item];
+            __syncthreads();
+            if (warp == 0) {
+              float reduced[4] = {0.0F, 0.0F, 0.0F, 0.0F};
+              for (int other = 0; other < kNwarps; ++other) {
+#pragma unroll
+                for (int item = 0; item < 4; ++item)
+                  reduced[item] += cparts[(other * 32 + lane) * 4 + item];
+              }
+#pragma unroll
+              for (int item = 0; item < 4; ++item) {
+                const int i = mma::tile16x8_i(lane, item);
+                const int j = mma::tile16x8_j(lane, item);
+                const int qcol = m0 + i;
+                const int krow = n0 + j;
+                if (qcol < kNcols && krow < kFattnNbatchFa)
+                  scores[qcol * kFattnNbatchFa + krow] =
+                      reduced[item] * attn_scale;
+              }
+            }
+            __syncthreads();
+          }
         }
       }
 
@@ -1340,7 +1391,7 @@ inline cudaError_t launch_fattn_mma_persistent_impl(
 }
 
 template <int Ncols1, bool DualF16, int Occupancy, int KvParts,
-          bool RegisterAcc = false, bool MmaPv = false>
+          bool RegisterAcc = false, bool MmaPv = false, bool WarpQK = false>
 inline cudaError_t launch_fattn_mma_quality_typed(
     const AttentionConfig& config, std::size_t start_position,
     std::size_t token_count, const float* query, const float* query_scale,
@@ -1356,12 +1407,12 @@ inline cudaError_t launch_fattn_mma_quality_typed(
             KvParts > 1 ? 2U : 1U);
   cudaError_t error = cudaFuncSetAttribute(
       fattn_mma_quality_kernel<Ncols1, DualF16, Occupancy, KvParts, RegisterAcc,
-                               MmaPv>,
+                               MmaPv, WarpQK>,
       cudaFuncAttributeMaxDynamicSharedMemorySize, static_cast<int>(shared));
   if (error != cudaSuccess) return error;
   error = quartz_launch_kernel(
       fattn_mma_quality_kernel<Ncols1, DualF16, Occupancy, KvParts, RegisterAcc,
-                               MmaPv>,
+                               MmaPv, WarpQK>,
       grid, dim3(kNthreads), shared, stream, config, start_position,
       token_count, query, query_scale, gate, committed_key, committed_value,
       candidate_key, candidate_value, output, normalized_query, partial, meta);
@@ -1391,6 +1442,14 @@ inline bool fattn_pv_is_mma(const char* pv_path) noexcept {
 
 inline bool fattn_pv_is_scalar(const char* pv_path) noexcept {
   return pv_path != nullptr && std::strcmp(pv_path, "scalar") == 0;
+}
+
+inline bool fattn_qk_is_cparts(const char* qk_path) noexcept {
+  return qk_path != nullptr && std::strcmp(qk_path, "cparts") == 0;
+}
+
+inline bool fattn_qk_is_warp_microtile(const char* qk_path) noexcept {
+  return qk_path != nullptr && std::strcmp(qk_path, "warp_microtile") == 0;
 }
 
 inline cudaError_t launch_fattn_mma_quality_path(
@@ -1507,6 +1566,29 @@ inline cudaError_t launch_fattn_mma_stream_k_pv(
   return cudaErrorInvalidValue;
 }
 
+inline cudaError_t launch_fattn_mma_stream_k_qk(
+    const AttentionConfig& config, std::size_t start_position,
+    std::size_t token_count, const float* query, const float* query_scale,
+    const float* gate, const __nv_bfloat16* committed_key,
+    const __nv_bfloat16* committed_value, const __nv_bfloat16* candidate_key,
+    const __nv_bfloat16* candidate_value, float* output,
+    float* normalized_query, float* partial, float* meta, const char* qk_path,
+    cudaStream_t stream) noexcept {
+  if (fattn_qk_is_warp_microtile(qk_path)) {
+    return launch_fattn_mma_quality_typed<16, true, 2, 2, true, true, true>(
+        config, start_position, token_count, query, query_scale, gate,
+        committed_key, committed_value, candidate_key, candidate_value, output,
+        normalized_query, partial, meta, stream);
+  }
+  if (fattn_qk_is_cparts(qk_path)) {
+    return launch_fattn_mma_quality_typed<16, true, 2, 2, true, true, false>(
+        config, start_position, token_count, query, query_scale, gate,
+        committed_key, committed_value, candidate_key, candidate_value, output,
+        normalized_query, partial, meta, stream);
+  }
+  return cudaErrorInvalidValue;
+}
+
 inline cudaError_t launch_fattn_mma_stream_k(
     const AttentionConfig& config, std::size_t start_position,
     std::size_t token_count, const float* query, const float* query_scale,
@@ -1522,6 +1604,12 @@ inline cudaError_t launch_fattn_mma_stream_k(
         normalized_query, meta, stream);
   }
   if (fattn_vkq_is_registers(kSelectedVkqAccum)) {
+    if (fattn_pv_is_mma(kSelectedPvPath)) {
+      return launch_fattn_mma_stream_k_qk(
+          config, start_position, token_count, query, query_scale, gate,
+          committed_key, committed_value, candidate_key, candidate_value,
+          output, normalized_query, partial, meta, kSelectedQKPath, stream);
+    }
     return launch_fattn_mma_stream_k_pv(
         config, start_position, token_count, query, query_scale, gate,
         committed_key, committed_value, candidate_key, candidate_value, output,
@@ -1535,20 +1623,20 @@ inline cudaError_t launch_fattn_mma_stream_k(
 }
 
 template <int Ncols1, bool DualF16, int Occupancy, int KvParts,
-          bool RegisterAcc = false, bool MmaPv = false>
+          bool RegisterAcc = false, bool MmaPv = false, bool WarpQK = false>
 inline int fattn_occupancy_typed() noexcept {
   int occupancy = 0;
   const int threads = fattn_nthreads_for_ncols1(Ncols1);
   const std::size_t shared = fattn_quality_shared_bytes(Ncols1, DualF16);
   cudaError_t error = cudaFuncSetAttribute(
       fattn_mma_quality_kernel<Ncols1, DualF16, Occupancy, KvParts, RegisterAcc,
-                               MmaPv>,
+                               MmaPv, WarpQK>,
       cudaFuncAttributeMaxDynamicSharedMemorySize, static_cast<int>(shared));
   if (error == cudaSuccess)
     error = cudaOccupancyMaxActiveBlocksPerMultiprocessor(
         &occupancy,
         fattn_mma_quality_kernel<Ncols1, DualF16, Occupancy, KvParts, RegisterAcc,
-                                 MmaPv>,
+                                 MmaPv, WarpQK>,
         threads, shared);
   return error == cudaSuccess ? occupancy : 0;
 }
@@ -1559,6 +1647,10 @@ inline int fattn_register_vkq_occupancy_typed() noexcept {
 
 inline int fattn_pv_mma_occupancy_typed() noexcept {
   return fattn_occupancy_typed<16, true, 2, 2, true, true>();
+}
+
+inline int fattn_warp_qk_occupancy_typed() noexcept {
+  return fattn_occupancy_typed<16, true, 2, 2, true, true, true>();
 }
 
 inline int fattn_occupancy_for(int ncols1) noexcept {

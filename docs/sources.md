@@ -836,6 +836,42 @@ baseline.
   lower complete GDN component time; improved P; cross-workload guard; does not
   substitute for the 2K llama.cpp parity gate; Quartz ≥ llama.cpp is not this
   gate. Envelopes unloosened; Nsight is not used.
+- OPT-041 is a local derivation over admitted Ada+ stream-K fattn with
+  register-resident VKQ and dual-F16 probability×V MMA. It assigns each of
+  eight 16×8 QK microtiles to one of four warps (`tile_id % 4`), lets the
+  owning warp visit K in the current virtual-warp partial order, folds in the
+  current FP32 order, and uses one block barrier after the microtile loop
+  instead of shared `cparts` reduction with two barriers per microtile. The
+  `cparts` shared slab stays allocated so occupancy and shared bytes are not
+  mixed with ownership. File-level provenance for warp-owned KQ MMA fragments
+  is already External: pinned llama.cpp revision
+  `cc83d7b4824f73cfdda4dfbb47ee39804f71b328` (MIT, The ggml authors)
+  `fattn-mma-f16.cuh` `KQ_C` with `np` parallel warps per Q column. This
+  increment does not vendor `fattn-mma-f16.cuh`, does not include ggml
+  headers, and does not copy `../ds4`. Production prompt fattn installs
+  `WarpQK=true` stream-K when dispatch predicates hold;
+  `launch_attention_prepare_chunk_stream_k_qk` with `cparts` remains the A/B
+  baseline. Softmax, rescale, P×V MMA, register VKQ, meta, and the stream-K
+  combine kernel stay. Decode `warp_query` attention stays. No extra persistent
+  `cudaMalloc`; the workspace byte formula is unchanged. Keep denominators are
+  the frozen then-current accepted P and D128/D2048 means and p95s copied into
+  the contract. **Measured, RTX 5090:** 4096 complete-attention A/B winner
+  `warp_microtile`; live exclusive sitting keep; production pin
+  `warp_microtile`; `reverted` false; `keep_sitting_skipped` false; `status`
+  measured. Live tok/s stay in the report; this ledger does not replace them.
+  The schema-1 contract, measured fixture, and report are
+  [`pins/opt041_fattn_warp_qk_contract.json`](../pins/opt041_fattn_warp_qk_contract.json),
+  [`fixtures/opt041_fattn_warp_qk.json`](../fixtures/opt041_fattn_warp_qk.json),
+  and
+  [`evidence/optimization/opt041-fattn-warp-qk/REPORT.md`](../evidence/optimization/opt041-fattn-warp-qk/REPORT.md).
+  The beginner explanations are
+  [`docs/44-cuda-attention-prefill.md`](44-cuda-attention-prefill.md),
+  [`docs/62-cuda-full-prefill.md`](62-cuda-full-prefill.md), and
+  [`docs/06-system-optimization.md`](06-system-optimization.md).
+  Proof limit: byte-equal quality attention outputs; frozen attention gates;
+  lower complete component time; improved P; cross-workload guard; does not
+  substitute for the 2K llama.cpp parity gate; Quartz ≥ llama.cpp is not this
+  gate. Envelopes unloosened; Nsight is not used.
 - OPT-029 adapts llama.cpp revision
   `cc83d7b4824f73cfdda4dfbb47ee39804f71b328` (MIT, The ggml authors)
   warp-column GDN recurrence from `gated_delta_net.cu` (`S_v=128`,

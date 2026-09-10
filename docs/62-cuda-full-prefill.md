@@ -1,6 +1,6 @@
 # Chunked full-model CUDA prefill
 
-[Index](README.md) · Implementation tasks: SCH-002, MEM-002, OPT-008, OPT-009, OPT-011, OPT-012, OPT-013, OPT-014, OPT-015, OPT-017, OPT-018, OPT-019, OPT-020, OPT-021, OPT-022, OPT-023, OPT-024, OPT-025, OPT-026, OPT-027, OPT-028, OPT-029, OPT-030, OPT-032, OPT-033, OPT-035, OPT-037, OPT-038, OPT-040, and EDU-047 in
+[Index](README.md) · Implementation tasks: SCH-002, MEM-002, OPT-008, OPT-009, OPT-011, OPT-012, OPT-013, OPT-014, OPT-015, OPT-017, OPT-018, OPT-019, OPT-020, OPT-021, OPT-022, OPT-023, OPT-024, OPT-025, OPT-026, OPT-027, OPT-028, OPT-029, OPT-030, OPT-032, OPT-033, OPT-035, OPT-037, OPT-038, OPT-040, OPT-041, and EDU-047 in
 [`implementation_ledger.md`](../implementation_ledger.md) · Contracts:
 [`pins/cuda_prompt_scheduler_contract.json`](../pins/cuda_prompt_scheduler_contract.json),
 [`pins/cuda_prompt_pipeline_contract.json`](../pins/cuda_prompt_pipeline_contract.json),
@@ -25,7 +25,8 @@
 [`pins/opt032_decode_oracle_contract.json`](../pins/opt032_decode_oracle_contract.json),
 [`pins/opt033_register_vkq_contract.json`](../pins/opt033_register_vkq_contract.json),
 [`pins/opt035_pv_mma_contract.json`](../pins/opt035_pv_mma_contract.json),
-[`pins/opt040_gdn_shared_inverse_contract.json`](../pins/opt040_gdn_shared_inverse_contract.json)
+[`pins/opt040_gdn_shared_inverse_contract.json`](../pins/opt040_gdn_shared_inverse_contract.json),
+[`pins/opt041_fattn_warp_qk_contract.json`](../pins/opt041_fattn_warp_qk_contract.json)
 · Evidence: [`fixtures/cuda_prompt_scheduler.json`](../fixtures/cuda_prompt_scheduler.json),
 [`fixtures/cuda_prompt_pipeline.json`](../fixtures/cuda_prompt_pipeline.json),
 [`fixtures/cuda_prompt_graph.json`](../fixtures/cuda_prompt_graph.json),
@@ -71,7 +72,9 @@
 [`evidence/optimization/opt033-register-vkq/REPORT.md`](../evidence/optimization/opt033-register-vkq/REPORT.md),
 [`evidence/optimization/opt035-pv-mma/REPORT.md`](../evidence/optimization/opt035-pv-mma/REPORT.md),
 [`fixtures/opt040_gdn_shared_inverse.json`](../fixtures/opt040_gdn_shared_inverse.json),
-[`evidence/optimization/opt040-gdn-shared-inverse/REPORT.md`](../evidence/optimization/opt040-gdn-shared-inverse/REPORT.md)
+[`evidence/optimization/opt040-gdn-shared-inverse/REPORT.md`](../evidence/optimization/opt040-gdn-shared-inverse/REPORT.md),
+[`fixtures/opt041_fattn_warp_qk.json`](../fixtures/opt041_fattn_warp_qk.json),
+[`evidence/optimization/opt041-fattn-warp-qk/REPORT.md`](../evidence/optimization/opt041-fattn-warp-qk/REPORT.md)
 
 ## Why prompt execution differs from decode
 
@@ -206,10 +209,11 @@ Attention also visits chunk rows in order. Production
 (ncols1=16, ncols2=2) and the two-row tiled path otherwise. Prompt scheduler
 attention uses Ada+ stream-K after the OPT-026 A/B win, aliasing existing
 workspace for the softmax combine, with register-resident value sums after
-the OPT-033 keep and dual-F16 probability×V MMA after the OPT-035 keep.
-OPT-027 measured persistent stream-K against that path and did not install
-it; production remains `stream_k` (`grid.z=2`) with
-`kSelectedVkqAccum = "registers"` and `kSelectedPvPath = "mma"`. The tiled
+the OPT-033 keep, dual-F16 probability×V MMA after the OPT-035 keep, and
+warp-owned QK microtiles after the OPT-041 keep. OPT-027 measured persistent
+stream-K against that path and did not install it; production remains
+`stream_k` (`grid.z=2`) with `kSelectedVkqAccum = "registers"`,
+`kSelectedPvPath = "mma"`, and `kSelectedQKPath = "warp_microtile"`. The tiled
 path remains the unloosened OPT-005 numeric reference. Rank-3 warp-0 MMA is
 retained for A/B. A row may read all committed KV rows
 from earlier chunks and candidate rows earlier in its current chunk, never a
@@ -847,6 +851,31 @@ stay in the report:
 and
 [`fixtures/opt040_gdn_shared_inverse.json`](../fixtures/opt040_gdn_shared_inverse.json).
 
+OPT-041 keeps warp-owned 16×8 prompt QK microtiles on production 4096-row
+fattn-mma stream-K including combine, on top of register-resident VKQ and
+dual-F16 probability×V MMA. **Measured, RTX 5090:** paired CUDA-event A/B
+among `cparts` and `warp_microtile`; winner `warp_microtile` with byte-equal
+quality output versus `cparts`, frozen OPT-005 envelopes versus tiled, and
+strictly lower component time. Production `kSelectedQKPath` is
+`warp_microtile`. The `cparts` shared slab stays allocated; softmax, rescale,
+P×V MMA, register VKQ, and the combine kernel stay. Ncols1 stays 16, Ncols2
+stays 2, KV tile stays 32, dual-F16 Q stays, `grid.z` stays 2, register VKQ
+stays, and P×V MMA stays. Decode 16/16 partitions stay. Mixer Q8 quality,
+skinny `mma_i32_j128`, FFN `shared_y_swiglu_q8`, and GDN shared-inverse stay.
+Tiled `launch_attention_prepare_chunk_tiled` remains the unloosened OPT-005
+reference. Live exclusive sitting **keep:** Quartz P strictly greater than the
+frozen then-current keep-oracle P denominator; D128/D2048 throughput and p95
+guards held; `reverted` false; `keep_sitting_skipped` false; `status`
+measured. D2048 tok/s improvement is not required for this prefill keep.
+`quartz_meets_llama` is informational and is not this gate. **The 2K parity
+owner remains the blocked dedicated gate.** This keep does not substitute for
+that gate and does not claim Quartz ≥ llama.cpp. Live numbers stay in the
+report:
+[`evidence/optimization/opt041-fattn-warp-qk/REPORT.md`](../evidence/optimization/opt041-fattn-warp-qk/REPORT.md),
+[`pins/opt041_fattn_warp_qk_contract.json`](../pins/opt041_fattn_warp_qk_contract.json),
+and
+[`fixtures/opt041_fattn_warp_qk.json`](../fixtures/opt041_fattn_warp_qk.json).
+
 The **proof boundary** excludes comparative speed claims, 2K/8K sustained
 prefill throughput, execution of a 128K prefill, 128K retrieval quality, thermal
 stability, superiority to llama.cpp/vLLM, and a Nsight Systems overlap timeline.
@@ -911,7 +940,10 @@ value accumulation and `mma` probability×V; it does not own or pass the
 overlay scratch and a live 4K keep versus the then-current accepted P
 denominator with the D128/D2048 guard; production inverse pin is `shared`;
 decode sequential GDN and fuse `off` stay; it does not own or pass the 2K
-tok/s gate. BEN-001
+tok/s gate. OPT-041 records warp-owned prompt QK microtiles and a live 4K keep
+versus the then-current keep-oracle P denominator with the D128/D2048 guard;
+production QK pin is `warp_microtile`; register VKQ and P×V MMA stay; it does
+not own or pass the 2K tok/s gate. BEN-001
 provides the harness; CMP-002/CMP-003 still own the 30-sample comparative gate.
 QLT-001 remains blocked. OPT-012's prompt graphs are FFN subgraphs only: not a
 whole-chunk graph, not a speedup gate, and not 128K quality recovery.

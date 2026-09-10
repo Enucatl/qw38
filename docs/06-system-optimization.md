@@ -34,9 +34,9 @@ Q4_K shares one DS4 Y for gate/up and writes down-leg Y from SwiGLU
 and not installed (OPT-037); production stays I=128 / J=128.
 Production prompt attention uses Ada+ stream-K fattn after the
 OPT-026 keep, with register-resident value sums after the OPT-033 keep
-and dual-F16 probability×V MMA after the OPT-035 keep;
-persistent stream-K was A/B-lost and not installed
-(OPT-027). Q4_K/Q6_K MMQ stream-K was A/B-lost and not installed
+and dual-F16 probability×V MMA after the OPT-035 keep, with warp-owned QK
+microtiles after the OPT-041 keep; persistent stream-K was A/B-lost and not
+installed (OPT-027). Q4_K/Q6_K MMQ stream-K was A/B-lost and not installed
 (OPT-028); production quality MMA stays 2D tiling. Fusing GDN conv and
 gated-output into the warp-column token loop was A/B-lost and not
 installed (OPT-029); production GDN core stays split parallel conv +
@@ -54,10 +54,10 @@ OPT-016 2K llama.cpp parity gate. Production prompt GDN recurrence is the
 warp-column fused quality path; sequential windows remain the unloosened
 reference. Production prompt attention (`token_count >= 16`) is the fattn-mma
 analog with Ada+ stream-K after the OPT-026 keep, register-resident
-value sums after the OPT-033 keep, and dual-F16 probability×V MMA after
-the OPT-035 keep; persistent stream-K
-was measured and rejected (OPT-027); tiled attention remains the
-unloosened reference. Q4_K/Q6_K MMQ stream-K was measured and rejected
+value sums after the OPT-033 keep, dual-F16 probability×V MMA after
+the OPT-035 keep, and warp-owned QK microtiles after the OPT-041 keep;
+persistent stream-K was measured and rejected (OPT-027); tiled attention
+remains the unloosened reference. Q4_K/Q6_K MMQ stream-K was measured and rejected
 (OPT-028); production quality MMA remains 2D tiling. Fusing GDN conv and
 gated-output into the warp-column token loop was measured and rejected
 (OPT-029); production GDN core remains split conv + warp-column +
@@ -601,6 +601,29 @@ increment does not own the 2K llama.cpp parity gate. Quartz ≥ llama.cpp is
 informational. Live tok/s stay in the report; this chapter does not replace
 them:
 [`evidence/optimization/opt040-gdn-shared-inverse/REPORT.md`](../evidence/optimization/opt040-gdn-shared-inverse/REPORT.md).
+
+## Warp-owned prompt QK microtiles (OPT-041)
+
+**Measured, RTX 5090:** production prompt fattn on Ada+ stream-K with
+register-resident VKQ and dual-F16 probability×V MMA was A/B'd between
+shared `cparts` QK reduction and warp-owned 16×8 microtiles. The paired
+CUDA-event A/B on the complete 4096-row attention component (staging +
+quality + combine) selected `warp_microtile` with byte-equal quality output
+versus `cparts` and frozen OPT-005 envelopes versus tiled. `kSelectedQKPath`
+is `warp_microtile`. `kSelectedVkqAccum` stays `registers`. `kSelectedPvPath`
+stays `mma`. The `cparts` shared slab stays allocated; softmax, rescale,
+P×V MMA, register VKQ scatter, meta, and the stream-K combine kernel stay.
+Decode `warp_query` attention, OPT-040 shared GDN inverse, and OPT-029 fuse
+`off` stay. No extra persistent `cudaMalloc`. Keep denominators are the frozen
+then-current accepted P and D128/D2048 means and p95s copied into the
+contract. **Keep:** A/B winner `warp_microtile` with strictly lower 4096
+complete-attention mean; live P tok/s strictly exceeds that frozen P
+denominator; the cross-workload guard held (D128/D2048 throughput and both
+p95 flavors within 5%). Frozen attention envelopes are unloosened. `reverted`
+is false. This increment does not own the 2K llama.cpp parity gate. Quartz ≥
+llama.cpp is informational. Live tok/s stay in the report; this chapter does
+not replace them:
+[`evidence/optimization/opt041-fattn-warp-qk/REPORT.md`](../evidence/optimization/opt041-fattn-warp-qk/REPORT.md).
 
 ## DwarfStar transfer boundary
 

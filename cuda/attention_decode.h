@@ -284,6 +284,20 @@ cudaError_t launch_attention_prepare_chunk_stream_k_pv(
     float* output, float* partial_vkq, float* meta, const char* pv_path,
     cudaStream_t stream) noexcept;
 
+const char* selected_qk_path() noexcept;
+bool fattn_uses_warp_qk() noexcept;
+int fattn_warp_qk_occupancy() noexcept;
+
+cudaError_t launch_attention_prepare_chunk_stream_k_qk(
+    const AttentionConfig& config, std::size_t start_position,
+    std::size_t token_count, const float* query, const float* key,
+    const float* value, const float* query_norm_scale,
+    const float* key_norm_scale, const float* output_gate,
+    const AttentionCache& committed, const AttentionCache& candidate_rows,
+    float* normalized_query, float* normalized_key, float* score_workspace,
+    float* output, float* partial_vkq, float* meta, const char* qk_path,
+    cudaStream_t stream) noexcept;
+
 cudaError_t launch_attention_prepare_chunk_grouped_instrumented(
     const AttentionConfig& config, std::size_t start_position,
     std::size_t token_count, const float* query, const float* key,
