@@ -2,14 +2,12 @@
 name: run-ledger-task-cursor
 description: >-
   Execute the next eligible or an explicitly selected repository
-  implementation-ledger task through Cursor Task subagents using
-  cursor-grok-4.6-high for every stage (planning, implementation,
-  documentation, verification, delivery). Use when advancing
+  implementation-ledger task through Cursor Task subagents. Use when advancing
   implementation_ledger.md, running the next ledger task, continuing
   ledger work, unblocking or delivering a pending ledger ID, or when
-  the user mentions run-ledger-task / run-ledger-task-cursor under
+  the user mentions run-ledger-task-codex / run-ledger-task-cursor under
   Cursor. Do not use for ad hoc changes that are not tracked in the
-  ledger. Prefer this over run-ledger-task when running under Cursor
+  ledger. Prefer this over run-ledger-task-codex when running under Cursor
   rather than Codex.
 ---
 
@@ -19,6 +17,12 @@ Act as a lightweight coordinator for exactly one primary ledger increment. The
 repository's `plan.md` and `implementation_ledger.md` are authoritative. Keep a
 permanent dossier at `tasks/<PRIMARY-ID>.md`; read
 [the dossier template](references/task-dossier-template.md) before planning.
+Before planning or implementation, check whether `tasks/<PRIMARY-ID>.md`
+already exists. When it exists, read it in full and use its resolved decisions,
+file boundaries, acceptance commands, non-goals, and run-record constraints as
+the implementation guide. Do not replace or silently weaken an existing
+dossier; amend it only when the failure loop explicitly permits a dossier
+repair.
 
 ## Performance steering (prefill/decode)
 
@@ -49,14 +53,15 @@ or plan-forbidden.
 
 ## Runtime mapping
 
-This skill is the Cursor port of `.agents/skills/run-ledger-task`. Differences:
+This skill is the Cursor port of `.agents/skills/run-ledger-task-codex`. Differences:
 
 - Spawn stages with the Cursor **Task** tool, not Codex native subagents.
-- Use model slug `cursor-grok-4.6-high` for **every** stage, repair, and
-  diagnostic agent. Do not substitute another family, effort, or the
-  `cursor-grok-4.6-high-fast` variant. Never use a `-fast` model for this
-  skill. If `cursor-grok-4.6-high` is unavailable or rejected, stop and report
-  the failure to the user; do not fall back.
+- Use model slug `cursor-grok-4.6-high` for planning and implementation, and
+  `composer-2.5` for documentation, verification/testing, delivery, and their
+  repairs. Do not substitute `cursor-grok-4.6-high-fast`, other `-fast`
+  variants, or `auto`. If either required
+  model is unavailable or rejected, stop and report the failure; do not fall
+  back silently.
 - Prefer `subagent_type: "generalPurpose"` unless a stage is pure codebase
   exploration, in which case `explore` is allowed for planning-only reads.
 - Give each stage **fresh context**: do not `resume` a prior agent; pass a
@@ -65,10 +70,12 @@ This skill is the Cursor port of `.agents/skills/run-ledger-task`. Differences:
   each stage before starting the next.
 - Do not perform stage work in the coordinator. Skip a stage when it has no
   real work.
-- There is no Codex `account_usage.py` equivalent here. After each stage,
-  record `model: cursor-grok-4.6-high` and `telemetry_unavailable` (Cursor
-  session) in the dossier unless the runtime clearly exposes token/cost
-  fields; never invent usage.
+- The Cursor Task surface may not expose token/cost fields directly. When the
+  Cursor SDK or Agents API is available, source `run.usage` / `result.usage`
+  (token counts), `result.duration_ms`, and `agent.get_usage()` or the usage API
+  (billed cost). Otherwise record the actually assigned model
+  (`cursor-grok-4.6-high` or `composer-2.5`) and
+  `telemetry_unavailable` in the dossier; never invent usage.
 
 ## Admission
 
@@ -89,31 +96,33 @@ Continue only when all of these hold:
 - The worktree is clean, including untracked files.
 - The current branch has a configured upstream.
 - The task does not require an unapproved change to `plan.md`.
+- If `tasks/<ID>.md` exists, it is readable and internally consistent with the
+  selected ledger row; unresolved decisions or contradictory acceptance text
+  are a planning stop, not an invitation to infer silently.
 
 Also reject unknown IDs and terminal or already-active explicitly selected
 tasks. Report the exact failed gate and the evidence inspected.
 
 ## Stages
 
-Every spawn below uses Task with `model: "cursor-grok-4.6-high"` only.
-
-1. Spawn a planning agent to inspect the repository and create a
-   decision-complete dossier. Its output contract is the dossier path, coupled
+1. Spawn a planning agent with `model: "cursor-grok-4.6-high"` to inspect the repository
+   and create or, when it already exists, validate and amend a decision-complete
+   dossier. Its output contract is the dossier path, coupled
    IDs, changed files, decisions made, and unresolved decisions. Verify that
    every coupled ID exists, is `pending`, has satisfied dependencies, and
    represents documentation or evidence inseparable from the primary increment.
    Then mark the primary and coupled tasks `in_progress`. Do not continue if any
    implementation choice remains unresolved or the dossier is inconsistent with
    the ledger or plan.
-2. Spawn an implementation agent to implement only the dossier's code, tests,
+2. Spawn an implementation agent with `model: "cursor-grok-4.6-high"` to implement only the dossier's code, tests,
    and fixtures and run focused validation. The agent must append its changes
    and exact command outcomes to the dossier, without committing.
 3. If documentation or evidence changes are required, spawn a fresh
-   documentation agent for prose, links, mechanical index updates, and any
+   documentation agent with `model: "composer-2.5"` for prose, links, mechanical index updates, and any
    fixtures, measurements, hashes, contracts, pins, ledger history, or
    acceptance claims the dossier assigns to this stage. It records its work in
    the dossier and does not commit.
-4. Spawn a fresh integration verifier. It independently reviews the complete
+4. Spawn a fresh integration verifier with `model: "composer-2.5"`. It independently reviews the complete
    diff against the dossier, ledger acceptance condition, `plan.md`, and
    repository boundaries. It may run formatting but makes no semantic fixes. It
    runs the dossier's focused and repository-wide gates, including
@@ -124,7 +133,8 @@ Every spawn below uses Task with `model: "cursor-grok-4.6-high"` only.
    sufficient evidence by themselves. If formatting changes files, it reruns
    affected tests. It appends exact commands, outcomes, and a clear pass/fail
    verdict to the dossier.
-5. Only after a passing verification, spawn a fresh delivery agent. It confirms
+5. Only after a passing verification, spawn a fresh delivery agent with
+   `model: "composer-2.5"`. It confirms
    scope and acceptance evidence, changes the primary and every coupled task
    from `in_progress` to `done`, adds the final UTC ledger entry, records the
    outcome in the dossier, creates one commit, and pushes the current branch to
@@ -145,11 +155,11 @@ Neither form authorizes a `plan.md` change.
 Keep retries bounded and record every attempt in the dossier:
 
 - After the first ordinary verification failure, spawn one fresh
-  implementation repair agent using the dossier and verifier findings, then
-  verify again with a fresh verifier agent.
+  `cursor-grok-4.6-high` implementation repair agent using the dossier and verifier
+  findings, then verify again with a fresh `composer-2.5` verifier agent.
 - For a repeated failure, or an architectural failure on any attempt, spawn one
-  diagnostic agent to amend an inadequate dossier, then one fresh repair and
-  one fresh verification pass.
+  `cursor-grok-4.6-high` diagnostic agent to amend an inadequate dossier, then one fresh
+  `cursor-grok-4.6-high` repair and one fresh `composer-2.5` verification pass.
 - On any further failure, unavailable dependency, material ambiguity, or needed
   architecture change, set the primary and applicable coupled tasks to
   `blocked`, add the reason and recovery condition to the dossier and ledger,
@@ -162,8 +172,9 @@ resuming; do not silently expand scope.
 ## Completion Report
 
 Report the task and coupled IDs, final status, commit and push result, verifier
-commands, retries, and dossier path. Also report per-stage model
-(`cursor-grok-4.6-high`), elapsed time when known, retry count, first-pass
+commands, retries, and dossier path. Also report per-stage model (`cursor-grok-4.6-high`
+for planning/implementation and `composer-2.5` for documentation,
+verification/testing, and delivery), elapsed time when known, retry count, first-pass
 acceptance, and token/cost data only when the runtime exposes them.
 
 For throughput / keep-reject / oracle-steered tasks, always include a
