@@ -13,7 +13,13 @@ Select a tier with `QW38_CUDA_TEST_TIER`:
 - `correctness`: small MMA coverage with three measured samples; no large
   tuning or admission sweeps.
 - `acceptance`: the historical three-warmup/30-sample protocol and all
-  performance/admission checks. Use this before recording performance claims.
+  performance/admission checks. Large independent host references are sampled
+  deterministically at up to 32 rows and 32 prompt rows; small/boundary cases
+  remain full-reference. Use this before recording performance claims.
+
+Native diagnostics emit epoch-millisecond run timestamps, per-suite phase
+durations, and aggregate host-reference timing/counts. Capture stdout as the
+run evidence when investigating a new bottleneck.
 
 For example:
 

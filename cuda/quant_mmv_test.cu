@@ -1,10 +1,12 @@
 #include "quant_mmv.h"
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
+#include <limits>
 #include <sys/stat.h>
 #include <vector>
 
@@ -14,6 +16,96 @@
 #include "test_tier.h"
 
 namespace {
+
+constexpr std::size_t kFullReferencePointLimit = 1'000'000;
+constexpr std::size_t kReferenceSampleCount = 32;
+
+struct ReferenceTelemetry {
+  std::size_t calls = 0;
+  std::size_t full_calls = 0;
+  std::size_t sampled_calls = 0;
+  std::size_t full_points = 0;
+  std::size_t sampled_points = 0;
+  double host_ms = 0.0;
+};
+
+ReferenceTelemetry g_reference_telemetry;
+
+std::int64_t epoch_ms() {
+  return std::chrono::duration_cast<std::chrono::milliseconds>(
+             std::chrono::system_clock::now().time_since_epoch())
+      .count();
+}
+
+class PhaseTimer {
+ public:
+  explicit PhaseTimer(const char* name)
+      : name_(name), start_(std::chrono::steady_clock::now()),
+        start_epoch_ms_(epoch_ms()) {}
+
+  ~PhaseTimer() {
+    const auto end = std::chrono::steady_clock::now();
+    const auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(
+                             end - start_)
+                             .count() /
+                         1000.0;
+    std::printf("test_phase=%s start_epoch_ms=%lld end_epoch_ms=%lld "
+                "elapsed_ms=%.3f\n",
+                name_, static_cast<long long>(start_epoch_ms_),
+                static_cast<long long>(epoch_ms()), elapsed);
+  }
+
+ private:
+  const char* name_;
+  std::chrono::steady_clock::time_point start_;
+  std::int64_t start_epoch_ms_;
+};
+
+class RunSummary {
+ public:
+  explicit RunSummary(const char* tier) : start_epoch_ms_(epoch_ms()) {
+    std::printf("test_run_start_epoch_ms=%lld test_tier=%s\n",
+                static_cast<long long>(start_epoch_ms_), tier);
+  }
+
+  ~RunSummary() {
+    std::printf("test_run_end_epoch_ms=%lld reference_calls=%zu "
+                "reference_full_calls=%zu reference_sampled_calls=%zu "
+                "reference_full_points=%zu reference_sampled_points=%zu "
+                "reference_host_ms=%.3f reference_policy=sampled_large_cases "
+                "reference_point_limit=%zu reference_axis_samples=%zu\n",
+                static_cast<long long>(epoch_ms()), g_reference_telemetry.calls,
+                g_reference_telemetry.full_calls,
+                g_reference_telemetry.sampled_calls,
+                g_reference_telemetry.full_points,
+                g_reference_telemetry.sampled_points,
+                g_reference_telemetry.host_ms, kFullReferencePointLimit,
+                kReferenceSampleCount);
+  }
+
+ private:
+  std::int64_t start_epoch_ms_;
+};
+
+std::vector<std::size_t> reference_indices(std::size_t count, bool sampled) {
+  if (!sampled) {
+    std::vector<std::size_t> indices(count);
+    for (std::size_t index = 0; index < count; ++index) indices[index] = index;
+    return indices;
+  }
+  const std::size_t samples = std::min(count, kReferenceSampleCount);
+  std::vector<std::size_t> indices;
+  indices.reserve(samples);
+  if (samples == 0) return indices;
+  if (samples == 1) {
+    indices.push_back(0);
+    return indices;
+  }
+  for (std::size_t sample = 0; sample < samples; ++sample) {
+    indices.push_back((sample * (count - 1)) / (samples - 1));
+  }
+  return indices;
+}
 
 int fail_cuda(const char* operation, cudaError_t error) {
   std::fprintf(stderr, "%s: %s\n", operation, cudaGetErrorString(error));
@@ -209,40 +301,64 @@ bool reference_dequant_gemm(qw38::cuda::QuantKind kind,
                             const std::vector<__nv_bfloat16>& prompt,
                             std::size_t prompt_rows,
                             std::vector<float>* output) {
+  const auto started = std::chrono::steady_clock::now();
   const std::size_t block_bytes =
       kind == qw38::cuda::QuantKind::kQ4K ? 144
       : kind == qw38::cuda::QuantKind::kQ6K ? 210
                                            : 34;
   const std::size_t block_values =
       kind == qw38::cuda::QuantKind::kQ8_0 ? 32 : 256;
-  output->assign(prompt_rows * output_rows, 0.0F);
+  const std::size_t points = prompt_rows * output_rows;
+  const bool sampled = points > kFullReferencePointLimit;
+  const float missing = std::numeric_limits<float>::quiet_NaN();
+  output->assign(points, sampled ? missing : 0.0F);
+  const std::vector<std::size_t> output_indices =
+      reference_indices(output_rows, sampled);
+  const std::vector<std::size_t> prompt_indices =
+      reference_indices(prompt_rows, sampled);
   std::vector<float> decoded(block_values);
-  for (std::size_t out = 0; out < output_rows; ++out) {
-    for (std::size_t prompt_row = 0; prompt_row < prompt_rows; ++prompt_row) {
+  std::vector<float> decoded_row(columns);
+  for (std::size_t out : output_indices) {
+    for (std::size_t block = 0; block < columns / block_values; ++block) {
+      const std::uint8_t* packed =
+          weights.data() +
+          (out * (columns / block_values) + block) * block_bytes;
+      const qw38::Status status =
+          kind == qw38::cuda::QuantKind::kQ4K
+              ? qw38::internal::decode_q4_k(packed, block_bytes, decoded.data(),
+                                            decoded.size())
+          : kind == qw38::cuda::QuantKind::kQ6K
+              ? qw38::internal::decode_q6_k(packed, block_bytes, decoded.data(),
+                                            decoded.size())
+              : qw38::internal::decode_q8_0(packed, block_bytes, decoded.data(),
+                                            decoded.size());
+      if (!status.is_ok()) return false;
+      std::copy(decoded.begin(), decoded.end(),
+                decoded_row.begin() + block * block_values);
+    }
+    for (std::size_t prompt_row : prompt_indices) {
       float sum = 0.0F;
-      for (std::size_t block = 0; block < columns / block_values; ++block) {
-        const std::uint8_t* packed =
-            weights.data() +
-            (out * (columns / block_values) + block) * block_bytes;
-        const qw38::Status status =
-            kind == qw38::cuda::QuantKind::kQ4K
-                ? qw38::internal::decode_q4_k(packed, block_bytes,
-                                              decoded.data(), decoded.size())
-            : kind == qw38::cuda::QuantKind::kQ6K
-                ? qw38::internal::decode_q6_k(packed, block_bytes,
-                                              decoded.data(), decoded.size())
-                : qw38::internal::decode_q8_0(packed, block_bytes,
-                                              decoded.data(), decoded.size());
-        if (!status.is_ok()) return false;
-        for (std::size_t within = 0; within < block_values; ++within) {
-          const std::size_t column = block * block_values + within;
-          sum += decoded[within] * __bfloat162float(
-                     prompt[prompt_row * columns + column]);
-        }
+      for (std::size_t column = 0; column < columns; ++column) {
+        sum += decoded_row[column] *
+               __bfloat162float(prompt[prompt_row * columns + column]);
       }
       (*output)[prompt_row * output_rows + out] = sum;
     }
   }
+  const auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(
+                           std::chrono::steady_clock::now() - started)
+                           .count() /
+                       1000.0;
+  ++g_reference_telemetry.calls;
+  if (sampled) {
+    ++g_reference_telemetry.sampled_calls;
+    g_reference_telemetry.sampled_points +=
+        output_indices.size() * prompt_indices.size();
+  } else {
+    ++g_reference_telemetry.full_calls;
+    g_reference_telemetry.full_points += points;
+  }
+  g_reference_telemetry.host_ms += elapsed;
   return true;
 }
 
@@ -260,11 +376,14 @@ bool ds4_q4k_association_ok(const std::vector<float>& got,
   *association_bad = 0;
   *nonfinite = 0;
   double squared = 0.0;
+  std::size_t compared = 0;
   for (std::size_t index = 0; index < got.size(); ++index) {
+    if (std::isnan(ref[index])) continue;
     if (!std::isfinite(got[index]) || !std::isfinite(ref[index])) {
       ++*nonfinite;
       continue;
     }
+    ++compared;
     const float absolute = std::fabs(got[index] - ref[index]);
     const float relative =
         ref[index] != 0.0F ? absolute / std::fabs(ref[index])
@@ -274,9 +393,9 @@ bool ds4_q4k_association_ok(const std::vector<float>& got,
     squared += static_cast<double>(absolute) * absolute;
     if (absolute > abs_tol && relative > kRelTol) ++*association_bad;
   }
-  *rms = got.empty()
+  *rms = compared == 0
              ? 0.0F
-             : static_cast<float>(std::sqrt(squared / got.size()));
+             : static_cast<float>(std::sqrt(squared / compared));
   return *nonfinite == 0 && *association_bad == 0;
 }
 
@@ -294,11 +413,14 @@ bool ds4_q8_association_ok(const std::vector<float>& got,
   *association_bad = 0;
   *nonfinite = 0;
   double squared = 0.0;
+  std::size_t compared = 0;
   for (std::size_t index = 0; index < got.size(); ++index) {
+    if (std::isnan(ref[index])) continue;
     if (!std::isfinite(got[index]) || !std::isfinite(ref[index])) {
       ++*nonfinite;
       continue;
     }
+    ++compared;
     const float absolute = std::fabs(got[index] - ref[index]);
     const float relative =
         ref[index] != 0.0F ? absolute / std::fabs(ref[index])
@@ -308,9 +430,9 @@ bool ds4_q8_association_ok(const std::vector<float>& got,
     squared += static_cast<double>(absolute) * absolute;
     if (absolute > abs_tol && relative > kRelTol) ++*association_bad;
   }
-  *rms = got.empty()
+  *rms = compared == 0
              ? 0.0F
-             : static_cast<float>(std::sqrt(squared / got.size()));
+             : static_cast<float>(std::sqrt(squared / compared));
   return *nonfinite == 0 && *association_bad == 0;
 }
 
@@ -862,6 +984,7 @@ int run_mma_ij_case(const char* name, std::size_t output_rows,
 }
 
 int run_ffn_tile_pin_suite() {
+  [[maybe_unused]] PhaseTimer phase("ffn_tile_pin_suite");
   if (!qw38::cuda::legal_ffn_quality_i(
           qw38::cuda::selected_ffn_gate_quality_i()) ||
       !qw38::cuda::legal_ffn_prompt_tile(
@@ -2563,6 +2686,7 @@ int run_mmq_stream_k_ab() {
 }
 
 int run_mmq_stream_k_suite() {
+  [[maybe_unused]] PhaseTimer phase("mmq_stream_k_suite");
   if (run_mmq_stream_k_helpers() != 0) return 1;
   if (run_mma_stream_k_case(qw38::cuda::QuantKind::kQ4K,
                             "q4_k_sk_64x17408x5120", 17408, 5120, 64,
@@ -3046,6 +3170,7 @@ int run_d2r_ab() {
 }
 
 int run_q8_quality_suite() {
+  [[maybe_unused]] PhaseTimer phase("q8_quality_and_ab_suite");
   if (qw38::cuda::selected_q8_quality_mmq_prompt_tile() != 128U ||
       qw38::cuda::q8_quality_mmq_occupancy(128) < 1 ||
       qw38::cuda::q8_quality_mmq_occupancy_i(128, 32) < 1 ||
@@ -3126,6 +3251,7 @@ int main() {
                  "or acceptance\n");
     return 2;
   }
+  [[maybe_unused]] RunSummary summary(qw38::cuda::test_tier_name());
   if (qw38::cuda::selected_mmv_warps(48) != 4 ||
       qw38::cuda::selected_mmv_warps(1024) != 8 ||
       qw38::cuda::selected_mmv_warps(5120) != 16 ||

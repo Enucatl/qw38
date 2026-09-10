@@ -1,6 +1,7 @@
 #include "scheduler_primitives.h"
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
@@ -13,6 +14,51 @@
 #include "test_tier.h"
 
 namespace {
+
+std::int64_t epoch_ms() {
+  return std::chrono::duration_cast<std::chrono::milliseconds>(
+             std::chrono::system_clock::now().time_since_epoch())
+      .count();
+}
+
+class PhaseTimer {
+ public:
+  explicit PhaseTimer(const char* name)
+      : name_(name), start_(std::chrono::steady_clock::now()),
+        start_epoch_ms_(epoch_ms()) {}
+
+  ~PhaseTimer() {
+    const auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(
+                             std::chrono::steady_clock::now() - start_)
+                             .count() /
+                         1000.0;
+    std::printf("test_phase=%s start_epoch_ms=%lld end_epoch_ms=%lld "
+                "elapsed_ms=%.3f\n",
+                name_, static_cast<long long>(start_epoch_ms_),
+                static_cast<long long>(epoch_ms()), elapsed);
+  }
+
+ private:
+  const char* name_;
+  std::chrono::steady_clock::time_point start_;
+  std::int64_t start_epoch_ms_;
+};
+
+class RunSummary {
+ public:
+  explicit RunSummary(const char* tier) : start_epoch_ms_(epoch_ms()) {
+    std::printf("test_run_start_epoch_ms=%lld test_tier=%s\n",
+                static_cast<long long>(start_epoch_ms_), tier);
+  }
+
+  ~RunSummary() {
+    std::printf("test_run_end_epoch_ms=%lld\n",
+                static_cast<long long>(epoch_ms()));
+  }
+
+ private:
+  std::int64_t start_epoch_ms_;
+};
 
 int fail_cuda(const char* operation, cudaError_t error) {
   std::fprintf(stderr, "%s: %s\n", operation, cudaGetErrorString(error));
@@ -42,6 +88,7 @@ void measure(const std::vector<__nv_bfloat16>& actual,
 }
 
 int run_pointwise() {
+  [[maybe_unused]] PhaseTimer phase("scheduler_pointwise");
   constexpr std::size_t kResidual = 5120;
   constexpr std::size_t kFfn = 17408;
   std::vector<__nv_bfloat16> residual(kResidual);
@@ -533,6 +580,7 @@ int main() {
                  "or acceptance\n");
     return 2;
   }
+  [[maybe_unused]] RunSummary summary(qw38::cuda::test_tier_name());
   if (run_pointwise() != 0 || run_layouts() != 0 || run_row_decode() != 0 ||
       run_tiled_gdn() != 0) {
     return 1;

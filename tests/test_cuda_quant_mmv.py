@@ -107,3 +107,11 @@ def test_cuda_quant_mmv_matches_scalar_reference() -> None:
     assert "production_numerics_path=strict" in run
     assert "optimized_admitted=false" in run
     assert "strict_reference=retained" in run
+    summary = next(
+        line for line in run.splitlines() if line.startswith("test_run_end_epoch_ms=")
+    )
+    summary_fields = dict(field.split("=", 1) for field in summary.split())
+    assert int(summary_fields["reference_sampled_calls"]) > 0
+    assert int(summary_fields["reference_sampled_points"]) > 0
+    assert "reference_policy=sampled_large_cases" in summary
+    assert any(line.startswith("test_phase=") for line in run.splitlines())

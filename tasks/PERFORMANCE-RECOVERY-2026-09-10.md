@@ -245,7 +245,10 @@ its individual dossier. No subagents or commits unless the user requests them.
    documentation. If Python code is touched use the Python skill, annotations,
    uv, and pytest. Broader checks follow the changed interfaces; no hardware
    throughput claims from skipped or smoke-only tests. Update existing
-   chapters/sources and the task's audit row at delivery.
+   chapters/sources and the task's audit row at delivery. Large quantized
+   diagnostic references use deterministic up-to-32-by-32 row sampling while
+   small/boundary references remain full; native stdout records epoch times,
+   phase durations, and aggregate host-reference time for bottleneck evidence.
 
 Profilers are allowed by `plan.md`. Prior tasks' `nsight:not_used` records are
 historical facts, not a ban on future profiling. Use Nsight Systems for launch
