@@ -1,6 +1,6 @@
 # The benchmark harness
 
-[Index](README.md) · Implementation tasks: BEN-001, OPT-032, OPT-038, OPT-056, OPT-069, EDU-046, and SCH-002 in
+[Index](README.md) · Implementation tasks: BEN-001, OPT-032, OPT-038, OPT-056, OPT-069, OPT-080, EDU-046, and SCH-002 in
 [`implementation_ledger.md`](../implementation_ledger.md) · Contracts:
 [`pins/benchmark_contract.json`](../pins/benchmark_contract.json),
 [`pins/opt032_decode_oracle_contract.json`](../pins/opt032_decode_oracle_contract.json),
@@ -244,6 +244,11 @@ Parity gap is `Tq-Tl`; the +5% bar is `Tq-Tl/1.05`. Quality v2 fails
 `task_arithmetic`. Preflight is not release evidence. The +5% outcome stays
 failed. Live numbers stay in
 [`evidence/optimization/opt069-batch-gate/REPORT.md`](../evidence/optimization/opt069-batch-gate/REPORT.md).
+OPT-080 is the post-069 combined freeze sitting. Quality preflight remains
+required before original P/D/2K timing. Preflight is not release evidence.
+The original +5% and 2K gates stay blocked unless their owning conditions
+pass. Live numbers stay in
+[`evidence/optimization/opt080-batch-gate/REPORT.md`](../evidence/optimization/opt080-batch-gate/REPORT.md).
 
 ## Reproduce a smoke safely
 

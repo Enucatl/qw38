@@ -172,7 +172,7 @@ New kernel tasks are conditional on measured opportunity and valid admission.
 | OPT-077 | Parallelize decode GDN state reductions across key/value tiles | OPT-070, OPT-071, OPT-073 | done | Complete 48-layer GDN benefits from bounded parallel FP32 recurrence with calibrated quality, exact state isolation and short E2E guards, or no-go/rejection | [`tasks/OPT-077.md`](tasks/OPT-077.md); [`pins/opt077_gdn_decode_contract.json`](pins/opt077_gdn_decode_contract.json); [`pins/opt077_iteration_contract.json`](pins/opt077_iteration_contract.json); [`fixtures/opt077_gdn_decode.json`](fixtures/opt077_gdn_decode.json); [`tools/opt077_gdn_decode.py`](tools/opt077_gdn_decode.py); [`tests/test_opt077_gdn_decode.py`](tests/test_opt077_gdn_decode.py); [`cuda/gdn_decode_path.cuh`](cuda/gdn_decode_path.cuh); [`cuda/gdn_decode_recurrence.cuh`](cuda/gdn_decode_recurrence.cuh); [`cuda/gdn_step.cu`](cuda/gdn_step.cu); [`cuda/gdn_step.h`](cuda/gdn_step.h); [`cuda/full_scheduler.h`](cuda/full_scheduler.h); [`cuda/full_scheduler.cu`](cuda/full_scheduler.cu); [`cuda/optimization_component_replay.cu`](cuda/optimization_component_replay.cu); [`cuda/optimization_component_replay.h`](cuda/optimization_component_replay.h); [`cuda/optimization_engine_probe.cu`](cuda/optimization_engine_probe.cu); [`cuda/opt077_gdn_decode_test.cu`](cuda/opt077_gdn_decode_test.cu); [`Makefile`](Makefile); [`evidence/optimization/opt077-gdn-decode/REPORT.md`](evidence/optimization/opt077-gdn-decode/REPORT.md); verification 2026-09-11T18:25:30Z |
 | OPT-078 | Hoist decode query preparation and vector-load KV | OPT-070, OPT-071, OPT-073 | done | Preparation-inclusive one-token attention wins with fixed 16 partitions, unchanged arithmetic/KV visibility and bounded E2E validation, or retained control | [`tasks/OPT-078.md`](tasks/OPT-078.md); [`pins/opt078_decode_attention_contract.json`](pins/opt078_decode_attention_contract.json); [`pins/opt078_iteration_contract.json`](pins/opt078_iteration_contract.json); [`fixtures/opt078_decode_attention.json`](fixtures/opt078_decode_attention.json); [`tools/opt078_decode_attention.py`](tools/opt078_decode_attention.py); [`tests/test_opt078_decode_attention.py`](tests/test_opt078_decode_attention.py); [`cuda/attention_decode_path.cuh`](cuda/attention_decode_path.cuh); [`cuda/attention_decode.cu`](cuda/attention_decode.cu); [`cuda/attention_decode.h`](cuda/attention_decode.h); [`cuda/opt078_decode_attention_test.cu`](cuda/opt078_decode_attention_test.cu); [`cuda/full_scheduler.h`](cuda/full_scheduler.h); [`cuda/full_scheduler.cu`](cuda/full_scheduler.cu); [`cuda/optimization_component_replay.cu`](cuda/optimization_component_replay.cu); [`cuda/optimization_component_replay.h`](cuda/optimization_component_replay.h); [`cuda/optimization_engine_probe.cu`](cuda/optimization_engine_probe.cu); [`Makefile`](Makefile); [`tools/run_optimization_task.py`](tools/run_optimization_task.py); [`evidence/optimization/opt078-decode-attention/REPORT.md`](evidence/optimization/opt078-decode-attention/REPORT.md); verification 2026-09-11T19:06:30Z |
 | OPT-079 | Convert prompt attention KV operands once per shared stage | OPT-070, OPT-071, OPT-073 | done | One conditional conversion-reuse candidate preserves exact F16 operands and async ownership and wins complete P cost, or resource/performance no-go | [`tasks/OPT-079.md`](tasks/OPT-079.md); [`pins/opt079_attention_kv_operands_contract.json`](pins/opt079_attention_kv_operands_contract.json); [`pins/opt079_iteration_contract.json`](pins/opt079_iteration_contract.json); [`fixtures/opt079_attention_kv_operands.json`](fixtures/opt079_attention_kv_operands.json); [`tools/opt079_attention_kv_operands.py`](tools/opt079_attention_kv_operands.py); [`tests/test_opt079_attention_kv_operands.py`](tests/test_opt079_attention_kv_operands.py); [`cuda/fattn_mma_f16.cuh`](cuda/fattn_mma_f16.cuh); [`cuda/fattn_mma_f16_pipeline.cuh`](cuda/fattn_mma_f16_pipeline.cuh); [`cuda/attention_decode.cu`](cuda/attention_decode.cu); [`cuda/attention_decode.h`](cuda/attention_decode.h); [`cuda/optimization_engine_probe.cu`](cuda/optimization_engine_probe.cu); [`cuda/opt079_attention_kv_operands_test.cu`](cuda/opt079_attention_kv_operands_test.cu); [`Makefile`](Makefile); [`evidence/optimization/opt079-attention-kv-operands/REPORT.md`](evidence/optimization/opt079-attention-kv-operands/REPORT.md); verification 2026-09-11T18:58:15Z |
-| OPT-080 | Validate the admitted combination against unchanged llama outcome gates | OPT-070, OPT-071, OPT-072, OPT-073, OPT-074, OPT-075, OPT-076, OPT-077, OPT-078, OPT-079 | pending | Quality preflight gates one combined original P/D/2K and state sitting; internal progress, parity, +5% and p95 outcomes reported without relaxing historical gates | [`tasks/OPT-080.md`](tasks/OPT-080.md) |
+| OPT-080 | Validate the admitted combination against unchanged llama outcome gates | OPT-070, OPT-071, OPT-072, OPT-073, OPT-074, OPT-075, OPT-076, OPT-077, OPT-078, OPT-079 | done | Quality preflight gates one combined original P/D/2K and state sitting; internal progress, parity, +5% and p95 outcomes reported without relaxing historical gates | [`tasks/OPT-080.md`](tasks/OPT-080.md); [`pins/opt080_batch_gate_contract.json`](pins/opt080_batch_gate_contract.json); [`pins/opt080_iteration_contract.json`](pins/opt080_iteration_contract.json); [`fixtures/opt080_batch_gate.json`](fixtures/opt080_batch_gate.json); [`tools/opt080_batch_gate.py`](tools/opt080_batch_gate.py); [`tests/test_opt080_batch_gate.py`](tests/test_opt080_batch_gate.py); [`evidence/optimization/opt080-batch-gate/REPORT.md`](evidence/optimization/opt080-batch-gate/REPORT.md); verification 2026-09-11T19:25:00Z |
 
 ### Post-042 recovery execution order (historical batch)
 
@@ -6651,3 +6651,31 @@ statements below are historical, not the current execution order.
   this ledger/audit bookkeeping. `plan.md` is unchanged. OPT-016 and OPT-056 stay
   `blocked`. Next eligible pending by dependency order: **OPT-080**.
   `claims_throughput=false`.
+
+### 2026-09-11T19:25:00Z — OPT-080 combined batch gate delivered (quality-blocked)
+
+- Ran OPT-080 as the post-069 freeze sitting. Every OPT-070–079 dependency has a
+  keep/reject/no-go (OPT-079 `kv_once` keep; Q8/MMQ inconclusive retain; packed
+  Q4, sequential GDN, and warp_query decode attention retained). Preflight
+  parsed all eight functional answers and scored 32 held-out targets; quality-v2
+  remains blocked on `task_arithmetic` (A vs expected B). Release stopped before
+  timed P/D/2K. Original +5% and 2K gates stay blocked. Diagnostic performance
+  plan recorded; not a keep.
+- Acceptance: host contract, 14 pytest cases, feedback preflight (51s), release
+  dry-run, and fail-closed `--mode release` (`quality_blocked`).
+- Acceptance evidence: [`tasks/OPT-080.md`](tasks/OPT-080.md);
+  [`pins/opt080_batch_gate_contract.json`](pins/opt080_batch_gate_contract.json);
+  [`pins/opt080_iteration_contract.json`](pins/opt080_iteration_contract.json);
+  [`fixtures/opt080_batch_gate.json`](fixtures/opt080_batch_gate.json);
+  [`tools/opt080_batch_gate.py`](tools/opt080_batch_gate.py);
+  [`tests/test_opt080_batch_gate.py`](tests/test_opt080_batch_gate.py);
+  [`Makefile`](Makefile);
+  [`evidence/optimization/opt080-batch-gate/REPORT.md`](evidence/optimization/opt080-batch-gate/REPORT.md).
+  Proof is quality-blocked preflight — not a release pass. **tok/s delta vs
+  OPT-069 baseline:** 0 (P 2914.65698 vs llama 3142.517034; D128 37.1789093 vs
+  68.8708796; D2048 35.4498482 vs 67.3394867). Remaining P parity 101.90 ms,
+  +5% bar 163.96 ms.
+- Marked OPT-080 `done`; delivery is limited to the verified task scope plus
+  this ledger/audit bookkeeping. `plan.md` is unchanged. OPT-016 and OPT-056 stay
+  `blocked`. No automatic next optimization sweep.
+

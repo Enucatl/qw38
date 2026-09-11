@@ -1,0 +1,170 @@
+{
+  "schema_version": 1,
+  "task": "OPT-058",
+  "workload": "functional",
+  "prompt_set": "v2",
+  "engines": [
+    "quartz",
+    "llama"
+  ],
+  "max_new_tokens": 16,
+  "token_271": 271,
+  "token_271_hex": "0a0a",
+  "selectors": {
+    "q4_decode": "packed",
+    "q8_decode": "dp4a_q8_1",
+    "q8_rows_skinny": 2,
+    "q8_layout_warps_skinny": 2,
+    "ffn_decode": "paired_staged",
+    "execution_graph": "ffn_only",
+    "rms_norm": "parallel_fma"
+  },
+  "quartz": [
+    {
+      "case": "task_arithmetic",
+      "next_token": 32,
+      "top_two": [
+        32,
+        33
+      ],
+      "text": "A",
+      "parser": "wrong_choice",
+      "tokens": [
+        32,
+        248046
+      ]
+    },
+    {
+      "case": "task_python_len",
+      "next_token": 32,
+      "top_two": [
+        32,
+        33
+      ],
+      "text": "A",
+      "parser": "exact_choice",
+      "tokens": [
+        32,
+        248046
+      ]
+    },
+    {
+      "case": "task_inference",
+      "next_token": 34,
+      "top_two": [
+        34,
+        90
+      ],
+      "text": "C",
+      "parser": "exact_choice",
+      "tokens": [
+        34,
+        248046
+      ]
+    },
+    {
+      "case": "task_minutes",
+      "next_token": 35,
+      "top_two": [
+        35,
+        34
+      ],
+      "text": "D",
+      "parser": "exact_choice",
+      "tokens": [
+        35,
+        248046
+      ]
+    },
+    {
+      "case": "task_sort",
+      "next_token": 33,
+      "top_two": [
+        33,
+        760
+      ],
+      "text": "B",
+      "parser": "exact_choice",
+      "tokens": [
+        33,
+        248046
+      ]
+    },
+    {
+      "case": "task_json",
+      "next_token": 32,
+      "top_two": [
+        32,
+        33
+      ],
+      "text": "A",
+      "parser": "exact_choice",
+      "tokens": [
+        32,
+        248046
+      ]
+    },
+    {
+      "case": "task_reading",
+      "next_token": 34,
+      "top_two": [
+        34,
+        248046
+      ],
+      "text": "C",
+      "parser": "exact_choice",
+      "tokens": [
+        34,
+        248046
+      ]
+    },
+    {
+      "case": "task_sequence",
+      "next_token": 35,
+      "top_two": [
+        35,
+        34
+      ],
+      "text": "D",
+      "parser": "exact_choice",
+      "tokens": [
+        35,
+        248046
+      ]
+    }
+  ],
+  "quartz_output_tokens": 16,
+  "llama_generate": null,
+  "llama_oracle": "missing",
+  "status": "passed",
+  "gguf_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+  "combined_production_paths": {
+    "rms_norm": "parallel_fma",
+    "q4_decode": "packed",
+    "q8_decode": "dp4a_q8_1",
+    "q6_decode": "integer_q8_1",
+    "ffn_decode": "paired_staged",
+    "query_prepare": "hoisted",
+    "attention_pipeline": "kv_once",
+    "gdn_preproc": "transpose",
+    "mmq_pipeline": "fma_async",
+    "ffn_prompt_pair": "off",
+    "execution_graphs": "ffn_only",
+    "production_numerics": "strict",
+    "gdn_decode": "sequential",
+    "decode_query_prep": "warp_query",
+    "q8_decode_rows_skinny": 2,
+    "q8_decode_rows_medium": 2,
+    "q8_decode_rows_wide": 2,
+    "q8_decode_layout_warps_skinny": 2,
+    "q8_decode_layout_warps_medium": 2,
+    "q8_decode_layout_warps_wide": 2,
+    "ffn_gate_quality_i": 128,
+    "ffn_gate_prompt_tile": 128,
+    "prompt_microbatch_rows": 4096,
+    "mmq_async_x": true,
+    "nvccflags": "-O2 --fmad=false",
+    "q8_layout": "r2_w2",
+    "ffn_tiles": "i128_j128"
+  }
+}

@@ -1,0 +1,203 @@
+{
+  "status": "quality_blocked",
+  "phase": "preflight",
+  "is_release_evidence": false,
+  "graph_eager_match": true,
+  "held_out_targets": 32,
+  "functional_output_tokens": 16,
+  "parsed_functional_answers": [
+    {
+      "raw": "A",
+      "stripped": "A",
+      "expected": "B",
+      "pass": false,
+      "reason": "wrong_choice",
+      "actual": "A",
+      "used_teacher_forcing": false,
+      "next_token": 32,
+      "top_two": [
+        32,
+        33
+      ],
+      "case": "task_arithmetic",
+      "engine": null
+    },
+    {
+      "raw": "A",
+      "stripped": "A",
+      "expected": "A",
+      "pass": true,
+      "reason": "exact_choice",
+      "actual": "A",
+      "used_teacher_forcing": false,
+      "next_token": 32,
+      "top_two": [
+        32,
+        33
+      ],
+      "case": "task_python_len",
+      "engine": null
+    },
+    {
+      "raw": "C",
+      "stripped": "C",
+      "expected": "C",
+      "pass": true,
+      "reason": "exact_choice",
+      "actual": "C",
+      "used_teacher_forcing": false,
+      "next_token": 34,
+      "top_two": [
+        34,
+        90
+      ],
+      "case": "task_inference",
+      "engine": null
+    },
+    {
+      "raw": "D",
+      "stripped": "D",
+      "expected": "D",
+      "pass": true,
+      "reason": "exact_choice",
+      "actual": "D",
+      "used_teacher_forcing": false,
+      "next_token": 35,
+      "top_two": [
+        35,
+        34
+      ],
+      "case": "task_minutes",
+      "engine": null
+    },
+    {
+      "raw": "B",
+      "stripped": "B",
+      "expected": "B",
+      "pass": true,
+      "reason": "exact_choice",
+      "actual": "B",
+      "used_teacher_forcing": false,
+      "next_token": 33,
+      "top_two": [
+        33,
+        760
+      ],
+      "case": "task_sort",
+      "engine": null
+    },
+    {
+      "raw": "A",
+      "stripped": "A",
+      "expected": "A",
+      "pass": true,
+      "reason": "exact_choice",
+      "actual": "A",
+      "used_teacher_forcing": false,
+      "next_token": 32,
+      "top_two": [
+        32,
+        33
+      ],
+      "case": "task_json",
+      "engine": null
+    },
+    {
+      "raw": "C",
+      "stripped": "C",
+      "expected": "C",
+      "pass": true,
+      "reason": "exact_choice",
+      "actual": "C",
+      "used_teacher_forcing": false,
+      "next_token": 34,
+      "top_two": [
+        34,
+        248046
+      ],
+      "case": "task_reading",
+      "engine": null
+    },
+    {
+      "raw": "D",
+      "stripped": "D",
+      "expected": "D",
+      "pass": true,
+      "reason": "exact_choice",
+      "actual": "D",
+      "used_teacher_forcing": false,
+      "next_token": 35,
+      "top_two": [
+        35,
+        34
+      ],
+      "case": "task_sequence",
+      "engine": null
+    }
+  ],
+  "selected_quality_verdicts": {
+    "parsed_functional_answers": true,
+    "held_out_32": true,
+    "quality_v2": "incomplete",
+    "quality_v3_absolute": "incomplete",
+    "quality_v3_engine_non_regression": "incomplete"
+  },
+  "quality_v2": {
+    "suite": "quality-v2",
+    "status": "incomplete",
+    "all": false,
+    "tasks": {
+      "pass": false,
+      "count": 8
+    }
+  },
+  "quality_v3": {
+    "suite": "quality-v3",
+    "status": "incomplete",
+    "absolute_task_accuracy": {
+      "pass": false,
+      "status": "incomplete"
+    },
+    "engine_non_regression": {
+      "pass": false,
+      "status": "incomplete"
+    }
+  },
+  "opt056_quality_requirement_met": false,
+  "d2048_output_tokens": 32,
+  "q4_path": "packed",
+  "selectors": {
+    "rms_norm": "parallel_fma",
+    "q4_decode": "packed",
+    "q8_decode": "dp4a_q8_1",
+    "q6_decode": "integer_q8_1",
+    "ffn_decode": "paired_staged",
+    "query_prepare": "hoisted",
+    "attention_pipeline": "kv_once",
+    "gdn_preproc": "transpose",
+    "mmq_pipeline": "fma_async",
+    "ffn_prompt_pair": "off",
+    "execution_graphs": "ffn_only",
+    "production_numerics": "strict",
+    "gdn_decode": "sequential",
+    "decode_query_prep": "warp_query",
+    "q8_decode_rows_skinny": 2,
+    "q8_decode_rows_medium": 2,
+    "q8_decode_rows_wide": 2,
+    "q8_decode_layout_warps_skinny": 2,
+    "q8_decode_layout_warps_medium": 2,
+    "q8_decode_layout_warps_wide": 2,
+    "ffn_gate_quality_i": 128,
+    "ffn_gate_prompt_tile": 128,
+    "prompt_microbatch_rows": 4096,
+    "mmq_async_x": true,
+    "nvccflags": "-O2 --fmad=false",
+    "q8_layout": "r2_w2",
+    "ffn_tiles": "i128_j128"
+  },
+  "launch_records": {
+    "source": "live probe/opt058 selectors plus OPT-060 protocol",
+    "q4_gate_up_down": "packed",
+    "instrumented_timing": false
+  }
+}

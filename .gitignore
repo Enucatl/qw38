@@ -71,3 +71,6 @@ Testing/
 .pytest_cache/
 .ruff_cache/
 __pycache__/
+
+# OPT-071 local capture cache (untracked sitting artifacts)
+evidence/optimization/opt071-attribution-repair/captures/

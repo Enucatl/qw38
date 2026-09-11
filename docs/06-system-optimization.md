@@ -720,6 +720,19 @@ outcomes: internal improvement with quality **unpassed**; llama parity
 end-to-end +5% gate stays blocked. Live numbers stay in
 [`evidence/optimization/opt069-batch-gate/REPORT.md`](../evidence/optimization/opt069-batch-gate/REPORT.md).
 
+## Combined post-069 batch sitting (OPT-080)
+
+**Measured, RTX 5090, quality-blocked preflight.** After OPT-070–079
+keep/reject/no-go, production still freezes packed Q4, sequential decode GDN,
+warp_query decode attention, and `kv_once` prompt attention. Quality-v2 remains
+the original absolute gate and failed `task_arithmetic` (A vs expected B) on
+parsed preflight answers; quality-v3 does not replace it. Preflight is not
+release evidence. Timed P/D/2K release was not started. Original +5% and 2K
+gates stay blocked. tok/s delta vs the OPT-069 sitting is 0 (P 2914.66 vs
+llama 3142.52; D128 37.18 vs 68.87; D2048 35.45 vs 67.34). Diagnostic
+performance is not a keep. Live numbers stay in
+[`evidence/optimization/opt080-batch-gate/REPORT.md`](../evidence/optimization/opt080-batch-gate/REPORT.md).
+
 ## Warp-owned prompt QK microtiles (OPT-041)
 
 **Measured, RTX 5090:** production prompt fattn on Ada+ stream-K with

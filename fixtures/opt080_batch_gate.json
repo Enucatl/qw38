@@ -1,0 +1,219 @@
+{
+  "schema_version": 1,
+  "task": "OPT-080",
+  "status": "quality_blocked",
+  "measurement_utc": "2026-09-11T19:22:26Z",
+  "combined_production_paths": {
+    "rms_norm": "parallel_fma",
+    "q4_decode": "packed",
+    "q8_decode": "dp4a_q8_1",
+    "q6_decode": "integer_q8_1",
+    "ffn_decode": "paired_staged",
+    "query_prepare": "hoisted",
+    "attention_pipeline": "kv_once",
+    "gdn_preproc": "transpose",
+    "mmq_pipeline": "fma_async",
+    "ffn_prompt_pair": "off",
+    "execution_graphs": "ffn_only",
+    "production_numerics": "strict",
+    "gdn_decode": "sequential",
+    "decode_query_prep": "warp_query",
+    "q8_decode_rows_skinny": 2,
+    "q8_decode_rows_medium": 2,
+    "q8_decode_rows_wide": 2,
+    "q8_decode_layout_warps_skinny": 2,
+    "q8_decode_layout_warps_medium": 2,
+    "q8_decode_layout_warps_wide": 2,
+    "ffn_gate_quality_i": 128,
+    "ffn_gate_prompt_tile": 128,
+    "prompt_microbatch_rows": 4096,
+    "mmq_async_x": true,
+    "nvccflags": "-O2 --fmad=false",
+    "q8_layout": "r2_w2",
+    "ffn_tiles": "i128_j128"
+  },
+  "candidate_decisions": {
+    "OPT-070": {
+      "status": "inconclusive",
+      "installed": true,
+      "selected": "r2_w2+fma_async_x",
+      "shipping_unchanged": true,
+      "q8_verdict": "inconclusive",
+      "mmq_verdict": "inconclusive"
+    },
+    "OPT-071": {
+      "status": "instrumentation",
+      "installed": false,
+      "selected": null,
+      "shipping_unchanged": true
+    },
+    "OPT-072": {
+      "status": "rejection_review",
+      "installed": false,
+      "selected": null,
+      "entry_count": 78
+    },
+    "OPT-073": {
+      "status": "quality_policy",
+      "installed": false,
+      "selected": "quality-v3 dual verdict",
+      "quality_v2_all": false
+    },
+    "OPT-074": {
+      "status": "measured",
+      "installed": false,
+      "selected": null,
+      "shipping_unchanged": true
+    },
+    "OPT-075": {
+      "status": "retain_packed",
+      "installed": false,
+      "selected": "packed",
+      "production_kept": false
+    },
+    "OPT-076": {
+      "status": "retain_packed",
+      "installed": false,
+      "selected": "packed",
+      "production_kept": false
+    },
+    "OPT-077": {
+      "status": "retain_sequential",
+      "installed": false,
+      "selected": "sequential",
+      "production_kept": false
+    },
+    "OPT-078": {
+      "status": "performance_rejected",
+      "installed": false,
+      "selected": "warp_query",
+      "production_kept": false
+    },
+    "OPT-079": {
+      "status": "keep",
+      "installed": true,
+      "selected": "kv_once",
+      "production_kept": true
+    }
+  },
+  "keeps": [
+    "OPT-064 r2_w2 (OPT-070 inconclusive retain)",
+    "OPT-066 fma_async_x (OPT-070 inconclusive retain)",
+    "OPT-079 kv_once"
+  ],
+  "rejected_or_retained": [
+    "OPT-070 Q8/MMQ inconclusive; shipping unchanged",
+    "OPT-071 instrumentation repair; no kernel keep",
+    "OPT-072 rejection review; no kernel keep",
+    "OPT-073 quality-v3 policy; quality-v2 still fail",
+    "OPT-074 GPU admission; missing coverage is not a keep",
+    "OPT-075 packed Q4 retained; integer not installed",
+    "OPT-076 packed retained; late-reduction not installed",
+    "OPT-077 sequential GDN retained",
+    "OPT-078 warp_query retained; prepared_q rejected"
+  ],
+  "batch_size": 4096,
+  "workspace_bytes": {
+    "mmq_x_shared_bytes": 94736,
+    "mmq_x_extra_bytes": 18448,
+    "x_ring_stages": 1
+  },
+  "compiler_flags": "-O2 --fmad=false",
+  "graphs": "ffn_only",
+  "intended_q4_path": "packed",
+  "opt056_history": "fixtures/opt056_performance_gate.json",
+  "opt069_history": "fixtures/opt069_batch_gate.json",
+  "hardware_executed": true,
+  "keep_sitting_skipped": true,
+  "preflight_is_release_evidence": false,
+  "owns_opt016_parity_gate": false,
+  "opt056_gate_passed": false,
+  "opt016_gate_passed": false,
+  "release_eligible": false,
+  "keep_claims_allowed": false,
+  "quality": {
+    "quality_v2": {
+      "suite": "quality-v2",
+      "status": "incomplete",
+      "all": false,
+      "tasks": {
+        "pass": false,
+        "count": 8
+      }
+    },
+    "quality_v3": {
+      "suite": "quality-v3",
+      "status": "incomplete",
+      "absolute_task_accuracy": {
+        "pass": false,
+        "status": "incomplete"
+      },
+      "engine_non_regression": {
+        "pass": false,
+        "status": "incomplete"
+      }
+    },
+    "legacy": {
+      "historical_only": true,
+      "opt056_tasks_pass": false
+    },
+    "qlt001_not_claimed": true,
+    "quality_v3_replaces_v2": false,
+    "relaxes_opt056": false
+  },
+  "preflight": {
+    "status": "quality_blocked",
+    "is_release_evidence": false,
+    "held_out_targets": 32,
+    "selected_quality_verdicts": {
+      "parsed_functional_answers": true,
+      "held_out_32": true,
+      "quality_v2": "incomplete",
+      "quality_v3_absolute": "incomplete",
+      "quality_v3_engine_non_regression": "incomplete"
+    },
+    "opt056_quality_requirement_met": false
+  },
+  "remaining_latency_budget": {
+    "source": "fixtures/opt069_batch_gate.json",
+    "p": {
+      "quartz_tok_s": 2914.65698,
+      "llama_tok_s": 3142.517034,
+      "parity_ms": 101.89738823402377,
+      "plus5_ms": 163.9647110002427
+    },
+    "d128": {
+      "quartz_tok_s": 37.1789093,
+      "llama_tok_s": 68.8708796,
+      "parity_ms": 3168.5234884718725,
+      "plus5_ms": 3345.528287325584
+    },
+    "d2048": {
+      "quartz_tok_s": 35.4498482,
+      "llama_tok_s": 67.3394867,
+      "parity_ms": 3419.836789346795,
+      "plus5_ms": 3600.866921708588
+    },
+    "tok_s_delta_vs_opt069": 0.0,
+    "speedup_vs_opt069": 1.0,
+    "note": "quality-blocked sitting does not replace OPT-069 measured tok/s"
+  },
+  "diagnostic_performance_plan": "evidence/optimization/opt080-batch-gate/diagnostic-performance-plan.json",
+  "proof_limit": "combined freeze of OPT-070-079 keep/reject/no-go selectors; OPT-069 and OPT-056 retained as history; same-sitting P/D128/D2048 versus pinned llama.cpp; parity gap is Tq-Tl; +5% throughput gap is Tq-Tl/1.05; do not label the parity gap as the +5% bar; decode p95 no worse than llama for the OPT-056 outcome; quality-v2 remains the original absolute gate; quality-v3 does not replace OPT-056 or OPT-016; full quality v2 on the frozen combination; original OPT-016 2K parity evidence; OPT-056 and OPT-016 stay blocked unless their gates pass; rejected candidates must not leak into production; instrumented timings are not release throughput; preflight is not release evidence; failed required quality stops release before long timing; diagnostic performance is not a release or keep",
+  "report_path": "evidence/optimization/opt080-batch-gate/REPORT.md",
+  "gate": {
+    "passed": false,
+    "quality": false
+  },
+  "outcomes": {
+    "internal_improvement_with_quality": {
+      "pass": false
+    },
+    "llama_parity": {
+      "pass": false
+    },
+    "opt056_plus5": {
+      "pass": false
+    }
+  }
+}

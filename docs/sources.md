@@ -999,6 +999,17 @@ baseline.
   is Tq-Tl/1.05; do not label the parity gap as the +5% bar; full quality v2;
   original OPT-016 2K parity evidence; OPT-056 and OPT-016 stay blocked unless
   their gates pass; preflight is not release evidence.
+- OPT-080 is the combined post-069 freeze sitting (packed Q4, sequential decode
+  GDN, warp_query decode attention, `kv_once` prompt attention). Quality-v2
+  preflight remains blocked on task_arithmetic. Preflight is not release
+  evidence. The original +5% and 2K gates stay blocked. Timed P/D/2K was not
+  started. tok/s delta versus the prior combined sitting is 0. Diagnostic
+  performance is not a keep. The schema-1 contract, fixture, and
+  report are
+  [`pins/opt080_batch_gate_contract.json`](../pins/opt080_batch_gate_contract.json),
+  [`fixtures/opt080_batch_gate.json`](../fixtures/opt080_batch_gate.json),
+  and
+  [`evidence/optimization/opt080-batch-gate/REPORT.md`](../evidence/optimization/opt080-batch-gate/REPORT.md).
 - OPT-041 is a local derivation over admitted Ada+ stream-K fattn with
   register-resident VKQ and dual-F16 probability×V MMA. It assigns each of
   eight 16×8 QK microtiles to one of four warps (`tile_id % 4`), lets the
