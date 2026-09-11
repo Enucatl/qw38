@@ -82,7 +82,7 @@ class GpuPhaseRecorder final {
         cudaEventDestroy(phases_[index].start);
       }
     }
-    if (epoch_ != nullptr) cudaEventDestroy(epoch_);
+    if (epoch_ != nullptr && owns_epoch_) cudaEventDestroy(epoch_);
   }
   GpuPhaseRecorder(const GpuPhaseRecorder&) = delete;
   GpuPhaseRecorder& operator=(const GpuPhaseRecorder&) = delete;
@@ -100,9 +100,22 @@ class GpuPhaseRecorder final {
   void set_layer(int layer) noexcept { layer_ = layer; }
 
   cudaError_t record_epoch(cudaStream_t stream) noexcept {
+    if (families_ != nullptr && families_->sequence_epoch_ready &&
+        families_->sequence_epoch != nullptr) {
+      epoch_ = families_->sequence_epoch;
+      owns_epoch_ = false;
+      return cudaSuccess;
+    }
     cudaError_t error = cudaSuccess;
     if (epoch_ == nullptr) error = cudaEventCreate(&epoch_);
     if (error == cudaSuccess) error = cudaEventRecord(epoch_, stream);
+    if (error == cudaSuccess && families_ != nullptr) {
+      families_->sequence_epoch = epoch_;
+      families_->sequence_epoch_ready = true;
+      owns_epoch_ = false;
+    } else if (error == cudaSuccess) {
+      owns_epoch_ = true;
+    }
     return error;
   }
 
@@ -357,6 +370,9 @@ class GpuPhaseRecorder final {
     rec.stream = reinterpret_cast<unsigned long long>(phase.stream);
     rec.start_event_id = static_cast<int>(families_->count) * 2;
     rec.end_event_id = rec.start_event_id + 1;
+    if (families_->next_scope_id < 1) families_->next_scope_id = 1;
+    rec.scope_id = families_->next_scope_id++;
+    rec.parent_scope_id = families_->token_scope_id;
     rec.start_ms = start_ms;
     rec.end_ms = end_ms;
     rec.complete_work_ms = elapsed;
@@ -413,6 +429,7 @@ class GpuPhaseRecorder final {
   bool active_ = false;
   bool overflow_ = false;
   cudaEvent_t epoch_ = nullptr;
+  bool owns_epoch_ = true;
   EngineAttribution* families_ = nullptr;
   LeafTimings* leaves_ = nullptr;
   DecodeAttribution* decode_ = nullptr;
@@ -522,22 +539,86 @@ cudaError_t maybe_capture_preprojection(ActivationCapture* capture,
   return error;
 }
 
+cudaError_t maybe_capture_layer_input(ActivationCapture* capture,
+                                     std::size_t layer, const float* device,
+                                     std::size_t count) noexcept {
+  if (capture == nullptr || !capture->capture_all_layers ||
+      capture->full_layer_input == nullptr || device == nullptr) {
+    return cudaSuccess;
+  }
+  if (layer >= capture->full_layer_count || count != internal::kResidualWidth) {
+    return cudaSuccess;
+  }
+  cudaError_t error = cudaDeviceSynchronize();
+  if (error != cudaSuccess) return error;
+  error = cudaMemcpy(capture->full_layer_input + layer * count, device,
+                     count * sizeof(float), cudaMemcpyDeviceToHost);
+  if (error == cudaSuccess && capture->full_layer_input_captured != nullptr) {
+    capture->full_layer_input_captured[layer] = true;
+  }
+  return error;
+}
+
+cudaError_t maybe_capture_attn_output(ActivationCapture* capture,
+                                     std::size_t layer, const float* device,
+                                     std::size_t count) noexcept {
+  if (capture == nullptr || !capture->capture_all_layers ||
+      capture->full_attn_output == nullptr || device == nullptr) {
+    return cudaSuccess;
+  }
+  if (layer >= capture->full_layer_count || count != internal::kResidualWidth) {
+    return cudaSuccess;
+  }
+  cudaError_t error = cudaDeviceSynchronize();
+  if (error != cudaSuccess) return error;
+  error = cudaMemcpy(capture->full_attn_output + layer * count, device,
+                     count * sizeof(float), cudaMemcpyDeviceToHost);
+  if (error == cudaSuccess && capture->full_attn_output_captured != nullptr) {
+    capture->full_attn_output_captured[layer] = true;
+  }
+  return error;
+}
+
 cudaError_t maybe_capture_residual(ActivationCapture* capture,
                                    std::size_t layer, const float* device,
                                    std::size_t count) noexcept {
-  const int slot = capture_slot_index(capture, layer);
-  if (slot < 0 || device == nullptr) return cudaSuccess;
+  if (capture == nullptr || device == nullptr) return cudaSuccess;
   if (count != internal::kResidualWidth) return cudaErrorInvalidValue;
-  cudaError_t error = cudaDeviceSynchronize();
+  cudaError_t error = cudaSuccess;
+  const int slot = capture_slot_index(capture, layer);
+  if (slot >= 0) {
+    error = cudaDeviceSynchronize();
+    if (error != cudaSuccess) return error;
+    ActivationCaptureSlot& dest = capture->slots[static_cast<std::size_t>(slot)];
+    dest.layer = layer;
+    std::snprintf(dest.residual_dtype, sizeof(dest.residual_dtype), "FP32");
+    dest.residual_shape = {1, count};
+    error = capture_fp32_vector(device, count, dest.residual_fp32.data(),
+                                dest.residual_sha256, dest.residual_prefix.data(),
+                                dest.residual_prefix.size());
+    if (error == cudaSuccess) dest.residual_captured = true;
+    if (error == cudaSuccess && capture->capture_all_layers &&
+        capture->full_ffn_input != nullptr &&
+        layer < capture->full_layer_count) {
+      std::memcpy(capture->full_ffn_input + layer * count,
+                  dest.residual_fp32.data(), count * sizeof(float));
+      if (capture->full_ffn_input_captured != nullptr) {
+        capture->full_ffn_input_captured[layer] = true;
+      }
+    }
+    return error;
+  }
+  if (!capture->capture_all_layers || capture->full_ffn_input == nullptr ||
+      layer >= capture->full_layer_count) {
+    return cudaSuccess;
+  }
+  error = cudaDeviceSynchronize();
   if (error != cudaSuccess) return error;
-  ActivationCaptureSlot& dest = capture->slots[static_cast<std::size_t>(slot)];
-  dest.layer = layer;
-  std::snprintf(dest.residual_dtype, sizeof(dest.residual_dtype), "FP32");
-  dest.residual_shape = {1, count};
-  error = capture_fp32_vector(device, count, dest.residual_fp32.data(),
-                              dest.residual_sha256, dest.residual_prefix.data(),
-                              dest.residual_prefix.size());
-  if (error == cudaSuccess) dest.residual_captured = true;
+  error = cudaMemcpy(capture->full_ffn_input + layer * count, device,
+                     count * sizeof(float), cudaMemcpyDeviceToHost);
+  if (error == cudaSuccess && capture->full_ffn_input_captured != nullptr) {
+    capture->full_ffn_input_captured[layer] = true;
+  }
   return error;
 }
 
@@ -2971,6 +3052,7 @@ Status execute_token(const ResidentModel& model, std::size_t token,
     copy_cstr(families->graph_mode, sizeof(families->graph_mode),
               graphs != nullptr ? "cuda_graph" : "eager_diagnostic");
     families->token_position = static_cast<int>(session->frontier_);
+    families->token_scope_id = families->next_scope_id++;
     error = category_recorder.record_epoch(nullptr);
     if (error == cudaSuccess) error = leaf_recorder.record_epoch(nullptr);
   }
@@ -3018,6 +3100,10 @@ Status execute_token(const ResidentModel& model, std::size_t token,
     if (categories != nullptr) categories->set_layer(static_cast<int>(layer_index));
     if (leaves != nullptr) leaves->set_layer(static_cast<int>(layer_index));
     if (families != nullptr) families->layer = static_cast<int>(layer_index);
+    if (error == cudaSuccess) {
+      error = maybe_capture_layer_input(capture, layer_index, residual,
+                                        internal::kResidualWidth);
+    }
     const DeviceLayer& layer = model.layers_[layer_index];
     const bool gdn_layer = layer.kind == internal::LayerKind::kGdn;
     const char* layer_kind = gdn_layer ? "gdn" : "attention";
@@ -3304,6 +3390,11 @@ Status execute_token(const ResidentModel& model, std::size_t token,
           error = matrix_vector(layer.attention.output,
                                 workspace->projected_bf16_, workspace,
                                 workspace->mixer_output_, nullptr);
+        }
+        if (error == cudaSuccess) {
+          error = maybe_capture_attn_output(capture, layer_index,
+                                            workspace->mixer_output_,
+                                            internal::kResidualWidth);
         }
         if (error == cudaSuccess) error = end_phase(leaves);
         ++attention_slot;
@@ -3735,6 +3826,7 @@ Status execute_prompt_chunk(
   cudaStream_t stream = fused ? workspace->prompt_compute_stream_ : nullptr;
   cudaError_t error = cudaSuccess;
   if (error == cudaSuccess && families != nullptr && families->record) {
+    families->token_scope_id = families->next_scope_id++;
     error = attribution_recorder.record_epoch(stream);
     if (error == cudaSuccess) error = leaf_recorder.record_epoch(stream);
   }
@@ -3848,6 +3940,10 @@ Status execute_prompt_chunk(
     }
     if (leaves != nullptr) leaves->set_layer(static_cast<int>(layer_index));
     if (families != nullptr) families->layer = static_cast<int>(layer_index);
+    if (error == cudaSuccess) {
+      error = maybe_capture_layer_input(capture, layer_index, residual,
+                                        internal::kResidualWidth);
+    }
     const DeviceLayer& layer = model.layers_[layer_index];
     const bool gdn_layer = layer.kind == internal::LayerKind::kGdn;
     const char* layer_kind = gdn_layer ? "gdn" : "attention";
@@ -4229,6 +4325,13 @@ Status execute_prompt_chunk(
                                 workspace->prompt_projected_bf16_, rows,
                                 workspace, workspace->prompt_mixer_output_,
                                 stream);
+        }
+        if (error == cudaSuccess && rows > 0) {
+          error = maybe_capture_attn_output(
+              capture, layer_index,
+              workspace->prompt_mixer_output_ +
+                  (rows - 1) * internal::kResidualWidth,
+              internal::kResidualWidth);
         }
         if (error == cudaSuccess) error = end_phase(leaves);
         ++attention_slot;

@@ -1,0 +1,240 @@
+{
+  "schema_version": 1,
+  "task": "OPT-071",
+  "status": "attribution_repair_protocol",
+  "claims_throughput": false,
+  "claims_performance_improvement": false,
+  "llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+  "gguf_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+  "token_generator": "(42 + index * 997) % 248320",
+  "not_llama_bench": true,
+  "synthetic_nested": {
+    "records": [
+      {
+        "engine": "quartz",
+        "phase": "decode",
+        "window": "measured",
+        "sequence_position": 0,
+        "token_position": 2048,
+        "layer": 0,
+        "role": "ffn_mmv",
+        "tensor_name": "blk.0.ffn",
+        "launch_family": "cuda_graph",
+        "fused_member_ids": "ffn_norm,activation_quant_ffn,ffn_gate,ffn_up,ffn_glu,ffn_down,residual_ffn",
+        "fused_member_count": 7,
+        "attribution_role": "enclosing",
+        "stream_index": 0,
+        "start_ms": 0.0,
+        "end_ms": 5.0,
+        "complete_work_ms": 5.0,
+        "scope_id": 10,
+        "parent_scope_id": 1,
+        "pool_overflow": false
+      },
+      {
+        "engine": "quartz",
+        "phase": "decode",
+        "window": "measured",
+        "sequence_position": 0,
+        "token_position": 2048,
+        "layer": 0,
+        "role": "ffn_gate_up_glu",
+        "tensor_name": "blk.0.ffn_gate",
+        "launch_family": "mmv",
+        "fused_member_ids": "ffn_gate,ffn_up,ffn_glu",
+        "fused_member_count": 3,
+        "attribution_role": "enclosing",
+        "stream_index": 0,
+        "start_ms": 0.0,
+        "end_ms": 3.0,
+        "complete_work_ms": 3.0,
+        "scope_id": 11,
+        "parent_scope_id": 10,
+        "pool_overflow": false
+      },
+      {
+        "engine": "quartz",
+        "phase": "decode",
+        "window": "measured",
+        "sequence_position": 0,
+        "token_position": 2048,
+        "layer": 0,
+        "role": "ffn_gate",
+        "tensor_name": "blk.0.ffn_gate",
+        "launch_family": "mmv",
+        "fused_member_ids": "",
+        "fused_member_count": 1,
+        "attribution_role": "member",
+        "stream_index": 0,
+        "start_ms": 0.0,
+        "end_ms": 2.0,
+        "complete_work_ms": 2.0,
+        "scope_id": 12,
+        "parent_scope_id": 11,
+        "pool_overflow": false
+      },
+      {
+        "engine": "quartz",
+        "phase": "decode",
+        "window": "measured",
+        "sequence_position": 0,
+        "token_position": 2048,
+        "layer": 0,
+        "role": "copy",
+        "tensor_name": "d2h",
+        "launch_family": "copy",
+        "fused_member_ids": "",
+        "fused_member_count": 1,
+        "attribution_role": "member",
+        "stream_index": 1,
+        "start_ms": 1.0,
+        "end_ms": 2.5,
+        "complete_work_ms": 1.5,
+        "scope_id": 13,
+        "parent_scope_id": 1,
+        "pool_overflow": false
+      }
+    ]
+  },
+  "two_token_epochs": {
+    "records": [
+      {
+        "engine": "quartz",
+        "phase": "decode",
+        "window": "measured",
+        "token_position": 2048,
+        "layer": 0,
+        "role": "gdn_core",
+        "attribution_role": "enclosing",
+        "fused_member_count": 1,
+        "stream_index": 0,
+        "start_ms": 0.2,
+        "end_ms": 1.2,
+        "complete_work_ms": 1.0,
+        "scope_id": 20,
+        "parent_scope_id": 2
+      },
+      {
+        "engine": "quartz",
+        "phase": "decode",
+        "window": "measured",
+        "token_position": 2049,
+        "layer": 0,
+        "role": "gdn_core",
+        "attribution_role": "enclosing",
+        "fused_member_count": 1,
+        "stream_index": 0,
+        "start_ms": 1.4,
+        "end_ms": 2.4,
+        "complete_work_ms": 1.0,
+        "scope_id": 21,
+        "parent_scope_id": 2
+      }
+    ]
+  },
+  "warmup_contamination": {
+    "records": [
+      {
+        "engine": "llama",
+        "phase": "warmup",
+        "window": "warmup",
+        "token_position": 0,
+        "role": "ffn_gate_up_glu",
+        "attribution_role": "enclosing",
+        "complete_work_ms": 4.0,
+        "pool_overflow": false
+      }
+    ]
+  },
+  "event_pool_overflow": {
+    "detected": true,
+    "records": [
+      {
+        "role": "overflow",
+        "pool_overflow": true,
+        "complete_work_ms": 0.0
+      }
+    ]
+  },
+  "stale_capture": {
+    "provided_key": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "computed_key": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  },
+  "wrong_role_layer_bundle": {
+    "layers": [
+      {
+        "layer": 0,
+        "role": "ffn_down",
+        "required_role": "attention_output",
+        "values": [1.0, 2.0],
+        "hash": "0000000000000000000000000000000000000000000000000000000000000000"
+      }
+    ]
+  },
+  "good_layer_bundle": {
+    "capture_key": "computed",
+    "layers": [
+      {
+        "layer": 0,
+        "role": "residual",
+        "values": [1.0, 2.0, 3.0, 4.0],
+        "hash": "ad73b9acd6e4a74b2f5bb5386658ce3bb146cd040a1867646ab3b973fb6632b1"
+      },
+      {
+        "layer": 0,
+        "role": "attention_output",
+        "values": [0.5, 1.5],
+        "hash": ""
+      }
+    ]
+  },
+  "mul_mat_not_mixer": {
+    "records": [
+      {
+        "engine": "llama",
+        "role": "MUL_MAT",
+        "tensor_name": "blk.0.ffn_down.weight",
+        "launch_family": "mmvq",
+        "attribution_role": "member",
+        "complete_work_ms": 1.0
+      },
+      {
+        "engine": "llama",
+        "role": "MUL_MAT",
+        "tensor_name": "output.weight",
+        "launch_family": "mmvq",
+        "attribution_role": "member",
+        "complete_work_ms": 0.4
+      }
+    ]
+  },
+  "honest_gap": {
+    "families": [
+      {"family": "ffn_gate_up_glu", "quartz_ms": 8.0, "llama_ms": 5.0},
+      {"family": "gdn_core", "quartz_ms": 6.0, "llama_ms": 5.5},
+      {"family": "attention_core", "quartz_ms": 3.0, "llama_ms": 2.0}
+    ],
+    "accounting_complete": {
+      "shipping_graph_wall_ms": 20.0,
+      "eager_diagnostic_work_ms": 18.0,
+      "instrumentation_overhead_ms": 1.5,
+      "attributed_union_ms": 19.2,
+      "uncovered_wall_ms": 0.8,
+      "unexplained_share": 0.04,
+      "invented_overlap": false,
+      "d2h_ms": 0.2,
+      "commit_ms": 0.1
+    },
+    "accounting_incomplete": {
+      "shipping_graph_wall_ms": 20.0,
+      "eager_diagnostic_work_ms": 12.0,
+      "instrumentation_overhead_ms": 1.5,
+      "attributed_union_ms": 12.0,
+      "uncovered_wall_ms": 8.0,
+      "unexplained_share": 0.4,
+      "invented_overlap": false,
+      "d2h_ms": 0.2,
+      "commit_ms": 0.1
+    }
+  }
+}

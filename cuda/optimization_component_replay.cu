@@ -1,9 +1,11 @@
 #include "optimization_component_replay.h"
 
+#include "engine_attribution.h"
 #include "model.h"
 #include "quant.h"
 #include "quant_mmv.h"
 #include "q8_decode_path.cuh"
+#include "rms_norm.cuh"
 #include "scheduler.h"
 #include "scheduler_primitives.h"
 #include "sha256.h"
@@ -11,7 +13,9 @@
 #include "weights.h"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -37,6 +41,10 @@ constexpr char kHardwareJson[] =
     "evidence/optimization/opt061-component-replay/hardware.json";
 constexpr char kProvenanceJson[] =
     "evidence/optimization/opt061-component-replay/provenance.json";
+constexpr char kOpt071CaptureRoot[] =
+    "evidence/optimization/opt071-attribution-repair/captures";
+constexpr std::size_t kLayerFloats =
+    qw38::cuda::kOpt061LayerCount * qw38::internal::kResidualWidth;
 
 struct Options final {
   const char* model = nullptr;
@@ -606,6 +614,171 @@ void fill_tokens(std::vector<std::size_t>* tokens) {
   }
 }
 
+void token_hash_hex(const std::vector<std::size_t>& tokens, char* hex) {
+  std::vector<std::uint32_t> packed(tokens.size());
+  for (std::size_t index = 0; index < tokens.size(); ++index) {
+    packed[index] = static_cast<std::uint32_t>(tokens[index]);
+  }
+  std::string digest;
+  qw38::internal::sha256_bytes(
+      reinterpret_cast<const unsigned char*>(packed.data()),
+      packed.size() * sizeof(std::uint32_t), &digest);
+  std::memcpy(hex, digest.data(), 64);
+  hex[64] = '\0';
+}
+
+void compute_capture_identity(const char* model_path, const char* stage,
+                              const char* state, int prompt_rows,
+                              const char* token_hash, char* identity_hex) {
+  char payload[2048];
+  std::snprintf(
+      payload, sizeof(payload),
+      "{\"build_flags\":\"QW38_DIAGNOSTIC_TRACE\",\"gguf_sha\":\"%s\","
+      "\"layer_role\":\"all_64\",\"model_path\":\"%s\",\"prompt_rows\":%d,"
+      "\"selectors\":{\"ffn_decode\":\"%s\",\"q4_decode\":\"%s\","
+      "\"q8_decode\":\"coop\",\"rms_norm\":\"%s\"},"
+      "\"source\":\"production_graph\",\"staging\":\"production_arithmetic\","
+      "\"stage\":\"%s\",\"state\":\"%s\",\"token_generator\":\"%s\","
+      "\"token_input_hash\":\"%s\"}",
+      qw38::cuda::kOpt061GgufSha, model_path != nullptr ? model_path : "",
+      prompt_rows, qw38::cuda::selected_ffn_decode_path(),
+      qw38::cuda::selected_q4_decode_path(),
+      qw38::cuda::selected_rms_norm_path(), stage, state,
+      qw38::cuda::kOpt061TokenGenerator, token_hash);
+  std::string digest;
+  qw38::internal::sha256_bytes(
+      reinterpret_cast<const unsigned char*>(payload), std::strlen(payload),
+      &digest);
+  std::memcpy(identity_hex, digest.data(), 64);
+  identity_hex[64] = '\0';
+}
+
+struct LayerActivations final {
+  std::vector<float> layer_input;
+  std::vector<float> ffn_input;
+  std::vector<float> attn_output;
+  std::vector<float> prompt_residual;
+  std::vector<float> prompt_mixer;
+  char identity[65]{};
+};
+
+bool write_floats(const char* path, const std::vector<float>& values) {
+  FILE* out = std::fopen(path, "wb");
+  if (out == nullptr) return false;
+  const std::size_t wrote =
+      std::fwrite(values.data(), sizeof(float), values.size(), out);
+  std::fclose(out);
+  return wrote == values.size();
+}
+
+bool read_floats(const char* path, std::vector<float>* values) {
+  FILE* in = std::fopen(path, "rb");
+  if (in == nullptr) return false;
+  std::fseek(in, 0, SEEK_END);
+  const long bytes = std::ftell(in);
+  std::fseek(in, 0, SEEK_SET);
+  if (bytes < 0 || bytes % static_cast<long>(sizeof(float)) != 0) {
+    std::fclose(in);
+    return false;
+  }
+  values->assign(static_cast<std::size_t>(bytes) / sizeof(float), 0.0F);
+  const std::size_t got =
+      std::fread(values->data(), sizeof(float), values->size(), in);
+  std::fclose(in);
+  return got == values->size();
+}
+
+int mkdir_p(const char* path) {
+  char command[1024];
+  std::snprintf(command, sizeof(command), "mkdir -p -- %s", path);
+  return std::system(command) == 0 ? 0 : 1;
+}
+
+int persist_activations(const char* identity, const LayerActivations& acts,
+                        qw38::cuda::ReplayFamily family) {
+  char dir[512];
+  std::snprintf(dir, sizeof(dir), "%s/%s", kOpt071CaptureRoot, identity);
+  if (mkdir_p(dir) != 0) return 1;
+  char path[640];
+  std::snprintf(path, sizeof(path), "%s/layer_input.bin", dir);
+  if (!write_floats(path, acts.layer_input)) return 1;
+  std::snprintf(path, sizeof(path), "%s/ffn_input.bin", dir);
+  if (!write_floats(path, acts.ffn_input)) return 1;
+  std::snprintf(path, sizeof(path), "%s/attn_output.bin", dir);
+  if (!write_floats(path, acts.attn_output)) return 1;
+  if (family == qw38::cuda::ReplayFamily::kPromptFfn) {
+    std::snprintf(path, sizeof(path), "%s/prompt_residual.bin", dir);
+    if (!write_floats(path, acts.prompt_residual)) return 1;
+    std::snprintf(path, sizeof(path), "%s/prompt_mixer.bin", dir);
+    if (!write_floats(path, acts.prompt_mixer)) return 1;
+  }
+  std::snprintf(path, sizeof(path), "%s/bundle.json", dir);
+  FILE* out = std::fopen(path, "w");
+  if (out == nullptr) return 1;
+  std::fprintf(
+      out,
+      "{\"schema_version\":1,\"task\":\"OPT-071\",\"capture_key\":\"%s\","
+      "\"layers\":[",
+      identity);
+  for (std::size_t layer = 0; layer < qw38::cuda::kOpt061LayerCount; ++layer) {
+    std::fprintf(
+        out,
+        "{\"layer\":%zu,\"role\":\"residual\"},{\"layer\":%zu,"
+        "\"role\":\"ffn_input\"},{\"layer\":%zu,\"role\":\"attention_output\"}%s",
+        layer, layer, layer,
+        layer + 1 == qw38::cuda::kOpt061LayerCount ? "" : ",");
+  }
+  std::fprintf(out, "],\"full_vectors\":true}\n");
+  std::fclose(out);
+  FILE* legacy = std::fopen(kCaptureCache, "w");
+  if (legacy != nullptr) {
+    std::fprintf(legacy,
+                 "{\"schema_version\":1,\"task\":\"OPT-071\","
+                 "\"capture_key\":\"%s\",\"full_vectors\":true}\n",
+                 identity);
+    std::fclose(legacy);
+  }
+  return 0;
+}
+
+int load_activations(const char* identity, qw38::cuda::ReplayFamily family,
+                     LayerActivations* acts) {
+  char dir[512];
+  std::snprintf(dir, sizeof(dir), "%s/%s", kOpt071CaptureRoot, identity);
+  char path[640];
+  std::snprintf(path, sizeof(path), "%s/bundle.json", dir);
+  FILE* in = std::fopen(path, "r");
+  if (in == nullptr) return 1;
+  char buffer[128];
+  const char* got = std::fgets(buffer, sizeof(buffer), in);
+  std::fclose(in);
+  if (got == nullptr || std::strstr(buffer, identity) == nullptr) return 1;
+  std::snprintf(path, sizeof(path), "%s/layer_input.bin", dir);
+  if (!read_floats(path, &acts->layer_input) ||
+      acts->layer_input.size() != kLayerFloats) {
+    return 1;
+  }
+  std::snprintf(path, sizeof(path), "%s/ffn_input.bin", dir);
+  if (!read_floats(path, &acts->ffn_input) ||
+      acts->ffn_input.size() != kLayerFloats) {
+    return 1;
+  }
+  std::snprintf(path, sizeof(path), "%s/attn_output.bin", dir);
+  if (!read_floats(path, &acts->attn_output) ||
+      acts->attn_output.size() != kLayerFloats) {
+    return 1;
+  }
+  if (family == qw38::cuda::ReplayFamily::kPromptFfn) {
+    std::snprintf(path, sizeof(path), "%s/prompt_residual.bin", dir);
+    if (!read_floats(path, &acts->prompt_residual)) return 1;
+    std::snprintf(path, sizeof(path), "%s/prompt_mixer.bin", dir);
+    if (!read_floats(path, &acts->prompt_mixer)) return 1;
+  }
+  std::memcpy(acts->identity, identity, 64);
+  acts->identity[64] = '\0';
+  return 0;
+}
+
 cudaError_t replay_decode_ffn_layer(const qw38::cuda::DeviceCommonLayer& layer,
                                     const float* residual,
                                     const float* next_norm,
@@ -747,12 +920,42 @@ std::size_t ffn_layer_bytes(const qw38::cuda::DeviceCommonLayer& layer) {
 }
 
 int capture_bundle(const char* model_path, qw38::cuda::ResidentModel* model,
-                   qw38::cuda::ReplayFamily family,
-                   std::vector<float>* residual_host,
-                   std::vector<float>* prompt_residual,
-                   std::vector<float>* prompt_mixer,
-                   char* identity_hex) {
+                   qw38::cuda::ReplayFamily family, const char* capture_key,
+                   LayerActivations* acts) {
   const bool prompt = family == qw38::cuda::ReplayFamily::kPromptFfn;
+  const char* stage = prompt ? "prompt-ffn" : "d128";
+  const char* state = prompt ? "prefill_p4096" : "decode_d128";
+  std::vector<std::size_t> tokens(prompt ? qw38::cuda::kOpt061PromptRows : 129);
+  fill_tokens(&tokens);
+  char token_digest[65]{};
+  token_hash_hex(tokens, token_digest);
+  compute_capture_identity(model_path, stage, state,
+                           prompt ? static_cast<int>(qw38::cuda::kOpt061PromptRows)
+                                  : 1,
+                           token_digest, acts->identity);
+  if (capture_key != nullptr && capture_key[0] != '\0') {
+    if (std::strlen(capture_key) != 64) {
+      std::fprintf(stderr, "capture key must be sha256 hex\n");
+      return 1;
+    }
+    if (std::strcmp(capture_key, acts->identity) != 0) {
+      std::fprintf(stderr, "stale capture key does not match current identity\n");
+      return 1;
+    }
+    if (load_activations(capture_key, family, acts) != 0) {
+      std::fprintf(stderr, "capture key was provided but its bundle was not loaded\n");
+      return 1;
+    }
+    std::printf("capture_reuse=true recapture=false capture_key=%s\n",
+                capture_key);
+    return 0;
+  }
+  if (load_activations(acts->identity, family, acts) == 0) {
+    std::printf("capture_reuse=true recapture=false capture_key=%s\n",
+                acts->identity);
+    return 0;
+  }
+
   const std::size_t capacity = prompt ? qw38::cuda::kOpt061PromptRows + 16 : 256;
   qw38::cuda::SchedulerSession session;
   qw38::cuda::SchedulerWorkspace workspace;
@@ -761,24 +964,35 @@ int capture_bundle(const char* model_path, qw38::cuda::ResidentModel* model,
   if (!status.is_ok()) return fail_status(status);
   std::vector<float> logits(qw38::internal::kVocabularySize);
   std::vector<float> hidden(qw38::internal::kResidualWidth);
+  acts->layer_input.assign(kLayerFloats, 0.0F);
+  acts->ffn_input.assign(kLayerFloats, 0.0F);
+  acts->attn_output.assign(kLayerFloats, 0.0F);
+  std::array<bool, qw38::cuda::kOpt061LayerCount> layer_captured{};
+  std::array<bool, qw38::cuda::kOpt061LayerCount> ffn_captured{};
+  std::array<bool, qw38::cuda::kOpt061LayerCount> attn_captured{};
   qw38::cuda::ActivationCapture capture;
-  capture.stage =
-      family == qw38::cuda::ReplayFamily::kPromptFfn ? "prompt-ffn" : "d128";
+  capture.stage = stage;
   capture.prompt_capture_layer = 0;
-  if (family == qw38::cuda::ReplayFamily::kPromptFfn) {
-    prompt_residual->assign(
+  capture.capture_all_layers = true;
+  capture.full_layer_count = qw38::cuda::kOpt061LayerCount;
+  capture.full_layer_input = acts->layer_input.data();
+  capture.full_ffn_input = acts->ffn_input.data();
+  capture.full_attn_output = acts->attn_output.data();
+  capture.full_layer_input_captured = layer_captured.data();
+  capture.full_ffn_input_captured = ffn_captured.data();
+  capture.full_attn_output_captured = attn_captured.data();
+  if (prompt) {
+    acts->prompt_residual.assign(
         qw38::cuda::kOpt061PromptRows * qw38::internal::kResidualWidth, 0.0F);
-    prompt_mixer->assign(
+    acts->prompt_mixer.assign(
         qw38::cuda::kOpt061PromptRows * qw38::internal::kResidualWidth, 0.0F);
-    capture.prompt_residual = prompt_residual->data();
-    capture.prompt_mixer_output = prompt_mixer->data();
+    capture.prompt_residual = acts->prompt_residual.data();
+    capture.prompt_mixer_output = acts->prompt_mixer.data();
   }
   for (std::size_t index = 0; index < capture.layers.size(); ++index) {
     capture.slots[index].layer = capture.layers[index];
   }
-  if (family == qw38::cuda::ReplayFamily::kPromptFfn) {
-    std::vector<std::size_t> tokens(qw38::cuda::kOpt061PromptRows);
-    fill_tokens(&tokens);
+  if (prompt) {
     qw38::cuda::SyncResult sync{};
     qw38::cuda::PrefillAttribution attribution;
     attribution.capture = &capture;
@@ -788,8 +1002,6 @@ int capture_bundle(const char* model_path, qw38::cuda::ResidentModel* model,
         nullptr, nullptr, qw38::cuda::GdnScanPath::kFusedTokenLoop,
         &attribution);
   } else {
-    std::vector<std::size_t> tokens(129);
-    fill_tokens(&tokens);
     qw38::cuda::SyncResult sync{};
     status = qw38::cuda::sync_tokens(
         *model, tokens.data(), tokens.size() - 1, &session, &workspace,
@@ -802,75 +1014,40 @@ int capture_bundle(const char* model_path, qw38::cuda::ResidentModel* model,
     status = qw38::cuda::execute_token(
         *model, tokens.back(), &session, &workspace, logits.data(),
         logits.size(), hidden.data(), hidden.size(), &elapsed, nullptr, nullptr,
-        qw38::cuda::PointwisePath::kUnfused, nullptr, &attribution);
+        qw38::cuda::PointwisePath::kFused, nullptr, &attribution);
   }
   if (!status.is_ok()) return fail_status(status);
-  residual_host->assign(capture.slots[0].residual_fp32.begin(),
-                        capture.slots[0].residual_fp32.end());
-  std::string digest;
-  const std::string identity = std::string(qw38::cuda::kOpt061GgufSha) + "|" +
-                               qw38::cuda::kOpt061TokenGenerator + "|" +
-                               capture.stage + "|" + model_path;
-  qw38::internal::sha256_bytes(
-      reinterpret_cast<const unsigned char*>(identity.data()), identity.size(),
-      &digest);
-  std::memcpy(identity_hex, digest.data(), 64);
-  identity_hex[64] = '\0';
-  char cache_path[256];
-  std::snprintf(cache_path, sizeof(cache_path),
-                "evidence/optimization/opt061-component-replay/capture-bundle-%s.json",
-                qw38::cuda::replay_family_name(family));
-  FILE* out = std::fopen(cache_path, "w");
-  if (out == nullptr) out = std::fopen(kCaptureCache, "w");
-  if (out != nullptr) {
-    std::fprintf(
-        out,
-        "{\"schema_version\":1,\"task\":\"OPT-061\",\"setup_phase\":true,"
-        "\"stage\":\"%s\",\"capture_key\":\"%s\",\"layers\":[0,3,31,32,62,63],"
-        "\"token_generator\":\"%s\",\"gguf_sha256\":\"%s\","
-        "\"prompt_rows\":%zu,\"prompt_row_indices\":[0,1024,2048,4095],"
-        "\"residual_sha256\":\"%s\",\"ffn_sha256\":\"%s\","
-        "\"mixer_sha256\":\"%s\",\"down_sha256\":\"%s\","
-        "\"final_norm_sha256\":\"%s\",\"selector_set\":{"
-        "\"ffn_decode\":\"%s\",\"q4_decode\":\"%s\",\"q8_decode\":\"coop\","
-        "\"rms_norm\":\"%s\"},\"slots\":[",
-        capture.stage, identity_hex, qw38::cuda::kOpt061TokenGenerator,
-        qw38::cuda::kOpt061GgufSha,
-        family == qw38::cuda::ReplayFamily::kPromptFfn
-            ? qw38::cuda::kOpt061PromptRows
-            : 1UL,
-        capture.slots[0].residual_sha256, capture.slots[0].ffn_sha256,
-        capture.slots[0].mixer_sha256, capture.slots[0].down_sha256,
-        capture.final_norm_sha256, qw38::cuda::selected_ffn_decode_path(),
-        qw38::cuda::selected_q4_decode_path(),
-        qw38::cuda::selected_rms_norm_path());
-    for (std::size_t index = 0; index < capture.slots.size(); ++index) {
-      const auto& slot = capture.slots[index];
-      std::fprintf(
-          out,
-          "{\"layer\":%zu,\"kind\":\"%s\",\"mixer_captured\":%s,"
-          "\"ffn_captured\":%s,\"residual_captured\":%s,"
-          "\"down_captured\":%s,\"mixer_sha256\":\"%s\","
-          "\"ffn_sha256\":\"%s\",\"residual_sha256\":\"%s\","
-          "\"down_sha256\":\"%s\"}%s",
-          slot.layer, slot.layer_kind, json_bool(slot.mixer_captured),
-          json_bool(slot.ffn_captured), json_bool(slot.residual_captured),
-          json_bool(slot.down_captured), slot.mixer_sha256, slot.ffn_sha256,
-          slot.residual_sha256, slot.down_sha256,
-          index + 1 == capture.slots.size() ? "" : ",");
-    }
-    std::fprintf(out, "]}\n");
-    std::fclose(out);
+  if (persist_activations(acts->identity, *acts, family) != 0) {
+    std::fprintf(stderr, "failed to persist capture bundle\n");
+    return 1;
   }
+  char samples_path[640];
+  std::snprintf(samples_path, sizeof(samples_path),
+                "%s/%s/host-samples.jsonl", kOpt071CaptureRoot, acts->identity);
+  FILE* samples = std::fopen(samples_path, "w");
+  if (samples != nullptr) {
+    for (std::size_t layer = 0; layer < qw38::cuda::kOpt061LayerCount; ++layer) {
+      const float* row =
+          acts->ffn_input.data() + layer * qw38::internal::kResidualWidth;
+      std::fprintf(samples, "{\"layer\":%zu,\"role\":\"ffn_input\",\"values\":[",
+                   layer);
+      for (int index = 0; index < 16; ++index) {
+        std::fprintf(samples, "%.9g%s", static_cast<double>(row[index]),
+                     index == 15 ? "" : ",");
+      }
+      std::fprintf(samples, "]}\n");
+    }
+    std::fclose(samples);
+  }
+  std::printf("capture_reuse=false recapture=true capture_key=%s\n",
+              acts->identity);
   return 0;
 }
 
 int time_family(qw38::cuda::ResidentModel* model,
                 qw38::cuda::ReplayFamily family, qw38::cuda::CacheMode mode,
-                const std::vector<float>& residual_host,
-                const std::vector<float>& prompt_residual,
-                const std::vector<float>& prompt_mixer, int warmups,
-                int samples, const HardwareInfo& info, FILE* rounds_out) {
+                const LayerActivations& acts, int warmups, int samples,
+                const HardwareInfo& info, FILE* rounds_out) {
   const std::size_t capacity =
       family == qw38::cuda::ReplayFamily::kPromptFfn
           ? qw38::cuda::kOpt061PromptRows + 16
@@ -888,40 +1065,35 @@ int time_family(qw38::cuda::ResidentModel* model,
     working += ffn_layer_bytes(model->layer(index).common);
   }
   const bool exceeds = working > 2 * info.l2_bytes;
-  cudaEvent_t enc_start = nullptr;
-  cudaEvent_t enc_stop = nullptr;
-  cudaEvent_t k_start = nullptr;
-  cudaEvent_t k_stop = nullptr;
-  cudaError_t error = cudaEventCreate(&enc_start);
-  if (error == cudaSuccess) error = cudaEventCreate(&enc_stop);
-  if (error == cudaSuccess) error = cudaEventCreate(&k_start);
-  if (error == cudaSuccess) error = cudaEventCreate(&k_stop);
-  if (error != cudaSuccess) return fail_cuda("events", error);
+  qw38::cuda::EngineEventPool<64> pool;
+  std::array<qw38::cuda::EngineOpRecord, 64> storage{};
+  qw38::cuda::EngineAttribution dest{};
+  dest.records = storage.data();
+  dest.capacity = storage.size();
 
-  auto restore = [&]() -> cudaError_t {
+  auto restore_layer = [&](std::size_t layer_index) -> cudaError_t {
+    const std::size_t offset = layer_index * qw38::internal::kResidualWidth;
     if (family == qw38::cuda::ReplayFamily::kPromptFfn) {
-      cudaError_t copy = cudaMemcpy(
-          workspace.prompt_residual_a_, prompt_residual.data(),
-          prompt_residual.size() * sizeof(float), cudaMemcpyHostToDevice);
-      if (copy == cudaSuccess) {
-        copy = cudaMemcpy(workspace.prompt_mixer_output_, prompt_mixer.data(),
-                          prompt_mixer.size() * sizeof(float),
-                          cudaMemcpyHostToDevice);
-      }
-      return copy;
+      return cudaMemcpy(workspace.prompt_residual_a_,
+                        acts.prompt_residual.data(),
+                        acts.prompt_residual.size() * sizeof(float),
+                        cudaMemcpyHostToDevice);
     }
-    return cudaMemcpy(workspace.residual_a_, residual_host.data(),
-                      residual_host.size() * sizeof(float),
+    const float* source = family == qw38::cuda::ReplayFamily::kDecodeMixer
+                              ? acts.layer_input.data() + offset
+                              : acts.ffn_input.data() + offset;
+    return cudaMemcpy(workspace.residual_a_, source,
+                      qw38::internal::kResidualWidth * sizeof(float),
                       cudaMemcpyHostToDevice);
   };
 
   const int total = warmups + samples;
   for (int sample = 0; sample < total; ++sample) {
     const bool warmup = sample < warmups;
-    error = restore();
-    if (error == cudaSuccess) error = cudaDeviceSynchronize();
-    if (error == cudaSuccess) error = cudaEventRecord(enc_start);
-    float kernel_acc = 0.0F;
+    cudaError_t error = pool.reset();
+    dest.count = 0;
+    dest.pool_overflow = false;
+    if (error == cudaSuccess) error = pool.record_epoch(nullptr);
     int gate_up = 0;
     int down = 0;
     int mixer = 0;
@@ -932,49 +1104,62 @@ int time_family(qw38::cuda::ResidentModel* model,
           layer_index + 1 < model->layer_count()
               ? model->layer(layer_index + 1).common.input_norm
               : nullptr;
+      error = restore_layer(layer_index);
+      if (error == cudaSuccess) error = cudaDeviceSynchronize();
+      qw38::cuda::EngineOpRecord spec{};
+      qw38::cuda::copy_cstr(spec.engine, sizeof(spec.engine), "quartz");
+      qw38::cuda::copy_cstr(spec.role, sizeof(spec.role),
+                            qw38::cuda::replay_family_name(family));
+      spec.layer = static_cast<int>(layer_index);
+      spec.fused_member_count = 1;
+      if (error == cudaSuccess) error = pool.begin(spec, nullptr);
       if (family == qw38::cuda::ReplayFamily::kDecodeFfn) {
-        error = replay_decode_ffn_layer(
-            layer.common, workspace.residual_a_, next_norm, &workspace,
-            workspace.residual_b_, nullptr, k_start, k_stop);
+        if (error == cudaSuccess) {
+          error = replay_decode_ffn_layer(
+              layer.common, workspace.residual_a_, next_norm, &workspace,
+              workspace.residual_b_, nullptr, nullptr, nullptr);
+        }
         ++gate_up;
         ++down;
       } else if (family == qw38::cuda::ReplayFamily::kDecodeMixer) {
-        error = replay_mixer_layer(layer, workspace.residual_a_, &workspace,
-                                   nullptr, k_start, k_stop);
+        if (error == cudaSuccess) {
+          error = replay_mixer_layer(layer, workspace.residual_a_, &workspace,
+                                     nullptr, nullptr, nullptr);
+        }
         mixer += layer.kind == qw38::internal::LayerKind::kGdn ? 4 : 3;
       } else {
-        error = cudaEventRecord(k_start);
         if (error == cudaSuccess) {
           error = qw38::cuda::execute_prompt_ffn(
               layer.common, workspace.prompt_residual_a_, &workspace,
               workspace.prompt_residual_b_, workspace.prompt_residual_a_,
               next_norm, qw38::cuda::kOpt061PromptRows, nullptr);
         }
-        if (error == cudaSuccess) error = cudaEventRecord(k_stop);
         ++gate_up;
         ++down;
       }
-      if (error != cudaSuccess) break;
-      float kernel_ms = 0.0F;
-      error = event_ms(k_start, k_stop, &kernel_ms);
-      kernel_acc += kernel_ms;
+      if (error == cudaSuccess) error = pool.end();
+      if (error != cudaSuccess) return fail_cuda("replay", error);
     }
-    if (error == cudaSuccess) error = cudaEventRecord(enc_stop);
-    float enclosing = 0.0F;
-    if (error == cudaSuccess) error = event_ms(enc_start, enc_stop, &enclosing);
-    if (error != cudaSuccess) {
-      cudaEventDestroy(enc_start);
-      cudaEventDestroy(enc_stop);
-      cudaEventDestroy(k_start);
-      cudaEventDestroy(k_stop);
-      return fail_cuda("replay", error);
+    error = pool.collect(&dest);
+    if (error != cudaSuccess || dest.pool_overflow) {
+      return fail_cuda("pooled events",
+                       dest.pool_overflow ? cudaErrorInvalidValue : error);
     }
+    float kernel_acc = 0.0F;
+    float start_ms = dest.count > 0 ? dest.records[0].start_ms : 0.0F;
+    float end_ms = dest.count > 0 ? dest.records[0].end_ms : 0.0F;
+    for (std::size_t index = 0; index < dest.count; ++index) {
+      kernel_acc += dest.records[index].complete_work_ms;
+      start_ms = std::min(start_ms, dest.records[index].start_ms);
+      end_ms = std::max(end_ms, dest.records[index].end_ms);
+    }
+    const float enclosing = end_ms - start_ms;
     std::printf(
         "round family=%s cache_mode=%s warmup=%s sample_index=%d "
         "observation_unit=independent_round enclosing_ms=%.6f "
         "kernel_only_ms=%.6f gate_up_calls=%d down_calls=%d mixer_calls=%d "
         "rotating_layers=%zu working_set_bytes=%zu exceeds_2x_l2=%s "
-        "eviction_outside_interval=false\n",
+        "eviction_outside_interval=false pooled_events=true\n",
         qw38::cuda::replay_family_name(family), qw38::cuda::cache_mode_name(mode),
         json_bool(warmup), warmup ? sample : sample - warmups, enclosing,
         kernel_acc, gate_up, down, mixer, layers.size(), working,
@@ -987,16 +1172,12 @@ int time_family(qw38::cuda::ResidentModel* model,
           "\"enclosing_ms\":%.9g,\"kernel_only_ms\":%.9g,"
           "\"gate_up_calls\":%d,\"down_calls\":%d,\"mixer_calls\":%d,"
           "\"rotating_layers\":%zu,\"working_set_bytes\":%zu,"
-          "\"accept_hot_as_production\":false}\n",
+          "\"accept_hot_as_production\":false,\"pooled_events\":true}\n",
           qw38::cuda::replay_family_name(family),
           qw38::cuda::cache_mode_name(mode), sample - warmups, enclosing,
           kernel_acc, gate_up, down, mixer, layers.size(), working);
     }
   }
-  cudaEventDestroy(enc_start);
-  cudaEventDestroy(enc_stop);
-  cudaEventDestroy(k_start);
-  cudaEventDestroy(k_stop);
   int registers = 0;
   std::size_t local_bytes = 0;
   int occupancy = 0;
@@ -1028,15 +1209,13 @@ int run_family(const Options& options, qw38::cuda::ReplayFamily family) {
     std::fprintf(stderr, "failed to resolve blk.0.ffn_gate.weight via inventory\n");
     return 1;
   }
-  std::vector<float> residual;
-  std::vector<float> prompt_residual;
-  std::vector<float> prompt_mixer;
-  char capture_key[65]{};
+  LayerActivations acts;
   std::printf("phase=setup_capture timed=false\n");
-  if (capture_bundle(options.model, &model, family, &residual, &prompt_residual,
-                     &prompt_mixer, capture_key) != 0) {
+  if (capture_bundle(options.model, &model, family, options.capture_key,
+                     &acts) != 0) {
     return 1;
   }
+  const char* capture_key = acts.identity;
   int warmups = options.warmups >= 0 ? options.warmups : qw38::cuda::test_warmups();
   int samples = options.samples >= 0 ? options.samples : qw38::cuda::test_samples();
   if (qw38::cuda::test_tier() == qw38::cuda::TestTier::kScreen) {
@@ -1058,8 +1237,8 @@ int run_family(const Options& options, qw38::cuda::ReplayFamily family) {
         std::strcmp(mode_arg, qw38::cuda::cache_mode_name(mode)) != 0) {
       continue;
     }
-    rc = time_family(&model, family, mode, residual, prompt_residual,
-                     prompt_mixer, warmups, samples, hardware, rounds);
+    rc = time_family(&model, family, mode, acts, warmups, samples, hardware,
+                     rounds);
     if (rc != 0) break;
   }
   if (rounds != nullptr) std::fclose(rounds);

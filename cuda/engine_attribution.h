@@ -37,6 +37,8 @@ struct EngineOpRecord final {
   int fused_member_count = 1;
   int start_event_id = -1;
   int end_event_id = -1;
+  int scope_id = -1;
+  int parent_scope_id = -1;
   char graph_mode[32]{};
   char attribution_role[16]{};
   float start_ms = 0.0F;
@@ -61,8 +63,15 @@ struct EngineAttribution final {
   float uninstrumented_wall_ms = 0.0F;
   float instrumented_wall_ms = 0.0F;
   float profiling_overhead_ms = 0.0F;
+  float shipping_graph_wall_ms = 0.0F;
+  float eager_diagnostic_work_ms = 0.0F;
+  float uncovered_wall_ms = 0.0F;
   bool uninstrumented_measured = false;
   bool instrumented_measured = false;
+  cudaEvent_t sequence_epoch = nullptr;
+  bool sequence_epoch_ready = false;
+  int next_scope_id = 1;
+  int token_scope_id = 0;
 };
 
 struct EngineEventSlot final {
@@ -200,6 +209,27 @@ class EngineEventPool final {
   bool overflow_ = false;
 };
 
+inline cudaError_t ensure_sequence_epoch(EngineAttribution* dest) noexcept {
+  if (dest == nullptr) return cudaErrorInvalidValue;
+  if (dest->sequence_epoch != nullptr) return cudaSuccess;
+  return cudaEventCreate(&dest->sequence_epoch);
+}
+
+inline cudaError_t record_sequence_epoch(EngineAttribution* dest,
+                                         cudaStream_t stream) noexcept {
+  cudaError_t error = ensure_sequence_epoch(dest);
+  if (error == cudaSuccess) error = cudaEventRecord(dest->sequence_epoch, stream);
+  if (error == cudaSuccess) dest->sequence_epoch_ready = true;
+  return error;
+}
+
+inline void destroy_sequence_epoch(EngineAttribution* dest) noexcept {
+  if (dest == nullptr || dest->sequence_epoch == nullptr) return;
+  cudaEventDestroy(dest->sequence_epoch);
+  dest->sequence_epoch = nullptr;
+  dest->sequence_epoch_ready = false;
+}
+
 inline void copy_cstr(char* dest, std::size_t bytes, const char* text) noexcept {
   if (dest == nullptr || bytes == 0) return;
   if (text == nullptr) {
@@ -220,7 +250,8 @@ inline void write_engine_record_json(FILE* out, const EngineOpRecord& rec,
       "\"k\":%d,\"strides\":[%lld,%lld,%lld,%lld],\"stream\":%llu,"
       "\"stream_index\":%d,\"launch_family\":\"%s\","
       "\"fused_member_ids\":\"%s\",\"fused_member_count\":%d,"
-      "\"start_event_id\":%d,\"end_event_id\":%d,\"graph_mode\":\"%s\","
+      "\"start_event_id\":%d,\"end_event_id\":%d,\"scope_id\":%d,"
+      "\"parent_scope_id\":%d,\"graph_mode\":\"%s\","
       "\"attribution_role\":\"%s\",\"start_ms\":%.9g,\"end_ms\":%.9g,"
       "\"complete_work_ms\":%.9g,\"attributed\":%s,\"pool_overflow\":%s}%s",
       rec.engine, rec.phase, rec.sequence_position, rec.token_position,
@@ -230,10 +261,10 @@ inline void write_engine_record_json(FILE* out, const EngineOpRecord& rec,
       static_cast<long long>(rec.strides[2]),
       static_cast<long long>(rec.strides[3]), rec.stream, rec.stream_index,
       rec.launch_family, rec.fused_member_ids, rec.fused_member_count,
-      rec.start_event_id, rec.end_event_id, rec.graph_mode,
-      rec.attribution_role, rec.start_ms, rec.end_ms, rec.complete_work_ms,
-      rec.attributed ? "true" : "false", rec.pool_overflow ? "true" : "false",
-      last ? "" : ",");
+      rec.start_event_id, rec.end_event_id, rec.scope_id, rec.parent_scope_id,
+      rec.graph_mode, rec.attribution_role, rec.start_ms, rec.end_ms,
+      rec.complete_work_ms, rec.attributed ? "true" : "false",
+      rec.pool_overflow ? "true" : "false", last ? "" : ",");
 }
 
 }  // namespace qw38::cuda

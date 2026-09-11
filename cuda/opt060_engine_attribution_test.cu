@@ -225,7 +225,7 @@ void dump_families(const qw38::cuda::EngineAttribution& families,
 }
 
 int run_llama(const Options& options, const char* workload, const char* mode,
-              int prompt, int prefix, int output_tokens, int rep) {
+              int prompt, int prefix, int output_tokens, int samples) {
   if (options.llama_bin == nullptr || options.llama_bin[0] == '\0') {
     std::printf("llama_status=unavailable reason=missing_binary\n");
     return 0;
@@ -238,19 +238,20 @@ int run_llama(const Options& options, const char* workload, const char* mode,
   }
   char log_path[512];
   std::snprintf(log_path, sizeof(log_path),
-                "%s/llama-%s-%s-rep%d.log", kEvidenceDir, workload, mode, rep);
+                "%s/llama-%s-%s-samples%d.log", kEvidenceDir, workload, mode,
+                samples);
   char cmd[2048];
   std::snprintf(cmd, sizeof(cmd),
                 "QW38_OPT060_ATTRIBUTION=%s %s %s --workload %s --mode %s "
                 "--batch-policy matched --prompt %d --prefix %d "
-                "--output-tokens %d --warmups 1 --samples 1 "
+                "--output-tokens %d --warmups 1 --samples %d "
                 "> %s 2>&1",
                 std::strcmp(mode, "eager_diagnostic") == 0 ? "1" : "0",
                 options.llama_bin, options.model != nullptr ? options.model : "",
-                workload, mode, prompt, prefix, output_tokens, log_path);
+                workload, mode, prompt, prefix, output_tokens, samples, log_path);
   const int rc = std::system(cmd);
-  std::printf("llama_status=%s rc=%d mode=%s log=%s\n",
-              rc == 0 ? "ok" : "failed", rc, mode, log_path);
+  std::printf("llama_status=%s rc=%d mode=%s samples=%d log=%s\n",
+              rc == 0 ? "ok" : "failed", rc, mode, samples, log_path);
   return rc == 0 ? 0 : 1;
 }
 
@@ -337,6 +338,17 @@ int run_quartz_decode(const qw38::cuda::ResidentModel& model,
       logits->size(), hidden.data(), hidden.size(), &result, nullptr,
       graph_ptr);
   if (!status.is_ok()) return fail_status(status);
+  if (families != nullptr && diagnostic) {
+    families->record = true;
+    qw38::cuda::copy_cstr(families->engine, sizeof(families->engine), "quartz");
+    qw38::cuda::copy_cstr(families->phase, sizeof(families->phase), "decode");
+    qw38::cuda::copy_cstr(families->graph_mode, sizeof(families->graph_mode),
+                          use_graph ? "cuda_graph" : "eager_diagnostic");
+    cudaDeviceSynchronize();
+    if (qw38::cuda::record_sequence_epoch(families, nullptr) != cudaSuccess) {
+      return 1;
+    }
+  }
   const auto started = std::chrono::steady_clock::now();
   for (std::size_t step = 0; step < outputs; ++step) {
     qw38::cuda::DecodeAttribution attribution;
@@ -358,6 +370,13 @@ int run_quartz_decode(const qw38::cuda::ResidentModel& model,
   *wall_ms = static_cast<float>(std::chrono::duration<double, std::milli>(
                                     std::chrono::steady_clock::now() - started)
                                     .count());
+  if (families != nullptr) {
+    qw38::cuda::destroy_sequence_epoch(families);
+    if (families->pool_overflow) {
+      std::fprintf(stderr, "quartz attribution dropped records\n");
+      return 1;
+    }
+  }
   return 0;
 }
 
@@ -382,9 +401,18 @@ int run_quartz_prefill(const qw38::cuda::ResidentModel& model,
   attribution.families = diagnostic ? families : nullptr;
   if (families != nullptr) {
     families->record = diagnostic;
+    qw38::cuda::copy_cstr(families->engine, sizeof(families->engine), "quartz");
     qw38::cuda::copy_cstr(families->phase, sizeof(families->phase), "prefill");
+    qw38::cuda::copy_cstr(families->graph_mode, sizeof(families->graph_mode),
+                          use_graph ? "cuda_graph" : "eager_diagnostic");
   }
   qw38::cuda::SyncResult result{};
+  if (diagnostic && families != nullptr) {
+    cudaDeviceSynchronize();
+    if (qw38::cuda::record_sequence_epoch(families, nullptr) != cudaSuccess) {
+      return 1;
+    }
+  }
   const auto started = std::chrono::steady_clock::now();
   status = qw38::cuda::sync_tokens(
       model, tokens.data(), tokens.size(), &session, &workspace, logits->data(),
@@ -394,6 +422,13 @@ int run_quartz_prefill(const qw38::cuda::ResidentModel& model,
   *wall_ms = static_cast<float>(std::chrono::duration<double, std::milli>(
                                     std::chrono::steady_clock::now() - started)
                                     .count());
+  if (families != nullptr) {
+    qw38::cuda::destroy_sequence_epoch(families);
+    if (families->pool_overflow) {
+      std::fprintf(stderr, "quartz attribution dropped records\n");
+      return 1;
+    }
+  }
   if (!status.is_ok()) return fail_status(status);
   return 0;
 }
@@ -415,61 +450,48 @@ int run_screen(const Options& options, const char* phase, int repetitions) {
   families.capacity = storage.size();
   std::vector<float> logits(qw38::internal::kVocabularySize);
   int rc = 0;
-  for (int rep = 0; rep < repetitions; ++rep) {
-    const bool quartz_first = (rep % 2) == 0;
-    float unperturbed = 0.0F;
-    float diagnostic = 0.0F;
-    auto quartz = [&]() {
+  {
+    qw38::cuda::ResidentModel model;
+    const int loaded = load_model(options.model, &model);
+    if (loaded != 0) return loaded;
+    for (int rep = 0; rep < repetitions; ++rep) {
       families.count = 0;
       families.pool_overflow = false;
-      qw38::cuda::ResidentModel model;
-      const int loaded = load_model(options.model, &model);
-      if (loaded != 0) return loaded;
-      int local = 0;
+      float unperturbed = 0.0F;
+      float diagnostic = 0.0F;
       if (prefill) {
-        local |= run_quartz_prefill(model, tokens, false, true, nullptr,
-                                    &unperturbed, &logits);
-        local |= run_quartz_prefill(model, tokens, true, false, &families,
-                                    &diagnostic, &logits);
+        rc |= run_quartz_prefill(model, tokens, false, true, nullptr,
+                                 &unperturbed, &logits);
+        rc |= run_quartz_prefill(model, tokens, true, false, &families,
+                                 &diagnostic, &logits);
       } else {
-        local |= run_quartz_decode(model, tokens, prompt, outputs, false, true,
-                                   nullptr, &unperturbed, &logits);
-        local |= run_quartz_decode(model, tokens, prompt, outputs, true, false,
-                                   &families, &diagnostic, &logits);
+        rc |= run_quartz_decode(model, tokens, prompt, outputs, false, true,
+                                nullptr, &unperturbed, &logits);
+        rc |= run_quartz_decode(model, tokens, prompt, outputs, true, false,
+                                &families, &diagnostic, &logits);
       }
       dump_families(families, phase, rep);
       std::printf(
-          "quartz_rep=%d phase=%s unperturbed_ms=%.9g diagnostic_ms=%.9g "
-          "overhead_ms=%.9g records=%zu graph_mode_diagnostic=eager_diagnostic "
-          "unperturbed_graph_mode=cuda_graph exclusive_gpu=true\n",
+          "quartz_rep=%d phase=%s shipping_graph_wall_ms=%.9g "
+          "eager_diagnostic_wall_ms=%.9g instrumentation_overhead_ms=%.9g "
+          "records=%zu graph_mode_diagnostic=eager_diagnostic "
+          "unperturbed_graph_mode=cuda_graph exclusive_gpu=true "
+          "prefix_excluded=true graph_create_excluded=true\n",
           rep, phase, unperturbed, diagnostic, diagnostic - unperturbed,
           families.count);
-      return local;
-    };
-    auto llama = [&]() {
-      int local = 0;
-      local |= run_llama(options, phase, "unperturbed",
-                         prefill ? 4096 : 0, prefill ? 0 : 2048,
-                         static_cast<int>(outputs), rep);
-      local |= run_llama(options, phase, "eager_diagnostic",
-                         prefill ? 4096 : 0, prefill ? 0 : 2048,
-                         static_cast<int>(outputs), rep);
-      return local;
-    };
-    if (quartz_first) {
-      rc |= quartz();
-      release_gpu();
-      rc |= llama();
-    } else {
-      rc |= llama();
-      rc |= quartz();
-      release_gpu();
+      if (rc != 0) break;
     }
   }
+  release_gpu();
+  rc |= run_llama(options, phase, "unperturbed", prefill ? 4096 : 0,
+                  prefill ? 0 : 2048, static_cast<int>(outputs), repetitions);
+  rc |= run_llama(options, phase, "eager_diagnostic", prefill ? 4096 : 0,
+                  prefill ? 0 : 2048, static_cast<int>(outputs), repetitions);
   std::printf(
-      "%s{\"schema_version\":1,\"task\":\"OPT-060\",\"workload\":\"%s\","
+      "%s{\"schema_version\":1,\"task\":\"OPT-071\",\"workload\":\"%s\","
       "\"engines\":2,\"modes\":[\"unperturbed\",\"eager_diagnostic\"],"
-      "\"repetitions\":%d,\"records\":%zu,\"claims_throughput\":false}\n",
+      "\"repetitions\":%d,\"records\":%zu,\"claims_throughput\":false,"
+      "\"shipping_graph_wall\":true}\n",
       kPrefix, phase, repetitions, families.count);
   return rc;
 }

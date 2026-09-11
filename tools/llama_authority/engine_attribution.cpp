@@ -94,7 +94,7 @@ int run_smoke() {
   setenv("QW38_OPT060_EAGER", "1", 1);
   qw38_opt060::begin_run();
   qw38_opt060::set_positions("smoke", 0, 0);
-  qw38_opt060::record_epoch(nullptr);
+  qw38_opt060::begin_measured_window(nullptr);
   qw38_opt060::begin_op(nullptr, 0);
   cudaEvent_t marker = nullptr;
   cudaEventCreate(&marker);
@@ -185,7 +185,7 @@ int run_model(const Options& options) {
   double instrumented_ms = 0.0;
 #ifdef QW38_OPT060_ATTRIBUTION
   qw38_opt060::begin_run();
-  qw38_opt060::set_positions(prefill ? "prefill" : "decode", 0, 0);
+  qw38_opt060::set_positions("setup", 0, 0);
 #endif
 
   llama_context* ctx = llama_init_from_model(model, context_params);
@@ -206,75 +206,105 @@ int run_model(const Options& options) {
     }
   }
 
-  llama_memory_clear(llama_get_memory(ctx), true);
-  if (!prefill) {
-    llama_batch prefix_batch = llama_batch_get_one(tokens.data(), prompt);
-    if (llama_decode(ctx, prefix_batch) != 0) {
-      llama_free(ctx);
-      llama_model_free(model);
-      llama_backend_free();
-      return 1;
+  const int windows = options.samples < 1 ? 1 : options.samples;
+  for (int sample = 0; sample < windows; ++sample) {
+    llama_memory_clear(llama_get_memory(ctx), true);
+    if (!prefill) {
+      llama_batch prefix_batch = llama_batch_get_one(tokens.data(), prompt);
+      if (llama_decode(ctx, prefix_batch) != 0) {
+        llama_free(ctx);
+        llama_model_free(model);
+        llama_backend_free();
+        return 1;
+      }
     }
-  }
 #ifdef QW38_OPT060_ATTRIBUTION
-  if (diagnostic) qw38_opt060::record_epoch(nullptr);
-#endif
-  const auto started = std::chrono::steady_clock::now();
-  if (prefill) {
-    llama_batch prompt_batch = llama_batch_get_one(tokens.data(), prompt);
-    if (llama_decode(ctx, prompt_batch) != 0) {
-      llama_free(ctx);
-      llama_model_free(model);
-      llama_backend_free();
-      return 1;
+    if (diagnostic) {
+      cudaDeviceSynchronize();
+      qw38_opt060::set_positions(prefill ? "prefill" : "decode", sample,
+                                 prefill ? 0 : prompt);
+      qw38_opt060::begin_measured_window(nullptr);
     }
-  }
-  for (int step = 0; step < decode_tokens; ++step) {
-#ifdef QW38_OPT060_ATTRIBUTION
-    qw38_opt060::set_positions("decode", 0, prompt + step);
 #endif
-    llama_token token = tokens[static_cast<std::size_t>(prompt + step)];
-    llama_batch batch = llama_batch_get_one(&token, 1);
-    if (llama_decode(ctx, batch) != 0) {
-      llama_free(ctx);
-      llama_model_free(model);
-      llama_backend_free();
-      return 1;
+    const auto started = std::chrono::steady_clock::now();
+    if (prefill) {
+      llama_batch prompt_batch = llama_batch_get_one(tokens.data(), prompt);
+      if (llama_decode(ctx, prompt_batch) != 0) {
+        llama_free(ctx);
+        llama_model_free(model);
+        llama_backend_free();
+        return 1;
+      }
     }
-    const float* logits = llama_get_logits_ith(ctx, -1);
-    volatile float sink = logits != nullptr ? logits[0] : 0.0F;
-    (void)sink;
-  }
-  cudaDeviceSynchronize();
-  const double wall_ms = std::chrono::duration<double, std::milli>(
-                             std::chrono::steady_clock::now() - started)
-                             .count();
-  if (diagnostic) {
-    instrumented_ms = wall_ms;
-  } else {
-    uninstrumented_ms = wall_ms;
-  }
+    for (int step = 0; step < decode_tokens; ++step) {
 #ifdef QW38_OPT060_ATTRIBUTION
-  if (diagnostic) qw38_opt060::resolve();
+      qw38_opt060::set_positions("decode", sample, prompt + step);
 #endif
+      llama_token token = tokens[static_cast<std::size_t>(prompt + step)];
+      llama_batch batch = llama_batch_get_one(&token, 1);
+      if (llama_decode(ctx, batch) != 0) {
+        llama_free(ctx);
+        llama_model_free(model);
+        llama_backend_free();
+        return 1;
+      }
+#ifdef QW38_OPT060_ATTRIBUTION
+      if (diagnostic) {
+        qw38_opt060::drain();
+        if (qw38_opt060::overflow()) {
+          std::fprintf(stderr, "llama attribution dropped records\n");
+          llama_free(ctx);
+          llama_model_free(model);
+          llama_backend_free();
+          return 1;
+        }
+      }
+#endif
+      const float* logits = llama_get_logits_ith(ctx, -1);
+      volatile float sink = logits != nullptr ? logits[0] : 0.0F;
+      (void)sink;
+    }
+    cudaDeviceSynchronize();
+    const double wall_ms = std::chrono::duration<double, std::milli>(
+                               std::chrono::steady_clock::now() - started)
+                               .count();
+    if (diagnostic) {
+      instrumented_ms = wall_ms;
+    } else {
+      uninstrumented_ms = wall_ms;
+    }
+#ifdef QW38_OPT060_ATTRIBUTION
+    if (diagnostic) {
+      qw38_opt060::drain();
+      if (qw38_opt060::overflow()) {
+        std::fprintf(stderr, "llama attribution dropped records\n");
+        llama_free(ctx);
+        llama_model_free(model);
+        llama_backend_free();
+        return 1;
+      }
+      qw38_opt060::resolve();
+    }
+#endif
+    std::printf(
+        "%s{\"schema_version\":1,\"task\":\"OPT-071\",\"engine\":\"llama\","
+        "\"workload\":\"%s\",\"mode\":\"%s\",\"batch_policy\":\"%s\","
+        "\"revision\":\"%s\",\"graph_mode\":\"%s\",\"n_batch\":%u,\"n_ubatch\":%u,"
+        "\"prompt\":%d,\"output_tokens\":%d,\"sample_index\":%d,"
+        "\"uninstrumented_wall_ms\":%.9g,\"instrumented_wall_ms\":%.9g,"
+        "\"not_llama_bench\":true}\n",
+        kPrefix, options.workload, options.mode, options.batch_policy, kRevision,
+        diagnostic ? "eager_diagnostic" : "cuda_graph",
+        static_cast<unsigned>(context_params.n_batch),
+        static_cast<unsigned>(context_params.n_ubatch), prompt, decode_tokens,
+        sample, uninstrumented_ms, instrumented_ms);
+#ifdef QW38_OPT060_ATTRIBUTION
+    if (diagnostic) qw38_opt060::dump_json(stdout);
+#endif
+  }
   llama_free(ctx);
   llama_model_free(model);
   llama_backend_free();
-
-  std::printf(
-      "%s{\"schema_version\":1,\"task\":\"OPT-060\",\"engine\":\"llama\","
-      "\"workload\":\"%s\",\"mode\":\"%s\",\"batch_policy\":\"%s\","
-      "\"revision\":\"%s\",\"graph_mode\":\"%s\",\"n_batch\":%u,\"n_ubatch\":%u,"
-      "\"prompt\":%d,\"output_tokens\":%d,\"uninstrumented_wall_ms\":%.9g,"
-      "\"instrumented_wall_ms\":%.9g,\"not_llama_bench\":true}\n",
-      kPrefix, options.workload, options.mode, options.batch_policy, kRevision,
-      diagnostic ? "eager_diagnostic" : "cuda_graph",
-      static_cast<unsigned>(context_params.n_batch),
-      static_cast<unsigned>(context_params.n_ubatch), prompt, decode_tokens,
-      uninstrumented_ms, instrumented_ms);
-#ifdef QW38_OPT060_ATTRIBUTION
-  if (diagnostic) qw38_opt060::dump_json(stdout);
-#endif
   return 0;
 }
 

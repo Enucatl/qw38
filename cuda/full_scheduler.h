@@ -208,6 +208,16 @@ struct ActivationCapture final {
   float* prompt_residual = nullptr;
   float* prompt_mixer_output = nullptr;
   bool prompt_rows_captured = false;
+  // OPT-071 full-layer production capture. Host owns the buffers; copies are
+  // untimed and excluded from replay intervals.
+  bool capture_all_layers = false;
+  std::size_t full_layer_count = 0;
+  float* full_layer_input = nullptr;
+  float* full_ffn_input = nullptr;
+  float* full_attn_output = nullptr;
+  bool* full_layer_input_captured = nullptr;
+  bool* full_ffn_input_captured = nullptr;
+  bool* full_attn_output_captured = nullptr;
 };
 
 // One request-level attribution record. A false `measured` flag means that the

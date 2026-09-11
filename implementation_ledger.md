@@ -163,7 +163,7 @@ New kernel tasks are conditional on measured opportunity and valid admission.
 | ID | Description | Dependencies | Status | Acceptance condition | Evidence |
 |---|---|---|---|---|---|
 | OPT-070 | Repair acceptance enforcement and revalidate installed Q8/MMQ keeps | OPT-069, OPT-071, OPT-073, OPT-074 | pending | Actual paired complete rotating and short E2E evidence yields separate retain/revert/inconclusive verdicts for OPT-064/066; screen-only results cannot admit a keep | [`tasks/OPT-070.md`](tasks/OPT-070.md) |
-| OPT-071 | Repair full-engine timing windows and production capture replay | OPT-060, OPT-061, OPT-069 | pending | No prefix/warmup contamination, dropped records or duplicate family charging; complete measured windows and identity-cached real inputs support honest sink ranking | [`tasks/OPT-071.md`](tasks/OPT-071.md) |
+| OPT-071 | Repair full-engine timing windows and production capture replay | OPT-060, OPT-061, OPT-069 | done | No prefix/warmup contamination, dropped records or duplicate family charging; complete measured windows and identity-cached real inputs support honest sink ranking | [`tasks/OPT-071.md`](tasks/OPT-071.md); [`pins/opt071_attribution_repair_contract.json`](pins/opt071_attribution_repair_contract.json); [`pins/opt071_iteration_contract.json`](pins/opt071_iteration_contract.json); [`fixtures/opt071_attribution_repair.json`](fixtures/opt071_attribution_repair.json); [`tools/opt071_attribution_repair.py`](tools/opt071_attribution_repair.py); [`tests/test_opt071_attribution_repair.py`](tests/test_opt071_attribution_repair.py); [`cuda/engine_attribution.h`](cuda/engine_attribution.h); [`cuda/optimization_component_replay.cu`](cuda/optimization_component_replay.cu); [`tools/llama_authority/engine_attribution.cpp`](tools/llama_authority/engine_attribution.cpp); [`evidence/optimization/opt071-attribution-repair/REPORT.md`](evidence/optimization/opt071-attribution-repair/REPORT.md); verification 2026-09-11T15:30:12Z |
 | OPT-072 | Reevaluate all correctness-based optimization rejections | OPT-059, OPT-069 | pending | Every historical numerical/test rejection has an evidence-backed disposition and owner; comparable-accuracy eligibility is separated from hard correctness and performance failures | [`tasks/OPT-072.md`](tasks/OPT-072.md) |
 | OPT-073 | Resolve functional authority failures and version quality decisions | OPT-058, OPT-069, OPT-072 | pending | Exact prompts/scorers audited, arithmetic truth preserved, absolute and regression verdicts explicit, and failed required quality stops release before long timing | [`tasks/OPT-073.md`](tasks/OPT-073.md) |
 | OPT-074 | Complete real production-shape llama GPU numerical admission | OPT-059, OPT-071, OPT-072 | pending | Full-M actual GPU dispatch, sampled independent FP64 and frozen held-out budgets cover production Q4 and selected Q8/Q6; missing coverage cannot become admission | [`tasks/OPT-074.md`](tasks/OPT-074.md) |
@@ -6327,7 +6327,40 @@ statements below are historical, not the current execution order.
   Each dossier specifies native targets, commands, work counts and stop rules.
 - Validation: new dependency graph is acyclic; all eleven dossier dependencies
   match their pending ledger rows; local dossier/protocol links resolve;
-  `git diff --check` passes. `uv run pytest -q tests/test_documentation.py`
+  `git diff --check` passes.   `uv run pytest -q tests/test_documentation.py`
   reports two passed and two failed on the pre-existing duplicate OPT-056
   reference in the audit chapter's OPT-069 row (also present at HEAD).
   No audit/test file, historical fixture, production pin or gate was changed.
+
+### 2026-09-11T15:30:43Z — OPT-071 attribution and replay repair delivered
+
+- Repaired llama measured-window recording (`begin_measured_window` after
+  setup/warmup/prefix; per-token drain; overflow fails acceptance), Quartz
+  per-sequence epoch with parent/scope IDs, graph/eager/overhead accounting,
+  and OPT-061 per-layer capture plus pooled-event replay. Coupled IDs: none.
+  No throughput claim.
+- Acceptance: feedback decode/prefill and acceptance decode+prefill within
+  300 s; `overflow=false`; correct 64/64/48/16/1 decode family counts; capture
+  identity reuse and stale-key rejection; honest gap ranking. `nsys` unavailable
+  (optional); component-replay binary built but not GPU-executed by runner
+  (host tests and native source review).
+- Acceptance evidence: [`tasks/OPT-071.md`](tasks/OPT-071.md);
+  [`pins/opt071_attribution_repair_contract.json`](pins/opt071_attribution_repair_contract.json);
+  [`pins/opt071_iteration_contract.json`](pins/opt071_iteration_contract.json);
+  [`fixtures/opt071_attribution_repair.json`](fixtures/opt071_attribution_repair.json);
+  [`tools/opt071_attribution_repair.py`](tools/opt071_attribution_repair.py);
+  [`tests/test_opt071_attribution_repair.py`](tests/test_opt071_attribution_repair.py);
+  [`cuda/engine_attribution.h`](cuda/engine_attribution.h);
+  [`cuda/opt060_engine_attribution_test.cu`](cuda/opt060_engine_attribution_test.cu);
+  [`cuda/optimization_component_replay.cu`](cuda/optimization_component_replay.cu);
+  [`cuda/full_scheduler.cu`](cuda/full_scheduler.cu);
+  [`tools/llama_authority/engine_attribution.cpp`](tools/llama_authority/engine_attribution.cpp);
+  [`tools/llama_authority/patches/qw38_opt060_attribution.cuh`](tools/llama_authority/patches/qw38_opt060_attribution.cuh);
+  [`tools/run_optimization_task.py`](tools/run_optimization_task.py);
+  [`evidence/optimization/opt071-attribution-repair/REPORT.md`](evidence/optimization/opt071-attribution-repair/REPORT.md).
+  Proof is clean measured windows, nonoverlapping family accounting, and
+  identity-cached replay — not a model speedup gate.
+- Marked OPT-071 `done`; delivery is limited to the verified task scope plus
+  this ledger/audit bookkeeping. `plan.md` is unchanged. OPT-016 and OPT-056 stay
+  `blocked`. Next eligible pending by dependency order: **OPT-072**. No tok/s
+  claim (`claims_throughput=false`).

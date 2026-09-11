@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "task": "OPT-071",
+  "llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+  "gguf_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+  "claims_performance_improvement": false,
+  "claims_throughput": false,
+  "isolated_op_timings_insufficient": true,
+  "no_new_profiling_backend": true,
+  "quartz_target": "build/qw38-cuda-opt060-engine-attribution-test",
+  "replay_target": "build/qw38-cuda-component-replay",
+  "llama_target": ".cache/authorities/llama-build-opt060/bin/qw38-llama-engine-attribution",
+  "token_generator": "(42 + index * 997) % 248320",
+  "expected_decode_counts_per_token": {
+    "ffn_gate_up_glu": 64,
+    "ffn_down": 64,
+    "gdn_core": 48,
+    "attention_core": 16,
+    "logits_projection": 1
+  },
+  "unexplained_limit": 0.05,
+  "required_identity_fields": [
+    "gguf_sha",
+    "token_generator",
+    "token_input_hash",
+    "source",
+    "build_flags",
+    "selectors",
+    "layer_role",
+    "staging",
+    "state",
+    "model_path"
+  ],
+  "proof_limit": [
+    "no speedup claim",
+    "eager events are not production graph timings",
+    "fused members charged once",
+    "summed GPU work is not wall time when streams overlap",
+    "prefix and graph creation are excluded from decode latency",
+    "dropped records fail acceptance",
+    "Nsight optional; event conservation and capture identity are required"
+  ]
+}

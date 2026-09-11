@@ -549,7 +549,7 @@ class OptimizationRunner:
                     work = phase_wrap(
                         f"{tier_name}_{label}",
                         lambda name=tier_name: self._workload(
-                            contract, name, remaining(), run_dir
+                            contract, mode, name, remaining(), run_dir
                         ),
                     )
                     load_count += int(work.get("load", 0))
@@ -754,11 +754,13 @@ class OptimizationRunner:
     def _workload(
         self,
         contract: Mapping[str, Any],
+        mode: str,
         name: str,
         timeout_s: float,
         run_dir: Path,
     ) -> dict[str, Any]:
         workload = contract["workloads"][name]
+        mode_spec = contract.get("modes", {}).get(mode, {})
         tier = validate_tier(str(workload.get("tier", name)))
         target = str(workload.get("target", contract["target"]))
         values = {
@@ -766,6 +768,10 @@ class OptimizationRunner:
             "model": str(contract.get("model", "")),
             "run_dir": str(run_dir),
             "root": str(self.root),
+            "mode": mode,
+            "repetitions": int(
+                mode_spec.get("repetitions", workload.get("samples", 1))
+            ),
         }
         args = [str(arg).format(**values) for arg in workload.get("args", [])]
         if str(workload.get("runner", "docker")) == "host":
