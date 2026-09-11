@@ -898,36 +898,22 @@ __global__ void merge_decode_kv_parts(AttentionConfig config, int n_parts,
   }
 }
 
-// OPT-039 warp-owned one-token vector attention. One warp owns one
-// query-head/partition pair. Q RMS stays the ordered FP32 sum-of-squares
-// from the CTA path; only the per-row QK fold uses warp shuffle reduction
-// (llama.cpp fattn-vec.cuh warp-owned Q/KQ/VKQ technique; MIT inspiration
-// only, not vendored).
-__global__ void warp_query_decode_attention(
-    AttentionConfig config, std::size_t position, int n_parts,
-    const float* query, const float* query_scale,
-    const __nv_bfloat16* committed_key, const __nv_bfloat16* committed_value,
-    const __nv_bfloat16* candidate_key, const __nv_bfloat16* candidate_value,
-    float* normalized_query, float* partial_vkq, float* meta) {
+__device__ unsigned int g_opt078_kv_unaligned_fallback = 0;
+
+// OPT-078 decode-only query preparation. One warp owns one query head.
+// Lane 0 keeps the ordered FP32 sum-of-squares from warp_query; RoPE uses
+// the same theta/angle. Always rewrite the existing normalized-query
+// workspace. Never skip because the destination pointer is unchanged.
+__global__ void prepare_decode_query(AttentionConfig config,
+                                     std::size_t position, const float* query,
+                                     const float* query_scale,
+                                     float* normalized_query) {
   const std::uint32_t query_head = blockIdx.x;
-  const int part = static_cast<int>(blockIdx.y);
   const std::uint32_t lane = threadIdx.x;
   const std::size_t width = config.head_width;
-  const std::uint32_t group = config.query_heads / config.kv_heads;
-  const std::uint32_t kv_head = query_head / group;
   const std::size_t qbase = static_cast<std::size_t>(query_head) * width;
-  const std::size_t L = position + 1;
-  const std::size_t part_begin =
-      (static_cast<std::size_t>(part) * L) / static_cast<std::size_t>(n_parts);
-  const std::size_t part_end =
-      (static_cast<std::size_t>(part + 1) * L) /
-      static_cast<std::size_t>(n_parts);
   __shared__ float q_scratch[kProductionHeadWidth];
   __shared__ float inverse;
-  float q[kWarpDimsPerLane];
-  float vkq[kWarpDimsPerLane]{};
-  float maximum = -INFINITY;
-  float denominator = 0.0F;
   float inv = 0.0F;
   if (lane == 0) {
     float sum = 0.0F;
@@ -966,8 +952,111 @@ __global__ void warp_query_decode_attention(
     const std::uint32_t dim =
         lane * static_cast<std::uint32_t>(kWarpDimsPerLane) +
         static_cast<std::uint32_t>(i);
-    q[i] = q_scratch[dim];
-    if (part == 0) normalized_query[qbase + dim] = q[i];
+    normalized_query[qbase + dim] = q_scratch[dim];
+  }
+}
+
+__device__ __forceinline__ void load_bf16x8(const __nv_bfloat16* ptr,
+                                            float* out) {
+  const unsigned long long addr = reinterpret_cast<unsigned long long>(ptr);
+  if ((addr & 15ull) == 0) {
+    const uint4 packed = *reinterpret_cast<const uint4*>(ptr);
+    const __nv_bfloat16* as_bf16 =
+        reinterpret_cast<const __nv_bfloat16*>(&packed);
+#pragma unroll
+    for (int i = 0; i < kWarpDimsPerLane; ++i)
+      out[i] = __bfloat162float(as_bf16[i]);
+  } else {
+    atomicOr(&g_opt078_kv_unaligned_fallback, 1u);
+#pragma unroll
+    for (int i = 0; i < kWarpDimsPerLane; ++i)
+      out[i] = __bfloat162float(ptr[i]);
+  }
+}
+
+// OPT-039 warp-owned one-token vector attention. One warp owns one
+// query-head/partition pair. Q RMS stays the ordered FP32 sum-of-squares
+// from the CTA path; only the per-row QK fold uses warp shuffle reduction
+// (llama.cpp fattn-vec.cuh warp-owned Q/KQ/VKQ technique; MIT inspiration
+// only, not vendored). OPT-078 can consume a once-prepared FP32 Q and
+// optionally 16-byte KV loads; reduction/softmax order and ascending-part
+// merge are unchanged.
+template <bool kUsePreparedQ, bool kVecKv>
+__global__ void warp_query_decode_attention(
+    AttentionConfig config, std::size_t position, int n_parts,
+    const float* query, const float* query_scale,
+    const __nv_bfloat16* committed_key, const __nv_bfloat16* committed_value,
+    const __nv_bfloat16* candidate_key, const __nv_bfloat16* candidate_value,
+    float* normalized_query, float* partial_vkq, float* meta) {
+  const std::uint32_t query_head = blockIdx.x;
+  const int part = static_cast<int>(blockIdx.y);
+  const std::uint32_t lane = threadIdx.x;
+  const std::size_t width = config.head_width;
+  const std::uint32_t group = config.query_heads / config.kv_heads;
+  const std::uint32_t kv_head = query_head / group;
+  const std::size_t qbase = static_cast<std::size_t>(query_head) * width;
+  const std::size_t L = position + 1;
+  const std::size_t part_begin =
+      (static_cast<std::size_t>(part) * L) / static_cast<std::size_t>(n_parts);
+  const std::size_t part_end =
+      (static_cast<std::size_t>(part + 1) * L) /
+      static_cast<std::size_t>(n_parts);
+  __shared__ float q_scratch[kProductionHeadWidth];
+  __shared__ float inverse;
+  float q[kWarpDimsPerLane];
+  float vkq[kWarpDimsPerLane]{};
+  float maximum = -INFINITY;
+  float denominator = 0.0F;
+  if constexpr (kUsePreparedQ) {
+#pragma unroll
+    for (int i = 0; i < kWarpDimsPerLane; ++i) {
+      const std::uint32_t dim =
+          lane * static_cast<std::uint32_t>(kWarpDimsPerLane) +
+          static_cast<std::uint32_t>(i);
+      q[i] = normalized_query[qbase + dim];
+    }
+  } else {
+    float inv = 0.0F;
+    if (lane == 0) {
+      float sum = 0.0F;
+      for (std::uint32_t i = 0; i < config.head_width; ++i) {
+        const float item = query[qbase + i];
+        sum = __fadd_rn(sum, item * item);
+      }
+      inverse = 1.0F / sqrtf(sum / static_cast<float>(width) + kRmsEpsilon);
+      inv = inverse;
+    }
+    inv = __shfl_sync(0xffffffff, inv, 0);
+#pragma unroll
+    for (int i = 0; i < kWarpDimsPerLane; ++i) {
+      const std::uint32_t dim =
+          lane * static_cast<std::uint32_t>(kWarpDimsPerLane) +
+          static_cast<std::uint32_t>(i);
+      q_scratch[dim] = query[qbase + dim] * inv * query_scale[dim];
+    }
+    __syncwarp();
+    const std::uint32_t half = config.rotary_width / 2;
+    for (std::uint32_t pair = lane; pair < half; pair += kWarpThreads) {
+      const float first = q_scratch[pair];
+      const float second = q_scratch[half + pair];
+      const float exponent =
+          static_cast<float>(pair * 2) / static_cast<float>(config.rotary_width);
+      const float angle =
+          static_cast<float>(position) / powf(kRopeTheta, exponent);
+      const float c = cosf(angle);
+      const float s = sinf(angle);
+      q_scratch[pair] = first * c - second * s;
+      q_scratch[half + pair] = second * c + first * s;
+    }
+    __syncwarp();
+#pragma unroll
+    for (int i = 0; i < kWarpDimsPerLane; ++i) {
+      const std::uint32_t dim =
+          lane * static_cast<std::uint32_t>(kWarpDimsPerLane) +
+          static_cast<std::uint32_t>(i);
+      q[i] = q_scratch[dim];
+      if (part == 0) normalized_query[qbase + dim] = q[i];
+    }
   }
   if (part_begin != part_end) {
     const std::size_t row_values =
@@ -988,14 +1077,24 @@ __global__ void warp_query_decode_attention(
       }
       float local = 0.0F;
       float v_reg[kWarpDimsPerLane];
+      const std::uint32_t dim0 =
+          lane * static_cast<std::uint32_t>(kWarpDimsPerLane);
+      if constexpr (kVecKv) {
+        float k_reg[kWarpDimsPerLane];
+        load_bf16x8(ksrc + dim0, k_reg);
+        load_bf16x8(vsrc + dim0, v_reg);
 #pragma unroll
-      for (int i = 0; i < kWarpDimsPerLane; ++i) {
-        const std::uint32_t dim =
-            lane * static_cast<std::uint32_t>(kWarpDimsPerLane) +
-            static_cast<std::uint32_t>(i);
-        local = __fadd_rn(
-            local, __fmul_rn(q[i], __bfloat162float(ksrc[dim])));
-        v_reg[i] = __bfloat162float(vsrc[dim]);
+        for (int i = 0; i < kWarpDimsPerLane; ++i) {
+          local = __fadd_rn(local, __fmul_rn(q[i], k_reg[i]));
+        }
+      } else {
+#pragma unroll
+        for (int i = 0; i < kWarpDimsPerLane; ++i) {
+          const std::uint32_t dim = dim0 + static_cast<std::uint32_t>(i);
+          local = __fadd_rn(
+              local, __fmul_rn(q[i], __bfloat162float(ksrc[dim])));
+          v_reg[i] = __bfloat162float(vsrc[dim]);
+        }
       }
       local = __fadd_rn(local, __shfl_down_sync(0xffffffff, local, 16));
       local = __fadd_rn(local, __shfl_down_sync(0xffffffff, local, 8));
@@ -1631,9 +1730,81 @@ bool decode_uses_warp_query() noexcept {
 int decode_kv_warp_query_occupancy() noexcept {
   int blocks = 0;
   const cudaError_t error = cudaOccupancyMaxActiveBlocksPerMultiprocessor(
-      &blocks, warp_query_decode_attention, kWarpThreads, 0);
+      &blocks, warp_query_decode_attention<false, false>, kWarpThreads, 0);
   if (error != cudaSuccess) return 0;
   return blocks;
+}
+
+int decode_query_prep_occupancy() noexcept {
+  int blocks = 0;
+  const cudaError_t error = cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+      &blocks, prepare_decode_query, kWarpThreads, 0);
+  if (error != cudaSuccess) return 0;
+  return blocks;
+}
+
+int decode_kv_warp_query_prepared_occupancy() noexcept {
+  int blocks = 0;
+  const cudaError_t error = cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+      &blocks, warp_query_decode_attention<true, false>, kWarpThreads, 0);
+  if (error != cudaSuccess) return 0;
+  return blocks;
+}
+
+void decode_attention_kernel_attributes(const char* prep_path, int* registers,
+                                        std::size_t* local_bytes,
+                                        int* occupancy) noexcept {
+  cudaFuncAttributes attrs{};
+  if (decode_query_prep_uses_veckv(prep_path)) {
+    cudaFuncGetAttributes(&attrs, warp_query_decode_attention<true, true>);
+  } else if (decode_query_prep_uses_prepared(prep_path)) {
+    cudaFuncGetAttributes(&attrs, warp_query_decode_attention<true, false>);
+  } else {
+    cudaFuncGetAttributes(&attrs, warp_query_decode_attention<false, false>);
+  }
+  if (registers != nullptr) *registers = attrs.numRegs;
+  if (local_bytes != nullptr) {
+    *local_bytes = static_cast<std::size_t>(attrs.localSizeBytes);
+  }
+  if (occupancy != nullptr) {
+    int blocks = 0;
+    if (decode_query_prep_uses_veckv(prep_path)) {
+      cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+          &blocks, warp_query_decode_attention<true, true>, kWarpThreads, 0);
+    } else if (decode_query_prep_uses_prepared(prep_path)) {
+      cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+          &blocks, warp_query_decode_attention<true, false>, kWarpThreads, 0);
+    } else {
+      cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+          &blocks, warp_query_decode_attention<false, false>, kWarpThreads, 0);
+    }
+    *occupancy = blocks;
+  }
+}
+
+cudaError_t launch_prepare_decode_query(
+    const AttentionConfig& config, std::size_t position, const float* query,
+    const float* query_norm_scale, float* normalized_query,
+    cudaStream_t stream) noexcept {
+  if (!valid_config(config) || query == nullptr ||
+      query_norm_scale == nullptr || normalized_query == nullptr ||
+      !production_warp_query_shape(config)) {
+    return cudaErrorInvalidValue;
+  }
+  prepare_decode_query<<<config.query_heads, kWarpThreads, 0, stream>>>(
+      config, position, query, query_norm_scale, normalized_query);
+  return cudaPeekAtLastError();
+}
+
+void reset_decode_kv_unaligned_fallback() noexcept {
+  const unsigned int zero = 0;
+  cudaMemcpyToSymbol(g_opt078_kv_unaligned_fallback, &zero, sizeof(zero));
+}
+
+unsigned int last_decode_kv_unaligned_fallback() noexcept {
+  unsigned int value = 0;
+  cudaMemcpyFromSymbol(&value, g_opt078_kv_unaligned_fallback, sizeof(value));
+  return value;
 }
 
 cudaError_t launch_attention_prepare_partitioned_vec(
@@ -1666,11 +1837,42 @@ cudaError_t launch_attention_prepare_partitioned_vec(
       score_workspace, output, stream);
   if (error != cudaSuccess) return error;
   if (decode_vec_is_warp_query(vec_path)) {
+    const char* prep_path = effective_decode_query_prep_path();
+    const bool prepared = decode_query_prep_uses_prepared(prep_path);
+    const bool vec_kv = decode_query_prep_uses_veckv(prep_path);
+    unsigned int prep_launches = 0;
+    unsigned int prep_grid = 0;
+    if (prepared) {
+      error = launch_prepare_decode_query(
+          config, position, query, query_norm_scale, normalized_query, stream);
+      if (error != cudaSuccess) return error;
+      prep_launches = 1;
+      prep_grid = config.query_heads;
+    }
     dim3 attention(config.query_heads, static_cast<unsigned>(n_parts), 1);
-    warp_query_decode_attention<<<attention, kWarpThreads, 0, stream>>>(
-        config, position, n_parts, query, query_norm_scale, committed.key,
-        committed.value, candidate_row.key, candidate_row.value,
-        normalized_query, partial_vkq, meta);
+    if (prepared && vec_kv) {
+      warp_query_decode_attention<true, true>
+          <<<attention, kWarpThreads, 0, stream>>>(
+              config, position, n_parts, query, query_norm_scale, committed.key,
+              committed.value, candidate_row.key, candidate_row.value,
+              normalized_query, partial_vkq, meta);
+    } else if (prepared) {
+      warp_query_decode_attention<true, false>
+          <<<attention, kWarpThreads, 0, stream>>>(
+              config, position, n_parts, query, query_norm_scale, committed.key,
+              committed.value, candidate_row.key, candidate_row.value,
+              normalized_query, partial_vkq, meta);
+    } else {
+      warp_query_decode_attention<false, false>
+          <<<attention, kWarpThreads, 0, stream>>>(
+              config, position, n_parts, query, query_norm_scale, committed.key,
+              committed.value, candidate_row.key, candidate_row.value,
+              normalized_query, partial_vkq, meta);
+    }
+    record_decode_query_prep_launch(
+        decode_query_prep_launch_variant(prep_path), prep_grid,
+        prepared ? static_cast<unsigned int>(kWarpThreads) : 0U,
+        static_cast<unsigned int>(n_parts), prepared, vec_kv, prep_launches);
   } else {
     const std::size_t shared = tiled_attention_shared_bytes();
     dim3 attention(config.kv_heads, static_cast<unsigned>(n_parts), 1);
@@ -2018,7 +2220,6 @@ void fattn_pipeline_f16_async_attributes(int* regs, std::size_t* local_bytes,
         fattn_pipeline_occupancy_typed<16, false, true, 32, 2, 2, 1, 2, false>();
   }
 }
-
 
 bool fattn_uses_warp_qk() noexcept {
   return fattn_qk_is_warp_microtile(kSelectedQKPath);

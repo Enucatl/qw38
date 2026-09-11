@@ -236,6 +236,22 @@ struct ActivationCapture final {
   float* gdn_committed_rec = nullptr;
   float* gdn_gate = nullptr;
   bool* gdn_slot_captured = nullptr;
+  // OPT-078 decode attention capture. Host owns the buffers; copies are
+  // untimed and excluded from replay intervals.
+  bool capture_decode_attention = false;
+  std::size_t attn_capture_position = 0;
+  std::size_t attn_capture_positions = 0;
+  std::size_t attn_capture_slots = 0;
+  std::size_t attn_kv_capacity = 0;
+  float* attn_query = nullptr;
+  float* attn_key = nullptr;
+  float* attn_value = nullptr;
+  float* attn_gate = nullptr;
+  __nv_bfloat16* attn_committed_key = nullptr;
+  __nv_bfloat16* attn_committed_value = nullptr;
+  __nv_bfloat16* attn_candidate_key = nullptr;
+  __nv_bfloat16* attn_candidate_value = nullptr;
+  bool* attn_slot_captured = nullptr;
 };
 
 // One request-level attribution record. A false `measured` flag means that the

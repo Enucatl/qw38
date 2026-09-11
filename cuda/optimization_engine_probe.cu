@@ -1,6 +1,8 @@
+#include "attention_decode.h"
 #include "ffn_decode_path.cuh"
 #include "full_scheduler.h"
 #include "gdn_decode_path.cuh"
+#include "attention_decode_path.cuh"
 #include "q4k_decode_path.cuh"
 #include "q8_decode_path.cuh"
 #include "quant_mmv.h"
@@ -50,6 +52,7 @@ struct Options final {
   const char* ffn_decode = nullptr;
   const char* gdn_decode = nullptr;
   const char* attention_pipeline = nullptr;
+  const char* decode_query_prep = nullptr;
   unsigned int q4_warps = 0;
   int mmq_async_x = -1;
   bool graph = false;
@@ -117,6 +120,7 @@ int usage(const char* argv0) {
                "[--q4-warps 2|4] "
                "[--ffn-decode paired_staged|shared_stage|paired_integer] "
                "[--gdn-decode sequential|tile16|tile32] "
+               "[--decode-query-prep warp_query|prepared_q|prepared_q_veckv] "
                "[--attention-pipeline f16_async|kv_once] "
                "[--selector NAME] [--modes graph,eager] [--skip-logits]\n",
                argv0);
@@ -165,6 +169,9 @@ int parse_args(int argc, char** argv, Options* options) {
     } else if (std::strcmp(arg, "--attention-pipeline") == 0 &&
                index + 1 < argc) {
       options->attention_pipeline = argv[++index];
+    } else if (std::strcmp(arg, "--decode-query-prep") == 0 &&
+               index + 1 < argc) {
+      options->decode_query_prep = argv[++index];
     } else if (std::strcmp(arg, "--selector") == 0 && index + 1 < argc) {
       options->selector = argv[++index];
     } else if (std::strcmp(arg, "--modes") == 0 && index + 1 < argc) {
@@ -234,15 +241,6 @@ int apply_defaults(const qw38::cuda::TestTier tier, Options* options) {
       options->eager = true;
     }
   }
-  if (std::strcmp(options->workload, "attn-ab") == 0) {
-    if (options->prompt == 0 && options->prefix == 0) {
-      options->prompt = kScreenPrompt;
-    }
-    if (!options->modes_set) {
-      options->graph = true;
-      options->eager = true;
-    }
-  }
   if (std::strcmp(options->workload, "q4-ab") == 0 ||
       std::strcmp(options->workload, "gdn-ab") == 0) {
     if (options->prefix == 0) options->prefix = kScreenPrefix;
@@ -256,6 +254,20 @@ int apply_defaults(const qw38::cuda::TestTier tier, Options* options) {
   }
   if (std::strcmp(options->workload, "mmq-ab") == 0) {
     if (options->prompt == 0) options->prompt = kScreenPrompt;
+    if (!options->modes_set) {
+      options->graph = true;
+      options->eager = true;
+    }
+  }
+  if (std::strcmp(options->workload, "attn-ab") == 0) {
+    if (options->decode_query_prep != nullptr) {
+      if (options->prefix == 0) options->prefix = kScreenPrefix;
+      if (options->output_tokens == 0) {
+        options->output_tokens = kScreenOutputTokens;
+      }
+    } else if (options->prompt == 0 && options->prefix == 0) {
+      options->prompt = kScreenPrompt;
+    }
     if (!options->modes_set) {
       options->graph = true;
       options->eager = true;
@@ -326,8 +338,15 @@ int reject_over_bounds(qw38::cuda::TestTier tier, const Options& options) {
     const bool gdn_ok = gdn_ab && options.prefix == kScreenPrefix &&
                         options.output_tokens == kScreenOutputTokens &&
                         options.prompt == 0 && options.pairs <= 1;
+    const bool attn_ok =
+        attn_ab && options.pairs <= 1 &&
+        ((options.prompt == kScreenPrompt && options.prefix == 0 &&
+          options.output_tokens == 0) ||
+         (options.prefix == kScreenPrefix &&
+          options.output_tokens == kScreenOutputTokens && options.prompt == 0));
     if (options.model == nullptr || options.runs != 1 ||
-        !(decode_ok || prefill_ok || q8_ok || mmq_ok || q4_ok || gdn_ok)) {
+        !(decode_ok || prefill_ok || q8_ok || mmq_ok || q4_ok || gdn_ok ||
+          attn_ok)) {
       std::fprintf(stderr,
                    "screen allows one pair of P4096 or prefix 2048 + 32 "
                    "output tokens\n");
@@ -336,7 +355,7 @@ int reject_over_bounds(qw38::cuda::TestTier tier, const Options& options) {
     return 0;
   }
   if (tier == qw38::cuda::TestTier::kAcceptance &&
-      (q8_ab || mmq_ab || q4_ab || gdn_ab)) {
+      (q8_ab || mmq_ab || q4_ab || gdn_ab || attn_ab)) {
     const bool q8_ok = q8_ab && options.prefix == kScreenPrefix &&
                        options.output_tokens == kScreenOutputTokens &&
                        options.prompt == 0 && options.pairs <= 5;
@@ -349,7 +368,14 @@ int reject_over_bounds(qw38::cuda::TestTier tier, const Options& options) {
     const bool gdn_ok = gdn_ab && options.prefix == kScreenPrefix &&
                         options.output_tokens == kScreenOutputTokens &&
                         options.prompt == 0 && options.pairs <= 5;
-    if (options.model == nullptr || !(q8_ok || mmq_ok || q4_ok || gdn_ok)) {
+    const bool attn_ok =
+        attn_ab && options.pairs <= 5 &&
+        ((options.prompt == kScreenPrompt && options.prefix == 0 &&
+          options.output_tokens == 0) ||
+         (options.prefix == kScreenPrefix &&
+          options.output_tokens == kScreenOutputTokens && options.prompt == 0));
+    if (options.model == nullptr ||
+        !(q8_ok || mmq_ok || q4_ok || gdn_ok || attn_ok)) {
       std::fprintf(stderr,
                    "acceptance keep-ab allows five P4096 or D2048+32 pairs\n");
       return 2;
@@ -810,10 +836,19 @@ int run_keep_ab(const Options& options) {
           return 2;
         }
       } else if (attn) {
-        const char* attn_path = candidate_side ? candidate_attn : "f16_async";
-        if (!qw38::cuda::apply_attention_pipeline_ident(attn_path)) {
-          std::fprintf(stderr, "invalid --attention-pipeline %s\n", attn_path);
-          return 2;
+        if (options.decode_query_prep != nullptr) {
+          const char* prep_path =
+              candidate_side ? options.decode_query_prep : "warp_query";
+          if (!qw38::cuda::apply_decode_query_prep_ident(prep_path)) {
+            std::fprintf(stderr, "invalid --decode-query-prep %s\n", prep_path);
+            return 2;
+          }
+        } else {
+          const char* attn_path = candidate_side ? candidate_attn : "f16_async";
+          if (!qw38::cuda::apply_attention_pipeline_ident(attn_path)) {
+            std::fprintf(stderr, "invalid --attention-pipeline %s\n", attn_path);
+            return 2;
+          }
         }
       } else if (q8) {
         if (!qw38::cuda::apply_q8_layout_ident(labels[side])) {
@@ -861,7 +896,8 @@ int run_keep_ab(const Options& options) {
           "captured_in_graph=%s staging=%s warps_per_row=%u "
           "wall_ms=%.9g captured_path=%s gdn_decode=%s gdn_launch=%s "
           "gdn_tile=%u attention_pipeline=%s attention_launch=%s "
-          "convert_once=%d\n",
+          "convert_once=%d decode_query_prep=%s decode_query_prep_launch=%s "
+          "prep_grid=%u n_parts=%u prepared_q=%s vec_kv=%s\n",
           pair, side, labels[side],
           q8_layout_copy[side] != nullptr ? q8_layout_copy[side] : "",
           q8_rows[side], mmq_kernel_buf[side],
@@ -876,13 +912,20 @@ int run_keep_ab(const Options& options) {
           qw38::cuda::last_gdn_decode_value_tile(),
           qw38::cuda::last_attention_pipeline_path(),
           qw38::cuda::last_attention_pipeline_launch(),
-          qw38::cuda::last_attention_pipeline_convert_once());
+          qw38::cuda::last_attention_pipeline_convert_once(),
+          qw38::cuda::effective_decode_query_prep_path(),
+          qw38::cuda::last_decode_query_prep_launch_variant(),
+          qw38::cuda::last_decode_query_prep_grid(),
+          qw38::cuda::last_decode_attention_n_parts(),
+          qw38::cuda::last_decode_query_prep_used() ? "true" : "false",
+          qw38::cuda::last_decode_vec_kv_used() ? "true" : "false");
       qw38::cuda::clear_q8_decode_path_override();
       qw38::cuda::clear_mmq_async_x_override();
       qw38::cuda::clear_q4_decode_path_override();
       qw38::cuda::clear_ffn_decode_path_override();
       qw38::cuda::clear_gdn_decode_path_override();
       qw38::cuda::clear_attention_pipeline_path_override();
+      qw38::cuda::clear_decode_query_prep_path_override();
     }
     std::printf(
         "{\"observation_unit\":\"independent_round\",\"sample_index\":%d,"
@@ -933,7 +976,11 @@ int run_keep_ab(const Options& options) {
               "\"workload\":\"%s\",\"pairs\":%d,\"model_loaded_once\":true,"
               "\"override_before_capture_applied\":true,"
               "\"recapture_after_selector\":true}\n",
-              kPrefix, gdn ? "OPT-077" : (q4 ? "OPT-075" : "OPT-070"),
+              kPrefix,
+              options.decode_query_prep != nullptr
+                  ? "OPT-078"
+                  : (attn ? "OPT-079"
+                          : (gdn ? "OPT-077" : (q4 ? "OPT-075" : "OPT-070"))),
               options.workload, pairs);
   std::printf(
       "QW38_OPT077_NATIVE_COUNTS={\"schema_version\":1,\"task\":\"OPT-077\","
@@ -953,6 +1000,18 @@ int run_keep_ab(const Options& options) {
       "\"observed_warmups\":0,\"observed_samples\":%d,\"observed_candidates\":2,"
       "\"observed_shapes\":1,\"observed_tier\":\"%s\",\"pairs\":%d,"
       "\"acceptance_executed\":%s,\"keep\":false,"
+      "\"override_before_capture_applied\":true,"
+      "\"graph_capture_separate\":true,\"recapture_after_selector\":true}\n",
+      qw38::cuda::test_tier_name(), pairs, pairs, qw38::cuda::test_tier_name(),
+      pairs,
+      qw38::cuda::test_tier() == qw38::cuda::TestTier::kAcceptance ? "true"
+                                                                   : "false");
+  std::printf(
+      "QW38_OPT078_NATIVE_COUNTS={\"schema_version\":1,\"task\":\"OPT-078\","
+      "\"family\":\"decode-attention\",\"tier\":\"%s\",\"warmups\":0,"
+      "\"samples\":%d,\"observed_warmups\":0,\"observed_samples\":%d,"
+      "\"observed_candidates\":2,\"observed_shapes\":1,\"observed_tier\":\"%s\","
+      "\"pairs\":%d,\"acceptance_executed\":%s,\"keep\":false,"
       "\"override_before_capture_applied\":true,"
       "\"graph_capture_separate\":true,\"recapture_after_selector\":true}\n",
       qw38::cuda::test_tier_name(), pairs, pairs, qw38::cuda::test_tier_name(),

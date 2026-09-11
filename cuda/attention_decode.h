@@ -8,6 +8,8 @@
 #include <cuda_fp16.h>
 #include <cuda_runtime.h>
 
+#include "attention_decode_path.cuh"
+
 namespace qw38::cuda {
 
 struct AttentionConfig {
@@ -159,6 +161,17 @@ int decode_kv_merge_occupancy(int n_parts) noexcept;
 const char* selected_decode_attention_vec() noexcept;
 bool decode_uses_warp_query() noexcept;
 int decode_kv_warp_query_occupancy() noexcept;
+int decode_query_prep_occupancy() noexcept;
+int decode_kv_warp_query_prepared_occupancy() noexcept;
+void decode_attention_kernel_attributes(const char* prep_path, int* registers,
+                                        std::size_t* local_bytes,
+                                        int* occupancy) noexcept;
+cudaError_t launch_prepare_decode_query(
+    const AttentionConfig& config, std::size_t position, const float* query,
+    const float* query_norm_scale, float* normalized_query,
+    cudaStream_t stream) noexcept;
+void reset_decode_kv_unaligned_fallback() noexcept;
+unsigned int last_decode_kv_unaligned_fallback() noexcept;
 
 cudaError_t launch_attention_prepare(
     const AttentionConfig& config, std::size_t position, const float* query,

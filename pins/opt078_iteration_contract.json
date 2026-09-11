@@ -1,0 +1,229 @@
+{
+  "schema_version": 1,
+  "task": "OPT-078",
+  "yardstick": "decode_query_prep_and_vec_kv",
+  "claims_throughput": false,
+  "claims_performance_improvement": false,
+  "performance_admission": {
+    "enabled": true
+  },
+  "image": "qw38-cuda:13.0.2",
+  "model": "models/Qwen3.8-27B-Q4_K_M.gguf",
+  "gpu_lock": "build/optimization-runs/qw38-gpu.lock",
+  "aggregate_deadline_s": 300,
+  "target": "build/qw38-cuda-opt078-decode-attention-test",
+  "diagnostics_make_target": "cuda-opt078-diagnostics",
+  "case_ids": ["d128", "d2048", "attention", "quality-state"],
+  "modes": {
+    "feedback": {
+      "target": "build/qw38-cuda-opt078-decode-attention-test",
+      "tier_sequence": ["d128", "d2048"],
+      "make_targets": [
+        "build/qw38-cuda-opt078-decode-attention-test",
+        "build/qw38-cuda-component-replay",
+        "build/qw38-cuda-optimization-engine-probe"
+      ],
+      "build_once": true,
+      "warm_repetitions": 0,
+      "aggregate_deadline_s": 300,
+      "workloads": ["d128", "d2048"]
+    },
+    "acceptance": {
+      "target": "build/qw38-cuda-opt078-decode-attention-test",
+      "tier_sequence": ["quality-state", "attention"],
+      "make_targets": [
+        "build/qw38-cuda-opt078-decode-attention-test",
+        "build/qw38-cuda-component-replay",
+        "build/qw38-cuda-optimization-engine-probe"
+      ],
+      "warm_repetitions": 0,
+      "aggregate_deadline_s": 300,
+      "workloads": ["quality-state", "attention"]
+    },
+    "release": {
+      "target": "build/qw38-cuda-opt078-decode-attention-test",
+      "tier": "acceptance",
+      "make_targets": [],
+      "skip_compile": true,
+      "historical_oracles": false,
+      "workloads": []
+    }
+  },
+  "workloads": {
+    "d128": {
+      "target": "build/qw38-cuda-opt078-decode-attention-test",
+      "tier": "screen",
+      "runner": "host",
+      "kind": "three_config_complete_rotating_decode_attention",
+      "cases": 1,
+      "candidates": 3,
+      "warmups": 1,
+      "samples": 3,
+      "tokens": 1,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "engine_pairs": 1,
+      "load_model": 1,
+      "reference": 1,
+      "sampled_rows": 16,
+      "sampled_vectors": 4,
+      "family": "decode-attention",
+      "cache_mode": "rotating",
+      "control": "warp_query",
+      "complete_attention_layers": 16,
+      "n_parts": 16,
+      "decode_position": 128,
+      "gpu_work": true,
+      "native_targets": [
+        "build/qw38-cuda-opt078-decode-attention-test",
+        "build/qw38-cuda-component-replay",
+        "build/qw38-cuda-optimization-engine-probe"
+      ],
+      "args": [
+        "uv",
+        "run",
+        "python",
+        "tools/opt078_decode_attention.py",
+        "--phase",
+        "{phase}",
+        "--mode",
+        "{mode}",
+        "--run-dir",
+        "{run_dir}"
+      ]
+    },
+    "d2048": {
+      "target": "build/qw38-cuda-opt078-decode-attention-test",
+      "tier": "screen",
+      "runner": "host",
+      "kind": "three_config_complete_rotating_decode_attention",
+      "cases": 1,
+      "candidates": 3,
+      "warmups": 1,
+      "samples": 3,
+      "tokens": 1,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "engine_pairs": 1,
+      "load_model": 1,
+      "reference": 1,
+      "family": "decode-attention",
+      "cache_mode": "rotating",
+      "control": "warp_query",
+      "complete_attention_layers": 16,
+      "n_parts": 16,
+      "decode_position": 2048,
+      "gpu_work": true,
+      "native_targets": [
+        "build/qw38-cuda-opt078-decode-attention-test",
+        "build/qw38-cuda-component-replay",
+        "build/qw38-cuda-optimization-engine-probe"
+      ],
+      "args": [
+        "uv",
+        "run",
+        "python",
+        "tools/opt078_decode_attention.py",
+        "--phase",
+        "{phase}",
+        "--mode",
+        "{mode}",
+        "--run-dir",
+        "{run_dir}"
+      ]
+    },
+    "attention": {
+      "target": "build/qw38-cuda-opt078-decode-attention-test",
+      "tier": "screen",
+      "runner": "host",
+      "kind": "three_config_complete_rotating_decode_attention",
+      "cases": 1,
+      "candidates": 3,
+      "warmups": 1,
+      "samples": 3,
+      "tokens": 1,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 1,
+      "reference": 1,
+      "family": "decode-attention",
+      "cache_mode": "rotating",
+      "control": "warp_query",
+      "complete_attention_layers": 16,
+      "n_parts": 16,
+      "decode_position": 2048,
+      "gpu_work": true,
+      "native_targets": [
+        "build/qw38-cuda-opt078-decode-attention-test",
+        "build/qw38-cuda-component-replay",
+        "build/qw38-cuda-optimization-engine-probe"
+      ],
+      "args": [
+        "uv",
+        "run",
+        "python",
+        "tools/opt078_decode_attention.py",
+        "--phase",
+        "{phase}",
+        "--mode",
+        "{mode}",
+        "--run-dir",
+        "{run_dir}"
+      ],
+      "mode_overrides": {
+        "acceptance": {
+          "tier": "acceptance",
+          "cases": 1,
+          "candidates": 2,
+          "warmups": 3,
+          "samples": 10,
+          "engine_pairs": 5
+        }
+      }
+    },
+    "quality-state": {
+      "target": "tools/opt078_decode_attention.py",
+      "tier": "acceptance",
+      "runner": "host",
+      "kind": "identity_cached_opt073_and_state_isolation",
+      "cases": 1,
+      "candidates": 1,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 1,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 0,
+      "reference": 1,
+      "gpu_work": false,
+      "args": [
+        "uv",
+        "run",
+        "python",
+        "tools/opt078_decode_attention.py",
+        "--phase",
+        "quality-state",
+        "--mode",
+        "{mode}",
+        "--run-dir",
+        "{run_dir}"
+      ]
+    }
+  },
+  "proof_limit": [
+    "n_parts fixed at 16",
+    "one warp per query head decode Q prep",
+    "prepared FP32 Q written once to normalized-query workspace",
+    "16-byte KV load with alignment-safe scalar fallback",
+    "candidate KV preparation stays separate",
+    "prepared Q refreshed on new input/position/graph capture",
+    "no pointer-identity skip",
+    "no partition-count or GQA-layout sweep",
+    "no prefill/prompt path change",
+    "no speculative overlap or approximate exponential",
+    "complete 16-layer decode attention including prep core merge gate and FP32-to-BF16",
+    "OPT-073 identity-cached quality",
+    "historical oracles none"
+  ],
+  "report_path": "evidence/optimization/opt078-decode-attention/REPORT.md"
+}

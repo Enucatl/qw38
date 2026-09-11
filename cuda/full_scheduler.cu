@@ -723,6 +723,63 @@ cudaError_t maybe_capture_gdn_decode(ActivationCapture* capture,
   return error;
 }
 
+cudaError_t maybe_capture_decode_attention(
+    ActivationCapture* capture, std::size_t attention_slot, const float* query,
+    const float* key, const float* value, const float* gate,
+    const AttentionCache& committed, const AttentionCache& candidate) noexcept {
+  if (capture == nullptr || !capture->capture_decode_attention) {
+    return cudaSuccess;
+  }
+  if (attention_slot >= capture->attn_capture_slots) return cudaSuccess;
+  const std::size_t pos = capture->attn_capture_position;
+  if (pos >= capture->attn_capture_positions) return cudaSuccess;
+  const std::size_t index = pos * capture->attn_capture_slots + attention_slot;
+  cudaError_t error = cudaDeviceSynchronize();
+  if (error != cudaSuccess) return error;
+  auto copy_f = [&](float* host, const float* device, std::size_t count) {
+    if (host == nullptr || device == nullptr || count == 0) return cudaSuccess;
+    return cudaMemcpy(host + index * count, device, count * sizeof(float),
+                      cudaMemcpyDeviceToHost);
+  };
+  auto copy_bf16 = [&](__nv_bfloat16* host, const __nv_bfloat16* device,
+                       std::size_t count) {
+    if (host == nullptr || device == nullptr || count == 0) return cudaSuccess;
+    return cudaMemcpy(host + index * count, device,
+                      count * sizeof(__nv_bfloat16), cudaMemcpyDeviceToHost);
+  };
+  error = copy_f(capture->attn_query, query, internal::kAttentionQueryWidth);
+  if (error == cudaSuccess) {
+    error = copy_f(capture->attn_key, key, internal::kAttentionKvWidth);
+  }
+  if (error == cudaSuccess) {
+    error = copy_f(capture->attn_value, value, internal::kAttentionKvWidth);
+  }
+  if (error == cudaSuccess) {
+    error = copy_f(capture->attn_gate, gate, internal::kAttentionQueryWidth);
+  }
+  const std::size_t committed_n =
+      capture->attn_kv_capacity * internal::kAttentionKvWidth;
+  if (error == cudaSuccess) {
+    error = copy_bf16(capture->attn_committed_key, committed.key, committed_n);
+  }
+  if (error == cudaSuccess) {
+    error =
+        copy_bf16(capture->attn_committed_value, committed.value, committed_n);
+  }
+  if (error == cudaSuccess) {
+    error = copy_bf16(capture->attn_candidate_key, candidate.key,
+                      internal::kAttentionKvWidth);
+  }
+  if (error == cudaSuccess) {
+    error = copy_bf16(capture->attn_candidate_value, candidate.value,
+                      internal::kAttentionKvWidth);
+  }
+  if (error == cudaSuccess && capture->attn_slot_captured != nullptr) {
+    capture->attn_slot_captured[index] = true;
+  }
+  return error;
+}
+
 cudaError_t maybe_capture_down_input(ActivationCapture* capture,
                                      std::size_t layer,
                                      const __nv_bfloat16* device) noexcept {
@@ -3396,6 +3453,12 @@ Status execute_token(const ResidentModel& model, std::size_t token,
                 attention_slot * internal::kAttentionKvWidth,
             workspace->attention_candidate_value_ +
                 attention_slot * internal::kAttentionKvWidth};
+        if (error == cudaSuccess) {
+          error = maybe_capture_decode_attention(
+              capture, attention_slot, workspace->gdn_convolved_,
+              workspace->projection_c_, workspace->projection_d_,
+              workspace->projection_b_, committed, candidate);
+        }
         if (error == cudaSuccess) {
           error = begin_phase(
               leaves, leaf_timings == nullptr
