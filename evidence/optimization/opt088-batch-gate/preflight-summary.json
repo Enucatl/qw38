@@ -1,0 +1,234 @@
+{
+  "status": "pass",
+  "phase": "preflight",
+  "is_release_evidence": false,
+  "graph_eager_match": true,
+  "held_out_targets": 32,
+  "functional_output_tokens": 16,
+  "parsed_functional_answers": [
+    {
+      "raw": "A",
+      "stripped": "A",
+      "expected": "B",
+      "pass": false,
+      "reason": "wrong_choice",
+      "actual": "A",
+      "used_teacher_forcing": false,
+      "next_token": 32,
+      "top_two": [
+        32,
+        33
+      ],
+      "case": "task_arithmetic",
+      "engine": null
+    },
+    {
+      "raw": "A",
+      "stripped": "A",
+      "expected": "A",
+      "pass": true,
+      "reason": "exact_choice",
+      "actual": "A",
+      "used_teacher_forcing": false,
+      "next_token": 32,
+      "top_two": [
+        32,
+        33
+      ],
+      "case": "task_python_len",
+      "engine": null
+    },
+    {
+      "raw": "C",
+      "stripped": "C",
+      "expected": "C",
+      "pass": true,
+      "reason": "exact_choice",
+      "actual": "C",
+      "used_teacher_forcing": false,
+      "next_token": 34,
+      "top_two": [
+        34,
+        90
+      ],
+      "case": "task_inference",
+      "engine": null
+    },
+    {
+      "raw": "D",
+      "stripped": "D",
+      "expected": "D",
+      "pass": true,
+      "reason": "exact_choice",
+      "actual": "D",
+      "used_teacher_forcing": false,
+      "next_token": 35,
+      "top_two": [
+        35,
+        34
+      ],
+      "case": "task_minutes",
+      "engine": null
+    },
+    {
+      "raw": "B",
+      "stripped": "B",
+      "expected": "B",
+      "pass": true,
+      "reason": "exact_choice",
+      "actual": "B",
+      "used_teacher_forcing": false,
+      "next_token": 33,
+      "top_two": [
+        33,
+        760
+      ],
+      "case": "task_sort",
+      "engine": null
+    },
+    {
+      "raw": "A",
+      "stripped": "A",
+      "expected": "A",
+      "pass": true,
+      "reason": "exact_choice",
+      "actual": "A",
+      "used_teacher_forcing": false,
+      "next_token": 32,
+      "top_two": [
+        32,
+        33
+      ],
+      "case": "task_json",
+      "engine": null
+    },
+    {
+      "raw": "C",
+      "stripped": "C",
+      "expected": "C",
+      "pass": true,
+      "reason": "exact_choice",
+      "actual": "C",
+      "used_teacher_forcing": false,
+      "next_token": 34,
+      "top_two": [
+        34,
+        248046
+      ],
+      "case": "task_reading",
+      "engine": null
+    },
+    {
+      "raw": "D",
+      "stripped": "D",
+      "expected": "D",
+      "pass": true,
+      "reason": "exact_choice",
+      "actual": "D",
+      "used_teacher_forcing": false,
+      "next_token": 35,
+      "top_two": [
+        35,
+        34
+      ],
+      "case": "task_sequence",
+      "engine": null
+    }
+  ],
+  "selected_quality_verdicts": {
+    "parsed_functional_answers": true,
+    "held_out_32": true,
+    "quartz_vs_baseline": "pass",
+    "quartz_vs_llama": "inspectable",
+    "absolute_task_accuracy": "fail",
+    "engine_non_regression": "pass"
+  },
+  "model_quality_pass": true,
+  "absolute_quality_status": "fail",
+  "quartz_baseline_regression_status": "pass",
+  "quartz_vs_baseline_quality_delta": {
+    "held_out_32_mean_nll": 3.3210704391995574,
+    "baseline_held_out_mean_nll": 3.325543138013308,
+    "baseline_held_out_32_mean_nll": 3.325543138013308,
+    "baseline_label": "opt084_held_out_32_alarm",
+    "scored": 32,
+    "held_out_ppl_ratio": 0.9955372888074996,
+    "ppl_ratio_max": 1.01,
+    "delta_nll": -0.004472698813750675,
+    "pass": true,
+    "status": "pass",
+    "known_baseline_defect_does_not_reject": true,
+    "inherited_absolute_task_fail": true,
+    "new_functional_regression": false,
+    "alarm_not_admission": true,
+    "single_boolean": null,
+    "inspectable": true
+  },
+  "quartz_vs_llama_quality_delta": {
+    "quartz_held_out_mean_nll": 3.3210704391995574,
+    "llama_held_out_mean_nll": 1.788091893045086,
+    "delta_quartz_minus_llama": 1.5329785461544714,
+    "baseline_aggregate_delta": -0.00012677606009181552,
+    "inspectable": true,
+    "authoritative_local_comparison": "quartz+llama",
+    "single_boolean": null
+  },
+  "recurrence_state_status": {
+    "status": "pass",
+    "incremental_nll": 0.0,
+    "incremental_nll_max": 0.02,
+    "source": "fixtures/opt084_quality_baseline.json",
+    "this_sitting_recurrence": null
+  },
+  "release_eligible": true,
+  "opt056_quality_requirement_met": false,
+  "d2048_output_tokens": 32,
+  "selector_changed": true,
+  "q4_path": "packed",
+  "q8_layout": "r1_w4",
+  "selectors": {
+    "rms_norm": "parallel_fma",
+    "q4_decode": "packed",
+    "q8_decode": "dp4a_q8_1",
+    "q6_decode": "integer_q8_1",
+    "ffn_decode": "paired_staged",
+    "query_prepare": "hoisted",
+    "attention_pipeline": "kv_once",
+    "gdn_preproc": "transpose",
+    "mmq_pipeline": "fma_async",
+    "ffn_prompt_pair": "off",
+    "execution_graphs": "ffn_only",
+    "production_numerics": "strict",
+    "gdn_decode": "sequential",
+    "decode_query_prep": "warp_query",
+    "q8_decode_rows_skinny": 1,
+    "q8_decode_rows_medium": 1,
+    "q8_decode_rows_wide": 1,
+    "q8_decode_layout_warps_skinny": 4,
+    "q8_decode_layout_warps_medium": 4,
+    "q8_decode_layout_warps_wide": 4,
+    "ffn_gate_quality_i": 128,
+    "ffn_gate_prompt_tile": 128,
+    "prompt_microbatch_rows": 4096,
+    "mmq_async_x": true,
+    "nvccflags": "-O2 --fmad=false",
+    "q8_layout": "r1_w4",
+    "ffn_tiles": "i128_j128"
+  },
+  "opt074_coverage_unadmitted_blocker": false,
+  "single_boolean": null,
+  "kernel_parity_pass": {
+    "q4": true,
+    "q8": true,
+    "mmq": true,
+    "kv_once": true,
+    "sources": {
+      "q4": "fixtures/opt085_q4_reevaluation.json#packed_paired_staged",
+      "q8": "fixtures/opt086_q8_mmq_reevaluation.json#q8.r1_w4",
+      "mmq": "fixtures/opt086_q8_mmq_reevaluation.json#mmq.fma_async_x",
+      "kv_once": "fixtures/opt079_attention_kv_operands.json#keep"
+    },
+    "opt074_coverage_unadmitted_blocker": false,
+    "all": true
+  }
+}

@@ -131,8 +131,7 @@ not imply a delivered speedup. Use
 the [source analysis and batch protocol](tasks/PERFORMANCE-RECOVERY-2026-09-11.md)
 and [testing strategy](testing-strategy.md). The post-069 batch is delivered;
 the [post-080 kernel-parity and quality-reset batch](tasks/PERFORMANCE-RECOVERY-POST-080.md)
-supplies the next work. Its first eligible task in ledger/dependency order is
-OPT-084. Existing OPT-056 and OPT-016 gates remain blocked on their original
+is delivered. Existing OPT-056 and OPT-016 gates remain blocked on their original
 conditions.
 
 | ID | Description | Dependencies | Status | Acceptance condition | Evidence |
@@ -185,7 +184,7 @@ superseded only by OPT-088 for the new combination.
 
 ### Post-080 kernel-parity and quality-reset batch
 
-Proposed work only. Read [the policy and batch protocol](tasks/PERFORMANCE-RECOVERY-POST-080.md).
+Delivered. Read [the policy and batch protocol](tasks/PERFORMANCE-RECOVERY-POST-080.md).
 This batch retires OPT-059/074 production-error admission as the active kernel
 gate and adopts the ds4 separation: kernel parity versus CPU/dequant at the
 same quantization, full-model quality, then independent performance. OPT-059/074
@@ -225,7 +224,7 @@ task in ledger/dependency order is OPT-086.
 | OPT-085 | Re-evaluate Q4 packed, integer paired, and late-reduction paths | OPT-075, OPT-076, OPT-082, OPT-084 | done | Independent kernel-parity, quality, performance, and keep/revert verdicts for packed vs integer_q8_paired vs late_w4; at most one Q4 production path; OPT-074 unadmitted is not a blocker | [`tasks/OPT-085.md`](tasks/OPT-085.md); [`pins/opt085_q4_reevaluation_contract.json`](pins/opt085_q4_reevaluation_contract.json); [`pins/opt085_iteration_contract.json`](pins/opt085_iteration_contract.json); [`fixtures/opt085_q4_reevaluation.json`](fixtures/opt085_q4_reevaluation.json); [`tools/opt085_q4_reevaluation.py`](tools/opt085_q4_reevaluation.py); [`tests/test_opt085_q4_reevaluation.py`](tests/test_opt085_q4_reevaluation.py); [`tools/run_optimization_task.py`](tools/run_optimization_task.py); [`Makefile`](Makefile); [`evidence/optimization/opt085-q4-reevaluation/REPORT.md`](evidence/optimization/opt085-q4-reevaluation/REPORT.md); verification 2026-09-11T22:04:10Z |
 | OPT-086 | Re-evaluate installed Q8 r2_w2 and MMQ fma_async_x | OPT-064, OPT-066, OPT-070, OPT-082, OPT-084 | done | Independent formal keep/revert for Q8 r1_w4 vs r2_w2 and MMQ fma_async vs fma_async_x using kernel parity, quality, and performance; OPT-074 coverage is not inconclusive | [`tasks/OPT-086.md`](tasks/OPT-086.md); [`pins/opt086_q8_mmq_reevaluation_contract.json`](pins/opt086_q8_mmq_reevaluation_contract.json); [`pins/opt086_iteration_contract.json`](pins/opt086_iteration_contract.json); [`fixtures/opt086_q8_mmq_reevaluation.json`](fixtures/opt086_q8_mmq_reevaluation.json); [`tools/opt086_q8_mmq_reevaluation.py`](tools/opt086_q8_mmq_reevaluation.py); [`tests/test_opt086_q8_mmq_reevaluation.py`](tests/test_opt086_q8_mmq_reevaluation.py); [`tools/run_optimization_task.py`](tools/run_optimization_task.py); [`Makefile`](Makefile); [`cuda/q8_decode_path.cuh`](cuda/q8_decode_path.cuh); [`evidence/optimization/opt086-q8-mmq-reevaluation/REPORT.md`](evidence/optimization/opt086-q8-mmq-reevaluation/REPORT.md); verification 2026-09-11T22:22:00Z |
 | OPT-087 | Selectively reopen remaining numerical-policy-blocked candidates | OPT-072, OPT-082, OPT-084 | done | Disposition table for remaining OPT-072 leftovers; reopen at most one already-implemented candidate with measured upside, or no_additional_reopen; no performance-loser rerun | [`tasks/OPT-087.md`](tasks/OPT-087.md); [`pins/opt087_historical_reevaluation_contract.json`](pins/opt087_historical_reevaluation_contract.json); [`pins/opt087_iteration_contract.json`](pins/opt087_iteration_contract.json); [`fixtures/opt087_historical_reevaluation.json`](fixtures/opt087_historical_reevaluation.json); [`tools/opt087_historical_reevaluation.py`](tools/opt087_historical_reevaluation.py); [`tests/test_opt087_historical_reevaluation.py`](tests/test_opt087_historical_reevaluation.py); [`tools/run_optimization_task.py`](tools/run_optimization_task.py); [`Makefile`](Makefile); [`evidence/optimization/opt087-historical-reevaluation/REPORT.md`](evidence/optimization/opt087-historical-reevaluation/REPORT.md); verification 2026-09-11T22:32:44Z |
-| OPT-088 | Combined post-reset production gate for the new combination | OPT-079, OPT-085, OPT-086, OPT-087 | pending | Independent kernel-parity, quality, Quartz-vs-baseline, Quartz-vs-llama, recurrence, P4096/D128/D2048/p95, llama parity, and OPT-056/+5% fields; OPT-080 remains historical and is not reinterpreted | [`tasks/OPT-088.md`](tasks/OPT-088.md); proposed 2026-09-11 |
+| OPT-088 | Combined post-reset production gate for the new combination | OPT-079, OPT-085, OPT-086, OPT-087 | done | Independent kernel-parity, quality, Quartz-vs-baseline, Quartz-vs-llama, recurrence, P4096/D128/D2048/p95, llama parity, and OPT-056/+5% fields; OPT-080 remains historical and is not reinterpreted | [`tasks/OPT-088.md`](tasks/OPT-088.md); [`pins/opt088_batch_gate_contract.json`](pins/opt088_batch_gate_contract.json); [`pins/opt088_iteration_contract.json`](pins/opt088_iteration_contract.json); [`fixtures/opt088_batch_gate.json`](fixtures/opt088_batch_gate.json); [`tools/opt088_batch_gate.py`](tools/opt088_batch_gate.py); [`tests/test_opt088_batch_gate.py`](tests/test_opt088_batch_gate.py); [`Makefile`](Makefile); [`evidence/optimization/opt088-batch-gate/REPORT.md`](evidence/optimization/opt088-batch-gate/REPORT.md); verification 2026-09-11T23:12:15Z |
 
 ### Post-042 recovery execution order (historical batch)
 
@@ -6949,4 +6948,36 @@ statements below are historical, not the current execution order.
 - Marked OPT-087 `done`; delivery is limited to the verified task scope plus
   this ledger/audit bookkeeping. `plan.md` is unchanged. OPT-016 and OPT-056 stay
   `blocked`. Next eligible pending by dependency order: **OPT-088**.
+
+### 2026-09-11T23:12:15Z — OPT-088 combined post-reset gate delivered (POST-080 batch complete)
+
+- Ran OPT-088 as the post-reset combination freeze sitting. Keeps: OPT-085 packed
+  Q4, OPT-086 r1_w4 Q8 revert, OPT-086 fma_async_x MMQ keep, OPT-079 `kv_once`,
+  OPT-087 `no_additional_reopen`. Independent kernel_parity_pass per family
+  (q4/q8/mmq/kv_once all true). Preflight quality passed (held-out 32 mean NLL
+  3.3210704391995574 vs OPT-084 alarm 3.325543138013308; `ppl_ratio=0.9955`;
+  inherited `task_arithmetic` A-vs-B remains fail). Release sitting measured
+  P4096/D128/D2048, OPT-016 2K point comparison, full OPT-083 quality suite,
+  and state/memory gates. Historical outcomes stay unpassed: internal
+  improvement-with-quality, llama parity, OPT-056 +5%. `gate.passed=false`.
+  `opt056_gate_passed=false`. OPT-016 2K point comparison `gate_passed=true`
+  this sitting; `owns_opt016_parity_gate=false` so the OPT-016 ledger row is not
+  rewritten. OPT-080 hashes unchanged.
+- Acceptance: host contract, 18 pytest cases, `uv run ruff format .`, feedback
+  preflight (21s), release dry-run, and measured release sitting.
+- Acceptance evidence: [`tasks/OPT-088.md`](tasks/OPT-088.md);
+  [`pins/opt088_batch_gate_contract.json`](pins/opt088_batch_gate_contract.json);
+  [`pins/opt088_iteration_contract.json`](pins/opt088_iteration_contract.json);
+  [`fixtures/opt088_batch_gate.json`](fixtures/opt088_batch_gate.json);
+  [`tools/opt088_batch_gate.py`](tools/opt088_batch_gate.py);
+  [`tests/test_opt088_batch_gate.py`](tests/test_opt088_batch_gate.py);
+  [`Makefile`](Makefile);
+  [`evidence/optimization/opt088-batch-gate/REPORT.md`](evidence/optimization/opt088-batch-gate/REPORT.md).
+  **tok/s vs OPT-069 baseline:** P +41.79 (2956.45 vs 2914.66), D128 +0.30
+  (37.48 vs 37.18), D2048 +0.28 (35.73 vs 35.45). Remaining P parity 93.71 ms,
+  +5% bar 155.22 ms; decode p95 worse than llama.
+- Marked OPT-088 `done`; **POST-080 batch (OPT-081–OPT-088) complete**. Delivery
+  is limited to the verified task scope plus this ledger/audit bookkeeping.
+  `plan.md` is unchanged. OPT-016 and OPT-056 stay `blocked`. No automatic next
+  optimization sweep.
 

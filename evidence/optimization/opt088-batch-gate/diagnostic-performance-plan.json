@@ -1,0 +1,65 @@
+{
+  "schema_version": 1,
+  "task": "OPT-088",
+  "status": "quality_blocked",
+  "is_release_evidence": false,
+  "release_eligible": false,
+  "keep_claims_allowed": false,
+  "stop_reason": "failed required quality stops release before long timing",
+  "preflight_status": "quality_blocked",
+  "opt056_gate_passed": false,
+  "opt016_gate_passed": false,
+  "relaxes_opt056": false,
+  "relaxes_opt016": false,
+  "opt074_coverage_unadmitted_blocker": false,
+  "remaining_latency_budget": {
+    "source": "fixtures/opt069_batch_gate.json",
+    "p": {
+      "quartz_tok_s": 2914.65698,
+      "llama_tok_s": 3142.517034,
+      "parity_ms": 101.89738823402377,
+      "plus5_ms": 163.9647110002427
+    },
+    "d128": {
+      "quartz_tok_s": 37.1789093,
+      "llama_tok_s": 68.8708796,
+      "parity_ms": 3168.5234884718725,
+      "plus5_ms": 3345.528287325584
+    },
+    "d2048": {
+      "quartz_tok_s": 35.4498482,
+      "llama_tok_s": 67.3394867,
+      "parity_ms": 3419.836789346795,
+      "plus5_ms": 3600.866921708588
+    },
+    "tok_s_delta_vs_opt069": 0.0,
+    "speedup_vs_opt069": 1.0,
+    "note": "unmeasured or quality-blocked sitting does not replace OPT-069 tok/s"
+  },
+  "diagnostic_performance": {
+    "purpose": "non-release P/D/2K under a known OPT-084 regression",
+    "not_a_release": true,
+    "does_not_pass_opt056": true,
+    "does_not_pass_opt016": true,
+    "command": [
+      "uv",
+      "run",
+      "python",
+      "tools/opt088_batch_gate.py",
+      "--phase",
+      "release",
+      "--diagnostic-performance"
+    ],
+    "workloads": [
+      "p4096",
+      "d128",
+      "d2048",
+      "opt016",
+      "state_memory"
+    ],
+    "opt021": "0 warmups, 3 replicates, 4096 tokens",
+    "opt032": "3 warmups + 30 runs of 256 tokens, prefixes 128 and 2048",
+    "opt016": "2048 prompt tokens, 3 replicates"
+  },
+  "next_optimization_sweep": false
+}

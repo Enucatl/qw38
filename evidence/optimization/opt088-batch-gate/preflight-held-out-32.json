@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "task": "OPT-058",
+  "workload": "quality-baseline",
+  "engine": "quartz",
+  "repetitions": 1,
+  "selectors": {
+    "q4_decode": "packed",
+    "q8_decode": "dp4a_q8_1",
+    "q8_rows_skinny": 1,
+    "q8_layout_warps_skinny": 4,
+    "ffn_decode": "paired_staged",
+    "execution_graph": "ffn_only",
+    "rms_norm": "parallel_fma"
+  },
+  "cases": [
+    {
+      "name": "held_out_wikitext_1024",
+      "scored": 32,
+      "mean_nll": 3.3210704391995574
+    }
+  ],
+  "status": "passed",
+  "gguf_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+  "combined_production_paths": {
+    "rms_norm": "parallel_fma",
+    "q4_decode": "packed",
+    "q8_decode": "dp4a_q8_1",
+    "q6_decode": "integer_q8_1",
+    "ffn_decode": "paired_staged",
+    "query_prepare": "hoisted",
+    "attention_pipeline": "kv_once",
+    "gdn_preproc": "transpose",
+    "mmq_pipeline": "fma_async",
+    "ffn_prompt_pair": "off",
+    "execution_graphs": "ffn_only",
+    "production_numerics": "strict",
+    "gdn_decode": "sequential",
+    "decode_query_prep": "warp_query",
+    "q8_decode_rows_skinny": 1,
+    "q8_decode_rows_medium": 1,
+    "q8_decode_rows_wide": 1,
+    "q8_decode_layout_warps_skinny": 4,
+    "q8_decode_layout_warps_medium": 4,
+    "q8_decode_layout_warps_wide": 4,
+    "ffn_gate_quality_i": 128,
+    "ffn_gate_prompt_tile": 128,
+    "prompt_microbatch_rows": 4096,
+    "mmq_async_x": true,
+    "nvccflags": "-O2 --fmad=false",
+    "q8_layout": "r1_w4",
+    "ffn_tiles": "i128_j128"
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "ok": true,
+  "cases": [
+    "checkpoint_case=round_trip bytes=160004416 frontier=2 published=true state_equal=true passed=true",
+    "checkpoint_case=exact_continuation frontier=3 state_equal=true passed=true",
+    "checkpoint_case=corrupt_rejected state_equal=true passed=true",
+    "checkpoint_case=incompatible_rejected state_equal=true passed=true"
+  ]
+}
