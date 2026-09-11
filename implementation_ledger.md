@@ -129,8 +129,9 @@ are repository-relative unless stated otherwise.
 This batch is delivered; task completion includes measured rejects and does
 not imply a delivered speedup. Use
 the [source analysis and batch protocol](tasks/PERFORMANCE-RECOVERY-2026-09-11.md)
-and [testing strategy](testing-strategy.md). The post-069 batch below supplies
-the next work; its first eligible task in dependency order is OPT-071.
+and [testing strategy](testing-strategy.md). The post-069 batch is delivered;
+the post-080 batch below supplies the next work; its first eligible task in
+dependency order is OPT-081.
 Existing OPT-056 and OPT-016 gates remain blocked on their original conditions.
 
 | ID | Description | Dependencies | Status | Acceptance condition | Evidence |
@@ -151,14 +152,16 @@ Existing OPT-056 and OPT-016 gates remain blocked on their original conditions.
 
 ### Post-069 evidence and decode recovery batch
 
-Proposed work only. Read [the diagnosis and batch protocol](tasks/PERFORMANCE-RECOVERY-POST-069.md).
-OPT-064/066 are installed with incomplete incremental acceptance evidence;
-OPT-070 revalidates them. OPT-072 reviews every correctness-based rejection,
-OPT-073 separates authority capability from engine regressions, and OPT-074
-completes actual production GPU admission before Q4 promotion. Historical
-fixtures and OPT-056/OPT-016 requirements remain unchanged. Execute OPT-071
-first, prepare OPT-072/073/074 as their dependencies permit, then OPT-070/075.
-New kernel tasks are conditional on measured opportunity and valid admission.
+This batch is delivered; task completion includes measured rejects,
+inconclusive retains, and one keep (OPT-079 `kv_once`). Use
+[the diagnosis and batch protocol](tasks/PERFORMANCE-RECOVERY-POST-069.md).
+OPT-074's `held_out_exceeds_frozen_calibration_ceiling` is v2 **reference
+inconsistency** (llama GPU vs FP64), not a Quartz-candidate numerical
+rejection. OPT-075/076 `retain_packed` and OPT-070 Q8/MMQ inconclusive
+retains remain historically correct and are reopened under v3 by
+OPT-083/084. OPT-080 remains the historical v2 freeze; OPT-085 is the
+post-v3 combination. Historical fixtures and OPT-056/OPT-016 requirements
+remain unchanged. The post-080 batch below is the next work.
 
 | ID | Description | Dependencies | Status | Acceptance condition | Evidence |
 |---|---|---|---|---|---|
@@ -173,6 +176,27 @@ New kernel tasks are conditional on measured opportunity and valid admission.
 | OPT-078 | Hoist decode query preparation and vector-load KV | OPT-070, OPT-071, OPT-073 | done | Preparation-inclusive one-token attention wins with fixed 16 partitions, unchanged arithmetic/KV visibility and bounded E2E validation, or retained control | [`tasks/OPT-078.md`](tasks/OPT-078.md); [`pins/opt078_decode_attention_contract.json`](pins/opt078_decode_attention_contract.json); [`pins/opt078_iteration_contract.json`](pins/opt078_iteration_contract.json); [`fixtures/opt078_decode_attention.json`](fixtures/opt078_decode_attention.json); [`tools/opt078_decode_attention.py`](tools/opt078_decode_attention.py); [`tests/test_opt078_decode_attention.py`](tests/test_opt078_decode_attention.py); [`cuda/attention_decode_path.cuh`](cuda/attention_decode_path.cuh); [`cuda/attention_decode.cu`](cuda/attention_decode.cu); [`cuda/attention_decode.h`](cuda/attention_decode.h); [`cuda/opt078_decode_attention_test.cu`](cuda/opt078_decode_attention_test.cu); [`cuda/full_scheduler.h`](cuda/full_scheduler.h); [`cuda/full_scheduler.cu`](cuda/full_scheduler.cu); [`cuda/optimization_component_replay.cu`](cuda/optimization_component_replay.cu); [`cuda/optimization_component_replay.h`](cuda/optimization_component_replay.h); [`cuda/optimization_engine_probe.cu`](cuda/optimization_engine_probe.cu); [`Makefile`](Makefile); [`tools/run_optimization_task.py`](tools/run_optimization_task.py); [`evidence/optimization/opt078-decode-attention/REPORT.md`](evidence/optimization/opt078-decode-attention/REPORT.md); verification 2026-09-11T19:06:30Z |
 | OPT-079 | Convert prompt attention KV operands once per shared stage | OPT-070, OPT-071, OPT-073 | done | One conditional conversion-reuse candidate preserves exact F16 operands and async ownership and wins complete P cost, or resource/performance no-go | [`tasks/OPT-079.md`](tasks/OPT-079.md); [`pins/opt079_attention_kv_operands_contract.json`](pins/opt079_attention_kv_operands_contract.json); [`pins/opt079_iteration_contract.json`](pins/opt079_iteration_contract.json); [`fixtures/opt079_attention_kv_operands.json`](fixtures/opt079_attention_kv_operands.json); [`tools/opt079_attention_kv_operands.py`](tools/opt079_attention_kv_operands.py); [`tests/test_opt079_attention_kv_operands.py`](tests/test_opt079_attention_kv_operands.py); [`cuda/fattn_mma_f16.cuh`](cuda/fattn_mma_f16.cuh); [`cuda/fattn_mma_f16_pipeline.cuh`](cuda/fattn_mma_f16_pipeline.cuh); [`cuda/attention_decode.cu`](cuda/attention_decode.cu); [`cuda/attention_decode.h`](cuda/attention_decode.h); [`cuda/optimization_engine_probe.cu`](cuda/optimization_engine_probe.cu); [`cuda/opt079_attention_kv_operands_test.cu`](cuda/opt079_attention_kv_operands_test.cu); [`Makefile`](Makefile); [`evidence/optimization/opt079-attention-kv-operands/REPORT.md`](evidence/optimization/opt079-attention-kv-operands/REPORT.md); verification 2026-09-11T18:58:15Z |
 | OPT-080 | Validate the admitted combination against unchanged llama outcome gates | OPT-070, OPT-071, OPT-072, OPT-073, OPT-074, OPT-075, OPT-076, OPT-077, OPT-078, OPT-079 | done | Quality preflight gates one combined original P/D/2K and state sitting; internal progress, parity, +5% and p95 outcomes reported without relaxing historical gates | [`tasks/OPT-080.md`](tasks/OPT-080.md); [`pins/opt080_batch_gate_contract.json`](pins/opt080_batch_gate_contract.json); [`pins/opt080_iteration_contract.json`](pins/opt080_iteration_contract.json); [`fixtures/opt080_batch_gate.json`](fixtures/opt080_batch_gate.json); [`tools/opt080_batch_gate.py`](tools/opt080_batch_gate.py); [`tests/test_opt080_batch_gate.py`](tests/test_opt080_batch_gate.py); [`evidence/optimization/opt080-batch-gate/REPORT.md`](evidence/optimization/opt080-batch-gate/REPORT.md); verification 2026-09-11T19:25:00Z |
+
+### Post-080 production numerics v3 batch
+
+Proposed work only. Read [the v3 admission protocol](tasks/PERFORMANCE-RECOVERY-POST-080.md).
+v2 (OPT-059/074) remains historical policy and must stay reproducible. v3 is
+the active policy for new optimized production-K numerical admission:
+Quartz is compared directly to pinned llama GPU on identical real captures.
+llama-vs-FP64 is diagnostic; held-out llama-vs-FP64 drift does not make a
+family untestable. OPT-083/084 may proceed independently after OPT-081/082.
+OPT-077/078 are not reopened (performance blockers, not v2 coverage).
+OPT-079 `kv_once` stays unless OPT-085 finds an interaction. OPT-056 and
+OPT-016 stay blocked on their original conditions. First eligible task in
+ledger/dependency order is OPT-081.
+
+| ID | Description | Dependencies | Status | Acceptance condition | Evidence |
+|---|---|---|---|---|---|
+| OPT-081 | Define production numerics v3: admit kernels by Quartz-vs-llama GPU match | OPT-059, OPT-074, OPT-080 | pending | Versioned v3 contract and module exist; candidate-vs-llama limits are frozen before candidate outputs; v2 fixtures still reproduce historical admission; llama-vs-FP64 drift does not define eligibility | [`tasks/OPT-081.md`](tasks/OPT-081.md) |
+| OPT-082 | Reclassify OPT-074 llama GPU/FP64 evidence into v3 authority coverage | OPT-081, OPT-074 | pending | Complete production-K llama exports become candidate-testable under v3 even when held-out llama-vs-FP64 exceeds v2 calibration ceilings; v2 diagnostics preserved; no Quartz candidate is admitted | [`tasks/OPT-082.md`](tasks/OPT-082.md) |
+| OPT-083 | Reopen OPT-075/076 Q4 candidates under v3 and select at most one keep | OPT-081, OPT-082, OPT-073, OPT-075, OPT-076 | pending | Packed control, integer paired, and late_w4 are compared to pinned llama GPU on real Q4 cases; verdict is numerical rejection, quality blocked, performance rejected, or production kept | [`tasks/OPT-083.md`](tasks/OPT-083.md) |
+| OPT-084 | Formal keep/revert for installed Q8 r2_w2 and MMQ fma_async_x under v3 | OPT-081, OPT-082, OPT-070, OPT-073 | pending | Independent Q8 and MMQ subdecisions each have v3 numerical, quality, and performance verdicts; one unresolved family cannot contaminate the other | [`tasks/OPT-084.md`](tasks/OPT-084.md) |
+| OPT-085 | Validate the post-v3 combination against unchanged llama outcome gates | OPT-081, OPT-082, OPT-083, OPT-084, OPT-079 | pending | Distinct production-admission, kernel-keep, model-quality, absolute-quality, parity, OPT-056, and release fields; OPT-080 is not rewritten; known absolute quality failure is not relabeled as kernel rejection | [`tasks/OPT-085.md`](tasks/OPT-085.md) |
 
 ### Post-042 recovery execution order (historical batch)
 
@@ -278,7 +302,7 @@ statements below are historical, not the current execution order.
 | 6. CUDA primitives | CUD-001–CUD-003 |
 | 7. GDN/attention/scheduler | GDN-001–GDN-002, ATN-001–ATN-002, SCH-001 |
 | 8. Sessions and 128K | SES-001–SES-003, MEM-001 |
-| 9. Profiling/optimization | OPT-001–OPT-080 (OPT-031 superseded by OPT-055; OPT-070–080 proposed) |
+| 9. Profiling/optimization | OPT-001–OPT-085 (OPT-031 superseded by OPT-055; OPT-081–085 proposed; v3 active for new production-K admission) |
 | 10. Product tools/API/quality | CLI-001, SRV-001–SRV-003, BEN-001, EVAL-001, QLT-001 |
 | 11. Comparative speed | CMP-001–CMP-003 |
 | 12. Documentation/release | DOC-001, REL-001 |
@@ -6678,4 +6702,26 @@ statements below are historical, not the current execution order.
 - Marked OPT-080 `done`; delivery is limited to the verified task scope plus
   this ledger/audit bookkeeping. `plan.md` is unchanged. OPT-016 and OPT-056 stay
   `blocked`. No automatic next optimization sweep.
+
+### 2026-09-11T20:10:00Z — Admit post-080 production numerics v3 tasks
+
+- Added pending OPT-081 through OPT-085 and
+  [`tasks/PERFORMANCE-RECOVERY-POST-080.md`](tasks/PERFORMANCE-RECOVERY-POST-080.md).
+  This is source-based task design, not kernel implementation or a new GPU
+  measurement. The first eligible task in ledger/dependency order is OPT-081.
+- Active policy for new optimized production-K admission is v3: compare
+  Quartz directly to pinned llama GPU on identical real captures. llama-vs-FP64
+  remains diagnostic. The OPT-074 v2 rule that held-out llama-vs-FP64 must fit
+  calibration-derived ceilings is not an active candidate gate. v2 contracts
+  and fixtures stay reproducible.
+- OPT-075/076 packed retains and OPT-070 Q8/MMQ inconclusive retains stay
+  historically correct and point to OPT-083/084. OPT-080 stays the historical
+  v2 freeze and points to OPT-085. OPT-077/078 are not reopened.
+- Hard structural correctness, typed staging (`sum_q` / `sum_x` / integer
+  sums), OPT-073 dual quality, and OPT-056/OPT-016 owning gates are unchanged.
+  `production_kept` may be true while `release_blocked` remains true.
+- Validation: new dependency graph is acyclic; all five dossier dependencies
+  match their pending ledger rows; local dossier/protocol links resolve;
+  `git diff --check` passes. No historical fixture, production pin, or
+  outcome gate was changed.
 
