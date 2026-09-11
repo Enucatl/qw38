@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "task": "OPT-065",
+  "status": "retained",
+  "selected_mmq_pipeline_path": "fma_async",
+  "control_tile": "i128_j128",
+  "screen_winner_gate_up": "i128_j128",
+  "screen_winner_down": "i128_j128",
+  "installed": false,
+  "claims_throughput": false,
+  "claims_performance_improvement": false,
+  "selected_ffn_gate_quality_i": 128,
+  "selected_ffn_gate_prompt_tile": 128,
+  "selected_ffn_up_quality_i": 128,
+  "selected_ffn_up_prompt_tile": 128,
+  "selected_ffn_down_quality_i": 128,
+  "selected_ffn_down_prompt_tile": 128,
+  "llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+  "gguf_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+  "measurement_utc": "2026-09-11T10:33:38Z",
+  "feedback_run": "build/optimization-runs/OPT-065/feedback/20260911T103300Z-9820fe68",
+  "acceptance_run": "build/optimization-runs/OPT-065/acceptance/20260911T103338Z-ae4e88a7",
+  "control_complete_ffn_ms": 9.64920521,
+  "winner_complete_ffn_ms": 9.62922668,
+  "gate_up_ms": {
+    "i128_j128": 2.86567473,
+    "i64_j128": 3.01149869,
+    "i128_j64": 3.06430936,
+    "i64_j64": 3.76597333
+  },
+  "down_ms": {
+    "i128_j128": 2.91010118,
+    "i64_j128": 3.02372265,
+    "i128_j64": 3.08259201,
+    "i64_j64": 3.81865621
+  },
+  "resources": {
+    "i128_j128": {"occupancy": 1, "registers": 255, "local_bytes": 80, "shared_bytes": 76288},
+    "i64_j128": {"occupancy": 1, "registers": 220, "local_bytes": 0, "shared_bytes": 56832},
+    "i128_j64": {"occupancy": 1, "registers": 246, "local_bytes": 0, "shared_bytes": 57600},
+    "i64_j64": {"occupancy": 1, "registers": 216, "local_bytes": 0, "shared_bytes": 38144}
+  },
+  "e2e_tok_s_sitting": false,
+  "note": "Four Q4 tiles compared with FMA/async Y preserved. Complete FFN keeps i128_j128. Occupancy 1 on all candidates. No D2048 sitting in this increment; OPT-069 owns combined E2E."
+}

@@ -1355,6 +1355,10 @@ cudaError_t launch_quality_mma_maybe_stream_k(
       fixup_needed, stream);
 }
 
+template <typename Kernel>
+cudaError_t prepare_mmq_shared(Kernel kernel, std::size_t shared,
+                               int* occupancy) noexcept;
+
 template <QuantKind Kind, int PromptTile, bool Fallback, int QualityI,
           bool SoaWeights, bool UseFma, bool UseAsyncY>
 cudaError_t launch_quality_mma(
@@ -1371,9 +1375,7 @@ cudaError_t launch_quality_mma(
   auto kernel = quant_mmq_mma_quality_kernel<Kind, PromptTile, Fallback,
                                              QualityI, SoaWeights, UseFma,
                                              UseAsyncY>;
-  cudaError_t error = cudaFuncSetAttribute(
-      kernel, cudaFuncAttributeMaxDynamicSharedMemorySize,
-      static_cast<int>(shared));
+  cudaError_t error = prepare_mmq_shared(kernel, shared, nullptr);
   if (error != cudaSuccess) return error;
   if constexpr (Kind == QuantKind::kQ4K && PromptTile == 128 &&
                 QualityI == kQualityI && !SoaWeights && !UseFma &&
@@ -1419,13 +1421,216 @@ cudaError_t launch_quality_mma_pipeline_aligned(
       weights, output_rows, columns, y, prompt_rows, output, stream);
 }
 
+template <typename Kernel>
+cudaError_t prepare_mmq_shared(Kernel kernel, std::size_t shared,
+                               int* occupancy) noexcept {
+  int device = 0;
+  cudaDeviceProp prop{};
+  cudaError_t error = cudaGetDevice(&device);
+  if (error != cudaSuccess) return error;
+  error = cudaGetDeviceProperties(&prop, device);
+  if (error != cudaSuccess) return error;
+  if (shared > static_cast<std::size_t>(prop.sharedMemPerBlockOptin)) {
+    return cudaErrorInvalidValue;
+  }
+  error = cudaFuncSetAttribute(
+      kernel, cudaFuncAttributeMaxDynamicSharedMemorySize,
+      static_cast<int>(shared));
+  if (error != cudaSuccess) return error;
+  int occ = 0;
+  error = cudaOccupancyMaxActiveBlocksPerMultiprocessor(&occ, kernel,
+                                                        kMmaThreads, shared);
+  if (error != cudaSuccess) return error;
+  if (occ <= 0) return cudaErrorLaunchOutOfResources;
+  if (occupancy != nullptr) *occupancy = occ;
+  return cudaSuccess;
+}
+
+template <QuantKind Kind, int PromptTile, int QualityI>
+cudaError_t query_pipeline_kernel(bool fma, bool async_y, int* occupancy,
+                                  int* registers, std::size_t* local_bytes,
+                                  std::size_t* shared_bytes) noexcept {
+  const std::size_t shared =
+      quality_shared_ints(PromptTile, QualityI, async_y) * sizeof(int);
+  cudaError_t error = cudaErrorInvalidValue;
+  int occ = 0;
+  cudaFuncAttributes attr{};
+  auto query = [&](auto kernel) -> cudaError_t {
+    const cudaError_t prepared = prepare_mmq_shared(kernel, shared, &occ);
+    if (prepared != cudaSuccess) return prepared;
+    return cudaFuncGetAttributes(&attr, kernel);
+  };
+  if (fma && async_y) {
+    error = query(quant_mmq_mma_quality_kernel<Kind, PromptTile, false,
+                                               QualityI, false, true, true>);
+  } else if (async_y) {
+    error = query(quant_mmq_mma_quality_kernel<Kind, PromptTile, false,
+                                               QualityI, false, false, true>);
+  } else if (fma) {
+    error = query(quant_mmq_mma_quality_kernel<Kind, PromptTile, false,
+                                               QualityI, false, true, false>);
+  } else {
+    error = query(
+        quant_mmq_mma_quality_kernel<Kind, PromptTile, false, QualityI>);
+  }
+  if (error != cudaSuccess) return error;
+  if (occupancy != nullptr) *occupancy = occ;
+  if (registers != nullptr) *registers = attr.numRegs;
+  if (local_bytes != nullptr) {
+    *local_bytes = static_cast<std::size_t>(attr.localSizeBytes);
+  }
+  if (shared_bytes != nullptr) *shared_bytes = shared;
+  return cudaSuccess;
+}
+
+cudaError_t query_q4_pipeline_kernel(unsigned int prompt_tile,
+                                     unsigned int quality_i, bool fma,
+                                     bool async_y, int* occupancy,
+                                     int* registers, std::size_t* local_bytes,
+                                     std::size_t* shared_bytes) noexcept {
+  if (quality_i == 64 && prompt_tile == 64) {
+    return query_pipeline_kernel<QuantKind::kQ4K, 64, 64>(
+        fma, async_y, occupancy, registers, local_bytes, shared_bytes);
+  }
+  if (quality_i == 64 && prompt_tile == 128) {
+    return query_pipeline_kernel<QuantKind::kQ4K, 128, 64>(
+        fma, async_y, occupancy, registers, local_bytes, shared_bytes);
+  }
+  if (quality_i == 128 && prompt_tile == 64) {
+    return query_pipeline_kernel<QuantKind::kQ4K, 64, 128>(
+        fma, async_y, occupancy, registers, local_bytes, shared_bytes);
+  }
+  if (quality_i == 128 && prompt_tile == 128) {
+    return query_pipeline_kernel<QuantKind::kQ4K, 128, 128>(
+        fma, async_y, occupancy, registers, local_bytes, shared_bytes);
+  }
+  return cudaErrorInvalidValue;
+}
+
+cudaError_t launch_q4_pipeline_aligned_ij(
+    const std::uint8_t* weights, std::size_t output_rows, std::size_t columns,
+    const int* y, std::size_t prompt_rows, float* output,
+    unsigned int quality_i, unsigned int prompt_tile, const char* path,
+    cudaStream_t stream) noexcept {
+  if (quality_i == 64 && prompt_tile == 64) {
+    return launch_quality_mma_pipeline_aligned<QuantKind::kQ4K, 64, 64>(
+        weights, output_rows, columns, y, prompt_rows, output, path, stream);
+  }
+  if (quality_i == 64 && prompt_tile == 128) {
+    return launch_quality_mma_pipeline_aligned<QuantKind::kQ4K, 128, 64>(
+        weights, output_rows, columns, y, prompt_rows, output, path, stream);
+  }
+  if (quality_i == 128 && prompt_tile == 64) {
+    return launch_quality_mma_pipeline_aligned<QuantKind::kQ4K, 64, 128>(
+        weights, output_rows, columns, y, prompt_rows, output, path, stream);
+  }
+  if (quality_i == 128 && prompt_tile == 128) {
+    return launch_quality_mma_pipeline_aligned<QuantKind::kQ4K, 128, 128>(
+        weights, output_rows, columns, y, prompt_rows, output, path, stream);
+  }
+  return cudaErrorInvalidValue;
+}
+
 }  // namespace
 
 constexpr const char kSelectedMmqStreamKPath[] = "off";
 constexpr const char kSelectedMmqPipelinePath[] = "fma_async";
 inline thread_local const char* g_mmq_pipeline_path_override = nullptr;
+inline thread_local MmqTileDispatch g_last_mmq_tile_dispatch{};
+inline thread_local bool g_ffn_tile_override = false;
+inline thread_local unsigned int g_ffn_gate_i = 0;
+inline thread_local unsigned int g_ffn_gate_j = 0;
+inline thread_local unsigned int g_ffn_up_i = 0;
+inline thread_local unsigned int g_ffn_up_j = 0;
+inline thread_local unsigned int g_ffn_down_i = 0;
+inline thread_local unsigned int g_ffn_down_j = 0;
 
 unsigned int selected_mma_mmq_prompt_tile() noexcept { return 128U; }
+
+bool mmq_q4_pipeline_tile(unsigned int quality_i,
+                          unsigned int prompt_tile) noexcept {
+  return (quality_i == 64 || quality_i == 128) &&
+         (prompt_tile == 64 || prompt_tile == 128);
+}
+
+const char* mmq_q4_tile_ident(unsigned int quality_i,
+                              unsigned int prompt_tile) noexcept {
+  if (quality_i == 128 && prompt_tile == 128) return "i128_j128";
+  if (quality_i == 64 && prompt_tile == 128) return "i64_j128";
+  if (quality_i == 128 && prompt_tile == 64) return "i128_j64";
+  if (quality_i == 64 && prompt_tile == 64) return "i64_j64";
+  if (quality_i == 128 && prompt_tile == 32) return "i128_j32";
+  if (quality_i == 64 && prompt_tile == 32) return "i64_j32";
+  return "unknown";
+}
+
+const char* mmq_q4_kernel_ident(unsigned int quality_i, unsigned int prompt_tile,
+                                bool pipeline, bool fallback, bool fma,
+                                bool async_y) noexcept {
+  if (fallback || !pipeline) {
+    if (quality_i == 128 && prompt_tile == 128) return "q4_i128_j128_sync_fallback";
+    if (quality_i == 64 && prompt_tile == 128) return "q4_i64_j128_sync_fallback";
+    if (quality_i == 128 && prompt_tile == 64) return "q4_i128_j64_sync_fallback";
+    if (quality_i == 64 && prompt_tile == 64) return "q4_i64_j64_sync_fallback";
+    return "q4_sync_fallback";
+  }
+  if (fma && async_y) {
+    if (quality_i == 128 && prompt_tile == 128) return "q4_i128_j128_fma_async";
+    if (quality_i == 64 && prompt_tile == 128) return "q4_i64_j128_fma_async";
+    if (quality_i == 128 && prompt_tile == 64) return "q4_i128_j64_fma_async";
+    if (quality_i == 64 && prompt_tile == 64) return "q4_i64_j64_fma_async";
+  }
+  return "q4_pipeline";
+}
+
+void record_q4_tile_dispatch(unsigned int quality_i, unsigned int prompt_tile,
+                             bool aligned, const char* path) noexcept {
+  const bool pipe_on = mmq_pipeline_path_on(path) &&
+                       mmq_q4_pipeline_tile(quality_i, prompt_tile) && aligned;
+  const bool fma = pipe_on && (std::strcmp(path, "fma") == 0 ||
+                               std::strcmp(path, "fma_async") == 0);
+  const bool async_y = pipe_on && (std::strcmp(path, "async_y") == 0 ||
+                                   std::strcmp(path, "fma_async") == 0);
+  g_last_mmq_tile_dispatch.quality_i = quality_i;
+  g_last_mmq_tile_dispatch.prompt_tile = prompt_tile;
+  g_last_mmq_tile_dispatch.aligned = aligned;
+  g_last_mmq_tile_dispatch.pipeline = pipe_on;
+  g_last_mmq_tile_dispatch.fallback = !aligned;
+  g_last_mmq_tile_dispatch.fma = fma;
+  g_last_mmq_tile_dispatch.async_y = async_y;
+  g_last_mmq_tile_dispatch.ident = mmq_q4_tile_ident(quality_i, prompt_tile);
+  g_last_mmq_tile_dispatch.path = path != nullptr ? path : "";
+  g_last_mmq_tile_dispatch.kernel = mmq_q4_kernel_ident(
+      quality_i, prompt_tile, pipe_on, !aligned, fma, async_y);
+}
+
+const MmqTileDispatch& last_mmq_tile_dispatch() noexcept {
+  return g_last_mmq_tile_dispatch;
+}
+
+void clear_mmq_tile_dispatch() noexcept { g_last_mmq_tile_dispatch = {}; }
+
+void set_ffn_tile_override(unsigned int gate_i, unsigned int gate_j,
+                           unsigned int up_i, unsigned int up_j,
+                           unsigned int down_i, unsigned int down_j) noexcept {
+  g_ffn_tile_override = true;
+  g_ffn_gate_i = gate_i;
+  g_ffn_gate_j = gate_j;
+  g_ffn_up_i = up_i;
+  g_ffn_up_j = up_j;
+  g_ffn_down_i = down_i;
+  g_ffn_down_j = down_j;
+}
+
+void clear_ffn_tile_override() noexcept {
+  g_ffn_tile_override = false;
+  g_ffn_gate_i = 0;
+  g_ffn_gate_j = 0;
+  g_ffn_up_i = 0;
+  g_ffn_up_j = 0;
+  g_ffn_down_i = 0;
+  g_ffn_down_j = 0;
+}
 
 bool legal_mmq_pipeline_path(const char* path) noexcept {
   return path != nullptr &&
@@ -1472,11 +1677,17 @@ int mmq_pipeline_occupancy(QuantKind kind, unsigned int prompt_tile,
                        std::strcmp(path, "fma_async") == 0;
   const bool fma = std::strcmp(path, "fma") == 0 ||
                    std::strcmp(path, "fma_async") == 0;
+  int occupancy = 0;
+  cudaError_t error = cudaErrorInvalidValue;
+  if (kind == QuantKind::kQ4K && mmq_q4_pipeline_tile(quality_i, prompt_tile)) {
+    error = query_q4_pipeline_kernel(prompt_tile, quality_i, fma, async_y,
+                                     &occupancy, nullptr, nullptr, nullptr);
+    return error == cudaSuccess ? occupancy : 0;
+  }
   const std::size_t shared =
       quality_shared_ints(static_cast<int>(prompt_tile),
                          static_cast<int>(quality_i), async_y) *
       sizeof(int);
-  int occupancy = 0;
   auto query = [&](auto kernel) -> cudaError_t {
     cudaError_t set = cudaFuncSetAttribute(
         kernel, cudaFuncAttributeMaxDynamicSharedMemorySize,
@@ -1485,25 +1696,7 @@ int mmq_pipeline_occupancy(QuantKind kind, unsigned int prompt_tile,
     return cudaOccupancyMaxActiveBlocksPerMultiprocessor(
         &occupancy, kernel, kMmaThreads, shared);
   };
-  cudaError_t error = cudaErrorInvalidValue;
-  if (kind == QuantKind::kQ4K && prompt_tile == 128 && quality_i == 128) {
-    if (fma && async_y) {
-      error = query(
-          quant_mmq_mma_quality_kernel<QuantKind::kQ4K, 128, false, 128, false,
-                                       true, true>);
-    } else if (async_y) {
-      error = query(
-          quant_mmq_mma_quality_kernel<QuantKind::kQ4K, 128, false, 128, false,
-                                       false, true>);
-    } else if (fma) {
-      error = query(
-          quant_mmq_mma_quality_kernel<QuantKind::kQ4K, 128, false, 128, false,
-                                       true, false>);
-    } else {
-      error = query(
-          quant_mmq_mma_quality_kernel<QuantKind::kQ4K, 128, false, 128>);
-    }
-  } else if (kind == QuantKind::kQ8_0 && prompt_tile == 128 &&
+  if (kind == QuantKind::kQ8_0 && prompt_tile == 128 &&
              (quality_i == 32 || quality_i == 64 || quality_i == 128)) {
     if (quality_i == 32) {
       if (fma && async_y) {
@@ -1570,6 +1763,35 @@ cudaError_t launch_quality_dispatch(
     const int* y, std::size_t prompt_rows, float* output,
     cudaStream_t stream) noexcept;
 
+cudaError_t launch_q4_quality_sync_ij(
+    const std::uint8_t* weights, std::size_t output_rows, std::size_t columns,
+    const int* packed, std::size_t prompt_rows, float* output,
+    unsigned int quality_i, unsigned int prompt_tile,
+    cudaStream_t stream) noexcept {
+  if (quality_i == 64) {
+    if (prompt_tile == 32) {
+      return launch_quality_dispatch<QuantKind::kQ4K, 32, 64>(
+          weights, output_rows, columns, packed, prompt_rows, output, stream);
+    }
+    if (prompt_tile == 64) {
+      return launch_quality_dispatch<QuantKind::kQ4K, 64, 64>(
+          weights, output_rows, columns, packed, prompt_rows, output, stream);
+    }
+    return launch_quality_dispatch<QuantKind::kQ4K, 128, 64>(
+        weights, output_rows, columns, packed, prompt_rows, output, stream);
+  }
+  if (prompt_tile == 32) {
+    return launch_quality_dispatch<QuantKind::kQ4K, 32>(
+        weights, output_rows, columns, packed, prompt_rows, output, stream);
+  }
+  if (prompt_tile == 64) {
+    return launch_quality_dispatch<QuantKind::kQ4K, 64>(
+        weights, output_rows, columns, packed, prompt_rows, output, stream);
+  }
+  return launch_quality_dispatch<QuantKind::kQ4K, 128>(
+      weights, output_rows, columns, packed, prompt_rows, output, stream);
+}
+
 cudaError_t launch_quant_mmq_mma_y_pipeline(
     QuantKind kind, const std::uint8_t* weights, std::size_t output_rows,
     std::size_t columns, const Q8Block* y, std::size_t prompt_rows,
@@ -1584,19 +1806,28 @@ cudaError_t launch_quant_mmq_mma_y_pipeline(
   const int* packed = reinterpret_cast<const int*>(y);
   const bool aligned =
       output_rows % quality_i == 0 && prompt_rows % prompt_tile == 0;
-  if (mmq_pipeline_path_on(path) && aligned && kind == QuantKind::kQ4K &&
-      quality_i == 128 && prompt_tile == 128) {
-    return launch_quality_mma_pipeline_aligned<QuantKind::kQ4K, 128, 128>(
-        weights, output_rows, columns, packed, prompt_rows, output, path,
-        stream);
+  if (kind == QuantKind::kQ4K) {
+    record_q4_tile_dispatch(quality_i, prompt_tile, aligned, path);
+    if (mmq_pipeline_path_on(path) && aligned &&
+        mmq_q4_pipeline_tile(quality_i, prompt_tile)) {
+      return launch_q4_pipeline_aligned_ij(
+          weights, output_rows, columns, packed, prompt_rows, output, quality_i,
+          prompt_tile, path, stream);
+    }
+    return launch_q4_quality_sync_ij(weights, output_rows, columns, packed,
+                                     prompt_rows, output, quality_i,
+                                     prompt_tile, stream);
   }
-  if (kind == QuantKind::kQ4K && quality_i == 128 && prompt_tile == 128) {
-    return launch_quality_dispatch<QuantKind::kQ4K, 128>(
+  if (prompt_tile == 32) {
+    return launch_quality_dispatch<QuantKind::kQ6K, 32>(
         weights, output_rows, columns, packed, prompt_rows, output, stream);
   }
-  return launch_quant_mmq_mma_y_ij(kind, weights, output_rows, columns, y,
-                                   prompt_rows, output, quality_i, prompt_tile,
-                                   stream);
+  if (prompt_tile == 64) {
+    return launch_quality_dispatch<QuantKind::kQ6K, 64>(
+        weights, output_rows, columns, packed, prompt_rows, output, stream);
+  }
+  return launch_quality_dispatch<QuantKind::kQ6K, 128>(
+      weights, output_rows, columns, packed, prompt_rows, output, stream);
 }
 
 cudaError_t launch_q8_mmq_quality_mma_pipeline(
@@ -2184,27 +2415,27 @@ bool legal_ffn_prompt_tile(unsigned int prompt_tile) noexcept {
 }
 
 unsigned int selected_ffn_gate_quality_i() noexcept {
-  return kSelectedFfnGateQualityI;
+  return g_ffn_tile_override ? g_ffn_gate_i : kSelectedFfnGateQualityI;
 }
 
 unsigned int selected_ffn_gate_prompt_tile() noexcept {
-  return kSelectedFfnGatePromptTile;
+  return g_ffn_tile_override ? g_ffn_gate_j : kSelectedFfnGatePromptTile;
 }
 
 unsigned int selected_ffn_up_quality_i() noexcept {
-  return kSelectedFfnUpQualityI;
+  return g_ffn_tile_override ? g_ffn_up_i : kSelectedFfnUpQualityI;
 }
 
 unsigned int selected_ffn_up_prompt_tile() noexcept {
-  return kSelectedFfnUpPromptTile;
+  return g_ffn_tile_override ? g_ffn_up_j : kSelectedFfnUpPromptTile;
 }
 
 unsigned int selected_ffn_down_quality_i() noexcept {
-  return kSelectedFfnDownQualityI;
+  return g_ffn_tile_override ? g_ffn_down_i : kSelectedFfnDownQualityI;
 }
 
 unsigned int selected_ffn_down_prompt_tile() noexcept {
-  return kSelectedFfnDownPromptTile;
+  return g_ffn_tile_override ? g_ffn_down_j : kSelectedFfnDownPromptTile;
 }
 
 int mma_mmq_occupancy_ij(QuantKind kind, unsigned int prompt_tile,
@@ -2257,38 +2488,22 @@ cudaError_t launch_quant_mmq_mma_y_ij(
     return cudaErrorInvalidValue;
   }
   const char* pipe = effective_mmq_pipeline_path();
-  if (mmq_pipeline_path_on(pipe) && kind == QuantKind::kQ4K &&
-      quality_i == 128 && prompt_tile == 128 && output_rows % 128U == 0 &&
-      prompt_rows % 128U == 0) {
-    return launch_quant_mmq_mma_y_pipeline(
-        kind, weights, output_rows, columns, y, prompt_rows, output, quality_i,
-        prompt_tile, pipe, stream);
+  const bool aligned =
+      output_rows % quality_i == 0 && prompt_rows % prompt_tile == 0;
+  if (kind == QuantKind::kQ4K) {
+    record_q4_tile_dispatch(quality_i, prompt_tile, aligned, pipe);
+    if (mmq_pipeline_path_on(pipe) && aligned &&
+        mmq_q4_pipeline_tile(quality_i, prompt_tile)) {
+      return launch_quant_mmq_mma_y_pipeline(
+          kind, weights, output_rows, columns, y, prompt_rows, output, quality_i,
+          prompt_tile, pipe, stream);
+    }
+    const int* packed = reinterpret_cast<const int*>(y);
+    return launch_q4_quality_sync_ij(weights, output_rows, columns, packed,
+                                     prompt_rows, output, quality_i,
+                                     prompt_tile, stream);
   }
   const int* packed = reinterpret_cast<const int*>(y);
-  if (kind == QuantKind::kQ4K && quality_i == 64) {
-    if (prompt_tile == 32) {
-      return launch_quality_dispatch<QuantKind::kQ4K, 32, 64>(
-          weights, output_rows, columns, packed, prompt_rows, output, stream);
-    }
-    if (prompt_tile == 64) {
-      return launch_quality_dispatch<QuantKind::kQ4K, 64, 64>(
-          weights, output_rows, columns, packed, prompt_rows, output, stream);
-    }
-    return launch_quality_dispatch<QuantKind::kQ4K, 128, 64>(
-        weights, output_rows, columns, packed, prompt_rows, output, stream);
-  }
-  if (kind == QuantKind::kQ4K) {
-    if (prompt_tile == 32) {
-      return launch_quality_dispatch<QuantKind::kQ4K, 32>(
-          weights, output_rows, columns, packed, prompt_rows, output, stream);
-    }
-    if (prompt_tile == 64) {
-      return launch_quality_dispatch<QuantKind::kQ4K, 64>(
-          weights, output_rows, columns, packed, prompt_rows, output, stream);
-    }
-    return launch_quality_dispatch<QuantKind::kQ4K, 128>(
-        weights, output_rows, columns, packed, prompt_rows, output, stream);
-  }
   if (prompt_tile == 32) {
     return launch_quality_dispatch<QuantKind::kQ6K, 32>(
         weights, output_rows, columns, packed, prompt_rows, output, stream);
@@ -2299,6 +2514,36 @@ cudaError_t launch_quant_mmq_mma_y_ij(
   }
   return launch_quality_dispatch<QuantKind::kQ6K, 128>(
       weights, output_rows, columns, packed, prompt_rows, output, stream);
+}
+
+cudaError_t mmq_pipeline_kernel_attributes(
+    QuantKind kind, unsigned int prompt_tile, unsigned int quality_i,
+    const char* path, int* occupancy, int* registers,
+    std::size_t* local_bytes, std::size_t* shared_bytes) noexcept {
+  if (!legal_mmq_pipeline_path(path)) return cudaErrorInvalidValue;
+  const bool async_y = std::strcmp(path, "async_y") == 0 ||
+                       std::strcmp(path, "fma_async") == 0;
+  const bool fma = std::strcmp(path, "fma") == 0 ||
+                   std::strcmp(path, "fma_async") == 0;
+  if (kind == QuantKind::kQ4K && mmq_q4_pipeline_tile(quality_i, prompt_tile)) {
+    return query_q4_pipeline_kernel(prompt_tile, quality_i, fma, async_y,
+                                    occupancy, registers, local_bytes,
+                                    shared_bytes);
+  }
+  if (kind == QuantKind::kQ8_0 && prompt_tile == 128 &&
+      (quality_i == 32 || quality_i == 64 || quality_i == 128)) {
+    if (quality_i == 32) {
+      return query_pipeline_kernel<QuantKind::kQ8_0, 128, 32>(
+          fma, async_y, occupancy, registers, local_bytes, shared_bytes);
+    }
+    if (quality_i == 64) {
+      return query_pipeline_kernel<QuantKind::kQ8_0, 128, 64>(
+          fma, async_y, occupancy, registers, local_bytes, shared_bytes);
+    }
+    return query_pipeline_kernel<QuantKind::kQ8_0, 128, 128>(
+        fma, async_y, occupancy, registers, local_bytes, shared_bytes);
+  }
+  return cudaErrorInvalidValue;
 }
 
 constexpr const char kSelectedFfnPath[] = "shared_y_swiglu_q8";

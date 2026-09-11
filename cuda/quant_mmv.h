@@ -308,6 +308,48 @@ unsigned int selected_ffn_down_prompt_tile() noexcept;
 int mma_mmq_occupancy_ij(QuantKind kind, unsigned int prompt_tile,
                          unsigned int quality_i) noexcept;
 
+bool mmq_q4_pipeline_tile(unsigned int quality_i,
+                          unsigned int prompt_tile) noexcept;
+const char* mmq_q4_tile_ident(unsigned int quality_i,
+                              unsigned int prompt_tile) noexcept;
+
+struct MmqTileDispatch final {
+  unsigned int quality_i = 0;
+  unsigned int prompt_tile = 0;
+  bool aligned = false;
+  bool pipeline = false;
+  bool fallback = false;
+  bool fma = false;
+  bool async_y = false;
+  const char* ident = "";
+  const char* path = "";
+  const char* kernel = "";
+};
+
+const MmqTileDispatch& last_mmq_tile_dispatch() noexcept;
+void clear_mmq_tile_dispatch() noexcept;
+
+cudaError_t mmq_pipeline_kernel_attributes(
+    QuantKind kind, unsigned int prompt_tile, unsigned int quality_i,
+    const char* path, int* occupancy, int* registers,
+    std::size_t* local_bytes, std::size_t* shared_bytes) noexcept;
+
+void set_ffn_tile_override(unsigned int gate_i, unsigned int gate_j,
+                           unsigned int up_i, unsigned int up_j,
+                           unsigned int down_i, unsigned int down_j) noexcept;
+void clear_ffn_tile_override() noexcept;
+
+struct FfnTileOverrideScope final {
+  FfnTileOverrideScope(unsigned int gate_i, unsigned int gate_j,
+                       unsigned int up_i, unsigned int up_j,
+                       unsigned int down_i, unsigned int down_j) noexcept {
+    set_ffn_tile_override(gate_i, gate_j, up_i, up_j, down_i, down_j);
+  }
+  ~FfnTileOverrideScope() { clear_ffn_tile_override(); }
+  FfnTileOverrideScope(const FfnTileOverrideScope&) = delete;
+  FfnTileOverrideScope& operator=(const FfnTileOverrideScope&) = delete;
+};
+
 cudaError_t launch_quant_mmq_mma_y_ij(
     QuantKind kind, const std::uint8_t* weights, std::size_t output_rows,
     std::size_t columns, const Q8Block* y, std::size_t prompt_rows,

@@ -1,0 +1,67 @@
+
+==========
+== CUDA ==
+==========
+
+CUDA Version 13.0.2
+
+Container image Copyright (c) 2016-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+
+This container image and its contents are governed by the NVIDIA Deep Learning Container License.
+By pulling and using the container, you accept the terms and conditions of this license:
+https://developer.nvidia.com/ngc/nvidia-deep-learning-container-license
+
+A copy of this license is made available in this container at /NGC-DL-CONTAINER-LICENSE for your convenience.
+
+screen_warmup group=gate_up tile=i128_j128 ms=2.92281604 pipeline=true kernel=q4_i128_j128_fma_async
+screen_sample group=gate_up tile=i128_j128 sample=1 ms=2.86342406 pipeline=true kernel=q4_i128_j128_fma_async
+screen_sample group=gate_up tile=i128_j128 sample=2 ms=2.86313605 pipeline=true kernel=q4_i128_j128_fma_async
+screen_sample group=gate_up tile=i128_j128 sample=3 ms=2.87046409 pipeline=true kernel=q4_i128_j128_fma_async
+screen_mean group=gate_up tile=i128_j128 ms=2.86567473
+screen_warmup group=gate_up tile=i64_j128 ms=3.00943995 pipeline=true kernel=q4_i64_j128_fma_async
+screen_sample group=gate_up tile=i64_j128 sample=1 ms=3.01785588 pipeline=true kernel=q4_i64_j128_fma_async
+screen_sample group=gate_up tile=i64_j128 sample=2 ms=3.00838399 pipeline=true kernel=q4_i64_j128_fma_async
+screen_sample group=gate_up tile=i64_j128 sample=3 ms=3.00825596 pipeline=true kernel=q4_i64_j128_fma_async
+screen_mean group=gate_up tile=i64_j128 ms=3.01149869
+screen_warmup group=gate_up tile=i128_j64 ms=3.07891202 pipeline=true kernel=q4_i128_j64_fma_async
+screen_sample group=gate_up tile=i128_j64 sample=1 ms=3.06188798 pipeline=true kernel=q4_i128_j64_fma_async
+screen_sample group=gate_up tile=i128_j64 sample=2 ms=3.06294394 pipeline=true kernel=q4_i128_j64_fma_async
+screen_sample group=gate_up tile=i128_j64 sample=3 ms=3.06809592 pipeline=true kernel=q4_i128_j64_fma_async
+screen_mean group=gate_up tile=i128_j64 ms=3.06430936
+screen_warmup group=gate_up tile=i64_j64 ms=3.75363207 pipeline=true kernel=q4_i64_j64_fma_async
+screen_sample group=gate_up tile=i64_j64 sample=1 ms=3.74396801 pipeline=true kernel=q4_i64_j64_fma_async
+screen_sample group=gate_up tile=i64_j64 sample=2 ms=3.74892807 pipeline=true kernel=q4_i64_j64_fma_async
+screen_sample group=gate_up tile=i64_j64 sample=3 ms=3.80502391 pipeline=true kernel=q4_i64_j64_fma_async
+screen_mean group=gate_up tile=i64_j64 ms=3.76597333
+screen_warmup group=down tile=i128_j128 ms=2.96739197 pipeline=true kernel=q4_i128_j128_fma_async
+screen_sample group=down tile=i128_j128 sample=1 ms=2.90198398 pipeline=true kernel=q4_i128_j128_fma_async
+screen_sample group=down tile=i128_j128 sample=2 ms=2.91375995 pipeline=true kernel=q4_i128_j128_fma_async
+screen_sample group=down tile=i128_j128 sample=3 ms=2.91456008 pipeline=true kernel=q4_i128_j128_fma_async
+screen_mean group=down tile=i128_j128 ms=2.91010118
+screen_warmup group=down tile=i64_j128 ms=3.00841594 pipeline=true kernel=q4_i64_j128_fma_async
+screen_sample group=down tile=i64_j128 sample=1 ms=3.02630401 pipeline=true kernel=q4_i64_j128_fma_async
+screen_sample group=down tile=i64_j128 sample=2 ms=3.022048 pipeline=true kernel=q4_i64_j128_fma_async
+screen_sample group=down tile=i64_j128 sample=3 ms=3.02281594 pipeline=true kernel=q4_i64_j128_fma_async
+screen_mean group=down tile=i64_j128 ms=3.02372265
+screen_warmup group=down tile=i128_j64 ms=3.08326411 pipeline=true kernel=q4_i128_j64_fma_async
+screen_sample group=down tile=i128_j64 sample=1 ms=3.08374405 pipeline=true kernel=q4_i128_j64_fma_async
+screen_sample group=down tile=i128_j64 sample=2 ms=3.08351994 pipeline=true kernel=q4_i128_j64_fma_async
+screen_sample group=down tile=i128_j64 sample=3 ms=3.08051205 pipeline=true kernel=q4_i128_j64_fma_async
+screen_mean group=down tile=i128_j64 ms=3.08259201
+screen_warmup group=down tile=i64_j64 ms=3.70441604 pipeline=true kernel=q4_i64_j64_fma_async
+screen_sample group=down tile=i64_j64 sample=1 ms=3.81891203 pipeline=true kernel=q4_i64_j64_fma_async
+screen_sample group=down tile=i64_j64 sample=2 ms=3.81964803 pipeline=true kernel=q4_i64_j64_fma_async
+screen_sample group=down tile=i64_j64 sample=3 ms=3.81740808 pipeline=true kernel=q4_i64_j64_fma_async
+screen_mean group=down tile=i64_j64 ms=3.81865621
+complete_warmup gate=i128_j128 down=i128_j128 ms=9.68083191 last_kernel=q4_i128_j128_fma_async pipeline=true
+complete_sample gate=i128_j128 down=i128_j128 sample=1 ms=9.6333437 last_kernel=q4_i128_j128_fma_async pipeline=true
+complete_sample gate=i128_j128 down=i128_j128 sample=2 ms=9.6543684 last_kernel=q4_i128_j128_fma_async pipeline=true
+complete_sample gate=i128_j128 down=i128_j128 sample=3 ms=9.65990353 last_kernel=q4_i128_j128_fma_async pipeline=true
+complete_warmup gate=i128_j128 down=i128_j128 ms=9.66550446 last_kernel=q4_i128_j128_fma_async pipeline=true
+complete_sample gate=i128_j128 down=i128_j128 sample=1 ms=9.62284756 last_kernel=q4_i128_j128_fma_async pipeline=true
+complete_sample gate=i128_j128 down=i128_j128 sample=2 ms=9.64057636 last_kernel=q4_i128_j128_fma_async pipeline=true
+complete_sample gate=i128_j128 down=i128_j128 sample=3 ms=9.62425613 last_kernel=q4_i128_j128_fma_async pipeline=true
+screen_winner gate_up=i128_j128 down=i128_j128 control_ffn_ms=9.64920521 winner_ffn_ms=9.62922668 keep=false installed_gate=i128_j128 installed_down=i128_j128
+selected_ffn_gate=128/128 up=128/128 down=128/128 pipeline=fma_async
+QW38_OPT065_MMQ_TILES_RESULT={"schema_version":1,"task":"OPT-065","workload":"screen","tier":"screen","status":"passed","selected_pipeline":"fma_async","gate_i":128,"gate_j":128,"down_i":128,"down_j":128,"claims_throughput":false,"llama_revision":"cc83d7b4824f73cfdda4dfbb47ee39804f71b328","gguf_sha256":"31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34"}
+status=passed
