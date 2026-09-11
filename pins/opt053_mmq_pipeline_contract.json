@@ -1,0 +1,109 @@
+{
+  "schema_version": 1,
+  "task": "OPT-053",
+  "yardstick": "prompt_mmq_scale_staging",
+  "opt052_quartz_p_mean_tok_s": 2692.64575,
+  "opt052_quartz_d128_mean_tok_s": 37.5680695,
+  "opt052_quartz_d2048_mean_tok_s": 35.6793633,
+  "opt052_quartz_d128_token_latency_p95_ms": 26.8831482,
+  "opt052_quartz_d128_run_mean_token_latency_p95_ms": 26.7299652,
+  "opt052_quartz_d2048_token_latency_p95_ms": 28.2002869,
+  "opt052_quartz_d2048_run_mean_token_latency_p95_ms": 28.0617561,
+  "llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+  "gguf_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+  "device_substring": "RTX 5090",
+  "selected_mmq_pipeline_path": "fma_async",
+  "selected_mmq_stream_k_path": "off",
+  "selected_ffn_path": "shared_y_swiglu_q8",
+  "selected_ffn_gate_quality_i": 128,
+  "selected_ffn_gate_prompt_tile": 128,
+  "selected_ffn_up_quality_i": 128,
+  "selected_ffn_up_prompt_tile": 128,
+  "selected_ffn_down_quality_i": 128,
+  "selected_ffn_down_prompt_tile": 128,
+  "legal_mmq_pipeline_paths": [
+    "off",
+    "fma",
+    "async_y",
+    "fma_async"
+  ],
+  "ab": {
+    "candidates": [
+      "off",
+      "fma",
+      "async_y",
+      "fma_async"
+    ],
+    "warmups": 3,
+    "measured_runs": 30,
+    "timed_token_counts": [
+      4096
+    ],
+    "reported_token_counts": [
+      512,
+      1024,
+      2048
+    ],
+    "correctness_token_counts": [
+      17,
+      65,
+      129,
+      255
+    ],
+    "include_staging_and_full_ffn": true,
+    "ties_retain": "off",
+    "like_arithmetic_byte_equal": true
+  },
+  "opt044": {
+    "formula": "max(strict_reference_ceiling, 1.05 * measured_llama_error + 1e-6)",
+    "like_arithmetic_byte_equal": true,
+    "cross_arithmetic_abs": 0.0003,
+    "cross_arithmetic_rms": 0.0002
+  },
+  "opt052_keep_fixture": "fixtures/opt052_gdn_arithmetic.json",
+  "owns_opt016_parity_gate": false,
+  "substitutes_for_opt016": false,
+  "llama_bench_decode_is_informational": true,
+  "required_fixture_keys": [
+    "schema_version",
+    "task",
+    "status",
+    "measurement_utc",
+    "device",
+    "compute_capability",
+    "llama_revision",
+    "gguf_sha256",
+    "reverted",
+    "selected_mmq_pipeline_path",
+    "selected_mmq_stream_k_path",
+    "selected_ffn_path",
+    "ab",
+    "correctness",
+    "production_numerics",
+    "keep_sitting_skipped",
+    "p",
+    "d128",
+    "d2048",
+    "instruction_mix",
+    "extra_workspace_bytes",
+    "owns_opt016_parity_gate",
+    "substitutes_for_opt016",
+    "nsight_systems",
+    "nsight_compute",
+    "proof_limit",
+    "report_path"
+  ],
+  "proof_limit": [
+    "OPT-044 production-numerics budgets",
+    "like-arithmetic off control remains production quality MMA I=128/J=128",
+    "complete FFN staging plus gate/up/SwiGLU/down cost",
+    "explicit FMA scale accumulation and two-stage packed-Y cp.async",
+    "Q4_K min corrections and Q6_K subscales unchanged",
+    "synchronous fallback for tails and misalignment",
+    "no unchanged OPT-024 D2R or OPT-028 stream-K rerun",
+    "95% throughput floors versus OPT-052 keep",
+    "105% p95 ceilings versus OPT-052",
+    "does not substitute for the 2K llama.cpp parity gate"
+  ],
+  "report_path": "evidence/optimization/opt053-mmq-pipeline/REPORT.md"
+}

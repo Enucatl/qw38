@@ -2385,6 +2385,51 @@ int run_mmq_stream_k_helpers() {
   return 0;
 }
 
+int run_mmq_pipeline_helpers() {
+  if (!qw38::cuda::legal_mmq_pipeline_path("off") ||
+      !qw38::cuda::legal_mmq_pipeline_path("fma") ||
+      !qw38::cuda::legal_mmq_pipeline_path("async_y") ||
+      !qw38::cuda::legal_mmq_pipeline_path("fma_async") ||
+      qw38::cuda::legal_mmq_pipeline_path("stream_k") ||
+      !qw38::cuda::legal_mmq_pipeline_path(
+          qw38::cuda::selected_mmq_pipeline_path())) {
+    std::fprintf(stderr, "mmq pipeline path contract failed\n");
+    return 1;
+  }
+  const int occ_off = qw38::cuda::mmq_pipeline_occupancy(
+      qw38::cuda::QuantKind::kQ4K, 128, 128, "off");
+  const int occ_fma = qw38::cuda::mmq_pipeline_occupancy(
+      qw38::cuda::QuantKind::kQ4K, 128, 128, "fma");
+  const int occ_async = qw38::cuda::mmq_pipeline_occupancy(
+      qw38::cuda::QuantKind::kQ4K, 128, 128, "async_y");
+  const int occ_both = qw38::cuda::mmq_pipeline_occupancy(
+      qw38::cuda::QuantKind::kQ4K, 128, 128, "fma_async");
+  if (occ_off < 1 || occ_fma < 1 || occ_async < 1 || occ_both < 1) {
+    std::fprintf(stderr,
+                 "mmq pipeline occupancy failed off=%d fma=%d async=%d both=%d\n",
+                 occ_off, occ_fma, occ_async, occ_both);
+    return 1;
+  }
+  if (qw38::cuda::mmq_pipeline_extra_shared_bytes(128, 128, "off") != 0 ||
+      qw38::cuda::mmq_pipeline_extra_shared_bytes(128, 128, "fma") != 0 ||
+      qw38::cuda::mmq_pipeline_extra_shared_bytes(128, 128, "async_y") == 0) {
+    std::fprintf(stderr, "mmq pipeline extra shared bytes failed\n");
+    return 1;
+  }
+  if (qw38::cuda::launch_quant_mmq_mma_y_pipeline(
+          qw38::cuda::QuantKind::kQ4K, nullptr, 128, 256, nullptr, 128, nullptr,
+          128, 128, "off", nullptr) != cudaErrorInvalidValue) {
+    std::fprintf(stderr, "pipeline launch must reject null buffers\n");
+    return 1;
+  }
+  std::printf("mmq_pipeline_helpers path=%s occ_off=%d occ_fma=%d occ_async=%d "
+              "occ_fma_async=%d extra_async=%zu\n",
+              qw38::cuda::selected_mmq_pipeline_path(), occ_off, occ_fma,
+              occ_async, occ_both,
+              qw38::cuda::mmq_pipeline_extra_shared_bytes(128, 128, "async_y"));
+  return 0;
+}
+
 int run_mma_stream_k_case(qw38::cuda::QuantKind kind, const char* name,
                           std::size_t output_rows, std::size_t columns,
                           std::size_t prompt_rows, const char* path) {
@@ -3550,6 +3595,7 @@ int main() {
 
   if (run_q8_quality_suite() != 0) return 1;
   if (run_mmq_stream_k_suite() != 0) return 1;
+  if (run_mmq_pipeline_helpers() != 0) return 1;
   if (run_ffn_tile_pin_suite() != 0) return 1;
 
   std::printf("production_numerics_path=%s optimized_admitted=%s "

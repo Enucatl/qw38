@@ -229,6 +229,28 @@ const char* selected_ffn_path() noexcept;
 bool ffn_shares_gate_up_y() noexcept;
 bool ffn_swiglu_writes_q8() noexcept;
 
+bool legal_mmq_pipeline_path(const char* path) noexcept;
+const char* selected_mmq_pipeline_path() noexcept;
+const char* effective_mmq_pipeline_path() noexcept;
+void set_mmq_pipeline_path_override(const char* path) noexcept;
+bool mmq_pipeline_path_on(const char* path) noexcept;
+std::size_t mmq_pipeline_extra_shared_bytes(unsigned int prompt_tile,
+                                            unsigned int quality_i,
+                                            const char* path) noexcept;
+int mmq_pipeline_occupancy(QuantKind kind, unsigned int prompt_tile,
+                           unsigned int quality_i, const char* path) noexcept;
+
+cudaError_t launch_quant_mmq_mma_y_pipeline(
+    QuantKind kind, const std::uint8_t* weights, std::size_t output_rows,
+    std::size_t columns, const Q8Block* y, std::size_t prompt_rows,
+    float* output, unsigned int quality_i, unsigned int prompt_tile,
+    const char* path, cudaStream_t stream) noexcept;
+
+cudaError_t launch_q8_mmq_quality_mma_pipeline(
+    const std::uint8_t* weights, std::size_t output_rows, std::size_t columns,
+    const Q8Block* y, std::size_t prompt_rows, float* output,
+    unsigned int quality_i, const char* path, cudaStream_t stream) noexcept;
+
 cudaError_t launch_quant_mmq_mma_y(
     QuantKind kind, const std::uint8_t* weights, std::size_t output_rows,
     std::size_t columns, const Q8Block* y, std::size_t prompt_rows,

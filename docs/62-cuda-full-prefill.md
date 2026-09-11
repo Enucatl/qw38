@@ -1,6 +1,6 @@
 # Chunked full-model CUDA prefill
 
-[Index](README.md) · Implementation tasks: SCH-002, MEM-002, OPT-008, OPT-009, OPT-011, OPT-012, OPT-013, OPT-014, OPT-015, OPT-017, OPT-018, OPT-019, OPT-020, OPT-021, OPT-022, OPT-023, OPT-024, OPT-025, OPT-026, OPT-027, OPT-028, OPT-029, OPT-030, OPT-032, OPT-033, OPT-035, OPT-037, OPT-038, OPT-040, OPT-041, OPT-052, and EDU-047 in
+[Index](README.md) · Implementation tasks: SCH-002, MEM-002, OPT-008, OPT-009, OPT-011, OPT-012, OPT-013, OPT-014, OPT-015, OPT-017, OPT-018, OPT-019, OPT-020, OPT-021, OPT-022, OPT-023, OPT-024, OPT-025, OPT-026, OPT-027, OPT-028, OPT-029, OPT-030, OPT-032, OPT-033, OPT-035, OPT-037, OPT-038, OPT-040, OPT-041, OPT-052, OPT-053, and EDU-047 in
 [`implementation_ledger.md`](../implementation_ledger.md) · Contracts:
 [`pins/cuda_prompt_scheduler_contract.json`](../pins/cuda_prompt_scheduler_contract.json),
 [`pins/cuda_prompt_pipeline_contract.json`](../pins/cuda_prompt_pipeline_contract.json),
@@ -870,6 +870,26 @@ stay in the report:
 and
 [`fixtures/opt052_gdn_arithmetic.json`](../fixtures/opt052_gdn_arithmetic.json).
 
+OPT-053 keeps explicit FMA scale accumulation and two-stage packed-Y
+`cp.async` on production quality MMA. **Measured, RTX 5090:** paired
+CUDA-event A/B on the complete 4096-token FFN (quantize Y + gate + up +
+SwiGLU-into-Q8 + down) among `off`, `fma`, `async_y`, and `fma_async`;
+winner `fma_async` with like-arithmetic `async_y` byte-equal versus `off`
+and FMA inside production-numerics budgets. Production
+`kSelectedMmqPipelinePath` is `fma_async`. Integer MMA fragments, Q4_K min
+corrections, Q6_K subscales, stream-K `off`, and I=128/J=128 tiles stay.
+Tails keep the synchronous Y load. Extra Y-tile shared is 18432 bytes at
+J=128. Occupancy remains 1. Live exclusive sitting **keep:** Quartz P
+strictly greater than the copied prior keep; D128/D2048 throughput and p95
+guards held; `reverted` false; `keep_sitting_skipped` false; `status`
+measured. `quartz_meets_llama` is informational and is not this gate.
+**The 2K parity owner remains the blocked dedicated gate.** Live numbers
+stay in the report:
+[`evidence/optimization/opt053-mmq-pipeline/REPORT.md`](../evidence/optimization/opt053-mmq-pipeline/REPORT.md),
+[`pins/opt053_mmq_pipeline_contract.json`](../pins/opt053_mmq_pipeline_contract.json),
+and
+[`fixtures/opt053_mmq_pipeline.json`](../fixtures/opt053_mmq_pipeline.json).
+
 OPT-041 keeps warp-owned 16×8 prompt QK microtiles on production 4096-row
 fattn-mma stream-K including combine, on top of register-resident VKQ and
 dual-F16 probability×V MMA. **Measured, RTX 5090:** paired CUDA-event A/B
@@ -962,7 +982,11 @@ decode sequential GDN and fuse `off` stay; it does not own or pass the 2K
 tok/s gate. OPT-041 records warp-owned prompt QK microtiles and a live 4K keep
 versus the then-current keep-oracle P denominator with the D128/D2048 guard;
 production QK pin is `warp_microtile`; register VKQ and P×V MMA stay; it does
-not own or pass the 2K tok/s gate. BEN-001
+not own or pass the 2K tok/s gate. OPT-053 records explicit FMA scale accumulation and two-stage
+packed-Y cp.async on quality MMA and a live 4K keep versus the prior keep
+P denominator with the D128/D2048 guard; production MMQ pipeline pin is
+`fma_async`; stream-K stays `off`; I=128/J=128 tiles stay; it does not own
+or pass the 2K tok/s gate. BEN-001
 provides the harness; CMP-002/CMP-003 still own the 30-sample comparative gate.
 QLT-001 remains blocked. OPT-012's prompt graphs are FFN subgraphs only: not a
 whole-chunk graph, not a speedup gate, and not 128K quality recovery.

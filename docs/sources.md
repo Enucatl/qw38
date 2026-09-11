@@ -868,6 +868,41 @@ baseline.
   transaction/restore exactness; 95% throughput floors versus OPT-051 keep;
   105% p95 ceilings versus OPT-051; does not substitute for the 2K llama.cpp
   parity gate. Envelopes unloosened; Nsight is not used.
+- OPT-053 is a local derivation over production quality MMA
+  (`quality_mma_process_tile`). Integer fragments stay. Explicit `__fmaf_rn`
+  is used only in dequant-scale accumulation. Packed Y is already Q8_1-style
+  ints; a two-stage `cp.async.cg.shared.global` 16-byte loader overlaps the
+  next Y tile with MMA on admitted full tiles. SM120 encodes that PTX as
+  `LDGSTS`. Tails and misalignment stay synchronous. Q4_K min corrections and
+  Q6_K subscales stay. Stream-K stays `off`. FFN tiles stay I=128/J=128.
+  Extra dynamic shared for the second Y tile is 18432 bytes at J=128.
+  Occupancy remains 1. File-level provenance for FMA accumulation and Ampere
+  `cp.async` tile loads is External: pinned llama.cpp revision
+  `cc83d7b4824f73cfdda4dfbb47ee39804f71b328` (MIT, The ggml authors)
+  `mmq-vec-dot.cuh` / `mmq-load-tiles.cuh` techniques, not a wholesale ggml
+  stub import. This increment does not vendor those headers and does not
+  copy `../ds4/cuda/mmq/`. Keep denominators are the frozen prior keep P and
+  D128/D2048 means and p95s copied into the contract. **Measured, RTX 5090:**
+  4096 complete-FFN A/B winner `fma_async`; live exclusive sitting keep;
+  production pin `fma_async`; `reverted` false; `keep_sitting_skipped` false;
+  `status` measured. Live tok/s stay in the report; this ledger does not
+  replace them. The schema-1 contract, measured fixture, and report are
+  [`pins/opt053_mmq_pipeline_contract.json`](../pins/opt053_mmq_pipeline_contract.json),
+  [`fixtures/opt053_mmq_pipeline.json`](../fixtures/opt053_mmq_pipeline.json),
+  and
+  [`evidence/optimization/opt053-mmq-pipeline/REPORT.md`](../evidence/optimization/opt053-mmq-pipeline/REPORT.md).
+  The beginner explanations are
+  [`docs/40-cuda-prompt-mmq.md`](40-cuda-prompt-mmq.md),
+  [`docs/62-cuda-full-prefill.md`](62-cuda-full-prefill.md), and
+  [`docs/06-system-optimization.md`](06-system-optimization.md).
+  Proof limit: production-numerics budgets; like-arithmetic off control
+  remains production quality MMA I=128/J=128; complete FFN staging plus
+  gate/up/SwiGLU/down cost; explicit FMA scale accumulation and two-stage
+  packed-Y cp.async; Q4_K min corrections and Q6_K subscales unchanged;
+  synchronous fallback for tails and misalignment; no unchanged D2R or
+  stream-K rerun; 95% throughput floors versus the prior keep; 105% p95
+  ceilings versus the prior keep; does not substitute for the 2K llama.cpp
+  parity gate. Envelopes unloosened; Nsight is not used.
 - OPT-041 is a local derivation over admitted Ada+ stream-K fattn with
   register-resident VKQ and dual-F16 probability×V MMA. It assigns each of
   eight 16×8 QK microtiles to one of four warps (`tile_id % 4`), lets the

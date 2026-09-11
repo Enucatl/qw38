@@ -119,7 +119,7 @@ are repository-relative unless stated otherwise.
 | OPT-050 | Prepare prompt Q normalization and RoPE once | OPT-044, OPT-045 | done | Prepared queries are reused across attention KV partitions; preparation-inclusive P improves with tail/prefix correctness, quality and memory guards, or retained rejection | [`tasks/OPT-050.md`](tasks/OPT-050.md); [`pins/opt050_attention_query_prepare_contract.json`](pins/opt050_attention_query_prepare_contract.json); [`fixtures/opt050_attention_query_prepare.json`](fixtures/opt050_attention_query_prepare.json); [`cuda/attention_decode.cu`](cuda/attention_decode.cu); [`cuda/fattn_mma_f16.cuh`](cuda/fattn_mma_f16.cuh); [`cuda/opt050_attention_query_prepare_ab_test.cu`](cuda/opt050_attention_query_prepare_ab_test.cu); [`tests/test_opt050_attention_query_prepare.py`](tests/test_opt050_attention_query_prepare.py); [`evidence/optimization/opt050-attention-query-prepare/REPORT.md`](evidence/optimization/opt050-attention-query-prepare/REPORT.md); verification 2026-09-10T21:40:39Z |
 | OPT-051 | Pipeline prompt attention with register softmax | OPT-044, OPT-050 | done | Staged admission of F16 operands, register reductions and tiled asynchronous loads reduces complete attention and P under documented quality and P/D guards, or retained rejection | [`tasks/OPT-051.md`](tasks/OPT-051.md); [`pins/opt051_attention_pipeline_contract.json`](pins/opt051_attention_pipeline_contract.json); [`fixtures/opt051_attention_pipeline.json`](fixtures/opt051_attention_pipeline.json); [`cuda/fattn_mma_f16_pipeline.cuh`](cuda/fattn_mma_f16_pipeline.cuh); [`cuda/fattn_mma_f16.cuh`](cuda/fattn_mma_f16.cuh); [`cuda/opt051_attention_pipeline_ab_test.cu`](cuda/opt051_attention_pipeline_ab_test.cu); [`tests/test_opt051_attention_pipeline.py`](tests/test_opt051_attention_pipeline.py); [`evidence/optimization/opt051-attention-pipeline/REPORT.md`](evidence/optimization/opt051-attention-pipeline/REPORT.md); verification 2026-09-10T22:50:00Z |
 | OPT-052 | Remove redundant GDN arithmetic and state traffic | OPT-044, OPT-045 | done | Hoisted scaled Q/K and decay plus admitted FMA improve complete GDN and P; optional conversion-inclusive state tiling wins where measured; recurrent quality and atomic state stay valid, or retained rejection | [`tasks/OPT-052.md`](tasks/OPT-052.md); [`pins/opt052_gdn_arithmetic_contract.json`](pins/opt052_gdn_arithmetic_contract.json); [`fixtures/opt052_gdn_arithmetic.json`](fixtures/opt052_gdn_arithmetic.json); [`cuda/gdn_fused_quality.cuh`](cuda/gdn_fused_quality.cuh); [`cuda/opt052_gdn_arithmetic_ab_test.cu`](cuda/opt052_gdn_arithmetic_ab_test.cu); [`tests/test_opt052_gdn_arithmetic.py`](tests/test_opt052_gdn_arithmetic.py); [`evidence/optimization/opt052-gdn-arithmetic/REPORT.md`](evidence/optimization/opt052-gdn-arithmetic/REPORT.md); verification 2026-09-10T23:30:00Z |
-| OPT-053 | Optimize MMQ scaling and tile staging | OPT-044, OPT-045 | pending | Existing quality MMA gains measured scaling/staging efficiency and full P speed under quality and memory guards, or a measured no-change result; no unchanged rejected tile/stream-K rerun | [Task](tasks/OPT-053.md) |
+| OPT-053 | Optimize MMQ scaling and tile staging | OPT-044, OPT-045 | done | Existing quality MMA gains measured scaling/staging efficiency and full P speed under quality and memory guards, or a measured no-change result; no unchanged rejected tile/stream-K rerun | [`tasks/OPT-053.md`](tasks/OPT-053.md); [`pins/opt053_mmq_pipeline_contract.json`](pins/opt053_mmq_pipeline_contract.json); [`fixtures/opt053_mmq_pipeline.json`](fixtures/opt053_mmq_pipeline.json); [`cuda/quant_mmq_mma.cuh`](cuda/quant_mmq_mma.cuh); [`cuda/opt053_mmq_pipeline_ab_test.cu`](cuda/opt053_mmq_pipeline_ab_test.cu); [`tests/test_opt053_mmq_pipeline.py`](tests/test_opt053_mmq_pipeline.py); [`evidence/optimization/opt053-mmq-pipeline/REPORT.md`](evidence/optimization/opt053-mmq-pipeline/REPORT.md); verification 2026-09-11T00:05:20Z |
 | OPT-054 | Tune internal prefill batches within atomic 4K | OPT-049, OPT-051, OPT-052, OPT-053 | pending | Compare 512/1024/2048/4096 physical batches while preserving one atomic 4096-token operation; keep only a complete P win with quality, cancellation, graph and memory checks | [Task](tasks/OPT-054.md) |
 | OPT-055 | Capture measured remaining decode and prompt launch gaps | OPT-054 | pending | Supersedes OPT-031; broader stable graphs save measured wall time with bounded cancellation, correct dynamic positions and post-graph memory reserve, or measured no-change result | [Task](tasks/OPT-055.md) |
 | OPT-056 | Exceed pinned llama.cpp prefill and decode with quality | OPT-045, OPT-046, OPT-047, OPT-048, OPT-049, OPT-050, OPT-051, OPT-052, OPT-053, OPT-054, OPT-055 | pending | Same-sitting P/D128/D2048 throughput exceeds llama by at least 5%, decode p95 is no worse, combined production quality passes, and original OPT-016 2K parity passes; candidate-task completion alone is insufficient | [Task](tasks/OPT-056.md) |
@@ -128,8 +128,8 @@ are repository-relative unless stated otherwise.
 
 The [2026-09-10 design](tasks/PERFORMANCE-RECOVERY-2026-09-10.md) compares the
 admitted Quartz, pinned llama.cpp and ds4 paths. It is source analysis and task
-design, not new performance evidence. **Next eligible recovery task: OPT-053**,
-then OPT-053–054 in row
+design, not new performance evidence. **Next eligible recovery task: OPT-054**,
+then OPT-054–055 in row
 order, measured remaining launch work in OPT-055, and the outcome gate OPT-056.
 Dependencies permit independent work but do not authorize subagents. The user
 accepts documented llama.cpp/ds4-like accuracy compromises; strict reference
@@ -5776,3 +5776,34 @@ statements below are historical, not the current execution order.
   Tok/s delta: P **2489.33** → **2692.65** (+203.32, 1.082×); D128
   **37.67** → **37.57** (−0.10, 0.997×); D2048 **35.76** → **35.68**
   (−0.08, 0.998×).
+
+### 2026-09-11T00:05:20Z — OPT-053 delivered (KEEP)
+
+- Independent verification pass confirmed. Explicit FMA scale accumulation and
+  two-stage packed-Y `cp.async` in `cuda/quant_mmq_mma.cuh::quality_mma_process_tile`.
+  Exclusive RTX 5090 sitting wrote
+  [`fixtures/opt053_mmq_pipeline.json`](fixtures/opt053_mmq_pipeline.json)
+  (`measurement_utc` 2026-09-10T23:58:33Z; A/B winner `fma_async` complete FFN
+  **9.68816757** ms vs off **11.2367001** ms, ~1.16×; sitting P Quartz
+  **2895.42773**, D128 **37.5605927**, D2048 **35.7286987** tok/s; `status`
+  measured; `reverted` false; `keep_sitting_skipped` false;
+  `selected_mmq_pipeline_path` fma_async). **Keep:** OPT-044
+  production-numerics budgets; OPT-052 keep P floor (strict P improvement)
+  and D128/D2048 ≥ 95% floors; decode p95 inside 105% of OPT-052.
+  Production `kSelectedMmqPipelinePath` is `fma_async`. Stream-K `off`, FFN
+  tiles I=128/J=128 unchanged. Coupled IDs: none.
+- Acceptance evidence: [`tasks/OPT-053.md`](tasks/OPT-053.md);
+  [`pins/opt053_mmq_pipeline_contract.json`](pins/opt053_mmq_pipeline_contract.json);
+  [`fixtures/opt053_mmq_pipeline.json`](fixtures/opt053_mmq_pipeline.json);
+  [`cuda/quant_mmq_mma.cuh`](cuda/quant_mmq_mma.cuh);
+  [`cuda/opt053_mmq_pipeline_ab_test.cu`](cuda/opt053_mmq_pipeline_ab_test.cu);
+  [`tests/test_opt053_mmq_pipeline.py`](tests/test_opt053_mmq_pipeline.py);
+  [`evidence/optimization/opt053-mmq-pipeline/REPORT.md`](evidence/optimization/opt053-mmq-pipeline/REPORT.md).
+  Proof is FMA scale accumulation and packed-Y cp.async with frozen OPT-044
+  numerics and OPT-052 keep denominators, not the 2K llama.cpp parity gate.
+- Marked OPT-053 `done`; delivery is limited to the verified task scope
+  plus this ledger/audit bookkeeping. `plan.md` is unchanged. OPT-016
+  stays `blocked`. Next eligible pending by ledger row order: **OPT-054**.
+  Tok/s delta: P **2692.65** → **2895.43** (+202.78, 1.075×); D128
+  **37.57** → **37.56** (−0.007, 1.000×); D2048 **35.68** → **35.73**
+  (+0.049, 1.001×).

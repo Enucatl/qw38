@@ -46,6 +46,8 @@ ordinary `<<<>>>`. Production prompt GDN may hoist per-(token, key_head)
 Q/K inverses into existing overlay scratch after the OPT-040 keep, and
 may hoist scaled Q/K and decay plus a conversion-inclusive column-major
 state tile after the OPT-052 keep;
+production quality MMA may use explicit FMA scale accumulation and a
+two-stage packed-Y `cp.async` loader after the OPT-053 keep;
 decode sequential GDN is unchanged. Decode stays MMV, with packed
 blockwise Q4_K/Q6_K loads after the OPT-034 keep.
 Tiny mixer prompts keep the
@@ -619,6 +621,22 @@ won the complete conv+preprocessing+recurrence+gated 4096-token component
 Production pin `kSelectedGdnPreprocPath` is `transpose`. Sequential windows,
 decode GDN, and fuse `off` stay. Live tok/s stay in
 [`evidence/optimization/opt052-gdn-arithmetic/REPORT.md`](../evidence/optimization/opt052-gdn-arithmetic/REPORT.md).
+This increment does not own the 2K llama.cpp parity gate.
+
+## MMQ FMA scale accumulation and packed-Y cp.async (OPT-053)
+
+**Measured, RTX 5090:** production quality MMA (Q4_K I=128/J=128 aligned FFN
+and Q8_0 quality mixer when rows divide the tile) was A/B'd against explicit
+`__fmaf_rn` dequant-scale accumulation and a two-stage packed-Y `cp.async`
+loader. The paired CUDA-event A/B on complete FFN (quantize Y + gate + up +
+SwiGLU-into-Q8 + down) selected `fma_async` (9.688 ms vs off 11.237 ms).
+Like-arithmetic `async_y` is byte-equal versus `off`. FMA stays inside
+production-numerics budgets. Production pin `kSelectedMmqPipelinePath` is
+`fma_async`. Integer MMA fragments, Q4_K min corrections, Q6_K subscales,
+stream-K `off`, and I=128/J=128 tiles stay. Tails keep the synchronous Y
+load. Extra Y-tile shared is 18432 bytes at J=128. Occupancy remains 1.
+SM120 encodes `cp.async` as `LDGSTS`. Live tok/s stay in
+[`evidence/optimization/opt053-mmq-pipeline/REPORT.md`](../evidence/optimization/opt053-mmq-pipeline/REPORT.md).
 This increment does not own the 2K llama.cpp parity gate.
 
 ## Warp-owned prompt QK microtiles (OPT-041)

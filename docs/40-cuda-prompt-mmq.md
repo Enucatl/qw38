@@ -1,6 +1,6 @@
 # 40. Tiled CUDA multiplication for prompt rows
 
-[Index](README.md) · Implementation tasks: CUD-002, OPT-009, OPT-015, OPT-017, OPT-018, OPT-022, OPT-023, OPT-024, OPT-025, OPT-028, OPT-037, and EDU-026 in
+[Index](README.md) · Implementation tasks: CUD-002, OPT-009, OPT-015, OPT-017, OPT-018, OPT-022, OPT-023, OPT-024, OPT-025, OPT-028, OPT-037, OPT-053, and EDU-026 in
 [`implementation_ledger.md`](../implementation_ledger.md)
 
 [Chapter 39](39-cuda-quant-mmv.md) multiplied one activation vector by a packed
@@ -671,3 +671,45 @@ rejection:
 [`evidence/optimization/opt037-ffn-tiles/REPORT.md`](../evidence/optimization/opt037-ffn-tiles/REPORT.md),
 and
 [`evidence/optimization/opt037-ffn-tiles/REJECTION.md`](../evidence/optimization/opt037-ffn-tiles/REJECTION.md).
+
+## OPT-053 MMQ scaling and tile staging
+
+Production quality MMA (`launch_quant_mmq_mma_y_ij` Q4_K I=128/J=128 aligned,
+and Q8_0 quality MMA when rows divide the tile) A/B'd explicit `__fmaf_rn`
+dequant-scale accumulation and a two-stage packed-Y `cp.async` loader against
+the off control. Integer MMA fragments, Q4_K min corrections, and Q6_K
+subscales stay. Tails and misaligned shapes keep the synchronous Y load.
+Stream-K stays `off`. FFN tiles stay I=128/J=128. Shared-Y /
+SwiGLU-into-Q8 stay. Decode FFN stays MMV. Extra dynamic shared for the
+second Y tile is 18432 bytes at J=128. Occupancy remains 1 at 255 registers.
+4096 FFN graphs are created at sitting time from the selected kernel
+(`graphs_created` true). SM120 encodes `cp.async` as `LDGSTS`.
+
+**A/B.** Exclusive RTX 5090, 3 warm-ups, 30 measured CUDA-event rounds on
+complete FFN (quantize Y + gate + up + SwiGLU-into-Q8 + down). Candidates:
+`off`, `fma`, `async_y`, `fma_async`. Like-arithmetic `async_y` is byte-equal
+versus `off`. FMA stays inside production-numerics 3e-4 / 2e-4 versus `off`.
+Raw samples stay in
+[`evidence/optimization/opt053-mmq-pipeline/mmq-pipeline-ab-raw.txt`](../evidence/optimization/opt053-mmq-pipeline/mmq-pipeline-ab-raw.txt);
+this chapter does not replace them. Winner: `fma_async` (`win=true`;
+9.688 ms vs off 11.237 ms).
+
+**Measured keep, RTX 5090:** live exclusive sitting. Cold exact-4096 Quartz
+mean is strictly greater than the frozen prior keep **2692.64575**.
+D128/D2048 throughput floors and p95 ceilings held. Keep: `reverted` false,
+`keep_sitting_skipped` false, production pin `fma_async`. Live numbers stay
+in the report; this chapter does not replace them:
+[`evidence/optimization/opt053-mmq-pipeline/REPORT.md`](../evidence/optimization/opt053-mmq-pipeline/REPORT.md).
+
+**Proof boundary:** MMQ FMA scale accumulation and two-stage packed-Y
+cp.async under unloosened production-numerics budgets when a paired A/B
+wins; like-arithmetic off control remains production quality MMA I=128/J=128;
+complete FFN staging plus gate/up/SwiGLU/down cost; Q4_K min corrections and
+Q6_K subscales unchanged; synchronous fallback for tails and misalignment;
+no unchanged D2R or stream-K rerun; 95% throughput floors versus the prior
+keep; 105% p95 ceilings versus the prior keep; **does not substitute for the
+2K llama.cpp parity gate**. Contract, fixture, and report:
+[`pins/opt053_mmq_pipeline_contract.json`](../pins/opt053_mmq_pipeline_contract.json),
+[`fixtures/opt053_mmq_pipeline.json`](../fixtures/opt053_mmq_pipeline.json),
+and
+[`evidence/optimization/opt053-mmq-pipeline/REPORT.md`](../evidence/optimization/opt053-mmq-pipeline/REPORT.md).
