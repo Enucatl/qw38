@@ -13,6 +13,7 @@
 #include "mixer.h"
 #include "weights.h"
 #include "quant_mmv.h"
+#include "engine_attribution.h"
 #include "gdn_step.h"
 #include "pdl_launch.cuh"
 #include "rms_norm.cuh"
@@ -232,6 +233,7 @@ struct PrefillAttribution final {
   bool record_leaves = false;
   LeafTimings leaves{};
   ActivationCapture* capture = nullptr;
+  EngineAttribution* families = nullptr;
 };
 
 struct DecodeAttribution final {
@@ -248,6 +250,7 @@ struct DecodeAttribution final {
   bool record_leaves = false;
   LeafTimings leaves{};
   ActivationCapture* capture = nullptr;
+  EngineAttribution* families = nullptr;
 };
 
 enum class PointwisePath : std::uint8_t {

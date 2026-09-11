@@ -690,6 +690,22 @@ class OptimizationRunner:
             lock_path = self.root / lock_path
         lock = (self.lock_factory or GpuLock)(lock_path)
         lock.acquire()
+        for index, raw in enumerate(contract.get("setup_host_commands", [])):
+            command = [
+                str(part).format(root=str(self.root), **contract) for part in raw
+            ]
+            completed = self._launch(
+                command,
+                600.0,
+                run_dir / f"setup-host-{index}",
+                None,
+            )
+            if completed.returncode != 0:
+                raise SetupError(
+                    f"setup command failed ({completed.returncode}): "
+                    + " ".join(command)
+                    + (f"\n{completed.stderr}" if completed.stderr else "")
+                )
         return {"success": True, "result_class": "ok", "lock": lock}
 
     def _compile(

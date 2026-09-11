@@ -75,33 +75,69 @@ class GpuPhaseRecorder final {
  public:
   GpuPhaseRecorder() noexcept = default;
   ~GpuPhaseRecorder() {
-    const std::size_t cleanup_count = count_ + (active_ ? 1 : 0);
-    for (std::size_t index = 0; index < cleanup_count; ++index) {
+    for (std::size_t index = 0; index < phases_.size(); ++index) {
       if (phases_[index].stop != nullptr) cudaEventDestroy(phases_[index].stop);
       if (phases_[index].start != nullptr) {
         cudaEventDestroy(phases_[index].start);
       }
     }
+    if (epoch_ != nullptr) cudaEventDestroy(epoch_);
   }
   GpuPhaseRecorder(const GpuPhaseRecorder&) = delete;
   GpuPhaseRecorder& operator=(const GpuPhaseRecorder&) = delete;
 
+  void bind_families(EngineAttribution* families, LeafTimings* leaves,
+                     const char* attribution_role) noexcept {
+    families_ = families;
+    leaves_ = leaves;
+    copy_cstr(attribution_role_, sizeof(attribution_role_), attribution_role);
+  }
+
+  void bind_decode(DecodeAttribution* decode) noexcept { decode_ = decode; }
+  void bind_prefill(PrefillAttribution* prefill) noexcept { prefill_ = prefill; }
+
+  void set_layer(int layer) noexcept { layer_ = layer; }
+
+  cudaError_t record_epoch(cudaStream_t stream) noexcept {
+    cudaError_t error = cudaSuccess;
+    if (epoch_ == nullptr) error = cudaEventCreate(&epoch_);
+    if (error == cudaSuccess) error = cudaEventRecord(epoch_, stream);
+    return error;
+  }
+
   cudaError_t begin(TimingValue* destination, cudaStream_t stream) noexcept {
-    if (destination == nullptr || active_ || count_ == phases_.size()) {
+    if (destination == nullptr || active_) return cudaErrorInvalidValue;
+    if (count_ == phases_.size()) {
+      overflow_ = true;
+      if (families_ != nullptr) families_->pool_overflow = true;
       return cudaErrorInvalidValue;
     }
     Phase& phase = phases_[count_];
     phase.destination = destination;
     phase.stream = stream;
-    cudaError_t error = cudaEventCreate(&phase.start);
-    if (error == cudaSuccess) error = cudaEventCreate(&phase.stop);
-    if (error == cudaSuccess) error = cudaEventRecord(phase.start, stream);
-    if (error != cudaSuccess) {
-      if (phase.stop != nullptr) cudaEventDestroy(phase.stop);
-      if (phase.start != nullptr) cudaEventDestroy(phase.start);
-      phase = {};
-      return error;
+    phase.layer = layer_;
+    infer_role(destination, phase.role, sizeof(phase.role), phase.launch_family,
+               sizeof(phase.launch_family), &phase.enclosing);
+    cudaError_t error = cudaSuccess;
+    if (phase.start == nullptr) error = cudaEventCreate(&phase.start);
+    if (error == cudaSuccess && phase.stop == nullptr) {
+      error = cudaEventCreate(&phase.stop);
     }
+    if (error == cudaSuccess) error = cudaEventRecord(phase.start, stream);
+#ifdef QW38_DIAGNOSTIC_TRACE
+    if (error == cudaSuccess) {
+      nvtxEventAttributes_t attr{};
+      attr.version = NVTX_VERSION;
+      attr.size = NVTX_EVENT_ATTRIB_STRUCT_SIZE;
+      attr.messageType = NVTX_MESSAGE_TYPE_ASCII;
+      attr.message.ascii = phase.role[0] != '\0' ? phase.role : "phase";
+      attr.payloadType = NVTX_PAYLOAD_TYPE_UNSIGNED_INT64;
+      attr.payload.ullValue = static_cast<std::uint64_t>(count_);
+      nvtxRangePushEx(&attr);
+      phase.nvtx_pushed = true;
+    }
+#endif
+    if (error != cudaSuccess) return error;
     active_ = true;
     return cudaSuccess;
   }
@@ -110,6 +146,12 @@ class GpuPhaseRecorder final {
     if (!active_) return cudaErrorInvalidValue;
     Phase& phase = phases_[count_];
     cudaError_t error = cudaEventRecord(phase.stop, phase.stream);
+#ifdef QW38_DIAGNOSTIC_TRACE
+    if (phase.nvtx_pushed) {
+      nvtxRangePop();
+      phase.nvtx_pushed = false;
+    }
+#endif
     if (error == cudaSuccess) {
       ++count_;
       active_ = false;
@@ -123,12 +165,25 @@ class GpuPhaseRecorder final {
       Phase& phase = phases_[index];
       cudaError_t error = cudaEventSynchronize(phase.stop);
       float milliseconds = 0.0F;
+      float start_ms = 0.0F;
+      float end_ms = 0.0F;
       if (error == cudaSuccess) {
         error = cudaEventElapsedTime(&milliseconds, phase.start, phase.stop);
+      }
+      if (error == cudaSuccess && epoch_ != nullptr) {
+        error = cudaEventElapsedTime(&start_ms, epoch_, phase.start);
+        if (error == cudaSuccess) {
+          error = cudaEventElapsedTime(&end_ms, epoch_, phase.stop);
+        }
       }
       if (error != cudaSuccess) return error;
       phase.destination->milliseconds += milliseconds;
       phase.destination->measured = true;
+      if (families_ != nullptr && families_->record &&
+          families_->records != nullptr) {
+        error = emit_family(phase, milliseconds, start_ms, end_ms);
+        if (error != cudaSuccess) return error;
+      }
     }
     return cudaSuccess;
   }
@@ -136,14 +191,17 @@ class GpuPhaseRecorder final {
   cudaError_t reset() noexcept {
     if (active_) return cudaErrorInvalidValue;
     for (std::size_t index = 0; index < count_; ++index) {
-      if (phases_[index].stop != nullptr) cudaEventDestroy(phases_[index].stop);
-      if (phases_[index].start != nullptr) {
-        cudaEventDestroy(phases_[index].start);
-      }
-      phases_[index] = {};
+      phases_[index].destination = nullptr;
+      phases_[index].stream = nullptr;
+      phases_[index].role[0] = '\0';
+      phases_[index].launch_family[0] = '\0';
+      phases_[index].enclosing = false;
+      phases_[index].layer = -1;
+      phases_[index].nvtx_pushed = false;
     }
     count_ = 0;
     active_ = false;
+    overflow_ = false;
     return cudaSuccess;
   }
 
@@ -153,12 +211,213 @@ class GpuPhaseRecorder final {
     cudaEvent_t stop = nullptr;
     cudaStream_t stream = nullptr;
     TimingValue* destination = nullptr;
+    char role[64]{};
+    char launch_family[32]{};
+    bool enclosing = false;
+    int layer = -1;
+    bool nvtx_pushed = false;
   };
+
+  void infer_role(TimingValue* dest, char* role, std::size_t role_bytes,
+                  char* launch, std::size_t launch_bytes,
+                  bool* enclosing) const noexcept {
+    *enclosing = false;
+    copy_cstr(launch, launch_bytes, "kernel");
+    copy_cstr(role, role_bytes, "unknown");
+    if (dest == nullptr) return;
+    const auto match = [&](TimingValue* field, const char* name,
+                           const char* family, bool is_enclosing) {
+      if (dest != field) return false;
+      copy_cstr(role, role_bytes, name);
+      copy_cstr(launch, launch_bytes, family);
+      *enclosing = is_enclosing;
+      return true;
+    };
+    if (leaves_ != nullptr) {
+      if (match(&leaves_->embedding, "embedding", "row_decode", false)) return;
+      if (match(&leaves_->input_norm, "input_norm", "rms_norm", false)) return;
+      if (match(&leaves_->residual_mixer, "residual_mixer", "pointwise", false))
+        return;
+      if (match(&leaves_->activation_staging_mixer, "activation_quant_mixer",
+                "q8_quant", false))
+        return;
+      if (match(&leaves_->proj_packed_qkv, "proj_packed_qkv", "mmv", false))
+        return;
+      if (match(&leaves_->proj_value_gate, "proj_value_gate", "mmv", false))
+        return;
+      if (match(&leaves_->proj_alpha, "proj_alpha", "mmv", false)) return;
+      if (match(&leaves_->proj_beta, "proj_beta", "mmv", false)) return;
+      if (match(&leaves_->proj_gdn_output, "proj_gdn_output", "mmv", false))
+        return;
+      if (match(&leaves_->proj_query_gate, "proj_query_gate", "mmv", false))
+        return;
+      if (match(&leaves_->proj_key, "proj_key", "mmv", false)) return;
+      if (match(&leaves_->proj_value, "proj_value", "mmv", false)) return;
+      if (match(&leaves_->proj_attn_output, "proj_attn_output", "mmv", false))
+        return;
+      if (match(&leaves_->gdn_gate_prep, "gdn_gate_prep", "gdn", false)) return;
+      if (match(&leaves_->gdn_conv_qk_norm_recurrence,
+                "gdn_conv_qk_norm_recurrence", "gdn", false))
+        return;
+      if (match(&leaves_->gdn_output_norm, "gdn_output_norm", "rms_norm",
+                false))
+        return;
+      if (match(&leaves_->attn_query_split, "attn_query_split", "attention",
+                false))
+        return;
+      if (match(&leaves_->attn_qk_prep_softmax_pv_merge,
+                "attn_qk_prep_softmax_pv_merge", "attention", false))
+        return;
+      if (match(&leaves_->attn_output_cast, "attn_output_cast", "cast", false))
+        return;
+      if (match(&leaves_->ffn_norm, "ffn_norm", "rms_norm", false)) return;
+      if (match(&leaves_->activation_staging_ffn, "activation_quant_ffn",
+                "q8_quant", false))
+        return;
+      if (match(&leaves_->proj_ffn_gate, "ffn_gate", "mmv", false)) return;
+      if (match(&leaves_->proj_ffn_up, "ffn_up", "mmv", false)) return;
+      if (match(&leaves_->swiglu, "ffn_glu", "swiglu", false)) return;
+      if (match(&leaves_->proj_ffn_down, "ffn_down", "mmv", false)) return;
+      if (match(&leaves_->residual_ffn, "residual_ffn", "pointwise", false))
+        return;
+      if (match(&leaves_->logits_norm, "logits_norm", "rms_norm", false))
+        return;
+      if (match(&leaves_->logits_projection, "logits_projection", "mmv",
+                false))
+        return;
+      if (match(&leaves_->d2h, "d2h", "copy", false)) return;
+      if (match(&leaves_->state_copies, "state_copies", "copy", false)) return;
+      if (match(&leaves_->host_graph_submit, "host_graph_submit", "graph",
+                true))
+        return;
+      if (match(&leaves_->host_submission_waits, "host_submission_waits",
+                "cpu_gap", true))
+        return;
+    }
+    if (decode_ != nullptr) {
+      if (match(&decode_->embedding, "embedding", "row_decode", true)) return;
+      if (match(&decode_->mixer_mmv, "mixer_mmv", "mmv", true)) return;
+      if (match(&decode_->gdn_core, "gdn_core", "gdn", true)) return;
+      if (match(&decode_->attention_core, "attention_core", "attention", true))
+        return;
+      if (match(&decode_->ffn_mmv, "ffn_mmv", "mmv", true)) return;
+      if (match(&decode_->logits, "logits", "mmv", true)) return;
+      if (match(&decode_->state_commit, "state_commit", "copy", true)) return;
+      if (match(&decode_->graph, "graph", "cuda_graph", true)) return;
+      if (match(&decode_->other_idle, "cpu_unknown_gap", "cpu_gap", true))
+        return;
+      if (match(&decode_->wall, "wall", "wall", true)) return;
+    }
+    if (prefill_ != nullptr) {
+      if (match(&prefill_->embedding, "embedding", "row_decode", true)) return;
+      if (match(&prefill_->mixer_mmq, "mixer_mmq", "mmq", true)) return;
+      if (match(&prefill_->gdn_core, "gdn_core", "gdn", true)) return;
+      if (match(&prefill_->attention_core, "attention_core", "attention", true))
+        return;
+      if (match(&prefill_->ffn_mmq, "ffn_mmq", "mmq", true)) return;
+      if (match(&prefill_->logits, "logits", "mmq", true)) return;
+      if (match(&prefill_->commit_sync, "commit_sync", "copy", true)) return;
+      if (match(&prefill_->graph, "graph", "cuda_graph", true)) return;
+      if (match(&prefill_->other_idle, "cpu_unknown_gap", "cpu_gap", true))
+        return;
+      if (match(&prefill_->wall, "wall", "wall", true)) return;
+    }
+    if (families_ == nullptr) return;
+  }
+
+  cudaError_t emit_family(const Phase& phase, float elapsed, float start_ms,
+                          float end_ms) noexcept {
+    if (families_->count >= families_->capacity) {
+      families_->pool_overflow = true;
+      overflow_ = true;
+      return cudaErrorInvalidValue;
+    }
+    EngineOpRecord& rec = families_->records[families_->count];
+    rec = {};
+    copy_cstr(rec.engine, sizeof(rec.engine),
+              families_->engine[0] != '\0' ? families_->engine : "quartz");
+    copy_cstr(rec.phase, sizeof(rec.phase),
+              families_->phase[0] != '\0' ? families_->phase : "decode");
+    rec.sequence_position = families_->sequence_position;
+    rec.token_position = families_->token_position;
+    rec.layer = phase.layer;
+    copy_cstr(rec.role, sizeof(rec.role), phase.role);
+    if (phase.layer >= 0 && rec.role[0] != '\0') {
+      std::snprintf(rec.tensor_name, sizeof(rec.tensor_name), "blk.%d.%s",
+                    phase.layer, rec.role);
+    }
+    copy_cstr(rec.launch_family, sizeof(rec.launch_family),
+              phase.launch_family);
+    copy_cstr(rec.graph_mode, sizeof(rec.graph_mode), families_->graph_mode);
+    copy_cstr(rec.attribution_role, sizeof(rec.attribution_role),
+              attribution_role_[0] != '\0'
+                  ? attribution_role_
+                  : (phase.enclosing ? "enclosing" : "member"));
+    rec.stream = reinterpret_cast<unsigned long long>(phase.stream);
+    rec.start_event_id = static_cast<int>(families_->count) * 2;
+    rec.end_event_id = rec.start_event_id + 1;
+    rec.start_ms = start_ms;
+    rec.end_ms = end_ms;
+    rec.complete_work_ms = elapsed;
+    rec.attributed = true;
+    rec.fused_member_count = 1;
+    rec.pool_overflow = overflow_;
+    apply_fused_members(&rec);
+    ++families_->count;
+    return cudaSuccess;
+  }
+
+  void apply_fused_members(EngineOpRecord* rec) const noexcept {
+    if (rec == nullptr || leaves_ == nullptr) return;
+    if (std::strcmp(rec->role, "ffn_mmv") == 0 ||
+        std::strcmp(rec->role, "ffn_mmq") == 0) {
+      if (leaves_->ffn_graph_fused) {
+        copy_cstr(rec->fused_member_ids, sizeof(rec->fused_member_ids),
+                  "ffn_norm,activation_quant_ffn,ffn_gate,ffn_up,ffn_glu,"
+                  "ffn_down,residual_ffn");
+        rec->fused_member_count = 7;
+        copy_cstr(rec->launch_family, sizeof(rec->launch_family), "cuda_graph");
+        copy_cstr(rec->attribution_role, sizeof(rec->attribution_role),
+                  "enclosing");
+      }
+    }
+    if (std::strcmp(rec->role, "ffn_gate") == 0 &&
+        leaves_->swiglu_fused_with_down_stage == false &&
+        rec->fused_member_count == 1) {
+      // Paired decode gate/up/SwiGLU uses one enclosing begin on ffn_gate.
+      if (!leaves_->ffn_graph_fused) {
+        copy_cstr(rec->fused_member_ids, sizeof(rec->fused_member_ids),
+                  "ffn_gate,ffn_up,ffn_glu");
+        rec->fused_member_count = 3;
+        copy_cstr(rec->role, sizeof(rec->role), "ffn_gate_up_glu");
+        copy_cstr(rec->attribution_role, sizeof(rec->attribution_role),
+                  "enclosing");
+      }
+    }
+    if (leaves_->gdn_conv_fused_with_recurrence &&
+        std::strcmp(rec->role, "gdn_conv_qk_norm_recurrence") == 0) {
+      copy_cstr(rec->fused_member_ids, sizeof(rec->fused_member_ids),
+                "gdn_conv,gdn_qk_norm,gdn_recurrence");
+      rec->fused_member_count = 3;
+      copy_cstr(rec->attribution_role, sizeof(rec->attribution_role),
+                "enclosing");
+    }
+  }
+
   // Enclosing OPT-038 categories plus OPT-043 exclusive leaves. Decode with
-  // per-projection leaves needs ~16 phases per layer.
+  // per-projection leaves needs ~16 phases per layer. Events are pooled and
+  // reused across reset() instead of create/destroy per phase.
   std::array<Phase, 1536> phases_{};
   std::size_t count_ = 0;
   bool active_ = false;
+  bool overflow_ = false;
+  cudaEvent_t epoch_ = nullptr;
+  EngineAttribution* families_ = nullptr;
+  LeafTimings* leaves_ = nullptr;
+  DecodeAttribution* decode_ = nullptr;
+  PrefillAttribution* prefill_ = nullptr;
+  char attribution_role_[16]{};
+  int layer_ = -1;
 };
 
 cudaError_t begin_phase(GpuPhaseRecorder* recorder, TimingValue* destination,
@@ -2512,10 +2771,13 @@ Status execute_token(const ResidentModel& model, std::size_t token,
       decode_attribution != nullptr && decode_attribution->record_leaves;
   ActivationCapture* capture =
       decode_attribution == nullptr ? nullptr : decode_attribution->capture;
+  EngineAttribution* families =
+      decode_attribution == nullptr ? nullptr : decode_attribution->families;
   if (decode_attribution != nullptr) {
     *decode_attribution = {};
     decode_attribution->record_leaves = record_leaves;
     decode_attribution->capture = capture;
+    decode_attribution->families = families;
   }
   GpuPhaseRecorder category_recorder;
   GpuPhaseRecorder leaf_recorder;
@@ -2529,6 +2791,12 @@ Status execute_token(const ResidentModel& model, std::size_t token,
   LeafTimings* leaf_timings =
       record_leaves ? &decode_attribution->leaves : nullptr;
   GpuPhaseRecorder* total = timings == nullptr ? nullptr : &total_recorder;
+  if (families != nullptr && families->record) {
+    category_recorder.bind_families(families, leaf_timings, "enclosing");
+    leaf_recorder.bind_families(families, leaf_timings, "member");
+    category_recorder.bind_decode(decode_attribution);
+    leaf_recorder.bind_decode(decode_attribution);
+  }
   if (timings != nullptr) {
     *timings = {};
     timings->loading = {model.upload_milliseconds(), true};
@@ -2538,6 +2806,15 @@ Status execute_token(const ResidentModel& model, std::size_t token,
   cudaError_t error = cudaEventCreate(&start);
   if (error == cudaSuccess) error = cudaEventCreate(&stop);
   if (error == cudaSuccess) error = cudaEventRecord(start);
+  if (error == cudaSuccess && families != nullptr && families->record) {
+    copy_cstr(families->engine, sizeof(families->engine), "quartz");
+    copy_cstr(families->phase, sizeof(families->phase), "decode");
+    copy_cstr(families->graph_mode, sizeof(families->graph_mode),
+              graphs != nullptr ? "cuda_graph" : "eager_diagnostic");
+    families->token_position = static_cast<int>(session->frontier_);
+    error = category_recorder.record_epoch(nullptr);
+    if (error == cudaSuccess) error = leaf_recorder.record_epoch(nullptr);
+  }
   if (error == cudaSuccess) {
     error = begin_phase(total, timings == nullptr ? nullptr
                                                   : &timings->token_total);
@@ -2579,6 +2856,9 @@ Status execute_token(const ResidentModel& model, std::size_t token,
        error == cudaSuccess && !interrupted &&
        layer_index < model.layers_.size();
        ++layer_index) {
+    if (categories != nullptr) categories->set_layer(static_cast<int>(layer_index));
+    if (leaves != nullptr) leaves->set_layer(static_cast<int>(layer_index));
+    if (families != nullptr) families->layer = static_cast<int>(layer_index);
     const DeviceLayer& layer = model.layers_[layer_index];
     const bool gdn_layer = layer.kind == internal::LayerKind::kGdn;
     const char* layer_kind = gdn_layer ? "gdn" : "attention";
@@ -3268,14 +3548,30 @@ Status execute_prompt_chunk(
       attribution != nullptr && attribution->record_leaves;
   ActivationCapture* capture =
       attribution == nullptr ? nullptr : attribution->capture;
+  EngineAttribution* families =
+      attribution == nullptr ? nullptr : attribution->families;
   GpuPhaseRecorder* leaves = record_leaves ? &leaf_recorder : nullptr;
   LeafTimings* leaf_timings =
       record_leaves ? &attribution->leaves : nullptr;
+  if (families != nullptr && families->record) {
+    attribution_recorder.bind_families(families, leaf_timings, "enclosing");
+    leaf_recorder.bind_families(families, leaf_timings, "member");
+    attribution_recorder.bind_prefill(attribution);
+    leaf_recorder.bind_prefill(attribution);
+    copy_cstr(families->engine, sizeof(families->engine), "quartz");
+    copy_cstr(families->phase, sizeof(families->phase), "prefill");
+    copy_cstr(families->graph_mode, sizeof(families->graph_mode),
+              graphs != nullptr ? "cuda_graph" : "eager_diagnostic");
+  }
   if (capture != nullptr) {
     capture->position = session->frontier_ + token_count - 1;
   }
   cudaStream_t stream = fused ? workspace->prompt_compute_stream_ : nullptr;
   cudaError_t error = cudaSuccess;
+  if (error == cudaSuccess && families != nullptr && families->record) {
+    error = attribution_recorder.record_epoch(stream);
+    if (error == cudaSuccess) error = leaf_recorder.record_epoch(stream);
+  }
   const std::size_t outer_frontier = session->frontier_;
   const std::size_t microbatch_rows = resolve_prompt_microbatch_rows(token_count);
   const bool split_candidate = microbatch_rows < token_count;
@@ -3381,6 +3677,11 @@ Status execute_prompt_chunk(
        error == cudaSuccess && poll_status.is_ok() &&
        layer_index < model.layers_.size();
        ++layer_index) {
+    if (categories != nullptr) {
+      categories->set_layer(static_cast<int>(layer_index));
+    }
+    if (leaves != nullptr) leaves->set_layer(static_cast<int>(layer_index));
+    if (families != nullptr) families->layer = static_cast<int>(layer_index);
     const DeviceLayer& layer = model.layers_[layer_index];
     const bool gdn_layer = layer.kind == internal::LayerKind::kGdn;
     const char* layer_kind = gdn_layer ? "gdn" : "attention";
@@ -4169,10 +4470,12 @@ Status sync_tokens(const ResidentModel& model, const std::size_t* tokens,
   if (attribution != nullptr) {
     const bool record_leaves = attribution->record_leaves;
     ActivationCapture* capture = attribution->capture;
+    EngineAttribution* families = attribution->families;
     *attribution = {};
     attribution->prompt_tokens = token_count;
     attribution->record_leaves = record_leaves;
     attribution->capture = capture;
+    attribution->families = families;
   }
   for (std::size_t index = 0; index < token_count; ++index) {
     if (tokens[index] >= internal::kVocabularySize) {

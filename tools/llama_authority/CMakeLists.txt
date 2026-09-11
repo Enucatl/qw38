@@ -86,3 +86,28 @@ set_target_properties(
   PROPERTIES
     BUILD_RPATH "\$ORIGIN"
     RUNTIME_OUTPUT_DIRECTORY "${LLAMA_BUILD}/bin")
+
+if(QW38_OPT060_ATTRIBUTION)
+  add_executable(qw38-llama-engine-attribution engine_attribution.cpp)
+  target_compile_features(qw38-llama-engine-attribution PRIVATE cxx_std_17)
+  target_compile_options(qw38-llama-engine-attribution PRIVATE -Wall -Wextra -Werror)
+  target_compile_definitions(
+    qw38-llama-engine-attribution PRIVATE QW38_OPT060_ATTRIBUTION)
+  find_package(CUDAToolkit REQUIRED)
+  target_include_directories(
+    qw38-llama-engine-attribution
+    PRIVATE
+      "${LLAMA_SOURCE}/include"
+      "${LLAMA_SOURCE}/ggml/include"
+      "${LLAMA_SOURCE}/ggml/src/ggml-cuda"
+      "${CUDAToolkit_INCLUDE_DIRS}")
+  target_link_directories(qw38-llama-engine-attribution PRIVATE "${LLAMA_BUILD}/bin")
+  target_link_libraries(
+    qw38-llama-engine-attribution
+    PRIVATE llama ggml ggml-cuda ggml-base CUDA::cudart)
+  set_target_properties(
+    qw38-llama-engine-attribution
+    PROPERTIES
+      BUILD_RPATH "\$ORIGIN"
+      RUNTIME_OUTPUT_DIRECTORY "${LLAMA_BUILD}/bin")
+endif()

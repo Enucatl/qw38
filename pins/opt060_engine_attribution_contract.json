@@ -1,0 +1,68 @@
+{
+  "schema_version": 1,
+  "task": "OPT-060",
+  "llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+  "gguf_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+  "claims_performance_improvement": false,
+  "claims_throughput": false,
+  "isolated_op_timings_insufficient": true,
+  "patch": "tools/llama_authority/patches/opt060-engine-attribution.patch",
+  "overlay": "tools/llama_authority/patches/qw38_opt060_attribution.cuh",
+  "build_helper": "tools/llama_authority/build_opt060_instrumented.sh",
+  "quartz_target": "build/qw38-cuda-opt060-engine-attribution-test",
+  "llama_target": "qw38-llama-engine-attribution",
+  "token_generator": "(42 + index * 997) % 248320",
+  "batch_policies": {
+    "historical_authority": {"n_batch": 2048, "n_ubatch": 512},
+    "matched_diagnostic": {
+      "prefill_n_batch": 4096,
+      "prefill_n_ubatch": 4096,
+      "decode_n_ubatch": 1
+    }
+  },
+  "modes": {
+    "unperturbed": "cuda_graph wall without per-op events",
+    "eager_diagnostic": "fusion retained, graphs disabled, CUDA events around actual launches"
+  },
+  "required_record_fields": [
+    "engine",
+    "phase",
+    "sequence_position",
+    "token_position",
+    "layer",
+    "role",
+    "tensor_name",
+    "tensor_type",
+    "m",
+    "n",
+    "k",
+    "strides",
+    "stream",
+    "launch_family",
+    "fused_member_ids",
+    "fused_member_count",
+    "start_event_id",
+    "end_event_id",
+    "graph_mode",
+    "complete_work_ms",
+    "attribution_role"
+  ],
+  "families": [
+    "embedding",
+    "ffn_gate_up_glu",
+    "ffn_down",
+    "activation_quant",
+    "logits_projection",
+    "copy",
+    "cuda_graph_launch",
+    "cpu_unknown_gap"
+  ],
+  "proof_limit": [
+    "no speedup claim",
+    "eager events are not production graph timings",
+    "fused members charged once",
+    "summed GPU work is not wall time when streams overlap",
+    "isolated OPT-043 component_gap timings are not this sitting",
+    "Nsight optional; events plus dispatch are the fallback"
+  ]
+}
