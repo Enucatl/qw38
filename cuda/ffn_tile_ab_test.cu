@@ -1,5 +1,6 @@
 #include "quant_mmv.h"
 
+#include "kernel_parity.cuh"
 #include "quant.h"
 
 #include <algorithm>
@@ -137,29 +138,14 @@ bool ds4_q4k_association_ok(const std::vector<float>& got,
                             const std::vector<float>& ref, std::size_t columns,
                             float* max_abs, float* rms, std::size_t* nonfinite,
                             std::size_t* bad) {
-  constexpr float kAbsScale = 0.20F;
-  constexpr float kRelTol = 0.05F;
-  const float abs_tol = kAbsScale * std::sqrt(static_cast<float>(columns));
-  *max_abs = 0.0F;
-  *nonfinite = 0;
-  *bad = 0;
-  double squared = 0.0;
-  for (std::size_t index = 0; index < got.size(); ++index) {
-    if (!std::isfinite(got[index]) || !std::isfinite(ref[index])) {
-      ++*nonfinite;
-      continue;
-    }
-    const float absolute = std::fabs(got[index] - ref[index]);
-    const float relative =
-        ref[index] != 0.0F ? absolute / std::fabs(ref[index])
-                           : (absolute > 0.0F ? INFINITY : 0.0F);
-    *max_abs = std::max(*max_abs, absolute);
-    squared += static_cast<double>(absolute) * absolute;
-    if (absolute > abs_tol && relative > kRelTol) ++*bad;
-  }
-  *rms = got.empty() ? 0.0F
-                     : static_cast<float>(std::sqrt(squared / got.size()));
-  return *nonfinite == 0 && *bad == 0;
+  const auto diagnostics = qw38::cuda::kernel_parity::check_close(
+      got, ref, qw38::cuda::kernel_parity::Family::Q4_K, columns,
+      qw38::cuda::kernel_parity::Class::QuantizedOperationAssociation, false);
+  *max_abs = diagnostics.max_abs;
+  *rms = diagnostics.rms;
+  *nonfinite = diagnostics.nonfinite_count;
+  *bad = diagnostics.failing_count;
+  return diagnostics.pass;
 }
 
 std::size_t count_nonfinite(const std::vector<float>& values) {

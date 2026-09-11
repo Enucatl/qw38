@@ -8,6 +8,7 @@
 #include <ctime>
 #include <vector>
 
+#include "kernel_parity.cuh"
 #include "quant.h"
 
 namespace {
@@ -151,18 +152,11 @@ bool reference_dequant_gemm_mmq(qw38::cuda::QuantKind kind,
 
 bool ds4_q4k_association_ok(const std::vector<float>& got,
                             const std::vector<float>& ref, std::size_t columns) {
-  constexpr float kAbsScale = 0.20F;
-  constexpr float kRelTol = 0.05F;
-  const float abs_tol = kAbsScale * std::sqrt(static_cast<float>(columns));
-  for (std::size_t index = 0; index < got.size(); ++index) {
-    if (!std::isfinite(got[index]) || !std::isfinite(ref[index])) return false;
-    const float absolute = std::fabs(got[index] - ref[index]);
-    const float relative =
-        ref[index] != 0.0F ? absolute / std::fabs(ref[index])
-                           : (absolute > 0.0F ? INFINITY : 0.0F);
-    if (absolute > abs_tol && relative > kRelTol) return false;
-  }
-  return true;
+  return qw38::cuda::kernel_parity::check_close(
+             got, ref, qw38::cuda::kernel_parity::Family::Q4_K, columns,
+             qw38::cuda::kernel_parity::Class::QuantizedOperationAssociation,
+             false)
+      .pass;
 }
 
 struct LaunchInfo {

@@ -12,6 +12,7 @@
 
 #include <cuda_fp16.h>
 
+#include "kernel_parity.cuh"
 #include "quant.h"
 #include "test_tier.h"
 
@@ -362,78 +363,66 @@ bool reference_dequant_gemm(qw38::cuda::QuantKind kind,
   return true;
 }
 
-// ds4 Q4_K check_close: fail only when both abs and rel exceed.
+void fill_association_outputs(
+    const qw38::cuda::kernel_parity::Diagnostics& diagnostics, float* max_abs,
+    float* max_rel, float* rms, std::size_t* association_bad,
+    std::size_t* nonfinite) {
+  *max_abs = diagnostics.max_abs;
+  *max_rel = diagnostics.max_rel;
+  *rms = diagnostics.rms;
+  *association_bad = diagnostics.failing_count;
+  *nonfinite = diagnostics.nonfinite_count;
+}
+
+void copy_finite_pairs(const std::vector<float>& got,
+                       const std::vector<float>& ref,
+                       std::vector<float>* got_out,
+                       std::vector<float>* ref_out) {
+  got_out->clear();
+  ref_out->clear();
+  got_out->reserve(got.size());
+  ref_out->reserve(ref.size());
+  const std::size_t count = std::min(got.size(), ref.size());
+  for (std::size_t index = 0; index < count; ++index) {
+    if (std::isnan(ref[index])) continue;
+    got_out->push_back(got[index]);
+    ref_out->push_back(ref[index]);
+  }
+}
+
+// Canonical Q4_K association (OPT-081 kernel_parity.cuh). Sampled NaN
+// reference holes from large MMQ cases are dropped before the checker.
 bool ds4_q4k_association_ok(const std::vector<float>& got,
                             const std::vector<float>& ref, std::size_t columns,
                             float* max_abs, float* max_rel, float* rms,
                             std::size_t* association_bad,
                             std::size_t* nonfinite) {
-  constexpr float kAbsScale = 0.20F;
-  constexpr float kRelTol = 0.05F;
-  const float abs_tol = kAbsScale * std::sqrt(static_cast<float>(columns));
-  *max_abs = 0.0F;
-  *max_rel = 0.0F;
-  *association_bad = 0;
-  *nonfinite = 0;
-  double squared = 0.0;
-  std::size_t compared = 0;
-  for (std::size_t index = 0; index < got.size(); ++index) {
-    if (std::isnan(ref[index])) continue;
-    if (!std::isfinite(got[index]) || !std::isfinite(ref[index])) {
-      ++*nonfinite;
-      continue;
-    }
-    ++compared;
-    const float absolute = std::fabs(got[index] - ref[index]);
-    const float relative =
-        ref[index] != 0.0F ? absolute / std::fabs(ref[index])
-                           : (absolute > 0.0F ? INFINITY : 0.0F);
-    *max_abs = std::max(*max_abs, absolute);
-    if (std::isfinite(relative)) *max_rel = std::max(*max_rel, relative);
-    squared += static_cast<double>(absolute) * absolute;
-    if (absolute > abs_tol && relative > kRelTol) ++*association_bad;
-  }
-  *rms = compared == 0
-             ? 0.0F
-             : static_cast<float>(std::sqrt(squared / compared));
-  return *nonfinite == 0 && *association_bad == 0;
+  std::vector<float> got_cmp;
+  std::vector<float> ref_cmp;
+  copy_finite_pairs(got, ref, &got_cmp, &ref_cmp);
+  const auto diagnostics = qw38::cuda::kernel_parity::check_close(
+      got_cmp, ref_cmp, qw38::cuda::kernel_parity::Family::Q4_K, columns,
+      qw38::cuda::kernel_parity::Class::QuantizedOperationAssociation, false);
+  fill_association_outputs(diagnostics, max_abs, max_rel, rms, association_bad,
+                           nonfinite);
+  return diagnostics.pass;
 }
 
-// ds4 Q8_0 check_close: fail only when both abs and rel exceed (abs scale 0.05).
+// Canonical Q8_0 association (OPT-081 kernel_parity.cuh).
 bool ds4_q8_association_ok(const std::vector<float>& got,
                            const std::vector<float>& ref, std::size_t columns,
                            float* max_abs, float* max_rel, float* rms,
                            std::size_t* association_bad,
                            std::size_t* nonfinite) {
-  constexpr float kAbsScale = 0.05F;
-  constexpr float kRelTol = 0.05F;
-  const float abs_tol = kAbsScale * std::sqrt(static_cast<float>(columns));
-  *max_abs = 0.0F;
-  *max_rel = 0.0F;
-  *association_bad = 0;
-  *nonfinite = 0;
-  double squared = 0.0;
-  std::size_t compared = 0;
-  for (std::size_t index = 0; index < got.size(); ++index) {
-    if (std::isnan(ref[index])) continue;
-    if (!std::isfinite(got[index]) || !std::isfinite(ref[index])) {
-      ++*nonfinite;
-      continue;
-    }
-    ++compared;
-    const float absolute = std::fabs(got[index] - ref[index]);
-    const float relative =
-        ref[index] != 0.0F ? absolute / std::fabs(ref[index])
-                           : (absolute > 0.0F ? INFINITY : 0.0F);
-    *max_abs = std::max(*max_abs, absolute);
-    if (std::isfinite(relative)) *max_rel = std::max(*max_rel, relative);
-    squared += static_cast<double>(absolute) * absolute;
-    if (absolute > abs_tol && relative > kRelTol) ++*association_bad;
-  }
-  *rms = compared == 0
-             ? 0.0F
-             : static_cast<float>(std::sqrt(squared / compared));
-  return *nonfinite == 0 && *association_bad == 0;
+  std::vector<float> got_cmp;
+  std::vector<float> ref_cmp;
+  copy_finite_pairs(got, ref, &got_cmp, &ref_cmp);
+  const auto diagnostics = qw38::cuda::kernel_parity::check_close(
+      got_cmp, ref_cmp, qw38::cuda::kernel_parity::Family::Q8_0, columns,
+      qw38::cuda::kernel_parity::Class::QuantizedOperationAssociation, false);
+  fill_association_outputs(diagnostics, max_abs, max_rel, rms, association_bad,
+                           nonfinite);
+  return diagnostics.pass;
 }
 
 int run_case(qw38::cuda::QuantKind kind, const char* name, std::size_t rows,
