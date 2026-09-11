@@ -51,6 +51,8 @@ struct Options final {
   const char* workload = nullptr;
   const char* cache_mode = nullptr;
   const char* capture_key = nullptr;
+  const char* q8_layout = nullptr;
+  int mmq_async_x = -1;
   int warmups = -1;
   int samples = -1;
   bool ncu = false;
@@ -62,6 +64,7 @@ int usage(const char* argv0) {
                "usage: %s [--workload smoke|correctness|decode-ffn|"
                "decode-mixer|prompt-ffn|acceptance|hardware] [MODEL] "
                "[--cache-mode hot|rotating] [--capture-key KEY] "
+               "[--q8-layout r1_w4|r2_w2] [--mmq-async-x 0|1] "
                "[--warmups N] [--samples N] [--ncu] [--corrupt-guard]\n",
                argv0);
   return 2;
@@ -76,6 +79,10 @@ int parse_args(int argc, char** argv, Options* options) {
       options->cache_mode = argv[++index];
     } else if (std::strcmp(arg, "--capture-key") == 0 && index + 1 < argc) {
       options->capture_key = argv[++index];
+    } else if (std::strcmp(arg, "--q8-layout") == 0 && index + 1 < argc) {
+      options->q8_layout = argv[++index];
+    } else if (std::strcmp(arg, "--mmq-async-x") == 0 && index + 1 < argc) {
+      options->mmq_async_x = std::atoi(argv[++index]);
     } else if (std::strcmp(arg, "--warmups") == 0 && index + 1 < argc) {
       options->warmups = std::atoi(argv[++index]);
     } else if (std::strcmp(arg, "--samples") == 0 && index + 1 < argc) {
@@ -858,6 +865,7 @@ cudaError_t replay_mixer_layer(const qw38::cuda::DeviceLayer& layer,
                                qw38::cuda::SchedulerWorkspace* workspace,
                                cudaStream_t stream, cudaEvent_t kernel_start,
                                cudaEvent_t kernel_stop) {
+  workspace->invalidate_q8_decode_staging();
   cudaError_t error = qw38::cuda::launch_rms_norm_fp32_to_bf16(
       residual, layer.common.input_norm, qw38::internal::kResidualWidth,
       workspace->normalized_, stream);
@@ -901,6 +909,32 @@ cudaError_t replay_mixer_layer(const qw38::cuda::DeviceLayer& layer,
     if (error == cudaSuccess) {
       error = proj(layer.attention.value, workspace->projection_d_);
     }
+  }
+  if (error == cudaSuccess) {
+    workspace->invalidate_q8_decode_staging();
+    error = cudaMemcpyAsync(
+        workspace->projected_bf16_, workspace->normalized_,
+        qw38::internal::kResidualWidth * sizeof(__nv_bfloat16),
+        cudaMemcpyDeviceToDevice, stream);
+  }
+  if (error == cudaSuccess) {
+    error = cudaMemsetAsync(
+        workspace->projected_bf16_ + qw38::internal::kResidualWidth, 0,
+        (qw38::internal::kGdnValueWidth - qw38::internal::kResidualWidth) *
+            sizeof(__nv_bfloat16),
+        stream);
+  }
+  if (error == cudaSuccess) {
+    error = qw38::cuda::launch_quantize_bf16_q8_1(
+        workspace->projected_bf16_, workspace->q8_,
+        qw38::internal::kGdnValueWidth, stream);
+  }
+  if (layer.kind == qw38::internal::LayerKind::kGdn) {
+    if (error == cudaSuccess) {
+      error = proj(layer.gdn.output, workspace->mixer_output_);
+    }
+  } else if (error == cudaSuccess) {
+    error = proj(layer.attention.output, workspace->mixer_output_);
   }
   if (error == cudaSuccess && kernel_stop != nullptr) {
     error = cudaEventRecord(kernel_stop, stream);
@@ -1097,6 +1131,8 @@ int time_family(qw38::cuda::ResidentModel* model,
     int gate_up = 0;
     int down = 0;
     int mixer = 0;
+    int gdn_groups = 0;
+    int attn_groups = 0;
     for (std::size_t step = 0; step < layers.size(); ++step) {
       const std::size_t layer_index = layers[step];
       const qw38::cuda::DeviceLayer& layer = model->layer(layer_index);
@@ -1126,7 +1162,12 @@ int time_family(qw38::cuda::ResidentModel* model,
           error = replay_mixer_layer(layer, workspace.residual_a_, &workspace,
                                      nullptr, nullptr, nullptr);
         }
-        mixer += layer.kind == qw38::internal::LayerKind::kGdn ? 4 : 3;
+        mixer += layer.kind == qw38::internal::LayerKind::kGdn ? 5 : 4;
+        if (layer.kind == qw38::internal::LayerKind::kGdn) {
+          ++gdn_groups;
+        } else {
+          ++attn_groups;
+        }
       } else {
         if (error == cudaSuccess) {
           error = qw38::cuda::execute_prompt_ffn(
@@ -1158,12 +1199,13 @@ int time_family(qw38::cuda::ResidentModel* model,
         "round family=%s cache_mode=%s warmup=%s sample_index=%d "
         "observation_unit=independent_round enclosing_ms=%.6f "
         "kernel_only_ms=%.6f gate_up_calls=%d down_calls=%d mixer_calls=%d "
+        "gdn_input_output_groups=%d attention_input_output_groups=%d "
         "rotating_layers=%zu working_set_bytes=%zu exceeds_2x_l2=%s "
         "eviction_outside_interval=false pooled_events=true\n",
         qw38::cuda::replay_family_name(family), qw38::cuda::cache_mode_name(mode),
         json_bool(warmup), warmup ? sample : sample - warmups, enclosing,
-        kernel_acc, gate_up, down, mixer, layers.size(), working,
-        json_bool(exceeds));
+        kernel_acc, gate_up, down, mixer, gdn_groups, attn_groups, layers.size(),
+        working, json_bool(exceeds));
     if (rounds_out != nullptr && !warmup) {
       std::fprintf(
           rounds_out,
@@ -1171,11 +1213,14 @@ int time_family(qw38::cuda::ResidentModel* model,
           "\"observation_unit\":\"independent_round\",\"warmup\":false,"
           "\"enclosing_ms\":%.9g,\"kernel_only_ms\":%.9g,"
           "\"gate_up_calls\":%d,\"down_calls\":%d,\"mixer_calls\":%d,"
+          "\"gdn_input_output_groups\":%d,"
+          "\"attention_input_output_groups\":%d,"
           "\"rotating_layers\":%zu,\"working_set_bytes\":%zu,"
           "\"accept_hot_as_production\":false,\"pooled_events\":true}\n",
           qw38::cuda::replay_family_name(family),
           qw38::cuda::cache_mode_name(mode), sample - warmups, enclosing,
-          kernel_acc, gate_up, down, mixer, layers.size(), working);
+          kernel_acc, gate_up, down, mixer, gdn_groups, attn_groups,
+          layers.size(), working);
     }
   }
   int registers = 0;
@@ -1228,6 +1273,15 @@ int run_family(const Options& options, qw38::cuda::ReplayFamily family) {
   }
   FILE* rounds = std::fopen(
       "evidence/optimization/opt061-component-replay/rounds.jsonl", "a");
+  if (options.q8_layout != nullptr &&
+      !qw38::cuda::apply_q8_layout_ident(options.q8_layout)) {
+    std::fprintf(stderr, "invalid --q8-layout %s\n", options.q8_layout);
+    if (rounds != nullptr) std::fclose(rounds);
+    return 1;
+  }
+  if (options.mmq_async_x >= 0) {
+    qw38::cuda::set_mmq_async_x_override(options.mmq_async_x != 0);
+  }
   const char* mode_arg = options.cache_mode;
   const qw38::cuda::CacheMode modes[] = {qw38::cuda::CacheMode::kHot,
                                          qw38::cuda::CacheMode::kRotating};
@@ -1244,9 +1298,14 @@ int run_family(const Options& options, qw38::cuda::ReplayFamily family) {
   if (rounds != nullptr) std::fclose(rounds);
   float stream_gbps = 0.0F;
   unsigned long long checksum = 0;
-  if (rc == 0) {
+  const bool opt070 = options.q8_layout != nullptr || options.mmq_async_x >= 0;
+  if (rc == 0 && !opt070) {
     rc = run_streaming_calibration(hardware, &stream_gbps, &checksum);
   }
+  const qw38::cuda::Q8DecodeDispatch q8_launch =
+      qw38::cuda::last_q8_decode_dispatch();
+  const qw38::cuda::MmqTileDispatch mmq_launch =
+      qw38::cuda::last_mmq_tile_dispatch();
   std::printf(
       "%s{\"schema_version\":1,\"task\":\"OPT-061\",\"workload\":\"%s\","
       "\"capture_key\":\"%s\",\"gguf_sha256\":\"%s\","
@@ -1269,6 +1328,28 @@ int run_family(const Options& options, qw38::cuda::ReplayFamily family) {
       static_cast<unsigned long long>(checksum), hardware.l2_bytes,
       static_cast<double>(hardware.power_limit_w),
       qw38::cuda::replay_family_name(family), capture_key);
+  std::printf(
+      "QW38_OPT070_NATIVE_COUNTS={\"schema_version\":1,\"task\":\"OPT-070\","
+      "\"family\":\"%s\",\"tier\":\"%s\",\"warmups\":%d,\"samples\":%d,"
+      "\"observed_warmups\":%d,\"observed_samples\":%d,"
+      "\"observed_candidates\":1,\"observed_shapes\":1,\"observed_tier\":\"%s\","
+      "\"pairs\":1,\"acceptance_executed\":%s,\"q8_layout\":\"%s\","
+      "\"effective_q8_rows_skinny\":%u,\"effective_q8_layout_warps_skinny\":%u,"
+      "\"mmq_async_x\":%s,\"last_q8_layout\":\"%s\",\"last_q8_rows\":%zu,"
+      "\"last_mmq_kernel\":\"%s\",\"last_mmq_async_x\":%s,"
+      "\"keep\":false,\"capture_key\":\"%s\"}\n",
+      qw38::cuda::replay_family_name(family), qw38::cuda::test_tier_name(),
+      warmups, samples, warmups, samples, qw38::cuda::test_tier_name(),
+      json_bool(qw38::cuda::test_tier() == qw38::cuda::TestTier::kAcceptance),
+      options.q8_layout != nullptr ? options.q8_layout : "installed",
+      qw38::cuda::effective_q8_decode_rows_skinny(),
+      qw38::cuda::effective_q8_decode_layout_warps_skinny(),
+      json_bool(qw38::cuda::effective_mmq_async_x()),
+      q8_launch.layout != nullptr ? q8_launch.layout : "", q8_launch.rows,
+      mmq_launch.kernel != nullptr ? mmq_launch.kernel : "",
+      json_bool(mmq_launch.async_x), capture_key);
+  if (options.q8_layout != nullptr) qw38::cuda::clear_q8_decode_path_override();
+  if (options.mmq_async_x >= 0) qw38::cuda::clear_mmq_async_x_override();
   FILE* prov = std::fopen(kProvenanceJson, "w");
   if (prov != nullptr) {
     std::fprintf(

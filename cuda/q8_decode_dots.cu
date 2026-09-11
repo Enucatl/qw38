@@ -70,6 +70,7 @@ cudaError_t launch_q8_coop_mmv_prequant(
       !legal_q8_decode_layout(rows_per_cta, warps_per_row)) {
     return cudaErrorInvalidValue;
   }
+  record_q8_decode_dispatch(rows, columns, rows_per_cta, warps_per_row);
   return launch_layout(weights, rows, columns, staged, output, rows_per_cta,
                        warps_per_row, stream);
 }

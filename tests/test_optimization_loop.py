@@ -518,3 +518,107 @@ def test_describe_plan_separates_screen_from_release() -> None:
     assert "build/qw38-cuda-decode-oracle-test" in release
     assert "screen:" in feedback
     assert "deadline_s=300" in feedback
+
+
+def _admission_counts(
+    *,
+    warmups: int,
+    samples: int,
+    tier: str,
+    keep: bool,
+    candidates: int = 2,
+) -> str:
+    payload = {
+        "warmups": warmups,
+        "samples": samples,
+        "observed_warmups": warmups,
+        "observed_samples": samples,
+        "observed_candidates": candidates,
+        "observed_shapes": 1,
+        "observed_tier": tier,
+        "pairs": 1,
+        "sample_ids": list(range(samples)),
+        "acceptance_executed": tier == "acceptance",
+        "keep": keep,
+    }
+    return "QW38_OPT070_NATIVE_COUNTS=" + json.dumps(payload) + "\n"
+
+
+def _admission_contract(model: Path) -> dict[str, Any]:
+    return {
+        "schema_version": 1,
+        "task": "OPT-057",
+        "claims_throughput": False,
+        "image": "qw38-cuda:13.0.2",
+        "model": str(model),
+        "gpu_lock": "build/optimization-runs/qw38-gpu.lock",
+        "aggregate_deadline_s": 300,
+        "target": "build/qw38-cuda-optimization-engine-probe",
+        "diagnostics_make_target": "cuda-opt057-diagnostics",
+        "performance_admission": {"enabled": True},
+        "modes": {
+            "feedback": {
+                "target": "build/qw38-cuda-optimization-engine-probe",
+                "tier_sequence": ["q8"],
+                "make_targets": ["build/qw38-cuda-optimization-engine-probe"],
+                "build_once": True,
+                "warm_repetitions": 0,
+                "aggregate_deadline_s": 300,
+                "workloads": ["q8"],
+            }
+        },
+        "workloads": {
+            "q8": {
+                "target": "build/qw38-cuda-optimization-engine-probe",
+                "tier": "screen",
+                "runner": "host",
+                "cases": 1,
+                "candidates": 2,
+                "warmups": 1,
+                "samples": 3,
+                "tokens": 1,
+                "execution_modes": 1,
+                "control_candidate_pairs": 1,
+                "load_model": 1,
+                "args": ["opt070-admission-probe", "{mode}", "{phase}"],
+            }
+        },
+        "proof_limit": ["screen-only keep=true is not production admission"],
+        "report_path": "evidence/optimization/opt057-iteration-loop/REPORT.md",
+    }
+
+
+def test_screen_only_keep_is_rejected_by_the_runner(tmp_path: Path) -> None:
+    runner, launcher, _clock = _runner(tmp_path)
+    launcher.script(
+        "opt070-admission-probe",
+        stdout=_admission_counts(warmups=1, samples=3, tier="screen", keep=True),
+    )
+    model = tmp_path / "model.gguf"
+    result = runner.run(
+        "OPT-057",
+        "feedback",
+        phase="q8",
+        output_dir=tmp_path / "out",
+        contract_data=_admission_contract(model),
+    )
+    assert result["success"] is False
+    assert result["result_class"] == "screen_only_keep"
+
+
+def test_wrong_native_counts_fail_performance_admission(tmp_path: Path) -> None:
+    runner, launcher, _clock = _runner(tmp_path)
+    launcher.script(
+        "opt070-admission-probe",
+        stdout=_admission_counts(warmups=3, samples=10, tier="screen", keep=False),
+    )
+    model = tmp_path / "model.gguf"
+    result = runner.run(
+        "OPT-057",
+        "feedback",
+        phase="q8",
+        output_dir=tmp_path / "out",
+        contract_data=_admission_contract(model),
+    )
+    assert result["success"] is False
+    assert result["result_class"] == "native_count_mismatch"

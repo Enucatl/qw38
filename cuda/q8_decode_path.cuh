@@ -258,4 +258,64 @@ struct Q8DecodeLayoutScope final {
   Q8DecodeLayoutScope& operator=(const Q8DecodeLayoutScope&) = delete;
 };
 
+struct Q8DecodeDispatch final {
+  unsigned int rows_per_cta = 0;
+  unsigned int warps_per_row = 0;
+  std::size_t rows = 0;
+  std::size_t columns = 0;
+  const char* layout = "";
+  bool graph_capture = false;
+};
+
+inline thread_local Q8DecodeDispatch g_last_q8_decode_dispatch{};
+
+inline const char* q8_layout_ident(unsigned int rows_per_cta,
+                                   unsigned int warps_per_row) noexcept {
+  if (rows_per_cta == 1 && warps_per_row == 4) return "r1_w4";
+  if (rows_per_cta == 2 && warps_per_row == 2) return "r2_w2";
+  if (rows_per_cta == 4 && warps_per_row == 1) return "r4_w1";
+  if (rows_per_cta == 8 && warps_per_row == 1) return "r8_w1";
+  return "unknown";
+}
+
+inline bool apply_q8_layout_ident(const char* ident) noexcept {
+  if (ident == nullptr) return false;
+  if (std::strcmp(ident, "r1_w4") == 0) {
+    set_q8_decode_layout_override(kSelectedQ8DecodePath, 1, 4, 1, 4, 1, 4);
+    return true;
+  }
+  if (std::strcmp(ident, "r2_w2") == 0) {
+    set_q8_decode_layout_override(kSelectedQ8DecodePath, 2, 2, 2, 2, 2, 2);
+    return true;
+  }
+  if (std::strcmp(ident, "r4_w1") == 0) {
+    set_q8_decode_layout_override(kSelectedQ8DecodePath, 4, 1, 4, 1, 4, 1);
+    return true;
+  }
+  if (std::strcmp(ident, "r8_w1") == 0) {
+    set_q8_decode_layout_override(kSelectedQ8DecodePath, 8, 1, 8, 1, 8, 1);
+    return true;
+  }
+  return false;
+}
+
+inline void record_q8_decode_dispatch(std::size_t rows, std::size_t columns,
+                                      unsigned int rows_per_cta,
+                                      unsigned int warps_per_row) noexcept {
+  g_last_q8_decode_dispatch.rows = rows;
+  g_last_q8_decode_dispatch.columns = columns;
+  g_last_q8_decode_dispatch.rows_per_cta = rows_per_cta;
+  g_last_q8_decode_dispatch.warps_per_row = warps_per_row;
+  g_last_q8_decode_dispatch.layout =
+      q8_layout_ident(rows_per_cta, warps_per_row);
+}
+
+inline const Q8DecodeDispatch& last_q8_decode_dispatch() noexcept {
+  return g_last_q8_decode_dispatch;
+}
+
+inline void clear_q8_decode_dispatch() noexcept {
+  g_last_q8_decode_dispatch = {};
+}
+
 }  // namespace qw38::cuda

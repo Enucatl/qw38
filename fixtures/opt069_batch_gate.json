@@ -1,8 +1,29 @@
 {
   "schema_version": 1,
   "task": "OPT-069",
-  "status": "configured",
-  "measurement_utc": "2026-09-11T12:32:47Z",
+  "status": "measured",
+  "measurement_utc": "2026-09-11T12:18:36Z",
+  "device": "NVIDIA GeForce RTX 5090",
+  "compute_capability": "12.0",
+  "power_limit_w": 400.0,
+  "telemetry": {
+    "device": "NVIDIA GeForce RTX 5090",
+    "device_substring": "RTX 5090",
+    "power_limit_w": 400.0,
+    "power_draw_w": 21.5,
+    "sm_clock_mhz": "240",
+    "mem_clock_mhz": "405",
+    "temperature_c": "43",
+    "raw": "NVIDIA GeForce RTX 5090, 400.00, 21.50, 240, 405, 43"
+  },
+  "llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+  "gguf_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+  "source_revision": "retained",
+  "source_state": "reporting_correction",
+  "hardware_executed": true,
+  "keep_sitting_skipped": false,
+  "reporting_correction": "OPT-070",
+  "reporting_correction_note": "REPORT.md was unmeasured after the sitting; rewritten from retained sidecars without altering numerical samples",
   "combined_production_paths": {
     "rms_norm": "parallel_fma",
     "q4_decode": "packed",
@@ -84,16 +105,826 @@
     "mmq_x_extra_bytes": 18448,
     "x_ring_stages": 1
   },
-  "compiler_flags": "-O2 --fmad=false",
-  "graphs": "ffn_only",
-  "intended_q4_path": "packed",
+  "p": {
+    "quartz": {
+      "prompt_tokens": 4096,
+      "replicates": 3,
+      "wall_ms": [
+        1391.12659,
+        1411.66711,
+        1413.35901
+      ],
+      "tok_s": [
+        2944.37622,
+        2901.53394,
+        2898.06055
+      ],
+      "mean_tok_s": 2914.65698,
+      "cold": true,
+      "cache_policy": "disabled",
+      "attribution": null,
+      "instrumented": false,
+      "graphs_created": true,
+      "prompt_graph_rows": 4096
+    },
+    "llama_cpp": {
+      "avg_ts": 3142.517034,
+      "avg_ns": 1303466854,
+      "n_prompt": 4096,
+      "n_batch": 2048,
+      "n_ubatch": 512,
+      "flash_attn": -1,
+      "build_commit": "cc83d7b",
+      "test_time": "2026-09-11T12:13:56Z",
+      "samples_ts": [
+        3170.84,
+        3130.42,
+        3126.29
+      ],
+      "samples_ns": [
+        1291772000,
+        1308450526,
+        1310178038
+      ]
+    }
+  },
+  "d128": {
+    "quartz": {
+      "prefix": 128,
+      "decode_tokens": 256,
+      "warmups": 3,
+      "runs": 30,
+      "warmup_tok_s": [
+        37.3440704,
+        37.2544479,
+        37.2312164
+      ],
+      "tok_s": [
+        37.2132378,
+        37.2041512,
+        37.2190399,
+        37.2119713,
+        37.2187653,
+        37.2169724,
+        37.1861649,
+        37.1986275,
+        37.1673203,
+        37.1893005,
+        37.164196,
+        37.1665001,
+        37.1893272,
+        37.1715622,
+        37.1600838,
+        37.1605873,
+        37.1456337,
+        37.1560936,
+        37.1671181,
+        37.1745567,
+        37.1780891,
+        37.1783714,
+        37.178997,
+        37.1767921,
+        37.1599045,
+        37.1566734,
+        37.1715279,
+        37.1630707,
+        37.1570969,
+        37.1655273
+      ],
+      "run_wall_ms": [
+        6879.27246,
+        6880.95264,
+        6878.2002,
+        6879.50635,
+        6878.25098,
+        6878.58203,
+        6884.28076,
+        6881.97412,
+        6887.771,
+        6883.7002,
+        6888.35059,
+        6887.92334,
+        6883.69531,
+        6886.98535,
+        6889.11279,
+        6889.01904,
+        6891.79248,
+        6889.85254,
+        6887.80859,
+        6886.43018,
+        6885.77637,
+        6885.72363,
+        6885.60791,
+        6886.01611,
+        6889.14551,
+        6889.74463,
+        6886.9917,
+        6888.55908,
+        6889.6665,
+        6888.10352
+      ],
+      "mean_tok_s": 37.1789093,
+      "token_latency_p50_ms": 26.9299564,
+      "token_latency_p95_ms": 27.0246696,
+      "run_mean_token_latency_p95_ms": 26.9132538,
+      "token_latency_sidecar": "evidence/optimization/opt069-batch-gate/quartz-d128-tokens.json",
+      "graphs_created": true,
+      "cache_policy": "disabled",
+      "attribution": null,
+      "instrumented": false
+    },
+    "llama_cpp": {
+      "prefix": 128,
+      "decode_tokens": 256,
+      "warmups": 3,
+      "runs": 30,
+      "warmup_tok_s": [
+        70.7183297,
+        70.2838893,
+        70.2636727
+      ],
+      "tok_s": [
+        70.2013985,
+        70.1575338,
+        70.0126898,
+        70.0469999,
+        68.9565447,
+        68.9179134,
+        68.8922821,
+        68.8985305,
+        68.8593899,
+        68.875934,
+        68.8483156,
+        68.7542535,
+        68.7053734,
+        68.7124732,
+        68.6774862,
+        68.6446884,
+        68.631199,
+        68.6177149,
+        68.5892005,
+        68.5517322,
+        68.5759901,
+        68.5885573,
+        68.5909831,
+        68.5590573,
+        68.5519708,
+        68.5501719,
+        68.5444086,
+        68.5257305,
+        68.5380224,
+        68.5498415
+      ],
+      "run_wall_ms": [
+        3646.651,
+        3648.931,
+        3656.48,
+        3654.689,
+        3712.483,
+        3714.564,
+        3715.946,
+        3715.609,
+        3717.721,
+        3716.828,
+        3718.319,
+        3723.406,
+        3726.055,
+        3725.67,
+        3727.568,
+        3729.349,
+        3730.082,
+        3730.815,
+        3732.366,
+        3734.406,
+        3733.085,
+        3732.401,
+        3732.269,
+        3734.007,
+        3734.393,
+        3734.491,
+        3734.805,
+        3735.823,
+        3735.153,
+        3734.509
+      ],
+      "mean_tok_s": 68.8708796,
+      "token_latency_p50_ms": 14.443,
+      "token_latency_p95_ms": 14.526,
+      "run_mean_token_latency_p95_ms": 14.5897834,
+      "token_latency_sidecar": "evidence/optimization/opt069-batch-gate/llama-decode-d128-tokens.json",
+      "n_gpu_layers": 99,
+      "n_ctx": 4096,
+      "n_batch": 2048,
+      "n_ubatch": 512,
+      "attribution": null,
+      "instrumented": false
+    }
+  },
+  "d2048": {
+    "quartz": {
+      "prefix": 2048,
+      "decode_tokens": 256,
+      "warmups": 3,
+      "runs": 30,
+      "warmup_tok_s": [
+        35.5202217,
+        35.5065727,
+        35.4862671
+      ],
+      "tok_s": [
+        35.476635,
+        35.4683418,
+        35.4673958,
+        35.4569473,
+        35.4734497,
+        35.4599876,
+        35.4493332,
+        35.4566307,
+        35.4538307,
+        35.4647865,
+        35.4454002,
+        35.4591179,
+        35.4327202,
+        35.4519958,
+        35.4431763,
+        35.4394722,
+        35.457428,
+        35.4573936,
+        35.4671631,
+        35.4550819,
+        35.4765701,
+        35.4473724,
+        35.4280472,
+        35.4095726,
+        35.4026413,
+        35.4208603,
+        35.433445,
+        35.4419556,
+        35.4472122,
+        35.4515724
+      ],
+      "run_wall_ms": [
+        7216.0166,
+        7217.7041,
+        7217.89697,
+        7220.02393,
+        7216.66455,
+        7219.4043,
+        7221.57471,
+        7220.08838,
+        7220.6582,
+        7218.42773,
+        7222.37598,
+        7219.58203,
+        7224.96045,
+        7221.03223,
+        7222.82861,
+        7223.58398,
+        7219.92578,
+        7219.93262,
+        7217.94434,
+        7220.40381,
+        7216.02979,
+        7221.97412,
+        7225.91309,
+        7229.68359,
+        7231.09863,
+        7227.37939,
+        7224.8125,
+        7223.07764,
+        7222.00635,
+        7221.11816
+      ],
+      "mean_tok_s": 35.4498482,
+      "token_latency_p50_ms": 28.2117672,
+      "token_latency_p95_ms": 28.3053131,
+      "run_mean_token_latency_p95_ms": 28.2368526,
+      "token_latency_sidecar": "evidence/optimization/opt069-batch-gate/quartz-d2048-tokens.json",
+      "graphs_created": true,
+      "cache_policy": "disabled",
+      "attribution": null,
+      "instrumented": false
+    },
+    "llama_cpp": {
+      "prefix": 2048,
+      "decode_tokens": 256,
+      "warmups": 3,
+      "runs": 30,
+      "warmup_tok_s": [
+        69.4849887,
+        68.2100251,
+        68.1814308
+      ],
+      "tok_s": [
+        68.1569975,
+        68.1528968,
+        68.096806,
+        68.1217943,
+        67.2542128,
+        67.2381207,
+        67.2348714,
+        67.2048656,
+        67.2067887,
+        67.2155234,
+        67.2280206,
+        67.2608568,
+        67.2069122,
+        67.2136881,
+        67.22043,
+        67.2198122,
+        67.1996791,
+        67.1936998,
+        67.2203417,
+        67.2173412,
+        67.2250018,
+        67.2444259,
+        67.2129292,
+        67.2264141,
+        67.1877391,
+        67.2082179,
+        67.1964865,
+        67.1809861,
+        67.2136528,
+        67.2250901
+      ],
+      "run_wall_ms": [
+        3756.034,
+        3756.26,
+        3759.354,
+        3757.975,
+        3806.453,
+        3807.364,
+        3807.548,
+        3809.248,
+        3809.139,
+        3808.644,
+        3807.936,
+        3806.077,
+        3809.132,
+        3808.748,
+        3808.366,
+        3808.401,
+        3809.542,
+        3809.881,
+        3808.371,
+        3808.541,
+        3808.107,
+        3807.007,
+        3808.791,
+        3808.027,
+        3810.219,
+        3809.058,
+        3809.723,
+        3810.602,
+        3808.75,
+        3808.102
+      ],
+      "mean_tok_s": 67.3394867,
+      "token_latency_p50_ms": 14.577,
+      "token_latency_p95_ms": 14.627,
+      "run_mean_token_latency_p95_ms": 14.8830416,
+      "token_latency_sidecar": "evidence/optimization/opt069-batch-gate/llama-decode-d2048-tokens.json",
+      "n_gpu_layers": 99,
+      "n_ctx": 4096,
+      "n_batch": 2048,
+      "n_ubatch": 512,
+      "attribution": null,
+      "instrumented": false
+    }
+  },
+  "opt016": {
+    "quartz": {
+      "prompt_tokens": 2048,
+      "mean_tok_s": 3132.88379,
+      "tok_s": [
+        3211.7373,
+        3098.33984,
+        3088.57397
+      ],
+      "attribution": null
+    },
+    "llama_cpp": {
+      "avg_ts": 3132.053862,
+      "avg_ns": 653994148,
+      "n_prompt": 2048,
+      "n_ubatch": 512,
+      "flash_attn": -1,
+      "build_commit": "cc83d7b",
+      "test_time": "2026-09-11T12:27:00Z"
+    },
+    "gate_passed": true,
+    "owns_opt016_parity_gate": false
+  },
+  "quality": {
+    "quality_v2": {
+      "suite": "quality-v2",
+      "status": "fail",
+      "all": false,
+      "missing_authority": [],
+      "missing_cases": [],
+      "used_teacher_forcing_for_answers": false,
+      "wikitext_nll": {
+        "pass": true,
+        "ppl_ratio": 1.0009627760076092,
+        "steps": 1024,
+        "mean_nll": 1.526086348254411
+      },
+      "held_out_wikitext_1024": {
+        "pass": true,
+        "ppl_ratio": 1.0000139886434911,
+        "steps": 1024,
+        "mean_nll": 1.788105881590737
+      },
+      "recurrence": {
+        "pass": true,
+        "incremental_nll": -0.004723283697648517
+      },
+      "task_arithmetic": {
+        "raw": "A",
+        "stripped": "A",
+        "expected": "B",
+        "pass": false,
+        "reason": "wrong_choice",
+        "actual": "A",
+        "used_teacher_forcing": false
+      },
+      "task_python_len": {
+        "raw": "A",
+        "stripped": "A",
+        "expected": "A",
+        "pass": true,
+        "reason": "exact_choice",
+        "actual": "A",
+        "used_teacher_forcing": false
+      },
+      "task_inference": {
+        "raw": "C",
+        "stripped": "C",
+        "expected": "C",
+        "pass": true,
+        "reason": "exact_choice",
+        "actual": "C",
+        "used_teacher_forcing": false
+      },
+      "task_minutes": {
+        "raw": "D",
+        "stripped": "D",
+        "expected": "D",
+        "pass": true,
+        "reason": "exact_choice",
+        "actual": "D",
+        "used_teacher_forcing": false
+      },
+      "task_sort": {
+        "raw": "B",
+        "stripped": "B",
+        "expected": "B",
+        "pass": true,
+        "reason": "exact_choice",
+        "actual": "B",
+        "used_teacher_forcing": false
+      },
+      "task_json": {
+        "raw": "A",
+        "stripped": "A",
+        "expected": "A",
+        "pass": true,
+        "reason": "exact_choice",
+        "actual": "A",
+        "used_teacher_forcing": false
+      },
+      "task_reading": {
+        "raw": "C",
+        "stripped": "C",
+        "expected": "C",
+        "pass": true,
+        "reason": "exact_choice",
+        "actual": "C",
+        "used_teacher_forcing": false
+      },
+      "task_sequence": {
+        "raw": "D",
+        "stripped": "D",
+        "expected": "D",
+        "pass": true,
+        "reason": "exact_choice",
+        "actual": "D",
+        "used_teacher_forcing": false
+      },
+      "tasks": {
+        "pass": false,
+        "count": 8
+      },
+      "llama_reference": {
+        "wikitext_nll": {
+          "mean_nll": 1.525124035418359
+        },
+        "held_out_wikitext_1024": {
+          "mean_nll": 1.788091893045086
+        },
+        "recurrence_short": {
+          "mean_nll": 1.7683376992507749
+        },
+        "recurrence_long": {
+          "mean_nll": 1.8402200970779121
+        }
+      },
+      "functional": {
+        "task_arithmetic": {
+          "raw": "A",
+          "stripped": "A",
+          "expected": "B",
+          "pass": false,
+          "reason": "wrong_choice",
+          "actual": "A",
+          "used_teacher_forcing": false,
+          "next_token": 32,
+          "top_two": [
+            32,
+            33
+          ]
+        },
+        "task_python_len": {
+          "raw": "A",
+          "stripped": "A",
+          "expected": "A",
+          "pass": true,
+          "reason": "exact_choice",
+          "actual": "A",
+          "used_teacher_forcing": false,
+          "next_token": 32,
+          "top_two": [
+            32,
+            33
+          ]
+        },
+        "task_inference": {
+          "raw": "C",
+          "stripped": "C",
+          "expected": "C",
+          "pass": true,
+          "reason": "exact_choice",
+          "actual": "C",
+          "used_teacher_forcing": false,
+          "next_token": 34,
+          "top_two": [
+            34,
+            90
+          ]
+        },
+        "task_minutes": {
+          "raw": "D",
+          "stripped": "D",
+          "expected": "D",
+          "pass": true,
+          "reason": "exact_choice",
+          "actual": "D",
+          "used_teacher_forcing": false,
+          "next_token": 35,
+          "top_two": [
+            35,
+            34
+          ]
+        },
+        "task_sort": {
+          "raw": "B",
+          "stripped": "B",
+          "expected": "B",
+          "pass": true,
+          "reason": "exact_choice",
+          "actual": "B",
+          "used_teacher_forcing": false,
+          "next_token": 33,
+          "top_two": [
+            33,
+            760
+          ]
+        },
+        "task_json": {
+          "raw": "A",
+          "stripped": "A",
+          "expected": "A",
+          "pass": true,
+          "reason": "exact_choice",
+          "actual": "A",
+          "used_teacher_forcing": false,
+          "next_token": 32,
+          "top_two": [
+            32,
+            33
+          ]
+        },
+        "task_reading": {
+          "raw": "C",
+          "stripped": "C",
+          "expected": "C",
+          "pass": true,
+          "reason": "exact_choice",
+          "actual": "C",
+          "used_teacher_forcing": false,
+          "next_token": 34,
+          "top_two": [
+            34,
+            248046
+          ]
+        },
+        "task_sequence": {
+          "raw": "D",
+          "stripped": "D",
+          "expected": "D",
+          "pass": true,
+          "reason": "exact_choice",
+          "actual": "D",
+          "used_teacher_forcing": false,
+          "next_token": 35,
+          "top_two": [
+            35,
+            34
+          ]
+        }
+      },
+      "nll_cases": [
+        {
+          "name": "wikitext_nll",
+          "scored": 1024,
+          "mean_nll": 1.526086348254411
+        },
+        {
+          "name": "held_out_wikitext_1024",
+          "scored": 1024,
+          "mean_nll": 1.788105881590737
+        },
+        {
+          "name": "recurrence_short",
+          "scored": 128,
+          "mean_nll": 1.771578346725201
+        },
+        {
+          "name": "recurrence_long",
+          "scored": 128,
+          "mean_nll": 1.8387374608546898
+        }
+      ]
+    },
+    "legacy": {
+      "qlt001_threshold": 1.05,
+      "opt056_tasks_pass": false,
+      "opt056_all": false,
+      "historical_only": true
+    },
+    "qlt001_not_claimed": true
+  },
+  "state_isolation": {
+    "memory_fit": {
+      "ok": true,
+      "post_graph_admitted": true
+    },
+    "checkpoint": {
+      "ok": true
+    },
+    "cancellation": {
+      "ok": true,
+      "frontier": 0,
+      "source": "fixtures/opt055_execution_graphs.json"
+    }
+  },
   "opt056_history": "fixtures/opt056_performance_gate.json",
-  "hardware_executed": false,
-  "keep_sitting_skipped": false,
-  "preflight_is_release_evidence": false,
   "owns_opt016_parity_gate": false,
   "opt056_gate_passed": false,
-  "opt016_gate_passed": false,
+  "opt016_gate_passed": true,
+  "preflight_is_release_evidence": false,
+  "nsight_systems": "not_used",
+  "nsight_compute": "not_used",
   "proof_limit": "combined freeze of OPT-062-068 keep/reject selectors; same-sitting P/D128/D2048 versus pinned llama.cpp; parity gap is Tq-Tl; +5% throughput gap is Tq-Tl/1.05; do not label the parity gap as the +5% bar; decode p95 no worse than llama for the OPT-056 outcome; full quality v2 on the frozen combination; original OPT-016 2K parity evidence; OPT-056 and OPT-016 stay blocked unless their gates pass; rejected candidates must not leak into production; instrumented timings are not release throughput; preflight is not release evidence",
-  "report_path": "evidence/optimization/opt069-batch-gate/REPORT.md"
+  "report_path": "evidence/optimization/opt069-batch-gate/REPORT.md",
+  "gaps": {
+    "p": {
+      "parity_ms": 101.89738823402377,
+      "plus5_ms": 163.9647110002427
+    },
+    "d128": {
+      "parity_ms": 3168.5234884718725,
+      "plus5_ms": 3345.528287325584
+    },
+    "d2048": {
+      "parity_ms": 3419.836789346795,
+      "plus5_ms": 3600.866921708588
+    }
+  },
+  "gate": {
+    "p": {
+      "quartz_mean_tok_s": 2914.656903333333,
+      "llama_mean_tok_s": 3142.5166666666664,
+      "ratio": 0.9274913111041575,
+      "margin": 1.05,
+      "point_exceeds_margin": false,
+      "confidence_supported": false,
+      "ci95_diff_minus_margin": {
+        "diff": -384.9855966666669,
+        "low": -439.18989786363454,
+        "high": -330.7812954696992,
+        "se": 21.08296429286958,
+        "df": 3.99998496524371
+      },
+      "remaining_tok_s": 384.9855966666669,
+      "pass": false,
+      "parity_pass": false
+    },
+    "d128": {
+      "quartz_mean_tok_s": 37.178908670000006,
+      "llama_mean_tok_s": 68.87087956666667,
+      "ratio": 0.5398349622355412,
+      "margin": 1.05,
+      "point_exceeds_margin": false,
+      "confidence_supported": false,
+      "ci95_diff_minus_margin": {
+        "diff": -35.135514875000005,
+        "low": -35.33564582882313,
+        "high": -34.93538392117688,
+        "se": 0.09800732312592031,
+        "df": 29.090856805717902
+      },
+      "remaining_tok_s": 35.135514875000005,
+      "pass": false,
+      "parity_pass": false
+    },
+    "d2048": {
+      "quartz_mean_tok_s": 35.44985122,
+      "llama_mean_tok_s": 67.33948674666667,
+      "ratio": 0.5264348294391297,
+      "margin": 1.05,
+      "point_exceeds_margin": false,
+      "confidence_supported": false,
+      "ci95_diff_minus_margin": {
+        "diff": -35.256609864,
+        "low": -35.380823549739766,
+        "high": -35.13239617826023,
+        "se": 0.06082942494601683,
+        "df": 29.17326281420913
+      },
+      "remaining_tok_s": 35.256609864,
+      "pass": false,
+      "parity_pass": false
+    },
+    "d128_p95": {
+      "token_latency_p95_ms": {
+        "quartz": 27.0246696,
+        "llama": 14.526,
+        "pass": false
+      },
+      "run_mean_token_latency_p95_ms": {
+        "quartz": 26.9132538,
+        "llama": 14.5897834,
+        "pass": false
+      },
+      "pass": false
+    },
+    "d2048_p95": {
+      "token_latency_p95_ms": {
+        "quartz": 28.3053131,
+        "llama": 14.627,
+        "pass": false
+      },
+      "run_mean_token_latency_p95_ms": {
+        "quartz": 28.2368526,
+        "llama": 14.8830416,
+        "pass": false
+      },
+      "pass": false
+    },
+    "quality": false,
+    "opt016": true,
+    "passed": false
+  },
+  "outcomes": {
+    "internal_improvement_with_quality": {
+      "name": "internal_improvement_with_quality",
+      "faster_than_opt056": false,
+      "quality_v2": false,
+      "pass": false,
+      "baseline_p_tok_s": 2808.49609,
+      "baseline_d128_tok_s": 37.4816246,
+      "baseline_d2048_tok_s": 35.7208481,
+      "post_p_tok_s": 2914.65698,
+      "post_d128_tok_s": 37.1789093,
+      "post_d2048_tok_s": 35.4498482
+    },
+    "llama_parity": {
+      "name": "llama_parity",
+      "p": false,
+      "d128": false,
+      "d2048": false,
+      "p_parity_gap_ms": 101.89738823402377,
+      "d128_parity_gap_ms": 3168.5234884718725,
+      "d2048_parity_gap_ms": 3419.836789346795,
+      "pass": false
+    },
+    "opt056_plus5": {
+      "name": "opt056_plus5_throughput_lead",
+      "pass": false,
+      "p_plus5_gap_ms": 163.9647110002427,
+      "d128_plus5_gap_ms": 3345.528287325584,
+      "d2048_plus5_gap_ms": 3600.866921708588
+    }
+  }
 }

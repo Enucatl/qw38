@@ -162,7 +162,7 @@ New kernel tasks are conditional on measured opportunity and valid admission.
 
 | ID | Description | Dependencies | Status | Acceptance condition | Evidence |
 |---|---|---|---|---|---|
-| OPT-070 | Repair acceptance enforcement and revalidate installed Q8/MMQ keeps | OPT-069, OPT-071, OPT-073, OPT-074 | pending | Actual paired complete rotating and short E2E evidence yields separate retain/revert/inconclusive verdicts for OPT-064/066; screen-only results cannot admit a keep | [`tasks/OPT-070.md`](tasks/OPT-070.md) |
+| OPT-070 | Repair acceptance enforcement and revalidate installed Q8/MMQ keeps | OPT-069, OPT-071, OPT-073, OPT-074 | done | Actual paired complete rotating and short E2E evidence yields separate retain/revert/inconclusive verdicts for OPT-064/066; screen-only results cannot admit a keep | [`tasks/OPT-070.md`](tasks/OPT-070.md); [`pins/opt070_iteration_contract.json`](pins/opt070_iteration_contract.json); [`pins/opt070_keep_revalidation_contract.json`](pins/opt070_keep_revalidation_contract.json); [`fixtures/opt070_keep_revalidation.json`](fixtures/opt070_keep_revalidation.json); [`tools/opt070_keep_revalidation.py`](tools/opt070_keep_revalidation.py); [`tests/test_opt070_keep_revalidation.py`](tests/test_opt070_keep_revalidation.py); [`tools/run_optimization_task.py`](tools/run_optimization_task.py); [`tools/opt069_batch_gate.py`](tools/opt069_batch_gate.py); [`cuda/q8_decode_path.cuh`](cuda/q8_decode_path.cuh); [`cuda/optimization_component_replay.cu`](cuda/optimization_component_replay.cu); [`cuda/optimization_engine_probe.cu`](cuda/optimization_engine_probe.cu); [`Makefile`](Makefile); [`evidence/optimization/opt070-keep-revalidation/REPORT.md`](evidence/optimization/opt070-keep-revalidation/REPORT.md); verification 2026-09-11T17:05:50Z |
 | OPT-071 | Repair full-engine timing windows and production capture replay | OPT-060, OPT-061, OPT-069 | done | No prefix/warmup contamination, dropped records or duplicate family charging; complete measured windows and identity-cached real inputs support honest sink ranking | [`tasks/OPT-071.md`](tasks/OPT-071.md); [`pins/opt071_attribution_repair_contract.json`](pins/opt071_attribution_repair_contract.json); [`pins/opt071_iteration_contract.json`](pins/opt071_iteration_contract.json); [`fixtures/opt071_attribution_repair.json`](fixtures/opt071_attribution_repair.json); [`tools/opt071_attribution_repair.py`](tools/opt071_attribution_repair.py); [`tests/test_opt071_attribution_repair.py`](tests/test_opt071_attribution_repair.py); [`cuda/engine_attribution.h`](cuda/engine_attribution.h); [`cuda/optimization_component_replay.cu`](cuda/optimization_component_replay.cu); [`tools/llama_authority/engine_attribution.cpp`](tools/llama_authority/engine_attribution.cpp); [`evidence/optimization/opt071-attribution-repair/REPORT.md`](evidence/optimization/opt071-attribution-repair/REPORT.md); verification 2026-09-11T15:30:12Z |
 | OPT-072 | Reevaluate all correctness-based optimization rejections | OPT-059, OPT-069 | done | Every historical numerical/test rejection has an evidence-backed disposition and owner; comparable-accuracy eligibility is separated from hard correctness and performance failures | [`tasks/OPT-072.md`](tasks/OPT-072.md); [`pins/opt072_rejection_review_contract.json`](pins/opt072_rejection_review_contract.json); [`pins/opt072_iteration_contract.json`](pins/opt072_iteration_contract.json); [`fixtures/opt072_rejection_review.json`](fixtures/opt072_rejection_review.json); [`tools/opt072_rejection_review.py`](tools/opt072_rejection_review.py); [`tests/test_opt072_rejection_review.py`](tests/test_opt072_rejection_review.py); [`cuda/q4k_decode_path.cuh`](cuda/q4k_decode_path.cuh); [`tools/run_optimization_task.py`](tools/run_optimization_task.py); [`evidence/optimization/opt072-rejection-review/REPORT.md`](evidence/optimization/opt072-rejection-review/REPORT.md); verification 2026-09-11T15:46:12Z |
 | OPT-073 | Resolve functional authority failures and version quality decisions | OPT-058, OPT-069, OPT-072 | done | Exact prompts/scorers audited, arithmetic truth preserved, absolute and regression verdicts explicit, and failed required quality stops release before long timing | [`tasks/OPT-073.md`](tasks/OPT-073.md); [`pins/opt073_quality_policy_contract.json`](pins/opt073_quality_policy_contract.json); [`pins/opt073_iteration_contract.json`](pins/opt073_iteration_contract.json); [`fixtures/opt073_quality_policy.json`](fixtures/opt073_quality_policy.json); [`tools/opt073_quality_policy.py`](tools/opt073_quality_policy.py); [`tests/test_opt073_quality_policy.py`](tests/test_opt073_quality_policy.py); [`tests/test_opt069_batch_gate.py`](tests/test_opt069_batch_gate.py); [`tools/opt069_batch_gate.py`](tools/opt069_batch_gate.py); [`tools/run_optimization_task.py`](tools/run_optimization_task.py); [`Makefile`](Makefile); [`evidence/optimization/opt073-quality-policy/REPORT.md`](evidence/optimization/opt073-quality-policy/REPORT.md); verification 2026-09-11T16:02:30Z |
@@ -6447,6 +6447,38 @@ statements below are historical, not the current execution order.
   Proof is production-shape GPU dispatch and frozen admission evidence — not a
   speedup gate.
 - Marked OPT-074 `done`; delivery is limited to the verified task scope plus
+  this ledger/audit bookkeeping. `plan.md` is unchanged. OPT-016 and OPT-056 stay
+  `blocked`. Next eligible pending by dependency order: **OPT-075**. No tok/s
+  claim (`claims_throughput=false`).
+
+### 2026-09-11T17:05:50Z — OPT-070 keep revalidation delivered
+
+- Repaired optimization-runner acceptance enforcement with native count validation,
+  screen-only keep rejection, and per-mode round overrides. Revalidated installed
+  Q8 `r2_w2` and MMQ `fma_async_x` with complete rotating mixer and short E2E
+  evidence; both keeps **inconclusive** (`opt074_coverage_unadmitted`); shipping
+  unchanged. Rewrote OPT-069 REPORT from retained sidecars (reporting correction
+  only; historical samples unchanged). Coupled IDs: none. No production pin change.
+- Acceptance: host contract, runner admission guards, paired component/E2E
+  evidence, OPT-069 reporting correction, and optimization-runner
+  feedback/acceptance phases; 25 pytest cases; scoped production overrides with
+  separate graph capture.
+- Acceptance evidence: [`tasks/OPT-070.md`](tasks/OPT-070.md);
+  [`pins/opt070_iteration_contract.json`](pins/opt070_iteration_contract.json);
+  [`pins/opt070_keep_revalidation_contract.json`](pins/opt070_keep_revalidation_contract.json);
+  [`fixtures/opt070_keep_revalidation.json`](fixtures/opt070_keep_revalidation.json);
+  [`tools/opt070_keep_revalidation.py`](tools/opt070_keep_revalidation.py);
+  [`tests/test_opt070_keep_revalidation.py`](tests/test_opt070_keep_revalidation.py);
+  [`tools/run_optimization_task.py`](tools/run_optimization_task.py);
+  [`tools/opt069_batch_gate.py`](tools/opt069_batch_gate.py);
+  [`cuda/q8_decode_path.cuh`](cuda/q8_decode_path.cuh);
+  [`cuda/optimization_component_replay.cu`](cuda/optimization_component_replay.cu);
+  [`cuda/optimization_engine_probe.cu`](cuda/optimization_engine_probe.cu);
+  [`Makefile`](Makefile);
+  [`evidence/optimization/opt070-keep-revalidation/REPORT.md`](evidence/optimization/opt070-keep-revalidation/REPORT.md).
+  Proof is fail-closed admission and measured keep revalidation — not a speedup
+  gate. **tok/s delta vs OPT-069 baseline:** 0 (2914.65698 tok/s unchanged).
+- Marked OPT-070 `done`; delivery is limited to the verified task scope plus
   this ledger/audit bookkeeping. `plan.md` is unchanged. OPT-016 and OPT-056 stay
   `blocked`. Next eligible pending by dependency order: **OPT-075**. No tok/s
   claim (`claims_throughput=false`).

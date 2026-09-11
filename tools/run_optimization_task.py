@@ -6,6 +6,7 @@ import argparse
 import fcntl
 import json
 import os
+import re
 import signal
 import subprocess
 import sys
@@ -216,6 +217,15 @@ def loop_product(workload: Mapping[str, Any]) -> int:
     return cases * candidates * (warmups + samples) * tokens * modes * pairs
 
 
+def workload_for_mode(workload: Mapping[str, Any], mode: str) -> dict[str, Any]:
+    """Apply optional per-mode warmup/sample/tier overrides for one family."""
+    merged = dict(workload)
+    extra = (workload.get("mode_overrides") or {}).get(mode)
+    if isinstance(extra, Mapping):
+        merged.update(dict(extra))
+    return merged
+
+
 def gpu_setup_required(contract: Mapping[str, Any]) -> bool:
     if contract.get("host_only") or contract.get("skip_gpu_setup"):
         return False
@@ -229,6 +239,221 @@ def compile_required(contract: Mapping[str, Any], mode: str) -> bool:
     if mode_spec.get("skip_compile"):
         return False
     return True
+
+
+def _json_objects(text: str) -> list[dict[str, Any]]:
+    decoder = json.JSONDecoder()
+    objects: list[dict[str, Any]] = []
+    index = 0
+    while index < len(text):
+        start = text.find("{", index)
+        if start < 0:
+            break
+        try:
+            payload, consumed = decoder.raw_decode(text[start:])
+        except json.JSONDecodeError:
+            index = start + 1
+            continue
+        if isinstance(payload, dict):
+            objects.append(payload)
+        index = start + consumed
+    return objects
+
+
+def parse_native_observation(stdout: str) -> dict[str, Any]:
+    """Read actual native warmup/round/candidate/shape/tier counts from stdout."""
+    text = stdout or ""
+    records = _json_objects(text)
+    counts: dict[str, Any] = {}
+    for prefix in (
+        "QW38_OPT070_NATIVE_COUNTS=",
+        "QW38_OPT070_RESULT=",
+        "QW38_OPT061_COMPONENT_REPLAY_RESULT=",
+        "QW38_OPT057_PROBE_RESULT=",
+    ):
+        for line in text.splitlines():
+            stripped = line.strip()
+            if stripped.startswith(prefix):
+                try:
+                    payload = json.loads(stripped[len(prefix) :])
+                except json.JSONDecodeError:
+                    continue
+                if isinstance(payload, dict):
+                    records.append(payload)
+    for record in records:
+        for key, value in record.items():
+            if key not in counts or counts[key] in (None, "", [], {}):
+                counts[key] = value
+        nested = record.get("native_counts")
+        if isinstance(nested, Mapping):
+            for key, value in nested.items():
+                counts.setdefault(key, value)
+    keep = counts.get("keep")
+    if keep is None:
+        if re.search(r"\bkeep\s*=\s*true\b", text, re.IGNORECASE):
+            keep = True
+        elif re.search(r"\bkeep\s*=\s*false\b", text, re.IGNORECASE):
+            keep = False
+    counts["keep"] = keep
+    rounds = [
+        record
+        for record in records
+        if record.get("observation_unit") == "independent_round"
+        or "sample_index" in record
+        or record.get("round") is not None
+    ]
+    if not rounds:
+        rounds = list(counts.get("rounds") or counts.get("paired_rounds") or [])
+    sample_ids: list[Any] = []
+    for record in rounds:
+        if isinstance(record, Mapping):
+            if "sample_index" in record:
+                sample_ids.append(record.get("sample_index"))
+            elif "sample_id" in record:
+                sample_ids.append(record.get("sample_id"))
+        elif isinstance(record, (int, float, str)):
+            sample_ids.append(record)
+    if not sample_ids and counts.get("sample_ids"):
+        sample_ids = list(counts["sample_ids"])
+    counts["rounds"] = rounds
+    counts["sample_ids"] = sample_ids
+    counts["observed_warmups"] = int(
+        counts.get("observed_warmups", counts.get("warmups", 0)) or 0
+    )
+    counts["observed_samples"] = int(
+        counts.get("observed_samples", counts.get("samples", len(sample_ids))) or 0
+    )
+    counts["observed_candidates"] = int(
+        counts.get("observed_candidates", counts.get("candidates", 0)) or 0
+    )
+    counts["observed_shapes"] = int(
+        counts.get("observed_shapes", counts.get("shapes", counts.get("cases", 0))) or 0
+    )
+    counts["observed_tier"] = str(
+        counts.get("observed_tier", counts.get("tier", counts.get("executed_tier", "")))
+        or ""
+    )
+    counts["acceptance_executed"] = bool(
+        counts.get("acceptance_executed", counts.get("observed_tier") == "acceptance")
+    )
+    counts["pairs"] = int(
+        counts.get("pairs", counts.get("control_candidate_pairs", 0)) or 0
+    )
+    return counts
+
+
+def validate_performance_admission(
+    contract: Mapping[str, Any],
+    *,
+    mode: str,
+    workload_name: str,
+    workload: Mapping[str, Any],
+    stdout: str,
+    success: bool,
+) -> dict[str, Any]:
+    """Reject screen-only keeps, missing pairs, reused samples, and count drift."""
+    spec = contract.get("performance_admission")
+    if not spec:
+        return {"ok": True, "result_class": "ok", "message": ""}
+    instrumentation_only = bool(
+        spec.get("instrumentation_only", contract.get("instrumentation_only", False))
+    )
+    observed = parse_native_observation(stdout)
+    keep = observed.get("keep")
+    if instrumentation_only:
+        if keep is True:
+            return {
+                "ok": False,
+                "result_class": "instrumentation_keep_forbidden",
+                "message": "instrumentation-only tasks cannot claim a keep",
+                "observed": observed,
+            }
+        return {
+            "ok": True,
+            "result_class": "ok",
+            "message": "instrumentation-only: no speed admission",
+            "observed": observed,
+        }
+    if not success:
+        return {
+            "ok": False,
+            "result_class": "native_failed",
+            "message": "native workload failed before admission",
+            "observed": observed,
+        }
+    plan_warmups = int(workload.get("warmups", 0))
+    plan_samples = int(workload.get("samples", 0) or 0)
+    plan_candidates = int(workload.get("candidates", 0) or 0)
+    plan_shapes = int(workload.get("cases", 0) or 0)
+    plan_tier = str(workload.get("tier", workload_name))
+    mismatches: list[str] = []
+    if observed["observed_warmups"] != plan_warmups:
+        mismatches.append(
+            f"warmups observed={observed['observed_warmups']} plan={plan_warmups}"
+        )
+    if observed["observed_samples"] != plan_samples:
+        mismatches.append(
+            f"rounds observed={observed['observed_samples']} plan={plan_samples}"
+        )
+    if observed["observed_candidates"] != plan_candidates:
+        mismatches.append(
+            f"candidates observed={observed['observed_candidates']} "
+            f"plan={plan_candidates}"
+        )
+    if observed["observed_shapes"] != plan_shapes:
+        mismatches.append(
+            f"shapes observed={observed['observed_shapes']} plan={plan_shapes}"
+        )
+    observed_tier = observed["observed_tier"]
+    if observed_tier and observed_tier != plan_tier:
+        mismatches.append(f"tier observed={observed_tier} plan={plan_tier}")
+    if mismatches:
+        return {
+            "ok": False,
+            "result_class": "native_count_mismatch",
+            "message": "native counts disagree with the plan: " + "; ".join(mismatches),
+            "observed": observed,
+        }
+    sample_ids = [item for item in observed.get("sample_ids", []) if item is not None]
+    if len(sample_ids) != len(set(sample_ids)) and sample_ids:
+        return {
+            "ok": False,
+            "result_class": "reused_sample_ids",
+            "message": "paired rounds reused sample IDs",
+            "observed": observed,
+        }
+    planned_pairs = int(workload.get("control_candidate_pairs", 1) or 1)
+    if keep is True or mode == "acceptance":
+        if planned_pairs > 0 and observed.get("pairs", 0) < planned_pairs:
+            return {
+                "ok": False,
+                "result_class": "missing_pairs",
+                "message": "missing control/candidate pairs for admission",
+                "observed": observed,
+            }
+    if mode == "acceptance" and not observed.get("acceptance_executed"):
+        return {
+            "ok": False,
+            "result_class": "unexecuted_acceptance",
+            "message": "acceptance mode did not execute the acceptance tier",
+            "observed": observed,
+        }
+    if keep is True and (
+        observed_tier == "screen"
+        or (plan_tier == "screen" and not observed.get("acceptance_executed"))
+    ):
+        return {
+            "ok": False,
+            "result_class": "screen_only_keep",
+            "message": "screen-only keep=true is not production admission",
+            "observed": observed,
+        }
+    return {
+        "ok": True,
+        "result_class": "ok",
+        "message": "",
+        "observed": observed,
+    }
 
 
 def describe_plan(
@@ -269,7 +494,7 @@ def describe_plan(
     for name in selected:
         if name not in workloads:
             continue
-        workload = workloads[name]
+        workload = workload_for_mode(workloads[name], mode)
         product = loop_product(workload)
         total += product
         extras: list[str] = []
@@ -796,7 +1021,7 @@ class OptimizationRunner:
         timeout_s: float,
         run_dir: Path,
     ) -> dict[str, Any]:
-        workload = contract["workloads"][name]
+        workload = workload_for_mode(contract["workloads"][name], mode)
         mode_spec = contract.get("modes", {}).get(mode, {})
         tier = validate_tier(str(workload.get("tier", name)))
         target = str(workload.get("target", contract["target"]))
@@ -806,6 +1031,7 @@ class OptimizationRunner:
             "run_dir": str(run_dir),
             "root": str(self.root),
             "mode": mode,
+            "phase": name,
             "repetitions": int(
                 mode_spec.get("repetitions", workload.get("samples", 1))
             ),
@@ -813,7 +1039,7 @@ class OptimizationRunner:
         args = [str(arg).format(**values) for arg in workload.get("args", [])]
         if str(workload.get("runner", "docker")) == "host":
             completed = self._launch(args, timeout_s, run_dir / name, None)
-            return {
+            payload = {
                 "success": completed.returncode == 0 and not completed.terminated,
                 "result_class": (
                     "timeout"
@@ -828,6 +1054,19 @@ class OptimizationRunner:
                 "reference": int(workload.get("reference", 0)),
                 "selected_paths": [workload.get("selector", "ffn_only")],
             }
+            admission = validate_performance_admission(
+                contract,
+                mode=mode,
+                workload_name=name,
+                workload=workload,
+                stdout=completed.stdout,
+                success=bool(payload["success"]),
+            )
+            if not admission["ok"]:
+                payload["success"] = False
+                payload["result_class"] = admission["result_class"]
+                payload["message"] = admission["message"]
+            return payload
         docker_name = f"qw38-{contract['task'].lower()}-{name}-{uuid.uuid4().hex[:8]}"
         command = self._docker_command(
             contract,
@@ -844,7 +1083,7 @@ class OptimizationRunner:
                 "message": "screen must not invoke historical P/D oracles",
             }
         completed = self._launch(command, timeout_s, run_dir / name, docker_name)
-        return {
+        payload = {
             "success": completed.returncode == 0 and not completed.terminated,
             "result_class": (
                 "timeout"
@@ -859,6 +1098,19 @@ class OptimizationRunner:
             "reference": int(workload.get("reference", 0)),
             "selected_paths": [workload.get("selector", "ffn_only")],
         }
+        admission = validate_performance_admission(
+            contract,
+            mode=mode,
+            workload_name=name,
+            workload=workload,
+            stdout=completed.stdout,
+            success=bool(payload["success"]),
+        )
+        if not admission["ok"]:
+            payload["success"] = False
+            payload["result_class"] = admission["result_class"]
+            payload["message"] = admission["message"]
+        return payload
 
     def _release(
         self,

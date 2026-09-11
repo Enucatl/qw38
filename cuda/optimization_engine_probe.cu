@@ -42,7 +42,10 @@ struct Options final {
   std::size_t prefix = 0;
   std::size_t output_tokens = 0;
   int runs = 1;
+  int pairs = 1;
   const char* selector = kDefaultSelector;
+  const char* q8_layout = nullptr;
+  int mmq_async_x = -1;
   bool graph = false;
   bool eager = false;
   bool skip_logits = false;
@@ -100,8 +103,10 @@ bool parse_modes(const char* text, Options* options) {
 
 int usage(const char* argv0) {
   std::fprintf(stderr,
-               "usage: %s [MODEL.gguf] [--workload tiny|tokens|prefill|decode] "
+               "usage: %s [MODEL.gguf] [--workload tiny|tokens|prefill|decode|"
+               "q8-ab|mmq-ab] "
                "[--prompt N] [--prefix N] [--output-tokens N] [--runs N] "
+               "[--pairs N] [--q8-layout r1_w4|r2_w2] [--mmq-async-x 0|1] "
                "[--selector NAME] [--modes graph,eager] [--skip-logits]\n",
                argv0);
   return 2;
@@ -127,6 +132,17 @@ int parse_args(int argc, char** argv, Options* options) {
         return 2;
       }
       options->runs = static_cast<int>(runs);
+    } else if (std::strcmp(arg, "--pairs") == 0 && index + 1 < argc) {
+      std::size_t pairs = 0;
+      if (!parse_size(argv[++index], &pairs) || pairs == 0 || pairs > 8) {
+        std::fprintf(stderr, "--pairs must be 1..8\n");
+        return 2;
+      }
+      options->pairs = static_cast<int>(pairs);
+    } else if (std::strcmp(arg, "--q8-layout") == 0 && index + 1 < argc) {
+      options->q8_layout = argv[++index];
+    } else if (std::strcmp(arg, "--mmq-async-x") == 0 && index + 1 < argc) {
+      options->mmq_async_x = std::atoi(argv[++index]);
     } else if (std::strcmp(arg, "--selector") == 0 && index + 1 < argc) {
       options->selector = argv[++index];
     } else if (std::strcmp(arg, "--modes") == 0 && index + 1 < argc) {
@@ -186,6 +202,23 @@ int apply_defaults(const qw38::cuda::TestTier tier, Options* options) {
   if (std::strcmp(options->workload, "prefill") == 0 && options->prompt == 0) {
     options->prompt = kScreenPrompt;
   }
+  if (std::strcmp(options->workload, "q8-ab") == 0) {
+    if (options->prefix == 0) options->prefix = kScreenPrefix;
+    if (options->output_tokens == 0) {
+      options->output_tokens = kScreenOutputTokens;
+    }
+    if (!options->modes_set) {
+      options->graph = true;
+      options->eager = true;
+    }
+  }
+  if (std::strcmp(options->workload, "mmq-ab") == 0) {
+    if (options->prompt == 0) options->prompt = kScreenPrompt;
+    if (!options->modes_set) {
+      options->graph = true;
+      options->eager = true;
+    }
+  }
   return 0;
 }
 
@@ -194,7 +227,9 @@ int reject_over_bounds(qw38::cuda::TestTier tier, const Options& options) {
   const bool tokens = std::strcmp(options.workload, "tokens") == 0;
   const bool prefill = std::strcmp(options.workload, "prefill") == 0;
   const bool decode = std::strcmp(options.workload, "decode") == 0;
-  if (!tiny && !tokens && !prefill && !decode) {
+  const bool q8_ab = std::strcmp(options.workload, "q8-ab") == 0;
+  const bool mmq_ab = std::strcmp(options.workload, "mmq-ab") == 0;
+  if (!tiny && !tokens && !prefill && !decode && !q8_ab && !mmq_ab) {
     std::fprintf(stderr, "unknown workload %s\n", options.workload);
     return 2;
   }
@@ -233,11 +268,31 @@ int reject_over_bounds(qw38::cuda::TestTier tier, const Options& options) {
         options.output_tokens == kScreenOutputTokens && options.prompt == 0;
     const bool prefill_ok = prefill && options.prompt == kScreenPrompt &&
                             options.prefix == 0 && options.output_tokens == 0;
+    const bool q8_ok = q8_ab && options.prefix == kScreenPrefix &&
+                       options.output_tokens == kScreenOutputTokens &&
+                       options.prompt == 0 && options.pairs <= 1;
+    const bool mmq_ok = mmq_ab && options.prompt == kScreenPrompt &&
+                        options.prefix == 0 && options.output_tokens == 0 &&
+                        options.pairs <= 1;
     if (options.model == nullptr || options.runs != 1 ||
-        !(decode_ok || prefill_ok)) {
+        !(decode_ok || prefill_ok || q8_ok || mmq_ok)) {
       std::fprintf(stderr,
                    "screen allows one pair of P4096 or prefix 2048 + 32 "
                    "output tokens\n");
+      return 2;
+    }
+    return 0;
+  }
+  if (tier == qw38::cuda::TestTier::kAcceptance && (q8_ab || mmq_ab)) {
+    const bool q8_ok = q8_ab && options.prefix == kScreenPrefix &&
+                       options.output_tokens == kScreenOutputTokens &&
+                       options.prompt == 0 && options.pairs <= 5;
+    const bool mmq_ok = mmq_ab && options.prompt == kScreenPrompt &&
+                        options.prefix == 0 && options.output_tokens == 0 &&
+                        options.pairs <= 5;
+    if (options.model == nullptr || !(q8_ok || mmq_ok)) {
+      std::fprintf(stderr,
+                   "acceptance keep-ab allows five P4096 or D2048+32 pairs\n");
       return 2;
     }
     return 0;
@@ -471,6 +526,14 @@ int run_engine(const Options& options, bool correctness) {
   qw38::cuda::SchedulerSession eager_session;
   if (status.is_ok()) status = graph_session.create(capacity);
   if (status.is_ok()) status = eager_session.create(capacity);
+  if (options.q8_layout != nullptr &&
+      !qw38::cuda::apply_q8_layout_ident(options.q8_layout)) {
+    std::fprintf(stderr, "invalid --q8-layout %s\n", options.q8_layout);
+    return 2;
+  }
+  if (options.mmq_async_x >= 0) {
+    qw38::cuda::set_mmq_async_x_override(options.mmq_async_x != 0);
+  }
   qw38::cuda::SchedulerGraphs graphs;
   if (status.is_ok() && options.graph) {
     status = graphs.create(model, &workspace);
@@ -569,21 +632,140 @@ int run_engine(const Options& options, bool correctness) {
               "\"graph_frontier\":%zu,\"eager_frontier\":%zu,"
               "\"logits_copied\":true,\"p95_diagnostic\":%s,"
               "\"override_after_capture_ignored\":%s,"
+              "\"override_before_capture_applied\":%s,"
               "\"captured_path\":\"%s\",\"q4_decode\":\"%s\","
               "\"q8_decode\":\"%s\",\"q8_rows_skinny\":%u,"
-              "\"q8_layout_warps_skinny\":%u,\"ffn_decode\":\"%s\","
+              "\"q8_layout_warps_skinny\":%u,\"effective_q8_rows_skinny\":%u,"
+              "\"effective_q8_layout_warps_skinny\":%u,"
+              "\"last_q8_layout\":\"%s\",\"last_mmq_kernel\":\"%s\","
+              "\"last_mmq_async_x\":%s,\"ffn_decode\":\"%s\","
               "\"model_loaded_once\":true}\n",
               prompt, prefix, output_tokens, options.runs,
               static_cast<double>(graph_ms), static_cast<double>(eager_ms),
               static_cast<double>(control_tok_s),
               static_cast<double>(candidate_tok_s), graph_frontier,
               eager_frontier, correctness ? "false" : "true",
-              override_ignored ? "true" : "false", captured_path,
-              qw38::cuda::selected_q4_decode_path(),
+              override_ignored ? "true" : "false",
+              (options.q8_layout != nullptr || options.mmq_async_x >= 0)
+                  ? "true"
+                  : "false",
+              captured_path, qw38::cuda::selected_q4_decode_path(),
               qw38::cuda::selected_q8_decode_path(),
               qw38::cuda::selected_q8_decode_rows_skinny(),
               qw38::cuda::selected_q8_decode_layout_warps_skinny(),
+              qw38::cuda::effective_q8_decode_rows_skinny(),
+              qw38::cuda::effective_q8_decode_layout_warps_skinny(),
+              qw38::cuda::last_q8_decode_dispatch().layout,
+              qw38::cuda::last_mmq_tile_dispatch().kernel,
+              qw38::cuda::last_mmq_tile_dispatch().async_x ? "true" : "false",
               qw38::cuda::selected_ffn_decode_path());
+  std::printf("status=passed\n");
+  return 0;
+}
+
+int run_keep_ab(const Options& options) {
+  const bool q8 = std::strcmp(options.workload, "q8-ab") == 0;
+  qw38::cuda::ResidentModel model;
+  const int loaded = load_model(options.model, &model);
+  if (loaded != 0) return loaded;
+  const std::size_t prompt = q8 ? 0 : options.prompt;
+  const std::size_t prefix = q8 ? options.prefix : 0;
+  const std::size_t output_tokens = q8 ? options.output_tokens : 0;
+  const std::size_t token_count =
+      prompt > 0 ? prompt : prefix + output_tokens;
+  const std::size_t capacity =
+      prompt > 0 ? prompt : std::max(prefix + output_tokens, std::size_t{64});
+  std::vector<std::size_t> tokens(token_count);
+  fill_tokens(&tokens);
+  const char* control_layout = "r1_w4";
+  const char* candidate_layout = "r2_w2";
+  const int pairs = options.pairs > 0 ? options.pairs : 1;
+  std::printf("phase=keep_ab family=%s pairs=%d model_loaded_once=true\n",
+              q8 ? "q8" : "mmq", pairs);
+  for (int pair = 0; pair < pairs; ++pair) {
+    const bool ba = (pair % 2) == 1;
+    const char* first = ba ? (q8 ? candidate_layout : "1")
+                           : (q8 ? control_layout : "0");
+    const char* second = ba ? (q8 ? control_layout : "0")
+                            : (q8 ? candidate_layout : "1");
+    float walls[2] = {0.0F, 0.0F};
+    const char* labels[2] = {first, second};
+    const char* q8_layout_copy[2] = {"", ""};
+    char mmq_kernel_buf[2][80]{{}, {}};
+    bool mmq_async[2] = {false, false};
+    unsigned int q8_rows[2] = {0, 0};
+    for (int side = 0; side < 2; ++side) {
+      if (q8) {
+        if (!qw38::cuda::apply_q8_layout_ident(labels[side])) {
+          std::fprintf(stderr, "invalid q8 layout %s\n", labels[side]);
+          return 2;
+        }
+      } else {
+        qw38::cuda::set_mmq_async_x_override(std::strcmp(labels[side], "1") == 0);
+      }
+      qw38::cuda::SchedulerWorkspace workspace;
+      qw38::cuda::SchedulerSession session;
+      qw38::Status status = workspace.create(capacity);
+      if (status.is_ok()) status = session.create(capacity);
+      qw38::cuda::SchedulerGraphs graphs;
+      if (status.is_ok()) status = graphs.create(model, &workspace);
+      if (!status.is_ok()) return fail_status(status);
+      std::vector<float> logits(qw38::internal::kVocabularySize);
+      std::array<float, qw38::internal::kResidualWidth> hidden{};
+      if (prompt > 0) {
+        status = run_prefill(model, tokens.data(), prompt, &session, &workspace,
+                             &graphs, logits.data(), hidden.data(),
+                             &walls[side]);
+      } else {
+        status = run_tokens(model, tokens.data(), prefix, output_tokens,
+                            &session, &workspace, &graphs, logits.data(),
+                            hidden.data(), &walls[side]);
+      }
+      if (!status.is_ok()) return fail_status(status);
+      q8_layout_copy[side] = qw38::cuda::last_q8_decode_dispatch().layout;
+      q8_rows[side] = qw38::cuda::effective_q8_decode_rows_skinny();
+      std::snprintf(
+          mmq_kernel_buf[side], sizeof(mmq_kernel_buf[side]), "%s",
+          qw38::cuda::last_mmq_tile_dispatch().kernel != nullptr
+              ? qw38::cuda::last_mmq_tile_dispatch().kernel
+              : "");
+      mmq_async[side] = qw38::cuda::last_mmq_tile_dispatch().async_x;
+      std::printf(
+          "keep_ab_launch pair=%d side=%d config=%s graph_capture=true "
+          "q8_layout=%s q8_rows=%u mmq_kernel=%s mmq_async_x=%s "
+          "wall_ms=%.9g captured_path=%s\n",
+          pair, side, labels[side],
+          q8_layout_copy[side] != nullptr ? q8_layout_copy[side] : "",
+          q8_rows[side], mmq_kernel_buf[side],
+          mmq_async[side] ? "true" : "false",
+          static_cast<double>(walls[side]), graphs.execution_graph_path());
+      qw38::cuda::clear_q8_decode_path_override();
+      qw38::cuda::clear_mmq_async_x_override();
+    }
+    std::printf(
+        "{\"observation_unit\":\"independent_round\",\"sample_index\":%d,"
+        "\"pair\":%d,\"order\":\"%s\",\"control_ms\":%.9g,"
+        "\"candidate_ms\":%.9g,\"family\":\"%s\"}\n",
+        pair, pair, ba ? "BA" : "AB",
+        static_cast<double>(ba ? walls[1] : walls[0]),
+        static_cast<double>(ba ? walls[0] : walls[1]), q8 ? "q8" : "mmq");
+  }
+  std::printf(
+      "QW38_OPT070_NATIVE_COUNTS={\"schema_version\":1,\"task\":\"OPT-070\","
+      "\"family\":\"%s\",\"tier\":\"%s\",\"warmups\":0,\"samples\":%d,"
+      "\"observed_warmups\":0,\"observed_samples\":%d,\"observed_candidates\":2,"
+      "\"observed_shapes\":1,\"observed_tier\":\"%s\",\"pairs\":%d,"
+      "\"acceptance_executed\":%s,\"keep\":false,"
+      "\"override_before_capture_applied\":true,"
+      "\"graph_capture_separate\":true}\n",
+      q8 ? "q8" : "mmq", qw38::cuda::test_tier_name(), pairs, pairs,
+      qw38::cuda::test_tier_name(), pairs,
+      qw38::cuda::test_tier() == qw38::cuda::TestTier::kAcceptance ? "true"
+                                                                   : "false");
+  std::printf("%s{\"schema_version\":1,\"task\":\"OPT-070\","
+              "\"workload\":\"%s\",\"pairs\":%d,\"model_loaded_once\":true,"
+              "\"override_before_capture_applied\":true}\n",
+              kPrefix, options.workload, pairs);
   std::printf("status=passed\n");
   return 0;
 }
@@ -605,5 +787,9 @@ int main(int argc, char** argv) {
   const int bounded = reject_over_bounds(tier, options);
   if (bounded != 0) return bounded;
   if (std::strcmp(options.workload, "tiny") == 0) return run_tiny();
+  if (std::strcmp(options.workload, "q8-ab") == 0 ||
+      std::strcmp(options.workload, "mmq-ab") == 0) {
+    return run_keep_ab(options);
+  }
   return run_engine(options, tier == qw38::cuda::TestTier::kCorrectness);
 }
