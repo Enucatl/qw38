@@ -1,0 +1,119 @@
+{
+  "schema_version": 1,
+  "task": "OPT-061",
+  "status": "replay_protocol",
+  "claims_throughput": false,
+  "claims_performance_improvement": false,
+  "accept_hot_as_production": false,
+  "llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+  "gguf_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+  "token_generator": "(42 + index * 997) % 248320",
+  "observation_unit": "independent_round",
+  "isolated_op_timings_insufficient": true,
+  "paired_gate_up_is_64_not_128": true,
+  "gate_up_down_calls_per_token": 64,
+  "synthetic_capture": {
+    "layer": 0,
+    "role": "ffn_gate",
+    "token": 128,
+    "shape": [5120, 17408],
+    "dtype": "Q4_K",
+    "tensor_name": "blk.0.ffn_gate.weight",
+    "gguf_identity": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+    "selector_set": {
+      "ffn_decode": "paired_staged",
+      "q4_decode": "packed"
+    },
+    "values": [1.0, 2.0, 3.0, 4.0],
+    "hash": "ad73b9acd6e4a74b2f5bb5386658ce3bb146cd040a1867646ab3b973fb6632b1"
+  },
+  "synthetic_paired_ffn": {
+    "enclosing_only": [
+      {
+        "role": "ffn_gate_up_glu",
+        "attribution_role": "enclosing",
+        "complete_work_ms": 4.0,
+        "fused_member_ids": "ffn_gate,ffn_up,ffn_glu",
+        "fused_member_count": 3
+      }
+    ],
+    "double_counted": [
+      {
+        "role": "ffn_gate_up_glu",
+        "attribution_role": "enclosing",
+        "complete_work_ms": 4.0
+      },
+      {
+        "role": "ffn_gate",
+        "attribution_role": "member",
+        "complete_work_ms": 2.0
+      },
+      {
+        "role": "ffn_up",
+        "attribution_role": "member",
+        "complete_work_ms": 2.0
+      }
+    ]
+  },
+  "synthetic_rounds": [
+    {
+      "family": "decode-ffn",
+      "cache_mode": "rotating",
+      "sample_index": 0,
+      "round_id": "r0",
+      "observation_unit": "independent_round",
+      "warmup": false,
+      "enclosing_ms": 12.5,
+      "kernel_only_ms": 11.8
+    },
+    {
+      "family": "decode-ffn",
+      "cache_mode": "rotating",
+      "sample_index": 1,
+      "round_id": "r1",
+      "observation_unit": "independent_round",
+      "warmup": false,
+      "enclosing_ms": 12.7,
+      "kernel_only_ms": 12.0
+    },
+    {
+      "family": "decode-ffn",
+      "cache_mode": "hot",
+      "sample_index": 0,
+      "round_id": "h0",
+      "observation_unit": "independent_round",
+      "warmup": false,
+      "enclosing_ms": 8.1,
+      "kernel_only_ms": 7.6
+    }
+  ],
+  "opt060_attribution_ms_per_decode_token": {
+    "decode-ffn": 15.43,
+    "decode-mixer": 7.10,
+    "prompt-ffn": 666.40
+  },
+  "rotating_replay_ms": {
+    "decode-ffn": 17.1957,
+    "decode-mixer": 5.4398,
+    "prompt-ffn": 699.9146
+  },
+  "hot_replay_ms": {
+    "decode-ffn": 15.7484,
+    "decode-mixer": 2.6117,
+    "prompt-ffn": 693.3972
+  },
+  "acceptance_rounds": 10,
+  "acceptance_warmups": 3,
+  "measurement_utc": "2026-09-11T08:17:23Z",
+  "capture_keys": {
+    "decode-ffn": "ffbd7cbc40792376734d837430d71c68fd266cba9f37194f5aea8d1145c395bd",
+    "decode-mixer": "ffbd7cbc40792376734d837430d71c68fd266cba9f37194f5aea8d1145c395bd",
+    "prompt-ffn": "2dcfaa062bbb3af5e0f285d3124ca454c2e5962b301753caa6ed893c92dbec63"
+  },
+  "microbench_disagreement": "OPT-046/047 reuse one resident matrix; rotating replay visits distinct layer weights. Disagreement is expected and is not invented into a reconciliation.",
+  "reference_identity": "independent_fp64_control_dots",
+  "opt059_reference": "fixtures/opt059_gpu_numerics.json",
+  "replay_command_template": "./build/qw38-cuda-component-replay --workload {family} --cache-mode {cache_mode} --capture-key {capture_key} --rows 0,1024,2048,4095",
+  "prompt_row_indices": [0, 1024, 2048, 4095],
+  "native_target": "build/qw38-cuda-component-replay"
+}

@@ -521,6 +521,51 @@ cudaError_t maybe_capture_preprojection(ActivationCapture* capture,
   return error;
 }
 
+cudaError_t maybe_capture_residual(ActivationCapture* capture,
+                                   std::size_t layer, const float* device,
+                                   std::size_t count) noexcept {
+  const int slot = capture_slot_index(capture, layer);
+  if (slot < 0 || device == nullptr) return cudaSuccess;
+  if (count != internal::kResidualWidth) return cudaErrorInvalidValue;
+  cudaError_t error = cudaDeviceSynchronize();
+  if (error != cudaSuccess) return error;
+  ActivationCaptureSlot& dest = capture->slots[static_cast<std::size_t>(slot)];
+  dest.layer = layer;
+  std::snprintf(dest.residual_dtype, sizeof(dest.residual_dtype), "FP32");
+  dest.residual_shape = {1, count};
+  error = capture_fp32_vector(device, count, dest.residual_fp32.data(),
+                              dest.residual_sha256, dest.residual_prefix.data(),
+                              dest.residual_prefix.size());
+  if (error == cudaSuccess) dest.residual_captured = true;
+  return error;
+}
+
+cudaError_t maybe_capture_prompt_rows(ActivationCapture* capture,
+                                      std::size_t layer, const float* residual,
+                                      const float* mixer_output,
+                                      std::size_t token_count) noexcept {
+  if (capture == nullptr || residual == nullptr) return cudaSuccess;
+  if (capture->prompt_residual == nullptr || token_count == 0) {
+    return cudaSuccess;
+  }
+  if (layer != capture->prompt_capture_layer) return cudaSuccess;
+  cudaError_t error = cudaDeviceSynchronize();
+  if (error != cudaSuccess) return error;
+  const std::size_t floats = token_count * internal::kResidualWidth;
+  error = cudaMemcpy(capture->prompt_residual, residual, floats * sizeof(float),
+                     cudaMemcpyDeviceToHost);
+  if (error == cudaSuccess && mixer_output != nullptr &&
+      capture->prompt_mixer_output != nullptr) {
+    error = cudaMemcpy(capture->prompt_mixer_output, mixer_output,
+                       floats * sizeof(float), cudaMemcpyDeviceToHost);
+  }
+  if (error == cudaSuccess) {
+    capture->prompt_rows = token_count;
+    capture->prompt_rows_captured = true;
+  }
+  return error;
+}
+
 cudaError_t maybe_capture_down_input(ActivationCapture* capture,
                                      std::size_t layer,
                                      const __nv_bfloat16* device) noexcept {
@@ -3167,6 +3212,10 @@ Status execute_token(const ResidentModel& model, std::size_t token,
     nvtxRangePop();
     nvtxRangePushA("qw38.ffn");
     if (error == cudaSuccess) {
+      error = maybe_capture_residual(capture, layer_index, next,
+                                     internal::kResidualWidth);
+    }
+    if (error == cudaSuccess) {
       error = begin_phase(categories,
                           exclusive ? &decode_attribution->ffn_mmv
                                     : (timings == nullptr ? nullptr
@@ -4105,10 +4154,15 @@ Status execute_prompt_chunk(
             layer_index + 1 < model.layers_.size()
                 ? model.layers_[layer_index + 1].common.input_norm
                 : nullptr;
-        error = execute_prompt_ffn_attributed(
-            layer.common, residual, workspace, after_mixer, residual,
-            next_input_norm, rows, stream, leaves, leaf_timings, capture,
-            layer_index, layer_kind);
+        error = maybe_capture_prompt_rows(
+            capture, layer_index, residual, workspace->prompt_mixer_output_,
+            rows);
+        if (error == cudaSuccess) {
+          error = execute_prompt_ffn_attributed(
+              layer.common, residual, workspace, after_mixer, residual,
+              next_input_norm, rows, stream, leaves, leaf_timings, capture,
+              layer_index, layer_kind);
+        }
         if (error == cudaSuccess) {
           bump(counters,
                &PromptPipelineCounters::fused_residual_norm_kernel_launches);

@@ -1,0 +1,140 @@
+{
+  "schema_version": 1,
+  "task": "OPT-061",
+  "yardstick": "real_input_streaming_component_replay",
+  "claims_throughput": false,
+  "claims_performance_improvement": false,
+  "image": "qw38-cuda:13.0.2",
+  "model": "models/Qwen3.8-27B-Q4_K_M.gguf",
+  "gpu_lock": "build/optimization-runs/qw38-gpu.lock",
+  "aggregate_deadline_s": 300,
+  "target": "build/qw38-cuda-component-replay",
+  "diagnostics_make_target": "cuda-opt061-diagnostics",
+  "token_generator": "(42 + index * 997) % 248320",
+  "modes": {
+    "feedback": {
+      "target": "build/qw38-cuda-component-replay",
+      "tier_sequence": ["decode-ffn", "decode-mixer", "prompt-ffn"],
+      "make_targets": ["build/qw38-cuda-component-replay"],
+      "build_once": true,
+      "aggregate_deadline_s": 300,
+      "workloads": ["decode-ffn", "decode-mixer", "prompt-ffn"]
+    },
+    "acceptance": {
+      "target": "build/qw38-cuda-component-replay",
+      "tier_sequence": ["acceptance"],
+      "make_targets": ["build/qw38-cuda-component-replay"],
+      "warm_repetitions": 0,
+      "aggregate_deadline_s": 300,
+      "workloads": ["acceptance"]
+    },
+    "release": {
+      "target": "build/qw38-cuda-component-replay",
+      "tier": "acceptance",
+      "make_targets": ["build/qw38-cuda-component-replay"],
+      "historical_oracles": false,
+      "workloads": []
+    }
+  },
+  "workloads": {
+    "smoke": {
+      "target": "build/qw38-cuda-component-replay",
+      "tier": "smoke",
+      "kind": "tiny_q4_q8_guards",
+      "cases": 2,
+      "candidates": 1,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 0,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 0,
+      "reference": 0,
+      "args": ["--workload", "smoke"]
+    },
+    "correctness": {
+      "target": "build/qw38-cuda-component-replay",
+      "tier": "correctness",
+      "kind": "sampled_fp64_dots",
+      "cases": 1,
+      "candidates": 1,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 1,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 0,
+      "reference": 1,
+      "args": ["--workload", "correctness"]
+    },
+    "decode-ffn": {
+      "target": "build/qw38-cuda-component-replay",
+      "tier": "screen",
+      "kind": "complete_decode_ffn_hot_rotating",
+      "cases": 1,
+      "candidates": 1,
+      "warmups": 1,
+      "samples": 3,
+      "tokens": 1,
+      "execution_modes": 2,
+      "control_candidate_pairs": 1,
+      "load_model": 1,
+      "reference": 0,
+      "args": ["{model}", "--workload", "decode-ffn"]
+    },
+    "decode-mixer": {
+      "target": "build/qw38-cuda-component-replay",
+      "tier": "screen",
+      "kind": "complete_decode_mixer_hot_rotating",
+      "cases": 1,
+      "candidates": 1,
+      "warmups": 1,
+      "samples": 3,
+      "tokens": 1,
+      "execution_modes": 2,
+      "control_candidate_pairs": 1,
+      "load_model": 1,
+      "reference": 0,
+      "args": ["{model}", "--workload", "decode-mixer"]
+    },
+    "prompt-ffn": {
+      "target": "build/qw38-cuda-component-replay",
+      "tier": "screen",
+      "kind": "complete_prompt_ffn_4096",
+      "cases": 1,
+      "candidates": 1,
+      "warmups": 1,
+      "samples": 3,
+      "tokens": 1,
+      "execution_modes": 2,
+      "control_candidate_pairs": 1,
+      "load_model": 1,
+      "reference": 0,
+      "args": ["{model}", "--workload", "prompt-ffn"]
+    },
+    "acceptance": {
+      "target": "build/qw38-cuda-component-replay",
+      "tier": "acceptance",
+      "kind": "three_warmup_ten_rounds_per_mode_family",
+      "cases": 1,
+      "candidates": 1,
+      "warmups": 3,
+      "samples": 10,
+      "tokens": 1,
+      "execution_modes": 2,
+      "control_candidate_pairs": 1,
+      "load_model": 1,
+      "reference": 0,
+      "args": ["{model}", "--workload", "acceptance"]
+    }
+  },
+  "proof_limit": [
+    "no throughput claim",
+    "no end-to-end sitting",
+    "hot cache_mode is diagnostic only",
+    "paired gate/up is 64 calls not 128",
+    "isolated MUL_MAT is not fused llama FFN",
+    "hardware counters optional and non-blocking"
+  ],
+  "report_path": "evidence/optimization/opt061-component-replay/REPORT.md"
+}

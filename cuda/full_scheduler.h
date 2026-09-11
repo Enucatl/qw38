@@ -180,6 +180,12 @@ struct ActivationCaptureSlot final {
   char down_sha256[65]{};
   float* down_full = nullptr;
   std::array<std::size_t, 2> down_shape{};
+  bool residual_captured = false;
+  std::array<float, internal::kResidualWidth> residual_fp32{};
+  std::array<float, 64> residual_prefix{};
+  char residual_sha256[65]{};
+  char residual_dtype[16]{};
+  std::array<std::size_t, 2> residual_shape{};
 };
 
 struct ActivationCapture final {
@@ -195,6 +201,13 @@ struct ActivationCapture final {
   std::array<float, 64> output_prefix{};
   char output_sha256[65]{};
   std::size_t output_count = 0;
+  // OPT-061 prompt-row capture. Host owns the buffers; copies are untimed.
+  std::array<std::size_t, 4> prompt_row_indices{0, 1024, 2048, 4095};
+  std::size_t prompt_capture_layer = 0;
+  std::size_t prompt_rows = 0;
+  float* prompt_residual = nullptr;
+  float* prompt_mixer_output = nullptr;
+  bool prompt_rows_captured = false;
 };
 
 // One request-level attribution record. A false `measured` flag means that the
