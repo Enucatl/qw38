@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "task": "OPT-066",
+  "status": "keep",
+  "selected_mmq_pipeline_path": "fma_async",
+  "selected_mmq_async_x": true,
+  "control_tile": "i128_j128",
+  "control_variant": "fma_async",
+  "candidate_variant": "fma_async_x",
+  "installed": true,
+  "claims_throughput": false,
+  "claims_performance_improvement": false,
+  "llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+  "gguf_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+  "measurement_utc": "2026-09-11T10:57:04Z",
+  "feedback_run": "build/optimization-runs/OPT-066/feedback/20260911T105659Z-f7f8ceb9",
+  "acceptance_run": "build/optimization-runs/OPT-066/acceptance/20260911T105704Z-056f463e",
+  "control_complete_ffn_ms": 9.36026669,
+  "winner_complete_ffn_ms": 8.61491203,
+  "keep": true,
+  "gate_up_ms": {
+    "control": 2.7695787,
+    "candidate": 2.53578663
+  },
+  "down_ms": {
+    "control": 2.79142404,
+    "candidate": 2.53610659
+  },
+  "resources": {
+    "control": {"occupancy": 1, "registers": 255, "local_bytes": 64, "shared_bytes": 76288, "extra_x": 0},
+    "candidate": {"occupancy": 1, "registers": 229, "local_bytes": 0, "shared_bytes": 94736, "extra_x": 18448, "extra_x_two_stage": 36880, "device_optin": 101376}
+  },
+  "x_ring_stages": 1,
+  "e2e_tok_s_sitting": false,
+  "compute_sanitizer": "memcheck 0 errors on correctness",
+  "note": "Single raw-X slot because 2*I*144+16 plus the Y ring exceeds SM120 opt-in. Complete FFN keeps fma_async_x. No D2048 sitting; OPT-069 owns combined E2E."
+}

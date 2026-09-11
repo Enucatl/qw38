@@ -273,10 +273,15 @@ bool legal_mmq_pipeline_path(const char* path) noexcept;
 const char* selected_mmq_pipeline_path() noexcept;
 const char* effective_mmq_pipeline_path() noexcept;
 void set_mmq_pipeline_path_override(const char* path) noexcept;
+bool selected_mmq_async_x() noexcept;
+bool effective_mmq_async_x() noexcept;
+void set_mmq_async_x_override(bool enabled) noexcept;
+void clear_mmq_async_x_override() noexcept;
 bool mmq_pipeline_path_on(const char* path) noexcept;
 std::size_t mmq_pipeline_extra_shared_bytes(unsigned int prompt_tile,
                                             unsigned int quality_i,
                                             const char* path) noexcept;
+std::size_t mmq_x_pipeline_extra_shared_bytes(unsigned int quality_i) noexcept;
 int mmq_pipeline_occupancy(QuantKind kind, unsigned int prompt_tile,
                            unsigned int quality_i, const char* path) noexcept;
 
@@ -321,6 +326,7 @@ struct MmqTileDispatch final {
   bool fallback = false;
   bool fma = false;
   bool async_y = false;
+  bool async_x = false;
   const char* ident = "";
   const char* path = "";
   const char* kernel = "";
@@ -333,11 +339,23 @@ cudaError_t mmq_pipeline_kernel_attributes(
     QuantKind kind, unsigned int prompt_tile, unsigned int quality_i,
     const char* path, int* occupancy, int* registers,
     std::size_t* local_bytes, std::size_t* shared_bytes) noexcept;
+cudaError_t mmq_x_pipeline_kernel_attributes(int* occupancy, int* registers,
+                                            std::size_t* local_bytes,
+                                            std::size_t* shared_bytes) noexcept;
 
 void set_ffn_tile_override(unsigned int gate_i, unsigned int gate_j,
                            unsigned int up_i, unsigned int up_j,
                            unsigned int down_i, unsigned int down_j) noexcept;
 void clear_ffn_tile_override() noexcept;
+
+struct MmqAsyncXOverrideScope final {
+  explicit MmqAsyncXOverrideScope(bool enabled) noexcept {
+    set_mmq_async_x_override(enabled);
+  }
+  ~MmqAsyncXOverrideScope() { clear_mmq_async_x_override(); }
+  MmqAsyncXOverrideScope(const MmqAsyncXOverrideScope&) = delete;
+  MmqAsyncXOverrideScope& operator=(const MmqAsyncXOverrideScope&) = delete;
+};
 
 struct FfnTileOverrideScope final {
   FfnTileOverrideScope(unsigned int gate_i, unsigned int gate_j,

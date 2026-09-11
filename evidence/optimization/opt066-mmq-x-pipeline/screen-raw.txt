@@ -1,0 +1,46 @@
+
+==========
+== CUDA ==
+==========
+
+CUDA Version 13.0.2
+
+Container image Copyright (c) 2016-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+
+This container image and its contents are governed by the NVIDIA Deep Learning Container License.
+By pulling and using the container, you accept the terms and conditions of this license:
+https://developer.nvidia.com/ngc/nvidia-deep-learning-container-license
+
+A copy of this license is made available in this container at /NGC-DL-CONTAINER-LICENSE for your convenience.
+
+screen_warmup group=gate_up variant=control ms=2.82521605 pipeline=true async_x=false kernel=q4_i128_j128_fma_async
+screen_sample group=gate_up variant=control sample=1 ms=2.75968003 pipeline=true async_x=false kernel=q4_i128_j128_fma_async
+screen_sample group=gate_up variant=control sample=2 ms=2.77606392 pipeline=true async_x=false kernel=q4_i128_j128_fma_async
+screen_sample group=gate_up variant=control sample=3 ms=2.7729919 pipeline=true async_x=false kernel=q4_i128_j128_fma_async
+screen_mean group=gate_up variant=control ms=2.7695787
+screen_warmup group=gate_up variant=candidate ms=2.51600003 pipeline=true async_x=true kernel=q4_i128_j128_fma_async_x
+screen_sample group=gate_up variant=candidate sample=1 ms=2.53849602 pipeline=true async_x=true kernel=q4_i128_j128_fma_async_x
+screen_sample group=gate_up variant=candidate sample=2 ms=2.53647995 pipeline=true async_x=true kernel=q4_i128_j128_fma_async_x
+screen_sample group=gate_up variant=candidate sample=3 ms=2.53238392 pipeline=true async_x=true kernel=q4_i128_j128_fma_async_x
+screen_mean group=gate_up variant=candidate ms=2.53578663
+screen_warmup group=down variant=control ms=2.82214403 pipeline=true async_x=false kernel=q4_i128_j128_fma_async
+screen_sample group=down variant=control sample=1 ms=2.786304 pipeline=true async_x=false kernel=q4_i128_j128_fma_async
+screen_sample group=down variant=control sample=2 ms=2.79449606 pipeline=true async_x=false kernel=q4_i128_j128_fma_async
+screen_sample group=down variant=control sample=3 ms=2.79347205 pipeline=true async_x=false kernel=q4_i128_j128_fma_async
+screen_mean group=down variant=control ms=2.79142404
+screen_warmup group=down variant=candidate ms=2.50880003 pipeline=true async_x=true kernel=q4_i128_j128_fma_async_x
+screen_sample group=down variant=candidate sample=1 ms=2.53235197 pipeline=true async_x=true kernel=q4_i128_j128_fma_async_x
+screen_sample group=down variant=candidate sample=2 ms=2.53952003 pipeline=true async_x=true kernel=q4_i128_j128_fma_async_x
+screen_sample group=down variant=candidate sample=3 ms=2.536448 pipeline=true async_x=true kernel=q4_i128_j128_fma_async_x
+screen_mean group=down variant=candidate ms=2.53610659
+complete_warmup async_x=false ms=9.19862366 last_kernel=q4_i128_j128_fma_async pipeline=true
+complete_sample async_x=false sample=1 ms=9.27206421 last_kernel=q4_i128_j128_fma_async pipeline=true
+complete_sample async_x=false sample=2 ms=9.39945602 last_kernel=q4_i128_j128_fma_async pipeline=true
+complete_sample async_x=false sample=3 ms=9.40927982 last_kernel=q4_i128_j128_fma_async pipeline=true
+complete_warmup async_x=true ms=8.59142399 last_kernel=q4_i128_j128_fma_async_x pipeline=true
+complete_sample async_x=true sample=1 ms=8.60796833 last_kernel=q4_i128_j128_fma_async_x pipeline=true
+complete_sample async_x=true sample=2 ms=8.60131168 last_kernel=q4_i128_j128_fma_async_x pipeline=true
+complete_sample async_x=true sample=3 ms=8.63545609 last_kernel=q4_i128_j128_fma_async_x pipeline=true
+screen_winner control_gate_up_ms=2.7695787 candidate_gate_up_ms=2.53578663 control_down_ms=2.79142404 candidate_down_ms=2.53610659 control_ffn_ms=9.36026669 survivor_ffn_ms=8.61491203 keep=true installed_async_x=true selected_async_x=true
+QW38_OPT066_MMQ_X_PIPELINE_RESULT={"schema_version":1,"task":"OPT-066","workload":"screen","tier":"screen","status":"passed","selected_pipeline":"fma_async","selected_async_x":true,"tile":"i128_j128","claims_throughput":false,"llama_revision":"cc83d7b4824f73cfdda4dfbb47ee39804f71b328","gguf_sha256":"31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34"}
+status=passed
