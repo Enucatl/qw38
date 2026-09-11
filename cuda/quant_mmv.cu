@@ -771,6 +771,9 @@ cudaError_t launch_quant_mmv(QuantKind kind, const std::uint8_t* weights,
         weights, rows, columns, activation, q8_workspace, output,
         effective_q4_decode_warps_per_row(), q4_decode_uses_q8_1(), stream);
   }
+  if (kind == QuantKind::kQ4K) {
+    record_q4_launch_variant(kQ4LaunchVariantPacked);
+  }
   if (kind == QuantKind::kQ6K && q6_decode_uses_integer_for_rows(rows)) {
     return launch_q6k_coop_mmv(
         weights, rows, columns, activation, q8_workspace, output,
@@ -799,13 +802,23 @@ cudaError_t launch_quant_mmv_prequant(QuantKind kind, const std::uint8_t* weight
                                       std::size_t rows, std::size_t columns,
                                       const Q8Block* q8, float* output,
                                       cudaStream_t stream) noexcept {
-  const unsigned int warps = selected_mmv_warps(rows);
   if (weights == nullptr || q8 == nullptr || output == nullptr || rows == 0 ||
       columns == 0 || columns % kValuesPerWeightBlock != 0 ||
-      (warps != 4 && warps != 8 && warps != 16) ||
       (kind != QuantKind::kQ4K && kind != QuantKind::kQ6K &&
        kind != QuantKind::kQ8_0)) {
     return cudaErrorInvalidValue;
+  }
+  // Q8Block* may dispatch only Q8Block-compatible kernels. Never reinterpret
+  // this pointer as Q8_1 because kSelectedQ4DecodePath became integer_q8_1.
+  if (kind == QuantKind::kQ4K && q4_decode_uses_integer_q8block()) {
+    return launch_q4k_coop_mmv_prequant_q8(
+        weights, rows, columns, q8, output, effective_q4_decode_warps_per_row(),
+        stream);
+  }
+  const unsigned int warps = selected_mmv_warps(rows);
+  if (warps != 4 && warps != 8 && warps != 16) return cudaErrorInvalidValue;
+  if (kind == QuantKind::kQ4K) {
+    record_q4_launch_variant(kQ4LaunchVariantPackedPrequant);
   }
   const bool packed = kind != QuantKind::kQ8_0;
   return launch_mmv_after_quant(kind, weights, rows, columns, q8, output, warps,
@@ -858,6 +871,7 @@ cudaError_t launch_q4k_gate_up_swiglu_prequant(
       (warps != 4 && warps != 8 && warps != 16)) {
     return cudaErrorInvalidValue;
   }
+  record_q4_launch_variant(kQ4LaunchVariantPairedStaged);
   return launch_gate_up_warps<true>(gate_weights, up_weights, rows, columns,
                                     staged, output, stream);
 }
@@ -874,6 +888,7 @@ cudaError_t launch_q4k_gate_up_swiglu(
       (warps != 4 && warps != 8 && warps != 16)) {
     return cudaErrorInvalidValue;
   }
+  record_q4_launch_variant(kQ4LaunchVariantPaired);
   return launch_gate_up_warps<false>(gate_weights, up_weights, rows, columns,
                                      activation, output, stream);
 }

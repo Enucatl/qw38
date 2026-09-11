@@ -663,6 +663,14 @@ cudaError_t execute_prompt_ffn(
     const float* next_input_norm, std::size_t token_count,
     cudaStream_t stream) noexcept;
 
+// Decode FFN using the current Q4/FFN selectors. Records gate/up/down
+// launch variants for eager work and CUDA graph capture.
+cudaError_t launch_decode_ffn(const DeviceCommonLayer& layer,
+                              const float* residual,
+                              SchedulerWorkspace* workspace, float* output,
+                              const float* next_input_norm,
+                              cudaStream_t stream) noexcept;
+
 Status execute_prompt_chunk(
     const ResidentModel& model, const std::size_t* tokens,
     std::size_t token_count, SchedulerSession* session,

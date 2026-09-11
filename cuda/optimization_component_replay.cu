@@ -619,10 +619,28 @@ cudaError_t replay_decode_ffn_layer(const qw38::cuda::DeviceCommonLayer& layer,
         workspace->normalized_, workspace->q8_, qw38::internal::kResidualWidth,
         stream);
   }
+  workspace->q8_decode_staged_activation_ = nullptr;
+  workspace->q8_decode_staged_columns_ = 0;
   if (error == cudaSuccess && kernel_start != nullptr) {
     error = cudaEventRecord(kernel_start, stream);
   }
-  if (error == cudaSuccess) {
+  if (error == cudaSuccess && qw38::cuda::q4_decode_uses_integer_q8block()) {
+    error = qw38::cuda::launch_quant_mmv_prequant(
+        layer.ffn_gate.kind, layer.ffn_gate.data, layer.ffn_gate.rows,
+        layer.ffn_gate.columns, workspace->q8_, workspace->projection_a_,
+        stream);
+    if (error == cudaSuccess) {
+      error = qw38::cuda::launch_quant_mmv_prequant(
+          layer.ffn_up.kind, layer.ffn_up.data, layer.ffn_up.rows,
+          layer.ffn_up.columns, workspace->q8_, workspace->projection_b_,
+          stream);
+    }
+    if (error == cudaSuccess) {
+      error = qw38::cuda::launch_swiglu_bf16(
+          workspace->projection_a_, workspace->projection_b_,
+          qw38::internal::kFfnWidth, workspace->ffn_activated_, stream);
+    }
+  } else if (error == cudaSuccess) {
     error = qw38::cuda::launch_q4k_gate_up_swiglu_prequant(
         layer.ffn_gate.data, layer.ffn_up.data, layer.ffn_gate.rows,
         layer.ffn_gate.columns, workspace->q8_, workspace->ffn_activated_,

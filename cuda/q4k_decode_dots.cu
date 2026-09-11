@@ -48,6 +48,8 @@ cudaError_t launch_q4k_coop_mmv_prequant(
       !legal_q4_decode_warps_per_row(warps_per_row)) {
     return cudaErrorInvalidValue;
   }
+  record_q4_launch_variant(q8_1 ? kQ4LaunchVariantCoopQ81Prequant
+                                : kQ4LaunchVariantCoopQ8Prequant);
   if (q8_1) {
     if (warps_per_row == 1) {
       return q4k_dots::launch_coop<1, true>(weights, rows, columns, staged,
@@ -96,8 +98,21 @@ cudaError_t launch_q4k_coop_mmv(
         activation, static_cast<Q8Block*>(workspace), columns, stream);
   }
   if (error != cudaSuccess) return error;
-  return launch_q4k_coop_mmv_prequant(weights, rows, columns, workspace, output,
-                                      warps_per_row, q8_1, stream);
+  error = launch_q4k_coop_mmv_prequant(weights, rows, columns, workspace, output,
+                                       warps_per_row, q8_1, stream);
+  if (error == cudaSuccess) {
+    record_q4_launch_variant(q8_1 ? kQ4LaunchVariantCoopQ81
+                                  : kQ4LaunchVariantCoopQ8);
+  }
+  return error;
+}
+
+cudaError_t launch_q4k_coop_mmv_prequant_q8(
+    const std::uint8_t* weights, std::size_t rows, std::size_t columns,
+    const Q8Block* q8, float* output, unsigned int warps_per_row,
+    cudaStream_t stream) noexcept {
+  return launch_q4k_coop_mmv_prequant(weights, rows, columns, q8, output,
+                                      warps_per_row, false, stream);
 }
 
 int q4k_coop_occupancy(unsigned int warps_per_row, bool q8_1) noexcept {

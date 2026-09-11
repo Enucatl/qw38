@@ -59,6 +59,14 @@ cudaError_t launch_q4k_coop_mmv_prequant(
     const void* staged, float* output, unsigned int warps_per_row, bool q8_1,
     cudaStream_t stream) noexcept;
 
+// Typed Q8Block prequant. Must not reinterpret the pointer as Q8_1 if a
+// global selector changed. Half-scale Q8_1 uses launch_q4k_coop_mmv_prequant
+// with a matching Q8_1 buffer, never this entry point.
+cudaError_t launch_q4k_coop_mmv_prequant_q8(
+    const std::uint8_t* weights, std::size_t rows, std::size_t columns,
+    const Q8Block* q8, float* output, unsigned int warps_per_row,
+    cudaStream_t stream) noexcept;
+
 cudaError_t launch_q4k_coop_mmv(
     const std::uint8_t* weights, std::size_t rows, std::size_t columns,
     const __nv_bfloat16* activation, void* workspace, float* output,

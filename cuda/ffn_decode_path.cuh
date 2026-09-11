@@ -50,6 +50,53 @@ inline bool ffn_decode_uses_bf16_activations() noexcept {
          0;
 }
 
+// OPT-062: actual gate/up/down launch variants and staging counts. Graph
+// capture and eager work both write this record; a selector constant is not
+// proof that integer Q4 reached every FFN leg.
+struct FfnDecodeDispatchRecord final {
+  const char* gate_variant = "";
+  const char* up_variant = "";
+  const char* down_variant = "";
+  int gate_up_stage_count = 0;
+  int down_stage_count = 0;
+  bool captured_in_graph = false;
+  const char* q4_path = "";
+  const char* ffn_path = "";
+  const char* staging = "";
+};
+
+inline thread_local FfnDecodeDispatchRecord g_last_ffn_decode_dispatch{};
+
+inline const FfnDecodeDispatchRecord& last_ffn_decode_dispatch() noexcept {
+  return g_last_ffn_decode_dispatch;
+}
+
+inline void clear_ffn_decode_dispatch() noexcept {
+  g_last_ffn_decode_dispatch = FfnDecodeDispatchRecord{};
+}
+
+inline void record_ffn_decode_dispatch(const char* gate_variant,
+                                       const char* up_variant,
+                                       const char* down_variant,
+                                       int gate_up_stage_count,
+                                       int down_stage_count,
+                                       bool captured_in_graph,
+                                       const char* q4_path, const char* ffn_path,
+                                       const char* staging) noexcept {
+  g_last_ffn_decode_dispatch.gate_variant =
+      gate_variant != nullptr ? gate_variant : "";
+  g_last_ffn_decode_dispatch.up_variant =
+      up_variant != nullptr ? up_variant : "";
+  g_last_ffn_decode_dispatch.down_variant =
+      down_variant != nullptr ? down_variant : "";
+  g_last_ffn_decode_dispatch.gate_up_stage_count = gate_up_stage_count;
+  g_last_ffn_decode_dispatch.down_stage_count = down_stage_count;
+  g_last_ffn_decode_dispatch.captured_in_graph = captured_in_graph;
+  g_last_ffn_decode_dispatch.q4_path = q4_path != nullptr ? q4_path : "";
+  g_last_ffn_decode_dispatch.ffn_path = ffn_path != nullptr ? ffn_path : "";
+  g_last_ffn_decode_dispatch.staging = staging != nullptr ? staging : "";
+}
+
 inline void set_ffn_decode_path_override(const char* path) noexcept {
   g_ffn_decode_path_override = path;
 }

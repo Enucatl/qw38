@@ -11,12 +11,27 @@ constexpr char kLegalQ4DecodePathPacked[] = "packed";
 constexpr char kLegalQ4DecodePathIntegerQ8[] = "integer_q8";
 constexpr char kLegalQ4DecodePathIntegerQ81[] = "integer_q8_1";
 
+// Actual launch variants recorded by the kernels that ran, not selector strings.
+constexpr char kQ4LaunchVariantPacked[] = "quant_mmv_packed";
+constexpr char kQ4LaunchVariantPackedPrequant[] = "quant_mmv_prequant_packed";
+constexpr char kQ4LaunchVariantCoopQ8[] = "q4k_coop_mmv_q8";
+constexpr char kQ4LaunchVariantCoopQ8Prequant[] = "q4k_coop_mmv_prequant_q8";
+constexpr char kQ4LaunchVariantCoopQ81[] = "q4k_coop_mmv_q8_1";
+constexpr char kQ4LaunchVariantCoopQ81Prequant[] = "q4k_coop_mmv_prequant_q8_1";
+constexpr char kQ4LaunchVariantPairedStaged[] = "q4k_gate_up_swiglu_prequant";
+constexpr char kQ4LaunchVariantPaired[] = "q4k_gate_up_swiglu";
+
+constexpr int kQ4LaunchTraceCapacity = 8;
+
 // Production pin. Keep sitting may switch away from packed; reject restores it.
 constexpr char kSelectedQ4DecodePath[] = "packed";
 constexpr unsigned int kSelectedQ4DecodeWarpsPerRow = 4;
 
 inline thread_local const char* g_q4_decode_path_override = nullptr;
 inline thread_local unsigned int g_q4_decode_warps_override = 0;
+inline thread_local const char* g_last_q4_launch_variant = "";
+inline thread_local const char* g_q4_launch_trace[kQ4LaunchTraceCapacity]{};
+inline thread_local int g_q4_launch_trace_count = 0;
 
 inline bool legal_q4_decode_path(const char* path) noexcept {
   return path != nullptr &&
@@ -60,6 +75,40 @@ inline bool q4_decode_uses_integer() noexcept {
 inline bool q4_decode_uses_q8_1() noexcept {
   return std::strcmp(effective_q4_decode_path(),
                      kLegalQ4DecodePathIntegerQ81) == 0;
+}
+
+// Q8Block integer cooperative dots. Distinct from half-scale Q8_1.
+inline bool q4_decode_uses_integer_q8block() noexcept {
+  return std::strcmp(effective_q4_decode_path(),
+                     kLegalQ4DecodePathIntegerQ8) == 0;
+}
+
+inline void record_q4_launch_variant(const char* variant) noexcept {
+  g_last_q4_launch_variant = variant != nullptr ? variant : "";
+  if (g_q4_launch_trace_count >= 0 &&
+      g_q4_launch_trace_count < kQ4LaunchTraceCapacity) {
+    g_q4_launch_trace[g_q4_launch_trace_count] = g_last_q4_launch_variant;
+    ++g_q4_launch_trace_count;
+  }
+}
+
+inline const char* last_q4_launch_variant() noexcept {
+  return g_last_q4_launch_variant != nullptr ? g_last_q4_launch_variant : "";
+}
+
+inline void clear_q4_launch_trace() noexcept {
+  g_last_q4_launch_variant = "";
+  g_q4_launch_trace_count = 0;
+  for (int index = 0; index < kQ4LaunchTraceCapacity; ++index) {
+    g_q4_launch_trace[index] = "";
+  }
+}
+
+inline int q4_launch_trace_count() noexcept { return g_q4_launch_trace_count; }
+
+inline const char* q4_launch_trace_at(int index) noexcept {
+  if (index < 0 || index >= g_q4_launch_trace_count) return "";
+  return g_q4_launch_trace[index] != nullptr ? g_q4_launch_trace[index] : "";
 }
 
 inline void set_q4_decode_path_override(const char* path,

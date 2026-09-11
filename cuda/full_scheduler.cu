@@ -22,6 +22,7 @@
 #include "scheduler_primitives.h"
 #include "sha256.h"
 #include "q8_decode_path.cuh"
+#include "q4k_decode_path.cuh"
 #include "ffn_decode_path.cuh"
 
 QW38_PDL_REGISTER_DEVICE_OPS()
@@ -1473,6 +1474,8 @@ cudaError_t execute_ffn(const DeviceCommonLayer& layer,
                         ActivationCapture* capture = nullptr,
                         std::size_t capture_layer = 0,
                         const char* capture_kind = "") noexcept {
+  clear_q4_launch_trace();
+  clear_ffn_decode_dispatch();
   if (leaf_timings != nullptr) leaf_timings->ffn_staging_fused_into_mmv = true;
   cudaError_t error = begin_phase(
       leaves, leaf_timings == nullptr ? nullptr : &leaf_timings->ffn_norm,
@@ -1495,8 +1498,14 @@ cudaError_t execute_ffn(const DeviceCommonLayer& layer,
                                         capture_kind, workspace->normalized_,
                                         internal::kResidualWidth);
   }
-  const bool paired = ffn_decode_uses_paired();
-  const bool share_stage = ffn_decode_shares_stage();
+  // Integer Q8Block cooperative dots own all three FFN legs. Paired packed
+  // fusion would bypass the Q4 selector; OPT-063 owns integer paired fusion.
+  const bool integer_q8 = q4_decode_uses_integer_q8block();
+  const bool paired = ffn_decode_uses_paired() && !integer_q8;
+  const bool share_stage = ffn_decode_shares_stage() || integer_q8;
+  const char* gate_variant = "";
+  const char* up_variant = "";
+  int gate_up_stages = 0;
   if (error == cudaSuccess) {
     error = begin_phase(
         leaves,
@@ -1509,6 +1518,7 @@ cudaError_t execute_ffn(const DeviceCommonLayer& layer,
                                       internal::kResidualWidth, stream);
       workspace->q8_decode_staged_activation_ = nullptr;
       workspace->q8_decode_staged_columns_ = 0;
+      gate_up_stages = 1;
       if (error == cudaSuccess) {
         error = launch_q4k_gate_up_swiglu_prequant(
             layer.ffn_gate.data, layer.ffn_up.data, layer.ffn_gate.rows,
@@ -1521,18 +1531,22 @@ cudaError_t execute_ffn(const DeviceCommonLayer& layer,
           layer.ffn_gate.columns, workspace->normalized_, workspace->q8_,
           workspace->ffn_activated_, stream);
     }
+    gate_variant = last_q4_launch_variant();
+    up_variant = gate_variant;
     if (error == cudaSuccess) error = end_phase(leaves);
   } else if (error == cudaSuccess && share_stage) {
     error = launch_quantize_bf16_q8(workspace->normalized_, workspace->q8_,
                                     internal::kResidualWidth, stream);
     workspace->q8_decode_staged_activation_ = nullptr;
     workspace->q8_decode_staged_columns_ = 0;
+    gate_up_stages = 1;
     if (error == cudaSuccess) {
       error = launch_quant_mmv_prequant(
           layer.ffn_gate.kind, layer.ffn_gate.data, layer.ffn_gate.rows,
           layer.ffn_gate.columns, workspace->q8_, workspace->projection_a_,
           stream);
     }
+    gate_variant = last_q4_launch_variant();
     if (error == cudaSuccess) error = end_phase(leaves);
     if (error == cudaSuccess) {
       error = begin_phase(
@@ -1545,6 +1559,7 @@ cudaError_t execute_ffn(const DeviceCommonLayer& layer,
           layer.ffn_up.columns, workspace->q8_, workspace->projection_b_,
           stream);
     }
+    up_variant = last_q4_launch_variant();
     if (error == cudaSuccess) error = end_phase(leaves);
     if (error == cudaSuccess) {
       error = begin_phase(
@@ -1562,6 +1577,7 @@ cudaError_t execute_ffn(const DeviceCommonLayer& layer,
       error = matrix_vector(layer.ffn_gate, workspace->normalized_, workspace,
                             workspace->projection_a_, stream);
     }
+    gate_variant = last_q4_launch_variant();
     if (error == cudaSuccess) error = end_phase(leaves);
     if (error == cudaSuccess) {
       error = begin_phase(
@@ -1572,6 +1588,7 @@ cudaError_t execute_ffn(const DeviceCommonLayer& layer,
       error = matrix_vector(layer.ffn_up, workspace->normalized_, workspace,
                             workspace->projection_b_, stream);
     }
+    up_variant = last_q4_launch_variant();
     if (error == cudaSuccess) error = end_phase(leaves);
     if (error == cudaSuccess) {
       error = begin_phase(
@@ -1599,6 +1616,15 @@ cudaError_t execute_ffn(const DeviceCommonLayer& layer,
     error = matrix_vector(layer.ffn_down, workspace->ffn_activated_, workspace,
                           workspace->mixer_output_, stream);
   }
+  const char* down_variant = last_q4_launch_variant();
+  cudaStreamCaptureStatus capture_status = cudaStreamCaptureStatusNone;
+  const bool captured =
+      cudaStreamIsCapturing(stream, &capture_status) == cudaSuccess &&
+      capture_status == cudaStreamCaptureStatusActive;
+  record_ffn_decode_dispatch(
+      gate_variant, up_variant, down_variant, gate_up_stages, 1, captured,
+      effective_q4_decode_path(), effective_ffn_decode_path(),
+      integer_q8 ? kStagingQ8Fp32 : kStagingQ8Fp32);
   if (error == cudaSuccess) error = end_phase(leaves);
   if (error == cudaSuccess) {
     error = begin_phase(
@@ -1685,6 +1711,15 @@ cudaError_t execute_prompt_ffn_attributed(
 }
 
 }  // namespace
+
+cudaError_t launch_decode_ffn(const DeviceCommonLayer& layer,
+                              const float* residual,
+                              SchedulerWorkspace* workspace, float* output,
+                              const float* next_input_norm,
+                              cudaStream_t stream) noexcept {
+  return execute_ffn(layer, residual, workspace, output, next_input_norm,
+                     PointwisePath::kFused, stream);
+}
 
 cudaError_t execute_prompt_ffn(
     const DeviceCommonLayer& layer, const float* residual,
