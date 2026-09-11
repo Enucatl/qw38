@@ -1,0 +1,144 @@
+{
+  "schema_version": 1,
+  "task": "OPT-064",
+  "mode": "acceptance",
+  "status": "passed",
+  "success": true,
+  "result_class": "ok",
+  "message": "",
+  "elapsed_s": 6.216203182993922,
+  "deadline_s": 7200.0,
+  "durations": {
+    "compile_cold_s": 0.39910677197622135,
+    "cold_s": 6.121629846980795
+  },
+  "compile": 0,
+  "cache_hits": 1,
+  "cache_misses": 0,
+  "claims_throughput": false,
+  "run_dir": "/home/user/qw38/build/optimization-runs/OPT-064/acceptance/20260911T094719Z-88153dad",
+  "owned_children": 0,
+  "link": 0,
+  "load": 2,
+  "reference": 2,
+  "phases": [
+    {
+      "phase": "setup",
+      "event": "start",
+      "epoch_s": 1789120039.6333394,
+      "monotonic_s": 273595.17802009
+    },
+    {
+      "phase": "setup",
+      "event": "end",
+      "epoch_s": 1789120039.6784005,
+      "elapsed_s": 0.045059716037940234,
+      "success": true,
+      "cache_hits": 0,
+      "cache_misses": 0,
+      "compile": 0,
+      "link": 0,
+      "load": 0,
+      "reference": 0,
+      "tokens": 0,
+      "selected_paths": [],
+      "result_class": "ok"
+    },
+    {
+      "phase": "compile_cold",
+      "event": "start",
+      "epoch_s": 1789120039.6784728,
+      "monotonic_s": 273595.223153566
+    },
+    {
+      "phase": "compile_cold",
+      "event": "end",
+      "epoch_s": 1789120040.0775814,
+      "elapsed_s": 0.39910677197622135,
+      "success": true,
+      "cache_hits": 1,
+      "cache_misses": 0,
+      "compile": 0,
+      "link": 0,
+      "load": 0,
+      "reference": 0,
+      "tokens": 0,
+      "selected_paths": [
+        "build/qw38-cuda-opt064-q8-rows-test"
+      ],
+      "result_class": "ok"
+    },
+    {
+      "phase": "smoke_cold",
+      "event": "start",
+      "epoch_s": 1789120040.0776255,
+      "monotonic_s": 273595.622306565
+    },
+    {
+      "phase": "smoke_cold",
+      "event": "end",
+      "epoch_s": 1789120040.642303,
+      "elapsed_s": 0.5646760790259577,
+      "success": true,
+      "cache_hits": 0,
+      "cache_misses": 0,
+      "compile": 0,
+      "link": 0,
+      "load": 0,
+      "reference": 1,
+      "tokens": 1,
+      "selected_paths": [
+        "ffn_only"
+      ],
+      "result_class": "ok"
+    },
+    {
+      "phase": "correctness_cold",
+      "event": "start",
+      "epoch_s": 1789120040.6423886,
+      "monotonic_s": 273596.187069259
+    },
+    {
+      "phase": "correctness_cold",
+      "event": "end",
+      "epoch_s": 1789120043.2472024,
+      "elapsed_s": 2.6048127849935554,
+      "success": true,
+      "cache_hits": 0,
+      "cache_misses": 0,
+      "compile": 0,
+      "link": 0,
+      "load": 1,
+      "reference": 1,
+      "tokens": 1,
+      "selected_paths": [
+        "ffn_only"
+      ],
+      "result_class": "ok"
+    },
+    {
+      "phase": "screen_cold",
+      "event": "start",
+      "epoch_s": 1789120043.2472377,
+      "monotonic_s": 273598.791918634
+    },
+    {
+      "phase": "screen_cold",
+      "event": "end",
+      "epoch_s": 1789120045.8000627,
+      "elapsed_s": 2.5528236310346983,
+      "success": true,
+      "cache_hits": 0,
+      "cache_misses": 0,
+      "compile": 0,
+      "link": 0,
+      "load": 1,
+      "reference": 0,
+      "tokens": 1,
+      "selected_paths": [
+        "ffn_only"
+      ],
+      "result_class": "ok"
+    }
+  ]
+}

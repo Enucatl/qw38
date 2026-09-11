@@ -108,14 +108,32 @@ cudaError_t launch_q8_coop_mmv_prequant(
     const void* staged, float* output, unsigned int warps_per_row,
     cudaStream_t stream) noexcept;
 
+cudaError_t launch_q8_coop_mmv_prequant(
+    const std::uint8_t* weights, std::size_t rows, std::size_t columns,
+    const void* staged, float* output, unsigned int rows_per_cta,
+    unsigned int warps_per_row, cudaStream_t stream) noexcept;
+
 cudaError_t launch_q8_coop_mmv(const std::uint8_t* weights, std::size_t rows,
                                std::size_t columns,
                                const __nv_bfloat16* activation, void* workspace,
                                float* output, unsigned int warps_per_row,
                                cudaStream_t stream) noexcept;
 
+cudaError_t launch_q8_coop_mmv(const std::uint8_t* weights, std::size_t rows,
+                               std::size_t columns,
+                               const __nv_bfloat16* activation, void* workspace,
+                               float* output, unsigned int rows_per_cta,
+                               unsigned int warps_per_row,
+                               cudaStream_t stream) noexcept;
+
 int q8_coop_occupancy(unsigned int warps_per_row) noexcept;
+int q8_coop_occupancy(unsigned int rows_per_cta,
+                      unsigned int warps_per_row) noexcept;
 void q8_coop_kernel_attributes(unsigned int warps_per_row, int* registers,
+                               std::size_t* local_bytes,
+                               int* occupancy) noexcept;
+void q8_coop_kernel_attributes(unsigned int rows_per_cta,
+                               unsigned int warps_per_row, int* registers,
                                std::size_t* local_bytes,
                                int* occupancy) noexcept;
 int q8_mmv_bf16_occupancy() noexcept;

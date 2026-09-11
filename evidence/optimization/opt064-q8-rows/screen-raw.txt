@@ -1,0 +1,119 @@
+
+==========
+== CUDA ==
+==========
+
+CUDA Version 13.0.2
+
+Container image Copyright (c) 2016-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+
+This container image and its contents are governed by the NVIDIA Deep Learning Container License.
+By pulling and using the container, you accept the terms and conditions of this license:
+https://developer.nvidia.com/ngc/nvidia-deep-learning-container-license
+
+A copy of this license is made available in this container at /NGC-DL-CONTAINER-LICENSE for your convenience.
+
+screen group=0 layout=r8_w1 rotating=true warmup=true sample=0 layer=0 ms=0.377792001
+screen group=0 layout=r4_w1 rotating=true warmup=true sample=0 layer=0 ms=0.0447999984
+screen group=0 layout=r2_w2 rotating=true warmup=true sample=0 layer=0 ms=0.0574720018
+screen group=0 layout=r1_w4 rotating=true warmup=true sample=0 layer=0 ms=0.0354879983
+screen group=0 layout=r1_w4 rotating=true warmup=false sample=0 layer=0 ms=0.0279680006
+screen group=0 layout=r2_w2 rotating=true warmup=false sample=0 layer=0 ms=0.0337279998
+screen group=0 layout=r4_w1 rotating=true warmup=false sample=0 layer=0 ms=0.0363200009
+screen group=0 layout=r8_w1 rotating=true warmup=false sample=0 layer=0 ms=0.0366399996
+screen group=0 layout=r8_w1 rotating=true warmup=false sample=1 layer=1 ms=0.0751359984
+screen group=0 layout=r4_w1 rotating=true warmup=false sample=1 layer=1 ms=0.0365439989
+screen group=0 layout=r2_w2 rotating=true warmup=false sample=1 layer=1 ms=0.0349120013
+screen group=0 layout=r1_w4 rotating=true warmup=false sample=1 layer=1 ms=0.0266880002
+screen group=0 layout=r1_w4 rotating=true warmup=false sample=2 layer=2 ms=0.0694079995
+screen group=0 layout=r2_w2 rotating=true warmup=false sample=2 layer=2 ms=0.0338240005
+screen group=0 layout=r4_w1 rotating=true warmup=false sample=2 layer=2 ms=0.0362880006
+screen group=0 layout=r8_w1 rotating=true warmup=false sample=2 layer=2 ms=0.0359040014
+screen group=0 layout=r1_w4 rotating=false warmup=true sample=0 layer=0 ms=0.0691199973
+screen group=0 layout=r2_w2 rotating=false warmup=true sample=0 layer=0 ms=0.0337279998
+screen group=0 layout=r4_w1 rotating=false warmup=true sample=0 layer=0 ms=0.0369919986
+screen group=0 layout=r8_w1 rotating=false warmup=true sample=0 layer=0 ms=0.0359040014
+screen group=0 layout=r1_w4 rotating=false warmup=false sample=0 layer=0 ms=0.0281600002
+screen group=0 layout=r2_w2 rotating=false warmup=false sample=0 layer=0 ms=0.0338560008
+screen group=0 layout=r4_w1 rotating=false warmup=false sample=0 layer=0 ms=0.0359360017
+screen group=0 layout=r8_w1 rotating=false warmup=false sample=0 layer=0 ms=0.0369599983
+screen group=0 layout=r8_w1 rotating=false warmup=false sample=1 layer=0 ms=0.0419519991
+screen group=0 layout=r4_w1 rotating=false warmup=false sample=1 layer=0 ms=0.0352960005
+screen group=0 layout=r2_w2 rotating=false warmup=false sample=1 layer=0 ms=0.035712
+screen group=0 layout=r1_w4 rotating=false warmup=false sample=1 layer=0 ms=0.0274560004
+screen group=0 layout=r1_w4 rotating=false warmup=false sample=2 layer=0 ms=0.0262080003
+screen group=0 layout=r2_w2 rotating=false warmup=false sample=2 layer=0 ms=0.0335999988
+screen group=0 layout=r4_w1 rotating=false warmup=false sample=2 layer=0 ms=0.0368640013
+screen group=0 layout=r8_w1 rotating=false warmup=false sample=2 layer=0 ms=0.0375679992
+screen group=1 layout=r8_w1 rotating=true warmup=true sample=0 layer=0 ms=0.0257280003
+screen group=1 layout=r4_w1 rotating=true warmup=true sample=0 layer=0 ms=0.0120959999
+screen group=1 layout=r2_w2 rotating=true warmup=true sample=0 layer=0 ms=0.0127039999
+screen group=1 layout=r1_w4 rotating=true warmup=true sample=0 layer=0 ms=0.011744
+screen group=1 layout=r1_w4 rotating=true warmup=false sample=0 layer=0 ms=0.0119359996
+screen group=1 layout=r2_w2 rotating=true warmup=false sample=0 layer=0 ms=0.0131839998
+screen group=1 layout=r4_w1 rotating=true warmup=false sample=0 layer=0 ms=0.0128319999
+screen group=1 layout=r8_w1 rotating=true warmup=false sample=0 layer=0 ms=0.0131200003
+screen group=1 layout=r8_w1 rotating=true warmup=false sample=1 layer=1 ms=0.0250240006
+screen group=1 layout=r4_w1 rotating=true warmup=false sample=1 layer=1 ms=0.0117119998
+screen group=1 layout=r2_w2 rotating=true warmup=false sample=1 layer=1 ms=0.0128319999
+screen group=1 layout=r1_w4 rotating=true warmup=false sample=1 layer=1 ms=0.011008
+screen group=1 layout=r1_w4 rotating=true warmup=false sample=2 layer=2 ms=0.0261119995
+screen group=1 layout=r2_w2 rotating=true warmup=false sample=2 layer=2 ms=0.0132160001
+screen group=1 layout=r4_w1 rotating=true warmup=false sample=2 layer=2 ms=0.0132160001
+screen group=1 layout=r8_w1 rotating=true warmup=false sample=2 layer=2 ms=0.0169280004
+screen group=1 layout=r1_w4 rotating=false warmup=true sample=0 layer=0 ms=0.0139520001
+screen group=1 layout=r2_w2 rotating=false warmup=true sample=0 layer=0 ms=0.0139520001
+screen group=1 layout=r4_w1 rotating=false warmup=true sample=0 layer=0 ms=0.0126719996
+screen group=1 layout=r8_w1 rotating=false warmup=true sample=0 layer=0 ms=0.0127360001
+screen group=1 layout=r1_w4 rotating=false warmup=false sample=0 layer=0 ms=0.0119679999
+screen group=1 layout=r2_w2 rotating=false warmup=false sample=0 layer=0 ms=0.0126080001
+screen group=1 layout=r4_w1 rotating=false warmup=false sample=0 layer=0 ms=0.0138879996
+screen group=1 layout=r8_w1 rotating=false warmup=false sample=0 layer=0 ms=0.0113279996
+screen group=1 layout=r8_w1 rotating=false warmup=false sample=1 layer=0 ms=0.011008
+screen group=1 layout=r4_w1 rotating=false warmup=false sample=1 layer=0 ms=0.0142719997
+screen group=1 layout=r2_w2 rotating=false warmup=false sample=1 layer=0 ms=0.0131519996
+screen group=1 layout=r1_w4 rotating=false warmup=false sample=1 layer=0 ms=0.0128640002
+screen group=1 layout=r1_w4 rotating=false warmup=false sample=2 layer=0 ms=0.0192000009
+screen group=1 layout=r2_w2 rotating=false warmup=false sample=2 layer=0 ms=0.0239359997
+screen group=1 layout=r4_w1 rotating=false warmup=false sample=2 layer=0 ms=0.0200960003
+screen group=1 layout=r8_w1 rotating=false warmup=false sample=2 layer=0 ms=0.0177280009
+screen group=2 layout=r8_w1 rotating=true warmup=true sample=0 layer=3 ms=0.0577920005
+screen group=2 layout=r4_w1 rotating=true warmup=true sample=0 layer=3 ms=0.0360959992
+screen group=2 layout=r2_w2 rotating=true warmup=true sample=0 layer=3 ms=0.0272320006
+screen group=2 layout=r1_w4 rotating=true warmup=true sample=0 layer=3 ms=0.024704
+screen group=2 layout=r1_w4 rotating=true warmup=false sample=0 layer=3 ms=0.0238719992
+screen group=2 layout=r2_w2 rotating=true warmup=false sample=0 layer=3 ms=0.0256639998
+screen group=2 layout=r4_w1 rotating=true warmup=false sample=0 layer=3 ms=0.0316479988
+screen group=2 layout=r8_w1 rotating=true warmup=false sample=0 layer=3 ms=0.0302719995
+screen group=2 layout=r8_w1 rotating=true warmup=false sample=1 layer=7 ms=0.0599999987
+screen group=2 layout=r4_w1 rotating=true warmup=false sample=1 layer=7 ms=0.0310079996
+screen group=2 layout=r2_w2 rotating=true warmup=false sample=1 layer=7 ms=0.02544
+screen group=2 layout=r1_w4 rotating=true warmup=false sample=1 layer=7 ms=0.0266559999
+screen group=2 layout=r1_w4 rotating=true warmup=false sample=2 layer=11 ms=0.0569600016
+screen group=2 layout=r2_w2 rotating=true warmup=false sample=2 layer=11 ms=0.0256319996
+screen group=2 layout=r4_w1 rotating=true warmup=false sample=2 layer=11 ms=0.0302719995
+screen group=2 layout=r8_w1 rotating=true warmup=false sample=2 layer=11 ms=0.0297919996
+screen group=2 layout=r1_w4 rotating=false warmup=true sample=0 layer=3 ms=0.0568000004
+screen group=2 layout=r2_w2 rotating=false warmup=true sample=0 layer=3 ms=0.0266880002
+screen group=2 layout=r4_w1 rotating=false warmup=true sample=0 layer=3 ms=0.0296
+screen group=2 layout=r8_w1 rotating=false warmup=true sample=0 layer=3 ms=0.0307519995
+screen group=2 layout=r1_w4 rotating=false warmup=false sample=0 layer=3 ms=0.0263679996
+screen group=2 layout=r2_w2 rotating=false warmup=false sample=0 layer=3 ms=0.0260799993
+screen group=2 layout=r4_w1 rotating=false warmup=false sample=0 layer=3 ms=0.0301760007
+screen group=2 layout=r8_w1 rotating=false warmup=false sample=0 layer=3 ms=0.0304959994
+screen group=2 layout=r8_w1 rotating=false warmup=false sample=1 layer=3 ms=0.0304000005
+screen group=2 layout=r4_w1 rotating=false warmup=false sample=1 layer=3 ms=0.0303680003
+screen group=2 layout=r2_w2 rotating=false warmup=false sample=1 layer=3 ms=0.0241919998
+screen group=2 layout=r1_w4 rotating=false warmup=false sample=1 layer=3 ms=0.0313280001
+screen group=2 layout=r1_w4 rotating=false warmup=false sample=2 layer=3 ms=0.0280000009
+screen group=2 layout=r2_w2 rotating=false warmup=false sample=2 layer=3 ms=0.0261119995
+screen group=2 layout=r4_w1 rotating=false warmup=false sample=2 layer=3 ms=0.0352320001
+screen group=2 layout=r8_w1 rotating=false warmup=false sample=2 layer=3 ms=0.0318400003
+weighted layout=r1_w4 rotating_ms=3.34318942 hot_ms=2.47074127 gdn_in_r=0.0413546674 gdn_out_r=0.0163519997 attn_r=0.0358293317 gdn_in_h=0.0272746664 gdn_out_h=0.0146773336 attn_h=0.0285653323 regs=40 local=0 occ=12
+weighted layout=r2_w2 rotating_ms=2.67639479 hot_ms=2.85320511 gdn_in_r=0.0341546685 gdn_out_r=0.0130773336 attn_r=0.0255786683 gdn_in_h=0.0343893319 gdn_out_h=0.0165653322 attn_h=0.0254613329 regs=40 local=0 occ=12
+weighted layout=r4_w1 rotating_ms=2.84620795 hot_ms=3.01243728 gdn_in_r=0.0363839976 gdn_out_r=0.0125866672 attn_r=0.0309759993 gdn_in_h=0.0360320024 gdn_out_h=0.0160853323 attn_h=0.0319253318 regs=40 local=0 occ=12
+weighted layout=r8_w1 rotating_ms=3.88437331 hot_ms=2.99929586 gdn_in_r=0.0492266677 gdn_out_r=0.0183573347 attn_r=0.0400213301 gdn_in_h=0.038826663 gdn_out_h=0.0133546665 attn_h=0.0309120025 regs=40 local=0 occ=6
+screen_winner=r2_w2 control=r1_w4 control_ms=3.34318942 winner_ms=2.67639479 saving_ms=0.666794628 keep=true effort_0p10=true installed=false layout_per_role skinny=r2_w2 medium=r2_w2 wide=r2_w2
+selected_q8_decode_path=dp4a_q8_1 historical_warps=4/4/4 rows=1/1/1 layout_warps=4/4/4
+QW38_OPT064_Q8_ROWS_RESULT={"schema_version":1,"task":"OPT-064","workload":"screen","tier":"screen","status":"passed","selected_q8_decode_path":"dp4a_q8_1","selected_rows_skinny":1,"selected_warps_skinny":4,"selected_rows_wide":1,"selected_warps_wide":4,"historical_warps_skinny":4,"claims_throughput":false,"llama_revision":"cc83d7b4824f73cfdda4dfbb47ee39804f71b328","gguf_sha256":"31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34"}
+status=passed

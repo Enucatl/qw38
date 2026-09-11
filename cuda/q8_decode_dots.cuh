@@ -1,10 +1,11 @@
 #pragma once
 
-// OPT-047 Q8_0 × Q8_1 cooperative DP4A mixer decode dots.
+// OPT-047/OPT-064 Q8_0 × Q8_1 cooperative DP4A mixer decode dots.
 // Technique from pinned llama.cpp mmvq.cu::mul_mat_vec_q and
 // vecdotq.cuh::vec_dot_q8_0_q8_1 (cc83d7b, MIT). Quartz-owned rewrite:
 // 2-byte-aligned Q8_0 qs loads, DP4A of four int8 products, K distributed
-// across 1/2/4/8 warps per row, OPT-046 Q8_1 staging reused. No ggml.
+// across warps per row, optional multiple output rows per CTA (OPT-064),
+// OPT-046 Q8_1 staging reused. No ggml.
 
 #include <cstddef>
 #include <cstdint>
@@ -27,14 +28,32 @@ cudaError_t launch_q8_coop_mmv_prequant(
     const void* staged, float* output, unsigned int warps_per_row,
     cudaStream_t stream) noexcept;
 
+cudaError_t launch_q8_coop_mmv_prequant(
+    const std::uint8_t* weights, std::size_t rows, std::size_t columns,
+    const void* staged, float* output, unsigned int rows_per_cta,
+    unsigned int warps_per_row, cudaStream_t stream) noexcept;
+
 cudaError_t launch_q8_coop_mmv(const std::uint8_t* weights, std::size_t rows,
                                std::size_t columns,
                                const __nv_bfloat16* activation, void* workspace,
                                float* output, unsigned int warps_per_row,
                                cudaStream_t stream) noexcept;
 
+cudaError_t launch_q8_coop_mmv(const std::uint8_t* weights, std::size_t rows,
+                               std::size_t columns,
+                               const __nv_bfloat16* activation, void* workspace,
+                               float* output, unsigned int rows_per_cta,
+                               unsigned int warps_per_row,
+                               cudaStream_t stream) noexcept;
+
 int q8_coop_occupancy(unsigned int warps_per_row) noexcept;
+int q8_coop_occupancy(unsigned int rows_per_cta,
+                      unsigned int warps_per_row) noexcept;
 void q8_coop_kernel_attributes(unsigned int warps_per_row, int* registers,
+                               std::size_t* local_bytes,
+                               int* occupancy) noexcept;
+void q8_coop_kernel_attributes(unsigned int rows_per_cta,
+                               unsigned int warps_per_row, int* registers,
                                std::size_t* local_bytes,
                                int* occupancy) noexcept;
 
@@ -66,6 +85,9 @@ __device__ __forceinline__ float read_q8_half(const std::uint8_t* bytes) {
 }
 
 __device__ __forceinline__ int get_int_b2(const void* x, int i32) {
+  // Q8_0 is 34 bytes. qs starts at byte 2, which is 2-mod-4 whenever the
+  // block is 0-mod-4 (production K/32 is even, so row bases stay 0-mod-4).
+  // Do not cast the payload to an aligned int*; use 2-byte loads.
   const std::uint16_t* x16 = static_cast<const std::uint16_t*>(x);
   return static_cast<int>(x16[2 * i32]) |
          (static_cast<int>(x16[2 * i32 + 1]) << 16);
@@ -86,40 +108,54 @@ __device__ __forceinline__ float vec_dot_q8_0_q8_1(const std::uint8_t* block,
   return d0 * d1 * static_cast<float>(sumi);
 }
 
-template <int WarpsPerRow>
+template <int RowsPerCta, int WarpsPerRow>
 __global__ void q8_coop_mmv(const std::uint8_t* weights, std::size_t rows,
                             std::size_t columns, const Q8_1Block* staged,
                             float* output) {
   const int lane = threadIdx.x;
   const int warp = threadIdx.y;
-  const std::size_t row = static_cast<std::size_t>(blockIdx.x);
-  if (row >= rows) return;
+  const int row_in_cta = warp / WarpsPerRow;
+  const int coop = warp % WarpsPerRow;
+  const std::size_t row = static_cast<std::size_t>(blockIdx.x) * RowsPerCta +
+                          static_cast<std::size_t>(row_in_cta);
+  const bool active = row < rows;
 
-  const int tid = kWarp * warp + lane;
+  const int tid = kWarp * coop + lane;
   const int n_blocks = static_cast<int>(columns / kQ80Values);
   constexpr int blocks_per_iter = kVdr * WarpsPerRow * kWarp / kQI8;
-  const std::uint8_t* row_weights =
-      weights + row * static_cast<std::size_t>(n_blocks) * kQ80Bytes;
   float acc = 0.0F;
-  for (int kbx = tid / (kQI8 / kVdr); kbx < n_blocks; kbx += blocks_per_iter) {
-    const int iqs = kVdr * (tid % (kQI8 / kVdr));
-    acc += vec_dot_q8_0_q8_1(row_weights + static_cast<std::size_t>(kbx) * kQ80Bytes,
-                             staged + kbx, iqs);
+  if (active) {
+    const std::uint8_t* row_weights =
+        weights + row * static_cast<std::size_t>(n_blocks) * kQ80Bytes;
+    for (int kbx = tid / (kQI8 / kVdr); kbx < n_blocks; kbx += blocks_per_iter) {
+      const int iqs = kVdr * (tid % (kQI8 / kVdr));
+      acc += vec_dot_q8_0_q8_1(
+          row_weights + static_cast<std::size_t>(kbx) * kQ80Bytes, staged + kbx,
+          iqs);
+    }
   }
 
-  __shared__ float partial[WarpsPerRow][kWarp];
-  partial[warp][lane] = acc;
-  __syncthreads();
-  if (warp == 0) {
-    float sum = 0.0F;
-#pragma unroll
-    for (int other = 0; other < WarpsPerRow; ++other) {
-      sum += partial[other][lane];
-    }
+  if constexpr (WarpsPerRow == 1) {
+    float sum = acc;
     for (int offset = kWarp / 2; offset > 0; offset /= 2) {
       sum += __shfl_down_sync(0xFFFFFFFFU, sum, offset, kWarp);
     }
-    if (lane == 0) output[row] = sum;
+    if (lane == 0 && active) output[row] = sum;
+  } else {
+    __shared__ float partial[RowsPerCta][WarpsPerRow][kWarp];
+    partial[row_in_cta][coop][lane] = acc;
+    __syncthreads();
+    if (coop == 0) {
+      float sum = 0.0F;
+#pragma unroll
+      for (int other = 0; other < WarpsPerRow; ++other) {
+        sum += partial[row_in_cta][other][lane];
+      }
+      for (int offset = kWarp / 2; offset > 0; offset /= 2) {
+        sum += __shfl_down_sync(0xFFFFFFFFU, sum, offset, kWarp);
+      }
+      if (lane == 0 && active) output[row] = sum;
+    }
   }
 }
 
@@ -149,13 +185,15 @@ __global__ void q8_mmv_bf16_ref(const std::uint8_t* weights, std::size_t rows,
   if (lane == 0) output[row] = sum;
 }
 
-template <int WarpsPerRow>
+template <int RowsPerCta, int WarpsPerRow>
 cudaError_t launch_coop(const std::uint8_t* weights, std::size_t rows,
                         std::size_t columns, const void* staged, float* output,
                         cudaStream_t stream) {
-  dim3 block(kWarp, WarpsPerRow);
-  const unsigned int grid = static_cast<unsigned int>(rows);
-  q8_coop_mmv<WarpsPerRow><<<grid, block, 0, stream>>>(
+  dim3 block(kWarp, RowsPerCta * WarpsPerRow);
+  const unsigned int grid = static_cast<unsigned int>(
+      (rows + static_cast<std::size_t>(RowsPerCta) - 1) /
+      static_cast<std::size_t>(RowsPerCta));
+  q8_coop_mmv<RowsPerCta, WarpsPerRow><<<grid, block, 0, stream>>>(
       weights, rows, columns, static_cast<const Q8_1Block*>(staged), output);
   return cudaPeekAtLastError();
 }

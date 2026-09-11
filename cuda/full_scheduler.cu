@@ -1270,9 +1270,10 @@ cudaError_t matrix_vector(const DeviceTensor& matrix,
         workspace->q8_decode_staged_activation_ = activation;
         workspace->q8_decode_staged_columns_ = matrix.columns;
       }
+      const Q8DecodeLayout layout = q8_decode_layout_for_rows(matrix.rows);
       return launch_q8_coop_mmv_prequant(
           matrix.data, matrix.rows, matrix.columns, workspace->q8_, output,
-          q8_decode_warps_for_rows(matrix.rows), stream);
+          layout.rows_per_cta, layout.warps_per_row, stream);
     }
     const unsigned int blocks = static_cast<unsigned int>(
         (matrix.rows + (kThreads / kWarpSize) - 1) /
@@ -3003,6 +3004,9 @@ Status execute_token(const ResidentModel& model, std::size_t token,
         error = launch_rms_norm_fp32_dispatch(
             residual, layer.common.input_norm, internal::kResidualWidth,
             workspace->normalized_, nullptr);
+      }
+      if (error == cudaSuccess) {
+        workspace->invalidate_q8_decode_staging();
       }
       if (error == cudaSuccess) error = end_phase(leaves);
       if (exclusive && error == cudaSuccess) error = end_phase(categories);

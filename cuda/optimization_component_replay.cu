@@ -450,9 +450,11 @@ int run_smoke(const Options& options) {
             spec.kind, inner, spec.rows, spec.columns, device_a, q8, device_o,
             nullptr);
       } else {
+        const qw38::cuda::Q8DecodeLayout layout =
+            qw38::cuda::q8_decode_layout_for_rows(spec.rows);
         error = qw38::cuda::launch_q8_coop_mmv(
             inner, spec.rows, spec.columns, device_a, q8, device_o,
-            qw38::cuda::q8_decode_warps_for_rows(spec.rows), nullptr);
+            layout.rows_per_cta, layout.warps_per_row, nullptr);
       }
     }
     if (error == cudaSuccess) error = cudaDeviceSynchronize();
@@ -697,9 +699,11 @@ cudaError_t replay_mixer_layer(const qw38::cuda::DeviceLayer& layer,
   auto proj = [&](const qw38::cuda::DeviceTensor& tensor,
                   float* output) -> cudaError_t {
     if (tensor.data == nullptr || tensor.rows == 0) return cudaSuccess;
+    const qw38::cuda::Q8DecodeLayout layout =
+        qw38::cuda::q8_decode_layout_for_rows(tensor.rows);
     return qw38::cuda::launch_q8_coop_mmv_prequant(
         tensor.data, tensor.rows, tensor.columns, workspace->q8_, output,
-        qw38::cuda::q8_decode_warps_for_rows(tensor.rows), stream);
+        layout.rows_per_cta, layout.warps_per_row, stream);
   };
   if (layer.kind == qw38::internal::LayerKind::kGdn) {
     if (error == cudaSuccess) {

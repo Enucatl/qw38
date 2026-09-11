@@ -1,0 +1,71 @@
+{
+  "schema_version": 1,
+  "task": "OPT-064",
+  "status": "measured",
+  "selected_q8_decode_path": "dp4a_q8_1",
+  "control_layout": "r1_w4",
+  "screen_winner": "r2_w2",
+  "installed": true,
+  "claims_throughput": false,
+  "claims_performance_improvement": false,
+  "selected_q8_decode_rows_skinny": 2,
+  "selected_q8_decode_rows_medium": 2,
+  "selected_q8_decode_rows_wide": 2,
+  "selected_q8_decode_layout_warps_skinny": 2,
+  "selected_q8_decode_layout_warps_medium": 2,
+  "selected_q8_decode_layout_warps_wide": 2,
+  "historical_warps_skinny_medium_wide": [4, 4, 4],
+  "llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+  "gguf_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+  "measurement_utc": "2026-09-11T09:47:34Z",
+  "feedback_run": "build/optimization-runs/OPT-064/feedback/20260911T094708Z-8764c23e",
+  "acceptance_run": "build/optimization-runs/OPT-064/acceptance/20260911T094719Z-88153dad",
+  "control_rotating_weighted_ms": 3.34318942,
+  "winner_rotating_weighted_ms": 2.67639479,
+  "saving_ms_per_token": 0.666794628,
+  "control_hot_weighted_ms": 2.47074127,
+  "winner_hot_weighted_ms": 2.85320511,
+  "registers": 40,
+  "local_bytes": 0,
+  "occupancy": 12,
+  "layouts": {
+    "r1_w4": {
+      "rows_per_cta": 1,
+      "warps_per_row": 4,
+      "rotating_weighted_ms": 3.34318942,
+      "hot_weighted_ms": 2.47074127,
+      "registers": 40,
+      "local_bytes": 0,
+      "occupancy": 12
+    },
+    "r2_w2": {
+      "rows_per_cta": 2,
+      "warps_per_row": 2,
+      "rotating_weighted_ms": 2.67639479,
+      "hot_weighted_ms": 2.85320511,
+      "registers": 40,
+      "local_bytes": 0,
+      "occupancy": 12
+    },
+    "r4_w1": {
+      "rows_per_cta": 4,
+      "warps_per_row": 1,
+      "rotating_weighted_ms": 2.84620795,
+      "hot_weighted_ms": 3.01243728,
+      "registers": 40,
+      "local_bytes": 0,
+      "occupancy": 12
+    },
+    "r8_w1": {
+      "rows_per_cta": 8,
+      "warps_per_row": 1,
+      "rotating_weighted_ms": 3.88437331,
+      "hot_weighted_ms": 2.99929586,
+      "registers": 40,
+      "local_bytes": 0,
+      "occupancy": 6
+    }
+  },
+  "e2e_tok_s_sitting": false,
+  "note": "One production rule r2_w2 for skinny/medium/wide. OPT-047 historical warps remain 4/4/4. No D2048 sitting in this increment; OPT-069 owns combined E2E."
+}

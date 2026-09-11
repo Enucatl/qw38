@@ -1,0 +1,120 @@
+{
+  "schema_version": 1,
+  "task": "OPT-064",
+  "mode": "feedback",
+  "status": "passed",
+  "success": true,
+  "result_class": "ok",
+  "message": "",
+  "elapsed_s": 9.517332339019049,
+  "deadline_s": 300.0,
+  "durations": {
+    "compile_cold_s": 6.151243211992551,
+    "cold_s": 9.4292831820203
+  },
+  "compile": 1,
+  "cache_hits": 0,
+  "cache_misses": 1,
+  "claims_throughput": false,
+  "run_dir": "/home/user/qw38/build/optimization-runs/OPT-064/feedback/20260911T094708Z-8764c23e",
+  "owned_children": 0,
+  "link": 1,
+  "load": 1,
+  "reference": 2,
+  "phases": [
+    {
+      "phase": "setup",
+      "event": "start",
+      "epoch_s": 1789120028.429895,
+      "monotonic_s": 273583.974575658
+    },
+    {
+      "phase": "setup",
+      "event": "end",
+      "epoch_s": 1789120028.4817088,
+      "elapsed_s": 0.051812458026688546,
+      "success": true,
+      "cache_hits": 0,
+      "cache_misses": 0,
+      "compile": 0,
+      "link": 0,
+      "load": 0,
+      "reference": 0,
+      "tokens": 0,
+      "selected_paths": [],
+      "result_class": "ok"
+    },
+    {
+      "phase": "compile_cold",
+      "event": "start",
+      "epoch_s": 1789120028.481779,
+      "monotonic_s": 273584.026460002
+    },
+    {
+      "phase": "compile_cold",
+      "event": "end",
+      "epoch_s": 1789120034.6330242,
+      "elapsed_s": 6.151243211992551,
+      "success": true,
+      "cache_hits": 0,
+      "cache_misses": 1,
+      "compile": 1,
+      "link": 1,
+      "load": 0,
+      "reference": 0,
+      "tokens": 0,
+      "selected_paths": [
+        "build/qw38-cuda-opt064-q8-rows-test"
+      ],
+      "result_class": "ok"
+    },
+    {
+      "phase": "smoke_cold",
+      "event": "start",
+      "epoch_s": 1789120034.6330688,
+      "monotonic_s": 273590.177749782
+    },
+    {
+      "phase": "smoke_cold",
+      "event": "end",
+      "epoch_s": 1789120035.2467551,
+      "elapsed_s": 0.6136844080174342,
+      "success": true,
+      "cache_hits": 0,
+      "cache_misses": 0,
+      "compile": 0,
+      "link": 0,
+      "load": 0,
+      "reference": 1,
+      "tokens": 1,
+      "selected_paths": [
+        "ffn_only"
+      ],
+      "result_class": "ok"
+    },
+    {
+      "phase": "correctness_cold",
+      "event": "start",
+      "epoch_s": 1789120035.2467942,
+      "monotonic_s": 273590.791475178
+    },
+    {
+      "phase": "correctness_cold",
+      "event": "end",
+      "epoch_s": 1789120037.9110236,
+      "elapsed_s": 2.6642282910179347,
+      "success": true,
+      "cache_hits": 0,
+      "cache_misses": 0,
+      "compile": 0,
+      "link": 0,
+      "load": 1,
+      "reference": 1,
+      "tokens": 1,
+      "selected_paths": [
+        "ffn_only"
+      ],
+      "result_class": "ok"
+    }
+  ]
+}

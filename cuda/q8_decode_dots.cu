@@ -9,6 +9,41 @@ constexpr int kBf16Threads = 256;
 constexpr int kWarpSize = 32;
 constexpr std::size_t kQ80Values = 32;
 
+cudaError_t launch_layout(const std::uint8_t* weights, std::size_t rows,
+                          std::size_t columns, const void* staged,
+                          float* output, unsigned int rows_per_cta,
+                          unsigned int warps_per_row, cudaStream_t stream) {
+  if (rows_per_cta == 1 && warps_per_row == 1) {
+    return q8_dots::launch_coop<1, 1>(weights, rows, columns, staged, output,
+                                      stream);
+  }
+  if (rows_per_cta == 1 && warps_per_row == 2) {
+    return q8_dots::launch_coop<1, 2>(weights, rows, columns, staged, output,
+                                      stream);
+  }
+  if (rows_per_cta == 1 && warps_per_row == 4) {
+    return q8_dots::launch_coop<1, 4>(weights, rows, columns, staged, output,
+                                      stream);
+  }
+  if (rows_per_cta == 1 && warps_per_row == 8) {
+    return q8_dots::launch_coop<1, 8>(weights, rows, columns, staged, output,
+                                      stream);
+  }
+  if (rows_per_cta == 2 && warps_per_row == 2) {
+    return q8_dots::launch_coop<2, 2>(weights, rows, columns, staged, output,
+                                      stream);
+  }
+  if (rows_per_cta == 4 && warps_per_row == 1) {
+    return q8_dots::launch_coop<4, 1>(weights, rows, columns, staged, output,
+                                      stream);
+  }
+  if (rows_per_cta == 8 && warps_per_row == 1) {
+    return q8_dots::launch_coop<8, 1>(weights, rows, columns, staged, output,
+                                      stream);
+  }
+  return cudaErrorInvalidValue;
+}
+
 }  // namespace
 
 cudaError_t launch_q8_mmv_bf16(const std::uint8_t* weights, std::size_t rows,
@@ -28,33 +63,30 @@ cudaError_t launch_q8_mmv_bf16(const std::uint8_t* weights, std::size_t rows,
 
 cudaError_t launch_q8_coop_mmv_prequant(
     const std::uint8_t* weights, std::size_t rows, std::size_t columns,
-    const void* staged, float* output, unsigned int warps_per_row,
-    cudaStream_t stream) noexcept {
+    const void* staged, float* output, unsigned int rows_per_cta,
+    unsigned int warps_per_row, cudaStream_t stream) noexcept {
   if (weights == nullptr || staged == nullptr || output == nullptr ||
       rows == 0 || columns == 0 || columns % kQ80Values != 0 ||
-      !legal_q8_decode_warps_per_row(warps_per_row) || warps_per_row == 0) {
+      !legal_q8_decode_layout(rows_per_cta, warps_per_row)) {
     return cudaErrorInvalidValue;
   }
-  if (warps_per_row == 1) {
-    return q8_dots::launch_coop<1>(weights, rows, columns, staged, output,
-                                   stream);
-  }
-  if (warps_per_row == 2) {
-    return q8_dots::launch_coop<2>(weights, rows, columns, staged, output,
-                                   stream);
-  }
-  if (warps_per_row == 4) {
-    return q8_dots::launch_coop<4>(weights, rows, columns, staged, output,
-                                   stream);
-  }
-  return q8_dots::launch_coop<8>(weights, rows, columns, staged, output,
-                                 stream);
+  return launch_layout(weights, rows, columns, staged, output, rows_per_cta,
+                       warps_per_row, stream);
+}
+
+cudaError_t launch_q8_coop_mmv_prequant(
+    const std::uint8_t* weights, std::size_t rows, std::size_t columns,
+    const void* staged, float* output, unsigned int warps_per_row,
+    cudaStream_t stream) noexcept {
+  return launch_q8_coop_mmv_prequant(weights, rows, columns, staged, output, 1U,
+                                     warps_per_row, stream);
 }
 
 cudaError_t launch_q8_coop_mmv(const std::uint8_t* weights, std::size_t rows,
                                std::size_t columns,
                                const __nv_bfloat16* activation, void* workspace,
-                               float* output, unsigned int warps_per_row,
+                               float* output, unsigned int rows_per_cta,
+                               unsigned int warps_per_row,
                                cudaStream_t stream) noexcept {
   if (activation == nullptr || workspace == nullptr) {
     return cudaErrorInvalidValue;
@@ -63,43 +95,74 @@ cudaError_t launch_q8_coop_mmv(const std::uint8_t* weights, std::size_t rows,
       activation, static_cast<Q8_1Block*>(workspace), columns, stream);
   if (error != cudaSuccess) return error;
   return launch_q8_coop_mmv_prequant(weights, rows, columns, workspace, output,
-                                     warps_per_row, stream);
+                                     rows_per_cta, warps_per_row, stream);
 }
 
-int q8_coop_occupancy(unsigned int warps_per_row) noexcept {
+cudaError_t launch_q8_coop_mmv(const std::uint8_t* weights, std::size_t rows,
+                               std::size_t columns,
+                               const __nv_bfloat16* activation, void* workspace,
+                               float* output, unsigned int warps_per_row,
+                               cudaStream_t stream) noexcept {
+  return launch_q8_coop_mmv(weights, rows, columns, activation, workspace,
+                            output, 1U, warps_per_row, stream);
+}
+
+int q8_coop_occupancy(unsigned int rows_per_cta,
+                      unsigned int warps_per_row) noexcept {
   int occupancy = 0;
   cudaError_t error = cudaErrorInvalidValue;
-  const int threads = static_cast<int>(warps_per_row) * kWarpSize;
-  if (warps_per_row == 1) {
+  const int threads =
+      static_cast<int>(rows_per_cta * warps_per_row) * kWarpSize;
+  if (rows_per_cta == 1 && warps_per_row == 1) {
     error = cudaOccupancyMaxActiveBlocksPerMultiprocessor(
-        &occupancy, q8_dots::q8_coop_mmv<1>, threads, 0);
-  } else if (warps_per_row == 2) {
+        &occupancy, q8_dots::q8_coop_mmv<1, 1>, threads, 0);
+  } else if (rows_per_cta == 1 && warps_per_row == 2) {
     error = cudaOccupancyMaxActiveBlocksPerMultiprocessor(
-        &occupancy, q8_dots::q8_coop_mmv<2>, threads, 0);
-  } else if (warps_per_row == 4) {
+        &occupancy, q8_dots::q8_coop_mmv<1, 2>, threads, 0);
+  } else if (rows_per_cta == 1 && warps_per_row == 4) {
     error = cudaOccupancyMaxActiveBlocksPerMultiprocessor(
-        &occupancy, q8_dots::q8_coop_mmv<4>, threads, 0);
-  } else if (warps_per_row == 8) {
+        &occupancy, q8_dots::q8_coop_mmv<1, 4>, threads, 0);
+  } else if (rows_per_cta == 1 && warps_per_row == 8) {
     error = cudaOccupancyMaxActiveBlocksPerMultiprocessor(
-        &occupancy, q8_dots::q8_coop_mmv<8>, threads, 0);
+        &occupancy, q8_dots::q8_coop_mmv<1, 8>, threads, 0);
+  } else if (rows_per_cta == 2 && warps_per_row == 2) {
+    error = cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+        &occupancy, q8_dots::q8_coop_mmv<2, 2>, threads, 0);
+  } else if (rows_per_cta == 4 && warps_per_row == 1) {
+    error = cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+        &occupancy, q8_dots::q8_coop_mmv<4, 1>, threads, 0);
+  } else if (rows_per_cta == 8 && warps_per_row == 1) {
+    error = cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+        &occupancy, q8_dots::q8_coop_mmv<8, 1>, threads, 0);
   }
   if (error != cudaSuccess) return 0;
   return occupancy;
 }
 
-void q8_coop_kernel_attributes(unsigned int warps_per_row, int* registers,
+int q8_coop_occupancy(unsigned int warps_per_row) noexcept {
+  return q8_coop_occupancy(1U, warps_per_row);
+}
+
+void q8_coop_kernel_attributes(unsigned int rows_per_cta,
+                               unsigned int warps_per_row, int* registers,
                                std::size_t* local_bytes,
                                int* occupancy) noexcept {
   cudaFuncAttributes attrs{};
   cudaError_t error = cudaErrorInvalidValue;
-  if (warps_per_row == 1) {
-    error = cudaFuncGetAttributes(&attrs, q8_dots::q8_coop_mmv<1>);
-  } else if (warps_per_row == 2) {
-    error = cudaFuncGetAttributes(&attrs, q8_dots::q8_coop_mmv<2>);
-  } else if (warps_per_row == 4) {
-    error = cudaFuncGetAttributes(&attrs, q8_dots::q8_coop_mmv<4>);
-  } else if (warps_per_row == 8) {
-    error = cudaFuncGetAttributes(&attrs, q8_dots::q8_coop_mmv<8>);
+  if (rows_per_cta == 1 && warps_per_row == 1) {
+    error = cudaFuncGetAttributes(&attrs, q8_dots::q8_coop_mmv<1, 1>);
+  } else if (rows_per_cta == 1 && warps_per_row == 2) {
+    error = cudaFuncGetAttributes(&attrs, q8_dots::q8_coop_mmv<1, 2>);
+  } else if (rows_per_cta == 1 && warps_per_row == 4) {
+    error = cudaFuncGetAttributes(&attrs, q8_dots::q8_coop_mmv<1, 4>);
+  } else if (rows_per_cta == 1 && warps_per_row == 8) {
+    error = cudaFuncGetAttributes(&attrs, q8_dots::q8_coop_mmv<1, 8>);
+  } else if (rows_per_cta == 2 && warps_per_row == 2) {
+    error = cudaFuncGetAttributes(&attrs, q8_dots::q8_coop_mmv<2, 2>);
+  } else if (rows_per_cta == 4 && warps_per_row == 1) {
+    error = cudaFuncGetAttributes(&attrs, q8_dots::q8_coop_mmv<4, 1>);
+  } else if (rows_per_cta == 8 && warps_per_row == 1) {
+    error = cudaFuncGetAttributes(&attrs, q8_dots::q8_coop_mmv<8, 1>);
   }
   if (registers != nullptr) {
     *registers = error == cudaSuccess ? attrs.numRegs : 0;
@@ -109,7 +172,16 @@ void q8_coop_kernel_attributes(unsigned int warps_per_row, int* registers,
                        ? static_cast<std::size_t>(attrs.localSizeBytes)
                        : 0;
   }
-  if (occupancy != nullptr) *occupancy = q8_coop_occupancy(warps_per_row);
+  if (occupancy != nullptr) {
+    *occupancy = q8_coop_occupancy(rows_per_cta, warps_per_row);
+  }
+}
+
+void q8_coop_kernel_attributes(unsigned int warps_per_row, int* registers,
+                               std::size_t* local_bytes,
+                               int* occupancy) noexcept {
+  q8_coop_kernel_attributes(1U, warps_per_row, registers, local_bytes,
+                            occupancy);
 }
 
 int q8_mmv_bf16_occupancy() noexcept {
