@@ -124,14 +124,37 @@ are repository-relative unless stated otherwise.
 | OPT-055 | Capture measured remaining decode and prompt launch gaps | OPT-054 | done | Supersedes OPT-031; broader stable graphs save measured wall time with bounded cancellation, correct dynamic positions and post-graph memory reserve, or measured no-change result | [`tasks/OPT-055.md`](tasks/OPT-055.md); [`pins/opt055_execution_graphs_contract.json`](pins/opt055_execution_graphs_contract.json); [`fixtures/opt055_execution_graphs.json`](fixtures/opt055_execution_graphs.json); [`cuda/full_scheduler.cu`](cuda/full_scheduler.cu); [`cuda/opt055_execution_graphs_ab_test.cu`](cuda/opt055_execution_graphs_ab_test.cu); [`tests/test_opt055_execution_graphs.py`](tests/test_opt055_execution_graphs.py); [`evidence/optimization/opt055-execution-graphs/REPORT.md`](evidence/optimization/opt055-execution-graphs/REPORT.md); verification 2026-09-11T01:30:00Z |
 | OPT-056 | Exceed pinned llama.cpp prefill and decode with quality | OPT-045, OPT-046, OPT-047, OPT-048, OPT-049, OPT-050, OPT-051, OPT-052, OPT-053, OPT-054, OPT-055 | blocked | Same-sitting P/D128/D2048 throughput exceeds llama by at least 5%, decode p95 is no worse, combined production quality passes, and original OPT-016 2K parity passes; candidate-task completion alone is insufficient | [`tasks/OPT-056.md`](tasks/OPT-056.md); [`pins/opt056_performance_gate_contract.json`](pins/opt056_performance_gate_contract.json); [`fixtures/opt056_performance_gate.json`](fixtures/opt056_performance_gate.json); [`tests/test_opt056_performance_gate.py`](tests/test_opt056_performance_gate.py); [`evidence/optimization/opt056-performance-gate/REPORT.md`](evidence/optimization/opt056-performance-gate/REPORT.md); blocked 2026-09-11T02:15:00Z measured gate unpassed P 2808.50 vs llama 3263.52 (+618 tok/s to 5% bar), D128 37.48 vs 68.93, D2048 35.72 vs 67.34, decode p95 worse; recovery: close remaining P/D gaps vs llama before re-pass |
 
-### Post-042 recovery execution order
+### Post-056 implementation batch
+
+All rows below are proposed implementation work, not delivered speedups. Use
+the [source analysis and batch protocol](tasks/PERFORMANCE-RECOVERY-2026-09-11.md)
+and [testing strategy](testing-strategy.md). The first eligible task is OPT-057.
+Existing OPT-056 and OPT-016 gates remain blocked on their original conditions.
+
+| ID | Description | Dependencies | Status | Acceptance condition | Evidence |
+|---|---|---|---|---|---|
+| OPT-057 | Bound optimization feedback and fix incremental CUDA builds | OPT-055 | pending | Reliable header/flag invalidation, explicit tier/workload limits, isolated evidence and measured warm feedback within 300 seconds; no throughput claim | [Implementation guide](tasks/OPT-057.md); proposed 2026-09-11 |
+| OPT-058 | Establish finite scheduler and valid functional/held-out quality baselines | OPT-057 | pending | Current eager/graph/trace nonfinites resolved or honestly blocked; both engines evaluated on valid functional prompts; missing held-out llama reference frozen and required | [Implementation guide](tasks/OPT-058.md); proposed 2026-09-11 |
+| OPT-059 | Calibrate GPU numerical error and wire per-family production admission | OPT-058 | pending | Actual pinned llama GPU and independent FP64 calibration, held-out v2 budgets, staging semantics and strict/current test separation; no unvalidated default | [Implementation guide](tasks/OPT-059.md); proposed 2026-09-11 |
+| OPT-060 | Instrument matched full-engine Quartz and pinned llama family execution | OPT-057 | pending | Real dispatch/fusion/stream records and matched P/D family attribution with overhead/overlap limits; reproducible private authority patch; no speedup required | [Implementation guide](tasks/OPT-060.md); proposed 2026-09-11 |
+| OPT-061 | Build real-input streaming replay and hardware bottleneck evidence | OPT-060 | pending | Reusable captured FFN/mixer inputs, hot versus rotating weights, correct call counts and complete costs; counters or explicitly limited event/resource fallback | [Implementation guide](tasks/OPT-061.md); proposed 2026-09-11 |
+| OPT-062 | Revalidate cooperative Q4 and dispatch all decode FFN projections | OPT-059, OPT-061 | pending | Gate/up/down actually use admitted integer variants with shared staging, graph coverage, complete FFN benefit and batch quality/non-regression, or retained rejection | [Implementation guide](tasks/OPT-062.md); proposed 2026-09-11 |
+| OPT-063 | Fuse admitted integer gate/up dots and SwiGLU | OPT-062 | pending | Shared-input paired Q4 improves complete FFN while preserving admitted arithmetic and output boundaries, or documented no-change/no-go | [Implementation guide](tasks/OPT-063.md); proposed 2026-09-11 |
+| OPT-064 | Improve Q8 decode row grouping and reduction cost | OPT-059, OPT-061 | pending | Bounded four-layout study improves frequency-weighted rotating mixer time with legal alignment, staging reuse and quality, or measured rejection | [Implementation guide](tasks/OPT-064.md); proposed 2026-09-11 |
+| OPT-065 | Retune MMQ tile resources with the current pipeline active | OPT-059, OPT-061 | pending | Four Q4 tiles compared with FMA/async Y preserved, actual dispatch/resource evidence, complete FFN/P benefit and tail correctness, or retained 128x128 | [Implementation guide](tasks/OPT-065.md); proposed 2026-09-11 |
+| OPT-066 | Pipeline packed Q4 prompt weight fetches | OPT-065 | pending | Bounded X-prefetch variant preserves stage lifetimes and arithmetic and improves complete P work, or measured resource/performance no-go | [Implementation guide](tasks/OPT-066.md); proposed 2026-09-11 |
+| OPT-067 | Pair prompt FFN gate/up tiles and BF16 SwiGLU output | OPT-065 | pending | Conditional two-candidate study proves complete FFN benefit, resource fit and output/staging quality, or explicit no-go/rejection | [Implementation guide](tasks/OPT-067.md); proposed 2026-09-11 |
+| OPT-068 | Measure scoped optimized compilation for one projection family | OPT-059, OPT-061 | pending | Three isolated O2/O3/FMA builds yield a quality-admitted complete win with strict/host flags intact, or retained flags | [Implementation guide](tasks/OPT-068.md); proposed 2026-09-11 |
+| OPT-069 | Validate combined batch and original llama outcome gates | OPT-058, OPT-059, OPT-062, OPT-063, OPT-064, OPT-065, OPT-066, OPT-067, OPT-068 | pending | Complete combined quality, original P/D/2K protocols and state/memory evidence; separately report improvement, parity and original +5% outcome without relabeling failed gates | [Implementation guide](tasks/OPT-069.md); proposed 2026-09-11 |
+
+### Post-042 recovery execution order (historical batch)
 
 The [2026-09-10 design](tasks/PERFORMANCE-RECOVERY-2026-09-10.md) compares the
 admitted Quartz, pinned llama.cpp and ds4 paths. It is source analysis and task
 design, not new performance evidence. **OPT-056 outcome gate measured unpassed**
 (2026-09-11); recovery requires closing remaining P/D throughput and decode-p95
-gaps versus llama before re-pass. No further pending recovery rows remain in the
-2026-09-10 ladder until new measured-bottleneck tasks are admitted.
+gaps versus llama before re-pass. The 2026-09-10 ladder is exhausted; the new
+OPT-057–069 batch above supplies the current recovery work.
 Dependencies permit independent work but do not authorize subagents. The user
 accepts documented llama.cpp/ds4-like accuracy compromises; strict reference
 arithmetic and exact structural/transaction guarantees remain separately tested.
@@ -228,7 +251,7 @@ statements below are historical, not the current execution order.
 | 6. CUDA primitives | CUD-001–CUD-003 |
 | 7. GDN/attention/scheduler | GDN-001–GDN-002, ATN-001–ATN-002, SCH-001 |
 | 8. Sessions and 128K | SES-001–SES-003, MEM-001 |
-| 9. Profiling/optimization | OPT-001–OPT-056 (OPT-031 superseded by OPT-055) |
+| 9. Profiling/optimization | OPT-001–OPT-069 (OPT-031 superseded by OPT-055; OPT-057–069 proposed) |
 | 10. Product tools/API/quality | CLI-001, SRV-001–SRV-003, BEN-001, EVAL-001, QLT-001 |
 | 11. Comparative speed | CMP-001–CMP-003 |
 | 12. Documentation/release | DOC-001, REL-001 |
@@ -5879,3 +5902,25 @@ statements below are historical, not the current execution order.
   decode-p95 gaps versus llama before re-pass. `plan.md` is unchanged. OPT-016
   stays `blocked`. No pending recovery rows remain until new measured-bottleneck
   tasks are admitted.
+
+### 2026-09-11T04:58:09Z — Post-056 recovery batch proposed
+
+- Added OPT-057–069 and detailed implementation guides based on current Quartz,
+  pinned llama.cpp and ds4 source plus retained OPT-044–056 evidence. The
+  [design](tasks/PERFORMANCE-RECOVERY-2026-09-11.md) distinguishes observations,
+  estimates, hypotheses and unmeasured candidates.
+- Priority findings: current paired gate/up bypass cooperative Q4 dispatch;
+  Q8_1 sum semantics differ from pinned llama; production admission remains a
+  strict stub; missing functional/held-out authority and historical scheduler
+  nonfinites need independent validation; pipelined MMQ tile/resource selection
+  needs a new bounded comparison.
+- Reviewed [testing policy](testing-strategy.md): first useful feedback targets
+  300 seconds including incremental build, with explicit screening workloads,
+  cached sampled references and one batch-level long release sitting. OPT-057
+  implements the runner; proposed commands do not exist yet.
+- Proposed versioned GPU-calibrated primitive error limits and incremental
+  component acceptance with E2E non-regression; keep PPL<=1.01, zero nonfinites,
+  functional correctness and original OPT-056/OPT-016 outcome conditions.
+- Read-only hardware inventory observed a 400 W power cap; no hardware settings
+  or runtime code changed. No new GPU speedup measurement or delivered candidate
+  is claimed. First eligible implementation task: OPT-057.
