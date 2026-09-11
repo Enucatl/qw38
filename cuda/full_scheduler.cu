@@ -1646,46 +1646,92 @@ SchedulerGraphs& SchedulerGraphs::operator=(SchedulerGraphs&& other) noexcept {
   executions_ = other.executions_;
   prompt_graphs_ = other.prompt_graphs_;
   prompt_executions_ = other.prompt_executions_;
+  decode_segment_graphs_ = other.decode_segment_graphs_;
+  decode_segment_executions_ = other.decode_segment_executions_;
+  prompt_mixer_graphs_ = other.prompt_mixer_graphs_;
+  prompt_mixer_executions_ = other.prompt_mixer_executions_;
   model_ = other.model_;
   workspace_ = other.workspace_;
   decode_graph_count_ = other.decode_graph_count_;
   prompt_graph_count_ = other.prompt_graph_count_;
   prompt_rows_ = other.prompt_rows_;
+  decode_node_count_ = other.decode_node_count_;
+  prompt_node_count_ = other.prompt_node_count_;
+  decode_segment_graph_count_ = other.decode_segment_graph_count_;
+  prompt_mixer_graph_count_ = other.prompt_mixer_graph_count_;
   allocated_bytes_ = other.allocated_bytes_;
+  launch_params_ = other.launch_params_;
   other.graphs_ = {};
   other.executions_ = {};
   other.prompt_graphs_ = {};
   other.prompt_executions_ = {};
+  other.decode_segment_graphs_ = {};
+  other.decode_segment_executions_ = {};
+  other.prompt_mixer_graphs_ = {};
+  other.prompt_mixer_executions_ = {};
   other.model_ = nullptr;
   other.workspace_ = nullptr;
   other.decode_graph_count_ = 0;
   other.prompt_graph_count_ = 0;
   other.prompt_rows_ = 0;
+  other.decode_node_count_ = 0;
+  other.prompt_node_count_ = 0;
+  other.decode_segment_graph_count_ = 0;
+  other.prompt_mixer_graph_count_ = 0;
   other.allocated_bytes_ = 0;
+  other.launch_params_ = {};
   return *this;
 }
 
+namespace {
+
+void destroy_graph_pair(cudaGraphExec_t* execution, cudaGraph_t* graph) noexcept {
+  if (execution != nullptr && *execution != nullptr) {
+    cudaGraphExecDestroy(*execution);
+    *execution = nullptr;
+  }
+  if (graph != nullptr && *graph != nullptr) {
+    cudaGraphDestroy(*graph);
+    *graph = nullptr;
+  }
+}
+
+std::size_t count_cuda_graph_nodes(cudaGraph_t graph) noexcept {
+  if (graph == nullptr) return 0;
+  std::size_t count = 0;
+  if (cudaGraphGetNodes(graph, nullptr, &count) != cudaSuccess) return 0;
+  return count;
+}
+
+}  // namespace
+
 void SchedulerGraphs::release() noexcept {
   for (std::size_t index = 0; index < executions_.size(); ++index) {
-    if (executions_[index] != nullptr) cudaGraphExecDestroy(executions_[index]);
-    if (graphs_[index] != nullptr) cudaGraphDestroy(graphs_[index]);
-    executions_[index] = nullptr;
-    graphs_[index] = nullptr;
+    destroy_graph_pair(&executions_[index], &graphs_[index]);
   }
   for (std::size_t index = 0; index < prompt_executions_.size(); ++index) {
-    if (prompt_executions_[index] != nullptr) {
-      cudaGraphExecDestroy(prompt_executions_[index]);
-    }
-    if (prompt_graphs_[index] != nullptr) cudaGraphDestroy(prompt_graphs_[index]);
-    prompt_executions_[index] = nullptr;
-    prompt_graphs_[index] = nullptr;
+    destroy_graph_pair(&prompt_executions_[index], &prompt_graphs_[index]);
+  }
+  for (std::size_t index = 0; index < decode_segment_executions_.size();
+       ++index) {
+    destroy_graph_pair(&decode_segment_executions_[index],
+                       &decode_segment_graphs_[index]);
+  }
+  for (std::size_t index = 0; index < prompt_mixer_executions_.size(); ++index) {
+    destroy_graph_pair(&prompt_mixer_executions_[index],
+                       &prompt_mixer_graphs_[index]);
   }
   model_ = nullptr;
   workspace_ = nullptr;
   decode_graph_count_ = 0;
   prompt_graph_count_ = 0;
   prompt_rows_ = 0;
+  decode_node_count_ = 0;
+  prompt_node_count_ = 0;
+  decode_segment_graph_count_ = 0;
+  prompt_mixer_graph_count_ = 0;
   allocated_bytes_ = 0;
+  launch_params_ = {};
 }
 
 Status SchedulerGraphs::create(const ResidentModel& model,
@@ -1775,6 +1821,14 @@ Status SchedulerGraphs::create(const ResidentModel& model,
     release();
     return cuda_status(error, "cannot capture CUDA scheduler FFN graphs");
   }
+  decode_node_count_ = 0;
+  prompt_node_count_ = 0;
+  for (std::size_t index = 0; index < decode_graph_count_; ++index) {
+    decode_node_count_ += count_cuda_graph_nodes(graphs_[index]);
+  }
+  for (std::size_t index = 0; index < prompt_graph_count_; ++index) {
+    prompt_node_count_ += count_cuda_graph_nodes(prompt_graphs_[index]);
+  }
   model_ = &model;
   workspace_ = workspace;
   allocated_bytes_ = free_before >= free_after ? free_before - free_after : 0;
@@ -1799,6 +1853,53 @@ std::size_t SchedulerGraphs::prompt_graph_rows() const noexcept {
 
 std::size_t SchedulerGraphs::allocated_bytes() const noexcept {
   return allocated_bytes_;
+}
+
+std::size_t SchedulerGraphs::decode_node_count() const noexcept {
+  return decode_node_count_;
+}
+
+std::size_t SchedulerGraphs::prompt_node_count() const noexcept {
+  return prompt_node_count_;
+}
+
+std::size_t SchedulerGraphs::node_count() const noexcept {
+  return decode_node_count_ + prompt_node_count_;
+}
+
+std::size_t SchedulerGraphs::decode_segment_graph_count() const noexcept {
+  return decode_segment_graph_count_;
+}
+
+std::size_t SchedulerGraphs::prompt_mixer_graph_count() const noexcept {
+  return prompt_mixer_graph_count_;
+}
+
+const char* SchedulerGraphs::execution_graph_path() const noexcept {
+  return kSelectedExecutionGraphPath;
+}
+
+GraphLaunchParams SchedulerGraphs::launch_params() const noexcept {
+  return launch_params_;
+}
+
+Status SchedulerGraphs::update_launch_params(std::uint32_t token,
+                                             std::uint32_t position,
+                                             std::uint32_t frontier) noexcept {
+  if (decode_graph_count_ == 0) {
+    return {StatusCode::kInvalidArgument,
+            "CUDA scheduler graph params require captured graphs"};
+  }
+  launch_params_.token = token;
+  launch_params_.position = position;
+  launch_params_.frontier = frontier;
+  constexpr std::uint32_t kKvBucketRows = 2048;
+  launch_params_.kv_bucket = frontier / kKvBucketRows;
+  return Status::ok();
+}
+
+const char* selected_execution_graph_path() noexcept {
+  return kSelectedExecutionGraphPath;
 }
 
 bool SchedulerGraphs::matches(
@@ -2362,6 +2463,13 @@ Status execute_token(const ResidentModel& model, std::size_t token,
             "CUDA token scheduler input, state, or output is invalid"};
   }
   const NvtxRange token_range("qw38.token");
+  if (graphs != nullptr) {
+    const Status param_status = graphs->update_launch_params(
+        static_cast<std::uint32_t>(token),
+        static_cast<std::uint32_t>(session->frontier_),
+        static_cast<std::uint32_t>(session->frontier_));
+    if (!param_status.is_ok()) return param_status;
+  }
   const auto attribution_started = std::chrono::steady_clock::now();
   const bool record_leaves =
       decode_attribution != nullptr && decode_attribution->record_leaves;
@@ -3085,6 +3193,13 @@ Status execute_prompt_chunk(
     }
   }
   const NvtxRange chunk_range("qw38.prefill_chunk");
+  if (graphs != nullptr) {
+    const Status param_status = graphs->update_launch_params(
+        static_cast<std::uint32_t>(tokens[0]),
+        static_cast<std::uint32_t>(session->frontier_),
+        static_cast<std::uint32_t>(session->frontier_));
+    if (!param_status.is_ok()) return param_status;
+  }
   GpuPhaseRecorder attribution_recorder;
   GpuPhaseRecorder leaf_recorder;
   GpuPhaseRecorder* categories =

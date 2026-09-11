@@ -50,6 +50,10 @@ Before graph creation, 3,537,895,424 bytes were free. After uploading the graph
 executables, 3,521,118,208 bytes were free; their difference is the measured
 16,777,216-byte graph allocation.
 
+OPT-055 did not add graph executables or extra `cudaMalloc` scratch. Production
+pin `kSelectedExecutionGraphPath` remains `ffn_only`, so this ledger still
+covers the live 128-executable owner set.
+
 ## Reserve result
 
 The device exposes 33,664,794,624 total bytes. With every owner and graph alive,

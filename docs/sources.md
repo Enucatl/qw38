@@ -931,6 +931,35 @@ baseline.
   p95 inside 105% versus OPT-053; OPT-044 admits cross-size arithmetic drift;
   does not substitute for the 2K llama.cpp parity gate. Envelopes unloosened;
   Nsight is not used.
+- OPT-055 revisits remaining decode and prompt launch gaps after OPT-054.
+  `SchedulerGraphs` gains node counts, a host `GraphLaunchParams` block, and
+  empty layer-segment / prompt-mixer slots. Mixer/GDN/attention stay ordinary
+  launches. Keep FFN-only unless remaining idle exceeds 0.5 ms decode / 20 ms
+  prefill or 1% of wall on both a null poll and a non-null Session poll.
+  Graph/eager equality, token/frontier changes, invalidation, partial tails,
+  and cancellation before publication stay. Extra device allocation is zero;
+  the measured 128-graph 128K reserve is unchanged. Keep denominators are the
+  frozen OPT-054 P and D128/D2048 means and p95s.
+  **Measured, RTX 5090 no-change:** remaining idle below noise; production pin
+  `kSelectedExecutionGraphPath` remains `ffn_only`. Copied P 2895.42773, D128
+  37.5605927, D2048 35.7286987. The schema-1 contract, measured fixture, and
+  report are
+  [`pins/opt055_execution_graphs_contract.json`](../pins/opt055_execution_graphs_contract.json),
+  [`fixtures/opt055_execution_graphs.json`](../fixtures/opt055_execution_graphs.json),
+  and
+  [`evidence/optimization/opt055-execution-graphs/REPORT.md`](../evidence/optimization/opt055-execution-graphs/REPORT.md).
+  The beginner explanations are
+  [`docs/53-stable-address-cuda-graphs.md`](53-stable-address-cuda-graphs.md),
+  [`docs/62-cuda-full-prefill.md`](62-cuda-full-prefill.md), and
+  [`docs/06-system-optimization.md`](06-system-optimization.md).
+  Proof limit: stable-address decode and prompt FFN graphs remain the shipping
+  path; layer-segment mixer/core capture stays unpopulated unless idle exceeds
+  noise; graph/eager equality on the same arithmetic path; token change,
+  frontier growth, invalidation, partial tails, and cancellation before
+  publication; node and launch counts plus measured idle/waits including poll
+  versus null; parameter uploads counted in host launch_params without extra
+  device allocation; 128K post-graph reserve unchanged; does not substitute
+  for the 2K llama.cpp parity gate. Envelopes unloosened; Nsight is not used.
 - OPT-041 is a local derivation over admitted Ada+ stream-K fattn with
   register-resident VKQ and dual-F16 probability×V MMA. It assigns each of
   eight 16×8 QK microtiles to one of four warps (`tile_id % 4`), lets the

@@ -25,10 +25,14 @@ namespace qw38::cuda {
 constexpr std::size_t kPromptChunkRows = 4096;
 constexpr std::size_t kSelectedPromptMicrobatchRows = 4096;
 constexpr std::size_t kLegalPromptMicrobatchRows[] = {512, 1024, 2048, 4096};
+inline constexpr char kSelectedExecutionGraphPath[] = "ffn_only";
+inline constexpr const char* kLegalExecutionGraphPaths[] = {"ffn_only",
+                                                           "layer_segments"};
 
 std::size_t selected_prompt_microbatch_rows() noexcept;
 void set_prompt_microbatch_rows_override(std::size_t rows) noexcept;
 void clear_prompt_microbatch_rows_override() noexcept;
+const char* selected_execution_graph_path() noexcept;
 
 struct PromptMicrobatchRowsScope final {
   explicit PromptMicrobatchRowsScope(std::size_t rows) noexcept {
@@ -486,6 +490,13 @@ class SchedulerWorkspace final {
   friend class SchedulerGraphs;
 };
 
+struct GraphLaunchParams final {
+  std::uint32_t token = 0;
+  std::uint32_t position = 0;
+  std::uint32_t frontier = 0;
+  std::uint32_t kv_bucket = 0;
+};
+
 class SchedulerGraphs final {
  public:
   SchedulerGraphs() noexcept;
@@ -501,7 +512,16 @@ class SchedulerGraphs final {
   std::size_t decode_graph_count() const noexcept;
   std::size_t prompt_graph_count() const noexcept;
   std::size_t prompt_graph_rows() const noexcept;
+  std::size_t decode_node_count() const noexcept;
+  std::size_t prompt_node_count() const noexcept;
+  std::size_t node_count() const noexcept;
+  std::size_t decode_segment_graph_count() const noexcept;
+  std::size_t prompt_mixer_graph_count() const noexcept;
   std::size_t allocated_bytes() const noexcept;
+  const char* execution_graph_path() const noexcept;
+  GraphLaunchParams launch_params() const noexcept;
+  Status update_launch_params(std::uint32_t token, std::uint32_t position,
+                              std::uint32_t frontier) noexcept;
 
  private:
   void release() noexcept;
@@ -511,12 +531,23 @@ class SchedulerGraphs final {
   std::array<cudaGraphExec_t, internal::kModelLayerCount> executions_{};
   std::array<cudaGraph_t, internal::kModelLayerCount> prompt_graphs_{};
   std::array<cudaGraphExec_t, internal::kModelLayerCount> prompt_executions_{};
+  std::array<cudaGraph_t, internal::kModelLayerCount> decode_segment_graphs_{};
+  std::array<cudaGraphExec_t, internal::kModelLayerCount>
+      decode_segment_executions_{};
+  std::array<cudaGraph_t, internal::kModelLayerCount> prompt_mixer_graphs_{};
+  std::array<cudaGraphExec_t, internal::kModelLayerCount>
+      prompt_mixer_executions_{};
   const ResidentModel* model_ = nullptr;
   const SchedulerWorkspace* workspace_ = nullptr;
   std::size_t decode_graph_count_ = 0;
   std::size_t prompt_graph_count_ = 0;
   std::size_t prompt_rows_ = 0;
+  std::size_t decode_node_count_ = 0;
+  std::size_t prompt_node_count_ = 0;
+  std::size_t decode_segment_graph_count_ = 0;
+  std::size_t prompt_mixer_graph_count_ = 0;
   std::size_t allocated_bytes_ = 0;
+  GraphLaunchParams launch_params_{};
 
   friend Status execute_token(const ResidentModel&, std::size_t,
                               SchedulerSession*, SchedulerWorkspace*, float*,

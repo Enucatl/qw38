@@ -1,6 +1,6 @@
 # Chunked full-model CUDA prefill
 
-[Index](README.md) · Implementation tasks: SCH-002, MEM-002, OPT-008, OPT-009, OPT-011, OPT-012, OPT-013, OPT-014, OPT-015, OPT-017, OPT-018, OPT-019, OPT-020, OPT-021, OPT-022, OPT-023, OPT-024, OPT-025, OPT-026, OPT-027, OPT-028, OPT-029, OPT-030, OPT-032, OPT-033, OPT-035, OPT-037, OPT-038, OPT-040, OPT-041, OPT-052, OPT-053, OPT-054, and EDU-047 in
+[Index](README.md) · Implementation tasks: SCH-002, MEM-002, OPT-008, OPT-009, OPT-011, OPT-012, OPT-013, OPT-014, OPT-015, OPT-017, OPT-018, OPT-019, OPT-020, OPT-021, OPT-022, OPT-023, OPT-024, OPT-025, OPT-026, OPT-027, OPT-028, OPT-029, OPT-030, OPT-032, OPT-033, OPT-035, OPT-037, OPT-038, OPT-040, OPT-041, OPT-052, OPT-053, OPT-054, OPT-055, and EDU-047 in
 [`implementation_ledger.md`](../implementation_ledger.md) · Contracts:
 [`pins/cuda_prompt_scheduler_contract.json`](../pins/cuda_prompt_scheduler_contract.json),
 [`pins/cuda_prompt_pipeline_contract.json`](../pins/cuda_prompt_pipeline_contract.json),
@@ -909,6 +909,18 @@ stay in the report:
 and
 [`fixtures/opt054_prefill_microbatch.json`](../fixtures/opt054_prefill_microbatch.json).
 
+OPT-055 measures remaining decode and prompt launch/idle gaps after that
+4096-row keep. `SchedulerGraphs` still ships 64 decode plus 64 prompt FFN
+executables; layer-segment mixer/core slots stay empty because measured
+`other_idle` stayed below noise on D128/D2048 and 4096-row prompt, including a
+non-null poll path. Graph/eager fused outputs stay equal. Copied P 2895.42773,
+D128 37.5605927, D2048 35.7286987. Extra device allocation is zero; the
+128-graph 128K reserve is unchanged. Live numbers stay in the report:
+[`evidence/optimization/opt055-execution-graphs/REPORT.md`](../evidence/optimization/opt055-execution-graphs/REPORT.md),
+[`pins/opt055_execution_graphs_contract.json`](../pins/opt055_execution_graphs_contract.json),
+and
+[`fixtures/opt055_execution_graphs.json`](../fixtures/opt055_execution_graphs.json).
+
 OPT-041 keeps warp-owned 16×8 prompt QK microtiles on production 4096-row
 fattn-mma stream-K including combine, on top of register-resident VKQ and
 dual-F16 probability×V MMA. **Measured, RTX 5090:** paired CUDA-event A/B
@@ -1008,7 +1020,9 @@ P denominator with the D128/D2048 guard; production MMQ pipeline pin is
 or pass the 2K tok/s gate. OPT-054 records the 512/1024/2048/4096 internal
 prefill microbatch sweep inside one atomic 4096-token transaction and keeps
 4096 unless a smaller size wins complete P without regressing D; it does not
-own or pass the 2K tok/s gate. BEN-001
+own or pass the 2K tok/s gate. OPT-055 records remaining decode/prompt launch
+idle after that keep and retains FFN-only graphs when idle stays below noise;
+it does not own or pass the 2K tok/s gate. BEN-001
 provides the harness; CMP-002/CMP-003 still own the 30-sample comparative gate.
 QLT-001 remains blocked. OPT-012's prompt graphs are FFN subgraphs only: not a
 whole-chunk graph, not a speedup gate, and not 128K quality recovery.

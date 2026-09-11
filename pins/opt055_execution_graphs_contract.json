@@ -1,0 +1,79 @@
+{
+  "schema_version": 1,
+  "task": "OPT-055",
+  "yardstick": "execution_graph_launch_gaps",
+  "opt054_quartz_p_mean_tok_s": 2895.42773,
+  "opt054_quartz_d128_mean_tok_s": 37.5605927,
+  "opt054_quartz_d2048_mean_tok_s": 35.7286987,
+  "opt054_quartz_d128_token_latency_p95_ms": 26.9020824,
+  "opt054_quartz_d128_run_mean_token_latency_p95_ms": 26.7428017,
+  "opt054_quartz_d2048_token_latency_p95_ms": 28.1707439,
+  "opt054_quartz_d2048_run_mean_token_latency_p95_ms": 28.0445251,
+  "llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+  "gguf_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+  "device_substring": "RTX 5090",
+  "selected_execution_graph_path": "ffn_only",
+  "legal_execution_graph_paths": [
+    "ffn_only",
+    "layer_segments"
+  ],
+  "ab": {
+    "candidates": [
+      "ffn_only",
+      "layer_segments"
+    ],
+    "ties_retain": "ffn_only",
+    "decode_idle_noise_ms": 0.5,
+    "prefill_idle_noise_ms": 20.0,
+    "idle_fraction": 0.01,
+    "graphs_on_shipping": true,
+    "poll_and_null_compared": true
+  },
+  "opt044": {
+    "formula": "max(strict_reference_ceiling, 1.05 * measured_llama_error + 1e-6)",
+    "like_arithmetic_byte_equal": true
+  },
+  "opt054_keep_fixture": "fixtures/opt054_prefill_microbatch.json",
+  "memory_fit_fixture": "fixtures/cuda_memory_fit_post_graph.json",
+  "owns_opt016_parity_gate": false,
+  "substitutes_for_opt016": false,
+  "llama_bench_decode_is_informational": true,
+  "required_fixture_keys": [
+    "schema_version",
+    "task",
+    "status",
+    "measurement_utc",
+    "device",
+    "compute_capability",
+    "llama_revision",
+    "gguf_sha256",
+    "reverted",
+    "selected_execution_graph_path",
+    "ab",
+    "correctness",
+    "counts",
+    "production_numerics",
+    "keep_sitting_skipped",
+    "p",
+    "d128",
+    "d2048",
+    "extra_workspace_bytes",
+    "owns_opt016_parity_gate",
+    "substitutes_for_opt016",
+    "nsight_systems",
+    "nsight_compute",
+    "proof_limit",
+    "report_path"
+  ],
+  "proof_limit": [
+    "stable-address decode and prompt FFN graphs remain the shipping path",
+    "layer-segment mixer/core capture stays unpopulated unless idle exceeds noise",
+    "graph/eager equality on the same arithmetic path",
+    "token change, frontier growth, invalidation, partial tails, and cancellation before publication",
+    "node and launch counts plus measured idle/waits including poll versus null",
+    "parameter uploads counted in host launch_params without extra device allocation",
+    "128K post-graph reserve unchanged",
+    "does not substitute for the 2K llama.cpp parity gate"
+  ],
+  "report_path": "evidence/optimization/opt055-execution-graphs/REPORT.md"
+}

@@ -1,0 +1,295 @@
+{
+  "schema_version": 1,
+  "task": "OPT-055",
+  "status": "measured",
+  "measurement_utc": "2026-09-11T01:21:59Z",
+  "device": "NVIDIA GeForce RTX 5090",
+  "compute_capability": "12.0",
+  "llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+  "gguf_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+  "reverted": false,
+  "selected_execution_graph_path": "ffn_only",
+  "ab": {
+    "winner": "ffn_only",
+    "win": false,
+    "below_noise": true,
+    "d128": {
+      "graphs": {
+        "wall_ms": 25.5044994,
+        "other_idle_ms": 0.0855464935,
+        "graph_ms": 0.231401995,
+        "idle_gaps_ms": 6.83407974,
+        "launches": 64
+      },
+      "eager": {
+        "wall_ms": 25.8807831,
+        "other_idle_ms": 0.306892395
+      },
+      "poll": {
+        "wall_ms": 25.8222733,
+        "other_idle_ms": 0.36829567,
+        "poll_calls": 64
+      }
+    },
+    "d2048": {
+      "graphs": {
+        "wall_ms": 27.6636486,
+        "other_idle_ms": 0.105142593,
+        "graph_ms": 0.220972955,
+        "idle_gaps_ms": 6.81625557,
+        "launches": 64
+      },
+      "eager": {
+        "wall_ms": 28.0760612,
+        "other_idle_ms": 0.385662079
+      },
+      "poll": {
+        "wall_ms": 27.9924431,
+        "other_idle_ms": 0.352926254,
+        "poll_calls": 64
+      }
+    },
+    "prompt": {
+      "graphs": {
+        "wall_ms": 1422.6759,
+        "other_idle_ms": 0,
+        "graph_ms": 0.198342994,
+        "launches": 64
+      },
+      "eager": {
+        "wall_ms": 1424.9436,
+        "other_idle_ms": 0
+      },
+      "poll": {
+        "wall_ms": 1428.71667,
+        "other_idle_ms": 0,
+        "poll_calls": 64
+      }
+    }
+  },
+  "correctness": {
+    "graph_eager_equal": true,
+    "token_change": true,
+    "frontier_growth": true,
+    "invalidation": true,
+    "partial_tail": true,
+    "cancellation": {
+      "ok": true,
+      "poll_calls": 8,
+      "frontier": 0
+    },
+    "poll_null": true,
+    "params_updated": true
+  },
+  "counts": {
+    "decode_graph_count": 64,
+    "prompt_graph_count": 64,
+    "decode_segment_graph_count": 0,
+    "prompt_mixer_graph_count": 0,
+    "decode_node_count": 384,
+    "prompt_node_count": 448,
+    "node_count": 832,
+    "allocated_bytes": 16777216,
+    "graph_launches_decode_token": 64
+  },
+  "production_numerics": {
+    "formula": "max(strict_reference_ceiling, 1.05 * measured_llama_error + 1e-6)",
+    "like_arithmetic_byte_equal": true
+  },
+  "keep_sitting_skipped": true,
+  "p": {
+    "quartz": {
+      "prompt_tokens": 4096,
+      "replicates": 3,
+      "wall_ms": [
+        1402.4071,
+        1419.93506,
+        1421.75232
+      ],
+      "tok_s": [
+        2920.69263,
+        2884.63892,
+        2880.9519
+      ],
+      "mean_tok_s": 2895.42773,
+      "cold": true,
+      "cache_policy": "disabled",
+      "attribution": null
+    }
+  },
+  "d128": {
+    "quartz": {
+      "prefix": 128,
+      "decode_tokens": 256,
+      "warmups": 3,
+      "runs": 30,
+      "warmup_tok_s": [
+        38.6196671,
+        38.3696709,
+        38.2330284
+      ],
+      "tok_s": [
+        38.1056747,
+        38.0195427,
+        37.9435158,
+        37.8577347,
+        37.7832069,
+        37.7481995,
+        37.6903114,
+        37.652565,
+        37.6436195,
+        37.591114,
+        37.5479927,
+        37.5291672,
+        37.4821815,
+        37.4850464,
+        37.4826088,
+        37.4805832,
+        37.4781456,
+        37.4412804,
+        37.4102936,
+        37.4155464,
+        37.4275436,
+        37.4190636,
+        37.4073067,
+        37.3925972,
+        37.3816414,
+        37.3938065,
+        37.3954659,
+        37.3980865,
+        37.405983,
+        37.4079361
+      ],
+      "run_wall_ms": [
+        6718.15967,
+        6733.37939,
+        6746.87061,
+        6762.1582,
+        6775.49658,
+        6781.78027,
+        6792.19629,
+        6799.00537,
+        6800.62158,
+        6810.12012,
+        6817.94092,
+        6821.36133,
+        6829.91211,
+        6829.38965,
+        6829.83398,
+        6830.20312,
+        6830.64746,
+        6837.37305,
+        6843.03662,
+        6842.07568,
+        6839.88281,
+        6841.43262,
+        6843.58301,
+        6846.2749,
+        6848.28174,
+        6846.05322,
+        6845.74951,
+        6845.27002,
+        6843.82471,
+        6843.46777
+      ],
+      "mean_tok_s": 37.5605927,
+      "token_latency_p50_ms": 26.6910706,
+      "token_latency_p95_ms": 26.9020824,
+      "run_mean_token_latency_p95_ms": 26.7428017,
+      "graphs_created": true,
+      "attribution": null,
+      "cache_policy": "disabled"
+    }
+  },
+  "d2048": {
+    "quartz": {
+      "prefix": 2048,
+      "decode_tokens": 256,
+      "warmups": 3,
+      "runs": 30,
+      "warmup_tok_s": [
+        36.2431412,
+        36.1283264,
+        36.0180435
+      ],
+      "tok_s": [
+        35.95924,
+        35.8961449,
+        35.8726387,
+        35.8354797,
+        35.8049965,
+        35.7615051,
+        35.7510986,
+        35.7444534,
+        35.7322426,
+        35.7312279,
+        35.7052422,
+        35.7324181,
+        35.6960297,
+        35.6803131,
+        35.702652,
+        35.6903267,
+        35.672493,
+        35.6733093,
+        35.6510506,
+        35.655117,
+        35.660408,
+        35.6737366,
+        35.6955948,
+        35.6818504,
+        35.6859436,
+        35.6752625,
+        35.7085419,
+        35.7073059,
+        35.7096558,
+        35.7147713
+      ],
+      "run_wall_ms": [
+        7119.17139,
+        7131.68506,
+        7136.3584,
+        7143.7583,
+        7149.83984,
+        7158.53564,
+        7160.61914,
+        7161.95068,
+        7164.39795,
+        7164.60107,
+        7169.81543,
+        7164.36279,
+        7171.66602,
+        7174.82471,
+        7170.33594,
+        7172.81201,
+        7176.39746,
+        7176.2334,
+        7180.71387,
+        7179.89502,
+        7178.83008,
+        7176.14795,
+        7171.75342,
+        7174.51562,
+        7173.69287,
+        7175.84033,
+        7169.15283,
+        7169.40088,
+        7168.9292,
+        7167.90234
+      ],
+      "mean_tok_s": 35.7286987,
+      "token_latency_p50_ms": 27.9902878,
+      "token_latency_p95_ms": 28.1707439,
+      "run_mean_token_latency_p95_ms": 28.0445251,
+      "graphs_created": true,
+      "attribution": null,
+      "cache_policy": "disabled"
+    }
+  },
+  "extra_workspace_bytes": 0,
+  "owns_opt016_parity_gate": false,
+  "substitutes_for_opt016": false,
+  "nsight_systems": "not_used",
+  "nsight_compute": "not_used",
+  "proof_limit": "stable-address decode and prompt FFN graphs remain the shipping path; layer-segment mixer/core capture stays unpopulated unless idle exceeds noise; graph/eager equality on the same arithmetic path; token change, frontier growth, invalidation, partial tails, and cancellation before publication; node and launch counts plus measured idle/waits including poll versus null; parameter uploads counted in host launch_params without extra device allocation; 128K post-graph reserve unchanged; does not substitute for the 2K llama.cpp parity gate",
+  "report_path": "evidence/optimization/opt055-execution-graphs/REPORT.md"
+}

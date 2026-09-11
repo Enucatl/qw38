@@ -1,14 +1,17 @@
 # Stable-address CUDA graphs
 
-[Index](README.md) · Implementation tasks: OPT-003, OPT-012, OPT-030, and EDU-039 in
+[Index](README.md) · Implementation tasks: OPT-003, OPT-012, OPT-030, OPT-055, and EDU-039 in
 [`implementation_ledger.md`](../implementation_ledger.md) · Evidence:
 [`cuda/full_scheduler.cu`](../cuda/full_scheduler.cu),
 [`cuda/graph_test.cu`](../cuda/graph_test.cu),
 [`cuda/prompt_graph_test.cu`](../cuda/prompt_graph_test.cu),
+[`cuda/opt055_execution_graphs_ab_test.cu`](../cuda/opt055_execution_graphs_ab_test.cu),
 [`tests/test_cuda_graph.py`](../tests/test_cuda_graph.py),
 [`tests/test_cuda_prompt_graph.py`](../tests/test_cuda_prompt_graph.py),
-[`fixtures/cuda_graph.json`](../fixtures/cuda_graph.json), and
-[`fixtures/cuda_prompt_graph.json`](../fixtures/cuda_prompt_graph.json)
+[`tests/test_opt055_execution_graphs.py`](../tests/test_opt055_execution_graphs.py),
+[`fixtures/cuda_graph.json`](../fixtures/cuda_graph.json),
+[`fixtures/cuda_prompt_graph.json`](../fixtures/cuda_prompt_graph.json), and
+[`fixtures/opt055_execution_graphs.json`](../fixtures/opt055_execution_graphs.json)
 
 ## The launch problem
 
@@ -62,8 +65,12 @@ Capturing those values once would replay stale token/session information.
 
 Those operations remain ordinary launches around the FFN graph launches. This
 is why the implementation and evidence say “FFN graphs,” never “whole-token
-graph.” A later design could add device-side control blocks and graph parameter
-updates, but that work is unavailable in V1 until separately admitted.
+graph.” OPT-055 extends `SchedulerGraphs` with node/launch counts, a host
+`GraphLaunchParams` block for token/position/frontier and a 2048-row KV bucket,
+and empty decode-segment / prompt-mixer executable slots. Production pin
+`kSelectedExecutionGraphPath` stays `ffn_only` after measured remaining idle
+stayed below noise; mixer/GDN/attention are not captured. A later keep can
+populate those slots only when idle exceeds the frozen noise caps.
 
 Prompt graphs follow the same exclusion list. They record prompt-scratch and
 weight pointers (`prompt_mixer_output_`, `prompt_normalized_`, prompt residuals,
@@ -199,3 +206,15 @@ graph-versus-ordinary fused byte equality stays after the PDL wrapper is
 present. FFN graphs were not recaptured and are not PDL-attributed.
 Production stays ordinary `<<<>>>` after the 4K reject. It does not apply
 PDL inside captured FFN graphs and does not own mixer/GDN graph capture.
+
+OPT-055 revisits remaining host/GPU launch gaps after OPT-054. It counts FFN
+graph nodes, records host launch parameters, compares graph/eager equality,
+token/frontier changes, invalidation, partial tails, and cancellation at the
+admitted per-layer poll boundary, and times remaining `other_idle` on decode
+D128/D2048 and 4096-row prompt with both a null poll and a non-null Session-style
+poll. **Measured no-change:** remaining idle stayed below 0.5 ms decode / 20 ms
+prefill or 1% of wall, so layer-segment mixer/core graphs stay unpopulated and
+the shipping path remains 64 decode plus 64 prompt FFN executables. Copied
+OPT-054 keep denominators are unchanged. Extra device allocation is zero; the
+[Chapter 54](54-post-graph-128k-memory.md) 128K post-graph reserve still holds.
+This increment does not own the 2K llama.cpp parity gate.

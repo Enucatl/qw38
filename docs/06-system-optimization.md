@@ -50,6 +50,8 @@ production quality MMA may use explicit FMA scale accumulation and a
 two-stage packed-Y `cp.async` loader after the OPT-053 keep;
 internal prefill microbatches stay 4096 after the OPT-054 keep unless a
 smaller complete-P winner is installed;
+decode/prompt execution graphs stay FFN-only after the OPT-055 measured
+no-change unless remaining idle exceeds noise;
 decode sequential GDN is unchanged. Decode stays MMV, with packed
 blockwise Q4_K/Q6_K loads after the OPT-034 keep.
 Tiny mixer prompts keep the
@@ -659,6 +661,25 @@ empty **3010.8645** tok/s; 4K append at prefix 2048 **2497.52612**; 4K append
 at prefix 4096 **2231.04932**. OPT-044 admits cross-size arithmetic drift.
 Live tok/s stay in
 [`evidence/optimization/opt054-prefill-microbatch/REPORT.md`](../evidence/optimization/opt054-prefill-microbatch/REPORT.md).
+This increment does not own the 2K llama.cpp parity gate.
+
+## Remaining execution-graph launch gaps (OPT-055)
+
+**Measured, RTX 5090:** after OPT-054, `SchedulerGraphs` still ships 64 decode
+plus 64 prompt FFN executables. OPT-055 adds node counts, a host
+`GraphLaunchParams` block (token/position/frontier and a 2048-row KV bucket),
+and empty layer-segment / prompt-mixer slots. Graph versus eager fused outputs
+stay byte-equal; token changes, frontier growth, mismatched-workspace
+invalidation, 65-token prompt tails, and poll-8 cancellation before publication
+hold. Remaining `other_idle` on D128 **0.0855464935** ms / 25.5044994 ms wall,
+D2048 **0.105142593** ms / 27.6636486 ms wall, and 4096-row prompt **0** ms /
+1422.6759 ms wall, with both a null poll and a non-null Session poll, stayed
+below noise (0.5 ms decode / 20 ms prefill or 1% of wall). Production pin
+`kSelectedExecutionGraphPath`
+stays `ffn_only`. Copied OPT-054 keep denominators remain P **2895.42773**,
+D128 **37.5605927**, D2048 **35.7286987**. Extra workspace bytes stay 0; the
+128-graph 128K reserve is unchanged. Live tok/s stay in
+[`evidence/optimization/opt055-execution-graphs/REPORT.md`](../evidence/optimization/opt055-execution-graphs/REPORT.md).
 This increment does not own the 2K llama.cpp parity gate.
 
 ## Warp-owned prompt QK microtiles (OPT-041)
