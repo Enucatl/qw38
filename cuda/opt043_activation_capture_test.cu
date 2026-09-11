@@ -1,12 +1,16 @@
 #include <array>
+#include <cerrno>
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <fstream>
 #include <string>
+#include <sys/stat.h>
 #include <vector>
 
 #include "full_scheduler.h"
+#include "mixer.h"
 #include "model.h"
 #include "scheduler.h"
 #include "weights.h"
@@ -37,6 +41,40 @@ std::vector<std::size_t> load_token_file(const char* path) {
   return tokens;
 }
 
+std::uint16_t fp32_to_bf16_bits(float value) {
+  std::uint32_t bits = 0;
+  std::memcpy(&bits, &value, sizeof(bits));
+  return static_cast<std::uint16_t>(bits >> 16U);
+}
+
+bool write_f32(const std::string& path, const float* values, std::size_t count) {
+  FILE* file = std::fopen(path.c_str(), "wb");
+  if (file == nullptr) return false;
+  const bool ok = std::fwrite(values, sizeof(float), count, file) == count;
+  std::fclose(file);
+  return ok;
+}
+
+bool write_bf16_from_f32(const std::string& path, const float* values,
+                         std::size_t count) {
+  std::vector<std::uint16_t> bits(count);
+  for (std::size_t index = 0; index < count; ++index) {
+    bits[index] = fp32_to_bf16_bits(values[index]);
+  }
+  FILE* file = std::fopen(path.c_str(), "wb");
+  if (file == nullptr) return false;
+  const bool ok =
+      std::fwrite(bits.data(), sizeof(std::uint16_t), count, file) == count;
+  std::fclose(file);
+  return ok;
+}
+
+bool dump_vector(const std::string& dir, const std::string& stem,
+                 const float* values, std::size_t count) {
+  return write_f32(dir + "/" + stem + ".f32", values, count) &&
+         write_bf16_from_f32(dir + "/" + stem + ".bf16", values, count);
+}
+
 void print_slot(const qw38::cuda::ActivationCaptureSlot& slot, bool last) {
   std::printf(
       "{\"layer\":%zu,\"layer_kind\":\"%s\",\"mixer_captured\":%s,"
@@ -63,39 +101,61 @@ void print_slot(const qw38::cuda::ActivationCaptureSlot& slot, bool last) {
 }  // namespace
 
 int main(int argc, char** argv) {
-  if (argc < 3 || argc > 4) {
+  const char* model_path = nullptr;
+  const char* stage = nullptr;
+  const char* token_file = nullptr;
+  const char* dump_dir = nullptr;
+  for (int index = 1; index < argc; ++index) {
+    if (std::strcmp(argv[index], "--dump-dir") == 0 && index + 1 < argc) {
+      dump_dir = argv[++index];
+    } else if (model_path == nullptr) {
+      model_path = argv[index];
+    } else if (stage == nullptr) {
+      stage = argv[index];
+    } else if (token_file == nullptr) {
+      token_file = argv[index];
+    } else {
+      std::fprintf(stderr,
+                   "usage: %s MODEL.gguf STAGE [TOKEN_FILE] [--dump-dir DIR]\n"
+                   "STAGE is d128, d2048, real_text, or t<position>\n",
+                   argv[0]);
+      return 2;
+    }
+  }
+  if (model_path == nullptr || stage == nullptr) {
     std::fprintf(stderr,
-                 "usage: %s MODEL.gguf STAGE [TOKEN_FILE]\n"
-                 "STAGE is d128, d2048, or real_text\n",
+                 "usage: %s MODEL.gguf STAGE [TOKEN_FILE] [--dump-dir DIR]\n",
                  argv[0]);
     return 2;
   }
-  const char* stage = argv[2];
   std::vector<std::size_t> tokens;
   if (std::strcmp(stage, "d128") == 0) {
     tokens = formula_tokens(129);
   } else if (std::strcmp(stage, "d2048") == 0) {
     tokens = formula_tokens(2049);
+  } else if (stage[0] == 't' && stage[1] >= '0' && stage[1] <= '9') {
+    const unsigned long position = std::strtoul(stage + 1, nullptr, 10);
+    tokens = formula_tokens(position + 1);
   } else if (std::strcmp(stage, "real_text") == 0) {
-    if (argc != 4) {
+    if (token_file == nullptr) {
       std::fprintf(stderr, "real_text requires TOKEN_FILE\n");
       return 2;
     }
-    tokens = load_token_file(argv[3]);
+    tokens = load_token_file(token_file);
     if (tokens.size() < 2) {
       std::fprintf(stderr, "TOKEN_FILE must contain at least two tokens\n");
       return 2;
     }
   } else {
-    std::fprintf(stderr, "STAGE must be d128, d2048, or real_text\n");
+    std::fprintf(stderr, "STAGE must be d128, d2048, real_text, or t<position>\n");
     return 2;
   }
 
   qw38::internal::ModelInfo info;
-  qw38::Status status = qw38::internal::inspect_gguf(argv[1], &info);
+  qw38::Status status = qw38::internal::inspect_gguf(model_path, &info);
   if (status.is_ok()) status = qw38::internal::validate_qwen38_contract(&info);
   qw38::internal::MappedFile mapping;
-  if (status.is_ok()) status = mapping.open(argv[1]);
+  if (status.is_ok()) status = mapping.open(model_path);
   qw38::internal::ModelWeights weights;
   if (status.is_ok()) {
     status = qw38::internal::bind_model_weights(info, mapping, &weights);
@@ -122,8 +182,16 @@ int main(int argc, char** argv) {
   qw38::cuda::ActivationCapture capture;
   capture.stage = stage;
   capture.position = prefix;
-  for (std::size_t index = 0; index < capture.layers.size(); ++index) {
+  std::vector<std::vector<float>> down_store(capture.slots.size());
+  std::vector<std::vector<float>> mix_store(capture.slots.size());
+  for (std::size_t index = 0; index < capture.slots.size(); ++index) {
     capture.slots[index].layer = capture.layers[index];
+    if (dump_dir != nullptr) {
+      down_store[index].assign(qw38::internal::kFfnWidth, 0.0F);
+      mix_store[index].assign(qw38::internal::kGdnValueWidth, 0.0F);
+      capture.slots[index].down_full = down_store[index].data();
+      capture.slots[index].mix_full = mix_store[index].data();
+    }
   }
   float elapsed_ms = 0.0F;
   qw38::cuda::DecodeAttribution attribution;
@@ -147,6 +215,47 @@ int main(int argc, char** argv) {
       capture.position != prefix) {
     std::fprintf(stderr, "OPT-043 capture missed final norm/output\n");
     return 1;
+  }
+  if (dump_dir != nullptr) {
+    if (mkdir(dump_dir, 0755) != 0 && errno != EEXIST) {
+      std::fprintf(stderr, "cannot create dump dir %s\n", dump_dir);
+      return 1;
+    }
+    if (!dump_vector(dump_dir, "final_norm", capture.final_norm.data(),
+                     capture.final_norm.size())) {
+      std::fprintf(stderr, "cannot dump final_norm\n");
+      return 1;
+    }
+    for (std::size_t index = 0; index < capture.slots.size(); ++index) {
+      const auto& slot = capture.slots[index];
+      const std::string prefix =
+          std::string("L") + std::to_string(slot.layer);
+      if (!dump_vector(dump_dir, prefix + "_mixer_preprojection",
+                       slot.mixer_preprojection.data(),
+                       slot.mixer_preprojection.size()) ||
+          !dump_vector(dump_dir, prefix + "_ffn_preprojection",
+                       slot.ffn_preprojection.data(),
+                       slot.ffn_preprojection.size())) {
+        std::fprintf(stderr, "cannot dump preprojection for layer %zu\n",
+                     slot.layer);
+        return 1;
+      }
+      if (slot.down_captured && slot.down_full != nullptr &&
+          !dump_vector(dump_dir, prefix + "_swiglu_down_input", slot.down_full,
+                       qw38::internal::kFfnWidth)) {
+        std::fprintf(stderr, "cannot dump down input for layer %zu\n",
+                     slot.layer);
+        return 1;
+      }
+      if (slot.mix_captured && slot.mix_full != nullptr &&
+          !dump_vector(dump_dir, prefix + "_gdn_or_attn_mix_6144", slot.mix_full,
+                       qw38::internal::kGdnValueWidth)) {
+        std::fprintf(stderr, "cannot dump mix input for layer %zu\n",
+                     slot.layer);
+        return 1;
+      }
+    }
+    std::printf("dump_dir=%s position=%zu\n", dump_dir, capture.position);
   }
 
   std::printf(

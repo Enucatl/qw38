@@ -166,7 +166,7 @@ New kernel tasks are conditional on measured opportunity and valid admission.
 | OPT-071 | Repair full-engine timing windows and production capture replay | OPT-060, OPT-061, OPT-069 | done | No prefix/warmup contamination, dropped records or duplicate family charging; complete measured windows and identity-cached real inputs support honest sink ranking | [`tasks/OPT-071.md`](tasks/OPT-071.md); [`pins/opt071_attribution_repair_contract.json`](pins/opt071_attribution_repair_contract.json); [`pins/opt071_iteration_contract.json`](pins/opt071_iteration_contract.json); [`fixtures/opt071_attribution_repair.json`](fixtures/opt071_attribution_repair.json); [`tools/opt071_attribution_repair.py`](tools/opt071_attribution_repair.py); [`tests/test_opt071_attribution_repair.py`](tests/test_opt071_attribution_repair.py); [`cuda/engine_attribution.h`](cuda/engine_attribution.h); [`cuda/optimization_component_replay.cu`](cuda/optimization_component_replay.cu); [`tools/llama_authority/engine_attribution.cpp`](tools/llama_authority/engine_attribution.cpp); [`evidence/optimization/opt071-attribution-repair/REPORT.md`](evidence/optimization/opt071-attribution-repair/REPORT.md); verification 2026-09-11T15:30:12Z |
 | OPT-072 | Reevaluate all correctness-based optimization rejections | OPT-059, OPT-069 | done | Every historical numerical/test rejection has an evidence-backed disposition and owner; comparable-accuracy eligibility is separated from hard correctness and performance failures | [`tasks/OPT-072.md`](tasks/OPT-072.md); [`pins/opt072_rejection_review_contract.json`](pins/opt072_rejection_review_contract.json); [`pins/opt072_iteration_contract.json`](pins/opt072_iteration_contract.json); [`fixtures/opt072_rejection_review.json`](fixtures/opt072_rejection_review.json); [`tools/opt072_rejection_review.py`](tools/opt072_rejection_review.py); [`tests/test_opt072_rejection_review.py`](tests/test_opt072_rejection_review.py); [`cuda/q4k_decode_path.cuh`](cuda/q4k_decode_path.cuh); [`tools/run_optimization_task.py`](tools/run_optimization_task.py); [`evidence/optimization/opt072-rejection-review/REPORT.md`](evidence/optimization/opt072-rejection-review/REPORT.md); verification 2026-09-11T15:46:12Z |
 | OPT-073 | Resolve functional authority failures and version quality decisions | OPT-058, OPT-069, OPT-072 | done | Exact prompts/scorers audited, arithmetic truth preserved, absolute and regression verdicts explicit, and failed required quality stops release before long timing | [`tasks/OPT-073.md`](tasks/OPT-073.md); [`pins/opt073_quality_policy_contract.json`](pins/opt073_quality_policy_contract.json); [`pins/opt073_iteration_contract.json`](pins/opt073_iteration_contract.json); [`fixtures/opt073_quality_policy.json`](fixtures/opt073_quality_policy.json); [`tools/opt073_quality_policy.py`](tools/opt073_quality_policy.py); [`tests/test_opt073_quality_policy.py`](tests/test_opt073_quality_policy.py); [`tests/test_opt069_batch_gate.py`](tests/test_opt069_batch_gate.py); [`tools/opt069_batch_gate.py`](tools/opt069_batch_gate.py); [`tools/run_optimization_task.py`](tools/run_optimization_task.py); [`Makefile`](Makefile); [`evidence/optimization/opt073-quality-policy/REPORT.md`](evidence/optimization/opt073-quality-policy/REPORT.md); verification 2026-09-11T16:02:30Z |
-| OPT-074 | Complete real production-shape llama GPU numerical admission | OPT-059, OPT-071, OPT-072 | pending | Full-M actual GPU dispatch, sampled independent FP64 and frozen held-out budgets cover production Q4 and selected Q8/Q6; missing coverage cannot become admission | [`tasks/OPT-074.md`](tasks/OPT-074.md) |
+| OPT-074 | Complete real production-shape llama GPU numerical admission | OPT-059, OPT-071, OPT-072 | done | Full-M actual GPU dispatch, sampled independent FP64 and frozen held-out budgets cover production Q4 and selected Q8/Q6; missing coverage cannot become admission | [`tasks/OPT-074.md`](tasks/OPT-074.md); [`pins/opt074_production_gpu_admission_contract.json`](pins/opt074_production_gpu_admission_contract.json); [`pins/opt074_iteration_contract.json`](pins/opt074_iteration_contract.json); [`fixtures/opt074_production_gpu_admission.json`](fixtures/opt074_production_gpu_admission.json); [`tools/opt074_production_gpu_admission.py`](tools/opt074_production_gpu_admission.py); [`tests/test_opt074_production_gpu_admission.py`](tests/test_opt074_production_gpu_admission.py); [`tools/llama_authority/projection_export.cpp`](tools/llama_authority/projection_export.cpp); [`tools/llama_authority/build_projection_export.sh`](tools/llama_authority/build_projection_export.sh); [`cuda/full_scheduler.h`](cuda/full_scheduler.h); [`cuda/full_scheduler.cu`](cuda/full_scheduler.cu); [`cuda/opt043_activation_capture_test.cu`](cuda/opt043_activation_capture_test.cu); [`Makefile`](Makefile); [`evidence/optimization/opt074-production-gpu-admission/REPORT.md`](evidence/optimization/opt074-production-gpu-admission/REPORT.md); verification 2026-09-11T16:28:16Z |
 | OPT-075 | Admit or reject existing unfused and paired cooperative Q4 FFN | OPT-070, OPT-073, OPT-074 | pending | Current packed versus existing integer survivor passes versioned production quality, actual all-leg dispatch and complete rotating/E2E acceptance, or documented retained packed | [`tasks/OPT-075.md`](tasks/OPT-075.md) |
 | OPT-076 | Remove Q4 K-loop shuffle reductions and scalar unpacking | OPT-071, OPT-074, OPT-075 | pending | Two bounded packed-load/late-reduction candidates yield an admitted complete FFN saving with staged semantics intact, or measured rejection | [`tasks/OPT-076.md`](tasks/OPT-076.md) |
 | OPT-077 | Parallelize decode GDN state reductions across key/value tiles | OPT-070, OPT-071, OPT-073 | pending | Complete 48-layer GDN benefits from bounded parallel FP32 recurrence with calibrated quality, exact state isolation and short E2E guards, or no-go/rejection | [`tasks/OPT-077.md`](tasks/OPT-077.md) |
@@ -6420,4 +6420,33 @@ statements below are historical, not the current execution order.
 - Marked OPT-073 `done`; delivery is limited to the verified task scope plus
   this ledger/audit bookkeeping. `plan.md` is unchanged. OPT-016 and OPT-056 stay
   `blocked`. Next eligible pending by dependency order: **OPT-074**. No tok/s
+  claim (`claims_throughput=false`).
+
+### OPT-074 delivery (2026-09-11T16:28:16Z)
+
+- Full-M N=1 llama GPU numerical admission on captured BF16 activations with
+  pinned authority `cc83d7b4824f73cfdda4dfbb47ee39804f71b328` and GGUF SHA
+  `31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34`. 48 GPU
+  cases measured; 12 attention×Q8 mixer cases explicit `absent_layer_kind`. v2
+  ceilings frozen from calibration; held-out did not enlarge them. Q6 vocab
+  K5120 v2-admitted; Q4 gate/up, Q4 down, and both Q8 mixer families remain
+  unadmitted. Evidence:
+  [`tasks/OPT-074.md`](tasks/OPT-074.md);
+  [`pins/opt074_production_gpu_admission_contract.json`](pins/opt074_production_gpu_admission_contract.json);
+  [`pins/opt074_iteration_contract.json`](pins/opt074_iteration_contract.json);
+  [`fixtures/opt074_production_gpu_admission.json`](fixtures/opt074_production_gpu_admission.json);
+  [`tools/opt074_production_gpu_admission.py`](tools/opt074_production_gpu_admission.py);
+  [`tests/test_opt074_production_gpu_admission.py`](tests/test_opt074_production_gpu_admission.py);
+  [`tools/llama_authority/projection_export.cpp`](tools/llama_authority/projection_export.cpp);
+  [`tools/llama_authority/build_projection_export.sh`](tools/llama_authority/build_projection_export.sh);
+  [`cuda/full_scheduler.h`](cuda/full_scheduler.h);
+  [`cuda/full_scheduler.cu`](cuda/full_scheduler.cu);
+  [`cuda/opt043_activation_capture_test.cu`](cuda/opt043_activation_capture_test.cu);
+  [`Makefile`](Makefile);
+  [`evidence/optimization/opt074-production-gpu-admission/REPORT.md`](evidence/optimization/opt074-production-gpu-admission/REPORT.md).
+  Proof is production-shape GPU dispatch and frozen admission evidence — not a
+  speedup gate.
+- Marked OPT-074 `done`; delivery is limited to the verified task scope plus
+  this ledger/audit bookkeeping. `plan.md` is unchanged. OPT-016 and OPT-056 stay
+  `blocked`. Next eligible pending by dependency order: **OPT-075**. No tok/s
   claim (`claims_throughput=false`).

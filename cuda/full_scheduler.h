@@ -180,6 +180,11 @@ struct ActivationCaptureSlot final {
   char down_sha256[65]{};
   float* down_full = nullptr;
   std::array<std::size_t, 2> down_shape{};
+  bool mix_captured = false;
+  std::array<float, 64> mix_prefix{};
+  char mix_sha256[65]{};
+  float* mix_full = nullptr;
+  std::array<std::size_t, 2> mix_shape{};
   bool residual_captured = false;
   std::array<float, internal::kResidualWidth> residual_fp32{};
   std::array<float, 64> residual_prefix{};

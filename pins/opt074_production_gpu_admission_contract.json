@@ -1,0 +1,185 @@
+{
+  "schema_version": 1,
+  "task": "OPT-074",
+  "yardstick": "production_shape_llama_gpu_numerical_admission",
+  "claims_throughput": false,
+  "claims_performance_improvement": false,
+  "llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+  "gguf_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+  "producer": "qw38-llama-projection-export/opt074",
+  "q8_1": {
+    "adapter": "private_adapter_quantize_q8_1_sum_x",
+    "ggml_cpy_f32_q8_1": "unsupported_this_revision",
+    "sum_q": "quartz_q8_1_sum_q",
+    "sum_x": "llama_q8_1_sum_x",
+    "exact_integer_sum": "exact_integer_sum_recomputed_dp4a",
+    "consumers": {
+      "quartz_q8_1_sum_q": "quartz_q8_1_integer_dot",
+      "llama_q8_1_sum_x": "llama_gpu_q8_1_mmvq",
+      "q8_fp32": "packed_fp32_q4_mmv",
+      "exact_integer_sum_recomputed_dp4a": "pinned_q4_mmv_recomputes_integer_sum"
+    }
+  },
+  "dispatch": {
+    "n": 1,
+    "full_m": true,
+    "row_limit_evidence": false,
+    "family": "mmvq",
+    "cuda_synchronize": true
+  },
+  "opt059_freeze": {
+    "calibration_layers": [
+      0,
+      3,
+      31,
+      32
+    ],
+    "held_out_layers": [
+      62,
+      63
+    ],
+    "calibration_token_positions": [
+      128,
+      512
+    ],
+    "held_out_token_positions": [
+      2048,
+      4095
+    ],
+    "max_rows": 16,
+    "max_activations": 4,
+    "max_production_fp64_dots_per_projection": 64,
+    "id_manifest_sha256": "f4423b8ace3f4a5c65e639a57937aae40e9d089e49a0ab7a6efe53fbb172ada2",
+    "historical_missing_evidence_preserved": true,
+    "wildcard_columns_not_production_coverage": true,
+    "held_out_cannot_enlarge": true
+  },
+  "families": [
+    {
+      "id": "q4_gate_up_k5120",
+      "family": "q4_k",
+      "rows": 17408,
+      "columns": 5120,
+      "role": "ffn_gate_up",
+      "activation": "ffn_preprojection"
+    },
+    {
+      "id": "q4_down_k17408",
+      "family": "q4_k",
+      "rows": 5120,
+      "columns": 17408,
+      "role": "ffn_down",
+      "activation": "swiglu_down_input"
+    },
+    {
+      "id": "q8_mixer_k5120",
+      "family": "q8_0",
+      "rows": 10240,
+      "columns": 5120,
+      "role": "mixer_qkv",
+      "activation": "mixer_preprojection"
+    },
+    {
+      "id": "q8_mixer_k6144",
+      "family": "q8_0",
+      "rows": 5120,
+      "columns": 6144,
+      "role": "mixer_output",
+      "activation": "gdn_or_attn_mix_6144"
+    },
+    {
+      "id": "q6_vocab_k5120",
+      "family": "q6_k",
+      "rows": 248320,
+      "columns": 5120,
+      "role": "vocab",
+      "activation": "final_norm"
+    }
+  ],
+  "case_ids": {
+    "calibration": [
+      "q4_gate_up_k5120_L0_t128",
+      "q4_gate_up_k5120_L0_t512",
+      "q4_gate_up_k5120_L3_t128",
+      "q4_gate_up_k5120_L3_t512",
+      "q4_gate_up_k5120_L31_t128",
+      "q4_gate_up_k5120_L31_t512",
+      "q4_gate_up_k5120_L32_t128",
+      "q4_gate_up_k5120_L32_t512",
+      "q4_down_k17408_L0_t128",
+      "q4_down_k17408_L0_t512",
+      "q4_down_k17408_L3_t128",
+      "q4_down_k17408_L3_t512",
+      "q4_down_k17408_L31_t128",
+      "q4_down_k17408_L31_t512",
+      "q4_down_k17408_L32_t128",
+      "q4_down_k17408_L32_t512",
+      "q8_mixer_k5120_L0_t128",
+      "q8_mixer_k5120_L0_t512",
+      "q8_mixer_k5120_L3_t128",
+      "q8_mixer_k5120_L3_t512",
+      "q8_mixer_k5120_L31_t128",
+      "q8_mixer_k5120_L31_t512",
+      "q8_mixer_k5120_L32_t128",
+      "q8_mixer_k5120_L32_t512",
+      "q8_mixer_k6144_L0_t128",
+      "q8_mixer_k6144_L0_t512",
+      "q8_mixer_k6144_L3_t128",
+      "q8_mixer_k6144_L3_t512",
+      "q8_mixer_k6144_L31_t128",
+      "q8_mixer_k6144_L31_t512",
+      "q8_mixer_k6144_L32_t128",
+      "q8_mixer_k6144_L32_t512",
+      "q6_vocab_k5120_L0_t128",
+      "q6_vocab_k5120_L0_t512",
+      "q6_vocab_k5120_L3_t128",
+      "q6_vocab_k5120_L3_t512",
+      "q6_vocab_k5120_L31_t128",
+      "q6_vocab_k5120_L31_t512",
+      "q6_vocab_k5120_L32_t128",
+      "q6_vocab_k5120_L32_t512"
+    ],
+    "held_out": [
+      "q4_gate_up_k5120_L62_t2048",
+      "q4_gate_up_k5120_L62_t4095",
+      "q4_gate_up_k5120_L63_t2048",
+      "q4_gate_up_k5120_L63_t4095",
+      "q4_down_k17408_L62_t2048",
+      "q4_down_k17408_L62_t4095",
+      "q4_down_k17408_L63_t2048",
+      "q4_down_k17408_L63_t4095",
+      "q8_mixer_k5120_L62_t2048",
+      "q8_mixer_k5120_L62_t4095",
+      "q8_mixer_k5120_L63_t2048",
+      "q8_mixer_k5120_L63_t4095",
+      "q8_mixer_k6144_L62_t2048",
+      "q8_mixer_k6144_L62_t4095",
+      "q8_mixer_k6144_L63_t2048",
+      "q8_mixer_k6144_L63_t4095",
+      "q6_vocab_k5120_L62_t2048",
+      "q6_vocab_k5120_L62_t4095",
+      "q6_vocab_k5120_L63_t2048",
+      "q6_vocab_k5120_L63_t4095"
+    ]
+  },
+  "strict_ceilings": {
+    "abs": 0.0003,
+    "rms": 0.0002
+  },
+  "v2_ceiling_rule": "max(strict, 1.25 * llama_gpu_error + 1e-6)",
+  "native_reuse": [
+    "build/qw38-cuda-opt059-numerics-test",
+    ".cache/authorities/llama-build/bin/qw38-llama-projection-export",
+    "build/qw38-cuda-opt043-activation-capture-test"
+  ],
+  "proof_limit": [
+    "no throughput claim",
+    "no production pin changes",
+    "full-M N=1 llama GPU dispatch",
+    "no --row-limit evidence",
+    "held-out cannot enlarge calibration ceilings",
+    "wildcard columns=0 is not production coverage",
+    "absent layer-kind is explicit",
+    "OPT-059 historical missing evidence preserved"
+  ]
+}

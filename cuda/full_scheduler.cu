@@ -648,6 +648,38 @@ cudaError_t maybe_capture_prompt_rows(ActivationCapture* capture,
   return error;
 }
 
+cudaError_t maybe_capture_mix(ActivationCapture* capture, std::size_t layer,
+                              const __nv_bfloat16* device,
+                              std::size_t count) noexcept {
+  const int slot = capture_slot_index(capture, layer);
+  if (slot < 0 || device == nullptr || count == 0) return cudaSuccess;
+  if (count != internal::kGdnValueWidth &&
+      count != internal::kAttentionQueryWidth) {
+    return cudaSuccess;
+  }
+  cudaError_t error = cudaDeviceSynchronize();
+  if (error != cudaSuccess) return error;
+  ActivationCaptureSlot& dest = capture->slots[static_cast<std::size_t>(slot)];
+  dest.mix_shape = {1, count};
+  std::array<__nv_bfloat16, internal::kGdnValueWidth> tmp{};
+  if (count > tmp.size()) return cudaErrorInvalidValue;
+  error = cudaMemcpy(tmp.data(), device, count * sizeof(__nv_bfloat16),
+                     cudaMemcpyDeviceToHost);
+  if (error != cudaSuccess) return error;
+  std::array<float, internal::kGdnValueWidth> host{};
+  for (std::size_t index = 0; index < count; ++index) {
+    host[index] = __bfloat162float(tmp[index]);
+  }
+  write_float_sha(host.data(), count, dest.mix_sha256);
+  copy_prefix(host.data(), count, dest.mix_prefix.data(),
+              dest.mix_prefix.size());
+  if (dest.mix_full != nullptr) {
+    std::memcpy(dest.mix_full, host.data(), count * sizeof(float));
+  }
+  dest.mix_captured = true;
+  return cudaSuccess;
+}
+
 cudaError_t maybe_capture_down_input(ActivationCapture* capture,
                                      std::size_t layer,
                                      const __nv_bfloat16* device) noexcept {
@@ -3362,6 +3394,12 @@ Status execute_token(const ResidentModel& model, std::size_t token,
         if (error == cudaSuccess) error = end_phase(leaves);
       }
       if (exclusive && error == cudaSuccess) error = end_phase(categories);
+    }
+    if (error == cudaSuccess && capture != nullptr) {
+      error = maybe_capture_mix(
+          capture, layer_index, workspace->projected_bf16_,
+          gdn_layer ? internal::kGdnValueWidth
+                    : internal::kAttentionQueryWidth);
     }
     {
       const NvtxRange mixer_range("qw38.mixer_mmv");
