@@ -16,7 +16,7 @@ THIRD_PARTY_OBJECTS := $(BUILD_DIR)/utf8proc.o
 BINARIES := $(BUILD_DIR)/qw38 $(BUILD_DIR)/qw38-server $(BUILD_DIR)/qw38-bench $(BUILD_DIR)/qw38-eval
 HOST_DIAGNOSTICS := $(BUILD_DIR)/qw38-server-core-test $(BUILD_DIR)/qw38-server-api-test $(BUILD_DIR)/qw38-responses-api-test $(BUILD_DIR)/qw38-opt044-production-numerics
 CUDA_IMAGE := qw38-cuda:13.0.2
-QUANT_MMV_CUDA_OBJECTS := $(BUILD_DIR)/quant_mmv.cuda.o $(BUILD_DIR)/q4k_decode_dots.cuda.o $(BUILD_DIR)/q8_decode_dots.cuda.o $(BUILD_DIR)/q6k_decode_dots.cuda.o
+QUANT_MMV_CUDA_OBJECTS := $(BUILD_DIR)/quant_mmv.cuda.o $(BUILD_DIR)/q4_prompt_mmq.cuda.o $(BUILD_DIR)/q4k_decode_dots.cuda.o $(BUILD_DIR)/q8_decode_dots.cuda.o $(BUILD_DIR)/q6k_decode_dots.cuda.o
 NVCC_CUDA_DEPS = -MMD -MP -MF $(@:.o=.d) -MT $@
 NVCC_BIN_DEPS = -MMD -MP -MF $@.d -MT $@
 CUDA_STRICT_FLAG_TEXT := $(NVCC) $(NVCCFLAGS) $(CPPFLAGS) -Icuda
@@ -29,7 +29,7 @@ SCHEDULER_DIAGNOSTIC_CUDA_OBJECTS := $(BUILD_DIR)/full_scheduler.trace.cuda.o $(
 CUDA_RELEASE_OBJECTS := $(CUDA_BUILD_DIR)/engine.o $(BUILD_DIR)/eval.cuda.o $(BUILD_DIR)/bench.cuda.o $(QUANT_MMV_CUDA_OBJECTS) $(BUILD_DIR)/gdn_step.cuda.o $(BUILD_DIR)/attention_decode.cuda.o $(BUILD_DIR)/scheduler_primitives.cuda.o $(BUILD_DIR)/full_scheduler.cuda.o $(BUILD_DIR)/checkpoint.cuda.o
 CUDA_TRACE_OBJECTS := $(CUDA_BUILD_DIR)/engine.trace.o $(BUILD_DIR)/eval.trace.cuda.o $(BUILD_DIR)/full_scheduler.trace.cuda.o $(BUILD_DIR)/checkpoint.trace.cuda.o
 
-.PHONY: all clean test diagnostic cuda-image cuda-build cuda-native cuda-products cuda-opt057-diagnostics cuda-opt058-diagnostics cuda-opt059-diagnostics cuda-opt060-diagnostics cuda-opt061-diagnostics cuda-opt062-diagnostics cuda-opt063-diagnostics cuda-opt064-diagnostics cuda-opt065-diagnostics cuda-opt066-diagnostics cuda-opt067-diagnostics FORCE
+.PHONY: all clean test diagnostic cuda-image cuda-build cuda-native cuda-products cuda-opt057-diagnostics cuda-opt058-diagnostics cuda-opt059-diagnostics cuda-opt060-diagnostics cuda-opt061-diagnostics cuda-opt062-diagnostics cuda-opt063-diagnostics cuda-opt064-diagnostics cuda-opt065-diagnostics cuda-opt066-diagnostics cuda-opt067-diagnostics cuda-opt068-diagnostics FORCE
 
 all: $(BINARIES) $(HOST_DIAGNOSTICS)
 
@@ -177,6 +177,66 @@ cuda-opt066-diagnostics: $(BUILD_DIR)/qw38-cuda-opt066-mmq-x-pipeline-test
 
 cuda-opt067-diagnostics: $(BUILD_DIR)/qw38-cuda-opt067-prompt-pair-test
 
+cuda-opt068-diagnostics: $(BUILD_DIR)/qw38-cuda-opt068-codegen-test
+
+# OPT-068 scoped Q4 prompt-MMQ codegen. Production/strict objects keep
+# NVCCFLAGS (-O2 --fmad=false). Variant dirs have unique stamps/objects.
+OPT068_O2_DIR := $(CUDA_BUILD_DIR)/opt068/o2_fmad_false
+OPT068_O3_DIR := $(CUDA_BUILD_DIR)/opt068/o3_fmad_false
+OPT068_O3FMA_DIR := $(CUDA_BUILD_DIR)/opt068/o3_fmad_true
+OPT068_NVCC_BASE := -std=c++17 -arch=sm_120 --expt-relaxed-constexpr -Xcompiler=-Wall,-Wextra,-Werror,-fno-exceptions,-fno-rtti,-ffp-contract=off,-pthread
+OPT068_O2_NVCCFLAGS := $(OPT068_NVCC_BASE) -O2 --fmad=false -Xptxas=-v
+OPT068_O3_NVCCFLAGS := $(OPT068_NVCC_BASE) -O3 --fmad=false -Xptxas=-v
+OPT068_O3FMA_NVCCFLAGS := $(OPT068_NVCC_BASE) -O3 --fmad=true -Xptxas=-v
+OPT068_O2_FLAG_TEXT := $(NVCC) $(OPT068_O2_NVCCFLAGS) -Icuda
+OPT068_O3_FLAG_TEXT := $(NVCC) $(OPT068_O3_NVCCFLAGS) -Icuda
+OPT068_O3FMA_FLAG_TEXT := $(NVCC) $(OPT068_O3FMA_NVCCFLAGS) -Icuda
+OPT068_O2_STAMP := $(OPT068_O2_DIR)/nvccflags.stamp
+OPT068_O3_STAMP := $(OPT068_O3_DIR)/nvccflags.stamp
+OPT068_O3FMA_STAMP := $(OPT068_O3FMA_DIR)/nvccflags.stamp
+OPT068_FAMILY_DEPS := cuda/q4_prompt_mmq.cu cuda/quant_mmv.h cuda/production_numerics.h cuda/quant_mmq_mma.cuh cuda/mma.cuh cuda/pdl_launch.cuh
+OPT068_BASE_CUDA_OBJECTS := $(filter-out $(BUILD_DIR)/q4_prompt_mmq.cuda.o,$(SCHEDULER_DIAGNOSTIC_CUDA_OBJECTS))
+OPT068_VARIANT_LINK := $(OPT068_BASE_CUDA_OBJECTS) $(DIAGNOSTIC_LIB_OBJECTS) $(THIRD_PARTY_OBJECTS)
+
+$(OPT068_O2_DIR) $(OPT068_O3_DIR) $(OPT068_O3FMA_DIR):
+	mkdir -p $@
+
+$(OPT068_O2_STAMP): FORCE | $(OPT068_O2_DIR)
+	@printf '%s\n' '$(OPT068_O2_FLAG_TEXT)' > $@.tmp
+	@if cmp -s $@.tmp $@; then rm -f $@.tmp; else mv -f $@.tmp $@; fi
+
+$(OPT068_O3_STAMP): FORCE | $(OPT068_O3_DIR)
+	@printf '%s\n' '$(OPT068_O3_FLAG_TEXT)' > $@.tmp
+	@if cmp -s $@.tmp $@; then rm -f $@.tmp; else mv -f $@.tmp $@; fi
+
+$(OPT068_O3FMA_STAMP): FORCE | $(OPT068_O3FMA_DIR)
+	@printf '%s\n' '$(OPT068_O3FMA_FLAG_TEXT)' > $@.tmp
+	@if cmp -s $@.tmp $@; then rm -f $@.tmp; else mv -f $@.tmp $@; fi
+
+$(OPT068_O2_DIR)/q4_prompt_mmq.cuda.o: $(OPT068_FAMILY_DEPS) $(OPT068_O2_STAMP) | $(OPT068_O2_DIR)
+	$(NVCC) $(OPT068_O2_NVCCFLAGS) -Icuda $(NVCC_CUDA_DEPS) -c $< -o $@
+
+$(OPT068_O3_DIR)/q4_prompt_mmq.cuda.o: $(OPT068_FAMILY_DEPS) $(OPT068_O3_STAMP) | $(OPT068_O3_DIR)
+	$(NVCC) $(OPT068_O3_NVCCFLAGS) -Icuda $(NVCC_CUDA_DEPS) -c $< -o $@
+
+$(OPT068_O3FMA_DIR)/q4_prompt_mmq.cuda.o: $(OPT068_FAMILY_DEPS) $(OPT068_O3FMA_STAMP) | $(OPT068_O3FMA_DIR)
+	$(NVCC) $(OPT068_O3FMA_NVCCFLAGS) -Icuda $(NVCC_CUDA_DEPS) -c $< -o $@
+
+$(BUILD_DIR)/opt068_codegen_test.cuda.o: cuda/opt068_codegen_test.cu cuda/full_scheduler.h cuda/quant_mmv.h cuda/test_tier.h $(CUDA_TRACE_STAMP) | $(BUILD_DIR)
+	$(NVCC) $(NVCCFLAGS) $(CPPFLAGS) -DQW38_DIAGNOSTIC_TRACE -Icuda $(NVCC_CUDA_DEPS) -c $< -o $@
+
+$(OPT068_O2_DIR)/qw38-cuda-opt068-codegen-test: $(BUILD_DIR)/opt068_codegen_test.cuda.o $(OPT068_O2_DIR)/q4_prompt_mmq.cuda.o $(OPT068_VARIANT_LINK) $(OPT068_O2_STAMP) $(CUDA_TRACE_STAMP) | $(OPT068_O2_DIR)
+	$(NVCC) $(NVCCFLAGS) $(CPPFLAGS) -DQW38_DIAGNOSTIC_TRACE -Icuda $(NVCC_BIN_DEPS) $(BUILD_DIR)/opt068_codegen_test.cuda.o $(OPT068_O2_DIR)/q4_prompt_mmq.cuda.o $(OPT068_VARIANT_LINK) -o $@
+
+$(OPT068_O3_DIR)/qw38-cuda-opt068-codegen-test: $(BUILD_DIR)/opt068_codegen_test.cuda.o $(OPT068_O3_DIR)/q4_prompt_mmq.cuda.o $(OPT068_VARIANT_LINK) $(OPT068_O3_STAMP) $(CUDA_TRACE_STAMP) | $(OPT068_O3_DIR)
+	$(NVCC) $(NVCCFLAGS) $(CPPFLAGS) -DQW38_DIAGNOSTIC_TRACE -Icuda $(NVCC_BIN_DEPS) $(BUILD_DIR)/opt068_codegen_test.cuda.o $(OPT068_O3_DIR)/q4_prompt_mmq.cuda.o $(OPT068_VARIANT_LINK) -o $@
+
+$(OPT068_O3FMA_DIR)/qw38-cuda-opt068-codegen-test: $(BUILD_DIR)/opt068_codegen_test.cuda.o $(OPT068_O3FMA_DIR)/q4_prompt_mmq.cuda.o $(OPT068_VARIANT_LINK) $(OPT068_O3FMA_STAMP) $(CUDA_TRACE_STAMP) | $(OPT068_O3FMA_DIR)
+	$(NVCC) $(NVCCFLAGS) $(CPPFLAGS) -DQW38_DIAGNOSTIC_TRACE -Icuda $(NVCC_BIN_DEPS) $(BUILD_DIR)/opt068_codegen_test.cuda.o $(OPT068_O3FMA_DIR)/q4_prompt_mmq.cuda.o $(OPT068_VARIANT_LINK) -o $@
+
+$(BUILD_DIR)/qw38-cuda-opt068-codegen-test: cuda/opt068_codegen_driver.cpp $(OPT068_O2_DIR)/qw38-cuda-opt068-codegen-test $(OPT068_O3_DIR)/qw38-cuda-opt068-codegen-test $(OPT068_O3FMA_DIR)/qw38-cuda-opt068-codegen-test | $(BUILD_DIR)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $< -o $@
+
 CUDA_STAMP_FILES := $(CUDA_STRICT_STAMP) $(CUDA_TRACE_STAMP) $(CUDA_EXPERIMENTAL_STAMP)
 
 $(BUILD_DIR)/qw38-cuda-optimization-engine-probe: cuda/optimization_engine_probe.cu $(SCHEDULER_DIAGNOSTIC_CUDA_OBJECTS) $(DIAGNOSTIC_LIB_OBJECTS) $(THIRD_PARTY_OBJECTS) $(CUDA_TRACE_STAMP) | $(BUILD_DIR)
@@ -221,7 +281,10 @@ $(BUILD_DIR)/qw38-cuda-opt067-prompt-pair-test: cuda/opt067_prompt_pair_test.cu 
 $(BUILD_DIR)/qw38-cuda-probe: cuda/device_probe.cu $(CUDA_STRICT_STAMP) | $(BUILD_DIR)
 	$(NVCC) $(NVCCFLAGS) $(NVCC_BIN_DEPS) $< -o $@
 
-$(BUILD_DIR)/quant_mmv.cuda.o: cuda/quant_mmv.cu cuda/quant_mmv.h cuda/production_numerics.h cuda/quant_mmq_mma.cuh cuda/mma.cuh cuda/pdl_launch.cuh cuda/q4k_decode_path.cuh cuda/q6k_decode_path.cuh cuda/ffn_decode_path.cuh $(CUDA_STRICT_STAMP) | $(BUILD_DIR)
+$(BUILD_DIR)/quant_mmv.cuda.o: cuda/quant_mmv.cu cuda/quant_mmv.h cuda/production_numerics.h cuda/pdl_launch.cuh cuda/q4k_decode_path.cuh cuda/q6k_decode_path.cuh cuda/ffn_decode_path.cuh $(CUDA_STRICT_STAMP) | $(BUILD_DIR)
+	$(NVCC) $(NVCCFLAGS) -Icuda $(NVCC_CUDA_DEPS) -c $< -o $@
+
+$(BUILD_DIR)/q4_prompt_mmq.cuda.o: cuda/q4_prompt_mmq.cu cuda/quant_mmv.h cuda/production_numerics.h cuda/quant_mmq_mma.cuh cuda/mma.cuh cuda/pdl_launch.cuh $(CUDA_STRICT_STAMP) | $(BUILD_DIR)
 	$(NVCC) $(NVCCFLAGS) -Icuda $(NVCC_CUDA_DEPS) -c $< -o $@
 
 $(BUILD_DIR)/q4k_decode_dots.cuda.o: cuda/q4k_decode_dots.cu cuda/q4k_decode_dots.cuh cuda/q4k_decode_path.cuh cuda/quant_mmv.h $(CUDA_STRICT_STAMP) | $(BUILD_DIR)
@@ -308,4 +371,4 @@ clean:
 release-provenance:
 	uv run python tools/release_provenance.py --require-clean
 
--include $(LIB_OBJECTS:.o=.d) $(DIAGNOSTIC_OBJECTS:.o=.d) $(THIRD_PARTY_OBJECTS:.o=.d) $(BUILD_DIR)/cli.d $(BUILD_DIR)/server.d $(BUILD_DIR)/bench.d $(BUILD_DIR)/eval.d $(CUDA_RELEASE_OBJECTS:.o=.d) $(CUDA_TRACE_OBJECTS:.o=.d) $(BUILD_DIR)/qw38-cuda-probe.d $(BUILD_DIR)/qw38-cuda-optimization-engine-probe.d $(BUILD_DIR)/qw38-cuda-decode-oracle-test.d $(BUILD_DIR)/qw38-cuda-prefill-4k-oracle-test.d $(BUILD_DIR)/qw38-cuda-opt058-quality-baseline-test.d $(BUILD_DIR)/qw38-cuda-opt059-numerics-test.d $(BUILD_DIR)/qw38-cuda-opt060-engine-attribution-test.d $(BUILD_DIR)/qw38-cuda-component-replay.d $(BUILD_DIR)/qw38-cuda-opt062-q4-admission-test.d $(BUILD_DIR)/qw38-cuda-opt063-integer-ffn-test.d $(BUILD_DIR)/qw38-cuda-opt064-q8-rows-test.d $(BUILD_DIR)/qw38-cuda-opt065-mmq-tiles-test.d $(BUILD_DIR)/qw38-cuda-opt066-mmq-x-pipeline-test.d $(BUILD_DIR)/qw38-cuda-opt067-prompt-pair-test.d $(wildcard $(CUDA_EXPERIMENTAL_DIR)/*.d)
+-include $(LIB_OBJECTS:.o=.d) $(DIAGNOSTIC_OBJECTS:.o=.d) $(THIRD_PARTY_OBJECTS:.o=.d) $(BUILD_DIR)/cli.d $(BUILD_DIR)/server.d $(BUILD_DIR)/bench.d $(BUILD_DIR)/eval.d $(CUDA_RELEASE_OBJECTS:.o=.d) $(CUDA_TRACE_OBJECTS:.o=.d) $(BUILD_DIR)/qw38-cuda-probe.d $(BUILD_DIR)/qw38-cuda-optimization-engine-probe.d $(BUILD_DIR)/qw38-cuda-decode-oracle-test.d $(BUILD_DIR)/qw38-cuda-prefill-4k-oracle-test.d $(BUILD_DIR)/qw38-cuda-opt058-quality-baseline-test.d $(BUILD_DIR)/qw38-cuda-opt059-numerics-test.d $(BUILD_DIR)/qw38-cuda-opt060-engine-attribution-test.d $(BUILD_DIR)/qw38-cuda-component-replay.d $(BUILD_DIR)/qw38-cuda-opt062-q4-admission-test.d $(BUILD_DIR)/qw38-cuda-opt063-integer-ffn-test.d $(BUILD_DIR)/qw38-cuda-opt064-q8-rows-test.d $(BUILD_DIR)/qw38-cuda-opt065-mmq-tiles-test.d $(BUILD_DIR)/qw38-cuda-opt066-mmq-x-pipeline-test.d $(BUILD_DIR)/qw38-cuda-opt067-prompt-pair-test.d $(BUILD_DIR)/opt068_codegen_test.cuda.d $(wildcard $(CUDA_EXPERIMENTAL_DIR)/*.d) $(wildcard $(OPT068_O2_DIR)/*.d) $(wildcard $(OPT068_O3_DIR)/*.d) $(wildcard $(OPT068_O3FMA_DIR)/*.d)

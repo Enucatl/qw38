@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "task": "OPT-068",
+  "yardstick": "scoped_q4_prompt_mmq_codegen",
+  "claims_throughput": false,
+  "claims_performance_improvement": false,
+  "llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+  "gguf_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+  "family": "q4_prompt_mmq",
+  "opt061_rank": "prompt-ffn",
+  "tile": "i128_j128",
+  "variants": ["o2_fmad_false", "o3_fmad_false", "o3_fmad_true"],
+  "installed": false,
+  "selected_flags": "-O2 --fmad=false",
+  "native_target": "build/qw38-cuda-opt068-codegen-test",
+  "report_path": "evidence/optimization/opt068-scoped-codegen/REPORT.md",
+  "required_fixture_keys": [
+    "schema_version",
+    "task",
+    "status",
+    "family",
+    "variants",
+    "installed",
+    "keep",
+    "winner",
+    "selected_flags",
+    "claims_throughput"
+  ]
+}

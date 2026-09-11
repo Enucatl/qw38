@@ -144,7 +144,7 @@ Existing OPT-056 and OPT-016 gates remain blocked on their original conditions.
 | OPT-065 | Retune MMQ tile resources with the current pipeline active | OPT-059, OPT-061 | done | Four Q4 tiles compared with FMA/async Y preserved, actual dispatch/resource evidence, complete FFN/P benefit and tail correctness, or retained 128x128 | [`tasks/OPT-065.md`](tasks/OPT-065.md); [`pins/opt065_mmq_tiles_contract.json`](pins/opt065_mmq_tiles_contract.json); [`pins/opt065_iteration_contract.json`](pins/opt065_iteration_contract.json); [`fixtures/opt065_mmq_tiles.json`](fixtures/opt065_mmq_tiles.json); [`cuda/opt065_mmq_tiles_test.cu`](cuda/opt065_mmq_tiles_test.cu); [`cuda/quant_mmq_mma.cuh`](cuda/quant_mmq_mma.cuh); [`cuda/quant_mmv.h`](cuda/quant_mmv.h); [`tests/test_opt065_mmq_tiles.py`](tests/test_opt065_mmq_tiles.py); [`evidence/optimization/opt065-mmq-tiles/REPORT.md`](evidence/optimization/opt065-mmq-tiles/REPORT.md); verification 2026-09-11T10:36:00Z |
 | OPT-066 | Pipeline packed Q4 prompt weight fetches | OPT-065 | done | Bounded X-prefetch variant preserves stage lifetimes and arithmetic and improves complete P work, or measured resource/performance no-go | [`tasks/OPT-066.md`](tasks/OPT-066.md); [`pins/opt066_mmq_x_pipeline_contract.json`](pins/opt066_mmq_x_pipeline_contract.json); [`pins/opt066_iteration_contract.json`](pins/opt066_iteration_contract.json); [`fixtures/opt066_mmq_x_pipeline.json`](fixtures/opt066_mmq_x_pipeline.json); [`cuda/opt066_mmq_x_pipeline_test.cu`](cuda/opt066_mmq_x_pipeline_test.cu); [`cuda/quant_mmq_mma.cuh`](cuda/quant_mmq_mma.cuh); [`cuda/quant_mmv.h`](cuda/quant_mmv.h); [`tests/test_opt066_mmq_x_pipeline.py`](tests/test_opt066_mmq_x_pipeline.py); [`evidence/optimization/opt066-mmq-x-pipeline/REPORT.md`](evidence/optimization/opt066-mmq-x-pipeline/REPORT.md); verification 2026-09-11T10:57:28Z |
 | OPT-067 | Pair prompt FFN gate/up tiles and BF16 SwiGLU output | OPT-065 | done | Conditional two-candidate study proves complete FFN benefit, resource fit and output/staging quality, or explicit no-go/rejection | [`tasks/OPT-067.md`](tasks/OPT-067.md); [`pins/opt067_prompt_pair_contract.json`](pins/opt067_prompt_pair_contract.json); [`pins/opt067_iteration_contract.json`](pins/opt067_iteration_contract.json); [`fixtures/opt067_prompt_pair.json`](fixtures/opt067_prompt_pair.json); [`cuda/opt067_prompt_pair_test.cu`](cuda/opt067_prompt_pair_test.cu); [`cuda/quant_mmq_mma.cuh`](cuda/quant_mmq_mma.cuh); [`cuda/quant_mmv.h`](cuda/quant_mmv.h); [`cuda/full_scheduler.cu`](cuda/full_scheduler.cu); [`tests/test_opt067_prompt_pair.py`](tests/test_opt067_prompt_pair.py); [`evidence/optimization/opt067-prompt-pair/REPORT.md`](evidence/optimization/opt067-prompt-pair/REPORT.md); verification 2026-09-11T11:23:26Z |
-| OPT-068 | Measure scoped optimized compilation for one projection family | OPT-059, OPT-061 | pending | Three isolated O2/O3/FMA builds yield a quality-admitted complete win with strict/host flags intact, or retained flags | [Implementation guide](tasks/OPT-068.md); proposed 2026-09-11 |
+| OPT-068 | Measure scoped optimized compilation for one projection family | OPT-059, OPT-061 | done | Three isolated O2/O3/FMA builds yield a quality-admitted complete win with strict/host flags intact, or retained flags | [`tasks/OPT-068.md`](tasks/OPT-068.md); [`pins/opt068_scoped_codegen_contract.json`](pins/opt068_scoped_codegen_contract.json); [`pins/opt068_iteration_contract.json`](pins/opt068_iteration_contract.json); [`fixtures/opt068_scoped_codegen.json`](fixtures/opt068_scoped_codegen.json); [`cuda/q4_prompt_mmq.cu`](cuda/q4_prompt_mmq.cu); [`cuda/opt068_codegen_test.cu`](cuda/opt068_codegen_test.cu); [`cuda/opt068_codegen_driver.cpp`](cuda/opt068_codegen_driver.cpp); [`tests/test_opt068_codegen.py`](tests/test_opt068_codegen.py); [`evidence/optimization/opt068-scoped-codegen/REPORT.md`](evidence/optimization/opt068-scoped-codegen/REPORT.md); verification 2026-09-11T11:47:06Z |
 | OPT-069 | Validate combined batch and original llama outcome gates | OPT-058, OPT-059, OPT-062, OPT-063, OPT-064, OPT-065, OPT-066, OPT-067, OPT-068 | pending | Complete combined quality, original P/D/2K protocols and state/memory evidence; separately report improvement, parity and original +5% outcome without relabeling failed gates | [Implementation guide](tasks/OPT-069.md); proposed 2026-09-11 |
 
 ### Post-042 recovery execution order (historical batch)
@@ -6230,4 +6230,30 @@ statements below are historical, not the current execution order.
 - Marked OPT-067 `done`; delivery is limited to the verified task scope plus
   this ledger/audit bookkeeping. `plan.md` is unchanged. OPT-016 and OPT-056 stay
   `blocked`. Next eligible pending by ledger row order: **OPT-068**. No tok/s
+  claim (`claims_throughput=false`).
+
+### 2026-09-11T11:47:06Z — OPT-068 scoped codegen delivered (rejected, O2 retained)
+
+- Q4 prompt MMQ (`q4_prompt_mmq`, OPT-061 prompt-ffn **699.91 ms**) extracted to
+  `cuda/q4_prompt_mmq.cu`. Three isolated builds: `-O2 --fmad=false`,
+  `-O3 --fmad=false`, `-O3 --fmad=true`. Complete FFN control **8.33649063** ms
+  vs O3 **8.34392548** ms vs FMA **8.34093857** ms (`keep=false`). Production
+  NVCCFLAGS stay `-O2 --fmad=false`; O3 variants rejected. O2/O3 SASS opcode
+  counts identical (FFMA 12987). FMA contracts SASS (FFMA 39212) but loses
+  complete FFN. Strict/host objects unchanged. No tok/s claim
+  (`claims_throughput=false`; component ms only).
+- Acceptance evidence: [`tasks/OPT-068.md`](tasks/OPT-068.md);
+  [`pins/opt068_scoped_codegen_contract.json`](pins/opt068_scoped_codegen_contract.json);
+  [`pins/opt068_iteration_contract.json`](pins/opt068_iteration_contract.json);
+  [`fixtures/opt068_scoped_codegen.json`](fixtures/opt068_scoped_codegen.json);
+  [`cuda/q4_prompt_mmq.cu`](cuda/q4_prompt_mmq.cu);
+  [`cuda/opt068_codegen_test.cu`](cuda/opt068_codegen_test.cu);
+  [`cuda/opt068_codegen_driver.cpp`](cuda/opt068_codegen_driver.cpp);
+  [`tests/test_opt068_codegen.py`](tests/test_opt068_codegen.py);
+  [`evidence/optimization/opt068-scoped-codegen/REPORT.md`](evidence/optimization/opt068-scoped-codegen/REPORT.md).
+  Proof is isolated variant wiring, SASS/resource evidence, and component
+  complete-FFN screen — not combined E2E (OPT-069 owns that gate).
+- Marked OPT-068 `done`; delivery is limited to the verified task scope plus
+  this ledger/audit bookkeeping. `plan.md` is unchanged. OPT-016 and OPT-056 stay
+  `blocked`. Next eligible pending by ledger row order: **OPT-069**. No tok/s
   claim (`claims_throughput=false`).

@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "task": "OPT-068",
+  "status": "rejected",
+  "family": "q4_prompt_mmq",
+  "opt061_rank": "prompt-ffn",
+  "opt061_rotating_prompt_ffn_ms": 699.91,
+  "tile": "i128_j128",
+  "kernel": "q4_i128_j128_fma_async_x",
+  "variants": ["o2_fmad_false", "o3_fmad_false", "o3_fmad_true"],
+  "installed": false,
+  "keep": false,
+  "keep_o3": false,
+  "keep_fma": false,
+  "winner": "o2_fmad_false",
+  "selected_flags": "-O2 --fmad=false",
+  "rejected_flags": ["-O3 --fmad=false", "-O3 --fmad=true"],
+  "strict_host_unchanged": true,
+  "use_fast_math": false,
+  "claims_throughput": false,
+  "claims_performance_improvement": false,
+  "llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+  "gguf_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+  "measurement_utc": "2026-09-11T11:43:46Z",
+  "feedback_run": "build/optimization-runs/OPT-068/feedback/20260911T114617Z-0641bcd2",
+  "acceptance_run": "build/optimization-runs/OPT-068/acceptance/20260911T114635Z-c7cb6219",
+  "o2_complete_ffn_ms": 8.33649063,
+  "o3_complete_ffn_ms": 8.34392548,
+  "fma_complete_ffn_ms": 8.34093857,
+  "o3_save_prompt_ms": -0.4758304,
+  "fma_save_prompt_ms": -0.28466816,
+  "component_gate_ms": 5.0,
+  "object_sha256": {
+    "o2_fmad_false": "0d88926180d9757c33613fc56045e67c5136c8bfd96b1b9aef9ca45690e2c945",
+    "o3_fmad_false": "369bff7dece415fc240c15a1cc1672cef9e4c2d1c3b40ef57b98c32ad75c395f",
+    "o3_fmad_true": "bed220df6ca53c77c5c44e2d73f524c3c9eb7eac2c05cf448d34be526df4d303"
+  },
+  "resources": {
+    "o2_fmad_false": {"occupancy": 1, "registers": 255, "local_bytes": 64, "shared_bytes": 76288, "x_registers": 229, "x_local_bytes": 0, "x_shared_bytes": 94736},
+    "o3_fmad_false": {"occupancy": 1, "registers": 255, "local_bytes": 64, "shared_bytes": 76288, "x_registers": 229, "x_local_bytes": 0, "x_shared_bytes": 94736},
+    "o3_fmad_true": {"occupancy": 1, "registers": 255, "local_bytes": 64, "shared_bytes": 76288, "x_registers": 229, "x_local_bytes": 0, "x_shared_bytes": 94736}
+  },
+  "sass_counts": {
+    "o2_fmad_false": {"ffma": 12987, "fmul": 61317, "fadd": 36148},
+    "o3_fmad_false": {"ffma": 12987, "fmul": 61317, "fadd": 36148},
+    "o3_fmad_true": {"ffma": 39212, "fmul": 35092, "fadd": 9923}
+  },
+  "e2e_tok_s_sitting": false,
+  "note": "OPT-061 prompt-ffn is the selected family. O3 matches O2 SASS opcode counts and is not faster. FMA contracts SASS (more FFMA) but loses complete FFN. Production NVCCFLAGS stay -O2 --fmad=false. Diagnostic variant dirs retained. No D2048 sitting; OPT-069 owns combined E2E."
+}

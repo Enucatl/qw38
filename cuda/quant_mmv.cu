@@ -1,8 +1,8 @@
 #include "quant_mmv.h"
-#include "quant_mmq_mma.cuh"
 #include "ffn_decode_path.cuh"
 #include "q4k_decode_path.cuh"
 #include "q6k_decode_path.cuh"
+#include "pdl_launch.cuh"
 
 #include <cstring>
 
