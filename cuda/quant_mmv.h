@@ -67,6 +67,17 @@ cudaError_t launch_q4k_coop_mmv_prequant_q8(
     const Q8Block* q8, float* output, unsigned int warps_per_row,
     cudaStream_t stream) noexcept;
 
+cudaError_t launch_q4k_coop_gate_up_swiglu_prequant_q8(
+    const std::uint8_t* gate_weights, const std::uint8_t* up_weights,
+    std::size_t rows, std::size_t columns, const Q8Block* q8,
+    __nv_bfloat16* output, unsigned int warps_per_row,
+    cudaStream_t stream) noexcept;
+
+int q4k_coop_gate_up_swiglu_occupancy(unsigned int warps_per_row) noexcept;
+void q4k_coop_gate_up_swiglu_kernel_attributes(
+    unsigned int warps_per_row, int* registers, std::size_t* local_bytes,
+    std::size_t* shared_bytes, int* occupancy) noexcept;
+
 cudaError_t launch_q4k_coop_mmv(
     const std::uint8_t* weights, std::size_t rows, std::size_t columns,
     const __nv_bfloat16* activation, void* workspace, float* output,

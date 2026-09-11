@@ -139,7 +139,7 @@ Existing OPT-056 and OPT-016 gates remain blocked on their original conditions.
 | OPT-060 | Instrument matched full-engine Quartz and pinned llama family execution | OPT-057 | done | Real dispatch/fusion/stream records and matched P/D family attribution with overhead/overlap limits; reproducible private authority patch; no speedup required | [`tasks/OPT-060.md`](tasks/OPT-060.md); [`pins/opt060_engine_attribution_contract.json`](pins/opt060_engine_attribution_contract.json); [`pins/opt060_iteration_contract.json`](pins/opt060_iteration_contract.json); [`fixtures/opt060_engine_attribution.json`](fixtures/opt060_engine_attribution.json); [`cuda/engine_attribution.h`](cuda/engine_attribution.h); [`cuda/opt060_engine_attribution_test.cu`](cuda/opt060_engine_attribution_test.cu); [`cuda/full_scheduler.cu`](cuda/full_scheduler.cu); [`tools/llama_authority/patches/opt060-engine-attribution.patch`](tools/llama_authority/patches/opt060-engine-attribution.patch); [`tools/llama_authority/build_opt060_instrumented.sh`](tools/llama_authority/build_opt060_instrumented.sh); [`tools/llama_authority/engine_attribution.cpp`](tools/llama_authority/engine_attribution.cpp); [`tools/opt060_engine_attribution.py`](tools/opt060_engine_attribution.py); [`tests/test_opt060_engine_attribution.py`](tests/test_opt060_engine_attribution.py); [`evidence/optimization/opt060-engine-attribution/REPORT.md`](evidence/optimization/opt060-engine-attribution/REPORT.md); verification 2026-09-11T07:55:00Z |
 | OPT-061 | Build real-input streaming replay and hardware bottleneck evidence | OPT-060 | done | Reusable captured FFN/mixer inputs, hot versus rotating weights, correct call counts and complete costs; counters or explicitly limited event/resource fallback | [`tasks/OPT-061.md`](tasks/OPT-061.md); [`pins/opt061_component_replay_contract.json`](pins/opt061_component_replay_contract.json); [`pins/opt061_iteration_contract.json`](pins/opt061_iteration_contract.json); [`fixtures/opt061_component_replay.json`](fixtures/opt061_component_replay.json); [`cuda/optimization_component_replay.h`](cuda/optimization_component_replay.h); [`cuda/optimization_component_replay.cu`](cuda/optimization_component_replay.cu); [`cuda/full_scheduler.cu`](cuda/full_scheduler.cu); [`tools/opt061_component_replay.py`](tools/opt061_component_replay.py); [`tests/test_opt061_component_replay.py`](tests/test_opt061_component_replay.py); [`evidence/optimization/opt061-component-replay/REPORT.md`](evidence/optimization/opt061-component-replay/REPORT.md); verification 2026-09-11T08:21:30Z |
 | OPT-062 | Revalidate cooperative Q4 and dispatch all decode FFN projections | OPT-059, OPT-061 | done | Gate/up/down actually use admitted integer variants with shared staging, graph coverage, complete FFN benefit and batch quality/non-regression, or retained rejection | [`tasks/OPT-062.md`](tasks/OPT-062.md); [`pins/opt062_q4_admission_contract.json`](pins/opt062_q4_admission_contract.json); [`pins/opt062_iteration_contract.json`](pins/opt062_iteration_contract.json); [`fixtures/opt062_q4_admission.json`](fixtures/opt062_q4_admission.json); [`cuda/opt062_q4_admission_test.cu`](cuda/opt062_q4_admission_test.cu); [`cuda/q4k_decode_dots.cu`](cuda/q4k_decode_dots.cu); [`cuda/q4k_decode_path.cuh`](cuda/q4k_decode_path.cuh); [`cuda/ffn_decode_path.cuh`](cuda/ffn_decode_path.cuh); [`cuda/quant_mmv.cu`](cuda/quant_mmv.cu); [`cuda/full_scheduler.cu`](cuda/full_scheduler.cu); [`tests/test_opt062_q4_admission.py`](tests/test_opt062_q4_admission.py); [`evidence/optimization/opt062-q4-admission/REPORT.md`](evidence/optimization/opt062-q4-admission/REPORT.md); verification 2026-09-11T08:49:10Z |
-| OPT-063 | Fuse admitted integer gate/up dots and SwiGLU | OPT-062 | pending | Shared-input paired Q4 improves complete FFN while preserving admitted arithmetic and output boundaries, or documented no-change/no-go | [Implementation guide](tasks/OPT-063.md); proposed 2026-09-11 |
+| OPT-063 | Fuse admitted integer gate/up dots and SwiGLU | OPT-062 | done | Shared-input paired Q4 improves complete FFN while preserving admitted arithmetic and output boundaries, or documented no-change/no-go | [`tasks/OPT-063.md`](tasks/OPT-063.md); [`pins/opt063_integer_ffn_contract.json`](pins/opt063_integer_ffn_contract.json); [`pins/opt063_iteration_contract.json`](pins/opt063_iteration_contract.json); [`fixtures/opt063_integer_ffn.json`](fixtures/opt063_integer_ffn.json); [`cuda/opt063_integer_ffn_test.cu`](cuda/opt063_integer_ffn_test.cu); [`cuda/q4k_decode_dots.cu`](cuda/q4k_decode_dots.cu); [`cuda/q4k_decode_dots.cuh`](cuda/q4k_decode_dots.cuh); [`cuda/q4k_decode_path.cuh`](cuda/q4k_decode_path.cuh); [`cuda/ffn_decode_path.cuh`](cuda/ffn_decode_path.cuh); [`cuda/quant_mmv.h`](cuda/quant_mmv.h); [`cuda/full_scheduler.cu`](cuda/full_scheduler.cu); [`cuda/optimization_component_replay.cu`](cuda/optimization_component_replay.cu); [`tests/test_opt063_integer_ffn.py`](tests/test_opt063_integer_ffn.py); [`evidence/optimization/opt063-integer-ffn/REPORT.md`](evidence/optimization/opt063-integer-ffn/REPORT.md); verification 2026-09-11T09:10:28Z |
 | OPT-064 | Improve Q8 decode row grouping and reduction cost | OPT-059, OPT-061 | pending | Bounded four-layout study improves frequency-weighted rotating mixer time with legal alignment, staging reuse and quality, or measured rejection | [Implementation guide](tasks/OPT-064.md); proposed 2026-09-11 |
 | OPT-065 | Retune MMQ tile resources with the current pipeline active | OPT-059, OPT-061 | pending | Four Q4 tiles compared with FMA/async Y preserved, actual dispatch/resource evidence, complete FFN/P benefit and tail correctness, or retained 128x128 | [Implementation guide](tasks/OPT-065.md); proposed 2026-09-11 |
 | OPT-066 | Pipeline packed Q4 prompt weight fetches | OPT-065 | pending | Bounded X-prefetch variant preserves stage lifetimes and arithmetic and improves complete P work, or measured resource/performance no-go | [Implementation guide](tasks/OPT-066.md); proposed 2026-09-11 |
@@ -6095,4 +6095,36 @@ statements below are historical, not the current execution order.
 - Marked OPT-062 `done`; delivery is limited to the verified task scope plus
   this ledger/audit bookkeeping. `plan.md` is unchanged. OPT-016 and OPT-056 stay
   `blocked`. Next eligible pending by ledger row order: **OPT-063**. No tok/s
+  claim (`claims_throughput=false`).
+
+### 2026-09-11T09:10:28Z — OPT-063 paired integer fusion delivered (packed retained)
+
+- Cooperative 4-warp `q4k_coop_gate_up_swiglu_prequant_q8` fuses admitted
+  integer gate/up dots and SwiGLU with separate GGUF pointers, shared Q8Block
+  staging, graph/eager dispatch records, and complete-FFN screen evidence.
+  Coupled IDs: none. **Packed retained:** screen winner is paired_integer
+  (~1.09× vs unfused integer **12.3049278** ms → **11.2725649** ms; ~1.40× vs
+  packed **15.8205442** ms) but production stays `packed` / `paired_staged`
+  because OPT-062 did not install integer Q8Block (`v2_admitted=false`) and this
+  sitting did not run combined v2 NLL / functional answers. No tok/s claim
+  (`claims_throughput=false`; component ms only).
+- Acceptance evidence: [`tasks/OPT-063.md`](tasks/OPT-063.md);
+  [`pins/opt063_integer_ffn_contract.json`](pins/opt063_integer_ffn_contract.json);
+  [`pins/opt063_iteration_contract.json`](pins/opt063_iteration_contract.json);
+  [`fixtures/opt063_integer_ffn.json`](fixtures/opt063_integer_ffn.json);
+  [`cuda/opt063_integer_ffn_test.cu`](cuda/opt063_integer_ffn_test.cu);
+  [`cuda/q4k_decode_dots.cu`](cuda/q4k_decode_dots.cu);
+  [`cuda/q4k_decode_dots.cuh`](cuda/q4k_decode_dots.cuh);
+  [`cuda/q4k_decode_path.cuh`](cuda/q4k_decode_path.cuh);
+  [`cuda/ffn_decode_path.cuh`](cuda/ffn_decode_path.cuh);
+  [`cuda/quant_mmv.h`](cuda/quant_mmv.h);
+  [`cuda/full_scheduler.cu`](cuda/full_scheduler.cu);
+  [`cuda/optimization_component_replay.cu`](cuda/optimization_component_replay.cu);
+  [`tests/test_opt063_integer_ffn.py`](tests/test_opt063_integer_ffn.py);
+  [`evidence/optimization/opt063-integer-ffn/REPORT.md`](evidence/optimization/opt063-integer-ffn/REPORT.md).
+  Proof is typed paired-integer selector wiring, trace unfused fallback, and
+  component complete-FFN screen — not a production install gate.
+- Marked OPT-063 `done`; delivery is limited to the verified task scope plus
+  this ledger/audit bookkeeping. `plan.md` is unchanged. OPT-016 and OPT-056 stay
+  `blocked`. Next eligible pending by ledger row order: **OPT-064**. No tok/s
   claim (`claims_throughput=false`).

@@ -20,6 +20,10 @@ constexpr char kQ4LaunchVariantCoopQ81[] = "q4k_coop_mmv_q8_1";
 constexpr char kQ4LaunchVariantCoopQ81Prequant[] = "q4k_coop_mmv_prequant_q8_1";
 constexpr char kQ4LaunchVariantPairedStaged[] = "q4k_gate_up_swiglu_prequant";
 constexpr char kQ4LaunchVariantPaired[] = "q4k_gate_up_swiglu";
+constexpr char kQ4LaunchVariantPairedIntegerQ8[] =
+    "q4k_coop_gate_up_swiglu_prequant_q8";
+constexpr char kQ4LaunchVariantPairedIntegerTraceUnfused[] =
+    "q4k_coop_mmv_prequant_q8_trace_unfused";
 
 constexpr int kQ4LaunchTraceCapacity = 8;
 

@@ -10,18 +10,23 @@ constexpr char kLegalFfnDecodePathSeparate[] = "separate";
 constexpr char kLegalFfnDecodePathSharedStage[] = "shared_stage";
 constexpr char kLegalFfnDecodePathPaired[] = "paired";
 constexpr char kLegalFfnDecodePathPairedStaged[] = "paired_staged";
+constexpr char kLegalFfnDecodePathPairedInteger[] = "paired_integer";
+constexpr char kStagingQ8Fp32PairedInteger[] = "q8_fp32";
+constexpr char kStagingQ8Fp32UnfusedTrace[] = "q8_fp32_unfused_trace";
 
 // Production pin. Keep sitting may switch away from separate; reject restores it.
 constexpr char kSelectedFfnDecodePath[] = "paired_staged";
 
 inline thread_local const char* g_ffn_decode_path_override = nullptr;
+inline thread_local bool g_ffn_paired_integer_trace_unfused = false;
 
 inline bool legal_ffn_decode_path(const char* path) noexcept {
   return path != nullptr &&
          (std::strcmp(path, kLegalFfnDecodePathSeparate) == 0 ||
           std::strcmp(path, kLegalFfnDecodePathSharedStage) == 0 ||
           std::strcmp(path, kLegalFfnDecodePathPaired) == 0 ||
-          std::strcmp(path, kLegalFfnDecodePathPairedStaged) == 0);
+          std::strcmp(path, kLegalFfnDecodePathPairedStaged) == 0 ||
+          std::strcmp(path, kLegalFfnDecodePathPairedInteger) == 0);
 }
 
 inline const char* selected_ffn_decode_path() noexcept {
@@ -36,13 +41,27 @@ inline const char* effective_ffn_decode_path() noexcept {
 inline bool ffn_decode_shares_stage() noexcept {
   const char* path = effective_ffn_decode_path();
   return std::strcmp(path, kLegalFfnDecodePathSharedStage) == 0 ||
-         std::strcmp(path, kLegalFfnDecodePathPairedStaged) == 0;
+         std::strcmp(path, kLegalFfnDecodePathPairedStaged) == 0 ||
+         std::strcmp(path, kLegalFfnDecodePathPairedInteger) == 0;
 }
 
 inline bool ffn_decode_uses_paired() noexcept {
   const char* path = effective_ffn_decode_path();
   return std::strcmp(path, kLegalFfnDecodePathPaired) == 0 ||
          std::strcmp(path, kLegalFfnDecodePathPairedStaged) == 0;
+}
+
+inline bool ffn_decode_uses_paired_integer() noexcept {
+  return std::strcmp(effective_ffn_decode_path(),
+                     kLegalFfnDecodePathPairedInteger) == 0;
+}
+
+inline bool ffn_paired_integer_trace_unfused() noexcept {
+  return g_ffn_paired_integer_trace_unfused;
+}
+
+inline void set_ffn_paired_integer_trace_unfused(bool enabled) noexcept {
+  g_ffn_paired_integer_trace_unfused = enabled;
 }
 
 inline bool ffn_decode_uses_bf16_activations() noexcept {
@@ -112,6 +131,19 @@ struct FfnDecodePathScope final {
   ~FfnDecodePathScope() { clear_ffn_decode_path_override(); }
   FfnDecodePathScope(const FfnDecodePathScope&) = delete;
   FfnDecodePathScope& operator=(const FfnDecodePathScope&) = delete;
+};
+
+struct FfnPairedIntegerTraceUnfusedScope final {
+  explicit FfnPairedIntegerTraceUnfusedScope() noexcept {
+    set_ffn_paired_integer_trace_unfused(true);
+  }
+  ~FfnPairedIntegerTraceUnfusedScope() {
+    set_ffn_paired_integer_trace_unfused(false);
+  }
+  FfnPairedIntegerTraceUnfusedScope(const FfnPairedIntegerTraceUnfusedScope&) =
+      delete;
+  FfnPairedIntegerTraceUnfusedScope& operator=(
+      const FfnPairedIntegerTraceUnfusedScope&) = delete;
 };
 
 }  // namespace qw38::cuda

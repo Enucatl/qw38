@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "task": "OPT-063",
+  "yardstick": "paired_integer_gate_up_swiglu",
+  "claims_throughput": false,
+  "claims_performance_improvement": false,
+  "llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+  "gguf_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+  "selected_q4_decode_path": "packed",
+  "selected_q4_decode_warps_per_row": 4,
+  "selected_ffn_decode_path": "paired_staged",
+  "opt062_installed": false,
+  "paired_integer_installed": false,
+  "warps_per_row": 4,
+  "legal_ffn_decode_paths": [
+    "separate",
+    "shared_stage",
+    "paired",
+    "paired_staged",
+    "paired_integer"
+  ],
+  "candidates": ["integer_q8_unfused", "paired_integer_4warp"],
+  "optional_control": "packed_paired_staged",
+  "staging": "q8_fp32",
+  "native_target": "build/qw38-cuda-opt063-integer-ffn-test",
+  "opt062_admission": "pins/opt062_q4_admission_contract.json",
+  "report_path": "evidence/optimization/opt063-integer-ffn/REPORT.md",
+  "required_fixture_keys": [
+    "schema_version",
+    "task",
+    "status",
+    "selected_q4_decode_path",
+    "selected_ffn_decode_path",
+    "opt062_installed",
+    "paired_integer_installed",
+    "claims_throughput"
+  ]
+}

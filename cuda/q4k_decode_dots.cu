@@ -185,4 +185,67 @@ void q4k_coop_kernel_attributes(unsigned int warps_per_row, bool q8_1,
   if (occupancy != nullptr) *occupancy = q4k_coop_occupancy(warps_per_row, q8_1);
 }
 
+cudaError_t launch_q4k_coop_gate_up_swiglu_prequant_q8(
+    const std::uint8_t* gate_weights, const std::uint8_t* up_weights,
+    std::size_t rows, std::size_t columns, const Q8Block* q8,
+    __nv_bfloat16* output, unsigned int warps_per_row,
+    cudaStream_t stream) noexcept {
+  if (gate_weights == nullptr || up_weights == nullptr || q8 == nullptr ||
+      output == nullptr || rows == 0 || columns == 0 ||
+      columns % kValuesPerWeightBlock != 0 ||
+      (warps_per_row != 4 && warps_per_row != 2)) {
+    return cudaErrorInvalidValue;
+  }
+  record_q4_launch_variant(kQ4LaunchVariantPairedIntegerQ8);
+  if (warps_per_row == 2) {
+    return q4k_dots::launch_coop_gate_up<2>(gate_weights, up_weights, rows,
+                                            columns, q8, output, stream);
+  }
+  return q4k_dots::launch_coop_gate_up<4>(gate_weights, up_weights, rows,
+                                          columns, q8, output, stream);
+}
+
+int q4k_coop_gate_up_swiglu_occupancy(unsigned int warps_per_row) noexcept {
+  int occupancy = 0;
+  cudaError_t error = cudaErrorInvalidValue;
+  const int threads = static_cast<int>(warps_per_row) * kWarpSize;
+  if (warps_per_row == 2) {
+    error = cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+        &occupancy, q4k_dots::q4k_coop_gate_up_swiglu<2>, threads, 0);
+  } else if (warps_per_row == 4) {
+    error = cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+        &occupancy, q4k_dots::q4k_coop_gate_up_swiglu<4>, threads, 0);
+  }
+  if (error != cudaSuccess) return 0;
+  return occupancy;
+}
+
+void q4k_coop_gate_up_swiglu_kernel_attributes(
+    unsigned int warps_per_row, int* registers, std::size_t* local_bytes,
+    std::size_t* shared_bytes, int* occupancy) noexcept {
+  cudaFuncAttributes attrs{};
+  cudaError_t error = cudaErrorInvalidValue;
+  if (warps_per_row == 2) {
+    error = cudaFuncGetAttributes(&attrs, q4k_dots::q4k_coop_gate_up_swiglu<2>);
+  } else if (warps_per_row == 4) {
+    error = cudaFuncGetAttributes(&attrs, q4k_dots::q4k_coop_gate_up_swiglu<4>);
+  }
+  if (registers != nullptr) {
+    *registers = error == cudaSuccess ? attrs.numRegs : 0;
+  }
+  if (local_bytes != nullptr) {
+    *local_bytes = error == cudaSuccess
+                       ? static_cast<std::size_t>(attrs.localSizeBytes)
+                       : 0;
+  }
+  if (shared_bytes != nullptr) {
+    *shared_bytes = error == cudaSuccess
+                        ? static_cast<std::size_t>(attrs.sharedSizeBytes)
+                        : 0;
+  }
+  if (occupancy != nullptr) {
+    *occupancy = q4k_coop_gate_up_swiglu_occupancy(warps_per_row);
+  }
+}
+
 }  // namespace qw38::cuda

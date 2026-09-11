@@ -624,7 +624,15 @@ cudaError_t replay_decode_ffn_layer(const qw38::cuda::DeviceCommonLayer& layer,
   if (error == cudaSuccess && kernel_start != nullptr) {
     error = cudaEventRecord(kernel_start, stream);
   }
-  if (error == cudaSuccess && qw38::cuda::q4_decode_uses_integer_q8block()) {
+  if (error == cudaSuccess && qw38::cuda::q4_decode_uses_integer_q8block() &&
+      qw38::cuda::ffn_decode_uses_paired_integer() &&
+      !qw38::cuda::ffn_paired_integer_trace_unfused()) {
+    error = qw38::cuda::launch_q4k_coop_gate_up_swiglu_prequant_q8(
+        layer.ffn_gate.data, layer.ffn_up.data, layer.ffn_gate.rows,
+        layer.ffn_gate.columns, workspace->q8_, workspace->ffn_activated_,
+        qw38::cuda::effective_q4_decode_warps_per_row(), stream);
+  } else if (error == cudaSuccess &&
+             qw38::cuda::q4_decode_uses_integer_q8block()) {
     error = qw38::cuda::launch_quant_mmv_prequant(
         layer.ffn_gate.kind, layer.ffn_gate.data, layer.ffn_gate.rows,
         layer.ffn_gate.columns, workspace->q8_, workspace->projection_a_,
