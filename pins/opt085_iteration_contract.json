@@ -1,0 +1,180 @@
+{
+  "schema_version": 1,
+  "task": "OPT-085",
+  "yardstick": "q4_decode_candidate_reevaluation",
+  "claims_throughput": false,
+  "claims_performance_improvement": false,
+  "opt074_family_admission_required": false,
+  "performance_admission": {
+    "enabled": true
+  },
+  "image": "qw38-cuda:13.0.2",
+  "model": "models/Qwen3.8-27B-Q4_K_M.gguf",
+  "gpu_lock": "build/optimization-runs/qw38-gpu.lock",
+  "aggregate_deadline_s": 300,
+  "target": "tools/opt085_q4_reevaluation.py",
+  "diagnostics_make_target": "cuda-opt085-diagnostics",
+  "case_ids": ["parity", "q4", "quality"],
+  "modes": {
+    "feedback": {
+      "target": "tools/opt085_q4_reevaluation.py",
+      "tier_sequence": ["parity", "q4"],
+      "make_targets": [
+        "build/qw38-cuda-opt082-kernel-parity-test",
+        "build/qw38-cuda-component-replay",
+        "build/qw38-cuda-optimization-engine-probe"
+      ],
+      "build_once": true,
+      "warm_repetitions": 0,
+      "aggregate_deadline_s": 300,
+      "workloads": ["parity", "q4"]
+    },
+    "acceptance": {
+      "target": "tools/opt085_q4_reevaluation.py",
+      "tier_sequence": ["quality", "q4"],
+      "make_targets": [
+        "build/qw38-cuda-opt082-kernel-parity-test",
+        "build/qw38-cuda-component-replay",
+        "build/qw38-cuda-optimization-engine-probe",
+        "build/qw38-cuda-opt058-quality-baseline-test"
+      ],
+      "warm_repetitions": 0,
+      "aggregate_deadline_s": 300,
+      "workloads": ["quality", "q4"]
+    },
+    "release": {
+      "target": "tools/opt085_q4_reevaluation.py",
+      "tier": "acceptance",
+      "make_targets": [],
+      "skip_compile": true,
+      "historical_oracles": false,
+      "workloads": []
+    }
+  },
+  "workloads": {
+    "parity": {
+      "target": "tools/opt085_q4_reevaluation.py",
+      "tier": "correctness",
+      "runner": "host",
+      "kind": "opt082_q4_ident_kernel_parity",
+      "cases": 26,
+      "candidates": 1,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 1,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 0,
+      "reference": 1,
+      "gpu_work": true,
+      "native_targets": ["build/qw38-cuda-opt082-kernel-parity-test"],
+      "args": [
+        "uv",
+        "run",
+        "python",
+        "tools/opt085_q4_reevaluation.py",
+        "--phase",
+        "{phase}",
+        "--mode",
+        "{mode}",
+        "--run-dir",
+        "{run_dir}"
+      ]
+    },
+    "q4": {
+      "target": "tools/opt085_q4_reevaluation.py",
+      "tier": "screen",
+      "runner": "host",
+      "kind": "three_config_complete_rotating_decode_ffn",
+      "cases": 1,
+      "candidates": 3,
+      "warmups": 1,
+      "samples": 3,
+      "tokens": 1,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 1,
+      "reference": 1,
+      "sampled_rows": 16,
+      "sampled_vectors": 4,
+      "family": "decode-ffn",
+      "cache_mode": "rotating",
+      "control": "packed_paired_staged",
+      "complete_ffns": 64,
+      "gpu_work": true,
+      "native_targets": [
+        "build/qw38-cuda-component-replay",
+        "build/qw38-cuda-optimization-engine-probe"
+      ],
+      "args": [
+        "uv",
+        "run",
+        "python",
+        "tools/opt085_q4_reevaluation.py",
+        "--phase",
+        "{phase}",
+        "--mode",
+        "{mode}",
+        "--run-dir",
+        "{run_dir}"
+      ],
+      "mode_overrides": {
+        "acceptance": {
+          "tier": "acceptance",
+          "candidates": 2,
+          "warmups": 3,
+          "samples": 10,
+          "engine_pairs": 5
+        }
+      }
+    },
+    "quality": {
+      "target": "tools/opt085_q4_reevaluation.py",
+      "tier": "acceptance",
+      "runner": "host",
+      "kind": "identity_cached_opt084_once_per_survivor",
+      "cases": 7,
+      "candidates": 1,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 1,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 0,
+      "reference": 1,
+      "gpu_work": false,
+      "native_targets": ["build/qw38-cuda-opt058-quality-baseline-test"],
+      "args": [
+        "uv",
+        "run",
+        "python",
+        "tools/opt085_q4_reevaluation.py",
+        "--phase",
+        "quality",
+        "--mode",
+        "{mode}",
+        "--run-dir",
+        "{run_dir}"
+      ]
+    }
+  },
+  "proof_limit": [
+    "exactly three configurations",
+    "four warps per row",
+    "FP32-scale Q8Block staging",
+    "no new fusion tile compiler or half-scale grid",
+    "no new Q4 kernel",
+    "OPT-082 Q4 ident kernel parity first",
+    "OPT-083/084 quality versus shipping baseline",
+    "opt074_coverage_unadmitted is not a blocker",
+    "independent kernel_parity_pass model_quality_pass performance_pass production_kept",
+    "at most one Q4 production path",
+    "complete 64-layer decode FFN",
+    "recapture graphs after selecting the configuration",
+    "historical OPT-075/076 reports unmodified",
+    "no OPT-074 rerun",
+    "no Q8/MMQ decision",
+    "historical oracles none"
+  ],
+  "report_path": "evidence/optimization/opt085-q4-reevaluation/REPORT.md"
+}
