@@ -11,6 +11,14 @@ constexpr char kLegalQ4DecodePathPacked[] = "packed";
 constexpr char kLegalQ4DecodePathIntegerQ8[] = "integer_q8";
 constexpr char kLegalQ4DecodePathIntegerQ81[] = "integer_q8_1";
 
+// OPT-072 typed Q8_1 pairing: the UseQ81 Q4 consumer treats stored q8_sum as
+// integer sum(q). A sum(x) producer must not feed that consumer. Production
+// Q8/Q6 paths do not read the stored sum field; leave their staging unchanged.
+constexpr char kQ81ConsumerExpects[] = "quartz_q8_1_sum_q";
+constexpr char kQ81SumQProducer[] = "quantize_bf16_q8_1";
+constexpr char kQ81SumXProducer[] = "quantize_bf16_q8_1_sum_x";
+constexpr char kQ81IllegalPairing[] = "sum_x_producer_to_sum_q_consumer";
+
 // Actual launch variants recorded by the kernels that ran, not selector strings.
 constexpr char kQ4LaunchVariantPacked[] = "quant_mmv_packed";
 constexpr char kQ4LaunchVariantPackedPrequant[] = "quant_mmv_prequant_packed";

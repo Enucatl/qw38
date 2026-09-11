@@ -164,7 +164,7 @@ New kernel tasks are conditional on measured opportunity and valid admission.
 |---|---|---|---|---|---|
 | OPT-070 | Repair acceptance enforcement and revalidate installed Q8/MMQ keeps | OPT-069, OPT-071, OPT-073, OPT-074 | pending | Actual paired complete rotating and short E2E evidence yields separate retain/revert/inconclusive verdicts for OPT-064/066; screen-only results cannot admit a keep | [`tasks/OPT-070.md`](tasks/OPT-070.md) |
 | OPT-071 | Repair full-engine timing windows and production capture replay | OPT-060, OPT-061, OPT-069 | done | No prefix/warmup contamination, dropped records or duplicate family charging; complete measured windows and identity-cached real inputs support honest sink ranking | [`tasks/OPT-071.md`](tasks/OPT-071.md); [`pins/opt071_attribution_repair_contract.json`](pins/opt071_attribution_repair_contract.json); [`pins/opt071_iteration_contract.json`](pins/opt071_iteration_contract.json); [`fixtures/opt071_attribution_repair.json`](fixtures/opt071_attribution_repair.json); [`tools/opt071_attribution_repair.py`](tools/opt071_attribution_repair.py); [`tests/test_opt071_attribution_repair.py`](tests/test_opt071_attribution_repair.py); [`cuda/engine_attribution.h`](cuda/engine_attribution.h); [`cuda/optimization_component_replay.cu`](cuda/optimization_component_replay.cu); [`tools/llama_authority/engine_attribution.cpp`](tools/llama_authority/engine_attribution.cpp); [`evidence/optimization/opt071-attribution-repair/REPORT.md`](evidence/optimization/opt071-attribution-repair/REPORT.md); verification 2026-09-11T15:30:12Z |
-| OPT-072 | Reevaluate all correctness-based optimization rejections | OPT-059, OPT-069 | pending | Every historical numerical/test rejection has an evidence-backed disposition and owner; comparable-accuracy eligibility is separated from hard correctness and performance failures | [`tasks/OPT-072.md`](tasks/OPT-072.md) |
+| OPT-072 | Reevaluate all correctness-based optimization rejections | OPT-059, OPT-069 | done | Every historical numerical/test rejection has an evidence-backed disposition and owner; comparable-accuracy eligibility is separated from hard correctness and performance failures | [`tasks/OPT-072.md`](tasks/OPT-072.md); [`pins/opt072_rejection_review_contract.json`](pins/opt072_rejection_review_contract.json); [`pins/opt072_iteration_contract.json`](pins/opt072_iteration_contract.json); [`fixtures/opt072_rejection_review.json`](fixtures/opt072_rejection_review.json); [`tools/opt072_rejection_review.py`](tools/opt072_rejection_review.py); [`tests/test_opt072_rejection_review.py`](tests/test_opt072_rejection_review.py); [`cuda/q4k_decode_path.cuh`](cuda/q4k_decode_path.cuh); [`tools/run_optimization_task.py`](tools/run_optimization_task.py); [`evidence/optimization/opt072-rejection-review/REPORT.md`](evidence/optimization/opt072-rejection-review/REPORT.md); verification 2026-09-11T15:46:12Z |
 | OPT-073 | Resolve functional authority failures and version quality decisions | OPT-058, OPT-069, OPT-072 | pending | Exact prompts/scorers audited, arithmetic truth preserved, absolute and regression verdicts explicit, and failed required quality stops release before long timing | [`tasks/OPT-073.md`](tasks/OPT-073.md) |
 | OPT-074 | Complete real production-shape llama GPU numerical admission | OPT-059, OPT-071, OPT-072 | pending | Full-M actual GPU dispatch, sampled independent FP64 and frozen held-out budgets cover production Q4 and selected Q8/Q6; missing coverage cannot become admission | [`tasks/OPT-074.md`](tasks/OPT-074.md) |
 | OPT-075 | Admit or reject existing unfused and paired cooperative Q4 FFN | OPT-070, OPT-073, OPT-074 | pending | Current packed versus existing integer survivor passes versioned production quality, actual all-leg dispatch and complete rotating/E2E acceptance, or documented retained packed | [`tasks/OPT-075.md`](tasks/OPT-075.md) |
@@ -6363,4 +6363,31 @@ statements below are historical, not the current execution order.
 - Marked OPT-071 `done`; delivery is limited to the verified task scope plus
   this ledger/audit bookkeeping. `plan.md` is unchanged. OPT-016 and OPT-056 stay
   `blocked`. Next eligible pending by dependency order: **OPT-072**. No tok/s
+  claim (`claims_throughput=false`).
+
+### 2026-09-11T15:47:11Z — OPT-072 correctness rejection review delivered
+
+- Inventoried 78 register entries across OPT-001–OPT-069 with disposition,
+  next owner, and reevaluation for every historical numerical/test rejection.
+  Q4 integer paths are numerically eligible vs staged FP64 but blocked on
+  OPT-074/075. OPT-068 remains performance-only no-repeat. OPT-064/066 evidence
+  repair stays OPT-070. Half-scale Q8_1 enumerated and not executed. Coupled
+  IDs: none. No throughput claim.
+- Acceptance: host contract, register completeness, Q8_1 consumer audit, and
+  optimization-runner inventory/q4-original-failure/review phases within 300 s;
+  `gpu_work=false`; 7 pytest cases; no production pin change.
+- Acceptance evidence: [`tasks/OPT-072.md`](tasks/OPT-072.md);
+  [`pins/opt072_rejection_review_contract.json`](pins/opt072_rejection_review_contract.json);
+  [`pins/opt072_iteration_contract.json`](pins/opt072_iteration_contract.json);
+  [`fixtures/opt072_rejection_review.json`](fixtures/opt072_rejection_review.json);
+  [`tools/opt072_rejection_review.py`](tools/opt072_rejection_review.py);
+  [`tests/test_opt072_rejection_review.py`](tests/test_opt072_rejection_review.py);
+  [`cuda/q4k_decode_path.cuh`](cuda/q4k_decode_path.cuh);
+  [`tools/run_optimization_task.py`](tools/run_optimization_task.py);
+  [`evidence/optimization/opt072-rejection-review/REPORT.md`](evidence/optimization/opt072-rejection-review/REPORT.md).
+  Proof is review completeness and evidence-backed dispositions — not a speedup
+  gate.
+- Marked OPT-072 `done`; delivery is limited to the verified task scope plus
+  this ledger/audit bookkeeping. `plan.md` is unchanged. OPT-016 and OPT-056 stay
+  `blocked`. Next eligible pending by dependency order: **OPT-073**. No tok/s
   claim (`claims_throughput=false`).

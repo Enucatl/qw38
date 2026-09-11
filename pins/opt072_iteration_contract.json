@@ -1,0 +1,216 @@
+{
+  "schema_version": 1,
+  "task": "OPT-072",
+  "yardstick": "correctness_rejection_review_completeness",
+  "claims_throughput": false,
+  "claims_performance_improvement": false,
+  "host_only": true,
+  "skip_gpu_setup": true,
+  "skip_compile": true,
+  "image": "qw38-cuda:13.0.2",
+  "model": "models/Qwen3.8-27B-Q4_K_M.gguf",
+  "gpu_lock": "build/optimization-runs/qw38-gpu.lock",
+  "aggregate_deadline_s": 300,
+  "target": "build/qw38-cuda-opt059-numerics-test",
+  "diagnostics_make_target": "cuda-opt072-diagnostics",
+  "case_ids": [
+    "inventory",
+    "q4-original-failure",
+    "half-scale-q8-1",
+    "review"
+  ],
+  "modes": {
+    "feedback": {
+      "target": "build/qw38-cuda-opt059-numerics-test",
+      "tier_sequence": [
+        "inventory",
+        "q4-original-failure"
+      ],
+      "make_targets": [],
+      "skip_compile": true,
+      "build_once": true,
+      "aggregate_deadline_s": 300,
+      "warm_repetitions": 0,
+      "repetitions": 1,
+      "workloads": [
+        "inventory",
+        "q4-original-failure"
+      ]
+    },
+    "acceptance": {
+      "target": "build/qw38-cuda-opt059-numerics-test",
+      "tier_sequence": ["review"],
+      "make_targets": [],
+      "skip_compile": true,
+      "warm_repetitions": 0,
+      "repetitions": 1,
+      "aggregate_deadline_s": 300,
+      "workloads": ["review"]
+    },
+    "release": {
+      "target": "build/qw38-cuda-opt059-numerics-test",
+      "tier": "acceptance",
+      "make_targets": [],
+      "skip_compile": true,
+      "historical_oracles": false,
+      "workloads": []
+    }
+  },
+  "workloads": {
+    "inventory": {
+      "target": "tools/opt072_rejection_review.py",
+      "tier": "correctness",
+      "runner": "host",
+      "kind": "rejection_register_audit",
+      "cases": 69,
+      "candidates": 1,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 1,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 0,
+      "reference": 0,
+      "gpu_work": false,
+      "args": [
+        "uv",
+        "run",
+        "python",
+        "tools/opt072_rejection_review.py",
+        "--phase",
+        "inventory",
+        "--run-dir",
+        "{run_dir}"
+      ]
+    },
+    "q4-original-failure": {
+      "target": "build/qw38-cuda-opt059-numerics-test",
+      "tier": "correctness",
+      "runner": "host",
+      "kind": "q4_original_failure_and_q8_1_consumer",
+      "cases": 2,
+      "candidates": 2,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 1,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "sampled_rows": 16,
+      "sampled_vectors": 4,
+      "load_model": 0,
+      "reference": 1,
+      "gpu_work": false,
+      "native_targets": [
+        "build/qw38-cuda-opt059-numerics-test",
+        "build/qw38-cuda-opt062-q4-admission-test"
+      ],
+      "args": [
+        "uv",
+        "run",
+        "python",
+        "tools/opt072_rejection_review.py",
+        "--phase",
+        "q4-original-failure",
+        "--run-dir",
+        "{run_dir}"
+      ]
+    },
+    "half-scale-q8-1": {
+      "target": "build/qw38-cuda-opt059-numerics-test",
+      "tier": "correctness",
+      "runner": "host",
+      "kind": "independent_legacy_numerical_candidate",
+      "cases": 2,
+      "candidates": 2,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 1,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "sampled_rows": 16,
+      "sampled_vectors": 4,
+      "load_model": 0,
+      "reference": 1,
+      "gpu_work": false,
+      "native_targets": [
+        "build/qw38-cuda-opt059-numerics-test",
+        "build/qw38-cuda-opt062-q4-admission-test"
+      ],
+      "optional_screen_warmups": 1,
+      "optional_screen_samples": 3,
+      "args": [
+        "uv",
+        "run",
+        "python",
+        "tools/opt072_rejection_review.py",
+        "--phase",
+        "review",
+        "--run-dir",
+        "{run_dir}"
+      ]
+    },
+    "half-scale-q8-1-screen": {
+      "target": "build/qw38-cuda-opt062-q4-admission-test",
+      "tier": "screen",
+      "runner": "host",
+      "kind": "optional_whole_family_screen",
+      "cases": 1,
+      "candidates": 2,
+      "warmups": 1,
+      "samples": 3,
+      "tokens": 1,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 0,
+      "reference": 0,
+      "gpu_work": false,
+      "note": "enumerated only; not executed by default OPT-072 commands",
+      "args": [
+        "uv",
+        "run",
+        "python",
+        "tools/opt072_rejection_review.py",
+        "--phase",
+        "review",
+        "--run-dir",
+        "{run_dir}"
+      ]
+    },
+    "review": {
+      "target": "tools/opt072_rejection_review.py",
+      "tier": "acceptance",
+      "runner": "host",
+      "kind": "review_completeness",
+      "cases": 69,
+      "candidates": 1,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 1,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 0,
+      "reference": 0,
+      "gpu_work": false,
+      "args": [
+        "uv",
+        "run",
+        "python",
+        "tools/opt072_rejection_review.py",
+        "--phase",
+        "review",
+        "--run-dir",
+        "{run_dir}"
+      ]
+    }
+  },
+  "proof_limit": [
+    "no throughput claim",
+    "no production pin change",
+    "register audit has no GPU work",
+    "one case-ID is at most two implementations and two shapes",
+    "optional screen is 1+3 whole-family rounds",
+    "historical oracles none",
+    "half-scale screen is enumerated not a keep"
+  ],
+  "report_path": "evidence/optimization/opt072-rejection-review/REPORT.md"
+}

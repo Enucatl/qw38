@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "task": "OPT-072",
+  "yardstick": "correctness_rejection_review_completeness",
+  "claims_throughput": false,
+  "claims_performance_improvement": false,
+  "llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+  "gguf_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+  "native_reuse": [
+    "build/qw38-cuda-opt059-numerics-test",
+    "build/qw38-cuda-opt062-q4-admission-test",
+    "build/qw38-cuda-opt063-integer-ffn-test"
+  ],
+  "historical_files_read_only": true,
+  "no_candidate_fitted_epsilon": true,
+  "no_copy_synthetic_m17_k256_to_production_k": true,
+  "no_historical_30_sample_oracle": true,
+  "hard_errors_never_relaxed": [
+    "layout",
+    "signedness",
+    "bounds",
+    "nonfinite",
+    "wrong_sum_semantics",
+    "stale_selector",
+    "integer_overflow"
+  ],
+  "q8_1_sum_cases": [2047, 2049, 4064, -2047, -2049, -4064],
+  "q8_1_producers": {
+    "quartz_q8_1_sum_q": "half(sum(q))",
+    "llama_q8_1_sum_x": "half(sum(x))"
+  },
+  "q8_1_consumers": {
+    "q4_useq81": "rintf stored half as int32 sum(q)",
+    "q4_q8block": "exact int32 sum of quantized bytes",
+    "q8_dp4a": "values and scale only",
+    "q6_integer": "values and scale only"
+  },
+  "illegal_pairing": "sum_x_producer_to_sum_q_consumer",
+  "q4_route": ["OPT-074", "OPT-075"],
+  "opt064_066_owner": "OPT-070",
+  "opt068_rescued_by_tolerance": false,
+  "independent_legacy_candidate": "half-scale-q8-1",
+  "max_implementations_per_case": 2,
+  "max_shapes_per_case": 2,
+  "sampled_rows": 16,
+  "sampled_vectors": 4,
+  "optional_screen": "1+3 whole-family rounds",
+  "acceptance": "review_completeness",
+  "proof_limit": [
+    "no throughput claim",
+    "no production pin change",
+    "no candidate-fitted epsilon",
+    "no copying synthetic M17/K256 llama GPU error to production K",
+    "nonfinite and layout errors cannot be admitted by numerical headroom",
+    "register audit has no GPU work",
+    "Q4 keep/reject belongs to OPT-074/075",
+    "OPT-064/066 evidence repair belongs to OPT-070",
+    "OPT-068 performance loss is not rescued by tolerance",
+    "half-scale Q8_1 screen is enumerated not a production keep"
+  ]
+}

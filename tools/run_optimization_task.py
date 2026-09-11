@@ -216,6 +216,21 @@ def loop_product(workload: Mapping[str, Any]) -> int:
     return cases * candidates * (warmups + samples) * tokens * modes * pairs
 
 
+def gpu_setup_required(contract: Mapping[str, Any]) -> bool:
+    if contract.get("host_only") or contract.get("skip_gpu_setup"):
+        return False
+    return True
+
+
+def compile_required(contract: Mapping[str, Any], mode: str) -> bool:
+    if contract.get("skip_compile"):
+        return False
+    mode_spec = contract.get("modes", {}).get(mode, {})
+    if mode_spec.get("skip_compile"):
+        return False
+    return True
+
+
 def describe_plan(
     task: str,
     mode: str,
@@ -231,6 +246,7 @@ def describe_plan(
     )
     target = str(mode_spec.get("target", contract["target"]))
     tiers = list(mode_spec.get("tier_sequence", []))
+    case_ids = [str(item) for item in contract.get("case_ids", [])]
     lines = [
         f"task={task}",
         f"mode={mode}",
@@ -238,7 +254,13 @@ def describe_plan(
         f"tier={' '.join(tiers) if tiers else mode_spec.get('tier', 'n/a')}",
         f"deadline_s={deadline:g}",
         f"phase={phase or 'all'}",
+        f"host_only={str(bool(contract.get('host_only', False))).lower()}",
+        f"skip_gpu_setup={str(not gpu_setup_required(contract)).lower()}",
+        f"skip_compile={str(not compile_required(contract, mode)).lower()}",
     ]
+    if case_ids:
+        lines.append("case_ids=" + ",".join(case_ids))
+        lines.append(f"case_id_count={len(case_ids)}")
     workloads = contract.get("workloads", {})
     selected = mode_spec.get("workloads", list(workloads))
     if phase:
@@ -496,13 +518,18 @@ class OptimizationRunner:
             labels = ["cold"]
             if repetitions:
                 labels.extend(f"warm{index}" for index in range(1, repetitions + 1))
+            should_compile = compile_required(contract, mode)
 
             for label in labels:
                 if remaining() <= 0:
                     raise BudgetExhausted("compile")
                 label_started = self.clock.monotonic()
-                if phase in {None, "compile"} or (
-                    phase in workloads or phase in mode_spec.get("tier_sequence", [])
+                if should_compile and (
+                    phase in {None, "compile"}
+                    or (
+                        phase in workloads
+                        or phase in mode_spec.get("tier_sequence", [])
+                    )
                 ):
                     built = phase_wrap(
                         f"compile_{label}",
@@ -662,6 +689,13 @@ class OptimizationRunner:
         }
 
     def _setup(self, contract: Mapping[str, Any], run_dir: Path) -> dict[str, Any]:
+        if not gpu_setup_required(contract):
+            return {
+                "success": True,
+                "result_class": "ok",
+                "lock": None,
+                "gpu_setup": False,
+            }
         image = str(contract.get("image", IMAGE))
         exists = (
             self.image_exists(image)
