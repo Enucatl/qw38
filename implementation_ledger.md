@@ -128,14 +128,14 @@ are repository-relative unless stated otherwise.
 
 All rows below are proposed implementation work, not delivered speedups. Use
 the [source analysis and batch protocol](tasks/PERFORMANCE-RECOVERY-2026-09-11.md)
-and [testing strategy](testing-strategy.md). The first eligible task is OPT-059.
+and [testing strategy](testing-strategy.md). The first eligible task is OPT-060.
 Existing OPT-056 and OPT-016 gates remain blocked on their original conditions.
 
 | ID | Description | Dependencies | Status | Acceptance condition | Evidence |
 |---|---|---|---|---|---|
 | OPT-057 | Bound optimization feedback and fix incremental CUDA builds | OPT-055 | done | Reliable header/flag invalidation, explicit tier/workload limits, isolated evidence and measured warm feedback within 300 seconds; no throughput claim | [`tasks/OPT-057.md`](tasks/OPT-057.md); [`pins/opt057_iteration_contract.json`](pins/opt057_iteration_contract.json); [`fixtures/opt057_iteration_loop.json`](fixtures/opt057_iteration_loop.json); [`tools/run_optimization_task.py`](tools/run_optimization_task.py); [`cuda/optimization_engine_probe.cu`](cuda/optimization_engine_probe.cu); [`tests/test_optimization_loop.py`](tests/test_optimization_loop.py); [`evidence/optimization/opt057-iteration-loop/REPORT.md`](evidence/optimization/opt057-iteration-loop/REPORT.md); verification 2026-09-11T05:26:00Z |
 | OPT-058 | Establish finite scheduler and valid functional/held-out quality baselines | OPT-057 | done | Current eager/graph/trace nonfinites resolved or honestly blocked; both engines evaluated on valid functional prompts; missing held-out llama reference frozen and required | [`tasks/OPT-058.md`](tasks/OPT-058.md); [`pins/opt058_quality_baseline_contract.json`](pins/opt058_quality_baseline_contract.json); [`pins/opt058_iteration_contract.json`](pins/opt058_iteration_contract.json); [`pins/production_quality_v2_inputs.json`](pins/production_quality_v2_inputs.json); [`pins/production_quality_v2_llama_reference.json`](pins/production_quality_v2_llama_reference.json); [`fixtures/opt058_quality_baseline.json`](fixtures/opt058_quality_baseline.json); [`cuda/full_scheduler.cu`](cuda/full_scheduler.cu); [`cuda/opt058_quality_baseline_test.cu`](cuda/opt058_quality_baseline_test.cu); [`tests/test_opt058_quality_baseline.py`](tests/test_opt058_quality_baseline.py); [`evidence/optimization/opt058-quality-baseline/REPORT.md`](evidence/optimization/opt058-quality-baseline/REPORT.md); verification 2026-09-11T06:04:00Z |
-| OPT-059 | Calibrate GPU numerical error and wire per-family production admission | OPT-058 | pending | Actual pinned llama GPU and independent FP64 calibration, held-out v2 budgets, staging semantics and strict/current test separation; no unvalidated default | [Implementation guide](tasks/OPT-059.md); proposed 2026-09-11 |
+| OPT-059 | Calibrate GPU numerical error and wire per-family production admission | OPT-058 | done | Actual pinned llama GPU and independent FP64 calibration, held-out v2 budgets, staging semantics and strict/current test separation; no unvalidated default | [`tasks/OPT-059.md`](tasks/OPT-059.md); [`pins/production_numerics_v2_contract.json`](pins/production_numerics_v2_contract.json); [`pins/opt059_admission_manifest.json`](pins/opt059_admission_manifest.json); [`pins/opt059_iteration_contract.json`](pins/opt059_iteration_contract.json); [`fixtures/opt059_gpu_numerics.json`](fixtures/opt059_gpu_numerics.json); [`cuda/opt059_numerics_test.cu`](cuda/opt059_numerics_test.cu); [`tools/llama_authority/projection_export.cpp`](tools/llama_authority/projection_export.cpp); [`tools/production_numerics_v2.py`](tools/production_numerics_v2.py); [`tests/test_opt059_numerics.py`](tests/test_opt059_numerics.py); [`evidence/optimization/opt059-gpu-numerics/REPORT.md`](evidence/optimization/opt059-gpu-numerics/REPORT.md); verification 2026-09-11T06:37:10Z |
 | OPT-060 | Instrument matched full-engine Quartz and pinned llama family execution | OPT-057 | pending | Real dispatch/fusion/stream records and matched P/D family attribution with overhead/overlap limits; reproducible private authority patch; no speedup required | [Implementation guide](tasks/OPT-060.md); proposed 2026-09-11 |
 | OPT-061 | Build real-input streaming replay and hardware bottleneck evidence | OPT-060 | pending | Reusable captured FFN/mixer inputs, hot versus rotating weights, correct call counts and complete costs; counters or explicitly limited event/resource fallback | [Implementation guide](tasks/OPT-061.md); proposed 2026-09-11 |
 | OPT-062 | Revalidate cooperative Q4 and dispatch all decode FFN projections | OPT-059, OPT-061 | pending | Gate/up/down actually use admitted integer variants with shared staging, graph coverage, complete FFN benefit and batch quality/non-regression, or retained rejection | [Implementation guide](tasks/OPT-062.md); proposed 2026-09-11 |
@@ -5973,4 +5973,34 @@ statements below are historical, not the current execution order.
 - Marked OPT-058 `done`; delivery is limited to the verified task scope plus
   this ledger/audit bookkeeping. `plan.md` is unchanged. OPT-016 and OPT-056 stay
   `blocked`. Next eligible pending by ledger row order: **OPT-059**. No tok/s
+  claim (`claims_throughput=false`).
+
+### 2026-09-11T06:38:19Z — OPT-059 GPU numerics v2 policy delivered
+
+- **v2 policy:** Frozen budgets in `pins/production_numerics_v2_contract.json`;
+  explicit `kProductionAdmission[]` mapping; engine summary **mixed** (Q8/Q6
+  optimized, Q4 **packed**/strict). v1 contract unchanged (`selected=strict`).
+  Coupled IDs: none. No throughput claim.
+- **GPU export:** `qw38-llama-projection-export` synthetic Q4 17×256 probe with
+  sync; sidecar
+  [`evidence/optimization/opt059-gpu-numerics/llama-gpu-export/`](evidence/optimization/opt059-gpu-numerics/llama-gpu-export/).
+  Production-K GGUF rows **unadmitted** (`llama_gpu_error=null`); strict fallback
+  per recipe §7.
+- **OPT-046:** Independent verdict — CUD-001 3.05175781e-4 > 3e-4 → fail; **not
+  installed**; `keep_strict_q4_dispatch=true`. Later Q4 work owns any keep.
+- Acceptance evidence: [`tasks/OPT-059.md`](tasks/OPT-059.md);
+  [`pins/production_numerics_v2_contract.json`](pins/production_numerics_v2_contract.json);
+  [`pins/opt059_admission_manifest.json`](pins/opt059_admission_manifest.json);
+  [`pins/opt059_iteration_contract.json`](pins/opt059_iteration_contract.json);
+  [`fixtures/opt059_gpu_numerics.json`](fixtures/opt059_gpu_numerics.json);
+  [`cuda/opt059_numerics_test.cu`](cuda/opt059_numerics_test.cu);
+  [`tools/llama_authority/projection_export.cpp`](tools/llama_authority/projection_export.cpp);
+  [`tools/production_numerics_v2.py`](tools/production_numerics_v2.py);
+  [`tests/test_opt059_numerics.py`](tests/test_opt059_numerics.py);
+  [`evidence/optimization/opt059-gpu-numerics/REPORT.md`](evidence/optimization/opt059-gpu-numerics/REPORT.md).
+  Proof is measured v2 policy freeze, GPU probe path, and honest unadmitted
+  production-K coverage — not a model speedup gate.
+- Marked OPT-059 `done`; delivery is limited to the verified task scope plus
+  this ledger/audit bookkeeping. `plan.md` is unchanged. OPT-016 and OPT-056 stay
+  `blocked`. Next eligible pending by ledger row order: **OPT-060**. No tok/s
   claim (`claims_throughput=false`).

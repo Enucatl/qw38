@@ -1,0 +1,144 @@
+{
+  "schema_version": 1,
+  "task": "OPT-059",
+  "yardstick": "gpu_numerics_v2_admission",
+  "claims_throughput": false,
+  "image": "qw38-cuda:13.0.2",
+  "model": "models/Qwen3.8-27B-Q4_K_M.gguf",
+  "gpu_lock": "build/optimization-runs/qw38-gpu.lock",
+  "aggregate_deadline_s": 300,
+  "target": "build/qw38-cuda-opt059-numerics-test",
+  "diagnostics_make_target": "cuda-opt059-diagnostics",
+  "modes": {
+    "feedback": {
+      "target": "build/qw38-cuda-opt059-numerics-test",
+      "tier_sequence": [
+        "smoke",
+        "q4"
+      ],
+      "make_targets": [
+        "build/qw38-cuda-opt059-numerics-test"
+      ],
+      "build_once": true,
+      "aggregate_deadline_s": 300,
+      "workloads": [
+        "smoke",
+        "q4"
+      ]
+    },
+    "acceptance": {
+      "target": "build/qw38-cuda-opt059-numerics-test",
+      "tier_sequence": [
+        "smoke",
+        "correctness",
+        "calibrate"
+      ],
+      "make_targets": [
+        "build/qw38-cuda-opt059-numerics-test"
+      ],
+      "warm_repetitions": 0,
+      "aggregate_deadline_s": 7200,
+      "workloads": [
+        "smoke",
+        "correctness",
+        "calibrate"
+      ]
+    },
+    "release": {
+      "target": "build/qw38-cuda-opt059-numerics-test",
+      "tier": "acceptance",
+      "make_targets": [
+        "build/qw38-cuda-opt059-numerics-test"
+      ],
+      "historical_oracles": false,
+      "workloads": []
+    }
+  },
+  "workloads": {
+    "smoke": {
+      "target": "build/qw38-cuda-opt059-numerics-test",
+      "tier": "smoke",
+      "kind": "small_random_two_refs",
+      "cases": 3,
+      "candidates": 1,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 1,
+      "execution_modes": 2,
+      "control_candidate_pairs": 1,
+      "load_model": 0,
+      "reference": 1,
+      "args": [
+        "--workload",
+        "smoke"
+      ]
+    },
+    "q4": {
+      "target": "build/qw38-cuda-opt059-numerics-test",
+      "tier": "correctness",
+      "kind": "q4_family_feedback",
+      "cases": 4,
+      "candidates": 1,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 1,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 0,
+      "reference": 1,
+      "fp64_dots": 64,
+      "args": [
+        "--workload",
+        "q4"
+      ]
+    },
+    "correctness": {
+      "target": "build/qw38-cuda-opt059-numerics-test",
+      "tier": "correctness",
+      "kind": "small_patterns_and_sampled_k",
+      "cases": 12,
+      "candidates": 1,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 1,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 0,
+      "reference": 1,
+      "fp64_dots": 64,
+      "args": [
+        "--workload",
+        "correctness"
+      ]
+    },
+    "calibrate": {
+      "target": "build/qw38-cuda-opt059-numerics-test",
+      "tier": "acceptance",
+      "kind": "reference_only_gpu_calibration",
+      "cases": 1,
+      "candidates": 1,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 1,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 1,
+      "reference": 1,
+      "args": [
+        "--workload",
+        "calibrate",
+        "{model}",
+        "--llama-export",
+        ".cache/authorities/llama-build/bin/qw38-llama-projection-export"
+      ]
+    }
+  },
+  "proof_limit": [
+    "no throughput claim",
+    "no P/D performance oracles",
+    "no OPT-046 install",
+    "v1 evidence preserved",
+    "numeric pins frozen before candidates"
+  ],
+  "report_path": "evidence/optimization/opt059-gpu-numerics/REPORT.md"
+}

@@ -17,10 +17,14 @@
 
 namespace qw38::cuda {
 
-// OPT-046 llama-style Q8_1 staging. Distinct from FP32-scale Q8Block.
+// OPT-046/OPT-059 Q8_1 staging. Distinct from FP32-scale Q8Block.
 // Layout matches pinned llama block_q8_1: half d, half s, int8 qs[32].
-// Kept out of quant_mmv.h so full_scheduler.cu does not pull cuda_fp16.h
-// through the packed MMV public header (that TU is codegen-sensitive).
+// Existing Quartz kernel stores half(sum(integer quants)) in q8_sum
+// (format id quartz_q8_1_sum_q). Pinned llama GPU quantize_q8_1 stores
+// half(sum(original x)). Do not reinterpret existing staged buffers.
+// Integers above 2048 lose units when stored as half. Kept out of
+// quant_mmv.h so full_scheduler.cu does not pull cuda_fp16.h through the
+// packed MMV public header (that TU is codegen-sensitive).
 struct Q8_1Block {
   __half scale;
   __half q8_sum;
@@ -31,6 +35,9 @@ static_assert(sizeof(Q8_1Block) == 36, "unexpected Q8_1 block padding");
 cudaError_t launch_quantize_bf16_q8_1(const __nv_bfloat16* activation,
                                       void* q8, std::size_t columns,
                                       cudaStream_t stream) noexcept;
+cudaError_t launch_quantize_bf16_q8_1_sum_x(const __nv_bfloat16* activation,
+                                            void* q8, std::size_t columns,
+                                            cudaStream_t stream) noexcept;
 
 #if defined(__CUDACC__) && !defined(QW38_SKIP_Q4K_DOT_KERNELS)
 
@@ -202,9 +209,38 @@ __global__ void quantize_bf16_q8_1(const __nv_bfloat16* input, Q8_1Block* output
   if (index < count) output[q8_index].values[lane] = quant;
   if (lane == 0 && q8_index * kWarp < count) {
     output[q8_index].scale = __float2half_rn(scale);
+    // quartz_q8_1_sum_q: half(sum(q)). The reduced original-x sum is unused.
     output[q8_index].q8_sum =
         __float2half_rn(static_cast<float>(q_sum));
     (void)sum;
+  }
+}
+
+// Distinct llama GPU staging: half(sum(original x)), matching pinned
+// ggml-cuda/quantize.cu::quantize_q8_1. Does not rewrite existing buffers.
+__global__ void quantize_bf16_q8_1_sum_x(const __nv_bfloat16* input,
+                                         Q8_1Block* output,
+                                         std::size_t count) {
+  const std::size_t index =
+      static_cast<std::size_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+  const int lane = threadIdx.x & (kWarp - 1);
+  const std::size_t q8_index = index / kWarp;
+  const float value = index < count ? __bfloat162float(input[index]) : 0.0F;
+  float maximum = fabsf(value);
+  float sum = value;
+  for (int offset = 16; offset > 0; offset /= 2) {
+    maximum = fmaxf(maximum,
+                    __shfl_down_sync(0xFFFFFFFFU, maximum, offset, kWarp));
+    sum += __shfl_down_sync(0xFFFFFFFFU, sum, offset, kWarp);
+  }
+  maximum = __shfl_sync(0xFFFFFFFFU, maximum, 0, kWarp);
+  const float scale = maximum == 0.0F ? 0.0F : maximum / 127.0F;
+  const std::int8_t quant =
+      scale == 0.0F ? 0 : static_cast<std::int8_t>(roundf(value / scale));
+  if (index < count) output[q8_index].values[lane] = quant;
+  if (lane == 0 && q8_index * kWarp < count) {
+    output[q8_index].scale = __float2half_rn(scale);
+    output[q8_index].q8_sum = __float2half_rn(sum);
   }
 }
 

@@ -174,6 +174,11 @@ struct ActivationCaptureSlot final {
   char ffn_dtype[16]{};
   std::array<std::size_t, 2> mixer_shape{};
   std::array<std::size_t, 2> ffn_shape{};
+  bool down_captured = false;
+  std::array<float, 64> down_prefix{};
+  char down_sha256[65]{};
+  float* down_full = nullptr;
+  std::array<std::size_t, 2> down_shape{};
 };
 
 struct ActivationCapture final {

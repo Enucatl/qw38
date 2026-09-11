@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "task": "OPT-059",
+  "engine": "llama.cpp_gpu",
+  "llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+  "not_cpu_replica": true,
+  "probe": "q4_k_17x256_synthetic",
+  "not_opt044_checksummed_case": true,
+  "not_production_k": true,
+  "rows_exported": 16,
+  "columns": 256,
+  "vs_fp64_orig_abs": 19.0954106,
+  "vs_fp64_orig_rms": 13.1575881,
+  "nonfinite": 0,
+  "output": "evidence/optimization/opt059-gpu-numerics/llama-gpu-export/llama_gpu.f32",
+  "weights": "evidence/optimization/opt059-gpu-numerics/llama-gpu-export/q4_k_17x256.weights",
+  "activation": "evidence/optimization/opt059-gpu-numerics/llama-gpu-export/activation.f32"
+}

@@ -199,7 +199,11 @@ def test_gate_inventory_and_strict_references_remain() -> None:
     assert quality["thresholds"]["nll_ppl_ratio"] == LEGACY_PPL_RATIO
     mmv = MMV.read_text()
     assert 'kSelectedProductionNumericsPath[] = "strict"' in mmv
-    assert "production_numerics_optimized_admitted() noexcept { return false; }" in mmv
+    assert "kProductionAdmission[]" in mmv
+    assert (
+        "production_numerics_optimized_admitted() noexcept { return false; }" not in mmv
+    )
+    assert "unrepresented_production_numerics_path" in mmv
     header = HEADER.read_text()
     assert "kLegalProductionNumericsPathOptimized" in header
     handbook = (ROOT / "docs/04-numerics.md").read_text().casefold()

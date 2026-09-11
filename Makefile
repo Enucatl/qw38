@@ -29,7 +29,7 @@ SCHEDULER_DIAGNOSTIC_CUDA_OBJECTS := $(BUILD_DIR)/full_scheduler.trace.cuda.o $(
 CUDA_RELEASE_OBJECTS := $(CUDA_BUILD_DIR)/engine.o $(BUILD_DIR)/eval.cuda.o $(BUILD_DIR)/bench.cuda.o $(QUANT_MMV_CUDA_OBJECTS) $(BUILD_DIR)/gdn_step.cuda.o $(BUILD_DIR)/attention_decode.cuda.o $(BUILD_DIR)/scheduler_primitives.cuda.o $(BUILD_DIR)/full_scheduler.cuda.o $(BUILD_DIR)/checkpoint.cuda.o
 CUDA_TRACE_OBJECTS := $(CUDA_BUILD_DIR)/engine.trace.o $(BUILD_DIR)/eval.trace.cuda.o $(BUILD_DIR)/full_scheduler.trace.cuda.o $(BUILD_DIR)/checkpoint.trace.cuda.o
 
-.PHONY: all clean test diagnostic cuda-image cuda-build cuda-native cuda-products cuda-opt057-diagnostics cuda-opt058-diagnostics FORCE
+.PHONY: all clean test diagnostic cuda-image cuda-build cuda-native cuda-products cuda-opt057-diagnostics cuda-opt058-diagnostics cuda-opt059-diagnostics FORCE
 
 all: $(BINARIES) $(HOST_DIAGNOSTICS)
 
@@ -159,6 +159,8 @@ cuda-opt057-diagnostics: $(BUILD_DIR)/qw38-cuda-optimization-engine-probe $(BUIL
 
 cuda-opt058-diagnostics: $(BUILD_DIR)/qw38-cuda-opt058-quality-baseline-test
 
+cuda-opt059-diagnostics: $(BUILD_DIR)/qw38-cuda-opt059-numerics-test
+
 CUDA_STAMP_FILES := $(CUDA_STRICT_STAMP) $(CUDA_TRACE_STAMP) $(CUDA_EXPERIMENTAL_STAMP)
 
 $(BUILD_DIR)/qw38-cuda-optimization-engine-probe: cuda/optimization_engine_probe.cu $(SCHEDULER_DIAGNOSTIC_CUDA_OBJECTS) $(DIAGNOSTIC_LIB_OBJECTS) $(THIRD_PARTY_OBJECTS) $(CUDA_TRACE_STAMP) | $(BUILD_DIR)
@@ -173,10 +175,13 @@ $(BUILD_DIR)/qw38-cuda-prefill-4k-oracle-test: cuda/prefill_4k_oracle_test.cu $(
 $(BUILD_DIR)/qw38-cuda-opt058-quality-baseline-test: cuda/opt058_quality_baseline_test.cu $(SCHEDULER_DIAGNOSTIC_CUDA_OBJECTS) $(DIAGNOSTIC_LIB_OBJECTS) $(THIRD_PARTY_OBJECTS) $(CUDA_TRACE_STAMP) | $(BUILD_DIR)
 	$(NVCC) $(NVCCFLAGS) $(CPPFLAGS) -DQW38_DIAGNOSTIC_TRACE -Icuda $(NVCC_BIN_DEPS) cuda/opt058_quality_baseline_test.cu $(SCHEDULER_DIAGNOSTIC_CUDA_OBJECTS) $(DIAGNOSTIC_LIB_OBJECTS) $(THIRD_PARTY_OBJECTS) -o $@
 
+$(BUILD_DIR)/qw38-cuda-opt059-numerics-test: cuda/opt059_numerics_test.cu $(QUANT_MMV_CUDA_OBJECTS) $(BUILD_DIR)/quant.o $(BUILD_DIR)/status.o $(CUDA_STRICT_STAMP) | $(BUILD_DIR)
+	$(NVCC) $(NVCCFLAGS) $(CPPFLAGS) -Icuda $(NVCC_BIN_DEPS) cuda/opt059_numerics_test.cu $(QUANT_MMV_CUDA_OBJECTS) $(BUILD_DIR)/quant.o $(BUILD_DIR)/status.o -o $@
+
 $(BUILD_DIR)/qw38-cuda-probe: cuda/device_probe.cu $(CUDA_STRICT_STAMP) | $(BUILD_DIR)
 	$(NVCC) $(NVCCFLAGS) $(NVCC_BIN_DEPS) $< -o $@
 
-$(BUILD_DIR)/quant_mmv.cuda.o: cuda/quant_mmv.cu cuda/quant_mmv.h cuda/quant_mmq_mma.cuh cuda/mma.cuh cuda/pdl_launch.cuh cuda/q4k_decode_path.cuh cuda/q6k_decode_path.cuh cuda/ffn_decode_path.cuh $(CUDA_STRICT_STAMP) | $(BUILD_DIR)
+$(BUILD_DIR)/quant_mmv.cuda.o: cuda/quant_mmv.cu cuda/quant_mmv.h cuda/production_numerics.h cuda/quant_mmq_mma.cuh cuda/mma.cuh cuda/pdl_launch.cuh cuda/q4k_decode_path.cuh cuda/q6k_decode_path.cuh cuda/ffn_decode_path.cuh $(CUDA_STRICT_STAMP) | $(BUILD_DIR)
 	$(NVCC) $(NVCCFLAGS) -Icuda $(NVCC_CUDA_DEPS) -c $< -o $@
 
 $(BUILD_DIR)/q4k_decode_dots.cuda.o: cuda/q4k_decode_dots.cu cuda/q4k_decode_dots.cuh cuda/q4k_decode_path.cuh cuda/quant_mmv.h $(CUDA_STRICT_STAMP) | $(BUILD_DIR)
@@ -263,4 +268,4 @@ clean:
 release-provenance:
 	uv run python tools/release_provenance.py --require-clean
 
--include $(LIB_OBJECTS:.o=.d) $(DIAGNOSTIC_OBJECTS:.o=.d) $(THIRD_PARTY_OBJECTS:.o=.d) $(BUILD_DIR)/cli.d $(BUILD_DIR)/server.d $(BUILD_DIR)/bench.d $(BUILD_DIR)/eval.d $(CUDA_RELEASE_OBJECTS:.o=.d) $(CUDA_TRACE_OBJECTS:.o=.d) $(BUILD_DIR)/qw38-cuda-probe.d $(BUILD_DIR)/qw38-cuda-optimization-engine-probe.d $(BUILD_DIR)/qw38-cuda-decode-oracle-test.d $(BUILD_DIR)/qw38-cuda-prefill-4k-oracle-test.d $(BUILD_DIR)/qw38-cuda-opt058-quality-baseline-test.d $(wildcard $(CUDA_EXPERIMENTAL_DIR)/*.d)
+-include $(LIB_OBJECTS:.o=.d) $(DIAGNOSTIC_OBJECTS:.o=.d) $(THIRD_PARTY_OBJECTS:.o=.d) $(BUILD_DIR)/cli.d $(BUILD_DIR)/server.d $(BUILD_DIR)/bench.d $(BUILD_DIR)/eval.d $(CUDA_RELEASE_OBJECTS:.o=.d) $(CUDA_TRACE_OBJECTS:.o=.d) $(BUILD_DIR)/qw38-cuda-probe.d $(BUILD_DIR)/qw38-cuda-optimization-engine-probe.d $(BUILD_DIR)/qw38-cuda-decode-oracle-test.d $(BUILD_DIR)/qw38-cuda-prefill-4k-oracle-test.d $(BUILD_DIR)/qw38-cuda-opt058-quality-baseline-test.d $(BUILD_DIR)/qw38-cuda-opt059-numerics-test.d $(wildcard $(CUDA_EXPERIMENTAL_DIR)/*.d)

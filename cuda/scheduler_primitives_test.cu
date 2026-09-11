@@ -584,10 +584,11 @@ int main() {
     return 1;
   }
   std::printf("production_numerics_path=%s optimized_admitted=%s "
-              "strict_reference=retained\n",
+              "unrepresented=%s strict_reference=retained\n",
               qw38::cuda::selected_production_numerics_path(),
               qw38::cuda::production_numerics_optimized_admitted() ? "true"
-                                                                  : "false");
+                                                                  : "false",
+              qw38::cuda::unrepresented_production_numerics_path());
   std::printf("test_tier=%s\n", qw38::cuda::test_tier_name());
   std::printf("status=passed\n");
   return 0;

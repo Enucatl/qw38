@@ -262,6 +262,33 @@ cudaError_t maybe_capture_preprojection(ActivationCapture* capture,
   return error;
 }
 
+cudaError_t maybe_capture_down_input(ActivationCapture* capture,
+                                     std::size_t layer,
+                                     const __nv_bfloat16* device) noexcept {
+  const int slot = capture_slot_index(capture, layer);
+  if (slot < 0) return cudaSuccess;
+  cudaError_t error = cudaDeviceSynchronize();
+  if (error != cudaSuccess) return error;
+  ActivationCaptureSlot& dest = capture->slots[static_cast<std::size_t>(slot)];
+  dest.down_shape = {1, internal::kFfnWidth};
+  std::array<__nv_bfloat16, internal::kFfnWidth> tmp{};
+  error = cudaMemcpy(tmp.data(), device, tmp.size() * sizeof(__nv_bfloat16),
+                     cudaMemcpyDeviceToHost);
+  if (error != cudaSuccess) return error;
+  std::array<float, internal::kFfnWidth> host{};
+  for (std::size_t index = 0; index < host.size(); ++index) {
+    host[index] = __bfloat162float(tmp[index]);
+  }
+  write_float_sha(host.data(), host.size(), dest.down_sha256);
+  copy_prefix(host.data(), host.size(), dest.down_prefix.data(),
+              dest.down_prefix.size());
+  if (dest.down_full != nullptr) {
+    std::memcpy(dest.down_full, host.data(), host.size() * sizeof(float));
+  }
+  dest.down_captured = true;
+  return cudaSuccess;
+}
+
 void copy_graph_host_leaf(LeafTimings* leaves, const TimingValue& graph) noexcept {
   if (leaves == nullptr) return;
   leaves->host_graph_submit = graph;
@@ -1253,6 +1280,10 @@ cudaError_t execute_ffn(const DeviceCommonLayer& layer,
           internal::kFfnWidth, workspace->ffn_activated_, stream);
     }
     if (error == cudaSuccess) error = end_phase(leaves);
+  }
+  if (error == cudaSuccess && capture != nullptr) {
+    error = maybe_capture_down_input(capture, capture_layer,
+                                     workspace->ffn_activated_);
   }
   if (error == cudaSuccess) {
     error = begin_phase(

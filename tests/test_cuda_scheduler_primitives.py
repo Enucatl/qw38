@@ -97,7 +97,9 @@ def test_scheduler_primitives_match_device_references() -> None:
     assert float(layout["rms"]) <= 1.0e-7
     assert "scheduler_embedding=q4_k bf16_exact=true" in lines
     assert "scheduler_gdn=tiled_to_grouped exact=true" in lines
-    assert any(line.startswith("production_numerics_path=strict") for line in lines)
-    assert any("optimized_admitted=false" in line for line in lines)
+    assert any("production_numerics_path=mixed" in line for line in lines)
+    assert any("optimized_admitted=true" in line for line in lines)
+    assert any("unrepresented=strict" in line for line in lines)
+    assert any("strict_reference=retained" in line for line in lines)
     assert f"test_tier={tier}" in lines
     assert "status=passed" in lines

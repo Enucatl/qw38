@@ -1,0 +1,63 @@
+{
+  "schema_version": 1,
+  "task": "OPT-059",
+  "status": "calibrated_policy",
+  "measurement_utc": "2026-09-11T06:35:22Z",
+  "claims_performance_improvement": false,
+  "opt046_installed": false,
+  "opt042_numeric_reject_preserved": true,
+  "llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+  "gguf_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+  "engine_summary_path": "mixed",
+  "any_optimized_selected": true,
+  "v1_path_selection_preserved": true,
+  "opt043_capture_layers": [
+    0,
+    3,
+    31,
+    32,
+    62,
+    63
+  ],
+  "llama_gpu_sidecars": {
+    "exporter": "tools/llama_authority/projection_export.cpp",
+    "status": "probe_exported_production_k_unadmitted",
+    "not_cpu_replica": true,
+    "cuda_f32_to_q8_1_cpy": "unsupported_this_revision",
+    "probe": {
+      "schema_version": 1,
+      "task": "OPT-059",
+      "engine": "llama.cpp_gpu",
+      "llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+      "not_cpu_replica": true,
+      "probe": "q4_k_17x256_synthetic",
+      "not_opt044_checksummed_case": true,
+      "not_production_k": true,
+      "rows_exported": 16,
+      "columns": 256,
+      "vs_fp64_orig_abs": 19.0954106,
+      "vs_fp64_orig_rms": 13.1575881,
+      "nonfinite": 0,
+      "output": "evidence/optimization/opt059-gpu-numerics/llama-gpu-export/llama_gpu.f32",
+      "weights": "evidence/optimization/opt059-gpu-numerics/llama-gpu-export/q4_k_17x256.weights",
+      "activation": "evidence/optimization/opt059-gpu-numerics/llama-gpu-export/activation.f32"
+    }
+  },
+  "case_id_hash": "f4423b8ace3f4a5c65e639a57937aae40e9d089e49a0ab7a6efe53fbb172ada2",
+  "opt046_independent_verdict": {
+    "candidate": "integer_q8_w4",
+    "installed": false,
+    "production_path": "packed",
+    "vs_fp64_original_max_abs": 0.85785675,
+    "vs_fp64_staged_max_abs": 3.05175781e-05,
+    "historical_cud001_max_abs": 0.000305175781,
+    "llama_gpu_error": null,
+    "v2_ceiling_abs": 0.0003,
+    "meets_v2_original": false,
+    "meets_staged_strict": true,
+    "meets_historical_cud001": false,
+    "keep_strict_q4_dispatch": true,
+    "reason": "OPT-046 remains uninstalled. Historical CUD-001 vs scalar host MMV is 3.05175781e-4 and still fails the 3e-4 envelope. Missing llama GPU error leaves v2 total-error unadmitted; do not retune that budget to pass this candidate. Later Q4 work owns any keep."
+  },
+  "report_path": "evidence/optimization/opt059-gpu-numerics/REPORT.md"
+}

@@ -45,6 +45,9 @@ cudaError_t launch_quantize_bf16_q8(const __nv_bfloat16* activation,
 cudaError_t launch_quantize_bf16_q8_1(const __nv_bfloat16* activation,
                                       void* q8, std::size_t columns,
                                       cudaStream_t stream) noexcept;
+cudaError_t launch_quantize_bf16_q8_1_sum_x(const __nv_bfloat16* activation,
+                                            void* q8, std::size_t columns,
+                                            cudaStream_t stream) noexcept;
 
 int q4k_coop_occupancy(unsigned int warps_per_row, bool q8_1) noexcept;
 void q4k_coop_kernel_attributes(unsigned int warps_per_row, bool q8_1,

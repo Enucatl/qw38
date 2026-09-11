@@ -148,6 +148,17 @@ Evidence: [`fixtures/opt044_production_numerics.json`](../fixtures/opt044_produc
 and [`evidence/optimization/opt044-production-numerics/REPORT.md`](../evidence/optimization/opt044-production-numerics/REPORT.md).
 This increment **claims no performance improvement**.
 
+OPT-059 adds a measured **v2** policy
+([`pins/production_numerics_v2_contract.json`](../pins/production_numerics_v2_contract.json))
+from actual llama GPU error when that export exists. Ceilings use 1.25 headroom
+rather than v1's 1.05. Quartz Q8_1 stores `half(sum(integer quants))`; pinned
+llama GPU stores `half(sum(original x))`. The live engine summary is **mixed**
+because selected Q8/Q6 pins already use approximations; unrepresented shapes stay
+on the strict fallback. Missing GPU coverage stays unadmitted. OPT-046 is not
+installed. Evidence:
+[`evidence/optimization/opt059-gpu-numerics/REPORT.md`](../evidence/optimization/opt059-gpu-numerics/REPORT.md).
+
+
 ## Common failures
 
 - Comparing logits only, or loosening tolerance until a structural bug passes.

@@ -492,7 +492,49 @@ std::size_t q8_prompt_workspace_bytes(std::size_t prompt_rows,
 }
 
 constexpr const char kSelectedMmvLoadPath[] = "packed";
+// Unrepresented family/shape fallback. Engine summary is computed from the
+// admission table because Q8/Q6 production pins already use approximations.
 constexpr const char kSelectedProductionNumericsPath[] = "strict";
+
+constexpr ProductionAdmissionEntry kProductionAdmission[] = {
+    {"q4_k_k5120_packed_q8_fp32", "q4_k", 5120, kStagingQ8Fp32, "packed_fp32",
+     kLegalProductionNumericsPathStrict, true, false, true},
+    {"q4_k_k17408_packed_q8_fp32", "q4_k", 17408, kStagingQ8Fp32, "packed_fp32",
+     kLegalProductionNumericsPathStrict, true, false, true},
+    {"q4_k_integer_q8", "q4_k", 0, kStagingQ8Fp32, "integer_dp4a_q8",
+     kLegalProductionNumericsPathStrict, false, false, true},
+    {"q4_k_integer_quartz_q8_1_sum_q", "q4_k", 0, kStagingQuartzQ81SumQ,
+     "integer_dp4a_q8_1", kLegalProductionNumericsPathStrict, false, false,
+     true},
+    {"q4_k_integer_llama_q8_1_sum_x", "q4_k", 0, kStagingLlamaQ81SumX,
+     "integer_dp4a_q8_1_sum_x", kLegalProductionNumericsPathStrict, false, false,
+     true},
+    {"q8_0_k5120_dp4a_q8_1", "q8_0", 5120, kStagingQuartzQ81SumQ, "dp4a_q8_1",
+     kLegalProductionNumericsPathOptimized, true, false, true},
+    {"q8_0_k6144_dp4a_q8_1", "q8_0", 6144, kStagingQuartzQ81SumQ, "dp4a_q8_1",
+     kLegalProductionNumericsPathOptimized, true, false, true},
+    {"q8_0_direct_bf16", "q8_0", 0, kStagingBf16Direct, "direct_bf16",
+     kLegalProductionNumericsPathStrict, false, false, true},
+    {"q6_k_k5120_integer_q8_1", "q6_k", 5120, kStagingQuartzQ81SumQ,
+     "integer_q8_1", kLegalProductionNumericsPathOptimized, true, false, true},
+    {"q6_k_packed_fp32", "q6_k", 256, kStagingQ8Fp32, "packed_fp32",
+     kLegalProductionNumericsPathStrict, true, false, true},
+};
+
+const ProductionAdmissionEntry* match_admission(const char* family,
+                                                std::size_t columns,
+                                                const char* staging,
+                                                const char* variant) noexcept {
+  const ProductionAdmissionEntry* wildcard = nullptr;
+  for (const ProductionAdmissionEntry& entry : kProductionAdmission) {
+    if (family == nullptr || std::strcmp(entry.family, family) != 0) continue;
+    if (staging != nullptr && std::strcmp(entry.staging, staging) != 0) continue;
+    if (variant != nullptr && std::strcmp(entry.variant, variant) != 0) continue;
+    if (entry.columns == columns) return &entry;
+    if (entry.columns == 0) wildcard = &entry;
+  }
+  return wildcard;
+}
 
 unsigned int selected_mmv_warps(std::size_t rows) noexcept {
   if (rows <= 48) return 4;
@@ -506,22 +548,88 @@ unsigned int selected_mmv_warps(std::size_t rows) noexcept {
 
 const char* selected_mmv_load_path() noexcept { return kSelectedMmvLoadPath; }
 
-const char* selected_production_numerics_path() noexcept {
+const char* unrepresented_production_numerics_path() noexcept {
   return kSelectedProductionNumericsPath;
 }
 
-bool production_numerics_optimized_admitted() noexcept { return false; }
+const char* selected_production_numerics_path() noexcept {
+  bool saw_strict = false;
+  bool saw_optimized = false;
+  for (const ProductionAdmissionEntry& entry : kProductionAdmission) {
+    if (!entry.currently_selected) continue;
+    if (std::strcmp(entry.production_dispatch,
+                    kLegalProductionNumericsPathOptimized) == 0) {
+      saw_optimized = true;
+    } else {
+      saw_strict = true;
+    }
+  }
+  if (saw_optimized && saw_strict) return kLegalProductionNumericsPathMixed;
+  if (saw_optimized) return kLegalProductionNumericsPathOptimized;
+  return kSelectedProductionNumericsPath;
+}
+
+bool production_numerics_optimized_admitted() noexcept {
+  for (const ProductionAdmissionEntry& entry : kProductionAdmission) {
+    if (entry.currently_selected &&
+        std::strcmp(entry.production_dispatch,
+                    kLegalProductionNumericsPathOptimized) == 0) {
+      return true;
+    }
+  }
+  return false;
+}
 
 bool mmv_uses_packed_loads() noexcept {
   return std::strcmp(kSelectedMmvLoadPath, "packed") == 0;
 }
 
 const char* production_numerics_path_for_family(const char* family) noexcept {
-  (void)family;
-  if (production_numerics_optimized_admitted()) {
-    return kLegalProductionNumericsPathOptimized;
+  const ProductionAdmissionEntry* selected = nullptr;
+  for (const ProductionAdmissionEntry& entry : kProductionAdmission) {
+    if (family == nullptr || std::strcmp(entry.family, family) != 0) continue;
+    if (!entry.currently_selected) continue;
+    selected = &entry;
+    break;
   }
-  return kSelectedProductionNumericsPath;
+  if (selected == nullptr) return kSelectedProductionNumericsPath;
+  return selected->production_dispatch;
+}
+
+const char* production_numerics_path_for(const char* family, std::size_t columns,
+                                         const char* staging,
+                                         const char* variant) noexcept {
+  const ProductionAdmissionEntry* entry =
+      match_admission(family, columns, staging, variant);
+  if (entry == nullptr) return kSelectedProductionNumericsPath;
+  return entry->production_dispatch;
+}
+
+bool production_numerics_testing_admitted(const char* family,
+                                          std::size_t columns,
+                                          const char* staging,
+                                          const char* variant) noexcept {
+  const ProductionAdmissionEntry* entry =
+      match_admission(family, columns, staging, variant);
+  return entry != nullptr && entry->testing_admitted;
+}
+
+bool production_numerics_v2_admitted(const char* family, std::size_t columns,
+                                     const char* staging,
+                                     const char* variant) noexcept {
+  const ProductionAdmissionEntry* entry =
+      match_admission(family, columns, staging, variant);
+  return entry != nullptr && entry->v2_admitted;
+}
+
+std::size_t production_numerics_admission_count() noexcept {
+  return sizeof(kProductionAdmission) / sizeof(kProductionAdmission[0]);
+}
+
+const ProductionAdmissionEntry* production_numerics_admission_entry(
+    std::size_t index) noexcept {
+  if (index >= production_numerics_admission_count()) return nullptr;
+  return &kProductionAdmission[index];
 }
 
 bool legal_mmv_load_path(const char* load_path) noexcept {

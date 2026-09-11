@@ -21,7 +21,10 @@ def test_cuda_quant_contract_and_handbook_are_connected() -> None:
     assert all(case["q8_equal"] for case in fixture["cases"])
     mmv = (ROOT / "cuda" / "quant_mmv.cu").read_text()
     assert 'kSelectedProductionNumericsPath[] = "strict"' in mmv
-    assert "production_numerics_optimized_admitted() noexcept { return false; }" in mmv
+    assert "kProductionAdmission[]" in mmv
+    assert (
+        "production_numerics_optimized_admitted() noexcept { return false; }" not in mmv
+    )
     chapter = (ROOT / "docs" / "39-cuda-quant-mmv.md").read_text().casefold()
     for term in [
         "matrix-vector multiplication",
@@ -104,8 +107,9 @@ def test_cuda_quant_mmv_matches_scalar_reference() -> None:
         assert float(fields["mean_ms"]) > 0.0
     assert "status=passed" in run
     assert f"test_tier={tier}" in run
-    assert "production_numerics_path=strict" in run
-    assert "optimized_admitted=false" in run
+    assert "production_numerics_path=mixed" in run
+    assert "optimized_admitted=true" in run
+    assert "unrepresented=strict" in run
     assert "strict_reference=retained" in run
     summary = next(
         line for line in run.splitlines() if line.startswith("test_run_end_epoch_ms=")

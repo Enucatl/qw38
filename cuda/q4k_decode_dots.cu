@@ -25,6 +25,20 @@ cudaError_t launch_quantize_bf16_q8_1(const __nv_bfloat16* activation,
   return cudaPeekAtLastError();
 }
 
+cudaError_t launch_quantize_bf16_q8_1_sum_x(const __nv_bfloat16* activation,
+                                            void* q8, std::size_t columns,
+                                            cudaStream_t stream) noexcept {
+  if (activation == nullptr || q8 == nullptr || columns == 0 ||
+      columns % kWarpSize != 0) {
+    return cudaErrorInvalidValue;
+  }
+  const unsigned int blocks =
+      static_cast<unsigned int>((columns + kThreads - 1) / kThreads);
+  q4k_dots::quantize_bf16_q8_1_sum_x<<<blocks, kThreads, 0, stream>>>(
+      activation, static_cast<Q8_1Block*>(q8), columns);
+  return cudaPeekAtLastError();
+}
+
 cudaError_t launch_q4k_coop_mmv_prequant(
     const std::uint8_t* weights, std::size_t rows, std::size_t columns,
     const void* staged, float* output, unsigned int warps_per_row, bool q8_1,
