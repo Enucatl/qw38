@@ -279,6 +279,9 @@ def describe_plan(
             "prefixes",
             "replicates",
             "output_tokens",
+            "held_out_targets",
+            "functional_cases",
+            "functional_tokens",
         ):
             if key in workload:
                 extras.append(f"{key}={workload[key]}")

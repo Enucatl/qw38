@@ -165,7 +165,7 @@ New kernel tasks are conditional on measured opportunity and valid admission.
 | OPT-070 | Repair acceptance enforcement and revalidate installed Q8/MMQ keeps | OPT-069, OPT-071, OPT-073, OPT-074 | pending | Actual paired complete rotating and short E2E evidence yields separate retain/revert/inconclusive verdicts for OPT-064/066; screen-only results cannot admit a keep | [`tasks/OPT-070.md`](tasks/OPT-070.md) |
 | OPT-071 | Repair full-engine timing windows and production capture replay | OPT-060, OPT-061, OPT-069 | done | No prefix/warmup contamination, dropped records or duplicate family charging; complete measured windows and identity-cached real inputs support honest sink ranking | [`tasks/OPT-071.md`](tasks/OPT-071.md); [`pins/opt071_attribution_repair_contract.json`](pins/opt071_attribution_repair_contract.json); [`pins/opt071_iteration_contract.json`](pins/opt071_iteration_contract.json); [`fixtures/opt071_attribution_repair.json`](fixtures/opt071_attribution_repair.json); [`tools/opt071_attribution_repair.py`](tools/opt071_attribution_repair.py); [`tests/test_opt071_attribution_repair.py`](tests/test_opt071_attribution_repair.py); [`cuda/engine_attribution.h`](cuda/engine_attribution.h); [`cuda/optimization_component_replay.cu`](cuda/optimization_component_replay.cu); [`tools/llama_authority/engine_attribution.cpp`](tools/llama_authority/engine_attribution.cpp); [`evidence/optimization/opt071-attribution-repair/REPORT.md`](evidence/optimization/opt071-attribution-repair/REPORT.md); verification 2026-09-11T15:30:12Z |
 | OPT-072 | Reevaluate all correctness-based optimization rejections | OPT-059, OPT-069 | done | Every historical numerical/test rejection has an evidence-backed disposition and owner; comparable-accuracy eligibility is separated from hard correctness and performance failures | [`tasks/OPT-072.md`](tasks/OPT-072.md); [`pins/opt072_rejection_review_contract.json`](pins/opt072_rejection_review_contract.json); [`pins/opt072_iteration_contract.json`](pins/opt072_iteration_contract.json); [`fixtures/opt072_rejection_review.json`](fixtures/opt072_rejection_review.json); [`tools/opt072_rejection_review.py`](tools/opt072_rejection_review.py); [`tests/test_opt072_rejection_review.py`](tests/test_opt072_rejection_review.py); [`cuda/q4k_decode_path.cuh`](cuda/q4k_decode_path.cuh); [`tools/run_optimization_task.py`](tools/run_optimization_task.py); [`evidence/optimization/opt072-rejection-review/REPORT.md`](evidence/optimization/opt072-rejection-review/REPORT.md); verification 2026-09-11T15:46:12Z |
-| OPT-073 | Resolve functional authority failures and version quality decisions | OPT-058, OPT-069, OPT-072 | pending | Exact prompts/scorers audited, arithmetic truth preserved, absolute and regression verdicts explicit, and failed required quality stops release before long timing | [`tasks/OPT-073.md`](tasks/OPT-073.md) |
+| OPT-073 | Resolve functional authority failures and version quality decisions | OPT-058, OPT-069, OPT-072 | done | Exact prompts/scorers audited, arithmetic truth preserved, absolute and regression verdicts explicit, and failed required quality stops release before long timing | [`tasks/OPT-073.md`](tasks/OPT-073.md); [`pins/opt073_quality_policy_contract.json`](pins/opt073_quality_policy_contract.json); [`pins/opt073_iteration_contract.json`](pins/opt073_iteration_contract.json); [`fixtures/opt073_quality_policy.json`](fixtures/opt073_quality_policy.json); [`tools/opt073_quality_policy.py`](tools/opt073_quality_policy.py); [`tests/test_opt073_quality_policy.py`](tests/test_opt073_quality_policy.py); [`tests/test_opt069_batch_gate.py`](tests/test_opt069_batch_gate.py); [`tools/opt069_batch_gate.py`](tools/opt069_batch_gate.py); [`tools/run_optimization_task.py`](tools/run_optimization_task.py); [`Makefile`](Makefile); [`evidence/optimization/opt073-quality-policy/REPORT.md`](evidence/optimization/opt073-quality-policy/REPORT.md); verification 2026-09-11T16:02:30Z |
 | OPT-074 | Complete real production-shape llama GPU numerical admission | OPT-059, OPT-071, OPT-072 | pending | Full-M actual GPU dispatch, sampled independent FP64 and frozen held-out budgets cover production Q4 and selected Q8/Q6; missing coverage cannot become admission | [`tasks/OPT-074.md`](tasks/OPT-074.md) |
 | OPT-075 | Admit or reject existing unfused and paired cooperative Q4 FFN | OPT-070, OPT-073, OPT-074 | pending | Current packed versus existing integer survivor passes versioned production quality, actual all-leg dispatch and complete rotating/E2E acceptance, or documented retained packed | [`tasks/OPT-075.md`](tasks/OPT-075.md) |
 | OPT-076 | Remove Q4 K-loop shuffle reductions and scalar unpacking | OPT-071, OPT-074, OPT-075 | pending | Two bounded packed-load/late-reduction candidates yield an admitted complete FFN saving with staged semantics intact, or measured rejection | [`tasks/OPT-076.md`](tasks/OPT-076.md) |
@@ -6390,4 +6390,34 @@ statements below are historical, not the current execution order.
 - Marked OPT-072 `done`; delivery is limited to the verified task scope plus
   this ledger/audit bookkeeping. `plan.md` is unchanged. OPT-016 and OPT-056 stay
   `blocked`. Next eligible pending by dependency order: **OPT-073**. No tok/s
+  claim (`claims_throughput=false`).
+
+### 2026-09-11T16:03:01Z — OPT-073 quality-v3 dual-verdict policy delivered
+
+- Audited all eight v2 functional cases; B=42 remains correct, A=41 wrong; both
+  engines emit A on the known miss. Quality-v3 separates absolute task accuracy
+  (fail) from engine non-regression (pass) on retained production items plus
+  authority behavior on the known miss. Four frozen arithmetic diagnostics;
+  OPT-069 preflight parses all eight answers and stops release before timed
+  oracles when quality-v2 `all` is false. Coupled IDs: none. No arithmetic
+  kernel change. No throughput claim.
+- Acceptance: host contract, quality-v3 dual verdict, OPT-069 fail-closed
+  preflight, and optimization-runner arithmetic/preflight/quality phases within
+  300 s; 20 pytest cases; no production pin change.
+- Acceptance evidence: [`tasks/OPT-073.md`](tasks/OPT-073.md);
+  [`pins/opt073_quality_policy_contract.json`](pins/opt073_quality_policy_contract.json);
+  [`pins/opt073_iteration_contract.json`](pins/opt073_iteration_contract.json);
+  [`fixtures/opt073_quality_policy.json`](fixtures/opt073_quality_policy.json);
+  [`tools/opt073_quality_policy.py`](tools/opt073_quality_policy.py);
+  [`tests/test_opt073_quality_policy.py`](tests/test_opt073_quality_policy.py);
+  [`tests/test_opt069_batch_gate.py`](tests/test_opt069_batch_gate.py);
+  [`tools/opt069_batch_gate.py`](tools/opt069_batch_gate.py);
+  [`tools/run_optimization_task.py`](tools/run_optimization_task.py);
+  [`Makefile`](Makefile);
+  [`evidence/optimization/opt073-quality-policy/REPORT.md`](evidence/optimization/opt073-quality-policy/REPORT.md).
+  Proof is policy/scoring correctness and fail-closed release — not a speedup
+  gate.
+- Marked OPT-073 `done`; delivery is limited to the verified task scope plus
+  this ledger/audit bookkeeping. `plan.md` is unchanged. OPT-016 and OPT-056 stay
+  `blocked`. Next eligible pending by dependency order: **OPT-074**. No tok/s
   claim (`claims_throughput=false`).

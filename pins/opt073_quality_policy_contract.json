@@ -1,0 +1,91 @@
+{
+  "schema_version": 1,
+  "task": "OPT-073",
+  "yardstick": "versioned_quality_v3_dual_verdict",
+  "claims_throughput": false,
+  "claims_performance_improvement": false,
+  "llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+  "gguf_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+  "native_reuse": [
+    "build/qw38-cuda-opt058-quality-baseline-test",
+    ".cache/authorities/llama-build/bin/qw38-llama-quality-oracle"
+  ],
+  "chat_template": "no_thinking",
+  "assistant_answer_boundary": "<|im_start|>assistant\n<think>\n\n</think>\n\n",
+  "max_new_tokens": 16,
+  "logit_masking": false,
+  "teacher_forcing_is_not_a_functional_answer": true,
+  "arithmetic": {
+    "expression": "17 + 25",
+    "independently_correct_value": 42,
+    "independently_correct_choice_original_v2": "B",
+    "wrong_authority_choice": "A",
+    "wrong_authority_value": 41,
+    "both_engines_failing_is_not_kernel_blame": true
+  },
+  "diagnostics": [
+    "original_v2",
+    "permuted_options",
+    "direct_numeric",
+    "independent_paraphrase"
+  ],
+  "permuted_options": {
+    "user": "What is 17 + 25?\nA. 44\nB. 43\nC. 42\nD. 41",
+    "expected": "C",
+    "frozen_before_measurement": true
+  },
+  "thresholds": {
+    "nll_ppl_ratio": 1.01,
+    "recurrence_incremental_nll": 0.02
+  },
+  "frozen_arithmetic_logits": {
+    "case": "task_arithmetic",
+    "prompt": "original_v2",
+    "authority_token": 32,
+    "authority_runner_up_token": 33,
+    "authority_logit": 26.5466595,
+    "authority_runner_up_logit": 24.3310528,
+    "authority_margin": 2.2156067
+  },
+  "quality_v3": {
+    "version": 3,
+    "replaces_opt056": false,
+    "replaces_opt016": false,
+    "absolute_task_accuracy": "all independently correct functional items including B=42",
+    "engine_non_regression": "reference-correct items remain correct; known miss is independently correct or authority A within frozen bounds; other wrong choices are not waived",
+    "internal_candidate_admission": "engine_non_regression plus NLL",
+    "near_tie_cannot_waive_wrong_semantic_answer": true,
+    "missing_evidence": "incomplete"
+  },
+  "required_selected_quality_verdicts": [
+    "parsed_functional_answers",
+    "held_out_32",
+    "quality_v2",
+    "quality_v3_absolute",
+    "quality_v3_engine_non_regression"
+  ],
+  "opt069_preflight": "parsed_answers_and_selected_quality_verdicts_fail_closed",
+  "release_with_failed_quality": "stop_before_timed_oracles",
+  "diagnostic_performance": "non_release_retain_failure_no_keep_claims",
+  "preserve": {
+    "qlt001": "pins/quality_contract.json",
+    "opt056": "pins/opt056_performance_gate_contract.json",
+    "quality_v2": "pins/opt058_quality_baseline_contract.json"
+  },
+  "proof_limit": [
+    "no throughput claim",
+    "no arithmetic kernel change",
+    "B=42 remains the correct 17+25 answer",
+    "A=41 remains wrong",
+    "both engines failing is not kernel blame",
+    "no prompt rewrite without an objective defect",
+    "no token mask",
+    "no teacher-forced functional answer",
+    "no selecting only paraphrases that pass",
+    "quality-v3 does not replace OPT-056 or OPT-016",
+    "missing evidence is incomplete",
+    "failed required quality stops release before long timing",
+    "diagnostic performance is not a release or keep"
+  ],
+  "report_path": "evidence/optimization/opt073-quality-policy/REPORT.md"
+}

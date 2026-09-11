@@ -30,6 +30,11 @@ from tools.opt058_quality_baseline import (  # noqa: E402
     parse_generated_answer,
     quality_v2_verdicts,
 )
+from tools.opt073_quality_policy import (  # noqa: E402
+    QualityPolicyError,
+    evaluate_preflight_quality,
+    oracle_policy,
+)
 
 IMAGE = "qw38-cuda:13.0.2"
 LLAMA_IMAGE = "qw38-llama-authority:cuda-13.0.2"
@@ -1093,6 +1098,14 @@ def run_preflight(run_dir: Path) -> dict[str, Any]:
     )
     if int(functional.get("quartz_output_tokens", 0)) > 128:
         raise BatchGateError("preflight functional exceeded 8x16 tokens")
+    try:
+        quality_eval = evaluate_preflight_quality(
+            functional,
+            held,
+            json.loads(_read(V2_INPUTS)),
+        )
+    except QualityPolicyError as exc:
+        raise BatchGateError(str(exc)) from exc
     decode = run_probe(
         "models/Qwen3.8-27B-Q4_K_M.gguf",
         workload="decode",
@@ -1154,12 +1167,19 @@ def run_preflight(run_dir: Path) -> dict[str, Any]:
     if not memory.get("ok") or not checkpoint.get("ok"):
         raise BatchGateError("preflight state/memory smoke failed")
     summary = {
-        "status": "passed",
+        "status": quality_eval["status"],
         "phase": "preflight",
         "is_release_evidence": False,
         "graph_eager_match": True,
         "held_out_targets": 32,
         "functional_output_tokens": functional.get("quartz_output_tokens"),
+        "parsed_functional_answers": quality_eval["parsed"],
+        "selected_quality_verdicts": quality_eval["selected_quality_verdicts"],
+        "quality_v2": quality_eval["quality_v2"],
+        "quality_v3": quality_eval["quality_v3"],
+        "opt056_quality_requirement_met": quality_eval[
+            "opt056_quality_requirement_met"
+        ],
         "d2048_output_tokens": decode.get("output_tokens"),
         "q4_path": freeze["intended_q4_path"],
         "selectors": freeze["combined_production_paths"],
@@ -1400,7 +1420,9 @@ def run_state_isolation(run_dir: Path) -> dict[str, Any]:
     }
 
 
-def run_release(run_dir: Path) -> dict[str, Any]:
+def run_release(
+    run_dir: Path, *, diagnostic_performance: bool = False
+) -> dict[str, Any]:
     freeze = frozen_combined_config()
     EVIDENCE.mkdir(parents=True, exist_ok=True)
     run_dir.mkdir(parents=True, exist_ok=True)
@@ -1422,6 +1444,15 @@ def run_release(run_dir: Path) -> dict[str, Any]:
         ]
     )
     quality = run_quality_v2(run_dir, freeze)
+    policy = oracle_policy(
+        bool(quality["quality_v2"].get("all")),
+        diagnostic_performance=diagnostic_performance,
+    )
+    if not policy["run_oracles"]:
+        raise BatchGateError(
+            policy["stop_reason"]
+            or "failed required quality stops release before long timing"
+        )
     llama_p = run_llama_bench_p(4096, "llama-bench-4k.json", run_dir)
     llama_d128 = run_llama_decode(128, run_dir)
     llama_d2048 = run_llama_decode(2048, run_dir)
@@ -1599,6 +1630,14 @@ def run_release(run_dir: Path) -> dict[str, Any]:
         fixture["opt056_gate_passed"] = False
     if not fixture["opt016"]["gate_passed"]:
         fixture["opt016_gate_passed"] = False
+    fixture["diagnostic_performance"] = bool(diagnostic_performance)
+    fixture["keep_claims_allowed"] = bool(policy["keep_claims_allowed"])
+    fixture["release_eligible"] = bool(policy["release_eligible"])
+    if diagnostic_performance:
+        fixture["opt056_gate_passed"] = False
+        fixture["gate"]["passed"] = False
+        fixture["release_passed"] = False
+        fixture["preflight_is_release_evidence"] = False
     validate_batch_result(fixture)
     write_json(FIXTURE, fixture)
     write_json(run_dir / "opt069_batch_gate.json", fixture)
@@ -1612,6 +1651,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--phase", choices=("preflight", "release", "freeze"), required=True
     )
     parser.add_argument("--run-dir", type=Path, default=None)
+    parser.add_argument(
+        "--diagnostic-performance",
+        action="store_true",
+        help="non-release timing under a known quality failure; keep/release claims forbidden",
+    )
     return parser
 
 
@@ -1632,7 +1676,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             result = run_preflight(run_dir)
             sys.stdout.write(json.dumps(result, indent=2) + "\n")
             return 0
-        result = run_release(run_dir)
+        result = run_release(
+            run_dir, diagnostic_performance=args.diagnostic_performance
+        )
         sys.stdout.write(
             json.dumps(
                 {"status": result["status"], "outcomes": result["outcomes"]}, indent=2

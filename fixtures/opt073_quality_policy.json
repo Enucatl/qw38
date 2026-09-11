@@ -1,0 +1,1135 @@
+{
+  "arithmetic_diagnostics": [
+    {
+      "assistant_answer_boundary": "<|im_start|>assistant\n<think>\n\n</think>\n\n",
+      "chat_template": "no_thinking",
+      "expected": "B",
+      "id": "original_v2",
+      "independently_correct_value": 42,
+      "instruction": "What is 17 + 25?\nA. 41\nB. 42\nC. 43\nD. 44\nReply with exactly one letter: A, B, C, or D.",
+      "instruction_kind": "letter",
+      "logit_masking": false,
+      "max_new_tokens": 16,
+      "parser": "choice",
+      "rendered": "<|im_start|>user\nWhat is 17 + 25?\nA. 41\nB. 42\nC. 43\nD. 44\nReply with exactly one letter: A, B, C, or D.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n",
+      "rendered_sha256": "54cfb45522982f029f091639fff92523432ab9862762cea041f13e39c72725de",
+      "scoring": "free_running_text",
+      "user": "What is 17 + 25?\nA. 41\nB. 42\nC. 43\nD. 44",
+      "wrong_authority_choice": "A",
+      "wrong_authority_value": 41
+    },
+    {
+      "assistant_answer_boundary": "<|im_start|>assistant\n<think>\n\n</think>\n\n",
+      "chat_template": "no_thinking",
+      "expected": "C",
+      "id": "permuted_options",
+      "independently_correct_value": 42,
+      "instruction": "What is 17 + 25?\nA. 44\nB. 43\nC. 42\nD. 41\nReply with exactly one letter: A, B, C, or D.",
+      "instruction_kind": "letter",
+      "logit_masking": false,
+      "max_new_tokens": 16,
+      "note": "fixed permutation frozen before measurement",
+      "parser": "choice",
+      "rendered": "<|im_start|>user\nWhat is 17 + 25?\nA. 44\nB. 43\nC. 42\nD. 41\nReply with exactly one letter: A, B, C, or D.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n",
+      "rendered_sha256": "6d3826a43279d5f488c194244f105c3977b120e0f5ae95f17042f42845185575",
+      "scoring": "free_running_text",
+      "user": "What is 17 + 25?\nA. 44\nB. 43\nC. 42\nD. 41"
+    },
+    {
+      "assistant_answer_boundary": "<|im_start|>assistant\n<think>\n\n</think>\n\n",
+      "chat_template": "no_thinking",
+      "expected": "42",
+      "id": "direct_numeric",
+      "independently_correct_value": 42,
+      "instruction": "What is 17 + 25?\nReply with the integer only.",
+      "instruction_kind": "integer",
+      "logit_masking": false,
+      "max_new_tokens": 16,
+      "parser": "numeric",
+      "rendered": "<|im_start|>user\nWhat is 17 + 25?\nReply with the integer only.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n",
+      "rendered_sha256": "a434774b7bd0c82fd72bb1ed564492ff0dc64e109794d2426c52e79896aa61af",
+      "scoring": "free_running_text",
+      "user": "What is 17 + 25?"
+    },
+    {
+      "assistant_answer_boundary": "<|im_start|>assistant\n<think>\n\n</think>\n\n",
+      "chat_template": "no_thinking",
+      "expected": "B",
+      "id": "independent_paraphrase",
+      "independently_correct_value": 42,
+      "instruction": "Add seventeen and twenty-five.\nA. 41\nB. 42\nC. 43\nD. 44\nReply with exactly one letter: A, B, C, or D.",
+      "instruction_kind": "letter",
+      "logit_masking": false,
+      "max_new_tokens": 16,
+      "note": "one independent paraphrase frozen before measurement",
+      "parser": "choice",
+      "rendered": "<|im_start|>user\nAdd seventeen and twenty-five.\nA. 41\nB. 42\nC. 43\nD. 44\nReply with exactly one letter: A, B, C, or D.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n",
+      "rendered_sha256": "ab66f46259b1ebae627c8c9777094a25b5e0fcc8ec62c53fcb436e463a78ac70",
+      "scoring": "free_running_text",
+      "user": "Add seventeen and twenty-five.\nA. 41\nB. 42\nC. 43\nD. 44"
+    }
+  ],
+  "both_engines_arithmetic": {
+    "authority_item_miss": true,
+    "both_emit_A": true,
+    "independently_correct": "B",
+    "independently_correct_value": 42,
+    "kernel_or_scorer_bug": false,
+    "llama": {
+      "actual": "A",
+      "case": "task_arithmetic",
+      "engine": "llama",
+      "expected": "B",
+      "logit": 26.5466595,
+      "next_token": 32,
+      "pass": false,
+      "raw": "A",
+      "reason": "wrong_choice",
+      "runner_up_logit": 24.3310528,
+      "runner_up_token": 33,
+      "stripped": "A",
+      "top_two": [
+        32,
+        33
+      ],
+      "used_teacher_forcing": false
+    },
+    "quartz": {
+      "actual": "A",
+      "case": "task_arithmetic",
+      "engine": "quartz",
+      "expected": "B",
+      "next_token": 32,
+      "pass": false,
+      "raw": "A",
+      "reason": "wrong_choice",
+      "stripped": "A",
+      "top_two": [
+        32,
+        33
+      ],
+      "used_teacher_forcing": false
+    }
+  },
+  "claims_performance_improvement": false,
+  "claims_throughput": false,
+  "diagnostic_performance": {
+    "diagnostic_performance": true,
+    "keep_claims_allowed": false,
+    "release_eligible": false,
+    "retain_quality_failure": true,
+    "run_oracles": true,
+    "stop_reason": null
+  },
+  "does_not_replace_opt016": true,
+  "does_not_replace_opt056": true,
+  "frozen_arithmetic_logits": {
+    "authority_answer": "A",
+    "authority_logit": 26.5466595,
+    "authority_margin": 2.2156067,
+    "authority_runner_up_logit": 24.3310528,
+    "authority_runner_up_token": 33,
+    "authority_token": 32,
+    "authority_value": 41,
+    "case": "task_arithmetic",
+    "independently_correct": "B",
+    "independently_correct_value": 42,
+    "prompt": "original_v2",
+    "source": "evidence/optimization/opt069-batch-gate/quality-v2-functional.json#llama_generate[task_arithmetic][0]"
+  },
+  "gguf_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+  "legacy": {
+    "historical_only": true,
+    "not_relabeled": true,
+    "opt056_all": false,
+    "opt056_tasks_pass": false,
+    "qlt001_threshold": 1.05
+  },
+  "llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+  "native_reuse": [
+    "build/qw38-cuda-opt058-quality-baseline-test",
+    ".cache/authorities/llama-build/bin/qw38-llama-quality-oracle"
+  ],
+  "preflight": {
+    "held_out_targets": 32,
+    "is_release_evidence": false,
+    "opt056_quality_requirement_met": false,
+    "selected_quality_verdicts": {
+      "held_out_32": true,
+      "parsed_functional_answers": true,
+      "quality_v2": "fail",
+      "quality_v3_absolute": "fail",
+      "quality_v3_engine_non_regression": "pass"
+    },
+    "status": "quality_blocked"
+  },
+  "proof_limit": [
+    "no throughput claim",
+    "no arithmetic kernel change",
+    "B=42 remains the correct 17+25 answer",
+    "A=41 remains wrong",
+    "both engines failing is not kernel blame",
+    "no prompt rewrite without an objective defect",
+    "no token mask",
+    "no teacher-forced functional answer",
+    "no selecting only paraphrases that pass",
+    "quality-v3 does not replace OPT-056 or OPT-016",
+    "missing evidence is incomplete",
+    "failed required quality stops release before long timing",
+    "diagnostic performance is not a release or keep"
+  ],
+  "quality_v2": {
+    "llama": {
+      "all": false,
+      "held_out_wikitext_1024": {
+        "pass": true,
+        "ppl_ratio": 1.0000139886434911,
+        "steps": 1024
+      },
+      "missing_authority": [],
+      "missing_cases": [],
+      "recurrence": {
+        "incremental_nll": -0.004723283697648517,
+        "pass": true
+      },
+      "status": "fail",
+      "suite": "quality-v2",
+      "task_arithmetic": {
+        "actual": "A",
+        "expected": "B",
+        "pass": false,
+        "raw": "A",
+        "reason": "wrong_choice",
+        "stripped": "A",
+        "used_teacher_forcing": false
+      },
+      "task_inference": {
+        "actual": "C",
+        "expected": "C",
+        "pass": true,
+        "raw": "C",
+        "reason": "exact_choice",
+        "stripped": "C",
+        "used_teacher_forcing": false
+      },
+      "task_json": {
+        "actual": "A",
+        "expected": "A",
+        "pass": true,
+        "raw": "A",
+        "reason": "exact_choice",
+        "stripped": "A",
+        "used_teacher_forcing": false
+      },
+      "task_minutes": {
+        "actual": "D",
+        "expected": "D",
+        "pass": true,
+        "raw": "D",
+        "reason": "exact_choice",
+        "stripped": "D",
+        "used_teacher_forcing": false
+      },
+      "task_python_len": {
+        "actual": "A",
+        "expected": "A",
+        "pass": true,
+        "raw": "A",
+        "reason": "exact_choice",
+        "stripped": "A",
+        "used_teacher_forcing": false
+      },
+      "task_reading": {
+        "actual": "C",
+        "expected": "C",
+        "pass": true,
+        "raw": "C",
+        "reason": "exact_choice",
+        "stripped": "C",
+        "used_teacher_forcing": false
+      },
+      "task_sequence": {
+        "actual": "D",
+        "expected": "D",
+        "pass": true,
+        "raw": "D",
+        "reason": "exact_choice",
+        "stripped": "D",
+        "used_teacher_forcing": false
+      },
+      "task_sort": {
+        "actual": "B",
+        "expected": "B",
+        "pass": true,
+        "raw": "B",
+        "reason": "exact_choice",
+        "stripped": "B",
+        "used_teacher_forcing": false
+      },
+      "tasks": {
+        "count": 8,
+        "pass": false
+      },
+      "used_teacher_forcing_for_answers": false,
+      "wikitext_nll": {
+        "pass": true,
+        "ppl_ratio": 1.0009627760076092,
+        "steps": 1024
+      }
+    },
+    "quartz": {
+      "all": false,
+      "held_out_wikitext_1024": {
+        "pass": true,
+        "ppl_ratio": 1.0000139886434911,
+        "steps": 1024
+      },
+      "missing_authority": [],
+      "missing_cases": [],
+      "recurrence": {
+        "incremental_nll": -0.004723283697648517,
+        "pass": true
+      },
+      "status": "fail",
+      "suite": "quality-v2",
+      "task_arithmetic": {
+        "actual": "A",
+        "expected": "B",
+        "pass": false,
+        "raw": "A",
+        "reason": "wrong_choice",
+        "stripped": "A",
+        "used_teacher_forcing": false
+      },
+      "task_inference": {
+        "actual": "C",
+        "expected": "C",
+        "pass": true,
+        "raw": "C",
+        "reason": "exact_choice",
+        "stripped": "C",
+        "used_teacher_forcing": false
+      },
+      "task_json": {
+        "actual": "A",
+        "expected": "A",
+        "pass": true,
+        "raw": "A",
+        "reason": "exact_choice",
+        "stripped": "A",
+        "used_teacher_forcing": false
+      },
+      "task_minutes": {
+        "actual": "D",
+        "expected": "D",
+        "pass": true,
+        "raw": "D",
+        "reason": "exact_choice",
+        "stripped": "D",
+        "used_teacher_forcing": false
+      },
+      "task_python_len": {
+        "actual": "A",
+        "expected": "A",
+        "pass": true,
+        "raw": "A",
+        "reason": "exact_choice",
+        "stripped": "A",
+        "used_teacher_forcing": false
+      },
+      "task_reading": {
+        "actual": "C",
+        "expected": "C",
+        "pass": true,
+        "raw": "C",
+        "reason": "exact_choice",
+        "stripped": "C",
+        "used_teacher_forcing": false
+      },
+      "task_sequence": {
+        "actual": "D",
+        "expected": "D",
+        "pass": true,
+        "raw": "D",
+        "reason": "exact_choice",
+        "stripped": "D",
+        "used_teacher_forcing": false
+      },
+      "task_sort": {
+        "actual": "B",
+        "expected": "B",
+        "pass": true,
+        "raw": "B",
+        "reason": "exact_choice",
+        "stripped": "B",
+        "used_teacher_forcing": false
+      },
+      "tasks": {
+        "count": 8,
+        "pass": false
+      },
+      "used_teacher_forcing_for_answers": false,
+      "wikitext_nll": {
+        "pass": true,
+        "ppl_ratio": 1.0009627760076092,
+        "steps": 1024
+      }
+    }
+  },
+  "quality_v3": {
+    "llama": {
+      "absolute_task_accuracy": {
+        "functional_independently_correct": false,
+        "near_tie_cannot_waive_wrong_semantic_answer": true,
+        "nll_pass": true,
+        "pass": false,
+        "status": "fail",
+        "task_arithmetic_must_be_B_42": true
+      },
+      "all": false,
+      "does_not_replace_opt016": true,
+      "does_not_replace_opt056": true,
+      "engine_non_regression": {
+        "known_miss": {
+          "admitted": true,
+          "authority_choice": true,
+          "independently_correct": false,
+          "logits_incomplete": false,
+          "near_tie_cannot_pass_absolute": true,
+          "status": "authority_behavior"
+        },
+        "nll_pass": true,
+        "other_wrong_choices_waived": false,
+        "pass": true,
+        "reference_correct_items_remain_correct": true,
+        "status": "pass"
+      },
+      "frozen_arithmetic_logits": {
+        "authority_answer": "A",
+        "authority_logit": 26.5466595,
+        "authority_margin": 2.2156067,
+        "authority_runner_up_logit": 24.3310528,
+        "authority_runner_up_token": 33,
+        "authority_token": 32,
+        "authority_value": 41,
+        "case": "task_arithmetic",
+        "independently_correct": "B",
+        "independently_correct_value": 42,
+        "prompt": "original_v2",
+        "source": "evidence/optimization/opt069-batch-gate/quality-v2-functional.json#llama_generate[task_arithmetic][0]"
+      },
+      "held_out_wikitext_1024": {
+        "pass": true,
+        "ppl_ratio": 1.0000139886434911,
+        "steps": 1024
+      },
+      "internal_candidate_admission": true,
+      "missing_authority": [],
+      "missing_cases": [],
+      "quality_v2": {
+        "all": false,
+        "status": "fail",
+        "tasks": {
+          "count": 8,
+          "pass": false
+        }
+      },
+      "rationale": "Pinned llama and Quartz both emit A (41) on the authenticated no-thinking v2 17+25 item whose independently correct answer is B (42). Rendering, tokenizer IDs, assistant boundary, termination, and the A/B/C/D parser match src/template.cpp enable_thinking=false; this is an authority item miss, not a kernel or scorer defect. Quality-v3 keeps absolute arithmetic accuracy failed while allowing internal candidate admission when every reference-correct functional item stays correct and the known miss is either independently corrected or preserved as authority A within the frozen first-token identity and logit/margin snapshot. Other wrong choices are not waived. Near-ties cannot pass absolute accuracy. Quality-v2, QLT-001, OPT-056, and OPT-016 remain unchanged historical conditions. Missing evidence is incomplete, never pass.",
+      "recurrence": {
+        "incremental_nll": -0.004723283697648517,
+        "pass": true
+      },
+      "selected_internal_quality": {
+        "does_not_replace_opt056": true,
+        "name": "quality-v3-engine-non-regression-plus-nll",
+        "pass": true
+      },
+      "status": "fail",
+      "suite": "quality-v3",
+      "tasks": {
+        "task_arithmetic": {
+          "logits": {
+            "choice": "A",
+            "logit": 26.5466595,
+            "margin": 2.215606700000002,
+            "runner_up_logit": 24.3310528,
+            "runner_up_token": 33,
+            "token": 32
+          },
+          "miss": {
+            "admitted": true,
+            "authority_choice": true,
+            "independently_correct": false,
+            "logits_incomplete": false,
+            "near_tie_cannot_pass_absolute": true,
+            "status": "authority_behavior"
+          },
+          "parser": {
+            "actual": "A",
+            "case": "task_arithmetic",
+            "engine": "llama",
+            "expected": "B",
+            "logit": 26.5466595,
+            "next_token": 32,
+            "pass": false,
+            "raw": "A",
+            "reason": "wrong_choice",
+            "runner_up_logit": 24.3310528,
+            "runner_up_token": 33,
+            "stripped": "A",
+            "top_two": [
+              32,
+              33
+            ],
+            "used_teacher_forcing": false
+          }
+        },
+        "task_inference": {
+          "logits": {
+            "choice": "C",
+            "logit": 27.5273781,
+            "margin": 10.883922599999998,
+            "runner_up_logit": 16.6434555,
+            "runner_up_token": 33,
+            "token": 34
+          },
+          "parser": {
+            "actual": "C",
+            "case": "task_inference",
+            "engine": "llama",
+            "expected": "C",
+            "logit": 27.5273781,
+            "next_token": 34,
+            "pass": true,
+            "raw": "C",
+            "reason": "exact_choice",
+            "runner_up_logit": 16.6434555,
+            "runner_up_token": 33,
+            "stripped": "C",
+            "top_two": [
+              34,
+              33
+            ],
+            "used_teacher_forcing": false
+          }
+        },
+        "task_json": {
+          "logits": {
+            "choice": "A",
+            "logit": 27.0642262,
+            "margin": 9.668171000000001,
+            "runner_up_logit": 17.3960552,
+            "runner_up_token": 33,
+            "token": 32
+          },
+          "parser": {
+            "actual": "A",
+            "case": "task_json",
+            "engine": "llama",
+            "expected": "A",
+            "logit": 27.0642262,
+            "next_token": 32,
+            "pass": true,
+            "raw": "A",
+            "reason": "exact_choice",
+            "runner_up_logit": 17.3960552,
+            "runner_up_token": 33,
+            "stripped": "A",
+            "top_two": [
+              32,
+              33
+            ],
+            "used_teacher_forcing": false
+          }
+        },
+        "task_minutes": {
+          "logits": {
+            "choice": "D",
+            "logit": 28.4858246,
+            "margin": 5.535099000000002,
+            "runner_up_logit": 22.9507256,
+            "runner_up_token": 34,
+            "token": 35
+          },
+          "parser": {
+            "actual": "D",
+            "case": "task_minutes",
+            "engine": "llama",
+            "expected": "D",
+            "logit": 28.4858246,
+            "next_token": 35,
+            "pass": true,
+            "raw": "D",
+            "reason": "exact_choice",
+            "runner_up_logit": 22.9507256,
+            "runner_up_token": 34,
+            "stripped": "D",
+            "top_two": [
+              35,
+              34
+            ],
+            "used_teacher_forcing": false
+          }
+        },
+        "task_python_len": {
+          "logits": {
+            "choice": "A",
+            "logit": 26.6076717,
+            "margin": 6.4964485,
+            "runner_up_logit": 20.1112232,
+            "runner_up_token": 33,
+            "token": 32
+          },
+          "parser": {
+            "actual": "A",
+            "case": "task_python_len",
+            "engine": "llama",
+            "expected": "A",
+            "logit": 26.6076717,
+            "next_token": 32,
+            "pass": true,
+            "raw": "A",
+            "reason": "exact_choice",
+            "runner_up_logit": 20.1112232,
+            "runner_up_token": 33,
+            "stripped": "A",
+            "top_two": [
+              32,
+              33
+            ],
+            "used_teacher_forcing": false
+          }
+        },
+        "task_reading": {
+          "logits": {
+            "choice": "C",
+            "logit": 32.8910408,
+            "margin": 13.5044289,
+            "runner_up_logit": 19.3866119,
+            "runner_up_token": 248046,
+            "token": 34
+          },
+          "parser": {
+            "actual": "C",
+            "case": "task_reading",
+            "engine": "llama",
+            "expected": "C",
+            "logit": 32.8910408,
+            "next_token": 34,
+            "pass": true,
+            "raw": "C",
+            "reason": "exact_choice",
+            "runner_up_logit": 19.3866119,
+            "runner_up_token": 248046,
+            "stripped": "C",
+            "top_two": [
+              34,
+              248046
+            ],
+            "used_teacher_forcing": false
+          }
+        },
+        "task_sequence": {
+          "logits": {
+            "choice": "D",
+            "logit": 26.0516853,
+            "margin": 9.8524627,
+            "runner_up_logit": 16.1992226,
+            "runner_up_token": 34,
+            "token": 35
+          },
+          "parser": {
+            "actual": "D",
+            "case": "task_sequence",
+            "engine": "llama",
+            "expected": "D",
+            "logit": 26.0516853,
+            "next_token": 35,
+            "pass": true,
+            "raw": "D",
+            "reason": "exact_choice",
+            "runner_up_logit": 16.1992226,
+            "runner_up_token": 34,
+            "stripped": "D",
+            "top_two": [
+              35,
+              34
+            ],
+            "used_teacher_forcing": false
+          }
+        },
+        "task_sort": {
+          "logits": {
+            "choice": "B",
+            "logit": 26.6400452,
+            "margin": 10.161237799999999,
+            "runner_up_logit": 16.4788074,
+            "runner_up_token": 35,
+            "token": 33
+          },
+          "parser": {
+            "actual": "B",
+            "case": "task_sort",
+            "engine": "llama",
+            "expected": "B",
+            "logit": 26.6400452,
+            "next_token": 33,
+            "pass": true,
+            "raw": "B",
+            "reason": "exact_choice",
+            "runner_up_logit": 16.4788074,
+            "runner_up_token": 35,
+            "stripped": "B",
+            "top_two": [
+              33,
+              35
+            ],
+            "used_teacher_forcing": false
+          }
+        }
+      },
+      "version": 3,
+      "wikitext_nll": {
+        "pass": true,
+        "ppl_ratio": 1.0009627760076092,
+        "steps": 1024
+      }
+    },
+    "quartz": {
+      "absolute_task_accuracy": {
+        "functional_independently_correct": false,
+        "near_tie_cannot_waive_wrong_semantic_answer": true,
+        "nll_pass": true,
+        "pass": false,
+        "status": "fail",
+        "task_arithmetic_must_be_B_42": true
+      },
+      "all": false,
+      "does_not_replace_opt016": true,
+      "does_not_replace_opt056": true,
+      "engine_non_regression": {
+        "known_miss": {
+          "admitted": true,
+          "authority_choice": true,
+          "independently_correct": false,
+          "logits_incomplete": true,
+          "near_tie_cannot_pass_absolute": true,
+          "status": "authority_behavior"
+        },
+        "nll_pass": true,
+        "other_wrong_choices_waived": false,
+        "pass": true,
+        "reference_correct_items_remain_correct": true,
+        "status": "pass"
+      },
+      "frozen_arithmetic_logits": {
+        "authority_answer": "A",
+        "authority_logit": 26.5466595,
+        "authority_margin": 2.2156067,
+        "authority_runner_up_logit": 24.3310528,
+        "authority_runner_up_token": 33,
+        "authority_token": 32,
+        "authority_value": 41,
+        "case": "task_arithmetic",
+        "independently_correct": "B",
+        "independently_correct_value": 42,
+        "prompt": "original_v2",
+        "source": "evidence/optimization/opt069-batch-gate/quality-v2-functional.json#llama_generate[task_arithmetic][0]"
+      },
+      "held_out_wikitext_1024": {
+        "pass": true,
+        "ppl_ratio": 1.0000139886434911,
+        "steps": 1024
+      },
+      "internal_candidate_admission": true,
+      "missing_authority": [],
+      "missing_cases": [],
+      "quality_v2": {
+        "all": false,
+        "status": "fail",
+        "tasks": {
+          "count": 8,
+          "pass": false
+        }
+      },
+      "rationale": "Pinned llama and Quartz both emit A (41) on the authenticated no-thinking v2 17+25 item whose independently correct answer is B (42). Rendering, tokenizer IDs, assistant boundary, termination, and the A/B/C/D parser match src/template.cpp enable_thinking=false; this is an authority item miss, not a kernel or scorer defect. Quality-v3 keeps absolute arithmetic accuracy failed while allowing internal candidate admission when every reference-correct functional item stays correct and the known miss is either independently corrected or preserved as authority A within the frozen first-token identity and logit/margin snapshot. Other wrong choices are not waived. Near-ties cannot pass absolute accuracy. Quality-v2, QLT-001, OPT-056, and OPT-016 remain unchanged historical conditions. Missing evidence is incomplete, never pass.",
+      "recurrence": {
+        "incremental_nll": -0.004723283697648517,
+        "pass": true
+      },
+      "selected_internal_quality": {
+        "does_not_replace_opt056": true,
+        "name": "quality-v3-engine-non-regression-plus-nll",
+        "pass": true
+      },
+      "status": "fail",
+      "suite": "quality-v3",
+      "tasks": {
+        "task_arithmetic": {
+          "logits": {
+            "choice": "A",
+            "logit": null,
+            "margin": null,
+            "runner_up_logit": null,
+            "runner_up_token": 33,
+            "token": 32
+          },
+          "miss": {
+            "admitted": true,
+            "authority_choice": true,
+            "independently_correct": false,
+            "logits_incomplete": true,
+            "near_tie_cannot_pass_absolute": true,
+            "status": "authority_behavior"
+          },
+          "parser": {
+            "actual": "A",
+            "case": "task_arithmetic",
+            "engine": "quartz",
+            "expected": "B",
+            "next_token": 32,
+            "pass": false,
+            "raw": "A",
+            "reason": "wrong_choice",
+            "stripped": "A",
+            "top_two": [
+              32,
+              33
+            ],
+            "used_teacher_forcing": false
+          }
+        },
+        "task_inference": {
+          "logits": {
+            "choice": "C",
+            "logit": null,
+            "margin": null,
+            "runner_up_logit": null,
+            "runner_up_token": 90,
+            "token": 34
+          },
+          "parser": {
+            "actual": "C",
+            "case": "task_inference",
+            "engine": "quartz",
+            "expected": "C",
+            "next_token": 34,
+            "pass": true,
+            "raw": "C",
+            "reason": "exact_choice",
+            "stripped": "C",
+            "top_two": [
+              34,
+              90
+            ],
+            "used_teacher_forcing": false
+          }
+        },
+        "task_json": {
+          "logits": {
+            "choice": "A",
+            "logit": null,
+            "margin": null,
+            "runner_up_logit": null,
+            "runner_up_token": 33,
+            "token": 32
+          },
+          "parser": {
+            "actual": "A",
+            "case": "task_json",
+            "engine": "quartz",
+            "expected": "A",
+            "next_token": 32,
+            "pass": true,
+            "raw": "A",
+            "reason": "exact_choice",
+            "stripped": "A",
+            "top_two": [
+              32,
+              33
+            ],
+            "used_teacher_forcing": false
+          }
+        },
+        "task_minutes": {
+          "logits": {
+            "choice": "D",
+            "logit": null,
+            "margin": null,
+            "runner_up_logit": null,
+            "runner_up_token": 34,
+            "token": 35
+          },
+          "parser": {
+            "actual": "D",
+            "case": "task_minutes",
+            "engine": "quartz",
+            "expected": "D",
+            "next_token": 35,
+            "pass": true,
+            "raw": "D",
+            "reason": "exact_choice",
+            "stripped": "D",
+            "top_two": [
+              35,
+              34
+            ],
+            "used_teacher_forcing": false
+          }
+        },
+        "task_python_len": {
+          "logits": {
+            "choice": "A",
+            "logit": null,
+            "margin": null,
+            "runner_up_logit": null,
+            "runner_up_token": 33,
+            "token": 32
+          },
+          "parser": {
+            "actual": "A",
+            "case": "task_python_len",
+            "engine": "quartz",
+            "expected": "A",
+            "next_token": 32,
+            "pass": true,
+            "raw": "A",
+            "reason": "exact_choice",
+            "stripped": "A",
+            "top_two": [
+              32,
+              33
+            ],
+            "used_teacher_forcing": false
+          }
+        },
+        "task_reading": {
+          "logits": {
+            "choice": "C",
+            "logit": null,
+            "margin": null,
+            "runner_up_logit": null,
+            "runner_up_token": 248046,
+            "token": 34
+          },
+          "parser": {
+            "actual": "C",
+            "case": "task_reading",
+            "engine": "quartz",
+            "expected": "C",
+            "next_token": 34,
+            "pass": true,
+            "raw": "C",
+            "reason": "exact_choice",
+            "stripped": "C",
+            "top_two": [
+              34,
+              248046
+            ],
+            "used_teacher_forcing": false
+          }
+        },
+        "task_sequence": {
+          "logits": {
+            "choice": "D",
+            "logit": null,
+            "margin": null,
+            "runner_up_logit": null,
+            "runner_up_token": 34,
+            "token": 35
+          },
+          "parser": {
+            "actual": "D",
+            "case": "task_sequence",
+            "engine": "quartz",
+            "expected": "D",
+            "next_token": 35,
+            "pass": true,
+            "raw": "D",
+            "reason": "exact_choice",
+            "stripped": "D",
+            "top_two": [
+              35,
+              34
+            ],
+            "used_teacher_forcing": false
+          }
+        },
+        "task_sort": {
+          "logits": {
+            "choice": "B",
+            "logit": null,
+            "margin": null,
+            "runner_up_logit": null,
+            "runner_up_token": 760,
+            "token": 33
+          },
+          "parser": {
+            "actual": "B",
+            "case": "task_sort",
+            "engine": "quartz",
+            "expected": "B",
+            "next_token": 33,
+            "pass": true,
+            "raw": "B",
+            "reason": "exact_choice",
+            "stripped": "B",
+            "top_two": [
+              33,
+              760
+            ],
+            "used_teacher_forcing": false
+          }
+        }
+      },
+      "version": 3,
+      "wikitext_nll": {
+        "pass": true,
+        "ppl_ratio": 1.0009627760076092,
+        "steps": 1024
+      }
+    }
+  },
+  "rationale": "Pinned llama and Quartz both emit A (41) on the authenticated no-thinking v2 17+25 item whose independently correct answer is B (42). Rendering, tokenizer IDs, assistant boundary, termination, and the A/B/C/D parser match src/template.cpp enable_thinking=false; this is an authority item miss, not a kernel or scorer defect. Quality-v3 keeps absolute arithmetic accuracy failed while allowing internal candidate admission when every reference-correct functional item stays correct and the known miss is either independently corrected or preserved as authority A within the frozen first-token identity and logit/margin snapshot. Other wrong choices are not waived. Near-ties cannot pass absolute accuracy. Quality-v2, QLT-001, OPT-056, and OPT-016 remain unchanged historical conditions. Missing evidence is incomplete, never pass.",
+  "release_gate": {
+    "diagnostic_performance": false,
+    "keep_claims_allowed": false,
+    "release_eligible": false,
+    "run_oracles": false,
+    "stop_reason": "failed required quality stops release before long timing"
+  },
+  "report_path": "evidence/optimization/opt073-quality-policy/REPORT.md",
+  "schema_version": 1,
+  "status": "quality_policy",
+  "task": "OPT-073",
+  "v2_audit": {
+    "arithmetic": {
+      "expected_unchanged": true,
+      "independently_correct": "B",
+      "independently_correct_value": 42,
+      "user": "What is 17 + 25?\nA. 41\nB. 42\nC. 43\nD. 44",
+      "wrong_authority_choice": "A",
+      "wrong_authority_value": 41
+    },
+    "assistant_answer_boundary": "<|im_start|>assistant\n<think>\n\n</think>\n\n",
+    "cases": [
+      {
+        "assistant_answer_boundary": true,
+        "case": "task_arithmetic",
+        "expected": "B",
+        "instruction": "What is 17 + 25?\nA. 41\nB. 42\nC. 43\nD. 44\nReply with exactly one letter: A, B, C, or D.",
+        "max_new_tokens": 16,
+        "objective_defects": [],
+        "prompt_rewrite_allowed": false,
+        "rendered": "<|im_start|>user\nWhat is 17 + 25?\nA. 41\nB. 42\nC. 43\nD. 44\nReply with exactly one letter: A, B, C, or D.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n",
+        "rendered_matches_template": true,
+        "scoring": "free_running_text",
+        "tokenizer_id_count": 62,
+        "user": "What is 17 + 25?\nA. 41\nB. 42\nC. 43\nD. 44"
+      },
+      {
+        "assistant_answer_boundary": true,
+        "case": "task_python_len",
+        "expected": "A",
+        "instruction": "What does this Python expression return: len(\"quartz\")?\nA. 6\nB. 5\nC. 7\nD. 8\nReply with exactly one letter: A, B, C, or D.",
+        "max_new_tokens": 16,
+        "objective_defects": [],
+        "prompt_rewrite_allowed": false,
+        "rendered": "<|im_start|>user\nWhat does this Python expression return: len(\"quartz\")?\nA. 6\nB. 5\nC. 7\nD. 8\nReply with exactly one letter: A, B, C, or D.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n",
+        "rendered_matches_template": true,
+        "scoring": "free_running_text",
+        "tokenizer_id_count": 61,
+        "user": "What does this Python expression return: len(\"quartz\")?\nA. 6\nB. 5\nC. 7\nD. 8"
+      },
+      {
+        "assistant_answer_boundary": true,
+        "case": "task_inference",
+        "expected": "C",
+        "instruction": "All quartz watches are timepieces. This object is a quartz watch. Which conclusion follows?\nA. It is not a timepiece.\nB. It might be a calendar.\nC. It is a timepiece.\nD. No conclusion follows.\nReply with exactly one letter: A, B, C, or D.",
+        "max_new_tokens": 16,
+        "objective_defects": [],
+        "prompt_rewrite_allowed": false,
+        "rendered": "<|im_start|>user\nAll quartz watches are timepieces. This object is a quartz watch. Which conclusion follows?\nA. It is not a timepiece.\nB. It might be a calendar.\nC. It is a timepiece.\nD. No conclusion follows.\nReply with exactly one letter: A, B, C, or D.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n",
+        "rendered_matches_template": true,
+        "scoring": "free_running_text",
+        "tokenizer_id_count": 81,
+        "user": "All quartz watches are timepieces. This object is a quartz watch. Which conclusion follows?\nA. It is not a timepiece.\nB. It might be a calendar.\nC. It is a timepiece.\nD. No conclusion follows."
+      },
+      {
+        "assistant_answer_boundary": true,
+        "case": "task_minutes",
+        "expected": "D",
+        "instruction": "How many minutes are in 3 hours?\nA. 60\nB. 120\nC. 240\nD. 180\nReply with exactly one letter: A, B, C, or D.",
+        "max_new_tokens": 16,
+        "objective_defects": [],
+        "prompt_rewrite_allowed": false,
+        "rendered": "<|im_start|>user\nHow many minutes are in 3 hours?\nA. 60\nB. 120\nC. 240\nD. 180\nReply with exactly one letter: A, B, C, or D.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n",
+        "rendered_matches_template": true,
+        "scoring": "free_running_text",
+        "tokenizer_id_count": 64,
+        "user": "How many minutes are in 3 hours?\nA. 60\nB. 120\nC. 240\nD. 180"
+      },
+      {
+        "assistant_answer_boundary": true,
+        "case": "task_sort",
+        "expected": "B",
+        "instruction": "Which list is in ascending numeric order?\nA. 9, 5, 2\nB. 2, 5, 9\nC. 5, 2, 9\nD. 2, 9, 5\nReply with exactly one letter: A, B, C, or D.",
+        "max_new_tokens": 16,
+        "objective_defects": [],
+        "prompt_rewrite_allowed": false,
+        "rendered": "<|im_start|>user\nWhich list is in ascending numeric order?\nA. 9, 5, 2\nB. 2, 5, 9\nC. 5, 2, 9\nD. 2, 9, 5\nReply with exactly one letter: A, B, C, or D.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n",
+        "rendered_matches_template": true,
+        "scoring": "free_running_text",
+        "tokenizer_id_count": 80,
+        "user": "Which list is in ascending numeric order?\nA. 9, 5, 2\nB. 2, 5, 9\nC. 5, 2, 9\nD. 2, 9, 5"
+      },
+      {
+        "assistant_answer_boundary": true,
+        "case": "task_json",
+        "expected": "A",
+        "instruction": "Which option is a valid JSON object?\nA. {\"x\":1}\nB. {'x':1}\nC. {x:1}\nD. [\"x\":1]\nReply with exactly one letter: A, B, C, or D.",
+        "max_new_tokens": 16,
+        "objective_defects": [],
+        "prompt_rewrite_allowed": false,
+        "rendered": "<|im_start|>user\nWhich option is a valid JSON object?\nA. {\"x\":1}\nB. {'x':1}\nC. {x:1}\nD. [\"x\":1]\nReply with exactly one letter: A, B, C, or D.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n",
+        "rendered_matches_template": true,
+        "scoring": "free_running_text",
+        "tokenizer_id_count": 68,
+        "user": "Which option is a valid JSON object?\nA. {\"x\":1}\nB. {'x':1}\nC. {x:1}\nD. [\"x\":1]"
+      },
+      {
+        "assistant_answer_boundary": true,
+        "case": "task_reading",
+        "expected": "C",
+        "instruction": "Mira placed an amber key in the blue box. She placed a silver key in the red box. Which key is in the blue box?\nA. silver\nB. red\nC. amber\nD. blue\nReply with exactly one letter: A, B, C, or D.",
+        "max_new_tokens": 16,
+        "objective_defects": [],
+        "prompt_rewrite_allowed": false,
+        "rendered": "<|im_start|>user\nMira placed an amber key in the blue box. She placed a silver key in the red box. Which key is in the blue box?\nA. silver\nB. red\nC. amber\nD. blue\nReply with exactly one letter: A, B, C, or D.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n",
+        "rendered_matches_template": true,
+        "scoring": "free_running_text",
+        "tokenizer_id_count": 73,
+        "user": "Mira placed an amber key in the blue box. She placed a silver key in the red box. Which key is in the blue box?\nA. silver\nB. red\nC. amber\nD. blue"
+      },
+      {
+        "assistant_answer_boundary": true,
+        "case": "task_sequence",
+        "expected": "D",
+        "instruction": "What number comes next: 2, 4, 8, 16, ?\nA. 18\nB. 20\nC. 24\nD. 32\nReply with exactly one letter: A, B, C, or D.",
+        "max_new_tokens": 16,
+        "objective_defects": [],
+        "prompt_rewrite_allowed": false,
+        "rendered": "<|im_start|>user\nWhat number comes next: 2, 4, 8, 16, ?\nA. 18\nB. 20\nC. 24\nD. 32\nReply with exactly one letter: A, B, C, or D.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n",
+        "rendered_matches_template": true,
+        "scoring": "free_running_text",
+        "tokenizer_id_count": 71,
+        "user": "What number comes next: 2, 4, 8, 16, ?\nA. 18\nB. 20\nC. 24\nD. 32"
+      }
+    ],
+    "chat_template": "no_thinking",
+    "logit_masking": false,
+    "max_new_tokens": 16,
+    "objective_defects": [],
+    "rendering_objectively_wrong": false
+  }
+}

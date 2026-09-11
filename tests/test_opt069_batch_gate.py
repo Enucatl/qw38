@@ -22,6 +22,12 @@ from tools.opt069_batch_gate import (
     three_outcomes,
     validate_batch_result,
 )
+from tools.opt073_quality_policy import (
+    QualityPolicyError,
+    evaluate_preflight_quality,
+    oracle_policy,
+    validate_parsed_functional_answers,
+)
 from tools.run_optimization_task import (
     describe_plan,
     load_contract as load_iteration,
@@ -292,3 +298,52 @@ def test_does_not_mark_opt056_or_opt016_passed_on_failure() -> None:
     validate_batch_result(honest)
     assert honest["opt056_gate_passed"] is False
     assert honest["opt016"]["gate_passed"] is False
+
+
+def test_preflight_requires_parsed_answers_not_token_count() -> None:
+    inputs = json.loads(
+        (ROOT / "pins/production_quality_v2_inputs.json").read_text(encoding="utf-8")
+    )
+    with pytest.raises(QualityPolicyError, match="missing"):
+        validate_parsed_functional_answers(
+            [{"case": "task_arithmetic", "tokens": [32]}],
+            inputs,
+        )
+    functional = json.loads(
+        (
+            ROOT / "evidence/optimization/opt069-batch-gate/preflight-functional.json"
+        ).read_text(encoding="utf-8")
+    )
+    held = json.loads(
+        (
+            ROOT / "evidence/optimization/opt069-batch-gate/preflight-held-out-32.json"
+        ).read_text(encoding="utf-8")
+    )
+    evaluated = evaluate_preflight_quality(functional, held, inputs)
+    assert evaluated["selected_quality_verdicts"]["parsed_functional_answers"] is True
+    assert evaluated["opt056_quality_requirement_met"] is False
+    assert evaluated["status"] == "quality_blocked"
+    assert evaluated["is_release_evidence"] is False
+    arithmetic = next(
+        row for row in evaluated["parsed"] if row["case"] == "task_arithmetic"
+    )
+    assert arithmetic["actual"] == "A"
+    assert arithmetic["expected"] == "B"
+
+
+def test_release_stops_before_oracles_unless_diagnostic() -> None:
+    stop = oracle_policy(False, diagnostic_performance=False)
+    assert stop["run_oracles"] is False
+    assert stop["release_eligible"] is False
+    assert stop["keep_claims_allowed"] is False
+    diagnostic = oracle_policy(False, diagnostic_performance=True)
+    assert diagnostic["run_oracles"] is True
+    assert diagnostic["release_eligible"] is False
+    assert diagnostic["keep_claims_allowed"] is False
+    assert diagnostic["retain_quality_failure"] is True
+    passing = oracle_policy(True, diagnostic_performance=False)
+    assert passing["run_oracles"] is True
+    assert passing["release_eligible"] is True
+    skipped = oracle_policy(None, diagnostic_performance=False)
+    assert skipped["run_oracles"] is False
+    assert skipped["stop_reason"] == "skipped quality phase"
