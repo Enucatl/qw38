@@ -60,10 +60,11 @@ constexpr char kLegalQueryPrepareHoisted[] = "hoisted";
 constexpr char kLegalQueryPrepareHoistedFma[] = "hoisted_fma";
 constexpr char kSelectedQueryPreparePath[] = "hoisted";
 
-// OPT-051 A/B winner. Legal values: off, f16, dual_reg, f16_reg, dual_async,
-// f16_async, nbatch64, gqa6. Default until A/B: off. Sibling kernel in
-// fattn_mma_f16_pipeline.cuh. Not a vendor of llama.cpp fattn-mma-f16.cuh.
-constexpr char kSelectedAttentionPipelinePath[] = "f16_async";
+// OPT-051 A/B winner f16_async; OPT-079 kept convert-once sibling kv_once.
+// Legal values: off, f16, dual_reg, f16_reg, dual_async, f16_async, nbatch64,
+// gqa6, kv_once. Sibling kernel in fattn_mma_f16_pipeline.cuh. Not a vendor of
+// llama.cpp fattn-mma-f16.cuh.
+constexpr char kSelectedAttentionPipelinePath[] = "kv_once";
 
 inline thread_local const char* g_query_prepare_path_override = nullptr;
 inline thread_local const char* g_attention_pipeline_path_override = nullptr;
@@ -218,10 +219,10 @@ inline __device__ void fattn_persistent_decode(int index, int ntiles_kv,
   *jt = rem - (*zt_gqa) * ntiles_x;
 }
 
-template <bool DualF16, int kNcols, int kWidth>
+template <bool DualF16, int kNcols, int kWidth, bool KeysAreF16 = false>
 inline __device__ void fattn_qk_mma_k16(
     float cfrag[4], float cfrag_lo[4], const __half* q_f16, const __half* q_lo,
-    const __nv_bfloat16* keys, int m0, int n0, int k0, int rows, int lane) {
+    const void* keys, int m0, int n0, int k0, int rows, int lane) {
   std::uint32_t a[4];
   std::uint32_t a_lo[4] = {0, 0, 0, 0};
   std::uint32_t b[2];
@@ -253,10 +254,18 @@ inline __device__ void fattn_qk_mma_k16(
     const int krow = n0 + n;
     __half pair[2] = {__float2half_rn(0.0F), __float2half_rn(0.0F)};
     if (krow < rows) {
-      pair[0] = __float2half_rn(
-          __bfloat162float(keys[krow * kWidth + k0 + j * 2]));
-      pair[1] = __float2half_rn(
-          __bfloat162float(keys[krow * kWidth + k0 + j * 2 + 1]));
+      if constexpr (KeysAreF16) {
+        const __half* keys_f16 = static_cast<const __half*>(keys);
+        pair[0] = keys_f16[krow * kWidth + k0 + j * 2];
+        pair[1] = keys_f16[krow * kWidth + k0 + j * 2 + 1];
+      } else {
+        const __nv_bfloat16* keys_bf16 =
+            static_cast<const __nv_bfloat16*>(keys);
+        pair[0] = __float2half_rn(
+            __bfloat162float(keys_bf16[krow * kWidth + k0 + j * 2]));
+        pair[1] = __float2half_rn(
+            __bfloat162float(keys_bf16[krow * kWidth + k0 + j * 2 + 1]));
+      }
     }
     b[item] = *reinterpret_cast<std::uint32_t*>(pair);
   }

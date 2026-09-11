@@ -164,7 +164,7 @@ EXPECTED_PATHS: dict[str, Any] = {
     "q6_decode": "integer_q8_1",
     "ffn_decode": "paired_staged",
     "query_prepare": "hoisted",
-    "attention_pipeline": "f16_async",
+    "attention_pipeline": "kv_once",
     "gdn_preproc": "transpose",
     "mmq_pipeline": "fma_async",
     "mmq_async_x": True,

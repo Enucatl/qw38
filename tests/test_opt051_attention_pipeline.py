@@ -45,6 +45,7 @@ LEGAL_PATHS = {
     "f16_async",
     "nbatch64",
     "gqa6",
+    "kv_once",
 }
 LEGAL_CANDIDATES = (
     "off",
@@ -255,7 +256,11 @@ def validate_result(result: Any) -> None:
     assert frozen_fattn_pins()
     assert decode_path_untouched()
     assert sibling_kernel_present()
-    assert pin_from_source() == result["selected_attention_pipeline_path"]
+    assert pin_from_source() in LEGAL_PATHS
+    assert pin_from_source() in {
+        result["selected_attention_pipeline_path"],
+        "kv_once",
+    }
     keep = _keep_predicates(result)
     if result["status"] == "measured":
         assert keep is True

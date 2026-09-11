@@ -327,6 +327,14 @@ int fattn_pipeline_occupancy_path(const char* path) noexcept;
 void set_attention_pipeline_path_override(const char* path) noexcept;
 void clear_attention_pipeline_path_override() noexcept;
 bool attention_pipeline_is_off(const char* path) noexcept;
+bool apply_attention_pipeline_ident(const char* path) noexcept;
+const char* last_attention_pipeline_path() noexcept;
+const char* last_attention_pipeline_launch() noexcept;
+int last_attention_pipeline_convert_once() noexcept;
+void fattn_pipeline_kv_once_attributes(int* regs, std::size_t* local_bytes,
+                                      int* occupancy) noexcept;
+void fattn_pipeline_f16_async_attributes(int* regs, std::size_t* local_bytes,
+                                         int* occupancy) noexcept;
 
 struct QueryPreparePathScope final {
   explicit QueryPreparePathScope(const char* path) noexcept {

@@ -49,6 +49,7 @@ struct Options final {
   const char* q4_decode = nullptr;
   const char* ffn_decode = nullptr;
   const char* gdn_decode = nullptr;
+  const char* attention_pipeline = nullptr;
   unsigned int q4_warps = 0;
   int mmq_async_x = -1;
   bool graph = false;
@@ -109,13 +110,14 @@ bool parse_modes(const char* text, Options* options) {
 int usage(const char* argv0) {
   std::fprintf(stderr,
                "usage: %s [MODEL.gguf] [--workload tiny|tokens|prefill|decode|"
-               "q8-ab|mmq-ab|q4-ab|gdn-ab] "
+               "q8-ab|mmq-ab|q4-ab|gdn-ab|attn-ab] "
                "[--prompt N] [--prefix N] [--output-tokens N] [--runs N] "
                "[--pairs N] [--q8-layout r1_w4|r2_w2] [--mmq-async-x 0|1] "
                "[--q4-decode packed|integer_q8|integer_q8_late] "
                "[--q4-warps 2|4] "
                "[--ffn-decode paired_staged|shared_stage|paired_integer] "
                "[--gdn-decode sequential|tile16|tile32] "
+               "[--attention-pipeline f16_async|kv_once] "
                "[--selector NAME] [--modes graph,eager] [--skip-logits]\n",
                argv0);
   return 2;
@@ -160,6 +162,9 @@ int parse_args(int argc, char** argv, Options* options) {
       options->ffn_decode = argv[++index];
     } else if (std::strcmp(arg, "--gdn-decode") == 0 && index + 1 < argc) {
       options->gdn_decode = argv[++index];
+    } else if (std::strcmp(arg, "--attention-pipeline") == 0 &&
+               index + 1 < argc) {
+      options->attention_pipeline = argv[++index];
     } else if (std::strcmp(arg, "--selector") == 0 && index + 1 < argc) {
       options->selector = argv[++index];
     } else if (std::strcmp(arg, "--modes") == 0 && index + 1 < argc) {
@@ -229,6 +234,15 @@ int apply_defaults(const qw38::cuda::TestTier tier, Options* options) {
       options->eager = true;
     }
   }
+  if (std::strcmp(options->workload, "attn-ab") == 0) {
+    if (options->prompt == 0 && options->prefix == 0) {
+      options->prompt = kScreenPrompt;
+    }
+    if (!options->modes_set) {
+      options->graph = true;
+      options->eager = true;
+    }
+  }
   if (std::strcmp(options->workload, "q4-ab") == 0 ||
       std::strcmp(options->workload, "gdn-ab") == 0) {
     if (options->prefix == 0) options->prefix = kScreenPrefix;
@@ -259,8 +273,9 @@ int reject_over_bounds(qw38::cuda::TestTier tier, const Options& options) {
   const bool mmq_ab = std::strcmp(options.workload, "mmq-ab") == 0;
   const bool q4_ab = std::strcmp(options.workload, "q4-ab") == 0;
   const bool gdn_ab = std::strcmp(options.workload, "gdn-ab") == 0;
+  const bool attn_ab = std::strcmp(options.workload, "attn-ab") == 0;
   if (!tiny && !tokens && !prefill && !decode && !q8_ab && !mmq_ab && !q4_ab &&
-      !gdn_ab) {
+      !gdn_ab && !attn_ab) {
     std::fprintf(stderr, "unknown workload %s\n", options.workload);
     return 2;
   }
@@ -724,12 +739,17 @@ int run_keep_ab(const Options& options) {
   const bool q8 = std::strcmp(options.workload, "q8-ab") == 0;
   const bool q4 = std::strcmp(options.workload, "q4-ab") == 0;
   const bool gdn = std::strcmp(options.workload, "gdn-ab") == 0;
+  const bool attn = std::strcmp(options.workload, "attn-ab") == 0;
   qw38::cuda::ResidentModel model;
   const int loaded = load_model(options.model, &model);
   if (loaded != 0) return loaded;
-  const std::size_t prompt = (!q8 && !q4 && !gdn) ? options.prompt : 0;
-  const std::size_t prefix = (q8 || q4 || gdn) ? options.prefix : 0;
-  const std::size_t output_tokens = (q8 || q4 || gdn) ? options.output_tokens : 0;
+  const std::size_t prompt =
+      attn ? options.prompt : ((!q8 && !q4 && !gdn) ? options.prompt : 0);
+  const std::size_t prefix =
+      attn ? options.prefix : ((q8 || q4 || gdn) ? options.prefix : 0);
+  const std::size_t output_tokens =
+      attn ? options.output_tokens
+           : ((q8 || q4 || gdn) ? options.output_tokens : 0);
   const std::size_t token_count =
       prompt > 0 ? prompt : prefix + output_tokens;
   const std::size_t capacity =
@@ -746,16 +766,22 @@ int run_keep_ab(const Options& options) {
       options.ffn_decode != nullptr ? options.ffn_decode : "paired_integer";
   const char* candidate_gdn =
       options.gdn_decode != nullptr ? options.gdn_decode : "tile16";
+  const char* candidate_attn = options.attention_pipeline != nullptr
+                                   ? options.attention_pipeline
+                                   : "kv_once";
   const int pairs = options.pairs > 0 ? options.pairs : 1;
   std::printf("phase=keep_ab family=%s pairs=%d model_loaded_once=true "
               "recapture_after_selector=true\n",
-              gdn ? "gdn" : (q4 ? "q4" : (q8 ? "q8" : "mmq")), pairs);
+              attn ? "attn"
+                   : (gdn ? "gdn" : (q4 ? "q4" : (q8 ? "q8" : "mmq"))),
+              pairs);
   for (int pair = 0; pair < pairs; ++pair) {
     const bool ba = (pair % 2) == 1;
-    const char* first = ba ? ((q4 || gdn) ? "1" : (q8 ? candidate_layout : "1"))
-                           : ((q4 || gdn) ? "0" : (q8 ? control_layout : "0"));
-    const char* second = ba ? ((q4 || gdn) ? "0" : (q8 ? control_layout : "0"))
-                            : ((q4 || gdn) ? "1" : (q8 ? candidate_layout : "1"));
+    const bool numeric_side = q4 || gdn || attn;
+    const char* first = ba ? (numeric_side ? "1" : (q8 ? candidate_layout : "1"))
+                           : (numeric_side ? "0" : (q8 ? control_layout : "0"));
+    const char* second = ba ? (numeric_side ? "0" : (q8 ? control_layout : "0"))
+                            : (numeric_side ? "1" : (q8 ? candidate_layout : "1"));
     float walls[2] = {0.0F, 0.0F};
     const char* labels[2] = {first, second};
     const char* q8_layout_copy[2] = {"", ""};
@@ -781,6 +807,12 @@ int run_keep_ab(const Options& options) {
         const char* gdn_path = candidate_side ? candidate_gdn : "sequential";
         if (!qw38::cuda::apply_gdn_decode_ident(gdn_path)) {
           std::fprintf(stderr, "invalid --gdn-decode %s\n", gdn_path);
+          return 2;
+        }
+      } else if (attn) {
+        const char* attn_path = candidate_side ? candidate_attn : "f16_async";
+        if (!qw38::cuda::apply_attention_pipeline_ident(attn_path)) {
+          std::fprintf(stderr, "invalid --attention-pipeline %s\n", attn_path);
           return 2;
         }
       } else if (q8) {
@@ -828,7 +860,8 @@ int run_keep_ab(const Options& options) {
           "down_variant=%s gate_up_stage_count=%d down_stage_count=%d "
           "captured_in_graph=%s staging=%s warps_per_row=%u "
           "wall_ms=%.9g captured_path=%s gdn_decode=%s gdn_launch=%s "
-          "gdn_tile=%u\n",
+          "gdn_tile=%u attention_pipeline=%s attention_launch=%s "
+          "convert_once=%d\n",
           pair, side, labels[side],
           q8_layout_copy[side] != nullptr ? q8_layout_copy[side] : "",
           q8_rows[side], mmq_kernel_buf[side],
@@ -840,12 +873,16 @@ int run_keep_ab(const Options& options) {
           static_cast<double>(walls[side]), graphs.execution_graph_path(),
           qw38::cuda::effective_gdn_decode_path(),
           qw38::cuda::last_gdn_decode_launch_variant(),
-          qw38::cuda::last_gdn_decode_value_tile());
+          qw38::cuda::last_gdn_decode_value_tile(),
+          qw38::cuda::last_attention_pipeline_path(),
+          qw38::cuda::last_attention_pipeline_launch(),
+          qw38::cuda::last_attention_pipeline_convert_once());
       qw38::cuda::clear_q8_decode_path_override();
       qw38::cuda::clear_mmq_async_x_override();
       qw38::cuda::clear_q4_decode_path_override();
       qw38::cuda::clear_ffn_decode_path_override();
       qw38::cuda::clear_gdn_decode_path_override();
+      qw38::cuda::clear_attention_pipeline_path_override();
     }
     std::printf(
         "{\"observation_unit\":\"independent_round\",\"sample_index\":%d,"
@@ -854,7 +891,7 @@ int run_keep_ab(const Options& options) {
         pair, pair, ba ? "BA" : "AB",
         static_cast<double>(ba ? walls[1] : walls[0]),
         static_cast<double>(ba ? walls[0] : walls[1]),
-        q4 ? "q4" : (gdn ? "gdn" : (q8 ? "q8" : "mmq")));
+        q4 ? "q4" : (gdn ? "gdn" : (attn ? "attn" : (q8 ? "q8" : "mmq"))));
   }
   std::printf(
       "QW38_OPT070_NATIVE_COUNTS={\"schema_version\":1,\"task\":\"OPT-070\","
@@ -910,6 +947,18 @@ int run_keep_ab(const Options& options) {
       pairs,
       qw38::cuda::test_tier() == qw38::cuda::TestTier::kAcceptance ? "true"
                                                                    : "false");
+  std::printf(
+      "QW38_OPT079_NATIVE_COUNTS={\"schema_version\":1,\"task\":\"OPT-079\","
+      "\"family\":\"attn\",\"tier\":\"%s\",\"warmups\":0,\"samples\":%d,"
+      "\"observed_warmups\":0,\"observed_samples\":%d,\"observed_candidates\":2,"
+      "\"observed_shapes\":1,\"observed_tier\":\"%s\",\"pairs\":%d,"
+      "\"acceptance_executed\":%s,\"keep\":false,"
+      "\"override_before_capture_applied\":true,"
+      "\"graph_capture_separate\":true,\"recapture_after_selector\":true}\n",
+      qw38::cuda::test_tier_name(), pairs, pairs, qw38::cuda::test_tier_name(),
+      pairs,
+      qw38::cuda::test_tier() == qw38::cuda::TestTier::kAcceptance ? "true"
+                                                                   : "false");
   std::printf("status=passed\n");
   return 0;
 }
@@ -934,7 +983,8 @@ int main(int argc, char** argv) {
   if (std::strcmp(options.workload, "q8-ab") == 0 ||
       std::strcmp(options.workload, "mmq-ab") == 0 ||
       std::strcmp(options.workload, "q4-ab") == 0 ||
-      std::strcmp(options.workload, "gdn-ab") == 0) {
+      std::strcmp(options.workload, "gdn-ab") == 0 ||
+      std::strcmp(options.workload, "attn-ab") == 0) {
     return run_keep_ab(options);
   }
   return run_engine(options, tier == qw38::cuda::TestTier::kCorrectness);

@@ -1,0 +1,68 @@
+{
+  "schema_version": 1,
+  "task": "OPT-079",
+  "yardstick": "prompt_attention_kv_operand_reuse",
+  "claims_throughput": false,
+  "claims_performance_improvement": false,
+  "llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+  "gguf_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+  "token_generator": "(42 + index * 997) % 248320",
+  "control": "f16_async",
+  "min_saving_ms_per_prompt": 5.0,
+  "configurations": [
+    {
+      "id": "f16_async",
+      "attention_pipeline": "f16_async",
+      "convert_once": 0,
+      "role": "control",
+      "expected_launch": "fattn_mma_pipeline_f16_async"
+    },
+    {
+      "id": "kv_once",
+      "attention_pipeline": "kv_once",
+      "convert_once": 1,
+      "role": "candidate",
+      "expected_launch": "fattn_mma_pipeline_kv_once"
+    }
+  ],
+  "tiny_cases": [
+    {"id": "T1", "tokens": 1, "start": 96},
+    {"id": "T17", "tokens": 17, "start": 96},
+    {"id": "T33", "tokens": 33, "start": 96}
+  ],
+  "quality_samples": {
+    "prompt_rows": 4,
+    "output_dims": 8,
+    "heads": 4,
+    "calibration_layer": 3,
+    "held_out_layer": 63
+  },
+  "feedback_warmups": 1,
+  "feedback_samples": 3,
+  "feedback_engine_pairs": 1,
+  "acceptance_warmups": 3,
+  "acceptance_samples": 10,
+  "acceptance_engine_pairs": 5,
+  "component_t_critical_df9": 2.262,
+  "engine_t_critical_df4": 2.132,
+  "native_test": "build/qw38-cuda-opt079-attention-kv-operands-test",
+  "native_probe": "build/qw38-cuda-optimization-engine-probe",
+  "required_fixture_keys": [
+    "schema_version",
+    "task",
+    "mode",
+    "llama_revision",
+    "gguf_sha256",
+    "claims_throughput",
+    "configurations",
+    "control",
+    "survivor",
+    "shipping_attention_pipeline",
+    "production_kept",
+    "quality",
+    "numeric",
+    "report_path"
+  ],
+  "verdicts": ["keep", "retain_f16_async", "performance_rejected", "quality_blocked", "inconclusive"],
+  "report_path": "evidence/optimization/opt079-attention-kv-operands/REPORT.md"
+}

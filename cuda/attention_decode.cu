@@ -1963,6 +1963,63 @@ bool attention_pipeline_is_off(const char* path) noexcept {
   return fattn_pipeline_is_off(path);
 }
 
+bool apply_attention_pipeline_ident(const char* path) noexcept {
+  if (!legal_attention_pipeline_path(path)) return false;
+  g_attention_pipeline_path_override = path;
+  return true;
+}
+
+const char* last_attention_pipeline_path() noexcept {
+  return g_last_attention_pipeline_path != nullptr ? g_last_attention_pipeline_path
+                                                   : "";
+}
+
+const char* last_attention_pipeline_launch() noexcept {
+  return g_last_attention_pipeline_launch != nullptr
+             ? g_last_attention_pipeline_launch
+             : "";
+}
+
+int last_attention_pipeline_convert_once() noexcept {
+  return g_last_attention_pipeline_convert_once;
+}
+
+void fattn_pipeline_kv_once_attributes(int* regs, std::size_t* local_bytes,
+                                      int* occupancy) noexcept {
+  cudaFuncAttributes attrs{};
+  const cudaError_t error = cudaFuncGetAttributes(
+      &attrs, fattn_mma_pipeline_kernel<16, false, true, 32, 2, 2, 1, 2, true>);
+  if (regs != nullptr) *regs = error == cudaSuccess ? attrs.numRegs : 0;
+  if (local_bytes != nullptr) {
+    *local_bytes = error == cudaSuccess
+                       ? static_cast<std::size_t>(attrs.localSizeBytes)
+                       : 1U;
+  }
+  if (occupancy != nullptr) {
+    *occupancy =
+        fattn_pipeline_occupancy_typed<16, false, true, 32, 2, 2, 1, 2, true>();
+  }
+}
+
+void fattn_pipeline_f16_async_attributes(int* regs, std::size_t* local_bytes,
+                                         int* occupancy) noexcept {
+  cudaFuncAttributes attrs{};
+  const cudaError_t error = cudaFuncGetAttributes(
+      &attrs,
+      fattn_mma_pipeline_kernel<16, false, true, 32, 2, 2, 1, 2, false>);
+  if (regs != nullptr) *regs = error == cudaSuccess ? attrs.numRegs : 0;
+  if (local_bytes != nullptr) {
+    *local_bytes = error == cudaSuccess
+                       ? static_cast<std::size_t>(attrs.localSizeBytes)
+                       : 1U;
+  }
+  if (occupancy != nullptr) {
+    *occupancy =
+        fattn_pipeline_occupancy_typed<16, false, true, 32, 2, 2, 1, 2, false>();
+  }
+}
+
+
 bool fattn_uses_warp_qk() noexcept {
   return fattn_qk_is_warp_microtile(kSelectedQKPath);
 }

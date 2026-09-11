@@ -1,0 +1,439 @@
+{
+  "schema_version": 1,
+  "task": "OPT-079",
+  "mode": "acceptance",
+  "status": "measured",
+  "llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+  "gguf_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+  "claims_throughput": true,
+  "claims_performance_improvement": false,
+  "configurations": [
+    "f16_async",
+    "kv_once"
+  ],
+  "control": "f16_async",
+  "survivor": "kv_once",
+  "shipping_attention_pipeline": "kv_once",
+  "production_kept": true,
+  "shipping_unchanged": false,
+  "quality": {
+    "quality_v3_absolute": "fail",
+    "quality_v3_engine_non_regression": "pass",
+    "quality_v3_quartz_engine_non_regression": "pass",
+    "quality_v2_all": false,
+    "opt056_visible": true,
+    "identity_cached": true,
+    "status": "quality_policy",
+    "functional_baseline_defect_cannot_excuse_new_errors": true
+  },
+  "numeric": {
+    "nonfinite": 0,
+    "f16_async_local_bytes": 0,
+    "kv_once_local_bytes": 0
+  },
+  "report_path": "evidence/optimization/opt079-attention-kv-operands/REPORT.md",
+  "token_generator": "(42 + index * 997) % 248320",
+  "verdict": {
+    "verdict": "keep",
+    "status": "production_kept",
+    "reasons": [
+      "component_ci_positive",
+      "saving_ge_5_ms_prompt",
+      "e2e_non_regression",
+      "quality",
+      "numeric"
+    ],
+    "shipping_unchanged": false,
+    "production_kept": true,
+    "retain_reason": null,
+    "component_accepted": true,
+    "e2e_non_regression": true
+  },
+  "tok_s_delta": 1.325183133973951,
+  "attention": {
+    "schema_version": 1,
+    "task": "OPT-079",
+    "phase": "attention",
+    "mode": "acceptance",
+    "control": "f16_async",
+    "survivor": "kv_once",
+    "configurations": [
+      "f16_async",
+      "kv_once"
+    ],
+    "component": {
+      "capture_key": null,
+      "by_config": {
+        "f16_async": {
+          "config": {
+            "id": "f16_async",
+            "attention_pipeline": "f16_async",
+            "convert_once": 0,
+            "role": "control",
+            "expected_launch": "fattn_mma_pipeline_f16_async"
+          },
+          "ms": [
+            249.722015,
+            249.662201,
+            249.734238,
+            249.745438,
+            249.720963,
+            249.605438,
+            249.711105,
+            249.71463,
+            249.726624,
+            249.62854
+          ],
+          "mean_ms": 249.6971192,
+          "dispatch": {
+            "path": "f16_async",
+            "launch": "fattn_mma_pipeline_f16_async",
+            "convert_once": 0,
+            "occupancy": 1
+          }
+        },
+        "kv_once": {
+          "config": {
+            "id": "kv_once",
+            "attention_pipeline": "kv_once",
+            "convert_once": 1,
+            "role": "candidate",
+            "expected_launch": "fattn_mma_pipeline_kv_once"
+          },
+          "ms": [
+            238.169083,
+            238.143707,
+            238.201157,
+            238.196381,
+            238.21962,
+            238.199966,
+            238.199524,
+            238.199814,
+            238.197342,
+            238.165695
+          ],
+          "mean_ms": 238.1892289,
+          "dispatch": {
+            "path": "kv_once",
+            "launch": "fattn_mma_pipeline_kv_once",
+            "convert_once": 1,
+            "occupancy": 1
+          }
+        }
+      },
+      "control": "f16_async",
+      "survivor": "kv_once",
+      "control_ms": [
+        249.722015,
+        249.662201,
+        249.734238,
+        249.745438,
+        249.720963,
+        249.605438,
+        249.711105,
+        249.71463,
+        249.726624,
+        249.62854
+      ],
+      "candidate_ms": [
+        238.169083,
+        238.143707,
+        238.201157,
+        238.196381,
+        238.21962,
+        238.199966,
+        238.199524,
+        238.199814,
+        238.197342,
+        238.165695
+      ],
+      "control_mean_ms": 249.6971192,
+      "candidate_mean_ms": 238.1892289,
+      "n": 10,
+      "df": 9,
+      "mean_diff_ms": 11.507890300000003,
+      "se": 0.013964680657565617,
+      "critical": 2.262,
+      "ci95_low": 11.47630219235259,
+      "ci95_high": 11.539478407647417,
+      "diffs": [
+        11.552931999999998,
+        11.518494000000004,
+        11.53308100000001,
+        11.549057000000005,
+        11.50134300000002,
+        11.405472000000003,
+        11.511581000000007,
+        11.514815999999996,
+        11.529281999999995,
+        11.462844999999987
+      ],
+      "positive": true,
+      "saving_ge_5_ms": true,
+      "launches": [
+        {
+          "config": "f16_async",
+          "dispatch": {
+            "path": "f16_async",
+            "launch": "fattn_mma_pipeline_f16_async",
+            "convert_once": 0,
+            "occupancy": 1
+          },
+          "mean_ms": 249.6971192
+        },
+        {
+          "config": "kv_once",
+          "dispatch": {
+            "path": "kv_once",
+            "launch": "fattn_mma_pipeline_kv_once",
+            "convert_once": 1,
+            "occupancy": 1
+          },
+          "mean_ms": 238.1892289
+        }
+      ],
+      "pairs": 10,
+      "dispatch_ok": true
+    },
+    "engine": {
+      "pairs": [
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 0,
+          "pair": 0,
+          "order": "AB",
+          "control_ms": 1336.23364,
+          "candidate_ms": 1356.4613,
+          "family": "attn"
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 1,
+          "pair": 1,
+          "order": "BA",
+          "control_ms": 1366.46533,
+          "candidate_ms": 1357.97913,
+          "family": "attn"
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 2,
+          "pair": 2,
+          "order": "AB",
+          "control_ms": 1367.09998,
+          "candidate_ms": 1362.521,
+          "family": "attn"
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 3,
+          "pair": 3,
+          "order": "BA",
+          "control_ms": 1370.95349,
+          "candidate_ms": 1364.30408,
+          "family": "attn"
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 4,
+          "pair": 4,
+          "order": "AB",
+          "control_ms": 1371.05286,
+          "candidate_ms": 1367.5387,
+          "family": "attn"
+        }
+      ],
+      "control_ms": [
+        1336.23364,
+        1366.46533,
+        1367.09998,
+        1370.95349,
+        1371.05286
+      ],
+      "candidate_ms": [
+        1356.4613,
+        1357.97913,
+        1362.521,
+        1364.30408,
+        1367.5387
+      ],
+      "control_mean_ms": 1362.36106,
+      "candidate_mean_ms": 1361.7608420000001,
+      "mean_regression_ms": -0.6002179999999953,
+      "regression_upper_ms": 10.650032508122766,
+      "df": 4,
+      "critical": 2.132,
+      "stdout": "\n==========\n== CUDA ==\n==========\n\nCUDA Version 13.0.2\n\nContainer image Copyright (c) 2016-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.\n\nThis container image and its contents are governed by the NVIDIA Deep Learning Container License.\nBy pulling and using the container, you accept the terms and conditions of this license:\nhttps://developer.nvidia.com/ngc/nvidia-deep-learning-container-license\n\nA copy of this license is made available in this container at /NGC-DL-CONTAINER-LICENSE for your convenience.\n\nphase=keep_ab family=attn pairs=5 model_loaded_once=true recapture_after_selector=true\nkeep_ab_launch pair=0 side=0 config=0 graph_capture=true override_before_capture_applied=true recapture=true q8_layout= q8_rows=2 mmq_kernel=q4_i128_j128_fma_async_x mmq_async_x=true q4_path=packed ffn_path=paired_staged gate_variant=q4k_gate_up_swiglu_prequant up_variant=q4k_gate_up_swiglu_prequant down_variant=quant_mmv_packed gate_up_stage_count=1 down_stage_count=1 captured_in_graph=true staging=q8_fp32 warps_per_row=4 wall_ms=1336.23364 captured_path=ffn_only gdn_decode=sequential gdn_launch= gdn_tile=0 attention_pipeline=f16_async attention_launch=fattn_mma_pipeline_f16_async convert_once=0 decode_query_prep=warp_query decode_query_prep_launch= prep_grid=0 n_parts=0 prepared_q=false vec_kv=false\nkeep_ab_launch pair=0 side=1 config=1 graph_capture=true override_before_capture_applied=true recapture=true q8_layout= q8_rows=2 mmq_kernel=q4_i128_j128_fma_async_x mmq_async_x=true q4_path=packed ffn_path=paired_staged gate_variant=q4k_gate_up_swiglu_prequant up_variant=q4k_gate_up_swiglu_prequant down_variant=quant_mmv_packed gate_up_stage_count=1 down_stage_count=1 captured_in_graph=true staging=q8_fp32 warps_per_row=4 wall_ms=1356.4613 captured_path=ffn_only gdn_decode=sequential gdn_launch= gdn_tile=0 attention_pipeline=kv_once attention_launch=fattn_mma_pipeline_kv_once convert_once=1 decode_query_prep=warp_query decode_query_prep_launch= prep_grid=0 n_parts=0 prepared_q=false vec_kv=false\n{\"observation_unit\":\"independent_round\",\"sample_index\":0,\"pair\":0,\"order\":\"AB\",\"control_ms\":1336.23364,\"candidate_ms\":1356.4613,\"family\":\"attn\"}\nkeep_ab_launch pair=1 side=0 config=1 graph_capture=true override_before_capture_applied=true recapture=true q8_layout= q8_rows=2 mmq_kernel=q4_i128_j128_fma_async_x mmq_async_x=true q4_path=packed ffn_path=paired_staged gate_variant=q4k_gate_up_swiglu_prequant up_variant=q4k_gate_up_swiglu_prequant down_variant=quant_mmv_packed gate_up_stage_count=1 down_stage_count=1 captured_in_graph=true staging=q8_fp32 warps_per_row=4 wall_ms=1357.97913 captured_path=ffn_only gdn_decode=sequential gdn_launch= gdn_tile=0 attention_pipeline=kv_once attention_launch=fattn_mma_pipeline_kv_once convert_once=1 decode_query_prep=warp_query decode_query_prep_launch= prep_grid=0 n_parts=0 prepared_q=false vec_kv=false\nkeep_ab_launch pair=1 side=1 config=0 graph_capture=true override_before_capture_applied=true recapture=true q8_layout= q8_rows=2 mmq_kernel=q4_i128_j128_fma_async_x mmq_async_x=true q4_path=packed ffn_path=paired_staged gate_variant=q4k_gate_up_swiglu_prequant up_variant=q4k_gate_up_swiglu_prequant down_variant=quant_mmv_packed gate_up_stage_count=1 down_stage_count=1 captured_in_graph=true staging=q8_fp32 warps_per_row=4 wall_ms=1366.46533 captured_path=ffn_only gdn_decode=sequential gdn_launch= gdn_tile=0 attention_pipeline=f16_async attention_launch=fattn_mma_pipeline_f16_async convert_once=0 decode_query_prep=warp_query decode_query_prep_launch= prep_grid=0 n_parts=0 prepared_q=false vec_kv=false\n{\"observation_unit\":\"independent_round\",\"sample_index\":1,\"pair\":1,\"order\":\"BA\",\"control_ms\":1366.46533,\"candidate_ms\":1357.97913,\"family\":\"attn\"}\nkeep_ab_launch pair=2 side=0 config=0 graph_capture=true override_before_capture_applied=true recapture=true q8_layout= q8_rows=2 mmq_kernel=q4_i128_j128_fma_async_x mmq_async_x=true q4_path=packed ffn_path=paired_staged gate_variant=q4k_gate_up_swiglu_prequant up_variant=q4k_gate_up_swiglu_prequant down_variant=quant_mmv_packed gate_up_stage_count=1 down_stage_count=1 captured_in_graph=true staging=q8_fp32 warps_per_row=4 wall_ms=1367.09998 captured_path=ffn_only gdn_decode=sequential gdn_launch= gdn_tile=0 attention_pipeline=f16_async attention_launch=fattn_mma_pipeline_f16_async convert_once=0 decode_query_prep=warp_query decode_query_prep_launch= prep_grid=0 n_parts=0 prepared_q=false vec_kv=false\nkeep_ab_launch pair=2 side=1 config=1 graph_capture=true override_before_capture_applied=true recapture=true q8_layout= q8_rows=2 mmq_kernel=q4_i128_j128_fma_async_x mmq_async_x=true q4_path=packed ffn_path=paired_staged gate_variant=q4k_gate_up_swiglu_prequant up_variant=q4k_gate_up_swiglu_prequant down_variant=quant_mmv_packed gate_up_stage_count=1 down_stage_count=1 captured_in_graph=true staging=q8_fp32 warps_per_row=4 wall_ms=1362.521 captured_path=ffn_only gdn_decode=sequential gdn_launch= gdn_tile=0 attention_pipeline=kv_once attention_launch=fattn_mma_pipeline_kv_once convert_once=1 decode_query_prep=warp_query decode_query_prep_launch= prep_grid=0 n_parts=0 prepared_q=false vec_kv=false\n{\"observation_unit\":\"independent_round\",\"sample_index\":2,\"pair\":2,\"order\":\"AB\",\"control_ms\":1367.09998,\"candidate_ms\":1362.521,\"family\":\"attn\"}\nkeep_ab_launch pair=3 side=0 config=1 graph_capture=true override_before_capture_applied=true recapture=true q8_layout= q8_rows=2 mmq_kernel=q4_i128_j128_fma_async_x mmq_async_x=true q4_path=packed ffn_path=paired_staged gate_variant=q4k_gate_up_swiglu_prequant up_variant=q4k_gate_up_swiglu_prequant down_variant=quant_mmv_packed gate_up_stage_count=1 down_stage_count=1 captured_in_graph=true staging=q8_fp32 warps_per_row=4 wall_ms=1364.30408 captured_path=ffn_only gdn_decode=sequential gdn_launch= gdn_tile=0 attention_pipeline=kv_once attention_launch=fattn_mma_pipeline_kv_once convert_once=1 decode_query_prep=warp_query decode_query_prep_launch= prep_grid=0 n_parts=0 prepared_q=false vec_kv=false\nkeep_ab_launch pair=3 side=1 config=0 graph_capture=true override_before_capture_applied=true recapture=true q8_layout= q8_rows=2 mmq_kernel=q4_i128_j128_fma_async_x mmq_async_x=true q4_path=packed ffn_path=paired_staged gate_variant=q4k_gate_up_swiglu_prequant up_variant=q4k_gate_up_swiglu_prequant down_variant=quant_mmv_packed gate_up_stage_count=1 down_stage_count=1 captured_in_graph=true staging=q8_fp32 warps_per_row=4 wall_ms=1370.95349 captured_path=ffn_only gdn_decode=sequential gdn_launch= gdn_tile=0 attention_pipeline=f16_async attention_launch=fattn_mma_pipeline_f16_async convert_once=0 decode_query_prep=warp_query decode_query_prep_launch= prep_grid=0 n_parts=0 prepared_q=false vec_kv=false\n{\"observation_unit\":\"independent_round\",\"sample_index\":3,\"pair\":3,\"order\":\"BA\",\"control_ms\":1370.95349,\"candidate_ms\":1364.30408,\"family\":\"attn\"}\nkeep_ab_launch pair=4 side=0 config=0 graph_capture=true override_before_capture_applied=true recapture=true q8_layout= q8_rows=2 mmq_kernel=q4_i128_j128_fma_async_x mmq_async_x=true q4_path=packed ffn_path=paired_staged gate_variant=q4k_gate_up_swiglu_prequant up_variant=q4k_gate_up_swiglu_prequant down_variant=quant_mmv_packed gate_up_stage_count=1 down_stage_count=1 captured_in_graph=true staging=q8_fp32 warps_per_row=4 wall_ms=1371.05286 captured_path=ffn_only gdn_decode=sequential gdn_launch= gdn_tile=0 attention_pipeline=f16_async attention_launch=fattn_mma_pipeline_f16_async convert_once=0 decode_query_prep=warp_query decode_query_prep_launch= prep_grid=0 n_parts=0 prepared_q=false vec_kv=false\nkeep_ab_launch pair=4 side=1 config=1 graph_capture=true override_before_capture_applied=true recapture=true q8_layout= q8_rows=2 mmq_kernel=q4_i128_j128_fma_async_x mmq_async_x=true q4_path=packed ffn_path=paired_staged gate_variant=q4k_gate_up_swiglu_prequant up_variant=q4k_gate_up_swiglu_prequant down_variant=quant_mmv_packed gate_up_stage_count=1 down_stage_count=1 captured_in_graph=true staging=q8_fp32 warps_per_row=4 wall_ms=1367.5387 captured_path=ffn_only gdn_decode=sequential gdn_launch= gdn_tile=0 attention_pipeline=kv_once attention_launch=fattn_mma_pipeline_kv_once convert_once=1 decode_query_prep=warp_query decode_query_prep_launch= prep_grid=0 n_parts=0 prepared_q=false vec_kv=false\n{\"observation_unit\":\"independent_round\",\"sample_index\":4,\"pair\":4,\"order\":\"AB\",\"control_ms\":1371.05286,\"candidate_ms\":1367.5387,\"family\":\"attn\"}\nQW38_OPT070_NATIVE_COUNTS={\"schema_version\":1,\"task\":\"OPT-070\",\"family\":\"mmq\",\"tier\":\"acceptance\",\"warmups\":0,\"samples\":5,\"observed_warmups\":0,\"observed_samples\":5,\"observed_candidates\":2,\"observed_shapes\":1,\"observed_tier\":\"acceptance\",\"pairs\":5,\"acceptance_executed\":true,\"keep\":false,\"override_before_capture_applied\":true,\"graph_capture_separate\":true}\nQW38_OPT075_NATIVE_COUNTS={\"schema_version\":1,\"task\":\"OPT-075\",\"family\":\"q4\",\"tier\":\"acceptance\",\"warmups\":0,\"samples\":5,\"observed_warmups\":0,\"observed_samples\":5,\"observed_candidates\":2,\"observed_shapes\":1,\"observed_tier\":\"acceptance\",\"pairs\":5,\"acceptance_executed\":true,\"keep\":false,\"override_before_capture_applied\":true,\"graph_capture_separate\":true,\"recapture_after_selector\":true}\nQW38_OPT076_NATIVE_COUNTS={\"schema_version\":1,\"task\":\"OPT-076\",\"family\":\"q4\",\"tier\":\"acceptance\",\"warmups\":0,\"samples\":5,\"observed_warmups\":0,\"observed_samples\":5,\"observed_candidates\":2,\"observed_shapes\":1,\"observed_tier\":\"acceptance\",\"pairs\":5,\"acceptance_executed\":true,\"keep\":false,\"override_before_capture_applied\":true,\"graph_capture_separate\":true,\"recapture_after_selector\":true}\nQW38_OPT057_PROBE_RESULT={\"schema_version\":1,\"task\":\"OPT-079\",\"workload\":\"attn-ab\",\"pairs\":5,\"model_loaded_once\":true,\"override_before_capture_applied\":true,\"recapture_after_selector\":true}\nQW38_OPT077_NATIVE_COUNTS={\"schema_version\":1,\"task\":\"OPT-077\",\"family\":\"gdn\",\"tier\":\"acceptance\",\"warmups\":0,\"samples\":5,\"observed_warmups\":0,\"observed_samples\":5,\"observed_candidates\":2,\"observed_shapes\":1,\"observed_tier\":\"acceptance\",\"pairs\":5,\"acceptance_executed\":true,\"keep\":false,\"override_before_capture_applied\":true,\"graph_capture_separate\":true,\"recapture_after_selector\":true}\nQW38_OPT079_NATIVE_COUNTS={\"schema_version\":1,\"task\":\"OPT-079\",\"family\":\"attn\",\"tier\":\"acceptance\",\"warmups\":0,\"samples\":5,\"observed_warmups\":0,\"observed_samples\":5,\"observed_candidates\":2,\"observed_shapes\":1,\"observed_tier\":\"acceptance\",\"pairs\":5,\"acceptance_executed\":true,\"keep\":false,\"override_before_capture_applied\":true,\"graph_capture_separate\":true,\"recapture_after_selector\":true}\nQW38_OPT078_NATIVE_COUNTS={\"schema_version\":1,\"task\":\"OPT-078\",\"family\":\"decode-attention\",\"tier\":\"acceptance\",\"warmups\":0,\"samples\":5,\"observed_warmups\":0,\"observed_samples\":5,\"observed_candidates\":2,\"observed_shapes\":1,\"observed_tier\":\"acceptance\",\"pairs\":5,\"acceptance_executed\":true,\"keep\":false,\"override_before_capture_applied\":true,\"graph_capture_separate\":true,\"recapture_after_selector\":true}\nstatus=passed\n",
+      "survivor": "kv_once",
+      "decode_guard": {
+        "pairs": [
+          {
+            "observation_unit": "independent_round",
+            "sample_index": 0,
+            "pair": 0,
+            "order": "AB",
+            "control_ms": 877.927917,
+            "candidate_ms": 880.140137,
+            "family": "attn"
+          }
+        ],
+        "stdout_ok": true
+      }
+    },
+    "native": {
+      "nonfinite": 0,
+      "f16_async_local_bytes": 0,
+      "kv_once_local_bytes": 0,
+      "f16_async_occupancy": 1,
+      "kv_once_occupancy": 1,
+      "native": {
+        "schema_version": 1,
+        "task": "OPT-079",
+        "workload": "acceptance",
+        "llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+        "gguf_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+        "selected_attention_pipeline_path": "f16_async",
+        "nonfinite": 0,
+        "pass": true,
+        "keep": false,
+        "observed_warmups": 3,
+        "observed_samples": 10,
+        "observed_candidates": 2,
+        "observed_shapes": 1,
+        "observed_tier": "acceptance",
+        "acceptance_executed": true,
+        "pairs": 1,
+        "sample_ids": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9
+        ],
+        "family": "prompt-attn",
+        "tier": "acceptance",
+        "warmups": 3,
+        "samples": 10,
+        "rounds": []
+      },
+      "pass": true
+    },
+    "quality": {
+      "quality_v3_absolute": "fail",
+      "quality_v3_engine_non_regression": "pass",
+      "quality_v3_quartz_engine_non_regression": "pass",
+      "quality_v2_all": false,
+      "opt056_visible": true,
+      "identity_cached": true,
+      "status": "quality_policy",
+      "functional_baseline_defect_cannot_excuse_new_errors": true
+    },
+    "numeric": {
+      "nonfinite": 0,
+      "f16_async_local_bytes": 0,
+      "kv_once_local_bytes": 0
+    },
+    "tiny_cases": [
+      {
+        "id": "T1",
+        "tokens": 1,
+        "start": 96
+      },
+      {
+        "id": "T17",
+        "tokens": 17,
+        "start": 96
+      },
+      {
+        "id": "T33",
+        "tokens": 33,
+        "start": 96
+      }
+    ],
+    "verdict": {
+      "verdict": "keep",
+      "status": "production_kept",
+      "reasons": [
+        "component_ci_positive",
+        "saving_ge_5_ms_prompt",
+        "e2e_non_regression",
+        "quality",
+        "numeric"
+      ],
+      "shipping_unchanged": false,
+      "production_kept": true,
+      "retain_reason": null,
+      "component_accepted": true,
+      "e2e_non_regression": true
+    },
+    "native_counts": {
+      "schema_version": 1,
+      "task": "OPT-079",
+      "warmups": 3,
+      "samples": 10,
+      "observed_warmups": 3,
+      "observed_samples": 10,
+      "observed_candidates": 2,
+      "observed_shapes": 1,
+      "observed_tier": "acceptance",
+      "pairs": 1,
+      "sample_ids": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9
+      ],
+      "acceptance_executed": true,
+      "keep": false,
+      "capture_key": null
+    },
+    "admission": {
+      "ok": true,
+      "result_class": "ok",
+      "message": "",
+      "observed": {
+        "schema_version": 1,
+        "task": "OPT-079",
+        "warmups": 3,
+        "samples": 10,
+        "observed_warmups": 3,
+        "observed_samples": 10,
+        "observed_candidates": 2,
+        "observed_shapes": 1,
+        "observed_tier": "acceptance",
+        "pairs": 1,
+        "sample_ids": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9
+        ],
+        "acceptance_executed": true,
+        "keep": false,
+        "capture_key": null,
+        "rounds": []
+      }
+    },
+    "claims_throughput": false,
+    "measurement_utc": "2026-09-11T18:53:52Z",
+    "status": "measured",
+    "dispatch_ok": true
+  }
+}

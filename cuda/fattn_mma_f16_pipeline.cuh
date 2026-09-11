@@ -15,6 +15,13 @@ constexpr char kLegalAttentionPipelineDualAsync[] = "dual_async";
 constexpr char kLegalAttentionPipelineF16Async[] = "f16_async";
 constexpr char kLegalAttentionPipelineN64[] = "nbatch64";
 constexpr char kLegalAttentionPipelineGqa6[] = "gqa6";
+constexpr char kLegalAttentionPipelineKvOnce[] = "kv_once";
+constexpr char kAttentionPipelineLaunchF16Async[] = "fattn_mma_pipeline_f16_async";
+constexpr char kAttentionPipelineLaunchKvOnce[] = "fattn_mma_pipeline_kv_once";
+
+inline thread_local const char* g_last_attention_pipeline_path = "";
+inline thread_local const char* g_last_attention_pipeline_launch = "";
+inline thread_local int g_last_attention_pipeline_convert_once = 0;
 
 inline bool fattn_pipeline_is_off(const char* path) noexcept {
   return path == nullptr || std::strcmp(path, kLegalAttentionPipelineOff) == 0;
@@ -29,7 +36,21 @@ inline bool legal_attention_pipeline_path(const char* path) noexcept {
           std::strcmp(path, kLegalAttentionPipelineDualAsync) == 0 ||
           std::strcmp(path, kLegalAttentionPipelineF16Async) == 0 ||
           std::strcmp(path, kLegalAttentionPipelineN64) == 0 ||
-          std::strcmp(path, kLegalAttentionPipelineGqa6) == 0);
+          std::strcmp(path, kLegalAttentionPipelineGqa6) == 0 ||
+          std::strcmp(path, kLegalAttentionPipelineKvOnce) == 0);
+}
+
+inline bool attention_pipeline_converts_kv_once(const char* path) noexcept {
+  return path != nullptr &&
+         std::strcmp(path, kLegalAttentionPipelineKvOnce) == 0;
+}
+
+inline void record_attention_pipeline_launch(const char* path,
+                                             const char* launch,
+                                             int convert_once) noexcept {
+  g_last_attention_pipeline_path = path != nullptr ? path : "";
+  g_last_attention_pipeline_launch = launch != nullptr ? launch : "";
+  g_last_attention_pipeline_convert_once = convert_once;
 }
 
 inline const char* effective_attention_pipeline_path() noexcept {
@@ -139,8 +160,46 @@ inline __device__ void fattn_pipeline_load_kv(
   if constexpr (UseCpAsync) fattn_cp_async_commit();
 }
 
+template <int Nbatch, int Width, int Nthreads>
+inline __device__ void fattn_pipeline_convert_kv_stage(
+    __nv_bfloat16* keys, __nv_bfloat16* values, int stage, int tid) {
+  __nv_bfloat16* ksrc = keys + stage * Nbatch * Width;
+  __nv_bfloat16* vsrc = values + stage * Nbatch * Width;
+  __half* kdst = reinterpret_cast<__half*>(ksrc);
+  __half* vdst = reinterpret_cast<__half*>(vsrc);
+  const int n = Nbatch * Width;
+  for (int index = tid; index < n; index += Nthreads) {
+    const __nv_bfloat16 kb = ksrc[index];
+    const __nv_bfloat16 vb = vsrc[index];
+    kdst[index] = __float2half_rn(__bfloat162float(kb));
+    vdst[index] = __float2half_rn(__bfloat162float(vb));
+  }
+}
+
+template <bool ConvertKvOnce, int Width>
+inline __device__ void fattn_load_value_f16_pair(
+    __half pair[2], const void* values_tile, int krow, int dim, int rows) {
+  pair[0] = __float2half_rn(0.0F);
+  pair[1] = __float2half_rn(0.0F);
+  if (dim >= Width) return;
+  if constexpr (ConvertKvOnce) {
+    const __half* values_f16 = static_cast<const __half*>(values_tile);
+    if (krow < rows) pair[0] = values_f16[krow * Width + dim];
+    if ((krow + 1) < rows) pair[1] = values_f16[(krow + 1) * Width + dim];
+  } else {
+    const __nv_bfloat16* values_bf16 =
+        static_cast<const __nv_bfloat16*>(values_tile);
+    if (krow < rows)
+      pair[0] = __float2half_rn(__bfloat162float(values_bf16[krow * Width + dim]));
+    if ((krow + 1) < rows)
+      pair[1] = __float2half_rn(
+          __bfloat162float(values_bf16[(krow + 1) * Width + dim]));
+  }
+}
+
 template <int Ncols1, bool DualF16, bool RegisterSoftmax, int NbatchFa,
-          int Nstages, int Ncols2, int Occupancy, int KvParts>
+          int Nstages, int Ncols2, int Occupancy, int KvParts,
+          bool ConvertKvOnce = false>
 __global__ void __launch_bounds__(Ncols1 <= 8 && Ncols2 == 2 ? 64 : 128,
                                   Occupancy)
 fattn_mma_pipeline_kernel(
@@ -295,6 +354,11 @@ fattn_mma_pipeline_kernel(
           row_values, width, config.capacity, 0, tid);
       if constexpr (kUseCpAsync) fattn_cp_async_wait();
       __syncthreads();
+      if constexpr (ConvertKvOnce) {
+        fattn_pipeline_convert_kv_stage<NbatchFa, kWidth, kNthreads>(
+            keys, values, 0, tid);
+        __syncthreads();
+      }
     }
 
     for (std::size_t tile = kv_begin; tile < kv_stop; tile += NbatchFa) {
@@ -321,9 +385,14 @@ fattn_mma_pipeline_kernel(
             row_values, width, config.capacity, 0, tid);
         if constexpr (kUseCpAsync) fattn_cp_async_wait();
         __syncthreads();
+        if constexpr (ConvertKvOnce) {
+          fattn_pipeline_convert_kv_stage<NbatchFa, kWidth, kNthreads>(
+              keys, values, 0, tid);
+          __syncthreads();
+        }
       }
-      const __nv_bfloat16* keys_tile = keys + buf * NbatchFa * kWidth;
-      const __nv_bfloat16* values_tile = values + buf * NbatchFa * kWidth;
+      const void* keys_tile = keys + buf * NbatchFa * kWidth;
+      const void* values_tile = values + buf * NbatchFa * kWidth;
 
       if constexpr (RegisterSoftmax) {
         float kq[kOwnedStrips][kPvMTiles][4];
@@ -338,7 +407,7 @@ fattn_mma_pipeline_kernel(
               float cfrag[4] = {0.0F, 0.0F, 0.0F, 0.0F};
               float cfrag_lo[4] = {0.0F, 0.0F, 0.0F, 0.0F};
               for (int k0 = vwarp * 16; k0 < kWidth; k0 += kNwarps * 16) {
-                fattn_qk_mma_k16<DualF16, kNcols, kWidth>(
+                fattn_qk_mma_k16<DualF16, kNcols, kWidth, ConvertKvOnce>(
                     cfrag, cfrag_lo, q_f16, q_lo, keys_tile, m0, n0, k0, rows,
                     lane);
               }
@@ -509,14 +578,8 @@ fattn_mma_pipeline_kernel(
                 const int dim = n0 + n;
                 const int krow = k0 + j * 2;
                 __half pair[2] = {__float2half_rn(0.0F), __float2half_rn(0.0F)};
-                if (dim < kWidth) {
-                  if (krow < rows)
-                    pair[0] = __float2half_rn(
-                        __bfloat162float(values_tile[krow * kWidth + dim]));
-                  if ((krow + 1) < rows)
-                    pair[1] = __float2half_rn(__bfloat162float(
-                        values_tile[(krow + 1) * kWidth + dim]));
-                }
+                fattn_load_value_f16_pair<ConvertKvOnce, kWidth>(
+                    pair, values_tile, krow, dim, rows);
                 b[item] = *reinterpret_cast<std::uint32_t*>(pair);
               }
               mma::mma_m16n8k16_f16_f32(c_acc[m_tile][n_local], a, b);
@@ -540,7 +603,7 @@ fattn_mma_pipeline_kernel(
               float cfrag[4] = {0.0F, 0.0F, 0.0F, 0.0F};
               float cfrag_lo[4] = {0.0F, 0.0F, 0.0F, 0.0F};
               for (int k0 = vwarp * 16; k0 < kWidth; k0 += kNwarps * 16) {
-                fattn_qk_mma_k16<DualF16, kNcols, kWidth>(
+                fattn_qk_mma_k16<DualF16, kNcols, kWidth, ConvertKvOnce>(
                     cfrag, cfrag_lo, q_f16, q_lo, keys_tile, m0, n0, k0, rows,
                     lane);
               }
@@ -648,14 +711,8 @@ fattn_mma_pipeline_kernel(
                 const int dim = n0 + n;
                 const int krow = k0 + j * 2;
                 __half pair[2] = {__float2half_rn(0.0F), __float2half_rn(0.0F)};
-                if (dim < kWidth) {
-                  if (krow < rows)
-                    pair[0] = __float2half_rn(
-                        __bfloat162float(values_tile[krow * kWidth + dim]));
-                  if ((krow + 1) < rows)
-                    pair[1] = __float2half_rn(__bfloat162float(
-                        values_tile[(krow + 1) * kWidth + dim]));
-                }
+                fattn_load_value_f16_pair<ConvertKvOnce, kWidth>(
+                    pair, values_tile, krow, dim, rows);
                 b[item] = *reinterpret_cast<std::uint32_t*>(pair);
               }
               mma::mma_m16n8k16_f16_f32(c_acc[m_tile][n_local], a, b);
@@ -676,6 +733,11 @@ fattn_mma_pipeline_kernel(
         if (next < kv_stop) {
           fattn_cp_async_wait();
           __syncthreads();
+          if constexpr (ConvertKvOnce) {
+            fattn_pipeline_convert_kv_stage<NbatchFa, kWidth, kNthreads>(
+                keys, values, 1 - buf, tid);
+            __syncthreads();
+          }
         }
         buf = 1 - buf;
       } else {
@@ -751,7 +813,8 @@ fattn_mma_pipeline_kernel(
 }
 
 template <int Ncols1, bool DualF16, bool RegisterSoftmax, int NbatchFa,
-          int Nstages, int Ncols2, int Occupancy, int KvParts>
+          int Nstages, int Ncols2, int Occupancy, int KvParts,
+          bool ConvertKvOnce = false>
 inline cudaError_t launch_fattn_mma_pipeline_typed(
     const AttentionConfig& config, std::size_t start_position,
     std::size_t token_count, const float* query, const float* query_scale,
@@ -770,12 +833,14 @@ inline cudaError_t launch_fattn_mma_pipeline_typed(
             KvParts > 1 ? 2U : 1U);
   cudaError_t error = cudaFuncSetAttribute(
       fattn_mma_pipeline_kernel<Ncols1, DualF16, RegisterSoftmax, NbatchFa,
-                                Nstages, Ncols2, Occupancy, KvParts>,
+                                Nstages, Ncols2, Occupancy, KvParts,
+                                ConvertKvOnce>,
       cudaFuncAttributeMaxDynamicSharedMemorySize, static_cast<int>(shared));
   if (error != cudaSuccess) return error;
   error = quartz_launch_kernel(
       fattn_mma_pipeline_kernel<Ncols1, DualF16, RegisterSoftmax, NbatchFa,
-                                Nstages, Ncols2, Occupancy, KvParts>,
+                                Nstages, Ncols2, Occupancy, KvParts,
+                                ConvertKvOnce>,
       grid, dim3(kNthreads), shared, stream, config, start_position,
       token_count, query, query_scale, gate, committed_key, committed_value,
       candidate_key, candidate_value, output, normalized_query, partial, meta,
@@ -793,7 +858,8 @@ inline cudaError_t launch_fattn_mma_pipeline_typed(
 }
 
 template <int Ncols1, bool DualF16, bool RegisterSoftmax, int NbatchFa,
-          int Nstages, int Ncols2, int Occupancy, int KvParts>
+          int Nstages, int Ncols2, int Occupancy, int KvParts,
+          bool ConvertKvOnce = false>
 inline int fattn_pipeline_occupancy_typed() noexcept {
   int occupancy = 0;
   const int threads = fattn_pipeline_nthreads(Ncols1, Ncols2);
@@ -801,13 +867,15 @@ inline int fattn_pipeline_occupancy_typed() noexcept {
       Ncols1, DualF16, RegisterSoftmax, NbatchFa, Nstages, Ncols2);
   cudaError_t error = cudaFuncSetAttribute(
       fattn_mma_pipeline_kernel<Ncols1, DualF16, RegisterSoftmax, NbatchFa,
-                                Nstages, Ncols2, Occupancy, KvParts>,
+                                Nstages, Ncols2, Occupancy, KvParts,
+                                ConvertKvOnce>,
       cudaFuncAttributeMaxDynamicSharedMemorySize, static_cast<int>(shared));
   if (error == cudaSuccess)
     error = cudaOccupancyMaxActiveBlocksPerMultiprocessor(
         &occupancy,
         fattn_mma_pipeline_kernel<Ncols1, DualF16, RegisterSoftmax, NbatchFa,
-                                  Nstages, Ncols2, Occupancy, KvParts>,
+                                  Nstages, Ncols2, Occupancy, KvParts,
+                                  ConvertKvOnce>,
         threads, shared);
   return error == cudaSuccess ? occupancy : 0;
 }
@@ -822,49 +890,64 @@ inline cudaError_t launch_fattn_mma_pipeline(
     const __half* prepared_q,
     std::size_t kv_origin = static_cast<std::size_t>(-1)) noexcept {
   if (path == nullptr) return cudaErrorInvalidValue;
+  const char* launch = "";
+  int convert_once = 0;
+  cudaError_t error = cudaErrorInvalidValue;
   if (std::strcmp(path, kLegalAttentionPipelineF16) == 0) {
-    return launch_fattn_mma_pipeline_typed<16, false, false, 32, 1, 2, 2, 2>(
+    launch = "fattn_mma_pipeline_f16";
+    error = launch_fattn_mma_pipeline_typed<16, false, false, 32, 1, 2, 2, 2>(
+        config, start_position, token_count, query, query_scale, gate,
+        committed_key, committed_value, candidate_key, candidate_value, output,
+        normalized_query, partial, meta, stream, prepared_q, kv_origin);
+  } else if (std::strcmp(path, kLegalAttentionPipelineDualReg) == 0) {
+    launch = "fattn_mma_pipeline_dual_reg";
+    error = launch_fattn_mma_pipeline_typed<16, true, true, 32, 1, 2, 2, 2>(
+        config, start_position, token_count, query, query_scale, gate,
+        committed_key, committed_value, candidate_key, candidate_value, output,
+        normalized_query, partial, meta, stream, prepared_q, kv_origin);
+  } else if (std::strcmp(path, kLegalAttentionPipelineF16Reg) == 0) {
+    launch = "fattn_mma_pipeline_f16_reg";
+    error = launch_fattn_mma_pipeline_typed<16, false, true, 32, 1, 2, 2, 2>(
+        config, start_position, token_count, query, query_scale, gate,
+        committed_key, committed_value, candidate_key, candidate_value, output,
+        normalized_query, partial, meta, stream, prepared_q, kv_origin);
+  } else if (std::strcmp(path, kLegalAttentionPipelineDualAsync) == 0) {
+    launch = "fattn_mma_pipeline_dual_async";
+    error = launch_fattn_mma_pipeline_typed<16, true, true, 32, 2, 2, 1, 2>(
+        config, start_position, token_count, query, query_scale, gate,
+        committed_key, committed_value, candidate_key, candidate_value, output,
+        normalized_query, partial, meta, stream, prepared_q, kv_origin);
+  } else if (std::strcmp(path, kLegalAttentionPipelineF16Async) == 0) {
+    launch = kAttentionPipelineLaunchF16Async;
+    error = launch_fattn_mma_pipeline_typed<16, false, true, 32, 2, 2, 1, 2>(
+        config, start_position, token_count, query, query_scale, gate,
+        committed_key, committed_value, candidate_key, candidate_value, output,
+        normalized_query, partial, meta, stream, prepared_q, kv_origin);
+  } else if (std::strcmp(path, kLegalAttentionPipelineKvOnce) == 0) {
+    launch = kAttentionPipelineLaunchKvOnce;
+    convert_once = 1;
+    error = launch_fattn_mma_pipeline_typed<16, false, true, 32, 2, 2, 1, 2,
+                                            true>(
+        config, start_position, token_count, query, query_scale, gate,
+        committed_key, committed_value, candidate_key, candidate_value, output,
+        normalized_query, partial, meta, stream, prepared_q, kv_origin);
+  } else if (std::strcmp(path, kLegalAttentionPipelineN64) == 0) {
+    launch = "fattn_mma_pipeline_nbatch64";
+    error = launch_fattn_mma_pipeline_typed<16, false, true, 64, 1, 2, 1, 2>(
+        config, start_position, token_count, query, query_scale, gate,
+        committed_key, committed_value, candidate_key, candidate_value, output,
+        normalized_query, partial, meta, stream, prepared_q, kv_origin);
+  } else if (std::strcmp(path, kLegalAttentionPipelineGqa6) == 0) {
+    launch = "fattn_mma_pipeline_gqa6";
+    error = launch_fattn_mma_pipeline_typed<8, false, true, 32, 1, 6, 1, 2>(
         config, start_position, token_count, query, query_scale, gate,
         committed_key, committed_value, candidate_key, candidate_value, output,
         normalized_query, partial, meta, stream, prepared_q, kv_origin);
   }
-  if (std::strcmp(path, kLegalAttentionPipelineDualReg) == 0) {
-    return launch_fattn_mma_pipeline_typed<16, true, true, 32, 1, 2, 2, 2>(
-        config, start_position, token_count, query, query_scale, gate,
-        committed_key, committed_value, candidate_key, candidate_value, output,
-        normalized_query, partial, meta, stream, prepared_q, kv_origin);
+  if (error == cudaSuccess) {
+    record_attention_pipeline_launch(path, launch, convert_once);
   }
-  if (std::strcmp(path, kLegalAttentionPipelineF16Reg) == 0) {
-    return launch_fattn_mma_pipeline_typed<16, false, true, 32, 1, 2, 2, 2>(
-        config, start_position, token_count, query, query_scale, gate,
-        committed_key, committed_value, candidate_key, candidate_value, output,
-        normalized_query, partial, meta, stream, prepared_q, kv_origin);
-  }
-  if (std::strcmp(path, kLegalAttentionPipelineDualAsync) == 0) {
-    return launch_fattn_mma_pipeline_typed<16, true, true, 32, 2, 2, 1, 2>(
-        config, start_position, token_count, query, query_scale, gate,
-        committed_key, committed_value, candidate_key, candidate_value, output,
-        normalized_query, partial, meta, stream, prepared_q, kv_origin);
-  }
-  if (std::strcmp(path, kLegalAttentionPipelineF16Async) == 0) {
-    return launch_fattn_mma_pipeline_typed<16, false, true, 32, 2, 2, 1, 2>(
-        config, start_position, token_count, query, query_scale, gate,
-        committed_key, committed_value, candidate_key, candidate_value, output,
-        normalized_query, partial, meta, stream, prepared_q, kv_origin);
-  }
-  if (std::strcmp(path, kLegalAttentionPipelineN64) == 0) {
-    return launch_fattn_mma_pipeline_typed<16, false, true, 64, 1, 2, 1, 2>(
-        config, start_position, token_count, query, query_scale, gate,
-        committed_key, committed_value, candidate_key, candidate_value, output,
-        normalized_query, partial, meta, stream, prepared_q, kv_origin);
-  }
-  if (std::strcmp(path, kLegalAttentionPipelineGqa6) == 0) {
-    return launch_fattn_mma_pipeline_typed<8, false, true, 32, 1, 6, 1, 2>(
-        config, start_position, token_count, query, query_scale, gate,
-        committed_key, committed_value, candidate_key, candidate_value, output,
-        normalized_query, partial, meta, stream, prepared_q, kv_origin);
-  }
-  return cudaErrorInvalidValue;
+  return error;
 }
 
 inline int fattn_pipeline_occupancy_for(const char* path) noexcept {
@@ -879,6 +962,8 @@ inline int fattn_pipeline_occupancy_for(const char* path) noexcept {
     return fattn_pipeline_occupancy_typed<16, true, true, 32, 2, 2, 1, 2>();
   if (std::strcmp(path, kLegalAttentionPipelineF16Async) == 0)
     return fattn_pipeline_occupancy_typed<16, false, true, 32, 2, 2, 1, 2>();
+  if (std::strcmp(path, kLegalAttentionPipelineKvOnce) == 0)
+    return fattn_pipeline_occupancy_typed<16, false, true, 32, 2, 2, 1, 2, true>();
   if (std::strcmp(path, kLegalAttentionPipelineN64) == 0)
     return fattn_pipeline_occupancy_typed<16, false, true, 64, 1, 2, 1, 2>();
   if (std::strcmp(path, kLegalAttentionPipelineGqa6) == 0)

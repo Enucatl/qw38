@@ -1,0 +1,119 @@
+{
+  "schema_version": 1,
+  "task": "OPT-079",
+  "yardstick": "prompt_attention_kv_operand_reuse",
+  "claims_throughput": false,
+  "claims_performance_improvement": false,
+  "performance_admission": {
+    "enabled": true
+  },
+  "image": "qw38-cuda:13.0.2",
+  "model": "models/Qwen3.8-27B-Q4_K_M.gguf",
+  "gpu_lock": "build/optimization-runs/qw38-gpu.lock",
+  "aggregate_deadline_s": 300,
+  "target": "build/qw38-cuda-opt079-attention-kv-operands-test",
+  "diagnostics_make_target": "cuda-opt079-diagnostics",
+  "case_ids": ["attention"],
+  "modes": {
+    "feedback": {
+      "target": "build/qw38-cuda-opt079-attention-kv-operands-test",
+      "tier_sequence": ["attention"],
+      "make_targets": [
+        "build/qw38-cuda-opt079-attention-kv-operands-test",
+        "build/qw38-cuda-optimization-engine-probe"
+      ],
+      "build_once": true,
+      "warm_repetitions": 0,
+      "aggregate_deadline_s": 300,
+      "workloads": ["attention"]
+    },
+    "acceptance": {
+      "target": "build/qw38-cuda-opt079-attention-kv-operands-test",
+      "tier_sequence": ["attention"],
+      "make_targets": [
+        "build/qw38-cuda-opt079-attention-kv-operands-test",
+        "build/qw38-cuda-optimization-engine-probe"
+      ],
+      "warm_repetitions": 0,
+      "aggregate_deadline_s": 300,
+      "workloads": ["attention"]
+    },
+    "release": {
+      "target": "build/qw38-cuda-opt079-attention-kv-operands-test",
+      "tier": "acceptance",
+      "make_targets": [],
+      "skip_compile": true,
+      "historical_oracles": false,
+      "workloads": []
+    }
+  },
+  "workloads": {
+    "attention": {
+      "target": "build/qw38-cuda-opt079-attention-kv-operands-test",
+      "tier": "screen",
+      "runner": "host",
+      "kind": "two_config_complete_prompt_attention",
+      "cases": 1,
+      "candidates": 2,
+      "warmups": 1,
+      "samples": 3,
+      "tokens": 1,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 1,
+      "reference": 1,
+      "sampled_rows": 4,
+      "sampled_vectors": 8,
+      "family": "prompt-attn",
+      "cache_mode": "rotating",
+      "control": "f16_async",
+      "complete_attention_layers": 16,
+      "gpu_work": true,
+      "native_targets": [
+        "build/qw38-cuda-opt079-attention-kv-operands-test",
+        "build/qw38-cuda-optimization-engine-probe"
+      ],
+      "args": [
+        "uv",
+        "run",
+        "python",
+        "tools/opt079_attention_kv_operands.py",
+        "--phase",
+        "{phase}",
+        "--mode",
+        "{mode}",
+        "--run-dir",
+        "{run_dir}"
+      ],
+      "mode_overrides": {
+        "acceptance": {
+          "tier": "acceptance",
+          "cases": 1,
+          "candidates": 2,
+          "warmups": 3,
+          "samples": 10,
+          "engine_pairs": 5
+        }
+      }
+    }
+  },
+  "proof_limit": [
+    "one convert-once candidate versus f16_async",
+    "tile dimensions unchanged",
+    "two-stage async ring",
+    "register softmax",
+    "stream-K",
+    "query preparation unchanged",
+    "selected F16 arithmetic",
+    "in-place F16 reuse of shared BF16 slots",
+    "no global converted KV cache",
+    "no gqa6 or nbatch64 retry",
+    "no OPT-051 precision selection",
+    "complete P4096 attention includes prep conversion core merge gating KV",
+    "require >=5 ms/prompt estimated saving",
+    "OPT-073 identity-cached quality",
+    "no long P/D protocol",
+    "historical oracles none"
+  ],
+  "report_path": "evidence/optimization/opt079-attention-kv-operands/REPORT.md"
+}
