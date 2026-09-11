@@ -1,0 +1,5 @@
+attrs warps=2 late_regs=40 late_local=0 late_occ=24 control_regs=40 control_local=0 control_occ=24 paired_late_regs=48 paired_late_local=0 paired_late_shared=512 paired_late_occ=20
+attrs warps=4 late_regs=40 late_local=0 late_occ=12 control_regs=40 control_local=0 control_occ=12 paired_late_regs=48 paired_late_local=0 paired_late_shared=1024 paired_late_occ=10
+sass_status=ok dp4a_or_idp=214 shfl=9084 ldg=16054 prmt=12642 k_loop_shuffles_absent_source=true
+ncu_available=true ncu_launch=not_used
+source: vec_dot_q4k_q8block_late has no __shfl_xor_sync; row-end shfl_down remains

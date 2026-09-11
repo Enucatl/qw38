@@ -29,7 +29,7 @@ SCHEDULER_DIAGNOSTIC_CUDA_OBJECTS := $(BUILD_DIR)/full_scheduler.trace.cuda.o $(
 CUDA_RELEASE_OBJECTS := $(CUDA_BUILD_DIR)/engine.o $(BUILD_DIR)/eval.cuda.o $(BUILD_DIR)/bench.cuda.o $(QUANT_MMV_CUDA_OBJECTS) $(BUILD_DIR)/gdn_step.cuda.o $(BUILD_DIR)/attention_decode.cuda.o $(BUILD_DIR)/scheduler_primitives.cuda.o $(BUILD_DIR)/full_scheduler.cuda.o $(BUILD_DIR)/checkpoint.cuda.o
 CUDA_TRACE_OBJECTS := $(CUDA_BUILD_DIR)/engine.trace.o $(BUILD_DIR)/eval.trace.cuda.o $(BUILD_DIR)/full_scheduler.trace.cuda.o $(BUILD_DIR)/checkpoint.trace.cuda.o
 
-.PHONY: all clean test diagnostic cuda-image cuda-build cuda-native cuda-products cuda-opt057-diagnostics cuda-opt058-diagnostics cuda-opt059-diagnostics cuda-opt060-diagnostics cuda-opt061-diagnostics cuda-opt062-diagnostics cuda-opt063-diagnostics cuda-opt064-diagnostics cuda-opt065-diagnostics cuda-opt066-diagnostics cuda-opt067-diagnostics cuda-opt068-diagnostics cuda-opt069-diagnostics cuda-opt070-diagnostics cuda-opt071-diagnostics cuda-opt073-diagnostics cuda-opt074-diagnostics cuda-opt075-diagnostics FORCE
+.PHONY: all clean test diagnostic cuda-image cuda-build cuda-native cuda-products cuda-opt057-diagnostics cuda-opt058-diagnostics cuda-opt059-diagnostics cuda-opt060-diagnostics cuda-opt061-diagnostics cuda-opt062-diagnostics cuda-opt063-diagnostics cuda-opt064-diagnostics cuda-opt065-diagnostics cuda-opt066-diagnostics cuda-opt067-diagnostics cuda-opt068-diagnostics cuda-opt069-diagnostics cuda-opt070-diagnostics cuda-opt071-diagnostics cuda-opt073-diagnostics cuda-opt074-diagnostics cuda-opt075-diagnostics cuda-opt076-diagnostics FORCE
 
 all: $(BINARIES) $(HOST_DIAGNOSTICS)
 
@@ -177,6 +177,8 @@ cuda-opt070-diagnostics: $(BUILD_DIR)/qw38-cuda-component-replay $(BUILD_DIR)/qw
 
 cuda-opt075-diagnostics: $(BUILD_DIR)/qw38-cuda-component-replay $(BUILD_DIR)/qw38-cuda-optimization-engine-probe $(BUILD_DIR)/qw38-cuda-opt062-q4-admission-test $(BUILD_DIR)/qw38-cuda-opt063-integer-ffn-test
 
+cuda-opt076-diagnostics: $(BUILD_DIR)/qw38-cuda-opt076-q4-reduction-test $(BUILD_DIR)/qw38-cuda-component-replay $(BUILD_DIR)/qw38-cuda-optimization-engine-probe
+
 cuda-opt062-diagnostics: $(BUILD_DIR)/qw38-cuda-opt062-q4-admission-test
 
 cuda-opt063-diagnostics: $(BUILD_DIR)/qw38-cuda-opt063-integer-ffn-test
@@ -284,6 +286,9 @@ $(BUILD_DIR)/qw38-cuda-opt062-q4-admission-test: cuda/opt062_q4_admission_test.c
 $(BUILD_DIR)/qw38-cuda-opt063-integer-ffn-test: cuda/opt063_integer_ffn_test.cu $(SCHEDULER_DIAGNOSTIC_CUDA_OBJECTS) $(DIAGNOSTIC_LIB_OBJECTS) $(THIRD_PARTY_OBJECTS) $(CUDA_TRACE_STAMP) | $(BUILD_DIR)
 	$(NVCC) $(NVCCFLAGS) $(CPPFLAGS) -DQW38_DIAGNOSTIC_TRACE -Icuda $(NVCC_BIN_DEPS) cuda/opt063_integer_ffn_test.cu $(SCHEDULER_DIAGNOSTIC_CUDA_OBJECTS) $(DIAGNOSTIC_LIB_OBJECTS) $(THIRD_PARTY_OBJECTS) -o $@
 
+$(BUILD_DIR)/qw38-cuda-opt076-q4-reduction-test: cuda/opt076_q4_reduction_test.cu $(SCHEDULER_DIAGNOSTIC_CUDA_OBJECTS) $(DIAGNOSTIC_LIB_OBJECTS) $(THIRD_PARTY_OBJECTS) $(CUDA_TRACE_STAMP) | $(BUILD_DIR)
+	$(NVCC) $(NVCCFLAGS) $(CPPFLAGS) -DQW38_DIAGNOSTIC_TRACE -Icuda $(NVCC_BIN_DEPS) cuda/opt076_q4_reduction_test.cu $(SCHEDULER_DIAGNOSTIC_CUDA_OBJECTS) $(DIAGNOSTIC_LIB_OBJECTS) $(THIRD_PARTY_OBJECTS) -o $@
+
 $(BUILD_DIR)/qw38-cuda-opt064-q8-rows-test: cuda/opt064_q8_rows_test.cu $(SCHEDULER_DIAGNOSTIC_CUDA_OBJECTS) $(DIAGNOSTIC_LIB_OBJECTS) $(THIRD_PARTY_OBJECTS) $(CUDA_TRACE_STAMP) | $(BUILD_DIR)
 	$(NVCC) $(NVCCFLAGS) $(CPPFLAGS) -DQW38_DIAGNOSTIC_TRACE -Icuda $(NVCC_BIN_DEPS) cuda/opt064_q8_rows_test.cu $(SCHEDULER_DIAGNOSTIC_CUDA_OBJECTS) $(DIAGNOSTIC_LIB_OBJECTS) $(THIRD_PARTY_OBJECTS) -o $@
 
@@ -389,4 +394,4 @@ clean:
 release-provenance:
 	uv run python tools/release_provenance.py --require-clean
 
--include $(LIB_OBJECTS:.o=.d) $(DIAGNOSTIC_OBJECTS:.o=.d) $(THIRD_PARTY_OBJECTS:.o=.d) $(BUILD_DIR)/cli.d $(BUILD_DIR)/server.d $(BUILD_DIR)/bench.d $(BUILD_DIR)/eval.d $(CUDA_RELEASE_OBJECTS:.o=.d) $(CUDA_TRACE_OBJECTS:.o=.d) $(BUILD_DIR)/qw38-cuda-probe.d $(BUILD_DIR)/qw38-cuda-optimization-engine-probe.d $(BUILD_DIR)/qw38-cuda-decode-oracle-test.d $(BUILD_DIR)/qw38-cuda-prefill-4k-oracle-test.d $(BUILD_DIR)/qw38-cuda-prefill-2k-parity-test.d $(BUILD_DIR)/qw38-cuda-opt058-quality-baseline-test.d $(BUILD_DIR)/qw38-cuda-opt059-numerics-test.d $(BUILD_DIR)/qw38-cuda-opt043-activation-capture-test.d $(BUILD_DIR)/qw38-cuda-opt060-engine-attribution-test.d $(BUILD_DIR)/qw38-cuda-component-replay.d $(BUILD_DIR)/qw38-cuda-opt062-q4-admission-test.d $(BUILD_DIR)/qw38-cuda-opt063-integer-ffn-test.d $(BUILD_DIR)/qw38-cuda-opt064-q8-rows-test.d $(BUILD_DIR)/qw38-cuda-opt065-mmq-tiles-test.d $(BUILD_DIR)/qw38-cuda-opt066-mmq-x-pipeline-test.d $(BUILD_DIR)/qw38-cuda-opt067-prompt-pair-test.d $(BUILD_DIR)/opt068_codegen_test.cuda.d $(wildcard $(CUDA_EXPERIMENTAL_DIR)/*.d) $(wildcard $(OPT068_O2_DIR)/*.d) $(wildcard $(OPT068_O3_DIR)/*.d) $(wildcard $(OPT068_O3FMA_DIR)/*.d)
+-include $(LIB_OBJECTS:.o=.d) $(DIAGNOSTIC_OBJECTS:.o=.d) $(THIRD_PARTY_OBJECTS:.o=.d) $(BUILD_DIR)/cli.d $(BUILD_DIR)/server.d $(BUILD_DIR)/bench.d $(BUILD_DIR)/eval.d $(CUDA_RELEASE_OBJECTS:.o=.d) $(CUDA_TRACE_OBJECTS:.o=.d) $(BUILD_DIR)/qw38-cuda-probe.d $(BUILD_DIR)/qw38-cuda-optimization-engine-probe.d $(BUILD_DIR)/qw38-cuda-decode-oracle-test.d $(BUILD_DIR)/qw38-cuda-prefill-4k-oracle-test.d $(BUILD_DIR)/qw38-cuda-prefill-2k-parity-test.d $(BUILD_DIR)/qw38-cuda-opt058-quality-baseline-test.d $(BUILD_DIR)/qw38-cuda-opt059-numerics-test.d $(BUILD_DIR)/qw38-cuda-opt043-activation-capture-test.d $(BUILD_DIR)/qw38-cuda-opt060-engine-attribution-test.d $(BUILD_DIR)/qw38-cuda-component-replay.d $(BUILD_DIR)/qw38-cuda-opt062-q4-admission-test.d $(BUILD_DIR)/qw38-cuda-opt063-integer-ffn-test.d $(BUILD_DIR)/qw38-cuda-opt076-q4-reduction-test.d $(BUILD_DIR)/qw38-cuda-opt064-q8-rows-test.d $(BUILD_DIR)/qw38-cuda-opt065-mmq-tiles-test.d $(BUILD_DIR)/qw38-cuda-opt066-mmq-x-pipeline-test.d $(BUILD_DIR)/qw38-cuda-opt067-prompt-pair-test.d $(BUILD_DIR)/opt068_codegen_test.cuda.d $(wildcard $(CUDA_EXPERIMENTAL_DIR)/*.d) $(wildcard $(OPT068_O2_DIR)/*.d) $(wildcard $(OPT068_O3_DIR)/*.d) $(wildcard $(OPT068_O3FMA_DIR)/*.d)

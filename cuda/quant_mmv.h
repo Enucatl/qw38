@@ -78,6 +78,15 @@ void q4k_coop_gate_up_swiglu_kernel_attributes(
     unsigned int warps_per_row, int* registers, std::size_t* local_bytes,
     std::size_t* shared_bytes, int* occupancy) noexcept;
 
+int q4k_coop_late_occupancy(unsigned int warps_per_row) noexcept;
+void q4k_coop_late_kernel_attributes(unsigned int warps_per_row, int* registers,
+                                     std::size_t* local_bytes,
+                                     int* occupancy) noexcept;
+int q4k_coop_gate_up_late_occupancy(unsigned int warps_per_row) noexcept;
+void q4k_coop_gate_up_late_kernel_attributes(
+    unsigned int warps_per_row, int* registers, std::size_t* local_bytes,
+    std::size_t* shared_bytes, int* occupancy) noexcept;
+
 cudaError_t launch_q4k_coop_mmv(
     const std::uint8_t* weights, std::size_t rows, std::size_t columns,
     const __nv_bfloat16* activation, void* workspace, float* output,

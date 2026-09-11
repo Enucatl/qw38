@@ -1,0 +1,148 @@
+{
+  "schema_version": 1,
+  "task": "OPT-076",
+  "yardstick": "q4_packed_load_late_reduction",
+  "claims_throughput": false,
+  "claims_performance_improvement": false,
+  "performance_admission": {
+    "enabled": true
+  },
+  "image": "qw38-cuda:13.0.2",
+  "model": "models/Qwen3.8-27B-Q4_K_M.gguf",
+  "gpu_lock": "build/optimization-runs/qw38-gpu.lock",
+  "aggregate_deadline_s": 300,
+  "target": "build/qw38-cuda-opt076-q4-reduction-test",
+  "diagnostics_make_target": "cuda-opt076-diagnostics",
+  "case_ids": ["q4", "quality"],
+  "modes": {
+    "feedback": {
+      "target": "build/qw38-cuda-opt076-q4-reduction-test",
+      "tier_sequence": ["q4"],
+      "make_targets": [
+        "build/qw38-cuda-opt076-q4-reduction-test",
+        "build/qw38-cuda-component-replay",
+        "build/qw38-cuda-optimization-engine-probe"
+      ],
+      "build_once": true,
+      "warm_repetitions": 0,
+      "aggregate_deadline_s": 300,
+      "workloads": ["q4"]
+    },
+    "acceptance": {
+      "target": "build/qw38-cuda-opt076-q4-reduction-test",
+      "tier_sequence": ["quality", "q4"],
+      "make_targets": [
+        "build/qw38-cuda-opt076-q4-reduction-test",
+        "build/qw38-cuda-component-replay",
+        "build/qw38-cuda-optimization-engine-probe"
+      ],
+      "warm_repetitions": 0,
+      "aggregate_deadline_s": 300,
+      "workloads": ["quality", "q4"]
+    },
+    "release": {
+      "target": "build/qw38-cuda-opt076-q4-reduction-test",
+      "tier": "acceptance",
+      "make_targets": [],
+      "skip_compile": true,
+      "historical_oracles": false,
+      "workloads": []
+    }
+  },
+  "workloads": {
+    "q4": {
+      "target": "build/qw38-cuda-opt076-q4-reduction-test",
+      "tier": "screen",
+      "runner": "host",
+      "kind": "three_config_complete_rotating_decode_ffn",
+      "cases": 1,
+      "candidates": 3,
+      "warmups": 1,
+      "samples": 3,
+      "tokens": 1,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 1,
+      "reference": 1,
+      "sampled_rows": 16,
+      "sampled_vectors": 4,
+      "family": "decode-ffn",
+      "cache_mode": "rotating",
+      "control": "packed_paired_staged",
+      "complete_ffns": 64,
+      "gpu_work": true,
+      "native_targets": [
+        "build/qw38-cuda-opt076-q4-reduction-test",
+        "build/qw38-cuda-component-replay",
+        "build/qw38-cuda-optimization-engine-probe"
+      ],
+      "args": [
+        "uv",
+        "run",
+        "python",
+        "tools/opt076_q4_reduction.py",
+        "--phase",
+        "{phase}",
+        "--mode",
+        "{mode}",
+        "--run-dir",
+        "{run_dir}"
+      ],
+      "mode_overrides": {
+        "acceptance": {
+          "tier": "acceptance",
+          "candidates": 2,
+          "warmups": 3,
+          "samples": 10,
+          "engine_pairs": 5
+        }
+      }
+    },
+    "quality": {
+      "target": "tools/opt076_q4_reduction.py",
+      "tier": "acceptance",
+      "runner": "host",
+      "kind": "identity_cached_opt073_once_per_survivor",
+      "cases": 1,
+      "candidates": 1,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 1,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 0,
+      "reference": 1,
+      "gpu_work": false,
+      "args": [
+        "uv",
+        "run",
+        "python",
+        "tools/opt076_q4_reduction.py",
+        "--phase",
+        "quality",
+        "--mode",
+        "{mode}",
+        "--run-dir",
+        "{run_dir}"
+      ]
+    }
+  },
+  "proof_limit": [
+    "exactly two late-reduction candidates",
+    "two and four warps per row",
+    "packed paired_staged control from OPT-075",
+    "FP32-scale Q8Block staging",
+    "no Q8/Q6 or prompt MMQ change",
+    "no half-scale staging",
+    "no warps/rows/staging grid expansion",
+    "K-loop shuffles removed",
+    "packed 32-bit loads and nibble masks",
+    "OPT-074 GPU-calibrated budgets",
+    "complete 64-layer decode FFN",
+    "recapture graphs after selecting the configuration",
+    "OPT-073 internal quality with legacy absolute visible",
+    "no long P/D protocol",
+    "historical oracles none"
+  ],
+  "report_path": "evidence/optimization/opt076-q4-reduction/REPORT.md"
+}

@@ -10,6 +10,9 @@ namespace qw38::cuda {
 constexpr char kLegalQ4DecodePathPacked[] = "packed";
 constexpr char kLegalQ4DecodePathIntegerQ8[] = "integer_q8";
 constexpr char kLegalQ4DecodePathIntegerQ81[] = "integer_q8_1";
+// OPT-076 packed-load / late-reduction Q8Block sibling. Not production until
+// admission; half-scale Q8_1 stays out of this path.
+constexpr char kLegalQ4DecodePathIntegerQ8Late[] = "integer_q8_late";
 
 // OPT-072 typed Q8_1 pairing: the UseQ81 Q4 consumer treats stored q8_sum as
 // integer sum(q). A sum(x) producer must not feed that consumer. Production
@@ -32,6 +35,11 @@ constexpr char kQ4LaunchVariantPairedIntegerQ8[] =
     "q4k_coop_gate_up_swiglu_prequant_q8";
 constexpr char kQ4LaunchVariantPairedIntegerTraceUnfused[] =
     "q4k_coop_mmv_prequant_q8_trace_unfused";
+constexpr char kQ4LaunchVariantCoopQ8Late[] = "q4k_coop_mmv_late_q8";
+constexpr char kQ4LaunchVariantCoopQ8LatePrequant[] =
+    "q4k_coop_mmv_late_prequant_q8";
+constexpr char kQ4LaunchVariantPairedIntegerQ8Late[] =
+    "q4k_coop_gate_up_swiglu_late_prequant_q8";
 
 constexpr int kQ4LaunchTraceCapacity = 8;
 
@@ -49,7 +57,8 @@ inline bool legal_q4_decode_path(const char* path) noexcept {
   return path != nullptr &&
          (std::strcmp(path, kLegalQ4DecodePathPacked) == 0 ||
           std::strcmp(path, kLegalQ4DecodePathIntegerQ8) == 0 ||
-          std::strcmp(path, kLegalQ4DecodePathIntegerQ81) == 0);
+          std::strcmp(path, kLegalQ4DecodePathIntegerQ81) == 0 ||
+          std::strcmp(path, kLegalQ4DecodePathIntegerQ8Late) == 0);
 }
 
 inline bool legal_q4_decode_warps_per_row(unsigned int warps) noexcept {
@@ -77,7 +86,8 @@ inline unsigned int effective_q4_decode_warps_per_row() noexcept {
 inline bool q4_decode_path_is_integer(const char* path) noexcept {
   return path != nullptr &&
          (std::strcmp(path, kLegalQ4DecodePathIntegerQ8) == 0 ||
-          std::strcmp(path, kLegalQ4DecodePathIntegerQ81) == 0);
+          std::strcmp(path, kLegalQ4DecodePathIntegerQ81) == 0 ||
+          std::strcmp(path, kLegalQ4DecodePathIntegerQ8Late) == 0);
 }
 
 inline bool q4_decode_uses_integer() noexcept {
@@ -89,10 +99,16 @@ inline bool q4_decode_uses_q8_1() noexcept {
                      kLegalQ4DecodePathIntegerQ81) == 0;
 }
 
+inline bool q4_decode_uses_late_reduction() noexcept {
+  return std::strcmp(effective_q4_decode_path(),
+                     kLegalQ4DecodePathIntegerQ8Late) == 0;
+}
+
 // Q8Block integer cooperative dots. Distinct from half-scale Q8_1.
 inline bool q4_decode_uses_integer_q8block() noexcept {
-  return std::strcmp(effective_q4_decode_path(),
-                     kLegalQ4DecodePathIntegerQ8) == 0;
+  const char* path = effective_q4_decode_path();
+  return std::strcmp(path, kLegalQ4DecodePathIntegerQ8) == 0 ||
+         std::strcmp(path, kLegalQ4DecodePathIntegerQ8Late) == 0;
 }
 
 inline void record_q4_launch_variant(const char* variant) noexcept {

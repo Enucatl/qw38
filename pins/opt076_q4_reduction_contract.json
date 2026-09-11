@@ -1,0 +1,96 @@
+{
+  "schema_version": 1,
+  "task": "OPT-076",
+  "yardstick": "q4_packed_load_late_reduction",
+  "claims_throughput": false,
+  "claims_performance_improvement": false,
+  "llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+  "gguf_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+  "token_generator": "(42 + index * 997) % 248320",
+  "control": "packed_paired_staged",
+  "staging": "q8_fp32",
+  "half_scale_forbidden": true,
+  "k_loop_shuffle_removed": true,
+  "min_saving_ms_per_token": 0.10,
+  "configurations": [
+    {
+      "id": "packed_paired_staged",
+      "q4_decode": "packed",
+      "ffn_decode": "paired_staged",
+      "warps_per_row": 4,
+      "role": "control",
+      "expected_gate_variant": "q4k_gate_up_swiglu_prequant",
+      "expected_up_variant": "q4k_gate_up_swiglu_prequant",
+      "expected_down_variant": "quant_mmv_packed"
+    },
+    {
+      "id": "late_w2",
+      "q4_decode": "integer_q8_late",
+      "ffn_decode": "paired_integer",
+      "warps_per_row": 2,
+      "role": "candidate",
+      "expected_gate_variant": "q4k_coop_gate_up_swiglu_late_prequant_q8",
+      "expected_up_variant": "q4k_coop_gate_up_swiglu_late_prequant_q8",
+      "expected_down_variant": "q4k_coop_mmv_late_q8"
+    },
+    {
+      "id": "late_w4",
+      "q4_decode": "integer_q8_late",
+      "ffn_decode": "paired_integer",
+      "warps_per_row": 4,
+      "role": "candidate",
+      "expected_gate_variant": "q4k_coop_gate_up_swiglu_late_prequant_q8",
+      "expected_up_variant": "q4k_coop_gate_up_swiglu_late_prequant_q8",
+      "expected_down_variant": "q4k_coop_mmv_late_q8"
+    }
+  ],
+  "tiny_cases": [
+    {"id": "M1_K256", "rows": 1, "columns": 256},
+    {"id": "M1_K512", "rows": 1, "columns": 512},
+    {"id": "M17_K256", "rows": 17, "columns": 256},
+    {"id": "M17_K512", "rows": 17, "columns": 512},
+    {"id": "M33_K256", "rows": 33, "columns": 256},
+    {"id": "M33_K512", "rows": 33, "columns": 512}
+  ],
+  "production_references": {
+    "sampled_rows": 16,
+    "captures_per_case": 4,
+    "roles": ["gate", "up", "down"]
+  },
+  "shapes": [
+    {"id": "gate_up", "rows": 17408, "columns": 5120},
+    {"id": "down", "rows": 5120, "columns": 17408}
+  ],
+  "legacy_abs": 0.0003,
+  "opt074_families": ["q4_gate_up_k5120", "q4_down_k17408"],
+  "feedback_warmups": 1,
+  "feedback_samples": 3,
+  "feedback_engine_pairs": 1,
+  "acceptance_warmups": 3,
+  "acceptance_samples": 10,
+  "acceptance_engine_pairs": 5,
+  "component_t_critical_df9": 2.262,
+  "engine_t_critical_df4": 2.132,
+  "native_test": "build/qw38-cuda-opt076-q4-reduction-test",
+  "native_replay": "build/qw38-cuda-component-replay",
+  "native_probe": "build/qw38-cuda-optimization-engine-probe",
+  "required_fixture_keys": [
+    "schema_version",
+    "task",
+    "mode",
+    "llama_revision",
+    "gguf_sha256",
+    "claims_throughput",
+    "configurations",
+    "control",
+    "survivor",
+    "shipping_q4_decode",
+    "shipping_ffn_decode",
+    "production_kept",
+    "quality",
+    "numeric",
+    "report_path"
+  ],
+  "verdicts": ["keep", "retain_packed", "performance_rejected", "quality_blocked", "inconclusive"],
+  "report_path": "evidence/optimization/opt076-q4-reduction/REPORT.md"
+}

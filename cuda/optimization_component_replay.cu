@@ -54,6 +54,7 @@ struct Options final {
   const char* q8_layout = nullptr;
   const char* q4_decode = nullptr;
   const char* ffn_decode = nullptr;
+  unsigned int q4_warps = 0;
   int mmq_async_x = -1;
   int warmups = -1;
   int samples = -1;
@@ -67,7 +68,8 @@ int usage(const char* argv0) {
                "decode-mixer|prompt-ffn|acceptance|hardware] [MODEL] "
                "[--cache-mode hot|rotating] [--capture-key KEY] "
                "[--q8-layout r1_w4|r2_w2] [--mmq-async-x 0|1] "
-               "[--q4-decode packed|integer_q8] "
+               "[--q4-decode packed|integer_q8|integer_q8_late] "
+               "[--q4-warps 2|4] "
                "[--ffn-decode paired_staged|shared_stage|paired_integer] "
                "[--warmups N] [--samples N] [--ncu] [--corrupt-guard]\n",
                argv0);
@@ -89,6 +91,8 @@ int parse_args(int argc, char** argv, Options* options) {
       options->mmq_async_x = std::atoi(argv[++index]);
     } else if (std::strcmp(arg, "--q4-decode") == 0 && index + 1 < argc) {
       options->q4_decode = argv[++index];
+    } else if (std::strcmp(arg, "--q4-warps") == 0 && index + 1 < argc) {
+      options->q4_warps = static_cast<unsigned int>(std::atoi(argv[++index]));
     } else if (std::strcmp(arg, "--ffn-decode") == 0 && index + 1 < argc) {
       options->ffn_decode = argv[++index];
     } else if (std::strcmp(arg, "--warmups") == 0 && index + 1 < argc) {
@@ -1333,8 +1337,10 @@ int run_family(const Options& options, qw38::cuda::ReplayFamily family) {
     qw38::cuda::set_mmq_async_x_override(options.mmq_async_x != 0);
   }
   if (options.q4_decode != nullptr &&
-      !qw38::cuda::apply_q4_decode_ident(options.q4_decode, 4)) {
-    std::fprintf(stderr, "invalid --q4-decode %s\n", options.q4_decode);
+      !qw38::cuda::apply_q4_decode_ident(
+          options.q4_decode, options.q4_warps > 0 ? options.q4_warps : 4U)) {
+    std::fprintf(stderr, "invalid --q4-decode %s warps=%u\n", options.q4_decode,
+                 options.q4_warps);
     if (rounds != nullptr) std::fclose(rounds);
     return 1;
   }
@@ -1415,6 +1421,32 @@ int run_family(const Options& options, qw38::cuda::ReplayFamily family) {
       qw38::cuda::last_ffn_decode_dispatch();
   std::printf(
       "QW38_OPT075_NATIVE_COUNTS={\"schema_version\":1,\"task\":\"OPT-075\","
+      "\"family\":\"%s\",\"tier\":\"%s\",\"warmups\":%d,\"samples\":%d,"
+      "\"observed_warmups\":%d,\"observed_samples\":%d,"
+      "\"observed_candidates\":1,\"observed_shapes\":1,\"observed_tier\":\"%s\","
+      "\"pairs\":1,\"acceptance_executed\":%s,\"keep\":false,"
+      "\"capture_key\":\"%s\",\"q4_decode\":\"%s\",\"ffn_decode\":\"%s\","
+      "\"effective_q4_decode\":\"%s\",\"effective_ffn_decode\":\"%s\","
+      "\"warps_per_row\":%u,\"gate_variant\":\"%s\",\"up_variant\":\"%s\","
+      "\"down_variant\":\"%s\",\"gate_up_stage_count\":%d,"
+      "\"down_stage_count\":%d,\"captured_in_graph\":%s,\"staging\":\"%s\","
+      "\"q8_decode\":\"%s\",\"q6_decode\":\"%s\","
+      "\"invalidate_q8_decode_staging\":true}\n",
+      qw38::cuda::replay_family_name(family), qw38::cuda::test_tier_name(),
+      warmups, samples, warmups, samples, qw38::cuda::test_tier_name(),
+      json_bool(qw38::cuda::test_tier() == qw38::cuda::TestTier::kAcceptance),
+      capture_key, options.q4_decode != nullptr ? options.q4_decode : "installed",
+      options.ffn_decode != nullptr ? options.ffn_decode : "installed",
+      qw38::cuda::effective_q4_decode_path(),
+      qw38::cuda::effective_ffn_decode_path(),
+      qw38::cuda::effective_q4_decode_warps_per_row(), ffn_launch.gate_variant,
+      ffn_launch.up_variant, ffn_launch.down_variant,
+      ffn_launch.gate_up_stage_count, ffn_launch.down_stage_count,
+      json_bool(ffn_launch.captured_in_graph), ffn_launch.staging,
+      qw38::cuda::selected_q8_decode_path(),
+      qw38::cuda::selected_q6_decode_path());
+  std::printf(
+      "QW38_OPT076_NATIVE_COUNTS={\"schema_version\":1,\"task\":\"OPT-076\","
       "\"family\":\"%s\",\"tier\":\"%s\",\"warmups\":%d,\"samples\":%d,"
       "\"observed_warmups\":%d,\"observed_samples\":%d,"
       "\"observed_candidates\":1,\"observed_shapes\":1,\"observed_tier\":\"%s\","

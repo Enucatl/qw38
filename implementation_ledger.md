@@ -168,7 +168,7 @@ New kernel tasks are conditional on measured opportunity and valid admission.
 | OPT-073 | Resolve functional authority failures and version quality decisions | OPT-058, OPT-069, OPT-072 | done | Exact prompts/scorers audited, arithmetic truth preserved, absolute and regression verdicts explicit, and failed required quality stops release before long timing | [`tasks/OPT-073.md`](tasks/OPT-073.md); [`pins/opt073_quality_policy_contract.json`](pins/opt073_quality_policy_contract.json); [`pins/opt073_iteration_contract.json`](pins/opt073_iteration_contract.json); [`fixtures/opt073_quality_policy.json`](fixtures/opt073_quality_policy.json); [`tools/opt073_quality_policy.py`](tools/opt073_quality_policy.py); [`tests/test_opt073_quality_policy.py`](tests/test_opt073_quality_policy.py); [`tests/test_opt069_batch_gate.py`](tests/test_opt069_batch_gate.py); [`tools/opt069_batch_gate.py`](tools/opt069_batch_gate.py); [`tools/run_optimization_task.py`](tools/run_optimization_task.py); [`Makefile`](Makefile); [`evidence/optimization/opt073-quality-policy/REPORT.md`](evidence/optimization/opt073-quality-policy/REPORT.md); verification 2026-09-11T16:02:30Z |
 | OPT-074 | Complete real production-shape llama GPU numerical admission | OPT-059, OPT-071, OPT-072 | done | Full-M actual GPU dispatch, sampled independent FP64 and frozen held-out budgets cover production Q4 and selected Q8/Q6; missing coverage cannot become admission | [`tasks/OPT-074.md`](tasks/OPT-074.md); [`pins/opt074_production_gpu_admission_contract.json`](pins/opt074_production_gpu_admission_contract.json); [`pins/opt074_iteration_contract.json`](pins/opt074_iteration_contract.json); [`fixtures/opt074_production_gpu_admission.json`](fixtures/opt074_production_gpu_admission.json); [`tools/opt074_production_gpu_admission.py`](tools/opt074_production_gpu_admission.py); [`tests/test_opt074_production_gpu_admission.py`](tests/test_opt074_production_gpu_admission.py); [`tools/llama_authority/projection_export.cpp`](tools/llama_authority/projection_export.cpp); [`tools/llama_authority/build_projection_export.sh`](tools/llama_authority/build_projection_export.sh); [`cuda/full_scheduler.h`](cuda/full_scheduler.h); [`cuda/full_scheduler.cu`](cuda/full_scheduler.cu); [`cuda/opt043_activation_capture_test.cu`](cuda/opt043_activation_capture_test.cu); [`Makefile`](Makefile); [`evidence/optimization/opt074-production-gpu-admission/REPORT.md`](evidence/optimization/opt074-production-gpu-admission/REPORT.md); verification 2026-09-11T16:28:16Z |
 | OPT-075 | Admit or reject existing unfused and paired cooperative Q4 FFN | OPT-070, OPT-073, OPT-074 | done | Current packed versus existing integer survivor passes versioned production quality, actual all-leg dispatch and complete rotating/E2E acceptance, or documented retained packed | [`tasks/OPT-075.md`](tasks/OPT-075.md); [`pins/opt075_q4_production_admission_contract.json`](pins/opt075_q4_production_admission_contract.json); [`pins/opt075_iteration_contract.json`](pins/opt075_iteration_contract.json); [`fixtures/opt075_q4_production_admission.json`](fixtures/opt075_q4_production_admission.json); [`tools/opt075_q4_production_admission.py`](tools/opt075_q4_production_admission.py); [`tests/test_opt075_q4_production_admission.py`](tests/test_opt075_q4_production_admission.py); [`tools/run_optimization_task.py`](tools/run_optimization_task.py); [`cuda/q4k_decode_path.cuh`](cuda/q4k_decode_path.cuh); [`cuda/ffn_decode_path.cuh`](cuda/ffn_decode_path.cuh); [`cuda/optimization_component_replay.cu`](cuda/optimization_component_replay.cu); [`cuda/optimization_component_replay.h`](cuda/optimization_component_replay.h); [`cuda/optimization_engine_probe.cu`](cuda/optimization_engine_probe.cu); [`Makefile`](Makefile); [`evidence/optimization/opt075-q4-production-admission/REPORT.md`](evidence/optimization/opt075-q4-production-admission/REPORT.md); verification 2026-09-11T17:28:23Z |
-| OPT-076 | Remove Q4 K-loop shuffle reductions and scalar unpacking | OPT-071, OPT-074, OPT-075 | pending | Two bounded packed-load/late-reduction candidates yield an admitted complete FFN saving with staged semantics intact, or measured rejection | [`tasks/OPT-076.md`](tasks/OPT-076.md) |
+| OPT-076 | Remove Q4 K-loop shuffle reductions and scalar unpacking | OPT-071, OPT-074, OPT-075 | done | Two bounded packed-load/late-reduction candidates yield an admitted complete FFN saving with staged semantics intact, or measured rejection | [`tasks/OPT-076.md`](tasks/OPT-076.md); [`pins/opt076_q4_reduction_contract.json`](pins/opt076_q4_reduction_contract.json); [`pins/opt076_iteration_contract.json`](pins/opt076_iteration_contract.json); [`fixtures/opt076_q4_reduction.json`](fixtures/opt076_q4_reduction.json); [`tools/opt076_q4_reduction.py`](tools/opt076_q4_reduction.py); [`tests/test_opt076_q4_reduction.py`](tests/test_opt076_q4_reduction.py); [`tools/run_optimization_task.py`](tools/run_optimization_task.py); [`cuda/q4k_decode_path.cuh`](cuda/q4k_decode_path.cuh); [`cuda/q4k_decode_dots.cuh`](cuda/q4k_decode_dots.cuh); [`cuda/q4k_decode_dots.cu`](cuda/q4k_decode_dots.cu); [`cuda/quant_mmv.h`](cuda/quant_mmv.h); [`cuda/optimization_component_replay.cu`](cuda/optimization_component_replay.cu); [`cuda/optimization_engine_probe.cu`](cuda/optimization_engine_probe.cu); [`cuda/opt076_q4_reduction_test.cu`](cuda/opt076_q4_reduction_test.cu); [`Makefile`](Makefile); [`evidence/optimization/opt076-q4-reduction/REPORT.md`](evidence/optimization/opt076-q4-reduction/REPORT.md); verification 2026-09-11T17:50:30Z |
 | OPT-077 | Parallelize decode GDN state reductions across key/value tiles | OPT-070, OPT-071, OPT-073 | pending | Complete 48-layer GDN benefits from bounded parallel FP32 recurrence with calibrated quality, exact state isolation and short E2E guards, or no-go/rejection | [`tasks/OPT-077.md`](tasks/OPT-077.md) |
 | OPT-078 | Hoist decode query preparation and vector-load KV | OPT-070, OPT-071, OPT-073 | pending | Preparation-inclusive one-token attention wins with fixed 16 partitions, unchanged arithmetic/KV visibility and bounded E2E validation, or retained control | [`tasks/OPT-078.md`](tasks/OPT-078.md) |
 | OPT-079 | Convert prompt attention KV operands once per shared stage | OPT-070, OPT-071, OPT-073 | pending | One conditional conversion-reuse candidate preserves exact F16 operands and async ownership and wins complete P cost, or resource/performance no-go | [`tasks/OPT-079.md`](tasks/OPT-079.md) |
@@ -6515,4 +6515,42 @@ statements below are historical, not the current execution order.
 - Marked OPT-075 `done`; delivery is limited to the verified task scope plus
   this ledger/audit bookkeeping. `plan.md` is unchanged. OPT-016 and OPT-056 stay
   `blocked`. Next eligible pending by dependency order: **OPT-076**. No tok/s
+  claim (`claims_throughput=false`).
+
+### 2026-09-11T17:52:00Z — OPT-076 Q4 late-reduction screen delivered
+
+- Screened packed/paired_staged control and two Q8Block packed-load /
+  late-reduction candidates (2 and 4 warps/row, paired_integer) on repaired
+  OPT-071 captures. Numeric legacy and versioned production rules pass;
+  OPT-074 Q4 families remain v2-unadmitted. Complete FFN acceptance n=10:
+  packed 16.421 ms vs late_w4 9.818 ms (positive CI). Engine D2048+32
+  non-regression holds. Quality-v3 absolute fail, engine NR pass. Verdict:
+  **retain_packed** / `missing_evidence`; shipping stays `packed` /
+  `paired_staged`. Coupled IDs: none. No production pin change. **OPT-075
+  unaffected.**
+- Acceptance: host contract, three-config screen, late-path dispatch proof,
+  identity-cached quality, complete rotating/E2E evidence, and documented
+  retain_packed decision; 10 pytest cases; native tiny/production numeric
+  plus SASS/resource; no added spills.
+- Acceptance evidence: [`tasks/OPT-076.md`](tasks/OPT-076.md);
+  [`pins/opt076_q4_reduction_contract.json`](pins/opt076_q4_reduction_contract.json);
+  [`pins/opt076_iteration_contract.json`](pins/opt076_iteration_contract.json);
+  [`fixtures/opt076_q4_reduction.json`](fixtures/opt076_q4_reduction.json);
+  [`tools/opt076_q4_reduction.py`](tools/opt076_q4_reduction.py);
+  [`tests/test_opt076_q4_reduction.py`](tests/test_opt076_q4_reduction.py);
+  [`tools/run_optimization_task.py`](tools/run_optimization_task.py);
+  [`cuda/q4k_decode_path.cuh`](cuda/q4k_decode_path.cuh);
+  [`cuda/q4k_decode_dots.cuh`](cuda/q4k_decode_dots.cuh);
+  [`cuda/q4k_decode_dots.cu`](cuda/q4k_decode_dots.cu);
+  [`cuda/quant_mmv.h`](cuda/quant_mmv.h);
+  [`cuda/optimization_component_replay.cu`](cuda/optimization_component_replay.cu);
+  [`cuda/optimization_engine_probe.cu`](cuda/optimization_engine_probe.cu);
+  [`cuda/opt076_q4_reduction_test.cu`](cuda/opt076_q4_reduction_test.cu);
+  [`Makefile`](Makefile);
+  [`evidence/optimization/opt076-q4-reduction/REPORT.md`](evidence/optimization/opt076-q4-reduction/REPORT.md).
+  Proof is measured retain_packed — not a shipping speedup. **tok/s delta vs
+  packed baseline:** 0 (shipping unchanged).
+- Marked OPT-076 `done`; delivery is limited to the verified task scope plus
+  this ledger/audit bookkeeping. `plan.md` is unchanged. OPT-016 and OPT-056 stay
+  `blocked`. Next eligible pending by dependency order: **OPT-077**. No tok/s
   claim (`claims_throughput=false`).

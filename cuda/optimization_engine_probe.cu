@@ -47,6 +47,7 @@ struct Options final {
   const char* q8_layout = nullptr;
   const char* q4_decode = nullptr;
   const char* ffn_decode = nullptr;
+  unsigned int q4_warps = 0;
   int mmq_async_x = -1;
   bool graph = false;
   bool eager = false;
@@ -109,7 +110,8 @@ int usage(const char* argv0) {
                "q8-ab|mmq-ab|q4-ab] "
                "[--prompt N] [--prefix N] [--output-tokens N] [--runs N] "
                "[--pairs N] [--q8-layout r1_w4|r2_w2] [--mmq-async-x 0|1] "
-               "[--q4-decode packed|integer_q8] "
+               "[--q4-decode packed|integer_q8|integer_q8_late] "
+               "[--q4-warps 2|4] "
                "[--ffn-decode paired_staged|shared_stage|paired_integer] "
                "[--selector NAME] [--modes graph,eager] [--skip-logits]\n",
                argv0);
@@ -149,6 +151,8 @@ int parse_args(int argc, char** argv, Options* options) {
       options->mmq_async_x = std::atoi(argv[++index]);
     } else if (std::strcmp(arg, "--q4-decode") == 0 && index + 1 < argc) {
       options->q4_decode = argv[++index];
+    } else if (std::strcmp(arg, "--q4-warps") == 0 && index + 1 < argc) {
+      options->q4_warps = static_cast<unsigned int>(std::atoi(argv[++index]));
     } else if (std::strcmp(arg, "--ffn-decode") == 0 && index + 1 < argc) {
       options->ffn_decode = argv[++index];
     } else if (std::strcmp(arg, "--selector") == 0 && index + 1 < argc) {
@@ -560,8 +564,10 @@ int run_engine(const Options& options, bool correctness) {
     qw38::cuda::set_mmq_async_x_override(options.mmq_async_x != 0);
   }
   if (options.q4_decode != nullptr &&
-      !qw38::cuda::apply_q4_decode_ident(options.q4_decode, 4)) {
-    std::fprintf(stderr, "invalid --q4-decode %s\n", options.q4_decode);
+      !qw38::cuda::apply_q4_decode_ident(
+          options.q4_decode, options.q4_warps > 0 ? options.q4_warps : 4U)) {
+    std::fprintf(stderr, "invalid --q4-decode %s warps=%u\n", options.q4_decode,
+                 options.q4_warps);
     return 2;
   }
   if (options.ffn_decode != nullptr &&
@@ -745,9 +751,12 @@ int run_keep_ab(const Options& options) {
       if (q4) {
         const char* q4_path = candidate_side ? candidate_q4 : control_q4;
         const char* ffn_path = candidate_side ? candidate_ffn : control_ffn;
-        if (!qw38::cuda::apply_q4_decode_ident(q4_path, 4) ||
+        const unsigned int warps =
+            candidate_side && options.q4_warps > 0 ? options.q4_warps : 4U;
+        if (!qw38::cuda::apply_q4_decode_ident(q4_path, warps) ||
             !qw38::cuda::apply_ffn_decode_ident(ffn_path)) {
-          std::fprintf(stderr, "invalid q4/ffn path %s/%s\n", q4_path, ffn_path);
+          std::fprintf(stderr, "invalid q4/ffn path %s/%s warps=%u\n", q4_path,
+                       ffn_path, warps);
           return 2;
         }
       } else if (q8) {
@@ -832,6 +841,18 @@ int run_keep_ab(const Options& options) {
                                                                    : "false");
   std::printf(
       "QW38_OPT075_NATIVE_COUNTS={\"schema_version\":1,\"task\":\"OPT-075\","
+      "\"family\":\"q4\",\"tier\":\"%s\",\"warmups\":0,\"samples\":%d,"
+      "\"observed_warmups\":0,\"observed_samples\":%d,\"observed_candidates\":2,"
+      "\"observed_shapes\":1,\"observed_tier\":\"%s\",\"pairs\":%d,"
+      "\"acceptance_executed\":%s,\"keep\":false,"
+      "\"override_before_capture_applied\":true,"
+      "\"graph_capture_separate\":true,\"recapture_after_selector\":true}\n",
+      qw38::cuda::test_tier_name(), pairs, pairs, qw38::cuda::test_tier_name(),
+      pairs,
+      qw38::cuda::test_tier() == qw38::cuda::TestTier::kAcceptance ? "true"
+                                                                   : "false");
+  std::printf(
+      "QW38_OPT076_NATIVE_COUNTS={\"schema_version\":1,\"task\":\"OPT-076\","
       "\"family\":\"q4\",\"tier\":\"%s\",\"warmups\":0,\"samples\":%d,"
       "\"observed_warmups\":0,\"observed_samples\":%d,\"observed_candidates\":2,"
       "\"observed_shapes\":1,\"observed_tier\":\"%s\",\"pairs\":%d,"
