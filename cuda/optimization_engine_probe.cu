@@ -1,4 +1,7 @@
+#include "ffn_decode_path.cuh"
 #include "full_scheduler.h"
+#include "q4k_decode_path.cuh"
+#include "q8_decode_path.cuh"
 #include "quant_mmv.h"
 #include "test_tier.h"
 
@@ -566,13 +569,21 @@ int run_engine(const Options& options, bool correctness) {
               "\"graph_frontier\":%zu,\"eager_frontier\":%zu,"
               "\"logits_copied\":true,\"p95_diagnostic\":%s,"
               "\"override_after_capture_ignored\":%s,"
-              "\"captured_path\":\"%s\",\"model_loaded_once\":true}\n",
+              "\"captured_path\":\"%s\",\"q4_decode\":\"%s\","
+              "\"q8_decode\":\"%s\",\"q8_rows_skinny\":%u,"
+              "\"q8_layout_warps_skinny\":%u,\"ffn_decode\":\"%s\","
+              "\"model_loaded_once\":true}\n",
               prompt, prefix, output_tokens, options.runs,
               static_cast<double>(graph_ms), static_cast<double>(eager_ms),
               static_cast<double>(control_tok_s),
               static_cast<double>(candidate_tok_s), graph_frontier,
               eager_frontier, correctness ? "false" : "true",
-              override_ignored ? "true" : "false", captured_path);
+              override_ignored ? "true" : "false", captured_path,
+              qw38::cuda::selected_q4_decode_path(),
+              qw38::cuda::selected_q8_decode_path(),
+              qw38::cuda::selected_q8_decode_rows_skinny(),
+              qw38::cuda::selected_q8_decode_layout_warps_skinny(),
+              qw38::cuda::selected_ffn_decode_path());
   std::printf("status=passed\n");
   return 0;
 }

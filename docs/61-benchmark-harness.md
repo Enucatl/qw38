@@ -1,6 +1,6 @@
 # The benchmark harness
 
-[Index](README.md) · Implementation tasks: BEN-001, OPT-032, OPT-038, OPT-056, EDU-046, and SCH-002 in
+[Index](README.md) · Implementation tasks: BEN-001, OPT-032, OPT-038, OPT-056, OPT-069, EDU-046, and SCH-002 in
 [`implementation_ledger.md`](../implementation_ledger.md) · Contracts:
 [`pins/benchmark_contract.json`](../pins/benchmark_contract.json),
 [`pins/opt032_decode_oracle_contract.json`](../pins/opt032_decode_oracle_contract.json),
@@ -236,6 +236,14 @@ secondary metric only. The same-sitting exclusive RTX 5090 outcome gate versus
 pinned llama.cpp did not pass (P 2808.50 vs 3263.52, D128 37.48 vs 68.93, D2048
 35.72 vs 67.34 tok/s). Live numbers stay in
 [`evidence/optimization/opt056-performance-gate/REPORT.md`](../evidence/optimization/opt056-performance-gate/REPORT.md).
+OPT-069 reuses those same P/D protocols plus original 2K parity and full
+quality v2 on the frozen 062–068 combination. **Measured sitting unpassed on
+the three outcomes:** P 2914.66 vs llama 3142.52 (baseline 2808.50), D128
+37.18 vs 68.87 (baseline 37.48), D2048 35.45 vs 67.34 (baseline 35.72) tok/s.
+Parity gap is `Tq-Tl`; the +5% bar is `Tq-Tl/1.05`. Quality v2 fails
+`task_arithmetic`. Preflight is not release evidence. The +5% outcome stays
+failed. Live numbers stay in
+[`evidence/optimization/opt069-batch-gate/REPORT.md`](../evidence/optimization/opt069-batch-gate/REPORT.md).
 
 ## Reproduce a smoke safely
 

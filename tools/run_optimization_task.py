@@ -250,6 +250,17 @@ def describe_plan(
         workload = workloads[name]
         product = loop_product(workload)
         total += product
+        extras: list[str] = []
+        for key in (
+            "engines",
+            "configurations",
+            "prefixes",
+            "replicates",
+            "output_tokens",
+        ):
+            if key in workload:
+                extras.append(f"{key}={workload[key]}")
+        extra = (" " + " ".join(str(item) for item in extras)) if extras else ""
         lines.append(
             f"{name}: target={workload.get('target', target)} "
             f"tier={workload.get('tier', name)} "
@@ -261,6 +272,7 @@ def describe_plan(
             f"modes={workload.get('execution_modes', 1)} "
             f"pairs={workload.get('control_candidate_pairs', 1)} "
             f"product={product}"
+            f"{extra}"
         )
     lines.append(f"loop_product_total={total}")
     if mode == "release":
@@ -749,8 +761,30 @@ class OptimizationRunner:
         workload = contract["workloads"][name]
         tier = validate_tier(str(workload.get("tier", name)))
         target = str(workload.get("target", contract["target"]))
-        values = {**workload, "model": str(contract.get("model", ""))}
+        values = {
+            **workload,
+            "model": str(contract.get("model", "")),
+            "run_dir": str(run_dir),
+            "root": str(self.root),
+        }
         args = [str(arg).format(**values) for arg in workload.get("args", [])]
+        if str(workload.get("runner", "docker")) == "host":
+            completed = self._launch(args, timeout_s, run_dir / name, None)
+            return {
+                "success": completed.returncode == 0 and not completed.terminated,
+                "result_class": (
+                    "timeout"
+                    if completed.terminated
+                    else "ok"
+                    if completed.returncode == 0
+                    else "numerical_failure"
+                ),
+                "message": completed.stderr,
+                "tokens": int(workload.get("tokens", 0)),
+                "load": int(workload.get("load_model", 0)),
+                "reference": int(workload.get("reference", 0)),
+                "selected_paths": [workload.get("selector", "ffn_only")],
+            }
         docker_name = f"qw38-{contract['task'].lower()}-{name}-{uuid.uuid4().hex[:8]}"
         command = self._docker_command(
             contract,
@@ -789,6 +823,7 @@ class OptimizationRunner:
         timeout_s: float,
         run_dir: Path,
     ) -> dict[str, Any]:
+        started = self.clock.monotonic()
         docker_name = f"qw38-{contract['task'].lower()}-release-{uuid.uuid4().hex[:8]}"
         command = self._docker_command(
             contract,
@@ -797,9 +832,33 @@ class OptimizationRunner:
             name=docker_name,
         )
         completed = self._launch(command, timeout_s, run_dir / "release", docker_name)
+        if completed.returncode != 0:
+            return {
+                "success": False,
+                "result_class": "release_failed",
+                "selected_paths": list(HISTORICAL_ORACLE_TARGETS),
+            }
+        host = list(
+            contract.get("modes", {}).get("release", {}).get("release_host_command", [])
+        )
+        if not host:
+            return {
+                "success": True,
+                "result_class": "ok",
+                "selected_paths": list(HISTORICAL_ORACLE_TARGETS),
+            }
+        remaining = timeout_s - (self.clock.monotonic() - started)
+        values = {
+            "run_dir": str(run_dir),
+            "root": str(self.root),
+            "model": str(contract.get("model", "")),
+        }
+        host_command = [str(part).format(**values) for part in host]
+        sitting = self._launch(host_command, remaining, run_dir / "release-host", None)
         return {
-            "success": completed.returncode == 0,
-            "result_class": "ok" if completed.returncode == 0 else "release_failed",
+            "success": sitting.returncode == 0,
+            "result_class": "ok" if sitting.returncode == 0 else "release_failed",
+            "message": sitting.stderr if sitting.returncode != 0 else "",
             "selected_paths": list(HISTORICAL_ORACLE_TARGETS),
         }
 

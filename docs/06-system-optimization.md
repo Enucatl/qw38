@@ -698,6 +698,28 @@ NLL passed. Original 2K evidence: Quartz **3012.69507** vs llama
 completion is not a pass. `gate.passed` is false. Live numbers stay in
 [`evidence/optimization/opt056-performance-gate/REPORT.md`](../evidence/optimization/opt056-performance-gate/REPORT.md).
 
+## Combined batch outcome sitting (OPT-069)
+
+**Measured, RTX 5090, unpassed outcomes.** After OPT-062–068 keep/reject,
+production freezes packed Q4, paired-staged FFN decode, Q8 `r2_w2`, retained
+`i128_j128` tiles, MMQ `fma_async_x`, prompt-pair `off`, and NVCCFLAGS
+`-O2 --fmad=false`. Same-sitting exclusive P/D/2K versus pinned llama.cpp:
+
+| Workload | Quartz tok/s | llama tok/s | OPT-056 baseline | vs baseline |
+|---|---:|---:|---:|---|
+| P 4096 | 2914.65698 | 3142.517034 | 2808.49609 | +106.16 (1.038×) |
+| D128 | 37.1789093 | 68.8708796 | 37.4816246 | −0.30 (0.992×) |
+| D2048 | 35.4498482 | 67.3394867 | 35.7208481 | −0.27 (0.992×) |
+
+Parity gap is `Tq-Tl` (P 101.90 ms); the +5% bar is `Tq-Tl/1.05` (P 163.96 ms).
+Decode p95 remains worse than llama (D128 27.02 vs 14.53 ms; D2048 28.31 vs
+14.63 ms). Quality v2 fails `task_arithmetic` (A vs expected B); NLL/recurrence
+pass. 2K point comparison Quartz 3132.88379 vs llama 3132.053862. Three
+outcomes: internal improvement with quality **unpassed**; llama parity
+**unpassed**; original +5% outcome **unpassed**. `gate.passed` is false. The
+end-to-end +5% gate stays blocked. Live numbers stay in
+[`evidence/optimization/opt069-batch-gate/REPORT.md`](../evidence/optimization/opt069-batch-gate/REPORT.md).
+
 ## Warp-owned prompt QK microtiles (OPT-041)
 
 **Measured, RTX 5090:** production prompt fattn on Ada+ stream-K with

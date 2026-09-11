@@ -980,6 +980,25 @@ baseline.
   OPT-016 2K parity evidence; candidate-task completion alone is insufficient;
   does not redefine the 2K llama.cpp parity gate; QLT-001 remains its own
   owner; Session TTFT does not replace the historical workload protocol.
+- OPT-069 is the combined-batch validation sitting after the 062-068 keep/reject
+  freeze (packed Q4, paired-staged FFN decode, Q8 `r2_w2`, retained `i128_j128`,
+  MMQ `fma_async_x`, prompt-pair `off`, NVCCFLAGS `-O2 --fmad=false`). Measured
+  sitting 2026-09-11T12:29:36Z reports three unpassed outcomes: internal
+  improvement with quality (P 2914.65698 vs baseline 2808.49609 but D128/D2048
+  slightly slower and quality v2 fail); llama parity unpassed (P 2914.65698 vs
+  3142.517034, D128 37.1789093 vs 68.8708796, D2048 35.4498482 vs 67.3394867);
+  original +5% outcome unpassed (`gate.passed` false). Parity gap is Tq-Tl; +5%
+  bar is Tq-Tl/1.05. 2K point comparison 3132.88379 vs 3132.053862. Preflight is
+  not release evidence. The schema-1 contract, fixture, and report are
+  [`pins/opt069_batch_gate_contract.json`](../pins/opt069_batch_gate_contract.json),
+  [`fixtures/opt069_batch_gate.json`](../fixtures/opt069_batch_gate.json),
+  and
+  [`evidence/optimization/opt069-batch-gate/REPORT.md`](../evidence/optimization/opt069-batch-gate/REPORT.md).
+  Proof limit: combined freeze of OPT-062-068 keep/reject selectors; same-sitting
+  P/D128/D2048 versus pinned llama.cpp; parity gap is Tq-Tl; +5% throughput gap
+  is Tq-Tl/1.05; do not label the parity gap as the +5% bar; full quality v2;
+  original OPT-016 2K parity evidence; OPT-056 and OPT-016 stay blocked unless
+  their gates pass; preflight is not release evidence.
 - OPT-041 is a local derivation over admitted Ada+ stream-K fattn with
   register-resident VKQ and dual-F16 probability×V MMA. It assigns each of
   eight 16×8 QK microtiles to one of four warps (`tile_id % 4`), lets the

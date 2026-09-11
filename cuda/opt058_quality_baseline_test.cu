@@ -38,6 +38,8 @@ struct Options final {
   const char* bundle = nullptr;
   const char* llama_oracle = nullptr;
   const char* prompt_set = "v2";
+  const char* case_name = nullptr;
+  std::size_t max_targets = 0;
 };
 
 struct BundleCase final {
@@ -63,7 +65,8 @@ int usage(const char* argv0) {
   std::fprintf(stderr,
                "usage: %s [--workload smoke|scheduler|functional|"
                "quality-baseline] [MODEL] [--bundle PATH] "
-               "[--llama-oracle PATH] [--prompt-set v2|original]\n",
+               "[--llama-oracle PATH] [--prompt-set v2|original] "
+               "[--case NAME] [--max-targets N]\n",
                argv0);
   return 2;
 }
@@ -79,6 +82,13 @@ int parse_args(int argc, char** argv, Options* options) {
       options->llama_oracle = argv[++index];
     } else if (std::strcmp(arg, "--prompt-set") == 0 && index + 1 < argc) {
       options->prompt_set = argv[++index];
+    } else if (std::strcmp(arg, "--case") == 0 && index + 1 < argc) {
+      options->case_name = argv[++index];
+    } else if (std::strcmp(arg, "--max-targets") == 0 && index + 1 < argc) {
+      char* end = nullptr;
+      const unsigned long parsed = std::strtoul(argv[++index], &end, 10);
+      if (end == argv[index] || *end != '\0' || parsed == 0) return usage(argv[0]);
+      options->max_targets = static_cast<std::size_t>(parsed);
     } else if (arg[0] != '-' && options->model == nullptr) {
       options->model = arg;
     } else {
@@ -305,9 +315,12 @@ int load_model(const char* path, qw38::cuda::ResidentModel* model,
 void print_selectors() {
   std::printf(
       "\"selectors\":{\"q4_decode\":\"%s\",\"q8_decode\":\"%s\","
+      "\"q8_rows_skinny\":%u,\"q8_layout_warps_skinny\":%u,"
       "\"ffn_decode\":\"%s\",\"execution_graph\":\"%s\",\"rms_norm\":\"%s\"}",
       qw38::cuda::selected_q4_decode_path(),
       qw38::cuda::selected_q8_decode_path(),
+      qw38::cuda::selected_q8_decode_rows_skinny(),
+      qw38::cuda::selected_q8_decode_layout_warps_skinny(),
       qw38::cuda::selected_ffn_decode_path(),
       qw38::cuda::selected_execution_graph_path(),
       qw38::cuda::selected_rms_norm_path());
@@ -703,7 +716,7 @@ int score_case(const qw38::cuda::ResidentModel& model, const BundleCase& item,
                qw38::cuda::SchedulerSession* session,
                qw38::cuda::SchedulerWorkspace* workspace,
                qw38::cuda::SchedulerGraphs* graphs, double* mean_nll,
-               std::size_t* scored) {
+               std::size_t* scored, std::size_t max_targets) {
   qw38::Status status = session->reset();
   if (!status.is_ok()) return fail_status(status);
   std::vector<std::size_t> context(item.context.begin(), item.context.end());
@@ -720,6 +733,7 @@ int score_case(const qw38::cuda::ResidentModel& model, const BundleCase& item,
   double total = 0.0;
   *scored = 0;
   for (std::uint32_t target : item.target) {
+    if (max_targets != 0 && *scored >= max_targets) break;
     const FiniteSummary summary = inspect_finite(logits.data(), logits.size());
     if (!summary.ok) {
       std::fprintf(stderr, "nonfinite logits scoring %s first=%zu\n",
@@ -771,10 +785,11 @@ int run_quality_baseline(const Options& options) {
   std::printf(",\"cases\":[");
   bool first = true;
   for (const auto& item : cases) {
+    if (options.case_name != nullptr && item.name != options.case_name) continue;
     double mean = 0.0;
     std::size_t scored = 0;
-    const int rc =
-        score_case(model, item, &session, &workspace, &graphs, &mean, &scored);
+    const int rc = score_case(model, item, &session, &workspace, &graphs, &mean,
+                              &scored, options.max_targets);
     if (rc != 0) return rc;
     if (!first) std::printf(",");
     first = false;

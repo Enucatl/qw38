@@ -1,0 +1,14 @@
+{
+  "ok": true,
+  "fields": {
+    "memory_fit": "post_graph",
+    "capacity": "131072",
+    "explicit_bytes": "29571252064",
+    "measured_delta": "29578231808",
+    "free_bytes": "3521118208",
+    "reserve_required": "1610612736",
+    "total_bytes": "33664794624",
+    "arithmetic": "true",
+    "passed": "true"
+  }
+}

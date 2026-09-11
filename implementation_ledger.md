@@ -145,7 +145,7 @@ Existing OPT-056 and OPT-016 gates remain blocked on their original conditions.
 | OPT-066 | Pipeline packed Q4 prompt weight fetches | OPT-065 | done | Bounded X-prefetch variant preserves stage lifetimes and arithmetic and improves complete P work, or measured resource/performance no-go | [`tasks/OPT-066.md`](tasks/OPT-066.md); [`pins/opt066_mmq_x_pipeline_contract.json`](pins/opt066_mmq_x_pipeline_contract.json); [`pins/opt066_iteration_contract.json`](pins/opt066_iteration_contract.json); [`fixtures/opt066_mmq_x_pipeline.json`](fixtures/opt066_mmq_x_pipeline.json); [`cuda/opt066_mmq_x_pipeline_test.cu`](cuda/opt066_mmq_x_pipeline_test.cu); [`cuda/quant_mmq_mma.cuh`](cuda/quant_mmq_mma.cuh); [`cuda/quant_mmv.h`](cuda/quant_mmv.h); [`tests/test_opt066_mmq_x_pipeline.py`](tests/test_opt066_mmq_x_pipeline.py); [`evidence/optimization/opt066-mmq-x-pipeline/REPORT.md`](evidence/optimization/opt066-mmq-x-pipeline/REPORT.md); verification 2026-09-11T10:57:28Z |
 | OPT-067 | Pair prompt FFN gate/up tiles and BF16 SwiGLU output | OPT-065 | done | Conditional two-candidate study proves complete FFN benefit, resource fit and output/staging quality, or explicit no-go/rejection | [`tasks/OPT-067.md`](tasks/OPT-067.md); [`pins/opt067_prompt_pair_contract.json`](pins/opt067_prompt_pair_contract.json); [`pins/opt067_iteration_contract.json`](pins/opt067_iteration_contract.json); [`fixtures/opt067_prompt_pair.json`](fixtures/opt067_prompt_pair.json); [`cuda/opt067_prompt_pair_test.cu`](cuda/opt067_prompt_pair_test.cu); [`cuda/quant_mmq_mma.cuh`](cuda/quant_mmq_mma.cuh); [`cuda/quant_mmv.h`](cuda/quant_mmv.h); [`cuda/full_scheduler.cu`](cuda/full_scheduler.cu); [`tests/test_opt067_prompt_pair.py`](tests/test_opt067_prompt_pair.py); [`evidence/optimization/opt067-prompt-pair/REPORT.md`](evidence/optimization/opt067-prompt-pair/REPORT.md); verification 2026-09-11T11:23:26Z |
 | OPT-068 | Measure scoped optimized compilation for one projection family | OPT-059, OPT-061 | done | Three isolated O2/O3/FMA builds yield a quality-admitted complete win with strict/host flags intact, or retained flags | [`tasks/OPT-068.md`](tasks/OPT-068.md); [`pins/opt068_scoped_codegen_contract.json`](pins/opt068_scoped_codegen_contract.json); [`pins/opt068_iteration_contract.json`](pins/opt068_iteration_contract.json); [`fixtures/opt068_scoped_codegen.json`](fixtures/opt068_scoped_codegen.json); [`cuda/q4_prompt_mmq.cu`](cuda/q4_prompt_mmq.cu); [`cuda/opt068_codegen_test.cu`](cuda/opt068_codegen_test.cu); [`cuda/opt068_codegen_driver.cpp`](cuda/opt068_codegen_driver.cpp); [`tests/test_opt068_codegen.py`](tests/test_opt068_codegen.py); [`evidence/optimization/opt068-scoped-codegen/REPORT.md`](evidence/optimization/opt068-scoped-codegen/REPORT.md); verification 2026-09-11T11:47:06Z |
-| OPT-069 | Validate combined batch and original llama outcome gates | OPT-058, OPT-059, OPT-062, OPT-063, OPT-064, OPT-065, OPT-066, OPT-067, OPT-068 | pending | Complete combined quality, original P/D/2K protocols and state/memory evidence; separately report improvement, parity and original +5% outcome without relabeling failed gates | [Implementation guide](tasks/OPT-069.md); proposed 2026-09-11 |
+| OPT-069 | Validate combined batch and original llama outcome gates | OPT-058, OPT-059, OPT-062, OPT-063, OPT-064, OPT-065, OPT-066, OPT-067, OPT-068 | done | Complete combined quality, original P/D/2K protocols and state/memory evidence; separately report improvement, parity and original +5% outcome without relabeling failed gates | [`tasks/OPT-069.md`](tasks/OPT-069.md); [`pins/opt069_batch_gate_contract.json`](pins/opt069_batch_gate_contract.json); [`pins/opt069_iteration_contract.json`](pins/opt069_iteration_contract.json); [`fixtures/opt069_batch_gate.json`](fixtures/opt069_batch_gate.json); [`tools/opt069_batch_gate.py`](tools/opt069_batch_gate.py); [`tests/test_opt069_batch_gate.py`](tests/test_opt069_batch_gate.py); [`evidence/optimization/opt069-batch-gate/REPORT.md`](evidence/optimization/opt069-batch-gate/REPORT.md); verification 2026-09-11T12:33:00Z |
 
 ### Post-042 recovery execution order (historical batch)
 
@@ -6257,3 +6257,29 @@ statements below are historical, not the current execution order.
   this ledger/audit bookkeeping. `plan.md` is unchanged. OPT-016 and OPT-056 stay
   `blocked`. Next eligible pending by ledger row order: **OPT-069**. No tok/s
   claim (`claims_throughput=false`).
+
+### 2026-09-11T12:33:00Z — OPT-069 combined batch gate delivered (three outcomes unpassed)
+
+- Combined freeze of OPT-062–068 keep/reject selectors on RTX 5090. Three
+  distinct outcomes all **unpassed**: internal improvement with quality,
+  llama parity (`Tq-Tl`), and OPT-056 +5% (`Tq-Tl/1.05`, p95, quality, 2K).
+  `gate.passed` is false. P Quartz **2914.66** vs OPT-056 baseline **2808.50**
+  (+106.16, 1.038×) and llama **3142.52**; D128 **37.18** vs baseline **37.48**
+  (−0.30, 0.992×) and llama **68.87**; D2048 **35.45** vs baseline **35.72**
+  (−0.27, 0.992×) and llama **67.34**. Decode p95 worse than llama. Quality v2
+  fails `task_arithmetic`; wikitext/held-out NLL pass. OPT-016 2K point
+  comparison passes in fixture but this increment does not own that ledger row.
+  State/memory (128K fit, checkpoint, cancellation) pass.
+- Acceptance evidence: [`tasks/OPT-069.md`](tasks/OPT-069.md);
+  [`pins/opt069_batch_gate_contract.json`](pins/opt069_batch_gate_contract.json);
+  [`pins/opt069_iteration_contract.json`](pins/opt069_iteration_contract.json);
+  [`fixtures/opt069_batch_gate.json`](fixtures/opt069_batch_gate.json);
+  [`tools/opt069_batch_gate.py`](tools/opt069_batch_gate.py);
+  [`tests/test_opt069_batch_gate.py`](tests/test_opt069_batch_gate.py);
+  [`evidence/optimization/opt069-batch-gate/REPORT.md`](evidence/optimization/opt069-batch-gate/REPORT.md).
+  Proof is honest same-sitting P/D128/D2048 versus pinned llama.cpp with full
+  quality v2 and state/memory boundaries; failed gates stay failed.
+- Marked OPT-069 `done`; delivery is limited to the verified task scope plus
+  this ledger/audit bookkeeping. `plan.md` is unchanged. OPT-056 and OPT-016 stay
+  `blocked`. Post-069 recovery batch has no further pending rows until new
+  measured-bottleneck tasks are admitted.

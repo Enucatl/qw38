@@ -1,0 +1,99 @@
+{
+  "schema_version": 1,
+  "task": "OPT-069",
+  "status": "configured",
+  "measurement_utc": "2026-09-11T12:32:47Z",
+  "combined_production_paths": {
+    "rms_norm": "parallel_fma",
+    "q4_decode": "packed",
+    "q8_decode": "dp4a_q8_1",
+    "q6_decode": "integer_q8_1",
+    "ffn_decode": "paired_staged",
+    "query_prepare": "hoisted",
+    "attention_pipeline": "f16_async",
+    "gdn_preproc": "transpose",
+    "mmq_pipeline": "fma_async",
+    "ffn_prompt_pair": "off",
+    "execution_graphs": "ffn_only",
+    "production_numerics": "strict",
+    "q8_decode_rows_skinny": 2,
+    "q8_decode_rows_medium": 2,
+    "q8_decode_rows_wide": 2,
+    "q8_decode_layout_warps_skinny": 2,
+    "q8_decode_layout_warps_medium": 2,
+    "q8_decode_layout_warps_wide": 2,
+    "ffn_gate_quality_i": 128,
+    "ffn_gate_prompt_tile": 128,
+    "prompt_microbatch_rows": 4096,
+    "mmq_async_x": true,
+    "nvccflags": "-O2 --fmad=false",
+    "q8_layout": "r2_w2",
+    "ffn_tiles": "i128_j128"
+  },
+  "candidate_decisions": {
+    "OPT-062": {
+      "status": "rejected",
+      "installed": false,
+      "selected": "packed"
+    },
+    "OPT-063": {
+      "status": "rejected",
+      "installed": false,
+      "selected": "paired_staged"
+    },
+    "OPT-064": {
+      "status": "keep",
+      "installed": true,
+      "selected": "r2_w2"
+    },
+    "OPT-065": {
+      "status": "retained",
+      "installed": false,
+      "selected": "i128_j128"
+    },
+    "OPT-066": {
+      "status": "keep",
+      "installed": true,
+      "selected": "fma_async_x"
+    },
+    "OPT-067": {
+      "status": "rejected",
+      "installed": false,
+      "selected": "off"
+    },
+    "OPT-068": {
+      "status": "rejected",
+      "installed": false,
+      "selected": "-O2 --fmad=false"
+    }
+  },
+  "keeps": [
+    "OPT-064 r2_w2",
+    "OPT-066 fma_async_x"
+  ],
+  "rejected_or_retained": [
+    "OPT-062 integer Q4 not installed",
+    "OPT-063 paired integer not installed",
+    "OPT-065 i128_j128 retained",
+    "OPT-067 prompt pair off",
+    "OPT-068 O2 --fmad=false retained"
+  ],
+  "batch_size": 4096,
+  "workspace_bytes": {
+    "mmq_x_shared_bytes": 94736,
+    "mmq_x_extra_bytes": 18448,
+    "x_ring_stages": 1
+  },
+  "compiler_flags": "-O2 --fmad=false",
+  "graphs": "ffn_only",
+  "intended_q4_path": "packed",
+  "opt056_history": "fixtures/opt056_performance_gate.json",
+  "hardware_executed": false,
+  "keep_sitting_skipped": false,
+  "preflight_is_release_evidence": false,
+  "owns_opt016_parity_gate": false,
+  "opt056_gate_passed": false,
+  "opt016_gate_passed": false,
+  "proof_limit": "combined freeze of OPT-062-068 keep/reject selectors; same-sitting P/D128/D2048 versus pinned llama.cpp; parity gap is Tq-Tl; +5% throughput gap is Tq-Tl/1.05; do not label the parity gap as the +5% bar; decode p95 no worse than llama for the OPT-056 outcome; full quality v2 on the frozen combination; original OPT-016 2K parity evidence; OPT-056 and OPT-016 stay blocked unless their gates pass; rejected candidates must not leak into production; instrumented timings are not release throughput; preflight is not release evidence",
+  "report_path": "evidence/optimization/opt069-batch-gate/REPORT.md"
+}

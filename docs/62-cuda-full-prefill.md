@@ -1,6 +1,6 @@
 # Chunked full-model CUDA prefill
 
-[Index](README.md) · Implementation tasks: SCH-002, MEM-002, OPT-008, OPT-009, OPT-011, OPT-012, OPT-013, OPT-014, OPT-015, OPT-017, OPT-018, OPT-019, OPT-020, OPT-021, OPT-022, OPT-023, OPT-024, OPT-025, OPT-026, OPT-027, OPT-028, OPT-029, OPT-030, OPT-032, OPT-033, OPT-035, OPT-037, OPT-038, OPT-040, OPT-041, OPT-052, OPT-053, OPT-054, OPT-055, OPT-056, and EDU-047 in
+[Index](README.md) · Implementation tasks: SCH-002, MEM-002, OPT-008, OPT-009, OPT-011, OPT-012, OPT-013, OPT-014, OPT-015, OPT-017, OPT-018, OPT-019, OPT-020, OPT-021, OPT-022, OPT-023, OPT-024, OPT-025, OPT-026, OPT-027, OPT-028, OPT-029, OPT-030, OPT-032, OPT-033, OPT-035, OPT-037, OPT-038, OPT-040, OPT-041, OPT-052, OPT-053, OPT-054, OPT-055, OPT-056, OPT-069, and EDU-047 in
 [`implementation_ledger.md`](../implementation_ledger.md) · Contracts:
 [`pins/cuda_prompt_scheduler_contract.json`](../pins/cuda_prompt_scheduler_contract.json),
 [`pins/cuda_prompt_pipeline_contract.json`](../pins/cuda_prompt_pipeline_contract.json),
@@ -929,6 +929,16 @@ prefixes; 2K **3012.69507** vs **3169.571249**. Combined production-optimization
 quality failed the eight greedy tasks. `gate.passed` is false. Live numbers stay
 in
 [`evidence/optimization/opt056-performance-gate/REPORT.md`](../evidence/optimization/opt056-performance-gate/REPORT.md).
+
+OPT-069 is the combined-batch re-sitting of that same exclusive P/D/2K protocol
+on the frozen 062–068 keep/reject selectors (keeps: Q8 `r2_w2` and MMQ
+`fma_async_x`). **Measured unpassed outcomes:** P **2914.65698** vs llama
+**3142.517034**, D128 **37.1789093** vs **68.8708796**, D2048 **35.4498482** vs
+**67.3394867** tok/s; decode p95 worse than llama; quality v2 fails
+`task_arithmetic`; 2K **3132.88379** vs **3132.053862**. Parity gap is `Tq-Tl`
+and is not the +5% bar `Tq-Tl/1.05`. The +5% outcome stays unpassed. Live
+numbers stay in
+[`evidence/optimization/opt069-batch-gate/REPORT.md`](../evidence/optimization/opt069-batch-gate/REPORT.md).
 
 OPT-041 keeps warp-owned 16×8 prompt QK microtiles on production 4096-row
 fattn-mma stream-K including combine, on top of register-resident VKQ and
