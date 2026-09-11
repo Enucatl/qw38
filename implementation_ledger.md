@@ -126,9 +126,11 @@ are repository-relative unless stated otherwise.
 
 ### Post-056 implementation batch
 
-All rows below are proposed implementation work, not delivered speedups. Use
+This batch is delivered; task completion includes measured rejects and does
+not imply a delivered speedup. Use
 the [source analysis and batch protocol](tasks/PERFORMANCE-RECOVERY-2026-09-11.md)
-and [testing strategy](testing-strategy.md). The first eligible task is OPT-061.
+and [testing strategy](testing-strategy.md). The post-069 batch below supplies
+the next work; its first eligible task in dependency order is OPT-071.
 Existing OPT-056 and OPT-016 gates remain blocked on their original conditions.
 
 | ID | Description | Dependencies | Status | Acceptance condition | Evidence |
@@ -146,6 +148,31 @@ Existing OPT-056 and OPT-016 gates remain blocked on their original conditions.
 | OPT-067 | Pair prompt FFN gate/up tiles and BF16 SwiGLU output | OPT-065 | done | Conditional two-candidate study proves complete FFN benefit, resource fit and output/staging quality, or explicit no-go/rejection | [`tasks/OPT-067.md`](tasks/OPT-067.md); [`pins/opt067_prompt_pair_contract.json`](pins/opt067_prompt_pair_contract.json); [`pins/opt067_iteration_contract.json`](pins/opt067_iteration_contract.json); [`fixtures/opt067_prompt_pair.json`](fixtures/opt067_prompt_pair.json); [`cuda/opt067_prompt_pair_test.cu`](cuda/opt067_prompt_pair_test.cu); [`cuda/quant_mmq_mma.cuh`](cuda/quant_mmq_mma.cuh); [`cuda/quant_mmv.h`](cuda/quant_mmv.h); [`cuda/full_scheduler.cu`](cuda/full_scheduler.cu); [`tests/test_opt067_prompt_pair.py`](tests/test_opt067_prompt_pair.py); [`evidence/optimization/opt067-prompt-pair/REPORT.md`](evidence/optimization/opt067-prompt-pair/REPORT.md); verification 2026-09-11T11:23:26Z |
 | OPT-068 | Measure scoped optimized compilation for one projection family | OPT-059, OPT-061 | done | Three isolated O2/O3/FMA builds yield a quality-admitted complete win with strict/host flags intact, or retained flags | [`tasks/OPT-068.md`](tasks/OPT-068.md); [`pins/opt068_scoped_codegen_contract.json`](pins/opt068_scoped_codegen_contract.json); [`pins/opt068_iteration_contract.json`](pins/opt068_iteration_contract.json); [`fixtures/opt068_scoped_codegen.json`](fixtures/opt068_scoped_codegen.json); [`cuda/q4_prompt_mmq.cu`](cuda/q4_prompt_mmq.cu); [`cuda/opt068_codegen_test.cu`](cuda/opt068_codegen_test.cu); [`cuda/opt068_codegen_driver.cpp`](cuda/opt068_codegen_driver.cpp); [`tests/test_opt068_codegen.py`](tests/test_opt068_codegen.py); [`evidence/optimization/opt068-scoped-codegen/REPORT.md`](evidence/optimization/opt068-scoped-codegen/REPORT.md); verification 2026-09-11T11:47:06Z |
 | OPT-069 | Validate combined batch and original llama outcome gates | OPT-058, OPT-059, OPT-062, OPT-063, OPT-064, OPT-065, OPT-066, OPT-067, OPT-068 | done | Complete combined quality, original P/D/2K protocols and state/memory evidence; separately report improvement, parity and original +5% outcome without relabeling failed gates | [`tasks/OPT-069.md`](tasks/OPT-069.md); [`pins/opt069_batch_gate_contract.json`](pins/opt069_batch_gate_contract.json); [`pins/opt069_iteration_contract.json`](pins/opt069_iteration_contract.json); [`fixtures/opt069_batch_gate.json`](fixtures/opt069_batch_gate.json); [`tools/opt069_batch_gate.py`](tools/opt069_batch_gate.py); [`tests/test_opt069_batch_gate.py`](tests/test_opt069_batch_gate.py); [`evidence/optimization/opt069-batch-gate/REPORT.md`](evidence/optimization/opt069-batch-gate/REPORT.md); verification 2026-09-11T12:33:00Z |
+
+### Post-069 evidence and decode recovery batch
+
+Proposed work only. Read [the diagnosis and batch protocol](tasks/PERFORMANCE-RECOVERY-POST-069.md).
+OPT-064/066 are installed with incomplete incremental acceptance evidence;
+OPT-070 revalidates them. OPT-072 reviews every correctness-based rejection,
+OPT-073 separates authority capability from engine regressions, and OPT-074
+completes actual production GPU admission before Q4 promotion. Historical
+fixtures and OPT-056/OPT-016 requirements remain unchanged. Execute OPT-071
+first, prepare OPT-072/073/074 as their dependencies permit, then OPT-070/075.
+New kernel tasks are conditional on measured opportunity and valid admission.
+
+| ID | Description | Dependencies | Status | Acceptance condition | Evidence |
+|---|---|---|---|---|---|
+| OPT-070 | Repair acceptance enforcement and revalidate installed Q8/MMQ keeps | OPT-069, OPT-071, OPT-073, OPT-074 | pending | Actual paired complete rotating and short E2E evidence yields separate retain/revert/inconclusive verdicts for OPT-064/066; screen-only results cannot admit a keep | [`tasks/OPT-070.md`](tasks/OPT-070.md) |
+| OPT-071 | Repair full-engine timing windows and production capture replay | OPT-060, OPT-061, OPT-069 | pending | No prefix/warmup contamination, dropped records or duplicate family charging; complete measured windows and identity-cached real inputs support honest sink ranking | [`tasks/OPT-071.md`](tasks/OPT-071.md) |
+| OPT-072 | Reevaluate all correctness-based optimization rejections | OPT-059, OPT-069 | pending | Every historical numerical/test rejection has an evidence-backed disposition and owner; comparable-accuracy eligibility is separated from hard correctness and performance failures | [`tasks/OPT-072.md`](tasks/OPT-072.md) |
+| OPT-073 | Resolve functional authority failures and version quality decisions | OPT-058, OPT-069, OPT-072 | pending | Exact prompts/scorers audited, arithmetic truth preserved, absolute and regression verdicts explicit, and failed required quality stops release before long timing | [`tasks/OPT-073.md`](tasks/OPT-073.md) |
+| OPT-074 | Complete real production-shape llama GPU numerical admission | OPT-059, OPT-071, OPT-072 | pending | Full-M actual GPU dispatch, sampled independent FP64 and frozen held-out budgets cover production Q4 and selected Q8/Q6; missing coverage cannot become admission | [`tasks/OPT-074.md`](tasks/OPT-074.md) |
+| OPT-075 | Admit or reject existing unfused and paired cooperative Q4 FFN | OPT-070, OPT-073, OPT-074 | pending | Current packed versus existing integer survivor passes versioned production quality, actual all-leg dispatch and complete rotating/E2E acceptance, or documented retained packed | [`tasks/OPT-075.md`](tasks/OPT-075.md) |
+| OPT-076 | Remove Q4 K-loop shuffle reductions and scalar unpacking | OPT-071, OPT-074, OPT-075 | pending | Two bounded packed-load/late-reduction candidates yield an admitted complete FFN saving with staged semantics intact, or measured rejection | [`tasks/OPT-076.md`](tasks/OPT-076.md) |
+| OPT-077 | Parallelize decode GDN state reductions across key/value tiles | OPT-070, OPT-071, OPT-073 | pending | Complete 48-layer GDN benefits from bounded parallel FP32 recurrence with calibrated quality, exact state isolation and short E2E guards, or no-go/rejection | [`tasks/OPT-077.md`](tasks/OPT-077.md) |
+| OPT-078 | Hoist decode query preparation and vector-load KV | OPT-070, OPT-071, OPT-073 | pending | Preparation-inclusive one-token attention wins with fixed 16 partitions, unchanged arithmetic/KV visibility and bounded E2E validation, or retained control | [`tasks/OPT-078.md`](tasks/OPT-078.md) |
+| OPT-079 | Convert prompt attention KV operands once per shared stage | OPT-070, OPT-071, OPT-073 | pending | One conditional conversion-reuse candidate preserves exact F16 operands and async ownership and wins complete P cost, or resource/performance no-go | [`tasks/OPT-079.md`](tasks/OPT-079.md) |
+| OPT-080 | Validate the admitted combination against unchanged llama outcome gates | OPT-070, OPT-071, OPT-072, OPT-073, OPT-074, OPT-075, OPT-076, OPT-077, OPT-078, OPT-079 | pending | Quality preflight gates one combined original P/D/2K and state sitting; internal progress, parity, +5% and p95 outcomes reported without relaxing historical gates | [`tasks/OPT-080.md`](tasks/OPT-080.md) |
 
 ### Post-042 recovery execution order (historical batch)
 
@@ -251,7 +278,7 @@ statements below are historical, not the current execution order.
 | 6. CUDA primitives | CUD-001–CUD-003 |
 | 7. GDN/attention/scheduler | GDN-001–GDN-002, ATN-001–ATN-002, SCH-001 |
 | 8. Sessions and 128K | SES-001–SES-003, MEM-001 |
-| 9. Profiling/optimization | OPT-001–OPT-069 (OPT-031 superseded by OPT-055; OPT-057–069 proposed) |
+| 9. Profiling/optimization | OPT-001–OPT-080 (OPT-031 superseded by OPT-055; OPT-070–080 proposed) |
 | 10. Product tools/API/quality | CLI-001, SRV-001–SRV-003, BEN-001, EVAL-001, QLT-001 |
 | 11. Comparative speed | CMP-001–CMP-003 |
 | 12. Documentation/release | DOC-001, REL-001 |
@@ -6283,3 +6310,24 @@ statements below are historical, not the current execution order.
   this ledger/audit bookkeeping. `plan.md` is unchanged. OPT-056 and OPT-016 stay
   `blocked`. Post-069 recovery batch has no further pending rows until new
   measured-bottleneck tasks are admitted.
+
+### 2026-09-11T13:14:43Z — Admit post-069 evidence and decode recovery tasks
+
+- Added pending OPT-070 through OPT-080 and
+  [`tasks/PERFORMANCE-RECOVERY-POST-069.md`](tasks/PERFORMANCE-RECOVERY-POST-069.md).
+  This is source-based task design, not kernel implementation or a new GPU
+  measurement. The first eligible task in ledger/dependency order is OPT-071.
+- Correctness rejections receive a complete review register and actual
+  production GPU calibration. Documented numerical concessions may admit a
+  faster path; layout/nonfinite/state bugs and historical outcome gates are
+  not waived. Arithmetic authority failures remain visible as absolute errors.
+- Installed Q8/MMQ keeps receive explicit paired revalidation. New conditional
+  mechanisms target Q4 packed loads and late reduction, parallel decode GDN,
+  decode query preparation/KV loads, and prompt KV operand conversion reuse.
+  Each dossier specifies native targets, commands, work counts and stop rules.
+- Validation: new dependency graph is acyclic; all eleven dossier dependencies
+  match their pending ledger rows; local dossier/protocol links resolve;
+  `git diff --check` passes. `uv run pytest -q tests/test_documentation.py`
+  reports two passed and two failed on the pre-existing duplicate OPT-056
+  reference in the audit chapter's OPT-069 row (also present at HEAD).
+  No audit/test file, historical fixture, production pin or gate was changed.
