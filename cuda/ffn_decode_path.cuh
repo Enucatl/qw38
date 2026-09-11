@@ -120,6 +120,12 @@ inline void set_ffn_decode_path_override(const char* path) noexcept {
   g_ffn_decode_path_override = path;
 }
 
+inline bool apply_ffn_decode_ident(const char* path) noexcept {
+  if (!legal_ffn_decode_path(path)) return false;
+  set_ffn_decode_path_override(path);
+  return true;
+}
+
 inline void clear_ffn_decode_path_override() noexcept {
   g_ffn_decode_path_override = nullptr;
 }

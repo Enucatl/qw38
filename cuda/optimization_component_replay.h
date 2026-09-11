@@ -9,6 +9,7 @@
 #include "ffn_decode_path.cuh"
 #include "full_scheduler.h"
 #include "q4k_decode_path.cuh"
+#include "q6k_decode_path.cuh"
 #include "q8_decode_path.cuh"
 
 namespace qw38::cuda {

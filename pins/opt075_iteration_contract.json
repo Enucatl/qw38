@@ -1,0 +1,146 @@
+{
+  "schema_version": 1,
+  "task": "OPT-075",
+  "yardstick": "admit_or_reject_existing_cooperative_q4_ffn",
+  "claims_throughput": false,
+  "claims_performance_improvement": false,
+  "performance_admission": {
+    "enabled": true
+  },
+  "image": "qw38-cuda:13.0.2",
+  "model": "models/Qwen3.8-27B-Q4_K_M.gguf",
+  "gpu_lock": "build/optimization-runs/qw38-gpu.lock",
+  "aggregate_deadline_s": 300,
+  "target": "build/qw38-cuda-component-replay",
+  "diagnostics_make_target": "cuda-opt075-diagnostics",
+  "case_ids": ["q4", "quality"],
+  "modes": {
+    "feedback": {
+      "target": "build/qw38-cuda-component-replay",
+      "tier_sequence": ["q4"],
+      "make_targets": [
+        "build/qw38-cuda-component-replay",
+        "build/qw38-cuda-optimization-engine-probe"
+      ],
+      "build_once": true,
+      "warm_repetitions": 0,
+      "aggregate_deadline_s": 300,
+      "workloads": ["q4"]
+    },
+    "acceptance": {
+      "target": "build/qw38-cuda-component-replay",
+      "tier_sequence": ["quality", "q4"],
+      "make_targets": [
+        "build/qw38-cuda-component-replay",
+        "build/qw38-cuda-optimization-engine-probe"
+      ],
+      "warm_repetitions": 0,
+      "aggregate_deadline_s": 300,
+      "workloads": ["quality", "q4"]
+    },
+    "release": {
+      "target": "build/qw38-cuda-component-replay",
+      "tier": "acceptance",
+      "make_targets": [],
+      "skip_compile": true,
+      "historical_oracles": false,
+      "workloads": []
+    }
+  },
+  "workloads": {
+    "q4": {
+      "target": "build/qw38-cuda-component-replay",
+      "tier": "screen",
+      "runner": "host",
+      "kind": "three_config_complete_rotating_decode_ffn",
+      "cases": 1,
+      "candidates": 3,
+      "warmups": 1,
+      "samples": 3,
+      "tokens": 1,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 1,
+      "reference": 1,
+      "sampled_rows": 16,
+      "sampled_vectors": 4,
+      "family": "decode-ffn",
+      "cache_mode": "rotating",
+      "control": "packed_paired_staged",
+      "complete_ffns": 64,
+      "gpu_work": true,
+      "native_targets": [
+        "build/qw38-cuda-component-replay",
+        "build/qw38-cuda-optimization-engine-probe",
+        "build/qw38-cuda-opt062-q4-admission-test",
+        "build/qw38-cuda-opt063-integer-ffn-test"
+      ],
+      "args": [
+        "uv",
+        "run",
+        "python",
+        "tools/opt075_q4_production_admission.py",
+        "--phase",
+        "{phase}",
+        "--mode",
+        "{mode}",
+        "--run-dir",
+        "{run_dir}"
+      ],
+      "mode_overrides": {
+        "acceptance": {
+          "tier": "acceptance",
+          "candidates": 2,
+          "warmups": 3,
+          "samples": 10,
+          "engine_pairs": 5
+        }
+      }
+    },
+    "quality": {
+      "target": "tools/opt075_q4_production_admission.py",
+      "tier": "acceptance",
+      "runner": "host",
+      "kind": "identity_cached_opt073_once_per_survivor",
+      "cases": 1,
+      "candidates": 1,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 1,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 0,
+      "reference": 1,
+      "gpu_work": false,
+      "args": [
+        "uv",
+        "run",
+        "python",
+        "tools/opt075_q4_production_admission.py",
+        "--phase",
+        "quality",
+        "--mode",
+        "{mode}",
+        "--run-dir",
+        "{run_dir}"
+      ]
+    }
+  },
+  "proof_limit": [
+    "exactly three configurations",
+    "four warps per row",
+    "FP32-scale Q8Block staging",
+    "no new fusion tile compiler or half-scale grid",
+    "OPT-042/046 reviewed through current equivalents",
+    "OPT-074 GPU-calibrated budgets",
+    "legacy 0.0003 recorded separately",
+    "unfinished reference freeze is not a numerical rejection",
+    "complete 64-layer decode FFN",
+    "recapture graphs after selecting the configuration",
+    "OPT-073 internal quality with legacy absolute visible",
+    "historical 1.26x/1.40x are hypotheses",
+    "no long P/D protocol",
+    "historical oracles none"
+  ],
+  "report_path": "evidence/optimization/opt075-q4-production-admission/REPORT.md"
+}

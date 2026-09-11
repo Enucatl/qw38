@@ -52,6 +52,8 @@ struct Options final {
   const char* cache_mode = nullptr;
   const char* capture_key = nullptr;
   const char* q8_layout = nullptr;
+  const char* q4_decode = nullptr;
+  const char* ffn_decode = nullptr;
   int mmq_async_x = -1;
   int warmups = -1;
   int samples = -1;
@@ -65,6 +67,8 @@ int usage(const char* argv0) {
                "decode-mixer|prompt-ffn|acceptance|hardware] [MODEL] "
                "[--cache-mode hot|rotating] [--capture-key KEY] "
                "[--q8-layout r1_w4|r2_w2] [--mmq-async-x 0|1] "
+               "[--q4-decode packed|integer_q8] "
+               "[--ffn-decode paired_staged|shared_stage|paired_integer] "
                "[--warmups N] [--samples N] [--ncu] [--corrupt-guard]\n",
                argv0);
   return 2;
@@ -83,6 +87,10 @@ int parse_args(int argc, char** argv, Options* options) {
       options->q8_layout = argv[++index];
     } else if (std::strcmp(arg, "--mmq-async-x") == 0 && index + 1 < argc) {
       options->mmq_async_x = std::atoi(argv[++index]);
+    } else if (std::strcmp(arg, "--q4-decode") == 0 && index + 1 < argc) {
+      options->q4_decode = argv[++index];
+    } else if (std::strcmp(arg, "--ffn-decode") == 0 && index + 1 < argc) {
+      options->ffn_decode = argv[++index];
     } else if (std::strcmp(arg, "--warmups") == 0 && index + 1 < argc) {
       options->warmups = std::atoi(argv[++index]);
     } else if (std::strcmp(arg, "--samples") == 0 && index + 1 < argc) {
@@ -793,6 +801,7 @@ cudaError_t replay_decode_ffn_layer(const qw38::cuda::DeviceCommonLayer& layer,
                                     float* output, cudaStream_t stream,
                                     cudaEvent_t kernel_start,
                                     cudaEvent_t kernel_stop) {
+  workspace->invalidate_q8_decode_staging();
   cudaError_t error = qw38::cuda::launch_rms_norm_fp32_to_bf16(
       residual, layer.ffn_norm, qw38::internal::kResidualWidth,
       workspace->normalized_, stream);
@@ -803,38 +812,58 @@ cudaError_t replay_decode_ffn_layer(const qw38::cuda::DeviceCommonLayer& layer,
   }
   workspace->q8_decode_staged_activation_ = nullptr;
   workspace->q8_decode_staged_columns_ = 0;
+  const bool integer_q8 = qw38::cuda::q4_decode_uses_integer_q8block();
+  const bool trace_unfused =
+      integer_q8 && qw38::cuda::ffn_decode_uses_paired_integer() &&
+      qw38::cuda::ffn_paired_integer_trace_unfused();
+  const bool paired_integer =
+      integer_q8 && qw38::cuda::ffn_decode_uses_paired_integer() &&
+      !trace_unfused;
+  const char* gate_variant = "";
+  const char* up_variant = "";
+  const char* staging = qw38::cuda::kStagingQ8Fp32;
+  int gate_up_stages = 1;
   if (error == cudaSuccess && kernel_start != nullptr) {
     error = cudaEventRecord(kernel_start, stream);
   }
-  if (error == cudaSuccess && qw38::cuda::q4_decode_uses_integer_q8block() &&
-      qw38::cuda::ffn_decode_uses_paired_integer() &&
-      !qw38::cuda::ffn_paired_integer_trace_unfused()) {
+  if (error == cudaSuccess && paired_integer) {
     error = qw38::cuda::launch_q4k_coop_gate_up_swiglu_prequant_q8(
         layer.ffn_gate.data, layer.ffn_up.data, layer.ffn_gate.rows,
         layer.ffn_gate.columns, workspace->q8_, workspace->ffn_activated_,
         qw38::cuda::effective_q4_decode_warps_per_row(), stream);
-  } else if (error == cudaSuccess &&
-             qw38::cuda::q4_decode_uses_integer_q8block()) {
+    gate_variant = qw38::cuda::last_q4_launch_variant();
+    up_variant = gate_variant;
+    staging = qw38::cuda::kStagingQ8Fp32PairedInteger;
+  } else if (error == cudaSuccess && integer_q8) {
     error = qw38::cuda::launch_quant_mmv_prequant(
         layer.ffn_gate.kind, layer.ffn_gate.data, layer.ffn_gate.rows,
         layer.ffn_gate.columns, workspace->q8_, workspace->projection_a_,
         stream);
+    gate_variant = qw38::cuda::last_q4_launch_variant();
     if (error == cudaSuccess) {
       error = qw38::cuda::launch_quant_mmv_prequant(
           layer.ffn_up.kind, layer.ffn_up.data, layer.ffn_up.rows,
           layer.ffn_up.columns, workspace->q8_, workspace->projection_b_,
           stream);
     }
+    up_variant = qw38::cuda::last_q4_launch_variant();
     if (error == cudaSuccess) {
       error = qw38::cuda::launch_swiglu_bf16(
           workspace->projection_a_, workspace->projection_b_,
           qw38::internal::kFfnWidth, workspace->ffn_activated_, stream);
+    }
+    if (trace_unfused) {
+      gate_variant = qw38::cuda::kQ4LaunchVariantPairedIntegerTraceUnfused;
+      up_variant = gate_variant;
+      staging = qw38::cuda::kStagingQ8Fp32UnfusedTrace;
     }
   } else if (error == cudaSuccess) {
     error = qw38::cuda::launch_q4k_gate_up_swiglu_prequant(
         layer.ffn_gate.data, layer.ffn_up.data, layer.ffn_gate.rows,
         layer.ffn_gate.columns, workspace->q8_, workspace->ffn_activated_,
         stream);
+    gate_variant = qw38::cuda::last_q4_launch_variant();
+    up_variant = gate_variant;
   }
   if (error == cudaSuccess) {
     error = qw38::cuda::launch_quant_mmv(
@@ -842,6 +871,15 @@ cudaError_t replay_decode_ffn_layer(const qw38::cuda::DeviceCommonLayer& layer,
         layer.ffn_down.columns, workspace->ffn_activated_, workspace->q8_,
         workspace->mixer_output_, stream);
   }
+  const char* down_variant = qw38::cuda::last_q4_launch_variant();
+  cudaStreamCaptureStatus capture_status = cudaStreamCaptureStatusNone;
+  const bool captured =
+      cudaStreamIsCapturing(stream, &capture_status) == cudaSuccess &&
+      capture_status == cudaStreamCaptureStatusActive;
+  qw38::cuda::record_ffn_decode_dispatch(
+      gate_variant, up_variant, down_variant, gate_up_stages, 1, captured,
+      qw38::cuda::effective_q4_decode_path(),
+      qw38::cuda::effective_ffn_decode_path(), staging);
   if (error == cudaSuccess && kernel_stop != nullptr) {
     error = cudaEventRecord(kernel_stop, stream);
   }
@@ -1201,7 +1239,8 @@ int time_family(qw38::cuda::ResidentModel* model,
         "kernel_only_ms=%.6f gate_up_calls=%d down_calls=%d mixer_calls=%d "
         "gdn_input_output_groups=%d attention_input_output_groups=%d "
         "rotating_layers=%zu working_set_bytes=%zu exceeds_2x_l2=%s "
-        "eviction_outside_interval=false pooled_events=true\n",
+        "eviction_outside_interval=false pooled_events=true "
+        "staging_ops_per_ffn=2 invalidate_q8_decode_staging=true\n",
         qw38::cuda::replay_family_name(family), qw38::cuda::cache_mode_name(mode),
         json_bool(warmup), warmup ? sample : sample - warmups, enclosing,
         kernel_acc, gate_up, down, mixer, gdn_groups, attn_groups, layers.size(),
@@ -1231,6 +1270,17 @@ int time_family(qw38::cuda::ResidentModel* model,
   std::printf("compiled_registers=%d compiled_local_bytes=%zu occupancy=%d "
               "shared_bytes_query=device_prop\n",
               registers, local_bytes, occupancy);
+  const qw38::cuda::FfnDecodeDispatchRecord& dispatch =
+      qw38::cuda::last_ffn_decode_dispatch();
+  std::printf(
+      "ffn_dispatch gate_variant=%s up_variant=%s down_variant=%s "
+      "gate_up_stage_count=%d down_stage_count=%d captured_in_graph=%s "
+      "q4_path=%s ffn_path=%s staging=%s warps_per_row=%u "
+      "eager_or_captured=true\n",
+      dispatch.gate_variant, dispatch.up_variant, dispatch.down_variant,
+      dispatch.gate_up_stage_count, dispatch.down_stage_count,
+      json_bool(dispatch.captured_in_graph), dispatch.q4_path, dispatch.ffn_path,
+      dispatch.staging, qw38::cuda::effective_q4_decode_warps_per_row());
   return 0;
 }
 
@@ -1282,6 +1332,18 @@ int run_family(const Options& options, qw38::cuda::ReplayFamily family) {
   if (options.mmq_async_x >= 0) {
     qw38::cuda::set_mmq_async_x_override(options.mmq_async_x != 0);
   }
+  if (options.q4_decode != nullptr &&
+      !qw38::cuda::apply_q4_decode_ident(options.q4_decode, 4)) {
+    std::fprintf(stderr, "invalid --q4-decode %s\n", options.q4_decode);
+    if (rounds != nullptr) std::fclose(rounds);
+    return 1;
+  }
+  if (options.ffn_decode != nullptr &&
+      !qw38::cuda::apply_ffn_decode_ident(options.ffn_decode)) {
+    std::fprintf(stderr, "invalid --ffn-decode %s\n", options.ffn_decode);
+    if (rounds != nullptr) std::fclose(rounds);
+    return 1;
+  }
   const char* mode_arg = options.cache_mode;
   const qw38::cuda::CacheMode modes[] = {qw38::cuda::CacheMode::kHot,
                                          qw38::cuda::CacheMode::kRotating};
@@ -1299,7 +1361,8 @@ int run_family(const Options& options, qw38::cuda::ReplayFamily family) {
   float stream_gbps = 0.0F;
   unsigned long long checksum = 0;
   const bool opt070 = options.q8_layout != nullptr || options.mmq_async_x >= 0;
-  if (rc == 0 && !opt070) {
+  const bool opt075 = options.q4_decode != nullptr || options.ffn_decode != nullptr;
+  if (rc == 0 && !opt070 && !opt075) {
     rc = run_streaming_calibration(hardware, &stream_gbps, &checksum);
   }
   const qw38::cuda::Q8DecodeDispatch q8_launch =
@@ -1348,8 +1411,38 @@ int run_family(const Options& options, qw38::cuda::ReplayFamily family) {
       q8_launch.layout != nullptr ? q8_launch.layout : "", q8_launch.rows,
       mmq_launch.kernel != nullptr ? mmq_launch.kernel : "",
       json_bool(mmq_launch.async_x), capture_key);
+  const qw38::cuda::FfnDecodeDispatchRecord& ffn_launch =
+      qw38::cuda::last_ffn_decode_dispatch();
+  std::printf(
+      "QW38_OPT075_NATIVE_COUNTS={\"schema_version\":1,\"task\":\"OPT-075\","
+      "\"family\":\"%s\",\"tier\":\"%s\",\"warmups\":%d,\"samples\":%d,"
+      "\"observed_warmups\":%d,\"observed_samples\":%d,"
+      "\"observed_candidates\":1,\"observed_shapes\":1,\"observed_tier\":\"%s\","
+      "\"pairs\":1,\"acceptance_executed\":%s,\"keep\":false,"
+      "\"capture_key\":\"%s\",\"q4_decode\":\"%s\",\"ffn_decode\":\"%s\","
+      "\"effective_q4_decode\":\"%s\",\"effective_ffn_decode\":\"%s\","
+      "\"warps_per_row\":%u,\"gate_variant\":\"%s\",\"up_variant\":\"%s\","
+      "\"down_variant\":\"%s\",\"gate_up_stage_count\":%d,"
+      "\"down_stage_count\":%d,\"captured_in_graph\":%s,\"staging\":\"%s\","
+      "\"q8_decode\":\"%s\",\"q6_decode\":\"%s\","
+      "\"invalidate_q8_decode_staging\":true}\n",
+      qw38::cuda::replay_family_name(family), qw38::cuda::test_tier_name(),
+      warmups, samples, warmups, samples, qw38::cuda::test_tier_name(),
+      json_bool(qw38::cuda::test_tier() == qw38::cuda::TestTier::kAcceptance),
+      capture_key, options.q4_decode != nullptr ? options.q4_decode : "installed",
+      options.ffn_decode != nullptr ? options.ffn_decode : "installed",
+      qw38::cuda::effective_q4_decode_path(),
+      qw38::cuda::effective_ffn_decode_path(),
+      qw38::cuda::effective_q4_decode_warps_per_row(), ffn_launch.gate_variant,
+      ffn_launch.up_variant, ffn_launch.down_variant,
+      ffn_launch.gate_up_stage_count, ffn_launch.down_stage_count,
+      json_bool(ffn_launch.captured_in_graph), ffn_launch.staging,
+      qw38::cuda::selected_q8_decode_path(),
+      qw38::cuda::selected_q6_decode_path());
   if (options.q8_layout != nullptr) qw38::cuda::clear_q8_decode_path_override();
   if (options.mmq_async_x >= 0) qw38::cuda::clear_mmq_async_x_override();
+  if (options.q4_decode != nullptr) qw38::cuda::clear_q4_decode_path_override();
+  if (options.ffn_decode != nullptr) qw38::cuda::clear_ffn_decode_path_override();
   FILE* prov = std::fopen(kProvenanceJson, "w");
   if (prov != nullptr) {
     std::fprintf(

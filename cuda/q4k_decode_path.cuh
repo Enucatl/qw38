@@ -129,6 +129,16 @@ inline void set_q4_decode_path_override(const char* path,
   g_q4_decode_warps_override = warps_per_row;
 }
 
+inline bool apply_q4_decode_ident(const char* path,
+                                  unsigned int warps_per_row) noexcept {
+  if (!legal_q4_decode_path(path) ||
+      !legal_q4_decode_warps_per_row(warps_per_row)) {
+    return false;
+  }
+  set_q4_decode_path_override(path, warps_per_row);
+  return true;
+}
+
 inline void clear_q4_decode_path_override() noexcept {
   g_q4_decode_path_override = nullptr;
   g_q4_decode_warps_override = 0;
