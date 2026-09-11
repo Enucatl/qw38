@@ -122,14 +122,16 @@ are repository-relative unless stated otherwise.
 | OPT-053 | Optimize MMQ scaling and tile staging | OPT-044, OPT-045 | done | Existing quality MMA gains measured scaling/staging efficiency and full P speed under quality and memory guards, or a measured no-change result; no unchanged rejected tile/stream-K rerun | [`tasks/OPT-053.md`](tasks/OPT-053.md); [`pins/opt053_mmq_pipeline_contract.json`](pins/opt053_mmq_pipeline_contract.json); [`fixtures/opt053_mmq_pipeline.json`](fixtures/opt053_mmq_pipeline.json); [`cuda/quant_mmq_mma.cuh`](cuda/quant_mmq_mma.cuh); [`cuda/opt053_mmq_pipeline_ab_test.cu`](cuda/opt053_mmq_pipeline_ab_test.cu); [`tests/test_opt053_mmq_pipeline.py`](tests/test_opt053_mmq_pipeline.py); [`evidence/optimization/opt053-mmq-pipeline/REPORT.md`](evidence/optimization/opt053-mmq-pipeline/REPORT.md); verification 2026-09-11T00:05:20Z |
 | OPT-054 | Tune internal prefill batches within atomic 4K | OPT-049, OPT-051, OPT-052, OPT-053 | done | Compare 512/1024/2048/4096 physical batches while preserving one atomic 4096-token operation; keep only a complete P win with quality, cancellation, graph and memory checks | [`tasks/OPT-054.md`](tasks/OPT-054.md); [`pins/opt054_prefill_microbatch_contract.json`](pins/opt054_prefill_microbatch_contract.json); [`fixtures/opt054_prefill_microbatch.json`](fixtures/opt054_prefill_microbatch.json); [`cuda/full_scheduler.cu`](cuda/full_scheduler.cu); [`cuda/opt054_prefill_microbatch_ab_test.cu`](cuda/opt054_prefill_microbatch_ab_test.cu); [`tests/test_opt054_prefill_microbatch.py`](tests/test_opt054_prefill_microbatch.py); [`evidence/optimization/opt054-prefill-microbatch/REPORT.md`](evidence/optimization/opt054-prefill-microbatch/REPORT.md); verification 2026-09-11T01:03:00Z |
 | OPT-055 | Capture measured remaining decode and prompt launch gaps | OPT-054 | done | Supersedes OPT-031; broader stable graphs save measured wall time with bounded cancellation, correct dynamic positions and post-graph memory reserve, or measured no-change result | [`tasks/OPT-055.md`](tasks/OPT-055.md); [`pins/opt055_execution_graphs_contract.json`](pins/opt055_execution_graphs_contract.json); [`fixtures/opt055_execution_graphs.json`](fixtures/opt055_execution_graphs.json); [`cuda/full_scheduler.cu`](cuda/full_scheduler.cu); [`cuda/opt055_execution_graphs_ab_test.cu`](cuda/opt055_execution_graphs_ab_test.cu); [`tests/test_opt055_execution_graphs.py`](tests/test_opt055_execution_graphs.py); [`evidence/optimization/opt055-execution-graphs/REPORT.md`](evidence/optimization/opt055-execution-graphs/REPORT.md); verification 2026-09-11T01:30:00Z |
-| OPT-056 | Exceed pinned llama.cpp prefill and decode with quality | OPT-045, OPT-046, OPT-047, OPT-048, OPT-049, OPT-050, OPT-051, OPT-052, OPT-053, OPT-054, OPT-055 | pending | Same-sitting P/D128/D2048 throughput exceeds llama by at least 5%, decode p95 is no worse, combined production quality passes, and original OPT-016 2K parity passes; candidate-task completion alone is insufficient | [Task](tasks/OPT-056.md) |
+| OPT-056 | Exceed pinned llama.cpp prefill and decode with quality | OPT-045, OPT-046, OPT-047, OPT-048, OPT-049, OPT-050, OPT-051, OPT-052, OPT-053, OPT-054, OPT-055 | blocked | Same-sitting P/D128/D2048 throughput exceeds llama by at least 5%, decode p95 is no worse, combined production quality passes, and original OPT-016 2K parity passes; candidate-task completion alone is insufficient | [`tasks/OPT-056.md`](tasks/OPT-056.md); [`pins/opt056_performance_gate_contract.json`](pins/opt056_performance_gate_contract.json); [`fixtures/opt056_performance_gate.json`](fixtures/opt056_performance_gate.json); [`tests/test_opt056_performance_gate.py`](tests/test_opt056_performance_gate.py); [`evidence/optimization/opt056-performance-gate/REPORT.md`](evidence/optimization/opt056-performance-gate/REPORT.md); blocked 2026-09-11T02:15:00Z measured gate unpassed P 2808.50 vs llama 3263.52 (+618 tok/s to 5% bar), D128 37.48 vs 68.93, D2048 35.72 vs 67.34, decode p95 worse; recovery: close remaining P/D gaps vs llama before re-pass |
 
 ### Post-042 recovery execution order
 
 The [2026-09-10 design](tasks/PERFORMANCE-RECOVERY-2026-09-10.md) compares the
 admitted Quartz, pinned llama.cpp and ds4 paths. It is source analysis and task
-design, not new performance evidence. **Next eligible recovery task: OPT-056**
-(outcome gate after measured remaining launch work in OPT-055).
+design, not new performance evidence. **OPT-056 outcome gate measured unpassed**
+(2026-09-11); recovery requires closing remaining P/D throughput and decode-p95
+gaps versus llama before re-pass. No further pending recovery rows remain in the
+2026-09-10 ladder until new measured-bottleneck tasks are admitted.
 Dependencies permit independent work but do not authorize subagents. The user
 accepts documented llama.cpp/ds4-like accuracy compromises; strict reference
 arithmetic and exact structural/transaction guarantees remain separately tested.
@@ -5857,3 +5859,23 @@ statements below are historical, not the current execution order.
   Tok/s delta: P **2895.43** → **2895.43** (0, 1.000×); D128 **37.56** →
   **37.56** (0, 1.000×); D2048 **35.73** → **35.73** (0, 1.000×). Speedup
   **0** (measured no-change).
+
+### 2026-09-11T02:15:00Z — OPT-056 blocked (performance gate unpassed)
+
+- Same-sitting exclusive RTX 5090 outcome gate measured on combined production
+  paths after OPT-045–055. `gate.passed` is false. P Quartz **2808.50** vs llama
+  **3263.52** tok/s (remaining **+618** tok/s to the 5% bar); D128 **37.48** vs
+  **68.93**; D2048 **35.72** vs **67.34**; decode p95 worse than llama on both
+  prefixes; production-optimization greedy tasks failed; OPT-016 2K **3012.70**
+  vs **3169.57**. Candidate-task completion is not a pass.
+- Acceptance evidence: [`tasks/OPT-056.md`](tasks/OPT-056.md);
+  [`pins/opt056_performance_gate_contract.json`](pins/opt056_performance_gate_contract.json);
+  [`fixtures/opt056_performance_gate.json`](fixtures/opt056_performance_gate.json);
+  [`tests/test_opt056_performance_gate.py`](tests/test_opt056_performance_gate.py);
+  [`evidence/optimization/opt056-performance-gate/REPORT.md`](evidence/optimization/opt056-performance-gate/REPORT.md).
+  Proof is honest same-sitting P/D128/D2048 versus pinned llama.cpp with quality
+  and OPT-016 evidence, not a substitute 2K gate.
+- Marked OPT-056 `blocked`; recovery: close remaining P/D throughput and
+  decode-p95 gaps versus llama before re-pass. `plan.md` is unchanged. OPT-016
+  stays `blocked`. No pending recovery rows remain until new measured-bottleneck
+  tasks are admitted.

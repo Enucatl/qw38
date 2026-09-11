@@ -185,8 +185,17 @@ cudaError_t quartz_launch_kernel(Kernel kernel, dim3 grid, dim3 block,
     g_pdl_last_used_ex = error == cudaSuccess;
     return error;
   }
+#if defined(__CUDACC__)
   kernel<<<grid, block, shared, stream>>>(std::forward<Args>(args)...);
   return cudaGetLastError();
+#else
+  (void)kernel;
+  (void)grid;
+  (void)block;
+  (void)shared;
+  (void)stream;
+  return cudaErrorInvalidDeviceFunction;
+#endif
 }
 
 }  // namespace qw38::cuda

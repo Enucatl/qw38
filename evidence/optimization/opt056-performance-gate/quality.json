@@ -1,0 +1,101 @@
+{
+  "production_optimization": {
+    "suite": "production-optimization",
+    "wikitext_nll": {
+      "pass": true,
+      "ppl_ratio": 1.0000765601619601
+    },
+    "continuation": {
+      "pass": true,
+      "positions": 32
+    },
+    "recurrence": {
+      "pass": true,
+      "incremental_nll": -0.0038120669000774043
+    },
+    "tasks": {
+      "pass": false,
+      "count": 8
+    },
+    "legacy_thresholds_unchanged": 1.05,
+    "all": false,
+    "held_out_wikitext_1024": {
+      "pass": true,
+      "ppl_ratio": null,
+      "quartz_mean_nll": 1.7878782710057632,
+      "llama_mean_nll": "not_run_this_sitting"
+    }
+  },
+  "families": {
+    "q4_k_17x256": {
+      "family": "q4_k",
+      "production_dispatch": "strict",
+      "pathological_llama": false
+    },
+    "q4_k_257x512": {
+      "family": "q4_k",
+      "production_dispatch": "strict",
+      "pathological_llama": false
+    },
+    "q4k_gate_up": {
+      "family": "q4_k",
+      "production_dispatch": "strict",
+      "pathological_llama": false
+    },
+    "q4k_down": {
+      "family": "q4_k",
+      "production_dispatch": "strict",
+      "pathological_llama": false
+    },
+    "q4_k_17x256_zero": {
+      "family": "q4_k",
+      "production_dispatch": "strict",
+      "pathological_llama": false
+    },
+    "q4_k_17x256_alternating": {
+      "family": "q4_k",
+      "production_dispatch": "strict",
+      "pathological_llama": false
+    },
+    "q4_k_17x256_cancellation": {
+      "family": "q4_k",
+      "production_dispatch": "strict",
+      "pathological_llama": false
+    },
+    "q4_k_17x256_extremes": {
+      "family": "q4_k",
+      "production_dispatch": "strict",
+      "pathological_llama": false
+    },
+    "q4_k_17x256_small": {
+      "family": "q4_k",
+      "production_dispatch": "strict",
+      "pathological_llama": false
+    },
+    "q6_k_17x256": {
+      "family": "q6_k",
+      "production_dispatch": "strict",
+      "pathological_llama": false
+    },
+    "q6_k_257x512": {
+      "family": "q6_k",
+      "production_dispatch": "strict",
+      "pathological_llama": true
+    },
+    "q8_0_17x256": {
+      "family": "q8_0",
+      "production_dispatch": "strict",
+      "pathological_llama": false
+    },
+    "q8_0_257x512": {
+      "family": "q8_0",
+      "production_dispatch": "strict",
+      "pathological_llama": false
+    }
+  },
+  "retained_reference": {
+    "opt044_wikitext_ppl_ratio": 1.0002643259599846,
+    "opt042_numeric_reject_preserved": true
+  },
+  "qlt001_not_claimed": true
+}

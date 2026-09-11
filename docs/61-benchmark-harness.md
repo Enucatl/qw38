@@ -1,6 +1,6 @@
 # The benchmark harness
 
-[Index](README.md) · Implementation tasks: BEN-001, OPT-032, OPT-038, EDU-046, and SCH-002 in
+[Index](README.md) · Implementation tasks: BEN-001, OPT-032, OPT-038, OPT-056, EDU-046, and SCH-002 in
 [`implementation_ledger.md`](../implementation_ledger.md) · Contracts:
 [`pins/benchmark_contract.json`](../pins/benchmark_contract.json),
 [`pins/opt032_decode_oracle_contract.json`](../pins/opt032_decode_oracle_contract.json),
@@ -230,7 +230,12 @@ exclusive decode categories are not `component_probe` fields. OPT-038 likewise
 leaves this harness unchanged: the post-ladder refresh reuses those oracle
 protocols, adds independent raw-wall attribution diagnostics, and records a
 host-recomputed next-task order without changing accepted keep denominators or
-public `component_probe` fields.
+public `component_probe` fields. OPT-056 likewise leaves this harness unchanged:
+it reuses the OPT-021 P and OPT-032 D128/D2048 protocols plus Session TTFT as a
+secondary metric only. The same-sitting exclusive RTX 5090 outcome gate versus
+pinned llama.cpp did not pass (P 2808.50 vs 3263.52, D128 37.48 vs 68.93, D2048
+35.72 vs 67.34 tok/s). Live numbers stay in
+[`evidence/optimization/opt056-performance-gate/REPORT.md`](../evidence/optimization/opt056-performance-gate/REPORT.md).
 
 ## Reproduce a smoke safely
 

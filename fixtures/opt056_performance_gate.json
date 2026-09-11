@@ -1,0 +1,1141 @@
+{
+  "schema_version": 1,
+  "task": "OPT-056",
+  "status": "measured",
+  "measurement_utc": "2026-09-11T01:50:43Z",
+  "device": "NVIDIA GeForce RTX 5090",
+  "compute_capability": "12.0",
+  "llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+  "gguf_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+  "source_revision": "a929d9b211d519d8a0897d83fa22611893fbc5d9",
+  "source_state": "dirty",
+  "hardware_executed": true,
+  "keep_sitting_skipped": false,
+  "combined_production_paths": {
+    "rms_norm": "parallel_fma",
+    "q4_decode": "packed",
+    "q8_decode": "dp4a_q8_1",
+    "q6_decode": "integer_q8_1",
+    "ffn_decode": "paired_staged",
+    "query_prepare": "hoisted",
+    "attention_pipeline": "f16_async",
+    "gdn_preproc": "transpose",
+    "mmq_pipeline": "fma_async",
+    "execution_graphs": "ffn_only",
+    "production_numerics": "strict",
+    "prompt_microbatch_rows": 4096
+  },
+  "component_rejections": {
+    "OPT-046": {
+      "fixture": "fixtures/opt046_q4_decode.json",
+      "reverted": true,
+      "selected": "packed"
+    }
+  },
+  "production_numerics": {
+    "path": "strict",
+    "optimized_admitted": false,
+    "formula": "max(strict_reference_ceiling, 1.05 * measured_llama_error + 1e-6)",
+    "like_arithmetic_byte_equal": true
+  },
+  "p": {
+    "quartz": {
+      "prompt_tokens": 4096,
+      "replicates": 3,
+      "wall_ms": [
+        1445.4325,
+        1464.19373,
+        1465.84644
+      ],
+      "tok_s": [
+        2833.75391,
+        2797.44409,
+        2794.29004
+      ],
+      "mean_tok_s": 2808.49609,
+      "cold": true,
+      "cache_policy": "disabled",
+      "attribution": null,
+      "graphs_created": true,
+      "prompt_graph_rows": 4096
+    },
+    "llama_cpp": {
+      "avg_ts": 3263.516321,
+      "avg_ns": 1255132559,
+      "n_prompt": 4096,
+      "n_batch": 2048,
+      "n_ubatch": 512,
+      "flash_attn": -1,
+      "build_commit": "cc83d7b",
+      "test_time": "2026-09-11T01:42:15Z",
+      "samples_ts": [
+        3290.89,
+        3252.66,
+        3246.99
+      ],
+      "samples_ns": [
+        1244647490,
+        1259275684,
+        1261474505
+      ]
+    }
+  },
+  "d128": {
+    "quartz": {
+      "prefix": 128,
+      "decode_tokens": 256,
+      "warmups": 3,
+      "runs": 30,
+      "warmup_tok_s": [
+        37.78862,
+        37.6774635,
+        37.658596
+      ],
+      "tok_s": [
+        37.6209221,
+        37.5943069,
+        37.5654793,
+        37.5318794,
+        37.5427361,
+        37.5121117,
+        37.4774094,
+        37.4795532,
+        37.4606056,
+        37.4776077,
+        37.4731789,
+        37.4767723,
+        37.4919052,
+        37.4891319,
+        37.4666862,
+        37.4688263,
+        37.458683,
+        37.4729614,
+        37.474308,
+        37.4487457,
+        37.4494247,
+        37.4608498,
+        37.4172707,
+        37.4371643,
+        37.4450302,
+        37.4315186,
+        37.4572906,
+        37.4416656,
+        37.4512711,
+        37.4733505
+      ],
+      "run_wall_ms": [
+        6804.72412,
+        6809.5415,
+        6814.76709,
+        6820.86816,
+        6818.89551,
+        6824.4624,
+        6830.78174,
+        6830.39062,
+        6833.8457,
+        6830.74561,
+        6831.55273,
+        6830.89795,
+        6828.14062,
+        6828.646,
+        6832.73633,
+        6832.34668,
+        6834.19629,
+        6831.59277,
+        6831.34668,
+        6836.00977,
+        6835.88574,
+        6833.80127,
+        6841.76025,
+        6838.125,
+        6836.68848,
+        6839.15625,
+        6834.4502,
+        6837.30273,
+        6835.54932,
+        6831.52148
+      ],
+      "mean_tok_s": 37.4816246,
+      "token_latency_p50_ms": 26.7092724,
+      "token_latency_p95_ms": 26.9079285,
+      "run_mean_token_latency_p95_ms": 26.713541,
+      "token_latency_sidecar": "evidence/optimization/opt056-performance-gate/quartz-d128-tokens.json",
+      "graphs_created": true,
+      "attribution": null,
+      "cache_policy": "disabled"
+    },
+    "llama_cpp": {
+      "prefix": 128,
+      "decode_tokens": 256,
+      "warmups": 3,
+      "runs": 30,
+      "warmup_tok_s": [
+        71.0724359,
+        70.5693152,
+        70.5469511
+      ],
+      "tok_s": [
+        70.4480967,
+        70.4591487,
+        70.3605981,
+        70.3340179,
+        69.1487278,
+        68.9143699,
+        68.8938394,
+        68.7845686,
+        68.7404257,
+        68.7382662,
+        68.7825172,
+        68.8049785,
+        68.8042758,
+        68.7255518,
+        68.762527,
+        68.6993443,
+        68.5358022,
+        68.7254595,
+        68.6689569,
+        68.6631736,
+        68.6886163,
+        68.6644812,
+        68.611315,
+        68.5780843,
+        68.5584698,
+        68.6164091,
+        68.5481712,
+        68.5318392,
+        68.5818506,
+        68.5824201
+      ],
+      "run_wall_ms": [
+        3633.881,
+        3633.311,
+        3638.4,
+        3639.775,
+        3702.165,
+        3714.755,
+        3715.862,
+        3721.765,
+        3724.155,
+        3724.272,
+        3721.876,
+        3720.661,
+        3720.699,
+        3724.961,
+        3722.958,
+        3726.382,
+        3735.274,
+        3724.966,
+        3728.031,
+        3728.345,
+        3726.964,
+        3728.274,
+        3731.163,
+        3732.971,
+        3734.039,
+        3730.886,
+        3734.6,
+        3735.49,
+        3732.766,
+        3732.735
+      ],
+      "mean_tok_s": 68.9318767,
+      "token_latency_p50_ms": 14.419,
+      "token_latency_p95_ms": 14.576,
+      "run_mean_token_latency_p95_ms": 14.5896225,
+      "token_latency_sidecar": "evidence/optimization/opt056-performance-gate/llama-decode-d128-tokens.json",
+      "n_gpu_layers": 99,
+      "n_ctx": 4096,
+      "n_batch": 2048,
+      "n_ubatch": 512
+    }
+  },
+  "d2048": {
+    "quartz": {
+      "prefix": 2048,
+      "decode_tokens": 256,
+      "warmups": 3,
+      "runs": 30,
+      "warmup_tok_s": [
+        35.8445511,
+        35.8117981,
+        35.8054352
+      ],
+      "tok_s": [
+        35.7645149,
+        35.7745972,
+        35.7697258,
+        35.7452469,
+        35.7372704,
+        35.7341232,
+        35.7133789,
+        35.6958504,
+        35.7108536,
+        35.6966133,
+        35.7050133,
+        35.6954575,
+        35.6967735,
+        35.7309456,
+        35.7092438,
+        35.7244225,
+        35.7157936,
+        35.7267494,
+        35.6898346,
+        35.7013245,
+        35.6915283,
+        35.6959114,
+        35.715004,
+        35.7087288,
+        35.7180672,
+        35.726944,
+        35.7238388,
+        35.728447,
+        35.7352371,
+        35.7440529
+      ],
+      "run_wall_ms": [
+        7157.93311,
+        7155.91553,
+        7156.89014,
+        7161.7915,
+        7163.38965,
+        7164.02051,
+        7168.18164,
+        7171.70166,
+        7168.68896,
+        7171.54834,
+        7169.86133,
+        7171.78076,
+        7171.51611,
+        7164.6582,
+        7169.01172,
+        7165.96582,
+        7167.69727,
+        7165.49902,
+        7172.91113,
+        7170.60254,
+        7172.57031,
+        7171.68994,
+        7167.85596,
+        7169.11523,
+        7167.24121,
+        7165.45996,
+        7166.08301,
+        7165.15869,
+        7163.79736,
+        7162.03076
+      ],
+      "mean_tok_s": 35.7208481,
+      "token_latency_p50_ms": 27.9847412,
+      "token_latency_p95_ms": 28.182457,
+      "run_mean_token_latency_p95_ms": 28.0163727,
+      "token_latency_sidecar": "evidence/optimization/opt056-performance-gate/quartz-d2048-tokens.json",
+      "graphs_created": true,
+      "attribution": null,
+      "cache_policy": "disabled"
+    },
+    "llama_cpp": {
+      "prefix": 2048,
+      "decode_tokens": 256,
+      "warmups": 3,
+      "runs": 30,
+      "warmup_tok_s": [
+        69.5865472,
+        68.3774746,
+        68.3151249
+      ],
+      "tok_s": [
+        68.3033866,
+        68.2462838,
+        68.276808,
+        68.2148416,
+        67.240964,
+        67.2648862,
+        67.249637,
+        67.1724366,
+        67.2121528,
+        67.1820087,
+        67.1866282,
+        67.1944052,
+        67.1670084,
+        67.2215243,
+        67.1740758,
+        67.1867692,
+        67.199732,
+        67.1741111,
+        67.1795052,
+        67.1776718,
+        67.1887971,
+        67.1920596,
+        67.1956575,
+        67.1986384,
+        67.2193709,
+        67.2088354,
+        67.1924299,
+        67.1657748,
+        67.1812329,
+        67.2153469
+      ],
+      "run_wall_ms": [
+        3747.984,
+        3751.12,
+        3749.443,
+        3752.849,
+        3807.203,
+        3805.849,
+        3806.712,
+        3811.087,
+        3808.835,
+        3810.544,
+        3810.282,
+        3809.841,
+        3811.395,
+        3808.304,
+        3810.994,
+        3810.274,
+        3809.539,
+        3810.992,
+        3810.686,
+        3810.79,
+        3810.159,
+        3809.974,
+        3809.77,
+        3809.601,
+        3808.426,
+        3809.023,
+        3809.953,
+        3811.465,
+        3810.588,
+        3808.654
+      ],
+      "mean_tok_s": 67.3394327,
+      "token_latency_p50_ms": 14.556,
+      "token_latency_p95_ms": 14.726,
+      "run_mean_token_latency_p95_ms": 14.8876168,
+      "token_latency_sidecar": "evidence/optimization/opt056-performance-gate/llama-decode-d2048-tokens.json",
+      "n_gpu_layers": 99,
+      "n_ctx": 4096,
+      "n_batch": 2048,
+      "n_ubatch": 512
+    }
+  },
+  "opt016": {
+    "quartz": {
+      "prompt_tokens": 2048,
+      "replicates": 3,
+      "wall_ms": [
+        665.151794,
+        686.816895,
+        687.890869
+      ],
+      "tok_s": [
+        3078.99634,
+        2981.87183,
+        2977.21655
+      ],
+      "mean_tok_s": 3012.69507,
+      "cold": true,
+      "cache_policy": "disabled",
+      "attribution": null
+    },
+    "llama_cpp": {
+      "avg_ts": 3169.571249,
+      "avg_ns": 646246815,
+      "n_prompt": 2048,
+      "n_ubatch": 512,
+      "flash_attn": -1,
+      "build_commit": "cc83d7b",
+      "test_time": "2026-09-11T01:59:08Z"
+    },
+    "gate_passed": false,
+    "owns_opt016_parity_gate": false
+  },
+  "quality": {
+    "production_optimization": {
+      "suite": "production-optimization",
+      "wikitext_nll": {
+        "pass": true,
+        "ppl_ratio": 1.0000765601619601
+      },
+      "continuation": {
+        "pass": true,
+        "positions": 32
+      },
+      "recurrence": {
+        "pass": true,
+        "incremental_nll": -0.0038120669000774043
+      },
+      "tasks": {
+        "pass": false,
+        "count": 8
+      },
+      "legacy_thresholds_unchanged": 1.05,
+      "all": false,
+      "held_out_wikitext_1024": {
+        "pass": true,
+        "ppl_ratio": null,
+        "quartz_mean_nll": 1.7878782710057632,
+        "llama_mean_nll": "not_run_this_sitting"
+      }
+    },
+    "families": {
+      "q4_k_17x256": {
+        "family": "q4_k",
+        "production_dispatch": "strict",
+        "pathological_llama": false
+      },
+      "q4_k_257x512": {
+        "family": "q4_k",
+        "production_dispatch": "strict",
+        "pathological_llama": false
+      },
+      "q4k_gate_up": {
+        "family": "q4_k",
+        "production_dispatch": "strict",
+        "pathological_llama": false
+      },
+      "q4k_down": {
+        "family": "q4_k",
+        "production_dispatch": "strict",
+        "pathological_llama": false
+      },
+      "q4_k_17x256_zero": {
+        "family": "q4_k",
+        "production_dispatch": "strict",
+        "pathological_llama": false
+      },
+      "q4_k_17x256_alternating": {
+        "family": "q4_k",
+        "production_dispatch": "strict",
+        "pathological_llama": false
+      },
+      "q4_k_17x256_cancellation": {
+        "family": "q4_k",
+        "production_dispatch": "strict",
+        "pathological_llama": false
+      },
+      "q4_k_17x256_extremes": {
+        "family": "q4_k",
+        "production_dispatch": "strict",
+        "pathological_llama": false
+      },
+      "q4_k_17x256_small": {
+        "family": "q4_k",
+        "production_dispatch": "strict",
+        "pathological_llama": false
+      },
+      "q6_k_17x256": {
+        "family": "q6_k",
+        "production_dispatch": "strict",
+        "pathological_llama": false
+      },
+      "q6_k_257x512": {
+        "family": "q6_k",
+        "production_dispatch": "strict",
+        "pathological_llama": true
+      },
+      "q8_0_17x256": {
+        "family": "q8_0",
+        "production_dispatch": "strict",
+        "pathological_llama": false
+      },
+      "q8_0_257x512": {
+        "family": "q8_0",
+        "production_dispatch": "strict",
+        "pathological_llama": false
+      }
+    },
+    "retained_reference": {
+      "opt044_wikitext_ppl_ratio": 1.0002643259599846,
+      "opt042_numeric_reject_preserved": true
+    },
+    "qlt001_not_claimed": true
+  },
+  "attribution": {
+    "prefill": {
+      "raw_host_wall_ms": 1436.90466,
+      "leaves": {
+        "embedding": {
+          "ms": 0.114560001,
+          "measured": true
+        },
+        "input_norm": {
+          "ms": 0.062624,
+          "measured": true
+        },
+        "activation_staging_mixer": {
+          "ms": 9.61174297,
+          "measured": true
+        },
+        "proj_packed_qkv": {
+          "ms": 89.6422653,
+          "measured": true
+        },
+        "proj_value_gate": {
+          "ms": 59.5161629,
+          "measured": true
+        },
+        "proj_alpha": {
+          "ms": 14.0456638,
+          "measured": true
+        },
+        "proj_beta": {
+          "ms": 6.83388758,
+          "measured": true
+        },
+        "proj_gdn_output": {
+          "ms": 56.6743736,
+          "measured": true
+        },
+        "proj_query_gate": {
+          "ms": 39.8283539,
+          "measured": true
+        },
+        "proj_key": {
+          "ms": 4.28895998,
+          "measured": true
+        },
+        "proj_value": {
+          "ms": 3.35433578,
+          "measured": true
+        },
+        "proj_attn_output": {
+          "ms": 26.2912006,
+          "measured": true
+        },
+        "gdn_conv_qk_norm_recurrence": {
+          "ms": 200.119385,
+          "measured": true
+        },
+        "attn_qk_prep_softmax_pv_merge": {
+          "ms": 257.03363,
+          "measured": true
+        },
+        "ffn_norm": {
+          "ms": 0,
+          "measured": false
+        },
+        "activation_staging_ffn": {
+          "ms": 0,
+          "measured": false
+        },
+        "proj_ffn_gate": {
+          "ms": 0,
+          "measured": false
+        },
+        "proj_ffn_up": {
+          "ms": 0,
+          "measured": false
+        },
+        "swiglu": {
+          "ms": 0,
+          "measured": false
+        },
+        "proj_ffn_down": {
+          "ms": 0,
+          "measured": false
+        },
+        "residual_ffn": {
+          "ms": 0,
+          "measured": false
+        },
+        "logits_norm": {
+          "ms": 0.0135679999,
+          "measured": true
+        },
+        "logits_projection": {
+          "ms": 1.00035203,
+          "measured": true
+        },
+        "d2h": {
+          "ms": 0,
+          "measured": false
+        },
+        "state_copies": {
+          "ms": 0.717599988,
+          "measured": true
+        },
+        "host_graph_submit": {
+          "ms": 1.51299512,
+          "measured": true
+        }
+      },
+      "categories_ms": {
+        "embedding": 0.119456001,
+        "mixer_mmq": 310.441254,
+        "gdn_core": 200.220718,
+        "attention_core": 257.051208,
+        "ffn_mmq": 666.404114,
+        "logits": 1.01510406,
+        "commit_sync": 0.718432009,
+        "graph": 1.51299512,
+        "other_idle": 0
+      }
+    },
+    "d2048": {
+      "raw_host_wall_ms": 28.6976166,
+      "leaves": {
+        "embedding": {
+          "ms": 0.052832,
+          "measured": true
+        },
+        "input_norm": {
+          "ms": 0.020064,
+          "measured": true
+        },
+        "residual_mixer": {
+          "ms": 0.240959987,
+          "measured": true
+        },
+        "proj_packed_qkv": {
+          "ms": 2.03385615,
+          "measured": true
+        },
+        "proj_value_gate": {
+          "ms": 1.15968013,
+          "measured": true
+        },
+        "proj_alpha": {
+          "ms": 0.187328026,
+          "measured": true
+        },
+        "proj_beta": {
+          "ms": 0.203263998,
+          "measured": true
+        },
+        "proj_gdn_output": {
+          "ms": 1.21916819,
+          "measured": true
+        },
+        "proj_query_gate": {
+          "ms": 0.738175988,
+          "measured": true
+        },
+        "proj_key": {
+          "ms": 0.122655988,
+          "measured": true
+        },
+        "proj_value": {
+          "ms": 0.125088006,
+          "measured": true
+        },
+        "proj_attn_output": {
+          "ms": 0.707808077,
+          "measured": true
+        },
+        "gdn_gate_prep": {
+          "ms": 0.228735983,
+          "measured": true
+        },
+        "gdn_conv_qk_norm_recurrence": {
+          "ms": 1.68716788,
+          "measured": true
+        },
+        "gdn_output_norm": {
+          "ms": 0.28057602,
+          "measured": true
+        },
+        "attn_query_split": {
+          "ms": 0.0530240051,
+          "measured": true
+        },
+        "attn_qk_prep_softmax_pv_merge": {
+          "ms": 2.08332801,
+          "measured": true
+        },
+        "attn_output_cast": {
+          "ms": 0.0535679981,
+          "measured": true
+        },
+        "ffn_norm": {
+          "ms": 0,
+          "measured": false
+        },
+        "proj_ffn_gate": {
+          "ms": 0,
+          "measured": false
+        },
+        "proj_ffn_up": {
+          "ms": 0,
+          "measured": false
+        },
+        "swiglu": {
+          "ms": 0,
+          "measured": false
+        },
+        "proj_ffn_down": {
+          "ms": 0,
+          "measured": false
+        },
+        "residual_ffn": {
+          "ms": 0,
+          "measured": false
+        },
+        "logits_norm": {
+          "ms": 0.0135359997,
+          "measured": true
+        },
+        "logits_projection": {
+          "ms": 0.673407972,
+          "measured": true
+        },
+        "d2h": {
+          "ms": 0.131743997,
+          "measured": true
+        },
+        "state_copies": {
+          "ms": 0.0225280002,
+          "measured": true
+        },
+        "host_graph_submit": {
+          "ms": 0.265611976,
+          "measured": true
+        }
+      },
+      "categories_ms": {
+        "embedding": 0.0535680018,
+        "mixer_mmv": 7.09635019,
+        "gdn_core": 2.37075186,
+        "attention_core": 2.22873592,
+        "ffn_mmv": 15.4258585,
+        "logits": 0.835039973,
+        "state_commit": 0.0281600002,
+        "graph": 0.265611976,
+        "other_idle": 0.120922089
+      }
+    }
+  },
+  "opt043_remaining_ms": {
+    "p": 701.5488738177955,
+    "d2048": 24.578147254269947
+  },
+  "remaining_ms": {
+    "p": 203.34385000457132,
+    "d2048": 13.144716081053918
+  },
+  "secondary_session": {
+    "ttft_ms": 119.808688,
+    "itl_ms_p50": 25.03173,
+    "itl_ms_p95": 25.146197,
+    "replaces_historical_protocol": false,
+    "raw": "evidence/optimization/opt056-performance-gate/session-ttft.json"
+  },
+  "state_isolation": {
+    "memory_fit": {
+      "ok": true,
+      "post_graph_admitted": true
+    },
+    "checkpoint": {
+      "ok": true
+    },
+    "cancellation": {
+      "ok": true,
+      "frontier": 0,
+      "source": "fixtures/opt055_execution_graphs.json"
+    }
+  },
+  "llama_bench_informational": {
+    "d128": {
+      "build_commit": "cc83d7b",
+      "build_number": 1,
+      "cpu_info": "AMD Ryzen 9 9900X 12-Core Processor",
+      "gpu_info": "NVIDIA GeForce RTX 5090",
+      "backends": "CUDA",
+      "model_filename": "/workspace/models/Qwen3.8-27B-Q4_K_M.gguf",
+      "model_type": "qwen35 27B Q4_K - Medium",
+      "model_size": 18962876416,
+      "model_n_params": 26895998464,
+      "n_batch": 2048,
+      "n_ubatch": 512,
+      "n_threads": 20,
+      "cpu_mask": "0x0",
+      "cpu_strict": false,
+      "poll": 50,
+      "type_k": "f16",
+      "type_v": "f16",
+      "n_gpu_layers": 99,
+      "n_cpu_moe": 0,
+      "split_mode": "layer",
+      "main_gpu": 0,
+      "no_kv_offload": false,
+      "flash_attn": -1,
+      "devices": "auto",
+      "tensor_split": "0.00",
+      "tensor_buft_overrides": "none",
+      "load_mode": "auto",
+      "lazy_mode": "auto",
+      "embeddings": false,
+      "no_op_offload": 0,
+      "no_host": false,
+      "fit_target": 0,
+      "fit_min_ctx": 0,
+      "n_prompt": 0,
+      "n_gen": 256,
+      "n_depth": 128,
+      "test_time": "2026-09-11T01:46:55Z",
+      "avg_ns": 3647698788,
+      "stddev_ns": 3363920,
+      "avg_ts": 70.181291,
+      "stddev_ts": 0.064795,
+      "samples_ns": [
+        3635911116,
+        3644395478,
+        3645104523,
+        3643548680,
+        3646377431,
+        3649327494,
+        3644314093,
+        3644510326,
+        3642751856,
+        3645368265,
+        3649847571,
+        3648706717,
+        3648501292,
+        3648064601,
+        3646924066,
+        3650384890,
+        3649533913,
+        3648197164,
+        3649483238,
+        3650585842,
+        3648626620,
+        3652616648,
+        3651304135,
+        3649606902,
+        3648937010,
+        3648000410,
+        3648566536,
+        3649599348,
+        3650548774,
+        3651318723
+      ],
+      "samples_ts": [
+        70.4088,
+        70.2448,
+        70.2312,
+        70.2612,
+        70.2067,
+        70.1499,
+        70.2464,
+        70.2426,
+        70.2765,
+        70.2261,
+        70.1399,
+        70.1618,
+        70.1658,
+        70.1742,
+        70.1961,
+        70.1296,
+        70.1459,
+        70.1716,
+        70.1469,
+        70.1257,
+        70.1634,
+        70.0867,
+        70.1119,
+        70.1445,
+        70.1574,
+        70.1754,
+        70.1645,
+        70.1447,
+        70.1264,
+        70.1117
+      ]
+    },
+    "d2048": {
+      "build_commit": "cc83d7b",
+      "build_number": 1,
+      "cpu_info": "AMD Ryzen 9 9900X 12-Core Processor",
+      "gpu_info": "NVIDIA GeForce RTX 5090",
+      "backends": "CUDA",
+      "model_filename": "/workspace/models/Qwen3.8-27B-Q4_K_M.gguf",
+      "model_type": "qwen35 27B Q4_K - Medium",
+      "model_size": 18962876416,
+      "model_n_params": 26895998464,
+      "n_batch": 2048,
+      "n_ubatch": 512,
+      "n_threads": 20,
+      "cpu_mask": "0x0",
+      "cpu_strict": false,
+      "poll": 50,
+      "type_k": "f16",
+      "type_v": "f16",
+      "n_gpu_layers": 99,
+      "n_cpu_moe": 0,
+      "split_mode": "layer",
+      "main_gpu": 0,
+      "no_kv_offload": false,
+      "flash_attn": -1,
+      "devices": "auto",
+      "tensor_split": "0.00",
+      "tensor_buft_overrides": "none",
+      "load_mode": "auto",
+      "lazy_mode": "auto",
+      "embeddings": false,
+      "no_op_offload": 0,
+      "no_host": false,
+      "fit_target": 0,
+      "fit_min_ctx": 0,
+      "n_prompt": 0,
+      "n_gen": 256,
+      "n_depth": 2048,
+      "test_time": "2026-09-11T01:48:47Z",
+      "avg_ns": 3668495861,
+      "stddev_ns": 1753654,
+      "avg_ts": 69.783384,
+      "stddev_ts": 0.033332,
+      "samples_ns": [
+        3667018020,
+        3665178507,
+        3666524975,
+        3666718202,
+        3667603884,
+        3667175370,
+        3667070571,
+        3668477604,
+        3668419172,
+        3671650190,
+        3669990536,
+        3668873835,
+        3667763126,
+        3667299865,
+        3666297993,
+        3668392988,
+        3667744892,
+        3669033982,
+        3667201260,
+        3665859001,
+        3670040645,
+        3669321518,
+        3671342477,
+        3668303414,
+        3668890600,
+        3671678496,
+        3671199114,
+        3670461352,
+        3669356054,
+        3669988204
+      ],
+      "samples_ts": [
+        69.8115,
+        69.8465,
+        69.8209,
+        69.8172,
+        69.8003,
+        69.8085,
+        69.8105,
+        69.7837,
+        69.7848,
+        69.7234,
+        69.7549,
+        69.7762,
+        69.7973,
+        69.8061,
+        69.8252,
+        69.7853,
+        69.7977,
+        69.7731,
+        69.808,
+        69.8336,
+        69.754,
+        69.7677,
+        69.7293,
+        69.787,
+        69.7759,
+        69.7229,
+        69.732,
+        69.746,
+        69.767,
+        69.755
+      ]
+    }
+  },
+  "owns_opt016_parity_gate": false,
+  "substitutes_for_opt016": false,
+  "owns_qlt001": false,
+  "nsight_systems": "not_used",
+  "nsight_compute": "not_used",
+  "proof_limit": "same-sitting P/D128/D2048 versus pinned llama.cpp; at least 5% throughput margin; decode p95 no worse than llama; confidence-supported improvement; combined production quality on selected paths; original OPT-016 2K parity evidence; candidate-task completion alone is insufficient; does not redefine the 2K llama.cpp parity gate; QLT-001 remains its own owner; Session TTFT does not replace the historical workload protocol",
+  "report_path": "evidence/optimization/opt056-performance-gate/REPORT.md",
+  "gate": {
+    "p": {
+      "quartz_mean_tok_s": 2808.4960133333334,
+      "llama_mean_tok_s": 3263.513333333333,
+      "ratio": 0.8605743952836107,
+      "margin": 1.05,
+      "point_exceeds_margin": false,
+      "confidence_supported": false,
+      "ci95_diff_minus_margin": {
+        "diff": -618.1929866666665,
+        "low": -667.6370641530767,
+        "high": -568.7489091802562,
+        "se": 19.23145759875934,
+        "df": 3.930417248933867
+      },
+      "remaining_tok_s": 618.1929866666665,
+      "pass": false
+    },
+    "d128": {
+      "quartz_mean_tok_s": 37.481621546666666,
+      "llama_mean_tok_s": 68.93187675333334,
+      "ratio": 0.5437487460379377,
+      "margin": 1.05,
+      "point_exceeds_margin": false,
+      "confidence_supported": false,
+      "ci95_diff_minus_margin": {
+        "diff": -34.896849044333344,
+        "low": -35.13252623557456,
+        "high": -34.66117185309213,
+        "se": 0.11541488307601222,
+        "df": 29.32104818489364
+      },
+      "remaining_tok_s": 34.896849044333344,
+      "pass": false
+    },
+    "d2048": {
+      "quartz_mean_tok_s": 35.720849746666666,
+      "llama_mean_tok_s": 67.33943266333333,
+      "ratio": 0.5304596182931143,
+      "margin": 1.05,
+      "point_exceeds_margin": false,
+      "confidence_supported": false,
+      "ci95_diff_minus_margin": {
+        "diff": -34.98555454983333,
+        "low": -35.1299979452781,
+        "high": -34.841111154388564,
+        "se": 0.07073623675062185,
+        "df": 29.203781352499334
+      },
+      "remaining_tok_s": 34.98555454983333,
+      "pass": false
+    },
+    "d128_p95": {
+      "token_latency_p95_ms": {
+        "quartz": 26.9079285,
+        "llama": 14.576,
+        "pass": false
+      },
+      "run_mean_token_latency_p95_ms": {
+        "quartz": 26.713541,
+        "llama": 14.5896225,
+        "pass": false
+      },
+      "pass": false
+    },
+    "d2048_p95": {
+      "token_latency_p95_ms": {
+        "quartz": 28.182457,
+        "llama": 14.726,
+        "pass": false
+      },
+      "run_mean_token_latency_p95_ms": {
+        "quartz": 28.0163727,
+        "llama": 14.8876168,
+        "pass": false
+      },
+      "pass": false
+    },
+    "quality": false,
+    "opt016": false,
+    "passed": false
+  }
+}

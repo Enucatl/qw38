@@ -14,6 +14,7 @@ THIRD_PARTY_OBJECTS := $(BUILD_DIR)/utf8proc.o
 BINARIES := $(BUILD_DIR)/qw38 $(BUILD_DIR)/qw38-server $(BUILD_DIR)/qw38-bench $(BUILD_DIR)/qw38-eval
 HOST_DIAGNOSTICS := $(BUILD_DIR)/qw38-server-core-test $(BUILD_DIR)/qw38-server-api-test $(BUILD_DIR)/qw38-responses-api-test $(BUILD_DIR)/qw38-opt044-production-numerics
 CUDA_IMAGE := qw38-cuda:13.0.2
+QUANT_MMV_CUDA_OBJECTS := $(BUILD_DIR)/quant_mmv.cuda.o $(BUILD_DIR)/q4k_decode_dots.cuda.o $(BUILD_DIR)/q8_decode_dots.cuda.o $(BUILD_DIR)/q6k_decode_dots.cuda.o
 
 .PHONY: all clean test diagnostic cuda-image cuda-build cuda-native cuda-products
 
@@ -132,8 +133,6 @@ $(BUILD_DIR)/q8_decode_dots.cuda.o: cuda/q8_decode_dots.cu cuda/q8_decode_dots.c
 
 $(BUILD_DIR)/q6k_decode_dots.cuda.o: cuda/q6k_decode_dots.cu cuda/q6k_decode_dots.cuh cuda/q6k_decode_path.cuh cuda/q4k_decode_dots.cuh cuda/quant_mmv.h | $(BUILD_DIR)
 	$(NVCC) $(NVCCFLAGS) -Icuda -c $< -o $@
-
-QUANT_MMV_CUDA_OBJECTS := $(BUILD_DIR)/quant_mmv.cuda.o $(BUILD_DIR)/q4k_decode_dots.cuda.o $(BUILD_DIR)/q8_decode_dots.cuda.o $(BUILD_DIR)/q6k_decode_dots.cuda.o
 
 $(BUILD_DIR)/qw38-cuda-quant-test: cuda/quant_mmv_test.cu $(QUANT_MMV_CUDA_OBJECTS) $(BUILD_DIR)/quant.o $(BUILD_DIR)/status.o | $(BUILD_DIR)
 	$(NVCC) $(NVCCFLAGS) $(CPPFLAGS) -Icuda $^ -o $@

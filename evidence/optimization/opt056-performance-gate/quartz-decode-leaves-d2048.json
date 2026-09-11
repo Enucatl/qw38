@@ -1,0 +1,160 @@
+{
+  "schema_version": 1,
+  "task": "OPT-043",
+  "status": "measured",
+  "mode": "decode_leaves",
+  "device": "NVIDIA GeForce RTX 5090",
+  "compute_capability": "12.0",
+  "driver": "13.1",
+  "runtime": "13.0",
+  "toolkit": "CUDA 13.0.2",
+  "pinned_image": "qw38-cuda:13.0.2",
+  "measurement_utc": "2026-09-11T01:59:27Z",
+  "prefix": 2048,
+  "graphs_created": true,
+  "eager_ffn": false,
+  "record_leaves": true,
+  "categories_ms": {
+    "embedding": 0.0535680018,
+    "mixer_mmv": 7.09635019,
+    "gdn_core": 2.37075186,
+    "attention_core": 2.22873592,
+    "ffn_mmv": 15.4258585,
+    "logits": 0.835039973,
+    "state_commit": 0.0281600002,
+    "graph": 0.265611976,
+    "other_idle": 0.120922089
+  },
+  "attributed_sum_ms": 28.4249973,
+  "wall_ms": 28.4249973,
+  "raw_host_wall_ms": 28.6976166,
+  "gpu_event_sum_ms": 28.0384636,
+  "graph_host_interval_ms": 0.265611976,
+  "adjusted_reconstruction_ms": 28.4249973,
+  "wall_raised": false,
+  "fused": {
+    "gdn_conv_fused_with_recurrence": true,
+    "gdn_output_norm_fused_with_gate": true,
+    "attention_prep_fused_with_core": true,
+    "ffn_graph_fused": true,
+    "ffn_staging_fused_into_mmv": false
+  },
+  "leaves": {
+    "embedding": {
+      "ms": 0.052832,
+      "measured": true
+    },
+    "input_norm": {
+      "ms": 0.020064,
+      "measured": true
+    },
+    "residual_mixer": {
+      "ms": 0.240959987,
+      "measured": true
+    },
+    "proj_packed_qkv": {
+      "ms": 2.03385615,
+      "measured": true
+    },
+    "proj_value_gate": {
+      "ms": 1.15968013,
+      "measured": true
+    },
+    "proj_alpha": {
+      "ms": 0.187328026,
+      "measured": true
+    },
+    "proj_beta": {
+      "ms": 0.203263998,
+      "measured": true
+    },
+    "proj_gdn_output": {
+      "ms": 1.21916819,
+      "measured": true
+    },
+    "proj_query_gate": {
+      "ms": 0.738175988,
+      "measured": true
+    },
+    "proj_key": {
+      "ms": 0.122655988,
+      "measured": true
+    },
+    "proj_value": {
+      "ms": 0.125088006,
+      "measured": true
+    },
+    "proj_attn_output": {
+      "ms": 0.707808077,
+      "measured": true
+    },
+    "gdn_gate_prep": {
+      "ms": 0.228735983,
+      "measured": true
+    },
+    "gdn_conv_qk_norm_recurrence": {
+      "ms": 1.68716788,
+      "measured": true
+    },
+    "gdn_output_norm": {
+      "ms": 0.28057602,
+      "measured": true
+    },
+    "attn_query_split": {
+      "ms": 0.0530240051,
+      "measured": true
+    },
+    "attn_qk_prep_softmax_pv_merge": {
+      "ms": 2.08332801,
+      "measured": true
+    },
+    "attn_output_cast": {
+      "ms": 0.0535679981,
+      "measured": true
+    },
+    "ffn_norm": {
+      "ms": 0,
+      "measured": false
+    },
+    "proj_ffn_gate": {
+      "ms": 0,
+      "measured": false
+    },
+    "proj_ffn_up": {
+      "ms": 0,
+      "measured": false
+    },
+    "swiglu": {
+      "ms": 0,
+      "measured": false
+    },
+    "proj_ffn_down": {
+      "ms": 0,
+      "measured": false
+    },
+    "residual_ffn": {
+      "ms": 0,
+      "measured": false
+    },
+    "logits_norm": {
+      "ms": 0.0135359997,
+      "measured": true
+    },
+    "logits_projection": {
+      "ms": 0.673407972,
+      "measured": true
+    },
+    "d2h": {
+      "ms": 0.131743997,
+      "measured": true
+    },
+    "state_copies": {
+      "ms": 0.0225280002,
+      "measured": true
+    },
+    "host_graph_submit": {
+      "ms": 0.265611976,
+      "measured": true
+    }
+  }
+}

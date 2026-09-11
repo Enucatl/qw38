@@ -682,6 +682,22 @@ D128 **37.5605927**, D2048 **35.7286987**. Extra workspace bytes stay 0; the
 [`evidence/optimization/opt055-execution-graphs/REPORT.md`](../evidence/optimization/opt055-execution-graphs/REPORT.md).
 This increment does not own the 2K llama.cpp parity gate.
 
+## End-to-end outcome gate (OPT-056)
+
+**Measured unpassed, RTX 5090:** after OPT-045–055, the combined production
+engine was measured on the frozen OPT-021 P and OPT-032 D128/D2048 protocols
+against same-sitting pinned llama.cpp. Quartz P **2808.49609** vs llama
+**3263.516321** tok/s (ratio 0.861; needs ≥3426.7; remaining **618.19** tok/s).
+D128 **37.4816246** vs **68.9318767** (remaining **34.90** tok/s; p95 26.91 vs
+14.58 ms). D2048 **35.7208481** vs **67.3394327** (remaining **34.99** tok/s;
+p95 28.18 vs 14.73 ms). Confidence-supported 5% margin failed on all three
+workloads. Combined production-optimization quality failed the eight greedy
+tasks (every case emitted token 271); wikitext/continuation/recurrence/held-out
+NLL passed. Original 2K evidence: Quartz **3012.69507** vs llama
+**3169.571249**. Session TTFT 119.81 ms is secondary only. Candidate-task
+completion is not a pass. `gate.passed` is false. Live numbers stay in
+[`evidence/optimization/opt056-performance-gate/REPORT.md`](../evidence/optimization/opt056-performance-gate/REPORT.md).
+
 ## Warp-owned prompt QK microtiles (OPT-041)
 
 **Measured, RTX 5090:** production prompt fattn on Ada+ stream-K with

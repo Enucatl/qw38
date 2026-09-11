@@ -960,6 +960,26 @@ baseline.
   versus null; parameter uploads counted in host launch_params without extra
   device allocation; 128K post-graph reserve unchanged; does not substitute
   for the 2K llama.cpp parity gate. Envelopes unloosened; Nsight is not used.
+- OPT-056 is the end-to-end outcome gate after OPT-045–055. Same-sitting
+  exclusive RTX 5090 P/D128/D2048 versus pinned llama.cpp must exceed llama by
+  at least 5% with confidence-supported means and decode p95 no worse;
+  combined OPT-044 production-optimization quality on selected paths; original
+  OPT-016 2K parity evidence. Candidate-task completion is insufficient.
+  QLT-001 remains its own owner. Session TTFT does not replace the historical
+  OPT-021/OPT-032 protocol. Measured sitting 2026-09-11T01:50:43Z is unpassed:
+  P 2808.49609 vs 3263.516321, D128 37.4816246 vs 68.9318767, D2048 35.7208481
+  vs 67.3394327 tok/s; decode p95 worse; greedy tasks failed; 2K 3012.69507 vs
+  3169.571249. The schema-1 contract, fixture, and report are
+  [`pins/opt056_performance_gate_contract.json`](../pins/opt056_performance_gate_contract.json),
+  [`fixtures/opt056_performance_gate.json`](../fixtures/opt056_performance_gate.json),
+  and
+  [`evidence/optimization/opt056-performance-gate/REPORT.md`](../evidence/optimization/opt056-performance-gate/REPORT.md).
+  Proof limit: same-sitting P/D128/D2048 versus pinned llama.cpp; at least 5%
+  throughput margin; decode p95 no worse than llama; confidence-supported
+  improvement; combined production quality on selected paths; original
+  OPT-016 2K parity evidence; candidate-task completion alone is insufficient;
+  does not redefine the 2K llama.cpp parity gate; QLT-001 remains its own
+  owner; Session TTFT does not replace the historical workload protocol.
 - OPT-041 is a local derivation over admitted Ada+ stream-K fattn with
   register-resident VKQ and dual-F16 probability×V MMA. It assigns each of
   eight 16×8 QK microtiles to one of four warps (`tile_id % 4`), lets the
