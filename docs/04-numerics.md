@@ -157,6 +157,21 @@ because selected Q8/Q6 pins already use approximations; unrepresented shapes sta
 on the strict fallback. Missing GPU coverage stays unadmitted. OPT-046 is not
 installed. Evidence:
 [`evidence/optimization/opt059-gpu-numerics/REPORT.md`](../evidence/optimization/opt059-gpu-numerics/REPORT.md).
+OPT-059 v2 and OPT-074 production GPU admission are **historical** diagnostics.
+They are not the active kernel-admission authority.
+
+## Kernel parity admission (OPT-081)
+
+**Proposed**. Active kernel admission is `kernel_parity_v1`
+([`pins/kernel_parity_v1_contract.json`](../pins/kernel_parity_v1_contract.json)):
+a GPU candidate versus independent CPU/dequant of the **same** quantized
+weights and staged/input activations. CUD-001 `3e-4` remains a historical
+MMV pin, not this envelope. The active hierarchy is structural → kernel parity
+→ same-math → model quality → performance → release. Kernel
+admission proves implementation of the intended quantized operation. It does
+not prove full-model quality and does not depend on llama GPU versus FP64
+consistency. OPT-074 unadmitted rows are not active keep blockers. Evidence:
+[`evidence/optimization/opt081-kernel-parity-policy/REPORT.md`](../evidence/optimization/opt081-kernel-parity-policy/REPORT.md).
 
 
 ## Common failures

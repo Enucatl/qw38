@@ -1,0 +1,129 @@
+{
+  "schema_version": 1,
+  "id": "kernel_parity_v1",
+  "task": "OPT-081",
+  "active_kernel_admission_authority": true,
+  "claims_throughput": false,
+  "claims_performance_improvement": false,
+  "llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+  "gguf_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+  "opt074_family_admission_required": false,
+  "policy_statement": "Kernel admission proves implementation of the intended quantized operation. It does not prove full-model quality and does not depend on llama GPU versus FP64 consistency.",
+  "reference": {
+    "kind": "independent_cpu_dequant",
+    "weights": "same_quantized_weights",
+    "activations": "same_staged_or_input_activations",
+    "not_reference": [
+      "original_unquantized_fp64_model_weights",
+      "llama_gpu",
+      "shallow_layer_production_budget"
+    ]
+  },
+  "classes": [
+    "quantized_operation_association",
+    "same_math_equivalence"
+  ],
+  "families": {
+    "Q8_0": {
+      "applies": true,
+      "abs_scale": 0.05,
+      "rel_tol": 0.05,
+      "role": "mixer Q8_0 GEMM / MMV / MMQ"
+    },
+    "Q4_K": {
+      "applies": true,
+      "abs_scale": 0.20,
+      "rel_tol": 0.05,
+      "role": "FFN MMV / MMVQ / MMQ"
+    },
+    "Q6_K": {
+      "applies": true,
+      "abs_scale": 0.20,
+      "rel_tol": 0.05,
+      "role": "vocabulary and any Q6_K MMQ",
+      "envelope_source": "pins/cuda_mmq_contract.json q4k_q6k K-quant envelope"
+    },
+    "Q2_K": {
+      "applies": false,
+      "status": "not_applicable",
+      "reason": "not in the pinned Q4_K_M GGUF"
+    },
+    "IQ2": {
+      "applies": false,
+      "status": "not_applicable",
+      "reason": "not in the pinned Q4_K_M GGUF"
+    }
+  },
+  "association": {
+    "abs_tolerance": "abs_scale * sqrt(K)",
+    "K": "weight columns",
+    "element_fails_only_when": "abs_error > abs_tolerance AND relative_error > relative_tolerance",
+    "or_rule": true,
+    "nonfinite_count": 0
+  },
+  "same_math_equivalence": {
+    "default_abs_tol": 0,
+    "default_rel_tol": 0,
+    "bit_identity": true,
+    "tiny_epsilon_requires": "named deterministic epsilon and exact arithmetic reason"
+  },
+  "hard_invariants": [
+    "NaN/Inf",
+    "OOB access",
+    "wrong shape/K/M/N/dtype/layout/signedness",
+    "stale staging",
+    "incorrect buffer lifetime or aliasing",
+    "incorrect Q8_1 field interpretation",
+    "integer overflow",
+    "wrong exact-sum semantics",
+    "wrong scale/min decode",
+    "graph using the wrong selector",
+    "eager/captured mismatch",
+    "fallback path measured instead of the requested kernel",
+    "causal-state corruption",
+    "reset/replay mismatch",
+    "checkpoint/cancellation failure",
+    "incomplete vocabulary/logits",
+    "model/weight/input identity mismatch"
+  ],
+  "q8_1_fields": {
+    "sum_q": "quartz_q8_1_sum_q",
+    "sum_x": "llama_q8_1_sum_x",
+    "tolerance_cannot_equate": true
+  },
+  "historical_diagnostic_only": {
+    "cud001_abs": 0.0003,
+    "opt059": "pins/production_numerics_v2_contract.json",
+    "opt074": "pins/opt074_production_gpu_admission_contract.json",
+    "do_not_tighten_envelopes_toward_cud001": true,
+    "do_not_derive_from_llama_gpu_or_fp64_production_layers": true
+  },
+  "successor_note": "OPT-074 unadmitted rows and held_out_exceeds_frozen_calibration_ceiling are not active keep blockers. Historical OPT-059/074/070/075/076 fixtures and reports remain as written.",
+  "diagnostics": [
+    "max_abs",
+    "max_rel",
+    "failing_count",
+    "rms",
+    "cosine"
+  ],
+  "canonical_checkers": [
+    "cuda/kernel_parity.cuh",
+    "tools/kernel_parity.py"
+  ],
+  "active_hierarchy": [
+    "structural",
+    "kernel_parity",
+    "same_math",
+    "model_quality",
+    "performance",
+    "release"
+  ],
+  "proof_limit": [
+    "no throughput claim",
+    "no arithmetic kernel change",
+    "no production selector change",
+    "kernel admission is not model quality",
+    "OPT-059/074 are historical_diagnostic_only",
+    "opt074_family_admission_required is false"
+  ]
+}

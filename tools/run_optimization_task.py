@@ -26,11 +26,28 @@ HISTORICAL_ORACLE_TARGETS = (
     "build/qw38-cuda-prefill-4k-oracle-test",
     "build/qw38-cuda-decode-oracle-test",
 )
+HISTORICAL_OPT074_KEEP_TASKS = frozenset({"OPT-070", "OPT-075", "OPT-076"})
+OPT074_UNADMITTED_REASON = "opt074_coverage_unadmitted"
+OPT074_PROMOTION_BLOCKER_KEYS = frozenset(
+    {
+        "promotion_blockers",
+        "keep_blockers",
+        "required_blockers",
+        "required_promotion_blockers",
+        "active_keep_blockers",
+        "admission_blockers",
+        "keep_promotion_blockers",
+    }
+)
 SETUP_IMAGE_COMMAND = "docker build -f docker/cuda.Dockerfile -t qw38-cuda:13.0.2 ."
 
 
 class SetupError(RuntimeError):
     """Image, model, GPU lock, or foreign-compute setup failed."""
+
+
+class KernelParityPolicyError(SetupError):
+    """A future keep contract still treats OPT-074 unadmitted as a blocker."""
 
 
 class BudgetExhausted(RuntimeError):
@@ -196,6 +213,42 @@ def contract_path(task: str) -> Path:
     return ROOT / "pins" / f"opt{number}_iteration_contract.json"
 
 
+def _opt074_unadmitted_blockers(node: Any) -> list[str]:
+    found: list[str] = []
+    if isinstance(node, Mapping):
+        if node.get("opt074_family_admission_required") is True:
+            found.append("opt074_family_admission_required")
+        for key, value in node.items():
+            if key in OPT074_PROMOTION_BLOCKER_KEYS:
+                items = value if isinstance(value, (list, tuple)) else [value]
+                for item in items:
+                    text = str(item)
+                    if OPT074_UNADMITTED_REASON in text:
+                        found.append(text)
+            else:
+                found.extend(_opt074_unadmitted_blockers(value))
+    elif isinstance(node, (list, tuple)):
+        for item in node:
+            found.extend(_opt074_unadmitted_blockers(item))
+    return found
+
+
+def validate_future_keep_policy(task: str, contract: Mapping[str, Any]) -> None:
+    """Fail closed if a non-historical keep still requires OPT-074 unadmitted."""
+    if task in HISTORICAL_OPT074_KEEP_TASKS:
+        return
+    blockers = _opt074_unadmitted_blockers(contract)
+    if not blockers:
+        return
+    raise KernelParityPolicyError(
+        "policy error: future keep contract still requires "
+        f"{OPT074_UNADMITTED_REASON} as a promotion blocker "
+        f"(task={task}, fields={blockers}); kernel_parity_v1 is the active "
+        "kernel-admission authority and OPT-074 unadmitted is not an active "
+        "keep blocker"
+    )
+
+
 def load_contract(task: str) -> dict[str, Any]:
     path = contract_path(task)
     if not path.is_file():
@@ -203,6 +256,7 @@ def load_contract(task: str) -> dict[str, Any]:
     contract = json.loads(path.read_text(encoding="utf-8"))
     if contract.get("task") != task:
         raise SetupError(f"contract task {contract.get('task')!r} != {task}")
+    validate_future_keep_policy(task, contract)
     return contract
 
 
@@ -612,6 +666,8 @@ class OptimizationRunner:
         contract = (
             dict(contract_data) if contract_data is not None else load_contract(task)
         )
+        if contract_data is not None:
+            validate_future_keep_policy(task, contract)
         plan = describe_plan(task, mode, contract, phase)
         if dry_run:
             return {
