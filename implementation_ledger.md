@@ -214,14 +214,14 @@ OPT-086, and OPT-087 must not make final keep decisions until both kernel-parity
 infrastructure and the shipping quality baseline are frozen. OPT-088 is the
 combined gate for the new combination only; it does not reinterpret OPT-080.
 Historical OPT-056 and OPT-016 requirements remain unchanged. First eligible
-task in ledger/dependency order is OPT-084.
+task in ledger/dependency order is OPT-085.
 
 | ID | Description | Dependencies | Status | Acceptance condition | Evidence |
 |---|---|---|---|---|---|
 | OPT-081 | Replace active OPT-059/074 numerical admission with a ds4-style kernel-parity contract | OPT-080 | done | Versioned kernel_parity_v1 encodes association OR-rule, same-math class, per-family abs-scale/rel-tol, and retires OPT-074 family admission as a future keep blocker; historical OPT-059/074 fixtures unchanged; no kernel or tok/s claim | [`tasks/OPT-081.md`](tasks/OPT-081.md); [`pins/kernel_parity_v1_contract.json`](pins/kernel_parity_v1_contract.json); [`pins/opt081_iteration_contract.json`](pins/opt081_iteration_contract.json); [`fixtures/opt081_kernel_parity_policy.json`](fixtures/opt081_kernel_parity_policy.json); [`cuda/kernel_parity.cuh`](cuda/kernel_parity.cuh); [`tools/kernel_parity.py`](tools/kernel_parity.py); [`tools/opt081_kernel_parity_policy.py`](tools/opt081_kernel_parity_policy.py); [`tests/test_opt081_kernel_parity_policy.py`](tests/test_opt081_kernel_parity_policy.py); [`evidence/optimization/opt081-kernel-parity-policy/REPORT.md`](evidence/optimization/opt081-kernel-parity-policy/REPORT.md); verification 2026-09-11T20:53:00Z |
 | OPT-082 | Port/adapt ds4 CUDA small-shape kernel-parity suite | OPT-081 | done | Bounded GPU suite proves Q4_K/Q8/Q6 MMV/MMQ/fused/staging candidates implement the intended quantized operation versus CPU dequant; same-math paths use exact equivalence; no model inference or production keep | [`tasks/OPT-082.md`](tasks/OPT-082.md); [`pins/opt082_iteration_contract.json`](pins/opt082_iteration_contract.json); [`fixtures/opt082_kernel_parity.json`](fixtures/opt082_kernel_parity.json); [`cuda/opt082_kernel_parity_test.cu`](cuda/opt082_kernel_parity_test.cu); [`tools/opt082_kernel_parity.py`](tools/opt082_kernel_parity.py); [`tests/test_opt082_kernel_parity.py`](tests/test_opt082_kernel_parity.py); [`Makefile`](Makefile); [`cuda/quant_mmv_test.cu`](cuda/quant_mmv_test.cu); [`cuda/prompt_mmq_test.cu`](cuda/prompt_mmq_test.cu); [`cuda/ffn_tile_ab_test.cu`](cuda/ffn_tile_ab_test.cu); [`tools/run_optimization_task.py`](tools/run_optimization_task.py); [`evidence/optimization/opt082-kernel-parity/REPORT.md`](evidence/optimization/opt082-kernel-parity/REPORT.md); verification 2026-09-11T21:17:00Z |
 | OPT-083 | Port/adapt ds4 full-model quality framework to pinned Qwen3.8 | OPT-058, OPT-073, OPT-080 | done | Teacher-forced continuation NLL, llama control scorer, inspectable per-case evidence, explicit --quality mode, and disabled-by-default OpenRouter interface; no production kernel change | [`tasks/OPT-083.md`](tasks/OPT-083.md); [`pins/opt083_quality_framework_contract.json`](pins/opt083_quality_framework_contract.json); [`pins/opt083_iteration_contract.json`](pins/opt083_iteration_contract.json); [`fixtures/opt083_quality_framework.json`](fixtures/opt083_quality_framework.json); [`tools/opt083_quality_framework.py`](tools/opt083_quality_framework.py); [`tools/quality/`](tools/quality/); [`tests/test_opt083_quality_framework.py`](tests/test_opt083_quality_framework.py); [`Makefile`](Makefile); [`evidence/optimization/opt083-quality-framework/REPORT.md`](evidence/optimization/opt083-quality-framework/REPORT.md); verification 2026-09-11T21:30:00Z |
-| OPT-084 | Freeze shipping Quartz and pinned-llama quality baseline | OPT-083 | pending | Complete local quality suite scored on llama.cpp and current shipping Quartz; acceptance criteria frozen before candidate keeps; historical OPT-056/073 failures reclassified not erased | [`tasks/OPT-084.md`](tasks/OPT-084.md); proposed 2026-09-11 |
+| OPT-084 | Freeze shipping Quartz and pinned-llama quality baseline | OPT-083 | done | Complete local quality suite scored on llama.cpp and current shipping Quartz; acceptance criteria frozen before candidate keeps; historical OPT-056/073 failures reclassified not erased | [`tasks/OPT-084.md`](tasks/OPT-084.md); [`pins/opt084_quality_baseline_contract.json`](pins/opt084_quality_baseline_contract.json); [`pins/opt084_iteration_contract.json`](pins/opt084_iteration_contract.json); [`fixtures/opt084_quality_baseline.json`](fixtures/opt084_quality_baseline.json); [`tools/opt084_quality_baseline.py`](tools/opt084_quality_baseline.py); [`tests/test_opt084_quality_baseline.py`](tests/test_opt084_quality_baseline.py); [`Makefile`](Makefile); [`evidence/optimization/opt084-quality-baseline/REPORT.md`](evidence/optimization/opt084-quality-baseline/REPORT.md); verification 2026-09-11T21:45:25Z |
 | OPT-085 | Re-evaluate Q4 packed, integer paired, and late-reduction paths | OPT-075, OPT-076, OPT-082, OPT-084 | pending | Independent kernel-parity, quality, performance, and keep/revert verdicts for packed vs integer_q8_paired vs late_w4; at most one Q4 production path; OPT-074 unadmitted is not a blocker | [`tasks/OPT-085.md`](tasks/OPT-085.md); proposed 2026-09-11 |
 | OPT-086 | Re-evaluate installed Q8 r2_w2 and MMQ fma_async_x | OPT-064, OPT-066, OPT-070, OPT-082, OPT-084 | pending | Independent formal keep/revert for Q8 r1_w4 vs r2_w2 and MMQ fma_async vs fma_async_x using kernel parity, quality, and performance; OPT-074 coverage is not inconclusive | [`tasks/OPT-086.md`](tasks/OPT-086.md); proposed 2026-09-11 |
 | OPT-087 | Selectively reopen remaining numerical-policy-blocked candidates | OPT-072, OPT-082, OPT-084 | pending | Disposition table for remaining OPT-072 leftovers; reopen at most one already-implemented candidate with measured upside, or no_additional_reopen; no performance-loser rerun | [`tasks/OPT-087.md`](tasks/OPT-087.md); proposed 2026-09-11 |
@@ -6849,4 +6849,28 @@ statements below are historical, not the current execution order.
 - Marked OPT-083 `done`; delivery is limited to the verified task scope plus
   this ledger/audit bookkeeping. `plan.md` is unchanged. OPT-016 and OPT-056 stay
   `blocked`. Next eligible pending by dependency order: **OPT-084**.
+
+### 2026-09-11T21:45:25Z — OPT-084 shipping quality baseline delivered
+
+- Froze shipping Quartz and pinned-llama quality baseline under OPT-080
+  selectors. Identity-cached GPU sitting (llama avg NLL 1.6730158457797915,
+  Quartz 1.6728890697196996, 2304 tokens). `quartz_baseline_regression_status=pass`
+  (zero-delta vs shipping). `absolute_quality_status=fail` on `task_arithmetic`
+  remains visible. No candidate kernel or production pin change. Coupled IDs:
+  none.
+- Acceptance: 7 pytest cases, feedback llama/quartz, acceptance baseline phase,
+  and verification checklist in [`tasks/OPT-084.md`](tasks/OPT-084.md).
+- Acceptance evidence: [`tasks/OPT-084.md`](tasks/OPT-084.md);
+  [`pins/opt084_quality_baseline_contract.json`](pins/opt084_quality_baseline_contract.json);
+  [`pins/opt084_iteration_contract.json`](pins/opt084_iteration_contract.json);
+  [`fixtures/opt084_quality_baseline.json`](fixtures/opt084_quality_baseline.json);
+  [`tools/opt084_quality_baseline.py`](tools/opt084_quality_baseline.py);
+  [`tests/test_opt084_quality_baseline.py`](tests/test_opt084_quality_baseline.py);
+  [`Makefile`](Makefile);
+  [`evidence/optimization/opt084-quality-baseline/REPORT.md`](evidence/optimization/opt084-quality-baseline/REPORT.md).
+  Proof is a quality baseline freeze, not a throughput gate. No tok/s claim
+  (`claims_throughput=false`).
+- Marked OPT-084 `done`; delivery is limited to the verified task scope plus
+  this ledger/audit bookkeeping. `plan.md` is unchanged. OPT-016 and OPT-056 stay
+  `blocked`. Next eligible pending by dependency order: **OPT-085**.
 

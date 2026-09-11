@@ -1,0 +1,122 @@
+{
+  "schema_version": 1,
+  "task": "OPT-084",
+  "yardstick": "shipping_quartz_quality_baseline_freeze",
+  "claims_throughput": false,
+  "claims_performance_improvement": false,
+  "candidate_installed": false,
+  "llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+  "gguf_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+  "vocab_size": 248320,
+  "native_reuse": [
+    "tools/run_llama_quality_reference.py",
+    "build/qw38-cuda-opt058-quality-baseline-test"
+  ],
+  "chat_template": "no_thinking",
+  "assistant_answer_boundary": "<|im_start|>assistant\n<think>\n\n</think>\n\n",
+  "enable_thinking": false,
+  "logit_masking": false,
+  "scoring": "teacher_forced_nll",
+  "quality_mode": {
+    "flag": "--quality",
+    "selector": "production_arithmetic_under_test",
+    "precision": {
+      "nvccflags": "-O2 --fmad=false",
+      "fmad": false,
+      "fast_math": false,
+      "fp_contract": "off"
+    },
+    "disables": [
+      "diagnostic_fallback",
+      "experimental_cuda",
+      "fmad_true",
+      "fast_math",
+      "incomplete_vocab_logits",
+      "logit_masking",
+      "teacher_forced_functional_answers",
+      "graph_kernel_divergence",
+      "speculative_decoding",
+      "numeric_bypass",
+      "ssd_streaming_approx",
+      "truncated_softmax"
+    ],
+    "unknown_shortcut": "fail_closed",
+    "graph_vs_eager": "same_math_equivalence_not_different_kernel",
+    "does_not_install_a_different_kernel": true
+  },
+  "shipping_selectors": {
+    "q4_decode": "packed",
+    "q4_staging": "paired_staged",
+    "q8_decode": "r2_w2",
+    "q8_path": "dp4a_q8_1",
+    "prompt_mmq": "fma_async_x",
+    "prompt_mmq_tile": "i128_j128",
+    "prompt_attention": "kv_once",
+    "decode_gdn": "sequential",
+    "decode_attention": "warp_query",
+    "prompt_pair": "off",
+    "nvccflags": "-O2 --fmad=false",
+    "production_numerics": "strict",
+    "execution_graphs": "ffn_only",
+    "chat_template": "no_thinking",
+    "enable_thinking": false,
+    "logit_masking": false
+  },
+  "suite_classes": [
+    "teacher_forced_continuation",
+    "known_qwen_continuations",
+    "ppl_1024_spans",
+    "recurrence_nll",
+    "opt073_dual_verdict",
+    "held_out_32_alarm",
+    "finite_vocab_state_consistency"
+  ],
+  "frozen_acceptance": {
+    "primary_candidate_gate": "quartz_vs_shipping_baseline_regression",
+    "ppl_ratio_max": 1.01,
+    "recurrence_incremental_nll_max": 0.02,
+    "engine_non_regression": "OPT-073 quality-v3",
+    "absolute_task_accuracy": "visible_and_separate",
+    "quartz_vs_llama_nll": "inspectable_control",
+    "projection_error_substitute_for_opt074": false,
+    "known_baseline_defect_does_not_reject_non_worsening_kernel": true,
+    "continuation_consistency": "no_new_greedy_mismatch_vs_baseline",
+    "opt073_engine_non_regression_must_remain": "pass",
+    "numerically_frozen_by": "OPT-084"
+  },
+  "held_out_32": {
+    "targets": 32,
+    "role": "alarm",
+    "kernel_admission": false
+  },
+  "openrouter": {
+    "default": "off",
+    "model": "qwen/qwen3.8-27b",
+    "endpoint": "https://openrouter.ai/api/v1/chat/completions",
+    "api_key_env": "OPENROUTER_API_KEY",
+    "label": "external_scorer",
+    "authoritative": false,
+    "pytest_network": false,
+    "missing_credentials": "success"
+  },
+  "opt056_remains_blocked": true,
+  "opt016_remains_blocked": true,
+  "does_not_replace_opt056": true,
+  "does_not_replace_opt016": true,
+  "historical_failures_erased": false,
+  "single_boolean_verdict": false,
+  "proof_limit": [
+    "no throughput claim",
+    "no candidate kernel installed",
+    "claims_throughput false",
+    "OpenRouter not invoked",
+    "OPT-056 and OPT-016 remain blocked",
+    "historical OPT-056/073 failures not erased",
+    "absolute_quality_status vs quartz_baseline_regression_status",
+    "zero-delta quartz vs shipping baseline",
+    "PPL ratio ≤ 1.01",
+    "recurrence incremental NLL ≤ 0.02",
+    "held-out 32 is an alarm not kernel admission"
+  ],
+  "report_path": "evidence/optimization/opt084-quality-baseline/REPORT.md"
+}

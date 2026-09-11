@@ -1,0 +1,2009 @@
+{
+  "absolute_quality_status": "fail",
+  "aggregate_nll": {
+    "cases": 4,
+    "delta_quartz_minus_llama": -0.00012677606009181552,
+    "llama_avg_nll": 1.6730158457797915,
+    "quartz_avg_nll": 1.6728890697196996,
+    "tokens": 2304
+  },
+  "candidate_installed": false,
+  "claims_performance_improvement": false,
+  "claims_throughput": false,
+  "does_not_replace_opt016": true,
+  "does_not_replace_opt056": true,
+  "ds4_datasets_not_applicable": [
+    "data/glm52-openrouter-100",
+    "data/flash",
+    "data/pro",
+    "data/pro-0813"
+  ],
+  "frozen_acceptance": {
+    "absolute_task_accuracy": "visible_and_separate",
+    "continuation_consistency": "no_new_greedy_mismatch_vs_baseline",
+    "engine_non_regression": "OPT-073 quality-v3",
+    "known_baseline_defect_does_not_reject_non_worsening_kernel": true,
+    "numerically_frozen_by": "OPT-084",
+    "opt073_engine_non_regression_must_remain": "pass",
+    "ppl_ratio_max": 1.01,
+    "primary_candidate_gate": "quartz_vs_shipping_baseline_regression",
+    "projection_error_substitute_for_opt074": false,
+    "quartz_vs_llama_nll": "inspectable_control",
+    "recurrence_incremental_nll_max": 0.02
+  },
+  "gguf_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+  "gpu": {
+    "available": true,
+    "blocker": "",
+    "full_1024_rescore": "identity_cached_opt058",
+    "historical_oracles": false,
+    "identity_cached_model_tokenizer": true,
+    "ran": false,
+    "reason": "1024-token teacher-forced suite exceeds the 300s feedback budget; freeze uses the last complete GPU sitting (OPT-058/069) under the OPT-080 shipping selector freeze",
+    "required": true,
+    "success": false
+  },
+  "graph_eager_identity": {
+    "does_not_install_a_different_kernel": true,
+    "modes": [
+      "eager",
+      "traced",
+      "graph"
+    ],
+    "same_math_equivalence": true,
+    "source": "fixtures/opt058_quality_baseline.json#scheduler",
+    "tokens": [
+      42,
+      3649
+    ]
+  },
+  "held_out_targets": 32,
+  "historical": {
+    "does_not_replace_opt016": true,
+    "does_not_replace_opt056": true,
+    "framework": {
+      "absolute_quality_status": "fail",
+      "note": "OPT-056 functional-task fail and OPT-073 quality-v2 / absolute task_arithmetic A-vs-B remain visible. They are not a shipping Quartz regression against this freeze.",
+      "quartz_baseline_regression_status": "pass"
+    },
+    "historical_failures_erased": false,
+    "ledger_opt016_blocked": true,
+    "ledger_opt056_blocked": true,
+    "opt016_remains_blocked": true,
+    "opt056_remains_blocked": true,
+    "opt056_tasks_pass": false,
+    "opt073_absolute_task_accuracy": "fail",
+    "opt073_does_not_replace_opt056": true,
+    "opt073_engine_non_regression": "pass",
+    "opt073_quality_v2_all": false
+  },
+  "historical_failures_erased": false,
+  "identity": [
+    {
+      "id": "qwen_capitals_paris",
+      "identity": {
+        "identical_context_construction": true,
+        "identical_scoring_definition": true,
+        "identical_target_tokens": true,
+        "identical_tokenization": true,
+        "llama_adapter": "tools/run_llama_quality_reference.py",
+        "mismatches": [],
+        "pass": true,
+        "quartz_native": "build/qw38-cuda-opt058-quality-baseline-test"
+      },
+      "llama": {
+        "context": [
+          151644,
+          872,
+          198,
+          5646,
+          279,
+          6722,
+          315,
+          9625,
+          304,
+          825,
+          3405
+        ],
+        "rendered": "<|im_start|>user\nName the capital of France in one word.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n",
+        "scoring": "teacher_forced_nll",
+        "targets": [
+          21567,
+          13
+        ]
+      },
+      "quartz": {
+        "context": [
+          151644,
+          872,
+          198,
+          5646,
+          279,
+          6722,
+          315,
+          9625,
+          304,
+          825,
+          3405
+        ],
+        "rendered": "<|im_start|>user\nName the capital of France in one word.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n",
+        "scoring": "teacher_forced_nll",
+        "targets": [
+          21567,
+          13
+        ]
+      }
+    },
+    {
+      "id": "qwen_two_plus_two",
+      "identity": {
+        "identical_context_construction": true,
+        "identical_scoring_definition": true,
+        "identical_target_tokens": true,
+        "identical_tokenization": true,
+        "llama_adapter": "tools/run_llama_quality_reference.py",
+        "mismatches": [],
+        "pass": true,
+        "quartz_native": "build/qw38-cuda-opt058-quality-baseline-test"
+      },
+      "llama": {
+        "context": [
+          151644,
+          872,
+          198,
+          3838,
+          374,
+          220,
+          17,
+          488,
+          220,
+          17,
+          30
+        ],
+        "rendered": "<|im_start|>user\nWhat is 2 + 2? Reply with the integer only.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n",
+        "scoring": "teacher_forced_nll",
+        "targets": [
+          19
+        ]
+      },
+      "quartz": {
+        "context": [
+          151644,
+          872,
+          198,
+          3838,
+          374,
+          220,
+          17,
+          488,
+          220,
+          17,
+          30
+        ],
+        "rendered": "<|im_start|>user\nWhat is 2 + 2? Reply with the integer only.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n",
+        "scoring": "teacher_forced_nll",
+        "targets": [
+          19
+        ]
+      }
+    }
+  ],
+  "identity_cached": true,
+  "llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+  "llama_scores": {
+    "held_out_wikitext_1024": {
+      "avg_nll": 1.788091893045086,
+      "engine": "llama",
+      "finite": true,
+      "first_match": 1,
+      "greedy_lcp": 1,
+      "id": "held_out_wikitext_1024",
+      "inspectable": true,
+      "mean_nll": 1.788091893045086,
+      "nll": 1831.006098478168,
+      "nonfinite_count": 0,
+      "perplexity": 5.97803484695957,
+      "scoring": "teacher_forced_nll",
+      "source": "pins/production_quality_v2_llama_reference.json",
+      "steps_head": [
+        {
+          "greedy_logit": 11.6877117,
+          "greedy_token": 310,
+          "log_probability": -1.1142115717902987,
+          "margin": 1.22974205,
+          "position": 1,
+          "runner_up_logit": 10.4579697,
+          "runner_up_token": 421,
+          "target_token": 310
+        },
+        {
+          "greedy_logit": 13.4891586,
+          "greedy_token": 1236,
+          "log_probability": -9.690156107870076,
+          "margin": 0.0299701691,
+          "position": 2,
+          "runner_up_logit": 13.4591885,
+          "runner_up_token": 3165,
+          "target_token": 52490
+        },
+        {
+          "greedy_logit": 12.1544666,
+          "greedy_token": 279,
+          "log_probability": -0.7779421241462985,
+          "margin": 2.33276749,
+          "position": 3,
+          "runner_up_logit": 9.82169914,
+          "runner_up_token": 780,
+          "target_token": 279
+        },
+        {
+          "greedy_logit": 8.90581512,
+          "greedy_token": 6149,
+          "log_probability": -6.937710776973201,
+          "margin": 0.797876358,
+          "position": 4,
+          "runner_up_logit": 8.10793877,
+          "runner_up_token": 13876,
+          "target_token": 8862
+        }
+      ],
+      "steps_omitted": 1020,
+      "target_tokens": 1024,
+      "vocab_size": 248320
+    },
+    "recurrence_long": {
+      "avg_nll": 1.8402200970779121,
+      "engine": "llama",
+      "finite": true,
+      "first_match": 1,
+      "greedy_lcp": 1,
+      "id": "recurrence_long",
+      "inspectable": true,
+      "mean_nll": 1.8402200970779121,
+      "nll": 235.54817242597275,
+      "nonfinite_count": 0,
+      "perplexity": 6.297924263220792,
+      "scoring": "teacher_forced_nll",
+      "source": "pins/production_quality_v2_llama_reference.json",
+      "steps_head": [
+        {
+          "greedy_logit": 18.0193939,
+          "greedy_token": 328,
+          "log_probability": -0.0881716373276516,
+          "margin": 4.42293739,
+          "position": 4096,
+          "runner_up_logit": 13.5964565,
+          "runner_up_token": 561,
+          "target_token": 328
+        },
+        {
+          "greedy_logit": 15.6204872,
+          "greedy_token": 4558,
+          "log_probability": -3.1909648677202527,
+          "margin": 0.998325348,
+          "position": 4097,
+          "runner_up_logit": 14.6221619,
+          "runner_up_token": 561,
+          "target_token": 86644
+        },
+        {
+          "greedy_logit": 23.5369568,
+          "greedy_token": 52561,
+          "log_probability": -0.00031302797119886494,
+          "margin": 8.60920906,
+          "position": 4098,
+          "runner_up_logit": 14.9277477,
+          "runner_up_token": 53963,
+          "target_token": 52561
+        },
+        {
+          "greedy_logit": 17.5478802,
+          "greedy_token": 557,
+          "log_probability": -3.3396002234404625,
+          "margin": 0.165664673,
+          "position": 4099,
+          "runner_up_logit": 17.3822155,
+          "runner_up_token": 359,
+          "target_token": 8308
+        }
+      ],
+      "steps_omitted": 124,
+      "target_tokens": 128,
+      "vocab_size": 248320
+    },
+    "recurrence_short": {
+      "avg_nll": 1.7683376992507749,
+      "engine": "llama",
+      "finite": true,
+      "first_match": 1,
+      "greedy_lcp": 1,
+      "id": "recurrence_short",
+      "inspectable": true,
+      "mean_nll": 1.7683376992507749,
+      "nll": 226.34722550409919,
+      "nonfinite_count": 0,
+      "perplexity": 5.861102344248298,
+      "scoring": "teacher_forced_nll",
+      "source": "pins/production_quality_v2_llama_reference.json",
+      "steps_head": [
+        {
+          "greedy_logit": 17.708313,
+          "greedy_token": 328,
+          "log_probability": -0.08962052062471518,
+          "margin": 4.16719818,
+          "position": 256,
+          "runner_up_logit": 13.5411148,
+          "runner_up_token": 271,
+          "target_token": 328
+        },
+        {
+          "greedy_logit": 15.2536201,
+          "greedy_token": 271,
+          "log_probability": -2.058837127199953,
+          "margin": 0.0191001892,
+          "position": 257,
+          "runner_up_logit": 15.23452,
+          "runner_up_token": 86644,
+          "target_token": 86644
+        },
+        {
+          "greedy_logit": 23.1505737,
+          "greedy_token": 52561,
+          "log_probability": -0.00031378473168157194,
+          "margin": 9.22245789,
+          "position": 258,
+          "runner_up_logit": 13.9281158,
+          "runner_up_token": 53963,
+          "target_token": 52561
+        },
+        {
+          "greedy_logit": 17.0476742,
+          "greedy_token": 557,
+          "log_probability": -3.29078131821114,
+          "margin": 0.665395737,
+          "position": 259,
+          "runner_up_logit": 16.3822784,
+          "runner_up_token": 359,
+          "target_token": 8308
+        }
+      ],
+      "steps_omitted": 124,
+      "target_tokens": 128,
+      "vocab_size": 248320
+    },
+    "wikitext_nll": {
+      "avg_nll": 1.525124035418359,
+      "engine": "llama",
+      "finite": true,
+      "first_match": 0,
+      "greedy_lcp": 0,
+      "id": "wikitext_nll",
+      "inspectable": true,
+      "mean_nll": 1.525124035418359,
+      "nll": 1561.7270122683997,
+      "nonfinite_count": 0,
+      "perplexity": 4.595713565210836,
+      "scoring": "teacher_forced_nll",
+      "source": "pins/production_quality_v2_llama_reference.json",
+      "steps_head": [
+        {
+          "greedy_logit": 9.51825523,
+          "greedy_token": 220,
+          "log_probability": -12.491733666589074,
+          "margin": 0.772356987,
+          "position": 1,
+          "runner_up_logit": 8.74589825,
+          "runner_up_token": 318,
+          "target_token": 8137
+        },
+        {
+          "greedy_logit": 8.43443108,
+          "greedy_token": 198,
+          "log_probability": -9.917930017983911,
+          "margin": 0.256933212,
+          "position": 2,
+          "runner_up_logit": 8.17749786,
+          "runner_up_token": 11,
+          "target_token": 211388
+        },
+        {
+          "greedy_logit": 14.6726437,
+          "greedy_token": 3869,
+          "log_probability": -2.9248720809411517,
+          "margin": 0.675378799,
+          "position": 3,
+          "runner_up_logit": 13.9972649,
+          "runner_up_token": 752,
+          "target_token": 455
+        },
+        {
+          "greedy_logit": 12.8650894,
+          "greedy_token": 11,
+          "log_probability": -5.321597184913009,
+          "margin": 0.13945961,
+          "position": 4,
+          "runner_up_logit": 12.7256298,
+          "runner_up_token": 198,
+          "target_token": 283
+        }
+      ],
+      "steps_omitted": 1020,
+      "target_tokens": 1024,
+      "vocab_size": 248320
+    }
+  },
+  "native_reuse": [
+    "tools/run_llama_quality_reference.py",
+    "build/qw38-cuda-opt058-quality-baseline-test"
+  ],
+  "openrouter": {
+    "api_key_env": "OPENROUTER_API_KEY",
+    "authoritative": false,
+    "credentials_present": false,
+    "default_off": true,
+    "enabled": false,
+    "endpoint": "https://openrouter.ai/api/v1/chat/completions",
+    "label": "external_scorer",
+    "model": "qwen/qwen3.8-27b",
+    "network": false,
+    "reason": "default_off",
+    "status": "disabled",
+    "success": true
+  },
+  "opt016_remains_blocked": true,
+  "opt056_remains_blocked": true,
+  "opt056_tasks_pass": false,
+  "opt080_combined_production_paths": {
+    "attention_pipeline": "kv_once",
+    "decode_query_prep": "warp_query",
+    "execution_graphs": "ffn_only",
+    "ffn_decode": "paired_staged",
+    "ffn_prompt_pair": "off",
+    "ffn_tiles": "i128_j128",
+    "gdn_decode": "sequential",
+    "gdn_preproc": "transpose",
+    "mmq_async_x": true,
+    "mmq_pipeline": "fma_async",
+    "nvccflags": "-O2 --fmad=false",
+    "production_numerics": "strict",
+    "prompt_microbatch_rows": 4096,
+    "q4_decode": "packed",
+    "q6_decode": "integer_q8_1",
+    "q8_decode": "dp4a_q8_1",
+    "q8_layout": "r2_w2",
+    "query_prepare": "hoisted",
+    "rms_norm": "parallel_fma"
+  },
+  "proof_limit": [
+    "no throughput claim",
+    "no candidate kernel installed",
+    "claims_throughput false",
+    "OpenRouter not invoked",
+    "OPT-056 and OPT-016 remain blocked",
+    "historical OPT-056/073 failures not erased",
+    "absolute_quality_status vs quartz_baseline_regression_status",
+    "zero-delta quartz vs shipping baseline",
+    "PPL ratio \u2264 1.01",
+    "recurrence incremental NLL \u2264 0.02",
+    "held-out 32 is an alarm not kernel admission"
+  ],
+  "quality_mode": {
+    "applied": {
+      "argv": [
+        "--quality"
+      ],
+      "delta": {
+        "diagnostic_fallbacks": "disabled",
+        "disables": [
+          "diagnostic_fallback",
+          "experimental_cuda",
+          "fmad_true",
+          "fast_math",
+          "incomplete_vocab_logits",
+          "logit_masking",
+          "teacher_forced_functional_answers",
+          "graph_kernel_divergence",
+          "speculative_decoding",
+          "numeric_bypass",
+          "ssd_streaming_approx",
+          "truncated_softmax"
+        ],
+        "does_not_install_a_different_kernel": true,
+        "flag": "--quality",
+        "graph_vs_eager": "same_math_equivalence_not_different_kernel",
+        "precision": {
+          "fast_math": false,
+          "fmad": false,
+          "fp_contract": "off",
+          "nvccflags": "-O2 --fmad=false"
+        },
+        "selector": "production_arithmetic_under_test",
+        "speed_oriented_numeric_bypass": "disabled",
+        "unknown_shortcut": "fail_closed"
+      },
+      "disabled_shortcuts": [
+        "diagnostic_fallback",
+        "experimental_cuda",
+        "fmad_true",
+        "fast_math",
+        "incomplete_vocab_logits",
+        "logit_masking",
+        "teacher_forced_functional_answers",
+        "graph_kernel_divergence",
+        "speculative_decoding",
+        "numeric_bypass",
+        "ssd_streaming_approx",
+        "truncated_softmax"
+      ],
+      "enabled_shortcuts": [],
+      "flag": "--quality",
+      "graph_vs_eager": "same_math_equivalence",
+      "quality": true,
+      "same_math_equivalence_not_different_kernel": true,
+      "selectors": {
+        "chat_template": "no_thinking",
+        "decode_attention": "warp_query",
+        "decode_gdn": "sequential",
+        "enable_thinking": false,
+        "execution_graphs": "ffn_only",
+        "logit_masking": false,
+        "nvccflags": "-O2 --fmad=false",
+        "production_numerics": "strict",
+        "prompt_attention": "kv_once",
+        "prompt_mmq": "fma_async_x",
+        "prompt_mmq_tile": "i128_j128",
+        "prompt_pair": "off",
+        "q4_decode": "packed",
+        "q4_staging": "paired_staged",
+        "q8_decode": "r2_w2",
+        "q8_path": "dp4a_q8_1"
+      },
+      "shortcuts": {
+        "diagnostic_fallback": false,
+        "experimental_cuda": false,
+        "fast_math": false,
+        "fmad_true": false,
+        "graph_kernel_divergence": false,
+        "incomplete_vocab_logits": false,
+        "logit_masking": false,
+        "numeric_bypass": false,
+        "speculative_decoding": false,
+        "ssd_streaming_approx": false,
+        "teacher_forced_functional_answers": false,
+        "truncated_softmax": false
+      }
+    },
+    "delta": {
+      "diagnostic_fallbacks": "disabled",
+      "disables": [
+        "diagnostic_fallback",
+        "experimental_cuda",
+        "fmad_true",
+        "fast_math",
+        "incomplete_vocab_logits",
+        "logit_masking",
+        "teacher_forced_functional_answers",
+        "graph_kernel_divergence",
+        "speculative_decoding",
+        "numeric_bypass",
+        "ssd_streaming_approx",
+        "truncated_softmax"
+      ],
+      "does_not_install_a_different_kernel": true,
+      "flag": "--quality",
+      "graph_vs_eager": "same_math_equivalence_not_different_kernel",
+      "precision": {
+        "fast_math": false,
+        "fmad": false,
+        "fp_contract": "off",
+        "nvccflags": "-O2 --fmad=false"
+      },
+      "selector": "production_arithmetic_under_test",
+      "speed_oriented_numeric_bypass": "disabled",
+      "unknown_shortcut": "fail_closed"
+    },
+    "enabled": true,
+    "flag": "--quality",
+    "selectors": {
+      "chat_template": "no_thinking",
+      "decode_attention": "warp_query",
+      "decode_gdn": "sequential",
+      "enable_thinking": false,
+      "execution_graphs": "ffn_only",
+      "logit_masking": false,
+      "nvccflags": "-O2 --fmad=false",
+      "production_numerics": "strict",
+      "prompt_attention": "kv_once",
+      "prompt_mmq": "fma_async_x",
+      "prompt_mmq_tile": "i128_j128",
+      "prompt_pair": "off",
+      "q4_decode": "packed",
+      "q4_staging": "paired_staged",
+      "q8_decode": "r2_w2",
+      "q8_path": "dp4a_q8_1"
+    },
+    "shortcuts": [
+      "diagnostic_fallback",
+      "experimental_cuda",
+      "fmad_true",
+      "fast_math",
+      "incomplete_vocab_logits",
+      "logit_masking",
+      "teacher_forced_functional_answers",
+      "graph_kernel_divergence",
+      "speculative_decoding",
+      "numeric_bypass",
+      "ssd_streaming_approx",
+      "truncated_softmax"
+    ],
+    "unknown_shortcut_fail_closed": true
+  },
+  "quartz_baseline_regression_status": "pass",
+  "quartz_scores": {
+    "held_out_wikitext_1024": {
+      "avg_nll": 1.7878782710057632,
+      "engine": "quartz",
+      "finite": true,
+      "first_match": 0,
+      "greedy_lcp": 0,
+      "id": "held_out_wikitext_1024",
+      "inspectable": true,
+      "mean_nll": 1.7878782710057632,
+      "nll": 1830.7873495099016,
+      "nonfinite_count": 0,
+      "perplexity": 5.9767579433566524,
+      "scoring": "teacher_forced_nll",
+      "source": "fixtures/opt058_quality_baseline.json",
+      "steps_head": [],
+      "steps_omitted": 1024,
+      "target_tokens": 1024,
+      "vocab_size": 248320
+    },
+    "recurrence_long": {
+      "avg_nll": 1.8354702048193376,
+      "engine": "quartz",
+      "finite": true,
+      "first_match": 0,
+      "greedy_lcp": 0,
+      "id": "recurrence_long",
+      "inspectable": true,
+      "mean_nll": 1.8354702048193376,
+      "nll": 234.94018621687522,
+      "nonfinite_count": 0,
+      "perplexity": 6.268080734400572,
+      "scoring": "teacher_forced_nll",
+      "source": "fixtures/opt058_quality_baseline.json",
+      "steps_head": [],
+      "steps_omitted": 128,
+      "target_tokens": 128,
+      "vocab_size": 248320
+    },
+    "recurrence_short": {
+      "avg_nll": 1.771902140891233,
+      "engine": "quartz",
+      "finite": true,
+      "first_match": 0,
+      "greedy_lcp": 0,
+      "id": "recurrence_short",
+      "inspectable": true,
+      "mean_nll": 1.771902140891233,
+      "nll": 226.80347403407782,
+      "nonfinite_count": 0,
+      "perplexity": 5.882031179149602,
+      "scoring": "teacher_forced_nll",
+      "source": "fixtures/opt058_quality_baseline.json",
+      "steps_head": [],
+      "steps_omitted": 128,
+      "target_tokens": 128,
+      "vocab_size": 248320
+    },
+    "wikitext_nll": {
+      "avg_nll": 1.5252005926497396,
+      "engine": "quartz",
+      "finite": true,
+      "first_match": 0,
+      "greedy_lcp": 0,
+      "id": "wikitext_nll",
+      "inspectable": true,
+      "mean_nll": 1.5252005926497396,
+      "nll": 1561.8054068733334,
+      "nonfinite_count": 0,
+      "perplexity": 4.596065413785712,
+      "scoring": "teacher_forced_nll",
+      "source": "fixtures/opt058_quality_baseline.json",
+      "steps_head": [],
+      "steps_omitted": 1024,
+      "target_tokens": 1024,
+      "vocab_size": 248320
+    }
+  },
+  "quartz_vs_baseline": {
+    "aggregate": {
+      "authoritative_local_comparison": "baseline+quartz",
+      "avg_greedy_lcp_left_right": [
+        0.0,
+        0.0
+      ],
+      "baseline_avg_nll": 1.6728890697196996,
+      "case_wins_right_left_ties": [
+        0,
+        0,
+        4
+      ],
+      "cases": 4,
+      "delta_right_minus_left": 0.0,
+      "examples": [
+        {
+          "baseline_avg_nll": 1.7878782710057632,
+          "baseline_first_match": 0,
+          "baseline_greedy_lcp": 0,
+          "baseline_nll": 1830.7873495099016,
+          "delta_right_minus_left": 0.0,
+          "id": "held_out_wikitext_1024",
+          "quartz_avg_nll": 1.7878782710057632,
+          "quartz_first_match": 0,
+          "quartz_greedy_lcp": 0,
+          "quartz_nll": 1830.7873495099016,
+          "target_tokens": 1024
+        },
+        {
+          "baseline_avg_nll": 1.8354702048193376,
+          "baseline_first_match": 0,
+          "baseline_greedy_lcp": 0,
+          "baseline_nll": 234.94018621687522,
+          "delta_right_minus_left": 0.0,
+          "id": "recurrence_long",
+          "quartz_avg_nll": 1.8354702048193376,
+          "quartz_first_match": 0,
+          "quartz_greedy_lcp": 0,
+          "quartz_nll": 234.94018621687522,
+          "target_tokens": 128
+        },
+        {
+          "baseline_avg_nll": 1.771902140891233,
+          "baseline_first_match": 0,
+          "baseline_greedy_lcp": 0,
+          "baseline_nll": 226.80347403407782,
+          "delta_right_minus_left": 0.0,
+          "id": "recurrence_short",
+          "quartz_avg_nll": 1.771902140891233,
+          "quartz_first_match": 0,
+          "quartz_greedy_lcp": 0,
+          "quartz_nll": 226.80347403407782,
+          "target_tokens": 128
+        },
+        {
+          "baseline_avg_nll": 1.5252005926497396,
+          "baseline_first_match": 0,
+          "baseline_greedy_lcp": 0,
+          "baseline_nll": 1561.8054068733334,
+          "delta_right_minus_left": 0.0,
+          "id": "wikitext_nll",
+          "quartz_avg_nll": 1.5252005926497396,
+          "quartz_first_match": 0,
+          "quartz_greedy_lcp": 0,
+          "quartz_nll": 1561.8054068733334,
+          "target_tokens": 1024
+        }
+      ],
+      "first_token_matches_left_right": [
+        0,
+        0
+      ],
+      "inspectable": true,
+      "quartz_avg_nll": 1.6728890697196996,
+      "relative_nll_change": 0.0,
+      "single_boolean": null,
+      "tokens": 2304
+    },
+    "delta_nll": 0.0,
+    "known_baseline_defect_does_not_reject_non_worsening_kernel": true,
+    "pass": true,
+    "ppl_ratio_max": 1.01,
+    "recurrence_incremental_nll": 0.0,
+    "recurrence_incremental_nll_max": 0.02,
+    "relative_nll_change": 0.0,
+    "status": "pass",
+    "tautological_shipping_self_comparison": true,
+    "zero_delta": true
+  },
+  "quartz_vs_llama": {
+    "authoritative_local_comparison": "quartz+llama",
+    "avg_greedy_lcp_left_right": [
+      0.0,
+      0.75
+    ],
+    "case_wins_right_left_ties": [
+      2,
+      2,
+      0
+    ],
+    "cases": 4,
+    "delta_right_minus_left": 0.00012677606009181552,
+    "examples": [
+      {
+        "delta_right_minus_left": 0.21874896826648182,
+        "id": "held_out_wikitext_1024",
+        "llama_avg_nll": 1.788091893045086,
+        "llama_first_match": 1,
+        "llama_greedy_lcp": 1,
+        "llama_nll": 1831.006098478168,
+        "quartz_avg_nll": 1.7878782710057632,
+        "quartz_first_match": 0,
+        "quartz_greedy_lcp": 0,
+        "quartz_nll": 1830.7873495099016,
+        "target_tokens": 1024
+      },
+      {
+        "delta_right_minus_left": 0.6079862090975325,
+        "id": "recurrence_long",
+        "llama_avg_nll": 1.8402200970779121,
+        "llama_first_match": 1,
+        "llama_greedy_lcp": 1,
+        "llama_nll": 235.54817242597275,
+        "quartz_avg_nll": 1.8354702048193376,
+        "quartz_first_match": 0,
+        "quartz_greedy_lcp": 0,
+        "quartz_nll": 234.94018621687522,
+        "target_tokens": 128
+      },
+      {
+        "delta_right_minus_left": -0.4562485299786374,
+        "id": "recurrence_short",
+        "llama_avg_nll": 1.7683376992507749,
+        "llama_first_match": 1,
+        "llama_greedy_lcp": 1,
+        "llama_nll": 226.34722550409919,
+        "quartz_avg_nll": 1.771902140891233,
+        "quartz_first_match": 0,
+        "quartz_greedy_lcp": 0,
+        "quartz_nll": 226.80347403407782,
+        "target_tokens": 128
+      },
+      {
+        "delta_right_minus_left": -0.07839460493369188,
+        "id": "wikitext_nll",
+        "llama_avg_nll": 1.525124035418359,
+        "llama_first_match": 0,
+        "llama_greedy_lcp": 0,
+        "llama_nll": 1561.7270122683997,
+        "quartz_avg_nll": 1.5252005926497396,
+        "quartz_first_match": 0,
+        "quartz_greedy_lcp": 0,
+        "quartz_nll": 1561.8054068733334,
+        "target_tokens": 1024
+      }
+    ],
+    "first_token_matches_left_right": [
+      0,
+      3
+    ],
+    "inspectable": true,
+    "llama_avg_nll": 1.6730158457797915,
+    "quartz_avg_nll": 1.6728890697196996,
+    "relative_nll_change": 7.578270573138646e-05,
+    "single_boolean": null,
+    "tokens": 2304
+  },
+  "report_path": "evidence/optimization/opt084-quality-baseline/REPORT.md",
+  "same_model_comparison_with_ds4": false,
+  "schema_version": 1,
+  "shipping_selectors": {
+    "chat_template": "no_thinking",
+    "decode_attention": "warp_query",
+    "decode_gdn": "sequential",
+    "enable_thinking": false,
+    "execution_graphs": "ffn_only",
+    "logit_masking": false,
+    "nvccflags": "-O2 --fmad=false",
+    "production_numerics": "strict",
+    "prompt_attention": "kv_once",
+    "prompt_mmq": "fma_async_x",
+    "prompt_mmq_tile": "i128_j128",
+    "prompt_pair": "off",
+    "q4_decode": "packed",
+    "q4_staging": "paired_staged",
+    "q8_decode": "r2_w2",
+    "q8_path": "dp4a_q8_1"
+  },
+  "single_boolean_refused": true,
+  "status": "quality_baseline_frozen",
+  "suite": {
+    "claims_throughput": false,
+    "classes": {
+      "finite_vocab_state_consistency": {
+        "class": "finite_vocab_state_consistency",
+        "finite": true,
+        "framework_vocab_size": 8,
+        "gguf_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+        "incomplete_vocab_rejected": true,
+        "inspectable": true,
+        "llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+        "production_vocab_size": 248320,
+        "selectors": {
+          "chat_template": "no_thinking",
+          "decode_attention": "warp_query",
+          "decode_gdn": "sequential",
+          "enable_thinking": false,
+          "execution_graphs": "ffn_only",
+          "logit_masking": false,
+          "nvccflags": "-O2 --fmad=false",
+          "production_numerics": "strict",
+          "prompt_attention": "kv_once",
+          "prompt_mmq": "fma_async_x",
+          "prompt_mmq_tile": "i128_j128",
+          "prompt_pair": "off",
+          "q4_decode": "packed",
+          "q4_staging": "paired_staged",
+          "q8_decode": "r2_w2",
+          "q8_path": "dp4a_q8_1"
+        },
+        "state_continuation": [
+          {
+            "context": [
+              7
+            ],
+            "next_context": [
+              7,
+              3
+            ],
+            "position": 0,
+            "target": 3
+          },
+          {
+            "context": [
+              7,
+              3
+            ],
+            "next_context": [
+              7,
+              3,
+              1
+            ],
+            "position": 1,
+            "target": 1
+          },
+          {
+            "context": [
+              7,
+              3,
+              1
+            ],
+            "next_context": [
+              7,
+              3,
+              1,
+              0
+            ],
+            "position": 2,
+            "target": 0
+          },
+          {
+            "context": [
+              7,
+              3,
+              1,
+              0
+            ],
+            "next_context": [
+              7,
+              3,
+              1,
+              0,
+              2
+            ],
+            "position": 3,
+            "target": 2
+          }
+        ]
+      },
+      "held_out_32_alarm": {
+        "alarm_not_admission": true,
+        "class": "held_out_32_alarm",
+        "held_out_targets": 32,
+        "inspectable": true,
+        "kernel_admission": false,
+        "retained_mean_nll": 3.325543138013308,
+        "retained_preflight_scored": 32,
+        "source": "evidence/optimization/opt069-batch-gate/preflight-held-out-32.json"
+      },
+      "known_qwen_continuations": {
+        "cases": [
+          {
+            "assistant_answer_boundary": "<|im_start|>assistant\n<think>\n\n</think>\n\n",
+            "chat_template": "no_thinking",
+            "context": [
+              151644,
+              872,
+              198,
+              5646,
+              279,
+              6722,
+              315,
+              9625,
+              304,
+              825,
+              3405
+            ],
+            "continuation_text": "Paris",
+            "ds4_dataset": false,
+            "enable_thinking": false,
+            "id": "qwen_capitals_paris",
+            "logit_masking": false,
+            "remote": false,
+            "rendered": "<|im_start|>user\nName the capital of France in one word.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n",
+            "scoring": "teacher_forced_nll",
+            "source": "opt083_deterministic_qwen",
+            "targets": [
+              21567,
+              13
+            ],
+            "user": "Name the capital of France in one word."
+          },
+          {
+            "assistant_answer_boundary": "<|im_start|>assistant\n<think>\n\n</think>\n\n",
+            "chat_template": "no_thinking",
+            "context": [
+              151644,
+              872,
+              198,
+              3838,
+              374,
+              220,
+              17,
+              488,
+              220,
+              17,
+              30
+            ],
+            "continuation_text": "4",
+            "ds4_dataset": false,
+            "enable_thinking": false,
+            "id": "qwen_two_plus_two",
+            "logit_masking": false,
+            "remote": false,
+            "rendered": "<|im_start|>user\nWhat is 2 + 2? Reply with the integer only.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n",
+            "scoring": "teacher_forced_nll",
+            "source": "opt083_deterministic_qwen",
+            "targets": [
+              19
+            ],
+            "user": "What is 2 + 2? Reply with the integer only."
+          }
+        ],
+        "class": "known_qwen_continuations",
+        "ds4_datasets_not_applicable": [
+          "data/glm52-openrouter-100",
+          "data/flash",
+          "data/pro",
+          "data/pro-0813"
+        ],
+        "inspectable": true,
+        "remote": false,
+        "same_model_comparison_with_ds4": false
+      },
+      "opt073_dual_verdict": {
+        "class": "opt073_dual_verdict",
+        "historical_failures_retained": true,
+        "inspectable": true,
+        "llama": {
+          "absolute_task_accuracy": {
+            "functional_independently_correct": false,
+            "near_tie_cannot_waive_wrong_semantic_answer": true,
+            "nll_pass": true,
+            "pass": false,
+            "status": "fail",
+            "task_arithmetic_must_be_B_42": true
+          },
+          "engine_non_regression": {
+            "known_miss": {
+              "admitted": true,
+              "authority_choice": true,
+              "independently_correct": false,
+              "logits_incomplete": false,
+              "near_tie_cannot_pass_absolute": true,
+              "status": "authority_behavior"
+            },
+            "nll_pass": true,
+            "other_wrong_choices_waived": false,
+            "pass": true,
+            "reference_correct_items_remain_correct": true,
+            "status": "pass"
+          },
+          "status": "fail"
+        },
+        "opt016_remains_blocked": true,
+        "opt056_remains_blocked": true,
+        "opt056_tasks_pass": false,
+        "opt073_does_not_replace_opt016": true,
+        "opt073_does_not_replace_opt056": true,
+        "quartz": {
+          "absolute_task_accuracy": {
+            "functional_independently_correct": false,
+            "near_tie_cannot_waive_wrong_semantic_answer": true,
+            "nll_pass": true,
+            "pass": false,
+            "status": "fail",
+            "task_arithmetic_must_be_B_42": true
+          },
+          "engine_non_regression": {
+            "known_miss": {
+              "admitted": true,
+              "authority_choice": true,
+              "independently_correct": false,
+              "logits_incomplete": true,
+              "near_tie_cannot_pass_absolute": true,
+              "status": "authority_behavior"
+            },
+            "nll_pass": true,
+            "other_wrong_choices_waived": false,
+            "pass": true,
+            "reference_correct_items_remain_correct": true,
+            "status": "pass"
+          },
+          "quality_v2_all": false,
+          "status": "fail"
+        }
+      },
+      "ppl_1024_spans": {
+        "class": "ppl_1024_spans",
+        "inspectable": true,
+        "numerically_frozen_by": "OPT-084",
+        "proposed_ppl_ratio_max": 1.01,
+        "spans": [
+          {
+            "full_target_count": 1024,
+            "id": "wikitext_nll",
+            "llama": {
+              "avg_nll": 1.525124035418359,
+              "engine": "llama",
+              "finite": true,
+              "first_match": 0,
+              "greedy_lcp": 0,
+              "id": "wikitext_nll",
+              "inspectable": true,
+              "mean_nll": 1.525124035418359,
+              "nll": 1561.7270122683997,
+              "nonfinite_count": 0,
+              "perplexity": 4.595713565210836,
+              "scoring": "teacher_forced_nll",
+              "source": "pins/production_quality_v2_llama_reference.json",
+              "steps_head": [
+                {
+                  "greedy_logit": 9.51825523,
+                  "greedy_token": 220,
+                  "log_probability": -12.491733666589074,
+                  "margin": 0.772356987,
+                  "position": 1,
+                  "runner_up_logit": 8.74589825,
+                  "runner_up_token": 318,
+                  "target_token": 8137
+                },
+                {
+                  "greedy_logit": 8.43443108,
+                  "greedy_token": 198,
+                  "log_probability": -9.917930017983911,
+                  "margin": 0.256933212,
+                  "position": 2,
+                  "runner_up_logit": 8.17749786,
+                  "runner_up_token": 11,
+                  "target_token": 211388
+                },
+                {
+                  "greedy_logit": 14.6726437,
+                  "greedy_token": 3869,
+                  "log_probability": -2.9248720809411517,
+                  "margin": 0.675378799,
+                  "position": 3,
+                  "runner_up_logit": 13.9972649,
+                  "runner_up_token": 752,
+                  "target_token": 455
+                },
+                {
+                  "greedy_logit": 12.8650894,
+                  "greedy_token": 11,
+                  "log_probability": -5.321597184913009,
+                  "margin": 0.13945961,
+                  "position": 4,
+                  "runner_up_logit": 12.7256298,
+                  "runner_up_token": 198,
+                  "target_token": 283
+                }
+              ],
+              "steps_omitted": 1020,
+              "target_tokens": 1024,
+              "vocab_size": 248320
+            },
+            "pass": true,
+            "ppl_ratio": 1.0000765601619601,
+            "ppl_ratio_gate": 1.01,
+            "quartz": {
+              "avg_nll": 1.5252005926497396,
+              "engine": "quartz",
+              "finite": true,
+              "first_match": 0,
+              "greedy_lcp": 0,
+              "id": "wikitext_nll",
+              "inspectable": true,
+              "mean_nll": 1.5252005926497396,
+              "nll": 1561.8054068733334,
+              "nonfinite_count": 0,
+              "perplexity": 4.596065413785712,
+              "scoring": "teacher_forced_nll",
+              "source": "fixtures/opt058_quality_baseline.json",
+              "steps_head": [],
+              "steps_omitted": 1024,
+              "target_tokens": 1024,
+              "vocab_size": 248320
+            },
+            "scoring": "teacher_forced_nll"
+          },
+          {
+            "full_target_count": 1024,
+            "id": "held_out_wikitext_1024",
+            "llama": {
+              "avg_nll": 1.788091893045086,
+              "engine": "llama",
+              "finite": true,
+              "first_match": 1,
+              "greedy_lcp": 1,
+              "id": "held_out_wikitext_1024",
+              "inspectable": true,
+              "mean_nll": 1.788091893045086,
+              "nll": 1831.006098478168,
+              "nonfinite_count": 0,
+              "perplexity": 5.97803484695957,
+              "scoring": "teacher_forced_nll",
+              "source": "pins/production_quality_v2_llama_reference.json",
+              "steps_head": [
+                {
+                  "greedy_logit": 11.6877117,
+                  "greedy_token": 310,
+                  "log_probability": -1.1142115717902987,
+                  "margin": 1.22974205,
+                  "position": 1,
+                  "runner_up_logit": 10.4579697,
+                  "runner_up_token": 421,
+                  "target_token": 310
+                },
+                {
+                  "greedy_logit": 13.4891586,
+                  "greedy_token": 1236,
+                  "log_probability": -9.690156107870076,
+                  "margin": 0.0299701691,
+                  "position": 2,
+                  "runner_up_logit": 13.4591885,
+                  "runner_up_token": 3165,
+                  "target_token": 52490
+                },
+                {
+                  "greedy_logit": 12.1544666,
+                  "greedy_token": 279,
+                  "log_probability": -0.7779421241462985,
+                  "margin": 2.33276749,
+                  "position": 3,
+                  "runner_up_logit": 9.82169914,
+                  "runner_up_token": 780,
+                  "target_token": 279
+                },
+                {
+                  "greedy_logit": 8.90581512,
+                  "greedy_token": 6149,
+                  "log_probability": -6.937710776973201,
+                  "margin": 0.797876358,
+                  "position": 4,
+                  "runner_up_logit": 8.10793877,
+                  "runner_up_token": 13876,
+                  "target_token": 8862
+                }
+              ],
+              "steps_omitted": 1020,
+              "target_tokens": 1024,
+              "vocab_size": 248320
+            },
+            "pass": true,
+            "ppl_ratio": 0.9997864007762405,
+            "ppl_ratio_gate": 1.01,
+            "quartz": {
+              "avg_nll": 1.7878782710057632,
+              "engine": "quartz",
+              "finite": true,
+              "first_match": 0,
+              "greedy_lcp": 0,
+              "id": "held_out_wikitext_1024",
+              "inspectable": true,
+              "mean_nll": 1.7878782710057632,
+              "nll": 1830.7873495099016,
+              "nonfinite_count": 0,
+              "perplexity": 5.9767579433566524,
+              "scoring": "teacher_forced_nll",
+              "source": "fixtures/opt058_quality_baseline.json",
+              "steps_head": [],
+              "steps_omitted": 1024,
+              "target_tokens": 1024,
+              "vocab_size": 248320
+            },
+            "scoring": "teacher_forced_nll"
+          }
+        ],
+        "status": "pass"
+      },
+      "recurrence_nll": {
+        "class": "recurrence_nll",
+        "incremental_nll": -0.008314333899032578,
+        "inspectable": true,
+        "numerically_frozen_by": "OPT-084",
+        "pass": true,
+        "proposed_max": 0.02,
+        "recurrence_long": {
+          "llama": {
+            "avg_nll": 1.8402200970779121,
+            "engine": "llama",
+            "finite": true,
+            "first_match": 1,
+            "greedy_lcp": 1,
+            "id": "recurrence_long",
+            "inspectable": true,
+            "mean_nll": 1.8402200970779121,
+            "nll": 235.54817242597275,
+            "nonfinite_count": 0,
+            "perplexity": 6.297924263220792,
+            "scoring": "teacher_forced_nll",
+            "source": "pins/production_quality_v2_llama_reference.json",
+            "steps_head": [
+              {
+                "greedy_logit": 18.0193939,
+                "greedy_token": 328,
+                "log_probability": -0.0881716373276516,
+                "margin": 4.42293739,
+                "position": 4096,
+                "runner_up_logit": 13.5964565,
+                "runner_up_token": 561,
+                "target_token": 328
+              },
+              {
+                "greedy_logit": 15.6204872,
+                "greedy_token": 4558,
+                "log_probability": -3.1909648677202527,
+                "margin": 0.998325348,
+                "position": 4097,
+                "runner_up_logit": 14.6221619,
+                "runner_up_token": 561,
+                "target_token": 86644
+              },
+              {
+                "greedy_logit": 23.5369568,
+                "greedy_token": 52561,
+                "log_probability": -0.00031302797119886494,
+                "margin": 8.60920906,
+                "position": 4098,
+                "runner_up_logit": 14.9277477,
+                "runner_up_token": 53963,
+                "target_token": 52561
+              },
+              {
+                "greedy_logit": 17.5478802,
+                "greedy_token": 557,
+                "log_probability": -3.3396002234404625,
+                "margin": 0.165664673,
+                "position": 4099,
+                "runner_up_logit": 17.3822155,
+                "runner_up_token": 359,
+                "target_token": 8308
+              }
+            ],
+            "steps_omitted": 124,
+            "target_tokens": 128,
+            "vocab_size": 248320
+          },
+          "quartz": {
+            "avg_nll": 1.8354702048193376,
+            "engine": "quartz",
+            "finite": true,
+            "first_match": 0,
+            "greedy_lcp": 0,
+            "id": "recurrence_long",
+            "inspectable": true,
+            "mean_nll": 1.8354702048193376,
+            "nll": 234.94018621687522,
+            "nonfinite_count": 0,
+            "perplexity": 6.268080734400572,
+            "scoring": "teacher_forced_nll",
+            "source": "fixtures/opt058_quality_baseline.json",
+            "steps_head": [],
+            "steps_omitted": 128,
+            "target_tokens": 128,
+            "vocab_size": 248320
+          }
+        },
+        "recurrence_short": {
+          "llama": {
+            "avg_nll": 1.7683376992507749,
+            "engine": "llama",
+            "finite": true,
+            "first_match": 1,
+            "greedy_lcp": 1,
+            "id": "recurrence_short",
+            "inspectable": true,
+            "mean_nll": 1.7683376992507749,
+            "nll": 226.34722550409919,
+            "nonfinite_count": 0,
+            "perplexity": 5.861102344248298,
+            "scoring": "teacher_forced_nll",
+            "source": "pins/production_quality_v2_llama_reference.json",
+            "steps_head": [
+              {
+                "greedy_logit": 17.708313,
+                "greedy_token": 328,
+                "log_probability": -0.08962052062471518,
+                "margin": 4.16719818,
+                "position": 256,
+                "runner_up_logit": 13.5411148,
+                "runner_up_token": 271,
+                "target_token": 328
+              },
+              {
+                "greedy_logit": 15.2536201,
+                "greedy_token": 271,
+                "log_probability": -2.058837127199953,
+                "margin": 0.0191001892,
+                "position": 257,
+                "runner_up_logit": 15.23452,
+                "runner_up_token": 86644,
+                "target_token": 86644
+              },
+              {
+                "greedy_logit": 23.1505737,
+                "greedy_token": 52561,
+                "log_probability": -0.00031378473168157194,
+                "margin": 9.22245789,
+                "position": 258,
+                "runner_up_logit": 13.9281158,
+                "runner_up_token": 53963,
+                "target_token": 52561
+              },
+              {
+                "greedy_logit": 17.0476742,
+                "greedy_token": 557,
+                "log_probability": -3.29078131821114,
+                "margin": 0.665395737,
+                "position": 259,
+                "runner_up_logit": 16.3822784,
+                "runner_up_token": 359,
+                "target_token": 8308
+              }
+            ],
+            "steps_omitted": 124,
+            "target_tokens": 128,
+            "vocab_size": 248320
+          },
+          "quartz": {
+            "avg_nll": 1.771902140891233,
+            "engine": "quartz",
+            "finite": true,
+            "first_match": 0,
+            "greedy_lcp": 0,
+            "id": "recurrence_short",
+            "inspectable": true,
+            "mean_nll": 1.771902140891233,
+            "nll": 226.80347403407782,
+            "nonfinite_count": 0,
+            "perplexity": 5.882031179149602,
+            "scoring": "teacher_forced_nll",
+            "source": "fixtures/opt058_quality_baseline.json",
+            "steps_head": [],
+            "steps_omitted": 128,
+            "target_tokens": 128,
+            "vocab_size": 248320
+          }
+        }
+      },
+      "teacher_forced_continuation": {
+        "aggregate": {
+          "authoritative_local_comparison": "quartz+llama",
+          "avg_greedy_lcp_left_right": [
+            0.0,
+            0.75
+          ],
+          "case_wins_right_left_ties": [
+            2,
+            2,
+            0
+          ],
+          "cases": 4,
+          "delta_right_minus_left": 0.00012677606009181552,
+          "examples": [
+            {
+              "delta_right_minus_left": 0.21874896826648182,
+              "id": "held_out_wikitext_1024",
+              "llama_avg_nll": 1.788091893045086,
+              "llama_first_match": 1,
+              "llama_greedy_lcp": 1,
+              "llama_nll": 1831.006098478168,
+              "quartz_avg_nll": 1.7878782710057632,
+              "quartz_first_match": 0,
+              "quartz_greedy_lcp": 0,
+              "quartz_nll": 1830.7873495099016,
+              "target_tokens": 1024
+            },
+            {
+              "delta_right_minus_left": 0.6079862090975325,
+              "id": "recurrence_long",
+              "llama_avg_nll": 1.8402200970779121,
+              "llama_first_match": 1,
+              "llama_greedy_lcp": 1,
+              "llama_nll": 235.54817242597275,
+              "quartz_avg_nll": 1.8354702048193376,
+              "quartz_first_match": 0,
+              "quartz_greedy_lcp": 0,
+              "quartz_nll": 234.94018621687522,
+              "target_tokens": 128
+            },
+            {
+              "delta_right_minus_left": -0.4562485299786374,
+              "id": "recurrence_short",
+              "llama_avg_nll": 1.7683376992507749,
+              "llama_first_match": 1,
+              "llama_greedy_lcp": 1,
+              "llama_nll": 226.34722550409919,
+              "quartz_avg_nll": 1.771902140891233,
+              "quartz_first_match": 0,
+              "quartz_greedy_lcp": 0,
+              "quartz_nll": 226.80347403407782,
+              "target_tokens": 128
+            },
+            {
+              "delta_right_minus_left": -0.07839460493369188,
+              "id": "wikitext_nll",
+              "llama_avg_nll": 1.525124035418359,
+              "llama_first_match": 0,
+              "llama_greedy_lcp": 0,
+              "llama_nll": 1561.7270122683997,
+              "quartz_avg_nll": 1.5252005926497396,
+              "quartz_first_match": 0,
+              "quartz_greedy_lcp": 0,
+              "quartz_nll": 1561.8054068733334,
+              "target_tokens": 1024
+            }
+          ],
+          "first_token_matches_left_right": [
+            0,
+            3
+          ],
+          "inspectable": true,
+          "llama_avg_nll": 1.6730158457797915,
+          "quartz_avg_nll": 1.6728890697196996,
+          "relative_nll_change": 7.578270573138646e-05,
+          "single_boolean": null,
+          "tokens": 2304
+        },
+        "aggregate_only": false,
+        "class": "teacher_forced_continuation",
+        "examples": [
+          {
+            "aggregate_only": false,
+            "delta_avg_nll": 7.655723138055848e-05,
+            "delta_nll": 0.07839460493369188,
+            "id": "wikitext_nll",
+            "inspectable": true,
+            "llama": {
+              "avg_nll": 1.525124035418359,
+              "engine": "llama",
+              "finite": true,
+              "first_match": 0,
+              "greedy_lcp": 0,
+              "id": "wikitext_nll",
+              "inspectable": true,
+              "mean_nll": 1.525124035418359,
+              "nll": 1561.7270122683997,
+              "nonfinite_count": 0,
+              "perplexity": 4.595713565210836,
+              "scoring": "teacher_forced_nll",
+              "source": "pins/production_quality_v2_llama_reference.json",
+              "steps_head": [
+                {
+                  "greedy_logit": 9.51825523,
+                  "greedy_token": 220,
+                  "log_probability": -12.491733666589074,
+                  "margin": 0.772356987,
+                  "position": 1,
+                  "runner_up_logit": 8.74589825,
+                  "runner_up_token": 318,
+                  "target_token": 8137
+                },
+                {
+                  "greedy_logit": 8.43443108,
+                  "greedy_token": 198,
+                  "log_probability": -9.917930017983911,
+                  "margin": 0.256933212,
+                  "position": 2,
+                  "runner_up_logit": 8.17749786,
+                  "runner_up_token": 11,
+                  "target_token": 211388
+                },
+                {
+                  "greedy_logit": 14.6726437,
+                  "greedy_token": 3869,
+                  "log_probability": -2.9248720809411517,
+                  "margin": 0.675378799,
+                  "position": 3,
+                  "runner_up_logit": 13.9972649,
+                  "runner_up_token": 752,
+                  "target_token": 455
+                },
+                {
+                  "greedy_logit": 12.8650894,
+                  "greedy_token": 11,
+                  "log_probability": -5.321597184913009,
+                  "margin": 0.13945961,
+                  "position": 4,
+                  "runner_up_logit": 12.7256298,
+                  "runner_up_token": 198,
+                  "target_token": 283
+                }
+              ],
+              "steps_omitted": 1020,
+              "target_tokens": 1024,
+              "vocab_size": 248320
+            },
+            "production_vocab": 248320,
+            "quartz": {
+              "avg_nll": 1.5252005926497396,
+              "engine": "quartz",
+              "finite": true,
+              "first_match": 0,
+              "greedy_lcp": 0,
+              "id": "wikitext_nll",
+              "inspectable": true,
+              "mean_nll": 1.5252005926497396,
+              "nll": 1561.8054068733334,
+              "nonfinite_count": 0,
+              "perplexity": 4.596065413785712,
+              "scoring": "teacher_forced_nll",
+              "source": "fixtures/opt058_quality_baseline.json",
+              "steps_head": [],
+              "steps_omitted": 1024,
+              "target_tokens": 1024,
+              "vocab_size": 248320
+            },
+            "suite_class": "teacher_forced_continuation"
+          },
+          {
+            "aggregate_only": false,
+            "delta_avg_nll": -0.00021362203932273616,
+            "delta_nll": -0.21874896826648182,
+            "id": "held_out_wikitext_1024",
+            "inspectable": true,
+            "llama": {
+              "avg_nll": 1.788091893045086,
+              "engine": "llama",
+              "finite": true,
+              "first_match": 1,
+              "greedy_lcp": 1,
+              "id": "held_out_wikitext_1024",
+              "inspectable": true,
+              "mean_nll": 1.788091893045086,
+              "nll": 1831.006098478168,
+              "nonfinite_count": 0,
+              "perplexity": 5.97803484695957,
+              "scoring": "teacher_forced_nll",
+              "source": "pins/production_quality_v2_llama_reference.json",
+              "steps_head": [
+                {
+                  "greedy_logit": 11.6877117,
+                  "greedy_token": 310,
+                  "log_probability": -1.1142115717902987,
+                  "margin": 1.22974205,
+                  "position": 1,
+                  "runner_up_logit": 10.4579697,
+                  "runner_up_token": 421,
+                  "target_token": 310
+                },
+                {
+                  "greedy_logit": 13.4891586,
+                  "greedy_token": 1236,
+                  "log_probability": -9.690156107870076,
+                  "margin": 0.0299701691,
+                  "position": 2,
+                  "runner_up_logit": 13.4591885,
+                  "runner_up_token": 3165,
+                  "target_token": 52490
+                },
+                {
+                  "greedy_logit": 12.1544666,
+                  "greedy_token": 279,
+                  "log_probability": -0.7779421241462985,
+                  "margin": 2.33276749,
+                  "position": 3,
+                  "runner_up_logit": 9.82169914,
+                  "runner_up_token": 780,
+                  "target_token": 279
+                },
+                {
+                  "greedy_logit": 8.90581512,
+                  "greedy_token": 6149,
+                  "log_probability": -6.937710776973201,
+                  "margin": 0.797876358,
+                  "position": 4,
+                  "runner_up_logit": 8.10793877,
+                  "runner_up_token": 13876,
+                  "target_token": 8862
+                }
+              ],
+              "steps_omitted": 1020,
+              "target_tokens": 1024,
+              "vocab_size": 248320
+            },
+            "production_vocab": 248320,
+            "quartz": {
+              "avg_nll": 1.7878782710057632,
+              "engine": "quartz",
+              "finite": true,
+              "first_match": 0,
+              "greedy_lcp": 0,
+              "id": "held_out_wikitext_1024",
+              "inspectable": true,
+              "mean_nll": 1.7878782710057632,
+              "nll": 1830.7873495099016,
+              "nonfinite_count": 0,
+              "perplexity": 5.9767579433566524,
+              "scoring": "teacher_forced_nll",
+              "source": "fixtures/opt058_quality_baseline.json",
+              "steps_head": [],
+              "steps_omitted": 1024,
+              "target_tokens": 1024,
+              "vocab_size": 248320
+            },
+            "suite_class": "teacher_forced_continuation"
+          },
+          {
+            "aggregate_only": false,
+            "delta_avg_nll": 0.0035644416404581047,
+            "delta_nll": 0.4562485299786374,
+            "id": "recurrence_short",
+            "inspectable": true,
+            "llama": {
+              "avg_nll": 1.7683376992507749,
+              "engine": "llama",
+              "finite": true,
+              "first_match": 1,
+              "greedy_lcp": 1,
+              "id": "recurrence_short",
+              "inspectable": true,
+              "mean_nll": 1.7683376992507749,
+              "nll": 226.34722550409919,
+              "nonfinite_count": 0,
+              "perplexity": 5.861102344248298,
+              "scoring": "teacher_forced_nll",
+              "source": "pins/production_quality_v2_llama_reference.json",
+              "steps_head": [
+                {
+                  "greedy_logit": 17.708313,
+                  "greedy_token": 328,
+                  "log_probability": -0.08962052062471518,
+                  "margin": 4.16719818,
+                  "position": 256,
+                  "runner_up_logit": 13.5411148,
+                  "runner_up_token": 271,
+                  "target_token": 328
+                },
+                {
+                  "greedy_logit": 15.2536201,
+                  "greedy_token": 271,
+                  "log_probability": -2.058837127199953,
+                  "margin": 0.0191001892,
+                  "position": 257,
+                  "runner_up_logit": 15.23452,
+                  "runner_up_token": 86644,
+                  "target_token": 86644
+                },
+                {
+                  "greedy_logit": 23.1505737,
+                  "greedy_token": 52561,
+                  "log_probability": -0.00031378473168157194,
+                  "margin": 9.22245789,
+                  "position": 258,
+                  "runner_up_logit": 13.9281158,
+                  "runner_up_token": 53963,
+                  "target_token": 52561
+                },
+                {
+                  "greedy_logit": 17.0476742,
+                  "greedy_token": 557,
+                  "log_probability": -3.29078131821114,
+                  "margin": 0.665395737,
+                  "position": 259,
+                  "runner_up_logit": 16.3822784,
+                  "runner_up_token": 359,
+                  "target_token": 8308
+                }
+              ],
+              "steps_omitted": 124,
+              "target_tokens": 128,
+              "vocab_size": 248320
+            },
+            "production_vocab": 248320,
+            "quartz": {
+              "avg_nll": 1.771902140891233,
+              "engine": "quartz",
+              "finite": true,
+              "first_match": 0,
+              "greedy_lcp": 0,
+              "id": "recurrence_short",
+              "inspectable": true,
+              "mean_nll": 1.771902140891233,
+              "nll": 226.80347403407782,
+              "nonfinite_count": 0,
+              "perplexity": 5.882031179149602,
+              "scoring": "teacher_forced_nll",
+              "source": "fixtures/opt058_quality_baseline.json",
+              "steps_head": [],
+              "steps_omitted": 128,
+              "target_tokens": 128,
+              "vocab_size": 248320
+            },
+            "suite_class": "teacher_forced_continuation"
+          },
+          {
+            "aggregate_only": false,
+            "delta_avg_nll": -0.004749892258574473,
+            "delta_nll": -0.6079862090975325,
+            "id": "recurrence_long",
+            "inspectable": true,
+            "llama": {
+              "avg_nll": 1.8402200970779121,
+              "engine": "llama",
+              "finite": true,
+              "first_match": 1,
+              "greedy_lcp": 1,
+              "id": "recurrence_long",
+              "inspectable": true,
+              "mean_nll": 1.8402200970779121,
+              "nll": 235.54817242597275,
+              "nonfinite_count": 0,
+              "perplexity": 6.297924263220792,
+              "scoring": "teacher_forced_nll",
+              "source": "pins/production_quality_v2_llama_reference.json",
+              "steps_head": [
+                {
+                  "greedy_logit": 18.0193939,
+                  "greedy_token": 328,
+                  "log_probability": -0.0881716373276516,
+                  "margin": 4.42293739,
+                  "position": 4096,
+                  "runner_up_logit": 13.5964565,
+                  "runner_up_token": 561,
+                  "target_token": 328
+                },
+                {
+                  "greedy_logit": 15.6204872,
+                  "greedy_token": 4558,
+                  "log_probability": -3.1909648677202527,
+                  "margin": 0.998325348,
+                  "position": 4097,
+                  "runner_up_logit": 14.6221619,
+                  "runner_up_token": 561,
+                  "target_token": 86644
+                },
+                {
+                  "greedy_logit": 23.5369568,
+                  "greedy_token": 52561,
+                  "log_probability": -0.00031302797119886494,
+                  "margin": 8.60920906,
+                  "position": 4098,
+                  "runner_up_logit": 14.9277477,
+                  "runner_up_token": 53963,
+                  "target_token": 52561
+                },
+                {
+                  "greedy_logit": 17.5478802,
+                  "greedy_token": 557,
+                  "log_probability": -3.3396002234404625,
+                  "margin": 0.165664673,
+                  "position": 4099,
+                  "runner_up_logit": 17.3822155,
+                  "runner_up_token": 359,
+                  "target_token": 8308
+                }
+              ],
+              "steps_omitted": 124,
+              "target_tokens": 128,
+              "vocab_size": 248320
+            },
+            "production_vocab": 248320,
+            "quartz": {
+              "avg_nll": 1.8354702048193376,
+              "engine": "quartz",
+              "finite": true,
+              "first_match": 0,
+              "greedy_lcp": 0,
+              "id": "recurrence_long",
+              "inspectable": true,
+              "mean_nll": 1.8354702048193376,
+              "nll": 234.94018621687522,
+              "nonfinite_count": 0,
+              "perplexity": 6.268080734400572,
+              "scoring": "teacher_forced_nll",
+              "source": "fixtures/opt058_quality_baseline.json",
+              "steps_head": [],
+              "steps_omitted": 128,
+              "target_tokens": 128,
+              "vocab_size": 248320
+            },
+            "suite_class": "teacher_forced_continuation"
+          }
+        ],
+        "identity": [
+          {
+            "identical_context_construction": true,
+            "identical_scoring_definition": true,
+            "identical_target_tokens": true,
+            "identical_tokenization": true,
+            "llama_adapter": "tools/run_llama_quality_reference.py",
+            "mismatches": [],
+            "pass": true,
+            "quartz_native": "build/qw38-cuda-opt058-quality-baseline-test"
+          },
+          {
+            "identical_context_construction": true,
+            "identical_scoring_definition": true,
+            "identical_target_tokens": true,
+            "identical_tokenization": true,
+            "llama_adapter": "tools/run_llama_quality_reference.py",
+            "mismatches": [],
+            "pass": true,
+            "quartz_native": "build/qw38-cuda-opt058-quality-baseline-test"
+          }
+        ],
+        "inspectable": true,
+        "llama_control_scorer": "tools/run_llama_quality_reference.py",
+        "quartz_scorer": "build/qw38-cuda-opt058-quality-baseline-test"
+      }
+    },
+    "ds4_datasets_not_applicable": [
+      "data/glm52-openrouter-100",
+      "data/flash",
+      "data/pro",
+      "data/pro-0813"
+    ],
+    "frozen_acceptance": {
+      "absolute_task_accuracy": "visible_and_separate",
+      "continuation_consistency": "no_new_greedy_mismatch_vs_baseline",
+      "engine_non_regression": "OPT-073 quality-v3",
+      "known_baseline_defect_does_not_reject_non_worsening_kernel": true,
+      "numerically_frozen_by": "OPT-084",
+      "opt073_engine_non_regression_must_remain": "pass",
+      "ppl_ratio_max": 1.01,
+      "primary_candidate_gate": "quartz_vs_shipping_baseline_regression",
+      "projection_error_substitute_for_opt074": false,
+      "quartz_vs_llama_nll": "inspectable_control",
+      "recurrence_incremental_nll_max": 0.02
+    },
+    "native_reuse": [
+      "tools/run_llama_quality_reference.py",
+      "build/qw38-cuda-opt058-quality-baseline-test"
+    ],
+    "openrouter_not_invoked": true,
+    "same_model_comparison_with_ds4": false,
+    "suite_class_names": [
+      "teacher_forced_continuation",
+      "known_qwen_continuations",
+      "ppl_1024_spans",
+      "recurrence_nll",
+      "opt073_dual_verdict",
+      "held_out_32_alarm",
+      "finite_vocab_state_consistency"
+    ]
+  },
+  "suite_classes": [
+    "teacher_forced_continuation",
+    "known_qwen_continuations",
+    "ppl_1024_spans",
+    "recurrence_nll",
+    "opt073_dual_verdict",
+    "held_out_32_alarm",
+    "finite_vocab_state_consistency"
+  ],
+  "task": "OPT-084",
+  "vocab_size": 248320
+}

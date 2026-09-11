@@ -1,0 +1,173 @@
+{
+  "schema_version": 1,
+  "task": "OPT-084",
+  "yardstick": "shipping_quartz_quality_baseline_freeze",
+  "claims_throughput": false,
+  "claims_performance_improvement": false,
+  "candidate_installed": false,
+  "host_only": false,
+  "skip_gpu_setup": false,
+  "skip_compile": true,
+  "image": "qw38-cuda:13.0.2",
+  "model": "models/Qwen3.8-27B-Q4_K_M.gguf",
+  "gpu_lock": "build/optimization-runs/qw38-gpu.lock",
+  "aggregate_deadline_s": 300,
+  "target": "tools/opt084_quality_baseline.py",
+  "diagnostics_make_target": "cuda-opt084-diagnostics",
+  "quality_contract": "pins/opt084_quality_baseline_contract.json",
+  "native_reuse": [
+    "tools/run_llama_quality_reference.py",
+    "build/qw38-cuda-opt058-quality-baseline-test"
+  ],
+  "case_ids": [
+    "llama",
+    "quartz",
+    "baseline"
+  ],
+  "modes": {
+    "feedback": {
+      "target": "tools/opt084_quality_baseline.py",
+      "tier_sequence": [
+        "llama",
+        "quartz"
+      ],
+      "make_targets": ["build/qw38-cuda-opt058-quality-baseline-test"],
+      "skip_compile": true,
+      "build_once": true,
+      "aggregate_deadline_s": 300,
+      "warm_repetitions": 0,
+      "repetitions": 1,
+      "workloads": [
+        "llama",
+        "quartz"
+      ]
+    },
+    "acceptance": {
+      "target": "tools/opt084_quality_baseline.py",
+      "tier_sequence": ["baseline"],
+      "make_targets": ["build/qw38-cuda-opt058-quality-baseline-test"],
+      "skip_compile": true,
+      "warm_repetitions": 0,
+      "repetitions": 1,
+      "aggregate_deadline_s": 300,
+      "workloads": ["baseline"]
+    },
+    "release": {
+      "target": "tools/opt084_quality_baseline.py",
+      "tier": "acceptance",
+      "make_targets": [],
+      "skip_compile": true,
+      "historical_oracles": false,
+      "workloads": []
+    }
+  },
+  "workloads": {
+    "llama": {
+      "target": "tools/opt084_quality_baseline.py",
+      "tier": "correctness",
+      "runner": "host",
+      "kind": "opt083_suite_llama_scorer",
+      "cases": 7,
+      "candidates": 1,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 1024,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "engines": ["llama.cpp"],
+      "held_out_targets": 32,
+      "functional_cases": 8,
+      "load_model": 1,
+      "reference": 1,
+      "gpu_work": true,
+      "native_targets": [
+        "build/qw38-cuda-opt058-quality-baseline-test"
+      ],
+      "args": [
+        "uv",
+        "run",
+        "python",
+        "tools/opt084_quality_baseline.py",
+        "--phase",
+        "llama",
+        "--quality",
+        "--run-dir",
+        "{run_dir}"
+      ]
+    },
+    "quartz": {
+      "target": "tools/opt084_quality_baseline.py",
+      "tier": "correctness",
+      "runner": "host",
+      "kind": "opt083_suite_shipping_quartz_scorer",
+      "cases": 7,
+      "candidates": 1,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 1024,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "engines": ["quartz"],
+      "held_out_targets": 32,
+      "functional_cases": 8,
+      "load_model": 1,
+      "reference": 1,
+      "gpu_work": true,
+      "native_targets": [
+        "build/qw38-cuda-opt058-quality-baseline-test"
+      ],
+      "args": [
+        "uv",
+        "run",
+        "python",
+        "tools/opt084_quality_baseline.py",
+        "--phase",
+        "quartz",
+        "--quality",
+        "--run-dir",
+        "{run_dir}"
+      ]
+    },
+    "baseline": {
+      "target": "tools/opt084_quality_baseline.py",
+      "tier": "acceptance",
+      "runner": "host",
+      "kind": "shipping_quality_baseline_freeze",
+      "cases": 7,
+      "candidates": 1,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 1,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "engines": ["quartz", "llama.cpp"],
+      "held_out_targets": 32,
+      "functional_cases": 8,
+      "load_model": 0,
+      "reference": 1,
+      "gpu_work": false,
+      "native_targets": [
+        "build/qw38-cuda-opt058-quality-baseline-test"
+      ],
+      "args": [
+        "uv",
+        "run",
+        "python",
+        "tools/opt084_quality_baseline.py",
+        "--phase",
+        "baseline",
+        "--quality",
+        "--run-dir",
+        "{run_dir}"
+      ]
+    }
+  },
+  "proof_limit": [
+    "no throughput claim",
+    "no candidate kernel installed",
+    "historical oracles none",
+    "OpenRouter not invoked",
+    "identity-cached model and tokenizer"
+  ],
+  "report_path": "evidence/optimization/opt084-quality-baseline/REPORT.md"
+}
