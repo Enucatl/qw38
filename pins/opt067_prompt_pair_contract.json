@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "task": "OPT-067",
+  "yardstick": "prompt_ffn_paired_swiglu",
+  "claims_throughput": false,
+  "claims_performance_improvement": false,
+  "llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+  "gguf_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+  "selected_mmq_pipeline_path": "fma_async",
+  "selected_mmq_async_x": true,
+  "selected_ffn_path": "shared_y_swiglu_q8",
+  "selected_ffn_prompt_pair_path": "off",
+  "control_tile": "i128_j128",
+  "candidate_tile": "i64_j64",
+  "installed": false,
+  "native_target": "build/qw38-cuda-opt067-prompt-pair-test",
+  "report_path": "evidence/optimization/opt067-prompt-pair/REPORT.md",
+  "required_fixture_keys": [
+    "schema_version",
+    "task",
+    "status",
+    "selected_ffn_prompt_pair_path",
+    "control_tile",
+    "candidate_tile",
+    "installed",
+    "keep",
+    "opt061_threshold_ms",
+    "claims_throughput"
+  ]
+}

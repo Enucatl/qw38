@@ -25,6 +25,9 @@
 // synchronous loader. OPT-066 may overlap packed Q4 weight fetches with
 // MMA via a two-stage raw-X shared ring on the accepted OPT-065 tile
 // when a paired complete-P sitting strictly beats the Y-only pipeline.
+// OPT-067 may pair prompt FFN gate/up Q4 tiles (I64/J64) with a BF16
+// SwiGLU epilogue when a complete-P sitting strictly beats separate
+// OPT-065/066 launches; decode paired selectors stay independent.
 // Output is token-major FP32
 // [prompt_rows, output_rows]. Production Q8_0 is launched via
 // launch_q8_mmq_bf16, not launch_quant_mmq.
@@ -658,6 +661,106 @@ __global__ void quantize_mmq_q8_1_swiglu(const float* gate, const float* up,
   }
 }
 
+template <int PromptTile, int QualityI, bool UseFma>
+__device__ __forceinline__ void quality_mma_q4_accumulate_half(
+    float* sum, const int* x_qs, const int* tile_y, int half) {
+  constexpr int kRowsPerWarp = quality_rows_per_warp(PromptTile);
+  constexpr int kNtx = kQualityNwarps * kRowsPerWarp / QualityI;
+  constexpr int kNi = kRowsPerWarp / 16;
+  constexpr int kSram = kQualitySramQ4;
+  const int lane = threadIdx.x;
+  const int k00 = half * kMmqTileNeK;
+  const int* y_tile = tile_y + (threadIdx.y % kNtx) * (8 * kMmqTileYk);
+  const int* y_qs = y_tile + 4;
+  const int i0 = (threadIdx.y / kNtx) * kRowsPerWarp;
+  const half2* y_dm = reinterpret_cast<const half2*>(y_tile);
+  int A[kNi][4][4];
+  float2 dmA[kNi][2][4];
+#pragma unroll
+  for (int n = 0; n < kNi; ++n) {
+#pragma unroll
+    for (int k01 = 0; k01 < kMmqTileNeK; k01 += kQi81) {
+      const int k0 = k00 + k01;
+      mma::load_a_m16k32(A[n][k01 / kQi81], x_qs + (i0 + n * 16) * kSram + k0,
+                         kSram);
+    }
+#pragma unroll
+    for (int l = 0; l < 2; ++l) {
+      const int i = i0 + n * 16 + mma::tile16x8_i(lane, 2 * l);
+#pragma unroll
+      for (int k01 = 0; k01 < kMmqTileNeK; k01 += kQi81) {
+        const int k0 = k00 + k01;
+        dmA[n][l][k01 / kQi81] = __half22float2(
+            reinterpret_cast<const half2*>(
+                x_qs + i * kSram + 2 * kMmqTileNeK)[k0 / kQi81]);
+      }
+    }
+  }
+#pragma unroll
+  for (int j0 = 0; j0 < PromptTile; j0 += kNtx * 8) {
+#pragma unroll
+    for (int k01 = 0; k01 < kMmqTileNeK; k01 += kQi81) {
+      int B[2];
+      float2 dsB[2];
+      mma::load_b_generic_k32(B, y_qs + j0 * kMmqTileYk + k01, kMmqTileYk);
+#pragma unroll
+      for (int l = 0; l < 2; ++l) {
+        const int j = j0 + mma::tile16x8_j(lane, l);
+        dsB[l] = __half22float2(y_dm[j * kMmqTileYk + k01 / kQi81]);
+      }
+#pragma unroll
+      for (int n = 0; n < kNi; ++n) {
+        int C[4] = {0, 0, 0, 0};
+        mma::mma_m16n8k32_s8(C, A[n][k01 / kQi81], B);
+#pragma unroll
+        for (int l = 0; l < 4; ++l) {
+          float& acc = sum[(j0 / (kNtx * 8) * kNi + n) * 4 + l];
+          const float mag = static_cast<float>(C[l]);
+          const float sx = dmA[n][l / 2][k01 / kQi81].x * dsB[l % 2].x;
+          const float sy = dmA[n][l / 2][k01 / kQi81].y;
+          const float dy = dsB[l % 2].y;
+          if constexpr (UseFma) {
+            acc = __fmaf_rn(sx, mag, __fmaf_rn(sy, dy, acc));
+          } else {
+            acc += sx * mag + sy * dy;
+          }
+        }
+      }
+    }
+  }
+}
+
+template <int PromptTile, bool Fallback>
+__device__ __forceinline__ void quality_load_y_sync(
+    int* tile_y, const int* y, std::size_t prompt_rows, std::size_t prompt0,
+    std::size_t k_block) {
+  const int tid = threadIdx.y * 32 + threadIdx.x;
+  if constexpr (Fallback) {
+#pragma unroll
+    for (int l0 = 0; l0 < PromptTile * kMmqTileYk;
+         l0 += kQualityNwarps * 32) {
+      const int l = l0 + tid;
+      if (l >= PromptTile * kMmqTileYk) continue;
+      const int j = l / kMmqTileYk;
+      const int r = l % kMmqTileYk;
+      const std::size_t prow = prompt0 + static_cast<std::size_t>(j);
+      int value = 0;
+      if (prow < prompt_rows) {
+        value = y[(k_block * prompt_rows + prow) * kMmqTileYk + r];
+      }
+      tile_y[l] = value;
+    }
+  } else {
+    const int* by0 = y + (k_block * prompt_rows + prompt0) * kMmqTileYk;
+#pragma unroll
+    for (int l0 = 0; l0 < PromptTile * kMmqTileYk;
+         l0 += kQualityNwarps * 32) {
+      const int l = l0 + tid;
+      if (l < PromptTile * kMmqTileYk) tile_y[l] = by0[l];
+    }
+  }
+}
+
 template <QuantKind Kind, int PromptTile, bool Fallback, int QualityI = kQualityI,
           bool SoaWeights = false, bool UseFma = false, bool UseAsyncY = false,
           bool UseAsyncX = false>
@@ -940,63 +1043,8 @@ __device__ __forceinline__ void quality_mma_process_tile(
       const int i0 = (threadIdx.y / kNtx) * kRowsPerWarp;
 
       if constexpr (Kind == QuantKind::kQ4K) {
-        const half2* y_dm = reinterpret_cast<const half2*>(y_tile);
-        int A[kNi][4][4];
-        float2 dmA[kNi][2][4];
-#pragma unroll
-        for (int n = 0; n < kNi; ++n) {
-#pragma unroll
-          for (int k01 = 0; k01 < kMmqTileNeK; k01 += kQi81) {
-            const int k0 = k00 + k01;
-            mma::load_a_m16k32(A[n][k01 / kQi81],
-                               x_qs + (i0 + n * 16) * kSram + k0,
-                               kSram);
-          }
-#pragma unroll
-          for (int l = 0; l < 2; ++l) {
-            const int i = i0 + n * 16 + mma::tile16x8_i(lane, 2 * l);
-#pragma unroll
-            for (int k01 = 0; k01 < kMmqTileNeK; k01 += kQi81) {
-              const int k0 = k00 + k01;
-              dmA[n][l][k01 / kQi81] = __half22float2(
-                  reinterpret_cast<const half2*>(
-                      x_qs + i * kSram + 2 * kMmqTileNeK)[k0 / kQi81]);
-            }
-          }
-        }
-#pragma unroll
-        for (int j0 = 0; j0 < PromptTile; j0 += kNtx * 8) {
-#pragma unroll
-          for (int k01 = 0; k01 < kMmqTileNeK; k01 += kQi81) {
-            int B[2];
-            float2 dsB[2];
-            mma::load_b_generic_k32(B, y_qs + j0 * kMmqTileYk + k01,
-                                    kMmqTileYk);
-#pragma unroll
-            for (int l = 0; l < 2; ++l) {
-              const int j = j0 + mma::tile16x8_j(lane, l);
-              dsB[l] = __half22float2(y_dm[j * kMmqTileYk + k01 / kQi81]);
-            }
-#pragma unroll
-            for (int n = 0; n < kNi; ++n) {
-              int C[4] = {0, 0, 0, 0};
-              mma::mma_m16n8k32_s8(C, A[n][k01 / kQi81], B);
-#pragma unroll
-              for (int l = 0; l < 4; ++l) {
-                float& acc = sum[(j0 / (kNtx * 8) * kNi + n) * 4 + l];
-                const float mag = static_cast<float>(C[l]);
-                const float sx = dmA[n][l / 2][k01 / kQi81].x * dsB[l % 2].x;
-                const float sy = dmA[n][l / 2][k01 / kQi81].y;
-                const float dy = dsB[l % 2].y;
-                if constexpr (UseFma) {
-                  acc = __fmaf_rn(sx, mag, __fmaf_rn(sy, dy, acc));
-                } else {
-                  acc += sx * mag + sy * dy;
-                }
-              }
-            }
-          }
-        }
+        quality_mma_q4_accumulate_half<PromptTile, QualityI, UseFma>(
+            sum, x_qs, tile_y, half);
       } else if constexpr (Kind == QuantKind::kQ6K) {
         const float* y_df = reinterpret_cast<const float*>(y_tile);
         int A[kNi][8][2];
@@ -1222,6 +1270,150 @@ __global__ void __launch_bounds__(256, 1) quant_mmq_mma_quality_kernel(
       prompt0, i_max, j_max, 0, static_cast<int>(columns / kMmaBlockValues),
       false);
   quartz_pdl_lc();
+}
+
+constexpr int kPairedQualityI = 64;
+constexpr int kPairedPromptTile = 64;
+
+template <bool Fallback>
+__global__ void __launch_bounds__(256, 1) quant_mmq_mma_q4_paired_swiglu_kernel(
+    const std::uint8_t* gate_weights, const std::uint8_t* up_weights,
+    std::size_t output_rows, std::size_t columns, const int* y,
+    std::size_t prompt_rows, __nv_bfloat16* activated, float* gate_dump,
+    float* up_dump) {
+  quartz_pdl_sync();
+  constexpr int QualityI = kPairedQualityI;
+  constexpr int PromptTile = kPairedPromptTile;
+  constexpr bool UseFma = true;
+  constexpr int kRowsPerWarp = quality_rows_per_warp(PromptTile);
+  constexpr int kNtx = kQualityNwarps * kRowsPerWarp / QualityI;
+  constexpr int kNi = kRowsPerWarp / 16;
+  constexpr int kSum = PromptTile * QualityI / (kQualityNwarps * 32);
+  constexpr std::size_t kYInts = quality_pad_ints(
+      static_cast<std::size_t>(PromptTile) * kMmqTileYk);
+  const std::size_t row_stride =
+      (columns / kMmaBlockValues) * kMmaQ4Bytes;
+  const std::size_t out0 =
+      static_cast<std::size_t>(blockIdx.x) * QualityI;
+  const std::size_t prompt0 =
+      static_cast<std::size_t>(blockIdx.y) * PromptTile;
+  const int i_max =
+      Fallback ? static_cast<int>(output_rows - out0) - 1 : QualityI - 1;
+  const int j_max =
+      Fallback ? static_cast<int>(prompt_rows - prompt0) - 1 : PromptTile - 1;
+  const int lane = threadIdx.x;
+  const int kb0_stop = static_cast<int>(columns / kMmaBlockValues);
+
+  extern __shared__ std::uint8_t shared[];
+  int* quality_shared = reinterpret_cast<int*>(shared);
+  int* tile_y0 = quality_shared + PromptTile;
+  int* tile_y1 = tile_y0 + kYInts;
+  int* x_qs = tile_y1 + kYInts;
+
+  float gate_sum[kSum];
+  float up_sum[kSum];
+#pragma unroll
+  for (int s = 0; s < kSum; ++s) {
+    gate_sum[s] = 0.0F;
+    up_sum[s] = 0.0F;
+  }
+
+  const std::uint8_t* gate_row0 = gate_weights + out0 * row_stride;
+  const std::uint8_t* up_row0 = up_weights + out0 * row_stride;
+  __syncthreads();
+
+  for (int kb0 = 0; kb0 < kb0_stop; ++kb0) {
+    const std::size_t k0 = static_cast<std::size_t>(kb0) * 2U;
+    const std::size_t k1 = k0 + 1U;
+    quality_load_y_sync<PromptTile, Fallback>(tile_y0, y, prompt_rows, prompt0,
+                                              k0);
+    quality_load_y_sync<PromptTile, Fallback>(tile_y1, y, prompt_rows, prompt0,
+                                              k1);
+    __syncthreads();
+
+    quality_unpack_q4_kb<QualityI, Fallback>(
+        x_qs, gate_row0 + static_cast<std::size_t>(kb0) * kMmaQ4Bytes,
+        row_stride, out0, output_rows, i_max, lane);
+    __syncthreads();
+    quality_mma_q4_accumulate_half<PromptTile, QualityI, UseFma>(
+        gate_sum, x_qs, tile_y0, 0);
+    quality_mma_q4_accumulate_half<PromptTile, QualityI, UseFma>(
+        gate_sum, x_qs, tile_y1, 1);
+    __syncthreads();
+
+    quality_unpack_q4_kb<QualityI, Fallback>(
+        x_qs, up_row0 + static_cast<std::size_t>(kb0) * kMmaQ4Bytes, row_stride,
+        out0, output_rows, i_max, lane);
+    __syncthreads();
+    quality_mma_q4_accumulate_half<PromptTile, QualityI, UseFma>(
+        up_sum, x_qs, tile_y0, 0);
+    quality_mma_q4_accumulate_half<PromptTile, QualityI, UseFma>(
+        up_sum, x_qs, tile_y1, 1);
+    __syncthreads();
+  }
+
+#pragma unroll
+  for (int j0 = 0; j0 < PromptTile; j0 += kNtx * 8) {
+#pragma unroll
+    for (int n = 0; n < kNi; ++n) {
+#pragma unroll
+      for (int l = 0; l < 4; ++l) {
+        const int j =
+            j0 + (threadIdx.y % kNtx) * 8 + mma::tile16x8_j(lane, l);
+        if (j > j_max) continue;
+        const int row = (threadIdx.y / kNtx) * kRowsPerWarp + n * 16 +
+                        mma::tile16x8_i(lane, l);
+        if (Fallback && row > i_max) continue;
+        const std::size_t out_row = out0 + static_cast<std::size_t>(row);
+        const std::size_t prompt_row =
+            prompt0 + static_cast<std::size_t>(j);
+        if (out_row >= output_rows || prompt_row >= prompt_rows) continue;
+        const int slot = (j0 / (kNtx * 8) * kNi + n) * 4 + l;
+        const float g = gate_sum[slot];
+        const float u = up_sum[slot];
+        const float activated_f = (g / (1.0F + expf(-g))) * u;
+        const std::size_t index = prompt_row * output_rows + out_row;
+        activated[index] = __float2bfloat16_rn(activated_f);
+        if (gate_dump != nullptr) gate_dump[index] = g;
+        if (up_dump != nullptr) up_dump[index] = u;
+      }
+    }
+  }
+  quartz_pdl_lc();
+}
+
+template <typename Kernel>
+cudaError_t prepare_mmq_shared(Kernel kernel, std::size_t shared,
+                               int* occupancy) noexcept;
+
+cudaError_t launch_q4_paired_swiglu_kernel(
+    const std::uint8_t* gate_weights, const std::uint8_t* up_weights,
+    std::size_t output_rows, std::size_t columns, const int* y,
+    std::size_t prompt_rows, __nv_bfloat16* activated, float* gate_dump,
+    float* up_dump, bool fallback, cudaStream_t stream) noexcept {
+  const dim3 grid(
+      static_cast<unsigned int>((output_rows + kPairedQualityI - 1) /
+                                kPairedQualityI),
+      static_cast<unsigned int>((prompt_rows + kPairedPromptTile - 1) /
+                                kPairedPromptTile));
+  const dim3 block(32, 8);
+  const std::size_t shared =
+      quality_shared_ints(kPairedPromptTile, kPairedQualityI, true, false) *
+      sizeof(int);
+  if (fallback) {
+    auto kernel = quant_mmq_mma_q4_paired_swiglu_kernel<true>;
+    cudaError_t error = prepare_mmq_shared(kernel, shared, nullptr);
+    if (error != cudaSuccess) return error;
+    return quartz_launch_kernel(kernel, grid, block, shared, stream,
+                                gate_weights, up_weights, output_rows, columns,
+                                y, prompt_rows, activated, gate_dump, up_dump);
+  }
+  auto kernel = quant_mmq_mma_q4_paired_swiglu_kernel<false>;
+  cudaError_t error = prepare_mmq_shared(kernel, shared, nullptr);
+  if (error != cudaSuccess) return error;
+  return quartz_launch_kernel(kernel, grid, block, shared, stream, gate_weights,
+                              up_weights, output_rows, columns, y, prompt_rows,
+                              activated, gate_dump, up_dump);
 }
 
 template <QuantKind Kind, int PromptTile, bool Fallback, int QualityI = kQualityI>
@@ -1689,6 +1881,10 @@ inline thread_local unsigned int g_ffn_up_i = 0;
 inline thread_local unsigned int g_ffn_up_j = 0;
 inline thread_local unsigned int g_ffn_down_i = 0;
 inline thread_local unsigned int g_ffn_down_j = 0;
+constexpr const char kSelectedFfnPromptPairPath[] = "off";
+inline thread_local const char* g_ffn_prompt_pair_override = nullptr;
+inline thread_local bool g_ffn_prompt_pair_trace_unfused = false;
+inline thread_local MmqPairedDispatch g_last_mmq_paired_dispatch{};
 
 unsigned int selected_mma_mmq_prompt_tile() noexcept { return 128U; }
 
@@ -2733,6 +2929,103 @@ bool ffn_shares_gate_up_y() noexcept {
 bool ffn_swiglu_writes_q8() noexcept {
   return std::strcmp(kSelectedFfnPath, "swiglu_q8") == 0 ||
          std::strcmp(kSelectedFfnPath, "shared_y_swiglu_q8") == 0;
+}
+
+bool legal_ffn_prompt_pair_path(const char* path) noexcept {
+  return path != nullptr &&
+         (std::strcmp(path, "off") == 0 || std::strcmp(path, "i64_j64") == 0);
+}
+
+const char* selected_ffn_prompt_pair_path() noexcept {
+  return kSelectedFfnPromptPairPath;
+}
+
+const char* effective_ffn_prompt_pair_path() noexcept {
+  return g_ffn_prompt_pair_override != nullptr ? g_ffn_prompt_pair_override
+                                               : kSelectedFfnPromptPairPath;
+}
+
+void set_ffn_prompt_pair_override(const char* path) noexcept {
+  g_ffn_prompt_pair_override = path;
+}
+
+void clear_ffn_prompt_pair_override() noexcept {
+  g_ffn_prompt_pair_override = nullptr;
+}
+
+void set_ffn_prompt_pair_trace_unfused(bool enabled) noexcept {
+  g_ffn_prompt_pair_trace_unfused = enabled;
+}
+
+bool ffn_prompt_pair_trace_unfused() noexcept {
+  return g_ffn_prompt_pair_trace_unfused;
+}
+
+bool ffn_prompt_uses_paired() noexcept {
+  if (g_ffn_prompt_pair_trace_unfused) return false;
+  return std::strcmp(effective_ffn_prompt_pair_path(), "i64_j64") == 0;
+}
+
+const MmqPairedDispatch& last_mmq_paired_dispatch() noexcept {
+  return g_last_mmq_paired_dispatch;
+}
+
+void clear_mmq_paired_dispatch() noexcept { g_last_mmq_paired_dispatch = {}; }
+
+void record_paired_dispatch(bool fallback, bool dump) noexcept {
+  g_last_mmq_paired_dispatch.quality_i = 64;
+  g_last_mmq_paired_dispatch.prompt_tile = 64;
+  g_last_mmq_paired_dispatch.fallback = fallback;
+  g_last_mmq_paired_dispatch.paired = true;
+  g_last_mmq_paired_dispatch.dump_gate_up = dump;
+  g_last_mmq_paired_dispatch.path = effective_ffn_prompt_pair_path();
+  g_last_mmq_paired_dispatch.kernel =
+      fallback ? "q4_pair_i64_j64_fma_swiglu_fallback"
+               : "q4_pair_i64_j64_fma_swiglu";
+}
+
+cudaError_t launch_q4_mmq_paired_gate_up_swiglu_bf16(
+    const std::uint8_t* gate_weights, const std::uint8_t* up_weights,
+    std::size_t output_rows, std::size_t columns, const Q8Block* y,
+    std::size_t prompt_rows, __nv_bfloat16* activated, cudaStream_t stream,
+    float* gate_dump, float* up_dump) noexcept {
+  if (gate_weights == nullptr || up_weights == nullptr || y == nullptr ||
+      activated == nullptr || output_rows == 0 || columns == 0 ||
+      prompt_rows == 0 || columns % kMmaBlockValues != 0) {
+    return cudaErrorInvalidValue;
+  }
+  const bool fallback = output_rows % 64U != 0 || prompt_rows % 64U != 0;
+  record_paired_dispatch(fallback, gate_dump != nullptr || up_dump != nullptr);
+  return launch_q4_paired_swiglu_kernel(
+      gate_weights, up_weights, output_rows, columns,
+      reinterpret_cast<const int*>(y), prompt_rows, activated, gate_dump,
+      up_dump, fallback, stream);
+}
+
+cudaError_t mmq_paired_kernel_attributes(int* occupancy, int* registers,
+                                        std::size_t* local_bytes,
+                                        std::size_t* shared_bytes,
+                                        bool fallback) noexcept {
+  const std::size_t shared =
+      quality_shared_ints(64, 64, true, false) * sizeof(int);
+  int occ = 0;
+  cudaFuncAttributes attr{};
+  auto query = [&](auto kernel) -> cudaError_t {
+    const cudaError_t prepared = prepare_mmq_shared(kernel, shared, &occ);
+    if (prepared != cudaSuccess) return prepared;
+    return cudaFuncGetAttributes(&attr, kernel);
+  };
+  const cudaError_t error =
+      fallback ? query(quant_mmq_mma_q4_paired_swiglu_kernel<true>)
+               : query(quant_mmq_mma_q4_paired_swiglu_kernel<false>);
+  if (error != cudaSuccess) return error;
+  if (occupancy != nullptr) *occupancy = occ;
+  if (registers != nullptr) *registers = attr.numRegs;
+  if (local_bytes != nullptr) {
+    *local_bytes = static_cast<std::size_t>(attr.localSizeBytes);
+  }
+  if (shared_bytes != nullptr) *shared_bytes = shared;
+  return cudaSuccess;
 }
 
 }  // namespace qw38::cuda

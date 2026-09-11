@@ -269,6 +269,48 @@ const char* selected_ffn_path() noexcept;
 bool ffn_shares_gate_up_y() noexcept;
 bool ffn_swiglu_writes_q8() noexcept;
 
+struct MmqPairedDispatch final {
+  unsigned int quality_i = 0;
+  unsigned int prompt_tile = 0;
+  bool fallback = false;
+  bool paired = false;
+  bool dump_gate_up = false;
+  const char* kernel = "";
+  const char* path = "";
+};
+
+const char* selected_ffn_prompt_pair_path() noexcept;
+const char* effective_ffn_prompt_pair_path() noexcept;
+bool legal_ffn_prompt_pair_path(const char* path) noexcept;
+bool ffn_prompt_uses_paired() noexcept;
+void set_ffn_prompt_pair_override(const char* path) noexcept;
+void clear_ffn_prompt_pair_override() noexcept;
+void set_ffn_prompt_pair_trace_unfused(bool enabled) noexcept;
+bool ffn_prompt_pair_trace_unfused() noexcept;
+const MmqPairedDispatch& last_mmq_paired_dispatch() noexcept;
+void clear_mmq_paired_dispatch() noexcept;
+
+cudaError_t launch_q4_mmq_paired_gate_up_swiglu_bf16(
+    const std::uint8_t* gate_weights, const std::uint8_t* up_weights,
+    std::size_t output_rows, std::size_t columns, const Q8Block* y,
+    std::size_t prompt_rows, __nv_bfloat16* activated, cudaStream_t stream,
+    float* gate_dump = nullptr, float* up_dump = nullptr) noexcept;
+
+cudaError_t mmq_paired_kernel_attributes(int* occupancy, int* registers,
+                                        std::size_t* local_bytes,
+                                        std::size_t* shared_bytes,
+                                        bool fallback = false) noexcept;
+
+struct FfnPromptPairOverrideScope final {
+  explicit FfnPromptPairOverrideScope(const char* path) noexcept {
+    set_ffn_prompt_pair_override(path);
+  }
+  ~FfnPromptPairOverrideScope() { clear_ffn_prompt_pair_override(); }
+  FfnPromptPairOverrideScope(const FfnPromptPairOverrideScope&) = delete;
+  FfnPromptPairOverrideScope& operator=(const FfnPromptPairOverrideScope&) =
+      delete;
+};
+
 bool legal_mmq_pipeline_path(const char* path) noexcept;
 const char* selected_mmq_pipeline_path() noexcept;
 const char* effective_mmq_pipeline_path() noexcept;

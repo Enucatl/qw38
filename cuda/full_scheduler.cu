@@ -1346,6 +1346,54 @@ cudaError_t execute_prompt_ffn_projections(
           internal::kResidualWidth, workspace->prompt_q8_, stream);
     }
     if (error == cudaSuccess) error = end_phase(leaves);
+    const bool prompt_paired =
+        ffn_prompt_uses_paired() && !ffn_prompt_pair_trace_unfused();
+    if (prompt_paired) {
+      if (error == cudaSuccess) {
+        error = begin_phase(leaves,
+                            leaf_timings == nullptr
+                                ? nullptr
+                                : &leaf_timings->proj_ffn_gate,
+                            stream);
+      }
+      if (error == cudaSuccess) {
+        error = launch_q4_mmq_paired_gate_up_swiglu_bf16(
+            layer.ffn_gate.data, layer.ffn_up.data, layer.ffn_gate.rows,
+            layer.ffn_gate.columns, workspace->prompt_q8_, token_count,
+            workspace->prompt_projected_bf16_, stream);
+      }
+      if (error == cudaSuccess) error = end_phase(leaves);
+      if (error == cudaSuccess) {
+        error = begin_phase(
+            leaves, leaf_timings == nullptr ? nullptr : &leaf_timings->swiglu,
+            stream);
+      }
+      if (error == cudaSuccess) {
+        error = launch_quantize_mmq_q8_1(
+            QuantKind::kQ4K, workspace->prompt_projected_bf16_, token_count,
+            internal::kFfnWidth, workspace->prompt_q8_, stream);
+      }
+      if (error == cudaSuccess) error = end_phase(leaves);
+      if (error == cudaSuccess) {
+        error = begin_phase(leaves,
+                            leaf_timings == nullptr
+                                ? nullptr
+                                : &leaf_timings->proj_ffn_down,
+                            stream);
+      }
+      if (error == cudaSuccess) {
+        error = launch_quant_mmq_mma_y_ij(
+            layer.ffn_down.kind, layer.ffn_down.data, layer.ffn_down.rows,
+            layer.ffn_down.columns, workspace->prompt_q8_, token_count,
+            workspace->prompt_mixer_output_, selected_ffn_down_quality_i(),
+            selected_ffn_down_prompt_tile(), stream,
+            reinterpret_cast<float*>(workspace->prompt_projected_bf16_),
+            workspace->prompt_chunk_rows_ * internal::kFfnWidth *
+                sizeof(__nv_bfloat16) / sizeof(float));
+      }
+      if (error == cudaSuccess) error = end_phase(leaves);
+      return error;
+    }
     if (error == cudaSuccess) {
       error = begin_phase(leaves,
                           leaf_timings == nullptr
