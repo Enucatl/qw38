@@ -1,0 +1,18 @@
+
+==========
+== CUDA ==
+==========
+
+CUDA Version 13.0.2
+
+Container image Copyright (c) 2016-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+
+This container image and its contents are governed by the NVIDIA Deep Learning Container License.
+By pulling and using the container, you accept the terms and conditions of this license:
+https://developer.nvidia.com/ngc/nvidia-deep-learning-container-license
+
+A copy of this license is made available in this container at /NGC-DL-CONTAINER-LICENSE for your convenience.
+
+mma_quality_q4_attrs fallback=1 regs=240 local=0 const=0 shared=0 maxThreadsPerBlock=256
+status=passed pin=4096 graphs_off_winner=4096 selected=4096
+QW38_OPT054_PREFILL_MICROBATCH_AB_RESULT={"schema_version":1,"task":"OPT-054","status":"passed","measurement_utc":"2026-09-11T00:33:24Z","device":"NVIDIA GeForce RTX 5090","compute_capability":"12.0","selected_prompt_microbatch_rows":4096,"graphs_off_winner":4096,"win":false,"pin":4096,"smoke":{"frontier":16,"cancel_frontier":0,"poll_calls":8},"cancellation":{"after_batch_1":{"ok":true,"poll_calls":64,"frontier":0},"after_batch_2":{"ok":true,"poll_calls":128,"frontier":0},"after_final_batch":{"ok":true,"poll_calls":256,"frontier":0}},"graphs_off":{"512":{"mean_ms":1654.02405,"tok_s":2476.38477,"samples":[1657.3269,1650.68542,1654.06018]},"1024":{"mean_ms":1518.56348,"tok_s":2697.28589,"samples":[1513.37256,1520.47473,1521.84326]},"2048":{"mean_ms":1451.12952,"tok_s":2822.62891,"samples":[1448.84424,1451.65076,1452.8938]},"4096":{"mean_ms":1441.02893,"tok_s":2842.41333,"samples":[1438.95105,1441.79761,1442.33838]}},"graphs_on":{"4096":{"mean_ms":1441.89697,"tok_s":2840.70215,"samples":[1441.20264,1442.02991,1442.45862]}},"diagnostic":{"p2k_empty":{"mean_ms":680.203308,"tok_s":3010.8645},"append_4k_at_2048":{"mean_ms":1640.02295,"tok_s":2497.52612},"append_4k_at_4096":{"mean_ms":1835.90747,"tok_s":2231.04932},"label":"diagnostic_not_historical_p"},"extra_workspace_bytes":0}

@@ -903,6 +903,34 @@ baseline.
   stream-K rerun; 95% throughput floors versus the prior keep; 105% p95
   ceilings versus the prior keep; does not substitute for the 2K llama.cpp
   parity gate. Envelopes unloosened; Nsight is not used.
+- OPT-054 keeps the public 4096-token prompt transaction atomic. Internal
+  physical batches of 512/1024/2048/4096 run all 64 layers per chronological
+  microbatch. Candidate KV uses an outer staging range and
+  `split_candidate_origin` so `start_position` is not the committed/uncommitted
+  classifier. GDN convolution/recurrent state is carried in a private buffer
+  and never swapped into the session until the outer publish. Graphs-off A/B
+  isolates batch size; graphs-on 4096 is the shipping control. Keep 4096
+  unless a smaller size wins complete cold P without regressing D. OPT-044
+  admits cross-size arithmetic drift; isolation/restore/frontier stay exact.
+  Keep denominators are the frozen OPT-053 P and D128/D2048 means and p95s.
+  **Measured, RTX 5090 keep 4096:** graphs-off 512 2476.38477 tok/s, 1024
+  2697.28589, 2048 2822.62891, 4096 2842.41333; graphs-on 4096 2840.70215.
+  No smaller size beat 4096 eager or graphs-on shipping. Copied P 2895.42773,
+  D128 37.5605927, D2048 35.7286987. Production pin
+  `kSelectedPromptMicrobatchRows` remains 4096. The schema-1 contract, measured fixture, and report are
+  [`pins/opt054_prefill_microbatch_contract.json`](../pins/opt054_prefill_microbatch_contract.json),
+  [`fixtures/opt054_prefill_microbatch.json`](../fixtures/opt054_prefill_microbatch.json),
+  and
+  [`evidence/optimization/opt054-prefill-microbatch/REPORT.md`](../evidence/optimization/opt054-prefill-microbatch/REPORT.md).
+  The beginner explanations are
+  [`docs/62-cuda-full-prefill.md`](62-cuda-full-prefill.md) and
+  [`docs/06-system-optimization.md`](06-system-optimization.md).
+  Proof limit: atomic 4096-token transaction; internal 512/1024/2048/4096
+  microbatches; no early commit; graphs-off isolation then graphs-on shipping;
+  keep 4096 unless a smaller size wins complete P; D128/D2048 95% floors and
+  p95 inside 105% versus OPT-053; OPT-044 admits cross-size arithmetic drift;
+  does not substitute for the 2K llama.cpp parity gate. Envelopes unloosened;
+  Nsight is not used.
 - OPT-041 is a local derivation over admitted Ada+ stream-K fattn with
   register-resident VKQ and dual-F16 probability×V MMA. It assigns each of
   eight 16×8 QK microtiles to one of four warps (`tile_id % 4`), lets the

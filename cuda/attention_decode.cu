@@ -232,7 +232,7 @@ __global__ void stage_chunk_rows(
     AttentionConfig config, std::size_t start_position, std::size_t token_count,
     const float* key, const float* value, const float* scale,
     __nv_bfloat16* candidate_key, __nv_bfloat16* candidate_value,
-    float* normalized_key) {
+    float* normalized_key, std::size_t kv_origin) {
   quartz_pdl_sync();
   const std::uint32_t kv_head = blockIdx.x;
   const std::size_t token = blockIdx.y;
@@ -242,19 +242,26 @@ __global__ void stage_chunk_rows(
     return;
   }
   const std::size_t width = config.head_width;
-  const std::size_t base = token * config.kv_heads * width + kv_head * width;
+  const std::size_t origin = attention_kv_origin(start_position, kv_origin);
+  const std::size_t candidate_token = (start_position - origin) + token;
+  const std::size_t base =
+      candidate_token * config.kv_heads * width + kv_head * width;
+  const std::size_t source_base =
+      token * config.kv_heads * width + kv_head * width;
   __shared__ float normalized[kMaximumHeadWidth];
   __shared__ float inverse;
   if (lane == 0) {
     float sum = 0.0F;
     for (std::uint32_t i = 0; i < config.head_width; ++i) {
-      const float item = key[base + i];
+      const float item = key[source_base + i];
       sum = __fadd_rn(sum, __fmul_rn(item, item));
     }
     inverse = 1.0F / sqrtf(sum / static_cast<float>(width) + kRmsEpsilon);
   }
   __syncthreads();
-  if (lane < width) normalized[lane] = __fmul_rn(key[base + lane] * inverse, scale[lane]);
+  if (lane < width)
+    normalized[lane] =
+        __fmul_rn(key[source_base + lane] * inverse, scale[lane]);
   __syncthreads();
   const std::uint32_t half = config.rotary_width / 2;
   if (lane < half) {
@@ -268,9 +275,10 @@ __global__ void stage_chunk_rows(
   }
   __syncthreads();
   if (lane < width) {
-    if (token_count == 1) normalized_key[base + lane] = normalized[lane];
+    if (token_count == 1) normalized_key[source_base + lane] = normalized[lane];
     candidate_key[base + lane] = __float2bfloat16_rn(normalized[lane]);
-    candidate_value[base + lane] = __float2bfloat16_rn(value[base + lane]);
+    candidate_value[base + lane] =
+        __float2bfloat16_rn(value[source_base + lane]);
   }
   quartz_pdl_lc();
 }
@@ -282,11 +290,13 @@ __device__ void load_kv_tile_rows(
     const __nv_bfloat16* committed_key, const __nv_bfloat16* committed_value,
     const __nv_bfloat16* candidate_key, const __nv_bfloat16* candidate_value,
     __nv_bfloat16* keys, __nv_bfloat16* values, AttentionKvTileSpan* records,
-    std::uint32_t* record_count, std::uint32_t record_capacity) {
+    std::uint32_t* record_count, std::uint32_t record_capacity,
+    std::size_t kv_origin) {
+  const std::size_t origin = attention_kv_origin(start_position, kv_origin);
   const std::size_t width = config.head_width;
   const std::size_t row_values =
       static_cast<std::size_t>(config.kv_heads) * width;
-  if (tile + rows <= start_position) {
+  if (tile + rows <= origin) {
     const std::size_t base = attention_kv_tile_base_offset(
         kv_head, tile, config.capacity, config.head_width);
     const __nv_bfloat16* tile_base = committed_key + base;
@@ -319,15 +329,15 @@ __device__ void load_kv_tile_rows(
       const std::size_t absolute = tile + row;
       const __nv_bfloat16* ksrc;
       const __nv_bfloat16* vsrc;
-      if (absolute < start_position) {
+      if (absolute < origin) {
         const std::size_t offset = attention_kv_physical_index(
             absolute, kv_head, 0, config.capacity, config.head_width);
         ksrc = committed_key + offset;
         vsrc = committed_value + offset;
       } else {
-        ksrc = candidate_key + (absolute - start_position) * row_values +
+        ksrc = candidate_key + (absolute - origin) * row_values +
                kv_head * width;
-        vsrc = candidate_value + (absolute - start_position) * row_values +
+        vsrc = candidate_value + (absolute - origin) * row_values +
                kv_head * width;
       }
       if (lane < width) {
@@ -408,7 +418,7 @@ __global__ void per_query_tiled_chunk_attention(
     load_kv_tile_rows<false>(
         config, start_position, tile, rows, kv_head, lane, committed_key,
         committed_value, candidate_key, candidate_value, keys, values, nullptr,
-        nullptr, 0);
+        nullptr, 0, start_position);
     if constexpr (CountLoads) {
       if (lane < width) local_loads += 2 * rows;
     }
@@ -513,7 +523,7 @@ __global__ void one_row_grouped_tiled_chunk_attention(
     load_kv_tile_rows<false>(
         config, start_position, tile, rows, kv_head, lane, committed_key,
         committed_value, candidate_key, candidate_value, keys, values, nullptr,
-        nullptr, 0);
+        nullptr, 0, start_position);
     if constexpr (CountLoads) {
       if (lane < width) local_loads += 2 * rows;
     }
@@ -654,7 +664,7 @@ __global__ void two_row_grouped_tiled_chunk_attention(
     load_kv_tile_rows<RecordSpans>(
         config, start_position, tile, rows, kv_head, lane, committed_key,
         committed_value, candidate_key, candidate_value, keys, values,
-        tile_spans, tile_span_count, tile_span_capacity);
+        tile_spans, tile_span_count, tile_span_capacity, start_position);
     __syncthreads();
     for (std::size_t tile_row = 0; tile_row < rows; ++tile_row) {
       const std::size_t absolute = tile + tile_row;
@@ -788,7 +798,7 @@ __global__ void partitioned_grouped_decode_attention(
       load_kv_tile_rows<false>(
           config, position, tile, rows, kv_head, lane, committed_key,
           committed_value, candidate_key, candidate_value, keys, values,
-          nullptr, nullptr, 0);
+          nullptr, nullptr, 0, position);
       __syncthreads();
       for (std::size_t tile_row = 0; tile_row < rows; ++tile_row) {
         for (std::uint32_t member = 0; member < group; ++member) {
@@ -1127,7 +1137,7 @@ __global__ void mma_grouped_chunk_attention(
       load_kv_tile_rows<false>(
           config, start_position, tile, rows, kv_head, lane, committed_key,
           committed_value, candidate_key, candidate_value, keys, values,
-          nullptr, nullptr, 0);
+          nullptr, nullptr, 0, start_position);
       __syncthreads();
       for (std::size_t pack = 0; pack < rows; pack += 8) {
         const std::size_t pack_rows =
@@ -1506,7 +1516,10 @@ cudaError_t stage_and_validate_chunk(
     const float* key_norm_scale, const float* output_gate,
     const AttentionCache& committed, const AttentionCache& candidate_rows,
     float* normalized_query, float* normalized_key, float* score_workspace,
-    float* output, cudaStream_t stream) noexcept {
+    float* output, cudaStream_t stream,
+    std::size_t kv_origin = static_cast<std::size_t>(-1)) noexcept {
+  const std::size_t origin =
+      resolve_attention_kv_origin(start_position, kv_origin);
   const std::size_t score_values =
       attention_chunk_score_values(config, start_position, token_count);
   if (score_values == 0 || query == nullptr || key == nullptr ||
@@ -1524,7 +1537,7 @@ cudaError_t stage_and_validate_chunk(
   return quartz_launch_kernel(
       stage_chunk_rows, staging, dim3(kThreads), 0, stream, config,
       start_position, token_count, key, value, key_norm_scale,
-      candidate_rows.key, candidate_rows.value, normalized_key);
+      candidate_rows.key, candidate_rows.value, normalized_key, origin);
 }
 
 }  // namespace
@@ -1814,7 +1827,9 @@ cudaError_t launch_attention_prepare_chunk_stream_k(
     const AttentionCache& committed, const AttentionCache& candidate_rows,
     float* normalized_query, float* normalized_key, float* score_workspace,
     float* output, float* partial_vkq, float* meta, cudaStream_t stream,
-    const __half* prepared_q) noexcept {
+    const __half* prepared_q, std::size_t kv_origin) noexcept {
+  const std::size_t origin =
+      resolve_attention_kv_origin(start_position, kv_origin);
   if (token_count < 16) {
     return launch_attention_prepare_chunk_tiled(
         config, start_position, token_count, query, key, value,
@@ -1825,7 +1840,7 @@ cudaError_t launch_attention_prepare_chunk_stream_k(
   cudaError_t error = stage_and_validate_chunk(
       config, start_position, token_count, query, key, value, query_norm_scale,
       key_norm_scale, output_gate, committed, candidate_rows, normalized_query,
-      normalized_key, score_workspace, output, stream);
+      normalized_key, score_workspace, output, stream, origin);
   if (error != cudaSuccess) return error;
   const char* prep = effective_query_prepare_path();
   __half* writable = const_cast<__half*>(prepared_q);
@@ -1839,7 +1854,7 @@ cudaError_t launch_attention_prepare_chunk_stream_k(
   return launch_fattn_mma_stream_k(
       config, start_position, token_count, query, query_norm_scale, output_gate,
       committed.key, committed.value, candidate_rows.key, candidate_rows.value,
-      output, normalized_query, partial_vkq, meta, stream, prepared_q);
+      output, normalized_query, partial_vkq, meta, stream, prepared_q, origin);
 }
 
 cudaError_t launch_attention_prepare_chunk_stream_k_vkq(
@@ -2102,7 +2117,9 @@ cudaError_t launch_attention_prepare_chunk(
     const float* key_norm_scale, const float* output_gate,
     const AttentionCache& committed, const AttentionCache& candidate_rows,
     float* normalized_query, float* normalized_key, float* score_workspace,
-    float* output, cudaStream_t stream) noexcept {
+    float* output, cudaStream_t stream, std::size_t kv_origin) noexcept {
+  const std::size_t origin =
+      resolve_attention_kv_origin(start_position, kv_origin);
   if (token_count < 16) {
     return launch_attention_prepare_chunk_tiled(
         config, start_position, token_count, query, key, value,
@@ -2110,11 +2127,15 @@ cudaError_t launch_attention_prepare_chunk(
         candidate_rows, normalized_query, normalized_key, score_workspace,
         output, stream);
   }
-  return launch_attention_prepare_chunk_mma_ncols1(
+  cudaError_t error = stage_and_validate_chunk(
       config, start_position, token_count, query, key, value, query_norm_scale,
       key_norm_scale, output_gate, committed, candidate_rows, normalized_query,
-      normalized_key, score_workspace, output, kSelectedAttentionMmaQueryRows,
-      stream);
+      normalized_key, score_workspace, output, stream, origin);
+  if (error != cudaSuccess) return error;
+  return launch_fattn_mma_quality(
+      config, start_position, token_count, query, query_norm_scale, output_gate,
+      committed.key, committed.value, candidate_rows.key, candidate_rows.value,
+      output, normalized_query, kSelectedAttentionMmaQueryRows, stream, origin);
 }
 
 template <bool Grouped>
@@ -2142,7 +2163,8 @@ cudaError_t launch_instrumented_tiled(
   dim3 staging(config.kv_heads, static_cast<unsigned>(token_count), 1);
   stage_chunk_rows<<<staging, kThreads, 0, stream>>>(
       config, start_position, token_count, key, value, key_norm_scale,
-      candidate_rows.key, candidate_rows.value, normalized_key);
+      candidate_rows.key, candidate_rows.value, normalized_key,
+      start_position);
   cudaError_t error = cudaPeekAtLastError();
   if (error != cudaSuccess) return error;
   const std::size_t shared =
@@ -2223,7 +2245,8 @@ cudaError_t launch_attention_prepare_chunk_tile_span_instrumented(
   dim3 staging(config.kv_heads, static_cast<unsigned>(token_count), 1);
   stage_chunk_rows<<<staging, kThreads, 0, stream>>>(
       config, start_position, token_count, key, value, key_norm_scale,
-      candidate_rows.key, candidate_rows.value, normalized_key);
+      candidate_rows.key, candidate_rows.value, normalized_key,
+      start_position);
   cudaError_t error = cudaPeekAtLastError();
   if (error != cudaSuccess) return error;
   dim3 attention(config.kv_heads,

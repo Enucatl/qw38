@@ -276,7 +276,7 @@ fattn_mma_quality_kernel(
     const __nv_bfloat16* committed_key, const __nv_bfloat16* committed_value,
     const __nv_bfloat16* candidate_key, const __nv_bfloat16* candidate_value,
     float* output, float* normalized_query, float* partial, float* meta,
-    [[maybe_unused]] const __half* prepared_q) {
+    [[maybe_unused]] const __half* prepared_q, std::size_t kv_origin) {
   quartz_pdl_sync();
   constexpr int kNcols = Ncols1 * kFattnNcols2;
   constexpr int kNthreads = Ncols1 <= 8 ? 64 : 128;
@@ -312,6 +312,7 @@ fattn_mma_quality_kernel(
   const std::size_t width = config.head_width;
   const std::size_t row_values =
       static_cast<std::size_t>(config.kv_heads) * width;
+  const std::size_t origin = attention_kv_origin(start_position, kv_origin);
   const std::uint32_t half = config.rotary_width / 2;
   const float attn_scale = 1.0F / sqrtf(static_cast<float>(width));
   if constexpr (PreparedQ) {
@@ -483,15 +484,15 @@ fattn_mma_quality_kernel(
         const __nv_bfloat16* ksrc = nullptr;
         const __nv_bfloat16* vsrc = nullptr;
         if (in_tile) {
-          if (absolute < start_position) {
+          if (absolute < origin) {
             const std::size_t packed = attention_kv_physical_index(
                 absolute, kv_head, 0, config.capacity, config.head_width);
             ksrc = committed_key + packed;
             vsrc = committed_value + packed;
           } else {
-            ksrc = candidate_key + (absolute - start_position) * row_values +
+            ksrc = candidate_key + (absolute - origin) * row_values +
                    kv_head * width;
-            vsrc = candidate_value + (absolute - start_position) * row_values +
+            vsrc = candidate_value + (absolute - origin) * row_values +
                    kv_head * width;
           }
         }
@@ -1488,7 +1489,8 @@ inline cudaError_t launch_fattn_mma_quality_typed(
     const __nv_bfloat16* committed_value, const __nv_bfloat16* candidate_key,
     const __nv_bfloat16* candidate_value, float* output,
     float* normalized_query, float* partial, float* meta,
-    cudaStream_t stream, const __half* prepared_q = nullptr) noexcept {
+    cudaStream_t stream, const __half* prepared_q = nullptr,
+    std::size_t kv_origin = static_cast<std::size_t>(-1)) noexcept {
   if constexpr (PreparedQ) {
     if (prepared_q == nullptr) return cudaErrorInvalidValue;
   }
@@ -1508,7 +1510,7 @@ inline cudaError_t launch_fattn_mma_quality_typed(
       grid, dim3(kNthreads), shared, stream, config, start_position,
       token_count, query, query_scale, gate, committed_key, committed_value,
       candidate_key, candidate_value, output, normalized_query, partial, meta,
-      prepared_q);
+      prepared_q, resolve_attention_kv_origin(start_position, kv_origin));
   if (error != cudaSuccess || KvParts == 1) return error;
   const std::size_t values =
       token_count * static_cast<std::size_t>(config.query_heads) *
@@ -1554,7 +1556,8 @@ inline cudaError_t launch_fattn_mma_quality_path(
     const __nv_bfloat16* committed_value, const __nv_bfloat16* candidate_key,
     const __nv_bfloat16* candidate_value, float* output,
     float* normalized_query, int ncols1, const char* path, float* partial,
-    float* meta, cudaStream_t stream) noexcept {
+    float* meta, cudaStream_t stream,
+    std::size_t kv_origin = static_cast<std::size_t>(-1)) noexcept {
   const bool persistent = path != nullptr && path[0] == 'p';
   const bool stream_k = path != nullptr && path[0] == 's';
   const bool occ2 = stream_k || (path != nullptr && path[0] == 'o');
@@ -1571,30 +1574,33 @@ inline cudaError_t launch_fattn_mma_quality_path(
     return launch_fattn_mma_quality_typed<16, true, 2, 2>(
         config, start_position, token_count, query, query_scale, gate,
         committed_key, committed_value, candidate_key, candidate_value, output,
-        normalized_query, partial, meta, stream);
+        normalized_query, partial, meta, stream, nullptr, kv_origin);
   }
   if (ncols1 == 16 && occ2) {
     return launch_fattn_mma_quality_typed<16, true, 2, 1>(
         config, start_position, token_count, query, query_scale, gate,
         committed_key, committed_value, candidate_key, candidate_value, output,
-        normalized_query, nullptr, nullptr, stream);
+        normalized_query, nullptr, nullptr, stream, nullptr, kv_origin);
   }
   switch (ncols1) {
     case 8:
       return launch_fattn_mma_quality_typed<8, true, 1, 1>(
           config, start_position, token_count, query, query_scale, gate,
           committed_key, committed_value, candidate_key, candidate_value,
-          output, normalized_query, nullptr, nullptr, stream);
+          output, normalized_query, nullptr, nullptr, stream, nullptr,
+          kv_origin);
     case 16:
       return launch_fattn_mma_quality_typed<16, true, 1, 1>(
           config, start_position, token_count, query, query_scale, gate,
           committed_key, committed_value, candidate_key, candidate_value,
-          output, normalized_query, nullptr, nullptr, stream);
+          output, normalized_query, nullptr, nullptr, stream, nullptr,
+          kv_origin);
     case 32:
       return launch_fattn_mma_quality_typed<32, false, 1, 1>(
           config, start_position, token_count, query, query_scale, gate,
           committed_key, committed_value, candidate_key, candidate_value,
-          output, normalized_query, nullptr, nullptr, stream);
+          output, normalized_query, nullptr, nullptr, stream, nullptr,
+          kv_origin);
     default:
       return cudaErrorInvalidValue;
   }
@@ -1606,13 +1612,14 @@ inline cudaError_t launch_fattn_mma_quality(
     const float* gate, const __nv_bfloat16* committed_key,
     const __nv_bfloat16* committed_value, const __nv_bfloat16* candidate_key,
     const __nv_bfloat16* candidate_value, float* output,
-    float* normalized_query, int ncols1, cudaStream_t stream) noexcept {
+    float* normalized_query, int ncols1, cudaStream_t stream,
+    std::size_t kv_origin = static_cast<std::size_t>(-1)) noexcept {
   const char* path = kSelectedFattnPath;
   if (path[0] == 's') path = "occ2";
   return launch_fattn_mma_quality_path(
       config, start_position, token_count, query, query_scale, gate,
       committed_key, committed_value, candidate_key, candidate_value, output,
-      normalized_query, ncols1, path, nullptr, nullptr, stream);
+      normalized_query, ncols1, path, nullptr, nullptr, stream, kv_origin);
 }
 
 inline cudaError_t launch_fattn_mma_stream_k_vkq(
@@ -1691,7 +1698,8 @@ inline cudaError_t launch_fattn_mma_stream_k(
     const __nv_bfloat16* committed_value, const __nv_bfloat16* candidate_key,
     const __nv_bfloat16* candidate_value, float* output,
     float* normalized_query, float* partial, float* meta,
-    cudaStream_t stream, const __half* prepared_q = nullptr) noexcept {
+    cudaStream_t stream, const __half* prepared_q = nullptr,
+    std::size_t kv_origin = static_cast<std::size_t>(-1)) noexcept {
   if (kSelectedPersistentFattnPath[0] == 'p') {
     return launch_fattn_mma_persistent_impl(
         config, start_position, token_count, query, query_scale, gate,
@@ -1708,7 +1716,7 @@ inline cudaError_t launch_fattn_mma_stream_k(
     return launch_fattn_mma_pipeline(
         pipe, config, start_position, token_count, query, query_scale, gate,
         committed_key, committed_value, candidate_key, candidate_value, output,
-        normalized_query, partial, meta, stream, prepared_q);
+        normalized_query, partial, meta, stream, prepared_q, kv_origin);
   }
   if (fattn_query_prepare_is_hoisted(prep) && prepared_q != nullptr &&
       fattn_vkq_is_registers(kSelectedVkqAccum) &&
@@ -1718,7 +1726,7 @@ inline cudaError_t launch_fattn_mma_stream_k(
                                           true>(
         config, start_position, token_count, query, query_scale, gate,
         committed_key, committed_value, candidate_key, candidate_value, output,
-        normalized_query, partial, meta, stream, prepared_q);
+        normalized_query, partial, meta, stream, prepared_q, kv_origin);
   }
   if (fattn_vkq_is_registers(kSelectedVkqAccum)) {
     if (fattn_pv_is_mma(kSelectedPvPath)) {

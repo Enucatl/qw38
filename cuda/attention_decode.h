@@ -18,6 +18,27 @@ struct AttentionConfig {
   std::uint32_t capacity;
 };
 
+// Candidate scratch is indexed from origin. Pass origin == start_position
+// (the unsplit default) to keep HEAD committed/candidate classification.
+// Do not store origin on AttentionConfig: extra by-value struct members
+// shift host/device kernel-argument layout.
+inline __host__ __device__ std::size_t attention_kv_origin(
+    std::size_t start_position, std::size_t candidate_origin) noexcept {
+  return candidate_origin == static_cast<std::size_t>(-1) ? start_position
+                                                          : candidate_origin;
+}
+
+inline __host__ __device__ std::size_t split_candidate_origin(
+    std::size_t outer_frontier, std::size_t query_start,
+    bool split_candidate) noexcept {
+  return split_candidate ? outer_frontier : query_start;
+}
+
+inline std::size_t resolve_attention_kv_origin(
+    std::size_t start_position, std::size_t kv_origin) noexcept {
+  return attention_kv_origin(start_position, kv_origin);
+}
+
 struct AttentionCache {
   __nv_bfloat16* key;
   __nv_bfloat16* value;
@@ -172,7 +193,8 @@ cudaError_t launch_attention_prepare_chunk(
     const float* key_norm_scale, const float* output_gate,
     const AttentionCache& committed, const AttentionCache& candidate_rows,
     float* normalized_query, float* normalized_key, float* score_workspace,
-    float* output, cudaStream_t stream) noexcept;
+    float* output, cudaStream_t stream,
+    std::size_t kv_origin = static_cast<std::size_t>(-1)) noexcept;
 
 cudaError_t launch_attention_prepare_chunk_tiled(
     const AttentionConfig& config, std::size_t start_position,
@@ -255,7 +277,8 @@ cudaError_t launch_attention_prepare_chunk_stream_k(
     const AttentionCache& committed, const AttentionCache& candidate_rows,
     float* normalized_query, float* normalized_key, float* score_workspace,
     float* output, float* partial_vkq, float* meta,
-    cudaStream_t stream, const __half* prepared_q = nullptr) noexcept;
+    cudaStream_t stream, const __half* prepared_q = nullptr,
+    std::size_t kv_origin = static_cast<std::size_t>(-1)) noexcept;
 
 const char* selected_vkq_accum() noexcept;
 bool fattn_uses_register_vkq() noexcept;

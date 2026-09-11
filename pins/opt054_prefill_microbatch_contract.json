@@ -1,0 +1,87 @@
+{
+  "schema_version": 1,
+  "task": "OPT-054",
+  "yardstick": "prefill_internal_microbatch",
+  "opt053_quartz_p_mean_tok_s": 2895.42773,
+  "opt053_quartz_d128_mean_tok_s": 37.5605927,
+  "opt053_quartz_d2048_mean_tok_s": 35.7286987,
+  "opt053_quartz_d128_token_latency_p95_ms": 26.9020824,
+  "opt053_quartz_d128_run_mean_token_latency_p95_ms": 26.7428017,
+  "opt053_quartz_d2048_token_latency_p95_ms": 28.1707439,
+  "opt053_quartz_d2048_run_mean_token_latency_p95_ms": 28.0445251,
+  "llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+  "gguf_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+  "device_substring": "RTX 5090",
+  "selected_prompt_microbatch_rows": 4096,
+  "legal_prompt_microbatch_rows": [
+    512,
+    1024,
+    2048,
+    4096
+  ],
+  "ab": {
+    "candidates": [
+      512,
+      1024,
+      2048,
+      4096
+    ],
+    "warmups": 0,
+    "measured_runs": 3,
+    "timed_token_counts": [
+      4096
+    ],
+    "graphs_off_isolation": true,
+    "graphs_on_shipping": true,
+    "ties_retain": 4096
+  },
+  "opt044": {
+    "formula": "max(strict_reference_ceiling, 1.05 * measured_llama_error + 1e-6)",
+    "like_arithmetic_byte_equal": true,
+    "cross_arithmetic_abs": 0.0003,
+    "cross_arithmetic_rms": 0.0002,
+    "cross_size_arithmetic_drift_admitted": true
+  },
+  "opt053_keep_fixture": "fixtures/opt053_mmq_pipeline.json",
+  "owns_opt016_parity_gate": false,
+  "substitutes_for_opt016": false,
+  "llama_bench_decode_is_informational": true,
+  "required_fixture_keys": [
+    "schema_version",
+    "task",
+    "status",
+    "measurement_utc",
+    "device",
+    "compute_capability",
+    "llama_revision",
+    "gguf_sha256",
+    "reverted",
+    "selected_prompt_microbatch_rows",
+    "ab",
+    "correctness",
+    "production_numerics",
+    "keep_sitting_skipped",
+    "p",
+    "d128",
+    "d2048",
+    "diagnostic",
+    "extra_workspace_bytes",
+    "owns_opt016_parity_gate",
+    "substitutes_for_opt016",
+    "nsight_systems",
+    "nsight_compute",
+    "proof_limit",
+    "report_path"
+  ],
+  "proof_limit": [
+    "atomic 4096-token transaction",
+    "internal 512/1024/2048/4096 microbatches",
+    "no early commit",
+    "graphs-off isolation then graphs-on shipping",
+    "keep 4096 unless a smaller size wins complete P",
+    "D128/D2048 95% floors and p95 inside 105% versus OPT-053",
+    "OPT-044 admits cross-size arithmetic drift",
+    "does not substitute for the 2K llama.cpp parity gate"
+  ],
+  "report_path": "evidence/optimization/opt054-prefill-microbatch/REPORT.md"
+}

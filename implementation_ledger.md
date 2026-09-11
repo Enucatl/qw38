@@ -120,7 +120,7 @@ are repository-relative unless stated otherwise.
 | OPT-051 | Pipeline prompt attention with register softmax | OPT-044, OPT-050 | done | Staged admission of F16 operands, register reductions and tiled asynchronous loads reduces complete attention and P under documented quality and P/D guards, or retained rejection | [`tasks/OPT-051.md`](tasks/OPT-051.md); [`pins/opt051_attention_pipeline_contract.json`](pins/opt051_attention_pipeline_contract.json); [`fixtures/opt051_attention_pipeline.json`](fixtures/opt051_attention_pipeline.json); [`cuda/fattn_mma_f16_pipeline.cuh`](cuda/fattn_mma_f16_pipeline.cuh); [`cuda/fattn_mma_f16.cuh`](cuda/fattn_mma_f16.cuh); [`cuda/opt051_attention_pipeline_ab_test.cu`](cuda/opt051_attention_pipeline_ab_test.cu); [`tests/test_opt051_attention_pipeline.py`](tests/test_opt051_attention_pipeline.py); [`evidence/optimization/opt051-attention-pipeline/REPORT.md`](evidence/optimization/opt051-attention-pipeline/REPORT.md); verification 2026-09-10T22:50:00Z |
 | OPT-052 | Remove redundant GDN arithmetic and state traffic | OPT-044, OPT-045 | done | Hoisted scaled Q/K and decay plus admitted FMA improve complete GDN and P; optional conversion-inclusive state tiling wins where measured; recurrent quality and atomic state stay valid, or retained rejection | [`tasks/OPT-052.md`](tasks/OPT-052.md); [`pins/opt052_gdn_arithmetic_contract.json`](pins/opt052_gdn_arithmetic_contract.json); [`fixtures/opt052_gdn_arithmetic.json`](fixtures/opt052_gdn_arithmetic.json); [`cuda/gdn_fused_quality.cuh`](cuda/gdn_fused_quality.cuh); [`cuda/opt052_gdn_arithmetic_ab_test.cu`](cuda/opt052_gdn_arithmetic_ab_test.cu); [`tests/test_opt052_gdn_arithmetic.py`](tests/test_opt052_gdn_arithmetic.py); [`evidence/optimization/opt052-gdn-arithmetic/REPORT.md`](evidence/optimization/opt052-gdn-arithmetic/REPORT.md); verification 2026-09-10T23:30:00Z |
 | OPT-053 | Optimize MMQ scaling and tile staging | OPT-044, OPT-045 | done | Existing quality MMA gains measured scaling/staging efficiency and full P speed under quality and memory guards, or a measured no-change result; no unchanged rejected tile/stream-K rerun | [`tasks/OPT-053.md`](tasks/OPT-053.md); [`pins/opt053_mmq_pipeline_contract.json`](pins/opt053_mmq_pipeline_contract.json); [`fixtures/opt053_mmq_pipeline.json`](fixtures/opt053_mmq_pipeline.json); [`cuda/quant_mmq_mma.cuh`](cuda/quant_mmq_mma.cuh); [`cuda/opt053_mmq_pipeline_ab_test.cu`](cuda/opt053_mmq_pipeline_ab_test.cu); [`tests/test_opt053_mmq_pipeline.py`](tests/test_opt053_mmq_pipeline.py); [`evidence/optimization/opt053-mmq-pipeline/REPORT.md`](evidence/optimization/opt053-mmq-pipeline/REPORT.md); verification 2026-09-11T00:05:20Z |
-| OPT-054 | Tune internal prefill batches within atomic 4K | OPT-049, OPT-051, OPT-052, OPT-053 | pending | Compare 512/1024/2048/4096 physical batches while preserving one atomic 4096-token operation; keep only a complete P win with quality, cancellation, graph and memory checks | [Task](tasks/OPT-054.md) |
+| OPT-054 | Tune internal prefill batches within atomic 4K | OPT-049, OPT-051, OPT-052, OPT-053 | done | Compare 512/1024/2048/4096 physical batches while preserving one atomic 4096-token operation; keep only a complete P win with quality, cancellation, graph and memory checks | [`tasks/OPT-054.md`](tasks/OPT-054.md); [`pins/opt054_prefill_microbatch_contract.json`](pins/opt054_prefill_microbatch_contract.json); [`fixtures/opt054_prefill_microbatch.json`](fixtures/opt054_prefill_microbatch.json); [`cuda/full_scheduler.cu`](cuda/full_scheduler.cu); [`cuda/opt054_prefill_microbatch_ab_test.cu`](cuda/opt054_prefill_microbatch_ab_test.cu); [`tests/test_opt054_prefill_microbatch.py`](tests/test_opt054_prefill_microbatch.py); [`evidence/optimization/opt054-prefill-microbatch/REPORT.md`](evidence/optimization/opt054-prefill-microbatch/REPORT.md); verification 2026-09-11T01:03:00Z |
 | OPT-055 | Capture measured remaining decode and prompt launch gaps | OPT-054 | pending | Supersedes OPT-031; broader stable graphs save measured wall time with bounded cancellation, correct dynamic positions and post-graph memory reserve, or measured no-change result | [Task](tasks/OPT-055.md) |
 | OPT-056 | Exceed pinned llama.cpp prefill and decode with quality | OPT-045, OPT-046, OPT-047, OPT-048, OPT-049, OPT-050, OPT-051, OPT-052, OPT-053, OPT-054, OPT-055 | pending | Same-sitting P/D128/D2048 throughput exceeds llama by at least 5%, decode p95 is no worse, combined production quality passes, and original OPT-016 2K parity passes; candidate-task completion alone is insufficient | [Task](tasks/OPT-056.md) |
 
@@ -128,8 +128,8 @@ are repository-relative unless stated otherwise.
 
 The [2026-09-10 design](tasks/PERFORMANCE-RECOVERY-2026-09-10.md) compares the
 admitted Quartz, pinned llama.cpp and ds4 paths. It is source analysis and task
-design, not new performance evidence. **Next eligible recovery task: OPT-054**,
-then OPT-054–055 in row
+design, not new performance evidence. **Next eligible recovery task: OPT-055**,
+then OPT-055 in row
 order, measured remaining launch work in OPT-055, and the outcome gate OPT-056.
 Dependencies permit independent work but do not authorize subagents. The user
 accepts documented llama.cpp/ds4-like accuracy compromises; strict reference
@@ -5807,3 +5807,27 @@ statements below are historical, not the current execution order.
   Tok/s delta: P **2692.65** → **2895.43** (+202.78, 1.075×); D128
   **37.57** → **37.56** (−0.007, 1.000×); D2048 **35.68** → **35.73**
   (+0.049, 1.001×).
+
+### 2026-09-11T01:03:00Z — OPT-054 keep 4096 microbatch
+
+- **Keep:** internal prefill microbatch rows remain **4096** after graphs-off
+  A/B (512 2476.38, 1024 2697.29, 2048 2822.63, 4096 2842.41 tok/s) and
+  graphs-on 4096 shipping (2840.70 tok/s). No smaller candidate wins complete
+  P. Cancellation frontier stays 0 after internal batches 1, 2, and the final
+  batch. `keep_sitting_skipped`=true; P/D128/D2048 copied from OPT-053.
+  Coupled IDs: none.
+- Acceptance evidence: [`tasks/OPT-054.md`](tasks/OPT-054.md);
+  [`pins/opt054_prefill_microbatch_contract.json`](pins/opt054_prefill_microbatch_contract.json);
+  [`fixtures/opt054_prefill_microbatch.json`](fixtures/opt054_prefill_microbatch.json);
+  [`cuda/full_scheduler.cu`](cuda/full_scheduler.cu);
+  [`cuda/opt054_prefill_microbatch_ab_test.cu`](cuda/opt054_prefill_microbatch_ab_test.cu);
+  [`tests/test_opt054_prefill_microbatch.py`](tests/test_opt054_prefill_microbatch.py);
+  [`evidence/optimization/opt054-prefill-microbatch/REPORT.md`](evidence/optimization/opt054-prefill-microbatch/REPORT.md).
+  Proof is atomic 4096-token transaction with internal microbatch sweep and
+  no early commit, not the 2K llama.cpp parity gate.
+- Marked OPT-054 `done`; delivery is limited to the verified task scope
+  plus this ledger/audit bookkeeping. `plan.md` is unchanged. OPT-016
+  stays `blocked`. Next eligible pending by ledger row order: **OPT-055**.
+  Tok/s delta: P **2895.43** → **2895.43** (0, 1.000×); D128 **37.56** →
+  **37.56** (0, 1.000×); D2048 **35.73** → **35.73** (0, 1.000×). Speedup
+  **0** (measured no-change).

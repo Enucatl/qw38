@@ -149,7 +149,7 @@ fattn_mma_pipeline_kernel(
     const __nv_bfloat16* committed_key, const __nv_bfloat16* committed_value,
     const __nv_bfloat16* candidate_key, const __nv_bfloat16* candidate_value,
     float* output, float* normalized_query, float* partial, float* meta,
-    const __half* prepared_q) {
+    const __half* prepared_q, std::size_t kv_origin) {
   quartz_pdl_sync();
   constexpr int kNcols = Ncols1 * Ncols2;
   constexpr int kNthreads = Ncols1 <= 8 && Ncols2 == 2 ? 64 : 128;
@@ -186,6 +186,7 @@ fattn_mma_pipeline_kernel(
   const std::size_t width = config.head_width;
   const std::size_t row_values =
       static_cast<std::size_t>(config.kv_heads) * width;
+  const std::size_t origin = attention_kv_origin(start_position, kv_origin);
   const float attn_scale = 1.0F / sqrtf(static_cast<float>(width));
 
   extern __shared__ unsigned char raw[];
@@ -290,7 +291,7 @@ fattn_mma_pipeline_kernel(
               : static_cast<std::size_t>(NbatchFa));
       fattn_pipeline_load_kv<NbatchFa, kWidth, kNthreads, Nstages, kUseCpAsync>(
           keys, values, committed_key, committed_value, candidate_key,
-          candidate_value, kv_begin, rows0, start_position, kv_span, kv_head,
+          candidate_value, kv_begin, rows0, origin, kv_span, kv_head,
           row_values, width, config.capacity, 0, tid);
       if constexpr (kUseCpAsync) fattn_cp_async_wait();
       __syncthreads();
@@ -310,13 +311,13 @@ fattn_mma_pipeline_kernel(
                   : static_cast<std::size_t>(NbatchFa));
           fattn_pipeline_load_kv<NbatchFa, kWidth, kNthreads, Nstages, true>(
               keys, values, committed_key, committed_value, candidate_key,
-              candidate_value, next, rows_next, start_position, kv_span,
+              candidate_value, next, rows_next, origin, kv_span,
               kv_head, row_values, width, config.capacity, 1 - buf, tid);
         }
       } else if (tile != kv_begin) {
         fattn_pipeline_load_kv<NbatchFa, kWidth, kNthreads, Nstages, kUseCpAsync>(
             keys, values, committed_key, committed_value, candidate_key,
-            candidate_value, tile, rows, start_position, kv_span, kv_head,
+            candidate_value, tile, rows, origin, kv_span, kv_head,
             row_values, width, config.capacity, 0, tid);
         if constexpr (kUseCpAsync) fattn_cp_async_wait();
         __syncthreads();
@@ -758,7 +759,8 @@ inline cudaError_t launch_fattn_mma_pipeline_typed(
     const __nv_bfloat16* committed_value, const __nv_bfloat16* candidate_key,
     const __nv_bfloat16* candidate_value, float* output,
     float* normalized_query, float* partial, float* meta, cudaStream_t stream,
-    const __half* prepared_q) noexcept {
+    const __half* prepared_q,
+    std::size_t kv_origin = static_cast<std::size_t>(-1)) noexcept {
   if (prepared_q == nullptr) return cudaErrorInvalidValue;
   constexpr int kNthreads = fattn_pipeline_nthreads(Ncols1, Ncols2);
   const std::size_t shared = fattn_pipeline_shared_bytes(
@@ -777,7 +779,7 @@ inline cudaError_t launch_fattn_mma_pipeline_typed(
       grid, dim3(kNthreads), shared, stream, config, start_position,
       token_count, query, query_scale, gate, committed_key, committed_value,
       candidate_key, candidate_value, output, normalized_query, partial, meta,
-      prepared_q);
+      prepared_q, resolve_attention_kv_origin(start_position, kv_origin));
   if (error != cudaSuccess || KvParts == 1) return error;
   const std::size_t values =
       token_count * static_cast<std::size_t>(config.query_heads) *
@@ -817,49 +819,50 @@ inline cudaError_t launch_fattn_mma_pipeline(
     const __nv_bfloat16* committed_value, const __nv_bfloat16* candidate_key,
     const __nv_bfloat16* candidate_value, float* output,
     float* normalized_query, float* partial, float* meta, cudaStream_t stream,
-    const __half* prepared_q) noexcept {
+    const __half* prepared_q,
+    std::size_t kv_origin = static_cast<std::size_t>(-1)) noexcept {
   if (path == nullptr) return cudaErrorInvalidValue;
   if (std::strcmp(path, kLegalAttentionPipelineF16) == 0) {
     return launch_fattn_mma_pipeline_typed<16, false, false, 32, 1, 2, 2, 2>(
         config, start_position, token_count, query, query_scale, gate,
         committed_key, committed_value, candidate_key, candidate_value, output,
-        normalized_query, partial, meta, stream, prepared_q);
+        normalized_query, partial, meta, stream, prepared_q, kv_origin);
   }
   if (std::strcmp(path, kLegalAttentionPipelineDualReg) == 0) {
     return launch_fattn_mma_pipeline_typed<16, true, true, 32, 1, 2, 2, 2>(
         config, start_position, token_count, query, query_scale, gate,
         committed_key, committed_value, candidate_key, candidate_value, output,
-        normalized_query, partial, meta, stream, prepared_q);
+        normalized_query, partial, meta, stream, prepared_q, kv_origin);
   }
   if (std::strcmp(path, kLegalAttentionPipelineF16Reg) == 0) {
     return launch_fattn_mma_pipeline_typed<16, false, true, 32, 1, 2, 2, 2>(
         config, start_position, token_count, query, query_scale, gate,
         committed_key, committed_value, candidate_key, candidate_value, output,
-        normalized_query, partial, meta, stream, prepared_q);
+        normalized_query, partial, meta, stream, prepared_q, kv_origin);
   }
   if (std::strcmp(path, kLegalAttentionPipelineDualAsync) == 0) {
     return launch_fattn_mma_pipeline_typed<16, true, true, 32, 2, 2, 1, 2>(
         config, start_position, token_count, query, query_scale, gate,
         committed_key, committed_value, candidate_key, candidate_value, output,
-        normalized_query, partial, meta, stream, prepared_q);
+        normalized_query, partial, meta, stream, prepared_q, kv_origin);
   }
   if (std::strcmp(path, kLegalAttentionPipelineF16Async) == 0) {
     return launch_fattn_mma_pipeline_typed<16, false, true, 32, 2, 2, 1, 2>(
         config, start_position, token_count, query, query_scale, gate,
         committed_key, committed_value, candidate_key, candidate_value, output,
-        normalized_query, partial, meta, stream, prepared_q);
+        normalized_query, partial, meta, stream, prepared_q, kv_origin);
   }
   if (std::strcmp(path, kLegalAttentionPipelineN64) == 0) {
     return launch_fattn_mma_pipeline_typed<16, false, true, 64, 1, 2, 1, 2>(
         config, start_position, token_count, query, query_scale, gate,
         committed_key, committed_value, candidate_key, candidate_value, output,
-        normalized_query, partial, meta, stream, prepared_q);
+        normalized_query, partial, meta, stream, prepared_q, kv_origin);
   }
   if (std::strcmp(path, kLegalAttentionPipelineGqa6) == 0) {
     return launch_fattn_mma_pipeline_typed<8, false, true, 32, 1, 6, 1, 2>(
         config, start_position, token_count, query, query_scale, gate,
         committed_key, committed_value, candidate_key, candidate_value, output,
-        normalized_query, partial, meta, stream, prepared_q);
+        normalized_query, partial, meta, stream, prepared_q, kv_origin);
   }
   return cudaErrorInvalidValue;
 }

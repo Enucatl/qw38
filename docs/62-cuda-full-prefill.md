@@ -1,6 +1,6 @@
 # Chunked full-model CUDA prefill
 
-[Index](README.md) · Implementation tasks: SCH-002, MEM-002, OPT-008, OPT-009, OPT-011, OPT-012, OPT-013, OPT-014, OPT-015, OPT-017, OPT-018, OPT-019, OPT-020, OPT-021, OPT-022, OPT-023, OPT-024, OPT-025, OPT-026, OPT-027, OPT-028, OPT-029, OPT-030, OPT-032, OPT-033, OPT-035, OPT-037, OPT-038, OPT-040, OPT-041, OPT-052, OPT-053, and EDU-047 in
+[Index](README.md) · Implementation tasks: SCH-002, MEM-002, OPT-008, OPT-009, OPT-011, OPT-012, OPT-013, OPT-014, OPT-015, OPT-017, OPT-018, OPT-019, OPT-020, OPT-021, OPT-022, OPT-023, OPT-024, OPT-025, OPT-026, OPT-027, OPT-028, OPT-029, OPT-030, OPT-032, OPT-033, OPT-035, OPT-037, OPT-038, OPT-040, OPT-041, OPT-052, OPT-053, OPT-054, and EDU-047 in
 [`implementation_ledger.md`](../implementation_ledger.md) · Contracts:
 [`pins/cuda_prompt_scheduler_contract.json`](../pins/cuda_prompt_scheduler_contract.json),
 [`pins/cuda_prompt_pipeline_contract.json`](../pins/cuda_prompt_pipeline_contract.json),
@@ -890,6 +890,25 @@ stay in the report:
 and
 [`fixtures/opt053_mmq_pipeline.json`](../fixtures/opt053_mmq_pipeline.json).
 
+OPT-054 measures internal 512/1024/2048/4096 physical batches inside one
+atomic 4096-token `execute_prompt_chunk` transaction. Candidate KV uses an
+outer staging range and explicit logical-versus-scratch indexing so earlier
+uncommitted rows are not read as committed cache. GDN convolution/recurrent
+state is carried privately between microbatches. State, frontier, tokens, and
+logits publish only after the last internal batch; cancellation after internal
+batches 1, 2, or the final batch leaves the outer transaction unpublished.
+Graphs-off A/B isolates batch size, then the shipping path keeps matching FFN
+graph shapes. **Measured, RTX 5090 keep 4096:** graphs-off 512 2476.38477 tok/s,
+1024 2697.28589, 2048 2822.62891, 4096 2842.41333; graphs-on 4096 2840.70215.
+No smaller size won complete wall versus 4096 eager or graphs-on shipping.
+Copied P 2895.42773, D128 37.5605927, D2048 35.7286987. OPT-044 admits
+cross-size arithmetic drift; isolation and restore stay exact. Live numbers
+stay in the report:
+[`evidence/optimization/opt054-prefill-microbatch/REPORT.md`](../evidence/optimization/opt054-prefill-microbatch/REPORT.md),
+[`pins/opt054_prefill_microbatch_contract.json`](../pins/opt054_prefill_microbatch_contract.json),
+and
+[`fixtures/opt054_prefill_microbatch.json`](../fixtures/opt054_prefill_microbatch.json).
+
 OPT-041 keeps warp-owned 16×8 prompt QK microtiles on production 4096-row
 fattn-mma stream-K including combine, on top of register-resident VKQ and
 dual-F16 probability×V MMA. **Measured, RTX 5090:** paired CUDA-event A/B
@@ -986,7 +1005,10 @@ not own or pass the 2K tok/s gate. OPT-053 records explicit FMA scale accumulati
 packed-Y cp.async on quality MMA and a live 4K keep versus the prior keep
 P denominator with the D128/D2048 guard; production MMQ pipeline pin is
 `fma_async`; stream-K stays `off`; I=128/J=128 tiles stay; it does not own
-or pass the 2K tok/s gate. BEN-001
+or pass the 2K tok/s gate. OPT-054 records the 512/1024/2048/4096 internal
+prefill microbatch sweep inside one atomic 4096-token transaction and keeps
+4096 unless a smaller size wins complete P without regressing D; it does not
+own or pass the 2K tok/s gate. BEN-001
 provides the harness; CMP-002/CMP-003 still own the 30-sample comparative gate.
 QLT-001 remains blocked. OPT-012's prompt graphs are FFN subgraphs only: not a
 whole-chunk graph, not a speedup gate, and not 128K quality recovery.

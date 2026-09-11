@@ -23,6 +23,22 @@
 namespace qw38::cuda {
 
 constexpr std::size_t kPromptChunkRows = 4096;
+constexpr std::size_t kSelectedPromptMicrobatchRows = 4096;
+constexpr std::size_t kLegalPromptMicrobatchRows[] = {512, 1024, 2048, 4096};
+
+std::size_t selected_prompt_microbatch_rows() noexcept;
+void set_prompt_microbatch_rows_override(std::size_t rows) noexcept;
+void clear_prompt_microbatch_rows_override() noexcept;
+
+struct PromptMicrobatchRowsScope final {
+  explicit PromptMicrobatchRowsScope(std::size_t rows) noexcept {
+    set_prompt_microbatch_rows_override(rows);
+  }
+  ~PromptMicrobatchRowsScope() { clear_prompt_microbatch_rows_override(); }
+  PromptMicrobatchRowsScope(const PromptMicrobatchRowsScope&) = delete;
+  PromptMicrobatchRowsScope& operator=(const PromptMicrobatchRowsScope&) =
+      delete;
+};
 
 struct DeviceTensor final {
   const std::uint8_t* data = nullptr;

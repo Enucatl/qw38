@@ -48,6 +48,8 @@ may hoist scaled Q/K and decay plus a conversion-inclusive column-major
 state tile after the OPT-052 keep;
 production quality MMA may use explicit FMA scale accumulation and a
 two-stage packed-Y `cp.async` loader after the OPT-053 keep;
+internal prefill microbatches stay 4096 after the OPT-054 keep unless a
+smaller complete-P winner is installed;
 decode sequential GDN is unchanged. Decode stays MMV, with packed
 blockwise Q4_K/Q6_K loads after the OPT-034 keep.
 Tiny mixer prompts keep the
@@ -637,6 +639,26 @@ stream-K `off`, and I=128/J=128 tiles stay. Tails keep the synchronous Y
 load. Extra Y-tile shared is 18432 bytes at J=128. Occupancy remains 1.
 SM120 encodes `cp.async` as `LDGSTS`. Live tok/s stay in
 [`evidence/optimization/opt053-mmq-pipeline/REPORT.md`](../evidence/optimization/opt053-mmq-pipeline/REPORT.md).
+This increment does not own the 2K llama.cpp parity gate.
+
+## Internal prefill microbatches (OPT-054)
+
+**Measured, RTX 5090:** production `execute_prompt_chunk` still publishes one
+atomic 4096-token transaction. Internal physical batches of 512/1024/2048/4096
+were A/B'd with prompt graphs disabled in both controls, then the shipping
+path kept matching FFN graph shapes. Attention reads committed KV plus earlier
+uncommitted candidate rows via explicit logical-versus-scratch indexing. GDN
+state is carried privately; cancellation after internal batches 1, 2, or the
+final batch does not publish. Graphs-off means: 512 **2476.38477** tok/s
+(1654.02405 ms), 1024 **2697.28589**, 2048 **2822.62891**, 4096 **2842.41333**;
+graphs-on 4096 **2840.70215** tok/s. No smaller size beat 4096 eager or the
+graphs-on shipping path. Production pin `kSelectedPromptMicrobatchRows` stays
+`4096`. Copied OPT-053 keep denominators remain P **2895.42773**, D128
+**37.5605927**, D2048 **35.7286987**. Diagnostic (not historical P): 2K from
+empty **3010.8645** tok/s; 4K append at prefix 2048 **2497.52612**; 4K append
+at prefix 4096 **2231.04932**. OPT-044 admits cross-size arithmetic drift.
+Live tok/s stay in
+[`evidence/optimization/opt054-prefill-microbatch/REPORT.md`](../evidence/optimization/opt054-prefill-microbatch/REPORT.md).
 This increment does not own the 2K llama.cpp parity gate.
 
 ## Warp-owned prompt QK microtiles (OPT-041)
