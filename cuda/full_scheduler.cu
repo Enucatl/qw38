@@ -1832,6 +1832,7 @@ Status SchedulerGraphs::create(const ResidentModel& model,
   model_ = &model;
   workspace_ = workspace;
   allocated_bytes_ = free_before >= free_after ? free_before - free_after : 0;
+  workspace->invalidate_q8_decode_staging();
   return Status::ok();
 }
 
@@ -2309,6 +2310,11 @@ void SchedulerWorkspace::release() noexcept {
   capacity_ = 0;
   prompt_chunk_rows_ = 0;
   allocated_bytes_ = 0;
+  q8_decode_staged_activation_ = nullptr;
+  q8_decode_staged_columns_ = 0;
+}
+
+void SchedulerWorkspace::invalidate_q8_decode_staging() noexcept {
   q8_decode_staged_activation_ = nullptr;
   q8_decode_staged_columns_ = 0;
 }
@@ -3126,6 +3132,29 @@ Status execute_token_traced(const ResidentModel& model, std::size_t token,
                          logits_count, host_hidden, hidden_count,
                          elapsed_milliseconds, nullptr, nullptr,
                          PointwisePath::kUnfused, nullptr);
+  active_trace = previous;
+  return status;
+}
+
+Status execute_token_traced_bundle(
+    const ResidentModel& model, std::size_t token, SchedulerSession* session,
+    SchedulerWorkspace* workspace, float* host_logits, std::size_t logits_count,
+    float* host_hidden, std::size_t hidden_count, float* elapsed_milliseconds,
+    internal::TraceSink sink, void* context, SchedulerGraphs* graphs,
+    PointwisePath pointwise_path) noexcept {
+  const internal::TraceFilter filter{internal::kTraceAllLayers, "*"};
+  Status status = internal::validate_trace_filter(filter);
+  if (!status.is_ok() || sink == nullptr) {
+    return {StatusCode::kInvalidArgument,
+            "CUDA diagnostic trace bundle is invalid"};
+  }
+  TraceContext trace{&filter, sink, context};
+  TraceContext* previous = active_trace;
+  active_trace = &trace;
+  status = execute_token(model, token, session, workspace, host_logits,
+                         logits_count, host_hidden, hidden_count,
+                         elapsed_milliseconds, nullptr, nullptr,
+                         pointwise_path, graphs);
   active_trace = previous;
   return status;
 }

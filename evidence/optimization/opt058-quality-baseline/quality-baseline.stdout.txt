@@ -1,0 +1,17 @@
+
+==========
+== CUDA ==
+==========
+
+CUDA Version 13.0.2
+
+Container image Copyright (c) 2016-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+
+This container image and its contents are governed by the NVIDIA Deep Learning Container License.
+By pulling and using the container, you accept the terms and conditions of this license:
+https://developer.nvidia.com/ngc/nvidia-deep-learning-container-license
+
+A copy of this license is made available in this container at /NGC-DL-CONTAINER-LICENSE for your convenience.
+
+QW38_OPT058_RESULT={"schema_version":1,"task":"OPT-058","workload":"quality-baseline","engine":"quartz","repetitions":1,"selectors":{"q4_decode":"packed","q8_decode":"dp4a_q8_1","ffn_decode":"paired_staged","execution_graph":"ffn_only","rms_norm":"parallel_fma"},"cases":[{"name":"wikitext_nll","scored":1024,"mean_nll":1.5252005926497396},{"name":"held_out_wikitext_1024","scored":1024,"mean_nll":1.7878782710057632},{"name":"recurrence_short","scored":128,"mean_nll":1.771902140891233},{"name":"recurrence_long","scored":128,"mean_nll":1.8354702048193376}],"status":"passed"}
+status=passed

@@ -1,0 +1,58 @@
+{
+  "schema_version": 1,
+  "task": "OPT-058",
+  "schema": "qw38.quality-baseline-contract",
+  "claims_throughput": false,
+  "chat_template": "no_thinking",
+  "assistant_answer_boundary": "<|im_start|>assistant\n<think>\n\n</think>\n\n",
+  "max_new_tokens": 16,
+  "logit_masking": false,
+  "parser": {
+    "strip": "leading_trailing_whitespace",
+    "accept": ["A", "B", "C", "D"],
+    "reject": ["empty", "extra_text", "second_answer", "teacher_forced_greedy"]
+  },
+  "thresholds": {
+    "nll_ppl_ratio": 1.01,
+    "recurrence_incremental_nll": 0.02,
+    "legacy_nll_ppl_ratio": 1.05
+  },
+  "cases": [
+    "wikitext_nll",
+    "held_out_wikitext_1024",
+    "recurrence_short",
+    "recurrence_long",
+    "task_arithmetic",
+    "task_python_len",
+    "task_inference",
+    "task_minutes",
+    "task_sort",
+    "task_json",
+    "task_reading",
+    "task_sequence"
+  ],
+  "held_out_wikitext_1024": {
+    "stream_start": 16385,
+    "stream_end": 17409,
+    "continuation_sha256": "2caf15f66a602c0bcc1cc2f75c605d48032a29f7c814daa3dc4da5df9c115faa",
+    "target_count": 1024,
+    "disjoint_from_calibration": true
+  },
+  "preserve": {
+    "qlt001": "pins/quality_contract.json",
+    "opt056": "pins/opt056_performance_gate_contract.json",
+    "seven_case_llama_reference": "fixtures/quality_llama_reference.json"
+  },
+  "inputs": "pins/production_quality_v2_inputs.json",
+  "llama_reference": "pins/production_quality_v2_llama_reference.json",
+  "missing_held_out_authority": "incomplete",
+  "proof_limit": [
+    "no throughput claim",
+    "no unrelated kernel tuning",
+    "single-traversal taps",
+    "missing held-out authority is incomplete",
+    "teacher forcing is not a functional answer",
+    "QLT-001 and OPT-056 verdicts preserved"
+  ],
+  "report_path": "evidence/optimization/opt058-quality-baseline/REPORT.md"
+}

@@ -1,0 +1,17 @@
+
+==========
+== CUDA ==
+==========
+
+CUDA Version 13.0.2
+
+Container image Copyright (c) 2016-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+
+This container image and its contents are governed by the NVIDIA Deep Learning Container License.
+By pulling and using the container, you accept the terms and conditions of this license:
+https://developer.nvidia.com/ngc/nvidia-deep-learning-container-license
+
+A copy of this license is made available in this container at /NGC-DL-CONTAINER-LICENSE for your convenience.
+
+QW38_OPT058_RESULT={"schema_version":1,"task":"OPT-058","workload":"scheduler","tokens":[42,3649],"modes":["eager","traced","graph"],"model_loaded_once":true,"single_traversal_taps":true,"selectors":{"q4_decode":"packed","q8_decode":"dp4a_q8_1","ffn_decode":"paired_staged","execution_graph":"ffn_only","rms_norm":"parallel_fma"},"runs":[{"token":42,"mode":"eager","elapsed_ms":28.7375355,"frontier":1,"taps_received":0,"logits":{"count":248320,"finite_count":248320,"nonfinite_count":0,"first_nonfinite":null,"finite":true},"logits_sha256":"f0a6d8fb50d240af6783a42fd75fe327962485d8e2e8e55175df5f83b08db8af"},{"token":42,"mode":"traced","elapsed_ms":24.5960636,"frontier":1,"taps_received":5,"logits":{"count":248320,"finite_count":248320,"nonfinite_count":0,"first_nonfinite":null,"finite":true},"logits_sha256":"f0a6d8fb50d240af6783a42fd75fe327962485d8e2e8e55175df5f83b08db8af"},{"token":42,"mode":"graph","elapsed_ms":24.2739525,"frontier":1,"taps_received":0,"logits":{"count":248320,"finite_count":248320,"nonfinite_count":0,"first_nonfinite":null,"finite":true},"logits_sha256":"f0a6d8fb50d240af6783a42fd75fe327962485d8e2e8e55175df5f83b08db8af"},{"token":3649,"mode":"eager","elapsed_ms":24.601984,"frontier":2,"taps_received":0,"logits":{"count":248320,"finite_count":248320,"nonfinite_count":0,"first_nonfinite":null,"finite":true},"logits_sha256":"1351ade64e734b149abe059c464c8acddd909a1aa462254e5faf8fc819caf694"},{"token":3649,"mode":"traced","elapsed_ms":24.6126404,"frontier":2,"taps_received":5,"logits":{"count":248320,"finite_count":248320,"nonfinite_count":0,"first_nonfinite":null,"finite":true},"logits_sha256":"1351ade64e734b149abe059c464c8acddd909a1aa462254e5faf8fc819caf694"},{"token":3649,"mode":"graph","elapsed_ms":24.2584324,"frontier":2,"taps_received":0,"logits":{"count":248320,"finite_count":248320,"nonfinite_count":0,"first_nonfinite":null,"finite":true},"logits_sha256":"1351ade64e734b149abe059c464c8acddd909a1aa462254e5faf8fc819caf694"}],"saved_taps":5,"all_finite":true,"historical_opt046_nan":"unreproduced_on_current_packed_production","status":"passed"}
+status=passed

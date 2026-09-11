@@ -222,8 +222,13 @@ def describe_plan(
     contract: Mapping[str, Any],
     phase: str | None,
 ) -> str:
-    deadline = float(contract.get("aggregate_deadline_s", FEEDBACK_BUDGET_S))
     mode_spec = contract["modes"][mode]
+    deadline = float(
+        mode_spec.get(
+            "aggregate_deadline_s",
+            contract.get("aggregate_deadline_s", FEEDBACK_BUDGET_S),
+        )
+    )
     target = str(mode_spec.get("target", contract["target"]))
     tiers = list(mode_spec.get("tier_sequence", []))
     lines = [
@@ -378,7 +383,13 @@ class OptimizationRunner:
         phases_path: Path,
     ) -> dict[str, Any]:
         started = self.clock.monotonic()
-        deadline = float(contract.get("aggregate_deadline_s", FEEDBACK_BUDGET_S))
+        mode_spec = contract["modes"][mode]
+        deadline = float(
+            mode_spec.get(
+                "aggregate_deadline_s",
+                contract.get("aggregate_deadline_s", FEEDBACK_BUDGET_S),
+            )
+        )
         records: list[dict[str, Any]] = []
         lock: GpuLock | None = None
         durations: dict[str, float] = {}
@@ -462,18 +473,25 @@ class OptimizationRunner:
                 )
 
             mode_spec = contract["modes"][mode]
-            repetitions = int(mode_spec.get("warm_repetitions", 0))
+            workloads = contract.get("workloads", {})
+            if phase not in {None, "compile"}:
+                known = set(mode_spec.get("tier_sequence", [])) | set(workloads)
+                if phase not in known:
+                    raise ValueError(f"unknown phase {phase}")
+            repetitions = int(
+                mode_spec.get("warm_repetitions", 2 if mode == "acceptance" else 0)
+            )
             labels = ["cold"]
-            if mode == "acceptance":
-                labels = ["cold", "warm1", "warm2"]
-            elif repetitions:
+            if repetitions:
                 labels.extend(f"warm{index}" for index in range(1, repetitions + 1))
 
             for label in labels:
                 if remaining() <= 0:
                     raise BudgetExhausted("compile")
                 label_started = self.clock.monotonic()
-                if phase in {None, "compile"}:
+                if phase in {None, "compile"} or (
+                    phase in workloads or phase in mode_spec.get("tier_sequence", [])
+                ):
                     built = phase_wrap(
                         f"compile_{label}",
                         lambda current=label: self._compile(
@@ -544,8 +562,10 @@ class OptimizationRunner:
             )
         except ValueError as exc:
             success = False
-            result_class = "invalid_tier"
             message = str(exc)
+            result_class = (
+                "invalid_phase" if "unknown phase" in message else "invalid_tier"
+            )
             emit(
                 {
                     "phase": "tier",
@@ -587,6 +607,7 @@ class OptimizationRunner:
             compile_count,
             cache_hits,
             cache_misses,
+            deadline,
         )
         result["link"] = link_count
         result["load"] = load_count
@@ -607,6 +628,7 @@ class OptimizationRunner:
         compile_count: int,
         cache_hits: int,
         cache_misses: int,
+        deadline_s: float = FEEDBACK_BUDGET_S,
     ) -> dict[str, Any]:
         return {
             "schema_version": 1,
@@ -617,7 +639,7 @@ class OptimizationRunner:
             "result_class": result_class,
             "message": message,
             "elapsed_s": self.clock.monotonic() - started,
-            "deadline_s": FEEDBACK_BUDGET_S,
+            "deadline_s": deadline_s,
             "durations": dict(durations),
             "compile": compile_count,
             "cache_hits": cache_hits,

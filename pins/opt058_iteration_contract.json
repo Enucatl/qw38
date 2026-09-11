@@ -1,0 +1,148 @@
+{
+  "schema_version": 1,
+  "task": "OPT-058",
+  "yardstick": "finite_scheduler_quality_baseline",
+  "claims_throughput": false,
+  "image": "qw38-cuda:13.0.2",
+  "model": "models/Qwen3.8-27B-Q4_K_M.gguf",
+  "gpu_lock": "build/optimization-runs/qw38-gpu.lock",
+  "aggregate_deadline_s": 300,
+  "target": "build/qw38-cuda-opt058-quality-baseline-test",
+  "diagnostics_make_target": "cuda-opt058-diagnostics",
+  "quality_contract": "pins/opt058_quality_baseline_contract.json",
+  "token_generator": "pinned [42, 3649]",
+  "selector": "ffn_only",
+  "modes": {
+    "feedback": {
+      "target": "build/qw38-cuda-opt058-quality-baseline-test",
+      "tier_sequence": ["smoke", "scheduler", "functional"],
+      "make_targets": ["build/qw38-cuda-opt058-quality-baseline-test"],
+      "build_once": true,
+      "aggregate_deadline_s": 300,
+      "workloads": ["smoke", "scheduler", "functional"]
+    },
+    "acceptance": {
+      "target": "build/qw38-cuda-opt058-quality-baseline-test",
+      "tier_sequence": ["smoke", "quality-baseline"],
+      "make_targets": ["build/qw38-cuda-opt058-quality-baseline-test"],
+      "warm_repetitions": 0,
+      "aggregate_deadline_s": 7200,
+      "workloads": ["smoke", "quality-baseline"]
+    },
+    "release": {
+      "target": "build/qw38-cuda-decode-oracle-test",
+      "tier": "acceptance",
+      "make_targets": [
+        "build/qw38-cuda-prefill-4k-oracle-test",
+        "build/qw38-cuda-decode-oracle-test"
+      ],
+      "historical_oracles": true,
+      "workloads": []
+    }
+  },
+  "workloads": {
+    "smoke": {
+      "target": "build/qw38-cuda-opt058-quality-baseline-test",
+      "tier": "smoke",
+      "kind": "parser_tap",
+      "cases": 4,
+      "candidates": 1,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 0,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 0,
+      "reference": 0,
+      "args": ["--workload", "smoke"]
+    },
+    "scheduler": {
+      "target": "build/qw38-cuda-opt058-quality-baseline-test",
+      "tier": "screen",
+      "kind": "eager_graph_trace",
+      "cases": 1,
+      "candidates": 1,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 2,
+      "execution_modes": 3,
+      "control_candidate_pairs": 1,
+      "selector": "ffn_only",
+      "load_model": 1,
+      "reference": 0,
+      "args": ["{model}", "--workload", "scheduler"]
+    },
+    "functional": {
+      "target": "build/qw38-cuda-opt058-quality-baseline-test",
+      "tier": "correctness",
+      "kind": "free_running_answers",
+      "cases": 8,
+      "candidates": 1,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 16,
+      "execution_modes": 2,
+      "control_candidate_pairs": 1,
+      "load_model": 1,
+      "reference": 1,
+      "args": [
+        "{model}",
+        "--workload",
+        "functional",
+        "--bundle",
+        "pins/production_quality_v2_functional.bundle",
+        "--prompt-set",
+        "v2",
+        "--llama-oracle",
+        ".cache/authorities/llama-build/bin/qw38-llama-quality-oracle"
+      ]
+    },
+    "quality-baseline": {
+      "target": "build/qw38-cuda-opt058-quality-baseline-test",
+      "tier": "acceptance",
+      "kind": "teacher_forced_nll",
+      "cases": 4,
+      "candidates": 1,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 1024,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 1,
+      "reference": 1,
+      "args": [
+        "{model}",
+        "--workload",
+        "quality-baseline",
+        "--bundle",
+        "pins/production_quality_v2_nll.bundle"
+      ]
+    }
+  },
+  "native_counts": {
+    "smoke_cases": 4,
+    "tokens": 2,
+    "execution_modes": 3
+  },
+  "required_fixture_keys": [
+    "schema_version",
+    "task",
+    "status",
+    "claims_throughput",
+    "scheduler_all_finite",
+    "token_271_decoded",
+    "functional",
+    "quality_v2",
+    "proof_limit",
+    "report_path"
+  ],
+  "proof_limit": [
+    "no throughput claim",
+    "no unrelated kernel tuning",
+    "single-traversal taps",
+    "missing held-out authority is incomplete",
+    "teacher forcing is not a functional answer",
+    "QLT-001 and OPT-056 verdicts preserved"
+  ],
+  "report_path": "evidence/optimization/opt058-quality-baseline/REPORT.md"
+}

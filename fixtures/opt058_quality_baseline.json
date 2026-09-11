@@ -1,0 +1,600 @@
+{
+  "claims_throughput": false,
+  "functional": {
+    "original": {
+      "diagnosis": "both engines greedily emit token 271 (U+000A U+000A) as the first free-running token",
+      "llama_first_tokens": {
+        "task_arithmetic": 271,
+        "task_inference": 271,
+        "task_json": 271,
+        "task_minutes": 271,
+        "task_python_len": 271,
+        "task_reading": 271,
+        "task_sequence": 271,
+        "task_sort": 271
+      },
+      "prompt_set": "original",
+      "quartz": [
+        {
+          "case": "task_arithmetic",
+          "next_token": 271,
+          "parser": "wrong_choice",
+          "text": "\n\nA",
+          "tokens": [
+            271,
+            32,
+            248044
+          ],
+          "top_two": [
+            271,
+            198
+          ]
+        },
+        {
+          "case": "task_python_len",
+          "next_token": 271,
+          "parser": "exact_choice",
+          "text": "\n\nA",
+          "tokens": [
+            271,
+            32,
+            248044
+          ],
+          "top_two": [
+            271,
+            198
+          ]
+        },
+        {
+          "case": "task_inference",
+          "next_token": 271,
+          "parser": "exact_choice",
+          "text": "\n\nC",
+          "tokens": [
+            271,
+            34,
+            248044
+          ],
+          "top_two": [
+            271,
+            198
+          ]
+        },
+        {
+          "case": "task_minutes",
+          "next_token": 271,
+          "parser": "exact_choice",
+          "text": "\n\nD",
+          "tokens": [
+            271,
+            35,
+            248044
+          ],
+          "top_two": [
+            271,
+            198
+          ]
+        },
+        {
+          "case": "task_sort",
+          "next_token": 271,
+          "parser": "exact_choice",
+          "text": "\n\nB",
+          "tokens": [
+            271,
+            33,
+            248044
+          ],
+          "top_two": [
+            271,
+            198
+          ]
+        },
+        {
+          "case": "task_json",
+          "next_token": 271,
+          "parser": "exact_choice",
+          "text": "\n\nA",
+          "tokens": [
+            271,
+            32,
+            248044
+          ],
+          "top_two": [
+            271,
+            198
+          ]
+        },
+        {
+          "case": "task_reading",
+          "next_token": 271,
+          "parser": "exact_choice",
+          "text": "\n\nC",
+          "tokens": [
+            271,
+            34,
+            248044
+          ],
+          "top_two": [
+            271,
+            248046
+          ]
+        },
+        {
+          "case": "task_sequence",
+          "next_token": 271,
+          "parser": "exact_choice",
+          "text": "\n\nD",
+          "tokens": [
+            271,
+            35,
+            248044
+          ],
+          "top_two": [
+            271,
+            414
+          ]
+        }
+      ],
+      "token_271_decoded": "\n\n",
+      "token_271_hex": "0a0a"
+    },
+    "v2": {
+      "chat_template": "no_thinking",
+      "llama_first_tokens": {
+        "task_arithmetic": 32,
+        "task_inference": 34,
+        "task_json": 32,
+        "task_minutes": 35,
+        "task_python_len": 32,
+        "task_reading": 34,
+        "task_sequence": 35,
+        "task_sort": 33
+      },
+      "llama_parser": [
+        {
+          "actual": "A",
+          "case": "task_arithmetic",
+          "expected": "B",
+          "next_token": 32,
+          "pass": false,
+          "raw": "A",
+          "reason": "wrong_choice",
+          "stripped": "A",
+          "text": "A",
+          "used_teacher_forcing": false
+        },
+        {
+          "actual": "A",
+          "case": "task_python_len",
+          "expected": "A",
+          "next_token": 32,
+          "pass": true,
+          "raw": "A",
+          "reason": "exact_choice",
+          "stripped": "A",
+          "text": "A",
+          "used_teacher_forcing": false
+        },
+        {
+          "actual": "C",
+          "case": "task_inference",
+          "expected": "C",
+          "next_token": 34,
+          "pass": true,
+          "raw": "C",
+          "reason": "exact_choice",
+          "stripped": "C",
+          "text": "C",
+          "used_teacher_forcing": false
+        },
+        {
+          "actual": "D",
+          "case": "task_minutes",
+          "expected": "D",
+          "next_token": 35,
+          "pass": true,
+          "raw": "D",
+          "reason": "exact_choice",
+          "stripped": "D",
+          "text": "D",
+          "used_teacher_forcing": false
+        },
+        {
+          "actual": "B",
+          "case": "task_sort",
+          "expected": "B",
+          "next_token": 33,
+          "pass": true,
+          "raw": "B",
+          "reason": "exact_choice",
+          "stripped": "B",
+          "text": "B",
+          "used_teacher_forcing": false
+        },
+        {
+          "actual": "A",
+          "case": "task_json",
+          "expected": "A",
+          "next_token": 32,
+          "pass": true,
+          "raw": "A",
+          "reason": "exact_choice",
+          "stripped": "A",
+          "text": "A",
+          "used_teacher_forcing": false
+        },
+        {
+          "actual": "C",
+          "case": "task_reading",
+          "expected": "C",
+          "next_token": 34,
+          "pass": true,
+          "raw": "C",
+          "reason": "exact_choice",
+          "stripped": "C",
+          "text": "C",
+          "used_teacher_forcing": false
+        },
+        {
+          "actual": "D",
+          "case": "task_sequence",
+          "expected": "D",
+          "next_token": 35,
+          "pass": true,
+          "raw": "D",
+          "reason": "exact_choice",
+          "stripped": "D",
+          "text": "D",
+          "used_teacher_forcing": false
+        }
+      ],
+      "prompt_set": "v2",
+      "quartz": [
+        {
+          "case": "task_arithmetic",
+          "next_token": 32,
+          "parser": "wrong_choice",
+          "text": "A",
+          "tokens": [
+            32,
+            248046
+          ],
+          "top_two": [
+            32,
+            33
+          ]
+        },
+        {
+          "case": "task_python_len",
+          "next_token": 32,
+          "parser": "exact_choice",
+          "text": "A",
+          "tokens": [
+            32,
+            248046
+          ],
+          "top_two": [
+            32,
+            33
+          ]
+        },
+        {
+          "case": "task_inference",
+          "next_token": 34,
+          "parser": "exact_choice",
+          "text": "C",
+          "tokens": [
+            34,
+            248046
+          ],
+          "top_two": [
+            34,
+            90
+          ]
+        },
+        {
+          "case": "task_minutes",
+          "next_token": 35,
+          "parser": "exact_choice",
+          "text": "D",
+          "tokens": [
+            35,
+            248046
+          ],
+          "top_two": [
+            35,
+            34
+          ]
+        },
+        {
+          "case": "task_sort",
+          "next_token": 33,
+          "parser": "exact_choice",
+          "text": "B",
+          "tokens": [
+            33,
+            248046
+          ],
+          "top_two": [
+            33,
+            760
+          ]
+        },
+        {
+          "case": "task_json",
+          "next_token": 32,
+          "parser": "exact_choice",
+          "text": "A",
+          "tokens": [
+            32,
+            248046
+          ],
+          "top_two": [
+            32,
+            33
+          ]
+        },
+        {
+          "case": "task_reading",
+          "next_token": 34,
+          "parser": "exact_choice",
+          "text": "C",
+          "tokens": [
+            34,
+            248046
+          ],
+          "top_two": [
+            34,
+            248046
+          ]
+        },
+        {
+          "case": "task_sequence",
+          "next_token": 35,
+          "parser": "exact_choice",
+          "text": "D",
+          "tokens": [
+            35,
+            248046
+          ],
+          "top_two": [
+            35,
+            34
+          ]
+        }
+      ]
+    }
+  },
+  "preserve": {
+    "opt056_tasks_pass": false,
+    "qlt001_nll_ppl_ratio": 1.05,
+    "seven_case_llama_reference": "fixtures/quality_llama_reference.json"
+  },
+  "proof_limit": [
+    "no throughput claim",
+    "no unrelated kernel tuning",
+    "single-traversal taps",
+    "missing held-out authority is incomplete",
+    "teacher forcing is not a functional answer",
+    "QLT-001 and OPT-056 verdicts preserved"
+  ],
+  "quality_v2": {
+    "all": false,
+    "blocker": "pinned llama and Quartz both emit A (token 32) for task_arithmetic under the no-thinking chat template; expected B (17+25=42). Rendering matches src/template.cpp enable_thinking=false. This is an item/model miss, not a CUDA nonfinite.",
+    "held_out_wikitext_1024": {
+      "pass": true,
+      "ppl_ratio": 0.9997864007762405,
+      "steps": 1024
+    },
+    "missing_authority": [],
+    "missing_cases": [],
+    "quartz": {
+      "held_out_wikitext_1024": {
+        "llama_mean_nll": 1.788091893045086,
+        "ppl_ratio": 0.9997864007762405,
+        "quartz_mean_nll": 1.7878782710057632,
+        "scored": 1024
+      },
+      "recurrence_long": {
+        "llama_mean_nll": 1.8402200970779121,
+        "ppl_ratio": 0.9952613706400849,
+        "quartz_mean_nll": 1.8354702048193376,
+        "scored": 128
+      },
+      "recurrence_short": {
+        "llama_mean_nll": 1.7683376992507749,
+        "ppl_ratio": 1.0035708018171432,
+        "quartz_mean_nll": 1.771902140891233,
+        "scored": 128
+      },
+      "wikitext_nll": {
+        "llama_mean_nll": 1.525124035418359,
+        "ppl_ratio": 1.0000765601619601,
+        "quartz_mean_nll": 1.5252005926497396,
+        "scored": 1024
+      }
+    },
+    "recurrence": {
+      "incremental_nll": -0.008314333899032578,
+      "pass": true
+    },
+    "recurrence_incremental_nll": -0.008314333899032578,
+    "status": "fail",
+    "suite": "quality-v2",
+    "task_arithmetic": {
+      "actual": "A",
+      "expected": "B",
+      "pass": false,
+      "raw": "A",
+      "reason": "wrong_choice",
+      "stripped": "A",
+      "used_teacher_forcing": false
+    },
+    "task_inference": {
+      "actual": "C",
+      "expected": "C",
+      "pass": true,
+      "raw": "C",
+      "reason": "exact_choice",
+      "stripped": "C",
+      "used_teacher_forcing": false
+    },
+    "task_json": {
+      "actual": "A",
+      "expected": "A",
+      "pass": true,
+      "raw": "A",
+      "reason": "exact_choice",
+      "stripped": "A",
+      "used_teacher_forcing": false
+    },
+    "task_minutes": {
+      "actual": "D",
+      "expected": "D",
+      "pass": true,
+      "raw": "D",
+      "reason": "exact_choice",
+      "stripped": "D",
+      "used_teacher_forcing": false
+    },
+    "task_python_len": {
+      "actual": "A",
+      "expected": "A",
+      "pass": true,
+      "raw": "A",
+      "reason": "exact_choice",
+      "stripped": "A",
+      "used_teacher_forcing": false
+    },
+    "task_reading": {
+      "actual": "C",
+      "expected": "C",
+      "pass": true,
+      "raw": "C",
+      "reason": "exact_choice",
+      "stripped": "C",
+      "used_teacher_forcing": false
+    },
+    "task_sequence": {
+      "actual": "D",
+      "expected": "D",
+      "pass": true,
+      "raw": "D",
+      "reason": "exact_choice",
+      "stripped": "D",
+      "used_teacher_forcing": false
+    },
+    "task_sort": {
+      "actual": "B",
+      "expected": "B",
+      "pass": true,
+      "raw": "B",
+      "reason": "exact_choice",
+      "stripped": "B",
+      "used_teacher_forcing": false
+    },
+    "tasks": {
+      "count": 8,
+      "pass": false
+    },
+    "thresholds": {
+      "legacy_nll_ppl_ratio": 1.05,
+      "nll_ppl_ratio": 1.01,
+      "recurrence_incremental_nll": 0.02
+    },
+    "used_teacher_forcing_for_answers": false,
+    "wikitext_nll": {
+      "pass": true,
+      "ppl_ratio": 1.0000765601619601,
+      "steps": 1024
+    }
+  },
+  "report_path": "evidence/optimization/opt058-quality-baseline/REPORT.md",
+  "runs": {
+    "functional_v2": "build/optimization-runs/OPT-058/feedback/20260911T054836Z-7c7f0cb7",
+    "llama_nll_log": "evidence/optimization/opt058-quality-baseline/llama-nll.stdout.txt",
+    "quality_baseline": "build/optimization-runs/OPT-058/acceptance/20260911T055652Z-2c969791",
+    "scheduler": "build/optimization-runs/OPT-058/feedback/20260911T054640Z-a483c712"
+  },
+  "scheduler": {
+    "all_finite": true,
+    "eager_after_capture_regression": "finite on capture workspace after invalidate",
+    "historical_opt046_nan": "unreproduced_on_current_packed_production",
+    "modes": [
+      "eager",
+      "traced",
+      "graph"
+    ],
+    "q8_staging_invalidation": "SchedulerGraphs::create calls SchedulerWorkspace::invalidate_q8_decode_staging",
+    "runs": [
+      {
+        "finite": true,
+        "finite_count": 248320,
+        "logits_sha256": "f0a6d8fb50d240af6783a42fd75fe327962485d8e2e8e55175df5f83b08db8af",
+        "mode": "eager",
+        "taps_received": 0,
+        "token": 42
+      },
+      {
+        "finite": true,
+        "finite_count": 248320,
+        "logits_sha256": "f0a6d8fb50d240af6783a42fd75fe327962485d8e2e8e55175df5f83b08db8af",
+        "mode": "traced",
+        "taps_received": 5,
+        "token": 42
+      },
+      {
+        "finite": true,
+        "finite_count": 248320,
+        "logits_sha256": "f0a6d8fb50d240af6783a42fd75fe327962485d8e2e8e55175df5f83b08db8af",
+        "mode": "graph",
+        "taps_received": 0,
+        "token": 42
+      },
+      {
+        "finite": true,
+        "finite_count": 248320,
+        "logits_sha256": "1351ade64e734b149abe059c464c8acddd909a1aa462254e5faf8fc819caf694",
+        "mode": "eager",
+        "taps_received": 0,
+        "token": 3649
+      },
+      {
+        "finite": true,
+        "finite_count": 248320,
+        "logits_sha256": "1351ade64e734b149abe059c464c8acddd909a1aa462254e5faf8fc819caf694",
+        "mode": "traced",
+        "taps_received": 5,
+        "token": 3649
+      },
+      {
+        "finite": true,
+        "finite_count": 248320,
+        "logits_sha256": "1351ade64e734b149abe059c464c8acddd909a1aa462254e5faf8fc819caf694",
+        "mode": "graph",
+        "taps_received": 0,
+        "token": 3649
+      }
+    ],
+    "saved_taps": 5,
+    "single_traversal_taps": true,
+    "tokens": [
+      42,
+      3649
+    ]
+  },
+  "scheduler_all_finite": true,
+  "schema_version": 1,
+  "selectors": {
+    "execution_graph": "ffn_only",
+    "ffn_decode": "paired_staged",
+    "q4_decode": "packed",
+    "q8_decode": "dp4a_q8_1",
+    "rms_norm": "parallel_fma"
+  },
+  "status": "fail",
+  "task": "OPT-058",
+  "token_271_decoded": "\n\n",
+  "token_271_hex": "0a0a"
+}

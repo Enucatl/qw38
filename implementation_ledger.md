@@ -128,13 +128,13 @@ are repository-relative unless stated otherwise.
 
 All rows below are proposed implementation work, not delivered speedups. Use
 the [source analysis and batch protocol](tasks/PERFORMANCE-RECOVERY-2026-09-11.md)
-and [testing strategy](testing-strategy.md). The first eligible task is OPT-058.
+and [testing strategy](testing-strategy.md). The first eligible task is OPT-059.
 Existing OPT-056 and OPT-016 gates remain blocked on their original conditions.
 
 | ID | Description | Dependencies | Status | Acceptance condition | Evidence |
 |---|---|---|---|---|---|
 | OPT-057 | Bound optimization feedback and fix incremental CUDA builds | OPT-055 | done | Reliable header/flag invalidation, explicit tier/workload limits, isolated evidence and measured warm feedback within 300 seconds; no throughput claim | [`tasks/OPT-057.md`](tasks/OPT-057.md); [`pins/opt057_iteration_contract.json`](pins/opt057_iteration_contract.json); [`fixtures/opt057_iteration_loop.json`](fixtures/opt057_iteration_loop.json); [`tools/run_optimization_task.py`](tools/run_optimization_task.py); [`cuda/optimization_engine_probe.cu`](cuda/optimization_engine_probe.cu); [`tests/test_optimization_loop.py`](tests/test_optimization_loop.py); [`evidence/optimization/opt057-iteration-loop/REPORT.md`](evidence/optimization/opt057-iteration-loop/REPORT.md); verification 2026-09-11T05:26:00Z |
-| OPT-058 | Establish finite scheduler and valid functional/held-out quality baselines | OPT-057 | pending | Current eager/graph/trace nonfinites resolved or honestly blocked; both engines evaluated on valid functional prompts; missing held-out llama reference frozen and required | [Implementation guide](tasks/OPT-058.md); proposed 2026-09-11 |
+| OPT-058 | Establish finite scheduler and valid functional/held-out quality baselines | OPT-057 | done | Current eager/graph/trace nonfinites resolved or honestly blocked; both engines evaluated on valid functional prompts; missing held-out llama reference frozen and required | [`tasks/OPT-058.md`](tasks/OPT-058.md); [`pins/opt058_quality_baseline_contract.json`](pins/opt058_quality_baseline_contract.json); [`pins/opt058_iteration_contract.json`](pins/opt058_iteration_contract.json); [`pins/production_quality_v2_inputs.json`](pins/production_quality_v2_inputs.json); [`pins/production_quality_v2_llama_reference.json`](pins/production_quality_v2_llama_reference.json); [`fixtures/opt058_quality_baseline.json`](fixtures/opt058_quality_baseline.json); [`cuda/full_scheduler.cu`](cuda/full_scheduler.cu); [`cuda/opt058_quality_baseline_test.cu`](cuda/opt058_quality_baseline_test.cu); [`tests/test_opt058_quality_baseline.py`](tests/test_opt058_quality_baseline.py); [`evidence/optimization/opt058-quality-baseline/REPORT.md`](evidence/optimization/opt058-quality-baseline/REPORT.md); verification 2026-09-11T06:04:00Z |
 | OPT-059 | Calibrate GPU numerical error and wire per-family production admission | OPT-058 | pending | Actual pinned llama GPU and independent FP64 calibration, held-out v2 budgets, staging semantics and strict/current test separation; no unvalidated default | [Implementation guide](tasks/OPT-059.md); proposed 2026-09-11 |
 | OPT-060 | Instrument matched full-engine Quartz and pinned llama family execution | OPT-057 | pending | Real dispatch/fusion/stream records and matched P/D family attribution with overhead/overlap limits; reproducible private authority patch; no speedup required | [Implementation guide](tasks/OPT-060.md); proposed 2026-09-11 |
 | OPT-061 | Build real-input streaming replay and hardware bottleneck evidence | OPT-060 | pending | Reusable captured FFN/mixer inputs, hot versus rotating weights, correct call counts and complete costs; counters or explicitly limited event/resource fallback | [Implementation guide](tasks/OPT-061.md); proposed 2026-09-11 |
@@ -5944,4 +5944,33 @@ statements below are historical, not the current execution order.
 - Marked OPT-057 `done`; delivery is limited to the verified task scope plus
   this ledger/audit bookkeeping. `plan.md` is unchanged. OPT-016 and OPT-056 stay
   `blocked`. Next eligible pending by ledger row order: **OPT-058**. No tok/s
+  claim (`claims_throughput=false`).
+
+### 2026-09-11T06:04:25Z — OPT-058 finite scheduler and quality baseline delivered
+
+- **Scheduler:** Q8 decode staging invalidated after graph capture
+  (`SchedulerWorkspace::invalidate_q8_decode_staging()`); eager/traced/FFN-graph
+  logits finite and byte-identical for tokens `[42, 3649]`. Coupled IDs: none.
+  No throughput claim.
+- **Quality:** v2 chat-template inputs and held-out llama NLL reference frozen;
+  relative PPL/recurrence scores within v2 bounds. Functional prerequisite
+  **blocked** on `task_arithmetic` — pinned llama and Quartz both emit A (token
+  32) vs expected B on both engines; exact defect in fixture `blocker` and
+  REPORT. quality-v2 suite `fail` is expected under the blocked-prerequisite
+  acceptance path.
+- Acceptance evidence: [`tasks/OPT-058.md`](tasks/OPT-058.md);
+  [`pins/opt058_quality_baseline_contract.json`](pins/opt058_quality_baseline_contract.json);
+  [`pins/opt058_iteration_contract.json`](pins/opt058_iteration_contract.json);
+  [`pins/production_quality_v2_inputs.json`](pins/production_quality_v2_inputs.json);
+  [`pins/production_quality_v2_llama_reference.json`](pins/production_quality_v2_llama_reference.json);
+  [`fixtures/opt058_quality_baseline.json`](fixtures/opt058_quality_baseline.json);
+  [`cuda/full_scheduler.cu`](cuda/full_scheduler.cu);
+  [`cuda/opt058_quality_baseline_test.cu`](cuda/opt058_quality_baseline_test.cu);
+  [`tests/test_opt058_quality_baseline.py`](tests/test_opt058_quality_baseline.py);
+  [`evidence/optimization/opt058-quality-baseline/REPORT.md`](evidence/optimization/opt058-quality-baseline/REPORT.md).
+  Proof is finite scheduler baseline, frozen v2 quality references, and honest
+  functional blocker documentation — not a model speedup gate.
+- Marked OPT-058 `done`; delivery is limited to the verified task scope plus
+  this ledger/audit bookkeeping. `plan.md` is unchanged. OPT-016 and OPT-056 stay
+  `blocked`. Next eligible pending by ledger row order: **OPT-059**. No tok/s
   claim (`claims_throughput=false`).

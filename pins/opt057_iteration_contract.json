@@ -142,5 +142,13 @@
     "screen is not a historical P/D oracle",
     "historical evidence remains immutable"
   ],
-  "report_path": "evidence/optimization/opt057-iteration-loop/REPORT.md"
+  "report_path": "evidence/optimization/opt057-iteration-loop/REPORT.md",
+  "quality_baseline": {
+    "task": "OPT-058",
+    "immutable": true,
+    "contract": "pins/opt058_quality_baseline_contract.json",
+    "inputs": "pins/production_quality_v2_inputs.json",
+    "llama_reference": "pins/production_quality_v2_llama_reference.json",
+    "fixture": "fixtures/opt058_quality_baseline.json"
+  }
 }

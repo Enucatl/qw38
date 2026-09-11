@@ -5,10 +5,12 @@ import argparse
 import hashlib
 import json
 import os
-import struct
 import subprocess
 import tempfile
 from pathlib import Path
+from typing import Sequence
+
+from tools.opt058_quality_baseline import bundle_cases
 
 CASES = (
     "wikitext_nll",
@@ -25,52 +27,45 @@ def digest(p: Path) -> str:
     return hashlib.sha256(p.read_bytes()).hexdigest()
 
 
-def bundle(inputs: dict, path: Path) -> None:
-    with path.open("wb") as f:
-        f.write(b"QW38Q\1\0\0")
-        f.write(struct.pack("<I", len(CASES)))
-        for name in CASES:
-            c = inputs["cases"][name]
-            encoded = name.encode("ascii")
-            f.write(struct.pack("<H", len(encoded)))
-            f.write(encoded)
-            f.write(struct.pack("<II", len(c["context"]), len(c["continuation"])))
-            f.write(struct.pack("<%dI" % len(c["context"]), *c["context"]))
-            f.write(struct.pack("<%dI" % len(c["continuation"]), *c["continuation"]))
+def bundle(inputs: dict, path: Path, cases: Sequence[str] = CASES) -> None:
+    bundle_cases(inputs, path, cases)
 
 
-def run(args: argparse.Namespace) -> dict:
-    inputs = json.loads(args.inputs.read_text())
-    llama_contract = json.loads(args.llama_contract.read_text())
-    if digest(args.model) != llama_contract["model"]["sha256"]:
-        raise ValueError("model hash differs")
-    if llama_contract["source"]["revision"] != args.llama_source_revision:
-        raise ValueError("llama revision differs")
+def selected_cases(args: argparse.Namespace, inputs: dict) -> tuple[str, ...]:
+    if args.cases:
+        names = tuple(item.strip() for item in args.cases.split(",") if item.strip())
+        if not names:
+            raise ValueError("case list is empty")
+        missing = [name for name in names if name not in inputs["cases"]]
+        if missing:
+            raise ValueError("missing input cases: " + ",".join(missing))
+        return names
     if not set(CASES).issubset(inputs["cases"]):
         raise ValueError("reference case set differs")
-    with tempfile.TemporaryDirectory() as td:
-        req = Path(td) / "quality.bundle"
-        bundle(inputs, req)
-        proc = subprocess.run(
-            [str(args.llama_binary), str(args.model), str(req)],
-            text=True,
-            capture_output=True,
-            check=False,
-            env={
-                **os.environ,
-                "LD_LIBRARY_PATH": str(args.llama_binary.parent)
-                + ":"
-                + os.environ.get("LD_LIBRARY_PATH", ""),
-            },
-        )
-        if proc.returncode:
-            raise RuntimeError(
-                f"llama quality oracle failed ({proc.returncode}): "
-                f"stderr={proc.stderr[-2000:]} stdout={proc.stdout[-4000:]}"
-            )
-    cases = {name: {"steps": [], "greedy_tokens": []} for name in CASES}
-    for line in proc.stdout.splitlines():
+    return CASES
+
+
+def parse_oracle_stdout(stdout: str, case_names: Sequence[str], generate: int) -> dict:
+    cases = {
+        name: {"steps": [], "greedy_tokens": [], "generated_tokens": []}
+        for name in case_names
+    }
+    for line in stdout.splitlines():
         fields = line.split("\t")
+        if not fields:
+            continue
+        if fields[0] == "gen":
+            _, name, pos, token, logit, runner, runner_logit = fields
+            cases[name]["generated_tokens"].append(
+                {
+                    "position": int(pos),
+                    "token": int(token),
+                    "logit": float(logit),
+                    "runner_up_token": int(runner),
+                    "runner_up_logit": float(runner_logit),
+                }
+            )
+            continue
         if fields[0] != "step":
             continue
         _, name, pos, target, lp, greedy, gl, runner, rl, margin = fields
@@ -86,16 +81,57 @@ def run(args: argparse.Namespace) -> dict:
         }
         cases[name]["steps"].append(row)
         cases[name]["greedy_tokens"].append(row["greedy_token"])
-    for name in CASES:
+    for name in case_names:
         rows = cases[name]["steps"]
-        if not rows:
+        if not rows and not generate:
             raise ValueError(f"missing case {name}")
-        mean = sum(-r["log_probability"] for r in rows) / len(rows)
-        cases[name]["mean_nll"] = mean
-        cases[name]["perplexity"] = __import__("math").exp(mean)
+        if rows:
+            mean = sum(-r["log_probability"] for r in rows) / len(rows)
+            cases[name]["mean_nll"] = mean
+            cases[name]["perplexity"] = __import__("math").exp(mean)
+    return cases
+
+
+def run(args: argparse.Namespace) -> dict:
+    inputs = json.loads(args.inputs.read_text())
+    llama_contract = json.loads(args.llama_contract.read_text())
+    if digest(args.model) != llama_contract["model"]["sha256"]:
+        raise ValueError("model hash differs")
+    if llama_contract["source"]["revision"] != args.llama_source_revision:
+        raise ValueError("llama revision differs")
+    case_names = selected_cases(args, inputs)
+    if args.from_log:
+        stdout = args.from_log.read_text()
+    else:
+        with tempfile.TemporaryDirectory() as td:
+            req = Path(td) / "quality.bundle"
+            bundle(inputs, req, case_names)
+            command = [str(args.llama_binary), str(args.model), str(req)]
+            if args.generate:
+                command.extend(["--generate", str(args.generate)])
+            proc = subprocess.run(
+                command,
+                text=True,
+                capture_output=True,
+                check=False,
+                env={
+                    **os.environ,
+                    "LD_LIBRARY_PATH": str(args.llama_binary.parent)
+                    + ":"
+                    + os.environ.get("LD_LIBRARY_PATH", ""),
+                },
+            )
+            if proc.returncode:
+                raise RuntimeError(
+                    f"llama quality oracle failed ({proc.returncode}): "
+                    f"stderr={proc.stderr[-2000:]} stdout={proc.stdout[-4000:]}"
+                )
+            stdout = proc.stdout
+    cases = parse_oracle_stdout(stdout, case_names, args.generate)
     return {
         "schema": "qw38.quality-llama-reference",
         "version": 1,
+        "case_list": list(case_names),
         "cases": cases,
         "model_sha256": digest(args.model),
         "quality_contract_sha256": digest(args.quality_contract),
@@ -113,6 +149,23 @@ def main() -> int:
     p.add_argument("--quality-contract", type=Path, required=True)
     p.add_argument("--inputs", type=Path, required=True)
     p.add_argument("--output", type=Path, required=True)
+    p.add_argument(
+        "--cases",
+        default="",
+        help="optional comma-separated case list; default is the frozen seven-case set",
+    )
+    p.add_argument(
+        "--generate",
+        type=int,
+        default=0,
+        help="optional free-running token count; 0 keeps teacher-forced scoring",
+    )
+    p.add_argument(
+        "--from-log",
+        type=Path,
+        default=None,
+        help="parse an existing oracle stdout log instead of spawning the binary",
+    )
     p.add_argument(
         "--llama-source-revision", default="cc83d7b4824f73cfdda4dfbb47ee39804f71b328"
     )

@@ -409,6 +409,7 @@ class SchedulerWorkspace final {
   SchedulerWorkspace& operator=(const SchedulerWorkspace&) = delete;
 
   Status create(std::size_t capacity) noexcept;
+  void invalidate_q8_decode_staging() noexcept;
   std::size_t allocated_bytes() const noexcept;
 #ifdef QW38_DIAGNOSTIC_TRACE
   Status copy_trace_taps(float* output, std::size_t count) const noexcept;
@@ -584,6 +585,13 @@ Status execute_token_traced(const ResidentModel& model, std::size_t token,
                             float* elapsed_milliseconds,
                             const internal::TraceFilter& filter,
                             internal::TraceSink sink, void* context) noexcept;
+
+Status execute_token_traced_bundle(
+    const ResidentModel& model, std::size_t token, SchedulerSession* session,
+    SchedulerWorkspace* workspace, float* host_logits, std::size_t logits_count,
+    float* host_hidden, std::size_t hidden_count, float* elapsed_milliseconds,
+    internal::TraceSink sink, void* context, SchedulerGraphs* graphs = nullptr,
+    PointwisePath pointwise_path = PointwisePath::kUnfused) noexcept;
 #endif
 
 cudaError_t launch_residual_add_fp32(const float* residual,

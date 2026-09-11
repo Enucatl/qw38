@@ -360,7 +360,7 @@ def test_malformed_tier_fails_before_gpu_probe(tmp_path: Path) -> None:
     )
     assert result["result_class"] == "invalid_tier"
     assert not any(
-        "optimization-engine-probe" in " ".join(command)
+        "./build/qw38-cuda-optimization-engine-probe" in " ".join(command)
         for command in launcher.commands
     )
 
