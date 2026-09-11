@@ -20,12 +20,12 @@ constexpr char kSelectedQ8DecodePath[] = "dp4a_q8_1";
 constexpr unsigned int kSelectedQ8DecodeWarpsSkinny = 4;
 constexpr unsigned int kSelectedQ8DecodeWarpsMedium = 4;
 constexpr unsigned int kSelectedQ8DecodeWarpsWide = 4;
-constexpr unsigned int kSelectedQ8DecodeRowsSkinny = 2;
-constexpr unsigned int kSelectedQ8DecodeRowsMedium = 2;
-constexpr unsigned int kSelectedQ8DecodeRowsWide = 2;
-constexpr unsigned int kSelectedQ8DecodeLayoutWarpsSkinny = 2;
-constexpr unsigned int kSelectedQ8DecodeLayoutWarpsMedium = 2;
-constexpr unsigned int kSelectedQ8DecodeLayoutWarpsWide = 2;
+constexpr unsigned int kSelectedQ8DecodeRowsSkinny = 1;
+constexpr unsigned int kSelectedQ8DecodeRowsMedium = 1;
+constexpr unsigned int kSelectedQ8DecodeRowsWide = 1;
+constexpr unsigned int kSelectedQ8DecodeLayoutWarpsSkinny = 4;
+constexpr unsigned int kSelectedQ8DecodeLayoutWarpsMedium = 4;
+constexpr unsigned int kSelectedQ8DecodeLayoutWarpsWide = 4;
 
 struct Q8DecodeLayout final {
   unsigned int rows_per_cta = 1;
