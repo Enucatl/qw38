@@ -1,0 +1,461 @@
+{
+  "schema_version": 1,
+  "task": "OPT-087",
+  "mode": "acceptance",
+  "phase": "review",
+  "status": "no_additional_reopen",
+  "llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+  "gguf_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+  "token_generator": "(42 + index * 997) % 248320",
+  "claims_throughput": false,
+  "claims_performance_improvement": false,
+  "no_additional_reopen": true,
+  "reopened_candidate": null,
+  "at_most_one_reopen": true,
+  "candidate_count": 20,
+  "candidates": [
+    {
+      "id": "OPT-075:q4_integer",
+      "label": "OPT-075/076 Q4 integer / late",
+      "disposition": "owned_elsewhere",
+      "owner": "OPT-085",
+      "reason": "owned by OPT-085; not reopened here",
+      "evidence_path": "fixtures/opt085_q4_reevaluation.json",
+      "historical_evidence": "fixtures/opt075_q4_production_admission.json",
+      "opt072_ids": [
+        "OPT-046:integer_q8_w4",
+        "OPT-062:integer_q8_complete_ffn",
+        "OPT-063:paired_integer"
+      ],
+      "status_note": null,
+      "confirmation": {
+        "opt075_production_kept": false,
+        "opt076_production_kept": false,
+        "opt085_selected_path": "packed_paired_staged",
+        "opt085_shipping_q4_decode": "packed",
+        "confirmed": true
+      },
+      "reopen": false
+    },
+    {
+      "id": "OPT-076:q4_late",
+      "label": "OPT-076 Q4 late reduction",
+      "disposition": "owned_elsewhere",
+      "owner": "OPT-085",
+      "reason": "owned by OPT-085; not reopened here",
+      "evidence_path": "fixtures/opt085_q4_reevaluation.json",
+      "historical_evidence": "fixtures/opt076_q4_reduction.json",
+      "opt072_ids": [],
+      "status_note": null,
+      "confirmation": {
+        "opt075_production_kept": false,
+        "opt076_production_kept": false,
+        "opt085_selected_path": "packed_paired_staged",
+        "opt085_shipping_q4_decode": "packed",
+        "confirmed": true
+      },
+      "reopen": false
+    },
+    {
+      "id": "OPT-064:q8_layout",
+      "label": "OPT-064/066 Q8/MMQ",
+      "disposition": "owned_elsewhere",
+      "owner": "OPT-086",
+      "reason": "owned by OPT-086; not reopened here",
+      "evidence_path": "fixtures/opt086_q8_mmq_reevaluation.json",
+      "historical_evidence": "fixtures/opt070_keep_revalidation.json",
+      "opt072_ids": [
+        "OPT-064:r2_w2_keep_evidence"
+      ],
+      "status_note": null,
+      "confirmation": {
+        "q8_selected": "r1_w4",
+        "mmq_selected": "fma_async_x",
+        "confirmed": true
+      },
+      "reopen": false
+    },
+    {
+      "id": "OPT-066:mmq_x_pipeline",
+      "label": "OPT-066 MMQ fma_async_x",
+      "disposition": "owned_elsewhere",
+      "owner": "OPT-086",
+      "reason": "owned by OPT-086; not reopened here",
+      "evidence_path": "fixtures/opt086_q8_mmq_reevaluation.json",
+      "historical_evidence": "fixtures/opt070_keep_revalidation.json",
+      "opt072_ids": [
+        "OPT-066:fma_async_x_keep_evidence"
+      ],
+      "status_note": null,
+      "confirmation": {
+        "q8_selected": "r1_w4",
+        "mmq_selected": "fma_async_x",
+        "confirmed": true
+      },
+      "reopen": false
+    },
+    {
+      "id": "OPT-077:tiled_decode_gdn",
+      "label": "OPT-077 tiled decode GDN",
+      "disposition": "do_not_reopen",
+      "owner": "none",
+      "reason": "component_interval_not_positive; performance, not numerical-policy",
+      "evidence_path": "fixtures/opt077_gdn_decode.json",
+      "historical_evidence": "evidence/optimization/opt077-gdn-decode/REPORT.md",
+      "opt072_ids": [],
+      "status_note": null,
+      "confirmation": {
+        "verdict": "retain_sequential",
+        "reasons": [
+          "component_interval_not_positive"
+        ],
+        "production_kept": false,
+        "confirmed": true
+      },
+      "reopen": false
+    },
+    {
+      "id": "OPT-078:prepared_q_veckv",
+      "label": "OPT-078 prepared_q / veckv",
+      "disposition": "do_not_reopen",
+      "owner": "none",
+      "reason": "performance_rejected / negative complete saving",
+      "evidence_path": "fixtures/opt078_decode_attention.json",
+      "historical_evidence": "evidence/optimization/opt078-decode-attention/REPORT.md",
+      "opt072_ids": [],
+      "status_note": null,
+      "confirmation": {
+        "verdict": "performance_rejected",
+        "reasons": [
+          "negative_complete_saving"
+        ],
+        "production_kept": false,
+        "confirmed": true
+      },
+      "reopen": false
+    },
+    {
+      "id": "OPT-079:kv_once",
+      "label": "OPT-079 kv_once",
+      "disposition": "do_not_reopen",
+      "owner": "OPT-088",
+      "reason": "keep; OPT-088 interaction check only",
+      "evidence_path": "fixtures/opt079_attention_kv_operands.json",
+      "historical_evidence": "evidence/optimization/opt079-attention-kv-operands/REPORT.md",
+      "opt072_ids": [],
+      "status_note": "keep",
+      "confirmation": {
+        "verdict": "keep",
+        "shipping": "kv_once",
+        "production_kept": true,
+        "confirmed": true
+      },
+      "reopen": false
+    },
+    {
+      "id": "OPT-067:prompt_pair",
+      "label": "OPT-067 prompt gate/up pairing",
+      "disposition": "do_not_reopen",
+      "owner": "none",
+      "reason": "OPT-072 no_repeat performance loser",
+      "evidence_path": "fixtures/opt072_rejection_review.json",
+      "historical_evidence": "evidence/optimization/opt067-prompt-pair/REPORT.md",
+      "opt072_ids": [
+        "OPT-067:prompt gate/up pairing"
+      ],
+      "status_note": null,
+      "confirmation": {
+        "disposition": "no_repeat",
+        "historical_files": [
+          "evidence/optimization/opt067-prompt-pair/REPORT.md"
+        ],
+        "reevaluation": "performance_loss_not_rescued_by_tolerance",
+        "confirmed": true
+      },
+      "reopen": false
+    },
+    {
+      "id": "OPT-065:mmq_tiles",
+      "label": "OPT-065 MMQ I/J retune",
+      "disposition": "do_not_reopen",
+      "owner": "none",
+      "reason": "OPT-072 no_repeat performance loser",
+      "evidence_path": "fixtures/opt072_rejection_review.json",
+      "historical_evidence": "evidence/optimization/opt065-mmq-tiles/REPORT.md",
+      "opt072_ids": [
+        "OPT-065:MMQ I/J retune with FMA/async Y"
+      ],
+      "status_note": null,
+      "confirmation": {
+        "disposition": "no_repeat",
+        "historical_files": [
+          "evidence/optimization/opt065-mmq-tiles/REPORT.md"
+        ],
+        "reevaluation": "performance_loss_not_rescued_by_tolerance",
+        "confirmed": true
+      },
+      "reopen": false
+    },
+    {
+      "id": "OPT-068:scoped_codegen",
+      "label": "OPT-068 scoped O3/FMA codegen",
+      "disposition": "do_not_reopen",
+      "owner": "none",
+      "reason": "OPT-072 no_repeat performance loser",
+      "evidence_path": "fixtures/opt072_rejection_review.json",
+      "historical_evidence": "evidence/optimization/opt068-scoped-codegen/REPORT.md",
+      "opt072_ids": [
+        "OPT-068:scoped O3/FMA codegen"
+      ],
+      "status_note": null,
+      "confirmation": {
+        "disposition": "no_repeat",
+        "historical_files": [
+          "evidence/optimization/opt068-scoped-codegen/REPORT.md"
+        ],
+        "reevaluation": "performance_loss_not_rescued_by_tolerance",
+        "confirmed": true
+      },
+      "reopen": false
+    },
+    {
+      "id": "OPT-024:mixer_q8_d2r",
+      "label": "OPT-024 Blackwell Q8 D2R",
+      "disposition": "do_not_reopen",
+      "owner": "none",
+      "reason": "OPT-072 no_repeat performance loser",
+      "evidence_path": "fixtures/opt072_rejection_review.json",
+      "historical_evidence": "evidence/optimization/opt024-mixer-q8-d2r/REJECTION.md",
+      "opt072_ids": [
+        "OPT-024:Blackwell Q8 D2R"
+      ],
+      "status_note": null,
+      "confirmation": {
+        "disposition": "no_repeat",
+        "historical_files": [
+          "evidence/optimization/opt024-mixer-q8-d2r/REJECTION.md"
+        ],
+        "reevaluation": "performance_loss_not_rescued_by_tolerance",
+        "confirmed": true
+      },
+      "reopen": false
+    },
+    {
+      "id": "OPT-027:persistent_fattn",
+      "label": "OPT-027 persistent Ada+ fattn stream-K",
+      "disposition": "do_not_reopen",
+      "owner": "none",
+      "reason": "OPT-072 no_repeat performance loser",
+      "evidence_path": "fixtures/opt072_rejection_review.json",
+      "historical_evidence": "evidence/optimization/opt027-persistent-fattn/REJECTION.md",
+      "opt072_ids": [
+        "OPT-027:persistent Ada+ fattn stream-K"
+      ],
+      "status_note": null,
+      "confirmation": {
+        "disposition": "no_repeat",
+        "historical_files": [
+          "evidence/optimization/opt027-persistent-fattn/REJECTION.md"
+        ],
+        "reevaluation": "performance_loss_not_rescued_by_tolerance",
+        "confirmed": true
+      },
+      "reopen": false
+    },
+    {
+      "id": "OPT-028:mmq_streamk",
+      "label": "OPT-028 Q4/Q6 MMQ stream-K",
+      "disposition": "do_not_reopen",
+      "owner": "none",
+      "reason": "OPT-072 no_repeat performance loser",
+      "evidence_path": "fixtures/opt072_rejection_review.json",
+      "historical_evidence": "evidence/optimization/opt028-mmq-streamk/REJECTION.md",
+      "opt072_ids": [
+        "OPT-028:Q4/Q6 MMQ stream-K"
+      ],
+      "status_note": null,
+      "confirmation": {
+        "disposition": "no_repeat",
+        "historical_files": [
+          "evidence/optimization/opt028-mmq-streamk/REJECTION.md"
+        ],
+        "reevaluation": "performance_loss_not_rescued_by_tolerance",
+        "confirmed": true
+      },
+      "reopen": false
+    },
+    {
+      "id": "OPT-029:gdn_fuse",
+      "label": "OPT-029 fused GDN conv/gated output",
+      "disposition": "do_not_reopen",
+      "owner": "none",
+      "reason": "OPT-072 no_repeat performance loser",
+      "evidence_path": "fixtures/opt072_rejection_review.json",
+      "historical_evidence": "evidence/optimization/opt029-gdn-fuse/REJECTION.md",
+      "opt072_ids": [
+        "OPT-029:fused GDN conv/gated output"
+      ],
+      "status_note": null,
+      "confirmation": {
+        "disposition": "no_repeat",
+        "historical_files": [
+          "evidence/optimization/opt029-gdn-fuse/REJECTION.md"
+        ],
+        "reevaluation": "performance_loss_not_rescued_by_tolerance",
+        "confirmed": true
+      },
+      "reopen": false
+    },
+    {
+      "id": "OPT-030:pdl_launches",
+      "label": "OPT-030 PDL prompt launches",
+      "disposition": "do_not_reopen",
+      "owner": "none",
+      "reason": "OPT-072 no_repeat performance loser",
+      "evidence_path": "fixtures/opt072_rejection_review.json",
+      "historical_evidence": "evidence/optimization/opt030-pdl-launches/REJECTION.md",
+      "opt072_ids": [
+        "OPT-030:PDL prompt launches"
+      ],
+      "status_note": null,
+      "confirmation": {
+        "disposition": "no_repeat",
+        "historical_files": [
+          "evidence/optimization/opt030-pdl-launches/REJECTION.md"
+        ],
+        "reevaluation": "performance_loss_not_rescued_by_tolerance",
+        "confirmed": true
+      },
+      "reopen": false
+    },
+    {
+      "id": "OPT-037:ffn_tiles",
+      "label": "OPT-037 FFN I/J tile sweep",
+      "disposition": "do_not_reopen",
+      "owner": "none",
+      "reason": "OPT-072 no_repeat performance loser",
+      "evidence_path": "fixtures/opt072_rejection_review.json",
+      "historical_evidence": "evidence/optimization/opt037-ffn-tiles/REJECTION.md",
+      "opt072_ids": [
+        "OPT-037:FFN I/J tile sweep"
+      ],
+      "status_note": null,
+      "confirmation": {
+        "disposition": "no_repeat",
+        "historical_files": [
+          "evidence/optimization/opt037-ffn-tiles/REJECTION.md"
+        ],
+        "reevaluation": "performance_loss_not_rescued_by_tolerance",
+        "confirmed": true
+      },
+      "reopen": false
+    },
+    {
+      "id": "OPT-054:prefill_microbatch",
+      "label": "OPT-054 prefill microbatch 512/1024/2048",
+      "disposition": "do_not_reopen",
+      "owner": "none",
+      "reason": "OPT-072 no_repeat performance loser",
+      "evidence_path": "fixtures/opt072_rejection_review.json",
+      "historical_evidence": "evidence/optimization/opt054-prefill-microbatch/REPORT.md",
+      "opt072_ids": [
+        "OPT-054:prefill microbatch 512/1024/2048"
+      ],
+      "status_note": null,
+      "confirmation": {
+        "disposition": "no_repeat",
+        "historical_files": [
+          "evidence/optimization/opt054-prefill-microbatch/REPORT.md"
+        ],
+        "reevaluation": "performance_loss_not_rescued_by_tolerance",
+        "confirmed": true
+      },
+      "reopen": false
+    },
+    {
+      "id": "OPT-055:execution_graphs",
+      "label": "OPT-055 broader execution graphs",
+      "disposition": "do_not_reopen",
+      "owner": "none",
+      "reason": "OPT-072 no_repeat performance loser",
+      "evidence_path": "fixtures/opt072_rejection_review.json",
+      "historical_evidence": "evidence/optimization/opt055-execution-graphs/REPORT.md",
+      "opt072_ids": [
+        "OPT-055:broader execution graphs"
+      ],
+      "status_note": null,
+      "confirmation": {
+        "disposition": "no_repeat",
+        "historical_files": [
+          "evidence/optimization/opt055-execution-graphs/REPORT.md"
+        ],
+        "reevaluation": "performance_loss_not_rescued_by_tolerance",
+        "confirmed": true
+      },
+      "reopen": false
+    },
+    {
+      "id": "half-scale-q8-1",
+      "label": "half-scale-q8-1",
+      "disposition": "do_not_reopen",
+      "owner": "none",
+      "reason": "never screened; OPT-075 forbade a half-scale grid; no measured upside",
+      "evidence_path": "fixtures/opt072_rejection_review.json",
+      "historical_evidence": "pins/opt075_q4_production_admission_contract.json",
+      "opt072_ids": [
+        "OPT-046:integer_q8_1_w4_half_scale",
+        "OPT-062:half_scale_skipped"
+      ],
+      "status_note": null,
+      "confirmation": {
+        "screen_executed": false,
+        "half_scale_forbidden": true,
+        "measured_upside": false,
+        "confirmed": true
+      },
+      "reopen": false
+    },
+    {
+      "id": "OPT-042:cud001_one_warp",
+      "label": "historical CUD-001 3e-4 one-warp Q4 diagnostic",
+      "disposition": "do_not_reopen",
+      "owner": "OPT-085",
+      "reason": "do not rebuild; superseded by OPT-085 kernel parity",
+      "evidence_path": "fixtures/opt072_rejection_review.json",
+      "historical_evidence": "evidence/optimization/opt042-mmv-integer-study/REPORT.md",
+      "opt072_ids": [
+        "OPT-042:integer_dp4a_q8block"
+      ],
+      "status_note": null,
+      "confirmation": {
+        "disposition": "already_superseded",
+        "next_owner": "OPT-075",
+        "rebuild": false,
+        "confirmed": true
+      },
+      "reopen": false
+    }
+  ],
+  "leftover_qualifying": [],
+  "dispositions": [
+    "reopen",
+    "owned_elsewhere",
+    "do_not_reopen"
+  ],
+  "opt074_family_admission_required": false,
+  "opt074_coverage_unadmitted_blocker": false,
+  "historical_opt072_unmodified": true,
+  "historical_opt072": {
+    "opt072_report": "evidence/optimization/opt072-rejection-review/REPORT.md",
+    "opt072_fixture": "fixtures/opt072_rejection_review.json",
+    "opt072_task": "OPT-072",
+    "opt072_status": "rejection_review",
+    "entry_count": 78,
+    "unmodified": true
+  },
+  "production_pins_unchanged": true,
+  "gpu_work": false,
+  "host_only": true,
+  "measurement_utc": "2026-09-11T22:32:44Z",
+  "report_path": "evidence/optimization/opt087-historical-reevaluation/REPORT.md"
+}

@@ -224,7 +224,7 @@ task in ledger/dependency order is OPT-086.
 | OPT-084 | Freeze shipping Quartz and pinned-llama quality baseline | OPT-083 | done | Complete local quality suite scored on llama.cpp and current shipping Quartz; acceptance criteria frozen before candidate keeps; historical OPT-056/073 failures reclassified not erased | [`tasks/OPT-084.md`](tasks/OPT-084.md); [`pins/opt084_quality_baseline_contract.json`](pins/opt084_quality_baseline_contract.json); [`pins/opt084_iteration_contract.json`](pins/opt084_iteration_contract.json); [`fixtures/opt084_quality_baseline.json`](fixtures/opt084_quality_baseline.json); [`tools/opt084_quality_baseline.py`](tools/opt084_quality_baseline.py); [`tests/test_opt084_quality_baseline.py`](tests/test_opt084_quality_baseline.py); [`Makefile`](Makefile); [`evidence/optimization/opt084-quality-baseline/REPORT.md`](evidence/optimization/opt084-quality-baseline/REPORT.md); verification 2026-09-11T21:45:25Z |
 | OPT-085 | Re-evaluate Q4 packed, integer paired, and late-reduction paths | OPT-075, OPT-076, OPT-082, OPT-084 | done | Independent kernel-parity, quality, performance, and keep/revert verdicts for packed vs integer_q8_paired vs late_w4; at most one Q4 production path; OPT-074 unadmitted is not a blocker | [`tasks/OPT-085.md`](tasks/OPT-085.md); [`pins/opt085_q4_reevaluation_contract.json`](pins/opt085_q4_reevaluation_contract.json); [`pins/opt085_iteration_contract.json`](pins/opt085_iteration_contract.json); [`fixtures/opt085_q4_reevaluation.json`](fixtures/opt085_q4_reevaluation.json); [`tools/opt085_q4_reevaluation.py`](tools/opt085_q4_reevaluation.py); [`tests/test_opt085_q4_reevaluation.py`](tests/test_opt085_q4_reevaluation.py); [`tools/run_optimization_task.py`](tools/run_optimization_task.py); [`Makefile`](Makefile); [`evidence/optimization/opt085-q4-reevaluation/REPORT.md`](evidence/optimization/opt085-q4-reevaluation/REPORT.md); verification 2026-09-11T22:04:10Z |
 | OPT-086 | Re-evaluate installed Q8 r2_w2 and MMQ fma_async_x | OPT-064, OPT-066, OPT-070, OPT-082, OPT-084 | done | Independent formal keep/revert for Q8 r1_w4 vs r2_w2 and MMQ fma_async vs fma_async_x using kernel parity, quality, and performance; OPT-074 coverage is not inconclusive | [`tasks/OPT-086.md`](tasks/OPT-086.md); [`pins/opt086_q8_mmq_reevaluation_contract.json`](pins/opt086_q8_mmq_reevaluation_contract.json); [`pins/opt086_iteration_contract.json`](pins/opt086_iteration_contract.json); [`fixtures/opt086_q8_mmq_reevaluation.json`](fixtures/opt086_q8_mmq_reevaluation.json); [`tools/opt086_q8_mmq_reevaluation.py`](tools/opt086_q8_mmq_reevaluation.py); [`tests/test_opt086_q8_mmq_reevaluation.py`](tests/test_opt086_q8_mmq_reevaluation.py); [`tools/run_optimization_task.py`](tools/run_optimization_task.py); [`Makefile`](Makefile); [`cuda/q8_decode_path.cuh`](cuda/q8_decode_path.cuh); [`evidence/optimization/opt086-q8-mmq-reevaluation/REPORT.md`](evidence/optimization/opt086-q8-mmq-reevaluation/REPORT.md); verification 2026-09-11T22:22:00Z |
-| OPT-087 | Selectively reopen remaining numerical-policy-blocked candidates | OPT-072, OPT-082, OPT-084 | pending | Disposition table for remaining OPT-072 leftovers; reopen at most one already-implemented candidate with measured upside, or no_additional_reopen; no performance-loser rerun | [`tasks/OPT-087.md`](tasks/OPT-087.md); proposed 2026-09-11 |
+| OPT-087 | Selectively reopen remaining numerical-policy-blocked candidates | OPT-072, OPT-082, OPT-084 | done | Disposition table for remaining OPT-072 leftovers; reopen at most one already-implemented candidate with measured upside, or no_additional_reopen; no performance-loser rerun | [`tasks/OPT-087.md`](tasks/OPT-087.md); [`pins/opt087_historical_reevaluation_contract.json`](pins/opt087_historical_reevaluation_contract.json); [`pins/opt087_iteration_contract.json`](pins/opt087_iteration_contract.json); [`fixtures/opt087_historical_reevaluation.json`](fixtures/opt087_historical_reevaluation.json); [`tools/opt087_historical_reevaluation.py`](tools/opt087_historical_reevaluation.py); [`tests/test_opt087_historical_reevaluation.py`](tests/test_opt087_historical_reevaluation.py); [`tools/run_optimization_task.py`](tools/run_optimization_task.py); [`Makefile`](Makefile); [`evidence/optimization/opt087-historical-reevaluation/REPORT.md`](evidence/optimization/opt087-historical-reevaluation/REPORT.md); verification 2026-09-11T22:32:44Z |
 | OPT-088 | Combined post-reset production gate for the new combination | OPT-079, OPT-085, OPT-086, OPT-087 | pending | Independent kernel-parity, quality, Quartz-vs-baseline, Quartz-vs-llama, recurrence, P4096/D128/D2048/p95, llama parity, and OPT-056/+5% fields; OPT-080 remains historical and is not reinterpreted | [`tasks/OPT-088.md`](tasks/OPT-088.md); proposed 2026-09-11 |
 
 ### Post-042 recovery execution order (historical batch)
@@ -6924,4 +6924,29 @@ statements below are historical, not the current execution order.
 - Marked OPT-086 `done`; delivery is limited to the verified task scope plus
   this ledger/audit bookkeeping. `plan.md` is unchanged. OPT-016 and OPT-056 stay
   `blocked`. Next eligible pending by dependency order: **OPT-087**.
+
+### 2026-09-11T22:32:44Z — OPT-087 historical leftover reevaluation delivered
+
+- Reviewed OPT-072 and OPT-075–079/085/086 evidence for remaining
+  numerical-policy-blocked candidates. **No additional reopen**
+  (`no_additional_reopen=true`; `reopened_candidate=null`). Twenty candidates
+  dispositioned; OPT-085/086 ownership and OPT-072 `no_repeat` performance
+  losers left closed. `opt074_coverage_unadmitted` is not a blocker. Coupled IDs:
+  none.
+- Acceptance: 10 pytest cases, feedback inventory, acceptance review, and
+  verification checklist in [`tasks/OPT-087.md`](tasks/OPT-087.md).
+- Acceptance evidence: [`tasks/OPT-087.md`](tasks/OPT-087.md);
+  [`pins/opt087_historical_reevaluation_contract.json`](pins/opt087_historical_reevaluation_contract.json);
+  [`pins/opt087_iteration_contract.json`](pins/opt087_iteration_contract.json);
+  [`fixtures/opt087_historical_reevaluation.json`](fixtures/opt087_historical_reevaluation.json);
+  [`tools/opt087_historical_reevaluation.py`](tools/opt087_historical_reevaluation.py);
+  [`tests/test_opt087_historical_reevaluation.py`](tests/test_opt087_historical_reevaluation.py);
+  [`tools/run_optimization_task.py`](tools/run_optimization_task.py);
+  [`Makefile`](Makefile);
+  [`evidence/optimization/opt087-historical-reevaluation/REPORT.md`](evidence/optimization/opt087-historical-reevaluation/REPORT.md).
+  `claims_throughput=false`. Tok/s delta versus the then-current shipping
+  baseline: **0**.
+- Marked OPT-087 `done`; delivery is limited to the verified task scope plus
+  this ledger/audit bookkeeping. `plan.md` is unchanged. OPT-016 and OPT-056 stay
+  `blocked`. Next eligible pending by dependency order: **OPT-088**.
 
