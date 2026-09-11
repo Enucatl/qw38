@@ -711,6 +711,12 @@ int main(int argc, char** argv) {
     std::fprintf(stderr, "QW38_CUDA_TEST_TIER must be set\n");
     return 1;
   }
+  if (qw38::cuda::test_tier() == qw38::cuda::TestTier::kScreen) {
+    std::fprintf(stderr,
+                 "QW38_CUDA_TEST_TIER=screen is not implemented by this "
+                 "binary\n");
+    return 1;
+  }
   const qw38::cuda::TestTier tier = qw38::cuda::test_tier();
   FILE* raw = nullptr;
   if (argc >= 2) {

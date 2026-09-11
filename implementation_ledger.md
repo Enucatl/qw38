@@ -128,12 +128,12 @@ are repository-relative unless stated otherwise.
 
 All rows below are proposed implementation work, not delivered speedups. Use
 the [source analysis and batch protocol](tasks/PERFORMANCE-RECOVERY-2026-09-11.md)
-and [testing strategy](testing-strategy.md). The first eligible task is OPT-057.
+and [testing strategy](testing-strategy.md). The first eligible task is OPT-058.
 Existing OPT-056 and OPT-016 gates remain blocked on their original conditions.
 
 | ID | Description | Dependencies | Status | Acceptance condition | Evidence |
 |---|---|---|---|---|---|
-| OPT-057 | Bound optimization feedback and fix incremental CUDA builds | OPT-055 | pending | Reliable header/flag invalidation, explicit tier/workload limits, isolated evidence and measured warm feedback within 300 seconds; no throughput claim | [Implementation guide](tasks/OPT-057.md); proposed 2026-09-11 |
+| OPT-057 | Bound optimization feedback and fix incremental CUDA builds | OPT-055 | done | Reliable header/flag invalidation, explicit tier/workload limits, isolated evidence and measured warm feedback within 300 seconds; no throughput claim | [`tasks/OPT-057.md`](tasks/OPT-057.md); [`pins/opt057_iteration_contract.json`](pins/opt057_iteration_contract.json); [`fixtures/opt057_iteration_loop.json`](fixtures/opt057_iteration_loop.json); [`tools/run_optimization_task.py`](tools/run_optimization_task.py); [`cuda/optimization_engine_probe.cu`](cuda/optimization_engine_probe.cu); [`tests/test_optimization_loop.py`](tests/test_optimization_loop.py); [`evidence/optimization/opt057-iteration-loop/REPORT.md`](evidence/optimization/opt057-iteration-loop/REPORT.md); verification 2026-09-11T05:26:00Z |
 | OPT-058 | Establish finite scheduler and valid functional/held-out quality baselines | OPT-057 | pending | Current eager/graph/trace nonfinites resolved or honestly blocked; both engines evaluated on valid functional prompts; missing held-out llama reference frozen and required | [Implementation guide](tasks/OPT-058.md); proposed 2026-09-11 |
 | OPT-059 | Calibrate GPU numerical error and wire per-family production admission | OPT-058 | pending | Actual pinned llama GPU and independent FP64 calibration, held-out v2 budgets, staging semantics and strict/current test separation; no unvalidated default | [Implementation guide](tasks/OPT-059.md); proposed 2026-09-11 |
 | OPT-060 | Instrument matched full-engine Quartz and pinned llama family execution | OPT-057 | pending | Real dispatch/fusion/stream records and matched P/D family attribution with overhead/overlap limits; reproducible private authority patch; no speedup required | [Implementation guide](tasks/OPT-060.md); proposed 2026-09-11 |
@@ -5924,3 +5924,24 @@ statements below are historical, not the current execution order.
 - Read-only hardware inventory observed a 400 W power cap; no hardware settings
   or runtime code changed. No new GPU speedup measurement or delivered candidate
   is claimed. First eligible implementation task: OPT-057.
+
+### 2026-09-11T05:26:54Z — OPT-057 bounded iteration runner delivered
+
+- **Infrastructure:** CUDA `-MMD -MP` depfiles and content-compared flag stamps;
+  `screen` tier in `cuda/test_tier.h`; `tools/run_optimization_task.py` with
+  feedback/acceptance/release modes; `cuda/optimization_engine_probe.cu` short
+  engine probe; 300-second aggregate deadline with owned-child teardown. Coupled
+  IDs: none. No throughput claim.
+- Acceptance evidence: [`tasks/OPT-057.md`](tasks/OPT-057.md);
+  [`pins/opt057_iteration_contract.json`](pins/opt057_iteration_contract.json);
+  [`fixtures/opt057_iteration_loop.json`](fixtures/opt057_iteration_loop.json);
+  [`tools/run_optimization_task.py`](tools/run_optimization_task.py);
+  [`cuda/optimization_engine_probe.cu`](cuda/optimization_engine_probe.cu);
+  [`tests/test_optimization_loop.py`](tests/test_optimization_loop.py);
+  [`evidence/optimization/opt057-iteration-loop/REPORT.md`](evidence/optimization/opt057-iteration-loop/REPORT.md).
+  Proof is bounded feedback/acceptance validation with reliable incremental builds,
+  not a model speedup or 2K llama.cpp parity gate.
+- Marked OPT-057 `done`; delivery is limited to the verified task scope plus
+  this ledger/audit bookkeeping. `plan.md` is unchanged. OPT-016 and OPT-056 stay
+  `blocked`. Next eligible pending by ledger row order: **OPT-058**. No tok/s
+  claim (`claims_throughput=false`).

@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "task": "OPT-057",
+  "status": "measured",
+  "measurement_utc": "2026-09-11T05:23:56Z",
+  "claims_throughput": false,
+  "aggregate_deadline_s": 300,
+  "cold_s": 3.622748716996284,
+  "warm1_s": 3.531790494977031,
+  "warm2_s": 3.544421892001992,
+  "warm2_recompiled": false,
+  "compile_cache_hits": 3,
+  "compile_cache_misses": 0,
+  "first_compile_s": 48.29801405000035,
+  "feedback_elapsed_s": 57.14313543398748,
+  "header_invalidation": true,
+  "flag_invalidation": true,
+  "missing_tier_fails_before_gpu": true,
+  "over_budget_teardown": true,
+  "screen_skips_historical_oracles": true,
+  "historical_evidence_immutable": true,
+  "p95_diagnostic": true,
+  "hardware_executed": true,
+  "native_counts": {
+    "tiny_cases": 1,
+    "tokens": 2,
+    "execution_modes": 2
+  },
+  "feedback_run_dir": "build/optimization-runs/OPT-057/feedback/20260911T052157Z-1d6d5733",
+  "acceptance_run_dir": "build/optimization-runs/OPT-057/acceptance/20260911T052356Z-7b5955d9",
+  "proof_limit": [
+    "no throughput claim",
+    "300-second aggregate feedback deadline",
+    "header and flag invalidation",
+    "missing tier fails before GPU work",
+    "over-budget subprocess teardown",
+    "screen is not a historical P/D oracle",
+    "historical evidence remains immutable"
+  ],
+  "report_path": "evidence/optimization/opt057-iteration-loop/REPORT.md"
+}

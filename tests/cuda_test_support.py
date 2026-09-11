@@ -7,7 +7,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 IMAGE = "qw38-cuda:13.0.2"
-_TIERS = frozenset({"smoke", "correctness", "acceptance"})
+_TIERS = frozenset({"smoke", "correctness", "screen", "acceptance"})
+_SHARED_SUITE_TIERS = frozenset({"smoke", "correctness", "acceptance"})
 
 
 def cuda_test_tier() -> str:
@@ -15,7 +16,8 @@ def cuda_test_tier() -> str:
     configured = os.environ.get("QW38_CUDA_TEST_TIER")
     if configured is None or not configured.strip():
         raise ValueError(
-            "QW38_CUDA_TEST_TIER must be set to smoke, correctness, or acceptance"
+            "QW38_CUDA_TEST_TIER must be set to smoke, correctness, "
+            "screen, or acceptance"
         )
     tier = configured.strip().lower()
     if tier not in _TIERS:
@@ -38,6 +40,8 @@ def _common_command(tier: str) -> list[str]:
         f"QW38_CUDA_TEST_TIER={tier}",
         "-v",
         f"{ROOT}:/workspace",
+        "-w",
+        "/workspace",
         IMAGE,
     ]
 
@@ -45,8 +49,11 @@ def _common_command(tier: str) -> list[str]:
 @lru_cache(maxsize=3)
 def run_cuda_suite(tier: str) -> dict[str, str]:
     """Build and run the shared CUDA binaries once per pytest process and tier."""
-    if tier not in _TIERS:
-        raise ValueError(f"unknown CUDA test tier: {tier!r}")
+    if tier not in _SHARED_SUITE_TIERS:
+        raise ValueError(
+            f"shared CUDA suites do not implement tier {tier!r}; "
+            "use smoke, correctness, or acceptance"
+        )
     common = _common_command(tier)
     build = subprocess.run(
         [

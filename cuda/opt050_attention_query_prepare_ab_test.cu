@@ -118,9 +118,8 @@ bool like_arithmetic(const char* path) {
 }  // namespace
 
 int main(int argc, char** argv) {
-  if (!qw38::cuda::test_tier_valid()) {
-    std::fprintf(stderr, "QW38_CUDA_TEST_TIER must be set to smoke, "
-                         "correctness, or acceptance\n");
+  if (!qw38::cuda::test_tier_legacy_ok()) {
+    std::fprintf(stderr, "%s\n", qw38::cuda::test_tier_legacy_error());
     return 1;
   }
   const qw38::cuda::TestTier tier = qw38::cuda::test_tier();

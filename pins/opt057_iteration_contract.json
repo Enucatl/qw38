@@ -1,0 +1,146 @@
+{
+  "schema_version": 1,
+  "task": "OPT-057",
+  "yardstick": "bounded_iteration_loop",
+  "claims_throughput": false,
+  "image": "qw38-cuda:13.0.2",
+  "model": "models/Qwen3.8-27B-Q4_K_M.gguf",
+  "gpu_lock": "build/optimization-runs/qw38-gpu.lock",
+  "aggregate_deadline_s": 300,
+  "target": "build/qw38-cuda-optimization-engine-probe",
+  "diagnostics_make_target": "cuda-opt057-diagnostics",
+  "token_generator": "(42 + index * 997) % 248320",
+  "selector": "ffn_only",
+  "modes": {
+    "feedback": {
+      "target": "build/qw38-cuda-optimization-engine-probe",
+      "tier_sequence": ["smoke", "correctness", "screen"],
+      "make_targets": ["build/qw38-cuda-optimization-engine-probe"],
+      "build_once": true,
+      "workloads": ["smoke", "correctness", "screen"]
+    },
+    "acceptance": {
+      "target": "build/qw38-cuda-optimization-engine-probe",
+      "tier_sequence": ["smoke", "correctness"],
+      "make_targets": ["build/qw38-cuda-optimization-engine-probe"],
+      "warm_repetitions": 2,
+      "workloads": ["smoke", "correctness"]
+    },
+    "release": {
+      "target": "build/qw38-cuda-decode-oracle-test",
+      "tier": "acceptance",
+      "make_targets": [
+        "build/qw38-cuda-prefill-4k-oracle-test",
+        "build/qw38-cuda-decode-oracle-test"
+      ],
+      "historical_oracles": true,
+      "workloads": []
+    }
+  },
+  "workloads": {
+    "smoke": {
+      "target": "build/qw38-cuda-optimization-engine-probe",
+      "tier": "smoke",
+      "kind": "tiny_projection",
+      "cases": 1,
+      "candidates": 1,
+      "warmups": 1,
+      "samples": 1,
+      "tokens": 0,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 0,
+      "reference": 0,
+      "args": ["--workload", "tiny"]
+    },
+    "correctness": {
+      "target": "build/qw38-cuda-optimization-engine-probe",
+      "tier": "correctness",
+      "kind": "engine_tokens",
+      "cases": 1,
+      "candidates": 1,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 2,
+      "execution_modes": 2,
+      "control_candidate_pairs": 1,
+      "selector": "ffn_only",
+      "load_model": 1,
+      "reference": 0,
+      "args": [
+        "{model}",
+        "--workload",
+        "tokens",
+        "--output-tokens",
+        "2",
+        "--selector",
+        "ffn_only",
+        "--modes",
+        "graph,eager"
+      ]
+    },
+    "screen": {
+      "target": "build/qw38-cuda-optimization-engine-probe",
+      "tier": "screen",
+      "kind": "decode_prefix",
+      "cases": 1,
+      "candidates": 1,
+      "warmups": 1,
+      "samples": 1,
+      "tokens": 32,
+      "prefix": 2048,
+      "output_tokens": 32,
+      "execution_modes": 2,
+      "control_candidate_pairs": 1,
+      "selector": "ffn_only",
+      "p95_diagnostic": true,
+      "load_model": 1,
+      "reference": 0,
+      "args": [
+        "{model}",
+        "--workload",
+        "decode",
+        "--prefix",
+        "2048",
+        "--output-tokens",
+        "32",
+        "--selector",
+        "ffn_only",
+        "--modes",
+        "graph,eager"
+      ]
+    }
+  },
+  "native_counts": {
+    "tiny_cases": 1,
+    "tokens": 2,
+    "execution_modes": 2
+  },
+  "required_fixture_keys": [
+    "schema_version",
+    "task",
+    "status",
+    "claims_throughput",
+    "aggregate_deadline_s",
+    "cold_s",
+    "warm1_s",
+    "warm2_s",
+    "warm2_recompiled",
+    "header_invalidation",
+    "missing_tier_fails_before_gpu",
+    "over_budget_teardown",
+    "screen_skips_historical_oracles",
+    "proof_limit",
+    "report_path"
+  ],
+  "proof_limit": [
+    "no throughput claim",
+    "300-second aggregate feedback deadline",
+    "header and flag invalidation",
+    "missing tier fails before GPU work",
+    "over-budget subprocess teardown",
+    "screen is not a historical P/D oracle",
+    "historical evidence remains immutable"
+  ],
+  "report_path": "evidence/optimization/opt057-iteration-loop/REPORT.md"
+}
