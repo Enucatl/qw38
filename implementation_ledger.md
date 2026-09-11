@@ -129,9 +129,11 @@ are repository-relative unless stated otherwise.
 This batch is delivered; task completion includes measured rejects and does
 not imply a delivered speedup. Use
 the [source analysis and batch protocol](tasks/PERFORMANCE-RECOVERY-2026-09-11.md)
-and [testing strategy](testing-strategy.md). The post-069 batch below supplies
-the next work; its first eligible task in dependency order is OPT-071.
-Existing OPT-056 and OPT-016 gates remain blocked on their original conditions.
+and [testing strategy](testing-strategy.md). The post-069 batch is delivered;
+the [post-080 kernel-parity and quality-reset batch](tasks/PERFORMANCE-RECOVERY-POST-080.md)
+supplies the next work. Its first eligible task in ledger/dependency order is
+OPT-081. Existing OPT-056 and OPT-016 gates remain blocked on their original
+conditions.
 
 | ID | Description | Dependencies | Status | Acceptance condition | Evidence |
 |---|---|---|---|---|---|
@@ -151,14 +153,12 @@ Existing OPT-056 and OPT-016 gates remain blocked on their original conditions.
 
 ### Post-069 evidence and decode recovery batch
 
-Proposed work only. Read [the diagnosis and batch protocol](tasks/PERFORMANCE-RECOVERY-POST-069.md).
-OPT-064/066 are installed with incomplete incremental acceptance evidence;
-OPT-070 revalidates them. OPT-072 reviews every correctness-based rejection,
-OPT-073 separates authority capability from engine regressions, and OPT-074
-completes actual production GPU admission before Q4 promotion. Historical
-fixtures and OPT-056/OPT-016 requirements remain unchanged. Execute OPT-071
-first, prepare OPT-072/073/074 as their dependencies permit, then OPT-070/075.
-New kernel tasks are conditional on measured opportunity and valid admission.
+This batch is delivered. Read [the diagnosis and batch protocol](tasks/PERFORMANCE-RECOVERY-POST-069.md).
+Historical fixtures and OPT-056/OPT-016 requirements remain unchanged. OPT-080
+is the historical final gate for this batch and the previous validation
+policy. Successor dispositions for OPT-070–080 are recorded below; the
+[post-080 kernel-parity and quality-reset batch](tasks/PERFORMANCE-RECOVERY-POST-080.md)
+is the next work.
 
 | ID | Description | Dependencies | Status | Acceptance condition | Evidence |
 |---|---|---|---|---|---|
@@ -174,14 +174,68 @@ New kernel tasks are conditional on measured opportunity and valid admission.
 | OPT-079 | Convert prompt attention KV operands once per shared stage | OPT-070, OPT-071, OPT-073 | done | One conditional conversion-reuse candidate preserves exact F16 operands and async ownership and wins complete P cost, or resource/performance no-go | [`tasks/OPT-079.md`](tasks/OPT-079.md); [`pins/opt079_attention_kv_operands_contract.json`](pins/opt079_attention_kv_operands_contract.json); [`pins/opt079_iteration_contract.json`](pins/opt079_iteration_contract.json); [`fixtures/opt079_attention_kv_operands.json`](fixtures/opt079_attention_kv_operands.json); [`tools/opt079_attention_kv_operands.py`](tools/opt079_attention_kv_operands.py); [`tests/test_opt079_attention_kv_operands.py`](tests/test_opt079_attention_kv_operands.py); [`cuda/fattn_mma_f16.cuh`](cuda/fattn_mma_f16.cuh); [`cuda/fattn_mma_f16_pipeline.cuh`](cuda/fattn_mma_f16_pipeline.cuh); [`cuda/attention_decode.cu`](cuda/attention_decode.cu); [`cuda/attention_decode.h`](cuda/attention_decode.h); [`cuda/optimization_engine_probe.cu`](cuda/optimization_engine_probe.cu); [`cuda/opt079_attention_kv_operands_test.cu`](cuda/opt079_attention_kv_operands_test.cu); [`Makefile`](Makefile); [`evidence/optimization/opt079-attention-kv-operands/REPORT.md`](evidence/optimization/opt079-attention-kv-operands/REPORT.md); verification 2026-09-11T18:58:15Z |
 | OPT-080 | Validate the admitted combination against unchanged llama outcome gates | OPT-070, OPT-071, OPT-072, OPT-073, OPT-074, OPT-075, OPT-076, OPT-077, OPT-078, OPT-079 | done | Quality preflight gates one combined original P/D/2K and state sitting; internal progress, parity, +5% and p95 outcomes reported without relaxing historical gates | [`tasks/OPT-080.md`](tasks/OPT-080.md); [`pins/opt080_batch_gate_contract.json`](pins/opt080_batch_gate_contract.json); [`pins/opt080_iteration_contract.json`](pins/opt080_iteration_contract.json); [`fixtures/opt080_batch_gate.json`](fixtures/opt080_batch_gate.json); [`tools/opt080_batch_gate.py`](tools/opt080_batch_gate.py); [`tests/test_opt080_batch_gate.py`](tests/test_opt080_batch_gate.py); [`evidence/optimization/opt080-batch-gate/REPORT.md`](evidence/optimization/opt080-batch-gate/REPORT.md); verification 2026-09-11T19:25:00Z |
 
+OPT-070–080 historical outcomes are preserved. Successor dispositions (not
+rewrites): OPT-070 inconclusive coverage → OPT-086; OPT-071 retain repairs;
+OPT-072 inventory → OPT-087; OPT-073 quality findings → OPT-083/084; OPT-074
+historical GPU/FP64 characterization, no longer active kernel-admission
+authority; OPT-075/076 retain-packed due missing admission → OPT-085; OPT-077
+and OPT-078 performance no-go, not reopened; OPT-079 keep `kv_once` unless
+OPT-088 quality exposes an interaction; OPT-080 historical failed gate,
+superseded only by OPT-088 for the new combination.
+
+### Post-080 kernel-parity and quality-reset batch
+
+Proposed work only. Read [the policy and batch protocol](tasks/PERFORMANCE-RECOVERY-POST-080.md).
+This batch retires OPT-059/074 production-error admission as the active kernel
+gate and adopts the ds4 separation: kernel parity versus CPU/dequant at the
+same quantization, full-model quality, then independent performance. OPT-059/074
+remain historical diagnostics. Do not require
+`held_out_exceeds_frozen_calibration_ceiling` or a replacement Quartz-versus-llama
+projection envelope for kernel promotion.
+
+Active validation hierarchy after this batch:
+
+1. structural correctness;
+2. quantized-kernel parity versus independent CPU/dequant reference;
+3. exact equivalence for same-math paths;
+4. full-model quality;
+5. performance;
+6. release outcome.
+
+A kernel does not need to reproduce llama.cpp GPU's layer-specific floating-point
+projection error. It must implement the intended quantized operation within the
+approved kernel-parity envelope and must not regress full-model quality. Passing
+kernel parity does not establish model quality. Passing model quality does not
+establish performance. Passing performance does not excuse kernel or quality
+failure.
+
+Execute OPT-081 then OPT-082, and independently OPT-083 then OPT-084. OPT-085,
+OPT-086, and OPT-087 must not make final keep decisions until both kernel-parity
+infrastructure and the shipping quality baseline are frozen. OPT-088 is the
+combined gate for the new combination only; it does not reinterpret OPT-080.
+Historical OPT-056 and OPT-016 requirements remain unchanged. First eligible
+task in ledger/dependency order is OPT-081.
+
+| ID | Description | Dependencies | Status | Acceptance condition | Evidence |
+|---|---|---|---|---|---|
+| OPT-081 | Replace active OPT-059/074 numerical admission with a ds4-style kernel-parity contract | OPT-080 | pending | Versioned kernel_parity_v1 encodes association OR-rule, same-math class, per-family abs-scale/rel-tol, and retires OPT-074 family admission as a future keep blocker; historical OPT-059/074 fixtures unchanged; no kernel or tok/s claim | [`tasks/OPT-081.md`](tasks/OPT-081.md); [`tasks/PERFORMANCE-RECOVERY-POST-080.md`](tasks/PERFORMANCE-RECOVERY-POST-080.md); proposed 2026-09-11 |
+| OPT-082 | Port/adapt ds4 CUDA small-shape kernel-parity suite | OPT-081 | pending | Bounded GPU suite proves Q4_K/Q8/Q6 MMV/MMQ/fused/staging candidates implement the intended quantized operation versus CPU dequant; same-math paths use exact equivalence; no model inference or production keep | [`tasks/OPT-082.md`](tasks/OPT-082.md); proposed 2026-09-11 |
+| OPT-083 | Port/adapt ds4 full-model quality framework to pinned Qwen3.8 | OPT-058, OPT-073, OPT-080 | pending | Teacher-forced continuation NLL, llama control scorer, inspectable per-case evidence, explicit --quality mode, and disabled-by-default OpenRouter interface; no production kernel change | [`tasks/OPT-083.md`](tasks/OPT-083.md); proposed 2026-09-11 |
+| OPT-084 | Freeze shipping Quartz and pinned-llama quality baseline | OPT-083 | pending | Complete local quality suite scored on llama.cpp and current shipping Quartz; acceptance criteria frozen before candidate keeps; historical OPT-056/073 failures reclassified not erased | [`tasks/OPT-084.md`](tasks/OPT-084.md); proposed 2026-09-11 |
+| OPT-085 | Re-evaluate Q4 packed, integer paired, and late-reduction paths | OPT-075, OPT-076, OPT-082, OPT-084 | pending | Independent kernel-parity, quality, performance, and keep/revert verdicts for packed vs integer_q8_paired vs late_w4; at most one Q4 production path; OPT-074 unadmitted is not a blocker | [`tasks/OPT-085.md`](tasks/OPT-085.md); proposed 2026-09-11 |
+| OPT-086 | Re-evaluate installed Q8 r2_w2 and MMQ fma_async_x | OPT-064, OPT-066, OPT-070, OPT-082, OPT-084 | pending | Independent formal keep/revert for Q8 r1_w4 vs r2_w2 and MMQ fma_async vs fma_async_x using kernel parity, quality, and performance; OPT-074 coverage is not inconclusive | [`tasks/OPT-086.md`](tasks/OPT-086.md); proposed 2026-09-11 |
+| OPT-087 | Selectively reopen remaining numerical-policy-blocked candidates | OPT-072, OPT-082, OPT-084 | pending | Disposition table for remaining OPT-072 leftovers; reopen at most one already-implemented candidate with measured upside, or no_additional_reopen; no performance-loser rerun | [`tasks/OPT-087.md`](tasks/OPT-087.md); proposed 2026-09-11 |
+| OPT-088 | Combined post-reset production gate for the new combination | OPT-079, OPT-085, OPT-086, OPT-087 | pending | Independent kernel-parity, quality, Quartz-vs-baseline, Quartz-vs-llama, recurrence, P4096/D128/D2048/p95, llama parity, and OPT-056/+5% fields; OPT-080 remains historical and is not reinterpreted | [`tasks/OPT-088.md`](tasks/OPT-088.md); proposed 2026-09-11 |
+
 ### Post-042 recovery execution order (historical batch)
 
 The [2026-09-10 design](tasks/PERFORMANCE-RECOVERY-2026-09-10.md) compares the
 admitted Quartz, pinned llama.cpp and ds4 paths. It is source analysis and task
 design, not new performance evidence. **OPT-056 outcome gate measured unpassed**
 (2026-09-11); recovery requires closing remaining P/D throughput and decode-p95
-gaps versus llama before re-pass. The 2026-09-10 ladder is exhausted; the new
-OPT-057–069 batch above supplies the current recovery work.
+gaps versus llama before re-pass. The 2026-09-10 ladder is exhausted; OPT-057–069 and OPT-070–080 are
+delivered. The current recovery work is the post-080 kernel-parity and
+quality-reset batch.
 Dependencies permit independent work but do not authorize subagents. The user
 accepts documented llama.cpp/ds4-like accuracy compromises; strict reference
 arithmetic and exact structural/transaction guarantees remain separately tested.
@@ -6678,4 +6732,28 @@ statements below are historical, not the current execution order.
 - Marked OPT-080 `done`; delivery is limited to the verified task scope plus
   this ledger/audit bookkeeping. `plan.md` is unchanged. OPT-016 and OPT-056 stay
   `blocked`. No automatic next optimization sweep.
+
+### 2026-09-11T20:40:00Z — Admit post-080 kernel-parity and quality-reset tasks
+
+- Added pending OPT-081 through OPT-088 and
+  [`tasks/PERFORMANCE-RECOVERY-POST-080.md`](tasks/PERFORMANCE-RECOVERY-POST-080.md).
+  This is source-based task design, not kernel implementation or a new GPU
+  measurement. The first eligible task in ledger/dependency order is OPT-081.
+  OPT-083 is independently eligible after OPT-080; OPT-085/086/087 keep
+  decisions wait for OPT-082 and OPT-084.
+- Active kernel admission becomes ds4-style CPU/dequant kernel parity plus
+  same-math exactness. OPT-059/074 remain historical production-numerics
+  experiments and are no longer optimization blockers.
+  `held_out_exceeds_frozen_calibration_ceiling` / `opt074_coverage_unadmitted`
+  must not gate future keeps. Full-model quality (OPT-083/084) is a separate
+  contract from kernel parity and from performance.
+- OPT-075/076 Q4 paths reopen under OPT-085. Installed Q8/MMQ keeps receive
+  formal OPT-086 decisions. OPT-077/078 stay closed as performance no-gos.
+  OPT-079 `kv_once` is retained unless OPT-088 quality exposes an interaction.
+  OPT-080 remains the historical previous-policy gate; OPT-088 supersedes it
+  only for the new combination.
+- Validation: new dependency graph is acyclic; all eight dossier dependencies
+  match their pending ledger rows; local dossier/protocol links resolve;
+  `plan.md` is unchanged. No historical fixture, production pin, or gate was
+  rewritten.
 

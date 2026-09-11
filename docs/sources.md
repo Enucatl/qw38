@@ -1010,6 +1010,15 @@ baseline.
   [`fixtures/opt080_batch_gate.json`](../fixtures/opt080_batch_gate.json),
   and
   [`evidence/optimization/opt080-batch-gate/REPORT.md`](../evidence/optimization/opt080-batch-gate/REPORT.md).
+- OPT-081–088 are a **Proposed** validation reset, not a measured keep.
+  Kernel admission ports the testing strategy of local MIT `../ds4`
+  `cuda/mmq/test/test_mmq_parity.cu` `check_close` (CPU dequant GEMM;
+  fail only when abs and rel both exceed). Model quality ports the testing
+  strategy of `../ds4/gguf-tools/quality-testing/` to pinned Qwen3.8; ds4
+  DeepSeek/GLM continuation datasets are not a same-model baseline. Protocol:
+  [`tasks/PERFORMANCE-RECOVERY-POST-080.md`](../tasks/PERFORMANCE-RECOVERY-POST-080.md).
+  This increment does not copy `../ds4/cuda/mmq/` kernels and does not call
+  OpenRouter. OPT-059/074 remain historical diagnostics.
 - OPT-041 is a local derivation over admitted Ada+ stream-K fattn with
   register-resident VKQ and dual-F16 probability×V MMA. It assigns each of
   eight 16×8 QK microtiles to one of four warps (`tile_id % 4`), lets the

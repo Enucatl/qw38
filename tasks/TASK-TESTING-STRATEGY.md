@@ -4,8 +4,12 @@ Reviewed 2026-09-11 for OPT-057–069. The five-minute goal is time to a useful
 implementation decision on a prepared machine, including incremental build,
 not a promise that full release validation fits five minutes. OPT-057 implements
 the missing support. Historical evidence and frozen acceptance protocols retain
-their original workload/sample counts. New batch acceptance is specified in
-[the batch protocol](PERFORMANCE-RECOVERY-2026-09-11.md).
+their original workload/sample counts. Post-056 batch acceptance is specified in
+[the 2026-09-11 protocol](PERFORMANCE-RECOVERY-2026-09-11.md).
+Post-069 batch acceptance is specified in
+[the post-069 protocol](PERFORMANCE-RECOVERY-POST-069.md).
+OPT-081–088 batch acceptance is specified in
+[the post-080 kernel-parity protocol](PERFORMANCE-RECOVERY-POST-080.md).
 
 This is the shared test-authoring contract for every recovery task that adds or
 changes a pytest test, native diagnostic, CUDA A/B binary, or end-to-end oracle.

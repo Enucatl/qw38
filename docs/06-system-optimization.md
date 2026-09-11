@@ -733,6 +733,16 @@ llama 3142.52; D128 37.18 vs 68.87; D2048 35.45 vs 67.34). Diagnostic
 performance is not a keep. Live numbers stay in
 [`evidence/optimization/opt080-batch-gate/REPORT.md`](../evidence/optimization/opt080-batch-gate/REPORT.md).
 
+## Post-080 kernel-parity and quality reset (OPT-081–088)
+
+**Proposed.** OPT-080 closed the previous validation policy. The next batch
+does not extend OPT-059/074 production-error admission. Kernel admission
+becomes ds4-style CPU/dequant parity at the same quantization; full-model
+quality is a separate suite; performance remains independent. OPT-059/074 and
+OPT-070–080 reports stay historical. Protocol:
+[`tasks/PERFORMANCE-RECOVERY-POST-080.md`](../tasks/PERFORMANCE-RECOVERY-POST-080.md).
+First eligible task: OPT-081. No tok/s claim from this paragraph.
+
 ## Warp-owned prompt QK microtiles (OPT-041)
 
 **Measured, RTX 5090:** production prompt fattn on Ada+ stream-K with
