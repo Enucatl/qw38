@@ -1,5 +1,6 @@
 #include "gdn_step.h"
 #include "gdn_fused_quality.cuh"
+#include "gdn_decode_path.cuh"
 #include "pdl_launch.cuh"
 
 #include <algorithm>
@@ -18,6 +19,8 @@ constexpr int kThreads = 128;
 constexpr int kConvolutionThreads = 256;
 constexpr std::size_t kScanWindow = 64;
 constexpr float kL2Epsilon = 1.0e-6F;
+
+#include "gdn_decode_recurrence.cuh"
 
 bool valid_config(const GdnConfig& config) noexcept {
   return config.key_heads > 0 && config.key_heads <= kMaximumKeyHeads &&
@@ -754,14 +757,28 @@ cudaError_t launch_sequential_windows(
         config.convolution_width, window);
     cudaError_t error = cudaPeekAtLastError();
     if (error != cudaSuccess) return error;
-    prepare_recurrence_window<<<config.value_heads, kThreads, 0, stream>>>(
-        config, convolution_output + start * channels,
-        log_decay + start * config.value_heads,
-        beta + start * config.value_heads, source_recurrent,
-        candidate.recurrent,
-        recurrent_output + start * gdn_output_values(config), window,
-        value_is_tiled);
-    error = cudaPeekAtLastError();
+    if (window == 1 && gdn_decode_uses_tiled()) {
+      error = launch_gdn_decode_tiled_recurrence(
+          config, convolution_output + start * channels,
+          log_decay + start * config.value_heads,
+          beta + start * config.value_heads, source_recurrent,
+          candidate.recurrent,
+          recurrent_output + start * gdn_output_values(config), value_is_tiled,
+          stream);
+    } else {
+      prepare_recurrence_window<<<config.value_heads, kThreads, 0, stream>>>(
+          config, convolution_output + start * channels,
+          log_decay + start * config.value_heads,
+          beta + start * config.value_heads, source_recurrent,
+          candidate.recurrent,
+          recurrent_output + start * gdn_output_values(config), window,
+          value_is_tiled);
+      error = cudaPeekAtLastError();
+      if (error == cudaSuccess) {
+        record_gdn_decode_launch(kGdnDecodeLaunchVariantSequential, 0,
+                                 config.value_heads, 1);
+      }
+    }
     if (error != cudaSuccess) return error;
   }
   return cudaSuccess;
@@ -1114,6 +1131,40 @@ cudaError_t launch_gdn_quality_fused(
 
 int gdn_fused_quality_occupancy() noexcept {
   return gdn_fuse_occupancy("off");
+}
+
+int gdn_decode_tiled_occupancy(unsigned int value_tile) noexcept {
+  int occupancy = 0;
+  if (value_tile == kGdnDecodeValueTile16) {
+    cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+        &occupancy, prepare_recurrence_decode_tiled<kGdnDecodeValueTile16>,
+        kGdnDecodeThreads, 0);
+  } else if (value_tile == kGdnDecodeValueTile32) {
+    cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+        &occupancy, prepare_recurrence_decode_tiled<kGdnDecodeValueTile32>,
+        kGdnDecodeThreads, 0);
+  }
+  return occupancy;
+}
+
+void gdn_decode_tiled_attributes(unsigned int value_tile, int* registers,
+                                 std::size_t* local_bytes,
+                                 int* occupancy) noexcept {
+  cudaFuncAttributes attrs{};
+  if (value_tile == kGdnDecodeValueTile16) {
+    cudaFuncGetAttributes(
+        &attrs, prepare_recurrence_decode_tiled<kGdnDecodeValueTile16>);
+  } else if (value_tile == kGdnDecodeValueTile32) {
+    cudaFuncGetAttributes(
+        &attrs, prepare_recurrence_decode_tiled<kGdnDecodeValueTile32>);
+  }
+  if (registers != nullptr) *registers = attrs.numRegs;
+  if (local_bytes != nullptr) {
+    *local_bytes = static_cast<std::size_t>(attrs.localSizeBytes);
+  }
+  if (occupancy != nullptr) {
+    *occupancy = gdn_decode_tiled_occupancy(value_tile);
+  }
 }
 
 cudaError_t launch_gdn_commit(const GdnConfig& config,

@@ -7,6 +7,8 @@
 #include <cuda_bf16.h>
 #include <cuda_runtime.h>
 
+#include "gdn_decode_path.cuh"
+
 namespace qw38::cuda {
 
 struct GdnConfig {
@@ -99,6 +101,10 @@ int gdn_preproc_decay_occupancy() noexcept;
 int gdn_preproc_recurrence_occupancy() noexcept;
 int gdn_preproc_fma_occupancy() noexcept;
 int gdn_preproc_transpose_occupancy() noexcept;
+int gdn_decode_tiled_occupancy(unsigned int value_tile) noexcept;
+void gdn_decode_tiled_attributes(unsigned int value_tile, int* registers,
+                                 std::size_t* local_bytes,
+                                 int* occupancy) noexcept;
 
 cudaError_t launch_gdn_shared_inverses(
     const GdnConfig& config, const float* convolution_output,

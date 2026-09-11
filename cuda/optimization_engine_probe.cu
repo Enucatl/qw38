@@ -1,5 +1,6 @@
 #include "ffn_decode_path.cuh"
 #include "full_scheduler.h"
+#include "gdn_decode_path.cuh"
 #include "q4k_decode_path.cuh"
 #include "q8_decode_path.cuh"
 #include "quant_mmv.h"
@@ -47,6 +48,7 @@ struct Options final {
   const char* q8_layout = nullptr;
   const char* q4_decode = nullptr;
   const char* ffn_decode = nullptr;
+  const char* gdn_decode = nullptr;
   unsigned int q4_warps = 0;
   int mmq_async_x = -1;
   bool graph = false;
@@ -107,12 +109,13 @@ bool parse_modes(const char* text, Options* options) {
 int usage(const char* argv0) {
   std::fprintf(stderr,
                "usage: %s [MODEL.gguf] [--workload tiny|tokens|prefill|decode|"
-               "q8-ab|mmq-ab|q4-ab] "
+               "q8-ab|mmq-ab|q4-ab|gdn-ab] "
                "[--prompt N] [--prefix N] [--output-tokens N] [--runs N] "
                "[--pairs N] [--q8-layout r1_w4|r2_w2] [--mmq-async-x 0|1] "
                "[--q4-decode packed|integer_q8|integer_q8_late] "
                "[--q4-warps 2|4] "
                "[--ffn-decode paired_staged|shared_stage|paired_integer] "
+               "[--gdn-decode sequential|tile16|tile32] "
                "[--selector NAME] [--modes graph,eager] [--skip-logits]\n",
                argv0);
   return 2;
@@ -155,6 +158,8 @@ int parse_args(int argc, char** argv, Options* options) {
       options->q4_warps = static_cast<unsigned int>(std::atoi(argv[++index]));
     } else if (std::strcmp(arg, "--ffn-decode") == 0 && index + 1 < argc) {
       options->ffn_decode = argv[++index];
+    } else if (std::strcmp(arg, "--gdn-decode") == 0 && index + 1 < argc) {
+      options->gdn_decode = argv[++index];
     } else if (std::strcmp(arg, "--selector") == 0 && index + 1 < argc) {
       options->selector = argv[++index];
     } else if (std::strcmp(arg, "--modes") == 0 && index + 1 < argc) {
@@ -224,7 +229,8 @@ int apply_defaults(const qw38::cuda::TestTier tier, Options* options) {
       options->eager = true;
     }
   }
-  if (std::strcmp(options->workload, "q4-ab") == 0) {
+  if (std::strcmp(options->workload, "q4-ab") == 0 ||
+      std::strcmp(options->workload, "gdn-ab") == 0) {
     if (options->prefix == 0) options->prefix = kScreenPrefix;
     if (options->output_tokens == 0) {
       options->output_tokens = kScreenOutputTokens;
@@ -252,7 +258,9 @@ int reject_over_bounds(qw38::cuda::TestTier tier, const Options& options) {
   const bool q8_ab = std::strcmp(options.workload, "q8-ab") == 0;
   const bool mmq_ab = std::strcmp(options.workload, "mmq-ab") == 0;
   const bool q4_ab = std::strcmp(options.workload, "q4-ab") == 0;
-  if (!tiny && !tokens && !prefill && !decode && !q8_ab && !mmq_ab && !q4_ab) {
+  const bool gdn_ab = std::strcmp(options.workload, "gdn-ab") == 0;
+  if (!tiny && !tokens && !prefill && !decode && !q8_ab && !mmq_ab && !q4_ab &&
+      !gdn_ab) {
     std::fprintf(stderr, "unknown workload %s\n", options.workload);
     return 2;
   }
@@ -300,8 +308,11 @@ int reject_over_bounds(qw38::cuda::TestTier tier, const Options& options) {
     const bool q4_ok = q4_ab && options.prefix == kScreenPrefix &&
                        options.output_tokens == kScreenOutputTokens &&
                        options.prompt == 0 && options.pairs <= 1;
+    const bool gdn_ok = gdn_ab && options.prefix == kScreenPrefix &&
+                        options.output_tokens == kScreenOutputTokens &&
+                        options.prompt == 0 && options.pairs <= 1;
     if (options.model == nullptr || options.runs != 1 ||
-        !(decode_ok || prefill_ok || q8_ok || mmq_ok || q4_ok)) {
+        !(decode_ok || prefill_ok || q8_ok || mmq_ok || q4_ok || gdn_ok)) {
       std::fprintf(stderr,
                    "screen allows one pair of P4096 or prefix 2048 + 32 "
                    "output tokens\n");
@@ -309,7 +320,8 @@ int reject_over_bounds(qw38::cuda::TestTier tier, const Options& options) {
     }
     return 0;
   }
-  if (tier == qw38::cuda::TestTier::kAcceptance && (q8_ab || mmq_ab || q4_ab)) {
+  if (tier == qw38::cuda::TestTier::kAcceptance &&
+      (q8_ab || mmq_ab || q4_ab || gdn_ab)) {
     const bool q8_ok = q8_ab && options.prefix == kScreenPrefix &&
                        options.output_tokens == kScreenOutputTokens &&
                        options.prompt == 0 && options.pairs <= 5;
@@ -319,7 +331,10 @@ int reject_over_bounds(qw38::cuda::TestTier tier, const Options& options) {
     const bool q4_ok = q4_ab && options.prefix == kScreenPrefix &&
                        options.output_tokens == kScreenOutputTokens &&
                        options.prompt == 0 && options.pairs <= 5;
-    if (options.model == nullptr || !(q8_ok || mmq_ok || q4_ok)) {
+    const bool gdn_ok = gdn_ab && options.prefix == kScreenPrefix &&
+                        options.output_tokens == kScreenOutputTokens &&
+                        options.prompt == 0 && options.pairs <= 5;
+    if (options.model == nullptr || !(q8_ok || mmq_ok || q4_ok || gdn_ok)) {
       std::fprintf(stderr,
                    "acceptance keep-ab allows five P4096 or D2048+32 pairs\n");
       return 2;
@@ -708,12 +723,13 @@ int run_engine(const Options& options, bool correctness) {
 int run_keep_ab(const Options& options) {
   const bool q8 = std::strcmp(options.workload, "q8-ab") == 0;
   const bool q4 = std::strcmp(options.workload, "q4-ab") == 0;
+  const bool gdn = std::strcmp(options.workload, "gdn-ab") == 0;
   qw38::cuda::ResidentModel model;
   const int loaded = load_model(options.model, &model);
   if (loaded != 0) return loaded;
-  const std::size_t prompt = (!q8 && !q4) ? options.prompt : 0;
-  const std::size_t prefix = (q8 || q4) ? options.prefix : 0;
-  const std::size_t output_tokens = (q8 || q4) ? options.output_tokens : 0;
+  const std::size_t prompt = (!q8 && !q4 && !gdn) ? options.prompt : 0;
+  const std::size_t prefix = (q8 || q4 || gdn) ? options.prefix : 0;
+  const std::size_t output_tokens = (q8 || q4 || gdn) ? options.output_tokens : 0;
   const std::size_t token_count =
       prompt > 0 ? prompt : prefix + output_tokens;
   const std::size_t capacity =
@@ -728,16 +744,18 @@ int run_keep_ab(const Options& options) {
       options.q4_decode != nullptr ? options.q4_decode : "integer_q8";
   const char* candidate_ffn =
       options.ffn_decode != nullptr ? options.ffn_decode : "paired_integer";
+  const char* candidate_gdn =
+      options.gdn_decode != nullptr ? options.gdn_decode : "tile16";
   const int pairs = options.pairs > 0 ? options.pairs : 1;
   std::printf("phase=keep_ab family=%s pairs=%d model_loaded_once=true "
               "recapture_after_selector=true\n",
-              q4 ? "q4" : (q8 ? "q8" : "mmq"), pairs);
+              gdn ? "gdn" : (q4 ? "q4" : (q8 ? "q8" : "mmq")), pairs);
   for (int pair = 0; pair < pairs; ++pair) {
     const bool ba = (pair % 2) == 1;
-    const char* first = ba ? (q4 ? "1" : (q8 ? candidate_layout : "1"))
-                           : (q4 ? "0" : (q8 ? control_layout : "0"));
-    const char* second = ba ? (q4 ? "0" : (q8 ? control_layout : "0"))
-                            : (q4 ? "1" : (q8 ? candidate_layout : "1"));
+    const char* first = ba ? ((q4 || gdn) ? "1" : (q8 ? candidate_layout : "1"))
+                           : ((q4 || gdn) ? "0" : (q8 ? control_layout : "0"));
+    const char* second = ba ? ((q4 || gdn) ? "0" : (q8 ? control_layout : "0"))
+                            : ((q4 || gdn) ? "1" : (q8 ? candidate_layout : "1"));
     float walls[2] = {0.0F, 0.0F};
     const char* labels[2] = {first, second};
     const char* q8_layout_copy[2] = {"", ""};
@@ -757,6 +775,12 @@ int run_keep_ab(const Options& options) {
             !qw38::cuda::apply_ffn_decode_ident(ffn_path)) {
           std::fprintf(stderr, "invalid q4/ffn path %s/%s warps=%u\n", q4_path,
                        ffn_path, warps);
+          return 2;
+        }
+      } else if (gdn) {
+        const char* gdn_path = candidate_side ? candidate_gdn : "sequential";
+        if (!qw38::cuda::apply_gdn_decode_ident(gdn_path)) {
+          std::fprintf(stderr, "invalid --gdn-decode %s\n", gdn_path);
           return 2;
         }
       } else if (q8) {
@@ -803,7 +827,8 @@ int run_keep_ab(const Options& options) {
           "q4_path=%s ffn_path=%s gate_variant=%s up_variant=%s "
           "down_variant=%s gate_up_stage_count=%d down_stage_count=%d "
           "captured_in_graph=%s staging=%s warps_per_row=%u "
-          "wall_ms=%.9g captured_path=%s\n",
+          "wall_ms=%.9g captured_path=%s gdn_decode=%s gdn_launch=%s "
+          "gdn_tile=%u\n",
           pair, side, labels[side],
           q8_layout_copy[side] != nullptr ? q8_layout_copy[side] : "",
           q8_rows[side], mmq_kernel_buf[side],
@@ -812,11 +837,15 @@ int run_keep_ab(const Options& options) {
           ffn.gate_up_stage_count, ffn.down_stage_count,
           ffn.captured_in_graph ? "true" : "false", ffn.staging,
           qw38::cuda::effective_q4_decode_warps_per_row(),
-          static_cast<double>(walls[side]), graphs.execution_graph_path());
+          static_cast<double>(walls[side]), graphs.execution_graph_path(),
+          qw38::cuda::effective_gdn_decode_path(),
+          qw38::cuda::last_gdn_decode_launch_variant(),
+          qw38::cuda::last_gdn_decode_value_tile());
       qw38::cuda::clear_q8_decode_path_override();
       qw38::cuda::clear_mmq_async_x_override();
       qw38::cuda::clear_q4_decode_path_override();
       qw38::cuda::clear_ffn_decode_path_override();
+      qw38::cuda::clear_gdn_decode_path_override();
     }
     std::printf(
         "{\"observation_unit\":\"independent_round\",\"sample_index\":%d,"
@@ -825,7 +854,7 @@ int run_keep_ab(const Options& options) {
         pair, pair, ba ? "BA" : "AB",
         static_cast<double>(ba ? walls[1] : walls[0]),
         static_cast<double>(ba ? walls[0] : walls[1]),
-        q4 ? "q4" : (q8 ? "q8" : "mmq"));
+        q4 ? "q4" : (gdn ? "gdn" : (q8 ? "q8" : "mmq")));
   }
   std::printf(
       "QW38_OPT070_NATIVE_COUNTS={\"schema_version\":1,\"task\":\"OPT-070\","
@@ -835,7 +864,7 @@ int run_keep_ab(const Options& options) {
       "\"acceptance_executed\":%s,\"keep\":false,"
       "\"override_before_capture_applied\":true,"
       "\"graph_capture_separate\":true}\n",
-      q4 ? "q4" : (q8 ? "q8" : "mmq"), qw38::cuda::test_tier_name(), pairs, pairs,
+      q4 ? "q4" : (gdn ? "gdn" : (q8 ? "q8" : "mmq")), qw38::cuda::test_tier_name(), pairs, pairs,
       qw38::cuda::test_tier_name(), pairs,
       qw38::cuda::test_tier() == qw38::cuda::TestTier::kAcceptance ? "true"
                                                                    : "false");
@@ -867,7 +896,20 @@ int run_keep_ab(const Options& options) {
               "\"workload\":\"%s\",\"pairs\":%d,\"model_loaded_once\":true,"
               "\"override_before_capture_applied\":true,"
               "\"recapture_after_selector\":true}\n",
-              kPrefix, q4 ? "OPT-075" : "OPT-070", options.workload, pairs);
+              kPrefix, gdn ? "OPT-077" : (q4 ? "OPT-075" : "OPT-070"),
+              options.workload, pairs);
+  std::printf(
+      "QW38_OPT077_NATIVE_COUNTS={\"schema_version\":1,\"task\":\"OPT-077\","
+      "\"family\":\"gdn\",\"tier\":\"%s\",\"warmups\":0,\"samples\":%d,"
+      "\"observed_warmups\":0,\"observed_samples\":%d,\"observed_candidates\":2,"
+      "\"observed_shapes\":1,\"observed_tier\":\"%s\",\"pairs\":%d,"
+      "\"acceptance_executed\":%s,\"keep\":false,"
+      "\"override_before_capture_applied\":true,"
+      "\"graph_capture_separate\":true,\"recapture_after_selector\":true}\n",
+      qw38::cuda::test_tier_name(), pairs, pairs, qw38::cuda::test_tier_name(),
+      pairs,
+      qw38::cuda::test_tier() == qw38::cuda::TestTier::kAcceptance ? "true"
+                                                                   : "false");
   std::printf("status=passed\n");
   return 0;
 }
@@ -891,7 +933,8 @@ int main(int argc, char** argv) {
   if (std::strcmp(options.workload, "tiny") == 0) return run_tiny();
   if (std::strcmp(options.workload, "q8-ab") == 0 ||
       std::strcmp(options.workload, "mmq-ab") == 0 ||
-      std::strcmp(options.workload, "q4-ab") == 0) {
+      std::strcmp(options.workload, "q4-ab") == 0 ||
+      std::strcmp(options.workload, "gdn-ab") == 0) {
     return run_keep_ab(options);
   }
   return run_engine(options, tier == qw38::cuda::TestTier::kCorrectness);

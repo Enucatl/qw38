@@ -223,6 +223,19 @@ struct ActivationCapture final {
   bool* full_layer_input_captured = nullptr;
   bool* full_ffn_input_captured = nullptr;
   bool* full_attn_output_captured = nullptr;
+  // OPT-077 decode GDN committed-state capture. Host owns the buffers;
+  // copies are untimed and excluded from replay intervals.
+  bool capture_gdn_decode = false;
+  std::size_t gdn_capture_position = 0;
+  std::size_t gdn_capture_positions = 0;
+  std::size_t gdn_capture_slots = 0;
+  float* gdn_conv_input = nullptr;
+  float* gdn_log_decay = nullptr;
+  float* gdn_beta = nullptr;
+  float* gdn_committed_conv = nullptr;
+  float* gdn_committed_rec = nullptr;
+  float* gdn_gate = nullptr;
+  bool* gdn_slot_captured = nullptr;
 };
 
 // One request-level attribution record. A false `measured` flag means that the

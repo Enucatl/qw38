@@ -1,0 +1,83 @@
+{
+  "schema_version": 1,
+  "task": "OPT-077",
+  "yardstick": "decode_gdn_parallel_recurrence",
+  "claims_throughput": false,
+  "claims_performance_improvement": false,
+  "llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+  "gguf_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+  "token_generator": "(42 + index * 997) % 248320",
+  "control": "sequential",
+  "state_layout": "row_major_fp32",
+  "transposed_state_forbidden": true,
+  "prompt_path_unchanged": true,
+  "convolution_separate": true,
+  "min_saving_ms_per_token": 0.10,
+  "recurrence_nll_ceiling": 0.02,
+  "configurations": [
+    {
+      "id": "sequential",
+      "gdn_decode": "sequential",
+      "value_tile": 0,
+      "warps_per_cta": 4,
+      "role": "control",
+      "expected_launch": "prepare_recurrence_window"
+    },
+    {
+      "id": "tile16",
+      "gdn_decode": "tile16",
+      "value_tile": 16,
+      "warps_per_cta": 4,
+      "role": "candidate",
+      "expected_launch": "prepare_recurrence_decode_tiled16"
+    },
+    {
+      "id": "tile32",
+      "gdn_decode": "tile32",
+      "value_tile": 32,
+      "warps_per_cta": 4,
+      "role": "candidate",
+      "expected_launch": "prepare_recurrence_decode_tiled32"
+    }
+  ],
+  "tiny_cases": [
+    {"id": "W8_U1", "key_width": 8, "value_width": 8, "updates": 1},
+    {"id": "W8_U4", "key_width": 8, "value_width": 8, "updates": 4},
+    {"id": "W32_U1", "key_width": 32, "value_width": 32, "updates": 1},
+    {"id": "W32_U4", "key_width": 32, "value_width": 32, "updates": 4}
+  ],
+  "production_references": {
+    "sampled_coordinates": 16,
+    "updates": 4,
+    "held_out_gdn_slots": [46, 47]
+  },
+  "feedback_warmups": 1,
+  "feedback_samples": 3,
+  "feedback_engine_pairs": 1,
+  "acceptance_warmups": 3,
+  "acceptance_samples": 10,
+  "acceptance_engine_pairs": 5,
+  "component_t_critical_df9": 2.262,
+  "engine_t_critical_df4": 2.132,
+  "native_test": "build/qw38-cuda-opt077-gdn-decode-test",
+  "native_replay": "build/qw38-cuda-component-replay",
+  "native_probe": "build/qw38-cuda-optimization-engine-probe",
+  "required_fixture_keys": [
+    "schema_version",
+    "task",
+    "mode",
+    "llama_revision",
+    "gguf_sha256",
+    "claims_throughput",
+    "configurations",
+    "control",
+    "survivor",
+    "shipping_gdn_decode",
+    "production_kept",
+    "quality",
+    "numeric",
+    "report_path"
+  ],
+  "verdicts": ["keep", "retain_sequential", "performance_rejected", "quality_blocked", "inconclusive"],
+  "report_path": "evidence/optimization/opt077-gdn-decode/REPORT.md"
+}

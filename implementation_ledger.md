@@ -169,7 +169,7 @@ New kernel tasks are conditional on measured opportunity and valid admission.
 | OPT-074 | Complete real production-shape llama GPU numerical admission | OPT-059, OPT-071, OPT-072 | done | Full-M actual GPU dispatch, sampled independent FP64 and frozen held-out budgets cover production Q4 and selected Q8/Q6; missing coverage cannot become admission | [`tasks/OPT-074.md`](tasks/OPT-074.md); [`pins/opt074_production_gpu_admission_contract.json`](pins/opt074_production_gpu_admission_contract.json); [`pins/opt074_iteration_contract.json`](pins/opt074_iteration_contract.json); [`fixtures/opt074_production_gpu_admission.json`](fixtures/opt074_production_gpu_admission.json); [`tools/opt074_production_gpu_admission.py`](tools/opt074_production_gpu_admission.py); [`tests/test_opt074_production_gpu_admission.py`](tests/test_opt074_production_gpu_admission.py); [`tools/llama_authority/projection_export.cpp`](tools/llama_authority/projection_export.cpp); [`tools/llama_authority/build_projection_export.sh`](tools/llama_authority/build_projection_export.sh); [`cuda/full_scheduler.h`](cuda/full_scheduler.h); [`cuda/full_scheduler.cu`](cuda/full_scheduler.cu); [`cuda/opt043_activation_capture_test.cu`](cuda/opt043_activation_capture_test.cu); [`Makefile`](Makefile); [`evidence/optimization/opt074-production-gpu-admission/REPORT.md`](evidence/optimization/opt074-production-gpu-admission/REPORT.md); verification 2026-09-11T16:28:16Z |
 | OPT-075 | Admit or reject existing unfused and paired cooperative Q4 FFN | OPT-070, OPT-073, OPT-074 | done | Current packed versus existing integer survivor passes versioned production quality, actual all-leg dispatch and complete rotating/E2E acceptance, or documented retained packed | [`tasks/OPT-075.md`](tasks/OPT-075.md); [`pins/opt075_q4_production_admission_contract.json`](pins/opt075_q4_production_admission_contract.json); [`pins/opt075_iteration_contract.json`](pins/opt075_iteration_contract.json); [`fixtures/opt075_q4_production_admission.json`](fixtures/opt075_q4_production_admission.json); [`tools/opt075_q4_production_admission.py`](tools/opt075_q4_production_admission.py); [`tests/test_opt075_q4_production_admission.py`](tests/test_opt075_q4_production_admission.py); [`tools/run_optimization_task.py`](tools/run_optimization_task.py); [`cuda/q4k_decode_path.cuh`](cuda/q4k_decode_path.cuh); [`cuda/ffn_decode_path.cuh`](cuda/ffn_decode_path.cuh); [`cuda/optimization_component_replay.cu`](cuda/optimization_component_replay.cu); [`cuda/optimization_component_replay.h`](cuda/optimization_component_replay.h); [`cuda/optimization_engine_probe.cu`](cuda/optimization_engine_probe.cu); [`Makefile`](Makefile); [`evidence/optimization/opt075-q4-production-admission/REPORT.md`](evidence/optimization/opt075-q4-production-admission/REPORT.md); verification 2026-09-11T17:28:23Z |
 | OPT-076 | Remove Q4 K-loop shuffle reductions and scalar unpacking | OPT-071, OPT-074, OPT-075 | done | Two bounded packed-load/late-reduction candidates yield an admitted complete FFN saving with staged semantics intact, or measured rejection | [`tasks/OPT-076.md`](tasks/OPT-076.md); [`pins/opt076_q4_reduction_contract.json`](pins/opt076_q4_reduction_contract.json); [`pins/opt076_iteration_contract.json`](pins/opt076_iteration_contract.json); [`fixtures/opt076_q4_reduction.json`](fixtures/opt076_q4_reduction.json); [`tools/opt076_q4_reduction.py`](tools/opt076_q4_reduction.py); [`tests/test_opt076_q4_reduction.py`](tests/test_opt076_q4_reduction.py); [`tools/run_optimization_task.py`](tools/run_optimization_task.py); [`cuda/q4k_decode_path.cuh`](cuda/q4k_decode_path.cuh); [`cuda/q4k_decode_dots.cuh`](cuda/q4k_decode_dots.cuh); [`cuda/q4k_decode_dots.cu`](cuda/q4k_decode_dots.cu); [`cuda/quant_mmv.h`](cuda/quant_mmv.h); [`cuda/optimization_component_replay.cu`](cuda/optimization_component_replay.cu); [`cuda/optimization_engine_probe.cu`](cuda/optimization_engine_probe.cu); [`cuda/opt076_q4_reduction_test.cu`](cuda/opt076_q4_reduction_test.cu); [`Makefile`](Makefile); [`evidence/optimization/opt076-q4-reduction/REPORT.md`](evidence/optimization/opt076-q4-reduction/REPORT.md); verification 2026-09-11T17:50:30Z |
-| OPT-077 | Parallelize decode GDN state reductions across key/value tiles | OPT-070, OPT-071, OPT-073 | pending | Complete 48-layer GDN benefits from bounded parallel FP32 recurrence with calibrated quality, exact state isolation and short E2E guards, or no-go/rejection | [`tasks/OPT-077.md`](tasks/OPT-077.md) |
+| OPT-077 | Parallelize decode GDN state reductions across key/value tiles | OPT-070, OPT-071, OPT-073 | done | Complete 48-layer GDN benefits from bounded parallel FP32 recurrence with calibrated quality, exact state isolation and short E2E guards, or no-go/rejection | [`tasks/OPT-077.md`](tasks/OPT-077.md); [`pins/opt077_gdn_decode_contract.json`](pins/opt077_gdn_decode_contract.json); [`pins/opt077_iteration_contract.json`](pins/opt077_iteration_contract.json); [`fixtures/opt077_gdn_decode.json`](fixtures/opt077_gdn_decode.json); [`tools/opt077_gdn_decode.py`](tools/opt077_gdn_decode.py); [`tests/test_opt077_gdn_decode.py`](tests/test_opt077_gdn_decode.py); [`cuda/gdn_decode_path.cuh`](cuda/gdn_decode_path.cuh); [`cuda/gdn_decode_recurrence.cuh`](cuda/gdn_decode_recurrence.cuh); [`cuda/gdn_step.cu`](cuda/gdn_step.cu); [`cuda/gdn_step.h`](cuda/gdn_step.h); [`cuda/full_scheduler.h`](cuda/full_scheduler.h); [`cuda/full_scheduler.cu`](cuda/full_scheduler.cu); [`cuda/optimization_component_replay.cu`](cuda/optimization_component_replay.cu); [`cuda/optimization_component_replay.h`](cuda/optimization_component_replay.h); [`cuda/optimization_engine_probe.cu`](cuda/optimization_engine_probe.cu); [`cuda/opt077_gdn_decode_test.cu`](cuda/opt077_gdn_decode_test.cu); [`Makefile`](Makefile); [`evidence/optimization/opt077-gdn-decode/REPORT.md`](evidence/optimization/opt077-gdn-decode/REPORT.md); verification 2026-09-11T18:25:30Z |
 | OPT-078 | Hoist decode query preparation and vector-load KV | OPT-070, OPT-071, OPT-073 | pending | Preparation-inclusive one-token attention wins with fixed 16 partitions, unchanged arithmetic/KV visibility and bounded E2E validation, or retained control | [`tasks/OPT-078.md`](tasks/OPT-078.md) |
 | OPT-079 | Convert prompt attention KV operands once per shared stage | OPT-070, OPT-071, OPT-073 | pending | One conditional conversion-reuse candidate preserves exact F16 operands and async ownership and wins complete P cost, or resource/performance no-go | [`tasks/OPT-079.md`](tasks/OPT-079.md) |
 | OPT-080 | Validate the admitted combination against unchanged llama outcome gates | OPT-070, OPT-071, OPT-072, OPT-073, OPT-074, OPT-075, OPT-076, OPT-077, OPT-078, OPT-079 | pending | Quality preflight gates one combined original P/D/2K and state sitting; internal progress, parity, +5% and p95 outcomes reported without relaxing historical gates | [`tasks/OPT-080.md`](tasks/OPT-080.md) |
@@ -6553,4 +6553,42 @@ statements below are historical, not the current execution order.
 - Marked OPT-076 `done`; delivery is limited to the verified task scope plus
   this ledger/audit bookkeeping. `plan.md` is unchanged. OPT-016 and OPT-056 stay
   `blocked`. Next eligible pending by dependency order: **OPT-077**. No tok/s
+  claim (`claims_throughput=false`).
+
+### 2026-09-11T18:26:00Z — OPT-077 decode GDN tile screen delivered
+
+- Screened sequential `prepare_recurrence_window` control and two value-tile
+  layouts (`tile16`, `tile32`, four warps/CTA) on repaired OPT-071 decode-GDN
+  captures. Native sequential/FP64 match ~1e-9; local_bytes 0. Complete 48-layer
+  GDN acceptance n=10: sequential 12.516 ms vs tile32 11.894 ms; paired CI
+  -0.164..1.409 ms (not entirely positive). Engine D2048+32 non-regression
+  holds. Quality-v3 absolute fail, engine NR pass. Verdict:
+  **retain_sequential** / `uncertainty`; shipping stays `sequential`. Coupled
+  IDs: none. No production pin change.
+- Acceptance: host contract, three-config screen, tiled launch dispatch proof,
+  identity-cached quality, complete rotating/E2E evidence, and documented
+  retain_sequential decision; 9 pytest cases; native tiny/production numeric
+  plus SASS/resource; no added spills.
+- Acceptance evidence: [`tasks/OPT-077.md`](tasks/OPT-077.md);
+  [`pins/opt077_gdn_decode_contract.json`](pins/opt077_gdn_decode_contract.json);
+  [`pins/opt077_iteration_contract.json`](pins/opt077_iteration_contract.json);
+  [`fixtures/opt077_gdn_decode.json`](fixtures/opt077_gdn_decode.json);
+  [`tools/opt077_gdn_decode.py`](tools/opt077_gdn_decode.py);
+  [`tests/test_opt077_gdn_decode.py`](tests/test_opt077_gdn_decode.py);
+  [`cuda/gdn_decode_path.cuh`](cuda/gdn_decode_path.cuh);
+  [`cuda/gdn_decode_recurrence.cuh`](cuda/gdn_decode_recurrence.cuh);
+  [`cuda/gdn_step.cu`](cuda/gdn_step.cu);
+  [`cuda/gdn_step.h`](cuda/gdn_step.h);
+  [`cuda/full_scheduler.h`](cuda/full_scheduler.h);
+  [`cuda/full_scheduler.cu`](cuda/full_scheduler.cu);
+  [`cuda/optimization_component_replay.cu`](cuda/optimization_component_replay.cu);
+  [`cuda/optimization_engine_probe.cu`](cuda/optimization_engine_probe.cu);
+  [`cuda/opt077_gdn_decode_test.cu`](cuda/opt077_gdn_decode_test.cu);
+  [`Makefile`](Makefile);
+  [`evidence/optimization/opt077-gdn-decode/REPORT.md`](evidence/optimization/opt077-gdn-decode/REPORT.md).
+  Proof is measured retain_sequential — not a shipping speedup. **tok/s delta vs
+  sequential baseline:** 0 (shipping unchanged).
+- Marked OPT-077 `done`; delivery is limited to the verified task scope plus
+  this ledger/audit bookkeeping. `plan.md` is unchanged. OPT-016 and OPT-056 stay
+  `blocked`. Next eligible pending by dependency order: **OPT-078**. No tok/s
   claim (`claims_throughput=false`).

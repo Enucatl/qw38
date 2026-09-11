@@ -8,6 +8,7 @@
 
 #include "ffn_decode_path.cuh"
 #include "full_scheduler.h"
+#include "gdn_decode_path.cuh"
 #include "q4k_decode_path.cuh"
 #include "q6k_decode_path.cuh"
 #include "q8_decode_path.cuh"
@@ -34,7 +35,10 @@ constexpr std::size_t kOpt061PromptRows = 4096;
 constexpr std::size_t kOpt061GuardBytes = 64;
 constexpr char kOpt061TokenGenerator[] = "(42 + index * 997) % 248320";
 
-enum class ReplayFamily { kDecodeFfn, kDecodeMixer, kPromptFfn };
+constexpr std::size_t kOpt061GdnLayers = 48;
+constexpr std::size_t kOpt077GdnCapturePositions = 2;
+
+enum class ReplayFamily { kDecodeFfn, kDecodeMixer, kPromptFfn, kDecodeGdn };
 enum class CacheMode { kHot, kRotating };
 
 inline const char* replay_family_name(ReplayFamily family) noexcept {
@@ -45,6 +49,8 @@ inline const char* replay_family_name(ReplayFamily family) noexcept {
       return "decode-mixer";
     case ReplayFamily::kPromptFfn:
       return "prompt-ffn";
+    case ReplayFamily::kDecodeGdn:
+      return "decode-gdn";
   }
   return "unknown";
 }

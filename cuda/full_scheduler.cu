@@ -677,7 +677,50 @@ cudaError_t maybe_capture_mix(ActivationCapture* capture, std::size_t layer,
     std::memcpy(dest.mix_full, host.data(), count * sizeof(float));
   }
   dest.mix_captured = true;
-  return cudaSuccess;
+  return error;
+}
+
+cudaError_t maybe_capture_gdn_decode(ActivationCapture* capture,
+                                     std::size_t gdn_slot,
+                                     const float* conv_input,
+                                     const float* log_decay, const float* beta,
+                                     const GdnState& committed,
+                                     const float* gate) noexcept {
+  if (capture == nullptr || !capture->capture_gdn_decode) return cudaSuccess;
+  if (gdn_slot >= capture->gdn_capture_slots) return cudaSuccess;
+  const std::size_t pos = capture->gdn_capture_position;
+  if (pos >= capture->gdn_capture_positions) return cudaSuccess;
+  const std::size_t index = pos * capture->gdn_capture_slots + gdn_slot;
+  cudaError_t error = cudaDeviceSynchronize();
+  if (error != cudaSuccess) return error;
+  auto copy = [&](float* host, const float* device, std::size_t count) {
+    if (host == nullptr || device == nullptr || count == 0) return cudaSuccess;
+    return cudaMemcpy(host + index * count, device, count * sizeof(float),
+                      cudaMemcpyDeviceToHost);
+  };
+  error = copy(capture->gdn_conv_input, conv_input,
+               internal::kGdnPackedQkvWidth);
+  if (error == cudaSuccess) {
+    error = copy(capture->gdn_log_decay, log_decay, internal::kGdnGateCount);
+  }
+  if (error == cudaSuccess) {
+    error = copy(capture->gdn_beta, beta, internal::kGdnGateCount);
+  }
+  if (error == cudaSuccess) {
+    error = copy(capture->gdn_committed_conv, committed.convolution,
+                 internal::kGdnConvolutionValues);
+  }
+  if (error == cudaSuccess) {
+    error = copy(capture->gdn_committed_rec, committed.recurrent,
+                 internal::kGdnRecurrentStateValues);
+  }
+  if (error == cudaSuccess) {
+    error = copy(capture->gdn_gate, gate, internal::kGdnValueWidth);
+  }
+  if (error == cudaSuccess && capture->gdn_slot_captured != nullptr) {
+    capture->gdn_slot_captured[index] = true;
+  }
+  return error;
 }
 
 cudaError_t maybe_capture_down_input(ActivationCapture* capture,
@@ -3295,6 +3338,12 @@ Status execute_token(const ResidentModel& model, std::size_t token,
                 gdn_slot * internal::kGdnConvolutionValues,
             workspace->gdn_candidate_recurrent_ +
                 gdn_slot * internal::kGdnRecurrentStateValues};
+        if (error == cudaSuccess) {
+          error = maybe_capture_gdn_decode(
+              capture, gdn_slot, workspace->projection_a_,
+              workspace->gdn_decay_, workspace->gdn_update_, committed,
+              workspace->projection_b_);
+        }
         if (error == cudaSuccess) {
           error = begin_phase(
               leaves, leaf_timings == nullptr
