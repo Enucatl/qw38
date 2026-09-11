@@ -1,0 +1,163 @@
+{
+  "schema_version": 1,
+  "task": "OPT-083",
+  "yardstick": "ds4_style_qwen_quality_framework",
+  "claims_throughput": false,
+  "claims_performance_improvement": false,
+  "host_only": true,
+  "skip_gpu_setup": true,
+  "skip_compile": true,
+  "image": "qw38-cuda:13.0.2",
+  "model": "models/Qwen3.8-27B-Q4_K_M.gguf",
+  "gpu_lock": "build/optimization-runs/qw38-gpu.lock",
+  "aggregate_deadline_s": 300,
+  "target": "tools/opt083_quality_framework.py",
+  "diagnostics_make_target": "cuda-opt083-diagnostics",
+  "quality_contract": "pins/opt083_quality_framework_contract.json",
+  "native_reuse": [
+    "tools/run_llama_quality_reference.py",
+    "build/qw38-cuda-opt058-quality-baseline-test"
+  ],
+  "case_ids": [
+    "identity",
+    "quality-flag",
+    "framework"
+  ],
+  "modes": {
+    "feedback": {
+      "target": "tools/opt083_quality_framework.py",
+      "tier_sequence": [
+        "identity",
+        "quality-flag"
+      ],
+      "make_targets": [],
+      "skip_compile": true,
+      "build_once": true,
+      "aggregate_deadline_s": 300,
+      "warm_repetitions": 0,
+      "repetitions": 1,
+      "workloads": [
+        "identity",
+        "quality-flag"
+      ]
+    },
+    "acceptance": {
+      "target": "tools/opt083_quality_framework.py",
+      "tier_sequence": ["framework"],
+      "make_targets": ["build/qw38-cuda-opt058-quality-baseline-test"],
+      "skip_compile": true,
+      "warm_repetitions": 0,
+      "repetitions": 1,
+      "aggregate_deadline_s": 300,
+      "workloads": ["framework"]
+    },
+    "release": {
+      "target": "tools/opt083_quality_framework.py",
+      "tier": "acceptance",
+      "make_targets": [],
+      "skip_compile": true,
+      "historical_oracles": false,
+      "workloads": []
+    }
+  },
+  "workloads": {
+    "identity": {
+      "target": "tools/opt083_quality_framework.py",
+      "tier": "correctness",
+      "runner": "host",
+      "kind": "scoring_identity_quartz_llama",
+      "cases": 2,
+      "candidates": 1,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 4,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "engines": ["quartz", "llama.cpp"],
+      "load_model": 0,
+      "reference": 1,
+      "gpu_work": false,
+      "native_targets": [
+        "build/qw38-cuda-opt058-quality-baseline-test"
+      ],
+      "args": [
+        "uv",
+        "run",
+        "python",
+        "tools/opt083_quality_framework.py",
+        "--phase",
+        "identity",
+        "--quality",
+        "--run-dir",
+        "{run_dir}"
+      ]
+    },
+    "quality-flag": {
+      "target": "tools/opt083_quality_framework.py",
+      "tier": "correctness",
+      "runner": "host",
+      "kind": "quality_mode_shortcut_catalog",
+      "cases": 12,
+      "candidates": 1,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 1,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 0,
+      "reference": 1,
+      "gpu_work": false,
+      "args": [
+        "uv",
+        "run",
+        "python",
+        "tools/opt083_quality_framework.py",
+        "--phase",
+        "quality-flag",
+        "--quality",
+        "--run-dir",
+        "{run_dir}"
+      ]
+    },
+    "framework": {
+      "target": "tools/opt083_quality_framework.py",
+      "tier": "acceptance",
+      "runner": "host",
+      "kind": "ds4_style_quality_framework_proof",
+      "cases": 7,
+      "candidates": 1,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 4,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "engines": ["quartz", "llama.cpp"],
+      "held_out_targets": 32,
+      "load_model": 0,
+      "reference": 1,
+      "gpu_work": false,
+      "native_targets": [
+        "build/qw38-cuda-opt058-quality-baseline-test"
+      ],
+      "args": [
+        "uv",
+        "run",
+        "python",
+        "tools/opt083_quality_framework.py",
+        "--phase",
+        "framework",
+        "--quality",
+        "--run-dir",
+        "{run_dir}"
+      ]
+    }
+  },
+  "proof_limit": [
+    "no throughput claim",
+    "no production kernel change",
+    "historical oracles none",
+    "OPT-084 shipping baseline not run",
+    "OpenRouter not invoked"
+  ],
+  "report_path": "evidence/optimization/opt083-quality-framework/REPORT.md"
+}

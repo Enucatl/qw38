@@ -1,0 +1,1927 @@
+{
+  "claims_performance_improvement": false,
+  "claims_throughput": false,
+  "does_not_replace_opt016": true,
+  "does_not_replace_opt056": true,
+  "ds4_datasets_not_applicable": [
+    "data/glm52-openrouter-100",
+    "data/flash",
+    "data/pro",
+    "data/pro-0813"
+  ],
+  "gguf_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+  "held_out_targets": 32,
+  "identity": {
+    "cases": [
+      {
+        "id": "qwen_capitals_paris",
+        "identity": {
+          "identical_context_construction": true,
+          "identical_scoring_definition": true,
+          "identical_target_tokens": true,
+          "identical_tokenization": true,
+          "llama_adapter": "tools/run_llama_quality_reference.py",
+          "mismatches": [],
+          "pass": true,
+          "quartz_native": "build/qw38-cuda-opt058-quality-baseline-test"
+        },
+        "llama": {
+          "context": [
+            151644,
+            872,
+            198,
+            5646,
+            279,
+            6722,
+            315,
+            9625,
+            304,
+            825,
+            3405
+          ],
+          "rendered": "<|im_start|>user\nName the capital of France in one word.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n",
+          "scoring": "teacher_forced_nll",
+          "targets": [
+            21567,
+            13
+          ]
+        },
+        "quartz": {
+          "context": [
+            151644,
+            872,
+            198,
+            5646,
+            279,
+            6722,
+            315,
+            9625,
+            304,
+            825,
+            3405
+          ],
+          "rendered": "<|im_start|>user\nName the capital of France in one word.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n",
+          "scoring": "teacher_forced_nll",
+          "targets": [
+            21567,
+            13
+          ]
+        }
+      },
+      {
+        "id": "qwen_two_plus_two",
+        "identity": {
+          "identical_context_construction": true,
+          "identical_scoring_definition": true,
+          "identical_target_tokens": true,
+          "identical_tokenization": true,
+          "llama_adapter": "tools/run_llama_quality_reference.py",
+          "mismatches": [],
+          "pass": true,
+          "quartz_native": "build/qw38-cuda-opt058-quality-baseline-test"
+        },
+        "llama": {
+          "context": [
+            151644,
+            872,
+            198,
+            3838,
+            374,
+            220,
+            17,
+            488,
+            220,
+            17,
+            30
+          ],
+          "rendered": "<|im_start|>user\nWhat is 2 + 2? Reply with the integer only.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n",
+          "scoring": "teacher_forced_nll",
+          "targets": [
+            19
+          ]
+        },
+        "quartz": {
+          "context": [
+            151644,
+            872,
+            198,
+            3838,
+            374,
+            220,
+            17,
+            488,
+            220,
+            17,
+            30
+          ],
+          "rendered": "<|im_start|>user\nWhat is 2 + 2? Reply with the integer only.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n",
+          "scoring": "teacher_forced_nll",
+          "targets": [
+            19
+          ]
+        }
+      }
+    ],
+    "chat_template": "no_thinking",
+    "ds4_datasets_not_applicable": [
+      "data/glm52-openrouter-100",
+      "data/flash",
+      "data/pro",
+      "data/pro-0813"
+    ],
+    "gguf_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+    "llama_control": {
+      "adapter": "tools/run_llama_quality_reference.py",
+      "case": "qwen_tf_identity_0",
+      "mean_nll": 0.20500000000000002,
+      "reused_parser": true,
+      "steps": 2,
+      "target_tokens": [
+        3,
+        1
+      ]
+    },
+    "llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+    "native_reuse": [
+      "tools/run_llama_quality_reference.py",
+      "build/qw38-cuda-opt058-quality-baseline-test"
+    ],
+    "scoring": "teacher_forced_nll",
+    "vocab_size": 248320
+  },
+  "llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+  "native_reuse": [
+    "tools/run_llama_quality_reference.py",
+    "build/qw38-cuda-opt058-quality-baseline-test"
+  ],
+  "openrouter": {
+    "api_key_env": "OPENROUTER_API_KEY",
+    "authoritative": false,
+    "credentials_present": false,
+    "default_off": true,
+    "enabled": false,
+    "endpoint": "https://openrouter.ai/api/v1/chat/completions",
+    "label": "external_scorer",
+    "model": "qwen/qwen3.8-27b",
+    "network": false,
+    "reason": "default_off",
+    "status": "disabled",
+    "success": true
+  },
+  "opt016_remains_blocked": true,
+  "opt056_remains_blocked": true,
+  "opt056_tasks_pass": false,
+  "opt084_baseline_not_run": true,
+  "proof_limit": [
+    "no throughput claim",
+    "no production kernel change",
+    "claims_throughput false",
+    "ds4 methodology port not same-model comparison",
+    "DeepSeek/GLM fixtures not applicable",
+    "OpenRouter default off",
+    "missing credentials are not a failure",
+    "no pytest network",
+    "OPT-056 and OPT-016 remain blocked",
+    "OPT-084 freezes numerical gates",
+    "held-out 32 is an alarm not kernel admission",
+    "quality results are not one boolean"
+  ],
+  "proposed_acceptance": {
+    "absolute_task_accuracy": "visible_and_separate",
+    "engine_non_regression": "OPT-073 quality-v3",
+    "numerically_frozen_by": "OPT-084",
+    "ppl_ratio_max": 1.01,
+    "projection_error_substitute_for_opt074": false,
+    "quartz_vs_llama_nll": "inspectable_control",
+    "quartz_vs_shipping_baseline_regression": "primary_candidate_gate",
+    "recurrence_incremental_nll_max": 0.02
+  },
+  "quality_mode": {
+    "applied": {
+      "argv": [
+        "--quality"
+      ],
+      "delta": {
+        "diagnostic_fallbacks": "disabled",
+        "disables": [
+          "diagnostic_fallback",
+          "experimental_cuda",
+          "fmad_true",
+          "fast_math",
+          "incomplete_vocab_logits",
+          "logit_masking",
+          "teacher_forced_functional_answers",
+          "graph_kernel_divergence",
+          "speculative_decoding",
+          "numeric_bypass",
+          "ssd_streaming_approx",
+          "truncated_softmax"
+        ],
+        "does_not_install_a_different_kernel": true,
+        "flag": "--quality",
+        "graph_vs_eager": "same_math_equivalence_not_different_kernel",
+        "precision": {
+          "fast_math": false,
+          "fmad": false,
+          "fp_contract": "off",
+          "nvccflags": "-O2 --fmad=false"
+        },
+        "selector": "production_arithmetic_under_test",
+        "speed_oriented_numeric_bypass": "disabled",
+        "unknown_shortcut": "fail_closed"
+      },
+      "disabled_shortcuts": [
+        "diagnostic_fallback",
+        "experimental_cuda",
+        "fmad_true",
+        "fast_math",
+        "incomplete_vocab_logits",
+        "logit_masking",
+        "teacher_forced_functional_answers",
+        "graph_kernel_divergence",
+        "speculative_decoding",
+        "numeric_bypass",
+        "ssd_streaming_approx",
+        "truncated_softmax"
+      ],
+      "enabled_shortcuts": [],
+      "flag": "--quality",
+      "graph_vs_eager": "same_math_equivalence",
+      "quality": true,
+      "same_math_equivalence_not_different_kernel": true,
+      "selectors": {
+        "chat_template": "no_thinking",
+        "decode_attention": "warp_query",
+        "decode_gdn": "sequential",
+        "enable_thinking": false,
+        "execution_graphs": "ffn_only",
+        "logit_masking": false,
+        "nvccflags": "-O2 --fmad=false",
+        "production_numerics": "strict",
+        "prompt_attention": "kv_once",
+        "prompt_mmq": "fma_async_x",
+        "prompt_mmq_tile": "i128_j128",
+        "prompt_pair": "off",
+        "q4_decode": "packed",
+        "q4_staging": "paired_staged",
+        "q8_decode": "r2_w2",
+        "q8_path": "dp4a_q8_1"
+      },
+      "shortcuts": {
+        "diagnostic_fallback": false,
+        "experimental_cuda": false,
+        "fast_math": false,
+        "fmad_true": false,
+        "graph_kernel_divergence": false,
+        "incomplete_vocab_logits": false,
+        "logit_masking": false,
+        "numeric_bypass": false,
+        "speculative_decoding": false,
+        "ssd_streaming_approx": false,
+        "teacher_forced_functional_answers": false,
+        "truncated_softmax": false
+      }
+    },
+    "delta": {
+      "diagnostic_fallbacks": "disabled",
+      "disables": [
+        "diagnostic_fallback",
+        "experimental_cuda",
+        "fmad_true",
+        "fast_math",
+        "incomplete_vocab_logits",
+        "logit_masking",
+        "teacher_forced_functional_answers",
+        "graph_kernel_divergence",
+        "speculative_decoding",
+        "numeric_bypass",
+        "ssd_streaming_approx",
+        "truncated_softmax"
+      ],
+      "does_not_install_a_different_kernel": true,
+      "flag": "--quality",
+      "graph_vs_eager": "same_math_equivalence_not_different_kernel",
+      "precision": {
+        "fast_math": false,
+        "fmad": false,
+        "fp_contract": "off",
+        "nvccflags": "-O2 --fmad=false"
+      },
+      "selector": "production_arithmetic_under_test",
+      "speed_oriented_numeric_bypass": "disabled",
+      "unknown_shortcut": "fail_closed"
+    },
+    "enabled": true,
+    "flag": "--quality",
+    "selectors": {
+      "chat_template": "no_thinking",
+      "decode_attention": "warp_query",
+      "decode_gdn": "sequential",
+      "enable_thinking": false,
+      "execution_graphs": "ffn_only",
+      "logit_masking": false,
+      "nvccflags": "-O2 --fmad=false",
+      "production_numerics": "strict",
+      "prompt_attention": "kv_once",
+      "prompt_mmq": "fma_async_x",
+      "prompt_mmq_tile": "i128_j128",
+      "prompt_pair": "off",
+      "q4_decode": "packed",
+      "q4_staging": "paired_staged",
+      "q8_decode": "r2_w2",
+      "q8_path": "dp4a_q8_1"
+    },
+    "shortcuts": [
+      "diagnostic_fallback",
+      "experimental_cuda",
+      "fmad_true",
+      "fast_math",
+      "incomplete_vocab_logits",
+      "logit_masking",
+      "teacher_forced_functional_answers",
+      "graph_kernel_divergence",
+      "speculative_decoding",
+      "numeric_bypass",
+      "ssd_streaming_approx",
+      "truncated_softmax"
+    ],
+    "unknown_shortcut_fail_closed": true
+  },
+  "report_path": "evidence/optimization/opt083-quality-framework/REPORT.md",
+  "same_model_comparison_with_ds4": false,
+  "schema_version": 1,
+  "single_boolean_refused": true,
+  "status": "quality_framework",
+  "suite": {
+    "claims_throughput": false,
+    "classes": {
+      "finite_vocab_state_consistency": {
+        "class": "finite_vocab_state_consistency",
+        "finite": true,
+        "framework_vocab_size": 8,
+        "gguf_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+        "incomplete_vocab_rejected": true,
+        "inspectable": true,
+        "llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+        "production_vocab_size": 248320,
+        "selectors": {
+          "chat_template": "no_thinking",
+          "decode_attention": "warp_query",
+          "decode_gdn": "sequential",
+          "enable_thinking": false,
+          "execution_graphs": "ffn_only",
+          "logit_masking": false,
+          "nvccflags": "-O2 --fmad=false",
+          "production_numerics": "strict",
+          "prompt_attention": "kv_once",
+          "prompt_mmq": "fma_async_x",
+          "prompt_mmq_tile": "i128_j128",
+          "prompt_pair": "off",
+          "q4_decode": "packed",
+          "q4_staging": "paired_staged",
+          "q8_decode": "r2_w2",
+          "q8_path": "dp4a_q8_1"
+        },
+        "state_continuation": [
+          {
+            "context": [
+              7
+            ],
+            "next_context": [
+              7,
+              3
+            ],
+            "position": 0,
+            "target": 3
+          },
+          {
+            "context": [
+              7,
+              3
+            ],
+            "next_context": [
+              7,
+              3,
+              1
+            ],
+            "position": 1,
+            "target": 1
+          },
+          {
+            "context": [
+              7,
+              3,
+              1
+            ],
+            "next_context": [
+              7,
+              3,
+              1,
+              0
+            ],
+            "position": 2,
+            "target": 0
+          },
+          {
+            "context": [
+              7,
+              3,
+              1,
+              0
+            ],
+            "next_context": [
+              7,
+              3,
+              1,
+              0,
+              2
+            ],
+            "position": 3,
+            "target": 2
+          }
+        ]
+      },
+      "held_out_32_alarm": {
+        "alarm_not_admission": true,
+        "class": "held_out_32_alarm",
+        "framework_scores": {
+          "llama": {
+            "avg_nll": 0.029460121359251464,
+            "engine": "llama",
+            "finite": true,
+            "first_match": 1,
+            "greedy_lcp": 32,
+            "id": "held_out_32",
+            "mean_nll": 0.029460121359251464,
+            "nll": 0.9427238834960469,
+            "perplexity": 1.0298983637061003,
+            "scoring": "teacher_forced_nll",
+            "steps": [
+              {
+                "greedy_logit": 5.0,
+                "greedy_token": 0,
+                "log_probability": -0.029460121359251464,
+                "margin": 4.0,
+                "nll": 0.029460121359251464,
+                "position": 0,
+                "runner_up_logit": 1.0,
+                "runner_up_token": 1,
+                "target_token": 0
+              },
+              {
+                "greedy_logit": 5.0,
+                "greedy_token": 1,
+                "log_probability": -0.029460121359251464,
+                "margin": 4.0,
+                "nll": 0.029460121359251464,
+                "position": 1,
+                "runner_up_logit": 1.0,
+                "runner_up_token": 0,
+                "target_token": 1
+              },
+              {
+                "greedy_logit": 5.0,
+                "greedy_token": 2,
+                "log_probability": -0.029460121359251464,
+                "margin": 4.0,
+                "nll": 0.029460121359251464,
+                "position": 2,
+                "runner_up_logit": 1.0,
+                "runner_up_token": 0,
+                "target_token": 2
+              },
+              {
+                "greedy_logit": 5.0,
+                "greedy_token": 3,
+                "log_probability": -0.029460121359251464,
+                "margin": 4.0,
+                "nll": 0.029460121359251464,
+                "position": 3,
+                "runner_up_logit": 1.0,
+                "runner_up_token": 0,
+                "target_token": 3
+              },
+              {
+                "greedy_logit": 5.0,
+                "greedy_token": 4,
+                "log_probability": -0.029460121359251464,
+                "margin": 4.0,
+                "nll": 0.029460121359251464,
+                "position": 4,
+                "runner_up_logit": 1.0,
+                "runner_up_token": 0,
+                "target_token": 4
+              },
+              {
+                "greedy_logit": 5.0,
+                "greedy_token": 5,
+                "log_probability": -0.029460121359251464,
+                "margin": 4.0,
+                "nll": 0.029460121359251464,
+                "position": 5,
+                "runner_up_logit": 1.0,
+                "runner_up_token": 0,
+                "target_token": 5
+              },
+              {
+                "greedy_logit": 5.0,
+                "greedy_token": 6,
+                "log_probability": -0.029460121359251464,
+                "margin": 4.0,
+                "nll": 0.029460121359251464,
+                "position": 6,
+                "runner_up_logit": 1.0,
+                "runner_up_token": 0,
+                "target_token": 6
+              },
+              {
+                "greedy_logit": 5.0,
+                "greedy_token": 7,
+                "log_probability": -0.029460121359251464,
+                "margin": 4.0,
+                "nll": 0.029460121359251464,
+                "position": 7,
+                "runner_up_logit": 1.0,
+                "runner_up_token": 0,
+                "target_token": 7
+              },
+              {
+                "greedy_logit": 5.0,
+                "greedy_token": 0,
+                "log_probability": -0.029460121359251464,
+                "margin": 4.0,
+                "nll": 0.029460121359251464,
+                "position": 8,
+                "runner_up_logit": 1.0,
+                "runner_up_token": 1,
+                "target_token": 0
+              },
+              {
+                "greedy_logit": 5.0,
+                "greedy_token": 1,
+                "log_probability": -0.029460121359251464,
+                "margin": 4.0,
+                "nll": 0.029460121359251464,
+                "position": 9,
+                "runner_up_logit": 1.0,
+                "runner_up_token": 0,
+                "target_token": 1
+              },
+              {
+                "greedy_logit": 5.0,
+                "greedy_token": 2,
+                "log_probability": -0.029460121359251464,
+                "margin": 4.0,
+                "nll": 0.029460121359251464,
+                "position": 10,
+                "runner_up_logit": 1.0,
+                "runner_up_token": 0,
+                "target_token": 2
+              },
+              {
+                "greedy_logit": 5.0,
+                "greedy_token": 3,
+                "log_probability": -0.029460121359251464,
+                "margin": 4.0,
+                "nll": 0.029460121359251464,
+                "position": 11,
+                "runner_up_logit": 1.0,
+                "runner_up_token": 0,
+                "target_token": 3
+              },
+              {
+                "greedy_logit": 5.0,
+                "greedy_token": 4,
+                "log_probability": -0.029460121359251464,
+                "margin": 4.0,
+                "nll": 0.029460121359251464,
+                "position": 12,
+                "runner_up_logit": 1.0,
+                "runner_up_token": 0,
+                "target_token": 4
+              },
+              {
+                "greedy_logit": 5.0,
+                "greedy_token": 5,
+                "log_probability": -0.029460121359251464,
+                "margin": 4.0,
+                "nll": 0.029460121359251464,
+                "position": 13,
+                "runner_up_logit": 1.0,
+                "runner_up_token": 0,
+                "target_token": 5
+              },
+              {
+                "greedy_logit": 5.0,
+                "greedy_token": 6,
+                "log_probability": -0.029460121359251464,
+                "margin": 4.0,
+                "nll": 0.029460121359251464,
+                "position": 14,
+                "runner_up_logit": 1.0,
+                "runner_up_token": 0,
+                "target_token": 6
+              },
+              {
+                "greedy_logit": 5.0,
+                "greedy_token": 7,
+                "log_probability": -0.029460121359251464,
+                "margin": 4.0,
+                "nll": 0.029460121359251464,
+                "position": 15,
+                "runner_up_logit": 1.0,
+                "runner_up_token": 0,
+                "target_token": 7
+              },
+              {
+                "greedy_logit": 5.0,
+                "greedy_token": 0,
+                "log_probability": -0.029460121359251464,
+                "margin": 4.0,
+                "nll": 0.029460121359251464,
+                "position": 16,
+                "runner_up_logit": 1.0,
+                "runner_up_token": 1,
+                "target_token": 0
+              },
+              {
+                "greedy_logit": 5.0,
+                "greedy_token": 1,
+                "log_probability": -0.029460121359251464,
+                "margin": 4.0,
+                "nll": 0.029460121359251464,
+                "position": 17,
+                "runner_up_logit": 1.0,
+                "runner_up_token": 0,
+                "target_token": 1
+              },
+              {
+                "greedy_logit": 5.0,
+                "greedy_token": 2,
+                "log_probability": -0.029460121359251464,
+                "margin": 4.0,
+                "nll": 0.029460121359251464,
+                "position": 18,
+                "runner_up_logit": 1.0,
+                "runner_up_token": 0,
+                "target_token": 2
+              },
+              {
+                "greedy_logit": 5.0,
+                "greedy_token": 3,
+                "log_probability": -0.029460121359251464,
+                "margin": 4.0,
+                "nll": 0.029460121359251464,
+                "position": 19,
+                "runner_up_logit": 1.0,
+                "runner_up_token": 0,
+                "target_token": 3
+              },
+              {
+                "greedy_logit": 5.0,
+                "greedy_token": 4,
+                "log_probability": -0.029460121359251464,
+                "margin": 4.0,
+                "nll": 0.029460121359251464,
+                "position": 20,
+                "runner_up_logit": 1.0,
+                "runner_up_token": 0,
+                "target_token": 4
+              },
+              {
+                "greedy_logit": 5.0,
+                "greedy_token": 5,
+                "log_probability": -0.029460121359251464,
+                "margin": 4.0,
+                "nll": 0.029460121359251464,
+                "position": 21,
+                "runner_up_logit": 1.0,
+                "runner_up_token": 0,
+                "target_token": 5
+              },
+              {
+                "greedy_logit": 5.0,
+                "greedy_token": 6,
+                "log_probability": -0.029460121359251464,
+                "margin": 4.0,
+                "nll": 0.029460121359251464,
+                "position": 22,
+                "runner_up_logit": 1.0,
+                "runner_up_token": 0,
+                "target_token": 6
+              },
+              {
+                "greedy_logit": 5.0,
+                "greedy_token": 7,
+                "log_probability": -0.029460121359251464,
+                "margin": 4.0,
+                "nll": 0.029460121359251464,
+                "position": 23,
+                "runner_up_logit": 1.0,
+                "runner_up_token": 0,
+                "target_token": 7
+              },
+              {
+                "greedy_logit": 5.0,
+                "greedy_token": 0,
+                "log_probability": -0.029460121359251464,
+                "margin": 4.0,
+                "nll": 0.029460121359251464,
+                "position": 24,
+                "runner_up_logit": 1.0,
+                "runner_up_token": 1,
+                "target_token": 0
+              },
+              {
+                "greedy_logit": 5.0,
+                "greedy_token": 1,
+                "log_probability": -0.029460121359251464,
+                "margin": 4.0,
+                "nll": 0.029460121359251464,
+                "position": 25,
+                "runner_up_logit": 1.0,
+                "runner_up_token": 0,
+                "target_token": 1
+              },
+              {
+                "greedy_logit": 5.0,
+                "greedy_token": 2,
+                "log_probability": -0.029460121359251464,
+                "margin": 4.0,
+                "nll": 0.029460121359251464,
+                "position": 26,
+                "runner_up_logit": 1.0,
+                "runner_up_token": 0,
+                "target_token": 2
+              },
+              {
+                "greedy_logit": 5.0,
+                "greedy_token": 3,
+                "log_probability": -0.029460121359251464,
+                "margin": 4.0,
+                "nll": 0.029460121359251464,
+                "position": 27,
+                "runner_up_logit": 1.0,
+                "runner_up_token": 0,
+                "target_token": 3
+              },
+              {
+                "greedy_logit": 5.0,
+                "greedy_token": 4,
+                "log_probability": -0.029460121359251464,
+                "margin": 4.0,
+                "nll": 0.029460121359251464,
+                "position": 28,
+                "runner_up_logit": 1.0,
+                "runner_up_token": 0,
+                "target_token": 4
+              },
+              {
+                "greedy_logit": 5.0,
+                "greedy_token": 5,
+                "log_probability": -0.029460121359251464,
+                "margin": 4.0,
+                "nll": 0.029460121359251464,
+                "position": 29,
+                "runner_up_logit": 1.0,
+                "runner_up_token": 0,
+                "target_token": 5
+              },
+              {
+                "greedy_logit": 5.0,
+                "greedy_token": 6,
+                "log_probability": -0.029460121359251464,
+                "margin": 4.0,
+                "nll": 0.029460121359251464,
+                "position": 30,
+                "runner_up_logit": 1.0,
+                "runner_up_token": 0,
+                "target_token": 6
+              },
+              {
+                "greedy_logit": 5.0,
+                "greedy_token": 7,
+                "log_probability": -0.029460121359251464,
+                "margin": 4.0,
+                "nll": 0.029460121359251464,
+                "position": 31,
+                "runner_up_logit": 1.0,
+                "runner_up_token": 0,
+                "target_token": 7
+              }
+            ],
+            "target_tokens": 32,
+            "vocab_size": 8
+          },
+          "quartz": {
+            "avg_nll": 0.029460121359251464,
+            "engine": "quartz",
+            "finite": true,
+            "first_match": 1,
+            "greedy_lcp": 32,
+            "id": "held_out_32",
+            "mean_nll": 0.029460121359251464,
+            "nll": 0.9427238834960469,
+            "perplexity": 1.0298983637061003,
+            "scoring": "teacher_forced_nll",
+            "steps": [
+              {
+                "greedy_logit": 5.0,
+                "greedy_token": 0,
+                "log_probability": -0.029460121359251464,
+                "margin": 4.0,
+                "nll": 0.029460121359251464,
+                "position": 0,
+                "runner_up_logit": 1.0,
+                "runner_up_token": 1,
+                "target_token": 0
+              },
+              {
+                "greedy_logit": 5.0,
+                "greedy_token": 1,
+                "log_probability": -0.029460121359251464,
+                "margin": 4.0,
+                "nll": 0.029460121359251464,
+                "position": 1,
+                "runner_up_logit": 1.0,
+                "runner_up_token": 0,
+                "target_token": 1
+              },
+              {
+                "greedy_logit": 5.0,
+                "greedy_token": 2,
+                "log_probability": -0.029460121359251464,
+                "margin": 4.0,
+                "nll": 0.029460121359251464,
+                "position": 2,
+                "runner_up_logit": 1.0,
+                "runner_up_token": 0,
+                "target_token": 2
+              },
+              {
+                "greedy_logit": 5.0,
+                "greedy_token": 3,
+                "log_probability": -0.029460121359251464,
+                "margin": 4.0,
+                "nll": 0.029460121359251464,
+                "position": 3,
+                "runner_up_logit": 1.0,
+                "runner_up_token": 0,
+                "target_token": 3
+              },
+              {
+                "greedy_logit": 5.0,
+                "greedy_token": 4,
+                "log_probability": -0.029460121359251464,
+                "margin": 4.0,
+                "nll": 0.029460121359251464,
+                "position": 4,
+                "runner_up_logit": 1.0,
+                "runner_up_token": 0,
+                "target_token": 4
+              },
+              {
+                "greedy_logit": 5.0,
+                "greedy_token": 5,
+                "log_probability": -0.029460121359251464,
+                "margin": 4.0,
+                "nll": 0.029460121359251464,
+                "position": 5,
+                "runner_up_logit": 1.0,
+                "runner_up_token": 0,
+                "target_token": 5
+              },
+              {
+                "greedy_logit": 5.0,
+                "greedy_token": 6,
+                "log_probability": -0.029460121359251464,
+                "margin": 4.0,
+                "nll": 0.029460121359251464,
+                "position": 6,
+                "runner_up_logit": 1.0,
+                "runner_up_token": 0,
+                "target_token": 6
+              },
+              {
+                "greedy_logit": 5.0,
+                "greedy_token": 7,
+                "log_probability": -0.029460121359251464,
+                "margin": 4.0,
+                "nll": 0.029460121359251464,
+                "position": 7,
+                "runner_up_logit": 1.0,
+                "runner_up_token": 0,
+                "target_token": 7
+              },
+              {
+                "greedy_logit": 5.0,
+                "greedy_token": 0,
+                "log_probability": -0.029460121359251464,
+                "margin": 4.0,
+                "nll": 0.029460121359251464,
+                "position": 8,
+                "runner_up_logit": 1.0,
+                "runner_up_token": 1,
+                "target_token": 0
+              },
+              {
+                "greedy_logit": 5.0,
+                "greedy_token": 1,
+                "log_probability": -0.029460121359251464,
+                "margin": 4.0,
+                "nll": 0.029460121359251464,
+                "position": 9,
+                "runner_up_logit": 1.0,
+                "runner_up_token": 0,
+                "target_token": 1
+              },
+              {
+                "greedy_logit": 5.0,
+                "greedy_token": 2,
+                "log_probability": -0.029460121359251464,
+                "margin": 4.0,
+                "nll": 0.029460121359251464,
+                "position": 10,
+                "runner_up_logit": 1.0,
+                "runner_up_token": 0,
+                "target_token": 2
+              },
+              {
+                "greedy_logit": 5.0,
+                "greedy_token": 3,
+                "log_probability": -0.029460121359251464,
+                "margin": 4.0,
+                "nll": 0.029460121359251464,
+                "position": 11,
+                "runner_up_logit": 1.0,
+                "runner_up_token": 0,
+                "target_token": 3
+              },
+              {
+                "greedy_logit": 5.0,
+                "greedy_token": 4,
+                "log_probability": -0.029460121359251464,
+                "margin": 4.0,
+                "nll": 0.029460121359251464,
+                "position": 12,
+                "runner_up_logit": 1.0,
+                "runner_up_token": 0,
+                "target_token": 4
+              },
+              {
+                "greedy_logit": 5.0,
+                "greedy_token": 5,
+                "log_probability": -0.029460121359251464,
+                "margin": 4.0,
+                "nll": 0.029460121359251464,
+                "position": 13,
+                "runner_up_logit": 1.0,
+                "runner_up_token": 0,
+                "target_token": 5
+              },
+              {
+                "greedy_logit": 5.0,
+                "greedy_token": 6,
+                "log_probability": -0.029460121359251464,
+                "margin": 4.0,
+                "nll": 0.029460121359251464,
+                "position": 14,
+                "runner_up_logit": 1.0,
+                "runner_up_token": 0,
+                "target_token": 6
+              },
+              {
+                "greedy_logit": 5.0,
+                "greedy_token": 7,
+                "log_probability": -0.029460121359251464,
+                "margin": 4.0,
+                "nll": 0.029460121359251464,
+                "position": 15,
+                "runner_up_logit": 1.0,
+                "runner_up_token": 0,
+                "target_token": 7
+              },
+              {
+                "greedy_logit": 5.0,
+                "greedy_token": 0,
+                "log_probability": -0.029460121359251464,
+                "margin": 4.0,
+                "nll": 0.029460121359251464,
+                "position": 16,
+                "runner_up_logit": 1.0,
+                "runner_up_token": 1,
+                "target_token": 0
+              },
+              {
+                "greedy_logit": 5.0,
+                "greedy_token": 1,
+                "log_probability": -0.029460121359251464,
+                "margin": 4.0,
+                "nll": 0.029460121359251464,
+                "position": 17,
+                "runner_up_logit": 1.0,
+                "runner_up_token": 0,
+                "target_token": 1
+              },
+              {
+                "greedy_logit": 5.0,
+                "greedy_token": 2,
+                "log_probability": -0.029460121359251464,
+                "margin": 4.0,
+                "nll": 0.029460121359251464,
+                "position": 18,
+                "runner_up_logit": 1.0,
+                "runner_up_token": 0,
+                "target_token": 2
+              },
+              {
+                "greedy_logit": 5.0,
+                "greedy_token": 3,
+                "log_probability": -0.029460121359251464,
+                "margin": 4.0,
+                "nll": 0.029460121359251464,
+                "position": 19,
+                "runner_up_logit": 1.0,
+                "runner_up_token": 0,
+                "target_token": 3
+              },
+              {
+                "greedy_logit": 5.0,
+                "greedy_token": 4,
+                "log_probability": -0.029460121359251464,
+                "margin": 4.0,
+                "nll": 0.029460121359251464,
+                "position": 20,
+                "runner_up_logit": 1.0,
+                "runner_up_token": 0,
+                "target_token": 4
+              },
+              {
+                "greedy_logit": 5.0,
+                "greedy_token": 5,
+                "log_probability": -0.029460121359251464,
+                "margin": 4.0,
+                "nll": 0.029460121359251464,
+                "position": 21,
+                "runner_up_logit": 1.0,
+                "runner_up_token": 0,
+                "target_token": 5
+              },
+              {
+                "greedy_logit": 5.0,
+                "greedy_token": 6,
+                "log_probability": -0.029460121359251464,
+                "margin": 4.0,
+                "nll": 0.029460121359251464,
+                "position": 22,
+                "runner_up_logit": 1.0,
+                "runner_up_token": 0,
+                "target_token": 6
+              },
+              {
+                "greedy_logit": 5.0,
+                "greedy_token": 7,
+                "log_probability": -0.029460121359251464,
+                "margin": 4.0,
+                "nll": 0.029460121359251464,
+                "position": 23,
+                "runner_up_logit": 1.0,
+                "runner_up_token": 0,
+                "target_token": 7
+              },
+              {
+                "greedy_logit": 5.0,
+                "greedy_token": 0,
+                "log_probability": -0.029460121359251464,
+                "margin": 4.0,
+                "nll": 0.029460121359251464,
+                "position": 24,
+                "runner_up_logit": 1.0,
+                "runner_up_token": 1,
+                "target_token": 0
+              },
+              {
+                "greedy_logit": 5.0,
+                "greedy_token": 1,
+                "log_probability": -0.029460121359251464,
+                "margin": 4.0,
+                "nll": 0.029460121359251464,
+                "position": 25,
+                "runner_up_logit": 1.0,
+                "runner_up_token": 0,
+                "target_token": 1
+              },
+              {
+                "greedy_logit": 5.0,
+                "greedy_token": 2,
+                "log_probability": -0.029460121359251464,
+                "margin": 4.0,
+                "nll": 0.029460121359251464,
+                "position": 26,
+                "runner_up_logit": 1.0,
+                "runner_up_token": 0,
+                "target_token": 2
+              },
+              {
+                "greedy_logit": 5.0,
+                "greedy_token": 3,
+                "log_probability": -0.029460121359251464,
+                "margin": 4.0,
+                "nll": 0.029460121359251464,
+                "position": 27,
+                "runner_up_logit": 1.0,
+                "runner_up_token": 0,
+                "target_token": 3
+              },
+              {
+                "greedy_logit": 5.0,
+                "greedy_token": 4,
+                "log_probability": -0.029460121359251464,
+                "margin": 4.0,
+                "nll": 0.029460121359251464,
+                "position": 28,
+                "runner_up_logit": 1.0,
+                "runner_up_token": 0,
+                "target_token": 4
+              },
+              {
+                "greedy_logit": 5.0,
+                "greedy_token": 5,
+                "log_probability": -0.029460121359251464,
+                "margin": 4.0,
+                "nll": 0.029460121359251464,
+                "position": 29,
+                "runner_up_logit": 1.0,
+                "runner_up_token": 0,
+                "target_token": 5
+              },
+              {
+                "greedy_logit": 5.0,
+                "greedy_token": 6,
+                "log_probability": -0.029460121359251464,
+                "margin": 4.0,
+                "nll": 0.029460121359251464,
+                "position": 30,
+                "runner_up_logit": 1.0,
+                "runner_up_token": 0,
+                "target_token": 6
+              },
+              {
+                "greedy_logit": 5.0,
+                "greedy_token": 7,
+                "log_probability": -0.029460121359251464,
+                "margin": 4.0,
+                "nll": 0.029460121359251464,
+                "position": 31,
+                "runner_up_logit": 1.0,
+                "runner_up_token": 0,
+                "target_token": 7
+              }
+            ],
+            "target_tokens": 32,
+            "vocab_size": 8
+          }
+        },
+        "held_out_targets": 32,
+        "inspectable": true,
+        "kernel_admission": false,
+        "opt084_scores_full_alarm": true,
+        "retained_mean_nll": 3.325543138013308,
+        "retained_preflight_scored": 32
+      },
+      "known_qwen_continuations": {
+        "cases": [
+          {
+            "assistant_answer_boundary": "<|im_start|>assistant\n<think>\n\n</think>\n\n",
+            "chat_template": "no_thinking",
+            "context": [
+              151644,
+              872,
+              198,
+              5646,
+              279,
+              6722,
+              315,
+              9625,
+              304,
+              825,
+              3405
+            ],
+            "continuation_text": "Paris",
+            "ds4_dataset": false,
+            "enable_thinking": false,
+            "id": "qwen_capitals_paris",
+            "logit_masking": false,
+            "remote": false,
+            "rendered": "<|im_start|>user\nName the capital of France in one word.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n",
+            "scoring": "teacher_forced_nll",
+            "source": "opt083_deterministic_qwen",
+            "targets": [
+              21567,
+              13
+            ],
+            "user": "Name the capital of France in one word."
+          },
+          {
+            "assistant_answer_boundary": "<|im_start|>assistant\n<think>\n\n</think>\n\n",
+            "chat_template": "no_thinking",
+            "context": [
+              151644,
+              872,
+              198,
+              3838,
+              374,
+              220,
+              17,
+              488,
+              220,
+              17,
+              30
+            ],
+            "continuation_text": "4",
+            "ds4_dataset": false,
+            "enable_thinking": false,
+            "id": "qwen_two_plus_two",
+            "logit_masking": false,
+            "remote": false,
+            "rendered": "<|im_start|>user\nWhat is 2 + 2? Reply with the integer only.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n",
+            "scoring": "teacher_forced_nll",
+            "source": "opt083_deterministic_qwen",
+            "targets": [
+              19
+            ],
+            "user": "What is 2 + 2? Reply with the integer only."
+          }
+        ],
+        "class": "known_qwen_continuations",
+        "ds4_datasets_not_applicable": [
+          "data/glm52-openrouter-100",
+          "data/flash",
+          "data/pro",
+          "data/pro-0813"
+        ],
+        "inspectable": true,
+        "remote": false,
+        "same_model_comparison_with_ds4": false
+      },
+      "opt073_dual_verdict": {
+        "class": "opt073_dual_verdict",
+        "historical_failures_retained": true,
+        "inspectable": true,
+        "llama": {
+          "absolute_task_accuracy": {
+            "functional_independently_correct": false,
+            "near_tie_cannot_waive_wrong_semantic_answer": true,
+            "nll_pass": true,
+            "pass": false,
+            "status": "fail",
+            "task_arithmetic_must_be_B_42": true
+          },
+          "engine_non_regression": {
+            "known_miss": {
+              "admitted": true,
+              "authority_choice": true,
+              "independently_correct": false,
+              "logits_incomplete": false,
+              "near_tie_cannot_pass_absolute": true,
+              "status": "authority_behavior"
+            },
+            "nll_pass": true,
+            "other_wrong_choices_waived": false,
+            "pass": true,
+            "reference_correct_items_remain_correct": true,
+            "status": "pass"
+          },
+          "status": "fail"
+        },
+        "opt016_remains_blocked": true,
+        "opt056_remains_blocked": true,
+        "opt056_tasks_pass": false,
+        "opt073_does_not_replace_opt016": true,
+        "opt073_does_not_replace_opt056": true,
+        "quartz": {
+          "absolute_task_accuracy": {
+            "functional_independently_correct": false,
+            "near_tie_cannot_waive_wrong_semantic_answer": true,
+            "nll_pass": true,
+            "pass": false,
+            "status": "fail",
+            "task_arithmetic_must_be_B_42": true
+          },
+          "engine_non_regression": {
+            "known_miss": {
+              "admitted": true,
+              "authority_choice": true,
+              "independently_correct": false,
+              "logits_incomplete": true,
+              "near_tie_cannot_pass_absolute": true,
+              "status": "authority_behavior"
+            },
+            "nll_pass": true,
+            "other_wrong_choices_waived": false,
+            "pass": true,
+            "reference_correct_items_remain_correct": true,
+            "status": "pass"
+          },
+          "quality_v2_all": false,
+          "status": "fail"
+        }
+      },
+      "ppl_1024_spans": {
+        "class": "ppl_1024_spans",
+        "historical_opt058_pass": {
+          "held_out_wikitext_1024": true,
+          "wikitext_nll": true
+        },
+        "inspectable": true,
+        "numerically_frozen_by": "OPT-084",
+        "proposed_ppl_ratio_max": 1.01,
+        "spans": [
+          {
+            "context_token": [
+              283
+            ],
+            "framework_prefix": 4,
+            "framework_prefix_scores": {
+              "llama": {
+                "avg_nll": 0.029460121359251464,
+                "engine": "llama",
+                "finite": true,
+                "first_match": 1,
+                "greedy_lcp": 4,
+                "id": "wikitext_nll",
+                "mean_nll": 0.029460121359251464,
+                "nll": 0.11784048543700586,
+                "perplexity": 1.0298983637061003,
+                "scoring": "teacher_forced_nll",
+                "steps": [
+                  {
+                    "greedy_logit": 5.0,
+                    "greedy_token": 1,
+                    "log_probability": -0.029460121359251464,
+                    "margin": 4.0,
+                    "nll": 0.029460121359251464,
+                    "position": 0,
+                    "runner_up_logit": 1.0,
+                    "runner_up_token": 0,
+                    "target_token": 1
+                  },
+                  {
+                    "greedy_logit": 5.0,
+                    "greedy_token": 4,
+                    "log_probability": -0.029460121359251464,
+                    "margin": 4.0,
+                    "nll": 0.029460121359251464,
+                    "position": 1,
+                    "runner_up_logit": 1.0,
+                    "runner_up_token": 0,
+                    "target_token": 4
+                  },
+                  {
+                    "greedy_logit": 5.0,
+                    "greedy_token": 7,
+                    "log_probability": -0.029460121359251464,
+                    "margin": 4.0,
+                    "nll": 0.029460121359251464,
+                    "position": 2,
+                    "runner_up_logit": 1.0,
+                    "runner_up_token": 0,
+                    "target_token": 7
+                  },
+                  {
+                    "greedy_logit": 5.0,
+                    "greedy_token": 3,
+                    "log_probability": -0.029460121359251464,
+                    "margin": 4.0,
+                    "nll": 0.029460121359251464,
+                    "position": 3,
+                    "runner_up_logit": 1.0,
+                    "runner_up_token": 0,
+                    "target_token": 3
+                  }
+                ],
+                "target_tokens": 4,
+                "vocab_size": 8
+              },
+              "quartz": {
+                "avg_nll": 0.029460121359251464,
+                "engine": "quartz",
+                "finite": true,
+                "first_match": 1,
+                "greedy_lcp": 4,
+                "id": "wikitext_nll",
+                "mean_nll": 0.029460121359251464,
+                "nll": 0.11784048543700586,
+                "perplexity": 1.0298983637061003,
+                "scoring": "teacher_forced_nll",
+                "steps": [
+                  {
+                    "greedy_logit": 5.0,
+                    "greedy_token": 1,
+                    "log_probability": -0.029460121359251464,
+                    "margin": 4.0,
+                    "nll": 0.029460121359251464,
+                    "position": 0,
+                    "runner_up_logit": 1.0,
+                    "runner_up_token": 0,
+                    "target_token": 1
+                  },
+                  {
+                    "greedy_logit": 5.0,
+                    "greedy_token": 4,
+                    "log_probability": -0.029460121359251464,
+                    "margin": 4.0,
+                    "nll": 0.029460121359251464,
+                    "position": 1,
+                    "runner_up_logit": 1.0,
+                    "runner_up_token": 0,
+                    "target_token": 4
+                  },
+                  {
+                    "greedy_logit": 5.0,
+                    "greedy_token": 7,
+                    "log_probability": -0.029460121359251464,
+                    "margin": 4.0,
+                    "nll": 0.029460121359251464,
+                    "position": 2,
+                    "runner_up_logit": 1.0,
+                    "runner_up_token": 0,
+                    "target_token": 7
+                  },
+                  {
+                    "greedy_logit": 5.0,
+                    "greedy_token": 3,
+                    "log_probability": -0.029460121359251464,
+                    "margin": 4.0,
+                    "nll": 0.029460121359251464,
+                    "position": 3,
+                    "runner_up_logit": 1.0,
+                    "runner_up_token": 0,
+                    "target_token": 3
+                  }
+                ],
+                "target_tokens": 4,
+                "vocab_size": 8
+              }
+            },
+            "full_target_count": 1024,
+            "id": "wikitext_nll",
+            "opt084_scores_full_span": true,
+            "ppl_ratio_gate_proposed": 1.01,
+            "prefix_targets": [
+              8137,
+              211388,
+              455,
+              283
+            ],
+            "retained_llama_mean_nll": 1.525124035418359,
+            "retained_ppl_ratio": 1.0000765601619601,
+            "retained_quartz_mean_nll": 1.5252005926497396,
+            "scoring": "teacher_forced_nll"
+          },
+          {
+            "context_token": [
+              6426
+            ],
+            "framework_prefix": 4,
+            "framework_prefix_scores": {
+              "llama": {
+                "avg_nll": 0.029460121359251464,
+                "engine": "llama",
+                "finite": true,
+                "first_match": 1,
+                "greedy_lcp": 4,
+                "id": "held_out_wikitext_1024",
+                "mean_nll": 0.029460121359251464,
+                "nll": 0.11784048543700586,
+                "perplexity": 1.0298983637061003,
+                "scoring": "teacher_forced_nll",
+                "steps": [
+                  {
+                    "greedy_logit": 5.0,
+                    "greedy_token": 6,
+                    "log_probability": -0.029460121359251464,
+                    "margin": 4.0,
+                    "nll": 0.029460121359251464,
+                    "position": 0,
+                    "runner_up_logit": 1.0,
+                    "runner_up_token": 0,
+                    "target_token": 6
+                  },
+                  {
+                    "greedy_logit": 5.0,
+                    "greedy_token": 2,
+                    "log_probability": -0.029460121359251464,
+                    "margin": 4.0,
+                    "nll": 0.029460121359251464,
+                    "position": 1,
+                    "runner_up_logit": 1.0,
+                    "runner_up_token": 0,
+                    "target_token": 2
+                  },
+                  {
+                    "greedy_logit": 5.0,
+                    "greedy_token": 7,
+                    "log_probability": -0.029460121359251464,
+                    "margin": 4.0,
+                    "nll": 0.029460121359251464,
+                    "position": 2,
+                    "runner_up_logit": 1.0,
+                    "runner_up_token": 0,
+                    "target_token": 7
+                  },
+                  {
+                    "greedy_logit": 5.0,
+                    "greedy_token": 6,
+                    "log_probability": -0.029460121359251464,
+                    "margin": 4.0,
+                    "nll": 0.029460121359251464,
+                    "position": 3,
+                    "runner_up_logit": 1.0,
+                    "runner_up_token": 0,
+                    "target_token": 6
+                  }
+                ],
+                "target_tokens": 4,
+                "vocab_size": 8
+              },
+              "quartz": {
+                "avg_nll": 0.029460121359251464,
+                "engine": "quartz",
+                "finite": true,
+                "first_match": 1,
+                "greedy_lcp": 4,
+                "id": "held_out_wikitext_1024",
+                "mean_nll": 0.029460121359251464,
+                "nll": 0.11784048543700586,
+                "perplexity": 1.0298983637061003,
+                "scoring": "teacher_forced_nll",
+                "steps": [
+                  {
+                    "greedy_logit": 5.0,
+                    "greedy_token": 6,
+                    "log_probability": -0.029460121359251464,
+                    "margin": 4.0,
+                    "nll": 0.029460121359251464,
+                    "position": 0,
+                    "runner_up_logit": 1.0,
+                    "runner_up_token": 0,
+                    "target_token": 6
+                  },
+                  {
+                    "greedy_logit": 5.0,
+                    "greedy_token": 2,
+                    "log_probability": -0.029460121359251464,
+                    "margin": 4.0,
+                    "nll": 0.029460121359251464,
+                    "position": 1,
+                    "runner_up_logit": 1.0,
+                    "runner_up_token": 0,
+                    "target_token": 2
+                  },
+                  {
+                    "greedy_logit": 5.0,
+                    "greedy_token": 7,
+                    "log_probability": -0.029460121359251464,
+                    "margin": 4.0,
+                    "nll": 0.029460121359251464,
+                    "position": 2,
+                    "runner_up_logit": 1.0,
+                    "runner_up_token": 0,
+                    "target_token": 7
+                  },
+                  {
+                    "greedy_logit": 5.0,
+                    "greedy_token": 6,
+                    "log_probability": -0.029460121359251464,
+                    "margin": 4.0,
+                    "nll": 0.029460121359251464,
+                    "position": 3,
+                    "runner_up_logit": 1.0,
+                    "runner_up_token": 0,
+                    "target_token": 6
+                  }
+                ],
+                "target_tokens": 4,
+                "vocab_size": 8
+              }
+            },
+            "full_target_count": 1024,
+            "id": "held_out_wikitext_1024",
+            "opt084_scores_full_span": true,
+            "ppl_ratio_gate_proposed": 1.01,
+            "prefix_targets": [
+              310,
+              52490,
+              279,
+              8862
+            ],
+            "retained_llama_mean_nll": 1.788091893045086,
+            "retained_ppl_ratio": 0.9997864007762405,
+            "retained_quartz_mean_nll": 1.7878782710057632,
+            "scoring": "teacher_forced_nll"
+          }
+        ]
+      },
+      "recurrence_nll": {
+        "class": "recurrence_nll",
+        "incremental_nll": -0.008314333899032578,
+        "inspectable": true,
+        "numerically_frozen_by": "OPT-084",
+        "pass_vs_proposed": true,
+        "proposed_max": 0.02,
+        "recurrence_long": {
+          "llama_mean_nll": 1.8402200970779121,
+          "ppl_ratio": 0.9952613706400849,
+          "quartz_mean_nll": 1.8354702048193376,
+          "scored": 128
+        },
+        "recurrence_short": {
+          "llama_mean_nll": 1.7683376992507749,
+          "ppl_ratio": 1.0035708018171432,
+          "quartz_mean_nll": 1.771902140891233,
+          "scored": 128
+        },
+        "retained_incremental_nll": -0.008314333899032578
+      },
+      "teacher_forced_continuation": {
+        "aggregate": {
+          "authoritative_local_comparison": "quartz+llama",
+          "avg_greedy_lcp_left_right": [
+            1.5,
+            1.5
+          ],
+          "case_wins_right_left_ties": [
+            0,
+            0,
+            2
+          ],
+          "cases": 2,
+          "delta_right_minus_left": 0.0,
+          "examples": [
+            {
+              "delta_right_minus_left": 0.0,
+              "id": "qwen_capitals_paris",
+              "llama_avg_nll": 0.029460121359251464,
+              "llama_first_match": 1,
+              "llama_greedy_lcp": 2,
+              "llama_nll": 0.05892024271850293,
+              "quartz_avg_nll": 0.029460121359251464,
+              "quartz_first_match": 1,
+              "quartz_greedy_lcp": 2,
+              "quartz_nll": 0.05892024271850293,
+              "target_tokens": 2
+            },
+            {
+              "delta_right_minus_left": 0.0,
+              "id": "qwen_two_plus_two",
+              "llama_avg_nll": 0.029460121359251464,
+              "llama_first_match": 1,
+              "llama_greedy_lcp": 1,
+              "llama_nll": 0.029460121359251464,
+              "quartz_avg_nll": 0.029460121359251464,
+              "quartz_first_match": 1,
+              "quartz_greedy_lcp": 1,
+              "quartz_nll": 0.029460121359251464,
+              "target_tokens": 1
+            }
+          ],
+          "first_token_matches_left_right": [
+            2,
+            2
+          ],
+          "inspectable": true,
+          "llama_avg_nll": 0.029460121359251464,
+          "quartz_avg_nll": 0.029460121359251464,
+          "relative_nll_change": 0.0,
+          "single_boolean": null,
+          "tokens": 3
+        },
+        "aggregate_only": false,
+        "class": "teacher_forced_continuation",
+        "examples": [
+          {
+            "aggregate_only": false,
+            "continuation_text": "Paris",
+            "delta_avg_nll": 0.0,
+            "delta_nll": 0.0,
+            "framework_vocab": 8,
+            "id": "qwen_capitals_paris",
+            "inspectable": true,
+            "llama": {
+              "avg_nll": 0.029460121359251464,
+              "engine": "llama",
+              "finite": true,
+              "first_match": 1,
+              "greedy_lcp": 2,
+              "id": "qwen_capitals_paris",
+              "mean_nll": 0.029460121359251464,
+              "nll": 0.05892024271850293,
+              "perplexity": 1.0298983637061003,
+              "scoring": "teacher_forced_nll",
+              "steps": [
+                {
+                  "greedy_logit": 5.0,
+                  "greedy_token": 7,
+                  "log_probability": -0.029460121359251464,
+                  "margin": 4.0,
+                  "nll": 0.029460121359251464,
+                  "position": 0,
+                  "runner_up_logit": 1.0,
+                  "runner_up_token": 0,
+                  "target_token": 7
+                },
+                {
+                  "greedy_logit": 5.0,
+                  "greedy_token": 5,
+                  "log_probability": -0.029460121359251464,
+                  "margin": 4.0,
+                  "nll": 0.029460121359251464,
+                  "position": 1,
+                  "runner_up_logit": 1.0,
+                  "runner_up_token": 0,
+                  "target_token": 5
+                }
+              ],
+              "target_tokens": 2,
+              "vocab_size": 8
+            },
+            "production_vocab": 248320,
+            "quartz": {
+              "avg_nll": 0.029460121359251464,
+              "engine": "quartz",
+              "finite": true,
+              "first_match": 1,
+              "greedy_lcp": 2,
+              "id": "qwen_capitals_paris",
+              "mean_nll": 0.029460121359251464,
+              "nll": 0.05892024271850293,
+              "perplexity": 1.0298983637061003,
+              "scoring": "teacher_forced_nll",
+              "steps": [
+                {
+                  "greedy_logit": 5.0,
+                  "greedy_token": 7,
+                  "log_probability": -0.029460121359251464,
+                  "margin": 4.0,
+                  "nll": 0.029460121359251464,
+                  "position": 0,
+                  "runner_up_logit": 1.0,
+                  "runner_up_token": 0,
+                  "target_token": 7
+                },
+                {
+                  "greedy_logit": 5.0,
+                  "greedy_token": 5,
+                  "log_probability": -0.029460121359251464,
+                  "margin": 4.0,
+                  "nll": 0.029460121359251464,
+                  "position": 1,
+                  "runner_up_logit": 1.0,
+                  "runner_up_token": 0,
+                  "target_token": 5
+                }
+              ],
+              "target_tokens": 2,
+              "vocab_size": 8
+            },
+            "suite_class": "teacher_forced_continuation"
+          },
+          {
+            "aggregate_only": false,
+            "continuation_text": "4",
+            "delta_avg_nll": 0.0,
+            "delta_nll": 0.0,
+            "framework_vocab": 8,
+            "id": "qwen_two_plus_two",
+            "inspectable": true,
+            "llama": {
+              "avg_nll": 0.029460121359251464,
+              "engine": "llama",
+              "finite": true,
+              "first_match": 1,
+              "greedy_lcp": 1,
+              "id": "qwen_two_plus_two",
+              "mean_nll": 0.029460121359251464,
+              "nll": 0.029460121359251464,
+              "perplexity": 1.0298983637061003,
+              "scoring": "teacher_forced_nll",
+              "steps": [
+                {
+                  "greedy_logit": 5.0,
+                  "greedy_token": 3,
+                  "log_probability": -0.029460121359251464,
+                  "margin": 4.0,
+                  "nll": 0.029460121359251464,
+                  "position": 0,
+                  "runner_up_logit": 1.0,
+                  "runner_up_token": 0,
+                  "target_token": 3
+                }
+              ],
+              "target_tokens": 1,
+              "vocab_size": 8
+            },
+            "production_vocab": 248320,
+            "quartz": {
+              "avg_nll": 0.029460121359251464,
+              "engine": "quartz",
+              "finite": true,
+              "first_match": 1,
+              "greedy_lcp": 1,
+              "id": "qwen_two_plus_two",
+              "mean_nll": 0.029460121359251464,
+              "nll": 0.029460121359251464,
+              "perplexity": 1.0298983637061003,
+              "scoring": "teacher_forced_nll",
+              "steps": [
+                {
+                  "greedy_logit": 5.0,
+                  "greedy_token": 3,
+                  "log_probability": -0.029460121359251464,
+                  "margin": 4.0,
+                  "nll": 0.029460121359251464,
+                  "position": 0,
+                  "runner_up_logit": 1.0,
+                  "runner_up_token": 0,
+                  "target_token": 3
+                }
+              ],
+              "target_tokens": 1,
+              "vocab_size": 8
+            },
+            "suite_class": "teacher_forced_continuation"
+          }
+        ],
+        "identity": [
+          {
+            "identical_context_construction": true,
+            "identical_scoring_definition": true,
+            "identical_target_tokens": true,
+            "identical_tokenization": true,
+            "llama_adapter": "tools/run_llama_quality_reference.py",
+            "mismatches": [],
+            "pass": true,
+            "quartz_native": "build/qw38-cuda-opt058-quality-baseline-test"
+          },
+          {
+            "identical_context_construction": true,
+            "identical_scoring_definition": true,
+            "identical_target_tokens": true,
+            "identical_tokenization": true,
+            "llama_adapter": "tools/run_llama_quality_reference.py",
+            "mismatches": [],
+            "pass": true,
+            "quartz_native": "build/qw38-cuda-opt058-quality-baseline-test"
+          }
+        ],
+        "inspectable": true,
+        "llama_control_scorer": "tools/run_llama_quality_reference.py",
+        "quartz_scorer": "build/qw38-cuda-opt058-quality-baseline-test"
+      }
+    },
+    "ds4_datasets_not_applicable": [
+      "data/glm52-openrouter-100",
+      "data/flash",
+      "data/pro",
+      "data/pro-0813"
+    ],
+    "native_reuse": [
+      "tools/run_llama_quality_reference.py",
+      "build/qw38-cuda-opt058-quality-baseline-test"
+    ],
+    "openrouter_not_invoked": true,
+    "opt084_baseline_not_run": true,
+    "proposed_acceptance": {
+      "absolute_task_accuracy": "visible_and_separate",
+      "engine_non_regression": "OPT-073 quality-v3",
+      "numerically_frozen_by": "OPT-084",
+      "ppl_ratio_max": 1.01,
+      "projection_error_substitute_for_opt074": false,
+      "quartz_vs_llama_nll": "inspectable_control",
+      "quartz_vs_shipping_baseline_regression": "primary_candidate_gate",
+      "recurrence_incremental_nll_max": 0.02
+    },
+    "same_model_comparison_with_ds4": false,
+    "suite_class_names": [
+      "teacher_forced_continuation",
+      "known_qwen_continuations",
+      "ppl_1024_spans",
+      "recurrence_nll",
+      "opt073_dual_verdict",
+      "held_out_32_alarm",
+      "finite_vocab_state_consistency"
+    ]
+  },
+  "suite_classes": [
+    "teacher_forced_continuation",
+    "known_qwen_continuations",
+    "ppl_1024_spans",
+    "recurrence_nll",
+    "opt073_dual_verdict",
+    "held_out_32_alarm",
+    "finite_vocab_state_consistency"
+  ],
+  "task": "OPT-083",
+  "vocab_size": 248320
+}
