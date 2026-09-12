@@ -337,6 +337,10 @@ bool selected_mmq_async_x() noexcept;
 bool effective_mmq_async_x() noexcept;
 void set_mmq_async_x_override(bool enabled) noexcept;
 void clear_mmq_async_x_override() noexcept;
+bool selected_mmq_split_xy_wait() noexcept;
+bool effective_mmq_split_xy_wait() noexcept;
+void set_mmq_split_xy_wait_override(bool enabled) noexcept;
+void clear_mmq_split_xy_wait_override() noexcept;
 bool mmq_pipeline_path_on(const char* path) noexcept;
 std::size_t mmq_pipeline_extra_shared_bytes(unsigned int prompt_tile,
                                             unsigned int quality_i,
@@ -387,6 +391,7 @@ struct MmqTileDispatch final {
   bool fma = false;
   bool async_y = false;
   bool async_x = false;
+  bool split_xy_wait = false;
   const char* ident = "";
   const char* path = "";
   const char* kernel = "";
@@ -415,6 +420,16 @@ struct MmqAsyncXOverrideScope final {
   ~MmqAsyncXOverrideScope() { clear_mmq_async_x_override(); }
   MmqAsyncXOverrideScope(const MmqAsyncXOverrideScope&) = delete;
   MmqAsyncXOverrideScope& operator=(const MmqAsyncXOverrideScope&) = delete;
+};
+
+struct MmqSplitXYWaitOverrideScope final {
+  explicit MmqSplitXYWaitOverrideScope(bool enabled) noexcept {
+    set_mmq_split_xy_wait_override(enabled);
+  }
+  ~MmqSplitXYWaitOverrideScope() { clear_mmq_split_xy_wait_override(); }
+  MmqSplitXYWaitOverrideScope(const MmqSplitXYWaitOverrideScope&) = delete;
+  MmqSplitXYWaitOverrideScope& operator=(const MmqSplitXYWaitOverrideScope&) =
+      delete;
 };
 
 struct FfnTileOverrideScope final {

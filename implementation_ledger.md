@@ -244,7 +244,7 @@ OPT-089.
 | OPT-094 | Conditionally replicate OPT-077 tile32 on demonstrably repaired timing | OPT-093 | done | Concrete measurement repair required; fixed 30-pair test and full quality/state/two-prefix gate, or no-reopen | [`tasks/OPT-094.md`](tasks/OPT-094.md); [`pins/opt094_gdn_replication_contract.json`](pins/opt094_gdn_replication_contract.json); [`pins/opt094_iteration_contract.json`](pins/opt094_iteration_contract.json); [`fixtures/opt094_gdn_replication.json`](fixtures/opt094_gdn_replication.json); [`tools/opt094_gdn_replication.py`](tools/opt094_gdn_replication.py); [`tests/test_opt094_gdn_replication.py`](tests/test_opt094_gdn_replication.py); [`Makefile`](Makefile); [`evidence/optimization/opt094-gdn-replication/REPORT.md`](evidence/optimization/opt094-gdn-replication/REPORT.md); delivery 2026-09-12T09:15:00Z |
 | OPT-095 | Share decode KV loads across six query heads without a prep launch | OPT-094 | done | Bitwise per-head output and complete 16-layer/two-prefix acceptance, or retain warp_query | [`tasks/OPT-095.md`](tasks/OPT-095.md); [`pins/opt095_attention_gqa_contract.json`](pins/opt095_attention_gqa_contract.json); [`pins/opt095_iteration_contract.json`](pins/opt095_iteration_contract.json); [`fixtures/opt095_attention_gqa.json`](fixtures/opt095_attention_gqa.json); [`tools/opt095_attention_gqa.py`](tools/opt095_attention_gqa.py); [`tests/test_opt095_attention_gqa.py`](tests/test_opt095_attention_gqa.py); [`Makefile`](Makefile); [`evidence/optimization/opt095-attention-gqa/REPORT.md`](evidence/optimization/opt095-attention-gqa/REPORT.md); delivery 2026-09-12T09:42:00Z |
 | OPT-096 | Conditionally capture eight-layer decode segments | OPT-095 | done | Fresh ≥0.50 ms removable overhead trigger, exact graph/state behavior and two-prefix gain, or no-reopen | [`tasks/OPT-096.md`](tasks/OPT-096.md); [`pins/opt096_decode_graphs_contract.json`](pins/opt096_decode_graphs_contract.json); [`pins/opt096_iteration_contract.json`](pins/opt096_iteration_contract.json); [`fixtures/opt096_decode_graphs.json`](fixtures/opt096_decode_graphs.json); [`tools/opt096_decode_graphs.py`](tools/opt096_decode_graphs.py); [`tests/test_opt096_decode_graphs.py`](tests/test_opt096_decode_graphs.py); [`cuda/execution_graph_path.cuh`](cuda/execution_graph_path.cuh); [`cuda/opt096_decode_graphs_test.cu`](cuda/opt096_decode_graphs_test.cu); [`cuda/full_scheduler.cu`](cuda/full_scheduler.cu); [`cuda/full_scheduler.h`](cuda/full_scheduler.h); [`Makefile`](Makefile); [`evidence/optimization/opt096-decode-graphs/REPORT.md`](evidence/optimization/opt096-decode-graphs/REPORT.md); delivery 2026-09-12T09:55:00Z |
-| OPT-097 | Separate X/Y async completion in fixed-tile prompt MMQ | OPT-096 | pending | Bitwise output and full FFN/P4096 win with decode guards, or retain fma_async_x schedule | [`tasks/OPT-097.md`](tasks/OPT-097.md) |
+| OPT-097 | Separate X/Y async completion in fixed-tile prompt MMQ | OPT-096 | done | Bitwise output and full FFN/P4096 win with decode guards, or retain fma_async_x schedule | [`tasks/OPT-097.md`](tasks/OPT-097.md) |
 | OPT-098 | Freeze and measure the combined post-088 production outcome | OPT-097 | pending | Complete quality, P/D/p95/2K/state/memory evidence; independent internal/parity/+5% outcomes, including failures | [`tasks/OPT-098.md`](tasks/OPT-098.md) |
 
 ### Post-042 recovery execution order (historical batch)
@@ -7168,21 +7168,17 @@ statements below are historical, not the current execution order.
 - **tok/s delta vs sitting D2048 baseline (OPT-088 35.73 tok/s): 0** (unchanged).
 - Marked OPT-096 `done`. Next eligible pending by dependency order: **OPT-097**.
 
-### 2026-09-12T09:55:00Z — OPT-096 conditional decode graph scaffold delivered
+### 2026-09-12T10:05:00Z — OPT-097 split_xy_wait rejected; joined_wait retained
 
-- Scaffold delivered: `ffn_only` / `decode_segments8` selectors, eight-layer segment
-  capture in `cuda/full_scheduler.cu`, eligibility tooling, native test harness,
-  and Makefile `cuda-opt096-diagnostics`. Production pin remains `ffn_only`.
-- Eligibility (host-only, OPT-090 fixture): `verdict=proceed` — D128/D2048 idle
-  ≥0.50 ms/token (OPT-090 attribution). `claims_throughput=false`.
-- GPU same-math, performance, quality, state-memory, and acceptance phases not
-  executed (`compile_failed`; docker OCI runtime cgroup timeout during
-  compile_cold). Fixture `incomplete: true` placeholders honest.
-- Verification attempt 2 PASS (`ruff check` clean; pytest 13 passed, 1 skipped).
-- Key evidence: [`fixtures/opt096_decode_graphs.json`](fixtures/opt096_decode_graphs.json);
-  [`evidence/optimization/opt096-decode-graphs/REPORT.md`](evidence/optimization/opt096-decode-graphs/REPORT.md).
-- Acceptance evidence: [`tasks/OPT-096.md`](tasks/OPT-096.md);
-  [`evidence/optimization/opt096-decode-graphs/REPORT.md`](evidence/optimization/opt096-decode-graphs/REPORT.md).
-- **tok/s delta vs sitting D2048 baseline (OPT-088 35.73 tok/s): 0** (unchanged).
-- Marked OPT-096 `done`. Next eligible pending by dependency order: **OPT-097**.
+- Added `UseSplitXYWait` selector (`joined_wait` control, `split_xy_wait` candidate) on
+  fixed `i128_j128` `fma_async_x`; kernel id `q4_i128_j128_fma_async_x_split_wait`.
+- Bitwise exact parity on aligned/fallback shapes; complete FFN screen regressed
+  (control **8.474** ms vs candidate **8.540** ms at N4096). Production pin
+  `kSelectedMmqSplitXYWait = false`.
+- Host verification PASS (pytest 19, native smoke/correctness/screen). Docker
+  `run_optimization_task` compile_failed (cgroup); native evidence authoritative.
+- Key evidence: [`fixtures/opt097_mmq_wait.json`](fixtures/opt097_mmq_wait.json);
+  [`evidence/optimization/opt097-mmq-wait/REPORT.md`](evidence/optimization/opt097-mmq-wait/REPORT.md).
+- **tok/s delta vs P4096 baseline (OPT-088 1680.8 tok/s): 0** (unchanged).
+- Marked OPT-097 `done`. Next eligible pending by dependency order: **OPT-098**.
 

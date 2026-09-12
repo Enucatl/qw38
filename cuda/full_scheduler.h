@@ -395,6 +395,15 @@ class ResidentModel final {
       PromptPipelinePath, PromptPipelineCounters*,
       SchedulerGraphs*, GdnScanPath, PrefillAttribution*) noexcept;
   friend class SchedulerGraphs;
+  friend std::size_t gdn_slot_before_layer(const ResidentModel& model,
+                                           std::size_t layer_index) noexcept;
+  friend std::size_t attention_slot_before_layer(const ResidentModel& model,
+                                                 std::size_t layer_index) noexcept;
+  friend cudaError_t enqueue_decode_layer_eager(
+      const ResidentModel& model, std::size_t layer_index, std::size_t frontier,
+      std::size_t gdn_slot, std::size_t attention_slot,
+      SchedulerWorkspace* workspace, float* residual, float* next,
+      std::uint64_t graph_generation, cudaStream_t stream) noexcept;
 };
 
 class SchedulerSession final {

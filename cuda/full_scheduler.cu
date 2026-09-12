@@ -2412,6 +2412,8 @@ std::size_t count_cuda_graph_nodes(cudaGraph_t graph) noexcept {
   return count;
 }
 
+}  // namespace
+
 std::size_t gdn_slot_before_layer(const ResidentModel& model,
                                   std::size_t layer_index) noexcept {
   std::size_t slot = 0;
@@ -2589,8 +2591,6 @@ cudaError_t capture_decode_segment_graph(
   cudaError_t capture_error = cudaStreamEndCapture(stream, graph_out);
   return error != cudaSuccess ? error : capture_error;
 }
-
-}  // namespace
 
 void SchedulerGraphs::release() noexcept {
   for (std::size_t index = 0; index < executions_.size(); ++index) {
