@@ -366,11 +366,16 @@ bool selected_mmq_split_xy_wait() noexcept;
 bool effective_mmq_split_xy_wait() noexcept;
 void set_mmq_split_xy_wait_override(bool enabled) noexcept;
 void clear_mmq_split_xy_wait_override() noexcept;
+bool selected_mmq_double_x() noexcept;
+bool effective_mmq_double_x() noexcept;
+void set_mmq_double_x_override(bool enabled) noexcept;
+void clear_mmq_double_x_override() noexcept;
 bool mmq_pipeline_path_on(const char* path) noexcept;
 std::size_t mmq_pipeline_extra_shared_bytes(unsigned int prompt_tile,
                                             unsigned int quality_i,
                                             const char* path) noexcept;
 std::size_t mmq_x_pipeline_extra_shared_bytes(unsigned int quality_i) noexcept;
+std::size_t mmq_x2_pipeline_extra_shared_bytes(unsigned int quality_i) noexcept;
 int mmq_pipeline_occupancy(QuantKind kind, unsigned int prompt_tile,
                            unsigned int quality_i, const char* path) noexcept;
 
@@ -416,6 +421,7 @@ struct MmqTileDispatch final {
   bool fma = false;
   bool async_y = false;
   bool async_x = false;
+  bool async_x2 = false;
   bool split_xy_wait = false;
   const char* ident = "";
   const char* path = "";
@@ -432,6 +438,9 @@ cudaError_t mmq_pipeline_kernel_attributes(
 cudaError_t mmq_x_pipeline_kernel_attributes(int* occupancy, int* registers,
                                             std::size_t* local_bytes,
                                             std::size_t* shared_bytes) noexcept;
+cudaError_t mmq_x2_pipeline_kernel_attributes(
+    int* occupancy, int* registers, std::size_t* local_bytes,
+    std::size_t* shared_bytes) noexcept;
 
 void set_ffn_tile_override(unsigned int gate_i, unsigned int gate_j,
                            unsigned int up_i, unsigned int up_j,
@@ -455,6 +464,15 @@ struct MmqSplitXYWaitOverrideScope final {
   MmqSplitXYWaitOverrideScope(const MmqSplitXYWaitOverrideScope&) = delete;
   MmqSplitXYWaitOverrideScope& operator=(const MmqSplitXYWaitOverrideScope&) =
       delete;
+};
+
+struct MmqDoubleXOverrideScope final {
+  explicit MmqDoubleXOverrideScope(bool enabled) noexcept {
+    set_mmq_double_x_override(enabled);
+  }
+  ~MmqDoubleXOverrideScope() { clear_mmq_double_x_override(); }
+  MmqDoubleXOverrideScope(const MmqDoubleXOverrideScope&) = delete;
+  MmqDoubleXOverrideScope& operator=(const MmqDoubleXOverrideScope&) = delete;
 };
 
 struct FfnTileOverrideScope final {

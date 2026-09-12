@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "task": "OPT-105",
+  "yardstick": "prompt_ffn_mmq_double_x_64x128",
+  "claims_throughput": true,
+  "claims_performance_improvement": true,
+  "llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+  "gguf_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+  "selected_mmq_pipeline_path": "fma_async",
+  "selected_mmq_async_x": true,
+  "selected_mmq_split_xy_wait": false,
+  "selected_mmq_double_x": false,
+  "control_tile": "i128_j128",
+  "candidate_tile": "i64_j128_x2",
+  "control_kernel": "q4_i128_j128_fma_async_x",
+  "candidate_kernel": "q4_i64_j128_fma_async_x2",
+  "min_complete_ffn_saving_ms": 5.0,
+  "native_target": "build/qw38-cuda-opt105-mmq-double-x-test",
+  "report_path": "evidence/optimization/opt105-mmq-double-x/REPORT.md",
+  "required_fixture_keys": [
+    "schema_version",
+    "task",
+    "status",
+    "selected_mmq_pipeline_path",
+    "selected_mmq_async_x",
+    "selected_mmq_double_x",
+    "control_tile",
+    "candidate_tile",
+    "installed",
+    "claims_throughput",
+    "independent_verdicts"
+  ]
+}

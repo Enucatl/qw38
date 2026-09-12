@@ -69,9 +69,12 @@ __device__ __forceinline__ bool q4_mmq_uses_aligned_meta() {
   return g_q4_mmq_aligned_meta != 0;
 }
 
-cudaError_t bind_q4_mmq_aligned_meta() noexcept {
-  const int flag = q4_device_uses_aligned_meta() ? 1 : 0;
-  return cudaMemcpyToSymbol(g_q4_mmq_aligned_meta, &flag, sizeof(flag));
+cudaError_t bind_q4_mmq_aligned_meta(cudaStream_t stream = nullptr) noexcept {
+  static const int kOff = 0;
+  static const int kOn = 1;
+  const int* flag = q4_device_uses_aligned_meta() ? &kOn : &kOff;
+  return cudaMemcpyToSymbolAsync(g_q4_mmq_aligned_meta, flag, sizeof(int), 0,
+                                 cudaMemcpyHostToDevice, stream);
 }
 
 __device__ float mma_read_half(const std::uint8_t* bytes) {
@@ -409,6 +412,7 @@ constexpr std::size_t quality_pad_ints(std::size_t count) noexcept {
 }
 
 constexpr int kMmqRawXStages = 1;  // 2*I*144+16 does not fit SM120 opt-in with Y
+constexpr int kMmqRawX2Stages = 2;  // OPT-105 64x128 two-slot raw-X ring
 
 constexpr std::size_t quality_raw_x_slot_bytes(int quality_i) noexcept {
   return static_cast<std::size_t>(quality_i) * kMmaQ4Bytes;
@@ -424,14 +428,16 @@ constexpr std::size_t quality_raw_x_ring_bytes(
 constexpr std::size_t quality_shared_ints(int prompt_tile,
                                          int quality_i = kQualityI,
                                          bool async_y = false,
-                                         bool async_x = false) noexcept {
+                                         bool async_x = false,
+                                         int x_stages = kMmqRawXStages) noexcept {
   const std::size_t y_tile = quality_pad_ints(
       static_cast<std::size_t>(prompt_tile) * kMmqTileYk);
   std::size_t ints = static_cast<std::size_t>(prompt_tile) +
                      y_tile * (async_y ? 2U : 1U) +
                      static_cast<std::size_t>(quality_i) * kQualitySramMax;
   if (async_x) {
-    ints += (quality_raw_x_ring_bytes(quality_i) + sizeof(int) - 1U) /
+    const int stages = x_stages > 0 ? x_stages : kMmqRawXStages;
+    ints += (quality_raw_x_ring_bytes(quality_i, stages) + sizeof(int) - 1U) /
             sizeof(int);
   }
   return ints;
@@ -905,7 +911,8 @@ __device__ __forceinline__ void quality_load_y_sync(
 
 template <QuantKind Kind, int PromptTile, bool Fallback, int QualityI = kQualityI,
           bool SoaWeights = false, bool UseFma = false, bool UseAsyncY = false,
-          bool UseAsyncX = false, bool UseSplitXYWait = false>
+          bool UseAsyncX = false, bool UseSplitXYWait = false,
+          bool UseAsyncX2 = false>
 __device__ __forceinline__ void quality_mma_process_tile(
     const std::uint8_t* weights, std::size_t output_rows, std::size_t columns,
     const int* y, std::size_t prompt_rows, float* output, float* tmp_fixup,
@@ -951,6 +958,8 @@ __device__ __forceinline__ void quality_mma_process_tile(
   constexpr bool kAsyncY = UseAsyncY && !Fallback;
   constexpr bool kAsyncX =
       UseAsyncX && !Fallback && Kind == QuantKind::kQ4K;
+  constexpr bool kAsyncX2 = kAsyncX && UseAsyncX2;
+  constexpr int kXStages = kAsyncX2 ? kMmqRawX2Stages : kMmqRawXStages;
   int* tile_y0 = quality_shared + PromptTile;
   int* tile_y = tile_y0;
   int* tile_x = tile_y0 + kYInts * (kAsyncY ? 2 : 1);
@@ -985,11 +994,18 @@ __device__ __forceinline__ void quality_mma_process_tile(
   const std::uint8_t* weight_row0 =
       weights + out0 * row_stride;
   [[maybe_unused]] int y_stage = 0;
+  [[maybe_unused]] int x_stage = 0;
   __syncthreads();
 
   if constexpr (kAsyncX) {
     if (!q4_mmq_uses_aligned_meta()) {
       mmq_load_raw_q4_async<QualityI>(raw_x, weight_row0, row_stride, kb0_start);
+      if constexpr (kAsyncX2) {
+        if (kb0_start + 1 < kb0_stop) {
+          mmq_load_raw_q4_async<QualityI>(raw_x + raw_slot_bytes, weight_row0,
+                                          row_stride, kb0_start + 1);
+        }
+      }
     }
   }
   if constexpr (kAsyncY) {
@@ -1157,7 +1173,7 @@ __device__ __forceinline__ void quality_mma_process_tile(
           issued_y = true;
         }
         if constexpr (kAsyncX) {
-          if (half == 0 && kb0 + 1 < kb0_stop) issue_x = true;
+          if (half == 0 && kb0 + kXStages < kb0_stop) issue_x = true;
         }
         if constexpr (UseSplitXYWait && kAsyncX) {
           if (issued_y && issue_x) {
@@ -1174,8 +1190,12 @@ __device__ __forceinline__ void quality_mma_process_tile(
           bool issued = issued_y;
           if (issue_x) {
             if (!q4_mmq_uses_aligned_meta()) {
-              mmq_load_raw_q4_async<QualityI>(raw_x, weight_row0, row_stride,
-                                              kb0 + 1);
+              std::uint8_t* dst =
+                  raw_x + (kAsyncX2 ? static_cast<std::size_t>(x_stage) *
+                                          raw_slot_bytes
+                                    : 0U);
+              mmq_load_raw_q4_async<QualityI>(dst, weight_row0, row_stride,
+                                              kb0 + kXStages);
             }
             issued = true;
           }
@@ -1382,10 +1402,14 @@ __device__ __forceinline__ void quality_mma_process_tile(
         y_stage = 1 - y_stage;
       } else {
         if constexpr (kAsyncX) {
-          if (half == 0 && kb0 + 1 < kb0_stop) {
+          if (half == 0 && kb0 + kXStages < kb0_stop) {
             if (!q4_mmq_uses_aligned_meta()) {
-              mmq_load_raw_q4_async<QualityI>(raw_x, weight_row0, row_stride,
-                                              kb0 + 1);
+              std::uint8_t* dst =
+                  raw_x + (kAsyncX2 ? static_cast<std::size_t>(x_stage) *
+                                          raw_slot_bytes
+                                    : 0U);
+              mmq_load_raw_q4_async<QualityI>(dst, weight_row0, row_stride,
+                                              kb0 + kXStages);
             }
             mmq_cp_async_commit();
             mmq_cp_async_wait();
@@ -1396,16 +1420,21 @@ __device__ __forceinline__ void quality_mma_process_tile(
     }
     if constexpr (kAsyncX) {
       if (kb0 + 1 < kb0_stop) {
-        if constexpr (UseSplitXYWait) {
+        if constexpr (UseSplitXYWait || kAsyncX2) {
           mmq_cp_async_wait();
         }
         if (q4_mmq_uses_aligned_meta()) {
           quality_unpack_q4_kb_aligned<QualityI, Fallback>(
               x_qs, weights, output_rows, columns, out0, kb0 + 1, i_max, lane);
         } else {
+          const std::uint8_t* packed =
+              kAsyncX2 ? raw_x + static_cast<std::size_t>(1 - x_stage) *
+                                     raw_slot_bytes
+                       : raw_x;
           quality_unpack_q4_kb<QualityI, Fallback>(
-              x_qs, raw_x, kMmaQ4Bytes, out0, output_rows, i_max, lane);
+              x_qs, packed, kMmaQ4Bytes, out0, output_rows, i_max, lane);
         }
+        if constexpr (kAsyncX2) x_stage = 1 - x_stage;
         __syncthreads();
       }
     }
@@ -1443,7 +1472,8 @@ __device__ __forceinline__ void quality_mma_process_tile(
 
 template <QuantKind Kind, int PromptTile, bool Fallback, int QualityI = kQualityI,
           bool SoaWeights = false, bool UseFma = false, bool UseAsyncY = false,
-          bool UseAsyncX = false, bool UseSplitXYWait = false>
+          bool UseAsyncX = false, bool UseSplitXYWait = false,
+          bool UseAsyncX2 = false>
 __global__ void __launch_bounds__(256, 1) quant_mmq_mma_quality_kernel(
     const std::uint8_t* weights, std::size_t output_rows, std::size_t columns,
     const int* y, std::size_t prompt_rows, float* output) {
@@ -1457,7 +1487,8 @@ __global__ void __launch_bounds__(256, 1) quant_mmq_mma_quality_kernel(
   const int j_max =
       Fallback ? static_cast<int>(prompt_rows - prompt0) - 1 : PromptTile - 1;
   quality_mma_process_tile<Kind, PromptTile, Fallback, QualityI, SoaWeights,
-                           UseFma, UseAsyncY, UseAsyncX, UseSplitXYWait>(
+                           UseFma, UseAsyncY, UseAsyncX, UseSplitXYWait,
+                           UseAsyncX2>(
       weights, output_rows, columns, y, prompt_rows, output, nullptr, out0,
       prompt0, i_max, j_max, 0, static_cast<int>(columns / kMmaBlockValues),
       false);
@@ -1593,7 +1624,7 @@ cudaError_t launch_q4_paired_swiglu_kernel(
     std::size_t output_rows, std::size_t columns, const int* y,
     std::size_t prompt_rows, __nv_bfloat16* activated, float* gate_dump,
     float* up_dump, bool fallback, cudaStream_t stream) noexcept {
-  const cudaError_t bound = bind_q4_mmq_aligned_meta();
+  const cudaError_t bound = bind_q4_mmq_aligned_meta(stream);
   if (bound != cudaSuccess) return bound;
   const dim3 grid(
       static_cast<unsigned int>((output_rows + kPairedQualityI - 1) /
@@ -1754,7 +1785,7 @@ cudaError_t launch_quality_mma_stream_k(
     const int* y, std::size_t prompt_rows, float* output, float* tmp_fixup,
     int nblocks, bool fixup_needed, cudaStream_t stream) noexcept {
   if constexpr (Kind == QuantKind::kQ4K) {
-    const cudaError_t bound = bind_q4_mmq_aligned_meta();
+    const cudaError_t bound = bind_q4_mmq_aligned_meta(stream);
     if (bound != cudaSuccess) return bound;
   }
   const int nty =
@@ -1795,7 +1826,8 @@ bool mmq_stream_k_path_on(const char* path) noexcept {
 
 template <QuantKind Kind, int PromptTile, bool Fallback, int QualityI = kQualityI,
           bool SoaWeights = false, bool UseFma = false, bool UseAsyncY = false,
-          bool UseAsyncX = false, bool UseSplitXYWait = false>
+          bool UseAsyncX = false, bool UseSplitXYWait = false,
+          bool UseAsyncX2 = false>
 cudaError_t launch_quality_mma(
     const std::uint8_t* weights, std::size_t output_rows, std::size_t columns,
     const int* y, std::size_t prompt_rows, float* output,
@@ -1867,13 +1899,13 @@ cudaError_t prepare_mmq_shared(Kernel kernel, std::size_t shared,
 
 template <QuantKind Kind, int PromptTile, bool Fallback, int QualityI,
           bool SoaWeights, bool UseFma, bool UseAsyncY, bool UseAsyncX,
-          bool UseSplitXYWait>
+          bool UseSplitXYWait, bool UseAsyncX2>
 cudaError_t launch_quality_mma(
     const std::uint8_t* weights, std::size_t output_rows, std::size_t columns,
     const int* y, std::size_t prompt_rows, float* output,
     cudaStream_t stream) noexcept {
   if constexpr (Kind == QuantKind::kQ4K) {
-    const cudaError_t bound = bind_q4_mmq_aligned_meta();
+    const cudaError_t bound = bind_q4_mmq_aligned_meta(stream);
     if (bound != cudaSuccess) return bound;
   }
   const dim3 grid(
@@ -1883,12 +1915,15 @@ cudaError_t launch_quality_mma(
   constexpr bool kAsyncY = UseAsyncY && !Fallback;
   constexpr bool kAsyncX =
       UseAsyncX && !Fallback && Kind == QuantKind::kQ4K;
+  constexpr int kXStages = (kAsyncX && UseAsyncX2) ? kMmqRawX2Stages
+                                                   : kMmqRawXStages;
   const std::size_t shared =
-      quality_shared_ints(PromptTile, QualityI, kAsyncY, kAsyncX) * sizeof(int);
+      quality_shared_ints(PromptTile, QualityI, kAsyncY, kAsyncX, kXStages) *
+      sizeof(int);
   auto kernel = quant_mmq_mma_quality_kernel<Kind, PromptTile, Fallback,
                                              QualityI, SoaWeights, UseFma,
                                              UseAsyncY, UseAsyncX,
-                                             UseSplitXYWait>;
+                                             UseSplitXYWait, UseAsyncX2>;
   cudaError_t error = prepare_mmq_shared(kernel, shared, nullptr);
   if (error != cudaSuccess) return error;
   if constexpr (Kind == QuantKind::kQ4K && PromptTile == 128 &&
@@ -1928,6 +1963,14 @@ cudaError_t launch_quality_mma_pipeline_aligned(
         return launch_quality_mma<Kind, PromptTile, false, QualityI, false, true,
                                   true, true>(weights, output_rows, columns, y,
                                               prompt_rows, output, stream);
+      }
+    }
+    if constexpr (Kind == QuantKind::kQ4K && PromptTile == 128 &&
+                  QualityI == 64) {
+      if (async_x) {
+        return launch_quality_mma<Kind, PromptTile, false, QualityI, false, true,
+                                  true, true, false, true>(
+            weights, output_rows, columns, y, prompt_rows, output, stream);
       }
     }
     return launch_quality_mma<Kind, PromptTile, false, QualityI, false, true,
@@ -2057,6 +2100,29 @@ cudaError_t query_q4_x_pipeline_kernel(int* occupancy, int* registers,
   return cudaSuccess;
 }
 
+cudaError_t query_q4_x2_pipeline_kernel(int* occupancy, int* registers,
+                                        std::size_t* local_bytes,
+                                        std::size_t* shared_bytes) noexcept {
+  const std::size_t shared =
+      quality_shared_ints(128, 64, true, true, kMmqRawX2Stages) * sizeof(int);
+  int occ = 0;
+  cudaFuncAttributes attr{};
+  auto kernel =
+      quant_mmq_mma_quality_kernel<QuantKind::kQ4K, 128, false, 64, false, true,
+                                   true, true, false, true>;
+  const cudaError_t prepared = prepare_mmq_shared(kernel, shared, &occ);
+  if (prepared != cudaSuccess) return prepared;
+  const cudaError_t error = cudaFuncGetAttributes(&attr, kernel);
+  if (error != cudaSuccess) return error;
+  if (occupancy != nullptr) *occupancy = occ;
+  if (registers != nullptr) *registers = attr.numRegs;
+  if (local_bytes != nullptr) {
+    *local_bytes = static_cast<std::size_t>(attr.localSizeBytes);
+  }
+  if (shared_bytes != nullptr) *shared_bytes = shared;
+  return cudaSuccess;
+}
+
 cudaError_t launch_q4_pipeline_aligned_ij(
     const std::uint8_t* weights, std::size_t output_rows, std::size_t columns,
     const int* y, std::size_t prompt_rows, float* output,
@@ -2091,9 +2157,11 @@ constexpr const char kSelectedMmqStreamKPath[] = "off";
 constexpr const char kSelectedMmqPipelinePath[] = "fma_async";
 constexpr bool kSelectedMmqAsyncX = true;
 constexpr bool kSelectedMmqSplitXYWait = false;
+constexpr bool kSelectedMmqDoubleX = false;
 inline thread_local const char* g_mmq_pipeline_path_override = nullptr;
 inline thread_local int g_mmq_async_x_override = -1;
 inline thread_local int g_mmq_split_xy_wait_override = -1;
+inline thread_local int g_mmq_double_x_override = -1;
 inline thread_local MmqTileDispatch g_last_mmq_tile_dispatch{};
 inline thread_local bool g_ffn_tile_override = false;
 inline thread_local unsigned int g_ffn_gate_i = 0;
@@ -2144,6 +2212,9 @@ const char* mmq_q4_kernel_ident(unsigned int quality_i, unsigned int prompt_tile
   if (fma && async_y && async_x && quality_i == 128 && prompt_tile == 128) {
     return "q4_i128_j128_fma_async_x";
   }
+  if (fma && async_y && async_x && quality_i == 64 && prompt_tile == 128) {
+    return "q4_i64_j128_fma_async_x2";
+  }
   if (fma && async_y) {
     if (quality_i == 128 && prompt_tile == 128) return "q4_i128_j128_fma_async";
     if (quality_i == 64 && prompt_tile == 128) return "q4_i64_j128_fma_async";
@@ -2161,10 +2232,14 @@ void record_q4_tile_dispatch(unsigned int quality_i, unsigned int prompt_tile,
                                std::strcmp(path, "fma_async") == 0);
   const bool async_y = pipe_on && (std::strcmp(path, "async_y") == 0 ||
                                    std::strcmp(path, "fma_async") == 0);
-  const bool async_x = pipe_on && async_y && fma && effective_mmq_async_x() &&
-                       quality_i == 128 && prompt_tile == 128;
+  const bool async_x128 = pipe_on && async_y && fma && effective_mmq_async_x() &&
+                          quality_i == 128 && prompt_tile == 128;
+  const bool async_x2 = pipe_on && async_y && fma && effective_mmq_async_x() &&
+                        effective_mmq_double_x() && quality_i == 64 &&
+                        prompt_tile == 128;
+  const bool async_x = async_x128 || async_x2;
   const bool split_xy_wait =
-      async_x && effective_mmq_split_xy_wait() && aligned;
+      async_x128 && effective_mmq_split_xy_wait() && aligned;
   g_last_mmq_tile_dispatch.quality_i = quality_i;
   g_last_mmq_tile_dispatch.prompt_tile = prompt_tile;
   g_last_mmq_tile_dispatch.aligned = aligned;
@@ -2173,6 +2248,7 @@ void record_q4_tile_dispatch(unsigned int quality_i, unsigned int prompt_tile,
   g_last_mmq_tile_dispatch.fma = fma;
   g_last_mmq_tile_dispatch.async_y = async_y;
   g_last_mmq_tile_dispatch.async_x = async_x;
+  g_last_mmq_tile_dispatch.async_x2 = async_x2;
   g_last_mmq_tile_dispatch.split_xy_wait = split_xy_wait;
   g_last_mmq_tile_dispatch.ident = mmq_q4_tile_ident(quality_i, prompt_tile);
   g_last_mmq_tile_dispatch.path = path != nullptr ? path : "";
@@ -2259,6 +2335,19 @@ void clear_mmq_split_xy_wait_override() noexcept {
   g_mmq_split_xy_wait_override = -1;
 }
 
+bool selected_mmq_double_x() noexcept { return kSelectedMmqDoubleX; }
+
+bool effective_mmq_double_x() noexcept {
+  if (g_mmq_double_x_override >= 0) return g_mmq_double_x_override != 0;
+  return kSelectedMmqDoubleX;
+}
+
+void set_mmq_double_x_override(bool enabled) noexcept {
+  g_mmq_double_x_override = enabled ? 1 : 0;
+}
+
+void clear_mmq_double_x_override() noexcept { g_mmq_double_x_override = -1; }
+
 bool mmq_pipeline_path_on(const char* path) noexcept {
   return legal_mmq_pipeline_path(path) && std::strcmp(path, "off") != 0;
 }
@@ -2279,6 +2368,10 @@ std::size_t mmq_pipeline_extra_shared_bytes(unsigned int prompt_tile,
 
 std::size_t mmq_x_pipeline_extra_shared_bytes(unsigned int quality_i) noexcept {
   return quality_raw_x_ring_bytes(static_cast<int>(quality_i));
+}
+
+std::size_t mmq_x2_pipeline_extra_shared_bytes(unsigned int quality_i) noexcept {
+  return quality_raw_x_ring_bytes(static_cast<int>(quality_i), kMmqRawX2Stages);
 }
 
 int mmq_pipeline_occupancy(QuantKind kind, unsigned int prompt_tile,
@@ -2423,7 +2516,10 @@ cudaError_t launch_quant_mmq_mma_y_pipeline(
         mmq_q4_pipeline_tile(quality_i, prompt_tile)) {
       return launch_q4_pipeline_aligned_ij(
           weights, output_rows, columns, packed, prompt_rows, output, quality_i,
-          prompt_tile, path, effective_mmq_async_x(),
+          prompt_tile, path,
+          effective_mmq_async_x() &&
+              (quality_i != 64 || prompt_tile != 128 ||
+               effective_mmq_double_x()),
           effective_mmq_split_xy_wait(), stream);
     }
     return launch_q4_quality_sync_ij(weights, output_rows, columns, packed,
@@ -3091,7 +3187,8 @@ bool legal_ffn_prompt_tile(unsigned int prompt_tile) noexcept {
 }
 
 unsigned int selected_ffn_gate_quality_i() noexcept {
-  return g_ffn_tile_override ? g_ffn_gate_i : kSelectedFfnGateQualityI;
+  if (g_ffn_tile_override) return g_ffn_gate_i;
+  return effective_mmq_double_x() ? 64U : kSelectedFfnGateQualityI;
 }
 
 unsigned int selected_ffn_gate_prompt_tile() noexcept {
@@ -3099,7 +3196,8 @@ unsigned int selected_ffn_gate_prompt_tile() noexcept {
 }
 
 unsigned int selected_ffn_up_quality_i() noexcept {
-  return g_ffn_tile_override ? g_ffn_up_i : kSelectedFfnUpQualityI;
+  if (g_ffn_tile_override) return g_ffn_up_i;
+  return effective_mmq_double_x() ? 64U : kSelectedFfnUpQualityI;
 }
 
 unsigned int selected_ffn_up_prompt_tile() noexcept {
@@ -3107,7 +3205,8 @@ unsigned int selected_ffn_up_prompt_tile() noexcept {
 }
 
 unsigned int selected_ffn_down_quality_i() noexcept {
-  return g_ffn_tile_override ? g_ffn_down_i : kSelectedFfnDownQualityI;
+  if (g_ffn_tile_override) return g_ffn_down_i;
+  return effective_mmq_double_x() ? 64U : kSelectedFfnDownQualityI;
 }
 
 unsigned int selected_ffn_down_prompt_tile() noexcept {
@@ -3227,6 +3326,13 @@ cudaError_t mmq_x_pipeline_kernel_attributes(int* occupancy, int* registers,
                                             std::size_t* shared_bytes) noexcept {
   return query_q4_x_pipeline_kernel(occupancy, registers, local_bytes,
                                     shared_bytes);
+}
+
+cudaError_t mmq_x2_pipeline_kernel_attributes(
+    int* occupancy, int* registers, std::size_t* local_bytes,
+    std::size_t* shared_bytes) noexcept {
+  return query_q4_x2_pipeline_kernel(occupancy, registers, local_bytes,
+                                     shared_bytes);
 }
 
 constexpr const char kSelectedFfnPath[] = "shared_y_swiglu_q8";

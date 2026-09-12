@@ -1,0 +1,30 @@
+
+==========
+== CUDA ==
+==========
+
+CUDA Version 13.0.2
+
+Container image Copyright (c) 2016-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+
+This container image and its contents are governed by the NVIDIA Deep Learning Container License.
+By pulling and using the container, you accept the terms and conditions of this license:
+https://developer.nvidia.com/ngc/nvidia-deep-learning-container-license
+
+A copy of this license is made available in this container at /NGC-DL-CONTAINER-LICENSE for your convenience.
+
+resource variant=i128_j128 occupancy=1 regs=255 local=48 shared=94736 extra_x=18448 device_optin=101376 query=ok
+resource variant=i64_j128_x2 occupancy=1 regs=244 local=0 shared=75280 extra_x2=18448 extra_x2_exact=18448 device_optin=101376 query=ok
+stage_lifetime warmup: cp.async raw X[k0] into slot0 and X[k1] into slot1 (I*9 16B chunks each) plus Y[k0,h0]; one commit group; wait_all; unpack slot0 into decoded X; CTA barrier. Slot0 is then free.
+stage_lifetime iter_k_load: joined waits issue next Y and raw X[k+2] into the free slot in one commit group; never reuse a live slot.
+stage_lifetime iter_k_compute: wait_all before unpack of the live slot (X[k+1]); decoded-X/MMA fragments, FMA association and epilogue are unchanged. OPT-097 split wait is not used.
+stage_lifetime drain: last kb0 issues no X[k+2]; no final unpack; Y drain matches the existing two-stage Y pipeline. Tails/misalignment keep the synchronous reference.
+resource_regs control=255 candidate=244
+mma_quality_q4_attrs fallback=1 regs=255 local=64 const=4 shared=0 maxThreadsPerBlock=256
+dispatch smoke_m17 variant=i128_j128 kernel=q4_i128_j128_sync_fallback aligned=false pipeline=false fallback=true fma=false async_y=false async_x=false async_x2=false split_xy_wait=false path=fma_async
+case=smoke_m17 variant=i128_j128 m=17 k=256 n=17 aligned=false nonfinite=0 fp64_max_abs=1.2789402 fp64_bad=0 fp64_nonfinite=0
+dispatch smoke_m17 variant=i64_j128_x2 kernel=q4_i64_j128_sync_fallback aligned=false pipeline=false fallback=true fma=false async_y=false async_x=false async_x2=false split_xy_wait=false path=fma_async
+case=smoke_m17 variant=i64_j128_x2 m=17 k=256 n=17 aligned=false nonfinite=0 fp64_max_abs=1.2789402 fp64_bad=0 fp64_nonfinite=0
+exact_vs_control smoke_m17 mismatch=0 nonfinite=0
+QW38_OPT105_MMQ_DOUBLE_X_RESULT={"schema_version":1,"task":"OPT-105","workload":"smoke","tier":"smoke","status":"passed","selected_pipeline":"fma_async","selected_async_x":true,"selected_double_x":false,"control_tile":"i128_j128","candidate_tile":"i64_j128_x2","control_kernel":"q4_i128_j128_fma_async_x","candidate_kernel":"q4_i64_j128_fma_async_x2","claims_throughput":true,"llama_revision":"cc83d7b4824f73cfdda4dfbb47ee39804f71b328","gguf_sha256":"31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34"}
+status=passed

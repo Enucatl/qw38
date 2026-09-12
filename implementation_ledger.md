@@ -264,7 +264,7 @@ in ledger/dependency order is OPT-099.
 | OPT-102 | Repack Q4 metadata and remove decode unpack overhead | OPT-099 | done | Source-faithful/branchless candidates improve complete 64-layer FFN and both decode prefixes while supporting prompt and memory gates, or late_w4 is retained | [`tasks/OPT-102.md`](tasks/OPT-102.md); [`pins/opt102_q4_repack_contract.json`](pins/opt102_q4_repack_contract.json); [`pins/opt102_iteration_contract.json`](pins/opt102_iteration_contract.json); [`fixtures/opt102_q4_repack.json`](fixtures/opt102_q4_repack.json); [`tools/opt102_q4_repack.py`](tools/opt102_q4_repack.py); [`tests/test_opt102_q4_repack.py`](tests/test_opt102_q4_repack.py); [`cuda/opt102_q4_repack_test.cu`](cuda/opt102_q4_repack_test.cu); [`cuda/q4k_aligned_layout.cuh`](cuda/q4k_aligned_layout.cuh); [`Makefile`](Makefile); [`evidence/optimization/opt102-q4-layout-unpack/REPORT.md`](evidence/optimization/opt102-q4-layout-unpack/REPORT.md); [`evidence/optimization/opt102-q4-layout-unpack/REJECTION.md`](evidence/optimization/opt102-q4-layout-unpack/REJECTION.md); verification 2026-09-12T16:38:33Z |
 | OPT-103 | Port the pinned-llama one-query vector attention specialization | OPT-099 | done | 128-thread online-softmax attention improves complete 16-layer D128/D2048 attention with full KV/quality/state guards, or warp_query is retained | [`tasks/OPT-103.md`](tasks/OPT-103.md); [`pins/opt103_vector_attention_contract.json`](pins/opt103_vector_attention_contract.json); [`pins/opt103_iteration_contract.json`](pins/opt103_iteration_contract.json); [`fixtures/opt103_vector_attention.json`](fixtures/opt103_vector_attention.json); [`tools/opt103_vector_attention.py`](tools/opt103_vector_attention.py); [`tests/test_opt103_vector_attention.py`](tests/test_opt103_vector_attention.py); [`cuda/opt103_vector_attention_test.cu`](cuda/opt103_vector_attention_test.cu); [`Makefile`](Makefile); [`evidence/optimization/opt103-vector-attention/REPORT.md`](evidence/optimization/opt103-vector-attention/REPORT.md); [`evidence/optimization/opt103-vector-attention/REJECTION.md`](evidence/optimization/opt103-vector-attention/REJECTION.md); verification 2026-09-12T17:08:30Z |
 | OPT-104 | Align Q6 weights for attention-output and vocabulary projections | OPT-099 | pending | One lossless replacement layout improves combined complete Q6 work and both decode prefixes with full-vocab/P4096/memory gates, or raw Q6 is retained | [`tasks/OPT-104.md`](tasks/OPT-104.md) |
-| OPT-105 | Double-buffer raw X in a 64x128 prompt MMQ tile | OPT-099 | pending | Bitwise two-X-stage schedule saves ≥5 ms over complete P4096 FFNs and improves P4096 with decode/quality guards, or 128x128 joined-wait remains | [`tasks/OPT-105.md`](tasks/OPT-105.md) |
+| OPT-105 | Double-buffer raw X in a 64x128 prompt MMQ tile | OPT-099 | done | Bitwise two-X-stage schedule saves ≥5 ms over complete P4096 FFNs and improves P4096 with decode/quality guards, or 128x128 joined-wait remains | [`tasks/OPT-105.md`](tasks/OPT-105.md); [`pins/opt105_mmq_double_x_contract.json`](pins/opt105_mmq_double_x_contract.json); [`pins/opt105_iteration_contract.json`](pins/opt105_iteration_contract.json); [`fixtures/opt105_mmq_double_x.json`](fixtures/opt105_mmq_double_x.json); [`tools/opt105_mmq_double_x.py`](tools/opt105_mmq_double_x.py); [`tests/test_opt105_mmq_double_x.py`](tests/test_opt105_mmq_double_x.py); [`cuda/opt105_mmq_double_x_test.cu`](cuda/opt105_mmq_double_x_test.cu); [`Makefile`](Makefile); [`evidence/optimization/opt105-mmq-double-x/REPORT.md`](evidence/optimization/opt105-mmq-double-x/REPORT.md); [`evidence/optimization/opt105-mmq-double-x/REJECTION.md`](evidence/optimization/opt105-mmq-double-x/REJECTION.md); verification 2026-09-12T17:33:55Z |
 | OPT-106 | Freeze and measure the post-098 recovery combination | OPT-100, OPT-101, OPT-102, OPT-103, OPT-104, OPT-105 | pending | Fresh quality/P/D/p95/2K/state/memory sitting independently reports internal improvement, llama parity and unchanged OPT-056 +5% outcomes | [`tasks/OPT-106.md`](tasks/OPT-106.md) |
 
 ### Post-042 recovery execution order (historical batch)
@@ -7357,4 +7357,24 @@ statements below are historical, not the current execution order.
 - **tok/s delta vs OPT-098 P4096 baseline (3046.23 tok/s): 0** (rejection; no
   throughput claim).
 - Marked OPT-103 `done`. Coupled IDs: none. First eligible pending task: **OPT-104**.
+
+### 2026-09-12T17:33:55Z — OPT-105 64x128 double-X delivered (reject)
+
+- Added 64×128 two-slot raw-Q4 X schedule `q4_i64_j128_fma_async_x2` vs control
+  `q4_i128_j128_fma_async_x` (`tools/opt105_mmq_double_x.py`, contracts,
+  fixture, tests, `cuda-opt105-diagnostics`, `UseAsyncX2` selector). Production
+  pin stays `kSelectedMmqDoubleX = false`. OPT-097 split wait stays rejected.
+- Kernel parity bitwise on K256/512/5120/17408, fallbacks, stale relaunch,
+  graph/eager, production gate/down samples. OPT-073 quality reuse (`pass`).
+- Complete 64-layer FFN screen (1+3): control **639.904 ms** vs candidate
+  **722.628 ms**; saving **−82.72 ms**; `keep=false` (gate ≥5 ms failed).
+  Gate/up 2.571 vs 2.911 ms; down 2.557 vs 2.900 ms. P4096 five-pair and
+  D128/D2048 guards deferred (`incomplete: true`).
+- Production retains 128×128 joined-wait. `claims_throughput=false`.
+- Key evidence: [`fixtures/opt105_mmq_double_x.json`](fixtures/opt105_mmq_double_x.json);
+  [`evidence/optimization/opt105-mmq-double-x/REPORT.md`](evidence/optimization/opt105-mmq-double-x/REPORT.md);
+  [`evidence/optimization/opt105-mmq-double-x/REJECTION.md`](evidence/optimization/opt105-mmq-double-x/REJECTION.md).
+- **tok/s delta vs OPT-098 P4096 baseline (3046.23 tok/s): 0** (rejection; no
+  throughput claim).
+- Marked OPT-105 `done`. Coupled IDs: none. First eligible pending task: **OPT-104**.
 

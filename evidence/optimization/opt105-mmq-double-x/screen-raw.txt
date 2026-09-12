@@ -1,0 +1,46 @@
+
+==========
+== CUDA ==
+==========
+
+CUDA Version 13.0.2
+
+Container image Copyright (c) 2016-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+
+This container image and its contents are governed by the NVIDIA Deep Learning Container License.
+By pulling and using the container, you accept the terms and conditions of this license:
+https://developer.nvidia.com/ngc/nvidia-deep-learning-container-license
+
+A copy of this license is made available in this container at /NGC-DL-CONTAINER-LICENSE for your convenience.
+
+screen_warmup group=gate_up variant=i128_j128 ms=2.59382391 pipeline=true async_x=true async_x2=false kernel=q4_i128_j128_fma_async_x
+screen_sample group=gate_up variant=i128_j128 sample=1 ms=2.56511998 pipeline=true async_x=true async_x2=false kernel=q4_i128_j128_fma_async_x
+screen_sample group=gate_up variant=i128_j128 sample=2 ms=2.57539201 pipeline=true async_x=true async_x2=false kernel=q4_i128_j128_fma_async_x
+screen_sample group=gate_up variant=i128_j128 sample=3 ms=2.57334399 pipeline=true async_x=true async_x2=false kernel=q4_i128_j128_fma_async_x
+screen_mean group=gate_up variant=i128_j128 ms=2.57128525
+screen_warmup group=gate_up variant=i64_j128_x2 ms=2.90303993 pipeline=true async_x=true async_x2=true kernel=q4_i64_j128_fma_async_x2
+screen_sample group=gate_up variant=i64_j128_x2 sample=1 ms=2.90307212 pipeline=true async_x=true async_x2=true kernel=q4_i64_j128_fma_async_x2
+screen_sample group=gate_up variant=i64_j128_x2 sample=2 ms=2.91331196 pipeline=true async_x=true async_x2=true kernel=q4_i64_j128_fma_async_x2
+screen_sample group=gate_up variant=i64_j128_x2 sample=3 ms=2.91737604 pipeline=true async_x=true async_x2=true kernel=q4_i64_j128_fma_async_x2
+screen_mean group=gate_up variant=i64_j128_x2 ms=2.91125369
+screen_warmup group=down variant=i128_j128 ms=2.59481597 pipeline=true async_x=true async_x2=false kernel=q4_i128_j128_fma_async_x
+screen_sample group=down variant=i128_j128 sample=1 ms=2.5497601 pipeline=true async_x=true async_x2=false kernel=q4_i128_j128_fma_async_x
+screen_sample group=down variant=i128_j128 sample=2 ms=2.55795193 pipeline=true async_x=true async_x2=false kernel=q4_i128_j128_fma_async_x
+screen_sample group=down variant=i128_j128 sample=3 ms=2.56307197 pipeline=true async_x=true async_x2=false kernel=q4_i128_j128_fma_async_x
+screen_mean group=down variant=i128_j128 ms=2.55692792
+screen_warmup group=down variant=i64_j128_x2 ms=2.8938241 pipeline=true async_x=true async_x2=true kernel=q4_i64_j128_fma_async_x2
+screen_sample group=down variant=i64_j128_x2 sample=1 ms=2.89280009 pipeline=true async_x=true async_x2=true kernel=q4_i64_j128_fma_async_x2
+screen_sample group=down variant=i64_j128_x2 sample=2 ms=2.90508795 pipeline=true async_x=true async_x2=true kernel=q4_i64_j128_fma_async_x2
+screen_sample group=down variant=i64_j128_x2 sample=3 ms=2.90300798 pipeline=true async_x=true async_x2=true kernel=q4_i64_j128_fma_async_x2
+screen_mean group=down variant=i64_j128_x2 ms=2.90029836
+complete64_warmup variant=i128_j128 ms=603.833374 last_kernel=q4_i128_j128_fma_async_x pipeline=true async_x2=false layers=64
+complete64_sample variant=i128_j128 sample=1 ms=638.877563 last_kernel=q4_i128_j128_fma_async_x pipeline=true async_x2=false
+complete64_sample variant=i128_j128 sample=2 ms=640.229675 last_kernel=q4_i128_j128_fma_async_x pipeline=true async_x2=false
+complete64_sample variant=i128_j128 sample=3 ms=640.606079 last_kernel=q4_i128_j128_fma_async_x pipeline=true async_x2=false
+complete64_warmup variant=i64_j128_x2 ms=720.481201 last_kernel=q4_i64_j128_fma_async_x2 pipeline=true async_x2=true layers=64
+complete64_sample variant=i64_j128_x2 sample=1 ms=721.134644 last_kernel=q4_i64_j128_fma_async_x2 pipeline=true async_x2=true
+complete64_sample variant=i64_j128_x2 sample=2 ms=722.215271 last_kernel=q4_i64_j128_fma_async_x2 pipeline=true async_x2=true
+complete64_sample variant=i64_j128_x2 sample=3 ms=724.53363 last_kernel=q4_i64_j128_fma_async_x2 pipeline=true async_x2=true
+screen_winner control_gate_up_ms=2.57128525 candidate_gate_up_ms=2.91125369 control_down_ms=2.55692792 candidate_down_ms=2.90029836 control_ffn64_ms=639.904419 survivor_ffn64_ms=722.627869 saving_ms=-82.7234497 keep=false installed_double_x=false selected_double_x=false
+QW38_OPT105_MMQ_DOUBLE_X_RESULT={"schema_version":1,"task":"OPT-105","workload":"screen","tier":"screen","status":"passed","selected_pipeline":"fma_async","selected_async_x":true,"selected_double_x":false,"control_tile":"i128_j128","candidate_tile":"i64_j128_x2","control_kernel":"q4_i128_j128_fma_async_x","candidate_kernel":"q4_i64_j128_fma_async_x2","claims_throughput":true,"llama_revision":"cc83d7b4824f73cfdda4dfbb47ee39804f71b328","gguf_sha256":"31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34"}
+status=passed
