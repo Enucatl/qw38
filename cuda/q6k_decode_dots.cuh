@@ -13,6 +13,7 @@
 #include <cuda_fp16.h>
 #include <cuda_runtime.h>
 
+#include "q6k_aligned_layout.cuh"
 #include "q6k_decode_path.cuh"
 #include "quant_mmv.h"
 
@@ -93,6 +94,51 @@ __device__ __forceinline__ float vec_dot_q6k_q8(const std::uint8_t* block,
   return d * sumf;
 }
 
+template <bool UseQ81>
+__device__ __forceinline__ float vec_dot_q6k_q8_aligned(
+    const std::uint8_t* soa, const Q6KAlignedLayoutDesc& desc, std::size_t row,
+    std::size_t kbx, const void* staged, int iqs) {
+  const std::size_t block = row * desc.n_blocks_per_row + kbx;
+  const std::uint8_t* ql = q6k_aligned_ql_plane(soa, desc) + block * kQ6KQlBytes;
+  const std::uint8_t* qh = q6k_aligned_qh_plane(soa, desc) + block * kQ6KQhBytes;
+  const int vl = get_int_aligned(ql, iqs);
+  const int vh_index = (kQI6 / 4) * (iqs / (kQI6 / 2)) + iqs % (kQI6 / 4);
+  const int vh_shift = 2 * ((iqs % (kQI6 / 2)) / (kQI6 / 4));
+  const int vh = get_int_aligned(qh, vh_index) >> vh_shift;
+  const int scale_offset =
+      (kQI6 / 4) * (iqs / (kQI6 / 2)) + (iqs % (kQI6 / 2)) / (kQI6 / 8);
+  const std::int8_t* scales = reinterpret_cast<const std::int8_t*>(
+      q6k_aligned_scale_plane(soa, desc) + block * kQ6KScaleBytes +
+      static_cast<std::size_t>(scale_offset));
+  const float d = read_half_b2(q6k_aligned_d_plane(soa) + block * kQ6KDBytes);
+  const int bq8_offset =
+      2 * kQR6 * (iqs / (kQI6 / 2)) + (iqs % (kQI6 / 2)) / (kQI6 / 4);
+  float sumf = 0.0F;
+#pragma unroll
+  for (int i = 0; i < kQR6; ++i) {
+    const int sc = static_cast<int>(scales[4 * i]);
+    const int vil = (vl >> (4 * i)) & 0x0F0F0F0F;
+    const int vih = ((vh >> (4 * i)) << 4) & 0x30303030;
+    const int vi = static_cast<int>(
+        __vsubss4(static_cast<unsigned int>(vil | vih), 0x20202020U));
+    int u = 0;
+    float d8 = 0.0F;
+    if constexpr (UseQ81) {
+      const Q8_1Block* q8 =
+          static_cast<const Q8_1Block*>(staged) + bq8_offset + 2 * i;
+      u = get_int_aligned(q8->values, iqs % kQI8);
+      d8 = __half2float(q8->scale);
+    } else {
+      const Q8Block* q8 =
+          static_cast<const Q8Block*>(staged) + bq8_offset + 2 * i;
+      u = get_int_aligned(q8->values, iqs % kQI8);
+      d8 = q8->scale;
+    }
+    sumf += d8 * static_cast<float>(__dp4a(vi, u, 0) * sc);
+  }
+  return d * sumf;
+}
+
 template <int WarpsPerRow, bool UseQ81>
 __global__ void q6k_coop_mmv(const std::uint8_t* weights, std::size_t rows,
                              std::size_t columns, const void* staged,
@@ -139,6 +185,55 @@ cudaError_t launch_coop(const std::uint8_t* weights, std::size_t rows,
   const unsigned int grid = static_cast<unsigned int>(rows);
   q6k_coop_mmv<WarpsPerRow, UseQ81>
       <<<grid, block, 0, stream>>>(weights, rows, columns, staged, output);
+  return cudaPeekAtLastError();
+}
+
+template <int WarpsPerRow, bool UseQ81>
+__global__ void q6k_coop_mmv_aligned(const std::uint8_t* soa, std::size_t rows,
+                                     std::size_t columns, const void* staged,
+                                     float* output) {
+  const int lane = threadIdx.x;
+  const int warp = threadIdx.y;
+  const std::size_t row = static_cast<std::size_t>(blockIdx.x);
+  if (row >= rows) return;
+
+  const Q6KAlignedLayoutDesc desc = make_q6k_aligned_layout_desc(rows, columns);
+  const std::size_t n_blocks = desc.n_blocks_per_row;
+  const std::size_t group_bytes =
+      UseQ81 ? sizeof(Q8_1Block) : sizeof(Q8Block);
+  const char* staged_bytes = static_cast<const char*>(staged);
+  float acc = 0.0F;
+  for (std::size_t kbx = static_cast<std::size_t>(warp); kbx < n_blocks;
+       kbx += static_cast<std::size_t>(WarpsPerRow)) {
+    const void* block_staged = staged_bytes + kbx * 8U * group_bytes;
+    acc += vec_dot_q6k_q8_aligned<UseQ81>(soa, desc, row, kbx, block_staged,
+                                          lane);
+  }
+
+  __shared__ float partial[WarpsPerRow][kWarp];
+  partial[warp][lane] = acc;
+  __syncthreads();
+  if (warp == 0) {
+    float sum = 0.0F;
+#pragma unroll
+    for (int other = 0; other < WarpsPerRow; ++other) {
+      sum += partial[other][lane];
+    }
+    for (int offset = kWarp / 2; offset > 0; offset /= 2) {
+      sum += __shfl_down_sync(0xFFFFFFFFU, sum, offset, kWarp);
+    }
+    if (lane == 0) output[row] = sum;
+  }
+}
+
+template <int WarpsPerRow, bool UseQ81>
+cudaError_t launch_coop_aligned(const std::uint8_t* soa, std::size_t rows,
+                                std::size_t columns, const void* staged,
+                                float* output, cudaStream_t stream) {
+  dim3 block(kWarp, WarpsPerRow);
+  const unsigned int grid = static_cast<unsigned int>(rows);
+  q6k_coop_mmv_aligned<WarpsPerRow, UseQ81>
+      <<<grid, block, 0, stream>>>(soa, rows, columns, staged, output);
   return cudaPeekAtLastError();
 }
 

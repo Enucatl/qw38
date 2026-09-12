@@ -10,6 +10,7 @@
 #include "ffn_decode_path.cuh"
 #include "production_numerics.h"
 #include "q4k_decode_path.cuh"
+#include "q6k_decode_path.cuh"
 #include "q8_decode_path.cuh"
 
 namespace qw38::cuda {
@@ -288,6 +289,15 @@ cudaError_t launch_repack_q4k_aligned(const std::uint8_t* weights,
                                       cudaStream_t stream) noexcept;
 
 cudaError_t launch_unpack_q4k_aligned(const std::uint8_t* soa, std::size_t rows,
+                                      std::size_t columns, std::uint8_t* gguf,
+                                      cudaStream_t stream) noexcept;
+
+cudaError_t launch_repack_q6k_aligned(const std::uint8_t* weights,
+                                      std::size_t rows, std::size_t columns,
+                                      std::uint8_t* soa,
+                                      cudaStream_t stream) noexcept;
+
+cudaError_t launch_unpack_q6k_aligned(const std::uint8_t* soa, std::size_t rows,
                                       std::size_t columns, std::uint8_t* gguf,
                                       cudaStream_t stream) noexcept;
 

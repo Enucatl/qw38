@@ -2255,12 +2255,16 @@ ResidentModel& ResidentModel::operator=(ResidentModel&& other) noexcept {
   upload_ms_ = other.upload_ms_;
   q8_device_layout_ = other.q8_device_layout_;
   q4_device_layout_ = other.q4_device_layout_;
+  q6_device_layout_ = other.q6_device_layout_;
   q8_aligned_tensor_count_ = other.q8_aligned_tensor_count_;
   q8_aligned_payload_bytes_ = other.q8_aligned_payload_bytes_;
   q8_repack_scratch_peak_bytes_ = other.q8_repack_scratch_peak_bytes_;
   q4_aligned_tensor_count_ = other.q4_aligned_tensor_count_;
   q4_aligned_payload_bytes_ = other.q4_aligned_payload_bytes_;
   q4_repack_scratch_peak_bytes_ = other.q4_repack_scratch_peak_bytes_;
+  q6_aligned_tensor_count_ = other.q6_aligned_tensor_count_;
+  q6_aligned_payload_bytes_ = other.q6_aligned_payload_bytes_;
+  q6_repack_scratch_peak_bytes_ = other.q6_repack_scratch_peak_bytes_;
   embedding_ = other.embedding_;
   output_norm_ = other.output_norm_;
   output_ = other.output_;
@@ -2270,12 +2274,16 @@ ResidentModel& ResidentModel::operator=(ResidentModel&& other) noexcept {
   other.upload_ms_ = 0.0F;
   other.q8_device_layout_ = kLegalQ8DeviceLayoutRawGguf;
   other.q4_device_layout_ = kLegalQ4DeviceLayoutRawGguf;
+  other.q6_device_layout_ = kLegalQ6DeviceLayoutRawGguf;
   other.q8_aligned_tensor_count_ = 0;
   other.q8_aligned_payload_bytes_ = 0;
   other.q8_repack_scratch_peak_bytes_ = 0;
   other.q4_aligned_tensor_count_ = 0;
   other.q4_aligned_payload_bytes_ = 0;
   other.q4_repack_scratch_peak_bytes_ = 0;
+  other.q6_aligned_tensor_count_ = 0;
+  other.q6_aligned_payload_bytes_ = 0;
+  other.q6_repack_scratch_peak_bytes_ = 0;
   return *this;
 }
 
@@ -2286,12 +2294,16 @@ void ResidentModel::release() noexcept {
   upload_ms_ = 0.0F;
   q8_device_layout_ = kLegalQ8DeviceLayoutRawGguf;
   q4_device_layout_ = kLegalQ4DeviceLayoutRawGguf;
+  q6_device_layout_ = kLegalQ6DeviceLayoutRawGguf;
   q8_aligned_tensor_count_ = 0;
   q8_aligned_payload_bytes_ = 0;
   q8_repack_scratch_peak_bytes_ = 0;
   q4_aligned_tensor_count_ = 0;
   q4_aligned_payload_bytes_ = 0;
   q4_repack_scratch_peak_bytes_ = 0;
+  q6_aligned_tensor_count_ = 0;
+  q6_aligned_payload_bytes_ = 0;
+  q6_repack_scratch_peak_bytes_ = 0;
 }
 
 Status ResidentModel::upload(const internal::ModelWeights& weights,
@@ -2396,6 +2408,15 @@ Status ResidentModel::upload(const internal::ModelWeights& weights,
       0) {
     const Status converted =
         set_q4_device_layout(kLegalQ4DeviceLayoutAlignedMeta, true);
+    if (!converted.is_ok()) {
+      release();
+      return converted;
+    }
+  }
+  if (std::strcmp(selected_q6_device_layout(), kLegalQ6DeviceLayoutAlignedSoa) ==
+      0) {
+    const Status converted =
+        set_q6_device_layout(kLegalQ6DeviceLayoutAlignedSoa, true);
     if (!converted.is_ok()) {
       release();
       return converted;
@@ -2627,6 +2648,117 @@ Status ResidentModel::set_q4_device_layout(const char* layout,
     q4_device_layout_ = kLegalQ4DeviceLayoutRawGguf;
     q4_aligned_tensor_count_ = 0;
     q4_aligned_payload_bytes_ = 0;
+  }
+  return Status::ok();
+}
+
+Status ResidentModel::set_q6_device_layout(const char* layout,
+                                           bool validate_inverse) noexcept {
+  if (blob_ == nullptr || !legal_q6_device_layout(layout)) {
+    return {StatusCode::kInvalidArgument,
+            "q6 device layout conversion input is invalid"};
+  }
+  if (std::strcmp(layout, q6_device_layout_) == 0) return Status::ok();
+  const bool to_aligned =
+      std::strcmp(layout, kLegalQ6DeviceLayoutAlignedSoa) == 0;
+  DeviceTensor* tensors[32];
+  std::size_t count = 0;
+  auto push = [&](DeviceTensor* tensor) {
+    if (tensor != nullptr && tensor->kind == QuantKind::kQ6K &&
+        tensor->data != nullptr && count < 32) {
+      tensors[count++] = tensor;
+    }
+  };
+  push(&output_);
+  for (std::size_t index = 0; index < layers_.size(); ++index) {
+    DeviceLayer& layer = layers_[index];
+    if (layer.kind == internal::LayerKind::kAttention) {
+      push(&layer.attention.output);
+    }
+  }
+  std::size_t max_bytes = 0;
+  for (std::size_t index = 0; index < count; ++index) {
+    const Q6KAlignedLayoutDesc desc =
+        make_q6k_aligned_layout_desc(tensors[index]->rows, tensors[index]->columns);
+    if (!q6k_aligned_is_byte_neutral(desc)) {
+      return {StatusCode::kInvalidArgument,
+              "q6 aligned SoA is not byte-neutral for an admitted Q6 tensor"};
+    }
+    if (desc.total_bytes > max_bytes) max_bytes = desc.total_bytes;
+  }
+  if (count == 0 || max_bytes == 0) {
+    q6_device_layout_ = to_aligned ? kLegalQ6DeviceLayoutAlignedSoa
+                                   : kLegalQ6DeviceLayoutRawGguf;
+    return Status::ok();
+  }
+  std::uint8_t* scratch = nullptr;
+  std::uint8_t* inverse = nullptr;
+  int* mismatch = nullptr;
+  cudaError_t error = cudaMalloc(&scratch, max_bytes);
+  if (error == cudaSuccess) error = cudaMalloc(&inverse, max_bytes);
+  if (error == cudaSuccess) error = cudaMalloc(&mismatch, sizeof(int));
+  if (error != cudaSuccess) {
+    if (scratch != nullptr) cudaFree(scratch);
+    if (inverse != nullptr) cudaFree(inverse);
+    if (mismatch != nullptr) cudaFree(mismatch);
+    return cuda_status(error, "cannot allocate bounded q6 SoA repack scratch");
+  }
+  q6_repack_scratch_peak_bytes_ = 2 * max_bytes + sizeof(int);
+  std::size_t payload = 0;
+  for (std::size_t index = 0; index < count && error == cudaSuccess; ++index) {
+    DeviceTensor* tensor = tensors[index];
+    const Q6KAlignedLayoutDesc desc =
+        make_q6k_aligned_layout_desc(tensor->rows, tensor->columns);
+    std::uint8_t* live = const_cast<std::uint8_t*>(tensor->data);
+    payload += desc.gguf_bytes;
+    error = cudaMemcpy(scratch, live, desc.gguf_bytes, cudaMemcpyDeviceToDevice);
+    if (error != cudaSuccess) break;
+    if (to_aligned) {
+      error = launch_repack_q6k_aligned(scratch, tensor->rows, tensor->columns,
+                                        live, nullptr);
+      if (error == cudaSuccess && validate_inverse) {
+        error = launch_unpack_q6k_aligned(live, tensor->rows, tensor->columns,
+                                          inverse, nullptr);
+        if (error == cudaSuccess) error = cudaMemset(mismatch, 0, sizeof(int));
+        if (error == cudaSuccess) {
+          const unsigned int blocks = static_cast<unsigned int>(
+              (desc.gguf_bytes + 255) / 256);
+          q8_bytes_mismatch<<<blocks, 256>>>(scratch, inverse, desc.gguf_bytes,
+                                             mismatch);
+          error = cudaPeekAtLastError();
+        }
+        int host_mismatch = 1;
+        if (error == cudaSuccess) {
+          error = cudaMemcpy(&host_mismatch, mismatch, sizeof(int),
+                             cudaMemcpyDeviceToHost);
+        }
+        if (error == cudaSuccess && host_mismatch != 0) {
+          cudaFree(scratch);
+          cudaFree(inverse);
+          cudaFree(mismatch);
+          return {StatusCode::kInternal,
+                  "q6 aligned SoA inverse reconstruction is not byte-exact"};
+        }
+      }
+    } else {
+      error = launch_unpack_q6k_aligned(scratch, tensor->rows, tensor->columns,
+                                        live, nullptr);
+    }
+  }
+  cudaFree(scratch);
+  cudaFree(inverse);
+  cudaFree(mismatch);
+  if (error != cudaSuccess) {
+    return cuda_status(error, "q6 aligned SoA conversion failed");
+  }
+  if (to_aligned) {
+    q6_device_layout_ = kLegalQ6DeviceLayoutAlignedSoa;
+    q6_aligned_tensor_count_ = count;
+    q6_aligned_payload_bytes_ = payload;
+  } else {
+    q6_device_layout_ = kLegalQ6DeviceLayoutRawGguf;
+    q6_aligned_tensor_count_ = 0;
+    q6_aligned_payload_bytes_ = 0;
   }
   return Status::ok();
 }

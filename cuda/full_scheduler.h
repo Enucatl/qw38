@@ -352,8 +352,12 @@ class ResidentModel final {
                               bool validate_inverse = true) noexcept;
   Status set_q4_device_layout(const char* layout,
                               bool validate_inverse = true) noexcept;
+  Status set_q6_device_layout(const char* layout,
+                              bool validate_inverse = true) noexcept;
   const char* q8_device_layout() const noexcept { return q8_device_layout_; }
   const char* q4_device_layout() const noexcept { return q4_device_layout_; }
+  const char* q6_device_layout() const noexcept { return q6_device_layout_; }
+  const DeviceTensor& output_projection() const noexcept { return output_; }
   std::size_t q8_aligned_tensor_count() const noexcept {
     return q8_aligned_tensor_count_;
   }
@@ -362,6 +366,15 @@ class ResidentModel final {
   }
   std::size_t q8_repack_scratch_peak_bytes() const noexcept {
     return q8_repack_scratch_peak_bytes_;
+  }
+  std::size_t q6_aligned_tensor_count() const noexcept {
+    return q6_aligned_tensor_count_;
+  }
+  std::size_t q6_aligned_payload_bytes() const noexcept {
+    return q6_aligned_payload_bytes_;
+  }
+  std::size_t q6_repack_scratch_peak_bytes() const noexcept {
+    return q6_repack_scratch_peak_bytes_;
   }
   std::size_t resident_bytes() const noexcept;
   float upload_milliseconds() const noexcept;
@@ -388,12 +401,16 @@ class ResidentModel final {
   float upload_ms_ = 0.0F;
   const char* q8_device_layout_ = kLegalQ8DeviceLayoutRawGguf;
   const char* q4_device_layout_ = kLegalQ4DeviceLayoutRawGguf;
+  const char* q6_device_layout_ = kLegalQ6DeviceLayoutRawGguf;
   std::size_t q8_aligned_tensor_count_ = 0;
   std::size_t q8_aligned_payload_bytes_ = 0;
   std::size_t q8_repack_scratch_peak_bytes_ = 0;
   std::size_t q4_aligned_tensor_count_ = 0;
   std::size_t q4_aligned_payload_bytes_ = 0;
   std::size_t q4_repack_scratch_peak_bytes_ = 0;
+  std::size_t q6_aligned_tensor_count_ = 0;
+  std::size_t q6_aligned_payload_bytes_ = 0;
+  std::size_t q6_repack_scratch_peak_bytes_ = 0;
   DeviceTensor embedding_;
   const float* output_norm_ = nullptr;
   DeviceTensor output_;

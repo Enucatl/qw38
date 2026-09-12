@@ -33,6 +33,7 @@
 namespace {
 
 constexpr std::size_t kQ4KBytes = 144;
+constexpr std::size_t kQ6KBytes = 210;
 constexpr std::size_t kQ80Bytes = 34;
 constexpr std::size_t kBlock = 256;
 constexpr std::size_t kQ80 = 32;
@@ -66,6 +67,7 @@ struct Options final {
   const char* q8_device_layout = nullptr;
   const char* q4_decode = nullptr;
   const char* q4_device_layout = nullptr;
+  const char* q6_device_layout = nullptr;
   const char* ffn_decode = nullptr;
   const char* gdn_decode = nullptr;
   const char* decode_query_prep = nullptr;
@@ -85,7 +87,7 @@ struct Options final {
 int usage(const char* argv0) {
   std::fprintf(stderr,
                "usage: %s [--workload smoke|correctness|decode-ffn|"
-               "decode-mixer|decode-gdn|decode-attention|prompt-ffn|"
+               "decode-mixer|decode-gdn|decode-attention|decode-q6|prompt-ffn|"
                "acceptance|hardware] [MODEL] "
                "[--cache-mode hot|rotating] [--capture-key KEY] "
                "[--q8-layout r1_w4|r2_w2] [--q8-grouping separate|grouped_r1_w4] "
@@ -93,6 +95,7 @@ int usage(const char* argv0) {
                "[--q4-decode packed|integer_q8|integer_q8_late|integer_q8_factored|"
                "integer_q8_branchless|integer_q8_aligned] "
                "[--q4-device-layout raw_gguf|aligned_meta] [--q4-warps 2|4] "
+               "[--q6-device-layout raw_gguf|aligned_soa] "
                "[--ffn-decode paired_staged|shared_stage|paired_integer] "
                "[--gdn-decode sequential|tile16|tile32|transposed] "
                "[--decode-query-prep warp_query|prepared_q|prepared_q_veckv] "
@@ -129,6 +132,9 @@ int parse_args(int argc, char** argv, Options* options) {
     } else if (std::strcmp(arg, "--q4-device-layout") == 0 &&
                index + 1 < argc) {
       options->q4_device_layout = argv[++index];
+    } else if (std::strcmp(arg, "--q6-device-layout") == 0 &&
+               index + 1 < argc) {
+      options->q6_device_layout = argv[++index];
     } else if (std::strcmp(arg, "--q4-warps") == 0 && index + 1 < argc) {
       options->q4_warps = static_cast<unsigned int>(std::atoi(argv[++index]));
     } else if (std::strcmp(arg, "--ffn-decode") == 0 && index + 1 < argc) {
@@ -1268,6 +1274,43 @@ cudaError_t replay_mixer_layer(const qw38::cuda::DeviceLayer& layer,
   return error;
 }
 
+cudaError_t replay_q6_combined(qw38::cuda::ResidentModel* model,
+                               const std::vector<std::size_t>& attn_layers,
+                               qw38::cuda::SchedulerWorkspace* workspace,
+                               float* logits, cudaStream_t stream,
+                               cudaEvent_t kernel_stop) {
+  cudaError_t error = qw38::cuda::launch_fp32_to_bf16(
+      workspace->residual_a_, qw38::internal::kResidualWidth,
+      workspace->projected_bf16_, stream);
+  if (error == cudaSuccess) {
+    error = cudaMemsetAsync(
+        workspace->projected_bf16_ + qw38::internal::kResidualWidth, 0,
+        (qw38::internal::kAttentionQueryWidth -
+         qw38::internal::kResidualWidth) *
+            sizeof(__nv_bfloat16),
+        stream);
+  }
+  if (error == cudaSuccess) {
+    const qw38::cuda::DeviceTensor& logits_w = model->output_projection();
+    error = qw38::cuda::launch_quant_mmv(
+        logits_w.kind, logits_w.data, logits_w.rows, logits_w.columns,
+        workspace->projected_bf16_, workspace->q8_, logits, stream);
+  }
+  for (std::size_t layer_index : attn_layers) {
+    if (error != cudaSuccess) break;
+    const qw38::cuda::DeviceTensor& attn_out =
+        model->layer(layer_index).attention.output;
+    error = qw38::cuda::launch_quant_mmv(
+        attn_out.kind, attn_out.data, attn_out.rows, attn_out.columns,
+        workspace->projected_bf16_, workspace->q8_, workspace->mixer_output_,
+        stream);
+  }
+  if (error == cudaSuccess && kernel_stop != nullptr) {
+    error = cudaEventRecord(kernel_stop, stream);
+  }
+  return error;
+}
+
 std::size_t ffn_layer_bytes(const qw38::cuda::DeviceCommonLayer& layer) {
   auto tensor_bytes = [](const qw38::cuda::DeviceTensor& tensor) {
     if (tensor.kind == qw38::cuda::QuantKind::kQ4K) {
@@ -1644,7 +1687,8 @@ int time_family(qw38::cuda::ResidentModel* model,
     if (mode == qw38::cuda::CacheMode::kHot && !layers.empty()) {
       layers.assign(layers.size(), layers.front());
     }
-  } else if (family == qw38::cuda::ReplayFamily::kDecodeAttention) {
+  } else if (family == qw38::cuda::ReplayFamily::kDecodeAttention ||
+             family == qw38::cuda::ReplayFamily::kDecodeQ6) {
     for (std::size_t index = 0; index < qw38::cuda::kOpt061LayerCount; ++index) {
       if (model->layer(index).kind == qw38::internal::LayerKind::kAttention) {
         layers.push_back(index);
@@ -1665,6 +1709,13 @@ int time_family(qw38::cuda::ResidentModel* model,
     working = layers.size() * gdn_core_bytes();
   } else if (family == qw38::cuda::ReplayFamily::kDecodeAttention) {
     working = layers.size() * attn_core_bytes(acts.attn_kv_capacity);
+  } else if (family == qw38::cuda::ReplayFamily::kDecodeQ6) {
+    const auto& logits_w = model->output_projection();
+    working = logits_w.rows * (logits_w.columns / kBlock) * kQ6KBytes;
+    for (std::size_t index : layers) {
+      const auto& attn = model->layer(index).attention.output;
+      working += attn.rows * (attn.columns / kBlock) * kQ6KBytes;
+    }
   } else {
     for (std::size_t index = 0; index < qw38::cuda::kOpt061LayerCount; ++index) {
       working += ffn_layer_bytes(model->layer(index).common);
@@ -1730,9 +1781,11 @@ int time_family(qw38::cuda::ResidentModel* model,
                         acts.prompt_residual.size() * sizeof(float),
                         cudaMemcpyHostToDevice);
     }
-    const float* source = family == qw38::cuda::ReplayFamily::kDecodeMixer
-                              ? acts.layer_input.data() + offset
-                              : acts.ffn_input.data() + offset;
+    const float* source =
+        (family == qw38::cuda::ReplayFamily::kDecodeMixer ||
+         family == qw38::cuda::ReplayFamily::kDecodeQ6)
+            ? acts.layer_input.data() + offset
+            : acts.ffn_input.data() + offset;
     return cudaMemcpy(workspace.residual_a_, source,
                       qw38::internal::kResidualWidth * sizeof(float),
                       cudaMemcpyHostToDevice);
@@ -1759,6 +1812,9 @@ int time_family(qw38::cuda::ResidentModel* model,
               ? model->layer(layer_index + 1).common.input_norm
               : nullptr;
       error = restore_layer(layer_index);
+      if (family == qw38::cuda::ReplayFamily::kDecodeQ6 && step != 0) {
+        continue;
+      }
       if (family == qw38::cuda::ReplayFamily::kDecodeGdn) {
         std::size_t gdn_slot = 0;
         for (std::size_t index = 0; index < layer_index; ++index) {
@@ -1815,6 +1871,13 @@ int time_family(qw38::cuda::ResidentModel* model,
         } else {
           ++attn_groups;
         }
+      } else if (family == qw38::cuda::ReplayFamily::kDecodeQ6) {
+        if (error == cudaSuccess) {
+          error = replay_q6_combined(model, layers, &workspace,
+                                     workspace.logits_, nullptr, nullptr);
+        }
+        mixer = static_cast<int>(layers.size() + 1);
+        attn_groups = static_cast<int>(layers.size());
       } else if (family == qw38::cuda::ReplayFamily::kDecodeGdn) {
         if (error == cudaSuccess) {
           error = replay_decode_gdn_layer(
@@ -1888,6 +1951,7 @@ int time_family(qw38::cuda::ResidentModel* model,
         "gdn_input_output_groups=%d attention_input_output_groups=%d "
         "q8_input_projection_launches=%u q8_grouped_launches=%u "
         "q8_projection_launches=%u q8_grouping=%s q8_device_layout=%s "
+        "q6_device_layout=%s "
         "rotating_layers=%zu working_set_bytes=%zu exceeds_2x_l2=%s "
         "eviction_outside_interval=false pooled_events=true "
         "staging_ops_per_ffn=2 invalidate_q8_decode_staging=true\n",
@@ -1896,7 +1960,8 @@ int time_family(qw38::cuda::ResidentModel* model,
         kernel_acc, gate_up, down, mixer, gdn_groups, attn_groups,
         input_launches, grouped_launches, projection_launches,
         qw38::cuda::effective_q8_decode_grouping(),
-        qw38::cuda::effective_q8_device_layout(), layers.size(),
+        qw38::cuda::effective_q8_device_layout(),
+        qw38::cuda::effective_q6_device_layout(), layers.size(),
         working, json_bool(exceeds));
     if (rounds_out != nullptr && !warmup) {
       std::fprintf(
@@ -1907,12 +1972,13 @@ int time_family(qw38::cuda::ResidentModel* model,
           "\"gate_up_calls\":%d,\"down_calls\":%d,\"mixer_calls\":%d,"
           "\"gdn_input_output_groups\":%d,"
           "\"attention_input_output_groups\":%d,"
+          "\"q6_device_layout\":\"%s\","
           "\"rotating_layers\":%zu,\"working_set_bytes\":%zu,"
           "\"accept_hot_as_production\":false,\"pooled_events\":true}\n",
           qw38::cuda::replay_family_name(family),
           qw38::cuda::cache_mode_name(mode), sample - warmups, enclosing,
           kernel_acc, gate_up, down, mixer, gdn_groups, attn_groups,
-          layers.size(), working);
+          qw38::cuda::effective_q6_device_layout(), layers.size(), working);
     }
   }
   if (family == qw38::cuda::ReplayFamily::kDecodeGdn) {
@@ -2101,6 +2167,20 @@ int run_family(const Options& options, qw38::cuda::ReplayFamily family) {
       return 1;
     }
   }
+  if (options.q6_device_layout != nullptr) {
+    if (!qw38::cuda::apply_q6_device_layout_ident(options.q6_device_layout)) {
+      std::fprintf(stderr, "invalid --q6-device-layout %s\n",
+                   options.q6_device_layout);
+      if (rounds != nullptr) std::fclose(rounds);
+      return 1;
+    }
+    const qw38::Status converted =
+        model.set_q6_device_layout(options.q6_device_layout, true);
+    if (!converted.is_ok()) {
+      if (rounds != nullptr) std::fclose(rounds);
+      return 1;
+    }
+  }
   if (options.ffn_decode != nullptr &&
       !qw38::cuda::apply_ffn_decode_ident(options.ffn_decode)) {
     std::fprintf(stderr, "invalid --ffn-decode %s\n", options.ffn_decode);
@@ -2166,8 +2246,10 @@ int run_family(const Options& options, qw38::cuda::ReplayFamily family) {
                       family == qw38::cuda::ReplayFamily::kDecodeAttention;
   const bool opt095 = options.decode_attention_gqa != nullptr;
   const bool opt103 = options.decode_attention_vec128 != nullptr;
+  const bool opt104 = options.q6_device_layout != nullptr ||
+                      family == qw38::cuda::ReplayFamily::kDecodeQ6;
   if (rc == 0 && !opt070 && !opt075 && !opt077 && !opt078 && !opt095 &&
-      !opt103) {
+      !opt103 && !opt104) {
     rc = run_streaming_calibration(hardware, &stream_gbps, &checksum);
   }
   const qw38::cuda::Q8DecodeDispatch q8_launch =
@@ -2456,6 +2538,9 @@ int main(int argc, char** argv) {
   }
   if (std::strcmp(workload, "decode-attention") == 0) {
     return run_family(options, qw38::cuda::ReplayFamily::kDecodeAttention);
+  }
+  if (std::strcmp(workload, "decode-q6") == 0) {
+    return run_family(options, qw38::cuda::ReplayFamily::kDecodeQ6);
   }
   if (std::strcmp(workload, "prompt-ffn") == 0) {
     return run_family(options, qw38::cuda::ReplayFamily::kPromptFfn);

@@ -43,6 +43,8 @@
 #include "pdl_launch.cuh"
 #include "q4k_aligned_layout.cuh"
 #include "q4k_decode_path.cuh"
+#include "q6k_aligned_layout.cuh"
+#include "q6k_decode_path.cuh"
 #include "quant_mmv.h"
 
 #include <cstdio>
@@ -64,14 +66,24 @@ constexpr std::size_t kMmaBlockValues = 256;
 constexpr std::size_t kMmaQ8Values = 32;
 
 __constant__ int g_q4_mmq_aligned_meta = 0;
+__constant__ int g_q6_mmq_aligned_soa = 0;
 
 __device__ __forceinline__ bool q4_mmq_uses_aligned_meta() {
   return g_q4_mmq_aligned_meta != 0;
 }
 
+__device__ __forceinline__ bool q6_mmq_uses_aligned_soa() {
+  return g_q6_mmq_aligned_soa != 0;
+}
+
 cudaError_t bind_q4_mmq_aligned_meta() noexcept {
   const int flag = q4_device_uses_aligned_meta() ? 1 : 0;
   return cudaMemcpyToSymbol(g_q4_mmq_aligned_meta, &flag, sizeof(flag));
+}
+
+cudaError_t bind_q6_mmq_aligned_soa() noexcept {
+  const int flag = q6_device_uses_aligned_soa() ? 1 : 0;
+  return cudaMemcpyToSymbol(g_q6_mmq_aligned_soa, &flag, sizeof(flag));
 }
 
 __device__ float mma_read_half(const std::uint8_t* bytes) {
@@ -122,6 +134,43 @@ __device__ void mma_decode_q8_group32(const std::uint8_t* block, int values[32],
   for (int lane = 0; lane < 32; ++lane) {
     values[lane] =
         static_cast<int>(static_cast<std::int8_t>(block[2 + lane]));
+  }
+}
+
+__device__ void mma_decode_q6_group32_aligned(const std::uint8_t* soa,
+                                              const Q6KAlignedLayoutDesc& desc,
+                                              std::size_t row, int index0,
+                                              int values[32], float scales[2]) {
+  const std::size_t block =
+      row * desc.n_blocks_per_row +
+      static_cast<std::size_t>(index0) / kMmaBlockValues;
+  const int within = index0 % static_cast<int>(kMmaBlockValues);
+  const int half = within / 128;
+  const int group0 = (within % 128) / 32;
+  const std::uint8_t* ql =
+      q6k_aligned_ql_plane(soa, desc) + block * kQ6KQlBytes;
+  const std::uint8_t* qh =
+      q6k_aligned_qh_plane(soa, desc) + block * kQ6KQhBytes;
+  const std::uint8_t* sc =
+      q6k_aligned_scale_plane(soa, desc) + block * kQ6KScaleBytes;
+  const float d = mma_read_half(q6k_aligned_d_plane(soa) + block * kQ6KDBytes);
+#pragma unroll
+  for (int lane = 0; lane < 32; ++lane) {
+    const int group = group0;
+    const int low_offset = half * 64;
+    const std::uint8_t low =
+        ql[low_offset + lane + ((group & 1) != 0 ? 32 : 0)];
+    const int low_four = group < 2 ? low & 15 : low >> 4;
+    const int high_two = (qh[half * 32 + lane] >> (group * 2)) & 3;
+    values[lane] = (low_four | (high_two << 4)) - 32;
+  }
+#pragma unroll
+  for (int part = 0; part < 2; ++part) {
+    const int lane = part * 16;
+    const std::uint8_t scale_byte = sc[half * 8 + (lane / 16) + group0 * 2];
+    const int scale = scale_byte < 128 ? static_cast<int>(scale_byte)
+                                       : static_cast<int>(scale_byte) - 256;
+    scales[part] = d * static_cast<float>(scale);
   }
 }
 
@@ -218,6 +267,12 @@ __global__ void __launch_bounds__(kMmaThreads, 2)
       } else if constexpr (Kind == QuantKind::kQ4K) {
         mma_decode_q4_group32(block, static_cast<int>(k % kWeightValues),
                               decoded, &d_scale, &neg_dmin);
+      } else if (q6_mmq_uses_aligned_soa()) {
+        const Q6KAlignedLayoutDesc desc =
+            make_q6k_aligned_layout_desc(output_rows, columns);
+        mma_decode_q6_group32_aligned(weights, desc, global_row,
+                                      static_cast<int>(k % kWeightValues),
+                                      decoded, q6_scales);
       } else {
         mma_decode_q6_group32(block, static_cast<int>(k % kWeightValues),
                               decoded, q6_scales);
@@ -596,6 +651,73 @@ __device__ __forceinline__ void quality_unpack_q4_kb_aligned(
   }
 }
 
+template <int QualityI, bool Fallback>
+__device__ __forceinline__ void quality_unpack_q6_kb_aligned(
+    int* x_qs, float* x_df, int* x_sc, const std::uint8_t* soa,
+    std::size_t output_rows, std::size_t columns, std::size_t out0, int kb0,
+    int i_max, int lane) {
+  constexpr int kSram = kQualitySramQ6;
+  const Q6KAlignedLayoutDesc desc =
+      make_q6k_aligned_layout_desc(output_rows, columns);
+#pragma unroll
+  for (int i0 = 0; i0 < QualityI; i0 += kQualityNwarps) {
+    int i = i0 + threadIdx.y;
+    if (Fallback) i = min(i, max(i_max, 0));
+    const std::size_t global_row = out0 + static_cast<std::size_t>(i);
+    int ql0 = 0;
+    int ql1 = 0;
+    int qh0 = 0;
+    int qh1 = 0;
+    if (!Fallback || global_row < output_rows) {
+      const std::size_t block =
+          global_row * desc.n_blocks_per_row + static_cast<std::size_t>(kb0);
+      const std::uint8_t* ql =
+          q6k_aligned_ql_plane(soa, desc) + block * kQ6KQlBytes;
+      const std::uint8_t* qh =
+          q6k_aligned_qh_plane(soa, desc) + block * kQ6KQhBytes;
+      const int ql_word = quality_get_int_b4(ql, lane);
+      ql0 = (ql_word >> 0) & 0x0F0F0F0F;
+      ql1 = (ql_word >> 4) & 0x0F0F0F0F;
+      const int qh_word = quality_get_int_b4(
+          qh, (kQi6K / 4) * (lane / (kQi6K / 2)) + (lane % (kQi6K / 4)));
+      qh0 = ((qh_word >> ((lane & 0x08) >> 2)) << 4) & 0x30303030;
+      qh1 = (qh_word >> ((lane & 0x08) >> 2)) & 0x30303030;
+    }
+    const int kq0 = 2 * lane - (lane % (kQi6K / 2));
+    const int kq1 = kq0 + (kQi6K / 2);
+    x_qs[i * kSram + kq0] = __vsubss4(ql0 | qh0, 0x20202020);
+    x_qs[i * kSram + kq1] = __vsubss4(ql1 | qh1, 0x20202020);
+  }
+#pragma unroll
+  for (int i0 = 0; i0 < QualityI; i0 += kQualityNwarps * 32) {
+    int i = (i0 + threadIdx.y * 32 + lane) % QualityI;
+    if (Fallback) i = min(i, max(i_max, 0));
+    const std::size_t global_row = out0 + static_cast<std::size_t>(i);
+    float d = 0.0F;
+    if (!Fallback || global_row < output_rows) {
+      const std::size_t block =
+          global_row * desc.n_blocks_per_row + static_cast<std::size_t>(kb0);
+      d = mma_read_half(q6k_aligned_d_plane(soa) + block * kQ6KDBytes);
+    }
+    x_df[i * kSram] = d;
+  }
+#pragma unroll
+  for (int i0 = 0; i0 < QualityI; i0 += kQualityNwarps * 8) {
+    int i = (i0 + threadIdx.y * 8 + lane / 4) % QualityI;
+    if (Fallback) i = min(i, max(i_max, 0));
+    const std::size_t global_row = out0 + static_cast<std::size_t>(i);
+    int sc = 0;
+    if (!Fallback || global_row < output_rows) {
+      const std::size_t block =
+          global_row * desc.n_blocks_per_row + static_cast<std::size_t>(kb0);
+      const std::uint8_t* scales =
+          q6k_aligned_scale_plane(soa, desc) + block * kQ6KScaleBytes;
+      sc = quality_get_int_b4(scales, lane % 4);
+    }
+    x_sc[i * kSram + (lane % 4)] = sc;
+  }
+}
+
 constexpr std::size_t soa_dq_bytes(std::size_t output_rows,
                                    std::size_t columns) noexcept {
   return output_rows * (columns / 32) * sizeof(half);
@@ -703,6 +825,61 @@ __global__ void unpack_q4k_aligned_kernel(const std::uint8_t* soa,
       soa + desc.qs_offset + index * kQ4KQsBytes);
 #pragma unroll
   for (int word = 0; word < 32; ++word) dst_qs[word] = qs[word];
+}
+
+__global__ void repack_q6k_aligned_kernel(const std::uint8_t* weights,
+                                          std::size_t rows, std::size_t columns,
+                                          std::uint8_t* soa) {
+  const Q6KAlignedLayoutDesc desc = make_q6k_aligned_layout_desc(rows, columns);
+  const std::size_t index =
+      static_cast<std::size_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+  if (index >= desc.n_blocks) return;
+  const std::uint8_t* src = weights + index * kQ6KGgufBlockBytes;
+  soa[index * kQ6KDBytes] = src[208];
+  soa[index * kQ6KDBytes + 1] = src[209];
+  std::uint8_t* scales = soa + desc.scale_offset + index * kQ6KScaleBytes;
+#pragma unroll
+  for (int byte = 0; byte < static_cast<int>(kQ6KScaleBytes); ++byte) {
+    scales[byte] = src[192 + byte];
+  }
+  std::uint8_t* ql = soa + desc.ql_offset + index * kQ6KQlBytes;
+#pragma unroll
+  for (int byte = 0; byte < static_cast<int>(kQ6KQlBytes); ++byte) {
+    ql[byte] = src[byte];
+  }
+  std::uint8_t* qh = soa + desc.qh_offset + index * kQ6KQhBytes;
+#pragma unroll
+  for (int byte = 0; byte < static_cast<int>(kQ6KQhBytes); ++byte) {
+    qh[byte] = src[128 + byte];
+  }
+}
+
+__global__ void unpack_q6k_aligned_kernel(const std::uint8_t* soa,
+                                          std::size_t rows, std::size_t columns,
+                                          std::uint8_t* gguf) {
+  const Q6KAlignedLayoutDesc desc = make_q6k_aligned_layout_desc(rows, columns);
+  const std::size_t index =
+      static_cast<std::size_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+  if (index >= desc.n_blocks) return;
+  std::uint8_t* dst = gguf + index * kQ6KGgufBlockBytes;
+  dst[208] = soa[index * kQ6KDBytes];
+  dst[209] = soa[index * kQ6KDBytes + 1];
+  const std::uint8_t* scales =
+      soa + desc.scale_offset + index * kQ6KScaleBytes;
+#pragma unroll
+  for (int byte = 0; byte < static_cast<int>(kQ6KScaleBytes); ++byte) {
+    dst[192 + byte] = scales[byte];
+  }
+  const std::uint8_t* ql = soa + desc.ql_offset + index * kQ6KQlBytes;
+#pragma unroll
+  for (int byte = 0; byte < static_cast<int>(kQ6KQlBytes); ++byte) {
+    dst[byte] = ql[byte];
+  }
+  const std::uint8_t* qh = soa + desc.qh_offset + index * kQ6KQhBytes;
+#pragma unroll
+  for (int byte = 0; byte < static_cast<int>(kQ6KQhBytes); ++byte) {
+    dst[128 + byte] = qh[byte];
+  }
 }
 
 constexpr int quality_rows_per_warp(int prompt_tile) {
@@ -1027,6 +1204,11 @@ __device__ __forceinline__ void quality_mma_process_tile(
             row_stride, out0, output_rows, i_max, lane);
       }
     } else if constexpr (Kind == QuantKind::kQ6K) {
+      if (q6_mmq_uses_aligned_soa()) {
+        quality_unpack_q6_kb_aligned<QualityI, Fallback>(
+            x_qs, x_df, x_sc, weights, output_rows, columns, out0, kb0, i_max,
+            lane);
+      } else {
 #pragma unroll
       for (int i0 = 0; i0 < QualityI; i0 += kQualityNwarps) {
         int i = i0 + threadIdx.y;
@@ -1081,6 +1263,7 @@ __device__ __forceinline__ void quality_mma_process_tile(
           sc = quality_get_int_b2(block + 192, lane % 4);
         }
         x_sc[i * kSram + (lane % 4)] = sc;
+      }
       }
     } else {
       const int kbx = lane / kQi80;
@@ -1757,6 +1940,10 @@ cudaError_t launch_quality_mma_stream_k(
     const cudaError_t bound = bind_q4_mmq_aligned_meta();
     if (bound != cudaSuccess) return bound;
   }
+  if constexpr (Kind == QuantKind::kQ6K) {
+    const cudaError_t bound = bind_q6_mmq_aligned_soa();
+    if (bound != cudaSuccess) return bound;
+  }
   const int nty =
       static_cast<int>((output_rows + QualityI - 1) / QualityI);
   const int ntx =
@@ -1874,6 +2061,10 @@ cudaError_t launch_quality_mma(
     cudaStream_t stream) noexcept {
   if constexpr (Kind == QuantKind::kQ4K) {
     const cudaError_t bound = bind_q4_mmq_aligned_meta();
+    if (bound != cudaSuccess) return bound;
+  }
+  if constexpr (Kind == QuantKind::kQ6K) {
+    const cudaError_t bound = bind_q6_mmq_aligned_soa();
     if (bound != cudaSuccess) return bound;
   }
   const dim3 grid(
@@ -3057,6 +3248,39 @@ cudaError_t launch_unpack_q4k_aligned(const std::uint8_t* soa, std::size_t rows,
       (desc.n_blocks + static_cast<std::size_t>(kQualityQuantThreads) - 1) /
       static_cast<std::size_t>(kQualityQuantThreads));
   unpack_q4k_aligned_kernel<<<blocks, kQualityQuantThreads, 0, stream>>>(
+      soa, rows, columns, gguf);
+  return cudaPeekAtLastError();
+}
+
+cudaError_t launch_repack_q6k_aligned(const std::uint8_t* weights,
+                                      std::size_t rows, std::size_t columns,
+                                      std::uint8_t* soa,
+                                      cudaStream_t stream) noexcept {
+  if (weights == nullptr || soa == nullptr ||
+      !q6k_aligned_geometry_ok(rows, columns)) {
+    return cudaErrorInvalidValue;
+  }
+  const Q6KAlignedLayoutDesc desc = make_q6k_aligned_layout_desc(rows, columns);
+  const unsigned int blocks = static_cast<unsigned int>(
+      (desc.n_blocks + static_cast<std::size_t>(kQualityQuantThreads) - 1) /
+      static_cast<std::size_t>(kQualityQuantThreads));
+  repack_q6k_aligned_kernel<<<blocks, kQualityQuantThreads, 0, stream>>>(
+      weights, rows, columns, soa);
+  return cudaPeekAtLastError();
+}
+
+cudaError_t launch_unpack_q6k_aligned(const std::uint8_t* soa, std::size_t rows,
+                                      std::size_t columns, std::uint8_t* gguf,
+                                      cudaStream_t stream) noexcept {
+  if (soa == nullptr || gguf == nullptr ||
+      !q6k_aligned_geometry_ok(rows, columns)) {
+    return cudaErrorInvalidValue;
+  }
+  const Q6KAlignedLayoutDesc desc = make_q6k_aligned_layout_desc(rows, columns);
+  const unsigned int blocks = static_cast<unsigned int>(
+      (desc.n_blocks + static_cast<std::size_t>(kQualityQuantThreads) - 1) /
+      static_cast<std::size_t>(kQualityQuantThreads));
+  unpack_q6k_aligned_kernel<<<blocks, kQualityQuantThreads, 0, stream>>>(
       soa, rows, columns, gguf);
   return cudaPeekAtLastError();
 }

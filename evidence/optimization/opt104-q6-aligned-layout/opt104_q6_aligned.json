@@ -1,0 +1,820 @@
+{
+  "schema_version": 1,
+  "task": "OPT-104",
+  "mode": "acceptance",
+  "llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+  "gguf_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+  "token_generator": "(42 + index * 997) % 248320",
+  "configurations": [
+    "raw_gguf",
+    "aligned_soa"
+  ],
+  "control": "raw_gguf",
+  "control_layout": "raw_gguf",
+  "shipping_layout": "raw_gguf",
+  "selected_path": "raw_gguf",
+  "production_kept": false,
+  "claims_throughput": false,
+  "claims_performance_improvement": false,
+  "evidence_complete": false,
+  "quality_contract_id": "opt089_strict",
+  "opt074_coverage_unadmitted_blocker": false,
+  "replacement_mandatory_on_keep": true,
+  "no_extra_persistent_q6": true,
+  "q6_decode_path_fixed": "integer_q8_1",
+  "q6_launches": 17,
+  "min_q6_saving_ms": 0.1,
+  "independent_verdicts": {
+    "raw_gguf": {
+      "kernel_parity_pass": true,
+      "model_quality_pass": true,
+      "performance_pass": false,
+      "production_kept": true,
+      "opt074_coverage_unadmitted_blocker": false,
+      "incomplete": false
+    },
+    "aligned_soa": {
+      "kernel_parity_pass": true,
+      "model_quality_pass": true,
+      "performance_pass": false,
+      "production_kept": false,
+      "opt074_coverage_unadmitted_blocker": false,
+      "incomplete": true
+    }
+  },
+  "kernel_parity_pass": {
+    "raw_gguf": true,
+    "aligned_soa": true
+  },
+  "model_quality_pass": {
+    "raw_gguf": true,
+    "aligned_soa": true
+  },
+  "performance_pass": {
+    "raw_gguf": false,
+    "aligned_soa": false
+  },
+  "report_path": "evidence/optimization/opt104-q6-aligned-layout/REPORT.md",
+  "parity": {
+    "schema_version": 1,
+    "task": "OPT-104",
+    "phase": "parity",
+    "mode": "feedback",
+    "parity": {
+      "schema_version": 1,
+      "task": "OPT-104",
+      "phase": "parity",
+      "host_ok": true,
+      "typed_staging_reject": true,
+      "source": "this_sitting",
+      "catalog_count": 12,
+      "corrected_comparators_rerun": true,
+      "gpu": {
+        "available": true,
+        "ran": true,
+        "success": true,
+        "blocker": ""
+      },
+      "by_ident": {
+        "aligned_soa": {
+          "ident": "aligned_soa",
+          "kernel_parity_pass": true,
+          "case_count": 12,
+          "gpu_case_count": 12,
+          "incomplete": false,
+          "documented_fails": []
+        },
+        "raw_gguf": {
+          "ident": "raw_gguf",
+          "kernel_parity_pass": true,
+          "case_count": 12,
+          "gpu_case_count": 12,
+          "incomplete": false,
+          "reference": "raw_gguf"
+        }
+      },
+      "opt074_coverage_unadmitted_blocker": false,
+      "q8_1_typed": {
+        "typed_comparison_rejected": true,
+        "message": "Q8_1 sum_q and sum_x are distinct typed fields; a kernel-parity tolerance cannot equate them",
+        "pass": true
+      }
+    },
+    "native_counts": {
+      "schema_version": 1,
+      "task": "OPT-104",
+      "warmups": 0,
+      "samples": 1,
+      "observed_warmups": 0,
+      "observed_samples": 1,
+      "observed_candidates": 1,
+      "observed_shapes": 12,
+      "observed_tier": "correctness",
+      "pairs": 1,
+      "sample_ids": [
+        0
+      ],
+      "acceptance_executed": false,
+      "keep": false,
+      "capture_key": null
+    },
+    "admission": {
+      "ok": true,
+      "result_class": "ok",
+      "message": "",
+      "observed": {
+        "schema_version": 1,
+        "task": "OPT-104",
+        "warmups": 0,
+        "samples": 1,
+        "observed_warmups": 0,
+        "observed_samples": 1,
+        "observed_candidates": 1,
+        "observed_shapes": 12,
+        "observed_tier": "correctness",
+        "pairs": 1,
+        "sample_ids": [
+          0
+        ],
+        "acceptance_executed": false,
+        "keep": false,
+        "capture_key": null,
+        "rounds": []
+      }
+    },
+    "independent_verdicts": {
+      "raw_gguf": {
+        "kernel_parity_pass": true,
+        "model_quality_pass": false,
+        "performance_pass": false,
+        "production_kept": false,
+        "opt074_coverage_unadmitted_blocker": false,
+        "incomplete": false
+      },
+      "aligned_soa": {
+        "kernel_parity_pass": true,
+        "model_quality_pass": false,
+        "performance_pass": false,
+        "production_kept": false,
+        "opt074_coverage_unadmitted_blocker": false,
+        "incomplete": false
+      }
+    },
+    "selected_path": "raw_gguf",
+    "shipping_unchanged": true,
+    "production_kept": false,
+    "control_layout": "raw_gguf",
+    "shipping_layout": "raw_gguf",
+    "opt074_coverage_unadmitted_blocker": false,
+    "winners": [],
+    "feedback_cannot_keep": true,
+    "claims_throughput": false,
+    "measurement_utc": "2026-09-12T17:41:06Z",
+    "status": "parity_evaluated"
+  },
+  "shipping_unchanged": true,
+  "status": "measured_reject",
+  "quality": {
+    "schema_version": 1,
+    "task": "OPT-104",
+    "phase": "quality",
+    "mode": "release",
+    "quality": {
+      "raw_gguf": {
+        "config": "raw_gguf",
+        "quality_contract_id": "opt089_strict",
+        "ppl_ratio_max": 1.01,
+        "recurrence_incremental_nll_max": 0.02,
+        "selectors": {
+          "q4_decode": "integer_q8_late",
+          "q4_staging": "paired_staged",
+          "q8_decode": "r1_w4",
+          "q8_path": "dp4a_q8_1",
+          "prompt_mmq": "fma_async_x",
+          "prompt_mmq_tile": "i128_j128",
+          "prompt_attention": "kv_once",
+          "decode_gdn": "sequential",
+          "decode_attention": "warp_query",
+          "prompt_pair": "off",
+          "nvccflags": "-O2 --fmad=false",
+          "production_numerics": "strict",
+          "execution_graphs": "ffn_only",
+          "chat_template": "no_thinking",
+          "enable_thinking": false,
+          "logit_masking": false,
+          "ffn_decode": "paired_integer",
+          "q6_device_layout": "raw_gguf",
+          "q6_decode": "integer_q8_1"
+        },
+        "opt088_control": {
+          "label": "opt088_packed_r1",
+          "source": "fixtures/opt088_batch_gate.json",
+          "authenticated": true,
+          "rescore_required": false,
+          "selectors": {
+            "q4_decode": "packed",
+            "q8_layout": "r1_w4",
+            "q8_decode": "dp4a_q8_1",
+            "ffn_decode": "paired_staged",
+            "gguf_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+            "source_fields": [
+              "attention_pipeline",
+              "decode_query_prep",
+              "execution_graphs",
+              "ffn_decode",
+              "ffn_gate_prompt_tile",
+              "ffn_gate_quality_i",
+              "ffn_prompt_pair",
+              "ffn_tiles",
+              "gdn_decode",
+              "gdn_preproc",
+              "mmq_async_x",
+              "mmq_pipeline",
+              "nvccflags",
+              "production_numerics",
+              "prompt_microbatch_rows",
+              "q4_decode",
+              "q6_decode",
+              "q8_decode",
+              "q8_decode_layout_warps_medium",
+              "q8_decode_layout_warps_skinny",
+              "q8_decode_layout_warps_wide",
+              "q8_decode_rows_medium",
+              "q8_decode_rows_skinny",
+              "q8_decode_rows_wide",
+              "q8_layout",
+              "query_prepare",
+              "rms_norm"
+            ]
+          },
+          "expected": {
+            "q4_decode": "packed",
+            "q8_layout": "r1_w4"
+          },
+          "gguf_ok": true,
+          "has_nll": true,
+          "payload_task": "OPT-088",
+          "reason": "source_selector_proof"
+        },
+        "opt084_freeze": {
+          "label": "opt084_packed_r2",
+          "source": "fixtures/opt084_quality_baseline.json",
+          "authenticated": true,
+          "rescore_required": false,
+          "selectors": {
+            "q4_decode": "packed",
+            "q8_layout": "r2_w2",
+            "q8_decode": "r2_w2",
+            "ffn_decode": "paired_staged",
+            "gguf_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+            "source_fields": [
+              "chat_template",
+              "decode_attention",
+              "decode_gdn",
+              "enable_thinking",
+              "execution_graphs",
+              "logit_masking",
+              "nvccflags",
+              "production_numerics",
+              "prompt_attention",
+              "prompt_mmq",
+              "prompt_mmq_tile",
+              "prompt_pair",
+              "q4_decode",
+              "q4_staging",
+              "q8_decode",
+              "q8_path"
+            ]
+          },
+          "expected": {
+            "q4_decode": "packed",
+            "q8_layout": "r2_w2"
+          },
+          "gguf_ok": true,
+          "has_nll": true,
+          "payload_task": "OPT-084",
+          "reason": "source_selector_proof"
+        },
+        "opt089_admission": {
+          "task": "OPT-089",
+          "production_kept": true,
+          "quality_contract_id": "opt089_strict"
+        },
+        "opt091_concession": {
+          "concession_used": false,
+          "successor_model_quality_pass": true
+        },
+        "reuse_opt089_authenticated_scores": false,
+        "opt074_coverage_unadmitted_blocker": false,
+        "model_quality_pass": true,
+        "incomplete": false,
+        "reason": "opt089_shipping_late_w4",
+        "shipping_q4_decode": "integer_q8_late",
+        "shipping_ffn_decode": "paired_integer"
+      },
+      "aligned_soa": {
+        "config": "aligned_soa",
+        "quality_contract_id": "opt089_strict",
+        "ppl_ratio_max": 1.01,
+        "recurrence_incremental_nll_max": 0.02,
+        "selectors": {
+          "q4_decode": "integer_q8_late",
+          "q4_staging": "paired_staged",
+          "q8_decode": "r1_w4",
+          "q8_path": "dp4a_q8_1",
+          "prompt_mmq": "fma_async_x",
+          "prompt_mmq_tile": "i128_j128",
+          "prompt_attention": "kv_once",
+          "decode_gdn": "sequential",
+          "decode_attention": "warp_query",
+          "prompt_pair": "off",
+          "nvccflags": "-O2 --fmad=false",
+          "production_numerics": "strict",
+          "execution_graphs": "ffn_only",
+          "chat_template": "no_thinking",
+          "enable_thinking": false,
+          "logit_masking": false,
+          "ffn_decode": "paired_integer",
+          "q6_device_layout": "aligned_soa",
+          "q6_decode": "integer_q8_1"
+        },
+        "opt088_control": {
+          "label": "opt088_packed_r1",
+          "source": "fixtures/opt088_batch_gate.json",
+          "authenticated": true,
+          "rescore_required": false,
+          "selectors": {
+            "q4_decode": "packed",
+            "q8_layout": "r1_w4",
+            "q8_decode": "dp4a_q8_1",
+            "ffn_decode": "paired_staged",
+            "gguf_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+            "source_fields": [
+              "attention_pipeline",
+              "decode_query_prep",
+              "execution_graphs",
+              "ffn_decode",
+              "ffn_gate_prompt_tile",
+              "ffn_gate_quality_i",
+              "ffn_prompt_pair",
+              "ffn_tiles",
+              "gdn_decode",
+              "gdn_preproc",
+              "mmq_async_x",
+              "mmq_pipeline",
+              "nvccflags",
+              "production_numerics",
+              "prompt_microbatch_rows",
+              "q4_decode",
+              "q6_decode",
+              "q8_decode",
+              "q8_decode_layout_warps_medium",
+              "q8_decode_layout_warps_skinny",
+              "q8_decode_layout_warps_wide",
+              "q8_decode_rows_medium",
+              "q8_decode_rows_skinny",
+              "q8_decode_rows_wide",
+              "q8_layout",
+              "query_prepare",
+              "rms_norm"
+            ]
+          },
+          "expected": {
+            "q4_decode": "packed",
+            "q8_layout": "r1_w4"
+          },
+          "gguf_ok": true,
+          "has_nll": true,
+          "payload_task": "OPT-088",
+          "reason": "source_selector_proof"
+        },
+        "opt084_freeze": {
+          "label": "opt084_packed_r2",
+          "source": "fixtures/opt084_quality_baseline.json",
+          "authenticated": true,
+          "rescore_required": false,
+          "selectors": {
+            "q4_decode": "packed",
+            "q8_layout": "r2_w2",
+            "q8_decode": "r2_w2",
+            "ffn_decode": "paired_staged",
+            "gguf_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+            "source_fields": [
+              "chat_template",
+              "decode_attention",
+              "decode_gdn",
+              "enable_thinking",
+              "execution_graphs",
+              "logit_masking",
+              "nvccflags",
+              "production_numerics",
+              "prompt_attention",
+              "prompt_mmq",
+              "prompt_mmq_tile",
+              "prompt_pair",
+              "q4_decode",
+              "q4_staging",
+              "q8_decode",
+              "q8_path"
+            ]
+          },
+          "expected": {
+            "q4_decode": "packed",
+            "q8_layout": "r2_w2"
+          },
+          "gguf_ok": true,
+          "has_nll": true,
+          "payload_task": "OPT-084",
+          "reason": "source_selector_proof"
+        },
+        "opt089_admission": {
+          "task": "OPT-089",
+          "production_kept": true,
+          "quality_contract_id": "opt089_strict"
+        },
+        "opt091_concession": {
+          "concession_used": false,
+          "successor_model_quality_pass": true
+        },
+        "reuse_opt089_authenticated_scores": true,
+        "opt074_coverage_unadmitted_blocker": false,
+        "model_quality_pass": true,
+        "incomplete": false,
+        "reason": "opt089_authenticated_late_w4_reused",
+        "shipping_q4_decode": "integer_q8_late",
+        "shipping_ffn_decode": "paired_integer"
+      }
+    },
+    "native_counts": {
+      "schema_version": 1,
+      "task": "OPT-104",
+      "warmups": 0,
+      "samples": 1,
+      "observed_warmups": 0,
+      "observed_samples": 1,
+      "observed_candidates": 1,
+      "observed_shapes": 12,
+      "observed_tier": "acceptance",
+      "pairs": 1,
+      "sample_ids": [
+        0
+      ],
+      "acceptance_executed": true,
+      "keep": false,
+      "capture_key": null
+    },
+    "admission": {
+      "ok": true,
+      "result_class": "ok",
+      "message": "",
+      "observed": {
+        "schema_version": 1,
+        "task": "OPT-104",
+        "warmups": 0,
+        "samples": 1,
+        "observed_warmups": 0,
+        "observed_samples": 1,
+        "observed_candidates": 1,
+        "observed_shapes": 12,
+        "observed_tier": "acceptance",
+        "pairs": 1,
+        "sample_ids": [
+          0
+        ],
+        "acceptance_executed": true,
+        "keep": false,
+        "capture_key": null,
+        "rounds": []
+      }
+    },
+    "independent_verdicts": {
+      "raw_gguf": {
+        "kernel_parity_pass": true,
+        "model_quality_pass": true,
+        "performance_pass": false,
+        "production_kept": false,
+        "opt074_coverage_unadmitted_blocker": false,
+        "incomplete": false
+      },
+      "aligned_soa": {
+        "kernel_parity_pass": true,
+        "model_quality_pass": true,
+        "performance_pass": false,
+        "production_kept": false,
+        "opt074_coverage_unadmitted_blocker": false,
+        "incomplete": false
+      }
+    },
+    "selected_path": "raw_gguf",
+    "shipping_unchanged": true,
+    "production_kept": false,
+    "control_layout": "raw_gguf",
+    "shipping_layout": "raw_gguf",
+    "opt074_coverage_unadmitted_blocker": false,
+    "winners": [],
+    "feedback_cannot_keep": true,
+    "claims_throughput": false,
+    "quality_contract_id": "opt089_strict",
+    "measurement_utc": "2026-09-12T17:41:21Z",
+    "status": "quality_evaluated"
+  },
+  "q6": {
+    "schema_version": 1,
+    "task": "OPT-104",
+    "phase": "q6",
+    "mode": "acceptance",
+    "component": {
+      "capture_key": "d933f97eab2a68476affb232d7276d287630552cae0fc727a1fdbf7c6c558808",
+      "by_config": {
+        "raw_gguf": {
+          "config": {
+            "id": "raw_gguf",
+            "q6_device_layout": "raw_gguf",
+            "q6_decode": "integer_q8_1",
+            "q6_warps": 2,
+            "role": "control",
+            "expected_q6_launches": 17
+          },
+          "ms": [
+            1.56208,
+            1.554848,
+            1.576288,
+            1.563648,
+            1.551904,
+            1.550176,
+            1.562624,
+            1.551616,
+            1.552096,
+            1.560608
+          ],
+          "mean_ms": 1.5585888,
+          "launches": {
+            "q6_launches": 17,
+            "attn_outputs": 16
+          }
+        },
+        "aligned_soa": {
+          "config": {
+            "id": "aligned_soa",
+            "q6_device_layout": "aligned_soa",
+            "q6_decode": "integer_q8_1",
+            "q6_warps": 2,
+            "role": "candidate",
+            "source_task": "OPT-104",
+            "expected_q6_launches": 17
+          },
+          "ms": [
+            1.56832,
+            1.56288,
+            1.555328,
+            1.576192,
+            1.56912,
+            1.557888,
+            1.575808,
+            1.560736,
+            1.572864,
+            1.558624
+          ],
+          "mean_ms": 1.565776,
+          "launches": {
+            "q6_launches": 17,
+            "attn_outputs": 16
+          }
+        }
+      },
+      "control": "raw_gguf",
+      "this_sitting": true,
+      "dispatch_ok": true,
+      "control_mean_ms": 1.5585888,
+      "candidate_mean_ms": 1.565776,
+      "n": 10,
+      "df": 9,
+      "mean_diff_ms": -0.007187200000000038,
+      "se": 0.003699353783808433,
+      "critical": 2.262,
+      "ci95_low": -0.015555138258974713,
+      "ci95_high": 0.0011807382589746375,
+      "diffs": [
+        -0.006240000000000023,
+        -0.008032000000000039,
+        0.020959999999999868,
+        -0.01254400000000011,
+        -0.01721600000000012,
+        -0.007711999999999941,
+        -0.013184000000000085,
+        -0.009119999999999795,
+        -0.02076800000000012,
+        0.0019839999999999858
+      ],
+      "positive": false
+    },
+    "engine": {
+      "pairs": [
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 0,
+          "pair": 0,
+          "order": "AB",
+          "control_ms": 637.12262,
+          "candidate_ms": 637.907349,
+          "control_itl_p50_ms": 19.7203674,
+          "control_itl_p95_ms": 19.761198,
+          "candidate_itl_p50_ms": 19.7511673,
+          "candidate_itl_p95_ms": 19.7756805,
+          "family": "q6_device"
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 1,
+          "pair": 1,
+          "order": "BA",
+          "control_ms": 638.383362,
+          "candidate_ms": 638.4729,
+          "control_itl_p50_ms": 19.7490082,
+          "control_itl_p95_ms": 19.7832928,
+          "candidate_itl_p50_ms": 19.7608795,
+          "candidate_itl_p95_ms": 19.7917538,
+          "family": "q6_device"
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 2,
+          "pair": 2,
+          "order": "AB",
+          "control_ms": 637.911133,
+          "candidate_ms": 638.702698,
+          "control_itl_p50_ms": 19.7634087,
+          "control_itl_p95_ms": 19.8096638,
+          "candidate_itl_p50_ms": 19.7716789,
+          "candidate_itl_p95_ms": 19.7987881,
+          "family": "q6_device"
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 3,
+          "pair": 3,
+          "order": "BA",
+          "control_ms": 638.503418,
+          "candidate_ms": 638.994751,
+          "control_itl_p50_ms": 19.7647991,
+          "control_itl_p95_ms": 19.7901192,
+          "candidate_itl_p50_ms": 19.7863674,
+          "candidate_itl_p95_ms": 19.8126068,
+          "family": "q6_device"
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 4,
+          "pair": 4,
+          "order": "AB",
+          "control_ms": 639.186096,
+          "candidate_ms": 638.78894,
+          "control_itl_p50_ms": 19.7759209,
+          "control_itl_p95_ms": 19.8136635,
+          "candidate_itl_p50_ms": 19.7793598,
+          "candidate_itl_p95_ms": 19.7993031,
+          "family": "q6_device"
+        }
+      ],
+      "control_ms": [
+        637.12262,
+        638.383362,
+        637.911133,
+        638.503418,
+        639.186096
+      ],
+      "candidate_ms": [
+        637.907349,
+        638.4729,
+        638.702698,
+        638.994751,
+        638.78894
+      ],
+      "control_mean_ms": 638.2213257999999,
+      "candidate_mean_ms": 638.5733276,
+      "this_sitting": true,
+      "prefix": 2048,
+      "output_tokens": 32,
+      "guards": {
+        "pass": true,
+        "incomplete": false,
+        "regression_upper_ms": 0.8358311166535943,
+        "regression_limit_ms": 12.764426515999999,
+        "throughput_ratio": 0.9994479603160903,
+        "p95_ratio": 0.9998527471815892,
+        "control_mean_ms": 638.2213257999999,
+        "candidate_mean_ms": 638.5733276
+      }
+    },
+    "performance": {
+      "raw_gguf": {
+        "performance_pass": false,
+        "this_sitting": true,
+        "incomplete": false,
+        "mean_diff_ms": null,
+        "screen_only": false
+      },
+      "aligned_soa": {
+        "performance_pass": false,
+        "this_sitting": true,
+        "incomplete": false,
+        "mean_diff_ms": -0.007187200000000038,
+        "screen_only": false
+      }
+    },
+    "native_counts": {
+      "schema_version": 1,
+      "task": "OPT-104",
+      "warmups": 3,
+      "samples": 10,
+      "observed_warmups": 3,
+      "observed_samples": 10,
+      "observed_candidates": 2,
+      "observed_shapes": 1,
+      "observed_tier": "acceptance",
+      "pairs": 1,
+      "sample_ids": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9
+      ],
+      "acceptance_executed": true,
+      "keep": false,
+      "capture_key": null
+    },
+    "admission": {
+      "ok": true,
+      "result_class": "ok",
+      "message": "",
+      "observed": {
+        "schema_version": 1,
+        "task": "OPT-104",
+        "warmups": 3,
+        "samples": 10,
+        "observed_warmups": 3,
+        "observed_samples": 10,
+        "observed_candidates": 2,
+        "observed_shapes": 1,
+        "observed_tier": "acceptance",
+        "pairs": 1,
+        "sample_ids": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9
+        ],
+        "acceptance_executed": true,
+        "keep": false,
+        "capture_key": null,
+        "rounds": []
+      }
+    },
+    "independent_verdicts": {
+      "raw_gguf": {
+        "kernel_parity_pass": true,
+        "model_quality_pass": true,
+        "performance_pass": false,
+        "production_kept": true,
+        "opt074_coverage_unadmitted_blocker": false,
+        "incomplete": false
+      },
+      "aligned_soa": {
+        "kernel_parity_pass": true,
+        "model_quality_pass": true,
+        "performance_pass": false,
+        "production_kept": false,
+        "opt074_coverage_unadmitted_blocker": false,
+        "incomplete": false
+      }
+    },
+    "selected_path": "raw_gguf",
+    "shipping_unchanged": true,
+    "production_kept": false,
+    "control_layout": "raw_gguf",
+    "shipping_layout": "raw_gguf",
+    "opt074_coverage_unadmitted_blocker": false,
+    "winners": [],
+    "feedback_cannot_keep": false,
+    "claims_throughput": false,
+    "this_sitting": true,
+    "measurement_utc": "2026-09-12T17:42:14Z",
+    "status": "q6_acceptance"
+  },
+  "pins_applied": {
+    "layout": false,
+    "layout_pin": "raw_gguf"
+  }
+}

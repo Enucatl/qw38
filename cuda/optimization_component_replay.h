@@ -46,7 +46,8 @@ enum class ReplayFamily {
   kDecodeMixer,
   kPromptFfn,
   kDecodeGdn,
-  kDecodeAttention
+  kDecodeAttention,
+  kDecodeQ6
 };
 enum class CacheMode { kHot, kRotating };
 
@@ -62,6 +63,8 @@ inline const char* replay_family_name(ReplayFamily family) noexcept {
       return "decode-gdn";
     case ReplayFamily::kDecodeAttention:
       return "decode-attention";
+    case ReplayFamily::kDecodeQ6:
+      return "decode-q6";
   }
   return "unknown";
 }

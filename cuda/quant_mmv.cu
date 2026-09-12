@@ -1,6 +1,7 @@
 #include "quant_mmv.h"
 #include "ffn_decode_path.cuh"
 #include "q4k_decode_path.cuh"
+#include "q6k_aligned_layout.cuh"
 #include "q6k_decode_path.cuh"
 #include "q8_aligned_layout.cuh"
 #include "pdl_launch.cuh"
@@ -20,6 +21,17 @@ constexpr std::size_t kValuesPerWeightBlock = 256;
 constexpr std::size_t kQ4KBytes = 144;
 constexpr std::size_t kQ6KBytes = 210;
 constexpr std::size_t kQ80Bytes = 34;
+
+__constant__ int g_q6_packed_aligned_soa = 0;
+
+cudaError_t bind_q6_packed_aligned_soa() noexcept {
+  const int flag = q6_device_uses_aligned_soa() ? 1 : 0;
+  return cudaMemcpyToSymbol(g_q6_packed_aligned_soa, &flag, sizeof(flag));
+}
+
+__device__ bool q6_packed_uses_aligned_soa() {
+  return g_q6_packed_aligned_soa != 0;
+}
 
 __device__ float read_half(const std::uint8_t* bytes) {
   const unsigned short bits = static_cast<unsigned short>(bytes[0]) |
@@ -69,6 +81,36 @@ __device__ float decode_q6(const std::uint8_t* block, int index) {
   const int scale = scale_byte < 128 ? static_cast<int>(scale_byte)
                                      : static_cast<int>(scale_byte) - 256;
   return read_half(block + 208) * static_cast<float>(scale * quant);
+}
+
+__device__ float decode_q6_aligned(const std::uint8_t* soa,
+                                   const Q6KAlignedLayoutDesc& desc,
+                                   std::size_t row, int index) {
+  const std::size_t block =
+      row * desc.n_blocks_per_row +
+      static_cast<std::size_t>(index) / kValuesPerWeightBlock;
+  const int within = index % static_cast<int>(kValuesPerWeightBlock);
+  const int half = within / 128;
+  const int inner = within % 128;
+  const int group = inner / 32;
+  const int lane = inner % 32;
+  const std::uint8_t* ql =
+      q6k_aligned_ql_plane(soa, desc) + block * kQ6KQlBytes;
+  const std::uint8_t* qh =
+      q6k_aligned_qh_plane(soa, desc) + block * kQ6KQhBytes;
+  const std::uint8_t* scales =
+      q6k_aligned_scale_plane(soa, desc) + block * kQ6KScaleBytes;
+  const std::uint8_t* d = q6k_aligned_d_plane(soa) + block * kQ6KDBytes;
+  const int low_offset = half * 64;
+  const std::uint8_t low =
+      ql[low_offset + lane + ((group & 1) != 0 ? 32 : 0)];
+  const int low_four = group < 2 ? low & 15 : low >> 4;
+  const int high_two = (qh[half * 32 + lane] >> (group * 2)) & 3;
+  const int quant = (low_four | (high_two << 4)) - 32;
+  const std::uint8_t scale_byte = scales[half * 8 + (lane / 16) + group * 2];
+  const int scale = scale_byte < 128 ? static_cast<int>(scale_byte)
+                                     : static_cast<int>(scale_byte) - 256;
+  return read_half(d) * static_cast<float>(scale * quant);
 }
 
 __device__ float decode_q8(const std::uint8_t* block, int index) {
@@ -160,22 +202,54 @@ __global__ void quant_mmv(const std::uint8_t* weights, std::size_t rows,
     }
   } else if constexpr (PackedLoads && Kind == QuantKind::kQ6K) {
     const std::size_t n_blocks = columns / kValuesPerWeightBlock;
+    const bool aligned = q6_packed_uses_aligned_soa();
+    const Q6KAlignedLayoutDesc desc =
+        aligned ? make_q6k_aligned_layout_desc(rows, columns)
+                : Q6KAlignedLayoutDesc{};
     for (std::size_t weight_block = 0; weight_block < n_blocks;
          ++weight_block) {
-      const std::uint8_t* block =
-          row_weights + weight_block * kQ6KBytes;
-      const float d = read_half(block + 208);
+      float d = 0.0F;
       int scales[16];
+      std::uint8_t ql[4];
+      std::uint8_t qh[2];
+      if (aligned) {
+        const std::size_t block = row * desc.n_blocks_per_row + weight_block;
+        const std::uint8_t* ql_plane =
+            q6k_aligned_ql_plane(weights, desc) + block * kQ6KQlBytes;
+        const std::uint8_t* qh_plane =
+            q6k_aligned_qh_plane(weights, desc) + block * kQ6KQhBytes;
+        const std::uint8_t* sc_plane =
+            q6k_aligned_scale_plane(weights, desc) + block * kQ6KScaleBytes;
+        d = read_half(q6k_aligned_d_plane(weights) + block * kQ6KDBytes);
 #pragma unroll
-      for (int s = 0; s < 16; ++s) {
-        const std::uint8_t scale_byte = block[192 + s];
-        scales[s] = scale_byte < 128 ? static_cast<int>(scale_byte)
-                                     : static_cast<int>(scale_byte) - 256;
+        for (int s = 0; s < 16; ++s) {
+          const std::uint8_t scale_byte = sc_plane[s];
+          scales[s] = scale_byte < 128 ? static_cast<int>(scale_byte)
+                                       : static_cast<int>(scale_byte) - 256;
+        }
+        ql[0] = ql_plane[lane];
+        ql[1] = ql_plane[32 + lane];
+        ql[2] = ql_plane[64 + lane];
+        ql[3] = ql_plane[96 + lane];
+        qh[0] = qh_plane[lane];
+        qh[1] = qh_plane[32 + lane];
+      } else {
+        const std::uint8_t* block =
+            row_weights + weight_block * kQ6KBytes;
+        d = read_half(block + 208);
+#pragma unroll
+        for (int s = 0; s < 16; ++s) {
+          const std::uint8_t scale_byte = block[192 + s];
+          scales[s] = scale_byte < 128 ? static_cast<int>(scale_byte)
+                                       : static_cast<int>(scale_byte) - 256;
+        }
+        ql[0] = block[lane];
+        ql[1] = block[32 + lane];
+        ql[2] = block[64 + lane];
+        ql[3] = block[96 + lane];
+        qh[0] = block[128 + lane];
+        qh[1] = block[160 + lane];
       }
-      const std::uint8_t ql[4] = {
-          block[lane], block[32 + lane], block[64 + lane],
-          block[96 + lane]};
-      const std::uint8_t qh[2] = {block[128 + lane], block[160 + lane]};
 #pragma unroll
       for (int i = 0; i < 8; ++i) {
         const int half = i / 4;
@@ -196,11 +270,21 @@ __global__ void quant_mmv(const std::uint8_t* weights, std::size_t rows,
       }
     }
   } else {
+    const bool aligned_q6 =
+        Kind == QuantKind::kQ6K && q6_packed_uses_aligned_soa();
+    const Q6KAlignedLayoutDesc desc =
+        aligned_q6 ? make_q6k_aligned_layout_desc(rows, columns)
+                   : Q6KAlignedLayoutDesc{};
     for (std::size_t column = lane; column < columns; column += kWarpSize) {
       const std::size_t weight_block = column / kWeightValues;
       const int within = static_cast<int>(column % kWeightValues);
-      const std::uint8_t* block = row_weights + weight_block * kWeightBytes;
-      const float weight = decode_weight<Kind>(block, within);
+      float weight = 0.0F;
+      if (aligned_q6) {
+        weight = decode_q6_aligned(weights, desc, row, static_cast<int>(column));
+      } else {
+        const std::uint8_t* block = row_weights + weight_block * kWeightBytes;
+        weight = decode_weight<Kind>(block, within);
+      }
       const Q8Block& q8 = activation[column / kWarpSize];
       const float value =
           q8.scale * static_cast<float>(q8.values[column % kWarpSize]);
@@ -319,12 +403,23 @@ __global__ void quant_mmq(const std::uint8_t* weights, std::size_t output_rows,
   const std::size_t q8_blocks_per_row = columns / kWarpSize;
   const std::uint8_t* row_weights =
       weights + output_row * (columns / kWeightValues) * kWeightBytes;
+  const bool aligned_q6 =
+      Kind == QuantKind::kQ6K && q6_packed_uses_aligned_soa();
+  const Q6KAlignedLayoutDesc desc =
+      aligned_q6 ? make_q6k_aligned_layout_desc(output_rows, columns)
+                 : Q6KAlignedLayoutDesc{};
   float sums[PromptRowsPerTile] = {};
   for (std::size_t column = lane; column < columns; column += kWarpSize) {
     const std::size_t weight_block = column / kWeightValues;
     const int within = static_cast<int>(column % kWeightValues);
-    const std::uint8_t* block = row_weights + weight_block * kWeightBytes;
-    const float weight = decode_weight<Kind>(block, within);
+    float weight = 0.0F;
+    if (aligned_q6) {
+      weight = decode_q6_aligned(weights, desc, output_row,
+                                 static_cast<int>(column));
+    } else {
+      const std::uint8_t* block = row_weights + weight_block * kWeightBytes;
+      weight = decode_weight<Kind>(block, within);
+    }
 #pragma unroll
     for (int prompt_offset = 0; prompt_offset < PromptRowsPerTile;
          ++prompt_offset) {
@@ -466,7 +561,7 @@ __global__ void q8_mmq_bf16_tiled(const std::uint8_t* weights, std::size_t rows,
 }
 
 template <QuantKind Kind>
-__global__ void quant_row_decode(const std::uint8_t* weights,
+__global__ void quant_row_decode(const std::uint8_t* weights, std::size_t rows,
                                  std::size_t columns, std::size_t row,
                                  __nv_bfloat16* output) {
   const std::size_t column =
@@ -478,6 +573,15 @@ __global__ void quant_row_decode(const std::uint8_t* weights,
                                : kQ80Bytes;
   constexpr std::size_t kWeightValues =
       Kind == QuantKind::kQ8_0 ? kWarpSize : kValuesPerWeightBlock;
+  if constexpr (Kind == QuantKind::kQ6K) {
+    if (q6_packed_uses_aligned_soa()) {
+      const Q6KAlignedLayoutDesc desc =
+          make_q6k_aligned_layout_desc(rows, columns);
+      output[column] = __float2bfloat16_rn(
+          decode_q6_aligned(weights, desc, row, static_cast<int>(column)));
+      return;
+    }
+  }
   const std::size_t row_bytes = columns / kWeightValues * kWeightBytes;
   const std::uint8_t* block =
       weights + row * row_bytes + column / kWeightValues * kWeightBytes;
@@ -487,7 +591,7 @@ __global__ void quant_row_decode(const std::uint8_t* weights,
 
 template <QuantKind Kind>
 __global__ void quant_rows_decode_widen(const std::uint8_t* weights,
-                                        std::size_t columns,
+                                        std::size_t rows, std::size_t columns,
                                         const std::size_t* token_ids,
                                         float* output) {
   const std::size_t column =
@@ -500,8 +604,18 @@ __global__ void quant_rows_decode_widen(const std::uint8_t* weights,
                                : kQ80Bytes;
   constexpr std::size_t kWeightValues =
       Kind == QuantKind::kQ8_0 ? kWarpSize : kValuesPerWeightBlock;
-  const std::size_t row_bytes = columns / kWeightValues * kWeightBytes;
   const std::size_t token = token_ids[row];
+  if constexpr (Kind == QuantKind::kQ6K) {
+    if (q6_packed_uses_aligned_soa()) {
+      const Q6KAlignedLayoutDesc desc =
+          make_q6k_aligned_layout_desc(rows, columns);
+      const __nv_bfloat16 rounded = __float2bfloat16_rn(
+          decode_q6_aligned(weights, desc, token, static_cast<int>(column)));
+      output[row * columns + column] = __bfloat162float(rounded);
+      return;
+    }
+  }
+  const std::size_t row_bytes = columns / kWeightValues * kWeightBytes;
   const std::uint8_t* block =
       weights + token * row_bytes + column / kWeightValues * kWeightBytes;
   const __nv_bfloat16 rounded = __float2bfloat16_rn(
@@ -1019,6 +1133,10 @@ cudaError_t launch_quant_mmv_path(
   if (error != cudaSuccess) return error;
   const bool packed =
       mmv_path_is_packed(load_path) && kind != QuantKind::kQ8_0;
+  if (kind == QuantKind::kQ6K) {
+    const cudaError_t bound = bind_q6_packed_aligned_soa();
+    if (bound != cudaSuccess) return bound;
+  }
   return launch_mmv_after_quant(kind, weights, rows, columns, q8_workspace,
                                 output, selected_warps, packed, stream);
 }
@@ -1064,6 +1182,10 @@ cudaError_t launch_quant_mmq_variant(
       prompt, q8_workspace, prompt_values);
   cudaError_t error = cudaPeekAtLastError();
   if (error != cudaSuccess) return error;
+  if (kind == QuantKind::kQ6K) {
+    error = bind_q6_packed_aligned_soa();
+    if (error != cudaSuccess) return error;
+  }
   if (prompt_tile == 1) {
     return launch_mmq_kernel<1>(kind, weights, output_rows, columns,
                                 q8_workspace, prompt_rows, output, stream);
@@ -1220,15 +1342,19 @@ cudaError_t launch_quant_row_decode(QuantKind kind,
   }
   const unsigned int blocks =
       static_cast<unsigned int>((columns + kThreads - 1) / kThreads);
+  if (kind == QuantKind::kQ6K) {
+    const cudaError_t bound = bind_q6_packed_aligned_soa();
+    if (bound != cudaSuccess) return bound;
+  }
   if (kind == QuantKind::kQ4K) {
     quant_row_decode<QuantKind::kQ4K><<<blocks, kThreads, 0, stream>>>(
-        weights, columns, row, output);
+        weights, rows, columns, row, output);
   } else if (kind == QuantKind::kQ6K) {
     quant_row_decode<QuantKind::kQ6K><<<blocks, kThreads, 0, stream>>>(
-        weights, columns, row, output);
+        weights, rows, columns, row, output);
   } else {
     quant_row_decode<QuantKind::kQ8_0><<<blocks, kThreads, 0, stream>>>(
-        weights, columns, row, output);
+        weights, rows, columns, row, output);
   }
   return cudaPeekAtLastError();
 }
@@ -1251,16 +1377,18 @@ cudaError_t launch_quant_rows_decode_widen(QuantKind kind,
                   static_cast<unsigned int>(token_count));
   if (kind == QuantKind::kQ4K) {
     return quartz_launch_kernel(quant_rows_decode_widen<QuantKind::kQ4K>, grid,
-                                dim3(kThreads), 0, stream, weights, columns,
-                                token_ids, output);
+                                dim3(kThreads), 0, stream, weights, rows,
+                                columns, token_ids, output);
   }
   if (kind == QuantKind::kQ6K) {
+    const cudaError_t bound = bind_q6_packed_aligned_soa();
+    if (bound != cudaSuccess) return bound;
     return quartz_launch_kernel(quant_rows_decode_widen<QuantKind::kQ6K>, grid,
-                                dim3(kThreads), 0, stream, weights, columns,
-                                token_ids, output);
+                                dim3(kThreads), 0, stream, weights, rows,
+                                columns, token_ids, output);
   }
   return quartz_launch_kernel(quant_rows_decode_widen<QuantKind::kQ8_0>, grid,
-                              dim3(kThreads), 0, stream, weights, columns,
+                              dim3(kThreads), 0, stream, weights, rows, columns,
                               token_ids, output);
 }
 

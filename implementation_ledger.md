@@ -263,7 +263,7 @@ in ledger/dependency order is OPT-099.
 | OPT-101 | Transpose and register-shard one-token GDN state | OPT-099 | done | Warp-column FP32 recurrence and canonical state round trips improve complete 48-layer GDN and both decode prefixes with quality/transactional gates, or sequential is retained | [`tasks/OPT-101.md`](tasks/OPT-101.md) |
 | OPT-102 | Repack Q4 metadata and remove decode unpack overhead | OPT-099 | done | Source-faithful/branchless candidates improve complete 64-layer FFN and both decode prefixes while supporting prompt and memory gates, or late_w4 is retained | [`tasks/OPT-102.md`](tasks/OPT-102.md); [`pins/opt102_q4_repack_contract.json`](pins/opt102_q4_repack_contract.json); [`pins/opt102_iteration_contract.json`](pins/opt102_iteration_contract.json); [`fixtures/opt102_q4_repack.json`](fixtures/opt102_q4_repack.json); [`tools/opt102_q4_repack.py`](tools/opt102_q4_repack.py); [`tests/test_opt102_q4_repack.py`](tests/test_opt102_q4_repack.py); [`cuda/opt102_q4_repack_test.cu`](cuda/opt102_q4_repack_test.cu); [`cuda/q4k_aligned_layout.cuh`](cuda/q4k_aligned_layout.cuh); [`Makefile`](Makefile); [`evidence/optimization/opt102-q4-layout-unpack/REPORT.md`](evidence/optimization/opt102-q4-layout-unpack/REPORT.md); [`evidence/optimization/opt102-q4-layout-unpack/REJECTION.md`](evidence/optimization/opt102-q4-layout-unpack/REJECTION.md); verification 2026-09-12T16:38:33Z |
 | OPT-103 | Port the pinned-llama one-query vector attention specialization | OPT-099 | done | 128-thread online-softmax attention improves complete 16-layer D128/D2048 attention with full KV/quality/state guards, or warp_query is retained | [`tasks/OPT-103.md`](tasks/OPT-103.md); [`pins/opt103_vector_attention_contract.json`](pins/opt103_vector_attention_contract.json); [`pins/opt103_iteration_contract.json`](pins/opt103_iteration_contract.json); [`fixtures/opt103_vector_attention.json`](fixtures/opt103_vector_attention.json); [`tools/opt103_vector_attention.py`](tools/opt103_vector_attention.py); [`tests/test_opt103_vector_attention.py`](tests/test_opt103_vector_attention.py); [`cuda/opt103_vector_attention_test.cu`](cuda/opt103_vector_attention_test.cu); [`Makefile`](Makefile); [`evidence/optimization/opt103-vector-attention/REPORT.md`](evidence/optimization/opt103-vector-attention/REPORT.md); [`evidence/optimization/opt103-vector-attention/REJECTION.md`](evidence/optimization/opt103-vector-attention/REJECTION.md); verification 2026-09-12T17:08:30Z |
-| OPT-104 | Align Q6 weights for attention-output and vocabulary projections | OPT-099 | pending | One lossless replacement layout improves combined complete Q6 work and both decode prefixes with full-vocab/P4096/memory gates, or raw Q6 is retained | [`tasks/OPT-104.md`](tasks/OPT-104.md) |
+| OPT-104 | Align Q6 weights for attention-output and vocabulary projections | OPT-099 | done | One lossless replacement layout improves combined complete Q6 work and both decode prefixes with full-vocab/P4096/memory gates, or raw Q6 is retained | [`tasks/OPT-104.md`](tasks/OPT-104.md); [`pins/opt104_q6_aligned_contract.json`](pins/opt104_q6_aligned_contract.json); [`pins/opt104_iteration_contract.json`](pins/opt104_iteration_contract.json); [`fixtures/opt104_q6_aligned.json`](fixtures/opt104_q6_aligned.json); [`tools/opt104_q6_aligned.py`](tools/opt104_q6_aligned.py); [`tests/test_opt104_q6_aligned.py`](tests/test_opt104_q6_aligned.py); [`cuda/opt104_q6_aligned_test.cu`](cuda/opt104_q6_aligned_test.cu); [`cuda/q6k_aligned_layout.cuh`](cuda/q6k_aligned_layout.cuh); [`Makefile`](Makefile); [`evidence/optimization/opt104-q6-aligned-layout/REPORT.md`](evidence/optimization/opt104-q6-aligned-layout/REPORT.md); [`evidence/optimization/opt104-q6-aligned-layout/REJECTION.md`](evidence/optimization/opt104-q6-aligned-layout/REJECTION.md); verification 2026-09-12T17:42:51Z |
 | OPT-105 | Double-buffer raw X in a 64x128 prompt MMQ tile | OPT-099 | pending | Bitwise two-X-stage schedule saves ≥5 ms over complete P4096 FFNs and improves P4096 with decode/quality guards, or 128x128 joined-wait remains | [`tasks/OPT-105.md`](tasks/OPT-105.md) |
 | OPT-106 | Freeze and measure the post-098 recovery combination | OPT-100, OPT-101, OPT-102, OPT-103, OPT-104, OPT-105 | pending | Fresh quality/P/D/p95/2K/state/memory sitting independently reports internal improvement, llama parity and unchanged OPT-056 +5% outcomes | [`tasks/OPT-106.md`](tasks/OPT-106.md) |
 
@@ -7357,4 +7357,24 @@ statements below are historical, not the current execution order.
 - **tok/s delta vs OPT-098 P4096 baseline (3046.23 tok/s): 0** (rejection; no
   throughput claim).
 - Marked OPT-103 `done`. Coupled IDs: none. First eligible pending task: **OPT-104**.
+
+### 2026-09-12T17:42:51Z — OPT-104 aligned Q6 layout delivered (reject)
+
+- Added aligned SoA Q6_K device-layout tooling (`tools/opt104_q6_aligned.py`,
+  contracts, fixture, tests, `cuda-opt104-diagnostics`, `q6k_aligned_layout.cuh`,
+  layout selector hooks in Q6 decode/MMV/MMQ paths). Kernel parity 12/12
+  bitwise; OPT-089 quality reuse under `opt089_strict`. No public GGUF rewrite;
+  no extra persistent Q6 copy. Decode path pin stays `integer_q8_1`.
+- Complete rotating Q6 acceptance (3+10, 16 attention outputs + logits):
+  control **1.559 ms** vs candidate **1.566 ms**/token; mean_diff **−0.0072 ms**;
+  CI95 **[−0.0156, 0.0012]**; `positive=false`. Keep gate ≥0.10 ms/token failed;
+  D128/P4096 gates not run.
+- Production pins remain `kSelectedQ6DeviceLayout[] = "raw_gguf"` and
+  `kSelectedQ6DecodePath[] = "integer_q8_1"`. `claims_throughput=false`.
+- Key evidence: [`fixtures/opt104_q6_aligned.json`](fixtures/opt104_q6_aligned.json);
+  [`evidence/optimization/opt104-q6-aligned-layout/REPORT.md`](evidence/optimization/opt104-q6-aligned-layout/REPORT.md);
+  [`evidence/optimization/opt104-q6-aligned-layout/REJECTION.md`](evidence/optimization/opt104-q6-aligned-layout/REJECTION.md).
+- **tok/s delta vs OPT-098 P4096 baseline (3046.23 tok/s): 0** (rejection; no
+  throughput claim).
+- Marked OPT-104 `done`. Coupled IDs: none. First eligible pending task: **OPT-105**.
 

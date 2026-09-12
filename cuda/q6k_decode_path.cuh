@@ -7,6 +7,8 @@
 #include <cstddef>
 #include <cstring>
 
+#include "q6k_aligned_layout.cuh"
+
 namespace qw38::cuda {
 
 constexpr char kLegalQ6DecodePathPacked[] = "packed";
@@ -14,11 +16,14 @@ constexpr char kLegalQ6DecodePathIntegerQ8[] = "integer_q8";
 constexpr char kLegalQ6DecodePathIntegerQ81[] = "integer_q8_1";
 
 // Production pin. Keep sitting may switch away from packed; reject restores it.
+// OPT-104 device layout is a separate selector; reject retains raw GGUF Q6_K.
 constexpr char kSelectedQ6DecodePath[] = "integer_q8_1";
 constexpr unsigned int kSelectedQ6DecodeWarpsPerRow = 2;
+constexpr char kSelectedQ6DeviceLayout[] = "raw_gguf";
 
 inline thread_local const char* g_q6_decode_path_override = nullptr;
 inline thread_local unsigned int g_q6_decode_warps_override = 0;
+inline thread_local const char* g_q6_device_layout_override = nullptr;
 
 inline bool legal_q6_decode_path(const char* path) noexcept {
   return path != nullptr &&
@@ -31,12 +36,22 @@ inline bool legal_q6_decode_warps_per_row(unsigned int warps) noexcept {
   return warps == 1 || warps == 2 || warps == 4 || warps == 8;
 }
 
+inline bool legal_q6_device_layout(const char* layout) noexcept {
+  return layout != nullptr &&
+         (std::strcmp(layout, kLegalQ6DeviceLayoutRawGguf) == 0 ||
+          std::strcmp(layout, kLegalQ6DeviceLayoutAlignedSoa) == 0);
+}
+
 inline const char* selected_q6_decode_path() noexcept {
   return kSelectedQ6DecodePath;
 }
 
 inline unsigned int selected_q6_decode_warps_per_row() noexcept {
   return kSelectedQ6DecodeWarpsPerRow;
+}
+
+inline const char* selected_q6_device_layout() noexcept {
+  return kSelectedQ6DeviceLayout;
 }
 
 inline const char* effective_q6_decode_path() noexcept {
@@ -47,6 +62,16 @@ inline const char* effective_q6_decode_path() noexcept {
 inline unsigned int effective_q6_decode_warps_per_row() noexcept {
   return g_q6_decode_warps_override > 0 ? g_q6_decode_warps_override
                                         : kSelectedQ6DecodeWarpsPerRow;
+}
+
+inline const char* effective_q6_device_layout() noexcept {
+  return g_q6_device_layout_override != nullptr ? g_q6_device_layout_override
+                                                : kSelectedQ6DeviceLayout;
+}
+
+inline bool q6_device_uses_aligned_soa() noexcept {
+  return std::strcmp(effective_q6_device_layout(),
+                     kLegalQ6DeviceLayoutAlignedSoa) == 0;
 }
 
 inline bool q6_decode_path_is_integer(const char* path) noexcept {
@@ -81,9 +106,23 @@ inline void set_q6_decode_path_override(const char* path,
   g_q6_decode_warps_override = warps_per_row;
 }
 
+inline void set_q6_device_layout_override(const char* layout) noexcept {
+  g_q6_device_layout_override = layout;
+}
+
+inline bool apply_q6_device_layout_ident(const char* ident) noexcept {
+  if (!legal_q6_device_layout(ident)) return false;
+  set_q6_device_layout_override(ident);
+  return true;
+}
+
 inline void clear_q6_decode_path_override() noexcept {
   g_q6_decode_path_override = nullptr;
   g_q6_decode_warps_override = 0;
+}
+
+inline void clear_q6_device_layout_override() noexcept {
+  g_q6_device_layout_override = nullptr;
 }
 
 struct Q6DecodePathScope final {
@@ -93,6 +132,15 @@ struct Q6DecodePathScope final {
   ~Q6DecodePathScope() { clear_q6_decode_path_override(); }
   Q6DecodePathScope(const Q6DecodePathScope&) = delete;
   Q6DecodePathScope& operator=(const Q6DecodePathScope&) = delete;
+};
+
+struct Q6DeviceLayoutScope final {
+  explicit Q6DeviceLayoutScope(const char* layout) noexcept {
+    set_q6_device_layout_override(layout);
+  }
+  ~Q6DeviceLayoutScope() { clear_q6_device_layout_override(); }
+  Q6DeviceLayoutScope(const Q6DeviceLayoutScope&) = delete;
+  Q6DeviceLayoutScope& operator=(const Q6DeviceLayoutScope&) = delete;
 };
 
 }  // namespace qw38::cuda

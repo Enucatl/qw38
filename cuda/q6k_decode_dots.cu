@@ -10,6 +10,48 @@ constexpr std::size_t kValuesPerWeightBlock = 256;
 
 }  // namespace
 
+namespace {
+
+template <bool UseQ81>
+cudaError_t launch_coop_dispatch(const std::uint8_t* weights, std::size_t rows,
+                                 std::size_t columns, const void* staged,
+                                 float* output, unsigned int warps_per_row,
+                                 cudaStream_t stream) noexcept {
+  const bool aligned = q6_device_uses_aligned_soa();
+  if (aligned) {
+    if (warps_per_row == 1) {
+      return q6k_dots::launch_coop_aligned<1, UseQ81>(
+          weights, rows, columns, staged, output, stream);
+    }
+    if (warps_per_row == 2) {
+      return q6k_dots::launch_coop_aligned<2, UseQ81>(
+          weights, rows, columns, staged, output, stream);
+    }
+    if (warps_per_row == 4) {
+      return q6k_dots::launch_coop_aligned<4, UseQ81>(
+          weights, rows, columns, staged, output, stream);
+    }
+    return q6k_dots::launch_coop_aligned<8, UseQ81>(weights, rows, columns,
+                                                    staged, output, stream);
+  }
+  if (warps_per_row == 1) {
+    return q6k_dots::launch_coop<1, UseQ81>(weights, rows, columns, staged,
+                                            output, stream);
+  }
+  if (warps_per_row == 2) {
+    return q6k_dots::launch_coop<2, UseQ81>(weights, rows, columns, staged,
+                                            output, stream);
+  }
+  if (warps_per_row == 4) {
+    return q6k_dots::launch_coop<4, UseQ81>(weights, rows, columns, staged,
+                                            output, stream);
+  }
+  return q6k_dots::launch_coop<8, UseQ81>(weights, rows, columns, staged, output,
+                                          stream);
+}
+
+}  // namespace
+
 cudaError_t launch_q6k_coop_mmv_prequant(
     const std::uint8_t* weights, std::size_t rows, std::size_t columns,
     const void* staged, float* output, unsigned int warps_per_row, bool q8_1,
@@ -20,35 +62,11 @@ cudaError_t launch_q6k_coop_mmv_prequant(
     return cudaErrorInvalidValue;
   }
   if (q8_1) {
-    if (warps_per_row == 1) {
-      return q6k_dots::launch_coop<1, true>(weights, rows, columns, staged,
-                                            output, stream);
-    }
-    if (warps_per_row == 2) {
-      return q6k_dots::launch_coop<2, true>(weights, rows, columns, staged,
-                                            output, stream);
-    }
-    if (warps_per_row == 4) {
-      return q6k_dots::launch_coop<4, true>(weights, rows, columns, staged,
-                                            output, stream);
-    }
-    return q6k_dots::launch_coop<8, true>(weights, rows, columns, staged,
-                                          output, stream);
+    return launch_coop_dispatch<true>(weights, rows, columns, staged, output,
+                                      warps_per_row, stream);
   }
-  if (warps_per_row == 1) {
-    return q6k_dots::launch_coop<1, false>(weights, rows, columns, staged,
-                                           output, stream);
-  }
-  if (warps_per_row == 2) {
-    return q6k_dots::launch_coop<2, false>(weights, rows, columns, staged,
-                                           output, stream);
-  }
-  if (warps_per_row == 4) {
-    return q6k_dots::launch_coop<4, false>(weights, rows, columns, staged,
-                                           output, stream);
-  }
-  return q6k_dots::launch_coop<8, false>(weights, rows, columns, staged, output,
-                                         stream);
+  return launch_coop_dispatch<false>(weights, rows, columns, staged, output,
+                                     warps_per_row, stream);
 }
 
 cudaError_t launch_q6k_coop_mmv(
@@ -75,8 +93,23 @@ int q6k_coop_occupancy(unsigned int warps_per_row, bool q8_1) noexcept {
   int occupancy = 0;
   cudaError_t error = cudaErrorInvalidValue;
   const int threads = static_cast<int>(warps_per_row) * kWarpSize;
+  const bool aligned = q6_device_uses_aligned_soa();
   if (q8_1) {
-    if (warps_per_row == 1) {
+    if (aligned) {
+      if (warps_per_row == 1) {
+        error = cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+            &occupancy, q6k_dots::q6k_coop_mmv_aligned<1, true>, threads, 0);
+      } else if (warps_per_row == 2) {
+        error = cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+            &occupancy, q6k_dots::q6k_coop_mmv_aligned<2, true>, threads, 0);
+      } else if (warps_per_row == 4) {
+        error = cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+            &occupancy, q6k_dots::q6k_coop_mmv_aligned<4, true>, threads, 0);
+      } else if (warps_per_row == 8) {
+        error = cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+            &occupancy, q6k_dots::q6k_coop_mmv_aligned<8, true>, threads, 0);
+      }
+    } else if (warps_per_row == 1) {
       error = cudaOccupancyMaxActiveBlocksPerMultiprocessor(
           &occupancy, q6k_dots::q6k_coop_mmv<1, true>, threads, 0);
     } else if (warps_per_row == 2) {
@@ -88,6 +121,20 @@ int q6k_coop_occupancy(unsigned int warps_per_row, bool q8_1) noexcept {
     } else if (warps_per_row == 8) {
       error = cudaOccupancyMaxActiveBlocksPerMultiprocessor(
           &occupancy, q6k_dots::q6k_coop_mmv<8, true>, threads, 0);
+    }
+  } else if (aligned) {
+    if (warps_per_row == 1) {
+      error = cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+          &occupancy, q6k_dots::q6k_coop_mmv_aligned<1, false>, threads, 0);
+    } else if (warps_per_row == 2) {
+      error = cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+          &occupancy, q6k_dots::q6k_coop_mmv_aligned<2, false>, threads, 0);
+    } else if (warps_per_row == 4) {
+      error = cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+          &occupancy, q6k_dots::q6k_coop_mmv_aligned<4, false>, threads, 0);
+    } else if (warps_per_row == 8) {
+      error = cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+          &occupancy, q6k_dots::q6k_coop_mmv_aligned<8, false>, threads, 0);
     }
   } else if (warps_per_row == 1) {
     error = cudaOccupancyMaxActiveBlocksPerMultiprocessor(
@@ -111,8 +158,23 @@ void q6k_coop_kernel_attributes(unsigned int warps_per_row, bool q8_1,
                                 int* occupancy) noexcept {
   cudaFuncAttributes attrs{};
   cudaError_t error = cudaErrorInvalidValue;
+  const bool aligned = q6_device_uses_aligned_soa();
   if (q8_1) {
-    if (warps_per_row == 1) {
+    if (aligned) {
+      if (warps_per_row == 1) {
+        error = cudaFuncGetAttributes(&attrs,
+                                      q6k_dots::q6k_coop_mmv_aligned<1, true>);
+      } else if (warps_per_row == 2) {
+        error = cudaFuncGetAttributes(&attrs,
+                                      q6k_dots::q6k_coop_mmv_aligned<2, true>);
+      } else if (warps_per_row == 4) {
+        error = cudaFuncGetAttributes(&attrs,
+                                      q6k_dots::q6k_coop_mmv_aligned<4, true>);
+      } else if (warps_per_row == 8) {
+        error = cudaFuncGetAttributes(&attrs,
+                                      q6k_dots::q6k_coop_mmv_aligned<8, true>);
+      }
+    } else if (warps_per_row == 1) {
       error = cudaFuncGetAttributes(&attrs, q6k_dots::q6k_coop_mmv<1, true>);
     } else if (warps_per_row == 2) {
       error = cudaFuncGetAttributes(&attrs, q6k_dots::q6k_coop_mmv<2, true>);
@@ -120,6 +182,20 @@ void q6k_coop_kernel_attributes(unsigned int warps_per_row, bool q8_1,
       error = cudaFuncGetAttributes(&attrs, q6k_dots::q6k_coop_mmv<4, true>);
     } else if (warps_per_row == 8) {
       error = cudaFuncGetAttributes(&attrs, q6k_dots::q6k_coop_mmv<8, true>);
+    }
+  } else if (aligned) {
+    if (warps_per_row == 1) {
+      error = cudaFuncGetAttributes(&attrs,
+                                    q6k_dots::q6k_coop_mmv_aligned<1, false>);
+    } else if (warps_per_row == 2) {
+      error = cudaFuncGetAttributes(&attrs,
+                                    q6k_dots::q6k_coop_mmv_aligned<2, false>);
+    } else if (warps_per_row == 4) {
+      error = cudaFuncGetAttributes(&attrs,
+                                    q6k_dots::q6k_coop_mmv_aligned<4, false>);
+    } else if (warps_per_row == 8) {
+      error = cudaFuncGetAttributes(&attrs,
+                                    q6k_dots::q6k_coop_mmv_aligned<8, false>);
     }
   } else if (warps_per_row == 1) {
     error = cudaFuncGetAttributes(&attrs, q6k_dots::q6k_coop_mmv<1, false>);
