@@ -1,0 +1,149 @@
+{
+  "schema_version": 1,
+  "task": "OPT-096",
+  "mode": "feedback",
+  "llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+  "gguf_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+  "token_generator": "(42 + index * 997) % 248320",
+  "claims_throughput": false,
+  "claims_performance_improvement": false,
+  "configurations": [
+    "ffn_only",
+    "decode_segments8"
+  ],
+  "control": "ffn_only",
+  "candidate": "decode_segments8",
+  "shipping_execution_graphs": "ffn_only",
+  "selected_path": "ffn_only",
+  "shipping_unchanged": true,
+  "production_kept": false,
+  "eligible": true,
+  "status": "eligible",
+  "report_path": "evidence/optimization/opt096-decode-graphs/REPORT.md",
+  "quality": {
+    "quality_v3_absolute": null,
+    "quality_v3_engine_non_regression": null,
+    "quality_v3_quartz_engine_non_regression": null,
+    "quality_v2_all": null,
+    "opt056_visible": true,
+    "identity_cached": true,
+    "status": "pending",
+    "functional_baseline_defect_cannot_excuse_new_errors": true
+  },
+  "numeric": {
+    "nonfinite": null,
+    "status": "pending"
+  },
+  "independent_verdicts": {
+    "ffn_only": {
+      "kernel_parity_pass": false,
+      "model_quality_pass": false,
+      "performance_pass": false,
+      "production_kept": false,
+      "incomplete": true
+    },
+    "decode_segments8": {
+      "kernel_parity_pass": false,
+      "model_quality_pass": false,
+      "performance_pass": false,
+      "production_kept": false,
+      "incomplete": true
+    }
+  },
+  "eligibility": {
+    "schema_version": 1,
+    "task": "OPT-096",
+    "phase": "eligibility",
+    "mode": "feedback",
+    "eligible": true,
+    "verdict": "proceed",
+    "reason": "unhidden_idle_at_both_prefixes",
+    "graph_reopen_eligible": true,
+    "overhead": {
+      "d128_idle_ms_per_token": 0.8568650399374936,
+      "d2048_idle_ms_per_token": 0.8618579507921694,
+      "d128_valid": true,
+      "d2048_valid": true,
+      "source": "fixtures/opt090_decode_attribution.json"
+    },
+    "graph_reopen": {
+      "eligible": true,
+      "reason": "unhidden_idle_at_both_prefixes",
+      "d128_idle_ms_per_token": 0.8568650399374936,
+      "d2048_idle_ms_per_token": 0.8618579507921694,
+      "threshold_ms": 0.5
+    },
+    "opt090_path": "/home/user/qw38/fixtures/opt090_decode_attribution.json",
+    "native_counts": {
+      "schema_version": 1,
+      "task": "OPT-096",
+      "warmups": 0,
+      "samples": 1,
+      "observed_warmups": 0,
+      "observed_samples": 1,
+      "observed_candidates": 1,
+      "observed_shapes": 1,
+      "observed_tier": "correctness",
+      "pairs": 1,
+      "sample_ids": [
+        0
+      ],
+      "acceptance_executed": false,
+      "keep": false,
+      "capture_key": null
+    },
+    "admission": {
+      "ok": true,
+      "result_class": "ok",
+      "message": "",
+      "observed": {
+        "schema_version": 1,
+        "task": "OPT-096",
+        "warmups": 0,
+        "samples": 1,
+        "observed_warmups": 0,
+        "observed_samples": 1,
+        "observed_candidates": 1,
+        "observed_shapes": 1,
+        "observed_tier": "correctness",
+        "pairs": 1,
+        "sample_ids": [
+          0
+        ],
+        "acceptance_executed": false,
+        "keep": false,
+        "capture_key": null,
+        "rounds": []
+      }
+    },
+    "independent_verdicts": {
+      "ffn_only": {
+        "kernel_parity_pass": false,
+        "model_quality_pass": false,
+        "performance_pass": false,
+        "production_kept": false,
+        "incomplete": true
+      },
+      "decode_segments8": {
+        "kernel_parity_pass": false,
+        "model_quality_pass": false,
+        "performance_pass": false,
+        "production_kept": false,
+        "incomplete": true
+      }
+    },
+    "claims_throughput": false,
+    "measurement_utc": "2026-09-12T09:47:39Z",
+    "status": "eligible"
+  },
+  "implementation_utc": "2026-09-12T09:50:00Z",
+  "host_validation": {
+    "pytest_pass": true,
+    "pytest_count": 10,
+    "pytest_command": "uv run pytest -q tests/test_opt096_decode_graphs.py",
+    "eligibility_pass": true,
+    "native_built": false,
+    "gpu_phases_executed": false
+  },
+  "updated_utc": "2026-09-12T09:50:00Z"
+}

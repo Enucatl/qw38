@@ -15,6 +15,7 @@
 #include "quant_mmv.h"
 #include "engine_attribution.h"
 #include "gdn_step.h"
+#include "execution_graph_path.cuh"
 #include "pdl_launch.cuh"
 #include "rms_norm.cuh"
 #ifdef QW38_DIAGNOSTIC_TRACE
@@ -26,9 +27,6 @@ namespace qw38::cuda {
 constexpr std::size_t kPromptChunkRows = 4096;
 constexpr std::size_t kSelectedPromptMicrobatchRows = 4096;
 constexpr std::size_t kLegalPromptMicrobatchRows[] = {512, 1024, 2048, 4096};
-inline constexpr char kSelectedExecutionGraphPath[] = "ffn_only";
-inline constexpr const char* kLegalExecutionGraphPaths[] = {"ffn_only",
-                                                           "layer_segments"};
 
 std::size_t selected_prompt_microbatch_rows() noexcept;
 void set_prompt_microbatch_rows_override(std::size_t rows) noexcept;
@@ -597,10 +595,12 @@ class SchedulerGraphs final {
   std::size_t allocated_bytes() const noexcept;
   const char* execution_graph_path() const noexcept;
   GraphLaunchParams launch_params() const noexcept;
+  std::uint32_t launch_param_update_count() const noexcept;
   Status update_launch_params(std::uint32_t token, std::uint32_t position,
                               std::uint32_t frontier) noexcept;
 
  private:
+  Status apply_segment_launch_params() noexcept;
   void release() noexcept;
   bool matches(const ResidentModel& model,
                const SchedulerWorkspace* workspace) const noexcept;
@@ -625,6 +625,7 @@ class SchedulerGraphs final {
   std::size_t prompt_mixer_graph_count_ = 0;
   std::size_t allocated_bytes_ = 0;
   GraphLaunchParams launch_params_{};
+  std::uint32_t launch_param_update_count_ = 0;
 
   friend Status execute_token(const ResidentModel&, std::size_t,
                               SchedulerSession*, SchedulerWorkspace*, float*,

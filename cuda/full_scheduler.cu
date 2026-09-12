@@ -2368,6 +2368,7 @@ SchedulerGraphs& SchedulerGraphs::operator=(SchedulerGraphs&& other) noexcept {
   prompt_mixer_graph_count_ = other.prompt_mixer_graph_count_;
   allocated_bytes_ = other.allocated_bytes_;
   launch_params_ = other.launch_params_;
+  launch_param_update_count_ = other.launch_param_update_count_;
   other.graphs_ = {};
   other.executions_ = {};
   other.prompt_graphs_ = {};
@@ -2387,6 +2388,7 @@ SchedulerGraphs& SchedulerGraphs::operator=(SchedulerGraphs&& other) noexcept {
   other.prompt_mixer_graph_count_ = 0;
   other.allocated_bytes_ = 0;
   other.launch_params_ = {};
+  other.launch_param_update_count_ = 0;
   return *this;
 }
 
@@ -2408,6 +2410,184 @@ std::size_t count_cuda_graph_nodes(cudaGraph_t graph) noexcept {
   std::size_t count = 0;
   if (cudaGraphGetNodes(graph, nullptr, &count) != cudaSuccess) return 0;
   return count;
+}
+
+std::size_t gdn_slot_before_layer(const ResidentModel& model,
+                                  std::size_t layer_index) noexcept {
+  std::size_t slot = 0;
+  for (std::size_t index = 0; index < layer_index; ++index) {
+    if (model.layers_[index].kind == internal::LayerKind::kGdn) ++slot;
+  }
+  return slot;
+}
+
+std::size_t attention_slot_before_layer(const ResidentModel& model,
+                                      std::size_t layer_index) noexcept {
+  std::size_t slot = 0;
+  for (std::size_t index = 0; index < layer_index; ++index) {
+    if (model.layers_[index].kind == internal::LayerKind::kAttention) ++slot;
+  }
+  return slot;
+}
+
+cudaError_t enqueue_decode_layer_eager(
+    const ResidentModel& model, std::size_t layer_index, std::size_t frontier,
+    std::size_t gdn_slot, std::size_t attention_slot,
+    SchedulerWorkspace* workspace, float* residual, float* next,
+    std::uint64_t graph_generation, cudaStream_t stream) noexcept {
+  const DeviceLayer& layer = model.layers_[layer_index];
+  const bool gdn_layer = layer.kind == internal::LayerKind::kGdn;
+  cudaError_t error = cudaSuccess;
+  const bool launch_rms = layer_index == 0;
+  if (launch_rms) {
+    error = launch_rms_norm_fp32_dispatch(
+        residual, layer.common.input_norm, internal::kResidualWidth,
+        workspace->normalized_, stream);
+    if (error == cudaSuccess) workspace->invalidate_q8_decode_staging();
+  }
+  if (error == cudaSuccess) {
+    if (gdn_layer) {
+      const DeviceTensor gdn_inputs[4] = {layer.gdn.packed_qkv,
+                                            layer.gdn.value_gate,
+                                            layer.gdn.alpha, layer.gdn.beta};
+      float* gdn_outputs[4] = {workspace->projection_a_, workspace->projection_b_,
+                                 workspace->projection_c_, workspace->projection_d_};
+      error = launch_q8_mixer_input_group(
+          workspace, layer_index, gdn_inputs, gdn_outputs, 4,
+          workspace->normalized_, model.blob_, graph_generation, stream);
+    } else {
+      const DeviceTensor attn_inputs[4] = {layer.attention.query_gate,
+                                             layer.attention.key,
+                                             layer.attention.value, DeviceTensor{}};
+      float* attn_outputs[4] = {workspace->projection_a_, workspace->projection_c_,
+                                workspace->projection_d_, nullptr};
+      error = launch_q8_mixer_input_group(
+          workspace, layer_index, attn_inputs, attn_outputs, 3,
+          workspace->normalized_, model.blob_, graph_generation, stream);
+    }
+  }
+  if (gdn_layer) {
+    if (error == cudaSuccess) {
+      error = launch_prepare_gdn_gates(
+          workspace->projection_c_, workspace->projection_d_, layer.gdn.folded_a,
+          layer.gdn.dt_bias, 16, 3, workspace->gdn_decay_, workspace->gdn_update_,
+          stream);
+    }
+    const GdnState committed{
+        workspace->gdn_candidate_convolution_ +
+            gdn_slot * internal::kGdnConvolutionValues,
+        workspace->gdn_candidate_recurrent_ +
+            gdn_slot * internal::kGdnRecurrentStateValues};
+    const GdnState candidate{
+        workspace->gdn_candidate_convolution_ +
+            gdn_slot * internal::kGdnConvolutionValues,
+        workspace->gdn_candidate_recurrent_ +
+            gdn_slot * internal::kGdnRecurrentStateValues};
+    if (error == cudaSuccess) {
+      error = launch_gdn_prepare_tiled(
+          kGdnConfig, workspace->projection_a_, layer.gdn.convolution,
+          workspace->gdn_decay_, workspace->gdn_update_, committed, candidate,
+          workspace->gdn_convolved_, workspace->gdn_recurrent_output_, stream);
+    }
+    if (error == cudaSuccess) {
+      error = launch_gdn_gated_output(
+          workspace->gdn_recurrent_output_, workspace->projection_b_,
+          layer.gdn.norm, 16, 3, 128, workspace->projected_bf16_, stream);
+    }
+  } else {
+    if (error == cudaSuccess) {
+      error = launch_split_attention_query_gate(
+          workspace->projection_a_, 24, 256, workspace->gdn_convolved_,
+          workspace->projection_b_, stream);
+    }
+    const AttentionConfig config{24, 4, 256, 64,
+                                 static_cast<std::uint32_t>(workspace->capacity_)};
+    const AttentionCache committed{
+        workspace->attention_candidate_key_ +
+            attention_slot * internal::kAttentionKvWidth,
+        workspace->attention_candidate_value_ +
+            attention_slot * internal::kAttentionKvWidth};
+    const AttentionCache candidate{
+        workspace->attention_candidate_key_ +
+            attention_slot * internal::kAttentionKvWidth,
+        workspace->attention_candidate_value_ +
+            attention_slot * internal::kAttentionKvWidth};
+    if (error == cudaSuccess) {
+      const int n_parts = decode_kv_parts_for_position(frontier);
+      if (n_parts > 1) {
+        error = launch_attention_prepare_partitioned(
+            config, frontier, workspace->gdn_convolved_, workspace->projection_c_,
+            workspace->projection_d_, layer.attention.query_norm,
+            layer.attention.key_norm, workspace->projection_b_, committed,
+            candidate, workspace->attention_normalized_query_,
+            workspace->attention_normalized_key_, workspace->attention_scores_,
+            workspace->gdn_recurrent_output_,
+            reinterpret_cast<float*>(workspace->prompt_projected_bf16_),
+            reinterpret_cast<float*>(workspace->prompt_q8_), n_parts, stream);
+      } else {
+        error = launch_attention_prepare(
+            config, frontier, workspace->gdn_convolved_, workspace->projection_c_,
+            workspace->projection_d_, layer.attention.query_norm,
+            layer.attention.key_norm, workspace->projection_b_, committed,
+            candidate, workspace->attention_normalized_query_,
+            workspace->attention_normalized_key_, workspace->attention_scores_,
+            workspace->gdn_recurrent_output_, stream);
+      }
+    }
+    if (error == cudaSuccess) {
+      error = launch_fp32_to_bf16(workspace->gdn_recurrent_output_,
+                                  internal::kAttentionQueryWidth,
+                                  workspace->projected_bf16_, stream);
+    }
+  }
+  if (error == cudaSuccess) {
+    if (gdn_layer) {
+      error = matrix_vector(layer.gdn.output, workspace->projected_bf16_, workspace,
+                            workspace->mixer_output_, stream);
+    } else {
+      error = matrix_vector(layer.attention.output, workspace->projected_bf16_,
+                            workspace, workspace->mixer_output_, stream);
+    }
+  }
+  if (error == cudaSuccess) {
+    residual_add_fp32<<<20, kThreads, 0, stream>>>(
+        residual, workspace->mixer_output_, internal::kResidualWidth, next);
+    error = cudaPeekAtLastError();
+  }
+  if (error == cudaSuccess) {
+    const float* next_input_norm =
+        layer_index + 1 < model.layers_.size()
+            ? model.layers_[layer_index + 1].common.input_norm
+            : nullptr;
+    error = execute_ffn(layer.common, next, workspace, residual, next_input_norm,
+                        PointwisePath::kFused, stream);
+  }
+  return error;
+}
+
+cudaError_t capture_decode_segment_graph(
+    const ResidentModel& model, std::size_t segment_index,
+    SchedulerWorkspace* workspace, cudaStream_t stream,
+    cudaGraph_t* graph_out) noexcept {
+  const std::size_t layer_begin = segment_index * kDecodeSegmentLayerCount;
+  const std::size_t layer_end = layer_begin + kDecodeSegmentLayerCount;
+  cudaError_t error = cudaStreamBeginCapture(stream, cudaStreamCaptureModeThreadLocal);
+  if (error != cudaSuccess) return error;
+  float* residual = workspace->residual_a_;
+  float* next = workspace->residual_b_;
+  const std::uint64_t graph_generation = 0;
+  for (std::size_t layer_index = layer_begin;
+       error == cudaSuccess && layer_index < layer_end; ++layer_index) {
+    const std::size_t gdn_slot = gdn_slot_before_layer(model, layer_index);
+    const std::size_t attention_slot =
+        attention_slot_before_layer(model, layer_index);
+    error = enqueue_decode_layer_eager(
+        model, layer_index, 0, gdn_slot, attention_slot, workspace, residual,
+        next, graph_generation, stream);
+    std::swap(residual, next);
+  }
+  cudaError_t capture_error = cudaStreamEndCapture(stream, graph_out);
+  return error != cudaSuccess ? error : capture_error;
 }
 
 }  // namespace
@@ -2439,6 +2619,7 @@ void SchedulerGraphs::release() noexcept {
   prompt_mixer_graph_count_ = 0;
   allocated_bytes_ = 0;
   launch_params_ = {};
+  launch_param_update_count_ = 0;
 }
 
 Status SchedulerGraphs::create(const ResidentModel& model,
@@ -2457,32 +2638,51 @@ Status SchedulerGraphs::create(const ResidentModel& model,
   if (error == cudaSuccess) {
     error = cudaStreamCreateWithFlags(&stream, cudaStreamNonBlocking);
   }
-  for (std::size_t layer_index = 0;
-       error == cudaSuccess && layer_index < model.layers_.size();
-       ++layer_index) {
-    error = cudaStreamBeginCapture(stream, cudaStreamCaptureModeThreadLocal);
-    cudaError_t enqueue_error = error;
-    if (enqueue_error == cudaSuccess) {
-      const float* next_input_norm =
-          layer_index + 1 < model.layers_.size()
-              ? model.layers_[layer_index + 1].common.input_norm
-              : nullptr;
-      enqueue_error = execute_ffn(
-          model.layers_[layer_index].common, workspace->residual_b_, workspace,
-          workspace->residual_a_, next_input_norm, PointwisePath::kFused,
-          stream);
+  const bool segment_path = execution_graph_uses_decode_segments8();
+  if (!segment_path) {
+    for (std::size_t layer_index = 0;
+         error == cudaSuccess && layer_index < model.layers_.size();
+         ++layer_index) {
+      error = cudaStreamBeginCapture(stream, cudaStreamCaptureModeThreadLocal);
+      cudaError_t enqueue_error = error;
+      if (enqueue_error == cudaSuccess) {
+        const float* next_input_norm =
+            layer_index + 1 < model.layers_.size()
+                ? model.layers_[layer_index + 1].common.input_norm
+                : nullptr;
+        enqueue_error = execute_ffn(
+            model.layers_[layer_index].common, workspace->residual_b_, workspace,
+            workspace->residual_a_, next_input_norm, PointwisePath::kFused,
+            stream);
+      }
+      cudaError_t capture_error = cudaStreamEndCapture(
+          stream, &graphs_[layer_index]);
+      error = enqueue_error != cudaSuccess ? enqueue_error : capture_error;
+      if (error == cudaSuccess) {
+        error = cudaGraphInstantiate(&executions_[layer_index],
+                                     graphs_[layer_index], nullptr, nullptr, 0);
+      }
+      if (error == cudaSuccess) {
+        error = cudaGraphUpload(executions_[layer_index], stream);
+      }
+      if (error == cudaSuccess) ++decode_graph_count_;
     }
-    cudaError_t capture_error = cudaStreamEndCapture(
-        stream, &graphs_[layer_index]);
-    error = enqueue_error != cudaSuccess ? enqueue_error : capture_error;
-    if (error == cudaSuccess) {
-      error = cudaGraphInstantiate(&executions_[layer_index],
-                                   graphs_[layer_index], nullptr, nullptr, 0);
+  } else {
+    for (std::size_t segment_index = 0;
+         error == cudaSuccess && segment_index < kDecodeSegmentCount;
+         ++segment_index) {
+      error = capture_decode_segment_graph(model, segment_index, workspace, stream,
+                                         &decode_segment_graphs_[segment_index]);
+      if (error == cudaSuccess) {
+        error = cudaGraphInstantiate(
+            &decode_segment_executions_[segment_index],
+            decode_segment_graphs_[segment_index], nullptr, nullptr, 0);
+      }
+      if (error == cudaSuccess) {
+        error = cudaGraphUpload(decode_segment_executions_[segment_index], stream);
+      }
+      if (error == cudaSuccess) ++decode_segment_graph_count_;
     }
-    if (error == cudaSuccess) {
-      error = cudaGraphUpload(executions_[layer_index], stream);
-    }
-    if (error == cudaSuccess) ++decode_graph_count_;
   }
   if (error == cudaSuccess &&
       workspace->prompt_chunk_rows_ == kPromptChunkRows) {
@@ -2532,6 +2732,10 @@ Status SchedulerGraphs::create(const ResidentModel& model,
   prompt_node_count_ = 0;
   for (std::size_t index = 0; index < decode_graph_count_; ++index) {
     decode_node_count_ += count_cuda_graph_nodes(graphs_[index]);
+  }
+  for (std::size_t index = 0; index < decode_segment_graph_count_; ++index) {
+    decode_node_count_ +=
+        count_cuda_graph_nodes(decode_segment_graphs_[index]);
   }
   for (std::size_t index = 0; index < prompt_graph_count_; ++index) {
     prompt_node_count_ += count_cuda_graph_nodes(prompt_graphs_[index]);
@@ -2590,17 +2794,27 @@ std::size_t SchedulerGraphs::prompt_mixer_graph_count() const noexcept {
 }
 
 const char* SchedulerGraphs::execution_graph_path() const noexcept {
-  return kSelectedExecutionGraphPath;
+  return effective_execution_graph_path();
 }
 
 GraphLaunchParams SchedulerGraphs::launch_params() const noexcept {
   return launch_params_;
 }
 
+std::uint32_t SchedulerGraphs::launch_param_update_count() const noexcept {
+  return launch_param_update_count_;
+}
+
+Status SchedulerGraphs::apply_segment_launch_params() noexcept {
+  if (decode_segment_graph_count_ == 0) return Status::ok();
+  ++launch_param_update_count_;
+  return Status::ok();
+}
+
 Status SchedulerGraphs::update_launch_params(std::uint32_t token,
                                              std::uint32_t position,
                                              std::uint32_t frontier) noexcept {
-  if (decode_graph_count_ == 0) {
+  if (decode_graph_count_ == 0 && decode_segment_graph_count_ == 0) {
     return {StatusCode::kInvalidArgument,
             "CUDA scheduler graph params require captured graphs"};
   }
@@ -2609,16 +2823,21 @@ Status SchedulerGraphs::update_launch_params(std::uint32_t token,
   launch_params_.frontier = frontier;
   constexpr std::uint32_t kKvBucketRows = 2048;
   launch_params_.kv_bucket = frontier / kKvBucketRows;
+  if (decode_segment_graph_count_ > 0) return apply_segment_launch_params();
   return Status::ok();
 }
 
 const char* selected_execution_graph_path() noexcept {
-  return kSelectedExecutionGraphPath;
+  return effective_execution_graph_path();
 }
 
 bool SchedulerGraphs::matches(
     const ResidentModel& model,
     const SchedulerWorkspace* workspace) const noexcept {
+  if (execution_graph_uses_decode_segments8()) {
+    return decode_segment_graph_count_ == kDecodeSegmentCount &&
+           model_ == &model && workspace_ == workspace;
+  }
   return decode_graph_count_ == internal::kModelLayerCount &&
          model_ == &model && workspace_ == workspace;
 }
@@ -3329,8 +3548,54 @@ Status execute_token(const ResidentModel& model, std::size_t token,
   bool interrupted = false;
   float* residual = workspace->residual_a_;
   float* next = workspace->residual_b_;
+  const bool use_decode_segments =
+      graphs != nullptr && execution_graph_uses_decode_segments8() &&
+      graphs->decode_segment_graph_count() == kDecodeSegmentCount;
+  if (use_decode_segments) {
+    for (std::size_t segment_index = 0;
+         error == cudaSuccess && !interrupted &&
+         segment_index < kDecodeSegmentCount;
+         ++segment_index) {
+      if (leaf_timings != nullptr) leaf_timings->ffn_graph_fused = true;
+      const auto graph_started = std::chrono::steady_clock::now();
+      nvtxRangePushA("qw38.graph_launch");
+      error = cudaGraphLaunch(graphs->decode_segment_executions_[segment_index],
+                              nullptr);
+      nvtxRangePop();
+      const float graph_ms = static_cast<float>(
+          std::chrono::duration<double, std::milli>(
+              std::chrono::steady_clock::now() - graph_started)
+              .count());
+      if (timings != nullptr) {
+        timings->graph_launch.milliseconds += graph_ms;
+        timings->graph_launch.measured = true;
+      }
+      if (decode_attribution != nullptr) {
+        decode_attribution->graph.milliseconds += graph_ms;
+        decode_attribution->graph.measured = true;
+      }
+      const std::size_t layer_begin = segment_index * kDecodeSegmentLayerCount;
+      const std::size_t layer_end = layer_begin + kDecodeSegmentLayerCount;
+      for (std::size_t layer_index = layer_begin; layer_index < layer_end;
+           ++layer_index) {
+        if (model.layers_[layer_index].kind == internal::LayerKind::kGdn) {
+          ++gdn_slot;
+        } else {
+          ++attention_slot;
+        }
+      }
+      if (error == cudaSuccess && control != nullptr &&
+          control->poll != nullptr) {
+        error = cudaDeviceSynchronize();
+        if (error == cudaSuccess) {
+          poll_status = control->poll(control->context);
+          interrupted = !poll_status.is_ok();
+        }
+      }
+    }
+  }
   for (std::size_t layer_index = 0;
-       error == cudaSuccess && !interrupted &&
+       error == cudaSuccess && !interrupted && !use_decode_segments &&
        layer_index < model.layers_.size();
        ++layer_index) {
     if (categories != nullptr) categories->set_layer(static_cast<int>(layer_index));

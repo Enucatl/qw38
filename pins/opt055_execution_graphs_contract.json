@@ -15,12 +15,12 @@
   "selected_execution_graph_path": "ffn_only",
   "legal_execution_graph_paths": [
     "ffn_only",
-    "layer_segments"
+    "decode_segments8"
   ],
   "ab": {
     "candidates": [
       "ffn_only",
-      "layer_segments"
+      "decode_segments8"
     ],
     "ties_retain": "ffn_only",
     "decode_idle_noise_ms": 0.5,

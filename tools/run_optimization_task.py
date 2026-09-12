@@ -360,6 +360,8 @@ def parse_native_observation(stdout: str) -> dict[str, Any]:
         "QW38_OPT095_NATIVE_COUNTS=",
         "QW38_OPT095_RESULT=",
         "QW38_OPT095_ATTENTION_GQA_RESULT=",
+        "QW38_OPT096_NATIVE_COUNTS=",
+        "QW38_OPT096_DECODE_GRAPHS_RESULT=",
         "QW38_OPT061_COMPONENT_REPLAY_RESULT=",
         "QW38_OPT057_PROBE_RESULT=",
     ):

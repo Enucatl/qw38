@@ -19,7 +19,6 @@ if str(ROOT) not in sys.path:
 from tools.opt075_q4_production_admission import (  # noqa: E402
     AdmissionError,
     FEEDBACK_CRIT,
-    T_CRIT_DF4,
     T_CRIT_DF9,
     docker_common,
     dump_json,
@@ -28,7 +27,6 @@ from tools.opt075_q4_production_admission import (  # noqa: E402
     paired_student_t,
     parse_engine_pairs,
     parse_rounds,
-    sample_variance,
     utc_now,
 )
 from tools.opt082_kernel_parity import (  # noqa: E402
@@ -280,7 +278,9 @@ def family_plan(phase: str, mode: str) -> dict[str, Any]:
         engine_pairs = 1 if mode == "feedback" else 5
     elif phase in {"d128", "d2048"}:
         engine_pairs = int(workload.get("samples", 5))
-    default_candidates = 2 if phase in {"mixer", "d128", "d2048", "prefill-guard"} else 1
+    default_candidates = (
+        2 if phase in {"mixer", "d128", "d2048", "prefill-guard"} else 1
+    )
     return {
         "phase": phase,
         "mode": mode,
@@ -891,12 +891,16 @@ def decide_independent_verdicts(
         else:
             kpass = bool(previous.get("kernel_parity_pass"))
         quality = quality_by_id.get(cid) or {}
-        qpass = bool(quality.get("model_quality_pass")) if quality else bool(
-            previous.get("model_quality_pass")
+        qpass = (
+            bool(quality.get("model_quality_pass"))
+            if quality
+            else bool(previous.get("model_quality_pass"))
         )
         perf = performance_by_id.get(cid) or {}
-        ppass = bool(perf.get("performance_pass")) if perf else bool(
-            previous.get("performance_pass")
+        ppass = (
+            bool(perf.get("performance_pass"))
+            if perf
+            else bool(previous.get("performance_pass"))
         )
         rows[cid] = {
             "kernel_parity_pass": kpass,
@@ -964,7 +968,6 @@ def write_report(payload: Mapping[str, Any]) -> None:
     EVIDENCE.mkdir(parents=True, exist_ok=True)
     verdicts = payload.get("independent_verdicts") or {}
     parity = payload.get("parity") or {}
-    quality_rows = payload.get("quality") or {}
     mixer = payload.get("mixer") or {}
     component = mixer.get("component") or {}
     engine = mixer.get("engine") or {}
@@ -1209,9 +1212,7 @@ def run_parity_phase(
 
 def run_quality_phase(*, mode: str, run_dir: Path) -> dict[str, Any]:
     plan = family_plan("quality", mode)
-    quality_by_id = {
-        config["id"]: evaluate_quality(config) for config in CONFIGS
-    }
+    quality_by_id = {config["id"]: evaluate_quality(config) for config in CONFIGS}
     observed = planned_observation(plan, keep=False)
     admission = admit_counts("quality", mode, observed)
     decided = decide_independent_verdicts(

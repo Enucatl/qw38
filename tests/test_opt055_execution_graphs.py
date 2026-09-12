@@ -32,7 +32,7 @@ OPT054_D128_P95 = 26.9020824
 OPT054_D128_RUN_P95 = 26.7428017
 OPT054_D2048_P95 = 28.1707439
 OPT054_D2048_RUN_P95 = 28.0445251
-LEGAL_PATHS = ("ffn_only", "layer_segments")
+LEGAL_PATHS = ("ffn_only", "decode_segments8")
 PROOF = (
     "stable-address decode and prompt FFN graphs remain the shipping path; "
     "layer-segment mixer/core capture stays unpopulated unless idle exceeds noise; "
@@ -78,7 +78,7 @@ def _contract() -> dict[str, Any]:
 
 
 def pin_from_source() -> str:
-    text = (ROOT / "cuda/full_scheduler.h").read_text()
+    text = (ROOT / "cuda/execution_graph_path.cuh").read_text()
     match = re.search(r'kSelectedExecutionGraphPath\[\] = "([^"]+)"', text)
     assert match is not None
     return match.group(1)
@@ -166,11 +166,11 @@ def _below_noise(ab: dict[str, Any]) -> bool:
 
 def _select_winner(ab: dict[str, Any]) -> str:
     if ab["counts"]["decode_segment_graph_count"] != 0:
-        return "layer_segments"
+        return "decode_segments8"
     if ab["counts"]["prompt_mixer_graph_count"] != 0:
-        return "layer_segments"
+        return "decode_segments8"
     if not _below_noise(ab):
-        return "layer_segments"
+        return "decode_segments8"
     return "ffn_only"
 
 
@@ -380,12 +380,12 @@ def test_opt055_validator_rejects_inadmissible_evidence() -> None:
                     "counts": noisy["counts"],
                 }
             )
-            == "layer_segments"
+            == "decode_segments8"
         )
         with pytest.raises(AssertionError):
             validate_result(noisy)
         bad = dict(good)
-        bad["selected_execution_graph_path"] = "layer_segments"
+        bad["selected_execution_graph_path"] = "decode_segments8"
         bad["keep_sitting_skipped"] = True
         with pytest.raises(AssertionError):
             validate_result(bad)
@@ -518,7 +518,7 @@ tok/s sitting {sitting}.
 | GPU | NVIDIA GeForce RTX 5090, compute capability 12.0, exclusive |
 | Quartz image | `qw38-cuda:13.0.2` |
 | llama.cpp revision | `{LLAMA_REV}` |
-| A/B | FFN graphs versus eager plus poll versus null; layer_segments unpopulated when idle is below noise |
+| A/B | FFN graphs versus eager plus poll versus null; decode_segments8 unpopulated when idle is below noise |
 | Cancellation | no publish after poll-8 layer boundary |
 | P / D128 / D2048 | OPT-021 / OPT-032 protocols, copied on measured no-change |
 | Nsight | not_used |

@@ -1,0 +1,78 @@
+{
+  "schema_version": 1,
+  "task": "OPT-096",
+  "yardstick": "conditional_eight_layer_decode_graphs",
+  "claims_throughput": true,
+  "claims_performance_improvement": true,
+  "llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+  "gguf_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+  "token_generator": "(42 + index * 997) % 248320",
+  "control": "ffn_only",
+  "candidate": "decode_segments8",
+  "segment_layer_count": 8,
+  "segment_count": 8,
+  "graph_reopen_ms": 0.50,
+  "min_saving_ms_per_token": 0.10,
+  "e2e_regression_frac": 0.02,
+  "legal_execution_graph_paths": ["ffn_only", "decode_segments8"],
+  "selected_execution_graph_path": "ffn_only",
+  "configurations": [
+    {
+      "id": "ffn_only",
+      "execution_graphs": "ffn_only",
+      "role": "control",
+      "expected_decode_graph_count": 64,
+      "expected_decode_segment_graph_count": 0
+    },
+    {
+      "id": "decode_segments8",
+      "execution_graphs": "decode_segments8",
+      "role": "candidate",
+      "expected_decode_graph_count": 0,
+      "expected_decode_segment_graph_count": 8
+    }
+  ],
+  "parity_positions": [0, 1, 127, 128, 2047, 2048, 4095, 4096],
+  "feedback_warmups": 1,
+  "feedback_samples": 3,
+  "feedback_engine_pairs": 1,
+  "acceptance_warmups": 3,
+  "acceptance_samples": 10,
+  "acceptance_engine_pairs": 5,
+  "native_test": "build/qw38-cuda-opt096-decode-graphs-test",
+  "native_probe": "build/qw38-cuda-optimization-engine-probe",
+  "opt090_fixture": "fixtures/opt090_decode_attribution.json",
+  "opt055_fixture": "fixtures/opt055_execution_graphs.json",
+  "required_fixture_keys": [
+    "schema_version",
+    "task",
+    "mode",
+    "llama_revision",
+    "gguf_sha256",
+    "claims_throughput",
+    "configurations",
+    "control",
+    "candidate",
+    "shipping_execution_graphs",
+    "production_kept",
+    "quality",
+    "numeric",
+    "report_path",
+    "independent_verdicts"
+  ],
+  "independent_verdicts": [
+    "kernel_parity_pass",
+    "model_quality_pass",
+    "performance_pass",
+    "production_kept"
+  ],
+  "verdicts": [
+    "keep",
+    "retain_ffn_only",
+    "no_reopen_overhead_below_trigger",
+    "performance_rejected",
+    "quality_blocked",
+    "inconclusive"
+  ],
+  "report_path": "evidence/optimization/opt096-decode-graphs/REPORT.md"
+}
