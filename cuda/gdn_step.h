@@ -109,6 +109,24 @@ int gdn_decode_transposed_occupancy() noexcept;
 void gdn_decode_transposed_attributes(int* registers, std::size_t* local_bytes,
                                       int* occupancy) noexcept;
 
+cudaError_t launch_gdn_recurrence_only(
+    const GdnConfig& config, const float* convolution_output,
+    const float* log_decay, const float* beta, const float* source,
+    float* candidate, float* output, bool value_is_tiled,
+    cudaStream_t stream) noexcept;
+
+cudaError_t launch_gdn_convert_recurrent_layout(
+    const GdnConfig& config, float* recurrent, bool to_col_major,
+    cudaStream_t stream, GdnConversionBoundary boundary) noexcept;
+
+cudaError_t launch_gdn_copy_converted_recurrent(
+    const GdnConfig& config, const float* source, float* dest, bool to_col_major,
+    cudaStream_t stream, GdnConversionBoundary boundary) noexcept;
+
+cudaError_t launch_gdn_convert_session_recurrent(
+    float* recurrent, std::size_t layers, bool to_col_major,
+    cudaStream_t stream, GdnConversionBoundary boundary) noexcept;
+
 cudaError_t launch_gdn_shared_inverses(
     const GdnConfig& config, const float* convolution_output,
     std::size_t token_count, float* inverses, cudaStream_t stream) noexcept;

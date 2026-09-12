@@ -133,7 +133,7 @@ int usage(const char* argv0) {
                "[--q6-device-layout raw_gguf|aligned_soa] "
                "[--q4-warps 2|4] "
                "[--ffn-decode paired_staged|shared_stage|paired_integer] "
-               "[--gdn-decode sequential|tile16|tile32|transposed] "
+               "[--gdn-decode sequential|tile16|tile32|transposed|persistent_transposed] "
                "[--decode-query-prep warp_query|prepared_q|prepared_q_veckv] "
                "[--decode-attention-gqa warp_query|warp_query_gqa6] "
                "[--decode-attention-vec128 warp_query|vec128_online] "

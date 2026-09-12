@@ -757,7 +757,15 @@ cudaError_t launch_sequential_windows(
         config.convolution_width, window);
     cudaError_t error = cudaPeekAtLastError();
     if (error != cudaSuccess) return error;
-    if (window == 1 && gdn_decode_uses_transposed()) {
+    if (window == 1 && gdn_decode_uses_persistent_transposed()) {
+      error = launch_gdn_decode_persistent_transposed_recurrence(
+          config, convolution_output + start * channels,
+          log_decay + start * config.value_heads,
+          beta + start * config.value_heads, source_recurrent,
+          candidate.recurrent,
+          recurrent_output + start * gdn_output_values(config), value_is_tiled,
+          stream);
+    } else if (window == 1 && gdn_decode_uses_transposed()) {
       error = launch_gdn_decode_transposed_recurrence(
           config, convolution_output + start * channels,
           log_decay + start * config.value_heads,
@@ -1193,6 +1201,106 @@ void gdn_decode_tiled_attributes(unsigned int value_tile, int* registers,
   if (occupancy != nullptr) {
     *occupancy = gdn_decode_tiled_occupancy(value_tile);
   }
+}
+
+cudaError_t launch_gdn_recurrence_only(
+    const GdnConfig& config, const float* convolution_output,
+    const float* log_decay, const float* beta, const float* source,
+    float* candidate, float* output, bool value_is_tiled,
+    cudaStream_t stream) noexcept {
+  if (convolution_output == nullptr || log_decay == nullptr ||
+      beta == nullptr || source == nullptr || candidate == nullptr ||
+      output == nullptr) {
+    return cudaErrorInvalidValue;
+  }
+  if (gdn_decode_uses_persistent_transposed()) {
+    return launch_gdn_decode_persistent_transposed_recurrence(
+        config, convolution_output, log_decay, beta, source, candidate, output,
+        value_is_tiled, stream);
+  }
+  if (gdn_decode_uses_transposed()) {
+    return launch_gdn_decode_transposed_recurrence(
+        config, convolution_output, log_decay, beta, source, candidate, output,
+        value_is_tiled, stream);
+  }
+  if (gdn_decode_uses_tiled()) {
+    return launch_gdn_decode_tiled_recurrence(
+        config, convolution_output, log_decay, beta, source, candidate, output,
+        value_is_tiled, stream);
+  }
+  prepare_recurrence_window<<<config.value_heads, kThreads, 0, stream>>>(
+      config, convolution_output, log_decay, beta, source, candidate, output, 1,
+      value_is_tiled);
+  cudaError_t error = cudaPeekAtLastError();
+  if (error == cudaSuccess) {
+    record_gdn_decode_launch(kGdnDecodeLaunchVariantSequential, 0,
+                             config.value_heads, 1);
+  }
+  return error;
+}
+
+cudaError_t launch_gdn_convert_recurrent_layout(
+    const GdnConfig& config, float* recurrent, bool to_col_major,
+    cudaStream_t stream, GdnConversionBoundary boundary) noexcept {
+  if (recurrent == nullptr || config.value_heads == 0 ||
+      config.value_width == 0) {
+    return cudaErrorInvalidValue;
+  }
+  const dim3 block(32, kGdnDecodeWarpsPerCta);
+  const std::size_t smem =
+      static_cast<std::size_t>(config.value_width) * config.value_width *
+      sizeof(float);
+  cudaError_t error = gdn_set_relayout_dynamic_smem(smem);
+  if (error != cudaSuccess) return error;
+  if (to_col_major) {
+    gdn_relayout_row_to_col_inplace<<<config.value_heads, block, smem, stream>>>(
+        recurrent, config.value_heads, config.value_width);
+  } else {
+    gdn_relayout_col_to_row_inplace<<<config.value_heads, block, smem, stream>>>(
+        recurrent, config.value_heads, config.value_width);
+  }
+  error = cudaPeekAtLastError();
+  if (error == cudaSuccess) {
+    const std::size_t bytes = static_cast<std::size_t>(config.value_heads) *
+                              config.key_width * config.value_width *
+                              sizeof(float);
+    gdn_record_conversion(boundary, 1, bytes);
+  }
+  return error;
+}
+
+cudaError_t launch_gdn_copy_converted_recurrent(
+    const GdnConfig& config, const float* source, float* dest, bool to_col_major,
+    cudaStream_t stream, GdnConversionBoundary boundary) noexcept {
+  if (source == nullptr || dest == nullptr) return cudaErrorInvalidValue;
+  cudaError_t error =
+      to_col_major ? launch_gdn_transpose_state_in(config, source, dest, stream)
+                   : launch_gdn_transpose_state_out(config, source, dest,
+                                                    stream);
+  if (error == cudaSuccess) {
+    const std::size_t bytes = static_cast<std::size_t>(config.value_heads) *
+                              config.key_width * config.value_width *
+                              sizeof(float);
+    gdn_record_conversion(boundary, 1, bytes);
+  }
+  return error;
+}
+
+cudaError_t launch_gdn_convert_session_recurrent(
+    float* recurrent, std::size_t layers, bool to_col_major,
+    cudaStream_t stream, GdnConversionBoundary boundary) noexcept {
+  if (recurrent == nullptr || layers == 0) return cudaErrorInvalidValue;
+  const GdnConfig config{16, 48, 128, 128, 4};
+  const std::size_t layer_floats =
+      static_cast<std::size_t>(config.value_heads) * config.key_width *
+      config.value_width;
+  cudaError_t error = cudaSuccess;
+  for (std::size_t layer = 0; layer < layers && error == cudaSuccess; ++layer) {
+    error = launch_gdn_convert_recurrent_layout(
+        config, recurrent + layer * layer_floats, to_col_major, stream,
+        boundary);
+  }
+  return error;
 }
 
 cudaError_t launch_gdn_commit(const GdnConfig& config,

@@ -276,7 +276,35 @@ Status SchedulerSession::save_checkpoint(const std::string& path,
                          : Status{StatusCode::kIoError,
                                   "cannot write checkpoint tokens"};
   if (status.is_ok()) {
-    status = write_device(&output, gdn_recurrent_, recurrent_bytes, &buffer);
+    if (gdn_decode_uses_persistent_transposed() &&
+        gdn_session_live_col_major()) {
+      float* canonical = nullptr;
+      const cudaError_t alloc = cudaMalloc(
+          &canonical, internal::kGdnRecurrentStateValues * sizeof(float));
+      if (alloc != cudaSuccess) {
+        status = {StatusCode::kInternal,
+                  "cannot allocate canonical GDN checkpoint scratch"};
+      }
+      const GdnConfig config{16, 48, 128, 128, 4};
+      for (std::size_t layer = 0; status.is_ok() && layer < kGdnLayers;
+           ++layer) {
+        const cudaError_t convert = launch_gdn_copy_converted_recurrent(
+            config,
+            gdn_recurrent_ + layer * internal::kGdnRecurrentStateValues,
+            canonical, false, nullptr, GdnConversionBoundary::kSave);
+        if (convert != cudaSuccess) {
+          status = {StatusCode::kInternal,
+                    "cannot convert GDN state to checkpoint row-major"};
+        } else {
+          status = write_device(
+              &output, canonical,
+              internal::kGdnRecurrentStateValues * sizeof(float), &buffer);
+        }
+      }
+      if (canonical != nullptr) cudaFree(canonical);
+    } else {
+      status = write_device(&output, gdn_recurrent_, recurrent_bytes, &buffer);
+    }
   }
   __nv_bfloat16* kv_staging = nullptr;
   if (status.is_ok() && frontier_ > 0) {
@@ -530,6 +558,18 @@ Status SchedulerSession::restore_checkpoint(
     }
   }
   if (!status.is_ok()) return status;
+  if (gdn_decode_uses_persistent_transposed()) {
+    const cudaError_t convert = launch_gdn_convert_session_recurrent(
+        workspace->gdn_candidate_recurrent_, kGdnLayers, true, nullptr,
+        GdnConversionBoundary::kRestore);
+    if (convert != cudaSuccess) {
+      return {StatusCode::kInternal,
+              "cannot convert restored GDN state to col-major"};
+    }
+    gdn_set_session_live_col_major(true);
+  } else {
+    gdn_set_session_live_col_major(false);
+  }
   std::swap(gdn_convolution_, workspace->gdn_candidate_convolution_);
   std::swap(gdn_recurrent_, workspace->gdn_candidate_recurrent_);
   std::copy(restored_tokens.begin(), restored_tokens.end(), tokens_);

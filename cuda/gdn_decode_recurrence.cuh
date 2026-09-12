@@ -350,6 +350,7 @@ cudaError_t launch_gdn_decode_transposed_recurrence(
     error = cudaPeekAtLastError();
     if (error != cudaSuccess) return error;
   }
+  gdn_record_timed_relayout(1);
   prepare_decode_qk_inverses<<<config.key_heads, 32, 0, stream>>>(
       config, convolution_output);
   error = cudaPeekAtLastError();
@@ -363,8 +364,36 @@ cudaError_t launch_gdn_decode_transposed_recurrence(
       candidate, config.value_heads, config.value_width);
   error = cudaPeekAtLastError();
   if (error == cudaSuccess) {
+    gdn_record_timed_relayout(1);
     record_gdn_decode_launch(kGdnDecodeLaunchVariantTransposed, 0, grid.x,
                              grid.y);
+  }
+  return error;
+}
+
+cudaError_t launch_gdn_decode_persistent_transposed_recurrence(
+    const GdnConfig& config, const float* convolution_output,
+    const float* log_decay, const float* beta, const float* source,
+    float* candidate, float* output, bool value_is_tiled,
+    cudaStream_t stream) noexcept {
+  if (!gdn_decode_transposed_shape(config) || convolution_output == nullptr ||
+      log_decay == nullptr || beta == nullptr || source == nullptr ||
+      candidate == nullptr || output == nullptr) {
+    return cudaErrorInvalidValue;
+  }
+  const dim3 grid(config.value_heads, kGdnDecodeTransposedGridY);
+  const dim3 block(32, kGdnDecodeWarpsPerCta);
+  prepare_decode_qk_inverses<<<config.key_heads, 32, 0, stream>>>(
+      config, convolution_output);
+  cudaError_t error = cudaPeekAtLastError();
+  if (error != cudaSuccess) return error;
+  prepare_recurrence_decode_transposed<<<grid, block, 0, stream>>>(
+      config, convolution_output, log_decay, beta, source, candidate, output,
+      value_is_tiled);
+  error = cudaPeekAtLastError();
+  if (error == cudaSuccess) {
+    record_gdn_decode_launch(kGdnDecodeLaunchVariantPersistentTransposed, 0,
+                             grid.x, grid.y);
   }
   return error;
 }

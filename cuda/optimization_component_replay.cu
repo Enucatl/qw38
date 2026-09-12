@@ -98,7 +98,7 @@ int usage(const char* argv0) {
                "[--q4-device-layout raw_gguf|aligned_meta] [--q4-warps 2|4] "
                "[--q6-device-layout raw_gguf|aligned_soa] "
                "[--ffn-decode paired_staged|shared_stage|paired_integer] "
-               "[--gdn-decode sequential|tile16|tile32|transposed] "
+               "[--gdn-decode sequential|tile16|tile32|transposed|persistent_transposed] "
                "[--decode-query-prep warp_query|prepared_q|prepared_q_veckv] "
                "[--decode-attention-gqa warp_query|warp_query_gqa6] "
                "[--decode-attention-vec128 warp_query|vec128_online] "
@@ -1797,6 +1797,7 @@ int time_family(qw38::cuda::ResidentModel* model,
                       cudaMemcpyHostToDevice);
   };
 
+  qw38::cuda::gdn_reset_layout_counters();
   const int total = warmups + samples;
   for (int sample = 0; sample < total; ++sample) {
     const bool warmup = sample < warmups;
@@ -1833,6 +1834,13 @@ int time_family(qw38::cuda::ResidentModel* model,
             static_cast<int>(qw38::cuda::kOpt077GdnCapturePositions));
         error = restore_gdn_snapshot(acts, position, gdn_slot, &workspace,
                                      gdn_committed_conv, gdn_committed_rec);
+        if (error == cudaSuccess &&
+            qw38::cuda::gdn_decode_uses_persistent_transposed()) {
+          const qw38::cuda::GdnConfig config{16, 48, 128, 128, 4};
+          error = qw38::cuda::launch_gdn_convert_recurrent_layout(
+              config, gdn_committed_rec, true, nullptr,
+              qw38::cuda::GdnConversionBoundary::kDiagnostic);
+        }
       }
       std::size_t attn_slot = 0;
       std::size_t attn_capture_pos = 0;
@@ -1992,7 +2000,8 @@ int time_family(qw38::cuda::ResidentModel* model,
     std::size_t local_bytes = 0;
     int occupancy = 0;
     const unsigned int tile = qw38::cuda::gdn_decode_value_tile();
-    if (qw38::cuda::gdn_decode_uses_transposed()) {
+    if (qw38::cuda::gdn_decode_uses_transposed() ||
+        qw38::cuda::gdn_decode_uses_persistent_transposed()) {
       qw38::cuda::gdn_decode_transposed_attributes(&regs, &local_bytes,
                                                    &occupancy);
     } else if (tile > 0) {
@@ -2006,20 +2015,39 @@ int time_family(qw38::cuda::ResidentModel* model,
         "gdn_dispatch path=%s launch=%s value_tile=%u grid_x=%u grid_y=%u "
         "warps_per_cta=4 sequential_windows=%s capture_positions=2 "
         "gdn_layers=%zu eager_or_captured=true logical_layout=%s "
-        "device_layout=%s checkpoint_layout=%s layout_version=%u\n",
+        "device_layout=%s checkpoint_layout=%s layout_version=%u "
+        "timed_relayout_launches=%u conversion_prefill=%u conversion_decode=%u "
+        "conversion_save=%u conversion_restore=%u "
+        "conversion_prefill_bytes=%zu conversion_decode_bytes=%zu "
+        "session_live_col_major=%s\n",
         qw38::cuda::effective_gdn_decode_path(),
         qw38::cuda::last_gdn_decode_launch_variant(),
         qw38::cuda::last_gdn_decode_value_tile(),
         qw38::cuda::last_gdn_decode_grid_x(),
         qw38::cuda::last_gdn_decode_grid_y(),
         qw38::cuda::gdn_decode_uses_tiled() ||
-                qw38::cuda::gdn_decode_uses_transposed()
+                qw38::cuda::gdn_decode_uses_transposed() ||
+                qw38::cuda::gdn_decode_uses_persistent_transposed()
             ? "false"
             : "true",
         layers.size(), qw38::cuda::gdn_recurrent_logical_layout(),
         qw38::cuda::gdn_recurrent_device_layout(),
         qw38::cuda::gdn_recurrent_checkpoint_layout(),
-        qw38::cuda::kGdnRecurrentLayoutVersion);
+        qw38::cuda::kGdnRecurrentLayoutVersion,
+        qw38::cuda::gdn_timed_relayout_launches(),
+        qw38::cuda::gdn_conversion_count(
+            qw38::cuda::GdnConversionBoundary::kPrefill),
+        qw38::cuda::gdn_conversion_count(
+            qw38::cuda::GdnConversionBoundary::kDecode),
+        qw38::cuda::gdn_conversion_count(
+            qw38::cuda::GdnConversionBoundary::kSave),
+        qw38::cuda::gdn_conversion_count(
+            qw38::cuda::GdnConversionBoundary::kRestore),
+        qw38::cuda::gdn_conversion_bytes(
+            qw38::cuda::GdnConversionBoundary::kPrefill),
+        qw38::cuda::gdn_conversion_bytes(
+            qw38::cuda::GdnConversionBoundary::kDecode),
+        qw38::cuda::gdn_session_live_col_major() ? "true" : "false");
     cudaFree(gdn_committed_conv);
     cudaFree(gdn_committed_rec);
     cudaFree(gdn_candidate_conv);

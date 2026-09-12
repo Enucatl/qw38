@@ -3413,6 +3413,7 @@ Status SchedulerSession::reset() noexcept {
     return cuda_status(error, "cannot reset CUDA scheduler session state");
   }
   frontier_ = 0;
+  gdn_set_session_live_col_major(false);
   return Status::ok();
 }
 
@@ -4584,6 +4585,9 @@ Status execute_token(const ResidentModel& model, std::size_t token,
   std::memcpy(host_hidden, workspace->candidate_hidden_host_,
               internal::kResidualWidth * sizeof(float));
   ++session->frontier_;
+  if (gdn_decode_uses_persistent_transposed()) {
+    gdn_set_session_live_col_major(true);
+  }
   return Status::ok();
 }
 
@@ -5698,6 +5702,17 @@ Status sync_tokens(const ResidentModel& model, const std::size_t* tokens,
     const std::size_t remaining = token_count - index;
     const std::size_t chunk =
         std::min(workspace->prompt_chunk_rows_, remaining);
+    if (chunk > 1 && gdn_decode_uses_persistent_transposed() &&
+        gdn_session_live_col_major()) {
+      const cudaError_t convert = launch_gdn_convert_session_recurrent(
+          session->gdn_recurrent_, kGdnLayers, false, nullptr,
+          GdnConversionBoundary::kPrefill);
+      if (convert != cudaSuccess) {
+        return cuda_status(convert,
+                           "cannot convert GDN state to row-major for prompt");
+      }
+      gdn_set_session_live_col_major(false);
+    }
     const Status status =
         chunk == 1
             ? execute_token(model, tokens[index], session, workspace,
@@ -5710,6 +5725,16 @@ Status sync_tokens(const ResidentModel& model, const std::size_t* tokens,
                                    PromptPipelinePath::kFusedOverlapped,
                                    nullptr, graphs, gdn_scan, attribution);
     if (!status.is_ok()) return status;
+    if (chunk > 1 && gdn_decode_uses_persistent_transposed()) {
+      const cudaError_t convert = launch_gdn_convert_session_recurrent(
+          session->gdn_recurrent_, kGdnLayers, true, nullptr,
+          GdnConversionBoundary::kPrefill);
+      if (convert != cudaSuccess) {
+        return cuda_status(convert,
+                           "cannot convert GDN state to col-major after prompt");
+      }
+      gdn_set_session_live_col_major(true);
+    }
     if (attribution != nullptr) {
       attribution->evaluated_tokens += chunk;
       ++attribution->chunk_count;

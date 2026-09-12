@@ -1,8 +1,9 @@
 #pragma once
 
-// OPT-077/101 one-token decode GDN recurrence selector. Host-includable.
+// OPT-077/101/109 one-token decode GDN recurrence selector. Host-includable.
 // Logical/checkpoint GDN recurrent order is row-major FP32. OPT-101 may use a
-// same-count col-major device order inside an isolated candidate slot.
+// same-count col-major device order inside an isolated candidate slot. OPT-109
+// keeps col-major as the live session representation with no timed relayout.
 
 #include <cstddef>
 #include <cstdint>
@@ -14,6 +15,8 @@ constexpr char kLegalGdnDecodePathSequential[] = "sequential";
 constexpr char kLegalGdnDecodePathTile16[] = "tile16";
 constexpr char kLegalGdnDecodePathTile32[] = "tile32";
 constexpr char kLegalGdnDecodePathTransposed[] = "transposed";
+constexpr char kLegalGdnDecodePathPersistentTransposed[] =
+    "persistent_transposed";
 
 constexpr char kGdnDecodeLaunchVariantSequential[] =
     "prepare_recurrence_window";
@@ -22,6 +25,8 @@ constexpr char kGdnDecodeLaunchVariantTile16[] =
 constexpr char kGdnDecodeLaunchVariantTile32[] =
     "prepare_recurrence_decode_tiled32";
 constexpr char kGdnDecodeLaunchVariantTransposed[] =
+    "prepare_recurrence_decode_transposed";
+constexpr char kGdnDecodeLaunchVariantPersistentTransposed[] =
     "prepare_recurrence_decode_transposed";
 
 constexpr char kGdnRecurrentLogicalLayout[] = "row_major_fp32";
@@ -41,18 +46,35 @@ constexpr unsigned int kGdnDecodeValueTile32 = 32;
 constexpr unsigned int kGdnDecodeTransposedGridY = 32;
 constexpr unsigned int kGdnDecodeQkInverseCount = 32;
 
+enum class GdnConversionBoundary : std::uint8_t {
+  kPrefill = 0,
+  kDecode = 1,
+  kSave = 2,
+  kRestore = 3,
+  kDiagnostic = 4,
+};
+
+constexpr unsigned kGdnConversionBoundaryCount = 5;
+
 inline thread_local const char* g_gdn_decode_path_override = nullptr;
 inline thread_local const char* g_last_gdn_decode_launch_variant = "";
 inline thread_local unsigned int g_last_gdn_decode_value_tile = 0;
 inline thread_local unsigned int g_last_gdn_decode_grid_x = 0;
 inline thread_local unsigned int g_last_gdn_decode_grid_y = 0;
+inline thread_local unsigned g_gdn_timed_relayout_launches = 0;
+inline thread_local unsigned g_gdn_conversion_count[kGdnConversionBoundaryCount] =
+    {};
+inline thread_local std::size_t
+    g_gdn_conversion_bytes[kGdnConversionBoundaryCount] = {};
+inline thread_local bool g_gdn_session_live_col_major = false;
 
 inline bool legal_gdn_decode_path(const char* path) noexcept {
   return path != nullptr &&
          (std::strcmp(path, kLegalGdnDecodePathSequential) == 0 ||
           std::strcmp(path, kLegalGdnDecodePathTile16) == 0 ||
           std::strcmp(path, kLegalGdnDecodePathTile32) == 0 ||
-          std::strcmp(path, kLegalGdnDecodePathTransposed) == 0);
+          std::strcmp(path, kLegalGdnDecodePathTransposed) == 0 ||
+          std::strcmp(path, kLegalGdnDecodePathPersistentTransposed) == 0);
 }
 
 inline const char* selected_gdn_decode_path() noexcept {
@@ -75,13 +97,70 @@ inline bool gdn_decode_uses_transposed() noexcept {
                      kLegalGdnDecodePathTransposed) == 0;
 }
 
+inline bool gdn_decode_uses_persistent_transposed() noexcept {
+  return std::strcmp(effective_gdn_decode_path(),
+                     kLegalGdnDecodePathPersistentTransposed) == 0;
+}
+
+inline bool gdn_decode_uses_col_major_device_state() noexcept {
+  return gdn_decode_uses_transposed() ||
+         gdn_decode_uses_persistent_transposed();
+}
+
 inline const char* gdn_recurrent_logical_layout() noexcept {
   return kGdnRecurrentLogicalLayout;
 }
 
 inline const char* gdn_recurrent_device_layout() noexcept {
-  return gdn_decode_uses_transposed() ? kGdnRecurrentDeviceLayoutTransposed
-                                     : kGdnRecurrentLogicalLayout;
+  return gdn_decode_uses_col_major_device_state()
+             ? kGdnRecurrentDeviceLayoutTransposed
+             : kGdnRecurrentLogicalLayout;
+}
+
+inline void gdn_reset_layout_counters() noexcept {
+  g_gdn_timed_relayout_launches = 0;
+  for (unsigned index = 0; index < kGdnConversionBoundaryCount; ++index) {
+    g_gdn_conversion_count[index] = 0;
+    g_gdn_conversion_bytes[index] = 0;
+  }
+}
+
+inline void gdn_record_timed_relayout(unsigned launches = 1) noexcept {
+  g_gdn_timed_relayout_launches += launches;
+}
+
+inline unsigned gdn_timed_relayout_launches() noexcept {
+  return g_gdn_timed_relayout_launches;
+}
+
+inline void gdn_record_conversion(GdnConversionBoundary boundary,
+                                  unsigned count, std::size_t bytes) noexcept {
+  const unsigned index = static_cast<unsigned>(boundary);
+  if (index < kGdnConversionBoundaryCount) {
+    g_gdn_conversion_count[index] += count;
+    g_gdn_conversion_bytes[index] += bytes;
+  }
+}
+
+inline unsigned gdn_conversion_count(GdnConversionBoundary boundary) noexcept {
+  const unsigned index = static_cast<unsigned>(boundary);
+  return index < kGdnConversionBoundaryCount ? g_gdn_conversion_count[index]
+                                             : 0;
+}
+
+inline std::size_t gdn_conversion_bytes(
+    GdnConversionBoundary boundary) noexcept {
+  const unsigned index = static_cast<unsigned>(boundary);
+  return index < kGdnConversionBoundaryCount ? g_gdn_conversion_bytes[index]
+                                             : 0;
+}
+
+inline bool gdn_session_live_col_major() noexcept {
+  return g_gdn_session_live_col_major;
+}
+
+inline void gdn_set_session_live_col_major(bool value) noexcept {
+  g_gdn_session_live_col_major = value;
 }
 
 inline const char* gdn_recurrent_checkpoint_layout() noexcept {

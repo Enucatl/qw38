@@ -890,6 +890,22 @@ stack as solved. tok/s delta vs production **0**. Live numbers stay in
 and
 [`evidence/optimization/opt108-llama-vector-stack/REJECTION.md`](../evidence/optimization/opt108-llama-vector-stack/REJECTION.md).
 
+## Persistent GDN session layout (OPT-109)
+
+**Outcome freeze, 2026-09-12:** OPT-109 tests resident col-major FP32 GDN
+state for the session lifetime (`persistent_transposed`) against sequential
+row-major (`prepare_recurrence_window`) with zero timed per-layer relayout and
+canonical row-major checkpoints. Pilot recurrence-only **won** (3+10: 0.026 vs
+0.011 ms; CI low **+0.012 ms**). Complete 48-layer GDN enclosing **lost**
+(3+10: 13.19 vs 13.99 ms; mean_diff **−0.803 ms**; 95% CI **[−1.053, −0.553]**);
+kernel-only was faster but enclosing wall did not survive. Verdict **rejected**;
+production sequential row-major retained. D128/D2048 engine pairs and P4096 were
+not run. OPT-077/094/101 rejection evidence is retained. tok/s delta vs
+production **0**. Live numbers stay in
+[`evidence/optimization/opt109-persistent-gdn-state/REPORT.md`](../evidence/optimization/opt109-persistent-gdn-state/REPORT.md)
+and
+[`evidence/optimization/opt109-persistent-gdn-state/REJECTION.md`](../evidence/optimization/opt109-persistent-gdn-state/REJECTION.md).
+
 ## DwarfStar transfer boundary
 
 Reuse MMV/MMQ phase split, quant block tests, explicit unavailable paths, stable
