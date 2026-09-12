@@ -13,33 +13,48 @@ cudaError_t launch_layout(const std::uint8_t* weights, std::size_t rows,
                           std::size_t columns, const void* staged,
                           float* output, unsigned int rows_per_cta,
                           unsigned int warps_per_row, cudaStream_t stream) {
+  const bool aligned = q8_device_uses_aligned_soa();
   if (rows_per_cta == 1 && warps_per_row == 1) {
-    return q8_dots::launch_coop<1, 1>(weights, rows, columns, staged, output,
-                                      stream);
+    return aligned ? q8_dots::launch_coop<1, 1, true>(weights, rows, columns,
+                                                      staged, output, stream)
+                   : q8_dots::launch_coop<1, 1, false>(weights, rows, columns,
+                                                       staged, output, stream);
   }
   if (rows_per_cta == 1 && warps_per_row == 2) {
-    return q8_dots::launch_coop<1, 2>(weights, rows, columns, staged, output,
-                                      stream);
+    return aligned ? q8_dots::launch_coop<1, 2, true>(weights, rows, columns,
+                                                      staged, output, stream)
+                   : q8_dots::launch_coop<1, 2, false>(weights, rows, columns,
+                                                       staged, output, stream);
   }
   if (rows_per_cta == 1 && warps_per_row == 4) {
-    return q8_dots::launch_coop<1, 4>(weights, rows, columns, staged, output,
-                                      stream);
+    return aligned ? q8_dots::launch_coop<1, 4, true>(weights, rows, columns,
+                                                      staged, output, stream)
+                   : q8_dots::launch_coop<1, 4, false>(weights, rows, columns,
+                                                       staged, output, stream);
   }
   if (rows_per_cta == 1 && warps_per_row == 8) {
-    return q8_dots::launch_coop<1, 8>(weights, rows, columns, staged, output,
-                                      stream);
+    return aligned ? q8_dots::launch_coop<1, 8, true>(weights, rows, columns,
+                                                      staged, output, stream)
+                   : q8_dots::launch_coop<1, 8, false>(weights, rows, columns,
+                                                       staged, output, stream);
   }
   if (rows_per_cta == 2 && warps_per_row == 2) {
-    return q8_dots::launch_coop<2, 2>(weights, rows, columns, staged, output,
-                                      stream);
+    return aligned ? q8_dots::launch_coop<2, 2, true>(weights, rows, columns,
+                                                      staged, output, stream)
+                   : q8_dots::launch_coop<2, 2, false>(weights, rows, columns,
+                                                       staged, output, stream);
   }
   if (rows_per_cta == 4 && warps_per_row == 1) {
-    return q8_dots::launch_coop<4, 1>(weights, rows, columns, staged, output,
-                                      stream);
+    return aligned ? q8_dots::launch_coop<4, 1, true>(weights, rows, columns,
+                                                      staged, output, stream)
+                   : q8_dots::launch_coop<4, 1, false>(weights, rows, columns,
+                                                       staged, output, stream);
   }
   if (rows_per_cta == 8 && warps_per_row == 1) {
-    return q8_dots::launch_coop<8, 1>(weights, rows, columns, staged, output,
-                                      stream);
+    return aligned ? q8_dots::launch_coop<8, 1, true>(weights, rows, columns,
+                                                      staged, output, stream)
+                   : q8_dots::launch_coop<8, 1, false>(weights, rows, columns,
+                                                       staged, output, stream);
   }
   return cudaErrorInvalidValue;
 }
@@ -56,8 +71,13 @@ cudaError_t launch_q8_mmv_bf16(const std::uint8_t* weights, std::size_t rows,
   }
   const unsigned int blocks = static_cast<unsigned int>(
       (rows + (kBf16Threads / kWarpSize) - 1) / (kBf16Threads / kWarpSize));
-  q8_dots::q8_mmv_bf16_ref<<<blocks, kBf16Threads, 0, stream>>>(
-      weights, rows, columns, activation, output);
+  if (q8_device_uses_aligned_soa()) {
+    q8_dots::q8_mmv_bf16_ref<true><<<blocks, kBf16Threads, 0, stream>>>(
+        weights, rows, columns, activation, output);
+  } else {
+    q8_dots::q8_mmv_bf16_ref<false><<<blocks, kBf16Threads, 0, stream>>>(
+        weights, rows, columns, activation, output);
+  }
   return cudaPeekAtLastError();
 }
 
@@ -130,8 +150,13 @@ cudaError_t launch_q8_coop_mmv_grouped_r1_w4(
   record_q8_grouped_dispatch(static_cast<std::size_t>(grid), columns);
   if (grid == 0) return cudaSuccess;
   dim3 block(kWarpSize, 4);
-  q8_dots::q8_coop_mmv_grouped_r1_w4<<<grid, block, 0, stream>>>(
-      descriptors, columns, static_cast<const Q8_1Block*>(staged));
+  if (q8_device_uses_aligned_soa()) {
+    q8_dots::q8_coop_mmv_grouped_r1_w4<true><<<grid, block, 0, stream>>>(
+        descriptors, columns, static_cast<const Q8_1Block*>(staged));
+  } else {
+    q8_dots::q8_coop_mmv_grouped_r1_w4<false><<<grid, block, 0, stream>>>(
+        descriptors, columns, static_cast<const Q8_1Block*>(staged));
+  }
   return cudaPeekAtLastError();
 }
 
@@ -141,27 +166,56 @@ int q8_coop_occupancy(unsigned int rows_per_cta,
   cudaError_t error = cudaErrorInvalidValue;
   const int threads =
       static_cast<int>(rows_per_cta * warps_per_row) * kWarpSize;
+  const bool aligned = q8_device_uses_aligned_soa();
   if (rows_per_cta == 1 && warps_per_row == 1) {
-    error = cudaOccupancyMaxActiveBlocksPerMultiprocessor(
-        &occupancy, q8_dots::q8_coop_mmv<1, 1>, threads, 0);
+    error = aligned ? cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+                          &occupancy, q8_dots::q8_coop_mmv<1, 1, true>, threads,
+                          0)
+                    : cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+                          &occupancy, q8_dots::q8_coop_mmv<1, 1, false>,
+                          threads, 0);
   } else if (rows_per_cta == 1 && warps_per_row == 2) {
-    error = cudaOccupancyMaxActiveBlocksPerMultiprocessor(
-        &occupancy, q8_dots::q8_coop_mmv<1, 2>, threads, 0);
+    error = aligned ? cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+                          &occupancy, q8_dots::q8_coop_mmv<1, 2, true>, threads,
+                          0)
+                    : cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+                          &occupancy, q8_dots::q8_coop_mmv<1, 2, false>,
+                          threads, 0);
   } else if (rows_per_cta == 1 && warps_per_row == 4) {
-    error = cudaOccupancyMaxActiveBlocksPerMultiprocessor(
-        &occupancy, q8_dots::q8_coop_mmv<1, 4>, threads, 0);
+    error = aligned ? cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+                          &occupancy, q8_dots::q8_coop_mmv<1, 4, true>, threads,
+                          0)
+                    : cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+                          &occupancy, q8_dots::q8_coop_mmv<1, 4, false>,
+                          threads, 0);
   } else if (rows_per_cta == 1 && warps_per_row == 8) {
-    error = cudaOccupancyMaxActiveBlocksPerMultiprocessor(
-        &occupancy, q8_dots::q8_coop_mmv<1, 8>, threads, 0);
+    error = aligned ? cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+                          &occupancy, q8_dots::q8_coop_mmv<1, 8, true>, threads,
+                          0)
+                    : cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+                          &occupancy, q8_dots::q8_coop_mmv<1, 8, false>,
+                          threads, 0);
   } else if (rows_per_cta == 2 && warps_per_row == 2) {
-    error = cudaOccupancyMaxActiveBlocksPerMultiprocessor(
-        &occupancy, q8_dots::q8_coop_mmv<2, 2>, threads, 0);
+    error = aligned ? cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+                          &occupancy, q8_dots::q8_coop_mmv<2, 2, true>, threads,
+                          0)
+                    : cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+                          &occupancy, q8_dots::q8_coop_mmv<2, 2, false>,
+                          threads, 0);
   } else if (rows_per_cta == 4 && warps_per_row == 1) {
-    error = cudaOccupancyMaxActiveBlocksPerMultiprocessor(
-        &occupancy, q8_dots::q8_coop_mmv<4, 1>, threads, 0);
+    error = aligned ? cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+                          &occupancy, q8_dots::q8_coop_mmv<4, 1, true>, threads,
+                          0)
+                    : cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+                          &occupancy, q8_dots::q8_coop_mmv<4, 1, false>,
+                          threads, 0);
   } else if (rows_per_cta == 8 && warps_per_row == 1) {
-    error = cudaOccupancyMaxActiveBlocksPerMultiprocessor(
-        &occupancy, q8_dots::q8_coop_mmv<8, 1>, threads, 0);
+    error = aligned ? cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+                          &occupancy, q8_dots::q8_coop_mmv<8, 1, true>, threads,
+                          0)
+                    : cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+                          &occupancy, q8_dots::q8_coop_mmv<8, 1, false>,
+                          threads, 0);
   }
   if (error != cudaSuccess) return 0;
   return occupancy;
@@ -177,20 +231,28 @@ void q8_coop_kernel_attributes(unsigned int rows_per_cta,
                                int* occupancy) noexcept {
   cudaFuncAttributes attrs{};
   cudaError_t error = cudaErrorInvalidValue;
+  const bool aligned = q8_device_uses_aligned_soa();
   if (rows_per_cta == 1 && warps_per_row == 1) {
-    error = cudaFuncGetAttributes(&attrs, q8_dots::q8_coop_mmv<1, 1>);
+    error = aligned ? cudaFuncGetAttributes(&attrs, q8_dots::q8_coop_mmv<1, 1, true>)
+                    : cudaFuncGetAttributes(&attrs, q8_dots::q8_coop_mmv<1, 1, false>);
   } else if (rows_per_cta == 1 && warps_per_row == 2) {
-    error = cudaFuncGetAttributes(&attrs, q8_dots::q8_coop_mmv<1, 2>);
+    error = aligned ? cudaFuncGetAttributes(&attrs, q8_dots::q8_coop_mmv<1, 2, true>)
+                    : cudaFuncGetAttributes(&attrs, q8_dots::q8_coop_mmv<1, 2, false>);
   } else if (rows_per_cta == 1 && warps_per_row == 4) {
-    error = cudaFuncGetAttributes(&attrs, q8_dots::q8_coop_mmv<1, 4>);
+    error = aligned ? cudaFuncGetAttributes(&attrs, q8_dots::q8_coop_mmv<1, 4, true>)
+                    : cudaFuncGetAttributes(&attrs, q8_dots::q8_coop_mmv<1, 4, false>);
   } else if (rows_per_cta == 1 && warps_per_row == 8) {
-    error = cudaFuncGetAttributes(&attrs, q8_dots::q8_coop_mmv<1, 8>);
+    error = aligned ? cudaFuncGetAttributes(&attrs, q8_dots::q8_coop_mmv<1, 8, true>)
+                    : cudaFuncGetAttributes(&attrs, q8_dots::q8_coop_mmv<1, 8, false>);
   } else if (rows_per_cta == 2 && warps_per_row == 2) {
-    error = cudaFuncGetAttributes(&attrs, q8_dots::q8_coop_mmv<2, 2>);
+    error = aligned ? cudaFuncGetAttributes(&attrs, q8_dots::q8_coop_mmv<2, 2, true>)
+                    : cudaFuncGetAttributes(&attrs, q8_dots::q8_coop_mmv<2, 2, false>);
   } else if (rows_per_cta == 4 && warps_per_row == 1) {
-    error = cudaFuncGetAttributes(&attrs, q8_dots::q8_coop_mmv<4, 1>);
+    error = aligned ? cudaFuncGetAttributes(&attrs, q8_dots::q8_coop_mmv<4, 1, true>)
+                    : cudaFuncGetAttributes(&attrs, q8_dots::q8_coop_mmv<4, 1, false>);
   } else if (rows_per_cta == 8 && warps_per_row == 1) {
-    error = cudaFuncGetAttributes(&attrs, q8_dots::q8_coop_mmv<8, 1>);
+    error = aligned ? cudaFuncGetAttributes(&attrs, q8_dots::q8_coop_mmv<8, 1, true>)
+                    : cudaFuncGetAttributes(&attrs, q8_dots::q8_coop_mmv<8, 1, false>);
   }
   if (registers != nullptr) {
     *registers = error == cudaSuccess ? attrs.numRegs : 0;
@@ -214,16 +276,20 @@ void q8_coop_kernel_attributes(unsigned int warps_per_row, int* registers,
 
 int q8_mmv_bf16_occupancy() noexcept {
   int occupancy = 0;
-  const cudaError_t error = cudaOccupancyMaxActiveBlocksPerMultiprocessor(
-      &occupancy, q8_dots::q8_mmv_bf16_ref, kBf16Threads, 0);
+  const cudaError_t error = q8_device_uses_aligned_soa()
+      ? cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+            &occupancy, q8_dots::q8_mmv_bf16_ref<true>, kBf16Threads, 0)
+      : cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+            &occupancy, q8_dots::q8_mmv_bf16_ref<false>, kBf16Threads, 0);
   return error == cudaSuccess ? occupancy : 0;
 }
 
 void q8_mmv_bf16_kernel_attributes(int* registers, std::size_t* local_bytes,
                                    int* occupancy) noexcept {
   cudaFuncAttributes attrs{};
-  const cudaError_t error =
-      cudaFuncGetAttributes(&attrs, q8_dots::q8_mmv_bf16_ref);
+  const cudaError_t error = q8_device_uses_aligned_soa()
+      ? cudaFuncGetAttributes(&attrs, q8_dots::q8_mmv_bf16_ref<true>)
+      : cudaFuncGetAttributes(&attrs, q8_dots::q8_mmv_bf16_ref<false>);
   if (registers != nullptr) {
     *registers = error == cudaSuccess ? attrs.numRegs : 0;
   }

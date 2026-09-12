@@ -49,6 +49,7 @@ struct Options final {
   const char* selector = kDefaultSelector;
   const char* q8_layout = nullptr;
   const char* q8_grouping = nullptr;
+  const char* q8_device_layout = nullptr;
   const char* q4_decode = nullptr;
   const char* ffn_decode = nullptr;
   const char* gdn_decode = nullptr;
@@ -115,10 +116,11 @@ bool parse_modes(const char* text, Options* options) {
 int usage(const char* argv0) {
   std::fprintf(stderr,
                "usage: %s [MODEL.gguf] [--workload tiny|tokens|prefill|decode|"
-               "q8-ab|mmq-ab|q4-ab|gdn-ab|attn-ab|grouping-ab] "
+               "q8-ab|mmq-ab|q4-ab|gdn-ab|attn-ab|grouping-ab|q8-device-ab] "
                "[--prompt N] [--prefix N] [--output-tokens N] [--runs N] "
                "[--pairs N] [--q8-layout r1_w4|r2_w2] "
-               "[--q8-grouping separate|grouped_r1_w4] [--mmq-async-x 0|1] "
+               "[--q8-grouping separate|grouped_r1_w4] "
+               "[--q8-device-layout raw_gguf|aligned_soa] [--mmq-async-x 0|1] "
                "[--q4-decode packed|integer_q8|integer_q8_late|"
                "integer_q8_factored] "
                "[--q4-warps 2|4] "
@@ -163,6 +165,9 @@ int parse_args(int argc, char** argv, Options* options) {
       options->q8_layout = argv[++index];
     } else if (std::strcmp(arg, "--q8-grouping") == 0 && index + 1 < argc) {
       options->q8_grouping = argv[++index];
+    } else if (std::strcmp(arg, "--q8-device-layout") == 0 &&
+               index + 1 < argc) {
+      options->q8_device_layout = argv[++index];
     } else if (std::strcmp(arg, "--mmq-async-x") == 0 && index + 1 < argc) {
       options->mmq_async_x = std::atoi(argv[++index]);
     } else if (std::strcmp(arg, "--q4-decode") == 0 && index + 1 < argc) {
@@ -242,7 +247,8 @@ int apply_defaults(const qw38::cuda::TestTier tier, Options* options) {
     options->prompt = kScreenPrompt;
   }
   if (std::strcmp(options->workload, "q8-ab") == 0 ||
-      std::strcmp(options->workload, "grouping-ab") == 0) {
+      std::strcmp(options->workload, "grouping-ab") == 0 ||
+      std::strcmp(options->workload, "q8-device-ab") == 0) {
     if (options->prefix == 0) options->prefix = kScreenPrefix;
     if (options->output_tokens == 0) {
       options->output_tokens = kScreenOutputTokens;
@@ -299,8 +305,9 @@ int reject_over_bounds(qw38::cuda::TestTier tier, const Options& options) {
   const bool gdn_ab = std::strcmp(options.workload, "gdn-ab") == 0;
   const bool attn_ab = std::strcmp(options.workload, "attn-ab") == 0;
   const bool grouping_ab = std::strcmp(options.workload, "grouping-ab") == 0;
+  const bool device_ab = std::strcmp(options.workload, "q8-device-ab") == 0;
   if (!tiny && !tokens && !prefill && !decode && !q8_ab && !mmq_ab && !q4_ab &&
-      !gdn_ab && !attn_ab && !grouping_ab) {
+      !gdn_ab && !attn_ab && !grouping_ab && !device_ab) {
     std::fprintf(stderr, "unknown workload %s\n", options.workload);
     return 2;
   }
@@ -354,6 +361,9 @@ int reject_over_bounds(qw38::cuda::TestTier tier, const Options& options) {
     const bool grouping_ok = grouping_ab && options.prefix == kScreenPrefix &&
                              options.output_tokens == kScreenOutputTokens &&
                              options.prompt == 0 && options.pairs <= 1;
+    const bool device_ok = device_ab && options.prefix == kScreenPrefix &&
+                           options.output_tokens == kScreenOutputTokens &&
+                           options.prompt == 0 && options.pairs <= 1;
     const bool attn_ok =
         attn_ab && options.pairs <= 1 &&
         ((options.prompt == kScreenPrompt && options.prefix == 0 &&
@@ -362,7 +372,7 @@ int reject_over_bounds(qw38::cuda::TestTier tier, const Options& options) {
           options.output_tokens == kScreenOutputTokens && options.prompt == 0));
     if (options.model == nullptr || options.runs != 1 ||
         !(decode_ok || prefill_ok || q8_ok || mmq_ok || q4_ok || gdn_ok ||
-          grouping_ok || attn_ok)) {
+          grouping_ok || device_ok || attn_ok)) {
       std::fprintf(stderr,
                    "screen allows one pair of P4096 or prefix 2048 + 32 "
                    "output tokens\n");
@@ -372,7 +382,7 @@ int reject_over_bounds(qw38::cuda::TestTier tier, const Options& options) {
   }
   if (tier == qw38::cuda::TestTier::kAcceptance &&
       (q8_ab || mmq_ab || q4_ab || gdn_ab || attn_ab || grouping_ab ||
-       prefill)) {
+       device_ab || prefill)) {
     const bool q8_ok = q8_ab && options.prefix == kScreenPrefix &&
                        options.output_tokens == kScreenOutputTokens &&
                        options.prompt == 0 && options.pairs <= 5;
@@ -392,6 +402,11 @@ int reject_over_bounds(qw38::cuda::TestTier tier, const Options& options) {
                               options.prefix == 128) &&
                              options.output_tokens == kScreenOutputTokens &&
                              options.prompt == 0 && options.pairs <= 5;
+    const bool device_ok = device_ab &&
+                           (options.prefix == kScreenPrefix ||
+                            options.prefix == 128) &&
+                           options.output_tokens == kScreenOutputTokens &&
+                           options.prompt == 0 && options.pairs <= 5;
     const bool attn_ok =
         attn_ab && options.pairs <= 5 &&
         ((options.prompt == kScreenPrompt && options.prefix == 0 &&
@@ -401,8 +416,8 @@ int reject_over_bounds(qw38::cuda::TestTier tier, const Options& options) {
     const bool prefill_ok = prefill && options.prompt == kScreenPrompt &&
                             options.prefix == 0 && options.output_tokens == 0;
     if (options.model == nullptr ||
-        !(q8_ok || mmq_ok || q4_ok || gdn_ok || grouping_ok || attn_ok ||
-          prefill_ok)) {
+        !(q8_ok || mmq_ok || q4_ok || gdn_ok || grouping_ok || device_ok ||
+          attn_ok || prefill_ok)) {
       std::fprintf(stderr,
                    "acceptance keep-ab allows five P4096 or D2048+32 pairs\n");
       return 2;
@@ -671,6 +686,16 @@ int run_engine(const Options& options, bool correctness) {
     std::fprintf(stderr, "invalid --q8-grouping %s\n", options.q8_grouping);
     return 2;
   }
+  if (options.q8_device_layout != nullptr) {
+    if (!qw38::cuda::apply_q8_device_layout_ident(options.q8_device_layout)) {
+      std::fprintf(stderr, "invalid --q8-device-layout %s\n",
+                   options.q8_device_layout);
+      return 2;
+    }
+    const qw38::Status converted =
+        model.set_q8_device_layout(options.q8_device_layout, true);
+    if (!converted.is_ok()) return fail_status(converted);
+  }
   if (options.mmq_async_x >= 0) {
     qw38::cuda::set_mmq_async_x_override(options.mmq_async_x != 0);
   }
@@ -819,6 +844,8 @@ int run_engine(const Options& options, bool correctness) {
 
 int run_keep_ab(const Options& options) {
   const bool grouping = std::strcmp(options.workload, "grouping-ab") == 0;
+  const bool device_layout =
+      std::strcmp(options.workload, "q8-device-ab") == 0;
   const bool q8 = std::strcmp(options.workload, "q8-ab") == 0;
   const bool q4 = std::strcmp(options.workload, "q4-ab") == 0;
   const bool gdn = std::strcmp(options.workload, "gdn-ab") == 0;
@@ -826,15 +853,13 @@ int run_keep_ab(const Options& options) {
   qw38::cuda::ResidentModel model;
   const int loaded = load_model(options.model, &model);
   if (loaded != 0) return loaded;
+  const bool decode_ab = q8 || q4 || gdn || grouping || device_layout;
   const std::size_t prompt =
-      attn ? options.prompt
-           : ((!q8 && !q4 && !gdn && !grouping) ? options.prompt : 0);
+      attn ? options.prompt : ((!decode_ab) ? options.prompt : 0);
   const std::size_t prefix =
-      attn ? options.prefix
-           : ((q8 || q4 || gdn || grouping) ? options.prefix : 0);
+      attn ? options.prefix : (decode_ab ? options.prefix : 0);
   const std::size_t output_tokens =
-      attn ? options.output_tokens
-           : ((q8 || q4 || gdn || grouping) ? options.output_tokens : 0);
+      attn ? options.output_tokens : (decode_ab ? options.output_tokens : 0);
   const std::size_t token_count =
       prompt > 0 ? prompt : prefix + output_tokens;
   const std::size_t capacity =
@@ -845,6 +870,8 @@ int run_keep_ab(const Options& options) {
   const char* candidate_layout = "r2_w2";
   const char* control_grouping = "separate";
   const char* candidate_grouping = "grouped_r1_w4";
+  const char* control_device = "raw_gguf";
+  const char* candidate_device = "aligned_soa";
   const char* control_q4 = "packed";
   const char* control_ffn = "paired_staged";
   const char* candidate_q4 =
@@ -863,26 +890,31 @@ int run_keep_ab(const Options& options) {
                    : (gdn ? "gdn"
                           : (q4 ? "q4"
                                 : (grouping ? "grouping"
-                                            : (q8 ? "q8" : "mmq")))),
+                                            : (device_layout ? "q8_device"
+                                                             : (q8 ? "q8"
+                                                                   : "mmq"))))),
               pairs);
   for (int pair = 0; pair < pairs; ++pair) {
     const bool ba = (pair % 2) == 1;
     const bool numeric_side = q4 || gdn || attn;
-    const char* first =
-        ba ? (numeric_side
-                  ? "1"
-                  : (grouping ? candidate_grouping
-                              : (q8 ? candidate_layout : "1")))
-           : (numeric_side
-                  ? "0"
-                  : (grouping ? control_grouping : (q8 ? control_layout : "0")));
-    const char* second =
-        ba ? (numeric_side
-                  ? "0"
-                  : (grouping ? control_grouping : (q8 ? control_layout : "0")))
-           : (numeric_side ? "1"
-                           : (grouping ? candidate_grouping
-                                       : (q8 ? candidate_layout : "1")));
+    const char* first = "0";
+    const char* second = "1";
+    if (numeric_side) {
+      first = ba ? "1" : "0";
+      second = ba ? "0" : "1";
+    } else if (grouping) {
+      first = ba ? candidate_grouping : control_grouping;
+      second = ba ? control_grouping : candidate_grouping;
+    } else if (device_layout) {
+      first = ba ? candidate_device : control_device;
+      second = ba ? control_device : candidate_device;
+    } else if (q8) {
+      first = ba ? candidate_layout : control_layout;
+      second = ba ? control_layout : candidate_layout;
+    } else {
+      first = ba ? "1" : "0";
+      second = ba ? "0" : "1";
+    }
     float walls[2] = {0.0F, 0.0F};
     float itl_p50[2] = {0.0F, 0.0F};
     float itl_p95[2] = {0.0F, 0.0F};
@@ -895,7 +927,8 @@ int run_keep_ab(const Options& options) {
       const bool candidate_side =
           std::strcmp(labels[side], "1") == 0 ||
           (q8 && std::strcmp(labels[side], candidate_layout) == 0) ||
-          (grouping && std::strcmp(labels[side], candidate_grouping) == 0);
+          (grouping && std::strcmp(labels[side], candidate_grouping) == 0) ||
+          (device_layout && std::strcmp(labels[side], candidate_device) == 0);
       if (q4) {
         const char* q4_path = candidate_side ? candidate_q4 : control_q4;
         const char* ffn_path = candidate_side ? candidate_ffn : control_ffn;
@@ -935,6 +968,14 @@ int run_keep_ab(const Options& options) {
             return 2;
           }
         }
+      } else if (device_layout) {
+        if (!qw38::cuda::apply_q8_device_layout_ident(labels[side])) {
+          std::fprintf(stderr, "invalid q8 device layout %s\n", labels[side]);
+          return 2;
+        }
+        const qw38::Status converted =
+            model.set_q8_device_layout(labels[side], pair == 0 && side == 0);
+        if (!converted.is_ok()) return fail_status(converted);
       } else if (grouping) {
         if (!qw38::cuda::apply_q8_grouping_ident(labels[side])) {
           std::fprintf(stderr, "invalid q8 grouping %s\n", labels[side]);
@@ -981,7 +1022,7 @@ int run_keep_ab(const Options& options) {
       std::printf(
           "keep_ab_launch pair=%d side=%d config=%s graph_capture=true "
           "override_before_capture_applied=true recapture=true "
-          "q8_layout=%s q8_grouping=%s q8_rows=%u mmq_kernel=%s mmq_async_x=%s "
+          "q8_layout=%s q8_grouping=%s q8_device_layout=%s q8_rows=%u mmq_kernel=%s mmq_async_x=%s "
           "q4_path=%s ffn_path=%s gate_variant=%s up_variant=%s "
           "down_variant=%s gate_up_stage_count=%d down_stage_count=%d "
           "captured_in_graph=%s staging=%s warps_per_row=%u "
@@ -992,6 +1033,7 @@ int run_keep_ab(const Options& options) {
           pair, side, labels[side],
           q8_layout_copy[side] != nullptr ? q8_layout_copy[side] : "",
           qw38::cuda::effective_q8_decode_grouping(),
+          qw38::cuda::effective_q8_device_layout(),
           q8_rows[side], mmq_kernel_buf[side],
           mmq_async[side] ? "true" : "false", ffn.q4_path, ffn.ffn_path,
           ffn.gate_variant, ffn.up_variant, ffn.down_variant,
@@ -1020,6 +1062,12 @@ int run_keep_ab(const Options& options) {
       qw38::cuda::clear_decode_query_prep_path_override();
       qw38::cuda::clear_decode_attention_gqa_path_override();
     }
+    if (device_layout) {
+      const qw38::Status restored = model.set_q8_device_layout(
+          qw38::cuda::selected_q8_device_layout(), false);
+      if (!restored.is_ok()) return fail_status(restored);
+      qw38::cuda::clear_q8_device_layout_override();
+    }
     std::printf(
         "{\"observation_unit\":\"independent_round\",\"sample_index\":%d,"
         "\"pair\":%d,\"order\":\"%s\",\"control_ms\":%.9g,"
@@ -1037,7 +1085,8 @@ int run_keep_ab(const Options& options) {
            : (gdn ? "gdn"
                   : (attn ? "attn"
                           : (grouping ? "grouping"
-                                      : (q8 ? "q8" : "mmq")))));
+                                      : (device_layout ? "q8_device"
+                                                       : (q8 ? "q8" : "mmq"))))));
   }
   std::printf(
       "QW38_OPT070_NATIVE_COUNTS={\"schema_version\":1,\"task\":\"OPT-070\","
@@ -1049,7 +1098,7 @@ int run_keep_ab(const Options& options) {
       "\"graph_capture_separate\":true}\n",
       q4 ? "q4"
          : (gdn ? "gdn"
-                : (grouping ? "grouping" : (q8 ? "q8" : "mmq"))),
+                : (grouping ? "grouping" : (device_layout ? "q8_device" : (q8 ? "q8" : "mmq")))),
       qw38::cuda::test_tier_name(), pairs, pairs,
       qw38::cuda::test_tier_name(), pairs,
       qw38::cuda::test_tier() == qw38::cuda::TestTier::kAcceptance ? "true"
@@ -1150,7 +1199,8 @@ int main(int argc, char** argv) {
       std::strcmp(options.workload, "q4-ab") == 0 ||
       std::strcmp(options.workload, "gdn-ab") == 0 ||
       std::strcmp(options.workload, "attn-ab") == 0 ||
-      std::strcmp(options.workload, "grouping-ab") == 0) {
+      std::strcmp(options.workload, "grouping-ab") == 0 ||
+      std::strcmp(options.workload, "q8-device-ab") == 0) {
     return run_keep_ab(options);
   }
   return run_engine(options, tier == qw38::cuda::TestTier::kCorrectness);

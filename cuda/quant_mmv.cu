@@ -2,6 +2,7 @@
 #include "ffn_decode_path.cuh"
 #include "q4k_decode_path.cuh"
 #include "q6k_decode_path.cuh"
+#include "q8_aligned_layout.cuh"
 #include "pdl_launch.cuh"
 
 #include <cstring>
@@ -354,6 +355,7 @@ __global__ void quant_mmq(const std::uint8_t* weights, std::size_t output_rows,
   }
 }
 
+template <bool Aligned>
 __global__ void q8_mmq_bf16_reference(const std::uint8_t* weights,
                                       std::size_t rows, std::size_t columns,
                                       const __nv_bfloat16* activation,
@@ -364,16 +366,29 @@ __global__ void q8_mmq_bf16_reference(const std::uint8_t* weights,
       static_cast<std::size_t>(blockIdx.x) * (kThreads / kWarpSize) + warp;
   const std::size_t prompt_row = blockIdx.y;
   if (row >= rows || prompt_row >= prompt_rows) return;
-  const std::uint8_t* row_weights = weights + row * (columns / 32) * 34;
   const __nv_bfloat16* row_activation = activation + prompt_row * columns;
   float sum = 0.0F;
-  for (std::size_t column = lane; column < columns; column += kWarpSize) {
-    const std::uint8_t* block = row_weights + (column / 32) * 34;
-    const float weight =
-        read_half(block) *
-        static_cast<float>(static_cast<std::int8_t>(block[2 + column % 32]));
-    sum = __fadd_rn(
-        sum, __fmul_rn(weight, __bfloat162float(row_activation[column])));
+  if constexpr (Aligned) {
+    const Q8AlignedLayoutDesc desc = make_q8_aligned_layout_desc(rows, columns);
+    const std::uint8_t* row_scales = weights + row * (columns / 32) * 2;
+    const std::int8_t* row_codes = reinterpret_cast<const std::int8_t*>(
+        q8_aligned_code_plane(weights, desc) + row * columns);
+    for (std::size_t column = lane; column < columns; column += kWarpSize) {
+      const float weight = read_half(row_scales + (column / 32) * 2) *
+                           static_cast<float>(row_codes[column]);
+      sum = __fadd_rn(
+          sum, __fmul_rn(weight, __bfloat162float(row_activation[column])));
+    }
+  } else {
+    const std::uint8_t* row_weights = weights + row * (columns / 32) * 34;
+    for (std::size_t column = lane; column < columns; column += kWarpSize) {
+      const std::uint8_t* block = row_weights + (column / 32) * 34;
+      const float weight =
+          read_half(block) *
+          static_cast<float>(static_cast<std::int8_t>(block[2 + column % 32]));
+      sum = __fadd_rn(
+          sum, __fmul_rn(weight, __bfloat162float(row_activation[column])));
+    }
   }
   for (int offset = 16; offset > 0; offset /= 2) {
     sum = __fadd_rn(
@@ -382,7 +397,7 @@ __global__ void q8_mmq_bf16_reference(const std::uint8_t* weights,
   if (lane == 0) output[prompt_row * rows + row] = sum;
 }
 
-template <int PromptTile>
+template <int PromptTile, bool Aligned>
 __global__ void q8_mmq_bf16_tiled(const std::uint8_t* weights, std::size_t rows,
                                   std::size_t columns,
                                   const __nv_bfloat16* activation,
@@ -395,22 +410,43 @@ __global__ void q8_mmq_bf16_tiled(const std::uint8_t* weights, std::size_t rows,
       static_cast<std::size_t>(blockIdx.y) * PromptTile;
   if (output_row >= rows) return;
 
-  const std::uint8_t* row_weights =
-      weights + output_row * (columns / 32) * 34;
   float sums[PromptTile] = {};
-  for (std::size_t column = lane; column < columns; column += kWarpSize) {
-    const std::uint8_t* block = row_weights + (column / 32) * 34;
-    const float weight =
-        read_half(block) *
-        static_cast<float>(static_cast<std::int8_t>(block[2 + column % 32]));
+  if constexpr (Aligned) {
+    const Q8AlignedLayoutDesc desc = make_q8_aligned_layout_desc(rows, columns);
+    const std::uint8_t* row_scales = weights + output_row * (columns / 32) * 2;
+    const std::int8_t* row_codes = reinterpret_cast<const std::int8_t*>(
+        q8_aligned_code_plane(weights, desc) + output_row * columns);
+    for (std::size_t column = lane; column < columns; column += kWarpSize) {
+      const float weight = read_half(row_scales + (column / 32) * 2) *
+                           static_cast<float>(row_codes[column]);
 #pragma unroll
-    for (int prompt_offset = 0; prompt_offset < PromptTile; ++prompt_offset) {
-      const std::size_t prompt_row = prompt_start + prompt_offset;
-      if (prompt_row < prompt_rows) {
-        sums[prompt_offset] = __fadd_rn(
-            sums[prompt_offset],
-            __fmul_rn(weight, __bfloat162float(
-                                  activation[prompt_row * columns + column])));
+      for (int prompt_offset = 0; prompt_offset < PromptTile; ++prompt_offset) {
+        const std::size_t prompt_row = prompt_start + prompt_offset;
+        if (prompt_row < prompt_rows) {
+          sums[prompt_offset] = __fadd_rn(
+              sums[prompt_offset],
+              __fmul_rn(weight, __bfloat162float(
+                                    activation[prompt_row * columns + column])));
+        }
+      }
+    }
+  } else {
+    const std::uint8_t* row_weights =
+        weights + output_row * (columns / 32) * 34;
+    for (std::size_t column = lane; column < columns; column += kWarpSize) {
+      const std::uint8_t* block = row_weights + (column / 32) * 34;
+      const float weight =
+          read_half(block) *
+          static_cast<float>(static_cast<std::int8_t>(block[2 + column % 32]));
+#pragma unroll
+      for (int prompt_offset = 0; prompt_offset < PromptTile; ++prompt_offset) {
+        const std::size_t prompt_row = prompt_start + prompt_offset;
+        if (prompt_row < prompt_rows) {
+          sums[prompt_offset] = __fadd_rn(
+              sums[prompt_offset],
+              __fmul_rn(weight, __bfloat162float(
+                                    activation[prompt_row * columns + column])));
+        }
       }
     }
   }
@@ -1083,8 +1119,13 @@ cudaError_t launch_q8_mmq_kernel(const std::uint8_t* weights,
   const dim3 grid(
       static_cast<unsigned int>((output_rows + 7) / 8),
       static_cast<unsigned int>((prompt_rows + PromptTile - 1) / PromptTile));
-  q8_mmq_bf16_tiled<PromptTile><<<grid, kThreads, 0, stream>>>(
-      weights, output_rows, columns, prompt, prompt_rows, output);
+  if (q8_device_uses_aligned_soa()) {
+    q8_mmq_bf16_tiled<PromptTile, true><<<grid, kThreads, 0, stream>>>(
+        weights, output_rows, columns, prompt, prompt_rows, output);
+  } else {
+    q8_mmq_bf16_tiled<PromptTile, false><<<grid, kThreads, 0, stream>>>(
+        weights, output_rows, columns, prompt, prompt_rows, output);
+  }
   return cudaPeekAtLastError();
 }
 
@@ -1156,8 +1197,13 @@ cudaError_t launch_q8_mmq_bf16_reference(
   }
   const dim3 grid(static_cast<unsigned int>((output_rows + 7) / 8),
                   static_cast<unsigned int>(prompt_rows));
-  q8_mmq_bf16_reference<<<grid, kThreads, 0, stream>>>(
-      weights, output_rows, columns, prompt, prompt_rows, output);
+  if (q8_device_uses_aligned_soa()) {
+    q8_mmq_bf16_reference<true><<<grid, kThreads, 0, stream>>>(
+        weights, output_rows, columns, prompt, prompt_rows, output);
+  } else {
+    q8_mmq_bf16_reference<false><<<grid, kThreads, 0, stream>>>(
+        weights, output_rows, columns, prompt, prompt_rows, output);
+  }
   return cudaPeekAtLastError();
 }
 

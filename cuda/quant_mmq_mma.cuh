@@ -563,6 +563,29 @@ __global__ void repack_q8_0_aligned_kernel(const std::uint8_t* weights,
   }
 }
 
+__global__ void unpack_q8_0_aligned_kernel(const std::uint8_t* soa,
+                                           std::size_t output_rows,
+                                           std::size_t columns,
+                                           std::uint8_t* gguf) {
+  const std::size_t nb = columns / 32;
+  const std::size_t nblk = output_rows * nb;
+  const std::size_t index =
+      static_cast<std::size_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+  if (index >= nblk) return;
+  const std::size_t row = index / nb;
+  const std::size_t kb = index % nb;
+  const std::size_t dq = soa_dq_bytes(output_rows, columns);
+  const std::size_t pad = soa_pad_bytes(dq);
+  std::uint8_t* dst = gguf + index * kMmaQ8Bytes;
+  *reinterpret_cast<half*>(dst) = reinterpret_cast<const half*>(soa)[index];
+  const std::int8_t* qs = reinterpret_cast<const std::int8_t*>(soa + dq + pad) +
+                          row * columns + kb * 32;
+#pragma unroll
+  for (int lane = 0; lane < 32; ++lane) {
+    dst[2 + lane] = static_cast<std::uint8_t>(qs[lane]);
+  }
+}
+
 constexpr int quality_rows_per_warp(int prompt_tile) {
   return prompt_tile >= 48 && prompt_tile % 16 == 0 ? 32 : 16;
 }
@@ -2679,6 +2702,20 @@ int q8_quality_mmq_occupancy(unsigned int prompt_tile) noexcept {
   return q8_quality_mmq_occupancy_i(prompt_tile, kQualityI);
 }
 
+template <int PromptTile, int QualityI>
+cudaError_t launch_q8_quality_layout(const std::uint8_t* weights,
+                                     std::size_t output_rows,
+                                     std::size_t columns, const int* packed,
+                                     std::size_t prompt_rows, float* output,
+                                     cudaStream_t stream) noexcept {
+  if (q8_device_uses_aligned_soa()) {
+    return launch_quality_dispatch<QuantKind::kQ8_0, PromptTile, QualityI, true>(
+        weights, output_rows, columns, packed, prompt_rows, output, stream);
+  }
+  return launch_quality_dispatch<QuantKind::kQ8_0, PromptTile, QualityI, false>(
+      weights, output_rows, columns, packed, prompt_rows, output, stream);
+}
+
 cudaError_t launch_q8_mmq_quality_mma_i(const std::uint8_t* weights,
                                         std::size_t output_rows,
                                         std::size_t columns, const Q8Block* y,
@@ -2692,22 +2729,22 @@ cudaError_t launch_q8_mmq_quality_mma_i(const std::uint8_t* weights,
     return cudaErrorInvalidValue;
   }
   const char* pipe = effective_mmq_pipeline_path();
-  if (mmq_pipeline_path_on(pipe) && output_rows % quality_i == 0 &&
-      prompt_rows % 128U == 0) {
+  if (!q8_device_uses_aligned_soa() && mmq_pipeline_path_on(pipe) &&
+      output_rows % quality_i == 0 && prompt_rows % 128U == 0) {
     return launch_q8_mmq_quality_mma_pipeline(weights, output_rows, columns, y,
                                               prompt_rows, output, quality_i,
                                               pipe, stream);
   }
   const int* packed = reinterpret_cast<const int*>(y);
   if (quality_i == 32) {
-    return launch_quality_dispatch<QuantKind::kQ8_0, 128, 32>(
+    return launch_q8_quality_layout<128, 32>(
         weights, output_rows, columns, packed, prompt_rows, output, stream);
   }
   if (quality_i == 64) {
-    return launch_quality_dispatch<QuantKind::kQ8_0, 128, 64>(
+    return launch_q8_quality_layout<128, 64>(
         weights, output_rows, columns, packed, prompt_rows, output, stream);
   }
-  return launch_quality_dispatch<QuantKind::kQ8_0, 128, 128>(
+  return launch_q8_quality_layout<128, 128>(
       weights, output_rows, columns, packed, prompt_rows, output, stream);
 }
 
@@ -2735,14 +2772,14 @@ cudaError_t launch_q8_mmq_quality_mma(const std::uint8_t* weights,
   }
   const int* packed = reinterpret_cast<const int*>(y);
   if (prompt_tile == 32) {
-    return launch_quality_dispatch<QuantKind::kQ8_0, 32>(
+    return launch_q8_quality_layout<32, kQualityI>(
         weights, output_rows, columns, packed, prompt_rows, output, stream);
   }
   if (prompt_tile == 64) {
-    return launch_quality_dispatch<QuantKind::kQ8_0, 64>(
+    return launch_q8_quality_layout<64, kQualityI>(
         weights, output_rows, columns, packed, prompt_rows, output, stream);
   }
-  return launch_quality_dispatch<QuantKind::kQ8_0, 128>(
+  return launch_q8_quality_layout<128, kQualityI>(
       weights, output_rows, columns, packed, prompt_rows, output, stream);
 }
 
@@ -2809,6 +2846,23 @@ cudaError_t launch_repack_q8_0_aligned(const std::uint8_t* weights,
       static_cast<std::size_t>(kQualityQuantThreads));
   repack_q8_0_aligned_kernel<<<blocks, kQualityQuantThreads, 0, stream>>>(
       weights, output_rows, columns, soa);
+  return cudaPeekAtLastError();
+}
+
+cudaError_t launch_unpack_q8_0_aligned(const std::uint8_t* soa,
+                                       std::size_t output_rows,
+                                       std::size_t columns, std::uint8_t* gguf,
+                                       cudaStream_t stream) noexcept {
+  if (soa == nullptr || gguf == nullptr || output_rows == 0 || columns == 0 ||
+      columns % 32 != 0) {
+    return cudaErrorInvalidValue;
+  }
+  const std::size_t nblk = output_rows * (columns / 32);
+  const unsigned int blocks = static_cast<unsigned int>(
+      (nblk + static_cast<std::size_t>(kQualityQuantThreads) - 1) /
+      static_cast<std::size_t>(kQualityQuantThreads));
+  unpack_q8_0_aligned_kernel<<<blocks, kQualityQuantThreads, 0, stream>>>(
+      soa, output_rows, columns, gguf);
   return cudaPeekAtLastError();
 }
 

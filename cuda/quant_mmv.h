@@ -266,6 +266,11 @@ cudaError_t launch_repack_q8_0_aligned(const std::uint8_t* weights,
                                        std::size_t columns, std::uint8_t* soa,
                                        cudaStream_t stream) noexcept;
 
+cudaError_t launch_unpack_q8_0_aligned(const std::uint8_t* soa,
+                                       std::size_t output_rows,
+                                       std::size_t columns, std::uint8_t* gguf,
+                                       cudaStream_t stream) noexcept;
+
 cudaError_t launch_q8_mmq_d2r(const std::uint8_t* soa, std::size_t output_rows,
                               std::size_t columns, const Q8Block* y,
                               std::size_t prompt_rows, float* output,

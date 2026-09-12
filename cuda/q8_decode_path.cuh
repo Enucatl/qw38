@@ -7,6 +7,8 @@
 #include <cstdint>
 #include <cstring>
 
+#include "q8_aligned_layout.cuh"
+
 namespace qw38::cuda {
 
 constexpr char kLegalQ8DecodePathDirectBf16[] = "direct_bf16";
@@ -24,8 +26,10 @@ constexpr unsigned int kQ8GroupedLaunchReduction = 176;
 // kSelectedQ8DecodeRows* plus kSelectedQ8DecodeLayoutWarps* so a later
 // layout keep does not rewrite the OPT-047 warp constants.
 // OPT-092 grouping is a separate selector; arithmetic stays dp4a_q8_1/r1_w4.
+// OPT-100 device layout is a separate selector; reject retains raw GGUF Q8_0.
 constexpr char kSelectedQ8DecodePath[] = "dp4a_q8_1";
 constexpr char kSelectedQ8DecodeGrouping[] = "grouped_r1_w4";
+constexpr char kSelectedQ8DeviceLayout[] = "raw_gguf";
 constexpr unsigned int kSelectedQ8DecodeWarpsSkinny = 4;
 constexpr unsigned int kSelectedQ8DecodeWarpsMedium = 4;
 constexpr unsigned int kSelectedQ8DecodeWarpsWide = 4;
@@ -49,6 +53,7 @@ struct Q8GroupedProjDesc final {
 
 inline thread_local const char* g_q8_decode_path_override = nullptr;
 inline thread_local const char* g_q8_decode_grouping_override = nullptr;
+inline thread_local const char* g_q8_device_layout_override = nullptr;
 inline thread_local unsigned int g_q8_decode_warps_skinny_override = 0;
 inline thread_local unsigned int g_q8_decode_warps_medium_override = 0;
 inline thread_local unsigned int g_q8_decode_warps_wide_override = 0;
@@ -69,6 +74,12 @@ inline bool legal_q8_decode_grouping(const char* grouping) noexcept {
   return grouping != nullptr &&
          (std::strcmp(grouping, kLegalQ8DecodeGroupingSeparate) == 0 ||
           std::strcmp(grouping, kLegalQ8DecodeGroupingGroupedR1W4) == 0);
+}
+
+inline bool legal_q8_device_layout(const char* layout) noexcept {
+  return layout != nullptr &&
+         (std::strcmp(layout, kLegalQ8DeviceLayoutRawGguf) == 0 ||
+          std::strcmp(layout, kLegalQ8DeviceLayoutAlignedSoa) == 0);
 }
 
 inline bool legal_q8_decode_warps_per_row(unsigned int warps) noexcept {
@@ -99,6 +110,10 @@ inline const char* selected_q8_decode_path() noexcept {
 
 inline const char* selected_q8_decode_grouping() noexcept {
   return kSelectedQ8DecodeGrouping;
+}
+
+inline const char* selected_q8_device_layout() noexcept {
+  return kSelectedQ8DeviceLayout;
 }
 
 inline unsigned int selected_q8_decode_warps_skinny() noexcept {
@@ -146,6 +161,11 @@ inline const char* effective_q8_decode_grouping() noexcept {
   return g_q8_decode_grouping_override != nullptr
              ? g_q8_decode_grouping_override
              : kSelectedQ8DecodeGrouping;
+}
+
+inline const char* effective_q8_device_layout() noexcept {
+  return g_q8_device_layout_override != nullptr ? g_q8_device_layout_override
+                                                : kSelectedQ8DeviceLayout;
 }
 
 inline unsigned int effective_q8_decode_warps_skinny() noexcept {
@@ -211,6 +231,11 @@ inline bool q8_decode_uses_grouped_r1_w4() noexcept {
                      kLegalQ8DecodeGroupingGroupedR1W4) == 0;
 }
 
+inline bool q8_device_uses_aligned_soa() noexcept {
+  return std::strcmp(effective_q8_device_layout(),
+                     kLegalQ8DeviceLayoutAlignedSoa) == 0;
+}
+
 inline unsigned int q8_decode_warps_for_rows(std::size_t rows) noexcept {
   if (rows > 0 && rows < 128) return effective_q8_decode_warps_skinny();
   if (rows < 4096) return effective_q8_decode_warps_medium();
@@ -263,6 +288,14 @@ inline void set_q8_decode_grouping_override(const char* grouping) noexcept {
   g_q8_decode_grouping_override = grouping;
 }
 
+inline void set_q8_device_layout_override(const char* layout) noexcept {
+  g_q8_device_layout_override = layout;
+}
+
+inline void clear_q8_device_layout_override() noexcept {
+  g_q8_device_layout_override = nullptr;
+}
+
 inline void clear_q8_decode_path_override() noexcept {
   g_q8_decode_path_override = nullptr;
   g_q8_decode_grouping_override = nullptr;
@@ -308,6 +341,7 @@ struct Q8DecodeDispatch final {
   std::size_t columns = 0;
   const char* layout = "";
   const char* grouping = "";
+  const char* device_layout = "";
   bool graph_capture = false;
   bool grouped = false;
 };
@@ -352,6 +386,12 @@ inline bool apply_q8_grouping_ident(const char* ident) noexcept {
   return true;
 }
 
+inline bool apply_q8_device_layout_ident(const char* ident) noexcept {
+  if (!legal_q8_device_layout(ident)) return false;
+  set_q8_device_layout_override(ident);
+  return true;
+}
+
 inline void record_q8_decode_dispatch(std::size_t rows, std::size_t columns,
                                       unsigned int rows_per_cta,
                                       unsigned int warps_per_row) noexcept {
@@ -362,6 +402,7 @@ inline void record_q8_decode_dispatch(std::size_t rows, std::size_t columns,
   g_last_q8_decode_dispatch.layout =
       q8_layout_ident(rows_per_cta, warps_per_row);
   g_last_q8_decode_dispatch.grouping = effective_q8_decode_grouping();
+  g_last_q8_decode_dispatch.device_layout = effective_q8_device_layout();
   g_last_q8_decode_dispatch.grouped = false;
   ++g_q8_projection_launch_count;
 }
@@ -374,6 +415,7 @@ inline void record_q8_grouped_dispatch(std::size_t rows,
   g_last_q8_decode_dispatch.warps_per_row = 4;
   g_last_q8_decode_dispatch.layout = "r1_w4";
   g_last_q8_decode_dispatch.grouping = kLegalQ8DecodeGroupingGroupedR1W4;
+  g_last_q8_decode_dispatch.device_layout = effective_q8_device_layout();
   g_last_q8_decode_dispatch.grouped = true;
   ++g_q8_projection_launch_count;
   ++g_q8_grouped_launch_count;
@@ -399,6 +441,15 @@ struct Q8DecodeGroupingScope final {
   ~Q8DecodeGroupingScope() { g_q8_decode_grouping_override = nullptr; }
   Q8DecodeGroupingScope(const Q8DecodeGroupingScope&) = delete;
   Q8DecodeGroupingScope& operator=(const Q8DecodeGroupingScope&) = delete;
+};
+
+struct Q8DeviceLayoutScope final {
+  explicit Q8DeviceLayoutScope(const char* layout) noexcept {
+    set_q8_device_layout_override(layout);
+  }
+  ~Q8DeviceLayoutScope() { g_q8_device_layout_override = nullptr; }
+  Q8DeviceLayoutScope(const Q8DeviceLayoutScope&) = delete;
+  Q8DeviceLayoutScope& operator=(const Q8DeviceLayoutScope&) = delete;
 };
 
 inline const Q8DecodeDispatch& last_q8_decode_dispatch() noexcept {

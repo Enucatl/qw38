@@ -259,7 +259,7 @@ in ledger/dependency order is OPT-099.
 | ID | Description | Dependencies | Status | Acceptance condition | Evidence |
 |---|---|---|---|---|---|
 | OPT-099 | Close matched Quartz/llama attribution and P4096 blind spots | OPT-098 | done | Valid D128/D2048/P4096 event unions, explicit FFN down, nonzero executed llama families, ≤5% unexplained wall, targeted counters and go/no-go triggers; diagnostic only | [`tasks/OPT-099.md`](tasks/OPT-099.md) |
-| OPT-100 | Replace raw Q8 device weights with a lossless aligned layout | OPT-099 | pending | All decode/prompt Q8 consumers use one replacement layout; complete mixer and D128/D2048 improve with quality/P4096/state/128K guards, or raw Q8 is retained | [`tasks/OPT-100.md`](tasks/OPT-100.md) |
+| OPT-100 | Replace raw Q8 device weights with a lossless aligned layout | OPT-099 | done | All decode/prompt Q8 consumers use one replacement layout; complete mixer and D128/D2048 improve with quality/P4096/state/128K guards, or raw Q8 is retained | [`tasks/OPT-100.md`](tasks/OPT-100.md) |
 | OPT-101 | Transpose and register-shard one-token GDN state | OPT-099 | pending | Warp-column FP32 recurrence and canonical state round trips improve complete 48-layer GDN and both decode prefixes with quality/transactional gates, or sequential is retained | [`tasks/OPT-101.md`](tasks/OPT-101.md) |
 | OPT-102 | Repack Q4 metadata and remove decode unpack overhead | OPT-099 | pending | Source-faithful/branchless candidates improve complete 64-layer FFN and both decode prefixes while supporting prompt and memory gates, or late_w4 is retained | [`tasks/OPT-102.md`](tasks/OPT-102.md) |
 | OPT-103 | Port the pinned-llama one-query vector attention specialization | OPT-099 | pending | 128-thread online-softmax attention improves complete 16-layer D128/D2048 attention with full KV/quality/state guards, or warp_query is retained | [`tasks/OPT-103.md`](tasks/OPT-103.md) |
@@ -7275,3 +7275,21 @@ statements below are historical, not the current execution order.
 - **tok/s delta vs OPT-098 P4096 baseline (3046.23 tok/s): 0** (diagnostic only; no
   throughput claim).
 - Marked OPT-099 `done`. Coupled IDs: none. First eligible pending task: **OPT-100**.
+
+### 2026-09-12T15:29:02Z — OPT-100 aligned Q8 layout delivered (reject)
+
+- Added aligned SoA Q8 device-layout tooling (`tools/opt100_q8_aligned.py`, contracts,
+  fixture, tests, `cuda-opt100-diagnostics`, `q8_aligned_layout.cuh`, layout selector
+  hooks in Q8 decode/MMV/MMQ paths). Kernel parity 12/12 bitwise; OPT-089 quality
+  reuse under `opt089_strict`. No Q8 D2R revival; no public GGUF rewrite.
+- Complete rotating Q8 mixer acceptance (3+10): control **6.902 ms** vs candidate
+  **7.085 ms**/token; mean_diff **−0.183 ms**; CI95 **[−0.275, −0.091]**;
+  `positive=false`. Keep gate ≥0.10 ms/token failed; D128/P4096 gates not run.
+- Production pin remains `kSelectedQ8DeviceLayout[] = "raw_gguf"`.
+  `claims_throughput=false`.
+- Key evidence: [`fixtures/opt100_q8_aligned.json`](fixtures/opt100_q8_aligned.json);
+  [`evidence/optimization/opt100-q8-aligned-layout/REPORT.md`](evidence/optimization/opt100-q8-aligned-layout/REPORT.md);
+  [`evidence/optimization/opt100-q8-aligned-layout/REJECTION.md`](evidence/optimization/opt100-q8-aligned-layout/REJECTION.md).
+- **tok/s delta vs OPT-098 P4096 baseline (3046.23 tok/s): 0** (rejection; no
+  throughput claim).
+- Marked OPT-100 `done`. Coupled IDs: none. First eligible pending task: **OPT-101**.

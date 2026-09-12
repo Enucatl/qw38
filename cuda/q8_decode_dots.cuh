@@ -13,6 +13,7 @@
 #include <cuda_bf16.h>
 #include <cuda_runtime.h>
 
+#include "q8_aligned_layout.cuh"
 #include "q8_decode_path.cuh"
 #include "quant_mmv.h"
 
@@ -116,7 +117,24 @@ __device__ __forceinline__ float vec_dot_q8_0_q8_1(const std::uint8_t* block,
   return d0 * d1 * static_cast<float>(sumi);
 }
 
-template <int RowsPerCta, int WarpsPerRow>
+__device__ __forceinline__ float vec_dot_q8_aligned_q8_1(
+    const std::uint8_t* row_scales, const std::int8_t* row_codes, int kbx,
+    const Q8_1Block* q8, int iqs) {
+  const int* packed = reinterpret_cast<const int*>(
+      row_codes + static_cast<std::size_t>(kbx) * kQ80Values);
+  const int v0 = packed[iqs];
+  const int v1 = packed[iqs + 1];
+  const int u0 =
+      *reinterpret_cast<const int*>(q8->values + static_cast<std::size_t>(iqs) * 4);
+  const int u1 = *reinterpret_cast<const int*>(
+      q8->values + static_cast<std::size_t>(iqs + 1) * 4);
+  const int sumi = __dp4a(v1, u1, __dp4a(v0, u0, 0));
+  const float d0 = read_q8_half(row_scales + static_cast<std::size_t>(kbx) * 2);
+  const float d1 = __half2float(q8->scale);
+  return d0 * d1 * static_cast<float>(sumi);
+}
+
+template <int RowsPerCta, int WarpsPerRow, bool Aligned>
 __global__ void q8_coop_mmv(const std::uint8_t* weights, std::size_t rows,
                             std::size_t columns, const Q8_1Block* staged,
                             float* output) {
@@ -133,13 +151,28 @@ __global__ void q8_coop_mmv(const std::uint8_t* weights, std::size_t rows,
   constexpr int blocks_per_iter = kVdr * WarpsPerRow * kWarp / kQI8;
   float acc = 0.0F;
   if (active) {
-    const std::uint8_t* row_weights =
-        weights + row * static_cast<std::size_t>(n_blocks) * kQ80Bytes;
-    for (int kbx = tid / (kQI8 / kVdr); kbx < n_blocks; kbx += blocks_per_iter) {
-      const int iqs = kVdr * (tid % (kQI8 / kVdr));
-      acc += vec_dot_q8_0_q8_1(
-          row_weights + static_cast<std::size_t>(kbx) * kQ80Bytes, staged + kbx,
-          iqs);
+    if constexpr (Aligned) {
+      const Q8AlignedLayoutDesc desc = make_q8_aligned_layout_desc(rows, columns);
+      const std::uint8_t* row_scales =
+          weights + row * static_cast<std::size_t>(n_blocks) * 2;
+      const std::int8_t* row_codes = reinterpret_cast<const std::int8_t*>(
+          q8_aligned_code_plane(weights, desc) + row * columns);
+      for (int kbx = tid / (kQI8 / kVdr); kbx < n_blocks;
+           kbx += blocks_per_iter) {
+        const int iqs = kVdr * (tid % (kQI8 / kVdr));
+        acc += vec_dot_q8_aligned_q8_1(row_scales, row_codes, kbx, staged + kbx,
+                                       iqs);
+      }
+    } else {
+      const std::uint8_t* row_weights =
+          weights + row * static_cast<std::size_t>(n_blocks) * kQ80Bytes;
+      for (int kbx = tid / (kQI8 / kVdr); kbx < n_blocks;
+           kbx += blocks_per_iter) {
+        const int iqs = kVdr * (tid % (kQI8 / kVdr));
+        acc += vec_dot_q8_0_q8_1(
+            row_weights + static_cast<std::size_t>(kbx) * kQ80Bytes, staged + kbx,
+            iqs);
+      }
     }
   }
 
@@ -167,6 +200,7 @@ __global__ void q8_coop_mmv(const std::uint8_t* weights, std::size_t rows,
   }
 }
 
+template <bool Aligned>
 __global__ void q8_coop_mmv_grouped_r1_w4(const Q8GroupedProjDesc* desc,
                                          std::size_t columns,
                                          const Q8_1Block* staged) {
@@ -199,13 +233,29 @@ __global__ void q8_coop_mmv_grouped_r1_w4(const Q8GroupedProjDesc* desc,
   constexpr int blocks_per_iter = kVdr * WarpsPerRow * kWarp / kQI8;
   float acc = 0.0F;
   if (active) {
-    const std::uint8_t* row_weights =
-        chosen->weights + row * static_cast<std::size_t>(n_blocks) * kQ80Bytes;
-    for (int kbx = tid / (kQI8 / kVdr); kbx < n_blocks; kbx += blocks_per_iter) {
-      const int iqs = kVdr * (tid % (kQI8 / kVdr));
-      acc += vec_dot_q8_0_q8_1(
-          row_weights + static_cast<std::size_t>(kbx) * kQ80Bytes, staged + kbx,
-          iqs);
+    if constexpr (Aligned) {
+      const Q8AlignedLayoutDesc layout =
+          make_q8_aligned_layout_desc(chosen->rows, columns);
+      const std::uint8_t* row_scales =
+          chosen->weights + row * static_cast<std::size_t>(n_blocks) * 2;
+      const std::int8_t* row_codes = reinterpret_cast<const std::int8_t*>(
+          q8_aligned_code_plane(chosen->weights, layout) + row * columns);
+      for (int kbx = tid / (kQI8 / kVdr); kbx < n_blocks;
+           kbx += blocks_per_iter) {
+        const int iqs = kVdr * (tid % (kQI8 / kVdr));
+        acc += vec_dot_q8_aligned_q8_1(row_scales, row_codes, kbx, staged + kbx,
+                                       iqs);
+      }
+    } else {
+      const std::uint8_t* row_weights =
+          chosen->weights + row * static_cast<std::size_t>(n_blocks) * kQ80Bytes;
+      for (int kbx = tid / (kQI8 / kVdr); kbx < n_blocks;
+           kbx += blocks_per_iter) {
+        const int iqs = kVdr * (tid % (kQI8 / kVdr));
+        acc += vec_dot_q8_0_q8_1(
+            row_weights + static_cast<std::size_t>(kbx) * kQ80Bytes, staged + kbx,
+            iqs);
+      }
     }
   }
 
@@ -225,6 +275,7 @@ __global__ void q8_coop_mmv_grouped_r1_w4(const Q8GroupedProjDesc* desc,
   }
 }
 
+template <bool Aligned>
 __global__ void q8_mmv_bf16_ref(const std::uint8_t* weights, std::size_t rows,
                                 std::size_t columns,
                                 const __nv_bfloat16* activation, float* output) {
@@ -234,16 +285,32 @@ __global__ void q8_mmv_bf16_ref(const std::uint8_t* weights, std::size_t rows,
       static_cast<std::size_t>(blockIdx.x) * (kBf16Threads / kWarp) +
       static_cast<std::size_t>(warp);
   if (row >= rows) return;
-  const std::uint8_t* row_weights = weights + row * (columns / 32) * 34;
   float sum = 0.0F;
-  for (std::size_t column = static_cast<std::size_t>(lane); column < columns;
-       column += kWarp) {
-    const std::uint8_t* block = row_weights + (column / 32) * 34;
-    const float weight =
-        read_q8_half(block) *
-        static_cast<float>(static_cast<std::int8_t>(block[2 + column % 32]));
-    sum = __fadd_rn(sum,
-                    __fmul_rn(weight, __bfloat162float(activation[column])));
+  if constexpr (Aligned) {
+    const Q8AlignedLayoutDesc desc = make_q8_aligned_layout_desc(rows, columns);
+    const std::uint8_t* row_scales =
+        weights + row * (columns / 32) * 2;
+    const std::int8_t* row_codes = reinterpret_cast<const std::int8_t*>(
+        q8_aligned_code_plane(weights, desc) + row * columns);
+    for (std::size_t column = static_cast<std::size_t>(lane); column < columns;
+         column += kWarp) {
+      const float weight =
+          read_q8_half(row_scales + (column / 32) * 2) *
+          static_cast<float>(row_codes[column]);
+      sum = __fadd_rn(sum,
+                      __fmul_rn(weight, __bfloat162float(activation[column])));
+    }
+  } else {
+    const std::uint8_t* row_weights = weights + row * (columns / 32) * 34;
+    for (std::size_t column = static_cast<std::size_t>(lane); column < columns;
+         column += kWarp) {
+      const std::uint8_t* block = row_weights + (column / 32) * 34;
+      const float weight =
+          read_q8_half(block) *
+          static_cast<float>(static_cast<std::int8_t>(block[2 + column % 32]));
+      sum = __fadd_rn(sum,
+                      __fmul_rn(weight, __bfloat162float(activation[column])));
+    }
   }
   for (int offset = 16; offset > 0; offset /= 2) {
     sum = __fadd_rn(sum, __shfl_down_sync(0xFFFFFFFFU, sum, offset, kWarp));
@@ -251,7 +318,7 @@ __global__ void q8_mmv_bf16_ref(const std::uint8_t* weights, std::size_t rows,
   if (lane == 0) output[row] = sum;
 }
 
-template <int RowsPerCta, int WarpsPerRow>
+template <int RowsPerCta, int WarpsPerRow, bool Aligned>
 cudaError_t launch_coop(const std::uint8_t* weights, std::size_t rows,
                         std::size_t columns, const void* staged, float* output,
                         cudaStream_t stream) {
@@ -259,7 +326,7 @@ cudaError_t launch_coop(const std::uint8_t* weights, std::size_t rows,
   const unsigned int grid = static_cast<unsigned int>(
       (rows + static_cast<std::size_t>(RowsPerCta) - 1) /
       static_cast<std::size_t>(RowsPerCta));
-  q8_coop_mmv<RowsPerCta, WarpsPerRow><<<grid, block, 0, stream>>>(
+  q8_coop_mmv<RowsPerCta, WarpsPerRow, Aligned><<<grid, block, 0, stream>>>(
       weights, rows, columns, static_cast<const Q8_1Block*>(staged), output);
   return cudaPeekAtLastError();
 }

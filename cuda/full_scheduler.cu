@@ -828,6 +828,7 @@ __device__ float read_q8_half(const std::uint8_t* bytes) {
   return __half2float(__ushort_as_half(bits));
 }
 
+template <bool Aligned>
 __global__ void q8_mmv_bf16(const std::uint8_t* weights, std::size_t rows,
                             std::size_t columns,
                             const __nv_bfloat16* activation, float* output) {
@@ -836,15 +837,28 @@ __global__ void q8_mmv_bf16(const std::uint8_t* weights, std::size_t rows,
   const std::size_t row =
       static_cast<std::size_t>(blockIdx.x) * (kThreads / kWarpSize) + warp;
   if (row >= rows) return;
-  const std::uint8_t* row_weights = weights + row * (columns / 32) * 34;
   float sum = 0.0F;
-  for (std::size_t column = lane; column < columns; column += kWarpSize) {
-    const std::uint8_t* block = row_weights + (column / 32) * 34;
-    const float weight =
-        read_q8_half(block) *
-        static_cast<float>(static_cast<std::int8_t>(block[2 + column % 32]));
-    sum = __fadd_rn(sum,
-                    __fmul_rn(weight, __bfloat162float(activation[column])));
+  if constexpr (Aligned) {
+    const Q8AlignedLayoutDesc desc = make_q8_aligned_layout_desc(rows, columns);
+    const std::uint8_t* row_scales = weights + row * (columns / 32) * 2;
+    const std::int8_t* row_codes = reinterpret_cast<const std::int8_t*>(
+        q8_aligned_code_plane(weights, desc) + row * columns);
+    for (std::size_t column = lane; column < columns; column += kWarpSize) {
+      const float weight = read_q8_half(row_scales + (column / 32) * 2) *
+                           static_cast<float>(row_codes[column]);
+      sum = __fadd_rn(sum,
+                      __fmul_rn(weight, __bfloat162float(activation[column])));
+    }
+  } else {
+    const std::uint8_t* row_weights = weights + row * (columns / 32) * 34;
+    for (std::size_t column = lane; column < columns; column += kWarpSize) {
+      const std::uint8_t* block = row_weights + (column / 32) * 34;
+      const float weight =
+          read_q8_half(block) *
+          static_cast<float>(static_cast<std::int8_t>(block[2 + column % 32]));
+      sum = __fadd_rn(sum,
+                      __fmul_rn(weight, __bfloat162float(activation[column])));
+    }
   }
   for (int offset = 16; offset > 0; offset /= 2) {
     sum = __fadd_rn(
@@ -1452,6 +1466,16 @@ bool remap_tensor(const internal::TensorView& source,
   return true;
 }
 
+__global__ void q8_bytes_mismatch(const std::uint8_t* left,
+                                  const std::uint8_t* right, std::size_t bytes,
+                                  int* mismatch) {
+  const std::size_t index =
+      static_cast<std::size_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+  if (index < bytes && left[index] != right[index]) {
+    atomicExch(mismatch, 1);
+  }
+}
+
 bool remap_common(const internal::CommonLayerWeights& source,
                   const std::uint8_t* base, std::size_t bytes,
                   const std::uint8_t* device, DeviceCommonLayer* output) {
@@ -1491,9 +1515,14 @@ cudaError_t matrix_vector(const DeviceTensor& matrix,
     const unsigned int blocks = static_cast<unsigned int>(
         (matrix.rows + (kThreads / kWarpSize) - 1) /
         (kThreads / kWarpSize));
-    return quartz_launch_kernel(
-        q8_mmv_bf16, dim3(blocks), dim3(kThreads), 0, stream, matrix.data,
-        matrix.rows, matrix.columns, activation, output);
+    if (q8_device_uses_aligned_soa()) {
+      return quartz_launch_kernel(q8_mmv_bf16<true>, dim3(blocks), dim3(kThreads),
+                                  0, stream, matrix.data, matrix.rows,
+                                  matrix.columns, activation, output);
+    }
+    return quartz_launch_kernel(q8_mmv_bf16<false>, dim3(blocks), dim3(kThreads),
+                                0, stream, matrix.data, matrix.rows,
+                                matrix.columns, activation, output);
   }
   if (workspace != nullptr) {
     workspace->q8_decode_staged_activation_ = nullptr;
@@ -2224,6 +2253,10 @@ ResidentModel& ResidentModel::operator=(ResidentModel&& other) noexcept {
   blob_ = other.blob_;
   blob_bytes_ = other.blob_bytes_;
   upload_ms_ = other.upload_ms_;
+  q8_device_layout_ = other.q8_device_layout_;
+  q8_aligned_tensor_count_ = other.q8_aligned_tensor_count_;
+  q8_aligned_payload_bytes_ = other.q8_aligned_payload_bytes_;
+  q8_repack_scratch_peak_bytes_ = other.q8_repack_scratch_peak_bytes_;
   embedding_ = other.embedding_;
   output_norm_ = other.output_norm_;
   output_ = other.output_;
@@ -2231,6 +2264,10 @@ ResidentModel& ResidentModel::operator=(ResidentModel&& other) noexcept {
   other.blob_ = nullptr;
   other.blob_bytes_ = 0;
   other.upload_ms_ = 0.0F;
+  other.q8_device_layout_ = kLegalQ8DeviceLayoutRawGguf;
+  other.q8_aligned_tensor_count_ = 0;
+  other.q8_aligned_payload_bytes_ = 0;
+  other.q8_repack_scratch_peak_bytes_ = 0;
   return *this;
 }
 
@@ -2239,6 +2276,10 @@ void ResidentModel::release() noexcept {
   blob_ = nullptr;
   blob_bytes_ = 0;
   upload_ms_ = 0.0F;
+  q8_device_layout_ = kLegalQ8DeviceLayoutRawGguf;
+  q8_aligned_tensor_count_ = 0;
+  q8_aligned_payload_bytes_ = 0;
+  q8_repack_scratch_peak_bytes_ = 0;
 }
 
 Status ResidentModel::upload(const internal::ModelWeights& weights,
@@ -2329,6 +2370,132 @@ Status ResidentModel::upload(const internal::ModelWeights& weights,
     release();
     return {StatusCode::kInvalidArgument,
             "typed model view does not fit the uploaded GGUF mapping"};
+  }
+  if (std::strcmp(selected_q8_device_layout(), kLegalQ8DeviceLayoutAlignedSoa) ==
+      0) {
+    const Status converted =
+        set_q8_device_layout(kLegalQ8DeviceLayoutAlignedSoa, true);
+    if (!converted.is_ok()) {
+      release();
+      return converted;
+    }
+  }
+  return Status::ok();
+}
+
+Status ResidentModel::set_q8_device_layout(const char* layout,
+                                           bool validate_inverse) noexcept {
+  if (blob_ == nullptr || !legal_q8_device_layout(layout)) {
+    return {StatusCode::kInvalidArgument, "q8 device layout conversion input is invalid"};
+  }
+  if (std::strcmp(layout, q8_device_layout_) == 0) return Status::ok();
+  const bool to_aligned =
+      std::strcmp(layout, kLegalQ8DeviceLayoutAlignedSoa) == 0;
+  DeviceTensor* tensors[320];
+  std::size_t count = 0;
+  auto push = [&](DeviceTensor* tensor) {
+    if (tensor != nullptr && tensor->kind == QuantKind::kQ8_0 &&
+        tensor->data != nullptr && count < 320) {
+      tensors[count++] = tensor;
+    }
+  };
+  for (std::size_t index = 0; index < layers_.size(); ++index) {
+    DeviceLayer& layer = layers_[index];
+    if (layer.kind == internal::LayerKind::kGdn) {
+      push(&layer.gdn.packed_qkv);
+      push(&layer.gdn.value_gate);
+      push(&layer.gdn.alpha);
+      push(&layer.gdn.beta);
+      push(&layer.gdn.output);
+    } else {
+      push(&layer.attention.query_gate);
+      push(&layer.attention.key);
+      push(&layer.attention.value);
+    }
+  }
+  std::size_t max_bytes = 0;
+  for (std::size_t index = 0; index < count; ++index) {
+    const Q8AlignedLayoutDesc desc =
+        make_q8_aligned_layout_desc(tensors[index]->rows, tensors[index]->columns);
+    if (!q8_aligned_is_byte_neutral(desc)) {
+      return {StatusCode::kInvalidArgument,
+              "q8 aligned SoA is not byte-neutral for an admitted mixer tensor"};
+    }
+    if (desc.total_bytes > max_bytes) max_bytes = desc.total_bytes;
+  }
+  if (count == 0 || max_bytes == 0) {
+    q8_device_layout_ = to_aligned ? kLegalQ8DeviceLayoutAlignedSoa
+                                   : kLegalQ8DeviceLayoutRawGguf;
+    return Status::ok();
+  }
+  std::uint8_t* scratch = nullptr;
+  std::uint8_t* inverse = nullptr;
+  int* mismatch = nullptr;
+  cudaError_t error = cudaMalloc(&scratch, max_bytes);
+  if (error == cudaSuccess) error = cudaMalloc(&inverse, max_bytes);
+  if (error == cudaSuccess) error = cudaMalloc(&mismatch, sizeof(int));
+  if (error != cudaSuccess) {
+    if (scratch != nullptr) cudaFree(scratch);
+    if (inverse != nullptr) cudaFree(inverse);
+    if (mismatch != nullptr) cudaFree(mismatch);
+    return cuda_status(error, "cannot allocate bounded q8 SoA repack scratch");
+  }
+  q8_repack_scratch_peak_bytes_ = 2 * max_bytes + sizeof(int);
+  std::size_t payload = 0;
+  for (std::size_t index = 0; index < count && error == cudaSuccess; ++index) {
+    DeviceTensor* tensor = tensors[index];
+    const Q8AlignedLayoutDesc desc =
+        make_q8_aligned_layout_desc(tensor->rows, tensor->columns);
+    std::uint8_t* live = const_cast<std::uint8_t*>(tensor->data);
+    payload += desc.gguf_bytes;
+    error = cudaMemcpy(scratch, live, desc.gguf_bytes, cudaMemcpyDeviceToDevice);
+    if (error != cudaSuccess) break;
+    if (to_aligned) {
+      error = launch_repack_q8_0_aligned(scratch, tensor->rows, tensor->columns,
+                                         live, nullptr);
+      if (error == cudaSuccess && validate_inverse) {
+        error = launch_unpack_q8_0_aligned(live, tensor->rows, tensor->columns,
+                                           inverse, nullptr);
+        if (error == cudaSuccess) error = cudaMemset(mismatch, 0, sizeof(int));
+        if (error == cudaSuccess) {
+          const unsigned int blocks = static_cast<unsigned int>(
+              (desc.gguf_bytes + 255) / 256);
+          q8_bytes_mismatch<<<blocks, 256>>>(scratch, inverse, desc.gguf_bytes,
+                                             mismatch);
+          error = cudaPeekAtLastError();
+        }
+        int host_mismatch = 1;
+        if (error == cudaSuccess) {
+          error = cudaMemcpy(&host_mismatch, mismatch, sizeof(int),
+                             cudaMemcpyDeviceToHost);
+        }
+        if (error == cudaSuccess && host_mismatch != 0) {
+          cudaFree(scratch);
+          cudaFree(inverse);
+          cudaFree(mismatch);
+          return {StatusCode::kInternal,
+                  "q8 aligned SoA inverse reconstruction is not byte-exact"};
+        }
+      }
+    } else {
+      error = launch_unpack_q8_0_aligned(scratch, tensor->rows, tensor->columns,
+                                         live, nullptr);
+    }
+  }
+  cudaFree(scratch);
+  cudaFree(inverse);
+  cudaFree(mismatch);
+  if (error != cudaSuccess) {
+    return cuda_status(error, "q8 aligned SoA conversion failed");
+  }
+  if (to_aligned) {
+    q8_device_layout_ = kLegalQ8DeviceLayoutAlignedSoa;
+    q8_aligned_tensor_count_ = count;
+    q8_aligned_payload_bytes_ = payload;
+  } else {
+    q8_device_layout_ = kLegalQ8DeviceLayoutRawGguf;
+    q8_aligned_tensor_count_ = 0;
+    q8_aligned_payload_bytes_ = 0;
   }
   return Status::ok();
 }

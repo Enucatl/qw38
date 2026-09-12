@@ -63,6 +63,7 @@ struct Options final {
   const char* capture_key = nullptr;
   const char* q8_layout = nullptr;
   const char* q8_grouping = nullptr;
+  const char* q8_device_layout = nullptr;
   const char* q4_decode = nullptr;
   const char* ffn_decode = nullptr;
   const char* gdn_decode = nullptr;
@@ -84,7 +85,8 @@ int usage(const char* argv0) {
                "decode-mixer|decode-gdn|decode-attention|prompt-ffn|"
                "acceptance|hardware] [MODEL] "
                "[--cache-mode hot|rotating] [--capture-key KEY] "
-               "[--q8-layout r1_w4|r2_w2] [--q8-grouping separate|grouped_r1_w4] [--mmq-async-x 0|1] "
+               "[--q8-layout r1_w4|r2_w2] [--q8-grouping separate|grouped_r1_w4] "
+               "[--q8-device-layout raw_gguf|aligned_soa] [--mmq-async-x 0|1] "
                "[--q4-decode packed|integer_q8|integer_q8_late|integer_q8_factored] "
                "[--q4-warps 2|4] "
                "[--ffn-decode paired_staged|shared_stage|paired_integer] "
@@ -111,6 +113,9 @@ int parse_args(int argc, char** argv, Options* options) {
       options->q8_layout = argv[++index];
     } else if (std::strcmp(arg, "--q8-grouping") == 0 && index + 1 < argc) {
       options->q8_grouping = argv[++index];
+    } else if (std::strcmp(arg, "--q8-device-layout") == 0 &&
+               index + 1 < argc) {
+      options->q8_device_layout = argv[++index];
     } else if (std::strcmp(arg, "--mmq-async-x") == 0 && index + 1 < argc) {
       options->mmq_async_x = std::atoi(argv[++index]);
     } else if (std::strcmp(arg, "--q4-decode") == 0 && index + 1 < argc) {
@@ -1863,7 +1868,7 @@ int time_family(qw38::cuda::ResidentModel* model,
         "kernel_only_ms=%.6f gate_up_calls=%d down_calls=%d mixer_calls=%d "
         "gdn_input_output_groups=%d attention_input_output_groups=%d "
         "q8_input_projection_launches=%u q8_grouped_launches=%u "
-        "q8_projection_launches=%u q8_grouping=%s "
+        "q8_projection_launches=%u q8_grouping=%s q8_device_layout=%s "
         "rotating_layers=%zu working_set_bytes=%zu exceeds_2x_l2=%s "
         "eviction_outside_interval=false pooled_events=true "
         "staging_ops_per_ffn=2 invalidate_q8_decode_staging=true\n",
@@ -1871,7 +1876,8 @@ int time_family(qw38::cuda::ResidentModel* model,
         json_bool(warmup), warmup ? sample : sample - warmups, enclosing,
         kernel_acc, gate_up, down, mixer, gdn_groups, attn_groups,
         input_launches, grouped_launches, projection_launches,
-        qw38::cuda::effective_q8_decode_grouping(), layers.size(),
+        qw38::cuda::effective_q8_decode_grouping(),
+        qw38::cuda::effective_q8_device_layout(), layers.size(),
         working, json_bool(exceeds));
     if (rounds_out != nullptr && !warmup) {
       std::fprintf(
@@ -2024,6 +2030,20 @@ int run_family(const Options& options, qw38::cuda::ReplayFamily family) {
     std::fprintf(stderr, "invalid --q8-grouping %s\n", options.q8_grouping);
     if (rounds != nullptr) std::fclose(rounds);
     return 1;
+  }
+  if (options.q8_device_layout != nullptr) {
+    if (!qw38::cuda::apply_q8_device_layout_ident(options.q8_device_layout)) {
+      std::fprintf(stderr, "invalid --q8-device-layout %s\n",
+                   options.q8_device_layout);
+      if (rounds != nullptr) std::fclose(rounds);
+      return 1;
+    }
+    const qw38::Status converted =
+        model.set_q8_device_layout(options.q8_device_layout, true);
+    if (!converted.is_ok()) {
+      if (rounds != nullptr) std::fclose(rounds);
+      return 1;
+    }
   }
   if (options.mmq_async_x >= 0) {
     qw38::cuda::set_mmq_async_x_override(options.mmq_async_x != 0);
