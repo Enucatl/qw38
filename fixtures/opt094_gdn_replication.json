@@ -1,0 +1,136 @@
+{
+  "schema_version": 1,
+  "task": "OPT-094",
+  "mode": "feedback",
+  "status": "no_reopen",
+  "llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+  "gguf_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+  "token_generator": "(42 + index * 997) % 248320",
+  "claims_throughput": false,
+  "claims_performance_improvement": false,
+  "configurations": [
+    "sequential",
+    "tile32"
+  ],
+  "control": "sequential",
+  "candidate": "tile32",
+  "shipping_gdn_decode": "sequential",
+  "production_kept": true,
+  "selected_path": "sequential",
+  "tok_s_delta": 0.0,
+  "independent_verdicts": {
+    "sequential": {
+      "kernel_parity_pass": false,
+      "model_quality_pass": false,
+      "performance_pass": false,
+      "production_kept": true,
+      "incomplete": false,
+      "not_applicable_reason": "no_reopen_eligibility"
+    },
+    "tile32": {
+      "kernel_parity_pass": false,
+      "model_quality_pass": false,
+      "performance_pass": false,
+      "production_kept": false,
+      "incomplete": true,
+      "not_applicable_reason": "no_reopen_eligibility"
+    }
+  },
+  "report_path": "evidence/optimization/opt094-gdn-replication/REPORT.md",
+  "eligibility": {
+    "schema_version": 1,
+    "task": "OPT-094",
+    "phase": "eligibility",
+    "mode": "feedback",
+    "gate": {
+      "eligible": false,
+      "verdict": "no_reopen",
+      "reason": "no_opt077_timing_capture_defect_repaired",
+      "gdn_reopen": {
+        "eligible": false,
+        "reason": "no_opt077_timing_capture_defect_repaired",
+        "repair": null
+      },
+      "opt090_path": "/home/user/qw38/fixtures/opt090_decode_attribution.json",
+      "opt077_prior": {
+        "control_mean_ms": 12.51649,
+        "tile32_mean_ms": 11.8939,
+        "ci95_low_ms": -0.1643,
+        "ci95_high_ms": 1.4094,
+        "inconclusive_not_rejection": true
+      }
+    },
+    "native_counts": {
+      "schema_version": 1,
+      "task": "OPT-094",
+      "warmups": 0,
+      "samples": 1,
+      "observed_warmups": 0,
+      "observed_samples": 1,
+      "observed_candidates": 1,
+      "observed_shapes": 1,
+      "observed_tier": "correctness",
+      "pairs": 1,
+      "sample_ids": [
+        0
+      ],
+      "acceptance_executed": false,
+      "keep": false,
+      "capture_key": null
+    },
+    "admission": {
+      "ok": true,
+      "result_class": "ok",
+      "message": "",
+      "observed": {
+        "schema_version": 1,
+        "task": "OPT-094",
+        "warmups": 0,
+        "samples": 1,
+        "observed_warmups": 0,
+        "observed_samples": 1,
+        "observed_candidates": 1,
+        "observed_shapes": 1,
+        "observed_tier": "correctness",
+        "pairs": 1,
+        "sample_ids": [
+          0
+        ],
+        "acceptance_executed": false,
+        "keep": false,
+        "capture_key": null,
+        "rounds": []
+      }
+    },
+    "eligible": false,
+    "claims_throughput": false,
+    "measurement_utc": "2026-09-12T09:14:04Z",
+    "status": "no_reopen",
+    "independent_verdicts": {
+      "sequential": {
+        "kernel_parity_pass": false,
+        "model_quality_pass": false,
+        "performance_pass": false,
+        "production_kept": true,
+        "incomplete": false,
+        "not_applicable_reason": "no_reopen_eligibility"
+      },
+      "tile32": {
+        "kernel_parity_pass": false,
+        "model_quality_pass": false,
+        "performance_pass": false,
+        "production_kept": false,
+        "incomplete": true,
+        "not_applicable_reason": "no_reopen_eligibility"
+      }
+    },
+    "selected_path": "sequential",
+    "shipping_unchanged": true,
+    "shipping_gdn_decode": "sequential",
+    "production_kept": true,
+    "winners": []
+  },
+  "eligible": false,
+  "shipping_unchanged": true,
+  "winners": []
+}
