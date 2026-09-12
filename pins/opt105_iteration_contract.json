@@ -1,0 +1,280 @@
+{
+  "schema_version": 1,
+  "task": "OPT-105",
+  "yardstick": "prompt_ffn_mmq_double_x_64x128",
+  "claims_throughput": true,
+  "claims_performance_improvement": true,
+  "performance_admission": {
+    "enabled": true
+  },
+  "image": "qw38-cuda:13.0.2",
+  "model": "models/Qwen3.8-27B-Q4_K_M.gguf",
+  "gpu_lock": "build/optimization-runs/qw38-gpu.lock",
+  "aggregate_deadline_s": 300,
+  "target": "build/qw38-cuda-opt105-mmq-double-x-test",
+  "diagnostics_make_target": "cuda-opt105-diagnostics",
+  "case_ids": [
+    "eligibility",
+    "parity",
+    "mmq",
+    "quality",
+    "p4096",
+    "decode-guards"
+  ],
+  "modes": {
+    "feedback": {
+      "target": "build/qw38-cuda-opt105-mmq-double-x-test",
+      "tier_sequence": ["eligibility", "parity", "mmq"],
+      "make_targets": [
+        "build/qw38-cuda-opt105-mmq-double-x-test",
+        "build/qw38-cuda-component-replay",
+        "build/qw38-cuda-optimization-engine-probe"
+      ],
+      "build_once": true,
+      "warm_repetitions": 0,
+      "aggregate_deadline_s": 300,
+      "workloads": ["eligibility", "parity", "mmq"]
+    },
+    "acceptance": {
+      "target": "build/qw38-cuda-opt105-mmq-double-x-test",
+      "tier_sequence": ["mmq", "p4096", "decode-guards"],
+      "make_targets": [
+        "build/qw38-cuda-opt105-mmq-double-x-test",
+        "build/qw38-cuda-component-replay",
+        "build/qw38-cuda-optimization-engine-probe",
+        "build/qw38-cuda-opt058-quality-baseline-test"
+      ],
+      "warm_repetitions": 0,
+      "aggregate_deadline_s": 7200,
+      "workloads": ["mmq", "p4096", "decode-guards"]
+    },
+    "release": {
+      "target": "tools/opt105_mmq_double_x.py",
+      "tier": "acceptance",
+      "make_targets": ["build/qw38-cuda-opt058-quality-baseline-test"],
+      "skip_compile": false,
+      "historical_oracles": false,
+      "aggregate_deadline_s": 7200,
+      "workloads": ["quality"],
+      "release_host_command": [
+        "uv",
+        "run",
+        "python",
+        "tools/opt105_mmq_double_x.py",
+        "--phase",
+        "quality",
+        "--mode",
+        "release",
+        "--run-dir",
+        "{run_dir}"
+      ]
+    }
+  },
+  "workloads": {
+    "eligibility": {
+      "target": "tools/opt105_mmq_double_x.py",
+      "tier": "correctness",
+      "runner": "host",
+      "kind": "opt105_double_x_eligibility",
+      "cases": 1,
+      "candidates": 1,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 1,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 0,
+      "reference": 1,
+      "gpu_work": false,
+      "native_targets": [],
+      "args": [
+        "uv",
+        "run",
+        "python",
+        "tools/opt105_mmq_double_x.py",
+        "--phase",
+        "{phase}",
+        "--mode",
+        "{mode}",
+        "--run-dir",
+        "{run_dir}"
+      ]
+    },
+    "parity": {
+      "target": "build/qw38-cuda-opt105-mmq-double-x-test",
+      "tier": "correctness",
+      "runner": "host",
+      "kind": "i128_vs_i64_x2_parity",
+      "cases": 9,
+      "candidates": 2,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 1,
+      "execution_modes": 2,
+      "control_candidate_pairs": 1,
+      "load_model": 1,
+      "reference": 1,
+      "gpu_work": true,
+      "native_targets": ["build/qw38-cuda-opt105-mmq-double-x-test"],
+      "args": [
+        "uv",
+        "run",
+        "python",
+        "tools/opt105_mmq_double_x.py",
+        "--phase",
+        "{phase}",
+        "--mode",
+        "{mode}",
+        "--run-dir",
+        "{run_dir}"
+      ]
+    },
+    "mmq": {
+      "target": "build/qw38-cuda-opt105-mmq-double-x-test",
+      "tier": "screen",
+      "runner": "host",
+      "kind": "i128_vs_i64_x2_complete_ffn_p4096",
+      "cases": 2,
+      "candidates": 2,
+      "warmups": 1,
+      "samples": 3,
+      "tokens": 1,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 1,
+      "reference": 1,
+      "family": "prompt-ffn",
+      "tile": "64x128",
+      "complete_ffns": 64,
+      "gpu_work": true,
+      "native_targets": [
+        "build/qw38-cuda-opt105-mmq-double-x-test",
+        "build/qw38-cuda-component-replay",
+        "build/qw38-cuda-optimization-engine-probe"
+      ],
+      "args": [
+        "uv",
+        "run",
+        "python",
+        "tools/opt105_mmq_double_x.py",
+        "--phase",
+        "{phase}",
+        "--mode",
+        "{mode}",
+        "--run-dir",
+        "{run_dir}"
+      ],
+      "mode_overrides": {
+        "acceptance": {
+          "tier": "acceptance",
+          "warmups": 3,
+          "samples": 10,
+          "engine_pairs": 5
+        }
+      }
+    },
+    "quality": {
+      "target": "tools/opt105_mmq_double_x.py",
+      "tier": "acceptance",
+      "runner": "host",
+      "kind": "opt073_quality_once",
+      "cases": 1,
+      "candidates": 1,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 1,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 1,
+      "reference": 1,
+      "gpu_work": true,
+      "native_targets": ["build/qw38-cuda-opt058-quality-baseline-test"],
+      "args": [
+        "uv",
+        "run",
+        "python",
+        "tools/opt105_mmq_double_x.py",
+        "--phase",
+        "quality",
+        "--mode",
+        "release",
+        "--run-dir",
+        "{run_dir}"
+      ]
+    },
+    "p4096": {
+      "target": "tools/opt105_mmq_double_x.py",
+      "tier": "acceptance",
+      "runner": "host",
+      "kind": "p4096_throughput_pair",
+      "cases": 1,
+      "candidates": 2,
+      "warmups": 1,
+      "samples": 5,
+      "tokens": 4096,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 1,
+      "reference": 1,
+      "gpu_work": true,
+      "native_targets": [
+        "build/qw38-cuda-component-replay",
+        "build/qw38-cuda-optimization-engine-probe"
+      ],
+      "args": [
+        "uv",
+        "run",
+        "python",
+        "tools/opt105_mmq_double_x.py",
+        "--phase",
+        "{phase}",
+        "--mode",
+        "acceptance",
+        "--run-dir",
+        "{run_dir}"
+      ]
+    },
+    "decode-guards": {
+      "target": "tools/opt105_mmq_double_x.py",
+      "tier": "acceptance",
+      "runner": "host",
+      "kind": "d128_d2048_cross_workload_guards",
+      "cases": 2,
+      "candidates": 2,
+      "warmups": 1,
+      "samples": 1,
+      "tokens": 1,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 1,
+      "reference": 1,
+      "gpu_work": true,
+      "native_targets": [
+        "build/qw38-cuda-component-replay",
+        "build/qw38-cuda-optimization-engine-probe"
+      ],
+      "args": [
+        "uv",
+        "run",
+        "python",
+        "tools/opt105_mmq_double_x.py",
+        "--phase",
+        "{phase}",
+        "--mode",
+        "acceptance",
+        "--run-dir",
+        "{run_dir}"
+      ]
+    }
+  },
+  "proof_limit": [
+    "control remains i128_j128 fma_async_x joined wait",
+    "candidate is only i64_j128 fma_async_x2 two raw-X slots",
+    "no OPT-097 split wait and no OPT-065 extra tiles",
+    "kernel parity then quality then performance",
+    "claims_throughput requires complete 64-layer FFN >=5ms/P4096 and P4096",
+    "reject retains 128x128 joined-wait",
+    "decode D128/D2048 are gross guards"
+  ],
+  "report_path": "evidence/optimization/opt105-mmq-double-x/REPORT.md"
+}
