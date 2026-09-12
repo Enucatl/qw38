@@ -237,7 +237,7 @@ OPT-089.
 | ID | Description | Dependencies | Status | Acceptance condition | Evidence |
 |---|---|---|---|---|---|
 | OPT-089 | Complete strict admission of late_w4 with corrected parity references and real candidate quality | OPT-088 | done | All positive parity/same-math cases accounted for; full Q and D128/D2048+p95 yield keep or explicit rejection | [`tasks/OPT-089.md`](tasks/OPT-089.md); [`pins/opt089_q4_promotion_contract.json`](pins/opt089_q4_promotion_contract.json); [`pins/opt089_iteration_contract.json`](pins/opt089_iteration_contract.json); [`fixtures/opt089_q4_promotion.json`](fixtures/opt089_q4_promotion.json); [`tools/opt089_q4_promotion.py`](tools/opt089_q4_promotion.py); [`tests/test_opt089_q4_promotion.py`](tests/test_opt089_q4_promotion.py); [`tools/run_optimization_task.py`](tools/run_optimization_task.py); [`tools/quality/quality_mode.py`](tools/quality/quality_mode.py); [`Makefile`](Makefile); [`cuda/q4k_decode_path.cuh`](cuda/q4k_decode_path.cuh); [`cuda/ffn_decode_path.cuh`](cuda/ffn_decode_path.cuh); [`cuda/opt082_kernel_parity_test.cu`](cuda/opt082_kernel_parity_test.cu); [`cuda/opt058_quality_baseline_test.cu`](cuda/opt058_quality_baseline_test.cu); [`cuda/optimization_component_replay.cu`](cuda/optimization_component_replay.cu); [`cuda/optimization_engine_probe.cu`](cuda/optimization_engine_probe.cu); [`evidence/optimization/opt089-q4-promotion/REPORT.md`](evidence/optimization/opt089-q4-promotion/REPORT.md); verification 2026-09-12T05:35:14Z |
-| OPT-090 | Measure matched post-Q4 decode sinks and secondary P4096 attribution | OPT-089 | pending | Correct call counts, no dropped events, ≤5% unexplained wall; auditable family ranking and conditional-task triggers | [`tasks/OPT-090.md`](tasks/OPT-090.md) |
+| OPT-090 | Measure matched post-Q4 decode sinks and secondary P4096 attribution | OPT-089 | done | Correct call counts, no dropped events, ≤5% unexplained wall; auditable family ranking and conditional-task triggers | [`tasks/OPT-090.md`](tasks/OPT-090.md); [`pins/opt090_decode_attribution_contract.json`](pins/opt090_decode_attribution_contract.json); [`pins/opt090_iteration_contract.json`](pins/opt090_iteration_contract.json); [`fixtures/opt090_decode_attribution.json`](fixtures/opt090_decode_attribution.json); [`tools/opt090_decode_attribution.py`](tools/opt090_decode_attribution.py); [`tests/test_opt090_decode_attribution.py`](tests/test_opt090_decode_attribution.py); [`Makefile`](Makefile); [`cuda/opt060_engine_attribution_test.cu`](cuda/opt060_engine_attribution_test.cu); [`evidence/optimization/opt090-decode-attribution/REPORT.md`](evidence/optimization/opt090-decode-attribution/REPORT.md); verification 2026-09-12T06:15:00Z |
 | OPT-091 | Establish successor quality gate and decide narrowly bounded late_w4 concession | OPT-090 | pending | Versioned strict/successor verdicts; full Q required; concession only with ≤1.015 PPL and strong two-prefix decode benefit | [`tasks/OPT-091.md`](tasks/OPT-091.md) |
 | OPT-092 | Group same-input Q8 decode projections into one launch per layer group | OPT-091 | pending | Exact staging/output parity and full mixer plus two-prefix E2E acceptance, or retain r1_w4 separate launches | [`tasks/OPT-092.md`](tasks/OPT-092.md) |
 | OPT-093 | Factor paired-group Q4 integer scale/min work | OPT-092 | pending | Strict parity, same-math internal reconstruction, full Q and complete FFN/two-prefix keep or reject | [`tasks/OPT-093.md`](tasks/OPT-093.md) |
@@ -7047,4 +7047,18 @@ statements below are historical, not the current execution order.
 - Marked OPT-089 `done`; delivery is limited to the verified task scope plus
   this ledger/audit bookkeeping. `plan.md` is unchanged. Next eligible pending
   by dependency order: **OPT-090**.
+
+### 2026-09-12T06:15:00Z — OPT-090 decode attribution delivered
+
+- Measured matched post-Q4 decode sinks for `opt088_control` (packed) and
+  `opt089_selected` (`late_w4`) plus pinned llama control. Conservation passed;
+  D128/D2048 attribution valid with call counts matching 64 paired FFNs per
+  token. Ranking complete; top Quartz-owned sinks are FFN gate/up/GLU and
+  mixer projections. `gdn_reopen_eligible=false` (no OPT-077 defect repaired).
+  `graph_reopen_eligible=true` (unhidden idle 0.857/0.862 ms/token at D128/D2048,
+  ≥0.50 ms trigger). P4096 prefill attribution remains secondary/unvalidated
+  this sitting. `claims_throughput=false`; no production selector changes.
+- Acceptance evidence: [`tasks/OPT-090.md`](tasks/OPT-090.md);
+  [`evidence/optimization/opt090-decode-attribution/REPORT.md`](evidence/optimization/opt090-decode-attribution/REPORT.md).
+- Marked OPT-090 `done`. Next eligible pending by dependency order: **OPT-091**.
 

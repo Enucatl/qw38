@@ -29,7 +29,7 @@ SCHEDULER_DIAGNOSTIC_CUDA_OBJECTS := $(BUILD_DIR)/full_scheduler.trace.cuda.o $(
 CUDA_RELEASE_OBJECTS := $(CUDA_BUILD_DIR)/engine.o $(BUILD_DIR)/eval.cuda.o $(BUILD_DIR)/bench.cuda.o $(QUANT_MMV_CUDA_OBJECTS) $(BUILD_DIR)/gdn_step.cuda.o $(BUILD_DIR)/attention_decode.cuda.o $(BUILD_DIR)/scheduler_primitives.cuda.o $(BUILD_DIR)/full_scheduler.cuda.o $(BUILD_DIR)/checkpoint.cuda.o
 CUDA_TRACE_OBJECTS := $(CUDA_BUILD_DIR)/engine.trace.o $(BUILD_DIR)/eval.trace.cuda.o $(BUILD_DIR)/full_scheduler.trace.cuda.o $(BUILD_DIR)/checkpoint.trace.cuda.o
 
-.PHONY: all clean test diagnostic cuda-image cuda-build cuda-native cuda-products cuda-opt057-diagnostics cuda-opt058-diagnostics cuda-opt059-diagnostics cuda-opt060-diagnostics cuda-opt061-diagnostics cuda-opt062-diagnostics cuda-opt063-diagnostics cuda-opt064-diagnostics cuda-opt065-diagnostics cuda-opt066-diagnostics cuda-opt067-diagnostics cuda-opt068-diagnostics cuda-opt069-diagnostics cuda-opt070-diagnostics cuda-opt071-diagnostics cuda-opt073-diagnostics cuda-opt074-diagnostics cuda-opt075-diagnostics cuda-opt076-diagnostics cuda-opt077-diagnostics cuda-opt078-diagnostics cuda-opt079-diagnostics cuda-opt080-diagnostics cuda-opt081-diagnostics cuda-opt082-diagnostics cuda-opt083-diagnostics cuda-opt084-diagnostics cuda-opt085-diagnostics cuda-opt086-diagnostics cuda-opt087-diagnostics cuda-opt088-diagnostics cuda-opt089-diagnostics FORCE
+.PHONY: all clean test diagnostic cuda-image cuda-build cuda-native cuda-products cuda-opt057-diagnostics cuda-opt058-diagnostics cuda-opt059-diagnostics cuda-opt060-diagnostics cuda-opt061-diagnostics cuda-opt062-diagnostics cuda-opt063-diagnostics cuda-opt064-diagnostics cuda-opt065-diagnostics cuda-opt066-diagnostics cuda-opt067-diagnostics cuda-opt068-diagnostics cuda-opt069-diagnostics cuda-opt070-diagnostics cuda-opt071-diagnostics cuda-opt073-diagnostics cuda-opt074-diagnostics cuda-opt075-diagnostics cuda-opt076-diagnostics cuda-opt077-diagnostics cuda-opt078-diagnostics cuda-opt079-diagnostics cuda-opt080-diagnostics cuda-opt081-diagnostics cuda-opt082-diagnostics cuda-opt083-diagnostics cuda-opt084-diagnostics cuda-opt085-diagnostics cuda-opt086-diagnostics cuda-opt087-diagnostics cuda-opt088-diagnostics cuda-opt089-diagnostics cuda-opt090-diagnostics FORCE
 
 all: $(BINARIES) $(HOST_DIAGNOSTICS)
 
@@ -180,6 +180,8 @@ cuda-opt087-diagnostics:
 cuda-opt088-diagnostics: $(BUILD_DIR)/qw38-cuda-optimization-engine-probe $(BUILD_DIR)/qw38-cuda-decode-oracle-test $(BUILD_DIR)/qw38-cuda-prefill-4k-oracle-test $(BUILD_DIR)/qw38-cuda-prefill-2k-parity-test $(BUILD_DIR)/qw38-cuda-opt058-quality-baseline-test $(BUILD_DIR)/qw38-cuda-checkpoint-test $(BUILD_DIR)/qw38-cuda-memory-fit-test
 
 cuda-opt089-diagnostics: $(BUILD_DIR)/qw38-cuda-opt082-kernel-parity-test $(BUILD_DIR)/qw38-cuda-component-replay $(BUILD_DIR)/qw38-cuda-optimization-engine-probe $(BUILD_DIR)/qw38-cuda-opt058-quality-baseline-test
+
+cuda-opt090-diagnostics: $(BUILD_DIR)/qw38-cuda-opt060-engine-attribution-test $(BUILD_DIR)/qw38-cuda-component-replay $(BUILD_DIR)/qw38-cuda-optimization-engine-probe
 
 cuda-opt073-diagnostics: $(BUILD_DIR)/qw38-cuda-opt058-quality-baseline-test
 
