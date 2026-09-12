@@ -251,7 +251,9 @@ OPT-089.
 
 Read [the post-098 analysis and protocol](tasks/PERFORMANCE-RECOVERY-POST-098.md).
 The batch targets the remaining 1.85x–1.91x decode gap with source-backed
-layout and kernel changes, plus the approximately 4.1% P4096 final-mile gap.
+layout and kernel changes, plus the approximately 4.1% historical P4096
+final-mile gap. OPT-106's fresh sitting is 3036.84 versus 3252.58 tok/s
+(6.6% below parity), so later tasks must use fresh same-sitting controls.
 OPT-099 first repairs matched family evidence; OPT-100–105 retain independent
 keep/reject decisions; OPT-106 owns the combined sitting. First eligible task
 in ledger/dependency order is OPT-099.
@@ -266,6 +268,30 @@ in ledger/dependency order is OPT-099.
 | OPT-104 | Align Q6 weights for attention-output and vocabulary projections | OPT-099 | done | One lossless replacement layout improves combined complete Q6 work and both decode prefixes with full-vocab/P4096/memory gates, or raw Q6 is retained | [`tasks/OPT-104.md`](tasks/OPT-104.md); [`pins/opt104_q6_aligned_contract.json`](pins/opt104_q6_aligned_contract.json); [`pins/opt104_iteration_contract.json`](pins/opt104_iteration_contract.json); [`fixtures/opt104_q6_aligned.json`](fixtures/opt104_q6_aligned.json); [`tools/opt104_q6_aligned.py`](tools/opt104_q6_aligned.py); [`tests/test_opt104_q6_aligned.py`](tests/test_opt104_q6_aligned.py); [`cuda/opt104_q6_aligned_test.cu`](cuda/opt104_q6_aligned_test.cu); [`cuda/q6k_aligned_layout.cuh`](cuda/q6k_aligned_layout.cuh); [`Makefile`](Makefile); [`evidence/optimization/opt104-q6-aligned-layout/REPORT.md`](evidence/optimization/opt104-q6-aligned-layout/REPORT.md); [`evidence/optimization/opt104-q6-aligned-layout/REJECTION.md`](evidence/optimization/opt104-q6-aligned-layout/REJECTION.md); verification 2026-09-12T17:42:51Z |
 | OPT-105 | Double-buffer raw X in a 64x128 prompt MMQ tile | OPT-099 | done | Bitwise two-X-stage schedule saves ≥5 ms over complete P4096 FFNs and improves P4096 with decode/quality guards, or 128x128 joined-wait remains | [`tasks/OPT-105.md`](tasks/OPT-105.md); [`pins/opt105_mmq_double_x_contract.json`](pins/opt105_mmq_double_x_contract.json); [`pins/opt105_iteration_contract.json`](pins/opt105_iteration_contract.json); [`fixtures/opt105_mmq_double_x.json`](fixtures/opt105_mmq_double_x.json); [`tools/opt105_mmq_double_x.py`](tools/opt105_mmq_double_x.py); [`tests/test_opt105_mmq_double_x.py`](tests/test_opt105_mmq_double_x.py); [`cuda/opt105_mmq_double_x_test.cu`](cuda/opt105_mmq_double_x_test.cu); [`Makefile`](Makefile); [`evidence/optimization/opt105-mmq-double-x/REPORT.md`](evidence/optimization/opt105-mmq-double-x/REPORT.md); [`evidence/optimization/opt105-mmq-double-x/REJECTION.md`](evidence/optimization/opt105-mmq-double-x/REJECTION.md); verification 2026-09-12T17:33:55Z |
 | OPT-106 | Freeze and measure the post-098 recovery combination | OPT-100, OPT-101, OPT-102, OPT-103, OPT-104, OPT-105 | done | Fresh quality/P/D/p95/2K/state/memory sitting independently reports internal improvement, llama parity and unchanged OPT-056 +5% outcomes | [`tasks/OPT-106.md`](tasks/OPT-106.md); [`pins/opt106_batch_gate_contract.json`](pins/opt106_batch_gate_contract.json); [`pins/opt106_iteration_contract.json`](pins/opt106_iteration_contract.json); [`fixtures/opt106_batch_gate.json`](fixtures/opt106_batch_gate.json); [`tools/opt106_batch_gate.py`](tools/opt106_batch_gate.py); [`tests/test_opt106_batch_gate.py`](tests/test_opt106_batch_gate.py); [`Makefile`](Makefile); [`evidence/optimization/opt106-batch-gate/REPORT.md`](evidence/optimization/opt106-batch-gate/REPORT.md); verification 2026-09-12T18:20:00Z |
+
+### Post-106 coupled-stack recovery batch
+
+The post-098 ladder rejected individually isolated changes, but several tests did
+not reproduce the corresponding llama.cpp subsystem as a coherent stack. This
+batch permits a bounded vertical slice to change mutually dependent layout,
+arithmetic, launch topology, and lifetime together, while retaining independent
+kernel parity, full-model quality, state, memory, and end-to-end performance
+verdicts. It does not reopen unchanged rejected candidates. OPT-114 first
+calibrates the current sitting and tests whether graph/launch overhead is real;
+OPT-107–112 then test bounded mechanisms; OPT-113 owns the final sitting. A
+failed screen is a useful measured rejection, not permission for another
+unbounded variant. First eligible task in ledger/dependency order is OPT-114.
+
+| ID | Description | Dependencies | Status | Acceptance condition | Evidence |
+|---|---|---|---|---|---|
+| OPT-114 | Calibrate the fresh sitting and measure real decode launch overhead | OPT-106 | pending | Same-binary A/A controls are repeatable; actual host/GPU launch gaps are separated from CUDA-event category time; existing segment graphs are admitted only if a fresh, correct A/B removes a material measured cost | [`tasks/OPT-114.md`](tasks/OPT-114.md) |
+| OPT-107 | Dispatch decode attention by measured prefix crossover | OPT-103, OPT-106, OPT-114 | pending | Existing warp_query remains at short prefixes while vec128_online is admitted only over a bounded measured range (including 2048 when supported); D128 is unchanged and D2048 component/E2E throughput improves with quality/state/P4096 guards | [`tasks/OPT-107.md`](tasks/OPT-107.md) |
+| OPT-108 | Reproduce the actual NVIDIA pinned-llama vector-attention stack | OPT-103, OPT-106, OPT-114 | pending | A source-faithful NVIDIA vector-attention slice (without assuming an AMD-only half2 path) beats the current attention control on equivalent buffers and clears the complete D2048/non-regression gates, or production is unchanged | [`tasks/OPT-108.md`](tasks/OPT-108.md) |
+| OPT-109 | Keep transposed GDN state for the session lifetime | OPT-101, OPT-106, OPT-114 | pending | Col-major device state persists across decode steps with no timed per-layer relayout; checkpoint/prompt boundaries round-trip canonically and complete GDN plus D128/D2048 improve, or sequential row-major remains | [`tasks/OPT-109.md`](tasks/OPT-109.md) |
+| OPT-110 | Execute pinned-llama Q4_K MMVQ through a Quartz adapter | OPT-106, OPT-114 | pending | Starting from identical BF16 input and raw Q4_K weights, a source-faithful Q8_1 MMVQ pipeline including its native staging beats the selected Q8Block `integer_q8_late` pipeline, then wins complete rotating FFN and both decode prefixes under existing parity/quality/memory gates, or production is unchanged | [`tasks/OPT-110.md`](tasks/OPT-110.md) |
+| OPT-111 | Reproduce the remaining llama F16 MMA prompt-attention differences | OPT-079, OPT-103, OPT-106, OPT-114 | pending | A source-backed prompt-attention adapter, justified against the shipping OPT-079 `kv_once` control, improves complete attention and P4096 sufficiently to reduce the measured prefill gap while preserving exact causality and quality; otherwise no swizzle follow-up | [`tasks/OPT-111.md`](tasks/OPT-111.md) |
+| OPT-112 | Fuse decode normalization into typed Q8 staging (deferred) | OPT-106, OPT-114 | pending | Only proceed after a fresh component screen shows enough removable norm/staging cost; emit and reuse Q8_1 or Q8Block only for consumers of that exact encoding, preserve BF16 rounding in-register, and keep the current path unless complete decode wins under full quality gates | [`tasks/OPT-112.md`](tasks/OPT-112.md) |
+| OPT-113 | Freeze and measure the coupled-stack recovery combination | OPT-107, OPT-108, OPT-109, OPT-110, OPT-111, OPT-114 | pending | Fresh controls and survivors receive independent internal-improvement, llama-parity, and OPT-056 +5% verdicts with honest failures; OPT-112 is optional and may be explicitly deferred without delaying the sitting | [`tasks/OPT-113.md`](tasks/OPT-113.md) |
 
 ### Post-042 recovery execution order (historical batch)
 
@@ -7424,4 +7450,3 @@ statements below are historical, not the current execution order.
 - **tok/s delta vs OPT-098 P4096 baseline (3046.23 tok/s): −9.39 tok/s (0.997×).**
   D128 +16.21 tok/s; D2048 +13.91 tok/s versus that same control sitting.
 - Marked OPT-106 `done`. Coupled IDs: none. Post-098 recovery batch complete.
-
