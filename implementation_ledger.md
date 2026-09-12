@@ -240,7 +240,7 @@ OPT-089.
 | OPT-090 | Measure matched post-Q4 decode sinks and secondary P4096 attribution | OPT-089 | done | Correct call counts, no dropped events, ≤5% unexplained wall; auditable family ranking and conditional-task triggers | [`tasks/OPT-090.md`](tasks/OPT-090.md); [`pins/opt090_decode_attribution_contract.json`](pins/opt090_decode_attribution_contract.json); [`pins/opt090_iteration_contract.json`](pins/opt090_iteration_contract.json); [`fixtures/opt090_decode_attribution.json`](fixtures/opt090_decode_attribution.json); [`tools/opt090_decode_attribution.py`](tools/opt090_decode_attribution.py); [`tests/test_opt090_decode_attribution.py`](tests/test_opt090_decode_attribution.py); [`Makefile`](Makefile); [`cuda/opt060_engine_attribution_test.cu`](cuda/opt060_engine_attribution_test.cu); [`evidence/optimization/opt090-decode-attribution/REPORT.md`](evidence/optimization/opt090-decode-attribution/REPORT.md); verification 2026-09-12T06:15:00Z |
 | OPT-091 | Establish successor quality gate and decide narrowly bounded late_w4 concession | OPT-090 | done | Versioned strict/successor verdicts; full Q required; concession only with ≤1.015 PPL and strong two-prefix decode benefit | [`tasks/OPT-091.md`](tasks/OPT-091.md); [`pins/opt091_quality_tradeoff_contract.json`](pins/opt091_quality_tradeoff_contract.json); [`pins/opt091_iteration_contract.json`](pins/opt091_iteration_contract.json); [`fixtures/opt091_quality_tradeoff.json`](fixtures/opt091_quality_tradeoff.json); [`tools/opt091_quality_tradeoff.py`](tools/opt091_quality_tradeoff.py); [`tests/test_opt091_quality_tradeoff.py`](tests/test_opt091_quality_tradeoff.py); [`docs/06-system-optimization.md`](docs/06-system-optimization.md); [`evidence/optimization/opt091-quality-tradeoff/REPORT.md`](evidence/optimization/opt091-quality-tradeoff/REPORT.md); verification 2026-09-12T07:50:00Z |
 | OPT-092 | Group same-input Q8 decode projections into one launch per layer group | OPT-091 | done | Exact staging/output parity and full mixer plus two-prefix E2E acceptance, or retain r1_w4 separate launches | [`tasks/OPT-092.md`](tasks/OPT-092.md); [`pins/opt092_q8_grouped_contract.json`](pins/opt092_q8_grouped_contract.json); [`pins/opt092_iteration_contract.json`](pins/opt092_iteration_contract.json); [`fixtures/opt092_q8_grouped.json`](fixtures/opt092_q8_grouped.json); [`tools/opt092_q8_grouped.py`](tools/opt092_q8_grouped.py); [`tests/test_opt092_q8_grouped.py`](tests/test_opt092_q8_grouped.py); [`cuda/opt092_q8_grouped_test.cu`](cuda/opt092_q8_grouped_test.cu); [`Makefile`](Makefile); [`evidence/optimization/opt092-q8-grouped/REPORT.md`](evidence/optimization/opt092-q8-grouped/REPORT.md); verification 2026-09-12T08:30:00Z |
-| OPT-093 | Factor paired-group Q4 integer scale/min work | OPT-092 | pending | Strict parity, same-math internal reconstruction, full Q and complete FFN/two-prefix keep or reject | [`tasks/OPT-093.md`](tasks/OPT-093.md) |
+| OPT-093 | Factor paired-group Q4 integer scale/min work | OPT-092 | done | Strict parity, same-math internal reconstruction, full Q and complete FFN/two-prefix keep or reject | [`tasks/OPT-093.md`](tasks/OPT-093.md); [`pins/opt093_q4_factored_contract.json`](pins/opt093_q4_factored_contract.json); [`pins/opt093_iteration_contract.json`](pins/opt093_iteration_contract.json); [`fixtures/opt093_q4_factored.json`](fixtures/opt093_q4_factored.json); [`tools/opt093_q4_factored.py`](tools/opt093_q4_factored.py); [`tests/test_opt093_q4_factored.py`](tests/test_opt093_q4_factored.py); [`cuda/opt093_q4_factored_test.cu`](cuda/opt093_q4_factored_test.cu); [`cuda/q4k_decode_path.cuh`](cuda/q4k_decode_path.cuh); [`cuda/q4k_decode_dots.cuh`](cuda/q4k_decode_dots.cuh); [`Makefile`](Makefile); [`evidence/optimization/opt093-q4-factored/REPORT.md`](evidence/optimization/opt093-q4-factored/REPORT.md); delivery 2026-09-12T09:10:00Z |
 | OPT-094 | Conditionally replicate OPT-077 tile32 on demonstrably repaired timing | OPT-093 | pending | Concrete measurement repair required; fixed 30-pair test and full quality/state/two-prefix gate, or no-reopen | [`tasks/OPT-094.md`](tasks/OPT-094.md) |
 | OPT-095 | Share decode KV loads across six query heads without a prep launch | OPT-094 | pending | Bitwise per-head output and complete 16-layer/two-prefix acceptance, or retain warp_query | [`tasks/OPT-095.md`](tasks/OPT-095.md) |
 | OPT-096 | Conditionally capture eight-layer decode segments | OPT-095 | pending | Fresh ≥0.50 ms removable overhead trigger, exact graph/state behavior and two-prefix gain, or no-reopen | [`tasks/OPT-096.md`](tasks/OPT-096.md) |
@@ -7084,4 +7084,23 @@ statements below are historical, not the current execution order.
 - Acceptance evidence: [`tasks/OPT-092.md`](tasks/OPT-092.md);
   [`evidence/optimization/opt092-q8-grouped/REPORT.md`](evidence/optimization/opt092-q8-grouped/REPORT.md).
 - Marked OPT-092 `done`. Next eligible pending by dependency order: **OPT-093**.
+
+### 2026-09-12T09:10:00Z — OPT-093 factored Q4 dots delivered
+
+- Measured reject `factored_pair_w4` (`integer_q8_factored` / `paired_integer`,
+  4 warps): 13/13 kernel parity bitwise; complete rotating FFN n=10 control
+  9.977 vs candidate 10.482 ms/token, mean diff (control−candidate)
+  **−0.505 ms/token**, CI95 **[−0.543, −0.466]** (`positive=false`,
+  `saving_ge_0_10_ms=false`). Retained control `integer_q8_late` /
+  `paired_integer`. `claims_throughput=false`.
+- Independent verdicts (`factored_pair_w4`): `kernel_parity_pass=true`;
+  `model_quality_pass=false` (candidate Q not measured; performance reject
+  first); `performance_pass=false`; `production_kept=false`.
+- Key evidence: [`fixtures/opt093_q4_factored.json`](fixtures/opt093_q4_factored.json);
+  [`evidence/optimization/opt093-q4-factored/REPORT.md`](evidence/optimization/opt093-q4-factored/REPORT.md).
+  Host-native phases via `QW38_HOST_NATIVE=1` direct tool (docker orchestrator
+  compile blocked).
+- Acceptance evidence: [`tasks/OPT-093.md`](tasks/OPT-093.md);
+  [`evidence/optimization/opt093-q4-factored/REPORT.md`](evidence/optimization/opt093-q4-factored/REPORT.md).
+- Marked OPT-093 `done`. Next eligible pending by dependency order: **OPT-094**.
 

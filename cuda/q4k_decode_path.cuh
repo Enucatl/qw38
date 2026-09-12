@@ -13,6 +13,9 @@ constexpr char kLegalQ4DecodePathIntegerQ81[] = "integer_q8_1";
 // OPT-076 packed-load / late-reduction Q8Block sibling. OPT-089 admitted this
 // path; half-scale Q8_1 stays out of it.
 constexpr char kLegalQ4DecodePathIntegerQ8Late[] = "integer_q8_late";
+// OPT-093 paired-group factored scale/min. Technique from pinned llama
+// vecdotq.cuh::vec_dot_q4_K_q8_1_impl_vmmq (cc83d7b, MIT).
+constexpr char kLegalQ4DecodePathIntegerQ8Factored[] = "integer_q8_factored";
 
 // OPT-072 typed Q8_1 pairing: the UseQ81 Q4 consumer treats stored q8_sum as
 // integer sum(q). A sum(x) producer must not feed that consumer. Production
@@ -40,6 +43,11 @@ constexpr char kQ4LaunchVariantCoopQ8LatePrequant[] =
     "q4k_coop_mmv_late_prequant_q8";
 constexpr char kQ4LaunchVariantPairedIntegerQ8Late[] =
     "q4k_coop_gate_up_swiglu_late_prequant_q8";
+constexpr char kQ4LaunchVariantCoopQ8Factored[] = "q4k_coop_mmv_factored_q8";
+constexpr char kQ4LaunchVariantCoopQ8FactoredPrequant[] =
+    "q4k_coop_mmv_factored_prequant_q8";
+constexpr char kQ4LaunchVariantPairedIntegerQ8Factored[] =
+    "q4k_coop_gate_up_swiglu_factored_prequant_q8";
 
 constexpr int kQ4LaunchTraceCapacity = 8;
 
@@ -58,7 +66,8 @@ inline bool legal_q4_decode_path(const char* path) noexcept {
          (std::strcmp(path, kLegalQ4DecodePathPacked) == 0 ||
           std::strcmp(path, kLegalQ4DecodePathIntegerQ8) == 0 ||
           std::strcmp(path, kLegalQ4DecodePathIntegerQ81) == 0 ||
-          std::strcmp(path, kLegalQ4DecodePathIntegerQ8Late) == 0);
+          std::strcmp(path, kLegalQ4DecodePathIntegerQ8Late) == 0 ||
+          std::strcmp(path, kLegalQ4DecodePathIntegerQ8Factored) == 0);
 }
 
 inline bool legal_q4_decode_warps_per_row(unsigned int warps) noexcept {
@@ -87,7 +96,8 @@ inline bool q4_decode_path_is_integer(const char* path) noexcept {
   return path != nullptr &&
          (std::strcmp(path, kLegalQ4DecodePathIntegerQ8) == 0 ||
           std::strcmp(path, kLegalQ4DecodePathIntegerQ81) == 0 ||
-          std::strcmp(path, kLegalQ4DecodePathIntegerQ8Late) == 0);
+          std::strcmp(path, kLegalQ4DecodePathIntegerQ8Late) == 0 ||
+          std::strcmp(path, kLegalQ4DecodePathIntegerQ8Factored) == 0);
 }
 
 inline bool q4_decode_uses_integer() noexcept {
@@ -104,11 +114,17 @@ inline bool q4_decode_uses_late_reduction() noexcept {
                      kLegalQ4DecodePathIntegerQ8Late) == 0;
 }
 
+inline bool q4_decode_uses_factored_reduction() noexcept {
+  return std::strcmp(effective_q4_decode_path(),
+                     kLegalQ4DecodePathIntegerQ8Factored) == 0;
+}
+
 // Q8Block integer cooperative dots. Distinct from half-scale Q8_1.
 inline bool q4_decode_uses_integer_q8block() noexcept {
   const char* path = effective_q4_decode_path();
   return std::strcmp(path, kLegalQ4DecodePathIntegerQ8) == 0 ||
-         std::strcmp(path, kLegalQ4DecodePathIntegerQ8Late) == 0;
+         std::strcmp(path, kLegalQ4DecodePathIntegerQ8Late) == 0 ||
+         std::strcmp(path, kLegalQ4DecodePathIntegerQ8Factored) == 0;
 }
 
 inline void record_q4_launch_variant(const char* variant) noexcept {

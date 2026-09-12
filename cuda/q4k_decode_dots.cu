@@ -48,6 +48,19 @@ cudaError_t launch_q4k_coop_mmv_prequant(
       !legal_q4_decode_warps_per_row(warps_per_row)) {
     return cudaErrorInvalidValue;
   }
+  if (q4_decode_uses_factored_reduction()) {
+    if (q8_1) return cudaErrorInvalidValue;
+    record_q4_launch_variant(kQ4LaunchVariantCoopQ8FactoredPrequant);
+    if (warps_per_row == 2) {
+      return q4k_dots::launch_coop_factored<2>(weights, rows, columns, staged,
+                                                 output, stream);
+    }
+    if (warps_per_row == 4) {
+      return q4k_dots::launch_coop_factored<4>(weights, rows, columns, staged,
+                                                 output, stream);
+    }
+    return cudaErrorInvalidValue;
+  }
   if (q4_decode_uses_late_reduction()) {
     if (q8_1) return cudaErrorInvalidValue;
     record_q4_launch_variant(kQ4LaunchVariantCoopQ8LatePrequant);
@@ -119,7 +132,9 @@ cudaError_t launch_q4k_coop_mmv(
   error = launch_q4k_coop_mmv_prequant(weights, rows, columns, workspace, output,
                                        warps_per_row, q8_1, stream);
   if (error == cudaSuccess) {
-    if (q4_decode_uses_late_reduction()) {
+    if (q4_decode_uses_factored_reduction()) {
+      record_q4_launch_variant(kQ4LaunchVariantCoopQ8Factored);
+    } else if (q4_decode_uses_late_reduction()) {
       record_q4_launch_variant(kQ4LaunchVariantCoopQ8Late);
     } else {
       record_q4_launch_variant(q8_1 ? kQ4LaunchVariantCoopQ81
@@ -217,6 +232,15 @@ cudaError_t launch_q4k_coop_gate_up_swiglu_prequant_q8(
       columns % kValuesPerWeightBlock != 0 ||
       (warps_per_row != 4 && warps_per_row != 2)) {
     return cudaErrorInvalidValue;
+  }
+  if (q4_decode_uses_factored_reduction()) {
+    record_q4_launch_variant(kQ4LaunchVariantPairedIntegerQ8Factored);
+    if (warps_per_row == 2) {
+      return q4k_dots::launch_coop_gate_up_factored<2>(
+          gate_weights, up_weights, rows, columns, q8, output, stream);
+    }
+    return q4k_dots::launch_coop_gate_up_factored<4>(
+        gate_weights, up_weights, rows, columns, q8, output, stream);
   }
   if (q4_decode_uses_late_reduction()) {
     record_q4_launch_variant(kQ4LaunchVariantPairedIntegerQ8Late);

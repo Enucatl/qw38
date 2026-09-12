@@ -41,7 +41,7 @@ cudaError_t launch_quantize_bf16_q8_1_sum_x(const __nv_bfloat16* activation,
                                             void* q8, std::size_t columns,
                                             cudaStream_t stream) noexcept;
 
-#if defined(__CUDACC__) && !defined(QW38_SKIP_Q4K_DOT_KERNELS)
+#if defined(__CUDACC__)
 
 namespace q4k_dots {
 
@@ -253,6 +253,208 @@ __device__ __forceinline__ float vec_dot_q4k_q8block_late(
 __device__ __forceinline__ __nv_bfloat16 admitted_swiglu(float gate, float up) {
   const float activated = gate / (1.0F + expf(-gate));
   return __float2bfloat16_rn(__fmul_rn(activated, up));
+}
+
+// OPT-093 paired-group factored Q8Block dots. Technique from pinned llama
+// vecdotq.cuh::vec_dot_q4_K_q8_1_impl_vmmq (cc83d7b, MIT). Quartz-owned
+// rewrite: one packed qs load per adjacent low/high group pair, exact int32
+// dot/min sums, FP32 d/min association per pair. Do not vendor ggml headers.
+__device__ __forceinline__ Q8PackRegs load_q8_pack_factored(
+    const void* block_staged, int group, int pack) {
+  return load_q8_pack_late(block_staged, group, pack);
+}
+
+__device__ __forceinline__ float vec_dot_q4k_q8block_factored_single(
+    const std::uint8_t* block, const Q8PackRegs& q8, int group, int pack) {
+  float d = 0.0F;
+  float dmin = 0.0F;
+  const std::uintptr_t block_addr = reinterpret_cast<std::uintptr_t>(block);
+  if ((block_addr & 3U) == 0U) {
+    const unsigned dm = __ldg(reinterpret_cast<const unsigned*>(block));
+    d = __half2float(
+        __ushort_as_half(static_cast<unsigned short>(dm & 0xFFFFU)));
+    dmin = __half2float(
+        __ushort_as_half(static_cast<unsigned short>(dm >> 16U)));
+  } else {
+    d = read_half_bytes(block);
+    dmin = read_half_bytes(block + 2);
+  }
+  int scale = 0;
+  int minimum = 0;
+  q4k_scale_min(block + 4, group, &scale, &minimum);
+  const std::uint8_t* qs = block + 16 + (group / 2) * 32;
+  const int high = group & 1;
+  int v0 = 0;
+  int v1 = 0;
+  const std::uintptr_t qs_addr = reinterpret_cast<std::uintptr_t>(qs);
+  if ((qs_addr & 3U) == 0U) {
+    const int* words = reinterpret_cast<const int*>(qs);
+    const int word0 = __ldg(words + pack);
+    const int word1 = __ldg(words + pack + 4);
+    const int shift = high << 2;
+    v0 = (word0 >> shift) & 0x0F0F0F0F;
+    v1 = (word1 >> shift) & 0x0F0F0F0F;
+  } else {
+    std::int8_t q4_lo[4];
+    std::int8_t q4_hi[4];
+#pragma unroll
+    for (int i = 0; i < 4; ++i) {
+      const std::uint8_t b0 = qs[pack * 4 + i];
+      const std::uint8_t b1 = qs[16 + pack * 4 + i];
+      q4_lo[i] = static_cast<std::int8_t>(high == 0 ? (b0 & 15) : (b0 >> 4));
+      q4_hi[i] = static_cast<std::int8_t>(high == 0 ? (b1 & 15) : (b1 >> 4));
+    }
+    v0 = pack4_bytes(q4_lo) & 0x0F0F0F0F;
+    v1 = pack4_bytes(q4_hi) & 0x0F0F0F0F;
+  }
+  const int dot = __dp4a(v1, q8.u1, __dp4a(v0, q8.u0, 0));
+  const int q8_sum = __dp4a(0x01010101, q8.u1, __dp4a(0x01010101, q8.u0, 0));
+  const float sum_d = __fmul_rn(q8.d8, __fmul_rn(static_cast<float>(dot),
+                                                 static_cast<float>(scale)));
+  const float sum_m = __fmul_rn(q8.d8, __fmul_rn(static_cast<float>(q8_sum),
+                                                 static_cast<float>(minimum)));
+  return __fsub_rn(__fmul_rn(d, sum_d), __fmul_rn(dmin, sum_m));
+}
+
+__device__ __forceinline__ float vec_dot_q4k_q8block_factored_pair(
+    const std::uint8_t* block, const void* block_staged, int pair, int pack) {
+  const int group0 = 2 * pair;
+  const int group1 = group0 + 1;
+  const Q8PackRegs q8_0 =
+      load_q8_pack_factored(block_staged, group0, pack);
+  const Q8PackRegs q8_1 =
+      load_q8_pack_factored(block_staged, group1, pack);
+  return __fadd_rn(
+      vec_dot_q4k_q8block_factored_single(block, q8_0, group0, pack),
+      vec_dot_q4k_q8block_factored_single(block, q8_1, group1, pack));
+}
+
+#ifndef QW38_SKIP_Q4K_DOT_KERNELS
+
+template <int WarpsPerRow>
+__global__ void q4k_coop_mmv_factored(const std::uint8_t* weights,
+                                      std::size_t rows, std::size_t columns,
+                                      const void* staged, float* output) {
+  const int lane = threadIdx.x;
+  const int warp = threadIdx.y;
+  const std::size_t row = static_cast<std::size_t>(blockIdx.x);
+  if (row >= rows) return;
+
+  const int pair = (lane % 16) / 4;
+  const int pack = lane % 4;
+  const int lane_half = lane / 16;
+  const std::size_t n_blocks = columns / kValuesPerBlock;
+  const std::uint8_t* row_weights = weights + row * n_blocks * kQ4KBytes;
+  const std::size_t group_bytes = sizeof(Q8Block);
+  const char* staged_bytes = static_cast<const char*>(staged);
+  float acc = 0.0F;
+  for (std::size_t kbx = static_cast<std::size_t>(2 * warp + lane_half);
+       kbx < n_blocks; kbx += 8U) {
+    const std::uint8_t* block = row_weights + kbx * kQ4KBytes;
+    const void* block_staged = staged_bytes + kbx * 8U * group_bytes;
+    const int group0 = 2 * pair;
+    const int group1 = group0 + 1;
+    const Q8PackRegs q8_0 = load_q8_pack_factored(block_staged, group0, pack);
+    const Q8PackRegs q8_1 = load_q8_pack_factored(block_staged, group1, pack);
+    acc += vec_dot_q4k_q8block_factored_single(block, q8_0, group0, pack);
+    acc += vec_dot_q4k_q8block_factored_single(block, q8_1, group1, pack);
+  }
+
+  __shared__ float partial[WarpsPerRow][kWarp];
+  partial[warp][lane] = acc;
+  __syncthreads();
+  if (warp == 0) {
+    float sum = 0.0F;
+#pragma unroll
+    for (int other = 0; other < WarpsPerRow; ++other) {
+      sum += partial[other][lane];
+    }
+    for (int offset = kWarp / 2; offset > 0; offset /= 2) {
+      sum += __shfl_down_sync(0xFFFFFFFFU, sum, offset, kWarp);
+    }
+    if (lane == 0) output[row] = sum;
+  }
+}
+
+template <int WarpsPerRow>
+__global__ void q4k_coop_gate_up_swiglu_factored(
+    const std::uint8_t* gate_weights, const std::uint8_t* up_weights,
+    std::size_t rows, std::size_t columns, const void* staged,
+    __nv_bfloat16* output) {
+  const int lane = threadIdx.x;
+  const int warp = threadIdx.y;
+  const std::size_t row = static_cast<std::size_t>(blockIdx.x);
+  const bool live = row < rows;
+
+  const int pair = (lane % 16) / 4;
+  const int pack = lane % 4;
+  const int lane_half = lane / 16;
+  const std::size_t n_blocks = columns / kValuesPerBlock;
+  const std::size_t group_bytes = sizeof(Q8Block);
+  const char* staged_bytes = static_cast<const char*>(staged);
+  float acc_g = 0.0F;
+  float acc_u = 0.0F;
+  if (live) {
+    const std::uint8_t* gate_row = gate_weights + row * n_blocks * kQ4KBytes;
+    const std::uint8_t* up_row = up_weights + row * n_blocks * kQ4KBytes;
+    for (std::size_t kbx = static_cast<std::size_t>(2 * warp + lane_half);
+         kbx < n_blocks; kbx += 8U) {
+      const void* block_staged = staged_bytes + kbx * 8U * group_bytes;
+      const int group0 = 2 * pair;
+      const int group1 = group0 + 1;
+      const Q8PackRegs q8_0 = load_q8_pack_factored(block_staged, group0, pack);
+      const Q8PackRegs q8_1 = load_q8_pack_factored(block_staged, group1, pack);
+      const std::uint8_t* gate_block = gate_row + kbx * kQ4KBytes;
+      const std::uint8_t* up_block = up_row + kbx * kQ4KBytes;
+      acc_g += vec_dot_q4k_q8block_factored_single(gate_block, q8_0, group0, pack);
+      acc_g += vec_dot_q4k_q8block_factored_single(gate_block, q8_1, group1, pack);
+      acc_u += vec_dot_q4k_q8block_factored_single(up_block, q8_0, group0, pack);
+      acc_u += vec_dot_q4k_q8block_factored_single(up_block, q8_1, group1, pack);
+    }
+  }
+
+  __shared__ float partial_g[WarpsPerRow][kWarp];
+  __shared__ float partial_u[WarpsPerRow][kWarp];
+  partial_g[warp][lane] = acc_g;
+  partial_u[warp][lane] = acc_u;
+  __syncthreads();
+  if (live && warp == 0) {
+    float sum_g = 0.0F;
+    float sum_u = 0.0F;
+#pragma unroll
+    for (int other = 0; other < WarpsPerRow; ++other) {
+      sum_g += partial_g[other][lane];
+      sum_u += partial_u[other][lane];
+    }
+    for (int offset = kWarp / 2; offset > 0; offset /= 2) {
+      sum_g += __shfl_down_sync(0xFFFFFFFFU, sum_g, offset, kWarp);
+      sum_u += __shfl_down_sync(0xFFFFFFFFU, sum_u, offset, kWarp);
+    }
+    if (lane == 0) output[row] = admitted_swiglu(sum_g, sum_u);
+  }
+}
+
+template <int WarpsPerRow>
+cudaError_t launch_coop_factored(const std::uint8_t* weights, std::size_t rows,
+                                 std::size_t columns, const void* staged,
+                                 float* output, cudaStream_t stream) {
+  dim3 block(kWarp, WarpsPerRow);
+  const unsigned int grid = static_cast<unsigned int>(rows);
+  q4k_coop_mmv_factored<WarpsPerRow>
+      <<<grid, block, 0, stream>>>(weights, rows, columns, staged, output);
+  return cudaPeekAtLastError();
+}
+
+template <int WarpsPerRow>
+cudaError_t launch_coop_gate_up_factored(
+    const std::uint8_t* gate_weights, const std::uint8_t* up_weights,
+    std::size_t rows, std::size_t columns, const void* staged,
+    __nv_bfloat16* output, cudaStream_t stream) {
+  dim3 block(kWarp, WarpsPerRow);
+  const unsigned int grid = static_cast<unsigned int>(rows);
+  q4k_coop_gate_up_swiglu_factored<WarpsPerRow><<<grid, block, 0, stream>>>(
+      gate_weights, up_weights, rows, columns, staged, output);
+  return cudaPeekAtLastError();
 }
 
 template <int WarpsPerRow, bool UseQ81>
@@ -556,6 +758,8 @@ cudaError_t launch_coop(const std::uint8_t* weights, std::size_t rows,
       <<<grid, block, 0, stream>>>(weights, rows, columns, staged, output);
   return cudaPeekAtLastError();
 }
+
+#endif  // !QW38_SKIP_Q4K_DOT_KERNELS
 
 }  // namespace q4k_dots
 

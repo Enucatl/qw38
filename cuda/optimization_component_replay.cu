@@ -84,7 +84,7 @@ int usage(const char* argv0) {
                "acceptance|hardware] [MODEL] "
                "[--cache-mode hot|rotating] [--capture-key KEY] "
                "[--q8-layout r1_w4|r2_w2] [--q8-grouping separate|grouped_r1_w4] [--mmq-async-x 0|1] "
-               "[--q4-decode packed|integer_q8|integer_q8_late] "
+               "[--q4-decode packed|integer_q8|integer_q8_late|integer_q8_factored] "
                "[--q4-warps 2|4] "
                "[--ffn-decode paired_staged|shared_stage|paired_integer] "
                "[--gdn-decode sequential|tile16|tile32] "
