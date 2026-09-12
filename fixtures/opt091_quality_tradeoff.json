@@ -1,0 +1,124 @@
+{
+  "schema_version": 1,
+  "task": "OPT-091",
+  "mode": "feedback",
+  "llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+  "gguf_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+  "quality_contract_id": "opt091_late_w4_v1",
+  "report_path": "evidence/optimization/opt091-quality-tradeoff/REPORT.md",
+  "policy": {
+    "schema_version": 1,
+    "task": "OPT-091",
+    "mode": "feedback",
+    "phase": "policy",
+    "quality_contract_id": "opt091_late_w4_v1",
+    "strict_quality_contract_id": "opt089_strict",
+    "active_quality_contract_id": "opt089_strict",
+    "absolute_quality_status": "visible_and_separate",
+    "strict_model_quality_pass": true,
+    "successor_model_quality_pass": true,
+    "regression_release_quality_pass": true,
+    "concession_eligible": false,
+    "concession_used": false,
+    "concession_reason": "strict_quality_already_passed",
+    "claims_throughput": false,
+    "production_kept": false,
+    "shipping_q4_decode": "integer_q8_late",
+    "shipping_ffn_decode": "paired_integer",
+    "shipping_unchanged": true,
+    "historical_gate_relabel": false,
+    "kernel_parity_pass": {
+      "packed_paired_staged": true,
+      "late_w4": true
+    },
+    "model_quality_pass": {
+      "packed_paired_staged": true,
+      "late_w4": true
+    },
+    "performance_pass": {
+      "packed_paired_staged": false,
+      "late_w4": false
+    },
+    "independent_verdicts": {
+      "packed_paired_staged": {
+        "kernel_parity_pass": true,
+        "model_quality_pass": true,
+        "performance_pass": false,
+        "production_kept": false,
+        "quality_contract_id": "opt089_strict",
+        "incomplete": false
+      },
+      "late_w4": {
+        "kernel_parity_pass": true,
+        "model_quality_pass": true,
+        "performance_pass": false,
+        "production_kept": false,
+        "quality_contract_id": "opt089_strict",
+        "incomplete": false
+      }
+    },
+    "ppl_ratios": {
+      "opt088_authenticated": 0.9993525856672696,
+      "opt084_frozen": 0.9993525856672696
+    },
+    "recurrence_incremental_nll": 0.0,
+    "functional_failures": 0,
+    "greedy_mismatch": false,
+    "changed_inherited_answer": false,
+    "incomplete": false,
+    "timed_phases_status": "not_applicable",
+    "opt089_reused": true,
+    "eligible_candidate": "late_w4",
+    "anchors": [
+      "opt084_frozen",
+      "opt088_authenticated"
+    ],
+    "decode_speed_ratio_ci_lower_min": 1.15,
+    "decode_p95_ratio_max": 0.9,
+    "kernel_parity_contract": "kernel_parity_v1",
+    "measurement_utc": "2026-09-12T07:52:13Z",
+    "status": "policy_evaluated"
+  },
+  "absolute_quality_status": "visible_and_separate",
+  "strict_model_quality_pass": true,
+  "successor_model_quality_pass": true,
+  "regression_release_quality_pass": true,
+  "concession_used": false,
+  "concession_eligible": false,
+  "claims_throughput": false,
+  "production_kept": false,
+  "shipping_q4_decode": "integer_q8_late",
+  "shipping_ffn_decode": "paired_integer",
+  "independent_verdicts": {
+    "packed_paired_staged": {
+      "kernel_parity_pass": true,
+      "model_quality_pass": true,
+      "performance_pass": false,
+      "production_kept": false,
+      "quality_contract_id": "opt089_strict",
+      "incomplete": false
+    },
+    "late_w4": {
+      "kernel_parity_pass": true,
+      "model_quality_pass": true,
+      "performance_pass": false,
+      "production_kept": false,
+      "quality_contract_id": "opt089_strict",
+      "incomplete": false
+    }
+  },
+  "kernel_parity_pass": {
+    "packed_paired_staged": true,
+    "late_w4": true
+  },
+  "model_quality_pass": {
+    "packed_paired_staged": true,
+    "late_w4": true
+  },
+  "performance_pass": {
+    "packed_paired_staged": false,
+    "late_w4": false
+  },
+  "timed_phases_status": "not_applicable",
+  "status": "policy_evaluated"
+}

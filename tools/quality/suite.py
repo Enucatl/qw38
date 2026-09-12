@@ -11,7 +11,7 @@ from tools.opt073_quality_policy import (
     retained_generated,
     retained_nll_bundle,
 )
-from tools.quality.compare import compare_engine_records
+from tools.quality.compare import compare_engine_records, evaluate_ppl_contract
 from tools.quality.errors import QualityFrameworkError
 from tools.quality.identity import (
     GGUF_SHA,
@@ -45,6 +45,112 @@ PPL_PREFIX = 4
 HELD_OUT_TARGETS = 32
 PPL_RATIO_MAX = 1.01
 RECURRENCE_MAX = 0.02
+
+QUALITY_CONTRACT_SPECS: dict[str, dict[str, Any]] = {
+    "opt084_frozen": {
+        "quality_contract_id": "opt084_frozen",
+        "ppl_ratio_max": 1.01,
+        "aggregate_ppl_ratio_max": 1.01,
+        "recurrence_incremental_nll_max": 0.02,
+        "require_full_candidate_Q": True,
+        "allow_incomplete_quality": False,
+        "new_functional_failures_max": 0,
+        "allow_new_greedy_mismatch": False,
+        "allow_changed_inherited_answer": False,
+    },
+    "opt089_strict": {
+        "quality_contract_id": "opt089_strict",
+        "ppl_ratio_max": 1.01,
+        "aggregate_ppl_ratio_max": 1.01,
+        "recurrence_incremental_nll_max": 0.02,
+        "require_full_candidate_Q": True,
+        "allow_incomplete_quality": False,
+        "new_functional_failures_max": 0,
+        "allow_new_greedy_mismatch": False,
+        "allow_changed_inherited_answer": False,
+    },
+    "opt091_late_w4_v1": {
+        "quality_contract_id": "opt091_late_w4_v1",
+        "default_ppl_ratio_max": 1.01,
+        "candidate_ppl_ratio_max": 1.015,
+        "aggregate_ppl_ratio_max": 1.015,
+        "recurrence_incremental_nll_max": 0.02,
+        "require_full_candidate_Q": True,
+        "allow_incomplete_quality": False,
+        "new_functional_failures_max": 0,
+        "allow_new_greedy_mismatch": False,
+        "allow_changed_inherited_answer": False,
+    },
+}
+
+
+def quality_contract_spec(contract_id: str) -> dict[str, Any]:
+    spec = QUALITY_CONTRACT_SPECS.get(contract_id)
+    if spec is None:
+        raise QualityFrameworkError(f"unknown quality contract {contract_id}")
+    return dict(spec)
+
+
+def contract_ppl_ratio_max(contract_id: str | None) -> float:
+    if not contract_id:
+        return PPL_RATIO_MAX
+    spec = quality_contract_spec(contract_id)
+    return float(
+        spec.get("ppl_ratio_max")
+        or spec.get("candidate_ppl_ratio_max")
+        or spec.get("default_ppl_ratio_max")
+        or PPL_RATIO_MAX
+    )
+
+
+def evaluate_quality_contracts(
+    *,
+    ratios: Mapping[str, float],
+    recurrence_incremental_nll: float,
+    functional_failures: int = 0,
+    greedy_mismatch: bool = False,
+    changed_inherited_answer: bool = False,
+    incomplete: bool = False,
+    contract_ids: Sequence[str] | None = None,
+) -> dict[str, Any]:
+    """Evaluate one or more explicit quality contracts without changing defaults."""
+    selected = list(contract_ids or QUALITY_CONTRACT_SPECS)
+    verdicts: dict[str, dict[str, Any]] = {}
+    for contract_id in selected:
+        spec = quality_contract_spec(contract_id)
+        ppl = evaluate_ppl_contract(ratios, spec)
+        rec_ok = float(recurrence_incremental_nll) <= float(
+            spec["recurrence_incremental_nll_max"]
+        )
+        func_ok = int(functional_failures) <= int(spec["new_functional_failures_max"])
+        greedy_ok = not greedy_mismatch or bool(spec["allow_new_greedy_mismatch"])
+        inherited_ok = (
+            not changed_inherited_answer or bool(spec["allow_changed_inherited_answer"])
+        )
+        complete_ok = not incomplete or bool(spec["allow_incomplete_quality"])
+        passed = bool(
+            complete_ok
+            and ppl["pass"]
+            and rec_ok
+            and func_ok
+            and greedy_ok
+            and inherited_ok
+        )
+        verdicts[contract_id] = {
+            "model_quality_pass": passed,
+            "ppl": ppl,
+            "recurrence_incremental_nll": float(recurrence_incremental_nll),
+            "recurrence_pass": rec_ok,
+            "functional_failures": int(functional_failures),
+            "functional_pass": func_ok,
+            "greedy_mismatch": bool(greedy_mismatch),
+            "greedy_pass": greedy_ok,
+            "changed_inherited_answer": bool(changed_inherited_answer),
+            "inherited_pass": inherited_ok,
+            "incomplete": bool(incomplete),
+            "complete_pass": complete_ok,
+        }
+    return {"contracts": verdicts, "contract_ids": selected}
 
 SUITE_CLASSES: tuple[str, ...] = (
     "teacher_forced_continuation",
@@ -156,7 +262,7 @@ def known_qwen_continuations() -> dict[str, Any]:
     }
 
 
-def ppl_1024_spans() -> dict[str, Any]:
+def ppl_1024_spans(contract_id: str | None = None) -> dict[str, Any]:
     inputs = load_json(V2_INPUTS)
     retained = load_json(OPT058_FIXTURE)["quality_v2"]
     prefixes: list[dict[str, Any]] = []
@@ -184,10 +290,11 @@ def ppl_1024_spans() -> dict[str, Any]:
                 "retained_quartz_mean_nll": quartz["quartz_mean_nll"],
                 "retained_llama_mean_nll": quartz["llama_mean_nll"],
                 "retained_ppl_ratio": quartz["ppl_ratio"],
-                "ppl_ratio_gate_proposed": PPL_RATIO_MAX,
+                "ppl_ratio_gate_proposed": contract_ppl_ratio_max(contract_id),
                 "framework_prefix_scores": scored,
             }
         )
+    proposed = contract_ppl_ratio_max(contract_id)
     return {
         "class": "ppl_1024_spans",
         "inspectable": True,
@@ -196,12 +303,13 @@ def ppl_1024_spans() -> dict[str, Any]:
             "wikitext_nll": retained["wikitext_nll"]["pass"],
             "held_out_wikitext_1024": retained["held_out_wikitext_1024"]["pass"],
         },
-        "proposed_ppl_ratio_max": PPL_RATIO_MAX,
+        "proposed_ppl_ratio_max": proposed,
+        "quality_contract_id": contract_id,
         "numerically_frozen_by": "OPT-084",
     }
 
 
-def recurrence_nll() -> dict[str, Any]:
+def recurrence_nll(contract_id: str | None = None) -> dict[str, Any]:
     retained = load_json(OPT058_FIXTURE)["quality_v2"]
     short = retained["quartz"]["recurrence_short"]
     long = retained["quartz"]["recurrence_long"]
@@ -218,8 +326,18 @@ def recurrence_nll() -> dict[str, Any]:
         "recurrence_long": long,
         "incremental_nll": drift,
         "retained_incremental_nll": retained["recurrence"]["incremental_nll"],
-        "proposed_max": RECURRENCE_MAX,
-        "pass_vs_proposed": drift <= RECURRENCE_MAX,
+        "proposed_max": (
+            quality_contract_spec(contract_id)["recurrence_incremental_nll_max"]
+            if contract_id
+            else RECURRENCE_MAX
+        ),
+        "pass_vs_proposed": drift
+        <= (
+            quality_contract_spec(contract_id)["recurrence_incremental_nll_max"]
+            if contract_id
+            else RECURRENCE_MAX
+        ),
+        "quality_contract_id": contract_id,
         "numerically_frozen_by": "OPT-084",
     }
 

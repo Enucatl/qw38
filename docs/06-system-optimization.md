@@ -810,6 +810,30 @@ stay in the report; this chapter does not replace them:
 [`evidence/optimization/opt044-production-numerics/REPORT.md`](../evidence/optimization/opt044-production-numerics/REPORT.md).
 This increment **claims no performance improvement**.
 
+## Successor quality gate for late_w4 (OPT-091)
+
+**Policy freeze, 2026-09-12:** OPT-091 introduces the successor contract
+`opt091_late_w4_v1` for the already-admitted `late_w4` path
+(`integer_q8_late` / `paired_integer`, four warps, FP32-scale Q8Block). The
+strict anchor `opt089_strict` (PPL ratio ≤1.01 on each authenticated
+OPT-088 packed/r1 and frozen OPT-084 packed/r2 span) remains the historical
+gate; OPT-091 never relabels it. A narrowly bounded concession to ≤1.015 on
+each span and aggregate applies only when `late_w4` has complete measured Q,
+passes parity/same-math, has no new task/continuation/state failure, keeps
+recurrence ≤0.02, and then clears conditional decode timing (paired throughput
+lower bound >1.15 and p95 ≤0.90× control at D128 and D2048, plus the common
+P4096 guard). OPT-089 already kept `late_w4` under strict quality, so OPT-091
+records `concession_used=false`, leaves production pins unchanged, and marks
+timed concession phases `not_applicable`. Policy emits separate
+`absolute_quality_status`, `strict_model_quality_pass`,
+`successor_model_quality_pass`, and `regression_release_quality_pass`; the
+active `quality_contract_id` is `opt091_late_w4_v1` while
+`model_quality_pass` continues to name the contract that supplied the value.
+This increment **claims no throughput improvement**.
+[`pins/opt091_quality_tradeoff_contract.json`](../pins/opt091_quality_tradeoff_contract.json)
+·
+[`evidence/optimization/opt091-quality-tradeoff/REPORT.md`](../evidence/optimization/opt091-quality-tradeoff/REPORT.md).
+
 ## DwarfStar transfer boundary
 
 Reuse MMV/MMQ phase split, quant block tests, explicit unavailable paths, stable

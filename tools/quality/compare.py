@@ -89,6 +89,48 @@ def compare_engine_records(
     }
 
 
+def evaluate_ppl_contract(
+    ratios: Mapping[str, float],
+    contract: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Evaluate named PPL ratios against explicit contract thresholds."""
+    if not ratios:
+        return {
+            "pass": False,
+            "incomplete": True,
+            "reason": "missing_ppl_ratios",
+            "per_ratio": {},
+            "aggregate_ratio": None,
+            "aggregate_pass": False,
+            "contract_id": contract.get("quality_contract_id")
+            or contract.get("contract_id"),
+        }
+    ppl_max = float(
+        contract.get("ppl_ratio_max")
+        or contract.get("candidate_ppl_ratio_max")
+        or contract.get("default_ppl_ratio_max")
+        or 1.01
+    )
+    aggregate_max = float(
+        contract.get("aggregate_ppl_ratio_max", ppl_max) or ppl_max
+    )
+    per_ratio = {name: float(value) <= ppl_max for name, value in ratios.items()}
+    aggregate = max(float(value) for value in ratios.values())
+    aggregate_pass = aggregate <= aggregate_max
+    passed = all(per_ratio.values()) and aggregate_pass
+    return {
+        "pass": passed,
+        "incomplete": False,
+        "ppl_ratio_max": ppl_max,
+        "aggregate_ppl_ratio_max": aggregate_max,
+        "per_ratio": per_ratio,
+        "aggregate_ratio": aggregate,
+        "aggregate_pass": aggregate_pass,
+        "contract_id": contract.get("quality_contract_id")
+        or contract.get("contract_id"),
+    }
+
+
 def records_to_tsv(rows: Sequence[Mapping[str, Any]]) -> str:
     if not rows:
         return ""
