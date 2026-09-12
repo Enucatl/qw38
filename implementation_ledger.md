@@ -260,7 +260,7 @@ in ledger/dependency order is OPT-099.
 |---|---|---|---|---|---|
 | OPT-099 | Close matched Quartz/llama attribution and P4096 blind spots | OPT-098 | done | Valid D128/D2048/P4096 event unions, explicit FFN down, nonzero executed llama families, ≤5% unexplained wall, targeted counters and go/no-go triggers; diagnostic only | [`tasks/OPT-099.md`](tasks/OPT-099.md) |
 | OPT-100 | Replace raw Q8 device weights with a lossless aligned layout | OPT-099 | done | All decode/prompt Q8 consumers use one replacement layout; complete mixer and D128/D2048 improve with quality/P4096/state/128K guards, or raw Q8 is retained | [`tasks/OPT-100.md`](tasks/OPT-100.md) |
-| OPT-101 | Transpose and register-shard one-token GDN state | OPT-099 | pending | Warp-column FP32 recurrence and canonical state round trips improve complete 48-layer GDN and both decode prefixes with quality/transactional gates, or sequential is retained | [`tasks/OPT-101.md`](tasks/OPT-101.md) |
+| OPT-101 | Transpose and register-shard one-token GDN state | OPT-099 | done | Warp-column FP32 recurrence and canonical state round trips improve complete 48-layer GDN and both decode prefixes with quality/transactional gates, or sequential is retained | [`tasks/OPT-101.md`](tasks/OPT-101.md) |
 | OPT-102 | Repack Q4 metadata and remove decode unpack overhead | OPT-099 | pending | Source-faithful/branchless candidates improve complete 64-layer FFN and both decode prefixes while supporting prompt and memory gates, or late_w4 is retained | [`tasks/OPT-102.md`](tasks/OPT-102.md) |
 | OPT-103 | Port the pinned-llama one-query vector attention specialization | OPT-099 | pending | 128-thread online-softmax attention improves complete 16-layer D128/D2048 attention with full KV/quality/state guards, or warp_query is retained | [`tasks/OPT-103.md`](tasks/OPT-103.md) |
 | OPT-104 | Align Q6 weights for attention-output and vocabulary projections | OPT-099 | pending | One lossless replacement layout improves combined complete Q6 work and both decode prefixes with full-vocab/P4096/memory gates, or raw Q6 is retained | [`tasks/OPT-104.md`](tasks/OPT-104.md) |
@@ -7293,3 +7293,22 @@ statements below are historical, not the current execution order.
 - **tok/s delta vs OPT-098 P4096 baseline (3046.23 tok/s): 0** (rejection; no
   throughput claim).
 - Marked OPT-100 `done`. Coupled IDs: none. First eligible pending task: **OPT-101**.
+
+### 2026-09-12T16:10:00Z — OPT-101 transposed GDN decode delivered (reject)
+
+- Added transposed warp-column decode GDN tooling (`tools/opt101_gdn_transposed.py`,
+  contracts, fixture, tests, `cuda-opt101-diagnostics`, `prepare_recurrence_decode_transposed`
+  in `gdn_decode_recurrence.cuh`, layout round trips in `gdn_decode_path.cuh`).
+  Kernel parity and OPT-073 quality reuse passed; native u1+u4 isolation passed.
+- Complete rotating GDN acceptance (3+10): sequential **12.418 ms** vs transposed
+  **13.339 ms**/token; mean_diff **−0.921 ms**; CI95 **[−1.276, −0.566]**;
+  `positive=false`. D128/D2048 five-pair engine guards failed; P4096 ratio 0.9997
+  (not a keep).
+- Production pin remains `kSelectedGdnDecodePath[] = "sequential"`.
+  `claims_throughput=false`. `evidence_complete=true`.
+- Key evidence: [`fixtures/opt101_gdn_transposed.json`](fixtures/opt101_gdn_transposed.json);
+  [`evidence/optimization/opt101-gdn-transposed-state/REPORT.md`](evidence/optimization/opt101-gdn-transposed-state/REPORT.md);
+  [`evidence/optimization/opt101-gdn-transposed-state/REJECTION.md`](evidence/optimization/opt101-gdn-transposed-state/REJECTION.md).
+- **tok/s delta vs OPT-098 P4096 baseline (3046.23 tok/s): 0** (rejection; no
+  throughput claim).
+- Marked OPT-101 `done`. Coupled IDs: none. First eligible pending task: **OPT-102**.

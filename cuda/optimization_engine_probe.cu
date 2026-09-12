@@ -125,7 +125,7 @@ int usage(const char* argv0) {
                "integer_q8_factored] "
                "[--q4-warps 2|4] "
                "[--ffn-decode paired_staged|shared_stage|paired_integer] "
-               "[--gdn-decode sequential|tile16|tile32] "
+               "[--gdn-decode sequential|tile16|tile32|transposed] "
                "[--decode-query-prep warp_query|prepared_q|prepared_q_veckv] "
                "[--decode-attention-gqa warp_query|warp_query_gqa6] "
                "[--attention-pipeline f16_async|kv_once] "
@@ -355,7 +355,9 @@ int reject_over_bounds(qw38::cuda::TestTier tier, const Options& options) {
     const bool q4_ok = q4_ab && options.prefix == kScreenPrefix &&
                        options.output_tokens == kScreenOutputTokens &&
                        options.prompt == 0 && options.pairs <= 1;
-    const bool gdn_ok = gdn_ab && options.prefix == kScreenPrefix &&
+    const bool gdn_ok = gdn_ab &&
+                        (options.prefix == kScreenPrefix ||
+                         options.prefix == 128) &&
                         options.output_tokens == kScreenOutputTokens &&
                         options.prompt == 0 && options.pairs <= 1;
     const bool grouping_ok = grouping_ab && options.prefix == kScreenPrefix &&
@@ -394,7 +396,9 @@ int reject_over_bounds(qw38::cuda::TestTier tier, const Options& options) {
                         options.prefix == 128) &&
                        options.output_tokens == kScreenOutputTokens &&
                        options.prompt == 0 && options.pairs <= 5;
-    const bool gdn_ok = gdn_ab && options.prefix == kScreenPrefix &&
+    const bool gdn_ok = gdn_ab &&
+                        (options.prefix == kScreenPrefix ||
+                         options.prefix == 128) &&
                         options.output_tokens == kScreenOutputTokens &&
                         options.prompt == 0 && options.pairs <= 5;
     const bool grouping_ok = grouping_ab &&

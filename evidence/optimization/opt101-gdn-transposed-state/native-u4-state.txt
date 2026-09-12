@@ -1,0 +1,25 @@
+
+==========
+== CUDA ==
+==========
+
+CUDA Version 13.0.2
+
+Container image Copyright (c) 2016-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+
+This container image and its contents are governed by the NVIDIA Deep Learning Container License.
+By pulling and using the container, you accept the terms and conditions of this license:
+https://developer.nvidia.com/ngc/nvidia-deep-learning-container-license
+
+A copy of this license is made available in this container at /NGC-DL-CONTAINER-LICENSE for your convenience.
+
+QW38_OPT101_CASE={"id":"layout_roundtrip","pass":true,"same_count":true,"restored_ok":true,"layouts_differ":true,"logical":"row_major_fp32","device":"col_major_fp32","checkpoint":"row_major_fp32","logical_sha256":"3ac4ad9f78bcbdd1f4aa80da8617b32d6e84384783be3d314fec91c1661a4721","device_sha256":"e709048e6ff6ce6223cb14aae0a6c686ae18980d82213f8bd34c266200b26741","layout_version":1}
+QW38_OPT101_CASE={"id":"prod_u1_transposed","path":"transposed","updates":1,"key_width":128,"value_width":128,"seq_abs":1.86264515e-09,"seq_rms":1.38904596e-10,"seq_nonfinite":0,"fp64_abs":9.31322575e-10,"fp64_nonfinite":0,"grid_x":48,"grid_y":32,"launch":"prepare_recurrence_decode_transposed","isolation":true,"pass":true,"checkpoint_layout":"row_major_fp32"}
+gdn_case=prod_u1_transposed path=transposed updates=1 key_width=128 value_width=128 seq_abs=1.86264515e-09 seq_rms=1.38904596e-10 seq_nonfinite=0 fp64_abs=9.31322575e-10 fp64_nonfinite=0 grid_x=48 grid_y=32 launch=prepare_recurrence_decode_transposed isolation_committed_unchanged_first=true pass=true
+QW38_OPT101_CASE={"id":"prod_u4_transposed","path":"transposed","updates":4,"key_width":128,"value_width":128,"seq_abs":3.7252903e-09,"seq_rms":2.70902328e-10,"seq_nonfinite":0,"fp64_abs":0,"fp64_nonfinite":0,"grid_x":48,"grid_y":32,"launch":"prepare_recurrence_decode_transposed","isolation":true,"pass":true,"checkpoint_layout":"row_major_fp32"}
+gdn_case=prod_u4_transposed path=transposed updates=4 key_width=128 value_width=128 seq_abs=3.7252903e-09 seq_rms=2.70902328e-10 seq_nonfinite=0 fp64_abs=0 fp64_nonfinite=0 grid_x=48 grid_y=32 launch=prepare_recurrence_decode_transposed isolation_committed_unchanged_first=true pass=true
+transposed_regs=38 transposed_local_bytes=0 transposed_occupancy=12 warps_per_cta=4 sequential_pin=sequential grid_y=32
+QW38_OPT101_CASE={"id":"attrs","pass":true,"registers":38,"local_bytes":0,"occupancy":12,"sequential_pin":true}
+QW38_OPT101_RESULT={"schema_version":1,"task":"OPT-101","workload":"screen","llama_revision":"cc83d7b4824f73cfdda4dfbb47ee39804f71b328","gguf_sha256":"31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34","selected_gdn_decode_path":"sequential","seq_abs":4.99999987e-05,"seq_rms":4.99999987e-06,"nonfinite":0,"pass":true,"kernel_parity_pass":true,"keep":false,"logical_layout":"row_major_fp32","device_layout":"col_major_fp32","checkpoint_layout":"row_major_fp32"}
+QW38_OPT101_NATIVE_COUNTS={"task":"OPT-101","observed_warmups":0,"observed_samples":1,"observed_candidates":2,"observed_shapes":1,"observed_tier":"correctness","pairs":1,"sample_ids":[0],"acceptance_executed":false,"keep":false,"pass":true}
+status=passed

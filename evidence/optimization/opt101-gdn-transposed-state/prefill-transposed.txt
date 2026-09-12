@@ -1,0 +1,17 @@
+
+==========
+== CUDA ==
+==========
+
+CUDA Version 13.0.2
+
+Container image Copyright (c) 2016-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+
+This container image and its contents are governed by the NVIDIA Deep Learning Container License.
+By pulling and using the container, you accept the terms and conditions of this license:
+https://developer.nvidia.com/ngc/nvidia-deep-learning-container-license
+
+A copy of this license is made available in this container at /NGC-DL-CONTAINER-LICENSE for your convenience.
+
+QW38_OPT057_PROBE_RESULT={"schema_version":1,"task":"OPT-057","workload":"prefill","selector":"ffn_only","modes":["graph"],"prompt":4096,"prefix":0,"output_tokens":0,"runs":1,"graph_wall_ms":1322.90906,"eager_wall_ms":0,"control_tok_s":3096.20679,"candidate_tok_s":0,"graph_frontier":4096,"eager_frontier":0,"logits_copied":true,"p95_diagnostic":true,"override_after_capture_ignored":true,"override_before_capture_applied":false,"captured_path":"ffn_only","q4_decode":"integer_q8_late","q8_decode":"dp4a_q8_1","q8_rows_skinny":1,"q8_layout_warps_skinny":4,"effective_q8_rows_skinny":1,"effective_q8_layout_warps_skinny":4,"last_q8_layout":"","last_mmq_kernel":"q4_i128_j128_fma_async_x","last_mmq_async_x":true,"ffn_decode":"paired_integer","model_loaded_once":true}
+status=passed

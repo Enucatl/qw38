@@ -757,7 +757,15 @@ cudaError_t launch_sequential_windows(
         config.convolution_width, window);
     cudaError_t error = cudaPeekAtLastError();
     if (error != cudaSuccess) return error;
-    if (window == 1 && gdn_decode_uses_tiled()) {
+    if (window == 1 && gdn_decode_uses_transposed()) {
+      error = launch_gdn_decode_transposed_recurrence(
+          config, convolution_output + start * channels,
+          log_decay + start * config.value_heads,
+          beta + start * config.value_heads, source_recurrent,
+          candidate.recurrent,
+          recurrent_output + start * gdn_output_values(config), value_is_tiled,
+          stream);
+    } else if (window == 1 && gdn_decode_uses_tiled()) {
       error = launch_gdn_decode_tiled_recurrence(
           config, convolution_output + start * channels,
           log_decay + start * config.value_heads,
@@ -1131,6 +1139,26 @@ cudaError_t launch_gdn_quality_fused(
 
 int gdn_fused_quality_occupancy() noexcept {
   return gdn_fuse_occupancy("off");
+}
+
+int gdn_decode_transposed_occupancy() noexcept {
+  int occupancy = 0;
+  cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+      &occupancy, prepare_recurrence_decode_transposed, kGdnDecodeThreads, 0);
+  return occupancy;
+}
+
+void gdn_decode_transposed_attributes(int* registers, std::size_t* local_bytes,
+                                      int* occupancy) noexcept {
+  cudaFuncAttributes attrs{};
+  cudaFuncGetAttributes(&attrs, prepare_recurrence_decode_transposed);
+  if (registers != nullptr) *registers = attrs.numRegs;
+  if (local_bytes != nullptr) {
+    *local_bytes = static_cast<std::size_t>(attrs.localSizeBytes);
+  }
+  if (occupancy != nullptr) {
+    *occupancy = gdn_decode_transposed_occupancy();
+  }
 }
 
 int gdn_decode_tiled_occupancy(unsigned int value_tile) noexcept {

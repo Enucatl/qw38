@@ -90,7 +90,7 @@ int usage(const char* argv0) {
                "[--q4-decode packed|integer_q8|integer_q8_late|integer_q8_factored] "
                "[--q4-warps 2|4] "
                "[--ffn-decode paired_staged|shared_stage|paired_integer] "
-               "[--gdn-decode sequential|tile16|tile32] "
+               "[--gdn-decode sequential|tile16|tile32|transposed] "
                "[--decode-query-prep warp_query|prepared_q|prepared_q_veckv] "
                "[--decode-attention-gqa warp_query|warp_query_gqa6] "
                "[--decode-position 128|2048] "
@@ -1552,8 +1552,13 @@ int capture_bundle(const char* model_path, qw38::cuda::ResidentModel* model,
         &attribution);
   } else {
     qw38::cuda::SyncResult sync{};
+    const std::size_t decode_tokens = (gdn || attn) ? 2 : 1;
     const std::size_t prefix =
-        attn ? static_cast<std::size_t>(pos) : tokens.size() - 1;
+        attn ? static_cast<std::size_t>(pos) : tokens.size() - decode_tokens;
+    if (prefix + decode_tokens > tokens.size()) {
+      std::fprintf(stderr, "decode capture window exceeds token vector\n");
+      return 1;
+    }
     status = qw38::cuda::sync_tokens(
         *model, tokens.data(), prefix, &session, &workspace, logits.data(),
         logits.size(), hidden.data(), hidden.size(), &sync, nullptr, nullptr);
@@ -1561,7 +1566,6 @@ int capture_bundle(const char* model_path, qw38::cuda::ResidentModel* model,
     float elapsed = 0.0F;
     qw38::cuda::DecodeAttribution attribution;
     attribution.capture = &capture;
-    const std::size_t decode_tokens = (gdn || attn) ? 2 : 1;
     const std::size_t first_decode = prefix;
     for (std::size_t step = 0; step < decode_tokens; ++step) {
       capture.gdn_capture_position = step;
@@ -1901,7 +1905,10 @@ int time_family(qw38::cuda::ResidentModel* model,
     std::size_t local_bytes = 0;
     int occupancy = 0;
     const unsigned int tile = qw38::cuda::gdn_decode_value_tile();
-    if (tile > 0) {
+    if (qw38::cuda::gdn_decode_uses_transposed()) {
+      qw38::cuda::gdn_decode_transposed_attributes(&regs, &local_bytes,
+                                                   &occupancy);
+    } else if (tile > 0) {
       qw38::cuda::gdn_decode_tiled_attributes(tile, &regs, &local_bytes,
                                               &occupancy);
     }
@@ -1911,13 +1918,21 @@ int time_family(qw38::cuda::ResidentModel* model,
     std::printf(
         "gdn_dispatch path=%s launch=%s value_tile=%u grid_x=%u grid_y=%u "
         "warps_per_cta=4 sequential_windows=%s capture_positions=2 "
-        "gdn_layers=%zu eager_or_captured=true\n",
+        "gdn_layers=%zu eager_or_captured=true logical_layout=%s "
+        "device_layout=%s checkpoint_layout=%s layout_version=%u\n",
         qw38::cuda::effective_gdn_decode_path(),
         qw38::cuda::last_gdn_decode_launch_variant(),
         qw38::cuda::last_gdn_decode_value_tile(),
         qw38::cuda::last_gdn_decode_grid_x(),
         qw38::cuda::last_gdn_decode_grid_y(),
-        qw38::cuda::gdn_decode_uses_tiled() ? "false" : "true", layers.size());
+        qw38::cuda::gdn_decode_uses_tiled() ||
+                qw38::cuda::gdn_decode_uses_transposed()
+            ? "false"
+            : "true",
+        layers.size(), qw38::cuda::gdn_recurrent_logical_layout(),
+        qw38::cuda::gdn_recurrent_device_layout(),
+        qw38::cuda::gdn_recurrent_checkpoint_layout(),
+        qw38::cuda::kGdnRecurrentLayoutVersion);
     cudaFree(gdn_committed_conv);
     cudaFree(gdn_committed_rec);
     cudaFree(gdn_candidate_conv);

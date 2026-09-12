@@ -105,6 +105,9 @@ int gdn_decode_tiled_occupancy(unsigned int value_tile) noexcept;
 void gdn_decode_tiled_attributes(unsigned int value_tile, int* registers,
                                  std::size_t* local_bytes,
                                  int* occupancy) noexcept;
+int gdn_decode_transposed_occupancy() noexcept;
+void gdn_decode_transposed_attributes(int* registers, std::size_t* local_bytes,
+                                      int* occupancy) noexcept;
 
 cudaError_t launch_gdn_shared_inverses(
     const GdnConfig& config, const float* convolution_output,
