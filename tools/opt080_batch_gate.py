@@ -117,7 +117,7 @@ PIN_STRINGS = {
         r'kSelectedFfnPromptPairPath\[\] = "([^"]+)"',
     ),
     "execution_graphs": (
-        "cuda/full_scheduler.h",
+        "cuda/execution_graph_path.cuh",
         r'kSelectedExecutionGraphPath\[\] = "([^"]+)"',
     ),
     "production_numerics": (

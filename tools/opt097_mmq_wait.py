@@ -61,9 +61,7 @@ def default_native_runner(
     if listed and not listed[0].startswith("docker"):
         if os.environ.get("QW38_HOST_NATIVE") == "0":
             pass
-        elif os.environ.get("QW38_HOST_NATIVE") == "1" or (
-            ROOT / NATIVE
-        ).is_file():
+        elif os.environ.get("QW38_HOST_NATIVE") == "1" or (ROOT / NATIVE).is_file():
             pass
         else:
             listed = [*docker_common(tier), *listed]

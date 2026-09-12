@@ -1,0 +1,14 @@
+{
+  "memory_fit": {
+    "ok": true,
+    "post_graph_admitted": true
+  },
+  "checkpoint": {
+    "ok": true
+  },
+  "cancellation": {
+    "ok": true,
+    "frontier": 0,
+    "source": "fixtures/opt055_execution_graphs.json"
+  }
+}

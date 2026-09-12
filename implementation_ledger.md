@@ -245,7 +245,7 @@ OPT-089.
 | OPT-095 | Share decode KV loads across six query heads without a prep launch | OPT-094 | done | Bitwise per-head output and complete 16-layer/two-prefix acceptance, or retain warp_query | [`tasks/OPT-095.md`](tasks/OPT-095.md); [`pins/opt095_attention_gqa_contract.json`](pins/opt095_attention_gqa_contract.json); [`pins/opt095_iteration_contract.json`](pins/opt095_iteration_contract.json); [`fixtures/opt095_attention_gqa.json`](fixtures/opt095_attention_gqa.json); [`tools/opt095_attention_gqa.py`](tools/opt095_attention_gqa.py); [`tests/test_opt095_attention_gqa.py`](tests/test_opt095_attention_gqa.py); [`Makefile`](Makefile); [`evidence/optimization/opt095-attention-gqa/REPORT.md`](evidence/optimization/opt095-attention-gqa/REPORT.md); delivery 2026-09-12T09:42:00Z |
 | OPT-096 | Conditionally capture eight-layer decode segments | OPT-095 | done | Fresh ≥0.50 ms removable overhead trigger, exact graph/state behavior and two-prefix gain, or no-reopen | [`tasks/OPT-096.md`](tasks/OPT-096.md); [`pins/opt096_decode_graphs_contract.json`](pins/opt096_decode_graphs_contract.json); [`pins/opt096_iteration_contract.json`](pins/opt096_iteration_contract.json); [`fixtures/opt096_decode_graphs.json`](fixtures/opt096_decode_graphs.json); [`tools/opt096_decode_graphs.py`](tools/opt096_decode_graphs.py); [`tests/test_opt096_decode_graphs.py`](tests/test_opt096_decode_graphs.py); [`cuda/execution_graph_path.cuh`](cuda/execution_graph_path.cuh); [`cuda/opt096_decode_graphs_test.cu`](cuda/opt096_decode_graphs_test.cu); [`cuda/full_scheduler.cu`](cuda/full_scheduler.cu); [`cuda/full_scheduler.h`](cuda/full_scheduler.h); [`Makefile`](Makefile); [`evidence/optimization/opt096-decode-graphs/REPORT.md`](evidence/optimization/opt096-decode-graphs/REPORT.md); delivery 2026-09-12T09:55:00Z |
 | OPT-097 | Separate X/Y async completion in fixed-tile prompt MMQ | OPT-096 | done | Bitwise output and full FFN/P4096 win with decode guards, or retain fma_async_x schedule | [`tasks/OPT-097.md`](tasks/OPT-097.md) |
-| OPT-098 | Freeze and measure the combined post-088 production outcome | OPT-097 | pending | Complete quality, P/D/p95/2K/state/memory evidence; independent internal/parity/+5% outcomes, including failures | [`tasks/OPT-098.md`](tasks/OPT-098.md) |
+| OPT-098 | Freeze and measure the combined post-088 production outcome | OPT-097 | done | Complete quality, P/D/p95/2K/state/memory evidence; independent internal/parity/+5% outcomes, including failures | [`tasks/OPT-098.md`](tasks/OPT-098.md) |
 
 ### Post-042 recovery execution order (historical batch)
 
@@ -7181,4 +7181,28 @@ statements below are historical, not the current execution order.
   [`evidence/optimization/opt097-mmq-wait/REPORT.md`](evidence/optimization/opt097-mmq-wait/REPORT.md).
 - **tok/s delta vs P4096 baseline (OPT-088 1680.8 tok/s): 0** (unchanged).
 - Marked OPT-097 `done`. Next eligible pending by dependency order: **OPT-098**.
+
+### 2026-09-12T10:45:00Z — OPT-098 combined post-088 outcome measured
+
+- Added OPT-098 batch gate (`tools/opt098_batch_gate.py`, contracts, fixture,
+  tests, `cuda-opt098-diagnostics`). Frozen `post088_control` from authenticated
+  OPT-088 fixture; `post098_selected` from OPT-089–097 keeps (late_w4 Q4,
+  grouped_r1_w4 Q8, paired_integer FFN, fma_async_x joined_wait).
+- Full sitting via native oracles (`QW38_HOST_NATIVE=1`); pinned llama P/D/2K
+  reused from authenticated OPT-088 fixture. Quality/state/memory pass; strict
+  1.01 PPL (concession inactive).
+- **P4096:** selected 3046.23 vs llama 3170.93 vs OPT-088 control 2956.45 tok/s.
+  **D128:** 37.29 vs 69.13 vs 37.48 tok/s (p95 27.01 vs 14.46 vs 26.81 ms).
+  **D2048:** 35.49 vs 67.72 vs 35.73 tok/s (p95 28.27 vs 14.55 vs 28.09 ms).
+  **2K:** 3165.45 vs llama 3173.96 tok/s (`gate_passed=false`).
+- Outcomes: internal_improvement_with_quality **false** (geo CI lower 0.982;
+  D128/D2048 below control); llama_parity **false**; opt056_plus5 **false**.
+  `kernel_parity_pass=true`; `model_quality_pass=true`; `performance_pass=false`;
+  `production_kept=true`.
+- Repair: OPT-088 freeze reads authenticated fixture (not live pins post-089);
+  execution_graphs pin path fixed in opt080 (`execution_graph_path.cuh`).
+- Key evidence: [`fixtures/opt098_batch_gate.json`](fixtures/opt098_batch_gate.json);
+  [`evidence/optimization/opt098-batch-gate/REPORT.md`](evidence/optimization/opt098-batch-gate/REPORT.md).
+- **tok/s delta vs OPT-088 P4096 control (2956.45 tok/s): +89.78 tok/s (1.03×).**
+- Marked OPT-098 `done`. No further pending post-088 batch tasks.
 

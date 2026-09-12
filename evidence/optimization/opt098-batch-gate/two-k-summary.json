@@ -1,0 +1,31 @@
+{
+  "quartz": {
+    "prompt_tokens": 2048,
+    "replicates": 3,
+    "wall_ms": [
+      631.819458,
+      654.229126,
+      655.462341
+    ],
+    "tok_s": [
+      3241.43237,
+      3130.40186,
+      3124.51196
+    ],
+    "mean_tok_s": 3165.44849,
+    "cold": true,
+    "cache_policy": "disabled",
+    "attribution": null
+  },
+  "llama_cpp": {
+    "avg_ts": 3173.955939,
+    "avg_ns": 645338780,
+    "n_prompt": 2048,
+    "n_ubatch": 512,
+    "flash_attn": -1,
+    "build_commit": "cc83d7b",
+    "test_time": "2026-09-11T23:07:43Z"
+  },
+  "gate_passed": false,
+  "owns_opt016_parity_gate": false
+}

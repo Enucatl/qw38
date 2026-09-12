@@ -843,6 +843,9 @@ class OptimizationRunner:
             if repetitions:
                 labels.extend(f"warm{index}" for index in range(1, repetitions + 1))
             should_compile = compile_required(contract, mode)
+            phase_workload = workloads.get(phase or "", {})
+            if phase_workload.get("skip_compile"):
+                should_compile = False
 
             for label in labels:
                 if remaining() <= 0:
@@ -875,11 +878,32 @@ class OptimizationRunner:
                 if phase == "compile":
                     continue
                 if mode == "release":
-                    released = phase_wrap(
-                        f"release_{label}",
-                        lambda: self._release(contract, remaining(), run_dir),
-                    )
-                    durations[f"{label}_s"] = float(released.get("elapsed_s", 0.0))
+                    if (
+                        phase
+                        and phase in workloads
+                        and workloads[phase].get("runner") == "host"
+                    ):
+                        work = phase_wrap(
+                            phase,
+                            lambda name=phase: self._workload(
+                                contract, mode, name, remaining(), run_dir
+                            ),
+                        )
+                        load_count += int(work.get("load", 0))
+                        reference_count += int(work.get("reference", 0))
+                        if not work.get("success", True):
+                            success = False
+                            result_class = str(
+                                work.get("result_class", "numerical_failure")
+                            )
+                            message = str(work.get("message", ""))
+                        durations[f"{label}_s"] = float(work.get("elapsed_s", 0.0))
+                    else:
+                        released = phase_wrap(
+                            f"release_{label}",
+                            lambda: self._release(contract, remaining(), run_dir),
+                        )
+                        durations[f"{label}_s"] = float(released.get("elapsed_s", 0.0))
                     continue
                 sequence = list(mode_spec.get("tier_sequence", []))
                 if phase:

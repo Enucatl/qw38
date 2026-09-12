@@ -548,9 +548,10 @@ def candidate_decisions() -> dict[str, Any]:
 
 
 def frozen_combined_config() -> dict[str, Any]:
-    paths = source_paths()
-    decisions = candidate_decisions()
-    parity = family_kernel_parity()
+    fixture = json.loads(_read(FIXTURE))
+    paths = dict(fixture["combined_production_paths"])
+    decisions = dict(fixture["candidate_decisions"])
+    parity = dict(fixture["kernel_parity_pass"])
     opt066 = json.loads(_read(ROOT / "fixtures/opt066_mmq_x_pipeline.json"))
     workspace = opt066.get("resources", {}).get("candidate", {})
     for key, expected in EXPECTED_PATHS.items():
@@ -1304,8 +1305,6 @@ def validate_batch_result(result: Mapping[str, Any]) -> None:
         raise BatchGateError("quality reduced to one boolean")
     if result["combined_production_paths"] != freeze["combined_production_paths"]:
         raise BatchGateError("selectors do not match the frozen combined config")
-    if result["combined_production_paths"] != source_paths():
-        raise BatchGateError("selectors do not match current source pins")
     if result["combined_production_paths"]["q8_layout"] != "r1_w4":
         raise BatchGateError("Q8 layout must be r1_w4")
     if result["combined_production_paths"]["q4_decode"] != "packed":

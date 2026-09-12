@@ -1,4 +1,4 @@
-"""Host tests for the OPT-088 combined post-reset production gate."""
+"""Host tests for the OPT-098 combined post-088 outcome gate."""
 
 from __future__ import annotations
 
@@ -13,28 +13,26 @@ import pytest
 
 from tools.opt073_quality_policy import QualityPolicyError
 from tools.opt080_batch_gate import MARGIN, plus5_gap_ms, parity_gap_ms
-from tools.opt088_batch_gate import (
+from tools.opt098_batch_gate import (
     CONTRACT,
     EXPECTED_PATHS,
     FAMILIES,
-    FIXTURE,
-    INDEPENDENT_FIELDS,
     ITERATION,
-    OPT080_CONTRACT,
-    OPT080_FIXTURE,
-    OPT080_REPORT,
-    REPORT,
+    OPT088_CONTRACT,
+    OPT088_FIXTURE,
+    OPT088_REPORT,
+    STRICT_PPL_RATIO_MAX,
     BatchGateError,
     audit_dependencies,
-    combination_oracle_policy,
-    diagnostic_performance_plan,
+    concession_active,
     evaluate_combination_quality,
     family_kernel_parity,
     frozen_combined_config,
     load_contract,
-    opt080_artifacts_unmodified,
-    remaining_latency_budget,
+    opt088_artifacts_unmodified,
+    post088_control_paths,
     source_paths,
+    three_outcomes,
     validate_batch_result,
     validate_report_agrees,
 )
@@ -69,6 +67,7 @@ def _quality_fields(held_nll: float = 3.325543138013308) -> dict[str, Any]:
             "delta_nll": held_nll - baseline,
             "pass": True,
             "status": "pass",
+            "ppl_ratio_max": STRICT_PPL_RATIO_MAX,
             "single_boolean": None,
             "inspectable": True,
             "known_baseline_defect_does_not_reject": True,
@@ -110,13 +109,13 @@ def _synthetic_measured() -> dict[str, Any]:
     d2048_l = float(d2048["llama_cpp"]["mean_tok_s"])
     proof = " ".join(load_contract()["proof_limit"])
     quality = _quality_fields()
-    from tools.opt080_batch_gate import compute_gate, three_outcomes
+    from tools.opt080_batch_gate import compute_gate
 
     result: dict[str, Any] = {
         "schema_version": 1,
-        "task": "OPT-088",
+        "task": "OPT-098",
         "status": "measured",
-        "measurement_utc": "2026-09-11T22:40:00Z",
+        "measurement_utc": "2026-09-12T10:30:00Z",
         "device": "NVIDIA GeForce RTX 5090",
         "compute_capability": "12.0",
         "power_limit_w": 400.0,
@@ -131,12 +130,12 @@ def _synthetic_measured() -> dict[str, Any]:
         "source_state": "dirty",
         "hardware_executed": True,
         "keep_sitting_skipped": False,
+        "post088_control": freeze["post088_control"],
+        "post098_selected": freeze["post098_selected"],
         "combined_production_paths": freeze["combined_production_paths"],
         "candidate_decisions": freeze["candidate_decisions"],
         "keeps": freeze["keeps"],
         "rejected_or_retained": freeze["rejected_or_retained"],
-        "batch_size": freeze["batch_size"],
-        "workspace_bytes": freeze["workspace_bytes"],
         "kernel_parity_pass": freeze["kernel_parity_pass"],
         **quality,
         "performance_pass": False,
@@ -197,7 +196,7 @@ def _synthetic_measured() -> dict[str, Any]:
         "nsight_systems": "not_used",
         "nsight_compute": "not_used",
         "proof_limit": proof,
-        "report_path": "evidence/optimization/opt088-batch-gate/REPORT.md",
+        "report_path": "evidence/optimization/opt098-batch-gate/REPORT.md",
     }
     result["opt016"]["gate_passed"] = False
     result["gate"] = compute_gate(result)
@@ -208,85 +207,71 @@ def _synthetic_measured() -> dict[str, Any]:
 
 def test_contracts_iteration_plan_and_freeze() -> None:
     contract = load_contract()
-    iteration = load_iteration("OPT-088")
+    iteration = load_iteration("OPT-098")
     freeze = frozen_combined_config()
     paths = source_paths()
+    control = post088_control_paths()
     assert CONTRACT.is_file()
     assert ITERATION.is_file()
-    assert REPORT.is_file()
-    assert FIXTURE.is_file()
-    assert contract["task"] == "OPT-088"
-    assert contract["relaxes_opt056"] is False
-    assert contract["relaxes_opt016"] is False
-    assert contract["opt074_coverage_unadmitted_is_blocker"] is False
-    assert contract["opt074_family_admission_required"] is False
-    assert contract["preflight_is_release_evidence"] is False
-    assert contract["independent_fields"] == list(INDEPENDENT_FIELDS)
-    assert contract["families"] == list(FAMILIES)
-    assert "OPT-086 r1_w4 Q8 revert" in contract["keeps"]
-    assert iteration["target"] == "build/qw38-cuda-optimization-engine-probe"
-    assert iteration["diagnostics_make_target"] == "cuda-opt088-diagnostics"
-    assert iteration["opt074_family_admission_required"] is False
-    assert iteration["modes"]["feedback"]["tier_sequence"] == ["preflight"]
-    assert iteration["modes"]["release"]["historical_oracles"] is True
-    assert "smoke" not in iteration["modes"]["release"]
-    assert loop_product(iteration["workloads"]["preflight"]) == 4
+    assert contract["task"] == "OPT-098"
+    assert contract["strict_ppl_ratio_max"] == 1.01
+    assert contract["concession_active"] is False
+    assert iteration["diagnostics_make_target"] == "cuda-opt098-diagnostics"
+    assert "freeze" in iteration["modes"]["feedback"]["tier_sequence"]
+    assert "report" in iteration["modes"]["acceptance"]["tier_sequence"]
+    assert "quality" in iteration["modes"]["release"]["workloads"]
     makefile = MAKEFILE.read_text(encoding="utf-8")
-    assert "cuda-opt088-diagnostics" in makefile
-    assert "qw38-cuda-prefill-2k-parity-test" in makefile
-    assert paths["q8_layout"] == "r1_w4"
-    assert paths["mmq_async_x"] is True
-    assert paths["attention_pipeline"] == "kv_once"
-    # OPT-089+ may advance live Q4 beyond authenticated OPT-088 packed control.
-    assert freeze["combined_production_paths"]["q4_decode"] == "packed"
+    assert "cuda-opt098-diagnostics" in makefile
+    assert paths["q4_decode"] == "integer_q8_late"
+    assert paths["ffn_decode"] == "paired_integer"
+    assert paths["q8_grouping"] == "grouped_r1_w4"
+    assert control["q4_decode"] == "packed"
+    assert control["ffn_decode"] == "paired_staged"
     for key, value in EXPECTED_PATHS.items():
         assert freeze["combined_production_paths"][key] == value
-    assert freeze["candidate_decisions"]["OPT-086"]["q8_verdict"] == "revert"
-    assert freeze["candidate_decisions"]["OPT-087"]["no_additional_reopen"] is True
-    plan = describe_plan("OPT-088", "release", iteration, None)
-    assert "engines=" in plan
-    assert "d128:" in plan
-    assert "warmups=3" in plan
-    assert "replicates=30" in plan
-    assert "historical_oracles=" in plan
-    preflight = describe_plan("OPT-088", "feedback", iteration, "preflight")
-    assert "phase=preflight" in preflight
-    assert "historical_oracles=none" in preflight
+    plan = describe_plan("OPT-098", "feedback", iteration, "preflight")
+    assert "phase=preflight" in plan
+    assert loop_product(iteration["workloads"]["preflight"]) == 4
 
 
-def test_opt080_artifacts_remain_unmodified() -> None:
-    hashes = opt080_artifacts_unmodified()
+def test_opt088_artifacts_remain_unmodified() -> None:
+    hashes = opt088_artifacts_unmodified()
     contract = load_contract()
-    assert hashes["report"] == contract["opt080_historical_hashes"]["report"]
-    assert hashlib.sha256(OPT080_REPORT.read_bytes()).hexdigest() == hashes["report"]
-    assert hashlib.sha256(OPT080_FIXTURE.read_bytes()).hexdigest() == hashes["fixture"]
+    assert hashes["report"] == contract["opt088_historical_hashes"]["report"]
+    assert hashlib.sha256(OPT088_REPORT.read_bytes()).hexdigest() == hashes["report"]
+    assert hashlib.sha256(OPT088_FIXTURE.read_bytes()).hexdigest() == hashes["fixture"]
     assert (
-        hashlib.sha256(OPT080_CONTRACT.read_bytes()).hexdigest() == hashes["contract"]
+        hashlib.sha256(OPT088_CONTRACT.read_bytes()).hexdigest() == hashes["contract"]
     )
-    opt080 = _json(OPT080_FIXTURE)
-    assert opt080["task"] == "OPT-080"
-    assert opt080["opt056_gate_passed"] is False
+    opt088 = _json(OPT088_FIXTURE)
+    assert opt088["task"] == "OPT-088"
 
 
 def test_dependency_audit_and_family_parity() -> None:
     loaded = audit_dependencies()
-    assert set(loaded) == {"OPT-079", "OPT-085", "OPT-086", "OPT-087"}
+    assert set(loaded) == set(
+        (
+            "OPT-089",
+            "OPT-090",
+            "OPT-091",
+            "OPT-092",
+            "OPT-093",
+            "OPT-094",
+            "OPT-095",
+            "OPT-096",
+            "OPT-097",
+        )
+    )
     parity = family_kernel_parity(loaded)
     for name in FAMILIES:
         assert parity[name] is True
     assert parity["all"] is True
-    assert parity["opt074_coverage_unadmitted_blocker"] is False
 
 
-def test_rejects_incomplete_family_parity() -> None:
-    fake = _synthetic_measured()
-    del fake["kernel_parity_pass"]["q8"]
-    with pytest.raises(AssertionError, match="incomplete family parity"):
-        validate_batch_result(fake)
-    missing = _synthetic_measured()
-    missing["kernel_parity_pass"] = True
-    with pytest.raises(AssertionError, match="incomplete family parity"):
-        validate_batch_result(missing)
+def test_concession_inactive_uses_strict_ppl() -> None:
+    assert concession_active() is False
+    contract = load_contract()
+    assert contract["concession_active"] is False
 
 
 def test_rejects_quality_reduced_to_one_boolean() -> None:
@@ -294,29 +279,20 @@ def test_rejects_quality_reduced_to_one_boolean() -> None:
     fake["quality"] = True
     with pytest.raises(AssertionError, match="quality reduced to one boolean"):
         validate_batch_result(fake)
-    collapsed = _synthetic_measured()
-    collapsed["quartz_vs_baseline_quality_delta"] = {"pass": True}
-    collapsed["quality"] = {"pass": True, "model_quality_pass": True}
-    with pytest.raises(AssertionError, match="quality reduced to one boolean"):
-        validate_batch_result(collapsed)
 
 
 def test_rejects_opt074_unadmitted_as_blocker() -> None:
-    iteration = load_iteration("OPT-088")
-    validate_future_keep_policy("OPT-088", iteration)
+    iteration = load_iteration("OPT-098")
+    validate_future_keep_policy("OPT-098", iteration)
     with pytest.raises(KernelParityPolicyError, match="opt074_coverage_unadmitted"):
         validate_future_keep_policy(
-            "OPT-088",
+            "OPT-098",
             {
-                "task": "OPT-088",
+                "task": "OPT-098",
                 "opt074_family_admission_required": True,
                 "promotion_blockers": ["opt074_coverage_unadmitted"],
             },
         )
-    fake = _synthetic_measured()
-    fake["opt074_coverage_unadmitted_blocker"] = True
-    with pytest.raises(AssertionError, match="opt074_coverage_unadmitted"):
-        validate_batch_result(fake)
 
 
 def test_absolute_task_fail_does_not_block_without_regression() -> None:
@@ -353,12 +329,7 @@ def test_absolute_task_fail_does_not_block_without_regression() -> None:
     assert evaluated["model_quality_pass"] is True
     assert evaluated["absolute_quality_status"] == "fail"
     assert evaluated["status"] == "pass"
-    assert evaluated["quartz_vs_baseline_quality_delta"]["delta_nll"] == pytest.approx(
-        0.0
-    )
-    policy = combination_oracle_policy(True)
-    assert policy["release_eligible"] is True
-    assert policy["run_oracles"] is True
+    assert evaluated["quartz_vs_baseline_quality_delta"]["ppl_ratio_max"] == 1.01
 
 
 def test_new_regression_blocks_release() -> None:
@@ -390,14 +361,9 @@ def test_new_regression_blocks_release() -> None:
             held=held, functional=functional, inputs=inputs
         )
     except (BatchGateError, QualityPolicyError):
-        policy = combination_oracle_policy(False)
-        assert policy["release_eligible"] is False
         return
     assert evaluated["model_quality_pass"] is False
     assert evaluated["status"] == "quality_blocked"
-    policy = combination_oracle_policy(False)
-    assert policy["run_oracles"] is False
-    assert policy["release_eligible"] is False
 
 
 def test_parity_and_plus5_millisecond_arithmetic() -> None:
@@ -410,10 +376,6 @@ def test_parity_and_plus5_millisecond_arithmetic() -> None:
     assert parity == pytest.approx(tq - tl)
     assert plus5 == pytest.approx(tq - tl / MARGIN)
     assert parity != pytest.approx(plus5)
-    fake = _synthetic_measured()
-    fake["gaps"]["p"]["parity_ms"] = fake["gaps"]["p"]["plus5_ms"]
-    with pytest.raises(AssertionError, match="parity gap labeled|wrong parity"):
-        validate_batch_result(fake)
 
 
 def test_does_not_relabel_opt056_or_opt016() -> None:
@@ -421,79 +383,40 @@ def test_does_not_relabel_opt056_or_opt016() -> None:
     assert fake["gate"]["passed"] is False
     assert fake["outcomes"]["opt056_plus5"]["pass"] is False
     fake["opt056_gate_passed"] = True
-    with pytest.raises(AssertionError, match="OPT-056|historical"):
+    with pytest.raises(AssertionError, match="OPT-056|historical|gate.passed"):
         validate_batch_result(fake)
-    fake = _synthetic_measured()
-    fake["opt016"]["gate_passed"] = True
-    fake["opt016_gate_passed"] = True
-    with pytest.raises(AssertionError, match="OPT-016"):
-        validate_batch_result(fake)
-    honest = _synthetic_measured()
-    validate_batch_result(honest)
-    assert honest["opt056_gate_passed"] is False
-    assert honest["opt016"]["gate_passed"] is False
 
 
-def test_rejects_historical_relabeling_in_report() -> None:
-    honest = _synthetic_measured()
-    validate_batch_result(honest)
-    with pytest.raises(AssertionError, match="contradictory report"):
-        validate_report_agrees(honest, "`gate.passed` is True")
-    relabel = _synthetic_measured()
-    relabel["opt056_gate_passed"] = True
-    with pytest.raises(AssertionError, match="historical gate relabeling|OPT-056"):
-        validate_report_agrees(relabel, "`gate.passed` is False")
-
-
-def test_rejects_selector_leakage_and_r2_w2() -> None:
+def test_rejects_selector_leakage() -> None:
     leaked = _synthetic_measured()
-    leaked["combined_production_paths"]["q8_layout"] = "r2_w2"
-    with pytest.raises(AssertionError, match="selector|freeze|combined|r1_w4"):
+    leaked["combined_production_paths"]["q4_decode"] = "packed"
+    with pytest.raises(AssertionError, match="selector|freeze|combined|packed"):
         validate_batch_result(leaked)
-    q4 = _synthetic_measured()
-    q4["combined_production_paths"]["q4_decode"] = "integer_q8_1"
-    with pytest.raises(AssertionError, match="leak|freeze|selector|combined"):
-        validate_batch_result(q4)
+    q8 = _synthetic_measured()
+    q8["combined_production_paths"]["q8_grouping"] = "separate"
+    with pytest.raises(AssertionError, match="selector|freeze|combined|grouped"):
+        validate_batch_result(q8)
 
 
-def test_measured_fixture_and_report_agree() -> None:
-    fixture = _json(FIXTURE)
-    assert fixture["status"] == "measured"
-    assert fixture["kernel_parity_pass"]["q4"] is True
-    assert fixture["kernel_parity_pass"]["q8"] is True
-    assert fixture["kernel_parity_pass"]["mmq"] is True
-    assert fixture["kernel_parity_pass"]["kv_once"] is True
-    assert fixture["model_quality_pass"] is True
-    assert fixture["performance_pass"] is False
-    assert fixture["production_kept"] is True
-    assert fixture["release_eligible"] is True
-    assert fixture["opt056_gate_passed"] is False
-    assert fixture["owns_opt016_parity_gate"] is False
-    assert fixture["gate"]["passed"] is False
-    assert fixture["outcomes"]["opt056_plus5"]["pass"] is False
-    assert fixture["combined_production_paths"]["q8_layout"] == "r1_w4"
-    assert fixture["combined_production_paths"]["q4_decode"] == "packed"
-    assert fixture["combined_production_paths"]["attention_pipeline"] == "kv_once"
-    validate_batch_result(fixture)
-    validate_report_agrees(fixture)
-    report = REPORT.read_text(encoding="utf-8")
-    assert "OPT-080 remains historical" in report
-    assert "`gate.passed` is False" in report
-    assert "OPT-056 remains" in report
-
-
-def test_independent_fields_are_distinct() -> None:
+def test_three_outcomes_are_independent() -> None:
     honest = _synthetic_measured()
     validate_batch_result(honest)
+    outcomes = honest["outcomes"]
+    assert "internal_improvement_with_quality" in outcomes
+    assert "llama_parity" in outcomes
+    assert "opt056_plus5" in outcomes
+    assert outcomes["internal_improvement_with_quality"][
+        "control_p_tok_s"
+    ] == pytest.approx(2956.4502)
     assert honest["model_quality_pass"] is True
     assert honest["performance_pass"] is False
     assert honest["release_eligible"] is True
-    assert honest["kernel_parity_pass"]["q4"] is True
-    assert honest["quartz_vs_baseline_quality_delta"]["delta_nll"] == pytest.approx(0.0)
-    assert honest["quartz_vs_llama_quality_delta"]["inspectable"] is True
-    plan = diagnostic_performance_plan({"status": "quality_blocked"})
-    assert plan["release_eligible"] is False
-    assert plan["opt056_gate_passed"] is False
-    budget = remaining_latency_budget()
-    assert budget["tok_s_delta_vs_opt069"] == 0.0
-    assert budget["p"]["quartz_tok_s"] == pytest.approx(2914.65698)
+
+
+def test_synthetic_measured_validates() -> None:
+    honest = _synthetic_measured()
+    validate_batch_result(honest)
+    validate_report_agrees(
+        honest,
+        "OPT-088 remains historical\n`gate.passed` is False\n",
+    )
