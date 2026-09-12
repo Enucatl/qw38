@@ -25,7 +25,7 @@ constexpr unsigned int kQ8GroupedLaunchReduction = 176;
 // layout keep does not rewrite the OPT-047 warp constants.
 // OPT-092 grouping is a separate selector; arithmetic stays dp4a_q8_1/r1_w4.
 constexpr char kSelectedQ8DecodePath[] = "dp4a_q8_1";
-constexpr char kSelectedQ8DecodeGrouping[] = "separate";
+constexpr char kSelectedQ8DecodeGrouping[] = "grouped_r1_w4";
 constexpr unsigned int kSelectedQ8DecodeWarpsSkinny = 4;
 constexpr unsigned int kSelectedQ8DecodeWarpsMedium = 4;
 constexpr unsigned int kSelectedQ8DecodeWarpsWide = 4;
@@ -399,7 +399,7 @@ struct Q8DecodeGroupingScope final {
   ~Q8DecodeGroupingScope() { g_q8_decode_grouping_override = nullptr; }
   Q8DecodeGroupingScope(const Q8DecodeGroupingScope&) = delete;
   Q8DecodeGroupingScope& operator=(const Q8DecodeGroupingScope&) = delete;
-}
+};
 
 inline const Q8DecodeDispatch& last_q8_decode_dispatch() noexcept {
   return g_last_q8_decode_dispatch;

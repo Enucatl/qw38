@@ -621,7 +621,8 @@ def test_cuda_repaired_comparators_and_quality_config() -> None:
     assert "--evidence-dir" in replay
     assert "set_evidence_dir" in replay
     probe = CUDA_PROBE.read_text(encoding="utf-8")
-    assert "attn_ab || prefill" in probe
+    assert "grouping-ab" in probe
+    assert "attn_ab || grouping_ab" in probe.replace("\n", " ")
     assert "const bool prefill_ok = prefill && options.prompt == kScreenPrompt" in probe
     assert "effective_q4_decode_path()" in probe
     assert "effective_ffn_decode_path()" in probe

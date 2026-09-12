@@ -344,6 +344,9 @@ int reject_over_bounds(qw38::cuda::TestTier tier, const Options& options) {
     const bool gdn_ok = gdn_ab && options.prefix == kScreenPrefix &&
                         options.output_tokens == kScreenOutputTokens &&
                         options.prompt == 0 && options.pairs <= 1;
+    const bool grouping_ok = grouping_ab && options.prefix == kScreenPrefix &&
+                             options.output_tokens == kScreenOutputTokens &&
+                             options.prompt == 0 && options.pairs <= 1;
     const bool attn_ok =
         attn_ab && options.pairs <= 1 &&
         ((options.prompt == kScreenPrompt && options.prefix == 0 &&
@@ -352,7 +355,7 @@ int reject_over_bounds(qw38::cuda::TestTier tier, const Options& options) {
           options.output_tokens == kScreenOutputTokens && options.prompt == 0));
     if (options.model == nullptr || options.runs != 1 ||
         !(decode_ok || prefill_ok || q8_ok || mmq_ok || q4_ok || gdn_ok ||
-          attn_ok)) {
+          grouping_ok || attn_ok)) {
       std::fprintf(stderr,
                    "screen allows one pair of P4096 or prefix 2048 + 32 "
                    "output tokens\n");
@@ -361,7 +364,8 @@ int reject_over_bounds(qw38::cuda::TestTier tier, const Options& options) {
     return 0;
   }
   if (tier == qw38::cuda::TestTier::kAcceptance &&
-      (q8_ab || mmq_ab || q4_ab || gdn_ab || attn_ab || prefill)) {
+      (q8_ab || mmq_ab || q4_ab || gdn_ab || attn_ab || grouping_ab ||
+       prefill)) {
     const bool q8_ok = q8_ab && options.prefix == kScreenPrefix &&
                        options.output_tokens == kScreenOutputTokens &&
                        options.prompt == 0 && options.pairs <= 5;
@@ -376,6 +380,11 @@ int reject_over_bounds(qw38::cuda::TestTier tier, const Options& options) {
     const bool gdn_ok = gdn_ab && options.prefix == kScreenPrefix &&
                         options.output_tokens == kScreenOutputTokens &&
                         options.prompt == 0 && options.pairs <= 5;
+    const bool grouping_ok = grouping_ab &&
+                             (options.prefix == kScreenPrefix ||
+                              options.prefix == 128) &&
+                             options.output_tokens == kScreenOutputTokens &&
+                             options.prompt == 0 && options.pairs <= 5;
     const bool attn_ok =
         attn_ab && options.pairs <= 5 &&
         ((options.prompt == kScreenPrompt && options.prefix == 0 &&
@@ -385,7 +394,8 @@ int reject_over_bounds(qw38::cuda::TestTier tier, const Options& options) {
     const bool prefill_ok = prefill && options.prompt == kScreenPrompt &&
                             options.prefix == 0 && options.output_tokens == 0;
     if (options.model == nullptr ||
-        !(q8_ok || mmq_ok || q4_ok || gdn_ok || attn_ok || prefill_ok)) {
+        !(q8_ok || mmq_ok || q4_ok || gdn_ok || grouping_ok || attn_ok ||
+          prefill_ok)) {
       std::fprintf(stderr,
                    "acceptance keep-ab allows five P4096 or D2048+32 pairs\n");
       return 2;
