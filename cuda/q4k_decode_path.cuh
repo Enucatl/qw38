@@ -10,8 +10,8 @@ namespace qw38::cuda {
 constexpr char kLegalQ4DecodePathPacked[] = "packed";
 constexpr char kLegalQ4DecodePathIntegerQ8[] = "integer_q8";
 constexpr char kLegalQ4DecodePathIntegerQ81[] = "integer_q8_1";
-// OPT-076 packed-load / late-reduction Q8Block sibling. Not production until
-// admission; half-scale Q8_1 stays out of this path.
+// OPT-076 packed-load / late-reduction Q8Block sibling. OPT-089 admitted this
+// path; half-scale Q8_1 stays out of it.
 constexpr char kLegalQ4DecodePathIntegerQ8Late[] = "integer_q8_late";
 
 // OPT-072 typed Q8_1 pairing: the UseQ81 Q4 consumer treats stored q8_sum as
@@ -44,7 +44,7 @@ constexpr char kQ4LaunchVariantPairedIntegerQ8Late[] =
 constexpr int kQ4LaunchTraceCapacity = 8;
 
 // Production pin. Keep sitting may switch away from packed; reject restores it.
-constexpr char kSelectedQ4DecodePath[] = "packed";
+constexpr char kSelectedQ4DecodePath[] = "integer_q8_late";
 constexpr unsigned int kSelectedQ4DecodeWarpsPerRow = 4;
 
 inline thread_local const char* g_q4_decode_path_override = nullptr;

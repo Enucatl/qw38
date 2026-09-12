@@ -14,6 +14,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <fstream>
+#include <iterator>
 #include <limits>
 #include <string>
 #include <vector>
@@ -31,6 +32,9 @@ constexpr char kPrefix[] = "QW38_OPT058_RESULT=";
 constexpr std::array<std::size_t, 2> kTokens{42, 3649};
 constexpr std::size_t kSavedTaps = 5;
 constexpr std::size_t kMaxGenerate = 16;
+char g_applied_q4[64];
+char g_applied_ffn[64];
+char g_applied_q8[32];
 
 struct Options final {
   const char* model = nullptr;
@@ -39,6 +43,11 @@ struct Options final {
   const char* llama_oracle = nullptr;
   const char* prompt_set = "v2";
   const char* case_name = nullptr;
+  const char* quality_config = nullptr;
+  const char* q4_decode = nullptr;
+  const char* ffn_decode = nullptr;
+  const char* q8_layout = nullptr;
+  bool quality = false;
   std::size_t max_targets = 0;
 };
 
@@ -66,7 +75,9 @@ int usage(const char* argv0) {
                "usage: %s [--workload smoke|scheduler|functional|"
                "quality-baseline] [MODEL] [--bundle PATH] "
                "[--llama-oracle PATH] [--prompt-set v2|original] "
-               "[--case NAME] [--max-targets N]\n",
+               "[--case NAME] [--max-targets N] [--quality] "
+               "[--quality-config PATH] [--q4-decode PATH] "
+               "[--ffn-decode PATH] [--q8-layout LAYOUT]\n",
                argv0);
   return 2;
 }
@@ -89,6 +100,16 @@ int parse_args(int argc, char** argv, Options* options) {
       const unsigned long parsed = std::strtoul(argv[++index], &end, 10);
       if (end == argv[index] || *end != '\0' || parsed == 0) return usage(argv[0]);
       options->max_targets = static_cast<std::size_t>(parsed);
+    } else if (std::strcmp(arg, "--quality") == 0) {
+      options->quality = true;
+    } else if (std::strcmp(arg, "--quality-config") == 0 && index + 1 < argc) {
+      options->quality_config = argv[++index];
+    } else if (std::strcmp(arg, "--q4-decode") == 0 && index + 1 < argc) {
+      options->q4_decode = argv[++index];
+    } else if (std::strcmp(arg, "--ffn-decode") == 0 && index + 1 < argc) {
+      options->ffn_decode = argv[++index];
+    } else if (std::strcmp(arg, "--q8-layout") == 0 && index + 1 < argc) {
+      options->q8_layout = argv[++index];
     } else if (arg[0] != '-' && options->model == nullptr) {
       options->model = arg;
     } else {
@@ -316,14 +337,118 @@ void print_selectors() {
   std::printf(
       "\"selectors\":{\"q4_decode\":\"%s\",\"q8_decode\":\"%s\","
       "\"q8_rows_skinny\":%u,\"q8_layout_warps_skinny\":%u,"
-      "\"ffn_decode\":\"%s\",\"execution_graph\":\"%s\",\"rms_norm\":\"%s\"}",
+      "\"q8_layout\":\"%s\",\"ffn_decode\":\"%s\","
+      "\"execution_graph\":\"%s\",\"rms_norm\":\"%s\","
+      "\"effective_q4_decode\":\"%s\",\"effective_ffn_decode\":\"%s\"}",
       qw38::cuda::selected_q4_decode_path(),
       qw38::cuda::selected_q8_decode_path(),
       qw38::cuda::selected_q8_decode_rows_skinny(),
       qw38::cuda::selected_q8_decode_layout_warps_skinny(),
+      qw38::cuda::q8_layout_ident(
+          qw38::cuda::effective_q8_decode_rows_skinny(),
+          qw38::cuda::effective_q8_decode_layout_warps_skinny()),
       qw38::cuda::selected_ffn_decode_path(),
       qw38::cuda::selected_execution_graph_path(),
-      qw38::cuda::selected_rms_norm_path());
+      qw38::cuda::selected_rms_norm_path(),
+      qw38::cuda::effective_q4_decode_path(),
+      qw38::cuda::effective_ffn_decode_path());
+}
+
+bool json_string_field(const std::string& text, const char* key,
+                       std::string* value) {
+  const std::string needle = std::string("\"") + key + "\":";
+  const std::size_t found = text.find(needle);
+  if (found == std::string::npos) return false;
+  std::size_t cursor = found + needle.size();
+  while (cursor < text.size() &&
+         (text[cursor] == ' ' || text[cursor] == '\t')) {
+    ++cursor;
+  }
+  if (cursor >= text.size() || text[cursor] != '"') return false;
+  ++cursor;
+  std::string out;
+  while (cursor < text.size() && text[cursor] != '"') {
+    out.push_back(text[cursor]);
+    ++cursor;
+  }
+  *value = out;
+  return true;
+}
+
+int apply_quality_selectors(const Options& options) {
+  std::string q4 = options.q4_decode != nullptr ? options.q4_decode : "";
+  std::string ffn = options.ffn_decode != nullptr ? options.ffn_decode : "";
+  std::string q8 = options.q8_layout != nullptr ? options.q8_layout : "";
+  if (options.quality_config != nullptr) {
+    std::ifstream file(options.quality_config);
+    if (!file) {
+      std::fprintf(stderr, "cannot read quality-config %s\n",
+                   options.quality_config);
+      return 2;
+    }
+    const std::string text((std::istreambuf_iterator<char>(file)),
+                           std::istreambuf_iterator<char>());
+    std::string parsed;
+    if (json_string_field(text, "q4_decode", &parsed)) q4 = parsed;
+    if (json_string_field(text, "q4_staging", &parsed)) ffn = parsed;
+    if (json_string_field(text, "ffn_decode", &parsed) && ffn.empty()) {
+      ffn = parsed;
+    }
+    if (json_string_field(text, "q8_decode", &parsed)) q8 = parsed;
+    if (json_string_field(text, "q8_layout", &parsed) &&
+        (q8.empty() || q8 == "dp4a_q8_1" || q8 == "r2_w2" || q8 == "r1_w4")) {
+      if (parsed == "r1_w4" || parsed == "r2_w2") q8 = parsed;
+    }
+  }
+  // `--quality` disables shortcuts only. It must not restore packed/r2
+  // production pins over an explicit candidate quality-config.
+  if (options.quality && q4.empty() && ffn.empty() && q8.empty()) {
+    std::printf("quality_flag=true restored_packed_or_r2=false "
+                "selectors_unchanged=true\n");
+  }
+  if (!q4.empty()) {
+    std::snprintf(g_applied_q4, sizeof(g_applied_q4), "%s", q4.c_str());
+    if (!qw38::cuda::apply_q4_decode_ident(g_applied_q4, 4U)) {
+      std::fprintf(stderr, "invalid --q4-decode %s\n", q4.c_str());
+      return 2;
+    }
+  }
+  if (!ffn.empty()) {
+    std::snprintf(g_applied_ffn, sizeof(g_applied_ffn), "%s", ffn.c_str());
+    if (!qw38::cuda::apply_ffn_decode_ident(g_applied_ffn)) {
+      std::fprintf(stderr, "invalid --ffn-decode %s\n", ffn.c_str());
+      return 2;
+    }
+  }
+  if (!q8.empty() && (q8 == "r1_w4" || q8 == "r2_w2" || q8 == "r4_w1" ||
+                      q8 == "r8_w1")) {
+    std::snprintf(g_applied_q8, sizeof(g_applied_q8), "%s", q8.c_str());
+    if (!qw38::cuda::apply_q8_layout_ident(g_applied_q8)) {
+      std::fprintf(stderr, "invalid --q8-layout %s\n", q8.c_str());
+      return 2;
+    }
+  }
+  if (options.quality) {
+    const char* effective_q4 = qw38::cuda::effective_q4_decode_path();
+    const char* layout = qw38::cuda::q8_layout_ident(
+        qw38::cuda::effective_q8_decode_rows_skinny(),
+        qw38::cuda::effective_q8_decode_layout_warps_skinny());
+    if (!q4.empty() && std::strcmp(effective_q4, q4.c_str()) != 0) {
+      std::fprintf(stderr, "--quality restored q4_decode to %s\n", effective_q4);
+      return 2;
+    }
+    if (!q8.empty() && (q8 == "r1_w4" || q8 == "r2_w2") &&
+        std::strcmp(layout, q8.c_str()) != 0) {
+      std::fprintf(stderr, "--quality restored q8_layout to %s\n", layout);
+      return 2;
+    }
+    std::printf("quality_flag=true restored_packed_or_r2=false "
+                "effective_q4=%s effective_ffn=%s effective_q8_layout=%s "
+                "applied_before_graph=true\n",
+                qw38::cuda::effective_q4_decode_path(),
+                qw38::cuda::effective_ffn_decode_path(), layout);
+  }
+  return 0;
 }
 
 int run_smoke() {
@@ -821,6 +946,8 @@ int main(int argc, char** argv) {
     std::fprintf(stderr, "model path is required for %s\n", options.workload);
     return 2;
   }
+  const int applied = apply_quality_selectors(options);
+  if (applied != 0) return applied;
   if (std::strcmp(options.workload, "scheduler") == 0) {
     return run_scheduler(options);
   }

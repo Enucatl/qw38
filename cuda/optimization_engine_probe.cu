@@ -355,14 +355,16 @@ int reject_over_bounds(qw38::cuda::TestTier tier, const Options& options) {
     return 0;
   }
   if (tier == qw38::cuda::TestTier::kAcceptance &&
-      (q8_ab || mmq_ab || q4_ab || gdn_ab || attn_ab)) {
+      (q8_ab || mmq_ab || q4_ab || gdn_ab || attn_ab || prefill)) {
     const bool q8_ok = q8_ab && options.prefix == kScreenPrefix &&
                        options.output_tokens == kScreenOutputTokens &&
                        options.prompt == 0 && options.pairs <= 5;
     const bool mmq_ok = mmq_ab && options.prompt == kScreenPrompt &&
                         options.prefix == 0 && options.output_tokens == 0 &&
                         options.pairs <= 5;
-    const bool q4_ok = q4_ab && options.prefix == kScreenPrefix &&
+    const bool q4_ok = q4_ab &&
+                       (options.prefix == kScreenPrefix ||
+                        options.prefix == 128) &&
                        options.output_tokens == kScreenOutputTokens &&
                        options.prompt == 0 && options.pairs <= 5;
     const bool gdn_ok = gdn_ab && options.prefix == kScreenPrefix &&
@@ -374,8 +376,10 @@ int reject_over_bounds(qw38::cuda::TestTier tier, const Options& options) {
           options.output_tokens == 0) ||
          (options.prefix == kScreenPrefix &&
           options.output_tokens == kScreenOutputTokens && options.prompt == 0));
+    const bool prefill_ok = prefill && options.prompt == kScreenPrompt &&
+                            options.prefix == 0 && options.output_tokens == 0;
     if (options.model == nullptr ||
-        !(q8_ok || mmq_ok || q4_ok || gdn_ok || attn_ok)) {
+        !(q8_ok || mmq_ok || q4_ok || gdn_ok || attn_ok || prefill_ok)) {
       std::fprintf(stderr,
                    "acceptance keep-ab allows five P4096 or D2048+32 pairs\n");
       return 2;
@@ -512,13 +516,25 @@ int load_model(const char* path, qw38::cuda::ResidentModel* model) {
   return 0;
 }
 
+float percentile_ms(std::vector<float>* values, double fraction) {
+  if (values == nullptr || values->empty()) return 0.0F;
+  std::sort(values->begin(), values->end());
+  const double index =
+      fraction * static_cast<double>(values->size() - 1);
+  const std::size_t lo = static_cast<std::size_t>(index);
+  const std::size_t hi = std::min(lo + 1, values->size() - 1);
+  const double mix = index - static_cast<double>(lo);
+  return static_cast<float>((1.0 - mix) * (*values)[lo] + mix * (*values)[hi]);
+}
+
 qw38::Status run_tokens(const qw38::cuda::ResidentModel& model,
                         const std::size_t* tokens, std::size_t prefix,
                         std::size_t output_tokens,
                         qw38::cuda::SchedulerSession* session,
                         qw38::cuda::SchedulerWorkspace* workspace,
                         qw38::cuda::SchedulerGraphs* graphs, float* logits,
-                        float* hidden, float* wall_ms) {
+                        float* hidden, float* wall_ms, float* itl_p50_ms,
+                        float* itl_p95_ms) {
   qw38::Status status = session->reset();
   if (!status.is_ok()) return status;
   if (prefix > 0) {
@@ -529,6 +545,8 @@ qw38::Status run_tokens(const qw38::cuda::ResidentModel& model,
         &result, nullptr, graphs);
     if (!status.is_ok()) return status;
   }
+  std::vector<float> itl;
+  itl.reserve(output_tokens);
   const auto started = std::chrono::steady_clock::now();
   for (std::size_t step = 0; step < output_tokens; ++step) {
     float elapsed = 0.0F;
@@ -538,11 +556,20 @@ qw38::Status run_tokens(const qw38::cuda::ResidentModel& model,
         &elapsed, nullptr, nullptr, qw38::cuda::PointwisePath::kFused, graphs,
         nullptr);
     if (!status.is_ok()) return status;
+    itl.push_back(elapsed);
   }
   if (wall_ms != nullptr) {
     *wall_ms = static_cast<float>(std::chrono::duration<double, std::milli>(
                                       std::chrono::steady_clock::now() - started)
                                       .count());
+  }
+  if (itl_p50_ms != nullptr) {
+    std::vector<float> copy = itl;
+    *itl_p50_ms = percentile_ms(&copy, 0.50);
+  }
+  if (itl_p95_ms != nullptr) {
+    std::vector<float> copy = itl;
+    *itl_p95_ms = percentile_ms(&copy, 0.95);
   }
   return status;
 }
@@ -662,7 +689,8 @@ int run_engine(const Options& options, bool correctness) {
                          graph_ptr, logits, hidden, wall);
     }
     return run_tokens(model, tokens.data(), prefix, output_tokens, session,
-                      &workspace, graph_ptr, logits, hidden, wall);
+                      &workspace, graph_ptr, logits, hidden, wall, nullptr,
+                      nullptr);
   };
 
   if (options.graph) {
@@ -747,7 +775,7 @@ int run_engine(const Options& options, bool correctness) {
                options.q4_decode != nullptr || options.ffn_decode != nullptr)
                   ? "true"
                   : "false",
-              captured_path, qw38::cuda::selected_q4_decode_path(),
+              captured_path, qw38::cuda::effective_q4_decode_path(),
               qw38::cuda::selected_q8_decode_path(),
               qw38::cuda::selected_q8_decode_rows_skinny(),
               qw38::cuda::selected_q8_decode_layout_warps_skinny(),
@@ -756,7 +784,7 @@ int run_engine(const Options& options, bool correctness) {
               qw38::cuda::last_q8_decode_dispatch().layout,
               qw38::cuda::last_mmq_tile_dispatch().kernel,
               qw38::cuda::last_mmq_tile_dispatch().async_x ? "true" : "false",
-              qw38::cuda::selected_ffn_decode_path());
+              qw38::cuda::effective_ffn_decode_path());
   std::printf("status=passed\n");
   return 0;
 }
@@ -809,6 +837,8 @@ int run_keep_ab(const Options& options) {
     const char* second = ba ? (numeric_side ? "0" : (q8 ? control_layout : "0"))
                             : (numeric_side ? "1" : (q8 ? candidate_layout : "1"));
     float walls[2] = {0.0F, 0.0F};
+    float itl_p50[2] = {0.0F, 0.0F};
+    float itl_p95[2] = {0.0F, 0.0F};
     const char* labels[2] = {first, second};
     const char* q8_layout_copy[2] = {"", ""};
     char mmq_kernel_buf[2][80]{{}, {}};
@@ -874,7 +904,8 @@ int run_keep_ab(const Options& options) {
       } else {
         status = run_tokens(model, tokens.data(), prefix, output_tokens,
                             &session, &workspace, &graphs, logits.data(),
-                            hidden.data(), &walls[side]);
+                            hidden.data(), &walls[side], &itl_p50[side],
+                            &itl_p95[side]);
       }
       if (!status.is_ok()) return fail_status(status);
       q8_layout_copy[side] = qw38::cuda::last_q8_decode_dispatch().layout;
@@ -930,10 +961,16 @@ int run_keep_ab(const Options& options) {
     std::printf(
         "{\"observation_unit\":\"independent_round\",\"sample_index\":%d,"
         "\"pair\":%d,\"order\":\"%s\",\"control_ms\":%.9g,"
-        "\"candidate_ms\":%.9g,\"family\":\"%s\"}\n",
+        "\"candidate_ms\":%.9g,\"control_itl_p50_ms\":%.9g,"
+        "\"control_itl_p95_ms\":%.9g,\"candidate_itl_p50_ms\":%.9g,"
+        "\"candidate_itl_p95_ms\":%.9g,\"family\":\"%s\"}\n",
         pair, pair, ba ? "BA" : "AB",
         static_cast<double>(ba ? walls[1] : walls[0]),
         static_cast<double>(ba ? walls[0] : walls[1]),
+        static_cast<double>(ba ? itl_p50[1] : itl_p50[0]),
+        static_cast<double>(ba ? itl_p95[1] : itl_p95[0]),
+        static_cast<double>(ba ? itl_p50[0] : itl_p50[1]),
+        static_cast<double>(ba ? itl_p95[0] : itl_p95[1]),
         q4 ? "q4" : (gdn ? "gdn" : (attn ? "attn" : (q8 ? "q8" : "mmq"))));
   }
   std::printf(

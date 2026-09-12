@@ -41,6 +41,13 @@ SHIPPING_SELECTORS: dict[str, Any] = {
     "logit_masking": False,
 }
 
+# OPT-088 shipping control (packed Q4, r1_w4 Q8). Distinct from the OPT-084
+# packed/r2 freeze in SHIPPING_SELECTORS. Authentication must keep both.
+OPT088_CONTROL_SELECTORS: dict[str, Any] = {
+    **SHIPPING_SELECTORS,
+    "q8_decode": "r1_w4",
+}
+
 QUALITY_DELTA: dict[str, Any] = {
     "flag": QUALITY_FLAG,
     "selector": "production_arithmetic_under_test",
@@ -97,6 +104,15 @@ def apply_quality_mode(
             raise QualityFrameworkError(
                 "quality mode requires production NVCCFLAGS -O2 --fmad=false"
             )
+    restored = False
+    if selectors:
+        for key in ("q4_decode", "q4_staging", "q8_decode"):
+            if key in selectors and effective.get(key) != selectors[key]:
+                restored = True
+                raise QualityFrameworkError(
+                    f"--quality restored default {key}={effective.get(key)!r} "
+                    f"over {selectors[key]!r}"
+                )
     return {
         "quality": enabled,
         "flag": QUALITY_FLAG,
@@ -108,4 +124,44 @@ def apply_quality_mode(
         "delta": dict(QUALITY_DELTA),
         "graph_vs_eager": "same_math_equivalence",
         "same_math_equivalence_not_different_kernel": True,
+        "does_not_restore_packed_or_r2": not restored,
     }
+
+
+def build_quality_config(
+    *,
+    enabled: bool,
+    selectors: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Explicit quality-config carrying all effective selectors.
+
+    `--quality` disables shortcuts only. It must not restore packed Q4 or
+    r2 Q8 defaults over the caller-supplied production selectors.
+    """
+    if not selectors:
+        raise QualityFrameworkError("quality-config requires effective selectors")
+    missing = [
+        key
+        for key in (
+            "q4_decode",
+            "q4_staging",
+            "q8_decode",
+            "q8_path",
+            "prompt_mmq",
+            "prompt_mmq_tile",
+            "prompt_attention",
+            "decode_gdn",
+            "decode_attention",
+            "prompt_pair",
+            "nvccflags",
+            "execution_graphs",
+        )
+        if key not in selectors
+    ]
+    if missing:
+        raise QualityFrameworkError("quality-config missing selector " + missing[0])
+    applied = apply_quality_mode(enabled=enabled, selectors=selectors)
+    applied["quality_config"] = True
+    if enabled:
+        applied["argv"] = [QUALITY_FLAG, "--quality-config", "{path}"]
+    return applied

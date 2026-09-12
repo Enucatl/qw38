@@ -19,7 +19,6 @@ from tools.kernel_parity import (
     check_close,
 )
 from tools.opt082_kernel_parity import (
-    FIXTURE,
     ITERATION,
     K_CORE,
     K_PROD,
@@ -30,7 +29,6 @@ from tools.opt082_kernel_parity import (
     Q4_MMQ,
     Q4_MMV,
     Q8_LAYOUTS,
-    REPORT,
     catalog,
     evaluate_host_cases,
     load_json,
@@ -217,19 +215,27 @@ def test_wrappers_call_canonical_checker() -> None:
         assert "kAbsScale" not in text
 
 
-def test_host_phase_writes_fixture_without_gpu() -> None:
+def test_host_phase_writes_fixture_without_gpu(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import tools.opt082_kernel_parity as mod
+
+    fixture = tmp_path / "opt082_kernel_parity.json"
+    report = tmp_path / "REPORT.md"
+    monkeypatch.setattr(mod, "FIXTURE", fixture)
+    monkeypatch.setattr(mod, "REPORT", report)
     result = run_phase("q4", skip_gpu=True)
     assert result["success"] is True
     assert result["claims_throughput"] is False
     assert result["host_ok"] is True
     assert result["gpu_ran"] is False
-    assert FIXTURE.is_file()
-    assert REPORT.is_file()
-    fixture = load_json(FIXTURE)
-    assert fixture["claims_throughput"] is False
-    assert fixture["catalog_count"] == len(catalog("q4"))
+    assert fixture.is_file()
+    assert report.is_file()
+    payload = load_json(fixture)
+    assert payload["claims_throughput"] is False
+    assert payload["catalog_count"] == len(catalog("q4"))
     assert all(row["matched_expectation"] for row in evaluate_host_cases())
-    text = REPORT.read_text(encoding="utf-8")
+    text = report.read_text(encoding="utf-8")
     assert "0.20" in text and "0.05" in text
     assert "claims_throughput: false" in text
     assert "no full production M" in text

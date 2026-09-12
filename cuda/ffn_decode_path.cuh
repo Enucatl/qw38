@@ -15,7 +15,7 @@ constexpr char kStagingQ8Fp32PairedInteger[] = "q8_fp32";
 constexpr char kStagingQ8Fp32UnfusedTrace[] = "q8_fp32_unfused_trace";
 
 // Production pin. Keep sitting may switch away from separate; reject restores it.
-constexpr char kSelectedFfnDecodePath[] = "paired_staged";
+constexpr char kSelectedFfnDecodePath[] = "paired_integer";
 
 inline thread_local const char* g_ffn_decode_path_override = nullptr;
 inline thread_local bool g_ffn_paired_integer_trace_unfused = false;

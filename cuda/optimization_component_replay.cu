@@ -39,12 +39,18 @@ constexpr std::size_t kQ80 = 32;
 constexpr std::size_t kTinyRows = 17;
 constexpr std::size_t kTinyCols = 256;
 constexpr std::uint8_t kGuardFill = 0xA5U;
-constexpr char kCaptureCache[] =
-    "evidence/optimization/opt061-component-replay/capture-bundle.json";
-constexpr char kHardwareJson[] =
-    "evidence/optimization/opt061-component-replay/hardware.json";
-constexpr char kProvenanceJson[] =
-    "evidence/optimization/opt061-component-replay/provenance.json";
+char g_evidence_dir[512] = "evidence/optimization/opt061-component-replay";
+
+void set_evidence_dir(const char* dir) {
+  const char* chosen =
+      (dir != nullptr && dir[0] != '\0') ? dir : qw38::cuda::kOpt061EvidenceDir;
+  std::snprintf(g_evidence_dir, sizeof(g_evidence_dir), "%s", chosen);
+}
+
+void evidence_path(char* out, std::size_t n, const char* name) {
+  std::snprintf(out, n, "%s/%s", g_evidence_dir, name);
+}
+
 constexpr char kOpt071CaptureRoot[] =
     "evidence/optimization/opt071-attribution-repair/captures";
 constexpr std::size_t kLayerFloats =
@@ -67,6 +73,7 @@ struct Options final {
   int decode_position = 128;
   bool ncu = false;
   bool corrupt_guard = false;
+  const char* evidence_dir = nullptr;
 };
 
 int usage(const char* argv0) {
@@ -82,7 +89,8 @@ int usage(const char* argv0) {
                "[--gdn-decode sequential|tile16|tile32] "
                "[--decode-query-prep warp_query|prepared_q|prepared_q_veckv] "
                "[--decode-position 128|2048] "
-               "[--warmups N] [--samples N] [--ncu] [--corrupt-guard]\n",
+               "[--warmups N] [--samples N] [--ncu] [--corrupt-guard] "
+               "[--evidence-dir DIR]\n",
                argv0);
   return 2;
 }
@@ -122,6 +130,8 @@ int parse_args(int argc, char** argv, Options* options) {
       options->ncu = true;
     } else if (std::strcmp(arg, "--corrupt-guard") == 0) {
       options->corrupt_guard = true;
+    } else if (std::strcmp(arg, "--evidence-dir") == 0 && index + 1 < argc) {
+      options->evidence_dir = argv[++index];
     } else if (arg[0] != '-' && options->model == nullptr) {
       options->model = arg;
     } else {
@@ -362,7 +372,9 @@ int query_hardware(HardwareInfo* info) {
 }
 
 void write_hardware_json(const HardwareInfo& info) {
-  FILE* out = std::fopen(kHardwareJson, "w");
+  char path[640];
+  evidence_path(path, sizeof(path), "hardware.json");
+  FILE* out = std::fopen(path, "w");
   if (out == nullptr) return;
   std::fprintf(
       out,
@@ -424,10 +436,14 @@ int run_ncu_probe(const HardwareInfo& info) {
                 "full_set=false\n");
     return 0;
   }
-  const int listed =
-      std::system("ncu --query-metrics > "
-                  "evidence/optimization/opt061-component-replay/ncu-metrics.txt "
-                  "2> evidence/optimization/opt061-component-replay/ncu-error.txt");
+  char metrics[640];
+  char errors[640];
+  char listed_cmd[1400];
+  evidence_path(metrics, sizeof(metrics), "ncu-metrics.txt");
+  evidence_path(errors, sizeof(errors), "ncu-error.txt");
+  std::snprintf(listed_cmd, sizeof(listed_cmd),
+                "ncu --query-metrics > %s 2> %s", metrics, errors);
+  const int listed = std::system(listed_cmd);
   if (listed != 0) {
     std::printf("ncu_status=unavailable reason=query_metrics_failed "
                 "full_set=false\n");
@@ -896,7 +912,9 @@ int persist_activations(const char* identity, const LayerActivations& acts,
   }
   std::fprintf(out, "],\"full_vectors\":true}\n");
   std::fclose(out);
-  FILE* legacy = std::fopen(kCaptureCache, "w");
+  char legacy_path[640];
+  evidence_path(legacy_path, sizeof(legacy_path), "capture-bundle.json");
+  FILE* legacy = std::fopen(legacy_path, "w");
   if (legacy != nullptr) {
     std::fprintf(legacy,
                  "{\"schema_version\":1,\"task\":\"OPT-071\","
@@ -1929,8 +1947,9 @@ int run_family(const Options& options, qw38::cuda::ReplayFamily family) {
     warmups = 3;
     samples = 10;
   }
-  FILE* rounds = std::fopen(
-      "evidence/optimization/opt061-component-replay/rounds.jsonl", "a");
+  char rounds_path[640];
+  evidence_path(rounds_path, sizeof(rounds_path), "rounds.jsonl");
+  FILE* rounds = std::fopen(rounds_path, "a");
   if (options.q8_layout != nullptr &&
       !qw38::cuda::apply_q8_layout_ident(options.q8_layout)) {
     std::fprintf(stderr, "invalid --q8-layout %s\n", options.q8_layout);
@@ -2140,7 +2159,9 @@ int run_family(const Options& options, qw38::cuda::ReplayFamily family) {
   if (options.decode_query_prep != nullptr) {
     qw38::cuda::clear_decode_query_prep_path_override();
   }
-  FILE* prov = std::fopen(kProvenanceJson, "w");
+  char prov_path[640];
+  evidence_path(prov_path, sizeof(prov_path), "provenance.json");
+  FILE* prov = std::fopen(prov_path, "w");
   if (prov != nullptr) {
     std::fprintf(
         prov,
@@ -2197,8 +2218,10 @@ int main(int argc, char** argv) {
   if (workload == nullptr || workload[0] == '\0') {
     workload = default_workload(qw38::cuda::test_tier());
   }
-  const int mkdir_rc =
-      std::system("mkdir -p evidence/optimization/opt061-component-replay");
+  set_evidence_dir(options.evidence_dir);
+  char mkdir_cmd[640];
+  std::snprintf(mkdir_cmd, sizeof(mkdir_cmd), "mkdir -p %s", g_evidence_dir);
+  const int mkdir_rc = std::system(mkdir_cmd);
   if (mkdir_rc != 0) {
     std::fprintf(stderr, "cannot create evidence directory\n");
     return 1;

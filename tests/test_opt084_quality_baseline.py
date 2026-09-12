@@ -10,13 +10,11 @@ import pytest
 
 from tools.opt084_quality_baseline import (
     CONTRACT,
-    FIXTURE,
     FREEZE_SELECTORS,
     FROZEN_ACCEPTANCE,
     ITERATION,
     NLL_CASES,
     PROOF,
-    REPORT,
     historical_reclassification,
     load_json,
     quartz_vs_baseline,
@@ -92,7 +90,13 @@ def test_selector_mismatch_fails_closed() -> None:
         require_shipping_selectors({"nvccflags": "-O3 --fmad=true"})
 
 
-def test_remote_scorer_invocation_refused_in_pytest() -> None:
+def test_remote_scorer_invocation_refused_in_pytest(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import tools.opt084_quality_baseline as mod
+
+    monkeypatch.setattr(mod, "FIXTURE", tmp_path / "opt084_quality_baseline.json")
+    monkeypatch.setattr(mod, "REPORT", tmp_path / "REPORT.md")
     with pytest.raises(QualityFrameworkError, match="cannot run in pytest"):
         run_phase("baseline", openrouter=True)
     os.environ.pop(API_KEY_ENV, None)
@@ -179,7 +183,15 @@ def test_iteration_loop_products_and_dry_run_phases() -> None:
     assert "held_out_targets=32" in baseline
 
 
-def test_host_phases_write_fixture_and_freeze_zero_delta() -> None:
+def test_host_phases_write_fixture_and_freeze_zero_delta(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import tools.opt084_quality_baseline as mod
+
+    fixture_path = tmp_path / "opt084_quality_baseline.json"
+    report_path = tmp_path / "REPORT.md"
+    monkeypatch.setattr(mod, "FIXTURE", fixture_path)
+    monkeypatch.setattr(mod, "REPORT", report_path)
     llama = run_phase("llama", skip_gpu=True)
     assert llama["success"] is True
     assert llama["claims_throughput"] is False
@@ -195,9 +207,9 @@ def test_host_phases_write_fixture_and_freeze_zero_delta() -> None:
     assert baseline["zero_delta"] is True
     assert baseline["historical_failures_erased"] is False
     assert baseline["candidate_installed"] is False
-    assert FIXTURE.is_file()
-    assert REPORT.is_file()
-    fixture = load_json(FIXTURE)
+    assert fixture_path.is_file()
+    assert report_path.is_file()
+    fixture = load_json(fixture_path)
     assert fixture["claims_throughput"] is False
     assert fixture["candidate_installed"] is False
     assert fixture["absolute_quality_status"] == "fail"
@@ -225,7 +237,7 @@ def test_host_phases_write_fixture_and_freeze_zero_delta() -> None:
     assert dual["quality_v2_all"] is False
     assert dual["absolute_task_accuracy"]["status"] == "fail"
     assert dual["engine_non_regression"]["status"] == "pass"
-    text = REPORT.read_text(encoding="utf-8")
+    text = report_path.read_text(encoding="utf-8")
     for item in PROOF:
         assert item in text
     assert "--quality" in text

@@ -38,6 +38,7 @@ static_assert(sizeof(Q81Host) == 36, "Q8_1 host layout");
 
 struct Options final {
   const char* phase = nullptr;
+  bool expand_opt089 = false;
 };
 
 struct CaseResult final {
@@ -64,13 +65,20 @@ struct CaseResult final {
   std::size_t failing = 0;
   std::size_t nonfinite = 0;
   std::string reason;
+  std::string reference_kind = "staged";
+  float approx_max_abs = 0.0F;
+  float approx_max_rel = 0.0F;
+  float fp64_max_abs = 0.0F;
+  bool producer_bytes_match = true;
+  bool guard_ok = true;
 };
 
 const char* json_bool(bool value) { return value ? "true" : "false"; }
 
 int usage(const char* argv0) {
   std::fprintf(stderr,
-               "usage: %s [--phase smoke|q4|q8-q6|parity]\n", argv0);
+               "usage: %s [--phase smoke|q4|q8-q6|parity] [--expand-opt089]\n",
+               argv0);
   return 2;
 }
 
@@ -81,6 +89,8 @@ int parse_args(int argc, char** argv, Options* options) {
          std::strcmp(arg, "--workload") == 0) &&
         index + 1 < argc) {
       options->phase = argv[++index];
+    } else if (std::strcmp(arg, "--expand-opt089") == 0) {
+      options->expand_opt089 = true;
     } else if (arg[0] == '-') {
       return usage(argv[0]);
     }
@@ -210,6 +220,9 @@ void fill_activation(std::size_t count, const char* pattern, std::uint32_t seed,
   }
 }
 
+bool decode_row(qw38::cuda::QuantKind kind, const std::uint8_t* packed,
+                std::size_t columns, std::vector<float>* decoded);
+
 void host_stage_q8(const std::vector<__nv_bfloat16>& activation,
                    std::size_t columns, std::size_t rows,
                    std::vector<qw38::cuda::Q8Block>* staged) {
@@ -235,6 +248,104 @@ void host_stage_q8(const std::vector<__nv_bfloat16>& activation,
       }
     }
   }
+}
+
+__global__ void silu_mul_bf16_rne(const float* gate, const float* up,
+                                  __nv_bfloat16* output, unsigned int count) {
+  const unsigned int index = blockIdx.x * blockDim.x + threadIdx.x;
+  if (index >= count) return;
+  const float g = gate[index];
+  const float silu = g / (1.0F + expf(-g));
+  output[index] = __float2bfloat16_rn(__fmul_rn(up[index], silu));
+}
+
+cudaError_t launch_silu_mul_bf16_rne(const float* gate, const float* up,
+                                     __nv_bfloat16* output, std::size_t count) {
+  if (gate == nullptr || up == nullptr || output == nullptr || count == 0) {
+    return cudaErrorInvalidValue;
+  }
+  const unsigned int threads = 256;
+  const unsigned int blocks =
+      static_cast<unsigned int>((count + threads - 1) / threads);
+  silu_mul_bf16_rne<<<blocks, threads>>>(gate, up, output,
+                                         static_cast<unsigned int>(count));
+  return cudaPeekAtLastError();
+}
+
+void host_stage_q8_1_independent(const std::vector<__nv_bfloat16>& activation,
+                                 std::size_t columns, std::size_t rows,
+                                 std::vector<Q81Host>* staged) {
+  staged->assign(rows * (columns / kQ80Values), Q81Host{});
+  for (std::size_t row = 0; row < rows; ++row) {
+    for (std::size_t block = 0; block < columns / kQ80Values; ++block) {
+      Q81Host& q8 = (*staged)[row * (columns / kQ80Values) + block];
+      float values[32];
+      float maximum = 0.0F;
+      for (std::size_t lane = 0; lane < 32; ++lane) {
+        values[lane] = __bfloat162float(
+            activation[row * columns + block * 32 + lane]);
+        maximum = std::max(maximum, std::fabs(values[lane]));
+      }
+      const float scale = maximum == 0.0F ? 0.0F : maximum / 127.0F;
+      int q_sum = 0;
+      for (std::size_t lane = 0; lane < 32; ++lane) {
+        const std::int8_t quant =
+            scale == 0.0F ? 0
+                          : static_cast<std::int8_t>(std::round(values[lane] / scale));
+        q8.values[lane] = quant;
+        q_sum += static_cast<int>(quant);
+      }
+      q8.scale = __float2half_rn(scale);
+      q8.q8_sum = __float2half_rn(static_cast<float>(q_sum));
+    }
+  }
+}
+
+bool reference_q8_1_staged(qw38::cuda::QuantKind kind,
+                           const std::vector<std::uint8_t>& weights,
+                           std::size_t output_rows, std::size_t columns,
+                           const std::vector<Q81Host>& staged,
+                           std::vector<float>* output) {
+  output->assign(output_rows, 0.0F);
+  std::vector<float> decoded;
+  const std::size_t bytes = block_bytes(kind);
+  const std::size_t values = block_values(kind);
+  for (std::size_t out = 0; out < output_rows; ++out) {
+    if (!decode_row(kind, weights.data() + out * (columns / values) * bytes,
+                    columns, &decoded)) {
+      return false;
+    }
+    float sum = 0.0F;
+    for (std::size_t column = 0; column < columns; ++column) {
+      const Q81Host& q8 = staged[column / 32];
+      const float scale = __half2float(q8.scale);
+      sum += decoded[column] * (scale * static_cast<float>(q8.values[column % 32]));
+    }
+    (*output)[out] = sum;
+  }
+  return true;
+}
+
+bool q81_producer_matches(const std::vector<Q81Host>& gpu,
+                          const std::vector<Q81Host>& cpu) {
+  if (gpu.size() != cpu.size()) return false;
+  return std::memcmp(gpu.data(), cpu.data(), gpu.size() * sizeof(Q81Host)) == 0;
+}
+
+void apply_approx_bf16(CaseResult* result, const std::vector<float>& actual,
+                       const std::vector<float>& bf16_ref, const char* family) {
+  const auto diagnostics =
+      parity_check(actual, bf16_ref, family, result->k, result->cls.c_str());
+  result->approx_max_abs = diagnostics.max_abs;
+  result->approx_max_rel = diagnostics.max_rel;
+}
+
+bool guards_intact(const std::uint8_t* bytes, std::size_t count,
+                   std::uint8_t fill) {
+  for (std::size_t index = 0; index < count; ++index) {
+    if (bytes[index] != fill) return false;
+  }
+  return true;
 }
 
 bool decode_row(qw38::cuda::QuantKind kind, const std::uint8_t* packed,
@@ -397,7 +508,10 @@ void print_case(const CaseResult& result) {
       "\"expected_launch\":\"%s\",\"fallback\":%s,\"expect_fallback\":%s,"
       "\"pass\":%s,\"applicable\":%s,\"max_abs\":%.9g,\"max_rel\":%.9g,"
       "\"rms\":%.9g,\"abs_tol\":%.9g,\"rel_tol\":%.9g,\"failing_count\":%zu,"
-      "\"nonfinite_count\":%zu,\"reason\":\"%s\"}\n",
+      "\"nonfinite_count\":%zu,\"reason\":\"%s\",\"reference_kind\":\"%s\","
+      "\"approx_max_abs\":%.9g,\"approx_max_rel\":%.9g,\"fp64_max_abs\":%.9g,"
+      "\"producer_bytes_match\":%s,\"guard_ok\":%s,"
+      "\"original_bf16_is_approximation_only\":true}\n",
       kCasePrefix, result.id.c_str(), result.family.c_str(), result.cls.c_str(),
       result.candidate.c_str(), result.op.c_str(), result.pattern.c_str(),
       result.m, result.n, result.k, result.launched.c_str(),
@@ -405,7 +519,9 @@ void print_case(const CaseResult& result) {
       json_bool(result.expect_fallback), json_bool(result.pass),
       json_bool(result.applicable), result.max_abs, result.max_rel, result.rms,
       result.abs_tol, result.rel_tol, result.failing, result.nonfinite,
-      result.reason.c_str());
+      result.reason.c_str(), result.reference_kind.c_str(), result.approx_max_abs,
+      result.approx_max_rel, result.fp64_max_abs,
+      json_bool(result.producer_bytes_match), json_bool(result.guard_ok));
 }
 
 struct DeviceBuf final {
@@ -526,10 +642,22 @@ int run_q4_mmv(CaseResult* result, const std::vector<std::uint8_t>& weights,
 
 int run_q8_mmv(CaseResult* result, const std::vector<std::uint8_t>& weights,
                const std::vector<__nv_bfloat16>& activation,
-               const std::vector<float>& expected) {
+               const std::vector<float>& bf16_expected) {
+  std::vector<Q81Host> cpu_staged;
+  host_stage_q8_1_independent(activation, result->k, 1, &cpu_staged);
+  std::vector<float> staged_expected;
+  if (!reference_q8_1_staged(qw38::cuda::QuantKind::kQ8_0, weights, result->m,
+                             result->k, cpu_staged, &staged_expected)) {
+    result->reason = "reference_failed";
+    return 1;
+  }
   DeviceBuf buf;
   cudaError_t error =
       alloc_mmv(&buf, weights.size(), result->k, result->m);
+  std::uint8_t* guard = nullptr;
+  constexpr std::size_t kGuard = 64;
+  if (error == cudaSuccess) error = cudaMalloc(&guard, kGuard);
+  if (error == cudaSuccess) error = cudaMemset(guard, 0xA5, kGuard);
   if (error == cudaSuccess) {
     error = cudaMemcpy(buf.weights, weights.data(), weights.size(),
                        cudaMemcpyHostToDevice);
@@ -541,9 +669,22 @@ int run_q8_mmv(CaseResult* result, const std::vector<std::uint8_t>& weights,
   }
   if (error != cudaSuccess) {
     buf.free_all();
+    cudaFree(guard);
     result->reason = "cuda_error";
     return fail_cuda("q8 mmv alloc", error);
   }
+  error = qw38::cuda::launch_quantize_bf16_q8_1(buf.act, buf.staged, result->k,
+                                                nullptr);
+  if (error == cudaSuccess) error = cudaDeviceSynchronize();
+  std::vector<Q81Host> gpu_staged(cpu_staged.size());
+  if (error == cudaSuccess) {
+    error = cudaMemcpy(gpu_staged.data(), buf.staged,
+                       gpu_staged.size() * sizeof(Q81Host),
+                       cudaMemcpyDeviceToHost);
+  }
+  result->producer_bytes_match = error == cudaSuccess &&
+                                 q81_producer_matches(gpu_staged, cpu_staged);
+  result->reference_kind = "cpu_dequant_q8_0_times_independent_q8_1";
   qw38::cuda::clear_q8_decode_dispatch();
   unsigned int rows = std::strcmp(result->candidate.c_str(), "r2_w2") == 0 ? 2U
                                                                           : 1U;
@@ -552,9 +693,11 @@ int run_q8_mmv(CaseResult* result, const std::vector<std::uint8_t>& weights,
     qw38::cuda::Q8DecodeLayoutScope scope(qw38::cuda::kLegalQ8DecodePathDp4aQ81,
                                           rows, warps, rows, warps, rows,
                                           warps);
-    error = qw38::cuda::launch_q8_coop_mmv(
-        buf.weights, result->m, result->k, buf.act, buf.staged, buf.out, rows,
-        warps, nullptr);
+    if (error == cudaSuccess) {
+      error = qw38::cuda::launch_q8_coop_mmv(
+          buf.weights, result->m, result->k, buf.act, buf.staged, buf.out, rows,
+          warps, nullptr);
+    }
   }
   if (error == cudaSuccess) error = cudaDeviceSynchronize();
   result->launched = qw38::cuda::last_q8_decode_dispatch().layout;
@@ -563,20 +706,43 @@ int run_q8_mmv(CaseResult* result, const std::vector<std::uint8_t>& weights,
     error = cudaMemcpy(actual.data(), buf.out, actual.size() * sizeof(float),
                        cudaMemcpyDeviceToHost);
   }
+  std::uint8_t host_guard[kGuard];
+  if (error == cudaSuccess) {
+    error = cudaMemcpy(host_guard, guard, kGuard, cudaMemcpyDeviceToHost);
+  }
   buf.free_all();
+  cudaFree(guard);
   if (error != cudaSuccess) {
     result->reason = "cuda_error";
     return fail_cuda("q8 mmv launch", error);
   }
-  apply_diagnostics(result, parity_check(actual, expected, "Q8_0", result->k,
-                                         result->cls.c_str()));
+  result->guard_ok = guards_intact(host_guard, kGuard, 0xA5);
+  apply_diagnostics(result, parity_check(actual, staged_expected, "Q8_0",
+                                         result->k, result->cls.c_str()));
+  apply_approx_bf16(result, actual, bf16_expected, "Q8_0");
+  if (!result->producer_bytes_match) {
+    result->pass = false;
+    result->reason = "q8_1_producer_mismatch";
+  }
+  if (!result->guard_ok) {
+    result->pass = false;
+    result->reason = "guard_buffer_overwrite";
+  }
   finalize_selector(result);
   return 0;
 }
 
 int run_q6_mmv(CaseResult* result, const std::vector<std::uint8_t>& weights,
                const std::vector<__nv_bfloat16>& activation,
-               const std::vector<float>& expected) {
+               const std::vector<float>& bf16_expected) {
+  std::vector<Q81Host> cpu_staged;
+  host_stage_q8_1_independent(activation, result->k, 1, &cpu_staged);
+  std::vector<float> staged_expected;
+  if (!reference_q8_1_staged(qw38::cuda::QuantKind::kQ6K, weights, result->m,
+                             result->k, cpu_staged, &staged_expected)) {
+    result->reason = "reference_failed";
+    return 1;
+  }
   DeviceBuf buf;
   cudaError_t error =
       alloc_mmv(&buf, weights.size(), result->k, result->m);
@@ -594,12 +760,27 @@ int run_q6_mmv(CaseResult* result, const std::vector<std::uint8_t>& weights,
     result->reason = "cuda_error";
     return fail_cuda("q6 mmv alloc", error);
   }
+  error = qw38::cuda::launch_quantize_bf16_q8_1(buf.act, buf.staged, result->k,
+                                                nullptr);
+  if (error == cudaSuccess) error = cudaDeviceSynchronize();
+  std::vector<Q81Host> gpu_staged(cpu_staged.size());
+  if (error == cudaSuccess) {
+    error = cudaMemcpy(gpu_staged.data(), buf.staged,
+                       gpu_staged.size() * sizeof(Q81Host),
+                       cudaMemcpyDeviceToHost);
+  }
+  result->producer_bytes_match = error == cudaSuccess &&
+                                 q81_producer_matches(gpu_staged, cpu_staged);
+  result->reference_kind = "cpu_dequant_q6_k_times_independent_q8_1";
   {
     qw38::cuda::Q6DecodePathScope scope(qw38::cuda::kLegalQ6DecodePathIntegerQ81,
                                         2);
-    error = qw38::cuda::launch_quant_mmv(qw38::cuda::QuantKind::kQ6K, buf.weights,
-                                         result->m, result->k, buf.act,
-                                         buf.staged, buf.out, nullptr);
+    if (error == cudaSuccess) {
+      error = qw38::cuda::launch_quant_mmv(qw38::cuda::QuantKind::kQ6K,
+                                           buf.weights, result->m, result->k,
+                                           buf.act, buf.staged, buf.out,
+                                           nullptr);
+    }
   }
   if (error == cudaSuccess) error = cudaDeviceSynchronize();
   result->launched = qw38::cuda::effective_q6_decode_path();
@@ -613,8 +794,13 @@ int run_q6_mmv(CaseResult* result, const std::vector<std::uint8_t>& weights,
     result->reason = "cuda_error";
     return fail_cuda("q6 mmv launch", error);
   }
-  apply_diagnostics(result, parity_check(actual, expected, "Q6_K", result->k,
-                                         result->cls.c_str()));
+  apply_diagnostics(result, parity_check(actual, staged_expected, "Q6_K",
+                                         result->k, result->cls.c_str()));
+  apply_approx_bf16(result, actual, bf16_expected, "Q6_K");
+  if (!result->producer_bytes_match) {
+    result->pass = false;
+    result->reason = "q8_1_producer_mismatch";
+  }
   finalize_selector(result);
   return 0;
 }
@@ -820,34 +1006,41 @@ int run_eager_vs_graph(std::vector<CaseResult>* results, const char* phase_filte
   return result.pass ? 0 : 1;
 }
 
-int run_fused_vs_independent(std::vector<CaseResult>* results,
-                             const char* phase_filter) {
-  if (std::strcmp(phase_filter, "q8-q6") == 0) return 0;
-  constexpr std::size_t kM = 3;
-  constexpr std::size_t kK = 256;
-  CaseResult result = make_case(
-      "Q4_K_fused_vs_independent_M3_N1_K256_random_same", "Q4_K",
-      "same_math_equivalence", "packed", "fused_gate_up", "random", kM, 1, kK,
-      qw38::cuda::kQ4LaunchVariantPairedStaged, false);
+int run_fused_case(std::vector<CaseResult>* results, const char* id,
+                   const char* candidate, const char* expected_launch,
+                   const char* q4_path, const char* ffn_path, std::size_t m,
+                   std::size_t k, std::uint32_t seed, const char* pattern) {
+  CaseResult result = make_case(id, "Q4_K", "same_math_equivalence", candidate,
+                                "fused_gate_up", pattern, m, 1, k,
+                                expected_launch, false);
+  result.reference_kind = "separate_gpu_prequant_plus_cuda_silu_bf16_rne";
   std::vector<std::uint8_t> gate;
   std::vector<std::uint8_t> up;
   std::vector<__nv_bfloat16> activation;
   std::vector<qw38::cuda::Q8Block> staged;
-  fill_weights(qw38::cuda::QuantKind::kQ4K, kM, kK, "random", &gate);
-  fill_weights(qw38::cuda::QuantKind::kQ4K, kM, kK, "cancel", &up);
-  fill_activation(kK, "random", 0x51U, &activation);
-  host_stage_q8(activation, kK, 1, &staged);
+  fill_weights(qw38::cuda::QuantKind::kQ4K, m, k, "random", &gate);
+  fill_weights(qw38::cuda::QuantKind::kQ4K, m, k, "cancel", &up);
+  fill_activation(k, "random", seed, &activation);
+  host_stage_q8(activation, k, 1, &staged);
   DeviceBuf buf;
   cudaError_t error = cudaMalloc(&buf.weights, gate.size());
   if (error == cudaSuccess) error = cudaMalloc(&buf.weights_b, up.size());
   if (error == cudaSuccess) {
     error = cudaMalloc(&buf.staged, staged.size() * sizeof(qw38::cuda::Q8Block));
   }
-  if (error == cudaSuccess) error = cudaMalloc(&buf.out, kM * sizeof(float));
-  if (error == cudaSuccess) error = cudaMalloc(&buf.out_b, kM * sizeof(float));
+  if (error == cudaSuccess) error = cudaMalloc(&buf.out, m * sizeof(float));
+  if (error == cudaSuccess) error = cudaMalloc(&buf.out_b, m * sizeof(float));
   if (error == cudaSuccess) {
-    error = cudaMalloc(&buf.fused, kM * sizeof(__nv_bfloat16));
+    error = cudaMalloc(&buf.fused, m * sizeof(__nv_bfloat16));
   }
+  __nv_bfloat16* independent = nullptr;
+  if (error == cudaSuccess) {
+    error = cudaMalloc(&independent, m * sizeof(__nv_bfloat16));
+  }
+  std::uint8_t* guard = nullptr;
+  constexpr std::size_t kGuard = 64;
+  if (error == cudaSuccess) error = cudaMalloc(&guard, kGuard);
+  if (error == cudaSuccess) error = cudaMemset(guard, 0xA5, kGuard);
   if (error == cudaSuccess) {
     error = cudaMemcpy(buf.weights, gate.data(), gate.size(),
                        cudaMemcpyHostToDevice);
@@ -863,34 +1056,51 @@ int run_fused_vs_independent(std::vector<CaseResult>* results,
   }
   if (error != cudaSuccess) {
     buf.free_all();
+    cudaFree(independent);
+    cudaFree(guard);
     return fail_cuda("fused alloc", error);
   }
   {
-    qw38::cuda::Q4DecodePathScope q4(qw38::cuda::kLegalQ4DecodePathPacked, 4);
-    qw38::cuda::FfnDecodePathScope ffn(
-        qw38::cuda::kLegalFfnDecodePathPairedStaged);
-    error = qw38::cuda::launch_q4k_gate_up_swiglu_prequant(
-        buf.weights, buf.weights_b, kM, kK, buf.staged, buf.fused, nullptr);
+    qw38::cuda::Q4DecodePathScope q4(q4_path, 4);
+    qw38::cuda::FfnDecodePathScope ffn(ffn_path);
+    if (std::strcmp(q4_path, qw38::cuda::kLegalQ4DecodePathPacked) == 0) {
+      error = qw38::cuda::launch_q4k_gate_up_swiglu_prequant(
+          buf.weights, buf.weights_b, m, k, buf.staged, buf.fused, nullptr);
+    } else {
+      error = qw38::cuda::launch_q4k_coop_gate_up_swiglu_prequant_q8(
+          buf.weights, buf.weights_b, m, k, buf.staged, buf.fused, 4, nullptr);
+    }
   }
   if (error == cudaSuccess) error = cudaDeviceSynchronize();
   result.launched = qw38::cuda::last_q4_launch_variant();
-  if (error == cudaSuccess) {
-    error = qw38::cuda::launch_quant_mmv_prequant(
-        qw38::cuda::QuantKind::kQ4K, buf.weights, kM, kK, buf.staged, buf.out,
-        nullptr);
+  {
+    qw38::cuda::Q4DecodePathScope q4(q4_path, 4);
+    if (error == cudaSuccess) {
+      error = qw38::cuda::launch_quant_mmv_prequant(
+          qw38::cuda::QuantKind::kQ4K, buf.weights, m, k, buf.staged, buf.out,
+          nullptr);
+    }
+    if (error == cudaSuccess) {
+      error = qw38::cuda::launch_quant_mmv_prequant(
+          qw38::cuda::QuantKind::kQ4K, buf.weights_b, m, k, buf.staged,
+          buf.out_b, nullptr);
+    }
   }
   if (error == cudaSuccess) {
-    error = qw38::cuda::launch_quant_mmv_prequant(
-        qw38::cuda::QuantKind::kQ4K, buf.weights_b, kM, kK, buf.staged, buf.out_b,
-        nullptr);
+    error = launch_silu_mul_bf16_rne(buf.out, buf.out_b, independent, m);
   }
   if (error == cudaSuccess) error = cudaDeviceSynchronize();
-  std::vector<__nv_bfloat16> fused(kM);
-  std::vector<float> gate_out(kM);
-  std::vector<float> up_out(kM);
+  std::vector<__nv_bfloat16> fused(m);
+  std::vector<__nv_bfloat16> indep(m);
+  std::vector<float> gate_out(m);
+  std::vector<float> up_out(m);
   if (error == cudaSuccess) {
     error = cudaMemcpy(fused.data(), buf.fused, fused.size() * sizeof(fused[0]),
                        cudaMemcpyDeviceToHost);
+  }
+  if (error == cudaSuccess) {
+    error = cudaMemcpy(indep.data(), independent,
+                       indep.size() * sizeof(indep[0]), cudaMemcpyDeviceToHost);
   }
   if (error == cudaSuccess) {
     error = cudaMemcpy(gate_out.data(), buf.out, gate_out.size() * sizeof(float),
@@ -900,22 +1110,48 @@ int run_fused_vs_independent(std::vector<CaseResult>* results,
     error = cudaMemcpy(up_out.data(), buf.out_b, up_out.size() * sizeof(float),
                        cudaMemcpyDeviceToHost);
   }
-  buf.free_all();
-  if (error != cudaSuccess) return fail_cuda("fused launch", error);
-  std::vector<float> fused_f(kM);
-  std::vector<float> independent(kM);
-  for (std::size_t index = 0; index < kM; ++index) {
-    fused_f[index] = __bfloat162float(fused[index]);
-    const float gate_v = gate_out[index];
-    const float silu = gate_v / (1.0F + std::exp(-gate_v));
-    independent[index] = silu * up_out[index];
+  std::uint8_t host_guard[kGuard];
+  if (error == cudaSuccess) {
+    error = cudaMemcpy(host_guard, guard, kGuard, cudaMemcpyDeviceToHost);
   }
-  apply_diagnostics(&result, parity_check(fused_f, independent, "Q4_K", kK,
+  buf.free_all();
+  cudaFree(independent);
+  cudaFree(guard);
+  if (error != cudaSuccess) return fail_cuda("fused launch", error);
+  result.guard_ok = guards_intact(host_guard, kGuard, 0xA5);
+  std::vector<float> fused_f(m);
+  std::vector<float> independent_f(m);
+  double fp64_max = 0.0;
+  for (std::size_t index = 0; index < m; ++index) {
+    fused_f[index] = __bfloat162float(fused[index]);
+    independent_f[index] = __bfloat162float(indep[index]);
+    const double gate_d = static_cast<double>(gate_out[index]);
+    const double silu = gate_d / (1.0 + std::exp(-gate_d));
+    const double proj = silu * static_cast<double>(up_out[index]);
+    fp64_max = std::max(fp64_max, std::fabs(static_cast<double>(fused_f[index]) -
+                                            proj));
+  }
+  result.fp64_max_abs = static_cast<float>(fp64_max);
+  apply_diagnostics(&result, parity_check(fused_f, independent_f, "Q4_K", k,
                                           "same_math_equivalence"));
+  if (!result.guard_ok) {
+    result.pass = false;
+    result.reason = "guard_buffer_overwrite";
+  }
   finalize_selector(&result);
   print_case(result);
   results->push_back(result);
   return 0;
+}
+
+int run_fused_vs_independent(std::vector<CaseResult>* results,
+                             const char* phase_filter) {
+  if (std::strcmp(phase_filter, "q8-q6") == 0) return 0;
+  return run_fused_case(
+      results, "Q4_K_fused_vs_independent_M3_N1_K256_random_same", "packed",
+      qw38::cuda::kQ4LaunchVariantPairedStaged,
+      qw38::cuda::kLegalQ4DecodePathPacked,
+      qw38::cuda::kLegalFfnDecodePathPairedStaged, 3, 256, 0x51U, "random");
 }
 
 int run_q81_typed(std::vector<CaseResult>* results, const char* phase_filter) {
@@ -1249,6 +1485,231 @@ int run_association_product(std::vector<CaseResult>* results, const char* phase,
   return 0;
 }
 
+int run_eager_graph_case(std::vector<CaseResult>* results, const char* id,
+                         const char* candidate, const char* expected_launch,
+                         const char* q4_path, std::size_t m, std::size_t k) {
+  CaseResult result = make_case(id, "Q4_K", "same_math_equivalence", candidate,
+                                "eager_vs_captured", "random", m, 1, k,
+                                expected_launch, false);
+  std::vector<std::uint8_t> weights;
+  std::vector<__nv_bfloat16> activation;
+  fill_weights(qw38::cuda::QuantKind::kQ4K, m, k, "random", &weights);
+  fill_activation(k, "random", 0xBEEFU, &activation);
+  DeviceBuf buf;
+  cudaError_t error = alloc_mmv(&buf, weights.size(), k, m);
+  if (error == cudaSuccess) error = cudaMalloc(&buf.out_b, m * sizeof(float));
+  if (error == cudaSuccess) {
+    error = cudaMemcpy(buf.weights, weights.data(), weights.size(),
+                       cudaMemcpyHostToDevice);
+  }
+  if (error == cudaSuccess) {
+    error = cudaMemcpy(buf.act, activation.data(),
+                       activation.size() * sizeof(__nv_bfloat16),
+                       cudaMemcpyHostToDevice);
+  }
+  if (error != cudaSuccess) {
+    buf.free_all();
+    return fail_cuda("graph alloc", error);
+  }
+  qw38::cuda::Q4DecodePathScope scope(q4_path, 4);
+  error = qw38::cuda::launch_quant_mmv(qw38::cuda::QuantKind::kQ4K, buf.weights,
+                                       m, k, buf.act, buf.staged, buf.out,
+                                       nullptr);
+  if (error == cudaSuccess) error = cudaDeviceSynchronize();
+  result.launched = qw38::cuda::last_q4_launch_variant();
+  cudaStream_t stream = nullptr;
+  cudaGraph_t graph = nullptr;
+  cudaGraphExec_t exec = nullptr;
+  if (error == cudaSuccess) {
+    error = cudaStreamCreateWithFlags(&stream, cudaStreamNonBlocking);
+  }
+  if (error == cudaSuccess) {
+    error = cudaStreamBeginCapture(stream, cudaStreamCaptureModeGlobal);
+  }
+  if (error == cudaSuccess) {
+    error = qw38::cuda::launch_quant_mmv(qw38::cuda::QuantKind::kQ4K, buf.weights,
+                                         m, k, buf.act, buf.staged, buf.out_b,
+                                         stream);
+  }
+  if (error == cudaSuccess) error = cudaStreamEndCapture(stream, &graph);
+  if (error == cudaSuccess) {
+    error = cudaGraphInstantiate(&exec, graph, nullptr, nullptr, 0);
+  }
+  if (error == cudaSuccess) error = cudaGraphLaunch(exec, stream);
+  if (error == cudaSuccess) error = cudaStreamSynchronize(stream);
+  std::vector<float> eager(m);
+  std::vector<float> captured(m);
+  if (error == cudaSuccess) {
+    error = cudaMemcpy(eager.data(), buf.out, eager.size() * sizeof(float),
+                       cudaMemcpyDeviceToHost);
+  }
+  if (error == cudaSuccess) {
+    error = cudaMemcpy(captured.data(), buf.out_b,
+                       captured.size() * sizeof(float), cudaMemcpyDeviceToHost);
+  }
+  if (exec != nullptr) cudaGraphExecDestroy(exec);
+  if (graph != nullptr) cudaGraphDestroy(graph);
+  if (stream != nullptr) cudaStreamDestroy(stream);
+  buf.free_all();
+  if (error != cudaSuccess) return fail_cuda("graph launch", error);
+  apply_diagnostics(&result, parity_check(eager, captured, "Q4_K", k,
+                                          "same_math_equivalence"));
+  finalize_selector(&result);
+  print_case(result);
+  results->push_back(result);
+  return 0;
+}
+
+int run_opt089_expansion(std::vector<CaseResult>* results, int* failed) {
+  auto take = [&](CaseResult result, auto runner) {
+    const int rc = runner(&result);
+    print_case(result);
+    results->push_back(result);
+    if (rc != 0) *failed = 1;
+    if (!result.pass &&
+        (result.reason == "wrong_selector" || result.reason == "nonfinite" ||
+         result.reason == "fallback_measured_as_candidate" ||
+         result.reason == "cuda_error" ||
+         result.reason == "q8_1_producer_mismatch" ||
+         result.reason == "guard_buffer_overwrite")) {
+      *failed = 1;
+    }
+  };
+  const std::size_t ms[] = {1, 3, 17};
+  const char* q4_cands[] = {"packed", "integer_q8", "integer_q8_late"};
+  const std::size_t q4_ks[] = {5120, 17408};
+  for (const char* cand : q4_cands) {
+    for (std::size_t m : ms) {
+      for (std::size_t k : q4_ks) {
+        if (std::strcmp(cand, "packed") == 0 && m == 1 && k == 5120) continue;
+        char id[192];
+        std::snprintf(id, sizeof(id), "Q4_K_mmv_%s_M%zu_N1_K%zu_random_assoc",
+                      cand, m, k);
+        CaseResult result =
+            make_case(id, "Q4_K", "quantized_operation_association", cand, "mmv",
+                      "random", m, 1, k, q4_expected(cand), false);
+        std::vector<std::uint8_t> weights;
+        std::vector<__nv_bfloat16> activation;
+        std::vector<qw38::cuda::Q8Block> staged;
+        std::vector<float> expected;
+        fill_weights(qw38::cuda::QuantKind::kQ4K, m, k, "random", &weights);
+        fill_activation(k, "random", 0xA5A5A5U, &activation);
+        host_stage_q8(activation, k, 1, &staged);
+        if (!reference_staged(qw38::cuda::QuantKind::kQ4K, weights, m, k, staged,
+                              1, &expected)) {
+          *failed = 1;
+          return 1;
+        }
+        take(result, [&](CaseResult* row) {
+          return run_q4_mmv(row, weights, activation, staged, expected);
+        });
+      }
+    }
+  }
+  const char* q8_cands[] = {"r1_w4", "r2_w2"};
+  const std::size_t q8_ks[] = {2048, 5120, 6144};
+  const std::uint32_t seeds[] = {0x55U, 89U, 90U};
+  for (const char* cand : q8_cands) {
+    for (std::size_t m : ms) {
+      for (std::size_t k : q8_ks) {
+        for (std::uint32_t seed : seeds) {
+          char id[192];
+          std::snprintf(id, sizeof(id),
+                        "Q8_0_mmv_%s_M%zu_N1_K%zu_seed%u_staged_assoc", cand, m,
+                        k, seed);
+          CaseResult result =
+              make_case(id, "Q8_0", "quantized_operation_association", cand,
+                        "mmv", "random", m, 1, k, cand, false);
+          std::vector<std::uint8_t> weights;
+          std::vector<__nv_bfloat16> activation;
+          std::vector<float> expected;
+          fill_weights(qw38::cuda::QuantKind::kQ8_0, m, k, "random", &weights);
+          fill_activation(k, "random", seed, &activation);
+          if (!reference_bf16(qw38::cuda::QuantKind::kQ8_0, weights, m, k,
+                              activation, 1, &expected)) {
+            *failed = 1;
+            return 1;
+          }
+          take(result, [&](CaseResult* row) {
+            return run_q8_mmv(row, weights, activation, expected);
+          });
+        }
+      }
+    }
+  }
+  const char* patterns[] = {"zero", "cancel", "minmax"};
+  for (const char* cand : q8_cands) {
+    for (const char* pattern : patterns) {
+      char id[192];
+      std::snprintf(id, sizeof(id),
+                    "Q8_0_mmv_%s_M3_N1_K256_%s_staged_assoc", cand, pattern);
+      CaseResult result =
+          make_case(id, "Q8_0", "quantized_operation_association", cand, "mmv",
+                    pattern, 3, 1, 256, cand, false);
+      std::vector<std::uint8_t> weights;
+      std::vector<__nv_bfloat16> activation;
+      std::vector<float> expected;
+      fill_weights(qw38::cuda::QuantKind::kQ8_0, 3, 256, pattern, &weights);
+      fill_activation(256, pattern, 0x55U, &activation);
+      if (!reference_bf16(qw38::cuda::QuantKind::kQ8_0, weights, 3, 256,
+                          activation, 1, &expected)) {
+        *failed = 1;
+        return 1;
+      }
+      take(result, [&](CaseResult* row) {
+        return run_q8_mmv(row, weights, activation, expected);
+      });
+    }
+  }
+  struct FusedSpec {
+    const char* ident;
+    const char* q4;
+    const char* ffn;
+    const char* launch;
+  };
+  const FusedSpec fused[] = {
+      {"packed", qw38::cuda::kLegalQ4DecodePathPacked,
+       qw38::cuda::kLegalFfnDecodePathPairedStaged,
+       qw38::cuda::kQ4LaunchVariantPairedStaged},
+      {"integer_q8_late", qw38::cuda::kLegalQ4DecodePathIntegerQ8Late,
+       qw38::cuda::kLegalFfnDecodePathPairedInteger,
+       qw38::cuda::kQ4LaunchVariantPairedIntegerQ8Late},
+      {"integer_q8", qw38::cuda::kLegalQ4DecodePathIntegerQ8,
+       qw38::cuda::kLegalFfnDecodePathPairedInteger,
+       qw38::cuda::kQ4LaunchVariantPairedIntegerQ8},
+  };
+  const std::size_t fused_k[] = {256, 5120};
+  const std::uint32_t gens[] = {0x51U, 0x91U};
+  for (const FusedSpec& spec : fused) {
+    for (std::size_t k : fused_k) {
+      for (int gen = 0; gen < 2; ++gen) {
+        char id[192];
+        std::snprintf(id, sizeof(id),
+                      "Q4_K_fused_vs_independent_%s_M17_N1_K%zu_gen%d_same",
+                      spec.ident, k, gen);
+        const int rc = run_fused_case(results, id, spec.ident, spec.launch,
+                                      spec.q4, spec.ffn, 17, k, gens[gen],
+                                      "random");
+        if (rc != 0) *failed = 1;
+      }
+    }
+  }
+  for (const FusedSpec& spec : fused) {
+    if (std::strcmp(spec.ident, "integer_q8") == 0) continue;
+    for (std::size_t k : fused_k) {
+      char id[192];
+      std::snprintf(id, sizeof(id),
+                    "Q4_K_eager_vs_graph_%s_M17_N1_K%zu_random_same", spec.ident,
+                    k);
+      const int rc = run_eager_graph_case(results, id, spec.ident,
+                                          q4_expected(spec.ident), spec.q4, 17,
+                                          k);
+      if (rc != 0) *failed = 1;
+    }
+  }
+  return 0;
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -1269,6 +1730,11 @@ int main(int argc, char** argv) {
   rc |= run_eager_vs_graph(&results, phase);
   rc |= run_fused_vs_independent(&results, phase);
   rc |= run_q81_typed(&results, phase);
+  if (options.expand_opt089 &&
+      (std::strcmp(phase, "parity") == 0 || std::strcmp(phase, "q4") == 0 ||
+       std::strcmp(phase, "q8-q6") == 0)) {
+    rc |= run_opt089_expansion(&results, &failed);
+  }
 
   int passed = 0;
   int shipping = 0;
@@ -1282,17 +1748,21 @@ int main(int argc, char** argv) {
     if (!row.pass &&
         (row.reason == "wrong_selector" || row.reason == "nonfinite" ||
          row.reason == "fallback_measured_as_candidate" ||
-         row.reason == "cuda_error")) {
+         row.reason == "cuda_error" ||
+         row.reason == "q8_1_producer_mismatch" ||
+         row.reason == "guard_buffer_overwrite")) {
       failed = 1;
     }
   }
   const bool success = failed == 0 && rc == 0;
   std::printf(
-      "%s{\"schema_version\":1,\"task\":\"OPT-082\",\"phase\":\"%s\","
+      "%s{\"schema_version\":1,\"task\":\"%s\",\"phase\":\"%s\","
       "\"success\":%s,\"claims_throughput\":false,\"case_count\":%zu,"
       "\"passed\":%d,\"failed\":%d,\"shipping_measured\":%d,"
-      "\"gpu_work\":true}\n",
-      kPrefix, phase, json_bool(success), results.size(), passed,
-      static_cast<int>(results.size()) - passed, shipping);
+      "\"expand_opt089\":%s,\"gpu_work\":true}\n",
+      kPrefix, options.expand_opt089 ? "OPT-089" : "OPT-082", phase,
+      json_bool(success), results.size(), passed,
+      static_cast<int>(results.size()) - passed, shipping,
+      json_bool(options.expand_opt089));
   return success ? 0 : 1;
 }

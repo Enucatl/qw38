@@ -236,7 +236,7 @@ OPT-089.
 
 | ID | Description | Dependencies | Status | Acceptance condition | Evidence |
 |---|---|---|---|---|---|
-| OPT-089 | Complete strict admission of late_w4 with corrected parity references and real candidate quality | OPT-088 | in_progress | All positive parity/same-math cases accounted for; full Q and D128/D2048+p95 yield keep or explicit rejection | [`tasks/OPT-089.md`](tasks/OPT-089.md) |
+| OPT-089 | Complete strict admission of late_w4 with corrected parity references and real candidate quality | OPT-088 | done | All positive parity/same-math cases accounted for; full Q and D128/D2048+p95 yield keep or explicit rejection | [`tasks/OPT-089.md`](tasks/OPT-089.md); [`pins/opt089_q4_promotion_contract.json`](pins/opt089_q4_promotion_contract.json); [`pins/opt089_iteration_contract.json`](pins/opt089_iteration_contract.json); [`fixtures/opt089_q4_promotion.json`](fixtures/opt089_q4_promotion.json); [`tools/opt089_q4_promotion.py`](tools/opt089_q4_promotion.py); [`tests/test_opt089_q4_promotion.py`](tests/test_opt089_q4_promotion.py); [`tools/run_optimization_task.py`](tools/run_optimization_task.py); [`tools/quality/quality_mode.py`](tools/quality/quality_mode.py); [`Makefile`](Makefile); [`cuda/q4k_decode_path.cuh`](cuda/q4k_decode_path.cuh); [`cuda/ffn_decode_path.cuh`](cuda/ffn_decode_path.cuh); [`cuda/opt082_kernel_parity_test.cu`](cuda/opt082_kernel_parity_test.cu); [`cuda/opt058_quality_baseline_test.cu`](cuda/opt058_quality_baseline_test.cu); [`cuda/optimization_component_replay.cu`](cuda/optimization_component_replay.cu); [`cuda/optimization_engine_probe.cu`](cuda/optimization_engine_probe.cu); [`evidence/optimization/opt089-q4-promotion/REPORT.md`](evidence/optimization/opt089-q4-promotion/REPORT.md); verification 2026-09-12T05:35:14Z |
 | OPT-090 | Measure matched post-Q4 decode sinks and secondary P4096 attribution | OPT-089 | pending | Correct call counts, no dropped events, ≤5% unexplained wall; auditable family ranking and conditional-task triggers | [`tasks/OPT-090.md`](tasks/OPT-090.md) |
 | OPT-091 | Establish successor quality gate and decide narrowly bounded late_w4 concession | OPT-090 | pending | Versioned strict/successor verdicts; full Q required; concession only with ≤1.015 PPL and strong two-prefix decode benefit | [`tasks/OPT-091.md`](tasks/OPT-091.md) |
 | OPT-092 | Group same-input Q8 decode projections into one launch per layer group | OPT-091 | pending | Exact staging/output parity and full mixer plus two-prefix E2E acceptance, or retain r1_w4 separate launches | [`tasks/OPT-092.md`](tasks/OPT-092.md) |
@@ -7016,4 +7016,35 @@ statements below are historical, not the current execution order.
   match their pending ledger rows; local dossier/protocol links resolve;
   `plan.md` is unchanged. No historical fixture, production pin, or gate was
   rewritten.
+
+### 2026-09-12T05:37:36Z — OPT-089 late_w4 Q4 decode admission delivered
+
+- Admitted `late_w4` (`integer_q8_late` / `paired_integer`) after corrected
+  198-case GPU kernel parity, full `opt089_strict` candidate quality, complete-FFN
+  acceptance (16.376→9.784 ms, CI 6.563–6.620 ms), D128/D2048+p95 guards, and
+  P4096 throughput guard (0.9983). Production pins updated in
+  `cuda/q4k_decode_path.cuh` and `cuda/ffn_decode_path.cuh`. Packed is no
+  longer the shipping Q4 path. Historical OPT-082/084/085/086 fixtures and
+  reports remain unmodified (`historical_reports.unmodified=true`).
+- Acceptance: 42 pytest cases, feedback parity/q4/quality-alarm, release
+  quality, acceptance q4/d128/d2048/prefill-guard, and verification checklist in
+  [`tasks/OPT-089.md`](tasks/OPT-089.md).
+- Acceptance evidence: [`tasks/OPT-089.md`](tasks/OPT-089.md);
+  [`pins/opt089_q4_promotion_contract.json`](pins/opt089_q4_promotion_contract.json);
+  [`pins/opt089_iteration_contract.json`](pins/opt089_iteration_contract.json);
+  [`fixtures/opt089_q4_promotion.json`](fixtures/opt089_q4_promotion.json);
+  [`tools/opt089_q4_promotion.py`](tools/opt089_q4_promotion.py);
+  [`tests/test_opt089_q4_promotion.py`](tests/test_opt089_q4_promotion.py);
+  [`tools/run_optimization_task.py`](tools/run_optimization_task.py);
+  [`tools/quality/quality_mode.py`](tools/quality/quality_mode.py);
+  [`Makefile`](Makefile);
+  [`cuda/q4k_decode_path.cuh`](cuda/q4k_decode_path.cuh);
+  [`cuda/ffn_decode_path.cuh`](cuda/ffn_decode_path.cuh);
+  [`evidence/optimization/opt089-q4-promotion/REPORT.md`](evidence/optimization/opt089-q4-promotion/REPORT.md).
+  **tok/s vs OPT-088 baseline** ([`fixtures/opt088_batch_gate.json`](fixtures/opt088_batch_gate.json)):
+  D128 +16.86 (54.35 vs 37.48, 1.45×); D2048 +14.26 (49.99 vs 35.73, 1.40×).
+  `claims_throughput=true`.
+- Marked OPT-089 `done`; delivery is limited to the verified task scope plus
+  this ledger/audit bookkeeping. `plan.md` is unchanged. Next eligible pending
+  by dependency order: **OPT-090**.
 
