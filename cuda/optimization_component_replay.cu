@@ -67,6 +67,7 @@ struct Options final {
   const char* ffn_decode = nullptr;
   const char* gdn_decode = nullptr;
   const char* decode_query_prep = nullptr;
+  const char* decode_attention_gqa = nullptr;
   unsigned int q4_warps = 0;
   int mmq_async_x = -1;
   int warmups = -1;
@@ -89,6 +90,7 @@ int usage(const char* argv0) {
                "[--ffn-decode paired_staged|shared_stage|paired_integer] "
                "[--gdn-decode sequential|tile16|tile32] "
                "[--decode-query-prep warp_query|prepared_q|prepared_q_veckv] "
+               "[--decode-attention-gqa warp_query|warp_query_gqa6] "
                "[--decode-position 128|2048] "
                "[--warmups N] [--samples N] [--ncu] [--corrupt-guard] "
                "[--evidence-dir DIR]\n",
@@ -122,6 +124,9 @@ int parse_args(int argc, char** argv, Options* options) {
     } else if (std::strcmp(arg, "--decode-query-prep") == 0 &&
                index + 1 < argc) {
       options->decode_query_prep = argv[++index];
+    } else if (std::strcmp(arg, "--decode-attention-gqa") == 0 &&
+               index + 1 < argc) {
+      options->decode_attention_gqa = argv[++index];
     } else if (std::strcmp(arg, "--decode-position") == 0 &&
                index + 1 < argc) {
       options->decode_position = std::atoi(argv[++index]);
@@ -1928,16 +1933,17 @@ int time_family(qw38::cuda::ResidentModel* model,
     std::printf(
         "decode_attention_dispatch path=%s launch=%s prep_grid=%u "
         "prep_block=%u n_parts=%u prep_launches=%u prepared_q=%s vec_kv=%s "
-        "attention_layers=%zu capture_positions=2 eager_or_captured=true "
-        "decode_position=%zu\n",
-        qw38::cuda::effective_decode_query_prep_path(),
+        "gqa_block_y=%u attention_layers=%zu capture_positions=2 "
+        "eager_or_captured=true decode_position=%zu\n",
+        qw38::cuda::effective_decode_attention_gqa_path(),
         qw38::cuda::last_decode_query_prep_launch_variant(),
-        qw38::cuda::last_decode_query_prep_grid(),
-        qw38::cuda::last_decode_query_prep_block(),
+        qw38::cuda::last_decode_attention_gqa_grid_x(),
+        qw38::cuda::last_decode_attention_gqa_block_x(),
         qw38::cuda::last_decode_attention_n_parts(),
         qw38::cuda::last_decode_attention_prep_launches(),
         json_bool(qw38::cuda::last_decode_query_prep_used()),
-        json_bool(qw38::cuda::last_decode_vec_kv_used()), layers.size(),
+        json_bool(qw38::cuda::last_decode_vec_kv_used()),
+        qw38::cuda::last_decode_attention_gqa_block_y(), layers.size(),
         acts.attn_decode_position);
     cudaFree(attn_committed_key);
     cudaFree(attn_committed_value);
@@ -2049,6 +2055,14 @@ int run_family(const Options& options, qw38::cuda::ReplayFamily family) {
     if (rounds != nullptr) std::fclose(rounds);
     return 1;
   }
+  if (options.decode_attention_gqa != nullptr &&
+      !qw38::cuda::apply_decode_attention_gqa_ident(
+          options.decode_attention_gqa)) {
+    std::fprintf(stderr, "invalid --decode-attention-gqa %s\n",
+                 options.decode_attention_gqa);
+    if (rounds != nullptr) std::fclose(rounds);
+    return 1;
+  }
   const char* mode_arg = options.cache_mode;
   const qw38::cuda::CacheMode modes[] = {qw38::cuda::CacheMode::kHot,
                                          qw38::cuda::CacheMode::kRotating};
@@ -2070,7 +2084,8 @@ int run_family(const Options& options, qw38::cuda::ReplayFamily family) {
   const bool opt077 = options.gdn_decode != nullptr;
   const bool opt078 = options.decode_query_prep != nullptr ||
                       family == qw38::cuda::ReplayFamily::kDecodeAttention;
-  if (rc == 0 && !opt070 && !opt075 && !opt077 && !opt078) {
+  const bool opt095 = options.decode_attention_gqa != nullptr;
+  if (rc == 0 && !opt070 && !opt075 && !opt077 && !opt078 && !opt095) {
     rc = run_streaming_calibration(hardware, &stream_gbps, &checksum);
   }
   const qw38::cuda::Q8DecodeDispatch q8_launch =
@@ -2214,6 +2229,29 @@ int run_family(const Options& options, qw38::cuda::ReplayFamily family) {
       qw38::cuda::last_decode_attention_prep_launches(),
       json_bool(qw38::cuda::last_decode_query_prep_used()),
       json_bool(qw38::cuda::last_decode_vec_kv_used()), capture_key);
+  std::printf(
+      "QW38_OPT095_NATIVE_COUNTS={\"schema_version\":1,\"task\":\"OPT-095\","
+      "\"family\":\"%s\",\"tier\":\"%s\",\"warmups\":%d,\"samples\":%d,"
+      "\"observed_warmups\":%d,\"observed_samples\":%d,"
+      "\"observed_candidates\":1,\"observed_shapes\":1,\"observed_tier\":\"%s\","
+      "\"pairs\":%d,\"sample_ids\":[%s],\"acceptance_executed\":%s,"
+      "\"decode_attention_gqa\":\"%s\",\"effective_decode_attention_gqa\":\"%s\","
+      "\"launch\":\"%s\",\"prep_grid\":%u,\"prep_block\":%u,\"gqa_block_y\":%u,"
+      "\"n_parts\":%u,\"prep_launches\":%u,\"keep\":false,"
+      "\"capture_key\":\"%s\"}\n",
+      qw38::cuda::replay_family_name(family), qw38::cuda::test_tier_name(),
+      warmups, samples, warmups, samples, qw38::cuda::test_tier_name(), samples,
+      samples == 3 ? "0,1,2" : (samples == 10 ? "0,1,2,3,4,5,6,7,8,9" : "0"),
+      json_bool(qw38::cuda::test_tier() == qw38::cuda::TestTier::kAcceptance),
+      options.decode_attention_gqa != nullptr ? options.decode_attention_gqa
+                                              : "installed",
+      qw38::cuda::effective_decode_attention_gqa_path(),
+      qw38::cuda::last_decode_query_prep_launch_variant(),
+      qw38::cuda::last_decode_attention_gqa_grid_x(),
+      qw38::cuda::last_decode_attention_gqa_block_x(),
+      qw38::cuda::last_decode_attention_gqa_block_y(),
+      qw38::cuda::last_decode_attention_n_parts(),
+      qw38::cuda::last_decode_attention_prep_launches(), capture_key);
   if (options.q8_layout != nullptr) qw38::cuda::clear_q8_decode_path_override();
   if (options.mmq_async_x >= 0) qw38::cuda::clear_mmq_async_x_override();
   if (options.q4_decode != nullptr) qw38::cuda::clear_q4_decode_path_override();
@@ -2221,6 +2259,9 @@ int run_family(const Options& options, qw38::cuda::ReplayFamily family) {
   if (options.gdn_decode != nullptr) qw38::cuda::clear_gdn_decode_path_override();
   if (options.decode_query_prep != nullptr) {
     qw38::cuda::clear_decode_query_prep_path_override();
+  }
+  if (options.decode_attention_gqa != nullptr) {
+    qw38::cuda::clear_decode_attention_gqa_path_override();
   }
   char prov_path[640];
   evidence_path(prov_path, sizeof(prov_path), "provenance.json");

@@ -161,6 +161,7 @@ int decode_kv_merge_occupancy(int n_parts) noexcept;
 const char* selected_decode_attention_vec() noexcept;
 bool decode_uses_warp_query() noexcept;
 int decode_kv_warp_query_occupancy() noexcept;
+int decode_kv_warp_query_gqa6_occupancy() noexcept;
 int decode_query_prep_occupancy() noexcept;
 int decode_kv_warp_query_prepared_occupancy() noexcept;
 void decode_attention_kernel_attributes(const char* prep_path, int* registers,

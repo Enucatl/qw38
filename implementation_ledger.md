@@ -242,7 +242,7 @@ OPT-089.
 | OPT-092 | Group same-input Q8 decode projections into one launch per layer group | OPT-091 | done | Exact staging/output parity and full mixer plus two-prefix E2E acceptance, or retain r1_w4 separate launches | [`tasks/OPT-092.md`](tasks/OPT-092.md); [`pins/opt092_q8_grouped_contract.json`](pins/opt092_q8_grouped_contract.json); [`pins/opt092_iteration_contract.json`](pins/opt092_iteration_contract.json); [`fixtures/opt092_q8_grouped.json`](fixtures/opt092_q8_grouped.json); [`tools/opt092_q8_grouped.py`](tools/opt092_q8_grouped.py); [`tests/test_opt092_q8_grouped.py`](tests/test_opt092_q8_grouped.py); [`cuda/opt092_q8_grouped_test.cu`](cuda/opt092_q8_grouped_test.cu); [`Makefile`](Makefile); [`evidence/optimization/opt092-q8-grouped/REPORT.md`](evidence/optimization/opt092-q8-grouped/REPORT.md); verification 2026-09-12T08:30:00Z |
 | OPT-093 | Factor paired-group Q4 integer scale/min work | OPT-092 | done | Strict parity, same-math internal reconstruction, full Q and complete FFN/two-prefix keep or reject | [`tasks/OPT-093.md`](tasks/OPT-093.md); [`pins/opt093_q4_factored_contract.json`](pins/opt093_q4_factored_contract.json); [`pins/opt093_iteration_contract.json`](pins/opt093_iteration_contract.json); [`fixtures/opt093_q4_factored.json`](fixtures/opt093_q4_factored.json); [`tools/opt093_q4_factored.py`](tools/opt093_q4_factored.py); [`tests/test_opt093_q4_factored.py`](tests/test_opt093_q4_factored.py); [`cuda/opt093_q4_factored_test.cu`](cuda/opt093_q4_factored_test.cu); [`cuda/q4k_decode_path.cuh`](cuda/q4k_decode_path.cuh); [`cuda/q4k_decode_dots.cuh`](cuda/q4k_decode_dots.cuh); [`Makefile`](Makefile); [`evidence/optimization/opt093-q4-factored/REPORT.md`](evidence/optimization/opt093-q4-factored/REPORT.md); delivery 2026-09-12T09:10:00Z |
 | OPT-094 | Conditionally replicate OPT-077 tile32 on demonstrably repaired timing | OPT-093 | done | Concrete measurement repair required; fixed 30-pair test and full quality/state/two-prefix gate, or no-reopen | [`tasks/OPT-094.md`](tasks/OPT-094.md); [`pins/opt094_gdn_replication_contract.json`](pins/opt094_gdn_replication_contract.json); [`pins/opt094_iteration_contract.json`](pins/opt094_iteration_contract.json); [`fixtures/opt094_gdn_replication.json`](fixtures/opt094_gdn_replication.json); [`tools/opt094_gdn_replication.py`](tools/opt094_gdn_replication.py); [`tests/test_opt094_gdn_replication.py`](tests/test_opt094_gdn_replication.py); [`Makefile`](Makefile); [`evidence/optimization/opt094-gdn-replication/REPORT.md`](evidence/optimization/opt094-gdn-replication/REPORT.md); delivery 2026-09-12T09:15:00Z |
-| OPT-095 | Share decode KV loads across six query heads without a prep launch | OPT-094 | pending | Bitwise per-head output and complete 16-layer/two-prefix acceptance, or retain warp_query | [`tasks/OPT-095.md`](tasks/OPT-095.md) |
+| OPT-095 | Share decode KV loads across six query heads without a prep launch | OPT-094 | done | Bitwise per-head output and complete 16-layer/two-prefix acceptance, or retain warp_query | [`tasks/OPT-095.md`](tasks/OPT-095.md); [`pins/opt095_attention_gqa_contract.json`](pins/opt095_attention_gqa_contract.json); [`pins/opt095_iteration_contract.json`](pins/opt095_iteration_contract.json); [`fixtures/opt095_attention_gqa.json`](fixtures/opt095_attention_gqa.json); [`tools/opt095_attention_gqa.py`](tools/opt095_attention_gqa.py); [`tests/test_opt095_attention_gqa.py`](tests/test_opt095_attention_gqa.py); [`Makefile`](Makefile); [`evidence/optimization/opt095-attention-gqa/REPORT.md`](evidence/optimization/opt095-attention-gqa/REPORT.md); delivery 2026-09-12T09:42:00Z |
 | OPT-096 | Conditionally capture eight-layer decode segments | OPT-095 | pending | Fresh ≥0.50 ms removable overhead trigger, exact graph/state behavior and two-prefix gain, or no-reopen | [`tasks/OPT-096.md`](tasks/OPT-096.md) |
 | OPT-097 | Separate X/Y async completion in fixed-tile prompt MMQ | OPT-096 | pending | Bitwise output and full FFN/P4096 win with decode guards, or retain fma_async_x schedule | [`tasks/OPT-097.md`](tasks/OPT-097.md) |
 | OPT-098 | Freeze and measure the combined post-088 production outcome | OPT-097 | pending | Complete quality, P/D/p95/2K/state/memory evidence; independent internal/parity/+5% outcomes, including failures | [`tasks/OPT-098.md`](tasks/OPT-098.md) |
@@ -7118,4 +7118,19 @@ statements below are historical, not the current execution order.
 - Acceptance evidence: [`tasks/OPT-094.md`](tasks/OPT-094.md);
   [`evidence/optimization/opt094-gdn-replication/REPORT.md`](evidence/optimization/opt094-gdn-replication/REPORT.md).
 - Marked OPT-094 `done`. Next eligible pending by dependency order: **OPT-095**.
+
+### 2026-09-12T09:42:00Z — OPT-095 grouped-KV decode attention delivered
+
+- `performance_rejected`: `warp_query_gqa6` passes kernel parity and OPT-073
+  quality but complete 16-layer attention is slower at D128/D2048 (acceptance
+  D2048 control 9.659 ms vs candidate 10.105 ms; paired CI negative). Retained
+  shipping decode attention `warp_query`. `claims_throughput=false`.
+- Independent verdicts: `kernel_parity_pass=true`, `model_quality_pass=true`,
+  `performance_pass=false`, `production_kept=false` (control pin kept).
+- Key evidence: [`fixtures/opt095_attention_gqa.json`](fixtures/opt095_attention_gqa.json);
+  [`evidence/optimization/opt095-attention-gqa/REPORT.md`](evidence/optimization/opt095-attention-gqa/REPORT.md).
+- Acceptance evidence: [`tasks/OPT-095.md`](tasks/OPT-095.md);
+  [`evidence/optimization/opt095-attention-gqa/REPORT.md`](evidence/optimization/opt095-attention-gqa/REPORT.md).
+- **tok/s delta vs sitting D2048 baseline (OPT-088 35.73 tok/s): 0** (unchanged).
+- Marked OPT-095 `done`. Next eligible pending by dependency order: **OPT-096**.
 

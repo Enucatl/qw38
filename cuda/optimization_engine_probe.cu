@@ -54,6 +54,7 @@ struct Options final {
   const char* gdn_decode = nullptr;
   const char* attention_pipeline = nullptr;
   const char* decode_query_prep = nullptr;
+  const char* decode_attention_gqa = nullptr;
   unsigned int q4_warps = 0;
   int mmq_async_x = -1;
   bool graph = false;
@@ -124,6 +125,7 @@ int usage(const char* argv0) {
                "[--ffn-decode paired_staged|shared_stage|paired_integer] "
                "[--gdn-decode sequential|tile16|tile32] "
                "[--decode-query-prep warp_query|prepared_q|prepared_q_veckv] "
+               "[--decode-attention-gqa warp_query|warp_query_gqa6] "
                "[--attention-pipeline f16_async|kv_once] "
                "[--selector NAME] [--modes graph,eager] [--skip-logits]\n",
                argv0);
@@ -177,6 +179,9 @@ int parse_args(int argc, char** argv, Options* options) {
     } else if (std::strcmp(arg, "--decode-query-prep") == 0 &&
                index + 1 < argc) {
       options->decode_query_prep = argv[++index];
+    } else if (std::strcmp(arg, "--decode-attention-gqa") == 0 &&
+               index + 1 < argc) {
+      options->decode_attention_gqa = argv[++index];
     } else if (std::strcmp(arg, "--selector") == 0 && index + 1 < argc) {
       options->selector = argv[++index];
     } else if (std::strcmp(arg, "--modes") == 0 && index + 1 < argc) {
@@ -266,7 +271,8 @@ int apply_defaults(const qw38::cuda::TestTier tier, Options* options) {
     }
   }
   if (std::strcmp(options->workload, "attn-ab") == 0) {
-    if (options->decode_query_prep != nullptr) {
+    if (options->decode_query_prep != nullptr ||
+        options->decode_attention_gqa != nullptr) {
       if (options->prefix == 0) options->prefix = kScreenPrefix;
       if (options->output_tokens == 0) {
         options->output_tokens = kScreenOutputTokens;
@@ -908,7 +914,14 @@ int run_keep_ab(const Options& options) {
           return 2;
         }
       } else if (attn) {
-        if (options.decode_query_prep != nullptr) {
+        if (options.decode_attention_gqa != nullptr) {
+          const char* gqa_path =
+              candidate_side ? options.decode_attention_gqa : "warp_query";
+          if (!qw38::cuda::apply_decode_attention_gqa_ident(gqa_path)) {
+            std::fprintf(stderr, "invalid --decode-attention-gqa %s\n", gqa_path);
+            return 2;
+          }
+        } else if (options.decode_query_prep != nullptr) {
           const char* prep_path =
               candidate_side ? options.decode_query_prep : "warp_query";
           if (!qw38::cuda::apply_decode_query_prep_ident(prep_path)) {
@@ -1005,6 +1018,7 @@ int run_keep_ab(const Options& options) {
       qw38::cuda::clear_gdn_decode_path_override();
       qw38::cuda::clear_attention_pipeline_path_override();
       qw38::cuda::clear_decode_query_prep_path_override();
+      qw38::cuda::clear_decode_attention_gqa_path_override();
     }
     std::printf(
         "{\"observation_unit\":\"independent_round\",\"sample_index\":%d,"
