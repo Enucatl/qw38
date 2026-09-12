@@ -395,6 +395,7 @@ def run_native_correctness(
         workload,
         "--execution-graphs",
         str(config["execution_graphs"]),
+        MODEL,
     ]
     completed = runner(command, workload)
     (run_dir / f"native-{config['id']}-{workload}.txt").write_text(
@@ -439,6 +440,7 @@ def run_component(
             str(plan["samples"]),
             "--tokens",
             str(plan.get("tokens", 1)),
+            MODEL,
         ]
         completed = runner(command, tier)
         stdout_all += completed.stdout + "\n"
@@ -508,6 +510,7 @@ def run_engine(
         str(pairs_n),
         "--tokens",
         str(plan.get("tokens", 1)),
+        MODEL,
     ]
     candidate_cmd = [
         f"./{NATIVE}",
@@ -523,6 +526,7 @@ def run_engine(
         str(pairs_n),
         "--tokens",
         str(plan.get("tokens", 1)),
+        MODEL,
     ]
     control_completed = runner(control_cmd, tier)
     candidate_completed = runner(candidate_cmd, tier)
@@ -640,6 +644,7 @@ def run_eligibility_phase(
                     "overhead",
                     "--execution-graphs",
                     CONTROL_ID,
+                    MODEL,
                 ],
                 "screen",
             )
@@ -880,6 +885,7 @@ def run(
     if phase == "eligibility":
         results["eligibility"] = payload
         results["status"] = payload.get("status")
+        results["eligible"] = bool(payload.get("eligible"))
         if not payload.get("eligible"):
             no_go = decide_no_reopen_verdicts(str(payload.get("verdict")))
             results.update(no_go)

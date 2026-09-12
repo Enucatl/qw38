@@ -72,11 +72,13 @@ qw38::Status run_token(const qw38::cuda::ResidentModel& model,
                        qw38::cuda::SchedulerWorkspace* workspace,
                        float* logits, float* hidden, float* elapsed,
                        qw38::cuda::SchedulerGraphs* graphs,
-                       const qw38::cuda::EvalControl* control) {
+                       const qw38::cuda::EvalControl* control,
+                       qw38::cuda::RuntimeTimings* timings = nullptr,
+                       qw38::cuda::DecodeAttribution* attribution = nullptr) {
   return qw38::cuda::execute_token(
       model, token, session, workspace, logits, qw38::internal::kVocabularySize,
-      hidden, qw38::internal::kResidualWidth, elapsed, control,
-      qw38::cuda::PointwisePath::kFused, graphs, nullptr);
+      hidden, qw38::internal::kResidualWidth, elapsed, control, timings,
+      qw38::cuda::PointwisePath::kFused, graphs, attribution);
 }
 
 int usage(const char* argv0) {
@@ -159,7 +161,8 @@ float measure_idle(const qw38::cuda::ResidentModel& model, std::size_t prefix) {
   qw38::cuda::DecodeAttribution attribution;
   float elapsed = 0.0F;
   status = run_token(model, tokens[prefix], &session, &workspace, logits.data(),
-                     hidden.data(), &elapsed, &graphs, nullptr);
+                     hidden.data(), &elapsed, &graphs, nullptr, nullptr,
+                     &attribution);
   if (!status.is_ok()) return 0.0F;
   return attribution.other_idle.milliseconds;
 }
@@ -243,11 +246,11 @@ int main(int argc, char** argv) {
   float eager_ms = 0.0F;
   status = run_token(model, 42, &graph_session, &graph_workspace,
                      graph_logits.data(), graph_hidden.data(), &graph_ms, &graphs,
-                     nullptr);
+                     nullptr, nullptr, nullptr);
   if (status.is_ok()) {
     status = run_token(model, 42, &eager_session, &eager_workspace,
                        eager_logits.data(), eager_hidden.data(), &eager_ms,
-                       nullptr, nullptr);
+                       nullptr, nullptr, nullptr, nullptr);
   }
   if (!status.is_ok()) return fail_status(status);
   passed = passed && exact_buffers(graph_logits, eager_logits, graph_hidden,
@@ -260,7 +263,8 @@ int main(int argc, char** argv) {
   if (status.is_ok()) {
     const qw38::Status cancelled = run_token(
         model, 11, &cancel_session, &graph_workspace, graph_logits.data(),
-        graph_hidden.data(), &graph_ms, &graphs, &cancel_control);
+        graph_hidden.data(), &graph_ms, &graphs, &cancel_control, nullptr,
+        nullptr);
     passed = passed && cancelled.code() == qw38::StatusCode::kCancelled &&
               cancel_session.frontier() == 0 && cancel_ctx.calls == 8;
   }
@@ -290,7 +294,8 @@ int main(int argc, char** argv) {
            error == cudaSuccess && index < options.tokens; ++index) {
         status = run_token(model, tokens[options.prefix + index], &session,
                            &graph_workspace, graph_logits.data(),
-                           graph_hidden.data(), &elapsed, &graphs, nullptr);
+                           graph_hidden.data(), &elapsed, &graphs, nullptr,
+                           nullptr, nullptr);
         if (!status.is_ok()) return fail_status(status);
       }
       if (error == cudaSuccess) error = cudaEventRecord(stop);

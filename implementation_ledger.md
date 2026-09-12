@@ -7168,6 +7168,19 @@ statements below are historical, not the current execution order.
 - **tok/s delta vs sitting D2048 baseline (OPT-088 35.73 tok/s): 0** (unchanged).
 - Marked OPT-096 `done`. Next eligible pending by dependency order: **OPT-097**.
 
+### 2026-09-12T11:19:00Z — OPT-096 fresh GPU overhead closes graph reopen
+
+- Post-reboot Docker compile succeeded after `opt096_decode_graphs_test.cu`
+  `execute_token` signature repair and `MODEL` path on native command builders.
+- Fresh native `--workload overhead`: D128 **0.0695** ms/token, D2048 **0.0766**
+  ms/token (below 0.50 ms trigger). Verdict **`no_reopen_overhead_below_trigger`**
+  (`idle_below_trigger`); supersedes host-only OPT-090 fixture `proceed`.
+- Same-math and downstream GPU gates correctly blocked. Production pin remains
+  `ffn_only`; `decode_segments8` not installed. `claims_throughput=false`.
+- Evidence: [`fixtures/opt096_decode_graphs.json`](fixtures/opt096_decode_graphs.json);
+  [`evidence/optimization/opt096-decode-graphs/REPORT.md`](evidence/optimization/opt096-decode-graphs/REPORT.md);
+  [`evidence/optimization/opt096-decode-graphs/eligibility-overhead.txt`](evidence/optimization/opt096-decode-graphs/eligibility-overhead.txt).
+
 ### 2026-09-12T10:05:00Z — OPT-097 split_xy_wait rejected; joined_wait retained
 
 - Added `UseSplitXYWait` selector (`joined_wait` control, `split_xy_wait` candidate) on

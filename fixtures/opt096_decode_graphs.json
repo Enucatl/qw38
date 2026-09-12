@@ -16,9 +16,9 @@
   "shipping_execution_graphs": "ffn_only",
   "selected_path": "ffn_only",
   "shipping_unchanged": true,
-  "production_kept": false,
-  "eligible": true,
-  "status": "eligible",
+  "production_kept": true,
+  "eligible": false,
+  "status": "no_reopen_overhead_below_trigger",
   "report_path": "evidence/optimization/opt096-decode-graphs/REPORT.md",
   "quality": {
     "quality_v3_absolute": null,
@@ -39,15 +39,17 @@
       "kernel_parity_pass": false,
       "model_quality_pass": false,
       "performance_pass": false,
-      "production_kept": false,
-      "incomplete": true
+      "production_kept": true,
+      "incomplete": false,
+      "not_applicable_reason": "no_reopen_overhead_below_trigger"
     },
     "decode_segments8": {
       "kernel_parity_pass": false,
       "model_quality_pass": false,
       "performance_pass": false,
       "production_kept": false,
-      "incomplete": true
+      "incomplete": true,
+      "not_applicable_reason": "no_reopen_overhead_below_trigger"
     }
   },
   "eligibility": {
@@ -55,22 +57,22 @@
     "task": "OPT-096",
     "phase": "eligibility",
     "mode": "feedback",
-    "eligible": true,
-    "verdict": "proceed",
-    "reason": "unhidden_idle_at_both_prefixes",
+    "eligible": false,
+    "verdict": "no_reopen_overhead_below_trigger",
+    "reason": "idle_below_trigger",
     "graph_reopen_eligible": true,
     "overhead": {
-      "d128_idle_ms_per_token": 0.8568650399374936,
-      "d2048_idle_ms_per_token": 0.8618579507921694,
+      "d128_idle_ms_per_token": 0.0694618225,
+      "d2048_idle_ms_per_token": 0.0765800476,
       "d128_valid": true,
       "d2048_valid": true,
-      "source": "fixtures/opt090_decode_attribution.json"
+      "source": "native_probe"
     },
     "graph_reopen": {
-      "eligible": true,
-      "reason": "unhidden_idle_at_both_prefixes",
-      "d128_idle_ms_per_token": 0.8568650399374936,
-      "d2048_idle_ms_per_token": 0.8618579507921694,
+      "eligible": false,
+      "reason": "idle_below_trigger",
+      "d128_idle_ms_per_token": 0.0694618225,
+      "d2048_idle_ms_per_token": 0.0765800476,
       "threshold_ms": 0.5
     },
     "opt090_path": "/home/user/qw38/fixtures/opt090_decode_attribution.json",
@@ -116,25 +118,32 @@
         "rounds": []
       }
     },
+    "claims_throughput": false,
+    "measurement_utc": "2026-09-12T11:19:25Z",
+    "status": "no_reopen_overhead_below_trigger",
     "independent_verdicts": {
       "ffn_only": {
         "kernel_parity_pass": false,
         "model_quality_pass": false,
         "performance_pass": false,
-        "production_kept": false,
-        "incomplete": true
+        "production_kept": true,
+        "incomplete": false,
+        "not_applicable_reason": "no_reopen_overhead_below_trigger"
       },
       "decode_segments8": {
         "kernel_parity_pass": false,
         "model_quality_pass": false,
         "performance_pass": false,
         "production_kept": false,
-        "incomplete": true
+        "incomplete": true,
+        "not_applicable_reason": "no_reopen_overhead_below_trigger"
       }
     },
-    "claims_throughput": false,
-    "measurement_utc": "2026-09-12T09:47:39Z",
-    "status": "eligible"
+    "selected_path": "ffn_only",
+    "shipping_unchanged": true,
+    "shipping_execution_graphs": "ffn_only",
+    "production_kept": true,
+    "winners": []
   },
   "implementation_utc": "2026-09-12T09:50:00Z",
   "host_validation": {
@@ -142,8 +151,11 @@
     "pytest_count": 10,
     "pytest_command": "uv run pytest -q tests/test_opt096_decode_graphs.py",
     "eligibility_pass": true,
-    "native_built": false,
-    "gpu_phases_executed": false
+    "native_built": true,
+    "gpu_phases_executed": true,
+    "fresh_overhead_probe": true,
+    "same_math_blocked": "no_reopen_overhead_below_trigger"
   },
-  "updated_utc": "2026-09-12T09:50:00Z"
+  "updated_utc": "2026-09-12T11:19:25Z",
+  "winners": []
 }
