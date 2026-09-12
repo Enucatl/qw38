@@ -280,11 +280,11 @@ verdicts. It does not reopen unchanged rejected candidates. OPT-114 first
 calibrates the current sitting and tests whether graph/launch overhead is real;
 OPT-107–112 then test bounded mechanisms; OPT-113 owns the final sitting. A
 failed screen is a useful measured rejection, not permission for another
-unbounded variant. First eligible task in ledger/dependency order is OPT-114.
+unbounded variant. First eligible task in ledger/dependency order is OPT-107.
 
 | ID | Description | Dependencies | Status | Acceptance condition | Evidence |
 |---|---|---|---|---|---|
-| OPT-114 | Calibrate the fresh sitting and measure real decode launch overhead | OPT-106 | pending | Same-binary A/A controls are repeatable; actual host/GPU launch gaps are separated from CUDA-event category time; existing segment graphs are admitted only if a fresh, correct A/B removes a material measured cost | [`tasks/OPT-114.md`](tasks/OPT-114.md) |
+| OPT-114 | Calibrate the fresh sitting and measure real decode launch overhead | OPT-106 | done | Same-binary A/A controls are repeatable; actual host/GPU launch gaps are separated from CUDA-event category time; existing segment graphs are admitted only if a fresh, correct A/B removes a material measured cost | [`tasks/OPT-114.md`](tasks/OPT-114.md); [`pins/opt114_sitting_launch_contract.json`](pins/opt114_sitting_launch_contract.json); [`pins/opt114_iteration_contract.json`](pins/opt114_iteration_contract.json); [`fixtures/opt114_sitting_launch.json`](fixtures/opt114_sitting_launch.json); [`tools/opt114_sitting_launch.py`](tools/opt114_sitting_launch.py); [`tests/test_opt114_sitting_launch.py`](tests/test_opt114_sitting_launch.py); [`cuda/opt114_sitting_launch_test.cu`](cuda/opt114_sitting_launch_test.cu); [`Makefile`](Makefile); [`evidence/optimization/opt114-sitting-and-launch-overhead/REPORT.md`](evidence/optimization/opt114-sitting-and-launch-overhead/REPORT.md); verification 2026-09-12T22:02:00Z |
 | OPT-107 | Dispatch decode attention by measured prefix crossover | OPT-103, OPT-106, OPT-114 | pending | Existing warp_query remains at short prefixes while vec128_online is admitted only over a bounded measured range (including 2048 when supported); D128 is unchanged and D2048 component/E2E throughput improves with quality/state/P4096 guards | [`tasks/OPT-107.md`](tasks/OPT-107.md) |
 | OPT-108 | Reproduce the actual NVIDIA pinned-llama vector-attention stack | OPT-103, OPT-106, OPT-114 | pending | A source-faithful NVIDIA vector-attention slice (without assuming an AMD-only half2 path) beats the current attention control on equivalent buffers and clears the complete D2048/non-regression gates, or production is unchanged | [`tasks/OPT-108.md`](tasks/OPT-108.md) |
 | OPT-109 | Keep transposed GDN state for the session lifetime | OPT-101, OPT-106, OPT-114 | pending | Col-major device state persists across decode steps with no timed per-layer relayout; checkpoint/prompt boundaries round-trip canonically and complete GDN plus D128/D2048 improve, or sequential row-major remains | [`tasks/OPT-109.md`](tasks/OPT-109.md) |
@@ -7450,3 +7450,27 @@ statements below are historical, not the current execution order.
 - **tok/s delta vs OPT-098 P4096 baseline (3046.23 tok/s): −9.39 tok/s (0.997×).**
   D128 +16.21 tok/s; D2048 +13.91 tok/s versus that same control sitting.
 - Marked OPT-106 `done`. Coupled IDs: none. Post-098 recovery batch complete.
+
+### 2026-09-12T22:04:12Z — OPT-114 sitting and launch overhead delivered
+
+- Added OPT-114 diagnostic sitting (`tools/opt114_sitting_launch.py`, contracts,
+  fixture, tests, `cuda-opt114-diagnostics`, native `opt114_sitting_launch_test.cu`,
+  observation prefixes in `run_optimization_task.py`). No production selector or
+  kernel-arithmetic change; `ffn_only` retained.
+- Fresh same-binary A/A (3 warmups + 10 interleaved AB/BA pairs): combined
+  `aa_verdict=repeatable`. **P4096** ~2980 tok/s (geo 0.9997); **D128** ~53.46
+  tok/s (geo 1.0001); **D2048** ~48.38 tok/s (geo 0.9915). Historical OPT-098
+  arrays recorded as calibration only.
+- Removable launch overhead ~**11 ms/token** at D128/D2048 (leaf CUDA-event
+  gaps); legacy `other_idle` ~0.32 ms — not the launch budget. Graph reopen
+  trigger met (`unhidden_idle_at_both_prefixes`) but `decode_segments8` capture
+  failed (`cannot capture CUDA scheduler FFN graphs`); verdict
+  `graph_ab_retain_ffn_only`. Memory reconcile: OPT-106 explicit Δ6144 B;
+  live 128K `memory-fit-test` OOM recorded; reserve cap unchanged.
+- `claims_throughput=false`. Sitting calibrated for OPT-107+ tasks.
+- Key evidence: [`fixtures/opt114_sitting_launch.json`](fixtures/opt114_sitting_launch.json);
+  [`evidence/optimization/opt114-sitting-and-launch-overhead/REPORT.md`](evidence/optimization/opt114-sitting-and-launch-overhead/REPORT.md).
+- **A/A baseline (fresh sitting):** P4096 ~2980 tok/s; D128 ~53.46 tok/s;
+  D2048 ~48.38 tok/s. Launch overhead ~11 ms/token. Graph not admitted.
+  **tok/s delta vs OPT-098 P4096 baseline (3046.23 tok/s): 0** (diagnostic).
+- Marked OPT-114 `done`. Coupled IDs: none. First eligible pending task: **OPT-107**.

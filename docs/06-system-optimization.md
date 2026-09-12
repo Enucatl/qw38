@@ -849,6 +849,18 @@ sitting does not require those gates to pass. OPT-098 remains historical.
 Live numbers stay in
 [`evidence/optimization/opt106-batch-gate/REPORT.md`](../evidence/optimization/opt106-batch-gate/REPORT.md).
 
+## Fresh sitting calibration (OPT-114)
+
+**Outcome freeze, 2026-09-12:** OPT-114 establishes a fresh same-binary Quartz
+A/A control after OPT-106. Combined `aa_verdict` is **repeatable** at P4096, D128,
+and D2048. Removable decode launch overhead is ~11 ms/token at both prefixes
+(leaf CUDA-event gaps; legacy `other_idle` ~0.32 ms and is not the budget).
+Graph trigger met but `decode_segments8` capture failed; production stays
+`ffn_only`. Memory reconcile: 6144 byte inventory delta vs OPT-106; live 128K
+OOM on this sitting. OPT-098 arrays remain historical calibration only; they are
+not a keep/reject baseline for post-106 tasks. Live numbers stay in
+[`evidence/optimization/opt114-sitting-and-launch-overhead/REPORT.md`](../evidence/optimization/opt114-sitting-and-launch-overhead/REPORT.md).
+
 ## DwarfStar transfer boundary
 
 Reuse MMV/MMQ phase split, quant block tests, explicit unavailable paths, stable

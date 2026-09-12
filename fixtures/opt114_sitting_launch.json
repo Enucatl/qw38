@@ -1,0 +1,1579 @@
+{
+  "schema_version": 1,
+  "task": "OPT-114",
+  "status": "measured",
+  "measurement_utc": "2026-09-12T21:59:32Z",
+  "identity": {
+    "device": "NVIDIA GeForce RTX 5090",
+    "compute_capability": "12.0",
+    "power_limit_w": 400.0,
+    "llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+    "gguf_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+    "token_generator": "(42 + index * 997) % 248320",
+    "source_revision": "7409d8640520d139cb2b59fd6b09b5bb84fbcf14",
+    "source_state": "dirty",
+    "nvccflags": "-O2 --fmad=false",
+    "execution_graphs": "ffn_only",
+    "selectors": {
+      "rms_norm": "parallel_fma",
+      "q4_decode": "integer_q8_late",
+      "q8_decode": "dp4a_q8_1",
+      "q8_grouping": "grouped_r1_w4",
+      "q8_decode_rows_skinny": 1,
+      "q8_decode_rows_medium": 1,
+      "q8_decode_rows_wide": 1,
+      "q8_decode_layout_warps_skinny": 4,
+      "q8_decode_layout_warps_medium": 4,
+      "q8_decode_layout_warps_wide": 4,
+      "q8_layout": "r1_w4",
+      "q6_decode": "integer_q8_1",
+      "ffn_decode": "paired_integer",
+      "query_prepare": "hoisted",
+      "attention_pipeline": "kv_once",
+      "gdn_preproc": "transpose",
+      "mmq_pipeline": "fma_async",
+      "mmq_async_x": true,
+      "ffn_prompt_pair": "off",
+      "ffn_tiles": "i128_j128",
+      "ffn_gate_quality_i": 128,
+      "ffn_gate_prompt_tile": 128,
+      "prompt_microbatch_rows": 4096,
+      "execution_graphs": "ffn_only",
+      "production_numerics": "strict",
+      "nvccflags": "-O2 --fmad=false",
+      "gdn_decode": "sequential",
+      "decode_query_prep": "warp_query",
+      "q8_device_layout": "raw_gguf",
+      "q6_device_layout": "raw_gguf",
+      "mmq_double_x": false
+    },
+    "clocks": {
+      "sm_clock_mhz": "2520",
+      "mem_clock_mhz": "13801",
+      "temperature_c": "60",
+      "power_draw_w": 76.93
+    },
+    "image": "qw38-cuda:13.0.2",
+    "model": "models/Qwen3.8-27B-Q4_K_M.gguf",
+    "telemetry": {
+      "device": "NVIDIA GeForce RTX 5090",
+      "device_substring": "RTX 5090",
+      "power_limit_w": 400.0,
+      "power_draw_w": 76.93,
+      "sm_clock_mhz": "2520",
+      "mem_clock_mhz": "13801",
+      "temperature_c": "60",
+      "raw": "NVIDIA GeForce RTX 5090, 400.00, 76.93, 2520, 13801, 60"
+    }
+  },
+  "hardware_executed": true,
+  "gpu_blocker": null,
+  "aa_control": {
+    "p4096": {
+      "workload": "p4096",
+      "prefix": 4096,
+      "warmups": 3,
+      "pairs": 10,
+      "decode_tokens": 0,
+      "uses_opt098_arrays": false,
+      "same_binary": true,
+      "a_tok_s": [
+        3008.99341,
+        3001.35815,
+        2996.4707,
+        2985.99829,
+        2983.43433,
+        2977.65625,
+        2973.35547,
+        2966.21655,
+        2964.0481,
+        2953.36255
+      ],
+      "b_tok_s": [
+        3003.86328,
+        3002.94604,
+        2993.729,
+        2990.28516,
+        2980.80127,
+        2977.74194,
+        2970.54883,
+        2967.87085,
+        2959.17651,
+        2955.4397
+      ],
+      "a_wall_ms": [
+        1361.25256,
+        1364.71545,
+        1366.94141,
+        1371.7356,
+        1372.91443,
+        1375.57849,
+        1377.56824,
+        1380.88367,
+        1381.89392,
+        1386.89368
+      ],
+      "b_wall_ms": [
+        1363.57739,
+        1363.9939,
+        1368.19336,
+        1369.76904,
+        1374.1272,
+        1375.53894,
+        1378.86975,
+        1380.11401,
+        1384.16882,
+        1385.91895
+      ],
+      "a_p50_ms": [
+        1361.25256,
+        1364.71545,
+        1366.94141,
+        1371.7356,
+        1372.91443,
+        1375.57849,
+        1377.56824,
+        1380.88367,
+        1381.89392,
+        1386.89368
+      ],
+      "a_p95_ms": [
+        1361.25256,
+        1364.71545,
+        1366.94141,
+        1371.7356,
+        1372.91443,
+        1375.57849,
+        1377.56824,
+        1380.88367,
+        1381.89392,
+        1386.89368
+      ],
+      "b_p50_ms": [
+        1363.57739,
+        1363.9939,
+        1368.19336,
+        1369.76904,
+        1374.1272,
+        1375.53894,
+        1378.86975,
+        1380.11401,
+        1384.16882,
+        1385.91895
+      ],
+      "b_p95_ms": [
+        1363.57739,
+        1363.9939,
+        1368.19336,
+        1369.76904,
+        1374.1272,
+        1375.53894,
+        1378.86975,
+        1380.11401,
+        1384.16882,
+        1385.91895
+      ],
+      "n": 10,
+      "df": 9,
+      "geometric_ratio": 0.9997159333687111,
+      "ci95_low": 0.9989451686942553,
+      "ci95_high": 1.0004872927486643,
+      "se": 0.00034097305303513905,
+      "critical": 2.262,
+      "ratios": [
+        0.9982950677183438,
+        1.0005290571536756,
+        0.9990850235912535,
+        1.0014356572186784,
+        0.9991174399337289,
+        1.000028777666999,
+        0.9990560698078929,
+        1.0005577138324575,
+        0.9983564403020315,
+        1.0007033169700077
+      ],
+      "equality_excluded": false,
+      "incomplete": false,
+      "guard": 0.02,
+      "point_outside_guard": false,
+      "status": "repeatable",
+      "a_mean_tok_s": 2981.08938,
+      "b_mean_tok_s": 2980.240258,
+      "a_p50_tok_s": 2980.54529,
+      "a_p95_tok_s": 3005.557543,
+      "b_p50_tok_s": 2979.271605,
+      "b_p95_tok_s": 3003.450522,
+      "native": {
+        "schema_version": 1,
+        "task": "OPT-114",
+        "workload": "aa-control",
+        "prefix": 4096,
+        "prefill": true,
+        "warmups": 3,
+        "samples": 10,
+        "tokens": 0,
+        "observed_warmups": 3,
+        "observed_samples": 10,
+        "observed_candidates": 2,
+        "observed_shapes": 1,
+        "observed_tier": "screen",
+        "keep": false,
+        "execution_graphs": "ffn_only",
+        "same_binary": true,
+        "pairs": [
+          {
+            "sample_index": 0,
+            "order": "AB",
+            "A": {
+              "wall_ms": 1361.25256,
+              "tok_s": 3008.99341,
+              "p50_ms": 1361.25256,
+              "p95_ms": 1361.25256
+            },
+            "B": {
+              "wall_ms": 1363.57739,
+              "tok_s": 3003.86328,
+              "p50_ms": 1363.57739,
+              "p95_ms": 1363.57739
+            }
+          },
+          {
+            "sample_index": 1,
+            "order": "BA",
+            "A": {
+              "wall_ms": 1364.71545,
+              "tok_s": 3001.35815,
+              "p50_ms": 1364.71545,
+              "p95_ms": 1364.71545
+            },
+            "B": {
+              "wall_ms": 1363.9939,
+              "tok_s": 3002.94604,
+              "p50_ms": 1363.9939,
+              "p95_ms": 1363.9939
+            }
+          },
+          {
+            "sample_index": 2,
+            "order": "AB",
+            "A": {
+              "wall_ms": 1366.94141,
+              "tok_s": 2996.4707,
+              "p50_ms": 1366.94141,
+              "p95_ms": 1366.94141
+            },
+            "B": {
+              "wall_ms": 1368.19336,
+              "tok_s": 2993.729,
+              "p50_ms": 1368.19336,
+              "p95_ms": 1368.19336
+            }
+          },
+          {
+            "sample_index": 3,
+            "order": "BA",
+            "A": {
+              "wall_ms": 1371.7356,
+              "tok_s": 2985.99829,
+              "p50_ms": 1371.7356,
+              "p95_ms": 1371.7356
+            },
+            "B": {
+              "wall_ms": 1369.76904,
+              "tok_s": 2990.28516,
+              "p50_ms": 1369.76904,
+              "p95_ms": 1369.76904
+            }
+          },
+          {
+            "sample_index": 4,
+            "order": "AB",
+            "A": {
+              "wall_ms": 1372.91443,
+              "tok_s": 2983.43433,
+              "p50_ms": 1372.91443,
+              "p95_ms": 1372.91443
+            },
+            "B": {
+              "wall_ms": 1374.1272,
+              "tok_s": 2980.80127,
+              "p50_ms": 1374.1272,
+              "p95_ms": 1374.1272
+            }
+          },
+          {
+            "sample_index": 5,
+            "order": "BA",
+            "A": {
+              "wall_ms": 1375.57849,
+              "tok_s": 2977.65625,
+              "p50_ms": 1375.57849,
+              "p95_ms": 1375.57849
+            },
+            "B": {
+              "wall_ms": 1375.53894,
+              "tok_s": 2977.74194,
+              "p50_ms": 1375.53894,
+              "p95_ms": 1375.53894
+            }
+          },
+          {
+            "sample_index": 6,
+            "order": "AB",
+            "A": {
+              "wall_ms": 1377.56824,
+              "tok_s": 2973.35547,
+              "p50_ms": 1377.56824,
+              "p95_ms": 1377.56824
+            },
+            "B": {
+              "wall_ms": 1378.86975,
+              "tok_s": 2970.54883,
+              "p50_ms": 1378.86975,
+              "p95_ms": 1378.86975
+            }
+          },
+          {
+            "sample_index": 7,
+            "order": "BA",
+            "A": {
+              "wall_ms": 1380.88367,
+              "tok_s": 2966.21655,
+              "p50_ms": 1380.88367,
+              "p95_ms": 1380.88367
+            },
+            "B": {
+              "wall_ms": 1380.11401,
+              "tok_s": 2967.87085,
+              "p50_ms": 1380.11401,
+              "p95_ms": 1380.11401
+            }
+          },
+          {
+            "sample_index": 8,
+            "order": "AB",
+            "A": {
+              "wall_ms": 1381.89392,
+              "tok_s": 2964.0481,
+              "p50_ms": 1381.89392,
+              "p95_ms": 1381.89392
+            },
+            "B": {
+              "wall_ms": 1384.16882,
+              "tok_s": 2959.17651,
+              "p50_ms": 1384.16882,
+              "p95_ms": 1384.16882
+            }
+          },
+          {
+            "sample_index": 9,
+            "order": "BA",
+            "A": {
+              "wall_ms": 1386.89368,
+              "tok_s": 2953.36255,
+              "p50_ms": 1386.89368,
+              "p95_ms": 1386.89368
+            },
+            "B": {
+              "wall_ms": 1385.91895,
+              "tok_s": 2955.4397,
+              "p50_ms": 1385.91895,
+              "p95_ms": 1385.91895
+            }
+          }
+        ]
+      }
+    },
+    "d128": {
+      "workload": "d128",
+      "prefix": 128,
+      "warmups": 3,
+      "pairs": 10,
+      "decode_tokens": 256,
+      "uses_opt098_arrays": false,
+      "same_binary": true,
+      "a_tok_s": [
+        53.7467003,
+        53.7134705,
+        53.6257629,
+        53.4808388,
+        53.4734802,
+        53.3674202,
+        53.3413467,
+        53.3109779,
+        53.293438,
+        53.2481079
+      ],
+      "b_tok_s": [
+        53.8277893,
+        53.7795143,
+        53.570034,
+        53.5206261,
+        53.4197235,
+        53.4095268,
+        53.3049622,
+        53.288887,
+        53.2648735,
+        53.2479897
+      ],
+      "a_wall_ms": [
+        4763.08301,
+        4766.02979,
+        4773.82471,
+        4786.76123,
+        4787.41992,
+        4796.93408,
+        4799.27881,
+        4802.0127,
+        4803.59326,
+        4807.68262
+      ],
+      "b_wall_ms": [
+        4755.90771,
+        4760.17676,
+        4778.79102,
+        4783.20264,
+        4792.2373,
+        4793.15234,
+        4802.55469,
+        4804.00342,
+        4806.16943,
+        4807.69336
+      ],
+      "a_p50_ms": [
+        18.6311398,
+        18.6389389,
+        18.6654148,
+        18.7148666,
+        18.7225132,
+        18.7612514,
+        18.7670135,
+        18.7710152,
+        18.7808228,
+        18.7945061
+      ],
+      "a_p95_ms": [
+        18.7127876,
+        18.7301006,
+        18.7622414,
+        18.796051,
+        18.807291,
+        18.8400059,
+        18.8516312,
+        18.864666,
+        18.874115,
+        18.8857651
+      ],
+      "b_p50_ms": [
+        18.5813332,
+        18.609848,
+        18.6850128,
+        18.7040863,
+        18.7419205,
+        18.7440224,
+        18.769928,
+        18.7810135,
+        18.7843094,
+        18.7886772
+      ],
+      "b_p95_ms": [
+        18.6865406,
+        18.6973114,
+        18.7707806,
+        18.7964382,
+        18.8281975,
+        18.833313,
+        18.8734264,
+        18.8642197,
+        18.8850899,
+        18.8962288
+      ],
+      "n": 10,
+      "df": 9,
+      "geometric_ratio": 1.0000588055156536,
+      "ci95_low": 0.9993870926451571,
+      "ci95_high": 1.0007309698610432,
+      "se": 0.0002970375977080116,
+      "critical": 2.262,
+      "ratios": [
+        1.0015087251784274,
+        1.0012295574906114,
+        0.9989607812180887,
+        1.0007439543001333,
+        0.9989947035465256,
+        1.0007889944809436,
+        0.9993178931119862,
+        0.9995856219324764,
+        0.999464014687887,
+        0.9999977802028154
+      ],
+      "equality_excluded": false,
+      "incomplete": false,
+      "guard": 0.02,
+      "point_outside_guard": false,
+      "status": "repeatable",
+      "a_mean_tok_s": 53.460154339999995,
+      "b_mean_tok_s": 53.46339264000001,
+      "a_p50_tok_s": 53.4204502,
+      "a_p95_tok_s": 53.73174689,
+      "b_p50_tok_s": 53.414625150000006,
+      "b_p95_tok_s": 53.80606555,
+      "native": {
+        "schema_version": 1,
+        "task": "OPT-114",
+        "workload": "aa-control",
+        "prefix": 128,
+        "prefill": false,
+        "warmups": 3,
+        "samples": 10,
+        "tokens": 256,
+        "observed_warmups": 3,
+        "observed_samples": 10,
+        "observed_candidates": 2,
+        "observed_shapes": 1,
+        "observed_tier": "screen",
+        "keep": false,
+        "execution_graphs": "ffn_only",
+        "same_binary": true,
+        "pairs": [
+          {
+            "sample_index": 0,
+            "order": "AB",
+            "A": {
+              "wall_ms": 4763.08301,
+              "tok_s": 53.7467003,
+              "p50_ms": 18.6311398,
+              "p95_ms": 18.7127876
+            },
+            "B": {
+              "wall_ms": 4755.90771,
+              "tok_s": 53.8277893,
+              "p50_ms": 18.5813332,
+              "p95_ms": 18.6865406
+            }
+          },
+          {
+            "sample_index": 1,
+            "order": "BA",
+            "A": {
+              "wall_ms": 4766.02979,
+              "tok_s": 53.7134705,
+              "p50_ms": 18.6389389,
+              "p95_ms": 18.7301006
+            },
+            "B": {
+              "wall_ms": 4760.17676,
+              "tok_s": 53.7795143,
+              "p50_ms": 18.609848,
+              "p95_ms": 18.6973114
+            }
+          },
+          {
+            "sample_index": 2,
+            "order": "AB",
+            "A": {
+              "wall_ms": 4773.82471,
+              "tok_s": 53.6257629,
+              "p50_ms": 18.6654148,
+              "p95_ms": 18.7622414
+            },
+            "B": {
+              "wall_ms": 4778.79102,
+              "tok_s": 53.570034,
+              "p50_ms": 18.6850128,
+              "p95_ms": 18.7707806
+            }
+          },
+          {
+            "sample_index": 3,
+            "order": "BA",
+            "A": {
+              "wall_ms": 4786.76123,
+              "tok_s": 53.4808388,
+              "p50_ms": 18.7148666,
+              "p95_ms": 18.796051
+            },
+            "B": {
+              "wall_ms": 4783.20264,
+              "tok_s": 53.5206261,
+              "p50_ms": 18.7040863,
+              "p95_ms": 18.7964382
+            }
+          },
+          {
+            "sample_index": 4,
+            "order": "AB",
+            "A": {
+              "wall_ms": 4787.41992,
+              "tok_s": 53.4734802,
+              "p50_ms": 18.7225132,
+              "p95_ms": 18.807291
+            },
+            "B": {
+              "wall_ms": 4792.2373,
+              "tok_s": 53.4197235,
+              "p50_ms": 18.7419205,
+              "p95_ms": 18.8281975
+            }
+          },
+          {
+            "sample_index": 5,
+            "order": "BA",
+            "A": {
+              "wall_ms": 4796.93408,
+              "tok_s": 53.3674202,
+              "p50_ms": 18.7612514,
+              "p95_ms": 18.8400059
+            },
+            "B": {
+              "wall_ms": 4793.15234,
+              "tok_s": 53.4095268,
+              "p50_ms": 18.7440224,
+              "p95_ms": 18.833313
+            }
+          },
+          {
+            "sample_index": 6,
+            "order": "AB",
+            "A": {
+              "wall_ms": 4799.27881,
+              "tok_s": 53.3413467,
+              "p50_ms": 18.7670135,
+              "p95_ms": 18.8516312
+            },
+            "B": {
+              "wall_ms": 4802.55469,
+              "tok_s": 53.3049622,
+              "p50_ms": 18.769928,
+              "p95_ms": 18.8734264
+            }
+          },
+          {
+            "sample_index": 7,
+            "order": "BA",
+            "A": {
+              "wall_ms": 4802.0127,
+              "tok_s": 53.3109779,
+              "p50_ms": 18.7710152,
+              "p95_ms": 18.864666
+            },
+            "B": {
+              "wall_ms": 4804.00342,
+              "tok_s": 53.288887,
+              "p50_ms": 18.7810135,
+              "p95_ms": 18.8642197
+            }
+          },
+          {
+            "sample_index": 8,
+            "order": "AB",
+            "A": {
+              "wall_ms": 4803.59326,
+              "tok_s": 53.293438,
+              "p50_ms": 18.7808228,
+              "p95_ms": 18.874115
+            },
+            "B": {
+              "wall_ms": 4806.16943,
+              "tok_s": 53.2648735,
+              "p50_ms": 18.7843094,
+              "p95_ms": 18.8850899
+            }
+          },
+          {
+            "sample_index": 9,
+            "order": "BA",
+            "A": {
+              "wall_ms": 4807.68262,
+              "tok_s": 53.2481079,
+              "p50_ms": 18.7945061,
+              "p95_ms": 18.8857651
+            },
+            "B": {
+              "wall_ms": 4807.69336,
+              "tok_s": 53.2479897,
+              "p50_ms": 18.7886772,
+              "p95_ms": 18.8962288
+            }
+          }
+        ]
+      }
+    },
+    "d2048": {
+      "workload": "d2048",
+      "prefix": 2048,
+      "warmups": 3,
+      "pairs": 10,
+      "decode_tokens": 256,
+      "uses_opt098_arrays": false,
+      "same_binary": true,
+      "a_tok_s": [
+        49.5466919,
+        49.5156631,
+        49.4958916,
+        49.5121384,
+        49.4916267,
+        49.4734459,
+        49.3884468,
+        45.0170059,
+        44.7870293,
+        47.6023369
+      ],
+      "b_tok_s": [
+        49.5348511,
+        49.5234146,
+        49.5072021,
+        49.4965134,
+        49.485939,
+        49.4995766,
+        45.5432816,
+        45.3125801,
+        48.3963547,
+        43.5529709
+      ],
+      "a_wall_ms": [
+        5166.84326,
+        5170.08105,
+        5172.14648,
+        5170.44922,
+        5172.59229,
+        5174.49316,
+        5183.39844,
+        5686.73975,
+        5715.94043,
+        5377.88721
+      ],
+      "b_wall_ms": [
+        5168.07861,
+        5169.27197,
+        5170.96484,
+        5172.08154,
+        5173.18652,
+        5171.76123,
+        5621.02686,
+        5649.64502,
+        5289.65479,
+        5877.8999
+      ],
+      "a_p50_ms": [
+        20.1870384,
+        20.197258,
+        20.2099018,
+        20.1991215,
+        20.2039871,
+        20.2147446,
+        20.2083015,
+        22.7273407,
+        22.9733829,
+        20.2721901
+      ],
+      "a_p95_ms": [
+        20.2771873,
+        20.2926483,
+        20.3029366,
+        20.2909794,
+        20.3023796,
+        20.3030109,
+        20.4566441,
+        23.1809139,
+        23.1149979,
+        23.0255699
+      ],
+      "b_p50_ms": [
+        20.19347,
+        20.19627,
+        20.2019119,
+        20.2022572,
+        20.2050858,
+        20.2039795,
+        20.29039,
+        22.8922043,
+        20.2334023,
+        22.9724464
+      ],
+      "b_p95_ms": [
+        20.2807617,
+        20.2913456,
+        20.2936363,
+        20.3068848,
+        20.3052597,
+        20.2922211,
+        23.1546364,
+        23.0980949,
+        20.3256321,
+        23.160841
+      ],
+      "n": 10,
+      "df": 9,
+      "geometric_ratio": 0.9914702307154166,
+      "ci95_low": 0.9587652820807625,
+      "ci95_high": 1.0252907951167098,
+      "se": 0.014828749280770161,
+      "critical": 2.262,
+      "ratios": [
+        0.9997610173445303,
+        1.0001565464241962,
+        1.0002285139156883,
+        0.9996844208207335,
+        0.9998850775296906,
+        1.0005281762675844,
+        0.9221444396587098,
+        1.0065658342684225,
+        1.0805886314946993,
+        0.9149334620166516
+      ],
+      "equality_excluded": false,
+      "incomplete": false,
+      "guard": 0.02,
+      "point_outside_guard": false,
+      "status": "repeatable",
+      "a_mean_tok_s": 48.383027649999995,
+      "b_mean_tok_s": 47.985268409999996,
+      "a_p50_tok_s": 49.4825363,
+      "a_p95_tok_s": 49.53272894,
+      "b_p50_tok_s": 49.4912262,
+      "b_p95_tok_s": 49.529704675000005,
+      "native": {
+        "schema_version": 1,
+        "task": "OPT-114",
+        "workload": "aa-control",
+        "prefix": 2048,
+        "prefill": false,
+        "warmups": 3,
+        "samples": 10,
+        "tokens": 256,
+        "observed_warmups": 3,
+        "observed_samples": 10,
+        "observed_candidates": 2,
+        "observed_shapes": 1,
+        "observed_tier": "screen",
+        "keep": false,
+        "execution_graphs": "ffn_only",
+        "same_binary": true,
+        "pairs": [
+          {
+            "sample_index": 0,
+            "order": "AB",
+            "A": {
+              "wall_ms": 5166.84326,
+              "tok_s": 49.5466919,
+              "p50_ms": 20.1870384,
+              "p95_ms": 20.2771873
+            },
+            "B": {
+              "wall_ms": 5168.07861,
+              "tok_s": 49.5348511,
+              "p50_ms": 20.19347,
+              "p95_ms": 20.2807617
+            }
+          },
+          {
+            "sample_index": 1,
+            "order": "BA",
+            "A": {
+              "wall_ms": 5170.08105,
+              "tok_s": 49.5156631,
+              "p50_ms": 20.197258,
+              "p95_ms": 20.2926483
+            },
+            "B": {
+              "wall_ms": 5169.27197,
+              "tok_s": 49.5234146,
+              "p50_ms": 20.19627,
+              "p95_ms": 20.2913456
+            }
+          },
+          {
+            "sample_index": 2,
+            "order": "AB",
+            "A": {
+              "wall_ms": 5172.14648,
+              "tok_s": 49.4958916,
+              "p50_ms": 20.2099018,
+              "p95_ms": 20.3029366
+            },
+            "B": {
+              "wall_ms": 5170.96484,
+              "tok_s": 49.5072021,
+              "p50_ms": 20.2019119,
+              "p95_ms": 20.2936363
+            }
+          },
+          {
+            "sample_index": 3,
+            "order": "BA",
+            "A": {
+              "wall_ms": 5170.44922,
+              "tok_s": 49.5121384,
+              "p50_ms": 20.1991215,
+              "p95_ms": 20.2909794
+            },
+            "B": {
+              "wall_ms": 5172.08154,
+              "tok_s": 49.4965134,
+              "p50_ms": 20.2022572,
+              "p95_ms": 20.3068848
+            }
+          },
+          {
+            "sample_index": 4,
+            "order": "AB",
+            "A": {
+              "wall_ms": 5172.59229,
+              "tok_s": 49.4916267,
+              "p50_ms": 20.2039871,
+              "p95_ms": 20.3023796
+            },
+            "B": {
+              "wall_ms": 5173.18652,
+              "tok_s": 49.485939,
+              "p50_ms": 20.2050858,
+              "p95_ms": 20.3052597
+            }
+          },
+          {
+            "sample_index": 5,
+            "order": "BA",
+            "A": {
+              "wall_ms": 5174.49316,
+              "tok_s": 49.4734459,
+              "p50_ms": 20.2147446,
+              "p95_ms": 20.3030109
+            },
+            "B": {
+              "wall_ms": 5171.76123,
+              "tok_s": 49.4995766,
+              "p50_ms": 20.2039795,
+              "p95_ms": 20.2922211
+            }
+          },
+          {
+            "sample_index": 6,
+            "order": "AB",
+            "A": {
+              "wall_ms": 5183.39844,
+              "tok_s": 49.3884468,
+              "p50_ms": 20.2083015,
+              "p95_ms": 20.4566441
+            },
+            "B": {
+              "wall_ms": 5621.02686,
+              "tok_s": 45.5432816,
+              "p50_ms": 20.29039,
+              "p95_ms": 23.1546364
+            }
+          },
+          {
+            "sample_index": 7,
+            "order": "BA",
+            "A": {
+              "wall_ms": 5686.73975,
+              "tok_s": 45.0170059,
+              "p50_ms": 22.7273407,
+              "p95_ms": 23.1809139
+            },
+            "B": {
+              "wall_ms": 5649.64502,
+              "tok_s": 45.3125801,
+              "p50_ms": 22.8922043,
+              "p95_ms": 23.0980949
+            }
+          },
+          {
+            "sample_index": 8,
+            "order": "AB",
+            "A": {
+              "wall_ms": 5715.94043,
+              "tok_s": 44.7870293,
+              "p50_ms": 22.9733829,
+              "p95_ms": 23.1149979
+            },
+            "B": {
+              "wall_ms": 5289.65479,
+              "tok_s": 48.3963547,
+              "p50_ms": 20.2334023,
+              "p95_ms": 20.3256321
+            }
+          },
+          {
+            "sample_index": 9,
+            "order": "BA",
+            "A": {
+              "wall_ms": 5377.88721,
+              "tok_s": 47.6023369,
+              "p50_ms": 20.2721901,
+              "p95_ms": 23.0255699
+            },
+            "B": {
+              "wall_ms": 5877.8999,
+              "tok_s": 43.5529709,
+              "p50_ms": 22.9724464,
+              "p95_ms": 23.160841
+            }
+          }
+        ]
+      }
+    },
+    "native_counts": {
+      "schema_version": 1,
+      "task": "OPT-114",
+      "warmups": 3,
+      "samples": 10,
+      "observed_warmups": 3,
+      "observed_samples": 10,
+      "observed_candidates": 2,
+      "observed_shapes": 3,
+      "observed_tier": "screen",
+      "sample_ids": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9
+      ],
+      "keep": false,
+      "product": 78
+    },
+    "admission": {
+      "ok": true,
+      "result_class": "ok",
+      "message": "instrumentation-only: no speed admission",
+      "observed": {
+        "schema_version": 1,
+        "task": "OPT-114",
+        "warmups": 3,
+        "samples": 10,
+        "observed_warmups": 3,
+        "observed_samples": 10,
+        "observed_candidates": 2,
+        "observed_shapes": 3,
+        "observed_tier": "screen",
+        "sample_ids": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9
+        ],
+        "keep": false,
+        "product": 78,
+        "rounds": [],
+        "acceptance_executed": false,
+        "pairs": 0
+      }
+    },
+    "uses_opt098_arrays": false
+  },
+  "aa_verdict": "repeatable",
+  "launch_overhead": {
+    "d128": {
+      "tokens": 1,
+      "record_count": 650,
+      "leaf_kernel_count": 342,
+      "kernel_interval_ms": 8.11737612079,
+      "gpu_idle_gap_ms": 10.992768100000063,
+      "host_named_submit_ms": 0,
+      "host_launch_submit_gap_ms": 10.992768100000063,
+      "sync_ms": 0.1399680006,
+      "graph_param_update_ms": 0.235616997,
+      "legacy_other_idle_ms": 0.320837021,
+      "legacy_other_idle_is_launch_budget": false,
+      "removable_launch_ms_per_token": 10.992768100000063,
+      "method": "leaf_cuda_event_gaps_plus_named_host_submit",
+      "valid": true,
+      "prefix": 128,
+      "native": {
+        "schema_version": 1,
+        "task": "OPT-114",
+        "workload": "launch-overhead",
+        "prefix": 128,
+        "tokens": 1,
+        "record_count": 650,
+        "pool_overflow": false,
+        "legacy_other_idle_ms": 0.320837021,
+        "legacy_other_idle_measured": true,
+        "wall_ms": 19.5559025,
+        "graph_ms": 0.235616997,
+        "tok_s": 50.4299088,
+        "launch_param_updates": 0,
+        "keep": false,
+        "observed_warmups": 1,
+        "observed_samples": 1,
+        "observed_candidates": 1,
+        "observed_shapes": 1,
+        "observed_tier": "screen"
+      }
+    },
+    "d2048": {
+      "tokens": 1,
+      "record_count": 650,
+      "leaf_kernel_count": 342,
+      "kernel_interval_ms": 9.74864000901,
+      "gpu_idle_gap_ms": 10.967419999999265,
+      "host_named_submit_ms": 0,
+      "host_launch_submit_gap_ms": 10.967419999999265,
+      "sync_ms": 0.124896001,
+      "graph_param_update_ms": 0.235536963,
+      "legacy_other_idle_ms": 0.328769684,
+      "legacy_other_idle_is_launch_budget": false,
+      "removable_launch_ms_per_token": 10.967419999999265,
+      "method": "leaf_cuda_event_gaps_plus_named_host_submit",
+      "valid": true,
+      "prefix": 2048,
+      "native": {
+        "schema_version": 1,
+        "task": "OPT-114",
+        "workload": "launch-overhead",
+        "prefix": 2048,
+        "tokens": 1,
+        "record_count": 650,
+        "pool_overflow": false,
+        "legacy_other_idle_ms": 0.328769684,
+        "legacy_other_idle_measured": true,
+        "wall_ms": 21.1552792,
+        "graph_ms": 0.235536963,
+        "tok_s": 46.6120071,
+        "launch_param_updates": 0,
+        "keep": false,
+        "observed_warmups": 1,
+        "observed_samples": 1,
+        "observed_candidates": 1,
+        "observed_shapes": 1,
+        "observed_tier": "screen"
+      }
+    },
+    "native_counts": {
+      "schema_version": 1,
+      "task": "OPT-114",
+      "warmups": 1,
+      "samples": 1,
+      "observed_warmups": 1,
+      "observed_samples": 1,
+      "observed_candidates": 1,
+      "observed_shapes": 2,
+      "observed_tier": "screen",
+      "sample_ids": [
+        0
+      ],
+      "keep": false,
+      "product": 4
+    },
+    "admission": {
+      "ok": true,
+      "result_class": "ok",
+      "message": "instrumentation-only: no speed admission",
+      "observed": {
+        "schema_version": 1,
+        "task": "OPT-114",
+        "warmups": 1,
+        "samples": 1,
+        "observed_warmups": 1,
+        "observed_samples": 1,
+        "observed_candidates": 1,
+        "observed_shapes": 2,
+        "observed_tier": "screen",
+        "sample_ids": [
+          0
+        ],
+        "keep": false,
+        "product": 4,
+        "rounds": [],
+        "acceptance_executed": false,
+        "pairs": 0
+      }
+    }
+  },
+  "graph_eligibility": {
+    "eligible": true,
+    "verdict": "graph_ab_retain_ffn_only",
+    "reason": "unhidden_idle_at_both_prefixes",
+    "threshold_ms": 0.5,
+    "d128_launch_ms_per_token": 10.992768100000063,
+    "d2048_launch_ms_per_token": 10.967419999999265,
+    "legacy_other_idle": {
+      "d128_ms": 0.320837021,
+      "d2048_ms": 0.328769684,
+      "used_as_launch_budget": false
+    },
+    "graph_reopen": {
+      "eligible": true,
+      "reason": "unhidden_idle_at_both_prefixes",
+      "d128_idle_ms_per_token": 10.992768100000063,
+      "d2048_idle_ms_per_token": 10.967419999999265,
+      "threshold_ms": 0.5
+    },
+    "independent_verdicts": {
+      "ffn_only": {
+        "kernel_parity_pass": false,
+        "model_quality_pass": false,
+        "performance_pass": false,
+        "production_kept": true,
+        "incomplete": false,
+        "not_applicable_reason": "graph_ab_retain_ffn_only"
+      },
+      "decode_segments8": {
+        "kernel_parity_pass": false,
+        "model_quality_pass": false,
+        "performance_pass": false,
+        "production_kept": false,
+        "incomplete": true,
+        "not_applicable_reason": "graph_ab_retain_ffn_only"
+      }
+    },
+    "selected_path": "ffn_only",
+    "shipping_unchanged": true,
+    "shipping_execution_graphs": "ffn_only",
+    "production_kept": true,
+    "winners": [],
+    "status": "graph_ab_retain_ffn_only",
+    "claims_throughput": false,
+    "graph_ab": {
+      "ran": true,
+      "admit": false,
+      "verdict": "graph_ab_retain_ffn_only",
+      "error": "native command failed: docker run --rm --gpus all --user 175200003:175200003 -e QW38_CUDA_TEST_TIER=acceptance -v /home/user/qw38:/workspace -w /workspace qw38-cuda:13.0.2 ./build/qw38-cuda-opt114-sitting-launch-test --workload graph-bench --execution-graphs decode_segments8 --prefix 128 --warmups 3 --samples 10 --tokens 1 models/Qwen3.8-27B-Q4_K_M.gguf\n\n==========\n== CUDA ==\n==========\n\nCUDA Version 13.0.2\n\nContainer image Copyright (c) 2016-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.\n\nThis container image and its contents are governed by the NVIDIA Deep Learning Container License.\nBy pulling and using the container, you accept the terms and conditions of this license:\nhttps://developer.nvidia.com/ngc/nvidia-deep-learning-container-license\n\nA copy of this license is made available in this container at /NGC-DL-CONTAINER-LICENSE for your convenience.\n\ndevice=NVIDIA GeForce RTX 5090 compute=12.0\ninternal: cannot capture CUDA scheduler FFN graphs\n",
+      "ffn_only_d128_body": "see graph-ab-ffn_only-d128.txt"
+    },
+    "production_selector_changed": false,
+    "trigger_met": true,
+    "native_counts": {
+      "schema_version": 1,
+      "task": "OPT-114",
+      "warmups": 3,
+      "samples": 10,
+      "observed_warmups": 3,
+      "observed_samples": 10,
+      "observed_candidates": 2,
+      "observed_shapes": 1,
+      "observed_tier": "screen",
+      "sample_ids": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9
+      ],
+      "keep": false,
+      "product": 26
+    },
+    "admission": {
+      "ok": true,
+      "result_class": "ok",
+      "message": "instrumentation-only: no speed admission",
+      "observed": {
+        "schema_version": 1,
+        "task": "OPT-114",
+        "warmups": 3,
+        "samples": 10,
+        "observed_warmups": 3,
+        "observed_samples": 10,
+        "observed_candidates": 2,
+        "observed_shapes": 1,
+        "observed_tier": "screen",
+        "sample_ids": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9
+        ],
+        "keep": false,
+        "product": 26,
+        "rounds": [],
+        "acceptance_executed": false,
+        "pairs": 0
+      }
+    }
+  },
+  "graph_opportunity": "graph_ab_retain_ffn_only",
+  "memory_reconcile": {
+    "inventory_explicit_bytes": 29571252064,
+    "opt106_explicit_bytes": 29571258208,
+    "explicit_delta_bytes": 6144,
+    "inventory_free_bytes": 3521118208,
+    "opt106_free_bytes": 3521118208,
+    "required_reserve_bytes": 1610612736,
+    "inventory_arithmetic_exact": true,
+    "opt106_arithmetic": "false",
+    "opt106_memory_fit_ok": false,
+    "opt106_reserve_ok": true,
+    "inventory_post_graph_admitted": true,
+    "reserve_ok": true,
+    "reserve_cap_increased": false,
+    "live": {
+      "ok": false,
+      "blocker": "native command failed: docker run --rm --gpus all --user 175200003:175200003 -e QW38_CUDA_TEST_TIER=acceptance -v /home/user/qw38:/workspace -w /workspace qw38-cuda:13.0.2 ./build/qw38-cuda-memory-fit-test models/Qwen3.8-27B-Q4_K_M.gguf\n\n==========\n== CUDA ==\n==========\n\nCUDA Version 13.0.2\n\nContainer image Copyright (c) 2016-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.\n\nThis container image and its contents are governed by the NVIDIA Deep Learning Container License.\nBy pulling and using the container, you accept the terms and conditions of this license:\nhttps://developer.nvidia.com/ngc/nvidia-deep-learning-container-license\n\nA copy of this license is made available in this container at /NGC-DL-CONTAINER-LICENSE for your convenience.\n\ninternal: cannot allocate CUDA scheduler session state\n"
+    },
+    "live_ok": false,
+    "explanation": "OPT-106 live sitting recorded explicit_bytes=29571258208 versus inventory 29571252064 (delta 6144 bytes). arithmetic=false so memory_fit.ok is false while reserve_ok remains true: free_bytes 3521118208 still exceed the 1.5 GiB reserve (1610612736). The discrepancy is allocator/graph-object accounting, not a capacity shortage. Do not raise the reserve cap.",
+    "status": "reconciled",
+    "native_counts": {
+      "schema_version": 1,
+      "task": "OPT-114",
+      "warmups": 0,
+      "samples": 1,
+      "observed_warmups": 0,
+      "observed_samples": 1,
+      "observed_candidates": 1,
+      "observed_shapes": 1,
+      "observed_tier": "correctness",
+      "sample_ids": [
+        0
+      ],
+      "keep": false,
+      "product": 1
+    },
+    "admission": {
+      "ok": true,
+      "result_class": "ok",
+      "message": "instrumentation-only: no speed admission",
+      "observed": {
+        "schema_version": 1,
+        "task": "OPT-114",
+        "warmups": 0,
+        "samples": 1,
+        "observed_warmups": 0,
+        "observed_samples": 1,
+        "observed_candidates": 1,
+        "observed_shapes": 1,
+        "observed_tier": "correctness",
+        "sample_ids": [
+          0
+        ],
+        "keep": false,
+        "product": 1,
+        "rounds": [],
+        "acceptance_executed": false,
+        "pairs": 0
+      }
+    }
+  },
+  "opt098_historical_calibration": {
+    "available": true,
+    "source": "historical_calibration_not_aa_control",
+    "uses_for_keep_reject": false,
+    "opt098_d128_tok_s": 37.2903061,
+    "opt106_d128_tok_s": 53.5021248,
+    "opt098_d2048_tok_s": 35.4885025,
+    "opt106_d2048_tok_s": 49.400589,
+    "opt098_p4096_tok_s": 3046.23218,
+    "opt106_p4096_tok_s": 3036.84448,
+    "note": "OPT-106 D128 53.50 tok/s versus historical OPT-098 37.29 tok/s is a sitting/calibration discrepancy, not an optimization."
+  },
+  "uses_opt098_arrays_for_keep_reject": false,
+  "production_kept": true,
+  "shipping_execution_graphs": "ffn_only",
+  "claims_throughput": false,
+  "claims_performance_improvement": false,
+  "opt074_coverage_unadmitted_blocker": false,
+  "kernel_parity_pass": true,
+  "model_quality_pass": null,
+  "performance_pass": false,
+  "report_path": "evidence/optimization/opt114-sitting-and-launch-overhead/REPORT.md",
+  "proof_limit": "fresh same-binary Quartz A/A is the control; OPT-098 arrays are historical calibration only; 3 warmups plus 10 interleaved AB/BA pairs at P4096, D128, and D2048; host launch/submit gaps are leaf CUDA-event gaps, never other_idle; other_idle is a legacy diagnostic and is not the launch budget; decode_segments8 is tested only when removable overhead is at least 0.50 ms/token at both D128 and D2048; no production selector change; no new profiling framework; do not raise the 1.5 GiB reserve cap without an allocation-backed reason; measurement_unstable stops post-106 keep/reject claims until a stable sitting exists",
+  "gpu_available": true,
+  "preflight": {
+    "selectors": {
+      "rms_norm": "parallel_fma",
+      "q4_decode": "integer_q8_late",
+      "q8_decode": "dp4a_q8_1",
+      "q8_grouping": "grouped_r1_w4",
+      "q8_decode_rows_skinny": 1,
+      "q8_decode_rows_medium": 1,
+      "q8_decode_rows_wide": 1,
+      "q8_decode_layout_warps_skinny": 4,
+      "q8_decode_layout_warps_medium": 4,
+      "q8_decode_layout_warps_wide": 4,
+      "q8_layout": "r1_w4",
+      "q6_decode": "integer_q8_1",
+      "ffn_decode": "paired_integer",
+      "query_prepare": "hoisted",
+      "attention_pipeline": "kv_once",
+      "gdn_preproc": "transpose",
+      "mmq_pipeline": "fma_async",
+      "mmq_async_x": true,
+      "ffn_prompt_pair": "off",
+      "ffn_tiles": "i128_j128",
+      "ffn_gate_quality_i": 128,
+      "ffn_gate_prompt_tile": 128,
+      "prompt_microbatch_rows": 4096,
+      "execution_graphs": "ffn_only",
+      "production_numerics": "strict",
+      "nvccflags": "-O2 --fmad=false",
+      "gdn_decode": "sequential",
+      "decode_query_prep": "warp_query",
+      "q8_device_layout": "raw_gguf",
+      "q6_device_layout": "raw_gguf",
+      "mmq_double_x": false
+    },
+    "identity": {
+      "device": "NVIDIA GeForce RTX 5090",
+      "compute_capability": "12.0",
+      "power_limit_w": 400.0,
+      "llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+      "gguf_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+      "token_generator": "(42 + index * 997) % 248320",
+      "source_revision": "7409d8640520d139cb2b59fd6b09b5bb84fbcf14",
+      "source_state": "dirty",
+      "nvccflags": "-O2 --fmad=false",
+      "execution_graphs": "ffn_only",
+      "selectors": {
+        "rms_norm": "parallel_fma",
+        "q4_decode": "integer_q8_late",
+        "q8_decode": "dp4a_q8_1",
+        "q8_grouping": "grouped_r1_w4",
+        "q8_decode_rows_skinny": 1,
+        "q8_decode_rows_medium": 1,
+        "q8_decode_rows_wide": 1,
+        "q8_decode_layout_warps_skinny": 4,
+        "q8_decode_layout_warps_medium": 4,
+        "q8_decode_layout_warps_wide": 4,
+        "q8_layout": "r1_w4",
+        "q6_decode": "integer_q8_1",
+        "ffn_decode": "paired_integer",
+        "query_prepare": "hoisted",
+        "attention_pipeline": "kv_once",
+        "gdn_preproc": "transpose",
+        "mmq_pipeline": "fma_async",
+        "mmq_async_x": true,
+        "ffn_prompt_pair": "off",
+        "ffn_tiles": "i128_j128",
+        "ffn_gate_quality_i": 128,
+        "ffn_gate_prompt_tile": 128,
+        "prompt_microbatch_rows": 4096,
+        "execution_graphs": "ffn_only",
+        "production_numerics": "strict",
+        "nvccflags": "-O2 --fmad=false",
+        "gdn_decode": "sequential",
+        "decode_query_prep": "warp_query",
+        "q8_device_layout": "raw_gguf",
+        "q6_device_layout": "raw_gguf",
+        "mmq_double_x": false
+      },
+      "clocks": {
+        "sm_clock_mhz": "2520",
+        "mem_clock_mhz": "13801",
+        "temperature_c": "60",
+        "power_draw_w": 76.93
+      },
+      "image": "qw38-cuda:13.0.2",
+      "model": "models/Qwen3.8-27B-Q4_K_M.gguf",
+      "telemetry": {
+        "device": "NVIDIA GeForce RTX 5090",
+        "device_substring": "RTX 5090",
+        "power_limit_w": 400.0,
+        "power_draw_w": 76.93,
+        "sm_clock_mhz": "2520",
+        "mem_clock_mhz": "13801",
+        "temperature_c": "60",
+        "raw": "NVIDIA GeForce RTX 5090, 400.00, 76.93, 2520, 13801, 60"
+      }
+    },
+    "gpu_available": true,
+    "gpu_blocker": null,
+    "opt098_unused_for_keep_reject": true,
+    "admission": {
+      "ok": true,
+      "result_class": "ok",
+      "message": "instrumentation-only: no speed admission",
+      "observed": {
+        "schema_version": 1,
+        "task": "OPT-114",
+        "warmups": 0,
+        "samples": 1,
+        "observed_warmups": 0,
+        "observed_samples": 1,
+        "observed_candidates": 1,
+        "observed_shapes": 1,
+        "observed_tier": "correctness",
+        "sample_ids": [
+          0
+        ],
+        "keep": false,
+        "product": 1,
+        "rounds": [],
+        "acceptance_executed": false,
+        "pairs": 0
+      }
+    },
+    "native_counts": {
+      "schema_version": 1,
+      "task": "OPT-114",
+      "warmups": 0,
+      "samples": 1,
+      "observed_warmups": 0,
+      "observed_samples": 1,
+      "observed_candidates": 1,
+      "observed_shapes": 1,
+      "observed_tier": "correctness",
+      "sample_ids": [
+        0
+      ],
+      "keep": false,
+      "product": 1
+    }
+  },
+  "report": {
+    "native_counts": {
+      "schema_version": 1,
+      "task": "OPT-114",
+      "warmups": 0,
+      "samples": 1,
+      "observed_warmups": 0,
+      "observed_samples": 1,
+      "observed_candidates": 1,
+      "observed_shapes": 1,
+      "observed_tier": "correctness",
+      "sample_ids": [
+        0
+      ],
+      "keep": false,
+      "product": 1
+    },
+    "admission": {
+      "ok": true,
+      "result_class": "ok",
+      "message": "instrumentation-only: no speed admission",
+      "observed": {
+        "schema_version": 1,
+        "task": "OPT-114",
+        "warmups": 0,
+        "samples": 1,
+        "observed_warmups": 0,
+        "observed_samples": 1,
+        "observed_candidates": 1,
+        "observed_shapes": 1,
+        "observed_tier": "correctness",
+        "sample_ids": [
+          0
+        ],
+        "keep": false,
+        "product": 1,
+        "rounds": [],
+        "acceptance_executed": false,
+        "pairs": 0
+      }
+    },
+    "report_path": "evidence/optimization/opt114-sitting-and-launch-overhead/REPORT.md"
+  }
+}
