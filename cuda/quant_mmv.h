@@ -9,6 +9,7 @@
 
 #include "ffn_decode_path.cuh"
 #include "production_numerics.h"
+#include "q4k_decode_path.cuh"
 #include "q8_decode_path.cuh"
 
 namespace qw38::cuda {
@@ -87,6 +88,16 @@ int q4k_coop_gate_up_late_occupancy(unsigned int warps_per_row) noexcept;
 void q4k_coop_gate_up_late_kernel_attributes(
     unsigned int warps_per_row, int* registers, std::size_t* local_bytes,
     std::size_t* shared_bytes, int* occupancy) noexcept;
+
+int q4k_coop_branchless_occupancy(unsigned int warps_per_row) noexcept;
+void q4k_coop_branchless_kernel_attributes(unsigned int warps_per_row,
+                                           int* registers,
+                                           std::size_t* local_bytes,
+                                           int* occupancy) noexcept;
+int q4k_coop_aligned_occupancy(unsigned int warps_per_row) noexcept;
+void q4k_coop_aligned_kernel_attributes(unsigned int warps_per_row,
+                                        int* registers, std::size_t* local_bytes,
+                                        int* occupancy) noexcept;
 
 cudaError_t launch_q4k_coop_mmv(
     const std::uint8_t* weights, std::size_t rows, std::size_t columns,
@@ -270,6 +281,15 @@ cudaError_t launch_unpack_q8_0_aligned(const std::uint8_t* soa,
                                        std::size_t output_rows,
                                        std::size_t columns, std::uint8_t* gguf,
                                        cudaStream_t stream) noexcept;
+
+cudaError_t launch_repack_q4k_aligned(const std::uint8_t* weights,
+                                      std::size_t rows, std::size_t columns,
+                                      std::uint8_t* soa,
+                                      cudaStream_t stream) noexcept;
+
+cudaError_t launch_unpack_q4k_aligned(const std::uint8_t* soa, std::size_t rows,
+                                      std::size_t columns, std::uint8_t* gguf,
+                                      cudaStream_t stream) noexcept;
 
 cudaError_t launch_q8_mmq_d2r(const std::uint8_t* soa, std::size_t output_rows,
                               std::size_t columns, const Q8Block* y,

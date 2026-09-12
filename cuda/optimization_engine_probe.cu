@@ -51,6 +51,7 @@ struct Options final {
   const char* q8_grouping = nullptr;
   const char* q8_device_layout = nullptr;
   const char* q4_decode = nullptr;
+  const char* q4_device_layout = nullptr;
   const char* ffn_decode = nullptr;
   const char* gdn_decode = nullptr;
   const char* attention_pipeline = nullptr;
@@ -116,13 +117,15 @@ bool parse_modes(const char* text, Options* options) {
 int usage(const char* argv0) {
   std::fprintf(stderr,
                "usage: %s [MODEL.gguf] [--workload tiny|tokens|prefill|decode|"
-               "q8-ab|mmq-ab|q4-ab|gdn-ab|attn-ab|grouping-ab|q8-device-ab] "
+               "q8-ab|mmq-ab|q4-ab|gdn-ab|attn-ab|grouping-ab|q8-device-ab|"
+               "q4-device-ab] "
                "[--prompt N] [--prefix N] [--output-tokens N] [--runs N] "
                "[--pairs N] [--q8-layout r1_w4|r2_w2] "
                "[--q8-grouping separate|grouped_r1_w4] "
                "[--q8-device-layout raw_gguf|aligned_soa] [--mmq-async-x 0|1] "
                "[--q4-decode packed|integer_q8|integer_q8_late|"
-               "integer_q8_factored] "
+               "integer_q8_factored|integer_q8_branchless|integer_q8_aligned] "
+               "[--q4-device-layout raw_gguf|aligned_meta] "
                "[--q4-warps 2|4] "
                "[--ffn-decode paired_staged|shared_stage|paired_integer] "
                "[--gdn-decode sequential|tile16|tile32|transposed] "
@@ -172,6 +175,9 @@ int parse_args(int argc, char** argv, Options* options) {
       options->mmq_async_x = std::atoi(argv[++index]);
     } else if (std::strcmp(arg, "--q4-decode") == 0 && index + 1 < argc) {
       options->q4_decode = argv[++index];
+    } else if (std::strcmp(arg, "--q4-device-layout") == 0 &&
+               index + 1 < argc) {
+      options->q4_device_layout = argv[++index];
     } else if (std::strcmp(arg, "--q4-warps") == 0 && index + 1 < argc) {
       options->q4_warps = static_cast<unsigned int>(std::atoi(argv[++index]));
     } else if (std::strcmp(arg, "--ffn-decode") == 0 && index + 1 < argc) {
@@ -248,7 +254,8 @@ int apply_defaults(const qw38::cuda::TestTier tier, Options* options) {
   }
   if (std::strcmp(options->workload, "q8-ab") == 0 ||
       std::strcmp(options->workload, "grouping-ab") == 0 ||
-      std::strcmp(options->workload, "q8-device-ab") == 0) {
+      std::strcmp(options->workload, "q8-device-ab") == 0 ||
+      std::strcmp(options->workload, "q4-device-ab") == 0) {
     if (options->prefix == 0) options->prefix = kScreenPrefix;
     if (options->output_tokens == 0) {
       options->output_tokens = kScreenOutputTokens;
@@ -305,7 +312,8 @@ int reject_over_bounds(qw38::cuda::TestTier tier, const Options& options) {
   const bool gdn_ab = std::strcmp(options.workload, "gdn-ab") == 0;
   const bool attn_ab = std::strcmp(options.workload, "attn-ab") == 0;
   const bool grouping_ab = std::strcmp(options.workload, "grouping-ab") == 0;
-  const bool device_ab = std::strcmp(options.workload, "q8-device-ab") == 0;
+  const bool device_ab = std::strcmp(options.workload, "q8-device-ab") == 0 ||
+                         std::strcmp(options.workload, "q4-device-ab") == 0;
   if (!tiny && !tokens && !prefill && !decode && !q8_ab && !mmq_ab && !q4_ab &&
       !gdn_ab && !attn_ab && !grouping_ab && !device_ab) {
     std::fprintf(stderr, "unknown workload %s\n", options.workload);
@@ -850,6 +858,8 @@ int run_keep_ab(const Options& options) {
   const bool grouping = std::strcmp(options.workload, "grouping-ab") == 0;
   const bool device_layout =
       std::strcmp(options.workload, "q8-device-ab") == 0;
+  const bool q4_device_layout =
+      std::strcmp(options.workload, "q4-device-ab") == 0;
   const bool q8 = std::strcmp(options.workload, "q8-ab") == 0;
   const bool q4 = std::strcmp(options.workload, "q4-ab") == 0;
   const bool gdn = std::strcmp(options.workload, "gdn-ab") == 0;
@@ -857,7 +867,8 @@ int run_keep_ab(const Options& options) {
   qw38::cuda::ResidentModel model;
   const int loaded = load_model(options.model, &model);
   if (loaded != 0) return loaded;
-  const bool decode_ab = q8 || q4 || gdn || grouping || device_layout;
+  const bool decode_ab =
+      q8 || q4 || gdn || grouping || device_layout || q4_device_layout;
   const std::size_t prompt =
       attn ? options.prompt : ((!decode_ab) ? options.prompt : 0);
   const std::size_t prefix =
@@ -876,12 +887,19 @@ int run_keep_ab(const Options& options) {
   const char* candidate_grouping = "grouped_r1_w4";
   const char* control_device = "raw_gguf";
   const char* candidate_device = "aligned_soa";
-  const char* control_q4 = "packed";
-  const char* control_ffn = "paired_staged";
+  const char* control_q4 = q4_device_layout ? "integer_q8_late" : "packed";
+  const char* control_ffn =
+      q4_device_layout ? "paired_integer" : "paired_staged";
+  const char* control_q4_layout = "raw_gguf";
   const char* candidate_q4 =
-      options.q4_decode != nullptr ? options.q4_decode : "integer_q8";
+      options.q4_decode != nullptr
+          ? options.q4_decode
+          : (q4_device_layout ? "integer_q8_aligned" : "integer_q8");
   const char* candidate_ffn =
       options.ffn_decode != nullptr ? options.ffn_decode : "paired_integer";
+  const char* candidate_q4_layout = options.q4_device_layout != nullptr
+                                        ? options.q4_device_layout
+                                        : "aligned_meta";
   const char* candidate_gdn =
       options.gdn_decode != nullptr ? options.gdn_decode : "tile16";
   const char* candidate_attn = options.attention_pipeline != nullptr
@@ -893,14 +911,17 @@ int run_keep_ab(const Options& options) {
               attn ? "attn"
                    : (gdn ? "gdn"
                           : (q4 ? "q4"
-                                : (grouping ? "grouping"
-                                            : (device_layout ? "q8_device"
-                                                             : (q8 ? "q8"
-                                                                   : "mmq"))))),
+                                : (q4_device_layout
+                                       ? "q4_device"
+                                       : (grouping ? "grouping"
+                                                   : (device_layout
+                                                          ? "q8_device"
+                                                          : (q8 ? "q8"
+                                                                : "mmq")))))),
               pairs);
   for (int pair = 0; pair < pairs; ++pair) {
     const bool ba = (pair % 2) == 1;
-    const bool numeric_side = q4 || gdn || attn;
+    const bool numeric_side = q4 || q4_device_layout || gdn || attn;
     const char* first = "0";
     const char* second = "1";
     if (numeric_side) {
@@ -933,7 +954,7 @@ int run_keep_ab(const Options& options) {
           (q8 && std::strcmp(labels[side], candidate_layout) == 0) ||
           (grouping && std::strcmp(labels[side], candidate_grouping) == 0) ||
           (device_layout && std::strcmp(labels[side], candidate_device) == 0);
-      if (q4) {
+      if (q4 || q4_device_layout) {
         const char* q4_path = candidate_side ? candidate_q4 : control_q4;
         const char* ffn_path = candidate_side ? candidate_ffn : control_ffn;
         const unsigned int warps =
@@ -943,6 +964,17 @@ int run_keep_ab(const Options& options) {
           std::fprintf(stderr, "invalid q4/ffn path %s/%s warps=%u\n", q4_path,
                        ffn_path, warps);
           return 2;
+        }
+        if (q4_device_layout) {
+          const char* layout =
+              candidate_side ? candidate_q4_layout : control_q4_layout;
+          if (!qw38::cuda::apply_q4_device_layout_ident(layout)) {
+            std::fprintf(stderr, "invalid q4 device layout %s\n", layout);
+            return 2;
+          }
+          const qw38::Status converted = model.set_q4_device_layout(
+              layout, pair == 0 && side == 0);
+          if (!converted.is_ok()) return fail_status(converted);
         }
       } else if (gdn) {
         const char* gdn_path = candidate_side ? candidate_gdn : "sequential";
@@ -1027,9 +1059,10 @@ int run_keep_ab(const Options& options) {
           "keep_ab_launch pair=%d side=%d config=%s graph_capture=true "
           "override_before_capture_applied=true recapture=true "
           "q8_layout=%s q8_grouping=%s q8_device_layout=%s q8_rows=%u mmq_kernel=%s mmq_async_x=%s "
-          "q4_path=%s ffn_path=%s gate_variant=%s up_variant=%s "
-          "down_variant=%s gate_up_stage_count=%d down_stage_count=%d "
-          "captured_in_graph=%s staging=%s warps_per_row=%u "
+          "q4_path=%s q4_device_layout=%s ffn_path=%s gate_variant=%s "
+          "up_variant=%s down_variant=%s gate_up_stage_count=%d "
+          "down_stage_count=%d captured_in_graph=%s staging=%s "
+          "warps_per_row=%u "
           "wall_ms=%.9g captured_path=%s gdn_decode=%s gdn_launch=%s "
           "gdn_tile=%u attention_pipeline=%s attention_launch=%s "
           "convert_once=%d decode_query_prep=%s decode_query_prep_launch=%s "
@@ -1039,7 +1072,8 @@ int run_keep_ab(const Options& options) {
           qw38::cuda::effective_q8_decode_grouping(),
           qw38::cuda::effective_q8_device_layout(),
           q8_rows[side], mmq_kernel_buf[side],
-          mmq_async[side] ? "true" : "false", ffn.q4_path, ffn.ffn_path,
+          mmq_async[side] ? "true" : "false", ffn.q4_path,
+          qw38::cuda::effective_q4_device_layout(), ffn.ffn_path,
           ffn.gate_variant, ffn.up_variant, ffn.down_variant,
           ffn.gate_up_stage_count, ffn.down_stage_count,
           ffn.captured_in_graph ? "true" : "false", ffn.staging,
@@ -1072,6 +1106,12 @@ int run_keep_ab(const Options& options) {
       if (!restored.is_ok()) return fail_status(restored);
       qw38::cuda::clear_q8_device_layout_override();
     }
+    if (q4_device_layout) {
+      const qw38::Status restored = model.set_q4_device_layout(
+          qw38::cuda::selected_q4_device_layout(), false);
+      if (!restored.is_ok()) return fail_status(restored);
+      qw38::cuda::clear_q4_device_layout_override();
+    }
     std::printf(
         "{\"observation_unit\":\"independent_round\",\"sample_index\":%d,"
         "\"pair\":%d,\"order\":\"%s\",\"control_ms\":%.9g,"
@@ -1086,11 +1126,15 @@ int run_keep_ab(const Options& options) {
         static_cast<double>(ba ? itl_p50[0] : itl_p50[1]),
         static_cast<double>(ba ? itl_p95[0] : itl_p95[1]),
         q4 ? "q4"
-           : (gdn ? "gdn"
-                  : (attn ? "attn"
-                          : (grouping ? "grouping"
-                                      : (device_layout ? "q8_device"
-                                                       : (q8 ? "q8" : "mmq"))))));
+           : (q4_device_layout
+                  ? "q4_device"
+                  : (gdn ? "gdn"
+                         : (attn ? "attn"
+                                 : (grouping
+                                        ? "grouping"
+                                        : (device_layout ? "q8_device"
+                                                         : (q8 ? "q8"
+                                                               : "mmq")))))));
   }
   std::printf(
       "QW38_OPT070_NATIVE_COUNTS={\"schema_version\":1,\"task\":\"OPT-070\","
@@ -1204,7 +1248,8 @@ int main(int argc, char** argv) {
       std::strcmp(options.workload, "gdn-ab") == 0 ||
       std::strcmp(options.workload, "attn-ab") == 0 ||
       std::strcmp(options.workload, "grouping-ab") == 0 ||
-      std::strcmp(options.workload, "q8-device-ab") == 0) {
+      std::strcmp(options.workload, "q8-device-ab") == 0 ||
+      std::strcmp(options.workload, "q4-device-ab") == 0) {
     return run_keep_ab(options);
   }
   return run_engine(options, tier == qw38::cuda::TestTier::kCorrectness);

@@ -350,7 +350,10 @@ class ResidentModel final {
                 std::size_t mapped_bytes) noexcept;
   Status set_q8_device_layout(const char* layout,
                               bool validate_inverse = true) noexcept;
+  Status set_q4_device_layout(const char* layout,
+                              bool validate_inverse = true) noexcept;
   const char* q8_device_layout() const noexcept { return q8_device_layout_; }
+  const char* q4_device_layout() const noexcept { return q4_device_layout_; }
   std::size_t q8_aligned_tensor_count() const noexcept {
     return q8_aligned_tensor_count_;
   }
@@ -384,9 +387,13 @@ class ResidentModel final {
   std::size_t blob_bytes_ = 0;
   float upload_ms_ = 0.0F;
   const char* q8_device_layout_ = kLegalQ8DeviceLayoutRawGguf;
+  const char* q4_device_layout_ = kLegalQ4DeviceLayoutRawGguf;
   std::size_t q8_aligned_tensor_count_ = 0;
   std::size_t q8_aligned_payload_bytes_ = 0;
   std::size_t q8_repack_scratch_peak_bytes_ = 0;
+  std::size_t q4_aligned_tensor_count_ = 0;
+  std::size_t q4_aligned_payload_bytes_ = 0;
+  std::size_t q4_repack_scratch_peak_bytes_ = 0;
   DeviceTensor embedding_;
   const float* output_norm_ = nullptr;
   DeviceTensor output_;

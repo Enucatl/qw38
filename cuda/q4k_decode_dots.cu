@@ -61,6 +61,42 @@ cudaError_t launch_q4k_coop_mmv_prequant(
     }
     return cudaErrorInvalidValue;
   }
+  if (q4_decode_uses_aligned_layout()) {
+    if (q8_1) return cudaErrorInvalidValue;
+    record_q4_launch_variant(kQ4LaunchVariantCoopQ8AlignedPrequant);
+    if (warps_per_row == 1) {
+      return q4k_dots::launch_coop_aligned<1>(weights, rows, columns, staged,
+                                              output, stream);
+    }
+    if (warps_per_row == 2) {
+      return q4k_dots::launch_coop_aligned<2>(weights, rows, columns, staged,
+                                              output, stream);
+    }
+    if (warps_per_row == 4) {
+      return q4k_dots::launch_coop_aligned<4>(weights, rows, columns, staged,
+                                              output, stream);
+    }
+    return q4k_dots::launch_coop_aligned<8>(weights, rows, columns, staged,
+                                            output, stream);
+  }
+  if (q4_decode_uses_branchless_unpack()) {
+    if (q8_1) return cudaErrorInvalidValue;
+    record_q4_launch_variant(kQ4LaunchVariantCoopQ8BranchlessPrequant);
+    if (warps_per_row == 1) {
+      return q4k_dots::launch_coop_branchless<1>(weights, rows, columns, staged,
+                                                 output, stream);
+    }
+    if (warps_per_row == 2) {
+      return q4k_dots::launch_coop_branchless<2>(weights, rows, columns, staged,
+                                                 output, stream);
+    }
+    if (warps_per_row == 4) {
+      return q4k_dots::launch_coop_branchless<4>(weights, rows, columns, staged,
+                                                 output, stream);
+    }
+    return q4k_dots::launch_coop_branchless<8>(weights, rows, columns, staged,
+                                               output, stream);
+  }
   if (q4_decode_uses_late_reduction()) {
     if (q8_1) return cudaErrorInvalidValue;
     record_q4_launch_variant(kQ4LaunchVariantCoopQ8LatePrequant);
@@ -134,6 +170,10 @@ cudaError_t launch_q4k_coop_mmv(
   if (error == cudaSuccess) {
     if (q4_decode_uses_factored_reduction()) {
       record_q4_launch_variant(kQ4LaunchVariantCoopQ8Factored);
+    } else if (q4_decode_uses_aligned_layout()) {
+      record_q4_launch_variant(kQ4LaunchVariantCoopQ8Aligned);
+    } else if (q4_decode_uses_branchless_unpack()) {
+      record_q4_launch_variant(kQ4LaunchVariantCoopQ8Branchless);
     } else if (q4_decode_uses_late_reduction()) {
       record_q4_launch_variant(kQ4LaunchVariantCoopQ8Late);
     } else {
@@ -240,6 +280,24 @@ cudaError_t launch_q4k_coop_gate_up_swiglu_prequant_q8(
           gate_weights, up_weights, rows, columns, q8, output, stream);
     }
     return q4k_dots::launch_coop_gate_up_factored<4>(
+        gate_weights, up_weights, rows, columns, q8, output, stream);
+  }
+  if (q4_decode_uses_aligned_layout()) {
+    record_q4_launch_variant(kQ4LaunchVariantPairedIntegerQ8Aligned);
+    if (warps_per_row == 2) {
+      return q4k_dots::launch_coop_gate_up_aligned<2>(
+          gate_weights, up_weights, rows, columns, q8, output, stream);
+    }
+    return q4k_dots::launch_coop_gate_up_aligned<4>(
+        gate_weights, up_weights, rows, columns, q8, output, stream);
+  }
+  if (q4_decode_uses_branchless_unpack()) {
+    record_q4_launch_variant(kQ4LaunchVariantPairedIntegerQ8Branchless);
+    if (warps_per_row == 2) {
+      return q4k_dots::launch_coop_gate_up_branchless<2>(
+          gate_weights, up_weights, rows, columns, q8, output, stream);
+    }
+    return q4k_dots::launch_coop_gate_up_branchless<4>(
         gate_weights, up_weights, rows, columns, q8, output, stream);
   }
   if (q4_decode_uses_late_reduction()) {
@@ -391,6 +449,73 @@ void q4k_coop_gate_up_late_kernel_attributes(
   }
   if (occupancy != nullptr) {
     *occupancy = q4k_coop_gate_up_late_occupancy(warps_per_row);
+  }
+}
+
+int q4k_coop_branchless_occupancy(unsigned int warps_per_row) noexcept {
+  int occupancy = 0;
+  cudaError_t error = cudaErrorInvalidValue;
+  const int threads = static_cast<int>(warps_per_row) * kWarpSize;
+  if (warps_per_row == 4) {
+    error = cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+        &occupancy, q4k_dots::q4k_coop_mmv_branchless<4>, threads, 0);
+  }
+  if (error != cudaSuccess) return 0;
+  return occupancy;
+}
+
+void q4k_coop_branchless_kernel_attributes(unsigned int warps_per_row,
+                                           int* registers,
+                                           std::size_t* local_bytes,
+                                           int* occupancy) noexcept {
+  cudaFuncAttributes attrs{};
+  cudaError_t error = cudaErrorInvalidValue;
+  if (warps_per_row == 4) {
+    error = cudaFuncGetAttributes(&attrs, q4k_dots::q4k_coop_mmv_branchless<4>);
+  }
+  if (registers != nullptr) {
+    *registers = error == cudaSuccess ? attrs.numRegs : 0;
+  }
+  if (local_bytes != nullptr) {
+    *local_bytes = error == cudaSuccess
+                       ? static_cast<std::size_t>(attrs.localSizeBytes)
+                       : 0;
+  }
+  if (occupancy != nullptr) {
+    *occupancy = q4k_coop_branchless_occupancy(warps_per_row);
+  }
+}
+
+int q4k_coop_aligned_occupancy(unsigned int warps_per_row) noexcept {
+  int occupancy = 0;
+  cudaError_t error = cudaErrorInvalidValue;
+  const int threads = static_cast<int>(warps_per_row) * kWarpSize;
+  if (warps_per_row == 4) {
+    error = cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+        &occupancy, q4k_dots::q4k_coop_mmv_aligned<4>, threads, 0);
+  }
+  if (error != cudaSuccess) return 0;
+  return occupancy;
+}
+
+void q4k_coop_aligned_kernel_attributes(unsigned int warps_per_row,
+                                        int* registers, std::size_t* local_bytes,
+                                        int* occupancy) noexcept {
+  cudaFuncAttributes attrs{};
+  cudaError_t error = cudaErrorInvalidValue;
+  if (warps_per_row == 4) {
+    error = cudaFuncGetAttributes(&attrs, q4k_dots::q4k_coop_mmv_aligned<4>);
+  }
+  if (registers != nullptr) {
+    *registers = error == cudaSuccess ? attrs.numRegs : 0;
+  }
+  if (local_bytes != nullptr) {
+    *local_bytes = error == cudaSuccess
+                       ? static_cast<std::size_t>(attrs.localSizeBytes)
+                       : 0;
+  }
+  if (occupancy != nullptr) {
+    *occupancy = q4k_coop_aligned_occupancy(warps_per_row);
   }
 }
 

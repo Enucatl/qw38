@@ -5,6 +5,8 @@
 
 #include <cstring>
 
+#include "q4k_aligned_layout.cuh"
+
 namespace qw38::cuda {
 
 constexpr char kLegalQ4DecodePathPacked[] = "packed";
@@ -14,8 +16,14 @@ constexpr char kLegalQ4DecodePathIntegerQ81[] = "integer_q8_1";
 // path; half-scale Q8_1 stays out of it.
 constexpr char kLegalQ4DecodePathIntegerQ8Late[] = "integer_q8_late";
 // OPT-093 paired-group factored scale/min. Technique from pinned llama
-// vecdotq.cuh::vec_dot_q4_K_q8_1_impl_vmmq (cc83d7b, MIT).
+// vecdotq.cuh::vec_dot_q4_K_q8_1_impl_vmmq (cc83d7b, MIT). Rejected; not an
+// OPT-102 candidate.
 constexpr char kLegalQ4DecodePathIntegerQ8Factored[] = "integer_q8_factored";
+// OPT-102 branchless 6-bit scale/min unpack, late_w4 association, raw GGUF.
+constexpr char kLegalQ4DecodePathIntegerQ8Branchless[] = "integer_q8_branchless";
+// OPT-102 aligned metadata/code-plane layout + branchless unpack, late
+// association. OPT-093 factored pairing is not selected.
+constexpr char kLegalQ4DecodePathIntegerQ8Aligned[] = "integer_q8_aligned";
 
 // OPT-072 typed Q8_1 pairing: the UseQ81 Q4 consumer treats stored q8_sum as
 // integer sum(q). A sum(x) producer must not feed that consumer. Production
@@ -48,15 +56,27 @@ constexpr char kQ4LaunchVariantCoopQ8FactoredPrequant[] =
     "q4k_coop_mmv_factored_prequant_q8";
 constexpr char kQ4LaunchVariantPairedIntegerQ8Factored[] =
     "q4k_coop_gate_up_swiglu_factored_prequant_q8";
+constexpr char kQ4LaunchVariantCoopQ8Branchless[] = "q4k_coop_mmv_branchless_q8";
+constexpr char kQ4LaunchVariantCoopQ8BranchlessPrequant[] =
+    "q4k_coop_mmv_branchless_prequant_q8";
+constexpr char kQ4LaunchVariantPairedIntegerQ8Branchless[] =
+    "q4k_coop_gate_up_swiglu_branchless_prequant_q8";
+constexpr char kQ4LaunchVariantCoopQ8Aligned[] = "q4k_coop_mmv_aligned_q8";
+constexpr char kQ4LaunchVariantCoopQ8AlignedPrequant[] =
+    "q4k_coop_mmv_aligned_prequant_q8";
+constexpr char kQ4LaunchVariantPairedIntegerQ8Aligned[] =
+    "q4k_coop_gate_up_swiglu_aligned_prequant_q8";
 
 constexpr int kQ4LaunchTraceCapacity = 8;
 
-// Production pin. Keep sitting may switch away from packed; reject restores it.
+// Production pin. Keep sitting may switch away from late_w4; reject restores it.
 constexpr char kSelectedQ4DecodePath[] = "integer_q8_late";
 constexpr unsigned int kSelectedQ4DecodeWarpsPerRow = 4;
+constexpr char kSelectedQ4DeviceLayout[] = "raw_gguf";
 
 inline thread_local const char* g_q4_decode_path_override = nullptr;
 inline thread_local unsigned int g_q4_decode_warps_override = 0;
+inline thread_local const char* g_q4_device_layout_override = nullptr;
 inline thread_local const char* g_last_q4_launch_variant = "";
 inline thread_local const char* g_q4_launch_trace[kQ4LaunchTraceCapacity]{};
 inline thread_local int g_q4_launch_trace_count = 0;
@@ -67,7 +87,15 @@ inline bool legal_q4_decode_path(const char* path) noexcept {
           std::strcmp(path, kLegalQ4DecodePathIntegerQ8) == 0 ||
           std::strcmp(path, kLegalQ4DecodePathIntegerQ81) == 0 ||
           std::strcmp(path, kLegalQ4DecodePathIntegerQ8Late) == 0 ||
-          std::strcmp(path, kLegalQ4DecodePathIntegerQ8Factored) == 0);
+          std::strcmp(path, kLegalQ4DecodePathIntegerQ8Factored) == 0 ||
+          std::strcmp(path, kLegalQ4DecodePathIntegerQ8Branchless) == 0 ||
+          std::strcmp(path, kLegalQ4DecodePathIntegerQ8Aligned) == 0);
+}
+
+inline bool legal_q4_device_layout(const char* layout) noexcept {
+  return layout != nullptr &&
+         (std::strcmp(layout, kLegalQ4DeviceLayoutRawGguf) == 0 ||
+          std::strcmp(layout, kLegalQ4DeviceLayoutAlignedMeta) == 0);
 }
 
 inline bool legal_q4_decode_warps_per_row(unsigned int warps) noexcept {
@@ -82,9 +110,18 @@ inline unsigned int selected_q4_decode_warps_per_row() noexcept {
   return kSelectedQ4DecodeWarpsPerRow;
 }
 
+inline const char* selected_q4_device_layout() noexcept {
+  return kSelectedQ4DeviceLayout;
+}
+
 inline const char* effective_q4_decode_path() noexcept {
   return g_q4_decode_path_override != nullptr ? g_q4_decode_path_override
                                               : kSelectedQ4DecodePath;
+}
+
+inline const char* effective_q4_device_layout() noexcept {
+  return g_q4_device_layout_override != nullptr ? g_q4_device_layout_override
+                                                : kSelectedQ4DeviceLayout;
 }
 
 inline unsigned int effective_q4_decode_warps_per_row() noexcept {
@@ -97,7 +134,9 @@ inline bool q4_decode_path_is_integer(const char* path) noexcept {
          (std::strcmp(path, kLegalQ4DecodePathIntegerQ8) == 0 ||
           std::strcmp(path, kLegalQ4DecodePathIntegerQ81) == 0 ||
           std::strcmp(path, kLegalQ4DecodePathIntegerQ8Late) == 0 ||
-          std::strcmp(path, kLegalQ4DecodePathIntegerQ8Factored) == 0);
+          std::strcmp(path, kLegalQ4DecodePathIntegerQ8Factored) == 0 ||
+          std::strcmp(path, kLegalQ4DecodePathIntegerQ8Branchless) == 0 ||
+          std::strcmp(path, kLegalQ4DecodePathIntegerQ8Aligned) == 0);
 }
 
 inline bool q4_decode_uses_integer() noexcept {
@@ -119,12 +158,32 @@ inline bool q4_decode_uses_factored_reduction() noexcept {
                      kLegalQ4DecodePathIntegerQ8Factored) == 0;
 }
 
+inline bool q4_decode_uses_branchless_unpack() noexcept {
+  const char* path = effective_q4_decode_path();
+  return std::strcmp(path, kLegalQ4DecodePathIntegerQ8Branchless) == 0 ||
+         std::strcmp(path, kLegalQ4DecodePathIntegerQ8Aligned) == 0;
+}
+
+inline bool q4_decode_uses_aligned_layout() noexcept {
+  return std::strcmp(effective_q4_decode_path(),
+                     kLegalQ4DecodePathIntegerQ8Aligned) == 0 ||
+         std::strcmp(effective_q4_device_layout(),
+                     kLegalQ4DeviceLayoutAlignedMeta) == 0;
+}
+
+inline bool q4_device_uses_aligned_meta() noexcept {
+  return std::strcmp(effective_q4_device_layout(),
+                     kLegalQ4DeviceLayoutAlignedMeta) == 0;
+}
+
 // Q8Block integer cooperative dots. Distinct from half-scale Q8_1.
 inline bool q4_decode_uses_integer_q8block() noexcept {
   const char* path = effective_q4_decode_path();
   return std::strcmp(path, kLegalQ4DecodePathIntegerQ8) == 0 ||
          std::strcmp(path, kLegalQ4DecodePathIntegerQ8Late) == 0 ||
-         std::strcmp(path, kLegalQ4DecodePathIntegerQ8Factored) == 0;
+         std::strcmp(path, kLegalQ4DecodePathIntegerQ8Factored) == 0 ||
+         std::strcmp(path, kLegalQ4DecodePathIntegerQ8Branchless) == 0 ||
+         std::strcmp(path, kLegalQ4DecodePathIntegerQ8Aligned) == 0;
 }
 
 inline void record_q4_launch_variant(const char* variant) noexcept {
@@ -161,6 +220,16 @@ inline void set_q4_decode_path_override(const char* path,
   g_q4_decode_warps_override = warps_per_row;
 }
 
+inline void set_q4_device_layout_override(const char* layout) noexcept {
+  g_q4_device_layout_override = layout;
+}
+
+inline bool apply_q4_device_layout_ident(const char* ident) noexcept {
+  if (!legal_q4_device_layout(ident)) return false;
+  set_q4_device_layout_override(ident);
+  return true;
+}
+
 inline bool apply_q4_decode_ident(const char* path,
                                   unsigned int warps_per_row) noexcept {
   if (!legal_q4_decode_path(path) ||
@@ -176,6 +245,10 @@ inline void clear_q4_decode_path_override() noexcept {
   g_q4_decode_warps_override = 0;
 }
 
+inline void clear_q4_device_layout_override() noexcept {
+  g_q4_device_layout_override = nullptr;
+}
+
 struct Q4DecodePathScope final {
   Q4DecodePathScope(const char* path, unsigned int warps_per_row) noexcept {
     set_q4_decode_path_override(path, warps_per_row);
@@ -183,6 +256,15 @@ struct Q4DecodePathScope final {
   ~Q4DecodePathScope() { clear_q4_decode_path_override(); }
   Q4DecodePathScope(const Q4DecodePathScope&) = delete;
   Q4DecodePathScope& operator=(const Q4DecodePathScope&) = delete;
+};
+
+struct Q4DeviceLayoutScope final {
+  explicit Q4DeviceLayoutScope(const char* layout) noexcept {
+    set_q4_device_layout_override(layout);
+  }
+  ~Q4DeviceLayoutScope() { clear_q4_device_layout_override(); }
+  Q4DeviceLayoutScope(const Q4DeviceLayoutScope&) = delete;
+  Q4DeviceLayoutScope& operator=(const Q4DeviceLayoutScope&) = delete;
 };
 
 }  // namespace qw38::cuda

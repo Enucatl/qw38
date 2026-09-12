@@ -41,6 +41,8 @@
 
 #include "mma.cuh"
 #include "pdl_launch.cuh"
+#include "q4k_aligned_layout.cuh"
+#include "q4k_decode_path.cuh"
 #include "quant_mmv.h"
 
 #include <cstdio>
@@ -60,6 +62,17 @@ constexpr std::size_t kMmaQ6Bytes = 210;
 constexpr std::size_t kMmaQ8Bytes = 34;
 constexpr std::size_t kMmaBlockValues = 256;
 constexpr std::size_t kMmaQ8Values = 32;
+
+__constant__ int g_q4_mmq_aligned_meta = 0;
+
+__device__ __forceinline__ bool q4_mmq_uses_aligned_meta() {
+  return g_q4_mmq_aligned_meta != 0;
+}
+
+cudaError_t bind_q4_mmq_aligned_meta() noexcept {
+  const int flag = q4_device_uses_aligned_meta() ? 1 : 0;
+  return cudaMemcpyToSymbol(g_q4_mmq_aligned_meta, &flag, sizeof(flag));
+}
 
 __device__ float mma_read_half(const std::uint8_t* bytes) {
   const unsigned short bits = static_cast<unsigned short>(bytes[0]) |
@@ -525,6 +538,64 @@ __device__ __forceinline__ void quality_unpack_q4_kb(
   }
 }
 
+template <int QualityI, bool Fallback>
+__device__ __forceinline__ void quality_unpack_q4_kb_aligned(
+    int* x_qs, const std::uint8_t* soa, std::size_t output_rows,
+    std::size_t columns, std::size_t out0, int kb0, int i_max, int lane) {
+  constexpr int kSram = kQualitySramQ4;
+  const Q4KAlignedLayoutDesc desc =
+      make_q4k_aligned_layout_desc(output_rows, columns);
+#pragma unroll
+  for (int i0 = 0; i0 < QualityI; i0 += kQualityNwarps) {
+    int i = i0 + threadIdx.y;
+    if (Fallback) i = min(i, max(i_max, 0));
+    const std::size_t global_row = out0 + static_cast<std::size_t>(i);
+    int qs0 = 0;
+    if (!Fallback || global_row < output_rows) {
+      const std::size_t block =
+          global_row * desc.n_blocks_per_row + static_cast<std::size_t>(kb0);
+      const std::uint8_t* qs = soa + desc.qs_offset + block * kQ4KQsBytes;
+      qs0 = quality_get_int_b4(qs, lane);
+    }
+    x_qs[i * kSram + 16 * (lane / 8) + (lane % 8) + 0] =
+        (qs0 >> 0) & 0x0F0F0F0F;
+    x_qs[i * kSram + 16 * (lane / 8) + (lane % 8) + 8] =
+        (qs0 >> 4) & 0x0F0F0F0F;
+  }
+#pragma unroll
+  for (int i0 = 0; i0 < QualityI; i0 += kQualityNwarps * 16) {
+    int i = (i0 + threadIdx.y * 16 + lane / 2) % QualityI;
+    if (Fallback) i = min(i, max(i_max, 0));
+    const std::size_t global_row = out0 + static_cast<std::size_t>(i);
+    half2* dm = reinterpret_cast<half2*>(x_qs + i * kSram + 2 * kMmqTileNeK);
+    const int ksc = lane % 2;
+    if (!Fallback || global_row < output_rows) {
+      const std::size_t block =
+          global_row * desc.n_blocks_per_row + static_cast<std::size_t>(kb0);
+      const std::uint8_t* dm_bytes = soa + block * kQ4KDmBytes;
+      const std::uint8_t* scales =
+          soa + desc.scale_offset + block * kQ4KScaleBytes;
+      const int* sc_words = reinterpret_cast<const int*>(scales);
+      const int sc32 = unpack_scales_q45_K(sc_words, ksc + 0);
+      const int m32 = unpack_scales_q45_K(sc_words, ksc + 2);
+      const std::uint8_t* sc8 = reinterpret_cast<const std::uint8_t*>(&sc32);
+      const std::uint8_t* m8 = reinterpret_cast<const std::uint8_t*>(&m32);
+      const float d = mma_read_half(dm_bytes);
+      const float dmin = mma_read_half(dm_bytes + 2);
+#pragma unroll
+      for (int l = 0; l < 4; ++l) {
+        dm[4 * ksc + l] = make_half2(d * static_cast<float>(sc8[l]),
+                                    -dmin * static_cast<float>(m8[l]));
+      }
+    } else {
+#pragma unroll
+      for (int l = 0; l < 4; ++l) {
+        dm[4 * ksc + l] = make_half2(0.0F, 0.0F);
+      }
+    }
+  }
+}
+
 constexpr std::size_t soa_dq_bytes(std::size_t output_rows,
                                    std::size_t columns) noexcept {
   return output_rows * (columns / 32) * sizeof(half);
@@ -584,6 +655,54 @@ __global__ void unpack_q8_0_aligned_kernel(const std::uint8_t* soa,
   for (int lane = 0; lane < 32; ++lane) {
     dst[2 + lane] = static_cast<std::uint8_t>(qs[lane]);
   }
+}
+
+__global__ void repack_q4k_aligned_kernel(const std::uint8_t* weights,
+                                          std::size_t rows, std::size_t columns,
+                                          std::uint8_t* soa) {
+  const Q4KAlignedLayoutDesc desc = make_q4k_aligned_layout_desc(rows, columns);
+  const std::size_t index =
+      static_cast<std::size_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+  if (index >= desc.n_blocks) return;
+  const std::uint8_t* src = weights + index * kQ4KGgufBlockBytes;
+  reinterpret_cast<std::uint32_t*>(soa)[index] =
+      *reinterpret_cast<const std::uint32_t*>(src);
+  std::uint32_t* scales = reinterpret_cast<std::uint32_t*>(
+      soa + desc.scale_offset + index * kQ4KScaleBytes);
+  const std::uint32_t* src_sc =
+      reinterpret_cast<const std::uint32_t*>(src + kQ4KDmBytes);
+  scales[0] = src_sc[0];
+  scales[1] = src_sc[1];
+  scales[2] = src_sc[2];
+  std::uint32_t* qs = reinterpret_cast<std::uint32_t*>(
+      soa + desc.qs_offset + index * kQ4KQsBytes);
+  const std::uint32_t* src_qs =
+      reinterpret_cast<const std::uint32_t*>(src + 16);
+#pragma unroll
+  for (int word = 0; word < 32; ++word) qs[word] = src_qs[word];
+}
+
+__global__ void unpack_q4k_aligned_kernel(const std::uint8_t* soa,
+                                          std::size_t rows, std::size_t columns,
+                                          std::uint8_t* gguf) {
+  const Q4KAlignedLayoutDesc desc = make_q4k_aligned_layout_desc(rows, columns);
+  const std::size_t index =
+      static_cast<std::size_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+  if (index >= desc.n_blocks) return;
+  std::uint8_t* dst = gguf + index * kQ4KGgufBlockBytes;
+  *reinterpret_cast<std::uint32_t*>(dst) =
+      reinterpret_cast<const std::uint32_t*>(soa)[index];
+  std::uint32_t* dst_sc = reinterpret_cast<std::uint32_t*>(dst + kQ4KDmBytes);
+  const std::uint32_t* scales = reinterpret_cast<const std::uint32_t*>(
+      soa + desc.scale_offset + index * kQ4KScaleBytes);
+  dst_sc[0] = scales[0];
+  dst_sc[1] = scales[1];
+  dst_sc[2] = scales[2];
+  std::uint32_t* dst_qs = reinterpret_cast<std::uint32_t*>(dst + 16);
+  const std::uint32_t* qs = reinterpret_cast<const std::uint32_t*>(
+      soa + desc.qs_offset + index * kQ4KQsBytes);
+#pragma unroll
+  for (int word = 0; word < 32; ++word) dst_qs[word] = qs[word];
 }
 
 constexpr int quality_rows_per_warp(int prompt_tile) {
@@ -869,7 +988,9 @@ __device__ __forceinline__ void quality_mma_process_tile(
   __syncthreads();
 
   if constexpr (kAsyncX) {
-    mmq_load_raw_q4_async<QualityI>(raw_x, weight_row0, row_stride, kb0_start);
+    if (!q4_mmq_uses_aligned_meta()) {
+      mmq_load_raw_q4_async<QualityI>(raw_x, weight_row0, row_stride, kb0_start);
+    }
   }
   if constexpr (kAsyncY) {
     const int* y0 =
@@ -883,14 +1004,24 @@ __device__ __forceinline__ void quality_mma_process_tile(
     __syncthreads();
   }
   if constexpr (kAsyncX) {
-    quality_unpack_q4_kb<QualityI, Fallback>(
-        x_qs, raw_x, kMmaQ4Bytes, out0, output_rows, i_max, lane);
+    if (q4_mmq_uses_aligned_meta()) {
+      quality_unpack_q4_kb_aligned<QualityI, Fallback>(
+          x_qs, weights, output_rows, columns, out0, kb0_start, i_max, lane);
+    } else {
+      quality_unpack_q4_kb<QualityI, Fallback>(
+          x_qs, raw_x, kMmaQ4Bytes, out0, output_rows, i_max, lane);
+    }
     __syncthreads();
   }
 
   for (int kb0 = kb0_start; kb0 < kb0_stop; ++kb0) {
     if constexpr (Kind == QuantKind::kQ4K) {
-      if constexpr (!kAsyncX) {
+      if (q4_mmq_uses_aligned_meta()) {
+        if constexpr (!kAsyncX) {
+          quality_unpack_q4_kb_aligned<QualityI, Fallback>(
+              x_qs, weights, output_rows, columns, out0, kb0, i_max, lane);
+        }
+      } else if constexpr (!kAsyncX) {
         quality_unpack_q4_kb<QualityI, Fallback>(
             x_qs, weight_row0 + static_cast<std::size_t>(kb0) * kWeightBytes,
             row_stride, out0, output_rows, i_max, lane);
@@ -1031,8 +1162,10 @@ __device__ __forceinline__ void quality_mma_process_tile(
         if constexpr (UseSplitXYWait && kAsyncX) {
           if (issued_y && issue_x) {
             mmq_cp_async_commit();
-            mmq_load_raw_q4_async<QualityI>(raw_x, weight_row0, row_stride,
-                                            kb0 + 1);
+            if (!q4_mmq_uses_aligned_meta()) {
+              mmq_load_raw_q4_async<QualityI>(raw_x, weight_row0, row_stride,
+                                              kb0 + 1);
+            }
             mmq_cp_async_commit();
           } else if (issued_y) {
             mmq_cp_async_commit();
@@ -1040,8 +1173,10 @@ __device__ __forceinline__ void quality_mma_process_tile(
         } else {
           bool issued = issued_y;
           if (issue_x) {
-            mmq_load_raw_q4_async<QualityI>(raw_x, weight_row0, row_stride,
-                                            kb0 + 1);
+            if (!q4_mmq_uses_aligned_meta()) {
+              mmq_load_raw_q4_async<QualityI>(raw_x, weight_row0, row_stride,
+                                              kb0 + 1);
+            }
             issued = true;
           }
           if (issued) mmq_cp_async_commit();
@@ -1248,8 +1383,10 @@ __device__ __forceinline__ void quality_mma_process_tile(
       } else {
         if constexpr (kAsyncX) {
           if (half == 0 && kb0 + 1 < kb0_stop) {
-            mmq_load_raw_q4_async<QualityI>(raw_x, weight_row0, row_stride,
-                                            kb0 + 1);
+            if (!q4_mmq_uses_aligned_meta()) {
+              mmq_load_raw_q4_async<QualityI>(raw_x, weight_row0, row_stride,
+                                              kb0 + 1);
+            }
             mmq_cp_async_commit();
             mmq_cp_async_wait();
           }
@@ -1262,8 +1399,13 @@ __device__ __forceinline__ void quality_mma_process_tile(
         if constexpr (UseSplitXYWait) {
           mmq_cp_async_wait();
         }
-        quality_unpack_q4_kb<QualityI, Fallback>(
-            x_qs, raw_x, kMmaQ4Bytes, out0, output_rows, i_max, lane);
+        if (q4_mmq_uses_aligned_meta()) {
+          quality_unpack_q4_kb_aligned<QualityI, Fallback>(
+              x_qs, weights, output_rows, columns, out0, kb0 + 1, i_max, lane);
+        } else {
+          quality_unpack_q4_kb<QualityI, Fallback>(
+              x_qs, raw_x, kMmaQ4Bytes, out0, output_rows, i_max, lane);
+        }
         __syncthreads();
       }
     }
@@ -1381,9 +1523,14 @@ __global__ void __launch_bounds__(256, 1) quant_mmq_mma_q4_paired_swiglu_kernel(
                                               k1);
     __syncthreads();
 
-    quality_unpack_q4_kb<QualityI, Fallback>(
-        x_qs, gate_row0 + static_cast<std::size_t>(kb0) * kMmaQ4Bytes,
-        row_stride, out0, output_rows, i_max, lane);
+    if (q4_mmq_uses_aligned_meta()) {
+      quality_unpack_q4_kb_aligned<QualityI, Fallback>(
+          x_qs, gate_weights, output_rows, columns, out0, kb0, i_max, lane);
+    } else {
+      quality_unpack_q4_kb<QualityI, Fallback>(
+          x_qs, gate_row0 + static_cast<std::size_t>(kb0) * kMmaQ4Bytes,
+          row_stride, out0, output_rows, i_max, lane);
+    }
     __syncthreads();
     quality_mma_q4_accumulate_half<PromptTile, QualityI, UseFma>(
         gate_sum, x_qs, tile_y0, 0);
@@ -1391,9 +1538,14 @@ __global__ void __launch_bounds__(256, 1) quant_mmq_mma_q4_paired_swiglu_kernel(
         gate_sum, x_qs, tile_y1, 1);
     __syncthreads();
 
-    quality_unpack_q4_kb<QualityI, Fallback>(
-        x_qs, up_row0 + static_cast<std::size_t>(kb0) * kMmaQ4Bytes, row_stride,
-        out0, output_rows, i_max, lane);
+    if (q4_mmq_uses_aligned_meta()) {
+      quality_unpack_q4_kb_aligned<QualityI, Fallback>(
+          x_qs, up_weights, output_rows, columns, out0, kb0, i_max, lane);
+    } else {
+      quality_unpack_q4_kb<QualityI, Fallback>(
+          x_qs, up_row0 + static_cast<std::size_t>(kb0) * kMmaQ4Bytes, row_stride,
+          out0, output_rows, i_max, lane);
+    }
     __syncthreads();
     quality_mma_q4_accumulate_half<PromptTile, QualityI, UseFma>(
         up_sum, x_qs, tile_y0, 0);
@@ -1441,6 +1593,8 @@ cudaError_t launch_q4_paired_swiglu_kernel(
     std::size_t output_rows, std::size_t columns, const int* y,
     std::size_t prompt_rows, __nv_bfloat16* activated, float* gate_dump,
     float* up_dump, bool fallback, cudaStream_t stream) noexcept {
+  const cudaError_t bound = bind_q4_mmq_aligned_meta();
+  if (bound != cudaSuccess) return bound;
   const dim3 grid(
       static_cast<unsigned int>((output_rows + kPairedQualityI - 1) /
                                 kPairedQualityI),
@@ -1599,6 +1753,10 @@ cudaError_t launch_quality_mma_stream_k(
     const std::uint8_t* weights, std::size_t output_rows, std::size_t columns,
     const int* y, std::size_t prompt_rows, float* output, float* tmp_fixup,
     int nblocks, bool fixup_needed, cudaStream_t stream) noexcept {
+  if constexpr (Kind == QuantKind::kQ4K) {
+    const cudaError_t bound = bind_q4_mmq_aligned_meta();
+    if (bound != cudaSuccess) return bound;
+  }
   const int nty =
       static_cast<int>((output_rows + QualityI - 1) / QualityI);
   const int ntx =
@@ -1714,6 +1872,10 @@ cudaError_t launch_quality_mma(
     const std::uint8_t* weights, std::size_t output_rows, std::size_t columns,
     const int* y, std::size_t prompt_rows, float* output,
     cudaStream_t stream) noexcept {
+  if constexpr (Kind == QuantKind::kQ4K) {
+    const cudaError_t bound = bind_q4_mmq_aligned_meta();
+    if (bound != cudaSuccess) return bound;
+  }
   const dim3 grid(
       static_cast<unsigned int>((output_rows + QualityI - 1) / QualityI),
       static_cast<unsigned int>((prompt_rows + PromptTile - 1) / PromptTile));
@@ -2863,6 +3025,39 @@ cudaError_t launch_unpack_q8_0_aligned(const std::uint8_t* soa,
       static_cast<std::size_t>(kQualityQuantThreads));
   unpack_q8_0_aligned_kernel<<<blocks, kQualityQuantThreads, 0, stream>>>(
       soa, output_rows, columns, gguf);
+  return cudaPeekAtLastError();
+}
+
+cudaError_t launch_repack_q4k_aligned(const std::uint8_t* weights,
+                                      std::size_t rows, std::size_t columns,
+                                      std::uint8_t* soa,
+                                      cudaStream_t stream) noexcept {
+  if (weights == nullptr || soa == nullptr ||
+      !q4k_aligned_geometry_ok(rows, columns)) {
+    return cudaErrorInvalidValue;
+  }
+  const Q4KAlignedLayoutDesc desc = make_q4k_aligned_layout_desc(rows, columns);
+  const unsigned int blocks = static_cast<unsigned int>(
+      (desc.n_blocks + static_cast<std::size_t>(kQualityQuantThreads) - 1) /
+      static_cast<std::size_t>(kQualityQuantThreads));
+  repack_q4k_aligned_kernel<<<blocks, kQualityQuantThreads, 0, stream>>>(
+      weights, rows, columns, soa);
+  return cudaPeekAtLastError();
+}
+
+cudaError_t launch_unpack_q4k_aligned(const std::uint8_t* soa, std::size_t rows,
+                                      std::size_t columns, std::uint8_t* gguf,
+                                      cudaStream_t stream) noexcept {
+  if (soa == nullptr || gguf == nullptr ||
+      !q4k_aligned_geometry_ok(rows, columns)) {
+    return cudaErrorInvalidValue;
+  }
+  const Q4KAlignedLayoutDesc desc = make_q4k_aligned_layout_desc(rows, columns);
+  const unsigned int blocks = static_cast<unsigned int>(
+      (desc.n_blocks + static_cast<std::size_t>(kQualityQuantThreads) - 1) /
+      static_cast<std::size_t>(kQualityQuantThreads));
+  unpack_q4k_aligned_kernel<<<blocks, kQualityQuantThreads, 0, stream>>>(
+      soa, rows, columns, gguf);
   return cudaPeekAtLastError();
 }
 

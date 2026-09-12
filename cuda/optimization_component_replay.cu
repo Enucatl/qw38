@@ -65,6 +65,7 @@ struct Options final {
   const char* q8_grouping = nullptr;
   const char* q8_device_layout = nullptr;
   const char* q4_decode = nullptr;
+  const char* q4_device_layout = nullptr;
   const char* ffn_decode = nullptr;
   const char* gdn_decode = nullptr;
   const char* decode_query_prep = nullptr;
@@ -87,8 +88,9 @@ int usage(const char* argv0) {
                "[--cache-mode hot|rotating] [--capture-key KEY] "
                "[--q8-layout r1_w4|r2_w2] [--q8-grouping separate|grouped_r1_w4] "
                "[--q8-device-layout raw_gguf|aligned_soa] [--mmq-async-x 0|1] "
-               "[--q4-decode packed|integer_q8|integer_q8_late|integer_q8_factored] "
-               "[--q4-warps 2|4] "
+               "[--q4-decode packed|integer_q8|integer_q8_late|integer_q8_factored|"
+               "integer_q8_branchless|integer_q8_aligned] "
+               "[--q4-device-layout raw_gguf|aligned_meta] [--q4-warps 2|4] "
                "[--ffn-decode paired_staged|shared_stage|paired_integer] "
                "[--gdn-decode sequential|tile16|tile32|transposed] "
                "[--decode-query-prep warp_query|prepared_q|prepared_q_veckv] "
@@ -120,6 +122,9 @@ int parse_args(int argc, char** argv, Options* options) {
       options->mmq_async_x = std::atoi(argv[++index]);
     } else if (std::strcmp(arg, "--q4-decode") == 0 && index + 1 < argc) {
       options->q4_decode = argv[++index];
+    } else if (std::strcmp(arg, "--q4-device-layout") == 0 &&
+               index + 1 < argc) {
+      options->q4_device_layout = argv[++index];
     } else if (std::strcmp(arg, "--q4-warps") == 0 && index + 1 < argc) {
       options->q4_warps = static_cast<unsigned int>(std::atoi(argv[++index]));
     } else if (std::strcmp(arg, "--ffn-decode") == 0 && index + 1 < argc) {
@@ -1986,11 +1991,12 @@ int time_family(qw38::cuda::ResidentModel* model,
       "ffn_dispatch gate_variant=%s up_variant=%s down_variant=%s "
       "gate_up_stage_count=%d down_stage_count=%d captured_in_graph=%s "
       "q4_path=%s ffn_path=%s staging=%s warps_per_row=%u "
-      "eager_or_captured=true\n",
+      "q4_device_layout=%s eager_or_captured=true\n",
       dispatch.gate_variant, dispatch.up_variant, dispatch.down_variant,
       dispatch.gate_up_stage_count, dispatch.down_stage_count,
       json_bool(dispatch.captured_in_graph), dispatch.q4_path, dispatch.ffn_path,
-      dispatch.staging, qw38::cuda::effective_q4_decode_warps_per_row());
+      dispatch.staging, qw38::cuda::effective_q4_decode_warps_per_row(),
+      qw38::cuda::effective_q4_device_layout());
   return 0;
 }
 
@@ -2070,6 +2076,20 @@ int run_family(const Options& options, qw38::cuda::ReplayFamily family) {
                  options.q4_warps);
     if (rounds != nullptr) std::fclose(rounds);
     return 1;
+  }
+  if (options.q4_device_layout != nullptr) {
+    if (!qw38::cuda::apply_q4_device_layout_ident(options.q4_device_layout)) {
+      std::fprintf(stderr, "invalid --q4-device-layout %s\n",
+                   options.q4_device_layout);
+      if (rounds != nullptr) std::fclose(rounds);
+      return 1;
+    }
+    const qw38::Status converted =
+        model.set_q4_device_layout(options.q4_device_layout, true);
+    if (!converted.is_ok()) {
+      if (rounds != nullptr) std::fclose(rounds);
+      return 1;
+    }
   }
   if (options.ffn_decode != nullptr &&
       !qw38::cuda::apply_ffn_decode_ident(options.ffn_decode)) {
