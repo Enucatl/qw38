@@ -9,6 +9,7 @@
 #include "quant.h"
 #include "quant_mmv.h"
 #include "q8_decode_path.cuh"
+#include "opt110_engine_hook.cuh"
 #include "rms_norm.cuh"
 #include "scheduler.h"
 #include "scheduler_primitives.h"
@@ -94,7 +95,7 @@ int usage(const char* argv0) {
                "[--q8-layout r1_w4|r2_w2] [--q8-grouping separate|grouped_r1_w4] "
                "[--q8-device-layout raw_gguf|aligned_soa] [--mmq-async-x 0|1] "
                "[--q4-decode packed|integer_q8|integer_q8_late|integer_q8_factored|"
-               "integer_q8_branchless|integer_q8_aligned] "
+               "integer_q8_branchless|integer_q8_aligned|llama_q4k_mmvq] "
                "[--q4-device-layout raw_gguf|aligned_meta] [--q4-warps 2|4] "
                "[--q6-device-layout raw_gguf|aligned_soa] "
                "[--ffn-decode paired_staged|shared_stage|paired_integer] "
@@ -1068,7 +1069,8 @@ cudaError_t replay_decode_ffn_layer(const qw38::cuda::DeviceCommonLayer& layer,
   cudaError_t error = qw38::cuda::launch_rms_norm_fp32_to_bf16(
       residual, layer.ffn_norm, qw38::internal::kResidualWidth,
       workspace->normalized_, stream);
-  if (error == cudaSuccess) {
+  const bool llama_mmvq = qw38::cuda::q4_decode_uses_llama_mmvq();
+  if (error == cudaSuccess && !llama_mmvq) {
     error = qw38::cuda::launch_quantize_bf16_q8(
         workspace->normalized_, workspace->q8_, qw38::internal::kResidualWidth,
         stream);
@@ -1089,7 +1091,20 @@ cudaError_t replay_decode_ffn_layer(const qw38::cuda::DeviceCommonLayer& layer,
   if (error == cudaSuccess && kernel_start != nullptr) {
     error = cudaEventRecord(kernel_start, stream);
   }
-  if (error == cudaSuccess && paired_integer) {
+  if (error == cudaSuccess && llama_mmvq) {
+    if (!qw38::cuda::opt110::engine_hooks_ready() ||
+        workspace->llama_q81_ == nullptr) {
+      error = cudaErrorNotSupported;
+    } else {
+      error = qw38::cuda::opt110::g_engine_gate_up(
+          layer.ffn_gate.data, layer.ffn_up.data, layer.ffn_gate.rows,
+          layer.ffn_gate.columns, workspace->normalized_, workspace->llama_q81_,
+          workspace->ffn_activated_, stream);
+    }
+    gate_variant = qw38::cuda::last_q4_launch_variant();
+    up_variant = gate_variant;
+    staging = qw38::cuda::kStagingLlamaBlockQ81;
+  } else if (error == cudaSuccess && paired_integer) {
     error = qw38::cuda::launch_q4k_coop_gate_up_swiglu_prequant_q8(
         layer.ffn_gate.data, layer.ffn_up.data, layer.ffn_gate.rows,
         layer.ffn_gate.columns, workspace->q8_, workspace->ffn_activated_,
@@ -1129,10 +1144,22 @@ cudaError_t replay_decode_ffn_layer(const qw38::cuda::DeviceCommonLayer& layer,
     up_variant = gate_variant;
   }
   if (error == cudaSuccess) {
-    error = qw38::cuda::launch_quant_mmv(
-        layer.ffn_down.kind, layer.ffn_down.data, layer.ffn_down.rows,
-        layer.ffn_down.columns, workspace->ffn_activated_, workspace->q8_,
-        workspace->mixer_output_, stream);
+    if (llama_mmvq) {
+      if (!qw38::cuda::opt110::engine_hooks_ready() ||
+          workspace->llama_q81_ == nullptr) {
+        error = cudaErrorNotSupported;
+      } else {
+        error = qw38::cuda::opt110::g_engine_down(
+            layer.ffn_down.data, layer.ffn_down.rows, layer.ffn_down.columns,
+            workspace->ffn_activated_, workspace->llama_q81_,
+            workspace->mixer_output_, stream);
+      }
+    } else {
+      error = qw38::cuda::launch_quant_mmv(
+          layer.ffn_down.kind, layer.ffn_down.data, layer.ffn_down.rows,
+          layer.ffn_down.columns, workspace->ffn_activated_, workspace->q8_,
+          workspace->mixer_output_, stream);
+    }
   }
   const char* down_variant = qw38::cuda::last_q4_launch_variant();
   cudaStreamCaptureStatus capture_status = cudaStreamCaptureStatusNone;

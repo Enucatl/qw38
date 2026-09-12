@@ -24,6 +24,7 @@
 #include "q8_decode_path.cuh"
 #include "q4k_decode_path.cuh"
 #include "ffn_decode_path.cuh"
+#include "opt110_engine_hook.cuh"
 
 QW38_PDL_REGISTER_DEVICE_OPS()
 
@@ -1838,6 +1839,7 @@ cudaError_t execute_ffn(const DeviceCommonLayer& layer,
   // fusion stays off that selector. OPT-063 paired integer fuses gate/up
   // dots and SwiGLU when selected; trace may fall back to the unfused
   // equivalent if separate gate/up taps are requested.
+  const bool llama_mmvq = q4_decode_uses_llama_mmvq();
   const bool integer_q8 = q4_decode_uses_integer_q8block();
   const bool trace_unfused =
       integer_q8 && ffn_decode_uses_paired_integer() &&
@@ -1857,7 +1859,21 @@ cudaError_t execute_ffn(const DeviceCommonLayer& layer,
         leaf_timings == nullptr ? nullptr : &leaf_timings->proj_ffn_gate,
         stream);
   }
-  if (error == cudaSuccess && paired_integer) {
+  if (error == cudaSuccess && llama_mmvq) {
+    if (!opt110::engine_hooks_ready() || workspace->llama_q81_ == nullptr) {
+      error = cudaErrorNotSupported;
+    } else {
+      error = opt110::g_engine_gate_up(
+          layer.ffn_gate.data, layer.ffn_up.data, layer.ffn_gate.rows,
+          layer.ffn_gate.columns, workspace->normalized_, workspace->llama_q81_,
+          workspace->ffn_activated_, stream);
+    }
+    gate_up_stages = 1;
+    staging = kStagingLlamaBlockQ81;
+    gate_variant = last_q4_launch_variant();
+    up_variant = gate_variant;
+    if (error == cudaSuccess) error = end_phase(leaves);
+  } else if (error == cudaSuccess && paired_integer) {
     error = launch_quantize_bf16_q8(workspace->normalized_, workspace->q8_,
                                     internal::kResidualWidth, stream);
     workspace->q8_decode_staged_activation_ = nullptr;
@@ -1979,8 +1995,19 @@ cudaError_t execute_ffn(const DeviceCommonLayer& layer,
         stream);
   }
   if (error == cudaSuccess) {
-    error = matrix_vector(layer.ffn_down, workspace->ffn_activated_, workspace,
-                          workspace->mixer_output_, stream);
+    if (llama_mmvq) {
+      if (!opt110::engine_hooks_ready() || workspace->llama_q81_ == nullptr) {
+        error = cudaErrorNotSupported;
+      } else {
+        error = opt110::g_engine_down(
+            layer.ffn_down.data, layer.ffn_down.rows, layer.ffn_down.columns,
+            workspace->ffn_activated_, workspace->llama_q81_,
+            workspace->mixer_output_, stream);
+      }
+    } else {
+      error = matrix_vector(layer.ffn_down, workspace->ffn_activated_, workspace,
+                            workspace->mixer_output_, stream);
+    }
   }
   const char* down_variant = last_q4_launch_variant();
   cudaStreamCaptureStatus capture_status = cudaStreamCaptureStatusNone;
@@ -3662,6 +3689,7 @@ void SchedulerWorkspace::release() noexcept {
   QW38_FREE(projection_b_);
   QW38_FREE(projection_a_);
   QW38_FREE(q8_grouped_descs_);
+  QW38_FREE(llama_q81_);
   QW38_FREE(q8_);
   QW38_FREE(ffn_activated_);
   QW38_FREE(projected_bf16_);
@@ -3754,6 +3782,7 @@ Status SchedulerWorkspace::create(std::size_t capacity) noexcept {
   QW38_ALLOCATE(projected_bf16_, internal::kGdnValueWidth);
   QW38_ALLOCATE(ffn_activated_, internal::kFfnWidth);
   QW38_ALLOCATE(q8_, internal::kFfnWidth / 32);
+  QW38_ALLOCATE(llama_q81_, (internal::kFfnWidth / 32) * 36);
   if (error == cudaSuccess) {
     error = allocate(&q8_grouped_descs_,
                      internal::kModelLayerCount * kQ8GroupedDescCount,

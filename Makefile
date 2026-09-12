@@ -17,6 +17,7 @@ BINARIES := $(BUILD_DIR)/qw38 $(BUILD_DIR)/qw38-server $(BUILD_DIR)/qw38-bench $
 HOST_DIAGNOSTICS := $(BUILD_DIR)/qw38-server-core-test $(BUILD_DIR)/qw38-server-api-test $(BUILD_DIR)/qw38-responses-api-test $(BUILD_DIR)/qw38-opt044-production-numerics
 CUDA_IMAGE := qw38-cuda:13.0.2
 QUANT_MMV_CUDA_OBJECTS := $(BUILD_DIR)/quant_mmv.cuda.o $(BUILD_DIR)/q4_prompt_mmq.cuda.o $(BUILD_DIR)/q4k_decode_dots.cuda.o $(BUILD_DIR)/q8_decode_dots.cuda.o $(BUILD_DIR)/q6k_decode_dots.cuda.o
+OPT110_LLAMA_OBJECT := $(CUDA_BUILD_DIR)/opt110/llama_fast_math/opt110_llama_q4_adapter.cuda.o
 NVCC_CUDA_DEPS = -MMD -MP -MF $(@:.o=.d) -MT $@
 NVCC_BIN_DEPS = -MMD -MP -MF $@.d -MT $@
 CUDA_STRICT_FLAG_TEXT := $(NVCC) $(NVCCFLAGS) $(CPPFLAGS) -Icuda
@@ -29,7 +30,7 @@ SCHEDULER_DIAGNOSTIC_CUDA_OBJECTS := $(BUILD_DIR)/full_scheduler.trace.cuda.o $(
 CUDA_RELEASE_OBJECTS := $(CUDA_BUILD_DIR)/engine.o $(BUILD_DIR)/eval.cuda.o $(BUILD_DIR)/bench.cuda.o $(QUANT_MMV_CUDA_OBJECTS) $(BUILD_DIR)/gdn_step.cuda.o $(BUILD_DIR)/attention_decode.cuda.o $(BUILD_DIR)/scheduler_primitives.cuda.o $(BUILD_DIR)/full_scheduler.cuda.o $(BUILD_DIR)/checkpoint.cuda.o
 CUDA_TRACE_OBJECTS := $(CUDA_BUILD_DIR)/engine.trace.o $(BUILD_DIR)/eval.trace.cuda.o $(BUILD_DIR)/full_scheduler.trace.cuda.o $(BUILD_DIR)/checkpoint.trace.cuda.o
 
-.PHONY: all clean test diagnostic cuda-image cuda-build cuda-native cuda-products cuda-opt057-diagnostics cuda-opt058-diagnostics cuda-opt059-diagnostics cuda-opt060-diagnostics cuda-opt061-diagnostics cuda-opt062-diagnostics cuda-opt063-diagnostics cuda-opt064-diagnostics cuda-opt065-diagnostics cuda-opt066-diagnostics cuda-opt067-diagnostics cuda-opt068-diagnostics cuda-opt069-diagnostics cuda-opt070-diagnostics cuda-opt071-diagnostics cuda-opt073-diagnostics cuda-opt074-diagnostics cuda-opt075-diagnostics cuda-opt076-diagnostics cuda-opt077-diagnostics cuda-opt078-diagnostics cuda-opt079-diagnostics cuda-opt080-diagnostics cuda-opt081-diagnostics cuda-opt082-diagnostics cuda-opt083-diagnostics cuda-opt084-diagnostics cuda-opt085-diagnostics cuda-opt086-diagnostics cuda-opt087-diagnostics cuda-opt088-diagnostics cuda-opt089-diagnostics cuda-opt090-diagnostics cuda-opt091-diagnostics cuda-opt092-diagnostics cuda-opt093-diagnostics cuda-opt094-diagnostics cuda-opt095-diagnostics cuda-opt096-diagnostics cuda-opt097-diagnostics cuda-opt098-diagnostics cuda-opt099-diagnostics cuda-opt100-diagnostics cuda-opt101-diagnostics cuda-opt102-diagnostics cuda-opt103-diagnostics cuda-opt104-diagnostics cuda-opt105-diagnostics cuda-opt106-diagnostics cuda-opt114-diagnostics cuda-opt107-diagnostics cuda-opt108-diagnostics cuda-opt109-diagnostics FORCE
+.PHONY: all clean test diagnostic cuda-image cuda-build cuda-native cuda-products cuda-opt057-diagnostics cuda-opt058-diagnostics cuda-opt059-diagnostics cuda-opt060-diagnostics cuda-opt061-diagnostics cuda-opt062-diagnostics cuda-opt063-diagnostics cuda-opt064-diagnostics cuda-opt065-diagnostics cuda-opt066-diagnostics cuda-opt067-diagnostics cuda-opt068-diagnostics cuda-opt069-diagnostics cuda-opt070-diagnostics cuda-opt071-diagnostics cuda-opt073-diagnostics cuda-opt074-diagnostics cuda-opt075-diagnostics cuda-opt076-diagnostics cuda-opt077-diagnostics cuda-opt078-diagnostics cuda-opt079-diagnostics cuda-opt080-diagnostics cuda-opt081-diagnostics cuda-opt082-diagnostics cuda-opt083-diagnostics cuda-opt084-diagnostics cuda-opt085-diagnostics cuda-opt086-diagnostics cuda-opt087-diagnostics cuda-opt088-diagnostics cuda-opt089-diagnostics cuda-opt090-diagnostics cuda-opt091-diagnostics cuda-opt092-diagnostics cuda-opt093-diagnostics cuda-opt094-diagnostics cuda-opt095-diagnostics cuda-opt096-diagnostics cuda-opt097-diagnostics cuda-opt098-diagnostics cuda-opt099-diagnostics cuda-opt100-diagnostics cuda-opt101-diagnostics cuda-opt102-diagnostics cuda-opt103-diagnostics cuda-opt104-diagnostics cuda-opt105-diagnostics cuda-opt106-diagnostics cuda-opt114-diagnostics cuda-opt107-diagnostics cuda-opt108-diagnostics cuda-opt109-diagnostics cuda-opt110-diagnostics FORCE
 
 all: $(BINARIES) $(HOST_DIAGNOSTICS)
 
@@ -223,6 +224,8 @@ cuda-opt108-diagnostics: $(BUILD_DIR)/qw38-cuda-opt108-llama-vector-stack-test $
 
 cuda-opt109-diagnostics: $(BUILD_DIR)/qw38-cuda-opt109-persistent-gdn-state-test $(BUILD_DIR)/qw38-cuda-component-replay $(BUILD_DIR)/qw38-cuda-optimization-engine-probe $(BUILD_DIR)/qw38-cuda-opt058-quality-baseline-test $(BUILD_DIR)/qw38-cuda-checkpoint-test $(BUILD_DIR)/qw38-cuda-memory-fit-test
 
+cuda-opt110-diagnostics: $(BUILD_DIR)/qw38-cuda-opt110-llama-q4-adapter-test $(BUILD_DIR)/qw38-cuda-component-replay $(BUILD_DIR)/qw38-cuda-optimization-engine-probe
+
 cuda-opt073-diagnostics: $(BUILD_DIR)/qw38-cuda-opt058-quality-baseline-test
 
 cuda-opt058-diagnostics: $(BUILD_DIR)/qw38-cuda-opt058-quality-baseline-test
@@ -323,8 +326,8 @@ $(BUILD_DIR)/qw38-cuda-opt068-codegen-test: cuda/opt068_codegen_driver.cpp $(OPT
 
 CUDA_STAMP_FILES := $(CUDA_STRICT_STAMP) $(CUDA_TRACE_STAMP) $(CUDA_EXPERIMENTAL_STAMP)
 
-$(BUILD_DIR)/qw38-cuda-optimization-engine-probe: cuda/optimization_engine_probe.cu $(SCHEDULER_DIAGNOSTIC_CUDA_OBJECTS) $(DIAGNOSTIC_LIB_OBJECTS) $(THIRD_PARTY_OBJECTS) $(CUDA_TRACE_STAMP) | $(BUILD_DIR)
-	$(NVCC) $(NVCCFLAGS) $(CPPFLAGS) -DQW38_DIAGNOSTIC_TRACE -Icuda $(NVCC_BIN_DEPS) cuda/optimization_engine_probe.cu $(SCHEDULER_DIAGNOSTIC_CUDA_OBJECTS) $(DIAGNOSTIC_LIB_OBJECTS) $(THIRD_PARTY_OBJECTS) -o $@
+$(BUILD_DIR)/qw38-cuda-optimization-engine-probe: cuda/optimization_engine_probe.cu $(SCHEDULER_DIAGNOSTIC_CUDA_OBJECTS) $(OPT110_LLAMA_OBJECT) $(DIAGNOSTIC_LIB_OBJECTS) $(THIRD_PARTY_OBJECTS) $(CUDA_TRACE_STAMP) | $(BUILD_DIR)
+	$(NVCC) $(NVCCFLAGS) $(CPPFLAGS) -DQW38_DIAGNOSTIC_TRACE -Icuda $(NVCC_BIN_DEPS) cuda/optimization_engine_probe.cu $(SCHEDULER_DIAGNOSTIC_CUDA_OBJECTS) $(OPT110_LLAMA_OBJECT) $(DIAGNOSTIC_LIB_OBJECTS) $(THIRD_PARTY_OBJECTS) -o $@
 
 $(BUILD_DIR)/qw38-cuda-decode-oracle-test: cuda/decode_oracle_test.cu $(SCHEDULER_DIAGNOSTIC_CUDA_OBJECTS) $(DIAGNOSTIC_LIB_OBJECTS) $(THIRD_PARTY_OBJECTS) $(CUDA_TRACE_STAMP) | $(BUILD_DIR)
 	$(NVCC) $(NVCCFLAGS) $(CPPFLAGS) -DQW38_DIAGNOSTIC_TRACE -Icuda $(NVCC_BIN_DEPS) cuda/decode_oracle_test.cu $(SCHEDULER_DIAGNOSTIC_CUDA_OBJECTS) $(DIAGNOSTIC_LIB_OBJECTS) $(THIRD_PARTY_OBJECTS) -o $@
@@ -335,8 +338,8 @@ $(BUILD_DIR)/qw38-cuda-prefill-4k-oracle-test: cuda/prefill_4k_oracle_test.cu $(
 $(BUILD_DIR)/qw38-cuda-prefill-2k-parity-test: cuda/prefill_2k_parity_test.cu $(SCHEDULER_DIAGNOSTIC_CUDA_OBJECTS) $(DIAGNOSTIC_LIB_OBJECTS) $(THIRD_PARTY_OBJECTS) $(CUDA_TRACE_STAMP) | $(BUILD_DIR)
 	$(NVCC) $(NVCCFLAGS) $(CPPFLAGS) -DQW38_DIAGNOSTIC_TRACE -Icuda $(NVCC_BIN_DEPS) cuda/prefill_2k_parity_test.cu $(SCHEDULER_DIAGNOSTIC_CUDA_OBJECTS) $(DIAGNOSTIC_LIB_OBJECTS) $(THIRD_PARTY_OBJECTS) -o $@
 
-$(BUILD_DIR)/qw38-cuda-opt058-quality-baseline-test: cuda/opt058_quality_baseline_test.cu $(SCHEDULER_DIAGNOSTIC_CUDA_OBJECTS) $(DIAGNOSTIC_LIB_OBJECTS) $(THIRD_PARTY_OBJECTS) $(CUDA_TRACE_STAMP) | $(BUILD_DIR)
-	$(NVCC) $(NVCCFLAGS) $(CPPFLAGS) -DQW38_DIAGNOSTIC_TRACE -Icuda $(NVCC_BIN_DEPS) cuda/opt058_quality_baseline_test.cu $(SCHEDULER_DIAGNOSTIC_CUDA_OBJECTS) $(DIAGNOSTIC_LIB_OBJECTS) $(THIRD_PARTY_OBJECTS) -o $@
+$(BUILD_DIR)/qw38-cuda-opt058-quality-baseline-test: cuda/opt058_quality_baseline_test.cu $(SCHEDULER_DIAGNOSTIC_CUDA_OBJECTS) $(OPT110_LLAMA_OBJECT) $(DIAGNOSTIC_LIB_OBJECTS) $(THIRD_PARTY_OBJECTS) $(CUDA_TRACE_STAMP) | $(BUILD_DIR)
+	$(NVCC) $(NVCCFLAGS) $(CPPFLAGS) -DQW38_DIAGNOSTIC_TRACE -Icuda $(NVCC_BIN_DEPS) cuda/opt058_quality_baseline_test.cu $(SCHEDULER_DIAGNOSTIC_CUDA_OBJECTS) $(OPT110_LLAMA_OBJECT) $(DIAGNOSTIC_LIB_OBJECTS) $(THIRD_PARTY_OBJECTS) -o $@
 
 $(BUILD_DIR)/qw38-cuda-opt059-numerics-test: cuda/opt059_numerics_test.cu $(QUANT_MMV_CUDA_OBJECTS) $(BUILD_DIR)/quant.o $(BUILD_DIR)/status.o $(CUDA_STRICT_STAMP) | $(BUILD_DIR)
 	$(NVCC) $(NVCCFLAGS) $(CPPFLAGS) -Icuda $(NVCC_BIN_DEPS) cuda/opt059_numerics_test.cu $(QUANT_MMV_CUDA_OBJECTS) $(BUILD_DIR)/quant.o $(BUILD_DIR)/status.o -o $@
@@ -359,8 +362,8 @@ $(BUILD_DIR)/qw38-cuda-opt043-activation-capture-test: cuda/opt043_activation_ca
 $(BUILD_DIR)/qw38-cuda-opt060-engine-attribution-test: cuda/opt060_engine_attribution_test.cu cuda/engine_attribution.h $(SCHEDULER_DIAGNOSTIC_CUDA_OBJECTS) $(DIAGNOSTIC_LIB_OBJECTS) $(THIRD_PARTY_OBJECTS) $(CUDA_TRACE_STAMP) | $(BUILD_DIR)
 	$(NVCC) $(NVCCFLAGS) $(CPPFLAGS) -DQW38_DIAGNOSTIC_TRACE -Icuda $(NVCC_BIN_DEPS) cuda/opt060_engine_attribution_test.cu $(SCHEDULER_DIAGNOSTIC_CUDA_OBJECTS) $(DIAGNOSTIC_LIB_OBJECTS) $(THIRD_PARTY_OBJECTS) -o $@
 
-$(BUILD_DIR)/qw38-cuda-component-replay: cuda/optimization_component_replay.cu cuda/optimization_component_replay.h $(SCHEDULER_DIAGNOSTIC_CUDA_OBJECTS) $(DIAGNOSTIC_LIB_OBJECTS) $(THIRD_PARTY_OBJECTS) $(CUDA_TRACE_STAMP) | $(BUILD_DIR)
-	$(NVCC) $(NVCCFLAGS) $(CPPFLAGS) -DQW38_DIAGNOSTIC_TRACE -Icuda $(NVCC_BIN_DEPS) cuda/optimization_component_replay.cu $(SCHEDULER_DIAGNOSTIC_CUDA_OBJECTS) $(DIAGNOSTIC_LIB_OBJECTS) $(THIRD_PARTY_OBJECTS) -o $@
+$(BUILD_DIR)/qw38-cuda-component-replay: cuda/optimization_component_replay.cu cuda/optimization_component_replay.h $(SCHEDULER_DIAGNOSTIC_CUDA_OBJECTS) $(OPT110_LLAMA_OBJECT) $(DIAGNOSTIC_LIB_OBJECTS) $(THIRD_PARTY_OBJECTS) $(CUDA_TRACE_STAMP) | $(BUILD_DIR)
+	$(NVCC) $(NVCCFLAGS) $(CPPFLAGS) -DQW38_DIAGNOSTIC_TRACE -Icuda $(NVCC_BIN_DEPS) cuda/optimization_component_replay.cu $(SCHEDULER_DIAGNOSTIC_CUDA_OBJECTS) $(OPT110_LLAMA_OBJECT) $(DIAGNOSTIC_LIB_OBJECTS) $(THIRD_PARTY_OBJECTS) -o $@
 
 $(BUILD_DIR)/qw38-cuda-opt062-q4-admission-test: cuda/opt062_q4_admission_test.cu $(SCHEDULER_DIAGNOSTIC_CUDA_OBJECTS) $(DIAGNOSTIC_LIB_OBJECTS) $(THIRD_PARTY_OBJECTS) $(CUDA_TRACE_STAMP) | $(BUILD_DIR)
 	$(NVCC) $(NVCCFLAGS) $(CPPFLAGS) -DQW38_DIAGNOSTIC_TRACE -Icuda $(NVCC_BIN_DEPS) cuda/opt062_q4_admission_test.cu $(SCHEDULER_DIAGNOSTIC_CUDA_OBJECTS) $(DIAGNOSTIC_LIB_OBJECTS) $(THIRD_PARTY_OBJECTS) -o $@
@@ -409,6 +412,19 @@ $(BUILD_DIR)/qw38-cuda-opt107-attention-crossover-test: cuda/opt107_attention_cr
 
 $(BUILD_DIR)/qw38-cuda-opt108-llama-vector-stack-test: cuda/opt108_llama_vector_stack_test.cu cuda/opt108_llama_vector_adapter.cuh $(SCHEDULER_DIAGNOSTIC_CUDA_OBJECTS) $(DIAGNOSTIC_LIB_OBJECTS) $(THIRD_PARTY_OBJECTS) $(CUDA_TRACE_STAMP) | $(BUILD_DIR)
 	$(NVCC) $(NVCCFLAGS) $(CPPFLAGS) -DQW38_DIAGNOSTIC_TRACE -Icuda $(NVCC_BIN_DEPS) cuda/opt108_llama_vector_stack_test.cu $(SCHEDULER_DIAGNOSTIC_CUDA_OBJECTS) $(DIAGNOSTIC_LIB_OBJECTS) $(THIRD_PARTY_OBJECTS) -o $@
+
+# OPT-110 candidate adapter uses pinned-llama CUDA flags; control TUs stay NVCCFLAGS.
+OPT110_LLAMA_NVCCFLAGS := -std=c++17 -O3 -arch=sm_120 --expt-relaxed-constexpr --use_fast_math --extended-lambda -Xptxas=-v -Xcompiler=-fno-exceptions,-fno-rtti,-pthread
+OPT110_LLAMA_DIR := $(CUDA_BUILD_DIR)/opt110/llama_fast_math
+OPT110_LLAMA_STAMP := $(OPT110_LLAMA_DIR)/nvccflags.stamp
+$(OPT110_LLAMA_DIR):
+	mkdir -p $@
+$(OPT110_LLAMA_STAMP): | $(OPT110_LLAMA_DIR)
+	printf '%s\n' "$(NVCC) $(OPT110_LLAMA_NVCCFLAGS) -Icuda" > $@
+$(OPT110_LLAMA_DIR)/opt110_llama_q4_adapter.cuda.o: cuda/opt110_llama_q4_adapter.cu cuda/opt110_llama_q4_adapter.cuh cuda/opt110_engine_hook.cuh cuda/q4k_decode_path.cuh $(OPT110_LLAMA_STAMP) | $(OPT110_LLAMA_DIR)
+	$(NVCC) $(OPT110_LLAMA_NVCCFLAGS) -Icuda $(NVCC_CUDA_DEPS) -c $< -o $@
+$(BUILD_DIR)/qw38-cuda-opt110-llama-q4-adapter-test: cuda/opt110_llama_q4_adapter_test.cu cuda/opt110_llama_q4_adapter.cuh $(OPT110_LLAMA_DIR)/opt110_llama_q4_adapter.cuda.o $(SCHEDULER_DIAGNOSTIC_CUDA_OBJECTS) $(DIAGNOSTIC_LIB_OBJECTS) $(THIRD_PARTY_OBJECTS) $(CUDA_TRACE_STAMP) | $(BUILD_DIR)
+	$(NVCC) $(NVCCFLAGS) $(CPPFLAGS) -DQW38_DIAGNOSTIC_TRACE -Icuda $(NVCC_BIN_DEPS) cuda/opt110_llama_q4_adapter_test.cu $(OPT110_LLAMA_DIR)/opt110_llama_q4_adapter.cuda.o $(SCHEDULER_DIAGNOSTIC_CUDA_OBJECTS) $(DIAGNOSTIC_LIB_OBJECTS) $(THIRD_PARTY_OBJECTS) -o $@
 
 $(BUILD_DIR)/qw38-cuda-opt097-mmq-wait-test: cuda/opt097_mmq_wait_test.cu $(SCHEDULER_DIAGNOSTIC_CUDA_OBJECTS) $(DIAGNOSTIC_LIB_OBJECTS) $(THIRD_PARTY_OBJECTS) $(CUDA_TRACE_STAMP) | $(BUILD_DIR)
 	$(NVCC) $(NVCCFLAGS) $(CPPFLAGS) -DQW38_DIAGNOSTIC_TRACE -Icuda $(NVCC_BIN_DEPS) cuda/opt097_mmq_wait_test.cu $(SCHEDULER_DIAGNOSTIC_CUDA_OBJECTS) $(DIAGNOSTIC_LIB_OBJECTS) $(THIRD_PARTY_OBJECTS) -o $@
@@ -473,10 +489,10 @@ $(BUILD_DIR)/qw38-cuda-attention-chunk-test: cuda/attention_chunk_test.cu $(BUIL
 $(BUILD_DIR)/scheduler_primitives.cuda.o: cuda/scheduler_primitives.cu cuda/scheduler_primitives.h cuda/pdl_launch.cuh cuda/rms_norm.cuh $(CUDA_STRICT_STAMP) | $(BUILD_DIR)
 	$(NVCC) $(NVCCFLAGS) -Icuda $(NVCC_CUDA_DEPS) -c $< -o $@
 
-$(BUILD_DIR)/full_scheduler.cuda.o: cuda/full_scheduler.cu cuda/full_scheduler.h cuda/gdn_step.h cuda/gdn_decode_path.cuh cuda/pdl_launch.cuh cuda/rms_norm.cuh cuda/q8_decode_path.cuh cuda/q4k_decode_path.cuh cuda/ffn_decode_path.cuh cuda/attention_decode.h $(CUDA_STRICT_STAMP) | $(BUILD_DIR)
+$(BUILD_DIR)/full_scheduler.cuda.o: cuda/full_scheduler.cu cuda/full_scheduler.h cuda/gdn_step.h cuda/gdn_decode_path.cuh cuda/pdl_launch.cuh cuda/rms_norm.cuh cuda/q8_decode_path.cuh cuda/q4k_decode_path.cuh cuda/ffn_decode_path.cuh cuda/attention_decode.h cuda/opt110_engine_hook.cuh $(CUDA_STRICT_STAMP) | $(BUILD_DIR)
 	$(NVCC) $(NVCCFLAGS) $(CPPFLAGS) -Icuda $(NVCC_CUDA_DEPS) -c $< -o $@
 
-$(BUILD_DIR)/full_scheduler.trace.cuda.o: cuda/full_scheduler.cu cuda/full_scheduler.h cuda/gdn_step.h cuda/gdn_decode_path.cuh cuda/pdl_launch.cuh cuda/rms_norm.cuh cuda/q8_decode_path.cuh cuda/q4k_decode_path.cuh cuda/ffn_decode_path.cuh cuda/attention_decode.h $(CUDA_TRACE_STAMP) | $(BUILD_DIR)
+$(BUILD_DIR)/full_scheduler.trace.cuda.o: cuda/full_scheduler.cu cuda/full_scheduler.h cuda/gdn_step.h cuda/gdn_decode_path.cuh cuda/pdl_launch.cuh cuda/rms_norm.cuh cuda/q8_decode_path.cuh cuda/q4k_decode_path.cuh cuda/ffn_decode_path.cuh cuda/attention_decode.h cuda/opt110_engine_hook.cuh $(CUDA_TRACE_STAMP) | $(BUILD_DIR)
 	$(NVCC) $(NVCCFLAGS) $(CPPFLAGS) -DQW38_DIAGNOSTIC_TRACE -Icuda $(NVCC_CUDA_DEPS) -c $< -o $@
 
 $(BUILD_DIR)/checkpoint.cuda.o: cuda/checkpoint.cu cuda/full_scheduler.h $(CUDA_STRICT_STAMP) | $(BUILD_DIR)

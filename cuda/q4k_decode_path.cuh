@@ -24,6 +24,9 @@ constexpr char kLegalQ4DecodePathIntegerQ8Branchless[] = "integer_q8_branchless"
 // OPT-102 aligned metadata/code-plane layout + branchless unpack, late
 // association. OPT-093 factored pairing is not selected.
 constexpr char kLegalQ4DecodePathIntegerQ8Aligned[] = "integer_q8_aligned";
+// OPT-110 source-faithful llama Q4_K MMVQ + native block_q8_1. Diagnostic
+// override only; production pin stays integer_q8_late.
+constexpr char kLegalQ4DecodePathLlamaMmvq[] = "llama_q4k_mmvq";
 
 // OPT-072 typed Q8_1 pairing: the UseQ81 Q4 consumer treats stored q8_sum as
 // integer sum(q). A sum(x) producer must not feed that consumer. Production
@@ -66,6 +69,9 @@ constexpr char kQ4LaunchVariantCoopQ8AlignedPrequant[] =
     "q4k_coop_mmv_aligned_prequant_q8";
 constexpr char kQ4LaunchVariantPairedIntegerQ8Aligned[] =
     "q4k_coop_gate_up_swiglu_aligned_prequant_q8";
+constexpr char kQ4LaunchVariantLlamaMmvq[] = "opt110_mul_mat_vec_q4_k_q8_1";
+constexpr char kQ4LaunchVariantLlamaMmvqGlu[] =
+    "opt110_mul_mat_vec_q4_k_q8_1_swiglu";
 
 constexpr int kQ4LaunchTraceCapacity = 8;
 
@@ -89,7 +95,8 @@ inline bool legal_q4_decode_path(const char* path) noexcept {
           std::strcmp(path, kLegalQ4DecodePathIntegerQ8Late) == 0 ||
           std::strcmp(path, kLegalQ4DecodePathIntegerQ8Factored) == 0 ||
           std::strcmp(path, kLegalQ4DecodePathIntegerQ8Branchless) == 0 ||
-          std::strcmp(path, kLegalQ4DecodePathIntegerQ8Aligned) == 0);
+          std::strcmp(path, kLegalQ4DecodePathIntegerQ8Aligned) == 0 ||
+          std::strcmp(path, kLegalQ4DecodePathLlamaMmvq) == 0);
 }
 
 inline bool legal_q4_device_layout(const char* layout) noexcept {
@@ -146,6 +153,11 @@ inline bool q4_decode_uses_integer() noexcept {
 inline bool q4_decode_uses_q8_1() noexcept {
   return std::strcmp(effective_q4_decode_path(),
                      kLegalQ4DecodePathIntegerQ81) == 0;
+}
+
+inline bool q4_decode_uses_llama_mmvq() noexcept {
+  return std::strcmp(effective_q4_decode_path(),
+                     kLegalQ4DecodePathLlamaMmvq) == 0;
 }
 
 inline bool q4_decode_uses_late_reduction() noexcept {

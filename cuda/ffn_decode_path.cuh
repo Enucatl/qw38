@@ -13,6 +13,7 @@ constexpr char kLegalFfnDecodePathPairedStaged[] = "paired_staged";
 constexpr char kLegalFfnDecodePathPairedInteger[] = "paired_integer";
 constexpr char kStagingQ8Fp32PairedInteger[] = "q8_fp32";
 constexpr char kStagingQ8Fp32UnfusedTrace[] = "q8_fp32_unfused_trace";
+constexpr char kStagingLlamaBlockQ81[] = "block_q8_1";
 
 // Production pin. Keep sitting may switch away from separate; reject restores it.
 constexpr char kSelectedFfnDecodePath[] = "paired_integer";

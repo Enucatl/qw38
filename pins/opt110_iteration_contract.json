@@ -1,0 +1,317 @@
+{
+  "schema_version": 1,
+  "task": "OPT-110",
+  "yardstick": "llama_q4k_mmvq_source_faithful_adapter",
+  "claims_throughput": true,
+  "claims_performance_improvement": true,
+  "opt074_family_admission_required": false,
+  "performance_admission": {
+    "enabled": true
+  },
+  "image": "qw38-cuda:13.0.2",
+  "model": "models/Qwen3.8-27B-Q4_K_M.gguf",
+  "gpu_lock": "build/optimization-runs/qw38-gpu.lock",
+  "aggregate_deadline_s": 300,
+  "target": "build/qw38-cuda-opt110-llama-q4-adapter-test",
+  "diagnostics_make_target": "cuda-opt110-diagnostics",
+  "case_ids": [
+    "parity",
+    "primitive",
+    "quality",
+    "q4",
+    "d128",
+    "d2048",
+    "prefill-guard"
+  ],
+  "modes": {
+    "feedback": {
+      "target": "build/qw38-cuda-opt110-llama-q4-adapter-test",
+      "tier_sequence": ["parity", "primitive"],
+      "make_targets": [
+        "build/qw38-cuda-opt110-llama-q4-adapter-test",
+        "build/qw38-cuda-component-replay",
+        "build/qw38-cuda-optimization-engine-probe"
+      ],
+      "build_once": true,
+      "warm_repetitions": 0,
+      "aggregate_deadline_s": 300,
+      "workloads": ["parity", "primitive"]
+    },
+    "acceptance": {
+      "target": "build/qw38-cuda-opt110-llama-q4-adapter-test",
+      "tier_sequence": ["primitive", "q4", "d128", "d2048", "prefill-guard"],
+      "make_targets": [
+        "build/qw38-cuda-opt110-llama-q4-adapter-test",
+        "build/qw38-cuda-component-replay",
+        "build/qw38-cuda-optimization-engine-probe"
+      ],
+      "warm_repetitions": 0,
+      "aggregate_deadline_s": 300,
+      "workloads": ["primitive", "q4", "d128", "d2048", "prefill-guard"]
+    },
+    "release": {
+      "target": "tools/opt110_llama_q4_adapter.py",
+      "tier": "acceptance",
+      "make_targets": ["build/qw38-cuda-opt058-quality-baseline-test"],
+      "skip_compile": false,
+      "historical_oracles": false,
+      "aggregate_deadline_s": 7200,
+      "workloads": ["quality"],
+      "release_host_command": [
+        "uv",
+        "run",
+        "python",
+        "tools/opt110_llama_q4_adapter.py",
+        "--phase",
+        "quality",
+        "--mode",
+        "release",
+        "--run-dir",
+        "{run_dir}"
+      ]
+    }
+  },
+  "workloads": {
+    "parity": {
+      "target": "build/qw38-cuda-opt110-llama-q4-adapter-test",
+      "tier": "correctness",
+      "runner": "host",
+      "kind": "source_faithful_q4k_mmvq_parity",
+      "cases": 1,
+      "candidates": 2,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 1,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 0,
+      "reference": 1,
+      "gpu_work": true,
+      "native_targets": ["build/qw38-cuda-opt110-llama-q4-adapter-test"],
+      "args": [
+        "uv",
+        "run",
+        "python",
+        "tools/opt110_llama_q4_adapter.py",
+        "--phase",
+        "{phase}",
+        "--mode",
+        "{mode}",
+        "--run-dir",
+        "{run_dir}"
+      ]
+    },
+    "primitive": {
+      "target": "build/qw38-cuda-opt110-llama-q4-adapter-test",
+      "tier": "screen",
+      "runner": "host",
+      "kind": "matched_bf16_raw_q4k_staging_plus_dot",
+      "cases": 2,
+      "candidates": 2,
+      "warmups": 1,
+      "samples": 3,
+      "tokens": 1,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 0,
+      "reference": 1,
+      "family": "decode-ffn-llama-mmvq",
+      "gpu_work": true,
+      "native_targets": ["build/qw38-cuda-opt110-llama-q4-adapter-test"],
+      "args": [
+        "uv",
+        "run",
+        "python",
+        "tools/opt110_llama_q4_adapter.py",
+        "--phase",
+        "{phase}",
+        "--mode",
+        "{mode}",
+        "--run-dir",
+        "{run_dir}"
+      ],
+      "mode_overrides": {
+        "acceptance": {
+          "tier": "acceptance",
+          "warmups": 3,
+          "samples": 10
+        }
+      }
+    },
+    "quality": {
+      "target": "tools/opt110_llama_q4_adapter.py",
+      "tier": "acceptance",
+      "runner": "host",
+      "kind": "candidate_nll_if_primitive_wins",
+      "cases": 1,
+      "candidates": 1,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 1,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 0,
+      "reference": 1,
+      "gpu_work": false,
+      "args": [
+        "uv",
+        "run",
+        "python",
+        "tools/opt110_llama_q4_adapter.py",
+        "--phase",
+        "quality",
+        "--mode",
+        "{mode}",
+        "--run-dir",
+        "{run_dir}"
+      ]
+    },
+    "q4": {
+      "target": "build/qw38-cuda-component-replay",
+      "tier": "screen",
+      "runner": "host",
+      "kind": "complete_rotating_decode_ffn_if_primitive_wins",
+      "cases": 1,
+      "candidates": 2,
+      "warmups": 1,
+      "samples": 3,
+      "tokens": 1,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 1,
+      "reference": 1,
+      "family": "decode-ffn",
+      "gpu_work": true,
+      "native_targets": [
+        "build/qw38-cuda-component-replay",
+        "build/qw38-cuda-optimization-engine-probe"
+      ],
+      "args": [
+        "uv",
+        "run",
+        "python",
+        "tools/opt110_llama_q4_adapter.py",
+        "--phase",
+        "{phase}",
+        "--mode",
+        "{mode}",
+        "--run-dir",
+        "{run_dir}"
+      ],
+      "mode_overrides": {
+        "acceptance": {
+          "tier": "acceptance",
+          "warmups": 3,
+          "samples": 10
+        }
+      }
+    },
+    "d128": {
+      "target": "build/qw38-cuda-optimization-engine-probe",
+      "tier": "acceptance",
+      "runner": "host",
+      "kind": "uninstrumented_d128_if_primitive_wins",
+      "cases": 1,
+      "candidates": 2,
+      "warmups": 0,
+      "samples": 5,
+      "tokens": 1,
+      "output_tokens": 32,
+      "prefix": 128,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 1,
+      "reference": 0,
+      "gpu_work": true,
+      "native_targets": ["build/qw38-cuda-optimization-engine-probe"],
+      "args": [
+        "uv",
+        "run",
+        "python",
+        "tools/opt110_llama_q4_adapter.py",
+        "--phase",
+        "d128",
+        "--mode",
+        "{mode}",
+        "--run-dir",
+        "{run_dir}"
+      ]
+    },
+    "d2048": {
+      "target": "build/qw38-cuda-optimization-engine-probe",
+      "tier": "acceptance",
+      "runner": "host",
+      "kind": "uninstrumented_d2048_if_primitive_wins",
+      "cases": 1,
+      "candidates": 2,
+      "warmups": 0,
+      "samples": 5,
+      "tokens": 1,
+      "output_tokens": 32,
+      "prefix": 2048,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 1,
+      "reference": 0,
+      "gpu_work": true,
+      "native_targets": ["build/qw38-cuda-optimization-engine-probe"],
+      "args": [
+        "uv",
+        "run",
+        "python",
+        "tools/opt110_llama_q4_adapter.py",
+        "--phase",
+        "d2048",
+        "--mode",
+        "{mode}",
+        "--run-dir",
+        "{run_dir}"
+      ]
+    },
+    "prefill-guard": {
+      "target": "build/qw38-cuda-optimization-engine-probe",
+      "tier": "acceptance",
+      "runner": "host",
+      "kind": "p4096_guard_if_primitive_wins",
+      "cases": 1,
+      "candidates": 2,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 4096,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 1,
+      "reference": 0,
+      "gpu_work": true,
+      "native_targets": ["build/qw38-cuda-optimization-engine-probe"],
+      "args": [
+        "uv",
+        "run",
+        "python",
+        "tools/opt110_llama_q4_adapter.py",
+        "--phase",
+        "prefill-guard",
+        "--mode",
+        "{mode}",
+        "--run-dir",
+        "{run_dir}"
+      ]
+    }
+  },
+  "proof_limit": [
+    "source-faithful pinned llama Q4_K x Q8_1 MMVQ adapter",
+    "matched BF16 plus raw Q4_K primitive before engine integration",
+    "control Q8Block integer_q8_late, candidate native block_q8_1 plus MMVQ",
+    "encodings are not interchangeable",
+    "staging and dot timed separately; sum is the primitive go/no-go",
+    "compile-time adapters only for 5120x17408 and 17408x5120",
+    "adapter compiled with pinned-llama CUDA flags; control remains strict",
+    "OPT-093 factored and OPT-102 aligned metadata are not candidates",
+    "no warp sweep",
+    "stop if the source-faithful complete primitive loses",
+    "complete FFN keep requires >=0.50 ms/token with positive 95% CI",
+    "reject retains integer_q8_late",
+    "historical oracles none"
+  ],
+  "report_path": "evidence/optimization/opt110-llama-q4-adapter/REPORT.md"
+}

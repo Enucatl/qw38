@@ -5,6 +5,7 @@
 #include "attention_decode_path.cuh"
 #include "q4k_decode_path.cuh"
 #include "q8_decode_path.cuh"
+#include "opt110_engine_hook.cuh"
 #include "quant_mmv.h"
 #include "test_tier.h"
 
@@ -128,7 +129,8 @@ int usage(const char* argv0) {
                "[--q8-grouping separate|grouped_r1_w4] "
                "[--q8-device-layout raw_gguf|aligned_soa] [--mmq-async-x 0|1] "
                "[--q4-decode packed|integer_q8|integer_q8_late|"
-               "integer_q8_factored|integer_q8_branchless|integer_q8_aligned] "
+               "integer_q8_factored|integer_q8_branchless|integer_q8_aligned|"
+               "llama_q4k_mmvq] "
                "[--q4-device-layout raw_gguf|aligned_meta] "
                "[--q6-device-layout raw_gguf|aligned_soa] "
                "[--q4-warps 2|4] "

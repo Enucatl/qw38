@@ -1,0 +1,62 @@
+{
+  "schema_version": 1,
+  "task": "OPT-110",
+  "authority": "pinned llama.cpp",
+  "llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+  "license": "MIT",
+  "authors": "The ggml authors",
+  "adapter_namespace": "qw38::cuda::opt110",
+  "specialization": "mul_mat_vec_q<Q4_K, ncols_dst=1> GENERIC nwarps=4 plus fused SWIGLU",
+  "candidate_nvccflags": "-O3 --use_fast_math --extended-lambda -arch=sm_120",
+  "control_nvccflags": "-O2 --fmad=false -arch=sm_120",
+  "not_vendored": [
+    "ggml tensor/runtime",
+    "ggml graph/allocator",
+    "ggml CLI/model",
+    "current llama HEAD as release authority"
+  ],
+  "copied_organization": [
+    {
+      "file": ".cache/authorities/llama.cpp/ggml/src/ggml-cuda/mmvq.cu",
+      "sha256": "6c8a629f890f64c8a514555326049df356e946d4091d3e22aa3f5f7403803b3b",
+      "use": "mul_mat_vec_q Q4_K ncols=1 GENERIC 4-warp launch, shared reduction, fused SWIGLU"
+    },
+    {
+      "file": ".cache/authorities/llama.cpp/ggml/src/ggml-cuda/vecdotq.cuh",
+      "sha256": "2d6a6ce1a60eed1e80912e6a76ef480bd2ef0648a1d7da1a10fae49ee2c27bb6",
+      "use": "vec_dot_q4_K_q8_1 / impl_vmmq VDR=2 QI=32 packed 16-bit scale extract"
+    },
+    {
+      "file": ".cache/authorities/llama.cpp/ggml/src/ggml-cuda/quantize.cu",
+      "sha256": "71cd7baab62ee1f457d23ae648c381d18b9b1327ec34832f31463b14b81895b3",
+      "use": "quantize_q8_1: d=amax/127, ds=half2(d, sum(x))"
+    },
+    {
+      "file": ".cache/authorities/llama.cpp/ggml/src/ggml-cuda/quantize.cuh",
+      "sha256": "112e190a096e1fa68d4c72ca2a450cb202586e3f2919c884f3e3316a8d5c57cd",
+      "use": "CUDA_QUANTIZE_BLOCK_SIZE=256"
+    },
+    {
+      "file": ".cache/authorities/llama.cpp/ggml/src/ggml-cuda/unary.cuh",
+      "sha256": "281a094dc34dd98a7e3d297c27a6d919a1bf482da2c76700ff6d56c4a31fef1d",
+      "use": "ggml_cuda_op_silu_single"
+    },
+    {
+      "file": ".cache/authorities/llama.cpp/ggml/src/ggml-common.h",
+      "sha256": "af255601767325f087313fa84b9435cb77aeec37df6b61b98d9ecc65f29fb4a0",
+      "use": "block_q4_K 144B and block_q8_1 36B layouts"
+    },
+    {
+      "file": ".cache/authorities/llama.cpp/ggml/src/ggml-cuda/common.cuh",
+      "sha256": "af2bf79c832015090f186ae8aca2a7af4343cc9d9b9d52ed09060a6728692b87",
+      "use": "ggml_cuda_dp4a, warp_reduce_sum/max, type traits QI4_K"
+    }
+  ],
+  "local_modifications": [
+    "BF16 activation input to quantize_q8_1 (llama kernel is float)",
+    "no ggml PDL, fastdiv, ids, or multi-channel/sample",
+    "fused SWIGLU stores BF16 for the Quartz FFN buffer adapter",
+    "compile-time production shapes 5120x17408 and 17408x5120 only",
+    "no ggml tensor descriptors"
+  ]
+}
