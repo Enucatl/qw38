@@ -46,6 +46,14 @@ cudaError_t launch_q8_coop_mmv(const std::uint8_t* weights, std::size_t rows,
                                unsigned int warps_per_row,
                                cudaStream_t stream) noexcept;
 
+cudaError_t launch_q8_coop_mmv_grouped_r1_w4(
+    const Q8GroupedProjDesc* descriptors, const Q8GroupedProjDesc host[4],
+    std::size_t columns, const void* staged, cudaStream_t stream) noexcept;
+
+cudaError_t upload_q8_grouped_descriptors(Q8GroupedProjDesc* device,
+                                          const Q8GroupedProjDesc host[4],
+                                          cudaStream_t stream) noexcept;
+
 int q8_coop_occupancy(unsigned int warps_per_row) noexcept;
 int q8_coop_occupancy(unsigned int rows_per_cta,
                       unsigned int warps_per_row) noexcept;
@@ -156,6 +164,64 @@ __global__ void q8_coop_mmv(const std::uint8_t* weights, std::size_t rows,
       }
       if (lane == 0 && active) output[row] = sum;
     }
+  }
+}
+
+__global__ void q8_coop_mmv_grouped_r1_w4(const Q8GroupedProjDesc* desc,
+                                         std::size_t columns,
+                                         const Q8_1Block* staged) {
+  constexpr int RowsPerCta = 1;
+  constexpr int WarpsPerRow = 4;
+  const int lane = threadIdx.x;
+  const int warp = threadIdx.y;
+  const int row_in_cta = warp / WarpsPerRow;
+  const int coop = warp % WarpsPerRow;
+
+  unsigned int remaining = static_cast<unsigned int>(blockIdx.x);
+  const Q8GroupedProjDesc* chosen = nullptr;
+  std::size_t row = 0;
+#pragma unroll
+  for (int index = 0; index < kQ8GroupedDescCount; ++index) {
+    const unsigned int n = static_cast<unsigned int>(desc[index].rows);
+    if (remaining < n) {
+      chosen = desc + index;
+      row = static_cast<std::size_t>(remaining);
+      break;
+    }
+    remaining -= n;
+  }
+  const bool mapped =
+      chosen != nullptr && chosen->weights != nullptr && chosen->output != nullptr;
+  const bool active = mapped && row < chosen->rows;
+
+  const int tid = kWarp * coop + lane;
+  const int n_blocks = static_cast<int>(columns / kQ80Values);
+  constexpr int blocks_per_iter = kVdr * WarpsPerRow * kWarp / kQI8;
+  float acc = 0.0F;
+  if (active) {
+    const std::uint8_t* row_weights =
+        chosen->weights + row * static_cast<std::size_t>(n_blocks) * kQ80Bytes;
+    for (int kbx = tid / (kQI8 / kVdr); kbx < n_blocks; kbx += blocks_per_iter) {
+      const int iqs = kVdr * (tid % (kQI8 / kVdr));
+      acc += vec_dot_q8_0_q8_1(
+          row_weights + static_cast<std::size_t>(kbx) * kQ80Bytes, staged + kbx,
+          iqs);
+    }
+  }
+
+  __shared__ float partial[RowsPerCta][WarpsPerRow][kWarp];
+  partial[row_in_cta][coop][lane] = acc;
+  __syncthreads();
+  if (coop == 0) {
+    float sum = 0.0F;
+#pragma unroll
+    for (int other = 0; other < WarpsPerRow; ++other) {
+      sum += partial[row_in_cta][other][lane];
+    }
+    for (int offset = kWarp / 2; offset > 0; offset /= 2) {
+      sum += __shfl_down_sync(0xFFFFFFFFU, sum, offset, kWarp);
+    }
+    if (lane == 0 && active) chosen->output[row] = sum;
   }
 }
 

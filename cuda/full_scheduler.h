@@ -475,6 +475,10 @@ class SchedulerWorkspace final {
 
   Status create(std::size_t capacity) noexcept;
   void invalidate_q8_decode_staging() noexcept;
+  cudaError_t bind_q8_grouped_descriptors(
+      std::size_t layer_index, const Q8GroupedProjDesc host[4],
+      const void* model_id, std::uint64_t graph_generation,
+      cudaStream_t stream) noexcept;
   std::size_t allocated_bytes() const noexcept;
 #ifdef QW38_DIAGNOSTIC_TRACE
   Status copy_trace_taps(float* output, std::size_t count) const noexcept;
@@ -490,6 +494,13 @@ class SchedulerWorkspace final {
   Q8Block* q8_ = nullptr;
   const __nv_bfloat16* q8_decode_staged_activation_ = nullptr;
   std::size_t q8_decode_staged_columns_ = 0;
+  Q8GroupedProjDesc* q8_grouped_descs_ = nullptr;
+  Q8GroupedProjDesc q8_grouped_host_[internal::kModelLayerCount *
+                                     kQ8GroupedDescCount]{};
+  bool q8_grouped_valid_[internal::kModelLayerCount]{};
+  const void* q8_grouped_model_id_ = nullptr;
+  const void* q8_grouped_workspace_id_ = nullptr;
+  std::uint64_t q8_grouped_graph_generation_ = 0;
   float* projection_a_ = nullptr;
   float* projection_b_ = nullptr;
   float* projection_c_ = nullptr;

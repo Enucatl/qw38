@@ -1504,6 +1504,51 @@ cudaError_t matrix_vector(const DeviceTensor& matrix,
                           stream);
 }
 
+cudaError_t launch_q8_mixer_input_group(
+    SchedulerWorkspace* workspace, std::size_t layer_index,
+    const DeviceTensor tensors[4], float* const outputs[4], int count,
+    const __nv_bfloat16* activation, const void* model_id,
+    std::uint64_t graph_generation, cudaStream_t stream) noexcept {
+  if (workspace == nullptr || tensors == nullptr || outputs == nullptr ||
+      count < 1 || count > kQ8GroupedDescCount) {
+    return cudaErrorInvalidValue;
+  }
+  if (!q8_decode_uses_grouped_r1_w4()) {
+    cudaError_t error = cudaSuccess;
+    for (int index = 0; index < count && error == cudaSuccess; ++index) {
+      error = matrix_vector(tensors[index], activation, workspace,
+                            outputs[index], stream);
+    }
+    return error;
+  }
+  if (activation == nullptr || workspace->q8_ == nullptr ||
+      tensors[0].columns == 0 || tensors[0].columns % 32 != 0) {
+    return cudaErrorInvalidValue;
+  }
+  const std::size_t columns = tensors[0].columns;
+  cudaError_t error = cudaSuccess;
+  if (workspace->q8_decode_staged_activation_ != activation ||
+      workspace->q8_decode_staged_columns_ != columns) {
+    error = launch_quantize_bf16_q8_1(activation, workspace->q8_, columns,
+                                      stream);
+    if (error != cudaSuccess) return error;
+    workspace->q8_decode_staged_activation_ = activation;
+    workspace->q8_decode_staged_columns_ = columns;
+  }
+  Q8GroupedProjDesc host[kQ8GroupedDescCount]{};
+  for (int index = 0; index < count; ++index) {
+    host[index].weights = tensors[index].data;
+    host[index].rows = tensors[index].rows;
+    host[index].output = outputs[index];
+  }
+  error = workspace->bind_q8_grouped_descriptors(
+      layer_index, host, model_id, graph_generation, stream);
+  if (error != cudaSuccess) return error;
+  return launch_q8_coop_mmv_grouped_r1_w4(
+      workspace->q8_grouped_descs_ + layer_index * kQ8GroupedDescCount, host,
+      columns, workspace->q8_, stream);
+}
+
 cudaError_t matrix_prompt(const DeviceTensor& matrix,
                           const __nv_bfloat16* activation,
                           std::size_t prompt_rows,
@@ -2495,6 +2540,12 @@ Status SchedulerGraphs::create(const ResidentModel& model,
   workspace_ = workspace;
   allocated_bytes_ = free_before >= free_after ? free_before - free_after : 0;
   workspace->invalidate_q8_decode_staging();
+  workspace->q8_grouped_model_id_ = nullptr;
+  workspace->q8_grouped_workspace_id_ = nullptr;
+  workspace->q8_grouped_graph_generation_ =
+      reinterpret_cast<std::uint64_t>(this);
+  std::memset(workspace->q8_grouped_valid_, 0,
+              sizeof(workspace->q8_grouped_valid_));
   return Status::ok();
 }
 
@@ -2852,6 +2903,18 @@ SchedulerWorkspace& SchedulerWorkspace::operator=(
   q8_decode_staged_columns_ = other.q8_decode_staged_columns_;
   other.q8_decode_staged_activation_ = nullptr;
   other.q8_decode_staged_columns_ = 0;
+  QW38_MOVE_POINTER(q8_grouped_descs_);
+  std::memcpy(q8_grouped_host_, other.q8_grouped_host_,
+              sizeof(q8_grouped_host_));
+  std::memcpy(q8_grouped_valid_, other.q8_grouped_valid_,
+              sizeof(q8_grouped_valid_));
+  q8_grouped_model_id_ = other.q8_grouped_model_id_;
+  q8_grouped_workspace_id_ = this;
+  q8_grouped_graph_generation_ = other.q8_grouped_graph_generation_;
+  other.q8_grouped_model_id_ = nullptr;
+  other.q8_grouped_workspace_id_ = nullptr;
+  other.q8_grouped_graph_generation_ = 0;
+  std::memset(other.q8_grouped_valid_, 0, sizeof(other.q8_grouped_valid_));
   QW38_MOVE_POINTER(projection_a_);
   QW38_MOVE_POINTER(projection_b_);
   QW38_MOVE_POINTER(projection_c_);
@@ -2948,6 +3011,7 @@ void SchedulerWorkspace::release() noexcept {
   QW38_FREE(projection_c_);
   QW38_FREE(projection_b_);
   QW38_FREE(projection_a_);
+  QW38_FREE(q8_grouped_descs_);
   QW38_FREE(q8_);
   QW38_FREE(ffn_activated_);
   QW38_FREE(projected_bf16_);
@@ -2974,11 +3038,46 @@ void SchedulerWorkspace::release() noexcept {
   allocated_bytes_ = 0;
   q8_decode_staged_activation_ = nullptr;
   q8_decode_staged_columns_ = 0;
+  q8_grouped_model_id_ = nullptr;
+  q8_grouped_workspace_id_ = nullptr;
+  q8_grouped_graph_generation_ = 0;
+  std::memset(q8_grouped_valid_, 0, sizeof(q8_grouped_valid_));
 }
 
 void SchedulerWorkspace::invalidate_q8_decode_staging() noexcept {
   q8_decode_staged_activation_ = nullptr;
   q8_decode_staged_columns_ = 0;
+}
+
+cudaError_t SchedulerWorkspace::bind_q8_grouped_descriptors(
+    std::size_t layer_index, const Q8GroupedProjDesc host[4],
+    const void* model_id, std::uint64_t graph_generation,
+    cudaStream_t stream) noexcept {
+  if (q8_grouped_descs_ == nullptr || host == nullptr ||
+      layer_index >= internal::kModelLayerCount) {
+    return cudaErrorInvalidValue;
+  }
+  const bool identity_ok = q8_grouped_model_id_ == model_id &&
+                           q8_grouped_workspace_id_ == this &&
+                           q8_grouped_graph_generation_ == graph_generation;
+  if (!identity_ok) {
+    q8_grouped_model_id_ = model_id;
+    q8_grouped_workspace_id_ = this;
+    q8_grouped_graph_generation_ = graph_generation;
+    std::memset(q8_grouped_valid_, 0, sizeof(q8_grouped_valid_));
+  }
+  Q8GroupedProjDesc* cached =
+      q8_grouped_host_ + layer_index * kQ8GroupedDescCount;
+  if (q8_grouped_valid_[layer_index] &&
+      std::memcmp(cached, host,
+                  sizeof(Q8GroupedProjDesc) * kQ8GroupedDescCount) == 0) {
+    return cudaSuccess;
+  }
+  std::memcpy(cached, host, sizeof(Q8GroupedProjDesc) * kQ8GroupedDescCount);
+  const cudaError_t error = upload_q8_grouped_descriptors(
+      q8_grouped_descs_ + layer_index * kQ8GroupedDescCount, host, stream);
+  if (error == cudaSuccess) q8_grouped_valid_[layer_index] = true;
+  return error;
 }
 
 Status SchedulerWorkspace::create(std::size_t capacity) noexcept {
@@ -3005,6 +3104,11 @@ Status SchedulerWorkspace::create(std::size_t capacity) noexcept {
   QW38_ALLOCATE(projected_bf16_, internal::kGdnValueWidth);
   QW38_ALLOCATE(ffn_activated_, internal::kFfnWidth);
   QW38_ALLOCATE(q8_, internal::kFfnWidth / 32);
+  if (error == cudaSuccess) {
+    error = allocate(&q8_grouped_descs_,
+                     internal::kModelLayerCount * kQ8GroupedDescCount,
+                     &allocated_bytes_);
+  }
   QW38_ALLOCATE(projection_a_, kMaximumProjection);
   QW38_ALLOCATE(projection_b_, kMaximumProjection);
   QW38_ALLOCATE(projection_c_, internal::kAttentionKvWidth);
@@ -3287,6 +3391,8 @@ Status execute_token(const ResidentModel& model, std::size_t token,
       if (exclusive && error == cudaSuccess) {
         error = begin_phase(categories, mixer_mmv);
       }
+      const std::uint64_t graph_generation =
+          graphs == nullptr ? 0 : reinterpret_cast<std::uint64_t>(graphs);
       if (gdn_layer) {
         if (error == cudaSuccess) {
           error = begin_phase(leaves, leaf_timings == nullptr
@@ -3294,38 +3400,15 @@ Status execute_token(const ResidentModel& model, std::size_t token,
                                           : &leaf_timings->proj_packed_qkv);
         }
         if (error == cudaSuccess) {
-          error = matrix_vector(layer.gdn.packed_qkv, workspace->normalized_,
-                                workspace, workspace->projection_a_, nullptr);
-        }
-        if (error == cudaSuccess) error = end_phase(leaves);
-        if (error == cudaSuccess) {
-          error = begin_phase(leaves, leaf_timings == nullptr
-                                          ? nullptr
-                                          : &leaf_timings->proj_value_gate);
-        }
-        if (error == cudaSuccess) {
-          error = matrix_vector(layer.gdn.value_gate, workspace->normalized_,
-                                workspace, workspace->projection_b_, nullptr);
-        }
-        if (error == cudaSuccess) error = end_phase(leaves);
-        if (error == cudaSuccess) {
-          error = begin_phase(leaves, leaf_timings == nullptr
-                                          ? nullptr
-                                          : &leaf_timings->proj_alpha);
-        }
-        if (error == cudaSuccess) {
-          error = matrix_vector(layer.gdn.alpha, workspace->normalized_,
-                                workspace, workspace->projection_c_, nullptr);
-        }
-        if (error == cudaSuccess) error = end_phase(leaves);
-        if (error == cudaSuccess) {
-          error = begin_phase(leaves, leaf_timings == nullptr
-                                          ? nullptr
-                                          : &leaf_timings->proj_beta);
-        }
-        if (error == cudaSuccess) {
-          error = matrix_vector(layer.gdn.beta, workspace->normalized_,
-                                workspace, workspace->projection_d_, nullptr);
+          const DeviceTensor gdn_inputs[4] = {
+              layer.gdn.packed_qkv, layer.gdn.value_gate, layer.gdn.alpha,
+              layer.gdn.beta};
+          float* gdn_outputs[4] = {
+              workspace->projection_a_, workspace->projection_b_,
+              workspace->projection_c_, workspace->projection_d_};
+          error = launch_q8_mixer_input_group(
+              workspace, layer_index, gdn_inputs, gdn_outputs, 4,
+              workspace->normalized_, model.blob_, graph_generation, nullptr);
         }
         if (error == cudaSuccess) error = end_phase(leaves);
       } else {
@@ -3335,29 +3418,15 @@ Status execute_token(const ResidentModel& model, std::size_t token,
                                           : &leaf_timings->proj_query_gate);
         }
         if (error == cudaSuccess) {
-          error = matrix_vector(layer.attention.query_gate,
-                                workspace->normalized_, workspace,
-                                workspace->projection_a_, nullptr);
-        }
-        if (error == cudaSuccess) error = end_phase(leaves);
-        if (error == cudaSuccess) {
-          error = begin_phase(leaves, leaf_timings == nullptr
-                                          ? nullptr
-                                          : &leaf_timings->proj_key);
-        }
-        if (error == cudaSuccess) {
-          error = matrix_vector(layer.attention.key, workspace->normalized_,
-                                workspace, workspace->projection_c_, nullptr);
-        }
-        if (error == cudaSuccess) error = end_phase(leaves);
-        if (error == cudaSuccess) {
-          error = begin_phase(leaves, leaf_timings == nullptr
-                                          ? nullptr
-                                          : &leaf_timings->proj_value);
-        }
-        if (error == cudaSuccess) {
-          error = matrix_vector(layer.attention.value, workspace->normalized_,
-                                workspace, workspace->projection_d_, nullptr);
+          const DeviceTensor attn_inputs[4] = {
+              layer.attention.query_gate, layer.attention.key,
+              layer.attention.value, DeviceTensor{}};
+          float* attn_outputs[4] = {
+              workspace->projection_a_, workspace->projection_c_,
+              workspace->projection_d_, nullptr};
+          error = launch_q8_mixer_input_group(
+              workspace, layer_index, attn_inputs, attn_outputs, 3,
+              workspace->normalized_, model.blob_, graph_generation, nullptr);
         }
         if (error == cudaSuccess) error = end_phase(leaves);
       }

@@ -9,6 +9,7 @@
 
 #include "ffn_decode_path.cuh"
 #include "production_numerics.h"
+#include "q8_decode_path.cuh"
 
 namespace qw38::cuda {
 
@@ -134,6 +135,14 @@ cudaError_t launch_q8_coop_mmv(const std::uint8_t* weights, std::size_t rows,
                                float* output, unsigned int rows_per_cta,
                                unsigned int warps_per_row,
                                cudaStream_t stream) noexcept;
+
+cudaError_t launch_q8_coop_mmv_grouped_r1_w4(
+    const Q8GroupedProjDesc* descriptors, const Q8GroupedProjDesc host[4],
+    std::size_t columns, const void* staged, cudaStream_t stream) noexcept;
+
+cudaError_t upload_q8_grouped_descriptors(Q8GroupedProjDesc* device,
+                                          const Q8GroupedProjDesc host[4],
+                                          cudaStream_t stream) noexcept;
 
 int q8_coop_occupancy(unsigned int warps_per_row) noexcept;
 int q8_coop_occupancy(unsigned int rows_per_cta,

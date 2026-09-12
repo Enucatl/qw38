@@ -829,7 +829,10 @@ timed concession phases `not_applicable`. Policy emits separate
 `successor_model_quality_pass`, and `regression_release_quality_pass`; the
 active `quality_contract_id` is `opt091_late_w4_v1` while
 `model_quality_pass` continues to name the contract that supplied the value.
-This increment **claims no throughput improvement**.
+OPT-056 remains the owner of absolute greedy-task accuracy and stays failed
+on inherited `task_arithmetic`; OPT-016 remains the 2K llama.cpp parity owner.
+Those historical failures are not relabeled and do not become OPT-091 keep
+evidence. This increment **claims no throughput improvement**.
 [`pins/opt091_quality_tradeoff_contract.json`](../pins/opt091_quality_tradeoff_contract.json)
 ·
 [`evidence/optimization/opt091-quality-tradeoff/REPORT.md`](../evidence/optimization/opt091-quality-tradeoff/REPORT.md).

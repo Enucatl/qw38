@@ -4,14 +4,18 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any, Sequence
+from typing import Any, Mapping, Sequence
 
 from tools.opt073_quality_policy import (
     quality_v3_verdicts,
     retained_generated,
     retained_nll_bundle,
 )
-from tools.quality.compare import compare_engine_records, evaluate_ppl_contract
+from tools.quality.compare import (
+    compare_engine_records,
+    evaluate_ppl_contract,
+    resolve_quality_contract,
+)
 from tools.quality.errors import QualityFrameworkError
 from tools.quality.identity import (
     GGUF_SHA,
@@ -124,8 +128,8 @@ def evaluate_quality_contracts(
         )
         func_ok = int(functional_failures) <= int(spec["new_functional_failures_max"])
         greedy_ok = not greedy_mismatch or bool(spec["allow_new_greedy_mismatch"])
-        inherited_ok = (
-            not changed_inherited_answer or bool(spec["allow_changed_inherited_answer"])
+        inherited_ok = not changed_inherited_answer or bool(
+            spec["allow_changed_inherited_answer"]
         )
         complete_ok = not incomplete or bool(spec["allow_incomplete_quality"])
         passed = bool(
@@ -151,6 +155,7 @@ def evaluate_quality_contracts(
             "complete_pass": complete_ok,
         }
     return {"contracts": verdicts, "contract_ids": selected}
+
 
 SUITE_CLASSES: tuple[str, ...] = (
     "teacher_forced_continuation",
@@ -192,7 +197,9 @@ def synthetic_steps(
     return rows
 
 
-def teacher_forced_continuation() -> dict[str, Any]:
+def teacher_forced_continuation(
+    contract: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
     examples: list[dict[str, Any]] = []
     quartz_map: dict[str, dict[str, Any]] = {}
     llama_map: dict[str, dict[str, Any]] = {}
@@ -238,7 +245,8 @@ def teacher_forced_continuation() -> dict[str, Any]:
                 },
             )
         )
-    compared = compare_engine_records(quartz_map, llama_map)
+    compared = compare_engine_records(quartz_map, llama_map, contract=contract)
+    limits = resolve_quality_contract(contract)
     return {
         "class": "teacher_forced_continuation",
         "inspectable": True,
@@ -248,6 +256,8 @@ def teacher_forced_continuation() -> dict[str, Any]:
         "identity": identity_rows,
         "llama_control_scorer": LLAMA_ADAPTER,
         "quartz_scorer": QUARTZ_NATIVE,
+        "quality_contract_id": limits["quality_contract_id"],
+        "ppl_ratio_max": limits["ppl_ratio_max"],
     }
 
 
@@ -447,12 +457,24 @@ def finite_vocab_state_consistency() -> dict[str, Any]:
     }
 
 
-def run_suite() -> dict[str, Any]:
+def run_suite(contract: Mapping[str, Any] | str | None = None) -> dict[str, Any]:
+    mapping: Mapping[str, Any] | None
+    contract_id: str | None
+    if isinstance(contract, str):
+        mapping = quality_contract_spec(contract)
+        contract_id = contract
+    elif isinstance(contract, Mapping):
+        mapping = contract
+        contract_id = str(contract.get("quality_contract_id") or "") or None
+    else:
+        mapping = None
+        contract_id = None
+    limits = resolve_quality_contract(mapping)
     classes = {
-        "teacher_forced_continuation": teacher_forced_continuation(),
+        "teacher_forced_continuation": teacher_forced_continuation(mapping),
         "known_qwen_continuations": known_qwen_continuations(),
-        "ppl_1024_spans": ppl_1024_spans(),
-        "recurrence_nll": recurrence_nll(),
+        "ppl_1024_spans": ppl_1024_spans(contract_id),
+        "recurrence_nll": recurrence_nll(contract_id),
         "opt073_dual_verdict": opt073_dual_verdict(),
         "held_out_32_alarm": held_out_32_alarm(),
         "finite_vocab_state_consistency": finite_vocab_state_consistency(),
@@ -469,10 +491,17 @@ def run_suite() -> dict[str, Any]:
         "native_reuse": [LLAMA_ADAPTER, QUARTZ_NATIVE],
         "ds4_datasets_not_applicable": list(DS4_DATASETS_NOT_APPLICABLE),
         "same_model_comparison_with_ds4": False,
+        "quality_contract_id": limits["quality_contract_id"],
         "proposed_acceptance": {
             "quartz_vs_shipping_baseline_regression": "primary_candidate_gate",
-            "ppl_ratio_max": PPL_RATIO_MAX,
-            "recurrence_incremental_nll_max": RECURRENCE_MAX,
+            "ppl_ratio_max": (
+                limits["ppl_ratio_max"] if mapping is not None else PPL_RATIO_MAX
+            ),
+            "recurrence_incremental_nll_max": (
+                limits["recurrence_incremental_nll_max"]
+                if mapping is not None
+                else RECURRENCE_MAX
+            ),
             "engine_non_regression": "OPT-073 quality-v3",
             "absolute_task_accuracy": "visible_and_separate",
             "quartz_vs_llama_nll": "inspectable_control",

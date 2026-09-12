@@ -108,6 +108,33 @@ cudaError_t launch_q8_coop_mmv(const std::uint8_t* weights, std::size_t rows,
                             output, 1U, warps_per_row, stream);
 }
 
+cudaError_t upload_q8_grouped_descriptors(Q8GroupedProjDesc* device,
+                                          const Q8GroupedProjDesc host[4],
+                                          cudaStream_t stream) noexcept {
+  if (device == nullptr || host == nullptr) return cudaErrorInvalidValue;
+  return cudaMemcpyAsync(device, host, sizeof(Q8GroupedProjDesc) * 4,
+                         cudaMemcpyHostToDevice, stream);
+}
+
+cudaError_t launch_q8_coop_mmv_grouped_r1_w4(
+    const Q8GroupedProjDesc* descriptors, const Q8GroupedProjDesc host[4],
+    std::size_t columns, const void* staged, cudaStream_t stream) noexcept {
+  if (descriptors == nullptr || host == nullptr || staged == nullptr ||
+      columns == 0 || columns % kQ80Values != 0) {
+    return cudaErrorInvalidValue;
+  }
+  unsigned int grid = 0;
+  for (int index = 0; index < kQ8GroupedDescCount; ++index) {
+    grid += static_cast<unsigned int>(host[index].rows);
+  }
+  record_q8_grouped_dispatch(static_cast<std::size_t>(grid), columns);
+  if (grid == 0) return cudaSuccess;
+  dim3 block(kWarpSize, 4);
+  q8_dots::q8_coop_mmv_grouped_r1_w4<<<grid, block, 0, stream>>>(
+      descriptors, columns, static_cast<const Q8_1Block*>(staged));
+  return cudaPeekAtLastError();
+}
+
 int q8_coop_occupancy(unsigned int rows_per_cta,
                       unsigned int warps_per_row) noexcept {
   int occupancy = 0;

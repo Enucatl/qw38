@@ -62,6 +62,7 @@ struct Options final {
   const char* cache_mode = nullptr;
   const char* capture_key = nullptr;
   const char* q8_layout = nullptr;
+  const char* q8_grouping = nullptr;
   const char* q4_decode = nullptr;
   const char* ffn_decode = nullptr;
   const char* gdn_decode = nullptr;
@@ -82,7 +83,7 @@ int usage(const char* argv0) {
                "decode-mixer|decode-gdn|decode-attention|prompt-ffn|"
                "acceptance|hardware] [MODEL] "
                "[--cache-mode hot|rotating] [--capture-key KEY] "
-               "[--q8-layout r1_w4|r2_w2] [--mmq-async-x 0|1] "
+               "[--q8-layout r1_w4|r2_w2] [--q8-grouping separate|grouped_r1_w4] [--mmq-async-x 0|1] "
                "[--q4-decode packed|integer_q8|integer_q8_late] "
                "[--q4-warps 2|4] "
                "[--ffn-decode paired_staged|shared_stage|paired_integer] "
@@ -106,6 +107,8 @@ int parse_args(int argc, char** argv, Options* options) {
       options->capture_key = argv[++index];
     } else if (std::strcmp(arg, "--q8-layout") == 0 && index + 1 < argc) {
       options->q8_layout = argv[++index];
+    } else if (std::strcmp(arg, "--q8-grouping") == 0 && index + 1 < argc) {
+      options->q8_grouping = argv[++index];
     } else if (std::strcmp(arg, "--mmq-async-x") == 0 && index + 1 < argc) {
       options->mmq_async_x = std::atoi(argv[++index]);
     } else if (std::strcmp(arg, "--q4-decode") == 0 && index + 1 < argc) {
@@ -1125,7 +1128,8 @@ cudaError_t replay_mixer_layer(const qw38::cuda::DeviceLayer& layer,
                                const float* residual,
                                qw38::cuda::SchedulerWorkspace* workspace,
                                cudaStream_t stream, cudaEvent_t kernel_start,
-                               cudaEvent_t kernel_stop) {
+                               cudaEvent_t kernel_stop, std::size_t layer_index,
+                               const void* model_id) {
   workspace->invalidate_q8_decode_staging();
   cudaError_t error = qw38::cuda::launch_rms_norm_fp32_to_bf16(
       residual, layer.common.input_norm, qw38::internal::kResidualWidth,
@@ -1147,7 +1151,43 @@ cudaError_t replay_mixer_layer(const qw38::cuda::DeviceLayer& layer,
         tensor.data, tensor.rows, tensor.columns, workspace->q8_, output,
         layout.rows_per_cta, layout.warps_per_row, stream);
   };
-  if (layer.kind == qw38::internal::LayerKind::kGdn) {
+  auto grouped_inputs = [&]() -> cudaError_t {
+    qw38::cuda::Q8GroupedProjDesc host[qw38::cuda::kQ8GroupedDescCount]{};
+    int count = 0;
+    if (layer.kind == qw38::internal::LayerKind::kGdn) {
+      host[0] = {layer.gdn.packed_qkv.data, layer.gdn.packed_qkv.rows,
+                 workspace->projection_a_};
+      host[1] = {layer.gdn.value_gate.data, layer.gdn.value_gate.rows,
+                 workspace->projection_b_};
+      host[2] = {layer.gdn.alpha.data, layer.gdn.alpha.rows,
+                 workspace->projection_c_};
+      host[3] = {layer.gdn.beta.data, layer.gdn.beta.rows,
+                 workspace->projection_d_};
+      count = 4;
+    } else {
+      host[0] = {layer.attention.query_gate.data,
+                 layer.attention.query_gate.rows, workspace->projection_a_};
+      host[1] = {layer.attention.key.data, layer.attention.key.rows,
+                 workspace->projection_c_};
+      host[2] = {layer.attention.value.data, layer.attention.value.rows,
+                 workspace->projection_d_};
+      count = 3;
+    }
+    (void)count;
+    cudaError_t local = workspace->bind_q8_grouped_descriptors(
+        layer_index, host, model_id, 0, stream);
+    if (local != cudaSuccess) return local;
+    const std::size_t columns = layer.kind == qw38::internal::LayerKind::kGdn
+                                    ? layer.gdn.packed_qkv.columns
+                                    : layer.attention.query_gate.columns;
+    return qw38::cuda::launch_q8_coop_mmv_grouped_r1_w4(
+        workspace->q8_grouped_descs_ +
+            layer_index * qw38::cuda::kQ8GroupedDescCount,
+        host, columns, workspace->q8_, stream);
+  };
+  if (qw38::cuda::q8_decode_uses_grouped_r1_w4()) {
+    if (error == cudaSuccess) error = grouped_inputs();
+  } else if (layer.kind == qw38::internal::LayerKind::kGdn) {
     if (error == cudaSuccess) {
       error = proj(layer.gdn.packed_qkv, workspace->projection_a_);
     }
@@ -1676,6 +1716,7 @@ int time_family(qw38::cuda::ResidentModel* model,
     dest.count = 0;
     dest.pool_overflow = false;
     if (error == cudaSuccess) error = pool.record_epoch(nullptr);
+    qw38::cuda::reset_q8_projection_launch_counts();
     int gate_up = 0;
     int down = 0;
     int mixer = 0;
@@ -1736,7 +1777,8 @@ int time_family(qw38::cuda::ResidentModel* model,
       } else if (family == qw38::cuda::ReplayFamily::kDecodeMixer) {
         if (error == cudaSuccess) {
           error = replay_mixer_layer(layer, workspace.residual_a_, &workspace,
-                                     nullptr, nullptr, nullptr);
+                                     nullptr, nullptr, nullptr, layer_index,
+                                     model);
         }
         mixer += layer.kind == qw38::internal::LayerKind::kGdn ? 5 : 4;
         if (layer.kind == qw38::internal::LayerKind::kGdn) {
@@ -1799,17 +1841,32 @@ int time_family(qw38::cuda::ResidentModel* model,
       end_ms = std::max(end_ms, dest.records[index].end_ms);
     }
     const float enclosing = end_ms - start_ms;
+    const unsigned int grouped_launches = qw38::cuda::q8_grouped_launch_count();
+    const unsigned int projection_launches =
+        qw38::cuda::q8_projection_launch_count();
+    const unsigned int output_launches =
+        static_cast<unsigned int>(gdn_groups + attn_groups);
+    const unsigned int input_launches =
+        grouped_launches > 0
+            ? grouped_launches
+            : (projection_launches >= output_launches
+                   ? projection_launches - output_launches
+                   : projection_launches);
     std::printf(
         "round family=%s cache_mode=%s warmup=%s sample_index=%d "
         "observation_unit=independent_round enclosing_ms=%.6f "
         "kernel_only_ms=%.6f gate_up_calls=%d down_calls=%d mixer_calls=%d "
         "gdn_input_output_groups=%d attention_input_output_groups=%d "
+        "q8_input_projection_launches=%u q8_grouped_launches=%u "
+        "q8_projection_launches=%u q8_grouping=%s "
         "rotating_layers=%zu working_set_bytes=%zu exceeds_2x_l2=%s "
         "eviction_outside_interval=false pooled_events=true "
         "staging_ops_per_ffn=2 invalidate_q8_decode_staging=true\n",
         qw38::cuda::replay_family_name(family), qw38::cuda::cache_mode_name(mode),
         json_bool(warmup), warmup ? sample : sample - warmups, enclosing,
-        kernel_acc, gate_up, down, mixer, gdn_groups, attn_groups, layers.size(),
+        kernel_acc, gate_up, down, mixer, gdn_groups, attn_groups,
+        input_launches, grouped_launches, projection_launches,
+        qw38::cuda::effective_q8_decode_grouping(), layers.size(),
         working, json_bool(exceeds));
     if (rounds_out != nullptr && !warmup) {
       std::fprintf(
@@ -1953,6 +2010,12 @@ int run_family(const Options& options, qw38::cuda::ReplayFamily family) {
   if (options.q8_layout != nullptr &&
       !qw38::cuda::apply_q8_layout_ident(options.q8_layout)) {
     std::fprintf(stderr, "invalid --q8-layout %s\n", options.q8_layout);
+    if (rounds != nullptr) std::fclose(rounds);
+    return 1;
+  }
+  if (options.q8_grouping != nullptr &&
+      !qw38::cuda::apply_q8_grouping_ident(options.q8_grouping)) {
+    std::fprintf(stderr, "invalid --q8-grouping %s\n", options.q8_grouping);
     if (rounds != nullptr) std::fclose(rounds);
     return 1;
   }

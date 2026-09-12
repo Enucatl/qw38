@@ -4,9 +4,14 @@ from __future__ import annotations
 
 import csv
 import io
+import math
 from typing import Any, Mapping, Sequence
 
 from tools.quality.errors import QualityFrameworkError
+
+HISTORICAL_QUALITY_CONTRACT_ID = "opt084_frozen"
+HISTORICAL_PPL_RATIO_MAX = 1.01
+HISTORICAL_RECURRENCE_MAX = 0.02
 
 
 def refuse_single_boolean(record: Mapping[str, Any] | None = None) -> bool:
@@ -19,12 +24,73 @@ def refuse_single_boolean(record: Mapping[str, Any] | None = None) -> bool:
     )
 
 
+def resolve_quality_contract(
+    contract: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Return PPL/recurrence limits. Omitting contract keeps the 1.01 freeze."""
+    if contract is None:
+        return {
+            "quality_contract_id": HISTORICAL_QUALITY_CONTRACT_ID,
+            "ppl_ratio_max": HISTORICAL_PPL_RATIO_MAX,
+            "recurrence_incremental_nll_max": HISTORICAL_RECURRENCE_MAX,
+            "explicit": False,
+        }
+    ppl = contract.get("ppl_ratio_max")
+    if ppl is None and str(contract.get("quality_contract_id") or "") == (
+        "opt091_late_w4_v1"
+    ):
+        ppl = contract.get("candidate_ppl_ratio_max")
+    if ppl is None:
+        ppl = HISTORICAL_PPL_RATIO_MAX
+    rec = contract.get("recurrence_incremental_nll_max")
+    if rec is None:
+        rec = HISTORICAL_RECURRENCE_MAX
+    cid = str(contract.get("quality_contract_id") or HISTORICAL_QUALITY_CONTRACT_ID)
+    return {
+        "quality_contract_id": cid,
+        "ppl_ratio_max": float(ppl),
+        "recurrence_incremental_nll_max": float(rec),
+        "explicit": True,
+    }
+
+
+def ppl_ratio_from_nll(candidate_nll: float, control_nll: float) -> float:
+    return math.exp(float(candidate_nll) - float(control_nll))
+
+
+def ratios_within_contract(
+    ratios: Sequence[float],
+    contract: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    limits = resolve_quality_contract(contract)
+    finite = [float(value) for value in ratios]
+    if not finite or any(not math.isfinite(value) for value in finite):
+        return {
+            "pass": False,
+            "incomplete": True,
+            "max_ratio": None,
+            "ppl_ratio_max": limits["ppl_ratio_max"],
+            "quality_contract_id": limits["quality_contract_id"],
+            "explicit": limits["explicit"],
+        }
+    return {
+        "pass": all(value <= limits["ppl_ratio_max"] for value in finite),
+        "incomplete": False,
+        "max_ratio": max(finite),
+        "ratios": finite,
+        "ppl_ratio_max": limits["ppl_ratio_max"],
+        "quality_contract_id": limits["quality_contract_id"],
+        "explicit": limits["explicit"],
+    }
+
+
 def compare_engine_records(
     left: Mapping[str, Mapping[str, Any]],
     right: Mapping[str, Mapping[str, Any]],
     *,
     left_name: str = "quartz",
     right_name: str = "llama",
+    contract: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     ids = sorted(set(left) & set(right))
     if not ids:
@@ -72,6 +138,9 @@ def compare_engine_records(
         )
     avg_left = left_nll / tokens
     avg_right = right_nll / tokens
+    limits = resolve_quality_contract(contract)
+    ppl_ratio = ppl_ratio_from_nll(avg_right, avg_left) if tokens else float("nan")
+    gated = ratios_within_contract([ppl_ratio], contract)
     return {
         "cases": len(ids),
         "tokens": tokens,
@@ -79,6 +148,10 @@ def compare_engine_records(
         f"{right_name}_avg_nll": avg_right,
         "delta_right_minus_left": avg_right - avg_left,
         "relative_nll_change": (avg_right / avg_left - 1.0) if avg_left else 0.0,
+        "ppl_ratio": ppl_ratio,
+        "ppl_ratio_max": limits["ppl_ratio_max"],
+        "quality_contract_id": limits["quality_contract_id"],
+        "ppl_ratio_pass": gated["pass"],
         "case_wins_right_left_ties": [right_wins, left_wins, ties],
         "first_token_matches_left_right": [left_first, right_first],
         "avg_greedy_lcp_left_right": [left_lcp / len(ids), right_lcp / len(ids)],
@@ -111,9 +184,7 @@ def evaluate_ppl_contract(
         or contract.get("default_ppl_ratio_max")
         or 1.01
     )
-    aggregate_max = float(
-        contract.get("aggregate_ppl_ratio_max", ppl_max) or ppl_max
-    )
+    aggregate_max = float(contract.get("aggregate_ppl_ratio_max", ppl_max) or ppl_max)
     per_ratio = {name: float(value) <= ppl_max for name, value in ratios.items()}
     aggregate = max(float(value) for value in ratios.values())
     aggregate_pass = aggregate <= aggregate_max
