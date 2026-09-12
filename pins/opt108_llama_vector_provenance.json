@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "task": "OPT-108",
+  "authority": "pinned llama.cpp",
+  "llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+  "license": "MIT",
+  "authors": "The ggml authors",
+  "adapter_namespace": "qw38::cuda::opt108",
+  "specialization": "flash_attn_ext_vec<256,1> NVIDIA BF16 KV ncols=1",
+  "not_vendored": [
+    "ggml tensor/runtime",
+    "ggml graph/allocator",
+    "current llama HEAD as release authority"
+  ],
+  "math_flags": {
+    "translation_unit": "cuda/opt108_llama_vector_adapter.cuh",
+    "strict_first": true,
+    "nvccflags": "--fmad=false",
+    "host_fp_contract": "off",
+    "v_dot2_f32_f16_available": false,
+    "nvidia_float2_v_accum": true,
+    "amd_half2_v_accum": false,
+    "note": "V_DOT2_F32_F16_AVAILABLE is HIP/AMD-only in the pin; SM120 uses float2"
+  },
+  "copied_organization": [
+    {
+      "file": ".cache/authorities/llama.cpp/ggml/src/ggml-cuda/fattn-vec.cuh",
+      "sha256": "f6305c9a667f438565ee0afff0e854cce335ddbd67e30fbee466cbc5672a9577",
+      "use": "128-thread mapping, 16-byte Q/K/V copies, tile softmax, NVIDIA float2 VKQ"
+    },
+    {
+      "file": ".cache/authorities/llama.cpp/ggml/src/ggml-cuda/fattn-common.cuh",
+      "sha256": "47537d7980d81f7dc9daa18698f5fdbb990ef6b916fa75fed4bc0bbfd1aa08cb",
+      "use": "BF16 vec_dot_KQ, dequantize_V_bf16, occupancy partition policy, combine_results"
+    },
+    {
+      "file": ".cache/authorities/llama.cpp/ggml/src/ggml-cuda/common.cuh",
+      "sha256": "af2bf79c832015090f186ae8aca2a7af4343cc9d9b9d52ed09060a6728692b87",
+      "use": "16-byte memcpy_1, warp reductions, V_DOT2 AMD-only define"
+    },
+    {
+      "file": ".cache/authorities/llama.cpp/ggml/src/ggml-cuda/convert.cuh",
+      "sha256": "fc32372473421c99494d7eea21ab510a8cea61d637f572afe34ed9db32b0d6ce",
+      "use": "nv_bfloat162 to float2 cast"
+    }
+  ],
+  "local_modifications": [
+    "Quartz physical BF16 KV plus candidate-row addressing",
+    "Q RMSNorm+RoPE prepared once via launch_prepare_decode_query",
+    "Qwen output gate applied after combine",
+    "no ggml tensor descriptors; compile-time Qwen 24/4/256 shape"
+  ]
+}

@@ -280,13 +280,13 @@ verdicts. It does not reopen unchanged rejected candidates. OPT-114 first
 calibrates the current sitting and tests whether graph/launch overhead is real;
 OPT-107–112 then test bounded mechanisms; OPT-113 owns the final sitting. A
 failed screen is a useful measured rejection, not permission for another
-unbounded variant. First eligible task in ledger/dependency order is OPT-108.
+unbounded variant. First eligible task in ledger/dependency order is OPT-109.
 
 | ID | Description | Dependencies | Status | Acceptance condition | Evidence |
 |---|---|---|---|---|---|
 | OPT-114 | Calibrate the fresh sitting and measure real decode launch overhead | OPT-106 | done | Same-binary A/A controls are repeatable; actual host/GPU launch gaps are separated from CUDA-event category time; existing segment graphs are admitted only if a fresh, correct A/B removes a material measured cost | [`tasks/OPT-114.md`](tasks/OPT-114.md); [`pins/opt114_sitting_launch_contract.json`](pins/opt114_sitting_launch_contract.json); [`pins/opt114_iteration_contract.json`](pins/opt114_iteration_contract.json); [`fixtures/opt114_sitting_launch.json`](fixtures/opt114_sitting_launch.json); [`tools/opt114_sitting_launch.py`](tools/opt114_sitting_launch.py); [`tests/test_opt114_sitting_launch.py`](tests/test_opt114_sitting_launch.py); [`cuda/opt114_sitting_launch_test.cu`](cuda/opt114_sitting_launch_test.cu); [`Makefile`](Makefile); [`evidence/optimization/opt114-sitting-and-launch-overhead/REPORT.md`](evidence/optimization/opt114-sitting-and-launch-overhead/REPORT.md); verification 2026-09-12T22:02:00Z |
 | OPT-107 | Dispatch decode attention by measured prefix crossover | OPT-103, OPT-106, OPT-114 | done | Existing warp_query remains at short prefixes while vec128_online is admitted only over a bounded measured range (including 2048 when supported); D128 is unchanged and D2048 component/E2E throughput improves with quality/state/P4096 guards | [`tasks/OPT-107.md`](tasks/OPT-107.md); [`pins/opt107_attention_crossover_contract.json`](pins/opt107_attention_crossover_contract.json); [`pins/opt107_iteration_contract.json`](pins/opt107_iteration_contract.json); [`fixtures/opt107_attention_crossover.json`](fixtures/opt107_attention_crossover.json); [`tools/opt107_attention_crossover.py`](tools/opt107_attention_crossover.py); [`tests/test_opt107_attention_crossover.py`](tests/test_opt107_attention_crossover.py); [`cuda/opt107_attention_crossover_test.cu`](cuda/opt107_attention_crossover_test.cu); [`cuda/attention_decode_path.cuh`](cuda/attention_decode_path.cuh); [`cuda/attention_decode.cu`](cuda/attention_decode.cu); [`Makefile`](Makefile); [`evidence/optimization/opt107-attention-crossover/REPORT.md`](evidence/optimization/opt107-attention-crossover/REPORT.md); verification 2026-09-12T22:30:00Z |
-| OPT-108 | Reproduce the actual NVIDIA pinned-llama vector-attention stack | OPT-103, OPT-106, OPT-114 | pending | A source-faithful NVIDIA vector-attention slice (without assuming an AMD-only half2 path) beats the current attention control on equivalent buffers and clears the complete D2048/non-regression gates, or production is unchanged | [`tasks/OPT-108.md`](tasks/OPT-108.md) |
+| OPT-108 | Reproduce the actual NVIDIA pinned-llama vector-attention stack | OPT-103, OPT-106, OPT-114 | done | A source-faithful NVIDIA vector-attention slice (without assuming an AMD-only half2 path) beats the current attention control on equivalent buffers and clears the complete D2048/non-regression gates, or production is unchanged | [`tasks/OPT-108.md`](tasks/OPT-108.md); [`pins/opt108_llama_vector_stack_contract.json`](pins/opt108_llama_vector_stack_contract.json); [`pins/opt108_iteration_contract.json`](pins/opt108_iteration_contract.json); [`pins/opt108_llama_vector_provenance.json`](pins/opt108_llama_vector_provenance.json); [`fixtures/opt108_llama_vector_stack.json`](fixtures/opt108_llama_vector_stack.json); [`tools/opt108_llama_vector_stack.py`](tools/opt108_llama_vector_stack.py); [`tests/test_opt108_llama_vector_stack.py`](tests/test_opt108_llama_vector_stack.py); [`cuda/opt108_llama_vector_adapter.cuh`](cuda/opt108_llama_vector_adapter.cuh); [`cuda/opt108_llama_vector_stack_test.cu`](cuda/opt108_llama_vector_stack_test.cu); [`Makefile`](Makefile); [`evidence/optimization/opt108-llama-vector-stack/REPORT.md`](evidence/optimization/opt108-llama-vector-stack/REPORT.md); [`evidence/optimization/opt108-llama-vector-stack/REJECTION.md`](evidence/optimization/opt108-llama-vector-stack/REJECTION.md); verification 2026-09-12T22:50:37Z |
 | OPT-109 | Keep transposed GDN state for the session lifetime | OPT-101, OPT-106, OPT-114 | pending | Col-major device state persists across decode steps with no timed per-layer relayout; checkpoint/prompt boundaries round-trip canonically and complete GDN plus D128/D2048 improve, or sequential row-major remains | [`tasks/OPT-109.md`](tasks/OPT-109.md) |
 | OPT-110 | Execute pinned-llama Q4_K MMVQ through a Quartz adapter | OPT-106, OPT-114 | pending | Starting from identical BF16 input and raw Q4_K weights, a source-faithful Q8_1 MMVQ pipeline including its native staging beats the selected Q8Block `integer_q8_late` pipeline, then wins complete rotating FFN and both decode prefixes under existing parity/quality/memory gates, or production is unchanged | [`tasks/OPT-110.md`](tasks/OPT-110.md) |
 | OPT-111 | Reproduce the remaining llama F16 MMA prompt-attention differences | OPT-079, OPT-103, OPT-106, OPT-114 | pending | A source-backed prompt-attention adapter, justified against the shipping OPT-079 `kv_once` control, improves complete attention and P4096 sufficiently to reduce the measured prefill gap while preserving exact causality and quality; otherwise no swizzle follow-up | [`tasks/OPT-111.md`](tasks/OPT-111.md) |
@@ -7494,3 +7494,28 @@ statements below are historical, not the current execution order.
   (**+1.338**); D2048 48.383 → 53.167 (**+4.784**).
   `uses_opt098_arrays_for_keep_reject: false`.
 - Marked OPT-107 `done`. Coupled IDs: none. First eligible pending task: **OPT-108**.
+
+### 2026-09-12T22:52:44Z — OPT-108 llama vector stack delivered (reject)
+
+- Added source-faithful NVIDIA adapter of pinned llama.cpp
+  `flash_attn_ext_vec<256,1>` (`tools/opt108_llama_vector_stack.py`, contracts,
+  fixture, tests, `cuda-opt108-diagnostics`, `opt108_llama_vector_adapter.cuh`,
+  provenance manifest). Control is production OPT-107 hybrid (`warp_query` below
+  1024, `vec128_online` on `[1024, 4096]`). Native parity passed; prepared Q
+  once per head; occupancy/KV-length partitions; NVIDIA float2 V accum.
+- Matched primitive screen (3+10 paired CUDA events on identical buffers):
+  D2048 control **0.03317 ms** vs candidate **0.03101 ms**; saving **+0.00216
+  ms**; CI95 **[−0.00099, 0.00531]**; `positive=false` (CI includes 0). Stop
+  rule: primitive must win D2048 with positive CI before engine integration.
+  **Reject.** Engine integration, complete 16-layer D2048, quality/state/128K,
+  and P4096 were not run.
+- Production unchanged: `attention_decode_path.cuh` crossover **1024** and
+  shipping vec128 pin `warp_query` retained. `claims_throughput=false`.
+  `claims_performance_improvement=false`.
+- Key evidence: [`fixtures/opt108_llama_vector_stack.json`](fixtures/opt108_llama_vector_stack.json);
+  [`evidence/optimization/opt108-llama-vector-stack/REPORT.md`](evidence/optimization/opt108-llama-vector-stack/REPORT.md);
+  [`evidence/optimization/opt108-llama-vector-stack/REJECTION.md`](evidence/optimization/opt108-llama-vector-stack/REJECTION.md).
+- **tok/s delta vs OPT-114 baseline (fresh sitting): 0** (rejection; production
+  unchanged).
+- Marked OPT-108 `done`. Coupled IDs: none. First eligible pending task:
+  **OPT-109**.

@@ -1,0 +1,2773 @@
+{
+  "schema_version": 1,
+  "task": "OPT-108",
+  "mode": "acceptance",
+  "status": "primitive_rejected",
+  "llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+  "gguf_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+  "control": "production_opt107",
+  "candidate": "llama_vec_nvidia",
+  "nvidia_float2_v_accum": true,
+  "amd_half2_v_accum": false,
+  "f16_cache_migration": false,
+  "prepared_q_once": true,
+  "primitive_win": false,
+  "shipping_decode_attention_vec128": "warp_query",
+  "production_kept": false,
+  "claims_throughput": false,
+  "quality": {
+    "quality_v3_absolute": "fail",
+    "quality_v3_engine_non_regression": "pass",
+    "quality_v3_quartz_engine_non_regression": "pass",
+    "quality_v2_all": false,
+    "opt056_visible": true,
+    "identity_cached": true,
+    "status": "quality_policy",
+    "functional_baseline_defect_cannot_excuse_new_errors": true
+  },
+  "numeric": {
+    "nonfinite": 0
+  },
+  "report_path": "evidence/optimization/opt108-llama-vector-stack/REPORT.md",
+  "independent_verdicts": {
+    "production_opt107": {
+      "kernel_parity_pass": true,
+      "primitive_pass": true,
+      "model_quality_pass": true,
+      "performance_pass": true,
+      "production_kept": false
+    },
+    "llama_vec_nvidia": {
+      "kernel_parity_pass": true,
+      "primitive_pass": false,
+      "model_quality_pass": false,
+      "performance_pass": false,
+      "production_kept": false
+    }
+  },
+  "token_generator": "(42 + index * 997) % 248320",
+  "claims_performance_improvement": false,
+  "provenance_manifest": "pins/opt108_llama_vector_provenance.json",
+  "eligibility": {
+    "schema_version": 1,
+    "task": "OPT-108",
+    "phase": "eligibility",
+    "measurement_utc": "2026-09-12T22:50:02Z",
+    "eligible": true,
+    "verdict": "proceed",
+    "reason": "opt107_hybrid_admitted",
+    "opt107_threshold": 1024,
+    "opt107_production_kept": true,
+    "control": "production_opt107"
+  },
+  "parity": {
+    "schema_version": 1,
+    "task": "OPT-108",
+    "phase": "parity",
+    "mode": "feedback",
+    "native_counts": {
+      "schema_version": 1,
+      "task": "OPT-108",
+      "workload": "correctness",
+      "llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+      "gguf_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+      "candidate": "llama_vec_nvidia",
+      "control": "production_opt107",
+      "nvidia_float2_v_accum": true,
+      "amd_half2_v_accum": false,
+      "f16_cache_migration": false,
+      "prepared_q_once": true,
+      "cpy_bytes": 16,
+      "threads": 128,
+      "shipping_decode_attention_vec128": "warp_query",
+      "crossover_threshold": 1024,
+      "nonfinite": 0,
+      "pass": true,
+      "keep": false,
+      "rounds": [],
+      "sample_ids": [
+        0
+      ],
+      "observed_warmups": 0,
+      "observed_samples": 1,
+      "observed_candidates": 2,
+      "observed_shapes": 1,
+      "observed_tier": "correctness",
+      "acceptance_executed": false,
+      "pairs": 1,
+      "warmups": 0,
+      "samples": 1
+    },
+    "admission": {
+      "ok": true,
+      "result_class": "ok",
+      "message": "",
+      "observed": {
+        "schema_version": 1,
+        "task": "OPT-108",
+        "workload": "correctness",
+        "llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+        "gguf_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+        "candidate": "llama_vec_nvidia",
+        "control": "production_opt107",
+        "nvidia_float2_v_accum": true,
+        "amd_half2_v_accum": false,
+        "f16_cache_migration": false,
+        "prepared_q_once": true,
+        "cpy_bytes": 16,
+        "threads": 128,
+        "shipping_decode_attention_vec128": "warp_query",
+        "crossover_threshold": 1024,
+        "nonfinite": 0,
+        "pass": true,
+        "keep": false,
+        "rounds": [],
+        "sample_ids": [
+          0
+        ],
+        "observed_warmups": 0,
+        "observed_samples": 1,
+        "observed_candidates": 2,
+        "observed_shapes": 1,
+        "observed_tier": "correctness",
+        "acceptance_executed": false,
+        "pairs": 1,
+        "warmups": 0,
+        "samples": 1
+      }
+    },
+    "pass": true,
+    "production_pin_unchanged": true,
+    "measurement_utc": "2026-09-12T22:50:02Z"
+  },
+  "verdict": {
+    "verdict": "primitive_rejected",
+    "status": "primitive_rejected",
+    "reasons": [
+      "matched_primitive_lost"
+    ],
+    "shipping_unchanged": true,
+    "production_kept": false,
+    "retain_reason": "primitive"
+  },
+  "primitive": {
+    "schema_version": 1,
+    "task": "OPT-108",
+    "phase": "primitive",
+    "mode": "acceptance",
+    "native_counts": {
+      "observation_unit": "independent_round",
+      "sample_index": 0,
+      "path": "production",
+      "position": 128,
+      "ms": 0.0207679998,
+      "schema_version": 1,
+      "task": "OPT-108",
+      "workload": "acceptance",
+      "llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+      "gguf_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+      "candidate": "llama_vec_nvidia",
+      "control": "production_opt107",
+      "nvidia_float2_v_accum": true,
+      "amd_half2_v_accum": false,
+      "f16_cache_migration": false,
+      "prepared_q_once": true,
+      "cpy_bytes": 16,
+      "threads": 128,
+      "shipping_decode_attention_vec128": "warp_query",
+      "crossover_threshold": 1024,
+      "nonfinite": 0,
+      "pass": true,
+      "keep": false,
+      "rounds": [
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 0,
+          "path": "production",
+          "position": 128,
+          "ms": 0.0207679998
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 1,
+          "path": "production",
+          "position": 128,
+          "ms": 0.0208640005
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 2,
+          "path": "production",
+          "position": 128,
+          "ms": 0.0281920005
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 3,
+          "path": "production",
+          "position": 128,
+          "ms": 0.0209279992
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 4,
+          "path": "production",
+          "position": 128,
+          "ms": 0.0213120002
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 5,
+          "path": "production",
+          "position": 128,
+          "ms": 0.0214399993
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 6,
+          "path": "production",
+          "position": 128,
+          "ms": 0.0212479997
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 7,
+          "path": "production",
+          "position": 128,
+          "ms": 0.020544
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 8,
+          "path": "production",
+          "position": 128,
+          "ms": 0.0212479997
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 9,
+          "path": "production",
+          "position": 128,
+          "ms": 0.0202879999
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 0,
+          "path": "llama_vec_nvidia",
+          "position": 128,
+          "ms": 0.0227840003
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 1,
+          "path": "llama_vec_nvidia",
+          "position": 128,
+          "ms": 0.0232319999
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 2,
+          "path": "llama_vec_nvidia",
+          "position": 128,
+          "ms": 0.0235200003
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 3,
+          "path": "llama_vec_nvidia",
+          "position": 128,
+          "ms": 0.0233600009
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 4,
+          "path": "llama_vec_nvidia",
+          "position": 128,
+          "ms": 0.0229759999
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 5,
+          "path": "llama_vec_nvidia",
+          "position": 128,
+          "ms": 0.038656
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 6,
+          "path": "llama_vec_nvidia",
+          "position": 128,
+          "ms": 0.023488
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 7,
+          "path": "llama_vec_nvidia",
+          "position": 128,
+          "ms": 0.0219839998
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 8,
+          "path": "llama_vec_nvidia",
+          "position": 128,
+          "ms": 0.0224959999
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 9,
+          "path": "llama_vec_nvidia",
+          "position": 128,
+          "ms": 0.0224319994
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 0,
+          "path": "production",
+          "position": 512,
+          "ms": 0.0316479988
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 1,
+          "path": "production",
+          "position": 512,
+          "ms": 0.031072
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 2,
+          "path": "production",
+          "position": 512,
+          "ms": 0.0311999992
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 3,
+          "path": "production",
+          "position": 512,
+          "ms": 0.0304000005
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 4,
+          "path": "production",
+          "position": 512,
+          "ms": 0.0313920006
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 5,
+          "path": "production",
+          "position": 512,
+          "ms": 0.0317119993
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 6,
+          "path": "production",
+          "position": 512,
+          "ms": 0.0398720019
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 7,
+          "path": "production",
+          "position": 512,
+          "ms": 0.0318080001
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 8,
+          "path": "production",
+          "position": 512,
+          "ms": 0.0318400003
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 9,
+          "path": "production",
+          "position": 512,
+          "ms": 0.0312959999
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 0,
+          "path": "llama_vec_nvidia",
+          "position": 512,
+          "ms": 0.0259199999
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 1,
+          "path": "llama_vec_nvidia",
+          "position": 512,
+          "ms": 0.0223360006
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 2,
+          "path": "llama_vec_nvidia",
+          "position": 512,
+          "ms": 0.0255679991
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 3,
+          "path": "llama_vec_nvidia",
+          "position": 512,
+          "ms": 0.0234559998
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 4,
+          "path": "llama_vec_nvidia",
+          "position": 512,
+          "ms": 0.0246399995
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 5,
+          "path": "llama_vec_nvidia",
+          "position": 512,
+          "ms": 0.0242240001
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 6,
+          "path": "llama_vec_nvidia",
+          "position": 512,
+          "ms": 0.0255999994
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 7,
+          "path": "llama_vec_nvidia",
+          "position": 512,
+          "ms": 0.0252480004
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 8,
+          "path": "llama_vec_nvidia",
+          "position": 512,
+          "ms": 0.0256639998
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 9,
+          "path": "llama_vec_nvidia",
+          "position": 512,
+          "ms": 0.02544
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 0,
+          "path": "production",
+          "position": 2048,
+          "ms": 0.0309120007
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 1,
+          "path": "production",
+          "position": 2048,
+          "ms": 0.0362240002
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 2,
+          "path": "production",
+          "position": 2048,
+          "ms": 0.0324480012
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 3,
+          "path": "production",
+          "position": 2048,
+          "ms": 0.0315200016
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 4,
+          "path": "production",
+          "position": 2048,
+          "ms": 0.0314880013
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 5,
+          "path": "production",
+          "position": 2048,
+          "ms": 0.030816
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 6,
+          "path": "production",
+          "position": 2048,
+          "ms": 0.0324480012
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 7,
+          "path": "production",
+          "position": 2048,
+          "ms": 0.0330239981
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 8,
+          "path": "production",
+          "position": 2048,
+          "ms": 0.0328640006
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 9,
+          "path": "production",
+          "position": 2048,
+          "ms": 0.0399999991
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 0,
+          "path": "llama_vec_nvidia",
+          "position": 2048,
+          "ms": 0.0289600007
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 1,
+          "path": "llama_vec_nvidia",
+          "position": 2048,
+          "ms": 0.0293439999
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 2,
+          "path": "llama_vec_nvidia",
+          "position": 2048,
+          "ms": 0.0286720004
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 3,
+          "path": "llama_vec_nvidia",
+          "position": 2048,
+          "ms": 0.0285759997
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 4,
+          "path": "llama_vec_nvidia",
+          "position": 2048,
+          "ms": 0.0296960007
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 5,
+          "path": "llama_vec_nvidia",
+          "position": 2048,
+          "ms": 0.0369599983
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 6,
+          "path": "llama_vec_nvidia",
+          "position": 2048,
+          "ms": 0.0287679993
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 7,
+          "path": "llama_vec_nvidia",
+          "position": 2048,
+          "ms": 0.0374719985
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 8,
+          "path": "llama_vec_nvidia",
+          "position": 2048,
+          "ms": 0.0296
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 9,
+          "path": "llama_vec_nvidia",
+          "position": 2048,
+          "ms": 0.0320959985
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 0,
+          "path": "production",
+          "position": 4096,
+          "ms": 0.0456000008
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 1,
+          "path": "production",
+          "position": 4096,
+          "ms": 0.0464639999
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 2,
+          "path": "production",
+          "position": 4096,
+          "ms": 0.0456640013
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 3,
+          "path": "production",
+          "position": 4096,
+          "ms": 0.045984
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 4,
+          "path": "production",
+          "position": 4096,
+          "ms": 0.0456640013
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 5,
+          "path": "production",
+          "position": 4096,
+          "ms": 0.0450880006
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 6,
+          "path": "production",
+          "position": 4096,
+          "ms": 0.0458239987
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 7,
+          "path": "production",
+          "position": 4096,
+          "ms": 0.0518079996
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 8,
+          "path": "production",
+          "position": 4096,
+          "ms": 0.0461120009
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 9,
+          "path": "production",
+          "position": 4096,
+          "ms": 0.0465920009
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 0,
+          "path": "llama_vec_nvidia",
+          "position": 4096,
+          "ms": 0.0382080004
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 1,
+          "path": "llama_vec_nvidia",
+          "position": 4096,
+          "ms": 0.037184
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 2,
+          "path": "llama_vec_nvidia",
+          "position": 4096,
+          "ms": 0.0346879996
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 3,
+          "path": "llama_vec_nvidia",
+          "position": 4096,
+          "ms": 0.0355519988
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 4,
+          "path": "llama_vec_nvidia",
+          "position": 4096,
+          "ms": 0.042431999
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 5,
+          "path": "llama_vec_nvidia",
+          "position": 4096,
+          "ms": 0.0367680006
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 6,
+          "path": "llama_vec_nvidia",
+          "position": 4096,
+          "ms": 0.037312001
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 7,
+          "path": "llama_vec_nvidia",
+          "position": 4096,
+          "ms": 0.0401280001
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 8,
+          "path": "llama_vec_nvidia",
+          "position": 4096,
+          "ms": 0.035583999
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 9,
+          "path": "llama_vec_nvidia",
+          "position": 4096,
+          "ms": 0.0347520001
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 0,
+          "path": "production",
+          "position": 128,
+          "ms": 0.0207679998
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 1,
+          "path": "production",
+          "position": 128,
+          "ms": 0.0208640005
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 2,
+          "path": "production",
+          "position": 128,
+          "ms": 0.0281920005
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 3,
+          "path": "production",
+          "position": 128,
+          "ms": 0.0209279992
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 4,
+          "path": "production",
+          "position": 128,
+          "ms": 0.0213120002
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 5,
+          "path": "production",
+          "position": 128,
+          "ms": 0.0214399993
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 6,
+          "path": "production",
+          "position": 128,
+          "ms": 0.0212479997
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 7,
+          "path": "production",
+          "position": 128,
+          "ms": 0.020544
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 8,
+          "path": "production",
+          "position": 128,
+          "ms": 0.0212479997
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 9,
+          "path": "production",
+          "position": 128,
+          "ms": 0.0202879999
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 0,
+          "path": "llama_vec_nvidia",
+          "position": 128,
+          "ms": 0.0227840003
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 1,
+          "path": "llama_vec_nvidia",
+          "position": 128,
+          "ms": 0.0232319999
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 2,
+          "path": "llama_vec_nvidia",
+          "position": 128,
+          "ms": 0.0235200003
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 3,
+          "path": "llama_vec_nvidia",
+          "position": 128,
+          "ms": 0.0233600009
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 4,
+          "path": "llama_vec_nvidia",
+          "position": 128,
+          "ms": 0.0229759999
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 5,
+          "path": "llama_vec_nvidia",
+          "position": 128,
+          "ms": 0.038656
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 6,
+          "path": "llama_vec_nvidia",
+          "position": 128,
+          "ms": 0.023488
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 7,
+          "path": "llama_vec_nvidia",
+          "position": 128,
+          "ms": 0.0219839998
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 8,
+          "path": "llama_vec_nvidia",
+          "position": 128,
+          "ms": 0.0224959999
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 9,
+          "path": "llama_vec_nvidia",
+          "position": 128,
+          "ms": 0.0224319994
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 0,
+          "path": "production",
+          "position": 512,
+          "ms": 0.0316479988
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 1,
+          "path": "production",
+          "position": 512,
+          "ms": 0.031072
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 2,
+          "path": "production",
+          "position": 512,
+          "ms": 0.0311999992
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 3,
+          "path": "production",
+          "position": 512,
+          "ms": 0.0304000005
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 4,
+          "path": "production",
+          "position": 512,
+          "ms": 0.0313920006
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 5,
+          "path": "production",
+          "position": 512,
+          "ms": 0.0317119993
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 6,
+          "path": "production",
+          "position": 512,
+          "ms": 0.0398720019
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 7,
+          "path": "production",
+          "position": 512,
+          "ms": 0.0318080001
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 8,
+          "path": "production",
+          "position": 512,
+          "ms": 0.0318400003
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 9,
+          "path": "production",
+          "position": 512,
+          "ms": 0.0312959999
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 0,
+          "path": "llama_vec_nvidia",
+          "position": 512,
+          "ms": 0.0259199999
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 1,
+          "path": "llama_vec_nvidia",
+          "position": 512,
+          "ms": 0.0223360006
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 2,
+          "path": "llama_vec_nvidia",
+          "position": 512,
+          "ms": 0.0255679991
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 3,
+          "path": "llama_vec_nvidia",
+          "position": 512,
+          "ms": 0.0234559998
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 4,
+          "path": "llama_vec_nvidia",
+          "position": 512,
+          "ms": 0.0246399995
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 5,
+          "path": "llama_vec_nvidia",
+          "position": 512,
+          "ms": 0.0242240001
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 6,
+          "path": "llama_vec_nvidia",
+          "position": 512,
+          "ms": 0.0255999994
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 7,
+          "path": "llama_vec_nvidia",
+          "position": 512,
+          "ms": 0.0252480004
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 8,
+          "path": "llama_vec_nvidia",
+          "position": 512,
+          "ms": 0.0256639998
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 9,
+          "path": "llama_vec_nvidia",
+          "position": 512,
+          "ms": 0.02544
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 0,
+          "path": "production",
+          "position": 2048,
+          "ms": 0.0309120007
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 1,
+          "path": "production",
+          "position": 2048,
+          "ms": 0.0362240002
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 2,
+          "path": "production",
+          "position": 2048,
+          "ms": 0.0324480012
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 3,
+          "path": "production",
+          "position": 2048,
+          "ms": 0.0315200016
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 4,
+          "path": "production",
+          "position": 2048,
+          "ms": 0.0314880013
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 5,
+          "path": "production",
+          "position": 2048,
+          "ms": 0.030816
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 6,
+          "path": "production",
+          "position": 2048,
+          "ms": 0.0324480012
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 7,
+          "path": "production",
+          "position": 2048,
+          "ms": 0.0330239981
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 8,
+          "path": "production",
+          "position": 2048,
+          "ms": 0.0328640006
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 9,
+          "path": "production",
+          "position": 2048,
+          "ms": 0.0399999991
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 0,
+          "path": "llama_vec_nvidia",
+          "position": 2048,
+          "ms": 0.0289600007
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 1,
+          "path": "llama_vec_nvidia",
+          "position": 2048,
+          "ms": 0.0293439999
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 2,
+          "path": "llama_vec_nvidia",
+          "position": 2048,
+          "ms": 0.0286720004
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 3,
+          "path": "llama_vec_nvidia",
+          "position": 2048,
+          "ms": 0.0285759997
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 4,
+          "path": "llama_vec_nvidia",
+          "position": 2048,
+          "ms": 0.0296960007
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 5,
+          "path": "llama_vec_nvidia",
+          "position": 2048,
+          "ms": 0.0369599983
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 6,
+          "path": "llama_vec_nvidia",
+          "position": 2048,
+          "ms": 0.0287679993
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 7,
+          "path": "llama_vec_nvidia",
+          "position": 2048,
+          "ms": 0.0374719985
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 8,
+          "path": "llama_vec_nvidia",
+          "position": 2048,
+          "ms": 0.0296
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 9,
+          "path": "llama_vec_nvidia",
+          "position": 2048,
+          "ms": 0.0320959985
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 0,
+          "path": "production",
+          "position": 4096,
+          "ms": 0.0456000008
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 1,
+          "path": "production",
+          "position": 4096,
+          "ms": 0.0464639999
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 2,
+          "path": "production",
+          "position": 4096,
+          "ms": 0.0456640013
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 3,
+          "path": "production",
+          "position": 4096,
+          "ms": 0.045984
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 4,
+          "path": "production",
+          "position": 4096,
+          "ms": 0.0456640013
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 5,
+          "path": "production",
+          "position": 4096,
+          "ms": 0.0450880006
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 6,
+          "path": "production",
+          "position": 4096,
+          "ms": 0.0458239987
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 7,
+          "path": "production",
+          "position": 4096,
+          "ms": 0.0518079996
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 8,
+          "path": "production",
+          "position": 4096,
+          "ms": 0.0461120009
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 9,
+          "path": "production",
+          "position": 4096,
+          "ms": 0.0465920009
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 0,
+          "path": "llama_vec_nvidia",
+          "position": 4096,
+          "ms": 0.0382080004
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 1,
+          "path": "llama_vec_nvidia",
+          "position": 4096,
+          "ms": 0.037184
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 2,
+          "path": "llama_vec_nvidia",
+          "position": 4096,
+          "ms": 0.0346879996
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 3,
+          "path": "llama_vec_nvidia",
+          "position": 4096,
+          "ms": 0.0355519988
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 4,
+          "path": "llama_vec_nvidia",
+          "position": 4096,
+          "ms": 0.042431999
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 5,
+          "path": "llama_vec_nvidia",
+          "position": 4096,
+          "ms": 0.0367680006
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 6,
+          "path": "llama_vec_nvidia",
+          "position": 4096,
+          "ms": 0.037312001
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 7,
+          "path": "llama_vec_nvidia",
+          "position": 4096,
+          "ms": 0.0401280001
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 8,
+          "path": "llama_vec_nvidia",
+          "position": 4096,
+          "ms": 0.035583999
+        },
+        {
+          "observation_unit": "independent_round",
+          "sample_index": 9,
+          "path": "llama_vec_nvidia",
+          "position": 4096,
+          "ms": 0.0347520001
+        }
+      ],
+      "sample_ids": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9
+      ],
+      "observed_warmups": 3,
+      "observed_samples": 10,
+      "observed_candidates": 2,
+      "observed_shapes": 4,
+      "observed_tier": "acceptance",
+      "acceptance_executed": true,
+      "pairs": 1,
+      "warmups": 3,
+      "samples": 10
+    },
+    "admission": {
+      "ok": true,
+      "result_class": "ok",
+      "message": "",
+      "observed": {
+        "observation_unit": "independent_round",
+        "sample_index": 0,
+        "path": "production",
+        "position": 128,
+        "ms": 0.0207679998,
+        "schema_version": 1,
+        "task": "OPT-108",
+        "workload": "acceptance",
+        "llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+        "gguf_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+        "candidate": "llama_vec_nvidia",
+        "control": "production_opt107",
+        "nvidia_float2_v_accum": true,
+        "amd_half2_v_accum": false,
+        "f16_cache_migration": false,
+        "prepared_q_once": true,
+        "cpy_bytes": 16,
+        "threads": 128,
+        "shipping_decode_attention_vec128": "warp_query",
+        "crossover_threshold": 1024,
+        "nonfinite": 0,
+        "pass": true,
+        "keep": false,
+        "rounds": [
+          {
+            "observation_unit": "independent_round",
+            "sample_index": 0,
+            "path": "production",
+            "position": 128,
+            "ms": 0.0207679998,
+            "schema_version": 1,
+            "task": "OPT-108",
+            "workload": "acceptance",
+            "llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+            "gguf_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+            "candidate": "llama_vec_nvidia",
+            "control": "production_opt107",
+            "nvidia_float2_v_accum": true,
+            "amd_half2_v_accum": false,
+            "f16_cache_migration": false,
+            "prepared_q_once": true,
+            "cpy_bytes": 16,
+            "threads": 128,
+            "shipping_decode_attention_vec128": "warp_query",
+            "crossover_threshold": 1024,
+            "nonfinite": 0,
+            "pass": true,
+            "keep": false,
+            "rounds": [
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 0,
+                "path": "production",
+                "position": 128,
+                "ms": 0.0207679998
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 1,
+                "path": "production",
+                "position": 128,
+                "ms": 0.0208640005
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 2,
+                "path": "production",
+                "position": 128,
+                "ms": 0.0281920005
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 3,
+                "path": "production",
+                "position": 128,
+                "ms": 0.0209279992
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 4,
+                "path": "production",
+                "position": 128,
+                "ms": 0.0213120002
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 5,
+                "path": "production",
+                "position": 128,
+                "ms": 0.0214399993
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 6,
+                "path": "production",
+                "position": 128,
+                "ms": 0.0212479997
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 7,
+                "path": "production",
+                "position": 128,
+                "ms": 0.020544
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 8,
+                "path": "production",
+                "position": 128,
+                "ms": 0.0212479997
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 9,
+                "path": "production",
+                "position": 128,
+                "ms": 0.0202879999
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 0,
+                "path": "llama_vec_nvidia",
+                "position": 128,
+                "ms": 0.0227840003
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 1,
+                "path": "llama_vec_nvidia",
+                "position": 128,
+                "ms": 0.0232319999
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 2,
+                "path": "llama_vec_nvidia",
+                "position": 128,
+                "ms": 0.0235200003
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 3,
+                "path": "llama_vec_nvidia",
+                "position": 128,
+                "ms": 0.0233600009
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 4,
+                "path": "llama_vec_nvidia",
+                "position": 128,
+                "ms": 0.0229759999
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 5,
+                "path": "llama_vec_nvidia",
+                "position": 128,
+                "ms": 0.038656
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 6,
+                "path": "llama_vec_nvidia",
+                "position": 128,
+                "ms": 0.023488
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 7,
+                "path": "llama_vec_nvidia",
+                "position": 128,
+                "ms": 0.0219839998
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 8,
+                "path": "llama_vec_nvidia",
+                "position": 128,
+                "ms": 0.0224959999
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 9,
+                "path": "llama_vec_nvidia",
+                "position": 128,
+                "ms": 0.0224319994
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 0,
+                "path": "production",
+                "position": 512,
+                "ms": 0.0316479988
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 1,
+                "path": "production",
+                "position": 512,
+                "ms": 0.031072
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 2,
+                "path": "production",
+                "position": 512,
+                "ms": 0.0311999992
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 3,
+                "path": "production",
+                "position": 512,
+                "ms": 0.0304000005
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 4,
+                "path": "production",
+                "position": 512,
+                "ms": 0.0313920006
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 5,
+                "path": "production",
+                "position": 512,
+                "ms": 0.0317119993
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 6,
+                "path": "production",
+                "position": 512,
+                "ms": 0.0398720019
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 7,
+                "path": "production",
+                "position": 512,
+                "ms": 0.0318080001
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 8,
+                "path": "production",
+                "position": 512,
+                "ms": 0.0318400003
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 9,
+                "path": "production",
+                "position": 512,
+                "ms": 0.0312959999
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 0,
+                "path": "llama_vec_nvidia",
+                "position": 512,
+                "ms": 0.0259199999
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 1,
+                "path": "llama_vec_nvidia",
+                "position": 512,
+                "ms": 0.0223360006
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 2,
+                "path": "llama_vec_nvidia",
+                "position": 512,
+                "ms": 0.0255679991
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 3,
+                "path": "llama_vec_nvidia",
+                "position": 512,
+                "ms": 0.0234559998
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 4,
+                "path": "llama_vec_nvidia",
+                "position": 512,
+                "ms": 0.0246399995
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 5,
+                "path": "llama_vec_nvidia",
+                "position": 512,
+                "ms": 0.0242240001
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 6,
+                "path": "llama_vec_nvidia",
+                "position": 512,
+                "ms": 0.0255999994
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 7,
+                "path": "llama_vec_nvidia",
+                "position": 512,
+                "ms": 0.0252480004
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 8,
+                "path": "llama_vec_nvidia",
+                "position": 512,
+                "ms": 0.0256639998
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 9,
+                "path": "llama_vec_nvidia",
+                "position": 512,
+                "ms": 0.02544
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 0,
+                "path": "production",
+                "position": 2048,
+                "ms": 0.0309120007
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 1,
+                "path": "production",
+                "position": 2048,
+                "ms": 0.0362240002
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 2,
+                "path": "production",
+                "position": 2048,
+                "ms": 0.0324480012
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 3,
+                "path": "production",
+                "position": 2048,
+                "ms": 0.0315200016
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 4,
+                "path": "production",
+                "position": 2048,
+                "ms": 0.0314880013
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 5,
+                "path": "production",
+                "position": 2048,
+                "ms": 0.030816
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 6,
+                "path": "production",
+                "position": 2048,
+                "ms": 0.0324480012
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 7,
+                "path": "production",
+                "position": 2048,
+                "ms": 0.0330239981
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 8,
+                "path": "production",
+                "position": 2048,
+                "ms": 0.0328640006
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 9,
+                "path": "production",
+                "position": 2048,
+                "ms": 0.0399999991
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 0,
+                "path": "llama_vec_nvidia",
+                "position": 2048,
+                "ms": 0.0289600007
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 1,
+                "path": "llama_vec_nvidia",
+                "position": 2048,
+                "ms": 0.0293439999
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 2,
+                "path": "llama_vec_nvidia",
+                "position": 2048,
+                "ms": 0.0286720004
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 3,
+                "path": "llama_vec_nvidia",
+                "position": 2048,
+                "ms": 0.0285759997
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 4,
+                "path": "llama_vec_nvidia",
+                "position": 2048,
+                "ms": 0.0296960007
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 5,
+                "path": "llama_vec_nvidia",
+                "position": 2048,
+                "ms": 0.0369599983
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 6,
+                "path": "llama_vec_nvidia",
+                "position": 2048,
+                "ms": 0.0287679993
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 7,
+                "path": "llama_vec_nvidia",
+                "position": 2048,
+                "ms": 0.0374719985
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 8,
+                "path": "llama_vec_nvidia",
+                "position": 2048,
+                "ms": 0.0296
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 9,
+                "path": "llama_vec_nvidia",
+                "position": 2048,
+                "ms": 0.0320959985
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 0,
+                "path": "production",
+                "position": 4096,
+                "ms": 0.0456000008
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 1,
+                "path": "production",
+                "position": 4096,
+                "ms": 0.0464639999
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 2,
+                "path": "production",
+                "position": 4096,
+                "ms": 0.0456640013
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 3,
+                "path": "production",
+                "position": 4096,
+                "ms": 0.045984
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 4,
+                "path": "production",
+                "position": 4096,
+                "ms": 0.0456640013
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 5,
+                "path": "production",
+                "position": 4096,
+                "ms": 0.0450880006
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 6,
+                "path": "production",
+                "position": 4096,
+                "ms": 0.0458239987
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 7,
+                "path": "production",
+                "position": 4096,
+                "ms": 0.0518079996
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 8,
+                "path": "production",
+                "position": 4096,
+                "ms": 0.0461120009
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 9,
+                "path": "production",
+                "position": 4096,
+                "ms": 0.0465920009
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 0,
+                "path": "llama_vec_nvidia",
+                "position": 4096,
+                "ms": 0.0382080004
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 1,
+                "path": "llama_vec_nvidia",
+                "position": 4096,
+                "ms": 0.037184
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 2,
+                "path": "llama_vec_nvidia",
+                "position": 4096,
+                "ms": 0.0346879996
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 3,
+                "path": "llama_vec_nvidia",
+                "position": 4096,
+                "ms": 0.0355519988
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 4,
+                "path": "llama_vec_nvidia",
+                "position": 4096,
+                "ms": 0.042431999
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 5,
+                "path": "llama_vec_nvidia",
+                "position": 4096,
+                "ms": 0.0367680006
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 6,
+                "path": "llama_vec_nvidia",
+                "position": 4096,
+                "ms": 0.037312001
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 7,
+                "path": "llama_vec_nvidia",
+                "position": 4096,
+                "ms": 0.0401280001
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 8,
+                "path": "llama_vec_nvidia",
+                "position": 4096,
+                "ms": 0.035583999
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 9,
+                "path": "llama_vec_nvidia",
+                "position": 4096,
+                "ms": 0.0347520001
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 0,
+                "path": "production",
+                "position": 128,
+                "ms": 0.0207679998
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 1,
+                "path": "production",
+                "position": 128,
+                "ms": 0.0208640005
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 2,
+                "path": "production",
+                "position": 128,
+                "ms": 0.0281920005
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 3,
+                "path": "production",
+                "position": 128,
+                "ms": 0.0209279992
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 4,
+                "path": "production",
+                "position": 128,
+                "ms": 0.0213120002
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 5,
+                "path": "production",
+                "position": 128,
+                "ms": 0.0214399993
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 6,
+                "path": "production",
+                "position": 128,
+                "ms": 0.0212479997
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 7,
+                "path": "production",
+                "position": 128,
+                "ms": 0.020544
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 8,
+                "path": "production",
+                "position": 128,
+                "ms": 0.0212479997
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 9,
+                "path": "production",
+                "position": 128,
+                "ms": 0.0202879999
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 0,
+                "path": "llama_vec_nvidia",
+                "position": 128,
+                "ms": 0.0227840003
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 1,
+                "path": "llama_vec_nvidia",
+                "position": 128,
+                "ms": 0.0232319999
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 2,
+                "path": "llama_vec_nvidia",
+                "position": 128,
+                "ms": 0.0235200003
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 3,
+                "path": "llama_vec_nvidia",
+                "position": 128,
+                "ms": 0.0233600009
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 4,
+                "path": "llama_vec_nvidia",
+                "position": 128,
+                "ms": 0.0229759999
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 5,
+                "path": "llama_vec_nvidia",
+                "position": 128,
+                "ms": 0.038656
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 6,
+                "path": "llama_vec_nvidia",
+                "position": 128,
+                "ms": 0.023488
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 7,
+                "path": "llama_vec_nvidia",
+                "position": 128,
+                "ms": 0.0219839998
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 8,
+                "path": "llama_vec_nvidia",
+                "position": 128,
+                "ms": 0.0224959999
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 9,
+                "path": "llama_vec_nvidia",
+                "position": 128,
+                "ms": 0.0224319994
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 0,
+                "path": "production",
+                "position": 512,
+                "ms": 0.0316479988
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 1,
+                "path": "production",
+                "position": 512,
+                "ms": 0.031072
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 2,
+                "path": "production",
+                "position": 512,
+                "ms": 0.0311999992
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 3,
+                "path": "production",
+                "position": 512,
+                "ms": 0.0304000005
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 4,
+                "path": "production",
+                "position": 512,
+                "ms": 0.0313920006
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 5,
+                "path": "production",
+                "position": 512,
+                "ms": 0.0317119993
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 6,
+                "path": "production",
+                "position": 512,
+                "ms": 0.0398720019
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 7,
+                "path": "production",
+                "position": 512,
+                "ms": 0.0318080001
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 8,
+                "path": "production",
+                "position": 512,
+                "ms": 0.0318400003
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 9,
+                "path": "production",
+                "position": 512,
+                "ms": 0.0312959999
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 0,
+                "path": "llama_vec_nvidia",
+                "position": 512,
+                "ms": 0.0259199999
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 1,
+                "path": "llama_vec_nvidia",
+                "position": 512,
+                "ms": 0.0223360006
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 2,
+                "path": "llama_vec_nvidia",
+                "position": 512,
+                "ms": 0.0255679991
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 3,
+                "path": "llama_vec_nvidia",
+                "position": 512,
+                "ms": 0.0234559998
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 4,
+                "path": "llama_vec_nvidia",
+                "position": 512,
+                "ms": 0.0246399995
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 5,
+                "path": "llama_vec_nvidia",
+                "position": 512,
+                "ms": 0.0242240001
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 6,
+                "path": "llama_vec_nvidia",
+                "position": 512,
+                "ms": 0.0255999994
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 7,
+                "path": "llama_vec_nvidia",
+                "position": 512,
+                "ms": 0.0252480004
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 8,
+                "path": "llama_vec_nvidia",
+                "position": 512,
+                "ms": 0.0256639998
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 9,
+                "path": "llama_vec_nvidia",
+                "position": 512,
+                "ms": 0.02544
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 0,
+                "path": "production",
+                "position": 2048,
+                "ms": 0.0309120007
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 1,
+                "path": "production",
+                "position": 2048,
+                "ms": 0.0362240002
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 2,
+                "path": "production",
+                "position": 2048,
+                "ms": 0.0324480012
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 3,
+                "path": "production",
+                "position": 2048,
+                "ms": 0.0315200016
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 4,
+                "path": "production",
+                "position": 2048,
+                "ms": 0.0314880013
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 5,
+                "path": "production",
+                "position": 2048,
+                "ms": 0.030816
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 6,
+                "path": "production",
+                "position": 2048,
+                "ms": 0.0324480012
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 7,
+                "path": "production",
+                "position": 2048,
+                "ms": 0.0330239981
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 8,
+                "path": "production",
+                "position": 2048,
+                "ms": 0.0328640006
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 9,
+                "path": "production",
+                "position": 2048,
+                "ms": 0.0399999991
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 0,
+                "path": "llama_vec_nvidia",
+                "position": 2048,
+                "ms": 0.0289600007
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 1,
+                "path": "llama_vec_nvidia",
+                "position": 2048,
+                "ms": 0.0293439999
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 2,
+                "path": "llama_vec_nvidia",
+                "position": 2048,
+                "ms": 0.0286720004
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 3,
+                "path": "llama_vec_nvidia",
+                "position": 2048,
+                "ms": 0.0285759997
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 4,
+                "path": "llama_vec_nvidia",
+                "position": 2048,
+                "ms": 0.0296960007
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 5,
+                "path": "llama_vec_nvidia",
+                "position": 2048,
+                "ms": 0.0369599983
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 6,
+                "path": "llama_vec_nvidia",
+                "position": 2048,
+                "ms": 0.0287679993
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 7,
+                "path": "llama_vec_nvidia",
+                "position": 2048,
+                "ms": 0.0374719985
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 8,
+                "path": "llama_vec_nvidia",
+                "position": 2048,
+                "ms": 0.0296
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 9,
+                "path": "llama_vec_nvidia",
+                "position": 2048,
+                "ms": 0.0320959985
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 0,
+                "path": "production",
+                "position": 4096,
+                "ms": 0.0456000008
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 1,
+                "path": "production",
+                "position": 4096,
+                "ms": 0.0464639999
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 2,
+                "path": "production",
+                "position": 4096,
+                "ms": 0.0456640013
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 3,
+                "path": "production",
+                "position": 4096,
+                "ms": 0.045984
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 4,
+                "path": "production",
+                "position": 4096,
+                "ms": 0.0456640013
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 5,
+                "path": "production",
+                "position": 4096,
+                "ms": 0.0450880006
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 6,
+                "path": "production",
+                "position": 4096,
+                "ms": 0.0458239987
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 7,
+                "path": "production",
+                "position": 4096,
+                "ms": 0.0518079996
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 8,
+                "path": "production",
+                "position": 4096,
+                "ms": 0.0461120009
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 9,
+                "path": "production",
+                "position": 4096,
+                "ms": 0.0465920009
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 0,
+                "path": "llama_vec_nvidia",
+                "position": 4096,
+                "ms": 0.0382080004
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 1,
+                "path": "llama_vec_nvidia",
+                "position": 4096,
+                "ms": 0.037184
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 2,
+                "path": "llama_vec_nvidia",
+                "position": 4096,
+                "ms": 0.0346879996
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 3,
+                "path": "llama_vec_nvidia",
+                "position": 4096,
+                "ms": 0.0355519988
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 4,
+                "path": "llama_vec_nvidia",
+                "position": 4096,
+                "ms": 0.042431999
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 5,
+                "path": "llama_vec_nvidia",
+                "position": 4096,
+                "ms": 0.0367680006
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 6,
+                "path": "llama_vec_nvidia",
+                "position": 4096,
+                "ms": 0.037312001
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 7,
+                "path": "llama_vec_nvidia",
+                "position": 4096,
+                "ms": 0.0401280001
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 8,
+                "path": "llama_vec_nvidia",
+                "position": 4096,
+                "ms": 0.035583999
+              },
+              {
+                "observation_unit": "independent_round",
+                "sample_index": 9,
+                "path": "llama_vec_nvidia",
+                "position": 4096,
+                "ms": 0.0347520001
+              }
+            ],
+            "sample_ids": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7,
+              8,
+              9
+            ],
+            "observed_warmups": 3,
+            "observed_samples": 10,
+            "observed_candidates": 2,
+            "observed_shapes": 4,
+            "observed_tier": "acceptance",
+            "acceptance_executed": true,
+            "pairs": 1,
+            "warmups": 3,
+            "samples": 10
+          }
+        ],
+        "sample_ids": [
+          0
+        ],
+        "observed_warmups": 3,
+        "observed_samples": 10,
+        "observed_candidates": 2,
+        "observed_shapes": 4,
+        "observed_tier": "acceptance",
+        "acceptance_executed": true,
+        "pairs": 1,
+        "warmups": 3,
+        "samples": 10
+      }
+    },
+    "pass": true,
+    "production_pin_unchanged": true,
+    "measurement_utc": "2026-09-12T22:50:02Z",
+    "by_position": {
+      "128": {
+        "position": 128,
+        "n_parts": 1,
+        "occupancy": 2,
+        "ntiles_kv": 1,
+        "control_mean_ms": 0.0216831999,
+        "candidate_mean_ms": 0.0244928,
+        "mean_diff_ms": -0.002809600160000001,
+        "faster": false,
+        "prepared_q_once": true,
+        "nvidia_float2": true,
+        "n": 10,
+        "df": 9,
+        "se": 0.0017348723326339364,
+        "critical": 2.262,
+        "ci95_low": -0.006733881376417965,
+        "ci95_high": 0.0011146810564179634,
+        "diffs": [
+          -0.0020160005,
+          -0.002367999400000001,
+          0.004672000200000002,
+          -0.002432001700000002,
+          -0.0016639996999999983,
+          -0.017216000700000005,
+          -0.0022400002999999995,
+          -0.001439999800000001,
+          -0.0012480002000000018,
+          -0.0021439995000000003
+        ],
+        "positive": false,
+        "control_samples_ms": [
+          0.0207679998,
+          0.0208640005,
+          0.0281920005,
+          0.0209279992,
+          0.0213120002,
+          0.0214399993,
+          0.0212479997,
+          0.020544,
+          0.0212479997,
+          0.0202879999
+        ],
+        "candidate_samples_ms": [
+          0.0227840003,
+          0.0232319999,
+          0.0235200003,
+          0.0233600009,
+          0.0229759999,
+          0.038656,
+          0.023488,
+          0.0219839998,
+          0.0224959999,
+          0.0224319994
+        ]
+      },
+      "512": {
+        "position": 512,
+        "n_parts": 3,
+        "occupancy": 2,
+        "ntiles_kv": 3,
+        "control_mean_ms": 0.0322240001,
+        "candidate_mean_ms": 0.0248095999,
+        "mean_diff_ms": 0.0074144002,
+        "faster": true,
+        "prepared_q_once": true,
+        "nvidia_float2": true,
+        "n": 10,
+        "df": 9,
+        "se": 0.0008175297738921274,
+        "critical": 2.262,
+        "ci95_low": 0.005565147851456008,
+        "ci95_high": 0.009263652548543992,
+        "diffs": [
+          0.0057279989,
+          0.0087359994,
+          0.0056320000999999995,
+          0.006944000700000001,
+          0.006752001099999998,
+          0.007487999200000001,
+          0.014272002500000002,
+          0.006559999699999996,
+          0.006176000499999997,
+          0.005855999900000002
+        ],
+        "positive": true,
+        "control_samples_ms": [
+          0.0316479988,
+          0.031072,
+          0.0311999992,
+          0.0304000005,
+          0.0313920006,
+          0.0317119993,
+          0.0398720019,
+          0.0318080001,
+          0.0318400003,
+          0.0312959999
+        ],
+        "candidate_samples_ms": [
+          0.0259199999,
+          0.0223360006,
+          0.0255679991,
+          0.0234559998,
+          0.0246399995,
+          0.0242240001,
+          0.0255999994,
+          0.0252480004,
+          0.0256639998,
+          0.02544
+        ]
+      },
+      "2048": {
+        "position": 2048,
+        "n_parts": 9,
+        "occupancy": 2,
+        "ntiles_kv": 9,
+        "control_mean_ms": 0.0331744004,
+        "candidate_mean_ms": 0.0310143996,
+        "mean_diff_ms": 0.0021600008000000003,
+        "faster": true,
+        "prepared_q_once": true,
+        "nvidia_float2": true,
+        "n": 10,
+        "df": 9,
+        "se": 0.0013937480682661477,
+        "critical": 2.262,
+        "ci95_low": -0.000992657330418026,
+        "ci95_high": 0.005312658930418027,
+        "diffs": [
+          0.0019520000000000023,
+          0.006880000300000001,
+          0.0037760007999999984,
+          0.0029440018999999998,
+          0.0017920005999999995,
+          -0.006143998299999998,
+          0.0036800019000000003,
+          -0.004448000399999999,
+          0.003264000599999997,
+          0.007904000600000002
+        ],
+        "positive": false,
+        "control_samples_ms": [
+          0.0309120007,
+          0.0362240002,
+          0.0324480012,
+          0.0315200016,
+          0.0314880013,
+          0.030816,
+          0.0324480012,
+          0.0330239981,
+          0.0328640006,
+          0.0399999991
+        ],
+        "candidate_samples_ms": [
+          0.0289600007,
+          0.0293439999,
+          0.0286720004,
+          0.0285759997,
+          0.0296960007,
+          0.0369599983,
+          0.0287679993,
+          0.0374719985,
+          0.0296,
+          0.0320959985
+        ]
+      },
+      "4096": {
+        "position": 4096,
+        "n_parts": 14,
+        "occupancy": 2,
+        "ntiles_kv": 17,
+        "control_mean_ms": 0.0464800004,
+        "candidate_mean_ms": 0.0372607999,
+        "mean_diff_ms": 0.00921920054,
+        "faster": true,
+        "prepared_q_once": true,
+        "nvidia_float2": true,
+        "n": 10,
+        "df": 9,
+        "se": 0.0008143976603591193,
+        "critical": 2.262,
+        "ci95_low": 0.007377033032267672,
+        "ci95_high": 0.011061368047732327,
+        "diffs": [
+          0.007392000400000001,
+          0.009279999899999995,
+          0.010976001700000002,
+          0.010432001199999999,
+          0.0032320023000000017,
+          0.008319999999999994,
+          0.008511997700000003,
+          0.011679999500000003,
+          0.0105280019,
+          0.0118400008
+        ],
+        "positive": true,
+        "control_samples_ms": [
+          0.0456000008,
+          0.0464639999,
+          0.0456640013,
+          0.045984,
+          0.0456640013,
+          0.0450880006,
+          0.0458239987,
+          0.0518079996,
+          0.0461120009,
+          0.0465920009
+        ],
+        "candidate_samples_ms": [
+          0.0382080004,
+          0.037184,
+          0.0346879996,
+          0.0355519988,
+          0.042431999,
+          0.0367680006,
+          0.037312001,
+          0.0401280001,
+          0.035583999,
+          0.0347520001
+        ]
+      }
+    },
+    "choose": {
+      "primitive_win": false,
+      "d2048_faster": false,
+      "d2048_positive": false,
+      "d128_regressed": false,
+      "missing": [],
+      "reason": "matched_primitive_lost"
+    },
+    "primitive_win": false
+  }
+}

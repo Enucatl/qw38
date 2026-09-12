@@ -876,6 +876,20 @@ win is opportunistic and is not evidence that the vector stack is solved. Live
 numbers stay in
 [`evidence/optimization/opt107-attention-crossover/REPORT.md`](../evidence/optimization/opt107-attention-crossover/REPORT.md).
 
+## Pinned llama vector stack (OPT-108)
+
+**Outcome freeze, 2026-09-12:** OPT-108 tests a source-faithful NVIDIA
+`flash_attn_ext_vec<256,1>` adapter against production OPT-107 hybrid on matched
+primitive buffers (128, 512, 2048, 4096). Matched D2048 primitive 95% CI
+includes 0 (point saving ~0.002 ms); verdict **primitive_rejected**. Production
+pins unchanged (`warp_query`, crossover **1024**). Engine integration,
+complete-attention 0.50 ms/token gate, quality/state/128K, and P4096 were not
+run. OPT-103/107 rejection evidence is retained; this does not reopen the vector
+stack as solved. tok/s delta vs production **0**. Live numbers stay in
+[`evidence/optimization/opt108-llama-vector-stack/REPORT.md`](../evidence/optimization/opt108-llama-vector-stack/REPORT.md)
+and
+[`evidence/optimization/opt108-llama-vector-stack/REJECTION.md`](../evidence/optimization/opt108-llama-vector-stack/REJECTION.md).
+
 ## DwarfStar transfer boundary
 
 Reuse MMV/MMQ phase split, quant block tests, explicit unavailable paths, stable
