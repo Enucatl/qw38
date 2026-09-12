@@ -19,6 +19,7 @@ namespace {
 
 constexpr int kVocabulary = 248320;
 constexpr char kPrefix[] = "QW38_OPT060_LLAMA_ATTRIBUTION_RESULT=";
+constexpr char kOpt099Prefix[] = "QW38_OPT099_ATTRIBUTION_RESULT=";
 constexpr char kRevision[] = "cc83d7b4824f73cfdda4dfbb47ee39804f71b328";
 
 struct Options final {
@@ -27,6 +28,7 @@ struct Options final {
   const char* phase = "decode";
   const char* mode = "eager_diagnostic";
   const char* batch_policy = "matched";
+  const char* evidence_dir = nullptr;
   int prefix = 2048;
   int prompt = 4096;
   int output_tokens = 16;
@@ -39,7 +41,8 @@ int usage(const char* argv0) {
                "usage: %s [MODEL.gguf] [--workload smoke|decode|prefill] "
                "[--phase decode|prefill] [--mode unperturbed|eager_diagnostic] "
                "[--batch-policy historical|matched] [--prefix N] [--prompt N] "
-               "[--output-tokens N] [--warmups N] [--samples N]\n",
+               "[--output-tokens N] [--warmups N] [--samples N] "
+               "[--evidence-dir DIR]\n",
                argv0);
   return 2;
 }
@@ -75,6 +78,8 @@ int parse_args(int argc, char** argv, Options* options) {
       if (!parse_int(argv[++index], &options->warmups)) return usage(argv[0]);
     } else if (std::strcmp(arg, "--samples") == 0 && index + 1 < argc) {
       if (!parse_int(argv[++index], &options->samples)) return usage(argv[0]);
+    } else if (std::strcmp(arg, "--evidence-dir") == 0 && index + 1 < argc) {
+      options->evidence_dir = argv[++index];
     } else if (arg[0] != '-' && options->model == nullptr) {
       options->model = arg;
     } else {
@@ -205,6 +210,22 @@ int run_model(const Options& options) {
       return 1;
     }
   }
+  cudaDeviceSynchronize();
+  if (!diagnostic && prefill) {
+    // Graph construction stays outside measured windows (OPT-099). Prefill has
+    // no prefix; llama.cpp may capture CUDA graphs on the first post-warmup
+    // decode, so run one untimed capture before the sample clock starts.
+    llama_memory_clear(llama_get_memory(ctx), true);
+    llama_batch capture_batch = llama_batch_get_one(tokens.data(), prompt);
+    if (llama_decode(ctx, capture_batch) != 0) {
+      llama_free(ctx);
+      llama_model_free(model);
+      llama_backend_free();
+      return 1;
+    }
+    cudaDeviceSynchronize();
+    std::printf("llama_graph_create_excluded=true window=pre_sample\n");
+  }
 
   const int windows = options.samples < 1 ? 1 : options.samples;
   for (int sample = 0; sample < windows; ++sample) {
@@ -287,19 +308,46 @@ int run_model(const Options& options) {
     }
 #endif
     std::printf(
-        "%s{\"schema_version\":1,\"task\":\"OPT-071\",\"engine\":\"llama\","
+        "%s{\"schema_version\":1,\"task\":\"OPT-099\",\"engine\":\"llama\","
         "\"workload\":\"%s\",\"mode\":\"%s\",\"batch_policy\":\"%s\","
         "\"revision\":\"%s\",\"graph_mode\":\"%s\",\"n_batch\":%u,\"n_ubatch\":%u,"
         "\"prompt\":%d,\"output_tokens\":%d,\"sample_index\":%d,"
         "\"uninstrumented_wall_ms\":%.9g,\"instrumented_wall_ms\":%.9g,"
-        "\"not_llama_bench\":true}\n",
+        "\"not_llama_bench\":true,\"claims_throughput\":false}\n",
         kPrefix, options.workload, options.mode, options.batch_policy, kRevision,
         diagnostic ? "eager_diagnostic" : "cuda_graph",
         static_cast<unsigned>(context_params.n_batch),
         static_cast<unsigned>(context_params.n_ubatch), prompt, decode_tokens,
         sample, uninstrumented_ms, instrumented_ms);
+    std::printf(
+        "%s{\"schema_version\":1,\"task\":\"OPT-099\",\"engine\":\"llama\","
+        "\"workload\":\"%s\",\"mode\":\"%s\",\"sample_index\":%d,"
+        "\"observed_warmups\":%d,\"observed_samples\":%d,"
+        "\"claims_throughput\":false,\"keep\":false}\n",
+        kOpt099Prefix, options.workload, options.mode, sample, options.warmups,
+        sample + 1);
 #ifdef QW38_OPT060_ATTRIBUTION
-    if (diagnostic) qw38_opt060::dump_json(stdout);
+    if (diagnostic) {
+      qw38_opt060::dump_json(stdout);
+      if (options.evidence_dir != nullptr && options.evidence_dir[0] != '\0') {
+        char mkdir_cmd[640];
+        std::snprintf(mkdir_cmd, sizeof(mkdir_cmd), "mkdir -p %s",
+                      options.evidence_dir);
+        const int made = std::system(mkdir_cmd);
+        (void)made;
+        char path[512];
+        std::snprintf(path, sizeof(path),
+                      "%s/llama-pinned_llama-%s-rep%d-records.json",
+                      options.evidence_dir, prefill ? "prefill" : "decode",
+                      sample);
+        FILE* out = std::fopen(path, "w");
+        if (out != nullptr) {
+          qw38_opt060::dump_json(out);
+          std::fclose(out);
+          std::printf("llama_records_path=%s sample_index=%d\n", path, sample);
+        }
+      }
+    }
 #endif
   }
   llama_free(ctx);

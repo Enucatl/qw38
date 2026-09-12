@@ -22,6 +22,7 @@ namespace {
 
 constexpr char kPrefix[] = "QW38_OPT060_ENGINE_ATTRIBUTION_RESULT=";
 constexpr char kOpt090Prefix[] = "QW38_OPT090_ATTRIBUTION_RESULT=";
+constexpr char kOpt099Prefix[] = "QW38_OPT099_ATTRIBUTION_RESULT=";
 constexpr std::size_t kCapacity = 8192;
 constexpr std::size_t kRecordCap = 49152;
 constexpr char kLlamaBin[] =
@@ -167,7 +168,7 @@ int load_ident_configs(const Options& options, IdentConfig* configs,
     if (!token.empty()) {
       if (token == "opt088_control") {
         fill_ident(&configs[n], token.c_str(), "packed", "paired_staged");
-      } else if (token == "opt089_selected") {
+      } else if (token == "opt089_selected" || token == "post098_selected") {
         fill_ident(&configs[n], token.c_str(), options.selected_q4,
                    options.selected_ffn);
       } else {
@@ -347,7 +348,7 @@ void dump_families(const Options& options, const char* ident,
   }
   std::fprintf(
       out,
-      "{\"schema_version\":1,\"task\":\"OPT-090\",\"engine\":\"quartz\","
+      "{\"schema_version\":1,\"task\":\"OPT-099\",\"engine\":\"quartz\","
       "\"ident\":\"%s\",\"phase\":\"%s\",\"rep\":%d,"
       "\"graph_mode\":\"eager_diagnostic\",\"pool_overflow\":%s,"
       "\"count\":%zu,\"records\":[",
@@ -390,11 +391,12 @@ int run_llama(const Options& options, const char* workload, const char* mode,
                 "QW38_OPT060_ATTRIBUTION=%s %s %s --workload %s --mode %s "
                 "--batch-policy matched --prompt %d --prefix %d "
                 "--output-tokens %d --warmups %d --samples %d "
+                "--evidence-dir %s "
                 "> %s 2>&1",
                 std::strcmp(mode, "eager_diagnostic") == 0 ? "1" : "0",
                 options.llama_bin, options.model != nullptr ? options.model : "",
                 workload, mode, prompt, prefix, output_tokens, warmups, samples,
-                log_path);
+                options.evidence_dir, log_path);
   const int rc = std::system(cmd);
   std::printf("llama_status=%s rc=%d mode=%s samples=%d log=%s ident=%s\n",
               rc == 0 ? "ok" : "failed", rc, mode, samples, log_path,
@@ -743,6 +745,18 @@ int run_screen(const Options& options, const char* phase, int repetitions) {
       "\"output_tokens\":%zu,\"records\":%zu,\"claims_throughput\":false,"
       "\"keep\":false,\"ident_count\":%d}\n",
       kOpt090Prefix, phase, configs[0].id, warmups, samples, observed_warmups,
+      observed_samples, ident_count, prefix, prompt, outputs, families.count,
+      ident_count);
+  std::printf(
+      "%s{\"schema_version\":1,\"task\":\"OPT-099\",\"workload\":\"%s\","
+      "\"ident\":\"%s\",\"engines\":2,"
+      "\"modes\":[\"unperturbed\",\"eager_diagnostic\"],"
+      "\"warmups\":%d,\"samples\":%d,\"observed_warmups\":%d,"
+      "\"observed_samples\":%d,\"observed_candidates\":%d,\"observed_shapes\":1,"
+      "\"observed_tier\":\"screen\",\"prefix\":%zu,\"prompt\":%zu,"
+      "\"output_tokens\":%zu,\"records\":%zu,\"claims_throughput\":false,"
+      "\"keep\":false,\"ident_count\":%d}\n",
+      kOpt099Prefix, phase, configs[0].id, warmups, samples, observed_warmups,
       observed_samples, ident_count, prefix, prompt, outputs, families.count,
       ident_count);
   return rc;

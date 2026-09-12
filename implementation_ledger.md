@@ -258,7 +258,7 @@ in ledger/dependency order is OPT-099.
 
 | ID | Description | Dependencies | Status | Acceptance condition | Evidence |
 |---|---|---|---|---|---|
-| OPT-099 | Close matched Quartz/llama attribution and P4096 blind spots | OPT-098 | pending | Valid D128/D2048/P4096 event unions, explicit FFN down, nonzero executed llama families, ≤5% unexplained wall, targeted counters and go/no-go triggers; diagnostic only | [`tasks/OPT-099.md`](tasks/OPT-099.md) |
+| OPT-099 | Close matched Quartz/llama attribution and P4096 blind spots | OPT-098 | done | Valid D128/D2048/P4096 event unions, explicit FFN down, nonzero executed llama families, ≤5% unexplained wall, targeted counters and go/no-go triggers; diagnostic only | [`tasks/OPT-099.md`](tasks/OPT-099.md) |
 | OPT-100 | Replace raw Q8 device weights with a lossless aligned layout | OPT-099 | pending | All decode/prompt Q8 consumers use one replacement layout; complete mixer and D128/D2048 improve with quality/P4096/state/128K guards, or raw Q8 is retained | [`tasks/OPT-100.md`](tasks/OPT-100.md) |
 | OPT-101 | Transpose and register-shard one-token GDN state | OPT-099 | pending | Warp-column FP32 recurrence and canonical state round trips improve complete 48-layer GDN and both decode prefixes with quality/transactional gates, or sequential is retained | [`tasks/OPT-101.md`](tasks/OPT-101.md) |
 | OPT-102 | Repack Q4 metadata and remove decode unpack overhead | OPT-099 | pending | Source-faithful/branchless candidates improve complete 64-layer FFN and both decode prefixes while supporting prompt and memory gates, or late_w4 is retained | [`tasks/OPT-102.md`](tasks/OPT-102.md) |
@@ -7255,3 +7255,23 @@ statements below are historical, not the current execution order.
   tile. Historical rejects and quality/outcome gates remain unchanged.
 - This entry records task design only. No kernel or production selector changed
   and no new throughput was measured. First eligible pending task: **OPT-099**.
+
+### 2026-09-12T14:54:13Z — OPT-099 matched attribution delivered
+
+- Added matched Quartz-versus-pinned-llama attribution tooling (`tools/opt099_matched_attribution.py`,
+  contracts, fixture, tests, `cuda-opt099-diagnostics`, native overlay/adapter hooks).
+  Diagnostic only; `claims_throughput=false`; production selectors/kernels unchanged.
+- Freeze `post098_selected` from compiled selectors; FFN down first-class; parent/leaf
+  exclusion; no zero-filled llama families. D128/D2048/P4096 each `attribution_valid=true`
+  with max unexplained_share ≤0.0196. P4096 graph-capture wall excluded from measured
+  llama prefill windows.
+- `evidence_complete=true`; `gap_attribution_complete=true`; go/no-go triggers emitted
+  for OPT-100–105 (`opt100_q8_aligned`, `opt102_q4_repack`, `opt104_q6_aligned` go;
+  `opt101_gdn_transpose`, `opt103_attention_vec` `llama_family_unmapped`;
+  `opt105_mmq_x2` `excess_below_trigger`). `full_ncu_sweep=false` (sequential GDN NCU
+  launch failed; event evidence retained).
+- Key evidence: [`fixtures/opt099_matched_attribution.json`](fixtures/opt099_matched_attribution.json);
+  [`evidence/optimization/opt099-matched-attribution/REPORT.md`](evidence/optimization/opt099-matched-attribution/REPORT.md).
+- **tok/s delta vs OPT-098 P4096 baseline (3046.23 tok/s): 0** (diagnostic only; no
+  throughput claim).
+- Marked OPT-099 `done`. Coupled IDs: none. First eligible pending task: **OPT-100**.

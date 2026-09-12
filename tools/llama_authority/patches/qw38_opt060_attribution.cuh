@@ -33,6 +33,8 @@ struct Record {
   int layer = -1;
   char role[64]{};
   char tensor_name[kName]{};
+  char weight_name[kName]{};
+  char ggml_op[32]{};
   char tensor_type[24]{};
   int m = 0;
   int n = 0;
@@ -105,6 +107,7 @@ struct Pool {
   char launch_family[32]{};
   int token_position = -1;
   int sequence_position = -1;
+  int last_layer = -1;
   char phase[16]{};
   std::mutex mutex;
 
@@ -163,6 +166,7 @@ inline void set_positions(const char* phase, int sequence, int token) {
   copy_str(p.phase, sizeof(p.phase), phase);
   p.sequence_position = sequence;
   p.token_position = token;
+  p.last_layer = -1;
   p.token_scope_id = p.next_scope_id++;
 }
 
@@ -178,6 +182,7 @@ inline void begin_run() {
   p.recording = false;
   p.next_scope_id = 1;
   p.token_scope_id = 0;
+  p.last_layer = -1;
   p.launch_family[0] = '\0';
 }
 
@@ -199,6 +204,7 @@ inline void begin_measured_window(cudaStream_t stream) {
   p.capturing = false;
   p.recording = true;
   p.next_scope_id = 1;
+  p.last_layer = -1;
   if (p.ensure_epoch() == cudaSuccess) cudaEventRecord(p.epoch, stream);
 }
 
@@ -210,42 +216,103 @@ inline void record_epoch(cudaStream_t stream) {
 }
 
 inline int parse_layer(const char* name) {
-  if (name == nullptr) return -1;
+  if (name == nullptr || name[0] == '\0') return -1;
   const char* blk = std::strstr(name, "blk.");
-  if (blk == nullptr) return -1;
-  return std::atoi(blk + 4);
+  if (blk != nullptr) return std::atoi(blk + 4);
+  const char* dash = std::strrchr(name, '-');
+  if (dash == nullptr || dash[1] < '0' || dash[1] > '9') return -1;
+  char* end = nullptr;
+  const long value = std::strtol(dash + 1, &end, 10);
+  if (end == dash + 1) return -1;
+  if (*end != '\0' && *end != ' ' && *end != '(' && *end != '[') return -1;
+  return static_cast<int>(value);
 }
 
-inline const char* infer_role(const char* name, const char* op, int fused_count) {
+inline int parse_layer_from_tensor(const ggml_tensor* node) {
+  if (node == nullptr) return -1;
+  int layer = parse_layer(node->name);
+  if (layer >= 0) return layer;
+  for (int src = 0; src < 2; ++src) {
+    if (node->src[src] == nullptr) continue;
+    layer = parse_layer(node->src[src]->name);
+    if (layer >= 0) return layer;
+  }
+  return -1;
+}
+
+inline bool name_prefix(const char* name, const char* prefix) {
+  if (name == nullptr || prefix == nullptr) return false;
+  const std::size_t n = std::strlen(prefix);
+  return std::strncmp(name, prefix, n) == 0;
+}
+
+inline const char* infer_role(const char* name, const char* op, int fused_count,
+                              const char* weight = nullptr) {
   if (name == nullptr) name = "";
-  if (std::strstr(name, "ffn_gate") != nullptr && fused_count > 1) {
+  if (op == nullptr) op = "";
+  if (weight == nullptr) weight = "";
+  char hay[512]{};
+  std::snprintf(hay, sizeof(hay), "%s %s %s", name, weight, op);
+  if (std::strstr(hay, "ffn_gate") != nullptr && fused_count > 1) {
     return "ffn_gate_up_glu";
   }
-  if (std::strstr(name, "ffn_gate") != nullptr) return "ffn_gate";
-  if (std::strstr(name, "ffn_up") != nullptr) return "ffn_up";
-  if (std::strstr(name, "ffn_down") != nullptr) return "ffn_down";
-  if (std::strstr(name, "attn_qkv") != nullptr) return "gdn_packed_qkv";
-  if (std::strstr(name, "ssm_out") != nullptr) return "gdn_output";
-  if (std::strstr(name, "ssm_alpha") != nullptr) return "gdn_alpha";
-  if (std::strstr(name, "ssm_beta") != nullptr) return "gdn_beta";
-  if (std::strstr(name, "attn_gate") != nullptr) return "gdn_value_gate";
-  if (std::strstr(name, "attn_out") != nullptr ||
-      std::strstr(name, "attn_output") != nullptr) {
-    return "attn_output";
+  if (std::strstr(hay, "ffn_gate") != nullptr) return "ffn_gate";
+  if (std::strstr(hay, "ffn_up") != nullptr) return "ffn_up";
+  if (std::strstr(hay, "ffn_out") != nullptr ||
+      std::strstr(hay, "ffn_down") != nullptr) {
+    return "ffn_down";
   }
-  if (std::strstr(name, "attn_q") != nullptr) return "attn_q";
-  if (std::strstr(name, "attn_k") != nullptr) return "attn_k";
-  if (std::strstr(name, "attn_v") != nullptr) return "attn_v";
-  if (std::strstr(name, "attn_norm") != nullptr) return "attn_norm";
-  if (std::strstr(name, "ffn_norm") != nullptr) return "ffn_norm";
-  if (std::strstr(name, "token_embd") != nullptr) return "embedding";
-  if (std::strstr(name, "output_norm") != nullptr) return "logits_norm";
-  if (std::strcmp(name, "output") == 0 || std::strstr(name, "output.weight") != nullptr) {
+  if (std::strcmp(op, "GLU") == 0) return "ffn_glu";
+  if (std::strstr(name, "ssm_out") != nullptr ||
+      std::strstr(weight, "ssm_out") != nullptr ||
+      std::strstr(name, "linear_attn_out") != nullptr ||
+      (name[0] == 'z' && name[1] == '-')) {
+    return "q8_gdn_output";
+  }
+  if (std::strcmp(op, "FLASH_ATTN_EXT") == 0 ||
+      std::strcmp(op, "FLASH_ATTN") == 0) {
+    return "attention_core";
+  }
+  if (std::strcmp(op, "ROPE") == 0) return "attention_query_prep";
+  if (name_prefix(name, "attn_output") ||
+      std::strstr(weight, "attn_output.weight") != nullptr) {
+    return "q6_attention_output";
+  }
+  if (std::strcmp(op, "SSM_CONV") == 0) return "gdn_conv";
+  if (std::strcmp(op, "GATED_DELTA_NET") == 0) return "gdn_recurrence";
+  if (std::strcmp(op, "L2_NORM") == 0) return "gdn_norm";
+  if (std::strstr(hay, "attn_qkv") != nullptr ||
+      std::strstr(name, "Qcur") != nullptr ||
+      std::strstr(name, "Kcur") != nullptr ||
+      std::strstr(name, "Vcur") != nullptr ||
+      std::strstr(weight, "attn_q.weight") != nullptr ||
+      std::strstr(weight, "attn_k.weight") != nullptr ||
+      std::strstr(weight, "attn_v.weight") != nullptr ||
+      std::strstr(weight, "ssm_alpha") != nullptr ||
+      std::strstr(weight, "ssm_beta") != nullptr ||
+      std::strstr(weight, "attn_gate.weight") != nullptr) {
+    return "q8_input_projections";
+  }
+  if (std::strstr(hay, "token_embd") != nullptr) return "embedding";
+  if (std::strstr(hay, "output_norm") != nullptr) return "logits_norm";
+  if (std::strcmp(name, "output") == 0 ||
+      std::strstr(weight, "output.weight") != nullptr ||
+      std::strstr(name, "result_output") != nullptr) {
     return "logits_projection";
   }
-  if (op != nullptr && std::strcmp(op, "CPY") == 0) return "copy";
-  if (op != nullptr && std::strstr(op, "QUANT") != nullptr) return "activation_quant";
-  return (op != nullptr && op[0] != '\0') ? op : "unknown";
+  if (std::strcmp(op, "CPY") == 0 || std::strcmp(op, "CONT") == 0) return "copy";
+  if (std::strstr(hay, "conv_state") != nullptr ||
+      std::strcmp(op, "SET_ROWS") == 0) {
+    return "state_commit";
+  }
+  if (std::strcmp(op, "ADD") == 0 || std::strcmp(op, "UNARY") == 0 ||
+      std::strcmp(op, "RMS_NORM") == 0 || std::strcmp(op, "MUL") == 0 ||
+      std::strcmp(op, "SCALE") == 0) {
+    return "pointwise";
+  }
+  if (std::strstr(op, "QUANT") != nullptr) return "activation_quant";
+  if (std::strcmp(op, "MUL_MAT") == 0) return "unknown";
+  return op[0] != '\0' ? op : "unknown";
 }
 
 inline bool begin_op(cudaStream_t stream, int stream_index) {
@@ -289,8 +356,17 @@ inline void fill_tensor(Record* rec, const ggml_tensor* node, int fused_skip,
                         const ggml_cgraph* cgraph, int index) {
   if (rec == nullptr || node == nullptr) return;
   const char* name = node->name;
-  rec->layer = parse_layer(name);
+  const char* weight = nullptr;
+  if (node->src[0] != nullptr && node->src[0]->name[0] != '\0') {
+    weight = node->src[0]->name;
+  }
+  rec->layer = parse_layer_from_tensor(node);
+  Pool& live = pool();
+  if (rec->layer < 0) rec->layer = live.last_layer;
+  if (rec->layer >= 0) live.last_layer = rec->layer;
   copy_str(rec->tensor_name, sizeof(rec->tensor_name), name);
+  copy_str(rec->weight_name, sizeof(rec->weight_name), weight);
+  copy_str(rec->ggml_op, sizeof(rec->ggml_op), ggml_op_name(node->op));
   copy_str(rec->tensor_type, sizeof(rec->tensor_type), ggml_type_name(node->type));
   rec->m = static_cast<int>(node->ne[1]);
   rec->n = static_cast<int>(node->ne[0]);
@@ -301,7 +377,8 @@ inline void fill_tensor(Record* rec, const ggml_tensor* node, int fused_skip,
   rec->strides[3] = static_cast<int64_t>(node->nb[3]);
   rec->fused_member_count = fused_skip + 1;
   if (fused_skip > 0) {
-    if (std::strstr(name, "ffn_gate") != nullptr) {
+    if ((name != nullptr && std::strstr(name, "ffn_gate") != nullptr) ||
+        (weight != nullptr && std::strstr(weight, "ffn_gate") != nullptr)) {
       copy_str(rec->fused_member_ids, sizeof(rec->fused_member_ids),
                "ffn_gate,ffn_up,ffn_glu");
       rec->fused_member_count = 3;
@@ -316,7 +393,8 @@ inline void fill_tensor(Record* rec, const ggml_tensor* node, int fused_skip,
   (void)cgraph;
   (void)index;
   copy_str(rec->role, sizeof(rec->role),
-           infer_role(name, ggml_op_name(node->op), rec->fused_member_count));
+           infer_role(name, ggml_op_name(node->op), rec->fused_member_count,
+                      weight));
 }
 
 inline void end_op(const ggml_tensor* node, const ggml_cgraph* cgraph, int index,
@@ -413,7 +491,9 @@ inline void write_record_json(FILE* out, const Record& rec, bool last) {
       out,
       "{\"engine\":\"%s\",\"phase\":\"%s\",\"sequence_position\":%d,"
       "\"token_position\":%d,\"layer\":%d,\"role\":\"%s\","
-      "\"tensor_name\":\"%s\",\"tensor_type\":\"%s\",\"m\":%d,\"n\":%d,"
+      "\"tensor_name\":\"%s\",\"weight_name\":\"%s\",\"op\":\"%s\","
+      "\"tensor_type\":\"%s\","
+      "\"m\":%d,\"n\":%d,"
       "\"k\":%d,\"strides\":[%lld,%lld,%lld,%lld],\"stream\":%llu,"
       "\"stream_index\":%d,\"launch_family\":\"%s\","
       "\"fused_member_ids\":\"%s\",\"fused_member_count\":%d,"
@@ -422,7 +502,9 @@ inline void write_record_json(FILE* out, const Record& rec, bool last) {
       "\"attribution_role\":\"%s\",\"start_ms\":%.9g,\"end_ms\":%.9g,"
       "\"complete_work_ms\":%.9g,\"attributed\":%s,\"pool_overflow\":%s}%s",
       rec.engine, rec.phase, rec.sequence_position, rec.token_position,
-      rec.layer, rec.role, rec.tensor_name, rec.tensor_type, rec.m, rec.n,
+      rec.layer, rec.role, rec.tensor_name, rec.weight_name, rec.ggml_op,
+      rec.tensor_type,
+      rec.m, rec.n,
       rec.k, static_cast<long long>(rec.strides[0]),
       static_cast<long long>(rec.strides[1]),
       static_cast<long long>(rec.strides[2]),
@@ -439,7 +521,7 @@ inline void dump_json(FILE* out) {
   resolve();
   Pool& p = pool();
   const std::size_t total = p.archive.size() + p.count;
-  std::fprintf(out, "{\"schema_version\":1,\"task\":\"OPT-071\",\"engine\":\"llama\",");
+  std::fprintf(out, "{\"schema_version\":1,\"task\":\"OPT-099\",\"engine\":\"llama\",");
   std::fprintf(
       out,
       "\"graph_mode\":\"%s\",\"pool_overflow\":%s,\"recording\":%s,"
