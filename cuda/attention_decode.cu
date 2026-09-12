@@ -2073,7 +2073,7 @@ int selected_decode_kv_parts_at_or_above_2048() noexcept {
 }
 
 int decode_kv_parts_for_position(std::size_t position) noexcept {
-  if (decode_attention_vec128_uses_online()) {
+  if (decode_attention_vec128_uses_online_at(position)) {
     return effective_vec128_n_parts();
   }
   return position >= kDecodeKvPartitionThreshold
@@ -2239,7 +2239,8 @@ cudaError_t launch_attention_prepare_partitioned_vec(
   if (!legal_decode_kv_parts(n_parts) || !legal_decode_attention_vec(vec_path)) {
     return cudaErrorInvalidValue;
   }
-  if (decode_vec_is_warp_query(vec_path) && !decode_attention_vec128_uses_online() &&
+  if (decode_vec_is_warp_query(vec_path) &&
+      !decode_attention_vec128_uses_online_at(position) &&
       (n_parts != 16 || !production_warp_query_shape(config))) {
     return cudaErrorInvalidValue;
   }
@@ -2257,7 +2258,7 @@ cudaError_t launch_attention_prepare_partitioned_vec(
       output_gate, committed, candidate_row, normalized_query, normalized_key,
       score_workspace, output, stream);
   if (error != cudaSuccess) return error;
-  if (decode_attention_vec128_uses_online()) {
+  if (decode_attention_vec128_uses_online_at(position)) {
     if (!legal_vec128_n_parts(n_parts) ||
         !production_warp_query_shape(config)) {
       return cudaErrorInvalidValue;
@@ -2270,7 +2271,7 @@ cudaError_t launch_attention_prepare_partitioned_vec(
         normalized_query, partial_vkq, meta);
     record_decode_attention_gqa_launch(
         decode_attention_vec128_launch_variant(
-            effective_decode_attention_vec128_path()),
+            decode_attention_vec128_path_for_position(position)),
         config.query_heads, static_cast<unsigned int>(kWarpThreads),
         static_cast<unsigned int>(kVec128Warps),
         static_cast<unsigned int>(n_parts));
@@ -2361,7 +2362,8 @@ cudaError_t launch_attention_prepare_partitioned(
     float* output, float* partial_vkq, float* meta, int n_parts,
     cudaStream_t stream) noexcept {
   const char* vec_path = selected_decode_attention_vec();
-  if (decode_uses_warp_query() && !decode_attention_vec128_uses_online() &&
+  if (decode_uses_warp_query() &&
+      !decode_attention_vec128_uses_online_at(position) &&
       (n_parts != 16 || !production_warp_query_shape(config))) {
     vec_path = "cta_group";
   }

@@ -280,12 +280,12 @@ verdicts. It does not reopen unchanged rejected candidates. OPT-114 first
 calibrates the current sitting and tests whether graph/launch overhead is real;
 OPT-107–112 then test bounded mechanisms; OPT-113 owns the final sitting. A
 failed screen is a useful measured rejection, not permission for another
-unbounded variant. First eligible task in ledger/dependency order is OPT-107.
+unbounded variant. First eligible task in ledger/dependency order is OPT-108.
 
 | ID | Description | Dependencies | Status | Acceptance condition | Evidence |
 |---|---|---|---|---|---|
 | OPT-114 | Calibrate the fresh sitting and measure real decode launch overhead | OPT-106 | done | Same-binary A/A controls are repeatable; actual host/GPU launch gaps are separated from CUDA-event category time; existing segment graphs are admitted only if a fresh, correct A/B removes a material measured cost | [`tasks/OPT-114.md`](tasks/OPT-114.md); [`pins/opt114_sitting_launch_contract.json`](pins/opt114_sitting_launch_contract.json); [`pins/opt114_iteration_contract.json`](pins/opt114_iteration_contract.json); [`fixtures/opt114_sitting_launch.json`](fixtures/opt114_sitting_launch.json); [`tools/opt114_sitting_launch.py`](tools/opt114_sitting_launch.py); [`tests/test_opt114_sitting_launch.py`](tests/test_opt114_sitting_launch.py); [`cuda/opt114_sitting_launch_test.cu`](cuda/opt114_sitting_launch_test.cu); [`Makefile`](Makefile); [`evidence/optimization/opt114-sitting-and-launch-overhead/REPORT.md`](evidence/optimization/opt114-sitting-and-launch-overhead/REPORT.md); verification 2026-09-12T22:02:00Z |
-| OPT-107 | Dispatch decode attention by measured prefix crossover | OPT-103, OPT-106, OPT-114 | pending | Existing warp_query remains at short prefixes while vec128_online is admitted only over a bounded measured range (including 2048 when supported); D128 is unchanged and D2048 component/E2E throughput improves with quality/state/P4096 guards | [`tasks/OPT-107.md`](tasks/OPT-107.md) |
+| OPT-107 | Dispatch decode attention by measured prefix crossover | OPT-103, OPT-106, OPT-114 | done | Existing warp_query remains at short prefixes while vec128_online is admitted only over a bounded measured range (including 2048 when supported); D128 is unchanged and D2048 component/E2E throughput improves with quality/state/P4096 guards | [`tasks/OPT-107.md`](tasks/OPT-107.md); [`pins/opt107_attention_crossover_contract.json`](pins/opt107_attention_crossover_contract.json); [`pins/opt107_iteration_contract.json`](pins/opt107_iteration_contract.json); [`fixtures/opt107_attention_crossover.json`](fixtures/opt107_attention_crossover.json); [`tools/opt107_attention_crossover.py`](tools/opt107_attention_crossover.py); [`tests/test_opt107_attention_crossover.py`](tests/test_opt107_attention_crossover.py); [`cuda/opt107_attention_crossover_test.cu`](cuda/opt107_attention_crossover_test.cu); [`cuda/attention_decode_path.cuh`](cuda/attention_decode_path.cuh); [`cuda/attention_decode.cu`](cuda/attention_decode.cu); [`Makefile`](Makefile); [`evidence/optimization/opt107-attention-crossover/REPORT.md`](evidence/optimization/opt107-attention-crossover/REPORT.md); verification 2026-09-12T22:30:00Z |
 | OPT-108 | Reproduce the actual NVIDIA pinned-llama vector-attention stack | OPT-103, OPT-106, OPT-114 | pending | A source-faithful NVIDIA vector-attention slice (without assuming an AMD-only half2 path) beats the current attention control on equivalent buffers and clears the complete D2048/non-regression gates, or production is unchanged | [`tasks/OPT-108.md`](tasks/OPT-108.md) |
 | OPT-109 | Keep transposed GDN state for the session lifetime | OPT-101, OPT-106, OPT-114 | pending | Col-major device state persists across decode steps with no timed per-layer relayout; checkpoint/prompt boundaries round-trip canonically and complete GDN plus D128/D2048 improve, or sequential row-major remains | [`tasks/OPT-109.md`](tasks/OPT-109.md) |
 | OPT-110 | Execute pinned-llama Q4_K MMVQ through a Quartz adapter | OPT-106, OPT-114 | pending | Starting from identical BF16 input and raw Q4_K weights, a source-faithful Q8_1 MMVQ pipeline including its native staging beats the selected Q8Block `integer_q8_late` pipeline, then wins complete rotating FFN and both decode prefixes under existing parity/quality/memory gates, or production is unchanged | [`tasks/OPT-110.md`](tasks/OPT-110.md) |
@@ -7474,3 +7474,23 @@ statements below are historical, not the current execution order.
   D2048 ~48.38 tok/s. Launch overhead ~11 ms/token. Graph not admitted.
   **tok/s delta vs OPT-098 P4096 baseline (3046.23 tok/s): 0** (diagnostic).
 - Marked OPT-114 `done`. Coupled IDs: none. First eligible pending task: **OPT-107**.
+
+### 2026-09-12T22:31:33Z — OPT-107 decode attention crossover delivered
+
+- Added prefix-aware decode attention selector (`tools/opt107_attention_crossover.py`,
+  contracts, fixture, tests, `cuda-opt107-diagnostics`,
+  `opt107_attention_crossover_test.cu`). Crossover threshold **1024** pinned in
+  `attention_decode_path.cuh`: `warp_query` below threshold, `vec128_online` at
+  and above through verified max 4096. No new kernels; OPT-103 arithmetic
+  unchanged. Shipping vec128 pin stays `warp_query`.
+- Screen (n=3 paired CI) admitted 1024 (512 rejected). Acceptance (3+10 +
+  five engine AB/BA vs concurrent warp_query): **D128** 54.798 tok/s
+  (`warp_query`, identity preserved); **D2048** 53.167 tok/s (`vec128_online`).
+  D2048 complete attention saving **1.491 ms** (CI95 1.092..1.889). P4096 ratio
+  0.999; quality/state/128K fallback guards pass. `production_kept=true`.
+- Key evidence: [`fixtures/opt107_attention_crossover.json`](fixtures/opt107_attention_crossover.json);
+  [`evidence/optimization/opt107-attention-crossover/REPORT.md`](evidence/optimization/opt107-attention-crossover/REPORT.md).
+- **tok/s delta vs OPT-114 baseline (fresh sitting):** D128 53.460 → 54.798
+  (**+1.338**); D2048 48.383 → 53.167 (**+4.784**).
+  `uses_opt098_arrays_for_keep_reject: false`.
+- Marked OPT-107 `done`. Coupled IDs: none. First eligible pending task: **OPT-108**.

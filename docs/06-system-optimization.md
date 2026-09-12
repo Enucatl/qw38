@@ -861,6 +861,21 @@ OOM on this sitting. OPT-098 arrays remain historical calibration only; they are
 not a keep/reject baseline for post-106 tasks. Live numbers stay in
 [`evidence/optimization/opt114-sitting-and-launch-overhead/REPORT.md`](../evidence/optimization/opt114-sitting-and-launch-overhead/REPORT.md).
 
+## Prefix-aware decode attention crossover (OPT-107)
+
+**Outcome freeze, 2026-09-12:** OPT-107 turns the OPT-103 split into a
+prefix-aware production selector on unchanged OPT-103 kernels. Shipping
+`kSelectedDecodeAttentionVec128Path` remains `warp_query`. Crossover threshold
+**1024** (`verified_max=4096`) dispatches `vec128_online` only at positions
+>= 1024 through 4096; below 1024 and above 4096 (128K host fallback) stays
+`warp_query`. D2048 complete 16-layer attention saving ~1.49 ms/token (95% CI
+1.09–1.89 ms); D128 selects `warp_query` with 2% engine non-regression pass.
+P4096 prefill throughput ratio 0.999. OPT-098 arrays remain historical
+calibration only; fresh OPT-114 sitting is the keep/reject control. The D2048
+win is opportunistic and is not evidence that the vector stack is solved. Live
+numbers stay in
+[`evidence/optimization/opt107-attention-crossover/REPORT.md`](../evidence/optimization/opt107-attention-crossover/REPORT.md).
+
 ## DwarfStar transfer boundary
 
 Reuse MMV/MMQ phase split, quant block tests, explicit unavailable paths, stable

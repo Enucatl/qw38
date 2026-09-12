@@ -74,6 +74,7 @@ struct Options final {
   const char* decode_attention_gqa = nullptr;
   const char* decode_attention_vec128 = nullptr;
   int vec128_n_parts = 0;
+  int decode_attention_crossover_threshold = -1;
   unsigned int q4_warps = 0;
   int mmq_async_x = -1;
   int warmups = -1;
@@ -102,7 +103,8 @@ int usage(const char* argv0) {
                "[--decode-attention-gqa warp_query|warp_query_gqa6] "
                "[--decode-attention-vec128 warp_query|vec128_online] "
                "[--vec128-n-parts 4|8|16] "
-               "[--decode-position 128|2048] "
+               "[--decode-attention-crossover-threshold 0|512|1024|1536|2048] "
+               "[--decode-position 128|512|1024|1536|2048|4096] "
                "[--warmups N] [--samples N] [--ncu] [--corrupt-guard] "
                "[--evidence-dir DIR]\n",
                argv0);
@@ -153,6 +155,10 @@ int parse_args(int argc, char** argv, Options* options) {
     } else if (std::strcmp(arg, "--vec128-n-parts") == 0 &&
                index + 1 < argc) {
       options->vec128_n_parts = std::atoi(argv[++index]);
+    } else if (std::strcmp(arg, "--decode-attention-crossover-threshold") ==
+                   0 &&
+               index + 1 < argc) {
+      options->decode_attention_crossover_threshold = std::atoi(argv[++index]);
     } else if (std::strcmp(arg, "--decode-position") == 0 &&
                index + 1 < argc) {
       options->decode_position = std::atoi(argv[++index]);
@@ -1485,16 +1491,16 @@ int capture_bundle(const char* model_path, qw38::cuda::ResidentModel* model,
   const bool prompt = family == qw38::cuda::ReplayFamily::kPromptFfn;
   const bool gdn = family == qw38::cuda::ReplayFamily::kDecodeGdn;
   const bool attn = family == qw38::cuda::ReplayFamily::kDecodeAttention;
-  const int pos = decode_position >= 2048 ? 2048 : 128;
+  const int pos = decode_position;
+  char attn_state[64];
+  std::snprintf(attn_state, sizeof(attn_state), "decode_d%d_d%d", pos, pos + 1);
   const char* stage = prompt ? "prompt-ffn"
                              : (gdn ? "decode-gdn"
                                     : (attn ? "decode-attention" : "d128"));
   const char* state =
       prompt ? "prefill_p4096"
              : (gdn ? "decode_d128_d129"
-                    : (attn ? (pos >= 2048 ? "decode_d2048_d2049"
-                                           : "decode_d128_d129")
-                            : "decode_d128"));
+                    : (attn ? attn_state : "decode_d128"));
   const std::size_t token_count =
       prompt ? qw38::cuda::kOpt061PromptRows
              : (gdn ? 130 : (attn ? static_cast<std::size_t>(pos) + 2 : 129));
@@ -2036,8 +2042,11 @@ int time_family(qw38::cuda::ResidentModel* model,
         "decode_attention_dispatch path=%s launch=%s prep_grid=%u "
         "prep_block=%u n_parts=%u prep_launches=%u prepared_q=%s vec_kv=%s "
         "gqa_block_y=%u attention_layers=%zu capture_positions=2 "
-        "eager_or_captured=true decode_position=%zu\n",
-        qw38::cuda::effective_decode_attention_dispatch_path(),
+        "eager_or_captured=true decode_position=%zu crossover_threshold=%d "
+        "path_for_position=%s extra_kernel=false extra_sync=false "
+        "extra_alloc=false extra_copy=false\n",
+        qw38::cuda::effective_decode_attention_dispatch_path(
+            acts.attn_decode_position),
         qw38::cuda::last_decode_query_prep_launch_variant(),
         qw38::cuda::last_decode_attention_gqa_grid_x(),
         qw38::cuda::last_decode_attention_gqa_block_x(),
@@ -2046,7 +2055,10 @@ int time_family(qw38::cuda::ResidentModel* model,
         json_bool(qw38::cuda::last_decode_query_prep_used()),
         json_bool(qw38::cuda::last_decode_vec_kv_used()),
         qw38::cuda::last_decode_attention_gqa_block_y(), layers.size(),
-        acts.attn_decode_position);
+        acts.attn_decode_position,
+        qw38::cuda::effective_decode_attention_crossover_threshold(),
+        qw38::cuda::decode_attention_vec128_path_for_position(
+            acts.attn_decode_position));
     cudaFree(attn_committed_key);
     cudaFree(attn_committed_value);
     cudaFree(attn_candidate_key);
@@ -2220,6 +2232,14 @@ int run_family(const Options& options, qw38::cuda::ReplayFamily family) {
       !qw38::cuda::apply_vec128_n_parts(options.vec128_n_parts)) {
     std::fprintf(stderr, "invalid --vec128-n-parts %d\n",
                  options.vec128_n_parts);
+    if (rounds != nullptr) std::fclose(rounds);
+    return 1;
+  }
+  if (options.decode_attention_crossover_threshold >= 0 &&
+      !qw38::cuda::apply_decode_attention_crossover_threshold(
+          options.decode_attention_crossover_threshold)) {
+    std::fprintf(stderr, "invalid --decode-attention-crossover-threshold %d\n",
+                 options.decode_attention_crossover_threshold);
     if (rounds != nullptr) std::fclose(rounds);
     return 1;
   }
@@ -2457,6 +2477,9 @@ int run_family(const Options& options, qw38::cuda::ReplayFamily family) {
   }
   if (options.vec128_n_parts != 0) {
     qw38::cuda::clear_vec128_n_parts_override();
+  }
+  if (options.decode_attention_crossover_threshold >= 0) {
+    qw38::cuda::clear_decode_attention_crossover_threshold_override();
   }
   char prov_path[640];
   evidence_path(prov_path, sizeof(prov_path), "provenance.json");

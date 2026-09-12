@@ -3,6 +3,7 @@
 // OPT-078 one-token decode query-prep selector. Host-includable.
 // Production pin stays in-kernel warp_query RMS+RoPE unless KEEP succeeds.
 
+#include <cstddef>
 #include <cstring>
 
 namespace qw38::cuda {
@@ -264,9 +265,18 @@ constexpr int kSelectedVec128NParts = 16;
 constexpr int kVec128Threads = 128;
 constexpr int kVec128Warps = 4;
 
+// OPT-107 prefix-aware hybrid. Threshold 0 disables vec128_online everywhere
+// and is byte-for-byte the OPT-103 warp_query production path. A positive
+// threshold admits vec128_online only on [threshold, verified_max]; shorter
+// prefixes and anything past the measured range stay warp_query.
+constexpr int kSelectedDecodeAttentionCrossoverThreshold = 1024;
+constexpr int kSelectedDecodeAttentionVerifiedMax = 4096;
+constexpr int kDecodeAttentionFallback128K = 131072;
+
 inline thread_local const char* g_decode_attention_vec128_path_override =
     nullptr;
 inline thread_local int g_vec128_n_parts_override = 0;
+inline thread_local int g_decode_attention_crossover_threshold_override = -1;
 
 inline bool legal_vec128_n_parts(int n_parts) noexcept {
   return n_parts == 4 || n_parts == 8 || n_parts == 16;
@@ -278,14 +288,50 @@ inline bool legal_decode_attention_vec128_path(const char* path) noexcept {
           std::strcmp(path, kLegalDecodeAttentionVec128Online) == 0);
 }
 
+inline bool legal_decode_attention_crossover_threshold(int threshold) noexcept {
+  return threshold == 0 || threshold == 512 || threshold == 1024 ||
+         threshold == 1536 || threshold == 2048;
+}
+
 inline const char* selected_decode_attention_vec128_path() noexcept {
   return kSelectedDecodeAttentionVec128Path;
+}
+
+inline int selected_decode_attention_crossover_threshold() noexcept {
+  return kSelectedDecodeAttentionCrossoverThreshold;
+}
+
+inline int selected_decode_attention_verified_max() noexcept {
+  return kSelectedDecodeAttentionVerifiedMax;
+}
+
+inline int effective_decode_attention_crossover_threshold() noexcept {
+  if (g_decode_attention_crossover_threshold_override >= 0 &&
+      legal_decode_attention_crossover_threshold(
+          g_decode_attention_crossover_threshold_override)) {
+    return g_decode_attention_crossover_threshold_override;
+  }
+  return kSelectedDecodeAttentionCrossoverThreshold;
 }
 
 inline const char* effective_decode_attention_vec128_path() noexcept {
   return g_decode_attention_vec128_path_override != nullptr
              ? g_decode_attention_vec128_path_override
              : kSelectedDecodeAttentionVec128Path;
+}
+
+inline const char* decode_attention_vec128_path_for_position(
+    std::size_t position) noexcept {
+  if (g_decode_attention_vec128_path_override != nullptr) {
+    return g_decode_attention_vec128_path_override;
+  }
+  const int threshold = effective_decode_attention_crossover_threshold();
+  if (threshold > 0 &&
+      position >= static_cast<std::size_t>(threshold) &&
+      position <= static_cast<std::size_t>(kSelectedDecodeAttentionVerifiedMax)) {
+    return kLegalDecodeAttentionVec128Online;
+  }
+  return kSelectedDecodeAttentionVec128Path;
 }
 
 inline bool decode_attention_vec128_uses_online(const char* path) noexcept {
@@ -296,6 +342,12 @@ inline bool decode_attention_vec128_uses_online(const char* path) noexcept {
 inline bool decode_attention_vec128_uses_online() noexcept {
   return decode_attention_vec128_uses_online(
       effective_decode_attention_vec128_path());
+}
+
+inline bool decode_attention_vec128_uses_online_at(
+    std::size_t position) noexcept {
+  return decode_attention_vec128_uses_online(
+      decode_attention_vec128_path_for_position(position));
 }
 
 inline int selected_vec128_n_parts() noexcept { return kSelectedVec128NParts; }
@@ -343,9 +395,27 @@ inline void clear_vec128_n_parts_override() noexcept {
   g_vec128_n_parts_override = 0;
 }
 
+inline bool apply_decode_attention_crossover_threshold(int threshold) noexcept {
+  if (!legal_decode_attention_crossover_threshold(threshold)) return false;
+  g_decode_attention_crossover_threshold_override = threshold;
+  return true;
+}
+
+inline void clear_decode_attention_crossover_threshold_override() noexcept {
+  g_decode_attention_crossover_threshold_override = -1;
+}
+
 inline const char* effective_decode_attention_dispatch_path() noexcept {
   if (decode_attention_vec128_uses_online()) {
     return effective_decode_attention_vec128_path();
+  }
+  return effective_decode_attention_gqa_path();
+}
+
+inline const char* effective_decode_attention_dispatch_path(
+    std::size_t position) noexcept {
+  if (decode_attention_vec128_uses_online_at(position)) {
+    return decode_attention_vec128_path_for_position(position);
   }
   return effective_decode_attention_gqa_path();
 }
@@ -369,6 +439,18 @@ struct Vec128NPartsScope final {
   ~Vec128NPartsScope() { clear_vec128_n_parts_override(); }
   Vec128NPartsScope(const Vec128NPartsScope&) = delete;
   Vec128NPartsScope& operator=(const Vec128NPartsScope&) = delete;
+};
+
+struct DecodeAttentionCrossoverScope final {
+  explicit DecodeAttentionCrossoverScope(int threshold) noexcept {
+    apply_decode_attention_crossover_threshold(threshold);
+  }
+  ~DecodeAttentionCrossoverScope() {
+    clear_decode_attention_crossover_threshold_override();
+  }
+  DecodeAttentionCrossoverScope(const DecodeAttentionCrossoverScope&) = delete;
+  DecodeAttentionCrossoverScope& operator=(
+      const DecodeAttentionCrossoverScope&) = delete;
 };
 
 }  // namespace qw38::cuda
