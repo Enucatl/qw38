@@ -247,15 +247,36 @@ OPT-089.
 | OPT-097 | Separate X/Y async completion in fixed-tile prompt MMQ | OPT-096 | done | Bitwise output and full FFN/P4096 win with decode guards, or retain fma_async_x schedule | [`tasks/OPT-097.md`](tasks/OPT-097.md) |
 | OPT-098 | Freeze and measure the combined post-088 production outcome | OPT-097 | done | Complete quality, P/D/p95/2K/state/memory evidence; independent internal/parity/+5% outcomes, including failures | [`tasks/OPT-098.md`](tasks/OPT-098.md) |
 
+### Post-098 matched-gap recovery batch
+
+Read [the post-098 analysis and protocol](tasks/PERFORMANCE-RECOVERY-POST-098.md).
+The batch targets the remaining 1.85x–1.91x decode gap with source-backed
+layout and kernel changes, plus the approximately 4.1% P4096 final-mile gap.
+OPT-099 first repairs matched family evidence; OPT-100–105 retain independent
+keep/reject decisions; OPT-106 owns the combined sitting. First eligible task
+in ledger/dependency order is OPT-099.
+
+| ID | Description | Dependencies | Status | Acceptance condition | Evidence |
+|---|---|---|---|---|---|
+| OPT-099 | Close matched Quartz/llama attribution and P4096 blind spots | OPT-098 | pending | Valid D128/D2048/P4096 event unions, explicit FFN down, nonzero executed llama families, ≤5% unexplained wall, targeted counters and go/no-go triggers; diagnostic only | [`tasks/OPT-099.md`](tasks/OPT-099.md) |
+| OPT-100 | Replace raw Q8 device weights with a lossless aligned layout | OPT-099 | pending | All decode/prompt Q8 consumers use one replacement layout; complete mixer and D128/D2048 improve with quality/P4096/state/128K guards, or raw Q8 is retained | [`tasks/OPT-100.md`](tasks/OPT-100.md) |
+| OPT-101 | Transpose and register-shard one-token GDN state | OPT-099 | pending | Warp-column FP32 recurrence and canonical state round trips improve complete 48-layer GDN and both decode prefixes with quality/transactional gates, or sequential is retained | [`tasks/OPT-101.md`](tasks/OPT-101.md) |
+| OPT-102 | Repack Q4 metadata and remove decode unpack overhead | OPT-099 | pending | Source-faithful/branchless candidates improve complete 64-layer FFN and both decode prefixes while supporting prompt and memory gates, or late_w4 is retained | [`tasks/OPT-102.md`](tasks/OPT-102.md) |
+| OPT-103 | Port the pinned-llama one-query vector attention specialization | OPT-099 | pending | 128-thread online-softmax attention improves complete 16-layer D128/D2048 attention with full KV/quality/state guards, or warp_query is retained | [`tasks/OPT-103.md`](tasks/OPT-103.md) |
+| OPT-104 | Align Q6 weights for attention-output and vocabulary projections | OPT-099 | pending | One lossless replacement layout improves combined complete Q6 work and both decode prefixes with full-vocab/P4096/memory gates, or raw Q6 is retained | [`tasks/OPT-104.md`](tasks/OPT-104.md) |
+| OPT-105 | Double-buffer raw X in a 64x128 prompt MMQ tile | OPT-099 | pending | Bitwise two-X-stage schedule saves ≥5 ms over complete P4096 FFNs and improves P4096 with decode/quality guards, or 128x128 joined-wait remains | [`tasks/OPT-105.md`](tasks/OPT-105.md) |
+| OPT-106 | Freeze and measure the post-098 recovery combination | OPT-100, OPT-101, OPT-102, OPT-103, OPT-104, OPT-105 | pending | Fresh quality/P/D/p95/2K/state/memory sitting independently reports internal improvement, llama parity and unchanged OPT-056 +5% outcomes | [`tasks/OPT-106.md`](tasks/OPT-106.md) |
+
 ### Post-042 recovery execution order (historical batch)
 
 The [2026-09-10 design](tasks/PERFORMANCE-RECOVERY-2026-09-10.md) compares the
 admitted Quartz, pinned llama.cpp and ds4 paths. It is source analysis and task
 design, not new performance evidence. **OPT-056 outcome gate measured unpassed**
 (2026-09-11); recovery requires closing remaining P/D throughput and decode-p95
-gaps versus llama before re-pass. The 2026-09-10 ladder is exhausted; OPT-057–069 and OPT-070–080 are
-delivered. The current recovery work is the post-080 kernel-parity and
-quality-reset batch.
+gaps versus llama before re-pass. The 2026-09-10 ladder is exhausted;
+OPT-057–069 and OPT-070–080 are delivered. The post-080 kernel-parity and
+quality-reset batch is also historical; current work is the post-098 batch
+defined immediately above.
 Dependencies permit independent work but do not authorize subagents. The user
 accepts documented llama.cpp/ds4-like accuracy compromises; strict reference
 arithmetic and exact structural/transaction guarantees remain separately tested.
@@ -352,7 +373,7 @@ statements below are historical, not the current execution order.
 | 6. CUDA primitives | CUD-001–CUD-003 |
 | 7. GDN/attention/scheduler | GDN-001–GDN-002, ATN-001–ATN-002, SCH-001 |
 | 8. Sessions and 128K | SES-001–SES-003, MEM-001 |
-| 9. Profiling/optimization | OPT-001–OPT-080 (OPT-031 superseded by OPT-055; OPT-070–080 proposed) |
+| 9. Profiling/optimization | OPT-001–OPT-106 (OPT-031 superseded by OPT-055) |
 | 10. Product tools/API/quality | CLI-001, SRV-001–SRV-003, BEN-001, EVAL-001, QLT-001 |
 | 11. Comparative speed | CMP-001–CMP-003 |
 | 12. Documentation/release | DOC-001, REL-001 |
@@ -7219,3 +7240,18 @@ statements below are historical, not the current execution order.
 - **tok/s delta vs OPT-088 P4096 control (2956.45 tok/s): +89.78 tok/s (1.03×).**
 - Marked OPT-098 `done`. No further pending post-088 batch tasks.
 
+### 2026-09-12T13:38:38Z — Post-098 matched-gap recovery tasks authored
+
+- Added pending OPT-099 through OPT-106 and the source-backed batch analysis in
+  [`tasks/PERFORMANCE-RECOVERY-POST-098.md`](tasks/PERFORMANCE-RECOVERY-POST-098.md).
+- Frozen the OPT-098 performance starting point without changing its evidence:
+  P4096 **3046.23 vs 3170.93 tok/s**, D128 **37.29 vs 69.13**, and D2048
+  **35.49 vs 67.72**. Decode remains the primary 12.35–13.41 ms/token gap;
+  P4096 needs about 52.9 ms/prompt for parity.
+- Repository comparison identified new mechanisms rather than reopening prior
+  candidates: matched llama-family attribution and explicit FFN down; replacement
+  aligned Q8/Q6 layouts; transposed register-sharded GDN state; source-faithful
+  Q4 unpack/layout; one-query vector attention; and a two-X-stage 64x128 prompt
+  tile. Historical rejects and quality/outcome gates remain unchanged.
+- This entry records task design only. No kernel or production selector changed
+  and no new throughput was measured. First eligible pending task: **OPT-099**.
