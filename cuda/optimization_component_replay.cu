@@ -70,6 +70,8 @@ struct Options final {
   const char* gdn_decode = nullptr;
   const char* decode_query_prep = nullptr;
   const char* decode_attention_gqa = nullptr;
+  const char* decode_attention_vec128 = nullptr;
+  int vec128_n_parts = 0;
   unsigned int q4_warps = 0;
   int mmq_async_x = -1;
   int warmups = -1;
@@ -95,6 +97,8 @@ int usage(const char* argv0) {
                "[--gdn-decode sequential|tile16|tile32|transposed] "
                "[--decode-query-prep warp_query|prepared_q|prepared_q_veckv] "
                "[--decode-attention-gqa warp_query|warp_query_gqa6] "
+               "[--decode-attention-vec128 warp_query|vec128_online] "
+               "[--vec128-n-parts 4|8|16] "
                "[--decode-position 128|2048] "
                "[--warmups N] [--samples N] [--ncu] [--corrupt-guard] "
                "[--evidence-dir DIR]\n",
@@ -137,6 +141,12 @@ int parse_args(int argc, char** argv, Options* options) {
     } else if (std::strcmp(arg, "--decode-attention-gqa") == 0 &&
                index + 1 < argc) {
       options->decode_attention_gqa = argv[++index];
+    } else if (std::strcmp(arg, "--decode-attention-vec128") == 0 &&
+               index + 1 < argc) {
+      options->decode_attention_vec128 = argv[++index];
+    } else if (std::strcmp(arg, "--vec128-n-parts") == 0 &&
+               index + 1 < argc) {
+      options->vec128_n_parts = std::atoi(argv[++index]);
     } else if (std::strcmp(arg, "--decode-position") == 0 &&
                index + 1 < argc) {
       options->decode_position = std::atoi(argv[++index]);
@@ -1388,7 +1398,7 @@ cudaError_t replay_decode_attention_layer(
   const qw38::cuda::AttentionConfig config{24, 4, 256, 64, capacity};
   const qw38::cuda::AttentionCache committed{committed_key, committed_value};
   const qw38::cuda::AttentionCache candidate{candidate_key, candidate_value};
-  const int n_parts = 16;
+  const int n_parts = qw38::cuda::decode_kv_parts_for_position(position);
   cudaError_t error = qw38::cuda::launch_attention_prepare_partitioned(
       config, position, workspace->gdn_convolved_, workspace->projection_c_,
       workspace->projection_d_, layer.attention.query_norm,
@@ -1961,7 +1971,7 @@ int time_family(qw38::cuda::ResidentModel* model,
         "prep_block=%u n_parts=%u prep_launches=%u prepared_q=%s vec_kv=%s "
         "gqa_block_y=%u attention_layers=%zu capture_positions=2 "
         "eager_or_captured=true decode_position=%zu\n",
-        qw38::cuda::effective_decode_attention_gqa_path(),
+        qw38::cuda::effective_decode_attention_dispatch_path(),
         qw38::cuda::last_decode_query_prep_launch_variant(),
         qw38::cuda::last_decode_attention_gqa_grid_x(),
         qw38::cuda::last_decode_attention_gqa_block_x(),
@@ -2118,6 +2128,21 @@ int run_family(const Options& options, qw38::cuda::ReplayFamily family) {
     if (rounds != nullptr) std::fclose(rounds);
     return 1;
   }
+  if (options.decode_attention_vec128 != nullptr &&
+      !qw38::cuda::apply_decode_attention_vec128_ident(
+          options.decode_attention_vec128)) {
+    std::fprintf(stderr, "invalid --decode-attention-vec128 %s\n",
+                 options.decode_attention_vec128);
+    if (rounds != nullptr) std::fclose(rounds);
+    return 1;
+  }
+  if (options.vec128_n_parts != 0 &&
+      !qw38::cuda::apply_vec128_n_parts(options.vec128_n_parts)) {
+    std::fprintf(stderr, "invalid --vec128-n-parts %d\n",
+                 options.vec128_n_parts);
+    if (rounds != nullptr) std::fclose(rounds);
+    return 1;
+  }
   const char* mode_arg = options.cache_mode;
   const qw38::cuda::CacheMode modes[] = {qw38::cuda::CacheMode::kHot,
                                          qw38::cuda::CacheMode::kRotating};
@@ -2140,7 +2165,9 @@ int run_family(const Options& options, qw38::cuda::ReplayFamily family) {
   const bool opt078 = options.decode_query_prep != nullptr ||
                       family == qw38::cuda::ReplayFamily::kDecodeAttention;
   const bool opt095 = options.decode_attention_gqa != nullptr;
-  if (rc == 0 && !opt070 && !opt075 && !opt077 && !opt078 && !opt095) {
+  const bool opt103 = options.decode_attention_vec128 != nullptr;
+  if (rc == 0 && !opt070 && !opt075 && !opt077 && !opt078 && !opt095 &&
+      !opt103) {
     rc = run_streaming_calibration(hardware, &stream_gbps, &checksum);
   }
   const qw38::cuda::Q8DecodeDispatch q8_launch =
@@ -2307,6 +2334,31 @@ int run_family(const Options& options, qw38::cuda::ReplayFamily family) {
       qw38::cuda::last_decode_attention_gqa_block_y(),
       qw38::cuda::last_decode_attention_n_parts(),
       qw38::cuda::last_decode_attention_prep_launches(), capture_key);
+  std::printf(
+      "QW38_OPT103_NATIVE_COUNTS={\"schema_version\":1,\"task\":\"OPT-103\","
+      "\"family\":\"%s\",\"tier\":\"%s\",\"warmups\":%d,\"samples\":%d,"
+      "\"observed_warmups\":%d,\"observed_samples\":%d,"
+      "\"observed_candidates\":1,\"observed_shapes\":1,\"observed_tier\":\"%s\","
+      "\"pairs\":%d,\"sample_ids\":[%s],\"acceptance_executed\":%s,"
+      "\"decode_attention_vec128\":\"%s\","
+      "\"effective_decode_attention_vec128\":\"%s\","
+      "\"launch\":\"%s\",\"prep_grid\":%u,\"prep_block\":%u,\"block_y\":%u,"
+      "\"n_parts\":%u,\"prep_launches\":%u,\"keep\":false,"
+      "\"capture_key\":\"%s\"}\n",
+      qw38::cuda::replay_family_name(family), qw38::cuda::test_tier_name(),
+      warmups, samples, warmups, samples, qw38::cuda::test_tier_name(), samples,
+      samples == 3 ? "0,1,2" : (samples == 10 ? "0,1,2,3,4,5,6,7,8,9" : "0"),
+      json_bool(qw38::cuda::test_tier() == qw38::cuda::TestTier::kAcceptance),
+      options.decode_attention_vec128 != nullptr
+          ? options.decode_attention_vec128
+          : "installed",
+      qw38::cuda::effective_decode_attention_vec128_path(),
+      qw38::cuda::last_decode_query_prep_launch_variant(),
+      qw38::cuda::last_decode_attention_gqa_grid_x(),
+      qw38::cuda::last_decode_attention_gqa_block_x(),
+      qw38::cuda::last_decode_attention_gqa_block_y(),
+      qw38::cuda::last_decode_attention_n_parts(),
+      qw38::cuda::last_decode_attention_prep_launches(), capture_key);
   if (options.q8_layout != nullptr) qw38::cuda::clear_q8_decode_path_override();
   if (options.mmq_async_x >= 0) qw38::cuda::clear_mmq_async_x_override();
   if (options.q4_decode != nullptr) qw38::cuda::clear_q4_decode_path_override();
@@ -2317,6 +2369,12 @@ int run_family(const Options& options, qw38::cuda::ReplayFamily family) {
   }
   if (options.decode_attention_gqa != nullptr) {
     qw38::cuda::clear_decode_attention_gqa_path_override();
+  }
+  if (options.decode_attention_vec128 != nullptr) {
+    qw38::cuda::clear_decode_attention_vec128_path_override();
+  }
+  if (options.vec128_n_parts != 0) {
+    qw38::cuda::clear_vec128_n_parts_override();
   }
   char prov_path[640];
   evidence_path(prov_path, sizeof(prov_path), "provenance.json");

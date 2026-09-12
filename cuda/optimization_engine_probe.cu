@@ -57,6 +57,8 @@ struct Options final {
   const char* attention_pipeline = nullptr;
   const char* decode_query_prep = nullptr;
   const char* decode_attention_gqa = nullptr;
+  const char* decode_attention_vec128 = nullptr;
+  int vec128_n_parts = 0;
   unsigned int q4_warps = 0;
   int mmq_async_x = -1;
   bool graph = false;
@@ -131,6 +133,8 @@ int usage(const char* argv0) {
                "[--gdn-decode sequential|tile16|tile32|transposed] "
                "[--decode-query-prep warp_query|prepared_q|prepared_q_veckv] "
                "[--decode-attention-gqa warp_query|warp_query_gqa6] "
+               "[--decode-attention-vec128 warp_query|vec128_online] "
+               "[--vec128-n-parts 4|8|16] "
                "[--attention-pipeline f16_async|kv_once] "
                "[--selector NAME] [--modes graph,eager] [--skip-logits]\n",
                argv0);
@@ -193,6 +197,12 @@ int parse_args(int argc, char** argv, Options* options) {
     } else if (std::strcmp(arg, "--decode-attention-gqa") == 0 &&
                index + 1 < argc) {
       options->decode_attention_gqa = argv[++index];
+    } else if (std::strcmp(arg, "--decode-attention-vec128") == 0 &&
+               index + 1 < argc) {
+      options->decode_attention_vec128 = argv[++index];
+    } else if (std::strcmp(arg, "--vec128-n-parts") == 0 &&
+               index + 1 < argc) {
+      options->vec128_n_parts = std::atoi(argv[++index]);
     } else if (std::strcmp(arg, "--selector") == 0 && index + 1 < argc) {
       options->selector = argv[++index];
     } else if (std::strcmp(arg, "--modes") == 0 && index + 1 < argc) {
@@ -285,7 +295,8 @@ int apply_defaults(const qw38::cuda::TestTier tier, Options* options) {
   }
   if (std::strcmp(options->workload, "attn-ab") == 0) {
     if (options->decode_query_prep != nullptr ||
-        options->decode_attention_gqa != nullptr) {
+        options->decode_attention_gqa != nullptr ||
+        options->decode_attention_vec128 != nullptr) {
       if (options->prefix == 0) options->prefix = kScreenPrefix;
       if (options->output_tokens == 0) {
         options->output_tokens = kScreenOutputTokens;
@@ -378,7 +389,7 @@ int reject_over_bounds(qw38::cuda::TestTier tier, const Options& options) {
         attn_ab && options.pairs <= 1 &&
         ((options.prompt == kScreenPrompt && options.prefix == 0 &&
           options.output_tokens == 0) ||
-         (options.prefix == kScreenPrefix &&
+         ((options.prefix == kScreenPrefix || options.prefix == 128) &&
           options.output_tokens == kScreenOutputTokens && options.prompt == 0));
     if (options.model == nullptr || options.runs != 1 ||
         !(decode_ok || prefill_ok || q8_ok || mmq_ok || q4_ok || gdn_ok ||
@@ -423,7 +434,7 @@ int reject_over_bounds(qw38::cuda::TestTier tier, const Options& options) {
         attn_ab && options.pairs <= 5 &&
         ((options.prompt == kScreenPrompt && options.prefix == 0 &&
           options.output_tokens == 0) ||
-         (options.prefix == kScreenPrefix &&
+         ((options.prefix == kScreenPrefix || options.prefix == 128) &&
           options.output_tokens == kScreenOutputTokens && options.prompt == 0));
     const bool prefill_ok = prefill && options.prompt == kScreenPrompt &&
                             options.prefix == 0 && options.output_tokens == 0;
@@ -983,7 +994,24 @@ int run_keep_ab(const Options& options) {
           return 2;
         }
       } else if (attn) {
-        if (options.decode_attention_gqa != nullptr) {
+        if (options.decode_attention_vec128 != nullptr) {
+          const char* vec_path =
+              candidate_side ? options.decode_attention_vec128 : "warp_query";
+          if (!qw38::cuda::apply_decode_attention_vec128_ident(vec_path)) {
+            std::fprintf(stderr, "invalid --decode-attention-vec128 %s\n",
+                         vec_path);
+            return 2;
+          }
+          if (options.vec128_n_parts != 0 && candidate_side &&
+              !qw38::cuda::apply_vec128_n_parts(options.vec128_n_parts)) {
+            std::fprintf(stderr, "invalid --vec128-n-parts %d\n",
+                         options.vec128_n_parts);
+            return 2;
+          }
+          if (!candidate_side) {
+            qw38::cuda::clear_vec128_n_parts_override();
+          }
+        } else if (options.decode_attention_gqa != nullptr) {
           const char* gqa_path =
               candidate_side ? options.decode_attention_gqa : "warp_query";
           if (!qw38::cuda::apply_decode_attention_gqa_ident(gqa_path)) {
@@ -1099,6 +1127,8 @@ int run_keep_ab(const Options& options) {
       qw38::cuda::clear_attention_pipeline_path_override();
       qw38::cuda::clear_decode_query_prep_path_override();
       qw38::cuda::clear_decode_attention_gqa_path_override();
+      qw38::cuda::clear_decode_attention_vec128_path_override();
+      qw38::cuda::clear_vec128_n_parts_override();
     }
     if (device_layout) {
       const qw38::Status restored = model.set_q8_device_layout(

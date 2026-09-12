@@ -1310,6 +1310,229 @@ __global__ void warp_query_gqa6_decode_attention(
   }
 }
 
+__device__ __forceinline__ float warp_reduce_sum_width8(float value) {
+  value = __fadd_rn(value, __shfl_xor_sync(0xffffffff, value, 4, 8));
+  value = __fadd_rn(value, __shfl_xor_sync(0xffffffff, value, 2, 8));
+  value = __fadd_rn(value, __shfl_xor_sync(0xffffffff, value, 1, 8));
+  return value;
+}
+
+// OPT-103 128-thread one-query online-softmax decode attention.
+// llama.cpp fattn-vec.cuh flash_attn_ext_vec<256,1> organization (MIT
+// inspiration only, not vendored): 128 threads, 8-thread vector QK groups,
+// query in registers, vectorized BF16 K/V loads, online max/sum, register V
+// accumulation, then a bounded 16-group merge inside the CTA. Head width 256
+// and GQA 24/4 are compile-time fixed. Sequence partitions stay contiguous
+// and reuse merge_decode_kv_parts.
+__global__ void __launch_bounds__(kVec128Threads, 1)
+vec128_online_decode_attention(
+    AttentionConfig config, std::size_t position, int n_parts,
+    const float* query, const float* query_scale,
+    const __nv_bfloat16* committed_key, const __nv_bfloat16* committed_value,
+    const __nv_bfloat16* candidate_key, const __nv_bfloat16* candidate_value,
+    float* normalized_query, float* partial_vkq, float* meta) {
+  constexpr int kGroups = 16;
+  constexpr int kGroupThreads = 8;
+  constexpr int kQRegs = 32;
+  const std::uint32_t query_head = blockIdx.x;
+  const int part = static_cast<int>(blockIdx.y);
+  const std::uint32_t lane = threadIdx.x;
+  const std::uint32_t warp = threadIdx.y;
+  const std::uint32_t tid =
+      warp * static_cast<std::uint32_t>(kWarpThreads) + lane;
+  const std::uint32_t gid = warp * 4U + (lane / kGroupThreads);
+  const std::uint32_t gl = lane % kGroupThreads;
+  const std::size_t width = config.head_width;
+  const std::uint32_t group = config.query_heads / config.kv_heads;
+  const std::uint32_t kv_head = query_head / group;
+  const std::size_t qbase = static_cast<std::size_t>(query_head) * width;
+  const std::size_t L = position + 1;
+  const std::size_t part_begin =
+      (static_cast<std::size_t>(part) * L) / static_cast<std::size_t>(n_parts);
+  const std::size_t part_end =
+      (static_cast<std::size_t>(part + 1) * L) /
+      static_cast<std::size_t>(n_parts);
+  __shared__ float q_scratch[kProductionHeadWidth];
+  __shared__ float inverse;
+  __shared__ float group_max[kGroups];
+  __shared__ float group_sum[kGroups];
+  __shared__ float group_vkq[kGroups][kProductionHeadWidth];
+  float q[kQRegs];
+  float vkq[kQRegs]{};
+  float maximum = -INFINITY;
+  float denominator = 0.0F;
+  if (warp == 0) {
+    float inv = 0.0F;
+    if (lane == 0) {
+      float sum = 0.0F;
+      for (std::uint32_t i = 0; i < config.head_width; ++i) {
+        const float item = query[qbase + i];
+        sum = __fadd_rn(sum, item * item);
+      }
+      inverse = 1.0F / sqrtf(sum / static_cast<float>(width) + kRmsEpsilon);
+      inv = inverse;
+    }
+    inv = __shfl_sync(0xffffffff, inv, 0);
+#pragma unroll
+    for (int i = 0; i < kWarpDimsPerLane; ++i) {
+      const std::uint32_t dim =
+          lane * static_cast<std::uint32_t>(kWarpDimsPerLane) +
+          static_cast<std::uint32_t>(i);
+      q_scratch[dim] = query[qbase + dim] * inv * query_scale[dim];
+    }
+    __syncwarp();
+    const std::uint32_t half = config.rotary_width / 2;
+    for (std::uint32_t pair = lane; pair < half; pair += kWarpThreads) {
+      const float first = q_scratch[pair];
+      const float second = q_scratch[half + pair];
+      const float exponent =
+          static_cast<float>(pair * 2) / static_cast<float>(config.rotary_width);
+      const float angle =
+          static_cast<float>(position) / powf(kRopeTheta, exponent);
+      const float c = cosf(angle);
+      const float s = sinf(angle);
+      q_scratch[pair] = first * c - second * s;
+      q_scratch[half + pair] = second * c + first * s;
+    }
+    __syncwarp();
+#pragma unroll
+    for (int i = 0; i < kWarpDimsPerLane; ++i) {
+      const std::uint32_t dim =
+          lane * static_cast<std::uint32_t>(kWarpDimsPerLane) +
+          static_cast<std::uint32_t>(i);
+      if (part == 0) normalized_query[qbase + dim] = q_scratch[dim];
+    }
+  }
+  __syncthreads();
+#pragma unroll
+  for (int chunk = 0; chunk < 4; ++chunk) {
+#pragma unroll
+    for (int i = 0; i < kGroupThreads; ++i) {
+      q[chunk * kGroupThreads + i] =
+          q_scratch[static_cast<std::uint32_t>(chunk) * 64U + gl * 8U +
+                    static_cast<std::uint32_t>(i)];
+    }
+  }
+  if (part_begin != part_end) {
+    const std::size_t row_values =
+        static_cast<std::size_t>(config.kv_heads) * width;
+    const float inv_sqrt = 1.0F / sqrtf(static_cast<float>(width));
+    for (std::size_t token_base = part_begin; token_base < part_end;
+         token_base += kVec128Threads) {
+#pragma unroll
+      for (int t = 0; t < kGroupThreads; ++t) {
+        const std::size_t token =
+            token_base + static_cast<std::size_t>(gid) * kGroupThreads +
+            static_cast<std::size_t>(t);
+        const bool in_range = token < part_end;
+        const __nv_bfloat16* ksrc = nullptr;
+        const __nv_bfloat16* vsrc = nullptr;
+        float local = 0.0F;
+        if (in_range) {
+          if (token < position) {
+            const std::size_t offset = attention_kv_physical_index(
+                token, kv_head, 0, config.capacity, config.head_width);
+            ksrc = committed_key + offset;
+            vsrc = committed_value + offset;
+          } else {
+            ksrc = candidate_key + (token - position) * row_values +
+                   kv_head * width;
+            vsrc = candidate_value + (token - position) * row_values +
+                   kv_head * width;
+          }
+#pragma unroll
+          for (int chunk = 0; chunk < 4; ++chunk) {
+            float k_reg[kGroupThreads];
+            const std::uint32_t dim0 =
+                static_cast<std::uint32_t>(chunk) * 64U + gl * 8U;
+            load_bf16x8(ksrc + dim0, k_reg);
+#pragma unroll
+            for (int i = 0; i < kGroupThreads; ++i) {
+              local = __fadd_rn(
+                  local, __fmul_rn(q[chunk * kGroupThreads + i], k_reg[i]));
+            }
+          }
+        }
+        local = warp_reduce_sum_width8(local);
+        if (in_range) {
+          const float score = local * inv_sqrt;
+          const float old_max = maximum;
+          maximum = fmaxf(maximum, score);
+          const float rescale =
+              old_max == -INFINITY ? 0.0F : expf(old_max - maximum);
+          const float weight = expf(score - maximum);
+          denominator = denominator * rescale + weight;
+#pragma unroll
+          for (int i = 0; i < kQRegs; ++i) vkq[i] *= rescale;
+#pragma unroll
+          for (int chunk = 0; chunk < 4; ++chunk) {
+            float v_reg[kGroupThreads];
+            const std::uint32_t dim0 =
+                static_cast<std::uint32_t>(chunk) * 64U + gl * 8U;
+            load_bf16x8(vsrc + dim0, v_reg);
+#pragma unroll
+            for (int i = 0; i < kGroupThreads; ++i) {
+              vkq[chunk * kGroupThreads + i] = __fadd_rn(
+                  vkq[chunk * kGroupThreads + i], __fmul_rn(weight, v_reg[i]));
+            }
+          }
+        }
+      }
+    }
+  }
+#pragma unroll
+  for (int chunk = 0; chunk < 4; ++chunk) {
+#pragma unroll
+    for (int i = 0; i < kGroupThreads; ++i) {
+      group_vkq[gid][static_cast<std::uint32_t>(chunk) * 64U + gl * 8U +
+                     static_cast<std::uint32_t>(i)] =
+          vkq[chunk * kGroupThreads + i];
+    }
+  }
+  if (gl == 0) {
+    group_max[gid] = maximum;
+    group_sum[gid] = denominator;
+  }
+  __syncthreads();
+  __shared__ float cta_max;
+  if (tid == 0) {
+    float merged = -INFINITY;
+#pragma unroll
+    for (int g = 0; g < kGroups; ++g) merged = fmaxf(merged, group_max[g]);
+    cta_max = merged;
+  }
+  __syncthreads();
+  const float global_max = cta_max;
+  float merged_sum = 0.0F;
+  float out0 = 0.0F;
+  float out1 = 0.0F;
+  const std::uint32_t dim0 = tid * 2U;
+#pragma unroll
+  for (int g = 0; g < kGroups; ++g) {
+    const float scale =
+        (global_max == -INFINITY || group_max[g] == -INFINITY)
+            ? 0.0F
+            : expf(group_max[g] - global_max);
+    merged_sum = __fadd_rn(merged_sum, __fmul_rn(scale, group_sum[g]));
+    out0 = __fadd_rn(out0, __fmul_rn(scale, group_vkq[g][dim0]));
+    out1 = __fadd_rn(out1, __fmul_rn(scale, group_vkq[g][dim0 + 1U]));
+  }
+  const std::size_t vkq_base =
+      (static_cast<std::size_t>(query_head) * static_cast<std::size_t>(n_parts) +
+       static_cast<std::size_t>(part)) *
+      width;
+  const std::size_t meta_base =
+      (static_cast<std::size_t>(query_head) * static_cast<std::size_t>(n_parts) +
+       static_cast<std::size_t>(part)) *
+      2U;
+  if (tid == 0) {
+    meta[meta_base] = global_max;
+    meta[meta_base + 1] = merged_sum;
+  }
+  partial_vkq[vkq_base + dim0] = out0;
+  partial_vkq[vkq_base + dim0 + 1U] = out1;
+}
+
 template <int QueryRows>
 __global__ void mma_grouped_chunk_attention(
     AttentionConfig config, std::size_t start_position, std::size_t token_count,
@@ -1850,6 +2073,9 @@ int selected_decode_kv_parts_at_or_above_2048() noexcept {
 }
 
 int decode_kv_parts_for_position(std::size_t position) noexcept {
+  if (decode_attention_vec128_uses_online()) {
+    return effective_vec128_n_parts();
+  }
   return position >= kDecodeKvPartitionThreshold
              ? kSelectedDecodeKvPartsHigh
              : kSelectedDecodeKvPartsLow;
@@ -1917,6 +2143,14 @@ int decode_kv_warp_query_gqa6_occupancy() noexcept {
   return blocks;
 }
 
+int decode_kv_vec128_online_occupancy() noexcept {
+  int blocks = 0;
+  const cudaError_t error = cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+      &blocks, vec128_online_decode_attention, kVec128Threads, 0);
+  if (error != cudaSuccess) return 0;
+  return blocks;
+}
+
 int decode_query_prep_occupancy() noexcept {
   int blocks = 0;
   const cudaError_t error = cudaOccupancyMaxActiveBlocksPerMultiprocessor(
@@ -1937,7 +2171,9 @@ void decode_attention_kernel_attributes(const char* prep_path, int* registers,
                                         std::size_t* local_bytes,
                                         int* occupancy) noexcept {
   cudaFuncAttributes attrs{};
-  if (decode_query_prep_uses_veckv(prep_path)) {
+  if (decode_attention_vec128_uses_online()) {
+    cudaFuncGetAttributes(&attrs, vec128_online_decode_attention);
+  } else if (decode_query_prep_uses_veckv(prep_path)) {
     cudaFuncGetAttributes(&attrs, warp_query_decode_attention<true, true>);
   } else if (decode_query_prep_uses_prepared(prep_path)) {
     cudaFuncGetAttributes(&attrs, warp_query_decode_attention<true, false>);
@@ -1950,7 +2186,10 @@ void decode_attention_kernel_attributes(const char* prep_path, int* registers,
   }
   if (occupancy != nullptr) {
     int blocks = 0;
-    if (decode_query_prep_uses_veckv(prep_path)) {
+    if (decode_attention_vec128_uses_online()) {
+      cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+          &blocks, vec128_online_decode_attention, kVec128Threads, 0);
+    } else if (decode_query_prep_uses_veckv(prep_path)) {
       cudaOccupancyMaxActiveBlocksPerMultiprocessor(
           &blocks, warp_query_decode_attention<true, true>, kWarpThreads, 0);
     } else if (decode_query_prep_uses_prepared(prep_path)) {
@@ -2000,7 +2239,7 @@ cudaError_t launch_attention_prepare_partitioned_vec(
   if (!legal_decode_kv_parts(n_parts) || !legal_decode_attention_vec(vec_path)) {
     return cudaErrorInvalidValue;
   }
-  if (decode_vec_is_warp_query(vec_path) &&
+  if (decode_vec_is_warp_query(vec_path) && !decode_attention_vec128_uses_online() &&
       (n_parts != 16 || !production_warp_query_shape(config))) {
     return cudaErrorInvalidValue;
   }
@@ -2018,7 +2257,24 @@ cudaError_t launch_attention_prepare_partitioned_vec(
       output_gate, committed, candidate_row, normalized_query, normalized_key,
       score_workspace, output, stream);
   if (error != cudaSuccess) return error;
-  if (decode_vec_is_warp_query(vec_path)) {
+  if (decode_attention_vec128_uses_online()) {
+    if (!legal_vec128_n_parts(n_parts) ||
+        !production_warp_query_shape(config)) {
+      return cudaErrorInvalidValue;
+    }
+    dim3 attention(config.query_heads, static_cast<unsigned>(n_parts), 1);
+    dim3 block(kWarpThreads, kVec128Warps, 1);
+    vec128_online_decode_attention<<<attention, block, 0, stream>>>(
+        config, position, n_parts, query, query_norm_scale, committed.key,
+        committed.value, candidate_row.key, candidate_row.value,
+        normalized_query, partial_vkq, meta);
+    record_decode_attention_gqa_launch(
+        decode_attention_vec128_launch_variant(
+            effective_decode_attention_vec128_path()),
+        config.query_heads, static_cast<unsigned int>(kWarpThreads),
+        static_cast<unsigned int>(kVec128Warps),
+        static_cast<unsigned int>(n_parts));
+  } else if (decode_vec_is_warp_query(vec_path)) {
     const char* gqa_path = effective_decode_attention_gqa_path();
     if (decode_attention_gqa_uses_gqa6(gqa_path)) {
       const std::uint32_t group = config.query_heads / config.kv_heads;
@@ -2105,7 +2361,7 @@ cudaError_t launch_attention_prepare_partitioned(
     float* output, float* partial_vkq, float* meta, int n_parts,
     cudaStream_t stream) noexcept {
   const char* vec_path = selected_decode_attention_vec();
-  if (decode_uses_warp_query() &&
+  if (decode_uses_warp_query() && !decode_attention_vec128_uses_online() &&
       (n_parts != 16 || !production_warp_query_shape(config))) {
     vec_path = "cta_group";
   }
