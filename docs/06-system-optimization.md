@@ -837,6 +837,18 @@ evidence. This increment **claims no throughput improvement**.
 ·
 [`evidence/optimization/opt091-quality-tradeoff/REPORT.md`](../evidence/optimization/opt091-quality-tradeoff/REPORT.md).
 
+## Post-098 recovery freeze (OPT-106)
+
+**Outcome freeze, 2026-09-12:** OPT-106 measures the combined post-098
+production combination after OPT-100–105. All six recovery candidates were
+rejected, so `post106_selected` equals authenticated `post098_selected`.
+Independent verdicts: internal improvement **false**, llama parity **false**,
+OPT-056 +5% **false**. P4096 3036.84 vs llama 3252.58 vs OPT-098 3046.23 tok/s;
+D128 53.50 vs 69.20 vs 37.29; D2048 49.40 vs 67.35 vs 35.49. Completing the
+sitting does not require those gates to pass. OPT-098 remains historical.
+Live numbers stay in
+[`evidence/optimization/opt106-batch-gate/REPORT.md`](../evidence/optimization/opt106-batch-gate/REPORT.md).
+
 ## DwarfStar transfer boundary
 
 Reuse MMV/MMQ phase split, quant block tests, explicit unavailable paths, stable

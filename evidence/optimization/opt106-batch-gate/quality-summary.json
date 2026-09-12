@@ -1,0 +1,268 @@
+{
+  "status": "pass",
+  "model_quality_pass": true,
+  "absolute_quality_status": "fail",
+  "quartz_baseline_regression_status": "pass",
+  "quartz_vs_baseline_quality_delta": {
+    "held_out_32_mean_nll": 1.7872306470098762,
+    "baseline_held_out_mean_nll": 1.7878782710057632,
+    "baseline_held_out_32_mean_nll": 3.325543138013308,
+    "baseline_label": "opt084_held_out_1024",
+    "scored": 1024,
+    "held_out_ppl_ratio": 0.9993525856672696,
+    "ppl_ratio_max": 1.01,
+    "strict_ppl_ratio_max": 1.01,
+    "conditional_late_w4_ppl_ratio_max": 1.015,
+    "concession_active": false,
+    "delta_nll": -0.0006476239958870256,
+    "pass": true,
+    "status": "pass",
+    "known_baseline_defect_does_not_reject": true,
+    "inherited_absolute_task_fail": true,
+    "new_functional_regression": false,
+    "alarm_not_admission": false,
+    "single_boolean": null,
+    "inspectable": true
+  },
+  "quartz_vs_opt098_quality_delta": {
+    "opt098_held_out_mean_nll": 1.7872306470098762,
+    "delta_quartz_minus_opt098": 0.0,
+    "inspectable": true,
+    "single_boolean": null
+  },
+  "quartz_vs_llama_quality_delta": {
+    "quartz_held_out_mean_nll": 1.7872306470098762,
+    "llama_held_out_mean_nll": 1.788091893045086,
+    "delta_quartz_minus_llama": -0.0008612460352097617,
+    "baseline_aggregate_delta": -0.00012677606009181552,
+    "inspectable": true,
+    "authoritative_local_comparison": "quartz+llama",
+    "single_boolean": null
+  },
+  "recurrence_state_status": {
+    "status": "pass",
+    "incremental_nll": 0.0,
+    "incremental_nll_max": 0.02,
+    "this_sitting_recurrence": "measured"
+  },
+  "parsed": [
+    {
+      "raw": "A",
+      "stripped": "A",
+      "expected": "B",
+      "pass": false,
+      "reason": "wrong_choice",
+      "actual": "A",
+      "used_teacher_forcing": false,
+      "next_token": 32,
+      "top_two": [
+        32,
+        33
+      ],
+      "case": "task_arithmetic",
+      "engine": null
+    },
+    {
+      "raw": "A",
+      "stripped": "A",
+      "expected": "A",
+      "pass": true,
+      "reason": "exact_choice",
+      "actual": "A",
+      "used_teacher_forcing": false,
+      "next_token": 32,
+      "top_two": [
+        32,
+        33
+      ],
+      "case": "task_python_len",
+      "engine": null
+    },
+    {
+      "raw": "C",
+      "stripped": "C",
+      "expected": "C",
+      "pass": true,
+      "reason": "exact_choice",
+      "actual": "C",
+      "used_teacher_forcing": false,
+      "next_token": 34,
+      "top_two": [
+        34,
+        90
+      ],
+      "case": "task_inference",
+      "engine": null
+    },
+    {
+      "raw": "D",
+      "stripped": "D",
+      "expected": "D",
+      "pass": true,
+      "reason": "exact_choice",
+      "actual": "D",
+      "used_teacher_forcing": false,
+      "next_token": 35,
+      "top_two": [
+        35,
+        34
+      ],
+      "case": "task_minutes",
+      "engine": null
+    },
+    {
+      "raw": "B",
+      "stripped": "B",
+      "expected": "B",
+      "pass": true,
+      "reason": "exact_choice",
+      "actual": "B",
+      "used_teacher_forcing": false,
+      "next_token": 33,
+      "top_two": [
+        33,
+        760
+      ],
+      "case": "task_sort",
+      "engine": null
+    },
+    {
+      "raw": "A",
+      "stripped": "A",
+      "expected": "A",
+      "pass": true,
+      "reason": "exact_choice",
+      "actual": "A",
+      "used_teacher_forcing": false,
+      "next_token": 32,
+      "top_two": [
+        32,
+        33
+      ],
+      "case": "task_json",
+      "engine": null
+    },
+    {
+      "raw": "C",
+      "stripped": "C",
+      "expected": "C",
+      "pass": true,
+      "reason": "exact_choice",
+      "actual": "C",
+      "used_teacher_forcing": false,
+      "next_token": 34,
+      "top_two": [
+        34,
+        248046
+      ],
+      "case": "task_reading",
+      "engine": null
+    },
+    {
+      "raw": "D",
+      "stripped": "D",
+      "expected": "D",
+      "pass": true,
+      "reason": "exact_choice",
+      "actual": "D",
+      "used_teacher_forcing": false,
+      "next_token": 35,
+      "top_two": [
+        35,
+        34
+      ],
+      "case": "task_sequence",
+      "engine": null
+    }
+  ],
+  "selected_quality_verdicts": {
+    "parsed_functional_answers": true,
+    "held_out_32": true,
+    "quartz_vs_baseline": "pass",
+    "quartz_vs_llama": "inspectable",
+    "absolute_task_accuracy": "fail",
+    "engine_non_regression": "pass"
+  },
+  "suite_classes": [
+    "teacher_forced_continuation",
+    "known_qwen_continuations",
+    "ppl_1024_spans",
+    "recurrence_nll",
+    "opt073_dual_verdict",
+    "held_out_32_alarm",
+    "finite_vocab_state_consistency"
+  ],
+  "frozen_acceptance": {
+    "primary_candidate_gate": "quartz_vs_shipping_baseline_regression",
+    "ppl_ratio_max": 1.01,
+    "recurrence_incremental_nll_max": 0.02,
+    "engine_non_regression": "OPT-073 quality-v3",
+    "absolute_task_accuracy": "visible_and_separate",
+    "quartz_vs_llama_nll": "inspectable_control",
+    "projection_error_substitute_for_opt074": false,
+    "known_baseline_defect_does_not_reject_non_worsening_kernel": true,
+    "continuation_consistency": "no_new_greedy_mismatch_vs_baseline",
+    "opt073_engine_non_regression_must_remain": "pass",
+    "numerically_frozen_by": "OPT-084"
+  },
+  "opt056_quality_requirement_met": false,
+  "quality_v2_all": false,
+  "is_release_evidence": false,
+  "opt074_coverage_unadmitted_blocker": false,
+  "single_boolean": null,
+  "quality_flag": "--quality",
+  "suite": "opt083",
+  "nll_cases": [
+    {
+      "name": "wikitext_nll",
+      "scored": 1024,
+      "mean_nll": 1.5264653580189336
+    },
+    {
+      "name": "held_out_wikitext_1024",
+      "scored": 1024,
+      "mean_nll": 1.7872306470098762
+    },
+    {
+      "name": "recurrence_short",
+      "scored": 128,
+      "mean_nll": 2.2469028478863704
+    },
+    {
+      "name": "recurrence_long",
+      "scored": 128,
+      "mean_nll": 2.7268403900965112
+    }
+  ],
+  "quality_v3_replaces_v2": false,
+  "relaxes_opt056": false,
+  "quality_v2": {
+    "suite": "quality-v2",
+    "status": "fail",
+    "all": false,
+    "wikitext_nll": {
+      "pass": true,
+      "mean_nll": 1.5264653580189336
+    },
+    "held_out_wikitext_1024": {
+      "pass": true,
+      "mean_nll": 1.7872306470098762
+    },
+    "recurrence": {
+      "pass": true,
+      "incremental_nll": 0.0
+    },
+    "tasks": {
+      "pass": false,
+      "count": 8
+    },
+    "llama_reference": {
+      "wikitext_nll": {
+        "mean_nll": 1.525124035418359
+      },
+      "held_out_wikitext_1024": {
+        "mean_nll": 1.788091893045086
+      }
+    }
+  }
+}

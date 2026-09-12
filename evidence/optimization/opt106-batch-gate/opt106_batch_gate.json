@@ -1,0 +1,1547 @@
+{
+  "schema_version": 1,
+  "task": "OPT-106",
+  "status": "measured",
+  "measurement_utc": "2026-09-12T18:14:20Z",
+  "device": "NVIDIA GeForce RTX 5090",
+  "compute_capability": "12.0",
+  "power_limit_w": 400.0,
+  "telemetry": {
+    "device": "NVIDIA GeForce RTX 5090",
+    "device_substring": "RTX 5090",
+    "power_limit_w": 400.0,
+    "power_draw_w": 31.16,
+    "sm_clock_mhz": "240",
+    "mem_clock_mhz": "405",
+    "temperature_c": "54",
+    "raw": "NVIDIA GeForce RTX 5090, 400.00, 31.16, 240, 405, 54"
+  },
+  "llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+  "gguf_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+  "source_revision": "baa5cd21f7265b1b4198119c1521394036963438",
+  "source_state": "dirty",
+  "hardware_executed": true,
+  "keep_sitting_skipped": false,
+  "post098_control": {
+    "rms_norm": "parallel_fma",
+    "q4_decode": "integer_q8_late",
+    "q8_decode": "dp4a_q8_1",
+    "q6_decode": "integer_q8_1",
+    "ffn_decode": "paired_integer",
+    "query_prepare": "hoisted",
+    "attention_pipeline": "kv_once",
+    "gdn_preproc": "transpose",
+    "mmq_pipeline": "fma_async",
+    "ffn_prompt_pair": "off",
+    "execution_graphs": "ffn_only",
+    "production_numerics": "strict",
+    "gdn_decode": "sequential",
+    "decode_query_prep": "warp_query",
+    "q8_decode_rows_skinny": 1,
+    "q8_decode_rows_medium": 1,
+    "q8_decode_rows_wide": 1,
+    "q8_decode_layout_warps_skinny": 4,
+    "q8_decode_layout_warps_medium": 4,
+    "q8_decode_layout_warps_wide": 4,
+    "ffn_gate_quality_i": 128,
+    "ffn_gate_prompt_tile": 128,
+    "prompt_microbatch_rows": 4096,
+    "mmq_async_x": true,
+    "nvccflags": "-O2 --fmad=false",
+    "q8_layout": "r1_w4",
+    "ffn_tiles": "i128_j128",
+    "q8_grouping": "grouped_r1_w4"
+  },
+  "post106_selected": {
+    "rms_norm": "parallel_fma",
+    "q4_decode": "integer_q8_late",
+    "q8_decode": "dp4a_q8_1",
+    "q6_decode": "integer_q8_1",
+    "ffn_decode": "paired_integer",
+    "query_prepare": "hoisted",
+    "attention_pipeline": "kv_once",
+    "gdn_preproc": "transpose",
+    "mmq_pipeline": "fma_async",
+    "ffn_prompt_pair": "off",
+    "execution_graphs": "ffn_only",
+    "production_numerics": "strict",
+    "gdn_decode": "sequential",
+    "decode_query_prep": "warp_query",
+    "q8_decode_rows_skinny": 1,
+    "q8_decode_rows_medium": 1,
+    "q8_decode_rows_wide": 1,
+    "q8_decode_layout_warps_skinny": 4,
+    "q8_decode_layout_warps_medium": 4,
+    "q8_decode_layout_warps_wide": 4,
+    "ffn_gate_quality_i": 128,
+    "ffn_gate_prompt_tile": 128,
+    "prompt_microbatch_rows": 4096,
+    "mmq_async_x": true,
+    "nvccflags": "-O2 --fmad=false",
+    "q8_layout": "r1_w4",
+    "ffn_tiles": "i128_j128",
+    "q8_grouping": "grouped_r1_w4",
+    "q8_device_layout": "raw_gguf",
+    "q6_device_layout": "raw_gguf",
+    "mmq_double_x": false
+  },
+  "combined_production_paths": {
+    "rms_norm": "parallel_fma",
+    "q4_decode": "integer_q8_late",
+    "q8_decode": "dp4a_q8_1",
+    "q6_decode": "integer_q8_1",
+    "ffn_decode": "paired_integer",
+    "query_prepare": "hoisted",
+    "attention_pipeline": "kv_once",
+    "gdn_preproc": "transpose",
+    "mmq_pipeline": "fma_async",
+    "ffn_prompt_pair": "off",
+    "execution_graphs": "ffn_only",
+    "production_numerics": "strict",
+    "gdn_decode": "sequential",
+    "decode_query_prep": "warp_query",
+    "q8_decode_rows_skinny": 1,
+    "q8_decode_rows_medium": 1,
+    "q8_decode_rows_wide": 1,
+    "q8_decode_layout_warps_skinny": 4,
+    "q8_decode_layout_warps_medium": 4,
+    "q8_decode_layout_warps_wide": 4,
+    "ffn_gate_quality_i": 128,
+    "ffn_gate_prompt_tile": 128,
+    "prompt_microbatch_rows": 4096,
+    "mmq_async_x": true,
+    "nvccflags": "-O2 --fmad=false",
+    "q8_layout": "r1_w4",
+    "ffn_tiles": "i128_j128",
+    "q8_grouping": "grouped_r1_w4",
+    "q8_device_layout": "raw_gguf",
+    "q6_device_layout": "raw_gguf",
+    "mmq_double_x": false
+  },
+  "selected_equals_control": true,
+  "candidate_decisions": {
+    "OPT-099": {
+      "status": "attribution_only",
+      "installed": false,
+      "selected": null,
+      "production_kept": false,
+      "diagnostic": true
+    },
+    "OPT-100": {
+      "status": "reject_aligned_soa",
+      "installed": false,
+      "selected": "raw_gguf",
+      "production_kept": false
+    },
+    "OPT-101": {
+      "status": "reject_transposed",
+      "installed": false,
+      "selected": "sequential",
+      "production_kept": false
+    },
+    "OPT-102": {
+      "status": "reject_repack",
+      "installed": false,
+      "selected": "late_w4",
+      "production_kept": false
+    },
+    "OPT-103": {
+      "status": "reject_vec128",
+      "installed": false,
+      "selected": "warp_query",
+      "production_kept": false
+    },
+    "OPT-104": {
+      "status": "reject_aligned_q6",
+      "installed": false,
+      "selected": "raw_gguf",
+      "production_kept": false
+    },
+    "OPT-105": {
+      "status": "reject_double_x",
+      "installed": false,
+      "selected": "i128_j128_joined_wait",
+      "production_kept": false
+    }
+  },
+  "kernel_parity_pass": {
+    "q4": true,
+    "q8": true,
+    "mmq": true,
+    "kv_once": true,
+    "all": true,
+    "sources": {
+      "q4": "fixtures/opt089_q4_promotion.json#late_w4",
+      "q8": "fixtures/opt092_q8_grouped.json#grouped_r1_w4",
+      "mmq": "fixtures/opt097_mmq_wait.json#joined_wait",
+      "kv_once": "fixtures/opt079_attention_kv_operands.json#keep"
+    },
+    "opt074_coverage_unadmitted_blocker": false
+  },
+  "matched_family_attribution": {
+    "source": "fixtures/opt099_matched_attribution.json",
+    "diagnostic": true,
+    "non_additive": true,
+    "claims_throughput": false,
+    "gap_attribution_complete": true,
+    "ffn_down_first_class": true,
+    "triggers": {
+      "opt100_q8_aligned": {
+        "go": true,
+        "reason": "matched_excess",
+        "family": "q8_input_projections",
+        "excess_ms": 17.923381116289377,
+        "threshold_ms": 0.1
+      },
+      "opt101_gdn_transpose": {
+        "go": false,
+        "reason": "llama_family_unmapped",
+        "family": "gdn_core",
+        "excess_ms": null
+      },
+      "opt102_q4_repack": {
+        "go": true,
+        "reason": "matched_excess",
+        "family": "ffn_gate_up_glu",
+        "excess_ms": 23.206335663532954,
+        "threshold_ms": 0.1
+      },
+      "opt103_attention_vec": {
+        "go": false,
+        "reason": "llama_family_unmapped",
+        "family": "attention_core",
+        "excess_ms": null
+      },
+      "opt104_q6_aligned": {
+        "go": true,
+        "reason": "matched_excess",
+        "family": "q6_attention_output",
+        "excess_ms": 10.569685420933318,
+        "threshold_ms": 0.1
+      },
+      "opt105_mmq_x2": {
+        "go": false,
+        "reason": "excess_below_trigger",
+        "family": "prompt_ffn",
+        "excess_ms": -81.09209577033357,
+        "threshold_ms": 5.0
+      }
+    },
+    "ranking": {
+      "p4096": [
+        {
+          "family": "attention_core",
+          "quartz_ms": 493.8657170666667,
+          "llama_ms": 37.88905580333334,
+          "matched_llama_excess_ms": 455.97666126333337,
+          "max_removable_ms": 455.97666126333337,
+          "llama_covered": true,
+          "rank": 1,
+          "matched": true
+        },
+        {
+          "family": "gdn_core",
+          "quartz_ms": 198.26257039333336,
+          "llama_ms": null,
+          "matched_llama_excess_ms": null,
+          "max_removable_ms": 198.26257039333336,
+          "llama_covered": false,
+          "rank": 2,
+          "matched": false
+        },
+        {
+          "family": "q8_input_projections",
+          "quartz_ms": 218.28126971066652,
+          "llama_ms": 135.12536548336666,
+          "matched_llama_excess_ms": 83.15590422729986,
+          "max_removable_ms": 83.15590422729986,
+          "llama_covered": true,
+          "rank": 3,
+          "matched": true
+        },
+        {
+          "family": "activation_quant",
+          "quartz_ms": 15.272693363566665,
+          "llama_ms": null,
+          "matched_llama_excess_ms": null,
+          "max_removable_ms": 15.272693363566665,
+          "llama_covered": false,
+          "rank": 4,
+          "matched": false
+        },
+        {
+          "family": "q6_attention_output",
+          "quartz_ms": 26.28640005,
+          "llama_ms": 22.37674665333334,
+          "matched_llama_excess_ms": 3.9096533966666627,
+          "max_removable_ms": 3.9096533966666627,
+          "llama_covered": true,
+          "rank": 5,
+          "matched": true
+        },
+        {
+          "family": "embedding",
+          "quartz_ms": 0.19975466763333335,
+          "llama_ms": null,
+          "matched_llama_excess_ms": null,
+          "max_removable_ms": 0.19975466763333335,
+          "llama_covered": false,
+          "rank": 6,
+          "matched": false
+        },
+        {
+          "family": "input_norm",
+          "quartz_ms": 0.06127999846666667,
+          "llama_ms": null,
+          "matched_llama_excess_ms": null,
+          "max_removable_ms": 0.06127999846666667,
+          "llama_covered": false,
+          "rank": 7,
+          "matched": false
+        },
+        {
+          "family": "logits_norm",
+          "quartz_ms": 0.014549333000000003,
+          "llama_ms": null,
+          "matched_llama_excess_ms": null,
+          "max_removable_ms": 0.014549333000000003,
+          "llama_covered": false,
+          "rank": 8,
+          "matched": false
+        }
+      ],
+      "d128": [
+        {
+          "family": "gdn_core",
+          "quartz_ms": 61.15052836441379,
+          "llama_ms": null,
+          "matched_llama_excess_ms": null,
+          "max_removable_ms": 61.15052836441379,
+          "llama_covered": false,
+          "rank": 1,
+          "matched": false
+        },
+        {
+          "family": "attention_core",
+          "quartz_ms": 31.914506764666843,
+          "llama_ms": 4.988128095566677,
+          "matched_llama_excess_ms": 26.926378669100167,
+          "max_removable_ms": 26.926378669100167,
+          "llama_covered": true,
+          "rank": 2,
+          "matched": true
+        },
+        {
+          "family": "ffn_norm",
+          "quartz_ms": 26.268607947999644,
+          "llama_ms": null,
+          "matched_llama_excess_ms": null,
+          "max_removable_ms": 26.268607947999644,
+          "llama_covered": false,
+          "rank": 3,
+          "matched": false
+        },
+        {
+          "family": "q8_input_projections",
+          "quartz_ms": 122.12362683153282,
+          "llama_ms": 104.13991490688414,
+          "matched_llama_excess_ms": 17.983711924648674,
+          "max_removable_ms": 17.983711924648674,
+          "llama_covered": true,
+          "rank": 4,
+          "matched": true
+        },
+        {
+          "family": "ffn_down",
+          "quartz_ms": 87.0339421104327,
+          "llama_ms": 75.12596284993349,
+          "matched_llama_excess_ms": 11.907979260499218,
+          "max_removable_ms": 11.907979260499218,
+          "llama_covered": true,
+          "rank": 5,
+          "matched": true
+        },
+        {
+          "family": "q6_attention_output",
+          "quartz_ms": 22.48598399343334,
+          "llama_ms": 11.136501380966687,
+          "matched_llama_excess_ms": 11.349482612466653,
+          "max_removable_ms": 11.349482612466653,
+          "llama_covered": true,
+          "rank": 6,
+          "matched": true
+        },
+        {
+          "family": "ffn_gate_up_glu",
+          "quartz_ms": 149.85162511609985,
+          "llama_ms": 139.33205276666578,
+          "matched_llama_excess_ms": 10.519572349434071,
+          "max_removable_ms": 10.519572349434071,
+          "llama_covered": true,
+          "rank": 7,
+          "matched": true
+        },
+        {
+          "family": "logits_norm",
+          "quartz_ms": 9.157471959683322,
+          "llama_ms": null,
+          "matched_llama_excess_ms": null,
+          "max_removable_ms": 9.157471959683322,
+          "llama_covered": false,
+          "rank": 8,
+          "matched": false
+        }
+      ],
+      "d2048": [
+        {
+          "family": "attention_core",
+          "quartz_ms": 137.49489041933327,
+          "llama_ms": 7.8832320868333055,
+          "matched_llama_excess_ms": 129.61165833249996,
+          "max_removable_ms": 129.61165833249996,
+          "llama_covered": true,
+          "rank": 1,
+          "matched": true
+        },
+        {
+          "family": "gdn_core",
+          "quartz_ms": 61.494795022193756,
+          "llama_ms": null,
+          "matched_llama_excess_ms": null,
+          "max_removable_ms": 61.494795022193756,
+          "llama_covered": false,
+          "rank": 2,
+          "matched": false
+        },
+        {
+          "family": "ffn_norm",
+          "quartz_ms": 26.28822396196632,
+          "llama_ms": null,
+          "matched_llama_excess_ms": null,
+          "max_removable_ms": 26.28822396196632,
+          "llama_covered": false,
+          "rank": 3,
+          "matched": false
+        },
+        {
+          "family": "q8_input_projections",
+          "quartz_ms": 122.22861877866626,
+          "llama_ms": 104.30523766237688,
+          "matched_llama_excess_ms": 17.923381116289377,
+          "max_removable_ms": 17.923381116289377,
+          "llama_covered": true,
+          "rank": 4,
+          "matched": true
+        },
+        {
+          "family": "ffn_down",
+          "quartz_ms": 87.54122731266602,
+          "llama_ms": 75.42861872666633,
+          "matched_llama_excess_ms": 12.112608585999695,
+          "max_removable_ms": 12.112608585999695,
+          "llama_covered": true,
+          "rank": 5,
+          "matched": true
+        },
+        {
+          "family": "q6_attention_output",
+          "quartz_ms": 22.51753602123334,
+          "llama_ms": 11.205503994633354,
+          "matched_llama_excess_ms": 11.312032026599987,
+          "max_removable_ms": 11.312032026599987,
+          "llama_covered": true,
+          "rank": 6,
+          "matched": true
+        },
+        {
+          "family": "ffn_gate_up_glu",
+          "quartz_ms": 150.29008922489973,
+          "llama_ms": 139.19636214736647,
+          "matched_llama_excess_ms": 11.09372707753326,
+          "max_removable_ms": 11.09372707753326,
+          "llama_covered": true,
+          "rank": 7,
+          "matched": true
+        },
+        {
+          "family": "logits_norm",
+          "quartz_ms": 9.301781294956667,
+          "llama_ms": null,
+          "matched_llama_excess_ms": null,
+          "max_removable_ms": 9.301781294956667,
+          "llama_covered": false,
+          "rank": 8,
+          "matched": false
+        }
+      ]
+    },
+    "conservation_ok": true
+  },
+  "keeps": [
+    "OPT-089 late_w4 integer_q8_late/paired_integer",
+    "OPT-092 grouped_r1_w4 Q8 grouping",
+    "OPT-079 kv_once",
+    "OPT-086 fma_async_x MMQ keep",
+    "OPT-097 joined_wait MMQ schedule retained"
+  ],
+  "rejected_or_retained": [
+    "OPT-100 aligned Q8 rejected; raw_gguf retained",
+    "OPT-101 transposed GDN rejected; sequential retained",
+    "OPT-102 Q4 repack rejected; late_w4 retained",
+    "OPT-103 vec128 attention rejected; warp_query retained",
+    "OPT-104 aligned Q6 rejected; raw_gguf retained",
+    "OPT-105 64x128 double-X rejected; i128_j128 joined-wait retained"
+  ],
+  "batch_size": 4096,
+  "compiler_flags": "-O2 --fmad=false",
+  "graphs": "ffn_only",
+  "intended_q4_path": "integer_q8_late",
+  "intended_q8_layout": "r1_w4",
+  "intended_q8_grouping": "grouped_r1_w4",
+  "intended_mmq": "fma_async_x",
+  "quality_mode": {
+    "quality": true,
+    "flag": "--quality",
+    "argv": [
+      "--quality"
+    ],
+    "shortcuts": {
+      "diagnostic_fallback": false,
+      "experimental_cuda": false,
+      "fmad_true": false,
+      "fast_math": false,
+      "incomplete_vocab_logits": false,
+      "logit_masking": false,
+      "teacher_forced_functional_answers": false,
+      "graph_kernel_divergence": false,
+      "speculative_decoding": false,
+      "numeric_bypass": false,
+      "ssd_streaming_approx": false,
+      "truncated_softmax": false
+    },
+    "disabled_shortcuts": [
+      "diagnostic_fallback",
+      "experimental_cuda",
+      "fmad_true",
+      "fast_math",
+      "incomplete_vocab_logits",
+      "logit_masking",
+      "teacher_forced_functional_answers",
+      "graph_kernel_divergence",
+      "speculative_decoding",
+      "numeric_bypass",
+      "ssd_streaming_approx",
+      "truncated_softmax"
+    ],
+    "enabled_shortcuts": [],
+    "selectors": {
+      "q4_decode": "integer_q8_late",
+      "q4_staging": "paired_integer",
+      "q8_decode": "r1_w4",
+      "q8_path": "dp4a_q8_1",
+      "prompt_mmq": "fma_async_x",
+      "prompt_mmq_tile": "i128_j128",
+      "prompt_attention": "kv_once",
+      "decode_gdn": "sequential",
+      "decode_attention": "warp_query",
+      "prompt_pair": "off",
+      "nvccflags": "-O2 --fmad=false",
+      "production_numerics": "strict",
+      "execution_graphs": "ffn_only",
+      "chat_template": "no_thinking",
+      "enable_thinking": false,
+      "logit_masking": false,
+      "q8_grouping": "grouped_r1_w4"
+    },
+    "delta": {
+      "flag": "--quality",
+      "selector": "production_arithmetic_under_test",
+      "precision": {
+        "nvccflags": "-O2 --fmad=false",
+        "fmad": false,
+        "fast_math": false,
+        "fp_contract": "off"
+      },
+      "disables": [
+        "diagnostic_fallback",
+        "experimental_cuda",
+        "fmad_true",
+        "fast_math",
+        "incomplete_vocab_logits",
+        "logit_masking",
+        "teacher_forced_functional_answers",
+        "graph_kernel_divergence",
+        "speculative_decoding",
+        "numeric_bypass",
+        "ssd_streaming_approx",
+        "truncated_softmax"
+      ],
+      "unknown_shortcut": "fail_closed",
+      "graph_vs_eager": "same_math_equivalence_not_different_kernel",
+      "diagnostic_fallbacks": "disabled",
+      "speed_oriented_numeric_bypass": "disabled",
+      "does_not_install_a_different_kernel": true
+    },
+    "graph_vs_eager": "same_math_equivalence",
+    "same_math_equivalence_not_different_kernel": true,
+    "does_not_restore_packed_or_r2": true
+  },
+  "opt098_history": "fixtures/opt098_batch_gate.json",
+  "opt056_history": "fixtures/opt056_performance_gate.json",
+  "opt084_baseline": "fixtures/opt084_quality_baseline.json",
+  "opt074_coverage_unadmitted_blocker": false,
+  "concession_active": false,
+  "strict_ppl_ratio_max": 1.01,
+  "reuse_historical_llama": false,
+  "p": {
+    "quartz": {
+      "prompt_tokens": 4096,
+      "replicates": 3,
+      "wall_ms": [
+        1335.64124,
+        1354.26099,
+        1356.59985
+      ],
+      "tok_s": [
+        3066.69189,
+        3024.52783,
+        3019.31323
+      ],
+      "mean_tok_s": 3036.84448,
+      "cold": true,
+      "cache_policy": "disabled",
+      "attribution": null,
+      "instrumented": false,
+      "graphs_created": true,
+      "prompt_graph_rows": 4096,
+      "cold_model_repack_ms": null,
+      "graph_construction_ms": null
+    },
+    "llama_cpp": {
+      "avg_ts": 3252.583232,
+      "avg_ns": 1259354479,
+      "n_prompt": 4096,
+      "n_batch": 2048,
+      "n_ubatch": 512,
+      "flash_attn": -1,
+      "build_commit": "cc83d7b",
+      "test_time": "2026-09-12T18:00:23Z",
+      "samples_ts": [
+        3280.7,
+        3241.84,
+        3235.21
+      ],
+      "samples_ns": [
+        1248514064,
+        1263479351,
+        1266070023
+      ]
+    }
+  },
+  "d128": {
+    "quartz": {
+      "prefix": 128,
+      "decode_tokens": 256,
+      "warmups": 3,
+      "runs": 30,
+      "warmup_tok_s": [
+        54.5356216,
+        54.4230576,
+        54.353569
+      ],
+      "tok_s": [
+        54.2822456,
+        54.1638145,
+        54.1070557,
+        53.9965401,
+        53.9353142,
+        53.8312492,
+        53.7350883,
+        53.7502823,
+        53.6692619,
+        53.638752,
+        53.5594826,
+        53.5463104,
+        53.497715,
+        53.4483795,
+        53.421669,
+        53.3677368,
+        53.3443832,
+        53.3076477,
+        53.3010597,
+        53.2629776,
+        53.2466049,
+        53.2350349,
+        53.2484856,
+        53.2053757,
+        53.1930237,
+        53.1776428,
+        53.1488457,
+        53.1512947,
+        53.151371,
+        53.1392708
+      ],
+      "run_wall_ms": [
+        4716.09082,
+        4726.40283,
+        4731.36084,
+        4741.04443,
+        4746.42627,
+        4755.60205,
+        4764.1123,
+        4762.76562,
+        4769.95557,
+        4772.66895,
+        4779.73242,
+        4780.9082,
+        4785.25098,
+        4789.66797,
+        4792.06299,
+        4796.90576,
+        4799.00586,
+        4802.31299,
+        4802.90625,
+        4806.34033,
+        4807.81836,
+        4808.86328,
+        4807.64844,
+        4811.54395,
+        4812.66113,
+        4814.05322,
+        4816.66162,
+        4816.43945,
+        4816.43262,
+        4817.5293
+      ],
+      "mean_tok_s": 53.5021248,
+      "token_latency_p50_ms": 18.7342377,
+      "token_latency_p95_ms": 18.8904171,
+      "run_mean_token_latency_p95_ms": 18.8146553,
+      "token_latency_sidecar": "evidence/optimization/opt106-batch-gate/quartz-d128-tokens.json",
+      "graphs_created": true,
+      "cache_policy": "disabled",
+      "attribution": null,
+      "instrumented": false
+    },
+    "llama_cpp": {
+      "prefix": 128,
+      "decode_tokens": 256,
+      "warmups": 3,
+      "runs": 30,
+      "warmup_tok_s": [
+        71.5796997,
+        71.0109659,
+        70.9650021
+      ],
+      "tok_s": [
+        70.9121827,
+        70.8107555,
+        70.6936065,
+        70.6053805,
+        69.2939542,
+        69.2683236,
+        69.235783,
+        69.2138069,
+        69.1381017,
+        69.162328,
+        69.0659531,
+        69.0763148,
+        68.9862205,
+        68.9931554,
+        68.9230902,
+        68.978302,
+        68.9910915,
+        68.9706826,
+        68.9864436,
+        68.9634736,
+        68.9384953,
+        68.825456,
+        68.8705605,
+        68.8203863,
+        68.7191686,
+        68.67791,
+        68.7326004,
+        68.671241,
+        68.6679622,
+        68.6631184
+      ],
+      "run_wall_ms": [
+        3610.099,
+        3615.27,
+        3621.261,
+        3625.786,
+        3694.406,
+        3695.773,
+        3697.51,
+        3698.684,
+        3702.734,
+        3701.437,
+        3706.602,
+        3706.046,
+        3710.886,
+        3710.513,
+        3714.285,
+        3711.312,
+        3710.624,
+        3711.722,
+        3710.874,
+        3712.11,
+        3713.455,
+        3719.554,
+        3717.118,
+        3719.828,
+        3725.307,
+        3727.545,
+        3724.579,
+        3727.907,
+        3728.085,
+        3728.348
+      ],
+      "mean_tok_s": 69.195195,
+      "token_latency_p50_ms": 14.383,
+      "token_latency_p95_ms": 14.486,
+      "run_mean_token_latency_p95_ms": 14.5624779,
+      "token_latency_sidecar": "evidence/optimization/opt106-batch-gate/llama-decode-d128-tokens.json",
+      "n_gpu_layers": 99,
+      "n_ctx": 4096,
+      "n_batch": 2048,
+      "n_ubatch": 512,
+      "attribution": null,
+      "instrumented": false
+    }
+  },
+  "d2048": {
+    "quartz": {
+      "prefix": 2048,
+      "decode_tokens": 256,
+      "warmups": 3,
+      "runs": 30,
+      "warmup_tok_s": [
+        49.499054,
+        49.4623833,
+        49.4708443
+      ],
+      "tok_s": [
+        49.4507523,
+        49.4581642,
+        49.43367,
+        49.4228249,
+        49.4393692,
+        49.4177361,
+        49.4046974,
+        49.4063721,
+        49.4029579,
+        49.3848877,
+        49.3846588,
+        49.3979263,
+        49.3885689,
+        49.3984528,
+        49.3740158,
+        49.392662,
+        49.4019699,
+        49.3884277,
+        49.3897285,
+        49.3869972,
+        49.4201241,
+        49.4159317,
+        49.3859901,
+        49.4025078,
+        49.3924637,
+        49.3697243,
+        49.3698311,
+        49.3486443,
+        49.3861961,
+        49.4014435
+      ],
+      "run_wall_ms": [
+        5176.86768,
+        5176.0918,
+        5178.65674,
+        5179.79297,
+        5178.05957,
+        5180.32617,
+        5181.69336,
+        5181.51807,
+        5181.87598,
+        5183.77197,
+        5183.7959,
+        5182.40381,
+        5183.38574,
+        5182.34863,
+        5184.91357,
+        5182.95605,
+        5181.97949,
+        5183.40039,
+        5183.26416,
+        5183.55078,
+        5180.07617,
+        5180.51562,
+        5183.65625,
+        5181.92334,
+        5182.97705,
+        5185.36426,
+        5185.35303,
+        5187.5791,
+        5183.63477,
+        5182.03467
+      ],
+      "mean_tok_s": 49.400589,
+      "token_latency_p50_ms": 20.2437668,
+      "token_latency_p95_ms": 20.3424911,
+      "run_mean_token_latency_p95_ms": 20.2552605,
+      "token_latency_sidecar": "evidence/optimization/opt106-batch-gate/quartz-d2048-tokens.json",
+      "graphs_created": true,
+      "cache_policy": "disabled",
+      "attribution": null,
+      "instrumented": false
+    },
+    "llama_cpp": {
+      "prefix": 2048,
+      "decode_tokens": 256,
+      "warmups": 3,
+      "runs": 30,
+      "warmup_tok_s": [
+        69.787989,
+        68.4195616,
+        68.3735482
+      ],
+      "tok_s": [
+        68.232314,
+        68.2098978,
+        68.1416676,
+        68.1024943,
+        67.2464042,
+        67.2478704,
+        67.2735123,
+        67.2639672,
+        67.2509973,
+        67.2156999,
+        67.2390743,
+        67.2040717,
+        67.2030838,
+        67.2375202,
+        67.248683,
+        67.174446,
+        67.226573,
+        67.2360545,
+        67.2136528,
+        67.2039835,
+        67.2034013,
+        67.1859052,
+        67.1891851,
+        67.2193003,
+        67.2001378,
+        67.2280736,
+        67.2384209,
+        67.2171471,
+        67.2224952,
+        67.2337589
+      ],
+      "run_wall_ms": [
+        3751.888,
+        3753.121,
+        3756.879,
+        3759.04,
+        3806.895,
+        3806.812,
+        3805.361,
+        3805.901,
+        3806.635,
+        3808.634,
+        3807.31,
+        3809.293,
+        3809.349,
+        3807.398,
+        3806.766,
+        3810.973,
+        3808.018,
+        3807.481,
+        3808.75,
+        3809.298,
+        3809.331,
+        3810.323,
+        3810.137,
+        3808.43,
+        3809.516,
+        3807.933,
+        3807.347,
+        3808.552,
+        3808.249,
+        3807.611
+      ],
+      "mean_tok_s": 67.3503264,
+      "token_latency_p50_ms": 14.577,
+      "token_latency_p95_ms": 14.611,
+      "run_mean_token_latency_p95_ms": 14.8837031,
+      "token_latency_sidecar": "evidence/optimization/opt106-batch-gate/llama-decode-d2048-tokens.json",
+      "n_gpu_layers": 99,
+      "n_ctx": 4096,
+      "n_batch": 2048,
+      "n_ubatch": 512,
+      "attribution": null,
+      "instrumented": false
+    }
+  },
+  "opt016": {
+    "quartz": {
+      "prompt_tokens": 2048,
+      "replicates": 3,
+      "wall_ms": [
+        642.310181,
+        666.96875,
+        667.034851
+      ],
+      "tok_s": [
+        3188.49072,
+        3070.60864,
+        3070.30444
+      ],
+      "mean_tok_s": 3109.80151,
+      "cold": true,
+      "cache_policy": "disabled",
+      "attribution": null
+    },
+    "llama_cpp": {
+      "avg_ts": 3141.838681,
+      "avg_ns": 651948623,
+      "n_prompt": 2048,
+      "n_ubatch": 512,
+      "flash_attn": -1,
+      "build_commit": "cc83d7b",
+      "test_time": "2026-09-12T18:13:44Z"
+    },
+    "gate_passed": false,
+    "owns_opt016_parity_gate": false
+  },
+  "quality": {
+    "status": "pass",
+    "model_quality_pass": true,
+    "absolute_quality_status": "fail",
+    "quartz_baseline_regression_status": "pass",
+    "quartz_vs_baseline_quality_delta": {
+      "held_out_32_mean_nll": 1.7872306470098762,
+      "baseline_held_out_mean_nll": 1.7878782710057632,
+      "baseline_held_out_32_mean_nll": 3.325543138013308,
+      "baseline_label": "opt084_held_out_1024",
+      "scored": 1024,
+      "held_out_ppl_ratio": 0.9993525856672696,
+      "ppl_ratio_max": 1.01,
+      "strict_ppl_ratio_max": 1.01,
+      "conditional_late_w4_ppl_ratio_max": 1.015,
+      "concession_active": false,
+      "delta_nll": -0.0006476239958870256,
+      "pass": true,
+      "status": "pass",
+      "known_baseline_defect_does_not_reject": true,
+      "inherited_absolute_task_fail": true,
+      "new_functional_regression": false,
+      "alarm_not_admission": false,
+      "single_boolean": null,
+      "inspectable": true
+    },
+    "quartz_vs_opt098_quality_delta": {
+      "opt098_held_out_mean_nll": 1.7872306470098762,
+      "delta_quartz_minus_opt098": 0.0,
+      "inspectable": true,
+      "single_boolean": null
+    },
+    "quartz_vs_llama_quality_delta": {
+      "quartz_held_out_mean_nll": 1.7872306470098762,
+      "llama_held_out_mean_nll": 1.788091893045086,
+      "delta_quartz_minus_llama": -0.0008612460352097617,
+      "baseline_aggregate_delta": -0.00012677606009181552,
+      "inspectable": true,
+      "authoritative_local_comparison": "quartz+llama",
+      "single_boolean": null
+    },
+    "recurrence_state_status": {
+      "status": "pass",
+      "incremental_nll": 0.0,
+      "incremental_nll_max": 0.02,
+      "this_sitting_recurrence": "measured"
+    },
+    "parsed": [
+      {
+        "raw": "A",
+        "stripped": "A",
+        "expected": "B",
+        "pass": false,
+        "reason": "wrong_choice",
+        "actual": "A",
+        "used_teacher_forcing": false,
+        "next_token": 32,
+        "top_two": [
+          32,
+          33
+        ],
+        "case": "task_arithmetic",
+        "engine": null
+      },
+      {
+        "raw": "A",
+        "stripped": "A",
+        "expected": "A",
+        "pass": true,
+        "reason": "exact_choice",
+        "actual": "A",
+        "used_teacher_forcing": false,
+        "next_token": 32,
+        "top_two": [
+          32,
+          33
+        ],
+        "case": "task_python_len",
+        "engine": null
+      },
+      {
+        "raw": "C",
+        "stripped": "C",
+        "expected": "C",
+        "pass": true,
+        "reason": "exact_choice",
+        "actual": "C",
+        "used_teacher_forcing": false,
+        "next_token": 34,
+        "top_two": [
+          34,
+          90
+        ],
+        "case": "task_inference",
+        "engine": null
+      },
+      {
+        "raw": "D",
+        "stripped": "D",
+        "expected": "D",
+        "pass": true,
+        "reason": "exact_choice",
+        "actual": "D",
+        "used_teacher_forcing": false,
+        "next_token": 35,
+        "top_two": [
+          35,
+          34
+        ],
+        "case": "task_minutes",
+        "engine": null
+      },
+      {
+        "raw": "B",
+        "stripped": "B",
+        "expected": "B",
+        "pass": true,
+        "reason": "exact_choice",
+        "actual": "B",
+        "used_teacher_forcing": false,
+        "next_token": 33,
+        "top_two": [
+          33,
+          760
+        ],
+        "case": "task_sort",
+        "engine": null
+      },
+      {
+        "raw": "A",
+        "stripped": "A",
+        "expected": "A",
+        "pass": true,
+        "reason": "exact_choice",
+        "actual": "A",
+        "used_teacher_forcing": false,
+        "next_token": 32,
+        "top_two": [
+          32,
+          33
+        ],
+        "case": "task_json",
+        "engine": null
+      },
+      {
+        "raw": "C",
+        "stripped": "C",
+        "expected": "C",
+        "pass": true,
+        "reason": "exact_choice",
+        "actual": "C",
+        "used_teacher_forcing": false,
+        "next_token": 34,
+        "top_two": [
+          34,
+          248046
+        ],
+        "case": "task_reading",
+        "engine": null
+      },
+      {
+        "raw": "D",
+        "stripped": "D",
+        "expected": "D",
+        "pass": true,
+        "reason": "exact_choice",
+        "actual": "D",
+        "used_teacher_forcing": false,
+        "next_token": 35,
+        "top_two": [
+          35,
+          34
+        ],
+        "case": "task_sequence",
+        "engine": null
+      }
+    ],
+    "selected_quality_verdicts": {
+      "parsed_functional_answers": true,
+      "held_out_32": true,
+      "quartz_vs_baseline": "pass",
+      "quartz_vs_llama": "inspectable",
+      "absolute_task_accuracy": "fail",
+      "engine_non_regression": "pass"
+    },
+    "suite_classes": [
+      "teacher_forced_continuation",
+      "known_qwen_continuations",
+      "ppl_1024_spans",
+      "recurrence_nll",
+      "opt073_dual_verdict",
+      "held_out_32_alarm",
+      "finite_vocab_state_consistency"
+    ],
+    "frozen_acceptance": {
+      "primary_candidate_gate": "quartz_vs_shipping_baseline_regression",
+      "ppl_ratio_max": 1.01,
+      "recurrence_incremental_nll_max": 0.02,
+      "engine_non_regression": "OPT-073 quality-v3",
+      "absolute_task_accuracy": "visible_and_separate",
+      "quartz_vs_llama_nll": "inspectable_control",
+      "projection_error_substitute_for_opt074": false,
+      "known_baseline_defect_does_not_reject_non_worsening_kernel": true,
+      "continuation_consistency": "no_new_greedy_mismatch_vs_baseline",
+      "opt073_engine_non_regression_must_remain": "pass",
+      "numerically_frozen_by": "OPT-084"
+    },
+    "opt056_quality_requirement_met": false,
+    "quality_v2_all": false,
+    "is_release_evidence": false,
+    "opt074_coverage_unadmitted_blocker": false,
+    "single_boolean": null,
+    "quality_flag": "--quality",
+    "suite": "opt083",
+    "nll_cases": [
+      {
+        "name": "wikitext_nll",
+        "scored": 1024,
+        "mean_nll": 1.5264653580189336
+      },
+      {
+        "name": "held_out_wikitext_1024",
+        "scored": 1024,
+        "mean_nll": 1.7872306470098762
+      },
+      {
+        "name": "recurrence_short",
+        "scored": 128,
+        "mean_nll": 2.2469028478863704
+      },
+      {
+        "name": "recurrence_long",
+        "scored": 128,
+        "mean_nll": 2.7268403900965112
+      }
+    ],
+    "quality_v3_replaces_v2": false,
+    "relaxes_opt056": false,
+    "quality_v2": {
+      "suite": "quality-v2",
+      "status": "fail",
+      "all": false,
+      "wikitext_nll": {
+        "pass": true,
+        "mean_nll": 1.5264653580189336
+      },
+      "held_out_wikitext_1024": {
+        "pass": true,
+        "mean_nll": 1.7872306470098762
+      },
+      "recurrence": {
+        "pass": true,
+        "incremental_nll": 0.0
+      },
+      "tasks": {
+        "pass": false,
+        "count": 8
+      },
+      "llama_reference": {
+        "wikitext_nll": {
+          "mean_nll": 1.525124035418359
+        },
+        "held_out_wikitext_1024": {
+          "mean_nll": 1.788091893045086
+        }
+      }
+    }
+  },
+  "state_isolation": {
+    "memory_fit": {
+      "ok": false,
+      "post_graph_admitted": false,
+      "reserve_ok": true,
+      "fields": {
+        "memory_fit": "post_graph",
+        "capacity": "131072",
+        "explicit_bytes": "29571258208",
+        "measured_delta": "29578231808",
+        "free_bytes": "3521118208",
+        "reserve_required": "1610612736",
+        "total_bytes": "33664794624",
+        "arithmetic": "false",
+        "passed": "false"
+      }
+    },
+    "checkpoint": {
+      "ok": true
+    },
+    "cancellation": {
+      "ok": true,
+      "frontier": 0,
+      "source": "fixtures/opt055_execution_graphs.json"
+    }
+  },
+  "owns_opt016_parity_gate": false,
+  "opt056_gate_passed": false,
+  "opt016_gate_passed": false,
+  "preflight_is_release_evidence": false,
+  "nsight_systems": "not_used",
+  "nsight_compute": "not_used",
+  "proof_limit": "combined freeze of post098_control from authenticated OPT-098 and post106_selected equal to that combination; OPT-100 through OPT-105 rejected with no production selector change; independent kernel_parity_pass per family; quality is not one boolean; quartz_vs_baseline_quality_delta and quartz_vs_llama_quality_delta stay distinct; opt074_coverage_unadmitted is not a blocker; absolute task-accuracy fail inherited from OPT-084 does not by itself block; new regression versus OPT-084 does block; OPT-098 remains historical and is not reinterpreted; OPT-056 and OPT-016 stay blocked unless their owning conditions pass; parity gap is Tq-Tl; +5% throughput gap is Tq-Tl/1.05; do not label the parity gap as the +5% bar; decode p95 no worse than llama for the OPT-056 outcome; preflight is not release evidence; failed required quality stops release before long timing; diagnostic performance is not a release or keep; rejected candidates must not leak into production; internal improvement is selected versus authenticated OPT-098 control not llama; llama numbers are measured in this sitting and not reused from OPT-098; strict_ppl_ratio_max=1.01 applies because concession is inactive; release_eligible is never a synonym for opt056_pass; OPT-099 matched family attribution is diagnostic and non-additive; selected equals control so Quartz is measured once",
+  "report_path": "evidence/optimization/opt106-batch-gate/REPORT.md",
+  "gaps": {
+    "p": {
+      "parity_ms": 89.46169853594392,
+      "plus5_ms": 149.42868635309674
+    },
+    "d128": {
+      "parity_ms": 1085.1778363812805,
+      "plus5_ms": 1261.3530200840823
+    },
+    "d2048": {
+      "parity_ms": 1381.1035222364067,
+      "plus5_ms": 1562.10451869893
+    }
+  },
+  "gate": {
+    "p": {
+      "quartz_mean_tok_s": 3036.844316666667,
+      "llama_mean_tok_s": 3252.5833333333335,
+      "ratio": 0.9336714867669289,
+      "margin": 1.05,
+      "point_exceeds_margin": false,
+      "confidence_supported": false,
+      "ci95_diff_minus_margin": {
+        "diff": -378.36818333333304,
+        "low": -432.7202698517687,
+        "high": -324.01609681489737,
+        "se": 21.140445942604295,
+        "df": 3.999813423115208
+      },
+      "remaining_tok_s": 378.36818333333304,
+      "pass": false,
+      "parity_pass": false
+    },
+    "d128": {
+      "quartz_mean_tok_s": 53.50213050333333,
+      "llama_mean_tok_s": 69.19519495333334,
+      "ratio": 0.7732058640692647,
+      "margin": 1.05,
+      "point_exceeds_margin": false,
+      "confidence_supported": false,
+      "ci95_diff_minus_margin": {
+        "diff": -19.152824197666675,
+        "low": -19.425073738598442,
+        "high": -18.880574656734908,
+        "se": 0.13890282700600404,
+        "df": 42.393936866686765
+      },
+      "remaining_tok_s": 19.152824197666675,
+      "pass": false,
+      "parity_pass": false
+    },
+    "d2048": {
+      "quartz_mean_tok_s": 49.40058988,
+      "llama_mean_tok_s": 67.35032643999999,
+      "ratio": 0.7334870147067398,
+      "margin": 1.05,
+      "point_exceeds_margin": false,
+      "confidence_supported": false,
+      "ci95_diff_minus_margin": {
+        "diff": -21.31725288199999,
+        "low": -21.446350557760752,
+        "high": -21.18815520623923,
+        "se": 0.06322119283093033,
+        "df": 29.282520682781673
+      },
+      "remaining_tok_s": 21.31725288199999,
+      "pass": false,
+      "parity_pass": false
+    },
+    "d128_p95": {
+      "token_latency_p95_ms": {
+        "quartz": 18.8904171,
+        "llama": 14.486,
+        "pass": false
+      },
+      "run_mean_token_latency_p95_ms": {
+        "quartz": 18.8146553,
+        "llama": 14.5624779,
+        "pass": false
+      },
+      "pass": false
+    },
+    "d2048_p95": {
+      "token_latency_p95_ms": {
+        "quartz": 20.3424911,
+        "llama": 14.611,
+        "pass": false
+      },
+      "run_mean_token_latency_p95_ms": {
+        "quartz": 20.2552605,
+        "llama": 14.8837031,
+        "pass": false
+      },
+      "pass": false
+    },
+    "quality": false,
+    "opt016": false,
+    "passed": false
+  },
+  "outcomes": {
+    "internal_improvement_with_quality": {
+      "name": "internal_improvement_with_quality",
+      "pass": false,
+      "quality_pass": false,
+      "state_memory_pass": false,
+      "geometric_mean_speed_ratio": 1.2580358820216184,
+      "geometric_mean_ci_lower": 0.9810442086786643,
+      "p_ci": {
+        "pass": false,
+        "incomplete": false,
+        "ci_lower": 0.9966731813187979,
+        "min_ratio": 0.9967026951793575,
+        "min_ratio_threshold": 0.95,
+        "threshold": 1.0,
+        "log_mean": -0.003085404915735793,
+        "df": 2,
+        "critical": 2.132
+      },
+      "d128_ci": {
+        "pass": true,
+        "incomplete": false,
+        "ci_lower": 1.4336436572053706,
+        "min_ratio": 1.4299325744571505,
+        "min_ratio_threshold": 0.95,
+        "threshold": 1.0,
+        "log_mean": 0.3609811338274725,
+        "df": 29,
+        "critical": 2.132
+      },
+      "d2048_ci": {
+        "pass": true,
+        "incomplete": false,
+        "ci_lower": 1.39163731634862,
+        "min_ratio": 1.3898998327579262,
+        "min_ratio_threshold": 0.95,
+        "threshold": 1.0,
+        "log_mean": 0.3307536155262069,
+        "df": 29,
+        "critical": 2.132
+      },
+      "d128_p95": {
+        "pass": true,
+        "ratio": 0.6992853032590877,
+        "limit": 1.05,
+        "control_p95_ms": 27.0138912,
+        "candidate_p95_ms": 18.8904171
+      },
+      "d2048_p95": {
+        "pass": true,
+        "ratio": 0.7195168383160299,
+        "limit": 1.05,
+        "control_p95_ms": 28.2724323,
+        "candidate_p95_ms": 20.3424911
+      },
+      "control_p_tok_s": 3046.23218,
+      "control_d128_tok_s": 37.2903061,
+      "control_d2048_tok_s": 35.4885025,
+      "selected_p_tok_s": 3036.84448,
+      "selected_d128_tok_s": 53.5021248,
+      "selected_d2048_tok_s": 49.400589,
+      "p_delta_tok_s": -9.387699999999768,
+      "d128_delta_tok_s": 16.211818699999995,
+      "d2048_delta_tok_s": 13.912086499999994,
+      "opt098_p4096_baseline_tok_s": 3046.23,
+      "selected_equals_control": true
+    },
+    "llama_parity": {
+      "name": "llama_parity",
+      "p": false,
+      "d128": false,
+      "d2048": false,
+      "d128_p95_inspectable": false,
+      "d2048_p95_inspectable": false,
+      "p_parity_gap_ms": 89.46169853594392,
+      "d128_parity_gap_ms": 1085.1778363812805,
+      "d2048_parity_gap_ms": 1381.1035222364067,
+      "pass": false
+    },
+    "opt056_plus5": {
+      "name": "opt056_plus5_throughput_lead",
+      "pass": false,
+      "p_plus5_gap_ms": 149.42868635309674,
+      "d128_plus5_gap_ms": 1261.3530200840823,
+      "d2048_plus5_gap_ms": 1562.10451869893
+    }
+  },
+  "model_quality_pass": true,
+  "quartz_vs_baseline_quality_delta": {
+    "held_out_32_mean_nll": 1.7872306470098762,
+    "baseline_held_out_mean_nll": 1.7878782710057632,
+    "baseline_held_out_32_mean_nll": 3.325543138013308,
+    "baseline_label": "opt084_held_out_1024",
+    "scored": 1024,
+    "held_out_ppl_ratio": 0.9993525856672696,
+    "ppl_ratio_max": 1.01,
+    "strict_ppl_ratio_max": 1.01,
+    "conditional_late_w4_ppl_ratio_max": 1.015,
+    "concession_active": false,
+    "delta_nll": -0.0006476239958870256,
+    "pass": true,
+    "status": "pass",
+    "known_baseline_defect_does_not_reject": true,
+    "inherited_absolute_task_fail": true,
+    "new_functional_regression": false,
+    "alarm_not_admission": false,
+    "single_boolean": null,
+    "inspectable": true
+  },
+  "quartz_vs_llama_quality_delta": {
+    "quartz_held_out_mean_nll": 1.7872306470098762,
+    "llama_held_out_mean_nll": 1.788091893045086,
+    "delta_quartz_minus_llama": -0.0008612460352097617,
+    "baseline_aggregate_delta": -0.00012677606009181552,
+    "inspectable": true,
+    "authoritative_local_comparison": "quartz+llama",
+    "single_boolean": null
+  },
+  "recurrence_state_status": {
+    "status": "pass",
+    "incremental_nll": 0.0,
+    "incremental_nll_max": 0.02,
+    "this_sitting_recurrence": "measured",
+    "memory_fit": false,
+    "checkpoint": true,
+    "cancellation": true
+  },
+  "performance_pass": false,
+  "production_kept": true,
+  "release_eligible": true
+}

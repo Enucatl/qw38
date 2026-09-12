@@ -265,7 +265,7 @@ in ledger/dependency order is OPT-099.
 | OPT-103 | Port the pinned-llama one-query vector attention specialization | OPT-099 | done | 128-thread online-softmax attention improves complete 16-layer D128/D2048 attention with full KV/quality/state guards, or warp_query is retained | [`tasks/OPT-103.md`](tasks/OPT-103.md); [`pins/opt103_vector_attention_contract.json`](pins/opt103_vector_attention_contract.json); [`pins/opt103_iteration_contract.json`](pins/opt103_iteration_contract.json); [`fixtures/opt103_vector_attention.json`](fixtures/opt103_vector_attention.json); [`tools/opt103_vector_attention.py`](tools/opt103_vector_attention.py); [`tests/test_opt103_vector_attention.py`](tests/test_opt103_vector_attention.py); [`cuda/opt103_vector_attention_test.cu`](cuda/opt103_vector_attention_test.cu); [`Makefile`](Makefile); [`evidence/optimization/opt103-vector-attention/REPORT.md`](evidence/optimization/opt103-vector-attention/REPORT.md); [`evidence/optimization/opt103-vector-attention/REJECTION.md`](evidence/optimization/opt103-vector-attention/REJECTION.md); verification 2026-09-12T17:08:30Z |
 | OPT-104 | Align Q6 weights for attention-output and vocabulary projections | OPT-099 | done | One lossless replacement layout improves combined complete Q6 work and both decode prefixes with full-vocab/P4096/memory gates, or raw Q6 is retained | [`tasks/OPT-104.md`](tasks/OPT-104.md); [`pins/opt104_q6_aligned_contract.json`](pins/opt104_q6_aligned_contract.json); [`pins/opt104_iteration_contract.json`](pins/opt104_iteration_contract.json); [`fixtures/opt104_q6_aligned.json`](fixtures/opt104_q6_aligned.json); [`tools/opt104_q6_aligned.py`](tools/opt104_q6_aligned.py); [`tests/test_opt104_q6_aligned.py`](tests/test_opt104_q6_aligned.py); [`cuda/opt104_q6_aligned_test.cu`](cuda/opt104_q6_aligned_test.cu); [`cuda/q6k_aligned_layout.cuh`](cuda/q6k_aligned_layout.cuh); [`Makefile`](Makefile); [`evidence/optimization/opt104-q6-aligned-layout/REPORT.md`](evidence/optimization/opt104-q6-aligned-layout/REPORT.md); [`evidence/optimization/opt104-q6-aligned-layout/REJECTION.md`](evidence/optimization/opt104-q6-aligned-layout/REJECTION.md); verification 2026-09-12T17:42:51Z |
 | OPT-105 | Double-buffer raw X in a 64x128 prompt MMQ tile | OPT-099 | done | Bitwise two-X-stage schedule saves ≥5 ms over complete P4096 FFNs and improves P4096 with decode/quality guards, or 128x128 joined-wait remains | [`tasks/OPT-105.md`](tasks/OPT-105.md); [`pins/opt105_mmq_double_x_contract.json`](pins/opt105_mmq_double_x_contract.json); [`pins/opt105_iteration_contract.json`](pins/opt105_iteration_contract.json); [`fixtures/opt105_mmq_double_x.json`](fixtures/opt105_mmq_double_x.json); [`tools/opt105_mmq_double_x.py`](tools/opt105_mmq_double_x.py); [`tests/test_opt105_mmq_double_x.py`](tests/test_opt105_mmq_double_x.py); [`cuda/opt105_mmq_double_x_test.cu`](cuda/opt105_mmq_double_x_test.cu); [`Makefile`](Makefile); [`evidence/optimization/opt105-mmq-double-x/REPORT.md`](evidence/optimization/opt105-mmq-double-x/REPORT.md); [`evidence/optimization/opt105-mmq-double-x/REJECTION.md`](evidence/optimization/opt105-mmq-double-x/REJECTION.md); verification 2026-09-12T17:33:55Z |
-| OPT-106 | Freeze and measure the post-098 recovery combination | OPT-100, OPT-101, OPT-102, OPT-103, OPT-104, OPT-105 | pending | Fresh quality/P/D/p95/2K/state/memory sitting independently reports internal improvement, llama parity and unchanged OPT-056 +5% outcomes | [`tasks/OPT-106.md`](tasks/OPT-106.md) |
+| OPT-106 | Freeze and measure the post-098 recovery combination | OPT-100, OPT-101, OPT-102, OPT-103, OPT-104, OPT-105 | done | Fresh quality/P/D/p95/2K/state/memory sitting independently reports internal improvement, llama parity and unchanged OPT-056 +5% outcomes | [`tasks/OPT-106.md`](tasks/OPT-106.md); [`pins/opt106_batch_gate_contract.json`](pins/opt106_batch_gate_contract.json); [`pins/opt106_iteration_contract.json`](pins/opt106_iteration_contract.json); [`fixtures/opt106_batch_gate.json`](fixtures/opt106_batch_gate.json); [`tools/opt106_batch_gate.py`](tools/opt106_batch_gate.py); [`tests/test_opt106_batch_gate.py`](tests/test_opt106_batch_gate.py); [`Makefile`](Makefile); [`evidence/optimization/opt106-batch-gate/REPORT.md`](evidence/optimization/opt106-batch-gate/REPORT.md); verification 2026-09-12T18:20:00Z |
 
 ### Post-042 recovery execution order (historical batch)
 
@@ -7397,4 +7397,31 @@ statements below are historical, not the current execution order.
 - **tok/s delta vs OPT-098 P4096 baseline (3046.23 tok/s): 0** (rejection; no
   throughput claim).
 - Marked OPT-104 `done`. Coupled IDs: none. First eligible pending task: **OPT-106**.
+
+### 2026-09-12T18:20:00Z — OPT-106 post-098 recovery outcome measured
+
+- Added OPT-106 batch gate (`tools/opt106_batch_gate.py`, contracts, fixture,
+  tests, `cuda-opt106-diagnostics`). Frozen `post098_control` from authenticated
+  OPT-098; `post106_selected` equals that combination because OPT-100–105 were
+  all rejected. Quartz measured once. Fresh pinned-llama P/D/2K in the same
+  sitting; OPT-098 llama numbers were not reused.
+- Quality/state checkpoint pass under strict 1.01 PPL (concession inactive).
+  Held-out 1024 NLL 1.78723 matches OPT-098. Inherited `task_arithmetic` fail
+  remains visible. 128K reserve after graphs is 3.28 GiB (≥1.5 GiB) but the
+  frozen workspace arithmetic pin fails (`1831816704` vs `1831810560` bytes,
+  +6144); `memory_fit=false` is an honest ledger miss, not a relaxed gate.
+- **P4096:** selected 3036.84 vs llama 3252.58 vs OPT-098 control 3046.23 tok/s.
+  **D128:** 53.50 vs 69.20 vs 37.29 tok/s (p95 18.89 vs 14.49 vs 27.01 ms).
+  **D2048:** 49.40 vs 67.35 vs 35.49 tok/s (p95 20.34 vs 14.61 vs 28.27 ms).
+  **2K:** 3109.80 vs llama 3141.84 tok/s (`gate_passed=false`).
+- Outcomes: internal_improvement_with_quality **false** (geo 1.258, CI lower
+  0.981; P4096 CI lower 0.997; memory arithmetic miss); llama_parity **false**;
+  opt056_plus5 **false**. `kernel_parity_pass=true`; `model_quality_pass=true`;
+  `performance_pass=false`; `production_kept=true`. Decode sitting-to-sitting
+  movement vs OPT-098 is not a new keep; selectors are unchanged.
+- Key evidence: [`fixtures/opt106_batch_gate.json`](fixtures/opt106_batch_gate.json);
+  [`evidence/optimization/opt106-batch-gate/REPORT.md`](evidence/optimization/opt106-batch-gate/REPORT.md).
+- **tok/s delta vs OPT-098 P4096 baseline (3046.23 tok/s): −9.39 tok/s (0.997×).**
+  D128 +16.21 tok/s; D2048 +13.91 tok/s versus that same control sitting.
+- Marked OPT-106 `done`. Coupled IDs: none. Post-098 recovery batch complete.
 
