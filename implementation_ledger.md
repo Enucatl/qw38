@@ -226,6 +226,27 @@ task in ledger/dependency order is OPT-086.
 | OPT-087 | Selectively reopen remaining numerical-policy-blocked candidates | OPT-072, OPT-082, OPT-084 | done | Disposition table for remaining OPT-072 leftovers; reopen at most one already-implemented candidate with measured upside, or no_additional_reopen; no performance-loser rerun | [`tasks/OPT-087.md`](tasks/OPT-087.md); [`pins/opt087_historical_reevaluation_contract.json`](pins/opt087_historical_reevaluation_contract.json); [`pins/opt087_iteration_contract.json`](pins/opt087_iteration_contract.json); [`fixtures/opt087_historical_reevaluation.json`](fixtures/opt087_historical_reevaluation.json); [`tools/opt087_historical_reevaluation.py`](tools/opt087_historical_reevaluation.py); [`tests/test_opt087_historical_reevaluation.py`](tests/test_opt087_historical_reevaluation.py); [`tools/run_optimization_task.py`](tools/run_optimization_task.py); [`Makefile`](Makefile); [`evidence/optimization/opt087-historical-reevaluation/REPORT.md`](evidence/optimization/opt087-historical-reevaluation/REPORT.md); verification 2026-09-11T22:32:44Z |
 | OPT-088 | Combined post-reset production gate for the new combination | OPT-079, OPT-085, OPT-086, OPT-087 | done | Independent kernel-parity, quality, Quartz-vs-baseline, Quartz-vs-llama, recurrence, P4096/D128/D2048/p95, llama parity, and OPT-056/+5% fields; OPT-080 remains historical and is not reinterpreted | [`tasks/OPT-088.md`](tasks/OPT-088.md); [`pins/opt088_batch_gate_contract.json`](pins/opt088_batch_gate_contract.json); [`pins/opt088_iteration_contract.json`](pins/opt088_iteration_contract.json); [`fixtures/opt088_batch_gate.json`](fixtures/opt088_batch_gate.json); [`tools/opt088_batch_gate.py`](tools/opt088_batch_gate.py); [`tests/test_opt088_batch_gate.py`](tests/test_opt088_batch_gate.py); [`Makefile`](Makefile); [`evidence/optimization/opt088-batch-gate/REPORT.md`](evidence/optimization/opt088-batch-gate/REPORT.md); verification 2026-09-11T23:12:15Z |
 
+### Post-088 performance recovery batch
+
+Read [the post-088 protocol](tasks/PERFORMANCE-RECOVERY-POST-088.md). This batch
+targets decode throughput recovery after OPT-088 with strict parity, successor
+quality policy, and measured keep/reject decisions. Execute OPT-089 through
+OPT-098 in dependency order. First eligible task in ledger/dependency order is
+OPT-089.
+
+| ID | Description | Dependencies | Status | Acceptance condition | Evidence |
+|---|---|---|---|---|---|
+| OPT-089 | Complete strict admission of late_w4 with corrected parity references and real candidate quality | OPT-088 | in_progress | All positive parity/same-math cases accounted for; full Q and D128/D2048+p95 yield keep or explicit rejection | [`tasks/OPT-089.md`](tasks/OPT-089.md) |
+| OPT-090 | Measure matched post-Q4 decode sinks and secondary P4096 attribution | OPT-089 | pending | Correct call counts, no dropped events, ≤5% unexplained wall; auditable family ranking and conditional-task triggers | [`tasks/OPT-090.md`](tasks/OPT-090.md) |
+| OPT-091 | Establish successor quality gate and decide narrowly bounded late_w4 concession | OPT-090 | pending | Versioned strict/successor verdicts; full Q required; concession only with ≤1.015 PPL and strong two-prefix decode benefit | [`tasks/OPT-091.md`](tasks/OPT-091.md) |
+| OPT-092 | Group same-input Q8 decode projections into one launch per layer group | OPT-091 | pending | Exact staging/output parity and full mixer plus two-prefix E2E acceptance, or retain r1_w4 separate launches | [`tasks/OPT-092.md`](tasks/OPT-092.md) |
+| OPT-093 | Factor paired-group Q4 integer scale/min work | OPT-092 | pending | Strict parity, same-math internal reconstruction, full Q and complete FFN/two-prefix keep or reject | [`tasks/OPT-093.md`](tasks/OPT-093.md) |
+| OPT-094 | Conditionally replicate OPT-077 tile32 on demonstrably repaired timing | OPT-093 | pending | Concrete measurement repair required; fixed 30-pair test and full quality/state/two-prefix gate, or no-reopen | [`tasks/OPT-094.md`](tasks/OPT-094.md) |
+| OPT-095 | Share decode KV loads across six query heads without a prep launch | OPT-094 | pending | Bitwise per-head output and complete 16-layer/two-prefix acceptance, or retain warp_query | [`tasks/OPT-095.md`](tasks/OPT-095.md) |
+| OPT-096 | Conditionally capture eight-layer decode segments | OPT-095 | pending | Fresh ≥0.50 ms removable overhead trigger, exact graph/state behavior and two-prefix gain, or no-reopen | [`tasks/OPT-096.md`](tasks/OPT-096.md) |
+| OPT-097 | Separate X/Y async completion in fixed-tile prompt MMQ | OPT-096 | pending | Bitwise output and full FFN/P4096 win with decode guards, or retain fma_async_x schedule | [`tasks/OPT-097.md`](tasks/OPT-097.md) |
+| OPT-098 | Freeze and measure the combined post-088 production outcome | OPT-097 | pending | Complete quality, P/D/p95/2K/state/memory evidence; independent internal/parity/+5% outcomes, including failures | [`tasks/OPT-098.md`](tasks/OPT-098.md) |
+
 ### Post-042 recovery execution order (historical batch)
 
 The [2026-09-10 design](tasks/PERFORMANCE-RECOVERY-2026-09-10.md) compares the
@@ -6980,4 +7001,19 @@ statements below are historical, not the current execution order.
   is limited to the verified task scope plus this ledger/audit bookkeeping.
   `plan.md` is unchanged. OPT-016 and OPT-056 stay `blocked`. No automatic next
   optimization sweep.
+
+### 2026-09-12T04:33:00Z — Admit post-088 performance recovery tasks
+
+- Added pending OPT-089 through OPT-098 and
+  [`tasks/PERFORMANCE-RECOVERY-POST-088.md`](tasks/PERFORMANCE-RECOVERY-POST-088.md).
+  This is source-based task design from the post-OPT-088 review, not kernel
+  implementation or a new GPU measurement. The first eligible task in
+  ledger/dependency order is OPT-089.
+- Decode recovery precedes prefill; each task requires the predecessor's
+  recorded keep/reject/no-go decision. Successor quality policy (OPT-091) and
+  conditional concessions apply only after OPT-090 attribution.
+- Validation: new dependency graph is acyclic; all ten dossier dependencies
+  match their pending ledger rows; local dossier/protocol links resolve;
+  `plan.md` is unchanged. No historical fixture, production pin, or gate was
+  rewritten.
 
