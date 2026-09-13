@@ -2605,6 +2605,10 @@ const char* selected_attention_pipeline_path() noexcept {
   return kSelectedAttentionPipelinePath;
 }
 
+const char* current_attention_pipeline_path() noexcept {
+  return effective_attention_pipeline_path();
+}
+
 bool fattn_uses_attention_pipeline() noexcept {
   return !fattn_pipeline_is_off(kSelectedAttentionPipelinePath);
 }
@@ -2683,6 +2687,42 @@ void fattn_pipeline_f16_async_attributes(int* regs, std::size_t* local_bytes,
   if (occupancy != nullptr) {
     *occupancy =
         fattn_pipeline_occupancy_typed<16, false, true, 32, 2, 2, 1, 2, false>();
+  }
+}
+
+void fattn_pipeline_opt111_base_attributes(int* regs, std::size_t* local_bytes,
+                                           int* occupancy) noexcept {
+  cudaFuncAttributes attrs{};
+  const cudaError_t error = cudaFuncGetAttributes(
+      &attrs, fattn_mma_pipeline_kernel<16, false, true, 32, 2, 2, 1, 2, true,
+                                        true, false>);
+  if (regs != nullptr) *regs = error == cudaSuccess ? attrs.numRegs : 0;
+  if (local_bytes != nullptr) {
+    *local_bytes = error == cudaSuccess
+                       ? static_cast<std::size_t>(attrs.localSizeBytes)
+                       : 1U;
+  }
+  if (occupancy != nullptr) {
+    *occupancy = fattn_pipeline_occupancy_typed<16, false, true, 32, 2, 2, 1, 2,
+                                                true, true, false>();
+  }
+}
+
+void fattn_pipeline_opt111_xor_attributes(int* regs, std::size_t* local_bytes,
+                                          int* occupancy) noexcept {
+  cudaFuncAttributes attrs{};
+  const cudaError_t error = cudaFuncGetAttributes(
+      &attrs, fattn_mma_pipeline_kernel<16, false, true, 32, 2, 2, 1, 2, true,
+                                        true, true>);
+  if (regs != nullptr) *regs = error == cudaSuccess ? attrs.numRegs : 0;
+  if (local_bytes != nullptr) {
+    *local_bytes = error == cudaSuccess
+                       ? static_cast<std::size_t>(attrs.localSizeBytes)
+                       : 1U;
+  }
+  if (occupancy != nullptr) {
+    *occupancy = fattn_pipeline_occupancy_typed<16, false, true, 32, 2, 2, 1, 2,
+                                                true, true, true>();
   }
 }
 

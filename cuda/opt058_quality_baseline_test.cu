@@ -1,3 +1,4 @@
+#include "attention_decode.h"
 #include "full_scheduler.h"
 
 #include "ffn_decode_path.cuh"
@@ -35,6 +36,7 @@ constexpr std::size_t kMaxGenerate = 16;
 char g_applied_q4[64];
 char g_applied_ffn[64];
 char g_applied_q8[32];
+char g_applied_attn[64];
 
 struct Options final {
   const char* model = nullptr;
@@ -47,6 +49,7 @@ struct Options final {
   const char* q4_decode = nullptr;
   const char* ffn_decode = nullptr;
   const char* q8_layout = nullptr;
+  const char* attention_pipeline = nullptr;
   bool quality = false;
   std::size_t max_targets = 0;
 };
@@ -77,7 +80,8 @@ int usage(const char* argv0) {
                "[--llama-oracle PATH] [--prompt-set v2|original] "
                "[--case NAME] [--max-targets N] [--quality] "
                "[--quality-config PATH] [--q4-decode PATH] "
-               "[--ffn-decode PATH] [--q8-layout LAYOUT]\n",
+               "[--ffn-decode PATH] [--q8-layout LAYOUT] "
+               "[--attention-pipeline PATH]\n",
                argv0);
   return 2;
 }
@@ -110,6 +114,9 @@ int parse_args(int argc, char** argv, Options* options) {
       options->ffn_decode = argv[++index];
     } else if (std::strcmp(arg, "--q8-layout") == 0 && index + 1 < argc) {
       options->q8_layout = argv[++index];
+    } else if (std::strcmp(arg, "--attention-pipeline") == 0 &&
+               index + 1 < argc) {
+      options->attention_pipeline = argv[++index];
     } else if (arg[0] != '-' && options->model == nullptr) {
       options->model = arg;
     } else {
@@ -379,6 +386,8 @@ int apply_quality_selectors(const Options& options) {
   std::string q4 = options.q4_decode != nullptr ? options.q4_decode : "";
   std::string ffn = options.ffn_decode != nullptr ? options.ffn_decode : "";
   std::string q8 = options.q8_layout != nullptr ? options.q8_layout : "";
+  std::string attn =
+      options.attention_pipeline != nullptr ? options.attention_pipeline : "";
   if (options.quality_config != nullptr) {
     std::ifstream file(options.quality_config);
     if (!file) {
@@ -399,6 +408,7 @@ int apply_quality_selectors(const Options& options) {
         (q8.empty() || q8 == "dp4a_q8_1" || q8 == "r2_w2" || q8 == "r1_w4")) {
       if (parsed == "r1_w4" || parsed == "r2_w2") q8 = parsed;
     }
+    if (json_string_field(text, "prompt_attention", &parsed)) attn = parsed;
   }
   // `--quality` disables shortcuts only. It must not restore packed/r2
   // production pins over an explicit candidate quality-config.
@@ -428,6 +438,13 @@ int apply_quality_selectors(const Options& options) {
       return 2;
     }
   }
+  if (!attn.empty()) {
+    std::snprintf(g_applied_attn, sizeof(g_applied_attn), "%s", attn.c_str());
+    if (!qw38::cuda::apply_attention_pipeline_ident(g_applied_attn)) {
+      std::fprintf(stderr, "invalid --attention-pipeline %s\n", attn.c_str());
+      return 2;
+    }
+  }
   if (options.quality) {
     const char* effective_q4 = qw38::cuda::effective_q4_decode_path();
     const char* layout = qw38::cuda::q8_layout_ident(
@@ -444,9 +461,10 @@ int apply_quality_selectors(const Options& options) {
     }
     std::printf("quality_flag=true restored_packed_or_r2=false "
                 "effective_q4=%s effective_ffn=%s effective_q8_layout=%s "
-                "applied_before_graph=true\n",
+                "effective_attention=%s applied_before_graph=true\n",
                 qw38::cuda::effective_q4_decode_path(),
-                qw38::cuda::effective_ffn_decode_path(), layout);
+                qw38::cuda::effective_ffn_decode_path(), layout,
+                qw38::cuda::current_attention_pipeline_path());
   }
   return 0;
 }

@@ -57,6 +57,7 @@ struct Options final {
   const char* ffn_decode = nullptr;
   const char* gdn_decode = nullptr;
   const char* attention_pipeline = nullptr;
+  const char* attention_pipeline_control = nullptr;
   const char* decode_query_prep = nullptr;
   const char* decode_attention_gqa = nullptr;
   const char* decode_attention_vec128 = nullptr;
@@ -141,7 +142,8 @@ int usage(const char* argv0) {
                "[--decode-attention-vec128 warp_query|vec128_online] "
                "[--vec128-n-parts 4|8|16] "
                "[--decode-attention-crossover-threshold 0|512|1024|1536|2048] "
-               "[--attention-pipeline f16_async|kv_once] "
+               "[--attention-pipeline f16_async|kv_once|opt111_base|opt111_xor] "
+               "[--attention-pipeline-control f16_async|kv_once] "
                "[--selector NAME] [--modes graph,eager] [--skip-logits]\n",
                argv0);
   return 2;
@@ -200,6 +202,9 @@ int parse_args(int argc, char** argv, Options* options) {
     } else if (std::strcmp(arg, "--attention-pipeline") == 0 &&
                index + 1 < argc) {
       options->attention_pipeline = argv[++index];
+    } else if (std::strcmp(arg, "--attention-pipeline-control") == 0 &&
+               index + 1 < argc) {
+      options->attention_pipeline_control = argv[++index];
     } else if (std::strcmp(arg, "--decode-query-prep") == 0 &&
                index + 1 < argc) {
       options->decode_query_prep = argv[++index];
@@ -1069,7 +1074,11 @@ int run_keep_ab(const Options& options) {
             return 2;
           }
         } else {
-          const char* attn_path = candidate_side ? candidate_attn : "f16_async";
+          const char* control_attn = options.attention_pipeline_control != nullptr
+                                         ? options.attention_pipeline_control
+                                         : "f16_async";
+          const char* attn_path =
+              candidate_side ? candidate_attn : control_attn;
           if (!qw38::cuda::apply_attention_pipeline_ident(attn_path)) {
             std::fprintf(stderr, "invalid --attention-pipeline %s\n", attn_path);
             return 2;

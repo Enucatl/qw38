@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "task": "OPT-111",
+  "authority": "pinned llama.cpp",
+  "llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+  "license": "MIT",
+  "authors": "The ggml authors",
+  "adapter_namespace": "qw38::cuda::opt111",
+  "specialization": "Ampere fattn-mma-f16 DKQ=DV=256 ncols=32 remaining deltas vs kv_once",
+  "xor_inspiration_commit": "e4b9af007",
+  "xor_inspiration_role": "technique only; pinned revision remains release comparator",
+  "not_vendored": [
+    "ggml tensor/runtime",
+    "ggml graph/allocator",
+    "ggml CLI/model",
+    "current llama HEAD as release authority"
+  ],
+  "copied_organization": [
+    {
+      "file": ".cache/authorities/llama.cpp/ggml/src/ggml-cuda/fattn-mma-f16.cuh",
+      "sha256": "08977d8e6e26ce2c8554c85c97e1fa07c1c4e3bdbe454eaf9b9b53c677fa4038",
+      "use": "Ampere DKQ=256 ncols=32 config, decreasing-granularity KV load, KQ_C/VKQ_C, nstages=2"
+    },
+    {
+      "file": ".cache/authorities/llama.cpp/ggml/src/ggml-cuda/fattn.cu",
+      "sha256": "43362d6bc282b359495e06269a1c4ed2d221755f112244a7b6dd10601fd5ceeb",
+      "use": "fattn-mma-f16 launch selection for Qwen GQA ncols2"
+    }
+  ],
+  "local_modifications": [
+    "BF16 committed/candidate KV with OPT-079 convert-once (not counted as new gain)",
+    "Quartz rotating cache physical mapping and candidate-row visibility",
+    "causal mask via absolute>qpos rather than ggml mask tensor",
+    "XOR swizzle from e4b9af007 is one optional candidate after a documented bank-conflict signal",
+    "diagnostic pipeline identities only; production pin stays kv_once until keep"
+  ]
+}

@@ -61,10 +61,39 @@ constexpr char kLegalQueryPrepareHoistedFma[] = "hoisted_fma";
 constexpr char kSelectedQueryPreparePath[] = "hoisted";
 
 // OPT-051 A/B winner f16_async; OPT-079 kept convert-once sibling kv_once.
+// OPT-111 kept opt111_base (llama decreasing-granularity KV load vs kv_once).
 // Legal values: off, f16, dual_reg, f16_reg, dual_async, f16_async, nbatch64,
-// gqa6, kv_once. Sibling kernel in fattn_mma_f16_pipeline.cuh. Not a vendor of
-// llama.cpp fattn-mma-f16.cuh.
-constexpr char kSelectedAttentionPipelinePath[] = "kv_once";
+// gqa6, kv_once, opt111_base, opt111_xor. Sibling kernel in
+// fattn_mma_f16_pipeline.cuh. Not a vendor of llama.cpp fattn-mma-f16.cuh.
+constexpr char kSelectedAttentionPipelinePath[] = "opt111_base";
+
+// Pinned Ampere fattn-mma-f16 DKQ=DV=256, ncols=32 (ncols1=16, ncols2=2):
+// nthreads=128, occupancy=2, nbatch_fa=32, nbatch_K2=nbatch_V2=128,
+// nbatch_combine=128, nstages=2, Q_in_reg=true. Shared K/V tiles use
+// stride nbatch_K2+4 half2 without XOR in the pin. Current-llama e4b9af007
+// XOR-swizzles bank-aligned tiles instead of +4 padding.
+constexpr int kFattnKvStrideH2 = kFattnHeadWidth / 2;
+
+inline __device__ int fattn_kv_swizzle_byte_off(int row, int col_h2) {
+  return ((row * kFattnKvStrideH2 + col_h2) *
+          static_cast<int>(sizeof(unsigned))) ^
+         ((row & 7) << 4);
+}
+
+template <bool Swizzle, typename T>
+inline __device__ const T* fattn_kv_elem(const T* base, int row, int dim) {
+  if constexpr (!Swizzle) return base + row * kFattnHeadWidth + dim;
+  const char* bytes = reinterpret_cast<const char*>(base);
+  return reinterpret_cast<const T*>(
+      bytes + fattn_kv_swizzle_byte_off(row, dim / 2) +
+      (dim & 1) * static_cast<int>(sizeof(T)));
+}
+
+template <bool Swizzle, typename T>
+inline __device__ T* fattn_kv_elem(T* base, int row, int dim) {
+  return const_cast<T*>(
+      fattn_kv_elem<Swizzle>(static_cast<const T*>(base), row, dim));
+}
 
 inline thread_local const char* g_query_prepare_path_override = nullptr;
 inline thread_local const char* g_attention_pipeline_path_override = nullptr;
@@ -219,7 +248,8 @@ inline __device__ void fattn_persistent_decode(int index, int ntiles_kv,
   *jt = rem - (*zt_gqa) * ntiles_x;
 }
 
-template <bool DualF16, int kNcols, int kWidth, bool KeysAreF16 = false>
+template <bool DualF16, int kNcols, int kWidth, bool KeysAreF16 = false,
+          bool XorSwizzle = false>
 inline __device__ void fattn_qk_mma_k16(
     float cfrag[4], float cfrag_lo[4], const __half* q_f16, const __half* q_lo,
     const void* keys, int m0, int n0, int k0, int rows, int lane) {
@@ -256,15 +286,15 @@ inline __device__ void fattn_qk_mma_k16(
     if (krow < rows) {
       if constexpr (KeysAreF16) {
         const __half* keys_f16 = static_cast<const __half*>(keys);
-        pair[0] = keys_f16[krow * kWidth + k0 + j * 2];
-        pair[1] = keys_f16[krow * kWidth + k0 + j * 2 + 1];
+        pair[0] = *fattn_kv_elem<XorSwizzle>(keys_f16, krow, k0 + j * 2);
+        pair[1] = *fattn_kv_elem<XorSwizzle>(keys_f16, krow, k0 + j * 2 + 1);
       } else {
         const __nv_bfloat16* keys_bf16 =
             static_cast<const __nv_bfloat16*>(keys);
-        pair[0] = __float2half_rn(
-            __bfloat162float(keys_bf16[krow * kWidth + k0 + j * 2]));
-        pair[1] = __float2half_rn(
-            __bfloat162float(keys_bf16[krow * kWidth + k0 + j * 2 + 1]));
+        pair[0] = __float2half_rn(__bfloat162float(
+            *fattn_kv_elem<XorSwizzle>(keys_bf16, krow, k0 + j * 2)));
+        pair[1] = __float2half_rn(__bfloat162float(
+            *fattn_kv_elem<XorSwizzle>(keys_bf16, krow, k0 + j * 2 + 1)));
       }
     }
     b[item] = *reinterpret_cast<std::uint32_t*>(pair);

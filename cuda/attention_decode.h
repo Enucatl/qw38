@@ -336,6 +336,7 @@ bool query_prepare_is_hoisted(const char* path) noexcept;
 void set_query_prepare_path_override(const char* path) noexcept;
 void clear_query_prepare_path_override() noexcept;
 const char* selected_attention_pipeline_path() noexcept;
+const char* current_attention_pipeline_path() noexcept;
 bool fattn_uses_attention_pipeline() noexcept;
 int fattn_pipeline_occupancy() noexcept;
 int fattn_pipeline_occupancy_path(const char* path) noexcept;
@@ -350,6 +351,10 @@ void fattn_pipeline_kv_once_attributes(int* regs, std::size_t* local_bytes,
                                       int* occupancy) noexcept;
 void fattn_pipeline_f16_async_attributes(int* regs, std::size_t* local_bytes,
                                          int* occupancy) noexcept;
+void fattn_pipeline_opt111_base_attributes(int* regs, std::size_t* local_bytes,
+                                           int* occupancy) noexcept;
+void fattn_pipeline_opt111_xor_attributes(int* regs, std::size_t* local_bytes,
+                                          int* occupancy) noexcept;
 
 struct QueryPreparePathScope final {
   explicit QueryPreparePathScope(const char* path) noexcept {

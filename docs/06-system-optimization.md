@@ -921,6 +921,22 @@ incremental vs control **−0.00611**. Verdict **`keep`**; production flipped to
 D2048 +8.283**, D128 **+4.809**, P4096 **+35.454**. Live numbers stay in
 [`evidence/optimization/opt110-llama-q4-adapter/REPORT.md`](../evidence/optimization/opt110-llama-q4-adapter/REPORT.md).
 
+## Remaining llama F16 MMA prompt-attention delta (OPT-111)
+
+**Outcome freeze, 2026-09-13:** OPT-111 adapted the remaining pinned llama Ampere
+`fattn-mma-f16` differences over shipping OPT-079 `kv_once`. Base candidate
+`opt111_base` (convert-once plus llama decreasing-granularity `cp.async` KV
+load) **won** matched primitive on rows 32–4096; row 1 tiled parity-only. XOR
+`opt111_xor` screened after measured bank-conflict hypothesis but not selected.
+Complete 16-layer P4096 attention **won** (3+10: **+32.436 ms**, CI
+**[32.407, 32.464]**). P4096 engine **2998.38 → 3046.73 tok/s** (strictly faster
+within 2%). D128/D2048 within OPT-114 2% bound. Candidate NLL measured on the
+OPT-058 harness: held-out/wikitext **ppl_ratio 1.0**, recurrence incremental
+**0.0**. Verdict **`keep`**; production flipped to `opt111_base`. **tok/s delta
+vs OPT-114 baseline: P4096 +65.6**, D2048 **+8.416**, D128 **+4.959**. Live
+numbers stay in
+[`evidence/optimization/opt111-llama-prompt-attention/REPORT.md`](../evidence/optimization/opt111-llama-prompt-attention/REPORT.md).
+
 ## DwarfStar transfer boundary
 
 Reuse MMV/MMQ phase split, quant block tests, explicit unavailable paths, stable
