@@ -22,6 +22,16 @@ struct DecodeLaunchState {
 inline constexpr std::uint32_t kDecodeLaunchKvBucketRows = 2048;
 inline constexpr int kDecodeGraphTopologyCount = 2;
 inline constexpr char kGdnParityDesign[] = "stable_pingpong_committed_slot";
+// OPT-127: recapture only on ping-pong base, KV identity, or missing
+// topology variants. Frontier/slot/token updates upload DecodeLaunchState.
+// Crossover 1024 selects the prebound vec128_online graphs; past verified
+// max 4096 uses topology 0. Split/session replacement invalidates.
+inline constexpr char kDecodeGraphInvalidationPolicy[] =
+    "recapture_on_pingpong_or_kv_identity_or_missing_topologies;"
+    "no_recapture_on_frontier_slot_token;"
+    "crossover_1024_selects_prebound_topology;"
+    "past_verified_max_4096_uses_topology_0;"
+    "session_or_kv_replacement_invalidates";
 
 __host__ __device__ inline std::size_t decode_launch_position(
     const DecodeLaunchState* launch, std::size_t fallback) noexcept {

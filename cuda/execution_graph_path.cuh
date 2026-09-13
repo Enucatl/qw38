@@ -11,7 +11,7 @@ namespace qw38::cuda {
 constexpr char kLegalExecutionGraphFfnOnly[] = "ffn_only";
 constexpr char kLegalExecutionGraphDecodeSegments8[] = "decode_segments8";
 
-constexpr char kSelectedExecutionGraphPath[] = "ffn_only";
+constexpr char kSelectedExecutionGraphPath[] = "decode_segments8";
 
 inline constexpr const char* kLegalExecutionGraphPaths[] = {
     kLegalExecutionGraphFfnOnly, kLegalExecutionGraphDecodeSegments8};

@@ -256,7 +256,12 @@ __global__ void stage_chunk_rows(
     return;
   }
   const std::size_t width = config.head_width;
-  const std::size_t origin = attention_kv_origin(start_position, kv_origin);
+  // Graph replay uploads DecodeLaunchState.position; a host-resolved origin
+  // captured at frontier 0 would write candidate_token=position into a
+  // one-token scratch buffer. Recompute origin after the launch-state load.
+  const std::size_t origin = attention_kv_origin(
+      start_position, launch != nullptr ? static_cast<std::size_t>(-1)
+                                        : kv_origin);
   const std::size_t candidate_token = (start_position - origin) + token;
   const std::size_t base =
       candidate_token * config.kv_heads * width + kv_head * width;
@@ -2287,7 +2292,8 @@ cudaError_t stage_and_validate_chunk(
   return quartz_launch_kernel(
       stage_chunk_rows, staging, dim3(kThreads), 0, stream, config,
       start_position, token_count, key, value, key_norm_scale,
-      candidate_rows.key, candidate_rows.value, normalized_key, origin, launch);
+      candidate_rows.key, candidate_rows.value, normalized_key,
+      launch != nullptr ? static_cast<std::size_t>(-1) : origin, launch);
 }
 
 }  // namespace

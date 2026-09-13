@@ -819,6 +819,21 @@ struct GraphLaunchParams final {
   std::uint32_t kv_bucket = 0;
 };
 
+struct GraphLifecycleCounts final {
+  std::uint32_t capture = 0;
+  std::uint32_t instantiate = 0;
+  std::uint32_t upload = 0;
+  std::uint32_t destroy = 0;
+  std::uint32_t exec_destroy = 0;
+  std::uint32_t launch_state_upload = 0;
+  std::uint32_t launch_param_update = 0;
+  std::uint32_t topology_recapture = 0;
+  float last_capture_ms = 0.0F;
+  float last_instantiate_ms = 0.0F;
+  float last_upload_ms = 0.0F;
+  float last_launch_state_upload_ms = 0.0F;
+};
+
 class SchedulerGraphs final {
  public:
   SchedulerGraphs() noexcept;
@@ -845,8 +860,17 @@ class SchedulerGraphs final {
   std::uint32_t launch_param_update_count() const noexcept;
   std::uint32_t launch_state_upload_count() const noexcept;
   std::uint32_t topology_recapture_count() const noexcept;
+  std::uint32_t graph_capture_count() const noexcept;
+  std::uint32_t graph_instantiate_count() const noexcept;
+  std::uint32_t graph_upload_count() const noexcept;
+  std::uint32_t graph_destroy_count() const noexcept;
+  std::uint32_t graph_exec_destroy_count() const noexcept;
   int captured_topology_count() const noexcept;
   float last_launch_state_upload_ms() const noexcept;
+  float last_graph_capture_ms() const noexcept;
+  float last_graph_instantiate_ms() const noexcept;
+  float last_graph_upload_ms() const noexcept;
+  GraphLifecycleCounts lifecycle_counts() const noexcept;
   Status update_launch_params(std::uint32_t token, std::uint32_t position,
                               std::uint32_t frontier) noexcept;
 
@@ -882,7 +906,15 @@ class SchedulerGraphs final {
   int captured_topology_count_ = 0;
   std::uint32_t launch_state_upload_count_ = 0;
   std::uint32_t topology_recapture_count_ = 0;
+  std::uint32_t graph_capture_count_ = 0;
+  std::uint32_t graph_instantiate_count_ = 0;
+  std::uint32_t graph_upload_count_ = 0;
+  std::uint32_t graph_destroy_count_ = 0;
+  std::uint32_t graph_exec_destroy_count_ = 0;
   float last_launch_state_upload_ms_ = 0.0F;
+  float last_graph_capture_ms_ = 0.0F;
+  float last_graph_instantiate_ms_ = 0.0F;
+  float last_graph_upload_ms_ = 0.0F;
   std::size_t decode_graph_count_ = 0;
   std::size_t prompt_graph_count_ = 0;
   std::size_t prompt_rows_ = 0;

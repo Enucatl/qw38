@@ -3372,6 +3372,18 @@ SchedulerGraphs& SchedulerGraphs::operator=(SchedulerGraphs&& other) noexcept {
   captured_frontier_ = other.captured_frontier_;
   captured_n_parts_ = other.captured_n_parts_;
   captured_vec128_ = other.captured_vec128_;
+  captured_topology_count_ = other.captured_topology_count_;
+  launch_state_upload_count_ = other.launch_state_upload_count_;
+  topology_recapture_count_ = other.topology_recapture_count_;
+  graph_capture_count_ = other.graph_capture_count_;
+  graph_instantiate_count_ = other.graph_instantiate_count_;
+  graph_upload_count_ = other.graph_upload_count_;
+  graph_destroy_count_ = other.graph_destroy_count_;
+  graph_exec_destroy_count_ = other.graph_exec_destroy_count_;
+  last_launch_state_upload_ms_ = other.last_launch_state_upload_ms_;
+  last_graph_capture_ms_ = other.last_graph_capture_ms_;
+  last_graph_instantiate_ms_ = other.last_graph_instantiate_ms_;
+  last_graph_upload_ms_ = other.last_graph_upload_ms_;
   decode_graph_count_ = other.decode_graph_count_;
   prompt_graph_count_ = other.prompt_graph_count_;
   prompt_rows_ = other.prompt_rows_;
@@ -3401,6 +3413,18 @@ SchedulerGraphs& SchedulerGraphs::operator=(SchedulerGraphs&& other) noexcept {
   other.captured_frontier_ = 0;
   other.captured_n_parts_ = 0;
   other.captured_vec128_ = false;
+  other.captured_topology_count_ = 0;
+  other.launch_state_upload_count_ = 0;
+  other.topology_recapture_count_ = 0;
+  other.graph_capture_count_ = 0;
+  other.graph_instantiate_count_ = 0;
+  other.graph_upload_count_ = 0;
+  other.graph_destroy_count_ = 0;
+  other.graph_exec_destroy_count_ = 0;
+  other.last_launch_state_upload_ms_ = 0.0F;
+  other.last_graph_capture_ms_ = 0.0F;
+  other.last_graph_instantiate_ms_ = 0.0F;
+  other.last_graph_upload_ms_ = 0.0F;
   other.decode_graph_count_ = 0;
   other.prompt_graph_count_ = 0;
   other.prompt_rows_ = 0;
@@ -3416,15 +3440,26 @@ SchedulerGraphs& SchedulerGraphs::operator=(SchedulerGraphs&& other) noexcept {
 
 namespace {
 
-void destroy_graph_pair(cudaGraphExec_t* execution, cudaGraph_t* graph) noexcept {
+void destroy_graph_pair(cudaGraphExec_t* execution, cudaGraph_t* graph,
+                        std::uint32_t* exec_destroys = nullptr,
+                        std::uint32_t* graph_destroys = nullptr) noexcept {
   if (execution != nullptr && *execution != nullptr) {
+    if (exec_destroys != nullptr) ++(*exec_destroys);
     cudaGraphExecDestroy(*execution);
     *execution = nullptr;
   }
   if (graph != nullptr && *graph != nullptr) {
+    if (graph_destroys != nullptr) ++(*graph_destroys);
     cudaGraphDestroy(*graph);
     *graph = nullptr;
   }
+}
+
+float elapsed_ms(const std::chrono::steady_clock::time_point started) noexcept {
+  return static_cast<float>(
+      std::chrono::duration<double, std::milli>(
+          std::chrono::steady_clock::now() - started)
+          .count());
 }
 
 std::size_t count_cuda_graph_nodes(cudaGraph_t graph) noexcept {
@@ -3763,19 +3798,23 @@ cudaError_t capture_decode_segment_graph(
 
 void SchedulerGraphs::release() noexcept {
   for (std::size_t index = 0; index < executions_.size(); ++index) {
-    destroy_graph_pair(&executions_[index], &graphs_[index]);
+    destroy_graph_pair(&executions_[index], &graphs_[index],
+                       &graph_exec_destroy_count_, &graph_destroy_count_);
   }
   for (std::size_t index = 0; index < prompt_executions_.size(); ++index) {
-    destroy_graph_pair(&prompt_executions_[index], &prompt_graphs_[index]);
+    destroy_graph_pair(&prompt_executions_[index], &prompt_graphs_[index],
+                       &graph_exec_destroy_count_, &graph_destroy_count_);
   }
   for (std::size_t index = 0; index < decode_segment_executions_.size();
        ++index) {
     destroy_graph_pair(&decode_segment_executions_[index],
-                       &decode_segment_graphs_[index]);
+                       &decode_segment_graphs_[index],
+                       &graph_exec_destroy_count_, &graph_destroy_count_);
   }
   for (std::size_t index = 0; index < prompt_mixer_executions_.size(); ++index) {
     destroy_graph_pair(&prompt_mixer_executions_[index],
-                       &prompt_mixer_graphs_[index]);
+                       &prompt_mixer_graphs_[index], &graph_exec_destroy_count_,
+                       &graph_destroy_count_);
   }
   model_ = nullptr;
   workspace_ = nullptr;
@@ -3791,7 +3830,15 @@ void SchedulerGraphs::release() noexcept {
   captured_topology_count_ = 0;
   launch_state_upload_count_ = 0;
   topology_recapture_count_ = 0;
+  graph_capture_count_ = 0;
+  graph_instantiate_count_ = 0;
+  graph_upload_count_ = 0;
+  graph_destroy_count_ = 0;
+  graph_exec_destroy_count_ = 0;
   last_launch_state_upload_ms_ = 0.0F;
+  last_graph_capture_ms_ = 0.0F;
+  last_graph_instantiate_ms_ = 0.0F;
+  last_graph_upload_ms_ = 0.0F;
   decode_graph_count_ = 0;
   prompt_graph_count_ = 0;
   prompt_rows_ = 0;
@@ -3839,6 +3886,7 @@ Status SchedulerGraphs::create(const ResidentModel& model,
     for (std::size_t layer_index = 0;
          error == cudaSuccess && layer_index < model.layers_.size();
          ++layer_index) {
+      const auto capture_started = std::chrono::steady_clock::now();
       error = cudaStreamBeginCapture(stream, cudaStreamCaptureModeThreadLocal);
       cudaError_t enqueue_error = error;
       if (enqueue_error == cudaSuccess) {
@@ -3853,13 +3901,21 @@ Status SchedulerGraphs::create(const ResidentModel& model,
       }
       cudaError_t capture_error = cudaStreamEndCapture(
           stream, &graphs_[layer_index]);
+      last_graph_capture_ms_ = elapsed_ms(capture_started);
+      if (capture_error == cudaSuccess) ++graph_capture_count_;
       error = enqueue_error != cudaSuccess ? enqueue_error : capture_error;
       if (error == cudaSuccess) {
+        const auto instantiate_started = std::chrono::steady_clock::now();
         error = cudaGraphInstantiate(&executions_[layer_index],
                                      graphs_[layer_index], nullptr, nullptr, 0);
+        last_graph_instantiate_ms_ = elapsed_ms(instantiate_started);
+        if (error == cudaSuccess) ++graph_instantiate_count_;
       }
       if (error == cudaSuccess) {
+        const auto upload_started = std::chrono::steady_clock::now();
         error = cudaGraphUpload(executions_[layer_index], stream);
+        last_graph_upload_ms_ = elapsed_ms(upload_started);
+        if (error == cudaSuccess) ++graph_upload_count_;
       }
       if (error == cudaSuccess) ++decode_graph_count_;
     }
@@ -3877,6 +3933,7 @@ Status SchedulerGraphs::create(const ResidentModel& model,
     for (std::size_t layer_index = 0;
          error == cudaSuccess && layer_index < model.layers_.size();
          ++layer_index) {
+      const auto capture_started = std::chrono::steady_clock::now();
       error = cudaStreamBeginCapture(stream, cudaStreamCaptureModeThreadLocal);
       cudaError_t enqueue_error = error;
       if (enqueue_error == cudaSuccess) {
@@ -3892,14 +3949,22 @@ Status SchedulerGraphs::create(const ResidentModel& model,
       }
       cudaError_t capture_error =
           cudaStreamEndCapture(stream, &prompt_graphs_[layer_index]);
+      last_graph_capture_ms_ = elapsed_ms(capture_started);
+      if (capture_error == cudaSuccess) ++graph_capture_count_;
       error = enqueue_error != cudaSuccess ? enqueue_error : capture_error;
       if (error == cudaSuccess) {
+        const auto instantiate_started = std::chrono::steady_clock::now();
         error = cudaGraphInstantiate(&prompt_executions_[layer_index],
                                      prompt_graphs_[layer_index], nullptr,
                                      nullptr, 0);
+        last_graph_instantiate_ms_ = elapsed_ms(instantiate_started);
+        if (error == cudaSuccess) ++graph_instantiate_count_;
       }
       if (error == cudaSuccess) {
+        const auto upload_started = std::chrono::steady_clock::now();
         error = cudaGraphUpload(prompt_executions_[layer_index], stream);
+        last_graph_upload_ms_ = elapsed_ms(upload_started);
+        if (error == cudaSuccess) ++graph_upload_count_;
       }
       if (error == cudaSuccess) ++prompt_graph_count_;
     }
@@ -3940,6 +4005,10 @@ Status SchedulerGraphs::create(const ResidentModel& model,
 }
 
 Status SchedulerGraphs::apply_segment_launch_params() noexcept {
+  // Invalidation policy is kDecodeGraphInvalidationPolicy: recapture only when
+  // ping-pong bases, KV identity, or captured topology count change. Ordinary
+  // frontier/slot/token updates upload DecodeLaunchState and launch the
+  // prebound topology graph (crossover 1024 / past verified-max 4096).
   if (decode_segment_graph_count_ == 0) return Status::ok();
   if (session_ == nullptr || workspace_ == nullptr || model_ == nullptr) {
     return {StatusCode::kInvalidArgument,
@@ -3978,7 +4047,8 @@ Status SchedulerGraphs::apply_segment_launch_params() noexcept {
     for (std::size_t index = 0; index < decode_segment_executions_.size();
          ++index) {
       destroy_graph_pair(&decode_segment_executions_[index],
-                         &decode_segment_graphs_[index]);
+                         &decode_segment_graphs_[index],
+                         &graph_exec_destroy_count_, &graph_destroy_count_);
     }
     decode_segment_graph_count_ = 0;
     const Status captured = capture_decode_segments(stream);
@@ -4060,17 +4130,26 @@ Status SchedulerGraphs::capture_decode_segments(cudaStream_t stream) noexcept {
           segment_index;
       cudaError_t enqueue_error = cudaSuccess;
       cudaError_t end_error = cudaSuccess;
+      const auto capture_started = std::chrono::steady_clock::now();
       error = capture_decode_segment_graph(
           *model_, segment_index, session_, workspace_, graph_generation, stream,
           &decode_segment_graphs_[graph_index], &enqueue_error, &end_error,
           capture_frontier);
+      last_graph_capture_ms_ = elapsed_ms(capture_started);
+      if (error == cudaSuccess) ++graph_capture_count_;
       if (error == cudaSuccess) {
+        const auto instantiate_started = std::chrono::steady_clock::now();
         error = cudaGraphInstantiate(&decode_segment_executions_[graph_index],
                                      decode_segment_graphs_[graph_index],
                                      nullptr, nullptr, 0);
+        last_graph_instantiate_ms_ = elapsed_ms(instantiate_started);
+        if (error == cudaSuccess) ++graph_instantiate_count_;
       }
       if (error == cudaSuccess) {
+        const auto upload_started = std::chrono::steady_clock::now();
         error = cudaGraphUpload(decode_segment_executions_[graph_index], stream);
+        last_graph_upload_ms_ = elapsed_ms(upload_started);
+        if (error == cudaSuccess) ++graph_upload_count_;
       }
       if (error == cudaSuccess) {
         ++decode_segment_graph_count_;
@@ -4208,12 +4287,61 @@ std::uint32_t SchedulerGraphs::topology_recapture_count() const noexcept {
   return topology_recapture_count_;
 }
 
+std::uint32_t SchedulerGraphs::graph_capture_count() const noexcept {
+  return graph_capture_count_;
+}
+
+std::uint32_t SchedulerGraphs::graph_instantiate_count() const noexcept {
+  return graph_instantiate_count_;
+}
+
+std::uint32_t SchedulerGraphs::graph_upload_count() const noexcept {
+  return graph_upload_count_;
+}
+
+std::uint32_t SchedulerGraphs::graph_destroy_count() const noexcept {
+  return graph_destroy_count_;
+}
+
+std::uint32_t SchedulerGraphs::graph_exec_destroy_count() const noexcept {
+  return graph_exec_destroy_count_;
+}
+
 int SchedulerGraphs::captured_topology_count() const noexcept {
   return captured_topology_count_;
 }
 
 float SchedulerGraphs::last_launch_state_upload_ms() const noexcept {
   return last_launch_state_upload_ms_;
+}
+
+float SchedulerGraphs::last_graph_capture_ms() const noexcept {
+  return last_graph_capture_ms_;
+}
+
+float SchedulerGraphs::last_graph_instantiate_ms() const noexcept {
+  return last_graph_instantiate_ms_;
+}
+
+float SchedulerGraphs::last_graph_upload_ms() const noexcept {
+  return last_graph_upload_ms_;
+}
+
+GraphLifecycleCounts SchedulerGraphs::lifecycle_counts() const noexcept {
+  GraphLifecycleCounts counts;
+  counts.capture = graph_capture_count_;
+  counts.instantiate = graph_instantiate_count_;
+  counts.upload = graph_upload_count_;
+  counts.destroy = graph_destroy_count_;
+  counts.exec_destroy = graph_exec_destroy_count_;
+  counts.launch_state_upload = launch_state_upload_count_;
+  counts.launch_param_update = launch_param_update_count_;
+  counts.topology_recapture = topology_recapture_count_;
+  counts.last_capture_ms = last_graph_capture_ms_;
+  counts.last_instantiate_ms = last_graph_instantiate_ms_;
+  counts.last_upload_ms = last_graph_upload_ms_;
+  counts.last_launch_state_upload_ms = last_launch_state_upload_ms_;
+  return counts;
 }
 
 Status SchedulerGraphs::update_launch_params(std::uint32_t token,

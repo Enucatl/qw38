@@ -1,0 +1,79 @@
+{
+  "schema_version": 1,
+  "task": "OPT-127",
+  "yardstick": "replay_decode_segments_without_per_token_recapture",
+  "claims_throughput": true,
+  "claims_performance_improvement": true,
+  "opt074_family_admission_required": false,
+  "opt074_coverage_unadmitted_is_blocker": false,
+  "llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+  "gguf_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+  "token_generator": "(42 + index * 997) % 248320",
+  "parent": "combined_opt118_opt119",
+  "parent_execution_graphs": "ffn_only",
+  "candidate": "decode_segments8",
+  "coarser_candidate": "not_admitted",
+  "segment_layer_count": 8,
+  "segment_count": 8,
+  "topology_count": 2,
+  "decode_segment_graph_count": 16,
+  "gdn_parity_design": "stable_pingpong_committed_slot",
+  "invalidation_policy": "recapture_on_pingpong_or_kv_identity_or_missing_topologies;no_recapture_on_frontier_slot_token;crossover_1024_selects_prebound_topology;past_verified_max_4096_uses_topology_0;session_or_kv_replacement_invalidates",
+  "aa_warmups": 3,
+  "screen_pairs": 5,
+  "aa_pairs": 10,
+  "decode_output_tokens": 256,
+  "target_workloads": [
+    "d128",
+    "d2048"
+  ],
+  "non_target_workloads": [
+    "p4096"
+  ],
+  "metrics": [
+    "decode_only",
+    "complete_request"
+  ],
+  "throughput_ratio_lower_bound": 1.0,
+  "non_target_point_ratio_min": 0.98,
+  "decode_p95_ratio_max": 1.05,
+  "ppl_ratio_max": 1.01,
+  "recurrence_incremental_nll_max": 0.02,
+  "require_candidate_nll": true,
+  "quality_budget_ratchets": false,
+  "legal_execution_graph_paths": [
+    "ffn_only",
+    "decode_segments8"
+  ],
+  "selected_execution_graph_path": "decode_segments8",
+  "opaque_byte_patching": false,
+  "native_test": "build/qw38-cuda-opt127-recapture-free-replay-test",
+  "diagnostics_make_target": "cuda-opt127-diagnostics",
+  "opt116_quality_contract": "opt116_generated_v1",
+  "required_fixture_keys": [
+    "schema_version",
+    "task",
+    "mode",
+    "llama_revision",
+    "gguf_sha256",
+    "parent",
+    "candidate",
+    "recapture_proof",
+    "cancellation",
+    "same_math",
+    "quality",
+    "state_memory",
+    "performance",
+    "shipping_execution_graphs",
+    "production_kept",
+    "verdict",
+    "report_path"
+  ],
+  "verdicts": [
+    "keep",
+    "retain_ffn_only",
+    "quality_blocked",
+    "inconclusive"
+  ],
+  "report_path": "evidence/optimization/opt127-recapture-free-replay/REPORT.md"
+}

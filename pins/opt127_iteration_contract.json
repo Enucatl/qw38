@@ -1,0 +1,445 @@
+{
+  "schema_version": 1,
+  "task": "OPT-127",
+  "yardstick": "replay_decode_segments_without_per_token_recapture",
+  "claims_throughput": true,
+  "claims_performance_improvement": true,
+  "opt074_family_admission_required": false,
+  "opt074_coverage_unadmitted_is_blocker": false,
+  "performance_admission": {
+    "enabled": true
+  },
+  "image": "qw38-cuda:13.0.2",
+  "model": "models/Qwen3.8-27B-Q4_K_M.gguf",
+  "gpu_lock": "build/optimization-runs/qw38-gpu.lock",
+  "aggregate_deadline_s": 7200,
+  "target": "tools/opt127_recapture_free_replay.py",
+  "diagnostics_make_target": "cuda-opt127-diagnostics",
+  "selector": "ffn_only",
+  "case_ids": [
+    "preflight",
+    "recapture-proof",
+    "cancellation",
+    "same-math",
+    "handoff",
+    "attribution",
+    "screen-d128",
+    "screen-d2048",
+    "screen-p4096",
+    "quality",
+    "state-memory",
+    "d128",
+    "d2048",
+    "p4096",
+    "report"
+  ],
+  "modes": {
+    "feedback": {
+      "target": "tools/opt127_recapture_free_replay.py",
+      "tier_sequence": [
+        "preflight",
+        "recapture-proof",
+        "cancellation",
+        "same-math",
+        "handoff",
+        "attribution",
+        "screen-d128",
+        "screen-d2048",
+        "screen-p4096"
+      ],
+      "make_targets": [
+        "build/qw38-cuda-opt127-recapture-free-replay-test"
+      ],
+      "build_once": true,
+      "warm_repetitions": 0,
+      "aggregate_deadline_s": 7200,
+      "workloads": [
+        "preflight",
+        "recapture-proof",
+        "cancellation",
+        "same-math",
+        "handoff",
+        "attribution",
+        "screen-d128",
+        "screen-d2048",
+        "screen-p4096"
+      ]
+    },
+    "acceptance": {
+      "target": "tools/opt127_recapture_free_replay.py",
+      "tier_sequence": [
+        "quality",
+        "state-memory",
+        "d128",
+        "d2048",
+        "p4096",
+        "report"
+      ],
+      "make_targets": [
+        "build/qw38-cuda-opt127-recapture-free-replay-test",
+        "build/qw38-cuda-opt058-quality-baseline-test",
+        "build/qw38-cuda-checkpoint-test",
+        "build/qw38-cuda-memory-fit-test"
+      ],
+      "warm_repetitions": 0,
+      "aggregate_deadline_s": 7200,
+      "workloads": [
+        "quality",
+        "state-memory",
+        "d128",
+        "d2048",
+        "p4096",
+        "report"
+      ]
+    },
+    "release": {
+      "target": "tools/opt127_recapture_free_replay.py",
+      "tier": "acceptance",
+      "make_targets": [
+        "build/qw38-cuda-opt127-recapture-free-replay-test",
+        "build/qw38-cuda-opt058-quality-baseline-test"
+      ],
+      "skip_compile": false,
+      "historical_oracles": false,
+      "aggregate_deadline_s": 7200,
+      "workloads": ["quality", "state-memory"]
+    }
+  },
+  "workloads": {
+    "preflight": {
+      "target": "tools/opt127_recapture_free_replay.py",
+      "tier": "correctness",
+      "runner": "host",
+      "kind": "identity_freeze_and_combined_parent",
+      "cases": 1,
+      "candidates": 1,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 1,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 0,
+      "reference": 1,
+      "gpu_work": false,
+      "args": [
+        "uv", "run", "python", "tools/opt127_recapture_free_replay.py",
+        "--phase", "preflight", "--mode", "{mode}", "--run-dir", "{run_dir}"
+      ]
+    },
+    "recapture-proof": {
+      "target": "build/qw38-cuda-opt127-recapture-free-replay-test",
+      "tier": "correctness",
+      "runner": "host",
+      "kind": "zero_steady_state_recapture_within_topology",
+      "cases": 2,
+      "candidates": 1,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 16,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 1,
+      "reference": 0,
+      "gpu_work": true,
+      "native_targets": ["build/qw38-cuda-opt127-recapture-free-replay-test"],
+      "args": [
+        "uv", "run", "python", "tools/opt127_recapture_free_replay.py",
+        "--phase", "recapture-proof", "--mode", "{mode}", "--run-dir", "{run_dir}"
+      ]
+    },
+    "cancellation": {
+      "target": "build/qw38-cuda-opt127-recapture-free-replay-test",
+      "tier": "correctness",
+      "runner": "host",
+      "kind": "segment_and_commit_boundary_cancellation",
+      "cases": 2,
+      "candidates": 1,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 1,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 1,
+      "reference": 0,
+      "gpu_work": true,
+      "native_targets": ["build/qw38-cuda-opt127-recapture-free-replay-test"],
+      "args": [
+        "uv", "run", "python", "tools/opt127_recapture_free_replay.py",
+        "--phase", "cancellation", "--mode", "{mode}", "--run-dir", "{run_dir}"
+      ]
+    },
+    "same-math": {
+      "target": "build/qw38-cuda-opt127-recapture-free-replay-test",
+      "tier": "correctness",
+      "runner": "host",
+      "kind": "graph_versus_eager_same_path_logits",
+      "cases": 1,
+      "candidates": 2,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 8,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 1,
+      "reference": 1,
+      "gpu_work": true,
+      "native_targets": ["build/qw38-cuda-opt127-recapture-free-replay-test"],
+      "args": [
+        "uv", "run", "python", "tools/opt127_recapture_free_replay.py",
+        "--phase", "same-math", "--mode", "{mode}", "--run-dir", "{run_dir}"
+      ]
+    },
+    "handoff": {
+      "target": "build/qw38-cuda-opt127-recapture-free-replay-test",
+      "tier": "correctness",
+      "runner": "host",
+      "kind": "prompt_to_decode_and_short_output",
+      "cases": 1,
+      "candidates": 2,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 1,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 1,
+      "reference": 1,
+      "gpu_work": true,
+      "native_targets": ["build/qw38-cuda-opt127-recapture-free-replay-test"],
+      "args": [
+        "uv", "run", "python", "tools/opt127_recapture_free_replay.py",
+        "--phase", "handoff", "--mode", "{mode}", "--run-dir", "{run_dir}"
+      ]
+    },
+    "attribution": {
+      "target": "build/qw38-cuda-opt127-recapture-free-replay-test",
+      "tier": "correctness",
+      "runner": "host",
+      "kind": "graph_busy_versus_parent_no_weight_byte_claim",
+      "cases": 1,
+      "candidates": 2,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 4,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 1,
+      "reference": 0,
+      "gpu_work": true,
+      "native_targets": ["build/qw38-cuda-opt127-recapture-free-replay-test"],
+      "args": [
+        "uv", "run", "python", "tools/opt127_recapture_free_replay.py",
+        "--phase", "attribution", "--mode", "{mode}", "--run-dir", "{run_dir}"
+      ]
+    },
+    "screen-d128": {
+      "target": "build/qw38-cuda-opt127-recapture-free-replay-test",
+      "tier": "screen",
+      "runner": "host",
+      "kind": "bounded_3_plus_5_ab_d128",
+      "cases": 1,
+      "candidates": 2,
+      "warmups": 3,
+      "samples": 5,
+      "tokens": 1,
+      "output_tokens": 256,
+      "prefix": 128,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 1,
+      "reference": 0,
+      "gpu_work": true,
+      "native_targets": ["build/qw38-cuda-opt127-recapture-free-replay-test"],
+      "args": [
+        "uv", "run", "python", "tools/opt127_recapture_free_replay.py",
+        "--phase", "screen-d128", "--mode", "{mode}", "--run-dir", "{run_dir}"
+      ]
+    },
+    "screen-d2048": {
+      "target": "build/qw38-cuda-opt127-recapture-free-replay-test",
+      "tier": "screen",
+      "runner": "host",
+      "kind": "bounded_3_plus_5_ab_d2048",
+      "cases": 1,
+      "candidates": 2,
+      "warmups": 3,
+      "samples": 5,
+      "tokens": 1,
+      "output_tokens": 256,
+      "prefix": 2048,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 1,
+      "reference": 0,
+      "gpu_work": true,
+      "native_targets": ["build/qw38-cuda-opt127-recapture-free-replay-test"],
+      "args": [
+        "uv", "run", "python", "tools/opt127_recapture_free_replay.py",
+        "--phase", "screen-d2048", "--mode", "{mode}", "--run-dir", "{run_dir}"
+      ]
+    },
+    "screen-p4096": {
+      "target": "build/qw38-cuda-opt127-recapture-free-replay-test",
+      "tier": "screen",
+      "runner": "host",
+      "kind": "bounded_3_plus_5_ab_p4096",
+      "cases": 1,
+      "candidates": 2,
+      "warmups": 3,
+      "samples": 5,
+      "tokens": 1,
+      "prefix": 4096,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 1,
+      "reference": 0,
+      "gpu_work": true,
+      "native_targets": ["build/qw38-cuda-opt127-recapture-free-replay-test"],
+      "args": [
+        "uv", "run", "python", "tools/opt127_recapture_free_replay.py",
+        "--phase", "screen-p4096", "--mode", "{mode}", "--run-dir", "{run_dir}"
+      ]
+    },
+    "quality": {
+      "target": "build/qw38-cuda-opt058-quality-baseline-test",
+      "tier": "acceptance",
+      "runner": "host",
+      "kind": "opt058_quality_flag_and_opt116_successor",
+      "engines": ["quartz"],
+      "configurations": ["combined_opt118_opt119", "decode_segments8"],
+      "cases": 12,
+      "candidates": 1,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 1024,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 1,
+      "reference": 1,
+      "aggregate_deadline_s": 7200,
+      "args": [
+        "uv", "run", "python", "tools/opt127_recapture_free_replay.py",
+        "--phase", "quality", "--mode", "{mode}", "--run-dir", "{run_dir}"
+      ]
+    },
+    "state-memory": {
+      "target": "build/qw38-cuda-memory-fit-test",
+      "tier": "acceptance",
+      "runner": "host",
+      "kind": "checkpoint_cancellation_graph_eager_handoff_128k_fit",
+      "cases": 3,
+      "candidates": 1,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 1,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 1,
+      "reference": 0,
+      "aggregate_deadline_s": 7200,
+      "args": [
+        "uv", "run", "python", "tools/opt127_recapture_free_replay.py",
+        "--phase", "state-memory", "--mode", "{mode}", "--run-dir", "{run_dir}"
+      ]
+    },
+    "d128": {
+      "target": "build/qw38-cuda-opt127-recapture-free-replay-test",
+      "tier": "acceptance",
+      "runner": "host",
+      "kind": "full_engine_graph_eager_ab_d128",
+      "cases": 1,
+      "candidates": 2,
+      "warmups": 3,
+      "samples": 10,
+      "tokens": 1,
+      "output_tokens": 256,
+      "prefix": 128,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 1,
+      "reference": 0,
+      "gpu_work": true,
+      "native_targets": ["build/qw38-cuda-opt127-recapture-free-replay-test"],
+      "args": [
+        "uv", "run", "python", "tools/opt127_recapture_free_replay.py",
+        "--phase", "d128", "--mode", "{mode}", "--run-dir", "{run_dir}"
+      ]
+    },
+    "d2048": {
+      "target": "build/qw38-cuda-opt127-recapture-free-replay-test",
+      "tier": "acceptance",
+      "runner": "host",
+      "kind": "full_engine_graph_eager_ab_d2048",
+      "cases": 1,
+      "candidates": 2,
+      "warmups": 3,
+      "samples": 10,
+      "tokens": 1,
+      "output_tokens": 256,
+      "prefix": 2048,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 1,
+      "reference": 0,
+      "gpu_work": true,
+      "native_targets": ["build/qw38-cuda-opt127-recapture-free-replay-test"],
+      "args": [
+        "uv", "run", "python", "tools/opt127_recapture_free_replay.py",
+        "--phase", "d2048", "--mode", "{mode}", "--run-dir", "{run_dir}"
+      ]
+    },
+    "p4096": {
+      "target": "build/qw38-cuda-opt127-recapture-free-replay-test",
+      "tier": "acceptance",
+      "runner": "host",
+      "kind": "non_target_prefill_guard",
+      "cases": 1,
+      "candidates": 2,
+      "warmups": 3,
+      "samples": 10,
+      "tokens": 1,
+      "prefix": 4096,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 1,
+      "reference": 0,
+      "gpu_work": true,
+      "native_targets": ["build/qw38-cuda-opt127-recapture-free-replay-test"],
+      "args": [
+        "uv", "run", "python", "tools/opt127_recapture_free_replay.py",
+        "--phase", "p4096", "--mode", "{mode}", "--run-dir", "{run_dir}"
+      ]
+    },
+    "report": {
+      "target": "tools/opt127_recapture_free_replay.py",
+      "tier": "acceptance",
+      "runner": "host",
+      "kind": "keep_or_retain_ffn_only_report",
+      "cases": 1,
+      "candidates": 1,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 1,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 0,
+      "reference": 0,
+      "gpu_work": false,
+      "args": [
+        "uv", "run", "python", "tools/opt127_recapture_free_replay.py",
+        "--phase", "report", "--mode", "{mode}", "--run-dir", "{run_dir}"
+      ]
+    }
+  },
+  "proof_limit": [
+    "parent is authenticated post124 combined_opt118_opt119 ffn_only; decode_segments8 is the candidate",
+    "keep requires OPT-116 quality, state/memory/cancellation/checkpoint/128K, and a measured request gain",
+    "3 warmups plus 5 paired AB/BA screen and 3 plus 10 acceptance at D128/D2048/P4096",
+    "both decode-only and complete-request metrics with matched boundaries",
+    "paired one-sided 95% Student-t log-ratio bounds; target CI lower >1.00; non-target >=0.98; decode p95 <=1.05x parent",
+    "zero capture/instantiate/destroy in steady-state tokens within one topology region",
+    "existing eight-layer segmentation is the only candidate; coarser graphs are not admitted without proven submission gaps",
+    "no claim of reduced weight/KV DRAM traffic from replay",
+    "do not replace current kernels with a historical graph-compatible implementation",
+    "aggregate_deadline_s 7200 is a ceiling, not a skip"
+  ]
+}
