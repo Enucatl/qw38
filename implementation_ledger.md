@@ -323,6 +323,38 @@ OPT-124 assesses the remaining ceiling without claiming universal optimality.
 | OPT-122 | Evaluate lower-precision persistent GDN state with FP32 updates | OPT-115, OPT-116, OPT-118 | done | BF16/Q8 block-scaled quantizers evaluated; enclosing gdn_core compute-bound vs DRAM; roofline critical-path save 0.0 ms; measured `no_material_opportunity`; pin `fp32` | [`tasks/OPT-122.md`](tasks/OPT-122.md); [`pins/opt122_gdn_state_precision_contract.json`](pins/opt122_gdn_state_precision_contract.json); [`pins/opt122_iteration_contract.json`](pins/opt122_iteration_contract.json); [`fixtures/opt122_gdn_state_precision.json`](fixtures/opt122_gdn_state_precision.json); [`tools/opt122_gdn_state_precision.py`](tools/opt122_gdn_state_precision.py); [`tests/test_opt122_gdn_state_precision.py`](tests/test_opt122_gdn_state_precision.py); [`cuda/opt122_gdn_state_precision_test.cu`](cuda/opt122_gdn_state_precision_test.cu); [`Makefile`](Makefile); [`evidence/optimization/opt122-gdn-state-precision/REPORT.md`](evidence/optimization/opt122-gdn-state-precision/REPORT.md); verification 2026-09-13T19:50:00Z |
 | OPT-123 | Measure interactions and admit the combined full-pipeline stack | OPT-117, OPT-118, OPT-119, OPT-120, OPT-121, OPT-122 | done | Combined OPT-118+OPT-119 on post113 `ffn_only`; freeze+leave-one-out; P4096/D128/D2048 keep (aggregate CI lower 1.005); PPL ratio 1.0; OPT-016 2K OOM non-exclusive | [`tasks/OPT-123.md`](tasks/OPT-123.md); [`pins/opt123_combined_stack_contract.json`](pins/opt123_combined_stack_contract.json); [`pins/opt123_iteration_contract.json`](pins/opt123_iteration_contract.json); [`fixtures/opt123_combined_stack.json`](fixtures/opt123_combined_stack.json); [`tools/opt123_combined_stack.py`](tools/opt123_combined_stack.py); [`tests/test_opt123_combined_stack.py`](tests/test_opt123_combined_stack.py); [`cuda/opt123_combined_stack_test.cu`](cuda/opt123_combined_stack_test.cu); [`Makefile`](Makefile); [`evidence/optimization/opt123-combined-stack/REPORT.md`](evidence/optimization/opt123-combined-stack/REPORT.md); verification 2026-09-13T20:38:00Z |
 | OPT-124 | Assess whether llama.cpp is a practical ceiling under explicit constraints | OPT-115, OPT-116, OPT-123 | done | Conditional byte/compute/serial bounds; OPT-123 identity reuse; P4096/D128/D2048 measurable headroom vs pinned llama (0.945/0.787/0.620); OPT-117–122 reopen=false; supports_continuing=false; universal_optimality_claimed=false | [`tasks/OPT-124.md`](tasks/OPT-124.md); [`pins/opt124_practical_ceiling_contract.json`](pins/opt124_practical_ceiling_contract.json); [`pins/opt124_iteration_contract.json`](pins/opt124_iteration_contract.json); [`fixtures/opt124_practical_ceiling.json`](fixtures/opt124_practical_ceiling.json); [`tools/opt124_practical_ceiling.py`](tools/opt124_practical_ceiling.py); [`tests/test_opt124_practical_ceiling.py`](tests/test_opt124_practical_ceiling.py); [`cuda/opt124_practical_ceiling_test.cu`](cuda/opt124_practical_ceiling_test.cu); [`Makefile`](Makefile); [`evidence/optimization/opt124-practical-ceiling/REPORT.md`](evidence/optimization/opt124-practical-ceiling/REPORT.md); verification 2026-09-13T20:57:00Z |
+| OPT-125 | Reconcile decode timing, GPU activity and traffic evidence | OPT-123, OPT-124 | pending | Corrected request/decode metrics, matched baseline, correlated GPU activity and reconciled traffic bounds; historical comparisons corrected explicitly | [Dossier](tasks/OPT-125.md) |
+| OPT-126 | Make decode graph inputs stable across token commits | OPT-125 | pending | Verified dynamic graph arguments and GDN ownership across commit/restore; shipping selector unchanged; no throughput claim | [Dossier](tasks/OPT-126.md) |
+| OPT-127 | Replay decode segments without per-token recapture | OPT-126 | pending | Zero steady-state recapture with correct topology transitions; full quality/state/memory and paired request keep or measured rejection | [Dossier](tasks/OPT-127.md) |
+| OPT-128 | Remove measured host submission and synchronization stalls | OPT-125, OPT-127 | pending | Attributable host critical-path reduction with API semantics intact and full-request gates, or quantified no opportunity | [Dossier](tasks/OPT-128.md) |
+| OPT-129 | Compare matched Quartz and llama decode-attention components | OPT-125 | pending | Identical-input representation-aware attention replay, native and matched-layout timings, actual llama kernels and bounded causal candidates | [Dossier](tasks/OPT-129.md) |
+| OPT-130 | Implement the evidenced dense decode-attention improvement | OPT-129 | pending | Dense full-context attention candidate passes quality/state/memory and complete-request gates, or evidenced rejection | [Dossier](tasks/OPT-130.md) |
+| OPT-131 | Fuse one measured residual decode launch chain | OPT-128, OPT-130 | pending | One evidenced producer/consumer fusion passes enclosing and full-request gates, or quantified no material opportunity | [Dossier](tasks/OPT-131.md) |
+| OPT-132 | Admit the combined decode stack and publish corrected headroom | OPT-125, OPT-126, OPT-127, OPT-128, OPT-129, OPT-130, OPT-131 | pending | Corrected matched combined/control/llama metrics, bounded interactions, quality/state/live-memory gates and explicit retained stack | [Dossier](tasks/OPT-132.md) |
+
+### Post-124 decode investigation batch (OPT-125–132)
+
+Authored 2026-09-13; specifications only, no implementation in this planning
+change. [OPT-125](tasks/OPT-125.md) owns the shared execution/quality protocol
+and first reconciles evidence: OPT-123 decode rates include prefill in their
+denominator, whereas OPT-115 request-probe decode rates subtract it; leaf-event
+gaps are not independently measured GPU inactivity. The reported 0.620×
+whole-workload ratio cannot establish an attention-component deficit.
+
+Execute OPT-125 first. Graph work follows OPT-126 → OPT-127 → OPT-128;
+the attention study and implementation follow OPT-129 → OPT-130. OPT-131
+considers one residual launch chain only after those verdicts. OPT-132 admits
+the combination and publishes corrected headroom. These are dependency tracks,
+not authorization for concurrent GPU experiments; serialize benchmark sittings.
+Read each dossier before execution. Rejection/no-opportunity is a valid
+completed experiment and supplies its retained parent to successors.
+
+New mechanisms are stable dynamic graph inputs that avoid OPT-117's per-token
+recapture, measured host stalls, and a representation-matched dense-attention
+study. Preserve original model/precision/state policies and OPT-116 quality
+budgets. No speculation, batching, sparse attention or renewed requantization
+ladder is authorized. Historical task outcomes remain recorded; OPT-125/132
+must link dated corrections rather than silently overwrite old evidence.
 
 ### Post-042 recovery execution order (historical batch)
 
