@@ -1572,6 +1572,13 @@ cudaError_t allocate(T** pointer, std::size_t count,
   return error;
 }
 
+cudaError_t allocate_bytes(void** pointer, std::size_t bytes,
+                           std::size_t* total) noexcept {
+  const cudaError_t error = cudaMalloc(pointer, bytes);
+  if (error == cudaSuccess) *total += bytes;
+  return error;
+}
+
 bool remap_bytes(const std::uint8_t* host, std::size_t bytes,
                  const std::uint8_t* base, std::size_t base_bytes,
                  const std::uint8_t* device_base,
@@ -3452,11 +3459,11 @@ cudaError_t enqueue_decode_layer_eager(
     }
     const AttentionConfig config{24, 4, 256, 64,
                                  static_cast<std::uint32_t>(session->capacity_)};
-    const std::size_t cache_stride =
-        session->capacity_ * internal::kAttentionKvWidth;
     const AttentionCache committed{
-        session->attention_key_ + attention_slot * cache_stride,
-        session->attention_value_ + attention_slot * cache_stride};
+        packed_kv_committed_key(session->attention_key_, attention_slot,
+                                session->capacity_),
+        packed_kv_committed_value(session->attention_value_, attention_slot,
+                                  session->capacity_)};
     const AttentionCache candidate{
         workspace->attention_candidate_key_ +
             attention_slot * internal::kAttentionKvWidth,
@@ -3866,9 +3873,14 @@ cudaError_t SchedulerGraphs::patch_segment_kernel_params(
       kGdnLayers * internal::kGdnConvolutionValues * sizeof(float);
   const std::size_t rec_bytes =
       kGdnLayers * internal::kGdnRecurrentStateValues * sizeof(float);
-  const std::size_t kv_committed_bytes =
-      kAttentionLayers * session_->capacity_ * internal::kAttentionKvWidth *
-      sizeof(__nv_bfloat16);
+  const PackedKvFormat kv_format = effective_packed_kv_format();
+  const std::size_t kv_committed_key_bytes =
+      kAttentionLayers * packed_kv_layer_bytes(packed_kv_key_tensor(kv_format),
+                                               session_->capacity_);
+  const std::size_t kv_committed_value_bytes =
+      kAttentionLayers *
+      packed_kv_layer_bytes(packed_kv_value_tensor(kv_format),
+                            session_->capacity_);
   const std::size_t kv_candidate_bytes =
       kAttentionLayers * internal::kAttentionKvWidth * sizeof(__nv_bfloat16);
   const PointerRange ranges[8] = {
@@ -3878,9 +3890,9 @@ cudaError_t SchedulerGraphs::patch_segment_kernel_params(
        conv_bytes},
       {captured_gdn_workspace_rec_, workspace_->gdn_candidate_recurrent_,
        rec_bytes},
-      {captured_attention_key_, session_->attention_key_, kv_committed_bytes},
+      {captured_attention_key_, session_->attention_key_, kv_committed_key_bytes},
       {session_->attention_value_, session_->attention_value_,
-       kv_committed_bytes},
+       kv_committed_value_bytes},
       {workspace_->attention_candidate_key_,
        workspace_->attention_candidate_key_, kv_candidate_bytes},
       {workspace_->attention_candidate_value_,
@@ -4084,13 +4096,23 @@ Status SchedulerSession::create(std::size_t capacity) noexcept {
                      kGdnLayers * internal::kGdnRecurrentStateValues,
                      &allocated_bytes_);
   }
-  const std::size_t attention_values =
-      kAttentionLayers * capacity * internal::kAttentionKvWidth;
+  const PackedKvFormat kv_format = effective_packed_kv_format();
+  const std::size_t key_bytes =
+      kAttentionLayers *
+      packed_kv_layer_bytes(packed_kv_key_tensor(kv_format), capacity);
+  const std::size_t value_bytes =
+      kAttentionLayers *
+      packed_kv_layer_bytes(packed_kv_value_tensor(kv_format), capacity);
   if (error == cudaSuccess) {
-    error = allocate(&attention_key_, attention_values, &allocated_bytes_);
+    void* key = nullptr;
+    error = allocate_bytes(&key, key_bytes, &allocated_bytes_);
+    if (error == cudaSuccess) attention_key_ = static_cast<__nv_bfloat16*>(key);
   }
   if (error == cudaSuccess) {
-    error = allocate(&attention_value_, attention_values, &allocated_bytes_);
+    void* value = nullptr;
+    error = allocate_bytes(&value, value_bytes, &allocated_bytes_);
+    if (error == cudaSuccess)
+      attention_value_ = static_cast<__nv_bfloat16*>(value);
   }
   if (error == cudaSuccess) {
     error = allocate(&last_logits_device_, internal::kVocabularySize,
@@ -4114,16 +4136,20 @@ Status SchedulerSession::create(std::size_t capacity) noexcept {
                            sizeof(float));
   }
   if (error == cudaSuccess) {
-    error = cudaMemset(attention_key_, 0,
-                       attention_values * sizeof(__nv_bfloat16));
+    error = cudaMemset(attention_key_, 0, key_bytes);
   }
   if (error == cudaSuccess) {
-    error = cudaMemset(attention_value_, 0,
-                       attention_values * sizeof(__nv_bfloat16));
+    error = cudaMemset(attention_value_, 0, value_bytes);
   }
   if (error != cudaSuccess) {
     release();
     return cuda_status(error, "cannot allocate CUDA scheduler session state");
+  }
+  const cudaError_t published =
+      publish_packed_kv_device_format(effective_packed_kv_format());
+  if (published != cudaSuccess) {
+    release();
+    return cuda_status(published, "cannot publish packed KV format");
   }
   capacity_ = capacity;
   return Status::ok();
@@ -4134,8 +4160,13 @@ Status SchedulerSession::reset() noexcept {
     return {StatusCode::kInvalidArgument,
             "CUDA scheduler session is not initialized"};
   }
-  const std::size_t attention_values =
-      kAttentionLayers * capacity_ * internal::kAttentionKvWidth;
+  const PackedKvFormat kv_format = effective_packed_kv_format();
+  const std::size_t key_bytes =
+      kAttentionLayers *
+      packed_kv_layer_bytes(packed_kv_key_tensor(kv_format), capacity_);
+  const std::size_t value_bytes =
+      kAttentionLayers *
+      packed_kv_layer_bytes(packed_kv_value_tensor(kv_format), capacity_);
   cudaError_t error = cudaMemset(
       gdn_convolution_, 0,
       kGdnLayers * internal::kGdnConvolutionValues * sizeof(float));
@@ -4145,12 +4176,10 @@ Status SchedulerSession::reset() noexcept {
         kGdnLayers * internal::kGdnRecurrentStateValues * sizeof(float));
   }
   if (error == cudaSuccess) {
-    error = cudaMemset(attention_key_, 0,
-                       attention_values * sizeof(__nv_bfloat16));
+    error = cudaMemset(attention_key_, 0, key_bytes);
   }
   if (error == cudaSuccess) {
-    error = cudaMemset(attention_value_, 0,
-                       attention_values * sizeof(__nv_bfloat16));
+    error = cudaMemset(attention_value_, 0, value_bytes);
   }
   if (error == cudaSuccess) error = cudaDeviceSynchronize();
   if (error != cudaSuccess) {
@@ -4211,23 +4240,15 @@ Status SchedulerSession::state_equals(const SchedulerSession& other,
     compare(last_hidden_device_, other.last_hidden_device_,
             internal::kResidualWidth * sizeof(float));
   }
-  const std::size_t cache_stride = capacity_ * internal::kAttentionKvWidth;
-  const std::size_t head_span_bytes =
-      frontier_ * internal::kAttentionHeadWidth * sizeof(__nv_bfloat16);
-  const std::size_t kv_heads =
-      internal::kAttentionKvWidth / internal::kAttentionHeadWidth;
-  for (std::size_t layer = 0; layer < kAttentionLayers; ++layer) {
-    for (std::size_t kv_head = 0; kv_head < kv_heads; ++kv_head) {
-      const std::size_t head_offset =
-          kv_head * capacity_ * internal::kAttentionHeadWidth;
-      compare(attention_key_ + layer * cache_stride + head_offset,
-              other.attention_key_ + layer * cache_stride + head_offset,
-              head_span_bytes);
-      compare(attention_value_ + layer * cache_stride + head_offset,
-              other.attention_value_ + layer * cache_stride + head_offset,
-              head_span_bytes);
-    }
-  }
+  const PackedKvFormat kv_format = effective_packed_kv_format();
+  const std::size_t key_bytes =
+      kAttentionLayers *
+      packed_kv_layer_bytes(packed_kv_key_tensor(kv_format), capacity_);
+  const std::size_t value_bytes =
+      kAttentionLayers *
+      packed_kv_layer_bytes(packed_kv_value_tensor(kv_format), capacity_);
+  compare(attention_key_, other.attention_key_, key_bytes);
+  compare(attention_value_, other.attention_value_, value_bytes);
   unsigned int host_mismatch = 1;
   if (error == cudaSuccess) {
     error = cudaMemcpy(&host_mismatch, mismatch, sizeof(unsigned int),
@@ -5124,11 +5145,11 @@ Status execute_token(const ResidentModel& model, std::size_t token,
         if (error == cudaSuccess) error = end_phase(leaves);
         const AttentionConfig config{
             24, 4, 256, 64, static_cast<std::uint32_t>(session->capacity_)};
-        const std::size_t cache_stride =
-            session->capacity_ * internal::kAttentionKvWidth;
         const AttentionCache committed{
-            session->attention_key_ + attention_slot * cache_stride,
-            session->attention_value_ + attention_slot * cache_stride};
+            packed_kv_committed_key(session->attention_key_, attention_slot,
+                                    session->capacity_),
+            packed_kv_committed_value(session->attention_value_, attention_slot,
+                                      session->capacity_)};
         const AttentionCache candidate{
             workspace->attention_candidate_key_ +
                 attention_slot * internal::kAttentionKvWidth,
@@ -6073,11 +6094,11 @@ Status execute_prompt_chunk(
         }
         AttentionConfig config{
             24, 4, 256, 64, static_cast<std::uint32_t>(session->capacity_)};
-        const std::size_t cache_stride =
-            session->capacity_ * internal::kAttentionKvWidth;
         const AttentionCache committed{
-            session->attention_key_ + attention_slot * cache_stride,
-            session->attention_value_ + attention_slot * cache_stride};
+            packed_kv_committed_key(session->attention_key_, attention_slot,
+                                    session->capacity_),
+            packed_kv_committed_value(session->attention_value_, attention_slot,
+                                      session->capacity_)};
         const std::size_t candidate_stride =
             workspace->prompt_chunk_rows_ * internal::kAttentionKvWidth;
         const AttentionCache candidate{
@@ -6501,8 +6522,10 @@ Status execute_prompt_chunk(
     for (std::size_t slot = 0; error == cudaSuccess && slot < kAttentionLayers;
          ++slot) {
       const AttentionCache committed{
-          session->attention_key_ + slot * cache_stride,
-          session->attention_value_ + slot * cache_stride};
+          packed_kv_committed_key(session->attention_key_, slot,
+                                  session->capacity_),
+          packed_kv_committed_value(session->attention_value_, slot,
+                                    session->capacity_)};
       const AttentionCache candidate{
           workspace->prompt_attention_candidate_key_ + slot * candidate_stride,
           workspace->prompt_attention_candidate_value_ +

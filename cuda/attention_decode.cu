@@ -13,6 +13,18 @@
 QW38_PDL_REGISTER_DEVICE_OPS()
 
 namespace qw38::cuda {
+
+__device__ int g_opt120_packed_kv_format = 0;
+
+__device__ PackedKvFormat packed_kv_device_format() {
+  return static_cast<PackedKvFormat>(g_opt120_packed_kv_format);
+}
+
+cudaError_t publish_packed_kv_device_format(PackedKvFormat format) noexcept {
+  const int id = static_cast<int>(format);
+  return cudaMemcpyToSymbol(g_opt120_packed_kv_format, &id, sizeof(id));
+}
+
 namespace {
 
 constexpr std::uint32_t kMaximumQueryHeads = 24;
@@ -177,19 +189,19 @@ __global__ void grouped_attention(
     const float scaling =
         1.0F / sqrtf(static_cast<float>(config.head_width));
     for (std::size_t context = 0; context <= position; ++context) {
-      const __nv_bfloat16* key_row =
-          context < chunk_start
-              ? committed_key + attention_kv_physical_index(
-                                    context, kv_head, 0, config.capacity,
-                                    config.head_width)
-              : candidate_key + (context - chunk_start) * row_values +
-                    static_cast<std::size_t>(kv_head) * config.head_width;
       float score = 0.0F;
       for (std::uint32_t index = 0; index < config.head_width; ++index) {
+        const float key_value =
+            context < chunk_start
+                ? packed_kv_load_key(committed_key, context, kv_head, index,
+                                     config.capacity, config.kv_heads,
+                                     config.head_width)
+                : __bfloat162float(
+                      (candidate_key + (context - chunk_start) * row_values +
+                       static_cast<std::size_t>(kv_head) * config.head_width)
+                          [index]);
         score = __fadd_rn(
-            score,
-            __fmul_rn(query[query_base + index],
-                      __bfloat162float(key_row[index])));
+            score, __fmul_rn(query[query_base + index], key_value));
       }
       head_scores[context] = __fmul_rn(score, scaling);
       maximum = fmaxf(maximum, head_scores[context]);
@@ -204,17 +216,17 @@ __global__ void grouped_attention(
   if (lane < config.head_width) {
     float result = 0.0F;
     for (std::size_t context = 0; context <= position; ++context) {
-      const __nv_bfloat16* value_row =
+      const float value =
           context < chunk_start
-              ? committed_value + attention_kv_physical_index(
-                                      context, kv_head, 0, config.capacity,
-                                      config.head_width)
-              : candidate_value + (context - chunk_start) * row_values +
-                    static_cast<std::size_t>(kv_head) * config.head_width;
+              ? packed_kv_load_value(committed_value, context, kv_head, lane,
+                                     config.capacity, config.kv_heads,
+                                     config.head_width)
+              : __bfloat162float(
+                    (candidate_value + (context - chunk_start) * row_values +
+                     static_cast<std::size_t>(kv_head) * config.head_width)
+                        [lane]);
       result = __fadd_rn(
-          result,
-          __fmul_rn(head_scores[context] / denominator,
-                    __bfloat162float(value_row[lane])));
+          result, __fmul_rn(head_scores[context] / denominator, value));
     }
     const float gate_value = gate[query_base + lane];
     const float sigmoid =
@@ -296,7 +308,8 @@ __device__ void load_kv_tile_rows(
   const std::size_t width = config.head_width;
   const std::size_t row_values =
       static_cast<std::size_t>(config.kv_heads) * width;
-  if (tile + rows <= origin) {
+  if (tile + rows <= origin &&
+      packed_kv_device_format() == PackedKvFormat::kDenseBf16) {
     const std::size_t base = attention_kv_tile_base_offset(
         kv_head, tile, config.capacity, config.head_width);
     const __nv_bfloat16* tile_base = committed_key + base;
@@ -327,22 +340,24 @@ __device__ void load_kv_tile_rows(
   } else {
     for (std::size_t row = 0; row < rows; ++row) {
       const std::size_t absolute = tile + row;
-      const __nv_bfloat16* ksrc;
-      const __nv_bfloat16* vsrc;
-      if (absolute < origin) {
-        const std::size_t offset = attention_kv_physical_index(
-            absolute, kv_head, 0, config.capacity, config.head_width);
-        ksrc = committed_key + offset;
-        vsrc = committed_value + offset;
-      } else {
-        ksrc = candidate_key + (absolute - origin) * row_values +
-               kv_head * width;
-        vsrc = candidate_value + (absolute - origin) * row_values +
-               kv_head * width;
-      }
       if (lane < width) {
-        keys[row * kMaximumHeadWidth + lane] = ksrc[lane];
-        values[row * kMaximumHeadWidth + lane] = vsrc[lane];
+        if (absolute < origin) {
+          keys[row * kMaximumHeadWidth + lane] = packed_kv_load_key_bf16(
+              committed_key, absolute, kv_head, lane, config.capacity,
+              config.kv_heads, config.head_width);
+          values[row * kMaximumHeadWidth + lane] = packed_kv_load_value_bf16(
+              committed_value, absolute, kv_head, lane, config.capacity,
+              config.kv_heads, config.head_width);
+        } else {
+          const __nv_bfloat16* ksrc =
+              candidate_key + (absolute - origin) * row_values +
+              kv_head * width;
+          const __nv_bfloat16* vsrc =
+              candidate_value + (absolute - origin) * row_values +
+              kv_head * width;
+          keys[row * kMaximumHeadWidth + lane] = ksrc[lane];
+          values[row * kMaximumHeadWidth + lane] = vsrc[lane];
+        }
       }
     }
     if constexpr (RecordSpans) {
@@ -1062,38 +1077,44 @@ __global__ void warp_query_decode_attention(
     const std::size_t row_values =
         static_cast<std::size_t>(config.kv_heads) * width;
     for (std::size_t token = part_begin; token < part_end; ++token) {
-      const __nv_bfloat16* ksrc;
-      const __nv_bfloat16* vsrc;
-      if (token < position) {
-        const std::size_t offset = attention_kv_physical_index(
-            token, kv_head, 0, config.capacity, config.head_width);
-        ksrc = committed_key + offset;
-        vsrc = committed_value + offset;
-      } else {
-        ksrc = candidate_key + (token - position) * row_values +
-               kv_head * width;
-        vsrc = candidate_value + (token - position) * row_values +
-               kv_head * width;
-      }
       float local = 0.0F;
       float v_reg[kWarpDimsPerLane];
       const std::uint32_t dim0 =
           lane * static_cast<std::uint32_t>(kWarpDimsPerLane);
-      if constexpr (kVecKv) {
-        float k_reg[kWarpDimsPerLane];
-        load_bf16x8(ksrc + dim0, k_reg);
-        load_bf16x8(vsrc + dim0, v_reg);
-#pragma unroll
-        for (int i = 0; i < kWarpDimsPerLane; ++i) {
-          local = __fadd_rn(local, __fmul_rn(q[i], k_reg[i]));
-        }
-      } else {
+      if (token < position) {
 #pragma unroll
         for (int i = 0; i < kWarpDimsPerLane; ++i) {
           const std::uint32_t dim = dim0 + static_cast<std::uint32_t>(i);
           local = __fadd_rn(
-              local, __fmul_rn(q[i], __bfloat162float(ksrc[dim])));
-          v_reg[i] = __bfloat162float(vsrc[dim]);
+              local, __fmul_rn(q[i], packed_kv_load_key(
+                                         committed_key, token, kv_head, dim,
+                                         config.capacity, config.kv_heads,
+                                         config.head_width)));
+          v_reg[i] = packed_kv_load_value(committed_value, token, kv_head, dim,
+                                          config.capacity, config.kv_heads,
+                                          config.head_width);
+        }
+      } else {
+        const __nv_bfloat16* ksrc =
+            candidate_key + (token - position) * row_values + kv_head * width;
+        const __nv_bfloat16* vsrc =
+            candidate_value + (token - position) * row_values + kv_head * width;
+        if constexpr (kVecKv) {
+          float k_reg[kWarpDimsPerLane];
+          load_bf16x8(ksrc + dim0, k_reg);
+          load_bf16x8(vsrc + dim0, v_reg);
+#pragma unroll
+          for (int i = 0; i < kWarpDimsPerLane; ++i) {
+            local = __fadd_rn(local, __fmul_rn(q[i], k_reg[i]));
+          }
+        } else {
+#pragma unroll
+          for (int i = 0; i < kWarpDimsPerLane; ++i) {
+            const std::uint32_t dim = dim0 + static_cast<std::uint32_t>(i);
+            local = __fadd_rn(
+                local, __fmul_rn(q[i], __bfloat162float(ksrc[dim])));
+            v_reg[i] = __bfloat162float(vsrc[dim]);
+          }
         }
       }
       local = __fadd_rn(local, __shfl_down_sync(0xffffffff, local, 16));
@@ -1215,44 +1236,56 @@ __global__ void warp_query_gqa6_decode_attention(
     const std::size_t row_values =
         static_cast<std::size_t>(config.kv_heads) * width;
     for (std::size_t token = part_begin; token < part_end; ++token) {
-      const __nv_bfloat16* ksrc;
-      const __nv_bfloat16* vsrc;
       if (token < position) {
-        const std::size_t offset = attention_kv_physical_index(
-            token, kv_head, 0, config.capacity, config.head_width);
-        ksrc = committed_key + offset;
-        vsrc = committed_value + offset;
-      } else {
-        ksrc = candidate_key + (token - position) * row_values + kv_head * width;
-        vsrc = candidate_value + (token - position) * row_values +
-               kv_head * width;
-      }
-      const std::uint32_t seg_count =
-          static_cast<std::uint32_t>(width / kWarpDimsPerLane);
-      for (std::uint32_t seg = tid; seg < seg_count; seg += nthreads) {
-        const std::uint32_t dim0 =
-            seg * static_cast<std::uint32_t>(kWarpDimsPerLane);
-        const unsigned long long addr =
-            reinterpret_cast<unsigned long long>(ksrc + dim0);
-        if ((addr & 15ull) == 0) {
-          float k_reg[kWarpDimsPerLane];
-          float v_reg[kWarpDimsPerLane];
-          load_bf16x8(ksrc + dim0, k_reg);
-          load_bf16x8(vsrc + dim0, v_reg);
-#pragma unroll
-          for (int i = 0; i < kWarpDimsPerLane; ++i) {
-            shared_key[dim0 + static_cast<std::uint32_t>(i)] =
-                __float2bfloat16_rn(k_reg[i]);
-            shared_value[dim0 + static_cast<std::uint32_t>(i)] =
-                __float2bfloat16_rn(v_reg[i]);
-          }
-        } else {
-          atomicOr(&g_opt078_kv_unaligned_fallback, 1u);
+        const std::uint32_t seg_count =
+            static_cast<std::uint32_t>(width / kWarpDimsPerLane);
+        for (std::uint32_t seg = tid; seg < seg_count; seg += nthreads) {
+          const std::uint32_t dim0 =
+              seg * static_cast<std::uint32_t>(kWarpDimsPerLane);
 #pragma unroll
           for (int i = 0; i < kWarpDimsPerLane; ++i) {
             const std::uint32_t dim = dim0 + static_cast<std::uint32_t>(i);
-            shared_key[dim] = ksrc[dim];
-            shared_value[dim] = vsrc[dim];
+            shared_key[dim] = packed_kv_load_key_bf16(
+                committed_key, token, kv_head, dim, config.capacity,
+                config.kv_heads, config.head_width);
+            shared_value[dim] = packed_kv_load_value_bf16(
+                committed_value, token, kv_head, dim, config.capacity,
+                config.kv_heads, config.head_width);
+          }
+        }
+      } else {
+        const __nv_bfloat16* ksrc =
+            candidate_key + (token - position) * row_values + kv_head * width;
+        const __nv_bfloat16* vsrc =
+            candidate_value + (token - position) * row_values +
+            kv_head * width;
+        const std::uint32_t seg_count =
+            static_cast<std::uint32_t>(width / kWarpDimsPerLane);
+        for (std::uint32_t seg = tid; seg < seg_count; seg += nthreads) {
+          const std::uint32_t dim0 =
+              seg * static_cast<std::uint32_t>(kWarpDimsPerLane);
+          const unsigned long long addr =
+              reinterpret_cast<unsigned long long>(ksrc + dim0);
+          if ((addr & 15ull) == 0) {
+            float k_reg[kWarpDimsPerLane];
+            float v_reg[kWarpDimsPerLane];
+            load_bf16x8(ksrc + dim0, k_reg);
+            load_bf16x8(vsrc + dim0, v_reg);
+#pragma unroll
+            for (int i = 0; i < kWarpDimsPerLane; ++i) {
+              shared_key[dim0 + static_cast<std::uint32_t>(i)] =
+                  __float2bfloat16_rn(k_reg[i]);
+              shared_value[dim0 + static_cast<std::uint32_t>(i)] =
+                  __float2bfloat16_rn(v_reg[i]);
+            }
+          } else {
+            atomicOr(&g_opt078_kv_unaligned_fallback, 1u);
+#pragma unroll
+            for (int i = 0; i < kWarpDimsPerLane; ++i) {
+              const std::uint32_t dim = dim0 + static_cast<std::uint32_t>(i);
+              shared_key[dim] = ksrc[dim];
+              shared_value[dim] = vsrc[dim];
+            }
           }
         }
       }
@@ -1425,16 +1458,12 @@ vec128_online_decode_attention(
             token_base + static_cast<std::size_t>(gid) * kGroupThreads +
             static_cast<std::size_t>(t);
         const bool in_range = token < part_end;
+        const bool committed = in_range && token < position;
         const __nv_bfloat16* ksrc = nullptr;
         const __nv_bfloat16* vsrc = nullptr;
         float local = 0.0F;
         if (in_range) {
-          if (token < position) {
-            const std::size_t offset = attention_kv_physical_index(
-                token, kv_head, 0, config.capacity, config.head_width);
-            ksrc = committed_key + offset;
-            vsrc = committed_value + offset;
-          } else {
+          if (!committed) {
             ksrc = candidate_key + (token - position) * row_values +
                    kv_head * width;
             vsrc = candidate_value + (token - position) * row_values +
@@ -1445,7 +1474,17 @@ vec128_online_decode_attention(
             float k_reg[kGroupThreads];
             const std::uint32_t dim0 =
                 static_cast<std::uint32_t>(chunk) * 64U + gl * 8U;
-            load_bf16x8(ksrc + dim0, k_reg);
+            if (committed) {
+#pragma unroll
+              for (int i = 0; i < kGroupThreads; ++i) {
+                k_reg[i] = packed_kv_load_key(
+                    committed_key, token, kv_head,
+                    dim0 + static_cast<std::uint32_t>(i), config.capacity,
+                    config.kv_heads, config.head_width);
+              }
+            } else {
+              load_bf16x8(ksrc + dim0, k_reg);
+            }
 #pragma unroll
             for (int i = 0; i < kGroupThreads; ++i) {
               local = __fadd_rn(
@@ -1469,7 +1508,17 @@ vec128_online_decode_attention(
             float v_reg[kGroupThreads];
             const std::uint32_t dim0 =
                 static_cast<std::uint32_t>(chunk) * 64U + gl * 8U;
-            load_bf16x8(vsrc + dim0, v_reg);
+            if (committed) {
+#pragma unroll
+              for (int i = 0; i < kGroupThreads; ++i) {
+                v_reg[i] = packed_kv_load_value(
+                    committed_value, token, kv_head,
+                    dim0 + static_cast<std::uint32_t>(i), config.capacity,
+                    config.kv_heads, config.head_width);
+              }
+            } else {
+              load_bf16x8(vsrc + dim0, v_reg);
+            }
 #pragma unroll
             for (int i = 0; i < kGroupThreads; ++i) {
               vkq[chunk * kGroupThreads + i] = __fadd_rn(
@@ -1782,6 +1831,193 @@ __global__ void scatter_committed_rows(
   }
 }
 
+__global__ void scatter_committed_rows_packed(
+    const __nv_bfloat16* candidate_key_base,
+    const __nv_bfloat16* candidate_value_base, __nv_bfloat16* committed_key_base,
+    __nv_bfloat16* committed_value_base, std::size_t candidate_layer_stride,
+    std::size_t start_position, std::size_t token_count, std::uint32_t kv_heads,
+    std::uint32_t capacity, std::uint32_t head_width, PackedKvFormat format) {
+  const std::size_t layer = blockIdx.y;
+  const __nv_bfloat16* candidate_key =
+      candidate_key_base + layer * candidate_layer_stride;
+  const __nv_bfloat16* candidate_value =
+      candidate_value_base + layer * candidate_layer_stride;
+  __nv_bfloat16* committed_key = packed_kv_layer_ptr(
+      committed_key_base, layer, packed_kv_key_tensor(format), capacity, kv_heads,
+      head_width);
+  __nv_bfloat16* committed_value = packed_kv_layer_ptr(
+      committed_value_base, layer, packed_kv_value_tensor(format), capacity,
+      kv_heads, head_width);
+  const std::size_t groups = packed_kv_group_count(head_width);
+  const std::size_t group_jobs =
+      token_count * static_cast<std::size_t>(kv_heads) * groups;
+  const std::size_t stride =
+      static_cast<std::size_t>(blockDim.x) * gridDim.x;
+  const PackedKvTensor key_tensor = packed_kv_key_tensor(format);
+  const PackedKvTensor value_tensor = packed_kv_value_tensor(format);
+  for (std::size_t job =
+           static_cast<std::size_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+       job < group_jobs; job += stride) {
+    const std::size_t rel_token = job / (static_cast<std::size_t>(kv_heads) * groups);
+    const std::size_t rem = job % (static_cast<std::size_t>(kv_heads) * groups);
+    const std::uint32_t kv_head = static_cast<std::uint32_t>(rem / groups);
+    const std::uint32_t group = static_cast<std::uint32_t>(rem % groups);
+    const std::uint32_t dim0 = group * kPackedKvGroup;
+    const std::uint32_t count = head_width - dim0 < kPackedKvGroup
+                                    ? head_width - dim0
+                                    : static_cast<std::uint32_t>(kPackedKvGroup);
+    float keys[kPackedKvGroup];
+    float values[kPackedKvGroup];
+    const std::size_t cand =
+        rel_token * static_cast<std::size_t>(kv_heads) * head_width +
+        static_cast<std::size_t>(kv_head) * head_width + dim0;
+    for (std::uint32_t index = 0; index < count; ++index) {
+      keys[index] = __bfloat162float(candidate_key[cand + index]);
+      values[index] = __bfloat162float(candidate_value[cand + index]);
+    }
+    packed_kv_store_group(committed_key, key_tensor, start_position + rel_token,
+                          kv_head, group, keys, count, capacity, kv_heads,
+                          head_width);
+    packed_kv_store_group(committed_value, value_tensor,
+                          start_position + rel_token, kv_head, group, values,
+                          count, capacity, kv_heads, head_width);
+  }
+}
+
+__global__ void gather_packed_kv_layer_kernel(
+    PackedKvTensor tensor, std::size_t frontier, std::uint32_t kv_heads,
+    std::uint32_t capacity, std::uint32_t head_width,
+    const std::uint8_t* physical, std::uint8_t* compact) {
+  const std::size_t payload_src =
+      packed_kv_payload_bytes(tensor, capacity, kv_heads, head_width);
+  const std::size_t payload_dst =
+      packed_kv_payload_bytes(tensor, frontier, kv_heads, head_width);
+  const std::size_t scale_count =
+      frontier * static_cast<std::size_t>(kv_heads) *
+      packed_kv_group_count(head_width);
+  const std::size_t src_scale_count =
+      capacity * static_cast<std::size_t>(kv_heads) *
+      packed_kv_group_count(head_width);
+  const std::size_t jobs = payload_dst + scale_count;
+  const std::size_t stride =
+      static_cast<std::size_t>(blockDim.x) * gridDim.x;
+  const __half* src_scales =
+      reinterpret_cast<const __half*>(physical + payload_src);
+  __half* dst_scales = reinterpret_cast<__half*>(compact + payload_dst);
+  (void)src_scale_count;
+  for (std::size_t index = static_cast<std::size_t>(blockIdx.x) * blockDim.x +
+                           threadIdx.x;
+       index < jobs; index += stride) {
+    if (index < payload_dst) {
+      if (tensor == PackedKvTensor::kQ8) {
+        const std::size_t row_values =
+            static_cast<std::size_t>(kv_heads) * head_width;
+        const std::size_t token = index / row_values;
+        const std::size_t rem = index % row_values;
+        const std::uint32_t kv_head =
+            static_cast<std::uint32_t>(rem / head_width);
+        const std::uint32_t dim = static_cast<std::uint32_t>(rem % head_width);
+        compact[index] = physical[packed_kv_physical_index(
+            token, kv_head, dim, capacity, head_width)];
+      } else {
+        const std::size_t values = frontier * static_cast<std::size_t>(kv_heads) *
+                                   head_width;
+        const std::size_t value_index = index * 2U;
+        if (value_index >= values) continue;
+        const std::size_t row_values =
+            static_cast<std::size_t>(kv_heads) * head_width;
+        const std::size_t token = value_index / row_values;
+        const std::size_t rem = value_index % row_values;
+        const std::uint32_t kv_head =
+            static_cast<std::uint32_t>(rem / head_width);
+        const std::uint32_t dim = static_cast<std::uint32_t>(rem % head_width);
+        const std::size_t src = packed_kv_physical_index(
+                                    token, kv_head, dim, capacity, head_width) /
+                                2U;
+        compact[index] = physical[src];
+      }
+    } else {
+      const std::size_t scale_index = index - payload_dst;
+      const std::size_t groups = packed_kv_group_count(head_width);
+      const std::size_t token =
+          scale_index / (static_cast<std::size_t>(kv_heads) * groups);
+      const std::size_t rem =
+          scale_index % (static_cast<std::size_t>(kv_heads) * groups);
+      const std::uint32_t kv_head = static_cast<std::uint32_t>(rem / groups);
+      const std::size_t group = rem % groups;
+      dst_scales[scale_index] = src_scales[(static_cast<std::size_t>(kv_head) *
+                                                capacity +
+                                            token) *
+                                               groups +
+                                           group];
+    }
+  }
+}
+
+__global__ void scatter_packed_kv_layer_kernel(
+    PackedKvTensor tensor, std::size_t frontier, std::uint32_t kv_heads,
+    std::uint32_t capacity, std::uint32_t head_width, const std::uint8_t* compact,
+    std::uint8_t* physical) {
+  const std::size_t payload_src =
+      packed_kv_payload_bytes(tensor, frontier, kv_heads, head_width);
+  const std::size_t payload_dst =
+      packed_kv_payload_bytes(tensor, capacity, kv_heads, head_width);
+  const std::size_t scale_count =
+      frontier * static_cast<std::size_t>(kv_heads) *
+      packed_kv_group_count(head_width);
+  const std::size_t jobs = payload_src + scale_count;
+  const std::size_t stride =
+      static_cast<std::size_t>(blockDim.x) * gridDim.x;
+  const __half* src_scales =
+      reinterpret_cast<const __half*>(compact + payload_src);
+  __half* dst_scales = reinterpret_cast<__half*>(physical + payload_dst);
+  for (std::size_t index = static_cast<std::size_t>(blockIdx.x) * blockDim.x +
+                           threadIdx.x;
+       index < jobs; index += stride) {
+    if (index < payload_src) {
+      if (tensor == PackedKvTensor::kQ8) {
+        const std::size_t row_values =
+            static_cast<std::size_t>(kv_heads) * head_width;
+        const std::size_t token = index / row_values;
+        const std::size_t rem = index % row_values;
+        const std::uint32_t kv_head =
+            static_cast<std::uint32_t>(rem / head_width);
+        const std::uint32_t dim = static_cast<std::uint32_t>(rem % head_width);
+        physical[packed_kv_physical_index(token, kv_head, dim, capacity,
+                                          head_width)] = compact[index];
+      } else {
+        const std::size_t values = frontier * static_cast<std::size_t>(kv_heads) *
+                                   head_width;
+        const std::size_t value_index = index * 2U;
+        if (value_index >= values) continue;
+        const std::size_t row_values =
+            static_cast<std::size_t>(kv_heads) * head_width;
+        const std::size_t token = value_index / row_values;
+        const std::size_t rem = value_index % row_values;
+        const std::uint32_t kv_head =
+            static_cast<std::uint32_t>(rem / head_width);
+        const std::uint32_t dim = static_cast<std::uint32_t>(rem % head_width);
+        const std::size_t dst = packed_kv_physical_index(
+                                    token, kv_head, dim, capacity, head_width) /
+                                2U;
+        physical[dst] = compact[index];
+      }
+    } else {
+      const std::size_t scale_index = index - payload_src;
+      const std::size_t groups = packed_kv_group_count(head_width);
+      const std::size_t token =
+          scale_index / (static_cast<std::size_t>(kv_heads) * groups);
+      const std::size_t rem =
+          scale_index % (static_cast<std::size_t>(kv_heads) * groups);
+      const std::uint32_t kv_head = static_cast<std::uint32_t>(rem / groups);
+      const std::size_t group = rem % groups;
+      dst_scales[(static_cast<std::size_t>(kv_head) * capacity + token) *
+                     groups +
+                 group] = src_scales[scale_index];
+    }
+  }
+}
+
 __global__ void pack_committed_kv_kernel(
     const __nv_bfloat16* physical, __nv_bfloat16* logical,
     std::size_t token_begin, std::size_t token_count, std::uint32_t kv_heads,
@@ -2029,6 +2265,9 @@ cudaError_t stage_and_validate_chunk(
       candidate_rows.value == committed.value) {
     return cudaErrorInvalidValue;
   }
+  const cudaError_t published =
+      publish_packed_kv_device_format(effective_packed_kv_format());
+  if (published != cudaSuccess) return published;
   dim3 staging(config.kv_heads, static_cast<unsigned>(token_count), 1);
   return quartz_launch_kernel(
       stage_chunk_rows, staging, dim3(kThreads), 0, stream, config,
@@ -2258,6 +2497,7 @@ cudaError_t launch_attention_prepare_partitioned_vec(
       output_gate, committed, candidate_row, normalized_query, normalized_key,
       score_workspace, output, stream);
   if (error != cudaSuccess) return error;
+  publish_packed_kv_device_format(effective_packed_kv_format());
   if (decode_attention_vec128_uses_online_at(position)) {
     if (!legal_vec128_n_parts(n_parts) ||
         !production_warp_query_shape(config)) {
@@ -3094,6 +3334,22 @@ cudaError_t launch_attention_scatter_layers(
       candidate_value_base == committed_value_base) {
     return cudaErrorInvalidValue;
   }
+  const PackedKvFormat format = effective_packed_kv_format();
+  cudaError_t published = publish_packed_kv_device_format(format);
+  if (published != cudaSuccess) return published;
+  if (format != PackedKvFormat::kDenseBf16) {
+    const std::size_t groups = packed_kv_group_count(config.head_width);
+    const std::size_t jobs =
+        token_count * static_cast<std::size_t>(config.kv_heads) * groups;
+    const unsigned blocks = scatter_block_count(jobs);
+    const dim3 grid(blocks, static_cast<unsigned>(layer_count));
+    scatter_committed_rows_packed<<<grid, kThreads, 0, stream>>>(
+        candidate_key_base, candidate_value_base, committed_key_base,
+        committed_value_base, candidate_layer_stride, start_position,
+        token_count, config.kv_heads, config.capacity, config.head_width,
+        format);
+    return cudaPeekAtLastError();
+  }
   const unsigned blocks = scatter_block_count(token_count * row_values);
   const dim3 grid(blocks, static_cast<unsigned>(layer_count));
   scatter_committed_rows<<<grid, kThreads, 0, stream>>>(
@@ -3128,11 +3384,61 @@ cudaError_t launch_attention_commit_chunk(
       candidate_rows.value == committed.value) {
     return cudaErrorInvalidValue;
   }
+  if (effective_packed_kv_format() != PackedKvFormat::kDenseBf16) {
+    cudaError_t error = launch_attention_scatter_layers(
+        config, start_position, token_count, 1, candidate_rows.key,
+        candidate_rows.value, 0, committed.key, committed.value, 0, stream);
+    if (error != cudaSuccess) return error;
+    if (committed_frontier != nullptr) {
+      error = cudaMemcpyAsync(committed_frontier, &new_frontier,
+                              sizeof(new_frontier), cudaMemcpyHostToDevice,
+                              stream);
+    }
+    return error;
+  }
   const unsigned blocks = scatter_block_count(token_count * row_values);
   scatter_committed_rows<<<dim3(blocks, 1), kThreads, 0, stream>>>(
       candidate_rows.key, candidate_rows.value, committed.key, committed.value,
       0, 0, start_position, token_count, config.kv_heads, config.capacity,
       config.head_width, new_frontier, committed_frontier);
+  return cudaPeekAtLastError();
+}
+
+cudaError_t launch_gather_packed_kv_layer(
+    PackedKvTensor tensor, std::size_t frontier, std::uint32_t kv_heads,
+    std::uint32_t capacity, std::uint32_t head_width,
+    const __nv_bfloat16* physical, std::uint8_t* compact,
+    cudaStream_t stream) noexcept {
+  if (tensor == PackedKvTensor::kBf16 || frontier == 0 || compact == nullptr ||
+      physical == nullptr) {
+    return cudaErrorInvalidValue;
+  }
+  const std::size_t bytes =
+      packed_kv_layer_bytes(tensor, frontier, kv_heads, head_width);
+  const unsigned blocks = scatter_block_count(bytes);
+  gather_packed_kv_layer_kernel<<<blocks == 0 ? 1 : blocks, kThreads, 0,
+                                  stream>>>(
+      tensor, frontier, kv_heads, capacity, head_width,
+      reinterpret_cast<const std::uint8_t*>(physical), compact);
+  return cudaPeekAtLastError();
+}
+
+cudaError_t launch_scatter_packed_kv_layer(
+    PackedKvTensor tensor, std::size_t frontier, std::uint32_t kv_heads,
+    std::uint32_t capacity, std::uint32_t head_width,
+    const std::uint8_t* compact, __nv_bfloat16* physical,
+    cudaStream_t stream) noexcept {
+  if (tensor == PackedKvTensor::kBf16 || frontier == 0 || compact == nullptr ||
+      physical == nullptr) {
+    return cudaErrorInvalidValue;
+  }
+  const std::size_t bytes =
+      packed_kv_layer_bytes(tensor, frontier, kv_heads, head_width);
+  const unsigned blocks = scatter_block_count(bytes);
+  scatter_packed_kv_layer_kernel<<<blocks == 0 ? 1 : blocks, kThreads, 0,
+                                   stream>>>(
+      tensor, frontier, kv_heads, capacity, head_width, compact,
+      reinterpret_cast<std::uint8_t*>(physical));
   return cudaPeekAtLastError();
 }
 

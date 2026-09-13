@@ -50,6 +50,7 @@ struct Options final {
   const char* ffn_decode = nullptr;
   const char* q8_layout = nullptr;
   const char* attention_pipeline = nullptr;
+  const char* packed_kv = nullptr;
   bool quality = false;
   std::size_t max_targets = 0;
 };
@@ -81,7 +82,7 @@ int usage(const char* argv0) {
                "[--case NAME] [--max-targets N] [--quality] "
                "[--quality-config PATH] [--q4-decode PATH] "
                "[--ffn-decode PATH] [--q8-layout LAYOUT] "
-               "[--attention-pipeline PATH]\n",
+               "[--attention-pipeline PATH] [--packed-kv dense_bf16|q8q8|q8q4|q4q4]\n",
                argv0);
   return 2;
 }
@@ -117,6 +118,8 @@ int parse_args(int argc, char** argv, Options* options) {
     } else if (std::strcmp(arg, "--attention-pipeline") == 0 &&
                index + 1 < argc) {
       options->attention_pipeline = argv[++index];
+    } else if (std::strcmp(arg, "--packed-kv") == 0 && index + 1 < argc) {
+      options->packed_kv = argv[++index];
     } else if (arg[0] != '-' && options->model == nullptr) {
       options->model = arg;
     } else {
@@ -388,6 +391,8 @@ int apply_quality_selectors(const Options& options) {
   std::string q8 = options.q8_layout != nullptr ? options.q8_layout : "";
   std::string attn =
       options.attention_pipeline != nullptr ? options.attention_pipeline : "";
+  std::string packed =
+      options.packed_kv != nullptr ? options.packed_kv : "";
   if (options.quality_config != nullptr) {
     std::ifstream file(options.quality_config);
     if (!file) {
@@ -409,6 +414,7 @@ int apply_quality_selectors(const Options& options) {
       if (parsed == "r1_w4" || parsed == "r2_w2") q8 = parsed;
     }
     if (json_string_field(text, "prompt_attention", &parsed)) attn = parsed;
+    if (json_string_field(text, "packed_kv", &parsed)) packed = parsed;
   }
   // `--quality` disables shortcuts only. It must not restore packed/r2
   // production pins over an explicit candidate quality-config.
@@ -444,6 +450,10 @@ int apply_quality_selectors(const Options& options) {
       std::fprintf(stderr, "invalid --attention-pipeline %s\n", attn.c_str());
       return 2;
     }
+  }
+  if (!packed.empty() && !qw38::cuda::apply_packed_kv_format_ident(packed.c_str())) {
+    std::fprintf(stderr, "invalid --packed-kv %s\n", packed.c_str());
+    return 2;
   }
   if (options.quality) {
     const char* effective_q4 = qw38::cuda::effective_q4_decode_path();

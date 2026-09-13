@@ -158,6 +158,40 @@ inline __device__ void fattn_pipeline_load_kv(
   __nv_bfloat16* vdst = values + stage * Nbatch * Width;
   constexpr int kNwarps = Nthreads / 32;
   constexpr int kChunks = Width * static_cast<int>(sizeof(__nv_bfloat16)) / 16;
+  if (packed_kv_device_format() != PackedKvFormat::kDenseBf16) {
+    for (int row = tid; row < Nbatch; row += Nthreads) {
+      const bool in_tile = row < rows;
+      const std::size_t absolute = tile + static_cast<std::size_t>(row);
+      for (int dim = 0; dim < Width; ++dim) {
+        __nv_bfloat16 k = __float2bfloat16_rn(0.0F);
+        __nv_bfloat16 v = __float2bfloat16_rn(0.0F);
+        if (in_tile && absolute < kv_span) {
+          if (absolute < start_position) {
+            k = packed_kv_load_key_bf16(
+                committed_key, absolute, kv_head, static_cast<std::uint32_t>(dim),
+                capacity, 4, static_cast<std::uint32_t>(width));
+            v = packed_kv_load_value_bf16(
+                committed_value, absolute, kv_head,
+                static_cast<std::uint32_t>(dim), capacity, 4,
+                static_cast<std::uint32_t>(width));
+          } else {
+            const __nv_bfloat16* ksrc =
+                candidate_key + (absolute - start_position) * row_values +
+                kv_head * width;
+            const __nv_bfloat16* vsrc =
+                candidate_value + (absolute - start_position) * row_values +
+                kv_head * width;
+            k = ksrc[dim];
+            v = vsrc[dim];
+          }
+        }
+        *fattn_kv_elem<XorSwizzle>(kdst, row, dim) = k;
+        *fattn_kv_elem<XorSwizzle>(vdst, row, dim) = v;
+      }
+    }
+    if constexpr (UseCpAsync) fattn_cp_async_commit();
+    return;
+  }
   if constexpr (LlamaLoad && UseCpAsync) {
     const int warp = tid / 32;
     const int lane = tid % 32;

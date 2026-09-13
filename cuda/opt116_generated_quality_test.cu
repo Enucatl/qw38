@@ -52,6 +52,7 @@ struct Options final {
   const char* ffn_decode = nullptr;
   const char* q8_layout = nullptr;
   const char* attention_pipeline = nullptr;
+  const char* packed_kv = nullptr;
   const char* cases_path = nullptr;
   const char* cache_jobs = nullptr;
   const char* cache_tokens = nullptr;
@@ -98,6 +99,7 @@ int usage(const char* argv0) {
                "usage: %s [--workload probe|gpu-baseline] [MODEL] [--quality] "
                "[--quality-config PATH] [--q4-decode PATH] [--ffn-decode PATH] "
                "[--q8-layout LAYOUT] [--attention-pipeline PATH] "
+               "[--packed-kv dense_bf16|q8q8|q8q4|q4q4] "
                "[--cases PATH] [--cache-jobs PATH] [--cache-tokens PATH] "
                "[--out PATH]\n",
                argv0);
@@ -122,6 +124,8 @@ int parse_args(int argc, char** argv, Options* options) {
     } else if (std::strcmp(arg, "--attention-pipeline") == 0 &&
                index + 1 < argc) {
       options->attention_pipeline = argv[++index];
+    } else if (std::strcmp(arg, "--packed-kv") == 0 && index + 1 < argc) {
+      options->packed_kv = argv[++index];
     } else if (std::strcmp(arg, "--cases") == 0 && index + 1 < argc) {
       options->cases_path = argv[++index];
     } else if (std::strcmp(arg, "--cache-jobs") == 0 && index + 1 < argc) {
@@ -200,6 +204,8 @@ int apply_quality_selectors(const Options& options) {
   std::string q8 = options.q8_layout != nullptr ? options.q8_layout : "";
   std::string attn =
       options.attention_pipeline != nullptr ? options.attention_pipeline : "";
+  std::string packed =
+      options.packed_kv != nullptr ? options.packed_kv : "";
   if (options.quality_config != nullptr) {
     std::ifstream file(options.quality_config);
     if (!file) {
@@ -221,6 +227,7 @@ int apply_quality_selectors(const Options& options) {
       if (parsed == "r1_w4" || parsed == "r2_w2") q8 = parsed;
     }
     if (json_string_field(text, "prompt_attention", &parsed)) attn = parsed;
+    if (json_string_field(text, "packed_kv", &parsed)) packed = parsed;
   }
   if (options.quality && q4.empty() && ffn.empty() && q8.empty()) {
     std::printf("quality_flag=true restored_packed_or_r2=false "
@@ -254,6 +261,10 @@ int apply_quality_selectors(const Options& options) {
       std::fprintf(stderr, "invalid --attention-pipeline %s\n", attn.c_str());
       return 2;
     }
+  }
+  if (!packed.empty() && !qw38::cuda::apply_packed_kv_format_ident(packed.c_str())) {
+    std::fprintf(stderr, "invalid --packed-kv %s\n", packed.c_str());
+    return 2;
   }
   if (options.quality) {
     const char* effective_q4 = qw38::cuda::effective_q4_decode_path();
@@ -312,6 +323,13 @@ std::size_t greedy_token(const std::vector<float>& logits) {
     if (logits[index] > logits[best]) best = index;
   }
   return best;
+}
+
+qw38::Status pull_outputs(
+    qw38::cuda::SchedulerSession* session, std::vector<float>* logits,
+    std::array<float, qw38::internal::kResidualWidth>* hidden) {
+  return session->copy_last_outputs(logits->data(), logits->size(),
+                                    hidden->data(), hidden->size());
 }
 
 std::size_t sample_token(const std::vector<float>& logits, float temperature,
@@ -517,6 +535,8 @@ int generate_one(const qw38::cuda::ResidentModel& model,
       model, context.data(), context.size(), session, workspace, logits.data(),
       logits.size(), hidden.data(), hidden.size(), &sync, nullptr, nullptr);
   if (!status.is_ok()) return fail_status(status);
+  status = pull_outputs(session, &logits, &hidden);
+  if (!status.is_ok()) return fail_status(status);
   qw38::cuda::SamplerState sampler{
       item.temperature, item.top_p, item.top_k, item.seed,
       item.seed == 0 ? kDefaultSeed : item.seed};
@@ -543,6 +563,8 @@ int generate_one(const qw38::cuda::ResidentModel& model,
         model, token, session, workspace, logits.data(), logits.size(),
         hidden.data(), hidden.size(), &elapsed, nullptr, nullptr,
         qw38::cuda::PointwisePath::kFused, nullptr);
+    if (!status.is_ok()) return fail_status(status);
+    status = pull_outputs(session, &logits, &hidden);
     if (!status.is_ok()) return fail_status(status);
   }
   status = tokenizer->decode(produced, true, text);
@@ -608,6 +630,8 @@ int run_gdn_stress(const qw38::cuda::ResidentModel& model, std::string* json) {
       model, tokens.data(), kPrefix, &session, &workspace, logits.data(),
       logits.size(), hidden.data(), hidden.size(), &sync, nullptr, nullptr);
   if (!status.is_ok()) return fail_status(status);
+  status = pull_outputs(&session, &logits, &hidden);
+  if (!status.is_ok()) return fail_status(status);
   bool finite = true;
   std::vector<std::size_t> history;
   history.reserve(kGdnUpdates);
@@ -624,6 +648,8 @@ int run_gdn_stress(const qw38::cuda::ResidentModel& model, std::string* json) {
         model, token, &session, &workspace, logits.data(), logits.size(),
         hidden.data(), hidden.size(), &elapsed, nullptr, nullptr,
         qw38::cuda::PointwisePath::kFused, nullptr);
+    if (!status.is_ok()) return fail_status(status);
+    status = pull_outputs(&session, &logits, &hidden);
     if (!status.is_ok()) return fail_status(status);
   }
   const std::string ckpt = "build/optimization-runs/OPT-116/opt116-gdn.ckpt";
@@ -655,6 +681,8 @@ int run_gdn_stress(const qw38::cuda::ResidentModel& model, std::string* json) {
         local_logits.size(), local_hidden.data(), local_hidden.size(),
         &local_sync, nullptr, nullptr);
     if (!st.is_ok()) return fail_status(st);
+    st = pull_outputs(&local, &local_logits, &local_hidden);
+    if (!st.is_ok()) return fail_status(st);
     for (int step = 0; step < 8; ++step) {
       const std::size_t token = greedy_token(local_logits);
       out->push_back(token);
@@ -663,6 +691,8 @@ int run_gdn_stress(const qw38::cuda::ResidentModel& model, std::string* json) {
           model, token, &local, &local_ws, local_logits.data(),
           local_logits.size(), local_hidden.data(), local_hidden.size(),
           &elapsed, nullptr, nullptr, qw38::cuda::PointwisePath::kFused, used);
+      if (!st.is_ok()) return fail_status(st);
+      st = pull_outputs(&local, &local_logits, &local_hidden);
       if (!st.is_ok()) return fail_status(st);
     }
     return 0;
@@ -778,6 +808,8 @@ int run_cache_nll(const qw38::cuda::ResidentModel& model,
         model, tokens.data(), job.prefix, &session, &workspace, logits.data(),
         logits.size(), hidden.data(), hidden.size(), &sync, nullptr, nullptr);
     if (!status.is_ok()) return fail_status(status);
+    status = pull_outputs(&session, &logits, &hidden);
+    if (!status.is_ok()) return fail_status(status);
     double total = 0.0;
     std::size_t scored = 0;
     bool finite = true;
@@ -801,6 +833,8 @@ int run_cache_nll(const qw38::cuda::ResidentModel& model,
           model, target, &session, &workspace, logits.data(), logits.size(),
           hidden.data(), hidden.size(), &elapsed, nullptr, nullptr,
           qw38::cuda::PointwisePath::kFused, nullptr);
+      if (!status.is_ok()) return fail_status(status);
+      status = pull_outputs(&session, &logits, &hidden);
       if (!status.is_ok()) return fail_status(status);
     }
     const double mean = scored ? total / static_cast<double>(scored) : 0.0;

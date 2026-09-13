@@ -536,10 +536,22 @@ fattn_mma_quality_kernel(
           }
         }
         for (int dim = tid; dim < static_cast<int>(width); dim += kNthreads) {
-          keys[row * kWidth + dim] =
-              in_tile ? ksrc[dim] : __float2bfloat16_rn(0.0F);
-          values[row * kWidth + dim] =
-              in_tile ? vsrc[dim] : __float2bfloat16_rn(0.0F);
+          if (!in_tile) {
+            keys[row * kWidth + dim] = __float2bfloat16_rn(0.0F);
+            values[row * kWidth + dim] = __float2bfloat16_rn(0.0F);
+          } else if (absolute < origin) {
+            keys[row * kWidth + dim] = packed_kv_load_key_bf16(
+                committed_key, absolute, kv_head,
+                static_cast<std::uint32_t>(dim), config.capacity,
+                config.kv_heads, config.head_width);
+            values[row * kWidth + dim] = packed_kv_load_value_bf16(
+                committed_value, absolute, kv_head,
+                static_cast<std::uint32_t>(dim), config.capacity,
+                config.kv_heads, config.head_width);
+          } else {
+            keys[row * kWidth + dim] = ksrc[dim];
+            values[row * kWidth + dim] = vsrc[dim];
+          }
         }
       }
       __syncthreads();
@@ -1063,10 +1075,21 @@ __device__ void fattn_persistent_process_tile(
         }
       }
       for (int dim = tid; dim < static_cast<int>(width); dim += kNthreads) {
-        keys[row * kWidth + dim] =
-            in_tile ? ksrc[dim] : __float2bfloat16_rn(0.0F);
-        values[row * kWidth + dim] =
-            in_tile ? vsrc[dim] : __float2bfloat16_rn(0.0F);
+        if (!in_tile) {
+          keys[row * kWidth + dim] = __float2bfloat16_rn(0.0F);
+          values[row * kWidth + dim] = __float2bfloat16_rn(0.0F);
+        } else if (absolute < start_position) {
+          keys[row * kWidth + dim] = packed_kv_load_key_bf16(
+              committed_key, absolute, kv_head, static_cast<std::uint32_t>(dim),
+              config.capacity, config.kv_heads, config.head_width);
+          values[row * kWidth + dim] = packed_kv_load_value_bf16(
+              committed_value, absolute, kv_head,
+              static_cast<std::uint32_t>(dim), config.capacity, config.kv_heads,
+              config.head_width);
+        } else {
+          keys[row * kWidth + dim] = ksrc[dim];
+          values[row * kWidth + dim] = vsrc[dim];
+        }
       }
     }
     __syncthreads();

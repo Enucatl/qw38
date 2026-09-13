@@ -26,6 +26,7 @@ namespace {
 
 constexpr std::array<char, 8> kMagic{'Q', 'W', '3', '8', 'C', 'K', 'P', '1'};
 constexpr std::uint32_t kVersion = 1;
+constexpr std::uint32_t kPackedVersion = 2;
 constexpr std::size_t kHeaderBytes = 248;
 constexpr std::size_t kDigestBytes = 64;
 constexpr std::size_t kChunkBytes = 1024 * 1024;
@@ -224,10 +225,20 @@ Status SchedulerSession::save_checkpoint(const std::string& path,
       kGdnLayers * internal::kGdnConvolutionValues * sizeof(float);
   const std::size_t recurrent_bytes =
       kGdnLayers * internal::kGdnRecurrentStateValues * sizeof(float);
-  const std::size_t key_bytes = kAttentionLayers * frontier_ *
-                                internal::kAttentionKvWidth *
-                                sizeof(__nv_bfloat16);
-  const std::size_t value_bytes = key_bytes;
+  const PackedKvFormat kv_format = effective_packed_kv_format();
+  const PackedKvTensor key_tensor = packed_kv_key_tensor(kv_format);
+  const PackedKvTensor value_tensor = packed_kv_value_tensor(kv_format);
+  const std::size_t key_bytes =
+      kv_format == PackedKvFormat::kDenseBf16
+          ? kAttentionLayers * frontier_ * internal::kAttentionKvWidth *
+                sizeof(__nv_bfloat16)
+          : packed_kv_checkpoint_tensor_bytes(key_tensor, kAttentionLayers,
+                                              frontier_);
+  const std::size_t value_bytes =
+      kv_format == PackedKvFormat::kDenseBf16
+          ? key_bytes
+          : packed_kv_checkpoint_tensor_bytes(value_tensor, kAttentionLayers,
+                                              frontier_);
   const std::size_t logits_bytes =
       frontier_ == 0 ? 0 : internal::kVocabularySize * sizeof(float);
   const std::size_t hidden_bytes =
@@ -236,7 +247,8 @@ Status SchedulerSession::save_checkpoint(const std::string& path,
   std::vector<unsigned char> header;
   header.reserve(kHeaderBytes);
   header.insert(header.end(), kMagic.begin(), kMagic.end());
-  append_u32(&header, kVersion);
+  append_u32(&header, kv_format == PackedKvFormat::kDenseBf16 ? kVersion
+                                                             : kPackedVersion);
   append_u32(&header, kHeaderBytes);
   header.insert(header.end(), kModelSha256, kModelSha256 + 64);
   header.insert(header.end(), kLayoutSha256, kLayoutSha256 + 64);
@@ -245,7 +257,7 @@ Status SchedulerSession::save_checkpoint(const std::string& path,
   append_u32(&header, float_bits(sampler_state_.temperature));
   append_u32(&header, float_bits(sampler_state_.top_p));
   append_u32(&header, sampler_state_.top_k);
-  append_u32(&header, 0);
+  append_u32(&header, static_cast<std::uint32_t>(kv_format));
   append_u64(&header, sampler_state_.seed);
   append_u64(&header, sampler_state_.rng_state);
   for (std::size_t bytes : {token_bytes, convolution_bytes, recurrent_bytes,
@@ -307,24 +319,69 @@ Status SchedulerSession::save_checkpoint(const std::string& path,
     }
   }
   __nv_bfloat16* kv_staging = nullptr;
+  std::uint8_t* packed_staging = nullptr;
   if (status.is_ok() && frontier_ > 0) {
-    const cudaError_t error = cudaMalloc(&kv_staging, kChunkBytes);
-    if (error != cudaSuccess) {
-      status = {StatusCode::kInternal, "cannot allocate CUDA checkpoint KV staging"};
+    if (kv_format == PackedKvFormat::kDenseBf16) {
+      const cudaError_t error = cudaMalloc(&kv_staging, kChunkBytes);
+      if (error != cudaSuccess) {
+        status = {StatusCode::kInternal,
+                  "cannot allocate CUDA checkpoint KV staging"};
+      }
+    } else {
+      const std::size_t compact = std::max(
+          packed_kv_layer_bytes(key_tensor, frontier_),
+          packed_kv_layer_bytes(value_tensor, frontier_));
+      const cudaError_t error = cudaMalloc(&packed_staging, compact);
+      if (error != cudaSuccess) {
+        status = {StatusCode::kInternal,
+                  "cannot allocate CUDA packed checkpoint KV staging"};
+      }
     }
   }
-  const std::size_t cache_stride = capacity_ * internal::kAttentionKvWidth;
   for (std::size_t layer = 0; status.is_ok() && layer < kAttentionLayers;
        ++layer) {
-    status = write_packed_kv(&output, attention_key_ + layer * cache_stride,
-                             capacity_, frontier_, kv_staging, &buffer);
+    if (kv_format == PackedKvFormat::kDenseBf16) {
+      status = write_packed_kv(
+          &output,
+          packed_kv_committed_key(attention_key_, layer, capacity_), capacity_,
+          frontier_, kv_staging, &buffer);
+    } else {
+      const cudaError_t error = launch_gather_packed_kv_layer(
+          key_tensor, frontier_, 4, static_cast<std::uint32_t>(capacity_), 256,
+          packed_kv_committed_key(attention_key_, layer, capacity_),
+          packed_staging, nullptr);
+      if (error != cudaSuccess) {
+        status = {StatusCode::kInternal, "cannot gather packed checkpoint K"};
+      } else {
+        status = write_device(
+            &output, packed_staging,
+            packed_kv_layer_bytes(key_tensor, frontier_), &buffer);
+      }
+    }
   }
   for (std::size_t layer = 0; status.is_ok() && layer < kAttentionLayers;
        ++layer) {
-    status = write_packed_kv(&output, attention_value_ + layer * cache_stride,
-                             capacity_, frontier_, kv_staging, &buffer);
+    if (kv_format == PackedKvFormat::kDenseBf16) {
+      status = write_packed_kv(
+          &output,
+          packed_kv_committed_value(attention_value_, layer, capacity_),
+          capacity_, frontier_, kv_staging, &buffer);
+    } else {
+      const cudaError_t error = launch_gather_packed_kv_layer(
+          value_tensor, frontier_, 4, static_cast<std::uint32_t>(capacity_), 256,
+          packed_kv_committed_value(attention_value_, layer, capacity_),
+          packed_staging, nullptr);
+      if (error != cudaSuccess) {
+        status = {StatusCode::kInternal, "cannot gather packed checkpoint V"};
+      } else {
+        status = write_device(
+            &output, packed_staging,
+            packed_kv_layer_bytes(value_tensor, frontier_), &buffer);
+      }
+    }
   }
   if (kv_staging != nullptr) cudaFree(kv_staging);
+  if (packed_staging != nullptr) cudaFree(packed_staging);
   if (status.is_ok() && logits_bytes != 0) {
     const Status materialized = materialize_last_outputs();
     if (!materialized.is_ok()) status = materialized;
@@ -409,7 +466,8 @@ Status SchedulerSession::restore_checkpoint(
   std::uint32_t version = 0;
   std::uint32_t header_bytes = 0;
   if (!read_u32(header, &offset, &version) ||
-      !read_u32(header, &offset, &header_bytes) || version != kVersion ||
+      !read_u32(header, &offset, &header_bytes) ||
+      (version != kVersion && version != kPackedVersion) ||
       header_bytes != kHeaderBytes) {
     return {StatusCode::kIncompatibleArtifact,
             "checkpoint version or header size is incompatible"};
@@ -439,11 +497,30 @@ Status SchedulerSession::restore_checkpoint(
       !read_u32(header, &offset, &top_k) ||
       !read_u32(header, &offset, &reserved) ||
       !read_u64(header, &offset, &seed) ||
-      !read_u64(header, &offset, &rng_state) || reserved != 0 ||
+      !read_u64(header, &offset, &rng_state) ||
       saved_capacity == 0 || saved_capacity > 131072 || frontier > capacity_ ||
       frontier > saved_capacity) {
     return {StatusCode::kIncompatibleArtifact,
             "checkpoint capacity, frontier, or sampler framing is invalid"};
+  }
+  const PackedKvFormat session_format = effective_packed_kv_format();
+  PackedKvFormat file_format = PackedKvFormat::kDenseBf16;
+  if (version == kVersion) {
+    if (reserved != 0) {
+      return {StatusCode::kIncompatibleArtifact,
+              "checkpoint reserved field is invalid"};
+    }
+  } else {
+    file_format = static_cast<PackedKvFormat>(reserved);
+    if (!legal_packed_kv_format(file_format) ||
+        file_format == PackedKvFormat::kDenseBf16) {
+      return {StatusCode::kIncompatibleArtifact,
+              "packed checkpoint format is invalid"};
+    }
+  }
+  if (file_format != session_format) {
+    return {StatusCode::kIncompatibleArtifact,
+            "legacy dense checkpoint cannot be interpreted as packed KV"};
   }
   std::array<std::uint64_t, 7> sections{};
   for (std::uint64_t& section : sections) {
@@ -457,16 +534,27 @@ Status SchedulerSession::restore_checkpoint(
       kGdnLayers * internal::kGdnConvolutionValues * sizeof(float);
   const std::size_t expected_recurrent =
       kGdnLayers * internal::kGdnRecurrentStateValues * sizeof(float);
-  const std::size_t expected_kv = kAttentionLayers * frontier *
-                                  internal::kAttentionKvWidth *
-                                  sizeof(__nv_bfloat16);
+  const PackedKvTensor key_tensor = packed_kv_key_tensor(file_format);
+  const PackedKvTensor value_tensor = packed_kv_value_tensor(file_format);
+  const std::size_t expected_kv_key =
+      file_format == PackedKvFormat::kDenseBf16
+          ? kAttentionLayers * frontier * internal::kAttentionKvWidth *
+                sizeof(__nv_bfloat16)
+          : packed_kv_checkpoint_tensor_bytes(key_tensor, kAttentionLayers,
+                                              static_cast<std::size_t>(frontier));
+  const std::size_t expected_kv_value =
+      file_format == PackedKvFormat::kDenseBf16
+          ? expected_kv_key
+          : packed_kv_checkpoint_tensor_bytes(
+                value_tensor, kAttentionLayers,
+                static_cast<std::size_t>(frontier));
   const std::size_t expected_logits =
       frontier == 0 ? 0 : internal::kVocabularySize * sizeof(float);
   const std::size_t expected_hidden =
       frontier == 0 ? 0 : internal::kResidualWidth * sizeof(float);
   const std::array<std::size_t, 7> expected{
-      expected_tokens, expected_convolution, expected_recurrent, expected_kv,
-      expected_kv, expected_logits, expected_hidden};
+      expected_tokens, expected_convolution, expected_recurrent, expected_kv_key,
+      expected_kv_value, expected_logits, expected_hidden};
   std::size_t authenticated_bytes = kHeaderBytes;
   for (std::size_t index = 0; index < expected.size(); ++index) {
     if (sections[index] != expected[index] ||
@@ -527,24 +615,74 @@ Status SchedulerSession::restore_checkpoint(
                          expected_recurrent, &buffer);
   }
   __nv_bfloat16* kv_staging = nullptr;
+  std::uint8_t* packed_staging = nullptr;
   if (status.is_ok() && frontier > 0) {
-    const cudaError_t error = cudaMalloc(&kv_staging, kChunkBytes);
-    if (error != cudaSuccess) {
-      status = {StatusCode::kInternal, "cannot allocate CUDA checkpoint KV staging"};
+    if (file_format == PackedKvFormat::kDenseBf16) {
+      const cudaError_t error = cudaMalloc(&kv_staging, kChunkBytes);
+      if (error != cudaSuccess) {
+        status = {StatusCode::kInternal,
+                  "cannot allocate CUDA checkpoint KV staging"};
+      }
+    } else {
+      const std::size_t compact = std::max(
+          packed_kv_layer_bytes(key_tensor, static_cast<std::size_t>(frontier)),
+          packed_kv_layer_bytes(value_tensor,
+                                static_cast<std::size_t>(frontier)));
+      const cudaError_t error = cudaMalloc(&packed_staging, compact);
+      if (error != cudaSuccess) {
+        status = {StatusCode::kInternal,
+                  "cannot allocate CUDA packed checkpoint KV staging"};
+      }
     }
   }
-  const std::size_t cache_stride = capacity_ * internal::kAttentionKvWidth;
   for (std::size_t layer = 0; status.is_ok() && layer < kAttentionLayers;
        ++layer) {
-    status = read_unpacked_kv(&input, attention_key_ + layer * cache_stride,
-                              capacity_, frontier, kv_staging, &buffer);
+    if (file_format == PackedKvFormat::kDenseBf16) {
+      status = read_unpacked_kv(
+          &input, packed_kv_committed_key(attention_key_, layer, capacity_),
+          capacity_, frontier, kv_staging, &buffer);
+    } else {
+      status = read_device(
+          &input, packed_staging,
+          packed_kv_layer_bytes(key_tensor, static_cast<std::size_t>(frontier)),
+          &buffer);
+      if (status.is_ok()) {
+        const cudaError_t error = launch_scatter_packed_kv_layer(
+            key_tensor, static_cast<std::size_t>(frontier), 4,
+            static_cast<std::uint32_t>(capacity_), 256, packed_staging,
+            packed_kv_committed_key(attention_key_, layer, capacity_), nullptr);
+        if (error != cudaSuccess) {
+          status = {StatusCode::kInternal, "cannot scatter packed checkpoint K"};
+        }
+      }
+    }
   }
   for (std::size_t layer = 0; status.is_ok() && layer < kAttentionLayers;
        ++layer) {
-    status = read_unpacked_kv(&input, attention_value_ + layer * cache_stride,
-                              capacity_, frontier, kv_staging, &buffer);
+    if (file_format == PackedKvFormat::kDenseBf16) {
+      status = read_unpacked_kv(
+          &input, packed_kv_committed_value(attention_value_, layer, capacity_),
+          capacity_, frontier, kv_staging, &buffer);
+    } else {
+      status = read_device(
+          &input, packed_staging,
+          packed_kv_layer_bytes(value_tensor,
+                                static_cast<std::size_t>(frontier)),
+          &buffer);
+      if (status.is_ok()) {
+        const cudaError_t error = launch_scatter_packed_kv_layer(
+            value_tensor, static_cast<std::size_t>(frontier), 4,
+            static_cast<std::uint32_t>(capacity_), 256, packed_staging,
+            packed_kv_committed_value(attention_value_, layer, capacity_),
+            nullptr);
+        if (error != cudaSuccess) {
+          status = {StatusCode::kInternal, "cannot scatter packed checkpoint V"};
+        }
+      }
+    }
   }
   if (kv_staging != nullptr) cudaFree(kv_staging);
+  if (packed_staging != nullptr) cudaFree(packed_staging);
   if (status.is_ok() && expected_logits != 0) {
     input.read(reinterpret_cast<char*>(workspace->candidate_logits_host_),
                expected_logits);

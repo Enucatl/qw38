@@ -9,6 +9,7 @@
 #include <cuda_runtime.h>
 
 #include "attention_decode_path.cuh"
+#include "opt120_packed_kv.cuh"
 
 namespace qw38::cuda {
 
@@ -456,6 +457,18 @@ cudaError_t launch_attention_scatter_layers(
     const __nv_bfloat16* candidate_value_base,
     std::size_t candidate_layer_stride, __nv_bfloat16* committed_key_base,
     __nv_bfloat16* committed_value_base, std::size_t committed_layer_stride,
+    cudaStream_t stream) noexcept;
+
+cudaError_t launch_gather_packed_kv_layer(
+    PackedKvTensor tensor, std::size_t frontier, std::uint32_t kv_heads,
+    std::uint32_t capacity, std::uint32_t head_width,
+    const __nv_bfloat16* physical, std::uint8_t* compact,
+    cudaStream_t stream) noexcept;
+
+cudaError_t launch_scatter_packed_kv_layer(
+    PackedKvTensor tensor, std::size_t frontier, std::uint32_t kv_heads,
+    std::uint32_t capacity, std::uint32_t head_width,
+    const std::uint8_t* compact, __nv_bfloat16* physical,
     cudaStream_t stream) noexcept;
 
 }  // namespace qw38::cuda

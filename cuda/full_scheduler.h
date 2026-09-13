@@ -18,6 +18,7 @@
 #include "execution_graph_path.cuh"
 #include "pdl_launch.cuh"
 #include "rms_norm.cuh"
+#include "opt120_packed_kv.cuh"
 #ifdef QW38_DIAGNOSTIC_TRACE
 #include "diagnostic_trace.h"
 #endif
