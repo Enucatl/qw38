@@ -1,0 +1,4006 @@
+{
+  "absolute_task_quality": "fail",
+  "approximate_format": {
+    "contract": {
+      "checkpoint_restore_exact_equivalence": true,
+      "corruption_is_not_acceptable_approximation": true,
+      "cross_arithmetic_token_identity_not_required": true,
+      "do_not_apply_old_same_math_bitwise_gate_to_new_representation": true,
+      "layers": [
+        {
+          "checks": [
+            "scales",
+            "clipping",
+            "ties",
+            "tails",
+            "zeros",
+            "extreme_values"
+          ],
+          "id": "declared_quantizer_reference",
+          "requirement": "kernel implements its declared quantizer/dequantizer/arithmetic against an independent reference"
+        },
+        {
+          "contract_id": "opt116_generated_v1",
+          "id": "model_quality_admission",
+          "requirement": "the complete changed operation is admitted by model quality"
+        }
+      ],
+      "ppl_and_recurrence_bounds_unchanged": true,
+      "same_path_graph_eager_exact_equivalence": true
+    },
+    "kernel_reference": {
+      "bitwise_same_math_applied": false,
+      "checks": [
+        "scales",
+        "clipping",
+        "ties",
+        "tails",
+        "zeros",
+        "extreme_values"
+      ],
+      "layer": "declared_quantizer_reference",
+      "mismatches": [],
+      "pass": true
+    },
+    "pass": true,
+    "quality_layer": {
+      "contract_id": "opt116_generated_v1",
+      "layer": "model_quality_admission",
+      "pass": true
+    },
+    "same_path_exact": {
+      "checkpoint_restore_exact": true,
+      "graph_eager_exact": true,
+      "pass": true
+    }
+  },
+  "authenticate": {
+    "absolute_task_quality": "fail",
+    "baseline_regression": "pass",
+    "contracts": {
+      "contract_ids": [
+        "opt084_frozen",
+        "opt116_generated_v1"
+      ],
+      "contracts": {
+        "opt084_frozen": {
+          "changed_inherited_answer": false,
+          "complete_pass": true,
+          "functional_failures": 0,
+          "functional_pass": true,
+          "greedy_mismatch": false,
+          "greedy_pass": true,
+          "incomplete": false,
+          "inherited_pass": true,
+          "model_quality_pass": true,
+          "ppl": {
+            "aggregate_pass": true,
+            "aggregate_ppl_ratio_max": 1.01,
+            "aggregate_ratio": 1.0,
+            "contract_id": "opt084_frozen",
+            "incomplete": false,
+            "pass": true,
+            "per_ratio": {
+              "opt084_frozen": true,
+              "post113": true
+            },
+            "ppl_ratio_max": 1.01
+          },
+          "recurrence_incremental_nll": 0.0,
+          "recurrence_pass": true
+        },
+        "opt116_generated_v1": {
+          "changed_inherited_answer": false,
+          "complete_pass": true,
+          "functional_failures": 0,
+          "functional_pass": true,
+          "greedy_mismatch": false,
+          "greedy_pass": true,
+          "incomplete": false,
+          "inherited_pass": true,
+          "model_quality_pass": true,
+          "ppl": {
+            "aggregate_pass": true,
+            "aggregate_ppl_ratio_max": 1.01,
+            "aggregate_ratio": 1.0,
+            "contract_id": "opt116_generated_v1",
+            "incomplete": false,
+            "pass": true,
+            "per_ratio": {
+              "opt084_frozen": true,
+              "post113": true
+            },
+            "ppl_ratio_max": 1.01
+          },
+          "recurrence_incremental_nll": 0.0,
+          "recurrence_pass": true
+        }
+      }
+    },
+    "inherited_failures_visible": true,
+    "inherited_functional_failures": [
+      {
+        "actual": "A",
+        "case": "task_arithmetic",
+        "engine": null,
+        "expected": "B",
+        "next_token": 32,
+        "pass": false,
+        "raw": "A",
+        "reason": "wrong_choice",
+        "stripped": "A",
+        "top_two": [
+          32,
+          33
+        ],
+        "used_teacher_forcing": false
+      }
+    ],
+    "llama_control_scorer": "tools/run_llama_quality_reference.py",
+    "new_functional_failures": 0,
+    "nonfinites": 0,
+    "opt073_dual_verdict": {
+      "class": "opt073_dual_verdict",
+      "historical_failures_retained": true,
+      "inspectable": true,
+      "llama": {
+        "absolute_task_accuracy": {
+          "functional_independently_correct": false,
+          "near_tie_cannot_waive_wrong_semantic_answer": true,
+          "nll_pass": true,
+          "pass": false,
+          "status": "fail",
+          "task_arithmetic_must_be_B_42": true
+        },
+        "engine_non_regression": {
+          "known_miss": {
+            "admitted": true,
+            "authority_choice": true,
+            "independently_correct": false,
+            "logits_incomplete": false,
+            "near_tie_cannot_pass_absolute": true,
+            "status": "authority_behavior"
+          },
+          "nll_pass": true,
+          "other_wrong_choices_waived": false,
+          "pass": true,
+          "reference_correct_items_remain_correct": true,
+          "status": "pass"
+        },
+        "status": "fail"
+      },
+      "opt016_remains_blocked": true,
+      "opt056_remains_blocked": true,
+      "opt056_tasks_pass": false,
+      "opt073_does_not_replace_opt016": true,
+      "opt073_does_not_replace_opt056": true,
+      "quartz": {
+        "absolute_task_accuracy": {
+          "functional_independently_correct": false,
+          "near_tie_cannot_waive_wrong_semantic_answer": true,
+          "nll_pass": true,
+          "pass": false,
+          "status": "fail",
+          "task_arithmetic_must_be_B_42": true
+        },
+        "engine_non_regression": {
+          "known_miss": {
+            "admitted": true,
+            "authority_choice": true,
+            "independently_correct": false,
+            "logits_incomplete": true,
+            "near_tie_cannot_pass_absolute": true,
+            "status": "authority_behavior"
+          },
+          "nll_pass": true,
+          "other_wrong_choices_waived": false,
+          "pass": true,
+          "reference_correct_items_remain_correct": true,
+          "status": "pass"
+        },
+        "quality_v2_all": false,
+        "status": "fail"
+      }
+    },
+    "opt113_summary": "evidence/optimization/opt113-coupled-stack-gate/quality-summary.json",
+    "ppl_vs_llama": {
+      "held_out_wikitext_1024": 0.9995073123739207,
+      "wikitext_nll": 0.9998110598226626
+    },
+    "ppl_vs_opt084": {
+      "held_out_wikitext_1024": 0.9997208519718781,
+      "wikitext_nll": 0.9997345199858954
+    },
+    "ppl_vs_post113": {
+      "held_out_wikitext_1024": 1.0,
+      "wikitext_nll": 1.0
+    },
+    "quartz_scorer": "build/qw38-cuda-opt058-quality-baseline-test",
+    "recurrence_incremental_nll": 0.0,
+    "strict_quality_pass": true,
+    "successor_quality_pass": true,
+    "suite_classes": [
+      "teacher_forced_continuation",
+      "known_qwen_continuations",
+      "ppl_1024_spans",
+      "recurrence_nll",
+      "opt073_dual_verdict",
+      "held_out_32_alarm",
+      "finite_vocab_state_consistency"
+    ]
+  },
+  "authority": {
+    "date": "2026-09-13",
+    "does_not_relabel_opt016_opt056": true,
+    "policy": "reduced numerical accuracy is acceptable when generated-text quality checks pass; PPL <= 1.01 and recurrence incremental NLL <= 0.02 stay",
+    "scope": "named_successor_contract_opt116_generated_v1",
+    "source": "user_request"
+  },
+  "baseline_regression": "pass",
+  "cache_gdn": {
+    "cache": {
+      "capacity": 131072,
+      "dispersed_retrieval": true,
+      "forbidden_path": "uncached_all_prefill",
+      "nll_must_use_actual_compressed_cache_decode": true,
+      "path": "compressed_cache_decode",
+      "pinned_llama_published_separately": true,
+      "ppl_ratio_max_vs_post113": 1.01,
+      "prefixes": [
+        {
+          "capacity": 131072,
+          "id": "cache_8192",
+          "prefix_tokens": 8192,
+          "retrieval_positions": [
+            16,
+            4096,
+            8000
+          ],
+          "scored_or_generated": 32
+        },
+        {
+          "capacity": 131072,
+          "id": "cache_32768",
+          "prefix_tokens": 32768,
+          "retrieval_positions": [
+            64,
+            16384,
+            32000
+          ],
+          "scored_or_generated": 32
+        },
+        {
+          "capacity": 131072,
+          "id": "cache_131040_plus_32",
+          "prefix_tokens": 131040,
+          "retrieval_positions": [
+            32,
+            65536,
+            120000,
+            131000
+          ],
+          "scored_or_generated": 32
+        }
+      ],
+      "recent_window_only": false,
+      "teacher_forced_and_free_running": true
+    },
+    "cache_path_exercised": true,
+    "decode_updates": 2048,
+    "forbidden_path": "uncached_all_prefill",
+    "gdn": {
+      "cancellation_exercised": true,
+      "chunk_splits": [
+        512,
+        1024,
+        2048
+      ],
+      "decode_updates": 2048,
+      "divergent_prefix_exercised": true,
+      "finite_state": true,
+      "free_running_stable": true,
+      "graph_eager_exact": false,
+      "matched_token_histories": true,
+      "numerical_drift": 0.0,
+      "output_quality_recorded": true,
+      "pass": false,
+      "recurrence_incremental_nll": 0.0,
+      "save_restore_exact": true,
+      "seeded_sampler_continuation_exact": true,
+      "source": "gpu_gdn_stress"
+    },
+    "gdn_contract": {
+      "cancellation": true,
+      "chunk_splits": [
+        512,
+        1024,
+        2048
+      ],
+      "decode_updates": 2048,
+      "divergent_prefix": true,
+      "finite_state": true,
+      "free_running_stability": true,
+      "graph_eager": "exact_equivalence_same_path",
+      "matched_token_histories": true,
+      "prompt_to_decode": true,
+      "record_numerical_drift_and_output_quality": true,
+      "recurrence_nll": true,
+      "save_restore": true,
+      "seeded_sampler_continuation": true,
+      "uses_actual_candidate_representation": true
+    },
+    "llama_cache": {
+      "measured": false,
+      "published_separately": true,
+      "reason": "pinned-llama long-cache NLL is inspectable and not a gate"
+    },
+    "long_cache_gpu_executed": true,
+    "path": "compressed_cache_decode",
+    "spans": [
+      {
+        "all_prefill": false,
+        "candidate_mean_nll": 4.187475230470056,
+        "capacity": 131072,
+        "finite": true,
+        "id": "cache_8192",
+        "nll": 133.9992073750418,
+        "pass": true,
+        "path": "compressed_cache_decode",
+        "post113_mean_nll": 4.187475230470056,
+        "ppl_ratio": 1.0,
+        "ppl_ratio_max": 1.01,
+        "prefix_tokens": 8192,
+        "retrieval_positions": [
+          16,
+          4096,
+          8000
+        ],
+        "scored": 32,
+        "scored_or_generated": 32,
+        "source": "compressed_cache_decode_gpu",
+        "synthetic": false
+      },
+      {
+        "all_prefill": false,
+        "candidate_mean_nll": 2.2673197320040788,
+        "capacity": 131072,
+        "finite": true,
+        "id": "cache_32768",
+        "nll": 72.55423142413052,
+        "pass": true,
+        "path": "compressed_cache_decode",
+        "post113_mean_nll": 2.2673197320040788,
+        "ppl_ratio": 1.0,
+        "ppl_ratio_max": 1.01,
+        "prefix_tokens": 32768,
+        "retrieval_positions": [
+          64,
+          16384,
+          32000
+        ],
+        "scored": 32,
+        "scored_or_generated": 32,
+        "source": "compressed_cache_decode_gpu",
+        "synthetic": false
+      },
+      {
+        "all_prefill": false,
+        "candidate_mean_nll": 0.0010480277781056149,
+        "capacity": 131072,
+        "finite": true,
+        "id": "cache_131040_plus_32",
+        "nll": 0.033536888899379676,
+        "pass": true,
+        "path": "compressed_cache_decode",
+        "post113_mean_nll": 0.0010480277781056149,
+        "ppl_ratio": 1.0,
+        "ppl_ratio_max": 1.01,
+        "prefix_tokens": 131040,
+        "retrieval_positions": [
+          32,
+          65536,
+          120000,
+          131000
+        ],
+        "scored": 32,
+        "scored_or_generated": 32,
+        "source": "compressed_cache_decode_gpu",
+        "synthetic": false
+      }
+    ],
+    "state_consistency": true
+  },
+  "cache_path_exercised": true,
+  "candidate_installed": false,
+  "claims_performance_improvement": false,
+  "claims_throughput": false,
+  "does_not_replace_opt016": true,
+  "does_not_replace_opt056": true,
+  "encodings": {
+    "graph_path": "ffn_only",
+    "kv_encoding": {
+      "attention_key": "committed_bf16_prefix",
+      "attention_value": "committed_bf16_prefix",
+      "logical_rows": "below_frontier_only"
+    },
+    "quantizer_parameters": {
+      "q4_staging": "paired_integer",
+      "q6_device_layout": "raw_gguf",
+      "q8_device_layout": "raw_gguf",
+      "q8_grouping": "grouped_r1_w4"
+    },
+    "state_encoding": {
+      "gdn_conv": "fp32_rings",
+      "gdn_decode": "sequential",
+      "gdn_recurrent": "fp32_matrices"
+    },
+    "weight_encoding": {
+      "ffn_decode": "paired_integer",
+      "q4_decode": "llama_q4k_mmvq",
+      "q6_decode": "integer_q8_1",
+      "q8_decode": "r1_w4",
+      "q8_path": "dp4a_q8_1"
+    }
+  },
+  "generated": {
+    "admission_split_hash": "f8c2d5543344df961964f8ae4f7805ac6f1c4f7f1b4004025bf851d32aeaf9fb",
+    "calibration_cases": [
+      {
+        "class": "extraction_long_context",
+        "consumes_own_sampled_tokens": true,
+        "executable": null,
+        "expected": "Rome",
+        "id": "cal_extract_city",
+        "instruction": null,
+        "json_schema": null,
+        "max_new_tokens": 64,
+        "prompt": "Dev only. Capital of Italy in one word?",
+        "retrieval_positions": [],
+        "role": "calibration",
+        "rubric": false,
+        "teacher_forced_answers": false,
+        "turns": null,
+        "validator": "exact_text"
+      },
+      {
+        "class": "instruction_constraints",
+        "consumes_own_sampled_tokens": true,
+        "executable": null,
+        "expected": "yes",
+        "id": "cal_instr_one_word",
+        "instruction": null,
+        "json_schema": null,
+        "max_new_tokens": 64,
+        "prompt": "Dev only. Reply with the single word yes.",
+        "retrieval_positions": [],
+        "role": "calibration",
+        "rubric": false,
+        "teacher_forced_answers": false,
+        "turns": null,
+        "validator": "exact_text"
+      },
+      {
+        "class": "arithmetic_reasoning",
+        "consumes_own_sampled_tokens": true,
+        "executable": null,
+        "expected": "2",
+        "id": "cal_arith_one_plus_one",
+        "instruction": null,
+        "json_schema": null,
+        "max_new_tokens": 64,
+        "prompt": "Dev only. 1+1 integer only.",
+        "retrieval_positions": [],
+        "role": "calibration",
+        "rubric": false,
+        "teacher_forced_answers": false,
+        "turns": null,
+        "validator": "exact_text"
+      },
+      {
+        "class": "code_executable",
+        "consumes_own_sampled_tokens": true,
+        "executable": {
+          "expect": 1,
+          "name": "result"
+        },
+        "expected": null,
+        "id": "cal_code_one",
+        "instruction": null,
+        "json_schema": null,
+        "max_new_tokens": 64,
+        "prompt": "Dev only. Python that binds result = 1.",
+        "retrieval_positions": [],
+        "role": "calibration",
+        "rubric": false,
+        "teacher_forced_answers": false,
+        "turns": null,
+        "validator": "python_exec"
+      },
+      {
+        "class": "tool_call_json",
+        "consumes_own_sampled_tokens": true,
+        "executable": null,
+        "expected": "{\"name\": \"ping\", \"arguments\": {}}",
+        "id": "cal_tool_ping",
+        "instruction": null,
+        "json_schema": {
+          "properties": {
+            "name": {
+              "const": "ping"
+            }
+          },
+          "required": [
+            "name"
+          ],
+          "type": "object"
+        },
+        "max_new_tokens": 64,
+        "prompt": "Dev only. JSON tool ping.",
+        "retrieval_positions": [],
+        "role": "calibration",
+        "rubric": false,
+        "teacher_forced_answers": false,
+        "turns": null,
+        "validator": "json_schema"
+      },
+      {
+        "class": "multi_turn_prose",
+        "consumes_own_sampled_tokens": true,
+        "executable": null,
+        "expected": null,
+        "id": "cal_prose_hello",
+        "instruction": null,
+        "json_schema": null,
+        "max_new_tokens": 64,
+        "prompt": "Dev only. Write one calm sentence.",
+        "retrieval_positions": [],
+        "role": "calibration",
+        "rubric": true,
+        "teacher_forced_answers": false,
+        "turns": null,
+        "validator": "rubric_prose"
+      }
+    ],
+    "calibration_separated": true,
+    "calibration_split_hash": "aa39b4b2e4c20fccfe55c27aaeddcfd29b41ae96f92f4f1880980c16889f9aed",
+    "cases": [
+      {
+        "class": "extraction_long_context",
+        "consumes_own_sampled_tokens": true,
+        "executable": null,
+        "expected": "Bruges",
+        "id": "extract_early_city",
+        "instruction": null,
+        "json_schema": null,
+        "max_new_tokens": 64,
+        "prompt": "Record dump. Token 16: CITY=Bruges. Later notes mention Paris, Oslo, and Lima. Ignore the later cities. Which city is recorded at the earliest dump token? Reply with the city name only.",
+        "retrieval_positions": [
+          16
+        ],
+        "role": "admission",
+        "rubric": false,
+        "teacher_forced_answers": false,
+        "turns": null,
+        "validator": "exact_text"
+      },
+      {
+        "class": "extraction_long_context",
+        "consumes_own_sampled_tokens": true,
+        "executable": null,
+        "expected": "ALPHA-9173",
+        "id": "extract_mid_code",
+        "instruction": null,
+        "json_schema": null,
+        "max_new_tokens": 64,
+        "prompt": "Prefix filler about weather. Midway code ALPHA-9173 is assigned to crate 12. Later codes are BETA-1001 and GAMMA-0007. What is crate 12's code? Reply with the code only.",
+        "retrieval_positions": [
+          4096
+        ],
+        "role": "admission",
+        "rubric": false,
+        "teacher_forced_answers": false,
+        "turns": null,
+        "validator": "exact_text"
+      },
+      {
+        "class": "extraction_long_context",
+        "consumes_own_sampled_tokens": true,
+        "executable": null,
+        "expected": "indigo",
+        "id": "extract_late_not_last",
+        "instruction": null,
+        "json_schema": null,
+        "max_new_tokens": 64,
+        "prompt": "A ledger lists: start=red, middle=green, near-end=indigo, final=gold. What color is recorded near the end but not last? One word.",
+        "retrieval_positions": [
+          8000
+        ],
+        "role": "admission",
+        "rubric": false,
+        "teacher_forced_answers": false,
+        "turns": null,
+        "validator": "exact_text"
+      },
+      {
+        "class": "extraction_long_context",
+        "consumes_own_sampled_tokens": true,
+        "executable": null,
+        "expected": "Thames 1666",
+        "id": "extract_two_needles",
+        "instruction": null,
+        "json_schema": null,
+        "max_new_tokens": 64,
+        "prompt": "Needle A at position 32 is river=Thames. Needle B at position 8000 is year=1666. Distractors: Seine 1851. Report river then year as 'river year'.",
+        "retrieval_positions": [
+          32,
+          8000
+        ],
+        "role": "admission",
+        "rubric": false,
+        "teacher_forced_answers": false,
+        "turns": null,
+        "validator": "exact_text"
+      },
+      {
+        "class": "extraction_long_context",
+        "consumes_own_sampled_tokens": true,
+        "executable": null,
+        "expected": "zinc",
+        "id": "extract_list_index",
+        "instruction": null,
+        "json_schema": null,
+        "max_new_tokens": 64,
+        "prompt": "Inventory in order: copper, tin, zinc, nickel, lead. What is the third item? One word.",
+        "retrieval_positions": [
+          64,
+          128,
+          192
+        ],
+        "role": "admission",
+        "rubric": false,
+        "teacher_forced_answers": false,
+        "turns": null,
+        "validator": "exact_text"
+      },
+      {
+        "class": "extraction_long_context",
+        "consumes_own_sampled_tokens": true,
+        "executable": null,
+        "expected": "QW-4401",
+        "id": "extract_ignore_distractor",
+        "instruction": null,
+        "json_schema": null,
+        "max_new_tokens": 64,
+        "prompt": "True id of the package is QW-4401. A nearby sticker wrongly says QW-4410. What is the true package id? Reply with the id.",
+        "retrieval_positions": [
+          120
+        ],
+        "role": "admission",
+        "rubric": false,
+        "teacher_forced_answers": false,
+        "turns": null,
+        "validator": "exact_text"
+      },
+      {
+        "class": "instruction_constraints",
+        "consumes_own_sampled_tokens": true,
+        "executable": null,
+        "expected": null,
+        "id": "instr_three_words",
+        "instruction": {
+          "words": 3
+        },
+        "json_schema": null,
+        "max_new_tokens": 64,
+        "prompt": "Reply with exactly three English words and nothing else.",
+        "retrieval_positions": [],
+        "role": "admission",
+        "rubric": false,
+        "teacher_forced_answers": false,
+        "turns": null,
+        "validator": "word_count"
+      },
+      {
+        "class": "instruction_constraints",
+        "consumes_own_sampled_tokens": true,
+        "executable": null,
+        "expected": "{\"ok\": true}",
+        "id": "instr_json_only",
+        "instruction": null,
+        "json_schema": null,
+        "max_new_tokens": 64,
+        "prompt": "Reply with only this JSON object: {\"ok\": true}",
+        "retrieval_positions": [],
+        "role": "admission",
+        "rubric": false,
+        "teacher_forced_answers": false,
+        "turns": null,
+        "validator": "exact_json"
+      },
+      {
+        "class": "instruction_constraints",
+        "consumes_own_sampled_tokens": true,
+        "executable": null,
+        "expected": "H2O",
+        "id": "instr_no_greeting",
+        "instruction": {
+          "forbidden": [
+            "hello",
+            "hi ",
+            "hey"
+          ]
+        },
+        "json_schema": null,
+        "max_new_tokens": 64,
+        "prompt": "Name the chemical symbol for water. Do not greet. Do not use the word hello. Reply with the formula only.",
+        "retrieval_positions": [],
+        "role": "admission",
+        "rubric": false,
+        "teacher_forced_answers": false,
+        "turns": null,
+        "validator": "forbidden_and_exact"
+      },
+      {
+        "class": "instruction_constraints",
+        "consumes_own_sampled_tokens": true,
+        "executable": null,
+        "expected": "READY",
+        "id": "instr_uppercase",
+        "instruction": null,
+        "json_schema": null,
+        "max_new_tokens": 64,
+        "prompt": "Reply with the word READY in uppercase and nothing else.",
+        "retrieval_positions": [],
+        "role": "admission",
+        "rubric": false,
+        "teacher_forced_answers": false,
+        "turns": null,
+        "validator": "exact_text"
+      },
+      {
+        "class": "instruction_constraints",
+        "consumes_own_sampled_tokens": true,
+        "executable": null,
+        "expected": null,
+        "id": "instr_two_bullets",
+        "instruction": {
+          "bullets": 2
+        },
+        "json_schema": null,
+        "max_new_tokens": 64,
+        "prompt": "List exactly two fruits as markdown bullets, one fruit per line, no intro or outro.",
+        "retrieval_positions": [],
+        "role": "admission",
+        "rubric": false,
+        "teacher_forced_answers": false,
+        "turns": null,
+        "validator": "bullet_count"
+      },
+      {
+        "class": "instruction_constraints",
+        "consumes_own_sampled_tokens": true,
+        "executable": null,
+        "expected": "ANSWER: 9",
+        "id": "instr_answer_prefix",
+        "instruction": null,
+        "json_schema": null,
+        "max_new_tokens": 64,
+        "prompt": "Reply in the exact form ANSWER: 9",
+        "retrieval_positions": [],
+        "role": "admission",
+        "rubric": false,
+        "teacher_forced_answers": false,
+        "turns": null,
+        "validator": "exact_text"
+      },
+      {
+        "class": "arithmetic_reasoning",
+        "consumes_own_sampled_tokens": true,
+        "executable": null,
+        "expected": "65",
+        "id": "arith_add",
+        "instruction": null,
+        "json_schema": null,
+        "max_new_tokens": 64,
+        "prompt": "Compute 47 + 18. Reply with the integer only.",
+        "retrieval_positions": [],
+        "role": "admission",
+        "rubric": false,
+        "teacher_forced_answers": false,
+        "turns": null,
+        "validator": "exact_text"
+      },
+      {
+        "class": "arithmetic_reasoning",
+        "consumes_own_sampled_tokens": true,
+        "executable": null,
+        "expected": "132",
+        "id": "arith_mul",
+        "instruction": null,
+        "json_schema": null,
+        "max_new_tokens": 64,
+        "prompt": "Compute 12 * 11. Reply with the integer only.",
+        "retrieval_positions": [],
+        "role": "admission",
+        "rubric": false,
+        "teacher_forced_answers": false,
+        "turns": null,
+        "validator": "exact_text"
+      },
+      {
+        "class": "arithmetic_reasoning",
+        "consumes_own_sampled_tokens": true,
+        "executable": null,
+        "expected": "12",
+        "id": "arith_percent",
+        "instruction": null,
+        "json_schema": null,
+        "max_new_tokens": 64,
+        "prompt": "What is 15% of 80? Reply with the integer only.",
+        "retrieval_positions": [],
+        "role": "admission",
+        "rubric": false,
+        "teacher_forced_answers": false,
+        "turns": null,
+        "validator": "exact_text"
+      },
+      {
+        "class": "arithmetic_reasoning",
+        "consumes_own_sampled_tokens": true,
+        "executable": null,
+        "expected": "2/3",
+        "id": "arith_compare",
+        "instruction": null,
+        "json_schema": null,
+        "max_new_tokens": 64,
+        "prompt": "Which is larger, 2/3 or 3/5? Reply with the larger fraction in lowest terms.",
+        "retrieval_positions": [],
+        "role": "admission",
+        "rubric": false,
+        "teacher_forced_answers": false,
+        "turns": null,
+        "validator": "exact_text"
+      },
+      {
+        "class": "arithmetic_reasoning",
+        "consumes_own_sampled_tokens": true,
+        "executable": null,
+        "expected": "10:55",
+        "id": "arith_minutes",
+        "instruction": null,
+        "json_schema": null,
+        "max_new_tokens": 64,
+        "prompt": "A meeting starts at 09:20 and lasts 95 minutes. What is the end time in 24-hour HH:MM?",
+        "retrieval_positions": [],
+        "role": "admission",
+        "rubric": false,
+        "teacher_forced_answers": false,
+        "turns": null,
+        "validator": "exact_text"
+      },
+      {
+        "class": "code_executable",
+        "consumes_own_sampled_tokens": true,
+        "executable": {
+          "expect": 3
+        },
+        "expected": null,
+        "id": "code_len",
+        "instruction": null,
+        "json_schema": null,
+        "max_new_tokens": 64,
+        "prompt": "Write a Python expression or function body that returns len([1, 2, 3]). Output only executable Python.",
+        "retrieval_positions": [],
+        "role": "admission",
+        "rubric": false,
+        "teacher_forced_answers": false,
+        "turns": null,
+        "validator": "python_exec"
+      },
+      {
+        "class": "code_executable",
+        "consumes_own_sampled_tokens": true,
+        "executable": {
+          "expect": 10,
+          "name": "result"
+        },
+        "expected": null,
+        "id": "code_sum",
+        "instruction": null,
+        "json_schema": null,
+        "max_new_tokens": 64,
+        "prompt": "Write Python that binds result = sum(range(5)). Output only executable Python.",
+        "retrieval_positions": [],
+        "role": "admission",
+        "rubric": false,
+        "teacher_forced_answers": false,
+        "turns": null,
+        "validator": "python_exec"
+      },
+      {
+        "class": "code_executable",
+        "consumes_own_sampled_tokens": true,
+        "executable": {
+          "expect": "dcba",
+          "name": "result"
+        },
+        "expected": null,
+        "id": "code_reverse",
+        "instruction": null,
+        "json_schema": null,
+        "max_new_tokens": 64,
+        "prompt": "Write Python that binds result = 'abcd'[::-1]. Output only executable Python.",
+        "retrieval_positions": [],
+        "role": "admission",
+        "rubric": false,
+        "teacher_forced_answers": false,
+        "turns": null,
+        "validator": "python_exec"
+      },
+      {
+        "class": "code_executable",
+        "consumes_own_sampled_tokens": true,
+        "executable": {
+          "expect": 9,
+          "name": "result"
+        },
+        "expected": null,
+        "id": "code_max",
+        "instruction": null,
+        "json_schema": null,
+        "max_new_tokens": 64,
+        "prompt": "Write Python that binds result = max(3, 9, 4). Output only executable Python.",
+        "retrieval_positions": [],
+        "role": "admission",
+        "rubric": false,
+        "teacher_forced_answers": false,
+        "turns": null,
+        "validator": "python_exec"
+      },
+      {
+        "class": "code_executable",
+        "consumes_own_sampled_tokens": true,
+        "executable": {
+          "expect": [
+            0,
+            2,
+            4,
+            6
+          ],
+          "name": "result"
+        },
+        "expected": null,
+        "id": "code_even",
+        "instruction": null,
+        "json_schema": null,
+        "max_new_tokens": 64,
+        "prompt": "Write Python that binds result to the list of even integers from 0 through 6 inclusive. Output only executable Python.",
+        "retrieval_positions": [],
+        "role": "admission",
+        "rubric": false,
+        "teacher_forced_answers": false,
+        "turns": null,
+        "validator": "python_exec"
+      },
+      {
+        "class": "tool_call_json",
+        "consumes_own_sampled_tokens": true,
+        "executable": null,
+        "expected": "{\"name\": \"get_weather\", \"arguments\": {\"city\": \"Oslo\"}}",
+        "id": "tool_weather_city",
+        "instruction": null,
+        "json_schema": {
+          "properties": {
+            "arguments": {
+              "properties": {
+                "city": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "city"
+              ],
+              "type": "object"
+            },
+            "name": {
+              "const": "get_weather"
+            }
+          },
+          "required": [
+            "name",
+            "arguments"
+          ],
+          "type": "object"
+        },
+        "max_new_tokens": 64,
+        "prompt": "Emit a JSON tool call named get_weather with argument city=\"Oslo\". JSON only.",
+        "retrieval_positions": [],
+        "role": "admission",
+        "rubric": false,
+        "teacher_forced_answers": false,
+        "turns": null,
+        "validator": "json_schema"
+      },
+      {
+        "class": "tool_call_json",
+        "consumes_own_sampled_tokens": true,
+        "executable": null,
+        "expected": "{\"name\": \"search\", \"arguments\": {\"query\": \"gdn state\"}}",
+        "id": "tool_search_query",
+        "instruction": null,
+        "json_schema": {
+          "properties": {
+            "arguments": {
+              "properties": {
+                "query": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "query"
+              ],
+              "type": "object"
+            },
+            "name": {
+              "const": "search"
+            }
+          },
+          "required": [
+            "name",
+            "arguments"
+          ],
+          "type": "object"
+        },
+        "max_new_tokens": 64,
+        "prompt": "Emit a JSON tool call named search with argument query=\"gdn state\". JSON only.",
+        "retrieval_positions": [],
+        "role": "admission",
+        "rubric": false,
+        "teacher_forced_answers": false,
+        "turns": null,
+        "validator": "json_schema"
+      },
+      {
+        "class": "tool_call_json",
+        "consumes_own_sampled_tokens": true,
+        "executable": null,
+        "expected": "{\"name\": \"add\", \"arguments\": {\"a\": 2, \"b\": 5}}",
+        "id": "tool_add_args",
+        "instruction": null,
+        "json_schema": {
+          "properties": {
+            "arguments": {
+              "properties": {
+                "a": {
+                  "type": "integer"
+                },
+                "b": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "a",
+                "b"
+              ],
+              "type": "object"
+            },
+            "name": {
+              "const": "add"
+            }
+          },
+          "required": [
+            "name",
+            "arguments"
+          ],
+          "type": "object"
+        },
+        "max_new_tokens": 64,
+        "prompt": "Emit a JSON tool call named add with integer arguments a=2 and b=5. JSON only.",
+        "retrieval_positions": [],
+        "role": "admission",
+        "rubric": false,
+        "teacher_forced_answers": false,
+        "turns": null,
+        "validator": "json_schema"
+      },
+      {
+        "class": "tool_call_json",
+        "consumes_own_sampled_tokens": true,
+        "executable": null,
+        "expected": "{\"name\": \"book_flight\", \"arguments\": {\"route\": {\"from\": \"HEL\", \"to\": \"ARN\"}}}",
+        "id": "tool_nested_route",
+        "instruction": null,
+        "json_schema": {
+          "properties": {
+            "arguments": {
+              "properties": {
+                "route": {
+                  "properties": {
+                    "from": {
+                      "type": "string"
+                    },
+                    "to": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "from",
+                    "to"
+                  ],
+                  "type": "object"
+                }
+              },
+              "required": [
+                "route"
+              ],
+              "type": "object"
+            },
+            "name": {
+              "const": "book_flight"
+            }
+          },
+          "required": [
+            "name",
+            "arguments"
+          ],
+          "type": "object"
+        },
+        "max_new_tokens": 64,
+        "prompt": "Emit a JSON tool call named book_flight with nested route from=\"HEL\" to=\"ARN\". JSON only.",
+        "retrieval_positions": [],
+        "role": "admission",
+        "rubric": false,
+        "teacher_forced_answers": false,
+        "turns": null,
+        "validator": "json_schema"
+      },
+      {
+        "class": "tool_call_json",
+        "consumes_own_sampled_tokens": true,
+        "executable": null,
+        "expected": "{\"name\": \"set_status\", \"arguments\": {\"status\": \"closed\"}}",
+        "id": "tool_enum_status",
+        "instruction": null,
+        "json_schema": {
+          "properties": {
+            "arguments": {
+              "properties": {
+                "status": {
+                  "enum": [
+                    "open",
+                    "closed"
+                  ]
+                }
+              },
+              "required": [
+                "status"
+              ],
+              "type": "object"
+            },
+            "name": {
+              "const": "set_status"
+            }
+          },
+          "required": [
+            "name",
+            "arguments"
+          ],
+          "type": "object"
+        },
+        "max_new_tokens": 64,
+        "prompt": "Emit a JSON tool call named set_status with argument status=\"closed\". JSON only.",
+        "retrieval_positions": [],
+        "role": "admission",
+        "rubric": false,
+        "teacher_forced_answers": false,
+        "turns": null,
+        "validator": "json_schema"
+      },
+      {
+        "class": "multi_turn_prose",
+        "consumes_own_sampled_tokens": true,
+        "executable": null,
+        "expected": null,
+        "id": "prose_continue_story",
+        "instruction": null,
+        "json_schema": null,
+        "max_new_tokens": 128,
+        "prompt": "",
+        "retrieval_positions": [],
+        "role": "admission",
+        "rubric": true,
+        "teacher_forced_answers": false,
+        "turns": [
+          {
+            "content": "Start a two-sentence story about a lighthouse.",
+            "role": "user"
+          },
+          {
+            "content": "The lighthouse kept a cold watch over the reef.",
+            "role": "assistant"
+          },
+          {
+            "content": "Continue in two sentences. Keep the lighthouse. Do not restart the story.",
+            "role": "user"
+          }
+        ],
+        "validator": "rubric_prose"
+      },
+      {
+        "class": "multi_turn_prose",
+        "consumes_own_sampled_tokens": true,
+        "executable": null,
+        "expected": "19:40",
+        "id": "prose_summarize_then_ask",
+        "instruction": null,
+        "json_schema": null,
+        "max_new_tokens": 128,
+        "prompt": "",
+        "retrieval_positions": [],
+        "role": "admission",
+        "rubric": true,
+        "teacher_forced_answers": false,
+        "turns": [
+          {
+            "content": "Context: The ferry to Naxos leaves at 07:10 and returns at 19:40. Summarize in one sentence.",
+            "role": "user"
+          },
+          {
+            "content": "The Naxos ferry departs at 07:10 and comes back at 19:40.",
+            "role": "assistant"
+          },
+          {
+            "content": "Using only that context, say when it returns. One sentence.",
+            "role": "user"
+          }
+        ],
+        "validator": "rubric_prose"
+      },
+      {
+        "class": "multi_turn_prose",
+        "consumes_own_sampled_tokens": true,
+        "executable": null,
+        "expected": "21",
+        "id": "prose_correct_then_explain",
+        "instruction": null,
+        "json_schema": null,
+        "max_new_tokens": 128,
+        "prompt": "",
+        "retrieval_positions": [],
+        "role": "admission",
+        "rubric": true,
+        "teacher_forced_answers": false,
+        "turns": [
+          {
+            "content": "Is 21 a prime number?",
+            "role": "user"
+          },
+          {
+            "content": "No.",
+            "role": "assistant"
+          },
+          {
+            "content": "Explain why in two short sentences.",
+            "role": "user"
+          }
+        ],
+        "validator": "rubric_prose"
+      },
+      {
+        "class": "multi_turn_prose",
+        "consumes_own_sampled_tokens": true,
+        "executable": null,
+        "expected": "Noah",
+        "id": "prose_two_speakers",
+        "instruction": null,
+        "json_schema": null,
+        "max_new_tokens": 128,
+        "prompt": "",
+        "retrieval_positions": [],
+        "role": "admission",
+        "rubric": true,
+        "teacher_forced_answers": false,
+        "turns": [
+          {
+            "content": "Write one line of dialogue from Maya.",
+            "role": "user"
+          },
+          {
+            "content": "Maya: \"The kettle is on.\"",
+            "role": "assistant"
+          },
+          {
+            "content": "Reply with one line from Noah that refers to the kettle. Prefix with Noah:",
+            "role": "user"
+          }
+        ],
+        "validator": "rubric_prose"
+      },
+      {
+        "class": "multi_turn_prose",
+        "consumes_own_sampled_tokens": true,
+        "executable": null,
+        "expected": "Pepper",
+        "id": "prose_remember_constraint",
+        "instruction": null,
+        "json_schema": null,
+        "max_new_tokens": 128,
+        "prompt": "",
+        "retrieval_positions": [],
+        "role": "admission",
+        "rubric": true,
+        "teacher_forced_answers": false,
+        "turns": [
+          {
+            "content": "Call the cat Pepper. Do not rename it. Confirm the name in three words.",
+            "role": "user"
+          },
+          {
+            "content": "The cat Pepper.",
+            "role": "assistant"
+          },
+          {
+            "content": "In one sentence, say what the cat is named. Use the agreed name.",
+            "role": "user"
+          }
+        ],
+        "validator": "rubric_prose"
+      }
+    ],
+    "class_counts": {
+      "arithmetic_reasoning": 5,
+      "code_executable": 5,
+      "extraction_long_context": 6,
+      "instruction_constraints": 6,
+      "multi_turn_prose": 5,
+      "tool_call_json": 5
+    },
+    "free_running_gpu_executed": true,
+    "generation_source": "gpu_free_running",
+    "greedy": [
+      {
+        "class": "extraction_long_context",
+        "generation_source": "gpu_free_running",
+        "id": "extract_early_city",
+        "mode": "greedy",
+        "objective": {
+          "id": "extract_early_city",
+          "objective": true,
+          "pass": true,
+          "reason": "exact_match",
+          "text": "Bruges",
+          "validator": "exact_text"
+        },
+        "sampler": {
+          "seed": 0,
+          "temperature": 0.0,
+          "top_k": 0,
+          "top_p": 1.0
+        },
+        "teacher_forced_answers": false,
+        "termination_reason": "stop_token",
+        "text": "Bruges"
+      },
+      {
+        "class": "extraction_long_context",
+        "generation_source": "gpu_free_running",
+        "id": "extract_mid_code",
+        "mode": "greedy",
+        "objective": {
+          "id": "extract_mid_code",
+          "objective": true,
+          "pass": true,
+          "reason": "exact_match",
+          "text": "ALPHA-9173",
+          "validator": "exact_text"
+        },
+        "sampler": {
+          "seed": 0,
+          "temperature": 0.0,
+          "top_k": 0,
+          "top_p": 1.0
+        },
+        "teacher_forced_answers": false,
+        "termination_reason": "stop_token",
+        "text": "ALPHA-9173"
+      },
+      {
+        "class": "extraction_long_context",
+        "generation_source": "gpu_free_running",
+        "id": "extract_late_not_last",
+        "mode": "greedy",
+        "objective": {
+          "id": "extract_late_not_last",
+          "objective": true,
+          "pass": true,
+          "reason": "exact_match",
+          "text": "indigo",
+          "validator": "exact_text"
+        },
+        "sampler": {
+          "seed": 0,
+          "temperature": 0.0,
+          "top_k": 0,
+          "top_p": 1.0
+        },
+        "teacher_forced_answers": false,
+        "termination_reason": "stop_token",
+        "text": "indigo"
+      },
+      {
+        "class": "extraction_long_context",
+        "generation_source": "gpu_free_running",
+        "id": "extract_two_needles",
+        "mode": "greedy",
+        "objective": {
+          "id": "extract_two_needles",
+          "objective": true,
+          "pass": true,
+          "reason": "exact_match",
+          "text": "Thames 1666",
+          "validator": "exact_text"
+        },
+        "sampler": {
+          "seed": 0,
+          "temperature": 0.0,
+          "top_k": 0,
+          "top_p": 1.0
+        },
+        "teacher_forced_answers": false,
+        "termination_reason": "stop_token",
+        "text": "Thames 1666"
+      },
+      {
+        "class": "extraction_long_context",
+        "generation_source": "gpu_free_running",
+        "id": "extract_list_index",
+        "mode": "greedy",
+        "objective": {
+          "id": "extract_list_index",
+          "objective": true,
+          "pass": true,
+          "reason": "exact_match",
+          "text": "zinc",
+          "validator": "exact_text"
+        },
+        "sampler": {
+          "seed": 0,
+          "temperature": 0.0,
+          "top_k": 0,
+          "top_p": 1.0
+        },
+        "teacher_forced_answers": false,
+        "termination_reason": "stop_token",
+        "text": "zinc"
+      },
+      {
+        "class": "extraction_long_context",
+        "generation_source": "gpu_free_running",
+        "id": "extract_ignore_distractor",
+        "mode": "greedy",
+        "objective": {
+          "id": "extract_ignore_distractor",
+          "objective": true,
+          "pass": true,
+          "reason": "exact_match",
+          "text": "QW-4401",
+          "validator": "exact_text"
+        },
+        "sampler": {
+          "seed": 0,
+          "temperature": 0.0,
+          "top_k": 0,
+          "top_p": 1.0
+        },
+        "teacher_forced_answers": false,
+        "termination_reason": "stop_token",
+        "text": "QW-4401"
+      },
+      {
+        "class": "instruction_constraints",
+        "generation_source": "gpu_free_running",
+        "id": "instr_three_words",
+        "mode": "greedy",
+        "objective": {
+          "id": "instr_three_words",
+          "objective": true,
+          "pass": true,
+          "reason": "word_count",
+          "text": "Hello there friend",
+          "validator": "word_count"
+        },
+        "sampler": {
+          "seed": 0,
+          "temperature": 0.0,
+          "top_k": 0,
+          "top_p": 1.0
+        },
+        "teacher_forced_answers": false,
+        "termination_reason": "stop_token",
+        "text": "Hello there friend"
+      },
+      {
+        "class": "instruction_constraints",
+        "generation_source": "gpu_free_running",
+        "id": "instr_json_only",
+        "mode": "greedy",
+        "objective": {
+          "id": "instr_json_only",
+          "objective": true,
+          "pass": true,
+          "reason": "json_match",
+          "text": "{\"ok\": true}",
+          "validator": "exact_json"
+        },
+        "sampler": {
+          "seed": 0,
+          "temperature": 0.0,
+          "top_k": 0,
+          "top_p": 1.0
+        },
+        "teacher_forced_answers": false,
+        "termination_reason": "stop_token",
+        "text": "{\"ok\": true}"
+      },
+      {
+        "class": "instruction_constraints",
+        "generation_source": "gpu_free_running",
+        "id": "instr_no_greeting",
+        "mode": "greedy",
+        "objective": {
+          "id": "instr_no_greeting",
+          "objective": true,
+          "pass": true,
+          "reason": "ok",
+          "text": "H2O",
+          "validator": "forbidden_and_exact"
+        },
+        "sampler": {
+          "seed": 0,
+          "temperature": 0.0,
+          "top_k": 0,
+          "top_p": 1.0
+        },
+        "teacher_forced_answers": false,
+        "termination_reason": "stop_token",
+        "text": "H2O"
+      },
+      {
+        "class": "instruction_constraints",
+        "generation_source": "gpu_free_running",
+        "id": "instr_uppercase",
+        "mode": "greedy",
+        "objective": {
+          "id": "instr_uppercase",
+          "objective": true,
+          "pass": true,
+          "reason": "exact_match",
+          "text": "READY",
+          "validator": "exact_text"
+        },
+        "sampler": {
+          "seed": 0,
+          "temperature": 0.0,
+          "top_k": 0,
+          "top_p": 1.0
+        },
+        "teacher_forced_answers": false,
+        "termination_reason": "stop_token",
+        "text": "READY"
+      },
+      {
+        "class": "instruction_constraints",
+        "generation_source": "gpu_free_running",
+        "id": "instr_two_bullets",
+        "mode": "greedy",
+        "objective": {
+          "id": "instr_two_bullets",
+          "objective": true,
+          "pass": true,
+          "reason": "bullet_count",
+          "text": "* Apple\n* Banana",
+          "validator": "bullet_count"
+        },
+        "sampler": {
+          "seed": 0,
+          "temperature": 0.0,
+          "top_k": 0,
+          "top_p": 1.0
+        },
+        "teacher_forced_answers": false,
+        "termination_reason": "stop_token",
+        "text": "* Apple\n* Banana"
+      },
+      {
+        "class": "instruction_constraints",
+        "generation_source": "gpu_free_running",
+        "id": "instr_answer_prefix",
+        "mode": "greedy",
+        "objective": {
+          "id": "instr_answer_prefix",
+          "objective": true,
+          "pass": true,
+          "reason": "exact_match",
+          "text": "ANSWER: 9",
+          "validator": "exact_text"
+        },
+        "sampler": {
+          "seed": 0,
+          "temperature": 0.0,
+          "top_k": 0,
+          "top_p": 1.0
+        },
+        "teacher_forced_answers": false,
+        "termination_reason": "stop_token",
+        "text": "ANSWER: 9"
+      },
+      {
+        "class": "arithmetic_reasoning",
+        "generation_source": "gpu_free_running",
+        "id": "arith_add",
+        "mode": "greedy",
+        "objective": {
+          "id": "arith_add",
+          "objective": true,
+          "pass": true,
+          "reason": "exact_match",
+          "text": "65",
+          "validator": "exact_text"
+        },
+        "sampler": {
+          "seed": 0,
+          "temperature": 0.0,
+          "top_k": 0,
+          "top_p": 1.0
+        },
+        "teacher_forced_answers": false,
+        "termination_reason": "stop_token",
+        "text": "65"
+      },
+      {
+        "class": "arithmetic_reasoning",
+        "generation_source": "gpu_free_running",
+        "id": "arith_mul",
+        "mode": "greedy",
+        "objective": {
+          "id": "arith_mul",
+          "objective": true,
+          "pass": true,
+          "reason": "exact_match",
+          "text": "132",
+          "validator": "exact_text"
+        },
+        "sampler": {
+          "seed": 0,
+          "temperature": 0.0,
+          "top_k": 0,
+          "top_p": 1.0
+        },
+        "teacher_forced_answers": false,
+        "termination_reason": "stop_token",
+        "text": "132"
+      },
+      {
+        "class": "arithmetic_reasoning",
+        "generation_source": "gpu_free_running",
+        "id": "arith_percent",
+        "mode": "greedy",
+        "objective": {
+          "id": "arith_percent",
+          "objective": true,
+          "pass": true,
+          "reason": "exact_match",
+          "text": "12",
+          "validator": "exact_text"
+        },
+        "sampler": {
+          "seed": 0,
+          "temperature": 0.0,
+          "top_k": 0,
+          "top_p": 1.0
+        },
+        "teacher_forced_answers": false,
+        "termination_reason": "stop_token",
+        "text": "12"
+      },
+      {
+        "class": "arithmetic_reasoning",
+        "generation_source": "gpu_free_running",
+        "id": "arith_compare",
+        "mode": "greedy",
+        "objective": {
+          "id": "arith_compare",
+          "objective": true,
+          "pass": false,
+          "reason": "mismatch",
+          "text": "To determine which fraction is larger, we can compare them by finding a common denominator or by converting them to decimals.\n\n**Method 1: Common Denominator**\n1. Find the least common multiple (LCM) of the denominators 3 and 5. The LCM is 15.\n",
+          "validator": "exact_text"
+        },
+        "sampler": {
+          "seed": 0,
+          "temperature": 0.0,
+          "top_k": 0,
+          "top_p": 1.0
+        },
+        "teacher_forced_answers": false,
+        "termination_reason": "max_new_tokens",
+        "text": "To determine which fraction is larger, we can compare them by finding a common denominator or by converting them to decimals.\n\n**Method 1: Common Denominator**\n1. Find the least common multiple (LCM) of the denominators 3 and 5. The LCM is 15.\n"
+      },
+      {
+        "class": "arithmetic_reasoning",
+        "generation_source": "gpu_free_running",
+        "id": "arith_minutes",
+        "mode": "greedy",
+        "objective": {
+          "id": "arith_minutes",
+          "objective": true,
+          "pass": false,
+          "reason": "mismatch",
+          "text": "To determine the end time, we need to add the duration of the meeting to the start time.\n\n**1. Break down the duration:**\nThe meeting lasts 95 minutes.\n$$95 \\text{ minutes} = 60 \\text{ minutes} + 35 \\text{ minutes",
+          "validator": "exact_text"
+        },
+        "sampler": {
+          "seed": 0,
+          "temperature": 0.0,
+          "top_k": 0,
+          "top_p": 1.0
+        },
+        "teacher_forced_answers": false,
+        "termination_reason": "max_new_tokens",
+        "text": "To determine the end time, we need to add the duration of the meeting to the start time.\n\n**1. Break down the duration:**\nThe meeting lasts 95 minutes.\n$$95 \\text{ minutes} = 60 \\text{ minutes} + 35 \\text{ minutes"
+      },
+      {
+        "class": "code_executable",
+        "generation_source": "gpu_free_running",
+        "id": "code_len",
+        "mode": "greedy",
+        "objective": {
+          "id": "code_len",
+          "objective": true,
+          "pass": false,
+          "reason": "exec_mismatch",
+          "text": "```python\ndef f():\n    return len([1, 2, 3])\n```",
+          "validator": "python_exec"
+        },
+        "sampler": {
+          "seed": 0,
+          "temperature": 0.0,
+          "top_k": 0,
+          "top_p": 1.0
+        },
+        "teacher_forced_answers": false,
+        "termination_reason": "stop_token",
+        "text": "```python\ndef f():\n    return len([1, 2, 3])\n```"
+      },
+      {
+        "class": "code_executable",
+        "generation_source": "gpu_free_running",
+        "id": "code_sum",
+        "mode": "greedy",
+        "objective": {
+          "id": "code_sum",
+          "objective": true,
+          "pass": true,
+          "reason": "exec_ok",
+          "text": "```python\nresult = sum(range(5))\n```",
+          "validator": "python_exec"
+        },
+        "sampler": {
+          "seed": 0,
+          "temperature": 0.0,
+          "top_k": 0,
+          "top_p": 1.0
+        },
+        "teacher_forced_answers": false,
+        "termination_reason": "stop_token",
+        "text": "```python\nresult = sum(range(5))\n```"
+      },
+      {
+        "class": "code_executable",
+        "generation_source": "gpu_free_running",
+        "id": "code_reverse",
+        "mode": "greedy",
+        "objective": {
+          "id": "code_reverse",
+          "objective": true,
+          "pass": true,
+          "reason": "exec_ok",
+          "text": "```python\nresult = 'abcd'[::-1]\n```",
+          "validator": "python_exec"
+        },
+        "sampler": {
+          "seed": 0,
+          "temperature": 0.0,
+          "top_k": 0,
+          "top_p": 1.0
+        },
+        "teacher_forced_answers": false,
+        "termination_reason": "stop_token",
+        "text": "```python\nresult = 'abcd'[::-1]\n```"
+      },
+      {
+        "class": "code_executable",
+        "generation_source": "gpu_free_running",
+        "id": "code_max",
+        "mode": "greedy",
+        "objective": {
+          "id": "code_max",
+          "objective": true,
+          "pass": true,
+          "reason": "exec_ok",
+          "text": "```python\nresult = max(3, 9, 4)\n```",
+          "validator": "python_exec"
+        },
+        "sampler": {
+          "seed": 0,
+          "temperature": 0.0,
+          "top_k": 0,
+          "top_p": 1.0
+        },
+        "teacher_forced_answers": false,
+        "termination_reason": "stop_token",
+        "text": "```python\nresult = max(3, 9, 4)\n```"
+      },
+      {
+        "class": "code_executable",
+        "generation_source": "gpu_free_running",
+        "id": "code_even",
+        "mode": "greedy",
+        "objective": {
+          "id": "code_even",
+          "objective": true,
+          "pass": true,
+          "reason": "exec_ok",
+          "text": "```python\nresult = [x for x in range(0, 7) if x % 2 == 0]\n```",
+          "validator": "python_exec"
+        },
+        "sampler": {
+          "seed": 0,
+          "temperature": 0.0,
+          "top_k": 0,
+          "top_p": 1.0
+        },
+        "teacher_forced_answers": false,
+        "termination_reason": "stop_token",
+        "text": "```python\nresult = [x for x in range(0, 7) if x % 2 == 0]\n```"
+      },
+      {
+        "class": "tool_call_json",
+        "generation_source": "gpu_free_running",
+        "id": "tool_weather_city",
+        "mode": "greedy",
+        "objective": {
+          "id": "tool_weather_city",
+          "objective": true,
+          "pass": false,
+          "reason": "schema_fail",
+          "text": "```json\n{\n  \"tool\": \"get_weather\",\n  \"arguments\": {\n    \"city\": \"Oslo\"\n  }\n}\n```",
+          "validator": "json_schema"
+        },
+        "sampler": {
+          "seed": 0,
+          "temperature": 0.0,
+          "top_k": 0,
+          "top_p": 1.0
+        },
+        "teacher_forced_answers": false,
+        "termination_reason": "stop_token",
+        "text": "```json\n{\n  \"tool\": \"get_weather\",\n  \"arguments\": {\n    \"city\": \"Oslo\"\n  }\n}\n```"
+      },
+      {
+        "class": "tool_call_json",
+        "generation_source": "gpu_free_running",
+        "id": "tool_search_query",
+        "mode": "greedy",
+        "objective": {
+          "id": "tool_search_query",
+          "objective": true,
+          "pass": false,
+          "reason": "schema_fail",
+          "text": "{\"tool\": \"search\", \"arguments\": {\"query\": \"gdn state\"}}",
+          "validator": "json_schema"
+        },
+        "sampler": {
+          "seed": 0,
+          "temperature": 0.0,
+          "top_k": 0,
+          "top_p": 1.0
+        },
+        "teacher_forced_answers": false,
+        "termination_reason": "stop_token",
+        "text": "{\"tool\": \"search\", \"arguments\": {\"query\": \"gdn state\"}}"
+      },
+      {
+        "class": "tool_call_json",
+        "generation_source": "gpu_free_running",
+        "id": "tool_add_args",
+        "mode": "greedy",
+        "objective": {
+          "id": "tool_add_args",
+          "objective": true,
+          "pass": true,
+          "reason": "schema_ok",
+          "text": "```json\n{\n  \"name\": \"add\",\n  \"arguments\": {\n    \"a\": 2,\n    \"b\": 5\n  }\n}\n```",
+          "validator": "json_schema"
+        },
+        "sampler": {
+          "seed": 0,
+          "temperature": 0.0,
+          "top_k": 0,
+          "top_p": 1.0
+        },
+        "teacher_forced_answers": false,
+        "termination_reason": "stop_token",
+        "text": "```json\n{\n  \"name\": \"add\",\n  \"arguments\": {\n    \"a\": 2,\n    \"b\": 5\n  }\n}\n```"
+      },
+      {
+        "class": "tool_call_json",
+        "generation_source": "gpu_free_running",
+        "id": "tool_nested_route",
+        "mode": "greedy",
+        "objective": {
+          "id": "tool_nested_route",
+          "objective": true,
+          "pass": false,
+          "reason": "schema_fail",
+          "text": "```json\n{\n  \"tool\": \"book_flight\",\n  \"arguments\": {\n    \"route\": {\n      \"from\": \"HEL\",\n      \"to\": \"ARN\"\n    }\n  }\n}\n```",
+          "validator": "json_schema"
+        },
+        "sampler": {
+          "seed": 0,
+          "temperature": 0.0,
+          "top_k": 0,
+          "top_p": 1.0
+        },
+        "teacher_forced_answers": false,
+        "termination_reason": "stop_token",
+        "text": "```json\n{\n  \"tool\": \"book_flight\",\n  \"arguments\": {\n    \"route\": {\n      \"from\": \"HEL\",\n      \"to\": \"ARN\"\n    }\n  }\n}\n```"
+      },
+      {
+        "class": "tool_call_json",
+        "generation_source": "gpu_free_running",
+        "id": "tool_enum_status",
+        "mode": "greedy",
+        "objective": {
+          "id": "tool_enum_status",
+          "objective": true,
+          "pass": true,
+          "reason": "schema_ok",
+          "text": "{\"name\":\"set_status\",\"arguments\":{\"status\":\"closed\"}}",
+          "validator": "json_schema"
+        },
+        "sampler": {
+          "seed": 0,
+          "temperature": 0.0,
+          "top_k": 0,
+          "top_p": 1.0
+        },
+        "teacher_forced_answers": false,
+        "termination_reason": "stop_token",
+        "text": "{\"name\":\"set_status\",\"arguments\":{\"status\":\"closed\"}}"
+      },
+      {
+        "class": "multi_turn_prose",
+        "generation_source": "gpu_free_running",
+        "id": "prose_continue_story",
+        "mode": "greedy",
+        "objective": {
+          "id": "prose_continue_story",
+          "objective": false,
+          "pass": true,
+          "reason": "deferred_to_rubric",
+          "text": "Tonight, the beam swept across the black water, searching for a ship that had vanished years ago.",
+          "validator": "rubric_prose"
+        },
+        "rubric": {
+          "aggregate": 8,
+          "blinded": true,
+          "dimensions": {
+            "coherence_completion": 2,
+            "factual_consistency": 2,
+            "instruction_compliance": 2,
+            "repetition": 2
+          },
+          "id": "prose_continue_story",
+          "max_aggregate": 8,
+          "raw_text": "Tonight, the beam swept across the black water, searching for a ship that had vanished years ago.",
+          "reasons": {
+            "coherence_completion": "score=2 words=17",
+            "factual_consistency": "score=2 expected=n/a",
+            "instruction_compliance": "score=2",
+            "repetition": "score=2"
+          },
+          "zero_dimensions": []
+        },
+        "sampler": {
+          "seed": 0,
+          "temperature": 0.0,
+          "top_k": 0,
+          "top_p": 1.0
+        },
+        "teacher_forced_answers": false,
+        "termination_reason": "stop_token",
+        "text": "Tonight, the beam swept across the black water, searching for a ship that had vanished years ago."
+      },
+      {
+        "class": "multi_turn_prose",
+        "generation_source": "gpu_free_running",
+        "id": "prose_summarize_then_ask",
+        "mode": "greedy",
+        "objective": {
+          "id": "prose_summarize_then_ask",
+          "objective": false,
+          "pass": true,
+          "reason": "deferred_to_rubric",
+          "text": "It returns at 19:40.",
+          "validator": "rubric_prose"
+        },
+        "rubric": {
+          "aggregate": 8,
+          "blinded": true,
+          "dimensions": {
+            "coherence_completion": 2,
+            "factual_consistency": 2,
+            "instruction_compliance": 2,
+            "repetition": 2
+          },
+          "id": "prose_summarize_then_ask",
+          "max_aggregate": 8,
+          "raw_text": "It returns at 19:40.",
+          "reasons": {
+            "coherence_completion": "score=2 words=5",
+            "factual_consistency": "score=2 expected=19:40",
+            "instruction_compliance": "score=2",
+            "repetition": "score=2"
+          },
+          "zero_dimensions": []
+        },
+        "sampler": {
+          "seed": 0,
+          "temperature": 0.0,
+          "top_k": 0,
+          "top_p": 1.0
+        },
+        "teacher_forced_answers": false,
+        "termination_reason": "stop_token",
+        "text": "It returns at 19:40."
+      },
+      {
+        "class": "multi_turn_prose",
+        "generation_source": "gpu_free_running",
+        "id": "prose_correct_then_explain",
+        "mode": "greedy",
+        "objective": {
+          "id": "prose_correct_then_explain",
+          "objective": false,
+          "pass": true,
+          "reason": "deferred_to_rubric",
+          "text": "A prime number must have exactly two distinct positive divisors: 1 and itself. Since 21 is divisible by 3 and 7, it has more than two divisors and is therefore not prime.",
+          "validator": "rubric_prose"
+        },
+        "rubric": {
+          "aggregate": 8,
+          "blinded": true,
+          "dimensions": {
+            "coherence_completion": 2,
+            "factual_consistency": 2,
+            "instruction_compliance": 2,
+            "repetition": 2
+          },
+          "id": "prose_correct_then_explain",
+          "max_aggregate": 8,
+          "raw_text": "A prime number must have exactly two distinct positive divisors: 1 and itself. Since 21 is divisible by 3 and 7, it has more than two divisors and is therefore not prime.",
+          "reasons": {
+            "coherence_completion": "score=2 words=32",
+            "factual_consistency": "score=2 expected=21",
+            "instruction_compliance": "score=2",
+            "repetition": "score=2"
+          },
+          "zero_dimensions": []
+        },
+        "sampler": {
+          "seed": 0,
+          "temperature": 0.0,
+          "top_k": 0,
+          "top_p": 1.0
+        },
+        "teacher_forced_answers": false,
+        "termination_reason": "stop_token",
+        "text": "A prime number must have exactly two distinct positive divisors: 1 and itself. Since 21 is divisible by 3 and 7, it has more than two divisors and is therefore not prime."
+      },
+      {
+        "class": "multi_turn_prose",
+        "generation_source": "gpu_free_running",
+        "id": "prose_two_speakers",
+        "mode": "greedy",
+        "objective": {
+          "id": "prose_two_speakers",
+          "objective": false,
+          "pass": true,
+          "reason": "deferred_to_rubric",
+          "text": "Noah: \"I'll pour the water before it boils over.\"",
+          "validator": "rubric_prose"
+        },
+        "rubric": {
+          "aggregate": 8,
+          "blinded": true,
+          "dimensions": {
+            "coherence_completion": 2,
+            "factual_consistency": 2,
+            "instruction_compliance": 2,
+            "repetition": 2
+          },
+          "id": "prose_two_speakers",
+          "max_aggregate": 8,
+          "raw_text": "Noah: \"I'll pour the water before it boils over.\"",
+          "reasons": {
+            "coherence_completion": "score=2 words=10",
+            "factual_consistency": "score=2 expected=Noah",
+            "instruction_compliance": "score=2",
+            "repetition": "score=2"
+          },
+          "zero_dimensions": []
+        },
+        "sampler": {
+          "seed": 0,
+          "temperature": 0.0,
+          "top_k": 0,
+          "top_p": 1.0
+        },
+        "teacher_forced_answers": false,
+        "termination_reason": "stop_token",
+        "text": "Noah: \"I'll pour the water before it boils over.\""
+      },
+      {
+        "class": "multi_turn_prose",
+        "generation_source": "gpu_free_running",
+        "id": "prose_remember_constraint",
+        "mode": "greedy",
+        "objective": {
+          "id": "prose_remember_constraint",
+          "objective": false,
+          "pass": true,
+          "reason": "deferred_to_rubric",
+          "text": "The cat is named Pepper.",
+          "validator": "rubric_prose"
+        },
+        "rubric": {
+          "aggregate": 8,
+          "blinded": true,
+          "dimensions": {
+            "coherence_completion": 2,
+            "factual_consistency": 2,
+            "instruction_compliance": 2,
+            "repetition": 2
+          },
+          "id": "prose_remember_constraint",
+          "max_aggregate": 8,
+          "raw_text": "The cat is named Pepper.",
+          "reasons": {
+            "coherence_completion": "score=2 words=5",
+            "factual_consistency": "score=2 expected=Pepper",
+            "instruction_compliance": "score=2",
+            "repetition": "score=2"
+          },
+          "zero_dimensions": []
+        },
+        "sampler": {
+          "seed": 0,
+          "temperature": 0.0,
+          "top_k": 0,
+          "top_p": 1.0
+        },
+        "teacher_forced_answers": false,
+        "termination_reason": "stop_token",
+        "text": "The cat is named Pepper."
+      }
+    ],
+    "new_objective_failures": 6,
+    "objective_failures": [
+      "arith_compare",
+      "arith_minutes",
+      "code_len",
+      "tool_weather_city",
+      "tool_search_query",
+      "tool_nested_route"
+    ],
+    "rubric": {
+      "admission": {
+        "aggregate_not_lower_than_post113": true,
+        "no_new_zero_dimension": true
+      },
+      "blinded": true,
+      "completed_review_required_before_promotion": true,
+      "different_wording_allowed": true,
+      "dimensions": [
+        "instruction_compliance",
+        "factual_consistency",
+        "coherence_completion",
+        "repetition"
+      ],
+      "grader_is_not_implementation_boolean": true,
+      "remote_judge_forbidden": true,
+      "rules": {
+        "coherence_completion": {
+          "0": "aborts, derails, or is unreadable",
+          "1": "readable but incomplete or weakly connected",
+          "2": "complete, locally coherent continuation"
+        },
+        "factual_consistency": {
+          "0": "contradicts supplied context or invents a conflicting fact",
+          "1": "mostly consistent with a minor unsupported extra",
+          "2": "consistent with supplied context; no conflicting invention"
+        },
+        "instruction_compliance": {
+          "0": "ignores the asked format, speaker, length, or constraint",
+          "1": "partially follows the constraint with extra or missing pieces",
+          "2": "satisfies the asked constraint"
+        },
+        "repetition": {
+          "0": "loops or restates the prior turn almost verbatim",
+          "1": "some echo but adds content",
+          "2": "no pathological repetition"
+        }
+      },
+      "same_path_seeded_repeatability_exact": true,
+      "scale": [
+        0,
+        1,
+        2
+      ]
+    },
+    "rubric_scores": [
+      {
+        "aggregate": 8,
+        "blinded": true,
+        "dimensions": {
+          "coherence_completion": 2,
+          "factual_consistency": 2,
+          "instruction_compliance": 2,
+          "repetition": 2
+        },
+        "id": "prose_continue_story",
+        "max_aggregate": 8,
+        "raw_text": "Tonight, the beam swept across the black water, searching for a ship that had vanished years ago.",
+        "reasons": {
+          "coherence_completion": "score=2 words=17",
+          "factual_consistency": "score=2 expected=n/a",
+          "instruction_compliance": "score=2",
+          "repetition": "score=2"
+        },
+        "zero_dimensions": []
+      },
+      {
+        "aggregate": 8,
+        "blinded": true,
+        "dimensions": {
+          "coherence_completion": 2,
+          "factual_consistency": 2,
+          "instruction_compliance": 2,
+          "repetition": 2
+        },
+        "id": "prose_summarize_then_ask",
+        "max_aggregate": 8,
+        "raw_text": "It returns at 19:40.",
+        "reasons": {
+          "coherence_completion": "score=2 words=5",
+          "factual_consistency": "score=2 expected=19:40",
+          "instruction_compliance": "score=2",
+          "repetition": "score=2"
+        },
+        "zero_dimensions": []
+      },
+      {
+        "aggregate": 8,
+        "blinded": true,
+        "dimensions": {
+          "coherence_completion": 2,
+          "factual_consistency": 2,
+          "instruction_compliance": 2,
+          "repetition": 2
+        },
+        "id": "prose_correct_then_explain",
+        "max_aggregate": 8,
+        "raw_text": "A prime number must have exactly two distinct positive divisors: 1 and itself. Since 21 is divisible by 3 and 7, it has more than two divisors and is therefore not prime.",
+        "reasons": {
+          "coherence_completion": "score=2 words=32",
+          "factual_consistency": "score=2 expected=21",
+          "instruction_compliance": "score=2",
+          "repetition": "score=2"
+        },
+        "zero_dimensions": []
+      },
+      {
+        "aggregate": 8,
+        "blinded": true,
+        "dimensions": {
+          "coherence_completion": 2,
+          "factual_consistency": 2,
+          "instruction_compliance": 2,
+          "repetition": 2
+        },
+        "id": "prose_two_speakers",
+        "max_aggregate": 8,
+        "raw_text": "Noah: \"I'll pour the water before it boils over.\"",
+        "reasons": {
+          "coherence_completion": "score=2 words=10",
+          "factual_consistency": "score=2 expected=Noah",
+          "instruction_compliance": "score=2",
+          "repetition": "score=2"
+        },
+        "zero_dimensions": []
+      },
+      {
+        "aggregate": 8,
+        "blinded": true,
+        "dimensions": {
+          "coherence_completion": 2,
+          "factual_consistency": 2,
+          "instruction_compliance": 2,
+          "repetition": 2
+        },
+        "id": "prose_remember_constraint",
+        "max_aggregate": 8,
+        "raw_text": "The cat is named Pepper.",
+        "reasons": {
+          "coherence_completion": "score=2 words=5",
+          "factual_consistency": "score=2 expected=Pepper",
+          "instruction_compliance": "score=2",
+          "repetition": "score=2"
+        },
+        "zero_dimensions": []
+      }
+    ],
+    "rubric_vs_post113": [
+      {
+        "aggregate_baseline": 8,
+        "aggregate_candidate": 8,
+        "lower_aggregate": false,
+        "new_zero_dimensions": [],
+        "pass": true
+      },
+      {
+        "aggregate_baseline": 8,
+        "aggregate_candidate": 8,
+        "lower_aggregate": false,
+        "new_zero_dimensions": [],
+        "pass": true
+      },
+      {
+        "aggregate_baseline": 8,
+        "aggregate_candidate": 8,
+        "lower_aggregate": false,
+        "new_zero_dimensions": [],
+        "pass": true
+      },
+      {
+        "aggregate_baseline": 8,
+        "aggregate_candidate": 8,
+        "lower_aggregate": false,
+        "new_zero_dimensions": [],
+        "pass": true
+      },
+      {
+        "aggregate_baseline": 8,
+        "aggregate_candidate": 8,
+        "lower_aggregate": false,
+        "new_zero_dimensions": [],
+        "pass": true
+      }
+    ],
+    "sample": [
+      {
+        "class": "extraction_long_context",
+        "generation_source": "gpu_free_running",
+        "id": "extract_early_city",
+        "mode": "sample",
+        "same_path_seeded_repeatability_exact": true,
+        "sampler": {
+          "seed": 11,
+          "temperature": 1.0,
+          "top_k": 0,
+          "top_p": 1.0
+        },
+        "teacher_forced_answers": false,
+        "termination_reason": "stop_token",
+        "text": "Bruges"
+      },
+      {
+        "class": "extraction_long_context",
+        "generation_source": "gpu_free_running",
+        "id": "extract_early_city",
+        "mode": "sample",
+        "same_path_seeded_repeatability_exact": true,
+        "sampler": {
+          "seed": 29,
+          "temperature": 1.0,
+          "top_k": 0,
+          "top_p": 1.0
+        },
+        "teacher_forced_answers": false,
+        "termination_reason": "stop_token",
+        "text": "Bruges"
+      },
+      {
+        "class": "extraction_long_context",
+        "generation_source": "gpu_free_running",
+        "id": "extract_early_city",
+        "mode": "sample",
+        "same_path_seeded_repeatability_exact": true,
+        "sampler": {
+          "seed": 47,
+          "temperature": 1.0,
+          "top_k": 0,
+          "top_p": 1.0
+        },
+        "teacher_forced_answers": false,
+        "termination_reason": "stop_token",
+        "text": "Bruges"
+      },
+      {
+        "class": "extraction_long_context",
+        "generation_source": "gpu_free_running",
+        "id": "extract_mid_code",
+        "mode": "sample",
+        "same_path_seeded_repeatability_exact": true,
+        "sampler": {
+          "seed": 11,
+          "temperature": 1.0,
+          "top_k": 0,
+          "top_p": 1.0
+        },
+        "teacher_forced_answers": false,
+        "termination_reason": "stop_token",
+        "text": "ALPHA-9173"
+      },
+      {
+        "class": "extraction_long_context",
+        "generation_source": "gpu_free_running",
+        "id": "extract_mid_code",
+        "mode": "sample",
+        "same_path_seeded_repeatability_exact": true,
+        "sampler": {
+          "seed": 29,
+          "temperature": 1.0,
+          "top_k": 0,
+          "top_p": 1.0
+        },
+        "teacher_forced_answers": false,
+        "termination_reason": "stop_token",
+        "text": "ALPHA-9173"
+      },
+      {
+        "class": "extraction_long_context",
+        "generation_source": "gpu_free_running",
+        "id": "extract_mid_code",
+        "mode": "sample",
+        "same_path_seeded_repeatability_exact": true,
+        "sampler": {
+          "seed": 47,
+          "temperature": 1.0,
+          "top_k": 0,
+          "top_p": 1.0
+        },
+        "teacher_forced_answers": false,
+        "termination_reason": "stop_token",
+        "text": "ALPHA-9173"
+      },
+      {
+        "class": "instruction_constraints",
+        "generation_source": "gpu_free_running",
+        "id": "instr_three_words",
+        "mode": "sample",
+        "same_path_seeded_repeatability_exact": true,
+        "sampler": {
+          "seed": 11,
+          "temperature": 1.0,
+          "top_k": 0,
+          "top_p": 1.0
+        },
+        "teacher_forced_answers": false,
+        "termination_reason": "stop_token",
+        "text": "Hello there friend"
+      },
+      {
+        "class": "instruction_constraints",
+        "generation_source": "gpu_free_running",
+        "id": "instr_three_words",
+        "mode": "sample",
+        "same_path_seeded_repeatability_exact": true,
+        "sampler": {
+          "seed": 29,
+          "temperature": 1.0,
+          "top_k": 0,
+          "top_p": 1.0
+        },
+        "teacher_forced_answers": false,
+        "termination_reason": "stop_token",
+        "text": "Hello there friend"
+      },
+      {
+        "class": "instruction_constraints",
+        "generation_source": "gpu_free_running",
+        "id": "instr_three_words",
+        "mode": "sample",
+        "same_path_seeded_repeatability_exact": true,
+        "sampler": {
+          "seed": 47,
+          "temperature": 1.0,
+          "top_k": 0,
+          "top_p": 1.0
+        },
+        "teacher_forced_answers": false,
+        "termination_reason": "stop_token",
+        "text": "Hello there friend"
+      },
+      {
+        "class": "instruction_constraints",
+        "generation_source": "gpu_free_running",
+        "id": "instr_json_only",
+        "mode": "sample",
+        "same_path_seeded_repeatability_exact": true,
+        "sampler": {
+          "seed": 11,
+          "temperature": 1.0,
+          "top_k": 0,
+          "top_p": 1.0
+        },
+        "teacher_forced_answers": false,
+        "termination_reason": "stop_token",
+        "text": "{\"ok\": true}"
+      },
+      {
+        "class": "instruction_constraints",
+        "generation_source": "gpu_free_running",
+        "id": "instr_json_only",
+        "mode": "sample",
+        "same_path_seeded_repeatability_exact": true,
+        "sampler": {
+          "seed": 29,
+          "temperature": 1.0,
+          "top_k": 0,
+          "top_p": 1.0
+        },
+        "teacher_forced_answers": false,
+        "termination_reason": "stop_token",
+        "text": "{\"ok\": true}"
+      },
+      {
+        "class": "instruction_constraints",
+        "generation_source": "gpu_free_running",
+        "id": "instr_json_only",
+        "mode": "sample",
+        "same_path_seeded_repeatability_exact": true,
+        "sampler": {
+          "seed": 47,
+          "temperature": 1.0,
+          "top_k": 0,
+          "top_p": 1.0
+        },
+        "teacher_forced_answers": false,
+        "termination_reason": "stop_token",
+        "text": "{\"ok\": true}"
+      },
+      {
+        "class": "arithmetic_reasoning",
+        "generation_source": "gpu_free_running",
+        "id": "arith_add",
+        "mode": "sample",
+        "same_path_seeded_repeatability_exact": true,
+        "sampler": {
+          "seed": 11,
+          "temperature": 1.0,
+          "top_k": 0,
+          "top_p": 1.0
+        },
+        "teacher_forced_answers": false,
+        "termination_reason": "stop_token",
+        "text": "65"
+      },
+      {
+        "class": "arithmetic_reasoning",
+        "generation_source": "gpu_free_running",
+        "id": "arith_add",
+        "mode": "sample",
+        "same_path_seeded_repeatability_exact": true,
+        "sampler": {
+          "seed": 29,
+          "temperature": 1.0,
+          "top_k": 0,
+          "top_p": 1.0
+        },
+        "teacher_forced_answers": false,
+        "termination_reason": "stop_token",
+        "text": "65"
+      },
+      {
+        "class": "arithmetic_reasoning",
+        "generation_source": "gpu_free_running",
+        "id": "arith_add",
+        "mode": "sample",
+        "same_path_seeded_repeatability_exact": true,
+        "sampler": {
+          "seed": 47,
+          "temperature": 1.0,
+          "top_k": 0,
+          "top_p": 1.0
+        },
+        "teacher_forced_answers": false,
+        "termination_reason": "stop_token",
+        "text": "65"
+      },
+      {
+        "class": "arithmetic_reasoning",
+        "generation_source": "gpu_free_running",
+        "id": "arith_mul",
+        "mode": "sample",
+        "same_path_seeded_repeatability_exact": true,
+        "sampler": {
+          "seed": 11,
+          "temperature": 1.0,
+          "top_k": 0,
+          "top_p": 1.0
+        },
+        "teacher_forced_answers": false,
+        "termination_reason": "stop_token",
+        "text": "132"
+      },
+      {
+        "class": "arithmetic_reasoning",
+        "generation_source": "gpu_free_running",
+        "id": "arith_mul",
+        "mode": "sample",
+        "same_path_seeded_repeatability_exact": true,
+        "sampler": {
+          "seed": 29,
+          "temperature": 1.0,
+          "top_k": 0,
+          "top_p": 1.0
+        },
+        "teacher_forced_answers": false,
+        "termination_reason": "stop_token",
+        "text": "132"
+      },
+      {
+        "class": "arithmetic_reasoning",
+        "generation_source": "gpu_free_running",
+        "id": "arith_mul",
+        "mode": "sample",
+        "same_path_seeded_repeatability_exact": true,
+        "sampler": {
+          "seed": 47,
+          "temperature": 1.0,
+          "top_k": 0,
+          "top_p": 1.0
+        },
+        "teacher_forced_answers": false,
+        "termination_reason": "stop_token",
+        "text": "132"
+      },
+      {
+        "class": "code_executable",
+        "generation_source": "gpu_free_running",
+        "id": "code_len",
+        "mode": "sample",
+        "same_path_seeded_repeatability_exact": true,
+        "sampler": {
+          "seed": 11,
+          "temperature": 1.0,
+          "top_k": 0,
+          "top_p": 1.0
+        },
+        "teacher_forced_answers": false,
+        "termination_reason": "stop_token",
+        "text": "```python\ndef solution():\n    return len([1, 2, 3])\n```"
+      },
+      {
+        "class": "code_executable",
+        "generation_source": "gpu_free_running",
+        "id": "code_len",
+        "mode": "sample",
+        "same_path_seeded_repeatability_exact": true,
+        "sampler": {
+          "seed": 29,
+          "temperature": 1.0,
+          "top_k": 0,
+          "top_p": 1.0
+        },
+        "teacher_forced_answers": false,
+        "termination_reason": "stop_token",
+        "text": "```python\nlen([1, 2, 3])\n```"
+      },
+      {
+        "class": "code_executable",
+        "generation_source": "gpu_free_running",
+        "id": "code_len",
+        "mode": "sample",
+        "same_path_seeded_repeatability_exact": true,
+        "sampler": {
+          "seed": 47,
+          "temperature": 1.0,
+          "top_k": 0,
+          "top_p": 1.0
+        },
+        "teacher_forced_answers": false,
+        "termination_reason": "stop_token",
+        "text": "```python\ndef f():\n    return len([1, 2, 3])\n```"
+      },
+      {
+        "class": "code_executable",
+        "generation_source": "gpu_free_running",
+        "id": "code_sum",
+        "mode": "sample",
+        "same_path_seeded_repeatability_exact": true,
+        "sampler": {
+          "seed": 11,
+          "temperature": 1.0,
+          "top_k": 0,
+          "top_p": 1.0
+        },
+        "teacher_forced_answers": false,
+        "termination_reason": "stop_token",
+        "text": "```python\nresult = sum(range(5))\nprint(result)\n```"
+      },
+      {
+        "class": "code_executable",
+        "generation_source": "gpu_free_running",
+        "id": "code_sum",
+        "mode": "sample",
+        "same_path_seeded_repeatability_exact": true,
+        "sampler": {
+          "seed": 29,
+          "temperature": 1.0,
+          "top_k": 0,
+          "top_p": 1.0
+        },
+        "teacher_forced_answers": false,
+        "termination_reason": "stop_token",
+        "text": "```python\nresult = sum(range(5))\n```"
+      },
+      {
+        "class": "code_executable",
+        "generation_source": "gpu_free_running",
+        "id": "code_sum",
+        "mode": "sample",
+        "same_path_seeded_repeatability_exact": true,
+        "sampler": {
+          "seed": 47,
+          "temperature": 1.0,
+          "top_k": 0,
+          "top_p": 1.0
+        },
+        "teacher_forced_answers": false,
+        "termination_reason": "stop_token",
+        "text": "```python\nresult = sum(range(5))\n```"
+      },
+      {
+        "class": "tool_call_json",
+        "generation_source": "gpu_free_running",
+        "id": "tool_weather_city",
+        "mode": "sample",
+        "same_path_seeded_repeatability_exact": true,
+        "sampler": {
+          "seed": 11,
+          "temperature": 1.0,
+          "top_k": 0,
+          "top_p": 1.0
+        },
+        "teacher_forced_answers": false,
+        "termination_reason": "stop_token",
+        "text": "```json\n{\n  \"tool\": \"get_weather\",\n  \"arguments\": {\n    \"city\": \"Oslo\"\n  }\n}\n```"
+      },
+      {
+        "class": "tool_call_json",
+        "generation_source": "gpu_free_running",
+        "id": "tool_weather_city",
+        "mode": "sample",
+        "same_path_seeded_repeatability_exact": true,
+        "sampler": {
+          "seed": 29,
+          "temperature": 1.0,
+          "top_k": 0,
+          "top_p": 1.0
+        },
+        "teacher_forced_answers": false,
+        "termination_reason": "stop_token",
+        "text": "```json\n{\"name\": \"get_weather\", \"arguments\": {\"city\": \"Oslo\"}}\n```"
+      },
+      {
+        "class": "tool_call_json",
+        "generation_source": "gpu_free_running",
+        "id": "tool_weather_city",
+        "mode": "sample",
+        "same_path_seeded_repeatability_exact": true,
+        "sampler": {
+          "seed": 47,
+          "temperature": 1.0,
+          "top_k": 0,
+          "top_p": 1.0
+        },
+        "teacher_forced_answers": false,
+        "termination_reason": "stop_token",
+        "text": "```json\n{\n  \"tool\": \"get_weather\",\n  \"arguments\": {\n    \"city\": \"Oslo\"\n  }\n}\n```"
+      },
+      {
+        "class": "tool_call_json",
+        "generation_source": "gpu_free_running",
+        "id": "tool_search_query",
+        "mode": "sample",
+        "same_path_seeded_repeatability_exact": true,
+        "sampler": {
+          "seed": 11,
+          "temperature": 1.0,
+          "top_k": 0,
+          "top_p": 1.0
+        },
+        "teacher_forced_answers": false,
+        "termination_reason": "stop_token",
+        "text": "```json\n{\n  \"tool\": \"search\",\n  \"arguments\": {\n    \"query\": \"gdn state\"\n  }\n}\n```"
+      },
+      {
+        "class": "tool_call_json",
+        "generation_source": "gpu_free_running",
+        "id": "tool_search_query",
+        "mode": "sample",
+        "same_path_seeded_repeatability_exact": true,
+        "sampler": {
+          "seed": 29,
+          "temperature": 1.0,
+          "top_k": 0,
+          "top_p": 1.0
+        },
+        "teacher_forced_answers": false,
+        "termination_reason": "stop_token",
+        "text": "{\"tool\": \"search\", \"args\": {\"query\": \"gdn state\"}}"
+      },
+      {
+        "class": "tool_call_json",
+        "generation_source": "gpu_free_running",
+        "id": "tool_search_query",
+        "mode": "sample",
+        "same_path_seeded_repeatability_exact": true,
+        "sampler": {
+          "seed": 47,
+          "temperature": 1.0,
+          "top_k": 0,
+          "top_p": 1.0
+        },
+        "teacher_forced_answers": false,
+        "termination_reason": "stop_token",
+        "text": "{\"name\": \"search\", \"arguments\": {\"query\": \"gdn state\"}}"
+      },
+      {
+        "class": "multi_turn_prose",
+        "generation_source": "gpu_free_running",
+        "id": "prose_continue_story",
+        "mode": "sample",
+        "same_path_seeded_repeatability_exact": true,
+        "sampler": {
+          "seed": 11,
+          "temperature": 1.0,
+          "top_k": 0,
+          "top_p": 1.0
+        },
+        "teacher_forced_answers": false,
+        "termination_reason": "stop_token",
+        "text": "Salt wind moaned against the tower\u2019s weathered stone, and a single lantern flickered as the storm tightened its grip. Below, the waves clawed at the foundation, demanding the endless trade of light for survival."
+      },
+      {
+        "class": "multi_turn_prose",
+        "generation_source": "gpu_free_running",
+        "id": "prose_continue_story",
+        "mode": "sample",
+        "same_path_seeded_repeatability_exact": true,
+        "sampler": {
+          "seed": 29,
+          "temperature": 1.0,
+          "top_k": 0,
+          "top_p": 1.0
+        },
+        "teacher_forced_answers": false,
+        "termination_reason": "stop_token",
+        "text": "Its beam cut through the fog, searching for the tiny boat lost in the night. When the gull finally crashed into the glass, the keeper extinguened the light for the first time in fifty years."
+      },
+      {
+        "class": "multi_turn_prose",
+        "generation_source": "gpu_free_running",
+        "id": "prose_continue_story",
+        "mode": "sample",
+        "same_path_seeded_repeatability_exact": true,
+        "sampler": {
+          "seed": 47,
+          "temperature": 1.0,
+          "top_k": 0,
+          "top_p": 1.0
+        },
+        "teacher_forced_answers": false,
+        "termination_reason": "stop_token",
+        "text": "Finally, a ship was spotted."
+      },
+      {
+        "class": "multi_turn_prose",
+        "generation_source": "gpu_free_running",
+        "id": "prose_summarize_then_ask",
+        "mode": "sample",
+        "same_path_seeded_repeatability_exact": true,
+        "sampler": {
+          "seed": 11,
+          "temperature": 1.0,
+          "top_k": 0,
+          "top_p": 1.0
+        },
+        "teacher_forced_answers": false,
+        "termination_reason": "stop_token",
+        "text": "It returns at 19:40."
+      },
+      {
+        "class": "multi_turn_prose",
+        "generation_source": "gpu_free_running",
+        "id": "prose_summarize_then_ask",
+        "mode": "sample",
+        "same_path_seeded_repeatability_exact": true,
+        "sampler": {
+          "seed": 29,
+          "temperature": 1.0,
+          "top_k": 0,
+          "top_p": 1.0
+        },
+        "teacher_forced_answers": false,
+        "termination_reason": "stop_token",
+        "text": "It returns at 19:40."
+      },
+      {
+        "class": "multi_turn_prose",
+        "generation_source": "gpu_free_running",
+        "id": "prose_summarize_then_ask",
+        "mode": "sample",
+        "same_path_seeded_repeatability_exact": true,
+        "sampler": {
+          "seed": 47,
+          "temperature": 1.0,
+          "top_k": 0,
+          "top_p": 1.0
+        },
+        "teacher_forced_answers": false,
+        "termination_reason": "stop_token",
+        "text": "It returns at 19:40."
+      }
+    ],
+    "sample_subset_ids": [
+      "extract_early_city",
+      "extract_mid_code",
+      "instr_three_words",
+      "instr_json_only",
+      "arith_add",
+      "arith_mul",
+      "code_len",
+      "code_sum",
+      "tool_weather_city",
+      "tool_search_query",
+      "prose_continue_story",
+      "prose_summarize_then_ask"
+    ],
+    "sampler": {
+      "greedy": {
+        "seed": 0,
+        "temperature": 0.0,
+        "top_k": 0,
+        "top_p": 1.0
+      },
+      "sample": {
+        "seeds": [
+          11,
+          29,
+          47
+        ],
+        "temperature": 1.0,
+        "top_k": 0,
+        "top_p": 1.0
+      }
+    }
+  },
+  "gguf_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+  "gpu": {
+    "available": true,
+    "blocker": "",
+    "free_running_gpu_executed": true,
+    "historical_oracles": false,
+    "identity_cached_model_tokenizer": true,
+    "long_cache_gpu_executed": true,
+    "native_out": "build/optimization-runs/OPT-116/gpu-baseline.json",
+    "ran": true,
+    "reason": "live compressed-cache decode-path NLL at 8192/32768/131040+32 and 32-case free-running greedy plus 12-case three-seed sample runs executed on RTX 5090 via qw38-cuda:13.0.2",
+    "required": true,
+    "success": true
+  },
+  "graph_path": "ffn_only",
+  "historical_failures_erased": false,
+  "identity": [
+    {
+      "id": "qwen_capitals_paris",
+      "identity": {
+        "encodings": {
+          "graph_path": "ffn_only",
+          "identical_graph_path": true,
+          "identical_kv_encoding": true,
+          "identical_quantizer_parameters": true,
+          "identical_state_encoding": true,
+          "identical_weight_encoding": true,
+          "mismatches": [],
+          "pass": true,
+          "weight_encoding": {
+            "ffn_decode": "paired_integer",
+            "q4_decode": "llama_q4k_mmvq",
+            "q6_decode": "integer_q8_1",
+            "q8_decode": "r1_w4",
+            "q8_path": "dp4a_q8_1"
+          }
+        },
+        "identical_context_construction": true,
+        "identical_encodings": true,
+        "identical_graph_path": true,
+        "identical_scoring_definition": true,
+        "identical_target_tokens": true,
+        "identical_tokenization": true,
+        "llama_adapter": "tools/run_llama_quality_reference.py",
+        "mismatches": [],
+        "pass": true,
+        "quartz_native": "build/qw38-cuda-opt058-quality-baseline-test"
+      },
+      "llama": {
+        "assistant_answer_boundary": "<|im_start|>assistant\n<think>\n\n</think>\n\n",
+        "chat_template": "no_thinking",
+        "context": [
+          151644,
+          872,
+          198,
+          5646,
+          279,
+          6722,
+          315,
+          9625,
+          304,
+          825,
+          3405
+        ],
+        "enable_thinking": false,
+        "engine": "llama",
+        "gguf_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+        "graph_path": "ffn_only",
+        "id": "qwen_capitals_paris",
+        "kv_encoding": {
+          "attention_key": "committed_bf16_prefix",
+          "attention_value": "committed_bf16_prefix",
+          "logical_rows": "below_frontier_only"
+        },
+        "llama_adapter": "tools/run_llama_quality_reference.py",
+        "llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+        "logit_masking": false,
+        "quantizer_parameters": {
+          "q4_staging": "paired_integer",
+          "q6_device_layout": "raw_gguf",
+          "q8_device_layout": "raw_gguf",
+          "q8_grouping": "grouped_r1_w4"
+        },
+        "quartz_native": "build/qw38-cuda-opt058-quality-baseline-test",
+        "rendered": "<|im_start|>user\nName the capital of France in one word.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n",
+        "scoring": "teacher_forced_nll",
+        "state_encoding": {
+          "gdn_conv": "fp32_rings",
+          "gdn_decode": "sequential",
+          "gdn_recurrent": "fp32_matrices"
+        },
+        "targets": [
+          21567,
+          13
+        ],
+        "tokenizer": "quartz/llama_identical",
+        "user": "Name the capital of France in one word.",
+        "vocab_size": 248320,
+        "weight_encoding": {
+          "ffn_decode": "paired_integer",
+          "q4_decode": "llama_q4k_mmvq",
+          "q6_decode": "integer_q8_1",
+          "q8_decode": "r1_w4",
+          "q8_path": "dp4a_q8_1"
+        }
+      },
+      "quartz": {
+        "assistant_answer_boundary": "<|im_start|>assistant\n<think>\n\n</think>\n\n",
+        "chat_template": "no_thinking",
+        "context": [
+          151644,
+          872,
+          198,
+          5646,
+          279,
+          6722,
+          315,
+          9625,
+          304,
+          825,
+          3405
+        ],
+        "enable_thinking": false,
+        "engine": "quartz",
+        "gguf_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+        "graph_path": "ffn_only",
+        "id": "qwen_capitals_paris",
+        "kv_encoding": {
+          "attention_key": "committed_bf16_prefix",
+          "attention_value": "committed_bf16_prefix",
+          "logical_rows": "below_frontier_only"
+        },
+        "llama_adapter": "tools/run_llama_quality_reference.py",
+        "llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+        "logit_masking": false,
+        "quantizer_parameters": {
+          "q4_staging": "paired_integer",
+          "q6_device_layout": "raw_gguf",
+          "q8_device_layout": "raw_gguf",
+          "q8_grouping": "grouped_r1_w4"
+        },
+        "quartz_native": "build/qw38-cuda-opt058-quality-baseline-test",
+        "rendered": "<|im_start|>user\nName the capital of France in one word.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n",
+        "scoring": "teacher_forced_nll",
+        "state_encoding": {
+          "gdn_conv": "fp32_rings",
+          "gdn_decode": "sequential",
+          "gdn_recurrent": "fp32_matrices"
+        },
+        "targets": [
+          21567,
+          13
+        ],
+        "tokenizer": "quartz/llama_identical",
+        "user": "Name the capital of France in one word.",
+        "vocab_size": 248320,
+        "weight_encoding": {
+          "ffn_decode": "paired_integer",
+          "q4_decode": "llama_q4k_mmvq",
+          "q6_decode": "integer_q8_1",
+          "q8_decode": "r1_w4",
+          "q8_path": "dp4a_q8_1"
+        }
+      }
+    },
+    {
+      "id": "qwen_two_plus_two",
+      "identity": {
+        "encodings": {
+          "graph_path": "ffn_only",
+          "identical_graph_path": true,
+          "identical_kv_encoding": true,
+          "identical_quantizer_parameters": true,
+          "identical_state_encoding": true,
+          "identical_weight_encoding": true,
+          "mismatches": [],
+          "pass": true,
+          "weight_encoding": {
+            "ffn_decode": "paired_integer",
+            "q4_decode": "llama_q4k_mmvq",
+            "q6_decode": "integer_q8_1",
+            "q8_decode": "r1_w4",
+            "q8_path": "dp4a_q8_1"
+          }
+        },
+        "identical_context_construction": true,
+        "identical_encodings": true,
+        "identical_graph_path": true,
+        "identical_scoring_definition": true,
+        "identical_target_tokens": true,
+        "identical_tokenization": true,
+        "llama_adapter": "tools/run_llama_quality_reference.py",
+        "mismatches": [],
+        "pass": true,
+        "quartz_native": "build/qw38-cuda-opt058-quality-baseline-test"
+      },
+      "llama": {
+        "assistant_answer_boundary": "<|im_start|>assistant\n<think>\n\n</think>\n\n",
+        "chat_template": "no_thinking",
+        "context": [
+          151644,
+          872,
+          198,
+          3838,
+          374,
+          220,
+          17,
+          488,
+          220,
+          17,
+          30
+        ],
+        "enable_thinking": false,
+        "engine": "llama",
+        "gguf_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+        "graph_path": "ffn_only",
+        "id": "qwen_two_plus_two",
+        "kv_encoding": {
+          "attention_key": "committed_bf16_prefix",
+          "attention_value": "committed_bf16_prefix",
+          "logical_rows": "below_frontier_only"
+        },
+        "llama_adapter": "tools/run_llama_quality_reference.py",
+        "llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+        "logit_masking": false,
+        "quantizer_parameters": {
+          "q4_staging": "paired_integer",
+          "q6_device_layout": "raw_gguf",
+          "q8_device_layout": "raw_gguf",
+          "q8_grouping": "grouped_r1_w4"
+        },
+        "quartz_native": "build/qw38-cuda-opt058-quality-baseline-test",
+        "rendered": "<|im_start|>user\nWhat is 2 + 2? Reply with the integer only.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n",
+        "scoring": "teacher_forced_nll",
+        "state_encoding": {
+          "gdn_conv": "fp32_rings",
+          "gdn_decode": "sequential",
+          "gdn_recurrent": "fp32_matrices"
+        },
+        "targets": [
+          19
+        ],
+        "tokenizer": "quartz/llama_identical",
+        "user": "What is 2 + 2? Reply with the integer only.",
+        "vocab_size": 248320,
+        "weight_encoding": {
+          "ffn_decode": "paired_integer",
+          "q4_decode": "llama_q4k_mmvq",
+          "q6_decode": "integer_q8_1",
+          "q8_decode": "r1_w4",
+          "q8_path": "dp4a_q8_1"
+        }
+      },
+      "quartz": {
+        "assistant_answer_boundary": "<|im_start|>assistant\n<think>\n\n</think>\n\n",
+        "chat_template": "no_thinking",
+        "context": [
+          151644,
+          872,
+          198,
+          3838,
+          374,
+          220,
+          17,
+          488,
+          220,
+          17,
+          30
+        ],
+        "enable_thinking": false,
+        "engine": "quartz",
+        "gguf_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+        "graph_path": "ffn_only",
+        "id": "qwen_two_plus_two",
+        "kv_encoding": {
+          "attention_key": "committed_bf16_prefix",
+          "attention_value": "committed_bf16_prefix",
+          "logical_rows": "below_frontier_only"
+        },
+        "llama_adapter": "tools/run_llama_quality_reference.py",
+        "llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+        "logit_masking": false,
+        "quantizer_parameters": {
+          "q4_staging": "paired_integer",
+          "q6_device_layout": "raw_gguf",
+          "q8_device_layout": "raw_gguf",
+          "q8_grouping": "grouped_r1_w4"
+        },
+        "quartz_native": "build/qw38-cuda-opt058-quality-baseline-test",
+        "rendered": "<|im_start|>user\nWhat is 2 + 2? Reply with the integer only.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n",
+        "scoring": "teacher_forced_nll",
+        "state_encoding": {
+          "gdn_conv": "fp32_rings",
+          "gdn_decode": "sequential",
+          "gdn_recurrent": "fp32_matrices"
+        },
+        "targets": [
+          19
+        ],
+        "tokenizer": "quartz/llama_identical",
+        "user": "What is 2 + 2? Reply with the integer only.",
+        "vocab_size": 248320,
+        "weight_encoding": {
+          "ffn_decode": "paired_integer",
+          "q4_decode": "llama_q4k_mmvq",
+          "q6_decode": "integer_q8_1",
+          "q8_decode": "r1_w4",
+          "q8_path": "dp4a_q8_1"
+        }
+      }
+    }
+  ],
+  "identity_cached": true,
+  "llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+  "llama_scores": {
+    "held_out_wikitext_1024": {
+      "avg_nll": 1.788091893045086,
+      "engine": "llama",
+      "finite": true,
+      "graph_path": "ffn_only",
+      "id": "held_out_wikitext_1024",
+      "inspectable": true,
+      "kv_encoding": {
+        "attention_key": "committed_bf16_prefix",
+        "attention_value": "committed_bf16_prefix",
+        "logical_rows": "below_frontier_only"
+      },
+      "mean_nll": 1.788091893045086,
+      "nll": 1831.006098478168,
+      "nonfinite_count": 0,
+      "perplexity": 5.97803484695957,
+      "quantizer_parameters": {
+        "q4_staging": "paired_integer",
+        "q6_device_layout": "raw_gguf",
+        "q8_device_layout": "raw_gguf",
+        "q8_grouping": "grouped_r1_w4"
+      },
+      "scoring": "teacher_forced_nll",
+      "source": "fixtures/opt084_quality_baseline.json#llama_scores",
+      "state_encoding": {
+        "gdn_conv": "fp32_rings",
+        "gdn_decode": "sequential",
+        "gdn_recurrent": "fp32_matrices"
+      },
+      "target_tokens": 1024,
+      "weight_encoding": {
+        "ffn_decode": "paired_integer",
+        "q4_decode": "llama_q4k_mmvq",
+        "q6_decode": "integer_q8_1",
+        "q8_decode": "r1_w4",
+        "q8_path": "dp4a_q8_1"
+      }
+    },
+    "recurrence_long": {
+      "avg_nll": 1.8402200970779121,
+      "engine": "llama",
+      "finite": true,
+      "graph_path": "ffn_only",
+      "id": "recurrence_long",
+      "inspectable": true,
+      "kv_encoding": {
+        "attention_key": "committed_bf16_prefix",
+        "attention_value": "committed_bf16_prefix",
+        "logical_rows": "below_frontier_only"
+      },
+      "mean_nll": 1.8402200970779121,
+      "nll": 235.54817242597275,
+      "nonfinite_count": 0,
+      "perplexity": 6.297924263220792,
+      "quantizer_parameters": {
+        "q4_staging": "paired_integer",
+        "q6_device_layout": "raw_gguf",
+        "q8_device_layout": "raw_gguf",
+        "q8_grouping": "grouped_r1_w4"
+      },
+      "scoring": "teacher_forced_nll",
+      "source": "fixtures/opt084_quality_baseline.json#llama_scores",
+      "state_encoding": {
+        "gdn_conv": "fp32_rings",
+        "gdn_decode": "sequential",
+        "gdn_recurrent": "fp32_matrices"
+      },
+      "target_tokens": 128,
+      "weight_encoding": {
+        "ffn_decode": "paired_integer",
+        "q4_decode": "llama_q4k_mmvq",
+        "q6_decode": "integer_q8_1",
+        "q8_decode": "r1_w4",
+        "q8_path": "dp4a_q8_1"
+      }
+    },
+    "recurrence_short": {
+      "avg_nll": 1.7683376992507749,
+      "engine": "llama",
+      "finite": true,
+      "graph_path": "ffn_only",
+      "id": "recurrence_short",
+      "inspectable": true,
+      "kv_encoding": {
+        "attention_key": "committed_bf16_prefix",
+        "attention_value": "committed_bf16_prefix",
+        "logical_rows": "below_frontier_only"
+      },
+      "mean_nll": 1.7683376992507749,
+      "nll": 226.34722550409919,
+      "nonfinite_count": 0,
+      "perplexity": 5.861102344248298,
+      "quantizer_parameters": {
+        "q4_staging": "paired_integer",
+        "q6_device_layout": "raw_gguf",
+        "q8_device_layout": "raw_gguf",
+        "q8_grouping": "grouped_r1_w4"
+      },
+      "scoring": "teacher_forced_nll",
+      "source": "fixtures/opt084_quality_baseline.json#llama_scores",
+      "state_encoding": {
+        "gdn_conv": "fp32_rings",
+        "gdn_decode": "sequential",
+        "gdn_recurrent": "fp32_matrices"
+      },
+      "target_tokens": 128,
+      "weight_encoding": {
+        "ffn_decode": "paired_integer",
+        "q4_decode": "llama_q4k_mmvq",
+        "q6_decode": "integer_q8_1",
+        "q8_decode": "r1_w4",
+        "q8_path": "dp4a_q8_1"
+      }
+    },
+    "wikitext_nll": {
+      "avg_nll": 1.525124035418359,
+      "engine": "llama",
+      "finite": true,
+      "graph_path": "ffn_only",
+      "id": "wikitext_nll",
+      "inspectable": true,
+      "kv_encoding": {
+        "attention_key": "committed_bf16_prefix",
+        "attention_value": "committed_bf16_prefix",
+        "logical_rows": "below_frontier_only"
+      },
+      "mean_nll": 1.525124035418359,
+      "nll": 1561.7270122683997,
+      "nonfinite_count": 0,
+      "perplexity": 4.595713565210836,
+      "quantizer_parameters": {
+        "q4_staging": "paired_integer",
+        "q6_device_layout": "raw_gguf",
+        "q8_device_layout": "raw_gguf",
+        "q8_grouping": "grouped_r1_w4"
+      },
+      "scoring": "teacher_forced_nll",
+      "source": "fixtures/opt084_quality_baseline.json#llama_scores",
+      "state_encoding": {
+        "gdn_conv": "fp32_rings",
+        "gdn_decode": "sequential",
+        "gdn_recurrent": "fp32_matrices"
+      },
+      "target_tokens": 1024,
+      "weight_encoding": {
+        "ffn_decode": "paired_integer",
+        "q4_decode": "llama_q4k_mmvq",
+        "q6_decode": "integer_q8_1",
+        "q8_decode": "r1_w4",
+        "q8_path": "dp4a_q8_1"
+      }
+    }
+  },
+  "native_probe": "build/qw38-cuda-opt116-generated-quality-test",
+  "native_reuse": [
+    "tools/run_llama_quality_reference.py",
+    "build/qw38-cuda-opt058-quality-baseline-test",
+    "build/qw38-cuda-checkpoint-test",
+    "build/qw38-cuda-gdn-chunk-test"
+  ],
+  "openrouter": {
+    "api_key_env": "OPENROUTER_API_KEY",
+    "authoritative": false,
+    "credentials_present": false,
+    "default_off": true,
+    "enabled": false,
+    "endpoint": "https://openrouter.ai/api/v1/chat/completions",
+    "label": "external_scorer",
+    "model": "qwen/qwen3.8-27b",
+    "network": false,
+    "reason": "default_off",
+    "status": "disabled",
+    "success": true
+  },
+  "opt016_remains_blocked": true,
+  "opt056_remains_blocked": true,
+  "opt073_engine_non_regression": "pass",
+  "opt084_scores": {
+    "held_out_wikitext_1024": {
+      "avg_nll": 1.7878782710057632,
+      "engine": "quartz_opt084",
+      "finite": true,
+      "graph_path": "ffn_only",
+      "id": "held_out_wikitext_1024",
+      "inspectable": true,
+      "kv_encoding": {
+        "attention_key": "committed_bf16_prefix",
+        "attention_value": "committed_bf16_prefix",
+        "logical_rows": "below_frontier_only"
+      },
+      "mean_nll": 1.7878782710057632,
+      "nll": 1830.7873495099016,
+      "nonfinite_count": 0,
+      "perplexity": 5.9767579433566524,
+      "quantizer_parameters": {
+        "q4_staging": "paired_integer",
+        "q6_device_layout": "raw_gguf",
+        "q8_device_layout": "raw_gguf",
+        "q8_grouping": "grouped_r1_w4"
+      },
+      "scoring": "teacher_forced_nll",
+      "source": "fixtures/opt084_quality_baseline.json#quartz_scores",
+      "state_encoding": {
+        "gdn_conv": "fp32_rings",
+        "gdn_decode": "sequential",
+        "gdn_recurrent": "fp32_matrices"
+      },
+      "target_tokens": 1024,
+      "weight_encoding": {
+        "ffn_decode": "paired_integer",
+        "q4_decode": "llama_q4k_mmvq",
+        "q6_decode": "integer_q8_1",
+        "q8_decode": "r1_w4",
+        "q8_path": "dp4a_q8_1"
+      }
+    },
+    "recurrence_long": {
+      "avg_nll": 1.8354702048193376,
+      "engine": "quartz_opt084",
+      "finite": true,
+      "graph_path": "ffn_only",
+      "id": "recurrence_long",
+      "inspectable": true,
+      "kv_encoding": {
+        "attention_key": "committed_bf16_prefix",
+        "attention_value": "committed_bf16_prefix",
+        "logical_rows": "below_frontier_only"
+      },
+      "mean_nll": 1.8354702048193376,
+      "nll": 234.94018621687522,
+      "nonfinite_count": 0,
+      "perplexity": 6.268080734400572,
+      "quantizer_parameters": {
+        "q4_staging": "paired_integer",
+        "q6_device_layout": "raw_gguf",
+        "q8_device_layout": "raw_gguf",
+        "q8_grouping": "grouped_r1_w4"
+      },
+      "scoring": "teacher_forced_nll",
+      "source": "fixtures/opt084_quality_baseline.json#quartz_scores",
+      "state_encoding": {
+        "gdn_conv": "fp32_rings",
+        "gdn_decode": "sequential",
+        "gdn_recurrent": "fp32_matrices"
+      },
+      "target_tokens": 128,
+      "weight_encoding": {
+        "ffn_decode": "paired_integer",
+        "q4_decode": "llama_q4k_mmvq",
+        "q6_decode": "integer_q8_1",
+        "q8_decode": "r1_w4",
+        "q8_path": "dp4a_q8_1"
+      }
+    },
+    "recurrence_short": {
+      "avg_nll": 1.771902140891233,
+      "engine": "quartz_opt084",
+      "finite": true,
+      "graph_path": "ffn_only",
+      "id": "recurrence_short",
+      "inspectable": true,
+      "kv_encoding": {
+        "attention_key": "committed_bf16_prefix",
+        "attention_value": "committed_bf16_prefix",
+        "logical_rows": "below_frontier_only"
+      },
+      "mean_nll": 1.771902140891233,
+      "nll": 226.80347403407782,
+      "nonfinite_count": 0,
+      "perplexity": 5.882031179149602,
+      "quantizer_parameters": {
+        "q4_staging": "paired_integer",
+        "q6_device_layout": "raw_gguf",
+        "q8_device_layout": "raw_gguf",
+        "q8_grouping": "grouped_r1_w4"
+      },
+      "scoring": "teacher_forced_nll",
+      "source": "fixtures/opt084_quality_baseline.json#quartz_scores",
+      "state_encoding": {
+        "gdn_conv": "fp32_rings",
+        "gdn_decode": "sequential",
+        "gdn_recurrent": "fp32_matrices"
+      },
+      "target_tokens": 128,
+      "weight_encoding": {
+        "ffn_decode": "paired_integer",
+        "q4_decode": "llama_q4k_mmvq",
+        "q6_decode": "integer_q8_1",
+        "q8_decode": "r1_w4",
+        "q8_path": "dp4a_q8_1"
+      }
+    },
+    "wikitext_nll": {
+      "avg_nll": 1.5252005926497396,
+      "engine": "quartz_opt084",
+      "finite": true,
+      "graph_path": "ffn_only",
+      "id": "wikitext_nll",
+      "inspectable": true,
+      "kv_encoding": {
+        "attention_key": "committed_bf16_prefix",
+        "attention_value": "committed_bf16_prefix",
+        "logical_rows": "below_frontier_only"
+      },
+      "mean_nll": 1.5252005926497396,
+      "nll": 1561.8054068733334,
+      "nonfinite_count": 0,
+      "perplexity": 4.596065413785712,
+      "quantizer_parameters": {
+        "q4_staging": "paired_integer",
+        "q6_device_layout": "raw_gguf",
+        "q8_device_layout": "raw_gguf",
+        "q8_grouping": "grouped_r1_w4"
+      },
+      "scoring": "teacher_forced_nll",
+      "source": "fixtures/opt084_quality_baseline.json#quartz_scores",
+      "state_encoding": {
+        "gdn_conv": "fp32_rings",
+        "gdn_decode": "sequential",
+        "gdn_recurrent": "fp32_matrices"
+      },
+      "target_tokens": 1024,
+      "weight_encoding": {
+        "ffn_decode": "paired_integer",
+        "q4_decode": "llama_q4k_mmvq",
+        "q6_decode": "integer_q8_1",
+        "q8_decode": "r1_w4",
+        "q8_path": "dp4a_q8_1"
+      }
+    }
+  },
+  "post113_scores": {
+    "held_out_wikitext_1024": {
+      "avg_nll": 1.7875990840085783,
+      "engine": "quartz_post113",
+      "finite": true,
+      "graph_path": "ffn_only",
+      "id": "held_out_wikitext_1024",
+      "inspectable": true,
+      "kv_encoding": {
+        "attention_key": "committed_bf16_prefix",
+        "attention_value": "committed_bf16_prefix",
+        "logical_rows": "below_frontier_only"
+      },
+      "mean_nll": 1.7875990840085783,
+      "nll": 1830.5014620247841,
+      "nonfinite_count": 0,
+      "perplexity": 5.975089543162202,
+      "quantizer_parameters": {
+        "q4_staging": "paired_integer",
+        "q6_device_layout": "raw_gguf",
+        "q8_device_layout": "raw_gguf",
+        "q8_grouping": "grouped_r1_w4"
+      },
+      "scoring": "teacher_forced_nll",
+      "source": "evidence/optimization/opt113-coupled-stack-gate/quality-nll.json",
+      "state_encoding": {
+        "gdn_conv": "fp32_rings",
+        "gdn_decode": "sequential",
+        "gdn_recurrent": "fp32_matrices"
+      },
+      "target_tokens": 1024,
+      "weight_encoding": {
+        "ffn_decode": "paired_integer",
+        "q4_decode": "llama_q4k_mmvq",
+        "q6_decode": "integer_q8_1",
+        "q8_decode": "r1_w4",
+        "q8_path": "dp4a_q8_1"
+      }
+    },
+    "recurrence_long": {
+      "avg_nll": 2.7207181590359952,
+      "engine": "quartz_post113",
+      "finite": true,
+      "graph_path": "ffn_only",
+      "id": "recurrence_long",
+      "inspectable": true,
+      "kv_encoding": {
+        "attention_key": "committed_bf16_prefix",
+        "attention_value": "committed_bf16_prefix",
+        "logical_rows": "below_frontier_only"
+      },
+      "mean_nll": 2.7207181590359952,
+      "nll": 348.2519243566074,
+      "nonfinite_count": 0,
+      "perplexity": 15.191228046124532,
+      "quantizer_parameters": {
+        "q4_staging": "paired_integer",
+        "q6_device_layout": "raw_gguf",
+        "q8_device_layout": "raw_gguf",
+        "q8_grouping": "grouped_r1_w4"
+      },
+      "scoring": "teacher_forced_nll",
+      "source": "evidence/optimization/opt113-coupled-stack-gate/quality-nll.json",
+      "state_encoding": {
+        "gdn_conv": "fp32_rings",
+        "gdn_decode": "sequential",
+        "gdn_recurrent": "fp32_matrices"
+      },
+      "target_tokens": 128,
+      "weight_encoding": {
+        "ffn_decode": "paired_integer",
+        "q4_decode": "llama_q4k_mmvq",
+        "q6_decode": "integer_q8_1",
+        "q8_decode": "r1_w4",
+        "q8_path": "dp4a_q8_1"
+      }
+    },
+    "recurrence_short": {
+      "avg_nll": 2.246893437286633,
+      "engine": "quartz_post113",
+      "finite": true,
+      "graph_path": "ffn_only",
+      "id": "recurrence_short",
+      "inspectable": true,
+      "kv_encoding": {
+        "attention_key": "committed_bf16_prefix",
+        "attention_value": "committed_bf16_prefix",
+        "logical_rows": "below_frontier_only"
+      },
+      "mean_nll": 2.246893437286633,
+      "nll": 287.60235997268904,
+      "nonfinite_count": 0,
+      "perplexity": 9.458307324401218,
+      "quantizer_parameters": {
+        "q4_staging": "paired_integer",
+        "q6_device_layout": "raw_gguf",
+        "q8_device_layout": "raw_gguf",
+        "q8_grouping": "grouped_r1_w4"
+      },
+      "scoring": "teacher_forced_nll",
+      "source": "evidence/optimization/opt113-coupled-stack-gate/quality-nll.json",
+      "state_encoding": {
+        "gdn_conv": "fp32_rings",
+        "gdn_decode": "sequential",
+        "gdn_recurrent": "fp32_matrices"
+      },
+      "target_tokens": 128,
+      "weight_encoding": {
+        "ffn_decode": "paired_integer",
+        "q4_decode": "llama_q4k_mmvq",
+        "q6_decode": "integer_q8_1",
+        "q8_decode": "r1_w4",
+        "q8_path": "dp4a_q8_1"
+      }
+    },
+    "wikitext_nll": {
+      "avg_nll": 1.5249350773895778,
+      "engine": "quartz_post113",
+      "finite": true,
+      "graph_path": "ffn_only",
+      "id": "wikitext_nll",
+      "inspectable": true,
+      "kv_encoding": {
+        "attention_key": "committed_bf16_prefix",
+        "attention_value": "committed_bf16_prefix",
+        "logical_rows": "below_frontier_only"
+      },
+      "mean_nll": 1.5249350773895778,
+      "nll": 1561.5335192469277,
+      "nonfinite_count": 0,
+      "perplexity": 4.594845250274834,
+      "quantizer_parameters": {
+        "q4_staging": "paired_integer",
+        "q6_device_layout": "raw_gguf",
+        "q8_device_layout": "raw_gguf",
+        "q8_grouping": "grouped_r1_w4"
+      },
+      "scoring": "teacher_forced_nll",
+      "source": "evidence/optimization/opt113-coupled-stack-gate/quality-nll.json",
+      "state_encoding": {
+        "gdn_conv": "fp32_rings",
+        "gdn_decode": "sequential",
+        "gdn_recurrent": "fp32_matrices"
+      },
+      "target_tokens": 1024,
+      "weight_encoding": {
+        "ffn_decode": "paired_integer",
+        "q4_decode": "llama_q4k_mmvq",
+        "q6_decode": "integer_q8_1",
+        "q8_decode": "r1_w4",
+        "q8_path": "dp4a_q8_1"
+      }
+    }
+  },
+  "post113_selectors": {
+    "chat_template": "no_thinking",
+    "decode_attention": "hybrid_crossover",
+    "decode_gdn": "sequential",
+    "enable_thinking": false,
+    "execution_graphs": "ffn_only",
+    "ffn_decode": "paired_integer",
+    "logit_masking": false,
+    "nvccflags": "-O2 --fmad=false",
+    "production_numerics": "strict",
+    "prompt_attention": "opt111_base",
+    "prompt_mmq": "fma_async_x",
+    "prompt_mmq_tile": "i128_j128",
+    "prompt_pair": "off",
+    "q4_decode": "llama_q4k_mmvq",
+    "q4_staging": "paired_integer",
+    "q8_decode": "r1_w4",
+    "q8_grouping": "grouped_r1_w4",
+    "q8_path": "dp4a_q8_1"
+  },
+  "ppl_ratio_max": 1.01,
+  "production_kernel_changed": false,
+  "proof_limit": [
+    "no throughput claim",
+    "no candidate kernel installed",
+    "no production kernel change",
+    "claims_throughput false",
+    "OpenRouter not invoked",
+    "OPT-056 and OPT-016 remain blocked",
+    "historical OPT-056/073 failures not erased",
+    "strict_quality_pass stays separate from successor_quality_pass",
+    "PPL ratio \u2264 1.01 vs post113 and OPT-084",
+    "recurrence incremental NLL \u2264 0.02",
+    "cross-arithmetic token identity is the successor change",
+    "OPT-091 1.015 late_w4 exception does not apply"
+  ],
+  "quality_contract_id": "opt116_generated_v1",
+  "quality_mode": {
+    "applied": {
+      "argv": [
+        "--quality"
+      ],
+      "delta": {
+        "diagnostic_fallbacks": "disabled",
+        "disables": [
+          "diagnostic_fallback",
+          "experimental_cuda",
+          "fmad_true",
+          "fast_math",
+          "incomplete_vocab_logits",
+          "logit_masking",
+          "teacher_forced_functional_answers",
+          "graph_kernel_divergence",
+          "speculative_decoding",
+          "numeric_bypass",
+          "ssd_streaming_approx",
+          "truncated_softmax"
+        ],
+        "does_not_install_a_different_kernel": true,
+        "flag": "--quality",
+        "graph_vs_eager": "same_math_equivalence_not_different_kernel",
+        "precision": {
+          "fast_math": false,
+          "fmad": false,
+          "fp_contract": "off",
+          "nvccflags": "-O2 --fmad=false"
+        },
+        "selector": "production_arithmetic_under_test",
+        "speed_oriented_numeric_bypass": "disabled",
+        "unknown_shortcut": "fail_closed"
+      },
+      "disabled_shortcuts": [
+        "diagnostic_fallback",
+        "experimental_cuda",
+        "fmad_true",
+        "fast_math",
+        "incomplete_vocab_logits",
+        "logit_masking",
+        "teacher_forced_functional_answers",
+        "graph_kernel_divergence",
+        "speculative_decoding",
+        "numeric_bypass",
+        "ssd_streaming_approx",
+        "truncated_softmax"
+      ],
+      "does_not_restore_packed_or_r2": true,
+      "enabled_shortcuts": [],
+      "encodings": {
+        "graph_path": "ffn_only",
+        "quantizer_parameters": {
+          "q4_staging": "paired_integer",
+          "q8_grouping": "grouped_r1_w4"
+        },
+        "weight_encoding": {
+          "ffn_decode": "paired_integer",
+          "q4_decode": "llama_q4k_mmvq",
+          "q8_decode": "r1_w4",
+          "q8_path": "dp4a_q8_1"
+        }
+      },
+      "flag": "--quality",
+      "graph_path": "ffn_only",
+      "graph_vs_eager": "same_math_equivalence",
+      "quality": true,
+      "same_math_equivalence_not_different_kernel": true,
+      "selectors": {
+        "chat_template": "no_thinking",
+        "decode_attention": "hybrid_crossover",
+        "decode_gdn": "sequential",
+        "enable_thinking": false,
+        "execution_graphs": "ffn_only",
+        "ffn_decode": "paired_integer",
+        "logit_masking": false,
+        "nvccflags": "-O2 --fmad=false",
+        "production_numerics": "strict",
+        "prompt_attention": "opt111_base",
+        "prompt_mmq": "fma_async_x",
+        "prompt_mmq_tile": "i128_j128",
+        "prompt_pair": "off",
+        "q4_decode": "llama_q4k_mmvq",
+        "q4_staging": "paired_integer",
+        "q8_decode": "r1_w4",
+        "q8_grouping": "grouped_r1_w4",
+        "q8_path": "dp4a_q8_1"
+      },
+      "shortcuts": {
+        "diagnostic_fallback": false,
+        "experimental_cuda": false,
+        "fast_math": false,
+        "fmad_true": false,
+        "graph_kernel_divergence": false,
+        "incomplete_vocab_logits": false,
+        "logit_masking": false,
+        "numeric_bypass": false,
+        "speculative_decoding": false,
+        "ssd_streaming_approx": false,
+        "teacher_forced_functional_answers": false,
+        "truncated_softmax": false
+      }
+    },
+    "does_not_restore_packed_or_r2": true,
+    "enabled": true,
+    "encodings": {
+      "graph_path": "ffn_only",
+      "quantizer_parameters": {
+        "q4_staging": "paired_integer",
+        "q8_grouping": "grouped_r1_w4"
+      },
+      "weight_encoding": {
+        "ffn_decode": "paired_integer",
+        "q4_decode": "llama_q4k_mmvq",
+        "q8_decode": "r1_w4",
+        "q8_path": "dp4a_q8_1"
+      }
+    },
+    "flag": "--quality",
+    "graph_path": "ffn_only",
+    "selectors": {
+      "chat_template": "no_thinking",
+      "decode_attention": "hybrid_crossover",
+      "decode_gdn": "sequential",
+      "enable_thinking": false,
+      "execution_graphs": "ffn_only",
+      "ffn_decode": "paired_integer",
+      "logit_masking": false,
+      "nvccflags": "-O2 --fmad=false",
+      "production_numerics": "strict",
+      "prompt_attention": "opt111_base",
+      "prompt_mmq": "fma_async_x",
+      "prompt_mmq_tile": "i128_j128",
+      "prompt_pair": "off",
+      "q4_decode": "llama_q4k_mmvq",
+      "q4_staging": "paired_integer",
+      "q8_decode": "r1_w4",
+      "q8_grouping": "grouped_r1_w4",
+      "q8_path": "dp4a_q8_1"
+    },
+    "shortcuts": [
+      "diagnostic_fallback",
+      "experimental_cuda",
+      "fmad_true",
+      "fast_math",
+      "incomplete_vocab_logits",
+      "logit_masking",
+      "teacher_forced_functional_answers",
+      "graph_kernel_divergence",
+      "speculative_decoding",
+      "numeric_bypass",
+      "ssd_streaming_approx",
+      "truncated_softmax"
+    ],
+    "unknown_shortcut_fail_closed": true
+  },
+  "recurrence_incremental_nll_max": 0.02,
+  "report_path": "evidence/optimization/opt116-generated-quality/REPORT.md",
+  "schema_version": 1,
+  "single_boolean_refused": true,
+  "state_consistency": true,
+  "status": "generated_quality_frozen",
+  "strict_quality_contract_id": "opt084_frozen",
+  "strict_quality_pass": true,
+  "successor_quality_pass": true,
+  "task": "OPT-116",
+  "vocab_size": 248320
+}

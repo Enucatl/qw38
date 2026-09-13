@@ -1,0 +1,216 @@
+{
+  "schema_version": 1,
+  "task": "OPT-116",
+  "yardstick": "generated_text_quality_admission_freeze",
+  "claims_throughput": false,
+  "claims_performance_improvement": false,
+  "candidate_installed": false,
+  "production_kernel_changed": false,
+  "llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+  "gguf_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+  "vocab_size": 248320,
+  "native_reuse": [
+    "tools/run_llama_quality_reference.py",
+    "build/qw38-cuda-opt058-quality-baseline-test",
+    "build/qw38-cuda-checkpoint-test",
+    "build/qw38-cuda-gdn-chunk-test"
+  ],
+  "native_probe": "build/qw38-cuda-opt116-generated-quality-test",
+  "chat_template": "no_thinking",
+  "assistant_answer_boundary": "<|im_start|>assistant\n<think>\n\n</think>\n\n",
+  "enable_thinking": false,
+  "logit_masking": false,
+  "scoring": "teacher_forced_nll_and_free_running",
+  "quality_contract_id": "opt116_generated_v1",
+  "strict_quality_contract_id": "opt084_frozen",
+  "anchors": ["opt084_frozen", "post113_authenticated"],
+  "authority": {
+    "source": "user_request",
+    "date": "2026-09-13",
+    "scope": "named_successor_contract_opt116_generated_v1",
+    "does_not_relabel_opt016_opt056": true
+  },
+  "quality_mode": {
+    "flag": "--quality",
+    "selector": "production_arithmetic_under_test",
+    "precision": {
+      "nvccflags": "-O2 --fmad=false",
+      "fmad": false,
+      "fast_math": false,
+      "fp_contract": "off"
+    },
+    "disables": [
+      "diagnostic_fallback",
+      "experimental_cuda",
+      "fmad_true",
+      "fast_math",
+      "incomplete_vocab_logits",
+      "logit_masking",
+      "teacher_forced_functional_answers",
+      "graph_kernel_divergence",
+      "speculative_decoding",
+      "numeric_bypass",
+      "ssd_streaming_approx",
+      "truncated_softmax"
+    ],
+    "unknown_shortcut": "fail_closed",
+    "graph_vs_eager": "same_math_equivalence_not_different_kernel",
+    "does_not_install_a_different_kernel": true,
+    "does_not_restore_packed_or_r2": true
+  },
+  "post113_selectors": {
+    "q4_decode": "llama_q4k_mmvq",
+    "q4_staging": "paired_integer",
+    "ffn_decode": "paired_integer",
+    "q8_decode": "r1_w4",
+    "q8_path": "dp4a_q8_1",
+    "q8_grouping": "grouped_r1_w4",
+    "prompt_mmq": "fma_async_x",
+    "prompt_mmq_tile": "i128_j128",
+    "prompt_attention": "opt111_base",
+    "decode_gdn": "sequential",
+    "decode_attention": "hybrid_crossover",
+    "prompt_pair": "off",
+    "nvccflags": "-O2 --fmad=false",
+    "production_numerics": "strict",
+    "execution_graphs": "ffn_only",
+    "chat_template": "no_thinking",
+    "enable_thinking": false,
+    "logit_masking": false
+  },
+  "encodings": {
+    "weight_encoding": {
+      "q4_decode": "llama_q4k_mmvq",
+      "q8_decode": "r1_w4",
+      "q8_path": "dp4a_q8_1",
+      "q6_decode": "integer_q8_1",
+      "ffn_decode": "paired_integer"
+    },
+    "kv_encoding": {
+      "attention_key": "committed_bf16_prefix",
+      "attention_value": "committed_bf16_prefix",
+      "logical_rows": "below_frontier_only"
+    },
+    "state_encoding": {
+      "gdn_conv": "fp32_rings",
+      "gdn_recurrent": "fp32_matrices",
+      "gdn_decode": "sequential"
+    },
+    "quantizer_parameters": {
+      "q4_staging": "paired_integer",
+      "q8_grouping": "grouped_r1_w4",
+      "q8_device_layout": "raw_gguf",
+      "q6_device_layout": "raw_gguf"
+    },
+    "graph_path": "ffn_only"
+  },
+  "sampler": {
+    "greedy": {"temperature": 0.0, "top_p": 1.0, "top_k": 0, "seed": 0},
+    "sample": {"temperature": 1.0, "top_p": 1.0, "top_k": 0, "seeds": [11, 29, 47]}
+  },
+  "frozen_acceptance": {
+    "ppl_ratio_max": 1.01,
+    "recurrence_incremental_nll_max": 0.02,
+    "zero_nonfinites": true,
+    "new_functional_failures_max": 0,
+    "opt091_late_w4_exception_does_not_apply": true,
+    "cross_arithmetic_token_identity": "successor_only",
+    "bounds_do_not_compound_across_keeps": true,
+    "do_not_loosen_after_candidate_fail": true
+  },
+  "held_out_free_running": {
+    "targets": 32,
+    "min_per_class": 4,
+    "classes": [
+      "extraction_long_context",
+      "instruction_constraints",
+      "arithmetic_reasoning",
+      "code_executable",
+      "tool_call_json",
+      "multi_turn_prose"
+    ],
+    "greedy_plus_three_seed_subset": 12,
+    "consumes_own_sampled_tokens": true,
+    "calibration_separated": true
+  },
+  "rubric": {
+    "blinded": true,
+    "scale": [0, 1, 2],
+    "dimensions": [
+      "instruction_compliance",
+      "factual_consistency",
+      "coherence_completion",
+      "repetition"
+    ],
+    "remote_judge_forbidden": true
+  },
+  "cache_reading": {
+    "path": "compressed_cache_decode",
+    "forbidden_path": "uncached_all_prefill",
+    "prefixes": [8192, 32768, 131040],
+    "scored_or_generated": 32,
+    "capacity": 131072,
+    "dispersed_retrieval": true,
+    "ppl_ratio_max_vs_post113": 1.01,
+    "pinned_llama_published_separately": true
+  },
+  "gdn_stress": {
+    "decode_updates": 2048,
+    "chunk_splits": [512, 1024, 2048],
+    "graph_eager": "exact_equivalence_same_path",
+    "cancellation": true,
+    "save_restore": true,
+    "divergent_prefix": true,
+    "seeded_sampler_continuation": true
+  },
+  "approximate_format": {
+    "layers": ["declared_quantizer_reference", "model_quality_admission"],
+    "do_not_apply_old_same_math_bitwise_gate_to_new_representation": true,
+    "corruption_is_not_acceptable_approximation": true,
+    "same_path_graph_eager_exact_equivalence": true,
+    "checkpoint_restore_exact_equivalence": true
+  },
+  "suite_classes": [
+    "teacher_forced_continuation",
+    "known_qwen_continuations",
+    "ppl_1024_spans",
+    "recurrence_nll",
+    "opt073_dual_verdict",
+    "held_out_32_alarm",
+    "finite_vocab_state_consistency"
+  ],
+  "report_fields": [
+    "strict_quality_pass",
+    "successor_quality_pass",
+    "absolute_task_quality",
+    "baseline_regression",
+    "cache_path_exercised",
+    "state_consistency"
+  ],
+  "openrouter": {
+    "default": "off",
+    "authoritative": false,
+    "pytest_network": false
+  },
+  "opt056_remains_blocked": true,
+  "opt016_remains_blocked": true,
+  "does_not_replace_opt056": true,
+  "does_not_replace_opt016": true,
+  "historical_failures_erased": false,
+  "single_boolean_verdict": false,
+  "proof_limit": [
+    "no throughput claim",
+    "no candidate kernel installed",
+    "no production kernel change",
+    "claims_throughput false",
+    "OpenRouter not invoked",
+    "OPT-056 and OPT-016 remain blocked",
+    "historical OPT-056/073 failures not erased",
+    "strict_quality_pass stays separate from successor_quality_pass",
+    "PPL ratio ≤ 1.01 vs post113 and OPT-084",
+    "recurrence incremental NLL ≤ 0.02",
+    "cross-arithmetic token identity is the successor change",
+    "OPT-091 1.015 late_w4 exception does not apply"
+  ],
+  "report_path": "evidence/optimization/opt116-generated-quality/REPORT.md"
+}

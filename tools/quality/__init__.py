@@ -1,7 +1,7 @@
 """OPT-083 ds4-style quality-testing runner modules for pinned Qwen3.8."""
 
 from tools.quality.compare import compare_engine_records, refuse_single_boolean
-from tools.quality.identity import scoring_identity
+from tools.quality.identity import encoding_identity, scoring_identity
 from tools.quality.quality_mode import (
     QUALITY_FLAG,
     QUALITY_SHORTCUTS,
@@ -16,6 +16,7 @@ __all__ = (
     "QUALITY_SHORTCUTS",
     "apply_quality_mode",
     "compare_engine_records",
+    "encoding_identity",
     "greedy_token",
     "openrouter_status",
     "quality_argv",

@@ -85,6 +85,22 @@ QUALITY_CONTRACT_SPECS: dict[str, dict[str, Any]] = {
         "allow_new_greedy_mismatch": False,
         "allow_changed_inherited_answer": False,
     },
+    # OPT-116 successor: same PPL/recurrence bounds as OPT-084. The only
+    # loosened admission is cross-arithmetic token identity. OPT-091's 1.015
+    # late_w4 exception does not apply.
+    "opt116_generated_v1": {
+        "quality_contract_id": "opt116_generated_v1",
+        "ppl_ratio_max": 1.01,
+        "aggregate_ppl_ratio_max": 1.01,
+        "recurrence_incremental_nll_max": 0.02,
+        "require_full_candidate_Q": True,
+        "allow_incomplete_quality": False,
+        "new_functional_failures_max": 0,
+        "allow_new_greedy_mismatch": True,
+        "allow_changed_inherited_answer": False,
+        "authority": "user_request_2026-09-13",
+        "does_not_relabel_opt016_opt056": True,
+    },
 }
 
 

@@ -314,7 +314,7 @@ OPT-124 assesses the remaining ceiling without claiming universal optimality.
 | ID | Description | Dependencies | Status | Acceptance condition | Evidence |
 |---|---|---|---|---|---|
 | OPT-115 | Audit complete-request memory traffic and establish conditional performance bounds | OPT-113, OPT-114 | done | Fresh post113/pinned-llama wall timelines, actual bytes and ownership by phase/context, reproducible bandwidth bounds, source-transfer matrix, and ranked pipeline opportunities; no speedup claim | [`tasks/OPT-115.md`](tasks/OPT-115.md); [`pins/opt115_pipeline_traffic_contract.json`](pins/opt115_pipeline_traffic_contract.json); [`pins/opt115_iteration_contract.json`](pins/opt115_iteration_contract.json); [`fixtures/opt115_pipeline_traffic.json`](fixtures/opt115_pipeline_traffic.json); [`tools/opt115_pipeline_traffic.py`](tools/opt115_pipeline_traffic.py); [`tests/test_opt115_pipeline_traffic.py`](tests/test_opt115_pipeline_traffic.py); [`cuda/opt115_pipeline_traffic_test.cu`](cuda/opt115_pipeline_traffic_test.cu); [`Makefile`](Makefile); [`evidence/optimization/opt115-pipeline-traffic/REPORT.md`](evidence/optimization/opt115-pipeline-traffic/REPORT.md); verification 2026-09-13T12:43:43Z |
-| OPT-116 | Freeze generated-text and long-context quality admission for precision experiments | OPT-113 | pending | Versioned candidate-independent rubric, free-running outputs, real cache/state-reading NLL and complete baseline evidence; strict and successor verdicts remain separate | [Dossier](tasks/OPT-116.md) |
+| OPT-116 | Freeze generated-text and long-context quality admission for precision experiments | OPT-113 | done | Versioned candidate-independent rubric, free-running outputs, real cache/state-reading NLL and complete baseline evidence; strict and successor verdicts remain separate | [`tasks/OPT-116.md`](tasks/OPT-116.md); [`pins/opt116_generated_quality_contract.json`](pins/opt116_generated_quality_contract.json); [`pins/opt116_iteration_contract.json`](pins/opt116_iteration_contract.json); [`fixtures/opt116_generated_quality.json`](fixtures/opt116_generated_quality.json); [`tools/opt116_generated_quality.py`](tools/opt116_generated_quality.py); [`tests/test_opt116_generated_quality.py`](tests/test_opt116_generated_quality.py); [`cuda/opt116_generated_quality_test.cu`](cuda/opt116_generated_quality_test.cu); [`Makefile`](Makefile); [`evidence/optimization/opt116-generated-quality/REPORT.md`](evidence/optimization/opt116-generated-quality/REPORT.md); verification 2026-09-13T13:29:43Z |
 | OPT-117 | Repair and evaluate capture of complete decode segments | OPT-115, OPT-116 | pending | Root-caused OPT-114 capture failure, same-arithmetic graph execution with dynamic-state/cancellation coverage, and complete-request keep/reject under shared gates | [Dossier](tasks/OPT-117.md) |
 | OPT-118 | Remove avoidable host/device transfers and state materialization | OPT-115, OPT-116, OPT-117 | pending | Measured copy/sync inventory drives at most two changes; committed state, sampling and public logits remain correct; complete-request and memory verdicts include graph interaction | [Dossier](tasks/OPT-118.md) |
 | OPT-119 | Reduce activation and prompt intermediate traffic across producer/consumer boundaries | OPT-115, OPT-116, OPT-118 | pending | At most two evidence-ranked pipeline slices reduce real bytes and pass full P/D/request, quality, state and memory gates; diagnostic microbenchmarks cannot admit a keep | [Dossier](tasks/OPT-119.md) |
@@ -7752,3 +7752,19 @@ statements below are historical, not the current execution order.
 - Key evidence: [`fixtures/opt115_pipeline_traffic.json`](fixtures/opt115_pipeline_traffic.json);
   [`evidence/optimization/opt115-pipeline-traffic/REPORT.md`](evidence/optimization/opt115-pipeline-traffic/REPORT.md).
 - OPT-115 marked `done`. Coupled IDs: none. First eligible pending task: **OPT-116**.
+
+### 2026-09-13T13:29:43Z — OPT-116 generated-text quality admission delivered
+
+- Froze successor contract `opt116_generated_v1` for precision experiments:
+  PPL ratio ≤1.01 vs authenticated post113 and OPT-084, recurrence incremental
+  NLL ≤0.02, zero non-finites; cross-arithmetic token-identity is the only
+  loosened admission. User request dated 2026-09-13 is recorded as authority.
+  No candidate promotion, no production kernel change, `claims_throughput=false`.
+- Live GPU baseline on RTX 5090 (`qw38-cuda:13.0.2`): compressed-cache
+  decode-path NLL at 8192/32768/131040+32 (4.19 / 2.27 / 0.00105 mean NLL),
+  32 greedy + 12×3-seed free-running generations, GDN 2048-step stress.
+  Report fields: strict/successor pass, absolute fail (inherited `task_arithmetic`),
+  baseline_regression pass, `cache_path_exercised=true`, `state_consistency=true`.
+- Key evidence: [`fixtures/opt116_generated_quality.json`](fixtures/opt116_generated_quality.json);
+  [`evidence/optimization/opt116-generated-quality/REPORT.md`](evidence/optimization/opt116-generated-quality/REPORT.md).
+- OPT-116 marked `done`. Coupled IDs: none. First eligible pending task: **OPT-117**.

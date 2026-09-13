@@ -16,7 +16,26 @@
       {
         "id": "qwen_capitals_paris",
         "identity": {
+          "encodings": {
+            "graph_path": "ffn_only",
+            "identical_graph_path": true,
+            "identical_kv_encoding": true,
+            "identical_quantizer_parameters": true,
+            "identical_state_encoding": true,
+            "identical_weight_encoding": true,
+            "mismatches": [],
+            "pass": true,
+            "weight_encoding": {
+              "ffn_decode": "paired_integer",
+              "q4_decode": "llama_q4k_mmvq",
+              "q6_decode": "integer_q8_1",
+              "q8_decode": "r1_w4",
+              "q8_path": "dp4a_q8_1"
+            }
+          },
           "identical_context_construction": true,
+          "identical_encodings": true,
+          "identical_graph_path": true,
           "identical_scoring_definition": true,
           "identical_target_tokens": true,
           "identical_tokenization": true,
@@ -71,7 +90,26 @@
       {
         "id": "qwen_two_plus_two",
         "identity": {
+          "encodings": {
+            "graph_path": "ffn_only",
+            "identical_graph_path": true,
+            "identical_kv_encoding": true,
+            "identical_quantizer_parameters": true,
+            "identical_state_encoding": true,
+            "identical_weight_encoding": true,
+            "mismatches": [],
+            "pass": true,
+            "weight_encoding": {
+              "ffn_decode": "paired_integer",
+              "q4_decode": "llama_q4k_mmvq",
+              "q6_decode": "integer_q8_1",
+              "q8_decode": "r1_w4",
+              "q8_path": "dp4a_q8_1"
+            }
+          },
           "identical_context_construction": true,
+          "identical_encodings": true,
+          "identical_graph_path": true,
           "identical_scoring_definition": true,
           "identical_target_tokens": true,
           "identical_tokenization": true,
@@ -244,8 +282,23 @@
         "ssd_streaming_approx",
         "truncated_softmax"
       ],
+      "does_not_restore_packed_or_r2": true,
       "enabled_shortcuts": [],
+      "encodings": {
+        "graph_path": "ffn_only",
+        "quantizer_parameters": {
+          "q4_staging": "paired_staged",
+          "q8_grouping": null
+        },
+        "weight_encoding": {
+          "ffn_decode": "paired_staged",
+          "q4_decode": "packed",
+          "q8_decode": "r2_w2",
+          "q8_path": "dp4a_q8_1"
+        }
+      },
       "flag": "--quality",
+      "graph_path": "ffn_only",
       "graph_vs_eager": "same_math_equivalence",
       "quality": true,
       "same_math_equivalence_not_different_kernel": true,
@@ -1336,6 +1389,7 @@
         "inspectable": true,
         "numerically_frozen_by": "OPT-084",
         "proposed_ppl_ratio_max": 1.01,
+        "quality_contract_id": null,
         "spans": [
           {
             "context_token": [
@@ -1630,6 +1684,7 @@
         "numerically_frozen_by": "OPT-084",
         "pass_vs_proposed": true,
         "proposed_max": 0.02,
+        "quality_contract_id": null,
         "recurrence_long": {
           "llama_mean_nll": 1.8402200970779121,
           "ppl_ratio": 0.9952613706400849,
@@ -1692,6 +1747,10 @@
           ],
           "inspectable": true,
           "llama_avg_nll": 0.029460121359251464,
+          "ppl_ratio": 1.0,
+          "ppl_ratio_max": 1.01,
+          "ppl_ratio_pass": true,
+          "quality_contract_id": "opt084_frozen",
           "quartz_avg_nll": 0.029460121359251464,
           "relative_nll_change": 0.0,
           "single_boolean": null,
@@ -1855,7 +1914,26 @@
         ],
         "identity": [
           {
+            "encodings": {
+              "graph_path": "ffn_only",
+              "identical_graph_path": true,
+              "identical_kv_encoding": true,
+              "identical_quantizer_parameters": true,
+              "identical_state_encoding": true,
+              "identical_weight_encoding": true,
+              "mismatches": [],
+              "pass": true,
+              "weight_encoding": {
+                "ffn_decode": "paired_integer",
+                "q4_decode": "llama_q4k_mmvq",
+                "q6_decode": "integer_q8_1",
+                "q8_decode": "r1_w4",
+                "q8_path": "dp4a_q8_1"
+              }
+            },
             "identical_context_construction": true,
+            "identical_encodings": true,
+            "identical_graph_path": true,
             "identical_scoring_definition": true,
             "identical_target_tokens": true,
             "identical_tokenization": true,
@@ -1865,7 +1943,26 @@
             "quartz_native": "build/qw38-cuda-opt058-quality-baseline-test"
           },
           {
+            "encodings": {
+              "graph_path": "ffn_only",
+              "identical_graph_path": true,
+              "identical_kv_encoding": true,
+              "identical_quantizer_parameters": true,
+              "identical_state_encoding": true,
+              "identical_weight_encoding": true,
+              "mismatches": [],
+              "pass": true,
+              "weight_encoding": {
+                "ffn_decode": "paired_integer",
+                "q4_decode": "llama_q4k_mmvq",
+                "q6_decode": "integer_q8_1",
+                "q8_decode": "r1_w4",
+                "q8_path": "dp4a_q8_1"
+              }
+            },
             "identical_context_construction": true,
+            "identical_encodings": true,
+            "identical_graph_path": true,
             "identical_scoring_definition": true,
             "identical_target_tokens": true,
             "identical_tokenization": true,
@@ -1877,6 +1974,8 @@
         ],
         "inspectable": true,
         "llama_control_scorer": "tools/run_llama_quality_reference.py",
+        "ppl_ratio_max": 1.01,
+        "quality_contract_id": "opt084_frozen",
         "quartz_scorer": "build/qw38-cuda-opt058-quality-baseline-test"
       }
     },
@@ -1902,6 +2001,7 @@
       "quartz_vs_shipping_baseline_regression": "primary_candidate_gate",
       "recurrence_incremental_nll_max": 0.02
     },
+    "quality_contract_id": "opt084_frozen",
     "same_model_comparison_with_ds4": false,
     "suite_class_names": [
       "teacher_forced_continuation",

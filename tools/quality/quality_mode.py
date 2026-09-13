@@ -113,6 +113,20 @@ def apply_quality_mode(
                     f"--quality restored default {key}={effective.get(key)!r} "
                     f"over {selectors[key]!r}"
                 )
+    graph_path = str(effective.get("execution_graphs") or "ffn_only")
+    encodings = {
+        "weight_encoding": {
+            "q4_decode": effective.get("q4_decode"),
+            "q8_decode": effective.get("q8_decode"),
+            "q8_path": effective.get("q8_path"),
+            "ffn_decode": effective.get("ffn_decode") or effective.get("q4_staging"),
+        },
+        "quantizer_parameters": {
+            "q4_staging": effective.get("q4_staging"),
+            "q8_grouping": effective.get("q8_grouping"),
+        },
+        "graph_path": graph_path,
+    }
     return {
         "quality": enabled,
         "flag": QUALITY_FLAG,
@@ -121,6 +135,8 @@ def apply_quality_mode(
         "disabled_shortcuts": [name for name, on in active.items() if not on],
         "enabled_shortcuts": [name for name, on in active.items() if on],
         "selectors": effective,
+        "encodings": encodings,
+        "graph_path": graph_path,
         "delta": dict(QUALITY_DELTA),
         "graph_vs_eager": "same_math_equivalence",
         "same_math_equivalence_not_different_kernel": True,
