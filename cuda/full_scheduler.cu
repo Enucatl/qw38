@@ -1171,6 +1171,155 @@ __global__ void residual_add_norm_rows_fp32_to_bf16_parallel(
   }
 }
 
+constexpr int kMmqQ8TileInts = 36;
+
+template <QuantKind Kind>
+__device__ __forceinline__ void store_mmq_q8_1_lane(std::uint8_t* y,
+                                                    std::size_t prompt_rows,
+                                                    std::size_t row,
+                                                    std::size_t col,
+                                                    float value) {
+  const int lane = static_cast<int>(threadIdx.x) & 31;
+  float maximum = fabsf(value);
+  for (int offset = 16; offset > 0; offset /= 2) {
+    maximum = fmaxf(maximum, __shfl_xor_sync(0xFFFFFFFFU, maximum, offset, 32));
+  }
+  const float scale = maximum == 0.0F ? 0.0F : maximum / 127.0F;
+  float prequant_sum = 0.0F;
+  if constexpr (Kind == QuantKind::kQ4K) {
+    prequant_sum = value;
+    for (int offset = 16; offset > 0; offset /= 2) {
+      prequant_sum += __shfl_xor_sync(0xFFFFFFFFU, prequant_sum, offset, 32);
+    }
+  }
+  const int q = scale == 0.0F ? 0 : static_cast<int>(roundf(value / scale));
+  const std::size_t k32 = col / 32;
+  const std::size_t k_block = k32 / 4;
+  const std::size_t group = k32 % 4;
+  std::uint8_t* block =
+      y + (k_block * prompt_rows + row) * (kMmqQ8TileInts * sizeof(int));
+  reinterpret_cast<std::int8_t*>(block + 16)[group * 32 + lane] =
+      static_cast<std::int8_t>(q);
+  if (lane == 0) {
+    if constexpr (Kind == QuantKind::kQ4K) {
+      reinterpret_cast<half2*>(block)[group] = make_half2(scale, prequant_sum);
+    } else {
+      reinterpret_cast<float*>(block)[group] = scale;
+    }
+  }
+}
+
+template <QuantKind Kind>
+__device__ __forceinline__ void store_norm_bf16_and_q8(
+    const float* row_input, const float* row_scale, std::size_t width,
+    std::size_t row, std::size_t prompt_rows, float inverse,
+    __nv_bfloat16* row_normalized, std::uint8_t* q8) {
+  for (std::size_t index = threadIdx.x; index < width; index += blockDim.x) {
+    const __nv_bfloat16 stored =
+        rms_norm_store_bf16(row_input[index], inverse, row_scale[index]);
+    if (row_normalized != nullptr && row + 1 == prompt_rows) {
+      row_normalized[index] = stored;
+    }
+    store_mmq_q8_1_lane<Kind>(q8, prompt_rows, row, index,
+                              __bfloat162float(stored));
+  }
+}
+
+template <QuantKind Kind, bool UseRsqrt>
+__global__ void rms_norm_rows_fp32_to_mmq_q8_1_parallel(
+    const float* input, const float* scale, std::size_t width,
+    std::uint8_t* q8, __nv_bfloat16* normalized) {
+  quartz_pdl_sync();
+  const std::size_t row = blockIdx.x;
+  const std::size_t prompt_rows = gridDim.x;
+  const float* row_input = input + row * width;
+  __nv_bfloat16* row_normalized =
+      normalized == nullptr ? nullptr : normalized + row * width;
+  const float inverse = cooperative_rms_inverse_fp32<UseRsqrt>(row_input, width);
+  store_norm_bf16_and_q8<Kind>(row_input, scale, width, row, prompt_rows,
+                               inverse, row_normalized, q8);
+  quartz_pdl_lc();
+}
+
+template <QuantKind Kind>
+__global__ void rms_norm_rows_fp32_to_mmq_q8_1_serial(
+    const float* input, const float* scale, std::size_t width, std::uint8_t* q8,
+    __nv_bfloat16* normalized) {
+  quartz_pdl_sync();
+  const std::size_t row = blockIdx.x;
+  const std::size_t prompt_rows = gridDim.x;
+  const float* row_input = input + row * width;
+  __nv_bfloat16* row_normalized =
+      normalized == nullptr ? nullptr : normalized + row * width;
+  __shared__ float inverse;
+  if (threadIdx.x == 0) {
+    float sum = 0.0F;
+    for (std::size_t index = 0; index < width; ++index) {
+      sum = __fadd_rn(sum, __fmul_rn(row_input[index], row_input[index]));
+    }
+    inverse = 1.0F / sqrtf(sum / static_cast<float>(width) + 1.0e-6F);
+  }
+  __syncthreads();
+  store_norm_bf16_and_q8<Kind>(row_input, scale, width, row, prompt_rows,
+                               inverse, row_normalized, q8);
+  quartz_pdl_lc();
+}
+
+template <QuantKind Kind, bool UseRsqrt>
+__global__ void residual_add_norm_rows_fp32_to_mmq_q8_1_parallel(
+    const float* residual, const float* correction, const float* scale,
+    std::size_t width, float* output, std::uint8_t* q8,
+    __nv_bfloat16* normalized) {
+  quartz_pdl_sync();
+  const std::size_t row = blockIdx.x;
+  const std::size_t prompt_rows = gridDim.x;
+  const float* row_residual = residual + row * width;
+  const float* row_correction = correction + row * width;
+  float* row_output = output + row * width;
+  __nv_bfloat16* row_normalized =
+      normalized == nullptr ? nullptr : normalized + row * width;
+  for (std::size_t index = threadIdx.x; index < width; index += blockDim.x) {
+    row_output[index] = __fadd_rn(row_residual[index], row_correction[index]);
+  }
+  __syncthreads();
+  const float inverse = cooperative_rms_inverse_fp32<UseRsqrt>(row_output, width);
+  store_norm_bf16_and_q8<Kind>(row_output, scale, width, row, prompt_rows,
+                               inverse, row_normalized, q8);
+  quartz_pdl_lc();
+}
+
+template <QuantKind Kind>
+__global__ void residual_add_norm_rows_fp32_to_mmq_q8_1_serial(
+    const float* residual, const float* correction, const float* scale,
+    std::size_t width, float* output, std::uint8_t* q8,
+    __nv_bfloat16* normalized) {
+  quartz_pdl_sync();
+  const std::size_t row = blockIdx.x;
+  const std::size_t prompt_rows = gridDim.x;
+  const float* row_residual = residual + row * width;
+  const float* row_correction = correction + row * width;
+  float* row_output = output + row * width;
+  __nv_bfloat16* row_normalized =
+      normalized == nullptr ? nullptr : normalized + row * width;
+  for (std::size_t index = threadIdx.x; index < width; index += blockDim.x) {
+    row_output[index] = __fadd_rn(row_residual[index], row_correction[index]);
+  }
+  __syncthreads();
+  __shared__ float inverse;
+  if (threadIdx.x == 0) {
+    float sum = 0.0F;
+    for (std::size_t index = 0; index < width; ++index) {
+      const float value = row_output[index];
+      sum = __fadd_rn(sum, __fmul_rn(value, value));
+    }
+    inverse = 1.0F / sqrtf(sum / static_cast<float>(width) + 1.0e-6F);
+  }
+  __syncthreads();
+  store_norm_bf16_and_q8<Kind>(row_output, scale, width, row, prompt_rows,
+                               inverse, row_normalized, q8);
+  quartz_pdl_lc();
+}
+
 __global__ void compare_bytes(const std::uint8_t* left,
                               const std::uint8_t* right,
                               std::size_t count,
@@ -1629,17 +1778,24 @@ cudaError_t execute_prompt_ffn_projections(
     leaf_timings->swiglu_fused_with_down_stage = swiglu_q8;
   }
   if (share_y) {
-    error = begin_phase(leaves,
-                        leaf_timings == nullptr
-                            ? nullptr
-                            : &leaf_timings->activation_staging_ffn,
-                        stream);
-    if (error == cudaSuccess) {
-      error = launch_quantize_mmq_q8_1(
-          QuantKind::kQ4K, workspace->prompt_normalized_, token_count,
-          internal::kResidualWidth, workspace->prompt_q8_, stream);
+    const bool fused_ffn_q8 =
+        ffn_norm_q8_fusion_enabled() && ffn_shares_gate_up_y();
+    if (!fused_ffn_q8) {
+      error = begin_phase(leaves,
+                          leaf_timings == nullptr
+                              ? nullptr
+                              : &leaf_timings->activation_staging_ffn,
+                          stream);
+      if (error == cudaSuccess) {
+        error = launch_quantize_mmq_q8_1(
+            QuantKind::kQ4K, workspace->prompt_normalized_, token_count,
+            internal::kResidualWidth, workspace->prompt_q8_, stream);
+        if (error == cudaSuccess) {
+          ++workspace->activation_ffn_quantize_launches_;
+        }
+      }
+      if (error == cudaSuccess) error = end_phase(leaves);
     }
-    if (error == cudaSuccess) error = end_phase(leaves);
     const bool prompt_paired =
         ffn_prompt_uses_paired() && !ffn_prompt_pair_trace_unfused();
     if (prompt_paired) {
@@ -2070,10 +2226,20 @@ cudaError_t execute_prompt_ffn_attributed(
       leaves, leaf_timings == nullptr ? nullptr : &leaf_timings->residual_ffn,
       stream);
   if (error == cudaSuccess) {
-    error = launch_residual_add_norm_rows_fp32_to_bf16(
-        residual, workspace->prompt_mixer_output_, layer.ffn_norm,
-        internal::kResidualWidth, token_count, after_mixer,
-        workspace->prompt_normalized_, stream);
+    if (ffn_norm_q8_fusion_enabled() && ffn_shares_gate_up_y()) {
+      error = launch_residual_add_norm_rows_fp32_to_mmq_q8_1(
+          QuantKind::kQ4K, residual, workspace->prompt_mixer_output_,
+          layer.ffn_norm, internal::kResidualWidth, token_count, after_mixer,
+          workspace->prompt_q8_, workspace->prompt_normalized_, stream);
+      if (error == cudaSuccess) {
+        ++workspace->activation_ffn_norm_q8_launches_;
+      }
+    } else {
+      error = launch_residual_add_norm_rows_fp32_to_bf16(
+          residual, workspace->prompt_mixer_output_, layer.ffn_norm,
+          internal::kResidualWidth, token_count, after_mixer,
+          workspace->prompt_normalized_, stream);
+    }
   }
   if (error == cudaSuccess) error = end_phase(leaves);
   if (error == cudaSuccess && capture != nullptr) {
@@ -2095,10 +2261,20 @@ cudaError_t execute_prompt_ffn_attributed(
   }
   if (error == cudaSuccess) {
     if (next_input_norm != nullptr) {
-      error = launch_residual_add_norm_rows_fp32_to_bf16(
-          after_mixer, workspace->prompt_mixer_output_, next_input_norm,
-          internal::kResidualWidth, token_count, output,
-          workspace->prompt_normalized_, stream);
+      if (mixer_norm_q8_fusion_enabled()) {
+        error = launch_residual_add_norm_rows_fp32_to_mmq_q8_1(
+            QuantKind::kQ8_0, after_mixer, workspace->prompt_mixer_output_,
+            next_input_norm, internal::kResidualWidth, token_count, output,
+            workspace->prompt_q8_, workspace->prompt_normalized_, stream);
+        if (error == cudaSuccess) {
+          ++workspace->activation_mixer_norm_q8_launches_;
+        }
+      } else {
+        error = launch_residual_add_norm_rows_fp32_to_bf16(
+            after_mixer, workspace->prompt_mixer_output_, next_input_norm,
+            internal::kResidualWidth, token_count, output,
+            workspace->prompt_normalized_, stream);
+      }
     } else {
       error = launch_residual_add_fp32(
           after_mixer, workspace->prompt_mixer_output_,
@@ -2178,20 +2354,41 @@ cudaError_t execute_prompt_ffn(
     SchedulerWorkspace* workspace, float* after_mixer, float* output,
     const float* next_input_norm, std::size_t token_count,
     cudaStream_t stream) noexcept {
-  cudaError_t error = launch_residual_add_norm_rows_fp32_to_bf16(
-      residual, workspace->prompt_mixer_output_, layer.ffn_norm,
-      internal::kResidualWidth, token_count, after_mixer,
-      workspace->prompt_normalized_, stream);
+  cudaError_t error;
+  if (ffn_norm_q8_fusion_enabled() && ffn_shares_gate_up_y()) {
+    error = launch_residual_add_norm_rows_fp32_to_mmq_q8_1(
+        QuantKind::kQ4K, residual, workspace->prompt_mixer_output_,
+        layer.ffn_norm, internal::kResidualWidth, token_count, after_mixer,
+        workspace->prompt_q8_, workspace->prompt_normalized_, stream);
+    if (error == cudaSuccess) {
+      ++workspace->activation_ffn_norm_q8_launches_;
+    }
+  } else {
+    error = launch_residual_add_norm_rows_fp32_to_bf16(
+        residual, workspace->prompt_mixer_output_, layer.ffn_norm,
+        internal::kResidualWidth, token_count, after_mixer,
+        workspace->prompt_normalized_, stream);
+  }
   if (error == cudaSuccess) {
     error = execute_prompt_ffn_projections(layer, workspace, token_count,
                                            stream);
   }
   if (error == cudaSuccess) {
     if (next_input_norm != nullptr) {
-      error = launch_residual_add_norm_rows_fp32_to_bf16(
-          after_mixer, workspace->prompt_mixer_output_, next_input_norm,
-          internal::kResidualWidth, token_count, output,
-          workspace->prompt_normalized_, stream);
+      if (mixer_norm_q8_fusion_enabled()) {
+        error = launch_residual_add_norm_rows_fp32_to_mmq_q8_1(
+            QuantKind::kQ8_0, after_mixer, workspace->prompt_mixer_output_,
+            next_input_norm, internal::kResidualWidth, token_count, output,
+            workspace->prompt_q8_, workspace->prompt_normalized_, stream);
+        if (error == cudaSuccess) {
+          ++workspace->activation_mixer_norm_q8_launches_;
+        }
+      } else {
+        error = launch_residual_add_norm_rows_fp32_to_bf16(
+            after_mixer, workspace->prompt_mixer_output_, next_input_norm,
+            internal::kResidualWidth, token_count, output,
+            workspace->prompt_normalized_, stream);
+      }
     } else {
       error = launch_residual_add_fp32(
           after_mixer, workspace->prompt_mixer_output_,
@@ -2273,6 +2470,98 @@ cudaError_t launch_residual_add_norm_rows_fp32_to_bf16(
   return launch_residual_add_norm_rows_dispatch(
       residual, correction, scale, width, token_count, output, normalized,
       stream);
+}
+
+cudaError_t launch_rms_norm_rows_fp32_to_mmq_q8_1(
+    QuantKind kind, const float* input, const float* scale, std::size_t width,
+    std::size_t token_count, Q8Block* q8, __nv_bfloat16* normalized,
+    cudaStream_t stream) noexcept {
+  if (input == nullptr || scale == nullptr || q8 == nullptr || width == 0 ||
+      token_count == 0 || width % 32 != 0 ||
+      (kind != QuantKind::kQ4K && kind != QuantKind::kQ8_0)) {
+    return cudaErrorInvalidValue;
+  }
+  auto* packed = reinterpret_cast<std::uint8_t*>(q8);
+  const dim3 grid(static_cast<unsigned int>(token_count));
+  if (rms_norm_uses_serial()) {
+    if (kind == QuantKind::kQ4K) {
+      return quartz_launch_kernel(rms_norm_rows_fp32_to_mmq_q8_1_serial<QuantKind::kQ4K>,
+                                  grid, dim3(kThreads), 0, stream, input, scale,
+                                  width, packed, normalized);
+    }
+    return quartz_launch_kernel(rms_norm_rows_fp32_to_mmq_q8_1_serial<QuantKind::kQ8_0>,
+                                grid, dim3(kThreads), 0, stream, input, scale,
+                                width, packed, normalized);
+  }
+  const dim3 block(static_cast<unsigned int>(rms_norm_block_threads()));
+  if (kind == QuantKind::kQ4K) {
+    if (rms_norm_uses_rsqrt()) {
+      return quartz_launch_kernel(
+          rms_norm_rows_fp32_to_mmq_q8_1_parallel<QuantKind::kQ4K, true>, grid,
+          block, 0, stream, input, scale, width, packed, normalized);
+    }
+    return quartz_launch_kernel(
+        rms_norm_rows_fp32_to_mmq_q8_1_parallel<QuantKind::kQ4K, false>, grid,
+        block, 0, stream, input, scale, width, packed, normalized);
+  }
+  if (rms_norm_uses_rsqrt()) {
+    return quartz_launch_kernel(
+        rms_norm_rows_fp32_to_mmq_q8_1_parallel<QuantKind::kQ8_0, true>, grid,
+        block, 0, stream, input, scale, width, packed, normalized);
+  }
+  return quartz_launch_kernel(
+      rms_norm_rows_fp32_to_mmq_q8_1_parallel<QuantKind::kQ8_0, false>, grid,
+      block, 0, stream, input, scale, width, packed, normalized);
+}
+
+cudaError_t launch_residual_add_norm_rows_fp32_to_mmq_q8_1(
+    QuantKind kind, const float* residual, const float* correction,
+    const float* scale, std::size_t width, std::size_t token_count,
+    float* output, Q8Block* q8, __nv_bfloat16* normalized,
+    cudaStream_t stream) noexcept {
+  if (residual == nullptr || correction == nullptr || scale == nullptr ||
+      output == nullptr || q8 == nullptr || width == 0 || token_count == 0 ||
+      width % 32 != 0 ||
+      (kind != QuantKind::kQ4K && kind != QuantKind::kQ8_0)) {
+    return cudaErrorInvalidValue;
+  }
+  auto* packed = reinterpret_cast<std::uint8_t*>(q8);
+  const dim3 grid(static_cast<unsigned int>(token_count));
+  if (rms_norm_uses_serial()) {
+    if (kind == QuantKind::kQ4K) {
+      return quartz_launch_kernel(
+          residual_add_norm_rows_fp32_to_mmq_q8_1_serial<QuantKind::kQ4K>, grid,
+          dim3(kThreads), 0, stream, residual, correction, scale, width, output,
+          packed, normalized);
+    }
+    return quartz_launch_kernel(
+        residual_add_norm_rows_fp32_to_mmq_q8_1_serial<QuantKind::kQ8_0>, grid,
+        dim3(kThreads), 0, stream, residual, correction, scale, width, output,
+        packed, normalized);
+  }
+  const dim3 block(static_cast<unsigned int>(rms_norm_block_threads()));
+  if (kind == QuantKind::kQ4K) {
+    if (rms_norm_uses_rsqrt()) {
+      return quartz_launch_kernel(
+          residual_add_norm_rows_fp32_to_mmq_q8_1_parallel<QuantKind::kQ4K, true>,
+          grid, block, 0, stream, residual, correction, scale, width, output,
+          packed, normalized);
+    }
+    return quartz_launch_kernel(
+        residual_add_norm_rows_fp32_to_mmq_q8_1_parallel<QuantKind::kQ4K, false>,
+        grid, block, 0, stream, residual, correction, scale, width, output,
+        packed, normalized);
+  }
+  if (rms_norm_uses_rsqrt()) {
+    return quartz_launch_kernel(
+        residual_add_norm_rows_fp32_to_mmq_q8_1_parallel<QuantKind::kQ8_0, true>,
+        grid, block, 0, stream, residual, correction, scale, width, output,
+        packed, normalized);
+  }
+  return quartz_launch_kernel(
+      residual_add_norm_rows_fp32_to_mmq_q8_1_parallel<QuantKind::kQ8_0, false>,
+      grid, block, 0, stream, residual, correction, scale, width, output,
+      packed, normalized);
 }
 
 cudaError_t launch_rms_norm_fp32_to_bf16(const float* input, const float* scale,
@@ -5532,11 +5821,22 @@ Status execute_prompt_chunk(
                             stream);
       }
       if (error == cudaSuccess) {
-        error = launch_rms_norm_rows_fp32_to_bf16(
-            residual, layer.common.input_norm, internal::kResidualWidth,
-            rows, workspace->prompt_normalized_, stream);
-        if (error == cudaSuccess) {
-          bump(counters, &PromptPipelineCounters::rms_norm_kernel_launches);
+        if (mixer_norm_q8_fusion_enabled()) {
+          error = launch_rms_norm_rows_fp32_to_mmq_q8_1(
+              QuantKind::kQ8_0, residual, layer.common.input_norm,
+              internal::kResidualWidth, rows, workspace->prompt_q8_,
+              workspace->prompt_normalized_, stream);
+          if (error == cudaSuccess) {
+            bump(counters, &PromptPipelineCounters::rms_norm_kernel_launches);
+            ++workspace->activation_mixer_norm_q8_launches_;
+          }
+        } else {
+          error = launch_rms_norm_rows_fp32_to_bf16(
+              residual, layer.common.input_norm, internal::kResidualWidth,
+              rows, workspace->prompt_normalized_, stream);
+          if (error == cudaSuccess) {
+            bump(counters, &PromptPipelineCounters::rms_norm_kernel_launches);
+          }
         }
       }
       if (error == cudaSuccess) error = end_phase(leaves);
@@ -5554,19 +5854,22 @@ Status execute_prompt_chunk(
       if (error == cudaSuccess) {
         error = begin_phase(categories, mixer_mmq, stream);
       }
-      if (error == cudaSuccess) {
+      if (error == cudaSuccess && !mixer_norm_q8_fusion_enabled()) {
         error = begin_phase(leaves,
                             leaf_timings == nullptr
                                 ? nullptr
                                 : &leaf_timings->activation_staging_mixer,
                             stream);
+        if (error == cudaSuccess) {
+          error = launch_quantize_mmq_q8_1(
+              QuantKind::kQ8_0, workspace->prompt_normalized_, rows,
+              internal::kResidualWidth, workspace->prompt_q8_, stream);
+          if (error == cudaSuccess) {
+            ++workspace->activation_mixer_quantize_launches_;
+          }
+        }
+        if (error == cudaSuccess) error = end_phase(leaves);
       }
-      if (error == cudaSuccess) {
-        error = launch_quantize_mmq_q8_1(
-            QuantKind::kQ8_0, workspace->prompt_normalized_, rows,
-            internal::kResidualWidth, workspace->prompt_q8_, stream);
-      }
-      if (error == cudaSuccess) error = end_phase(leaves);
       if (gdn_layer) {
         if (error == cudaSuccess) {
           error = begin_phase(leaves, leaf_timings == nullptr
@@ -5960,11 +6263,22 @@ Status execute_prompt_chunk(
           bump(counters, &PromptPipelineCounters::residual_add_kernel_launches);
         }
         if (error == cudaSuccess) {
-          error = launch_rms_norm_rows_fp32_to_bf16(
-              after_mixer, layer.common.ffn_norm, internal::kResidualWidth,
-              rows, workspace->prompt_normalized_, stream);
-          if (error == cudaSuccess) {
-            bump(counters, &PromptPipelineCounters::rms_norm_kernel_launches);
+          if (ffn_norm_q8_fusion_enabled() && ffn_shares_gate_up_y()) {
+            error = launch_rms_norm_rows_fp32_to_mmq_q8_1(
+                QuantKind::kQ4K, after_mixer, layer.common.ffn_norm,
+                internal::kResidualWidth, rows, workspace->prompt_q8_,
+                workspace->prompt_normalized_, stream);
+            if (error == cudaSuccess) {
+              bump(counters, &PromptPipelineCounters::rms_norm_kernel_launches);
+              ++workspace->activation_ffn_norm_q8_launches_;
+            }
+          } else {
+            error = launch_rms_norm_rows_fp32_to_bf16(
+                after_mixer, layer.common.ffn_norm, internal::kResidualWidth,
+                rows, workspace->prompt_normalized_, stream);
+            if (error == cudaSuccess) {
+              bump(counters, &PromptPipelineCounters::rms_norm_kernel_launches);
+            }
           }
         }
         if (error == cudaSuccess) {

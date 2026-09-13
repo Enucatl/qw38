@@ -872,6 +872,9 @@ int score_case(const qw38::cuda::ResidentModel& model, const BundleCase& item,
         logits.data(), logits.size(), hidden.data(), hidden.size(), &sync,
         nullptr, graphs);
     if (!status.is_ok()) return fail_status(status);
+    status = session->copy_last_outputs(logits.data(), logits.size(),
+                                        hidden.data(), hidden.size());
+    if (!status.is_ok()) return fail_status(status);
   }
   double total = 0.0;
   *scored = 0;
@@ -890,6 +893,9 @@ int score_case(const qw38::cuda::ResidentModel& model, const BundleCase& item,
         model, target, session, workspace, logits.data(), logits.size(),
         hidden.data(), hidden.size(), &elapsed, nullptr, nullptr,
         qw38::cuda::PointwisePath::kFused, graphs);
+    if (!status.is_ok()) return fail_status(status);
+    status = session->copy_last_outputs(logits.data(), logits.size(),
+                                        hidden.data(), hidden.size());
     if (!status.is_ok()) return fail_status(status);
   }
   *mean_nll = total / static_cast<double>(*scored);

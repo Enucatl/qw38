@@ -1,0 +1,96 @@
+{
+  "schema_version": 1,
+  "task": "OPT-119",
+  "yardstick": "reduce_activation_traffic_across_pipeline_boundaries",
+  "claims_throughput": true,
+  "claims_performance_improvement": true,
+  "opt074_family_admission_required": false,
+  "opt074_coverage_unadmitted_is_blocker": false,
+  "llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+  "gguf_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+  "token_generator": "(42 + index * 997) % 248320",
+  "parent": "post113_selected",
+  "parent_execution_graphs": "ffn_only",
+  "parent_stack": "opt118_kept_lazy_overlap_ffn_only",
+  "candidate": "norm_q8_pipeline",
+  "candidate_a": "mixer_rms_norm_to_mmq_q8_0",
+  "candidate_b": "ffn_residual_norm_to_mmq_q4k",
+  "max_changes": 2,
+  "primary_target": "prefill",
+  "selected_mixer_norm_q8_fusion": true,
+  "selected_ffn_norm_q8_fusion": true,
+  "aa_warmups": 3,
+  "aa_pairs": 10,
+  "screen_pairs": 5,
+  "decode_output_tokens": 256,
+  "target_workloads": [
+    "p4096"
+  ],
+  "non_target_workloads": [
+    "d128",
+    "d2048"
+  ],
+  "tail_prefixes": [
+    2048,
+    5120,
+    8192
+  ],
+  "throughput_ratio_lower_bound": 1.0,
+  "non_target_point_ratio_min": 0.98,
+  "decode_p95_ratio_max": 1.05,
+  "ppl_ratio_max": 1.01,
+  "recurrence_incremental_nll_max": 0.02,
+  "encodings": {
+    "mixer_q8": "mmq_q8_0_float_scale",
+    "ffn_q8": "mmq_q4k_half2_scale_sum",
+    "not_interchangeable": [
+      "q8_1_decode",
+      "q8block_fp32_scale",
+      "mmq_q8_0",
+      "mmq_q4k"
+    ],
+    "bf16_rounding_retained": true
+  },
+  "native_test": "build/qw38-cuda-opt119-activation-pipeline-test",
+  "diagnostics_make_target": "cuda-opt119-diagnostics",
+  "opt116_quality_contract": "opt116_generated_v1",
+  "require_candidate_nll": true,
+  "required_fixture_keys": [
+    "schema_version",
+    "task",
+    "mode",
+    "llama_revision",
+    "gguf_sha256",
+    "parent",
+    "candidate",
+    "primary_target",
+    "inventory",
+    "same_math",
+    "tails",
+    "quality",
+    "state_memory",
+    "performance",
+    "shipping_mixer_norm_q8_fusion",
+    "shipping_ffn_norm_q8_fusion",
+    "production_kept",
+    "verdict",
+    "report_path"
+  ],
+  "independent_verdicts": [
+    "inventory_ok",
+    "same_math_pass",
+    "tails_pass",
+    "model_quality_pass",
+    "state_memory_pass",
+    "performance_pass",
+    "production_kept"
+  ],
+  "verdicts": [
+    "keep",
+    "reject",
+    "zero_redundancy",
+    "quality_blocked",
+    "inconclusive"
+  ],
+  "report_path": "evidence/optimization/opt119-activation-pipeline/REPORT.md"
+}

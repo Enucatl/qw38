@@ -37,8 +37,14 @@ const char* selected_execution_graph_path() noexcept;
 constexpr bool kSelectedLazyOutputMaterialization = true;
 constexpr bool kSelectedOutputCommitOverlap = true;
 
+// OPT-119. Prefill producer/consumer fusion. Pins stay false unless kept.
+constexpr bool kSelectedMixerNormQ8Fusion = true;
+constexpr bool kSelectedFfnNormQ8Fusion = true;
+
 inline thread_local int g_lazy_output_override = -1;
 inline thread_local int g_output_overlap_override = -1;
+inline thread_local int g_mixer_norm_q8_override = -1;
+inline thread_local int g_ffn_norm_q8_override = -1;
 
 inline bool lazy_output_materialization_enabled() noexcept {
   return g_lazy_output_override >= 0 ? g_lazy_output_override != 0
@@ -64,6 +70,32 @@ inline void set_output_commit_overlap_override(bool enabled) noexcept {
 
 inline void clear_output_commit_overlap_override() noexcept {
   g_output_overlap_override = -1;
+}
+
+inline bool mixer_norm_q8_fusion_enabled() noexcept {
+  return g_mixer_norm_q8_override >= 0 ? g_mixer_norm_q8_override != 0
+                                       : kSelectedMixerNormQ8Fusion;
+}
+
+inline bool ffn_norm_q8_fusion_enabled() noexcept {
+  return g_ffn_norm_q8_override >= 0 ? g_ffn_norm_q8_override != 0
+                                    : kSelectedFfnNormQ8Fusion;
+}
+
+inline void set_mixer_norm_q8_fusion_override(bool enabled) noexcept {
+  g_mixer_norm_q8_override = enabled ? 1 : 0;
+}
+
+inline void clear_mixer_norm_q8_fusion_override() noexcept {
+  g_mixer_norm_q8_override = -1;
+}
+
+inline void set_ffn_norm_q8_fusion_override(bool enabled) noexcept {
+  g_ffn_norm_q8_override = enabled ? 1 : 0;
+}
+
+inline void clear_ffn_norm_q8_fusion_override() noexcept {
+  g_ffn_norm_q8_override = -1;
 }
 
 struct PromptMicrobatchRowsScope final {
@@ -92,6 +124,24 @@ struct OutputOverlapScope final {
   ~OutputOverlapScope() { clear_output_commit_overlap_override(); }
   OutputOverlapScope(const OutputOverlapScope&) = delete;
   OutputOverlapScope& operator=(const OutputOverlapScope&) = delete;
+};
+
+struct MixerNormQ8FusionScope final {
+  explicit MixerNormQ8FusionScope(bool enabled) noexcept {
+    set_mixer_norm_q8_fusion_override(enabled);
+  }
+  ~MixerNormQ8FusionScope() { clear_mixer_norm_q8_fusion_override(); }
+  MixerNormQ8FusionScope(const MixerNormQ8FusionScope&) = delete;
+  MixerNormQ8FusionScope& operator=(const MixerNormQ8FusionScope&) = delete;
+};
+
+struct FfnNormQ8FusionScope final {
+  explicit FfnNormQ8FusionScope(bool enabled) noexcept {
+    set_ffn_norm_q8_fusion_override(enabled);
+  }
+  ~FfnNormQ8FusionScope() { clear_ffn_norm_q8_fusion_override(); }
+  FfnNormQ8FusionScope(const FfnNormQ8FusionScope&) = delete;
+  FfnNormQ8FusionScope& operator=(const FfnNormQ8FusionScope&) = delete;
 };
 
 struct DeviceTensor final {
@@ -680,6 +730,10 @@ class SchedulerWorkspace final {
   std::uint32_t transfer_h2d_copies_ = 0;
   std::uint32_t transfer_d2h_copies_ = 0;
   std::uint32_t transfer_d2d_copies_ = 0;
+  std::uint32_t activation_mixer_quantize_launches_ = 0;
+  std::uint32_t activation_ffn_quantize_launches_ = 0;
+  std::uint32_t activation_mixer_norm_q8_launches_ = 0;
+  std::uint32_t activation_ffn_norm_q8_launches_ = 0;
 
   void reset_transfer_counters() noexcept {
     transfer_h2d_bytes_ = 0;
@@ -688,6 +742,10 @@ class SchedulerWorkspace final {
     transfer_h2d_copies_ = 0;
     transfer_d2h_copies_ = 0;
     transfer_d2d_copies_ = 0;
+    activation_mixer_quantize_launches_ = 0;
+    activation_ffn_quantize_launches_ = 0;
+    activation_mixer_norm_q8_launches_ = 0;
+    activation_ffn_norm_q8_launches_ = 0;
   }
 
   friend Status execute_token(const ResidentModel&, std::size_t,
@@ -883,6 +941,17 @@ cudaError_t launch_residual_add_norm_rows_fp32_to_bf16(
     const float* residual, const float* correction, const float* scale,
     std::size_t width, std::size_t token_count, float* output,
     __nv_bfloat16* normalized, cudaStream_t stream) noexcept;
+
+cudaError_t launch_rms_norm_rows_fp32_to_mmq_q8_1(
+    QuantKind kind, const float* input, const float* scale, std::size_t width,
+    std::size_t token_count, Q8Block* q8, __nv_bfloat16* normalized,
+    cudaStream_t stream) noexcept;
+
+cudaError_t launch_residual_add_norm_rows_fp32_to_mmq_q8_1(
+    QuantKind kind, const float* residual, const float* correction,
+    const float* scale, std::size_t width, std::size_t token_count,
+    float* output, Q8Block* q8, __nv_bfloat16* normalized,
+    cudaStream_t stream) noexcept;
 
 cudaError_t execute_prompt_ffn(
     const DeviceCommonLayer& layer, const float* residual,
