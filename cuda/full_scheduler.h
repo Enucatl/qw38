@@ -16,6 +16,7 @@
 #include "engine_attribution.h"
 #include "gdn_step.h"
 #include "execution_graph_path.cuh"
+#include "decode_launch_state.cuh"
 #include "pdl_launch.cuh"
 #include "rms_norm.cuh"
 #include "opt120_packed_kv.cuh"
@@ -598,6 +599,19 @@ class SchedulerSession final {
   std::size_t frontier() const noexcept;
   std::size_t token_count() const noexcept;
   std::size_t allocated_bytes() const noexcept;
+  std::uint32_t gdn_committed_slot() const noexcept;
+  std::uint32_t launch_generation() const noexcept;
+  const DecodeLaunchState* launch_state_device() const noexcept;
+  DecodeLaunchState launch_state_host() const noexcept;
+  float* gdn_committed_convolution() const noexcept;
+  float* gdn_committed_recurrent() const noexcept;
+  float* gdn_candidate_convolution() const noexcept;
+  float* gdn_candidate_recurrent() const noexcept;
+  Status bind_decode_launch_workspace(class SchedulerWorkspace* workspace) noexcept;
+  Status upload_decode_launch_state(std::uint32_t token, std::uint32_t position,
+                                    std::uint32_t frontier,
+                                    cudaStream_t stream) noexcept;
+  void commit_gdn_slot() noexcept;
   bool greedy_token_valid() const noexcept;
   std::size_t cached_greedy_token() const noexcept;
   cudaError_t commit_outputs(class SchedulerWorkspace* workspace,
@@ -621,10 +635,17 @@ class SchedulerSession final {
       SchedulerSession* session, SchedulerWorkspace* workspace,
       std::uint64_t graph_generation, cudaStream_t stream,
       cudaGraph_t* graph_out, cudaError_t* enqueue_error_out,
-      cudaError_t* end_capture_error_out) noexcept;
+      cudaError_t* end_capture_error_out,
+      std::size_t capture_frontier) noexcept;
   friend class SchedulerGraphs;
   float* gdn_convolution_ = nullptr;
   float* gdn_recurrent_ = nullptr;
+  float* gdn_conv_slots_[2] = {};
+  float* gdn_rec_slots_[2] = {};
+  std::uint32_t gdn_committed_slot_ = 0;
+  std::uint32_t launch_generation_ = 0;
+  DecodeLaunchState launch_state_host_{};
+  DecodeLaunchState* launch_state_device_ = nullptr;
   __nv_bfloat16* attention_key_ = nullptr;
   __nv_bfloat16* attention_value_ = nullptr;
   std::size_t* tokens_ = nullptr;
@@ -822,6 +843,10 @@ class SchedulerGraphs final {
   const char* execution_graph_path() const noexcept;
   GraphLaunchParams launch_params() const noexcept;
   std::uint32_t launch_param_update_count() const noexcept;
+  std::uint32_t launch_state_upload_count() const noexcept;
+  std::uint32_t topology_recapture_count() const noexcept;
+  int captured_topology_count() const noexcept;
+  float last_launch_state_upload_ms() const noexcept;
   Status update_launch_params(std::uint32_t token, std::uint32_t position,
                               std::uint32_t frontier) noexcept;
 
@@ -854,6 +879,10 @@ class SchedulerGraphs final {
   std::uint32_t captured_frontier_ = 0;
   int captured_n_parts_ = 0;
   bool captured_vec128_ = false;
+  int captured_topology_count_ = 0;
+  std::uint32_t launch_state_upload_count_ = 0;
+  std::uint32_t topology_recapture_count_ = 0;
+  float last_launch_state_upload_ms_ = 0.0F;
   std::size_t decode_graph_count_ = 0;
   std::size_t prompt_graph_count_ = 0;
   std::size_t prompt_rows_ = 0;
@@ -920,7 +949,8 @@ cudaError_t capture_decode_segment_graph(
     SchedulerSession* session, SchedulerWorkspace* workspace,
     std::uint64_t graph_generation, cudaStream_t stream, cudaGraph_t* graph_out,
     cudaError_t* enqueue_error_out = nullptr,
-    cudaError_t* end_capture_error_out = nullptr) noexcept;
+    cudaError_t* end_capture_error_out = nullptr,
+    std::size_t capture_frontier = static_cast<std::size_t>(-1)) noexcept;
 
 cudaError_t launch_residual_add_fp32(const float* residual,
                                      const float* correction, std::size_t count,

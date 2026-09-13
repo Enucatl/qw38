@@ -90,7 +90,7 @@ def test_contracts_makefile_and_native_hooks() -> None:
     assert "QW38_OPT122_NATIVE_COUNTS=" in runner
     assert "QW38_OPT122_GDN_STATE_PRECISION_RESULT=" in runner
     assert "no_material_opportunity" in tool
-    assert "std::swap(session->gdn_recurrent_" in scheduler
+    assert "commit_gdn_slot" in scheduler
     assert "kGdnRecurrentStateValues" in checkpoint
     validate_future_keep_policy("OPT-122", iteration)
 

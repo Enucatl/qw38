@@ -283,7 +283,7 @@ Status SchedulerSession::save_checkpoint(const std::string& path,
     output.write(reinterpret_cast<const char*>(encoded.data()), encoded.size());
   }
   std::vector<unsigned char> buffer(kChunkBytes);
-  Status status = output ? write_device(&output, gdn_convolution_,
+  Status status = output ? write_device(&output, gdn_committed_convolution(),
                                         convolution_bytes, &buffer)
                          : Status{StatusCode::kIoError,
                                   "cannot write checkpoint tokens"};
@@ -302,7 +302,8 @@ Status SchedulerSession::save_checkpoint(const std::string& path,
            ++layer) {
         const cudaError_t convert = launch_gdn_copy_converted_recurrent(
             config,
-            gdn_recurrent_ + layer * internal::kGdnRecurrentStateValues,
+            gdn_committed_recurrent() +
+                layer * internal::kGdnRecurrentStateValues,
             canonical, false, nullptr, GdnConversionBoundary::kSave);
         if (convert != cudaSuccess) {
           status = {StatusCode::kInternal,
@@ -315,7 +316,8 @@ Status SchedulerSession::save_checkpoint(const std::string& path,
       }
       if (canonical != nullptr) cudaFree(canonical);
     } else {
-      status = write_device(&output, gdn_recurrent_, recurrent_bytes, &buffer);
+      status = write_device(&output, gdn_committed_recurrent(), recurrent_bytes,
+                            &buffer);
     }
   }
   __nv_bfloat16* kv_staging = nullptr;
@@ -608,11 +610,9 @@ Status SchedulerSession::restore_checkpoint(
     restored_tokens[index] = token;
   }
   std::vector<unsigned char> buffer(kChunkBytes);
-  status = read_device(&input, workspace->gdn_candidate_convolution_,
-                       expected_convolution, &buffer);
+  status = read_device(&input, gdn_convolution_, expected_convolution, &buffer);
   if (status.is_ok()) {
-    status = read_device(&input, workspace->gdn_candidate_recurrent_,
-                         expected_recurrent, &buffer);
+    status = read_device(&input, gdn_recurrent_, expected_recurrent, &buffer);
   }
   __nv_bfloat16* kv_staging = nullptr;
   std::uint8_t* packed_staging = nullptr;
@@ -702,7 +702,7 @@ Status SchedulerSession::restore_checkpoint(
   if (!status.is_ok()) return status;
   if (gdn_decode_uses_persistent_transposed()) {
     const cudaError_t convert = launch_gdn_convert_session_recurrent(
-        workspace->gdn_candidate_recurrent_, kGdnLayers, true, nullptr,
+        gdn_recurrent_, kGdnLayers, true, nullptr,
         GdnConversionBoundary::kRestore);
     if (convert != cudaSuccess) {
       return {StatusCode::kInternal,
@@ -712,8 +712,36 @@ Status SchedulerSession::restore_checkpoint(
   } else {
     gdn_set_session_live_col_major(false);
   }
-  std::swap(gdn_convolution_, workspace->gdn_candidate_convolution_);
-  std::swap(gdn_recurrent_, workspace->gdn_candidate_recurrent_);
+  gdn_committed_slot_ = 0;
+  gdn_conv_slots_[0] = gdn_convolution_;
+  gdn_rec_slots_[0] = gdn_recurrent_;
+  if (workspace != nullptr) {
+    const Status bound = bind_decode_launch_workspace(workspace);
+    if (!bound.is_ok()) return bound;
+    if (gdn_conv_slots_[1] != nullptr) {
+      cudaMemset(gdn_conv_slots_[1], 0,
+                 kGdnLayers * internal::kGdnConvolutionValues * sizeof(float));
+    }
+    if (gdn_rec_slots_[1] != nullptr) {
+      cudaMemset(gdn_rec_slots_[1], 0,
+                 kGdnLayers * internal::kGdnRecurrentStateValues * sizeof(float));
+    }
+  }
+  ++launch_generation_;
+  if (launch_generation_ == 0) launch_generation_ = 1;
+  launch_state_host_.gdn_committed_slot = 0;
+  launch_state_host_.generation = launch_generation_;
+  launch_state_host_.position = static_cast<std::uint32_t>(frontier);
+  launch_state_host_.frontier = static_cast<std::uint32_t>(frontier);
+  if (launch_state_device_ != nullptr) {
+    const cudaError_t uploaded =
+        cudaMemcpy(launch_state_device_, &launch_state_host_,
+                   sizeof(DecodeLaunchState), cudaMemcpyHostToDevice);
+    if (uploaded != cudaSuccess) {
+      return {StatusCode::kInternal, "cannot upload restored decode launch-state"};
+    }
+  }
+  workspace->invalidate_q8_decode_staging();
   std::copy(restored_tokens.begin(), restored_tokens.end(), tokens_);
   if (frontier != 0) {
     std::memcpy(last_logits_, workspace->candidate_logits_host_, expected_logits);

@@ -232,7 +232,8 @@ int main(int argc, char** argv) {
       std::strcmp(options.execution_graphs,
                   qw38::cuda::kLegalExecutionGraphDecodeSegments8) == 0;
   passed = passed &&
-           ((segments && graphs.decode_segment_graph_count() == 8 &&
+           ((segments && graphs.decode_segment_graph_count() ==
+                             8 * qw38::cuda::kDecodeGraphTopologyCount &&
              graphs.decode_graph_count() == 0) ||
             (!segments && graphs.decode_graph_count() ==
                               qw38::internal::kModelLayerCount &&

@@ -244,8 +244,10 @@ __global__ void stage_chunk_rows(
     AttentionConfig config, std::size_t start_position, std::size_t token_count,
     const float* key, const float* value, const float* scale,
     __nv_bfloat16* candidate_key, __nv_bfloat16* candidate_value,
-    float* normalized_key, std::size_t kv_origin) {
+    float* normalized_key, std::size_t kv_origin,
+    const DecodeLaunchState* launch) {
   quartz_pdl_sync();
+  start_position = decode_launch_position(launch, start_position);
   const std::uint32_t kv_head = blockIdx.x;
   const std::size_t token = blockIdx.y;
   const std::uint32_t lane = threadIdx.x;
@@ -742,7 +744,9 @@ __global__ void partitioned_grouped_decode_attention(
     const float* query, const float* query_scale,
     const __nv_bfloat16* committed_key, const __nv_bfloat16* committed_value,
     const __nv_bfloat16* candidate_key, const __nv_bfloat16* candidate_value,
-    float* normalized_query, float* partial_vkq, float* meta) {
+    float* normalized_query, float* partial_vkq, float* meta,
+    const DecodeLaunchState* launch) {
+  position = decode_launch_position(launch, position);
   constexpr std::uint32_t kMaximumGroup =
       kMaximumQueryHeads / kMaximumKvHeads;
   const std::uint32_t kv_head = blockIdx.x;
@@ -922,7 +926,9 @@ __device__ unsigned int g_opt078_kv_unaligned_fallback = 0;
 __global__ void prepare_decode_query(AttentionConfig config,
                                      std::size_t position, const float* query,
                                      const float* query_scale,
-                                     float* normalized_query) {
+                                     float* normalized_query,
+                                     const DecodeLaunchState* launch) {
+  position = decode_launch_position(launch, position);
   const std::uint32_t query_head = blockIdx.x;
   const std::uint32_t lane = threadIdx.x;
   const std::size_t width = config.head_width;
@@ -1002,7 +1008,9 @@ __global__ void warp_query_decode_attention(
     const float* query, const float* query_scale,
     const __nv_bfloat16* committed_key, const __nv_bfloat16* committed_value,
     const __nv_bfloat16* candidate_key, const __nv_bfloat16* candidate_value,
-    float* normalized_query, float* partial_vkq, float* meta) {
+    float* normalized_query, float* partial_vkq, float* meta,
+    const DecodeLaunchState* launch) {
+  position = decode_launch_position(launch, position);
   const std::uint32_t query_head = blockIdx.x;
   const int part = static_cast<int>(blockIdx.y);
   const std::uint32_t lane = threadIdx.x;
@@ -1164,7 +1172,9 @@ __global__ void warp_query_gqa6_decode_attention(
     const float* query, const float* query_scale,
     const __nv_bfloat16* committed_key, const __nv_bfloat16* committed_value,
     const __nv_bfloat16* candidate_key, const __nv_bfloat16* candidate_value,
-    float* normalized_query, float* partial_vkq, float* meta) {
+    float* normalized_query, float* partial_vkq, float* meta,
+    const DecodeLaunchState* launch) {
+  position = decode_launch_position(launch, position);
   const std::uint32_t kv_head = blockIdx.x;
   const int part = static_cast<int>(blockIdx.y);
   const std::uint32_t warp = threadIdx.y;
@@ -1363,7 +1373,9 @@ vec128_online_decode_attention(
     const float* query, const float* query_scale,
     const __nv_bfloat16* committed_key, const __nv_bfloat16* committed_value,
     const __nv_bfloat16* candidate_key, const __nv_bfloat16* candidate_value,
-    float* normalized_query, float* partial_vkq, float* meta) {
+    float* normalized_query, float* partial_vkq, float* meta,
+    const DecodeLaunchState* launch) {
+  position = decode_launch_position(launch, position);
   constexpr int kGroups = 16;
   constexpr int kGroupThreads = 8;
   constexpr int kQRegs = 32;
@@ -2101,7 +2113,9 @@ cudaError_t launch_attention_prepare(
     const float* key_norm_scale, const float* output_gate,
     const AttentionCache& committed, const AttentionCache& candidate_row,
     float* normalized_query, float* normalized_key, float* score_workspace,
-    float* output, cudaStream_t stream) noexcept {
+    float* output, cudaStream_t stream,
+    const DecodeLaunchState* launch) noexcept {
+  (void)launch;
   return launch_attention_prepare_chunk(
       config, position, 1, query, key, value, query_norm_scale, key_norm_scale,
       output_gate, committed, candidate_row, normalized_query, normalized_key,
@@ -2249,7 +2263,8 @@ cudaError_t stage_and_validate_chunk(
     const AttentionCache& committed, const AttentionCache& candidate_rows,
     float* normalized_query, float* normalized_key, float* score_workspace,
     float* output, cudaStream_t stream,
-    std::size_t kv_origin = static_cast<std::size_t>(-1)) noexcept {
+    std::size_t kv_origin = static_cast<std::size_t>(-1),
+    const DecodeLaunchState* launch = nullptr) noexcept {
   const std::size_t origin =
       resolve_attention_kv_origin(start_position, kv_origin);
   const std::size_t score_values =
@@ -2272,7 +2287,7 @@ cudaError_t stage_and_validate_chunk(
   return quartz_launch_kernel(
       stage_chunk_rows, staging, dim3(kThreads), 0, stream, config,
       start_position, token_count, key, value, key_norm_scale,
-      candidate_rows.key, candidate_rows.value, normalized_key, origin);
+      candidate_rows.key, candidate_rows.value, normalized_key, origin, launch);
 }
 
 }  // namespace
@@ -2445,14 +2460,14 @@ void decode_attention_kernel_attributes(const char* prep_path, int* registers,
 cudaError_t launch_prepare_decode_query(
     const AttentionConfig& config, std::size_t position, const float* query,
     const float* query_norm_scale, float* normalized_query,
-    cudaStream_t stream) noexcept {
+    cudaStream_t stream, const DecodeLaunchState* launch) noexcept {
   if (!valid_config(config) || query == nullptr ||
       query_norm_scale == nullptr || normalized_query == nullptr ||
       !production_warp_query_shape(config)) {
     return cudaErrorInvalidValue;
   }
   prepare_decode_query<<<config.query_heads, kWarpThreads, 0, stream>>>(
-      config, position, query, query_norm_scale, normalized_query);
+      config, position, query, query_norm_scale, normalized_query, launch);
   return cudaPeekAtLastError();
 }
 
@@ -2474,7 +2489,8 @@ cudaError_t launch_attention_prepare_partitioned_vec(
     const AttentionCache& committed, const AttentionCache& candidate_row,
     float* normalized_query, float* normalized_key, float* score_workspace,
     float* output, float* partial_vkq, float* meta, int n_parts,
-    const char* vec_path, cudaStream_t stream) noexcept {
+    const char* vec_path, cudaStream_t stream,
+    const DecodeLaunchState* launch) noexcept {
   if (!legal_decode_kv_parts(n_parts) || !legal_decode_attention_vec(vec_path)) {
     return cudaErrorInvalidValue;
   }
@@ -2489,13 +2505,13 @@ cudaError_t launch_attention_prepare_partitioned_vec(
     return launch_attention_prepare(
         config, position, query, key, value, query_norm_scale,
         key_norm_scale, output_gate, committed, candidate_row, normalized_query,
-        normalized_key, score_workspace, output, stream);
+        normalized_key, score_workspace, output, stream, launch);
   }
   if (partial_vkq == nullptr || meta == nullptr) return cudaErrorInvalidValue;
   cudaError_t error = stage_and_validate_chunk(
       config, position, 1, query, key, value, query_norm_scale, key_norm_scale,
       output_gate, committed, candidate_row, normalized_query, normalized_key,
-      score_workspace, output, stream);
+      score_workspace, output, stream, static_cast<std::size_t>(-1), launch);
   if (error != cudaSuccess) return error;
   publish_packed_kv_device_format(effective_packed_kv_format());
   if (decode_attention_vec128_uses_online_at(position)) {
@@ -2508,7 +2524,7 @@ cudaError_t launch_attention_prepare_partitioned_vec(
     vec128_online_decode_attention<<<attention, block, 0, stream>>>(
         config, position, n_parts, query, query_norm_scale, committed.key,
         committed.value, candidate_row.key, candidate_row.value,
-        normalized_query, partial_vkq, meta);
+        normalized_query, partial_vkq, meta, launch);
     record_decode_attention_gqa_launch(
         decode_attention_vec128_launch_variant(
             decode_attention_vec128_path_for_position(position)),
@@ -2528,7 +2544,7 @@ cudaError_t launch_attention_prepare_partitioned_vec(
       warp_query_gqa6_decode_attention<<<attention, block, shared, stream>>>(
           config, position, n_parts, query, query_norm_scale, committed.key,
           committed.value, candidate_row.key, candidate_row.value,
-          normalized_query, partial_vkq, meta);
+          normalized_query, partial_vkq, meta, launch);
       record_decode_attention_gqa_launch(
           decode_attention_gqa_launch_variant(gqa_path), config.kv_heads,
           static_cast<unsigned int>(kWarpThreads), group,
@@ -2541,7 +2557,8 @@ cudaError_t launch_attention_prepare_partitioned_vec(
       unsigned int prep_grid = 0;
       if (prepared) {
         error = launch_prepare_decode_query(
-            config, position, query, query_norm_scale, normalized_query, stream);
+            config, position, query, query_norm_scale, normalized_query, stream,
+            launch);
         if (error != cudaSuccess) return error;
         prep_launches = 1;
         prep_grid = config.query_heads;
@@ -2552,19 +2569,22 @@ cudaError_t launch_attention_prepare_partitioned_vec(
             <<<attention, kWarpThreads, 0, stream>>>(
                 config, position, n_parts, query, query_norm_scale,
                 committed.key, committed.value, candidate_row.key,
-                candidate_row.value, normalized_query, partial_vkq, meta);
+                candidate_row.value, normalized_query, partial_vkq, meta,
+                launch);
       } else if (prepared) {
         warp_query_decode_attention<true, false>
             <<<attention, kWarpThreads, 0, stream>>>(
                 config, position, n_parts, query, query_norm_scale,
                 committed.key, committed.value, candidate_row.key,
-                candidate_row.value, normalized_query, partial_vkq, meta);
+                candidate_row.value, normalized_query, partial_vkq, meta,
+                launch);
       } else {
         warp_query_decode_attention<false, false>
             <<<attention, kWarpThreads, 0, stream>>>(
                 config, position, n_parts, query, query_norm_scale,
                 committed.key, committed.value, candidate_row.key,
-                candidate_row.value, normalized_query, partial_vkq, meta);
+                candidate_row.value, normalized_query, partial_vkq, meta,
+                launch);
       }
       record_decode_query_prep_launch(
           decode_query_prep_launch_variant(prep_path), prep_grid,
@@ -2584,7 +2604,7 @@ cudaError_t launch_attention_prepare_partitioned_vec(
                                            stream>>>(
         config, position, n_parts, query, query_norm_scale, committed.key,
         committed.value, candidate_row.key, candidate_row.value,
-        normalized_query, partial_vkq, meta);
+        normalized_query, partial_vkq, meta, launch);
   }
   error = cudaPeekAtLastError();
   if (error != cudaSuccess) return error;
@@ -2600,7 +2620,7 @@ cudaError_t launch_attention_prepare_partitioned(
     const AttentionCache& committed, const AttentionCache& candidate_row,
     float* normalized_query, float* normalized_key, float* score_workspace,
     float* output, float* partial_vkq, float* meta, int n_parts,
-    cudaStream_t stream) noexcept {
+    cudaStream_t stream, const DecodeLaunchState* launch) noexcept {
   const char* vec_path = selected_decode_attention_vec();
   if (decode_uses_warp_query() &&
       !decode_attention_vec128_uses_online_at(position) &&
@@ -2610,7 +2630,8 @@ cudaError_t launch_attention_prepare_partitioned(
   return launch_attention_prepare_partitioned_vec(
       config, position, query, key, value, query_norm_scale, key_norm_scale,
       output_gate, committed, candidate_row, normalized_query, normalized_key,
-      score_workspace, output, partial_vkq, meta, n_parts, vec_path, stream);
+      score_workspace, output, partial_vkq, meta, n_parts, vec_path, stream,
+      launch);
 }
 
 cudaError_t launch_attention_prepare_chunk_mma_rank3(
@@ -3167,7 +3188,7 @@ cudaError_t launch_instrumented_tiled(
   stage_chunk_rows<<<staging, kThreads, 0, stream>>>(
       config, start_position, token_count, key, value, key_norm_scale,
       candidate_rows.key, candidate_rows.value, normalized_key,
-      start_position);
+      start_position, nullptr);
   cudaError_t error = cudaPeekAtLastError();
   if (error != cudaSuccess) return error;
   const std::size_t shared =
@@ -3249,7 +3270,7 @@ cudaError_t launch_attention_prepare_chunk_tile_span_instrumented(
   stage_chunk_rows<<<staging, kThreads, 0, stream>>>(
       config, start_position, token_count, key, value, key_norm_scale,
       candidate_rows.key, candidate_rows.value, normalized_key,
-      start_position);
+      start_position, nullptr);
   cudaError_t error = cudaPeekAtLastError();
   if (error != cudaSuccess) return error;
   dim3 attention(config.kv_heads,

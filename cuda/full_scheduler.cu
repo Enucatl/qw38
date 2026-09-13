@@ -3586,6 +3586,10 @@ cudaError_t enqueue_decode_layer_eager(
       session->capacity_ == 0 || workspace->capacity_ != session->capacity_) {
     return cudaErrorInvalidValue;
   }
+  if (session->gdn_candidate_convolution() == nullptr) {
+    const Status bound = session->bind_decode_launch_workspace(workspace);
+    if (!bound.is_ok()) return cudaErrorInvalidValue;
+  }
   const DeviceLayer& layer = model.layers_[layer_index];
   const bool gdn_layer = layer.kind == internal::LayerKind::kGdn;
   cudaError_t error = cudaSuccess;
@@ -3625,18 +3629,21 @@ cudaError_t enqueue_decode_layer_eager(
           stream);
     }
     const GdnState committed{
-        session->gdn_convolution_ + gdn_slot * internal::kGdnConvolutionValues,
-        session->gdn_recurrent_ + gdn_slot * internal::kGdnRecurrentStateValues};
-    const GdnState candidate{
-        workspace->gdn_candidate_convolution_ +
+        session->gdn_committed_convolution() +
             gdn_slot * internal::kGdnConvolutionValues,
-        workspace->gdn_candidate_recurrent_ +
+        session->gdn_committed_recurrent() +
+            gdn_slot * internal::kGdnRecurrentStateValues};
+    const GdnState candidate{
+        session->gdn_candidate_convolution() +
+            gdn_slot * internal::kGdnConvolutionValues,
+        session->gdn_candidate_recurrent() +
             gdn_slot * internal::kGdnRecurrentStateValues};
     if (error == cudaSuccess) {
       error = launch_gdn_prepare_tiled(
           kGdnConfig, workspace->projection_a_, layer.gdn.convolution,
           workspace->gdn_decay_, workspace->gdn_update_, committed, candidate,
-          workspace->gdn_convolved_, workspace->gdn_recurrent_output_, stream);
+          workspace->gdn_convolved_, workspace->gdn_recurrent_output_, stream,
+          session->launch_state_device(), gdn_slot);
     }
     if (error == cudaSuccess) {
       error = launch_gdn_gated_output(
@@ -3672,7 +3679,8 @@ cudaError_t enqueue_decode_layer_eager(
             workspace->attention_normalized_key_, workspace->attention_scores_,
             workspace->gdn_recurrent_output_,
             reinterpret_cast<float*>(workspace->prompt_projected_bf16_),
-            reinterpret_cast<float*>(workspace->prompt_q8_), n_parts, stream);
+            reinterpret_cast<float*>(workspace->prompt_q8_), n_parts, stream,
+            session->launch_state_device());
       } else {
         error = launch_attention_prepare(
             config, frontier, workspace->gdn_convolved_, workspace->projection_c_,
@@ -3680,7 +3688,8 @@ cudaError_t enqueue_decode_layer_eager(
             layer.attention.key_norm, workspace->projection_b_, committed,
             candidate, workspace->attention_normalized_query_,
             workspace->attention_normalized_key_, workspace->attention_scores_,
-            workspace->gdn_recurrent_output_, stream);
+            workspace->gdn_recurrent_output_, stream,
+            session->launch_state_device());
       }
     }
     if (error == cudaSuccess) {
@@ -3718,7 +3727,8 @@ cudaError_t capture_decode_segment_graph(
     const ResidentModel& model, std::size_t segment_index,
     SchedulerSession* session, SchedulerWorkspace* workspace,
     std::uint64_t graph_generation, cudaStream_t stream, cudaGraph_t* graph_out,
-    cudaError_t* enqueue_error_out, cudaError_t* end_capture_error_out) noexcept {
+    cudaError_t* enqueue_error_out, cudaError_t* end_capture_error_out,
+    std::size_t capture_frontier) noexcept {
   const std::size_t layer_begin = segment_index * kDecodeSegmentLayerCount;
   const std::size_t layer_end = layer_begin + kDecodeSegmentLayerCount;
   cudaError_t enqueue_error = cudaSuccess;
@@ -3732,7 +3742,10 @@ cudaError_t capture_decode_segment_graph(
   }
   float* residual = workspace->residual_a_;
   float* next = workspace->residual_b_;
-  const std::size_t frontier = session == nullptr ? 0 : session->frontier_;
+  const std::size_t frontier =
+      capture_frontier != static_cast<std::size_t>(-1)
+          ? capture_frontier
+          : (session == nullptr ? 0 : session->frontier_);
   for (std::size_t layer_index = layer_begin;
        enqueue_error == cudaSuccess && layer_index < layer_end; ++layer_index) {
     const std::size_t gdn_slot = gdn_slot_before_layer(model, layer_index);
@@ -3775,6 +3788,10 @@ void SchedulerGraphs::release() noexcept {
   captured_frontier_ = 0;
   captured_n_parts_ = 0;
   captured_vec128_ = false;
+  captured_topology_count_ = 0;
+  launch_state_upload_count_ = 0;
+  topology_recapture_count_ = 0;
+  last_launch_state_upload_ms_ = 0.0F;
   decode_graph_count_ = 0;
   prompt_graph_count_ = 0;
   prompt_rows_ = 0;
@@ -3928,19 +3945,29 @@ Status SchedulerGraphs::apply_segment_launch_params() noexcept {
     return {StatusCode::kInvalidArgument,
             "CUDA scheduler graph params require captured session state"};
   }
+  const Status bound = session_->bind_decode_launch_workspace(workspace_);
+  if (!bound.is_ok()) return bound;
   const std::size_t frontier = launch_params_.frontier;
-  const int n_parts = decode_kv_parts_for_position(frontier);
-  const bool vec128 = decode_attention_vec128_uses_online_at(frontier);
-  const bool gdn_moved =
+  const bool pingpong_moved =
       captured_gdn_session_conv_ != session_->gdn_convolution_ ||
       captured_gdn_session_rec_ != session_->gdn_recurrent_ ||
       captured_gdn_workspace_conv_ != workspace_->gdn_candidate_convolution_ ||
       captured_gdn_workspace_rec_ != workspace_->gdn_candidate_recurrent_;
-  const bool topology_changed =
-      n_parts != captured_n_parts_ || vec128 != captured_vec128_ ||
-      captured_attention_key_ != session_->attention_key_;
+  const bool identity_changed =
+      captured_attention_key_ != session_->attention_key_ || pingpong_moved;
   ++launch_param_update_count_;
+  const auto upload_started = std::chrono::steady_clock::now();
+  const Status uploaded = session_->upload_decode_launch_state(
+      launch_params_.token, launch_params_.position,
+      static_cast<std::uint32_t>(frontier), nullptr);
+  last_launch_state_upload_ms_ = static_cast<float>(
+      std::chrono::duration<double, std::milli>(
+          std::chrono::steady_clock::now() - upload_started)
+          .count());
+  ++launch_state_upload_count_;
+  if (!uploaded.is_ok()) return uploaded;
   auto recapture = [&]() -> Status {
+    ++topology_recapture_count_;
     cudaStream_t stream = nullptr;
     cudaError_t error =
         cudaStreamCreateWithFlags(&stream, cudaStreamNonBlocking);
@@ -3964,8 +3991,8 @@ Status SchedulerGraphs::apply_segment_launch_params() noexcept {
     }
     return Status::ok();
   };
-  if (topology_changed || gdn_moved ||
-      captured_frontier_ != static_cast<std::uint32_t>(frontier)) {
+  if (identity_changed ||
+      captured_topology_count_ != kDecodeGraphTopologyCount) {
     return recapture();
   }
   return Status::ok();
@@ -4009,29 +4036,51 @@ Status SchedulerGraphs::capture_decode_segments(cudaStream_t stream) noexcept {
         layer_index, host, model_->blob_, graph_generation, stream);
   }
   if (error == cudaSuccess) error = cudaStreamSynchronize(stream);
+  const Status bound = session_->bind_decode_launch_workspace(workspace_);
+  if (!bound.is_ok()) return bound;
   decode_segment_graph_count_ = 0;
-  for (std::size_t segment_index = 0;
-       error == cudaSuccess && segment_index < kDecodeSegmentCount;
-       ++segment_index) {
-    cudaError_t enqueue_error = cudaSuccess;
-    cudaError_t end_error = cudaSuccess;
-    error = capture_decode_segment_graph(
-        *model_, segment_index, session_, workspace_, graph_generation, stream,
-        &decode_segment_graphs_[segment_index], &enqueue_error, &end_error);
-    if (error == cudaSuccess) {
-      error = cudaGraphInstantiate(&decode_segment_executions_[segment_index],
-                                   decode_segment_graphs_[segment_index],
-                                   nullptr, nullptr, 0);
+  captured_topology_count_ = 0;
+  for (int topology = 0; error == cudaSuccess &&
+                         topology < kDecodeGraphTopologyCount;
+       ++topology) {
+    const std::size_t capture_frontier =
+        decode_graph_topology_capture_position(topology);
+    const Status uploaded = session_->upload_decode_launch_state(
+        0, static_cast<std::uint32_t>(capture_frontier),
+        static_cast<std::uint32_t>(capture_frontier), stream);
+    if (!uploaded.is_ok()) {
+      return cuda_status(cudaErrorInvalidValue,
+                         "cannot upload decode launch-state for graph capture");
     }
-    if (error == cudaSuccess) {
-      error = cudaGraphUpload(decode_segment_executions_[segment_index], stream);
+    for (std::size_t segment_index = 0;
+         error == cudaSuccess && segment_index < kDecodeSegmentCount;
+         ++segment_index) {
+      const std::size_t graph_index =
+          static_cast<std::size_t>(topology) * kDecodeSegmentCount +
+          segment_index;
+      cudaError_t enqueue_error = cudaSuccess;
+      cudaError_t end_error = cudaSuccess;
+      error = capture_decode_segment_graph(
+          *model_, segment_index, session_, workspace_, graph_generation, stream,
+          &decode_segment_graphs_[graph_index], &enqueue_error, &end_error,
+          capture_frontier);
+      if (error == cudaSuccess) {
+        error = cudaGraphInstantiate(&decode_segment_executions_[graph_index],
+                                     decode_segment_graphs_[graph_index],
+                                     nullptr, nullptr, 0);
+      }
+      if (error == cudaSuccess) {
+        error = cudaGraphUpload(decode_segment_executions_[graph_index], stream);
+      }
+      if (error == cudaSuccess) {
+        ++decode_segment_graph_count_;
+      } else {
+        return capture_status(error,
+                              "cannot capture CUDA scheduler decode segment",
+                              segment_index, enqueue_error, end_error);
+      }
     }
-    if (error == cudaSuccess) {
-      ++decode_segment_graph_count_;
-    } else {
-      return capture_status(error, "cannot capture CUDA scheduler decode segment",
-                            segment_index, enqueue_error, end_error);
-    }
+    if (error == cudaSuccess) ++captured_topology_count_;
   }
   captured_gdn_session_conv_ = session_->gdn_convolution_;
   captured_gdn_session_rec_ = session_->gdn_recurrent_;
@@ -4151,6 +4200,22 @@ std::uint32_t SchedulerGraphs::launch_param_update_count() const noexcept {
   return launch_param_update_count_;
 }
 
+std::uint32_t SchedulerGraphs::launch_state_upload_count() const noexcept {
+  return launch_state_upload_count_;
+}
+
+std::uint32_t SchedulerGraphs::topology_recapture_count() const noexcept {
+  return topology_recapture_count_;
+}
+
+int SchedulerGraphs::captured_topology_count() const noexcept {
+  return captured_topology_count_;
+}
+
+float SchedulerGraphs::last_launch_state_upload_ms() const noexcept {
+  return last_launch_state_upload_ms_;
+}
+
 Status SchedulerGraphs::update_launch_params(std::uint32_t token,
                                              std::uint32_t position,
                                              std::uint32_t frontier) noexcept {
@@ -4174,7 +4239,8 @@ const char* selected_execution_graph_path() noexcept {
 bool SchedulerGraphs::matches(
     const ResidentModel& model, const SchedulerWorkspace* workspace,
     const SchedulerSession* session) const noexcept {
-  if (decode_segment_graph_count_ == kDecodeSegmentCount) {
+  if (decode_segment_graph_count_ ==
+      kDecodeSegmentCount * kDecodeGraphTopologyCount) {
     if (session != nullptr) {
       return model_ == &model && workspace_ == workspace && session_ == session;
     }
@@ -4196,6 +4262,14 @@ SchedulerSession& SchedulerSession::operator=(SchedulerSession&& other) noexcept
   release();
   gdn_convolution_ = other.gdn_convolution_;
   gdn_recurrent_ = other.gdn_recurrent_;
+  gdn_conv_slots_[0] = other.gdn_conv_slots_[0];
+  gdn_conv_slots_[1] = other.gdn_conv_slots_[1];
+  gdn_rec_slots_[0] = other.gdn_rec_slots_[0];
+  gdn_rec_slots_[1] = other.gdn_rec_slots_[1];
+  gdn_committed_slot_ = other.gdn_committed_slot_;
+  launch_generation_ = other.launch_generation_;
+  launch_state_host_ = other.launch_state_host_;
+  launch_state_device_ = other.launch_state_device_;
   attention_key_ = other.attention_key_;
   attention_value_ = other.attention_value_;
   tokens_ = other.tokens_;
@@ -4214,6 +4288,14 @@ SchedulerSession& SchedulerSession::operator=(SchedulerSession&& other) noexcept
   sampler_state_ = other.sampler_state_;
   other.gdn_convolution_ = nullptr;
   other.gdn_recurrent_ = nullptr;
+  other.gdn_conv_slots_[0] = nullptr;
+  other.gdn_conv_slots_[1] = nullptr;
+  other.gdn_rec_slots_[0] = nullptr;
+  other.gdn_rec_slots_[1] = nullptr;
+  other.gdn_committed_slot_ = 0;
+  other.launch_generation_ = 0;
+  other.launch_state_host_ = {};
+  other.launch_state_device_ = nullptr;
   other.attention_key_ = nullptr;
   other.attention_value_ = nullptr;
   other.tokens_ = nullptr;
@@ -4242,10 +4324,19 @@ void SchedulerSession::release() noexcept {
   if (last_logits_device_ != nullptr) cudaFree(last_logits_device_);
   if (attention_value_ != nullptr) cudaFree(attention_value_);
   if (attention_key_ != nullptr) cudaFree(attention_key_);
+  if (launch_state_device_ != nullptr) cudaFree(launch_state_device_);
   if (gdn_recurrent_ != nullptr) cudaFree(gdn_recurrent_);
   if (gdn_convolution_ != nullptr) cudaFree(gdn_convolution_);
   gdn_convolution_ = nullptr;
   gdn_recurrent_ = nullptr;
+  gdn_conv_slots_[0] = nullptr;
+  gdn_conv_slots_[1] = nullptr;
+  gdn_rec_slots_[0] = nullptr;
+  gdn_rec_slots_[1] = nullptr;
+  gdn_committed_slot_ = 0;
+  launch_generation_ = 0;
+  launch_state_host_ = {};
+  launch_state_device_ = nullptr;
   attention_key_ = nullptr;
   attention_value_ = nullptr;
   tokens_ = nullptr;
@@ -4318,6 +4409,14 @@ Status SchedulerSession::create(std::size_t capacity) noexcept {
     error = allocate(&greedy_index_device_, 1, &allocated_bytes_);
   }
   if (error == cudaSuccess) {
+    void* launch_state = nullptr;
+    error = allocate_bytes(&launch_state, sizeof(DecodeLaunchState),
+                           &allocated_bytes_);
+    if (error == cudaSuccess) {
+      launch_state_device_ = static_cast<DecodeLaunchState*>(launch_state);
+    }
+  }
+  if (error == cudaSuccess) {
     error = cudaMemset(gdn_convolution_, 0,
                        kGdnLayers * internal::kGdnConvolutionValues *
                            sizeof(float));
@@ -4344,7 +4443,119 @@ Status SchedulerSession::create(std::size_t capacity) noexcept {
     return cuda_status(published, "cannot publish packed KV format");
   }
   capacity_ = capacity;
+  gdn_conv_slots_[0] = gdn_convolution_;
+  gdn_rec_slots_[0] = gdn_recurrent_;
+  gdn_conv_slots_[1] = nullptr;
+  gdn_rec_slots_[1] = nullptr;
+  gdn_committed_slot_ = 0;
+  ++launch_generation_;
+  if (launch_generation_ == 0) launch_generation_ = 1;
+  launch_state_host_ = {};
+  launch_state_host_.generation = launch_generation_;
+  launch_state_host_.gdn_conv[0] = gdn_conv_slots_[0];
+  launch_state_host_.gdn_rec[0] = gdn_rec_slots_[0];
+  const cudaError_t uploaded =
+      cudaMemcpy(launch_state_device_, &launch_state_host_,
+                 sizeof(DecodeLaunchState), cudaMemcpyHostToDevice);
+  if (uploaded != cudaSuccess) {
+    release();
+    return cuda_status(uploaded, "cannot initialize CUDA decode launch state");
+  }
   return Status::ok();
+}
+
+std::uint32_t SchedulerSession::gdn_committed_slot() const noexcept {
+  return gdn_committed_slot_;
+}
+
+std::uint32_t SchedulerSession::launch_generation() const noexcept {
+  return launch_generation_;
+}
+
+const DecodeLaunchState* SchedulerSession::launch_state_device() const noexcept {
+  return launch_state_device_;
+}
+
+DecodeLaunchState SchedulerSession::launch_state_host() const noexcept {
+  return launch_state_host_;
+}
+
+float* SchedulerSession::gdn_committed_convolution() const noexcept {
+  return gdn_conv_slots_[gdn_committed_slot_];
+}
+
+float* SchedulerSession::gdn_committed_recurrent() const noexcept {
+  return gdn_rec_slots_[gdn_committed_slot_];
+}
+
+float* SchedulerSession::gdn_candidate_convolution() const noexcept {
+  return gdn_conv_slots_[gdn_committed_slot_ ^ 1u];
+}
+
+float* SchedulerSession::gdn_candidate_recurrent() const noexcept {
+  return gdn_rec_slots_[gdn_committed_slot_ ^ 1u];
+}
+
+Status SchedulerSession::bind_decode_launch_workspace(
+    SchedulerWorkspace* workspace) noexcept {
+  if (capacity_ == 0 || workspace == nullptr ||
+      workspace->capacity_ != capacity_ ||
+      workspace->gdn_candidate_convolution_ == nullptr ||
+      workspace->gdn_candidate_recurrent_ == nullptr ||
+      launch_state_device_ == nullptr) {
+    return {StatusCode::kInvalidArgument,
+            "CUDA decode launch-state workspace bind is invalid"};
+  }
+  gdn_conv_slots_[0] = gdn_convolution_;
+  gdn_rec_slots_[0] = gdn_recurrent_;
+  gdn_conv_slots_[1] = workspace->gdn_candidate_convolution_;
+  gdn_rec_slots_[1] = workspace->gdn_candidate_recurrent_;
+  if (gdn_conv_slots_[0] == nullptr || gdn_rec_slots_[0] == nullptr ||
+      gdn_conv_slots_[0] == gdn_conv_slots_[1] ||
+      gdn_rec_slots_[0] == gdn_rec_slots_[1]) {
+    return {StatusCode::kInvalidArgument,
+            "CUDA GDN ping-pong slots are not distinct"};
+  }
+  launch_state_host_.gdn_conv[0] = gdn_conv_slots_[0];
+  launch_state_host_.gdn_conv[1] = gdn_conv_slots_[1];
+  launch_state_host_.gdn_rec[0] = gdn_rec_slots_[0];
+  launch_state_host_.gdn_rec[1] = gdn_rec_slots_[1];
+  launch_state_host_.gdn_committed_slot = gdn_committed_slot_;
+  launch_state_host_.generation = launch_generation_;
+  const cudaError_t error =
+      cudaMemcpy(launch_state_device_, &launch_state_host_,
+                 sizeof(DecodeLaunchState), cudaMemcpyHostToDevice);
+  return cuda_status(error, "cannot bind CUDA decode launch-state ping-pong");
+}
+
+Status SchedulerSession::upload_decode_launch_state(
+    std::uint32_t token, std::uint32_t position, std::uint32_t frontier,
+    cudaStream_t stream) noexcept {
+  if (launch_state_device_ == nullptr || gdn_conv_slots_[0] == nullptr ||
+      gdn_conv_slots_[1] == nullptr) {
+    return {StatusCode::kInvalidArgument,
+            "CUDA decode launch-state is not bound"};
+  }
+  (void)stream;
+  launch_state_host_.token = token;
+  launch_state_host_.position = position;
+  launch_state_host_.frontier = frontier;
+  launch_state_host_.kv_bucket = frontier / kDecodeLaunchKvBucketRows;
+  launch_state_host_.gdn_committed_slot = gdn_committed_slot_;
+  launch_state_host_.generation = launch_generation_;
+  launch_state_host_.gdn_conv[0] = gdn_conv_slots_[0];
+  launch_state_host_.gdn_conv[1] = gdn_conv_slots_[1];
+  launch_state_host_.gdn_rec[0] = gdn_rec_slots_[0];
+  launch_state_host_.gdn_rec[1] = gdn_rec_slots_[1];
+  const cudaError_t error = cudaMemcpy(
+      launch_state_device_, &launch_state_host_, sizeof(DecodeLaunchState),
+      cudaMemcpyHostToDevice);
+  return cuda_status(error, "cannot upload CUDA decode launch-state");
+}
+
+void SchedulerSession::commit_gdn_slot() noexcept {
+  gdn_committed_slot_ ^= 1u;
+  launch_state_host_.gdn_committed_slot = gdn_committed_slot_;
 }
 
 Status SchedulerSession::reset() noexcept {
@@ -4367,6 +4578,18 @@ Status SchedulerSession::reset() noexcept {
         gdn_recurrent_, 0,
         kGdnLayers * internal::kGdnRecurrentStateValues * sizeof(float));
   }
+  if (error == cudaSuccess && gdn_conv_slots_[1] != nullptr &&
+      gdn_conv_slots_[1] != gdn_convolution_) {
+    error = cudaMemset(
+        gdn_conv_slots_[1], 0,
+        kGdnLayers * internal::kGdnConvolutionValues * sizeof(float));
+  }
+  if (error == cudaSuccess && gdn_rec_slots_[1] != nullptr &&
+      gdn_rec_slots_[1] != gdn_recurrent_) {
+    error = cudaMemset(
+        gdn_rec_slots_[1], 0,
+        kGdnLayers * internal::kGdnRecurrentStateValues * sizeof(float));
+  }
   if (error == cudaSuccess) {
     error = cudaMemset(attention_key_, 0, key_bytes);
   }
@@ -4382,6 +4605,22 @@ Status SchedulerSession::reset() noexcept {
   outputs_host_valid_ = false;
   greedy_token_valid_ = false;
   device_outputs_valid_ = false;
+  gdn_committed_slot_ = 0;
+  ++launch_generation_;
+  if (launch_generation_ == 0) launch_generation_ = 1;
+  launch_state_host_.token = 0;
+  launch_state_host_.position = 0;
+  launch_state_host_.frontier = 0;
+  launch_state_host_.kv_bucket = 0;
+  launch_state_host_.gdn_committed_slot = 0;
+  launch_state_host_.generation = launch_generation_;
+  if (launch_state_device_ != nullptr) {
+    error = cudaMemcpy(launch_state_device_, &launch_state_host_,
+                       sizeof(DecodeLaunchState), cudaMemcpyHostToDevice);
+    if (error != cudaSuccess) {
+      return cuda_status(error, "cannot reset CUDA decode launch-state");
+    }
+  }
   gdn_set_session_live_col_major(false);
   return Status::ok();
 }
@@ -4422,9 +4661,9 @@ Status SchedulerSession::state_equals(const SchedulerSession& other,
         static_cast<const std::uint8_t*>(right), bytes, mismatch);
     error = cudaPeekAtLastError();
   };
-  compare(gdn_convolution_, other.gdn_convolution_,
+  compare(gdn_committed_convolution(), other.gdn_committed_convolution(),
           kGdnLayers * internal::kGdnConvolutionValues * sizeof(float));
-  compare(gdn_recurrent_, other.gdn_recurrent_,
+  compare(gdn_committed_recurrent(), other.gdn_committed_recurrent(),
           kGdnLayers * internal::kGdnRecurrentStateValues * sizeof(float));
   if (frontier_ > 0 && device_outputs_valid_ && other.device_outputs_valid_) {
     compare(last_logits_device_, other.last_logits_device_,
@@ -5007,6 +5246,8 @@ Status execute_token(const ResidentModel& model, std::size_t token,
             "CUDA token scheduler input, state, or output is invalid"};
   }
   const NvtxRange token_range("qw38.token");
+  const Status bound = session->bind_decode_launch_workspace(workspace);
+  if (!bound.is_ok()) return bound;
   float graph_update_ms = 0.0F;
   if (graphs != nullptr) {
     const auto update_started = std::chrono::steady_clock::now();
@@ -5019,6 +5260,19 @@ Status execute_token(const ResidentModel& model, std::size_t token,
             std::chrono::steady_clock::now() - update_started)
             .count());
     if (!param_status.is_ok()) return param_status;
+  } else {
+    const Status uploaded = session->upload_decode_launch_state(
+        static_cast<std::uint32_t>(token),
+        static_cast<std::uint32_t>(session->frontier_),
+        static_cast<std::uint32_t>(session->frontier_), nullptr);
+    if (!uploaded.is_ok()) return uploaded;
+  }
+  if (graphs != nullptr && graphs->decode_segment_graph_count() == 0) {
+    const Status uploaded = session->upload_decode_launch_state(
+        static_cast<std::uint32_t>(token),
+        static_cast<std::uint32_t>(session->frontier_),
+        static_cast<std::uint32_t>(session->frontier_), nullptr);
+    if (!uploaded.is_ok()) return uploaded;
   }
   const auto attribution_started = std::chrono::steady_clock::now();
   const bool record_leaves =
@@ -5109,8 +5363,10 @@ Status execute_token(const ResidentModel& model, std::size_t token,
   float* next = workspace->residual_b_;
   const bool use_decode_segments =
       graphs != nullptr && execution_graph_uses_decode_segments8() &&
-      graphs->decode_segment_graph_count() == kDecodeSegmentCount;
+      graphs->decode_segment_graph_count() ==
+          kDecodeSegmentCount * kDecodeGraphTopologyCount;
   if (use_decode_segments) {
+    const int topology = decode_graph_topology_index(session->frontier_);
     for (std::size_t segment_index = 0;
          error == cudaSuccess && !interrupted &&
          segment_index < kDecodeSegmentCount;
@@ -5118,7 +5374,10 @@ Status execute_token(const ResidentModel& model, std::size_t token,
       if (leaf_timings != nullptr) leaf_timings->ffn_graph_fused = true;
       const auto graph_started = std::chrono::steady_clock::now();
       nvtxRangePushA("qw38.graph_launch");
-      error = cudaGraphLaunch(graphs->decode_segment_executions_[segment_index],
+      const std::size_t graph_index =
+          static_cast<std::size_t>(topology) * kDecodeSegmentCount +
+          segment_index;
+      error = cudaGraphLaunch(graphs->decode_segment_executions_[graph_index],
                               nullptr);
       nvtxRangePop();
       const float graph_ms = static_cast<float>(
@@ -5280,14 +5539,14 @@ Status execute_token(const ResidentModel& model, std::size_t token,
         }
         if (error == cudaSuccess) error = end_phase(leaves);
         const GdnState committed{
-            session->gdn_convolution_ +
+            session->gdn_committed_convolution() +
                 gdn_slot * internal::kGdnConvolutionValues,
-            session->gdn_recurrent_ +
+            session->gdn_committed_recurrent() +
                 gdn_slot * internal::kGdnRecurrentStateValues};
         const GdnState candidate{
-            workspace->gdn_candidate_convolution_ +
+            session->gdn_candidate_convolution() +
                 gdn_slot * internal::kGdnConvolutionValues,
-            workspace->gdn_candidate_recurrent_ +
+            session->gdn_candidate_recurrent() +
                 gdn_slot * internal::kGdnRecurrentStateValues};
         if (error == cudaSuccess) {
           error = maybe_capture_gdn_decode(
@@ -5306,7 +5565,8 @@ Status execute_token(const ResidentModel& model, std::size_t token,
               kGdnConfig, workspace->projection_a_, layer.gdn.convolution,
               workspace->gdn_decay_, workspace->gdn_update_, committed,
               candidate, workspace->gdn_convolved_,
-              workspace->gdn_recurrent_output_, nullptr);
+              workspace->gdn_recurrent_output_, nullptr,
+              session->launch_state_device(), gdn_slot);
         }
         if (error == cudaSuccess) error = end_phase(leaves);
         if (error == cudaSuccess) {
@@ -5373,7 +5633,7 @@ Status execute_token(const ResidentModel& model, std::size_t token,
                 workspace->attention_scores_, workspace->gdn_recurrent_output_,
                 reinterpret_cast<float*>(workspace->prompt_projected_bf16_),
                 reinterpret_cast<float*>(workspace->prompt_q8_), n_parts,
-                nullptr);
+                nullptr, session->launch_state_device());
           } else {
             error = launch_attention_prepare(
                 config, session->frontier_, workspace->gdn_convolved_,
@@ -5383,7 +5643,7 @@ Status execute_token(const ResidentModel& model, std::size_t token,
                 workspace->attention_normalized_query_,
                 workspace->attention_normalized_key_,
                 workspace->attention_scores_, workspace->gdn_recurrent_output_,
-                nullptr);
+                nullptr, session->launch_state_device());
           }
         }
         if (error == cudaSuccess) error = end_phase(leaves);
@@ -5723,9 +5983,7 @@ Status execute_token(const ResidentModel& model, std::size_t token,
     timings->idle_gaps = {
         std::max(0.0F, timings->token_total.milliseconds - attributed), true};
   }
-  std::swap(session->gdn_convolution_,
-            workspace->gdn_candidate_convolution_);
-  std::swap(session->gdn_recurrent_, workspace->gdn_candidate_recurrent_);
+  session->commit_gdn_slot();
   session->tokens_[session->frontier_] = token;
   ++session->frontier_;
   if (gdn_decode_uses_persistent_transposed()) {
@@ -5851,6 +6109,8 @@ Status execute_prompt_chunk(
     }
   }
   const NvtxRange chunk_range("qw38.prefill_chunk");
+  const Status bound = session->bind_decode_launch_workspace(workspace);
+  if (!bound.is_ok()) return bound;
   if (graphs != nullptr) {
     const Status param_status = graphs->update_launch_params(
         static_cast<std::uint32_t>(tokens[0]),
@@ -6209,16 +6469,18 @@ Status execute_prompt_chunk(
               workspace->prompt_gdn_update_);
         }
         float* gdn_committed_conv =
-            mb_offset == 0 ? session->gdn_convolution_ : gdn_carry_convolution;
+            mb_offset == 0 ? session->gdn_committed_convolution()
+                           : gdn_carry_convolution;
         float* gdn_committed_rec =
-            mb_offset == 0 ? session->gdn_recurrent_ : gdn_carry_recurrent;
+            mb_offset == 0 ? session->gdn_committed_recurrent()
+                           : gdn_carry_recurrent;
         const GdnState committed{
             gdn_committed_conv + gdn_slot * internal::kGdnConvolutionValues,
             gdn_committed_rec + gdn_slot * internal::kGdnRecurrentStateValues};
         const GdnState candidate{
-            workspace->gdn_candidate_convolution_ +
+            session->gdn_candidate_convolution() +
                 gdn_slot * internal::kGdnConvolutionValues,
-            workspace->gdn_candidate_recurrent_ +
+            session->gdn_candidate_recurrent() +
                 gdn_slot * internal::kGdnRecurrentStateValues};
         bool used_fused_gate = false;
         if (error == cudaSuccess) {
@@ -6593,12 +6855,12 @@ Status execute_prompt_chunk(
   nvtxRangePop();
     } else if (error == cudaSuccess && split_candidate) {
       error = cudaMemcpyAsync(gdn_carry_convolution,
-                              workspace->gdn_candidate_convolution_,
+                              session->gdn_candidate_convolution(),
                               gdn_conv_bytes, cudaMemcpyDeviceToDevice, stream);
       if (error == cudaSuccess) {
         bump_transfer(workspace, cudaMemcpyDeviceToDevice, gdn_conv_bytes);
         error = cudaMemcpyAsync(gdn_carry_recurrent,
-                                workspace->gdn_candidate_recurrent_,
+                                session->gdn_candidate_recurrent(),
                                 gdn_rec_bytes, cudaMemcpyDeviceToDevice,
                                 stream);
       }
@@ -6785,9 +7047,7 @@ Status execute_prompt_chunk(
     capture->output_count = logits_count;
     capture->output_captured = true;
   }
-  std::swap(session->gdn_convolution_,
-            workspace->gdn_candidate_convolution_);
-  std::swap(session->gdn_recurrent_, workspace->gdn_candidate_recurrent_);
+  session->commit_gdn_slot();
   std::memcpy(session->tokens_ + session->frontier_, tokens,
               token_count * sizeof(std::size_t));
   session->frontier_ += token_count;

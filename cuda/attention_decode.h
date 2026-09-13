@@ -9,6 +9,7 @@
 #include <cuda_runtime.h>
 
 #include "attention_decode_path.cuh"
+#include "decode_launch_state.cuh"
 #include "opt120_packed_kv.cuh"
 
 namespace qw38::cuda {
@@ -172,7 +173,7 @@ void decode_attention_kernel_attributes(const char* prep_path, int* registers,
 cudaError_t launch_prepare_decode_query(
     const AttentionConfig& config, std::size_t position, const float* query,
     const float* query_norm_scale, float* normalized_query,
-    cudaStream_t stream) noexcept;
+    cudaStream_t stream, const DecodeLaunchState* launch = nullptr) noexcept;
 void reset_decode_kv_unaligned_fallback() noexcept;
 unsigned int last_decode_kv_unaligned_fallback() noexcept;
 
@@ -182,7 +183,8 @@ cudaError_t launch_attention_prepare(
     const float* key_norm_scale, const float* output_gate,
     const AttentionCache& committed, const AttentionCache& candidate_row,
     float* normalized_query, float* normalized_key, float* score_workspace,
-    float* output, cudaStream_t stream) noexcept;
+    float* output, cudaStream_t stream,
+    const DecodeLaunchState* launch = nullptr) noexcept;
 
 cudaError_t launch_attention_prepare_partitioned(
     const AttentionConfig& config, std::size_t position, const float* query,
@@ -191,7 +193,7 @@ cudaError_t launch_attention_prepare_partitioned(
     const AttentionCache& committed, const AttentionCache& candidate_row,
     float* normalized_query, float* normalized_key, float* score_workspace,
     float* output, float* partial_vkq, float* meta, int n_parts,
-    cudaStream_t stream) noexcept;
+    cudaStream_t stream, const DecodeLaunchState* launch = nullptr) noexcept;
 
 cudaError_t launch_attention_prepare_partitioned_vec(
     const AttentionConfig& config, std::size_t position, const float* query,
@@ -200,7 +202,8 @@ cudaError_t launch_attention_prepare_partitioned_vec(
     const AttentionCache& committed, const AttentionCache& candidate_row,
     float* normalized_query, float* normalized_key, float* score_workspace,
     float* output, float* partial_vkq, float* meta, int n_parts,
-    const char* vec_path, cudaStream_t stream) noexcept;
+    const char* vec_path, cudaStream_t stream,
+    const DecodeLaunchState* launch = nullptr) noexcept;
 
 cudaError_t launch_attention_prepare_chunk(
     const AttentionConfig& config, std::size_t start_position,

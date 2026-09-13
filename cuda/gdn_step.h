@@ -7,6 +7,7 @@
 #include <cuda_bf16.h>
 #include <cuda_runtime.h>
 
+#include "decode_launch_state.cuh"
 #include "gdn_decode_path.cuh"
 
 namespace qw38::cuda {
@@ -51,7 +52,8 @@ cudaError_t launch_gdn_prepare_tiled(
     const float* convolution_weights, const float* log_decay,
     const float* beta, const GdnState& committed, const GdnState& candidate,
     float* convolution_output, float* recurrent_output,
-    cudaStream_t stream) noexcept;
+    cudaStream_t stream, const DecodeLaunchState* launch = nullptr,
+    std::size_t gdn_layer_index = 0) noexcept;
 
 cudaError_t launch_gdn_prepare_chunk(
     const GdnConfig& config, const float* convolution_input,

@@ -237,7 +237,8 @@ int run_capture_repro(const qw38::cuda::ResidentModel& model,
   std::string message;
   json_escape(status.message(), &message);
   const bool ok = status.is_ok() &&
-                  graphs.decode_segment_graph_count() == 8 &&
+                  graphs.decode_segment_graph_count() ==
+                      8 * qw38::cuda::kDecodeGraphTopologyCount &&
                   graphs.decode_graph_count() == 0;
   std::printf(
       "%s{\"schema_version\":1,\"task\":\"OPT-117\","
@@ -625,7 +626,8 @@ int run_same_math(const qw38::cuda::ResidentModel& model,
   std::string message;
   json_escape(status.message(), &message);
   const bool ok = status.is_ok() && exact &&
-                  segment_graphs.decode_segment_graph_count() == 8;
+                  segment_graphs.decode_segment_graph_count() ==
+                      8 * qw38::cuda::kDecodeGraphTopologyCount;
   std::printf(
       "%s{\"schema_version\":1,\"task\":\"OPT-117\",\"workload\":\"same-math\","
       "\"ok\":%s,\"exact\":%s,\"prefill_exact\":%s,\"matched_tokens\":%zu,"

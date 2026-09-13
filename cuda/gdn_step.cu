@@ -35,7 +35,10 @@ bool valid_config(const GdnConfig& config) noexcept {
 __global__ void prepare_convolution_window(
     const float* input, const float* weights, const float* source,
     float* candidate, float* output, std::size_t channels, std::uint32_t width,
-    std::size_t token_count) {
+    std::size_t token_count, const DecodeLaunchState* launch,
+    std::size_t layer_offset) {
+  source = decode_launch_gdn_source(launch, source, layer_offset, false);
+  candidate = decode_launch_gdn_candidate(launch, candidate, layer_offset, false);
   const std::size_t channel =
       static_cast<std::size_t>(blockIdx.x) * blockDim.x + threadIdx.x;
   if (channel >= channels) return;
@@ -100,7 +103,10 @@ __global__ void prepare_recurrence_window(
     GdnConfig config, const float* convolution_output,
     const float* log_decay, const float* beta, const float* source,
     float* candidate, float* output, std::size_t token_count,
-    bool value_is_tiled) {
+    bool value_is_tiled, const DecodeLaunchState* launch,
+    std::size_t layer_offset) {
+  source = decode_launch_gdn_source(launch, source, layer_offset, true);
+  candidate = decode_launch_gdn_candidate(launch, candidate, layer_offset, true);
   const std::uint32_t value_head = blockIdx.x;
   const std::uint32_t lane = threadIdx.x;
   if (value_head >= config.value_heads || lane >= config.value_width) return;
@@ -639,7 +645,9 @@ cudaError_t launch_gdn_prepare_chunk_layout(
     const float* beta, std::size_t token_count, const GdnState& committed,
     const GdnState& candidate, float* convolution_output,
     float* recurrent_output, cudaStream_t stream, bool value_is_tiled,
-    GdnScanPath path, float* scratch, std::size_t scratch_floats) noexcept;
+    GdnScanPath path, float* scratch, std::size_t scratch_floats,
+    const DecodeLaunchState* launch = nullptr,
+    std::size_t gdn_layer_index = 0) noexcept;
 
 }  // namespace
 
@@ -699,11 +707,12 @@ cudaError_t launch_gdn_prepare_tiled(
     const float* convolution_weights, const float* log_decay,
     const float* beta, const GdnState& committed, const GdnState& candidate,
     float* convolution_output, float* recurrent_output,
-    cudaStream_t stream) noexcept {
+    cudaStream_t stream, const DecodeLaunchState* launch,
+    std::size_t gdn_layer_index) noexcept {
   return launch_gdn_prepare_chunk_layout(
       config, convolution_input, convolution_weights, log_decay, beta, 1,
       committed, candidate, convolution_output, recurrent_output, stream, true,
-      GdnScanPath::kSequentialWindows, nullptr, 0);
+      GdnScanPath::kSequentialWindows, nullptr, 0, launch, gdn_layer_index);
 }
 
 cudaError_t launch_gdn_prepare_chunk(
@@ -740,8 +749,12 @@ cudaError_t launch_sequential_windows(
     const float* beta, std::size_t token_count, const GdnState& committed,
     const GdnState& candidate, float* convolution_output,
     float* recurrent_output, cudaStream_t stream,
-    bool value_is_tiled) noexcept {
+    bool value_is_tiled, const DecodeLaunchState* launch,
+    std::size_t gdn_layer_index) noexcept {
   const std::size_t channels = gdn_convolution_channels(config);
+  const std::size_t conv_offset =
+      gdn_layer_index * gdn_convolution_values(config);
+  const std::size_t rec_offset = gdn_layer_index * gdn_recurrent_values(config);
   const unsigned int blocks =
       static_cast<unsigned int>((channels + kThreads - 1) / kThreads);
   for (std::size_t start = 0; start < token_count; start += kScanWindow) {
@@ -750,11 +763,13 @@ cudaError_t launch_sequential_windows(
         start == 0 ? committed.convolution : candidate.convolution;
     const float* source_recurrent =
         start == 0 ? committed.recurrent : candidate.recurrent;
+    const DecodeLaunchState* window_launch =
+        start == 0 ? launch : nullptr;
     prepare_convolution_window<<<blocks, kThreads, 0, stream>>>(
         convolution_input + start * channels, convolution_weights,
         source_convolution, candidate.convolution,
         convolution_output + start * channels, channels,
-        config.convolution_width, window);
+        config.convolution_width, window, window_launch, conv_offset);
     cudaError_t error = cudaPeekAtLastError();
     if (error != cudaSuccess) return error;
     if (window == 1 && gdn_decode_uses_persistent_transposed()) {
@@ -788,7 +803,7 @@ cudaError_t launch_sequential_windows(
           beta + start * config.value_heads, source_recurrent,
           candidate.recurrent,
           recurrent_output + start * gdn_output_values(config), window,
-          value_is_tiled);
+          value_is_tiled, window_launch, rec_offset);
       error = cudaPeekAtLastError();
       if (error == cudaSuccess) {
         record_gdn_decode_launch(kGdnDecodeLaunchVariantSequential, 0,
@@ -868,7 +883,8 @@ cudaError_t launch_parallel_associative(
   if (num_windows < 2) {
     prepare_recurrence_window<<<config.value_heads, kThreads, 0, stream>>>(
         config, convolution_output, log_decay, beta, committed.recurrent,
-        candidate.recurrent, recurrent_output, token_count, value_is_tiled);
+        candidate.recurrent, recurrent_output, token_count, value_is_tiled,
+        nullptr, 0);
     return cudaPeekAtLastError();
   }
   const std::size_t operator_values = gdn_scan_operator_values(config);
@@ -920,7 +936,8 @@ cudaError_t launch_gdn_prepare_chunk_layout(
     const float* beta, std::size_t token_count, const GdnState& committed,
     const GdnState& candidate, float* convolution_output,
     float* recurrent_output, cudaStream_t stream, bool value_is_tiled,
-    GdnScanPath path, float* scratch, std::size_t scratch_floats) noexcept {
+    GdnScanPath path, float* scratch, std::size_t scratch_floats,
+    const DecodeLaunchState* launch, std::size_t gdn_layer_index) noexcept {
   const std::size_t channels = gdn_convolution_channels(config);
   const bool allow_null_conv =
       path == GdnScanPath::kFusedTokenLoop && gdn_fuses_conv();
@@ -960,7 +977,7 @@ cudaError_t launch_gdn_prepare_chunk_layout(
   return launch_sequential_windows(
       config, convolution_input, convolution_weights, log_decay, beta,
       token_count, committed, candidate, convolution_output, recurrent_output,
-      stream, value_is_tiled);
+      stream, value_is_tiled, launch, gdn_layer_index);
 }
 
 }  // namespace
@@ -1230,7 +1247,7 @@ cudaError_t launch_gdn_recurrence_only(
   }
   prepare_recurrence_window<<<config.value_heads, kThreads, 0, stream>>>(
       config, convolution_output, log_decay, beta, source, candidate, output, 1,
-      value_is_tiled);
+      value_is_tiled, nullptr, 0);
   cudaError_t error = cudaPeekAtLastError();
   if (error == cudaSuccess) {
     record_gdn_decode_launch(kGdnDecodeLaunchVariantSequential, 0,

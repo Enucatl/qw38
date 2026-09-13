@@ -1,0 +1,258 @@
+{
+  "schema_version": 1,
+  "task": "OPT-126",
+  "yardstick": "stable_decode_graph_inputs_across_token_commits",
+  "claims_throughput": false,
+  "claims_performance_improvement": false,
+  "opt074_family_admission_required": false,
+  "opt074_coverage_unadmitted_is_blocker": false,
+  "performance_admission": {
+    "enabled": true,
+    "instrumentation_only": true
+  },
+  "image": "qw38-cuda:13.0.2",
+  "model": "models/Qwen3.8-27B-Q4_K_M.gguf",
+  "gpu_lock": "build/optimization-runs/qw38-gpu.lock",
+  "aggregate_deadline_s": 7200,
+  "target": "tools/opt126_stable_graph_inputs.py",
+  "diagnostics_make_target": "cuda-opt126-diagnostics",
+  "selector": "ffn_only",
+  "case_ids": [
+    "preflight",
+    "inventory",
+    "positions",
+    "isolation",
+    "restore",
+    "same-math",
+    "costs",
+    "report"
+  ],
+  "modes": {
+    "feedback": {
+      "target": "tools/opt126_stable_graph_inputs.py",
+      "tier_sequence": [
+        "preflight",
+        "inventory",
+        "positions",
+        "isolation",
+        "restore",
+        "same-math",
+        "costs"
+      ],
+      "make_targets": [
+        "build/qw38-cuda-opt126-stable-graph-inputs-test"
+      ],
+      "build_once": true,
+      "warm_repetitions": 0,
+      "aggregate_deadline_s": 7200,
+      "workloads": [
+        "preflight",
+        "inventory",
+        "positions",
+        "isolation",
+        "restore",
+        "same-math",
+        "costs"
+      ]
+    },
+    "acceptance": {
+      "target": "tools/opt126_stable_graph_inputs.py",
+      "tier_sequence": ["report"],
+      "make_targets": [
+        "build/qw38-cuda-opt126-stable-graph-inputs-test"
+      ],
+      "warm_repetitions": 0,
+      "aggregate_deadline_s": 7200,
+      "workloads": ["report"]
+    },
+    "release": {
+      "target": "tools/opt126_stable_graph_inputs.py",
+      "tier": "acceptance",
+      "make_targets": [
+        "build/qw38-cuda-opt126-stable-graph-inputs-test"
+      ],
+      "skip_compile": false,
+      "historical_oracles": false,
+      "aggregate_deadline_s": 7200,
+      "workloads": []
+    }
+  },
+  "workloads": {
+    "preflight": {
+      "target": "tools/opt126_stable_graph_inputs.py",
+      "tier": "correctness",
+      "runner": "host",
+      "kind": "identity_freeze_and_selector_unchanged",
+      "cases": 1,
+      "candidates": 1,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 1,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 0,
+      "reference": 1,
+      "gpu_work": false,
+      "args": [
+        "uv", "run", "python", "tools/opt126_stable_graph_inputs.py",
+        "--phase", "preflight", "--mode", "{mode}", "--run-dir", "{run_dir}"
+      ]
+    },
+    "inventory": {
+      "target": "build/qw38-cuda-opt126-stable-graph-inputs-test",
+      "tier": "correctness",
+      "runner": "host",
+      "kind": "argument_ownership_inventory",
+      "cases": 1,
+      "candidates": 1,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 1,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 1,
+      "reference": 1,
+      "gpu_work": true,
+      "native_targets": ["build/qw38-cuda-opt126-stable-graph-inputs-test"],
+      "args": [
+        "uv", "run", "python", "tools/opt126_stable_graph_inputs.py",
+        "--phase", "inventory", "--mode", "{mode}", "--run-dir", "{run_dir}"
+      ]
+    },
+    "positions": {
+      "target": "build/qw38-cuda-opt126-stable-graph-inputs-test",
+      "tier": "correctness",
+      "runner": "host",
+      "kind": "odd_even_positions_including_crossover_and_capacity",
+      "cases": 6,
+      "candidates": 2,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 1,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 1,
+      "reference": 0,
+      "gpu_work": true,
+      "native_targets": ["build/qw38-cuda-opt126-stable-graph-inputs-test"],
+      "args": [
+        "uv", "run", "python", "tools/opt126_stable_graph_inputs.py",
+        "--phase", "positions", "--mode", "{mode}", "--run-dir", "{run_dir}"
+      ]
+    },
+    "isolation": {
+      "target": "build/qw38-cuda-opt126-stable-graph-inputs-test",
+      "tier": "correctness",
+      "runner": "host",
+      "kind": "cancel_retry_failure_candidate_committed_isolation",
+      "cases": 2,
+      "candidates": 1,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 1,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 1,
+      "reference": 0,
+      "gpu_work": true,
+      "native_targets": ["build/qw38-cuda-opt126-stable-graph-inputs-test"],
+      "args": [
+        "uv", "run", "python", "tools/opt126_stable_graph_inputs.py",
+        "--phase", "isolation", "--mode", "{mode}", "--run-dir", "{run_dir}"
+      ]
+    },
+    "restore": {
+      "target": "build/qw38-cuda-opt126-stable-graph-inputs-test",
+      "tier": "correctness",
+      "runner": "host",
+      "kind": "checkpoint_restore_divergent_prefix_session_replacement",
+      "cases": 1,
+      "candidates": 1,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 1,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 1,
+      "reference": 0,
+      "gpu_work": true,
+      "native_targets": ["build/qw38-cuda-opt126-stable-graph-inputs-test"],
+      "args": [
+        "uv", "run", "python", "tools/opt126_stable_graph_inputs.py",
+        "--phase", "restore", "--mode", "{mode}", "--run-dir", "{run_dir}"
+      ]
+    },
+    "same-math": {
+      "target": "build/qw38-cuda-opt126-stable-graph-inputs-test",
+      "tier": "correctness",
+      "runner": "host",
+      "kind": "ffn_only_versus_decode_segments8_same_path_logits",
+      "cases": 1,
+      "candidates": 2,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 8,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 1,
+      "reference": 1,
+      "gpu_work": true,
+      "native_targets": ["build/qw38-cuda-opt126-stable-graph-inputs-test"],
+      "args": [
+        "uv", "run", "python", "tools/opt126_stable_graph_inputs.py",
+        "--phase", "same-math", "--mode", "{mode}", "--run-dir", "{run_dir}"
+      ]
+    },
+    "costs": {
+      "target": "build/qw38-cuda-opt126-stable-graph-inputs-test",
+      "tier": "correctness",
+      "runner": "host",
+      "kind": "upload_indirection_memory_costs",
+      "cases": 1,
+      "candidates": 1,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 1,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 1,
+      "reference": 0,
+      "gpu_work": true,
+      "native_targets": ["build/qw38-cuda-opt126-stable-graph-inputs-test"],
+      "args": [
+        "uv", "run", "python", "tools/opt126_stable_graph_inputs.py",
+        "--phase", "costs", "--mode", "{mode}", "--run-dir", "{run_dir}"
+      ]
+    },
+    "report": {
+      "target": "tools/opt126_stable_graph_inputs.py",
+      "tier": "correctness",
+      "runner": "host",
+      "kind": "prerequisite_report_no_speed_keep",
+      "cases": 1,
+      "candidates": 1,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 1,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 0,
+      "reference": 1,
+      "gpu_work": false,
+      "args": [
+        "uv", "run", "python", "tools/opt126_stable_graph_inputs.py",
+        "--phase", "report", "--mode", "{mode}", "--run-dir", "{run_dir}"
+      ]
+    }
+  },
+  "proof_limit": [
+    "foundation/correctness prerequisite: no production speed keep",
+    "shipping graph selector stays ffn_only; claims_throughput=false",
+    "do not patch opaque captured argument bytes",
+    "no captured pointers to temporary host storage",
+    "GDN parity is stable ping-pong with committed slot, not two parity graphs",
+    "topology variants are bounded (warp_query vs vec128_online); no graph per position",
+    "OPT-127 owns full replay admission",
+    "aggregate_deadline_s 7200 is a ceiling, not a skip"
+  ]
+}

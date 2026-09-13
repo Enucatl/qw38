@@ -350,6 +350,19 @@ inline bool decode_attention_vec128_uses_online_at(
       decode_attention_vec128_path_for_position(position));
 }
 
+// Bounded decode-graph topology: warp_query vs vec128_online. n_parts is 16
+// on both sides of 2048 with current pins, so 2048 is not a dispatch change.
+inline int decode_graph_topology_index(std::size_t position) noexcept {
+  return decode_attention_vec128_uses_online_at(position) ? 1 : 0;
+}
+
+inline std::size_t decode_graph_topology_capture_position(int topology) noexcept {
+  if (topology == 1) {
+    return static_cast<std::size_t>(kSelectedDecodeAttentionCrossoverThreshold);
+  }
+  return 0;
+}
+
 inline int selected_vec128_n_parts() noexcept { return kSelectedVec128NParts; }
 
 inline int effective_vec128_n_parts() noexcept {
