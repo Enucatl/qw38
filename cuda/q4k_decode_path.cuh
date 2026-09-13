@@ -83,6 +83,7 @@ constexpr char kSelectedQ4DeviceLayout[] = "raw_gguf";
 inline thread_local const char* g_q4_decode_path_override = nullptr;
 inline thread_local unsigned int g_q4_decode_warps_override = 0;
 inline thread_local const char* g_q4_device_layout_override = nullptr;
+inline thread_local int g_q4_mmq_aligned_override = -1;
 inline thread_local const char* g_last_q4_launch_variant = "";
 inline thread_local const char* g_q4_launch_trace[kQ4LaunchTraceCapacity]{};
 inline thread_local int g_q4_launch_trace_count = 0;

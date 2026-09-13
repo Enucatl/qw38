@@ -25,6 +25,8 @@
 #include "scheduler.h"
 #include "scheduler_primitives.h"
 #include "sha256.h"
+#include "quant.h"
+#include "tensor.h"
 #include "q8_decode_path.cuh"
 #include "q4k_decode_path.cuh"
 #include "ffn_decode_path.cuh"
@@ -36,6 +38,14 @@ namespace qw38::cuda {
 namespace {
 
 Status cuda_status(cudaError_t error, const char* message) noexcept;
+
+struct PackedWeightCacheEntry final {
+  const std::uint8_t* source = nullptr;
+  std::vector<std::uint8_t> packed;
+};
+
+WeightRequantConfig g_packed_weight_cache_config = WeightRequantConfig::kNone;
+std::vector<PackedWeightCacheEntry> g_packed_weight_cache;
 
 constexpr std::size_t kGdnLayers = 48;
 constexpr std::size_t kAttentionLayers = 16;
@@ -1705,6 +1715,23 @@ cudaError_t launch_q8_mixer_input_group(
       count < 1 || count > kQ8GroupedDescCount) {
     return cudaErrorInvalidValue;
   }
+  bool all_q8 = true;
+  for (int index = 0; index < count; ++index) {
+    if (tensors[index].data != nullptr &&
+        tensors[index].kind != QuantKind::kQ8_0) {
+      all_q8 = false;
+      break;
+    }
+  }
+  if (!all_q8) {
+    cudaError_t error = cudaSuccess;
+    for (int index = 0; index < count && error == cudaSuccess; ++index) {
+      if (tensors[index].data == nullptr || outputs[index] == nullptr) continue;
+      error = matrix_vector(tensors[index], activation, workspace,
+                            outputs[index], stream);
+    }
+    return error;
+  }
   if (!q8_decode_uses_grouped_r1_w4()) {
     cudaError_t error = cudaSuccess;
     for (int index = 0; index < count && error == cudaSuccess; ++index) {
@@ -1765,6 +1792,29 @@ cudaError_t matrix_prompt_q8_quality_mma(const DeviceTensor& matrix,
                                          cudaStream_t stream) noexcept {
   return launch_q8_mmq_quality_mma(matrix.data, matrix.rows, matrix.columns, y,
                                    prompt_rows, output, stream);
+}
+
+cudaError_t mixer_prompt_matrix(const DeviceTensor& matrix,
+                                const Q8Block* q8,
+                                const __nv_bfloat16* activation,
+                                std::size_t prompt_rows,
+                                SchedulerWorkspace* workspace, float* output,
+                                cudaStream_t stream) noexcept {
+  if (matrix.kind == QuantKind::kQ8_0) {
+    return matrix_prompt_q8_quality_mma(matrix, q8, prompt_rows, output, stream);
+  }
+  const int previous = g_q4_mmq_aligned_override;
+  if (matrix.kind == QuantKind::kQ4K) {
+    g_q4_mmq_aligned_override = 0;
+  }
+  const cudaError_t error =
+      matrix_prompt(matrix, activation, prompt_rows, workspace, output, stream);
+  g_q4_mmq_aligned_override = previous;
+  if (error != cudaSuccess) return error;
+  if (matrix.kind == QuantKind::kQ4K) {
+    return bind_q4_mmq_aligned_meta(stream);
+  }
+  return cudaSuccess;
 }
 
 cudaError_t execute_prompt_ffn_projections(
@@ -2647,6 +2697,11 @@ ResidentModel& ResidentModel::operator=(ResidentModel&& other) noexcept {
   q6_aligned_tensor_count_ = other.q6_aligned_tensor_count_;
   q6_aligned_payload_bytes_ = other.q6_aligned_payload_bytes_;
   q6_repack_scratch_peak_bytes_ = other.q6_repack_scratch_peak_bytes_;
+  applied_weight_requant_ = other.applied_weight_requant_;
+  converted_tensor_count_ = other.converted_tensor_count_;
+  converted_src_bytes_ = other.converted_src_bytes_;
+  converted_dst_bytes_ = other.converted_dst_bytes_;
+  conversion_ms_ = other.conversion_ms_;
   embedding_ = other.embedding_;
   output_norm_ = other.output_norm_;
   output_ = other.output_;
@@ -2666,6 +2721,11 @@ ResidentModel& ResidentModel::operator=(ResidentModel&& other) noexcept {
   other.q6_aligned_tensor_count_ = 0;
   other.q6_aligned_payload_bytes_ = 0;
   other.q6_repack_scratch_peak_bytes_ = 0;
+  other.applied_weight_requant_ = WeightRequantConfig::kNone;
+  other.converted_tensor_count_ = 0;
+  other.converted_src_bytes_ = 0;
+  other.converted_dst_bytes_ = 0;
+  other.conversion_ms_ = 0.0F;
   return *this;
 }
 
@@ -2686,6 +2746,11 @@ void ResidentModel::release() noexcept {
   q6_aligned_tensor_count_ = 0;
   q6_aligned_payload_bytes_ = 0;
   q6_repack_scratch_peak_bytes_ = 0;
+  applied_weight_requant_ = WeightRequantConfig::kNone;
+  converted_tensor_count_ = 0;
+  converted_src_bytes_ = 0;
+  converted_dst_bytes_ = 0;
+  conversion_ms_ = 0.0F;
 }
 
 Status ResidentModel::upload(const internal::ModelWeights& weights,
@@ -2804,7 +2869,134 @@ Status ResidentModel::upload(const internal::ModelWeights& weights,
       return converted;
     }
   }
+  const Status requant = apply_weight_requant(weights);
+  if (!requant.is_ok()) {
+    release();
+    return requant;
+  }
   return Status::ok();
+}
+
+Status ResidentModel::apply_weight_requant(
+    const internal::ModelWeights& weights) noexcept {
+  const WeightRequantConfig config = effective_weight_requant_config();
+  applied_weight_requant_ = config;
+  converted_tensor_count_ = 0;
+  converted_src_bytes_ = 0;
+  converted_dst_bytes_ = 0;
+  conversion_ms_ = 0.0F;
+  if (config == WeightRequantConfig::kNone ||
+      config == WeightRequantConfig::kFp4Study) {
+    return Status::ok();
+  }
+  if (blob_ == nullptr) {
+    return {StatusCode::kInvalidArgument, "weight requant requires an uploaded model"};
+  }
+  const auto started = std::chrono::steady_clock::now();
+  auto convert = [&](DeviceTensor* destination, const internal::TensorView& source,
+                     WeightRole role) -> Status {
+    if (destination == nullptr || !role_converts_to_q4k(role, config)) {
+      return Status::ok();
+    }
+    if (source.data == nullptr || destination->data == nullptr ||
+        source.columns != destination->columns ||
+        source.rows != destination->rows || source.columns % 256 != 0) {
+      return {StatusCode::kInvalidArgument,
+              "weight requant source/device tensor mismatch"};
+    }
+    const std::size_t dst_bytes =
+        q4k_storage_bytes(source.rows, source.columns);
+    if (dst_bytes == 0 || dst_bytes > source.storage_bytes) {
+      return {StatusCode::kInvalidArgument,
+              "q4_k requant does not shrink the source tensor"};
+    }
+    if (g_packed_weight_cache_config != config) {
+      g_packed_weight_cache.clear();
+      g_packed_weight_cache_config = config;
+    }
+    std::vector<std::uint8_t>* packed = nullptr;
+    for (PackedWeightCacheEntry& entry : g_packed_weight_cache) {
+      if (entry.source == source.data) {
+        packed = &entry.packed;
+        break;
+      }
+    }
+    if (packed == nullptr) {
+      g_packed_weight_cache.push_back(
+          PackedWeightCacheEntry{source.data, std::vector<std::uint8_t>(dst_bytes)});
+      packed = &g_packed_weight_cache.back().packed;
+      std::vector<float> row(source.columns);
+      const std::size_t row_bytes = (source.columns / 256) * 144;
+      for (std::size_t index = 0; index < source.rows; ++index) {
+        Status decode = internal::tensor_row_decode(
+            source, index, row.data(), source.columns);
+        if (decode.is_ok()) {
+          decode = internal::encode_q4_k_row(
+              row.data(), source.columns, packed->data() + index * row_bytes,
+              row_bytes);
+        }
+        if (!decode.is_ok()) return decode;
+      }
+    }
+    const cudaError_t error = cudaMemcpy(
+        const_cast<std::uint8_t*>(destination->data), packed->data(), dst_bytes,
+        cudaMemcpyHostToDevice);
+    if (error != cudaSuccess) {
+      return cuda_status(error, "cannot replace resident weights with q4_k");
+    }
+    destination->kind = QuantKind::kQ4K;
+    ++converted_tensor_count_;
+    converted_src_bytes_ += source.storage_bytes;
+    converted_dst_bytes_ += dst_bytes;
+    return Status::ok();
+  };
+  Status status = convert(&output_, weights.output, WeightRole::kOutput);
+  for (std::size_t index = 0; status.is_ok() && index < layers_.size();
+       ++index) {
+    const internal::LayerWeights& source = weights.layers[index];
+    DeviceLayer& destination = layers_[index];
+    if (source.kind == internal::LayerKind::kGdn) {
+      status = convert(&destination.gdn.packed_qkv, source.gdn.packed_qkv,
+                       WeightRole::kGdnPackedQkv);
+      if (status.is_ok()) {
+        status = convert(&destination.gdn.value_gate, source.gdn.value_gate,
+                         WeightRole::kGdnValueGate);
+      }
+      if (status.is_ok()) {
+        status = convert(&destination.gdn.alpha, source.gdn.alpha,
+                         WeightRole::kGdnAlpha);
+      }
+      if (status.is_ok()) {
+        status =
+            convert(&destination.gdn.beta, source.gdn.beta, WeightRole::kGdnBeta);
+      }
+      if (status.is_ok()) {
+        status = convert(&destination.gdn.output, source.gdn.output,
+                         WeightRole::kGdnOutput);
+      }
+    } else {
+      status = convert(&destination.attention.query_gate,
+                       source.attention.query_gate,
+                       WeightRole::kAttentionQueryGate);
+      if (status.is_ok()) {
+        status = convert(&destination.attention.key, source.attention.key,
+                         WeightRole::kAttentionKey);
+      }
+      if (status.is_ok()) {
+        status = convert(&destination.attention.value, source.attention.value,
+                         WeightRole::kAttentionValue);
+      }
+      if (status.is_ok()) {
+        status = convert(&destination.attention.output, source.attention.output,
+                         WeightRole::kAttentionOutput);
+      }
+    }
+  }
+  conversion_ms_ = static_cast<float>(
+      std::chrono::duration<double, std::milli>(
+          std::chrono::steady_clock::now() - started)
+          .count());
+  return status;
 }
 
 Status ResidentModel::set_q8_device_layout(const char* layout,
@@ -5899,8 +6091,9 @@ Status execute_prompt_chunk(
                               stream);
         }
         if (error == cudaSuccess) {
-          error = matrix_prompt_q8_quality_mma(
-              layer.gdn.packed_qkv, workspace->prompt_q8_, rows,
+          error = mixer_prompt_matrix(
+              layer.gdn.packed_qkv, workspace->prompt_q8_,
+              workspace->prompt_normalized_, rows, workspace,
               workspace->prompt_projection_a_, stream);
         }
         if (error == cudaSuccess) error = end_phase(leaves);
@@ -5911,8 +6104,9 @@ Status execute_prompt_chunk(
                               stream);
         }
         if (error == cudaSuccess) {
-          error = matrix_prompt_q8_quality_mma(
-              layer.gdn.value_gate, workspace->prompt_q8_, rows,
+          error = mixer_prompt_matrix(
+              layer.gdn.value_gate, workspace->prompt_q8_,
+              workspace->prompt_normalized_, rows, workspace,
               workspace->prompt_projection_b_, stream);
         }
         if (error == cudaSuccess) error = end_phase(leaves);
@@ -5923,8 +6117,9 @@ Status execute_prompt_chunk(
                               stream);
         }
         if (error == cudaSuccess) {
-          error = matrix_prompt_q8_quality_mma(
-              layer.gdn.alpha, workspace->prompt_q8_, rows,
+          error = mixer_prompt_matrix(
+              layer.gdn.alpha, workspace->prompt_q8_,
+              workspace->prompt_normalized_, rows, workspace,
               workspace->prompt_projection_c_, stream);
         }
         if (error == cudaSuccess) error = end_phase(leaves);
@@ -5935,8 +6130,9 @@ Status execute_prompt_chunk(
                               stream);
         }
         if (error == cudaSuccess) {
-          error = matrix_prompt_q8_quality_mma(
-              layer.gdn.beta, workspace->prompt_q8_, rows,
+          error = mixer_prompt_matrix(
+              layer.gdn.beta, workspace->prompt_q8_,
+              workspace->prompt_normalized_, rows, workspace,
               workspace->prompt_projection_d_, stream);
         }
         if (error == cudaSuccess) error = end_phase(leaves);
@@ -5948,8 +6144,9 @@ Status execute_prompt_chunk(
                               stream);
         }
         if (error == cudaSuccess) {
-          error = matrix_prompt_q8_quality_mma(
-              layer.attention.query_gate, workspace->prompt_q8_, rows,
+          error = mixer_prompt_matrix(
+              layer.attention.query_gate, workspace->prompt_q8_,
+              workspace->prompt_normalized_, rows, workspace,
               workspace->prompt_projection_a_, stream);
         }
         if (error == cudaSuccess) error = end_phase(leaves);
@@ -5960,8 +6157,9 @@ Status execute_prompt_chunk(
                               stream);
         }
         if (error == cudaSuccess) {
-          error = matrix_prompt_q8_quality_mma(
-              layer.attention.key, workspace->prompt_q8_, rows,
+          error = mixer_prompt_matrix(
+              layer.attention.key, workspace->prompt_q8_,
+              workspace->prompt_normalized_, rows, workspace,
               workspace->prompt_projection_c_, stream);
         }
         if (error == cudaSuccess) error = end_phase(leaves);
@@ -5972,8 +6170,9 @@ Status execute_prompt_chunk(
                               stream);
         }
         if (error == cudaSuccess) {
-          error = matrix_prompt_q8_quality_mma(
-              layer.attention.value, workspace->prompt_q8_, rows,
+          error = mixer_prompt_matrix(
+              layer.attention.value, workspace->prompt_q8_,
+              workspace->prompt_normalized_, rows, workspace,
               workspace->prompt_projection_d_, stream);
         }
         if (error == cudaSuccess) error = end_phase(leaves);
@@ -6178,9 +6377,11 @@ Status execute_prompt_chunk(
                               stream);
         }
         if (error == cudaSuccess) {
-          error = launch_quantize_mmq_q8_1(
-              QuantKind::kQ8_0, workspace->prompt_projected_bf16_, rows,
-              internal::kGdnValueWidth, workspace->prompt_q8_, stream);
+          if (layer.gdn.output.kind == QuantKind::kQ8_0) {
+            error = launch_quantize_mmq_q8_1(
+                QuantKind::kQ8_0, workspace->prompt_projected_bf16_, rows,
+                internal::kGdnValueWidth, workspace->prompt_q8_, stream);
+          }
         }
         if (error == cudaSuccess) error = end_phase(leaves);
         if (error == cudaSuccess) {
@@ -6190,8 +6391,9 @@ Status execute_prompt_chunk(
                               stream);
         }
         if (error == cudaSuccess) {
-          error = matrix_prompt_q8_quality_mma(
-              layer.gdn.output, workspace->prompt_q8_, rows,
+          error = mixer_prompt_matrix(
+              layer.gdn.output, workspace->prompt_q8_,
+              workspace->prompt_projected_bf16_, rows, workspace,
               workspace->prompt_mixer_output_, stream);
         }
         if (error == cudaSuccess) error = end_phase(leaves);

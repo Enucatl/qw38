@@ -76,10 +76,13 @@ __device__ __forceinline__ bool q6_mmq_uses_aligned_soa() {
   return g_q6_mmq_aligned_soa != 0;
 }
 
-cudaError_t bind_q4_mmq_aligned_meta(cudaStream_t stream = nullptr) noexcept {
+cudaError_t bind_q4_mmq_aligned_meta_symbol(cudaStream_t stream) noexcept {
   static const int kOff = 0;
   static const int kOn = 1;
-  const int* flag = q4_device_uses_aligned_meta() ? &kOn : &kOff;
+  const bool aligned = g_q4_mmq_aligned_override >= 0
+                           ? g_q4_mmq_aligned_override != 0
+                           : q4_device_uses_aligned_meta();
+  const int* flag = aligned ? &kOn : &kOff;
   return cudaMemcpyToSymbolAsync(g_q4_mmq_aligned_meta, flag, sizeof(int), 0,
                                  cudaMemcpyHostToDevice, stream);
 }
@@ -1807,7 +1810,7 @@ cudaError_t launch_q4_paired_swiglu_kernel(
     std::size_t output_rows, std::size_t columns, const int* y,
     std::size_t prompt_rows, __nv_bfloat16* activated, float* gate_dump,
     float* up_dump, bool fallback, cudaStream_t stream) noexcept {
-  const cudaError_t bound = bind_q4_mmq_aligned_meta(stream);
+  const cudaError_t bound = bind_q4_mmq_aligned_meta_symbol(stream);
   if (bound != cudaSuccess) return bound;
   const dim3 grid(
       static_cast<unsigned int>((output_rows + kPairedQualityI - 1) /
@@ -1968,7 +1971,7 @@ cudaError_t launch_quality_mma_stream_k(
     const int* y, std::size_t prompt_rows, float* output, float* tmp_fixup,
     int nblocks, bool fixup_needed, cudaStream_t stream) noexcept {
   if constexpr (Kind == QuantKind::kQ4K) {
-    const cudaError_t bound = bind_q4_mmq_aligned_meta(stream);
+    const cudaError_t bound = bind_q4_mmq_aligned_meta_symbol(stream);
     if (bound != cudaSuccess) return bound;
   }
   if constexpr (Kind == QuantKind::kQ6K) {
@@ -2092,7 +2095,7 @@ cudaError_t launch_quality_mma(
     const int* y, std::size_t prompt_rows, float* output,
     cudaStream_t stream) noexcept {
   if constexpr (Kind == QuantKind::kQ4K) {
-    const cudaError_t bound = bind_q4_mmq_aligned_meta(stream);
+    const cudaError_t bound = bind_q4_mmq_aligned_meta_symbol(stream);
     if (bound != cudaSuccess) return bound;
   }
   if constexpr (Kind == QuantKind::kQ6K) {
@@ -2343,6 +2346,10 @@ cudaError_t launch_q4_pipeline_aligned_ij(
 }
 
 }  // namespace
+
+cudaError_t bind_q4_mmq_aligned_meta(cudaStream_t stream) noexcept {
+  return bind_q4_mmq_aligned_meta_symbol(stream);
+}
 
 constexpr const char kSelectedMmqStreamKPath[] = "off";
 constexpr const char kSelectedMmqPipelinePath[] = "fma_async";

@@ -51,6 +51,7 @@ struct Options final {
   const char* q8_layout = nullptr;
   const char* attention_pipeline = nullptr;
   const char* packed_kv = nullptr;
+  const char* weight_requant = nullptr;
   bool quality = false;
   std::size_t max_targets = 0;
 };
@@ -82,7 +83,8 @@ int usage(const char* argv0) {
                "[--case NAME] [--max-targets N] [--quality] "
                "[--quality-config PATH] [--q4-decode PATH] "
                "[--ffn-decode PATH] [--q8-layout LAYOUT] "
-               "[--attention-pipeline PATH] [--packed-kv dense_bf16|q8q8|q8q4|q4q4]\n",
+               "[--attention-pipeline PATH] [--packed-kv dense_bf16|q8q8|q8q4|q4q4] "
+               "[--weight-requant none|q8_to_q4k|q8_q6_to_q4k|fp4_study]\n",
                argv0);
   return 2;
 }
@@ -120,6 +122,8 @@ int parse_args(int argc, char** argv, Options* options) {
       options->attention_pipeline = argv[++index];
     } else if (std::strcmp(arg, "--packed-kv") == 0 && index + 1 < argc) {
       options->packed_kv = argv[++index];
+    } else if (std::strcmp(arg, "--weight-requant") == 0 && index + 1 < argc) {
+      options->weight_requant = argv[++index];
     } else if (arg[0] != '-' && options->model == nullptr) {
       options->model = arg;
     } else {
@@ -393,6 +397,8 @@ int apply_quality_selectors(const Options& options) {
       options.attention_pipeline != nullptr ? options.attention_pipeline : "";
   std::string packed =
       options.packed_kv != nullptr ? options.packed_kv : "";
+  std::string requant =
+      options.weight_requant != nullptr ? options.weight_requant : "";
   if (options.quality_config != nullptr) {
     std::ifstream file(options.quality_config);
     if (!file) {
@@ -415,6 +421,7 @@ int apply_quality_selectors(const Options& options) {
     }
     if (json_string_field(text, "prompt_attention", &parsed)) attn = parsed;
     if (json_string_field(text, "packed_kv", &parsed)) packed = parsed;
+    if (json_string_field(text, "weight_requant", &parsed)) requant = parsed;
   }
   // `--quality` disables shortcuts only. It must not restore packed/r2
   // production pins over an explicit candidate quality-config.
@@ -453,6 +460,10 @@ int apply_quality_selectors(const Options& options) {
   }
   if (!packed.empty() && !qw38::cuda::apply_packed_kv_format_ident(packed.c_str())) {
     std::fprintf(stderr, "invalid --packed-kv %s\n", packed.c_str());
+    return 2;
+  }
+  if (!requant.empty() && !qw38::cuda::apply_weight_requant_ident(requant.c_str())) {
+    std::fprintf(stderr, "invalid --weight-requant %s\n", requant.c_str());
     return 2;
   }
   if (options.quality) {

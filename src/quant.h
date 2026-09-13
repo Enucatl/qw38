@@ -16,6 +16,11 @@ constexpr std::size_t kQ80BlockBytes = 34;
 
 Status decode_q4_k(const std::uint8_t* block, std::size_t block_bytes,
                    float* output, std::size_t output_count) noexcept;
+Status encode_q4_k(const float* input, std::size_t input_count,
+                   std::uint8_t* block, std::size_t block_bytes) noexcept;
+Status encode_q4_k_row(const float* input, std::size_t columns,
+                       std::uint8_t* output,
+                       std::size_t output_bytes) noexcept;
 Status decode_q6_k(const std::uint8_t* block, std::size_t block_bytes,
                    float* output, std::size_t output_count) noexcept;
 Status decode_q8_0(const std::uint8_t* block, std::size_t block_bytes,

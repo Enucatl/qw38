@@ -19,6 +19,7 @@
 #include "pdl_launch.cuh"
 #include "rms_norm.cuh"
 #include "opt120_packed_kv.cuh"
+#include "opt121_weight_requant.cuh"
 #ifdef QW38_DIAGNOSTIC_TRACE
 #include "diagnostic_trace.h"
 #endif
@@ -456,6 +457,8 @@ class ResidentModel final {
                               bool validate_inverse = true) noexcept;
   Status set_q6_device_layout(const char* layout,
                               bool validate_inverse = true) noexcept;
+  Status apply_weight_requant(
+      const internal::ModelWeights& weights) noexcept;
   const char* q8_device_layout() const noexcept { return q8_device_layout_; }
   const char* q4_device_layout() const noexcept { return q4_device_layout_; }
   const char* q6_device_layout() const noexcept { return q6_device_layout_; }
@@ -478,6 +481,19 @@ class ResidentModel final {
   std::size_t q6_repack_scratch_peak_bytes() const noexcept {
     return q6_repack_scratch_peak_bytes_;
   }
+  const char* weight_requant_config() const noexcept {
+    return weight_requant_ident(applied_weight_requant_);
+  }
+  std::size_t converted_tensor_count() const noexcept {
+    return converted_tensor_count_;
+  }
+  std::size_t converted_src_bytes() const noexcept {
+    return converted_src_bytes_;
+  }
+  std::size_t converted_dst_bytes() const noexcept {
+    return converted_dst_bytes_;
+  }
+  float conversion_milliseconds() const noexcept { return conversion_ms_; }
   std::size_t resident_bytes() const noexcept;
   float upload_milliseconds() const noexcept;
   std::size_t layer_count() const noexcept { return layers_.size(); }
@@ -513,6 +529,11 @@ class ResidentModel final {
   std::size_t q6_aligned_tensor_count_ = 0;
   std::size_t q6_aligned_payload_bytes_ = 0;
   std::size_t q6_repack_scratch_peak_bytes_ = 0;
+  WeightRequantConfig applied_weight_requant_ = WeightRequantConfig::kNone;
+  std::size_t converted_tensor_count_ = 0;
+  std::size_t converted_src_bytes_ = 0;
+  std::size_t converted_dst_bytes_ = 0;
+  float conversion_ms_ = 0.0F;
   DeviceTensor embedding_;
   const float* output_norm_ = nullptr;
   DeviceTensor output_;

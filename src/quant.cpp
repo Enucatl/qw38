@@ -92,6 +92,150 @@ Status dot_decoded(const float* values, const float* activation,
 
 }  // namespace
 
+std::uint16_t float_to_half(float value) noexcept {
+  std::uint32_t bits = 0;
+  std::memcpy(&bits, &value, sizeof(bits));
+  const std::uint16_t sign =
+      static_cast<std::uint16_t>((bits >> 16U) & 0x8000U);
+  const std::int32_t exponent =
+      static_cast<std::int32_t>((bits >> 23U) & 0xFFU) - 127;
+  std::uint32_t fraction = bits & 0x7FFFFFU;
+  if ((bits & 0x7FFFFFFFU) == 0U) {
+    return sign;
+  }
+  if (exponent == 128) {
+    if (fraction != 0U) {
+      return static_cast<std::uint16_t>(sign | 0x7E00U);
+    }
+    return static_cast<std::uint16_t>(sign | 0x7C00U);
+  }
+  if (exponent > 15) {
+    return static_cast<std::uint16_t>(sign | 0x7C00U);
+  }
+  if (exponent >= -14) {
+    return static_cast<std::uint16_t>(
+        sign | static_cast<std::uint16_t>((exponent + 15) << 10) |
+        static_cast<std::uint16_t>(fraction >> 13U));
+  }
+  if (exponent < -24) {
+    return sign;
+  }
+  fraction |= 0x800000U;
+  const std::uint32_t shift =
+      static_cast<std::uint32_t>(-14 - exponent + 13);
+  return static_cast<std::uint16_t>(sign | (fraction >> shift));
+}
+
+int nearest_nonneg_int(float value, int max_value) noexcept {
+  if (!(value > 0.0F)) return 0;
+  const int rounded = static_cast<int>(value + 0.5F);
+  if (rounded < 0) return 0;
+  if (rounded > max_value) return max_value;
+  return rounded;
+}
+
+void write_u16_le(std::uint8_t* bytes, std::uint16_t value) noexcept {
+  bytes[0] = static_cast<std::uint8_t>(value & 0xFFU);
+  bytes[1] = static_cast<std::uint8_t>(value >> 8U);
+}
+
+void pack_q4_scale_min(std::uint8_t* packed, const std::uint8_t* scales,
+                       const std::uint8_t* mins) noexcept {
+  for (std::size_t index = 0; index < 4; ++index) {
+    packed[index] = static_cast<std::uint8_t>(
+        (scales[index] & 63U) | ((scales[index + 4] & 48U) << 2U));
+    packed[index + 4] = static_cast<std::uint8_t>(
+        (mins[index] & 63U) | ((mins[index + 4] & 48U) << 2U));
+    packed[index + 8] = static_cast<std::uint8_t>(
+        (scales[index + 4] & 15U) | ((mins[index + 4] & 15U) << 4U));
+  }
+}
+
+Status encode_q4_k(const float* input, std::size_t input_count,
+                   std::uint8_t* block, std::size_t block_bytes) noexcept {
+  if (input == nullptr || block == nullptr) {
+    return {StatusCode::kInvalidArgument,
+            "quant block and input pointers must not be null"};
+  }
+  if (block_bytes != kQ4KBlockBytes || input_count != kQuantBlockValues) {
+    return {StatusCode::kInvalidArgument, "q4_k encode size mismatch"};
+  }
+  float group_scale[8];
+  float group_min[8];
+  std::uint8_t codes[256];
+  float max_scale = 0.0F;
+  float max_min = 0.0F;
+  for (std::size_t group = 0; group < 8; ++group) {
+    float minv = input[group * 32];
+    float maxv = minv;
+    for (std::size_t lane = 1; lane < 32; ++lane) {
+      const float value = input[group * 32 + lane];
+      if (value < minv) minv = value;
+      if (value > maxv) maxv = value;
+    }
+    if (minv > 0.0F) minv = 0.0F;
+    const float range = maxv - minv;
+    group_scale[group] = range > 0.0F ? range / 15.0F : 0.0F;
+    group_min[group] = -minv;
+    if (group_scale[group] > max_scale) max_scale = group_scale[group];
+    if (group_min[group] > max_min) max_min = group_min[group];
+  }
+  const float d = max_scale > 0.0F ? max_scale / 63.0F : 0.0F;
+  const float dmin = max_min > 0.0F ? max_min / 63.0F : 0.0F;
+  std::uint8_t packed_scales[8];
+  std::uint8_t packed_mins[8];
+  for (std::size_t group = 0; group < 8; ++group) {
+    packed_scales[group] = static_cast<std::uint8_t>(
+        nearest_nonneg_int(d > 0.0F ? group_scale[group] / d : 0.0F, 63));
+    packed_mins[group] = static_cast<std::uint8_t>(
+        nearest_nonneg_int(dmin > 0.0F ? group_min[group] / dmin : 0.0F, 63));
+    const float used_d = d * static_cast<float>(packed_scales[group]);
+    const float used_min = dmin * static_cast<float>(packed_mins[group]);
+    for (std::size_t lane = 0; lane < 32; ++lane) {
+      float quant = 0.0F;
+      if (used_d > 0.0F) {
+        quant = (input[group * 32 + lane] + used_min) / used_d;
+      }
+      int code = nearest_nonneg_int(quant, 15);
+      if (code < 0) code = 0;
+      codes[group * 32 + lane] = static_cast<std::uint8_t>(code);
+    }
+  }
+  std::memset(block, 0, kQ4KBlockBytes);
+  write_u16_le(block, float_to_half(d));
+  write_u16_le(block + 2, float_to_half(dmin));
+  pack_q4_scale_min(block + 4, packed_scales, packed_mins);
+  std::uint8_t* quants = block + 16;
+  for (std::size_t pair = 0; pair < 4; ++pair) {
+    for (std::size_t lane = 0; lane < 32; ++lane) {
+      const std::uint8_t low = codes[pair * 64 + lane] & 15U;
+      const std::uint8_t high = codes[pair * 64 + 32 + lane] & 15U;
+      quants[pair * 32 + lane] = static_cast<std::uint8_t>(low | (high << 4U));
+    }
+  }
+  return Status::ok();
+}
+
+Status encode_q4_k_row(const float* input, std::size_t columns,
+                       std::uint8_t* output,
+                       std::size_t output_bytes) noexcept {
+  if (input == nullptr || output == nullptr || columns == 0 ||
+      columns % kQuantBlockValues != 0) {
+    return {StatusCode::kInvalidArgument, "q4_k row encode is not block aligned"};
+  }
+  const std::size_t blocks = columns / kQuantBlockValues;
+  if (output_bytes != blocks * kQ4KBlockBytes) {
+    return {StatusCode::kInvalidArgument, "q4_k row output size mismatch"};
+  }
+  for (std::size_t index = 0; index < blocks; ++index) {
+    const Status status =
+        encode_q4_k(input + index * kQuantBlockValues, kQuantBlockValues,
+                    output + index * kQ4KBlockBytes, kQ4KBlockBytes);
+    if (!status.is_ok()) return status;
+  }
+  return Status::ok();
+}
+
 Status decode_q4_k(const std::uint8_t* block, std::size_t block_bytes,
                    float* output, std::size_t output_count) noexcept {
   Status status =

@@ -1,0 +1,83 @@
+{
+  "schema_version": 1,
+  "task": "OPT-121",
+  "yardstick": "selective_weight_requant_packed_q4k",
+  "claims_throughput": true,
+  "claims_performance_improvement": true,
+  "opt074_family_admission_required": false,
+  "opt074_coverage_unadmitted_is_blocker": false,
+  "llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+  "gguf_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+  "token_generator": "(42 + index * 997) % 248320",
+  "parent": "post113_selected",
+  "parent_execution_graphs": "ffn_only",
+  "parent_stack": "opt119_kept_mixer_ffn_norm_q8_ffn_only",
+  "candidate": "q8_to_q4k",
+  "candidates": [
+    "q8_to_q4k",
+    "q8_q6_to_q4k",
+    "fp4_study"
+  ],
+  "max_changes": 1,
+  "max_configs": 3,
+  "primary_target": "decode",
+  "selected_weight_requant": "none",
+  "encoding": "q4_k_minmax_ref",
+  "policy": "opt121_role_map_v1",
+  "calibration": "opt121_calib_v1_seed_20260913",
+  "aa_warmups": 3,
+  "aa_pairs": 10,
+  "decode_output_tokens": 256,
+  "target_workloads": [
+    "d128",
+    "d2048"
+  ],
+  "non_target_workloads": [
+    "p4096"
+  ],
+  "throughput_ratio_lower_bound": 1.0,
+  "non_target_point_ratio_min": 0.98,
+  "decode_p95_ratio_max": 1.05,
+  "ppl_ratio_max": 1.01,
+  "recurrence_incremental_nll_max": 0.02,
+  "native_test": "build/qw38-cuda-opt121-weight-traffic-test",
+  "diagnostics_make_target": "cuda-opt121-diagnostics",
+  "opt116_quality_contract": "opt116_generated_v1",
+  "require_candidate_nll": true,
+  "required_fixture_keys": [
+    "schema_version",
+    "task",
+    "mode",
+    "llama_revision",
+    "gguf_sha256",
+    "parent",
+    "candidate",
+    "primary_target",
+    "inventory",
+    "reference",
+    "format",
+    "quality",
+    "long_cache",
+    "state_memory",
+    "performance",
+    "selected_weight_requant",
+    "production_kept",
+    "verdict",
+    "report_path"
+  ],
+  "independent_verdicts": [
+    "kernel_correctness",
+    "model_quality",
+    "state_memory",
+    "performance",
+    "production_kept"
+  ],
+  "verdicts": [
+    "keep",
+    "reject",
+    "zero_redundancy",
+    "quality_blocked",
+    "inconclusive"
+  ],
+  "report_path": "evidence/optimization/opt121-weight-traffic/REPORT.md"
+}
