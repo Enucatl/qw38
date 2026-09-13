@@ -1,0 +1,191 @@
+{
+  "schema_version": 1,
+  "task": "OPT-122",
+  "yardstick": "lower_precision_persistent_gdn_state",
+  "claims_throughput": false,
+  "claims_performance_improvement": false,
+  "opt074_family_admission_required": false,
+  "opt074_coverage_unadmitted_is_blocker": false,
+  "performance_admission": {
+    "enabled": true
+  },
+  "image": "qw38-cuda:13.0.2",
+  "model": "models/Qwen3.8-27B-Q4_K_M.gguf",
+  "gpu_lock": "build/optimization-runs/qw38-gpu.lock",
+  "aggregate_deadline_s": 7200,
+  "target": "tools/opt122_gdn_state_precision.py",
+  "diagnostics_make_target": "cuda-opt122-diagnostics",
+  "selector": "ffn_only",
+  "case_ids": [
+    "preflight",
+    "reference",
+    "inventory",
+    "bound",
+    "report"
+  ],
+  "modes": {
+    "feedback": {
+      "target": "tools/opt122_gdn_state_precision.py",
+      "tier_sequence": [
+        "preflight",
+        "reference",
+        "inventory",
+        "bound"
+      ],
+      "make_targets": [
+        "build/qw38-cuda-opt122-gdn-state-precision-test"
+      ],
+      "build_once": true,
+      "warm_repetitions": 0,
+      "aggregate_deadline_s": 7200,
+      "workloads": [
+        "preflight",
+        "reference",
+        "inventory",
+        "bound"
+      ]
+    },
+    "acceptance": {
+      "target": "tools/opt122_gdn_state_precision.py",
+      "tier_sequence": [
+        "report"
+      ],
+      "make_targets": [
+        "build/qw38-cuda-opt122-gdn-state-precision-test"
+      ],
+      "warm_repetitions": 0,
+      "aggregate_deadline_s": 7200,
+      "workloads": [
+        "report"
+      ]
+    },
+    "release": {
+      "target": "tools/opt122_gdn_state_precision.py",
+      "tier": "acceptance",
+      "make_targets": [
+        "build/qw38-cuda-opt122-gdn-state-precision-test"
+      ],
+      "skip_compile": false,
+      "historical_oracles": false,
+      "aggregate_deadline_s": 7200,
+      "workloads": ["bound", "report"]
+    }
+  },
+  "workloads": {
+    "preflight": {
+      "target": "tools/opt122_gdn_state_precision.py",
+      "tier": "correctness",
+      "runner": "host",
+      "kind": "identity_freeze_and_post113_auth",
+      "cases": 1,
+      "candidates": 1,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 1,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 0,
+      "reference": 1,
+      "gpu_work": false,
+      "args": [
+        "uv", "run", "python", "tools/opt122_gdn_state_precision.py",
+        "--phase", "preflight", "--mode", "{mode}", "--run-dir", "{run_dir}"
+      ]
+    },
+    "reference": {
+      "target": "build/qw38-cuda-opt122-gdn-state-precision-test",
+      "tier": "correctness",
+      "runner": "host",
+      "kind": "host_device_quantizer_reference",
+      "cases": 1,
+      "candidates": 2,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 1,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 1,
+      "reference": 1,
+      "gpu_work": true,
+      "native_targets": ["build/qw38-cuda-opt122-gdn-state-precision-test"],
+      "args": [
+        "uv", "run", "python", "tools/opt122_gdn_state_precision.py",
+        "--phase", "reference", "--mode", "{mode}", "--run-dir", "{run_dir}"
+      ]
+    },
+    "inventory": {
+      "target": "build/qw38-cuda-opt122-gdn-state-precision-test",
+      "tier": "correctness",
+      "runner": "host",
+      "kind": "gdn_state_traffic_and_leaf_bound",
+      "cases": 1,
+      "candidates": 2,
+      "warmups": 1,
+      "samples": 1,
+      "tokens": 1,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 1,
+      "reference": 0,
+      "gpu_work": true,
+      "native_targets": ["build/qw38-cuda-opt122-gdn-state-precision-test"],
+      "args": [
+        "uv", "run", "python", "tools/opt122_gdn_state_precision.py",
+        "--phase", "inventory", "--mode", "{mode}", "--run-dir", "{run_dir}"
+      ]
+    },
+    "bound": {
+      "target": "tools/opt122_gdn_state_precision.py",
+      "tier": "correctness",
+      "runner": "host",
+      "kind": "materiality_bound_versus_aa",
+      "cases": 1,
+      "candidates": 2,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 1,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 0,
+      "reference": 1,
+      "gpu_work": false,
+      "args": [
+        "uv", "run", "python", "tools/opt122_gdn_state_precision.py",
+        "--phase", "bound", "--mode", "{mode}", "--run-dir", "{run_dir}"
+      ]
+    },
+    "report": {
+      "target": "tools/opt122_gdn_state_precision.py",
+      "tier": "acceptance",
+      "runner": "host",
+      "kind": "disposition_report",
+      "cases": 1,
+      "candidates": 1,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 1,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 0,
+      "reference": 0,
+      "gpu_work": false,
+      "args": [
+        "uv", "run", "python", "tools/opt122_gdn_state_precision.py",
+        "--phase", "report", "--mode", "{mode}", "--run-dir", "{run_dir}"
+      ]
+    }
+  },
+  "proof_limit": [
+    "parent is authenticated post113_selected ffn_only with OPT-118 kept lazy/overlap pins; OPT-117 graph path was rejected",
+    "measure GDN state traffic including read/write amplification, candidate buffers and prompt carries after OPT-118",
+    "at most two storage candidates: BF16 recurrent with FP32 update/accumulation, and block-scaled 8-bit only if calibrated error and net bytes justify it",
+    "convolution rings, gates/decay, reductions and update arithmetic stay FP32",
+    "do not expand packed state into a persistent FP32 shadow; load packed values into recurrence registers",
+    "a quantified upper bound below OPT-115 A/A resolution is no_material_opportunity; a missing counter is not a measured zero",
+    "recurrence-only speedup never admits a keep; complete-request gates apply only if a storage candidate is engine-admitted",
+    "candidate NLL/OPT-058 is required only when a packed encoding is admitted to complete-request A/B",
+    "3 warmups plus 10 interleaved ab/ba at P4096, D128, and D2048 if a candidate proceeds",
+    "aggregate_deadline_s 7200 is a ceiling, not a skip",
+    "retain FP32 on failed quality, negligible benefit or an E2E loss"
+  ]
+}
