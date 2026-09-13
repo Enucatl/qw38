@@ -35,16 +35,18 @@ All byte values below were live at the same time on the 32 GiB RTX 5090:
 | GDN state | 158,859,264 | 48 FP32 convolution/recurrent session states |
 | Attention K/V | 8,589,934,592 | 16 BF16 K and V caches at 131,072 rows |
 | Complete session | 8,748,793,856 | GDN plus attention state |
-| Atomic workspace | 1,831,810,560 | Decode candidates plus fixed 4,096-row prompt scratch, scores, projections, logits, taps |
+| Atomic workspace | 1,831,836,288 | Decode candidates plus fixed 4,096-row prompt scratch, scores, projections, logits, taps |
 | 64 decode plus 64 prompt uploaded graphs | 16,777,216 | Measured graph executable allocation |
-| Explicit Quartz total | 29,571,252,064 | Model + session + workspace + graphs |
-| Allocator delta | 6,979,744 | CUDA delta not assigned to explicit owners |
+| Explicit Quartz total | 29,571,277,792 | Model + session + workspace + graphs |
+| Allocator delta | 6,954,016 | CUDA delta not assigned to explicit owners |
 
 The graph owner reports its own before/after CUDA free-memory delta covering
 decode then prompt upload, and the outer ledger observes the same 16,777,216-byte
 change for 128 executables. This cross-check prevents a graph object from being
-counted as a zero-byte host abstraction. Workspace requested bytes are unchanged
-from the OPT-008 4,096-row formula.
+counted as a zero-byte host abstraction. Workspace requested bytes are +25,728
+versus the OPT-012 ledger snapshot (`1,831,810,560` → `1,831,836,288`) on the
+current production stack; the OPT-008 4,096-row formula still governs the
+prompt scratch shape.
 
 Before graph creation, 3,537,895,424 bytes were free. After uploading the graph
 executables, 3,521,118,208 bytes were free; their difference is the measured

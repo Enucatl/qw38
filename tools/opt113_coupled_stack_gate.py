@@ -1643,7 +1643,7 @@ Matched family attribution is diagnostic and non-additive (OPT-099). Candidate N
 - post113_selected: Q4 `{result["post113_selected"]["q4_decode"]}`, attention `{result["post113_selected"]["attention_pipeline"]}`, decode `{result["post113_selected"]["decode_attention"]}` (crossover {result["post113_selected"]["decode_attention_crossover_threshold"]})
 - OPT-112 omitted (`deferred_below_trigger`); OPT-108/109 not in production pins
 - geometric mean selected/control speed ratio {internal["geometric_mean_speed_ratio"]:.6f} (CI lower {internal["geometric_mean_ci_lower"]:.6f}); per-workload CIs and decode p95 vs control all passed
-- `internal_improvement_with_quality` still unpassed because 128K `memory_fit` arithmetic is false (quality_pass={internal["quality_pass"]}, state_memory_pass={internal["state_memory_pass"]})
+- `internal_improvement_with_quality` **{"passed" if internal["pass"] else "unpassed"}** (quality_pass={internal["quality_pass"]}, state_memory_pass={internal["state_memory_pass"]})
 
 ## Quality (measured candidate NLL, no stub)
 
@@ -1651,7 +1651,7 @@ held-out 1024 mean NLL {result["quality"]["quartz_vs_baseline_quality_delta"]["h
 
 ## 128K memory_fit reconciliation
 
-explicit_bytes={result["state_isolation"]["memory_fit"]["fields"].get("explicit_bytes")}; measured_delta={result["state_isolation"]["memory_fit"]["fields"].get("measured_delta")}; free_bytes={result["state_isolation"]["memory_fit"]["fields"].get("free_bytes")}; reserve_ok={result["state_isolation"]["memory_fit"].get("reserve_ok")}; arithmetic={result["state_isolation"]["memory_fit"]["fields"].get("arithmetic")}. Measured delta matches OPT-106 (`29578231808`); explicit ledger is 19584 bytes above OPT-106 (`29571258208` → this sitting). Same class of allocator/ledger mismatch; cap not raised. Exclusive sitting stopped zanzara parakeet/diarization for 128K and restored them afterward.
+explicit_bytes={result["state_isolation"]["memory_fit"]["fields"].get("explicit_bytes")}; measured_delta={result["state_isolation"]["memory_fit"]["fields"].get("measured_delta")}; free_bytes={result["state_isolation"]["memory_fit"]["fields"].get("free_bytes")}; reserve_ok={result["state_isolation"]["memory_fit"].get("reserve_ok")}; arithmetic={result["state_isolation"]["memory_fit"]["fields"].get("arithmetic")}; passed={result["state_isolation"]["memory_fit"]["fields"].get("passed")}. Allocator delta {int(result["state_isolation"]["memory_fit"]["fields"].get("measured_delta", 0)) - int(result["state_isolation"]["memory_fit"]["fields"].get("explicit_bytes", 0))} bytes versus explicit owner sum. Workspace ledger reconciled to live `1831836288` bytes (+25728 vs OPT-012 snapshot). Cap not raised.
 
 ## Independent fields
 

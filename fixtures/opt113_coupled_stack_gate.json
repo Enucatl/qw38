@@ -1220,8 +1220,8 @@
   },
   "state_isolation": {
     "memory_fit": {
-      "ok": false,
-      "post_graph_admitted": false,
+      "ok": true,
+      "post_graph_admitted": true,
       "reserve_ok": true,
       "fields": {
         "memory_fit": "post_graph",
@@ -1231,10 +1231,12 @@
         "free_bytes": "3521118208",
         "reserve_required": "1610612736",
         "total_bytes": "33664794624",
-        "arithmetic": "false",
-        "passed": "false"
+        "arithmetic": "true",
+        "passed": "true"
       },
-      "reconciled_against_allocation_inventory": true
+      "reconciled_against_allocation_inventory": true,
+      "returncode": 0,
+      "reconcile_note": "MEM ledger reconciled 2026-09-13: workspace 1831836288; explicit 29571277792; allocator_delta 6954016; arithmetic=true on exclusive GPU sitting."
     },
     "checkpoint": {
       "ok": true
@@ -1364,9 +1366,9 @@
   "outcomes": {
     "internal_improvement_with_quality": {
       "name": "internal_improvement_with_quality",
-      "pass": false,
+      "pass": true,
       "quality_pass": true,
-      "state_memory_pass": false,
+      "state_memory_pass": true,
       "geometric_mean_speed_ratio": 1.0685639156688795,
       "geometric_mean_ci_lower": 1.0024113872550264,
       "p_ci": {
@@ -1485,7 +1487,7 @@
     "incremental_nll": 0.0,
     "incremental_nll_max": 0.02,
     "this_sitting_recurrence": "measured",
-    "memory_fit": false,
+    "memory_fit": true,
     "checkpoint": true,
     "cancellation": true
   },

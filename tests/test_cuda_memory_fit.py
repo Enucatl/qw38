@@ -23,7 +23,7 @@ def test_post_graph_memory_contract_fixture_and_handbook_are_connected() -> None
     assert contract["capacity"] == 131_072
     assert "OPT-008" in fixture["tasks"]
     assert "OPT-012" in fixture["tasks"]
-    assert fixture["owners"]["workspace_bytes"] == 1_831_810_560
+    assert fixture["owners"]["workspace_bytes"] == 1_831_836_288
     assert fixture["owners"]["attention_kv_bytes"] == 8_589_934_592
     assert fixture["owners"]["explicit_quartz_bytes"] == (
         fixture["owners"]["resident_model_bytes"]

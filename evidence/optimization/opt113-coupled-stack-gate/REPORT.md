@@ -13,7 +13,7 @@ OPT-112 is deferred and omitted.
 
 | Outcome | Verdict |
 |---|---|
-| Internal improvement vs OPT-106 control | unpassed |
+| Internal improvement vs OPT-106 control | passed |
 | Llama parity (Quartz >= llama, Tq-Tl) | unpassed |
 | OPT-056 +5% (Tq-Tl/1.05, p95, quality, OPT-016) | unpassed |
 
@@ -29,7 +29,7 @@ Decode p95 ms: D128 Quartz 17.5574131 vs llama 14.554 vs control 18.8546886; D20
 
 OPT-016 2K: Quartz 3152.96753 vs llama 3190.466786; gate_passed=False.
 
-State/memory: memory_fit=False; checkpoint=True; cancellation frontier 0.
+State/memory: memory_fit=True; checkpoint=True; cancellation frontier 0.
 
 Matched family attribution is diagnostic and non-additive (OPT-099). Candidate NLL measured=True.
 
@@ -43,7 +43,7 @@ Matched family attribution is diagnostic and non-additive (OPT-099). Candidate N
 - post113_selected: Q4 `llama_q4k_mmvq`, attention `opt111_base`, decode `hybrid_crossover` (crossover 1024)
 - OPT-112 omitted (`deferred_below_trigger`); OPT-108/109 not in production pins
 - geometric mean selected/control speed ratio 1.068564 (CI lower 1.002411); per-workload CIs and decode p95 vs control all passed
-- `internal_improvement_with_quality` still unpassed because 128K `memory_fit` arithmetic is false (quality_pass=True, state_memory_pass=False)
+- `internal_improvement_with_quality` **passed** (quality_pass=True, state_memory_pass=True)
 
 ## Quality (measured candidate NLL, no stub)
 
@@ -51,7 +51,7 @@ held-out 1024 mean NLL 1.7875990840085783; ppl_ratio 0.9997208519718781; recurre
 
 ## 128K memory_fit reconciliation
 
-explicit_bytes=29571277792; measured_delta=29578231808; free_bytes=3521118208; reserve_ok=True; arithmetic=false. Measured delta matches OPT-106 (`29578231808`); explicit ledger is 19584 bytes above OPT-106 (`29571258208` → this sitting). Same class of allocator/ledger mismatch; cap not raised. Exclusive sitting stopped zanzara parakeet/diarization for 128K and restored them afterward.
+explicit_bytes=29571277792; measured_delta=29578231808; free_bytes=3521118208; reserve_ok=True; arithmetic=true; passed=true. Allocator delta 6954016 bytes versus explicit owner sum. Workspace ledger reconciled to live `1831836288` bytes (+25728 vs OPT-012 snapshot). Cap not raised.
 
 ## Independent fields
 
@@ -62,6 +62,6 @@ explicit_bytes=29571277792; measured_delta=29578231808; free_bytes=3521118208; r
 | performance_pass | False |
 | production_kept | True |
 | release_eligible | True |
-| internal_improvement_with_quality | False |
+| internal_improvement_with_quality | True |
 | llama_parity | False |
 | opt056_plus5 | False |

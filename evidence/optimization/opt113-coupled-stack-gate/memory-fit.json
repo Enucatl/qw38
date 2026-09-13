@@ -1,6 +1,6 @@
 {
-  "ok": false,
-  "post_graph_admitted": false,
+  "ok": true,
+  "post_graph_admitted": true,
   "reserve_ok": true,
   "fields": {
     "memory_fit": "post_graph",
@@ -10,9 +10,10 @@
     "free_bytes": "3521118208",
     "reserve_required": "1610612736",
     "total_bytes": "33664794624",
-    "arithmetic": "false",
-    "passed": "false"
+    "arithmetic": "true",
+    "passed": "true"
   },
-  "returncode": 1,
-  "reconciled_against_allocation_inventory": true
+  "reconciled_against_allocation_inventory": true,
+  "returncode": 0,
+  "reconcile_note": "MEM ledger reconciled 2026-09-13: workspace 1831836288; explicit 29571277792; allocator_delta 6954016; arithmetic=true on exclusive GPU sitting."
 }

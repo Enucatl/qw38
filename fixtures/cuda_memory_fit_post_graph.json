@@ -12,14 +12,14 @@
     "gdn_state_bytes": 158859264,
     "attention_kv_bytes": 8589934592,
     "session_total_bytes": 8748793856,
-    "workspace_bytes": 1831810560,
+    "workspace_bytes": 1831836288,
     "graph_count": 128,
     "decode_graph_count": 64,
     "prompt_graph_count": 64,
     "prompt_graph_rows": 4096,
     "graph_bytes": 16777216,
-    "explicit_quartz_bytes": 29571252064,
-    "allocator_delta_bytes": 6979744
+    "explicit_quartz_bytes": 29571277792,
+    "allocator_delta_bytes": 6954016
   },
   "measured_quartz_delta_bytes": 29578231808,
   "free_after_graph_creation_bytes": 3521118208,

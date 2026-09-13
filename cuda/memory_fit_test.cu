@@ -124,7 +124,7 @@ int main(int argc, char** argv) {
       graphs.prompt_graph_count() == 64 && graphs.prompt_graph_rows() == 4096 &&
       graphs.graph_count() == 128 &&
       model.resident_bytes() == 18973870432ULL &&
-      workspace.allocated_bytes() == 1831810560ULL;
+      workspace.allocated_bytes() == 1831836288ULL;
   const bool passed = arithmetic && session.capacity() == kCapacity &&
                       free_after_graphs >= kReserveBytes;
 

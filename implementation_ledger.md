@@ -7664,3 +7664,22 @@ statements below are historical, not the current execution order.
 - Key evidence: [`fixtures/opt113_coupled_stack_gate.json`](fixtures/opt113_coupled_stack_gate.json);
   [`evidence/optimization/opt113-coupled-stack-gate/REPORT.md`](evidence/optimization/opt113-coupled-stack-gate/REPORT.md).
 - Marked OPT-113 `done`. Coupled IDs: none. OPT-107–113 recovery batch complete.
+
+### 2026-09-13T07:56:00Z — MEM 128K ledger reconcile; OPT-113 internal outcome revised
+
+- Reconciled post-graph 128K owner ledger to live production workspace
+  **1,831,836,288** bytes (+25,728 vs OPT-012 snapshot **1,831,810,560**).
+  Updated `fixtures/cuda_memory_fit_post_graph.json` (`explicit_quartz_bytes`
+  **29,571,277,792**, `allocator_delta_bytes` **6,954,016**),
+  `cuda/memory_fit_test.cu` workspace pin, `docs/54-post-graph-128k-memory.md`,
+  and `tests/test_cuda_memory_fit.py`. Live memory-fit now reports
+  `arithmetic=true` on exclusive GPU (reserve still requires uncontended VRAM).
+- Revised OPT-113 `internal_improvement_with_quality` to **true**: throughput
+  CIs vs `post106_control` already passed (geo **1.0686**, CI lower **1.0024**);
+  candidate NLL measured; 128K `memory_fit` now reconciled (`arithmetic=true`,
+  `passed=true`, `free_bytes=3521118208` on exclusive sitting). **llama_parity**
+  and **opt056_plus5** remain **false**.
+- Key evidence: [`fixtures/cuda_memory_fit_post_graph.json`](fixtures/cuda_memory_fit_post_graph.json);
+  [`fixtures/opt113_coupled_stack_gate.json`](fixtures/opt113_coupled_stack_gate.json);
+  [`evidence/optimization/opt113-coupled-stack-gate/REPORT.md`](evidence/optimization/opt113-coupled-stack-gate/REPORT.md).
+- OPT-113 remains `done`. Coupled IDs: none.

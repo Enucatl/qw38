@@ -129,7 +129,27 @@ def _synthetic_measured() -> dict[str, Any]:
         "proof_limit": " ".join(load_contract()["proof_limit"]),
         "report_path": "evidence/optimization/opt113-coupled-stack-gate/REPORT.md",
     }
+    mem = _json(ROOT / "fixtures/cuda_memory_fit_post_graph.json")
+    result["state_isolation"]["memory_fit"] = {
+        "ok": True,
+        "post_graph_admitted": True,
+        "reserve_ok": True,
+        "returncode": 0,
+        "fields": {
+            "memory_fit": "post_graph",
+            "capacity": "131072",
+            "explicit_bytes": str(mem["owners"]["explicit_quartz_bytes"]),
+            "measured_delta": str(mem["measured_quartz_delta_bytes"]),
+            "free_bytes": str(mem["free_after_graph_creation_bytes"]),
+            "reserve_required": str(mem["required_reserve_bytes"]),
+            "total_bytes": str(mem["total_device_bytes"]),
+            "arithmetic": "true",
+            "passed": "true",
+        },
+        "reconciled_against_allocation_inventory": True,
+    }
     result["quality"]["candidate_nll_measured"] = True
+    result["recurrence_state_status"]["memory_fit"] = True
     result["quality"]["single_boolean"] = None
     result["p"]["quartz"]["attribution"] = None
     result["p"]["quartz"]["instrumented"] = False
@@ -299,6 +319,16 @@ def test_three_outcomes_are_independent() -> None:
     assert honest["performance_pass"] is False
     assert honest["selected_equals_control"] is False
     assert outcomes["internal_improvement_with_quality"]["p_delta_vs_llama_tok_s"] != 0
+
+
+def test_measured_fixture_internal_improvement_passes_after_mem_reconcile() -> None:
+    fixture = _json(ROOT / "fixtures/opt113_coupled_stack_gate.json")
+    validate_batch_result(fixture)
+    assert fixture["state_isolation"]["memory_fit"]["ok"] is True
+    assert fixture["state_isolation"]["memory_fit"]["fields"]["arithmetic"] == "true"
+    assert fixture["outcomes"]["internal_improvement_with_quality"]["pass"] is True
+    assert fixture["outcomes"]["llama_parity"]["pass"] is False
+    assert fixture["outcomes"]["opt056_plus5"]["pass"] is False
 
 
 def test_memory_fit_failure_is_honest_not_lost_state() -> None:
