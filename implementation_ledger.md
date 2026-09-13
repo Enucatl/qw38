@@ -321,8 +321,8 @@ OPT-124 assesses the remaining ceiling without claiming universal optimality.
 | OPT-120 | Evaluate physically packed 8-bit and 4-bit attention KV caches | OPT-115, OPT-116 | done | Packed storage consumed directly across prompt/decode/checkpoints, measured metadata-inclusive bytes, long-context generated quality and E2E verdict; no dense shadow-cache speed claim | [Dossier](tasks/OPT-120.md) |
 | OPT-121 | Reduce streamed weight bytes with selective requantization and a bounded native-FP4 study | OPT-115, OPT-116 | done | Selective Q8→Q4_K on 192 tensors (3.36 GB traffic saved); OPT-058 recurrence ΔNLL fail; long-cache fail; D128/D2048 decode gates fail; measured reject `quality_blocked`; pin `none` | [`tasks/OPT-121.md`](tasks/OPT-121.md); [`pins/opt121_weight_traffic_contract.json`](pins/opt121_weight_traffic_contract.json); [`pins/opt121_iteration_contract.json`](pins/opt121_iteration_contract.json); [`fixtures/opt121_weight_traffic.json`](fixtures/opt121_weight_traffic.json); [`tools/opt121_weight_traffic.py`](tools/opt121_weight_traffic.py); [`tests/test_opt121_weight_traffic.py`](tests/test_opt121_weight_traffic.py); [`cuda/opt121_weight_requant_test.cu`](cuda/opt121_weight_requant_test.cu); [`Makefile`](Makefile); [`evidence/optimization/opt121-weight-traffic/REPORT.md`](evidence/optimization/opt121-weight-traffic/REPORT.md); verification 2026-09-13T19:27:00Z |
 | OPT-122 | Evaluate lower-precision persistent GDN state with FP32 updates | OPT-115, OPT-116, OPT-118 | done | BF16/Q8 block-scaled quantizers evaluated; enclosing gdn_core compute-bound vs DRAM; roofline critical-path save 0.0 ms; measured `no_material_opportunity`; pin `fp32` | [`tasks/OPT-122.md`](tasks/OPT-122.md); [`pins/opt122_gdn_state_precision_contract.json`](pins/opt122_gdn_state_precision_contract.json); [`pins/opt122_iteration_contract.json`](pins/opt122_iteration_contract.json); [`fixtures/opt122_gdn_state_precision.json`](fixtures/opt122_gdn_state_precision.json); [`tools/opt122_gdn_state_precision.py`](tools/opt122_gdn_state_precision.py); [`tests/test_opt122_gdn_state_precision.py`](tests/test_opt122_gdn_state_precision.py); [`cuda/opt122_gdn_state_precision_test.cu`](cuda/opt122_gdn_state_precision_test.cu); [`Makefile`](Makefile); [`evidence/optimization/opt122-gdn-state-precision/REPORT.md`](evidence/optimization/opt122-gdn-state-precision/REPORT.md); verification 2026-09-13T19:50:00Z |
-| OPT-123 | Measure interactions and admit the combined full-pipeline stack | OPT-117, OPT-118, OPT-119, OPT-120, OPT-121, OPT-122 | pending | Frozen combined and leave-one-out evidence, fresh baseline/llama comparisons and independent quality/performance/128K/historical-gate verdicts; no sum of isolated speedups | [Dossier](tasks/OPT-123.md) |
-| OPT-124 | Assess whether llama.cpp is a practical ceiling under explicit constraints | OPT-115, OPT-116, OPT-123 | pending | Reproducible conditional bounds and matched quality/resource frontier support a bounded conclusion, unresolved opportunities and stop/reopen criteria; no universal-optimality assertion | [Dossier](tasks/OPT-124.md) |
+| OPT-123 | Measure interactions and admit the combined full-pipeline stack | OPT-117, OPT-118, OPT-119, OPT-120, OPT-121, OPT-122 | done | Combined OPT-118+OPT-119 on post113 `ffn_only`; freeze+leave-one-out; P4096/D128/D2048 keep (aggregate CI lower 1.005); PPL ratio 1.0; OPT-016 2K OOM non-exclusive | [`tasks/OPT-123.md`](tasks/OPT-123.md); [`pins/opt123_combined_stack_contract.json`](pins/opt123_combined_stack_contract.json); [`pins/opt123_iteration_contract.json`](pins/opt123_iteration_contract.json); [`fixtures/opt123_combined_stack.json`](fixtures/opt123_combined_stack.json); [`tools/opt123_combined_stack.py`](tools/opt123_combined_stack.py); [`tests/test_opt123_combined_stack.py`](tests/test_opt123_combined_stack.py); [`cuda/opt123_combined_stack_test.cu`](cuda/opt123_combined_stack_test.cu); [`Makefile`](Makefile); [`evidence/optimization/opt123-combined-stack/REPORT.md`](evidence/optimization/opt123-combined-stack/REPORT.md); verification 2026-09-13T20:38:00Z |
+| OPT-124 | Assess whether llama.cpp is a practical ceiling under explicit constraints | OPT-115, OPT-116, OPT-123 | in_progress | Reproducible conditional bounds and matched quality/resource frontier support a bounded conclusion, unresolved opportunities and stop/reopen criteria; no universal-optimality assertion | [Dossier](tasks/OPT-124.md) |
 
 ### Post-042 recovery execution order (historical batch)
 
@@ -7859,3 +7859,23 @@ statements below are historical, not the current execution order.
   [`evidence/optimization/opt122-gdn-state-precision/REPORT.md`](evidence/optimization/opt122-gdn-state-precision/REPORT.md).
 - OPT-122 marked `done`. Coupled IDs: none. Next eligible pending task:
   **OPT-123**.
+
+### OPT-123 delivery (2026-09-13T20:39:00Z)
+
+- Fresh combined sitting of keepers OPT-118 (lazy logits + overlap) and OPT-119
+  (mixer+FFN norm Q8 fusion) versus authenticated post113_selected `ffn_only`.
+  Rejected paths did not leak: OPT-117 `ffn_only`, OPT-120 dense KV, OPT-121
+  none requant, OPT-122 FP32 GDN. Interaction matrix: control, combined,
+  opt118_only (reused OPT-118), opt119_only (fresh 3+5), leave-one-out. OPT-058
+  `--quality` measured combined NLL; held-out PPL ratio **1.0**. State/memory
+  128k_fit=`True`; session_bytes **696743940**. Full-engine A/B (3 warmups +
+  10 AB/BA): P4096 2917.106 → 2935.394 tok/s (**+18.288**, 1.006×); D128
+  53.773 → 54.016 (**+0.243**, 1.005×); D2048 41.448 → 41.633 (**+0.185**,
+  1.004×). Aggregate geo CI lower **1.0048**. Fresh pinned llama P4096/D128/D2048
+  **3105.425 / 68.670 / 67.185** tok/s. OPT-016 2K quartz OOM and D131040 OOM
+  on non-exclusive sitting (labeled separately). **Measured disposition:**
+  `keep`; retained stack `combined_opt118_opt119`; production pins unchanged.
+- Key evidence: [`fixtures/opt123_combined_stack.json`](fixtures/opt123_combined_stack.json);
+  [`evidence/optimization/opt123-combined-stack/REPORT.md`](evidence/optimization/opt123-combined-stack/REPORT.md).
+- OPT-123 marked `done`. Coupled IDs: none. Next eligible pending task:
+  **OPT-124**.

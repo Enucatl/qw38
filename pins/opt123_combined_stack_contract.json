@@ -1,0 +1,108 @@
+{
+  "schema_version": 1,
+  "task": "OPT-123",
+  "yardstick": "combined_pipeline_stack_interaction_and_admission",
+  "claims_throughput": true,
+  "claims_performance_improvement": true,
+  "opt074_family_admission_required": false,
+  "opt074_coverage_unadmitted_is_blocker": false,
+  "llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+  "gguf_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+  "token_generator": "(42 + index * 997) % 248320",
+  "parent": "post113_selected",
+  "parent_execution_graphs": "ffn_only",
+  "candidate": "combined_opt118_opt119",
+  "historical_control": "post113_selected",
+  "opt113_numbers_historical_only": true,
+  "keepers": ["OPT-118", "OPT-119"],
+  "rejected": {
+    "OPT-117": {
+      "verdict": "retain_ffn_only",
+      "retain": "ffn_only",
+      "pin": "kSelectedExecutionGraphPath"
+    },
+    "OPT-120": {
+      "verdict": "quality_blocked",
+      "retain": "dense_bf16",
+      "pin": "kSelectedPackedKvFormat"
+    },
+    "OPT-121": {
+      "verdict": "quality_blocked",
+      "retain": "none",
+      "pin": "kSelectedWeightRequantConfig"
+    },
+    "OPT-122": {
+      "verdict": "no_material_opportunity",
+      "retain": "fp32",
+      "pin": "kSelectedGdnStateFormat"
+    }
+  },
+  "interaction_matrix": [
+    "control",
+    "combined",
+    "opt118_only",
+    "opt119_only"
+  ],
+  "leave_one_out": [
+    "combined_minus_opt118",
+    "combined_minus_opt119"
+  ],
+  "primary_target": "aggregate_p4096_d128_d2048",
+  "target_workloads": ["p4096", "d128", "d2048"],
+  "non_target_workloads": ["d8192", "d32768", "d131040", "opt016_2k"],
+  "aa_warmups": 3,
+  "aa_pairs": 10,
+  "screen_pairs": 5,
+  "decode_output_tokens": 256,
+  "throughput_ratio_lower_bound": 1.0,
+  "non_target_point_ratio_min": 0.98,
+  "decode_p95_ratio_max": 1.05,
+  "ppl_ratio_max": 1.01,
+  "recurrence_incremental_nll_max": 0.02,
+  "opt116_quality_contract": "opt116_generated_v1",
+  "require_candidate_nll": true,
+  "quality_budget_ratchets": false,
+  "quality_anchor": "post113_selected",
+  "removal_rules_frozen_before_results": true,
+  "native_test": "build/qw38-cuda-opt123-combined-stack-test",
+  "diagnostics_make_target": "cuda-opt123-diagnostics",
+  "required_fixture_keys": [
+    "schema_version",
+    "task",
+    "mode",
+    "llama_revision",
+    "gguf_sha256",
+    "parent",
+    "candidate",
+    "historical_control",
+    "keepers",
+    "rejected_no_leak",
+    "freeze",
+    "interaction_matrix",
+    "inventory",
+    "same_math",
+    "quality",
+    "state_memory",
+    "performance",
+    "llama",
+    "long_context",
+    "opt016_2k",
+    "production_kept",
+    "verdict",
+    "report_path"
+  ],
+  "independent_verdicts": [
+    "freeze_ok",
+    "rejected_no_leak",
+    "same_math_pass",
+    "model_quality_pass",
+    "state_memory_pass",
+    "performance_pass",
+    "llama_measured",
+    "long_context_measured",
+    "opt016_measured",
+    "production_kept"
+  ],
+  "verdicts": ["keep", "reject", "quality_blocked", "inconclusive"],
+  "report_path": "evidence/optimization/opt123-combined-stack/REPORT.md"
+}
