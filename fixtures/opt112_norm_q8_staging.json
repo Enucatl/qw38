@@ -1,0 +1,438 @@
+{
+  "schema_version": 1,
+  "task": "OPT-112",
+  "mode": "acceptance",
+  "llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+  "gguf_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+  "token_generator": "(42 + index * 997) % 248320",
+  "configurations": [
+    "current_bf16_q8_staging",
+    "norm_to_typed_q8_rounded",
+    "residual_norm_to_typed_q8_rounded"
+  ],
+  "control": "current_bf16_q8_staging",
+  "candidates": [
+    "norm_to_typed_q8_rounded",
+    "residual_norm_to_typed_q8_rounded"
+  ],
+  "selected_path": "current_bf16_q8_staging",
+  "fusion_implemented": false,
+  "claims_throughput": false,
+  "claims_performance_improvement": false,
+  "report_path": "evidence/optimization/opt112-norm-q8-staging/REPORT.md",
+  "screen": {
+    "schema_version": 1,
+    "task": "OPT-112",
+    "phase": "screen",
+    "mode": "acceptance",
+    "eligible": false,
+    "verdict": "deferred_below_trigger",
+    "reason": "upper_bound_clue_is_not_removable_budget",
+    "threshold_ms_per_token": 0.5,
+    "min_potentially_removable_ms_per_token": 0.24962933131322917,
+    "max_upper_bound_clue_ms_per_token": 0.8215069988114475,
+    "opt099_path": "fixtures/opt099_matched_attribution.json",
+    "opt090_path": "fixtures/opt090_decode_attribution.json",
+    "opt099_ffn_norm_clue_window_ms": 26.28822396196632,
+    "d128": {
+      "prefix": 128,
+      "tokens": 32,
+      "source": "fixtures/opt099_matched_attribution.json",
+      "families_ms": {
+        "ffn_norm": 26.268607947999644,
+        "input_norm": 0.5009386676333333,
+        "activation_quant": 0.0,
+        "residual_mixer": 7.988138602023334,
+        "logits_norm": 9.157471959683322,
+        "gdn_output_norm": 0.0
+      },
+      "ffn_norm_ms_per_token": 0.8208939983749889,
+      "input_norm_ms_per_token": 0.015654333363541665,
+      "activation_quant_ms_per_token": 0.0,
+      "residual_mixer_ms_per_token": 0.24962933131322917,
+      "upper_bound_clue_ms_per_token": 0.8208939983749889,
+      "potentially_removable_ms_per_token": 0.24962933131322917,
+      "threshold_ms_per_token": 0.5,
+      "above_trigger": false,
+      "eager_labeled_diagnostic": true
+    },
+    "d2048": {
+      "prefix": 2048,
+      "tokens": 32,
+      "source": "fixtures/opt099_matched_attribution.json",
+      "families_ms": {
+        "ffn_norm": 26.28822396196632,
+        "input_norm": 0.5217386683666668,
+        "activation_quant": 0.0,
+        "residual_mixer": 8.079466598953339,
+        "logits_norm": 9.301781294956667,
+        "gdn_output_norm": 0.0
+      },
+      "ffn_norm_ms_per_token": 0.8215069988114475,
+      "input_norm_ms_per_token": 0.01630433338645834,
+      "activation_quant_ms_per_token": 0.0,
+      "residual_mixer_ms_per_token": 0.25248333121729183,
+      "upper_bound_clue_ms_per_token": 0.8215069988114475,
+      "potentially_removable_ms_per_token": 0.25248333121729183,
+      "threshold_ms_per_token": 0.5,
+      "above_trigger": false,
+      "eager_labeled_diagnostic": true
+    },
+    "consumers": [
+      {
+        "id": "mixer_gdn_qkv_gate_alpha_beta",
+        "layer_kind": "gdn",
+        "layer_count": 48,
+        "producer": "input_norm",
+        "encoding": "Q8_1Block",
+        "reuse_group": "qkv_gate_alpha_beta",
+        "bf16_externally_observed": false,
+        "retain_existing_path": false,
+        "notes": "grouped_r1_w4 Q8_1 from workspace->normalized_; GDN conv/recurrence consume projection outputs, not the normalized BF16 vector."
+      },
+      {
+        "id": "mixer_attn_query_gate_key_value",
+        "layer_kind": "attention",
+        "layer_count": 16,
+        "producer": "input_norm",
+        "encoding": "Q8_1Block",
+        "reuse_group": "query_gate_key_value",
+        "bf16_externally_observed": false,
+        "retain_existing_path": false,
+        "notes": "grouped_r1_w4 Q8_1; query split/RoPE consume projected Q/K/V, not the RMSNorm BF16 vector."
+      },
+      {
+        "id": "ffn_gate_up",
+        "layer_kind": "ffn",
+        "layer_count": 64,
+        "producer": "ffn_norm",
+        "encoding": "Q8_1Block",
+        "alternate_encoding": "Q8Block",
+        "reuse_group": "gate_up",
+        "bf16_externally_observed": false,
+        "retain_existing_path": false,
+        "notes": "Sitting pin llama_q4k_mmvq restages BF16 into block_q8_1 inside the adapter. paired_integer late-Q4 would require FP32-scale Q8Block instead; encodings are not interchangeable."
+      },
+      {
+        "id": "logits_output_norm",
+        "layer_kind": "logits",
+        "layer_count": 1,
+        "producer": "logits_norm",
+        "encoding": null,
+        "reuse_group": null,
+        "bf16_externally_observed": true,
+        "retain_existing_path": true,
+        "notes": "Unquantized logits projection; keep the existing BF16 path."
+      }
+    ],
+    "fusion_candidates": [
+      "norm_to_typed_q8_rounded",
+      "residual_norm_to_typed_q8_rounded"
+    ],
+    "fusion_implemented": false,
+    "native_counts": {
+      "schema_version": 1,
+      "task": "OPT-112",
+      "warmups": 0,
+      "samples": 1,
+      "observed_warmups": 0,
+      "observed_samples": 1,
+      "observed_candidates": 1,
+      "observed_shapes": 1,
+      "observed_tier": "correctness",
+      "pairs": 1,
+      "sample_ids": [
+        0
+      ],
+      "acceptance_executed": false,
+      "keep": false,
+      "capture_key": null
+    },
+    "admission": {
+      "ok": true,
+      "result_class": "ok",
+      "message": "instrumentation-only: no speed admission",
+      "observed": {
+        "schema_version": 1,
+        "task": "OPT-112",
+        "warmups": 0,
+        "samples": 1,
+        "observed_warmups": 0,
+        "observed_samples": 1,
+        "observed_candidates": 1,
+        "observed_shapes": 1,
+        "observed_tier": "correctness",
+        "pairs": 1,
+        "sample_ids": [
+          0
+        ],
+        "acceptance_executed": false,
+        "keep": false,
+        "capture_key": null,
+        "rounds": []
+      }
+    },
+    "claims_throughput": false,
+    "measurement_utc": "2026-09-13T06:51:02Z",
+    "status": "deferred_below_trigger",
+    "independent_verdicts": {
+      "current_bf16_q8_staging": {
+        "kernel_parity_pass": false,
+        "model_quality_pass": false,
+        "performance_pass": false,
+        "production_kept": true,
+        "incomplete": false,
+        "not_applicable_reason": "deferred_below_trigger"
+      },
+      "norm_to_typed_q8_rounded": {
+        "kernel_parity_pass": false,
+        "model_quality_pass": false,
+        "performance_pass": false,
+        "production_kept": false,
+        "incomplete": true,
+        "not_applicable_reason": "deferred_below_trigger"
+      },
+      "residual_norm_to_typed_q8_rounded": {
+        "kernel_parity_pass": false,
+        "model_quality_pass": false,
+        "performance_pass": false,
+        "production_kept": false,
+        "incomplete": true,
+        "not_applicable_reason": "deferred_below_trigger"
+      }
+    },
+    "selected_path": "current_bf16_q8_staging",
+    "shipping_unchanged": true,
+    "production_kept": true,
+    "winners": [],
+    "claims_performance_improvement": false
+  },
+  "updated_utc": "2026-09-13T06:51:02Z",
+  "eligibility": {
+    "schema_version": 1,
+    "task": "OPT-112",
+    "phase": "screen",
+    "mode": "acceptance",
+    "eligible": false,
+    "verdict": "deferred_below_trigger",
+    "reason": "upper_bound_clue_is_not_removable_budget",
+    "threshold_ms_per_token": 0.5,
+    "min_potentially_removable_ms_per_token": 0.24962933131322917,
+    "max_upper_bound_clue_ms_per_token": 0.8215069988114475,
+    "opt099_path": "fixtures/opt099_matched_attribution.json",
+    "opt090_path": "fixtures/opt090_decode_attribution.json",
+    "opt099_ffn_norm_clue_window_ms": 26.28822396196632,
+    "d128": {
+      "prefix": 128,
+      "tokens": 32,
+      "source": "fixtures/opt099_matched_attribution.json",
+      "families_ms": {
+        "ffn_norm": 26.268607947999644,
+        "input_norm": 0.5009386676333333,
+        "activation_quant": 0.0,
+        "residual_mixer": 7.988138602023334,
+        "logits_norm": 9.157471959683322,
+        "gdn_output_norm": 0.0
+      },
+      "ffn_norm_ms_per_token": 0.8208939983749889,
+      "input_norm_ms_per_token": 0.015654333363541665,
+      "activation_quant_ms_per_token": 0.0,
+      "residual_mixer_ms_per_token": 0.24962933131322917,
+      "upper_bound_clue_ms_per_token": 0.8208939983749889,
+      "potentially_removable_ms_per_token": 0.24962933131322917,
+      "threshold_ms_per_token": 0.5,
+      "above_trigger": false,
+      "eager_labeled_diagnostic": true
+    },
+    "d2048": {
+      "prefix": 2048,
+      "tokens": 32,
+      "source": "fixtures/opt099_matched_attribution.json",
+      "families_ms": {
+        "ffn_norm": 26.28822396196632,
+        "input_norm": 0.5217386683666668,
+        "activation_quant": 0.0,
+        "residual_mixer": 8.079466598953339,
+        "logits_norm": 9.301781294956667,
+        "gdn_output_norm": 0.0
+      },
+      "ffn_norm_ms_per_token": 0.8215069988114475,
+      "input_norm_ms_per_token": 0.01630433338645834,
+      "activation_quant_ms_per_token": 0.0,
+      "residual_mixer_ms_per_token": 0.25248333121729183,
+      "upper_bound_clue_ms_per_token": 0.8215069988114475,
+      "potentially_removable_ms_per_token": 0.25248333121729183,
+      "threshold_ms_per_token": 0.5,
+      "above_trigger": false,
+      "eager_labeled_diagnostic": true
+    },
+    "consumers": [
+      {
+        "id": "mixer_gdn_qkv_gate_alpha_beta",
+        "layer_kind": "gdn",
+        "layer_count": 48,
+        "producer": "input_norm",
+        "encoding": "Q8_1Block",
+        "reuse_group": "qkv_gate_alpha_beta",
+        "bf16_externally_observed": false,
+        "retain_existing_path": false,
+        "notes": "grouped_r1_w4 Q8_1 from workspace->normalized_; GDN conv/recurrence consume projection outputs, not the normalized BF16 vector."
+      },
+      {
+        "id": "mixer_attn_query_gate_key_value",
+        "layer_kind": "attention",
+        "layer_count": 16,
+        "producer": "input_norm",
+        "encoding": "Q8_1Block",
+        "reuse_group": "query_gate_key_value",
+        "bf16_externally_observed": false,
+        "retain_existing_path": false,
+        "notes": "grouped_r1_w4 Q8_1; query split/RoPE consume projected Q/K/V, not the RMSNorm BF16 vector."
+      },
+      {
+        "id": "ffn_gate_up",
+        "layer_kind": "ffn",
+        "layer_count": 64,
+        "producer": "ffn_norm",
+        "encoding": "Q8_1Block",
+        "alternate_encoding": "Q8Block",
+        "reuse_group": "gate_up",
+        "bf16_externally_observed": false,
+        "retain_existing_path": false,
+        "notes": "Sitting pin llama_q4k_mmvq restages BF16 into block_q8_1 inside the adapter. paired_integer late-Q4 would require FP32-scale Q8Block instead; encodings are not interchangeable."
+      },
+      {
+        "id": "logits_output_norm",
+        "layer_kind": "logits",
+        "layer_count": 1,
+        "producer": "logits_norm",
+        "encoding": null,
+        "reuse_group": null,
+        "bf16_externally_observed": true,
+        "retain_existing_path": true,
+        "notes": "Unquantized logits projection; keep the existing BF16 path."
+      }
+    ],
+    "fusion_candidates": [
+      "norm_to_typed_q8_rounded",
+      "residual_norm_to_typed_q8_rounded"
+    ],
+    "fusion_implemented": false,
+    "native_counts": {
+      "schema_version": 1,
+      "task": "OPT-112",
+      "warmups": 0,
+      "samples": 1,
+      "observed_warmups": 0,
+      "observed_samples": 1,
+      "observed_candidates": 1,
+      "observed_shapes": 1,
+      "observed_tier": "correctness",
+      "pairs": 1,
+      "sample_ids": [
+        0
+      ],
+      "acceptance_executed": false,
+      "keep": false,
+      "capture_key": null
+    },
+    "admission": {
+      "ok": true,
+      "result_class": "ok",
+      "message": "instrumentation-only: no speed admission",
+      "observed": {
+        "schema_version": 1,
+        "task": "OPT-112",
+        "warmups": 0,
+        "samples": 1,
+        "observed_warmups": 0,
+        "observed_samples": 1,
+        "observed_candidates": 1,
+        "observed_shapes": 1,
+        "observed_tier": "correctness",
+        "pairs": 1,
+        "sample_ids": [
+          0
+        ],
+        "acceptance_executed": false,
+        "keep": false,
+        "capture_key": null,
+        "rounds": []
+      }
+    },
+    "claims_throughput": false,
+    "measurement_utc": "2026-09-13T06:51:02Z",
+    "status": "deferred_below_trigger",
+    "independent_verdicts": {
+      "current_bf16_q8_staging": {
+        "kernel_parity_pass": false,
+        "model_quality_pass": false,
+        "performance_pass": false,
+        "production_kept": true,
+        "incomplete": false,
+        "not_applicable_reason": "deferred_below_trigger"
+      },
+      "norm_to_typed_q8_rounded": {
+        "kernel_parity_pass": false,
+        "model_quality_pass": false,
+        "performance_pass": false,
+        "production_kept": false,
+        "incomplete": true,
+        "not_applicable_reason": "deferred_below_trigger"
+      },
+      "residual_norm_to_typed_q8_rounded": {
+        "kernel_parity_pass": false,
+        "model_quality_pass": false,
+        "performance_pass": false,
+        "production_kept": false,
+        "incomplete": true,
+        "not_applicable_reason": "deferred_below_trigger"
+      }
+    },
+    "selected_path": "current_bf16_q8_staging",
+    "shipping_unchanged": true,
+    "production_kept": true,
+    "winners": [],
+    "claims_performance_improvement": false
+  },
+  "status": "deferred_below_trigger",
+  "eligible": false,
+  "independent_verdicts": {
+    "current_bf16_q8_staging": {
+      "kernel_parity_pass": false,
+      "model_quality_pass": false,
+      "performance_pass": false,
+      "production_kept": true,
+      "incomplete": false,
+      "not_applicable_reason": "deferred_below_trigger"
+    },
+    "norm_to_typed_q8_rounded": {
+      "kernel_parity_pass": false,
+      "model_quality_pass": false,
+      "performance_pass": false,
+      "production_kept": false,
+      "incomplete": true,
+      "not_applicable_reason": "deferred_below_trigger"
+    },
+    "residual_norm_to_typed_q8_rounded": {
+      "kernel_parity_pass": false,
+      "model_quality_pass": false,
+      "performance_pass": false,
+      "production_kept": false,
+      "incomplete": true,
+      "not_applicable_reason": "deferred_below_trigger"
+    }
+  },
+  "shipping_unchanged": true,
+  "production_kept": true,
+  "winners": [],
+  "quality": {
+    "status": "not_required",
+    "reason": "deferred_below_trigger",
+    "candidate_nll_measured": false
+  },
+  "numeric": {
+    "status": "not_required",
+    "reason": "deferred_below_trigger"
+  }
+}

@@ -937,6 +937,20 @@ vs OPT-114 baseline: P4096 +65.6**, D2048 **+8.416**, D128 **+4.959**. Live
 numbers stay in
 [`evidence/optimization/opt111-llama-prompt-attention/REPORT.md`](../evidence/optimization/opt111-llama-prompt-attention/REPORT.md).
 
+## Decode norm → typed Q8 staging (OPT-112)
+
+**Outcome freeze, 2026-09-13:** OPT-112 screened decode normalization → typed
+Q8 staging from OPT-099/OPT-090 attribution. OPT-099 unmatched `ffn_norm`
+D2048 window 26.288 ms is an upper-bound clue (0.8215 ms/token), not a
+removable budget. `activation_quant` is 0 (restage sits inside projection
+intervals). Min potentially removable **0.2496 ms/token** (`residual_mixer`) is
+below the **0.50 ms/token** trigger at D128 and D2048. Verdict
+**`deferred_below_trigger`**; fusion candidates `norm_to_typed_q8_rounded` and
+`residual_norm_to_typed_q8_rounded` were **not** implemented. Production
+unchanged (`current_bf16_q8_staging`). Quality/OPT-058 not required on defer.
+tok/s delta vs production **0**. Live numbers stay in
+[`evidence/optimization/opt112-norm-q8-staging/REPORT.md`](../evidence/optimization/opt112-norm-q8-staging/REPORT.md).
+
 ## DwarfStar transfer boundary
 
 Reuse MMV/MMQ phase split, quant block tests, explicit unavailable paths, stable
