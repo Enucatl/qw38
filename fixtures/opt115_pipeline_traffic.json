@@ -1,0 +1,5748 @@
+{
+  "schema_version": 1,
+  "task": "OPT-115",
+  "status": "measured",
+  "measurement_utc": "2026-09-13T12:41:02Z",
+  "identity": {
+    "device": "NVIDIA GeForce RTX 5090",
+    "compute_capability": "12.0",
+    "power_limit_w": 400.0,
+    "llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+    "llama_inspection_head": "1945e092030f8668ff93382799502d01490e564d",
+    "ds4_inspection_head": "c238077a87186381bf626cc531bccffe1fef79e7",
+    "gguf_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+    "token_generator": "(42 + index * 997) % 248320",
+    "source_revision": "e4e02bfea64e2d44fc6e4e7537f447c46f7c6d67",
+    "source_state": "dirty",
+    "nvccflags": "-O2 --fmad=false",
+    "execution_graphs": "ffn_only",
+    "selectors": {
+      "rms_norm": "parallel_fma",
+      "q4_decode": "llama_q4k_mmvq",
+      "q8_decode": "dp4a_q8_1",
+      "q6_decode": "integer_q8_1",
+      "ffn_decode": "paired_integer",
+      "query_prepare": "hoisted",
+      "attention_pipeline": "opt111_base",
+      "gdn_preproc": "transpose",
+      "mmq_pipeline": "fma_async",
+      "ffn_prompt_pair": "off",
+      "execution_graphs": "ffn_only",
+      "production_numerics": "strict",
+      "gdn_decode": "sequential",
+      "decode_query_prep": "warp_query",
+      "q8_decode_rows_skinny": 1,
+      "q8_decode_rows_medium": 1,
+      "q8_decode_rows_wide": 1,
+      "q8_decode_layout_warps_skinny": 4,
+      "q8_decode_layout_warps_medium": 4,
+      "q8_decode_layout_warps_wide": 4,
+      "ffn_gate_quality_i": 128,
+      "ffn_gate_prompt_tile": 128,
+      "prompt_microbatch_rows": 4096,
+      "mmq_async_x": true,
+      "nvccflags": "-O2 --fmad=false",
+      "q8_layout": "r1_w4",
+      "ffn_tiles": "i128_j128",
+      "q8_grouping": "grouped_r1_w4",
+      "q8_device_layout": "raw_gguf",
+      "q6_device_layout": "raw_gguf",
+      "mmq_double_x": false,
+      "decode_attention_vec128": "warp_query",
+      "decode_attention_crossover_threshold": 1024,
+      "decode_attention": "hybrid_crossover"
+    },
+    "clocks": {
+      "sm_clock_mhz": "232",
+      "mem_clock_mhz": "405",
+      "temperature_c": "50",
+      "power_draw_w": 23.72
+    },
+    "image": "qw38-cuda:13.0.2",
+    "model": "models/Qwen3.8-27B-Q4_K_M.gguf",
+    "telemetry": {
+      "device": "NVIDIA GeForce RTX 5090",
+      "device_substring": "RTX 5090",
+      "power_limit_w": 400.0,
+      "power_draw_w": 23.72,
+      "sm_clock_mhz": "232",
+      "mem_clock_mhz": "405",
+      "temperature_c": "50",
+      "raw": "NVIDIA GeForce RTX 5090, 400.00, 23.72, 232, 405, 50"
+    }
+  },
+  "hardware_executed": true,
+  "gpu_blocker": null,
+  "post113_authenticated": {
+    "ok": true,
+    "selectors": {
+      "rms_norm": "parallel_fma",
+      "q4_decode": "llama_q4k_mmvq",
+      "q8_decode": "dp4a_q8_1",
+      "q6_decode": "integer_q8_1",
+      "ffn_decode": "paired_integer",
+      "query_prepare": "hoisted",
+      "attention_pipeline": "opt111_base",
+      "gdn_preproc": "transpose",
+      "mmq_pipeline": "fma_async",
+      "ffn_prompt_pair": "off",
+      "execution_graphs": "ffn_only",
+      "production_numerics": "strict",
+      "gdn_decode": "sequential",
+      "decode_query_prep": "warp_query",
+      "q8_decode_rows_skinny": 1,
+      "q8_decode_rows_medium": 1,
+      "q8_decode_rows_wide": 1,
+      "q8_decode_layout_warps_skinny": 4,
+      "q8_decode_layout_warps_medium": 4,
+      "q8_decode_layout_warps_wide": 4,
+      "ffn_gate_quality_i": 128,
+      "ffn_gate_prompt_tile": 128,
+      "prompt_microbatch_rows": 4096,
+      "mmq_async_x": true,
+      "nvccflags": "-O2 --fmad=false",
+      "q8_layout": "r1_w4",
+      "ffn_tiles": "i128_j128",
+      "q8_grouping": "grouped_r1_w4",
+      "q8_device_layout": "raw_gguf",
+      "q6_device_layout": "raw_gguf",
+      "mmq_double_x": false,
+      "decode_attention_vec128": "warp_query",
+      "decode_attention_crossover_threshold": 1024,
+      "decode_attention": "hybrid_crossover"
+    },
+    "expected": {
+      "rms_norm": "parallel_fma",
+      "q4_decode": "llama_q4k_mmvq",
+      "q8_decode": "dp4a_q8_1",
+      "q8_grouping": "grouped_r1_w4",
+      "q8_layout": "r1_w4",
+      "q6_decode": "integer_q8_1",
+      "ffn_decode": "paired_integer",
+      "query_prepare": "hoisted",
+      "attention_pipeline": "opt111_base",
+      "gdn_preproc": "transpose",
+      "mmq_pipeline": "fma_async",
+      "mmq_async_x": true,
+      "ffn_prompt_pair": "off",
+      "ffn_tiles": "i128_j128",
+      "prompt_microbatch_rows": 4096,
+      "execution_graphs": "ffn_only",
+      "production_numerics": "strict",
+      "nvccflags": "-O2 --fmad=false",
+      "gdn_decode": "sequential",
+      "decode_query_prep": "warp_query",
+      "decode_attention": "hybrid_crossover",
+      "decode_attention_vec128": "warp_query",
+      "decode_attention_crossover_threshold": 1024,
+      "q8_device_layout": "raw_gguf",
+      "q6_device_layout": "raw_gguf",
+      "mmq_double_x": false
+    },
+    "opt113_fixture_selected": {
+      "rms_norm": "parallel_fma",
+      "q4_decode": "llama_q4k_mmvq",
+      "q8_decode": "dp4a_q8_1",
+      "q6_decode": "integer_q8_1",
+      "ffn_decode": "paired_integer",
+      "query_prepare": "hoisted",
+      "attention_pipeline": "opt111_base",
+      "gdn_preproc": "transpose",
+      "mmq_pipeline": "fma_async",
+      "ffn_prompt_pair": "off",
+      "execution_graphs": "ffn_only",
+      "production_numerics": "strict",
+      "gdn_decode": "sequential",
+      "decode_query_prep": "warp_query",
+      "q8_decode_rows_skinny": 1,
+      "q8_decode_rows_medium": 1,
+      "q8_decode_rows_wide": 1,
+      "q8_decode_layout_warps_skinny": 4,
+      "q8_decode_layout_warps_medium": 4,
+      "q8_decode_layout_warps_wide": 4,
+      "ffn_gate_quality_i": 128,
+      "ffn_gate_prompt_tile": 128,
+      "prompt_microbatch_rows": 4096,
+      "mmq_async_x": true,
+      "nvccflags": "-O2 --fmad=false",
+      "q8_layout": "r1_w4",
+      "ffn_tiles": "i128_j128",
+      "q8_grouping": "grouped_r1_w4",
+      "q8_device_layout": "raw_gguf",
+      "q6_device_layout": "raw_gguf",
+      "mmq_double_x": false,
+      "decode_attention_vec128": "warp_query",
+      "decode_attention_crossover_threshold": 1024,
+      "decode_attention": "hybrid_crossover"
+    },
+    "mismatches": {},
+    "llama_q4k_mmvq": true,
+    "opt111_base": true,
+    "hybrid_crossover": true,
+    "sequential_gdn": true,
+    "ffn_only_graphs": true,
+    "opt113_numbers_historical_only": true
+  },
+  "request_trace": {
+    "p4096": {
+      "workload": "p4096",
+      "prefix": 4096,
+      "warmups": 3,
+      "pairs": 10,
+      "decode_tokens": 0,
+      "same_binary": true,
+      "a_tok_s": [
+        3011.13818,
+        3002.35913,
+        2997.59912,
+        2990.87598,
+        2989.85547,
+        2981.27124,
+        2978.71924,
+        2970.99561,
+        2969.24658,
+        2964.66675
+      ],
+      "b_tok_s": [
+        3008.84692,
+        3005.08447,
+        2995.52612,
+        2992.26611,
+        2987.95337,
+        2983.74365,
+        2977.22437,
+        2975.34912,
+        2967.96948,
+        2967.17529
+      ],
+      "a_wall_ms": [
+        1360.28296,
+        1364.2605,
+        1366.42688,
+        1369.49841,
+        1369.96594,
+        1373.91052,
+        1375.08765,
+        1378.66248,
+        1379.47449,
+        1381.60559
+      ],
+      "b_wall_ms": [
+        1361.31885,
+        1363.02319,
+        1367.37244,
+        1368.86218,
+        1370.83801,
+        1372.77209,
+        1375.77808,
+        1376.64514,
+        1380.06812,
+        1380.4375
+      ],
+      "a_p50_ms": [
+        1360.28296,
+        1364.2605,
+        1366.42688,
+        1369.49841,
+        1369.96594,
+        1373.91052,
+        1375.08765,
+        1378.66248,
+        1379.47449,
+        1381.60559
+      ],
+      "a_p95_ms": [
+        1360.28296,
+        1364.2605,
+        1366.42688,
+        1369.49841,
+        1369.96594,
+        1373.91052,
+        1375.08765,
+        1378.66248,
+        1379.47449,
+        1381.60559
+      ],
+      "b_p50_ms": [
+        1361.31885,
+        1363.02319,
+        1367.37244,
+        1368.86218,
+        1370.83801,
+        1372.77209,
+        1375.77808,
+        1376.64514,
+        1380.06812,
+        1380.4375
+      ],
+      "b_p95_ms": [
+        1361.31885,
+        1363.02319,
+        1367.37244,
+        1368.86218,
+        1370.83801,
+        1372.77209,
+        1375.77808,
+        1376.64514,
+        1380.06812,
+        1380.4375
+      ],
+      "n": 10,
+      "df": 9,
+      "geometric_ratio": 1.0001489561933106,
+      "ci95_low": 0.9995522884926582,
+      "ci95_high": 1.0007459800657699,
+      "se": 0.00026381824071660667,
+      "critical": 2.262,
+      "ratios": [
+        0.9992390717851414,
+        1.0009077328467364,
+        0.9993084465543879,
+        1.0004647902518513,
+        0.9993638154020871,
+        1.0008293140076714,
+        0.9994981500841281,
+        1.0014653370692796,
+        0.9995698908913117,
+        1.0008461456924291
+      ],
+      "equality_excluded": false,
+      "incomplete": false,
+      "guard": 0.02,
+      "point_outside_guard": false,
+      "status": "repeatable",
+      "a_mean_tok_s": 2985.67273,
+      "b_mean_tok_s": 2986.1138899999996,
+      "a_p50_tok_s": 2985.5633550000002,
+      "a_p95_tok_s": 3007.1876075,
+      "b_p50_tok_s": 2985.84851,
+      "b_p95_tok_s": 3007.1538174999996,
+      "native": {
+        "schema_version": 1,
+        "task": "OPT-115",
+        "workload": "request-trace",
+        "prefix": 4096,
+        "prefill": true,
+        "warmups": 3,
+        "samples": 10,
+        "tokens": 0,
+        "observed_warmups": 3,
+        "observed_samples": 10,
+        "observed_candidates": 2,
+        "observed_shapes": 1,
+        "observed_tier": "screen",
+        "keep": false,
+        "execution_graphs": "ffn_only",
+        "same_binary": true,
+        "independently_restored": true,
+        "opt110_hooks_ready": true,
+        "pairs": [
+          {
+            "sample_index": 0,
+            "order": "AB",
+            "A": {
+              "wall_ms": 1360.28296,
+              "tok_s": 3011.13818,
+              "p50_ms": 1360.28296,
+              "p95_ms": 1360.28296
+            },
+            "B": {
+              "wall_ms": 1361.31885,
+              "tok_s": 3008.84692,
+              "p50_ms": 1361.31885,
+              "p95_ms": 1361.31885
+            }
+          },
+          {
+            "sample_index": 1,
+            "order": "BA",
+            "A": {
+              "wall_ms": 1364.2605,
+              "tok_s": 3002.35913,
+              "p50_ms": 1364.2605,
+              "p95_ms": 1364.2605
+            },
+            "B": {
+              "wall_ms": 1363.02319,
+              "tok_s": 3005.08447,
+              "p50_ms": 1363.02319,
+              "p95_ms": 1363.02319
+            }
+          },
+          {
+            "sample_index": 2,
+            "order": "AB",
+            "A": {
+              "wall_ms": 1366.42688,
+              "tok_s": 2997.59912,
+              "p50_ms": 1366.42688,
+              "p95_ms": 1366.42688
+            },
+            "B": {
+              "wall_ms": 1367.37244,
+              "tok_s": 2995.52612,
+              "p50_ms": 1367.37244,
+              "p95_ms": 1367.37244
+            }
+          },
+          {
+            "sample_index": 3,
+            "order": "BA",
+            "A": {
+              "wall_ms": 1369.49841,
+              "tok_s": 2990.87598,
+              "p50_ms": 1369.49841,
+              "p95_ms": 1369.49841
+            },
+            "B": {
+              "wall_ms": 1368.86218,
+              "tok_s": 2992.26611,
+              "p50_ms": 1368.86218,
+              "p95_ms": 1368.86218
+            }
+          },
+          {
+            "sample_index": 4,
+            "order": "AB",
+            "A": {
+              "wall_ms": 1369.96594,
+              "tok_s": 2989.85547,
+              "p50_ms": 1369.96594,
+              "p95_ms": 1369.96594
+            },
+            "B": {
+              "wall_ms": 1370.83801,
+              "tok_s": 2987.95337,
+              "p50_ms": 1370.83801,
+              "p95_ms": 1370.83801
+            }
+          },
+          {
+            "sample_index": 5,
+            "order": "BA",
+            "A": {
+              "wall_ms": 1373.91052,
+              "tok_s": 2981.27124,
+              "p50_ms": 1373.91052,
+              "p95_ms": 1373.91052
+            },
+            "B": {
+              "wall_ms": 1372.77209,
+              "tok_s": 2983.74365,
+              "p50_ms": 1372.77209,
+              "p95_ms": 1372.77209
+            }
+          },
+          {
+            "sample_index": 6,
+            "order": "AB",
+            "A": {
+              "wall_ms": 1375.08765,
+              "tok_s": 2978.71924,
+              "p50_ms": 1375.08765,
+              "p95_ms": 1375.08765
+            },
+            "B": {
+              "wall_ms": 1375.77808,
+              "tok_s": 2977.22437,
+              "p50_ms": 1375.77808,
+              "p95_ms": 1375.77808
+            }
+          },
+          {
+            "sample_index": 7,
+            "order": "BA",
+            "A": {
+              "wall_ms": 1378.66248,
+              "tok_s": 2970.99561,
+              "p50_ms": 1378.66248,
+              "p95_ms": 1378.66248
+            },
+            "B": {
+              "wall_ms": 1376.64514,
+              "tok_s": 2975.34912,
+              "p50_ms": 1376.64514,
+              "p95_ms": 1376.64514
+            }
+          },
+          {
+            "sample_index": 8,
+            "order": "AB",
+            "A": {
+              "wall_ms": 1379.47449,
+              "tok_s": 2969.24658,
+              "p50_ms": 1379.47449,
+              "p95_ms": 1379.47449
+            },
+            "B": {
+              "wall_ms": 1380.06812,
+              "tok_s": 2967.96948,
+              "p50_ms": 1380.06812,
+              "p95_ms": 1380.06812
+            }
+          },
+          {
+            "sample_index": 9,
+            "order": "BA",
+            "A": {
+              "wall_ms": 1381.60559,
+              "tok_s": 2964.66675,
+              "p50_ms": 1381.60559,
+              "p95_ms": 1381.60559
+            },
+            "B": {
+              "wall_ms": 1380.4375,
+              "tok_s": 2967.17529,
+              "p50_ms": 1380.4375,
+              "p95_ms": 1380.4375
+            }
+          }
+        ]
+      }
+    },
+    "d128": {
+      "workload": "d128",
+      "prefix": 128,
+      "warmups": 3,
+      "pairs": 10,
+      "decode_tokens": 256,
+      "same_binary": true,
+      "a_tok_s": [
+        57.5051346,
+        57.4614449,
+        57.4492073,
+        57.4129257,
+        57.3948746,
+        57.3634644,
+        57.3742981,
+        57.3380928,
+        57.3404121,
+        57.3092079
+      ],
+      "b_tok_s": [
+        57.4905815,
+        57.4699745,
+        57.4432526,
+        57.4201698,
+        57.3807335,
+        57.3785248,
+        57.3582687,
+        57.3375969,
+        57.3409386,
+        57.3309593
+      ],
+      "a_wall_ms": [
+        4451.77637,
+        4455.16113,
+        4456.11035,
+        4458.92627,
+        4460.32861,
+        4462.771,
+        4461.92822,
+        4464.74561,
+        4464.56494,
+        4466.99609
+      ],
+      "b_wall_ms": [
+        4452.90332,
+        4454.5,
+        4456.57227,
+        4458.36377,
+        4461.42773,
+        4461.59961,
+        4463.17529,
+        4464.78418,
+        4464.52393,
+        4465.30127
+      ],
+      "a_p50_ms": [
+        17.3997421,
+        17.4076843,
+        17.4127636,
+        17.4248905,
+        17.4312592,
+        17.4389572,
+        17.4352245,
+        17.4474087,
+        17.447113,
+        17.4557686
+      ],
+      "a_p95_ms": [
+        17.5008202,
+        17.5020313,
+        17.5152321,
+        17.5202026,
+        17.5245247,
+        17.5320168,
+        17.5265636,
+        17.5385551,
+        17.5410271,
+        17.5464973
+      ],
+      "b_p50_ms": [
+        17.404335,
+        17.4108429,
+        17.4177818,
+        17.4228363,
+        17.4366837,
+        17.440815,
+        17.4395332,
+        17.4498329,
+        17.4470024,
+        17.449543
+      ],
+      "b_p95_ms": [
+        17.4953403,
+        17.5004406,
+        17.5024185,
+        17.5150719,
+        17.5233669,
+        17.5315552,
+        17.5369339,
+        17.5436535,
+        17.539505,
+        17.542511
+      ],
+      "n": 10,
+      "df": 9,
+      "geometric_ratio": 1.0000034512963472,
+      "ci95_low": 0.9998409592316034,
+      "ci95_high": 1.000165969768962,
+      "se": 7.184116141123374e-05,
+      "critical": 2.262,
+      "ratios": [
+        0.9997469252076144,
+        1.0001484404023402,
+        0.9998963484392587,
+        1.0001261754197626,
+        0.9997536173726564,
+        1.0002625434177927,
+        0.9997206170614574,
+        0.9999913512993582,
+        1.0000091820058614,
+        1.0003795445932173
+      ],
+      "equality_excluded": false,
+      "incomplete": false,
+      "guard": 0.02,
+      "point_outside_guard": false,
+      "status": "repeatable",
+      "a_mean_tok_s": 57.39490624,
+      "b_mean_tok_s": 57.395100019999994,
+      "a_p50_tok_s": 57.38458635,
+      "a_p95_tok_s": 57.485474235,
+      "b_p50_tok_s": 57.37962915,
+      "b_p95_tok_s": 57.48130835,
+      "native": {
+        "schema_version": 1,
+        "task": "OPT-115",
+        "workload": "request-trace",
+        "prefix": 128,
+        "prefill": false,
+        "warmups": 3,
+        "samples": 10,
+        "tokens": 256,
+        "observed_warmups": 3,
+        "observed_samples": 10,
+        "observed_candidates": 2,
+        "observed_shapes": 1,
+        "observed_tier": "screen",
+        "keep": false,
+        "execution_graphs": "ffn_only",
+        "same_binary": true,
+        "independently_restored": true,
+        "opt110_hooks_ready": true,
+        "pairs": [
+          {
+            "sample_index": 0,
+            "order": "AB",
+            "A": {
+              "wall_ms": 4451.77637,
+              "tok_s": 57.5051346,
+              "p50_ms": 17.3997421,
+              "p95_ms": 17.5008202
+            },
+            "B": {
+              "wall_ms": 4452.90332,
+              "tok_s": 57.4905815,
+              "p50_ms": 17.404335,
+              "p95_ms": 17.4953403
+            }
+          },
+          {
+            "sample_index": 1,
+            "order": "BA",
+            "A": {
+              "wall_ms": 4455.16113,
+              "tok_s": 57.4614449,
+              "p50_ms": 17.4076843,
+              "p95_ms": 17.5020313
+            },
+            "B": {
+              "wall_ms": 4454.5,
+              "tok_s": 57.4699745,
+              "p50_ms": 17.4108429,
+              "p95_ms": 17.5004406
+            }
+          },
+          {
+            "sample_index": 2,
+            "order": "AB",
+            "A": {
+              "wall_ms": 4456.11035,
+              "tok_s": 57.4492073,
+              "p50_ms": 17.4127636,
+              "p95_ms": 17.5152321
+            },
+            "B": {
+              "wall_ms": 4456.57227,
+              "tok_s": 57.4432526,
+              "p50_ms": 17.4177818,
+              "p95_ms": 17.5024185
+            }
+          },
+          {
+            "sample_index": 3,
+            "order": "BA",
+            "A": {
+              "wall_ms": 4458.92627,
+              "tok_s": 57.4129257,
+              "p50_ms": 17.4248905,
+              "p95_ms": 17.5202026
+            },
+            "B": {
+              "wall_ms": 4458.36377,
+              "tok_s": 57.4201698,
+              "p50_ms": 17.4228363,
+              "p95_ms": 17.5150719
+            }
+          },
+          {
+            "sample_index": 4,
+            "order": "AB",
+            "A": {
+              "wall_ms": 4460.32861,
+              "tok_s": 57.3948746,
+              "p50_ms": 17.4312592,
+              "p95_ms": 17.5245247
+            },
+            "B": {
+              "wall_ms": 4461.42773,
+              "tok_s": 57.3807335,
+              "p50_ms": 17.4366837,
+              "p95_ms": 17.5233669
+            }
+          },
+          {
+            "sample_index": 5,
+            "order": "BA",
+            "A": {
+              "wall_ms": 4462.771,
+              "tok_s": 57.3634644,
+              "p50_ms": 17.4389572,
+              "p95_ms": 17.5320168
+            },
+            "B": {
+              "wall_ms": 4461.59961,
+              "tok_s": 57.3785248,
+              "p50_ms": 17.440815,
+              "p95_ms": 17.5315552
+            }
+          },
+          {
+            "sample_index": 6,
+            "order": "AB",
+            "A": {
+              "wall_ms": 4461.92822,
+              "tok_s": 57.3742981,
+              "p50_ms": 17.4352245,
+              "p95_ms": 17.5265636
+            },
+            "B": {
+              "wall_ms": 4463.17529,
+              "tok_s": 57.3582687,
+              "p50_ms": 17.4395332,
+              "p95_ms": 17.5369339
+            }
+          },
+          {
+            "sample_index": 7,
+            "order": "BA",
+            "A": {
+              "wall_ms": 4464.74561,
+              "tok_s": 57.3380928,
+              "p50_ms": 17.4474087,
+              "p95_ms": 17.5385551
+            },
+            "B": {
+              "wall_ms": 4464.78418,
+              "tok_s": 57.3375969,
+              "p50_ms": 17.4498329,
+              "p95_ms": 17.5436535
+            }
+          },
+          {
+            "sample_index": 8,
+            "order": "AB",
+            "A": {
+              "wall_ms": 4464.56494,
+              "tok_s": 57.3404121,
+              "p50_ms": 17.447113,
+              "p95_ms": 17.5410271
+            },
+            "B": {
+              "wall_ms": 4464.52393,
+              "tok_s": 57.3409386,
+              "p50_ms": 17.4470024,
+              "p95_ms": 17.539505
+            }
+          },
+          {
+            "sample_index": 9,
+            "order": "BA",
+            "A": {
+              "wall_ms": 4466.99609,
+              "tok_s": 57.3092079,
+              "p50_ms": 17.4557686,
+              "p95_ms": 17.5464973
+            },
+            "B": {
+              "wall_ms": 4465.30127,
+              "tok_s": 57.3309593,
+              "p50_ms": 17.449543,
+              "p95_ms": 17.542511
+            }
+          }
+        ]
+      }
+    },
+    "d2048": {
+      "workload": "d2048",
+      "prefix": 2048,
+      "warmups": 3,
+      "pairs": 10,
+      "decode_tokens": 256,
+      "same_binary": true,
+      "a_tok_s": [
+        55.678875,
+        55.682827,
+        55.6663475,
+        55.6677322,
+        55.6688957,
+        55.6691971,
+        55.6730957,
+        55.6595459,
+        55.6583176,
+        55.656971
+      ],
+      "b_tok_s": [
+        55.6921196,
+        55.68116,
+        55.6717529,
+        55.6565323,
+        55.6418571,
+        55.6640663,
+        55.6578865,
+        55.6576157,
+        55.6531677,
+        55.6636238
+      ],
+      "a_wall_ms": [
+        4597.79395,
+        4597.46777,
+        4598.82861,
+        4598.71436,
+        4598.61816,
+        4598.59326,
+        4598.27148,
+        4599.39062,
+        4599.49219,
+        4599.60352
+      ],
+      "b_wall_ms": [
+        4596.70068,
+        4597.60547,
+        4598.38232,
+        4599.63965,
+        4600.85303,
+        4599.01709,
+        4599.52783,
+        4599.55029,
+        4599.91797,
+        4599.05371
+      ],
+      "a_p50_ms": [
+        18.0274048,
+        18.0217953,
+        18.0299911,
+        18.0273304,
+        18.0281029,
+        18.0267258,
+        18.0273361,
+        18.0311489,
+        18.032135,
+        18.0265846
+      ],
+      "a_p95_ms": [
+        18.0588398,
+        18.0576324,
+        18.065464,
+        18.0637531,
+        18.0680122,
+        18.0593662,
+        18.0679893,
+        18.0691109,
+        18.0687542,
+        18.0712585
+      ],
+      "b_p50_ms": [
+        18.0189857,
+        18.0219498,
+        18.023653,
+        18.0296249,
+        18.0346031,
+        18.0244503,
+        18.027256,
+        18.030262,
+        18.0335808,
+        18.0289783
+      ],
+      "b_p95_ms": [
+        18.0527649,
+        18.0662155,
+        18.0595093,
+        18.0615845,
+        18.0767841,
+        18.0675926,
+        18.0701752,
+        18.0741367,
+        18.0744801,
+        18.0683098
+      ],
+      "n": 10,
+      "df": 9,
+      "geometric_ratio": 0.999924492125514,
+      "ci95_low": 0.9997749288902946,
+      "ci95_high": 1.0000740777349306,
+      "se": 6.612984821385308e-05,
+      "critical": 2.262,
+      "ratios": [
+        1.0002378747774627,
+        0.9999700625832089,
+        1.0000971035507584,
+        0.9997988080426958,
+        0.9995142960955125,
+        0.9999078341296933,
+        0.9997268123892021,
+        0.999965321312476,
+        0.999907472948841,
+        1.000119532196605
+      ],
+      "equality_excluded": false,
+      "incomplete": false,
+      "guard": 0.02,
+      "point_outside_guard": false,
+      "status": "repeatable",
+      "a_mean_tok_s": 55.66818047,
+      "b_mean_tok_s": 55.66397819,
+      "a_p50_tok_s": 55.66831395,
+      "a_p95_tok_s": 55.6810486,
+      "b_p50_tok_s": 55.66075515,
+      "b_p95_tok_s": 55.68718778,
+      "native": {
+        "schema_version": 1,
+        "task": "OPT-115",
+        "workload": "request-trace",
+        "prefix": 2048,
+        "prefill": false,
+        "warmups": 3,
+        "samples": 10,
+        "tokens": 256,
+        "observed_warmups": 3,
+        "observed_samples": 10,
+        "observed_candidates": 2,
+        "observed_shapes": 1,
+        "observed_tier": "screen",
+        "keep": false,
+        "execution_graphs": "ffn_only",
+        "same_binary": true,
+        "independently_restored": true,
+        "opt110_hooks_ready": true,
+        "pairs": [
+          {
+            "sample_index": 0,
+            "order": "AB",
+            "A": {
+              "wall_ms": 4597.79395,
+              "tok_s": 55.678875,
+              "p50_ms": 18.0274048,
+              "p95_ms": 18.0588398
+            },
+            "B": {
+              "wall_ms": 4596.70068,
+              "tok_s": 55.6921196,
+              "p50_ms": 18.0189857,
+              "p95_ms": 18.0527649
+            }
+          },
+          {
+            "sample_index": 1,
+            "order": "BA",
+            "A": {
+              "wall_ms": 4597.46777,
+              "tok_s": 55.682827,
+              "p50_ms": 18.0217953,
+              "p95_ms": 18.0576324
+            },
+            "B": {
+              "wall_ms": 4597.60547,
+              "tok_s": 55.68116,
+              "p50_ms": 18.0219498,
+              "p95_ms": 18.0662155
+            }
+          },
+          {
+            "sample_index": 2,
+            "order": "AB",
+            "A": {
+              "wall_ms": 4598.82861,
+              "tok_s": 55.6663475,
+              "p50_ms": 18.0299911,
+              "p95_ms": 18.065464
+            },
+            "B": {
+              "wall_ms": 4598.38232,
+              "tok_s": 55.6717529,
+              "p50_ms": 18.023653,
+              "p95_ms": 18.0595093
+            }
+          },
+          {
+            "sample_index": 3,
+            "order": "BA",
+            "A": {
+              "wall_ms": 4598.71436,
+              "tok_s": 55.6677322,
+              "p50_ms": 18.0273304,
+              "p95_ms": 18.0637531
+            },
+            "B": {
+              "wall_ms": 4599.63965,
+              "tok_s": 55.6565323,
+              "p50_ms": 18.0296249,
+              "p95_ms": 18.0615845
+            }
+          },
+          {
+            "sample_index": 4,
+            "order": "AB",
+            "A": {
+              "wall_ms": 4598.61816,
+              "tok_s": 55.6688957,
+              "p50_ms": 18.0281029,
+              "p95_ms": 18.0680122
+            },
+            "B": {
+              "wall_ms": 4600.85303,
+              "tok_s": 55.6418571,
+              "p50_ms": 18.0346031,
+              "p95_ms": 18.0767841
+            }
+          },
+          {
+            "sample_index": 5,
+            "order": "BA",
+            "A": {
+              "wall_ms": 4598.59326,
+              "tok_s": 55.6691971,
+              "p50_ms": 18.0267258,
+              "p95_ms": 18.0593662
+            },
+            "B": {
+              "wall_ms": 4599.01709,
+              "tok_s": 55.6640663,
+              "p50_ms": 18.0244503,
+              "p95_ms": 18.0675926
+            }
+          },
+          {
+            "sample_index": 6,
+            "order": "AB",
+            "A": {
+              "wall_ms": 4598.27148,
+              "tok_s": 55.6730957,
+              "p50_ms": 18.0273361,
+              "p95_ms": 18.0679893
+            },
+            "B": {
+              "wall_ms": 4599.52783,
+              "tok_s": 55.6578865,
+              "p50_ms": 18.027256,
+              "p95_ms": 18.0701752
+            }
+          },
+          {
+            "sample_index": 7,
+            "order": "BA",
+            "A": {
+              "wall_ms": 4599.39062,
+              "tok_s": 55.6595459,
+              "p50_ms": 18.0311489,
+              "p95_ms": 18.0691109
+            },
+            "B": {
+              "wall_ms": 4599.55029,
+              "tok_s": 55.6576157,
+              "p50_ms": 18.030262,
+              "p95_ms": 18.0741367
+            }
+          },
+          {
+            "sample_index": 8,
+            "order": "AB",
+            "A": {
+              "wall_ms": 4599.49219,
+              "tok_s": 55.6583176,
+              "p50_ms": 18.032135,
+              "p95_ms": 18.0687542
+            },
+            "B": {
+              "wall_ms": 4599.91797,
+              "tok_s": 55.6531677,
+              "p50_ms": 18.0335808,
+              "p95_ms": 18.0744801
+            }
+          },
+          {
+            "sample_index": 9,
+            "order": "BA",
+            "A": {
+              "wall_ms": 4599.60352,
+              "tok_s": 55.656971,
+              "p50_ms": 18.0265846,
+              "p95_ms": 18.0712585
+            },
+            "B": {
+              "wall_ms": 4599.05371,
+              "tok_s": 55.6636238,
+              "p50_ms": 18.0289783,
+              "p95_ms": 18.0683098
+            }
+          }
+        ]
+      }
+    },
+    "session_loop": {
+      "schema_version": 1,
+      "task": "OPT-115",
+      "workload": "session-loop",
+      "prefix": 4096,
+      "tokens": 32,
+      "capacity": 4160,
+      "wall_ms": 2046.31543,
+      "prefill_wall_ms": 1383.86047,
+      "ttft_ms": 1402.31323,
+      "tok_s": 48.305172,
+      "p50_ms": 20.6322517,
+      "p95_ms": 20.6806183,
+      "host_sample_ms": 4.217972,
+      "last_sampled_token": 198,
+      "planned_tokens": true,
+      "session_sync_sample_eval": true,
+      "keep": false,
+      "status": "measured"
+    },
+    "native_counts": {
+      "schema_version": 1,
+      "task": "OPT-115",
+      "warmups": 3,
+      "samples": 10,
+      "observed_warmups": 3,
+      "observed_samples": 10,
+      "observed_candidates": 2,
+      "observed_shapes": 3,
+      "observed_tier": "screen",
+      "sample_ids": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9
+      ],
+      "keep": false,
+      "product": 78
+    },
+    "admission": {
+      "ok": true,
+      "result_class": "ok",
+      "message": "instrumentation-only: no speed admission",
+      "observed": {
+        "schema_version": 1,
+        "task": "OPT-115",
+        "warmups": 3,
+        "samples": 10,
+        "observed_warmups": 3,
+        "observed_samples": 10,
+        "observed_candidates": 2,
+        "observed_shapes": 3,
+        "observed_tier": "screen",
+        "sample_ids": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9
+        ],
+        "keep": false,
+        "product": 78,
+        "rounds": [],
+        "acceptance_executed": false,
+        "pairs": 0
+      }
+    }
+  },
+  "aa_verdict": "repeatable",
+  "session_loop": {
+    "schema_version": 1,
+    "task": "OPT-115",
+    "workload": "session-loop",
+    "prefix": 4096,
+    "tokens": 32,
+    "capacity": 4160,
+    "wall_ms": 2046.31543,
+    "prefill_wall_ms": 1383.86047,
+    "ttft_ms": 1402.31323,
+    "tok_s": 48.305172,
+    "p50_ms": 20.6322517,
+    "p95_ms": 20.6806183,
+    "host_sample_ms": 4.217972,
+    "last_sampled_token": 198,
+    "planned_tokens": true,
+    "session_sync_sample_eval": true,
+    "keep": false,
+    "status": "measured"
+  },
+  "long_context": {
+    "d8192": {
+      "probe": "d8192",
+      "prefix": 8192,
+      "capacity": 131072,
+      "decode_tokens": 32,
+      "populated_cache": true,
+      "capacity_alone_is_not_traffic": true,
+      "status": "measured",
+      "tok_s": 41.4200325,
+      "wall_ms": 772.573059,
+      "ttft_ms": 3159.91846,
+      "p50_ms": 24.1365051,
+      "p95_ms": 24.1648502,
+      "prefill_wall_ms": 3135.62134,
+      "native": {
+        "schema_version": 1,
+        "task": "OPT-115",
+        "workload": "long-context",
+        "prefix": 8192,
+        "tokens": 32,
+        "capacity": 131072,
+        "wall_ms": 772.573059,
+        "prefill_wall_ms": 3135.62134,
+        "ttft_ms": 3159.91846,
+        "tok_s": 41.4200325,
+        "p50_ms": 24.1365051,
+        "p95_ms": 24.1648502,
+        "populated_cache": true,
+        "capacity_alone_is_not_traffic": true,
+        "keep": false,
+        "status": "measured"
+      }
+    },
+    "d32768": {
+      "probe": "d32768",
+      "prefix": 32768,
+      "capacity": 131072,
+      "decode_tokens": 32,
+      "populated_cache": true,
+      "capacity_alone_is_not_traffic": true,
+      "status": "measured",
+      "tok_s": 22.1179714,
+      "wall_ms": 1446.78723,
+      "ttft_ms": 21911.7754,
+      "p50_ms": 45.1986923,
+      "p95_ms": 45.2872314,
+      "prefill_wall_ms": 21866.3184,
+      "native": {
+        "schema_version": 1,
+        "task": "OPT-115",
+        "workload": "long-context",
+        "prefix": 32768,
+        "tokens": 32,
+        "capacity": 131072,
+        "wall_ms": 1446.78723,
+        "prefill_wall_ms": 21866.3184,
+        "ttft_ms": 21911.7754,
+        "tok_s": 22.1179714,
+        "p50_ms": 45.1986923,
+        "p95_ms": 45.2872314,
+        "populated_cache": true,
+        "capacity_alone_is_not_traffic": true,
+        "keep": false,
+        "status": "measured"
+      }
+    },
+    "d131040": {
+      "probe": "d131040",
+      "prefix": 131040,
+      "capacity": 131072,
+      "decode_tokens": 32,
+      "populated_cache": true,
+      "capacity_alone_is_not_traffic": true,
+      "status": "measured",
+      "tok_s": 7.7232008,
+      "wall_ms": 4143.35986,
+      "ttft_ms": 242093.438,
+      "p50_ms": 129.476837,
+      "p95_ms": 129.535004,
+      "prefill_wall_ms": 241963.891,
+      "native": {
+        "schema_version": 1,
+        "task": "OPT-115",
+        "workload": "long-context",
+        "prefix": 131040,
+        "tokens": 32,
+        "capacity": 131072,
+        "wall_ms": 4143.35986,
+        "prefill_wall_ms": 241963.891,
+        "ttft_ms": 242093.438,
+        "tok_s": 7.7232008,
+        "p50_ms": 129.476837,
+        "p95_ms": 129.535004,
+        "populated_cache": true,
+        "capacity_alone_is_not_traffic": true,
+        "keep": false,
+        "status": "measured"
+      }
+    },
+    "native_counts": {
+      "schema_version": 1,
+      "task": "OPT-115",
+      "warmups": 1,
+      "samples": 1,
+      "observed_warmups": 1,
+      "observed_samples": 1,
+      "observed_candidates": 1,
+      "observed_shapes": 3,
+      "observed_tier": "screen",
+      "sample_ids": [
+        0
+      ],
+      "keep": false,
+      "product": 6
+    },
+    "admission": {
+      "ok": true,
+      "result_class": "ok",
+      "message": "instrumentation-only: no speed admission",
+      "observed": {
+        "schema_version": 1,
+        "task": "OPT-115",
+        "warmups": 1,
+        "samples": 1,
+        "observed_warmups": 1,
+        "observed_samples": 1,
+        "observed_candidates": 1,
+        "observed_shapes": 3,
+        "observed_tier": "screen",
+        "sample_ids": [
+          0
+        ],
+        "keep": false,
+        "product": 6,
+        "rounds": [],
+        "acceptance_executed": false,
+        "pairs": 0
+      }
+    }
+  },
+  "traffic_map": {
+    "units": "bytes",
+    "inventory": {
+      "tensor_count": 851,
+      "by_dtype_bytes": {
+        "Q6_K": 1455820800,
+        "F32": 10582016,
+        "Q4_K": 10341089280,
+        "Q8_0": 7155384320
+      },
+      "by_role_bytes": {
+        "output_projection": 1042944000,
+        "final_norm": 20480,
+        "token_embedding": 715161600,
+        "gdn_value_gate": 1604321280,
+        "input_norm": 1310720,
+        "gdn_packed_qkv": 2673868800,
+        "ffn_down": 3208642560,
+        "ffn_gate": 3208642560,
+        "ffn_up": 3208642560,
+        "ffn_norm": 1310720,
+        "gdn_decay": 9216,
+        "gdn_alpha": 12533760,
+        "gdn_beta": 12533760,
+        "gdn_convolution": 7864320,
+        "gdn_dt_bias": 9216,
+        "gdn_norm": 24576,
+        "gdn_output": 1604321280,
+        "attention_k": 89128960,
+        "attention_k_norm": 16384,
+        "attention_output": 412876800,
+        "attention_q_gate": 1069547520,
+        "attention_q_norm": 16384,
+        "attention_v": 89128960
+      },
+      "by_phase_bytes": {
+        "weights": 17202071552,
+        "norms": 2699264,
+        "embedding": 715161600,
+        "output_head": 1042944000
+      },
+      "q4_k_bytes": 10341089280,
+      "q8_0_bytes": 7155384320,
+      "q6_k_bytes": 1455820800,
+      "f32_bytes": 10582016,
+      "units": "bytes"
+    },
+    "memory_ledger": {
+      "resident_model_bytes": 18973870432,
+      "attention_kv_bytes": 8589934592,
+      "gdn_state_bytes": 158859264,
+      "workspace_bytes": 1831836288,
+      "required_reserve_bytes": 1610612736,
+      "post_graph_admitted": true
+    },
+    "p4096": {
+      "scope": "prefill_request",
+      "tokens": 4096,
+      "microbatch": 4096,
+      "tiles": 1,
+      "units": "bytes",
+      "phases": {
+        "weights": 18259511296,
+        "activations": 5368709120,
+        "kv": 268435456,
+        "gdn_state": 158859264,
+        "transfers": 1013760,
+        "logits": 993280,
+        "barriers": 0,
+        "graphs": 0
+      },
+      "bytes_per_request": 24057522176,
+      "bytes_per_token": 5873418.5,
+      "source": "tensor_inventory_plus_architecture_constants",
+      "measured": false
+    },
+    "d128": {
+      "scope": "one_decode_token",
+      "prefix": 128,
+      "units": "bytes",
+      "phases": {
+        "weights": 18247717696,
+        "activations": 5767168,
+        "kv": 8454144,
+        "gdn_state": 158859264,
+        "transfers": 1013760,
+        "logits": 993280,
+        "barriers": 0,
+        "graphs": 0
+      },
+      "bytes_per_token": 18422805312,
+      "bytes_per_request_one_token": 18422805312,
+      "embedding_row_bytes": 2880,
+      "embedding_full_table_excluded": true,
+      "kv_read_bytes": 8388608,
+      "kv_append_bytes": 65536,
+      "gdn": {
+        "convolution_bytes": 7864320,
+        "recurrent_bytes": 150994944,
+        "total_bytes": 158859264,
+        "candidate_plus_committed_capacity_note": "decode swaps candidate/committed pointers; do not charge a full duplicate copy on every token unless measured"
+      },
+      "logits_d2h_bytes": 993280,
+      "hidden_d2h_bytes": 20480,
+      "source": "tensor_inventory_plus_architecture_constants",
+      "measured": false
+    },
+    "d2048": {
+      "scope": "one_decode_token",
+      "prefix": 2048,
+      "units": "bytes",
+      "phases": {
+        "weights": 18247717696,
+        "activations": 5767168,
+        "kv": 134283264,
+        "gdn_state": 158859264,
+        "transfers": 1013760,
+        "logits": 993280,
+        "barriers": 0,
+        "graphs": 0
+      },
+      "bytes_per_token": 18548634432,
+      "bytes_per_request_one_token": 18548634432,
+      "embedding_row_bytes": 2880,
+      "embedding_full_table_excluded": true,
+      "kv_read_bytes": 134217728,
+      "kv_append_bytes": 65536,
+      "gdn": {
+        "convolution_bytes": 7864320,
+        "recurrent_bytes": 150994944,
+        "total_bytes": 158859264,
+        "candidate_plus_committed_capacity_note": "decode swaps candidate/committed pointers; do not charge a full duplicate copy on every token unless measured"
+      },
+      "logits_d2h_bytes": 993280,
+      "hidden_d2h_bytes": 20480,
+      "source": "tensor_inventory_plus_architecture_constants",
+      "measured": false
+    },
+    "d8192": {
+      "scope": "one_decode_token",
+      "prefix": 8192,
+      "units": "bytes",
+      "phases": {
+        "weights": 18247717696,
+        "activations": 5767168,
+        "kv": 536936448,
+        "gdn_state": 158859264,
+        "transfers": 1013760,
+        "logits": 993280,
+        "barriers": 0,
+        "graphs": 0
+      },
+      "bytes_per_token": 18951287616,
+      "bytes_per_request_one_token": 18951287616,
+      "embedding_row_bytes": 2880,
+      "embedding_full_table_excluded": true,
+      "kv_read_bytes": 536870912,
+      "kv_append_bytes": 65536,
+      "gdn": {
+        "convolution_bytes": 7864320,
+        "recurrent_bytes": 150994944,
+        "total_bytes": 158859264,
+        "candidate_plus_committed_capacity_note": "decode swaps candidate/committed pointers; do not charge a full duplicate copy on every token unless measured"
+      },
+      "logits_d2h_bytes": 993280,
+      "hidden_d2h_bytes": 20480,
+      "source": "tensor_inventory_plus_architecture_constants",
+      "measured": false
+    },
+    "d32768": {
+      "scope": "one_decode_token",
+      "prefix": 32768,
+      "units": "bytes",
+      "phases": {
+        "weights": 18247717696,
+        "activations": 5767168,
+        "kv": 2147549184,
+        "gdn_state": 158859264,
+        "transfers": 1013760,
+        "logits": 993280,
+        "barriers": 0,
+        "graphs": 0
+      },
+      "bytes_per_token": 20561900352,
+      "bytes_per_request_one_token": 20561900352,
+      "embedding_row_bytes": 2880,
+      "embedding_full_table_excluded": true,
+      "kv_read_bytes": 2147483648,
+      "kv_append_bytes": 65536,
+      "gdn": {
+        "convolution_bytes": 7864320,
+        "recurrent_bytes": 150994944,
+        "total_bytes": 158859264,
+        "candidate_plus_committed_capacity_note": "decode swaps candidate/committed pointers; do not charge a full duplicate copy on every token unless measured"
+      },
+      "logits_d2h_bytes": 993280,
+      "hidden_d2h_bytes": 20480,
+      "source": "tensor_inventory_plus_architecture_constants",
+      "measured": false
+    },
+    "d131040": {
+      "scope": "one_decode_token",
+      "prefix": 131040,
+      "units": "bytes",
+      "phases": {
+        "weights": 18247717696,
+        "activations": 5767168,
+        "kv": 8587902976,
+        "gdn_state": 158859264,
+        "transfers": 1013760,
+        "logits": 993280,
+        "barriers": 0,
+        "graphs": 0
+      },
+      "bytes_per_token": 27002254144,
+      "bytes_per_request_one_token": 27002254144,
+      "embedding_row_bytes": 2880,
+      "embedding_full_table_excluded": true,
+      "kv_read_bytes": 8587837440,
+      "kv_append_bytes": 65536,
+      "gdn": {
+        "convolution_bytes": 7864320,
+        "recurrent_bytes": 150994944,
+        "total_bytes": 158859264,
+        "candidate_plus_committed_capacity_note": "decode swaps candidate/committed pointers; do not charge a full duplicate copy on every token unless measured"
+      },
+      "logits_d2h_bytes": 993280,
+      "hidden_d2h_bytes": 20480,
+      "source": "tensor_inventory_plus_architecture_constants",
+      "measured": false
+    },
+    "phases": [
+      "weights",
+      "activations",
+      "kv",
+      "gdn_state",
+      "transfers",
+      "logits",
+      "barriers",
+      "graphs"
+    ],
+    "measured": false,
+    "note": "tensor-derived compulsory traffic; GPU phases overlay measured timeline counters when available",
+    "measured_overlay": {
+      "d128": {
+        "logits_d2h_bytes": 993280,
+        "hidden_d2h_bytes": 20480,
+        "kv_append_bytes": 65536,
+        "gdn_state_bytes": 158859264,
+        "measured": true
+      },
+      "d2048": {
+        "logits_d2h_bytes": 993280,
+        "hidden_d2h_bytes": 20480,
+        "kv_append_bytes": 65536,
+        "gdn_state_bytes": 158859264,
+        "measured": true
+      }
+    }
+  },
+  "timeline": {
+    "d128": {
+      "tokens": 1,
+      "record_count": 650,
+      "charged_count": 650,
+      "leaf_kernel_count": 340,
+      "gpu_busy_union_ms": 7.89075479999984,
+      "gpu_idle_gap_ms": 9.974685400000169,
+      "host_overlap_union_ms": 0.0,
+      "sync_union_ms": 0.12688500000000147,
+      "graph_union_ms": 0.0,
+      "launch_submission_ms": 9.974685400000169,
+      "classified_union_ms": 8.017639799999841,
+      "unclassified_ms": 0.6377406999999913,
+      "wall_ms": 18.6300659,
+      "interval_coverage": 0.9657681994565575,
+      "overlap_not_summed": true,
+      "sum_exceeds_wall": true,
+      "stream_aware": {
+        "summed_gpu_work_ms": 27.51302405134,
+        "interval_union_ms": 17.884204999999966,
+        "overlap_ms": 9.628819051340034,
+        "streams": {
+          "0": 27.51302405134
+        },
+        "sum_exceeds_wall": true
+      },
+      "families": {
+        "embedding": {
+          "role": "embedding",
+          "ms": 0.023008000100000002,
+          "calls": 2,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "row_decode"
+          ]
+        },
+        "gdn_core": {
+          "role": "gdn_core",
+          "ms": 2.2206720022999997,
+          "calls": 49,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "gdn"
+          ]
+        },
+        "mixer_mmv": {
+          "role": "mixer_mmv",
+          "ms": 6.378399997200001,
+          "calls": 128,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "mmv"
+          ]
+        },
+        "ffn_mmv": {
+          "role": "ffn_mmv",
+          "ms": 7.940223969999998,
+          "calls": 64,
+          "fused_member_count": 7,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "cuda_graph"
+          ]
+        },
+        "attention_core": {
+          "role": "attention_core",
+          "ms": 0.5471680167000001,
+          "calls": 16,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "attention"
+          ]
+        },
+        "logits": {
+          "role": "logits",
+          "ms": 0.762528002,
+          "calls": 1,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "mmv"
+          ]
+        },
+        "state_commit": {
+          "role": "state_commit",
+          "ms": 0.0231999997,
+          "calls": 1,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "copy"
+          ]
+        },
+        "input_norm": {
+          "role": "input_norm",
+          "ms": 0.0178239997,
+          "calls": 1,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "rms_norm"
+          ]
+        },
+        "proj_packed_qkv": {
+          "role": "proj_packed_qkv",
+          "ms": 2.9208319937,
+          "calls": 48,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "mmv"
+          ]
+        },
+        "gdn_gate_prep": {
+          "role": "gdn_gate_prep",
+          "ms": 0.2209600013999999,
+          "calls": 48,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "gdn"
+          ]
+        },
+        "gdn_conv_qk_norm_recurrence": {
+          "role": "gdn_conv_qk_norm_recurrence",
+          "ms": 1.6112000086000007,
+          "calls": 48,
+          "fused_member_count": 3,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "gdn"
+          ]
+        },
+        "gdn_output_norm": {
+          "role": "gdn_output_norm",
+          "ms": 0.27596799847,
+          "calls": 48,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "rms_norm"
+          ]
+        },
+        "proj_gdn_output": {
+          "role": "proj_gdn_output",
+          "ms": 1.192255998,
+          "calls": 48,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "mmv"
+          ]
+        },
+        "residual_mixer": {
+          "role": "residual_mixer",
+          "ms": 0.23820800229,
+          "calls": 64,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "pointwise"
+          ]
+        },
+        "proj_query_gate": {
+          "role": "proj_query_gate",
+          "ms": 0.8543040116,
+          "calls": 16,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "mmv"
+          ]
+        },
+        "attn_query_split": {
+          "role": "attn_query_split",
+          "ms": 0.04825600148000001,
+          "calls": 16,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "attention"
+          ]
+        },
+        "attn_qk_prep_softmax_pv_merge": {
+          "role": "attn_qk_prep_softmax_pv_merge",
+          "ms": 0.4160000083999999,
+          "calls": 16,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "attention"
+          ]
+        },
+        "attn_output_cast": {
+          "role": "attn_output_cast",
+          "ms": 0.059904001599999986,
+          "calls": 16,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "cast"
+          ]
+        },
+        "proj_attn_output": {
+          "role": "proj_attn_output",
+          "ms": 0.9891840183000001,
+          "calls": 16,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "mmv"
+          ]
+        },
+        "logits_norm": {
+          "role": "logits_norm",
+          "ms": 0.0136000002,
+          "calls": 1,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "rms_norm"
+          ]
+        },
+        "logits_projection": {
+          "role": "logits_projection",
+          "ms": 0.632448018,
+          "calls": 1,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "mmv"
+          ]
+        },
+        "d2h": {
+          "role": "d2h",
+          "ms": 0.105760001,
+          "calls": 1,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "copy"
+          ]
+        },
+        "state_copies": {
+          "role": "state_copies",
+          "ms": 0.0211200006,
+          "calls": 1,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "copy"
+          ]
+        }
+      },
+      "method": "event_union_plus_leaf_gaps",
+      "valid": true,
+      "prefix": 128,
+      "uninstrumented_wall_ms": 17.4953766,
+      "instrumented_wall_ms": 18.6300659,
+      "profiler_perturbation_ms": 1.13468933,
+      "native": {
+        "schema_version": 1,
+        "task": "OPT-115",
+        "workload": "traffic-timeline",
+        "prefix": 128,
+        "tokens": 1,
+        "record_count": 650,
+        "pool_overflow": false,
+        "wall_ms": 18.6300659,
+        "uninstrumented_wall_ms": 17.4953766,
+        "instrumented_wall_ms": 18.6300659,
+        "profiler_perturbation_ms": 1.13468933,
+        "tok_s": 53.6766739,
+        "logits_d2h_bytes": 993280,
+        "hidden_d2h_bytes": 20480,
+        "kv_append_bytes": 65536,
+        "gdn_state_bytes": 158859264,
+        "kv_read_bytes": 8388608,
+        "keep": false,
+        "observed_warmups": 1,
+        "observed_samples": 1,
+        "observed_candidates": 1,
+        "observed_shapes": 1,
+        "observed_tier": "screen"
+      }
+    },
+    "d2048": {
+      "tokens": 1,
+      "record_count": 650,
+      "charged_count": 650,
+      "leaf_kernel_count": 340,
+      "gpu_busy_union_ms": 8.26415000000054,
+      "gpu_idle_gap_ms": 10.025705999999445,
+      "host_overlap_union_ms": 0.0,
+      "sync_union_ms": 0.14349300000003495,
+      "graph_union_ms": 0.0,
+      "launch_submission_ms": 10.025705999999445,
+      "classified_union_ms": 8.407643000000576,
+      "unclassified_ms": 0.47919139999997995,
+      "wall_ms": 18.9125404,
+      "interval_coverage": 0.9746627692597035,
+      "overlap_not_summed": true,
+      "sum_exceeds_wall": true,
+      "stream_aware": {
+        "summed_gpu_work_ms": 28.38336002656,
+        "interval_union_ms": 18.33540100000016,
+        "overlap_ms": 10.047959026559838,
+        "streams": {
+          "0": 28.38336002656
+        },
+        "sum_exceeds_wall": true
+      },
+      "families": {
+        "embedding": {
+          "role": "embedding",
+          "ms": 0.034111999000000004,
+          "calls": 2,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "row_decode"
+          ]
+        },
+        "gdn_core": {
+          "role": "gdn_core",
+          "ms": 2.2535680012000006,
+          "calls": 49,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "gdn"
+          ]
+        },
+        "mixer_mmv": {
+          "role": "mixer_mmv",
+          "ms": 6.386623974099999,
+          "calls": 128,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "mmv"
+          ]
+        },
+        "ffn_mmv": {
+          "role": "ffn_mmv",
+          "ms": 7.969535961000001,
+          "calls": 64,
+          "fused_member_count": 7,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "cuda_graph"
+          ]
+        },
+        "attention_core": {
+          "role": "attention_core",
+          "ms": 0.8787520155000001,
+          "calls": 16,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "attention"
+          ]
+        },
+        "logits": {
+          "role": "logits",
+          "ms": 0.791743994,
+          "calls": 1,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "mmv"
+          ]
+        },
+        "state_commit": {
+          "role": "state_commit",
+          "ms": 0.0370879993,
+          "calls": 1,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "copy"
+          ]
+        },
+        "input_norm": {
+          "role": "input_norm",
+          "ms": 0.0149760004,
+          "calls": 1,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "rms_norm"
+          ]
+        },
+        "proj_packed_qkv": {
+          "role": "proj_packed_qkv",
+          "ms": 2.920768011499999,
+          "calls": 48,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "mmv"
+          ]
+        },
+        "gdn_gate_prep": {
+          "role": "gdn_gate_prep",
+          "ms": 0.22697600013999986,
+          "calls": 48,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "gdn"
+          ]
+        },
+        "gdn_conv_qk_norm_recurrence": {
+          "role": "gdn_conv_qk_norm_recurrence",
+          "ms": 1.6400640085000004,
+          "calls": 48,
+          "fused_member_count": 3,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "gdn"
+          ]
+        },
+        "gdn_output_norm": {
+          "role": "gdn_output_norm",
+          "ms": 0.27231999959000003,
+          "calls": 48,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "rms_norm"
+          ]
+        },
+        "proj_gdn_output": {
+          "role": "proj_gdn_output",
+          "ms": 1.1966079957000004,
+          "calls": 48,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "mmv"
+          ]
+        },
+        "residual_mixer": {
+          "role": "residual_mixer",
+          "ms": 0.24025600135,
+          "calls": 64,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "pointwise"
+          ]
+        },
+        "proj_query_gate": {
+          "role": "proj_query_gate",
+          "ms": 0.8643200174000003,
+          "calls": 16,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "mmv"
+          ]
+        },
+        "attn_query_split": {
+          "role": "attn_query_split",
+          "ms": 0.047936001379999996,
+          "calls": 16,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "attention"
+          ]
+        },
+        "attn_qk_prep_softmax_pv_merge": {
+          "role": "attn_qk_prep_softmax_pv_merge",
+          "ms": 0.7475520254000002,
+          "calls": 16,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "attention"
+          ]
+        },
+        "attn_output_cast": {
+          "role": "attn_output_cast",
+          "ms": 0.059904001599999986,
+          "calls": 16,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "cast"
+          ]
+        },
+        "proj_attn_output": {
+          "role": "proj_attn_output",
+          "ms": 0.9840640240000001,
+          "calls": 16,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "mmv"
+          ]
+        },
+        "logits_norm": {
+          "role": "logits_norm",
+          "ms": 0.0136000002,
+          "calls": 1,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "rms_norm"
+          ]
+        },
+        "logits_projection": {
+          "role": "logits_projection",
+          "ms": 0.65910399,
+          "calls": 1,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "mmv"
+          ]
+        },
+        "d2h": {
+          "role": "d2h",
+          "ms": 0.108096004,
+          "calls": 1,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "copy"
+          ]
+        },
+        "state_copies": {
+          "role": "state_copies",
+          "ms": 0.0353920013,
+          "calls": 1,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "copy"
+          ]
+        }
+      },
+      "method": "event_union_plus_leaf_gaps",
+      "valid": true,
+      "prefix": 2048,
+      "uninstrumented_wall_ms": 17.9790764,
+      "instrumented_wall_ms": 18.9125404,
+      "profiler_perturbation_ms": 0.93346405,
+      "native": {
+        "schema_version": 1,
+        "task": "OPT-115",
+        "workload": "traffic-timeline",
+        "prefix": 2048,
+        "tokens": 1,
+        "record_count": 650,
+        "pool_overflow": false,
+        "wall_ms": 18.9125404,
+        "uninstrumented_wall_ms": 17.9790764,
+        "instrumented_wall_ms": 18.9125404,
+        "profiler_perturbation_ms": 0.93346405,
+        "tok_s": 52.8749695,
+        "logits_d2h_bytes": 993280,
+        "hidden_d2h_bytes": 20480,
+        "kv_append_bytes": 65536,
+        "gdn_state_bytes": 158859264,
+        "kv_read_bytes": 134217728,
+        "keep": false,
+        "observed_warmups": 1,
+        "observed_samples": 1,
+        "observed_candidates": 1,
+        "observed_shapes": 1,
+        "observed_tier": "screen"
+      }
+    }
+  },
+  "bandwidth_bounds": {
+    "p4096": {
+      "prefix": 4096,
+      "peak_bandwidth_gb_s": 1792.0,
+      "measured_sustainable_bandwidth_gb_s": null,
+      "per_phase": {
+        "weights": {
+          "bytes": 18259511296.0,
+          "peak_ms": 10.189459428571428,
+          "sustainable_ms": null
+        },
+        "activations": {
+          "bytes": 5368709120.0,
+          "peak_ms": 2.9959314285714287,
+          "sustainable_ms": null
+        },
+        "kv": {
+          "bytes": 268435456.0,
+          "peak_ms": 0.14979657142857142,
+          "sustainable_ms": null
+        },
+        "gdn_state": {
+          "bytes": 158859264.0,
+          "peak_ms": 0.08864914285714286,
+          "sustainable_ms": null
+        },
+        "transfers": {
+          "bytes": 1013760.0,
+          "peak_ms": 0.0005657142857142857,
+          "sustainable_ms": null
+        },
+        "logits": {
+          "bytes": 993280.0,
+          "peak_ms": 0.0005542857142857143,
+          "sustainable_ms": null
+        },
+        "barriers": {
+          "bytes": 0.0,
+          "peak_ms": 0.0,
+          "sustainable_ms": null
+        },
+        "graphs": {
+          "bytes": 0.0,
+          "peak_ms": 0.0,
+          "sustainable_ms": null
+        }
+      },
+      "independent_sum_peak_ms": 13.424956571428572,
+      "independent_sum_not_a_bound": true,
+      "critical_path_peak_ms": 10.189459428571428,
+      "overlap_aware_peak_ms": 10.189459428571428,
+      "wall_ms": null,
+      "assumptions": [
+        "RTX 5090 listed peak 1792 GB/s from NVIDIA Blackwell architecture paper",
+        "peak is an optimistic bound, not observed application bandwidth",
+        "compulsory reads assume no L2 reuse across layers and no write-allocate traffic beyond listed writes",
+        "embedding lookup charges one Q4_K row, not the full table",
+        "GDN decode charges one recurrent+conv pass with pointer-swap commit, not a full 8 GiB KV copy",
+        "overlapping costs use max/critical-path, not a sum of independent peak bounds",
+        "fixed-format Q4_K/Q8_0/Q6_K; quality-gated lower-bit models are separate OPT-121/122 candidates",
+        "measured sustainable bandwidth unavailable; sustainable_ms is null"
+      ],
+      "units": {
+        "bytes": "bytes",
+        "time": "milliseconds",
+        "bandwidth": "GB/s"
+      },
+      "claims_throughput": false
+    },
+    "d128": {
+      "prefix": 128,
+      "peak_bandwidth_gb_s": 1792.0,
+      "measured_sustainable_bandwidth_gb_s": null,
+      "per_phase": {
+        "weights": {
+          "bytes": 18247717696.0,
+          "peak_ms": 10.182878178571428,
+          "sustainable_ms": null
+        },
+        "activations": {
+          "bytes": 5767168.0,
+          "peak_ms": 0.0032182857142857143,
+          "sustainable_ms": null
+        },
+        "kv": {
+          "bytes": 8454144.0,
+          "peak_ms": 0.004717714285714286,
+          "sustainable_ms": null
+        },
+        "gdn_state": {
+          "bytes": 158859264.0,
+          "peak_ms": 0.08864914285714286,
+          "sustainable_ms": null
+        },
+        "transfers": {
+          "bytes": 1013760.0,
+          "peak_ms": 0.0005657142857142857,
+          "sustainable_ms": null
+        },
+        "logits": {
+          "bytes": 993280.0,
+          "peak_ms": 0.0005542857142857143,
+          "sustainable_ms": null
+        },
+        "barriers": {
+          "bytes": 0.0,
+          "peak_ms": 0.0,
+          "sustainable_ms": null
+        },
+        "graphs": {
+          "bytes": 0.0,
+          "peak_ms": 0.0,
+          "sustainable_ms": null
+        }
+      },
+      "independent_sum_peak_ms": 10.280583321428571,
+      "independent_sum_not_a_bound": true,
+      "critical_path_peak_ms": 10.182878178571428,
+      "overlap_aware_peak_ms": 10.182878178571428,
+      "wall_ms": 18.6300659,
+      "assumptions": [
+        "RTX 5090 listed peak 1792 GB/s from NVIDIA Blackwell architecture paper",
+        "peak is an optimistic bound, not observed application bandwidth",
+        "compulsory reads assume no L2 reuse across layers and no write-allocate traffic beyond listed writes",
+        "embedding lookup charges one Q4_K row, not the full table",
+        "GDN decode charges one recurrent+conv pass with pointer-swap commit, not a full 8 GiB KV copy",
+        "overlapping costs use max/critical-path, not a sum of independent peak bounds",
+        "fixed-format Q4_K/Q8_0/Q6_K; quality-gated lower-bit models are separate OPT-121/122 candidates",
+        "measured sustainable bandwidth unavailable; sustainable_ms is null"
+      ],
+      "units": {
+        "bytes": "bytes",
+        "time": "milliseconds",
+        "bandwidth": "GB/s"
+      },
+      "claims_throughput": false
+    },
+    "d2048": {
+      "prefix": 2048,
+      "peak_bandwidth_gb_s": 1792.0,
+      "measured_sustainable_bandwidth_gb_s": null,
+      "per_phase": {
+        "weights": {
+          "bytes": 18247717696.0,
+          "peak_ms": 10.182878178571428,
+          "sustainable_ms": null
+        },
+        "activations": {
+          "bytes": 5767168.0,
+          "peak_ms": 0.0032182857142857143,
+          "sustainable_ms": null
+        },
+        "kv": {
+          "bytes": 134283264.0,
+          "peak_ms": 0.07493485714285714,
+          "sustainable_ms": null
+        },
+        "gdn_state": {
+          "bytes": 158859264.0,
+          "peak_ms": 0.08864914285714286,
+          "sustainable_ms": null
+        },
+        "transfers": {
+          "bytes": 1013760.0,
+          "peak_ms": 0.0005657142857142857,
+          "sustainable_ms": null
+        },
+        "logits": {
+          "bytes": 993280.0,
+          "peak_ms": 0.0005542857142857143,
+          "sustainable_ms": null
+        },
+        "barriers": {
+          "bytes": 0.0,
+          "peak_ms": 0.0,
+          "sustainable_ms": null
+        },
+        "graphs": {
+          "bytes": 0.0,
+          "peak_ms": 0.0,
+          "sustainable_ms": null
+        }
+      },
+      "independent_sum_peak_ms": 10.350800464285713,
+      "independent_sum_not_a_bound": true,
+      "critical_path_peak_ms": 10.182878178571428,
+      "overlap_aware_peak_ms": 10.182878178571428,
+      "wall_ms": 18.9125404,
+      "assumptions": [
+        "RTX 5090 listed peak 1792 GB/s from NVIDIA Blackwell architecture paper",
+        "peak is an optimistic bound, not observed application bandwidth",
+        "compulsory reads assume no L2 reuse across layers and no write-allocate traffic beyond listed writes",
+        "embedding lookup charges one Q4_K row, not the full table",
+        "GDN decode charges one recurrent+conv pass with pointer-swap commit, not a full 8 GiB KV copy",
+        "overlapping costs use max/critical-path, not a sum of independent peak bounds",
+        "fixed-format Q4_K/Q8_0/Q6_K; quality-gated lower-bit models are separate OPT-121/122 candidates",
+        "measured sustainable bandwidth unavailable; sustainable_ms is null"
+      ],
+      "units": {
+        "bytes": "bytes",
+        "time": "milliseconds",
+        "bandwidth": "GB/s"
+      },
+      "claims_throughput": false
+    },
+    "d8192": {
+      "prefix": 8192,
+      "peak_bandwidth_gb_s": 1792.0,
+      "measured_sustainable_bandwidth_gb_s": null,
+      "per_phase": {
+        "weights": {
+          "bytes": 18247717696.0,
+          "peak_ms": 10.182878178571428,
+          "sustainable_ms": null
+        },
+        "activations": {
+          "bytes": 5767168.0,
+          "peak_ms": 0.0032182857142857143,
+          "sustainable_ms": null
+        },
+        "kv": {
+          "bytes": 536936448.0,
+          "peak_ms": 0.2996297142857143,
+          "sustainable_ms": null
+        },
+        "gdn_state": {
+          "bytes": 158859264.0,
+          "peak_ms": 0.08864914285714286,
+          "sustainable_ms": null
+        },
+        "transfers": {
+          "bytes": 1013760.0,
+          "peak_ms": 0.0005657142857142857,
+          "sustainable_ms": null
+        },
+        "logits": {
+          "bytes": 993280.0,
+          "peak_ms": 0.0005542857142857143,
+          "sustainable_ms": null
+        },
+        "barriers": {
+          "bytes": 0.0,
+          "peak_ms": 0.0,
+          "sustainable_ms": null
+        },
+        "graphs": {
+          "bytes": 0.0,
+          "peak_ms": 0.0,
+          "sustainable_ms": null
+        }
+      },
+      "independent_sum_peak_ms": 10.575495321428571,
+      "independent_sum_not_a_bound": true,
+      "critical_path_peak_ms": 10.182878178571428,
+      "overlap_aware_peak_ms": 10.182878178571428,
+      "wall_ms": null,
+      "assumptions": [
+        "RTX 5090 listed peak 1792 GB/s from NVIDIA Blackwell architecture paper",
+        "peak is an optimistic bound, not observed application bandwidth",
+        "compulsory reads assume no L2 reuse across layers and no write-allocate traffic beyond listed writes",
+        "embedding lookup charges one Q4_K row, not the full table",
+        "GDN decode charges one recurrent+conv pass with pointer-swap commit, not a full 8 GiB KV copy",
+        "overlapping costs use max/critical-path, not a sum of independent peak bounds",
+        "fixed-format Q4_K/Q8_0/Q6_K; quality-gated lower-bit models are separate OPT-121/122 candidates",
+        "measured sustainable bandwidth unavailable; sustainable_ms is null"
+      ],
+      "units": {
+        "bytes": "bytes",
+        "time": "milliseconds",
+        "bandwidth": "GB/s"
+      },
+      "claims_throughput": false
+    },
+    "d32768": {
+      "prefix": 32768,
+      "peak_bandwidth_gb_s": 1792.0,
+      "measured_sustainable_bandwidth_gb_s": null,
+      "per_phase": {
+        "weights": {
+          "bytes": 18247717696.0,
+          "peak_ms": 10.182878178571428,
+          "sustainable_ms": null
+        },
+        "activations": {
+          "bytes": 5767168.0,
+          "peak_ms": 0.0032182857142857143,
+          "sustainable_ms": null
+        },
+        "kv": {
+          "bytes": 2147549184.0,
+          "peak_ms": 1.1984091428571428,
+          "sustainable_ms": null
+        },
+        "gdn_state": {
+          "bytes": 158859264.0,
+          "peak_ms": 0.08864914285714286,
+          "sustainable_ms": null
+        },
+        "transfers": {
+          "bytes": 1013760.0,
+          "peak_ms": 0.0005657142857142857,
+          "sustainable_ms": null
+        },
+        "logits": {
+          "bytes": 993280.0,
+          "peak_ms": 0.0005542857142857143,
+          "sustainable_ms": null
+        },
+        "barriers": {
+          "bytes": 0.0,
+          "peak_ms": 0.0,
+          "sustainable_ms": null
+        },
+        "graphs": {
+          "bytes": 0.0,
+          "peak_ms": 0.0,
+          "sustainable_ms": null
+        }
+      },
+      "independent_sum_peak_ms": 11.47427475,
+      "independent_sum_not_a_bound": true,
+      "critical_path_peak_ms": 10.182878178571428,
+      "overlap_aware_peak_ms": 10.182878178571428,
+      "wall_ms": null,
+      "assumptions": [
+        "RTX 5090 listed peak 1792 GB/s from NVIDIA Blackwell architecture paper",
+        "peak is an optimistic bound, not observed application bandwidth",
+        "compulsory reads assume no L2 reuse across layers and no write-allocate traffic beyond listed writes",
+        "embedding lookup charges one Q4_K row, not the full table",
+        "GDN decode charges one recurrent+conv pass with pointer-swap commit, not a full 8 GiB KV copy",
+        "overlapping costs use max/critical-path, not a sum of independent peak bounds",
+        "fixed-format Q4_K/Q8_0/Q6_K; quality-gated lower-bit models are separate OPT-121/122 candidates",
+        "measured sustainable bandwidth unavailable; sustainable_ms is null"
+      ],
+      "units": {
+        "bytes": "bytes",
+        "time": "milliseconds",
+        "bandwidth": "GB/s"
+      },
+      "claims_throughput": false
+    },
+    "d131040": {
+      "prefix": 131040,
+      "peak_bandwidth_gb_s": 1792.0,
+      "measured_sustainable_bandwidth_gb_s": null,
+      "per_phase": {
+        "weights": {
+          "bytes": 18247717696.0,
+          "peak_ms": 10.182878178571428,
+          "sustainable_ms": null
+        },
+        "activations": {
+          "bytes": 5767168.0,
+          "peak_ms": 0.0032182857142857143,
+          "sustainable_ms": null
+        },
+        "kv": {
+          "bytes": 8587902976.0,
+          "peak_ms": 4.792356571428571,
+          "sustainable_ms": null
+        },
+        "gdn_state": {
+          "bytes": 158859264.0,
+          "peak_ms": 0.08864914285714286,
+          "sustainable_ms": null
+        },
+        "transfers": {
+          "bytes": 1013760.0,
+          "peak_ms": 0.0005657142857142857,
+          "sustainable_ms": null
+        },
+        "logits": {
+          "bytes": 993280.0,
+          "peak_ms": 0.0005542857142857143,
+          "sustainable_ms": null
+        },
+        "barriers": {
+          "bytes": 0.0,
+          "peak_ms": 0.0,
+          "sustainable_ms": null
+        },
+        "graphs": {
+          "bytes": 0.0,
+          "peak_ms": 0.0,
+          "sustainable_ms": null
+        }
+      },
+      "independent_sum_peak_ms": 15.068222178571428,
+      "independent_sum_not_a_bound": true,
+      "critical_path_peak_ms": 10.182878178571428,
+      "overlap_aware_peak_ms": 10.182878178571428,
+      "wall_ms": null,
+      "assumptions": [
+        "RTX 5090 listed peak 1792 GB/s from NVIDIA Blackwell architecture paper",
+        "peak is an optimistic bound, not observed application bandwidth",
+        "compulsory reads assume no L2 reuse across layers and no write-allocate traffic beyond listed writes",
+        "embedding lookup charges one Q4_K row, not the full table",
+        "GDN decode charges one recurrent+conv pass with pointer-swap commit, not a full 8 GiB KV copy",
+        "overlapping costs use max/critical-path, not a sum of independent peak bounds",
+        "fixed-format Q4_K/Q8_0/Q6_K; quality-gated lower-bit models are separate OPT-121/122 candidates",
+        "measured sustainable bandwidth unavailable; sustainable_ms is null"
+      ],
+      "units": {
+        "bytes": "bytes",
+        "time": "milliseconds",
+        "bandwidth": "GB/s"
+      },
+      "claims_throughput": false
+    }
+  },
+  "source_comparison": {
+    "pinned_llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+    "llama_inspection_head_expected": "1945e092030f8668ff93382799502d01490e564d",
+    "llama_inspection_head_actual": "1945e092030f8668ff93382799502d01490e564d",
+    "llama_inspection_is_not_pin": true,
+    "ds4_inspection_head_expected": "c238077a87186381bf626cc531bccffe1fef79e7",
+    "ds4_inspection_head_actual": "c238077a87186381bf626cc531bccffe1fef79e7",
+    "llama": {
+      "path": "/home/user/llama.cpp",
+      "present": true,
+      "revision": "1945e092030f8668ff93382799502d01490e564d",
+      "state": "clean"
+    },
+    "ds4": {
+      "path": "/home/user/ds4",
+      "present": true,
+      "revision": "c238077a87186381bf626cc531bccffe1fef79e7",
+      "state": "dirty"
+    },
+    "mechanisms": {
+      "OPT-117_cuda_graphs": {
+        "task": "OPT-117",
+        "quartz": {
+          "file": "cuda/full_scheduler.cu",
+          "functions": [
+            "capture_decode_segment_graph",
+            "enqueue_decode_layer_eager"
+          ],
+          "physical_dtype": "existing production kernels",
+          "notes": "ffn_only ships; decode_segments8 capture failed in OPT-114"
+        },
+        "llama": {
+          "path": "/home/user/llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu",
+          "present": true,
+          "bytes": 236345,
+          "found": [
+            "ggml_cuda_graph_evaluate_and_capture",
+            "cudaGraphLaunch",
+            "ggml_cuda_graph_check_compability"
+          ],
+          "missing": []
+        },
+        "ds4": {
+          "present": false,
+          "notes": "not the Qwen graph authority"
+        },
+        "transferability": "llama CUDA-graph capture of the decoded cgraph is the mechanism analogue; Quartz must capture its own scheduler FFN/attention/GDN launches, not import ggml graphs",
+        "actual_consumers": "decode token body after graph capture"
+      },
+      "OPT-118_transfers": {
+        "task": "OPT-118",
+        "quartz": {
+          "file": "cuda/full_scheduler.cu",
+          "functions": [
+            "execute_token D2H logits/hidden",
+            "greedy_sample"
+          ],
+          "physical_dtype": "FP32 logits 248320",
+          "bytes_per_token": 993280
+        },
+        "llama": {
+          "path": "/home/user/llama.cpp/src/models/qwen35.cpp",
+          "present": true,
+          "bytes": 28105,
+          "found": [
+            "llama_model_qwen35",
+            "tok_embd"
+          ],
+          "missing": []
+        },
+        "ds4": {
+          "present": true,
+          "notes": "host sampling analogue only"
+        },
+        "transferability": "lazy host logits is a Quartz API change; llama keeps outputs on device until requested. Not a drop-in kernel.",
+        "actual_consumers": "Session::sample / Session::logits / CLI poll"
+      },
+      "OPT-119_activations": {
+        "task": "OPT-119",
+        "quartz": {
+          "file": "cuda/scheduler_primitives.cu",
+          "notes": "norm, quantize, residual, SwiGLU staging"
+        },
+        "llama": {
+          "path": "/home/user/llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu",
+          "present": true,
+          "bytes": 236345,
+          "found": [
+            "ggml_cuda_try_fuse",
+            "mul_mat"
+          ],
+          "missing": []
+        },
+        "ds4": {
+          "present": true
+        },
+        "transferability": "producer/consumer fusion is architecture-specific; Q8_1 vs internal Q8Block are not interchangeable",
+        "actual_consumers": "next projection / FFN down / KV append"
+      },
+      "OPT-120_packed_kv": {
+        "task": "OPT-120",
+        "quartz": {
+          "physical_dtype": "BF16 K/V, 16 layers, 4 KV heads, 256 width",
+          "bytes_at_128k": 8589934592
+        },
+        "llama": {
+          "path": "/home/user/llama.cpp/ggml/src/ggml-cuda/fattn-vec.cuh",
+          "present": true,
+          "bytes": 24960,
+          "found": [
+            "flash_attn_ext_vec",
+            "type_K",
+            "type_V",
+            "q8_1"
+          ],
+          "missing": []
+        },
+        "ds4": {
+          "path": "/home/user/ds4/ds4_cuda.cu",
+          "present": true,
+          "bytes": 1316122,
+          "found": [
+            "fp8_kv_quantize_row",
+            "fp8_kv_quantize_store_rows_kernel",
+            "indexer_hadamard_fp4_kernel"
+          ],
+          "missing": []
+        },
+        "transferability": "llama fattn-vec can consume quantized K/V types in-registers. ds4 fp8_kv_quantize_row quantizes numerically then writes floats/half into raw cache (sizeof(float) storage); not a ready packed 8/4-bit resident cache. DeepSeek indexer/MoE is not Qwen 48-GDN/16-attention.",
+        "actual_consumers": "prompt and decode attention over the live prefix"
+      },
+      "OPT-121_weight_bytes": {
+        "task": "OPT-121",
+        "quartz": {
+          "physical_dtype": "Q4_K FFN, Q8_0 mixer, Q6_K output/attn out",
+          "streamed_decode_bytes": 18952294400
+        },
+        "llama": {
+          "files": [
+            "ggml/src/ggml-cuda/mmq.cuh",
+            "ggml/src/ggml-cuda/mmvq.cuh"
+          ],
+          "present": true
+        },
+        "ds4": {
+          "files": [
+            "cuda/mmq/mmq.cuh",
+            "cuda/mmq/ds4_repack.cu",
+            "ds4_cuda.cu"
+          ],
+          "present": true,
+          "notes": "MXFP4 path preserves an already-MXFP4 source; requantizing this Q4_K_M artifact is a different approximation"
+        },
+        "transferability": "use llama/ds4 packed consumers as implementation references; do not relabel Q4_K bits as FP4",
+        "actual_consumers": "decode MMVQ and prompt MMQ of each role"
+      },
+      "OPT-122_gdn_state": {
+        "task": "OPT-122",
+        "quartz": {
+          "physical_dtype": "FP32 recurrent + conv rings",
+          "bytes": {
+            "convolution_bytes": 7864320,
+            "recurrent_bytes": 150994944,
+            "total_bytes": 158859264,
+            "candidate_plus_committed_capacity_note": "decode swaps candidate/committed pointers; do not charge a full duplicate copy on every token unless measured"
+          }
+        },
+        "llama": {
+          "path": "/home/user/llama.cpp/src/llama-memory-recurrent.h",
+          "present": true,
+          "bytes": 6273,
+          "found": [
+            "llama_memory_recurrent"
+          ],
+          "missing": [
+            "ssm"
+          ]
+        },
+        "ds4": {
+          "present": false,
+          "notes": "DeepSeek MLA/indexer, not Qwen GDN"
+        },
+        "transferability": "BF16/block-scaled recurrent storage is a Quartz numerical experiment; llama recurrent memory is a different layout",
+        "actual_consumers": "gdn_step recurrence, checkpoint, prompt carry"
+      }
+    },
+    "architecture_warning": "DeepSeek compression/indexer/MoE is not Qwen's 48-GDN/16-attention"
+  },
+  "ranked_opportunities": {
+    "ranked": [
+      {
+        "task": "OPT-121",
+        "verdict": "go",
+        "removable_bytes_upper": 18247717696,
+        "peak_ms_upper": 10.182878178571428,
+        "uncertainty": "peak-bandwidth lower bound on weight time; L2 reuse and compute can only make wall longer, not shorter than this optimistic bound",
+        "primary_workload": "d128/d2048",
+        "rationale": "streamed packed weights dominate compulsory decode bytes (10.183 ms at 1792 GB/s peak). Largest byte sink.",
+        "go": true,
+        "rank": 1
+      },
+      {
+        "task": "OPT-117",
+        "verdict": "go",
+        "removable_bytes_upper": 0,
+        "peak_ms_upper": 9.974685400000169,
+        "uncertainty": "launch ms is GPU-idle leaf gaps this sitting when measured, else OPT-114 historical hypothesis; capture failure is not a measured graph loss",
+        "primary_workload": "d128/d2048",
+        "rationale": "decode-segment graphs target launch/submit gaps. Bytes are not the savings; time is. Revalidate post113 gaps before treating OPT-114 ~11 ms/token as causal.",
+        "go": true,
+        "rank": 2
+      },
+      {
+        "task": "OPT-120",
+        "verdict": "go",
+        "removable_bytes_upper": 8587902976,
+        "peak_ms_upper": 4.792356571428571,
+        "uncertainty": "D128/D2048 KV peak bounds are small; 128K populated-cache reads are the material term. Capacity is not traffic.",
+        "primary_workload": "long-context decode",
+        "rationale": "KV peak bound D128 0.0047 ms, D2048 0.0749 ms, D131040 4.792 ms. Headline D128/D2048 must not be claimed from 128K capacity savings.",
+        "go": true,
+        "rank": 3
+      },
+      {
+        "task": "OPT-122",
+        "verdict": "go_conditional",
+        "removable_bytes_upper": 158859264,
+        "peak_ms_upper": 0.08864914285714286,
+        "uncertainty": "upper bound assumes one recurrent+conv pass per token with pointer-swap commit; extra rereads would raise the bound. Missing counter is not a measured zero.",
+        "primary_workload": "complete request after OPT-118",
+        "rationale": "GDN state 158859264 B resident; one-pass traffic peak bound 0.089 ms. Material only if measured amplification or long-scan traffic exceeds A/A resolution; otherwise no_material_opportunity remains open until OPT-122 measures it.",
+        "go": true,
+        "rank": 4
+      },
+      {
+        "task": "OPT-119",
+        "verdict": "go",
+        "removable_bytes_upper": 5767168,
+        "peak_ms_upper": 0.0032182857142857143,
+        "uncertainty": "activation bytes are architecture-derived; fusion may not remove the compulsory dense weight sweep",
+        "primary_workload": "prefill (P4096) then decode guard",
+        "rationale": "decode activation traffic is far below weights. Prefill microbatch activations are the plausible slice.",
+        "go": true,
+        "rank": 5
+      },
+      {
+        "task": "OPT-118",
+        "verdict": "go",
+        "removable_bytes_upper": 1013760,
+        "peak_ms_upper": 0.0005542857142857143,
+        "uncertainty": "PCIe byte bound is small; host-sample/D2H sync latency may exceed the copy bound and is not proven zero",
+        "primary_workload": "complete sync/sample/eval request",
+        "rationale": "logits D2H 993280 B/token (0.0006 ms at peak). Inventory, do not skip: sync and sampling can sit on the request critical path.",
+        "go": true,
+        "rank": 6
+      }
+    ],
+    "method": "peak_ms_upper_then_request_relevance",
+    "claims_throughput": false,
+    "opt114_launch_historical": {
+      "available": true,
+      "historical_not_this_sitting": true,
+      "d128_ms": 10.992768100000063,
+      "d2048_ms": 10.967419999999265,
+      "status": "graph_ab_retain_ffn_only",
+      "note": "OPT-114 launch numbers are a hypothesis to revalidate on post113; wall minus leaf-event sums alone cannot identify causal removable overhead"
+    },
+    "bounds_ref": {
+      "peak_bandwidth_gb_s": 1792.0,
+      "overlap_aware": 10.182878178571428
+    }
+  },
+  "shared_keep_protocol": {
+    "frozen_for": [
+      "OPT-117",
+      "OPT-118",
+      "OPT-119",
+      "OPT-120",
+      "OPT-121",
+      "OPT-122",
+      "OPT-123"
+    ],
+    "parent": "post113_selected",
+    "quality_against": "post113",
+    "screen_warmups": 3,
+    "screen_pairs": 5,
+    "acceptance_warmups": 3,
+    "acceptance_pairs": 10,
+    "decode_output_tokens": 256,
+    "workloads": [
+      "p4096",
+      "d128",
+      "d2048"
+    ],
+    "throughput_ratio_lower_bound": 1.0,
+    "non_target_point_ratio_min": 0.98,
+    "decode_p95_ratio_max": 1.05,
+    "no_extra_sampling": true,
+    "no_layer_token_dropping": true,
+    "no_speculative_decoding": true,
+    "no_batching": true,
+    "memory_only_is_not_throughput_keep": true,
+    "source_dossier": "tasks/OPT-115.md"
+  },
+  "production_kept": true,
+  "claims_throughput": false,
+  "claims_performance_improvement": false,
+  "opt074_coverage_unadmitted_blocker": false,
+  "report_path": "evidence/optimization/opt115-pipeline-traffic/REPORT.md",
+  "proof_limit": "diagnostics only: no production selector or kernel change; fresh post113_selected is the authenticated control; pinned llama cc83d7b4824f73cfdda4dfbb47ee39804f71b328 is the benchmark authority; 3 warmups plus 10 interleaved AB/BA pairs at P4096, D128, and D2048; long-context D8192/D32768/D131040+32 are separately labeled probes in a 131072-capacity session; 1792 GB/s is listed RTX 5090 peak, not observed application bandwidth; event unions distinguish GPU busy/idle, host overlap, sync and launch submission; no throughput or optimality claim",
+  "gpu_available": true,
+  "preflight": {
+    "identity": {
+      "device": "NVIDIA GeForce RTX 5090",
+      "compute_capability": "12.0",
+      "power_limit_w": 400.0,
+      "llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+      "llama_inspection_head": "1945e092030f8668ff93382799502d01490e564d",
+      "ds4_inspection_head": "c238077a87186381bf626cc531bccffe1fef79e7",
+      "gguf_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+      "token_generator": "(42 + index * 997) % 248320",
+      "source_revision": "e4e02bfea64e2d44fc6e4e7537f447c46f7c6d67",
+      "source_state": "dirty",
+      "nvccflags": "-O2 --fmad=false",
+      "execution_graphs": "ffn_only",
+      "selectors": {
+        "rms_norm": "parallel_fma",
+        "q4_decode": "llama_q4k_mmvq",
+        "q8_decode": "dp4a_q8_1",
+        "q6_decode": "integer_q8_1",
+        "ffn_decode": "paired_integer",
+        "query_prepare": "hoisted",
+        "attention_pipeline": "opt111_base",
+        "gdn_preproc": "transpose",
+        "mmq_pipeline": "fma_async",
+        "ffn_prompt_pair": "off",
+        "execution_graphs": "ffn_only",
+        "production_numerics": "strict",
+        "gdn_decode": "sequential",
+        "decode_query_prep": "warp_query",
+        "q8_decode_rows_skinny": 1,
+        "q8_decode_rows_medium": 1,
+        "q8_decode_rows_wide": 1,
+        "q8_decode_layout_warps_skinny": 4,
+        "q8_decode_layout_warps_medium": 4,
+        "q8_decode_layout_warps_wide": 4,
+        "ffn_gate_quality_i": 128,
+        "ffn_gate_prompt_tile": 128,
+        "prompt_microbatch_rows": 4096,
+        "mmq_async_x": true,
+        "nvccflags": "-O2 --fmad=false",
+        "q8_layout": "r1_w4",
+        "ffn_tiles": "i128_j128",
+        "q8_grouping": "grouped_r1_w4",
+        "q8_device_layout": "raw_gguf",
+        "q6_device_layout": "raw_gguf",
+        "mmq_double_x": false,
+        "decode_attention_vec128": "warp_query",
+        "decode_attention_crossover_threshold": 1024,
+        "decode_attention": "hybrid_crossover"
+      },
+      "clocks": {
+        "sm_clock_mhz": "232",
+        "mem_clock_mhz": "405",
+        "temperature_c": "50",
+        "power_draw_w": 23.72
+      },
+      "image": "qw38-cuda:13.0.2",
+      "model": "models/Qwen3.8-27B-Q4_K_M.gguf",
+      "telemetry": {
+        "device": "NVIDIA GeForce RTX 5090",
+        "device_substring": "RTX 5090",
+        "power_limit_w": 400.0,
+        "power_draw_w": 23.72,
+        "sm_clock_mhz": "232",
+        "mem_clock_mhz": "405",
+        "temperature_c": "50",
+        "raw": "NVIDIA GeForce RTX 5090, 400.00, 23.72, 232, 405, 50"
+      }
+    },
+    "post113_authenticated": {
+      "ok": true,
+      "selectors": {
+        "rms_norm": "parallel_fma",
+        "q4_decode": "llama_q4k_mmvq",
+        "q8_decode": "dp4a_q8_1",
+        "q6_decode": "integer_q8_1",
+        "ffn_decode": "paired_integer",
+        "query_prepare": "hoisted",
+        "attention_pipeline": "opt111_base",
+        "gdn_preproc": "transpose",
+        "mmq_pipeline": "fma_async",
+        "ffn_prompt_pair": "off",
+        "execution_graphs": "ffn_only",
+        "production_numerics": "strict",
+        "gdn_decode": "sequential",
+        "decode_query_prep": "warp_query",
+        "q8_decode_rows_skinny": 1,
+        "q8_decode_rows_medium": 1,
+        "q8_decode_rows_wide": 1,
+        "q8_decode_layout_warps_skinny": 4,
+        "q8_decode_layout_warps_medium": 4,
+        "q8_decode_layout_warps_wide": 4,
+        "ffn_gate_quality_i": 128,
+        "ffn_gate_prompt_tile": 128,
+        "prompt_microbatch_rows": 4096,
+        "mmq_async_x": true,
+        "nvccflags": "-O2 --fmad=false",
+        "q8_layout": "r1_w4",
+        "ffn_tiles": "i128_j128",
+        "q8_grouping": "grouped_r1_w4",
+        "q8_device_layout": "raw_gguf",
+        "q6_device_layout": "raw_gguf",
+        "mmq_double_x": false,
+        "decode_attention_vec128": "warp_query",
+        "decode_attention_crossover_threshold": 1024,
+        "decode_attention": "hybrid_crossover"
+      },
+      "expected": {
+        "rms_norm": "parallel_fma",
+        "q4_decode": "llama_q4k_mmvq",
+        "q8_decode": "dp4a_q8_1",
+        "q8_grouping": "grouped_r1_w4",
+        "q8_layout": "r1_w4",
+        "q6_decode": "integer_q8_1",
+        "ffn_decode": "paired_integer",
+        "query_prepare": "hoisted",
+        "attention_pipeline": "opt111_base",
+        "gdn_preproc": "transpose",
+        "mmq_pipeline": "fma_async",
+        "mmq_async_x": true,
+        "ffn_prompt_pair": "off",
+        "ffn_tiles": "i128_j128",
+        "prompt_microbatch_rows": 4096,
+        "execution_graphs": "ffn_only",
+        "production_numerics": "strict",
+        "nvccflags": "-O2 --fmad=false",
+        "gdn_decode": "sequential",
+        "decode_query_prep": "warp_query",
+        "decode_attention": "hybrid_crossover",
+        "decode_attention_vec128": "warp_query",
+        "decode_attention_crossover_threshold": 1024,
+        "q8_device_layout": "raw_gguf",
+        "q6_device_layout": "raw_gguf",
+        "mmq_double_x": false
+      },
+      "opt113_fixture_selected": {
+        "rms_norm": "parallel_fma",
+        "q4_decode": "llama_q4k_mmvq",
+        "q8_decode": "dp4a_q8_1",
+        "q6_decode": "integer_q8_1",
+        "ffn_decode": "paired_integer",
+        "query_prepare": "hoisted",
+        "attention_pipeline": "opt111_base",
+        "gdn_preproc": "transpose",
+        "mmq_pipeline": "fma_async",
+        "ffn_prompt_pair": "off",
+        "execution_graphs": "ffn_only",
+        "production_numerics": "strict",
+        "gdn_decode": "sequential",
+        "decode_query_prep": "warp_query",
+        "q8_decode_rows_skinny": 1,
+        "q8_decode_rows_medium": 1,
+        "q8_decode_rows_wide": 1,
+        "q8_decode_layout_warps_skinny": 4,
+        "q8_decode_layout_warps_medium": 4,
+        "q8_decode_layout_warps_wide": 4,
+        "ffn_gate_quality_i": 128,
+        "ffn_gate_prompt_tile": 128,
+        "prompt_microbatch_rows": 4096,
+        "mmq_async_x": true,
+        "nvccflags": "-O2 --fmad=false",
+        "q8_layout": "r1_w4",
+        "ffn_tiles": "i128_j128",
+        "q8_grouping": "grouped_r1_w4",
+        "q8_device_layout": "raw_gguf",
+        "q6_device_layout": "raw_gguf",
+        "mmq_double_x": false,
+        "decode_attention_vec128": "warp_query",
+        "decode_attention_crossover_threshold": 1024,
+        "decode_attention": "hybrid_crossover"
+      },
+      "mismatches": {},
+      "llama_q4k_mmvq": true,
+      "opt111_base": true,
+      "hybrid_crossover": true,
+      "sequential_gdn": true,
+      "ffn_only_graphs": true,
+      "opt113_numbers_historical_only": true
+    },
+    "gpu_available": true,
+    "gpu_blocker": null,
+    "shared_keep_protocol": {
+      "frozen_for": [
+        "OPT-117",
+        "OPT-118",
+        "OPT-119",
+        "OPT-120",
+        "OPT-121",
+        "OPT-122",
+        "OPT-123"
+      ],
+      "parent": "post113_selected",
+      "quality_against": "post113",
+      "screen_warmups": 3,
+      "screen_pairs": 5,
+      "acceptance_warmups": 3,
+      "acceptance_pairs": 10,
+      "decode_output_tokens": 256,
+      "workloads": [
+        "p4096",
+        "d128",
+        "d2048"
+      ],
+      "throughput_ratio_lower_bound": 1.0,
+      "non_target_point_ratio_min": 0.98,
+      "decode_p95_ratio_max": 1.05,
+      "no_extra_sampling": true,
+      "no_layer_token_dropping": true,
+      "no_speculative_decoding": true,
+      "no_batching": true,
+      "memory_only_is_not_throughput_keep": true,
+      "source_dossier": "tasks/OPT-115.md"
+    },
+    "admission": {
+      "ok": true,
+      "result_class": "ok",
+      "message": "instrumentation-only: no speed admission",
+      "observed": {
+        "schema_version": 1,
+        "task": "OPT-115",
+        "warmups": 0,
+        "samples": 1,
+        "observed_warmups": 0,
+        "observed_samples": 1,
+        "observed_candidates": 1,
+        "observed_shapes": 1,
+        "observed_tier": "correctness",
+        "sample_ids": [
+          0
+        ],
+        "keep": false,
+        "product": 1,
+        "rounds": [],
+        "acceptance_executed": false,
+        "pairs": 0
+      }
+    },
+    "native_counts": {
+      "schema_version": 1,
+      "task": "OPT-115",
+      "warmups": 0,
+      "samples": 1,
+      "observed_warmups": 0,
+      "observed_samples": 1,
+      "observed_candidates": 1,
+      "observed_shapes": 1,
+      "observed_tier": "correctness",
+      "sample_ids": [
+        0
+      ],
+      "keep": false,
+      "product": 1
+    }
+  },
+  "traffic_timeline": {
+    "timeline": {
+      "d128": {
+        "tokens": 1,
+        "record_count": 650,
+        "charged_count": 650,
+        "leaf_kernel_count": 340,
+        "gpu_busy_union_ms": 7.89075479999984,
+        "gpu_idle_gap_ms": 9.974685400000169,
+        "host_overlap_union_ms": 0.0,
+        "sync_union_ms": 0.12688500000000147,
+        "graph_union_ms": 0.0,
+        "launch_submission_ms": 9.974685400000169,
+        "classified_union_ms": 8.017639799999841,
+        "unclassified_ms": 0.6377406999999913,
+        "wall_ms": 18.6300659,
+        "interval_coverage": 0.9657681994565575,
+        "overlap_not_summed": true,
+        "sum_exceeds_wall": true,
+        "stream_aware": {
+          "summed_gpu_work_ms": 27.51302405134,
+          "interval_union_ms": 17.884204999999966,
+          "overlap_ms": 9.628819051340034,
+          "streams": {
+            "0": 27.51302405134
+          },
+          "sum_exceeds_wall": true
+        },
+        "families": {
+          "embedding": {
+            "role": "embedding",
+            "ms": 0.023008000100000002,
+            "calls": 2,
+            "fused_member_count": 1,
+            "engines": [
+              "quartz"
+            ],
+            "launch_families": [
+              "row_decode"
+            ]
+          },
+          "gdn_core": {
+            "role": "gdn_core",
+            "ms": 2.2206720022999997,
+            "calls": 49,
+            "fused_member_count": 1,
+            "engines": [
+              "quartz"
+            ],
+            "launch_families": [
+              "gdn"
+            ]
+          },
+          "mixer_mmv": {
+            "role": "mixer_mmv",
+            "ms": 6.378399997200001,
+            "calls": 128,
+            "fused_member_count": 1,
+            "engines": [
+              "quartz"
+            ],
+            "launch_families": [
+              "mmv"
+            ]
+          },
+          "ffn_mmv": {
+            "role": "ffn_mmv",
+            "ms": 7.940223969999998,
+            "calls": 64,
+            "fused_member_count": 7,
+            "engines": [
+              "quartz"
+            ],
+            "launch_families": [
+              "cuda_graph"
+            ]
+          },
+          "attention_core": {
+            "role": "attention_core",
+            "ms": 0.5471680167000001,
+            "calls": 16,
+            "fused_member_count": 1,
+            "engines": [
+              "quartz"
+            ],
+            "launch_families": [
+              "attention"
+            ]
+          },
+          "logits": {
+            "role": "logits",
+            "ms": 0.762528002,
+            "calls": 1,
+            "fused_member_count": 1,
+            "engines": [
+              "quartz"
+            ],
+            "launch_families": [
+              "mmv"
+            ]
+          },
+          "state_commit": {
+            "role": "state_commit",
+            "ms": 0.0231999997,
+            "calls": 1,
+            "fused_member_count": 1,
+            "engines": [
+              "quartz"
+            ],
+            "launch_families": [
+              "copy"
+            ]
+          },
+          "input_norm": {
+            "role": "input_norm",
+            "ms": 0.0178239997,
+            "calls": 1,
+            "fused_member_count": 1,
+            "engines": [
+              "quartz"
+            ],
+            "launch_families": [
+              "rms_norm"
+            ]
+          },
+          "proj_packed_qkv": {
+            "role": "proj_packed_qkv",
+            "ms": 2.9208319937,
+            "calls": 48,
+            "fused_member_count": 1,
+            "engines": [
+              "quartz"
+            ],
+            "launch_families": [
+              "mmv"
+            ]
+          },
+          "gdn_gate_prep": {
+            "role": "gdn_gate_prep",
+            "ms": 0.2209600013999999,
+            "calls": 48,
+            "fused_member_count": 1,
+            "engines": [
+              "quartz"
+            ],
+            "launch_families": [
+              "gdn"
+            ]
+          },
+          "gdn_conv_qk_norm_recurrence": {
+            "role": "gdn_conv_qk_norm_recurrence",
+            "ms": 1.6112000086000007,
+            "calls": 48,
+            "fused_member_count": 3,
+            "engines": [
+              "quartz"
+            ],
+            "launch_families": [
+              "gdn"
+            ]
+          },
+          "gdn_output_norm": {
+            "role": "gdn_output_norm",
+            "ms": 0.27596799847,
+            "calls": 48,
+            "fused_member_count": 1,
+            "engines": [
+              "quartz"
+            ],
+            "launch_families": [
+              "rms_norm"
+            ]
+          },
+          "proj_gdn_output": {
+            "role": "proj_gdn_output",
+            "ms": 1.192255998,
+            "calls": 48,
+            "fused_member_count": 1,
+            "engines": [
+              "quartz"
+            ],
+            "launch_families": [
+              "mmv"
+            ]
+          },
+          "residual_mixer": {
+            "role": "residual_mixer",
+            "ms": 0.23820800229,
+            "calls": 64,
+            "fused_member_count": 1,
+            "engines": [
+              "quartz"
+            ],
+            "launch_families": [
+              "pointwise"
+            ]
+          },
+          "proj_query_gate": {
+            "role": "proj_query_gate",
+            "ms": 0.8543040116,
+            "calls": 16,
+            "fused_member_count": 1,
+            "engines": [
+              "quartz"
+            ],
+            "launch_families": [
+              "mmv"
+            ]
+          },
+          "attn_query_split": {
+            "role": "attn_query_split",
+            "ms": 0.04825600148000001,
+            "calls": 16,
+            "fused_member_count": 1,
+            "engines": [
+              "quartz"
+            ],
+            "launch_families": [
+              "attention"
+            ]
+          },
+          "attn_qk_prep_softmax_pv_merge": {
+            "role": "attn_qk_prep_softmax_pv_merge",
+            "ms": 0.4160000083999999,
+            "calls": 16,
+            "fused_member_count": 1,
+            "engines": [
+              "quartz"
+            ],
+            "launch_families": [
+              "attention"
+            ]
+          },
+          "attn_output_cast": {
+            "role": "attn_output_cast",
+            "ms": 0.059904001599999986,
+            "calls": 16,
+            "fused_member_count": 1,
+            "engines": [
+              "quartz"
+            ],
+            "launch_families": [
+              "cast"
+            ]
+          },
+          "proj_attn_output": {
+            "role": "proj_attn_output",
+            "ms": 0.9891840183000001,
+            "calls": 16,
+            "fused_member_count": 1,
+            "engines": [
+              "quartz"
+            ],
+            "launch_families": [
+              "mmv"
+            ]
+          },
+          "logits_norm": {
+            "role": "logits_norm",
+            "ms": 0.0136000002,
+            "calls": 1,
+            "fused_member_count": 1,
+            "engines": [
+              "quartz"
+            ],
+            "launch_families": [
+              "rms_norm"
+            ]
+          },
+          "logits_projection": {
+            "role": "logits_projection",
+            "ms": 0.632448018,
+            "calls": 1,
+            "fused_member_count": 1,
+            "engines": [
+              "quartz"
+            ],
+            "launch_families": [
+              "mmv"
+            ]
+          },
+          "d2h": {
+            "role": "d2h",
+            "ms": 0.105760001,
+            "calls": 1,
+            "fused_member_count": 1,
+            "engines": [
+              "quartz"
+            ],
+            "launch_families": [
+              "copy"
+            ]
+          },
+          "state_copies": {
+            "role": "state_copies",
+            "ms": 0.0211200006,
+            "calls": 1,
+            "fused_member_count": 1,
+            "engines": [
+              "quartz"
+            ],
+            "launch_families": [
+              "copy"
+            ]
+          }
+        },
+        "method": "event_union_plus_leaf_gaps",
+        "valid": true,
+        "prefix": 128,
+        "uninstrumented_wall_ms": 17.4953766,
+        "instrumented_wall_ms": 18.6300659,
+        "profiler_perturbation_ms": 1.13468933,
+        "native": {
+          "schema_version": 1,
+          "task": "OPT-115",
+          "workload": "traffic-timeline",
+          "prefix": 128,
+          "tokens": 1,
+          "record_count": 650,
+          "pool_overflow": false,
+          "wall_ms": 18.6300659,
+          "uninstrumented_wall_ms": 17.4953766,
+          "instrumented_wall_ms": 18.6300659,
+          "profiler_perturbation_ms": 1.13468933,
+          "tok_s": 53.6766739,
+          "logits_d2h_bytes": 993280,
+          "hidden_d2h_bytes": 20480,
+          "kv_append_bytes": 65536,
+          "gdn_state_bytes": 158859264,
+          "kv_read_bytes": 8388608,
+          "keep": false,
+          "observed_warmups": 1,
+          "observed_samples": 1,
+          "observed_candidates": 1,
+          "observed_shapes": 1,
+          "observed_tier": "screen"
+        }
+      },
+      "d2048": {
+        "tokens": 1,
+        "record_count": 650,
+        "charged_count": 650,
+        "leaf_kernel_count": 340,
+        "gpu_busy_union_ms": 8.26415000000054,
+        "gpu_idle_gap_ms": 10.025705999999445,
+        "host_overlap_union_ms": 0.0,
+        "sync_union_ms": 0.14349300000003495,
+        "graph_union_ms": 0.0,
+        "launch_submission_ms": 10.025705999999445,
+        "classified_union_ms": 8.407643000000576,
+        "unclassified_ms": 0.47919139999997995,
+        "wall_ms": 18.9125404,
+        "interval_coverage": 0.9746627692597035,
+        "overlap_not_summed": true,
+        "sum_exceeds_wall": true,
+        "stream_aware": {
+          "summed_gpu_work_ms": 28.38336002656,
+          "interval_union_ms": 18.33540100000016,
+          "overlap_ms": 10.047959026559838,
+          "streams": {
+            "0": 28.38336002656
+          },
+          "sum_exceeds_wall": true
+        },
+        "families": {
+          "embedding": {
+            "role": "embedding",
+            "ms": 0.034111999000000004,
+            "calls": 2,
+            "fused_member_count": 1,
+            "engines": [
+              "quartz"
+            ],
+            "launch_families": [
+              "row_decode"
+            ]
+          },
+          "gdn_core": {
+            "role": "gdn_core",
+            "ms": 2.2535680012000006,
+            "calls": 49,
+            "fused_member_count": 1,
+            "engines": [
+              "quartz"
+            ],
+            "launch_families": [
+              "gdn"
+            ]
+          },
+          "mixer_mmv": {
+            "role": "mixer_mmv",
+            "ms": 6.386623974099999,
+            "calls": 128,
+            "fused_member_count": 1,
+            "engines": [
+              "quartz"
+            ],
+            "launch_families": [
+              "mmv"
+            ]
+          },
+          "ffn_mmv": {
+            "role": "ffn_mmv",
+            "ms": 7.969535961000001,
+            "calls": 64,
+            "fused_member_count": 7,
+            "engines": [
+              "quartz"
+            ],
+            "launch_families": [
+              "cuda_graph"
+            ]
+          },
+          "attention_core": {
+            "role": "attention_core",
+            "ms": 0.8787520155000001,
+            "calls": 16,
+            "fused_member_count": 1,
+            "engines": [
+              "quartz"
+            ],
+            "launch_families": [
+              "attention"
+            ]
+          },
+          "logits": {
+            "role": "logits",
+            "ms": 0.791743994,
+            "calls": 1,
+            "fused_member_count": 1,
+            "engines": [
+              "quartz"
+            ],
+            "launch_families": [
+              "mmv"
+            ]
+          },
+          "state_commit": {
+            "role": "state_commit",
+            "ms": 0.0370879993,
+            "calls": 1,
+            "fused_member_count": 1,
+            "engines": [
+              "quartz"
+            ],
+            "launch_families": [
+              "copy"
+            ]
+          },
+          "input_norm": {
+            "role": "input_norm",
+            "ms": 0.0149760004,
+            "calls": 1,
+            "fused_member_count": 1,
+            "engines": [
+              "quartz"
+            ],
+            "launch_families": [
+              "rms_norm"
+            ]
+          },
+          "proj_packed_qkv": {
+            "role": "proj_packed_qkv",
+            "ms": 2.920768011499999,
+            "calls": 48,
+            "fused_member_count": 1,
+            "engines": [
+              "quartz"
+            ],
+            "launch_families": [
+              "mmv"
+            ]
+          },
+          "gdn_gate_prep": {
+            "role": "gdn_gate_prep",
+            "ms": 0.22697600013999986,
+            "calls": 48,
+            "fused_member_count": 1,
+            "engines": [
+              "quartz"
+            ],
+            "launch_families": [
+              "gdn"
+            ]
+          },
+          "gdn_conv_qk_norm_recurrence": {
+            "role": "gdn_conv_qk_norm_recurrence",
+            "ms": 1.6400640085000004,
+            "calls": 48,
+            "fused_member_count": 3,
+            "engines": [
+              "quartz"
+            ],
+            "launch_families": [
+              "gdn"
+            ]
+          },
+          "gdn_output_norm": {
+            "role": "gdn_output_norm",
+            "ms": 0.27231999959000003,
+            "calls": 48,
+            "fused_member_count": 1,
+            "engines": [
+              "quartz"
+            ],
+            "launch_families": [
+              "rms_norm"
+            ]
+          },
+          "proj_gdn_output": {
+            "role": "proj_gdn_output",
+            "ms": 1.1966079957000004,
+            "calls": 48,
+            "fused_member_count": 1,
+            "engines": [
+              "quartz"
+            ],
+            "launch_families": [
+              "mmv"
+            ]
+          },
+          "residual_mixer": {
+            "role": "residual_mixer",
+            "ms": 0.24025600135,
+            "calls": 64,
+            "fused_member_count": 1,
+            "engines": [
+              "quartz"
+            ],
+            "launch_families": [
+              "pointwise"
+            ]
+          },
+          "proj_query_gate": {
+            "role": "proj_query_gate",
+            "ms": 0.8643200174000003,
+            "calls": 16,
+            "fused_member_count": 1,
+            "engines": [
+              "quartz"
+            ],
+            "launch_families": [
+              "mmv"
+            ]
+          },
+          "attn_query_split": {
+            "role": "attn_query_split",
+            "ms": 0.047936001379999996,
+            "calls": 16,
+            "fused_member_count": 1,
+            "engines": [
+              "quartz"
+            ],
+            "launch_families": [
+              "attention"
+            ]
+          },
+          "attn_qk_prep_softmax_pv_merge": {
+            "role": "attn_qk_prep_softmax_pv_merge",
+            "ms": 0.7475520254000002,
+            "calls": 16,
+            "fused_member_count": 1,
+            "engines": [
+              "quartz"
+            ],
+            "launch_families": [
+              "attention"
+            ]
+          },
+          "attn_output_cast": {
+            "role": "attn_output_cast",
+            "ms": 0.059904001599999986,
+            "calls": 16,
+            "fused_member_count": 1,
+            "engines": [
+              "quartz"
+            ],
+            "launch_families": [
+              "cast"
+            ]
+          },
+          "proj_attn_output": {
+            "role": "proj_attn_output",
+            "ms": 0.9840640240000001,
+            "calls": 16,
+            "fused_member_count": 1,
+            "engines": [
+              "quartz"
+            ],
+            "launch_families": [
+              "mmv"
+            ]
+          },
+          "logits_norm": {
+            "role": "logits_norm",
+            "ms": 0.0136000002,
+            "calls": 1,
+            "fused_member_count": 1,
+            "engines": [
+              "quartz"
+            ],
+            "launch_families": [
+              "rms_norm"
+            ]
+          },
+          "logits_projection": {
+            "role": "logits_projection",
+            "ms": 0.65910399,
+            "calls": 1,
+            "fused_member_count": 1,
+            "engines": [
+              "quartz"
+            ],
+            "launch_families": [
+              "mmv"
+            ]
+          },
+          "d2h": {
+            "role": "d2h",
+            "ms": 0.108096004,
+            "calls": 1,
+            "fused_member_count": 1,
+            "engines": [
+              "quartz"
+            ],
+            "launch_families": [
+              "copy"
+            ]
+          },
+          "state_copies": {
+            "role": "state_copies",
+            "ms": 0.0353920013,
+            "calls": 1,
+            "fused_member_count": 1,
+            "engines": [
+              "quartz"
+            ],
+            "launch_families": [
+              "copy"
+            ]
+          }
+        },
+        "method": "event_union_plus_leaf_gaps",
+        "valid": true,
+        "prefix": 2048,
+        "uninstrumented_wall_ms": 17.9790764,
+        "instrumented_wall_ms": 18.9125404,
+        "profiler_perturbation_ms": 0.93346405,
+        "native": {
+          "schema_version": 1,
+          "task": "OPT-115",
+          "workload": "traffic-timeline",
+          "prefix": 2048,
+          "tokens": 1,
+          "record_count": 650,
+          "pool_overflow": false,
+          "wall_ms": 18.9125404,
+          "uninstrumented_wall_ms": 17.9790764,
+          "instrumented_wall_ms": 18.9125404,
+          "profiler_perturbation_ms": 0.93346405,
+          "tok_s": 52.8749695,
+          "logits_d2h_bytes": 993280,
+          "hidden_d2h_bytes": 20480,
+          "kv_append_bytes": 65536,
+          "gdn_state_bytes": 158859264,
+          "kv_read_bytes": 134217728,
+          "keep": false,
+          "observed_warmups": 1,
+          "observed_samples": 1,
+          "observed_candidates": 1,
+          "observed_shapes": 1,
+          "observed_tier": "screen"
+        }
+      }
+    },
+    "traffic_overlay": {
+      "d128": {
+        "logits_d2h_bytes": 993280,
+        "hidden_d2h_bytes": 20480,
+        "kv_append_bytes": 65536,
+        "gdn_state_bytes": 158859264,
+        "measured": true
+      },
+      "d2048": {
+        "logits_d2h_bytes": 993280,
+        "hidden_d2h_bytes": 20480,
+        "kv_append_bytes": 65536,
+        "gdn_state_bytes": 158859264,
+        "measured": true
+      }
+    },
+    "native_counts": {
+      "schema_version": 1,
+      "task": "OPT-115",
+      "warmups": 1,
+      "samples": 1,
+      "observed_warmups": 1,
+      "observed_samples": 1,
+      "observed_candidates": 1,
+      "observed_shapes": 2,
+      "observed_tier": "screen",
+      "sample_ids": [
+        0
+      ],
+      "keep": false,
+      "product": 4
+    },
+    "admission": {
+      "ok": true,
+      "result_class": "ok",
+      "message": "instrumentation-only: no speed admission",
+      "observed": {
+        "schema_version": 1,
+        "task": "OPT-115",
+        "warmups": 1,
+        "samples": 1,
+        "observed_warmups": 1,
+        "observed_samples": 1,
+        "observed_candidates": 1,
+        "observed_shapes": 2,
+        "observed_tier": "screen",
+        "sample_ids": [
+          0
+        ],
+        "keep": false,
+        "product": 4,
+        "rounds": [],
+        "acceptance_executed": false,
+        "pairs": 0
+      }
+    },
+    "d128": {
+      "tokens": 1,
+      "record_count": 650,
+      "charged_count": 650,
+      "leaf_kernel_count": 340,
+      "gpu_busy_union_ms": 7.89075479999984,
+      "gpu_idle_gap_ms": 9.974685400000169,
+      "host_overlap_union_ms": 0.0,
+      "sync_union_ms": 0.12688500000000147,
+      "graph_union_ms": 0.0,
+      "launch_submission_ms": 9.974685400000169,
+      "classified_union_ms": 8.017639799999841,
+      "unclassified_ms": 0.6377406999999913,
+      "wall_ms": 18.6300659,
+      "interval_coverage": 0.9657681994565575,
+      "overlap_not_summed": true,
+      "sum_exceeds_wall": true,
+      "stream_aware": {
+        "summed_gpu_work_ms": 27.51302405134,
+        "interval_union_ms": 17.884204999999966,
+        "overlap_ms": 9.628819051340034,
+        "streams": {
+          "0": 27.51302405134
+        },
+        "sum_exceeds_wall": true
+      },
+      "families": {
+        "embedding": {
+          "role": "embedding",
+          "ms": 0.023008000100000002,
+          "calls": 2,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "row_decode"
+          ]
+        },
+        "gdn_core": {
+          "role": "gdn_core",
+          "ms": 2.2206720022999997,
+          "calls": 49,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "gdn"
+          ]
+        },
+        "mixer_mmv": {
+          "role": "mixer_mmv",
+          "ms": 6.378399997200001,
+          "calls": 128,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "mmv"
+          ]
+        },
+        "ffn_mmv": {
+          "role": "ffn_mmv",
+          "ms": 7.940223969999998,
+          "calls": 64,
+          "fused_member_count": 7,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "cuda_graph"
+          ]
+        },
+        "attention_core": {
+          "role": "attention_core",
+          "ms": 0.5471680167000001,
+          "calls": 16,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "attention"
+          ]
+        },
+        "logits": {
+          "role": "logits",
+          "ms": 0.762528002,
+          "calls": 1,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "mmv"
+          ]
+        },
+        "state_commit": {
+          "role": "state_commit",
+          "ms": 0.0231999997,
+          "calls": 1,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "copy"
+          ]
+        },
+        "input_norm": {
+          "role": "input_norm",
+          "ms": 0.0178239997,
+          "calls": 1,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "rms_norm"
+          ]
+        },
+        "proj_packed_qkv": {
+          "role": "proj_packed_qkv",
+          "ms": 2.9208319937,
+          "calls": 48,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "mmv"
+          ]
+        },
+        "gdn_gate_prep": {
+          "role": "gdn_gate_prep",
+          "ms": 0.2209600013999999,
+          "calls": 48,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "gdn"
+          ]
+        },
+        "gdn_conv_qk_norm_recurrence": {
+          "role": "gdn_conv_qk_norm_recurrence",
+          "ms": 1.6112000086000007,
+          "calls": 48,
+          "fused_member_count": 3,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "gdn"
+          ]
+        },
+        "gdn_output_norm": {
+          "role": "gdn_output_norm",
+          "ms": 0.27596799847,
+          "calls": 48,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "rms_norm"
+          ]
+        },
+        "proj_gdn_output": {
+          "role": "proj_gdn_output",
+          "ms": 1.192255998,
+          "calls": 48,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "mmv"
+          ]
+        },
+        "residual_mixer": {
+          "role": "residual_mixer",
+          "ms": 0.23820800229,
+          "calls": 64,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "pointwise"
+          ]
+        },
+        "proj_query_gate": {
+          "role": "proj_query_gate",
+          "ms": 0.8543040116,
+          "calls": 16,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "mmv"
+          ]
+        },
+        "attn_query_split": {
+          "role": "attn_query_split",
+          "ms": 0.04825600148000001,
+          "calls": 16,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "attention"
+          ]
+        },
+        "attn_qk_prep_softmax_pv_merge": {
+          "role": "attn_qk_prep_softmax_pv_merge",
+          "ms": 0.4160000083999999,
+          "calls": 16,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "attention"
+          ]
+        },
+        "attn_output_cast": {
+          "role": "attn_output_cast",
+          "ms": 0.059904001599999986,
+          "calls": 16,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "cast"
+          ]
+        },
+        "proj_attn_output": {
+          "role": "proj_attn_output",
+          "ms": 0.9891840183000001,
+          "calls": 16,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "mmv"
+          ]
+        },
+        "logits_norm": {
+          "role": "logits_norm",
+          "ms": 0.0136000002,
+          "calls": 1,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "rms_norm"
+          ]
+        },
+        "logits_projection": {
+          "role": "logits_projection",
+          "ms": 0.632448018,
+          "calls": 1,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "mmv"
+          ]
+        },
+        "d2h": {
+          "role": "d2h",
+          "ms": 0.105760001,
+          "calls": 1,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "copy"
+          ]
+        },
+        "state_copies": {
+          "role": "state_copies",
+          "ms": 0.0211200006,
+          "calls": 1,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "copy"
+          ]
+        }
+      },
+      "method": "event_union_plus_leaf_gaps",
+      "valid": true,
+      "prefix": 128,
+      "uninstrumented_wall_ms": 17.4953766,
+      "instrumented_wall_ms": 18.6300659,
+      "profiler_perturbation_ms": 1.13468933,
+      "native": {
+        "schema_version": 1,
+        "task": "OPT-115",
+        "workload": "traffic-timeline",
+        "prefix": 128,
+        "tokens": 1,
+        "record_count": 650,
+        "pool_overflow": false,
+        "wall_ms": 18.6300659,
+        "uninstrumented_wall_ms": 17.4953766,
+        "instrumented_wall_ms": 18.6300659,
+        "profiler_perturbation_ms": 1.13468933,
+        "tok_s": 53.6766739,
+        "logits_d2h_bytes": 993280,
+        "hidden_d2h_bytes": 20480,
+        "kv_append_bytes": 65536,
+        "gdn_state_bytes": 158859264,
+        "kv_read_bytes": 8388608,
+        "keep": false,
+        "observed_warmups": 1,
+        "observed_samples": 1,
+        "observed_candidates": 1,
+        "observed_shapes": 1,
+        "observed_tier": "screen"
+      }
+    },
+    "d2048": {
+      "tokens": 1,
+      "record_count": 650,
+      "charged_count": 650,
+      "leaf_kernel_count": 340,
+      "gpu_busy_union_ms": 8.26415000000054,
+      "gpu_idle_gap_ms": 10.025705999999445,
+      "host_overlap_union_ms": 0.0,
+      "sync_union_ms": 0.14349300000003495,
+      "graph_union_ms": 0.0,
+      "launch_submission_ms": 10.025705999999445,
+      "classified_union_ms": 8.407643000000576,
+      "unclassified_ms": 0.47919139999997995,
+      "wall_ms": 18.9125404,
+      "interval_coverage": 0.9746627692597035,
+      "overlap_not_summed": true,
+      "sum_exceeds_wall": true,
+      "stream_aware": {
+        "summed_gpu_work_ms": 28.38336002656,
+        "interval_union_ms": 18.33540100000016,
+        "overlap_ms": 10.047959026559838,
+        "streams": {
+          "0": 28.38336002656
+        },
+        "sum_exceeds_wall": true
+      },
+      "families": {
+        "embedding": {
+          "role": "embedding",
+          "ms": 0.034111999000000004,
+          "calls": 2,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "row_decode"
+          ]
+        },
+        "gdn_core": {
+          "role": "gdn_core",
+          "ms": 2.2535680012000006,
+          "calls": 49,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "gdn"
+          ]
+        },
+        "mixer_mmv": {
+          "role": "mixer_mmv",
+          "ms": 6.386623974099999,
+          "calls": 128,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "mmv"
+          ]
+        },
+        "ffn_mmv": {
+          "role": "ffn_mmv",
+          "ms": 7.969535961000001,
+          "calls": 64,
+          "fused_member_count": 7,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "cuda_graph"
+          ]
+        },
+        "attention_core": {
+          "role": "attention_core",
+          "ms": 0.8787520155000001,
+          "calls": 16,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "attention"
+          ]
+        },
+        "logits": {
+          "role": "logits",
+          "ms": 0.791743994,
+          "calls": 1,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "mmv"
+          ]
+        },
+        "state_commit": {
+          "role": "state_commit",
+          "ms": 0.0370879993,
+          "calls": 1,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "copy"
+          ]
+        },
+        "input_norm": {
+          "role": "input_norm",
+          "ms": 0.0149760004,
+          "calls": 1,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "rms_norm"
+          ]
+        },
+        "proj_packed_qkv": {
+          "role": "proj_packed_qkv",
+          "ms": 2.920768011499999,
+          "calls": 48,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "mmv"
+          ]
+        },
+        "gdn_gate_prep": {
+          "role": "gdn_gate_prep",
+          "ms": 0.22697600013999986,
+          "calls": 48,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "gdn"
+          ]
+        },
+        "gdn_conv_qk_norm_recurrence": {
+          "role": "gdn_conv_qk_norm_recurrence",
+          "ms": 1.6400640085000004,
+          "calls": 48,
+          "fused_member_count": 3,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "gdn"
+          ]
+        },
+        "gdn_output_norm": {
+          "role": "gdn_output_norm",
+          "ms": 0.27231999959000003,
+          "calls": 48,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "rms_norm"
+          ]
+        },
+        "proj_gdn_output": {
+          "role": "proj_gdn_output",
+          "ms": 1.1966079957000004,
+          "calls": 48,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "mmv"
+          ]
+        },
+        "residual_mixer": {
+          "role": "residual_mixer",
+          "ms": 0.24025600135,
+          "calls": 64,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "pointwise"
+          ]
+        },
+        "proj_query_gate": {
+          "role": "proj_query_gate",
+          "ms": 0.8643200174000003,
+          "calls": 16,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "mmv"
+          ]
+        },
+        "attn_query_split": {
+          "role": "attn_query_split",
+          "ms": 0.047936001379999996,
+          "calls": 16,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "attention"
+          ]
+        },
+        "attn_qk_prep_softmax_pv_merge": {
+          "role": "attn_qk_prep_softmax_pv_merge",
+          "ms": 0.7475520254000002,
+          "calls": 16,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "attention"
+          ]
+        },
+        "attn_output_cast": {
+          "role": "attn_output_cast",
+          "ms": 0.059904001599999986,
+          "calls": 16,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "cast"
+          ]
+        },
+        "proj_attn_output": {
+          "role": "proj_attn_output",
+          "ms": 0.9840640240000001,
+          "calls": 16,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "mmv"
+          ]
+        },
+        "logits_norm": {
+          "role": "logits_norm",
+          "ms": 0.0136000002,
+          "calls": 1,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "rms_norm"
+          ]
+        },
+        "logits_projection": {
+          "role": "logits_projection",
+          "ms": 0.65910399,
+          "calls": 1,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "mmv"
+          ]
+        },
+        "d2h": {
+          "role": "d2h",
+          "ms": 0.108096004,
+          "calls": 1,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "copy"
+          ]
+        },
+        "state_copies": {
+          "role": "state_copies",
+          "ms": 0.0353920013,
+          "calls": 1,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "copy"
+          ]
+        }
+      },
+      "method": "event_union_plus_leaf_gaps",
+      "valid": true,
+      "prefix": 2048,
+      "uninstrumented_wall_ms": 17.9790764,
+      "instrumented_wall_ms": 18.9125404,
+      "profiler_perturbation_ms": 0.93346405,
+      "native": {
+        "schema_version": 1,
+        "task": "OPT-115",
+        "workload": "traffic-timeline",
+        "prefix": 2048,
+        "tokens": 1,
+        "record_count": 650,
+        "pool_overflow": false,
+        "wall_ms": 18.9125404,
+        "uninstrumented_wall_ms": 17.9790764,
+        "instrumented_wall_ms": 18.9125404,
+        "profiler_perturbation_ms": 0.93346405,
+        "tok_s": 52.8749695,
+        "logits_d2h_bytes": 993280,
+        "hidden_d2h_bytes": 20480,
+        "kv_append_bytes": 65536,
+        "gdn_state_bytes": 158859264,
+        "kv_read_bytes": 134217728,
+        "keep": false,
+        "observed_warmups": 1,
+        "observed_samples": 1,
+        "observed_candidates": 1,
+        "observed_shapes": 1,
+        "observed_tier": "screen"
+      }
+    }
+  },
+  "ranking": {
+    "traffic_map": {
+      "units": "bytes",
+      "inventory": {
+        "tensor_count": 851,
+        "by_dtype_bytes": {
+          "Q6_K": 1455820800,
+          "F32": 10582016,
+          "Q4_K": 10341089280,
+          "Q8_0": 7155384320
+        },
+        "by_role_bytes": {
+          "output_projection": 1042944000,
+          "final_norm": 20480,
+          "token_embedding": 715161600,
+          "gdn_value_gate": 1604321280,
+          "input_norm": 1310720,
+          "gdn_packed_qkv": 2673868800,
+          "ffn_down": 3208642560,
+          "ffn_gate": 3208642560,
+          "ffn_up": 3208642560,
+          "ffn_norm": 1310720,
+          "gdn_decay": 9216,
+          "gdn_alpha": 12533760,
+          "gdn_beta": 12533760,
+          "gdn_convolution": 7864320,
+          "gdn_dt_bias": 9216,
+          "gdn_norm": 24576,
+          "gdn_output": 1604321280,
+          "attention_k": 89128960,
+          "attention_k_norm": 16384,
+          "attention_output": 412876800,
+          "attention_q_gate": 1069547520,
+          "attention_q_norm": 16384,
+          "attention_v": 89128960
+        },
+        "by_phase_bytes": {
+          "weights": 17202071552,
+          "norms": 2699264,
+          "embedding": 715161600,
+          "output_head": 1042944000
+        },
+        "q4_k_bytes": 10341089280,
+        "q8_0_bytes": 7155384320,
+        "q6_k_bytes": 1455820800,
+        "f32_bytes": 10582016,
+        "units": "bytes"
+      },
+      "memory_ledger": {
+        "resident_model_bytes": 18973870432,
+        "attention_kv_bytes": 8589934592,
+        "gdn_state_bytes": 158859264,
+        "workspace_bytes": 1831836288,
+        "required_reserve_bytes": 1610612736,
+        "post_graph_admitted": true
+      },
+      "p4096": {
+        "scope": "prefill_request",
+        "tokens": 4096,
+        "microbatch": 4096,
+        "tiles": 1,
+        "units": "bytes",
+        "phases": {
+          "weights": 18259511296,
+          "activations": 5368709120,
+          "kv": 268435456,
+          "gdn_state": 158859264,
+          "transfers": 1013760,
+          "logits": 993280,
+          "barriers": 0,
+          "graphs": 0
+        },
+        "bytes_per_request": 24057522176,
+        "bytes_per_token": 5873418.5,
+        "source": "tensor_inventory_plus_architecture_constants",
+        "measured": false
+      },
+      "d128": {
+        "scope": "one_decode_token",
+        "prefix": 128,
+        "units": "bytes",
+        "phases": {
+          "weights": 18247717696,
+          "activations": 5767168,
+          "kv": 8454144,
+          "gdn_state": 158859264,
+          "transfers": 1013760,
+          "logits": 993280,
+          "barriers": 0,
+          "graphs": 0
+        },
+        "bytes_per_token": 18422805312,
+        "bytes_per_request_one_token": 18422805312,
+        "embedding_row_bytes": 2880,
+        "embedding_full_table_excluded": true,
+        "kv_read_bytes": 8388608,
+        "kv_append_bytes": 65536,
+        "gdn": {
+          "convolution_bytes": 7864320,
+          "recurrent_bytes": 150994944,
+          "total_bytes": 158859264,
+          "candidate_plus_committed_capacity_note": "decode swaps candidate/committed pointers; do not charge a full duplicate copy on every token unless measured"
+        },
+        "logits_d2h_bytes": 993280,
+        "hidden_d2h_bytes": 20480,
+        "source": "tensor_inventory_plus_architecture_constants",
+        "measured": false
+      },
+      "d2048": {
+        "scope": "one_decode_token",
+        "prefix": 2048,
+        "units": "bytes",
+        "phases": {
+          "weights": 18247717696,
+          "activations": 5767168,
+          "kv": 134283264,
+          "gdn_state": 158859264,
+          "transfers": 1013760,
+          "logits": 993280,
+          "barriers": 0,
+          "graphs": 0
+        },
+        "bytes_per_token": 18548634432,
+        "bytes_per_request_one_token": 18548634432,
+        "embedding_row_bytes": 2880,
+        "embedding_full_table_excluded": true,
+        "kv_read_bytes": 134217728,
+        "kv_append_bytes": 65536,
+        "gdn": {
+          "convolution_bytes": 7864320,
+          "recurrent_bytes": 150994944,
+          "total_bytes": 158859264,
+          "candidate_plus_committed_capacity_note": "decode swaps candidate/committed pointers; do not charge a full duplicate copy on every token unless measured"
+        },
+        "logits_d2h_bytes": 993280,
+        "hidden_d2h_bytes": 20480,
+        "source": "tensor_inventory_plus_architecture_constants",
+        "measured": false
+      },
+      "d8192": {
+        "scope": "one_decode_token",
+        "prefix": 8192,
+        "units": "bytes",
+        "phases": {
+          "weights": 18247717696,
+          "activations": 5767168,
+          "kv": 536936448,
+          "gdn_state": 158859264,
+          "transfers": 1013760,
+          "logits": 993280,
+          "barriers": 0,
+          "graphs": 0
+        },
+        "bytes_per_token": 18951287616,
+        "bytes_per_request_one_token": 18951287616,
+        "embedding_row_bytes": 2880,
+        "embedding_full_table_excluded": true,
+        "kv_read_bytes": 536870912,
+        "kv_append_bytes": 65536,
+        "gdn": {
+          "convolution_bytes": 7864320,
+          "recurrent_bytes": 150994944,
+          "total_bytes": 158859264,
+          "candidate_plus_committed_capacity_note": "decode swaps candidate/committed pointers; do not charge a full duplicate copy on every token unless measured"
+        },
+        "logits_d2h_bytes": 993280,
+        "hidden_d2h_bytes": 20480,
+        "source": "tensor_inventory_plus_architecture_constants",
+        "measured": false
+      },
+      "d32768": {
+        "scope": "one_decode_token",
+        "prefix": 32768,
+        "units": "bytes",
+        "phases": {
+          "weights": 18247717696,
+          "activations": 5767168,
+          "kv": 2147549184,
+          "gdn_state": 158859264,
+          "transfers": 1013760,
+          "logits": 993280,
+          "barriers": 0,
+          "graphs": 0
+        },
+        "bytes_per_token": 20561900352,
+        "bytes_per_request_one_token": 20561900352,
+        "embedding_row_bytes": 2880,
+        "embedding_full_table_excluded": true,
+        "kv_read_bytes": 2147483648,
+        "kv_append_bytes": 65536,
+        "gdn": {
+          "convolution_bytes": 7864320,
+          "recurrent_bytes": 150994944,
+          "total_bytes": 158859264,
+          "candidate_plus_committed_capacity_note": "decode swaps candidate/committed pointers; do not charge a full duplicate copy on every token unless measured"
+        },
+        "logits_d2h_bytes": 993280,
+        "hidden_d2h_bytes": 20480,
+        "source": "tensor_inventory_plus_architecture_constants",
+        "measured": false
+      },
+      "d131040": {
+        "scope": "one_decode_token",
+        "prefix": 131040,
+        "units": "bytes",
+        "phases": {
+          "weights": 18247717696,
+          "activations": 5767168,
+          "kv": 8587902976,
+          "gdn_state": 158859264,
+          "transfers": 1013760,
+          "logits": 993280,
+          "barriers": 0,
+          "graphs": 0
+        },
+        "bytes_per_token": 27002254144,
+        "bytes_per_request_one_token": 27002254144,
+        "embedding_row_bytes": 2880,
+        "embedding_full_table_excluded": true,
+        "kv_read_bytes": 8587837440,
+        "kv_append_bytes": 65536,
+        "gdn": {
+          "convolution_bytes": 7864320,
+          "recurrent_bytes": 150994944,
+          "total_bytes": 158859264,
+          "candidate_plus_committed_capacity_note": "decode swaps candidate/committed pointers; do not charge a full duplicate copy on every token unless measured"
+        },
+        "logits_d2h_bytes": 993280,
+        "hidden_d2h_bytes": 20480,
+        "source": "tensor_inventory_plus_architecture_constants",
+        "measured": false
+      },
+      "phases": [
+        "weights",
+        "activations",
+        "kv",
+        "gdn_state",
+        "transfers",
+        "logits",
+        "barriers",
+        "graphs"
+      ],
+      "measured": false,
+      "note": "tensor-derived compulsory traffic; GPU phases overlay measured timeline counters when available",
+      "measured_overlay": {
+        "d128": {
+          "logits_d2h_bytes": 993280,
+          "hidden_d2h_bytes": 20480,
+          "kv_append_bytes": 65536,
+          "gdn_state_bytes": 158859264,
+          "measured": true
+        },
+        "d2048": {
+          "logits_d2h_bytes": 993280,
+          "hidden_d2h_bytes": 20480,
+          "kv_append_bytes": 65536,
+          "gdn_state_bytes": 158859264,
+          "measured": true
+        }
+      }
+    },
+    "bandwidth_bounds": {
+      "p4096": {
+        "prefix": 4096,
+        "peak_bandwidth_gb_s": 1792.0,
+        "measured_sustainable_bandwidth_gb_s": null,
+        "per_phase": {
+          "weights": {
+            "bytes": 18259511296.0,
+            "peak_ms": 10.189459428571428,
+            "sustainable_ms": null
+          },
+          "activations": {
+            "bytes": 5368709120.0,
+            "peak_ms": 2.9959314285714287,
+            "sustainable_ms": null
+          },
+          "kv": {
+            "bytes": 268435456.0,
+            "peak_ms": 0.14979657142857142,
+            "sustainable_ms": null
+          },
+          "gdn_state": {
+            "bytes": 158859264.0,
+            "peak_ms": 0.08864914285714286,
+            "sustainable_ms": null
+          },
+          "transfers": {
+            "bytes": 1013760.0,
+            "peak_ms": 0.0005657142857142857,
+            "sustainable_ms": null
+          },
+          "logits": {
+            "bytes": 993280.0,
+            "peak_ms": 0.0005542857142857143,
+            "sustainable_ms": null
+          },
+          "barriers": {
+            "bytes": 0.0,
+            "peak_ms": 0.0,
+            "sustainable_ms": null
+          },
+          "graphs": {
+            "bytes": 0.0,
+            "peak_ms": 0.0,
+            "sustainable_ms": null
+          }
+        },
+        "independent_sum_peak_ms": 13.424956571428572,
+        "independent_sum_not_a_bound": true,
+        "critical_path_peak_ms": 10.189459428571428,
+        "overlap_aware_peak_ms": 10.189459428571428,
+        "wall_ms": null,
+        "assumptions": [
+          "RTX 5090 listed peak 1792 GB/s from NVIDIA Blackwell architecture paper",
+          "peak is an optimistic bound, not observed application bandwidth",
+          "compulsory reads assume no L2 reuse across layers and no write-allocate traffic beyond listed writes",
+          "embedding lookup charges one Q4_K row, not the full table",
+          "GDN decode charges one recurrent+conv pass with pointer-swap commit, not a full 8 GiB KV copy",
+          "overlapping costs use max/critical-path, not a sum of independent peak bounds",
+          "fixed-format Q4_K/Q8_0/Q6_K; quality-gated lower-bit models are separate OPT-121/122 candidates",
+          "measured sustainable bandwidth unavailable; sustainable_ms is null"
+        ],
+        "units": {
+          "bytes": "bytes",
+          "time": "milliseconds",
+          "bandwidth": "GB/s"
+        },
+        "claims_throughput": false
+      },
+      "d128": {
+        "prefix": 128,
+        "peak_bandwidth_gb_s": 1792.0,
+        "measured_sustainable_bandwidth_gb_s": null,
+        "per_phase": {
+          "weights": {
+            "bytes": 18247717696.0,
+            "peak_ms": 10.182878178571428,
+            "sustainable_ms": null
+          },
+          "activations": {
+            "bytes": 5767168.0,
+            "peak_ms": 0.0032182857142857143,
+            "sustainable_ms": null
+          },
+          "kv": {
+            "bytes": 8454144.0,
+            "peak_ms": 0.004717714285714286,
+            "sustainable_ms": null
+          },
+          "gdn_state": {
+            "bytes": 158859264.0,
+            "peak_ms": 0.08864914285714286,
+            "sustainable_ms": null
+          },
+          "transfers": {
+            "bytes": 1013760.0,
+            "peak_ms": 0.0005657142857142857,
+            "sustainable_ms": null
+          },
+          "logits": {
+            "bytes": 993280.0,
+            "peak_ms": 0.0005542857142857143,
+            "sustainable_ms": null
+          },
+          "barriers": {
+            "bytes": 0.0,
+            "peak_ms": 0.0,
+            "sustainable_ms": null
+          },
+          "graphs": {
+            "bytes": 0.0,
+            "peak_ms": 0.0,
+            "sustainable_ms": null
+          }
+        },
+        "independent_sum_peak_ms": 10.280583321428571,
+        "independent_sum_not_a_bound": true,
+        "critical_path_peak_ms": 10.182878178571428,
+        "overlap_aware_peak_ms": 10.182878178571428,
+        "wall_ms": 18.6300659,
+        "assumptions": [
+          "RTX 5090 listed peak 1792 GB/s from NVIDIA Blackwell architecture paper",
+          "peak is an optimistic bound, not observed application bandwidth",
+          "compulsory reads assume no L2 reuse across layers and no write-allocate traffic beyond listed writes",
+          "embedding lookup charges one Q4_K row, not the full table",
+          "GDN decode charges one recurrent+conv pass with pointer-swap commit, not a full 8 GiB KV copy",
+          "overlapping costs use max/critical-path, not a sum of independent peak bounds",
+          "fixed-format Q4_K/Q8_0/Q6_K; quality-gated lower-bit models are separate OPT-121/122 candidates",
+          "measured sustainable bandwidth unavailable; sustainable_ms is null"
+        ],
+        "units": {
+          "bytes": "bytes",
+          "time": "milliseconds",
+          "bandwidth": "GB/s"
+        },
+        "claims_throughput": false
+      },
+      "d2048": {
+        "prefix": 2048,
+        "peak_bandwidth_gb_s": 1792.0,
+        "measured_sustainable_bandwidth_gb_s": null,
+        "per_phase": {
+          "weights": {
+            "bytes": 18247717696.0,
+            "peak_ms": 10.182878178571428,
+            "sustainable_ms": null
+          },
+          "activations": {
+            "bytes": 5767168.0,
+            "peak_ms": 0.0032182857142857143,
+            "sustainable_ms": null
+          },
+          "kv": {
+            "bytes": 134283264.0,
+            "peak_ms": 0.07493485714285714,
+            "sustainable_ms": null
+          },
+          "gdn_state": {
+            "bytes": 158859264.0,
+            "peak_ms": 0.08864914285714286,
+            "sustainable_ms": null
+          },
+          "transfers": {
+            "bytes": 1013760.0,
+            "peak_ms": 0.0005657142857142857,
+            "sustainable_ms": null
+          },
+          "logits": {
+            "bytes": 993280.0,
+            "peak_ms": 0.0005542857142857143,
+            "sustainable_ms": null
+          },
+          "barriers": {
+            "bytes": 0.0,
+            "peak_ms": 0.0,
+            "sustainable_ms": null
+          },
+          "graphs": {
+            "bytes": 0.0,
+            "peak_ms": 0.0,
+            "sustainable_ms": null
+          }
+        },
+        "independent_sum_peak_ms": 10.350800464285713,
+        "independent_sum_not_a_bound": true,
+        "critical_path_peak_ms": 10.182878178571428,
+        "overlap_aware_peak_ms": 10.182878178571428,
+        "wall_ms": 18.9125404,
+        "assumptions": [
+          "RTX 5090 listed peak 1792 GB/s from NVIDIA Blackwell architecture paper",
+          "peak is an optimistic bound, not observed application bandwidth",
+          "compulsory reads assume no L2 reuse across layers and no write-allocate traffic beyond listed writes",
+          "embedding lookup charges one Q4_K row, not the full table",
+          "GDN decode charges one recurrent+conv pass with pointer-swap commit, not a full 8 GiB KV copy",
+          "overlapping costs use max/critical-path, not a sum of independent peak bounds",
+          "fixed-format Q4_K/Q8_0/Q6_K; quality-gated lower-bit models are separate OPT-121/122 candidates",
+          "measured sustainable bandwidth unavailable; sustainable_ms is null"
+        ],
+        "units": {
+          "bytes": "bytes",
+          "time": "milliseconds",
+          "bandwidth": "GB/s"
+        },
+        "claims_throughput": false
+      },
+      "d8192": {
+        "prefix": 8192,
+        "peak_bandwidth_gb_s": 1792.0,
+        "measured_sustainable_bandwidth_gb_s": null,
+        "per_phase": {
+          "weights": {
+            "bytes": 18247717696.0,
+            "peak_ms": 10.182878178571428,
+            "sustainable_ms": null
+          },
+          "activations": {
+            "bytes": 5767168.0,
+            "peak_ms": 0.0032182857142857143,
+            "sustainable_ms": null
+          },
+          "kv": {
+            "bytes": 536936448.0,
+            "peak_ms": 0.2996297142857143,
+            "sustainable_ms": null
+          },
+          "gdn_state": {
+            "bytes": 158859264.0,
+            "peak_ms": 0.08864914285714286,
+            "sustainable_ms": null
+          },
+          "transfers": {
+            "bytes": 1013760.0,
+            "peak_ms": 0.0005657142857142857,
+            "sustainable_ms": null
+          },
+          "logits": {
+            "bytes": 993280.0,
+            "peak_ms": 0.0005542857142857143,
+            "sustainable_ms": null
+          },
+          "barriers": {
+            "bytes": 0.0,
+            "peak_ms": 0.0,
+            "sustainable_ms": null
+          },
+          "graphs": {
+            "bytes": 0.0,
+            "peak_ms": 0.0,
+            "sustainable_ms": null
+          }
+        },
+        "independent_sum_peak_ms": 10.575495321428571,
+        "independent_sum_not_a_bound": true,
+        "critical_path_peak_ms": 10.182878178571428,
+        "overlap_aware_peak_ms": 10.182878178571428,
+        "wall_ms": null,
+        "assumptions": [
+          "RTX 5090 listed peak 1792 GB/s from NVIDIA Blackwell architecture paper",
+          "peak is an optimistic bound, not observed application bandwidth",
+          "compulsory reads assume no L2 reuse across layers and no write-allocate traffic beyond listed writes",
+          "embedding lookup charges one Q4_K row, not the full table",
+          "GDN decode charges one recurrent+conv pass with pointer-swap commit, not a full 8 GiB KV copy",
+          "overlapping costs use max/critical-path, not a sum of independent peak bounds",
+          "fixed-format Q4_K/Q8_0/Q6_K; quality-gated lower-bit models are separate OPT-121/122 candidates",
+          "measured sustainable bandwidth unavailable; sustainable_ms is null"
+        ],
+        "units": {
+          "bytes": "bytes",
+          "time": "milliseconds",
+          "bandwidth": "GB/s"
+        },
+        "claims_throughput": false
+      },
+      "d32768": {
+        "prefix": 32768,
+        "peak_bandwidth_gb_s": 1792.0,
+        "measured_sustainable_bandwidth_gb_s": null,
+        "per_phase": {
+          "weights": {
+            "bytes": 18247717696.0,
+            "peak_ms": 10.182878178571428,
+            "sustainable_ms": null
+          },
+          "activations": {
+            "bytes": 5767168.0,
+            "peak_ms": 0.0032182857142857143,
+            "sustainable_ms": null
+          },
+          "kv": {
+            "bytes": 2147549184.0,
+            "peak_ms": 1.1984091428571428,
+            "sustainable_ms": null
+          },
+          "gdn_state": {
+            "bytes": 158859264.0,
+            "peak_ms": 0.08864914285714286,
+            "sustainable_ms": null
+          },
+          "transfers": {
+            "bytes": 1013760.0,
+            "peak_ms": 0.0005657142857142857,
+            "sustainable_ms": null
+          },
+          "logits": {
+            "bytes": 993280.0,
+            "peak_ms": 0.0005542857142857143,
+            "sustainable_ms": null
+          },
+          "barriers": {
+            "bytes": 0.0,
+            "peak_ms": 0.0,
+            "sustainable_ms": null
+          },
+          "graphs": {
+            "bytes": 0.0,
+            "peak_ms": 0.0,
+            "sustainable_ms": null
+          }
+        },
+        "independent_sum_peak_ms": 11.47427475,
+        "independent_sum_not_a_bound": true,
+        "critical_path_peak_ms": 10.182878178571428,
+        "overlap_aware_peak_ms": 10.182878178571428,
+        "wall_ms": null,
+        "assumptions": [
+          "RTX 5090 listed peak 1792 GB/s from NVIDIA Blackwell architecture paper",
+          "peak is an optimistic bound, not observed application bandwidth",
+          "compulsory reads assume no L2 reuse across layers and no write-allocate traffic beyond listed writes",
+          "embedding lookup charges one Q4_K row, not the full table",
+          "GDN decode charges one recurrent+conv pass with pointer-swap commit, not a full 8 GiB KV copy",
+          "overlapping costs use max/critical-path, not a sum of independent peak bounds",
+          "fixed-format Q4_K/Q8_0/Q6_K; quality-gated lower-bit models are separate OPT-121/122 candidates",
+          "measured sustainable bandwidth unavailable; sustainable_ms is null"
+        ],
+        "units": {
+          "bytes": "bytes",
+          "time": "milliseconds",
+          "bandwidth": "GB/s"
+        },
+        "claims_throughput": false
+      },
+      "d131040": {
+        "prefix": 131040,
+        "peak_bandwidth_gb_s": 1792.0,
+        "measured_sustainable_bandwidth_gb_s": null,
+        "per_phase": {
+          "weights": {
+            "bytes": 18247717696.0,
+            "peak_ms": 10.182878178571428,
+            "sustainable_ms": null
+          },
+          "activations": {
+            "bytes": 5767168.0,
+            "peak_ms": 0.0032182857142857143,
+            "sustainable_ms": null
+          },
+          "kv": {
+            "bytes": 8587902976.0,
+            "peak_ms": 4.792356571428571,
+            "sustainable_ms": null
+          },
+          "gdn_state": {
+            "bytes": 158859264.0,
+            "peak_ms": 0.08864914285714286,
+            "sustainable_ms": null
+          },
+          "transfers": {
+            "bytes": 1013760.0,
+            "peak_ms": 0.0005657142857142857,
+            "sustainable_ms": null
+          },
+          "logits": {
+            "bytes": 993280.0,
+            "peak_ms": 0.0005542857142857143,
+            "sustainable_ms": null
+          },
+          "barriers": {
+            "bytes": 0.0,
+            "peak_ms": 0.0,
+            "sustainable_ms": null
+          },
+          "graphs": {
+            "bytes": 0.0,
+            "peak_ms": 0.0,
+            "sustainable_ms": null
+          }
+        },
+        "independent_sum_peak_ms": 15.068222178571428,
+        "independent_sum_not_a_bound": true,
+        "critical_path_peak_ms": 10.182878178571428,
+        "overlap_aware_peak_ms": 10.182878178571428,
+        "wall_ms": null,
+        "assumptions": [
+          "RTX 5090 listed peak 1792 GB/s from NVIDIA Blackwell architecture paper",
+          "peak is an optimistic bound, not observed application bandwidth",
+          "compulsory reads assume no L2 reuse across layers and no write-allocate traffic beyond listed writes",
+          "embedding lookup charges one Q4_K row, not the full table",
+          "GDN decode charges one recurrent+conv pass with pointer-swap commit, not a full 8 GiB KV copy",
+          "overlapping costs use max/critical-path, not a sum of independent peak bounds",
+          "fixed-format Q4_K/Q8_0/Q6_K; quality-gated lower-bit models are separate OPT-121/122 candidates",
+          "measured sustainable bandwidth unavailable; sustainable_ms is null"
+        ],
+        "units": {
+          "bytes": "bytes",
+          "time": "milliseconds",
+          "bandwidth": "GB/s"
+        },
+        "claims_throughput": false
+      }
+    },
+    "source_comparison": {
+      "pinned_llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+      "llama_inspection_head_expected": "1945e092030f8668ff93382799502d01490e564d",
+      "llama_inspection_head_actual": "1945e092030f8668ff93382799502d01490e564d",
+      "llama_inspection_is_not_pin": true,
+      "ds4_inspection_head_expected": "c238077a87186381bf626cc531bccffe1fef79e7",
+      "ds4_inspection_head_actual": "c238077a87186381bf626cc531bccffe1fef79e7",
+      "llama": {
+        "path": "/home/user/llama.cpp",
+        "present": true,
+        "revision": "1945e092030f8668ff93382799502d01490e564d",
+        "state": "clean"
+      },
+      "ds4": {
+        "path": "/home/user/ds4",
+        "present": true,
+        "revision": "c238077a87186381bf626cc531bccffe1fef79e7",
+        "state": "dirty"
+      },
+      "mechanisms": {
+        "OPT-117_cuda_graphs": {
+          "task": "OPT-117",
+          "quartz": {
+            "file": "cuda/full_scheduler.cu",
+            "functions": [
+              "capture_decode_segment_graph",
+              "enqueue_decode_layer_eager"
+            ],
+            "physical_dtype": "existing production kernels",
+            "notes": "ffn_only ships; decode_segments8 capture failed in OPT-114"
+          },
+          "llama": {
+            "path": "/home/user/llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu",
+            "present": true,
+            "bytes": 236345,
+            "found": [
+              "ggml_cuda_graph_evaluate_and_capture",
+              "cudaGraphLaunch",
+              "ggml_cuda_graph_check_compability"
+            ],
+            "missing": []
+          },
+          "ds4": {
+            "present": false,
+            "notes": "not the Qwen graph authority"
+          },
+          "transferability": "llama CUDA-graph capture of the decoded cgraph is the mechanism analogue; Quartz must capture its own scheduler FFN/attention/GDN launches, not import ggml graphs",
+          "actual_consumers": "decode token body after graph capture"
+        },
+        "OPT-118_transfers": {
+          "task": "OPT-118",
+          "quartz": {
+            "file": "cuda/full_scheduler.cu",
+            "functions": [
+              "execute_token D2H logits/hidden",
+              "greedy_sample"
+            ],
+            "physical_dtype": "FP32 logits 248320",
+            "bytes_per_token": 993280
+          },
+          "llama": {
+            "path": "/home/user/llama.cpp/src/models/qwen35.cpp",
+            "present": true,
+            "bytes": 28105,
+            "found": [
+              "llama_model_qwen35",
+              "tok_embd"
+            ],
+            "missing": []
+          },
+          "ds4": {
+            "present": true,
+            "notes": "host sampling analogue only"
+          },
+          "transferability": "lazy host logits is a Quartz API change; llama keeps outputs on device until requested. Not a drop-in kernel.",
+          "actual_consumers": "Session::sample / Session::logits / CLI poll"
+        },
+        "OPT-119_activations": {
+          "task": "OPT-119",
+          "quartz": {
+            "file": "cuda/scheduler_primitives.cu",
+            "notes": "norm, quantize, residual, SwiGLU staging"
+          },
+          "llama": {
+            "path": "/home/user/llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu",
+            "present": true,
+            "bytes": 236345,
+            "found": [
+              "ggml_cuda_try_fuse",
+              "mul_mat"
+            ],
+            "missing": []
+          },
+          "ds4": {
+            "present": true
+          },
+          "transferability": "producer/consumer fusion is architecture-specific; Q8_1 vs internal Q8Block are not interchangeable",
+          "actual_consumers": "next projection / FFN down / KV append"
+        },
+        "OPT-120_packed_kv": {
+          "task": "OPT-120",
+          "quartz": {
+            "physical_dtype": "BF16 K/V, 16 layers, 4 KV heads, 256 width",
+            "bytes_at_128k": 8589934592
+          },
+          "llama": {
+            "path": "/home/user/llama.cpp/ggml/src/ggml-cuda/fattn-vec.cuh",
+            "present": true,
+            "bytes": 24960,
+            "found": [
+              "flash_attn_ext_vec",
+              "type_K",
+              "type_V",
+              "q8_1"
+            ],
+            "missing": []
+          },
+          "ds4": {
+            "path": "/home/user/ds4/ds4_cuda.cu",
+            "present": true,
+            "bytes": 1316122,
+            "found": [
+              "fp8_kv_quantize_row",
+              "fp8_kv_quantize_store_rows_kernel",
+              "indexer_hadamard_fp4_kernel"
+            ],
+            "missing": []
+          },
+          "transferability": "llama fattn-vec can consume quantized K/V types in-registers. ds4 fp8_kv_quantize_row quantizes numerically then writes floats/half into raw cache (sizeof(float) storage); not a ready packed 8/4-bit resident cache. DeepSeek indexer/MoE is not Qwen 48-GDN/16-attention.",
+          "actual_consumers": "prompt and decode attention over the live prefix"
+        },
+        "OPT-121_weight_bytes": {
+          "task": "OPT-121",
+          "quartz": {
+            "physical_dtype": "Q4_K FFN, Q8_0 mixer, Q6_K output/attn out",
+            "streamed_decode_bytes": 18952294400
+          },
+          "llama": {
+            "files": [
+              "ggml/src/ggml-cuda/mmq.cuh",
+              "ggml/src/ggml-cuda/mmvq.cuh"
+            ],
+            "present": true
+          },
+          "ds4": {
+            "files": [
+              "cuda/mmq/mmq.cuh",
+              "cuda/mmq/ds4_repack.cu",
+              "ds4_cuda.cu"
+            ],
+            "present": true,
+            "notes": "MXFP4 path preserves an already-MXFP4 source; requantizing this Q4_K_M artifact is a different approximation"
+          },
+          "transferability": "use llama/ds4 packed consumers as implementation references; do not relabel Q4_K bits as FP4",
+          "actual_consumers": "decode MMVQ and prompt MMQ of each role"
+        },
+        "OPT-122_gdn_state": {
+          "task": "OPT-122",
+          "quartz": {
+            "physical_dtype": "FP32 recurrent + conv rings",
+            "bytes": {
+              "convolution_bytes": 7864320,
+              "recurrent_bytes": 150994944,
+              "total_bytes": 158859264,
+              "candidate_plus_committed_capacity_note": "decode swaps candidate/committed pointers; do not charge a full duplicate copy on every token unless measured"
+            }
+          },
+          "llama": {
+            "path": "/home/user/llama.cpp/src/llama-memory-recurrent.h",
+            "present": true,
+            "bytes": 6273,
+            "found": [
+              "llama_memory_recurrent"
+            ],
+            "missing": [
+              "ssm"
+            ]
+          },
+          "ds4": {
+            "present": false,
+            "notes": "DeepSeek MLA/indexer, not Qwen GDN"
+          },
+          "transferability": "BF16/block-scaled recurrent storage is a Quartz numerical experiment; llama recurrent memory is a different layout",
+          "actual_consumers": "gdn_step recurrence, checkpoint, prompt carry"
+        }
+      },
+      "architecture_warning": "DeepSeek compression/indexer/MoE is not Qwen's 48-GDN/16-attention"
+    },
+    "ranked_opportunities": {
+      "ranked": [
+        {
+          "task": "OPT-121",
+          "verdict": "go",
+          "removable_bytes_upper": 18247717696,
+          "peak_ms_upper": 10.182878178571428,
+          "uncertainty": "peak-bandwidth lower bound on weight time; L2 reuse and compute can only make wall longer, not shorter than this optimistic bound",
+          "primary_workload": "d128/d2048",
+          "rationale": "streamed packed weights dominate compulsory decode bytes (10.183 ms at 1792 GB/s peak). Largest byte sink.",
+          "go": true,
+          "rank": 1
+        },
+        {
+          "task": "OPT-117",
+          "verdict": "go",
+          "removable_bytes_upper": 0,
+          "peak_ms_upper": 9.974685400000169,
+          "uncertainty": "launch ms is GPU-idle leaf gaps this sitting when measured, else OPT-114 historical hypothesis; capture failure is not a measured graph loss",
+          "primary_workload": "d128/d2048",
+          "rationale": "decode-segment graphs target launch/submit gaps. Bytes are not the savings; time is. Revalidate post113 gaps before treating OPT-114 ~11 ms/token as causal.",
+          "go": true,
+          "rank": 2
+        },
+        {
+          "task": "OPT-120",
+          "verdict": "go",
+          "removable_bytes_upper": 8587902976,
+          "peak_ms_upper": 4.792356571428571,
+          "uncertainty": "D128/D2048 KV peak bounds are small; 128K populated-cache reads are the material term. Capacity is not traffic.",
+          "primary_workload": "long-context decode",
+          "rationale": "KV peak bound D128 0.0047 ms, D2048 0.0749 ms, D131040 4.792 ms. Headline D128/D2048 must not be claimed from 128K capacity savings.",
+          "go": true,
+          "rank": 3
+        },
+        {
+          "task": "OPT-122",
+          "verdict": "go_conditional",
+          "removable_bytes_upper": 158859264,
+          "peak_ms_upper": 0.08864914285714286,
+          "uncertainty": "upper bound assumes one recurrent+conv pass per token with pointer-swap commit; extra rereads would raise the bound. Missing counter is not a measured zero.",
+          "primary_workload": "complete request after OPT-118",
+          "rationale": "GDN state 158859264 B resident; one-pass traffic peak bound 0.089 ms. Material only if measured amplification or long-scan traffic exceeds A/A resolution; otherwise no_material_opportunity remains open until OPT-122 measures it.",
+          "go": true,
+          "rank": 4
+        },
+        {
+          "task": "OPT-119",
+          "verdict": "go",
+          "removable_bytes_upper": 5767168,
+          "peak_ms_upper": 0.0032182857142857143,
+          "uncertainty": "activation bytes are architecture-derived; fusion may not remove the compulsory dense weight sweep",
+          "primary_workload": "prefill (P4096) then decode guard",
+          "rationale": "decode activation traffic is far below weights. Prefill microbatch activations are the plausible slice.",
+          "go": true,
+          "rank": 5
+        },
+        {
+          "task": "OPT-118",
+          "verdict": "go",
+          "removable_bytes_upper": 1013760,
+          "peak_ms_upper": 0.0005542857142857143,
+          "uncertainty": "PCIe byte bound is small; host-sample/D2H sync latency may exceed the copy bound and is not proven zero",
+          "primary_workload": "complete sync/sample/eval request",
+          "rationale": "logits D2H 993280 B/token (0.0006 ms at peak). Inventory, do not skip: sync and sampling can sit on the request critical path.",
+          "go": true,
+          "rank": 6
+        }
+      ],
+      "method": "peak_ms_upper_then_request_relevance",
+      "claims_throughput": false,
+      "opt114_launch_historical": {
+        "available": true,
+        "historical_not_this_sitting": true,
+        "d128_ms": 10.992768100000063,
+        "d2048_ms": 10.967419999999265,
+        "status": "graph_ab_retain_ffn_only",
+        "note": "OPT-114 launch numbers are a hypothesis to revalidate on post113; wall minus leaf-event sums alone cannot identify causal removable overhead"
+      },
+      "bounds_ref": {
+        "peak_bandwidth_gb_s": 1792.0,
+        "overlap_aware": 10.182878178571428
+      }
+    },
+    "shared_keep_protocol": {
+      "frozen_for": [
+        "OPT-117",
+        "OPT-118",
+        "OPT-119",
+        "OPT-120",
+        "OPT-121",
+        "OPT-122",
+        "OPT-123"
+      ],
+      "parent": "post113_selected",
+      "quality_against": "post113",
+      "screen_warmups": 3,
+      "screen_pairs": 5,
+      "acceptance_warmups": 3,
+      "acceptance_pairs": 10,
+      "decode_output_tokens": 256,
+      "workloads": [
+        "p4096",
+        "d128",
+        "d2048"
+      ],
+      "throughput_ratio_lower_bound": 1.0,
+      "non_target_point_ratio_min": 0.98,
+      "decode_p95_ratio_max": 1.05,
+      "no_extra_sampling": true,
+      "no_layer_token_dropping": true,
+      "no_speculative_decoding": true,
+      "no_batching": true,
+      "memory_only_is_not_throughput_keep": true,
+      "source_dossier": "tasks/OPT-115.md"
+    },
+    "native_counts": {
+      "schema_version": 1,
+      "task": "OPT-115",
+      "warmups": 0,
+      "samples": 1,
+      "observed_warmups": 0,
+      "observed_samples": 1,
+      "observed_candidates": 1,
+      "observed_shapes": 1,
+      "observed_tier": "correctness",
+      "sample_ids": [
+        0
+      ],
+      "keep": false,
+      "product": 1
+    },
+    "admission": {
+      "ok": true,
+      "result_class": "ok",
+      "message": "instrumentation-only: no speed admission",
+      "observed": {
+        "schema_version": 1,
+        "task": "OPT-115",
+        "warmups": 0,
+        "samples": 1,
+        "observed_warmups": 0,
+        "observed_samples": 1,
+        "observed_candidates": 1,
+        "observed_shapes": 1,
+        "observed_tier": "correctness",
+        "sample_ids": [
+          0
+        ],
+        "keep": false,
+        "product": 1,
+        "rounds": [],
+        "acceptance_executed": false,
+        "pairs": 0
+      }
+    }
+  },
+  "report": {
+    "native_counts": {
+      "schema_version": 1,
+      "task": "OPT-115",
+      "warmups": 0,
+      "samples": 1,
+      "observed_warmups": 0,
+      "observed_samples": 1,
+      "observed_candidates": 1,
+      "observed_shapes": 1,
+      "observed_tier": "correctness",
+      "sample_ids": [
+        0
+      ],
+      "keep": false,
+      "product": 1
+    },
+    "admission": {
+      "ok": true,
+      "result_class": "ok",
+      "message": "instrumentation-only: no speed admission",
+      "observed": {
+        "schema_version": 1,
+        "task": "OPT-115",
+        "warmups": 0,
+        "samples": 1,
+        "observed_warmups": 0,
+        "observed_samples": 1,
+        "observed_candidates": 1,
+        "observed_shapes": 1,
+        "observed_tier": "correctness",
+        "sample_ids": [
+          0
+        ],
+        "keep": false,
+        "product": 1,
+        "rounds": [],
+        "acceptance_executed": false,
+        "pairs": 0
+      }
+    },
+    "report_path": "evidence/optimization/opt115-pipeline-traffic/REPORT.md"
+  }
+}

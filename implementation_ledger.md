@@ -313,7 +313,7 @@ OPT-124 assesses the remaining ceiling without claiming universal optimality.
 
 | ID | Description | Dependencies | Status | Acceptance condition | Evidence |
 |---|---|---|---|---|---|
-| OPT-115 | Audit complete-request memory traffic and establish conditional performance bounds | OPT-113, OPT-114 | pending | Fresh post113/pinned-llama wall timelines, actual bytes and ownership by phase/context, reproducible bandwidth bounds, source-transfer matrix, and ranked pipeline opportunities; no speedup claim | [Dossier](tasks/OPT-115.md) |
+| OPT-115 | Audit complete-request memory traffic and establish conditional performance bounds | OPT-113, OPT-114 | done | Fresh post113/pinned-llama wall timelines, actual bytes and ownership by phase/context, reproducible bandwidth bounds, source-transfer matrix, and ranked pipeline opportunities; no speedup claim | [`tasks/OPT-115.md`](tasks/OPT-115.md); [`pins/opt115_pipeline_traffic_contract.json`](pins/opt115_pipeline_traffic_contract.json); [`pins/opt115_iteration_contract.json`](pins/opt115_iteration_contract.json); [`fixtures/opt115_pipeline_traffic.json`](fixtures/opt115_pipeline_traffic.json); [`tools/opt115_pipeline_traffic.py`](tools/opt115_pipeline_traffic.py); [`tests/test_opt115_pipeline_traffic.py`](tests/test_opt115_pipeline_traffic.py); [`cuda/opt115_pipeline_traffic_test.cu`](cuda/opt115_pipeline_traffic_test.cu); [`Makefile`](Makefile); [`evidence/optimization/opt115-pipeline-traffic/REPORT.md`](evidence/optimization/opt115-pipeline-traffic/REPORT.md); verification 2026-09-13T12:43:43Z |
 | OPT-116 | Freeze generated-text and long-context quality admission for precision experiments | OPT-113 | pending | Versioned candidate-independent rubric, free-running outputs, real cache/state-reading NLL and complete baseline evidence; strict and successor verdicts remain separate | [Dossier](tasks/OPT-116.md) |
 | OPT-117 | Repair and evaluate capture of complete decode segments | OPT-115, OPT-116 | pending | Root-caused OPT-114 capture failure, same-arithmetic graph execution with dynamic-state/cancellation coverage, and complete-request keep/reject under shared gates | [Dossier](tasks/OPT-117.md) |
 | OPT-118 | Remove avoidable host/device transfers and state materialization | OPT-115, OPT-116, OPT-117 | pending | Measured copy/sync inventory drives at most two changes; committed state, sampling and public logits remain correct; complete-request and memory verdicts include graph interaction | [Dossier](tasks/OPT-118.md) |
@@ -7737,3 +7737,18 @@ statements below are historical, not the current execution order.
   dossiers, every local dossier link resolves, and the dependency closure is
   acyclic. `git diff --check` passed. No GPU benchmarks or implementation tests
   were run; there is no new performance evidence or production promotion.
+
+### 2026-09-13T12:43:43Z — OPT-115 pipeline traffic audit delivered
+
+- Added OPT-115 complete-request memory-traffic diagnostic (`tools/opt115_pipeline_traffic.py`,
+  contracts, fixture, tests, `cuda-opt115-diagnostics`, native
+  `opt115_pipeline_traffic_test.cu`, observation hooks in `run_optimization_task.py`).
+  No production selector, kernel, or dispatch change; `claims_throughput=false`.
+- Fresh post113 same-binary A/A: combined `aa_verdict=repeatable` (P4096 ~2986,
+  D128 ~57.39, D2048 ~55.67 tok/s — calibration only, not a speedup claim).
+  Request timeline coverage D128 **0.9658**, D2048 **0.9747**; weight peak bound
+  **10.18 ms** at listed 1792 GB/s. Long-context probes D8192/D32768/D131040
+  measured separately. Ranked go/no-go for OPT-117–122 published.
+- Key evidence: [`fixtures/opt115_pipeline_traffic.json`](fixtures/opt115_pipeline_traffic.json);
+  [`evidence/optimization/opt115-pipeline-traffic/REPORT.md`](evidence/optimization/opt115-pipeline-traffic/REPORT.md).
+- OPT-115 marked `done`. Coupled IDs: none. First eligible pending task: **OPT-116**.

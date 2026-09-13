@@ -1,0 +1,263 @@
+{
+  "schema_version": 1,
+  "task": "OPT-115",
+  "yardstick": "complete_request_memory_traffic_and_conditional_bounds",
+  "claims_throughput": false,
+  "claims_performance_improvement": false,
+  "opt074_family_admission_required": false,
+  "opt074_coverage_unadmitted_is_blocker": false,
+  "performance_admission": {
+    "enabled": true,
+    "instrumentation_only": true
+  },
+  "image": "qw38-cuda:13.0.2",
+  "model": "models/Qwen3.8-27B-Q4_K_M.gguf",
+  "gpu_lock": "build/optimization-runs/qw38-gpu.lock",
+  "aggregate_deadline_s": 3600,
+  "target": "tools/opt115_pipeline_traffic.py",
+  "diagnostics_make_target": "cuda-opt115-diagnostics",
+  "case_ids": [
+    "preflight",
+    "request-trace",
+    "long-context",
+    "traffic-timeline",
+    "ranking",
+    "report"
+  ],
+  "modes": {
+    "feedback": {
+      "target": "tools/opt115_pipeline_traffic.py",
+      "tier_sequence": [
+        "preflight",
+        "request-trace",
+        "long-context",
+        "traffic-timeline",
+        "ranking"
+      ],
+      "make_targets": [
+        "build/qw38-cuda-opt115-pipeline-traffic-test"
+      ],
+      "build_once": true,
+      "warm_repetitions": 0,
+      "aggregate_deadline_s": 3600,
+      "workloads": [
+        "preflight",
+        "request-trace",
+        "long-context",
+        "traffic-timeline",
+        "ranking"
+      ]
+    },
+    "acceptance": {
+      "target": "tools/opt115_pipeline_traffic.py",
+      "tier_sequence": ["report"],
+      "make_targets": [
+        "build/qw38-cuda-opt115-pipeline-traffic-test"
+      ],
+      "warm_repetitions": 0,
+      "aggregate_deadline_s": 3600,
+      "workloads": ["report"]
+    },
+    "release": {
+      "target": "tools/opt115_pipeline_traffic.py",
+      "tier": "acceptance",
+      "make_targets": [
+        "build/qw38-cuda-opt115-pipeline-traffic-test"
+      ],
+      "skip_compile": false,
+      "historical_oracles": false,
+      "aggregate_deadline_s": 3600,
+      "workloads": []
+    }
+  },
+  "workloads": {
+    "preflight": {
+      "target": "tools/opt115_pipeline_traffic.py",
+      "tier": "correctness",
+      "runner": "host",
+      "kind": "identity_freeze_and_post113_auth",
+      "cases": 1,
+      "candidates": 1,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 1,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 0,
+      "reference": 1,
+      "gpu_work": false,
+      "args": [
+        "uv",
+        "run",
+        "python",
+        "tools/opt115_pipeline_traffic.py",
+        "--phase",
+        "preflight",
+        "--mode",
+        "{mode}",
+        "--run-dir",
+        "{run_dir}"
+      ]
+    },
+    "request-trace": {
+      "target": "build/qw38-cuda-opt115-pipeline-traffic-test",
+      "tier": "screen",
+      "runner": "host",
+      "kind": "post113_aa_and_session_loop",
+      "cases": 3,
+      "candidates": 2,
+      "warmups": 3,
+      "samples": 10,
+      "tokens": 1,
+      "output_tokens": 256,
+      "prefixes": [4096, 128, 2048],
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 1,
+      "reference": 0,
+      "gpu_work": true,
+      "native_targets": ["build/qw38-cuda-opt115-pipeline-traffic-test"],
+      "args": [
+        "uv",
+        "run",
+        "python",
+        "tools/opt115_pipeline_traffic.py",
+        "--phase",
+        "request-trace",
+        "--mode",
+        "{mode}",
+        "--run-dir",
+        "{run_dir}"
+      ]
+    },
+    "long-context": {
+      "target": "build/qw38-cuda-opt115-pipeline-traffic-test",
+      "tier": "screen",
+      "runner": "host",
+      "kind": "populated_cache_long_context_probes",
+      "cases": 3,
+      "candidates": 1,
+      "warmups": 1,
+      "samples": 1,
+      "tokens": 1,
+      "output_tokens": 32,
+      "prefixes": [8192, 32768, 131040],
+      "capacity": 131072,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 1,
+      "reference": 0,
+      "gpu_work": true,
+      "native_targets": ["build/qw38-cuda-opt115-pipeline-traffic-test"],
+      "args": [
+        "uv",
+        "run",
+        "python",
+        "tools/opt115_pipeline_traffic.py",
+        "--phase",
+        "long-context",
+        "--mode",
+        "{mode}",
+        "--run-dir",
+        "{run_dir}"
+      ]
+    },
+    "traffic-timeline": {
+      "target": "build/qw38-cuda-opt115-pipeline-traffic-test",
+      "tier": "screen",
+      "runner": "host",
+      "kind": "attribution_timeline_and_byte_map",
+      "cases": 2,
+      "candidates": 1,
+      "warmups": 1,
+      "samples": 1,
+      "tokens": 1,
+      "output_tokens": 1,
+      "prefixes": [128, 2048],
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 1,
+      "reference": 0,
+      "gpu_work": true,
+      "native_targets": ["build/qw38-cuda-opt115-pipeline-traffic-test"],
+      "args": [
+        "uv",
+        "run",
+        "python",
+        "tools/opt115_pipeline_traffic.py",
+        "--phase",
+        "traffic-timeline",
+        "--mode",
+        "{mode}",
+        "--run-dir",
+        "{run_dir}"
+      ]
+    },
+    "ranking": {
+      "target": "tools/opt115_pipeline_traffic.py",
+      "tier": "correctness",
+      "runner": "host",
+      "kind": "bounds_source_matrix_and_opt117_122_go_nogo",
+      "cases": 1,
+      "candidates": 1,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 1,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 0,
+      "reference": 1,
+      "gpu_work": false,
+      "args": [
+        "uv",
+        "run",
+        "python",
+        "tools/opt115_pipeline_traffic.py",
+        "--phase",
+        "ranking",
+        "--mode",
+        "{mode}",
+        "--run-dir",
+        "{run_dir}"
+      ]
+    },
+    "report": {
+      "target": "tools/opt115_pipeline_traffic.py",
+      "tier": "correctness",
+      "runner": "host",
+      "kind": "host_only_evidence_validation",
+      "cases": 1,
+      "candidates": 1,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 1,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 0,
+      "reference": 1,
+      "gpu_work": false,
+      "args": [
+        "uv",
+        "run",
+        "python",
+        "tools/opt115_pipeline_traffic.py",
+        "--phase",
+        "report",
+        "--mode",
+        "{mode}",
+        "--run-dir",
+        "{run_dir}"
+      ]
+    }
+  },
+  "proof_limit": [
+    "diagnostics only",
+    "post113_selected is the authenticated control",
+    "pinned llama is cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+    "1792 GB/s is listed peak not measured bandwidth",
+    "no production selector change",
+    "historical oracles none",
+    "instrumentation-only: no speed keep"
+  ],
+  "report_path": "evidence/optimization/opt115-pipeline-traffic/REPORT.md"
+}
