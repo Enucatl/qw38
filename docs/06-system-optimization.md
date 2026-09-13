@@ -908,20 +908,18 @@ and
 
 ## Pinned llama Q4_K MMVQ adapter (OPT-110)
 
-**Outcome freeze, 2026-09-12:** OPT-110 tests a source-faithful llama GENERIC
+**Outcome freeze, 2026-09-13:** OPT-110 admitted a source-faithful llama GENERIC
 nwarps=4 `mul_mat_vec_q<Q4_K, ncols_dst=1>` adapter (`llama_q4k_mmvq` with native
-`block_q8_1` staging and fused SWIGLU) against production `integer_q8_late` /
+`block_q8_1` staging and fused SWIGLU) over production `integer_q8_late` /
 Q8Block / `raw_gguf`. Matched primitive staging+dot **won** (combined saving
 **+0.050 ms**). Complete rotating 64-layer FFN **won** (3+10: **+0.717 ms/token**,
 CI **[0.678, 0.756]**). D128 **55.01 → 58.27 tok/s** and D2048 **53.31 → 56.67
-tok/s** improved; P4096 ratio **0.99985**. Verdict **quality_blocked**: candidate
-NLL was not measured, so keep is blocked despite primitive and performance wins.
-Production `integer_q8_late` / `raw_gguf` / 4 warps retained (diagnostic engine
-hooks only). OPT-093 factored and OPT-102 aligned metadata are not used. tok/s
-delta vs production **0**. Live numbers stay in
-[`evidence/optimization/opt110-llama-q4-adapter/REPORT.md`](../evidence/optimization/opt110-llama-q4-adapter/REPORT.md)
-and
-[`evidence/optimization/opt110-llama-q4-adapter/REJECTION.md`](../evidence/optimization/opt110-llama-q4-adapter/REJECTION.md).
+tok/s** improved; P4096 ratio **0.99985**. Candidate NLL measured on the OPT-058
+harness: held-out PPL ratio **1.00037**, wikitext **0.99847**, recurrence
+incremental vs control **−0.00611**. Verdict **`keep`**; production flipped to
+`llama_q4k_mmvq` / `raw_gguf` / 4 warps. **tok/s delta vs OPT-114 baseline:
+D2048 +8.283**, D128 **+4.809**, P4096 **+35.454**. Live numbers stay in
+[`evidence/optimization/opt110-llama-q4-adapter/REPORT.md`](../evidence/optimization/opt110-llama-q4-adapter/REPORT.md).
 
 ## DwarfStar transfer boundary
 

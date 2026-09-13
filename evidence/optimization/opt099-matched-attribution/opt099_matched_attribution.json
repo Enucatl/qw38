@@ -74,7 +74,7 @@
   "freeze": {
     "ok": true,
     "requested": {
-      "q4_decode": "integer_q8_late",
+      "q4_decode": "llama_q4k_mmvq",
       "q4_warps_per_row": 4,
       "ffn_decode": "paired_integer",
       "q8_grouping": "grouped_r1_w4",
@@ -87,7 +87,7 @@
       "execution_graphs": "ffn_only"
     },
     "observed": {
-      "q4_decode": "integer_q8_late",
+      "q4_decode": "llama_q4k_mmvq",
       "q4_warps_per_row": 4,
       "ffn_decode": "paired_integer",
       "q8_grouping": "grouped_r1_w4",
@@ -256,7 +256,7 @@
         }
       ]
     },
-    "capture_identity": "5a00f7f01137094798aeb90f268ab7c59ce6a3fed9a35259ea6bd185016abf35",
+    "capture_identity": "393f4b6827d9ac8957c562f9e5304960c4ca7577b6c6fba7b984b145e31027b0",
     "llama_mapping_sample": {
       "ffn_gate_up_glu": 0.07,
       "ffn_down": 0.04
@@ -8354,5 +8354,5 @@
     "unknown_ms": 0.0,
     "llama_zero_filled": false
   },
-  "updated_utc": "2026-09-12T14:53:01Z"
+  "updated_utc": "2026-09-13T05:33:55Z"
 }

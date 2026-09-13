@@ -18,9 +18,12 @@ from tools.opt110_llama_q4_adapter import (
     PROVENANCE,
     REPORT,
     decide_verdict,
+    evaluate_measured_quality,
     family_plan,
+    ppl_ratio,
     primitive_verdict,
 )
+from tools.quality.scoring import recurrence_incremental_nll
 from tools.run_optimization_task import (
     describe_plan,
     load_contract,
@@ -72,8 +75,9 @@ def test_contracts_makefile_and_native_hooks() -> None:
     assert iteration["diagnostics_make_target"] == "cuda-opt110-diagnostics"
     assert "cuda-opt110-diagnostics" in makefile
     assert "qw38-cuda-opt110-llama-q4-adapter-test" in makefile
+    assert "qw38-cuda-opt058-quality-baseline-test" in makefile
     assert "--use_fast_math" in makefile
-    assert 'kSelectedQ4DecodePath[] = "integer_q8_late"' in path
+    assert 'kSelectedQ4DecodePath[] = "llama_q4k_mmvq"' in path
     assert "llama_q4k_mmvq" in path
     assert "kLegalQ4DecodePathLlamaMmvq" in path
     assert "BlockQ81" in adapter
@@ -200,3 +204,38 @@ def test_future_keep_policy() -> None:
     assert blocked["verdict"] == "quality_blocked"
     assert blocked["keep"] is False
     assert blocked["production_kept"] is False
+
+
+def test_candidate_quality_passes_against_control() -> None:
+    control_cases = [
+        {"name": "held_out_wikitext_1024", "mean_nll": 1.80},
+        {"name": "wikitext_nll", "mean_nll": 1.52},
+        {"name": "recurrence_short", "mean_nll": 1.77},
+        {"name": "recurrence_long", "mean_nll": 1.78},
+    ]
+    control = {"cases": control_cases}
+    candidate = {
+        "cases": [
+            {"name": "held_out_wikitext_1024", "mean_nll": 1.801},
+            {"name": "wikitext_nll", "mean_nll": 1.521},
+            {"name": "recurrence_short", "mean_nll": 1.771},
+            {"name": "recurrence_long", "mean_nll": 1.781},
+        ],
+        "new_functional_failures": 0,
+        "new_greedy_mismatch": False,
+    }
+    control_eval = evaluate_measured_quality(CONTROL_ID, measured=control)
+    candidate_eval = evaluate_measured_quality(
+        CANDIDATE_ID, measured=candidate, control_measured=control
+    )
+    assert control_eval["model_quality_pass"] is True
+    assert candidate_eval["model_quality_pass"] is True
+    assert candidate_eval["ppl_ratio_held_out"] <= 1.01
+    assert ppl_ratio(1.801, 1.80) <= 1.01
+    rec_delta = recurrence_incremental_nll(
+        {"mean_nll": 1.771},
+        {"mean_nll": 1.781},
+        1.77,
+        1.78,
+    )
+    assert abs(rec_delta) <= 0.02

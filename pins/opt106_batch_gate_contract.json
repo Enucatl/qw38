@@ -83,7 +83,7 @@
   ],
   "post098_control": {
     "rms_norm": "parallel_fma",
-    "q4_decode": "integer_q8_late",
+    "q4_decode": "llama_q4k_mmvq",
     "q8_decode": "dp4a_q8_1",
     "q8_grouping": "grouped_r1_w4",
     "q8_layout": "r1_w4",
@@ -105,7 +105,7 @@
   },
   "post106_selected": {
     "rms_norm": "parallel_fma",
-    "q4_decode": "integer_q8_late",
+    "q4_decode": "llama_q4k_mmvq",
     "q8_decode": "dp4a_q8_1",
     "q8_grouping": "grouped_r1_w4",
     "q8_layout": "r1_w4",

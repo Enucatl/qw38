@@ -140,7 +140,7 @@ PIN_FILES = {
     ),
 }
 REQUESTED_POST098: dict[str, Any] = {
-    "q4_decode": "integer_q8_late",
+    "q4_decode": "llama_q4k_mmvq",
     "q4_warps_per_row": 4,
     "ffn_decode": "paired_integer",
     "q8_grouping": "grouped_r1_w4",

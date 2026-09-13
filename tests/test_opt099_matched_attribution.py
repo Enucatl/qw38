@@ -113,7 +113,7 @@ def test_contracts_makefile_and_native_hooks() -> None:
     ffn = FFN_PATH.read_text(encoding="utf-8")
     q8 = Q8_PATH.read_text(encoding="utf-8")
     q6 = Q6_PATH.read_text(encoding="utf-8")
-    assert 'kSelectedQ4DecodePath[] = "integer_q8_late"' in q4
+    assert 'kSelectedQ4DecodePath[] = "llama_q4k_mmvq"' in q4
     assert "kSelectedQ4DecodeWarpsPerRow = 4" in q4
     assert 'kSelectedFfnDecodePath[] = "paired_integer"' in ffn
     assert 'kSelectedQ8DecodeGrouping[] = "grouped_r1_w4"' in q8

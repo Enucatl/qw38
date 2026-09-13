@@ -82,7 +82,7 @@ def test_contracts_makefile_and_native_hooks() -> None:
     assert "QW38_OPT114_SITTING_LAUNCH_RESULT=" in native
     q4 = (ROOT / "cuda/q4k_decode_path.cuh").read_text(encoding="utf-8")
     graphs = (ROOT / "cuda/execution_graph_path.cuh").read_text(encoding="utf-8")
-    assert 'kSelectedQ4DecodePath[] = "integer_q8_late"' in q4
+    assert 'kSelectedQ4DecodePath[] = "llama_q4k_mmvq"' in q4
     assert 'kSelectedExecutionGraphPath[] = "ffn_only"' in graphs
 
 

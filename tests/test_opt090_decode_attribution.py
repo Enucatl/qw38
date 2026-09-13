@@ -103,7 +103,7 @@ def test_contracts_makefile_and_native_hooks() -> None:
     assert "QW38_OPT090_ATTRIBUTION_RESULT=" in native
     q4 = Q4_PATH.read_text(encoding="utf-8")
     ffn = FFN_PATH.read_text(encoding="utf-8")
-    assert 'kSelectedQ4DecodePath[] = "integer_q8_late"' in q4
+    assert 'kSelectedQ4DecodePath[] = "llama_q4k_mmvq"' in q4
     assert 'kSelectedFfnDecodePath[] = "paired_integer"' in ffn
 
 

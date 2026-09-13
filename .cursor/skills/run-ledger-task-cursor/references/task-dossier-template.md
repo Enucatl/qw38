@@ -48,6 +48,7 @@ evidence.
 - Acceptance conditions: <testable conditions, including every coupled task>
 - Tests/fixtures to add or change: <exact paths and cases>
 - Focused commands: `<exact commands>`
+- Candidate quality: `<required NLL / OPT-058 commands, or explicitly not required with reason>`
 - Repository-wide commands: `<exact commands>`
 - Native/CUDA/hardware gates: `<exact commands or not applicable with reason>`
 - Documentation/evidence updates: <exact paths or none>

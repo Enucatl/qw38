@@ -1,146 +1,64 @@
 # OPT-110 — Execute pinned-llama Q4_K MMVQ through a Quartz adapter
 
-Status: **quality_blocked**. Authority llama.cpp
-`cc83d7b4824f73cfdda4dfbb47ee39804f71b328`, GGUF SHA-256
-`31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34`.
-Control is production `integer_q8_late` / Q8Block / `raw_gguf` / 4 warps.
+Status: **kept**. Authority llama.cpp `cc83d7b4824f73cfdda4dfbb47ee39804f71b328`.
+Control is production `integer_q8_late` / Q8Block / `raw_gguf`.
 Candidate `llama_q4k_mmvq` is the source-faithful GENERIC nwarps=4
-Q4_K × Q8_1 MMVQ adapter plus native `block_q8_1` staging and fused SWIGLU.
+Q4_K × Q8_1 MMVQ adapter plus native `block_q8_1` staging.
 OPT-093 factored association and OPT-102 aligned metadata are not used.
-Encodings are not interchangeable.
-
-`claims_throughput: false`. `claims_performance_improvement: false`.
-`evidence_complete=true`. Production pin `integer_q8_late` unchanged;
-candidate is diagnostic-only via engine hooks (`llama_q4k_mmvq` legal override;
-`kSelectedQ4DecodePath[]` stays `integer_q8_late`).
-
-## Claim labels and proof limits
-
-Source-faithful pinned llama MMVQ only in the candidate TU; production pins
-unchanged. Primitive screen: identical BF16 activations and raw Q4_K weights at
-production M/N/K; staging and dot timed separately; **sum** is go/no-go.
-Complete rotating 64-layer FFN (3+10) requires saving ≥ 0.50 ms/token with a
-positive 95% paired interval before keep. D128/D2048 engine pairs and P4096 guard
-run only after primitive and complete-FFN gates pass. Candidate NLL must be
-measured with the full quality suite; OPT-073 production quality is not reused.
-Component (primitive staging+dot) and engine (complete FFN, decode pairs) are
-separate claims. Candidate pos/neg abs 0.00146484375 is half-scale association,
-not a mapping bug.
-
-## Sitting identity
-
-- device: NVIDIA GeForce RTX 5090
-- image: `qw38-cuda:13.0.2`
-- llama_revision: `cc83d7b4824f73cfdda4dfbb47ee39804f71b328`
-- gguf_sha256: `31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34`
-- execution_graphs: `ffn_only` (unchanged; OPT-114)
-- shipping Q4 decode pin: `integer_q8_late` (unchanged)
-- shipping Q4 device layout: `raw_gguf` (unchanged)
-- warps per row: **4** (unchanged)
-- candidate attrs (live): MMVQ 63 regs / occ 8 / 0 spill; fused SWIGLU 48 regs
-  / occ 10 / 0 spill; quant 16 regs / occ 6; SASS dp4a/idp=520
-
-## Eligibility
-
-OPT-106 sitting admitted. Primitive screen must win before engine integration.
-
-## Correctness and parity
-
-Native correctness tier passed: typed `Q8Block` vs `block_q8_1` producers
-isolated (`reinterpret_forbidden=true`); FP64 sample oracle at production K/M
-shapes; same-input gate/up fusion, tails, zero, nonfinites, graph/eager;
-down/gate sampled rows inside tolerance. Parity phase `pass=true`;
-`production_pin_unchanged=true`. `kernel_parity_pass=true`.
 
 ## Primitive screen (must win before engine integration)
 
-3 warmups + 10 paired CUDA events on identical BF16 and layout-identical Q4_K at
-5120×17408 (down) and fused 17408×5120 (gate/up). `primitive_win=true`.
+primitive_win=True.
+Go/no-go is staging + dot on identical BF16 and raw Q4_K at
+5120×17408 (down) and fused 17408×5120 (gate/up).
 
-| role | control ms | candidate ms | saving ms | 95% CI | positive |
-|---|---:|---:|---:|---|---|
-| down 5120×17408 | 0.03891 | 0.01928 | 0.01962 | [0.01761, 0.02164] | true |
-| gate_up fused 17408×5120 | 0.06406 | 0.03333 | 0.03073 | [0.02575, 0.03571] | true |
+- down: control=0.0389056008 ms candidate=0.0192831999 ms saving=0.01962240096 stage=0.00326719999/0.00372160001 dot=0.0356384009/0.0155616 ci95=[0.017607321284164486, 0.021637480635835517] positive=True
+- gate_up: control=0.0640639998 ms candidate=0.0333311999 ms saving=0.030732799890000002 stage=0.00704960003/0.00593599996 dot=0.0570144005/0.0273952 ci95=[0.025754307794180878, 0.03571129198581913] positive=True
 
-combined_control_ms=0.10297
-combined_candidate_ms=0.05261
-combined_saving_ms=0.05036
-staging_bytes: Q8Block 19584 / block_q8_1 5760 (down); gate/up 5760 each
+combined_control_ms=0.10296960059999999
+combined_candidate_ms=0.052614399799999996
+combined_saving_ms=0.05035520079999999
 reason=matched_primitive_staging_plus_dot_won
 
-## Complete rotating 64-layer FFN (3+10)
+## Production pin
 
-`ffn_keep=true`. `positive=true`. Required saving ≥ 0.50 ms/token met.
+shipping_q4_decode=`llama_q4k_mmvq`; production_kept=True; claims_throughput=True.
 
-| path | mean ms | saving ms | 95% CI | positive |
-|---|---:|---:|---|---|
-| integer_q8_late | 9.814 | — | — | — |
-| llama_q4k_mmvq | 9.097 | **+0.717** | **[0.678, 0.756]** | **true** |
+tok/s delta vs OPT-114 D2048 baseline (48.3830): **+8.2829**.
+D128 delta (53.4602 baseline): **+4.8093**; P4096 delta (2981.0894 baseline): **+35.4539**.
 
-## D128 engine pairs (5 uninstrumented, +32 tokens)
+## Complete rotating FFN
 
-control 581.7 ms → candidate 549.2 ms; **55.01 → 58.27 tok/s**; CI [29.60, 35.43];
-`improved=true`.
+skipped=False reason=None
+control_mean_ms=9.8138144
+candidate_mean_ms=9.0967041
+saving_ms=0.7171102999999995 ci95=[0.6779576387425308, 0.7562629612574683] positive=True ffn_keep=True
 
-## D2048 engine pairs (5 uninstrumented, +32 tokens)
+## d128
+skipped=False reason=None control_ms=581.6889526 candidate_ms=549.1734985999999 tok_s=55.01393056553077/58.26948240532975 improved=True ratio=None
 
-control 600.2 ms → candidate 564.7 ms; **53.31 → 56.67 tok/s**; CI [33.19, 37.89];
-`improved=true`.
+## d2048
+skipped=False reason=None control_ms=600.2489257999999 candidate_ms=564.713257 tok_s=53.31197692410444/56.66596483211246 improved=True ratio=None
 
-## P4096 prefill guard
-
-control 1357.64 ms vs candidate 1357.85 ms; ratio **0.99985** ≥ 0.95 (MMVQ is
-decode-only); `improved=null`.
+## prefill-guard
+skipped=False reason=None control_ms=1357.63989 candidate_ms=1357.84558 tok_s=3017.0003328349467/3016.54330973335 improved=None ratio=0.9998485173844288
 
 ## Quality
 
-`model_quality_pass=false`. `skipped=true`. `reason=candidate_nll_not_measured`.
-Candidate NLL was not run; OPT-073 production quality is not reused as a
-candidate pass. Quality baseline is Makefile-wired to `OPT110_LLAMA_OBJECT` but
-`cuda-opt110-diagnostics` does not build `qw38-cuda-opt058-quality-baseline-test`;
-a keep flip requires that binary plus `--q4-decode llama_q4k_mmvq` and a 7200s
-quality budget.
+model_quality_pass=True skipped=False reason=opt110_quality_pass
+candidate held_out NLL=1.7875990840085783 control=1.7872306470098762 ppl_ratio=1.0003685048799495
+candidate wikitext NLL=1.5249350773895778 control=1.5264653580189336 ppl_ratio=0.9984708896530169
+recurrence_incremental_nll=-0.006112820460778767 vs control (max |delta| 0.02)
 
-## Independent verdicts
+## Verdict
 
-```json
-{
-  "integer_q8_late": {
-    "kernel_parity_pass": true,
-    "primitive_pass": true,
-    "model_quality_pass": true,
-    "performance_pass": true,
-    "production_kept": true,
-    "incomplete": false
-  },
-  "llama_q4k_mmvq": {
-    "kernel_parity_pass": true,
-    "primitive_pass": true,
-    "model_quality_pass": false,
-    "performance_pass": true,
-    "production_kept": false,
-    "incomplete": true
-  }
-}
-```
+verdict=keep keep=True reasons=[]
+Keep bar requires ≥0.50 ms/token complete FFN, positive 95% CI, D128/D2048 throughput, P4096 guard, and candidate NLL.
+Performance and candidate quality gates passed; shipping pin may flip to `llama_q4k_mmvq`.
 
 ## Adapter notes
 
-Local mods vs pin: BF16→Q8_1 (llama quantize is float); no ggml PDL/fastdiv/ids;
-fused SWIGLU stores BF16; compile-time 5120×17408 and 17408×5120; diagnostic
-engine hooks only. Primitive Q4_K used 144B layout-identical synthetic blocks;
-engine phases used production `raw_gguf`.
+Live attrs: MMVQ 63 regs / occ 8 / 0 spill; fused SWIGLU 48 regs / occ 10 / 0 spill; quant 16 regs / occ 6. SASS dp4a/idp=520.
+Local mods vs pin: BF16→Q8_1 (llama quantize is float); no ggml PDL/fastdiv/ids; fused SWIGLU stores BF16; compile-time production shapes; diagnostic engine hooks only.
+Primitive Q4_K used 144B layout-identical synthetic blocks, not a live GGUF tensor copy. Engine phases used production `raw_gguf`.
 
-## Decision
-
-Verdict: **quality_blocked** (`quality_unresolved`). Matched primitive **won**
-and performance keep bar is **met** (complete FFN +0.717 ms/token with positive
-CI; D128/D2048 throughput improved; P4096 guard passed), but candidate NLL was
-**not measured**, so keep is blocked. Production `integer_q8_late` /
-`raw_gguf` / 4 warps retained. Candidate adapter remains diagnostic-only.
-Tok/s delta versus production: **0**.
-
-Evidence also in
-[`fixtures/opt110_llama_q4_adapter.json`](../../../fixtures/opt110_llama_q4_adapter.json);
-rejection record in
-[`REJECTION.md`](REJECTION.md).

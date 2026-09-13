@@ -156,8 +156,8 @@ def test_contracts_makefile_and_native_hooks() -> None:
     shipping = load_json(FIXTURE)
     shipping_q4 = str(shipping.get("shipping_q4_decode") or "packed")
     shipping_ffn = str(shipping.get("shipping_ffn_decode") or "paired_staged")
-    assert "integer_q8_late" in q4
-    assert f'kSelectedQ4DecodePath[] = "{shipping_q4}"' in q4
+    assert "llama_q4k_mmvq" in q4
+    assert 'kSelectedQ4DecodePath[] = "llama_q4k_mmvq"' in q4
     assert f'kSelectedFfnDecodePath[] = "{shipping_ffn}"' in ffn
 
 
@@ -781,7 +781,7 @@ def test_committed_fixture_has_independent_verdicts() -> None:
     assert "late_w4" in fixture["independent_verdicts"]
     shipping_q4 = str(fixture.get("shipping_q4_decode") or "packed")
     shipping_ffn = str(fixture.get("shipping_ffn_decode") or "paired_staged")
-    assert f'kSelectedQ4DecodePath[] = "{shipping_q4}"' in q4
+    assert 'kSelectedQ4DecodePath[] = "llama_q4k_mmvq"' in q4
     assert f'kSelectedFfnDecodePath[] = "{shipping_ffn}"' in ffn
     if fixture.get("production_kept"):
         assert fixture["claims_throughput"] is True

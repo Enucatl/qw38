@@ -8,7 +8,8 @@ description: >-
   the user mentions run-ledger-task-codex / run-ledger-task-cursor under
   Cursor. Do not use for ad hoc changes that are not tracked in the
   ledger. Prefer this over run-ledger-task-codex when running under Cursor
-  rather than Codex.
+  rather than Codex. For keep/reject tasks, enforce candidate NLL and quality
+  phase execution before delivery.
 ---
 
 # Run Ledger Task (Cursor)
@@ -38,6 +39,8 @@ that format as authoritative when it is decision-complete.
 - Implementation names exact files, behaviors, and non-goals; no material
   choice is left open.
 - Acceptance lists testable conditions, artifact paths, and focused commands.
+- For keep/reject tasks, acceptance names candidate quality/NLL when required,
+  or states explicitly that quality is not in scope.
 - No placeholders, `TBD`, or contradictory text versus `plan.md` or the ledger.
 - Coupled IDs are named explicitly or clearly `none`.
 - For throughput / keep-reject tasks whose dossier already cites a sink and
@@ -81,6 +84,73 @@ Examples: after mixer quality lands, if attribution shows `ffn_mmq` then
 `attention_core` dominating, the next idea must target those—not a lower
 sink—unless a dossier proves the larger sinks are already llama-competitive
 or plan-forbidden.
+
+## Keep/reject quality gate
+
+OPT-* keep/reject and promotion tasks often require **candidate-specific model
+quality** (NLL / OPT-058 quality harness), not just primitive or engine
+performance. Missing quality is an **acceptance failure**, not a deliverable
+`quality_blocked` outcome, unless the quality phase was actually executed and
+measured a fail.
+
+Before spawning implementation, the coordinator (not a subagent) must read:
+
+- `tasks/<PRIMARY-ID>.md` **Acceptance** / focused commands
+- `pins/opt<ID>_iteration_contract.json` workloads and modes
+- `pins/opt<ID>_*_contract.json` when it names `require_candidate_nll`,
+  `quality`, or `native_quality`
+
+Treat candidate NLL as **required** when any of these hold:
+
+- Dossier acceptance says to run candidate NLL, complete quality, or forbids
+  reusing production/OPT-073 quality for the candidate path.
+- Iteration contract lists a `quality` workload or `release` mode with
+  `make_targets` including `build/qw38-cuda-opt058-quality-baseline-test`.
+- Task contract sets `require_candidate_nll: true` or equivalent.
+
+When required, the coordinator must confirm before delivery:
+
+1. **Implementation wires quality** — runner `--phase quality` invokes the
+   OPT-058 native harness (`build/qw38-cuda-opt058-quality-baseline-test`) with
+   explicit `--quality --quality-config … --q4-decode …`; no stub that sets
+   `candidate_nll_not_measured` without executing GPU work.
+2. **Diagnostics build quality** — if the iteration contract lists `quality`,
+   `<diagnostics_make_target>` in the Makefile includes
+   `qw38-cuda-opt058-quality-baseline-test` (compare OPT-106/109/110 peers).
+3. **Quality was executed** — fixture or run-dir sidecars contain measured NLL
+   cases for control and candidate (for example `quality-*.txt`,
+   `held_out_wikitext_1024`, `wikitext_nll`), not only a skipped flag.
+4. **`aggregate_deadline_s: 7200` is a timeout ceiling**, not expected runtime.
+   Do not skip quality because of the 7200 s budget; OPT-058 acceptance quality
+   typically finishes in minutes on the sitting GPU.
+
+**Implementation subagent prompt must include** every dossier focused GPU
+command, especially `--phase quality --mode acceptance` (or the dossier's
+release equivalent), plus any peer-task patterns the dossier cites (for example
+OPT-089 quality wiring, OPT-108 adapter shape). Do not narrow the prompt to
+primitive/perf phases only.
+
+**Verifier must fail** when candidate NLL is required and any of:
+
+- fixture/reason is `candidate_nll_not_measured` or `quality_unresolved` because
+  quality was skipped or stubbed;
+- quality phase commands were not executed;
+- diagnostics/Makefile omit the OPT-058 quality baseline though the iteration
+  contract requires it;
+- dossier acceptance claims quality/NLL that artifacts do not support.
+
+A measured **`quality_blocked` reject is valid only after** running candidate
+quality and recording fail thresholds. **`quality_blocked` caused by not
+running quality is a verification failure** — send back to implementation.
+
+**Coordinator must not pre-bake verdicts.** Do not spawn documentation,
+verification, or delivery subagents with `quality_blocked`, `keep`, or
+`reject` already decided. Pass dossier paths, required phases, and verifier
+findings only; let verification determine the verdict from executed artifacts.
+
+On **keep** after measured quality pass, delivery must flip production pins when
+the dossier requires it and report tok/s delta versus the then-current sitting
+baseline (for example OPT-114 D2048/D128/P4096 numbers), not `0` by default.
 
 ## Runtime mapping
 
@@ -149,19 +219,25 @@ tasks. Report the exact failed gate and the evidence inspected.
    not continue if any implementation choice remains unresolved or the dossier
    is inconsistent with the ledger or plan.
 2. Spawn an implementation agent with `model: "cursor-grok-4.6-high"` to implement only the dossier's code, tests,
-   and fixtures and run focused validation. The agent must append its changes
-   and exact command outcomes to the dossier, without committing.
+   and fixtures and run focused validation. The coordinator prompt must list
+   every required acceptance phase from the dossier and iteration contract,
+   including candidate quality when the [keep/reject quality gate](#keepreject-quality-gate)
+   applies. The agent must append its changes and exact command outcomes to
+   the dossier, without committing.
 3. If documentation or evidence changes are required, spawn a fresh
    documentation agent with `model: "composer-2.5"` for prose, links, mechanical index updates, and any
    fixtures, measurements, hashes, contracts, pins, ledger history, or
-   acceptance claims the dossier assigns to this stage. It records its work in
-   the dossier and does not commit.
+   acceptance claims the dossier assigns to this stage. Pass the **measured
+   verdict and artifact paths from verification**, not a coordinator guess.
+   It records its work in the dossier and does not commit.
 4. Spawn a fresh integration verifier with `model: "composer-2.5"`. It independently reviews the complete
    diff against the dossier, ledger acceptance condition, `plan.md`, and
    repository boundaries. It may run formatting but makes no semantic fixes. It
    runs the dossier's focused and repository-wide gates, including
    `uv run ruff format .`, Ruff checks, required pytest selections, native
-   builds/tests, and named CUDA or hardware gates. It must trace every
+   builds/tests, and named CUDA or hardware gates. For keep/reject tasks it
+   must apply the [keep/reject quality gate](#keepreject-quality-gate): fail
+   closed when candidate NLL was required but not measured. It must trace every
    acceptance claim to an executed assertion or an independently inspected
    artifact; stdout labels, fixture status fields, and dossier claims are not
    sufficient evidence by themselves. If formatting changes files, it reruns
@@ -169,10 +245,11 @@ tasks. Report the exact failed gate and the evidence inspected.
    verdict to the dossier.
 5. Only after a passing verification, spawn a fresh delivery agent with
    `model: "composer-2.5"`. It confirms
-   scope and acceptance evidence, changes the primary and every coupled task
+   scope and acceptance evidence **as determined by verification**, changes the primary and every coupled task
    from `in_progress` to `done`, adds the final UTC ledger entry, records the
    outcome in the dossier, creates one commit, and pushes the current branch to
-   its configured upstream.
+   its configured upstream. On keep, include production pin flips and tok/s
+   delta when the dossier requires them.
 
 The delivery commit uses a Google-style subject of at most 50 characters and an
 intent-focused body. It must not force-push, rebase, merge, amend, or
@@ -222,6 +299,8 @@ report (and in the dossier Final outcome / delivery ledger History entry):
   (`post / baseline`, or percent).
 - On a reject/revert, still report the measured post number and state that
   speedup is `0` (baseline unchanged).
+- On **keep** with production pin flip, report tok/s delta versus the sitting
+  baseline (for example OPT-114), not `0`.
 - When an OPT-021-style llama.cpp same-sitting number exists, also report
   Quartz-versus-llama tok/s (informational unless that task owns the gate).
 

@@ -11,7 +11,7 @@ Token generator `(42 + index * 997) % 248320`.
 ## Frozen post098_selected
 
 ok=True mismatches={}.
-observed={'q4_decode': 'integer_q8_late', 'q4_warps_per_row': 4, 'ffn_decode': 'paired_integer', 'q8_grouping': 'grouped_r1_w4', 'q6_decode': 'integer_q8_1', 'q6_warps_per_row': 2, 'gdn_decode': 'sequential', 'decode_query_prep': 'warp_query', 'prompt_mmq': 'i128_j128_fma_async_x', 'prompt_mmq_wait': 'joined_wait', 'execution_graphs': 'ffn_only', 'mmq_pipeline': 'fma_async', 'mmq_async_x': True, 'ffn_tiles': 'i128_j128'}.
+observed={'q4_decode': 'llama_q4k_mmvq', 'q4_warps_per_row': 4, 'ffn_decode': 'paired_integer', 'q8_grouping': 'grouped_r1_w4', 'q6_decode': 'integer_q8_1', 'q6_warps_per_row': 2, 'gdn_decode': 'sequential', 'decode_query_prep': 'warp_query', 'prompt_mmq': 'i128_j128_fma_async_x', 'prompt_mmq_wait': 'joined_wait', 'execution_graphs': 'ffn_only', 'mmq_pipeline': 'fma_async', 'mmq_async_x': True, 'ffn_tiles': 'i128_j128'}.
 
 ## Conservation
 

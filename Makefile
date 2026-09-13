@@ -224,7 +224,7 @@ cuda-opt108-diagnostics: $(BUILD_DIR)/qw38-cuda-opt108-llama-vector-stack-test $
 
 cuda-opt109-diagnostics: $(BUILD_DIR)/qw38-cuda-opt109-persistent-gdn-state-test $(BUILD_DIR)/qw38-cuda-component-replay $(BUILD_DIR)/qw38-cuda-optimization-engine-probe $(BUILD_DIR)/qw38-cuda-opt058-quality-baseline-test $(BUILD_DIR)/qw38-cuda-checkpoint-test $(BUILD_DIR)/qw38-cuda-memory-fit-test
 
-cuda-opt110-diagnostics: $(BUILD_DIR)/qw38-cuda-opt110-llama-q4-adapter-test $(BUILD_DIR)/qw38-cuda-component-replay $(BUILD_DIR)/qw38-cuda-optimization-engine-probe
+cuda-opt110-diagnostics: $(BUILD_DIR)/qw38-cuda-opt110-llama-q4-adapter-test $(BUILD_DIR)/qw38-cuda-component-replay $(BUILD_DIR)/qw38-cuda-optimization-engine-probe $(BUILD_DIR)/qw38-cuda-opt058-quality-baseline-test
 
 cuda-opt073-diagnostics: $(BUILD_DIR)/qw38-cuda-opt058-quality-baseline-test
 

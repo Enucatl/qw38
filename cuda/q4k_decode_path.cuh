@@ -76,7 +76,7 @@ constexpr char kQ4LaunchVariantLlamaMmvqGlu[] =
 constexpr int kQ4LaunchTraceCapacity = 8;
 
 // Production pin. Keep sitting may switch away from late_w4; reject restores it.
-constexpr char kSelectedQ4DecodePath[] = "integer_q8_late";
+constexpr char kSelectedQ4DecodePath[] = "llama_q4k_mmvq";
 constexpr unsigned int kSelectedQ4DecodeWarpsPerRow = 4;
 constexpr char kSelectedQ4DeviceLayout[] = "raw_gguf";
 

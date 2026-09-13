@@ -2,21 +2,161 @@
   "schema_version": 1,
   "task": "OPT-110",
   "mode": "acceptance",
-  "status": "quality_blocked",
+  "status": "kept",
   "llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
   "gguf_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
-  "claims_throughput": false,
+  "claims_throughput": true,
   "control": "integer_q8_late",
   "candidate": "llama_q4k_mmvq",
   "control_staging": "Q8Block",
   "candidate_staging": "block_q8_1",
   "primitive_win": true,
-  "shipping_q4_decode": "integer_q8_late",
-  "production_kept": false,
+  "shipping_q4_decode": "llama_q4k_mmvq",
+  "production_kept": true,
   "quality": {
-    "model_quality_pass": false,
-    "skipped": true,
-    "reason": "candidate_nll_not_measured"
+    "schema_version": 1,
+    "task": "OPT-110",
+    "phase": "quality",
+    "mode": "acceptance",
+    "model_quality_pass": true,
+    "candidate_nll_measured": true,
+    "skipped": false,
+    "control": {
+      "config": "integer_q8_late",
+      "quality_contract_id": "opt058_quality_baseline",
+      "ppl_ratio_max": 1.01,
+      "recurrence_incremental_nll_max": 0.02,
+      "opt073_engine_non_regression": "pass",
+      "candidate_nll_measured": true,
+      "model_quality_pass": true,
+      "skipped": false,
+      "incomplete": false,
+      "held_out_mean_nll": 1.7872306470098762,
+      "wikitext_mean_nll": 1.5264653580189336,
+      "reason": "control_measured"
+    },
+    "candidate": {
+      "config": "llama_q4k_mmvq",
+      "quality_contract_id": "opt058_quality_baseline",
+      "ppl_ratio_max": 1.01,
+      "recurrence_incremental_nll_max": 0.02,
+      "opt073_engine_non_regression": "pass",
+      "candidate_nll_measured": true,
+      "model_quality_pass": true,
+      "skipped": false,
+      "incomplete": false,
+      "held_out_mean_nll": 1.7875990840085783,
+      "wikitext_mean_nll": 1.5249350773895778,
+      "control_held_out_mean_nll": 1.7872306470098762,
+      "control_wikitext_mean_nll": 1.5264653580189336,
+      "ppl_ratio_held_out": 1.0003685048799495,
+      "ppl_ratio_wikitext": 0.9984708896530169,
+      "recurrence_incremental_nll": -0.006112820460778767,
+      "new_functional_failures": 0,
+      "new_greedy_mismatch": false,
+      "reason": "opt110_quality_pass"
+    },
+    "measured_by_id": {
+      "integer_q8_late": {
+        "cases": [
+          {
+            "name": "wikitext_nll",
+            "mean_nll": 1.5264653580189336
+          },
+          {
+            "name": "held_out_wikitext_1024",
+            "mean_nll": 1.7872306470098762
+          },
+          {
+            "name": "recurrence_short",
+            "mean_nll": 2.2469028478863704
+          },
+          {
+            "name": "recurrence_long",
+            "mean_nll": 2.7268403900965112
+          }
+        ],
+        "restored_packed_or_r2": false,
+        "applied_before_graph": true,
+        "selectors_printed": true,
+        "new_functional_failures": 0,
+        "new_greedy_mismatch": false
+      },
+      "llama_q4k_mmvq": {
+        "cases": [
+          {
+            "name": "wikitext_nll",
+            "mean_nll": 1.5249350773895778
+          },
+          {
+            "name": "held_out_wikitext_1024",
+            "mean_nll": 1.7875990840085783
+          },
+          {
+            "name": "recurrence_short",
+            "mean_nll": 2.246893437286633
+          },
+          {
+            "name": "recurrence_long",
+            "mean_nll": 2.7207181590359952
+          }
+        ],
+        "restored_packed_or_r2": false,
+        "applied_before_graph": true,
+        "selectors_printed": true,
+        "new_functional_failures": 0,
+        "new_greedy_mismatch": false
+      }
+    },
+    "native_counts": {
+      "schema_version": 1,
+      "task": "OPT-110",
+      "warmups": 0,
+      "samples": 1,
+      "observed_warmups": 0,
+      "observed_samples": 1,
+      "observed_candidates": 1,
+      "observed_shapes": 1,
+      "observed_tier": "acceptance",
+      "pairs": 1,
+      "sample_ids": [
+        0
+      ],
+      "acceptance_executed": true,
+      "keep": false
+    },
+    "admission": {
+      "ok": true,
+      "result_class": "ok",
+      "message": "",
+      "observed": {
+        "schema_version": 1,
+        "task": "OPT-110",
+        "warmups": 0,
+        "samples": 1,
+        "observed_warmups": 0,
+        "observed_samples": 1,
+        "observed_candidates": 1,
+        "observed_shapes": 1,
+        "observed_tier": "acceptance",
+        "pairs": 1,
+        "sample_ids": [
+          0
+        ],
+        "acceptance_executed": true,
+        "keep": false,
+        "rounds": []
+      }
+    },
+    "measurement_utc": "2026-09-13T05:31:33Z",
+    "held_out_mean_nll": 1.7875990840085783,
+    "wikitext_mean_nll": 1.5249350773895778,
+    "control_held_out_mean_nll": 1.7872306470098762,
+    "control_wikitext_mean_nll": 1.5264653580189336,
+    "ppl_ratio_held_out": 1.0003685048799495,
+    "ppl_ratio_wikitext": 0.9984708896530169,
+    "recurrence_incremental_nll": -0.006112820460778767,
+    "reason": "opt110_quality_pass"
   },
   "report_path": "evidence/optimization/opt110-llama-q4-adapter/REPORT.md",
   "independent_verdicts": {
@@ -25,18 +165,18 @@
       "primitive_pass": true,
       "model_quality_pass": true,
       "performance_pass": true,
-      "production_kept": true
+      "production_kept": false
     },
     "llama_q4k_mmvq": {
       "kernel_parity_pass": true,
       "primitive_pass": true,
-      "model_quality_pass": false,
+      "model_quality_pass": true,
       "performance_pass": true,
-      "production_kept": false
+      "production_kept": true
     }
   },
   "token_generator": "(42 + index * 997) % 248320",
-  "claims_performance_improvement": false,
+  "claims_performance_improvement": true,
   "shipping_q4_device_layout": "raw_gguf",
   "provenance_manifest": "pins/opt110_llama_q4_provenance.json",
   "parity": {
@@ -119,17 +259,15 @@
     "stdout_excerpt": "\n==========\n== CUDA ==\n==========\n\nCUDA Version 13.0.2\n\nContainer image Copyright (c) 2016-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.\n\nThis container image and its contents are governed by the NVIDIA Deep Learning Container License.\nBy pulling and using the container, you accept the terms and conditions of this license:\nhttps://developer.nvidia.com/ngc/nvidia-deep-learning-container-license\n\nA copy of this license is made available in this container at /NGC-DL-CONTAINER-LICENSE for your convenience.\n\ntype_isolation same_size=true bytes_differ=true q8block_scale_f32=0.0150098428 block_q8_1_d_f16=0.015007019 q8block_hex=d8eb753c q81_hex=af239549 reinterpret_forbidden=true\nQW38_OPT110_CASE={\"id\":\"typed_activation_producers\",\"pass\":true,\"max_abs\":0,\"nonfinite_count\":0,\"reason\":\"q8block_vs_block_q8_1\"}\nmmv id=Q4_mmv_M1_N1_K256 rows=1 cols=256 control_abs=1.32913701e-05 candidate_abs=3.95774841e-05 control_launch=q4k_coop_mmv_late_prequant_q8 candidate_launch=opt110_mul_mat_vec_q4_k_q8_1 nwarps=4 vdr=2 occupancy=8 regs=63 local=0 staging_q8block=288 staging_q81=288\nQW38_OPT110_CASE={\"id\":\"Q4_mmv_M1_N1_K256\",\"pass\":true,\"max_abs\":3.95774841e-05,\"nonfinite_count\":0,\"reason\":\"typed_fp64\"}\nmmv id=Q4_mmv_M3_N1_K256 rows=3 cols=256 control_abs=5.84402587e-05 candidate_abs=4.529953e-05 control_launch=q4k_coop_mmv_late_prequant_q8 candidate_launch=opt110_mul_mat_vec_q4_k_q8_1 nwarps=4 vdr=2 occupancy=8 regs=63 local=0 staging_q8block=288 staging_q81=288\nQW38_OPT110_CASE={\"id\":\"Q4_mmv_M3_N1_K256\",\"pass\":true,\"max_abs\":5.84402587e-05,\"nonfinite_count\":0,\"reason\":\"typed_fp64\"}\nmmv id=Q4_mmv_M17_N1_K256_tail rows=17 cols=256 control_abs=6.13501761e-05 candidate_abs=0.000112056732 control_launch=q4k_coop_mmv_late_prequant_q8 candidate_launch=opt110_mul_mat_vec_q4_k_q8_1 nwarps=4 vdr=2 occupancy=8 regs=63 local=0 staging_q8block=288 staging_q81=288\nQW38_OPT110_CASE={\"id\":\"Q4_mmv_M17_N1_K256_tail\",\"pass\":true,\"max_abs\":0.000112056732,\"nonfinite_count\":0,\"reason\":\"typed_fp64\"}\nmmv id=Q4_mmv_zero rows=1 cols=256 control_abs=0 candidate_abs=0 control_launch=q4k_coop_mmv_late_prequant_q8 candidate_launch=opt110_mul_mat_vec_q4_k_q8_1 nwarps=4 vdr=2 occupancy=8 regs=63 local=0 staging_q8block=288 staging_q81=288\nQW38_OPT110_CASE={\"id\":\"Q4_mmv_zero\",\"pass\":true,\"max_abs\":0,\"nonfinite_count\":0,\"reason\":\"typed_fp64\"}\nmmv id=Q4_mmv_pos rows=1 cols=256 control_abs=0 candidate_abs=0.00146484375 control_launch=q4k_coop_mmv_late_prequant_q8 candidate_launch=opt110_mul_mat_vec_q4_k_q8_1 nwarps=4 vdr=2 occupancy=8 regs=63 local=0 staging_q8block=288 staging_q81=288\nQW38_OPT110_CASE={\"id\":\"Q4_mmv_pos\",\"pass\":true,\"max_abs\":0.00146484375,\"nonfinite_count\":0,\"reason\":\"typed_fp64\"}\nmmv id=Q4_mmv_neg rows=1 cols=256 control_abs=0 candidate_abs=0.00146484375 control_launch=q4k_coop_mmv_late_prequant_q8 candidate_launch=opt110_mul_mat_vec_q4_k_q8_1 nwarps=4 vdr=2 occupancy=8 regs=63 local=0 staging_q8block=288 staging_q81=288\nQW38_OPT110_CASE={\"id\":\"Q4_mmv_neg\",\"pass\":true,\"max_abs\":0.00146484375,\"nonfinite_count\":0,\"reason\":\"typed_fp64\"}\nmmv id=Q4_mmv_nan rows=1 cols=256 control_abs=3.4653116e-05 candidate_abs=8.34465027e-05 control_launch=q4k_coop_mmv_late_prequant_q8 candidate_launch=opt110_mul_mat_vec_q4_k_q8_1 nwarps=4 vdr=2 occupancy=8 regs=63 local=0 staging_q8block=288 staging_q81=288\nQW38_OPT110_CASE={\"id\":\"Q4_mmv_nan\",\"pass\":true,\"max_abs\":8.34465027e-05,\"nonfinite_count\":0,\"reason\":\"typed_fp64\"}\nQW38_OPT110_CASE={\"id\":\"Q4_fused_M3_K256\",\"pass\":true,\"max_abs\":0,\"nonfinite_count\":0,\"reason\":\"same_input_glu\"}\nQW38_OPT110_CASE={\"id\":\"graph_eager\",\"pass\":true,\"max_abs\":0,\"nonfinite_count\":0,\"reason\":\"bitwise\"}\nmmv id=Q4_mmv_down_sampled rows=16 cols=17408 control_abs=9.53774434e-05 candidate_abs=0.00324106216 control_launch=q4k_coop_mmv_late_prequant_q8 candidate_launch=opt110_mul_mat_vec_q4_k_q8_1 nwarps=4 vdr=2 occupancy=8 regs=63 local=0 staging_q8block=19584 staging_q81=19584\nQW38_OPT110_CASE={\"id\":\"Q4_mmv_down_sampled\",\"pass\":true,\"max_abs\":0.00324106216,\"nonfinite_count\":0,\"reason\":\"typed_fp64\"}\nmmv id=Q4_mmv_gate_sampled rows=16 cols=5120 control_abs=0.000569871103 candidate_abs=0.000982284546 control_launch=q4k_coop_mmv_late_prequant_q8 candidate_launch=opt110_mul_mat_vec_q4_k_q8_1 nwarps=4 vdr=2 occupancy=8 regs=63 local=0 staging_q8block=5760 staging_q81=5760\nQW38_OPT110_CASE={\"id\":\"Q4_mmv_gate_sampled\",\"pass\":true,\"max_abs\":0.000982284546,\"nonfinite_count\":0,\"reason\":\"typed_fp64\"}\nattrs mmvq_regs=63 mmvq_local=0 mmvq_occ=8 glu_regs=48 glu_local=0 glu_occ=10 quant_regs=16 quant_local=0 quant_occ=6 late_occ=12 nwarps=4 vdr=2 launch_geometry=32x4\nsass_status=ok dp4a_or_idp=520 shfl=4871 ldg=22481\nQW38_OPT110_LLAMA_Q4_ADAPTER_RESULT={\"task\":\"OPT-110\",\"workload\":\"correctness\",\"pass\":true,\"llama_revision\":\"cc83d7b4824f73cfdda4dfbb47ee39804f71b328\",\"gguf_sha256\":\"31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34\",\"control\":\"integer_q8_late\",\"candidate\":\"llama_q4k_mmvq\",\"nwarps\":4,\"vdr\":2}\nQW38_OPT110_NATIVE_COUNTS={\"cases\":1,\"candidates\":2,\"warmups\":0,\"samples\":1}\n"
   },
   "verdict": {
-    "verdict": "quality_blocked",
-    "status": "quality_blocked",
-    "reasons": [
-      "quality_unresolved"
-    ],
-    "shipping_unchanged": true,
-    "production_kept": false,
-    "keep": false,
-    "retain_reason": "quality"
+    "verdict": "keep",
+    "status": "kept",
+    "reasons": [],
+    "shipping_unchanged": false,
+    "production_kept": true,
+    "keep": true,
+    "retain_reason": ""
   },
-  "tok_s_delta": 0,
+  "tok_s_delta": 8.282937182112462,
   "primitive": {
     "schema_version": 1,
     "task": "OPT-110",
@@ -566,7 +704,7 @@
     "production_pin_unchanged": true,
     "measurement_utc": "2026-09-12T23:50:01Z"
   },
-  "keep": false,
+  "keep": true,
   "d128": {
     "schema_version": 1,
     "task": "OPT-110",
@@ -912,5 +1050,8 @@
     },
     "production_pin_unchanged": true,
     "measurement_utc": "2026-09-12T23:51:16Z"
-  }
+  },
+  "tok_s_delta_d128": 4.809328065329751,
+  "tok_s_delta_d2048": 8.282937182112462,
+  "tok_s_delta_p4096": 35.45392973334992
 }

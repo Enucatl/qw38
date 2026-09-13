@@ -188,7 +188,7 @@ PROOF = (
 )
 EXPECTED_PATHS: dict[str, Any] = {
     "rms_norm": "parallel_fma",
-    "q4_decode": "integer_q8_late",
+    "q4_decode": "llama_q4k_mmvq",
     "q8_decode": "dp4a_q8_1",
     "q8_grouping": "grouped_r1_w4",
     "q8_decode_rows_skinny": 1,
