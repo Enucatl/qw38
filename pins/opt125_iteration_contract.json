@@ -1,0 +1,286 @@
+{
+  "schema_version": 1,
+  "task": "OPT-125",
+  "yardstick": "reconcile_decode_timing_gpu_activity_and_traffic_evidence",
+  "claims_throughput": false,
+  "claims_performance_improvement": false,
+  "opt074_family_admission_required": false,
+  "opt074_coverage_unadmitted_is_blocker": false,
+  "performance_admission": {
+    "enabled": true,
+    "instrumentation_only": true
+  },
+  "image": "qw38-cuda:13.0.2",
+  "model": "models/Qwen3.8-27B-Q4_K_M.gguf",
+  "gpu_lock": "build/optimization-runs/qw38-gpu.lock",
+  "aggregate_deadline_s": 7200,
+  "target": "tools/opt125_decode_accounting.py",
+  "diagnostics_make_target": "cuda-opt125-diagnostics",
+  "selector": "ffn_only",
+  "case_ids": [
+    "metrics",
+    "freeze",
+    "matched-baseline",
+    "activity-trace",
+    "intervals",
+    "weight-reads",
+    "long-context",
+    "ranking",
+    "report"
+  ],
+  "modes": {
+    "feedback": {
+      "target": "tools/opt125_decode_accounting.py",
+      "tier_sequence": [
+        "metrics",
+        "freeze",
+        "matched-baseline",
+        "activity-trace",
+        "intervals",
+        "weight-reads",
+        "long-context",
+        "ranking"
+      ],
+      "make_targets": [
+        "build/qw38-cuda-opt125-decode-accounting-test"
+      ],
+      "build_once": true,
+      "warm_repetitions": 0,
+      "aggregate_deadline_s": 7200,
+      "workloads": [
+        "metrics",
+        "freeze",
+        "matched-baseline",
+        "activity-trace",
+        "intervals",
+        "weight-reads",
+        "long-context",
+        "ranking"
+      ]
+    },
+    "acceptance": {
+      "target": "tools/opt125_decode_accounting.py",
+      "tier_sequence": ["report"],
+      "make_targets": [
+        "build/qw38-cuda-opt125-decode-accounting-test"
+      ],
+      "warm_repetitions": 0,
+      "aggregate_deadline_s": 7200,
+      "workloads": ["report"]
+    },
+    "release": {
+      "target": "tools/opt125_decode_accounting.py",
+      "tier": "acceptance",
+      "make_targets": [
+        "build/qw38-cuda-opt125-decode-accounting-test"
+      ],
+      "skip_compile": false,
+      "historical_oracles": false,
+      "aggregate_deadline_s": 7200,
+      "workloads": []
+    }
+  },
+  "workloads": {
+    "metrics": {
+      "target": "tools/opt125_decode_accounting.py",
+      "tier": "correctness",
+      "runner": "host",
+      "kind": "freeze_metric_names_and_synthetic_tests",
+      "cases": 1,
+      "candidates": 1,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 1,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 0,
+      "reference": 1,
+      "gpu_work": false,
+      "args": [
+        "uv", "run", "python", "tools/opt125_decode_accounting.py",
+        "--phase", "metrics", "--mode", "{mode}", "--run-dir", "{run_dir}"
+      ]
+    },
+    "freeze": {
+      "target": "tools/opt125_decode_accounting.py",
+      "tier": "correctness",
+      "runner": "host",
+      "kind": "authenticate_combined_post113_llama_identities",
+      "cases": 1,
+      "candidates": 1,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 1,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 0,
+      "reference": 1,
+      "gpu_work": false,
+      "args": [
+        "uv", "run", "python", "tools/opt125_decode_accounting.py",
+        "--phase", "freeze", "--mode", "{mode}", "--run-dir", "{run_dir}"
+      ]
+    },
+    "matched-baseline": {
+      "target": "build/qw38-cuda-opt125-decode-accounting-test",
+      "tier": "screen",
+      "runner": "host",
+      "kind": "aa_and_matched_p4096_d128_d2048_dual_metrics",
+      "cases": 3,
+      "candidates": 2,
+      "warmups": 3,
+      "samples": 5,
+      "tokens": 1,
+      "output_tokens": 256,
+      "prefixes": [4096, 128, 2048],
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 1,
+      "reference": 1,
+      "gpu_work": true,
+      "native_targets": ["build/qw38-cuda-opt125-decode-accounting-test"],
+      "args": [
+        "uv", "run", "python", "tools/opt125_decode_accounting.py",
+        "--phase", "matched-baseline", "--mode", "{mode}", "--run-dir", "{run_dir}"
+      ]
+    },
+    "activity-trace": {
+      "target": "build/qw38-cuda-opt125-decode-accounting-test",
+      "tier": "screen",
+      "runner": "host",
+      "kind": "bounded_activity_early_middle_late_windows",
+      "cases": 2,
+      "candidates": 1,
+      "warmups": 1,
+      "samples": 1,
+      "tokens": 1,
+      "output_tokens": 256,
+      "prefixes": [128, 2048],
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 1,
+      "reference": 0,
+      "gpu_work": true,
+      "native_targets": ["build/qw38-cuda-opt125-decode-accounting-test"],
+      "args": [
+        "uv", "run", "python", "tools/opt125_decode_accounting.py",
+        "--phase", "activity-trace", "--mode", "{mode}", "--run-dir", "{run_dir}"
+      ]
+    },
+    "intervals": {
+      "target": "tools/opt125_decode_accounting.py",
+      "tier": "correctness",
+      "runner": "host",
+      "kind": "disjoint_device_active_inactive_unobserved",
+      "cases": 1,
+      "candidates": 1,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 1,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 0,
+      "reference": 1,
+      "gpu_work": false,
+      "args": [
+        "uv", "run", "python", "tools/opt125_decode_accounting.py",
+        "--phase", "intervals", "--mode", "{mode}", "--run-dir", "{run_dir}"
+      ]
+    },
+    "weight-reads": {
+      "target": "tools/opt125_decode_accounting.py",
+      "tier": "correctness",
+      "runner": "host",
+      "kind": "recompute_weight_reads_and_busy_bound_reconcile",
+      "cases": 1,
+      "candidates": 1,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 1,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 0,
+      "reference": 1,
+      "gpu_work": false,
+      "args": [
+        "uv", "run", "python", "tools/opt125_decode_accounting.py",
+        "--phase", "weight-reads", "--mode", "{mode}", "--run-dir", "{run_dir}"
+      ]
+    },
+    "long-context": {
+      "target": "build/qw38-cuda-opt125-decode-accounting-test",
+      "tier": "screen",
+      "runner": "host",
+      "kind": "d8192_d32768_d131040_request_and_decode_only",
+      "cases": 3,
+      "candidates": 1,
+      "warmups": 1,
+      "samples": 1,
+      "tokens": 1,
+      "output_tokens": 32,
+      "prefixes": [8192, 32768, 131040],
+      "capacity": 131072,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 1,
+      "reference": 0,
+      "gpu_work": true,
+      "native_targets": ["build/qw38-cuda-opt125-decode-accounting-test"],
+      "args": [
+        "uv", "run", "python", "tools/opt125_decode_accounting.py",
+        "--phase", "long-context", "--mode", "{mode}", "--run-dir", "{run_dir}"
+      ]
+    },
+    "ranking": {
+      "target": "tools/opt125_decode_accounting.py",
+      "tier": "correctness",
+      "runner": "host",
+      "kind": "causal_removable_ms_opt126_131",
+      "cases": 1,
+      "candidates": 1,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 1,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 0,
+      "reference": 1,
+      "gpu_work": false,
+      "args": [
+        "uv", "run", "python", "tools/opt125_decode_accounting.py",
+        "--phase", "ranking", "--mode", "{mode}", "--run-dir", "{run_dir}"
+      ]
+    },
+    "report": {
+      "target": "tools/opt125_decode_accounting.py",
+      "tier": "correctness",
+      "runner": "host",
+      "kind": "host_only_decode_accounting_report",
+      "cases": 1,
+      "candidates": 1,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 1,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 0,
+      "reference": 1,
+      "gpu_work": false,
+      "args": [
+        "uv", "run", "python", "tools/opt125_decode_accounting.py",
+        "--phase", "report", "--mode", "{mode}", "--run-dir", "{run_dir}"
+      ]
+    }
+  },
+  "proof_limit": [
+    "diagnostics only",
+    "no production selector change",
+    "instrumentation-only: no speed keep",
+    "historical oracles none",
+    "3 warmups plus 5 paired AB/BA screening for this sitting; later keep gates use 3+10",
+    "pinned llama is cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+    "leaf gaps are unobserved not GPU idle",
+    "1792 GB/s is listed peak not measured bandwidth"
+  ],
+  "report_path": "evidence/optimization/opt125-decode-accounting/REPORT.md"
+}
