@@ -442,8 +442,8 @@ class ResidentModel final {
   friend cudaError_t enqueue_decode_layer_eager(
       const ResidentModel& model, std::size_t layer_index, std::size_t frontier,
       std::size_t gdn_slot, std::size_t attention_slot,
-      SchedulerWorkspace* workspace, float* residual, float* next,
-      std::uint64_t graph_generation, cudaStream_t stream) noexcept;
+      SchedulerSession* session, SchedulerWorkspace* workspace, float* residual,
+      float* next, std::uint64_t graph_generation, cudaStream_t stream) noexcept;
 };
 
 class SchedulerSession final {
@@ -477,6 +477,18 @@ class SchedulerSession final {
 
  private:
   void release() noexcept;
+  friend cudaError_t enqueue_decode_layer_eager(
+      const ResidentModel& model, std::size_t layer_index, std::size_t frontier,
+      std::size_t gdn_slot, std::size_t attention_slot, SchedulerSession* session,
+      SchedulerWorkspace* workspace, float* residual, float* next,
+      std::uint64_t graph_generation, cudaStream_t stream) noexcept;
+  friend cudaError_t capture_decode_segment_graph(
+      const ResidentModel& model, std::size_t segment_index,
+      SchedulerSession* session, SchedulerWorkspace* workspace,
+      std::uint64_t graph_generation, cudaStream_t stream,
+      cudaGraph_t* graph_out, cudaError_t* enqueue_error_out,
+      cudaError_t* end_capture_error_out) noexcept;
+  friend class SchedulerGraphs;
   float* gdn_convolution_ = nullptr;
   float* gdn_recurrent_ = nullptr;
   __nv_bfloat16* attention_key_ = nullptr;
@@ -631,8 +643,8 @@ class SchedulerGraphs final {
   SchedulerGraphs(const SchedulerGraphs&) = delete;
   SchedulerGraphs& operator=(const SchedulerGraphs&) = delete;
 
-  Status create(const ResidentModel& model,
-                SchedulerWorkspace* workspace) noexcept;
+  Status create(const ResidentModel& model, SchedulerWorkspace* workspace,
+                SchedulerSession* session = nullptr) noexcept;
   std::size_t graph_count() const noexcept;
   std::size_t decode_graph_count() const noexcept;
   std::size_t prompt_graph_count() const noexcept;
@@ -651,9 +663,12 @@ class SchedulerGraphs final {
 
  private:
   Status apply_segment_launch_params() noexcept;
+  Status capture_decode_segments(cudaStream_t stream) noexcept;
+  cudaError_t patch_segment_kernel_params(std::size_t segment_index,
+                                         int* patched_nodes = nullptr) noexcept;
   void release() noexcept;
-  bool matches(const ResidentModel& model,
-               const SchedulerWorkspace* workspace) const noexcept;
+  bool matches(const ResidentModel& model, const SchedulerWorkspace* workspace,
+               const SchedulerSession* session = nullptr) const noexcept;
   std::array<cudaGraph_t, internal::kModelLayerCount> graphs_{};
   std::array<cudaGraphExec_t, internal::kModelLayerCount> executions_{};
   std::array<cudaGraph_t, internal::kModelLayerCount> prompt_graphs_{};
@@ -665,7 +680,16 @@ class SchedulerGraphs final {
   std::array<cudaGraphExec_t, internal::kModelLayerCount>
       prompt_mixer_executions_{};
   const ResidentModel* model_ = nullptr;
-  const SchedulerWorkspace* workspace_ = nullptr;
+  SchedulerWorkspace* workspace_ = nullptr;
+  SchedulerSession* session_ = nullptr;
+  float* captured_gdn_session_conv_ = nullptr;
+  float* captured_gdn_session_rec_ = nullptr;
+  float* captured_gdn_workspace_conv_ = nullptr;
+  float* captured_gdn_workspace_rec_ = nullptr;
+  __nv_bfloat16* captured_attention_key_ = nullptr;
+  std::uint32_t captured_frontier_ = 0;
+  int captured_n_parts_ = 0;
+  bool captured_vec128_ = false;
   std::size_t decode_graph_count_ = 0;
   std::size_t prompt_graph_count_ = 0;
   std::size_t prompt_rows_ = 0;
@@ -720,6 +744,19 @@ Status execute_token_traced_bundle(
     internal::TraceSink sink, void* context, SchedulerGraphs* graphs = nullptr,
     PointwisePath pointwise_path = PointwisePath::kUnfused) noexcept;
 #endif
+
+cudaError_t enqueue_decode_layer_eager(
+    const ResidentModel& model, std::size_t layer_index, std::size_t frontier,
+    std::size_t gdn_slot, std::size_t attention_slot, SchedulerSession* session,
+    SchedulerWorkspace* workspace, float* residual, float* next,
+    std::uint64_t graph_generation, cudaStream_t stream) noexcept;
+
+cudaError_t capture_decode_segment_graph(
+    const ResidentModel& model, std::size_t segment_index,
+    SchedulerSession* session, SchedulerWorkspace* workspace,
+    std::uint64_t graph_generation, cudaStream_t stream, cudaGraph_t* graph_out,
+    cudaError_t* enqueue_error_out = nullptr,
+    cudaError_t* end_capture_error_out = nullptr) noexcept;
 
 cudaError_t launch_residual_add_fp32(const float* residual,
                                      const float* correction, std::size_t count,
