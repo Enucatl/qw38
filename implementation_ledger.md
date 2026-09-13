@@ -293,6 +293,37 @@ unbounded variant. First eligible task in ledger/dependency order is OPT-109.
 | OPT-112 | Fuse decode normalization into typed Q8 staging (deferred) | OPT-106, OPT-114 | done | Only proceed after a fresh component screen shows enough removable norm/staging cost; emit and reuse Q8_1 or Q8Block only for consumers of that exact encoding, preserve BF16 rounding in-register, and keep the current path unless complete decode wins under full quality gates | [`tasks/OPT-112.md`](tasks/OPT-112.md); [`pins/opt112_norm_q8_staging_contract.json`](pins/opt112_norm_q8_staging_contract.json); [`pins/opt112_iteration_contract.json`](pins/opt112_iteration_contract.json); [`fixtures/opt112_norm_q8_staging.json`](fixtures/opt112_norm_q8_staging.json); [`tools/opt112_norm_q8_staging.py`](tools/opt112_norm_q8_staging.py); [`tests/test_opt112_norm_q8_staging.py`](tests/test_opt112_norm_q8_staging.py); [`Makefile`](Makefile); [`evidence/optimization/opt112-norm-q8-staging/REPORT.md`](evidence/optimization/opt112-norm-q8-staging/REPORT.md); verification 2026-09-13T06:52:00Z |
 | OPT-113 | Freeze and measure the coupled-stack recovery combination | OPT-107, OPT-108, OPT-109, OPT-110, OPT-111, OPT-114 | done | Fresh controls and survivors receive independent internal-improvement, llama-parity, and OPT-056 +5% verdicts with honest failures; OPT-112 is optional and may be explicitly deferred without delaying the sitting | [`tasks/OPT-113.md`](tasks/OPT-113.md); [`pins/opt113_coupled_stack_gate_contract.json`](pins/opt113_coupled_stack_gate_contract.json); [`pins/opt113_iteration_contract.json`](pins/opt113_iteration_contract.json); [`fixtures/opt113_coupled_stack_gate.json`](fixtures/opt113_coupled_stack_gate.json); [`tools/opt113_coupled_stack_gate.py`](tools/opt113_coupled_stack_gate.py); [`tests/test_opt113_coupled_stack_gate.py`](tests/test_opt113_coupled_stack_gate.py); [`cuda/opt113_coupled_stack_gate_test.cu`](cuda/opt113_coupled_stack_gate_test.cu); [`Makefile`](Makefile); [`evidence/optimization/opt113-coupled-stack-gate/REPORT.md`](evidence/optimization/opt113-coupled-stack-gate/REPORT.md); verification 2026-09-13T07:45:00Z |
 
+### Post-113 full-pipeline and memory-traffic investigation
+
+The 2026-09-13 user request authorizes task preparation only in this sitting.
+OPT-115–124 are new implementation-agent dossiers; no experiment, precision
+change, or production promotion has been performed by authoring them. Read
+[OPT-115](tasks/OPT-115.md) for the shared measurement/keep protocol and
+[OPT-116](tasks/OPT-116.md) for generated-text quality admission. The first
+eligible task in this batch is OPT-115. OPT-116 can follow independently;
+OPT-117–122 require both foundations. Dependencies require delivered evidence,
+including an honest rejection/no-opportunity outcome, not a successful keep.
+
+Investigate complete requests and bytes crossing each memory boundary before
+choosing candidates. Numerical precision may change under the new measured
+quality contract; exact artifact identity, causality, transaction semantics,
+and the 128K context/reserve guarantee remain. Historical OPT-016/056 gates
+retain their original meanings. OPT-123 measures interacting survivors;
+OPT-124 assesses the remaining ceiling without claiming universal optimality.
+
+| ID | Description | Dependencies | Status | Acceptance condition | Evidence |
+|---|---|---|---|---|---|
+| OPT-115 | Audit complete-request memory traffic and establish conditional performance bounds | OPT-113, OPT-114 | pending | Fresh post113/pinned-llama wall timelines, actual bytes and ownership by phase/context, reproducible bandwidth bounds, source-transfer matrix, and ranked pipeline opportunities; no speedup claim | [Dossier](tasks/OPT-115.md) |
+| OPT-116 | Freeze generated-text and long-context quality admission for precision experiments | OPT-113 | pending | Versioned candidate-independent rubric, free-running outputs, real cache/state-reading NLL and complete baseline evidence; strict and successor verdicts remain separate | [Dossier](tasks/OPT-116.md) |
+| OPT-117 | Repair and evaluate capture of complete decode segments | OPT-115, OPT-116 | pending | Root-caused OPT-114 capture failure, same-arithmetic graph execution with dynamic-state/cancellation coverage, and complete-request keep/reject under shared gates | [Dossier](tasks/OPT-117.md) |
+| OPT-118 | Remove avoidable host/device transfers and state materialization | OPT-115, OPT-116, OPT-117 | pending | Measured copy/sync inventory drives at most two changes; committed state, sampling and public logits remain correct; complete-request and memory verdicts include graph interaction | [Dossier](tasks/OPT-118.md) |
+| OPT-119 | Reduce activation and prompt intermediate traffic across producer/consumer boundaries | OPT-115, OPT-116, OPT-118 | pending | At most two evidence-ranked pipeline slices reduce real bytes and pass full P/D/request, quality, state and memory gates; diagnostic microbenchmarks cannot admit a keep | [Dossier](tasks/OPT-119.md) |
+| OPT-120 | Evaluate physically packed 8-bit and 4-bit attention KV caches | OPT-115, OPT-116 | pending | Packed storage consumed directly across prompt/decode/checkpoints, measured metadata-inclusive bytes, long-context generated quality and E2E verdict; no dense shadow-cache speed claim | [Dossier](tasks/OPT-120.md) |
+| OPT-121 | Reduce streamed weight bytes with selective requantization and a bounded native-FP4 study | OPT-115, OPT-116 | pending | At most three calibrated role/format candidates from the pinned artifact, real packed consumers and full-model quality/E2E/128K evidence; arithmetic and encoding changes disclosed | [Dossier](tasks/OPT-121.md) |
+| OPT-122 | Evaluate lower-precision persistent GDN state with FP32 updates | OPT-115, OPT-116, OPT-118 | pending | At most two state encodings reduce storage/traffic and pass long recurrence, chunk/restore/graph and full-request gates, or retain FP32 with a measured disposition | [Dossier](tasks/OPT-122.md) |
+| OPT-123 | Measure interactions and admit the combined full-pipeline stack | OPT-117, OPT-118, OPT-119, OPT-120, OPT-121, OPT-122 | pending | Frozen combined and leave-one-out evidence, fresh baseline/llama comparisons and independent quality/performance/128K/historical-gate verdicts; no sum of isolated speedups | [Dossier](tasks/OPT-123.md) |
+| OPT-124 | Assess whether llama.cpp is a practical ceiling under explicit constraints | OPT-115, OPT-116, OPT-123 | pending | Reproducible conditional bounds and matched quality/resource frontier support a bounded conclusion, unresolved opportunities and stop/reopen criteria; no universal-optimality assertion | [Dossier](tasks/OPT-124.md) |
+
 ### Post-042 recovery execution order (historical batch)
 
 The [2026-09-10 design](tasks/PERFORMANCE-RECOVERY-2026-09-10.md) compares the
@@ -301,8 +332,8 @@ design, not new performance evidence. **OPT-056 outcome gate measured unpassed**
 (2026-09-11); recovery requires closing remaining P/D throughput and decode-p95
 gaps versus llama before re-pass. The 2026-09-10 ladder is exhausted;
 OPT-057–069 and OPT-070–080 are delivered. The post-080 kernel-parity and
-quality-reset batch is also historical; current work is the post-098 batch
-defined immediately above.
+quality-reset batch is also historical; current planned work is the post-113
+full-pipeline batch defined immediately above.
 Dependencies permit independent work but do not authorize subagents. The user
 accepts documented llama.cpp/ds4-like accuracy compromises; strict reference
 arithmetic and exact structural/transaction guarantees remain separately tested.
@@ -7683,3 +7714,26 @@ statements below are historical, not the current execution order.
   [`fixtures/opt113_coupled_stack_gate.json`](fixtures/opt113_coupled_stack_gate.json);
   [`evidence/optimization/opt113-coupled-stack-gate/REPORT.md`](evidence/optimization/opt113-coupled-stack-gate/REPORT.md).
 - OPT-113 remains `done`. Coupled IDs: none.
+
+### 2026-09-13T11:47:55Z — Post-113 pipeline investigation tasks authored
+
+- Added pending OPT-115–124 and matching dossiers at the user's request;
+  this sitting prepares implementation work only. No source, tests, build
+  files, selectors, fixtures or existing numerical contracts were changed.
+- OPT-115 establishes complete-request traffic, timing and conditional
+  bandwidth/compute bounds. OPT-116 freezes generated-text and populated-cache
+  quality admission before lower-precision candidates. OPT-117–122 cover
+  graph capture, transfers/state ownership, intermediate traffic, packed KV,
+  selective weight compression/native FP4 and recurrent-state precision.
+- OPT-123 measures composition and leave-one-out interactions against fresh
+  post113 and pinned llama controls. OPT-124 assesses practical headroom under
+  explicit constraints; an exhausted search cannot prove universal optimality.
+- Source inspection retained the OPT-113 memory reconciliation, distinguished
+  OPT-114's old-control overhead estimate from current measurements, and noted
+  OPT-109's recurrence-only win/complete-GDN loss. ds4's inspected FP8 KV/FP4
+  indexer routines round into float storage, so packed-byte savings must be
+  implemented and measured rather than inferred from those function names.
+- Verified all ten new statuses/dependency lists agree between ledger and
+  dossiers, every local dossier link resolves, and the dependency closure is
+  acyclic. `git diff --check` passed. No GPU benchmarks or implementation tests
+  were run; there is no new performance evidence or production promotion.
