@@ -2111,6 +2111,59 @@ cudaError_t execute_prompt_ffn_attributed(
 
 }  // namespace
 
+void bump_transfer(SchedulerWorkspace* workspace, cudaMemcpyKind kind,
+                   std::size_t bytes) noexcept {
+  if (workspace == nullptr || bytes == 0) return;
+  if (kind == cudaMemcpyHostToDevice) {
+    workspace->transfer_h2d_bytes_ += bytes;
+    ++workspace->transfer_h2d_copies_;
+  } else if (kind == cudaMemcpyDeviceToHost) {
+    workspace->transfer_d2h_bytes_ += bytes;
+    ++workspace->transfer_d2h_copies_;
+  } else if (kind == cudaMemcpyDeviceToDevice) {
+    workspace->transfer_d2d_bytes_ += bytes;
+    ++workspace->transfer_d2d_copies_;
+  }
+}
+
+__global__ void greedy_argmax_fp32(const float* logits, int count, int* best) {
+  __shared__ float shared_value[256];
+  __shared__ int shared_index[256];
+  const int tid = static_cast<int>(threadIdx.x);
+  float best_value = -INFINITY;
+  int best_index = 0;
+  for (int index = tid; index < count; index += static_cast<int>(blockDim.x)) {
+    const float value = logits[index];
+    if (value > best_value || (value == best_value && index < best_index)) {
+      best_value = value;
+      best_index = index;
+    }
+  }
+  shared_value[tid] = best_value;
+  shared_index[tid] = best_index;
+  __syncthreads();
+  for (int stride = static_cast<int>(blockDim.x) / 2; stride > 0; stride >>= 1) {
+    if (tid < stride) {
+      const float other_value = shared_value[tid + stride];
+      const int other_index = shared_index[tid + stride];
+      if (other_value > shared_value[tid] ||
+          (other_value == shared_value[tid] && other_index < shared_index[tid])) {
+        shared_value[tid] = other_value;
+        shared_index[tid] = other_index;
+      }
+    }
+    __syncthreads();
+  }
+  if (tid == 0) *best = shared_index[0];
+}
+
+cudaError_t launch_greedy_argmax(const float* logits, int* best,
+                                 cudaStream_t stream) noexcept {
+  greedy_argmax_fp32<<<1, 256, 0, stream>>>(
+      logits, static_cast<int>(internal::kVocabularySize), best);
+  return cudaPeekAtLastError();
+}
+
 cudaError_t launch_decode_ffn(const DeviceCommonLayer& layer,
                               const float* residual,
                               SchedulerWorkspace* workspace, float* output,
@@ -3655,6 +3708,13 @@ SchedulerSession& SchedulerSession::operator=(SchedulerSession&& other) noexcept
   tokens_ = other.tokens_;
   last_logits_ = other.last_logits_;
   last_hidden_ = other.last_hidden_;
+  last_logits_device_ = other.last_logits_device_;
+  last_hidden_device_ = other.last_hidden_device_;
+  greedy_index_device_ = other.greedy_index_device_;
+  cached_greedy_token_ = other.cached_greedy_token_;
+  outputs_host_valid_ = other.outputs_host_valid_;
+  greedy_token_valid_ = other.greedy_token_valid_;
+  device_outputs_valid_ = other.device_outputs_valid_;
   capacity_ = other.capacity_;
   frontier_ = other.frontier_;
   allocated_bytes_ = other.allocated_bytes_;
@@ -3666,6 +3726,13 @@ SchedulerSession& SchedulerSession::operator=(SchedulerSession&& other) noexcept
   other.tokens_ = nullptr;
   other.last_logits_ = nullptr;
   other.last_hidden_ = nullptr;
+  other.last_logits_device_ = nullptr;
+  other.last_hidden_device_ = nullptr;
+  other.greedy_index_device_ = nullptr;
+  other.cached_greedy_token_ = 0;
+  other.outputs_host_valid_ = false;
+  other.greedy_token_valid_ = false;
+  other.device_outputs_valid_ = false;
   other.capacity_ = 0;
   other.frontier_ = 0;
   other.allocated_bytes_ = 0;
@@ -3677,6 +3744,9 @@ void SchedulerSession::release() noexcept {
   std::free(last_hidden_);
   std::free(last_logits_);
   std::free(tokens_);
+  if (greedy_index_device_ != nullptr) cudaFree(greedy_index_device_);
+  if (last_hidden_device_ != nullptr) cudaFree(last_hidden_device_);
+  if (last_logits_device_ != nullptr) cudaFree(last_logits_device_);
   if (attention_value_ != nullptr) cudaFree(attention_value_);
   if (attention_key_ != nullptr) cudaFree(attention_key_);
   if (gdn_recurrent_ != nullptr) cudaFree(gdn_recurrent_);
@@ -3688,6 +3758,13 @@ void SchedulerSession::release() noexcept {
   tokens_ = nullptr;
   last_logits_ = nullptr;
   last_hidden_ = nullptr;
+  last_logits_device_ = nullptr;
+  last_hidden_device_ = nullptr;
+  greedy_index_device_ = nullptr;
+  cached_greedy_token_ = 0;
+  outputs_host_valid_ = false;
+  greedy_token_valid_ = false;
+  device_outputs_valid_ = false;
   capacity_ = 0;
   frontier_ = 0;
   allocated_bytes_ = 0;
@@ -3725,6 +3802,17 @@ Status SchedulerSession::create(std::size_t capacity) noexcept {
   }
   if (error == cudaSuccess) {
     error = allocate(&attention_value_, attention_values, &allocated_bytes_);
+  }
+  if (error == cudaSuccess) {
+    error = allocate(&last_logits_device_, internal::kVocabularySize,
+                     &allocated_bytes_);
+  }
+  if (error == cudaSuccess) {
+    error = allocate(&last_hidden_device_, internal::kResidualWidth,
+                     &allocated_bytes_);
+  }
+  if (error == cudaSuccess) {
+    error = allocate(&greedy_index_device_, 1, &allocated_bytes_);
   }
   if (error == cudaSuccess) {
     error = cudaMemset(gdn_convolution_, 0,
@@ -3780,6 +3868,10 @@ Status SchedulerSession::reset() noexcept {
     return cuda_status(error, "cannot reset CUDA scheduler session state");
   }
   frontier_ = 0;
+  cached_greedy_token_ = 0;
+  outputs_host_valid_ = false;
+  greedy_token_valid_ = false;
+  device_outputs_valid_ = false;
   gdn_set_session_live_col_major(false);
   return Status::ok();
 }
@@ -3800,12 +3892,14 @@ Status SchedulerSession::state_equals(const SchedulerSession& other,
       std::memcmp(tokens_, other.tokens_, frontier_ * sizeof(std::size_t)) != 0) {
     return Status::ok();
   }
-  if (frontier_ > 0 &&
-      (std::memcmp(last_logits_, other.last_logits_,
-                   internal::kVocabularySize * sizeof(float)) != 0 ||
-       std::memcmp(last_hidden_, other.last_hidden_,
-                   internal::kResidualWidth * sizeof(float)) != 0)) {
-    return Status::ok();
+  if (frontier_ > 0) {
+    if (outputs_host_valid_ && other.outputs_host_valid_ &&
+        (std::memcmp(last_logits_, other.last_logits_,
+                     internal::kVocabularySize * sizeof(float)) != 0 ||
+         std::memcmp(last_hidden_, other.last_hidden_,
+                     internal::kResidualWidth * sizeof(float)) != 0)) {
+      return Status::ok();
+    }
   }
   unsigned int* mismatch = nullptr;
   cudaError_t error = cudaMalloc(&mismatch, sizeof(unsigned int));
@@ -3822,6 +3916,12 @@ Status SchedulerSession::state_equals(const SchedulerSession& other,
           kGdnLayers * internal::kGdnConvolutionValues * sizeof(float));
   compare(gdn_recurrent_, other.gdn_recurrent_,
           kGdnLayers * internal::kGdnRecurrentStateValues * sizeof(float));
+  if (frontier_ > 0 && device_outputs_valid_ && other.device_outputs_valid_) {
+    compare(last_logits_device_, other.last_logits_device_,
+            internal::kVocabularySize * sizeof(float));
+    compare(last_hidden_device_, other.last_hidden_device_,
+            internal::kResidualWidth * sizeof(float));
+  }
   const std::size_t cache_stride = capacity_ * internal::kAttentionKvWidth;
   const std::size_t head_span_bytes =
       frontier_ * internal::kAttentionHeadWidth * sizeof(__nv_bfloat16);
@@ -3861,9 +3961,160 @@ Status SchedulerSession::copy_last_outputs(
     return {StatusCode::kInvalidArgument,
             "CUDA committed output copy input is invalid"};
   }
+  const Status status = materialize_last_outputs();
+  if (!status.is_ok()) return status;
   std::memcpy(logits, last_logits_, logits_count * sizeof(float));
   std::memcpy(hidden, last_hidden_, hidden_count * sizeof(float));
   return Status::ok();
+}
+
+Status SchedulerSession::materialize_last_outputs() const noexcept {
+  if (frontier_ == 0) {
+    return {StatusCode::kInvalidArgument, "session has no committed logits"};
+  }
+  if (outputs_host_valid_) return Status::ok();
+  if (!device_outputs_valid_ || last_logits_device_ == nullptr ||
+      last_hidden_device_ == nullptr || last_logits_ == nullptr ||
+      last_hidden_ == nullptr) {
+    return {StatusCode::kInvalidArgument,
+            "CUDA committed device outputs are not available"};
+  }
+  cudaError_t error =
+      cudaMemcpy(last_logits_, last_logits_device_,
+                 internal::kVocabularySize * sizeof(float),
+                 cudaMemcpyDeviceToHost);
+  if (error == cudaSuccess) {
+    error = cudaMemcpy(last_hidden_, last_hidden_device_,
+                       internal::kResidualWidth * sizeof(float),
+                       cudaMemcpyDeviceToHost);
+  }
+  if (error != cudaSuccess) {
+    return cuda_status(error, "cannot materialize CUDA committed outputs");
+  }
+  outputs_host_valid_ = true;
+  return Status::ok();
+}
+
+bool SchedulerSession::greedy_token_valid() const noexcept {
+  return greedy_token_valid_;
+}
+
+std::size_t SchedulerSession::cached_greedy_token() const noexcept {
+  return cached_greedy_token_;
+}
+
+cudaError_t SchedulerSession::commit_outputs(
+    SchedulerWorkspace* workspace, const float* device_logits,
+    const float* device_hidden, float* host_logits, float* host_hidden,
+    cudaStream_t compute_stream) noexcept {
+  if (workspace == nullptr || device_logits == nullptr ||
+      device_hidden == nullptr || last_logits_device_ == nullptr ||
+      last_hidden_device_ == nullptr || greedy_index_device_ == nullptr) {
+    return cudaErrorInvalidValue;
+  }
+  const bool lazy = lazy_output_materialization_enabled();
+  const bool overlap = output_commit_overlap_enabled();
+  const std::size_t logits_bytes = internal::kVocabularySize * sizeof(float);
+  const std::size_t hidden_bytes = internal::kResidualWidth * sizeof(float);
+  cudaError_t error = cudaSuccess;
+  cudaStream_t copy = nullptr;
+  if ((lazy || overlap) && workspace->prompt_copy_stream_ != nullptr) {
+    copy = workspace->prompt_copy_stream_;
+    if (workspace->prompt_compute_done_ != nullptr &&
+        (compute_stream == nullptr || !fattn_uses_attention_pipeline())) {
+      error = cudaEventRecord(workspace->prompt_compute_done_, compute_stream);
+      if (error == cudaSuccess) {
+        error = cudaStreamWaitEvent(copy, workspace->prompt_compute_done_, 0);
+      }
+    }
+  }
+  const cudaStream_t stash_stream = copy != nullptr ? copy : compute_stream;
+  if (error == cudaSuccess && (lazy || overlap)) {
+    error = cudaMemcpyAsync(last_logits_device_, device_logits, logits_bytes,
+                            cudaMemcpyDeviceToDevice, stash_stream);
+    if (error == cudaSuccess) {
+      bump_transfer(workspace, cudaMemcpyDeviceToDevice, logits_bytes);
+      error = cudaMemcpyAsync(last_hidden_device_, device_hidden, hidden_bytes,
+                              cudaMemcpyDeviceToDevice, stash_stream);
+    }
+    if (error == cudaSuccess) {
+      bump_transfer(workspace, cudaMemcpyDeviceToDevice, hidden_bytes);
+      error = launch_greedy_argmax(device_logits, greedy_index_device_,
+                                   stash_stream);
+    }
+  }
+  if (error == cudaSuccess && !lazy) {
+    if (overlap && copy != nullptr) {
+      error = cudaMemcpyAsync(workspace->candidate_logits_host_, device_logits,
+                              logits_bytes, cudaMemcpyDeviceToHost, copy);
+      if (error == cudaSuccess) {
+        bump_transfer(workspace, cudaMemcpyDeviceToHost, logits_bytes);
+        error = cudaMemcpyAsync(workspace->candidate_hidden_host_, device_hidden,
+                                hidden_bytes, cudaMemcpyDeviceToHost, copy);
+      }
+      if (error == cudaSuccess) {
+        bump_transfer(workspace, cudaMemcpyDeviceToHost, hidden_bytes);
+      }
+    } else {
+      error = cudaMemcpy(workspace->candidate_logits_host_, device_logits,
+                         logits_bytes, cudaMemcpyDeviceToHost);
+      if (error == cudaSuccess) {
+        bump_transfer(workspace, cudaMemcpyDeviceToHost, logits_bytes);
+        error = cudaMemcpy(workspace->candidate_hidden_host_, device_hidden,
+                           hidden_bytes, cudaMemcpyDeviceToHost);
+      }
+      if (error == cudaSuccess) {
+        bump_transfer(workspace, cudaMemcpyDeviceToHost, hidden_bytes);
+      }
+    }
+  }
+  if (error != cudaSuccess) return error;
+  device_outputs_valid_ = lazy || overlap;
+  greedy_token_valid_ = false;
+  outputs_host_valid_ = false;
+  (void)host_logits;
+  (void)host_hidden;
+  return cudaSuccess;
+}
+
+cudaError_t SchedulerSession::finish_output_commit(
+    SchedulerWorkspace* workspace, float* host_logits,
+    float* host_hidden) noexcept {
+  if (workspace == nullptr || host_logits == nullptr || host_hidden == nullptr ||
+      workspace->candidate_logits_host_ == nullptr ||
+      workspace->candidate_hidden_host_ == nullptr) {
+    return cudaErrorInvalidValue;
+  }
+  const bool lazy = lazy_output_materialization_enabled();
+  const bool overlap = output_commit_overlap_enabled();
+  cudaError_t error = cudaSuccess;
+  if ((lazy || overlap) && workspace->prompt_copy_stream_ != nullptr) {
+    error = cudaStreamSynchronize(workspace->prompt_copy_stream_);
+  }
+  if (error == cudaSuccess && lazy) {
+    int best = 0;
+    error = cudaMemcpy(&best, greedy_index_device_, sizeof(int),
+                       cudaMemcpyDeviceToHost);
+    if (error == cudaSuccess) {
+      bump_transfer(workspace, cudaMemcpyDeviceToHost, sizeof(int));
+      cached_greedy_token_ = static_cast<std::size_t>(best);
+      greedy_token_valid_ = true;
+      outputs_host_valid_ = false;
+    }
+    return error;
+  }
+  if (error != cudaSuccess) return error;
+  std::memcpy(last_logits_, workspace->candidate_logits_host_,
+              internal::kVocabularySize * sizeof(float));
+  std::memcpy(last_hidden_, workspace->candidate_hidden_host_,
+              internal::kResidualWidth * sizeof(float));
+  std::memcpy(host_logits, workspace->candidate_logits_host_,
+              internal::kVocabularySize * sizeof(float));
+  std::memcpy(host_hidden, workspace->candidate_hidden_host_,
+              internal::kResidualWidth * sizeof(float));
+  outputs_host_valid_ = true;
+  greedy_token_valid_ = false;
+  return cudaSuccess;
 }
 
 Status SchedulerSession::copy_tokens(std::size_t* output,
@@ -4856,33 +5107,41 @@ Status execute_token(const ResidentModel& model, std::size_t token,
                                                        : &leaf_timings->d2h);
   }
   if (error == cudaSuccess && !interrupted) {
-    error = cudaMemcpy(workspace->candidate_logits_host_, workspace->logits_,
-                       logits_count * sizeof(float), cudaMemcpyDeviceToHost);
+    error = session->commit_outputs(workspace, workspace->logits_, residual,
+                                    host_logits, host_hidden, nullptr);
   }
 #ifdef QW38_DIAGNOSTIC_TRACE
   if (error == cudaSuccess && !interrupted && active_trace != nullptr &&
       internal::trace_filter_matches(*active_trace->filter,
                                      internal::kTraceAllLayers, "logits")) {
-    const Status trace_status = internal::emit_trace_tensor(
-        *active_trace->filter, active_trace->sink, active_trace->context,
-        {"logits", internal::kTraceAllLayers, workspace->candidate_logits_host_,
-         logits_count, {logits_count, 0, 0}, 1});
-    if (!trace_status.is_ok()) return trace_status;
+    if (lazy_output_materialization_enabled()) {
+      error = cudaMemcpy(workspace->candidate_logits_host_, workspace->logits_,
+                         logits_count * sizeof(float), cudaMemcpyDeviceToHost);
+    }
+    if (error == cudaSuccess) {
+      const Status trace_status = internal::emit_trace_tensor(
+          *active_trace->filter, active_trace->sink, active_trace->context,
+          {"logits", internal::kTraceAllLayers,
+           workspace->candidate_logits_host_, logits_count,
+           {logits_count, 0, 0}, 1});
+      if (!trace_status.is_ok()) return trace_status;
+    }
   }
 #endif
-  if (error == cudaSuccess && !interrupted) {
-    error = cudaMemcpy(workspace->candidate_hidden_host_, residual,
-                       hidden_count * sizeof(float),
-                       cudaMemcpyDeviceToHost);
-  }
   if (error == cudaSuccess && !interrupted) error = end_phase(leaves);
   if (error == cudaSuccess && !interrupted && capture != nullptr) {
-    write_float_sha(workspace->candidate_logits_host_, logits_count,
-                    capture->output_sha256);
-    copy_prefix(workspace->candidate_logits_host_, logits_count,
-                capture->output_prefix.data(), capture->output_prefix.size());
-    capture->output_count = logits_count;
-    capture->output_captured = true;
+    if (lazy_output_materialization_enabled()) {
+      error = cudaMemcpy(workspace->candidate_logits_host_, workspace->logits_,
+                         logits_count * sizeof(float), cudaMemcpyDeviceToHost);
+    }
+    if (error == cudaSuccess) {
+      write_float_sha(workspace->candidate_logits_host_, logits_count,
+                      capture->output_sha256);
+      copy_prefix(workspace->candidate_logits_host_, logits_count,
+                  capture->output_prefix.data(), capture->output_prefix.size());
+      capture->output_count = logits_count;
+      capture->output_captured = true;
+    }
   }
   if (error == cudaSuccess && !interrupted) error = end_phase(categories);
   nvtxRangePop();
@@ -4916,6 +5175,9 @@ Status execute_token(const ResidentModel& model, std::size_t token,
       internal::kAttentionKvWidth, session->attention_key_,
       session->attention_value_, cache_stride, nullptr);
   if (error == cudaSuccess) error = cudaDeviceSynchronize();
+  if (error == cudaSuccess) {
+    error = session->finish_output_commit(workspace, host_logits, host_hidden);
+  }
   if (error == cudaSuccess) error = end_phase(leaves);
   if (error == cudaSuccess) error = end_phase(categories);
   nvtxRangePop();
@@ -4963,14 +5225,6 @@ Status execute_token(const ResidentModel& model, std::size_t token,
             workspace->gdn_candidate_convolution_);
   std::swap(session->gdn_recurrent_, workspace->gdn_candidate_recurrent_);
   session->tokens_[session->frontier_] = token;
-  std::memcpy(session->last_logits_, workspace->candidate_logits_host_,
-              internal::kVocabularySize * sizeof(float));
-  std::memcpy(session->last_hidden_, workspace->candidate_hidden_host_,
-              internal::kResidualWidth * sizeof(float));
-  std::memcpy(host_logits, workspace->candidate_logits_host_,
-              internal::kVocabularySize * sizeof(float));
-  std::memcpy(host_hidden, workspace->candidate_hidden_host_,
-              internal::kResidualWidth * sizeof(float));
   ++session->frontier_;
   if (gdn_decode_uses_persistent_transposed()) {
     gdn_set_session_live_col_major(true);
@@ -5805,10 +6059,14 @@ Status execute_prompt_chunk(
                               workspace->gdn_candidate_convolution_,
                               gdn_conv_bytes, cudaMemcpyDeviceToDevice, stream);
       if (error == cudaSuccess) {
+        bump_transfer(workspace, cudaMemcpyDeviceToDevice, gdn_conv_bytes);
         error = cudaMemcpyAsync(gdn_carry_recurrent,
                                 workspace->gdn_candidate_recurrent_,
                                 gdn_rec_bytes, cudaMemcpyDeviceToDevice,
                                 stream);
+      }
+      if (error == cudaSuccess) {
+        bump_transfer(workspace, cudaMemcpyDeviceToDevice, gdn_rec_bytes);
       }
     }
   }
@@ -5848,21 +6106,29 @@ Status execute_prompt_chunk(
         }
       }
     }
-    if (error == cudaSuccess) {
+    if (error == cudaSuccess && lazy_output_materialization_enabled()) {
+      error = session->commit_outputs(workspace, workspace->logits_, final_hidden,
+                                      host_logits, host_hidden, stream);
+    }
+    if (error == cudaSuccess && !lazy_output_materialization_enabled()) {
       error = cudaMemcpyAsync(
           workspace->candidate_logits_host_, workspace->logits_,
           logits_count * sizeof(float), cudaMemcpyDeviceToHost,
           workspace->prompt_copy_stream_);
       if (error == cudaSuccess) {
+        bump_transfer(workspace, cudaMemcpyDeviceToHost,
+                      logits_count * sizeof(float));
         bump(counters, &PromptPipelineCounters::async_d2h_copies);
       }
     }
-    if (error == cudaSuccess) {
+    if (error == cudaSuccess && !lazy_output_materialization_enabled()) {
       error = cudaMemcpyAsync(
           workspace->candidate_hidden_host_, final_hidden,
           hidden_count * sizeof(float), cudaMemcpyDeviceToHost,
           workspace->prompt_copy_stream_);
       if (error == cudaSuccess) {
+        bump_transfer(workspace, cudaMemcpyDeviceToHost,
+                      hidden_count * sizeof(float));
         bump(counters, &PromptPipelineCounters::async_d2h_copies);
       }
     }
@@ -5898,16 +6164,10 @@ Status execute_prompt_chunk(
                           stream);
     }
     if (error == cudaSuccess) {
-      error = cudaMemcpy(workspace->candidate_logits_host_, workspace->logits_,
-                         logits_count * sizeof(float), cudaMemcpyDeviceToHost);
-      if (error == cudaSuccess) {
+      error = session->commit_outputs(workspace, workspace->logits_, final_hidden,
+                                      host_logits, host_hidden, stream);
+      if (error == cudaSuccess && !lazy_output_materialization_enabled()) {
         bump(counters, &PromptPipelineCounters::blocking_d2h_copies);
-      }
-    }
-    if (error == cudaSuccess) {
-      error = cudaMemcpy(workspace->candidate_hidden_host_, final_hidden,
-                         hidden_count * sizeof(float), cudaMemcpyDeviceToHost);
-      if (error == cudaSuccess) {
         bump(counters, &PromptPipelineCounters::blocking_d2h_copies);
       }
     }
@@ -5949,6 +6209,9 @@ Status execute_prompt_chunk(
     if (error == cudaSuccess) error = end_phase(leaves);
     if (error == cudaSuccess) error = end_phase(categories);
   }
+  if (error == cudaSuccess) {
+    error = session->finish_output_commit(workspace, host_logits, host_hidden);
+  }
   nvtxRangePop();
   if (error != cudaSuccess) {
     if (fused) {
@@ -5988,14 +6251,6 @@ Status execute_prompt_chunk(
   std::swap(session->gdn_recurrent_, workspace->gdn_candidate_recurrent_);
   std::memcpy(session->tokens_ + session->frontier_, tokens,
               token_count * sizeof(std::size_t));
-  std::memcpy(session->last_logits_, workspace->candidate_logits_host_,
-              logits_count * sizeof(float));
-  std::memcpy(session->last_hidden_, workspace->candidate_hidden_host_,
-              hidden_count * sizeof(float));
-  std::memcpy(host_logits, workspace->candidate_logits_host_,
-              logits_count * sizeof(float));
-  std::memcpy(host_hidden, workspace->candidate_hidden_host_,
-              hidden_count * sizeof(float));
   session->frontier_ += token_count;
   return Status::ok();
 }
@@ -6010,8 +6265,14 @@ Status greedy_sample(const SchedulerSession& session,
             "CUDA greedy sampling input or committed logits are invalid"};
   }
   std::size_t best = 0;
-  for (std::size_t index = 1; index < internal::kVocabularySize; ++index) {
-    if (session.last_logits_[index] > session.last_logits_[best]) best = index;
+  if (session.greedy_token_valid_) {
+    best = session.cached_greedy_token_;
+  } else {
+    const Status materialized = session.materialize_last_outputs();
+    if (!materialized.is_ok()) return materialized;
+    for (std::size_t index = 1; index < internal::kVocabularySize; ++index) {
+      if (session.last_logits_[index] > session.last_logits_[best]) best = index;
+    }
   }
   *token = best;
   if (timings != nullptr) {
@@ -6077,6 +6338,8 @@ Status sync_tokens(const ResidentModel& model, const std::size_t* tokens,
     if (!reset_status.is_ok()) return reset_status;
   }
   if (start == token_count && token_count > 0) {
+    const Status materialized = session->materialize_last_outputs();
+    if (!materialized.is_ok()) return materialized;
     std::memcpy(host_logits, session->last_logits_,
                 internal::kVocabularySize * sizeof(float));
     std::memcpy(host_hidden, session->last_hidden_,

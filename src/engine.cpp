@@ -55,8 +55,8 @@ struct Session::Impl final {
   cuda::SchedulerSession session;
   cuda::SchedulerWorkspace workspace;
   cuda::SchedulerGraphs graphs;
-  std::vector<float> logits;
-  std::vector<float> hidden;
+  mutable std::vector<float> logits;
+  mutable std::vector<float> hidden;
   mutable bool has_pending_sampler = false;
   mutable Token pending_token = 0;
   mutable cuda::SamplerState pending_sampler;
@@ -299,6 +299,10 @@ Status Session::logits(std::vector<float>* output) const noexcept {
   if (!impl_ || impl_->session.frontier() == 0) {
     return {StatusCode::kInvalidArgument, "session has no committed logits"};
   }
+  Status status = impl_->session.copy_last_outputs(
+      impl_->logits.data(), impl_->logits.size(), impl_->hidden.data(),
+      impl_->hidden.size());
+  if (!status.is_ok()) return status;
   *output = impl_->logits;
   return Status::ok();
 #else
@@ -336,6 +340,12 @@ Status Session::sample(const SamplerConfig& config, Token* token,
       }
     }
     return status;
+  }
+  {
+    const Status materialized = impl_->session.copy_last_outputs(
+        impl_->logits.data(), impl_->logits.size(), impl_->hidden.data(),
+        impl_->hidden.size());
+    if (!materialized.is_ok()) return materialized;
   }
   cuda::SamplerState state = impl_->session.sampler_state();
   const auto sampling_started = std::chrono::steady_clock::now();

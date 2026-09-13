@@ -33,6 +33,39 @@ void set_prompt_microbatch_rows_override(std::size_t rows) noexcept;
 void clear_prompt_microbatch_rows_override() noexcept;
 const char* selected_execution_graph_path() noexcept;
 
+// OPT-118. Production pins stay false unless acceptance keeps the candidate.
+constexpr bool kSelectedLazyOutputMaterialization = true;
+constexpr bool kSelectedOutputCommitOverlap = true;
+
+inline thread_local int g_lazy_output_override = -1;
+inline thread_local int g_output_overlap_override = -1;
+
+inline bool lazy_output_materialization_enabled() noexcept {
+  return g_lazy_output_override >= 0 ? g_lazy_output_override != 0
+                                     : kSelectedLazyOutputMaterialization;
+}
+
+inline bool output_commit_overlap_enabled() noexcept {
+  return g_output_overlap_override >= 0 ? g_output_overlap_override != 0
+                                        : kSelectedOutputCommitOverlap;
+}
+
+inline void set_lazy_output_materialization_override(bool enabled) noexcept {
+  g_lazy_output_override = enabled ? 1 : 0;
+}
+
+inline void clear_lazy_output_materialization_override() noexcept {
+  g_lazy_output_override = -1;
+}
+
+inline void set_output_commit_overlap_override(bool enabled) noexcept {
+  g_output_overlap_override = enabled ? 1 : 0;
+}
+
+inline void clear_output_commit_overlap_override() noexcept {
+  g_output_overlap_override = -1;
+}
+
 struct PromptMicrobatchRowsScope final {
   explicit PromptMicrobatchRowsScope(std::size_t rows) noexcept {
     set_prompt_microbatch_rows_override(rows);
@@ -41,6 +74,24 @@ struct PromptMicrobatchRowsScope final {
   PromptMicrobatchRowsScope(const PromptMicrobatchRowsScope&) = delete;
   PromptMicrobatchRowsScope& operator=(const PromptMicrobatchRowsScope&) =
       delete;
+};
+
+struct LazyOutputScope final {
+  explicit LazyOutputScope(bool enabled) noexcept {
+    set_lazy_output_materialization_override(enabled);
+  }
+  ~LazyOutputScope() { clear_lazy_output_materialization_override(); }
+  LazyOutputScope(const LazyOutputScope&) = delete;
+  LazyOutputScope& operator=(const LazyOutputScope&) = delete;
+};
+
+struct OutputOverlapScope final {
+  explicit OutputOverlapScope(bool enabled) noexcept {
+    set_output_commit_overlap_override(enabled);
+  }
+  ~OutputOverlapScope() { clear_output_commit_overlap_override(); }
+  OutputOverlapScope(const OutputOverlapScope&) = delete;
+  OutputOverlapScope& operator=(const OutputOverlapScope&) = delete;
 };
 
 struct DeviceTensor final {
@@ -468,12 +519,23 @@ class SchedulerSession final {
   Status copy_last_outputs(float* logits, std::size_t logits_count,
                            float* hidden,
                            std::size_t hidden_count) const noexcept;
+  Status materialize_last_outputs() const noexcept;
   Status copy_tokens(std::size_t* output,
                      std::size_t output_count) const noexcept;
   std::size_t capacity() const noexcept;
   std::size_t frontier() const noexcept;
   std::size_t token_count() const noexcept;
   std::size_t allocated_bytes() const noexcept;
+  bool greedy_token_valid() const noexcept;
+  std::size_t cached_greedy_token() const noexcept;
+  cudaError_t commit_outputs(class SchedulerWorkspace* workspace,
+                             const float* device_logits,
+                             const float* device_hidden, float* host_logits,
+                             float* host_hidden,
+                             cudaStream_t compute_stream) noexcept;
+  cudaError_t finish_output_commit(class SchedulerWorkspace* workspace,
+                                   float* host_logits,
+                                   float* host_hidden) noexcept;
 
  private:
   void release() noexcept;
@@ -494,8 +556,15 @@ class SchedulerSession final {
   __nv_bfloat16* attention_key_ = nullptr;
   __nv_bfloat16* attention_value_ = nullptr;
   std::size_t* tokens_ = nullptr;
-  float* last_logits_ = nullptr;
-  float* last_hidden_ = nullptr;
+  mutable float* last_logits_ = nullptr;
+  mutable float* last_hidden_ = nullptr;
+  float* last_logits_device_ = nullptr;
+  float* last_hidden_device_ = nullptr;
+  int* greedy_index_device_ = nullptr;
+  std::size_t cached_greedy_token_ = 0;
+  mutable bool outputs_host_valid_ = false;
+  bool greedy_token_valid_ = false;
+  bool device_outputs_valid_ = false;
   std::size_t capacity_ = 0;
   std::size_t frontier_ = 0;
   std::size_t allocated_bytes_ = 0;
@@ -605,6 +674,21 @@ class SchedulerWorkspace final {
   cudaStream_t prompt_compute_stream_ = nullptr;
   cudaStream_t prompt_copy_stream_ = nullptr;
   cudaEvent_t prompt_compute_done_ = nullptr;
+  std::uint64_t transfer_h2d_bytes_ = 0;
+  std::uint64_t transfer_d2h_bytes_ = 0;
+  std::uint64_t transfer_d2d_bytes_ = 0;
+  std::uint32_t transfer_h2d_copies_ = 0;
+  std::uint32_t transfer_d2h_copies_ = 0;
+  std::uint32_t transfer_d2d_copies_ = 0;
+
+  void reset_transfer_counters() noexcept {
+    transfer_h2d_bytes_ = 0;
+    transfer_d2h_bytes_ = 0;
+    transfer_d2d_bytes_ = 0;
+    transfer_h2d_copies_ = 0;
+    transfer_d2h_copies_ = 0;
+    transfer_d2d_copies_ = 0;
+  }
 
   friend Status execute_token(const ResidentModel&, std::size_t,
                               SchedulerSession*, SchedulerWorkspace*, float*,

@@ -326,6 +326,10 @@ Status SchedulerSession::save_checkpoint(const std::string& path,
   }
   if (kv_staging != nullptr) cudaFree(kv_staging);
   if (status.is_ok() && logits_bytes != 0) {
+    const Status materialized = materialize_last_outputs();
+    if (!materialized.is_ok()) status = materialized;
+  }
+  if (status.is_ok() && logits_bytes != 0) {
     output.write(reinterpret_cast<const char*>(last_logits_), logits_bytes);
     if (!output) status = {StatusCode::kIoError, "cannot write checkpoint logits"};
   }
@@ -576,6 +580,21 @@ Status SchedulerSession::restore_checkpoint(
   if (frontier != 0) {
     std::memcpy(last_logits_, workspace->candidate_logits_host_, expected_logits);
     std::memcpy(last_hidden_, workspace->candidate_hidden_host_, expected_hidden);
+    outputs_host_valid_ = true;
+    greedy_token_valid_ = false;
+    if (last_logits_device_ != nullptr && last_hidden_device_ != nullptr) {
+      cudaError_t upload =
+          cudaMemcpy(last_logits_device_, last_logits_, expected_logits,
+                     cudaMemcpyHostToDevice);
+      if (upload == cudaSuccess) {
+        upload = cudaMemcpy(last_hidden_device_, last_hidden_, expected_hidden,
+                            cudaMemcpyHostToDevice);
+      }
+      device_outputs_valid_ = upload == cudaSuccess;
+      if (upload != cudaSuccess) {
+        return {StatusCode::kInternal, "cannot upload restored CUDA outputs"};
+      }
+    }
   }
   sampler_state_ = restored_sampler;
   frontier_ = static_cast<std::size_t>(frontier);
