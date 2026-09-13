@@ -1,0 +1,4600 @@
+{
+  "schema_version": 1,
+  "task": "OPT-124",
+  "status": "analysis",
+  "measurement_utc": "2026-09-13T20:55:00Z",
+  "identity": {
+    "device": "NVIDIA GeForce RTX 5090",
+    "llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+    "llama_inspection_head": "1945e092030f8668ff93382799502d01490e564d",
+    "ds4_inspection_head": "c238077a87186381bf626cc531bccffe1fef79e7",
+    "gguf_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+    "source_revision": "a8daac9b610b331be9e5f559757fdd189a6cb04f",
+    "source_state": "dirty",
+    "nvccflags": "-O2 --fmad=false",
+    "execution_graphs": "ffn_only",
+    "final_stack": "combined_opt118_opt119",
+    "historical_control": "post113_selected",
+    "image": "qw38-cuda:13.0.2",
+    "model": "models/Qwen3.8-27B-Q4_K_M.gguf",
+    "opt123": {
+      "llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+      "gguf_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+      "parent": "post113_selected",
+      "candidate": "combined_opt118_opt119",
+      "keepers": [
+        "OPT-118",
+        "OPT-119"
+      ],
+      "execution_graphs": "ffn_only",
+      "q4_decode": "llama_q4k_mmvq",
+      "packed_kv": "DenseBf16",
+      "weight_requant": "none",
+      "gdn_state": "Fp32",
+      "rejected_no_leak": true,
+      "reuse_historical_llama": false,
+      "llama_p4096_flash_attn": -1,
+      "llama_n_gpu_layers": 99,
+      "llama_type_k": "f16",
+      "llama_type_v": "f16",
+      "quality_ppl_ratio": 1.0,
+      "opt116_contract_id": "opt116_generated_v1"
+    },
+    "post113_authenticated": {
+      "ok": true,
+      "selectors": {
+        "rms_norm": "parallel_fma",
+        "q4_decode": "llama_q4k_mmvq",
+        "q8_decode": "dp4a_q8_1",
+        "q6_decode": "integer_q8_1",
+        "ffn_decode": "paired_integer",
+        "query_prepare": "hoisted",
+        "attention_pipeline": "opt111_base",
+        "gdn_preproc": "transpose",
+        "mmq_pipeline": "fma_async",
+        "ffn_prompt_pair": "off",
+        "execution_graphs": "ffn_only",
+        "production_numerics": "strict",
+        "gdn_decode": "sequential",
+        "decode_query_prep": "warp_query",
+        "q8_decode_rows_skinny": 1,
+        "q8_decode_rows_medium": 1,
+        "q8_decode_rows_wide": 1,
+        "q8_decode_layout_warps_skinny": 4,
+        "q8_decode_layout_warps_medium": 4,
+        "q8_decode_layout_warps_wide": 4,
+        "ffn_gate_quality_i": 128,
+        "ffn_gate_prompt_tile": 128,
+        "prompt_microbatch_rows": 4096,
+        "mmq_async_x": true,
+        "nvccflags": "-O2 --fmad=false",
+        "q8_layout": "r1_w4",
+        "ffn_tiles": "i128_j128",
+        "q8_grouping": "grouped_r1_w4",
+        "q8_device_layout": "raw_gguf",
+        "q6_device_layout": "raw_gguf",
+        "mmq_double_x": false,
+        "decode_attention_vec128": "warp_query",
+        "decode_attention_crossover_threshold": 1024,
+        "decode_attention": "hybrid_crossover"
+      },
+      "expected": {
+        "rms_norm": "parallel_fma",
+        "q4_decode": "llama_q4k_mmvq",
+        "q8_decode": "dp4a_q8_1",
+        "q8_grouping": "grouped_r1_w4",
+        "q8_layout": "r1_w4",
+        "q6_decode": "integer_q8_1",
+        "ffn_decode": "paired_integer",
+        "query_prepare": "hoisted",
+        "attention_pipeline": "opt111_base",
+        "gdn_preproc": "transpose",
+        "mmq_pipeline": "fma_async",
+        "mmq_async_x": true,
+        "ffn_prompt_pair": "off",
+        "ffn_tiles": "i128_j128",
+        "prompt_microbatch_rows": 4096,
+        "execution_graphs": "ffn_only",
+        "production_numerics": "strict",
+        "nvccflags": "-O2 --fmad=false",
+        "gdn_decode": "sequential",
+        "decode_query_prep": "warp_query",
+        "decode_attention": "hybrid_crossover",
+        "decode_attention_vec128": "warp_query",
+        "decode_attention_crossover_threshold": 1024,
+        "q8_device_layout": "raw_gguf",
+        "q6_device_layout": "raw_gguf",
+        "mmq_double_x": false
+      },
+      "opt113_fixture_selected": {
+        "rms_norm": "parallel_fma",
+        "q4_decode": "llama_q4k_mmvq",
+        "q8_decode": "dp4a_q8_1",
+        "q6_decode": "integer_q8_1",
+        "ffn_decode": "paired_integer",
+        "query_prepare": "hoisted",
+        "attention_pipeline": "opt111_base",
+        "gdn_preproc": "transpose",
+        "mmq_pipeline": "fma_async",
+        "ffn_prompt_pair": "off",
+        "execution_graphs": "ffn_only",
+        "production_numerics": "strict",
+        "gdn_decode": "sequential",
+        "decode_query_prep": "warp_query",
+        "q8_decode_rows_skinny": 1,
+        "q8_decode_rows_medium": 1,
+        "q8_decode_rows_wide": 1,
+        "q8_decode_layout_warps_skinny": 4,
+        "q8_decode_layout_warps_medium": 4,
+        "q8_decode_layout_warps_wide": 4,
+        "ffn_gate_quality_i": 128,
+        "ffn_gate_prompt_tile": 128,
+        "prompt_microbatch_rows": 4096,
+        "mmq_async_x": true,
+        "nvccflags": "-O2 --fmad=false",
+        "q8_layout": "r1_w4",
+        "ffn_tiles": "i128_j128",
+        "q8_grouping": "grouped_r1_w4",
+        "q8_device_layout": "raw_gguf",
+        "q6_device_layout": "raw_gguf",
+        "mmq_double_x": false,
+        "decode_attention_vec128": "warp_query",
+        "decode_attention_crossover_threshold": 1024,
+        "decode_attention": "hybrid_crossover"
+      },
+      "mismatches": {},
+      "llama_q4k_mmvq": true,
+      "opt111_base": true,
+      "hybrid_crossover": true,
+      "sequential_gdn": true,
+      "ffn_only_graphs": true,
+      "opt113_numbers_historical_only": true
+    }
+  },
+  "hardware_executed": true,
+  "gpu_blocker": null,
+  "opt123_identities_match": {
+    "ok": true,
+    "expected": {
+      "llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+      "gguf_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+      "parent": "post113_selected",
+      "candidate": "combined_opt118_opt119",
+      "keepers": [
+        "OPT-118",
+        "OPT-119"
+      ],
+      "execution_graphs": "ffn_only",
+      "q4_decode": "llama_q4k_mmvq",
+      "packed_kv": "DenseBf16",
+      "weight_requant": "none",
+      "gdn_state": "Fp32",
+      "rejected_no_leak": true,
+      "reuse_historical_llama": false
+    },
+    "observed": {
+      "llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+      "gguf_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+      "parent": "post113_selected",
+      "candidate": "combined_opt118_opt119",
+      "keepers": [
+        "OPT-118",
+        "OPT-119"
+      ],
+      "execution_graphs": "ffn_only",
+      "q4_decode": "llama_q4k_mmvq",
+      "packed_kv": "DenseBf16",
+      "weight_requant": "none",
+      "gdn_state": "Fp32",
+      "rejected_no_leak": true,
+      "reuse_historical_llama": false,
+      "llama_p4096_flash_attn": -1,
+      "llama_n_gpu_layers": 99,
+      "llama_type_k": "f16",
+      "llama_type_v": "f16",
+      "quality_ppl_ratio": 1.0,
+      "opt116_contract_id": "opt116_generated_v1"
+    },
+    "mismatches": {},
+    "reuse_opt123_samples": true
+  },
+  "bounds": {
+    "peak_bandwidth_gb_s": 1792.0,
+    "peak_fp32_tflops": 104.8,
+    "peak_fp16_tensor_tflops_dense": 209.5,
+    "measured_sustainable_bandwidth_gb_s": null,
+    "n_params": 26895998464,
+    "serial_dependency": {
+      "batch": 1,
+      "sessions": 1,
+      "autoregressive": true,
+      "tokens_cannot_overlap": true,
+      "request_time_ge_n_times_per_token_bound": true,
+      "cross_token_weight_amortization": "Prefill may reuse a weight tile across prompt rows inside one microbatch. Ordinary decode batch-one cannot; each token rereads streamed weights. That scope limit is not a license to implement speculation, MTP, or multi-session batching here.",
+      "excluded": [
+        "speculative_decoding",
+        "multi_token_prediction",
+        "batching_concurrent_sessions",
+        "model_replacement_retraining",
+        "sparse_attention"
+      ]
+    },
+    "inventory": {
+      "tensor_count": 851,
+      "by_dtype_bytes": {
+        "Q6_K": 1455820800,
+        "F32": 10582016,
+        "Q4_K": 10341089280,
+        "Q8_0": 7155384320
+      },
+      "by_role_bytes": {
+        "output_projection": 1042944000,
+        "final_norm": 20480,
+        "token_embedding": 715161600,
+        "gdn_value_gate": 1604321280,
+        "input_norm": 1310720,
+        "gdn_packed_qkv": 2673868800,
+        "ffn_down": 3208642560,
+        "ffn_gate": 3208642560,
+        "ffn_up": 3208642560,
+        "ffn_norm": 1310720,
+        "gdn_decay": 9216,
+        "gdn_alpha": 12533760,
+        "gdn_beta": 12533760,
+        "gdn_convolution": 7864320,
+        "gdn_dt_bias": 9216,
+        "gdn_norm": 24576,
+        "gdn_output": 1604321280,
+        "attention_k": 89128960,
+        "attention_k_norm": 16384,
+        "attention_output": 412876800,
+        "attention_q_gate": 1069547520,
+        "attention_q_norm": 16384,
+        "attention_v": 89128960
+      },
+      "by_phase_bytes": {
+        "weights": 17202071552,
+        "norms": 2699264,
+        "embedding": 715161600,
+        "output_head": 1042944000
+      },
+      "q4_k_bytes": 10341089280,
+      "q8_0_bytes": 7155384320,
+      "q6_k_bytes": 1455820800,
+      "f32_bytes": 10582016,
+      "units": "bytes"
+    },
+    "opt115_timeline_overlay": {
+      "available": true,
+      "identity": "post113_selected",
+      "matches_combined_stack": false,
+      "reuse_as_combined": false,
+      "note": "OPT-115 timeline is post113, not combined_opt118_opt119. Idle/busy numbers are a labeled overlay, not a combined-stack measurement.",
+      "d128": {
+        "gpu_busy_union_ms": 7.89075479999984,
+        "gpu_idle_gap_ms": 9.974685400000169,
+        "unclassified_ms": 0.6377406999999913,
+        "interval_coverage": 0.9657681994565575,
+        "wall_ms": 18.6300659
+      },
+      "d2048": {
+        "gpu_busy_union_ms": 8.26415000000054,
+        "gpu_idle_gap_ms": 10.025705999999445,
+        "unclassified_ms": 0.47919139999997995,
+        "interval_coverage": 0.9746627692597035,
+        "wall_ms": 18.9125404
+      },
+      "aa_repeatable": true
+    },
+    "workloads": {
+      "p4096": {
+        "traffic": {
+          "scope": "prefill_request",
+          "tokens": 4096,
+          "microbatch": 4096,
+          "tiles": 1,
+          "units": "bytes",
+          "phases": {
+            "weights": 18259511296,
+            "activations": 5200936960,
+            "kv": 268435456,
+            "gdn_state": 158859264,
+            "transfers": 1013760,
+            "logits": 993280,
+            "barriers": 0,
+            "graphs": 0
+          },
+          "bytes_per_request": 23889750016,
+          "bytes_per_token": 5832458.5,
+          "source": "tensor_inventory_plus_architecture_constants",
+          "measured": false,
+          "representation": "combined_opt118_opt119",
+          "opt119_bf16_reread_removed_bytes": 167772160,
+          "parent_activation_bytes": 5368709120
+        },
+        "byte_bound": {
+          "prefix": 4096,
+          "peak_bandwidth_gb_s": 1792.0,
+          "measured_sustainable_bandwidth_gb_s": null,
+          "per_phase": {
+            "weights": {
+              "bytes": 18259511296.0,
+              "peak_ms": 10.189459428571428,
+              "sustainable_ms": null
+            },
+            "activations": {
+              "bytes": 5200936960.0,
+              "peak_ms": 2.9023085714285712,
+              "sustainable_ms": null
+            },
+            "kv": {
+              "bytes": 268435456.0,
+              "peak_ms": 0.14979657142857142,
+              "sustainable_ms": null
+            },
+            "gdn_state": {
+              "bytes": 158859264.0,
+              "peak_ms": 0.08864914285714286,
+              "sustainable_ms": null
+            },
+            "transfers": {
+              "bytes": 1013760.0,
+              "peak_ms": 0.0005657142857142857,
+              "sustainable_ms": null
+            },
+            "logits": {
+              "bytes": 993280.0,
+              "peak_ms": 0.0005542857142857143,
+              "sustainable_ms": null
+            },
+            "barriers": {
+              "bytes": 0.0,
+              "peak_ms": 0.0,
+              "sustainable_ms": null
+            },
+            "graphs": {
+              "bytes": 0.0,
+              "peak_ms": 0.0,
+              "sustainable_ms": null
+            }
+          },
+          "independent_sum_peak_ms": 13.331333714285714,
+          "independent_sum_not_a_bound": true,
+          "critical_path_peak_ms": 10.189459428571428,
+          "overlap_aware_peak_ms": 10.189459428571428,
+          "wall_ms": 1395.3836138944625,
+          "assumptions": [
+            "RTX 5090 listed peak 1792 GB/s from NVIDIA Blackwell architecture paper",
+            "peak is an optimistic bound, not observed application bandwidth",
+            "compulsory reads assume no L2 reuse across layers and no write-allocate traffic beyond listed writes",
+            "embedding lookup charges one Q4_K row, not the full table",
+            "GDN decode charges one recurrent+conv pass with pointer-swap commit, not a full 8 GiB KV copy",
+            "overlapping costs use max/critical-path, not a sum of independent peak bounds",
+            "fixed-format Q4_K/Q8_0/Q6_K; quality-gated lower-bit models are separate OPT-121/122 candidates",
+            "measured sustainable bandwidth unavailable; sustainable_ms is null"
+          ],
+          "units": {
+            "bytes": "bytes",
+            "time": "milliseconds",
+            "bandwidth": "GB/s"
+          },
+          "claims_throughput": false
+        },
+        "compute_bound": {
+          "logical_dense_mac_flops": 220332019417088.0,
+          "attention_extra_flops": 0.0,
+          "total_flops": 220332019417088.0,
+          "excludes_unpack_scale": true,
+          "unpack_scale_note": "Q4_K/Q8_0/Q6_K dequant and scale application are required work not counted in 2*N*T. Excluding them makes the compute bound optimistic, not attainable.",
+          "peak_fp32_tflops": 104.8,
+          "peak_fp16_tensor_tflops_dense": 209.5,
+          "fp32_peak_ms": 2102.404765430229,
+          "fp16_tensor_peak_ms": 1051.704149962234,
+          "optimistic_compute_ms": 1051.704149962234,
+          "listed_peaks_not_measured": true
+        },
+        "overlap_aware": {
+          "byte_critical_ms": 10.189459428571428,
+          "compute_ms": 1051.704149962234,
+          "serial_idle_ms": null,
+          "busy_overlap_ms": 1051.704149962234,
+          "overlap_aware_ms": 1051.704149962234,
+          "independent_sum_not_a_bound": true,
+          "note": "Weight traffic and GEMM share the busy interval (max). Launch/idle gaps are serial. Summing independent peak bounds is not a bound. A roofline bottleneck is not proof of an optimal algorithm."
+        },
+        "lower_precision": {
+          "admitted": false,
+          "note": "These encodings were quality-gated or bound-rejected. A smaller byte model is not an identical-arithmetic kernel win and is not the shipping representation.",
+          "opt121_q8_to_q4k": {
+            "task": "OPT-121",
+            "verdict": "quality_blocked",
+            "weight_bytes": 14892274496,
+            "peak_ms": 8.310421035714286,
+            "bytes_saved": 3355443200,
+            "quality_matched": false
+          },
+          "opt120_q8q8_kv": {
+            "task": "OPT-120",
+            "verdict": "quality_blocked",
+            "kv_bytes": 142606336,
+            "peak_ms": 0.07957942857142856,
+            "capacity_128k_bytes": 4563402752,
+            "quality_matched": false
+          },
+          "opt122_bf16_gdn": {
+            "task": "OPT-122",
+            "verdict": "no_material_opportunity",
+            "gdn_dram_bytes": 166723584,
+            "peak_ms": 0.09303771428571429,
+            "critical_path_save_ms": 0.0,
+            "quality_matched": true,
+            "note": "compute already exceeds FP32 DRAM time on gdn_core"
+          }
+        },
+        "opt123_combined_ms": 1395.3836138944625,
+        "opt123_llama_ms": 1318.9822143298827,
+        "residual_vs_busy_bound_ms": 343.6794639322286,
+        "idle_source": null,
+        "bound_excludes_unpack_and_may_exclude_idle": true,
+        "optimistic_not_attainable": true
+      },
+      "d128": {
+        "traffic": {
+          "scope": "one_decode_token",
+          "prefix": 128,
+          "units": "bytes",
+          "phases": {
+            "weights": 18247717696,
+            "activations": 5767168,
+            "kv": 8454144,
+            "gdn_state": 158859264,
+            "transfers": 4,
+            "logits": 4,
+            "barriers": 0,
+            "graphs": 0
+          },
+          "bytes_per_token": 18420798280,
+          "bytes_per_request_one_token": 18420798280,
+          "embedding_row_bytes": 2880,
+          "embedding_full_table_excluded": true,
+          "kv_read_bytes": 8388608,
+          "kv_append_bytes": 65536,
+          "gdn": {
+            "convolution_bytes": 7864320,
+            "recurrent_bytes": 150994944,
+            "total_bytes": 158859264,
+            "candidate_plus_committed_capacity_note": "decode swaps candidate/committed pointers; do not charge a full duplicate copy on every token unless measured"
+          },
+          "logits_d2h_bytes": 4,
+          "hidden_d2h_bytes": 0,
+          "source": "tensor_inventory_plus_architecture_constants",
+          "measured": false,
+          "representation": "combined_opt118_opt119",
+          "parent_transfers_bytes": 1013760,
+          "lazy_index_bytes": 4,
+          "measured_d2h_source": "fixtures/opt123_combined_stack.json inventory",
+          "opt119_decode_note": "mixer/FFN Q8 fusion removes standalone quantize rereads; weight sweeps unchanged. Architecture residual/FFN intermediates remain."
+        },
+        "byte_bound": {
+          "prefix": 128,
+          "peak_bandwidth_gb_s": 1792.0,
+          "measured_sustainable_bandwidth_gb_s": null,
+          "per_phase": {
+            "weights": {
+              "bytes": 18247717696.0,
+              "peak_ms": 10.182878178571428,
+              "sustainable_ms": null
+            },
+            "activations": {
+              "bytes": 5767168.0,
+              "peak_ms": 0.0032182857142857143,
+              "sustainable_ms": null
+            },
+            "kv": {
+              "bytes": 8454144.0,
+              "peak_ms": 0.004717714285714286,
+              "sustainable_ms": null
+            },
+            "gdn_state": {
+              "bytes": 158859264.0,
+              "peak_ms": 0.08864914285714286,
+              "sustainable_ms": null
+            },
+            "transfers": {
+              "bytes": 4.0,
+              "peak_ms": 2.232142857142857e-09,
+              "sustainable_ms": null
+            },
+            "logits": {
+              "bytes": 4.0,
+              "peak_ms": 2.232142857142857e-09,
+              "sustainable_ms": null
+            },
+            "barriers": {
+              "bytes": 0.0,
+              "peak_ms": 0.0,
+              "sustainable_ms": null
+            },
+            "graphs": {
+              "bytes": 0.0,
+              "peak_ms": 0.0,
+              "sustainable_ms": null
+            }
+          },
+          "independent_sum_peak_ms": 10.279463325892857,
+          "independent_sum_not_a_bound": true,
+          "critical_path_peak_ms": 10.182878178571428,
+          "overlap_aware_peak_ms": 10.182878178571428,
+          "wall_ms": 18.513067304710496,
+          "assumptions": [
+            "RTX 5090 listed peak 1792 GB/s from NVIDIA Blackwell architecture paper",
+            "peak is an optimistic bound, not observed application bandwidth",
+            "compulsory reads assume no L2 reuse across layers and no write-allocate traffic beyond listed writes",
+            "embedding lookup charges one Q4_K row, not the full table",
+            "GDN decode charges one recurrent+conv pass with pointer-swap commit, not a full 8 GiB KV copy",
+            "overlapping costs use max/critical-path, not a sum of independent peak bounds",
+            "fixed-format Q4_K/Q8_0/Q6_K; quality-gated lower-bit models are separate OPT-121/122 candidates",
+            "measured sustainable bandwidth unavailable; sustainable_ms is null"
+          ],
+          "units": {
+            "bytes": "bytes",
+            "time": "milliseconds",
+            "bandwidth": "GB/s"
+          },
+          "claims_throughput": false
+        },
+        "compute_bound": {
+          "logical_dense_mac_flops": 53791996928.0,
+          "attention_extra_flops": 25165824.0,
+          "total_flops": 53817162752.0,
+          "excludes_unpack_scale": true,
+          "unpack_scale_note": "Q4_K/Q8_0/Q6_K dequant and scale application are required work not counted in 2*N*T. Excluding them makes the compute bound optimistic, not attainable.",
+          "peak_fp32_tflops": 104.8,
+          "peak_fp16_tensor_tflops_dense": 209.5,
+          "fp32_peak_ms": 0.5135225453435114,
+          "fp16_tensor_peak_ms": 0.25688383175178997,
+          "optimistic_compute_ms": 0.25688383175178997,
+          "listed_peaks_not_measured": true
+        },
+        "overlap_aware": {
+          "byte_critical_ms": 10.182878178571428,
+          "compute_ms": 0.25688383175178997,
+          "serial_idle_ms": 9.978260100000128,
+          "busy_overlap_ms": 10.182878178571428,
+          "overlap_aware_ms": 20.161138278571556,
+          "independent_sum_not_a_bound": true,
+          "note": "Weight traffic and GEMM share the busy interval (max). Launch/idle gaps are serial. Summing independent peak bounds is not a bound. A roofline bottleneck is not proof of an optimal algorithm."
+        },
+        "lower_precision": {
+          "admitted": false,
+          "note": "These encodings were quality-gated or bound-rejected. A smaller byte model is not an identical-arithmetic kernel win and is not the shipping representation.",
+          "opt121_q8_to_q4k": {
+            "task": "OPT-121",
+            "verdict": "quality_blocked",
+            "weight_bytes": 14892274496,
+            "peak_ms": 8.310421035714286,
+            "bytes_saved": 3355443200,
+            "quality_matched": false
+          },
+          "opt120_q8q8_kv": {
+            "task": "OPT-120",
+            "verdict": "quality_blocked",
+            "kv_bytes": 4456448,
+            "peak_ms": 0.0024868571428571427,
+            "capacity_128k_bytes": 4563402752,
+            "quality_matched": false
+          },
+          "opt122_bf16_gdn": {
+            "task": "OPT-122",
+            "verdict": "no_material_opportunity",
+            "gdn_dram_bytes": 166723584,
+            "peak_ms": 0.09303771428571429,
+            "critical_path_save_ms": 0.0,
+            "quality_matched": true,
+            "note": "compute already exceeds FP32 DRAM time on gdn_core"
+          }
+        },
+        "opt123_combined_ms": 18.513067304710496,
+        "opt123_llama_ms": 14.562478114142657,
+        "residual_vs_busy_bound_ms": 8.330189126139068,
+        "idle_source": "combined_timeline",
+        "bound_excludes_unpack_and_may_exclude_idle": true,
+        "optimistic_not_attainable": true
+      },
+      "d2048": {
+        "traffic": {
+          "scope": "one_decode_token",
+          "prefix": 2048,
+          "units": "bytes",
+          "phases": {
+            "weights": 18247717696,
+            "activations": 5767168,
+            "kv": 134283264,
+            "gdn_state": 158859264,
+            "transfers": 4,
+            "logits": 4,
+            "barriers": 0,
+            "graphs": 0
+          },
+          "bytes_per_token": 18546627400,
+          "bytes_per_request_one_token": 18546627400,
+          "embedding_row_bytes": 2880,
+          "embedding_full_table_excluded": true,
+          "kv_read_bytes": 134217728,
+          "kv_append_bytes": 65536,
+          "gdn": {
+            "convolution_bytes": 7864320,
+            "recurrent_bytes": 150994944,
+            "total_bytes": 158859264,
+            "candidate_plus_committed_capacity_note": "decode swaps candidate/committed pointers; do not charge a full duplicate copy on every token unless measured"
+          },
+          "logits_d2h_bytes": 4,
+          "hidden_d2h_bytes": 0,
+          "source": "tensor_inventory_plus_architecture_constants",
+          "measured": false,
+          "representation": "combined_opt118_opt119",
+          "parent_transfers_bytes": 1013760,
+          "lazy_index_bytes": 4,
+          "measured_d2h_source": "fixtures/opt123_combined_stack.json inventory",
+          "opt119_decode_note": "mixer/FFN Q8 fusion removes standalone quantize rereads; weight sweeps unchanged. Architecture residual/FFN intermediates remain."
+        },
+        "byte_bound": {
+          "prefix": 2048,
+          "peak_bandwidth_gb_s": 1792.0,
+          "measured_sustainable_bandwidth_gb_s": null,
+          "per_phase": {
+            "weights": {
+              "bytes": 18247717696.0,
+              "peak_ms": 10.182878178571428,
+              "sustainable_ms": null
+            },
+            "activations": {
+              "bytes": 5767168.0,
+              "peak_ms": 0.0032182857142857143,
+              "sustainable_ms": null
+            },
+            "kv": {
+              "bytes": 134283264.0,
+              "peak_ms": 0.07493485714285714,
+              "sustainable_ms": null
+            },
+            "gdn_state": {
+              "bytes": 158859264.0,
+              "peak_ms": 0.08864914285714286,
+              "sustainable_ms": null
+            },
+            "transfers": {
+              "bytes": 4.0,
+              "peak_ms": 2.232142857142857e-09,
+              "sustainable_ms": null
+            },
+            "logits": {
+              "bytes": 4.0,
+              "peak_ms": 2.232142857142857e-09,
+              "sustainable_ms": null
+            },
+            "barriers": {
+              "bytes": 0.0,
+              "peak_ms": 0.0,
+              "sustainable_ms": null
+            },
+            "graphs": {
+              "bytes": 0.0,
+              "peak_ms": 0.0,
+              "sustainable_ms": null
+            }
+          },
+          "independent_sum_peak_ms": 10.34968046875,
+          "independent_sum_not_a_bound": true,
+          "critical_path_peak_ms": 10.182878178571428,
+          "overlap_aware_peak_ms": 10.182878178571428,
+          "wall_ms": 24.019346388313107,
+          "assumptions": [
+            "RTX 5090 listed peak 1792 GB/s from NVIDIA Blackwell architecture paper",
+            "peak is an optimistic bound, not observed application bandwidth",
+            "compulsory reads assume no L2 reuse across layers and no write-allocate traffic beyond listed writes",
+            "embedding lookup charges one Q4_K row, not the full table",
+            "GDN decode charges one recurrent+conv pass with pointer-swap commit, not a full 8 GiB KV copy",
+            "overlapping costs use max/critical-path, not a sum of independent peak bounds",
+            "fixed-format Q4_K/Q8_0/Q6_K; quality-gated lower-bit models are separate OPT-121/122 candidates",
+            "measured sustainable bandwidth unavailable; sustainable_ms is null"
+          ],
+          "units": {
+            "bytes": "bytes",
+            "time": "milliseconds",
+            "bandwidth": "GB/s"
+          },
+          "claims_throughput": false
+        },
+        "compute_bound": {
+          "logical_dense_mac_flops": 53791996928.0,
+          "attention_extra_flops": 402653184.0,
+          "total_flops": 54194650112.0,
+          "excludes_unpack_scale": true,
+          "unpack_scale_note": "Q4_K/Q8_0/Q6_K dequant and scale application are required work not counted in 2*N*T. Excluding them makes the compute bound optimistic, not attainable.",
+          "peak_fp32_tflops": 104.8,
+          "peak_fp16_tensor_tflops_dense": 209.5,
+          "fp32_peak_ms": 0.5171245239694657,
+          "fp16_tensor_peak_ms": 0.258685680725537,
+          "optimistic_compute_ms": 0.258685680725537,
+          "listed_peaks_not_measured": true
+        },
+        "overlap_aware": {
+          "byte_critical_ms": 10.182878178571428,
+          "compute_ms": 0.258685680725537,
+          "serial_idle_ms": 10.002813999999944,
+          "busy_overlap_ms": 10.182878178571428,
+          "overlap_aware_ms": 20.185692178571372,
+          "independent_sum_not_a_bound": true,
+          "note": "Weight traffic and GEMM share the busy interval (max). Launch/idle gaps are serial. Summing independent peak bounds is not a bound. A roofline bottleneck is not proof of an optimal algorithm."
+        },
+        "lower_precision": {
+          "admitted": false,
+          "note": "These encodings were quality-gated or bound-rejected. A smaller byte model is not an identical-arithmetic kernel win and is not the shipping representation.",
+          "opt121_q8_to_q4k": {
+            "task": "OPT-121",
+            "verdict": "quality_blocked",
+            "weight_bytes": 14892274496,
+            "peak_ms": 8.310421035714286,
+            "bytes_saved": 3355443200,
+            "quality_matched": false
+          },
+          "opt120_q8q8_kv": {
+            "task": "OPT-120",
+            "verdict": "quality_blocked",
+            "kv_bytes": 71303168,
+            "peak_ms": 0.03978971428571428,
+            "capacity_128k_bytes": 4563402752,
+            "quality_matched": false
+          },
+          "opt122_bf16_gdn": {
+            "task": "OPT-122",
+            "verdict": "no_material_opportunity",
+            "gdn_dram_bytes": 166723584,
+            "peak_ms": 0.09303771428571429,
+            "critical_path_save_ms": 0.0,
+            "quality_matched": true,
+            "note": "compute already exceeds FP32 DRAM time on gdn_core"
+          }
+        },
+        "opt123_combined_ms": 24.019346388313107,
+        "opt123_llama_ms": 14.884165566641247,
+        "residual_vs_busy_bound_ms": 13.836468209741678,
+        "idle_source": "combined_timeline",
+        "bound_excludes_unpack_and_may_exclude_idle": true,
+        "optimistic_not_attainable": true
+      },
+      "d8192": {
+        "traffic": {
+          "scope": "one_decode_token",
+          "prefix": 8192,
+          "units": "bytes",
+          "phases": {
+            "weights": 18247717696,
+            "activations": 5767168,
+            "kv": 536936448,
+            "gdn_state": 158859264,
+            "transfers": 4,
+            "logits": 4,
+            "barriers": 0,
+            "graphs": 0
+          },
+          "bytes_per_token": 18949280584,
+          "bytes_per_request_one_token": 18949280584,
+          "embedding_row_bytes": 2880,
+          "embedding_full_table_excluded": true,
+          "kv_read_bytes": 536870912,
+          "kv_append_bytes": 65536,
+          "gdn": {
+            "convolution_bytes": 7864320,
+            "recurrent_bytes": 150994944,
+            "total_bytes": 158859264,
+            "candidate_plus_committed_capacity_note": "decode swaps candidate/committed pointers; do not charge a full duplicate copy on every token unless measured"
+          },
+          "logits_d2h_bytes": 4,
+          "hidden_d2h_bytes": 0,
+          "source": "tensor_inventory_plus_architecture_constants",
+          "measured": false,
+          "representation": "combined_opt118_opt119",
+          "parent_transfers_bytes": 1013760,
+          "lazy_index_bytes": 4,
+          "measured_d2h_source": "fixtures/opt123_combined_stack.json inventory",
+          "opt119_decode_note": "mixer/FFN Q8 fusion removes standalone quantize rereads; weight sweeps unchanged. Architecture residual/FFN intermediates remain."
+        },
+        "byte_bound": {
+          "prefix": 8192,
+          "peak_bandwidth_gb_s": 1792.0,
+          "measured_sustainable_bandwidth_gb_s": null,
+          "per_phase": {
+            "weights": {
+              "bytes": 18247717696.0,
+              "peak_ms": 10.182878178571428,
+              "sustainable_ms": null
+            },
+            "activations": {
+              "bytes": 5767168.0,
+              "peak_ms": 0.0032182857142857143,
+              "sustainable_ms": null
+            },
+            "kv": {
+              "bytes": 536936448.0,
+              "peak_ms": 0.2996297142857143,
+              "sustainable_ms": null
+            },
+            "gdn_state": {
+              "bytes": 158859264.0,
+              "peak_ms": 0.08864914285714286,
+              "sustainable_ms": null
+            },
+            "transfers": {
+              "bytes": 4.0,
+              "peak_ms": 2.232142857142857e-09,
+              "sustainable_ms": null
+            },
+            "logits": {
+              "bytes": 4.0,
+              "peak_ms": 2.232142857142857e-09,
+              "sustainable_ms": null
+            },
+            "barriers": {
+              "bytes": 0.0,
+              "peak_ms": 0.0,
+              "sustainable_ms": null
+            },
+            "graphs": {
+              "bytes": 0.0,
+              "peak_ms": 0.0,
+              "sustainable_ms": null
+            }
+          },
+          "independent_sum_peak_ms": 10.574375325892857,
+          "independent_sum_not_a_bound": true,
+          "critical_path_peak_ms": 10.182878178571428,
+          "overlap_aware_peak_ms": 10.182878178571428,
+          "wall_ms": 123.98107301963736,
+          "assumptions": [
+            "RTX 5090 listed peak 1792 GB/s from NVIDIA Blackwell architecture paper",
+            "peak is an optimistic bound, not observed application bandwidth",
+            "compulsory reads assume no L2 reuse across layers and no write-allocate traffic beyond listed writes",
+            "embedding lookup charges one Q4_K row, not the full table",
+            "GDN decode charges one recurrent+conv pass with pointer-swap commit, not a full 8 GiB KV copy",
+            "overlapping costs use max/critical-path, not a sum of independent peak bounds",
+            "fixed-format Q4_K/Q8_0/Q6_K; quality-gated lower-bit models are separate OPT-121/122 candidates",
+            "measured sustainable bandwidth unavailable; sustainable_ms is null"
+          ],
+          "units": {
+            "bytes": "bytes",
+            "time": "milliseconds",
+            "bandwidth": "GB/s"
+          },
+          "claims_throughput": false
+        },
+        "compute_bound": {
+          "logical_dense_mac_flops": 53791996928.0,
+          "attention_extra_flops": 1610612736.0,
+          "total_flops": 55402609664.0,
+          "excludes_unpack_scale": true,
+          "unpack_scale_note": "Q4_K/Q8_0/Q6_K dequant and scale application are required work not counted in 2*N*T. Excluding them makes the compute bound optimistic, not attainable.",
+          "peak_fp32_tflops": 104.8,
+          "peak_fp16_tensor_tflops_dense": 209.5,
+          "fp32_peak_ms": 0.528650855572519,
+          "fp16_tensor_peak_ms": 0.2644515974415274,
+          "optimistic_compute_ms": 0.2644515974415274,
+          "listed_peaks_not_measured": true
+        },
+        "overlap_aware": {
+          "byte_critical_ms": 10.182878178571428,
+          "compute_ms": 0.2644515974415274,
+          "serial_idle_ms": null,
+          "busy_overlap_ms": 10.182878178571428,
+          "overlap_aware_ms": 10.182878178571428,
+          "independent_sum_not_a_bound": true,
+          "note": "Weight traffic and GEMM share the busy interval (max). Launch/idle gaps are serial. Summing independent peak bounds is not a bound. A roofline bottleneck is not proof of an optimal algorithm."
+        },
+        "lower_precision": {
+          "admitted": false,
+          "note": "These encodings were quality-gated or bound-rejected. A smaller byte model is not an identical-arithmetic kernel win and is not the shipping representation.",
+          "opt121_q8_to_q4k": {
+            "task": "OPT-121",
+            "verdict": "quality_blocked",
+            "weight_bytes": 14892274496,
+            "peak_ms": 8.310421035714286,
+            "bytes_saved": 3355443200,
+            "quality_matched": false
+          },
+          "opt120_q8q8_kv": {
+            "task": "OPT-120",
+            "verdict": "quality_blocked",
+            "kv_bytes": 285212672,
+            "peak_ms": 0.15915885714285713,
+            "capacity_128k_bytes": 4563402752,
+            "quality_matched": false
+          },
+          "opt122_bf16_gdn": {
+            "task": "OPT-122",
+            "verdict": "no_material_opportunity",
+            "gdn_dram_bytes": 166723584,
+            "peak_ms": 0.09303771428571429,
+            "critical_path_save_ms": 0.0,
+            "quality_matched": true,
+            "note": "compute already exceeds FP32 DRAM time on gdn_core"
+          }
+        },
+        "opt123_combined_ms": 123.98107301963736,
+        "opt123_llama_ms": null,
+        "residual_vs_busy_bound_ms": 113.79819484106594,
+        "idle_source": null,
+        "bound_excludes_unpack_and_may_exclude_idle": true,
+        "optimistic_not_attainable": true
+      },
+      "d32768": {
+        "traffic": {
+          "scope": "one_decode_token",
+          "prefix": 32768,
+          "units": "bytes",
+          "phases": {
+            "weights": 18247717696,
+            "activations": 5767168,
+            "kv": 2147549184,
+            "gdn_state": 158859264,
+            "transfers": 4,
+            "logits": 4,
+            "barriers": 0,
+            "graphs": 0
+          },
+          "bytes_per_token": 20559893320,
+          "bytes_per_request_one_token": 20559893320,
+          "embedding_row_bytes": 2880,
+          "embedding_full_table_excluded": true,
+          "kv_read_bytes": 2147483648,
+          "kv_append_bytes": 65536,
+          "gdn": {
+            "convolution_bytes": 7864320,
+            "recurrent_bytes": 150994944,
+            "total_bytes": 158859264,
+            "candidate_plus_committed_capacity_note": "decode swaps candidate/committed pointers; do not charge a full duplicate copy on every token unless measured"
+          },
+          "logits_d2h_bytes": 4,
+          "hidden_d2h_bytes": 0,
+          "source": "tensor_inventory_plus_architecture_constants",
+          "measured": false,
+          "representation": "combined_opt118_opt119",
+          "parent_transfers_bytes": 1013760,
+          "lazy_index_bytes": 4,
+          "measured_d2h_source": "fixtures/opt123_combined_stack.json inventory",
+          "opt119_decode_note": "mixer/FFN Q8 fusion removes standalone quantize rereads; weight sweeps unchanged. Architecture residual/FFN intermediates remain."
+        },
+        "byte_bound": {
+          "prefix": 32768,
+          "peak_bandwidth_gb_s": 1792.0,
+          "measured_sustainable_bandwidth_gb_s": null,
+          "per_phase": {
+            "weights": {
+              "bytes": 18247717696.0,
+              "peak_ms": 10.182878178571428,
+              "sustainable_ms": null
+            },
+            "activations": {
+              "bytes": 5767168.0,
+              "peak_ms": 0.0032182857142857143,
+              "sustainable_ms": null
+            },
+            "kv": {
+              "bytes": 2147549184.0,
+              "peak_ms": 1.1984091428571428,
+              "sustainable_ms": null
+            },
+            "gdn_state": {
+              "bytes": 158859264.0,
+              "peak_ms": 0.08864914285714286,
+              "sustainable_ms": null
+            },
+            "transfers": {
+              "bytes": 4.0,
+              "peak_ms": 2.232142857142857e-09,
+              "sustainable_ms": null
+            },
+            "logits": {
+              "bytes": 4.0,
+              "peak_ms": 2.232142857142857e-09,
+              "sustainable_ms": null
+            },
+            "barriers": {
+              "bytes": 0.0,
+              "peak_ms": 0.0,
+              "sustainable_ms": null
+            },
+            "graphs": {
+              "bytes": 0.0,
+              "peak_ms": 0.0,
+              "sustainable_ms": null
+            }
+          },
+          "independent_sum_peak_ms": 11.473154754464286,
+          "independent_sum_not_a_bound": true,
+          "critical_path_peak_ms": 10.182878178571428,
+          "overlap_aware_peak_ms": 10.182878178571428,
+          "wall_ms": 739.6771890456087,
+          "assumptions": [
+            "RTX 5090 listed peak 1792 GB/s from NVIDIA Blackwell architecture paper",
+            "peak is an optimistic bound, not observed application bandwidth",
+            "compulsory reads assume no L2 reuse across layers and no write-allocate traffic beyond listed writes",
+            "embedding lookup charges one Q4_K row, not the full table",
+            "GDN decode charges one recurrent+conv pass with pointer-swap commit, not a full 8 GiB KV copy",
+            "overlapping costs use max/critical-path, not a sum of independent peak bounds",
+            "fixed-format Q4_K/Q8_0/Q6_K; quality-gated lower-bit models are separate OPT-121/122 candidates",
+            "measured sustainable bandwidth unavailable; sustainable_ms is null"
+          ],
+          "units": {
+            "bytes": "bytes",
+            "time": "milliseconds",
+            "bandwidth": "GB/s"
+          },
+          "claims_throughput": false
+        },
+        "compute_bound": {
+          "logical_dense_mac_flops": 53791996928.0,
+          "attention_extra_flops": 6442450944.0,
+          "total_flops": 60234447872.0,
+          "excludes_unpack_scale": true,
+          "unpack_scale_note": "Q4_K/Q8_0/Q6_K dequant and scale application are required work not counted in 2*N*T. Excluding them makes the compute bound optimistic, not attainable.",
+          "peak_fp32_tflops": 104.8,
+          "peak_fp16_tensor_tflops_dense": 209.5,
+          "fp32_peak_ms": 0.5747561819847328,
+          "fp16_tensor_peak_ms": 0.28751526430548924,
+          "optimistic_compute_ms": 0.28751526430548924,
+          "listed_peaks_not_measured": true
+        },
+        "overlap_aware": {
+          "byte_critical_ms": 10.182878178571428,
+          "compute_ms": 0.28751526430548924,
+          "serial_idle_ms": null,
+          "busy_overlap_ms": 10.182878178571428,
+          "overlap_aware_ms": 10.182878178571428,
+          "independent_sum_not_a_bound": true,
+          "note": "Weight traffic and GEMM share the busy interval (max). Launch/idle gaps are serial. Summing independent peak bounds is not a bound. A roofline bottleneck is not proof of an optimal algorithm."
+        },
+        "lower_precision": {
+          "admitted": false,
+          "note": "These encodings were quality-gated or bound-rejected. A smaller byte model is not an identical-arithmetic kernel win and is not the shipping representation.",
+          "opt121_q8_to_q4k": {
+            "task": "OPT-121",
+            "verdict": "quality_blocked",
+            "weight_bytes": 14892274496,
+            "peak_ms": 8.310421035714286,
+            "bytes_saved": 3355443200,
+            "quality_matched": false
+          },
+          "opt120_q8q8_kv": {
+            "task": "OPT-120",
+            "verdict": "quality_blocked",
+            "kv_bytes": 1140850688,
+            "peak_ms": 0.6366354285714285,
+            "capacity_128k_bytes": 4563402752,
+            "quality_matched": false
+          },
+          "opt122_bf16_gdn": {
+            "task": "OPT-122",
+            "verdict": "no_material_opportunity",
+            "gdn_dram_bytes": 166723584,
+            "peak_ms": 0.09303771428571429,
+            "critical_path_save_ms": 0.0,
+            "quality_matched": true,
+            "note": "compute already exceeds FP32 DRAM time on gdn_core"
+          }
+        },
+        "opt123_combined_ms": 739.6771890456087,
+        "opt123_llama_ms": null,
+        "residual_vs_busy_bound_ms": 729.4943108670373,
+        "idle_source": null,
+        "bound_excludes_unpack_and_may_exclude_idle": true,
+        "optimistic_not_attainable": true
+      },
+      "d131040": {
+        "traffic": {
+          "scope": "one_decode_token",
+          "prefix": 131040,
+          "units": "bytes",
+          "phases": {
+            "weights": 18247717696,
+            "activations": 5767168,
+            "kv": 8587902976,
+            "gdn_state": 158859264,
+            "transfers": 4,
+            "logits": 4,
+            "barriers": 0,
+            "graphs": 0
+          },
+          "bytes_per_token": 27000247112,
+          "bytes_per_request_one_token": 27000247112,
+          "embedding_row_bytes": 2880,
+          "embedding_full_table_excluded": true,
+          "kv_read_bytes": 8587837440,
+          "kv_append_bytes": 65536,
+          "gdn": {
+            "convolution_bytes": 7864320,
+            "recurrent_bytes": 150994944,
+            "total_bytes": 158859264,
+            "candidate_plus_committed_capacity_note": "decode swaps candidate/committed pointers; do not charge a full duplicate copy on every token unless measured"
+          },
+          "logits_d2h_bytes": 4,
+          "hidden_d2h_bytes": 0,
+          "source": "tensor_inventory_plus_architecture_constants",
+          "measured": false,
+          "representation": "combined_opt118_opt119",
+          "parent_transfers_bytes": 1013760,
+          "lazy_index_bytes": 4,
+          "measured_d2h_source": "fixtures/opt123_combined_stack.json inventory",
+          "opt119_decode_note": "mixer/FFN Q8 fusion removes standalone quantize rereads; weight sweeps unchanged. Architecture residual/FFN intermediates remain."
+        },
+        "byte_bound": {
+          "prefix": 131040,
+          "peak_bandwidth_gb_s": 1792.0,
+          "measured_sustainable_bandwidth_gb_s": null,
+          "per_phase": {
+            "weights": {
+              "bytes": 18247717696.0,
+              "peak_ms": 10.182878178571428,
+              "sustainable_ms": null
+            },
+            "activations": {
+              "bytes": 5767168.0,
+              "peak_ms": 0.0032182857142857143,
+              "sustainable_ms": null
+            },
+            "kv": {
+              "bytes": 8587902976.0,
+              "peak_ms": 4.792356571428571,
+              "sustainable_ms": null
+            },
+            "gdn_state": {
+              "bytes": 158859264.0,
+              "peak_ms": 0.08864914285714286,
+              "sustainable_ms": null
+            },
+            "transfers": {
+              "bytes": 4.0,
+              "peak_ms": 2.232142857142857e-09,
+              "sustainable_ms": null
+            },
+            "logits": {
+              "bytes": 4.0,
+              "peak_ms": 2.232142857142857e-09,
+              "sustainable_ms": null
+            },
+            "barriers": {
+              "bytes": 0.0,
+              "peak_ms": 0.0,
+              "sustainable_ms": null
+            },
+            "graphs": {
+              "bytes": 0.0,
+              "peak_ms": 0.0,
+              "sustainable_ms": null
+            }
+          },
+          "independent_sum_peak_ms": 15.067102183035713,
+          "independent_sum_not_a_bound": true,
+          "critical_path_peak_ms": 10.182878178571428,
+          "overlap_aware_peak_ms": 10.182878178571428,
+          "wall_ms": null,
+          "assumptions": [
+            "RTX 5090 listed peak 1792 GB/s from NVIDIA Blackwell architecture paper",
+            "peak is an optimistic bound, not observed application bandwidth",
+            "compulsory reads assume no L2 reuse across layers and no write-allocate traffic beyond listed writes",
+            "embedding lookup charges one Q4_K row, not the full table",
+            "GDN decode charges one recurrent+conv pass with pointer-swap commit, not a full 8 GiB KV copy",
+            "overlapping costs use max/critical-path, not a sum of independent peak bounds",
+            "fixed-format Q4_K/Q8_0/Q6_K; quality-gated lower-bit models are separate OPT-121/122 candidates",
+            "measured sustainable bandwidth unavailable; sustainable_ms is null"
+          ],
+          "units": {
+            "bytes": "bytes",
+            "time": "milliseconds",
+            "bandwidth": "GB/s"
+          },
+          "claims_throughput": false
+        },
+        "compute_bound": {
+          "logical_dense_mac_flops": 53791996928.0,
+          "attention_extra_flops": 25763512320.0,
+          "total_flops": 79555509248.0,
+          "excludes_unpack_scale": true,
+          "unpack_scale_note": "Q4_K/Q8_0/Q6_K dequant and scale application are required work not counted in 2*N*T. Excluding them makes the compute bound optimistic, not attainable.",
+          "peak_fp32_tflops": 104.8,
+          "peak_fp16_tensor_tflops_dense": 209.5,
+          "fp32_peak_ms": 0.7591174546564886,
+          "fp16_tensor_peak_ms": 0.3797399009451074,
+          "optimistic_compute_ms": 0.3797399009451074,
+          "listed_peaks_not_measured": true
+        },
+        "overlap_aware": {
+          "byte_critical_ms": 10.182878178571428,
+          "compute_ms": 0.3797399009451074,
+          "serial_idle_ms": null,
+          "busy_overlap_ms": 10.182878178571428,
+          "overlap_aware_ms": 10.182878178571428,
+          "independent_sum_not_a_bound": true,
+          "note": "Weight traffic and GEMM share the busy interval (max). Launch/idle gaps are serial. Summing independent peak bounds is not a bound. A roofline bottleneck is not proof of an optimal algorithm."
+        },
+        "lower_precision": {
+          "admitted": false,
+          "note": "These encodings were quality-gated or bound-rejected. A smaller byte model is not an identical-arithmetic kernel win and is not the shipping representation.",
+          "opt121_q8_to_q4k": {
+            "task": "OPT-121",
+            "verdict": "quality_blocked",
+            "weight_bytes": 14892274496,
+            "peak_ms": 8.310421035714286,
+            "bytes_saved": 3355443200,
+            "quality_matched": false
+          },
+          "opt120_q8q8_kv": {
+            "task": "OPT-120",
+            "verdict": "quality_blocked",
+            "kv_bytes": 4562288640,
+            "peak_ms": 2.54592,
+            "capacity_128k_bytes": 4563402752,
+            "quality_matched": false
+          },
+          "opt122_bf16_gdn": {
+            "task": "OPT-122",
+            "verdict": "no_material_opportunity",
+            "gdn_dram_bytes": 166723584,
+            "peak_ms": 0.09303771428571429,
+            "critical_path_save_ms": 0.0,
+            "quality_matched": true,
+            "note": "compute already exceeds FP32 DRAM time on gdn_core"
+          }
+        },
+        "opt123_combined_ms": null,
+        "opt123_llama_ms": null,
+        "residual_vs_busy_bound_ms": null,
+        "idle_source": null,
+        "bound_excludes_unpack_and_may_exclude_idle": true,
+        "optimistic_not_attainable": true
+      }
+    },
+    "assumptions": [
+      "RTX 5090 listed peak 1792 GB/s; listed FP32 104.8 TFLOPS; dense FP16 tensor 209.5 TFLOPS is 2x FP32 without sparsity",
+      "peaks are optimistic listed values, not observed application rates",
+      "2*N*T MAC FLOPs exclude Q4_K unpack/scale; excluding required work makes the compute bound optimistic",
+      "combined decode D2H is the measured 4-byte greedy index (OPT-123 inventory), not 1,013,760 B logits",
+      "OPT-119 removed 167,772,160 B prefill BF16 quantize rereads; weight sweeps unchanged",
+      "GDN decode charges pointer-swap commit, not an 8 GiB KV copy",
+      "embedding lookup charges one Q4_K row",
+      "independent phase sums are not a bound",
+      "lower-precision alternatives are not admitted and are not identical-arithmetic wins"
+    ],
+    "claims_throughput": false
+  },
+  "llama_comparison": {
+    "pinned_llama": {
+      "ok": true,
+      "pinned_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+      "authority_unchanged": true,
+      "n_gpu_layers": 99,
+      "flash_attn": -1,
+      "flash_attn_auto": true,
+      "backends": "CUDA",
+      "gpu_info": "NVIDIA GeForce RTX 5090",
+      "type_k": "f16",
+      "type_v": "f16",
+      "model_n_params": 26895998464,
+      "decode_n_ctx": 4096,
+      "decode_tokens": 256,
+      "kv_policy": {
+        "type_k": "f16",
+        "type_v": "f16",
+        "matches_quartz_dense_bf16": true,
+        "asymmetry_note": "Pinned llama KV is f16. Quartz ships dense BF16 KV. Packed 8/4-bit Quartz KV (OPT-120) was quality_blocked and slower; no quality-matched llama packed-KV baseline was introduced. Do not call a changed-quantization Quartz comparison an identical-arithmetic kernel win."
+      },
+      "graph_and_offload": "llama-bench on the pinned authority used n_gpu_layers=99, CUDA backend, flash_attn auto (-1), type_k/v f16, n_ctx 4096 for decode oracles. That is the intended strong baseline for this pin: full GPU offload and the flash-attention auto path. Graph capture is llama's internal CUDA-graph evaluate/capture, not a Quartz decode_segments8 equivalent.",
+      "intended_strong_baseline": true,
+      "source": "fixtures/opt123_combined_stack.json llama"
+    },
+    "supplementary_llama": {
+      "path": "/home/user/llama.cpp",
+      "present": true,
+      "revision": "1945e092030f8668ff93382799502d01490e564d",
+      "state": "clean",
+      "pinned_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+      "recorded_inspection_head": "1945e092030f8668ff93382799502d01490e564d",
+      "is_not_pin": true,
+      "materially_stronger_evidence": false,
+      "supplementary_admitted": [],
+      "max_configs": 2,
+      "measured": false,
+      "limits_this_conclusion": false,
+      "does_not_invalidate_pinned_comparison": true,
+      "note": "Pinned authority is unchanged. Failure to build/run a supplementary baseline limits the 'is this the strongest local llama' clause but does not invalidate the pinned comparison."
+    },
+    "quality": {
+      "opt116_contract": "opt116_generated_v1",
+      "strict_quality_pass": true,
+      "successor_quality_pass": true,
+      "ppl_ratio": 1.0,
+      "candidate_nll_measured": true,
+      "anchor": "post113_selected"
+    },
+    "memory": {
+      "session_bytes": 696743940,
+      "workspace_bytes": 1820039808,
+      "128k_fit": true
+    },
+    "p4096_d128_d2048": [
+      {
+        "workload": "p4096",
+        "post113_tok_s": 2917.105567,
+        "quartz_combined_tok_s": 2935.3935069999998,
+        "llama_tok_s": 3105.42474,
+        "post113_ms": 1404.131563264745,
+        "quartz_combined_ms": 1395.3836138944625,
+        "llama_ms": 1318.9822143298827,
+        "quartz_over_llama": 0.9452470282696337,
+        "matched_request_boundaries": true,
+        "source": "fixtures/opt123_combined_stack.json"
+      },
+      {
+        "workload": "d128",
+        "post113_tok_s": 53.77292633,
+        "quartz_combined_tok_s": 54.01590042,
+        "llama_tok_s": 68.6696311,
+        "post113_ms": 18.59671898574169,
+        "quartz_combined_ms": 18.513067304710496,
+        "llama_ms": 14.562478114142657,
+        "quartz_over_llama": 0.7866053676819592,
+        "matched_request_boundaries": true,
+        "source": "fixtures/opt123_combined_stack.json"
+      },
+      {
+        "workload": "d2048",
+        "post113_tok_s": 41.4484684,
+        "quartz_combined_tok_s": 41.633106240000004,
+        "llama_tok_s": 67.1854929,
+        "post113_ms": 24.126343833732584,
+        "quartz_combined_ms": 24.019346388313107,
+        "llama_ms": 14.884165566641247,
+        "quartz_over_llama": 0.6196740463297249,
+        "matched_request_boundaries": true,
+        "source": "fixtures/opt123_combined_stack.json"
+      }
+    ],
+    "long_context": {
+      "d8192": {
+        "post113_tok_s": null,
+        "combined_tok_s": 8.06574726,
+        "llama_tok_s": null,
+        "combined_ms": 123.98107301963736,
+        "oom": false,
+        "ok": true,
+        "populated_cache": true,
+        "separately_labeled": true,
+        "source": "fixtures/opt123_combined_stack.json long_context"
+      },
+      "d32768": {
+        "post113_tok_s": null,
+        "combined_tok_s": 1.35194111,
+        "llama_tok_s": null,
+        "combined_ms": 739.6771890456087,
+        "oom": false,
+        "ok": true,
+        "populated_cache": true,
+        "separately_labeled": true,
+        "source": "fixtures/opt123_combined_stack.json long_context"
+      },
+      "d131040": {
+        "post113_tok_s": null,
+        "combined_tok_s": null,
+        "llama_tok_s": null,
+        "combined_ms": null,
+        "oom": true,
+        "ok": false,
+        "populated_cache": false,
+        "separately_labeled": true,
+        "source": "fixtures/opt123_combined_stack.json long_context"
+      },
+      "not_a_d128_win": true
+    },
+    "opt016_2k": {
+      "quartz_tok_s": 0.0,
+      "llama_tok_s": 3288.205178,
+      "quartz_measured": false,
+      "oom": true,
+      "separately_labeled": true,
+      "source": "fixtures/opt123_combined_stack.json opt016_2k"
+    },
+    "nonexclusive_sitting": true,
+    "opt113_numbers_historical_only": true,
+    "smaller_context_or_skipped_sampling_is_not_an_improvement": true
+  },
+  "mechanism_disposition": {
+    "parent_stack": "combined_opt118_opt119 on post113 ffn_only",
+    "rejected_paths_do_not_leak": true,
+    "opt115_idle_is_post113_overlay": true,
+    "ranked": [
+      {
+        "task": "OPT-117",
+        "mechanism": "decode-segment CUDA graphs",
+        "bytes_or_time_upper": {
+          "bytes": 0,
+          "peak_ms": 9.974685400000169,
+          "kind": "launch_idle_gap"
+        },
+        "implemented_candidate": "decode_segments8",
+        "quality_state_blockers": "none (same_math/quality/state passed)",
+        "complete_request_outcome": "retain_ffn_only",
+        "measured_loss": "D128 geo CI lower 0.979; D2048 0.980; decode p95 > 1.05\u00d7 parent. Per-token recapture (257 param updates / 256 tokens) exceeded the remaining launch/idle gap.",
+        "missing_evidence": null,
+        "capability_failure": "kernel-arg patching is not byte-exact; production replay recaptures when frontier/GDN/KV topology change",
+        "reopen": false,
+        "reopen_requires": "a new causal capture/replay design that avoids per-token recapture; not another random launch/tile choice"
+      },
+      {
+        "task": "OPT-118",
+        "mechanism": "lazy logits/hidden + decode D2H overlap",
+        "bytes_or_time_upper": {
+          "bytes": 1013760,
+          "peak_ms": 0.0005657142857142857,
+          "kind": "pcie_logits_hidden"
+        },
+        "implemented_candidate": "lazy+overlap",
+        "quality_state_blockers": "none",
+        "complete_request_outcome": "keep",
+        "measured_loss": null,
+        "measured_keep": "D128 +0.172 tok/s (1.003\u00d7); shipping pin true/true",
+        "missing_evidence": null,
+        "capability_failure": null,
+        "reopen": false,
+        "reopen_requires": "none; already in the OPT-123 combined stack"
+      },
+      {
+        "task": "OPT-119",
+        "mechanism": "mixer+FFN RMSNorm\u2192MMQ Q8 fusion",
+        "bytes_or_time_upper": {
+          "bytes": 167772160,
+          "peak_ms": 0.09362285714285715,
+          "kind": "prefill_activation_reread"
+        },
+        "implemented_candidate": "mixer_q8+ffn_q8",
+        "quality_state_blockers": "none",
+        "complete_request_outcome": "keep",
+        "measured_loss": null,
+        "measured_keep": "P4096 +17.66 tok/s (1.006\u00d7); D128/D2048 guards ~1.00",
+        "missing_evidence": null,
+        "capability_failure": null,
+        "reopen": false,
+        "reopen_requires": "none; already in the OPT-123 combined stack"
+      },
+      {
+        "task": "OPT-120",
+        "mechanism": "packed Q8/Q4 attention KV",
+        "bytes_or_time_upper": {
+          "bytes": 4026531840,
+          "peak_ms": 4.79232,
+          "kind": "long_context_kv"
+        },
+        "implemented_candidate": "q8q8",
+        "quality_state_blockers": "long-cache generated quality fail; held-out PPL still <1.01",
+        "complete_request_outcome": "quality_blocked",
+        "measured_loss": "D8192 0.624\u00d7, D32768 0.316\u00d7, D131040 0.215\u00d7 vs dense parent; P4096 guard 0.789\u00d7. Byte savings did not become a request win.",
+        "missing_evidence": null,
+        "capability_failure": null,
+        "reopen": false,
+        "reopen_requires": "a quality-matched packed encoding that is actually faster on populated-cache requests; unpack-into-registers already tried"
+      },
+      {
+        "task": "OPT-121",
+        "mechanism": "selective Q8\u2192Q4_K weight requant + native FP4 study",
+        "bytes_or_time_upper": {
+          "bytes": 3355443200,
+          "peak_ms": 1.8724571428571428,
+          "kind": "streamed_weights"
+        },
+        "implemented_candidate": "q8_to_q4k",
+        "quality_state_blockers": "recurrence \u0394NLL 3.92/3.46 vs max 0.02; long-cache fail",
+        "complete_request_outcome": "quality_blocked",
+        "measured_loss": "D128 0.870\u00d7, D2048 0.909\u00d7; P4096 guard 1.014\u00d7 but quality fail",
+        "missing_evidence": null,
+        "capability_failure": "native FP4 study capability_absent=true",
+        "reopen": false,
+        "reopen_requires": "a quality-passing weight encoding with a different error profile, or an actual FP4 path; not another Q8\u2192Q4_K launch"
+      },
+      {
+        "task": "OPT-122",
+        "mechanism": "lower-precision persistent GDN state",
+        "bytes_or_time_upper": {
+          "bytes": 150994944,
+          "peak_ms": 0.0,
+          "kind": "gdn_dram_vs_compute"
+        },
+        "implemented_candidate": "none admitted (BF16/Q8 bound-rejected)",
+        "quality_state_blockers": "not in scope; FP32 retained",
+        "complete_request_outcome": "no_material_opportunity",
+        "measured_loss": null,
+        "measured_keep": null,
+        "missing_evidence": null,
+        "capability_failure": null,
+        "reopen": false,
+        "reopen_requires": "evidence that gdn_core became DRAM-bound after some other keep; current enclosing compute already exceeds FP32 DRAM time"
+      }
+    ],
+    "changed_under_final_stack": "OPT-118 and OPT-119 are the keepers. OPT-117/120/121/122 outcomes do not reverse on the combined stack: graphs remain ffn_only, KV dense BF16, weights unrequantized, GDN FP32. No new causal reason to reopen a rejected idea appeared in OPT-123 leave-one-out."
+  },
+  "timeline": {
+    "d128": {
+      "tokens": 1,
+      "record_count": 650,
+      "charged_count": 650,
+      "leaf_kernel_count": 340,
+      "gpu_busy_union_ms": 8.292201499999877,
+      "gpu_idle_gap_ms": 9.978260100000128,
+      "host_overlap_union_ms": 0.0,
+      "sync_union_ms": 0.11219800000000646,
+      "graph_union_ms": 0.0,
+      "launch_submission_ms": 9.978260100000128,
+      "classified_union_ms": 8.404399499999883,
+      "unclassified_ms": 0.7222864999999885,
+      "wall_ms": 19.1049461,
+      "interval_coverage": 0.9621937431166064,
+      "overlap_not_summed": true,
+      "sum_exceeds_wall": true,
+      "stream_aware": {
+        "summed_gpu_work_ms": 28.31308799508,
+        "interval_union_ms": 18.29865960000012,
+        "overlap_ms": 10.014428395079879,
+        "streams": {
+          "0": 28.31308799508
+        },
+        "sum_exceeds_wall": true
+      },
+      "families": {
+        "embedding": {
+          "role": "embedding",
+          "ms": 0.021216000470000003,
+          "calls": 2,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "row_decode"
+          ]
+        },
+        "gdn_core": {
+          "role": "gdn_core",
+          "ms": 2.2258879955999995,
+          "calls": 49,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "gdn"
+          ]
+        },
+        "mixer_mmv": {
+          "role": "mixer_mmv",
+          "ms": 6.349407980500001,
+          "calls": 128,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "mmv"
+          ]
+        },
+        "ffn_mmv": {
+          "role": "ffn_mmv",
+          "ms": 7.965183966,
+          "calls": 64,
+          "fused_member_count": 7,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "cuda_graph"
+          ]
+        },
+        "attention_core": {
+          "role": "attention_core",
+          "ms": 0.9678720006999999,
+          "calls": 16,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "attention"
+          ]
+        },
+        "logits": {
+          "role": "logits",
+          "ms": 0.723136008,
+          "calls": 1,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "mmv"
+          ]
+        },
+        "state_commit": {
+          "role": "state_commit",
+          "ms": 0.0553920008,
+          "calls": 1,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "copy"
+          ]
+        },
+        "input_norm": {
+          "role": "input_norm",
+          "ms": 0.0157440007,
+          "calls": 1,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "rms_norm"
+          ]
+        },
+        "proj_packed_qkv": {
+          "role": "proj_packed_qkv",
+          "ms": 2.9007360114000007,
+          "calls": 48,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "mmv"
+          ]
+        },
+        "gdn_gate_prep": {
+          "role": "gdn_gate_prep",
+          "ms": 0.22758400252,
+          "calls": 48,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "gdn"
+          ]
+        },
+        "gdn_conv_qk_norm_recurrence": {
+          "role": "gdn_conv_qk_norm_recurrence",
+          "ms": 1.6099839811000003,
+          "calls": 48,
+          "fused_member_count": 3,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "gdn"
+          ]
+        },
+        "gdn_output_norm": {
+          "role": "gdn_output_norm",
+          "ms": 0.27468799900000007,
+          "calls": 48,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "rms_norm"
+          ]
+        },
+        "proj_gdn_output": {
+          "role": "proj_gdn_output",
+          "ms": 1.2247360180000002,
+          "calls": 48,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "mmv"
+          ]
+        },
+        "residual_mixer": {
+          "role": "residual_mixer",
+          "ms": 0.24137600291000014,
+          "calls": 64,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "pointwise"
+          ]
+        },
+        "proj_query_gate": {
+          "role": "proj_query_gate",
+          "ms": 0.8583040013000001,
+          "calls": 16,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "mmv"
+          ]
+        },
+        "attn_query_split": {
+          "role": "attn_query_split",
+          "ms": 0.04838400152,
+          "calls": 16,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "attention"
+          ]
+        },
+        "attn_qk_prep_softmax_pv_merge": {
+          "role": "attn_qk_prep_softmax_pv_merge",
+          "ms": 0.7981120049,
+          "calls": 16,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "attention"
+          ]
+        },
+        "attn_output_cast": {
+          "role": "attn_output_cast",
+          "ms": 0.07628800066000001,
+          "calls": 16,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "cast"
+          ]
+        },
+        "proj_attn_output": {
+          "role": "proj_attn_output",
+          "ms": 0.9711679965000001,
+          "calls": 16,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "mmv"
+          ]
+        },
+        "logits_norm": {
+          "role": "logits_norm",
+          "ms": 0.0132160001,
+          "calls": 1,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "rms_norm"
+          ]
+        },
+        "logits_projection": {
+          "role": "logits_projection",
+          "ms": 0.632480025,
+          "calls": 1,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "mmv"
+          ]
+        },
+        "d2h": {
+          "role": "d2h",
+          "ms": 0.0575359985,
+          "calls": 1,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "copy"
+          ]
+        },
+        "state_copies": {
+          "role": "state_copies",
+          "ms": 0.0546559989,
+          "calls": 1,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "copy"
+          ]
+        }
+      },
+      "method": "event_union_plus_leaf_gaps",
+      "valid": true,
+      "prefix": 128,
+      "identity": "combined_opt118_opt119",
+      "native": {
+        "schema_version": 1,
+        "task": "OPT-124",
+        "workload": "combined-timeline",
+        "stack": "combined_opt118_opt119",
+        "prefix": 128,
+        "tokens": 1,
+        "record_count": 650,
+        "pool_overflow": false,
+        "wall_ms": 19.1049461,
+        "uninstrumented_wall_ms": 17.6661129,
+        "instrumented_wall_ms": 19.1049461,
+        "profiler_perturbation_ms": 1.43883324,
+        "tok_s": 52.3424644,
+        "keep": false,
+        "observed_warmups": 1,
+        "observed_samples": 1,
+        "observed_candidates": 1,
+        "observed_shapes": 1,
+        "observed_tier": "screen"
+      }
+    },
+    "d2048": {
+      "tokens": 1,
+      "record_count": 650,
+      "charged_count": 650,
+      "leaf_kernel_count": 340,
+      "gpu_busy_union_ms": 10.540765000000079,
+      "gpu_idle_gap_ms": 10.002813999999944,
+      "host_overlap_union_ms": 0.0,
+      "sync_union_ms": 0.07598800000005212,
+      "graph_union_ms": 0.0,
+      "launch_submission_ms": 10.002813999999944,
+      "classified_union_ms": 10.61675300000013,
+      "unclassified_ms": 0.44848909999992514,
+      "wall_ms": 21.0680561,
+      "interval_coverage": 0.9787123644501817,
+      "overlap_not_summed": true,
+      "sum_exceeds_wall": true,
+      "stream_aware": {
+        "summed_gpu_work_ms": 32.78627197682,
+        "interval_union_ms": 20.526923000000465,
+        "overlap_ms": 12.259348976819531,
+        "streams": {
+          "0": 32.78627197682
+        },
+        "sum_exceeds_wall": true
+      },
+      "families": {
+        "embedding": {
+          "role": "embedding",
+          "ms": 0.0279359994,
+          "calls": 2,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "row_decode"
+          ]
+        },
+        "gdn_core": {
+          "role": "gdn_core",
+          "ms": 2.2613439841,
+          "calls": 49,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "gdn"
+          ]
+        },
+        "mixer_mmv": {
+          "role": "mixer_mmv",
+          "ms": 6.2834879803,
+          "calls": 128,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "mmv"
+          ]
+        },
+        "ffn_mmv": {
+          "role": "ffn_mmv",
+          "ms": 7.972480018999999,
+          "calls": 64,
+          "fused_member_count": 7,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "cuda_graph"
+          ]
+        },
+        "attention_core": {
+          "role": "attention_core",
+          "ms": 3.2390720079999995,
+          "calls": 16,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "attention"
+          ]
+        },
+        "logits": {
+          "role": "logits",
+          "ms": 0.696767986,
+          "calls": 1,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "mmv"
+          ]
+        },
+        "state_commit": {
+          "role": "state_commit",
+          "ms": 0.0590399988,
+          "calls": 1,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "copy"
+          ]
+        },
+        "input_norm": {
+          "role": "input_norm",
+          "ms": 0.0181440003,
+          "calls": 1,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "rms_norm"
+          ]
+        },
+        "proj_packed_qkv": {
+          "role": "proj_packed_qkv",
+          "ms": 2.899488028100001,
+          "calls": 48,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "mmv"
+          ]
+        },
+        "gdn_gate_prep": {
+          "role": "gdn_gate_prep",
+          "ms": 0.22659200053000003,
+          "calls": 48,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "gdn"
+          ]
+        },
+        "gdn_conv_qk_norm_recurrence": {
+          "role": "gdn_conv_qk_norm_recurrence",
+          "ms": 1.6430399757999996,
+          "calls": 48,
+          "fused_member_count": 3,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "gdn"
+          ]
+        },
+        "gdn_output_norm": {
+          "role": "gdn_output_norm",
+          "ms": 0.27497599983000004,
+          "calls": 48,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "rms_norm"
+          ]
+        },
+        "proj_gdn_output": {
+          "role": "proj_gdn_output",
+          "ms": 1.2246080189000004,
+          "calls": 48,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "mmv"
+          ]
+        },
+        "residual_mixer": {
+          "role": "residual_mixer",
+          "ms": 0.2426240024300001,
+          "calls": 64,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "pointwise"
+          ]
+        },
+        "proj_query_gate": {
+          "role": "proj_query_gate",
+          "ms": 0.8621760235,
+          "calls": 16,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "mmv"
+          ]
+        },
+        "attn_query_split": {
+          "role": "attn_query_split",
+          "ms": 0.048032001410000004,
+          "calls": 16,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "attention"
+          ]
+        },
+        "attn_qk_prep_softmax_pv_merge": {
+          "role": "attn_qk_prep_softmax_pv_merge",
+          "ms": 3.1078719530000005,
+          "calls": 16,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "attention"
+          ]
+        },
+        "attn_output_cast": {
+          "role": "attn_output_cast",
+          "ms": 0.05907200131999999,
+          "calls": 16,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "cast"
+          ]
+        },
+        "proj_attn_output": {
+          "role": "proj_attn_output",
+          "ms": 0.897023995,
+          "calls": 16,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "mmv"
+          ]
+        },
+        "logits_norm": {
+          "role": "logits_norm",
+          "ms": 0.0135679999,
+          "calls": 1,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "rms_norm"
+          ]
+        },
+        "logits_projection": {
+          "role": "logits_projection",
+          "ms": 0.652960002,
+          "calls": 1,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "mmv"
+          ]
+        },
+        "d2h": {
+          "role": "d2h",
+          "ms": 0.0187199991,
+          "calls": 1,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "copy"
+          ]
+        },
+        "state_copies": {
+          "role": "state_copies",
+          "ms": 0.0572480001,
+          "calls": 1,
+          "fused_member_count": 1,
+          "engines": [
+            "quartz"
+          ],
+          "launch_families": [
+            "copy"
+          ]
+        }
+      },
+      "method": "event_union_plus_leaf_gaps",
+      "valid": true,
+      "prefix": 2048,
+      "identity": "combined_opt118_opt119",
+      "native": {
+        "schema_version": 1,
+        "task": "OPT-124",
+        "workload": "combined-timeline",
+        "stack": "combined_opt118_opt119",
+        "prefix": 2048,
+        "tokens": 1,
+        "record_count": 650,
+        "pool_overflow": false,
+        "wall_ms": 21.0680561,
+        "uninstrumented_wall_ms": 20.4526882,
+        "instrumented_wall_ms": 21.0680561,
+        "profiler_perturbation_ms": 0.615367889,
+        "tok_s": 47.4652252,
+        "keep": false,
+        "observed_warmups": 1,
+        "observed_samples": 1,
+        "observed_candidates": 1,
+        "observed_shapes": 1,
+        "observed_tier": "screen"
+      }
+    }
+  },
+  "conclusions": {
+    "per_workload": {
+      "p4096": {
+        "workload": "p4096",
+        "label": "measurable_headroom",
+        "why": "remaining mechanism: prefill MMQ/attention efficiency versus pinned llama (OPT-119 already kept activation fusion; weight requant quality_blocked). Distance to llama and/or the optimistic busy bound exceeds 2% of request time.",
+        "quartz_tok_s": 2935.3935069999998,
+        "llama_tok_s": 3105.42474,
+        "quartz_ms": 1395.3836138944625,
+        "llama_ms": 1318.9822143298827,
+        "busy_bound_ms": 1051.704149962234,
+        "residual_vs_busy_bound_ms": 343.6794639322286,
+        "materiality_ms": 27.90767227788925,
+        "remaining_mechanism": "prefill MMQ/attention efficiency versus pinned llama (OPT-119 already kept activation fusion; weight requant quality_blocked)",
+        "remaining_ms": 76.40139956457983,
+        "quartz_over_llama": 0.9452470282696337,
+        "universal_optimality": false
+      },
+      "d128": {
+        "workload": "d128",
+        "label": "measurable_headroom",
+        "why": "remaining mechanism: launch/idle after OPT-117 recapture reject; optimistic weight byte bound still below both Quartz and llama walls. Distance to llama and/or the optimistic busy bound exceeds 2% of request time.",
+        "quartz_tok_s": 54.01590042,
+        "llama_tok_s": 68.6696311,
+        "quartz_ms": 18.513067304710496,
+        "llama_ms": 14.562478114142657,
+        "busy_bound_ms": 10.182878178571428,
+        "residual_vs_busy_bound_ms": 8.330189126139068,
+        "materiality_ms": 0.3702613460942099,
+        "remaining_mechanism": "launch/idle after OPT-117 recapture reject; optimistic weight byte bound still below both Quartz and llama walls",
+        "remaining_ms": 9.978260100000128,
+        "quartz_over_llama": 0.7866053676819592,
+        "universal_optimality": false
+      },
+      "d2048": {
+        "workload": "d2048",
+        "label": "measurable_headroom",
+        "why": "remaining mechanism: launch/idle plus decode-attention path versus llama flash-attn auto; hybrid_crossover@1024 is shipping and was not reopened. Distance to llama and/or the optimistic busy bound exceeds 2% of request time.",
+        "quartz_tok_s": 41.633106240000004,
+        "llama_tok_s": 67.1854929,
+        "quartz_ms": 24.019346388313107,
+        "llama_ms": 14.884165566641247,
+        "busy_bound_ms": 10.182878178571428,
+        "residual_vs_busy_bound_ms": 13.836468209741678,
+        "materiality_ms": 0.48038692776626213,
+        "remaining_mechanism": "launch/idle plus decode-attention path versus llama flash-attn auto; hybrid_crossover@1024 is shipping and was not reopened",
+        "remaining_ms": 10.002813999999944,
+        "quartz_over_llama": 0.6196740463297249,
+        "universal_optimality": false
+      },
+      "d8192": {
+        "workload": "d8192",
+        "label": "measurable_headroom",
+        "why": "remaining mechanism: populated-cache KV traffic exists in the byte model, but OPT-120 packed KV was slower and quality_blocked; no matched llama long-context number on this sitting. Distance to llama and/or the optimistic busy bound exceeds 2% of request time.",
+        "quartz_tok_s": 8.06574726,
+        "llama_tok_s": null,
+        "quartz_ms": 123.98107301963736,
+        "llama_ms": null,
+        "busy_bound_ms": 10.182878178571428,
+        "residual_vs_busy_bound_ms": 113.79819484106594,
+        "materiality_ms": 2.4796214603927473,
+        "remaining_mechanism": "populated-cache KV traffic exists in the byte model, but OPT-120 packed KV was slower and quality_blocked; no matched llama long-context number on this sitting",
+        "remaining_ms": 113.79819484106594,
+        "quartz_over_llama": null,
+        "universal_optimality": false
+      },
+      "d32768": {
+        "workload": "d32768",
+        "label": "measurable_headroom",
+        "why": "remaining mechanism: same as D8192: KV-byte headroom in the bound, no admitted encoding. Distance to llama and/or the optimistic busy bound exceeds 2% of request time.",
+        "quartz_tok_s": 1.35194111,
+        "llama_tok_s": null,
+        "quartz_ms": 739.6771890456087,
+        "llama_ms": null,
+        "busy_bound_ms": 10.182878178571428,
+        "residual_vs_busy_bound_ms": 729.4943108670373,
+        "materiality_ms": 14.793543780912174,
+        "remaining_mechanism": "same as D8192: KV-byte headroom in the bound, no admitted encoding",
+        "remaining_ms": 729.4943108670373,
+        "quartz_over_llama": null,
+        "universal_optimality": false
+      },
+      "d131040": {
+        "workload": "d131040",
+        "label": "insufficient_evidence",
+        "why": "required sitting did not complete (OOM or unlabeled). Missing measurement, not a proof that llama is optimal.",
+        "quartz_tok_s": null,
+        "llama_tok_s": null,
+        "quartz_ms": null,
+        "llama_ms": null,
+        "busy_bound_ms": 10.182878178571428,
+        "residual_vs_busy_bound_ms": null,
+        "materiality_ms": null,
+        "remaining_mechanism": null,
+        "remaining_ms": null,
+        "quartz_over_llama": null,
+        "universal_optimality": false
+      },
+      "opt016_2k": {
+        "workload": "opt016_2k",
+        "label": "insufficient_evidence",
+        "why": "required sitting did not complete (OOM or unlabeled). Missing measurement, not a proof that llama is optimal.",
+        "quartz_tok_s": null,
+        "llama_tok_s": 3288.205178,
+        "quartz_ms": null,
+        "llama_ms": 622.8321802125694,
+        "busy_bound_ms": null,
+        "residual_vs_busy_bound_ms": null,
+        "materiality_ms": null,
+        "remaining_mechanism": null,
+        "remaining_ms": null,
+        "quartz_over_llama": null,
+        "universal_optimality": false
+      }
+    },
+    "supports_continuing": false,
+    "supports_continuing_why": "The approved OPT-117\u2013122 ladder is exhausted for quality-admitted encodings. Remaining decode gaps versus llama and versus the optimistic busy bound exceed 2%, so this is not evidence that further improvement is impractical. Continuing requires a new causal mechanism (capture/replay that avoids recapture, or a quality-passing weight encoding), not another random tile/launch. Speculation/MTP/batching are outside this batch and are not authorized here.",
+    "supports_claiming_llama_is_practical_ceiling": false,
+    "universal_optimality_claimed": false,
+    "materiality_fraction": 0.02,
+    "mechanisms_reviewed": [
+      "OPT-117",
+      "OPT-118",
+      "OPT-119",
+      "OPT-120",
+      "OPT-121",
+      "OPT-122"
+    ],
+    "quality_envelope": {
+      "opt116_contract": "opt116_generated_v1",
+      "strict_quality_pass": true,
+      "successor_quality_pass": true,
+      "ppl_ratio": 1.0,
+      "candidate_nll_measured": true,
+      "anchor": "post113_selected"
+    }
+  },
+  "stop_reopen_criteria": {
+    "stop_this_batch_when": [
+      "OPT-117\u2013122 quality-admitted candidates are keep-or-reject complete",
+      "no new causal mechanism is identified (random tile/launch is not a reason)",
+      "speculation/MTP/batching/model-replacement/sparse attention remain out of scope"
+    ],
+    "do_not_stop_claiming": [
+      "llama.cpp is globally optimal",
+      "the kernel-tuning ladder proved a bandwidth bound",
+      "a roofline bottleneck proved an optimal algorithm"
+    ],
+    "reopen_when": [
+      "a new causal graph-capture/replay design avoids per-token recapture",
+      "a quality-passing weight encoding with a different error profile exists",
+      "gdn_core becomes DRAM-bound after some other keep",
+      "a quality-matched packed-KV encoding is actually faster on populated cache",
+      "exclusive sitting completes D131040 and OPT-016 2K for the combined stack"
+    ],
+    "practical_stop_requires": "complete traffic account within measurement uncertainty AND plausible remaining scoped savings below 2% request time. Decode P4096/D128/D2048 do not currently meet that joint test versus llama.",
+    "missing_for_a_stronger_stop": [
+      "combined-stack event-union timeline if identity-timeline GPU phase did not run",
+      "measured sustainable bandwidth for weight-stream access",
+      "exclusive-sitting D131040 and OPT-016 2K",
+      "quality-matched llama packed-KV / lower-precision weight baseline",
+      "built inspection-HEAD llama supplementary configs"
+    ]
+  },
+  "supports_continuing": false,
+  "universal_optimality_claimed": false,
+  "production_kept": true,
+  "claims_throughput": false,
+  "claims_performance_improvement": false,
+  "report_path": "evidence/optimization/opt124-practical-ceiling/REPORT.md",
+  "proof_limit": "analysis/diagnostics only: no production selector or kernel change; reuse OPT-123 samples only with matching identities; pinned llama cc83d7b4824f73cfdda4dfbb47ee39804f71b328 remains the benchmark authority; 1792 GB/s and 104.8 TFLOPS are listed peaks, not measured application rates; a bound that excludes unpack/scale or serial launch idle is optimistic, not attainable; independent phase sums are not a bound; no universal-optimality assertion; speculation/MTP/batching/model replacement/sparse attention are outside this approved batch",
+  "freeze": {
+    "schema_version": 1,
+    "task": "OPT-124",
+    "phase": "freeze",
+    "mode": "feedback",
+    "ok": true,
+    "identity": {
+      "device": "NVIDIA GeForce RTX 5090",
+      "llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+      "llama_inspection_head": "1945e092030f8668ff93382799502d01490e564d",
+      "ds4_inspection_head": "c238077a87186381bf626cc531bccffe1fef79e7",
+      "gguf_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+      "source_revision": "a8daac9b610b331be9e5f559757fdd189a6cb04f",
+      "source_state": "dirty",
+      "nvccflags": "-O2 --fmad=false",
+      "execution_graphs": "ffn_only",
+      "final_stack": "combined_opt118_opt119",
+      "historical_control": "post113_selected",
+      "image": "qw38-cuda:13.0.2",
+      "model": "models/Qwen3.8-27B-Q4_K_M.gguf",
+      "opt123": {
+        "llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+        "gguf_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+        "parent": "post113_selected",
+        "candidate": "combined_opt118_opt119",
+        "keepers": [
+          "OPT-118",
+          "OPT-119"
+        ],
+        "execution_graphs": "ffn_only",
+        "q4_decode": "llama_q4k_mmvq",
+        "packed_kv": "DenseBf16",
+        "weight_requant": "none",
+        "gdn_state": "Fp32",
+        "rejected_no_leak": true,
+        "reuse_historical_llama": false,
+        "llama_p4096_flash_attn": -1,
+        "llama_n_gpu_layers": 99,
+        "llama_type_k": "f16",
+        "llama_type_v": "f16",
+        "quality_ppl_ratio": 1.0,
+        "opt116_contract_id": "opt116_generated_v1"
+      },
+      "post113_authenticated": {
+        "ok": true,
+        "selectors": {
+          "rms_norm": "parallel_fma",
+          "q4_decode": "llama_q4k_mmvq",
+          "q8_decode": "dp4a_q8_1",
+          "q6_decode": "integer_q8_1",
+          "ffn_decode": "paired_integer",
+          "query_prepare": "hoisted",
+          "attention_pipeline": "opt111_base",
+          "gdn_preproc": "transpose",
+          "mmq_pipeline": "fma_async",
+          "ffn_prompt_pair": "off",
+          "execution_graphs": "ffn_only",
+          "production_numerics": "strict",
+          "gdn_decode": "sequential",
+          "decode_query_prep": "warp_query",
+          "q8_decode_rows_skinny": 1,
+          "q8_decode_rows_medium": 1,
+          "q8_decode_rows_wide": 1,
+          "q8_decode_layout_warps_skinny": 4,
+          "q8_decode_layout_warps_medium": 4,
+          "q8_decode_layout_warps_wide": 4,
+          "ffn_gate_quality_i": 128,
+          "ffn_gate_prompt_tile": 128,
+          "prompt_microbatch_rows": 4096,
+          "mmq_async_x": true,
+          "nvccflags": "-O2 --fmad=false",
+          "q8_layout": "r1_w4",
+          "ffn_tiles": "i128_j128",
+          "q8_grouping": "grouped_r1_w4",
+          "q8_device_layout": "raw_gguf",
+          "q6_device_layout": "raw_gguf",
+          "mmq_double_x": false,
+          "decode_attention_vec128": "warp_query",
+          "decode_attention_crossover_threshold": 1024,
+          "decode_attention": "hybrid_crossover"
+        },
+        "expected": {
+          "rms_norm": "parallel_fma",
+          "q4_decode": "llama_q4k_mmvq",
+          "q8_decode": "dp4a_q8_1",
+          "q8_grouping": "grouped_r1_w4",
+          "q8_layout": "r1_w4",
+          "q6_decode": "integer_q8_1",
+          "ffn_decode": "paired_integer",
+          "query_prepare": "hoisted",
+          "attention_pipeline": "opt111_base",
+          "gdn_preproc": "transpose",
+          "mmq_pipeline": "fma_async",
+          "mmq_async_x": true,
+          "ffn_prompt_pair": "off",
+          "ffn_tiles": "i128_j128",
+          "prompt_microbatch_rows": 4096,
+          "execution_graphs": "ffn_only",
+          "production_numerics": "strict",
+          "nvccflags": "-O2 --fmad=false",
+          "gdn_decode": "sequential",
+          "decode_query_prep": "warp_query",
+          "decode_attention": "hybrid_crossover",
+          "decode_attention_vec128": "warp_query",
+          "decode_attention_crossover_threshold": 1024,
+          "q8_device_layout": "raw_gguf",
+          "q6_device_layout": "raw_gguf",
+          "mmq_double_x": false
+        },
+        "opt113_fixture_selected": {
+          "rms_norm": "parallel_fma",
+          "q4_decode": "llama_q4k_mmvq",
+          "q8_decode": "dp4a_q8_1",
+          "q6_decode": "integer_q8_1",
+          "ffn_decode": "paired_integer",
+          "query_prepare": "hoisted",
+          "attention_pipeline": "opt111_base",
+          "gdn_preproc": "transpose",
+          "mmq_pipeline": "fma_async",
+          "ffn_prompt_pair": "off",
+          "execution_graphs": "ffn_only",
+          "production_numerics": "strict",
+          "gdn_decode": "sequential",
+          "decode_query_prep": "warp_query",
+          "q8_decode_rows_skinny": 1,
+          "q8_decode_rows_medium": 1,
+          "q8_decode_rows_wide": 1,
+          "q8_decode_layout_warps_skinny": 4,
+          "q8_decode_layout_warps_medium": 4,
+          "q8_decode_layout_warps_wide": 4,
+          "ffn_gate_quality_i": 128,
+          "ffn_gate_prompt_tile": 128,
+          "prompt_microbatch_rows": 4096,
+          "mmq_async_x": true,
+          "nvccflags": "-O2 --fmad=false",
+          "q8_layout": "r1_w4",
+          "ffn_tiles": "i128_j128",
+          "q8_grouping": "grouped_r1_w4",
+          "q8_device_layout": "raw_gguf",
+          "q6_device_layout": "raw_gguf",
+          "mmq_double_x": false,
+          "decode_attention_vec128": "warp_query",
+          "decode_attention_crossover_threshold": 1024,
+          "decode_attention": "hybrid_crossover"
+        },
+        "mismatches": {},
+        "llama_q4k_mmvq": true,
+        "opt111_base": true,
+        "hybrid_crossover": true,
+        "sequential_gdn": true,
+        "ffn_only_graphs": true,
+        "opt113_numbers_historical_only": true
+      }
+    },
+    "opt123_identities_match": {
+      "ok": true,
+      "expected": {
+        "llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+        "gguf_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+        "parent": "post113_selected",
+        "candidate": "combined_opt118_opt119",
+        "keepers": [
+          "OPT-118",
+          "OPT-119"
+        ],
+        "execution_graphs": "ffn_only",
+        "q4_decode": "llama_q4k_mmvq",
+        "packed_kv": "DenseBf16",
+        "weight_requant": "none",
+        "gdn_state": "Fp32",
+        "rejected_no_leak": true,
+        "reuse_historical_llama": false
+      },
+      "observed": {
+        "llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+        "gguf_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+        "parent": "post113_selected",
+        "candidate": "combined_opt118_opt119",
+        "keepers": [
+          "OPT-118",
+          "OPT-119"
+        ],
+        "execution_graphs": "ffn_only",
+        "q4_decode": "llama_q4k_mmvq",
+        "packed_kv": "DenseBf16",
+        "weight_requant": "none",
+        "gdn_state": "Fp32",
+        "rejected_no_leak": true,
+        "reuse_historical_llama": false,
+        "llama_p4096_flash_attn": -1,
+        "llama_n_gpu_layers": 99,
+        "llama_type_k": "f16",
+        "llama_type_v": "f16",
+        "quality_ppl_ratio": 1.0,
+        "opt116_contract_id": "opt116_generated_v1"
+      },
+      "mismatches": {},
+      "reuse_opt123_samples": true
+    },
+    "opt115_fixture": "fixtures/opt115_pipeline_traffic.json",
+    "opt116_fixture": "fixtures/opt116_generated_quality.json",
+    "opt123_fixture": "fixtures/opt123_combined_stack.json",
+    "family_plan": "task=OPT-124 mode=feedback phase=freeze loop_product=1 cases=1 candidates=1 warmups=0 samples=1 tokens=1",
+    "measured_at": "2026-09-13T20:53:29Z"
+  },
+  "llama_compare": {
+    "schema_version": 1,
+    "task": "OPT-124",
+    "phase": "llama-compare",
+    "mode": "feedback",
+    "ok": true,
+    "llama_comparison": {
+      "pinned_llama": {
+        "ok": true,
+        "pinned_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+        "authority_unchanged": true,
+        "n_gpu_layers": 99,
+        "flash_attn": -1,
+        "flash_attn_auto": true,
+        "backends": "CUDA",
+        "gpu_info": "NVIDIA GeForce RTX 5090",
+        "type_k": "f16",
+        "type_v": "f16",
+        "model_n_params": 26895998464,
+        "decode_n_ctx": 4096,
+        "decode_tokens": 256,
+        "kv_policy": {
+          "type_k": "f16",
+          "type_v": "f16",
+          "matches_quartz_dense_bf16": true,
+          "asymmetry_note": "Pinned llama KV is f16. Quartz ships dense BF16 KV. Packed 8/4-bit Quartz KV (OPT-120) was quality_blocked and slower; no quality-matched llama packed-KV baseline was introduced. Do not call a changed-quantization Quartz comparison an identical-arithmetic kernel win."
+        },
+        "graph_and_offload": "llama-bench on the pinned authority used n_gpu_layers=99, CUDA backend, flash_attn auto (-1), type_k/v f16, n_ctx 4096 for decode oracles. That is the intended strong baseline for this pin: full GPU offload and the flash-attention auto path. Graph capture is llama's internal CUDA-graph evaluate/capture, not a Quartz decode_segments8 equivalent.",
+        "intended_strong_baseline": true,
+        "source": "fixtures/opt123_combined_stack.json llama"
+      },
+      "supplementary_llama": {
+        "path": "/home/user/llama.cpp",
+        "present": true,
+        "revision": "1945e092030f8668ff93382799502d01490e564d",
+        "state": "clean",
+        "pinned_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+        "recorded_inspection_head": "1945e092030f8668ff93382799502d01490e564d",
+        "is_not_pin": true,
+        "materially_stronger_evidence": false,
+        "supplementary_admitted": [],
+        "max_configs": 2,
+        "measured": false,
+        "limits_this_conclusion": false,
+        "does_not_invalidate_pinned_comparison": true,
+        "note": "Pinned authority is unchanged. Failure to build/run a supplementary baseline limits the 'is this the strongest local llama' clause but does not invalidate the pinned comparison."
+      },
+      "quality": {
+        "opt116_contract": "opt116_generated_v1",
+        "strict_quality_pass": true,
+        "successor_quality_pass": true,
+        "ppl_ratio": 1.0,
+        "candidate_nll_measured": true,
+        "anchor": "post113_selected"
+      },
+      "memory": {
+        "session_bytes": 696743940,
+        "workspace_bytes": 1820039808,
+        "128k_fit": true
+      },
+      "p4096_d128_d2048": [
+        {
+          "workload": "p4096",
+          "post113_tok_s": 2917.105567,
+          "quartz_combined_tok_s": 2935.3935069999998,
+          "llama_tok_s": 3105.42474,
+          "post113_ms": 1404.131563264745,
+          "quartz_combined_ms": 1395.3836138944625,
+          "llama_ms": 1318.9822143298827,
+          "quartz_over_llama": 0.9452470282696337,
+          "matched_request_boundaries": true,
+          "source": "fixtures/opt123_combined_stack.json"
+        },
+        {
+          "workload": "d128",
+          "post113_tok_s": 53.77292633,
+          "quartz_combined_tok_s": 54.01590042,
+          "llama_tok_s": 68.6696311,
+          "post113_ms": 18.59671898574169,
+          "quartz_combined_ms": 18.513067304710496,
+          "llama_ms": 14.562478114142657,
+          "quartz_over_llama": 0.7866053676819592,
+          "matched_request_boundaries": true,
+          "source": "fixtures/opt123_combined_stack.json"
+        },
+        {
+          "workload": "d2048",
+          "post113_tok_s": 41.4484684,
+          "quartz_combined_tok_s": 41.633106240000004,
+          "llama_tok_s": 67.1854929,
+          "post113_ms": 24.126343833732584,
+          "quartz_combined_ms": 24.019346388313107,
+          "llama_ms": 14.884165566641247,
+          "quartz_over_llama": 0.6196740463297249,
+          "matched_request_boundaries": true,
+          "source": "fixtures/opt123_combined_stack.json"
+        }
+      ],
+      "long_context": {
+        "d8192": {
+          "post113_tok_s": null,
+          "combined_tok_s": 8.06574726,
+          "llama_tok_s": null,
+          "combined_ms": 123.98107301963736,
+          "oom": false,
+          "ok": true,
+          "populated_cache": true,
+          "separately_labeled": true,
+          "source": "fixtures/opt123_combined_stack.json long_context"
+        },
+        "d32768": {
+          "post113_tok_s": null,
+          "combined_tok_s": 1.35194111,
+          "llama_tok_s": null,
+          "combined_ms": 739.6771890456087,
+          "oom": false,
+          "ok": true,
+          "populated_cache": true,
+          "separately_labeled": true,
+          "source": "fixtures/opt123_combined_stack.json long_context"
+        },
+        "d131040": {
+          "post113_tok_s": null,
+          "combined_tok_s": null,
+          "llama_tok_s": null,
+          "combined_ms": null,
+          "oom": true,
+          "ok": false,
+          "populated_cache": false,
+          "separately_labeled": true,
+          "source": "fixtures/opt123_combined_stack.json long_context"
+        },
+        "not_a_d128_win": true
+      },
+      "opt016_2k": {
+        "quartz_tok_s": 0.0,
+        "llama_tok_s": 3288.205178,
+        "quartz_measured": false,
+        "oom": true,
+        "separately_labeled": true,
+        "source": "fixtures/opt123_combined_stack.json opt016_2k"
+      },
+      "nonexclusive_sitting": true,
+      "opt113_numbers_historical_only": true,
+      "smaller_context_or_skipped_sampling_is_not_an_improvement": true
+    },
+    "family_plan": "task=OPT-124 mode=feedback phase=llama-compare loop_product=3 cases=3 candidates=1 warmups=0 samples=1 tokens=1",
+    "measured_at": "2026-09-13T20:53:29Z"
+  },
+  "mechanisms": {
+    "schema_version": 1,
+    "task": "OPT-124",
+    "phase": "mechanisms",
+    "mode": "feedback",
+    "ok": true,
+    "mechanism_disposition": {
+      "parent_stack": "combined_opt118_opt119 on post113 ffn_only",
+      "rejected_paths_do_not_leak": true,
+      "opt115_idle_is_post113_overlay": true,
+      "ranked": [
+        {
+          "task": "OPT-117",
+          "mechanism": "decode-segment CUDA graphs",
+          "bytes_or_time_upper": {
+            "bytes": 0,
+            "peak_ms": 9.974685400000169,
+            "kind": "launch_idle_gap"
+          },
+          "implemented_candidate": "decode_segments8",
+          "quality_state_blockers": "none (same_math/quality/state passed)",
+          "complete_request_outcome": "retain_ffn_only",
+          "measured_loss": "D128 geo CI lower 0.979; D2048 0.980; decode p95 > 1.05\u00d7 parent. Per-token recapture (257 param updates / 256 tokens) exceeded the remaining launch/idle gap.",
+          "missing_evidence": null,
+          "capability_failure": "kernel-arg patching is not byte-exact; production replay recaptures when frontier/GDN/KV topology change",
+          "reopen": false,
+          "reopen_requires": "a new causal capture/replay design that avoids per-token recapture; not another random launch/tile choice"
+        },
+        {
+          "task": "OPT-118",
+          "mechanism": "lazy logits/hidden + decode D2H overlap",
+          "bytes_or_time_upper": {
+            "bytes": 1013760,
+            "peak_ms": 0.0005657142857142857,
+            "kind": "pcie_logits_hidden"
+          },
+          "implemented_candidate": "lazy+overlap",
+          "quality_state_blockers": "none",
+          "complete_request_outcome": "keep",
+          "measured_loss": null,
+          "measured_keep": "D128 +0.172 tok/s (1.003\u00d7); shipping pin true/true",
+          "missing_evidence": null,
+          "capability_failure": null,
+          "reopen": false,
+          "reopen_requires": "none; already in the OPT-123 combined stack"
+        },
+        {
+          "task": "OPT-119",
+          "mechanism": "mixer+FFN RMSNorm\u2192MMQ Q8 fusion",
+          "bytes_or_time_upper": {
+            "bytes": 167772160,
+            "peak_ms": 0.09362285714285715,
+            "kind": "prefill_activation_reread"
+          },
+          "implemented_candidate": "mixer_q8+ffn_q8",
+          "quality_state_blockers": "none",
+          "complete_request_outcome": "keep",
+          "measured_loss": null,
+          "measured_keep": "P4096 +17.66 tok/s (1.006\u00d7); D128/D2048 guards ~1.00",
+          "missing_evidence": null,
+          "capability_failure": null,
+          "reopen": false,
+          "reopen_requires": "none; already in the OPT-123 combined stack"
+        },
+        {
+          "task": "OPT-120",
+          "mechanism": "packed Q8/Q4 attention KV",
+          "bytes_or_time_upper": {
+            "bytes": 4026531840,
+            "peak_ms": 4.79232,
+            "kind": "long_context_kv"
+          },
+          "implemented_candidate": "q8q8",
+          "quality_state_blockers": "long-cache generated quality fail; held-out PPL still <1.01",
+          "complete_request_outcome": "quality_blocked",
+          "measured_loss": "D8192 0.624\u00d7, D32768 0.316\u00d7, D131040 0.215\u00d7 vs dense parent; P4096 guard 0.789\u00d7. Byte savings did not become a request win.",
+          "missing_evidence": null,
+          "capability_failure": null,
+          "reopen": false,
+          "reopen_requires": "a quality-matched packed encoding that is actually faster on populated-cache requests; unpack-into-registers already tried"
+        },
+        {
+          "task": "OPT-121",
+          "mechanism": "selective Q8\u2192Q4_K weight requant + native FP4 study",
+          "bytes_or_time_upper": {
+            "bytes": 3355443200,
+            "peak_ms": 1.8724571428571428,
+            "kind": "streamed_weights"
+          },
+          "implemented_candidate": "q8_to_q4k",
+          "quality_state_blockers": "recurrence \u0394NLL 3.92/3.46 vs max 0.02; long-cache fail",
+          "complete_request_outcome": "quality_blocked",
+          "measured_loss": "D128 0.870\u00d7, D2048 0.909\u00d7; P4096 guard 1.014\u00d7 but quality fail",
+          "missing_evidence": null,
+          "capability_failure": "native FP4 study capability_absent=true",
+          "reopen": false,
+          "reopen_requires": "a quality-passing weight encoding with a different error profile, or an actual FP4 path; not another Q8\u2192Q4_K launch"
+        },
+        {
+          "task": "OPT-122",
+          "mechanism": "lower-precision persistent GDN state",
+          "bytes_or_time_upper": {
+            "bytes": 150994944,
+            "peak_ms": 0.0,
+            "kind": "gdn_dram_vs_compute"
+          },
+          "implemented_candidate": "none admitted (BF16/Q8 bound-rejected)",
+          "quality_state_blockers": "not in scope; FP32 retained",
+          "complete_request_outcome": "no_material_opportunity",
+          "measured_loss": null,
+          "measured_keep": null,
+          "missing_evidence": null,
+          "capability_failure": null,
+          "reopen": false,
+          "reopen_requires": "evidence that gdn_core became DRAM-bound after some other keep; current enclosing compute already exceeds FP32 DRAM time"
+        }
+      ],
+      "changed_under_final_stack": "OPT-118 and OPT-119 are the keepers. OPT-117/120/121/122 outcomes do not reverse on the combined stack: graphs remain ffn_only, KV dense BF16, weights unrequantized, GDN FP32. No new causal reason to reopen a rejected idea appeared in OPT-123 leave-one-out."
+    },
+    "family_plan": "task=OPT-124 mode=feedback phase=mechanisms loop_product=6 cases=6 candidates=1 warmups=0 samples=1 tokens=1",
+    "measured_at": "2026-09-13T20:53:29Z"
+  },
+  "identity_timeline": {
+    "schema_version": 1,
+    "task": "OPT-124",
+    "phase": "identity-timeline",
+    "mode": "feedback",
+    "ok": true,
+    "hardware_executed": true,
+    "gpu_blocker": null,
+    "native_identity": {
+      "schema_version": 1,
+      "task": "OPT-124",
+      "workload": "identity",
+      "ok": true,
+      "stack": "combined_opt118_opt119",
+      "execution_graphs": "ffn_only",
+      "q4_decode": "llama_q4k_mmvq",
+      "packed_kv": "dense_bf16",
+      "weight_requant": "none",
+      "gdn_state": "fp32",
+      "decode_d2h_bytes": 4,
+      "mixer_quantize_launches": 0,
+      "ffn_quantize_launches": 0,
+      "mixer_norm_q8_launches": 127,
+      "ffn_norm_q8_launches": 128,
+      "lazy_ok": true,
+      "fusion_ok": true,
+      "opt117_rejected_ffn_only": true,
+      "opt120_rejected_dense_kv": true,
+      "opt121_rejected_none_requant": true,
+      "opt122_rejected_fp32_gdn": true,
+      "opt110_hooks_ready": true,
+      "independently_restored": true,
+      "keep": false
+    },
+    "timeline": {
+      "d128": {
+        "tokens": 1,
+        "record_count": 650,
+        "charged_count": 650,
+        "leaf_kernel_count": 340,
+        "gpu_busy_union_ms": 8.292201499999877,
+        "gpu_idle_gap_ms": 9.978260100000128,
+        "host_overlap_union_ms": 0.0,
+        "sync_union_ms": 0.11219800000000646,
+        "graph_union_ms": 0.0,
+        "launch_submission_ms": 9.978260100000128,
+        "classified_union_ms": 8.404399499999883,
+        "unclassified_ms": 0.7222864999999885,
+        "wall_ms": 19.1049461,
+        "interval_coverage": 0.9621937431166064,
+        "overlap_not_summed": true,
+        "sum_exceeds_wall": true,
+        "stream_aware": {
+          "summed_gpu_work_ms": 28.31308799508,
+          "interval_union_ms": 18.29865960000012,
+          "overlap_ms": 10.014428395079879,
+          "streams": {
+            "0": 28.31308799508
+          },
+          "sum_exceeds_wall": true
+        },
+        "families": {
+          "embedding": {
+            "role": "embedding",
+            "ms": 0.021216000470000003,
+            "calls": 2,
+            "fused_member_count": 1,
+            "engines": [
+              "quartz"
+            ],
+            "launch_families": [
+              "row_decode"
+            ]
+          },
+          "gdn_core": {
+            "role": "gdn_core",
+            "ms": 2.2258879955999995,
+            "calls": 49,
+            "fused_member_count": 1,
+            "engines": [
+              "quartz"
+            ],
+            "launch_families": [
+              "gdn"
+            ]
+          },
+          "mixer_mmv": {
+            "role": "mixer_mmv",
+            "ms": 6.349407980500001,
+            "calls": 128,
+            "fused_member_count": 1,
+            "engines": [
+              "quartz"
+            ],
+            "launch_families": [
+              "mmv"
+            ]
+          },
+          "ffn_mmv": {
+            "role": "ffn_mmv",
+            "ms": 7.965183966,
+            "calls": 64,
+            "fused_member_count": 7,
+            "engines": [
+              "quartz"
+            ],
+            "launch_families": [
+              "cuda_graph"
+            ]
+          },
+          "attention_core": {
+            "role": "attention_core",
+            "ms": 0.9678720006999999,
+            "calls": 16,
+            "fused_member_count": 1,
+            "engines": [
+              "quartz"
+            ],
+            "launch_families": [
+              "attention"
+            ]
+          },
+          "logits": {
+            "role": "logits",
+            "ms": 0.723136008,
+            "calls": 1,
+            "fused_member_count": 1,
+            "engines": [
+              "quartz"
+            ],
+            "launch_families": [
+              "mmv"
+            ]
+          },
+          "state_commit": {
+            "role": "state_commit",
+            "ms": 0.0553920008,
+            "calls": 1,
+            "fused_member_count": 1,
+            "engines": [
+              "quartz"
+            ],
+            "launch_families": [
+              "copy"
+            ]
+          },
+          "input_norm": {
+            "role": "input_norm",
+            "ms": 0.0157440007,
+            "calls": 1,
+            "fused_member_count": 1,
+            "engines": [
+              "quartz"
+            ],
+            "launch_families": [
+              "rms_norm"
+            ]
+          },
+          "proj_packed_qkv": {
+            "role": "proj_packed_qkv",
+            "ms": 2.9007360114000007,
+            "calls": 48,
+            "fused_member_count": 1,
+            "engines": [
+              "quartz"
+            ],
+            "launch_families": [
+              "mmv"
+            ]
+          },
+          "gdn_gate_prep": {
+            "role": "gdn_gate_prep",
+            "ms": 0.22758400252,
+            "calls": 48,
+            "fused_member_count": 1,
+            "engines": [
+              "quartz"
+            ],
+            "launch_families": [
+              "gdn"
+            ]
+          },
+          "gdn_conv_qk_norm_recurrence": {
+            "role": "gdn_conv_qk_norm_recurrence",
+            "ms": 1.6099839811000003,
+            "calls": 48,
+            "fused_member_count": 3,
+            "engines": [
+              "quartz"
+            ],
+            "launch_families": [
+              "gdn"
+            ]
+          },
+          "gdn_output_norm": {
+            "role": "gdn_output_norm",
+            "ms": 0.27468799900000007,
+            "calls": 48,
+            "fused_member_count": 1,
+            "engines": [
+              "quartz"
+            ],
+            "launch_families": [
+              "rms_norm"
+            ]
+          },
+          "proj_gdn_output": {
+            "role": "proj_gdn_output",
+            "ms": 1.2247360180000002,
+            "calls": 48,
+            "fused_member_count": 1,
+            "engines": [
+              "quartz"
+            ],
+            "launch_families": [
+              "mmv"
+            ]
+          },
+          "residual_mixer": {
+            "role": "residual_mixer",
+            "ms": 0.24137600291000014,
+            "calls": 64,
+            "fused_member_count": 1,
+            "engines": [
+              "quartz"
+            ],
+            "launch_families": [
+              "pointwise"
+            ]
+          },
+          "proj_query_gate": {
+            "role": "proj_query_gate",
+            "ms": 0.8583040013000001,
+            "calls": 16,
+            "fused_member_count": 1,
+            "engines": [
+              "quartz"
+            ],
+            "launch_families": [
+              "mmv"
+            ]
+          },
+          "attn_query_split": {
+            "role": "attn_query_split",
+            "ms": 0.04838400152,
+            "calls": 16,
+            "fused_member_count": 1,
+            "engines": [
+              "quartz"
+            ],
+            "launch_families": [
+              "attention"
+            ]
+          },
+          "attn_qk_prep_softmax_pv_merge": {
+            "role": "attn_qk_prep_softmax_pv_merge",
+            "ms": 0.7981120049,
+            "calls": 16,
+            "fused_member_count": 1,
+            "engines": [
+              "quartz"
+            ],
+            "launch_families": [
+              "attention"
+            ]
+          },
+          "attn_output_cast": {
+            "role": "attn_output_cast",
+            "ms": 0.07628800066000001,
+            "calls": 16,
+            "fused_member_count": 1,
+            "engines": [
+              "quartz"
+            ],
+            "launch_families": [
+              "cast"
+            ]
+          },
+          "proj_attn_output": {
+            "role": "proj_attn_output",
+            "ms": 0.9711679965000001,
+            "calls": 16,
+            "fused_member_count": 1,
+            "engines": [
+              "quartz"
+            ],
+            "launch_families": [
+              "mmv"
+            ]
+          },
+          "logits_norm": {
+            "role": "logits_norm",
+            "ms": 0.0132160001,
+            "calls": 1,
+            "fused_member_count": 1,
+            "engines": [
+              "quartz"
+            ],
+            "launch_families": [
+              "rms_norm"
+            ]
+          },
+          "logits_projection": {
+            "role": "logits_projection",
+            "ms": 0.632480025,
+            "calls": 1,
+            "fused_member_count": 1,
+            "engines": [
+              "quartz"
+            ],
+            "launch_families": [
+              "mmv"
+            ]
+          },
+          "d2h": {
+            "role": "d2h",
+            "ms": 0.0575359985,
+            "calls": 1,
+            "fused_member_count": 1,
+            "engines": [
+              "quartz"
+            ],
+            "launch_families": [
+              "copy"
+            ]
+          },
+          "state_copies": {
+            "role": "state_copies",
+            "ms": 0.0546559989,
+            "calls": 1,
+            "fused_member_count": 1,
+            "engines": [
+              "quartz"
+            ],
+            "launch_families": [
+              "copy"
+            ]
+          }
+        },
+        "method": "event_union_plus_leaf_gaps",
+        "valid": true,
+        "prefix": 128,
+        "identity": "combined_opt118_opt119",
+        "native": {
+          "schema_version": 1,
+          "task": "OPT-124",
+          "workload": "combined-timeline",
+          "stack": "combined_opt118_opt119",
+          "prefix": 128,
+          "tokens": 1,
+          "record_count": 650,
+          "pool_overflow": false,
+          "wall_ms": 19.1049461,
+          "uninstrumented_wall_ms": 17.6661129,
+          "instrumented_wall_ms": 19.1049461,
+          "profiler_perturbation_ms": 1.43883324,
+          "tok_s": 52.3424644,
+          "keep": false,
+          "observed_warmups": 1,
+          "observed_samples": 1,
+          "observed_candidates": 1,
+          "observed_shapes": 1,
+          "observed_tier": "screen"
+        }
+      },
+      "d2048": {
+        "tokens": 1,
+        "record_count": 650,
+        "charged_count": 650,
+        "leaf_kernel_count": 340,
+        "gpu_busy_union_ms": 10.540765000000079,
+        "gpu_idle_gap_ms": 10.002813999999944,
+        "host_overlap_union_ms": 0.0,
+        "sync_union_ms": 0.07598800000005212,
+        "graph_union_ms": 0.0,
+        "launch_submission_ms": 10.002813999999944,
+        "classified_union_ms": 10.61675300000013,
+        "unclassified_ms": 0.44848909999992514,
+        "wall_ms": 21.0680561,
+        "interval_coverage": 0.9787123644501817,
+        "overlap_not_summed": true,
+        "sum_exceeds_wall": true,
+        "stream_aware": {
+          "summed_gpu_work_ms": 32.78627197682,
+          "interval_union_ms": 20.526923000000465,
+          "overlap_ms": 12.259348976819531,
+          "streams": {
+            "0": 32.78627197682
+          },
+          "sum_exceeds_wall": true
+        },
+        "families": {
+          "embedding": {
+            "role": "embedding",
+            "ms": 0.0279359994,
+            "calls": 2,
+            "fused_member_count": 1,
+            "engines": [
+              "quartz"
+            ],
+            "launch_families": [
+              "row_decode"
+            ]
+          },
+          "gdn_core": {
+            "role": "gdn_core",
+            "ms": 2.2613439841,
+            "calls": 49,
+            "fused_member_count": 1,
+            "engines": [
+              "quartz"
+            ],
+            "launch_families": [
+              "gdn"
+            ]
+          },
+          "mixer_mmv": {
+            "role": "mixer_mmv",
+            "ms": 6.2834879803,
+            "calls": 128,
+            "fused_member_count": 1,
+            "engines": [
+              "quartz"
+            ],
+            "launch_families": [
+              "mmv"
+            ]
+          },
+          "ffn_mmv": {
+            "role": "ffn_mmv",
+            "ms": 7.972480018999999,
+            "calls": 64,
+            "fused_member_count": 7,
+            "engines": [
+              "quartz"
+            ],
+            "launch_families": [
+              "cuda_graph"
+            ]
+          },
+          "attention_core": {
+            "role": "attention_core",
+            "ms": 3.2390720079999995,
+            "calls": 16,
+            "fused_member_count": 1,
+            "engines": [
+              "quartz"
+            ],
+            "launch_families": [
+              "attention"
+            ]
+          },
+          "logits": {
+            "role": "logits",
+            "ms": 0.696767986,
+            "calls": 1,
+            "fused_member_count": 1,
+            "engines": [
+              "quartz"
+            ],
+            "launch_families": [
+              "mmv"
+            ]
+          },
+          "state_commit": {
+            "role": "state_commit",
+            "ms": 0.0590399988,
+            "calls": 1,
+            "fused_member_count": 1,
+            "engines": [
+              "quartz"
+            ],
+            "launch_families": [
+              "copy"
+            ]
+          },
+          "input_norm": {
+            "role": "input_norm",
+            "ms": 0.0181440003,
+            "calls": 1,
+            "fused_member_count": 1,
+            "engines": [
+              "quartz"
+            ],
+            "launch_families": [
+              "rms_norm"
+            ]
+          },
+          "proj_packed_qkv": {
+            "role": "proj_packed_qkv",
+            "ms": 2.899488028100001,
+            "calls": 48,
+            "fused_member_count": 1,
+            "engines": [
+              "quartz"
+            ],
+            "launch_families": [
+              "mmv"
+            ]
+          },
+          "gdn_gate_prep": {
+            "role": "gdn_gate_prep",
+            "ms": 0.22659200053000003,
+            "calls": 48,
+            "fused_member_count": 1,
+            "engines": [
+              "quartz"
+            ],
+            "launch_families": [
+              "gdn"
+            ]
+          },
+          "gdn_conv_qk_norm_recurrence": {
+            "role": "gdn_conv_qk_norm_recurrence",
+            "ms": 1.6430399757999996,
+            "calls": 48,
+            "fused_member_count": 3,
+            "engines": [
+              "quartz"
+            ],
+            "launch_families": [
+              "gdn"
+            ]
+          },
+          "gdn_output_norm": {
+            "role": "gdn_output_norm",
+            "ms": 0.27497599983000004,
+            "calls": 48,
+            "fused_member_count": 1,
+            "engines": [
+              "quartz"
+            ],
+            "launch_families": [
+              "rms_norm"
+            ]
+          },
+          "proj_gdn_output": {
+            "role": "proj_gdn_output",
+            "ms": 1.2246080189000004,
+            "calls": 48,
+            "fused_member_count": 1,
+            "engines": [
+              "quartz"
+            ],
+            "launch_families": [
+              "mmv"
+            ]
+          },
+          "residual_mixer": {
+            "role": "residual_mixer",
+            "ms": 0.2426240024300001,
+            "calls": 64,
+            "fused_member_count": 1,
+            "engines": [
+              "quartz"
+            ],
+            "launch_families": [
+              "pointwise"
+            ]
+          },
+          "proj_query_gate": {
+            "role": "proj_query_gate",
+            "ms": 0.8621760235,
+            "calls": 16,
+            "fused_member_count": 1,
+            "engines": [
+              "quartz"
+            ],
+            "launch_families": [
+              "mmv"
+            ]
+          },
+          "attn_query_split": {
+            "role": "attn_query_split",
+            "ms": 0.048032001410000004,
+            "calls": 16,
+            "fused_member_count": 1,
+            "engines": [
+              "quartz"
+            ],
+            "launch_families": [
+              "attention"
+            ]
+          },
+          "attn_qk_prep_softmax_pv_merge": {
+            "role": "attn_qk_prep_softmax_pv_merge",
+            "ms": 3.1078719530000005,
+            "calls": 16,
+            "fused_member_count": 1,
+            "engines": [
+              "quartz"
+            ],
+            "launch_families": [
+              "attention"
+            ]
+          },
+          "attn_output_cast": {
+            "role": "attn_output_cast",
+            "ms": 0.05907200131999999,
+            "calls": 16,
+            "fused_member_count": 1,
+            "engines": [
+              "quartz"
+            ],
+            "launch_families": [
+              "cast"
+            ]
+          },
+          "proj_attn_output": {
+            "role": "proj_attn_output",
+            "ms": 0.897023995,
+            "calls": 16,
+            "fused_member_count": 1,
+            "engines": [
+              "quartz"
+            ],
+            "launch_families": [
+              "mmv"
+            ]
+          },
+          "logits_norm": {
+            "role": "logits_norm",
+            "ms": 0.0135679999,
+            "calls": 1,
+            "fused_member_count": 1,
+            "engines": [
+              "quartz"
+            ],
+            "launch_families": [
+              "rms_norm"
+            ]
+          },
+          "logits_projection": {
+            "role": "logits_projection",
+            "ms": 0.652960002,
+            "calls": 1,
+            "fused_member_count": 1,
+            "engines": [
+              "quartz"
+            ],
+            "launch_families": [
+              "mmv"
+            ]
+          },
+          "d2h": {
+            "role": "d2h",
+            "ms": 0.0187199991,
+            "calls": 1,
+            "fused_member_count": 1,
+            "engines": [
+              "quartz"
+            ],
+            "launch_families": [
+              "copy"
+            ]
+          },
+          "state_copies": {
+            "role": "state_copies",
+            "ms": 0.0572480001,
+            "calls": 1,
+            "fused_member_count": 1,
+            "engines": [
+              "quartz"
+            ],
+            "launch_families": [
+              "copy"
+            ]
+          }
+        },
+        "method": "event_union_plus_leaf_gaps",
+        "valid": true,
+        "prefix": 2048,
+        "identity": "combined_opt118_opt119",
+        "native": {
+          "schema_version": 1,
+          "task": "OPT-124",
+          "workload": "combined-timeline",
+          "stack": "combined_opt118_opt119",
+          "prefix": 2048,
+          "tokens": 1,
+          "record_count": 650,
+          "pool_overflow": false,
+          "wall_ms": 21.0680561,
+          "uninstrumented_wall_ms": 20.4526882,
+          "instrumented_wall_ms": 21.0680561,
+          "profiler_perturbation_ms": 0.615367889,
+          "tok_s": 47.4652252,
+          "keep": false,
+          "observed_warmups": 1,
+          "observed_samples": 1,
+          "observed_candidates": 1,
+          "observed_shapes": 1,
+          "observed_tier": "screen"
+        }
+      }
+    },
+    "bounds": {
+      "peak_bandwidth_gb_s": 1792.0,
+      "peak_fp32_tflops": 104.8,
+      "peak_fp16_tensor_tflops_dense": 209.5,
+      "measured_sustainable_bandwidth_gb_s": null,
+      "n_params": 26895998464,
+      "serial_dependency": {
+        "batch": 1,
+        "sessions": 1,
+        "autoregressive": true,
+        "tokens_cannot_overlap": true,
+        "request_time_ge_n_times_per_token_bound": true,
+        "cross_token_weight_amortization": "Prefill may reuse a weight tile across prompt rows inside one microbatch. Ordinary decode batch-one cannot; each token rereads streamed weights. That scope limit is not a license to implement speculation, MTP, or multi-session batching here.",
+        "excluded": [
+          "speculative_decoding",
+          "multi_token_prediction",
+          "batching_concurrent_sessions",
+          "model_replacement_retraining",
+          "sparse_attention"
+        ]
+      },
+      "inventory": {
+        "tensor_count": 851,
+        "by_dtype_bytes": {
+          "Q6_K": 1455820800,
+          "F32": 10582016,
+          "Q4_K": 10341089280,
+          "Q8_0": 7155384320
+        },
+        "by_role_bytes": {
+          "output_projection": 1042944000,
+          "final_norm": 20480,
+          "token_embedding": 715161600,
+          "gdn_value_gate": 1604321280,
+          "input_norm": 1310720,
+          "gdn_packed_qkv": 2673868800,
+          "ffn_down": 3208642560,
+          "ffn_gate": 3208642560,
+          "ffn_up": 3208642560,
+          "ffn_norm": 1310720,
+          "gdn_decay": 9216,
+          "gdn_alpha": 12533760,
+          "gdn_beta": 12533760,
+          "gdn_convolution": 7864320,
+          "gdn_dt_bias": 9216,
+          "gdn_norm": 24576,
+          "gdn_output": 1604321280,
+          "attention_k": 89128960,
+          "attention_k_norm": 16384,
+          "attention_output": 412876800,
+          "attention_q_gate": 1069547520,
+          "attention_q_norm": 16384,
+          "attention_v": 89128960
+        },
+        "by_phase_bytes": {
+          "weights": 17202071552,
+          "norms": 2699264,
+          "embedding": 715161600,
+          "output_head": 1042944000
+        },
+        "q4_k_bytes": 10341089280,
+        "q8_0_bytes": 7155384320,
+        "q6_k_bytes": 1455820800,
+        "f32_bytes": 10582016,
+        "units": "bytes"
+      },
+      "opt115_timeline_overlay": {
+        "available": true,
+        "identity": "post113_selected",
+        "matches_combined_stack": false,
+        "reuse_as_combined": false,
+        "note": "OPT-115 timeline is post113, not combined_opt118_opt119. Idle/busy numbers are a labeled overlay, not a combined-stack measurement.",
+        "d128": {
+          "gpu_busy_union_ms": 7.89075479999984,
+          "gpu_idle_gap_ms": 9.974685400000169,
+          "unclassified_ms": 0.6377406999999913,
+          "interval_coverage": 0.9657681994565575,
+          "wall_ms": 18.6300659
+        },
+        "d2048": {
+          "gpu_busy_union_ms": 8.26415000000054,
+          "gpu_idle_gap_ms": 10.025705999999445,
+          "unclassified_ms": 0.47919139999997995,
+          "interval_coverage": 0.9746627692597035,
+          "wall_ms": 18.9125404
+        },
+        "aa_repeatable": true
+      },
+      "workloads": {
+        "p4096": {
+          "traffic": {
+            "scope": "prefill_request",
+            "tokens": 4096,
+            "microbatch": 4096,
+            "tiles": 1,
+            "units": "bytes",
+            "phases": {
+              "weights": 18259511296,
+              "activations": 5200936960,
+              "kv": 268435456,
+              "gdn_state": 158859264,
+              "transfers": 1013760,
+              "logits": 993280,
+              "barriers": 0,
+              "graphs": 0
+            },
+            "bytes_per_request": 23889750016,
+            "bytes_per_token": 5832458.5,
+            "source": "tensor_inventory_plus_architecture_constants",
+            "measured": false,
+            "representation": "combined_opt118_opt119",
+            "opt119_bf16_reread_removed_bytes": 167772160,
+            "parent_activation_bytes": 5368709120
+          },
+          "byte_bound": {
+            "prefix": 4096,
+            "peak_bandwidth_gb_s": 1792.0,
+            "measured_sustainable_bandwidth_gb_s": null,
+            "per_phase": {
+              "weights": {
+                "bytes": 18259511296.0,
+                "peak_ms": 10.189459428571428,
+                "sustainable_ms": null
+              },
+              "activations": {
+                "bytes": 5200936960.0,
+                "peak_ms": 2.9023085714285712,
+                "sustainable_ms": null
+              },
+              "kv": {
+                "bytes": 268435456.0,
+                "peak_ms": 0.14979657142857142,
+                "sustainable_ms": null
+              },
+              "gdn_state": {
+                "bytes": 158859264.0,
+                "peak_ms": 0.08864914285714286,
+                "sustainable_ms": null
+              },
+              "transfers": {
+                "bytes": 1013760.0,
+                "peak_ms": 0.0005657142857142857,
+                "sustainable_ms": null
+              },
+              "logits": {
+                "bytes": 993280.0,
+                "peak_ms": 0.0005542857142857143,
+                "sustainable_ms": null
+              },
+              "barriers": {
+                "bytes": 0.0,
+                "peak_ms": 0.0,
+                "sustainable_ms": null
+              },
+              "graphs": {
+                "bytes": 0.0,
+                "peak_ms": 0.0,
+                "sustainable_ms": null
+              }
+            },
+            "independent_sum_peak_ms": 13.331333714285714,
+            "independent_sum_not_a_bound": true,
+            "critical_path_peak_ms": 10.189459428571428,
+            "overlap_aware_peak_ms": 10.189459428571428,
+            "wall_ms": 1395.3836138944625,
+            "assumptions": [
+              "RTX 5090 listed peak 1792 GB/s from NVIDIA Blackwell architecture paper",
+              "peak is an optimistic bound, not observed application bandwidth",
+              "compulsory reads assume no L2 reuse across layers and no write-allocate traffic beyond listed writes",
+              "embedding lookup charges one Q4_K row, not the full table",
+              "GDN decode charges one recurrent+conv pass with pointer-swap commit, not a full 8 GiB KV copy",
+              "overlapping costs use max/critical-path, not a sum of independent peak bounds",
+              "fixed-format Q4_K/Q8_0/Q6_K; quality-gated lower-bit models are separate OPT-121/122 candidates",
+              "measured sustainable bandwidth unavailable; sustainable_ms is null"
+            ],
+            "units": {
+              "bytes": "bytes",
+              "time": "milliseconds",
+              "bandwidth": "GB/s"
+            },
+            "claims_throughput": false
+          },
+          "compute_bound": {
+            "logical_dense_mac_flops": 220332019417088.0,
+            "attention_extra_flops": 0.0,
+            "total_flops": 220332019417088.0,
+            "excludes_unpack_scale": true,
+            "unpack_scale_note": "Q4_K/Q8_0/Q6_K dequant and scale application are required work not counted in 2*N*T. Excluding them makes the compute bound optimistic, not attainable.",
+            "peak_fp32_tflops": 104.8,
+            "peak_fp16_tensor_tflops_dense": 209.5,
+            "fp32_peak_ms": 2102.404765430229,
+            "fp16_tensor_peak_ms": 1051.704149962234,
+            "optimistic_compute_ms": 1051.704149962234,
+            "listed_peaks_not_measured": true
+          },
+          "overlap_aware": {
+            "byte_critical_ms": 10.189459428571428,
+            "compute_ms": 1051.704149962234,
+            "serial_idle_ms": null,
+            "busy_overlap_ms": 1051.704149962234,
+            "overlap_aware_ms": 1051.704149962234,
+            "independent_sum_not_a_bound": true,
+            "note": "Weight traffic and GEMM share the busy interval (max). Launch/idle gaps are serial. Summing independent peak bounds is not a bound. A roofline bottleneck is not proof of an optimal algorithm."
+          },
+          "lower_precision": {
+            "admitted": false,
+            "note": "These encodings were quality-gated or bound-rejected. A smaller byte model is not an identical-arithmetic kernel win and is not the shipping representation.",
+            "opt121_q8_to_q4k": {
+              "task": "OPT-121",
+              "verdict": "quality_blocked",
+              "weight_bytes": 14892274496,
+              "peak_ms": 8.310421035714286,
+              "bytes_saved": 3355443200,
+              "quality_matched": false
+            },
+            "opt120_q8q8_kv": {
+              "task": "OPT-120",
+              "verdict": "quality_blocked",
+              "kv_bytes": 142606336,
+              "peak_ms": 0.07957942857142856,
+              "capacity_128k_bytes": 4563402752,
+              "quality_matched": false
+            },
+            "opt122_bf16_gdn": {
+              "task": "OPT-122",
+              "verdict": "no_material_opportunity",
+              "gdn_dram_bytes": 166723584,
+              "peak_ms": 0.09303771428571429,
+              "critical_path_save_ms": 0.0,
+              "quality_matched": true,
+              "note": "compute already exceeds FP32 DRAM time on gdn_core"
+            }
+          },
+          "opt123_combined_ms": 1395.3836138944625,
+          "opt123_llama_ms": 1318.9822143298827,
+          "residual_vs_busy_bound_ms": 343.6794639322286,
+          "idle_source": null,
+          "bound_excludes_unpack_and_may_exclude_idle": true,
+          "optimistic_not_attainable": true
+        },
+        "d128": {
+          "traffic": {
+            "scope": "one_decode_token",
+            "prefix": 128,
+            "units": "bytes",
+            "phases": {
+              "weights": 18247717696,
+              "activations": 5767168,
+              "kv": 8454144,
+              "gdn_state": 158859264,
+              "transfers": 4,
+              "logits": 4,
+              "barriers": 0,
+              "graphs": 0
+            },
+            "bytes_per_token": 18420798280,
+            "bytes_per_request_one_token": 18420798280,
+            "embedding_row_bytes": 2880,
+            "embedding_full_table_excluded": true,
+            "kv_read_bytes": 8388608,
+            "kv_append_bytes": 65536,
+            "gdn": {
+              "convolution_bytes": 7864320,
+              "recurrent_bytes": 150994944,
+              "total_bytes": 158859264,
+              "candidate_plus_committed_capacity_note": "decode swaps candidate/committed pointers; do not charge a full duplicate copy on every token unless measured"
+            },
+            "logits_d2h_bytes": 4,
+            "hidden_d2h_bytes": 0,
+            "source": "tensor_inventory_plus_architecture_constants",
+            "measured": false,
+            "representation": "combined_opt118_opt119",
+            "parent_transfers_bytes": 1013760,
+            "lazy_index_bytes": 4,
+            "measured_d2h_source": "fixtures/opt123_combined_stack.json inventory",
+            "opt119_decode_note": "mixer/FFN Q8 fusion removes standalone quantize rereads; weight sweeps unchanged. Architecture residual/FFN intermediates remain."
+          },
+          "byte_bound": {
+            "prefix": 128,
+            "peak_bandwidth_gb_s": 1792.0,
+            "measured_sustainable_bandwidth_gb_s": null,
+            "per_phase": {
+              "weights": {
+                "bytes": 18247717696.0,
+                "peak_ms": 10.182878178571428,
+                "sustainable_ms": null
+              },
+              "activations": {
+                "bytes": 5767168.0,
+                "peak_ms": 0.0032182857142857143,
+                "sustainable_ms": null
+              },
+              "kv": {
+                "bytes": 8454144.0,
+                "peak_ms": 0.004717714285714286,
+                "sustainable_ms": null
+              },
+              "gdn_state": {
+                "bytes": 158859264.0,
+                "peak_ms": 0.08864914285714286,
+                "sustainable_ms": null
+              },
+              "transfers": {
+                "bytes": 4.0,
+                "peak_ms": 2.232142857142857e-09,
+                "sustainable_ms": null
+              },
+              "logits": {
+                "bytes": 4.0,
+                "peak_ms": 2.232142857142857e-09,
+                "sustainable_ms": null
+              },
+              "barriers": {
+                "bytes": 0.0,
+                "peak_ms": 0.0,
+                "sustainable_ms": null
+              },
+              "graphs": {
+                "bytes": 0.0,
+                "peak_ms": 0.0,
+                "sustainable_ms": null
+              }
+            },
+            "independent_sum_peak_ms": 10.279463325892857,
+            "independent_sum_not_a_bound": true,
+            "critical_path_peak_ms": 10.182878178571428,
+            "overlap_aware_peak_ms": 10.182878178571428,
+            "wall_ms": 18.513067304710496,
+            "assumptions": [
+              "RTX 5090 listed peak 1792 GB/s from NVIDIA Blackwell architecture paper",
+              "peak is an optimistic bound, not observed application bandwidth",
+              "compulsory reads assume no L2 reuse across layers and no write-allocate traffic beyond listed writes",
+              "embedding lookup charges one Q4_K row, not the full table",
+              "GDN decode charges one recurrent+conv pass with pointer-swap commit, not a full 8 GiB KV copy",
+              "overlapping costs use max/critical-path, not a sum of independent peak bounds",
+              "fixed-format Q4_K/Q8_0/Q6_K; quality-gated lower-bit models are separate OPT-121/122 candidates",
+              "measured sustainable bandwidth unavailable; sustainable_ms is null"
+            ],
+            "units": {
+              "bytes": "bytes",
+              "time": "milliseconds",
+              "bandwidth": "GB/s"
+            },
+            "claims_throughput": false
+          },
+          "compute_bound": {
+            "logical_dense_mac_flops": 53791996928.0,
+            "attention_extra_flops": 25165824.0,
+            "total_flops": 53817162752.0,
+            "excludes_unpack_scale": true,
+            "unpack_scale_note": "Q4_K/Q8_0/Q6_K dequant and scale application are required work not counted in 2*N*T. Excluding them makes the compute bound optimistic, not attainable.",
+            "peak_fp32_tflops": 104.8,
+            "peak_fp16_tensor_tflops_dense": 209.5,
+            "fp32_peak_ms": 0.5135225453435114,
+            "fp16_tensor_peak_ms": 0.25688383175178997,
+            "optimistic_compute_ms": 0.25688383175178997,
+            "listed_peaks_not_measured": true
+          },
+          "overlap_aware": {
+            "byte_critical_ms": 10.182878178571428,
+            "compute_ms": 0.25688383175178997,
+            "serial_idle_ms": 9.978260100000128,
+            "busy_overlap_ms": 10.182878178571428,
+            "overlap_aware_ms": 20.161138278571556,
+            "independent_sum_not_a_bound": true,
+            "note": "Weight traffic and GEMM share the busy interval (max). Launch/idle gaps are serial. Summing independent peak bounds is not a bound. A roofline bottleneck is not proof of an optimal algorithm."
+          },
+          "lower_precision": {
+            "admitted": false,
+            "note": "These encodings were quality-gated or bound-rejected. A smaller byte model is not an identical-arithmetic kernel win and is not the shipping representation.",
+            "opt121_q8_to_q4k": {
+              "task": "OPT-121",
+              "verdict": "quality_blocked",
+              "weight_bytes": 14892274496,
+              "peak_ms": 8.310421035714286,
+              "bytes_saved": 3355443200,
+              "quality_matched": false
+            },
+            "opt120_q8q8_kv": {
+              "task": "OPT-120",
+              "verdict": "quality_blocked",
+              "kv_bytes": 4456448,
+              "peak_ms": 0.0024868571428571427,
+              "capacity_128k_bytes": 4563402752,
+              "quality_matched": false
+            },
+            "opt122_bf16_gdn": {
+              "task": "OPT-122",
+              "verdict": "no_material_opportunity",
+              "gdn_dram_bytes": 166723584,
+              "peak_ms": 0.09303771428571429,
+              "critical_path_save_ms": 0.0,
+              "quality_matched": true,
+              "note": "compute already exceeds FP32 DRAM time on gdn_core"
+            }
+          },
+          "opt123_combined_ms": 18.513067304710496,
+          "opt123_llama_ms": 14.562478114142657,
+          "residual_vs_busy_bound_ms": 8.330189126139068,
+          "idle_source": "combined_timeline",
+          "bound_excludes_unpack_and_may_exclude_idle": true,
+          "optimistic_not_attainable": true
+        },
+        "d2048": {
+          "traffic": {
+            "scope": "one_decode_token",
+            "prefix": 2048,
+            "units": "bytes",
+            "phases": {
+              "weights": 18247717696,
+              "activations": 5767168,
+              "kv": 134283264,
+              "gdn_state": 158859264,
+              "transfers": 4,
+              "logits": 4,
+              "barriers": 0,
+              "graphs": 0
+            },
+            "bytes_per_token": 18546627400,
+            "bytes_per_request_one_token": 18546627400,
+            "embedding_row_bytes": 2880,
+            "embedding_full_table_excluded": true,
+            "kv_read_bytes": 134217728,
+            "kv_append_bytes": 65536,
+            "gdn": {
+              "convolution_bytes": 7864320,
+              "recurrent_bytes": 150994944,
+              "total_bytes": 158859264,
+              "candidate_plus_committed_capacity_note": "decode swaps candidate/committed pointers; do not charge a full duplicate copy on every token unless measured"
+            },
+            "logits_d2h_bytes": 4,
+            "hidden_d2h_bytes": 0,
+            "source": "tensor_inventory_plus_architecture_constants",
+            "measured": false,
+            "representation": "combined_opt118_opt119",
+            "parent_transfers_bytes": 1013760,
+            "lazy_index_bytes": 4,
+            "measured_d2h_source": "fixtures/opt123_combined_stack.json inventory",
+            "opt119_decode_note": "mixer/FFN Q8 fusion removes standalone quantize rereads; weight sweeps unchanged. Architecture residual/FFN intermediates remain."
+          },
+          "byte_bound": {
+            "prefix": 2048,
+            "peak_bandwidth_gb_s": 1792.0,
+            "measured_sustainable_bandwidth_gb_s": null,
+            "per_phase": {
+              "weights": {
+                "bytes": 18247717696.0,
+                "peak_ms": 10.182878178571428,
+                "sustainable_ms": null
+              },
+              "activations": {
+                "bytes": 5767168.0,
+                "peak_ms": 0.0032182857142857143,
+                "sustainable_ms": null
+              },
+              "kv": {
+                "bytes": 134283264.0,
+                "peak_ms": 0.07493485714285714,
+                "sustainable_ms": null
+              },
+              "gdn_state": {
+                "bytes": 158859264.0,
+                "peak_ms": 0.08864914285714286,
+                "sustainable_ms": null
+              },
+              "transfers": {
+                "bytes": 4.0,
+                "peak_ms": 2.232142857142857e-09,
+                "sustainable_ms": null
+              },
+              "logits": {
+                "bytes": 4.0,
+                "peak_ms": 2.232142857142857e-09,
+                "sustainable_ms": null
+              },
+              "barriers": {
+                "bytes": 0.0,
+                "peak_ms": 0.0,
+                "sustainable_ms": null
+              },
+              "graphs": {
+                "bytes": 0.0,
+                "peak_ms": 0.0,
+                "sustainable_ms": null
+              }
+            },
+            "independent_sum_peak_ms": 10.34968046875,
+            "independent_sum_not_a_bound": true,
+            "critical_path_peak_ms": 10.182878178571428,
+            "overlap_aware_peak_ms": 10.182878178571428,
+            "wall_ms": 24.019346388313107,
+            "assumptions": [
+              "RTX 5090 listed peak 1792 GB/s from NVIDIA Blackwell architecture paper",
+              "peak is an optimistic bound, not observed application bandwidth",
+              "compulsory reads assume no L2 reuse across layers and no write-allocate traffic beyond listed writes",
+              "embedding lookup charges one Q4_K row, not the full table",
+              "GDN decode charges one recurrent+conv pass with pointer-swap commit, not a full 8 GiB KV copy",
+              "overlapping costs use max/critical-path, not a sum of independent peak bounds",
+              "fixed-format Q4_K/Q8_0/Q6_K; quality-gated lower-bit models are separate OPT-121/122 candidates",
+              "measured sustainable bandwidth unavailable; sustainable_ms is null"
+            ],
+            "units": {
+              "bytes": "bytes",
+              "time": "milliseconds",
+              "bandwidth": "GB/s"
+            },
+            "claims_throughput": false
+          },
+          "compute_bound": {
+            "logical_dense_mac_flops": 53791996928.0,
+            "attention_extra_flops": 402653184.0,
+            "total_flops": 54194650112.0,
+            "excludes_unpack_scale": true,
+            "unpack_scale_note": "Q4_K/Q8_0/Q6_K dequant and scale application are required work not counted in 2*N*T. Excluding them makes the compute bound optimistic, not attainable.",
+            "peak_fp32_tflops": 104.8,
+            "peak_fp16_tensor_tflops_dense": 209.5,
+            "fp32_peak_ms": 0.5171245239694657,
+            "fp16_tensor_peak_ms": 0.258685680725537,
+            "optimistic_compute_ms": 0.258685680725537,
+            "listed_peaks_not_measured": true
+          },
+          "overlap_aware": {
+            "byte_critical_ms": 10.182878178571428,
+            "compute_ms": 0.258685680725537,
+            "serial_idle_ms": 10.002813999999944,
+            "busy_overlap_ms": 10.182878178571428,
+            "overlap_aware_ms": 20.185692178571372,
+            "independent_sum_not_a_bound": true,
+            "note": "Weight traffic and GEMM share the busy interval (max). Launch/idle gaps are serial. Summing independent peak bounds is not a bound. A roofline bottleneck is not proof of an optimal algorithm."
+          },
+          "lower_precision": {
+            "admitted": false,
+            "note": "These encodings were quality-gated or bound-rejected. A smaller byte model is not an identical-arithmetic kernel win and is not the shipping representation.",
+            "opt121_q8_to_q4k": {
+              "task": "OPT-121",
+              "verdict": "quality_blocked",
+              "weight_bytes": 14892274496,
+              "peak_ms": 8.310421035714286,
+              "bytes_saved": 3355443200,
+              "quality_matched": false
+            },
+            "opt120_q8q8_kv": {
+              "task": "OPT-120",
+              "verdict": "quality_blocked",
+              "kv_bytes": 71303168,
+              "peak_ms": 0.03978971428571428,
+              "capacity_128k_bytes": 4563402752,
+              "quality_matched": false
+            },
+            "opt122_bf16_gdn": {
+              "task": "OPT-122",
+              "verdict": "no_material_opportunity",
+              "gdn_dram_bytes": 166723584,
+              "peak_ms": 0.09303771428571429,
+              "critical_path_save_ms": 0.0,
+              "quality_matched": true,
+              "note": "compute already exceeds FP32 DRAM time on gdn_core"
+            }
+          },
+          "opt123_combined_ms": 24.019346388313107,
+          "opt123_llama_ms": 14.884165566641247,
+          "residual_vs_busy_bound_ms": 13.836468209741678,
+          "idle_source": "combined_timeline",
+          "bound_excludes_unpack_and_may_exclude_idle": true,
+          "optimistic_not_attainable": true
+        },
+        "d8192": {
+          "traffic": {
+            "scope": "one_decode_token",
+            "prefix": 8192,
+            "units": "bytes",
+            "phases": {
+              "weights": 18247717696,
+              "activations": 5767168,
+              "kv": 536936448,
+              "gdn_state": 158859264,
+              "transfers": 4,
+              "logits": 4,
+              "barriers": 0,
+              "graphs": 0
+            },
+            "bytes_per_token": 18949280584,
+            "bytes_per_request_one_token": 18949280584,
+            "embedding_row_bytes": 2880,
+            "embedding_full_table_excluded": true,
+            "kv_read_bytes": 536870912,
+            "kv_append_bytes": 65536,
+            "gdn": {
+              "convolution_bytes": 7864320,
+              "recurrent_bytes": 150994944,
+              "total_bytes": 158859264,
+              "candidate_plus_committed_capacity_note": "decode swaps candidate/committed pointers; do not charge a full duplicate copy on every token unless measured"
+            },
+            "logits_d2h_bytes": 4,
+            "hidden_d2h_bytes": 0,
+            "source": "tensor_inventory_plus_architecture_constants",
+            "measured": false,
+            "representation": "combined_opt118_opt119",
+            "parent_transfers_bytes": 1013760,
+            "lazy_index_bytes": 4,
+            "measured_d2h_source": "fixtures/opt123_combined_stack.json inventory",
+            "opt119_decode_note": "mixer/FFN Q8 fusion removes standalone quantize rereads; weight sweeps unchanged. Architecture residual/FFN intermediates remain."
+          },
+          "byte_bound": {
+            "prefix": 8192,
+            "peak_bandwidth_gb_s": 1792.0,
+            "measured_sustainable_bandwidth_gb_s": null,
+            "per_phase": {
+              "weights": {
+                "bytes": 18247717696.0,
+                "peak_ms": 10.182878178571428,
+                "sustainable_ms": null
+              },
+              "activations": {
+                "bytes": 5767168.0,
+                "peak_ms": 0.0032182857142857143,
+                "sustainable_ms": null
+              },
+              "kv": {
+                "bytes": 536936448.0,
+                "peak_ms": 0.2996297142857143,
+                "sustainable_ms": null
+              },
+              "gdn_state": {
+                "bytes": 158859264.0,
+                "peak_ms": 0.08864914285714286,
+                "sustainable_ms": null
+              },
+              "transfers": {
+                "bytes": 4.0,
+                "peak_ms": 2.232142857142857e-09,
+                "sustainable_ms": null
+              },
+              "logits": {
+                "bytes": 4.0,
+                "peak_ms": 2.232142857142857e-09,
+                "sustainable_ms": null
+              },
+              "barriers": {
+                "bytes": 0.0,
+                "peak_ms": 0.0,
+                "sustainable_ms": null
+              },
+              "graphs": {
+                "bytes": 0.0,
+                "peak_ms": 0.0,
+                "sustainable_ms": null
+              }
+            },
+            "independent_sum_peak_ms": 10.574375325892857,
+            "independent_sum_not_a_bound": true,
+            "critical_path_peak_ms": 10.182878178571428,
+            "overlap_aware_peak_ms": 10.182878178571428,
+            "wall_ms": 123.98107301963736,
+            "assumptions": [
+              "RTX 5090 listed peak 1792 GB/s from NVIDIA Blackwell architecture paper",
+              "peak is an optimistic bound, not observed application bandwidth",
+              "compulsory reads assume no L2 reuse across layers and no write-allocate traffic beyond listed writes",
+              "embedding lookup charges one Q4_K row, not the full table",
+              "GDN decode charges one recurrent+conv pass with pointer-swap commit, not a full 8 GiB KV copy",
+              "overlapping costs use max/critical-path, not a sum of independent peak bounds",
+              "fixed-format Q4_K/Q8_0/Q6_K; quality-gated lower-bit models are separate OPT-121/122 candidates",
+              "measured sustainable bandwidth unavailable; sustainable_ms is null"
+            ],
+            "units": {
+              "bytes": "bytes",
+              "time": "milliseconds",
+              "bandwidth": "GB/s"
+            },
+            "claims_throughput": false
+          },
+          "compute_bound": {
+            "logical_dense_mac_flops": 53791996928.0,
+            "attention_extra_flops": 1610612736.0,
+            "total_flops": 55402609664.0,
+            "excludes_unpack_scale": true,
+            "unpack_scale_note": "Q4_K/Q8_0/Q6_K dequant and scale application are required work not counted in 2*N*T. Excluding them makes the compute bound optimistic, not attainable.",
+            "peak_fp32_tflops": 104.8,
+            "peak_fp16_tensor_tflops_dense": 209.5,
+            "fp32_peak_ms": 0.528650855572519,
+            "fp16_tensor_peak_ms": 0.2644515974415274,
+            "optimistic_compute_ms": 0.2644515974415274,
+            "listed_peaks_not_measured": true
+          },
+          "overlap_aware": {
+            "byte_critical_ms": 10.182878178571428,
+            "compute_ms": 0.2644515974415274,
+            "serial_idle_ms": null,
+            "busy_overlap_ms": 10.182878178571428,
+            "overlap_aware_ms": 10.182878178571428,
+            "independent_sum_not_a_bound": true,
+            "note": "Weight traffic and GEMM share the busy interval (max). Launch/idle gaps are serial. Summing independent peak bounds is not a bound. A roofline bottleneck is not proof of an optimal algorithm."
+          },
+          "lower_precision": {
+            "admitted": false,
+            "note": "These encodings were quality-gated or bound-rejected. A smaller byte model is not an identical-arithmetic kernel win and is not the shipping representation.",
+            "opt121_q8_to_q4k": {
+              "task": "OPT-121",
+              "verdict": "quality_blocked",
+              "weight_bytes": 14892274496,
+              "peak_ms": 8.310421035714286,
+              "bytes_saved": 3355443200,
+              "quality_matched": false
+            },
+            "opt120_q8q8_kv": {
+              "task": "OPT-120",
+              "verdict": "quality_blocked",
+              "kv_bytes": 285212672,
+              "peak_ms": 0.15915885714285713,
+              "capacity_128k_bytes": 4563402752,
+              "quality_matched": false
+            },
+            "opt122_bf16_gdn": {
+              "task": "OPT-122",
+              "verdict": "no_material_opportunity",
+              "gdn_dram_bytes": 166723584,
+              "peak_ms": 0.09303771428571429,
+              "critical_path_save_ms": 0.0,
+              "quality_matched": true,
+              "note": "compute already exceeds FP32 DRAM time on gdn_core"
+            }
+          },
+          "opt123_combined_ms": 123.98107301963736,
+          "opt123_llama_ms": null,
+          "residual_vs_busy_bound_ms": 113.79819484106594,
+          "idle_source": null,
+          "bound_excludes_unpack_and_may_exclude_idle": true,
+          "optimistic_not_attainable": true
+        },
+        "d32768": {
+          "traffic": {
+            "scope": "one_decode_token",
+            "prefix": 32768,
+            "units": "bytes",
+            "phases": {
+              "weights": 18247717696,
+              "activations": 5767168,
+              "kv": 2147549184,
+              "gdn_state": 158859264,
+              "transfers": 4,
+              "logits": 4,
+              "barriers": 0,
+              "graphs": 0
+            },
+            "bytes_per_token": 20559893320,
+            "bytes_per_request_one_token": 20559893320,
+            "embedding_row_bytes": 2880,
+            "embedding_full_table_excluded": true,
+            "kv_read_bytes": 2147483648,
+            "kv_append_bytes": 65536,
+            "gdn": {
+              "convolution_bytes": 7864320,
+              "recurrent_bytes": 150994944,
+              "total_bytes": 158859264,
+              "candidate_plus_committed_capacity_note": "decode swaps candidate/committed pointers; do not charge a full duplicate copy on every token unless measured"
+            },
+            "logits_d2h_bytes": 4,
+            "hidden_d2h_bytes": 0,
+            "source": "tensor_inventory_plus_architecture_constants",
+            "measured": false,
+            "representation": "combined_opt118_opt119",
+            "parent_transfers_bytes": 1013760,
+            "lazy_index_bytes": 4,
+            "measured_d2h_source": "fixtures/opt123_combined_stack.json inventory",
+            "opt119_decode_note": "mixer/FFN Q8 fusion removes standalone quantize rereads; weight sweeps unchanged. Architecture residual/FFN intermediates remain."
+          },
+          "byte_bound": {
+            "prefix": 32768,
+            "peak_bandwidth_gb_s": 1792.0,
+            "measured_sustainable_bandwidth_gb_s": null,
+            "per_phase": {
+              "weights": {
+                "bytes": 18247717696.0,
+                "peak_ms": 10.182878178571428,
+                "sustainable_ms": null
+              },
+              "activations": {
+                "bytes": 5767168.0,
+                "peak_ms": 0.0032182857142857143,
+                "sustainable_ms": null
+              },
+              "kv": {
+                "bytes": 2147549184.0,
+                "peak_ms": 1.1984091428571428,
+                "sustainable_ms": null
+              },
+              "gdn_state": {
+                "bytes": 158859264.0,
+                "peak_ms": 0.08864914285714286,
+                "sustainable_ms": null
+              },
+              "transfers": {
+                "bytes": 4.0,
+                "peak_ms": 2.232142857142857e-09,
+                "sustainable_ms": null
+              },
+              "logits": {
+                "bytes": 4.0,
+                "peak_ms": 2.232142857142857e-09,
+                "sustainable_ms": null
+              },
+              "barriers": {
+                "bytes": 0.0,
+                "peak_ms": 0.0,
+                "sustainable_ms": null
+              },
+              "graphs": {
+                "bytes": 0.0,
+                "peak_ms": 0.0,
+                "sustainable_ms": null
+              }
+            },
+            "independent_sum_peak_ms": 11.473154754464286,
+            "independent_sum_not_a_bound": true,
+            "critical_path_peak_ms": 10.182878178571428,
+            "overlap_aware_peak_ms": 10.182878178571428,
+            "wall_ms": 739.6771890456087,
+            "assumptions": [
+              "RTX 5090 listed peak 1792 GB/s from NVIDIA Blackwell architecture paper",
+              "peak is an optimistic bound, not observed application bandwidth",
+              "compulsory reads assume no L2 reuse across layers and no write-allocate traffic beyond listed writes",
+              "embedding lookup charges one Q4_K row, not the full table",
+              "GDN decode charges one recurrent+conv pass with pointer-swap commit, not a full 8 GiB KV copy",
+              "overlapping costs use max/critical-path, not a sum of independent peak bounds",
+              "fixed-format Q4_K/Q8_0/Q6_K; quality-gated lower-bit models are separate OPT-121/122 candidates",
+              "measured sustainable bandwidth unavailable; sustainable_ms is null"
+            ],
+            "units": {
+              "bytes": "bytes",
+              "time": "milliseconds",
+              "bandwidth": "GB/s"
+            },
+            "claims_throughput": false
+          },
+          "compute_bound": {
+            "logical_dense_mac_flops": 53791996928.0,
+            "attention_extra_flops": 6442450944.0,
+            "total_flops": 60234447872.0,
+            "excludes_unpack_scale": true,
+            "unpack_scale_note": "Q4_K/Q8_0/Q6_K dequant and scale application are required work not counted in 2*N*T. Excluding them makes the compute bound optimistic, not attainable.",
+            "peak_fp32_tflops": 104.8,
+            "peak_fp16_tensor_tflops_dense": 209.5,
+            "fp32_peak_ms": 0.5747561819847328,
+            "fp16_tensor_peak_ms": 0.28751526430548924,
+            "optimistic_compute_ms": 0.28751526430548924,
+            "listed_peaks_not_measured": true
+          },
+          "overlap_aware": {
+            "byte_critical_ms": 10.182878178571428,
+            "compute_ms": 0.28751526430548924,
+            "serial_idle_ms": null,
+            "busy_overlap_ms": 10.182878178571428,
+            "overlap_aware_ms": 10.182878178571428,
+            "independent_sum_not_a_bound": true,
+            "note": "Weight traffic and GEMM share the busy interval (max). Launch/idle gaps are serial. Summing independent peak bounds is not a bound. A roofline bottleneck is not proof of an optimal algorithm."
+          },
+          "lower_precision": {
+            "admitted": false,
+            "note": "These encodings were quality-gated or bound-rejected. A smaller byte model is not an identical-arithmetic kernel win and is not the shipping representation.",
+            "opt121_q8_to_q4k": {
+              "task": "OPT-121",
+              "verdict": "quality_blocked",
+              "weight_bytes": 14892274496,
+              "peak_ms": 8.310421035714286,
+              "bytes_saved": 3355443200,
+              "quality_matched": false
+            },
+            "opt120_q8q8_kv": {
+              "task": "OPT-120",
+              "verdict": "quality_blocked",
+              "kv_bytes": 1140850688,
+              "peak_ms": 0.6366354285714285,
+              "capacity_128k_bytes": 4563402752,
+              "quality_matched": false
+            },
+            "opt122_bf16_gdn": {
+              "task": "OPT-122",
+              "verdict": "no_material_opportunity",
+              "gdn_dram_bytes": 166723584,
+              "peak_ms": 0.09303771428571429,
+              "critical_path_save_ms": 0.0,
+              "quality_matched": true,
+              "note": "compute already exceeds FP32 DRAM time on gdn_core"
+            }
+          },
+          "opt123_combined_ms": 739.6771890456087,
+          "opt123_llama_ms": null,
+          "residual_vs_busy_bound_ms": 729.4943108670373,
+          "idle_source": null,
+          "bound_excludes_unpack_and_may_exclude_idle": true,
+          "optimistic_not_attainable": true
+        },
+        "d131040": {
+          "traffic": {
+            "scope": "one_decode_token",
+            "prefix": 131040,
+            "units": "bytes",
+            "phases": {
+              "weights": 18247717696,
+              "activations": 5767168,
+              "kv": 8587902976,
+              "gdn_state": 158859264,
+              "transfers": 4,
+              "logits": 4,
+              "barriers": 0,
+              "graphs": 0
+            },
+            "bytes_per_token": 27000247112,
+            "bytes_per_request_one_token": 27000247112,
+            "embedding_row_bytes": 2880,
+            "embedding_full_table_excluded": true,
+            "kv_read_bytes": 8587837440,
+            "kv_append_bytes": 65536,
+            "gdn": {
+              "convolution_bytes": 7864320,
+              "recurrent_bytes": 150994944,
+              "total_bytes": 158859264,
+              "candidate_plus_committed_capacity_note": "decode swaps candidate/committed pointers; do not charge a full duplicate copy on every token unless measured"
+            },
+            "logits_d2h_bytes": 4,
+            "hidden_d2h_bytes": 0,
+            "source": "tensor_inventory_plus_architecture_constants",
+            "measured": false,
+            "representation": "combined_opt118_opt119",
+            "parent_transfers_bytes": 1013760,
+            "lazy_index_bytes": 4,
+            "measured_d2h_source": "fixtures/opt123_combined_stack.json inventory",
+            "opt119_decode_note": "mixer/FFN Q8 fusion removes standalone quantize rereads; weight sweeps unchanged. Architecture residual/FFN intermediates remain."
+          },
+          "byte_bound": {
+            "prefix": 131040,
+            "peak_bandwidth_gb_s": 1792.0,
+            "measured_sustainable_bandwidth_gb_s": null,
+            "per_phase": {
+              "weights": {
+                "bytes": 18247717696.0,
+                "peak_ms": 10.182878178571428,
+                "sustainable_ms": null
+              },
+              "activations": {
+                "bytes": 5767168.0,
+                "peak_ms": 0.0032182857142857143,
+                "sustainable_ms": null
+              },
+              "kv": {
+                "bytes": 8587902976.0,
+                "peak_ms": 4.792356571428571,
+                "sustainable_ms": null
+              },
+              "gdn_state": {
+                "bytes": 158859264.0,
+                "peak_ms": 0.08864914285714286,
+                "sustainable_ms": null
+              },
+              "transfers": {
+                "bytes": 4.0,
+                "peak_ms": 2.232142857142857e-09,
+                "sustainable_ms": null
+              },
+              "logits": {
+                "bytes": 4.0,
+                "peak_ms": 2.232142857142857e-09,
+                "sustainable_ms": null
+              },
+              "barriers": {
+                "bytes": 0.0,
+                "peak_ms": 0.0,
+                "sustainable_ms": null
+              },
+              "graphs": {
+                "bytes": 0.0,
+                "peak_ms": 0.0,
+                "sustainable_ms": null
+              }
+            },
+            "independent_sum_peak_ms": 15.067102183035713,
+            "independent_sum_not_a_bound": true,
+            "critical_path_peak_ms": 10.182878178571428,
+            "overlap_aware_peak_ms": 10.182878178571428,
+            "wall_ms": null,
+            "assumptions": [
+              "RTX 5090 listed peak 1792 GB/s from NVIDIA Blackwell architecture paper",
+              "peak is an optimistic bound, not observed application bandwidth",
+              "compulsory reads assume no L2 reuse across layers and no write-allocate traffic beyond listed writes",
+              "embedding lookup charges one Q4_K row, not the full table",
+              "GDN decode charges one recurrent+conv pass with pointer-swap commit, not a full 8 GiB KV copy",
+              "overlapping costs use max/critical-path, not a sum of independent peak bounds",
+              "fixed-format Q4_K/Q8_0/Q6_K; quality-gated lower-bit models are separate OPT-121/122 candidates",
+              "measured sustainable bandwidth unavailable; sustainable_ms is null"
+            ],
+            "units": {
+              "bytes": "bytes",
+              "time": "milliseconds",
+              "bandwidth": "GB/s"
+            },
+            "claims_throughput": false
+          },
+          "compute_bound": {
+            "logical_dense_mac_flops": 53791996928.0,
+            "attention_extra_flops": 25763512320.0,
+            "total_flops": 79555509248.0,
+            "excludes_unpack_scale": true,
+            "unpack_scale_note": "Q4_K/Q8_0/Q6_K dequant and scale application are required work not counted in 2*N*T. Excluding them makes the compute bound optimistic, not attainable.",
+            "peak_fp32_tflops": 104.8,
+            "peak_fp16_tensor_tflops_dense": 209.5,
+            "fp32_peak_ms": 0.7591174546564886,
+            "fp16_tensor_peak_ms": 0.3797399009451074,
+            "optimistic_compute_ms": 0.3797399009451074,
+            "listed_peaks_not_measured": true
+          },
+          "overlap_aware": {
+            "byte_critical_ms": 10.182878178571428,
+            "compute_ms": 0.3797399009451074,
+            "serial_idle_ms": null,
+            "busy_overlap_ms": 10.182878178571428,
+            "overlap_aware_ms": 10.182878178571428,
+            "independent_sum_not_a_bound": true,
+            "note": "Weight traffic and GEMM share the busy interval (max). Launch/idle gaps are serial. Summing independent peak bounds is not a bound. A roofline bottleneck is not proof of an optimal algorithm."
+          },
+          "lower_precision": {
+            "admitted": false,
+            "note": "These encodings were quality-gated or bound-rejected. A smaller byte model is not an identical-arithmetic kernel win and is not the shipping representation.",
+            "opt121_q8_to_q4k": {
+              "task": "OPT-121",
+              "verdict": "quality_blocked",
+              "weight_bytes": 14892274496,
+              "peak_ms": 8.310421035714286,
+              "bytes_saved": 3355443200,
+              "quality_matched": false
+            },
+            "opt120_q8q8_kv": {
+              "task": "OPT-120",
+              "verdict": "quality_blocked",
+              "kv_bytes": 4562288640,
+              "peak_ms": 2.54592,
+              "capacity_128k_bytes": 4563402752,
+              "quality_matched": false
+            },
+            "opt122_bf16_gdn": {
+              "task": "OPT-122",
+              "verdict": "no_material_opportunity",
+              "gdn_dram_bytes": 166723584,
+              "peak_ms": 0.09303771428571429,
+              "critical_path_save_ms": 0.0,
+              "quality_matched": true,
+              "note": "compute already exceeds FP32 DRAM time on gdn_core"
+            }
+          },
+          "opt123_combined_ms": null,
+          "opt123_llama_ms": null,
+          "residual_vs_busy_bound_ms": null,
+          "idle_source": null,
+          "bound_excludes_unpack_and_may_exclude_idle": true,
+          "optimistic_not_attainable": true
+        }
+      },
+      "assumptions": [
+        "RTX 5090 listed peak 1792 GB/s; listed FP32 104.8 TFLOPS; dense FP16 tensor 209.5 TFLOPS is 2x FP32 without sparsity",
+        "peaks are optimistic listed values, not observed application rates",
+        "2*N*T MAC FLOPs exclude Q4_K unpack/scale; excluding required work makes the compute bound optimistic",
+        "combined decode D2H is the measured 4-byte greedy index (OPT-123 inventory), not 1,013,760 B logits",
+        "OPT-119 removed 167,772,160 B prefill BF16 quantize rereads; weight sweeps unchanged",
+        "GDN decode charges pointer-swap commit, not an 8 GiB KV copy",
+        "embedding lookup charges one Q4_K row",
+        "independent phase sums are not a bound",
+        "lower-precision alternatives are not admitted and are not identical-arithmetic wins"
+      ],
+      "claims_throughput": false
+    },
+    "family_plan": "task=OPT-124 mode=feedback phase=identity-timeline loop_product=4 cases=2 candidates=1 warmups=1 samples=1 tokens=1",
+    "measured_at": "2026-09-13T20:54:52Z"
+  }
+}

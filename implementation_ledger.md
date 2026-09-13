@@ -322,7 +322,7 @@ OPT-124 assesses the remaining ceiling without claiming universal optimality.
 | OPT-121 | Reduce streamed weight bytes with selective requantization and a bounded native-FP4 study | OPT-115, OPT-116 | done | Selective Q8→Q4_K on 192 tensors (3.36 GB traffic saved); OPT-058 recurrence ΔNLL fail; long-cache fail; D128/D2048 decode gates fail; measured reject `quality_blocked`; pin `none` | [`tasks/OPT-121.md`](tasks/OPT-121.md); [`pins/opt121_weight_traffic_contract.json`](pins/opt121_weight_traffic_contract.json); [`pins/opt121_iteration_contract.json`](pins/opt121_iteration_contract.json); [`fixtures/opt121_weight_traffic.json`](fixtures/opt121_weight_traffic.json); [`tools/opt121_weight_traffic.py`](tools/opt121_weight_traffic.py); [`tests/test_opt121_weight_traffic.py`](tests/test_opt121_weight_traffic.py); [`cuda/opt121_weight_requant_test.cu`](cuda/opt121_weight_requant_test.cu); [`Makefile`](Makefile); [`evidence/optimization/opt121-weight-traffic/REPORT.md`](evidence/optimization/opt121-weight-traffic/REPORT.md); verification 2026-09-13T19:27:00Z |
 | OPT-122 | Evaluate lower-precision persistent GDN state with FP32 updates | OPT-115, OPT-116, OPT-118 | done | BF16/Q8 block-scaled quantizers evaluated; enclosing gdn_core compute-bound vs DRAM; roofline critical-path save 0.0 ms; measured `no_material_opportunity`; pin `fp32` | [`tasks/OPT-122.md`](tasks/OPT-122.md); [`pins/opt122_gdn_state_precision_contract.json`](pins/opt122_gdn_state_precision_contract.json); [`pins/opt122_iteration_contract.json`](pins/opt122_iteration_contract.json); [`fixtures/opt122_gdn_state_precision.json`](fixtures/opt122_gdn_state_precision.json); [`tools/opt122_gdn_state_precision.py`](tools/opt122_gdn_state_precision.py); [`tests/test_opt122_gdn_state_precision.py`](tests/test_opt122_gdn_state_precision.py); [`cuda/opt122_gdn_state_precision_test.cu`](cuda/opt122_gdn_state_precision_test.cu); [`Makefile`](Makefile); [`evidence/optimization/opt122-gdn-state-precision/REPORT.md`](evidence/optimization/opt122-gdn-state-precision/REPORT.md); verification 2026-09-13T19:50:00Z |
 | OPT-123 | Measure interactions and admit the combined full-pipeline stack | OPT-117, OPT-118, OPT-119, OPT-120, OPT-121, OPT-122 | done | Combined OPT-118+OPT-119 on post113 `ffn_only`; freeze+leave-one-out; P4096/D128/D2048 keep (aggregate CI lower 1.005); PPL ratio 1.0; OPT-016 2K OOM non-exclusive | [`tasks/OPT-123.md`](tasks/OPT-123.md); [`pins/opt123_combined_stack_contract.json`](pins/opt123_combined_stack_contract.json); [`pins/opt123_iteration_contract.json`](pins/opt123_iteration_contract.json); [`fixtures/opt123_combined_stack.json`](fixtures/opt123_combined_stack.json); [`tools/opt123_combined_stack.py`](tools/opt123_combined_stack.py); [`tests/test_opt123_combined_stack.py`](tests/test_opt123_combined_stack.py); [`cuda/opt123_combined_stack_test.cu`](cuda/opt123_combined_stack_test.cu); [`Makefile`](Makefile); [`evidence/optimization/opt123-combined-stack/REPORT.md`](evidence/optimization/opt123-combined-stack/REPORT.md); verification 2026-09-13T20:38:00Z |
-| OPT-124 | Assess whether llama.cpp is a practical ceiling under explicit constraints | OPT-115, OPT-116, OPT-123 | in_progress | Reproducible conditional bounds and matched quality/resource frontier support a bounded conclusion, unresolved opportunities and stop/reopen criteria; no universal-optimality assertion | [Dossier](tasks/OPT-124.md) |
+| OPT-124 | Assess whether llama.cpp is a practical ceiling under explicit constraints | OPT-115, OPT-116, OPT-123 | done | Conditional byte/compute/serial bounds; OPT-123 identity reuse; P4096/D128/D2048 measurable headroom vs pinned llama (0.945/0.787/0.620); OPT-117–122 reopen=false; supports_continuing=false; universal_optimality_claimed=false | [`tasks/OPT-124.md`](tasks/OPT-124.md); [`pins/opt124_practical_ceiling_contract.json`](pins/opt124_practical_ceiling_contract.json); [`pins/opt124_iteration_contract.json`](pins/opt124_iteration_contract.json); [`fixtures/opt124_practical_ceiling.json`](fixtures/opt124_practical_ceiling.json); [`tools/opt124_practical_ceiling.py`](tools/opt124_practical_ceiling.py); [`tests/test_opt124_practical_ceiling.py`](tests/test_opt124_practical_ceiling.py); [`cuda/opt124_practical_ceiling_test.cu`](cuda/opt124_practical_ceiling_test.cu); [`Makefile`](Makefile); [`evidence/optimization/opt124-practical-ceiling/REPORT.md`](evidence/optimization/opt124-practical-ceiling/REPORT.md); verification 2026-09-13T20:57:00Z |
 
 ### Post-042 recovery execution order (historical batch)
 
@@ -7879,3 +7879,24 @@ statements below are historical, not the current execution order.
   [`evidence/optimization/opt123-combined-stack/REPORT.md`](evidence/optimization/opt123-combined-stack/REPORT.md).
 - OPT-123 marked `done`. Coupled IDs: none. Next eligible pending task:
   **OPT-124**.
+
+### OPT-124 delivery (2026-09-13T20:58:00Z)
+
+- Analysis/diagnostics only on the OPT-123 combined stack
+  (`combined_opt118_opt119`) versus authenticated post113 and pinned llama
+  (`cc83d7b4824f73cfdda4dfbb47ee39804f71b328`). Recomputed conditional
+  byte/compute/serial bounds with independent sums explicitly not a bound;
+  unpack/scale and lower-precision alternatives not admitted. Matched
+  comparison reused OPT-123 samples (identity match `True`): P4096 combined
+  **2935.394** vs llama **3105.425** tok/s (ratio **0.945**); D128 **54.016**
+  vs **68.670** (**0.787**); D2048 **41.633** vs **67.185** (**0.620**).
+  D8192/D32768 show measurable headroom without matched llama; D131040 and
+  OPT-016 2K OOM on non-exclusive sitting → `insufficient_evidence`.
+  Mechanism disposition OPT-117–122: all `reopen=false`. Identity timeline
+  D128 coverage **0.962**, D2048 **0.979**. **Measured disposition:**
+  `supports_continuing=false`; `universal_optimality_claimed=false`;
+  `claims_throughput=false`. Production pins unchanged. **Sitting tok/s delta
+  0** (baseline unchanged).
+- Key evidence: [`fixtures/opt124_practical_ceiling.json`](fixtures/opt124_practical_ceiling.json);
+  [`evidence/optimization/opt124-practical-ceiling/REPORT.md`](evidence/optimization/opt124-practical-ceiling/REPORT.md).
+- OPT-124 marked `done`. Coupled IDs: none. OPT-115–124 batch complete.
