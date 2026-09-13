@@ -6,6 +6,7 @@
 
 #include "full_scheduler.h"
 #include "model.h"
+#include "opt113_sitting_selectors.cuh"
 #include "scheduler.h"
 #include "weights.h"
 
@@ -23,15 +24,17 @@ int fail_status(const qw38::Status& status) {
 }  // namespace
 
 int main(int argc, char** argv) {
-  if (argc != 2) {
-    std::fprintf(stderr, "usage: %s MODEL.gguf\n", argv[0]);
-    return 2;
-  }
+  const char* model_path = nullptr;
+  qw38::cuda::SittingSelectorFlags flags{};
+  const int parsed = qw38::cuda::parse_sitting_selector_args(
+      argc, argv, &model_path, nullptr, &flags);
+  if (parsed != 0) return parsed;
+  if (!qw38::cuda::apply_sitting_selector_flags(flags)) return 2;
   qw38::internal::ModelInfo info;
-  qw38::Status status = qw38::internal::inspect_gguf(argv[1], &info);
+  qw38::Status status = qw38::internal::inspect_gguf(model_path, &info);
   if (status.is_ok()) status = qw38::internal::validate_qwen38_contract(&info);
   qw38::internal::MappedFile mapping;
-  if (status.is_ok()) status = mapping.open(argv[1]);
+  if (status.is_ok()) status = mapping.open(model_path);
   qw38::internal::ModelWeights weights;
   if (status.is_ok()) {
     status = qw38::internal::bind_model_weights(info, mapping, &weights);
@@ -122,10 +125,14 @@ int main(int argc, char** argv) {
       "\"wall_ms\":[%.9g,%.9g,%.9g],\"tok_s\":[%.9g,%.9g,%.9g],"
       "\"mean_tok_s\":%.9g,\"cold\":true,\"cache_policy\":\"disabled\","
       "\"attribution\":null,\"graphs_created\":true,\"prompt_graph_rows\":%zu,"
-      "\"nsight_systems\":\"not_used\",\"nsight_compute\":\"not_used\"}\n",
+      "\"nsight_systems\":\"not_used\",\"nsight_compute\":\"not_used\","
+      "\"q4_decode\":\"%s\",\"attention_pipeline\":\"%s\","
+      "\"decode_attention_crossover_threshold\":%d}\n",
       prop.name, prop.major, prop.minor, utc, kPromptTokens, kReplicates,
       wall_ms[0], wall_ms[1], wall_ms[2], tok_s[0], tok_s[1], tok_s[2],
-      mean_tok_s, kPromptTokens);
+      mean_tok_s, kPromptTokens, qw38::cuda::effective_q4_decode_path(),
+      qw38::cuda::current_attention_pipeline_path(),
+      qw38::cuda::effective_decode_attention_crossover_threshold());
   std::printf("status=passed\n");
   return 0;
 }

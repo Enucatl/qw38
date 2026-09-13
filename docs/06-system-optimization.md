@@ -951,6 +951,24 @@ unchanged (`current_bf16_q8_staging`). Quality/OPT-058 not required on defer.
 tok/s delta vs production **0**. Live numbers stay in
 [`evidence/optimization/opt112-norm-q8-staging/REPORT.md`](../evidence/optimization/opt112-norm-q8-staging/REPORT.md).
 
+## Coupled-stack recovery sitting (OPT-113)
+
+**Outcome freeze, 2026-09-13:** OPT-113 freezes authenticated OPT-106
+`post106_control` (`integer_q8_late` / `kv_once` / `warp_query`) versus the
+combined production survivors from OPT-107–111 in one exclusive-GPU sitting.
+`post113_selected` installs OPT-107 `hybrid_crossover@1024`, OPT-110
+`llama_q4k_mmvq`, and OPT-111 `opt111_base`; OPT-108/109 rejections do not
+leak; OPT-112 is omitted (`deferred_below_trigger`). Independent verdicts:
+internal improvement **false** (throughput CIs vs control passed but 128K
+`memory_fit` arithmetic false), llama parity **false**, OPT-056 +5% **false**.
+P4096 **3064.77** vs control **3022.22** vs llama **3227.71** tok/s; D128
+**57.30** vs **53.58** vs **68.61**; D2048 **55.65** vs **49.46** vs **67.27**.
+Candidate NLL measured: held-out 1024 mean NLL **1.787599**, ppl_ratio
+**0.999721**, recurrence **0.0**; inherited `task_arithmetic` fail visible.
+Completing the sitting does not require comparative gates to pass. Live numbers
+stay in
+[`evidence/optimization/opt113-coupled-stack-gate/REPORT.md`](../evidence/optimization/opt113-coupled-stack-gate/REPORT.md).
+
 ## DwarfStar transfer boundary
 
 Reuse MMV/MMQ phase split, quant block tests, explicit unavailable paths, stable

@@ -291,7 +291,7 @@ unbounded variant. First eligible task in ledger/dependency order is OPT-109.
 | OPT-110 | Execute pinned-llama Q4_K MMVQ through a Quartz adapter | OPT-106, OPT-114 | done | Starting from identical BF16 input and raw Q4_K weights, a source-faithful Q8_1 MMVQ pipeline including its native staging beats the selected Q8Block `integer_q8_late` pipeline, then wins complete rotating FFN and both decode prefixes under existing parity/quality/memory gates, or production is unchanged | [`tasks/OPT-110.md`](tasks/OPT-110.md); [`pins/opt110_llama_q4_adapter_contract.json`](pins/opt110_llama_q4_adapter_contract.json); [`pins/opt110_iteration_contract.json`](pins/opt110_iteration_contract.json); [`pins/opt110_llama_q4_provenance.json`](pins/opt110_llama_q4_provenance.json); [`fixtures/opt110_llama_q4_adapter.json`](fixtures/opt110_llama_q4_adapter.json); [`tools/opt110_llama_q4_adapter.py`](tools/opt110_llama_q4_adapter.py); [`tests/test_opt110_llama_q4_adapter.py`](tests/test_opt110_llama_q4_adapter.py); [`cuda/opt110_llama_q4_adapter.cuh`](cuda/opt110_llama_q4_adapter.cuh); [`cuda/opt110_llama_q4_adapter_test.cu`](cuda/opt110_llama_q4_adapter_test.cu); [`cuda/q4k_decode_path.cuh`](cuda/q4k_decode_path.cuh); [`Makefile`](Makefile); [`evidence/optimization/opt110-llama-q4-adapter/REPORT.md`](evidence/optimization/opt110-llama-q4-adapter/REPORT.md); verification 2026-09-13T05:35:00Z |
 | OPT-111 | Reproduce the remaining llama F16 MMA prompt-attention differences | OPT-079, OPT-103, OPT-106, OPT-114 | done | A source-backed prompt-attention adapter, justified against the shipping OPT-079 `kv_once` control, improves complete attention and P4096 sufficiently to reduce the measured prefill gap while preserving exact causality and quality; otherwise no swizzle follow-up | [`tasks/OPT-111.md`](tasks/OPT-111.md); [`pins/opt111_llama_prompt_attention_contract.json`](pins/opt111_llama_prompt_attention_contract.json); [`pins/opt111_iteration_contract.json`](pins/opt111_iteration_contract.json); [`pins/opt111_llama_prompt_attention_provenance.json`](pins/opt111_llama_prompt_attention_provenance.json); [`fixtures/opt111_llama_prompt_attention.json`](fixtures/opt111_llama_prompt_attention.json); [`tools/opt111_llama_prompt_attention.py`](tools/opt111_llama_prompt_attention.py); [`tests/test_opt111_llama_prompt_attention.py`](tests/test_opt111_llama_prompt_attention.py); [`cuda/opt111_llama_prompt_attention.cuh`](cuda/opt111_llama_prompt_attention.cuh); [`cuda/opt111_llama_prompt_attention_test.cu`](cuda/opt111_llama_prompt_attention_test.cu); [`cuda/fattn_mma_f16.cuh`](cuda/fattn_mma_f16.cuh); [`Makefile`](Makefile); [`evidence/optimization/opt111-llama-prompt-attention/REPORT.md`](evidence/optimization/opt111-llama-prompt-attention/REPORT.md); verification 2026-09-13T06:38:00Z |
 | OPT-112 | Fuse decode normalization into typed Q8 staging (deferred) | OPT-106, OPT-114 | done | Only proceed after a fresh component screen shows enough removable norm/staging cost; emit and reuse Q8_1 or Q8Block only for consumers of that exact encoding, preserve BF16 rounding in-register, and keep the current path unless complete decode wins under full quality gates | [`tasks/OPT-112.md`](tasks/OPT-112.md); [`pins/opt112_norm_q8_staging_contract.json`](pins/opt112_norm_q8_staging_contract.json); [`pins/opt112_iteration_contract.json`](pins/opt112_iteration_contract.json); [`fixtures/opt112_norm_q8_staging.json`](fixtures/opt112_norm_q8_staging.json); [`tools/opt112_norm_q8_staging.py`](tools/opt112_norm_q8_staging.py); [`tests/test_opt112_norm_q8_staging.py`](tests/test_opt112_norm_q8_staging.py); [`Makefile`](Makefile); [`evidence/optimization/opt112-norm-q8-staging/REPORT.md`](evidence/optimization/opt112-norm-q8-staging/REPORT.md); verification 2026-09-13T06:52:00Z |
-| OPT-113 | Freeze and measure the coupled-stack recovery combination | OPT-107, OPT-108, OPT-109, OPT-110, OPT-111, OPT-114 | pending | Fresh controls and survivors receive independent internal-improvement, llama-parity, and OPT-056 +5% verdicts with honest failures; OPT-112 is optional and may be explicitly deferred without delaying the sitting | [`tasks/OPT-113.md`](tasks/OPT-113.md) |
+| OPT-113 | Freeze and measure the coupled-stack recovery combination | OPT-107, OPT-108, OPT-109, OPT-110, OPT-111, OPT-114 | done | Fresh controls and survivors receive independent internal-improvement, llama-parity, and OPT-056 +5% verdicts with honest failures; OPT-112 is optional and may be explicitly deferred without delaying the sitting | [`tasks/OPT-113.md`](tasks/OPT-113.md); [`pins/opt113_coupled_stack_gate_contract.json`](pins/opt113_coupled_stack_gate_contract.json); [`pins/opt113_iteration_contract.json`](pins/opt113_iteration_contract.json); [`fixtures/opt113_coupled_stack_gate.json`](fixtures/opt113_coupled_stack_gate.json); [`tools/opt113_coupled_stack_gate.py`](tools/opt113_coupled_stack_gate.py); [`tests/test_opt113_coupled_stack_gate.py`](tests/test_opt113_coupled_stack_gate.py); [`cuda/opt113_coupled_stack_gate_test.cu`](cuda/opt113_coupled_stack_gate_test.cu); [`Makefile`](Makefile); [`evidence/optimization/opt113-coupled-stack-gate/REPORT.md`](evidence/optimization/opt113-coupled-stack-gate/REPORT.md); verification 2026-09-13T07:45:00Z |
 
 ### Post-042 recovery execution order (historical batch)
 
@@ -7638,3 +7638,29 @@ statements below are historical, not the current execution order.
 - **tok/s delta vs production: 0** (defer; production unchanged).
 - Marked OPT-112 `done`. Coupled IDs: none. First eligible pending task:
   **OPT-113**.
+
+### 2026-09-13T07:45:00Z — OPT-113 coupled-stack recovery sitting delivered
+
+- Added OPT-113 coupled-stack gate (`tools/opt113_coupled_stack_gate.py`,
+  contracts, fixture, tests, `cuda-opt113-diagnostics`). Frozen authenticated
+  OPT-106 `post106_control` vs `post113_selected` combining OPT-107
+  `hybrid_crossover@1024`, OPT-110 `llama_q4k_mmvq`, and OPT-111 `opt111_base`.
+  OPT-108/109 rejections do not leak; OPT-112 omitted (`deferred_below_trigger`).
+  Fresh pinned-llama P/D/2K and control Quartz measured in one exclusive sitting;
+  OPT-106 llama/control numbers were not reused.
+- Candidate NLL measured via OPT-058 before timing: held-out 1024 mean NLL
+  **1.787599**, ppl_ratio **0.999721**, recurrence incremental NLL **0.0**;
+  inherited `task_arithmetic` fail visible. 128K `memory_fit` arithmetic false
+  (explicit ledger +19584 B vs measured delta matching OPT-106); cap not raised.
+- **P4096:** selected **3064.77** vs control **3022.22** vs llama **3227.71**
+  tok/s (Δ vs control **+42.54**). **D128:** **57.30** vs **53.58** vs **68.61**
+  (Δ **+3.722**). **D2048:** **55.65** vs **49.46** vs **67.27** (Δ **+6.184**).
+  **2K:** **3152.97** vs llama **3190.47** (`gate_passed=false`).
+- Outcomes: internal_improvement_with_quality **false** (geo **1.0686**, CI lower
+  **1.0024**; throughput CIs pass; `memory_fit` miss); llama_parity **false**;
+  opt056_plus5 **false**. `kernel_parity_pass=true`; `model_quality_pass=true`;
+  `performance_pass=false`; `production_kept=true`. Completing the sitting does
+  not require comparative gates to pass.
+- Key evidence: [`fixtures/opt113_coupled_stack_gate.json`](fixtures/opt113_coupled_stack_gate.json);
+  [`evidence/optimization/opt113-coupled-stack-gate/REPORT.md`](evidence/optimization/opt113-coupled-stack-gate/REPORT.md).
+- Marked OPT-113 `done`. Coupled IDs: none. OPT-107–113 recovery batch complete.

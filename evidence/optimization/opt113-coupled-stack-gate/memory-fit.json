@@ -1,0 +1,18 @@
+{
+  "ok": false,
+  "post_graph_admitted": false,
+  "reserve_ok": true,
+  "fields": {
+    "memory_fit": "post_graph",
+    "capacity": "131072",
+    "explicit_bytes": "29571277792",
+    "measured_delta": "29578231808",
+    "free_bytes": "3521118208",
+    "reserve_required": "1610612736",
+    "total_bytes": "33664794624",
+    "arithmetic": "false",
+    "passed": "false"
+  },
+  "returncode": 1,
+  "reconciled_against_allocation_inventory": true
+}

@@ -1,0 +1,10 @@
+{
+  "device": "NVIDIA GeForce RTX 5090",
+  "device_substring": "RTX 5090",
+  "power_limit_w": 400.0,
+  "power_draw_w": 19.92,
+  "sm_clock_mhz": "240",
+  "mem_clock_mhz": "405",
+  "temperature_c": "42",
+  "raw": "NVIDIA GeForce RTX 5090, 400.00, 19.92, 240, 405, 42"
+}
