@@ -1,0 +1,95 @@
+{
+  "schema_version": 1,
+  "task": "OPT-129",
+  "kind": "inspect",
+  "llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+  "authority_head": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+  "gguf_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+  "crossover_threshold": 1024,
+  "verified_max": 4096,
+  "vec128_pin": "warp_query",
+  "hybrid_crossover_unchanged": true,
+  "fattn_cu_sha256": "43362d6bc282b359495e06269a1c4ed2d221755f112244a7b6dd10601fd5ceeb",
+  "fattn_vec_sha256": "f6305c9a667f438565ee0afff0e854cce335ddbd67e30fbee466cbc5672a9577",
+  "has_best_fattn_kernel": true,
+  "has_vec_ncols1": true,
+  "has_get_n_kv_pad": true,
+  "llama_default_kv": true,
+  "scheduler_dispatch": "launch_attention_prepare_partitioned",
+  "prefixes": {
+    "128": {
+      "quartz": "warp_query_decode_attention",
+      "llama_padded_nkv": 256,
+      "llama_selected": "flash_attn_ext_vec<256,1>",
+      "llama_vec_is_selected": true
+    },
+    "1023": {
+      "quartz": "warp_query_decode_attention",
+      "llama_padded_nkv": 1024,
+      "llama_selected": "flash_attn_ext_vec<256,1>",
+      "llama_vec_is_selected": true
+    },
+    "1024": {
+      "quartz": "vec128_online_decode_attention",
+      "llama_padded_nkv": 1280,
+      "llama_selected": "flash_attn_ext_vec<256,1>",
+      "llama_vec_is_selected": true
+    },
+    "2048": {
+      "quartz": "vec128_online_decode_attention",
+      "llama_padded_nkv": 2304,
+      "llama_selected": "flash_attn_ext_vec<256,1>",
+      "llama_vec_is_selected": true
+    },
+    "8192": {
+      "quartz": "warp_query_decode_attention",
+      "llama_padded_nkv": 8448,
+      "llama_selected": "fattn-mma-f16_ncols1=1_ncols2=8",
+      "llama_vec_is_selected": false
+    },
+    "32768": {
+      "quartz": "warp_query_decode_attention",
+      "llama_padded_nkv": 33024,
+      "llama_selected": "fattn-mma-f16_ncols1=1_ncols2=8",
+      "llama_vec_is_selected": false
+    }
+  },
+  "proof": "Ada+ decode Q.ne[1]==1 unquantized KV selects VEC unless gqa_ratio>4 and K.ne[1]>=8192, in which case MMA_F16 ncols2=8. get_n_kv pads used_max_p1 to max(n_pad,256), not full n_ctx.",
+  "gpu": {
+    "schema_version": 1,
+    "task": "OPT-129",
+    "kind": "inspect",
+    "llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+    "gguf_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+    "shipping_crossover": 1024,
+    "verified_max": 4096,
+    "vec128_pin": "warp_query",
+    "gqa_pin": "warp_query",
+    "prep_pin": "warp_query",
+    "production_selector_change": false,
+    "kSelectedDecodeAttentionCrossoverThreshold": 1024,
+    "quartz_p128": "warp_query_decode_attention",
+    "quartz_p1023": "warp_query_decode_attention",
+    "quartz_p1024": "vec128_online_decode_attention",
+    "quartz_p2048": "vec128_online_decode_attention",
+    "quartz_p8192": "warp_query_decode_attention",
+    "quartz_p32768": "warp_query_decode_attention",
+    "llama_p128": "flash_attn_ext_vec<256,1>",
+    "llama_p1023": "flash_attn_ext_vec<256,1>",
+    "llama_p1024": "flash_attn_ext_vec<256,1>",
+    "llama_p2048": "flash_attn_ext_vec<256,1>",
+    "llama_p8192": "fattn-mma-f16_ncols1=1_ncols2=8",
+    "llama_p32768": "fattn-mma-f16_ncols1=1_ncols2=8",
+    "llama_kv_default": "f16/f16",
+    "quartz_kv_native": "bf16_physical",
+    "fattn_kq_stride": 256,
+    "gqa_ratio": 6,
+    "f16_occupancy": 3,
+    "matched_occupancy": 2,
+    "nsm": 170,
+    "f16_registers": 167,
+    "f16_local_bytes": 0,
+    "full_scheduler_dispatch": "launch_attention_prepare_partitioned",
+    "authority_head": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328"
+  }
+}

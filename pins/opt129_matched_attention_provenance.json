@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "task": "OPT-129",
+  "authority": "pinned llama.cpp",
+  "llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+  "license": "MIT",
+  "authors": "The ggml authors",
+  "adapter_namespace": "qw38::cuda::opt129",
+  "specialization": "decode flash_attn_ext_vec<256,1> F16/F16 token-major layout plus BF16-physical conversion adapter",
+  "not_vendored": [
+    "ggml tensor/runtime",
+    "ggml graph/allocator",
+    "ggml CLI/model",
+    "current llama HEAD as release authority",
+    "fattn-mma-f16 decode consumer (source identity only at n_kv>=8192)"
+  ],
+  "copied_organization": [
+    {
+      "file": ".cache/authorities/llama.cpp/ggml/src/ggml-cuda/fattn.cu",
+      "use": "ggml_cuda_get_best_fattn_kernel Ada+/decode VEC vs MMA_F16 rule"
+    },
+    {
+      "file": ".cache/authorities/llama.cpp/ggml/src/ggml-cuda/fattn-vec.cuh",
+      "use": "flash_attn_ext_vec<256,1> 128-thread NVIDIA float2 V accum"
+    },
+    {
+      "file": ".cache/authorities/llama.cpp/ggml/src/ggml-cuda/fattn-common.cuh",
+      "use": "FATTN_KQ_STRIDE=256, FATTN_KQ_MAX_OFFSET"
+    },
+    {
+      "file": ".cache/authorities/llama.cpp/src/llama-kv-cache.cpp",
+      "use": "get_n_kv pads used_max_p1 to max(n_pad,256); get_k view [D, n_head_kv, n_kv] then permute to [D, n_kv, n_head_kv]"
+    },
+    {
+      "file": ".cache/authorities/llama.cpp/src/llama-context.cpp",
+      "use": "default type_k=type_v=GGML_TYPE_F16"
+    }
+  ],
+  "local_modifications": [
+    "Diagnostic F16 token-major consumer only; production remains BF16 physical hybrid_crossover@1024",
+    "Conversion adapter is timed separately and in the enclosing adapter-inclusive path",
+    "OPT-108 BF16-physical llama-vec is the matched-layout llama organization, not native llama dtype"
+  ]
+}

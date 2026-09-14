@@ -1,0 +1,203 @@
+{
+  "rows": [
+    {
+      "layer": 3,
+      "prefix": 128,
+      "max_abs_quartz_vs_matched": 1.11758709e-08,
+      "max_abs_quartz_vs_f16": 1.11758709e-08,
+      "max_abs_matched_vs_f16": 6.98491931e-10,
+      "identical_arithmetic": false,
+      "nonfinite": 0,
+      "q_hash": "dfb76fd49d54ec9f",
+      "out_hash": "31585a404af2ac75"
+    },
+    {
+      "layer": 3,
+      "prefix": 1023,
+      "max_abs_quartz_vs_matched": 5.58793545e-09,
+      "max_abs_quartz_vs_f16": 5.58793545e-09,
+      "max_abs_matched_vs_f16": 5.82076609e-10,
+      "identical_arithmetic": false,
+      "nonfinite": 0,
+      "q_hash": "dfb76fd49d54ec9f",
+      "out_hash": "6ae2ceb74cafbb07"
+    },
+    {
+      "layer": 3,
+      "prefix": 1024,
+      "max_abs_quartz_vs_matched": 4.65661287e-09,
+      "max_abs_quartz_vs_f16": 4.65661287e-09,
+      "max_abs_matched_vs_f16": 0,
+      "identical_arithmetic": false,
+      "nonfinite": 0,
+      "q_hash": "dfb76fd49d54ec9f",
+      "out_hash": "7e234d1c7545c01a"
+    },
+    {
+      "layer": 3,
+      "prefix": 2048,
+      "max_abs_quartz_vs_matched": 2.79396772e-09,
+      "max_abs_quartz_vs_f16": 2.79396772e-09,
+      "max_abs_matched_vs_f16": 4.65661287e-10,
+      "identical_arithmetic": false,
+      "nonfinite": 0,
+      "q_hash": "dfb76fd49d54ec9f",
+      "out_hash": "625bb7b962a80633"
+    },
+    {
+      "layer": 3,
+      "prefix": 8192,
+      "max_abs_quartz_vs_matched": 2.79396772e-09,
+      "max_abs_quartz_vs_f16": 11.3616056,
+      "max_abs_matched_vs_f16": 11.3616056,
+      "identical_arithmetic": false,
+      "nonfinite": 0,
+      "q_hash": "dfb76fd49d54ec9f",
+      "out_hash": "618eb692a2727ed0"
+    },
+    {
+      "layer": 3,
+      "prefix": 32768,
+      "max_abs_quartz_vs_matched": 2.79396772e-09,
+      "max_abs_quartz_vs_f16": 0.129812568,
+      "max_abs_matched_vs_f16": 0.129812568,
+      "identical_arithmetic": false,
+      "nonfinite": 0,
+      "q_hash": "dfb76fd49d54ec9f",
+      "out_hash": "e01ac5bdb1b0c2c5"
+    },
+    {
+      "layer": 7,
+      "prefix": 128,
+      "max_abs_quartz_vs_matched": 1.11758709e-08,
+      "max_abs_quartz_vs_f16": 1.11758709e-08,
+      "max_abs_matched_vs_f16": 0,
+      "identical_arithmetic": false,
+      "nonfinite": 0,
+      "q_hash": "bb44e1c6f9d9ec10",
+      "out_hash": "16bb207e518da1cc"
+    },
+    {
+      "layer": 7,
+      "prefix": 1023,
+      "max_abs_quartz_vs_matched": 3.7252903e-09,
+      "max_abs_quartz_vs_f16": 3.7252903e-09,
+      "max_abs_matched_vs_f16": 4.65661287e-10,
+      "identical_arithmetic": false,
+      "nonfinite": 0,
+      "q_hash": "bb44e1c6f9d9ec10",
+      "out_hash": "93dcc97f804b6ec8"
+    },
+    {
+      "layer": 7,
+      "prefix": 1024,
+      "max_abs_quartz_vs_matched": 4.65661287e-09,
+      "max_abs_quartz_vs_f16": 4.65661287e-09,
+      "max_abs_matched_vs_f16": 4.65661287e-10,
+      "identical_arithmetic": false,
+      "nonfinite": 0,
+      "q_hash": "bb44e1c6f9d9ec10",
+      "out_hash": "d4a7ee49696e70ae"
+    },
+    {
+      "layer": 7,
+      "prefix": 2048,
+      "max_abs_quartz_vs_matched": 2.79396772e-09,
+      "max_abs_quartz_vs_f16": 2.79396772e-09,
+      "max_abs_matched_vs_f16": 3.49245965e-10,
+      "identical_arithmetic": false,
+      "nonfinite": 0,
+      "q_hash": "bb44e1c6f9d9ec10",
+      "out_hash": "18dbbacf6cb81d07"
+    },
+    {
+      "layer": 7,
+      "prefix": 8192,
+      "max_abs_quartz_vs_matched": 2.32830644e-09,
+      "max_abs_quartz_vs_f16": 2.38502932,
+      "max_abs_matched_vs_f16": 2.38502932,
+      "identical_arithmetic": false,
+      "nonfinite": 0,
+      "q_hash": "bb44e1c6f9d9ec10",
+      "out_hash": "9c36abedf972290e"
+    },
+    {
+      "layer": 7,
+      "prefix": 32768,
+      "max_abs_quartz_vs_matched": 2.09547579e-09,
+      "max_abs_quartz_vs_f16": 0.124400578,
+      "max_abs_matched_vs_f16": 0.124400578,
+      "identical_arithmetic": false,
+      "nonfinite": 0,
+      "q_hash": "bb44e1c6f9d9ec10",
+      "out_hash": "092416550c6d035b"
+    },
+    {
+      "layer": 63,
+      "prefix": 128,
+      "max_abs_quartz_vs_matched": 1.11758709e-08,
+      "max_abs_quartz_vs_f16": 1.11758709e-08,
+      "max_abs_matched_vs_f16": 2.32830644e-10,
+      "identical_arithmetic": false,
+      "nonfinite": 0,
+      "q_hash": "81e956507ba009d8",
+      "out_hash": "304407b7c4bc3400"
+    },
+    {
+      "layer": 63,
+      "prefix": 1023,
+      "max_abs_quartz_vs_matched": 3.7252903e-09,
+      "max_abs_quartz_vs_f16": 3.7252903e-09,
+      "max_abs_matched_vs_f16": 1.16415322e-09,
+      "identical_arithmetic": false,
+      "nonfinite": 0,
+      "q_hash": "81e956507ba009d8",
+      "out_hash": "6104b9b4231f08bc"
+    },
+    {
+      "layer": 63,
+      "prefix": 1024,
+      "max_abs_quartz_vs_matched": 4.65661287e-09,
+      "max_abs_quartz_vs_f16": 4.65661287e-09,
+      "max_abs_matched_vs_f16": 9.31322575e-10,
+      "identical_arithmetic": false,
+      "nonfinite": 0,
+      "q_hash": "81e956507ba009d8",
+      "out_hash": "783a3fa359198cd5"
+    },
+    {
+      "layer": 63,
+      "prefix": 2048,
+      "max_abs_quartz_vs_matched": 2.79396772e-09,
+      "max_abs_quartz_vs_f16": 2.79396772e-09,
+      "max_abs_matched_vs_f16": 6.98491931e-10,
+      "identical_arithmetic": false,
+      "nonfinite": 0,
+      "q_hash": "81e956507ba009d8",
+      "out_hash": "d79dd08d9165c786"
+    },
+    {
+      "layer": 63,
+      "prefix": 8192,
+      "max_abs_quartz_vs_matched": 2.79396772e-09,
+      "max_abs_quartz_vs_f16": 16.8496933,
+      "max_abs_matched_vs_f16": 16.8496933,
+      "identical_arithmetic": false,
+      "nonfinite": 0,
+      "q_hash": "81e956507ba009d8",
+      "out_hash": "157dee5b421e7bae"
+    },
+    {
+      "layer": 63,
+      "prefix": 32768,
+      "max_abs_quartz_vs_matched": 2.79396772e-09,
+      "max_abs_quartz_vs_f16": 0.132315442,
+      "max_abs_matched_vs_f16": 0.132315442,
+      "identical_arithmetic": false,
+      "nonfinite": 0,
+      "q_hash": "81e956507ba009d8",
+      "out_hash": "8b4d0746fefdb13f"
+    }
+  ],
+  "identical_arithmetic": false
+}

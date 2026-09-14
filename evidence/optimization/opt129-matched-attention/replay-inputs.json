@@ -1,0 +1,25 @@
+{
+  "generator": "(layer * 10007) + 89; unit(index, seed)",
+  "token_generator": "(42 + index * 997) % 248320",
+  "layers": [
+    3,
+    7,
+    63
+  ],
+  "prefixes": [
+    128,
+    1023,
+    1024,
+    2048,
+    8192,
+    32768
+  ],
+  "query_heads": 24,
+  "kv_heads": 4,
+  "head_width": 256,
+  "rotary_width": 64,
+  "capacity_rule": "allocated == visible prefix+1",
+  "llama_pad_rule": "max(256, pad(n_kv, 256))",
+  "path": "/home/user/qw38/evidence/optimization/opt129-matched-attention/replay-inputs.json",
+  "note": "Q/K/V are generated in-process from the frozen seed; hashes in per-shape rows authenticate the buffers. Large prefixes are not dumped as raw tensors."
+}

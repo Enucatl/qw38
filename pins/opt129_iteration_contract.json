@@ -1,0 +1,173 @@
+{
+  "schema_version": 1,
+  "task": "OPT-129",
+  "yardstick": "compare_matched_quartz_and_llama_decode_attention_components",
+  "claims_throughput": false,
+  "claims_performance_improvement": false,
+  "opt074_family_admission_required": false,
+  "opt074_coverage_unadmitted_is_blocker": false,
+  "performance_admission": {
+    "enabled": true,
+    "instrumentation_only": true
+  },
+  "image": "qw38-cuda:13.0.2",
+  "model": "models/Qwen3.8-27B-Q4_K_M.gguf",
+  "gpu_lock": "build/optimization-runs/qw38-gpu.lock",
+  "aggregate_deadline_s": 7200,
+  "target": "tools/opt129_matched_attention.py",
+  "diagnostics_make_target": "cuda-opt129-diagnostics",
+  "selector": "hybrid_crossover",
+  "case_ids": [
+    "inspect",
+    "replay",
+    "numerical",
+    "ranking",
+    "report"
+  ],
+  "modes": {
+    "feedback": {
+      "target": "tools/opt129_matched_attention.py",
+      "tier_sequence": ["inspect", "replay", "numerical", "ranking"],
+      "make_targets": ["build/qw38-cuda-opt129-matched-attention-test"],
+      "build_once": true,
+      "warm_repetitions": 0,
+      "aggregate_deadline_s": 7200,
+      "workloads": ["inspect", "replay", "numerical", "ranking"]
+    },
+    "acceptance": {
+      "target": "tools/opt129_matched_attention.py",
+      "tier_sequence": ["report"],
+      "make_targets": ["build/qw38-cuda-opt129-matched-attention-test"],
+      "warm_repetitions": 0,
+      "aggregate_deadline_s": 7200,
+      "workloads": ["report"]
+    },
+    "release": {
+      "target": "tools/opt129_matched_attention.py",
+      "tier": "acceptance",
+      "make_targets": ["build/qw38-cuda-opt129-matched-attention-test"],
+      "skip_compile": false,
+      "historical_oracles": false,
+      "aggregate_deadline_s": 7200,
+      "workloads": []
+    }
+  },
+  "workloads": {
+    "inspect": {
+      "target": "tools/opt129_matched_attention.py",
+      "tier": "correctness",
+      "runner": "host",
+      "kind": "inspect_dispatch_and_pinned_fattn",
+      "cases": 1,
+      "candidates": 1,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 1,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 0,
+      "reference": 1,
+      "gpu_work": false,
+      "args": [
+        "uv", "run", "python", "tools/opt129_matched_attention.py",
+        "--phase", "inspect", "--mode", "{mode}", "--run-dir", "{run_dir}"
+      ]
+    },
+    "replay": {
+      "target": "build/qw38-cuda-opt129-matched-attention-test",
+      "tier": "screen",
+      "runner": "host",
+      "kind": "matched_prefix_layer_replay",
+      "cases": 18,
+      "candidates": 3,
+      "warmups": 3,
+      "samples": 5,
+      "tokens": 1,
+      "prefixes": [128, 1023, 1024, 2048, 8192, 32768],
+      "layers": [3, 7, 63],
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 0,
+      "reference": 1,
+      "gpu_work": true,
+      "native_targets": ["build/qw38-cuda-opt129-matched-attention-test"],
+      "args": [
+        "uv", "run", "python", "tools/opt129_matched_attention.py",
+        "--phase", "replay", "--mode", "{mode}", "--run-dir", "{run_dir}"
+      ]
+    },
+    "numerical": {
+      "target": "build/qw38-cuda-opt129-matched-attention-test",
+      "tier": "correctness",
+      "runner": "host",
+      "kind": "hashes_and_tolerances",
+      "cases": 3,
+      "candidates": 2,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 1,
+      "prefixes": [128, 1024, 2048],
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 0,
+      "reference": 1,
+      "gpu_work": true,
+      "native_targets": ["build/qw38-cuda-opt129-matched-attention-test"],
+      "args": [
+        "uv", "run", "python", "tools/opt129_matched_attention.py",
+        "--phase", "numerical", "--mode", "{mode}", "--run-dir", "{run_dir}"
+      ]
+    },
+    "ranking": {
+      "target": "tools/opt129_matched_attention.py",
+      "tier": "correctness",
+      "runner": "host",
+      "kind": "at_most_two_causal_transfers_opt130",
+      "cases": 1,
+      "candidates": 1,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 1,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 0,
+      "reference": 1,
+      "gpu_work": false,
+      "args": [
+        "uv", "run", "python", "tools/opt129_matched_attention.py",
+        "--phase", "ranking", "--mode", "{mode}", "--run-dir", "{run_dir}"
+      ]
+    },
+    "report": {
+      "target": "tools/opt129_matched_attention.py",
+      "tier": "correctness",
+      "runner": "host",
+      "kind": "host_only_matched_attention_report",
+      "cases": 1,
+      "candidates": 1,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 1,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 0,
+      "reference": 1,
+      "gpu_work": false,
+      "args": [
+        "uv", "run", "python", "tools/opt129_matched_attention.py",
+        "--phase", "report", "--mode", "{mode}", "--run-dir", "{run_dir}"
+      ]
+    }
+  },
+  "proof_limit": [
+    "diagnostics only",
+    "no production selector change",
+    "instrumentation-only: no speed keep",
+    "historical oracles none",
+    "hybrid_crossover@1024 shipping unchanged",
+    "pinned llama is cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+    "native BF16 vs llama f16/f16 is not identical arithmetic",
+    "at most two causal transfers into OPT-130"
+  ],
+  "report_path": "evidence/optimization/opt129-matched-attention/REPORT.md"
+}

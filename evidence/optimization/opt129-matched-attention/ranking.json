@@ -1,0 +1,56 @@
+{
+  "schema_version": 1,
+  "task": "OPT-130",
+  "attention_material": true,
+  "materiality_fraction": 0.02,
+  "d128_branch_ms": 0.5818026858666667,
+  "d2048_branch_ms": 1.8078037546666668,
+  "d8192_branch_ms": 9.133670485333333,
+  "d32768_branch_ms": 49.24160128,
+  "d128_share_of_request": 0.03151523134535869,
+  "d2048_share_of_request": 0.07541943073286053,
+  "matched_d2048_branch_delta_ms": 1.3394602880000002,
+  "matched_layout_d8192_branch_delta_ms": 8.3283627392,
+  "matched_layout_d32768_branch_delta_ms": 46.56943922666667,
+  "opt108_d2048_control_ms": 0.03317,
+  "opt108_d2048_candidate_ms": 0.03101,
+  "adapter_d2048_ms": 0.20404907093333333,
+  "adapter_d32768_ms": 3.1483903733333336,
+  "sitting_exclusive": false,
+  "reasons": [
+    "D2048 attention branch >= 2% of OPT-125 request",
+    "D128 attention branch >= 2% of OPT-125 request",
+    "D32768 16-layer enclosing attention is at least 1 ms/token"
+  ],
+  "transfers": [
+    {
+      "id": "occupancy_partition_or_gqa_kv_reuse",
+      "rank": 1,
+      "source": "llama vec occupancy n_parts vs Quartz hardcoded 16; GQA=6 duplicated KV rereads in warp_query; shipping warp_query fallback past verified_max 4096",
+      "estimated_removable_branch_ms": 1.3394602880000002,
+      "enclosing_request_benefit": 1.3394602880000002,
+      "long_context_matched_layout_branch_ms": 46.56943922666667,
+      "d8192_matched_layout_branch_ms": 8.3283627392,
+      "required_layout_workspace": "BF16 physical, no new cache",
+      "numerical_risk": "low_for_partition_count, medium_for_gqa6",
+      "provenance": "OPT-108 llama_vec_nvidia / OPT-095 gqa6 (both rejected)",
+      "matched_result": true,
+      "reason": "Matched BF16-physical llama-vec vs shipping hybrid on identical buffers where llama source-selects VEC (prefixes <=2048). OPT-108 D2048 control was 0.033 ms with a 95% CI that included 0 versus llama-vec 0.031 ms; this sitting's larger Quartz number is non-exclusive and must be re-screened before OPT-130 treats D2048 as a proven win. Long-context BF16 llama-vec vs warp_query is the same layout but is not a matched llama result: llama source-selects MMA at n_kv>=8192."
+    },
+    {
+      "id": "llama_mma_decode_consumer",
+      "rank": 2,
+      "source": "pinned fattn.cu BEST_FATTN_KERNEL_MMA_F16 for Ada+ decode when gqa_ratio>4 and K.ne[1]>=8192; ncols1=1 ncols2=8",
+      "estimated_removable_branch_ms": null,
+      "enclosing_request_benefit": "unknown_until_mma_launched",
+      "required_layout_workspace": "Port MMA onto dense BF16 physical or keep the existing BF16 cache and a BF16 MMA consumer. Native llama MMA reads F16/F16 token-major and needs stream-K/fixup workspace. Diagnostic BF16->F16 convert is not a production path; OPT-130 forbids a shadow F16 cache.",
+      "numerical_risk": "medium",
+      "provenance": "MIT ggml fattn-mma-f16 at cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+      "matched_result": false,
+      "reason": "Source-selected llama kernel at prefixes 8192/32768 is MMA, not the diagnostic F16 vec actually launched. Quartz shipping is warp_query past verified_max 4096. Adapter convert cost grows with prefix and cannot be amortized per token without a forbidden F16 cache."
+    }
+  ],
+  "opt130_disposition": "proceed",
+  "max_transfers": 2,
+  "production_kept": "hybrid_crossover@1024"
+}
