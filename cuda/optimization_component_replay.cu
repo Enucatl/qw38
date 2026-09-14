@@ -83,6 +83,7 @@ struct Options final {
   int decode_position = 128;
   bool ncu = false;
   bool corrupt_guard = false;
+  bool opt138_protocol = false;
   const char* evidence_dir = nullptr;
 };
 
@@ -107,7 +108,7 @@ int usage(const char* argv0) {
                "[--decode-attention-crossover-threshold 0|512|1024|1536|2048] "
                "[--decode-position 128|512|1024|1536|2048|4096] "
                "[--warmups N] [--samples N] [--ncu] [--corrupt-guard] "
-               "[--evidence-dir DIR]\n",
+               "[--opt138-protocol] [--evidence-dir DIR]\n",
                argv0);
   return 2;
 }
@@ -171,6 +172,8 @@ int parse_args(int argc, char** argv, Options* options) {
       options->ncu = true;
     } else if (std::strcmp(arg, "--corrupt-guard") == 0) {
       options->corrupt_guard = true;
+    } else if (std::strcmp(arg, "--opt138-protocol") == 0) {
+      options->opt138_protocol = true;
     } else if (std::strcmp(arg, "--evidence-dir") == 0 && index + 1 < argc) {
       options->evidence_dir = argv[++index];
     } else if (arg[0] != '-' && options->model == nullptr) {
@@ -2180,6 +2183,16 @@ int run_family(const Options& options, qw38::cuda::ReplayFamily family) {
     warmups = 3;
     samples = 10;
   }
+  if (options.opt138_protocol) {
+    warmups = qw38::cuda::kOpt138ReplayWarmups;
+    samples = qw38::cuda::kOpt138ReplaySamples;
+    if (options.cache_mode != nullptr &&
+        std::strcmp(options.cache_mode, "hot") == 0) {
+      std::fprintf(stderr,
+                   "OPT-138 protocol refuses hot cache as production evidence\n");
+      return 1;
+    }
+  }
   char rounds_path[640];
   evidence_path(rounds_path, sizeof(rounds_path), "rounds.jsonl");
   FILE* rounds = std::fopen(rounds_path, "a");
@@ -2299,6 +2312,9 @@ int run_family(const Options& options, qw38::cuda::ReplayFamily family) {
     return 1;
   }
   const char* mode_arg = options.cache_mode;
+  if (options.opt138_protocol && mode_arg == nullptr) {
+    mode_arg = "rotating";
+  }
   const qw38::cuda::CacheMode modes[] = {qw38::cuda::CacheMode::kHot,
                                          qw38::cuda::CacheMode::kRotating};
   int rc = 0;
@@ -2353,6 +2369,19 @@ int run_family(const Options& options, qw38::cuda::ReplayFamily family) {
       static_cast<unsigned long long>(checksum), hardware.l2_bytes,
       static_cast<double>(hardware.power_limit_w),
       qw38::cuda::replay_family_name(family), capture_key);
+  if (options.opt138_protocol) {
+    std::printf(
+        "%s{\"schema_version\":1,\"task\":\"OPT-138\","
+        "\"protocol\":\"%s\",\"family\":\"%s\",\"cache_mode\":\"%s\","
+        "\"warmups\":%d,\"samples\":%d,\"production_weights\":true,"
+        "\"synthetic_weights\":false,\"accept_hot_as_production\":false,"
+        "\"rotating_layers\":true,\"full_ncu_sweep\":false,"
+        "\"capture_key\":\"%s\",\"claims_throughput\":false}\n",
+        qw38::cuda::kOpt138ResultPrefix, qw38::cuda::kOpt138ReplayProtocol,
+        qw38::cuda::replay_family_name(family),
+        mode_arg != nullptr ? mode_arg : "rotating", warmups, samples,
+        capture_key);
+  }
   std::printf(
       "QW38_OPT070_NATIVE_COUNTS={\"schema_version\":1,\"task\":\"OPT-070\","
       "\"family\":\"%s\",\"tier\":\"%s\",\"warmups\":%d,\"samples\":%d,"

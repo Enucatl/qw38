@@ -18,6 +18,10 @@ constexpr std::size_t kEngineFusedMemberBytes = 192;
 // OPT-136 diagnostic-only identity markers. Production attribution math and
 // selectors are unchanged. NVTX ranges may carry engine/prefix/step/layer/op.
 constexpr bool kOpt136DiagnosticIdentityMarkers = true;
+// OPT-138 extends the same diagnostic markers for prefill windows. Production
+// arithmetic and selectors stay unchanged.
+constexpr bool kOpt138DiagnosticIdentityMarkers = true;
+constexpr char kOpt138PrefillNvtx[] = "opt138.prefill";
 
 // Shared Quartz/llama family record. Member counts are informational; fused
 // complete-work time is charged once on the enclosing interval.

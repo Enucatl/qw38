@@ -78,6 +78,12 @@ FAMILY_GROUPS = (
     "logits",
     "gdn",
     "residual_norm_quant",
+    "prompt_mmq",
+    "decode_mmv",
+    "conversion",
+    "staging",
+    "epilogue",
+    "commit_copy",
     "copy",
     "unclassified",
 )
@@ -99,9 +105,42 @@ NAMED_FAMILIES = (
     "attn_merge",
     "attn_gate",
     "residual_norm_quant",
+    "prompt_mmq",
+    "decode_mmv",
+    "conversion",
+    "staging",
+    "epilogue",
+    "commit_copy",
     "copy_other",
     "unclassified",
 )
+
+# Llama fused kernels define enclosing groups. Quartz leaves that sit inside a
+# fused llama op are regrouped to that boundary; unmatched time stays explicit.
+LLAMA_ENCLOSING_GROUPS: dict[str, tuple[str, ...]] = {
+    "q4_ffn_fused": ("q4_gate", "q4_up", "q4_swiglu"),
+    "q4_down": ("q4_down",),
+    "q8_mixer": ("q8_mixer",),
+    "attn_fused": (
+        "attn_prepare",
+        "attn_core",
+        "attn_merge",
+        "attn_gate",
+        "attn_cache_write",
+        "q6_attn_out",
+    ),
+    "gdn_fused": ("gdn_conv", "gdn_recurrence", "gdn_gated_out"),
+    "prompt_mmq": ("prompt_mmq",),
+    "decode_mmv": ("decode_mmv",),
+    "q6_logits": ("q6_logits",),
+    "residual_norm_quant": ("residual_norm_quant",),
+    "conversion": ("conversion",),
+    "staging": ("staging",),
+    "epilogue": ("epilogue",),
+    "commit_copy": ("commit_copy", "copy_other"),
+}
+
+RESIDUAL_WALL_LIMIT = 0.05
 
 REQUIRED_COVERAGE_FIELDS = (
     "identity",
@@ -369,6 +408,18 @@ def classify_kernel_family(name: str) -> str:
         return "q8_mixer"
     if "logits" in lowered or ("q6" in lowered and "lm_head" in lowered):
         return "q6_logits"
+    if "mmq" in lowered or "mul_mat_q" in lowered:
+        return "prompt_mmq"
+    if "mmvq" in lowered or "mmv" in lowered or "mul_mat_vec" in lowered:
+        return "decode_mmv"
+    if "convert" in lowered or "unpack" in lowered or "repack" in lowered:
+        return "conversion"
+    if "stage" in lowered or "staging" in lowered:
+        return "staging"
+    if "epilogue" in lowered:
+        return "epilogue"
+    if "commit" in lowered:
+        return "commit_copy"
     if "attn" in lowered and "out" in lowered:
         return "q6_attn_out"
     if "gdn" in lowered and "conv" in lowered:
@@ -403,6 +454,10 @@ def classify_kernel_family(name: str) -> str:
 
 
 def family_group(family: str) -> str:
+    if family == "prompt_mmq":
+        return "prompt_mmq"
+    if family == "decode_mmv":
+        return "decode_mmv"
     if family.startswith("q4_") or family in {
         "q4_gate",
         "q4_up",
@@ -420,8 +475,14 @@ def family_group(family: str) -> str:
         return "gdn"
     if family == "residual_norm_quant":
         return "residual_norm_quant"
-    if family == "copy_other":
-        return "copy"
+    if family in {"conversion"}:
+        return "conversion"
+    if family in {"staging"}:
+        return "staging"
+    if family in {"epilogue"}:
+        return "epilogue"
+    if family in {"commit_copy", "copy_other"}:
+        return "copy" if family == "copy_other" else "commit_copy"
     return "unclassified"
 
 
@@ -1000,10 +1061,14 @@ def validate_coverage_row(row: Mapping[str, Any]) -> list[str]:
         if row.get("family_assignment_ok") is True:
             problems.append("family share below 95% marked ok")
     identity = row.get("identity") or {}
-    if identity.get("metric") in {"complete_request", "decode_only"} and identity.get(
-        "capacity_mismatch"
-    ):
+    if identity.get("metric") in {
+        "complete_request",
+        "decode_only",
+        "prefill",
+    } and identity.get("capacity_mismatch"):
         problems.append("metric/capacity mismatch")
+    if identity.get("metric") == "prefill" and identity.get("output_policy_mismatch"):
+        problems.append("prefill output-policy mismatch")
     return problems
 
 
@@ -1056,6 +1121,350 @@ def load_json(path: Path) -> Any:
 def dump_json(path: Path, payload: Mapping[str, Any] | Sequence[Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+
+
+def _mean(values: Sequence[float]) -> float | None:
+    if not values:
+        return None
+    return float(sum(values) / len(values))
+
+
+def regroup_fused_families(
+    quartz_ms: Mapping[str, float],
+    llama_ms: Mapping[str, float],
+    *,
+    enclosing: Mapping[str, Sequence[str]] | None = None,
+    kernel_ids: Mapping[str, Sequence[str]] | None = None,
+) -> dict[str, Any]:
+    """Regroup Quartz leaves to llama fused enclosing groups.
+
+    Unmatched time stays explicit. A parent graph is not an extra family.
+    """
+    groups = enclosing or LLAMA_ENCLOSING_GROUPS
+    llama_present = {name for name, value in llama_ms.items() if float(value) > 0.0}
+    assigned_quartz: set[str] = set()
+    rows: list[dict[str, Any]] = []
+    matched_excess = 0.0
+    for family, members in groups.items():
+        member_list = [str(item) for item in members]
+        llama_value = 0.0
+        quartz_value = 0.0
+        used_members: list[str] = []
+        llama_hit = False
+        for member in member_list:
+            if member in llama_ms:
+                llama_value += float(llama_ms[member])
+                llama_hit = True
+            if member in quartz_ms:
+                quartz_value += float(quartz_ms[member])
+                used_members.append(member)
+                assigned_quartz.add(member)
+        if not llama_hit and not used_members:
+            continue
+        if family not in llama_present and not llama_hit and used_members:
+            continue
+        delta = quartz_value - llama_value
+        matched_excess += delta
+        rows.append(
+            {
+                "family": family,
+                "logical_members": used_members or member_list,
+                "Quartz_ms": quartz_value,
+                "llama_ms": llama_value,
+                "delta_ms": delta,
+                "kernel_ids": list(kernel_ids.get(family, []) if kernel_ids else []),
+                "coverage_status": (
+                    "matched" if llama_hit and used_members else "partial"
+                ),
+                "proof_limit": (
+                    "enclosing fused kernel; comparison is the fused boundary"
+                    if len(member_list) > 1
+                    else "leaf family"
+                ),
+            }
+        )
+    unmatched_quartz = {
+        name: float(value)
+        for name, value in quartz_ms.items()
+        if name not in assigned_quartz and name != "unclassified"
+    }
+    unmatched_unclassified = float(quartz_ms.get("unclassified") or 0.0)
+    unmatched_llama = {
+        name: float(value)
+        for name, value in llama_ms.items()
+        if name not in {row["family"] for row in rows}
+        and all(name not in (row.get("logical_members") or []) for row in rows)
+        and name != "unclassified"
+    }
+    unmatched_ms = sum(unmatched_quartz.values()) + unmatched_unclassified
+    rows.sort(key=lambda row: str(row["family"]))
+    return {
+        "families": rows,
+        "matched_disjoint_excess_ms": matched_excess,
+        "unmatched_quartz_ms": unmatched_quartz,
+        "unmatched_llama_ms": unmatched_llama,
+        "unmatched_work_gap_ms": unmatched_ms,
+        "unclassified_ms": unmatched_unclassified,
+    }
+
+
+def reconcile_whole_gap(
+    *,
+    quartz_wall_ms: float,
+    llama_wall_ms: float,
+    matched_disjoint_excess_ms: float,
+    unmatched_work_gap_ms: float,
+    scheduling_host_residual_ms: float,
+    overlap_ms: float = 0.0,
+) -> dict[str, Any]:
+    """whole wall gap = matched family excess + unmatched + host residual."""
+    reconstructed = (
+        matched_disjoint_excess_ms + unmatched_work_gap_ms + scheduling_host_residual_ms
+    )
+    observed = float(quartz_wall_ms) - float(llama_wall_ms)
+    residual = observed - reconstructed
+    limit = RESIDUAL_WALL_LIMIT * float(quartz_wall_ms)
+    ranking_complete = abs(residual) <= limit
+    return {
+        "quartz_wall_ms": float(quartz_wall_ms),
+        "llama_wall_ms": float(llama_wall_ms),
+        "observed_gap_ms": observed,
+        "matched_disjoint_excess_ms": float(matched_disjoint_excess_ms),
+        "unmatched_work_gap_ms": float(unmatched_work_gap_ms),
+        "scheduling_host_residual_ms": float(scheduling_host_residual_ms),
+        "overlap_ms": float(overlap_ms),
+        "reconstructed_gap_ms": reconstructed,
+        "absolute_residual_ms": residual,
+        "residual_limit_ms": limit,
+        "residual_share_of_quartz_wall": (
+            abs(residual) / float(quartz_wall_ms) if quartz_wall_ms else None
+        ),
+        "ranking_complete": ranking_complete,
+        "proof_limit": (
+            None
+            if ranking_complete
+            else (
+                "absolute residual above 5% of Quartz wall; "
+                "mapping/window diagnosis required"
+            )
+        ),
+    }
+
+
+def _positive_lower_bound(deltas: Sequence[float]) -> dict[str, Any]:
+    stats = family_excess_significant(list(deltas))
+    return {
+        **stats,
+        "evidenced": bool(stats.get("significant_positive_excess")),
+    }
+
+
+def select_top_two_families(
+    rows: Sequence[Mapping[str, Any]],
+    *,
+    phase: str,
+) -> dict[str, Any]:
+    """Deterministic top-two selection.
+
+    Decode ranks the larger positive middle-window excess across D128/D2048.
+    Prefill ranks P4096 complete-prompt totals. Ties break by family name.
+    A family is selected once. Early/late-only wins are labeled unstable.
+    """
+    ranked: list[dict[str, Any]] = []
+    unstable: list[str] = []
+    for raw in rows:
+        family = str(raw.get("family") or "")
+        if not family:
+            continue
+        if phase == "prefill":
+            deltas = [float(item) for item in (raw.get("p4096_deltas_ms") or [])]
+            stats = _positive_lower_bound(deltas)
+            score = stats.get("mean_ms")
+            evidenced = bool(stats.get("evidenced"))
+            ranked.append(
+                {
+                    "family": family,
+                    "score_ms": score,
+                    "evidenced": evidenced,
+                    "stats": stats,
+                    "source": "p4096_complete",
+                }
+            )
+            continue
+        d128 = [float(item) for item in (raw.get("d128_middle_deltas_ms") or [])]
+        d2048 = [float(item) for item in (raw.get("d2048_middle_deltas_ms") or [])]
+        s128 = (
+            _positive_lower_bound(d128)
+            if d128
+            else {"evidenced": False, "mean_ms": None}
+        )
+        s2048 = (
+            _positive_lower_bound(d2048)
+            if d2048
+            else {"evidenced": False, "mean_ms": None}
+        )
+        means = [
+            value
+            for value in (s128.get("mean_ms"), s2048.get("mean_ms"))
+            if value is not None
+        ]
+        score = max(means) if means else None
+        evidenced = bool(s128.get("evidenced") or s2048.get("evidenced"))
+        early = _mean([float(item) for item in (raw.get("d128_early_deltas_ms") or [])])
+        late = _mean([float(item) for item in (raw.get("d128_late_deltas_ms") or [])])
+        middle = s128.get("mean_ms")
+        only_edge = False
+        if not evidenced and (
+            (early is not None and early > 0) or (late is not None and late > 0)
+        ):
+            if middle is None or middle <= 0:
+                only_edge = True
+                unstable.append(family)
+        ranked.append(
+            {
+                "family": family,
+                "score_ms": score,
+                "evidenced": evidenced and not only_edge,
+                "unstable_edge_only": only_edge,
+                "d128_middle": s128,
+                "d2048_middle": s2048,
+                "source": "middle_window",
+            }
+        )
+    evidenced_rows = [
+        row
+        for row in ranked
+        if row.get("evidenced") and row.get("score_ms") is not None
+    ]
+    evidenced_rows.sort(key=lambda row: (-float(row["score_ms"]), str(row["family"])))
+    selected: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for row in evidenced_rows:
+        name = str(row["family"])
+        if name in seen:
+            continue
+        seen.add(name)
+        selected.append(row)
+        if len(selected) == 2:
+            break
+    return {
+        "phase": phase,
+        "selected": selected,
+        "ranked": ranked,
+        "unstable": unstable,
+        "selection_complete": len(selected) > 0,
+        "max_selected": 2,
+        "tie_break": "family_name",
+        "window": "middle_[122,134)" if phase != "prefill" else "p4096_complete",
+    }
+
+
+def prefill_output_policy_ok(record: Mapping[str, Any]) -> dict[str, Any]:
+    final_only = bool(record.get("final_token_logits_only"))
+    logits_rows = record.get("logits_rows")
+    full_vocab_every_row = bool(record.get("full_vocabulary_logits_every_row"))
+    ok = final_only and not full_vocab_every_row and (logits_rows in {1, None})
+    return {
+        "ok": ok,
+        "final_token_logits_only": final_only,
+        "logits_rows": logits_rows,
+        "full_vocabulary_logits_every_row": full_vocab_every_row,
+        "reason": None if ok else "prefill output-policy mismatch",
+    }
+
+
+def replay_production_boundary_ok(record: Mapping[str, Any]) -> dict[str, Any]:
+    cache_mode = str(record.get("cache_mode") or "")
+    rotating = cache_mode == "rotating"
+    synthetic = bool(record.get("synthetic_weights"))
+    production_weights = bool(record.get("production_weights", True))
+    phase = str(record.get("phase") or "")
+    replay_family = str(record.get("replay_family") or "")
+    phase_mismatch = False
+    if phase == "prefill" and replay_family.startswith("decode-"):
+        phase_mismatch = True
+    if phase == "decode" and replay_family.startswith("prompt-"):
+        phase_mismatch = True
+    ok = rotating and production_weights and not synthetic and not phase_mismatch
+    reason = None
+    if not rotating:
+        reason = "hot_cache_is_not_production"
+    elif synthetic or not production_weights:
+        reason = "synthetic_weights_not_production"
+    elif phase_mismatch:
+        reason = "replay/production boundary mismatch"
+    return {
+        "ok": ok,
+        "cache_mode": cache_mode,
+        "production_weights": production_weights,
+        "synthetic_weights": synthetic,
+        "phase": phase,
+        "replay_family": replay_family,
+        "reason": reason,
+    }
+
+
+def parent_identity_ok(
+    pins: Mapping[str, Any],
+    *,
+    expected_graphs: str = "decode_segments8",
+    expected_q4: str = "llama_q4k_mmvq",
+    expected_mma: bool = True,
+) -> dict[str, Any]:
+    graphs = str(
+        pins.get("execution_graphs") or pins.get("selected_execution_graph_path") or ""
+    )
+    q4 = str(pins.get("q4_decode") or "")
+    mma = pins.get("opt137_dense_mma")
+    ok = graphs == expected_graphs and q4 == expected_q4 and mma is expected_mma
+    mismatches: list[str] = []
+    if graphs != expected_graphs:
+        mismatches.append("stale_execution_graphs")
+    if q4 != expected_q4:
+        mismatches.append("stale_q4_decode")
+    if mma is not expected_mma:
+        mismatches.append("stale_opt137_mma_parent")
+    return {
+        "ok": ok,
+        "reason": None if ok else "stale parent identity",
+        "mismatches": mismatches,
+        "expected": {
+            "execution_graphs": expected_graphs,
+            "q4_decode": expected_q4,
+            "opt137_dense_mma": expected_mma,
+        },
+        "observed": {
+            "execution_graphs": graphs,
+            "q4_decode": q4,
+            "opt137_dense_mma": mma,
+        },
+    }
+
+
+def missing_counter_record(
+    *,
+    kernel: str,
+    engine: str,
+    error: str | None,
+) -> dict[str, Any]:
+    """Unsupported metrics or permission failures are null, never zero."""
+    return {
+        "kernel": kernel,
+        "engine": engine,
+        "metrics": {},
+        "dram_read_bytes": None,
+        "dram_write_bytes": None,
+        "dram_throughput": None,
+        "l2_traffic": None,
+        "sm_throughput": None,
+        "achieved_occupancy": None,
+        "stalls": None,
+        "registers": None,
+        "local_memory_spills": None,
+        "error": error or "counters_unavailable",
+        "zero_filled": False,
+        "full_ncu_sweep": False,
+    }
 
 
 def opt133_expected_128_early() -> dict[str, float | int]:

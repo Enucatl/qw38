@@ -1,0 +1,656 @@
+{
+  "schema_version": 1,
+  "task": "OPT-138",
+  "phase": "baseline",
+  "mode": "acceptance",
+  "ok": true,
+  "results": {
+    "warmup-d128-quartz-0": {
+      "ok": true,
+      "returncode": 0
+    },
+    "warmup-d128-llama-0": {
+      "ok": true,
+      "returncode": 0
+    },
+    "warmup-d128-quartz-1": {
+      "ok": true,
+      "returncode": 0
+    },
+    "warmup-d128-llama-1": {
+      "ok": true,
+      "returncode": 0
+    },
+    "warmup-d128-quartz-2": {
+      "ok": true,
+      "returncode": 0
+    },
+    "warmup-d128-llama-2": {
+      "ok": true,
+      "returncode": 0
+    },
+    "pair-d128-quartz-0": {
+      "ok": true,
+      "decode_only_ms": 4265.53711,
+      "returncode": 0,
+      "output_policy": null
+    },
+    "pair-d128-llama-0": {
+      "ok": true,
+      "decode_only_ms": 3599.76444,
+      "returncode": 0,
+      "output_policy": null
+    },
+    "pair-d128-quartz-1": {
+      "ok": true,
+      "decode_only_ms": 4276.20459,
+      "returncode": 0,
+      "output_policy": null
+    },
+    "pair-d128-llama-1": {
+      "ok": true,
+      "decode_only_ms": 3602.86254,
+      "returncode": 0,
+      "output_policy": null
+    },
+    "pair-d128-quartz-2": {
+      "ok": true,
+      "decode_only_ms": 4280.0166,
+      "returncode": 0,
+      "output_policy": null
+    },
+    "pair-d128-llama-2": {
+      "ok": true,
+      "decode_only_ms": 3607.18109,
+      "returncode": 0,
+      "output_policy": null
+    },
+    "pair-d128-quartz-3": {
+      "ok": true,
+      "decode_only_ms": 4279.63623,
+      "returncode": 0,
+      "output_policy": null
+    },
+    "pair-d128-llama-3": {
+      "ok": true,
+      "decode_only_ms": 3611.59516,
+      "returncode": 0,
+      "output_policy": null
+    },
+    "pair-d128-quartz-4": {
+      "ok": true,
+      "decode_only_ms": 4282.51465,
+      "returncode": 0,
+      "output_policy": null
+    },
+    "pair-d128-llama-4": {
+      "ok": true,
+      "decode_only_ms": 3614.20634,
+      "returncode": 0,
+      "output_policy": null
+    },
+    "pair-d128-quartz-5": {
+      "ok": true,
+      "decode_only_ms": 4286.0874,
+      "returncode": 0,
+      "output_policy": null
+    },
+    "pair-d128-llama-5": {
+      "ok": true,
+      "decode_only_ms": 3615.42306,
+      "returncode": 0,
+      "output_policy": null
+    },
+    "pair-d128-quartz-6": {
+      "ok": true,
+      "decode_only_ms": 4287.81348,
+      "returncode": 0,
+      "output_policy": null
+    },
+    "pair-d128-llama-6": {
+      "ok": true,
+      "decode_only_ms": 3617.73111,
+      "returncode": 0,
+      "output_policy": null
+    },
+    "pair-d128-quartz-7": {
+      "ok": true,
+      "decode_only_ms": 4286.41895,
+      "returncode": 0,
+      "output_policy": null
+    },
+    "pair-d128-llama-7": {
+      "ok": true,
+      "decode_only_ms": 3617.99283,
+      "returncode": 0,
+      "output_policy": null
+    },
+    "pair-d128-quartz-8": {
+      "ok": true,
+      "decode_only_ms": 4289.68604,
+      "returncode": 0,
+      "output_policy": null
+    },
+    "pair-d128-llama-8": {
+      "ok": true,
+      "decode_only_ms": 3619.64384,
+      "returncode": 0,
+      "output_policy": null
+    },
+    "pair-d128-quartz-9": {
+      "ok": true,
+      "decode_only_ms": 4291.59717,
+      "returncode": 0,
+      "output_policy": null
+    },
+    "pair-d128-llama-9": {
+      "ok": true,
+      "decode_only_ms": 3622.51679,
+      "returncode": 0,
+      "output_policy": null
+    },
+    "d128": {
+      "kind": "decode",
+      "metric": "decode_only_ms",
+      "quartz_ms": [
+        4265.53711,
+        4276.20459,
+        4280.0166,
+        4279.63623,
+        4282.51465,
+        4286.0874,
+        4287.81348,
+        4286.41895,
+        4289.68604,
+        4291.59717
+      ],
+      "llama_ms": [
+        3599.76444,
+        3602.86254,
+        3607.18109,
+        3611.59516,
+        3614.20634,
+        3615.42306,
+        3617.73111,
+        3617.99283,
+        3619.64384,
+        3622.51679
+      ],
+      "n_pairs": 10
+    },
+    "warmup-d2048-quartz-0": {
+      "ok": true,
+      "returncode": 0
+    },
+    "warmup-d2048-llama-0": {
+      "ok": true,
+      "returncode": 0
+    },
+    "warmup-d2048-quartz-1": {
+      "ok": true,
+      "returncode": 0
+    },
+    "warmup-d2048-llama-1": {
+      "ok": true,
+      "returncode": 0
+    },
+    "warmup-d2048-quartz-2": {
+      "ok": true,
+      "returncode": 0
+    },
+    "warmup-d2048-llama-2": {
+      "ok": true,
+      "returncode": 0
+    },
+    "pair-d2048-quartz-0": {
+      "ok": true,
+      "decode_only_ms": 5104.60596,
+      "returncode": 0,
+      "output_policy": null
+    },
+    "pair-d2048-llama-0": {
+      "ok": true,
+      "decode_only_ms": 3657.49805,
+      "returncode": 0,
+      "output_policy": null
+    },
+    "pair-d2048-quartz-1": {
+      "ok": true,
+      "decode_only_ms": 5102.98242,
+      "returncode": 0,
+      "output_policy": null
+    },
+    "pair-d2048-llama-1": {
+      "ok": true,
+      "decode_only_ms": 3660.60288,
+      "returncode": 0,
+      "output_policy": null
+    },
+    "pair-d2048-quartz-2": {
+      "ok": true,
+      "decode_only_ms": 5103.02637,
+      "returncode": 0,
+      "output_policy": null
+    },
+    "pair-d2048-llama-2": {
+      "ok": true,
+      "decode_only_ms": 3655.04034,
+      "returncode": 0,
+      "output_policy": null
+    },
+    "pair-d2048-quartz-3": {
+      "ok": true,
+      "decode_only_ms": 5104.55713,
+      "returncode": 0,
+      "output_policy": null
+    },
+    "pair-d2048-llama-3": {
+      "ok": true,
+      "decode_only_ms": 3663.28244,
+      "returncode": 0,
+      "output_policy": null
+    },
+    "pair-d2048-quartz-4": {
+      "ok": true,
+      "decode_only_ms": 5105.43457,
+      "returncode": 0,
+      "output_policy": null
+    },
+    "pair-d2048-llama-4": {
+      "ok": true,
+      "decode_only_ms": 3661.10795,
+      "returncode": 0,
+      "output_policy": null
+    },
+    "pair-d2048-quartz-5": {
+      "ok": true,
+      "decode_only_ms": 5103.12256,
+      "returncode": 0,
+      "output_policy": null
+    },
+    "pair-d2048-llama-5": {
+      "ok": true,
+      "decode_only_ms": 3657.71248,
+      "returncode": 0,
+      "output_policy": null
+    },
+    "pair-d2048-quartz-6": {
+      "ok": true,
+      "decode_only_ms": 5103.75146,
+      "returncode": 0,
+      "output_policy": null
+    },
+    "pair-d2048-llama-6": {
+      "ok": true,
+      "decode_only_ms": 3661.44398,
+      "returncode": 0,
+      "output_policy": null
+    },
+    "pair-d2048-quartz-7": {
+      "ok": true,
+      "decode_only_ms": 5105.32373,
+      "returncode": 0,
+      "output_policy": null
+    },
+    "pair-d2048-llama-7": {
+      "ok": true,
+      "decode_only_ms": 3660.18001,
+      "returncode": 0,
+      "output_policy": null
+    },
+    "pair-d2048-quartz-8": {
+      "ok": true,
+      "decode_only_ms": 5104.67627,
+      "returncode": 0,
+      "output_policy": null
+    },
+    "pair-d2048-llama-8": {
+      "ok": true,
+      "decode_only_ms": 3657.68014,
+      "returncode": 0,
+      "output_policy": null
+    },
+    "pair-d2048-quartz-9": {
+      "ok": true,
+      "decode_only_ms": 5103.03125,
+      "returncode": 0,
+      "output_policy": null
+    },
+    "pair-d2048-llama-9": {
+      "ok": true,
+      "decode_only_ms": 3659.37066,
+      "returncode": 0,
+      "output_policy": null
+    },
+    "d2048": {
+      "kind": "decode",
+      "metric": "decode_only_ms",
+      "quartz_ms": [
+        5104.60596,
+        5102.98242,
+        5103.02637,
+        5104.55713,
+        5105.43457,
+        5103.12256,
+        5103.75146,
+        5105.32373,
+        5104.67627,
+        5103.03125
+      ],
+      "llama_ms": [
+        3657.49805,
+        3660.60288,
+        3655.04034,
+        3663.28244,
+        3661.10795,
+        3657.71248,
+        3661.44398,
+        3660.18001,
+        3657.68014,
+        3659.37066
+      ],
+      "n_pairs": 10
+    },
+    "warmup-p4096-quartz-0": {
+      "ok": true,
+      "returncode": 0
+    },
+    "warmup-p4096-llama-0": {
+      "ok": true,
+      "returncode": 0
+    },
+    "warmup-p4096-quartz-1": {
+      "ok": true,
+      "returncode": 0
+    },
+    "warmup-p4096-llama-1": {
+      "ok": true,
+      "returncode": 0
+    },
+    "warmup-p4096-quartz-2": {
+      "ok": true,
+      "returncode": 0
+    },
+    "warmup-p4096-llama-2": {
+      "ok": true,
+      "returncode": 0
+    },
+    "pair-p4096-quartz-0": {
+      "ok": true,
+      "prefill_ms": 1358.2644,
+      "returncode": 0,
+      "output_policy": {
+        "ok": true,
+        "final_token_logits_only": true,
+        "logits_rows": 1,
+        "full_vocabulary_logits_every_row": false,
+        "reason": null
+      }
+    },
+    "pair-p4096-llama-0": {
+      "ok": true,
+      "prefill_ms": 1264.23674,
+      "returncode": 0,
+      "output_policy": {
+        "ok": true,
+        "final_token_logits_only": true,
+        "logits_rows": 1,
+        "full_vocabulary_logits_every_row": false,
+        "reason": null
+      }
+    },
+    "pair-p4096-quartz-1": {
+      "ok": true,
+      "prefill_ms": 1355.16614,
+      "returncode": 0,
+      "output_policy": {
+        "ok": true,
+        "final_token_logits_only": true,
+        "logits_rows": 1,
+        "full_vocabulary_logits_every_row": false,
+        "reason": null
+      }
+    },
+    "pair-p4096-llama-1": {
+      "ok": true,
+      "prefill_ms": 1260.95795,
+      "returncode": 0,
+      "output_policy": {
+        "ok": true,
+        "final_token_logits_only": true,
+        "logits_rows": 1,
+        "full_vocabulary_logits_every_row": false,
+        "reason": null
+      }
+    },
+    "pair-p4096-quartz-2": {
+      "ok": true,
+      "prefill_ms": 1353.62292,
+      "returncode": 0,
+      "output_policy": {
+        "ok": true,
+        "final_token_logits_only": true,
+        "logits_rows": 1,
+        "full_vocabulary_logits_every_row": false,
+        "reason": null
+      }
+    },
+    "pair-p4096-llama-2": {
+      "ok": true,
+      "prefill_ms": 1258.43957,
+      "returncode": 0,
+      "output_policy": {
+        "ok": true,
+        "final_token_logits_only": true,
+        "logits_rows": 1,
+        "full_vocabulary_logits_every_row": false,
+        "reason": null
+      }
+    },
+    "pair-p4096-quartz-3": {
+      "ok": true,
+      "prefill_ms": 1352.57227,
+      "returncode": 0,
+      "output_policy": {
+        "ok": true,
+        "final_token_logits_only": true,
+        "logits_rows": 1,
+        "full_vocabulary_logits_every_row": false,
+        "reason": null
+      }
+    },
+    "pair-p4096-llama-3": {
+      "ok": true,
+      "prefill_ms": 1261.70679,
+      "returncode": 0,
+      "output_policy": {
+        "ok": true,
+        "final_token_logits_only": true,
+        "logits_rows": 1,
+        "full_vocabulary_logits_every_row": false,
+        "reason": null
+      }
+    },
+    "pair-p4096-quartz-4": {
+      "ok": true,
+      "prefill_ms": 1350.88916,
+      "returncode": 0,
+      "output_policy": {
+        "ok": true,
+        "final_token_logits_only": true,
+        "logits_rows": 1,
+        "full_vocabulary_logits_every_row": false,
+        "reason": null
+      }
+    },
+    "pair-p4096-llama-4": {
+      "ok": true,
+      "prefill_ms": 1257.09896,
+      "returncode": 0,
+      "output_policy": {
+        "ok": true,
+        "final_token_logits_only": true,
+        "logits_rows": 1,
+        "full_vocabulary_logits_every_row": false,
+        "reason": null
+      }
+    },
+    "pair-p4096-quartz-5": {
+      "ok": true,
+      "prefill_ms": 1347.47815,
+      "returncode": 0,
+      "output_policy": {
+        "ok": true,
+        "final_token_logits_only": true,
+        "logits_rows": 1,
+        "full_vocabulary_logits_every_row": false,
+        "reason": null
+      }
+    },
+    "pair-p4096-llama-5": {
+      "ok": true,
+      "prefill_ms": 1252.15084,
+      "returncode": 0,
+      "output_policy": {
+        "ok": true,
+        "final_token_logits_only": true,
+        "logits_rows": 1,
+        "full_vocabulary_logits_every_row": false,
+        "reason": null
+      }
+    },
+    "pair-p4096-quartz-6": {
+      "ok": true,
+      "prefill_ms": 1345.70544,
+      "returncode": 0,
+      "output_policy": {
+        "ok": true,
+        "final_token_logits_only": true,
+        "logits_rows": 1,
+        "full_vocabulary_logits_every_row": false,
+        "reason": null
+      }
+    },
+    "pair-p4096-llama-6": {
+      "ok": true,
+      "prefill_ms": 1251.6555,
+      "returncode": 0,
+      "output_policy": {
+        "ok": true,
+        "final_token_logits_only": true,
+        "logits_rows": 1,
+        "full_vocabulary_logits_every_row": false,
+        "reason": null
+      }
+    },
+    "pair-p4096-quartz-7": {
+      "ok": true,
+      "prefill_ms": 1344.84058,
+      "returncode": 0,
+      "output_policy": {
+        "ok": true,
+        "final_token_logits_only": true,
+        "logits_rows": 1,
+        "full_vocabulary_logits_every_row": false,
+        "reason": null
+      }
+    },
+    "pair-p4096-llama-7": {
+      "ok": true,
+      "prefill_ms": 1250.40474,
+      "returncode": 0,
+      "output_policy": {
+        "ok": true,
+        "final_token_logits_only": true,
+        "logits_rows": 1,
+        "full_vocabulary_logits_every_row": false,
+        "reason": null
+      }
+    },
+    "pair-p4096-quartz-8": {
+      "ok": true,
+      "prefill_ms": 1344.55457,
+      "returncode": 0,
+      "output_policy": {
+        "ok": true,
+        "final_token_logits_only": true,
+        "logits_rows": 1,
+        "full_vocabulary_logits_every_row": false,
+        "reason": null
+      }
+    },
+    "pair-p4096-llama-8": {
+      "ok": true,
+      "prefill_ms": 1250.00274,
+      "returncode": 0,
+      "output_policy": {
+        "ok": true,
+        "final_token_logits_only": true,
+        "logits_rows": 1,
+        "full_vocabulary_logits_every_row": false,
+        "reason": null
+      }
+    },
+    "pair-p4096-quartz-9": {
+      "ok": true,
+      "prefill_ms": 1345.65393,
+      "returncode": 0,
+      "output_policy": {
+        "ok": true,
+        "final_token_logits_only": true,
+        "logits_rows": 1,
+        "full_vocabulary_logits_every_row": false,
+        "reason": null
+      }
+    },
+    "pair-p4096-llama-9": {
+      "ok": true,
+      "prefill_ms": 1252.07218,
+      "returncode": 0,
+      "output_policy": {
+        "ok": true,
+        "final_token_logits_only": true,
+        "logits_rows": 1,
+        "full_vocabulary_logits_every_row": false,
+        "reason": null
+      }
+    },
+    "p4096": {
+      "kind": "prefill",
+      "metric": "prefill_ms",
+      "quartz_ms": [
+        1358.2644,
+        1355.16614,
+        1353.62292,
+        1352.57227,
+        1350.88916,
+        1347.47815,
+        1345.70544,
+        1344.84058,
+        1344.55457,
+        1345.65393
+      ],
+      "llama_ms": [
+        1264.23674,
+        1260.95795,
+        1258.43957,
+        1261.70679,
+        1257.09896,
+        1252.15084,
+        1251.6555,
+        1250.40474,
+        1250.00274,
+        1252.07218
+      ],
+      "n_pairs": 10
+    }
+  },
+  "hashes": {
+    "quartz_native": "57cb9315e9062d73c27136745af1d4d4d708fc028fd27b745bad23d0104de314",
+    "llama_profile": "4a02206a38b8c01a7f9b313ef2bd5ff42844790dfc3772aba43dca5c6ea9f794",
+    "replay": "006f6053049ec98cc75ab7a08a1fe07cabfe66e3e06e4741fd949dee4122ea57"
+  },
+  "claims_throughput": false,
+  "family_plan": "task=OPT-138 mode=acceptance phase=baseline loop_product=78 cases=3 candidates=2 warmups=3 samples=10 tokens=1",
+  "measured_at": "2026-09-14T18:51:39Z"
+}

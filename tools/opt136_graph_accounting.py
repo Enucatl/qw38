@@ -323,6 +323,7 @@ def nsys_profile_command(
     binary_args: Sequence[str],
     *,
     graph_trace: str,
+    nvtx_capture: str = "opt136.window",
 ) -> list[str]:
     stem = str(output)
     command = [
@@ -346,7 +347,7 @@ def nsys_profile_command(
             [
                 "--kill=none",
                 "--capture-range=nvtx",
-                "--nvtx-capture=opt136.window",
+                f"--nvtx-capture={nvtx_capture}",
                 "--capture-range-end=stop",
             ]
         )
@@ -388,21 +389,27 @@ def nsys_export_sqlite(
     )
 
 
-def capture_trace_files(stem: Path) -> list[tuple[str, Path]]:
+def capture_trace_files(
+    stem: Path, *, windows: Sequence[str] | None = None
+) -> list[tuple[str, Path]]:
     found: list[tuple[str, Path]] = []
+    names = tuple(windows) if windows is not None else WINDOWS
     direct = Path(str(stem) + ".nsys-rep")
     if direct.is_file() and direct.stat().st_size > 0:
-        found.append(("all", direct))
-    for index, name in enumerate(WINDOWS, start=1):
+        label = names[0] if len(names) == 1 else "all"
+        found.append((label, direct))
+    for index, name in enumerate(names, start=1):
         path = Path(f"{stem}.{index}.nsys-rep")
         if path.is_file() and path.stat().st_size > 0:
             found.append((name, path))
     return found
 
 
-def export_capture_traces(stem: Path) -> dict[str, str]:
+def export_capture_traces(
+    stem: Path, *, windows: Sequence[str] | None = None
+) -> dict[str, str]:
     exported: dict[str, str] = {}
-    for window, trace in capture_trace_files(stem):
+    for window, trace in capture_trace_files(stem, windows=windows):
         sqlite_path = trace.with_name(trace.name.replace(".nsys-rep", ".sqlite"))
         if not sqlite_path.is_file():
             result = nsys_export_sqlite(trace, sqlite_path)
@@ -415,12 +422,15 @@ def export_capture_traces(stem: Path) -> dict[str, str]:
 def authenticate_current_pins() -> dict[str, Any]:
     header = (ROOT / "cuda/execution_graph_path.cuh").read_text(encoding="utf-8")
     q4 = (ROOT / "cuda/q4k_decode_path.cuh").read_text(encoding="utf-8")
+    attention = (ROOT / "cuda/attention_decode_path.cuh").read_text(encoding="utf-8")
     graphs_ok = 'kSelectedExecutionGraphPath[] = "decode_segments8"' in header
     q4_ok = 'kSelectedQ4DecodePath[] = "llama_q4k_mmvq"' in q4
+    mma_ok = "constexpr bool kSelectedOpt137DenseMma = true;" in attention
     return {
         "ok": graphs_ok and q4_ok,
         "execution_graphs": SELECTOR,
         "q4_decode": "llama_q4k_mmvq",
+        "opt137_dense_mma": mma_ok,
         "ffn_only_prerequisite_not_used": True,
         "mismatches": []
         if graphs_ok and q4_ok
@@ -898,6 +908,59 @@ def llama_args(*, workload: str, prefix: int) -> list[str]:
         "--ctx",
         str(CAPACITY),
     ]
+
+
+PREFILL_TOKENS = 4096
+PREFILL_WINDOWS = ("prefill",)
+PREFILL_NVTX = "opt138.prefill"
+RESULT_PREFIX_OPT138 = "QW38_OPT138_REMAINING_GAP_RESULT="
+
+
+def quartz_prefill_args(*, workload: str) -> list[str]:
+    return [
+        f"./{NATIVE}",
+        "--workload",
+        workload,
+        "--prefix",
+        str(PREFILL_TOKENS),
+        "--tokens",
+        str(PREFILL_TOKENS),
+        "--capacity",
+        str(CAPACITY),
+        "--attribution",
+        "off",
+        MODEL,
+    ]
+
+
+def llama_prefill_args(*, workload: str) -> list[str]:
+    return [
+        LLAMA_BIN,
+        MODEL,
+        "--workload",
+        workload,
+        "--prefix",
+        str(PREFILL_TOKENS),
+        "--tokens",
+        str(PREFILL_TOKENS),
+        "--ctx",
+        str(CAPACITY),
+        "--batch",
+        str(PREFILL_TOKENS),
+        "--ubatch",
+        str(PREFILL_TOKENS),
+    ]
+
+
+def parse_prefixed_json(text: str, prefix: str) -> dict[str, Any] | None:
+    for line in (text or "").splitlines():
+        if line.startswith(prefix):
+            try:
+                parsed = json.loads(line[len(prefix) :])
+            except json.JSONDecodeError:
+                return None
+            return parsed if isinstance(parsed, dict) else None
+    return None
 
 
 def run_baseline(run_dir: Path, mode: str) -> dict[str, Any]:

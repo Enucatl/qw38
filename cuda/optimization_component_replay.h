@@ -17,6 +17,11 @@
 namespace qw38::cuda {
 
 constexpr char kOpt061Task[] = "OPT-061";
+constexpr char kOpt138Task[] = "OPT-138";
+constexpr char kOpt138ReplayProtocol[] = "opt138";
+constexpr int kOpt138ReplayWarmups = 1;
+constexpr int kOpt138ReplaySamples = 3;
+constexpr char kOpt138ResultPrefix[] = "QW38_OPT138_REPLAY_RESULT=";
 constexpr char kOpt061ResultPrefix[] = "QW38_OPT061_COMPONENT_REPLAY_RESULT=";
 constexpr char kOpt061EvidenceDir[] =
     "evidence/optimization/opt061-component-replay";

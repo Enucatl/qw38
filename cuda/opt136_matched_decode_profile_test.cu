@@ -32,12 +32,14 @@
 namespace {
 
 constexpr char kPrefix[] = "QW38_OPT136_GRAPH_ACCOUNTING_RESULT=";
+constexpr char kOpt138Prefix[] = "QW38_OPT138_REMAINING_GAP_RESULT=";
 constexpr char kCounts[] = "QW38_OPT136_NATIVE_COUNTS=";
 constexpr std::size_t kDefaultCapacity = 131072;
 constexpr std::size_t kRecordCap = 16384;
 constexpr std::size_t kDefaultDecodeTokens = 256;
 constexpr std::size_t kWindowTokens = 12;
 constexpr std::size_t kWindowStarts[] = {0, 122, 244};
+constexpr std::size_t kPrefillTokens = 4096;
 
 struct Options final {
   const char* workload = "identity";
@@ -78,7 +80,8 @@ int fail_status(const qw38::Status& status) {
 int usage(const char* argv0) {
   std::fprintf(
       stderr,
-      "usage: %s [--workload identity|unprofiled|graph-capture|node-capture] "
+      "usage: %s [--workload identity|unprofiled|graph-capture|node-capture|"
+      "prefill-unprofiled|prefill-graph-capture|prefill-node-capture] "
       "[--attribution on|off] [--prefix N] [--tokens N] [--capacity N] "
       "MODEL independently_restored=true same_binary=true\n",
       argv0);
@@ -93,7 +96,12 @@ bool parse_size(const char* text, std::size_t* value) {
   return true;
 }
 
-bool legal_prefix(std::size_t prefix) {
+bool prefill_workload(const char* workload) {
+  return std::strncmp(workload, "prefill", 7) == 0;
+}
+
+bool legal_prefix(std::size_t prefix, const char* workload) {
+  if (prefill_workload(workload)) return prefix == kPrefillTokens;
   return prefix == 128 || prefix == 2048 || prefix == 8192 || prefix == 32768;
 }
 
@@ -118,8 +126,13 @@ int parse_args(int argc, char** argv, Options* options) {
     }
   }
   if (model_index < 0) return usage(argv[0]);
-  if (!legal_prefix(options->prefix == 0 ? 128 : options->prefix)) {
-    std::fprintf(stderr, "invalid --prefix %zu\n", options->prefix);
+  if (prefill_workload(options->workload) && options->prefix == 128) {
+    options->prefix = kPrefillTokens;
+  }
+  if (!legal_prefix(options->prefix == 0 ? 128 : options->prefix,
+                    options->workload)) {
+    std::fprintf(stderr, "invalid --prefix %zu for workload %s\n",
+                 options->prefix, options->workload);
     return 2;
   }
   return model_index;
@@ -292,6 +305,7 @@ int run_identity(const qw38::cuda::ResidentModel& model,
   const bool fusion = qw38::cuda::kSelectedMixerNormQ8Fusion &&
                       qw38::cuda::kSelectedFfnNormQ8Fusion &&
                       qw38::cuda::kSelectedLazyOutputMaterialization;
+  const bool mma = qw38::cuda::kSelectedOpt137DenseMma;
   std::string message;
   json_escape(status.message(), &message);
   const bool ok =
@@ -300,7 +314,8 @@ int run_identity(const qw38::cuda::ResidentModel& model,
       qw38::cuda::opt110::engine_hooks_ready() &&
       graphs.decode_segment_graph_count() ==
           qw38::cuda::kDecodeSegmentCount *
-              static_cast<std::size_t>(qw38::cuda::kDecodeGraphTopologyCount);
+              static_cast<std::size_t>(
+                  qw38::cuda::effective_decode_graph_topology_count());
   std::printf(
       "%s{\"schema_version\":1,\"task\":\"OPT-136\",\"workload\":\"identity\","
       "\"ok\":%s,\"parent\":\"post124_plus_opt127_decode_segments8\","
@@ -308,6 +323,7 @@ int run_identity(const qw38::cuda::ResidentModel& model,
       "\"q4_decode\":\"%s\",\"packed_kv\":\"%s\",\"weight_requant\":\"%s\","
       "\"gdn_state\":\"%s\",\"decode_attention\":\"hybrid_crossover\","
       "\"crossover\":%d,\"n_parts\":%d,\"verified_max\":%d,"
+      "\"opt137_dense_mma\":%s,\"opt138_diagnostic_markers\":%s,"
       "\"capacity\":%zu,\"decode_segment_graphs\":%zu,"
       "\"lazy\":%s,\"fusion\":%s,\"decode_d2h_bytes\":%llu,"
       "\"opt110_hooks_ready\":%s,\"opt136_diagnostic_markers\":%s,"
@@ -319,7 +335,8 @@ int run_identity(const qw38::cuda::ResidentModel& model,
       qw38::cuda::gdn_state_format_ident(qw38::cuda::kSelectedGdnStateFormat),
       qw38::cuda::kSelectedDecodeAttentionCrossoverThreshold,
       qw38::cuda::kSelectedVec128NParts,
-      qw38::cuda::kSelectedDecodeAttentionVerifiedMax, capacity,
+      qw38::cuda::kSelectedDecodeAttentionVerifiedMax, json_bool(mma),
+      json_bool(qw38::cuda::kOpt138DiagnosticIdentityMarkers), capacity,
       graphs.decode_segment_graph_count(), json_bool(lazy_ok),
       json_bool(fusion), static_cast<unsigned long long>(decode_d2h),
       json_bool(qw38::cuda::opt110::engine_hooks_ready()),
@@ -452,6 +469,73 @@ int run_trajectory(const qw38::cuda::ResidentModel& model,
   return families.pool_overflow ? 1 : 0;
 }
 
+int run_prefill(const qw38::cuda::ResidentModel& model, const Options& options,
+                bool nsys_capture) {
+  const std::size_t prompt =
+      options.prefix == 0 ? kPrefillTokens : options.prefix;
+  const std::size_t capacity =
+      options.capacity == 0 ? kDefaultCapacity : options.capacity;
+  qw38::cuda::PromptMicrobatchRowsScope micro(kPrefillTokens);
+  std::vector<std::size_t> tokens(prompt);
+  fill_tokens(&tokens);
+  qw38::cuda::SchedulerSession session;
+  qw38::cuda::SchedulerWorkspace workspace;
+  qw38::cuda::SchedulerGraphs graphs;
+  qw38::Status status = session.create(capacity);
+  if (status.is_ok()) status = workspace.create(capacity);
+  if (status.is_ok()) {
+    status = create_graphs(model, &session, &workspace, &graphs);
+  }
+  std::vector<float> logits(qw38::internal::kVocabularySize);
+  std::array<float, qw38::internal::kResidualWidth> hidden{};
+  if (!status.is_ok()) return fail_status(status);
+  const std::size_t microbatch = qw38::cuda::selected_prompt_microbatch_rows();
+  const std::size_t chunk_count =
+      microbatch == 0 ? 1 : (prompt + microbatch - 1) / microbatch;
+  cudaDeviceSynchronize();
+  if (nsys_capture) {
+    nvtxRangePushA(qw38::cuda::kOpt138PrefillNvtx);
+    cudaProfilerStart();
+  }
+  const auto started = std::chrono::steady_clock::now();
+  qw38::cuda::SyncResult sync{};
+  status = qw38::cuda::sync_tokens(
+      model, tokens.data(), prompt, &session, &workspace, logits.data(),
+      qw38::internal::kVocabularySize, hidden.data(),
+      qw38::internal::kResidualWidth, &sync, nullptr, &graphs);
+  cudaDeviceSynchronize();
+  const float prefill_ms = wall_ms(started);
+  if (nsys_capture) {
+    cudaProfilerStop();
+    nvtxRangePop();
+  }
+  if (!status.is_ok()) return fail_status(status);
+  std::string message;
+  json_escape(status.message(), &message);
+  char result[4096];
+  std::snprintf(
+      result, sizeof(result),
+      "{\"schema_version\":1,\"task\":\"OPT-138\",\"workload\":\"%s\","
+      "\"ok\":true,\"engine\":\"quartz\",\"prefix\":%zu,\"eval_count\":0,"
+      "\"emitted_token_count\":0,\"capacity\":%zu,\"nsys_capture\":%s,"
+      "\"prefill_ms\":%.9g,\"decode_only_ms\":0,\"complete_request_ms\":%.9g,"
+      "\"logical_batch\":%zu,\"physical_microbatch\":%zu,\"chunk_count\":%zu,"
+      "\"evaluated_tokens\":%zu,\"reused_tokens\":%zu,"
+      "\"logits_rows\":1,\"final_token_logits_only\":true,"
+      "\"full_vocabulary_logits_every_row\":false,"
+      "\"opt137_dense_mma\":%s,\"message\":\"%s\",\"keep\":false,"
+      "\"claims_throughput\":false}\n",
+      options.workload, prompt, capacity, json_bool(nsys_capture),
+      static_cast<double>(prefill_ms), static_cast<double>(prefill_ms), prompt,
+      microbatch, chunk_count, sync.evaluated_tokens, sync.reused_tokens,
+      json_bool(qw38::cuda::kSelectedOpt137DenseMma), message.c_str());
+  std::printf("%s%s", kPrefix, result);
+  std::printf("%s%s", kOpt138Prefix, result);
+  write_gate_text("result.txt", result);
+  print_counts(0, 1, 1, false);
+  return 0;
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -472,6 +556,13 @@ int main(int argc, char** argv) {
   if (std::strcmp(options.workload, "graph-capture") == 0 ||
       std::strcmp(options.workload, "node-capture") == 0) {
     return run_trajectory(model, options, true);
+  }
+  if (std::strcmp(options.workload, "prefill-unprofiled") == 0) {
+    return run_prefill(model, options, false);
+  }
+  if (std::strcmp(options.workload, "prefill-graph-capture") == 0 ||
+      std::strcmp(options.workload, "prefill-node-capture") == 0) {
+    return run_prefill(model, options, true);
   }
   return usage(argv[0]);
 }

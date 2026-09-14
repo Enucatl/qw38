@@ -336,7 +336,7 @@ OPT-124 assesses the remaining ceiling without claiming universal optimality.
 | OPT-135 | Separate target improvement from guard non-regression | OPT-134 | done | `target_guard_v2` host policy; `evaluate()` + CLI; 23/23 self-check; neutral-guard keep, guard-loss reject, straddling CI inconclusive; OPT-130 counterfactual preserves `reject`; opt-in runner schema only; no CUDA, production pin, or historical fixture change | [`tasks/OPT-135.md`](tasks/OPT-135.md); [`pins/performance_keep_policy_v2.json`](pins/performance_keep_policy_v2.json); [`tools/performance_keep_policy.py`](tools/performance_keep_policy.py); [`fixtures/opt135_target_guard_policy.json`](fixtures/opt135_target_guard_policy.json); [`tests/test_performance_keep_policy.py`](tests/test_performance_keep_policy.py); [`evidence/optimization/opt135-target-guard-policy/REPORT.md`](evidence/optimization/opt135-target-guard-policy/REPORT.md); verification 2026-09-14T14:00:00Z |
 | OPT-136 | Repair graph accounting and profile matched production decode | OPT-133, OPT-134, OPT-135 | done | Graph accounting repair invalidates OPT-133 idle; shared `performance_evidence.py` parser and capture harness; 150/150 coverage valid; matched decode ratios D128 0.844, D2048 0.717, D8192 0.519, D32768 0.244; diagnostics only, no production change | [`tasks/OPT-136.md`](tasks/OPT-136.md); [`tools/performance_evidence.py`](tools/performance_evidence.py); [`tools/opt136_graph_accounting.py`](tools/opt136_graph_accounting.py); [`fixtures/opt136_graph_accounting.json`](fixtures/opt136_graph_accounting.json); [`evidence/optimization/opt136-graph-accounting/REPORT.md`](evidence/optimization/opt136-graph-accounting/REPORT.md); verification 2026-09-14T15:53:00Z |
 | OPT-137 | Implement a bounded long-context dense attention consumer | OPT-135, OPT-136 | done | `keep`; `dense_bf16_tile_f16_mma_decode_v1`; `kSelectedOpt137DenseMma=true` for position≥8192; parent `hybrid_crossover@1024` below 8192; D8192 +13.46 tok/s (1.38×), D32768 +18.58 tok/s (2.21×) vs OPT-132 sitting; D128/D2048 guard geo L≈0.999; OPT-058 PPL 1.0; `topology_recapture=0`; no OPT-130 leak | [`tasks/OPT-137.md`](tasks/OPT-137.md); [`pins/opt137_long_attention_contract.json`](pins/opt137_long_attention_contract.json); [`pins/opt137_iteration_contract.json`](pins/opt137_iteration_contract.json); [`pins/opt137_long_attention_provenance.json`](pins/opt137_long_attention_provenance.json); [`fixtures/opt137_long_attention.json`](fixtures/opt137_long_attention.json); [`tools/opt137_long_attention.py`](tools/opt137_long_attention.py); [`tests/test_opt137_long_attention.py`](tests/test_opt137_long_attention.py); [`cuda/opt137_long_attention_test.cu`](cuda/opt137_long_attention_test.cu); [`cuda/opt137_dense_mma_decode.cuh`](cuda/opt137_dense_mma_decode.cuh); [`cuda/attention_decode.cu`](cuda/attention_decode.cu); [`cuda/attention_decode_path.cuh`](cuda/attention_decode_path.cuh); [`cuda/full_scheduler.cu`](cuda/full_scheduler.cu); [`cuda/opt058_quality_baseline_test.cu`](cuda/opt058_quality_baseline_test.cu); [`Makefile`](Makefile); [`tools/run_optimization_task.py`](tools/run_optimization_task.py); [`evidence/optimization/opt137-long-attention/REPORT.md`](evidence/optimization/opt137-long-attention/REPORT.md); verification 2026-09-14T17:54:00Z |
-| OPT-138 | Profile remaining short-decode and prefill excess versus llama | OPT-136, OPT-137 | pending | Current matched D128/D2048/P4096 profiles reconcile whole time, fused families and overhead; targeted counters/replays yield supported decode/prefill priorities or explicit unknowns without changing production | [`tasks/OPT-138.md`](tasks/OPT-138.md) |
+| OPT-138 | Profile remaining short-decode and prefill excess versus llama | OPT-136, OPT-137 | done | Diagnostics only on OPT-137 keep stack; matched D128/D2048/P4096 profiles; Q/L ratios D128 0.844, D2048 0.717, P4096 0.935; top decode families `attn_core` + `residual_norm_quant`; prefill `attn_core` + `prompt_mmq`; whole-wall ranking incomplete (>5% residual); ncu `ERR_NVGPUCTRPERM` (mechanism unknown); no production change | [`tasks/OPT-138.md`](tasks/OPT-138.md); [`tools/opt138_remaining_gap_profile.py`](tools/opt138_remaining_gap_profile.py); [`pins/opt138_remaining_gap_contract.json`](pins/opt138_remaining_gap_contract.json); [`pins/opt138_iteration_contract.json`](pins/opt138_iteration_contract.json); [`fixtures/opt138_remaining_gap_profile.json`](fixtures/opt138_remaining_gap_profile.json); [`tests/test_opt138_remaining_gap_profile.py`](tests/test_opt138_remaining_gap_profile.py); [`evidence/optimization/opt138-remaining-gap/REPORT.md`](evidence/optimization/opt138-remaining-gap/REPORT.md); verification 2026-09-14T18:51:00Z |
 
 ### Post-133 evidence repair and focused performance work (OPT-134–138)
 
@@ -8342,3 +8342,29 @@ statements below are historical, not the current execution order.
   [`evidence/optimization/opt137-long-attention/REPORT.md`](evidence/optimization/opt137-long-attention/REPORT.md).
 - OPT-137 marked `done`. Coupled IDs: none. Next eligible pending task:
   **OPT-138**.
+
+### OPT-138 delivery (2026-09-14T18:52:02Z)
+
+- Implemented `opt138_remaining_gap_profile.py` phased diagnostics harness on the
+  OPT-137 keep stack (`decode_segments8`, `kSelectedOpt137DenseMma=true`), extending
+  OPT-136 graph accounting with P4096 prefill capture, family excess ranking,
+  bounded ncu counter attempts and rotating real-input replay. 54 captures, 42/42
+  coverage windows valid; production kernels, selectors and arithmetic unchanged.
+- Verification **PASS** (2026-09-14T18:51:00Z): ruff format/check clean;
+  **36 passed**; independent family-excess reproduction from `coverage.json`
+  `union_ns` matches `family-gaps.json`; `next-experiments.json` decode/prefill
+  entries present; `git diff --check` pass.
+- Throughput delta: **N/A** (diagnostics only; not a keep).
+- Fresh identity-matched Quartz/llama ratios (capacity 131072): D128 **0.844**
+  (59.72 vs 70.77 tok/s); D2048 **0.717** (50.16 vs 69.96 tok/s); P4096
+  **0.935** (3035 vs 3245 tok/s). Evidenced family excess: decode
+  `attn_core` + `residual_norm_quant`; prefill `attn_core` + `prompt_mmq`.
+  Whole-wall reconstruction residual >5% (decode ~23%, prefill ~5.9%) →
+  whole-wall ranking **incomplete**; ncu `ERR_NVGPUCTRPERM` → causal mechanism
+  **unknown**.
+- Key evidence: [`tasks/OPT-138.md`](tasks/OPT-138.md);
+  [`tools/opt138_remaining_gap_profile.py`](tools/opt138_remaining_gap_profile.py);
+  [`fixtures/opt138_remaining_gap_profile.json`](fixtures/opt138_remaining_gap_profile.json);
+  [`evidence/optimization/opt138-remaining-gap/REPORT.md`](evidence/optimization/opt138-remaining-gap/REPORT.md).
+- OPT-138 marked `done`. Coupled IDs: none. **OPT-134–138 batch complete.**
+  Next eligible pending task: **EVAL-002**.

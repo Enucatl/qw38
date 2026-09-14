@@ -1,0 +1,92 @@
+{
+  "decode": {
+    "phase": "decode",
+    "selected_family": "attn_core",
+    "measured_excess_ms": 47.51016466666667,
+    "uncertainty": {
+      "one_sided_low": 47.38279750168242,
+      "df": 2,
+      "n": 3
+    },
+    "quartz_source_function": "cuda/attention_decode.cu",
+    "llama_source_function": "ggml-cuda fattn",
+    "supported_mechanism": null,
+    "affected_files": [
+      "cuda/attention_decode.cu"
+    ],
+    "candidate": null,
+    "target_workloads": [
+      "D128",
+      "D2048"
+    ],
+    "guards_under_opt135": {
+      "policy": "target_guard_v2",
+      "decode_guards": [
+        "D128",
+        "D2048",
+        "P4096"
+      ]
+    },
+    "expected_benefit": {
+      "kind": "labeled_estimate",
+      "value": null,
+      "label": "unknown_until_mechanism"
+    },
+    "disconfirming_experiment": "repeat node-level family accounting after any candidate; a non-positive lower bound rejects the family as the priority",
+    "quality_state_gates": "N/A diagnostics; any later keep requires OPT-058 NLL",
+    "resolving_measurement": "targeted Nsight Compute metrics on the enclosing fused kernel plus rotating real-input replay; occupancy-only is insufficient",
+    "replay": {
+      "ok": true,
+      "reason": null
+    },
+    "evidence_links": [
+      "evidence/optimization/opt138-remaining-gap/family-gaps.json",
+      "evidence/optimization/opt138-remaining-gap/counter-evidence.json",
+      "evidence/optimization/opt138-remaining-gap/coverage.json"
+    ]
+  },
+  "prefill": {
+    "phase": "prefill",
+    "selected_family": "attn_core",
+    "measured_excess_ms": 186.58288100000001,
+    "uncertainty": {
+      "one_sided_low": 186.10589919623453,
+      "df": 2,
+      "n": 3
+    },
+    "quartz_source_function": "cuda/attention_decode.cu",
+    "llama_source_function": "ggml-cuda fattn",
+    "supported_mechanism": null,
+    "affected_files": [
+      "cuda/attention_decode.cu"
+    ],
+    "candidate": null,
+    "target_workloads": [
+      "P4096"
+    ],
+    "guards_under_opt135": {
+      "policy": "target_guard_v2",
+      "decode_guards": [
+        "D128",
+        "D2048"
+      ]
+    },
+    "expected_benefit": {
+      "kind": "labeled_estimate",
+      "value": null,
+      "label": "unknown_until_mechanism"
+    },
+    "disconfirming_experiment": "repeat node-level family accounting after any candidate; a non-positive lower bound rejects the family as the priority",
+    "quality_state_gates": "N/A diagnostics; any later keep requires OPT-058 NLL",
+    "resolving_measurement": "targeted Nsight Compute metrics on the enclosing fused kernel plus rotating real-input replay; occupancy-only is insufficient",
+    "replay": {
+      "ok": false,
+      "reason": "replay/production boundary mismatch"
+    },
+    "evidence_links": [
+      "evidence/optimization/opt138-remaining-gap/family-gaps.json",
+      "evidence/optimization/opt138-remaining-gap/counter-evidence.json",
+      "evidence/optimization/opt138-remaining-gap/coverage.json"
+    ]
+  }
+}
