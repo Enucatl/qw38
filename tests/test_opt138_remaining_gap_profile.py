@@ -16,6 +16,9 @@ from tools.opt138_remaining_gap_profile import (
     REPORT,
     REQUIRED_FIXTURE_KEYS,
     SELECTOR,
+    _parse_ncu_metric_names,
+    _select_ncu_metrics,
+    counter_timeout_s,
     family_plan,
     validate_fixture,
 )
@@ -159,6 +162,62 @@ def test_stale_parent_identity() -> None:
     assert stale["ok"] is False
     assert stale["reason"] == "stale parent identity"
     assert "stale_opt137_mma_parent" in stale["mismatches"]
+
+
+def test_parse_ncu_metric_names_from_csv_and_table() -> None:
+    csv = (
+        '"Metric name","Metric type"\n'
+        '"dram__bytes","Counter"\n'
+        '"dram__bytes_op_read","Counter"\n'
+    )
+    assert _parse_ncu_metric_names(csv) == [
+        "dram__bytes",
+        "dram__bytes_op_read",
+    ]
+    table = (
+        "Device NVIDIA GeForce RTX 5090 (GB202)\n"
+        "Metric Name                                                                 Metric Type\n"
+        "--------------------------------------------------------------------------- ---------------\n"
+        "dram__bytes                                                                 Counter\n"
+    )
+    assert _parse_ncu_metric_names(table) == ["dram__bytes"]
+
+
+def test_select_ncu_metrics_uses_aliases_not_table_lines() -> None:
+    names = [
+        "dram__bytes",
+        "dram__bytes_op_read",
+        "dram__bytes_op_write",
+        "dram__throughput",
+        "lts__t_sector_hit_rate",
+        "lts__t_sectors",
+        "sm__pipe_tensor_cycles_active",
+        "sm__throughput",
+        "sm__warps_active.avg.pct_of_peak_sustained_active",
+        "smsp__warps_issue_stalled_long_scoreboard",
+        "smsp__warps_issue_stalled_barrier",
+        "launch__registers_per_thread",
+    ]
+    selected = _select_ncu_metrics(names)
+    assert selected == [
+        "dram__bytes_op_read",
+        "dram__bytes_op_write",
+        "dram__bytes",
+        "dram__throughput.avg.pct_of_peak_sustained_elapsed",
+        "lts__t_sectors",
+        "lts__t_sector_hit_rate",
+        "sm__pipe_tensor_cycles_active",
+        "sm__throughput.avg.pct_of_peak_sustained_elapsed",
+        "sm__warps_active.avg.pct_of_peak_sustained_active",
+        "smsp__warps_issue_stalled_long_scoreboard",
+        "smsp__warps_issue_stalled_barrier",
+        "launch__registers_per_thread",
+    ]
+
+
+def test_counter_timeout_is_extended_for_prompt_ffn_replay() -> None:
+    assert counter_timeout_s("decode-attention") == 300
+    assert counter_timeout_s("prompt-ffn") == 1200
 
 
 def test_missing_counters_are_null_never_zero() -> None:

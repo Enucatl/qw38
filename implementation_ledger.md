@@ -337,6 +337,37 @@ OPT-124 assesses the remaining ceiling without claiming universal optimality.
 | OPT-136 | Repair graph accounting and profile matched production decode | OPT-133, OPT-134, OPT-135 | done | Graph accounting repair invalidates OPT-133 idle; shared `performance_evidence.py` parser and capture harness; 150/150 coverage valid; matched decode ratios D128 0.844, D2048 0.717, D8192 0.519, D32768 0.244; diagnostics only, no production change | [`tasks/OPT-136.md`](tasks/OPT-136.md); [`tools/performance_evidence.py`](tools/performance_evidence.py); [`tools/opt136_graph_accounting.py`](tools/opt136_graph_accounting.py); [`fixtures/opt136_graph_accounting.json`](fixtures/opt136_graph_accounting.json); [`evidence/optimization/opt136-graph-accounting/REPORT.md`](evidence/optimization/opt136-graph-accounting/REPORT.md); verification 2026-09-14T15:53:00Z |
 | OPT-137 | Implement a bounded long-context dense attention consumer | OPT-135, OPT-136 | done | `keep`; `dense_bf16_tile_f16_mma_decode_v1`; `kSelectedOpt137DenseMma=true` for position≥8192; parent `hybrid_crossover@1024` below 8192; D8192 +13.46 tok/s (1.38×), D32768 +18.58 tok/s (2.21×) vs OPT-132 sitting; D128/D2048 guard geo L≈0.999; OPT-058 PPL 1.0; `topology_recapture=0`; no OPT-130 leak | [`tasks/OPT-137.md`](tasks/OPT-137.md); [`pins/opt137_long_attention_contract.json`](pins/opt137_long_attention_contract.json); [`pins/opt137_iteration_contract.json`](pins/opt137_iteration_contract.json); [`pins/opt137_long_attention_provenance.json`](pins/opt137_long_attention_provenance.json); [`fixtures/opt137_long_attention.json`](fixtures/opt137_long_attention.json); [`tools/opt137_long_attention.py`](tools/opt137_long_attention.py); [`tests/test_opt137_long_attention.py`](tests/test_opt137_long_attention.py); [`cuda/opt137_long_attention_test.cu`](cuda/opt137_long_attention_test.cu); [`cuda/opt137_dense_mma_decode.cuh`](cuda/opt137_dense_mma_decode.cuh); [`cuda/attention_decode.cu`](cuda/attention_decode.cu); [`cuda/attention_decode_path.cuh`](cuda/attention_decode_path.cuh); [`cuda/full_scheduler.cu`](cuda/full_scheduler.cu); [`cuda/opt058_quality_baseline_test.cu`](cuda/opt058_quality_baseline_test.cu); [`Makefile`](Makefile); [`tools/run_optimization_task.py`](tools/run_optimization_task.py); [`evidence/optimization/opt137-long-attention/REPORT.md`](evidence/optimization/opt137-long-attention/REPORT.md); verification 2026-09-14T17:54:00Z |
 | OPT-138 | Profile remaining short-decode and prefill excess versus llama | OPT-136, OPT-137 | done | Diagnostics only on OPT-137 keep stack; matched D128/D2048/P4096 profiles; Q/L ratios D128 0.844, D2048 0.717, P4096 0.935; top decode families `attn_core` + `residual_norm_quant`; prefill `attn_core` + `prompt_mmq`; whole-wall ranking incomplete (>5% residual); ncu `ERR_NVGPUCTRPERM` (mechanism unknown); no production change | [`tasks/OPT-138.md`](tasks/OPT-138.md); [`tools/opt138_remaining_gap_profile.py`](tools/opt138_remaining_gap_profile.py); [`pins/opt138_remaining_gap_contract.json`](pins/opt138_remaining_gap_contract.json); [`pins/opt138_iteration_contract.json`](pins/opt138_iteration_contract.json); [`fixtures/opt138_remaining_gap_profile.json`](fixtures/opt138_remaining_gap_profile.json); [`tests/test_opt138_remaining_gap_profile.py`](tests/test_opt138_remaining_gap_profile.py); [`evidence/optimization/opt138-remaining-gap/REPORT.md`](evidence/optimization/opt138-remaining-gap/REPORT.md); verification 2026-09-14T18:51:00Z |
+| OPT-139 | Normalize NCU evidence and authenticate production kernel identity | OPT-138 | pending | Structured per-launch counters authenticate phase/workload/production dispatch; missing values and unsupported mechanisms remain explicit | [`tasks/OPT-139.md`](tasks/OPT-139.md) |
+| OPT-140 | Add a production-boundary prefill attention replay | OPT-139 | pending | Real P4096 attention replay matches production inputs, complete family boundary and outputs; decode substitution is rejected | [`tasks/OPT-140.md`](tasks/OPT-140.md) |
+| OPT-141 | Collect matched llama counters for the selected gap families | OPT-139, OPT-140 | pending | All four selected phase/family comparisons have authenticated llama launch mappings and matched counter evidence | [`tasks/OPT-141.md`](tasks/OPT-141.md) |
+| OPT-142 | Reconcile remaining whole-wall profiling residual | OPT-138 | pending | Required decode windows and P4096 reconcile within 5% with explicit overlap, host/idle and unmatched accounting | [`tasks/OPT-142.md`](tasks/OPT-142.md) |
+| OPT-143 | Evaluate one production-matched short-decode attention optimization | OPT-135, OPT-141 | pending | One source-supported short-decode attention candidate yields verified keep or measured no-keep under target_guard_v2 | [`tasks/OPT-143.md`](tasks/OPT-143.md) |
+| OPT-144 | Evaluate one complete-boundary prefill attention optimization | OPT-135, OPT-141, OPT-143 | pending | One production-boundary P4096 attention candidate yields verified keep or measured no-keep with quality and decode guards | [`tasks/OPT-144.md`](tasks/OPT-144.md) |
+| OPT-145 | Evaluate one remaining normalization or prompt-MMQ optimization | OPT-135, OPT-143, OPT-144 | pending | Fresh evidence selects at most one normalization or prompt-MMQ candidate with verified keep or measured no-opportunity/no-keep | [`tasks/OPT-145.md`](tasks/OPT-145.md) |
+| OPT-146 | Measure the combined stack and publish the next remaining-gap decision | OPT-142, OPT-143, OPT-144, OPT-145 | pending | Final stack gains and llama gaps are freshly measured, reconciled and independently verified; next proposals remain evidence-gated | [`tasks/OPT-146.md`](tasks/OPT-146.md) |
+
+### Post-138 counter evidence and optimization batch (OPT-139–146)
+
+Drafted 2026-09-14 from the user's post-run summary and current diagnostic
+source. Documentation only; all eight tasks are pending. The reported NCU
+permission/parser/timeout repairs supersede the historical permission failure
+for the latest run, but do not establish a production-matched mechanism.
+OPT-138's original delivery record below remains historical evidence.
+
+Start with OPT-139, then OPT-140 and OPT-141. OPT-142 is independently eligible
+after OPT-138; complete it before the final batch reconciliation. OPT-143,
+OPT-144 and OPT-145 evaluate one candidate each in sequence on the latest
+accepted parent. OPT-146 measures the combined result. Dependency completion
+never waives a dossier's evidence eligibility requirements. A measured no-keep
+retains the parent and allows subsequent tasks; missing evidence stays blocked.
+
+The starting reported Q/L ratios are D128 0.844, D2048 0.717 and P4096 0.935.
+Attention leads both phase rankings, but decode excess is measured over the
+twelve-eval middle window and prefill over the whole prompt. Raw NCU replay
+totals and low occupancy are hypotheses, not causal or bandwidth proof.
+No candidate design or speedup is promised before matched evidence exists.
+Secondary work selects one remaining normalization/MMQ opportunity after
+attention, following the minimum-change approach rather than a tuning sweep.
 
 ### Post-133 evidence repair and focused performance work (OPT-134–138)
 

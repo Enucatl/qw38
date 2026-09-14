@@ -66,6 +66,11 @@ REPETITIONS = 3
 BASELINE_WARMUPS = 3
 BASELINE_PAIRS = 10
 CHILD_TIMEOUT_S = 300
+# prompt-ffn NCU application replay profiles every layer/kernel in the rotating
+# OPT-138 protocol; 300s expires around replay pass 3 of ~10.
+COUNTER_TIMEOUT_BY_REPLAY: dict[str, int] = {
+    "prompt-ffn": 1200,
+}
 AGGREGATE_DEADLINE_S = 7200
 PARENT = "post124_plus_opt127_decode_segments8_plus_opt137_mma"
 SELECTOR = "decode_segments8"
@@ -115,6 +120,13 @@ NCU_NEEDLES = (
     "launch__local_memory",
     "smsp__sass_lmem_total_bytes",
 )
+NCU_NEEDLE_ALIASES = {
+    "dram__bytes_read": "dram__bytes_op_read",
+    "dram__bytes_write": "dram__bytes_op_write",
+    "sm__pipe_tensor": "sm__pipe_tensor_cycles_active",
+    "dram__throughput": "dram__throughput.avg.pct_of_peak_sustained_elapsed",
+    "sm__throughput": "sm__throughput.avg.pct_of_peak_sustained_elapsed",
+}
 FAMILY_TO_REPLAY = {
     "q4_ffn_fused": "decode-ffn",
     "q4_down": "decode-ffn",
@@ -911,12 +923,60 @@ def _mean(values: Sequence[float]) -> float | None:
     return float(sum(values) / len(values))
 
 
+def _parse_ncu_metric_names(text: str) -> list[str]:
+    names: list[str] = []
+    for line in text.splitlines():
+        line = line.strip()
+        if line.startswith('"') and '","' in line:
+            name = line[1 : line.index('","')]
+            if name.lower() != "metric name":
+                names.append(name)
+            continue
+        if not line or line.startswith("==") or line.startswith("Device "):
+            continue
+        if line.startswith("Metric Name") or set(line) <= {"-", " "}:
+            continue
+        token = line.split(maxsplit=1)[0] if line.split() else ""
+        if "__" in token:
+            names.append(token)
+    return names
+
+
+def _select_ncu_metrics(names: Sequence[str]) -> list[str]:
+    available = set(names)
+    selected: list[str] = []
+    for needle in NCU_NEEDLES:
+        candidate = NCU_NEEDLE_ALIASES.get(needle, needle)
+        if candidate in available:
+            selected.append(candidate)
+            continue
+        if needle in available:
+            if candidate != needle:
+                selected.append(candidate)
+            else:
+                selected.append(needle)
+            continue
+        base = candidate.split(".", 1)[0]
+        if base in available and candidate not in selected:
+            selected.append(candidate)
+    return selected
+
+
+def _docker_ncu(*extra: str) -> list[str]:
+    base = docker_common(IMAGE, "acceptance")
+    return [*base[:-1], "-e", "HOME=/tmp", base[-1], *extra]
+
+
+def counter_timeout_s(replay_family: str) -> int:
+    return COUNTER_TIMEOUT_BY_REPLAY.get(replay_family, CHILD_TIMEOUT_S)
+
+
 def _query_ncu_metrics() -> dict[str, Any]:
     command = [
-        *docker_common(IMAGE, "acceptance"),
+        *_docker_ncu(),
         "bash",
         "-lc",
-        "command -v ncu && ncu --query-metrics",
+        "command -v ncu && ncu --query-metrics --csv",
     ]
     completed = subprocess.run(
         command,
@@ -930,7 +990,7 @@ def _query_ncu_metrics() -> dict[str, Any]:
     text = (completed.stdout or "") + (completed.stderr or "")
     if completed.returncode != 0 or "ncu" not in text:
         host = subprocess.run(
-            ["bash", "-lc", "command -v ncu && ncu --query-metrics"],
+            ["bash", "-lc", "HOME=/tmp command -v ncu && ncu --query-metrics --csv"],
             cwd=ROOT,
             capture_output=True,
             text=True,
@@ -940,8 +1000,8 @@ def _query_ncu_metrics() -> dict[str, Any]:
         )
         text = (host.stdout or "") + (host.stderr or "")
         completed = host
-    names = [line.strip() for line in text.splitlines() if line.strip()]
-    selected = [name for name in names if any(needle in name for needle in NCU_NEEDLES)]
+    names = _parse_ncu_metric_names(text)
+    selected = _select_ncu_metrics(names)
     available = completed.returncode == 0 and bool(selected or "ncu" in text)
     permission = "ERR_NVGPUCTRPERM" in text
     error = None
@@ -1025,7 +1085,7 @@ def run_counters(run_dir: Path, mode: str) -> dict[str, Any]:
                 )
                 continue
             collect = [
-                *docker_common(IMAGE, "acceptance"),
+                *_docker_ncu(),
                 "ncu",
                 "--metrics",
                 metrics,
@@ -1045,9 +1105,15 @@ def run_counters(run_dir: Path, mode: str) -> dict[str, Any]:
                 "--samples",
                 "1",
             ]
-            completed = opt136.with_gpu_lock(collect, timeout_s=CHILD_TIMEOUT_S)
+            timeout_s = counter_timeout_s(replay_family)
+            completed = opt136.with_gpu_lock(collect, timeout_s=timeout_s)
             blob = (completed.stdout or "") + (completed.stderr or "")
-            if completed.returncode != 0 or "ERR_NVGPUCTRPERM" in blob:
+            timed_out = "timeout after" in blob
+            if (
+                completed.returncode != 0
+                or "ERR_NVGPUCTRPERM" in blob
+                or timed_out
+            ):
                 kernels.append(
                     {
                         **missing_counter_record(
@@ -1058,6 +1124,7 @@ def run_counters(run_dir: Path, mode: str) -> dict[str, Any]:
                         "command": collect,
                         "replay_mode": "application",
                         "selected_metrics": ncu.get("selected_metrics"),
+                        "timeout_s": timeout_s,
                     }
                 )
                 continue
@@ -1074,6 +1141,7 @@ def run_counters(run_dir: Path, mode: str) -> dict[str, Any]:
                     "replay_family": replay_family,
                     "replay_mode": "application",
                     "selected_metrics": ncu.get("selected_metrics"),
+                    "timeout_s": timeout_s,
                     "metrics": parsed_metrics,
                     "dram_read_bytes": None,
                     "dram_write_bytes": None,
