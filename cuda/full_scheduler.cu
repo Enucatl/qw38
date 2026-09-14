@@ -87,6 +87,46 @@ class NvtxRange final {
   NvtxRange& operator=(const NvtxRange&) = delete;
 };
 
+float host_stall_ms(std::chrono::steady_clock::time_point started) noexcept {
+  return static_cast<float>(std::chrono::duration<double, std::milli>(
+                                std::chrono::steady_clock::now() - started)
+                                .count());
+}
+
+cudaError_t poll_eval_control(const EvalControl* control, cudaError_t error,
+                              Status* poll_status,
+                              bool* interrupted) noexcept {
+  if (error != cudaSuccess || control == nullptr || control->poll == nullptr ||
+      poll_status == nullptr || interrupted == nullptr) {
+    return error;
+  }
+  const auto started = std::chrono::steady_clock::now();
+  if (poll_without_device_sync_enabled()) {
+    *poll_status = control->poll(control->context);
+    *interrupted = !poll_status->is_ok();
+    if (g_host_stall_timings != nullptr) {
+      const float poll_ms = host_stall_ms(started);
+      g_host_stall_timings->poll_host_ms += poll_ms;
+      g_host_stall_timings->delaying_host_ms += poll_ms;
+      ++g_host_stall_timings->poll_calls;
+    }
+    return error;
+  }
+  error = cudaDeviceSynchronize();
+  if (error == cudaSuccess) {
+    *poll_status = control->poll(control->context);
+    *interrupted = !poll_status->is_ok();
+  }
+  if (g_host_stall_timings != nullptr) {
+    const float poll_ms = host_stall_ms(started);
+    g_host_stall_timings->poll_device_sync_ms += poll_ms;
+    g_host_stall_timings->overlapping_wait_ms += poll_ms;
+    ++g_host_stall_timings->poll_device_syncs;
+    ++g_host_stall_timings->poll_calls;
+  }
+  return error;
+}
+
 class GpuPhaseRecorder final {
  public:
   GpuPhaseRecorder() noexcept = default;
@@ -4962,8 +5002,14 @@ cudaError_t SchedulerSession::finish_output_commit(
   }
   if (error == cudaSuccess && lazy) {
     int best = 0;
+    const auto greedy_started = std::chrono::steady_clock::now();
     error = cudaMemcpy(&best, greedy_index_device_, sizeof(int),
                        cudaMemcpyDeviceToHost);
+    if (g_host_stall_timings != nullptr) {
+      const float greedy_ms = host_stall_ms(greedy_started);
+      g_host_stall_timings->greedy_d2h_ms += greedy_ms;
+      ++g_host_stall_timings->blocking_d2h_copies;
+    }
     if (error == cudaSuccess) {
       bump_transfer(workspace, cudaMemcpyDeviceToHost, sizeof(int));
       cached_greedy_token_ = static_cast<std::size_t>(best);
@@ -5387,6 +5433,10 @@ Status execute_token(const ResidentModel& model, std::size_t token,
         std::chrono::duration<double, std::milli>(
             std::chrono::steady_clock::now() - update_started)
             .count());
+    if (g_host_stall_timings != nullptr) {
+      g_host_stall_timings->launch_param_update_ms += graph_update_ms;
+      g_host_stall_timings->delaying_host_ms += graph_update_ms;
+    }
     if (!param_status.is_ok()) return param_status;
   } else {
     const Status uploaded = session->upload_decode_launch_state(
@@ -5437,10 +5487,22 @@ Status execute_token(const ResidentModel& model, std::size_t token,
     *timings = {};
     timings->loading = {model.upload_milliseconds(), true};
   }
+  if (g_host_stall_timings != nullptr) {
+    g_host_stall_timings->poll_without_device_sync =
+        poll_without_device_sync_enabled();
+    g_host_stall_timings->defer_elapsed_event_sync =
+        defer_elapsed_event_sync_enabled();
+  }
   cudaEvent_t start = nullptr;
   cudaEvent_t stop = nullptr;
+  const auto event_create_started = std::chrono::steady_clock::now();
   cudaError_t error = cudaEventCreate(&start);
   if (error == cudaSuccess) error = cudaEventCreate(&stop);
+  if (g_host_stall_timings != nullptr) {
+    const float created_ms = host_stall_ms(event_create_started);
+    g_host_stall_timings->event_create_ms += created_ms;
+    g_host_stall_timings->delaying_host_ms += created_ms;
+  }
   if (error == cudaSuccess) error = cudaEventRecord(start);
   if (error == cudaSuccess && families != nullptr && families->record) {
     copy_cstr(families->engine, sizeof(families->engine), "quartz");
@@ -5520,6 +5582,11 @@ Status execute_token(const ResidentModel& model, std::size_t token,
         decode_attribution->graph.milliseconds += graph_ms;
         decode_attribution->graph.measured = true;
       }
+      if (g_host_stall_timings != nullptr) {
+        g_host_stall_timings->graph_launch_host_ms += graph_ms;
+        g_host_stall_timings->delaying_host_ms += graph_ms;
+        ++g_host_stall_timings->graph_launches;
+      }
       const std::size_t layer_begin = segment_index * kDecodeSegmentLayerCount;
       const std::size_t layer_end = layer_begin + kDecodeSegmentLayerCount;
       for (std::size_t layer_index = layer_begin; layer_index < layer_end;
@@ -5530,14 +5597,7 @@ Status execute_token(const ResidentModel& model, std::size_t token,
           ++attention_slot;
         }
       }
-      if (error == cudaSuccess && control != nullptr &&
-          control->poll != nullptr) {
-        error = cudaDeviceSynchronize();
-        if (error == cudaSuccess) {
-          poll_status = control->poll(control->context);
-          interrupted = !poll_status.is_ok();
-        }
-      }
+      error = poll_eval_control(control, error, &poll_status, &interrupted);
     }
     workspace->invalidate_q8_decode_staging();
   }
@@ -5909,11 +5969,7 @@ Status execute_token(const ResidentModel& model, std::size_t token,
 #endif
     if (error == cudaSuccess && control != nullptr &&
         control->poll != nullptr) {
-      error = cudaDeviceSynchronize();
-      if (error == cudaSuccess) {
-        poll_status = control->poll(control->context);
-        interrupted = !poll_status.is_ok();
-      }
+      error = poll_eval_control(control, error, &poll_status, &interrupted);
     }
   }
   if (error == cudaSuccess && !interrupted &&
@@ -5976,9 +6032,18 @@ Status execute_token(const ResidentModel& model, std::size_t token,
     }
   }
 #endif
+  const bool defer_elapsed = defer_elapsed_event_sync_enabled();
   if (error == cudaSuccess && !interrupted) error = cudaEventRecord(stop);
-  if (error == cudaSuccess && !interrupted) error = cudaEventSynchronize(stop);
-  if (error == cudaSuccess && !interrupted) {
+  if (error == cudaSuccess && !interrupted && !defer_elapsed) {
+    const auto sync_started = std::chrono::steady_clock::now();
+    error = cudaEventSynchronize(stop);
+    if (g_host_stall_timings != nullptr) {
+      const float sync_ms = host_stall_ms(sync_started);
+      g_host_stall_timings->elapsed_event_sync_ms += sync_ms;
+      g_host_stall_timings->overlapping_wait_ms += sync_ms;
+    }
+  }
+  if (error == cudaSuccess && !interrupted && !defer_elapsed) {
     error = cudaEventElapsedTime(elapsed_milliseconds, start, stop);
     if (error == cudaSuccess) {
       *elapsed_milliseconds += graph_update_ms;
@@ -6036,8 +6101,13 @@ Status execute_token(const ResidentModel& model, std::size_t token,
   if (error == cudaSuccess && !interrupted) error = end_phase(categories);
   nvtxRangePop();
   if (interrupted) {
+    cudaDeviceSynchronize();
+    const auto destroy_started = std::chrono::steady_clock::now();
     if (stop != nullptr) cudaEventDestroy(stop);
     if (start != nullptr) cudaEventDestroy(start);
+    if (g_host_stall_timings != nullptr) {
+      g_host_stall_timings->event_destroy_ms += host_stall_ms(destroy_started);
+    }
     return poll_status;
   }
   if (error != cudaSuccess) {
@@ -6064,9 +6134,46 @@ Status execute_token(const ResidentModel& model, std::size_t token,
       workspace->attention_candidate_key_, workspace->attention_candidate_value_,
       internal::kAttentionKvWidth, session->attention_key_,
       session->attention_value_, cache_stride, nullptr);
-  if (error == cudaSuccess) error = cudaDeviceSynchronize();
+  if (error == cudaSuccess && defer_elapsed) {
+    const auto sync_started = std::chrono::steady_clock::now();
+    error = cudaEventSynchronize(stop);
+    if (error == cudaSuccess) {
+      error = cudaEventElapsedTime(elapsed_milliseconds, start, stop);
+    }
+    if (error == cudaSuccess) {
+      *elapsed_milliseconds += graph_update_ms;
+      if (timings != nullptr) {
+        timings->graph_launch.milliseconds += graph_update_ms;
+        timings->graph_launch.measured = true;
+      }
+      if (decode_attribution != nullptr && graph_update_ms > 0.0F) {
+        decode_attribution->graph.milliseconds += graph_update_ms;
+        decode_attribution->graph.measured = true;
+      }
+    }
+    if (g_host_stall_timings != nullptr) {
+      const float sync_ms = host_stall_ms(sync_started);
+      g_host_stall_timings->elapsed_event_sync_ms += sync_ms;
+      g_host_stall_timings->overlapping_wait_ms += sync_ms;
+    }
+  }
   if (error == cudaSuccess) {
+    const auto scatter_sync_started = std::chrono::steady_clock::now();
+    error = cudaDeviceSynchronize();
+    if (g_host_stall_timings != nullptr) {
+      const float sync_ms = host_stall_ms(scatter_sync_started);
+      g_host_stall_timings->scatter_device_sync_ms += sync_ms;
+      g_host_stall_timings->overlapping_wait_ms += sync_ms;
+    }
+  }
+  if (error == cudaSuccess) {
+    const auto finish_started = std::chrono::steady_clock::now();
     error = session->finish_output_commit(workspace, host_logits, host_hidden);
+    if (g_host_stall_timings != nullptr) {
+      const float finish_ms = host_stall_ms(finish_started);
+      g_host_stall_timings->finish_output_commit_ms += finish_ms;
+      g_host_stall_timings->delaying_host_ms += finish_ms;
+    }
   }
   if (error == cudaSuccess) error = end_phase(leaves);
   if (error == cudaSuccess) error = end_phase(categories);
@@ -6082,8 +6189,14 @@ Status execute_token(const ResidentModel& model, std::size_t token,
   }
   if (error == cudaSuccess && leaves != nullptr) error = leaves->collect();
   if (error == cudaSuccess && total != nullptr) error = total->collect();
+  const auto destroy_started = std::chrono::steady_clock::now();
   if (stop != nullptr) cudaEventDestroy(stop);
   if (start != nullptr) cudaEventDestroy(start);
+  if (g_host_stall_timings != nullptr) {
+    const float destroy_ms = host_stall_ms(destroy_started);
+    g_host_stall_timings->event_destroy_ms += destroy_ms;
+    g_host_stall_timings->delaying_host_ms += destroy_ms;
+  }
   if (error != cudaSuccess) {
     return cuda_status(error, "cannot collect CUDA token attribution");
   }
@@ -7208,6 +7321,11 @@ Status greedy_sample(const SchedulerSession& session,
                                std::chrono::steady_clock::now() - started)
                                .count()),
         true};
+  }
+  if (g_host_stall_timings != nullptr) {
+    const float sampling_ms = host_stall_ms(started);
+    g_host_stall_timings->sampling_ms += sampling_ms;
+    g_host_stall_timings->delaying_host_ms += sampling_ms;
   }
   return Status::ok();
 }

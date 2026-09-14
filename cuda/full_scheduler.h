@@ -44,10 +44,40 @@ constexpr bool kSelectedOutputCommitOverlap = true;
 constexpr bool kSelectedMixerNormQ8Fusion = true;
 constexpr bool kSelectedFfnNormQ8Fusion = true;
 
+// OPT-128. Production pins stay false unless acceptance keeps the candidate.
+constexpr bool kSelectedPollWithoutDeviceSync = false;
+constexpr bool kSelectedDeferElapsedEventSync = false;
+
+struct HostStallTimings final {
+  float event_create_ms = 0.0F;
+  float event_destroy_ms = 0.0F;
+  float elapsed_event_sync_ms = 0.0F;
+  float scatter_device_sync_ms = 0.0F;
+  float finish_output_commit_ms = 0.0F;
+  float greedy_d2h_ms = 0.0F;
+  float graph_launch_host_ms = 0.0F;
+  float poll_device_sync_ms = 0.0F;
+  float poll_host_ms = 0.0F;
+  float launch_param_update_ms = 0.0F;
+  float sampling_ms = 0.0F;
+  float wall_ms = 0.0F;
+  float overlapping_wait_ms = 0.0F;
+  float delaying_host_ms = 0.0F;
+  std::uint32_t poll_device_syncs = 0;
+  std::uint32_t poll_calls = 0;
+  std::uint32_t graph_launches = 0;
+  std::uint32_t blocking_d2h_copies = 0;
+  bool poll_without_device_sync = false;
+  bool defer_elapsed_event_sync = false;
+};
+
 inline thread_local int g_lazy_output_override = -1;
 inline thread_local int g_output_overlap_override = -1;
 inline thread_local int g_mixer_norm_q8_override = -1;
 inline thread_local int g_ffn_norm_q8_override = -1;
+inline thread_local int g_poll_without_device_sync_override = -1;
+inline thread_local int g_defer_elapsed_event_sync_override = -1;
+inline thread_local HostStallTimings* g_host_stall_timings = nullptr;
 
 inline bool lazy_output_materialization_enabled() noexcept {
   return g_lazy_output_override >= 0 ? g_lazy_output_override != 0
@@ -100,6 +130,67 @@ inline void set_ffn_norm_q8_fusion_override(bool enabled) noexcept {
 inline void clear_ffn_norm_q8_fusion_override() noexcept {
   g_ffn_norm_q8_override = -1;
 }
+
+inline bool poll_without_device_sync_enabled() noexcept {
+  return g_poll_without_device_sync_override >= 0
+             ? g_poll_without_device_sync_override != 0
+             : kSelectedPollWithoutDeviceSync;
+}
+
+inline bool defer_elapsed_event_sync_enabled() noexcept {
+  return g_defer_elapsed_event_sync_override >= 0
+             ? g_defer_elapsed_event_sync_override != 0
+             : kSelectedDeferElapsedEventSync;
+}
+
+inline void set_poll_without_device_sync_override(bool enabled) noexcept {
+  g_poll_without_device_sync_override = enabled ? 1 : 0;
+}
+
+inline void clear_poll_without_device_sync_override() noexcept {
+  g_poll_without_device_sync_override = -1;
+}
+
+inline void set_defer_elapsed_event_sync_override(bool enabled) noexcept {
+  g_defer_elapsed_event_sync_override = enabled ? 1 : 0;
+}
+
+inline void clear_defer_elapsed_event_sync_override() noexcept {
+  g_defer_elapsed_event_sync_override = -1;
+}
+
+struct HostStallScope final {
+  explicit HostStallScope(HostStallTimings* timings) noexcept
+      : previous_(g_host_stall_timings) {
+    g_host_stall_timings = timings;
+  }
+  ~HostStallScope() { g_host_stall_timings = previous_; }
+  HostStallScope(const HostStallScope&) = delete;
+  HostStallScope& operator=(const HostStallScope&) = delete;
+
+ private:
+  HostStallTimings* previous_ = nullptr;
+};
+
+struct PollWithoutDeviceSyncScope final {
+  explicit PollWithoutDeviceSyncScope(bool enabled) noexcept {
+    set_poll_without_device_sync_override(enabled);
+  }
+  ~PollWithoutDeviceSyncScope() { clear_poll_without_device_sync_override(); }
+  PollWithoutDeviceSyncScope(const PollWithoutDeviceSyncScope&) = delete;
+  PollWithoutDeviceSyncScope& operator=(const PollWithoutDeviceSyncScope&) =
+      delete;
+};
+
+struct DeferElapsedEventSyncScope final {
+  explicit DeferElapsedEventSyncScope(bool enabled) noexcept {
+    set_defer_elapsed_event_sync_override(enabled);
+  }
+  ~DeferElapsedEventSyncScope() { clear_defer_elapsed_event_sync_override(); }
+  DeferElapsedEventSyncScope(const DeferElapsedEventSyncScope&) = delete;
+  DeferElapsedEventSyncScope& operator=(const DeferElapsedEventSyncScope&) =
+      delete;
+};
 
 struct PromptMicrobatchRowsScope final {
   explicit PromptMicrobatchRowsScope(std::size_t rows) noexcept {
