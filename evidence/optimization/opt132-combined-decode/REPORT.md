@@ -69,7 +69,7 @@ A capacity calculation was not substituted for live fit.
 
 ## Activity versus OPT-125 budget
 
-Method `cuda_event_engine_attribution`; nsys=`True`; proven inactive `0.0`. Nsight Systems is installed; this phase still used CUDA-event attribution only (no nsys capture run). Leaf gaps remain unobserved by event leaves, not proven GPU idle. Component savings are not added. OPT-124 `supports_continuing=false` described an exhausted ladder, not proof that optimization is impossible.
+Method `cuda_event_engine_attribution`; nsys=`True`; proven inactive `0.0`. Nsight Systems is installed (`cuda-nsight-systems-13-0`, nsys **2025.3.2**); this phase still used CUDA-event attribution only (no nsys capture run). Leaf gaps remain **unobserved** at event-leaf granularity, not proven GPU idle in this phase. **OPT-133 amendment (2026-09-14):** bounded Nsight capture on this admitted stack reconciles OPT-125 unobserved ~**126 ms**/12-token window as hardware GPU idle (fraction **1.0**); unresolved **0 ms** — see [`evidence/optimization/opt133-decode-nsys-trace/REPORT.md`](../opt133-decode-nsys-trace/REPORT.md). Removable decode headroom is still not proven (dominant API time is `cudaEventSynchronize` from event instrumentation). Component savings are not added. OPT-124 `supports_continuing=false` described an exhausted ladder, not proof that optimization is impossible.
 
 {
   "d128": {

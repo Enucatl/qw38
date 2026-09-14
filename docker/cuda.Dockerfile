@@ -3,10 +3,9 @@ FROM nvidia/cuda:13.0.2-devel-ubuntu24.04@sha256:0eee3094c71518ad31d011a594ae6ed
 RUN apt-get update \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
         ca-certificates \
+        cuda-nsight-systems-13-0 \
         g++ \
         make \
-        nsight-systems \
-        nsight-systems-target \
         python3 \
     && rm -rf /var/lib/apt/lists/*
 

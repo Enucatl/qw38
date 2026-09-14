@@ -125,12 +125,39 @@ Parent for later tasks: `combined_opt118_opt119`. Keep protocol: 3+5 screen,
 3+10 acceptance, both decode-only and complete-request metrics, 2% request
 materiality reported separately.
 
+## OPT-133 Nsight reconciliation (2026-09-14T12:50:00Z)
+
+Follow-on [`OPT-133`](../../tasks/OPT-133.md) bounded Nsight capture on the
+admitted `decode_segments8` stack (nsys **2025.3.2**, measurement
+`2026-09-14T12:01:33Z`) reconciles this report's CUDA-event **unobserved**
+intervals against hardware `gputrace`:
+
+| Window set | OPT-125 unobserved (12-token scale) | Nsight gpu_idle_ms | Unresolved |
+| --- | ---: | ---: | ---: |
+| mean over D128/D2048 × early/middle/late | **126.4 ms** | **188–237 ms** | **0 ms** |
+
+Fraction of OPT-125 unobserved explained by Nsight hardware idle: **1.0**. Dominant
+CUDA API time in the bounded window is **`cudaEventSynchronize`** (~193–244 ms/window)
+from this task's event-attribution probe — not a separate removable budget. Actual
+GPU kernel union ~**8 ms**/window. See
+[`evidence/optimization/opt133-decode-nsys-trace/REPORT.md`](../opt133-decode-nsys-trace/REPORT.md).
+
+This section amends interpretation only; OPT-125 sidecars and CUDA-event tables above
+are unchanged.
+
 ## Answers
 
-1. **Is 10 ms/token true inactive?** `False`.
-   The ~10 ms/token figure is the OPT-115/124 leaf-gap remainder after event-union busy time, not an independent CUPTI/Nsight proof of hardware inactivity. Relabeled unobserved. Proven inactive ms/token=0.0.
+1. **Is 10 ms/token true inactive?** `False` as **removable** headroom.
+   At CUDA-event attribution (this task): ~10 ms/token is the OPT-115/124 leaf-gap
+   remainder after event-union busy time; proven inactive ms/token=**0.0**; relabeled
+   **unobserved**. **OPT-133 amendment:** Nsight hardware idle fully accounts for that
+   unobserved remainder (fraction **1.0**) — the GPU was inactive during event-leaf gaps,
+   not running missing kernels. That idle is dominated by `cudaEventSynchronize` waits
+   from event instrumentation, not proven removable decode time.
 2. **How much is causally removable?** `n/a` ms/token proven.
-   Only API-correlated proven device-inactive spans are removable host/submission time. Source-grounded graph (OPT-126/127) and attention (OPT-129) work may still proceed without that number.
+   Only API-correlated proven device-inactive spans are removable host/submission time.
+   OPT-133 does not establish removable ms/token from the leaf-gap remainder. Source-grounded
+   graph (OPT-126/127) and attention (OPT-129) work may still proceed without that number.
 3. **Do llama and long-context ratios survive matched boundaries?**
    llama `False`
    (D128 published `0.7866` vs matched

@@ -12,6 +12,7 @@ from tools.opt133_decode_nsys_trace import (
     FIXTURE,
     ITERATION,
     NATIVE,
+    NSYS_BIN,
     PARENT,
     PHASES,
     PREFIXES,
@@ -26,6 +27,7 @@ from tools.opt133_decode_nsys_trace import (
     nsys_profile_command,
     nsys_stats_command,
     nsys_capture_script,
+    modern_nsys,
     overhead_pair,
     reconcile_window,
     summarize_nsys_stats,
@@ -149,18 +151,20 @@ def test_nsys_command_line_builder() -> None:
             "models/Qwen3.8-27B-Q4_K_M.gguf",
         ],
     )
-    assert command[:2] == [
-        "/usr/lib/nsight-systems/bin/nsys",
-        "profile",
-    ]
+    assert command[0] == NSYS_BIN
+    assert command[1] == "profile"
     assert "-o" in command
     assert "--force-overwrite" in command
     assert "true" in command
     assert "--trace=cuda,nvtx,osrt" in command
-    assert "--capture-range=nvtx" in command
-    assert "--nvtx-capture=opt133.window" in command
-    assert "--capture-range-end=stop" in command
-    assert "--kill=none" in command
+    if modern_nsys():
+        assert "--capture-range=cudaProfilerApi" in command
+        assert "--capture-range-end=repeat" in command
+    else:
+        assert "--capture-range=nvtx" in command
+        assert "--nvtx-capture=opt133.window" in command
+        assert "--capture-range-end=stop" in command
+        assert "--kill=none" in command
     script = nsys_capture_script(
         "build/optimization-runs/opt133/trace-128-early",
         [
@@ -181,8 +185,8 @@ def test_nsys_command_line_builder() -> None:
     stats = nsys_stats_command(
         "gputrace", "build/optimization-runs/opt133/trace-128-early.nsys-rep"
     )
-    assert stats[:3] == [
-        "/usr/lib/nsight-systems/bin/nsys",
+    assert stats[0] == NSYS_BIN
+    assert stats[1:3] == [
         "stats",
         "--report",
     ]

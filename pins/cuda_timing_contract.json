@@ -13,7 +13,7 @@
   "availability": {
     "graph_launch": "unavailable until OPT-003",
     "queueing": "unavailable in scheduler record; SRV-001 records HTTP gate timing separately",
-    "nsight_systems": "installed in pinned CUDA image (apt nsight-systems); availability probed via command -v nsys",
+    "nsight_systems": "cuda-nsight-systems-13-0 in pinned CUDA image (NVIDIA CUDA repo); probed via command -v nsys",
     "nsight_compute": "2025.3.1 installed; GPU performance counters denied by host ERR_NVGPUCTRPERM"
   }
 }

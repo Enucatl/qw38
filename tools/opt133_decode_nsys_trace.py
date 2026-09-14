@@ -100,12 +100,17 @@ REQUIRED_SIDECAR_KEYS = (
     "nsys_overhead_ms",
     "nsys_overhead_ratio",
 )
-NSYS_HOST = "/usr/lib/nsight-systems/host-linux-x64"
-NSYS_BIN = "/usr/lib/nsight-systems/bin/nsys"
-QDSTRM_IMPORTER = f"{NSYS_HOST}/QdstrmImporter"
 NSYS_TRACE = "cuda,nvtx,osrt"
 NSYS_NVTX_RANGE = "opt133.window"
 NSYS_STATS_REPORTS = ("gputrace", "cudaapisum", "cuda_api_sum", "nvtxsum")
+_LEGACY_NSYS_BIN = "/usr/lib/nsight-systems/bin/nsys"
+_LEGACY_NSYS_HOST = "/usr/lib/nsight-systems/host-linux-x64"
+NSYS_BIN = "/usr/local/cuda/bin/nsys"
+NSYS_HOST = _LEGACY_NSYS_HOST
+QDSTRM_IMPORTER = f"{_LEGACY_NSYS_HOST}/QdstrmImporter"
+_DOCKER_NSYS_CACHE: dict[str, Any] | None = None
+
+
 START_KEYS = ("Start (ns)", "Start(ns)", "Start", "start_ns", "start")
 DURATION_KEYS = (
     "Duration (ns)",
@@ -293,24 +298,28 @@ def native_command(args: Sequence[str], *, tier: str) -> list[str]:
 
 
 def nsys_profile_command(output: Path | str, binary_args: Sequence[str]) -> list[str]:
-    """Build nsys profile argv for the pinned 2022.4.2 image.
-
-    The dossier lists ``cuda,nvtx,cudart,osrt``; this Nsight build has no
-    distinct ``cudart`` domain (CUDA runtime is included in ``cuda``).
-    ``cudaProfilerApi`` capture-range emits no QDSTRM on CUDA 13 + nsys 2022.4
-    (the runtime profiler APIs are not hooked). Native still calls
-    ``cudaProfilerStart`` / ``Stop`` around the window; nsys is triggered by
-    the matching NVTX range ``opt133.window``. Invoke the tree-local nsys
-    binary so ``QdstrmImporter`` resolves via ``../host-linux-x64``.
-    ``capture-range-end=stop`` plus ``--kill=none`` keeps the 256-token
-    trajectory alive after the 12-token window; default stop-shutdown/sigterm
-    would kill the process before nsys flushes.
-    """
+    """Build nsys profile argv for the pinned CUDA-repo or legacy Ubuntu nsys."""
+    stem = str(output)
+    if modern_nsys():
+        return [
+            NSYS_BIN,
+            "profile",
+            "-o",
+            stem,
+            "--force-overwrite",
+            "true",
+            f"--trace={NSYS_TRACE}",
+            "--sample=none",
+            "--cpuctxsw=none",
+            "--capture-range=cudaProfilerApi",
+            "--capture-range-end=repeat",
+            *binary_args,
+        ]
     return [
         NSYS_BIN,
         "profile",
         "-o",
-        str(output),
+        stem,
         "--force-overwrite",
         "true",
         f"--trace={NSYS_TRACE}",
@@ -531,6 +540,71 @@ def docker_sh(script: str) -> subprocess.CompletedProcess[str]:
         encoding="utf-8",
         errors="replace",
     )
+
+
+def docker_nsys_layout(*, refresh: bool = False) -> dict[str, Any]:
+    """Resolve nsys paths from the pinned CUDA image, not the host OS."""
+    global _DOCKER_NSYS_CACHE
+    if _DOCKER_NSYS_CACHE is not None and not refresh:
+        return _DOCKER_NSYS_CACHE
+    script = (
+        "nsys_bin=$(command -v nsys || true); "
+        'echo "NSYS_BIN=${nsys_bin}"; '
+        "nsys --version 2>&1 | head -1; "
+        "host=$(ls -d /opt/nvidia/nsight-systems/*/host-linux-x64 2>/dev/null | sort -V | tail -1); "
+        'if [ -n "$host" ]; then echo "NSYS_HOST=$host"; '
+        'elif [ -x /usr/lib/nsight-systems/host-linux-x64/QdstrmImporter ]; then '
+        'echo "NSYS_HOST=/usr/lib/nsight-systems/host-linux-x64"; fi'
+    )
+    completed = docker_sh(script)
+    blob = completed.stdout + completed.stderr
+    resolved_bin = "/usr/local/cuda/bin/nsys"
+    host_dir = _LEGACY_NSYS_HOST
+    version = ""
+    for line in blob.splitlines():
+        if line.startswith("NSYS_BIN="):
+            value = line.split("=", 1)[1].strip()
+            if value:
+                resolved_bin = value
+        elif line.startswith("NSYS_HOST="):
+            value = line.split("=", 1)[1].strip()
+            if value:
+                host_dir = value
+        elif "Nsight Systems version" in line:
+            version = line.strip()
+    modern = (
+        "2025." in version
+        or "2024." in version
+        or resolved_bin.startswith("/usr/local/cuda/")
+        or resolved_bin.startswith("/usr/local/bin/")
+    )
+    layout = {
+        "nsys_bin": resolved_bin,
+        "host_dir": host_dir,
+        "qdstrm_importer": f"{host_dir}/QdstrmImporter",
+        "version": version or None,
+        "modern": modern,
+    }
+    _DOCKER_NSYS_CACHE = layout
+    return layout
+
+
+def ensure_nsys_layout(*, refresh: bool = False) -> dict[str, Any]:
+    layout = docker_nsys_layout(refresh=refresh)
+    global NSYS_BIN, NSYS_HOST, QDSTRM_IMPORTER
+    NSYS_BIN = str(layout["nsys_bin"])
+    NSYS_HOST = str(layout["host_dir"])
+    QDSTRM_IMPORTER = str(layout["qdstrm_importer"])
+    return layout
+
+
+def nsys_version_text() -> str:
+    return str(docker_nsys_layout().get("version") or "")
+
+
+def modern_nsys() -> bool:
+    ensure_nsys_layout()
+    return bool(docker_nsys_layout().get("modern"))
 
 
 def gpu_residents() -> list[dict[str, str]]:
@@ -985,6 +1059,7 @@ def extract_opt125_targets() -> dict[str, Any]:
 
 def run_preflight(run_dir: Path, mode: str) -> dict[str, Any]:
     run_dir.mkdir(parents=True, exist_ok=True)
+    ensure_nsys_layout(refresh=True)
     EVIDENCE.mkdir(parents=True, exist_ok=True)
     TRACES.mkdir(parents=True, exist_ok=True)
     contract = load_contract()
@@ -994,8 +1069,8 @@ def run_preflight(run_dir: Path, mode: str) -> dict[str, Any]:
     available, gpu_blocker = gpu_available()
     residents = gpu_residents() if available else []
     probe = docker_sh(
-        "command -v nsys; command -v ncu; "
-        "(nsys --version || true); (ncu --version | head -n 1 || true)"
+        "command -v nsys; nsys --version; nsys status -e 2>&1 | head -n 12 || true; "
+        "command -v ncu; (ncu --version | head -n 1 || true)"
     )
     blob = probe.stdout + probe.stderr
     nsys_available = "nsys" in blob and probe.returncode == 0
@@ -1057,6 +1132,9 @@ def run_preflight(run_dir: Path, mode: str) -> dict[str, Any]:
         "mode": mode,
         "ok": ok,
         "nsys_available": nsys_available,
+        "nsys_bin": NSYS_BIN,
+        "nsys_version": nsys_version_text().strip() or None,
+        "modern_nsys": modern_nsys(),
         "ncu_available": ncu_available,
         "cupti_linked": False,
         "image": IMAGE,
@@ -1098,6 +1176,7 @@ def _write_capture_text(path: Path, completed: subprocess.CompletedProcess[str])
 
 def run_capture(run_dir: Path, mode: str) -> dict[str, Any]:
     run_dir.mkdir(parents=True, exist_ok=True)
+    ensure_nsys_layout(refresh=True)
     TRACES.mkdir(parents=True, exist_ok=True)
     available, blocker = gpu_available()
     captures: dict[str, Any] = {}
@@ -1143,16 +1222,22 @@ def run_capture(run_dir: Path, mode: str) -> dict[str, Any]:
         dump_json(run_dir / f"baseline-{key}-records.json", baseline_records)
 
         stem = run_dir / f"trace-{prefix}-{window}"
-        inner = [
-            "bash",
-            "-lc",
-            nsys_capture_script(
-                stem,
-                native_binary_args("nsys-window", prefix, window),
-                session=nsys_session_name(prefix, window),
-            ),
-        ]
-        nsys_run = run_native(inner, tier="screen")
+        if modern_nsys():
+            profile_cmd = nsys_profile_command(
+                stem, native_binary_args("nsys-window", prefix, window)
+            )
+            nsys_run = run_native(profile_cmd, tier="screen")
+        else:
+            inner = [
+                "bash",
+                "-lc",
+                nsys_capture_script(
+                    stem,
+                    native_binary_args("nsys-window", prefix, window),
+                    session=nsys_session_name(prefix, window),
+                ),
+            ]
+            nsys_run = run_native(inner, tier="screen")
         nsys_raw = _write_capture_text(run_dir / f"nsys-{key}.txt", nsys_run)
         nsys_raw = merge_gate_output(nsys_raw, Path(f"{stem}-gate"))
         nsys_summary = parse_prefixed(nsys_raw, RESULT_PREFIX)
@@ -1211,6 +1296,51 @@ def _load_json_if_present(path: Path) -> Any | None:
         return path.read_text(encoding="utf-8")
 
 
+def nsys_report_aliases() -> dict[str, list[str]]:
+    if modern_nsys():
+        return {
+            "gputrace": ["cuda_gpu_trace", "gputrace"],
+            "cudaapisum": ["cuda_api_sum", "cudaapisum"],
+            "nvtxsum": ["nvtx_pushpop_sum", "nvtxsum"],
+        }
+    return {
+        "gputrace": ["gputrace"],
+        "cudaapisum": ["cudaapisum", "cuda_api_sum"],
+        "nvtxsum": ["nvtxsum"],
+    }
+
+
+def fetch_nsys_report(
+    run_dir: Path,
+    *,
+    key: str,
+    canonical: str,
+    trace: Path,
+) -> tuple[Any | None, list[str]]:
+    errors: list[str] = []
+    parsed_json: Any | None = None
+    raw = ""
+    for report in nsys_report_aliases()[canonical]:
+        completed = run_native(
+            nsys_stats_command(report, trace),
+            tier="acceptance",
+            check=False,
+        )
+        raw = completed.stdout or completed.stderr
+        sidecar_path = run_dir / f"stats-{key}-{canonical}.json"
+        parsed_json = extract_json(raw)
+        skipped = "does not contain" in raw and "SKIPPED" in raw
+        if parsed_json is not None:
+            dump_json(sidecar_path, parsed_json)
+            return parsed_json, errors
+        sidecar_path.write_text(raw, encoding="utf-8")
+        if completed.returncode != 0 and not skipped:
+            errors.append(f"{report}: {raw[-400:]}")
+        elif skipped:
+            errors.append(f"{report}: skipped_no_cuda13_cupti_events")
+    return None, errors
+
+
 def parse_one_trace(run_dir: Path, prefix: int, window: str) -> dict[str, Any]:
     key = case_key(prefix, window)
     stem = run_dir / f"trace-{prefix}-{window}"
@@ -1239,36 +1369,15 @@ def parse_one_trace(run_dir: Path, prefix: int, window: str) -> dict[str, Any]:
             "memcpy_ms": None,
             "sync_ms": None,
         }
-    for report in ("gputrace", "cudaapisum", "nvtxsum"):
-        completed = run_native(
-            nsys_stats_command(report, trace),
-            tier="acceptance",
-            check=False,
+    for canonical in ("gputrace", "cudaapisum", "nvtxsum"):
+        parsed_json, report_errors = fetch_nsys_report(
+            run_dir,
+            key=key,
+            canonical=canonical,
+            trace=trace,
         )
-        raw = completed.stdout or completed.stderr
-        sidecar_path = run_dir / f"stats-{key}-{report}.json"
-        parsed_json = extract_json(raw)
-        skipped = "does not contain" in raw and "SKIPPED" in raw
-        if parsed_json is None and completed.returncode != 0 and report == "cudaapisum":
-            retry = run_native(
-                nsys_stats_command("cuda_api_sum", trace),
-                tier="acceptance",
-                check=False,
-            )
-            raw = retry.stdout or retry.stderr
-            completed = retry
-            parsed_json = extract_json(raw)
-            skipped = "does not contain" in raw and "SKIPPED" in raw
-        if parsed_json is not None:
-            dump_json(sidecar_path, parsed_json)
-            reports[report] = parsed_json
-        else:
-            sidecar_path.write_text(raw, encoding="utf-8")
-            reports[report] = None
-            if completed.returncode != 0 and not skipped:
-                errors.append(f"{report}: {raw[-400:]}")
-            elif skipped:
-                errors.append(f"{report}: skipped_no_cuda13_cupti_events")
+        reports[canonical] = parsed_json
+        errors.extend(report_errors)
     gputrace = reports.get("gputrace")
     nvtx = reports.get("nvtxsum")
     cuda_api = reports.get("cudaapisum")
@@ -1310,6 +1419,7 @@ def parse_one_trace(run_dir: Path, prefix: int, window: str) -> dict[str, Any]:
 
 def run_parse(run_dir: Path, mode: str) -> dict[str, Any]:
     run_dir.mkdir(parents=True, exist_ok=True)
+    ensure_nsys_layout()
     parsed: dict[str, Any] = {}
     for prefix, window in iter_cases():
         parsed[case_key(prefix, window)] = parse_one_trace(run_dir, prefix, window)
@@ -1559,7 +1669,9 @@ def write_report(payload: Mapping[str, Any]) -> None:
         "",
         f"Measured at `{payload.get('measurement_utc')}`. "
         f"Image `{IMAGE}`. nsys_available="
-        f"`{preflight.get('nsys_available')}`.",
+        f"`{preflight.get('nsys_available')}`. "
+        f"nsys=`{preflight.get('nsys_bin')}` version="
+        f"`{preflight.get('nsys_version') or 'unknown'}`.",
         "",
         "## Answers",
         "",
@@ -1568,15 +1680,17 @@ def write_report(payload: Mapping[str, Any]) -> None:
         f"mean explained-by-idle `{_fmt(idle.get('mean_explained_by_idle_ms'))}` ms, "
         f"fraction of OPT-125 unobserved "
         f"`{_fmt(idle.get('fraction_of_unobserved'))}`. "
-        "Pinned nsys 2022.4.2 ships CUPTI 12.0 and cannot emit `gputrace`/"
-        "`cudaapisum` against CUDA 13.0.2, so hardware idle is unmeasured "
-        "rather than proven 0 ms.",
+        + (
+            "Hardware GPU trace parsed from `gputrace`."
+            if payload.get("hardware_gpu_trace")
+            else "Hardware idle/API remain unmeasured when `gputrace`/`cudaapisum` "
+            "do not parse from the retained trace."
+        ),
         "2. **Host/API submission** visible to Nsight but not CUDA-event leaves: "
         f"mean explained-by-API `{_fmt(api.get('mean_explained_by_api_ms'))}` ms, "
         f"fraction `{_fmt(api.get('fraction_of_unobserved'))}`. "
         "NVTX push/pop ranges (`qw38.ffn`, `qw38.graph_launch`, mixer/attention) "
-        "are present in `.qdrep` traces; CUDA runtime API sum is unavailable "
-        "for the same CUPTI mismatch.",
+        "are retained in the trace when present.",
         "3. **Unresolved** after both instruments: "
         f"mean `{_fmt(unresolved.get('mean_unresolved_ms'))}` ms, "
         f"fraction `{_fmt(unresolved.get('fraction_of_unobserved'))}`. "
@@ -1667,6 +1781,7 @@ def run_report(run_dir: Path, mode: str) -> dict[str, Any]:
         "reconcile": reconcile,
         "overhead": overhead,
         "answers": answers,
+        "hardware_gpu_trace": parse_payload.get("hardware_gpu_trace"),
         "report_path": str(contract["report_path"]),
         "family_plan": family_plan(mode, "report"),
         "measured_at": utc_now(),
