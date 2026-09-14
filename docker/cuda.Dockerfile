@@ -5,6 +5,8 @@ RUN apt-get update \
         ca-certificates \
         g++ \
         make \
+        nsight-systems \
+        nsight-systems-target \
         python3 \
     && rm -rf /var/lib/apt/lists/*
 

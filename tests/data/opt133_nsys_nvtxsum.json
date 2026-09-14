@@ -1,0 +1,29 @@
+{
+  "nvtxsum": [
+    {
+      "Name": "qw38.mixer",
+      "Start (ns)": 1000000,
+      "Duration (ns)": 1500000
+    },
+    {
+      "Name": "qw38.gdn",
+      "Start (ns)": 2500000,
+      "Duration (ns)": 800000
+    },
+    {
+      "Name": "qw38.attention",
+      "Start (ns)": 3300000,
+      "Duration (ns)": 1200000
+    },
+    {
+      "Name": "qw38.ffn",
+      "Start (ns)": 4500000,
+      "Duration (ns)": 2500000
+    },
+    {
+      "Name": "qw38.graph_launch",
+      "Start (ns)": 7000000,
+      "Duration (ns)": 400000
+    }
+  ]
+}

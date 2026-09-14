@@ -1390,7 +1390,7 @@ probes are labeled separately from free-running sample/eval/output loops.
 method=`{(activity.get("d128") or activity).get("method") if isinstance(activity.get("d128"), Mapping) else activity.get("method")}`.
 nsys=`{activity.get("nsys_available")}` ncu=`{activity.get("ncu_available")}`
 cupti_linked=`{activity.get("cupti_linked")}`.
-Profiler absence is an attribution limitation, not zero activity.
+{"Nsight Systems is installed in the pinned CUDA image; this phase still used CUDA-event attribution only (no nsys capture run)." if activity.get("nsys_available") else "Profiler absence is an attribution limitation, not zero activity."}
 Windows: early / middle / late on the same 256-output trajectory.
 
 ## Disjoint intervals

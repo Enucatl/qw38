@@ -331,6 +331,7 @@ OPT-124 assesses the remaining ceiling without claiming universal optimality.
 | OPT-130 | Implement the evidenced dense decode-attention improvement | OPT-129 | done | `reject`; occupancy vec128_open nparts8 candidate; D2048 request geo 1.019 CI pass; D128 request CI lower 0.99975 fail; OPT-058 quality PPL ratio 1.0; `hybrid_crossover@1024` unchanged; `claims_throughput=false` | [`tasks/OPT-130.md`](tasks/OPT-130.md); [`pins/opt130_dense_attention_contract.json`](pins/opt130_dense_attention_contract.json); [`pins/opt130_iteration_contract.json`](pins/opt130_iteration_contract.json); [`pins/opt130_dense_attention_provenance.json`](pins/opt130_dense_attention_provenance.json); [`fixtures/opt130_dense_attention.json`](fixtures/opt130_dense_attention.json); [`tools/opt130_dense_attention.py`](tools/opt130_dense_attention.py); [`tests/test_opt130_dense_attention.py`](tests/test_opt130_dense_attention.py); [`cuda/opt130_dense_attention_test.cu`](cuda/opt130_dense_attention_test.cu); [`cuda/attention_decode.cu`](cuda/attention_decode.cu); [`cuda/attention_decode_path.cuh`](cuda/attention_decode_path.cuh); [`Makefile`](Makefile); [`evidence/optimization/opt130-dense-attention/REPORT.md`](evidence/optimization/opt130-dense-attention/REPORT.md); verification 2026-09-14T01:08:00Z |
 | OPT-131 | Fuse one measured residual decode launch chain | OPT-128, OPT-130 | done | `no_material_opportunity`; parent `decode_segments8` unchanged; top chain bound 0.026 ms/token; launch gap 3.17 ms/token already removed by graphs; no fusion pin; OPT-125 state/memory pass; `claims_throughput=false` | [`tasks/OPT-131.md`](tasks/OPT-131.md); [`pins/opt131_decode_chain_contract.json`](pins/opt131_decode_chain_contract.json); [`pins/opt131_iteration_contract.json`](pins/opt131_iteration_contract.json); [`fixtures/opt131_decode_chain.json`](fixtures/opt131_decode_chain.json); [`tools/opt131_decode_chain.py`](tools/opt131_decode_chain.py); [`tests/test_opt131_decode_chain.py`](tests/test_opt131_decode_chain.py); [`cuda/opt131_decode_chain_test.cu`](cuda/opt131_decode_chain_test.cu); [`Makefile`](Makefile); [`tools/run_optimization_task.py`](tools/run_optimization_task.py); [`evidence/optimization/opt131-decode-chain/REPORT.md`](evidence/optimization/opt131-decode-chain/REPORT.md); verification 2026-09-14T01:25:56Z |
 | OPT-132 | Admit the combined decode stack and publish corrected headroom | OPT-125, OPT-126, OPT-127, OPT-128, OPT-129, OPT-130, OPT-131 | done | `keep`; admitted stack post124+OPT-127 `decode_segments8`; D128 +3.82 tok/s (1.070×), D2048 +2.57 (1.062×), aggregate CI lower 1.033; vs llama decode-only D128 0.862× D2048 0.744× (corrected from OPT-124 0.620×); OPT-058 quality PPL 1.0; rejected OPT-130/128/131 excluded | [`tasks/OPT-132.md`](tasks/OPT-132.md); [`pins/opt132_combined_decode_contract.json`](pins/opt132_combined_decode_contract.json); [`pins/opt132_iteration_contract.json`](pins/opt132_iteration_contract.json); [`fixtures/opt132_combined_decode.json`](fixtures/opt132_combined_decode.json); [`tools/opt132_combined_decode.py`](tools/opt132_combined_decode.py); [`tests/test_opt132_combined_decode.py`](tests/test_opt132_combined_decode.py); [`cuda/opt132_combined_decode_test.cu`](cuda/opt132_combined_decode_test.cu); [`cuda/full_scheduler.cu`](cuda/full_scheduler.cu); [`cuda/opt058_quality_baseline_test.cu`](cuda/opt058_quality_baseline_test.cu); [`Makefile`](Makefile); [`tools/run_optimization_task.py`](tools/run_optimization_task.py); [`evidence/optimization/opt132-combined-decode/REPORT.md`](evidence/optimization/opt132-combined-decode/REPORT.md); verification 2026-09-14T02:05:00Z |
+| OPT-133 | Capture Nsight Systems decode activity on the admitted stack | OPT-125, OPT-132 | done | Diagnostics on `decode_segments8`; 6 bounded `.qdrep` captures + baselines (D128/D2048 × early/middle/late); nsys overhead ≈0 ms; OPT-125 unobserved ~126 ms/window **not** relabeled GPU idle; hardware idle/API **unmeasured** (nsys 2022.4.2 CUPTI vs CUDA 13); NVTX ranges captured; `claims_throughput=false`; no production change | [`tasks/OPT-133.md`](tasks/OPT-133.md); [`pins/opt133_decode_nsys_contract.json`](pins/opt133_decode_nsys_contract.json); [`pins/opt133_iteration_contract.json`](pins/opt133_iteration_contract.json); [`fixtures/opt133_decode_nsys_trace.json`](fixtures/opt133_decode_nsys_trace.json); [`tools/opt133_decode_nsys_trace.py`](tools/opt133_decode_nsys_trace.py); [`tests/test_opt133_decode_nsys_trace.py`](tests/test_opt133_decode_nsys_trace.py); [`cuda/opt133_decode_nsys_trace_test.cu`](cuda/opt133_decode_nsys_trace_test.cu); [`Makefile`](Makefile); [`tools/run_optimization_task.py`](tools/run_optimization_task.py); [`evidence/optimization/opt133-decode-nsys-trace/REPORT.md`](evidence/optimization/opt133-decode-nsys-trace/REPORT.md); verification 2026-09-14T11:45:00Z |
 
 ### Post-124 decode investigation batch (OPT-125–132)
 
@@ -8127,3 +8128,29 @@ statements below are historical, not the current execution order.
 - Updated: [`fixtures/opt132_combined_decode.json`](fixtures/opt132_combined_decode.json);
   [`evidence/optimization/opt132-combined-decode/REPORT.md`](evidence/optimization/opt132-combined-decode/REPORT.md);
   sidecars under `build/optimization-runs/opt132/`.
+
+### OPT-133 planning (2026-09-14T10:50:00Z)
+
+- User-requested follow-on after installing Nsight Systems in `qw38-cuda:13.0.2`.
+  OPT-125 left ~10.55 ms/token **unobserved** with proven device-inactive **0 ms**
+  because CUDA-event leaves cannot prove hardware idle. OPT-133 runs bounded
+  `nsys profile` captures on the admitted `decode_segments8` stack and reconciles
+  against OPT-125 intervals. Diagnostics only; no production change.
+- Added [`tasks/OPT-133.md`](tasks/OPT-133.md); ledger row `pending`. Next
+  eligible pending task: **OPT-133**.
+
+### OPT-133 delivery (2026-09-14T11:45:00Z)
+
+- Bounded Nsight capture on admitted `decode_segments8` stack (D128/D2048 ×
+  early/middle/late 12-token windows). Six `.qdrep` traces + six baseline twins;
+  mean nsys wrapper overhead **−0.33 ms** (noise). OPT-125 unobserved **~126 ms**
+  per 12-token window remains **unresolved** — not relabeled as proven GPU idle.
+  Pinned nsys **2022.4.2** (CUPTI 12.0) cannot emit `gputrace`/`cudaapisum` on
+  **CUDA 13.0.2**; hardware idle and CUDA API sums are **unmeasured** (null), not
+  zero. NVTX component ranges present in traces. Also ships nsight-systems in
+  pinned CUDA image and OPT-125/132 nsys-available report wording.
+- Key evidence: [`fixtures/opt133_decode_nsys_trace.json`](fixtures/opt133_decode_nsys_trace.json);
+  [`evidence/optimization/opt133-decode-nsys-trace/REPORT.md`](evidence/optimization/opt133-decode-nsys-trace/REPORT.md).
+- OPT-133 marked `done`. Coupled IDs: none. **Remaining recovery:** upgrade nsys
+  in `qw38-cuda:13.0.2` for hardware GPU trace on CUDA 13 before closing OPT-125
+  idle attribution.

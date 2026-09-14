@@ -1,6 +1,6 @@
 # OPT-125 — Decode timing, GPU activity, and traffic evidence
 
-Status: `analysis`. measurement_utc=`2026-09-14T10:28:41Z`.
+Status: `analysis`. measurement_utc=`2026-09-14T10:44:19Z`.
 Diagnostics only. claims_throughput=`false`. claims_performance_improvement=`false`.
 production_kept=`true`.
 
@@ -74,9 +74,9 @@ probes are labeled separately from free-running sample/eval/output loops.
 ## Activity trace
 
 method=`cuda_event_engine_attribution`.
-nsys=`False` ncu=`True`
+nsys=`True` ncu=`True`
 cupti_linked=`False`.
-Profiler absence is an attribution limitation, not zero activity.
+Nsight Systems is installed in the pinned CUDA image; this phase still used CUDA-event attribution only (no nsys capture run).
 Windows: early / middle / late on the same 256-output trajectory.
 
 ## Disjoint intervals

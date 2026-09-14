@@ -1407,9 +1407,16 @@ def write_report(result: Mapping[str, Any]) -> None:
         "",
         f"Method `{activity.get('method')}`; nsys=`{activity.get('nsys_available')}`; "
         f"proven inactive `{activity.get('proven_device_inactive_ms')}`. "
-        "Leaf gaps remain unobserved, not GPU idle. Component savings are not "
-        "added. OPT-124 `supports_continuing=false` described an exhausted "
-        "ladder, not proof that optimization is impossible.",
+        + (
+            "Nsight Systems is installed; this phase still used CUDA-event "
+            "attribution only (no nsys capture run). Leaf gaps remain "
+            "unobserved by event leaves, not proven GPU idle."
+            if activity.get("nsys_available")
+            else "Leaf gaps remain unobserved, not GPU idle."
+        )
+        + " Component savings are not added. OPT-124 "
+        "`supports_continuing=false` described an exhausted ladder, not proof "
+        "that optimization is impossible.",
         "",
         json.dumps(activity.get("windows") or {}, indent=2, sort_keys=True)[:4000],
         "",

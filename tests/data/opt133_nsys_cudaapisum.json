@@ -1,0 +1,22 @@
+{
+  "cudaapisum": [
+    {
+      "Name": "cudaGraphLaunch",
+      "Total Time (ns)": 2000000,
+      "Num Calls": 8,
+      "Time (%)": 51.28
+    },
+    {
+      "Name": "cudaStreamSynchronize",
+      "Total Time (ns)": 1500000,
+      "Num Calls": 12,
+      "Time (%)": 38.46
+    },
+    {
+      "Name": "cudaMemcpyAsync",
+      "Total Time (ns)": 400000,
+      "Num Calls": 12,
+      "Time (%)": 10.26
+    }
+  ]
+}

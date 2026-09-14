@@ -69,21 +69,21 @@ A capacity calculation was not substituted for live fit.
 
 ## Activity versus OPT-125 budget
 
-Method `cuda_event_engine_attribution`; nsys=`False`; proven inactive `0.0`. Leaf gaps remain unobserved, not GPU idle. Component savings are not added. OPT-124 `supports_continuing=false` described an exhausted ladder, not proof that optimization is impossible.
+Method `cuda_event_engine_attribution`; nsys=`True`; proven inactive `0.0`. Nsight Systems is installed; this phase still used CUDA-event attribution only (no nsys capture run). Leaf gaps remain unobserved by event leaves, not proven GPU idle. Component savings are not added. OPT-124 `supports_continuing=false` described an exhausted ladder, not proof that optimization is impossible.
 
 {
   "d128": {
-    "device_active_ms_per_token": 0.7650098250001219,
+    "device_active_ms_per_token": 0.7556013750000107,
     "intervals": {
       "charged_count": 96,
-      "device_active_ms": 9.180117900001463,
+      "device_active_ms": 9.067216500000129,
       "device_inactive_proven_ms": 0.0,
       "host_device_overlap_ms": 0.0,
       "host_union_ms": 0.0,
       "inactive_method": "not_proven_from_leaf_gaps; CUPTI/Nsight Systems required for hardware inactivity independent of event leaves",
-      "interval_coverage": 0.002135857508194442,
+      "interval_coverage": 0.0021151967772925326,
       "leaf_gap_is_not_gpu_idle": true,
-      "leaf_gap_ms_opt115_label": 4289.709215299999,
+      "leaf_gap_ms_opt115_label": 4278.3907255,
       "leaf_gap_relabeled": "unobserved_or_unrecorded_device_work",
       "leaf_kernel_count": 36,
       "never_count_cpu_wait_overlapping_gpu_twice": true,
@@ -92,25 +92,25 @@ Method `cuda_event_engine_attribution`; nsys=`False`; proven inactive `0.0`. Lea
       "profiler": "cuda_event_engine_attribution",
       "record_count": 96,
       "tokens": 12,
-      "unobserved_ms": 4288.9146120999985,
-      "wall_ms": 4298.09473
+      "unobserved_ms": 4277.6339535,
+      "wall_ms": 4286.70117
     },
     "native": {
       "cupti_linked": false,
-      "decode_only_tok_s": 59.5612755,
-      "instrumented_decode_only_wall_ms": 4298.09473,
+      "decode_only_tok_s": 59.7195816,
+      "instrumented_decode_only_wall_ms": 4286.70117,
       "keep": false,
       "method": "cuda_event_engine_attribution",
       "pool_overflow": false,
       "prefix": 128,
-      "profiler_perturbation_ms": 9.57080078,
+      "profiler_perturbation_ms": 15.1606445,
       "record_count": 96,
-      "request_tok_s": 58.3543129,
+      "request_tok_s": 58.5070114,
       "schema_version": 1,
       "stack": "post124_plus_opt127_decode_segments8",
       "task": "OPT-132",
       "tokens": 256,
-      "uninstrumented_decode_only_wall_ms": 4288.52393,
+      "uninstrumented_decode_only_wall_ms": 4271.54053,
       "windows": {
         "early": "0:4",
         "late": "n-4:n",
@@ -120,18 +120,18 @@ Method `cuda_event_engine_attribution`; nsys=`False`; proven inactive `0.0`. Lea
     },
     "proven_device_inactive_ms": 0.0,
     "record_count": 96,
-    "unobserved_ms_per_token": 357.4095510083332,
+    "unobserved_ms_per_token": 356.469496125,
     "windows": {
       "early": {
         "charged_count": 32,
-        "device_active_ms": 2.98138790000003,
+        "device_active_ms": 2.9375964999999695,
         "device_inactive_proven_ms": 0.0,
         "host_device_overlap_ms": 0.0,
         "host_union_ms": 0.0,
         "inactive_method": "not_proven_from_leaf_gaps; CUPTI/Nsight Systems required for hardware inactivity independent of event leaves",
         "interval_coverage": 1.0,
         "leaf_gap_is_not_gpu_idle": true,
-        "leaf_gap_ms_opt115_label": 63.00401930000001,
+        "leaf_gap_ms_opt115_label": 62.88759950000002,
         "leaf_gap_relabeled": "unobserved_or_unrecorded_device_work",
         "leaf_kernel_count": 12,
         "never_count_cpu_wait_overlapping_gpu_twice": true,
@@ -141,18 +141,18 @@ Method `cuda_event_engine_attribution`; nsys=`False`; proven inactive `0.0`. Lea
         "record_count": 32,
         "tokens": 4,
         "unobserved_ms": 0.0,
-        "wall_ms": 2.98138790000003
+        "wall_ms": 2.9375964999999695
       },
       "late": {
         "charged_count": 32,
-        "device_active_ms": 3.0727600000018356,
+        "device_active_ms": 3.064419999997881,
         "device_inactive_proven_ms": 0.0,
         "host_device_overlap_ms": 0.0,
         "host_union_ms": 0.0,
         "inactive_method": "not_proven_from_leaf_gaps; CUPTI/Nsight Systems required for hardware inactivity independent of event leaves",
         "interval_coverage": 1.0,
         "leaf_gap_is_not_gpu_idle": true,
-        "leaf_gap_ms_opt115_label": 65.04442999999901,
+        "leaf_gap_ms_opt115_label": 64.87844000000132,
         "leaf_gap_relabeled": "unobserved_or_unrecorded_device_work",
         "leaf_kernel_count": 12,
         "never_count_cpu_wait_overlapping_gpu_twice": true,
@@ -162,15 +162,16 @@ Method `cuda_event_engine_attribution`; nsys=`False`; proven inactive `0.0`. Lea
         "record_count": 32,
         "tokens": 4,
         "unobserved_ms": 0.0,
-        "wall_ms": 3.0727600000018356
+        "wall_ms": 3.064419999997881
       },
       "middle": {
         "charged_count": 32,
-        "device_active_ms": 3.1259699999995973,
+        "device_active_ms": 3.065200000002278,
         "device_inactive_proven_ms": 0.0,
         "host_device_overlap_ms": 0.0,
         "host_union_ms": 0.0,
-        "inactive_method": "not_proven_from_leaf_gaps; CUPTI/Nsight Systems required for hardware inactivity independent of event
+        "inactive_method": "not_proven_from_leaf_gaps; CUPTI/Nsight Systems required for hardware inactivity independent of event leaves",
+   
 
 ## Corrections versus original OPT-115–124 evidence
 
@@ -178,7 +179,7 @@ Method `cuda_event_engine_attribution`; nsys=`False`; proven inactive `0.0`. Lea
 - OPT-123 D8192/D32768 request rates mixed prefill into decode tok/s.
 - OPT-124 0.787×/0.620× mixed complete-request Quartz with decode-only llama.
 
-Blocked gates: ['opt016_2k_resource_blocked', 'nsight_systems_absent'].
+Blocked gates: ['opt016_2k_resource_blocked'].
 
 Reasons: [].
 

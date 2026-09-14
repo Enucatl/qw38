@@ -1,0 +1,20 @@
+{
+  "gputrace": [
+    {
+      "Start (ns)": 1000000,
+      "Duration (ns)": 5000000,
+      "Name": "void mixer_mmq(int)",
+      "Stream": 7
+    },
+    {
+      "Start (ns)": 7000000,
+      "Duration (ns)": 1000000,
+      "Name": "[CUDA memcpy Device-to-Host]"
+    },
+    {
+      "Start (ns)": 8500000,
+      "Duration (ns)": 2000000,
+      "Name": "qw38.ffn"
+    }
+  ]
+}
