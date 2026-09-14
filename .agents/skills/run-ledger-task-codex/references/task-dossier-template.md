@@ -2,7 +2,11 @@
 
 The planning agent creates `tasks/<PRIMARY-ID>.md` from this template. Replace
 all guidance; do not leave placeholders or unresolved choices. Keep the dossier
-after delivery as versioned evidence.
+after delivery as versioned evidence. Throughput, recovery, keep/reject, and
+bottleneck-ranking tasks must satisfy
+[performance-evidence-checklist.md](performance-evidence-checklist.md); read
+[performance-evidence-review-cases.md](performance-evidence-review-cases.md)
+before ranking or verifying a timing claim.
 
 ```markdown
 # <PRIMARY-ID> — <ledger description>
@@ -27,6 +31,21 @@ after delivery as versioned evidence.
 ## Repository evidence
 
 - `<path:line>` — <fact this establishes>
+
+## Performance evidence
+
+Required for throughput, recovery, keep/reject, or bottleneck-ranking tasks;
+write `N/A` with reason for instruction-only or non-timing work. Draft
+conclusions stay `unverified` until verification.
+
+- Measurement identity: <engine/commit, loaded binary hash, build flags/image/tool versions, GGUF, selectors, input token hash, prefix, output/eval counts, first-token convention, allocated capacity, populated length, sampling/output policy, graph mode, clocks/residents, warmups/samples, exact numerator/start/end events>
+- Metric class: <prefill | decode-only | complete-request | component | public sample/eval/output; a ratio requires matching identities>
+- Coverage: <tables, units, clock domain, capture bounds, streams, expected/observed graph/node counts, family mapping, unclassified work; OPT-136 coverage.json path or `unavailable`; graph envelopes are not leaf kernel time>
+- Time accounting: <disjoint union method; nested/overlap handling; no parent+child or CPU-wait+GPU double count>
+- Contradiction register: <conflicting sources, identities, quantitative disagreement, disposition, resolving check, or none>
+- Claim types: each conclusion tagged `measured` | `derived` | `hypothesis` | `incomplete` | `historical` (derivations include formula, units, and input links)
+- Target/guard roles: <region, primary metric, targets, guards, thresholds, policy ID; apply OPT-135 when opted in; or not opted in>
+- Evidence completeness: <complete | incomplete | unavailable checks>
 
 ## Implementation decisions
 
@@ -54,6 +73,7 @@ after delivery as versioned evidence.
 - Agent/model: <model and effort>
 - UTC/time/tokens/cost: <values when exposed; otherwise unavailable>
 - Outcome: <decisions and files changed>
+- Performance evidence applied: <yes, N/A with reason, or planning stop>
 
 ### Implementation
 
@@ -66,6 +86,7 @@ after delivery as versioned evidence.
 
 - Agent/model: <model and effort, or skipped with reason>
 - Changes and evidence: <paths and links>
+- Draft conclusions: `unverified` (verification has not run; do not include a verifier verdict)
 - UTC/time/tokens/cost: <values when exposed; otherwise unavailable>
 
 ### Verification
@@ -73,9 +94,10 @@ after delivery as versioned evidence.
 - Attempt: <number>
 - Agent/model: <model and effort>
 - Diff review: <scope and acceptance result>
+- Independent raw-record checks: <largest claimed gap, each claimed eliminated gap, coverage, units, identities, calculations>
 - Commands: `<exact command>` — <pass/fail and salient output>
 - Formatting changed files: <paths and rerun commands, or none>
-- Verdict: `pass` or `fail` — <reason>
+- Verdict: `pass` or `fail` — <reason; failed evidence checks return to implementation; missing hardware is incomplete/blocked>
 - UTC/time/tokens/cost: <values when exposed; otherwise unavailable>
 
 ### Retries and escalation
@@ -86,10 +108,14 @@ after delivery as versioned evidence.
 
 - Status: `done` or `blocked`
 - Acceptance evidence: <links for primary and coupled IDs>
+- Candidate measured delta: <identity-matched metric/window, or N/A with reason>
+- Shipping delta: <zero on reject/revert; N/A for diagnostics; identity-matched on keep>
+- Quality result: <pass/fail/not required/incomplete>
+- Evidence completeness: <complete | incomplete | unavailable checks>
 - Tok/s delta (required for every task): baseline <fixture + mean tok/s> →
   post-task <fixture + mean tok/s>; absolute delta `<post-baseline>` tok/s;
   relative speedup `<post/baseline>`× (`N/A` with an explicit reason when no
-  meaningful throughput measurement exists)
+  meaningful throughput measurement exists); matching metric identity and window
 - Commit: <hash and subject, not created, or local-only after push failure>
 - Push: <upstream and result, not attempted, or failure>
 - First-pass acceptance: <yes/no>

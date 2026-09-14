@@ -44,9 +44,11 @@ that format as authoritative when it is decision-complete.
 - No placeholders, `TBD`, or contradictory text versus `plan.md` or the ledger.
 - Coupled IDs are named explicitly or clearly `none`.
 - For throughput / keep-reject tasks whose dossier already cites a sink and
-  measured numbers, those numbers are current enough for this increment; when
-  the task itself produces the measurements (for example OPT-043), sink ranking
-  in the dossier is not required before implementation.
+  measured numbers, those numbers remain current only when they satisfy the
+  [performance evidence checklist](references/performance-evidence-checklist.md)
+  (identity, coverage, no unresolved material contradiction). When the task
+  itself produces the measurements (for example OPT-043), sink ranking in the
+  dossier is not required before implementation.
 
 On admission, the coordinator (not a subagent) appends a brief **Run record →
 Planning** entry (`skipped — pre-authored dossier admitted`), marks the primary
@@ -58,32 +60,41 @@ Planning repairs should amend the existing dossier minimally; do not rewrite a
 good pre-authored dossier into the long template unless the repair truly needs
 extra structure.
 
-## Performance steering (prefill/decode)
+## Performance evidence (prefill/decode)
 
 When the increment is a throughput or recovery idea (OPT-* keep/reject,
 parity, or similar), do **not** pick the next idea from a stale ranked list
-alone. Guide selection and planning with live instrumentation:
+alone. Guide selection and planning with live instrumentation that satisfies
+the [performance evidence checklist](references/performance-evidence-checklist.md).
+The eight [adversarial review cases](references/performance-evidence-review-cases.md)
+are required reading before ranking or verifying a bottleneck claim.
 
-1. Prefer the current OPT-020-style exclusive CUDA-event attribution
-   (`mixer_mmq`, `gdn_core`, `attention_core`, `ffn_mmq`, plus existing
-   categories) on a rebuilt diagnostic against **current** production
-   objects. Stale binaries are not evidence.
-2. Rank sinks by measured milliseconds (and share of wall). Prefer the
-   largest Quartz-owned sink that still has a transferable llama.cpp/ds4
-   technique under `plan.md` provenance.
-3. When a same-protocol llama.cpp category or whole-prefill/decode comparison
-   exists, prefer ideas that close the largest Quartz-versus-llama gap, not
-   only the largest Quartz-internal share.
-4. Decode work uses decode timing / BEN-001 probes the same way: longest
-   Quartz-owned decode sink first.
-5. Record the chosen sink and the measured numbers in the planning dossier
-   (`Repository evidence` / `Implementation decisions`). If admitting a new
-   ledger task after a discovery stop, name the sink that justified it.
+1. Establish measurement identity and graph-aware coverage on a rebuilt
+   diagnostic against **current** production objects before ranking any sink.
+   A rebuilt binary is necessary but not sufficient. Stale binaries are not
+   evidence. OPT-020-style CUDA-event categories cannot rank production graph
+   execution until coverage of that graph is established.
+2. Rank only covered, identity-matched sinks by measured milliseconds (and
+   share of wall) after reconstructing a disjoint union. Prefer the largest
+   Quartz-owned covered sink that still has a transferable llama.cpp/ds4
+   technique under `plan.md` provenance. Missing coverage is not zero excess.
+3. A Quartz-versus-llama comparison requires matching metric identities
+   (same prefill / decode-only / complete-request / component boundary) and
+   mapped corresponding work. Unmapped families stay `null`/`unknown`.
+4. Decode work uses decode timing / BEN-001 probes the same way, after the
+   same coverage and identity checks: longest covered Quartz-owned decode
+   sink first.
+5. Record the chosen sink, identities, coverage, contradiction register,
+   claim types, and measured numbers in the planning dossier
+   (`Repository evidence` / `Implementation decisions` /
+   `Performance evidence`). If admitting a new ledger task after a discovery
+   stop, name the sink that justified it only when those checks pass.
 
-Examples: after mixer quality lands, if attribution shows `ffn_mmq` then
-`attention_core` dominating, the next idea must target those—not a lower
-sink—unless a dossier proves the larger sinks are already llama-competitive
-or plan-forbidden.
+Examples: after mixer quality lands, if attribution **with established graph
+coverage** shows `ffn_mmq` then `attention_core` dominating, the next idea
+must target those—not a lower covered sink—unless a dossier proves the larger
+sinks are already llama-competitive or plan-forbidden. Incomplete coverage
+cannot justify skipping a larger unknown.
 
 ## Keep/reject quality gate
 
@@ -145,12 +156,20 @@ running quality is a verification failure** — send back to implementation.
 
 **Coordinator must not pre-bake verdicts.** Do not spawn documentation,
 verification, or delivery subagents with `quality_blocked`, `keep`, or
-`reject` already decided. Pass dossier paths, required phases, and verifier
-findings only; let verification determine the verdict from executed artifacts.
+`reject` already decided. Pass dossier paths and required phases to
+documentation and verification. Pass verifier findings only after verification
+has run (repair or delivery). Let verification determine the verdict from
+executed artifacts. Documentation precedes verification as draft preparation;
+do not pass a future verifier verdict into the documentation stage.
 
 On **keep** after measured quality pass, delivery must flip production pins when
-the dossier requires it and report tok/s delta versus the then-current sitting
-baseline (for example OPT-114 D2048/D128/P4096 numbers), not `0` by default.
+the dossier requires it and report candidate measured delta versus the
+then-current sitting baseline (for example OPT-114 D2048/D128/P4096 numbers)
+separately from shipping delta. Do not report shipping delta as `0` by default
+on keep. On reject, shipping delta is zero even if the candidate measured a
+gain. Missing required capture or candidate NLL is `incomplete`/`blocked`, not
+a fabricated `no_material_opportunity`, quality pass, or measured reject; apply
+the [performance evidence checklist](references/performance-evidence-checklist.md).
 
 ## Runtime mapping
 
@@ -200,6 +219,10 @@ Continue only when all of these hold:
 - If `tasks/<ID>.md` exists, it is readable and internally consistent with the
   selected ledger row; unresolved decisions or contradictory acceptance text
   are a planning stop, not an invitation to infer silently.
+- For throughput, recovery, keep/reject, or bottleneck-ranking increments,
+  apply the [performance evidence checklist](references/performance-evidence-checklist.md)
+  at admission. Unresolved measurement identity, coverage, or material
+  contradictions in an existing dossier are a planning stop.
 
 Also reject unknown IDs and terminal or already-active explicitly selected
 tasks. Report the exact failed gate and the evidence inspected.
@@ -213,11 +236,14 @@ tasks. Report the exact failed gate and the evidence inspected.
    `model: "cursor-grok-4.6-high"` to inspect the repository and create or
    amend a decision-complete dossier. A planning agent's output contract is the
    dossier path, coupled IDs, changed files, decisions made, and unresolved
-   decisions. Verify that every coupled ID exists, is `pending`, has satisfied
-   dependencies, and represents documentation or evidence inseparable from the
-   primary increment. Then mark the primary and coupled tasks `in_progress`. Do
-   not continue if any implementation choice remains unresolved or the dossier
-   is inconsistent with the ledger or plan.
+   decisions. Apply the
+   [performance evidence checklist](references/performance-evidence-checklist.md)
+   when the increment ranks a bottleneck or reports a timing delta. Verify that
+   every coupled ID exists, is `pending`, has satisfied dependencies, and
+   represents documentation or evidence inseparable from the primary increment.
+   Then mark the primary and coupled tasks `in_progress`. Do not continue if any
+   implementation choice remains unresolved or the dossier is inconsistent with
+   the ledger or plan.
 2. Spawn an implementation agent with `model: "cursor-grok-4.6-high"` to implement only the dossier's code, tests,
    and fixtures and run focused validation. The coordinator prompt must list
    every required acceptance phase from the dossier and iteration contract,
@@ -225,11 +251,14 @@ tasks. Report the exact failed gate and the evidence inspected.
    applies. The agent must append its changes and exact command outcomes to
    the dossier, without committing.
 3. If documentation or evidence changes are required, spawn a fresh
-   documentation agent with `model: "composer-2.5"` for prose, links, mechanical index updates, and any
-   fixtures, measurements, hashes, contracts, pins, ledger history, or
-   acceptance claims the dossier assigns to this stage. Pass the **measured
-   verdict and artifact paths from verification**, not a coordinator guess.
-   It records its work in the dossier and does not commit.
+   documentation agent with `model: "composer-2.5"` for prose, links, mechanical
+   index updates, and any fixtures, measurements, hashes, contracts, pins,
+   ledger history, or acceptance claims the dossier assigns to this stage.
+   This stage prepares a draft before verification; label conclusions
+   `unverified` and apply the
+   [performance evidence checklist](references/performance-evidence-checklist.md).
+   Do not pass a measured verdict or artifact judgment from a verification
+   that has not run. It records its work in the dossier and does not commit.
 4. Spawn a fresh integration verifier with `model: "composer-2.5"`. It independently reviews the complete
    diff against the dossier, ledger acceptance condition, `plan.md`, and
    repository boundaries. It may run formatting but makes no semantic fixes. It
@@ -237,10 +266,20 @@ tasks. Report the exact failed gate and the evidence inspected.
    `uv run ruff format .`, Ruff checks, required pytest selections, native
    builds/tests, and named CUDA or hardware gates. For keep/reject tasks it
    must apply the [keep/reject quality gate](#keepreject-quality-gate): fail
-   closed when candidate NLL was required but not measured. It must trace every
+   closed when candidate NLL was required but not measured. Pass task paths and
+   required phases without a pre-decided verdict. The verifier independently
+   queries raw records for the largest claimed gap and every claimed eliminated
+   gap; checks coverage, units, and identities; records calculations; and
+   assesses the documentation draft plus all artifacts against the
+   [performance evidence checklist](references/performance-evidence-checklist.md)
+   and the eight
+   [review cases](references/performance-evidence-review-cases.md). A second
+   agent restating generated JSON is not independent evidence. It must trace every
    acceptance claim to an executed assertion or an independently inspected
    artifact; stdout labels, fixture status fields, and dossier claims are not
-   sufficient evidence by themselves. If formatting changes files, it reruns
+   sufficient evidence by themselves. Failed evidence checks return to
+   implementation. Missing hardware is `incomplete`/`blocked`, not a measured
+   rejection or no opportunity. If formatting changes files, it reruns
    affected tests. It appends exact commands, outcomes, and a clear pass/fail
    verdict to the dossier.
 5. Only after a passing verification, spawn a fresh delivery agent with
@@ -248,8 +287,13 @@ tasks. Report the exact failed gate and the evidence inspected.
    scope and acceptance evidence **as determined by verification**, changes the primary and every coupled task
    from `in_progress` to `done`, adds the final UTC ledger entry, records the
    outcome in the dossier, creates one commit, and pushes the current branch to
-   its configured upstream. On keep, include production pin flips and tok/s
-   delta when the dossier requires them.
+   its configured upstream. Delivery may publish the verified verdict but must
+   not invent or revise scientific conclusions; a semantic report change
+   returns to verification. On keep, include production pin flips and report
+   candidate measured delta separately from shipping delta when the dossier
+   requires them. Apply the
+   [performance evidence checklist](references/performance-evidence-checklist.md)
+   reporting split.
 
 The delivery commit uses a Google-style subject of at most 50 characters and an
 intent-focused body. It must not force-push, rebase, merge, amend, or
@@ -290,18 +334,26 @@ documentation, verification/testing, and delivery), elapsed time when known,
 retry count, first-pass acceptance, and token/cost data only when the runtime
 exposes them.
 
-For throughput / keep-reject / oracle-steered tasks, always include a
-**tok/s delta versus the then-current baseline** at the end of the completion
-report (and in the dossier Final outcome / delivery ledger History entry):
+For throughput / keep-reject / oracle-steered tasks, always include identity-
+matched deltas at the end of the completion report (and in the dossier Final
+outcome / delivery ledger History entry), applying the
+[performance evidence checklist](references/performance-evidence-checklist.md):
 
-- Name the baseline (fixture path + mean tok/s) and the post-task mean tok/s.
+- Record candidate measured delta, shipping delta, quality result, and evidence
+  completeness as separate fields. Every ratio uses a matching metric identity
+  and window.
+- Name the baseline (fixture path + mean tok/s) and the post-task mean tok/s
+  for the claimed metric.
 - Report absolute delta (`post - baseline`) and relative speedup
-  (`post / baseline`, or percent).
-- On a reject/revert, still report the measured post number and state that
-  speedup is `0` (baseline unchanged).
-- On **keep** with production pin flip, report tok/s delta versus the sitting
-  baseline (for example OPT-114), not `0`.
+  (`post / baseline`, or percent) only for that identity-matched metric.
+- Diagnostics use `N/A` for shipping throughput changes.
+- On a reject/revert, report the candidate measured delta and set shipping
+  delta to zero (baseline unchanged). Do not conflate a rejected measured
+  result with zero shipping impact.
+- On **keep** with production pin flip, report shipping tok/s delta versus the
+  sitting baseline (for example OPT-114), not `0`.
 - When an OPT-021-style llama.cpp same-sitting number exists, also report
-  Quartz-versus-llama tok/s (informational unless that task owns the gate).
+  Quartz-versus-llama tok/s only on a matching metric identity (informational
+  unless that task owns the gate).
 
 Example: `4K Quartz 1680.8 tok/s vs baseline 967.3 (+713.5, 1.74×); llama 3227.5`.
