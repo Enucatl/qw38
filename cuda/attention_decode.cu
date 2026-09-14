@@ -1,6 +1,7 @@
 #include "attention_decode.h"
 #include "fattn_mma_f16.cuh"
 #include "mma.cuh"
+#include "opt137_dense_mma_decode.cuh"
 #include "pdl_launch.cuh"
 #include "rms_norm.cuh"
 
@@ -880,14 +881,15 @@ __global__ void merge_decode_kv_parts(AttentionConfig config, int n_parts,
   const std::uint32_t query_head = blockIdx.x;
   const std::uint32_t lane = threadIdx.x;
   const std::size_t width = config.head_width;
-  __shared__ float shared_meta[32];
+  __shared__ float shared_meta[512];
   const int meta_floats = n_parts * 2;
-  if (static_cast<int>(lane) < meta_floats) {
-    shared_meta[lane] =
+  for (int index = static_cast<int>(lane); index < meta_floats;
+       index += static_cast<int>(blockDim.x)) {
+    shared_meta[index] =
         meta[(static_cast<std::size_t>(query_head) *
               static_cast<std::size_t>(n_parts)) *
                  2U +
-             lane];
+             static_cast<std::size_t>(index)];
   }
   __syncthreads();
   float global_max = -INFINITY;
@@ -2333,6 +2335,9 @@ int selected_decode_kv_parts_at_or_above_2048() noexcept {
 }
 
 int decode_kv_parts_for_position(std::size_t position) noexcept {
+  if (opt137_uses_mma_at(position)) {
+    return opt137_n_parts_for_position(position);
+  }
   if (decode_attention_vec128_uses_online_at(position)) {
     return effective_vec128_n_parts();
   }
@@ -2341,14 +2346,42 @@ int decode_kv_parts_for_position(std::size_t position) noexcept {
              : kSelectedDecodeKvPartsLow;
 }
 
+int opt137_mma_occupancy(int* nsm) noexcept { return opt137::occupancy(nsm); }
+
+void opt137_prepare_mma_runtime() noexcept {
+  if (!opt137_mma_enabled()) return;
+  if (g_opt137_frozen_n_parts[0] == 0) {
+    int nsm = 148;
+    cudaDeviceGetAttribute(&nsm, cudaDevAttrMultiProcessorCount, 0);
+    if (nsm < 1) nsm = 148;
+    const int occ = kOpt137MmaOccupancyPinned;
+    opt137_set_frozen_n_parts(
+        opt137_parallel_blocks(kOpt137RepVisible8448, occ, nsm),
+        opt137_parallel_blocks(kOpt137RepVisible33024, occ, nsm),
+        opt137_parallel_blocks(kOpt137RepVisible131072, occ, nsm));
+  }
+  static bool shared_ready = false;
+  if (!shared_ready) {
+    cudaFuncSetAttribute(
+        opt137::dense_bf16_tile_f16_mma_decode,
+        cudaFuncAttributeMaxDynamicSharedMemorySize,
+        static_cast<int>(opt137::shared_bytes()));
+    shared_ready = true;
+  }
+}
+
 std::size_t decode_kv_partial_vkq_values(int n_parts) noexcept {
-  if (!legal_decode_kv_parts(n_parts)) return 0;
+  if (!legal_decode_kv_parts(n_parts) && !legal_opt137_n_parts(n_parts)) {
+    return 0;
+  }
   return static_cast<std::size_t>(kProductionQueryHeads) *
          static_cast<std::size_t>(n_parts) * kProductionHeadWidth;
 }
 
 std::size_t decode_kv_partial_meta_values(int n_parts) noexcept {
-  if (!legal_decode_kv_parts(n_parts)) return 0;
+  if (!legal_decode_kv_parts(n_parts) && !legal_opt137_n_parts(n_parts)) {
+    return 0;
+  }
   return static_cast<std::size_t>(kProductionQueryHeads) *
          static_cast<std::size_t>(n_parts) * 2U;
 }
@@ -2682,6 +2715,28 @@ cudaError_t launch_attention_prepare_partitioned(
     float* normalized_query, float* normalized_key, float* score_workspace,
     float* output, float* partial_vkq, float* meta, int n_parts,
     cudaStream_t stream, const DecodeLaunchState* launch) noexcept {
+  if (opt137_uses_mma_at(position)) {
+    opt137_prepare_mma_runtime();
+    const int mma_parts = opt137_n_parts_for_position(position);
+    cudaError_t error = stage_and_validate_chunk(
+        config, position, 1, query, key, value, query_norm_scale,
+        key_norm_scale, output_gate, committed, candidate_row, normalized_query,
+        normalized_key, score_workspace, output, stream,
+        static_cast<std::size_t>(-1), launch);
+    if (error != cudaSuccess) return error;
+    publish_packed_kv_device_format(effective_packed_kv_format());
+    error = launch_prepare_decode_query(config, position, query,
+                                        query_norm_scale, normalized_query,
+                                        stream, launch);
+    if (error != cudaSuccess) return error;
+    error = opt137::launch_core(config, position, mma_parts, normalized_query,
+                                committed, candidate_row, partial_vkq, meta,
+                                stream, launch);
+    if (error != cudaSuccess) return error;
+    merge_decode_kv_parts<<<config.query_heads, kThreads, 0, stream>>>(
+        config, mma_parts, partial_vkq, meta, output_gate, output);
+    return cudaPeekAtLastError();
+  }
   const char* vec_path = selected_decode_attention_vec();
   if (decode_uses_warp_query() &&
       !decode_attention_vec128_uses_online_at(position) &&

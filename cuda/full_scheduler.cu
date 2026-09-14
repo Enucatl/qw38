@@ -3902,6 +3902,9 @@ Status SchedulerGraphs::create(const ResidentModel& model,
             "CUDA scheduler graph creation input is invalid"};
   }
   const bool segment_path = execution_graph_uses_decode_segments8();
+  if (opt137_mma_enabled()) {
+    opt137_prepare_mma_runtime();
+  }
   if (segment_path) {
     if (session == nullptr || session->capacity_ != workspace->capacity_) {
       return {StatusCode::kInvalidArgument,
@@ -4101,8 +4104,10 @@ Status SchedulerGraphs::apply_segment_launch_params() noexcept {
     }
     return Status::ok();
   };
+  // Parent topology count remains kDecodeGraphTopologyCount (2). OPT-137
+  // MMA candidate uses effective_decode_graph_topology_count() (5).
   if (identity_changed ||
-      captured_topology_count_ != kDecodeGraphTopologyCount) {
+      captured_topology_count_ != effective_decode_graph_topology_count()) {
     return recapture();
   }
   return Status::ok();
@@ -4112,6 +4117,9 @@ Status SchedulerGraphs::capture_decode_segments(cudaStream_t stream) noexcept {
   if (model_ == nullptr || workspace_ == nullptr || session_ == nullptr) {
     return {StatusCode::kInvalidArgument,
             "decode_segments8 capture requires model, workspace, and session"};
+  }
+  if (opt137_mma_enabled()) {
+    opt137_prepare_mma_runtime();
   }
   const std::uint64_t graph_generation = reinterpret_cast<std::uint64_t>(this);
   cudaError_t error = cudaSuccess;
@@ -4151,10 +4159,15 @@ Status SchedulerGraphs::capture_decode_segments(cudaStream_t stream) noexcept {
   decode_segment_graph_count_ = 0;
   captured_topology_count_ = 0;
   for (int topology = 0; error == cudaSuccess &&
-                         topology < kDecodeGraphTopologyCount;
+                         topology < effective_decode_graph_topology_count();
        ++topology) {
-    const std::size_t capture_frontier =
-        decode_graph_topology_capture_position(topology);
+    const std::size_t capture_frontier = [&]() {
+      std::size_t pos = decode_graph_topology_capture_position(topology);
+      const std::size_t cap = session_->capacity_;
+      if (cap == 0) return pos;
+      if (pos >= cap) pos = cap - 1;
+      return pos;
+    }();
     const Status uploaded = session_->upload_decode_launch_state(
         0, static_cast<std::uint32_t>(capture_frontier),
         static_cast<std::uint32_t>(capture_frontier), stream);
@@ -4408,7 +4421,8 @@ bool SchedulerGraphs::matches(
     const ResidentModel& model, const SchedulerWorkspace* workspace,
     const SchedulerSession* session) const noexcept {
   if (decode_segment_graph_count_ ==
-      kDecodeSegmentCount * kDecodeGraphTopologyCount) {
+      kDecodeSegmentCount *
+          static_cast<std::size_t>(effective_decode_graph_topology_count())) {
     if (session != nullptr) {
       return model_ == &model && workspace_ == workspace && session_ == session;
     }
@@ -5554,7 +5568,8 @@ Status execute_token(const ResidentModel& model, std::size_t token,
   const bool use_decode_segments =
       graphs != nullptr && execution_graph_uses_decode_segments8() &&
       graphs->decode_segment_graph_count() ==
-          kDecodeSegmentCount * kDecodeGraphTopologyCount;
+          kDecodeSegmentCount *
+              static_cast<std::size_t>(effective_decode_graph_topology_count());
   if (use_decode_segments) {
     const int topology = decode_graph_topology_index(session->frontier_);
     for (std::size_t segment_index = 0;

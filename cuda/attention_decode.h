@@ -168,6 +168,8 @@ int decode_kv_vec128_online_occupancy() noexcept;
 int occupancy_raw_vec128_n_parts(std::size_t position, int* occupancy,
                                  int* nsm) noexcept;
 int occupancy_snapped_vec128_n_parts(std::size_t position) noexcept;
+int opt137_mma_occupancy(int* nsm) noexcept;
+void opt137_prepare_mma_runtime() noexcept;
 int decode_query_prep_occupancy() noexcept;
 int decode_kv_warp_query_prepared_occupancy() noexcept;
 void decode_attention_kernel_attributes(const char* prep_path, int* registers,

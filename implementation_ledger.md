@@ -335,7 +335,7 @@ OPT-124 assesses the remaining ceiling without claiming universal optimality.
 | OPT-134 | Enforce evidence discipline in both ledger runner skills | OPT-133 | done | Both runner skills require metric identity, graph-aware coverage, contradiction resolution, independent raw-evidence verification and separate experiment/shipping verdicts; eight adversarial review cases pass | [`tasks/OPT-134.md`](tasks/OPT-134.md); [`.agents/skills/run-ledger-task-codex/references/performance-evidence-checklist.md`](.agents/skills/run-ledger-task-codex/references/performance-evidence-checklist.md); [`.agents/skills/run-ledger-task-codex/references/performance-evidence-review-cases.md`](.agents/skills/run-ledger-task-codex/references/performance-evidence-review-cases.md); [`.cursor/skills/run-ledger-task-cursor/references/performance-evidence-checklist.md`](.cursor/skills/run-ledger-task-cursor/references/performance-evidence-checklist.md); [`.cursor/skills/run-ledger-task-cursor/references/performance-evidence-review-cases.md`](.cursor/skills/run-ledger-task-cursor/references/performance-evidence-review-cases.md); verification 2026-09-14T13:37:00Z |
 | OPT-135 | Separate target improvement from guard non-regression | OPT-134 | done | `target_guard_v2` host policy; `evaluate()` + CLI; 23/23 self-check; neutral-guard keep, guard-loss reject, straddling CI inconclusive; OPT-130 counterfactual preserves `reject`; opt-in runner schema only; no CUDA, production pin, or historical fixture change | [`tasks/OPT-135.md`](tasks/OPT-135.md); [`pins/performance_keep_policy_v2.json`](pins/performance_keep_policy_v2.json); [`tools/performance_keep_policy.py`](tools/performance_keep_policy.py); [`fixtures/opt135_target_guard_policy.json`](fixtures/opt135_target_guard_policy.json); [`tests/test_performance_keep_policy.py`](tests/test_performance_keep_policy.py); [`evidence/optimization/opt135-target-guard-policy/REPORT.md`](evidence/optimization/opt135-target-guard-policy/REPORT.md); verification 2026-09-14T14:00:00Z |
 | OPT-136 | Repair graph accounting and profile matched production decode | OPT-133, OPT-134, OPT-135 | done | Graph accounting repair invalidates OPT-133 idle; shared `performance_evidence.py` parser and capture harness; 150/150 coverage valid; matched decode ratios D128 0.844, D2048 0.717, D8192 0.519, D32768 0.244; diagnostics only, no production change | [`tasks/OPT-136.md`](tasks/OPT-136.md); [`tools/performance_evidence.py`](tools/performance_evidence.py); [`tools/opt136_graph_accounting.py`](tools/opt136_graph_accounting.py); [`fixtures/opt136_graph_accounting.json`](fixtures/opt136_graph_accounting.json); [`evidence/optimization/opt136-graph-accounting/REPORT.md`](evidence/optimization/opt136-graph-accounting/REPORT.md); verification 2026-09-14T15:53:00Z |
-| OPT-137 | Implement a bounded long-context dense attention consumer | OPT-135, OPT-136 | pending | One dense BF16 long-context MMA experiment has a verified keep or bounded measured no-keep; any keep requires complete 8K/32K branch/engine evidence, frozen target/guard admission, measured quality and graph/state/128K checks | [`tasks/OPT-137.md`](tasks/OPT-137.md) |
+| OPT-137 | Implement a bounded long-context dense attention consumer | OPT-135, OPT-136 | done | `keep`; `dense_bf16_tile_f16_mma_decode_v1`; `kSelectedOpt137DenseMma=true` for position≥8192; parent `hybrid_crossover@1024` below 8192; D8192 +13.46 tok/s (1.38×), D32768 +18.58 tok/s (2.21×) vs OPT-132 sitting; D128/D2048 guard geo L≈0.999; OPT-058 PPL 1.0; `topology_recapture=0`; no OPT-130 leak | [`tasks/OPT-137.md`](tasks/OPT-137.md); [`pins/opt137_long_attention_contract.json`](pins/opt137_long_attention_contract.json); [`pins/opt137_iteration_contract.json`](pins/opt137_iteration_contract.json); [`pins/opt137_long_attention_provenance.json`](pins/opt137_long_attention_provenance.json); [`fixtures/opt137_long_attention.json`](fixtures/opt137_long_attention.json); [`tools/opt137_long_attention.py`](tools/opt137_long_attention.py); [`tests/test_opt137_long_attention.py`](tests/test_opt137_long_attention.py); [`cuda/opt137_long_attention_test.cu`](cuda/opt137_long_attention_test.cu); [`cuda/opt137_dense_mma_decode.cuh`](cuda/opt137_dense_mma_decode.cuh); [`cuda/attention_decode.cu`](cuda/attention_decode.cu); [`cuda/attention_decode_path.cuh`](cuda/attention_decode_path.cuh); [`cuda/full_scheduler.cu`](cuda/full_scheduler.cu); [`cuda/opt058_quality_baseline_test.cu`](cuda/opt058_quality_baseline_test.cu); [`Makefile`](Makefile); [`tools/run_optimization_task.py`](tools/run_optimization_task.py); [`evidence/optimization/opt137-long-attention/REPORT.md`](evidence/optimization/opt137-long-attention/REPORT.md); verification 2026-09-14T17:54:00Z |
 | OPT-138 | Profile remaining short-decode and prefill excess versus llama | OPT-136, OPT-137 | pending | Current matched D128/D2048/P4096 profiles reconcile whole time, fused families and overhead; targeted counters/replays yield supported decode/prefill priorities or explicit unknowns without changing production | [`tasks/OPT-138.md`](tasks/OPT-138.md) |
 
 ### Post-133 evidence repair and focused performance work (OPT-134–138)
@@ -8320,3 +8320,25 @@ statements below are historical, not the current execution order.
   [`evidence/optimization/opt136-graph-accounting/REPORT.md`](evidence/optimization/opt136-graph-accounting/REPORT.md).
 - OPT-136 marked `done`. Coupled IDs: none. Next eligible pending task:
   **OPT-137**.
+
+### OPT-137 delivery (2026-09-14T17:54:40Z)
+
+- Implemented bounded long-context dense BF16 tile-F16 MMA decode candidate
+  `dense_bf16_tile_f16_mma_decode_v1` with frozen partition buckets, graph
+  integration on OPT-127 `decode_segments8`, and production pin
+  `kSelectedOpt137DenseMma=true` for `position>=8192`. Parent
+  `hybrid_crossover@1024` / `verified_max=4096` / `n_parts=16` remains below
+  8192. No OPT-130 pin leak.
+- Verification **PASS** (2026-09-14T17:53:00Z): `target_guard_v2` keep;
+  OPT-058 quality PPL ratio **1.0**; candidate NLL measured; long-cache MMA
+  launches **48/48/48** at 8192/32768/131040; `topology_recapture=0`; ruff
+  format/check clean; **71 passed**; `git diff --check` pass.
+- Throughput delta vs OPT-132 sitting (`decode_segments8`, capacity 131072):
+  D8192 **35.20→48.66 tok/s** (**+13.46**, **1.38×**); D32768
+  **15.36→33.94 tok/s** (**+18.58**, **2.21×**). Short-context guards D128/D2048
+  geo L≈**0.999** (≥0.98 floor); P4096 prefill geo **0.996**.
+- Key evidence: [`tasks/OPT-137.md`](tasks/OPT-137.md);
+  [`fixtures/opt137_long_attention.json`](fixtures/opt137_long_attention.json);
+  [`evidence/optimization/opt137-long-attention/REPORT.md`](evidence/optimization/opt137-long-attention/REPORT.md).
+- OPT-137 marked `done`. Coupled IDs: none. Next eligible pending task:
+  **OPT-138**.

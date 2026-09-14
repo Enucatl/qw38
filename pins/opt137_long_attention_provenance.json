@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "task": "OPT-137",
+  "candidate": "dense_bf16_tile_f16_mma_decode_v1",
+  "authority": "pinned llama.cpp",
+  "llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+  "license": "MIT",
+  "authors": "The ggml authors",
+  "adapter_namespace": "qw38::cuda::opt137",
+  "specialization": "Ampere fattn-mma-f16 DKQ=DV=256 ncols1=1 ncols2=8 decode consumer over dense BF16 KV",
+  "not_vendored": [
+    "ggml tensor/runtime",
+    "ggml graph/allocator",
+    "ggml CLI/model",
+    "current llama HEAD as release authority"
+  ],
+  "copied_organization": [
+    {
+      "file": ".cache/authorities/llama.cpp/ggml/src/ggml-cuda/fattn-mma-f16.cuh",
+      "sha256": "08977d8e6e26ce2c8554c85c97e1fa07c1c4e3bdbe454eaf9b9b53c677fa4038",
+      "use": "tile/stage/partition organization, nbatch_fa=64, occupancy-based parallel_blocks, ncols2=8 GQA pad"
+    },
+    {
+      "file": ".cache/authorities/llama.cpp/ggml/src/ggml-cuda/fattn.cu",
+      "sha256": "43362d6bc282b359495e06269a1c4ed2d221755f112244a7b6dd10601fd5ceeb",
+      "use": "fattn-mma-f16 launch selection for Qwen GQA ncols2"
+    }
+  ],
+  "local_modifications": [
+    "BF16 committed/candidate KV load into a bounded F16 tile via FP32 with OPT-111 rounding (__float2half_rn(__bfloat162float))",
+    "Quartz rotating cache physical strides and packed_kv_load for committed rows",
+    "GQA ratio six; padded eight-column tile masks heads 6 and 7",
+    "causal frontier via decode launch state; no ggml mask tensor",
+    "output gating and merge of frozen partitions remain outside the MMA core",
+    "partition counts frozen per graph bucket from representative visibilities 8448/33024/131072",
+    "no persistent F16 shadow cache",
+    "diagnostic pipeline identities only; production pin stays hybrid_crossover until keep"
+  ]
+}
