@@ -16,6 +16,7 @@ from tools.opt138_remaining_gap_profile import (
     REPORT,
     REQUIRED_FIXTURE_KEYS,
     SELECTOR,
+    _experiment_entry,
     _parse_ncu_metric_names,
     _select_ncu_metrics,
     counter_timeout_s,
@@ -365,3 +366,42 @@ def test_fixture_keys() -> None:
         assert key in fixture
     assert fixture["claims_throughput"] is False
     assert REPORT.parent.as_posix().endswith("opt138-remaining-gap")
+
+
+def test_throughput_only_does_not_set_supported_mechanism() -> None:
+    entry = _experiment_entry(
+        "decode",
+        {
+            "selected": [
+                {
+                    "family": "attn_core",
+                    "score_ms": 4.2,
+                    "stats": {"mean_ms": 4.2, "one_sided_low": 4.1, "n": 3},
+                }
+            ]
+        },
+        {
+            "kernels": [
+                {
+                    "family": "attn_core",
+                    "engine": "quartz",
+                    "phase": "decode",
+                    "replay_family": "decode-attention",
+                    "dram_throughput": 70.0,
+                    "sm_throughput": 20.0,
+                    "error": None,
+                }
+            ]
+        },
+        {"rounds": []},
+    )
+    assert entry["supported_mechanism"] is None
+    assert entry["candidate"] is None
+
+
+def test_collector_requests_csv_and_imports_opt139() -> None:
+    tool = (ROOT / "tools/opt138_remaining_gap_profile.py").read_text(encoding="utf-8")
+    assert "from tools import opt139_counter_identity as opt139" in tool
+    assert '"--csv"' in tool
+    assert "counter_record_from_ncu_blob" in tool
+    assert "OPT140_INELIGIBLE" in tool

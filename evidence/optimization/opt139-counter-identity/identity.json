@@ -1,0 +1,128 @@
+{
+  "schema_version": 1,
+  "task": "OPT-139",
+  "phase": "identity",
+  "mode": "acceptance",
+  "ok": true,
+  "decode_shapes": {
+    "d128": {
+      "prefix": 128,
+      "workload": "D128",
+      "phase": "decode",
+      "family": "attn_core",
+      "engine": "quartz",
+      "replay_family": "decode-attention",
+      "path": "warp_query",
+      "expected_kernel": "warp_query_decode_attention",
+      "hybrid_crossover_threshold": 1024,
+      "verified_max": 4096,
+      "override": null,
+      "selector": "decode_segments8",
+      "proof_limit": "hybrid dispatch can select vec128_online at D2048; a warp_query replay is not automatically evidence for that gap",
+      "trace_kernel": {
+        "name": "void qw38::cuda::<unnamed>::warp_query_decode_attention<(bool)0, (bool)0>(qw38::cuda::AttentionConfig, unsigned long, int, const float *, const float *, const __nv_bfloat16 *, const __nv_bfloat16 *, const __nv_bfloat16 *, const __nv_bfloat16 *, float *, float *, float *, const qw38::cuda::DecodeLaunchState *)",
+        "stem": "warp_query_decode_attention",
+        "duration_ns": 30464,
+        "family": "attn_core"
+      },
+      "kernel_source": "trace_largest_duration",
+      "sqlite": "build/optimization-runs/opt138/traces/quartz-d128-node-r0.2.sqlite",
+      "identity": {
+        "ok": true,
+        "phase": "decode",
+        "engine": "quartz",
+        "workload": "D128",
+        "kernel": "warp_query_decode_attention",
+        "expected_kernel": "warp_query_decode_attention",
+        "replay_family": "decode-attention",
+        "replay_boundary": {
+          "ok": true,
+          "cache_mode": "rotating",
+          "production_weights": true,
+          "synthetic_weights": false,
+          "phase": "decode",
+          "replay_family": "decode-attention",
+          "reason": null
+        },
+        "mismatches": [],
+        "reason": null
+      },
+      "warp_query_is_not_d2048_evidence": null
+    },
+    "d2048": {
+      "prefix": 2048,
+      "workload": "D2048",
+      "phase": "decode",
+      "family": "attn_core",
+      "engine": "quartz",
+      "replay_family": "decode-attention",
+      "path": "vec128_online",
+      "expected_kernel": "vec128_online_decode_attention",
+      "hybrid_crossover_threshold": 1024,
+      "verified_max": 4096,
+      "override": null,
+      "selector": "decode_segments8",
+      "proof_limit": "hybrid dispatch can select vec128_online at D2048; a warp_query replay is not automatically evidence for that gap",
+      "trace_kernel": {
+        "name": "qw38::cuda::<unnamed>::vec128_online_decode_attention(qw38::cuda::AttentionConfig, unsigned long, int, const float *, const float *, const __nv_bfloat16 *, const __nv_bfloat16 *, const __nv_bfloat16 *, const __nv_bfloat16 *, float *, float *, float *, const qw38::cuda::DecodeLaunchState *)",
+        "stem": "vec128_online_decode_attention",
+        "duration_ns": 275969,
+        "family": "attn_core"
+      },
+      "kernel_source": "trace_largest_duration",
+      "sqlite": "build/optimization-runs/opt138/traces/quartz-d2048-node-r0.2.sqlite",
+      "identity": {
+        "ok": true,
+        "phase": "decode",
+        "engine": "quartz",
+        "workload": "D2048",
+        "kernel": "vec128_online_decode_attention",
+        "expected_kernel": "vec128_online_decode_attention",
+        "replay_family": "decode-attention",
+        "replay_boundary": {
+          "ok": true,
+          "cache_mode": "rotating",
+          "production_weights": true,
+          "synthetic_weights": false,
+          "phase": "decode",
+          "replay_family": "decode-attention",
+          "reason": null
+        },
+        "mismatches": [],
+        "reason": null
+      },
+      "warp_query_is_not_d2048_evidence": {
+        "ok": false,
+        "phase": "decode",
+        "engine": "quartz",
+        "workload": "D2048",
+        "kernel": "warp_query_decode_attention",
+        "expected_kernel": "vec128_online_decode_attention",
+        "replay_family": "decode-attention",
+        "replay_boundary": {
+          "ok": true,
+          "cache_mode": "rotating",
+          "production_weights": true,
+          "synthetic_weights": false,
+          "phase": "decode",
+          "replay_family": "decode-attention",
+          "reason": null
+        },
+        "mismatches": [
+          "kernel_selector_mismatch"
+        ],
+        "reason": "kernel_selector_mismatch"
+      }
+    }
+  },
+  "prefill_attn_core": {
+    "phase": "prefill",
+    "family": "attn_core",
+    "eligible": false,
+    "reason": "prefill_decode_attention_ineligible_until_opt140",
+    "replay_family": "decode-attention"
+  },
+  "claims_throughput": false,
+  "family_plan": "task=OPT-139 mode=acceptance phase=identity loop_product=2 cases=2 candidates=1 warmups=0 samples=1 tokens=1",
+  "measured_at": "2026-09-14T23:29:41Z"
+}

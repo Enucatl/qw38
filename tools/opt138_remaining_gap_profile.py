@@ -43,6 +43,7 @@ from tools.run_optimization_task import (  # noqa: E402
     validate_future_keep_policy,
     workload_for_mode,
 )
+from tools import opt139_counter_identity as opt139  # noqa: E402
 
 CONTRACT = ROOT / "pins/opt138_remaining_gap_contract.json"
 ITERATION = ROOT / "pins/opt138_iteration_contract.json"
@@ -1064,6 +1065,22 @@ def run_counters(run_dir: Path, mode: str) -> dict[str, Any]:
                     )
                 )
                 continue
+            if phase == "prefill" and replay_family == "decode-attention":
+                kernels.append(
+                    {
+                        **missing_counter_record(
+                            kernel=kernel_id,
+                            engine=engine,
+                            error=opt139.OPT140_INELIGIBLE,
+                        ),
+                        "family": family,
+                        "phase": phase,
+                        "replay_family": replay_family,
+                        "supported_mechanism": None,
+                        "candidate": None,
+                    }
+                )
+                continue
             metrics = ",".join(ncu.get("selected_metrics") or [])
             if engine == "llama":
                 kernels.append(
@@ -1084,36 +1101,55 @@ def run_counters(run_dir: Path, mode: str) -> dict[str, Any]:
                     )
                 )
                 continue
+            expected_kernel = None
+            if family == "attn_core" and phase == "decode":
+                expected_kernel = opt139.launch_for_path(
+                    opt139.decode_attention_vec128_path_for_position(128)
+                )
             collect = [
                 *_docker_ncu(),
                 "ncu",
+                "--csv",
                 "--metrics",
                 metrics,
                 "--target-processes",
                 "all",
                 "--replay-mode",
                 "application",
-                f"./{REPLAY_BIN}",
-                MODEL,
-                "--workload",
-                replay_family,
-                "--cache-mode",
-                "rotating",
-                "--opt138-protocol",
-                "--warmups",
-                "0",
-                "--samples",
-                "1",
             ]
+            if expected_kernel:
+                collect.extend(
+                    [
+                        "--kernel-name",
+                        f"regex:{opt139.kernel_stem(expected_kernel)}",
+                        "--launch-count",
+                        "1",
+                    ]
+                )
+            collect.extend(
+                [
+                    f"./{REPLAY_BIN}",
+                    MODEL,
+                    "--workload",
+                    replay_family,
+                    "--cache-mode",
+                    "rotating",
+                    "--opt138-protocol",
+                    "--warmups",
+                    "0",
+                    "--samples",
+                    "1",
+                ]
+            )
             timeout_s = counter_timeout_s(replay_family)
+            raw_dir = EVIDENCE / "ncu-raw"
+            raw_dir.mkdir(parents=True, exist_ok=True)
+            raw_path = raw_dir / f"{engine}-{phase}-{family}.ncu.txt"
             completed = opt136.with_gpu_lock(collect, timeout_s=timeout_s)
             blob = (completed.stdout or "") + (completed.stderr or "")
+            raw_path.write_text(blob, encoding="utf-8")
             timed_out = "timeout after" in blob
-            if (
-                completed.returncode != 0
-                or "ERR_NVGPUCTRPERM" in blob
-                or timed_out
-            ):
+            if completed.returncode != 0 or "ERR_NVGPUCTRPERM" in blob or timed_out:
                 kernels.append(
                     {
                         **missing_counter_record(
@@ -1125,42 +1161,25 @@ def run_counters(run_dir: Path, mode: str) -> dict[str, Any]:
                         "replay_mode": "application",
                         "selected_metrics": ncu.get("selected_metrics"),
                         "timeout_s": timeout_s,
+                        "raw_artifact": relpath(raw_path),
                     }
                 )
                 continue
-            parsed_metrics: dict[str, Any] = {}
-            for line in blob.splitlines():
-                if "," in line or ":" in line:
-                    parsed_metrics[line.strip()[:120]] = line.strip()
             kernels.append(
-                {
-                    "kernel": kernel_id,
-                    "engine": engine,
-                    "family": family,
-                    "phase": phase,
-                    "replay_family": replay_family,
-                    "replay_mode": "application",
-                    "selected_metrics": ncu.get("selected_metrics"),
-                    "timeout_s": timeout_s,
-                    "metrics": parsed_metrics,
-                    "dram_read_bytes": None,
-                    "dram_write_bytes": None,
-                    "dram_throughput": None,
-                    "l2_traffic": None,
-                    "sm_throughput": None,
-                    "achieved_occupancy": None,
-                    "stalls": None,
-                    "registers": None,
-                    "local_memory_spills": None,
-                    "error": None,
-                    "zero_filled": False,
-                    "full_ncu_sweep": False,
-                    "stdout_tail": blob[-1500:],
-                    "proof_limit": (
-                        "counter values left null unless a named metric parsed; "
-                        "occupancy alone is not a bandwidth claim"
-                    ),
-                }
+                opt139.counter_record_from_ncu_blob(
+                    blob,
+                    kernel_id=kernel_id,
+                    engine=engine,
+                    family=family,
+                    phase=phase,
+                    replay_family=replay_family,
+                    expected_kernel=expected_kernel,
+                    workload=phase,
+                    selected_metrics=ncu.get("selected_metrics") or [],
+                    command=collect,
+                    timeout_s=timeout_s,
+                    raw_artifact=relpath(raw_path),
+                )
             )
     payload = {
         "schema_version": 1,
@@ -1294,8 +1313,35 @@ def _experiment_entry(
     for row in kernel_rows:
         if row.get("error"):
             continue
-        if row.get("dram_throughput") or row.get("sm_throughput"):
-            supported = "hardware_counter_bound"
+        admission = opt139.admit_supported_mechanism(
+            {
+                "phase": phase,
+                "engine": row.get("engine") or "quartz",
+                "workload": row.get("workload") or phase,
+                "replay_family": row.get("replay_family")
+                or FAMILY_TO_REPLAY.get(family, ""),
+                "kernel": row.get("target_kernel") or row.get("kernel"),
+                "expected_kernel": row.get("expected_kernel"),
+                "identity": row.get("identity"),
+                "replay_boundary": row.get("replay_boundary")
+                or (replay.get("rounds") and None),
+                "dram_throughput": row.get("dram_throughput"),
+                "sm_throughput": row.get("sm_throughput"),
+                "dram_read_bytes": row.get("dram_read_bytes"),
+                "dram_write_bytes": row.get("dram_write_bytes"),
+                "l2_traffic": row.get("l2_traffic"),
+                "tensor_activity": row.get("tensor_activity"),
+                "achieved_occupancy": row.get("achieved_occupancy"),
+                "stalls": row.get("stalls"),
+                "registers": row.get("registers"),
+                "local_memory_spills": row.get("local_memory_spills"),
+                "source_observations": row.get("source_observations"),
+                "sass_observations": row.get("sass_observations"),
+                "candidate": row.get("candidate"),
+            }
+        )
+        if admission.get("ok") and admission.get("supported_mechanism"):
+            supported = admission.get("supported_mechanism")
             break
     replay_row = next(
         (
