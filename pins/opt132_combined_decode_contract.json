@@ -1,0 +1,146 @@
+{
+  "schema_version": 1,
+  "task": "OPT-132",
+  "yardstick": "combined_decode_stack_admission_and_corrected_headroom",
+  "claims_throughput": true,
+  "claims_performance_improvement": true,
+  "opt074_family_admission_required": false,
+  "opt074_coverage_unadmitted_is_blocker": false,
+  "llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+  "gguf_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+  "token_generator": "(42 + index * 997) % 248320",
+  "parent": "post124_combined_opt118_opt119",
+  "parent_execution_graphs": "ffn_only",
+  "candidate": "post124_plus_opt127_decode_segments8",
+  "historical_control": "post113_selected",
+  "opt113_numbers_historical_only": true,
+  "opt056_plus_5pct_historical_only": true,
+  "keepers": [
+    "OPT-118",
+    "OPT-119",
+    "OPT-126+127"
+  ],
+  "independent_survivor_unit": "OPT-126+127",
+  "rejected": {
+    "OPT-128": {
+      "verdict": "no_material_opportunity",
+      "retain": "poll_and_defer_sync_false",
+      "pin": "kSelectedPollWithoutDeviceSync"
+    },
+    "OPT-130": {
+      "verdict": "reject",
+      "retain": "hybrid_crossover@1024_nparts16_verified_max4096",
+      "pin": "kSelectedDecodeAttentionCrossoverThreshold"
+    },
+    "OPT-131": {
+      "verdict": "no_material_opportunity",
+      "retain": "none",
+      "pin": "shipping_decode_chain_fusion"
+    }
+  },
+  "excluded_from_admitted_runtime": [
+    "OPT-130 occupancy_vec128_open selector",
+    "OPT-128 poll_without_device_sync",
+    "OPT-128 defer_elapsed_event_sync",
+    "OPT-131 decode_chain_fusion"
+  ],
+  "interaction_matrix": [
+    "control",
+    "combination",
+    "combination_minus_opt126_127"
+  ],
+  "leave_one_out": [
+    "combination_minus_opt126_127"
+  ],
+  "graph_attention_interaction": "not_applicable_opt130_rejected",
+  "primary_target": "aggregate_p4096_d128_d2048_complete_request",
+  "target_workloads": [
+    "d128",
+    "d2048"
+  ],
+  "non_target_workloads": [
+    "p4096",
+    "d8192",
+    "d32768",
+    "d131040",
+    "opt016_2k"
+  ],
+  "metrics": [
+    "decode_only",
+    "complete_request"
+  ],
+  "aggregate_metric": "complete_request",
+  "aggregate_metric_boundaries": {
+    "clock": "steady_clock from before prefill through last decode eval, including setup for request; decode_only starts after prefill",
+    "denominator": "actual emitted decode tokens for D128/D2048; prompt tokens for P4096 prefill-only",
+    "paired": "3 warmups plus 10 interleaved AB/BA independently restored sessions",
+    "ci": "one-sided 95% Student-t log-ratio lower bound vs post124 control",
+    "not_opt123_mixed_prefill_in_decode": true,
+    "not_opt056_plus_5pct": true
+  },
+  "aa_warmups": 3,
+  "aa_pairs": 10,
+  "screen_pairs": 5,
+  "decode_output_tokens": 256,
+  "throughput_ratio_lower_bound": 1.0,
+  "non_target_point_ratio_min": 0.98,
+  "decode_p95_ratio_max": 1.05,
+  "ppl_ratio_max": 1.01,
+  "recurrence_incremental_nll_max": 0.02,
+  "opt116_quality_contract": "opt116_generated_v1",
+  "require_candidate_nll": true,
+  "quality_budget_ratchets": false,
+  "quality_anchor": "post113_selected",
+  "removal_rules_frozen_before_results": true,
+  "native_test": "build/qw38-cuda-opt132-combined-decode-test",
+  "diagnostics_make_target": "cuda-opt132-diagnostics",
+  "required_fixture_keys": [
+    "schema_version",
+    "task",
+    "mode",
+    "llama_revision",
+    "gguf_sha256",
+    "parent",
+    "candidate",
+    "historical_control",
+    "keepers",
+    "rejected_no_leak",
+    "freeze",
+    "interaction_matrix",
+    "identity",
+    "same_math",
+    "quality",
+    "state_memory",
+    "performance",
+    "llama",
+    "long_context",
+    "opt016_2k",
+    "activity",
+    "headroom",
+    "production_kept",
+    "verdict",
+    "report_path"
+  ],
+  "independent_verdicts": [
+    "freeze_ok",
+    "rejected_no_leak",
+    "same_math_pass",
+    "model_quality_pass",
+    "state_memory_pass",
+    "performance_pass",
+    "llama_measured",
+    "long_context_measured",
+    "opt016_measured",
+    "activity_measured",
+    "production_kept"
+  ],
+  "verdicts": [
+    "keep",
+    "reject",
+    "quality_blocked",
+    "inconclusive",
+    "retained_control"
+  ],
+  "report_path": "evidence/optimization/opt132-combined-decode/REPORT.md",
+  "selected_execution_graph_path": "decode_segments8"
+}

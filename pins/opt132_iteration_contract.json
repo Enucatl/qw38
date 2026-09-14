@@ -1,0 +1,491 @@
+{
+  "schema_version": 1,
+  "task": "OPT-132",
+  "yardstick": "combined_decode_stack_admission_and_corrected_headroom",
+  "claims_throughput": true,
+  "claims_performance_improvement": true,
+  "opt074_family_admission_required": false,
+  "opt074_coverage_unadmitted_is_blocker": false,
+  "performance_admission": {
+    "enabled": true
+  },
+  "image": "qw38-cuda:13.0.2",
+  "model": "models/Qwen3.8-27B-Q4_K_M.gguf",
+  "gpu_lock": "build/optimization-runs/qw38-gpu.lock",
+  "aggregate_deadline_s": 7200,
+  "target": "tools/opt132_combined_decode.py",
+  "diagnostics_make_target": "cuda-opt132-diagnostics",
+  "selector": "decode_segments8",
+  "case_ids": [
+    "freeze",
+    "identity",
+    "recapture-proof",
+    "cancellation",
+    "same-math",
+    "api",
+    "quality",
+    "state-memory",
+    "p4096",
+    "d128",
+    "d2048",
+    "leave-one-out",
+    "llama",
+    "two-k",
+    "long-context",
+    "activity",
+    "report"
+  ],
+  "modes": {
+    "feedback": {
+      "target": "tools/opt132_combined_decode.py",
+      "tier_sequence": [
+        "freeze",
+        "identity",
+        "recapture-proof",
+        "cancellation",
+        "same-math",
+        "api"
+      ],
+      "make_targets": ["build/qw38-cuda-opt132-combined-decode-test"],
+      "build_once": true,
+      "warm_repetitions": 0,
+      "aggregate_deadline_s": 7200,
+      "workloads": [
+        "freeze",
+        "identity",
+        "recapture-proof",
+        "cancellation",
+        "same-math",
+        "api"
+      ]
+    },
+    "acceptance": {
+      "target": "tools/opt132_combined_decode.py",
+      "tier_sequence": [
+        "quality",
+        "state-memory",
+        "p4096",
+        "d128",
+        "d2048",
+        "leave-one-out",
+        "llama",
+        "two-k",
+        "long-context",
+        "activity",
+        "report"
+      ],
+      "make_targets": [
+        "build/qw38-cuda-opt132-combined-decode-test",
+        "build/qw38-cuda-opt058-quality-baseline-test",
+        "build/qw38-cuda-checkpoint-test",
+        "build/qw38-cuda-memory-fit-test",
+        "build/qw38-cuda-prefill-2k-parity-test"
+      ],
+      "warm_repetitions": 0,
+      "aggregate_deadline_s": 7200,
+      "workloads": [
+        "quality",
+        "state-memory",
+        "p4096",
+        "d128",
+        "d2048",
+        "leave-one-out",
+        "llama",
+        "two-k",
+        "long-context",
+        "activity",
+        "report"
+      ]
+    },
+    "release": {
+      "target": "tools/opt132_combined_decode.py",
+      "tier": "acceptance",
+      "make_targets": [
+        "build/qw38-cuda-opt132-combined-decode-test",
+        "build/qw38-cuda-opt058-quality-baseline-test"
+      ],
+      "skip_compile": false,
+      "historical_oracles": false,
+      "aggregate_deadline_s": 7200,
+      "workloads": ["quality", "state-memory"]
+    }
+  },
+  "workloads": {
+    "freeze": {
+      "target": "tools/opt132_combined_decode.py",
+      "tier": "correctness",
+      "runner": "host",
+      "kind": "post124_identity_and_rejected_no_leak",
+      "cases": 1,
+      "candidates": 1,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 1,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 0,
+      "reference": 1,
+      "gpu_work": false,
+      "args": [
+        "uv", "run", "python", "tools/opt132_combined_decode.py",
+        "--phase", "freeze", "--mode", "{mode}", "--run-dir", "{run_dir}"
+      ]
+    },
+    "identity": {
+      "target": "build/qw38-cuda-opt132-combined-decode-test",
+      "tier": "correctness",
+      "runner": "host",
+      "kind": "combination_pin_inventory",
+      "cases": 1,
+      "candidates": 2,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 1,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 1,
+      "reference": 0,
+      "gpu_work": true,
+      "native_targets": ["build/qw38-cuda-opt132-combined-decode-test"],
+      "args": [
+        "uv", "run", "python", "tools/opt132_combined_decode.py",
+        "--phase", "identity", "--mode", "{mode}", "--run-dir", "{run_dir}"
+      ]
+    },
+    "recapture-proof": {
+      "target": "build/qw38-cuda-opt132-combined-decode-test",
+      "tier": "correctness",
+      "runner": "host",
+      "kind": "zero_steady_state_recapture_and_1024_split",
+      "cases": 2,
+      "candidates": 1,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 16,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 1,
+      "reference": 0,
+      "gpu_work": true,
+      "native_targets": ["build/qw38-cuda-opt132-combined-decode-test"],
+      "args": [
+        "uv", "run", "python", "tools/opt132_combined_decode.py",
+        "--phase", "recapture-proof", "--mode", "{mode}", "--run-dir", "{run_dir}"
+      ]
+    },
+    "cancellation": {
+      "target": "build/qw38-cuda-opt132-combined-decode-test",
+      "tier": "correctness",
+      "runner": "host",
+      "kind": "segment_and_commit_boundary_cancellation",
+      "cases": 2,
+      "candidates": 1,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 1,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 1,
+      "reference": 0,
+      "gpu_work": true,
+      "native_targets": ["build/qw38-cuda-opt132-combined-decode-test"],
+      "args": [
+        "uv", "run", "python", "tools/opt132_combined_decode.py",
+        "--phase", "cancellation", "--mode", "{mode}", "--run-dir", "{run_dir}"
+      ]
+    },
+    "same-math": {
+      "target": "build/qw38-cuda-opt132-combined-decode-test",
+      "tier": "correctness",
+      "runner": "host",
+      "kind": "control_ffn_only_versus_combination_logits",
+      "cases": 1,
+      "candidates": 2,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 8,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 1,
+      "reference": 1,
+      "gpu_work": true,
+      "native_targets": ["build/qw38-cuda-opt132-combined-decode-test"],
+      "args": [
+        "uv", "run", "python", "tools/opt132_combined_decode.py",
+        "--phase", "same-math", "--mode", "{mode}", "--run-dir", "{run_dir}"
+      ]
+    },
+    "api": {
+      "target": "build/qw38-cuda-opt132-combined-decode-test",
+      "tier": "correctness",
+      "runner": "host",
+      "kind": "logits_sample_eval_restore_cancel_divergent_request_loop",
+      "cases": 1,
+      "candidates": 1,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 2,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 1,
+      "reference": 0,
+      "gpu_work": true,
+      "native_targets": ["build/qw38-cuda-opt132-combined-decode-test"],
+      "args": [
+        "uv", "run", "python", "tools/opt132_combined_decode.py",
+        "--phase", "api", "--mode", "{mode}", "--run-dir", "{run_dir}"
+      ]
+    },
+    "quality": {
+      "target": "build/qw38-cuda-opt058-quality-baseline-test",
+      "tier": "acceptance",
+      "runner": "host",
+      "kind": "opt058_quality_flag_and_opt116_successor",
+      "engines": ["quartz"],
+      "configurations": ["post124_combined_opt118_opt119", "post124_plus_opt127_decode_segments8"],
+      "cases": 12,
+      "candidates": 1,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 1024,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 1,
+      "reference": 1,
+      "aggregate_deadline_s": 7200,
+      "args": [
+        "uv", "run", "python", "tools/opt132_combined_decode.py",
+        "--phase", "quality", "--mode", "{mode}", "--run-dir", "{run_dir}"
+      ]
+    },
+    "state-memory": {
+      "target": "build/qw38-cuda-memory-fit-test",
+      "tier": "acceptance",
+      "runner": "host",
+      "kind": "checkpoint_cancellation_128k_fit",
+      "cases": 3,
+      "candidates": 1,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 1,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 1,
+      "reference": 0,
+      "aggregate_deadline_s": 7200,
+      "args": [
+        "uv", "run", "python", "tools/opt132_combined_decode.py",
+        "--phase", "state-memory", "--mode", "{mode}", "--run-dir", "{run_dir}"
+      ]
+    },
+    "p4096": {
+      "target": "build/qw38-cuda-opt132-combined-decode-test",
+      "tier": "acceptance",
+      "runner": "host",
+      "kind": "control_vs_combination_prefill_ab_p4096",
+      "cases": 1,
+      "candidates": 2,
+      "warmups": 3,
+      "samples": 10,
+      "tokens": 1,
+      "prefix": 4096,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 1,
+      "reference": 0,
+      "gpu_work": true,
+      "native_targets": ["build/qw38-cuda-opt132-combined-decode-test"],
+      "args": [
+        "uv", "run", "python", "tools/opt132_combined_decode.py",
+        "--phase", "p4096", "--mode", "{mode}", "--run-dir", "{run_dir}"
+      ]
+    },
+    "d128": {
+      "target": "build/qw38-cuda-opt132-combined-decode-test",
+      "tier": "acceptance",
+      "runner": "host",
+      "kind": "control_vs_combination_decode_ab_d128",
+      "cases": 1,
+      "candidates": 2,
+      "warmups": 3,
+      "samples": 10,
+      "tokens": 1,
+      "output_tokens": 256,
+      "prefix": 128,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 1,
+      "reference": 0,
+      "gpu_work": true,
+      "native_targets": ["build/qw38-cuda-opt132-combined-decode-test"],
+      "args": [
+        "uv", "run", "python", "tools/opt132_combined_decode.py",
+        "--phase", "d128", "--mode", "{mode}", "--run-dir", "{run_dir}"
+      ]
+    },
+    "d2048": {
+      "target": "build/qw38-cuda-opt132-combined-decode-test",
+      "tier": "acceptance",
+      "runner": "host",
+      "kind": "control_vs_combination_decode_ab_d2048",
+      "cases": 1,
+      "candidates": 2,
+      "warmups": 3,
+      "samples": 10,
+      "tokens": 1,
+      "output_tokens": 256,
+      "prefix": 2048,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 1,
+      "reference": 0,
+      "gpu_work": true,
+      "native_targets": ["build/qw38-cuda-opt132-combined-decode-test"],
+      "args": [
+        "uv", "run", "python", "tools/opt132_combined_decode.py",
+        "--phase", "d2048", "--mode", "{mode}", "--run-dir", "{run_dir}"
+      ]
+    },
+    "leave-one-out": {
+      "target": "build/qw38-cuda-opt132-combined-decode-test",
+      "tier": "acceptance",
+      "runner": "host",
+      "kind": "combination_minus_opt126_127_unit",
+      "cases": 3,
+      "candidates": 2,
+      "warmups": 3,
+      "samples": 5,
+      "tokens": 1,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 1,
+      "reference": 0,
+      "gpu_work": true,
+      "native_targets": ["build/qw38-cuda-opt132-combined-decode-test"],
+      "args": [
+        "uv", "run", "python", "tools/opt132_combined_decode.py",
+        "--phase", "leave-one-out", "--mode", "{mode}", "--run-dir", "{run_dir}"
+      ]
+    },
+    "llama": {
+      "target": "tools/opt132_combined_decode.py",
+      "tier": "acceptance",
+      "runner": "host",
+      "kind": "fresh_pinned_llama_matched_decode_only_and_prefill",
+      "engines": ["quartz", "llama.cpp"],
+      "cases": 3,
+      "candidates": 1,
+      "warmups": 3,
+      "samples": 30,
+      "tokens": 1,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 1,
+      "reference": 1,
+      "gpu_work": true,
+      "aggregate_deadline_s": 7200,
+      "args": [
+        "uv", "run", "python", "tools/opt132_combined_decode.py",
+        "--phase", "llama", "--mode", "{mode}", "--run-dir", "{run_dir}"
+      ]
+    },
+    "two-k": {
+      "target": "build/qw38-cuda-prefill-2k-parity-test",
+      "tier": "acceptance",
+      "runner": "host",
+      "kind": "opt016_2k_gate_fresh_sitting",
+      "engines": ["quartz", "llama.cpp"],
+      "cases": 1,
+      "candidates": 1,
+      "warmups": 0,
+      "samples": 3,
+      "tokens": 2048,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 1,
+      "reference": 1,
+      "gpu_work": true,
+      "aggregate_deadline_s": 3600,
+      "args": [
+        "uv", "run", "python", "tools/opt132_combined_decode.py",
+        "--phase", "two-k", "--mode", "{mode}", "--run-dir", "{run_dir}"
+      ]
+    },
+    "long-context": {
+      "target": "build/qw38-cuda-opt132-combined-decode-test",
+      "tier": "acceptance",
+      "runner": "host",
+      "kind": "populated_long_cache_d8192_d32768_d131040",
+      "cases": 3,
+      "candidates": 1,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 32,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 1,
+      "reference": 0,
+      "gpu_work": true,
+      "native_targets": ["build/qw38-cuda-opt132-combined-decode-test"],
+      "args": [
+        "uv", "run", "python", "tools/opt132_combined_decode.py",
+        "--phase", "long-context", "--mode", "{mode}", "--run-dir", "{run_dir}"
+      ]
+    },
+    "activity": {
+      "target": "build/qw38-cuda-opt132-combined-decode-test",
+      "tier": "acceptance",
+      "runner": "host",
+      "kind": "cuda_event_active_inactive_unobserved_vs_opt125",
+      "cases": 2,
+      "candidates": 1,
+      "warmups": 1,
+      "samples": 1,
+      "tokens": 256,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 1,
+      "reference": 1,
+      "gpu_work": true,
+      "native_targets": ["build/qw38-cuda-opt132-combined-decode-test"],
+      "args": [
+        "uv", "run", "python", "tools/opt132_combined_decode.py",
+        "--phase", "activity", "--mode", "{mode}", "--run-dir", "{run_dir}"
+      ]
+    },
+    "report": {
+      "target": "tools/opt132_combined_decode.py",
+      "tier": "acceptance",
+      "runner": "host",
+      "kind": "keep_or_retain_control_combined_decode_report",
+      "cases": 1,
+      "candidates": 1,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 1,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 0,
+      "reference": 0,
+      "gpu_work": false,
+      "args": [
+        "uv", "run", "python", "tools/opt132_combined_decode.py",
+        "--phase", "report", "--mode", "{mode}", "--run-dir", "{run_dir}"
+      ]
+    }
+  },
+  "proof_limit": [
+    "control is authenticated post124 combined OPT-118+119 ffn_only; combination is post124 plus OPT-127 decode_segments8 only",
+    "OPT-126+127 is one valid unit, not an invalid partial ablation",
+    "rejected OPT-130 selector and OPT-128/131 pins cannot leak into the admitted runtime",
+    "graph times attention interaction is not applicable because OPT-130 rejected",
+    "keep requires OPT-116 quality, state/memory/cancellation/checkpoint/128K, aggregate complete-request CI lower >1 over matched P/D, and OPT-125 per-workload guards",
+    "3 warmups plus 10 interleaved ab/ba for the keep gate; leave-one-out uses 3+5 screen pairs",
+    "both decode-only and complete-request metrics with matched OPT-125 boundaries; never retrofit successor metrics into OPT-056 +5% or OPT-123 mixed-prefill gates",
+    "long-context D8192/D32768/D131040 and OPT-016 2K are separately labeled; resource-blocked is not an inferred pass",
+    "recompute active/inactive/unobserved vs OPT-125 budget; leaf gaps remain unobserved, not proven inactive",
+    "OPT-124 supports_continuing=false described an exhausted ladder, not a hardware ceiling",
+    "aggregate_deadline_s 7200 is a ceiling, not a skip",
+    "no new optimization is invented inside this gate"
+  ]
+}

@@ -5600,6 +5600,12 @@ Status execute_token(const ResidentModel& model, std::size_t token,
       error = poll_eval_control(control, error, &poll_status, &interrupted);
     }
     workspace->invalidate_q8_decode_staging();
+    if (decode_attribution != nullptr) {
+      decode_attribution->mixer_mmv.measured = true;
+      decode_attribution->gdn_core.measured = true;
+      decode_attribution->attention_core.measured = true;
+      decode_attribution->ffn_mmv.measured = true;
+    }
   }
   for (std::size_t layer_index = 0;
        error == cudaSuccess && !interrupted && !use_decode_segments &&

@@ -626,7 +626,7 @@ int run_scheduler(const Options& options) {
     for (const char* mode : modes) {
       const bool use_graph = std::strcmp(mode, "graph") == 0;
       if (use_graph && !graphs_ready) {
-        status = graphs.create(model, &graph_workspace);
+        status = graphs.create(model, &graph_workspace, &graph_session);
         if (!status.is_ok()) return fail_status(status);
         graphs_ready = true;
         status = graph_session.reset();
@@ -868,7 +868,7 @@ int run_functional(const Options& options) {
     qw38::cuda::SchedulerSession session;
     if (status.is_ok()) status = session.create(capacity);
     qw38::cuda::SchedulerGraphs graphs;
-    if (status.is_ok()) status = graphs.create(model, &workspace);
+    if (status.is_ok()) status = graphs.create(model, &workspace, &session);
     if (!status.is_ok()) return fail_status(status);
     std::string token_271;
     status = tokenizer.decode({271}, false, &token_271);
@@ -998,7 +998,7 @@ int run_quality_baseline(const Options& options) {
   qw38::cuda::SchedulerSession session;
   if (status.is_ok()) status = session.create(capacity);
   qw38::cuda::SchedulerGraphs graphs;
-  if (status.is_ok()) status = graphs.create(model, &workspace);
+  if (status.is_ok()) status = graphs.create(model, &workspace, &session);
   if (!status.is_ok()) return fail_status(status);
   std::printf("%s{\"schema_version\":1,\"task\":\"OPT-058\","
               "\"workload\":\"quality-baseline\",\"engine\":\"quartz\","
