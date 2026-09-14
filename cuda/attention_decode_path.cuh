@@ -272,11 +272,19 @@ constexpr int kVec128Warps = 4;
 constexpr int kSelectedDecodeAttentionCrossoverThreshold = 1024;
 constexpr int kSelectedDecodeAttentionVerifiedMax = 4096;
 constexpr int kDecodeAttentionFallback128K = 131072;
+// OPT-130 occupancy freeze (llama vec n_parts~9 at D2048 → legal 8) and
+// vec128_open past verified_max. Production pins stay 16 / 4096 until KEEP.
+constexpr int kOpt130CandidateVec128NParts = 8;
+constexpr int kOpt130CandidateVerifiedMax = 131072;
+constexpr char kLegalDecodeAttentionOccupancyVec128Open[] =
+    "occupancy_vec128_open";
+constexpr char kLegalDecodeAttentionHybridCrossover[] = "hybrid_crossover";
 
 inline thread_local const char* g_decode_attention_vec128_path_override =
     nullptr;
 inline thread_local int g_vec128_n_parts_override = 0;
 inline thread_local int g_decode_attention_crossover_threshold_override = -1;
+inline thread_local int g_decode_attention_verified_max_override = -1;
 
 inline bool legal_vec128_n_parts(int n_parts) noexcept {
   return n_parts == 4 || n_parts == 8 || n_parts == 16;
@@ -305,6 +313,20 @@ inline int selected_decode_attention_verified_max() noexcept {
   return kSelectedDecodeAttentionVerifiedMax;
 }
 
+inline bool legal_decode_attention_verified_max(int verified_max) noexcept {
+  return verified_max == 4096 || verified_max == 8192 ||
+         verified_max == 32768 || verified_max == 131072;
+}
+
+inline int effective_decode_attention_verified_max() noexcept {
+  if (g_decode_attention_verified_max_override >= 0 &&
+      legal_decode_attention_verified_max(
+          g_decode_attention_verified_max_override)) {
+    return g_decode_attention_verified_max_override;
+  }
+  return kSelectedDecodeAttentionVerifiedMax;
+}
+
 inline int effective_decode_attention_crossover_threshold() noexcept {
   if (g_decode_attention_crossover_threshold_override >= 0 &&
       legal_decode_attention_crossover_threshold(
@@ -326,9 +348,10 @@ inline const char* decode_attention_vec128_path_for_position(
     return g_decode_attention_vec128_path_override;
   }
   const int threshold = effective_decode_attention_crossover_threshold();
+  const int verified = effective_decode_attention_verified_max();
   if (threshold > 0 &&
       position >= static_cast<std::size_t>(threshold) &&
-      position <= static_cast<std::size_t>(kSelectedDecodeAttentionVerifiedMax)) {
+      position <= static_cast<std::size_t>(verified)) {
     return kLegalDecodeAttentionVec128Online;
   }
   return kSelectedDecodeAttentionVec128Path;
@@ -418,6 +441,36 @@ inline void clear_decode_attention_crossover_threshold_override() noexcept {
   g_decode_attention_crossover_threshold_override = -1;
 }
 
+inline bool apply_decode_attention_verified_max(int verified_max) noexcept {
+  if (!legal_decode_attention_verified_max(verified_max)) return false;
+  g_decode_attention_verified_max_override = verified_max;
+  return true;
+}
+
+inline void clear_decode_attention_verified_max_override() noexcept {
+  g_decode_attention_verified_max_override = -1;
+}
+
+inline bool apply_opt130_dense_attention_ident(const char* path) noexcept {
+  if (path != nullptr &&
+      std::strcmp(path, kLegalDecodeAttentionOccupancyVec128Open) == 0) {
+    return apply_decode_attention_verified_max(kOpt130CandidateVerifiedMax) &&
+           apply_vec128_n_parts(kOpt130CandidateVec128NParts);
+  }
+  if (path != nullptr &&
+      std::strcmp(path, kLegalDecodeAttentionHybridCrossover) == 0) {
+    clear_decode_attention_verified_max_override();
+    clear_vec128_n_parts_override();
+    return true;
+  }
+  return false;
+}
+
+inline void clear_opt130_dense_attention_ident() noexcept {
+  clear_decode_attention_verified_max_override();
+  clear_vec128_n_parts_override();
+}
+
 inline const char* effective_decode_attention_dispatch_path() noexcept {
   if (decode_attention_vec128_uses_online()) {
     return effective_decode_attention_vec128_path();
@@ -464,6 +517,29 @@ struct DecodeAttentionCrossoverScope final {
   DecodeAttentionCrossoverScope(const DecodeAttentionCrossoverScope&) = delete;
   DecodeAttentionCrossoverScope& operator=(
       const DecodeAttentionCrossoverScope&) = delete;
+};
+
+struct DecodeAttentionVerifiedMaxScope final {
+  explicit DecodeAttentionVerifiedMaxScope(int verified_max) noexcept {
+    apply_decode_attention_verified_max(verified_max);
+  }
+  ~DecodeAttentionVerifiedMaxScope() {
+    clear_decode_attention_verified_max_override();
+  }
+  DecodeAttentionVerifiedMaxScope(const DecodeAttentionVerifiedMaxScope&) =
+      delete;
+  DecodeAttentionVerifiedMaxScope& operator=(
+      const DecodeAttentionVerifiedMaxScope&) = delete;
+};
+
+struct Opt130DenseAttentionScope final {
+  explicit Opt130DenseAttentionScope(const char* path) noexcept {
+    apply_opt130_dense_attention_ident(path);
+  }
+  ~Opt130DenseAttentionScope() { clear_opt130_dense_attention_ident(); }
+  Opt130DenseAttentionScope(const Opt130DenseAttentionScope&) = delete;
+  Opt130DenseAttentionScope& operator=(const Opt130DenseAttentionScope&) =
+      delete;
 };
 
 }  // namespace qw38::cuda

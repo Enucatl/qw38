@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "task": "OPT-130",
+  "candidate": "occupancy_vec128_open",
+  "source_function": "llama.cpp ggml_cuda_flash_attn_ext_vec occupancy n_parts (parallel_blocks_for_kv) at cc83d7b4824f73cfdda4dfbb47ee39804f71b328; Quartz vec128_online_decode_attention",
+  "license": "MIT",
+  "attribution": "Occupancy partition count follows pinned-llama fattn-vec policy as adapted in OPT-108 (rejected as a full NVIDIA vec stack). OPT-130 freezes legal n_parts=8 from that policy at D2048 and reopens vec128_online past verified_max 4096. GQA6 (OPT-095) and llama MMA decode consumer are not admitted.",
+  "files": [
+    "cuda/attention_decode.cu",
+    "cuda/attention_decode_path.cuh"
+  ]
+}

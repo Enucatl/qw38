@@ -165,6 +165,9 @@ bool decode_uses_warp_query() noexcept;
 int decode_kv_warp_query_occupancy() noexcept;
 int decode_kv_warp_query_gqa6_occupancy() noexcept;
 int decode_kv_vec128_online_occupancy() noexcept;
+int occupancy_raw_vec128_n_parts(std::size_t position, int* occupancy,
+                                 int* nsm) noexcept;
+int occupancy_snapped_vec128_n_parts(std::size_t position) noexcept;
 int decode_query_prep_occupancy() noexcept;
 int decode_kv_warp_query_prepared_occupancy() noexcept;
 void decode_attention_kernel_attributes(const char* prep_path, int* registers,

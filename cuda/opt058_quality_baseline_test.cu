@@ -37,6 +37,7 @@ char g_applied_q4[64];
 char g_applied_ffn[64];
 char g_applied_q8[32];
 char g_applied_attn[64];
+char g_applied_graphs[32];
 
 struct Options final {
   const char* model = nullptr;
@@ -389,6 +390,23 @@ bool json_string_field(const std::string& text, const char* key,
   return true;
 }
 
+bool json_int_field(const std::string& text, const char* key, int* value) {
+  const std::string needle = std::string("\"") + key + "\":";
+  const std::size_t found = text.find(needle);
+  if (found == std::string::npos) return false;
+  std::size_t cursor = found + needle.size();
+  while (cursor < text.size() &&
+         (text[cursor] == ' ' || text[cursor] == '\t')) {
+    ++cursor;
+  }
+  if (cursor >= text.size()) return false;
+  char* end = nullptr;
+  const long parsed = std::strtol(text.c_str() + cursor, &end, 10);
+  if (end == text.c_str() + cursor) return false;
+  *value = static_cast<int>(parsed);
+  return true;
+}
+
 int apply_quality_selectors(const Options& options) {
   std::string q4 = options.q4_decode != nullptr ? options.q4_decode : "";
   std::string ffn = options.ffn_decode != nullptr ? options.ffn_decode : "";
@@ -422,6 +440,41 @@ int apply_quality_selectors(const Options& options) {
     if (json_string_field(text, "prompt_attention", &parsed)) attn = parsed;
     if (json_string_field(text, "packed_kv", &parsed)) packed = parsed;
     if (json_string_field(text, "weight_requant", &parsed)) requant = parsed;
+    std::string decode_attn;
+    if (json_string_field(text, "decode_attention", &decode_attn)) {
+      if (decode_attn != "hybrid_crossover" && decode_attn != "warp_query" &&
+          !qw38::cuda::apply_opt130_dense_attention_ident(decode_attn.c_str())) {
+        std::fprintf(stderr, "invalid decode_attention %s\n",
+                     decode_attn.c_str());
+        return 2;
+      }
+      if (decode_attn == "hybrid_crossover" || decode_attn == "warp_query") {
+        qw38::cuda::apply_opt130_dense_attention_ident("hybrid_crossover");
+      }
+    }
+    int verified_max = 0;
+    if (json_int_field(text, "decode_attention_verified_max", &verified_max) &&
+        !qw38::cuda::apply_decode_attention_verified_max(verified_max)) {
+      std::fprintf(stderr, "invalid decode_attention_verified_max %d\n",
+                   verified_max);
+      return 2;
+    }
+    int n_parts = 0;
+    if (json_int_field(text, "vec128_n_parts", &n_parts) &&
+        !qw38::cuda::apply_vec128_n_parts(n_parts)) {
+      std::fprintf(stderr, "invalid vec128_n_parts %d\n", n_parts);
+      return 2;
+    }
+    std::string graphs;
+    if (json_string_field(text, "execution_graphs", &graphs)) {
+      if (!qw38::cuda::legal_execution_graph_path(graphs.c_str())) {
+        std::fprintf(stderr, "invalid execution_graphs %s\n", graphs.c_str());
+        return 2;
+      }
+      std::snprintf(g_applied_graphs, sizeof(g_applied_graphs), "%s",
+                    graphs.c_str());
+      qw38::cuda::set_execution_graph_path_override(g_applied_graphs);
+    }
   }
   // `--quality` disables shortcuts only. It must not restore packed/r2
   // production pins over an explicit candidate quality-config.

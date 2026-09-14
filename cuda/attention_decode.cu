@@ -2411,6 +2411,61 @@ int decode_kv_vec128_online_occupancy() noexcept {
   return blocks;
 }
 
+namespace {
+
+constexpr int kLlamaVecNbatchFa = 256;
+
+int snap_legal_vec128_n_parts(int raw) noexcept {
+  if (raw <= 6) return 4;
+  if (raw <= 12) return 8;
+  return 16;
+}
+
+}  // namespace
+
+int occupancy_raw_vec128_n_parts(std::size_t position, int* occupancy,
+                                 int* nsm) noexcept {
+  const int occ = decode_kv_vec128_online_occupancy();
+  int device = 0;
+  cudaGetDevice(&device);
+  cudaDeviceProp prop{};
+  cudaGetDeviceProperties(&prop, device);
+  const int sm = prop.multiProcessorCount > 0 ? prop.multiProcessorCount : 1;
+  if (occupancy != nullptr) *occupancy = occ;
+  if (nsm != nullptr) *nsm = sm;
+  int n_kv = static_cast<int>(position + 1);
+  if (n_kv < 1) n_kv = 1;
+  const int ntiles_kv = (n_kv + kLlamaVecNbatchFa - 1) / kLlamaVecNbatchFa;
+  const int ntiles_dst = static_cast<int>(kProductionQueryHeads);
+  const int occ_use = occ > 0 ? occ : 1;
+  int parallel_blocks = occ_use < ntiles_kv ? occ_use : ntiles_kv;
+  if (parallel_blocks < 1) parallel_blocks = 1;
+  const int blocks_per_wave = sm * occ_use;
+  int nwaves_best = 0;
+  int efficiency_best = 0;
+  for (int test = parallel_blocks; test <= ntiles_kv; ++test) {
+    const int nblocks_total = ntiles_dst * test;
+    const int nwaves =
+        (nblocks_total + blocks_per_wave - 1) / blocks_per_wave;
+    const int efficiency =
+        blocks_per_wave > 0 ? (100 * nblocks_total) / (nwaves * blocks_per_wave)
+                            : 0;
+    if (efficiency_best >= 95 && nwaves > nwaves_best) break;
+    if (efficiency > efficiency_best) {
+      nwaves_best = nwaves;
+      efficiency_best = efficiency;
+      parallel_blocks = test;
+    }
+  }
+  if (parallel_blocks > 16) parallel_blocks = 16;
+  return parallel_blocks;
+}
+
+int occupancy_snapped_vec128_n_parts(std::size_t position) noexcept {
+  return snap_legal_vec128_n_parts(
+      occupancy_raw_vec128_n_parts(position, nullptr, nullptr));
+}
+
 int decode_query_prep_occupancy() noexcept {
   int blocks = 0;
   const cudaError_t error = cudaOccupancyMaxActiveBlocksPerMultiprocessor(
