@@ -332,6 +332,39 @@ OPT-124 assesses the remaining ceiling without claiming universal optimality.
 | OPT-131 | Fuse one measured residual decode launch chain | OPT-128, OPT-130 | done | `no_material_opportunity`; parent `decode_segments8` unchanged; top chain bound 0.026 ms/token; launch gap 3.17 ms/token already removed by graphs; no fusion pin; OPT-125 state/memory pass; `claims_throughput=false` | [`tasks/OPT-131.md`](tasks/OPT-131.md); [`pins/opt131_decode_chain_contract.json`](pins/opt131_decode_chain_contract.json); [`pins/opt131_iteration_contract.json`](pins/opt131_iteration_contract.json); [`fixtures/opt131_decode_chain.json`](fixtures/opt131_decode_chain.json); [`tools/opt131_decode_chain.py`](tools/opt131_decode_chain.py); [`tests/test_opt131_decode_chain.py`](tests/test_opt131_decode_chain.py); [`cuda/opt131_decode_chain_test.cu`](cuda/opt131_decode_chain_test.cu); [`Makefile`](Makefile); [`tools/run_optimization_task.py`](tools/run_optimization_task.py); [`evidence/optimization/opt131-decode-chain/REPORT.md`](evidence/optimization/opt131-decode-chain/REPORT.md); verification 2026-09-14T01:25:56Z |
 | OPT-132 | Admit the combined decode stack and publish corrected headroom | OPT-125, OPT-126, OPT-127, OPT-128, OPT-129, OPT-130, OPT-131 | done | `keep`; admitted stack post124+OPT-127 `decode_segments8`; D128 +3.82 tok/s (1.070×), D2048 +2.57 (1.062×), aggregate CI lower 1.033; vs llama decode-only D128 0.862× D2048 0.744× (corrected from OPT-124 0.620×); OPT-058 quality PPL 1.0; rejected OPT-130/128/131 excluded | [`tasks/OPT-132.md`](tasks/OPT-132.md); [`pins/opt132_combined_decode_contract.json`](pins/opt132_combined_decode_contract.json); [`pins/opt132_iteration_contract.json`](pins/opt132_iteration_contract.json); [`fixtures/opt132_combined_decode.json`](fixtures/opt132_combined_decode.json); [`tools/opt132_combined_decode.py`](tools/opt132_combined_decode.py); [`tests/test_opt132_combined_decode.py`](tests/test_opt132_combined_decode.py); [`cuda/opt132_combined_decode_test.cu`](cuda/opt132_combined_decode_test.cu); [`cuda/full_scheduler.cu`](cuda/full_scheduler.cu); [`cuda/opt058_quality_baseline_test.cu`](cuda/opt058_quality_baseline_test.cu); [`Makefile`](Makefile); [`tools/run_optimization_task.py`](tools/run_optimization_task.py); [`evidence/optimization/opt132-combined-decode/REPORT.md`](evidence/optimization/opt132-combined-decode/REPORT.md); verification 2026-09-14T02:05:00Z |
 | OPT-133 | Capture Nsight Systems decode activity on the admitted stack | OPT-125, OPT-132 | done | Diagnostics on `decode_segments8`; 6 bounded `.nsys-rep` captures + baselines (D128/D2048 × early/middle/late); nsys **2025.3.2** (`cuda-nsight-systems-13-0`); mean wrapper overhead **0.18 ms**; OPT-125 unobserved ~126 ms/12-token window **fully explained** by Nsight hardware idle (fraction 1.0); unresolved 0; dominant API `cudaEventSynchronize` (event instrumentation); `claims_throughput=false`; no production change | [`tasks/OPT-133.md`](tasks/OPT-133.md); [`pins/opt133_decode_nsys_contract.json`](pins/opt133_decode_nsys_contract.json); [`pins/opt133_iteration_contract.json`](pins/opt133_iteration_contract.json); [`fixtures/opt133_decode_nsys_trace.json`](fixtures/opt133_decode_nsys_trace.json); [`tools/opt133_decode_nsys_trace.py`](tools/opt133_decode_nsys_trace.py); [`tests/test_opt133_decode_nsys_trace.py`](tests/test_opt133_decode_nsys_trace.py); [`cuda/opt133_decode_nsys_trace_test.cu`](cuda/opt133_decode_nsys_trace_test.cu); [`Makefile`](Makefile); [`tools/run_optimization_task.py`](tools/run_optimization_task.py); [`evidence/optimization/opt133-decode-nsys-trace/REPORT.md`](evidence/optimization/opt133-decode-nsys-trace/REPORT.md); verification 2026-09-14T12:50:00Z |
+| OPT-134 | Enforce evidence discipline in both ledger runner skills | OPT-133 | pending | Both runner skills require metric identity, graph-aware coverage, contradiction resolution, independent raw-evidence verification and separate experiment/shipping verdicts; eight adversarial review cases pass | [`tasks/OPT-134.md`](tasks/OPT-134.md) |
+| OPT-135 | Separate target improvement from guard non-regression | OPT-134 | pending | A tested prospective policy freezes target/guard roles and matched metrics, admits proven target gains with non-regressing neutral guards, rejects guard losses and missing evidence, and leaves historical verdicts and release gates unchanged | [`tasks/OPT-135.md`](tasks/OPT-135.md) |
+| OPT-136 | Repair graph accounting and profile matched production decode | OPT-133, OPT-134, OPT-135 | pending | Raw graph intervals invalidate the OPT-133 idle claim; matched graph/node captures and unprofiled controls reconcile D128/D2048 and long-context decode with explicit coverage, overhead, family gaps and unknowns | [`tasks/OPT-136.md`](tasks/OPT-136.md) |
+| OPT-137 | Implement a bounded long-context dense attention consumer | OPT-135, OPT-136 | pending | One dense BF16 long-context MMA experiment has a verified keep or bounded measured no-keep; any keep requires complete 8K/32K branch/engine evidence, frozen target/guard admission, measured quality and graph/state/128K checks | [`tasks/OPT-137.md`](tasks/OPT-137.md) |
+| OPT-138 | Profile remaining short-decode and prefill excess versus llama | OPT-136, OPT-137 | pending | Current matched D128/D2048/P4096 profiles reconcile whole time, fused families and overhead; targeted counters/replays yield supported decode/prefill priorities or explicit unknowns without changing production | [`tasks/OPT-138.md`](tasks/OPT-138.md) |
+
+### Post-133 evidence repair and focused performance work (OPT-134–138)
+
+Authored 2026-09-14 at the user's request; tasks only, no implementation or GPU
+execution in this planning change. Execute in table order: **OPT-134 → OPT-135
+→ OPT-136 → OPT-137 → OPT-138**. These rows precede the older eligible EVAL-002
+work intentionally. All five dossiers are pre-authored with file boundaries,
+fixed workloads, formulas, required phases, negative cases and stop conditions.
+
+**Evidence caution:** OPT-133's historical row and 12:50 amendment record a
+conclusion now contradicted by read-only inspection of its raw SQLite exports.
+The graph-level capture contains GPU graph intervals omitted from the reported
+kernel/copy union. In D128 early, 96 graph envelopes account for 186.02 ms of a
+196.74 ms span; ordinary kernels/copies account for 8.24 ms. This does not prove
+continuous activity inside the graphs, but invalidates labeling their omitted
+time as proven hardware idle. OPT-136 owns executable repair, independent
+reproduction and dated report corrections; do not use the old "fully explained"
+or "unresolved 0" claims to select or reject another optimization meanwhile.
+Historical OPT-132 throughput admission is separate and remains historical.
+
+OPT-134 reviews and hardens both runner skills; this planning turn did not run
+or edit them. OPT-135 changes prospective internal target/guard admission only;
+OPT-130 remains rejected and release/+5% gates are unchanged. OPT-136 supplies
+current matched graph/node profiling. OPT-137 evaluates one dense-BF16,
+tile-converted MMA attention candidate at 8K/32K, preserving cache format.
+OPT-138 profiles remaining short-decode and P4096 excess on whatever stack
+OPT-137 actually admits. A measured rejection passes its retained parent to
+the next task; missing required evidence remains blocked, not no opportunity.
 
 ### Post-124 decode investigation batch (OPT-125–132)
 
@@ -8185,3 +8218,36 @@ statements below are historical, not the current execution order.
   and OPT-132 sidecars unchanged; dossiers and reports cross-link OPT-133.
 - Cleared infrastructure blocker **`nsight_systems_absent`** on OPT-132 (activity
   phase still CUDA-event only).
+
+### OPT-134–138 task authoring (2026-09-14T13:13:53Z)
+
+- User requested tasks for graph-accounting repair/matched profiling,
+  long-context attention, the profiler needed to choose remaining decode and
+  prefill work, runner-prompt evidence discipline, and target/guard policy.
+  Added five pending rows and decision-complete dossiers
+  [`OPT-134`](tasks/OPT-134.md), [`OPT-135`](tasks/OPT-135.md),
+  [`OPT-136`](tasks/OPT-136.md), [`OPT-137`](tasks/OPT-137.md),
+  [`OPT-138`](tasks/OPT-138.md). No tasks executed in this authoring turn.
+- Reviewed `.agents/skills/run-ledger-task-codex/SKILL.md` and
+  `.cursor/skills/run-ledger-task-cursor/SKILL.md` plus both templates. Their
+  preference for eager/event categories does not establish production graph
+  coverage, and artifact-status checks do not establish interval completeness.
+  OPT-134 specifies explicit verifier obligations and eight adversarial cases;
+  OPT-136 supplies corresponding executable checks and raw-trace reproduction.
+- The previous OPT-133 idle conclusion is disputed by the existing graph
+  intervals, as explained in the new batch note. Historical rows/logs remain
+  visible; OPT-136 is tasked with dated corrections without rewriting raw
+  measurements. No new hardware result or causal attribution is claimed here.
+- OPT-135 fixes role declaration as well as acceptance: positive target gain,
+  bounded guard non-regression, explicit uncertainty and no retrospective
+  OPT-130 keep. OPT-137 has 8K/32K decode targets and short-context/prefill
+  guards; OPT-138 cannot invent another ladder from missing measurements.
+- Changed files are restricted to `implementation_ledger.md` and
+  `tasks/OPT-134.md` through `tasks/OPT-138.md`. Skills, runtime code, tests,
+  contracts, pins, historical reports and `plan.md` are unchanged. Throughput
+  delta: **N/A** (task specifications only). Commit/push not requested.
+- Authoring validation: `git diff --check` passed. A read-only structural check
+  verified unique new IDs, exact ledger/dossier titles and acceptance text,
+  dependency order, pending statuses, contiguous table rows, Markdown fences
+  and links, and a scope of exactly the ledger plus five task documents. No
+  implementation tests or GPU phases were run.
