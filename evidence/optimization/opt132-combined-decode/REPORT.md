@@ -53,7 +53,19 @@ Pinned llama `cc83d7b4824f73cfdda4dfbb47ee39804f71b328`. D128/D2048 compare deco
 
 ## Long-cache and OPT-016 2K
 
-Long-context resource_blocked=`True`; probes=`['d8192', 'd32768', 'd131040']`. OPT-016 2K resource_blocked=`True`; opt016_gate_passed=`False` (historical OPT-056 +5%, not this keep gate). A capacity calculation was not substituted for live fit.
+Long-context resource_blocked=`False`; capacity_131072_measured=`True`; probes=`['d8192', 'd32768', 'd131040']`.
+
+Fresh exclusive sitting (2026-09-14, `decode_segments8`, capacity 131072):
+
+| Probe | request tok/s | decode-only tok/s | TTFT ms | decode p50 ms |
+|---|---:|---:|---:|---:|
+| D8192 | 7.99888277 | 35.2028809 | 3119.83911 | 28.4443092 |
+| D32768 | 1.34404731 | 15.3636465 | 21790.8555 | 65.1188202 |
+| D131040 | 0.128306419 | 4.72411203 | 242840.766 | 211.705383 |
+
+OPT-016 2K resource_blocked=`True`; block_reason=`decode_segments8_requires_matching_session_capacity`; opt016_gate_passed=`False` (historical OPT-056 +5%, not this keep gate). Quartz 2K prefill remains blocked because the parity binary does not satisfy `decode_segments8` session-capacity capture requirements (not an OOM on exclusive sitting). Llama 2K measured for reference only.
+
+A capacity calculation was not substituted for live fit.
 
 ## Activity versus OPT-125 budget
 
@@ -166,7 +178,7 @@ Method `cuda_event_engine_attribution`; nsys=`False`; proven inactive `0.0`. Lea
 - OPT-123 D8192/D32768 request rates mixed prefill into decode tok/s.
 - OPT-124 0.787×/0.620× mixed complete-request Quartz with decode-only llama.
 
-Blocked gates: ['long_context_resource_blocked', 'opt016_2k_resource_blocked', 'nsight_systems_absent'].
+Blocked gates: ['opt016_2k_resource_blocked', 'nsight_systems_absent'].
 
 Reasons: [].
 

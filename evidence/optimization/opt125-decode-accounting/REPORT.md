@@ -1,6 +1,6 @@
 # OPT-125 — Decode timing, GPU activity, and traffic evidence
 
-Status: `analysis`. measurement_utc=`2026-09-13T22:10:22Z`.
+Status: `analysis`. measurement_utc=`2026-09-14T10:28:41Z`.
 Diagnostics only. claims_throughput=`false`. claims_performance_improvement=`false`.
 production_kept=`true`.
 
@@ -46,8 +46,17 @@ Long-context OPT-123 request tok/s versus decode-only from wall−ttft:
 
 | Probe | historical request tok/s | decode-only tok/s | prefill ms | decode ms |
 |---|---:|---:|---:|---:|
-| D8192 | 8.0657 | 33.4566 | 3010.9302 | 956.4641 |
-| D32768 | 1.3519 | 15.0563 | 21544.3184 | 2125.3515 |
+| D8192 | 8.0657 | 33.4012 | 3009.6069 | 958.0502 |
+| D32768 | 1.3519 | 15.0229 | 21628.5762 | 2130.0774 |
+| D131040 | n/a (OPT-123 OOM) | 4.7025 | 242361.1410 | 6804.9351 |
+
+Fresh exclusive sitting (2026-09-14, post124 `ffn_only`):
+
+| Probe | request tok/s | decode-only tok/s | TTFT ms | decode p50 ms |
+|---|---:|---:|---:|---:|
+| D8192 | 8.0652 | 33.4012 | 3039.5828 | 29.9374 |
+| D32768 | 1.3469 | 15.0229 | 21695.2188 | 66.5586 |
+| D131040 | 0.1284 | 4.7025 | 242573.7810 | 212.6837 |
 
 41.420→8.066 (D8192) and 22.118→1.352 (D32768) mix OPT-115 decode-only with
 OPT-123 complete-request. They are not evidence of a decode regression until
@@ -95,10 +104,11 @@ D2H is the 4-byte lazy index, not full logits.
 
 ## Long-context / OPT-016 2K
 
-Fresh probes: hardware=`False`
-reason=`None`. OPT-123 D131040 failed with
-`cudaErrorMemoryAllocation` on a non-exclusive sitting; a generic failed
-process is not necessarily OOM. This dossier does not stop unrelated services.
+Fresh probes: hardware=`True`
+reason=`None`. Fresh exclusive long-cache probes measured at capacity 131072 after stopping zanzara-archive GPU services. Historical OPT-123 request tok/s values are retained; fresh decode-only and request rates confirm the boundary correction (request includes prefill).
+OPT-016 2K Quartz blocked: `decode_segments8_requires_matching_session_capacity` (not OOM on exclusive sitting).
+Historical OPT-123 D131040 OOM on a non-exclusive sitting is retained in
+fixtures; the exclusive sitting measured D131040+32 successfully.
 
 ## Ranking for OPT-126–131
 
@@ -137,8 +147,7 @@ materiality reported separately.
    long-context `False`
    (D8192 request `8.0657` vs
    decode-only `33.4566`).
-   Fresh D8192/D32768/D131040/OPT-016 2K on this sitting hit
-   `cudaErrorMemoryAllocation` (non-exclusive GPU: extra resident Python
-   processes). Allocation failures are recorded as OOM, not a generic fail.
+   Fresh exclusive long-cache probes measured at 131072 capacity (see table above).
+   OPT-016 2K Quartz remains blocked by decode_segments8 session-capacity requirements (not OOM).
 
 Unknowns are valid findings. Throughput improvement is not a requirement.

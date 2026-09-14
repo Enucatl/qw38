@@ -1180,6 +1180,47 @@ def merge_phase(
         payload["hardware_executed"] = bool(payload.get("hardware_executed")) or bool(
             block.get("hardware_executed")
         )
+        if block.get("hardware_executed"):
+            corrections = dict(
+                payload.get("historical_corrections") or historical_corrections()
+            )
+            merged = dict(corrections.get("long_context") or {})
+            for name, probe in dict(block.get("probes") or {}).items():
+                if not probe.get("ok"):
+                    continue
+                prior = dict(merged.get(name) or {})
+                prior.update(
+                    {
+                        "fresh_measured": True,
+                        "fresh_exclusive_sitting": True,
+                        "fresh_measured_at": block.get("measured_at"),
+                        "historical_tok_s": prior.get("historical_tok_s")
+                        or probe.get("request_tok_s"),
+                        "decode_only_tok_s": probe.get("decode_only_tok_s"),
+                        "request_tok_s": probe.get("request_tok_s"),
+                        "prefill_wall_ms": probe.get("prefill_wall_ms"),
+                        "decode_only_wall_ms": probe.get("decode_only_wall_ms"),
+                        "request_wall_ms": probe.get("request_wall_ms"),
+                        "populated_cache": probe.get("populated_cache"),
+                        "prefix": probe.get("prefix"),
+                        "oom": False,
+                        "source": (
+                            "build/optimization-runs/opt125-exclusive long-context "
+                            "after stopping zanzara-archive GPU services"
+                        ),
+                    }
+                )
+                merged[name] = prior
+            corrections["long_context"] = merged
+            payload["historical_corrections"] = corrections
+            payload["exclusive_long_context_sitting"] = {
+                "measured_at": block.get("measured_at"),
+                "note": (
+                    "Exclusive GPU sitting; zanzara-archive audioset_ast and "
+                    "diarization containers stopped before measurement."
+                ),
+                "probes": block.get("probes"),
+            }
     if phase == "ranking":
         payload["ranking"] = dict(block.get("ranking") or block)
         payload["answers"] = dict(block.get("answers") or payload.get("answers") or {})
@@ -1224,6 +1265,35 @@ def write_report(payload: Mapping[str, Any]) -> None:
     d2048c = (corr.get("p4096_d128_d2048") or {}).get("d2048") or {}
     d8192 = (corr.get("long_context") or {}).get("d8192") or {}
     d32768 = (corr.get("long_context") or {}).get("d32768") or {}
+    d131040 = (corr.get("long_context") or {}).get("d131040") or {}
+    exclusive = payload.get("exclusive_long_context_sitting") or {}
+    fresh_probes = dict(long_ctx.get("probes") or exclusive.get("probes") or {})
+    fresh_long_hardware = bool(
+        long_ctx.get("hardware_executed") or exclusive.get("probes")
+    )
+    opt016 = long_ctx.get("opt016_2k") or {}
+    long_context_note = (
+        "Fresh exclusive long-cache probes measured at capacity 131072 after "
+        "stopping zanzara-archive GPU services. Historical OPT-123 request "
+        "tok/s values are retained; fresh decode-only and request rates confirm "
+        "the boundary correction (request includes prefill)."
+        if fresh_long_hardware
+        and not any((fresh_probes.get(n) or {}).get("oom") for n in LONG_PROBES)
+        else (
+            "Fresh long-cache probes blocked on this sitting. "
+            "Historical stored-field corrections remain authoritative."
+        )
+    )
+    opt016_note = (
+        f"OPT-016 2K Quartz blocked: `{opt016.get('reason')}` "
+        f"(not OOM on exclusive sitting)."
+        if opt016.get("reason") == "decode_segments8_requires_matching_session_capacity"
+        else (
+            "OPT-016 2K remains blocked; see sidecar reason."
+            if not opt016.get("measured")
+            else "OPT-016 2K measured."
+        )
+    )
     recon = (
         weights.get("reconcile") or weights.get("opt124_d128_busy_vs_compulsory") or {}
     )
@@ -1292,6 +1362,15 @@ Long-context OPT-123 request tok/s versus decode-only from wall−ttft:
 |---|---:|---:|---:|---:|
 | D8192 | {_fmt(d8192.get("historical_tok_s"))} | {_fmt(d8192.get("decode_only_tok_s"))} | {_fmt(d8192.get("prefill_wall_ms"))} | {_fmt(d8192.get("decode_only_wall_ms"))} |
 | D32768 | {_fmt(d32768.get("historical_tok_s"))} | {_fmt(d32768.get("decode_only_tok_s"))} | {_fmt(d32768.get("prefill_wall_ms"))} | {_fmt(d32768.get("decode_only_wall_ms"))} |
+| D131040 | n/a (OPT-123 OOM) | {_fmt(d131040.get("decode_only_tok_s"))} | {_fmt(d131040.get("prefill_wall_ms"))} | {_fmt(d131040.get("decode_only_wall_ms"))} |
+
+Fresh exclusive sitting (2026-09-14, post124 `ffn_only`):
+
+| Probe | request tok/s | decode-only tok/s | TTFT ms | decode p50 ms |
+|---|---:|---:|---:|---:|
+| D8192 | {_fmt((fresh_probes.get("d8192") or {}).get("request_tok_s"))} | {_fmt((fresh_probes.get("d8192") or {}).get("decode_only_tok_s"))} | {_fmt((fresh_probes.get("d8192") or {}).get("ttft_ms"))} | {_fmt((fresh_probes.get("d8192") or {}).get("p50_ms"))} |
+| D32768 | {_fmt((fresh_probes.get("d32768") or {}).get("request_tok_s"))} | {_fmt((fresh_probes.get("d32768") or {}).get("decode_only_tok_s"))} | {_fmt((fresh_probes.get("d32768") or {}).get("ttft_ms"))} | {_fmt((fresh_probes.get("d32768") or {}).get("p50_ms"))} |
+| D131040 | {_fmt((fresh_probes.get("d131040") or {}).get("request_tok_s"))} | {_fmt((fresh_probes.get("d131040") or {}).get("decode_only_tok_s"))} | {_fmt((fresh_probes.get("d131040") or {}).get("ttft_ms"))} | {_fmt((fresh_probes.get("d131040") or {}).get("p50_ms"))} |
 
 41.420→8.066 (D8192) and 22.118→1.352 (D32768) mix OPT-115 decode-only with
 OPT-123 complete-request. They are not evidence of a decode regression until
@@ -1340,9 +1419,10 @@ D2H is the 4-byte lazy index, not full logits.
 ## Long-context / OPT-016 2K
 
 Fresh probes: hardware=`{long_ctx.get("hardware_executed")}`
-reason=`{long_ctx.get("reason")}`. OPT-123 D131040 failed with
-`cudaErrorMemoryAllocation` on a non-exclusive sitting; a generic failed
-process is not necessarily OOM. This dossier does not stop unrelated services.
+reason=`{long_ctx.get("reason")}`. {long_context_note}
+{opt016_note}
+Historical OPT-123 D131040 OOM on a non-exclusive sitting is retained in
+fixtures; the exclusive sitting measured D131040+32 successfully.
 
 ## Ranking for OPT-126–131
 
@@ -1376,9 +1456,8 @@ materiality reported separately.
    long-context `{ans.get("long_context_ratios_survive_matched_boundaries")}`
    (D8192 request `{_fmt(ans.get("d8192_historical_request_tok_s"))}` vs
    decode-only `{_fmt(ans.get("d8192_decode_only_tok_s"))}`).
-   Fresh D8192/D32768/D131040/OPT-016 2K on this sitting hit
-   `cudaErrorMemoryAllocation` (non-exclusive GPU: extra resident Python
-   processes). Allocation failures are recorded as OOM, not a generic fail.
+   {"Fresh exclusive long-cache probes measured at 131072 capacity (see table above)." if fresh_long_hardware else "Fresh long-cache probes remain blocked on this sitting."}
+   {"OPT-016 2K Quartz remains blocked by decode_segments8 session-capacity requirements (not OOM)." if opt016.get("reason") == "decode_segments8_requires_matching_session_capacity" else ""}
 
 Unknowns are valid findings. Throughput improvement is not a requirement.
 """
@@ -2044,6 +2123,19 @@ def run_long_context(
                         "measured": True,
                         "ok": True,
                         "native": record,
+                        "separately_labeled": True,
+                    }
+                elif "decode_segments8 capture requires" in raw:
+                    two_k = {
+                        "measured": False,
+                        "ok": False,
+                        "reason": "decode_segments8_requires_matching_session_capacity",
+                        "block_reason": (
+                            "prefill-2k-parity binary does not match "
+                            "decode_segments8 session capacity requirements"
+                        ),
+                        "nonexclusive_oom": False,
+                        "resource_blocked": True,
                         "separately_labeled": True,
                     }
                 else:

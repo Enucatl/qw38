@@ -786,6 +786,14 @@ def run_two_k(run_dir: Path, mode: str) -> dict[str, Any]:
     blob = completed.stdout + completed.stderr
     (run_dir / "two-k-raw.txt").write_text(blob, encoding="utf-8")
     oom = "cudaErrorMemoryAllocation" in blob or "out of memory" in blob.lower()
+    graph_capacity_block = "decode_segments8 capture requires" in blob
+    block_reason = None
+    if oom:
+        block_reason = "cudaErrorMemoryAllocation"
+    elif graph_capacity_block:
+        block_reason = "decode_segments8_requires_matching_session_capacity"
+    elif completed.returncode != 0:
+        block_reason = "quartz_2k_binary_failed"
     quartz: dict[str, Any] = {}
     quartz_ts = 0.0
     if completed.returncode == 0:
@@ -810,6 +818,7 @@ def run_two_k(run_dir: Path, mode: str) -> dict[str, Any]:
             ratio >= 1.05 if llama_ts > 0.0 and quartz_ts > 0.0 else False
         ),
         "nonexclusive_oom": oom,
+        "block_reason": block_reason,
         "resource_blocked": oom or completed.returncode != 0,
         "quartz": quartz,
         "llama": llama_2k,
@@ -1366,11 +1375,33 @@ def write_report(result: Mapping[str, Any]) -> None:
         "## Long-cache and OPT-016 2K",
         "",
         f"Long-context resource_blocked=`{long_ctx.get('resource_blocked')}`; "
-        f"probes=`{list((long_ctx.get('probes') or {}).keys())}`. "
+        f"capacity_131072_measured=`{long_ctx.get('capacity_131072_measured')}`; "
+        f"probes=`{list((long_ctx.get('probes') or {}).keys())}`.",
+        "",
+        "Fresh exclusive sitting (2026-09-14, `decode_segments8`, capacity 131072):",
+        "",
+        "| Probe | request tok/s | decode-only tok/s | TTFT ms | decode p50 ms |",
+        "|---|---:|---:|---:|---:|",
+        *[
+            (
+                f"| {name.upper()} | "
+                f"{(long_ctx.get('probes') or {}).get(name, {}).get('request_tok_s', 'n/a')} | "
+                f"{(long_ctx.get('probes') or {}).get(name, {}).get('decode_only_tok_s', 'n/a')} | "
+                f"{(long_ctx.get('probes') or {}).get(name, {}).get('ttft_ms', 'n/a')} | "
+                f"{(long_ctx.get('probes') or {}).get(name, {}).get('p50_ms', 'n/a')} |"
+            )
+            for name in ("d8192", "d32768", "d131040")
+        ],
+        "",
         f"OPT-016 2K resource_blocked=`{two_k.get('resource_blocked')}`; "
+        f"block_reason=`{two_k.get('block_reason')}`; "
         f"opt016_gate_passed=`{two_k.get('opt016_gate_passed')}` "
-        "(historical OPT-056 +5%, not this keep gate). A capacity calculation "
-        "was not substituted for live fit.",
+        "(historical OPT-056 +5%, not this keep gate). "
+        "Quartz 2K prefill remains blocked because the parity binary does not "
+        "satisfy `decode_segments8` session-capacity capture requirements "
+        "(not an OOM on exclusive sitting). Llama 2K measured for reference only.",
+        "",
+        "A capacity calculation was not substituted for live fit.",
         "",
         "## Activity versus OPT-125 budget",
         "",

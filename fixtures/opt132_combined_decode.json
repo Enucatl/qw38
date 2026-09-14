@@ -21129,7 +21129,7 @@
     "phase": "long-context",
     "mode": "acceptance",
     "ok": true,
-    "capacity_131072_measured": false,
+    "capacity_131072_measured": true,
     "separately_labeled": true,
     "not_a_d128_win": true,
     "capacity": 131072,
@@ -21138,39 +21138,87 @@
       "decode_only",
       "complete_request"
     ],
-    "nonexclusive_oom": true,
-    "resource_blocked": true,
+    "nonexclusive_oom": false,
+    "resource_blocked": false,
     "probes": {
       "d8192": {
-        "ok": false,
+        "schema_version": 1,
+        "task": "OPT-132",
+        "workload": "long-context",
+        "ok": true,
         "prefix": 8192,
+        "tokens": 32,
         "capacity": 131072,
-        "oom": true,
-        "populated_cache": false,
-        "resource_blocked": true,
-        "stderr_tail": "\n==========\n== CUDA ==\n==========\n\nCUDA Version 13.0.2\n\nContainer image Copyright (c) 2016-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.\n\nThis container image and its contents are governed by the NVIDIA Deep Learning Container License.\nBy pulling and using the container, you accept the terms and conditions of this license:\nhttps://developer.nvidia.com/ngc/nvidia-deep-learning-container-license\n\nA copy of this license is made available in this container at /NGC-DL-CONTAINER-LICENSE for your convenience.\n\ninternal: cannot allocate CUDA scheduler workspace: cudaErrorMemoryAllocation (out of memory)\n"
+        "setup_ms": 20.5742168,
+        "prefill_ms": 3070.96606,
+        "decode_only_ms": 909.016479,
+        "request_ms": 4000.55859,
+        "ttft_ms": 3119.83911,
+        "decode_only_tok_s": 35.2028809,
+        "request_tok_s": 7.99888277,
+        "p50_ms": 28.4443092,
+        "p95_ms": 28.4919224,
+        "emitted_tokens": 32,
+        "eval_calls": 32,
+        "session_bytes": 8749807676,
+        "workspace_bytes": 1831836288,
+        "populated_cache": true,
+        "capacity_alone_is_not_traffic": true,
+        "keep": false
       },
       "d32768": {
-        "ok": false,
+        "schema_version": 1,
+        "task": "OPT-132",
+        "workload": "long-context",
+        "ok": true,
         "prefix": 32768,
+        "tokens": 32,
         "capacity": 131072,
-        "oom": true,
-        "populated_cache": false,
-        "resource_blocked": true,
-        "stderr_tail": "\n==========\n== CUDA ==\n==========\n\nCUDA Version 13.0.2\n\nContainer image Copyright (c) 2016-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.\n\nThis container image and its contents are governed by the NVIDIA Deep Learning Container License.\nBy pulling and using the container, you accept the terms and conditions of this license:\nhttps://developer.nvidia.com/ngc/nvidia-deep-learning-container-license\n\nA copy of this license is made available in this container at /NGC-DL-CONTAINER-LICENSE for your convenience.\n\ninternal: cannot allocate CUDA scheduler workspace: cudaErrorMemoryAllocation (out of memory)\n"
+        "setup_ms": 20.1926517,
+        "prefill_ms": 21705.6504,
+        "decode_only_ms": 2082.83887,
+        "request_ms": 23808.6855,
+        "ttft_ms": 21790.8555,
+        "decode_only_tok_s": 15.3636465,
+        "request_tok_s": 1.34404731,
+        "p50_ms": 65.1188202,
+        "p95_ms": 65.1600876,
+        "emitted_tokens": 32,
+        "eval_calls": 32,
+        "session_bytes": 8749807676,
+        "workspace_bytes": 1831836288,
+        "populated_cache": true,
+        "capacity_alone_is_not_traffic": true,
+        "keep": false
       },
       "d131040": {
-        "ok": false,
+        "schema_version": 1,
+        "task": "OPT-132",
+        "workload": "long-context",
+        "ok": true,
         "prefix": 131040,
+        "tokens": 32,
         "capacity": 131072,
-        "oom": true,
-        "populated_cache": false,
-        "resource_blocked": true,
-        "stderr_tail": "\n==========\n== CUDA ==\n==========\n\nCUDA Version 13.0.2\n\nContainer image Copyright (c) 2016-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.\n\nThis container image and its contents are governed by the NVIDIA Deep Learning Container License.\nBy pulling and using the container, you accept the terms and conditions of this license:\nhttps://developer.nvidia.com/ngc/nvidia-deep-learning-container-license\n\nA copy of this license is made available in this container at /NGC-DL-CONTAINER-LICENSE for your convenience.\n\ninternal: cannot allocate CUDA scheduler workspace: cudaErrorMemoryAllocation (out of memory)\n"
+        "setup_ms": 20.5052967,
+        "prefill_ms": 242608.688,
+        "decode_only_ms": 6773.75977,
+        "request_ms": 249402.953,
+        "ttft_ms": 242840.766,
+        "decode_only_tok_s": 4.72411203,
+        "request_tok_s": 0.128306419,
+        "p50_ms": 211.705383,
+        "p95_ms": 211.764282,
+        "emitted_tokens": 32,
+        "eval_calls": 32,
+        "session_bytes": 8749807676,
+        "workspace_bytes": 1831836288,
+        "populated_cache": true,
+        "capacity_alone_is_not_traffic": true,
+        "keep": false
       }
     },
     "family_plan": "task=OPT-132 mode=acceptance phase=long-context loop_product=96 cases=3 candidates=1 warmups=0 samples=1 tokens=32",
-    "measured_at": "2026-09-14T01:59:22Z"
+    "measured_at": "2026-09-14T10:33:32Z"
   },
   "opt016_2k": {
     "schema_version": 1,
@@ -21183,10 +21231,11 @@
     "not_a_d128_win": true,
     "opt056_plus_5pct_historical_only": true,
     "quartz_tok_s": 0.0,
-    "llama_tok_s": 3124.419023,
+    "llama_tok_s": 3189.416791,
     "ratio_vs_llama": 0.0,
     "opt016_gate_passed": false,
-    "nonexclusive_oom": true,
+    "nonexclusive_oom": false,
+    "block_reason": "decode_segments8_requires_matching_session_capacity",
     "resource_blocked": true,
     "quartz": {},
     "llama": {
@@ -21226,24 +21275,24 @@
       "n_prompt": 2048,
       "n_gen": 0,
       "n_depth": 0,
-      "test_time": "2026-09-14T01:59:08Z",
-      "avg_ns": 655589198,
-      "stddev_ns": 10227638,
-      "avg_ts": 3124.419023,
-      "stddev_ts": 49.1846,
+      "test_time": "2026-09-14T10:33:34Z",
+      "avg_ns": 642205563,
+      "stddev_ns": 8847505,
+      "avg_ts": 3189.416791,
+      "stddev_ts": 44.285094,
       "samples_ns": [
-        643783824,
-        661210035,
-        661773735
+        632011771,
+        646717092,
+        647887827
       ],
       "samples_ts": [
-        3181.19,
-        3097.35,
-        3094.71
+        3240.45,
+        3166.76,
+        3161.04
       ]
     },
     "family_plan": "task=OPT-132 mode=acceptance phase=two-k loop_product=6144 cases=1 candidates=1 warmups=0 samples=3 tokens=2048",
-    "measured_at": "2026-09-14T01:59:13Z"
+    "measured_at": "2026-09-14T10:33:39Z"
   },
   "activity": {
     "schema_version": 1,
@@ -24312,7 +24361,7 @@
     "state_memory_pass": true,
     "performance_pass": true,
     "llama_measured": true,
-    "long_context_measured": false,
+    "long_context_measured": true,
     "opt016_measured": false,
     "activity_measured": true,
     "production_kept": true
@@ -24336,13 +24385,12 @@
     "d2048_decode_only_delta": 3.2544807299999974
   },
   "blocked_gates": [
-    "long_context_resource_blocked",
     "opt016_2k_resource_blocked",
     "nsight_systems_absent"
   ],
   "claims_throughput": true,
   "claims_performance_improvement": true,
   "report_path": "evidence/optimization/opt132-combined-decode/REPORT.md",
-  "measured_at": "2026-09-14T02:05:14Z",
+  "measured_at": "2026-09-14T10:33:39Z",
   "family_plan": "task=OPT-132 mode=acceptance phase=report loop_product=1 cases=1 candidates=1 warmups=0 samples=1 tokens=1"
 }

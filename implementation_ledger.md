@@ -7955,6 +7955,18 @@ statements below are historical, not the current execution order.
 - OPT-125 marked `done`. Coupled IDs: none. Next eligible pending task:
   **OPT-126**.
 
+### OPT-125 evidence amendment (2026-09-14T10:33:00Z)
+
+- Exclusive GPU sitting after stopping zanzara-archive `audioset_ast` and
+  `diarization` containers. Fresh long-cache probes at capacity 131072 measured
+  for D8192/D32768/D131040 (post124 `ffn_only`): request/decode-only tok/s
+  **8.07/33.40**, **1.35/15.02**, **0.128/4.70**. Confirms OPT-123 request rates
+  were boundary-mixed, not decode regressions. OPT-016 2K Quartz remains blocked
+  by `decode_segments8_requires_matching_session_capacity` (not OOM).
+- Updated: [`fixtures/opt125_decode_accounting.json`](fixtures/opt125_decode_accounting.json);
+  [`evidence/optimization/opt125-decode-accounting/REPORT.md`](evidence/optimization/opt125-decode-accounting/REPORT.md);
+  sidecars under `build/optimization-runs/opt125/`.
+
 ### OPT-126 delivery (2026-09-13T23:07:00Z)
 
 - Foundation/correctness prerequisite for stable decode graph inputs across
@@ -8101,3 +8113,17 @@ statements below are historical, not the current execution order.
   [`build/optimization-runs/opt132/report.json`](build/optimization-runs/opt132/report.json).
 - OPT-132 marked `done`. Coupled IDs: none. Post-124 decode investigation batch
   (OPT-125–132) complete.
+
+### OPT-132 evidence amendment (2026-09-14T10:33:00Z)
+
+- Exclusive GPU sitting after stopping zanzara-archive GPU services. Fresh
+  long-cache measured for `decode_segments8` at capacity 131072:
+  D8192 **7.99/35.20**, D32768 **1.34/15.36**, D131040 **0.128/4.72**
+  (request/decode-only tok/s). Cleared `long_context_resource_blocked`;
+  `long_context_measured=true`. OPT-016 2K Quartz still blocked
+  (`decode_segments8_requires_matching_session_capacity`; llama 2K **3150.7**
+  tok/s reference only). Remaining blocked gates: `opt016_2k_resource_blocked`,
+  `nsight_systems_absent`.
+- Updated: [`fixtures/opt132_combined_decode.json`](fixtures/opt132_combined_decode.json);
+  [`evidence/optimization/opt132-combined-decode/REPORT.md`](evidence/optimization/opt132-combined-decode/REPORT.md);
+  sidecars under `build/optimization-runs/opt132/`.
