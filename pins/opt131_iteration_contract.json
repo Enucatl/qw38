@@ -1,0 +1,515 @@
+{
+  "schema_version": 1,
+  "task": "OPT-131",
+  "yardstick": "fuse_one_measured_residual_decode_launch_chain",
+  "claims_throughput": false,
+  "claims_performance_improvement": false,
+  "opt074_family_admission_required": false,
+  "opt074_coverage_unadmitted_is_blocker": false,
+  "performance_admission": {
+    "enabled": true
+  },
+  "image": "qw38-cuda:13.0.2",
+  "model": "models/Qwen3.8-27B-Q4_K_M.gguf",
+  "gpu_lock": "build/optimization-runs/qw38-gpu.lock",
+  "aggregate_deadline_s": 7200,
+  "target": "tools/opt131_decode_chain.py",
+  "diagnostics_make_target": "cuda-opt131-diagnostics",
+  "selector": "decode_segments8",
+  "case_ids": [
+    "preflight",
+    "identity",
+    "profile",
+    "occupancy",
+    "lifetime",
+    "cancellation",
+    "equivalence",
+    "rank",
+    "freeze",
+    "screen-d128",
+    "screen-d2048",
+    "screen-p4096",
+    "quality",
+    "state-memory",
+    "d128",
+    "d2048",
+    "p4096",
+    "report"
+  ],
+  "modes": {
+    "feedback": {
+      "target": "tools/opt131_decode_chain.py",
+      "tier_sequence": [
+        "preflight",
+        "identity",
+        "profile",
+        "occupancy",
+        "lifetime",
+        "cancellation",
+        "equivalence",
+        "rank",
+        "freeze",
+        "screen-d128",
+        "screen-d2048",
+        "screen-p4096"
+      ],
+      "make_targets": ["build/qw38-cuda-opt131-decode-chain-test"],
+      "build_once": true,
+      "warm_repetitions": 0,
+      "aggregate_deadline_s": 7200,
+      "workloads": [
+        "preflight",
+        "identity",
+        "profile",
+        "occupancy",
+        "lifetime",
+        "cancellation",
+        "equivalence",
+        "rank",
+        "freeze",
+        "screen-d128",
+        "screen-d2048",
+        "screen-p4096"
+      ]
+    },
+    "acceptance": {
+      "target": "tools/opt131_decode_chain.py",
+      "tier_sequence": [
+        "quality",
+        "state-memory",
+        "d128",
+        "d2048",
+        "p4096",
+        "report"
+      ],
+      "make_targets": [
+        "build/qw38-cuda-opt131-decode-chain-test",
+        "build/qw38-cuda-opt058-quality-baseline-test",
+        "build/qw38-cuda-checkpoint-test",
+        "build/qw38-cuda-memory-fit-test"
+      ],
+      "warm_repetitions": 0,
+      "aggregate_deadline_s": 7200,
+      "workloads": [
+        "quality",
+        "state-memory",
+        "d128",
+        "d2048",
+        "p4096",
+        "report"
+      ]
+    },
+    "release": {
+      "target": "tools/opt131_decode_chain.py",
+      "tier": "acceptance",
+      "make_targets": [
+        "build/qw38-cuda-opt131-decode-chain-test",
+        "build/qw38-cuda-opt058-quality-baseline-test"
+      ],
+      "skip_compile": false,
+      "historical_oracles": false,
+      "aggregate_deadline_s": 7200,
+      "workloads": ["quality", "state-memory"]
+    }
+  },
+  "workloads": {
+    "preflight": {
+      "target": "tools/opt131_decode_chain.py",
+      "tier": "correctness",
+      "runner": "host",
+      "kind": "identity_freeze_and_opt127_parent",
+      "cases": 1,
+      "candidates": 1,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 1,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 0,
+      "reference": 1,
+      "gpu_work": false,
+      "args": [
+        "uv", "run", "python", "tools/opt131_decode_chain.py",
+        "--phase", "preflight", "--mode", "{mode}", "--run-dir", "{run_dir}"
+      ]
+    },
+    "identity": {
+      "target": "build/qw38-cuda-opt131-decode-chain-test",
+      "tier": "correctness",
+      "runner": "host",
+      "kind": "parent_pins_and_graph_counts",
+      "cases": 1,
+      "candidates": 1,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 1,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 1,
+      "reference": 1,
+      "gpu_work": true,
+      "native_targets": ["build/qw38-cuda-opt131-decode-chain-test"],
+      "args": [
+        "uv", "run", "python", "tools/opt131_decode_chain.py",
+        "--phase", "identity", "--mode", "{mode}", "--run-dir", "{run_dir}"
+      ]
+    },
+    "profile": {
+      "target": "build/qw38-cuda-opt131-decode-chain-test",
+      "tier": "correctness",
+      "runner": "host",
+      "kind": "eager_leaves_graph_nodes_and_launch_gap",
+      "cases": 2,
+      "candidates": 1,
+      "warmups": 1,
+      "samples": 1,
+      "tokens": 4,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 1,
+      "reference": 0,
+      "gpu_work": true,
+      "native_targets": ["build/qw38-cuda-opt131-decode-chain-test"],
+      "args": [
+        "uv", "run", "python", "tools/opt131_decode_chain.py",
+        "--phase", "profile", "--mode", "{mode}", "--run-dir", "{run_dir}"
+      ]
+    },
+    "occupancy": {
+      "target": "build/qw38-cuda-opt131-decode-chain-test",
+      "tier": "correctness",
+      "runner": "host",
+      "kind": "isolated_short_kernel_events",
+      "cases": 5,
+      "candidates": 1,
+      "warmups": 1,
+      "samples": 3,
+      "tokens": 1,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 1,
+      "reference": 0,
+      "gpu_work": true,
+      "native_targets": ["build/qw38-cuda-opt131-decode-chain-test"],
+      "args": [
+        "uv", "run", "python", "tools/opt131_decode_chain.py",
+        "--phase", "occupancy", "--mode", "{mode}", "--run-dir", "{run_dir}"
+      ]
+    },
+    "lifetime": {
+      "target": "build/qw38-cuda-opt131-decode-chain-test",
+      "tier": "correctness",
+      "runner": "host",
+      "kind": "lazy_logits_restore_cancel_subsequent",
+      "cases": 1,
+      "candidates": 1,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 1,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 1,
+      "reference": 0,
+      "gpu_work": true,
+      "native_targets": ["build/qw38-cuda-opt131-decode-chain-test"],
+      "args": [
+        "uv", "run", "python", "tools/opt131_decode_chain.py",
+        "--phase", "lifetime", "--mode", "{mode}", "--run-dir", "{run_dir}"
+      ]
+    },
+    "cancellation": {
+      "target": "build/qw38-cuda-opt131-decode-chain-test",
+      "tier": "correctness",
+      "runner": "host",
+      "kind": "segment_and_commit_boundary_cancellation",
+      "cases": 2,
+      "candidates": 1,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 1,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 1,
+      "reference": 0,
+      "gpu_work": true,
+      "native_targets": ["build/qw38-cuda-opt131-decode-chain-test"],
+      "args": [
+        "uv", "run", "python", "tools/opt131_decode_chain.py",
+        "--phase", "cancellation", "--mode", "{mode}", "--run-dir", "{run_dir}"
+      ]
+    },
+    "equivalence": {
+      "target": "build/qw38-cuda-opt131-decode-chain-test",
+      "tier": "correctness",
+      "runner": "host",
+      "kind": "graph_versus_eager_unchanged_fallback",
+      "cases": 1,
+      "candidates": 2,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 2,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 1,
+      "reference": 1,
+      "gpu_work": true,
+      "native_targets": ["build/qw38-cuda-opt131-decode-chain-test"],
+      "args": [
+        "uv", "run", "python", "tools/opt131_decode_chain.py",
+        "--phase", "equivalence", "--mode", "{mode}", "--run-dir", "{run_dir}"
+      ]
+    },
+    "rank": {
+      "target": "tools/opt131_decode_chain.py",
+      "tier": "correctness",
+      "runner": "host",
+      "kind": "rank_avoided_launches_and_intermediate_traffic",
+      "cases": 1,
+      "candidates": 1,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 1,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 0,
+      "reference": 1,
+      "gpu_work": false,
+      "args": [
+        "uv", "run", "python", "tools/opt131_decode_chain.py",
+        "--phase", "rank", "--mode", "{mode}", "--run-dir", "{run_dir}"
+      ]
+    },
+    "freeze": {
+      "target": "tools/opt131_decode_chain.py",
+      "tier": "correctness",
+      "runner": "host",
+      "kind": "freeze_at_most_two_measured_chains",
+      "cases": 1,
+      "candidates": 2,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 1,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 0,
+      "reference": 1,
+      "gpu_work": false,
+      "args": [
+        "uv", "run", "python", "tools/opt131_decode_chain.py",
+        "--phase", "freeze", "--mode", "{mode}", "--run-dir", "{run_dir}"
+      ]
+    },
+    "screen-d128": {
+      "target": "build/qw38-cuda-opt131-decode-chain-test",
+      "tier": "screen",
+      "runner": "host",
+      "kind": "bounded_3_plus_5_ab_d128_or_skip",
+      "cases": 1,
+      "candidates": 2,
+      "warmups": 3,
+      "samples": 5,
+      "tokens": 1,
+      "output_tokens": 256,
+      "prefix": 128,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 1,
+      "reference": 0,
+      "gpu_work": true,
+      "native_targets": ["build/qw38-cuda-opt131-decode-chain-test"],
+      "args": [
+        "uv", "run", "python", "tools/opt131_decode_chain.py",
+        "--phase", "screen-d128", "--mode", "{mode}", "--run-dir", "{run_dir}"
+      ]
+    },
+    "screen-d2048": {
+      "target": "build/qw38-cuda-opt131-decode-chain-test",
+      "tier": "screen",
+      "runner": "host",
+      "kind": "bounded_3_plus_5_ab_d2048_or_skip",
+      "cases": 1,
+      "candidates": 2,
+      "warmups": 3,
+      "samples": 5,
+      "tokens": 1,
+      "output_tokens": 256,
+      "prefix": 2048,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 1,
+      "reference": 0,
+      "gpu_work": true,
+      "native_targets": ["build/qw38-cuda-opt131-decode-chain-test"],
+      "args": [
+        "uv", "run", "python", "tools/opt131_decode_chain.py",
+        "--phase", "screen-d2048", "--mode", "{mode}", "--run-dir", "{run_dir}"
+      ]
+    },
+    "screen-p4096": {
+      "target": "build/qw38-cuda-opt131-decode-chain-test",
+      "tier": "screen",
+      "runner": "host",
+      "kind": "bounded_3_plus_5_ab_p4096_or_skip",
+      "cases": 1,
+      "candidates": 2,
+      "warmups": 3,
+      "samples": 5,
+      "tokens": 1,
+      "prefix": 4096,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 1,
+      "reference": 0,
+      "gpu_work": true,
+      "native_targets": ["build/qw38-cuda-opt131-decode-chain-test"],
+      "args": [
+        "uv", "run", "python", "tools/opt131_decode_chain.py",
+        "--phase", "screen-p4096", "--mode", "{mode}", "--run-dir", "{run_dir}"
+      ]
+    },
+    "quality": {
+      "target": "build/qw38-cuda-opt058-quality-baseline-test",
+      "tier": "acceptance",
+      "runner": "host",
+      "kind": "opt058_quality_when_candidate_admitted",
+      "engines": ["quartz"],
+      "configurations": ["decode_segments8"],
+      "cases": 12,
+      "candidates": 1,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 1024,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 1,
+      "reference": 1,
+      "aggregate_deadline_s": 7200,
+      "args": [
+        "uv", "run", "python", "tools/opt131_decode_chain.py",
+        "--phase", "quality", "--mode", "{mode}", "--run-dir", "{run_dir}"
+      ]
+    },
+    "state-memory": {
+      "target": "build/qw38-cuda-memory-fit-test",
+      "tier": "acceptance",
+      "runner": "host",
+      "kind": "checkpoint_cancellation_restore_128k_fit",
+      "cases": 3,
+      "candidates": 1,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 1,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 1,
+      "reference": 0,
+      "aggregate_deadline_s": 7200,
+      "args": [
+        "uv", "run", "python", "tools/opt131_decode_chain.py",
+        "--phase", "state-memory", "--mode", "{mode}", "--run-dir", "{run_dir}"
+      ]
+    },
+    "d128": {
+      "target": "build/qw38-cuda-opt131-decode-chain-test",
+      "tier": "acceptance",
+      "runner": "host",
+      "kind": "full_engine_ab_d128_or_skip",
+      "cases": 1,
+      "candidates": 2,
+      "warmups": 3,
+      "samples": 10,
+      "tokens": 1,
+      "output_tokens": 256,
+      "prefix": 128,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 1,
+      "reference": 0,
+      "gpu_work": true,
+      "native_targets": ["build/qw38-cuda-opt131-decode-chain-test"],
+      "args": [
+        "uv", "run", "python", "tools/opt131_decode_chain.py",
+        "--phase", "d128", "--mode", "{mode}", "--run-dir", "{run_dir}"
+      ]
+    },
+    "d2048": {
+      "target": "build/qw38-cuda-opt131-decode-chain-test",
+      "tier": "acceptance",
+      "runner": "host",
+      "kind": "full_engine_ab_d2048_or_skip",
+      "cases": 1,
+      "candidates": 2,
+      "warmups": 3,
+      "samples": 10,
+      "tokens": 1,
+      "output_tokens": 256,
+      "prefix": 2048,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 1,
+      "reference": 0,
+      "gpu_work": true,
+      "native_targets": ["build/qw38-cuda-opt131-decode-chain-test"],
+      "args": [
+        "uv", "run", "python", "tools/opt131_decode_chain.py",
+        "--phase", "d2048", "--mode", "{mode}", "--run-dir", "{run_dir}"
+      ]
+    },
+    "p4096": {
+      "target": "build/qw38-cuda-opt131-decode-chain-test",
+      "tier": "acceptance",
+      "runner": "host",
+      "kind": "non_target_prefill_guard_or_skip",
+      "cases": 1,
+      "candidates": 2,
+      "warmups": 3,
+      "samples": 10,
+      "tokens": 1,
+      "prefix": 4096,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 1,
+      "reference": 0,
+      "gpu_work": true,
+      "native_targets": ["build/qw38-cuda-opt131-decode-chain-test"],
+      "args": [
+        "uv", "run", "python", "tools/opt131_decode_chain.py",
+        "--phase", "p4096", "--mode", "{mode}", "--run-dir", "{run_dir}"
+      ]
+    },
+    "report": {
+      "target": "tools/opt131_decode_chain.py",
+      "tier": "acceptance",
+      "runner": "host",
+      "kind": "keep_reject_or_no_opportunity_report",
+      "cases": 1,
+      "candidates": 1,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 1,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 0,
+      "reference": 0,
+      "gpu_work": false,
+      "args": [
+        "uv", "run", "python", "tools/opt131_decode_chain.py",
+        "--phase", "report", "--mode", "{mode}", "--run-dir", "{run_dir}"
+      ]
+    }
+  },
+  "proof_limit": [
+    "parent is OPT-127 kept decode_segments8 plus OPT-128 no-opportunity and OPT-130 reject hybrid_crossover",
+    "at most two implementations of one adjacent producer/consumer chain; no general fusion framework",
+    "reuse OPT-119 norm to Q8; do not recreate it",
+    "OPT-109 isolated GDN win and enclosing loss are required prior evidence if a GDN chain is chosen",
+    "do not fuse across a required cancellation or commit boundary",
+    "graphs already capturing a chain remove its launch gap; remaining bound is traffic",
+    "a kernel-only speedup is not a keep",
+    "keep requires OPT-116 quality, state/memory/cancellation, and a measured request gain",
+    "no_material_opportunity is valid when the quantified bound cannot clear noise",
+    "3 warmups plus 5 paired AB/BA screen and 3 plus 10 acceptance at D128/D2048/P4096 only if a candidate is frozen",
+    "aggregate_deadline_s 7200 is a ceiling, not a skip"
+  ],
+  "report_path": "evidence/optimization/opt131-decode-chain/REPORT.md"
+}

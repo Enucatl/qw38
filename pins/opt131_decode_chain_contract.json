@@ -1,0 +1,85 @@
+{
+  "schema_version": 1,
+  "task": "OPT-131",
+  "yardstick": "fuse_one_measured_residual_decode_launch_chain",
+  "claims_throughput": false,
+  "claims_performance_improvement": false,
+  "opt074_family_admission_required": false,
+  "opt074_coverage_unadmitted_is_blocker": false,
+  "llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+  "gguf_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+  "token_generator": "(42 + index * 997) % 248320",
+  "parent": "opt127_kept_decode_segments8",
+  "parent_execution_graphs": "decode_segments8",
+  "parent_attention": "hybrid_crossover",
+  "opt128_disposition": "no_material_opportunity",
+  "opt130_disposition": "reject",
+  "candidate": "none",
+  "candidates": [
+    "attn_output_cast",
+    "embed_bf16_to_fp32"
+  ],
+  "max_changes": 2,
+  "reuse_opt119_norm_q8": true,
+  "recreate_opt119_norm_q8": false,
+  "opt109_gdn_prior_required_if_gdn_chain": true,
+  "selected_decode_chain_fusion": "none",
+  "aa_warmups": 3,
+  "screen_pairs": 5,
+  "aa_pairs": 10,
+  "decode_output_tokens": 256,
+  "target_workloads": [
+    "d128",
+    "d2048"
+  ],
+  "non_target_workloads": [
+    "p4096"
+  ],
+  "metrics": [
+    "decode_only",
+    "complete_request"
+  ],
+  "throughput_ratio_lower_bound": 1.0,
+  "non_target_point_ratio_min": 0.98,
+  "decode_p95_ratio_max": 1.05,
+  "ppl_ratio_max": 1.01,
+  "require_candidate_nll": false,
+  "require_candidate_nll_when": "decode_chain_candidate_admitted_to_complete_request_ab",
+  "opt116_quality_contract": "opt116_generated_v1",
+  "native_test": "build/qw38-cuda-opt131-decode-chain-test",
+  "diagnostics_make_target": "cuda-opt131-diagnostics",
+  "legal_execution_graph_paths": [
+    "ffn_only",
+    "decode_segments8"
+  ],
+  "selected_execution_graph_path": "decode_segments8",
+  "kernel_only_speedup_is_not_keep": true,
+  "opaque_byte_patching": false,
+  "required_fixture_keys": [
+    "schema_version",
+    "task",
+    "mode",
+    "llama_revision",
+    "gguf_sha256",
+    "parent",
+    "candidate",
+    "profile",
+    "rank",
+    "freeze",
+    "quality",
+    "state_memory",
+    "performance",
+    "shipping_decode_chain_fusion",
+    "production_kept",
+    "verdict",
+    "report_path"
+  ],
+  "verdicts": [
+    "keep",
+    "reject",
+    "no_material_opportunity",
+    "quality_blocked",
+    "inconclusive"
+  ],
+  "report_path": "evidence/optimization/opt131-decode-chain/REPORT.md"
+}
