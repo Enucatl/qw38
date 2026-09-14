@@ -553,7 +553,7 @@ def docker_nsys_layout(*, refresh: bool = False) -> dict[str, Any]:
         "nsys --version 2>&1 | head -1; "
         "host=$(ls -d /opt/nvidia/nsight-systems/*/host-linux-x64 2>/dev/null | sort -V | tail -1); "
         'if [ -n "$host" ]; then echo "NSYS_HOST=$host"; '
-        'elif [ -x /usr/lib/nsight-systems/host-linux-x64/QdstrmImporter ]; then '
+        "elif [ -x /usr/lib/nsight-systems/host-linux-x64/QdstrmImporter ]; then "
         'echo "NSYS_HOST=/usr/lib/nsight-systems/host-linux-x64"; fi'
     )
     completed = docker_sh(script)
@@ -988,6 +988,11 @@ def reconcile_window(
         intervals["inactive_method"] = "nsys_gputrace_union_idle"
         intervals["unobserved_ms"] = unresolved
         intervals["leaf_gap_relabeled"] = "nsys_idle_or_host_api_or_unresolved"
+    graph_launches = int(parsed.get("graph_launch_count") or 0)
+    envelopes = parsed.get("graph_envelope_union_ms")
+    idle_claim_valid = from_trace and graph_launches == 0
+    if from_trace and graph_launches > 0 and envelopes is None:
+        idle_claim_valid = False
     return {
         "opt125_unobserved_ms": unobserved,
         "opt125_device_active_ms": opt125.get("device_active_ms"),
@@ -1007,6 +1012,18 @@ def reconcile_window(
         "profiler": profiler,
         "intervals": intervals,
         "stub_relabel_avoided": from_trace,
+        "idle_claim_valid": idle_claim_valid,
+        "current_derived_idle_ms": gpu_idle if idle_claim_valid else None,
+        "idle_invalid_reason": None
+        if idle_claim_valid
+        else (
+            "graph launches present without CUPTI_ACTIVITY_KIND_GRAPH_TRACE "
+            "envelopes; remainder after kernel/copy union is not proven idle"
+            if from_trace and graph_launches > 0
+            else None
+        ),
+        "causal_reconciliation": False,
+        "historical_explained_by_idle_ms": explained_idle,
     }
 
 
@@ -1721,6 +1738,22 @@ def write_report(payload: Mapping[str, Any]) -> None:
         f"```json\n{json.dumps(preflight.get('gpu_residents') or [], indent=2)}\n```",
         "",
     ]
+    correction = payload.get("opt136_correction") or {}
+    if correction:
+        lines.extend(
+            [
+                f"## OPT-136 dated correction ({correction.get('date', '2026-09-14')})",
+                "",
+                str(correction.get("reason") or ""),
+                "",
+                f"Current derived idle: `{correction.get('gpu_idle_ms')}`. "
+                f"Valid: `{correction.get('idle_claim_valid')}`. "
+                f"Link: `{correction.get('link')}`.",
+                "",
+                "Raw sample arrays are preserved under `opt136_historical_idle`.",
+                "",
+            ]
+        )
     REPORT.write_text("\n".join(lines), encoding="utf-8")
 
 
@@ -1758,6 +1791,7 @@ def run_report(run_dir: Path, mode: str) -> dict[str, Any]:
     answers = answers_from_phases(reconcile, overhead)
     captures = capture.get("captures") or current_fixture().get("captures") or {}
     parsed = parse_payload.get("parsed") or current_fixture().get("parsed") or {}
+    existing = current_fixture()
     payload = {
         "schema_version": 1,
         "task": "OPT-133",
@@ -1785,6 +1819,8 @@ def run_report(run_dir: Path, mode: str) -> dict[str, Any]:
         "report_path": str(contract["report_path"]),
         "family_plan": family_plan(mode, "report"),
         "measured_at": utc_now(),
+        "opt136_historical_idle": existing.get("opt136_historical_idle"),
+        "opt136_correction": existing.get("opt136_correction"),
     }
     validate_fixture(payload)
     persist_fixture(payload)

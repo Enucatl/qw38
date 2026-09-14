@@ -111,3 +111,28 @@ if(QW38_OPT060_ATTRIBUTION)
       BUILD_RPATH "\$ORIGIN"
       RUNTIME_OUTPUT_DIRECTORY "${LLAMA_BUILD}/bin")
 endif()
+
+add_executable(qw38-llama-opt136-decode-profile opt136_decode_profile.cpp)
+target_compile_features(qw38-llama-opt136-decode-profile PRIVATE cxx_std_17)
+target_compile_options(qw38-llama-opt136-decode-profile PRIVATE -Wall -Wextra -Werror)
+find_package(CUDAToolkit REQUIRED)
+target_include_directories(
+  qw38-llama-opt136-decode-profile
+  PRIVATE
+    "${LLAMA_SOURCE}/include"
+    "${LLAMA_SOURCE}/ggml/include"
+    "${CUDAToolkit_INCLUDE_DIRS}")
+target_link_directories(qw38-llama-opt136-decode-profile PRIVATE "${LLAMA_BUILD}/bin")
+target_link_libraries(
+  qw38-llama-opt136-decode-profile
+  PRIVATE llama ggml ggml-cuda ggml-base CUDA::cudart)
+if(QW38_PROFILE_OUTPUT_DIR)
+  set(_opt136_out "${QW38_PROFILE_OUTPUT_DIR}")
+else()
+  set(_opt136_out "${LLAMA_BUILD}/bin")
+endif()
+set_target_properties(
+  qw38-llama-opt136-decode-profile
+  PROPERTIES
+    BUILD_RPATH "\$ORIGIN"
+    RUNTIME_OUTPUT_DIRECTORY "${_opt136_out}")

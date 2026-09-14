@@ -1,0 +1,715 @@
+{
+  "schema_version": 1,
+  "task": "OPT-136",
+  "phase": "baseline",
+  "mode": "acceptance",
+  "ok": true,
+  "results": {
+    "warmup-d128-quartz-0": {
+      "ok": true,
+      "returncode": 0,
+      "stdout_tail": "NVIDIA Deep Learning Container License.\nBy pulling and using the container, you accept the terms and conditions of this license:\nhttps://developer.nvidia.com/ngc/nvidia-deep-learning-container-license\n\nA copy of this license is made available in this container at /NGC-DL-CONTAINER-LICENSE for your convenience.\n\nindependently_restored=true same_binary=true\nQW38_OPT136_GRAPH_ACCOUNTING_RESULT={\"schema_version\":1,\"task\":\"OPT-136\",\"workload\":\"unprofiled\",\"ok\":true,\"engine\":\"quartz\",\"prefix\":128,\"eval_count\":256,\"emitted_token_count\":0,\"capacity\":131072,\"window_tokens\":12,\"window_steps\":0,\"nsys_capture\":false,\"attribution\":false,\"prefill_ms\":81.9199753,\"decode_only_ms\":4261.37598,\"complete_request_ms\":4343.2959,\"record_count\":0,\"decode_segment_graphs\":16,\"consumed_token_ids\":256,\"message\":\"\",\"keep\":false}\nQW38_OPT136_NATIVE_COUNTS={\"schema_version\":1,\"task\":\"OPT-136\",\"observed_warmups\":0,\"observed_samples\":1,\"observed_candidates\":1,\"observed_shapes\":1,\"observed_tier\":\"screen\",\"keep\":false}\n"
+    },
+    "warmup-d128-llama-0": {
+      "ok": true,
+      "returncode": 0,
+      "stdout_tail": "\n==========\n== CUDA ==\n==========\n\nCUDA Version 13.0.2\n\nContainer image Copyright (c) 2016-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.\n\nThis container image and its contents are governed by the NVIDIA Deep Learning Container License.\nBy pulling and using the container, you accept the terms and conditions of this license:\nhttps://developer.nvidia.com/ngc/nvidia-deep-learning-container-license\n\nA copy of this license is made available in this container at /NGC-DL-CONTAINER-LICENSE for your convenience.\n\nQW38_OPT136_GRAPH_ACCOUNTING_RESULT={\"schema_version\":1,\"task\":\"OPT-136\",\"workload\":\"unprofiled\",\"ok\":true,\"engine\":\"llama\",\"llama_revision\":\"cc83d7b4824f73cfdda4dfbb47ee39804f71b328\",\"prefix\":128,\"eval_count\":256,\"emitted_token_count\":0,\"capacity\":131072,\"window_steps\":0,\"nsys_capture\":false,\"prefill_ms\":69.705743,\"decode_only_ms\":3590.95429,\"complete_request_ms\":3660.66004,\"keep\":false}\n"
+    },
+    "warmup-d128-quartz-1": {
+      "ok": true,
+      "returncode": 0,
+      "stdout_tail": "VIDIA Deep Learning Container License.\nBy pulling and using the container, you accept the terms and conditions of this license:\nhttps://developer.nvidia.com/ngc/nvidia-deep-learning-container-license\n\nA copy of this license is made available in this container at /NGC-DL-CONTAINER-LICENSE for your convenience.\n\nindependently_restored=true same_binary=true\nQW38_OPT136_GRAPH_ACCOUNTING_RESULT={\"schema_version\":1,\"task\":\"OPT-136\",\"workload\":\"unprofiled\",\"ok\":true,\"engine\":\"quartz\",\"prefix\":128,\"eval_count\":256,\"emitted_token_count\":0,\"capacity\":131072,\"window_tokens\":12,\"window_steps\":0,\"nsys_capture\":false,\"attribution\":false,\"prefill_ms\":81.8994827,\"decode_only_ms\":4268.08643,\"complete_request_ms\":4349.98584,\"record_count\":0,\"decode_segment_graphs\":16,\"consumed_token_ids\":256,\"message\":\"\",\"keep\":false}\nQW38_OPT136_NATIVE_COUNTS={\"schema_version\":1,\"task\":\"OPT-136\",\"observed_warmups\":0,\"observed_samples\":1,\"observed_candidates\":1,\"observed_shapes\":1,\"observed_tier\":\"screen\",\"keep\":false}\n"
+    },
+    "warmup-d128-llama-1": {
+      "ok": true,
+      "returncode": 0,
+      "stdout_tail": "\n==========\n== CUDA ==\n==========\n\nCUDA Version 13.0.2\n\nContainer image Copyright (c) 2016-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.\n\nThis container image and its contents are governed by the NVIDIA Deep Learning Container License.\nBy pulling and using the container, you accept the terms and conditions of this license:\nhttps://developer.nvidia.com/ngc/nvidia-deep-learning-container-license\n\nA copy of this license is made available in this container at /NGC-DL-CONTAINER-LICENSE for your convenience.\n\nQW38_OPT136_GRAPH_ACCOUNTING_RESULT={\"schema_version\":1,\"task\":\"OPT-136\",\"workload\":\"unprofiled\",\"ok\":true,\"engine\":\"llama\",\"llama_revision\":\"cc83d7b4824f73cfdda4dfbb47ee39804f71b328\",\"prefix\":128,\"eval_count\":256,\"emitted_token_count\":0,\"capacity\":131072,\"window_steps\":0,\"nsys_capture\":false,\"prefill_ms\":69.43009,\"decode_only_ms\":3603.50418,\"complete_request_ms\":3672.93426,\"keep\":false}\n"
+    },
+    "warmup-d128-quartz-2": {
+      "ok": true,
+      "returncode": 0,
+      "stdout_tail": " the NVIDIA Deep Learning Container License.\nBy pulling and using the container, you accept the terms and conditions of this license:\nhttps://developer.nvidia.com/ngc/nvidia-deep-learning-container-license\n\nA copy of this license is made available in this container at /NGC-DL-CONTAINER-LICENSE for your convenience.\n\nindependently_restored=true same_binary=true\nQW38_OPT136_GRAPH_ACCOUNTING_RESULT={\"schema_version\":1,\"task\":\"OPT-136\",\"workload\":\"unprofiled\",\"ok\":true,\"engine\":\"quartz\",\"prefix\":128,\"eval_count\":256,\"emitted_token_count\":0,\"capacity\":131072,\"window_tokens\":12,\"window_steps\":0,\"nsys_capture\":false,\"attribution\":false,\"prefill_ms\":81.9702148,\"decode_only_ms\":4276,\"complete_request_ms\":4357.97021,\"record_count\":0,\"decode_segment_graphs\":16,\"consumed_token_ids\":256,\"message\":\"\",\"keep\":false}\nQW38_OPT136_NATIVE_COUNTS={\"schema_version\":1,\"task\":\"OPT-136\",\"observed_warmups\":0,\"observed_samples\":1,\"observed_candidates\":1,\"observed_shapes\":1,\"observed_tier\":\"screen\",\"keep\":false}\n"
+    },
+    "warmup-d128-llama-2": {
+      "ok": true,
+      "returncode": 0,
+      "stdout_tail": "\n==========\n== CUDA ==\n==========\n\nCUDA Version 13.0.2\n\nContainer image Copyright (c) 2016-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.\n\nThis container image and its contents are governed by the NVIDIA Deep Learning Container License.\nBy pulling and using the container, you accept the terms and conditions of this license:\nhttps://developer.nvidia.com/ngc/nvidia-deep-learning-container-license\n\nA copy of this license is made available in this container at /NGC-DL-CONTAINER-LICENSE for your convenience.\n\nQW38_OPT136_GRAPH_ACCOUNTING_RESULT={\"schema_version\":1,\"task\":\"OPT-136\",\"workload\":\"unprofiled\",\"ok\":true,\"engine\":\"llama\",\"llama_revision\":\"cc83d7b4824f73cfdda4dfbb47ee39804f71b328\",\"prefix\":128,\"eval_count\":256,\"emitted_token_count\":0,\"capacity\":131072,\"window_steps\":0,\"nsys_capture\":false,\"prefill_ms\":69.98217,\"decode_only_ms\":3608.91811,\"complete_request_ms\":3678.90027,\"keep\":false}\n"
+    },
+    "pair-d128-quartz-0": {
+      "ok": true,
+      "decode_only_ms": 4280.69971,
+      "returncode": 0
+    },
+    "pair-d128-llama-0": {
+      "ok": true,
+      "decode_only_ms": 3610.63712,
+      "returncode": 0
+    },
+    "pair-d128-quartz-1": {
+      "ok": true,
+      "decode_only_ms": 4285.09619,
+      "returncode": 0
+    },
+    "pair-d128-llama-1": {
+      "ok": true,
+      "decode_only_ms": 3612.81087,
+      "returncode": 0
+    },
+    "pair-d128-quartz-2": {
+      "ok": true,
+      "decode_only_ms": 4287.93018,
+      "returncode": 0
+    },
+    "pair-d128-llama-2": {
+      "ok": true,
+      "decode_only_ms": 3617.62317,
+      "returncode": 0
+    },
+    "pair-d128-quartz-3": {
+      "ok": true,
+      "decode_only_ms": 4289.61865,
+      "returncode": 0
+    },
+    "pair-d128-llama-3": {
+      "ok": true,
+      "decode_only_ms": 3617.54991,
+      "returncode": 0
+    },
+    "pair-d128-quartz-4": {
+      "ok": true,
+      "decode_only_ms": 4290.8877,
+      "returncode": 0
+    },
+    "pair-d128-llama-4": {
+      "ok": true,
+      "decode_only_ms": 3623.08057,
+      "returncode": 0
+    },
+    "pair-d128-quartz-5": {
+      "ok": true,
+      "decode_only_ms": 4290.61865,
+      "returncode": 0
+    },
+    "pair-d128-llama-5": {
+      "ok": true,
+      "decode_only_ms": 3622.82904,
+      "returncode": 0
+    },
+    "pair-d128-quartz-6": {
+      "ok": true,
+      "decode_only_ms": 4293.62842,
+      "returncode": 0
+    },
+    "pair-d128-llama-6": {
+      "ok": true,
+      "decode_only_ms": 3625.08787,
+      "returncode": 0
+    },
+    "pair-d128-quartz-7": {
+      "ok": true,
+      "decode_only_ms": 4293.58154,
+      "returncode": 0
+    },
+    "pair-d128-llama-7": {
+      "ok": true,
+      "decode_only_ms": 3626.99836,
+      "returncode": 0
+    },
+    "pair-d128-quartz-8": {
+      "ok": true,
+      "decode_only_ms": 4293.90771,
+      "returncode": 0
+    },
+    "pair-d128-llama-8": {
+      "ok": true,
+      "decode_only_ms": 3627.34055,
+      "returncode": 0
+    },
+    "pair-d128-quartz-9": {
+      "ok": true,
+      "decode_only_ms": 4296.81934,
+      "returncode": 0
+    },
+    "pair-d128-llama-9": {
+      "ok": true,
+      "decode_only_ms": 3625.38458,
+      "returncode": 0
+    },
+    "d128": {
+      "quartz_decode_only_ms": [
+        4280.69971,
+        4285.09619,
+        4287.93018,
+        4289.61865,
+        4290.8877,
+        4290.61865,
+        4293.62842,
+        4293.58154,
+        4293.90771,
+        4296.81934
+      ],
+      "llama_decode_only_ms": [
+        3610.63712,
+        3612.81087,
+        3617.62317,
+        3617.54991,
+        3623.08057,
+        3622.82904,
+        3625.08787,
+        3626.99836,
+        3627.34055,
+        3625.38458
+      ],
+      "n_pairs": 10
+    },
+    "warmup-d2048-quartz-0": {
+      "ok": true,
+      "returncode": 0,
+      "stdout_tail": "IDIA Deep Learning Container License.\nBy pulling and using the container, you accept the terms and conditions of this license:\nhttps://developer.nvidia.com/ngc/nvidia-deep-learning-container-license\n\nA copy of this license is made available in this container at /NGC-DL-CONTAINER-LICENSE for your convenience.\n\nindependently_restored=true same_binary=true\nQW38_OPT136_GRAPH_ACCOUNTING_RESULT={\"schema_version\":1,\"task\":\"OPT-136\",\"workload\":\"unprofiled\",\"ok\":true,\"engine\":\"quartz\",\"prefix\":2048,\"eval_count\":256,\"emitted_token_count\":0,\"capacity\":131072,\"window_tokens\":12,\"window_steps\":0,\"nsys_capture\":false,\"attribution\":false,\"prefill_ms\":632.454773,\"decode_only_ms\":5105.07959,\"complete_request_ms\":5737.53418,\"record_count\":0,\"decode_segment_graphs\":16,\"consumed_token_ids\":256,\"message\":\"\",\"keep\":false}\nQW38_OPT136_NATIVE_COUNTS={\"schema_version\":1,\"task\":\"OPT-136\",\"observed_warmups\":0,\"observed_samples\":1,\"observed_candidates\":1,\"observed_shapes\":1,\"observed_tier\":\"screen\",\"keep\":false}\n"
+    },
+    "warmup-d2048-llama-0": {
+      "ok": true,
+      "returncode": 0,
+      "stdout_tail": "\n==========\n== CUDA ==\n==========\n\nCUDA Version 13.0.2\n\nContainer image Copyright (c) 2016-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.\n\nThis container image and its contents are governed by the NVIDIA Deep Learning Container License.\nBy pulling and using the container, you accept the terms and conditions of this license:\nhttps://developer.nvidia.com/ngc/nvidia-deep-learning-container-license\n\nA copy of this license is made available in this container at /NGC-DL-CONTAINER-LICENSE for your convenience.\n\nQW38_OPT136_GRAPH_ACCOUNTING_RESULT={\"schema_version\":1,\"task\":\"OPT-136\",\"workload\":\"unprofiled\",\"ok\":true,\"engine\":\"llama\",\"llama_revision\":\"cc83d7b4824f73cfdda4dfbb47ee39804f71b328\",\"prefix\":2048,\"eval_count\":256,\"emitted_token_count\":0,\"capacity\":131072,\"window_steps\":0,\"nsys_capture\":false,\"prefill_ms\":635.388727,\"decode_only_ms\":3661.5653,\"complete_request_ms\":4296.95402,\"keep\":false}\n"
+    },
+    "warmup-d2048-quartz-1": {
+      "ok": true,
+      "returncode": 0,
+      "stdout_tail": "VIDIA Deep Learning Container License.\nBy pulling and using the container, you accept the terms and conditions of this license:\nhttps://developer.nvidia.com/ngc/nvidia-deep-learning-container-license\n\nA copy of this license is made available in this container at /NGC-DL-CONTAINER-LICENSE for your convenience.\n\nindependently_restored=true same_binary=true\nQW38_OPT136_GRAPH_ACCOUNTING_RESULT={\"schema_version\":1,\"task\":\"OPT-136\",\"workload\":\"unprofiled\",\"ok\":true,\"engine\":\"quartz\",\"prefix\":2048,\"eval_count\":256,\"emitted_token_count\":0,\"capacity\":131072,\"window_tokens\":12,\"window_steps\":0,\"nsys_capture\":false,\"attribution\":false,\"prefill_ms\":633.226196,\"decode_only_ms\":5106.4082,\"complete_request_ms\":5739.63428,\"record_count\":0,\"decode_segment_graphs\":16,\"consumed_token_ids\":256,\"message\":\"\",\"keep\":false}\nQW38_OPT136_NATIVE_COUNTS={\"schema_version\":1,\"task\":\"OPT-136\",\"observed_warmups\":0,\"observed_samples\":1,\"observed_candidates\":1,\"observed_shapes\":1,\"observed_tier\":\"screen\",\"keep\":false}\n"
+    },
+    "warmup-d2048-llama-1": {
+      "ok": true,
+      "returncode": 0,
+      "stdout_tail": "\n==========\n== CUDA ==\n==========\n\nCUDA Version 13.0.2\n\nContainer image Copyright (c) 2016-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.\n\nThis container image and its contents are governed by the NVIDIA Deep Learning Container License.\nBy pulling and using the container, you accept the terms and conditions of this license:\nhttps://developer.nvidia.com/ngc/nvidia-deep-learning-container-license\n\nA copy of this license is made available in this container at /NGC-DL-CONTAINER-LICENSE for your convenience.\n\nQW38_OPT136_GRAPH_ACCOUNTING_RESULT={\"schema_version\":1,\"task\":\"OPT-136\",\"workload\":\"unprofiled\",\"ok\":true,\"engine\":\"llama\",\"llama_revision\":\"cc83d7b4824f73cfdda4dfbb47ee39804f71b328\",\"prefix\":2048,\"eval_count\":256,\"emitted_token_count\":0,\"capacity\":131072,\"window_steps\":0,\"nsys_capture\":false,\"prefill_ms\":637.100402,\"decode_only_ms\":3664.9481,\"complete_request_ms\":4302.0485,\"keep\":false}\n"
+    },
+    "warmup-d2048-quartz-2": {
+      "ok": true,
+      "returncode": 0,
+      "stdout_tail": "VIDIA Deep Learning Container License.\nBy pulling and using the container, you accept the terms and conditions of this license:\nhttps://developer.nvidia.com/ngc/nvidia-deep-learning-container-license\n\nA copy of this license is made available in this container at /NGC-DL-CONTAINER-LICENSE for your convenience.\n\nindependently_restored=true same_binary=true\nQW38_OPT136_GRAPH_ACCOUNTING_RESULT={\"schema_version\":1,\"task\":\"OPT-136\",\"workload\":\"unprofiled\",\"ok\":true,\"engine\":\"quartz\",\"prefix\":2048,\"eval_count\":256,\"emitted_token_count\":0,\"capacity\":131072,\"window_tokens\":12,\"window_steps\":0,\"nsys_capture\":false,\"attribution\":false,\"prefill_ms\":634.305786,\"decode_only_ms\":5106.11084,\"complete_request_ms\":5740.4165,\"record_count\":0,\"decode_segment_graphs\":16,\"consumed_token_ids\":256,\"message\":\"\",\"keep\":false}\nQW38_OPT136_NATIVE_COUNTS={\"schema_version\":1,\"task\":\"OPT-136\",\"observed_warmups\":0,\"observed_samples\":1,\"observed_candidates\":1,\"observed_shapes\":1,\"observed_tier\":\"screen\",\"keep\":false}\n"
+    },
+    "warmup-d2048-llama-2": {
+      "ok": true,
+      "returncode": 0,
+      "stdout_tail": "\n==========\n== CUDA ==\n==========\n\nCUDA Version 13.0.2\n\nContainer image Copyright (c) 2016-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.\n\nThis container image and its contents are governed by the NVIDIA Deep Learning Container License.\nBy pulling and using the container, you accept the terms and conditions of this license:\nhttps://developer.nvidia.com/ngc/nvidia-deep-learning-container-license\n\nA copy of this license is made available in this container at /NGC-DL-CONTAINER-LICENSE for your convenience.\n\nQW38_OPT136_GRAPH_ACCOUNTING_RESULT={\"schema_version\":1,\"task\":\"OPT-136\",\"workload\":\"unprofiled\",\"ok\":true,\"engine\":\"llama\",\"llama_revision\":\"cc83d7b4824f73cfdda4dfbb47ee39804f71b328\",\"prefix\":2048,\"eval_count\":256,\"emitted_token_count\":0,\"capacity\":131072,\"window_steps\":0,\"nsys_capture\":false,\"prefill_ms\":637.002715,\"decode_only_ms\":3665.06086,\"complete_request_ms\":4302.06358,\"keep\":false}\n"
+    },
+    "pair-d2048-quartz-0": {
+      "ok": true,
+      "decode_only_ms": 5106.07275,
+      "returncode": 0
+    },
+    "pair-d2048-llama-0": {
+      "ok": true,
+      "decode_only_ms": 3662.33142,
+      "returncode": 0
+    },
+    "pair-d2048-quartz-1": {
+      "ok": true,
+      "decode_only_ms": 5104.72949,
+      "returncode": 0
+    },
+    "pair-d2048-llama-1": {
+      "ok": true,
+      "decode_only_ms": 3667.48593,
+      "returncode": 0
+    },
+    "pair-d2048-quartz-2": {
+      "ok": true,
+      "decode_only_ms": 5105.44629,
+      "returncode": 0
+    },
+    "pair-d2048-llama-2": {
+      "ok": true,
+      "decode_only_ms": 3660.47554,
+      "returncode": 0
+    },
+    "pair-d2048-quartz-3": {
+      "ok": true,
+      "decode_only_ms": 5105.91113,
+      "returncode": 0
+    },
+    "pair-d2048-llama-3": {
+      "ok": true,
+      "decode_only_ms": 3660.2522,
+      "returncode": 0
+    },
+    "pair-d2048-quartz-4": {
+      "ok": true,
+      "decode_only_ms": 5106.89795,
+      "returncode": 0
+    },
+    "pair-d2048-llama-4": {
+      "ok": true,
+      "decode_only_ms": 3662.33179,
+      "returncode": 0
+    },
+    "pair-d2048-quartz-5": {
+      "ok": true,
+      "decode_only_ms": 5106.68359,
+      "returncode": 0
+    },
+    "pair-d2048-llama-5": {
+      "ok": true,
+      "decode_only_ms": 3661.47351,
+      "returncode": 0
+    },
+    "pair-d2048-quartz-6": {
+      "ok": true,
+      "decode_only_ms": 5104.53223,
+      "returncode": 0
+    },
+    "pair-d2048-llama-6": {
+      "ok": true,
+      "decode_only_ms": 3661.5486,
+      "returncode": 0
+    },
+    "pair-d2048-quartz-7": {
+      "ok": true,
+      "decode_only_ms": 5105.23193,
+      "returncode": 0
+    },
+    "pair-d2048-llama-7": {
+      "ok": true,
+      "decode_only_ms": 3659.36539,
+      "returncode": 0
+    },
+    "pair-d2048-quartz-8": {
+      "ok": true,
+      "decode_only_ms": 5105.31592,
+      "returncode": 0
+    },
+    "pair-d2048-llama-8": {
+      "ok": true,
+      "decode_only_ms": 3662.49066,
+      "returncode": 0
+    },
+    "pair-d2048-quartz-9": {
+      "ok": true,
+      "decode_only_ms": 5106.44385,
+      "returncode": 0
+    },
+    "pair-d2048-llama-9": {
+      "ok": true,
+      "decode_only_ms": 3663.82865,
+      "returncode": 0
+    },
+    "d2048": {
+      "quartz_decode_only_ms": [
+        5106.07275,
+        5104.72949,
+        5105.44629,
+        5105.91113,
+        5106.89795,
+        5106.68359,
+        5104.53223,
+        5105.23193,
+        5105.31592,
+        5106.44385
+      ],
+      "llama_decode_only_ms": [
+        3662.33142,
+        3667.48593,
+        3660.47554,
+        3660.2522,
+        3662.33179,
+        3661.47351,
+        3661.5486,
+        3659.36539,
+        3662.49066,
+        3663.82865
+      ],
+      "n_pairs": 10
+    },
+    "warmup-d8192-quartz-0": {
+      "ok": true,
+      "returncode": 0,
+      "stdout_tail": "IDIA Deep Learning Container License.\nBy pulling and using the container, you accept the terms and conditions of this license:\nhttps://developer.nvidia.com/ngc/nvidia-deep-learning-container-license\n\nA copy of this license is made available in this container at /NGC-DL-CONTAINER-LICENSE for your convenience.\n\nindependently_restored=true same_binary=true\nQW38_OPT136_GRAPH_ACCOUNTING_RESULT={\"schema_version\":1,\"task\":\"OPT-136\",\"workload\":\"unprofiled\",\"ok\":true,\"engine\":\"quartz\",\"prefix\":8192,\"eval_count\":256,\"emitted_token_count\":0,\"capacity\":131072,\"window_tokens\":12,\"window_steps\":0,\"nsys_capture\":false,\"attribution\":false,\"prefill_ms\":3106.09766,\"decode_only_ms\":7324.12207,\"complete_request_ms\":10430.2197,\"record_count\":0,\"decode_segment_graphs\":16,\"consumed_token_ids\":256,\"message\":\"\",\"keep\":false}\nQW38_OPT136_NATIVE_COUNTS={\"schema_version\":1,\"task\":\"OPT-136\",\"observed_warmups\":0,\"observed_samples\":1,\"observed_candidates\":1,\"observed_shapes\":1,\"observed_tier\":\"screen\",\"keep\":false}\n"
+    },
+    "warmup-d8192-llama-0": {
+      "ok": true,
+      "returncode": 0,
+      "stdout_tail": "\n==========\n== CUDA ==\n==========\n\nCUDA Version 13.0.2\n\nContainer image Copyright (c) 2016-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.\n\nThis container image and its contents are governed by the NVIDIA Deep Learning Container License.\nBy pulling and using the container, you accept the terms and conditions of this license:\nhttps://developer.nvidia.com/ngc/nvidia-deep-learning-container-license\n\nA copy of this license is made available in this container at /NGC-DL-CONTAINER-LICENSE for your convenience.\n\nQW38_OPT136_GRAPH_ACCOUNTING_RESULT={\"schema_version\":1,\"task\":\"OPT-136\",\"workload\":\"unprofiled\",\"ok\":true,\"engine\":\"llama\",\"llama_revision\":\"cc83d7b4824f73cfdda4dfbb47ee39804f71b328\",\"prefix\":8192,\"eval_count\":256,\"emitted_token_count\":0,\"capacity\":131072,\"window_steps\":0,\"nsys_capture\":false,\"prefill_ms\":2599.72742,\"decode_only_ms\":3806.89736,\"complete_request_ms\":6406.62478,\"keep\":false}\n"
+    },
+    "warmup-d8192-quartz-1": {
+      "ok": true,
+      "returncode": 0,
+      "stdout_tail": "VIDIA Deep Learning Container License.\nBy pulling and using the container, you accept the terms and conditions of this license:\nhttps://developer.nvidia.com/ngc/nvidia-deep-learning-container-license\n\nA copy of this license is made available in this container at /NGC-DL-CONTAINER-LICENSE for your convenience.\n\nindependently_restored=true same_binary=true\nQW38_OPT136_GRAPH_ACCOUNTING_RESULT={\"schema_version\":1,\"task\":\"OPT-136\",\"workload\":\"unprofiled\",\"ok\":true,\"engine\":\"quartz\",\"prefix\":8192,\"eval_count\":256,\"emitted_token_count\":0,\"capacity\":131072,\"window_tokens\":12,\"window_steps\":0,\"nsys_capture\":false,\"attribution\":false,\"prefill_ms\":3099.87646,\"decode_only_ms\":7326.0166,\"complete_request_ms\":10425.8926,\"record_count\":0,\"decode_segment_graphs\":16,\"consumed_token_ids\":256,\"message\":\"\",\"keep\":false}\nQW38_OPT136_NATIVE_COUNTS={\"schema_version\":1,\"task\":\"OPT-136\",\"observed_warmups\":0,\"observed_samples\":1,\"observed_candidates\":1,\"observed_shapes\":1,\"observed_tier\":\"screen\",\"keep\":false}\n"
+    },
+    "warmup-d8192-llama-1": {
+      "ok": true,
+      "returncode": 0,
+      "stdout_tail": "\n==========\n== CUDA ==\n==========\n\nCUDA Version 13.0.2\n\nContainer image Copyright (c) 2016-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.\n\nThis container image and its contents are governed by the NVIDIA Deep Learning Container License.\nBy pulling and using the container, you accept the terms and conditions of this license:\nhttps://developer.nvidia.com/ngc/nvidia-deep-learning-container-license\n\nA copy of this license is made available in this container at /NGC-DL-CONTAINER-LICENSE for your convenience.\n\nQW38_OPT136_GRAPH_ACCOUNTING_RESULT={\"schema_version\":1,\"task\":\"OPT-136\",\"workload\":\"unprofiled\",\"ok\":true,\"engine\":\"llama\",\"llama_revision\":\"cc83d7b4824f73cfdda4dfbb47ee39804f71b328\",\"prefix\":8192,\"eval_count\":256,\"emitted_token_count\":0,\"capacity\":131072,\"window_steps\":0,\"nsys_capture\":false,\"prefill_ms\":2595.62975,\"decode_only_ms\":3807.28113,\"complete_request_ms\":6402.91088,\"keep\":false}\n"
+    },
+    "warmup-d8192-quartz-2": {
+      "ok": true,
+      "returncode": 0,
+      "stdout_tail": "IDIA Deep Learning Container License.\nBy pulling and using the container, you accept the terms and conditions of this license:\nhttps://developer.nvidia.com/ngc/nvidia-deep-learning-container-license\n\nA copy of this license is made available in this container at /NGC-DL-CONTAINER-LICENSE for your convenience.\n\nindependently_restored=true same_binary=true\nQW38_OPT136_GRAPH_ACCOUNTING_RESULT={\"schema_version\":1,\"task\":\"OPT-136\",\"workload\":\"unprofiled\",\"ok\":true,\"engine\":\"quartz\",\"prefix\":8192,\"eval_count\":256,\"emitted_token_count\":0,\"capacity\":131072,\"window_tokens\":12,\"window_steps\":0,\"nsys_capture\":false,\"attribution\":false,\"prefill_ms\":3099.63428,\"decode_only_ms\":7324.67578,\"complete_request_ms\":10424.3105,\"record_count\":0,\"decode_segment_graphs\":16,\"consumed_token_ids\":256,\"message\":\"\",\"keep\":false}\nQW38_OPT136_NATIVE_COUNTS={\"schema_version\":1,\"task\":\"OPT-136\",\"observed_warmups\":0,\"observed_samples\":1,\"observed_candidates\":1,\"observed_shapes\":1,\"observed_tier\":\"screen\",\"keep\":false}\n"
+    },
+    "warmup-d8192-llama-2": {
+      "ok": true,
+      "returncode": 0,
+      "stdout_tail": "\n==========\n== CUDA ==\n==========\n\nCUDA Version 13.0.2\n\nContainer image Copyright (c) 2016-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.\n\nThis container image and its contents are governed by the NVIDIA Deep Learning Container License.\nBy pulling and using the container, you accept the terms and conditions of this license:\nhttps://developer.nvidia.com/ngc/nvidia-deep-learning-container-license\n\nA copy of this license is made available in this container at /NGC-DL-CONTAINER-LICENSE for your convenience.\n\nQW38_OPT136_GRAPH_ACCOUNTING_RESULT={\"schema_version\":1,\"task\":\"OPT-136\",\"workload\":\"unprofiled\",\"ok\":true,\"engine\":\"llama\",\"llama_revision\":\"cc83d7b4824f73cfdda4dfbb47ee39804f71b328\",\"prefix\":8192,\"eval_count\":256,\"emitted_token_count\":0,\"capacity\":131072,\"window_steps\":0,\"nsys_capture\":false,\"prefill_ms\":2597.72524,\"decode_only_ms\":3804.94767,\"complete_request_ms\":6402.67291,\"keep\":false}\n"
+    },
+    "pair-d8192-quartz-0": {
+      "ok": true,
+      "decode_only_ms": 7325.88623,
+      "returncode": 0
+    },
+    "pair-d8192-llama-0": {
+      "ok": true,
+      "decode_only_ms": 3805.28208,
+      "returncode": 0
+    },
+    "pair-d8192-quartz-1": {
+      "ok": true,
+      "decode_only_ms": 7326.76172,
+      "returncode": 0
+    },
+    "pair-d8192-llama-1": {
+      "ok": true,
+      "decode_only_ms": 3800.36591,
+      "returncode": 0
+    },
+    "pair-d8192-quartz-2": {
+      "ok": true,
+      "decode_only_ms": 7327.44141,
+      "returncode": 0
+    },
+    "pair-d8192-llama-2": {
+      "ok": true,
+      "decode_only_ms": 3804.33611,
+      "returncode": 0
+    },
+    "pair-d8192-quartz-3": {
+      "ok": true,
+      "decode_only_ms": 7332.96777,
+      "returncode": 0
+    },
+    "pair-d8192-llama-3": {
+      "ok": true,
+      "decode_only_ms": 3807.27926,
+      "returncode": 0
+    },
+    "pair-d8192-quartz-4": {
+      "ok": true,
+      "decode_only_ms": 7325.5918,
+      "returncode": 0
+    },
+    "pair-d8192-llama-4": {
+      "ok": true,
+      "decode_only_ms": 3808.13819,
+      "returncode": 0
+    },
+    "pair-d8192-quartz-5": {
+      "ok": true,
+      "decode_only_ms": 7326.70996,
+      "returncode": 0
+    },
+    "pair-d8192-llama-5": {
+      "ok": true,
+      "decode_only_ms": 3802.42588,
+      "returncode": 0
+    },
+    "pair-d8192-quartz-6": {
+      "ok": true,
+      "decode_only_ms": 7329.16357,
+      "returncode": 0
+    },
+    "pair-d8192-llama-6": {
+      "ok": true,
+      "decode_only_ms": 3803.41959,
+      "returncode": 0
+    },
+    "pair-d8192-quartz-7": {
+      "ok": true,
+      "decode_only_ms": 7324.41016,
+      "returncode": 0
+    },
+    "pair-d8192-llama-7": {
+      "ok": true,
+      "decode_only_ms": 3798.99046,
+      "returncode": 0
+    },
+    "pair-d8192-quartz-8": {
+      "ok": true,
+      "decode_only_ms": 7325.91748,
+      "returncode": 0
+    },
+    "pair-d8192-llama-8": {
+      "ok": true,
+      "decode_only_ms": 3805.65447,
+      "returncode": 0
+    },
+    "pair-d8192-quartz-9": {
+      "ok": true,
+      "decode_only_ms": 7324.25586,
+      "returncode": 0
+    },
+    "pair-d8192-llama-9": {
+      "ok": true,
+      "decode_only_ms": 3807.14029,
+      "returncode": 0
+    },
+    "d8192": {
+      "quartz_decode_only_ms": [
+        7325.88623,
+        7326.76172,
+        7327.44141,
+        7332.96777,
+        7325.5918,
+        7326.70996,
+        7329.16357,
+        7324.41016,
+        7325.91748,
+        7324.25586
+      ],
+      "llama_decode_only_ms": [
+        3805.28208,
+        3800.36591,
+        3804.33611,
+        3807.27926,
+        3808.13819,
+        3802.42588,
+        3803.41959,
+        3798.99046,
+        3805.65447,
+        3807.14029
+      ],
+      "n_pairs": 10
+    },
+    "warmup-d32768-quartz-0": {
+      "ok": true,
+      "returncode": 0,
+      "stdout_tail": "DIA Deep Learning Container License.\nBy pulling and using the container, you accept the terms and conditions of this license:\nhttps://developer.nvidia.com/ngc/nvidia-deep-learning-container-license\n\nA copy of this license is made available in this container at /NGC-DL-CONTAINER-LICENSE for your convenience.\n\nindependently_restored=true same_binary=true\nQW38_OPT136_GRAPH_ACCOUNTING_RESULT={\"schema_version\":1,\"task\":\"OPT-136\",\"workload\":\"unprofiled\",\"ok\":true,\"engine\":\"quartz\",\"prefix\":32768,\"eval_count\":256,\"emitted_token_count\":0,\"capacity\":131072,\"window_tokens\":12,\"window_steps\":0,\"nsys_capture\":false,\"attribution\":false,\"prefill_ms\":21836.0918,\"decode_only_ms\":16714.7969,\"complete_request_ms\":38550.8906,\"record_count\":0,\"decode_segment_graphs\":16,\"consumed_token_ids\":256,\"message\":\"\",\"keep\":false}\nQW38_OPT136_NATIVE_COUNTS={\"schema_version\":1,\"task\":\"OPT-136\",\"observed_warmups\":0,\"observed_samples\":1,\"observed_candidates\":1,\"observed_shapes\":1,\"observed_tier\":\"screen\",\"keep\":false}\n"
+    },
+    "warmup-d32768-llama-0": {
+      "ok": true,
+      "returncode": 0,
+      "stdout_tail": "\n==========\n== CUDA ==\n==========\n\nCUDA Version 13.0.2\n\nContainer image Copyright (c) 2016-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.\n\nThis container image and its contents are governed by the NVIDIA Deep Learning Container License.\nBy pulling and using the container, you accept the terms and conditions of this license:\nhttps://developer.nvidia.com/ngc/nvidia-deep-learning-container-license\n\nA copy of this license is made available in this container at /NGC-DL-CONTAINER-LICENSE for your convenience.\n\nQW38_OPT136_GRAPH_ACCOUNTING_RESULT={\"schema_version\":1,\"task\":\"OPT-136\",\"workload\":\"unprofiled\",\"ok\":true,\"engine\":\"llama\",\"llama_revision\":\"cc83d7b4824f73cfdda4dfbb47ee39804f71b328\",\"prefix\":32768,\"eval_count\":256,\"emitted_token_count\":0,\"capacity\":131072,\"window_steps\":0,\"nsys_capture\":false,\"prefill_ms\":12107.9061,\"decode_only_ms\":4074.29174,\"complete_request_ms\":16182.1978,\"keep\":false}\n"
+    },
+    "warmup-d32768-quartz-1": {
+      "ok": true,
+      "returncode": 0,
+      "stdout_tail": "DIA Deep Learning Container License.\nBy pulling and using the container, you accept the terms and conditions of this license:\nhttps://developer.nvidia.com/ngc/nvidia-deep-learning-container-license\n\nA copy of this license is made available in this container at /NGC-DL-CONTAINER-LICENSE for your convenience.\n\nindependently_restored=true same_binary=true\nQW38_OPT136_GRAPH_ACCOUNTING_RESULT={\"schema_version\":1,\"task\":\"OPT-136\",\"workload\":\"unprofiled\",\"ok\":true,\"engine\":\"quartz\",\"prefix\":32768,\"eval_count\":256,\"emitted_token_count\":0,\"capacity\":131072,\"window_tokens\":12,\"window_steps\":0,\"nsys_capture\":false,\"attribution\":false,\"prefill_ms\":21841.6289,\"decode_only_ms\":16708.0996,\"complete_request_ms\":38549.7266,\"record_count\":0,\"decode_segment_graphs\":16,\"consumed_token_ids\":256,\"message\":\"\",\"keep\":false}\nQW38_OPT136_NATIVE_COUNTS={\"schema_version\":1,\"task\":\"OPT-136\",\"observed_warmups\":0,\"observed_samples\":1,\"observed_candidates\":1,\"observed_shapes\":1,\"observed_tier\":\"screen\",\"keep\":false}\n"
+    },
+    "warmup-d32768-llama-1": {
+      "ok": true,
+      "returncode": 0,
+      "stdout_tail": "\n==========\n== CUDA ==\n==========\n\nCUDA Version 13.0.2\n\nContainer image Copyright (c) 2016-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.\n\nThis container image and its contents are governed by the NVIDIA Deep Learning Container License.\nBy pulling and using the container, you accept the terms and conditions of this license:\nhttps://developer.nvidia.com/ngc/nvidia-deep-learning-container-license\n\nA copy of this license is made available in this container at /NGC-DL-CONTAINER-LICENSE for your convenience.\n\nQW38_OPT136_GRAPH_ACCOUNTING_RESULT={\"schema_version\":1,\"task\":\"OPT-136\",\"workload\":\"unprofiled\",\"ok\":true,\"engine\":\"llama\",\"llama_revision\":\"cc83d7b4824f73cfdda4dfbb47ee39804f71b328\",\"prefix\":32768,\"eval_count\":256,\"emitted_token_count\":0,\"capacity\":131072,\"window_steps\":0,\"nsys_capture\":false,\"prefill_ms\":12137.688,\"decode_only_ms\":4077.31938,\"complete_request_ms\":16215.0073,\"keep\":false}\n"
+    },
+    "warmup-d32768-quartz-2": {
+      "ok": true,
+      "returncode": 0,
+      "stdout_tail": "DIA Deep Learning Container License.\nBy pulling and using the container, you accept the terms and conditions of this license:\nhttps://developer.nvidia.com/ngc/nvidia-deep-learning-container-license\n\nA copy of this license is made available in this container at /NGC-DL-CONTAINER-LICENSE for your convenience.\n\nindependently_restored=true same_binary=true\nQW38_OPT136_GRAPH_ACCOUNTING_RESULT={\"schema_version\":1,\"task\":\"OPT-136\",\"workload\":\"unprofiled\",\"ok\":true,\"engine\":\"quartz\",\"prefix\":32768,\"eval_count\":256,\"emitted_token_count\":0,\"capacity\":131072,\"window_tokens\":12,\"window_steps\":0,\"nsys_capture\":false,\"attribution\":false,\"prefill_ms\":21843.6914,\"decode_only_ms\":16707.2422,\"complete_request_ms\":38550.9336,\"record_count\":0,\"decode_segment_graphs\":16,\"consumed_token_ids\":256,\"message\":\"\",\"keep\":false}\nQW38_OPT136_NATIVE_COUNTS={\"schema_version\":1,\"task\":\"OPT-136\",\"observed_warmups\":0,\"observed_samples\":1,\"observed_candidates\":1,\"observed_shapes\":1,\"observed_tier\":\"screen\",\"keep\":false}\n"
+    },
+    "warmup-d32768-llama-2": {
+      "ok": true,
+      "returncode": 0,
+      "stdout_tail": "\n==========\n== CUDA ==\n==========\n\nCUDA Version 13.0.2\n\nContainer image Copyright (c) 2016-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.\n\nThis container image and its contents are governed by the NVIDIA Deep Learning Container License.\nBy pulling and using the container, you accept the terms and conditions of this license:\nhttps://developer.nvidia.com/ngc/nvidia-deep-learning-container-license\n\nA copy of this license is made available in this container at /NGC-DL-CONTAINER-LICENSE for your convenience.\n\nQW38_OPT136_GRAPH_ACCOUNTING_RESULT={\"schema_version\":1,\"task\":\"OPT-136\",\"workload\":\"unprofiled\",\"ok\":true,\"engine\":\"llama\",\"llama_revision\":\"cc83d7b4824f73cfdda4dfbb47ee39804f71b328\",\"prefix\":32768,\"eval_count\":256,\"emitted_token_count\":0,\"capacity\":131072,\"window_steps\":0,\"nsys_capture\":false,\"prefill_ms\":12118.1081,\"decode_only_ms\":4076.03042,\"complete_request_ms\":16194.1385,\"keep\":false}\n"
+    },
+    "pair-d32768-quartz-0": {
+      "ok": true,
+      "decode_only_ms": 16723.6914,
+      "returncode": 0
+    },
+    "pair-d32768-llama-0": {
+      "ok": true,
+      "decode_only_ms": 4075.12436,
+      "returncode": 0
+    },
+    "pair-d32768-quartz-1": {
+      "ok": true,
+      "decode_only_ms": 16723.2695,
+      "returncode": 0
+    },
+    "pair-d32768-llama-1": {
+      "ok": true,
+      "decode_only_ms": 4076.94328,
+      "returncode": 0
+    },
+    "pair-d32768-quartz-2": {
+      "ok": true,
+      "decode_only_ms": 16713.7129,
+      "returncode": 0
+    },
+    "pair-d32768-llama-2": {
+      "ok": true,
+      "decode_only_ms": 4076.92871,
+      "returncode": 0
+    },
+    "pair-d32768-quartz-3": {
+      "ok": true,
+      "decode_only_ms": 16706.8242,
+      "returncode": 0
+    },
+    "pair-d32768-llama-3": {
+      "ok": true,
+      "decode_only_ms": 4078.74861,
+      "returncode": 0
+    },
+    "pair-d32768-quartz-4": {
+      "ok": true,
+      "decode_only_ms": 16705.123,
+      "returncode": 0
+    },
+    "pair-d32768-llama-4": {
+      "ok": true,
+      "decode_only_ms": 4078.45949,
+      "returncode": 0
+    },
+    "pair-d32768-quartz-5": {
+      "ok": true,
+      "decode_only_ms": 16721.3047,
+      "returncode": 0
+    },
+    "pair-d32768-llama-5": {
+      "ok": true,
+      "decode_only_ms": 4079.89866,
+      "returncode": 0
+    },
+    "pair-d32768-quartz-6": {
+      "ok": true,
+      "decode_only_ms": 16709.5566,
+      "returncode": 0
+    },
+    "pair-d32768-llama-6": {
+      "ok": true,
+      "decode_only_ms": 4077.29315,
+      "returncode": 0
+    },
+    "pair-d32768-quartz-7": {
+      "ok": true,
+      "decode_only_ms": 16703.0703,
+      "returncode": 0
+    },
+    "pair-d32768-llama-7": {
+      "ok": true,
+      "decode_only_ms": 4076.61641,
+      "returncode": 0
+    },
+    "pair-d32768-quartz-8": {
+      "ok": true,
+      "decode_only_ms": 16711.3047,
+      "returncode": 0
+    },
+    "pair-d32768-llama-8": {
+      "ok": true,
+      "decode_only_ms": 4072.35051,
+      "returncode": 0
+    },
+    "pair-d32768-quartz-9": {
+      "ok": true,
+      "decode_only_ms": 16712.916,
+      "returncode": 0
+    },
+    "pair-d32768-llama-9": {
+      "ok": true,
+      "decode_only_ms": 4072.3823,
+      "returncode": 0
+    },
+    "d32768": {
+      "quartz_decode_only_ms": [
+        16723.6914,
+        16723.2695,
+        16713.7129,
+        16706.8242,
+        16705.123,
+        16721.3047,
+        16709.5566,
+        16703.0703,
+        16711.3047,
+        16712.916
+      ],
+      "llama_decode_only_ms": [
+        4075.12436,
+        4076.94328,
+        4076.92871,
+        4078.74861,
+        4078.45949,
+        4079.89866,
+        4077.29315,
+        4076.61641,
+        4072.35051,
+        4072.3823
+      ],
+      "n_pairs": 10
+    }
+  },
+  "aa": {
+    "d128": {
+      "a": [
+        4296.21191,
+        4291.69873,
+        4290.27783,
+        4292.31445,
+        4289.04297
+      ],
+      "b": [
+        4293.29883,
+        4291.72559,
+        4289.91309,
+        4291.75586,
+        4290.78223
+      ],
+      "ci": {
+        "usable": true,
+        "n": 5,
+        "df": 4,
+        "geometric_ratio": 0.9999036518735769,
+        "ci95_low": 0.9994220254945494,
+        "ci95_high": 1.0003855103507202,
+        "point_ratios": [
+          0.9993219421990754,
+          1.0000062585940184,
+          0.9999149845267713,
+          0.9998698627496875,
+          1.0004055123747104
+        ],
+        "critical": 2.7764451051977987
+      },
+      "usable": true
+    },
+    "d2048": {
+      "a": [
+        5104.4668,
+        5105.00684,
+        5105.73779,
+        5106.04346,
+        5105.84277
+      ],
+      "b": [
+        5102.60742,
+        5105.49219,
+        5105.68896,
+        5104.07959,
+        5106.26318
+      ],
+      "ci": {
+        "usable": true,
+        "n": 5,
+        "df": 4,
+        "geometric_ratio": 0.9998837704006661,
+        "ci95_low": 0.9995867053818048,
+        "ci95_high": 1.00018092370364,
+        "point_ratios": [
+          0.9996357347255154,
+          1.0000950733300096,
+          0.9999904362499588,
+          0.9996153832188496,
+          1.0000823390023816
+        ],
+        "critical": 2.7764451051977987
+      },
+      "usable": true
+    }
+  },
+  "hashes": {
+    "quartz_native": "790a78488bcdf4028c1cc76f4a0897cbe3d372fb6d3ae20f250d7dd71f5ab5bd",
+    "llama_profile": "6e1399e1112fe6d6035d64afa7bc36d4c732d32235d5888d185ffa2282fd7cb9",
+    "gguf_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+    "llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328"
+  },
+  "claims_throughput": false,
+  "metric": "decode_only_ms",
+  "family_plan": "task=OPT-136 mode=acceptance phase=baseline loop_product=104 cases=4 candidates=2 warmups=3 samples=10 tokens=1",
+  "measured_at": "2026-09-14T15:25:21Z"
+}

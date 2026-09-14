@@ -1,0 +1,2702 @@
+{
+  "schema_version": 1,
+  "task": "OPT-136",
+  "phase": "historical",
+  "date": "2026-09-14",
+  "windows": {
+    "d128-early": {
+      "prefix": 128,
+      "window": "early",
+      "sqlite": "build/optimization-runs/opt133-nsys2025/trace-128-early.sqlite",
+      "trace": "evidence/optimization/opt133-decode-nsys-trace/traces/trace-128-early.nsys-rep",
+      "exported": false,
+      "ok": true,
+      "quantities_ms": {
+        "ordinary_kernel_count": 84,
+        "gpu_graph_count": 96,
+        "kernel_copy_union_ms": 8.24,
+        "graph_envelope_union_ms": 186.02,
+        "combined_union_ms": 194.26,
+        "first_to_last_span_ms": 196.74,
+        "outside_combined_envelopes_ms": 2.48
+      },
+      "coverage": {
+        "identity": {
+          "engine": "quartz",
+          "metric": "decode_only",
+          "prefix": 128,
+          "eval_count": 12,
+          "allocated_capacity": 131072,
+          "populated_length": 128,
+          "graph_mode": "decode_segments8",
+          "output_boundary": "eval_logits_no_host_materialize",
+          "capture_arm": "graph",
+          "device": 0,
+          "context": 0,
+          "process": 1
+        },
+        "window_start_ns": 27973343,
+        "window_end_ns": 224713093,
+        "window_ns": 196739750,
+        "window_ms": 196.73975,
+        "tables": {
+          "ANALYSIS_DETAILS": {
+            "count": 1,
+            "unit": null
+          },
+          "ANALYSIS_FILE": {
+            "count": 2,
+            "unit": null
+          },
+          "CUDA_GRAPH_EVENTS": {
+            "count": 320,
+            "unit": null
+          },
+          "CUPTI_ACTIVITY_KIND_CUDA_EVENT": {
+            "count": 228,
+            "unit": "ns"
+          },
+          "CUPTI_ACTIVITY_KIND_GRAPH_TRACE": {
+            "count": 96,
+            "unit": "ns"
+          },
+          "CUPTI_ACTIVITY_KIND_KERNEL": {
+            "count": 84,
+            "unit": "ns"
+          },
+          "CUPTI_ACTIVITY_KIND_MEMCPY": {
+            "count": 84,
+            "unit": "ns"
+          },
+          "CUPTI_ACTIVITY_KIND_RUNTIME": {
+            "count": 1156,
+            "unit": "ns"
+          },
+          "CUPTI_ACTIVITY_KIND_SYNCHRONIZATION": {
+            "count": 146,
+            "unit": "ns"
+          },
+          "DIAGNOSTIC_EVENT": {
+            "count": 19,
+            "unit": null
+          },
+          "ENUM_CUDA_DEV_MEM_EVENT_OPER": {
+            "count": 2,
+            "unit": null
+          },
+          "ENUM_CUDA_FUNC_CACHE_CONFIG": {
+            "count": 4,
+            "unit": null
+          },
+          "ENUM_CUDA_KERNEL_LAUNCH_TYPE": {
+            "count": 4,
+            "unit": null
+          },
+          "ENUM_CUDA_MEMCPY_OPER": {
+            "count": 14,
+            "unit": null
+          },
+          "ENUM_CUDA_MEMPOOL_OPER": {
+            "count": 4,
+            "unit": null
+          },
+          "ENUM_CUDA_MEMPOOL_TYPE": {
+            "count": 3,
+            "unit": null
+          },
+          "ENUM_CUDA_MEM_KIND": {
+            "count": 8,
+            "unit": null
+          },
+          "ENUM_CUDA_SHARED_MEM_LIMIT_CONFIG": {
+            "count": 2,
+            "unit": null
+          },
+          "ENUM_CUDA_UNIF_MEM_ACCESS_TYPE": {
+            "count": 5,
+            "unit": null
+          },
+          "ENUM_CUDA_UNIF_MEM_MIGRATION": {
+            "count": 6,
+            "unit": null
+          },
+          "ENUM_CUPTI_STREAM_TYPE": {
+            "count": 4,
+            "unit": null
+          },
+          "ENUM_CUPTI_SYNC_TYPE": {
+            "count": 5,
+            "unit": null
+          },
+          "ENUM_DIAGNOSTIC_SEVERITY_LEVEL": {
+            "count": 5,
+            "unit": null
+          },
+          "ENUM_DIAGNOSTIC_SOURCE_TYPE": {
+            "count": 4,
+            "unit": null
+          },
+          "ENUM_DIAGNOSTIC_TIMESTAMP_SOURCE": {
+            "count": 3,
+            "unit": null
+          },
+          "ENUM_NSYS_EVENT_CLASS": {
+            "count": 89,
+            "unit": null
+          },
+          "ENUM_NSYS_EVENT_TYPE": {
+            "count": 150,
+            "unit": null
+          },
+          "ENUM_NSYS_GENERIC_EVENT_FIELD_ETW_FLAGS": {
+            "count": 7,
+            "unit": null
+          },
+          "ENUM_NSYS_GENERIC_EVENT_FIELD_ETW_PROPERTY": {
+            "count": 8,
+            "unit": null
+          },
+          "ENUM_NSYS_GENERIC_EVENT_FIELD_ETW_TYPE": {
+            "count": 22,
+            "unit": null
+          },
+          "ENUM_NSYS_GENERIC_EVENT_FIELD_TYPE": {
+            "count": 4,
+            "unit": null
+          },
+          "ENUM_NSYS_GENERIC_EVENT_GROUP": {
+            "count": 5,
+            "unit": null
+          },
+          "ENUM_NSYS_GENERIC_EVENT_SOURCE": {
+            "count": 4,
+            "unit": null
+          },
+          "ENUM_SAMPLING_THREAD_STATE": {
+            "count": 11,
+            "unit": null
+          },
+          "ENUM_SCHEDULING_THREAD_BLOCK": {
+            "count": 53,
+            "unit": null
+          },
+          "ENUM_STACK_UNWIND_METHOD": {
+            "count": 10,
+            "unit": null
+          },
+          "META_DATA_CAPTURE": {
+            "count": 132,
+            "unit": null
+          },
+          "META_DATA_EXPORT": {
+            "count": 29,
+            "unit": null
+          },
+          "NVTX_EVENTS": {
+            "count": 252,
+            "unit": "ns"
+          },
+          "OSRT_API": {
+            "count": 20,
+            "unit": null
+          },
+          "OSRT_CALLCHAINS": {
+            "count": 99,
+            "unit": null
+          },
+          "PROCESSES": {
+            "count": 5,
+            "unit": null
+          },
+          "PROFILER_OVERHEAD": {
+            "count": 7,
+            "unit": null
+          },
+          "ProcessStreams": {
+            "count": 2,
+            "unit": null
+          },
+          "StringIds": {
+            "count": 133,
+            "unit": null
+          },
+          "TARGET_INFO_CUDA_CONTEXT_INFO": {
+            "count": 1,
+            "unit": null
+          },
+          "TARGET_INFO_CUDA_DEVICE": {
+            "count": 1,
+            "unit": null
+          },
+          "TARGET_INFO_CUDA_STREAM": {
+            "count": 90,
+            "unit": null
+          },
+          "TARGET_INFO_GPU": {
+            "count": 1,
+            "unit": null
+          },
+          "TARGET_INFO_SESSION_START_TIME": {
+            "count": 1,
+            "unit": null
+          },
+          "TARGET_INFO_SYSTEM_ENV": {
+            "count": 71,
+            "unit": null
+          },
+          "ThreadNames": {
+            "count": 28,
+            "unit": null
+          }
+        },
+        "table_names": [
+          "ANALYSIS_DETAILS",
+          "ANALYSIS_FILE",
+          "CUDA_GRAPH_EVENTS",
+          "CUPTI_ACTIVITY_KIND_CUDA_EVENT",
+          "CUPTI_ACTIVITY_KIND_GRAPH_TRACE",
+          "CUPTI_ACTIVITY_KIND_KERNEL",
+          "CUPTI_ACTIVITY_KIND_MEMCPY",
+          "CUPTI_ACTIVITY_KIND_RUNTIME",
+          "CUPTI_ACTIVITY_KIND_SYNCHRONIZATION",
+          "DIAGNOSTIC_EVENT",
+          "ENUM_CUDA_DEV_MEM_EVENT_OPER",
+          "ENUM_CUDA_FUNC_CACHE_CONFIG",
+          "ENUM_CUDA_KERNEL_LAUNCH_TYPE",
+          "ENUM_CUDA_MEMCPY_OPER",
+          "ENUM_CUDA_MEMPOOL_OPER",
+          "ENUM_CUDA_MEMPOOL_TYPE",
+          "ENUM_CUDA_MEM_KIND",
+          "ENUM_CUDA_SHARED_MEM_LIMIT_CONFIG",
+          "ENUM_CUDA_UNIF_MEM_ACCESS_TYPE",
+          "ENUM_CUDA_UNIF_MEM_MIGRATION",
+          "ENUM_CUPTI_STREAM_TYPE",
+          "ENUM_CUPTI_SYNC_TYPE",
+          "ENUM_DIAGNOSTIC_SEVERITY_LEVEL",
+          "ENUM_DIAGNOSTIC_SOURCE_TYPE",
+          "ENUM_DIAGNOSTIC_TIMESTAMP_SOURCE",
+          "ENUM_NSYS_EVENT_CLASS",
+          "ENUM_NSYS_EVENT_TYPE",
+          "ENUM_NSYS_GENERIC_EVENT_FIELD_ETW_FLAGS",
+          "ENUM_NSYS_GENERIC_EVENT_FIELD_ETW_PROPERTY",
+          "ENUM_NSYS_GENERIC_EVENT_FIELD_ETW_TYPE",
+          "ENUM_NSYS_GENERIC_EVENT_FIELD_TYPE",
+          "ENUM_NSYS_GENERIC_EVENT_GROUP",
+          "ENUM_NSYS_GENERIC_EVENT_SOURCE",
+          "ENUM_SAMPLING_THREAD_STATE",
+          "ENUM_SCHEDULING_THREAD_BLOCK",
+          "ENUM_STACK_UNWIND_METHOD",
+          "META_DATA_CAPTURE",
+          "META_DATA_EXPORT",
+          "NVTX_EVENTS",
+          "OSRT_API",
+          "OSRT_CALLCHAINS",
+          "PROCESSES",
+          "PROFILER_OVERHEAD",
+          "ProcessStreams",
+          "StringIds",
+          "TARGET_INFO_CUDA_CONTEXT_INFO",
+          "TARGET_INFO_CUDA_DEVICE",
+          "TARGET_INFO_CUDA_STREAM",
+          "TARGET_INFO_GPU",
+          "TARGET_INFO_SESSION_START_TIME",
+          "TARGET_INFO_SYSTEM_ENV",
+          "ThreadNames"
+        ],
+        "expected_graph_launches": 96,
+        "observed_graph_launches": 96,
+        "observed_kernel_count": 84,
+        "observed_copy_count": 84,
+        "observed_node_count": 0,
+        "parent_node_correspondence": {
+          "graph_launches": 96,
+          "expanded_nodes": 0,
+          "expected_nodes": null,
+          "matched": true
+        },
+        "drops": 0,
+        "errors": [],
+        "kernel_copy_union_ns": 8243373,
+        "graph_envelope_union_ns": 186016213,
+        "combined_union_ns": 194259586,
+        "graph_exclusive_without_leaf_ns": 186016213,
+        "time_outside_all_activity_ns": 2480164,
+        "first_last_span_ns": 196739750,
+        "outside_combined_envelopes_in_span_ns": 2480164,
+        "unmapped_kernel_time_ns": 8081741,
+        "named_family_share": 0.019607507751984533,
+        "family_assignment_ok": false,
+        "families": {
+          "residual_norm_quant": {
+            "family": "residual_norm_quant",
+            "count": 36,
+            "union_ns": 161632,
+            "group": "residual_norm_quant",
+            "ms_per_eval": 0.013469333333333333
+          },
+          "unclassified": {
+            "family": "unclassified",
+            "count": 132,
+            "union_ns": 8081741,
+            "group": "unclassified",
+            "ms_per_eval": 0.6734784166666666
+          }
+        },
+        "profiler_overhead": {},
+        "internal_idle_ms": null,
+        "capture_arm": "graph",
+        "cpu_api_union_ns": 196008808,
+        "conservation_ok": true,
+        "parent_child_not_double_counted": true,
+        "nvtx_does_not_add_gpu_work": true,
+        "process_scoped_gaps_are_not_device_wide_idle": true,
+        "coverage_valid": true,
+        "perturbed": false,
+        "sql_window": {
+          "start_ns": 27973343,
+          "end_ns": 224713093,
+          "source": "markers_or_explicit"
+        },
+        "sql": {
+          "kernel": "SELECT start, end FROM CUPTI_ACTIVITY_KIND_KERNEL",
+          "memcpy": "SELECT start, end FROM CUPTI_ACTIVITY_KIND_MEMCPY",
+          "graph": "SELECT start, end FROM CUPTI_ACTIVITY_KIND_GRAPH_TRACE",
+          "units": "export_schema / CUPTI documented nanoseconds"
+        },
+        "quantities_ms": {
+          "ordinary_kernel_count": 84,
+          "gpu_graph_count": 96,
+          "kernel_copy_union_ms": 8.24,
+          "graph_envelope_union_ms": 186.02,
+          "combined_union_ms": 194.26,
+          "first_to_last_span_ms": 196.74,
+          "outside_combined_envelopes_ms": 2.48
+        }
+      },
+      "expected_128_early": {
+        "ok": true,
+        "fields": {
+          "ordinary_kernel_count": {
+            "expected": 84,
+            "observed": 84,
+            "match": true
+          },
+          "gpu_graph_count": {
+            "expected": 96,
+            "observed": 96,
+            "match": true
+          },
+          "kernel_copy_union_ms": {
+            "expected": 8.24,
+            "observed": 8.24,
+            "match": true
+          },
+          "graph_envelope_union_ms": {
+            "expected": 186.02,
+            "observed": 186.02,
+            "match": true
+          },
+          "combined_union_ms": {
+            "expected": 194.26,
+            "observed": 194.26,
+            "match": true
+          },
+          "first_to_last_span_ms": {
+            "expected": 196.74,
+            "observed": 196.74,
+            "match": true
+          },
+          "outside_combined_envelopes_ms": {
+            "expected": 2.48,
+            "observed": 2.48,
+            "match": true
+          }
+        }
+      },
+      "sql": {
+        "kernel": "SELECT start, end FROM CUPTI_ACTIVITY_KIND_KERNEL",
+        "memcpy": "SELECT start, end FROM CUPTI_ACTIVITY_KIND_MEMCPY",
+        "graph": "SELECT start, end FROM CUPTI_ACTIVITY_KIND_GRAPH_TRACE",
+        "units": "export_schema / CUPTI documented nanoseconds"
+      },
+      "table_counts": {
+        "ANALYSIS_DETAILS": 1,
+        "ANALYSIS_FILE": 2,
+        "CUDA_GRAPH_EVENTS": 320,
+        "CUPTI_ACTIVITY_KIND_CUDA_EVENT": 228,
+        "CUPTI_ACTIVITY_KIND_GRAPH_TRACE": 96,
+        "CUPTI_ACTIVITY_KIND_KERNEL": 84,
+        "CUPTI_ACTIVITY_KIND_MEMCPY": 84,
+        "CUPTI_ACTIVITY_KIND_RUNTIME": 1156,
+        "CUPTI_ACTIVITY_KIND_SYNCHRONIZATION": 146,
+        "DIAGNOSTIC_EVENT": 19,
+        "ENUM_CUDA_DEV_MEM_EVENT_OPER": 2,
+        "ENUM_CUDA_FUNC_CACHE_CONFIG": 4,
+        "ENUM_CUDA_KERNEL_LAUNCH_TYPE": 4,
+        "ENUM_CUDA_MEMCPY_OPER": 14,
+        "ENUM_CUDA_MEMPOOL_OPER": 4,
+        "ENUM_CUDA_MEMPOOL_TYPE": 3,
+        "ENUM_CUDA_MEM_KIND": 8,
+        "ENUM_CUDA_SHARED_MEM_LIMIT_CONFIG": 2,
+        "ENUM_CUDA_UNIF_MEM_ACCESS_TYPE": 5,
+        "ENUM_CUDA_UNIF_MEM_MIGRATION": 6,
+        "ENUM_CUPTI_STREAM_TYPE": 4,
+        "ENUM_CUPTI_SYNC_TYPE": 5,
+        "ENUM_DIAGNOSTIC_SEVERITY_LEVEL": 5,
+        "ENUM_DIAGNOSTIC_SOURCE_TYPE": 4,
+        "ENUM_DIAGNOSTIC_TIMESTAMP_SOURCE": 3,
+        "ENUM_NSYS_EVENT_CLASS": 89,
+        "ENUM_NSYS_EVENT_TYPE": 150,
+        "ENUM_NSYS_GENERIC_EVENT_FIELD_ETW_FLAGS": 7,
+        "ENUM_NSYS_GENERIC_EVENT_FIELD_ETW_PROPERTY": 8,
+        "ENUM_NSYS_GENERIC_EVENT_FIELD_ETW_TYPE": 22,
+        "ENUM_NSYS_GENERIC_EVENT_FIELD_TYPE": 4,
+        "ENUM_NSYS_GENERIC_EVENT_GROUP": 5,
+        "ENUM_NSYS_GENERIC_EVENT_SOURCE": 4,
+        "ENUM_SAMPLING_THREAD_STATE": 11,
+        "ENUM_SCHEDULING_THREAD_BLOCK": 53,
+        "ENUM_STACK_UNWIND_METHOD": 10,
+        "META_DATA_CAPTURE": 132,
+        "META_DATA_EXPORT": 29,
+        "NVTX_EVENTS": 252,
+        "OSRT_API": 20,
+        "OSRT_CALLCHAINS": 99,
+        "PROCESSES": 5,
+        "PROFILER_OVERHEAD": 7,
+        "ProcessStreams": 2,
+        "StringIds": 133,
+        "TARGET_INFO_CUDA_CONTEXT_INFO": 1,
+        "TARGET_INFO_CUDA_DEVICE": 1,
+        "TARGET_INFO_CUDA_STREAM": 90,
+        "TARGET_INFO_GPU": 1,
+        "TARGET_INFO_SESSION_START_TIME": 1,
+        "TARGET_INFO_SYSTEM_ENV": 71,
+        "ThreadNames": 28
+      },
+      "errors": []
+    },
+    "d128-middle": {
+      "prefix": 128,
+      "window": "middle",
+      "sqlite": "build/optimization-runs/opt133-nsys2025/trace-128-middle.sqlite",
+      "trace": "evidence/optimization/opt133-decode-nsys-trace/traces/trace-128-middle.nsys-rep",
+      "exported": false,
+      "ok": true,
+      "quantities_ms": {
+        "ordinary_kernel_count": 84,
+        "gpu_graph_count": 96,
+        "kernel_copy_union_ms": 8.28,
+        "graph_envelope_union_ms": 189.31,
+        "combined_union_ms": 197.59,
+        "first_to_last_span_ms": 199.96,
+        "outside_combined_envelopes_ms": 2.38
+      },
+      "coverage": {
+        "identity": {
+          "engine": "quartz",
+          "metric": "decode_only",
+          "prefix": 128,
+          "eval_count": 12,
+          "allocated_capacity": 131072,
+          "populated_length": 128,
+          "graph_mode": "decode_segments8",
+          "output_boundary": "eval_logits_no_host_materialize",
+          "capture_arm": "graph",
+          "device": 0,
+          "context": 0,
+          "process": 1
+        },
+        "window_start_ns": 27208496,
+        "window_end_ns": 227172389,
+        "window_ns": 199963893,
+        "window_ms": 199.963893,
+        "tables": {
+          "ANALYSIS_DETAILS": {
+            "count": 1,
+            "unit": null
+          },
+          "ANALYSIS_FILE": {
+            "count": 2,
+            "unit": null
+          },
+          "CUDA_GRAPH_EVENTS": {
+            "count": 320,
+            "unit": null
+          },
+          "CUPTI_ACTIVITY_KIND_CUDA_EVENT": {
+            "count": 228,
+            "unit": "ns"
+          },
+          "CUPTI_ACTIVITY_KIND_GRAPH_TRACE": {
+            "count": 96,
+            "unit": "ns"
+          },
+          "CUPTI_ACTIVITY_KIND_KERNEL": {
+            "count": 84,
+            "unit": "ns"
+          },
+          "CUPTI_ACTIVITY_KIND_MEMCPY": {
+            "count": 84,
+            "unit": "ns"
+          },
+          "CUPTI_ACTIVITY_KIND_RUNTIME": {
+            "count": 1154,
+            "unit": "ns"
+          },
+          "CUPTI_ACTIVITY_KIND_SYNCHRONIZATION": {
+            "count": 146,
+            "unit": "ns"
+          },
+          "DIAGNOSTIC_EVENT": {
+            "count": 19,
+            "unit": null
+          },
+          "ENUM_CUDA_DEV_MEM_EVENT_OPER": {
+            "count": 2,
+            "unit": null
+          },
+          "ENUM_CUDA_FUNC_CACHE_CONFIG": {
+            "count": 4,
+            "unit": null
+          },
+          "ENUM_CUDA_KERNEL_LAUNCH_TYPE": {
+            "count": 4,
+            "unit": null
+          },
+          "ENUM_CUDA_MEMCPY_OPER": {
+            "count": 14,
+            "unit": null
+          },
+          "ENUM_CUDA_MEMPOOL_OPER": {
+            "count": 4,
+            "unit": null
+          },
+          "ENUM_CUDA_MEMPOOL_TYPE": {
+            "count": 3,
+            "unit": null
+          },
+          "ENUM_CUDA_MEM_KIND": {
+            "count": 8,
+            "unit": null
+          },
+          "ENUM_CUDA_SHARED_MEM_LIMIT_CONFIG": {
+            "count": 2,
+            "unit": null
+          },
+          "ENUM_CUDA_UNIF_MEM_ACCESS_TYPE": {
+            "count": 5,
+            "unit": null
+          },
+          "ENUM_CUDA_UNIF_MEM_MIGRATION": {
+            "count": 6,
+            "unit": null
+          },
+          "ENUM_CUPTI_STREAM_TYPE": {
+            "count": 4,
+            "unit": null
+          },
+          "ENUM_CUPTI_SYNC_TYPE": {
+            "count": 5,
+            "unit": null
+          },
+          "ENUM_DIAGNOSTIC_SEVERITY_LEVEL": {
+            "count": 5,
+            "unit": null
+          },
+          "ENUM_DIAGNOSTIC_SOURCE_TYPE": {
+            "count": 4,
+            "unit": null
+          },
+          "ENUM_DIAGNOSTIC_TIMESTAMP_SOURCE": {
+            "count": 3,
+            "unit": null
+          },
+          "ENUM_NSYS_EVENT_CLASS": {
+            "count": 89,
+            "unit": null
+          },
+          "ENUM_NSYS_EVENT_TYPE": {
+            "count": 150,
+            "unit": null
+          },
+          "ENUM_NSYS_GENERIC_EVENT_FIELD_ETW_FLAGS": {
+            "count": 7,
+            "unit": null
+          },
+          "ENUM_NSYS_GENERIC_EVENT_FIELD_ETW_PROPERTY": {
+            "count": 8,
+            "unit": null
+          },
+          "ENUM_NSYS_GENERIC_EVENT_FIELD_ETW_TYPE": {
+            "count": 22,
+            "unit": null
+          },
+          "ENUM_NSYS_GENERIC_EVENT_FIELD_TYPE": {
+            "count": 4,
+            "unit": null
+          },
+          "ENUM_NSYS_GENERIC_EVENT_GROUP": {
+            "count": 5,
+            "unit": null
+          },
+          "ENUM_NSYS_GENERIC_EVENT_SOURCE": {
+            "count": 4,
+            "unit": null
+          },
+          "ENUM_SAMPLING_THREAD_STATE": {
+            "count": 11,
+            "unit": null
+          },
+          "ENUM_SCHEDULING_THREAD_BLOCK": {
+            "count": 53,
+            "unit": null
+          },
+          "ENUM_STACK_UNWIND_METHOD": {
+            "count": 10,
+            "unit": null
+          },
+          "META_DATA_CAPTURE": {
+            "count": 132,
+            "unit": null
+          },
+          "META_DATA_EXPORT": {
+            "count": 29,
+            "unit": null
+          },
+          "NVTX_EVENTS": {
+            "count": 252,
+            "unit": "ns"
+          },
+          "OSRT_API": {
+            "count": 21,
+            "unit": null
+          },
+          "OSRT_CALLCHAINS": {
+            "count": 106,
+            "unit": null
+          },
+          "PROCESSES": {
+            "count": 5,
+            "unit": null
+          },
+          "PROFILER_OVERHEAD": {
+            "count": 7,
+            "unit": null
+          },
+          "ProcessStreams": {
+            "count": 2,
+            "unit": null
+          },
+          "StringIds": {
+            "count": 131,
+            "unit": null
+          },
+          "TARGET_INFO_CUDA_CONTEXT_INFO": {
+            "count": 1,
+            "unit": null
+          },
+          "TARGET_INFO_CUDA_DEVICE": {
+            "count": 1,
+            "unit": null
+          },
+          "TARGET_INFO_CUDA_STREAM": {
+            "count": 90,
+            "unit": null
+          },
+          "TARGET_INFO_GPU": {
+            "count": 1,
+            "unit": null
+          },
+          "TARGET_INFO_SESSION_START_TIME": {
+            "count": 1,
+            "unit": null
+          },
+          "TARGET_INFO_SYSTEM_ENV": {
+            "count": 71,
+            "unit": null
+          },
+          "ThreadNames": {
+            "count": 28,
+            "unit": null
+          }
+        },
+        "table_names": [
+          "ANALYSIS_DETAILS",
+          "ANALYSIS_FILE",
+          "CUDA_GRAPH_EVENTS",
+          "CUPTI_ACTIVITY_KIND_CUDA_EVENT",
+          "CUPTI_ACTIVITY_KIND_GRAPH_TRACE",
+          "CUPTI_ACTIVITY_KIND_KERNEL",
+          "CUPTI_ACTIVITY_KIND_MEMCPY",
+          "CUPTI_ACTIVITY_KIND_RUNTIME",
+          "CUPTI_ACTIVITY_KIND_SYNCHRONIZATION",
+          "DIAGNOSTIC_EVENT",
+          "ENUM_CUDA_DEV_MEM_EVENT_OPER",
+          "ENUM_CUDA_FUNC_CACHE_CONFIG",
+          "ENUM_CUDA_KERNEL_LAUNCH_TYPE",
+          "ENUM_CUDA_MEMCPY_OPER",
+          "ENUM_CUDA_MEMPOOL_OPER",
+          "ENUM_CUDA_MEMPOOL_TYPE",
+          "ENUM_CUDA_MEM_KIND",
+          "ENUM_CUDA_SHARED_MEM_LIMIT_CONFIG",
+          "ENUM_CUDA_UNIF_MEM_ACCESS_TYPE",
+          "ENUM_CUDA_UNIF_MEM_MIGRATION",
+          "ENUM_CUPTI_STREAM_TYPE",
+          "ENUM_CUPTI_SYNC_TYPE",
+          "ENUM_DIAGNOSTIC_SEVERITY_LEVEL",
+          "ENUM_DIAGNOSTIC_SOURCE_TYPE",
+          "ENUM_DIAGNOSTIC_TIMESTAMP_SOURCE",
+          "ENUM_NSYS_EVENT_CLASS",
+          "ENUM_NSYS_EVENT_TYPE",
+          "ENUM_NSYS_GENERIC_EVENT_FIELD_ETW_FLAGS",
+          "ENUM_NSYS_GENERIC_EVENT_FIELD_ETW_PROPERTY",
+          "ENUM_NSYS_GENERIC_EVENT_FIELD_ETW_TYPE",
+          "ENUM_NSYS_GENERIC_EVENT_FIELD_TYPE",
+          "ENUM_NSYS_GENERIC_EVENT_GROUP",
+          "ENUM_NSYS_GENERIC_EVENT_SOURCE",
+          "ENUM_SAMPLING_THREAD_STATE",
+          "ENUM_SCHEDULING_THREAD_BLOCK",
+          "ENUM_STACK_UNWIND_METHOD",
+          "META_DATA_CAPTURE",
+          "META_DATA_EXPORT",
+          "NVTX_EVENTS",
+          "OSRT_API",
+          "OSRT_CALLCHAINS",
+          "PROCESSES",
+          "PROFILER_OVERHEAD",
+          "ProcessStreams",
+          "StringIds",
+          "TARGET_INFO_CUDA_CONTEXT_INFO",
+          "TARGET_INFO_CUDA_DEVICE",
+          "TARGET_INFO_CUDA_STREAM",
+          "TARGET_INFO_GPU",
+          "TARGET_INFO_SESSION_START_TIME",
+          "TARGET_INFO_SYSTEM_ENV",
+          "ThreadNames"
+        ],
+        "expected_graph_launches": 96,
+        "observed_graph_launches": 96,
+        "observed_kernel_count": 84,
+        "observed_copy_count": 84,
+        "observed_node_count": 0,
+        "parent_node_correspondence": {
+          "graph_launches": 96,
+          "expanded_nodes": 0,
+          "expected_nodes": null,
+          "matched": true
+        },
+        "drops": 0,
+        "errors": [],
+        "kernel_copy_union_ns": 8276623,
+        "graph_envelope_union_ns": 189309187,
+        "combined_union_ns": 197585810,
+        "graph_exclusive_without_leaf_ns": 189309187,
+        "time_outside_all_activity_ns": 2378083,
+        "first_last_span_ns": 199963893,
+        "outside_combined_envelopes_in_span_ns": 2378083,
+        "unmapped_kernel_time_ns": 8113390,
+        "named_family_share": 0.01972217412826463,
+        "family_assignment_ok": false,
+        "families": {
+          "residual_norm_quant": {
+            "family": "residual_norm_quant",
+            "count": 36,
+            "union_ns": 163233,
+            "group": "residual_norm_quant",
+            "ms_per_eval": 0.013602749999999999
+          },
+          "unclassified": {
+            "family": "unclassified",
+            "count": 132,
+            "union_ns": 8113390,
+            "group": "unclassified",
+            "ms_per_eval": 0.6761158333333334
+          }
+        },
+        "profiler_overhead": {},
+        "internal_idle_ms": null,
+        "capture_arm": "graph",
+        "cpu_api_union_ns": 199193131,
+        "conservation_ok": true,
+        "parent_child_not_double_counted": true,
+        "nvtx_does_not_add_gpu_work": true,
+        "process_scoped_gaps_are_not_device_wide_idle": true,
+        "coverage_valid": true,
+        "perturbed": false,
+        "sql_window": {
+          "start_ns": 27208496,
+          "end_ns": 227172389,
+          "source": "markers_or_explicit"
+        },
+        "sql": {
+          "kernel": "SELECT start, end FROM CUPTI_ACTIVITY_KIND_KERNEL",
+          "memcpy": "SELECT start, end FROM CUPTI_ACTIVITY_KIND_MEMCPY",
+          "graph": "SELECT start, end FROM CUPTI_ACTIVITY_KIND_GRAPH_TRACE",
+          "units": "export_schema / CUPTI documented nanoseconds"
+        },
+        "quantities_ms": {
+          "ordinary_kernel_count": 84,
+          "gpu_graph_count": 96,
+          "kernel_copy_union_ms": 8.28,
+          "graph_envelope_union_ms": 189.31,
+          "combined_union_ms": 197.59,
+          "first_to_last_span_ms": 199.96,
+          "outside_combined_envelopes_ms": 2.38
+        }
+      },
+      "expected_128_early": null,
+      "sql": {
+        "kernel": "SELECT start, end FROM CUPTI_ACTIVITY_KIND_KERNEL",
+        "memcpy": "SELECT start, end FROM CUPTI_ACTIVITY_KIND_MEMCPY",
+        "graph": "SELECT start, end FROM CUPTI_ACTIVITY_KIND_GRAPH_TRACE",
+        "units": "export_schema / CUPTI documented nanoseconds"
+      },
+      "table_counts": {
+        "ANALYSIS_DETAILS": 1,
+        "ANALYSIS_FILE": 2,
+        "CUDA_GRAPH_EVENTS": 320,
+        "CUPTI_ACTIVITY_KIND_CUDA_EVENT": 228,
+        "CUPTI_ACTIVITY_KIND_GRAPH_TRACE": 96,
+        "CUPTI_ACTIVITY_KIND_KERNEL": 84,
+        "CUPTI_ACTIVITY_KIND_MEMCPY": 84,
+        "CUPTI_ACTIVITY_KIND_RUNTIME": 1154,
+        "CUPTI_ACTIVITY_KIND_SYNCHRONIZATION": 146,
+        "DIAGNOSTIC_EVENT": 19,
+        "ENUM_CUDA_DEV_MEM_EVENT_OPER": 2,
+        "ENUM_CUDA_FUNC_CACHE_CONFIG": 4,
+        "ENUM_CUDA_KERNEL_LAUNCH_TYPE": 4,
+        "ENUM_CUDA_MEMCPY_OPER": 14,
+        "ENUM_CUDA_MEMPOOL_OPER": 4,
+        "ENUM_CUDA_MEMPOOL_TYPE": 3,
+        "ENUM_CUDA_MEM_KIND": 8,
+        "ENUM_CUDA_SHARED_MEM_LIMIT_CONFIG": 2,
+        "ENUM_CUDA_UNIF_MEM_ACCESS_TYPE": 5,
+        "ENUM_CUDA_UNIF_MEM_MIGRATION": 6,
+        "ENUM_CUPTI_STREAM_TYPE": 4,
+        "ENUM_CUPTI_SYNC_TYPE": 5,
+        "ENUM_DIAGNOSTIC_SEVERITY_LEVEL": 5,
+        "ENUM_DIAGNOSTIC_SOURCE_TYPE": 4,
+        "ENUM_DIAGNOSTIC_TIMESTAMP_SOURCE": 3,
+        "ENUM_NSYS_EVENT_CLASS": 89,
+        "ENUM_NSYS_EVENT_TYPE": 150,
+        "ENUM_NSYS_GENERIC_EVENT_FIELD_ETW_FLAGS": 7,
+        "ENUM_NSYS_GENERIC_EVENT_FIELD_ETW_PROPERTY": 8,
+        "ENUM_NSYS_GENERIC_EVENT_FIELD_ETW_TYPE": 22,
+        "ENUM_NSYS_GENERIC_EVENT_FIELD_TYPE": 4,
+        "ENUM_NSYS_GENERIC_EVENT_GROUP": 5,
+        "ENUM_NSYS_GENERIC_EVENT_SOURCE": 4,
+        "ENUM_SAMPLING_THREAD_STATE": 11,
+        "ENUM_SCHEDULING_THREAD_BLOCK": 53,
+        "ENUM_STACK_UNWIND_METHOD": 10,
+        "META_DATA_CAPTURE": 132,
+        "META_DATA_EXPORT": 29,
+        "NVTX_EVENTS": 252,
+        "OSRT_API": 21,
+        "OSRT_CALLCHAINS": 106,
+        "PROCESSES": 5,
+        "PROFILER_OVERHEAD": 7,
+        "ProcessStreams": 2,
+        "StringIds": 131,
+        "TARGET_INFO_CUDA_CONTEXT_INFO": 1,
+        "TARGET_INFO_CUDA_DEVICE": 1,
+        "TARGET_INFO_CUDA_STREAM": 90,
+        "TARGET_INFO_GPU": 1,
+        "TARGET_INFO_SESSION_START_TIME": 1,
+        "TARGET_INFO_SYSTEM_ENV": 71,
+        "ThreadNames": 28
+      },
+      "errors": []
+    },
+    "d128-late": {
+      "prefix": 128,
+      "window": "late",
+      "sqlite": "build/optimization-runs/opt133-nsys2025/trace-128-late.sqlite",
+      "trace": "evidence/optimization/opt133-decode-nsys-trace/traces/trace-128-late.nsys-rep",
+      "exported": false,
+      "ok": true,
+      "quantities_ms": {
+        "ordinary_kernel_count": 84,
+        "gpu_graph_count": 96,
+        "kernel_copy_union_ms": 8.31,
+        "graph_envelope_union_ms": 191.58,
+        "combined_union_ms": 199.89,
+        "first_to_last_span_ms": 202.09,
+        "outside_combined_envelopes_ms": 2.2
+      },
+      "coverage": {
+        "identity": {
+          "engine": "quartz",
+          "metric": "decode_only",
+          "prefix": 128,
+          "eval_count": 12,
+          "allocated_capacity": 131072,
+          "populated_length": 128,
+          "graph_mode": "decode_segments8",
+          "output_boundary": "eval_logits_no_host_materialize",
+          "capture_arm": "graph",
+          "device": 0,
+          "context": 0,
+          "process": 1
+        },
+        "window_start_ns": 27074850,
+        "window_end_ns": 229160290,
+        "window_ns": 202085440,
+        "window_ms": 202.08544,
+        "tables": {
+          "ANALYSIS_DETAILS": {
+            "count": 1,
+            "unit": null
+          },
+          "ANALYSIS_FILE": {
+            "count": 2,
+            "unit": null
+          },
+          "CUDA_GRAPH_EVENTS": {
+            "count": 320,
+            "unit": null
+          },
+          "CUPTI_ACTIVITY_KIND_CUDA_EVENT": {
+            "count": 228,
+            "unit": "ns"
+          },
+          "CUPTI_ACTIVITY_KIND_GRAPH_TRACE": {
+            "count": 96,
+            "unit": "ns"
+          },
+          "CUPTI_ACTIVITY_KIND_KERNEL": {
+            "count": 84,
+            "unit": "ns"
+          },
+          "CUPTI_ACTIVITY_KIND_MEMCPY": {
+            "count": 84,
+            "unit": "ns"
+          },
+          "CUPTI_ACTIVITY_KIND_RUNTIME": {
+            "count": 1154,
+            "unit": "ns"
+          },
+          "CUPTI_ACTIVITY_KIND_SYNCHRONIZATION": {
+            "count": 146,
+            "unit": "ns"
+          },
+          "DIAGNOSTIC_EVENT": {
+            "count": 19,
+            "unit": null
+          },
+          "ENUM_CUDA_DEV_MEM_EVENT_OPER": {
+            "count": 2,
+            "unit": null
+          },
+          "ENUM_CUDA_FUNC_CACHE_CONFIG": {
+            "count": 4,
+            "unit": null
+          },
+          "ENUM_CUDA_KERNEL_LAUNCH_TYPE": {
+            "count": 4,
+            "unit": null
+          },
+          "ENUM_CUDA_MEMCPY_OPER": {
+            "count": 14,
+            "unit": null
+          },
+          "ENUM_CUDA_MEMPOOL_OPER": {
+            "count": 4,
+            "unit": null
+          },
+          "ENUM_CUDA_MEMPOOL_TYPE": {
+            "count": 3,
+            "unit": null
+          },
+          "ENUM_CUDA_MEM_KIND": {
+            "count": 8,
+            "unit": null
+          },
+          "ENUM_CUDA_SHARED_MEM_LIMIT_CONFIG": {
+            "count": 2,
+            "unit": null
+          },
+          "ENUM_CUDA_UNIF_MEM_ACCESS_TYPE": {
+            "count": 5,
+            "unit": null
+          },
+          "ENUM_CUDA_UNIF_MEM_MIGRATION": {
+            "count": 6,
+            "unit": null
+          },
+          "ENUM_CUPTI_STREAM_TYPE": {
+            "count": 4,
+            "unit": null
+          },
+          "ENUM_CUPTI_SYNC_TYPE": {
+            "count": 5,
+            "unit": null
+          },
+          "ENUM_DIAGNOSTIC_SEVERITY_LEVEL": {
+            "count": 5,
+            "unit": null
+          },
+          "ENUM_DIAGNOSTIC_SOURCE_TYPE": {
+            "count": 4,
+            "unit": null
+          },
+          "ENUM_DIAGNOSTIC_TIMESTAMP_SOURCE": {
+            "count": 3,
+            "unit": null
+          },
+          "ENUM_NSYS_EVENT_CLASS": {
+            "count": 89,
+            "unit": null
+          },
+          "ENUM_NSYS_EVENT_TYPE": {
+            "count": 150,
+            "unit": null
+          },
+          "ENUM_NSYS_GENERIC_EVENT_FIELD_ETW_FLAGS": {
+            "count": 7,
+            "unit": null
+          },
+          "ENUM_NSYS_GENERIC_EVENT_FIELD_ETW_PROPERTY": {
+            "count": 8,
+            "unit": null
+          },
+          "ENUM_NSYS_GENERIC_EVENT_FIELD_ETW_TYPE": {
+            "count": 22,
+            "unit": null
+          },
+          "ENUM_NSYS_GENERIC_EVENT_FIELD_TYPE": {
+            "count": 4,
+            "unit": null
+          },
+          "ENUM_NSYS_GENERIC_EVENT_GROUP": {
+            "count": 5,
+            "unit": null
+          },
+          "ENUM_NSYS_GENERIC_EVENT_SOURCE": {
+            "count": 4,
+            "unit": null
+          },
+          "ENUM_SAMPLING_THREAD_STATE": {
+            "count": 11,
+            "unit": null
+          },
+          "ENUM_SCHEDULING_THREAD_BLOCK": {
+            "count": 53,
+            "unit": null
+          },
+          "ENUM_STACK_UNWIND_METHOD": {
+            "count": 10,
+            "unit": null
+          },
+          "META_DATA_CAPTURE": {
+            "count": 132,
+            "unit": null
+          },
+          "META_DATA_EXPORT": {
+            "count": 29,
+            "unit": null
+          },
+          "NVTX_EVENTS": {
+            "count": 252,
+            "unit": "ns"
+          },
+          "OSRT_API": {
+            "count": 20,
+            "unit": null
+          },
+          "OSRT_CALLCHAINS": {
+            "count": 99,
+            "unit": null
+          },
+          "PROCESSES": {
+            "count": 5,
+            "unit": null
+          },
+          "PROFILER_OVERHEAD": {
+            "count": 7,
+            "unit": null
+          },
+          "ProcessStreams": {
+            "count": 2,
+            "unit": null
+          },
+          "StringIds": {
+            "count": 131,
+            "unit": null
+          },
+          "TARGET_INFO_CUDA_CONTEXT_INFO": {
+            "count": 1,
+            "unit": null
+          },
+          "TARGET_INFO_CUDA_DEVICE": {
+            "count": 1,
+            "unit": null
+          },
+          "TARGET_INFO_CUDA_STREAM": {
+            "count": 90,
+            "unit": null
+          },
+          "TARGET_INFO_GPU": {
+            "count": 1,
+            "unit": null
+          },
+          "TARGET_INFO_SESSION_START_TIME": {
+            "count": 1,
+            "unit": null
+          },
+          "TARGET_INFO_SYSTEM_ENV": {
+            "count": 71,
+            "unit": null
+          },
+          "ThreadNames": {
+            "count": 28,
+            "unit": null
+          }
+        },
+        "table_names": [
+          "ANALYSIS_DETAILS",
+          "ANALYSIS_FILE",
+          "CUDA_GRAPH_EVENTS",
+          "CUPTI_ACTIVITY_KIND_CUDA_EVENT",
+          "CUPTI_ACTIVITY_KIND_GRAPH_TRACE",
+          "CUPTI_ACTIVITY_KIND_KERNEL",
+          "CUPTI_ACTIVITY_KIND_MEMCPY",
+          "CUPTI_ACTIVITY_KIND_RUNTIME",
+          "CUPTI_ACTIVITY_KIND_SYNCHRONIZATION",
+          "DIAGNOSTIC_EVENT",
+          "ENUM_CUDA_DEV_MEM_EVENT_OPER",
+          "ENUM_CUDA_FUNC_CACHE_CONFIG",
+          "ENUM_CUDA_KERNEL_LAUNCH_TYPE",
+          "ENUM_CUDA_MEMCPY_OPER",
+          "ENUM_CUDA_MEMPOOL_OPER",
+          "ENUM_CUDA_MEMPOOL_TYPE",
+          "ENUM_CUDA_MEM_KIND",
+          "ENUM_CUDA_SHARED_MEM_LIMIT_CONFIG",
+          "ENUM_CUDA_UNIF_MEM_ACCESS_TYPE",
+          "ENUM_CUDA_UNIF_MEM_MIGRATION",
+          "ENUM_CUPTI_STREAM_TYPE",
+          "ENUM_CUPTI_SYNC_TYPE",
+          "ENUM_DIAGNOSTIC_SEVERITY_LEVEL",
+          "ENUM_DIAGNOSTIC_SOURCE_TYPE",
+          "ENUM_DIAGNOSTIC_TIMESTAMP_SOURCE",
+          "ENUM_NSYS_EVENT_CLASS",
+          "ENUM_NSYS_EVENT_TYPE",
+          "ENUM_NSYS_GENERIC_EVENT_FIELD_ETW_FLAGS",
+          "ENUM_NSYS_GENERIC_EVENT_FIELD_ETW_PROPERTY",
+          "ENUM_NSYS_GENERIC_EVENT_FIELD_ETW_TYPE",
+          "ENUM_NSYS_GENERIC_EVENT_FIELD_TYPE",
+          "ENUM_NSYS_GENERIC_EVENT_GROUP",
+          "ENUM_NSYS_GENERIC_EVENT_SOURCE",
+          "ENUM_SAMPLING_THREAD_STATE",
+          "ENUM_SCHEDULING_THREAD_BLOCK",
+          "ENUM_STACK_UNWIND_METHOD",
+          "META_DATA_CAPTURE",
+          "META_DATA_EXPORT",
+          "NVTX_EVENTS",
+          "OSRT_API",
+          "OSRT_CALLCHAINS",
+          "PROCESSES",
+          "PROFILER_OVERHEAD",
+          "ProcessStreams",
+          "StringIds",
+          "TARGET_INFO_CUDA_CONTEXT_INFO",
+          "TARGET_INFO_CUDA_DEVICE",
+          "TARGET_INFO_CUDA_STREAM",
+          "TARGET_INFO_GPU",
+          "TARGET_INFO_SESSION_START_TIME",
+          "TARGET_INFO_SYSTEM_ENV",
+          "ThreadNames"
+        ],
+        "expected_graph_launches": 96,
+        "observed_graph_launches": 96,
+        "observed_kernel_count": 84,
+        "observed_copy_count": 84,
+        "observed_node_count": 0,
+        "parent_node_correspondence": {
+          "graph_launches": 96,
+          "expanded_nodes": 0,
+          "expected_nodes": null,
+          "matched": true
+        },
+        "drops": 0,
+        "errors": [],
+        "kernel_copy_union_ns": 8307149,
+        "graph_envelope_union_ns": 191580081,
+        "combined_union_ns": 199887230,
+        "graph_exclusive_without_leaf_ns": 191580081,
+        "time_outside_all_activity_ns": 2198210,
+        "first_last_span_ns": 202085440,
+        "outside_combined_envelopes_in_span_ns": 2198210,
+        "unmapped_kernel_time_ns": 8145005,
+        "named_family_share": 0.019518609814269613,
+        "family_assignment_ok": false,
+        "families": {
+          "residual_norm_quant": {
+            "family": "residual_norm_quant",
+            "count": 36,
+            "union_ns": 162144,
+            "group": "residual_norm_quant",
+            "ms_per_eval": 0.013512000000000001
+          },
+          "unclassified": {
+            "family": "unclassified",
+            "count": 132,
+            "union_ns": 8145005,
+            "group": "unclassified",
+            "ms_per_eval": 0.6787504166666666
+          }
+        },
+        "profiler_overhead": {},
+        "internal_idle_ms": null,
+        "capture_arm": "graph",
+        "cpu_api_union_ns": 201443099,
+        "conservation_ok": true,
+        "parent_child_not_double_counted": true,
+        "nvtx_does_not_add_gpu_work": true,
+        "process_scoped_gaps_are_not_device_wide_idle": true,
+        "coverage_valid": true,
+        "perturbed": false,
+        "sql_window": {
+          "start_ns": 27074850,
+          "end_ns": 229160290,
+          "source": "markers_or_explicit"
+        },
+        "sql": {
+          "kernel": "SELECT start, end FROM CUPTI_ACTIVITY_KIND_KERNEL",
+          "memcpy": "SELECT start, end FROM CUPTI_ACTIVITY_KIND_MEMCPY",
+          "graph": "SELECT start, end FROM CUPTI_ACTIVITY_KIND_GRAPH_TRACE",
+          "units": "export_schema / CUPTI documented nanoseconds"
+        },
+        "quantities_ms": {
+          "ordinary_kernel_count": 84,
+          "gpu_graph_count": 96,
+          "kernel_copy_union_ms": 8.31,
+          "graph_envelope_union_ms": 191.58,
+          "combined_union_ms": 199.89,
+          "first_to_last_span_ms": 202.09,
+          "outside_combined_envelopes_ms": 2.2
+        }
+      },
+      "expected_128_early": null,
+      "sql": {
+        "kernel": "SELECT start, end FROM CUPTI_ACTIVITY_KIND_KERNEL",
+        "memcpy": "SELECT start, end FROM CUPTI_ACTIVITY_KIND_MEMCPY",
+        "graph": "SELECT start, end FROM CUPTI_ACTIVITY_KIND_GRAPH_TRACE",
+        "units": "export_schema / CUPTI documented nanoseconds"
+      },
+      "table_counts": {
+        "ANALYSIS_DETAILS": 1,
+        "ANALYSIS_FILE": 2,
+        "CUDA_GRAPH_EVENTS": 320,
+        "CUPTI_ACTIVITY_KIND_CUDA_EVENT": 228,
+        "CUPTI_ACTIVITY_KIND_GRAPH_TRACE": 96,
+        "CUPTI_ACTIVITY_KIND_KERNEL": 84,
+        "CUPTI_ACTIVITY_KIND_MEMCPY": 84,
+        "CUPTI_ACTIVITY_KIND_RUNTIME": 1154,
+        "CUPTI_ACTIVITY_KIND_SYNCHRONIZATION": 146,
+        "DIAGNOSTIC_EVENT": 19,
+        "ENUM_CUDA_DEV_MEM_EVENT_OPER": 2,
+        "ENUM_CUDA_FUNC_CACHE_CONFIG": 4,
+        "ENUM_CUDA_KERNEL_LAUNCH_TYPE": 4,
+        "ENUM_CUDA_MEMCPY_OPER": 14,
+        "ENUM_CUDA_MEMPOOL_OPER": 4,
+        "ENUM_CUDA_MEMPOOL_TYPE": 3,
+        "ENUM_CUDA_MEM_KIND": 8,
+        "ENUM_CUDA_SHARED_MEM_LIMIT_CONFIG": 2,
+        "ENUM_CUDA_UNIF_MEM_ACCESS_TYPE": 5,
+        "ENUM_CUDA_UNIF_MEM_MIGRATION": 6,
+        "ENUM_CUPTI_STREAM_TYPE": 4,
+        "ENUM_CUPTI_SYNC_TYPE": 5,
+        "ENUM_DIAGNOSTIC_SEVERITY_LEVEL": 5,
+        "ENUM_DIAGNOSTIC_SOURCE_TYPE": 4,
+        "ENUM_DIAGNOSTIC_TIMESTAMP_SOURCE": 3,
+        "ENUM_NSYS_EVENT_CLASS": 89,
+        "ENUM_NSYS_EVENT_TYPE": 150,
+        "ENUM_NSYS_GENERIC_EVENT_FIELD_ETW_FLAGS": 7,
+        "ENUM_NSYS_GENERIC_EVENT_FIELD_ETW_PROPERTY": 8,
+        "ENUM_NSYS_GENERIC_EVENT_FIELD_ETW_TYPE": 22,
+        "ENUM_NSYS_GENERIC_EVENT_FIELD_TYPE": 4,
+        "ENUM_NSYS_GENERIC_EVENT_GROUP": 5,
+        "ENUM_NSYS_GENERIC_EVENT_SOURCE": 4,
+        "ENUM_SAMPLING_THREAD_STATE": 11,
+        "ENUM_SCHEDULING_THREAD_BLOCK": 53,
+        "ENUM_STACK_UNWIND_METHOD": 10,
+        "META_DATA_CAPTURE": 132,
+        "META_DATA_EXPORT": 29,
+        "NVTX_EVENTS": 252,
+        "OSRT_API": 20,
+        "OSRT_CALLCHAINS": 99,
+        "PROCESSES": 5,
+        "PROFILER_OVERHEAD": 7,
+        "ProcessStreams": 2,
+        "StringIds": 131,
+        "TARGET_INFO_CUDA_CONTEXT_INFO": 1,
+        "TARGET_INFO_CUDA_DEVICE": 1,
+        "TARGET_INFO_CUDA_STREAM": 90,
+        "TARGET_INFO_GPU": 1,
+        "TARGET_INFO_SESSION_START_TIME": 1,
+        "TARGET_INFO_SYSTEM_ENV": 71,
+        "ThreadNames": 28
+      },
+      "errors": []
+    },
+    "d2048-early": {
+      "prefix": 2048,
+      "window": "early",
+      "sqlite": "build/optimization-runs/opt133-nsys2025/trace-2048-early.sqlite",
+      "trace": "evidence/optimization/opt133-decode-nsys-trace/traces/trace-2048-early.nsys-rep",
+      "exported": false,
+      "ok": true,
+      "quantities_ms": {
+        "ordinary_kernel_count": 84,
+        "gpu_graph_count": 96,
+        "kernel_copy_union_ms": 8.37,
+        "graph_envelope_union_ms": 215.99,
+        "combined_union_ms": 224.36,
+        "first_to_last_span_ms": 227.16,
+        "outside_combined_envelopes_ms": 2.81
+      },
+      "coverage": {
+        "identity": {
+          "engine": "quartz",
+          "metric": "decode_only",
+          "prefix": 2048,
+          "eval_count": 12,
+          "allocated_capacity": 131072,
+          "populated_length": 2048,
+          "graph_mode": "decode_segments8",
+          "output_boundary": "eval_logits_no_host_materialize",
+          "capture_arm": "graph",
+          "device": 0,
+          "context": 0,
+          "process": 1
+        },
+        "window_start_ns": 27797081,
+        "window_end_ns": 254961509,
+        "window_ns": 227164428,
+        "window_ms": 227.164428,
+        "tables": {
+          "ANALYSIS_DETAILS": {
+            "count": 1,
+            "unit": null
+          },
+          "ANALYSIS_FILE": {
+            "count": 2,
+            "unit": null
+          },
+          "CUDA_GRAPH_EVENTS": {
+            "count": 320,
+            "unit": null
+          },
+          "CUPTI_ACTIVITY_KIND_CUDA_EVENT": {
+            "count": 228,
+            "unit": "ns"
+          },
+          "CUPTI_ACTIVITY_KIND_GRAPH_TRACE": {
+            "count": 96,
+            "unit": "ns"
+          },
+          "CUPTI_ACTIVITY_KIND_KERNEL": {
+            "count": 84,
+            "unit": "ns"
+          },
+          "CUPTI_ACTIVITY_KIND_MEMCPY": {
+            "count": 84,
+            "unit": "ns"
+          },
+          "CUPTI_ACTIVITY_KIND_RUNTIME": {
+            "count": 1156,
+            "unit": "ns"
+          },
+          "CUPTI_ACTIVITY_KIND_SYNCHRONIZATION": {
+            "count": 146,
+            "unit": "ns"
+          },
+          "DIAGNOSTIC_EVENT": {
+            "count": 19,
+            "unit": null
+          },
+          "ENUM_CUDA_DEV_MEM_EVENT_OPER": {
+            "count": 2,
+            "unit": null
+          },
+          "ENUM_CUDA_FUNC_CACHE_CONFIG": {
+            "count": 4,
+            "unit": null
+          },
+          "ENUM_CUDA_KERNEL_LAUNCH_TYPE": {
+            "count": 4,
+            "unit": null
+          },
+          "ENUM_CUDA_MEMCPY_OPER": {
+            "count": 14,
+            "unit": null
+          },
+          "ENUM_CUDA_MEMPOOL_OPER": {
+            "count": 4,
+            "unit": null
+          },
+          "ENUM_CUDA_MEMPOOL_TYPE": {
+            "count": 3,
+            "unit": null
+          },
+          "ENUM_CUDA_MEM_KIND": {
+            "count": 8,
+            "unit": null
+          },
+          "ENUM_CUDA_SHARED_MEM_LIMIT_CONFIG": {
+            "count": 2,
+            "unit": null
+          },
+          "ENUM_CUDA_UNIF_MEM_ACCESS_TYPE": {
+            "count": 5,
+            "unit": null
+          },
+          "ENUM_CUDA_UNIF_MEM_MIGRATION": {
+            "count": 6,
+            "unit": null
+          },
+          "ENUM_CUPTI_STREAM_TYPE": {
+            "count": 4,
+            "unit": null
+          },
+          "ENUM_CUPTI_SYNC_TYPE": {
+            "count": 5,
+            "unit": null
+          },
+          "ENUM_DIAGNOSTIC_SEVERITY_LEVEL": {
+            "count": 5,
+            "unit": null
+          },
+          "ENUM_DIAGNOSTIC_SOURCE_TYPE": {
+            "count": 4,
+            "unit": null
+          },
+          "ENUM_DIAGNOSTIC_TIMESTAMP_SOURCE": {
+            "count": 3,
+            "unit": null
+          },
+          "ENUM_NSYS_EVENT_CLASS": {
+            "count": 89,
+            "unit": null
+          },
+          "ENUM_NSYS_EVENT_TYPE": {
+            "count": 150,
+            "unit": null
+          },
+          "ENUM_NSYS_GENERIC_EVENT_FIELD_ETW_FLAGS": {
+            "count": 7,
+            "unit": null
+          },
+          "ENUM_NSYS_GENERIC_EVENT_FIELD_ETW_PROPERTY": {
+            "count": 8,
+            "unit": null
+          },
+          "ENUM_NSYS_GENERIC_EVENT_FIELD_ETW_TYPE": {
+            "count": 22,
+            "unit": null
+          },
+          "ENUM_NSYS_GENERIC_EVENT_FIELD_TYPE": {
+            "count": 4,
+            "unit": null
+          },
+          "ENUM_NSYS_GENERIC_EVENT_GROUP": {
+            "count": 5,
+            "unit": null
+          },
+          "ENUM_NSYS_GENERIC_EVENT_SOURCE": {
+            "count": 4,
+            "unit": null
+          },
+          "ENUM_SAMPLING_THREAD_STATE": {
+            "count": 11,
+            "unit": null
+          },
+          "ENUM_SCHEDULING_THREAD_BLOCK": {
+            "count": 53,
+            "unit": null
+          },
+          "ENUM_STACK_UNWIND_METHOD": {
+            "count": 10,
+            "unit": null
+          },
+          "META_DATA_CAPTURE": {
+            "count": 132,
+            "unit": null
+          },
+          "META_DATA_EXPORT": {
+            "count": 29,
+            "unit": null
+          },
+          "NVTX_EVENTS": {
+            "count": 252,
+            "unit": "ns"
+          },
+          "OSRT_API": {
+            "count": 23,
+            "unit": null
+          },
+          "OSRT_CALLCHAINS": {
+            "count": 116,
+            "unit": null
+          },
+          "PROCESSES": {
+            "count": 5,
+            "unit": null
+          },
+          "PROFILER_OVERHEAD": {
+            "count": 7,
+            "unit": null
+          },
+          "ProcessStreams": {
+            "count": 2,
+            "unit": null
+          },
+          "StringIds": {
+            "count": 133,
+            "unit": null
+          },
+          "TARGET_INFO_CUDA_CONTEXT_INFO": {
+            "count": 1,
+            "unit": null
+          },
+          "TARGET_INFO_CUDA_DEVICE": {
+            "count": 1,
+            "unit": null
+          },
+          "TARGET_INFO_CUDA_STREAM": {
+            "count": 90,
+            "unit": null
+          },
+          "TARGET_INFO_GPU": {
+            "count": 1,
+            "unit": null
+          },
+          "TARGET_INFO_SESSION_START_TIME": {
+            "count": 1,
+            "unit": null
+          },
+          "TARGET_INFO_SYSTEM_ENV": {
+            "count": 71,
+            "unit": null
+          },
+          "ThreadNames": {
+            "count": 28,
+            "unit": null
+          }
+        },
+        "table_names": [
+          "ANALYSIS_DETAILS",
+          "ANALYSIS_FILE",
+          "CUDA_GRAPH_EVENTS",
+          "CUPTI_ACTIVITY_KIND_CUDA_EVENT",
+          "CUPTI_ACTIVITY_KIND_GRAPH_TRACE",
+          "CUPTI_ACTIVITY_KIND_KERNEL",
+          "CUPTI_ACTIVITY_KIND_MEMCPY",
+          "CUPTI_ACTIVITY_KIND_RUNTIME",
+          "CUPTI_ACTIVITY_KIND_SYNCHRONIZATION",
+          "DIAGNOSTIC_EVENT",
+          "ENUM_CUDA_DEV_MEM_EVENT_OPER",
+          "ENUM_CUDA_FUNC_CACHE_CONFIG",
+          "ENUM_CUDA_KERNEL_LAUNCH_TYPE",
+          "ENUM_CUDA_MEMCPY_OPER",
+          "ENUM_CUDA_MEMPOOL_OPER",
+          "ENUM_CUDA_MEMPOOL_TYPE",
+          "ENUM_CUDA_MEM_KIND",
+          "ENUM_CUDA_SHARED_MEM_LIMIT_CONFIG",
+          "ENUM_CUDA_UNIF_MEM_ACCESS_TYPE",
+          "ENUM_CUDA_UNIF_MEM_MIGRATION",
+          "ENUM_CUPTI_STREAM_TYPE",
+          "ENUM_CUPTI_SYNC_TYPE",
+          "ENUM_DIAGNOSTIC_SEVERITY_LEVEL",
+          "ENUM_DIAGNOSTIC_SOURCE_TYPE",
+          "ENUM_DIAGNOSTIC_TIMESTAMP_SOURCE",
+          "ENUM_NSYS_EVENT_CLASS",
+          "ENUM_NSYS_EVENT_TYPE",
+          "ENUM_NSYS_GENERIC_EVENT_FIELD_ETW_FLAGS",
+          "ENUM_NSYS_GENERIC_EVENT_FIELD_ETW_PROPERTY",
+          "ENUM_NSYS_GENERIC_EVENT_FIELD_ETW_TYPE",
+          "ENUM_NSYS_GENERIC_EVENT_FIELD_TYPE",
+          "ENUM_NSYS_GENERIC_EVENT_GROUP",
+          "ENUM_NSYS_GENERIC_EVENT_SOURCE",
+          "ENUM_SAMPLING_THREAD_STATE",
+          "ENUM_SCHEDULING_THREAD_BLOCK",
+          "ENUM_STACK_UNWIND_METHOD",
+          "META_DATA_CAPTURE",
+          "META_DATA_EXPORT",
+          "NVTX_EVENTS",
+          "OSRT_API",
+          "OSRT_CALLCHAINS",
+          "PROCESSES",
+          "PROFILER_OVERHEAD",
+          "ProcessStreams",
+          "StringIds",
+          "TARGET_INFO_CUDA_CONTEXT_INFO",
+          "TARGET_INFO_CUDA_DEVICE",
+          "TARGET_INFO_CUDA_STREAM",
+          "TARGET_INFO_GPU",
+          "TARGET_INFO_SESSION_START_TIME",
+          "TARGET_INFO_SYSTEM_ENV",
+          "ThreadNames"
+        ],
+        "expected_graph_launches": 96,
+        "observed_graph_launches": 96,
+        "observed_kernel_count": 84,
+        "observed_copy_count": 84,
+        "observed_node_count": 0,
+        "parent_node_correspondence": {
+          "graph_launches": 96,
+          "expanded_nodes": 0,
+          "expected_nodes": null,
+          "matched": true
+        },
+        "drops": 0,
+        "errors": [],
+        "kernel_copy_union_ns": 8366732,
+        "graph_envelope_union_ns": 215991355,
+        "combined_union_ns": 224358087,
+        "graph_exclusive_without_leaf_ns": 215991355,
+        "time_outside_all_activity_ns": 2806341,
+        "first_last_span_ns": 227164428,
+        "outside_combined_envelopes_in_span_ns": 2806341,
+        "unmapped_kernel_time_ns": 8201484,
+        "named_family_share": 0.019750602744297296,
+        "family_assignment_ok": false,
+        "families": {
+          "residual_norm_quant": {
+            "family": "residual_norm_quant",
+            "count": 36,
+            "union_ns": 165248,
+            "group": "residual_norm_quant",
+            "ms_per_eval": 0.013770666666666667
+          },
+          "unclassified": {
+            "family": "unclassified",
+            "count": 132,
+            "union_ns": 8201484,
+            "group": "unclassified",
+            "ms_per_eval": 0.6834570000000001
+          }
+        },
+        "profiler_overhead": {},
+        "internal_idle_ms": null,
+        "capture_arm": "graph",
+        "cpu_api_union_ns": 226319660,
+        "conservation_ok": true,
+        "parent_child_not_double_counted": true,
+        "nvtx_does_not_add_gpu_work": true,
+        "process_scoped_gaps_are_not_device_wide_idle": true,
+        "coverage_valid": true,
+        "perturbed": false,
+        "sql_window": {
+          "start_ns": 27797081,
+          "end_ns": 254961509,
+          "source": "markers_or_explicit"
+        },
+        "sql": {
+          "kernel": "SELECT start, end FROM CUPTI_ACTIVITY_KIND_KERNEL",
+          "memcpy": "SELECT start, end FROM CUPTI_ACTIVITY_KIND_MEMCPY",
+          "graph": "SELECT start, end FROM CUPTI_ACTIVITY_KIND_GRAPH_TRACE",
+          "units": "export_schema / CUPTI documented nanoseconds"
+        },
+        "quantities_ms": {
+          "ordinary_kernel_count": 84,
+          "gpu_graph_count": 96,
+          "kernel_copy_union_ms": 8.37,
+          "graph_envelope_union_ms": 215.99,
+          "combined_union_ms": 224.36,
+          "first_to_last_span_ms": 227.16,
+          "outside_combined_envelopes_ms": 2.81
+        }
+      },
+      "expected_128_early": null,
+      "sql": {
+        "kernel": "SELECT start, end FROM CUPTI_ACTIVITY_KIND_KERNEL",
+        "memcpy": "SELECT start, end FROM CUPTI_ACTIVITY_KIND_MEMCPY",
+        "graph": "SELECT start, end FROM CUPTI_ACTIVITY_KIND_GRAPH_TRACE",
+        "units": "export_schema / CUPTI documented nanoseconds"
+      },
+      "table_counts": {
+        "ANALYSIS_DETAILS": 1,
+        "ANALYSIS_FILE": 2,
+        "CUDA_GRAPH_EVENTS": 320,
+        "CUPTI_ACTIVITY_KIND_CUDA_EVENT": 228,
+        "CUPTI_ACTIVITY_KIND_GRAPH_TRACE": 96,
+        "CUPTI_ACTIVITY_KIND_KERNEL": 84,
+        "CUPTI_ACTIVITY_KIND_MEMCPY": 84,
+        "CUPTI_ACTIVITY_KIND_RUNTIME": 1156,
+        "CUPTI_ACTIVITY_KIND_SYNCHRONIZATION": 146,
+        "DIAGNOSTIC_EVENT": 19,
+        "ENUM_CUDA_DEV_MEM_EVENT_OPER": 2,
+        "ENUM_CUDA_FUNC_CACHE_CONFIG": 4,
+        "ENUM_CUDA_KERNEL_LAUNCH_TYPE": 4,
+        "ENUM_CUDA_MEMCPY_OPER": 14,
+        "ENUM_CUDA_MEMPOOL_OPER": 4,
+        "ENUM_CUDA_MEMPOOL_TYPE": 3,
+        "ENUM_CUDA_MEM_KIND": 8,
+        "ENUM_CUDA_SHARED_MEM_LIMIT_CONFIG": 2,
+        "ENUM_CUDA_UNIF_MEM_ACCESS_TYPE": 5,
+        "ENUM_CUDA_UNIF_MEM_MIGRATION": 6,
+        "ENUM_CUPTI_STREAM_TYPE": 4,
+        "ENUM_CUPTI_SYNC_TYPE": 5,
+        "ENUM_DIAGNOSTIC_SEVERITY_LEVEL": 5,
+        "ENUM_DIAGNOSTIC_SOURCE_TYPE": 4,
+        "ENUM_DIAGNOSTIC_TIMESTAMP_SOURCE": 3,
+        "ENUM_NSYS_EVENT_CLASS": 89,
+        "ENUM_NSYS_EVENT_TYPE": 150,
+        "ENUM_NSYS_GENERIC_EVENT_FIELD_ETW_FLAGS": 7,
+        "ENUM_NSYS_GENERIC_EVENT_FIELD_ETW_PROPERTY": 8,
+        "ENUM_NSYS_GENERIC_EVENT_FIELD_ETW_TYPE": 22,
+        "ENUM_NSYS_GENERIC_EVENT_FIELD_TYPE": 4,
+        "ENUM_NSYS_GENERIC_EVENT_GROUP": 5,
+        "ENUM_NSYS_GENERIC_EVENT_SOURCE": 4,
+        "ENUM_SAMPLING_THREAD_STATE": 11,
+        "ENUM_SCHEDULING_THREAD_BLOCK": 53,
+        "ENUM_STACK_UNWIND_METHOD": 10,
+        "META_DATA_CAPTURE": 132,
+        "META_DATA_EXPORT": 29,
+        "NVTX_EVENTS": 252,
+        "OSRT_API": 23,
+        "OSRT_CALLCHAINS": 116,
+        "PROCESSES": 5,
+        "PROFILER_OVERHEAD": 7,
+        "ProcessStreams": 2,
+        "StringIds": 133,
+        "TARGET_INFO_CUDA_CONTEXT_INFO": 1,
+        "TARGET_INFO_CUDA_DEVICE": 1,
+        "TARGET_INFO_CUDA_STREAM": 90,
+        "TARGET_INFO_GPU": 1,
+        "TARGET_INFO_SESSION_START_TIME": 1,
+        "TARGET_INFO_SYSTEM_ENV": 71,
+        "ThreadNames": 28
+      },
+      "errors": []
+    },
+    "d2048-middle": {
+      "prefix": 2048,
+      "window": "middle",
+      "sqlite": "build/optimization-runs/opt133-nsys2025/trace-2048-middle.sqlite",
+      "trace": "evidence/optimization/opt133-decode-nsys-trace/traces/trace-2048-middle.nsys-rep",
+      "exported": false,
+      "ok": true,
+      "quantities_ms": {
+        "ordinary_kernel_count": 84,
+        "gpu_graph_count": 96,
+        "kernel_copy_union_ms": 8.4,
+        "graph_envelope_union_ms": 233.67,
+        "combined_union_ms": 242.08,
+        "first_to_last_span_ms": 244.28,
+        "outside_combined_envelopes_ms": 2.2
+      },
+      "coverage": {
+        "identity": {
+          "engine": "quartz",
+          "metric": "decode_only",
+          "prefix": 2048,
+          "eval_count": 12,
+          "allocated_capacity": 131072,
+          "populated_length": 2048,
+          "graph_mode": "decode_segments8",
+          "output_boundary": "eval_logits_no_host_materialize",
+          "capture_arm": "graph",
+          "device": 0,
+          "context": 0,
+          "process": 1
+        },
+        "window_start_ns": 27326940,
+        "window_end_ns": 271605277,
+        "window_ns": 244278337,
+        "window_ms": 244.278337,
+        "tables": {
+          "ANALYSIS_DETAILS": {
+            "count": 1,
+            "unit": null
+          },
+          "ANALYSIS_FILE": {
+            "count": 2,
+            "unit": null
+          },
+          "CUDA_GRAPH_EVENTS": {
+            "count": 320,
+            "unit": null
+          },
+          "CUPTI_ACTIVITY_KIND_CUDA_EVENT": {
+            "count": 228,
+            "unit": "ns"
+          },
+          "CUPTI_ACTIVITY_KIND_GRAPH_TRACE": {
+            "count": 96,
+            "unit": "ns"
+          },
+          "CUPTI_ACTIVITY_KIND_KERNEL": {
+            "count": 84,
+            "unit": "ns"
+          },
+          "CUPTI_ACTIVITY_KIND_MEMCPY": {
+            "count": 84,
+            "unit": "ns"
+          },
+          "CUPTI_ACTIVITY_KIND_RUNTIME": {
+            "count": 1154,
+            "unit": "ns"
+          },
+          "CUPTI_ACTIVITY_KIND_SYNCHRONIZATION": {
+            "count": 146,
+            "unit": "ns"
+          },
+          "DIAGNOSTIC_EVENT": {
+            "count": 19,
+            "unit": null
+          },
+          "ENUM_CUDA_DEV_MEM_EVENT_OPER": {
+            "count": 2,
+            "unit": null
+          },
+          "ENUM_CUDA_FUNC_CACHE_CONFIG": {
+            "count": 4,
+            "unit": null
+          },
+          "ENUM_CUDA_KERNEL_LAUNCH_TYPE": {
+            "count": 4,
+            "unit": null
+          },
+          "ENUM_CUDA_MEMCPY_OPER": {
+            "count": 14,
+            "unit": null
+          },
+          "ENUM_CUDA_MEMPOOL_OPER": {
+            "count": 4,
+            "unit": null
+          },
+          "ENUM_CUDA_MEMPOOL_TYPE": {
+            "count": 3,
+            "unit": null
+          },
+          "ENUM_CUDA_MEM_KIND": {
+            "count": 8,
+            "unit": null
+          },
+          "ENUM_CUDA_SHARED_MEM_LIMIT_CONFIG": {
+            "count": 2,
+            "unit": null
+          },
+          "ENUM_CUDA_UNIF_MEM_ACCESS_TYPE": {
+            "count": 5,
+            "unit": null
+          },
+          "ENUM_CUDA_UNIF_MEM_MIGRATION": {
+            "count": 6,
+            "unit": null
+          },
+          "ENUM_CUPTI_STREAM_TYPE": {
+            "count": 4,
+            "unit": null
+          },
+          "ENUM_CUPTI_SYNC_TYPE": {
+            "count": 5,
+            "unit": null
+          },
+          "ENUM_DIAGNOSTIC_SEVERITY_LEVEL": {
+            "count": 5,
+            "unit": null
+          },
+          "ENUM_DIAGNOSTIC_SOURCE_TYPE": {
+            "count": 4,
+            "unit": null
+          },
+          "ENUM_DIAGNOSTIC_TIMESTAMP_SOURCE": {
+            "count": 3,
+            "unit": null
+          },
+          "ENUM_NSYS_EVENT_CLASS": {
+            "count": 89,
+            "unit": null
+          },
+          "ENUM_NSYS_EVENT_TYPE": {
+            "count": 150,
+            "unit": null
+          },
+          "ENUM_NSYS_GENERIC_EVENT_FIELD_ETW_FLAGS": {
+            "count": 7,
+            "unit": null
+          },
+          "ENUM_NSYS_GENERIC_EVENT_FIELD_ETW_PROPERTY": {
+            "count": 8,
+            "unit": null
+          },
+          "ENUM_NSYS_GENERIC_EVENT_FIELD_ETW_TYPE": {
+            "count": 22,
+            "unit": null
+          },
+          "ENUM_NSYS_GENERIC_EVENT_FIELD_TYPE": {
+            "count": 4,
+            "unit": null
+          },
+          "ENUM_NSYS_GENERIC_EVENT_GROUP": {
+            "count": 5,
+            "unit": null
+          },
+          "ENUM_NSYS_GENERIC_EVENT_SOURCE": {
+            "count": 4,
+            "unit": null
+          },
+          "ENUM_SAMPLING_THREAD_STATE": {
+            "count": 11,
+            "unit": null
+          },
+          "ENUM_SCHEDULING_THREAD_BLOCK": {
+            "count": 53,
+            "unit": null
+          },
+          "ENUM_STACK_UNWIND_METHOD": {
+            "count": 10,
+            "unit": null
+          },
+          "META_DATA_CAPTURE": {
+            "count": 132,
+            "unit": null
+          },
+          "META_DATA_EXPORT": {
+            "count": 29,
+            "unit": null
+          },
+          "NVTX_EVENTS": {
+            "count": 252,
+            "unit": "ns"
+          },
+          "OSRT_API": {
+            "count": 25,
+            "unit": null
+          },
+          "OSRT_CALLCHAINS": {
+            "count": 126,
+            "unit": null
+          },
+          "PROCESSES": {
+            "count": 5,
+            "unit": null
+          },
+          "PROFILER_OVERHEAD": {
+            "count": 7,
+            "unit": null
+          },
+          "ProcessStreams": {
+            "count": 2,
+            "unit": null
+          },
+          "StringIds": {
+            "count": 131,
+            "unit": null
+          },
+          "TARGET_INFO_CUDA_CONTEXT_INFO": {
+            "count": 1,
+            "unit": null
+          },
+          "TARGET_INFO_CUDA_DEVICE": {
+            "count": 1,
+            "unit": null
+          },
+          "TARGET_INFO_CUDA_STREAM": {
+            "count": 90,
+            "unit": null
+          },
+          "TARGET_INFO_GPU": {
+            "count": 1,
+            "unit": null
+          },
+          "TARGET_INFO_SESSION_START_TIME": {
+            "count": 1,
+            "unit": null
+          },
+          "TARGET_INFO_SYSTEM_ENV": {
+            "count": 71,
+            "unit": null
+          },
+          "ThreadNames": {
+            "count": 28,
+            "unit": null
+          }
+        },
+        "table_names": [
+          "ANALYSIS_DETAILS",
+          "ANALYSIS_FILE",
+          "CUDA_GRAPH_EVENTS",
+          "CUPTI_ACTIVITY_KIND_CUDA_EVENT",
+          "CUPTI_ACTIVITY_KIND_GRAPH_TRACE",
+          "CUPTI_ACTIVITY_KIND_KERNEL",
+          "CUPTI_ACTIVITY_KIND_MEMCPY",
+          "CUPTI_ACTIVITY_KIND_RUNTIME",
+          "CUPTI_ACTIVITY_KIND_SYNCHRONIZATION",
+          "DIAGNOSTIC_EVENT",
+          "ENUM_CUDA_DEV_MEM_EVENT_OPER",
+          "ENUM_CUDA_FUNC_CACHE_CONFIG",
+          "ENUM_CUDA_KERNEL_LAUNCH_TYPE",
+          "ENUM_CUDA_MEMCPY_OPER",
+          "ENUM_CUDA_MEMPOOL_OPER",
+          "ENUM_CUDA_MEMPOOL_TYPE",
+          "ENUM_CUDA_MEM_KIND",
+          "ENUM_CUDA_SHARED_MEM_LIMIT_CONFIG",
+          "ENUM_CUDA_UNIF_MEM_ACCESS_TYPE",
+          "ENUM_CUDA_UNIF_MEM_MIGRATION",
+          "ENUM_CUPTI_STREAM_TYPE",
+          "ENUM_CUPTI_SYNC_TYPE",
+          "ENUM_DIAGNOSTIC_SEVERITY_LEVEL",
+          "ENUM_DIAGNOSTIC_SOURCE_TYPE",
+          "ENUM_DIAGNOSTIC_TIMESTAMP_SOURCE",
+          "ENUM_NSYS_EVENT_CLASS",
+          "ENUM_NSYS_EVENT_TYPE",
+          "ENUM_NSYS_GENERIC_EVENT_FIELD_ETW_FLAGS",
+          "ENUM_NSYS_GENERIC_EVENT_FIELD_ETW_PROPERTY",
+          "ENUM_NSYS_GENERIC_EVENT_FIELD_ETW_TYPE",
+          "ENUM_NSYS_GENERIC_EVENT_FIELD_TYPE",
+          "ENUM_NSYS_GENERIC_EVENT_GROUP",
+          "ENUM_NSYS_GENERIC_EVENT_SOURCE",
+          "ENUM_SAMPLING_THREAD_STATE",
+          "ENUM_SCHEDULING_THREAD_BLOCK",
+          "ENUM_STACK_UNWIND_METHOD",
+          "META_DATA_CAPTURE",
+          "META_DATA_EXPORT",
+          "NVTX_EVENTS",
+          "OSRT_API",
+          "OSRT_CALLCHAINS",
+          "PROCESSES",
+          "PROFILER_OVERHEAD",
+          "ProcessStreams",
+          "StringIds",
+          "TARGET_INFO_CUDA_CONTEXT_INFO",
+          "TARGET_INFO_CUDA_DEVICE",
+          "TARGET_INFO_CUDA_STREAM",
+          "TARGET_INFO_GPU",
+          "TARGET_INFO_SESSION_START_TIME",
+          "TARGET_INFO_SYSTEM_ENV",
+          "ThreadNames"
+        ],
+        "expected_graph_launches": 96,
+        "observed_graph_launches": 96,
+        "observed_kernel_count": 84,
+        "observed_copy_count": 84,
+        "observed_node_count": 0,
+        "parent_node_correspondence": {
+          "graph_launches": 96,
+          "expanded_nodes": 0,
+          "expected_nodes": null,
+          "matched": true
+        },
+        "drops": 0,
+        "errors": [],
+        "kernel_copy_union_ns": 8402598,
+        "graph_envelope_union_ns": 233673460,
+        "combined_union_ns": 242076058,
+        "graph_exclusive_without_leaf_ns": 233673460,
+        "time_outside_all_activity_ns": 2202279,
+        "first_last_span_ns": 244278337,
+        "outside_combined_envelopes_in_span_ns": 2202279,
+        "unmapped_kernel_time_ns": 8237510,
+        "named_family_share": 0.019647256717505706,
+        "family_assignment_ok": false,
+        "families": {
+          "residual_norm_quant": {
+            "family": "residual_norm_quant",
+            "count": 36,
+            "union_ns": 165088,
+            "group": "residual_norm_quant",
+            "ms_per_eval": 0.013757333333333335
+          },
+          "unclassified": {
+            "family": "unclassified",
+            "count": 132,
+            "union_ns": 8237510,
+            "group": "unclassified",
+            "ms_per_eval": 0.6864591666666667
+          }
+        },
+        "profiler_overhead": {},
+        "internal_idle_ms": null,
+        "capture_arm": "graph",
+        "cpu_api_union_ns": 243619047,
+        "conservation_ok": true,
+        "parent_child_not_double_counted": true,
+        "nvtx_does_not_add_gpu_work": true,
+        "process_scoped_gaps_are_not_device_wide_idle": true,
+        "coverage_valid": true,
+        "perturbed": false,
+        "sql_window": {
+          "start_ns": 27326940,
+          "end_ns": 271605277,
+          "source": "markers_or_explicit"
+        },
+        "sql": {
+          "kernel": "SELECT start, end FROM CUPTI_ACTIVITY_KIND_KERNEL",
+          "memcpy": "SELECT start, end FROM CUPTI_ACTIVITY_KIND_MEMCPY",
+          "graph": "SELECT start, end FROM CUPTI_ACTIVITY_KIND_GRAPH_TRACE",
+          "units": "export_schema / CUPTI documented nanoseconds"
+        },
+        "quantities_ms": {
+          "ordinary_kernel_count": 84,
+          "gpu_graph_count": 96,
+          "kernel_copy_union_ms": 8.4,
+          "graph_envelope_union_ms": 233.67,
+          "combined_union_ms": 242.08,
+          "first_to_last_span_ms": 244.28,
+          "outside_combined_envelopes_ms": 2.2
+        }
+      },
+      "expected_128_early": null,
+      "sql": {
+        "kernel": "SELECT start, end FROM CUPTI_ACTIVITY_KIND_KERNEL",
+        "memcpy": "SELECT start, end FROM CUPTI_ACTIVITY_KIND_MEMCPY",
+        "graph": "SELECT start, end FROM CUPTI_ACTIVITY_KIND_GRAPH_TRACE",
+        "units": "export_schema / CUPTI documented nanoseconds"
+      },
+      "table_counts": {
+        "ANALYSIS_DETAILS": 1,
+        "ANALYSIS_FILE": 2,
+        "CUDA_GRAPH_EVENTS": 320,
+        "CUPTI_ACTIVITY_KIND_CUDA_EVENT": 228,
+        "CUPTI_ACTIVITY_KIND_GRAPH_TRACE": 96,
+        "CUPTI_ACTIVITY_KIND_KERNEL": 84,
+        "CUPTI_ACTIVITY_KIND_MEMCPY": 84,
+        "CUPTI_ACTIVITY_KIND_RUNTIME": 1154,
+        "CUPTI_ACTIVITY_KIND_SYNCHRONIZATION": 146,
+        "DIAGNOSTIC_EVENT": 19,
+        "ENUM_CUDA_DEV_MEM_EVENT_OPER": 2,
+        "ENUM_CUDA_FUNC_CACHE_CONFIG": 4,
+        "ENUM_CUDA_KERNEL_LAUNCH_TYPE": 4,
+        "ENUM_CUDA_MEMCPY_OPER": 14,
+        "ENUM_CUDA_MEMPOOL_OPER": 4,
+        "ENUM_CUDA_MEMPOOL_TYPE": 3,
+        "ENUM_CUDA_MEM_KIND": 8,
+        "ENUM_CUDA_SHARED_MEM_LIMIT_CONFIG": 2,
+        "ENUM_CUDA_UNIF_MEM_ACCESS_TYPE": 5,
+        "ENUM_CUDA_UNIF_MEM_MIGRATION": 6,
+        "ENUM_CUPTI_STREAM_TYPE": 4,
+        "ENUM_CUPTI_SYNC_TYPE": 5,
+        "ENUM_DIAGNOSTIC_SEVERITY_LEVEL": 5,
+        "ENUM_DIAGNOSTIC_SOURCE_TYPE": 4,
+        "ENUM_DIAGNOSTIC_TIMESTAMP_SOURCE": 3,
+        "ENUM_NSYS_EVENT_CLASS": 89,
+        "ENUM_NSYS_EVENT_TYPE": 150,
+        "ENUM_NSYS_GENERIC_EVENT_FIELD_ETW_FLAGS": 7,
+        "ENUM_NSYS_GENERIC_EVENT_FIELD_ETW_PROPERTY": 8,
+        "ENUM_NSYS_GENERIC_EVENT_FIELD_ETW_TYPE": 22,
+        "ENUM_NSYS_GENERIC_EVENT_FIELD_TYPE": 4,
+        "ENUM_NSYS_GENERIC_EVENT_GROUP": 5,
+        "ENUM_NSYS_GENERIC_EVENT_SOURCE": 4,
+        "ENUM_SAMPLING_THREAD_STATE": 11,
+        "ENUM_SCHEDULING_THREAD_BLOCK": 53,
+        "ENUM_STACK_UNWIND_METHOD": 10,
+        "META_DATA_CAPTURE": 132,
+        "META_DATA_EXPORT": 29,
+        "NVTX_EVENTS": 252,
+        "OSRT_API": 25,
+        "OSRT_CALLCHAINS": 126,
+        "PROCESSES": 5,
+        "PROFILER_OVERHEAD": 7,
+        "ProcessStreams": 2,
+        "StringIds": 131,
+        "TARGET_INFO_CUDA_CONTEXT_INFO": 1,
+        "TARGET_INFO_CUDA_DEVICE": 1,
+        "TARGET_INFO_CUDA_STREAM": 90,
+        "TARGET_INFO_GPU": 1,
+        "TARGET_INFO_SESSION_START_TIME": 1,
+        "TARGET_INFO_SYSTEM_ENV": 71,
+        "ThreadNames": 28
+      },
+      "errors": []
+    },
+    "d2048-late": {
+      "prefix": 2048,
+      "window": "late",
+      "sqlite": "build/optimization-runs/opt133-nsys2025/trace-2048-late.sqlite",
+      "trace": "evidence/optimization/opt133-decode-nsys-trace/traces/trace-2048-late.nsys-rep",
+      "exported": false,
+      "ok": true,
+      "quantities_ms": {
+        "ordinary_kernel_count": 84,
+        "gpu_graph_count": 96,
+        "kernel_copy_union_ms": 8.39,
+        "graph_envelope_union_ms": 234.52,
+        "combined_union_ms": 242.91,
+        "first_to_last_span_ms": 245.13,
+        "outside_combined_envelopes_ms": 2.23
+      },
+      "coverage": {
+        "identity": {
+          "engine": "quartz",
+          "metric": "decode_only",
+          "prefix": 2048,
+          "eval_count": 12,
+          "allocated_capacity": 131072,
+          "populated_length": 2048,
+          "graph_mode": "decode_segments8",
+          "output_boundary": "eval_logits_no_host_materialize",
+          "capture_arm": "graph",
+          "device": 0,
+          "context": 0,
+          "process": 1
+        },
+        "window_start_ns": 27618928,
+        "window_end_ns": 272753057,
+        "window_ns": 245134129,
+        "window_ms": 245.134129,
+        "tables": {
+          "ANALYSIS_DETAILS": {
+            "count": 1,
+            "unit": null
+          },
+          "ANALYSIS_FILE": {
+            "count": 2,
+            "unit": null
+          },
+          "CUDA_GRAPH_EVENTS": {
+            "count": 320,
+            "unit": null
+          },
+          "CUPTI_ACTIVITY_KIND_CUDA_EVENT": {
+            "count": 228,
+            "unit": "ns"
+          },
+          "CUPTI_ACTIVITY_KIND_GRAPH_TRACE": {
+            "count": 96,
+            "unit": "ns"
+          },
+          "CUPTI_ACTIVITY_KIND_KERNEL": {
+            "count": 84,
+            "unit": "ns"
+          },
+          "CUPTI_ACTIVITY_KIND_MEMCPY": {
+            "count": 84,
+            "unit": "ns"
+          },
+          "CUPTI_ACTIVITY_KIND_RUNTIME": {
+            "count": 1154,
+            "unit": "ns"
+          },
+          "CUPTI_ACTIVITY_KIND_SYNCHRONIZATION": {
+            "count": 146,
+            "unit": "ns"
+          },
+          "DIAGNOSTIC_EVENT": {
+            "count": 19,
+            "unit": null
+          },
+          "ENUM_CUDA_DEV_MEM_EVENT_OPER": {
+            "count": 2,
+            "unit": null
+          },
+          "ENUM_CUDA_FUNC_CACHE_CONFIG": {
+            "count": 4,
+            "unit": null
+          },
+          "ENUM_CUDA_KERNEL_LAUNCH_TYPE": {
+            "count": 4,
+            "unit": null
+          },
+          "ENUM_CUDA_MEMCPY_OPER": {
+            "count": 14,
+            "unit": null
+          },
+          "ENUM_CUDA_MEMPOOL_OPER": {
+            "count": 4,
+            "unit": null
+          },
+          "ENUM_CUDA_MEMPOOL_TYPE": {
+            "count": 3,
+            "unit": null
+          },
+          "ENUM_CUDA_MEM_KIND": {
+            "count": 8,
+            "unit": null
+          },
+          "ENUM_CUDA_SHARED_MEM_LIMIT_CONFIG": {
+            "count": 2,
+            "unit": null
+          },
+          "ENUM_CUDA_UNIF_MEM_ACCESS_TYPE": {
+            "count": 5,
+            "unit": null
+          },
+          "ENUM_CUDA_UNIF_MEM_MIGRATION": {
+            "count": 6,
+            "unit": null
+          },
+          "ENUM_CUPTI_STREAM_TYPE": {
+            "count": 4,
+            "unit": null
+          },
+          "ENUM_CUPTI_SYNC_TYPE": {
+            "count": 5,
+            "unit": null
+          },
+          "ENUM_DIAGNOSTIC_SEVERITY_LEVEL": {
+            "count": 5,
+            "unit": null
+          },
+          "ENUM_DIAGNOSTIC_SOURCE_TYPE": {
+            "count": 4,
+            "unit": null
+          },
+          "ENUM_DIAGNOSTIC_TIMESTAMP_SOURCE": {
+            "count": 3,
+            "unit": null
+          },
+          "ENUM_NSYS_EVENT_CLASS": {
+            "count": 89,
+            "unit": null
+          },
+          "ENUM_NSYS_EVENT_TYPE": {
+            "count": 150,
+            "unit": null
+          },
+          "ENUM_NSYS_GENERIC_EVENT_FIELD_ETW_FLAGS": {
+            "count": 7,
+            "unit": null
+          },
+          "ENUM_NSYS_GENERIC_EVENT_FIELD_ETW_PROPERTY": {
+            "count": 8,
+            "unit": null
+          },
+          "ENUM_NSYS_GENERIC_EVENT_FIELD_ETW_TYPE": {
+            "count": 22,
+            "unit": null
+          },
+          "ENUM_NSYS_GENERIC_EVENT_FIELD_TYPE": {
+            "count": 4,
+            "unit": null
+          },
+          "ENUM_NSYS_GENERIC_EVENT_GROUP": {
+            "count": 5,
+            "unit": null
+          },
+          "ENUM_NSYS_GENERIC_EVENT_SOURCE": {
+            "count": 4,
+            "unit": null
+          },
+          "ENUM_SAMPLING_THREAD_STATE": {
+            "count": 11,
+            "unit": null
+          },
+          "ENUM_SCHEDULING_THREAD_BLOCK": {
+            "count": 53,
+            "unit": null
+          },
+          "ENUM_STACK_UNWIND_METHOD": {
+            "count": 10,
+            "unit": null
+          },
+          "META_DATA_CAPTURE": {
+            "count": 132,
+            "unit": null
+          },
+          "META_DATA_EXPORT": {
+            "count": 29,
+            "unit": null
+          },
+          "NVTX_EVENTS": {
+            "count": 252,
+            "unit": "ns"
+          },
+          "OSRT_API": {
+            "count": 25,
+            "unit": null
+          },
+          "OSRT_CALLCHAINS": {
+            "count": 126,
+            "unit": null
+          },
+          "PROCESSES": {
+            "count": 5,
+            "unit": null
+          },
+          "PROFILER_OVERHEAD": {
+            "count": 7,
+            "unit": null
+          },
+          "ProcessStreams": {
+            "count": 2,
+            "unit": null
+          },
+          "StringIds": {
+            "count": 131,
+            "unit": null
+          },
+          "TARGET_INFO_CUDA_CONTEXT_INFO": {
+            "count": 1,
+            "unit": null
+          },
+          "TARGET_INFO_CUDA_DEVICE": {
+            "count": 1,
+            "unit": null
+          },
+          "TARGET_INFO_CUDA_STREAM": {
+            "count": 90,
+            "unit": null
+          },
+          "TARGET_INFO_GPU": {
+            "count": 1,
+            "unit": null
+          },
+          "TARGET_INFO_SESSION_START_TIME": {
+            "count": 1,
+            "unit": null
+          },
+          "TARGET_INFO_SYSTEM_ENV": {
+            "count": 71,
+            "unit": null
+          },
+          "ThreadNames": {
+            "count": 28,
+            "unit": null
+          }
+        },
+        "table_names": [
+          "ANALYSIS_DETAILS",
+          "ANALYSIS_FILE",
+          "CUDA_GRAPH_EVENTS",
+          "CUPTI_ACTIVITY_KIND_CUDA_EVENT",
+          "CUPTI_ACTIVITY_KIND_GRAPH_TRACE",
+          "CUPTI_ACTIVITY_KIND_KERNEL",
+          "CUPTI_ACTIVITY_KIND_MEMCPY",
+          "CUPTI_ACTIVITY_KIND_RUNTIME",
+          "CUPTI_ACTIVITY_KIND_SYNCHRONIZATION",
+          "DIAGNOSTIC_EVENT",
+          "ENUM_CUDA_DEV_MEM_EVENT_OPER",
+          "ENUM_CUDA_FUNC_CACHE_CONFIG",
+          "ENUM_CUDA_KERNEL_LAUNCH_TYPE",
+          "ENUM_CUDA_MEMCPY_OPER",
+          "ENUM_CUDA_MEMPOOL_OPER",
+          "ENUM_CUDA_MEMPOOL_TYPE",
+          "ENUM_CUDA_MEM_KIND",
+          "ENUM_CUDA_SHARED_MEM_LIMIT_CONFIG",
+          "ENUM_CUDA_UNIF_MEM_ACCESS_TYPE",
+          "ENUM_CUDA_UNIF_MEM_MIGRATION",
+          "ENUM_CUPTI_STREAM_TYPE",
+          "ENUM_CUPTI_SYNC_TYPE",
+          "ENUM_DIAGNOSTIC_SEVERITY_LEVEL",
+          "ENUM_DIAGNOSTIC_SOURCE_TYPE",
+          "ENUM_DIAGNOSTIC_TIMESTAMP_SOURCE",
+          "ENUM_NSYS_EVENT_CLASS",
+          "ENUM_NSYS_EVENT_TYPE",
+          "ENUM_NSYS_GENERIC_EVENT_FIELD_ETW_FLAGS",
+          "ENUM_NSYS_GENERIC_EVENT_FIELD_ETW_PROPERTY",
+          "ENUM_NSYS_GENERIC_EVENT_FIELD_ETW_TYPE",
+          "ENUM_NSYS_GENERIC_EVENT_FIELD_TYPE",
+          "ENUM_NSYS_GENERIC_EVENT_GROUP",
+          "ENUM_NSYS_GENERIC_EVENT_SOURCE",
+          "ENUM_SAMPLING_THREAD_STATE",
+          "ENUM_SCHEDULING_THREAD_BLOCK",
+          "ENUM_STACK_UNWIND_METHOD",
+          "META_DATA_CAPTURE",
+          "META_DATA_EXPORT",
+          "NVTX_EVENTS",
+          "OSRT_API",
+          "OSRT_CALLCHAINS",
+          "PROCESSES",
+          "PROFILER_OVERHEAD",
+          "ProcessStreams",
+          "StringIds",
+          "TARGET_INFO_CUDA_CONTEXT_INFO",
+          "TARGET_INFO_CUDA_DEVICE",
+          "TARGET_INFO_CUDA_STREAM",
+          "TARGET_INFO_GPU",
+          "TARGET_INFO_SESSION_START_TIME",
+          "TARGET_INFO_SYSTEM_ENV",
+          "ThreadNames"
+        ],
+        "expected_graph_launches": 96,
+        "observed_graph_launches": 96,
+        "observed_kernel_count": 84,
+        "observed_copy_count": 84,
+        "observed_node_count": 0,
+        "parent_node_correspondence": {
+          "graph_launches": 96,
+          "expanded_nodes": 0,
+          "expected_nodes": null,
+          "matched": true
+        },
+        "drops": 0,
+        "errors": [],
+        "kernel_copy_union_ns": 8390313,
+        "graph_envelope_union_ns": 234515430,
+        "combined_union_ns": 242905743,
+        "graph_exclusive_without_leaf_ns": 234515430,
+        "time_outside_all_activity_ns": 2228386,
+        "first_last_span_ns": 245134129,
+        "outside_combined_envelopes_in_span_ns": 2228386,
+        "unmapped_kernel_time_ns": 8224201,
+        "named_family_share": 0.0197980695118287,
+        "family_assignment_ok": false,
+        "families": {
+          "residual_norm_quant": {
+            "family": "residual_norm_quant",
+            "count": 36,
+            "union_ns": 166112,
+            "group": "residual_norm_quant",
+            "ms_per_eval": 0.013842666666666668
+          },
+          "unclassified": {
+            "family": "unclassified",
+            "count": 132,
+            "union_ns": 8224201,
+            "group": "unclassified",
+            "ms_per_eval": 0.6853500833333334
+          }
+        },
+        "profiler_overhead": {},
+        "internal_idle_ms": null,
+        "capture_arm": "graph",
+        "cpu_api_union_ns": 244424018,
+        "conservation_ok": true,
+        "parent_child_not_double_counted": true,
+        "nvtx_does_not_add_gpu_work": true,
+        "process_scoped_gaps_are_not_device_wide_idle": true,
+        "coverage_valid": true,
+        "perturbed": false,
+        "sql_window": {
+          "start_ns": 27618928,
+          "end_ns": 272753057,
+          "source": "markers_or_explicit"
+        },
+        "sql": {
+          "kernel": "SELECT start, end FROM CUPTI_ACTIVITY_KIND_KERNEL",
+          "memcpy": "SELECT start, end FROM CUPTI_ACTIVITY_KIND_MEMCPY",
+          "graph": "SELECT start, end FROM CUPTI_ACTIVITY_KIND_GRAPH_TRACE",
+          "units": "export_schema / CUPTI documented nanoseconds"
+        },
+        "quantities_ms": {
+          "ordinary_kernel_count": 84,
+          "gpu_graph_count": 96,
+          "kernel_copy_union_ms": 8.39,
+          "graph_envelope_union_ms": 234.52,
+          "combined_union_ms": 242.91,
+          "first_to_last_span_ms": 245.13,
+          "outside_combined_envelopes_ms": 2.23
+        }
+      },
+      "expected_128_early": null,
+      "sql": {
+        "kernel": "SELECT start, end FROM CUPTI_ACTIVITY_KIND_KERNEL",
+        "memcpy": "SELECT start, end FROM CUPTI_ACTIVITY_KIND_MEMCPY",
+        "graph": "SELECT start, end FROM CUPTI_ACTIVITY_KIND_GRAPH_TRACE",
+        "units": "export_schema / CUPTI documented nanoseconds"
+      },
+      "table_counts": {
+        "ANALYSIS_DETAILS": 1,
+        "ANALYSIS_FILE": 2,
+        "CUDA_GRAPH_EVENTS": 320,
+        "CUPTI_ACTIVITY_KIND_CUDA_EVENT": 228,
+        "CUPTI_ACTIVITY_KIND_GRAPH_TRACE": 96,
+        "CUPTI_ACTIVITY_KIND_KERNEL": 84,
+        "CUPTI_ACTIVITY_KIND_MEMCPY": 84,
+        "CUPTI_ACTIVITY_KIND_RUNTIME": 1154,
+        "CUPTI_ACTIVITY_KIND_SYNCHRONIZATION": 146,
+        "DIAGNOSTIC_EVENT": 19,
+        "ENUM_CUDA_DEV_MEM_EVENT_OPER": 2,
+        "ENUM_CUDA_FUNC_CACHE_CONFIG": 4,
+        "ENUM_CUDA_KERNEL_LAUNCH_TYPE": 4,
+        "ENUM_CUDA_MEMCPY_OPER": 14,
+        "ENUM_CUDA_MEMPOOL_OPER": 4,
+        "ENUM_CUDA_MEMPOOL_TYPE": 3,
+        "ENUM_CUDA_MEM_KIND": 8,
+        "ENUM_CUDA_SHARED_MEM_LIMIT_CONFIG": 2,
+        "ENUM_CUDA_UNIF_MEM_ACCESS_TYPE": 5,
+        "ENUM_CUDA_UNIF_MEM_MIGRATION": 6,
+        "ENUM_CUPTI_STREAM_TYPE": 4,
+        "ENUM_CUPTI_SYNC_TYPE": 5,
+        "ENUM_DIAGNOSTIC_SEVERITY_LEVEL": 5,
+        "ENUM_DIAGNOSTIC_SOURCE_TYPE": 4,
+        "ENUM_DIAGNOSTIC_TIMESTAMP_SOURCE": 3,
+        "ENUM_NSYS_EVENT_CLASS": 89,
+        "ENUM_NSYS_EVENT_TYPE": 150,
+        "ENUM_NSYS_GENERIC_EVENT_FIELD_ETW_FLAGS": 7,
+        "ENUM_NSYS_GENERIC_EVENT_FIELD_ETW_PROPERTY": 8,
+        "ENUM_NSYS_GENERIC_EVENT_FIELD_ETW_TYPE": 22,
+        "ENUM_NSYS_GENERIC_EVENT_FIELD_TYPE": 4,
+        "ENUM_NSYS_GENERIC_EVENT_GROUP": 5,
+        "ENUM_NSYS_GENERIC_EVENT_SOURCE": 4,
+        "ENUM_SAMPLING_THREAD_STATE": 11,
+        "ENUM_SCHEDULING_THREAD_BLOCK": 53,
+        "ENUM_STACK_UNWIND_METHOD": 10,
+        "META_DATA_CAPTURE": 132,
+        "META_DATA_EXPORT": 29,
+        "NVTX_EVENTS": 252,
+        "OSRT_API": 25,
+        "OSRT_CALLCHAINS": 126,
+        "PROCESSES": 5,
+        "PROFILER_OVERHEAD": 7,
+        "ProcessStreams": 2,
+        "StringIds": 131,
+        "TARGET_INFO_CUDA_CONTEXT_INFO": 1,
+        "TARGET_INFO_CUDA_DEVICE": 1,
+        "TARGET_INFO_CUDA_STREAM": 90,
+        "TARGET_INFO_GPU": 1,
+        "TARGET_INFO_SESSION_START_TIME": 1,
+        "TARGET_INFO_SYSTEM_ENV": 71,
+        "ThreadNames": 28
+      },
+      "errors": []
+    }
+  },
+  "opt133_d128_early_expected": {
+    "ordinary_kernel_count": 84,
+    "gpu_graph_count": 96,
+    "kernel_copy_union_ms": 8.24,
+    "graph_envelope_union_ms": 186.02,
+    "combined_union_ms": 194.26,
+    "first_to_last_span_ms": 196.74,
+    "outside_combined_envelopes_ms": 2.48
+  },
+  "opt133_d128_early_observed": {
+    "ordinary_kernel_count": 84,
+    "gpu_graph_count": 96,
+    "kernel_copy_union_ms": 8.24,
+    "graph_envelope_union_ms": 186.02,
+    "combined_union_ms": 194.26,
+    "first_to_last_span_ms": 196.74,
+    "outside_combined_envelopes_ms": 2.48
+  },
+  "idle_invalidation": {
+    "method": "min(old_unobserved, new_idle)",
+    "old_unobserved_ms": 4530.492161700013,
+    "new_idle_ms": 188.496377,
+    "historical_min_ms": 188.496377,
+    "causal": false,
+    "claim_type": "historical",
+    "current_derived_idle_ms": null,
+    "current_derived_idle_valid": false,
+    "reason": "OPT-133 subtracted ordinary kernel/copy union from the window and labeled the remainder GPU idle while CUPTI_ACTIVITY_KIND_GRAPH_TRACE envelopes were omitted from cuda_gpu_trace. Graph-internal activity is unknown until node tracing covers it. min(old_unobserved, new_idle) is not causal.",
+    "link": "evidence/optimization/opt136-graph-accounting/historical-reconciliation.json",
+    "scalar_fraction_of_different_window_forbidden": true
+  },
+  "graph_envelopes_are_not_continuous_busy": true,
+  "sql": [
+    "d128-early: SELECT start,end FROM KERNEL/MEMCPY/GRAPH_TRACE; kernels=84 graphs=96",
+    "d128-middle: SELECT start,end FROM KERNEL/MEMCPY/GRAPH_TRACE; kernels=84 graphs=96",
+    "d128-late: SELECT start,end FROM KERNEL/MEMCPY/GRAPH_TRACE; kernels=84 graphs=96",
+    "d2048-early: SELECT start,end FROM KERNEL/MEMCPY/GRAPH_TRACE; kernels=84 graphs=96",
+    "d2048-middle: SELECT start,end FROM KERNEL/MEMCPY/GRAPH_TRACE; kernels=84 graphs=96",
+    "d2048-late: SELECT start,end FROM KERNEL/MEMCPY/GRAPH_TRACE; kernels=84 graphs=96"
+  ],
+  "blockers": [],
+  "ok": true,
+  "parser_correction": {
+    "fixture": "fixtures/opt133_decode_nsys_trace.json",
+    "correction": {
+      "date": "2026-09-14",
+      "gpu_idle_ms": null,
+      "device_inactive_proven_ms": null,
+      "idle_claim_valid": false,
+      "causal_reconciliation": false,
+      "reason": "OPT-133 subtracted ordinary kernel/copy union from the window and labeled the remainder GPU idle while CUPTI_ACTIVITY_KIND_GRAPH_TRACE envelopes were omitted from cuda_gpu_trace. Graph-internal activity is unknown until node tracing covers it. min(old_unobserved, new_idle) is not causal.",
+      "link": "evidence/optimization/opt136-graph-accounting/historical-reconciliation.json",
+      "historical_values_preserved_under": "opt136_historical_idle"
+    }
+  },
+  "appended_reports": [
+    "evidence/optimization/opt133-decode-nsys-trace/REPORT.md",
+    "evidence/optimization/opt125-decode-accounting/REPORT.md",
+    "evidence/optimization/opt132-combined-decode/REPORT.md",
+    "tasks/OPT-133.md",
+    "tasks/OPT-125.md",
+    "tasks/OPT-132.md"
+  ]
+}

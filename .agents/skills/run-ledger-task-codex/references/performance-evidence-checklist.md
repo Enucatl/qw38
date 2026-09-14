@@ -53,6 +53,12 @@ Quartz minus zero.
 
 Use OPT-136's checked `coverage.json` when available; do not substitute its
 existence or a success flag for inspecting the assertions and source rows.
+Validate required coverage with the shared CLI (nonzero exit is a fail;
+`null`/`unavailable` is not a pass):
+
+```sh
+uv run python tools/performance_evidence.py --validate <coverage.json>
+```
 
 ## 3. Time accounting
 

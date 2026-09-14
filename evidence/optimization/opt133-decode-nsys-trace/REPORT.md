@@ -49,3 +49,19 @@ GPU residents at preflight:
 ```json
 []
 ```
+
+## OPT-136 dated correction (2026-09-14)
+
+Derived GPU idle from OPT-133 `cuda_gpu_trace` is **invalid**. The capture used
+`--cuda-graph-trace=graph`, but the GPU sum omitted
+`CUPTI_ACTIVITY_KIND_GRAPH_TRACE`. Subtracting ordinary kernel/copy union from
+the window does not prove hardware idle; graph-internal activity is unknown
+until node tracing covers those envelopes. Cross-run
+`min(old_unobserved, new_idle)` is **not causal**.
+
+Raw OPT-133 sample arrays and historical admission are preserved. Current
+derived idle fields are null. Evidence:
+[`evidence/optimization/opt136-graph-accounting/historical-reconciliation.json`](../../evidence/optimization/opt136-graph-accounting/historical-reconciliation.json).
+
+Do not treat graph envelopes as continuous busy time, and do not replace the
+old ~188 ms idle claim with a claim of ~194 ms continuous hardware busy time.

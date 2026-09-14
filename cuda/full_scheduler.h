@@ -25,6 +25,9 @@
 #include "diagnostic_trace.h"
 #endif
 
+// OPT-136: diagnostic NVTX in this translation unit may include engine, prefix,
+// step, and logical layer/operation IDs. Production selectors stay unchanged.
+
 namespace qw38::cuda {
 
 constexpr std::size_t kPromptChunkRows = 4096;

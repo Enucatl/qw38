@@ -334,7 +334,7 @@ OPT-124 assesses the remaining ceiling without claiming universal optimality.
 | OPT-133 | Capture Nsight Systems decode activity on the admitted stack | OPT-125, OPT-132 | done | Diagnostics on `decode_segments8`; 6 bounded `.nsys-rep` captures + baselines (D128/D2048 × early/middle/late); nsys **2025.3.2** (`cuda-nsight-systems-13-0`); mean wrapper overhead **0.18 ms**; OPT-125 unobserved ~126 ms/12-token window **fully explained** by Nsight hardware idle (fraction 1.0); unresolved 0; dominant API `cudaEventSynchronize` (event instrumentation); `claims_throughput=false`; no production change | [`tasks/OPT-133.md`](tasks/OPT-133.md); [`pins/opt133_decode_nsys_contract.json`](pins/opt133_decode_nsys_contract.json); [`pins/opt133_iteration_contract.json`](pins/opt133_iteration_contract.json); [`fixtures/opt133_decode_nsys_trace.json`](fixtures/opt133_decode_nsys_trace.json); [`tools/opt133_decode_nsys_trace.py`](tools/opt133_decode_nsys_trace.py); [`tests/test_opt133_decode_nsys_trace.py`](tests/test_opt133_decode_nsys_trace.py); [`cuda/opt133_decode_nsys_trace_test.cu`](cuda/opt133_decode_nsys_trace_test.cu); [`Makefile`](Makefile); [`tools/run_optimization_task.py`](tools/run_optimization_task.py); [`evidence/optimization/opt133-decode-nsys-trace/REPORT.md`](evidence/optimization/opt133-decode-nsys-trace/REPORT.md); verification 2026-09-14T12:50:00Z |
 | OPT-134 | Enforce evidence discipline in both ledger runner skills | OPT-133 | done | Both runner skills require metric identity, graph-aware coverage, contradiction resolution, independent raw-evidence verification and separate experiment/shipping verdicts; eight adversarial review cases pass | [`tasks/OPT-134.md`](tasks/OPT-134.md); [`.agents/skills/run-ledger-task-codex/references/performance-evidence-checklist.md`](.agents/skills/run-ledger-task-codex/references/performance-evidence-checklist.md); [`.agents/skills/run-ledger-task-codex/references/performance-evidence-review-cases.md`](.agents/skills/run-ledger-task-codex/references/performance-evidence-review-cases.md); [`.cursor/skills/run-ledger-task-cursor/references/performance-evidence-checklist.md`](.cursor/skills/run-ledger-task-cursor/references/performance-evidence-checklist.md); [`.cursor/skills/run-ledger-task-cursor/references/performance-evidence-review-cases.md`](.cursor/skills/run-ledger-task-cursor/references/performance-evidence-review-cases.md); verification 2026-09-14T13:37:00Z |
 | OPT-135 | Separate target improvement from guard non-regression | OPT-134 | done | `target_guard_v2` host policy; `evaluate()` + CLI; 23/23 self-check; neutral-guard keep, guard-loss reject, straddling CI inconclusive; OPT-130 counterfactual preserves `reject`; opt-in runner schema only; no CUDA, production pin, or historical fixture change | [`tasks/OPT-135.md`](tasks/OPT-135.md); [`pins/performance_keep_policy_v2.json`](pins/performance_keep_policy_v2.json); [`tools/performance_keep_policy.py`](tools/performance_keep_policy.py); [`fixtures/opt135_target_guard_policy.json`](fixtures/opt135_target_guard_policy.json); [`tests/test_performance_keep_policy.py`](tests/test_performance_keep_policy.py); [`evidence/optimization/opt135-target-guard-policy/REPORT.md`](evidence/optimization/opt135-target-guard-policy/REPORT.md); verification 2026-09-14T14:00:00Z |
-| OPT-136 | Repair graph accounting and profile matched production decode | OPT-133, OPT-134, OPT-135 | pending | Raw graph intervals invalidate the OPT-133 idle claim; matched graph/node captures and unprofiled controls reconcile D128/D2048 and long-context decode with explicit coverage, overhead, family gaps and unknowns | [`tasks/OPT-136.md`](tasks/OPT-136.md) |
+| OPT-136 | Repair graph accounting and profile matched production decode | OPT-133, OPT-134, OPT-135 | done | Graph accounting repair invalidates OPT-133 idle; shared `performance_evidence.py` parser and capture harness; 150/150 coverage valid; matched decode ratios D128 0.844, D2048 0.717, D8192 0.519, D32768 0.244; diagnostics only, no production change | [`tasks/OPT-136.md`](tasks/OPT-136.md); [`tools/performance_evidence.py`](tools/performance_evidence.py); [`tools/opt136_graph_accounting.py`](tools/opt136_graph_accounting.py); [`fixtures/opt136_graph_accounting.json`](fixtures/opt136_graph_accounting.json); [`evidence/optimization/opt136-graph-accounting/REPORT.md`](evidence/optimization/opt136-graph-accounting/REPORT.md); verification 2026-09-14T15:53:00Z |
 | OPT-137 | Implement a bounded long-context dense attention consumer | OPT-135, OPT-136 | pending | One dense BF16 long-context MMA experiment has a verified keep or bounded measured no-keep; any keep requires complete 8K/32K branch/engine evidence, frozen target/guard admission, measured quality and graph/state/128K checks | [`tasks/OPT-137.md`](tasks/OPT-137.md) |
 | OPT-138 | Profile remaining short-decode and prefill excess versus llama | OPT-136, OPT-137 | pending | Current matched D128/D2048/P4096 profiles reconcile whole time, fused families and overhead; targeted counters/replays yield supported decode/prefill priorities or explicit unknowns without changing production | [`tasks/OPT-138.md`](tasks/OPT-138.md) |
 
@@ -8296,3 +8296,27 @@ statements below are historical, not the current execution order.
   [`evidence/optimization/opt135-target-guard-policy/REPORT.md`](evidence/optimization/opt135-target-guard-policy/REPORT.md).
 - OPT-135 marked `done`. Coupled IDs: none. Next eligible pending task:
   **OPT-136**.
+
+### OPT-136 delivery (2026-09-14T15:53:26Z)
+
+- Implemented shared `performance_evidence.py` interval parser (`--validate`),
+  `opt136_graph_accounting.py` phased harness, matched Quartz/llama decode
+  profiling, and OPT-133 historical correction. Six OPT-133 sqlite windows
+  independently reproduce graph-envelope accounting; derived idle claim
+  invalidated with raw arrays preserved. Acceptance: 72/72 captures, 150/150
+  coverage rows valid, A/A usable at D128 and D2048; production selectors and
+  arithmetic unchanged.
+- Verification **PASS** (2026-09-14T15:53:00Z): ruff format/check clean;
+  `31 passed`; independent sqlite3 recomputation matches d128-early and
+  d2048-late quantities; `--validate` `ok=true window_count=150`; all six GPU
+  phases and evidence artifacts present.
+- Throughput delta: **N/A** (diagnostics only; not a keep).
+- Matched `decode_only` Quartz/llama ratios: D128 **0.844**, D2048 **0.717**,
+  D8192 **0.519**, D32768 **0.244** (diagnostic ranking only).
+- Key evidence: [`tasks/OPT-136.md`](tasks/OPT-136.md);
+  [`tools/performance_evidence.py`](tools/performance_evidence.py);
+  [`tools/opt136_graph_accounting.py`](tools/opt136_graph_accounting.py);
+  [`fixtures/opt136_graph_accounting.json`](fixtures/opt136_graph_accounting.json);
+  [`evidence/optimization/opt136-graph-accounting/REPORT.md`](evidence/optimization/opt136-graph-accounting/REPORT.md).
+- OPT-136 marked `done`. Coupled IDs: none. Next eligible pending task:
+  **OPT-137**.

@@ -1193,9 +1193,13 @@
   },
   "answers": {
     "proven_gpu_idle": {
-      "mean_explained_by_idle_ms": 126.36168635000536,
+      "mean_explained_by_idle_ms": null,
       "mean_opt125_unobserved_ms": 126.36168635000536,
-      "fraction_of_unobserved": 1.0
+      "fraction_of_unobserved": 1.0,
+      "historical_mean_explained_by_idle_ms": 126.36168635000536,
+      "valid": false,
+      "reason": "OPT-133 subtracted ordinary kernel/copy union from the window and labeled the remainder GPU idle while CUPTI_ACTIVITY_KIND_GRAPH_TRACE envelopes were omitted from cuda_gpu_trace. Graph-internal activity is unknown until node tracing covers it. min(old_unobserved, new_idle) is not causal.",
+      "link": "evidence/optimization/opt136-graph-accounting/historical-reconciliation.json"
     },
     "host_api_submission": {
       "mean_explained_by_api_ms": 0.0,
@@ -1280,5 +1284,55 @@
   "hardware_gpu_trace": true,
   "report_path": "evidence/optimization/opt133-decode-nsys-trace/REPORT.md",
   "family_plan": "task=OPT-133 mode=acceptance phase=report loop_product=1 cases=1 candidates=1 warmups=0 samples=1 tokens=1",
-  "measured_at": "2026-09-14T12:01:33Z"
+  "measured_at": "2026-09-14T12:01:33Z",
+  "opt136_historical_idle": {
+    "parsed_gpu_idle_ms": {
+      "d128-early": {
+        "gpu_idle_ms": 188.496377,
+        "gpu_busy_ms": 8.243372999999991,
+        "cuda_api_ms": 196.08351100000002
+      },
+      "d128-middle": {
+        "gpu_idle_ms": 191.68726999999998,
+        "gpu_busy_ms": 8.276623,
+        "cuda_api_ms": 199.25930100000002
+      },
+      "d128-late": {
+        "gpu_idle_ms": 193.778291,
+        "gpu_busy_ms": 8.30714900000001,
+        "cuda_api_ms": 201.49893499999996
+      },
+      "d2048-early": {
+        "gpu_idle_ms": 218.79769599999997,
+        "gpu_busy_ms": 8.366732000000017,
+        "cuda_api_ms": 226.38128100000003
+      },
+      "d2048-middle": {
+        "gpu_idle_ms": 235.8757389999999,
+        "gpu_busy_ms": 8.402598000000083,
+        "cuda_api_ms": 243.68176899999997
+      },
+      "d2048-late": {
+        "gpu_idle_ms": 236.743816,
+        "gpu_busy_ms": 8.390312999999985,
+        "cuda_api_ms": 244.482751
+      }
+    },
+    "answers_proven_gpu_idle": {
+      "mean_explained_by_idle_ms": 126.36168635000536,
+      "mean_opt125_unobserved_ms": 126.36168635000536,
+      "fraction_of_unobserved": 1.0
+    },
+    "preserved_raw_sample_arrays": true
+  },
+  "opt136_correction": {
+    "date": "2026-09-14",
+    "gpu_idle_ms": null,
+    "device_inactive_proven_ms": null,
+    "idle_claim_valid": false,
+    "causal_reconciliation": false,
+    "reason": "OPT-133 subtracted ordinary kernel/copy union from the window and labeled the remainder GPU idle while CUPTI_ACTIVITY_KIND_GRAPH_TRACE envelopes were omitted from cuda_gpu_trace. Graph-internal activity is unknown until node tracing covers it. min(old_unobserved, new_idle) is not causal.",
+    "link": "evidence/optimization/opt136-graph-accounting/historical-reconciliation.json",
+    "historical_values_preserved_under": "opt136_historical_idle"
+  }
 }

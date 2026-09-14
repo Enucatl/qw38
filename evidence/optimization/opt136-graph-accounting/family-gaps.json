@@ -1,0 +1,4133 @@
+{
+  "quartz-d128-graph-r0-early": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 36,
+      "union_ns": 165344,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 0.013778666666666666
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 132,
+      "union_ns": 8113785,
+      "group": "unclassified",
+      "ms_per_eval": 0.67614875
+    }
+  },
+  "quartz-d128-graph-r0-middle": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 36,
+      "union_ns": 165376,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 0.013781333333333333
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 132,
+      "union_ns": 8143069,
+      "group": "unclassified",
+      "ms_per_eval": 0.6785890833333333
+    }
+  },
+  "quartz-d128-graph-r0-late": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 36,
+      "union_ns": 165824,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 0.013818666666666667
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 132,
+      "union_ns": 8162522,
+      "group": "unclassified",
+      "ms_per_eval": 0.6802101666666666
+    }
+  },
+  "quartz-d128-graph-r1-early": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 36,
+      "union_ns": 165664,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 0.013805333333333334
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 132,
+      "union_ns": 8135808,
+      "group": "unclassified",
+      "ms_per_eval": 0.677984
+    }
+  },
+  "quartz-d128-graph-r1-middle": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 36,
+      "union_ns": 165632,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 0.013802666666666666
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 132,
+      "union_ns": 8141535,
+      "group": "unclassified",
+      "ms_per_eval": 0.6784612499999999
+    }
+  },
+  "quartz-d128-graph-r1-late": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 36,
+      "union_ns": 166176,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 0.013848
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 132,
+      "union_ns": 8153279,
+      "group": "unclassified",
+      "ms_per_eval": 0.6794399166666666
+    }
+  },
+  "quartz-d128-graph-r2-early": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 36,
+      "union_ns": 164512,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 0.013709333333333332
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 132,
+      "union_ns": 8107520,
+      "group": "unclassified",
+      "ms_per_eval": 0.6756266666666666
+    }
+  },
+  "quartz-d128-graph-r2-middle": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 36,
+      "union_ns": 164928,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 0.013744
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 132,
+      "union_ns": 8142784,
+      "group": "unclassified",
+      "ms_per_eval": 0.6785653333333334
+    }
+  },
+  "quartz-d128-graph-r2-late": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 36,
+      "union_ns": 164928,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 0.013744
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 132,
+      "union_ns": 8155616,
+      "group": "unclassified",
+      "ms_per_eval": 0.6796346666666667
+    }
+  },
+  "quartz-d128-node-r0-early": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 5616,
+      "union_ns": 33329765,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 2.7774804166666667
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 3012,
+      "union_ns": 94890247,
+      "group": "unclassified",
+      "ms_per_eval": 7.9075205833333335
+    },
+    "q8_mixer": {
+      "family": "q8_mixer",
+      "count": 768,
+      "union_ns": 40970918,
+      "group": "mixer",
+      "ms_per_eval": 3.4142431666666666
+    },
+    "attn_prepare": {
+      "family": "attn_prepare",
+      "count": 1152,
+      "union_ns": 2510304,
+      "group": "attention",
+      "ms_per_eval": 0.20919200000000002
+    },
+    "gdn_recurrence": {
+      "family": "gdn_recurrence",
+      "count": 576,
+      "union_ns": 15012898,
+      "group": "gdn",
+      "ms_per_eval": 1.2510748333333332
+    },
+    "attn_core": {
+      "family": "attn_core",
+      "count": 576,
+      "union_ns": 4687840,
+      "group": "attention",
+      "ms_per_eval": 0.3906533333333333
+    },
+    "attn_merge": {
+      "family": "attn_merge",
+      "count": 192,
+      "union_ns": 377568,
+      "group": "attention",
+      "ms_per_eval": 0.031464
+    }
+  },
+  "quartz-d128-node-r0-middle": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 5616,
+      "union_ns": 33317796,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 2.7764830000000003
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 3012,
+      "union_ns": 94941418,
+      "group": "unclassified",
+      "ms_per_eval": 7.911784833333333
+    },
+    "q8_mixer": {
+      "family": "q8_mixer",
+      "count": 768,
+      "union_ns": 40987207,
+      "group": "mixer",
+      "ms_per_eval": 3.415600583333333
+    },
+    "attn_prepare": {
+      "family": "attn_prepare",
+      "count": 1152,
+      "union_ns": 2511328,
+      "group": "attention",
+      "ms_per_eval": 0.20927733333333332
+    },
+    "gdn_recurrence": {
+      "family": "gdn_recurrence",
+      "count": 576,
+      "union_ns": 15051649,
+      "group": "gdn",
+      "ms_per_eval": 1.2543040833333332
+    },
+    "attn_core": {
+      "family": "attn_core",
+      "count": 576,
+      "union_ns": 6850400,
+      "group": "attention",
+      "ms_per_eval": 0.5708666666666666
+    },
+    "attn_merge": {
+      "family": "attn_merge",
+      "count": 192,
+      "union_ns": 378496,
+      "group": "attention",
+      "ms_per_eval": 0.03154133333333333
+    }
+  },
+  "quartz-d128-node-r0-late": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 5616,
+      "union_ns": 33337157,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 2.7780964166666666
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 3012,
+      "union_ns": 95005642,
+      "group": "unclassified",
+      "ms_per_eval": 7.917136833333333
+    },
+    "q8_mixer": {
+      "family": "q8_mixer",
+      "count": 768,
+      "union_ns": 40978499,
+      "group": "mixer",
+      "ms_per_eval": 3.4148749166666668
+    },
+    "attn_prepare": {
+      "family": "attn_prepare",
+      "count": 1152,
+      "union_ns": 2513314,
+      "group": "attention",
+      "ms_per_eval": 0.20944283333333333
+    },
+    "gdn_recurrence": {
+      "family": "gdn_recurrence",
+      "count": 576,
+      "union_ns": 15068002,
+      "group": "gdn",
+      "ms_per_eval": 1.2556668333333334
+    },
+    "attn_core": {
+      "family": "attn_core",
+      "count": 576,
+      "union_ns": 9033792,
+      "group": "attention",
+      "ms_per_eval": 0.752816
+    },
+    "attn_merge": {
+      "family": "attn_merge",
+      "count": 192,
+      "union_ns": 378400,
+      "group": "attention",
+      "ms_per_eval": 0.03153333333333334
+    }
+  },
+  "quartz-d128-node-r1-early": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 5616,
+      "union_ns": 33286726,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 2.7738938333333336
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 3012,
+      "union_ns": 94891443,
+      "group": "unclassified",
+      "ms_per_eval": 7.90762025
+    },
+    "q8_mixer": {
+      "family": "q8_mixer",
+      "count": 768,
+      "union_ns": 40966886,
+      "group": "mixer",
+      "ms_per_eval": 3.4139071666666667
+    },
+    "attn_prepare": {
+      "family": "attn_prepare",
+      "count": 1152,
+      "union_ns": 2505601,
+      "group": "attention",
+      "ms_per_eval": 0.20880008333333333
+    },
+    "gdn_recurrence": {
+      "family": "gdn_recurrence",
+      "count": 576,
+      "union_ns": 15018946,
+      "group": "gdn",
+      "ms_per_eval": 1.2515788333333333
+    },
+    "attn_core": {
+      "family": "attn_core",
+      "count": 576,
+      "union_ns": 4685184,
+      "group": "attention",
+      "ms_per_eval": 0.39043199999999995
+    },
+    "attn_merge": {
+      "family": "attn_merge",
+      "count": 192,
+      "union_ns": 378112,
+      "group": "attention",
+      "ms_per_eval": 0.031509333333333334
+    }
+  },
+  "quartz-d128-node-r1-middle": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 5616,
+      "union_ns": 33284135,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 2.7736779166666667
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 3012,
+      "union_ns": 94957458,
+      "group": "unclassified",
+      "ms_per_eval": 7.9131215
+    },
+    "q8_mixer": {
+      "family": "q8_mixer",
+      "count": 768,
+      "union_ns": 40982180,
+      "group": "mixer",
+      "ms_per_eval": 3.415181666666667
+    },
+    "attn_prepare": {
+      "family": "attn_prepare",
+      "count": 1152,
+      "union_ns": 2507969,
+      "group": "attention",
+      "ms_per_eval": 0.20899741666666669
+    },
+    "gdn_recurrence": {
+      "family": "gdn_recurrence",
+      "count": 576,
+      "union_ns": 15038820,
+      "group": "gdn",
+      "ms_per_eval": 1.2532349999999999
+    },
+    "attn_core": {
+      "family": "attn_core",
+      "count": 576,
+      "union_ns": 6849889,
+      "group": "attention",
+      "ms_per_eval": 0.5708240833333333
+    },
+    "attn_merge": {
+      "family": "attn_merge",
+      "count": 192,
+      "union_ns": 378432,
+      "group": "attention",
+      "ms_per_eval": 0.031536
+    }
+  },
+  "quartz-d128-node-r1-late": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 5616,
+      "union_ns": 33325829,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 2.7771524166666666
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 3012,
+      "union_ns": 95001585,
+      "group": "unclassified",
+      "ms_per_eval": 7.916798750000001
+    },
+    "q8_mixer": {
+      "family": "q8_mixer",
+      "count": 768,
+      "union_ns": 40979752,
+      "group": "mixer",
+      "ms_per_eval": 3.414979333333333
+    },
+    "attn_prepare": {
+      "family": "attn_prepare",
+      "count": 1152,
+      "union_ns": 2506753,
+      "group": "attention",
+      "ms_per_eval": 0.20889608333333332
+    },
+    "gdn_recurrence": {
+      "family": "gdn_recurrence",
+      "count": 576,
+      "union_ns": 15047265,
+      "group": "gdn",
+      "ms_per_eval": 1.2539387499999999
+    },
+    "attn_core": {
+      "family": "attn_core",
+      "count": 576,
+      "union_ns": 9037634,
+      "group": "attention",
+      "ms_per_eval": 0.7531361666666667
+    },
+    "attn_merge": {
+      "family": "attn_merge",
+      "count": 192,
+      "union_ns": 378496,
+      "group": "attention",
+      "ms_per_eval": 0.03154133333333333
+    }
+  },
+  "quartz-d128-node-r2-early": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 5616,
+      "union_ns": 33282885,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 2.77357375
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 3012,
+      "union_ns": 94920396,
+      "group": "unclassified",
+      "ms_per_eval": 7.910032999999999
+    },
+    "q8_mixer": {
+      "family": "q8_mixer",
+      "count": 768,
+      "union_ns": 40974727,
+      "group": "mixer",
+      "ms_per_eval": 3.4145605833333335
+    },
+    "attn_prepare": {
+      "family": "attn_prepare",
+      "count": 1152,
+      "union_ns": 2503680,
+      "group": "attention",
+      "ms_per_eval": 0.20864000000000002
+    },
+    "gdn_recurrence": {
+      "family": "gdn_recurrence",
+      "count": 576,
+      "union_ns": 15058818,
+      "group": "gdn",
+      "ms_per_eval": 1.2549015000000001
+    },
+    "attn_core": {
+      "family": "attn_core",
+      "count": 576,
+      "union_ns": 4686336,
+      "group": "attention",
+      "ms_per_eval": 0.390528
+    },
+    "attn_merge": {
+      "family": "attn_merge",
+      "count": 192,
+      "union_ns": 377760,
+      "group": "attention",
+      "ms_per_eval": 0.03148
+    }
+  },
+  "quartz-d128-node-r2-middle": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 5616,
+      "union_ns": 33292295,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 2.7743579166666668
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 3012,
+      "union_ns": 94951085,
+      "group": "unclassified",
+      "ms_per_eval": 7.912590416666667
+    },
+    "q8_mixer": {
+      "family": "q8_mixer",
+      "count": 768,
+      "union_ns": 40972547,
+      "group": "mixer",
+      "ms_per_eval": 3.4143789166666667
+    },
+    "attn_prepare": {
+      "family": "attn_prepare",
+      "count": 1152,
+      "union_ns": 2506784,
+      "group": "attention",
+      "ms_per_eval": 0.20889866666666668
+    },
+    "gdn_recurrence": {
+      "family": "gdn_recurrence",
+      "count": 576,
+      "union_ns": 15086689,
+      "group": "gdn",
+      "ms_per_eval": 1.2572240833333332
+    },
+    "attn_core": {
+      "family": "attn_core",
+      "count": 576,
+      "union_ns": 6842306,
+      "group": "attention",
+      "ms_per_eval": 0.5701921666666666
+    },
+    "attn_merge": {
+      "family": "attn_merge",
+      "count": 192,
+      "union_ns": 378432,
+      "group": "attention",
+      "ms_per_eval": 0.031536
+    }
+  },
+  "quartz-d128-node-r2-late": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 5616,
+      "union_ns": 33309444,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 2.775787
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 3012,
+      "union_ns": 94968143,
+      "group": "unclassified",
+      "ms_per_eval": 7.9140119166666665
+    },
+    "q8_mixer": {
+      "family": "q8_mixer",
+      "count": 768,
+      "union_ns": 40979366,
+      "group": "mixer",
+      "ms_per_eval": 3.4149471666666664
+    },
+    "attn_prepare": {
+      "family": "attn_prepare",
+      "count": 1152,
+      "union_ns": 2507457,
+      "group": "attention",
+      "ms_per_eval": 0.20895475
+    },
+    "gdn_recurrence": {
+      "family": "gdn_recurrence",
+      "count": 576,
+      "union_ns": 15072610,
+      "group": "gdn",
+      "ms_per_eval": 1.2560508333333333
+    },
+    "attn_core": {
+      "family": "attn_core",
+      "count": 576,
+      "union_ns": 9029858,
+      "group": "attention",
+      "ms_per_eval": 0.7524881666666667
+    },
+    "attn_merge": {
+      "family": "attn_merge",
+      "count": 192,
+      "union_ns": 378400,
+      "group": "attention",
+      "ms_per_eval": 0.03153333333333334
+    }
+  },
+  "llama-d128-graph-r0-early": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 738,
+      "union_ns": 1532262,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 0.1276885
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 1106,
+      "union_ns": 13788170,
+      "group": "unclassified",
+      "ms_per_eval": 1.1490141666666667
+    },
+    "q4_swiglu": {
+      "family": "q4_swiglu",
+      "count": 48,
+      "union_ns": 46528,
+      "group": "ffn",
+      "ms_per_eval": 0.0038773333333333333
+    },
+    "attn_core": {
+      "family": "attn_core",
+      "count": 16,
+      "union_ns": 124000,
+      "group": "attention",
+      "ms_per_eval": 0.010333333333333333
+    }
+  },
+  "llama-d128-graph-r0-middle": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 738,
+      "union_ns": 1551271,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 0.12927258333333333
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 1106,
+      "union_ns": 13825166,
+      "group": "unclassified",
+      "ms_per_eval": 1.1520971666666666
+    },
+    "q4_swiglu": {
+      "family": "q4_swiglu",
+      "count": 48,
+      "union_ns": 46688,
+      "group": "ffn",
+      "ms_per_eval": 0.003890666666666667
+    },
+    "attn_core": {
+      "family": "attn_core",
+      "count": 32,
+      "union_ns": 142497,
+      "group": "attention",
+      "ms_per_eval": 0.011874750000000002
+    }
+  },
+  "llama-d128-graph-r0-late": {
+    "unclassified": {
+      "family": "unclassified",
+      "count": 96,
+      "union_ns": 297857,
+      "group": "unclassified",
+      "ms_per_eval": 0.024821416666666665
+    }
+  },
+  "llama-d128-graph-r1-early": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 738,
+      "union_ns": 1531778,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 0.12764816666666667
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 1106,
+      "union_ns": 13777290,
+      "group": "unclassified",
+      "ms_per_eval": 1.1481075
+    },
+    "q4_swiglu": {
+      "family": "q4_swiglu",
+      "count": 48,
+      "union_ns": 46144,
+      "group": "ffn",
+      "ms_per_eval": 0.003845333333333333
+    },
+    "attn_core": {
+      "family": "attn_core",
+      "count": 16,
+      "union_ns": 124096,
+      "group": "attention",
+      "ms_per_eval": 0.010341333333333333
+    }
+  },
+  "llama-d128-graph-r1-middle": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 738,
+      "union_ns": 1553318,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 0.12944316666666666
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 1106,
+      "union_ns": 13814272,
+      "group": "unclassified",
+      "ms_per_eval": 1.1511893333333334
+    },
+    "q4_swiglu": {
+      "family": "q4_swiglu",
+      "count": 48,
+      "union_ns": 46784,
+      "group": "ffn",
+      "ms_per_eval": 0.0038986666666666666
+    },
+    "attn_core": {
+      "family": "attn_core",
+      "count": 32,
+      "union_ns": 144128,
+      "group": "attention",
+      "ms_per_eval": 0.012010666666666668
+    }
+  },
+  "llama-d128-graph-r1-late": {
+    "unclassified": {
+      "family": "unclassified",
+      "count": 96,
+      "union_ns": 291905,
+      "group": "unclassified",
+      "ms_per_eval": 0.02432541666666667
+    }
+  },
+  "llama-d128-graph-r2-early": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 738,
+      "union_ns": 1527206,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 0.12726716666666668
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 1106,
+      "union_ns": 13777050,
+      "group": "unclassified",
+      "ms_per_eval": 1.1480875
+    },
+    "q4_swiglu": {
+      "family": "q4_swiglu",
+      "count": 48,
+      "union_ns": 46113,
+      "group": "ffn",
+      "ms_per_eval": 0.0038427500000000002
+    },
+    "attn_core": {
+      "family": "attn_core",
+      "count": 16,
+      "union_ns": 124192,
+      "group": "attention",
+      "ms_per_eval": 0.010349333333333334
+    }
+  },
+  "llama-d128-graph-r2-middle": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 738,
+      "union_ns": 1552647,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 0.12938725
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 1106,
+      "union_ns": 13818124,
+      "group": "unclassified",
+      "ms_per_eval": 1.1515103333333332
+    },
+    "q4_swiglu": {
+      "family": "q4_swiglu",
+      "count": 48,
+      "union_ns": 47072,
+      "group": "ffn",
+      "ms_per_eval": 0.003922666666666667
+    },
+    "attn_core": {
+      "family": "attn_core",
+      "count": 32,
+      "union_ns": 143744,
+      "group": "attention",
+      "ms_per_eval": 0.011978666666666667
+    }
+  },
+  "llama-d128-graph-r2-late": {
+    "unclassified": {
+      "family": "unclassified",
+      "count": 96,
+      "union_ns": 289952,
+      "group": "unclassified",
+      "ms_per_eval": 0.024162666666666666
+    }
+  },
+  "llama-d128-node-r0-early": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 8856,
+      "union_ns": 17082968,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 1.4235806666666668
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 12216,
+      "union_ns": 160857962,
+      "group": "unclassified",
+      "ms_per_eval": 13.404830166666665
+    },
+    "q4_swiglu": {
+      "family": "q4_swiglu",
+      "count": 576,
+      "union_ns": 612578,
+      "group": "ffn",
+      "ms_per_eval": 0.051048166666666665
+    },
+    "attn_core": {
+      "family": "attn_core",
+      "count": 192,
+      "union_ns": 1427076,
+      "group": "attention",
+      "ms_per_eval": 0.118923
+    }
+  },
+  "llama-d128-node-r0-middle": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 8856,
+      "union_ns": 17132254,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 1.4276878333333334
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 12216,
+      "union_ns": 160937547,
+      "group": "unclassified",
+      "ms_per_eval": 13.41146225
+    },
+    "q4_swiglu": {
+      "family": "q4_swiglu",
+      "count": 576,
+      "union_ns": 616034,
+      "group": "ffn",
+      "ms_per_eval": 0.05133616666666666
+    },
+    "attn_core": {
+      "family": "attn_core",
+      "count": 288,
+      "union_ns": 1523588,
+      "group": "attention",
+      "ms_per_eval": 0.12696566666666667
+    }
+  },
+  "llama-d128-node-r0-late": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 8856,
+      "union_ns": 17041247,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 1.4201039166666665
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 12216,
+      "union_ns": 160908799,
+      "group": "unclassified",
+      "ms_per_eval": 13.409066583333333
+    },
+    "q4_swiglu": {
+      "family": "q4_swiglu",
+      "count": 576,
+      "union_ns": 620548,
+      "group": "ffn",
+      "ms_per_eval": 0.05171233333333333
+    },
+    "attn_core": {
+      "family": "attn_core",
+      "count": 384,
+      "union_ns": 1595363,
+      "group": "attention",
+      "ms_per_eval": 0.13294691666666666
+    }
+  },
+  "llama-d128-node-r1-early": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 8856,
+      "union_ns": 17092119,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 1.42434325
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 12216,
+      "union_ns": 160919073,
+      "group": "unclassified",
+      "ms_per_eval": 13.40992275
+    },
+    "q4_swiglu": {
+      "family": "q4_swiglu",
+      "count": 576,
+      "union_ns": 609890,
+      "group": "ffn",
+      "ms_per_eval": 0.05082416666666667
+    },
+    "attn_core": {
+      "family": "attn_core",
+      "count": 192,
+      "union_ns": 1434501,
+      "group": "attention",
+      "ms_per_eval": 0.11954175
+    }
+  },
+  "llama-d128-node-r1-middle": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 8856,
+      "union_ns": 17155476,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 1.429623
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 12216,
+      "union_ns": 161037074,
+      "group": "unclassified",
+      "ms_per_eval": 13.419756166666666
+    },
+    "q4_swiglu": {
+      "family": "q4_swiglu",
+      "count": 576,
+      "union_ns": 613760,
+      "group": "ffn",
+      "ms_per_eval": 0.05114666666666667
+    },
+    "attn_core": {
+      "family": "attn_core",
+      "count": 288,
+      "union_ns": 1524995,
+      "group": "attention",
+      "ms_per_eval": 0.12708291666666668
+    }
+  },
+  "llama-d128-node-r1-late": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 8856,
+      "union_ns": 17063645,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 1.4219704166666667
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 12216,
+      "union_ns": 160995424,
+      "group": "unclassified",
+      "ms_per_eval": 13.416285333333335
+    },
+    "q4_swiglu": {
+      "family": "q4_swiglu",
+      "count": 576,
+      "union_ns": 619876,
+      "group": "ffn",
+      "ms_per_eval": 0.05165633333333333
+    },
+    "attn_core": {
+      "family": "attn_core",
+      "count": 384,
+      "union_ns": 1603848,
+      "group": "attention",
+      "ms_per_eval": 0.133654
+    }
+  },
+  "llama-d128-node-r2-early": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 8856,
+      "union_ns": 17074605,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 1.4228837499999998
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 12216,
+      "union_ns": 160899180,
+      "group": "unclassified",
+      "ms_per_eval": 13.408265
+    },
+    "q4_swiglu": {
+      "family": "q4_swiglu",
+      "count": 576,
+      "union_ns": 609729,
+      "group": "ffn",
+      "ms_per_eval": 0.050810749999999995
+    },
+    "attn_core": {
+      "family": "attn_core",
+      "count": 192,
+      "union_ns": 1427751,
+      "group": "attention",
+      "ms_per_eval": 0.11897925
+    }
+  },
+  "llama-d128-node-r2-middle": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 8856,
+      "union_ns": 17147122,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 1.4289268333333334
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 12216,
+      "union_ns": 161002850,
+      "group": "unclassified",
+      "ms_per_eval": 13.416904166666667
+    },
+    "q4_swiglu": {
+      "family": "q4_swiglu",
+      "count": 576,
+      "union_ns": 611842,
+      "group": "ffn",
+      "ms_per_eval": 0.050986833333333335
+    },
+    "attn_core": {
+      "family": "attn_core",
+      "count": 288,
+      "union_ns": 1521286,
+      "group": "attention",
+      "ms_per_eval": 0.12677383333333334
+    }
+  },
+  "llama-d128-node-r2-late": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 8856,
+      "union_ns": 17055799,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 1.4213165833333334
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 12216,
+      "union_ns": 160963929,
+      "group": "unclassified",
+      "ms_per_eval": 13.41366075
+    },
+    "q4_swiglu": {
+      "family": "q4_swiglu",
+      "count": 576,
+      "union_ns": 619971,
+      "group": "ffn",
+      "ms_per_eval": 0.05166425
+    },
+    "attn_core": {
+      "family": "attn_core",
+      "count": 384,
+      "union_ns": 1600710,
+      "group": "attention",
+      "ms_per_eval": 0.1333925
+    }
+  },
+  "quartz-d2048-graph-r0-early": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 36,
+      "union_ns": 166753,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 0.013896083333333335
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 132,
+      "union_ns": 8211286,
+      "group": "unclassified",
+      "ms_per_eval": 0.6842738333333332
+    }
+  },
+  "quartz-d2048-graph-r0-middle": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 36,
+      "union_ns": 167872,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 0.013989333333333333
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 132,
+      "union_ns": 8217912,
+      "group": "unclassified",
+      "ms_per_eval": 0.684826
+    }
+  },
+  "quartz-d2048-graph-r0-late": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 36,
+      "union_ns": 167904,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 0.013992
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 132,
+      "union_ns": 8232951,
+      "group": "unclassified",
+      "ms_per_eval": 0.68607925
+    }
+  },
+  "quartz-d2048-graph-r1-early": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 36,
+      "union_ns": 166528,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 0.013877333333333334
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 132,
+      "union_ns": 8196824,
+      "group": "unclassified",
+      "ms_per_eval": 0.6830686666666667
+    }
+  },
+  "quartz-d2048-graph-r1-middle": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 36,
+      "union_ns": 166496,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 0.013874666666666667
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 132,
+      "union_ns": 8228248,
+      "group": "unclassified",
+      "ms_per_eval": 0.6856873333333334
+    }
+  },
+  "quartz-d2048-graph-r1-late": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 36,
+      "union_ns": 167616,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 0.013968
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 132,
+      "union_ns": 8219419,
+      "group": "unclassified",
+      "ms_per_eval": 0.6849515833333334
+    }
+  },
+  "quartz-d2048-graph-r2-early": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 36,
+      "union_ns": 166432,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 0.013869333333333332
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 132,
+      "union_ns": 8201498,
+      "group": "unclassified",
+      "ms_per_eval": 0.6834581666666667
+    }
+  },
+  "quartz-d2048-graph-r2-middle": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 36,
+      "union_ns": 168033,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 0.01400275
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 132,
+      "union_ns": 8222393,
+      "group": "unclassified",
+      "ms_per_eval": 0.6851994166666667
+    }
+  },
+  "quartz-d2048-graph-r2-late": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 36,
+      "union_ns": 166849,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 0.013904083333333333
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 132,
+      "union_ns": 8225016,
+      "group": "unclassified",
+      "ms_per_eval": 0.685418
+    }
+  },
+  "quartz-d2048-node-r0-early": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 5616,
+      "union_ns": 33399131,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 2.7832609166666664
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 3012,
+      "union_ns": 95097486,
+      "group": "unclassified",
+      "ms_per_eval": 7.9247905
+    },
+    "q8_mixer": {
+      "family": "q8_mixer",
+      "count": 768,
+      "union_ns": 40988899,
+      "group": "mixer",
+      "ms_per_eval": 3.4157415833333338
+    },
+    "attn_prepare": {
+      "family": "attn_prepare",
+      "count": 1152,
+      "union_ns": 2518056,
+      "group": "attention",
+      "ms_per_eval": 0.209838
+    },
+    "gdn_recurrence": {
+      "family": "gdn_recurrence",
+      "count": 576,
+      "union_ns": 15079859,
+      "group": "gdn",
+      "ms_per_eval": 1.2566549166666667
+    },
+    "attn_core": {
+      "family": "attn_core",
+      "count": 576,
+      "union_ns": 33482758,
+      "group": "attention",
+      "ms_per_eval": 2.790229833333333
+    },
+    "attn_merge": {
+      "family": "attn_merge",
+      "count": 192,
+      "union_ns": 380065,
+      "group": "attention",
+      "ms_per_eval": 0.03167208333333333
+    }
+  },
+  "quartz-d2048-node-r0-middle": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 5616,
+      "union_ns": 33383852,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 2.7819876666666663
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 3012,
+      "union_ns": 95092811,
+      "group": "unclassified",
+      "ms_per_eval": 7.9244009166666665
+    },
+    "q8_mixer": {
+      "family": "q8_mixer",
+      "count": 768,
+      "union_ns": 40998486,
+      "group": "mixer",
+      "ms_per_eval": 3.4165405
+    },
+    "attn_prepare": {
+      "family": "attn_prepare",
+      "count": 1152,
+      "union_ns": 2520842,
+      "group": "attention",
+      "ms_per_eval": 0.21007016666666667
+    },
+    "gdn_recurrence": {
+      "family": "gdn_recurrence",
+      "count": 576,
+      "union_ns": 15101938,
+      "group": "gdn",
+      "ms_per_eval": 1.2584948333333335
+    },
+    "attn_core": {
+      "family": "attn_core",
+      "count": 576,
+      "union_ns": 51242496,
+      "group": "attention",
+      "ms_per_eval": 4.270208
+    },
+    "attn_merge": {
+      "family": "attn_merge",
+      "count": 192,
+      "union_ns": 380673,
+      "group": "attention",
+      "ms_per_eval": 0.03172275
+    }
+  },
+  "quartz-d2048-node-r0-late": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 5616,
+      "union_ns": 33392417,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 2.782701416666667
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 3012,
+      "union_ns": 95098830,
+      "group": "unclassified",
+      "ms_per_eval": 7.924902500000001
+    },
+    "q8_mixer": {
+      "family": "q8_mixer",
+      "count": 768,
+      "union_ns": 40993220,
+      "group": "mixer",
+      "ms_per_eval": 3.4161016666666666
+    },
+    "attn_prepare": {
+      "family": "attn_prepare",
+      "count": 1152,
+      "union_ns": 2524006,
+      "group": "attention",
+      "ms_per_eval": 0.21033383333333333
+    },
+    "gdn_recurrence": {
+      "family": "gdn_recurrence",
+      "count": 576,
+      "union_ns": 15091890,
+      "group": "gdn",
+      "ms_per_eval": 1.2576574999999999
+    },
+    "attn_core": {
+      "family": "attn_core",
+      "count": 576,
+      "union_ns": 51931841,
+      "group": "attention",
+      "ms_per_eval": 4.327653416666666
+    },
+    "attn_merge": {
+      "family": "attn_merge",
+      "count": 192,
+      "union_ns": 380640,
+      "group": "attention",
+      "ms_per_eval": 0.03172
+    }
+  },
+  "quartz-d2048-node-r1-early": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 5616,
+      "union_ns": 33416282,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 2.784690166666667
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 3012,
+      "union_ns": 95087042,
+      "group": "unclassified",
+      "ms_per_eval": 7.923920166666666
+    },
+    "q8_mixer": {
+      "family": "q8_mixer",
+      "count": 768,
+      "union_ns": 41007409,
+      "group": "mixer",
+      "ms_per_eval": 3.4172840833333336
+    },
+    "attn_prepare": {
+      "family": "attn_prepare",
+      "count": 1152,
+      "union_ns": 2516740,
+      "group": "attention",
+      "ms_per_eval": 0.20972833333333332
+    },
+    "gdn_recurrence": {
+      "family": "gdn_recurrence",
+      "count": 576,
+      "union_ns": 15099398,
+      "group": "gdn",
+      "ms_per_eval": 1.2582831666666667
+    },
+    "attn_core": {
+      "family": "attn_core",
+      "count": 576,
+      "union_ns": 33457065,
+      "group": "attention",
+      "ms_per_eval": 2.78808875
+    },
+    "attn_merge": {
+      "family": "attn_merge",
+      "count": 192,
+      "union_ns": 380066,
+      "group": "attention",
+      "ms_per_eval": 0.03167216666666667
+    }
+  },
+  "quartz-d2048-node-r1-middle": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 5616,
+      "union_ns": 33409254,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 2.7841044999999998
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 3012,
+      "union_ns": 95131036,
+      "group": "unclassified",
+      "ms_per_eval": 7.927586333333333
+    },
+    "q8_mixer": {
+      "family": "q8_mixer",
+      "count": 768,
+      "union_ns": 41003429,
+      "group": "mixer",
+      "ms_per_eval": 3.4169524166666663
+    },
+    "attn_prepare": {
+      "family": "attn_prepare",
+      "count": 1152,
+      "union_ns": 2518339,
+      "group": "attention",
+      "ms_per_eval": 0.20986158333333335
+    },
+    "gdn_recurrence": {
+      "family": "gdn_recurrence",
+      "count": 576,
+      "union_ns": 15073557,
+      "group": "gdn",
+      "ms_per_eval": 1.25612975
+    },
+    "attn_core": {
+      "family": "attn_core",
+      "count": 576,
+      "union_ns": 51199358,
+      "group": "attention",
+      "ms_per_eval": 4.266613166666667
+    },
+    "attn_merge": {
+      "family": "attn_merge",
+      "count": 192,
+      "union_ns": 380130,
+      "group": "attention",
+      "ms_per_eval": 0.031677500000000004
+    }
+  },
+  "quartz-d2048-node-r1-late": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 5616,
+      "union_ns": 33417159,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 2.7847632499999997
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 3012,
+      "union_ns": 95115140,
+      "group": "unclassified",
+      "ms_per_eval": 7.926261666666666
+    },
+    "q8_mixer": {
+      "family": "q8_mixer",
+      "count": 768,
+      "union_ns": 41010242,
+      "group": "mixer",
+      "ms_per_eval": 3.4175201666666664
+    },
+    "attn_prepare": {
+      "family": "attn_prepare",
+      "count": 1152,
+      "union_ns": 2523145,
+      "group": "attention",
+      "ms_per_eval": 0.21026208333333332
+    },
+    "gdn_recurrence": {
+      "family": "gdn_recurrence",
+      "count": 576,
+      "union_ns": 15098798,
+      "group": "gdn",
+      "ms_per_eval": 1.2582331666666666
+    },
+    "attn_core": {
+      "family": "attn_core",
+      "count": 576,
+      "union_ns": 51927292,
+      "group": "attention",
+      "ms_per_eval": 4.3272743333333334
+    },
+    "attn_merge": {
+      "family": "attn_merge",
+      "count": 192,
+      "union_ns": 380705,
+      "group": "attention",
+      "ms_per_eval": 0.031725416666666666
+    }
+  },
+  "quartz-d2048-node-r2-early": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 5616,
+      "union_ns": 33393115,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 2.7827595833333336
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 3012,
+      "union_ns": 95112348,
+      "group": "unclassified",
+      "ms_per_eval": 7.926029
+    },
+    "q8_mixer": {
+      "family": "q8_mixer",
+      "count": 768,
+      "union_ns": 41006693,
+      "group": "mixer",
+      "ms_per_eval": 3.4172244166666665
+    },
+    "attn_prepare": {
+      "family": "attn_prepare",
+      "count": 1152,
+      "union_ns": 2519782,
+      "group": "attention",
+      "ms_per_eval": 0.20998183333333334
+    },
+    "gdn_recurrence": {
+      "family": "gdn_recurrence",
+      "count": 576,
+      "union_ns": 15117812,
+      "group": "gdn",
+      "ms_per_eval": 1.2598176666666667
+    },
+    "attn_core": {
+      "family": "attn_core",
+      "count": 576,
+      "union_ns": 33412888,
+      "group": "attention",
+      "ms_per_eval": 2.7844073333333337
+    },
+    "attn_merge": {
+      "family": "attn_merge",
+      "count": 192,
+      "union_ns": 379969,
+      "group": "attention",
+      "ms_per_eval": 0.031664083333333336
+    }
+  },
+  "quartz-d2048-node-r2-middle": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 5616,
+      "union_ns": 33421506,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 2.7851255
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 3012,
+      "union_ns": 95105809,
+      "group": "unclassified",
+      "ms_per_eval": 7.925484083333333
+    },
+    "q8_mixer": {
+      "family": "q8_mixer",
+      "count": 768,
+      "union_ns": 41013567,
+      "group": "mixer",
+      "ms_per_eval": 3.41779725
+    },
+    "attn_prepare": {
+      "family": "attn_prepare",
+      "count": 1152,
+      "union_ns": 2526342,
+      "group": "attention",
+      "ms_per_eval": 0.2105285
+    },
+    "gdn_recurrence": {
+      "family": "gdn_recurrence",
+      "count": 576,
+      "union_ns": 15126956,
+      "group": "gdn",
+      "ms_per_eval": 1.2605796666666667
+    },
+    "attn_core": {
+      "family": "attn_core",
+      "count": 576,
+      "union_ns": 51164181,
+      "group": "attention",
+      "ms_per_eval": 4.26368175
+    },
+    "attn_merge": {
+      "family": "attn_merge",
+      "count": 192,
+      "union_ns": 380353,
+      "group": "attention",
+      "ms_per_eval": 0.03169608333333333
+    }
+  },
+  "quartz-d2048-node-r2-late": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 5616,
+      "union_ns": 33406920,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 2.78391
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 3012,
+      "union_ns": 95124437,
+      "group": "unclassified",
+      "ms_per_eval": 7.927036416666667
+    },
+    "q8_mixer": {
+      "family": "q8_mixer",
+      "count": 768,
+      "union_ns": 41006009,
+      "group": "mixer",
+      "ms_per_eval": 3.4171674166666666
+    },
+    "attn_prepare": {
+      "family": "attn_prepare",
+      "count": 1152,
+      "union_ns": 2524777,
+      "group": "attention",
+      "ms_per_eval": 0.21039808333333332
+    },
+    "gdn_recurrence": {
+      "family": "gdn_recurrence",
+      "count": 576,
+      "union_ns": 15112752,
+      "group": "gdn",
+      "ms_per_eval": 1.259396
+    },
+    "attn_core": {
+      "family": "attn_core",
+      "count": 576,
+      "union_ns": 51887031,
+      "group": "attention",
+      "ms_per_eval": 4.32391925
+    },
+    "attn_merge": {
+      "family": "attn_merge",
+      "count": 192,
+      "union_ns": 380801,
+      "group": "attention",
+      "ms_per_eval": 0.03173341666666667
+    }
+  },
+  "llama-d2048-graph-r0-early": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 738,
+      "union_ns": 1591589,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 0.13263241666666667
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 1106,
+      "union_ns": 13867156,
+      "group": "unclassified",
+      "ms_per_eval": 1.1555963333333332
+    },
+    "q4_swiglu": {
+      "family": "q4_swiglu",
+      "count": 48,
+      "union_ns": 42592,
+      "group": "ffn",
+      "ms_per_eval": 0.003549333333333333
+    },
+    "attn_core": {
+      "family": "attn_core",
+      "count": 32,
+      "union_ns": 217856,
+      "group": "attention",
+      "ms_per_eval": 0.018154666666666666
+    }
+  },
+  "llama-d2048-graph-r0-middle": {
+    "unclassified": {
+      "family": "unclassified",
+      "count": 96,
+      "union_ns": 308227,
+      "group": "unclassified",
+      "ms_per_eval": 0.02568558333333333
+    }
+  },
+  "llama-d2048-graph-r0-late": {
+    "unclassified": {
+      "family": "unclassified",
+      "count": 96,
+      "union_ns": 304930,
+      "group": "unclassified",
+      "ms_per_eval": 0.02541083333333333
+    }
+  },
+  "llama-d2048-graph-r1-early": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 738,
+      "union_ns": 1593441,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 0.13278675
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 1106,
+      "union_ns": 13838264,
+      "group": "unclassified",
+      "ms_per_eval": 1.1531886666666666
+    },
+    "q4_swiglu": {
+      "family": "q4_swiglu",
+      "count": 48,
+      "union_ns": 43232,
+      "group": "ffn",
+      "ms_per_eval": 0.0036026666666666668
+    },
+    "attn_core": {
+      "family": "attn_core",
+      "count": 32,
+      "union_ns": 218817,
+      "group": "attention",
+      "ms_per_eval": 0.01823475
+    }
+  },
+  "llama-d2048-graph-r1-middle": {
+    "unclassified": {
+      "family": "unclassified",
+      "count": 96,
+      "union_ns": 258275,
+      "group": "unclassified",
+      "ms_per_eval": 0.021522916666666666
+    }
+  },
+  "llama-d2048-graph-r1-late": {
+    "unclassified": {
+      "family": "unclassified",
+      "count": 96,
+      "union_ns": 257184,
+      "group": "unclassified",
+      "ms_per_eval": 0.021432000000000003
+    }
+  },
+  "llama-d2048-graph-r2-early": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 738,
+      "union_ns": 1593572,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 0.13279766666666667
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 1106,
+      "union_ns": 13874450,
+      "group": "unclassified",
+      "ms_per_eval": 1.1562041666666667
+    },
+    "q4_swiglu": {
+      "family": "q4_swiglu",
+      "count": 48,
+      "union_ns": 42945,
+      "group": "ffn",
+      "ms_per_eval": 0.00357875
+    },
+    "attn_core": {
+      "family": "attn_core",
+      "count": 32,
+      "union_ns": 217984,
+      "group": "attention",
+      "ms_per_eval": 0.018165333333333335
+    }
+  },
+  "llama-d2048-graph-r2-middle": {
+    "unclassified": {
+      "family": "unclassified",
+      "count": 96,
+      "union_ns": 306050,
+      "group": "unclassified",
+      "ms_per_eval": 0.025504166666666665
+    }
+  },
+  "llama-d2048-graph-r2-late": {
+    "unclassified": {
+      "family": "unclassified",
+      "count": 96,
+      "union_ns": 307714,
+      "group": "unclassified",
+      "ms_per_eval": 0.025642833333333333
+    }
+  },
+  "llama-d2048-node-r0-early": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 8856,
+      "union_ns": 17900277,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 1.49168975
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 12216,
+      "union_ns": 161964848,
+      "group": "unclassified",
+      "ms_per_eval": 13.497070666666666
+    },
+    "q4_swiglu": {
+      "family": "q4_swiglu",
+      "count": 576,
+      "union_ns": 596868,
+      "group": "ffn",
+      "ms_per_eval": 0.049739
+    },
+    "attn_core": {
+      "family": "attn_core",
+      "count": 384,
+      "union_ns": 2603655,
+      "group": "attention",
+      "ms_per_eval": 0.21697124999999998
+    }
+  },
+  "llama-d2048-node-r0-middle": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 8856,
+      "union_ns": 17823696,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 1.485308
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 12216,
+      "union_ns": 161964611,
+      "group": "unclassified",
+      "ms_per_eval": 13.497050916666666
+    },
+    "q4_swiglu": {
+      "family": "q4_swiglu",
+      "count": 576,
+      "union_ns": 607077,
+      "group": "ffn",
+      "ms_per_eval": 0.050589749999999996
+    },
+    "attn_core": {
+      "family": "attn_core",
+      "count": 384,
+      "union_ns": 2609034,
+      "group": "attention",
+      "ms_per_eval": 0.2174195
+    }
+  },
+  "llama-d2048-node-r0-late": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 8856,
+      "union_ns": 17831030,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 1.4859191666666665
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 12216,
+      "union_ns": 161948772,
+      "group": "unclassified",
+      "ms_per_eval": 13.495731
+    },
+    "q4_swiglu": {
+      "family": "q4_swiglu",
+      "count": 576,
+      "union_ns": 606145,
+      "group": "ffn",
+      "ms_per_eval": 0.05051208333333334
+    },
+    "attn_core": {
+      "family": "attn_core",
+      "count": 384,
+      "union_ns": 2613637,
+      "group": "attention",
+      "ms_per_eval": 0.21780308333333334
+    }
+  },
+  "llama-d2048-node-r1-early": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 8856,
+      "union_ns": 17883258,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 1.4902715000000002
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 12216,
+      "union_ns": 161922154,
+      "group": "unclassified",
+      "ms_per_eval": 13.493512833333334
+    },
+    "q4_swiglu": {
+      "family": "q4_swiglu",
+      "count": 576,
+      "union_ns": 598849,
+      "group": "ffn",
+      "ms_per_eval": 0.04990408333333333
+    },
+    "attn_core": {
+      "family": "attn_core",
+      "count": 384,
+      "union_ns": 2605481,
+      "group": "attention",
+      "ms_per_eval": 0.21712341666666668
+    }
+  },
+  "llama-d2048-node-r1-middle": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 8856,
+      "union_ns": 17810620,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 1.4842183333333334
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 12216,
+      "union_ns": 161902243,
+      "group": "unclassified",
+      "ms_per_eval": 13.491853583333333
+    },
+    "q4_swiglu": {
+      "family": "q4_swiglu",
+      "count": 576,
+      "union_ns": 603681,
+      "group": "ffn",
+      "ms_per_eval": 0.050306750000000004
+    },
+    "attn_core": {
+      "family": "attn_core",
+      "count": 384,
+      "union_ns": 2610250,
+      "group": "attention",
+      "ms_per_eval": 0.21752083333333336
+    }
+  },
+  "llama-d2048-node-r1-late": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 8856,
+      "union_ns": 17809975,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 1.4841645833333335
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 12216,
+      "union_ns": 161911841,
+      "group": "unclassified",
+      "ms_per_eval": 13.492653416666668
+    },
+    "q4_swiglu": {
+      "family": "q4_swiglu",
+      "count": 576,
+      "union_ns": 606946,
+      "group": "ffn",
+      "ms_per_eval": 0.05057883333333333
+    },
+    "attn_core": {
+      "family": "attn_core",
+      "count": 384,
+      "union_ns": 2613158,
+      "group": "attention",
+      "ms_per_eval": 0.21776316666666665
+    }
+  },
+  "llama-d2048-node-r2-early": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 8856,
+      "union_ns": 17865592,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 1.4887993333333334
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 12216,
+      "union_ns": 161893971,
+      "group": "unclassified",
+      "ms_per_eval": 13.491164249999999
+    },
+    "q4_swiglu": {
+      "family": "q4_swiglu",
+      "count": 576,
+      "union_ns": 599104,
+      "group": "ffn",
+      "ms_per_eval": 0.04992533333333333
+    },
+    "attn_core": {
+      "family": "attn_core",
+      "count": 384,
+      "union_ns": 2601639,
+      "group": "attention",
+      "ms_per_eval": 0.21680325
+    }
+  },
+  "llama-d2048-node-r2-middle": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 8856,
+      "union_ns": 17792645,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 1.4827204166666668
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 12216,
+      "union_ns": 161866733,
+      "group": "unclassified",
+      "ms_per_eval": 13.488894416666668
+    },
+    "q4_swiglu": {
+      "family": "q4_swiglu",
+      "count": 576,
+      "union_ns": 604514,
+      "group": "ffn",
+      "ms_per_eval": 0.050376166666666666
+    },
+    "attn_core": {
+      "family": "attn_core",
+      "count": 384,
+      "union_ns": 2607753,
+      "group": "attention",
+      "ms_per_eval": 0.21731275000000003
+    }
+  },
+  "llama-d2048-node-r2-late": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 8856,
+      "union_ns": 17805841,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 1.4838200833333335
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 12216,
+      "union_ns": 161893784,
+      "group": "unclassified",
+      "ms_per_eval": 13.491148666666668
+    },
+    "q4_swiglu": {
+      "family": "q4_swiglu",
+      "count": 576,
+      "union_ns": 604545,
+      "group": "ffn",
+      "ms_per_eval": 0.05037875
+    },
+    "attn_core": {
+      "family": "attn_core",
+      "count": 384,
+      "union_ns": 2609542,
+      "group": "attention",
+      "ms_per_eval": 0.21746183333333333
+    }
+  },
+  "quartz-d8192-graph-r0-early": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 36,
+      "union_ns": 166336,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 0.013861333333333335
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 132,
+      "union_ns": 8229536,
+      "group": "unclassified",
+      "ms_per_eval": 0.6857946666666667
+    }
+  },
+  "quartz-d8192-graph-r0-middle": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 36,
+      "union_ns": 166624,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 0.013885333333333333
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 132,
+      "union_ns": 8240480,
+      "group": "unclassified",
+      "ms_per_eval": 0.6867066666666667
+    }
+  },
+  "quartz-d8192-graph-r0-late": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 36,
+      "union_ns": 165600,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 0.0138
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 132,
+      "union_ns": 8213152,
+      "group": "unclassified",
+      "ms_per_eval": 0.6844293333333332
+    }
+  },
+  "quartz-d8192-graph-r1-early": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 36,
+      "union_ns": 166688,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 0.013890666666666667
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 132,
+      "union_ns": 8231488,
+      "group": "unclassified",
+      "ms_per_eval": 0.6859573333333334
+    }
+  },
+  "quartz-d8192-graph-r1-middle": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 36,
+      "union_ns": 166688,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 0.013890666666666667
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 132,
+      "union_ns": 8232866,
+      "group": "unclassified",
+      "ms_per_eval": 0.6860721666666666
+    }
+  },
+  "quartz-d8192-graph-r1-late": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 36,
+      "union_ns": 167232,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 0.013935999999999999
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 132,
+      "union_ns": 8220705,
+      "group": "unclassified",
+      "ms_per_eval": 0.68505875
+    }
+  },
+  "quartz-d8192-graph-r2-early": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 36,
+      "union_ns": 166944,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 0.013912
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 132,
+      "union_ns": 8240449,
+      "group": "unclassified",
+      "ms_per_eval": 0.6867040833333333
+    }
+  },
+  "quartz-d8192-graph-r2-middle": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 36,
+      "union_ns": 166464,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 0.013872
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 132,
+      "union_ns": 8225536,
+      "group": "unclassified",
+      "ms_per_eval": 0.6854613333333334
+    }
+  },
+  "quartz-d8192-graph-r2-late": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 36,
+      "union_ns": 166464,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 0.013872
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 132,
+      "union_ns": 8220897,
+      "group": "unclassified",
+      "ms_per_eval": 0.6850747500000001
+    }
+  },
+  "quartz-d8192-node-r0-early": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 5616,
+      "union_ns": 33369454,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 2.780787833333333
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 3012,
+      "union_ns": 95039967,
+      "group": "unclassified",
+      "ms_per_eval": 7.919997250000001
+    },
+    "q8_mixer": {
+      "family": "q8_mixer",
+      "count": 768,
+      "union_ns": 40986538,
+      "group": "mixer",
+      "ms_per_eval": 3.4155448333333336
+    },
+    "attn_prepare": {
+      "family": "attn_prepare",
+      "count": 1152,
+      "union_ns": 2517474,
+      "group": "attention",
+      "ms_per_eval": 0.2097895
+    },
+    "gdn_recurrence": {
+      "family": "gdn_recurrence",
+      "count": 576,
+      "union_ns": 15124967,
+      "group": "gdn",
+      "ms_per_eval": 1.2604139166666666
+    },
+    "attn_core": {
+      "family": "attn_core",
+      "count": 576,
+      "union_ns": 148998950,
+      "group": "attention",
+      "ms_per_eval": 12.416579166666667
+    },
+    "attn_merge": {
+      "family": "attn_merge",
+      "count": 192,
+      "union_ns": 379744,
+      "group": "attention",
+      "ms_per_eval": 0.03164533333333334
+    }
+  },
+  "quartz-d8192-node-r0-middle": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 5616,
+      "union_ns": 33341386,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 2.7784488333333335
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 3012,
+      "union_ns": 95055999,
+      "group": "unclassified",
+      "ms_per_eval": 7.92133325
+    },
+    "q8_mixer": {
+      "family": "q8_mixer",
+      "count": 768,
+      "union_ns": 40985292,
+      "group": "mixer",
+      "ms_per_eval": 3.415441
+    },
+    "attn_prepare": {
+      "family": "attn_prepare",
+      "count": 1152,
+      "union_ns": 2516193,
+      "group": "attention",
+      "ms_per_eval": 0.20968275
+    },
+    "gdn_recurrence": {
+      "family": "gdn_recurrence",
+      "count": 576,
+      "union_ns": 15071332,
+      "group": "gdn",
+      "ms_per_eval": 1.2559443333333333
+    },
+    "attn_core": {
+      "family": "attn_core",
+      "count": 576,
+      "union_ns": 151457933,
+      "group": "attention",
+      "ms_per_eval": 12.621494416666666
+    },
+    "attn_merge": {
+      "family": "attn_merge",
+      "count": 192,
+      "union_ns": 378816,
+      "group": "attention",
+      "ms_per_eval": 0.031568
+    }
+  },
+  "quartz-d8192-node-r0-late": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 5616,
+      "union_ns": 33352044,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 2.779337
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 3012,
+      "union_ns": 95047674,
+      "group": "unclassified",
+      "ms_per_eval": 7.9206395
+    },
+    "q8_mixer": {
+      "family": "q8_mixer",
+      "count": 768,
+      "union_ns": 40994190,
+      "group": "mixer",
+      "ms_per_eval": 3.4161825
+    },
+    "attn_prepare": {
+      "family": "attn_prepare",
+      "count": 1152,
+      "union_ns": 2520736,
+      "group": "attention",
+      "ms_per_eval": 0.21006133333333332
+    },
+    "gdn_recurrence": {
+      "family": "gdn_recurrence",
+      "count": 576,
+      "union_ns": 15102726,
+      "group": "gdn",
+      "ms_per_eval": 1.2585605
+    },
+    "attn_core": {
+      "family": "attn_core",
+      "count": 576,
+      "union_ns": 153678446,
+      "group": "attention",
+      "ms_per_eval": 12.806537166666667
+    },
+    "attn_merge": {
+      "family": "attn_merge",
+      "count": 192,
+      "union_ns": 379712,
+      "group": "attention",
+      "ms_per_eval": 0.031642666666666666
+    }
+  },
+  "quartz-d8192-node-r1-early": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 5616,
+      "union_ns": 33348390,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 2.7790325
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 3012,
+      "union_ns": 95070970,
+      "group": "unclassified",
+      "ms_per_eval": 7.922580833333334
+    },
+    "q8_mixer": {
+      "family": "q8_mixer",
+      "count": 768,
+      "union_ns": 41010093,
+      "group": "mixer",
+      "ms_per_eval": 3.41750775
+    },
+    "attn_prepare": {
+      "family": "attn_prepare",
+      "count": 1152,
+      "union_ns": 2513568,
+      "group": "attention",
+      "ms_per_eval": 0.20946399999999998
+    },
+    "gdn_recurrence": {
+      "family": "gdn_recurrence",
+      "count": 576,
+      "union_ns": 15097573,
+      "group": "gdn",
+      "ms_per_eval": 1.2581310833333335
+    },
+    "attn_core": {
+      "family": "attn_core",
+      "count": 576,
+      "union_ns": 148897958,
+      "group": "attention",
+      "ms_per_eval": 12.408163166666666
+    },
+    "attn_merge": {
+      "family": "attn_merge",
+      "count": 192,
+      "union_ns": 379552,
+      "group": "attention",
+      "ms_per_eval": 0.031629333333333336
+    }
+  },
+  "quartz-d8192-node-r1-middle": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 5616,
+      "union_ns": 33331749,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 2.77764575
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 3012,
+      "union_ns": 95071714,
+      "group": "unclassified",
+      "ms_per_eval": 7.922642833333334
+    },
+    "q8_mixer": {
+      "family": "q8_mixer",
+      "count": 768,
+      "union_ns": 40999498,
+      "group": "mixer",
+      "ms_per_eval": 3.4166248333333336
+    },
+    "attn_prepare": {
+      "family": "attn_prepare",
+      "count": 1152,
+      "union_ns": 2514560,
+      "group": "attention",
+      "ms_per_eval": 0.20954666666666666
+    },
+    "gdn_recurrence": {
+      "family": "gdn_recurrence",
+      "count": 576,
+      "union_ns": 15114561,
+      "group": "gdn",
+      "ms_per_eval": 1.25954675
+    },
+    "attn_core": {
+      "family": "attn_core",
+      "count": 576,
+      "union_ns": 151459334,
+      "group": "attention",
+      "ms_per_eval": 12.621611166666668
+    },
+    "attn_merge": {
+      "family": "attn_merge",
+      "count": 192,
+      "union_ns": 378880,
+      "group": "attention",
+      "ms_per_eval": 0.031573333333333335
+    }
+  },
+  "quartz-d8192-node-r1-late": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 5616,
+      "union_ns": 33333163,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 2.7777635833333334
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 3012,
+      "union_ns": 95080665,
+      "group": "unclassified",
+      "ms_per_eval": 7.92338875
+    },
+    "q8_mixer": {
+      "family": "q8_mixer",
+      "count": 768,
+      "union_ns": 40986532,
+      "group": "mixer",
+      "ms_per_eval": 3.415544333333333
+    },
+    "attn_prepare": {
+      "family": "attn_prepare",
+      "count": 1152,
+      "union_ns": 2514496,
+      "group": "attention",
+      "ms_per_eval": 0.20954133333333333
+    },
+    "gdn_recurrence": {
+      "family": "gdn_recurrence",
+      "count": 576,
+      "union_ns": 15116359,
+      "group": "gdn",
+      "ms_per_eval": 1.2596965833333333
+    },
+    "attn_core": {
+      "family": "attn_core",
+      "count": 576,
+      "union_ns": 153649066,
+      "group": "attention",
+      "ms_per_eval": 12.804088833333333
+    },
+    "attn_merge": {
+      "family": "attn_merge",
+      "count": 192,
+      "union_ns": 379584,
+      "group": "attention",
+      "ms_per_eval": 0.031632
+    }
+  },
+  "quartz-d8192-node-r2-early": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 5616,
+      "union_ns": 33381293,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 2.7817744166666665
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 3012,
+      "union_ns": 95056260,
+      "group": "unclassified",
+      "ms_per_eval": 7.921354999999999
+    },
+    "q8_mixer": {
+      "family": "q8_mixer",
+      "count": 768,
+      "union_ns": 40996078,
+      "group": "mixer",
+      "ms_per_eval": 3.4163398333333332
+    },
+    "attn_prepare": {
+      "family": "attn_prepare",
+      "count": 1152,
+      "union_ns": 2512896,
+      "group": "attention",
+      "ms_per_eval": 0.209408
+    },
+    "gdn_recurrence": {
+      "family": "gdn_recurrence",
+      "count": 576,
+      "union_ns": 15078791,
+      "group": "gdn",
+      "ms_per_eval": 1.2565659166666667
+    },
+    "attn_core": {
+      "family": "attn_core",
+      "count": 576,
+      "union_ns": 149078709,
+      "group": "attention",
+      "ms_per_eval": 12.42322575
+    },
+    "attn_merge": {
+      "family": "attn_merge",
+      "count": 192,
+      "union_ns": 379584,
+      "group": "attention",
+      "ms_per_eval": 0.031632
+    }
+  },
+  "quartz-d8192-node-r2-middle": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 5616,
+      "union_ns": 33366188,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 2.7805156666666666
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 3012,
+      "union_ns": 95033439,
+      "group": "unclassified",
+      "ms_per_eval": 7.91945325
+    },
+    "q8_mixer": {
+      "family": "q8_mixer",
+      "count": 768,
+      "union_ns": 40990446,
+      "group": "mixer",
+      "ms_per_eval": 3.4158705
+    },
+    "attn_prepare": {
+      "family": "attn_prepare",
+      "count": 1152,
+      "union_ns": 2516512,
+      "group": "attention",
+      "ms_per_eval": 0.20970933333333333
+    },
+    "gdn_recurrence": {
+      "family": "gdn_recurrence",
+      "count": 576,
+      "union_ns": 15082119,
+      "group": "gdn",
+      "ms_per_eval": 1.25684325
+    },
+    "attn_core": {
+      "family": "attn_core",
+      "count": 576,
+      "union_ns": 151512890,
+      "group": "attention",
+      "ms_per_eval": 12.626074166666667
+    },
+    "attn_merge": {
+      "family": "attn_merge",
+      "count": 192,
+      "union_ns": 379168,
+      "group": "attention",
+      "ms_per_eval": 0.03159733333333333
+    }
+  },
+  "quartz-d8192-node-r2-late": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 5616,
+      "union_ns": 33356204,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 2.7796836666666667
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 3012,
+      "union_ns": 95055371,
+      "group": "unclassified",
+      "ms_per_eval": 7.9212809166666664
+    },
+    "q8_mixer": {
+      "family": "q8_mixer",
+      "count": 768,
+      "union_ns": 40986861,
+      "group": "mixer",
+      "ms_per_eval": 3.41557175
+    },
+    "attn_prepare": {
+      "family": "attn_prepare",
+      "count": 1152,
+      "union_ns": 2514240,
+      "group": "attention",
+      "ms_per_eval": 0.20952
+    },
+    "gdn_recurrence": {
+      "family": "gdn_recurrence",
+      "count": 576,
+      "union_ns": 15064768,
+      "group": "gdn",
+      "ms_per_eval": 1.2553973333333335
+    },
+    "attn_core": {
+      "family": "attn_core",
+      "count": 576,
+      "union_ns": 153747094,
+      "group": "attention",
+      "ms_per_eval": 12.812257833333334
+    },
+    "attn_merge": {
+      "family": "attn_merge",
+      "count": 192,
+      "union_ns": 379520,
+      "group": "attention",
+      "ms_per_eval": 0.03162666666666667
+    }
+  },
+  "llama-d8192-graph-r0-early": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 738,
+      "union_ns": 1463744,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 0.12197866666666667
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 1106,
+      "union_ns": 13763776,
+      "group": "unclassified",
+      "ms_per_eval": 1.1469813333333334
+    },
+    "q4_swiglu": {
+      "family": "q4_swiglu",
+      "count": 48,
+      "union_ns": 44032,
+      "group": "ffn",
+      "ms_per_eval": 0.0036693333333333335
+    },
+    "attn_core": {
+      "family": "attn_core",
+      "count": 32,
+      "union_ns": 499807,
+      "group": "attention",
+      "ms_per_eval": 0.04165058333333333
+    }
+  },
+  "llama-d8192-graph-r0-middle": {
+    "unclassified": {
+      "family": "unclassified",
+      "count": 96,
+      "union_ns": 286688,
+      "group": "unclassified",
+      "ms_per_eval": 0.023890666666666668
+    }
+  },
+  "llama-d8192-graph-r0-late": {
+    "unclassified": {
+      "family": "unclassified",
+      "count": 96,
+      "union_ns": 288096,
+      "group": "unclassified",
+      "ms_per_eval": 0.024008
+    }
+  },
+  "llama-d8192-graph-r1-early": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 738,
+      "union_ns": 1464544,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 0.12204533333333334
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 1106,
+      "union_ns": 13701926,
+      "group": "unclassified",
+      "ms_per_eval": 1.1418271666666666
+    },
+    "q4_swiglu": {
+      "family": "q4_swiglu",
+      "count": 48,
+      "union_ns": 43872,
+      "group": "ffn",
+      "ms_per_eval": 0.003656
+    },
+    "attn_core": {
+      "family": "attn_core",
+      "count": 32,
+      "union_ns": 501601,
+      "group": "attention",
+      "ms_per_eval": 0.04180008333333333
+    }
+  },
+  "llama-d8192-graph-r1-middle": {
+    "unclassified": {
+      "family": "unclassified",
+      "count": 96,
+      "union_ns": 272928,
+      "group": "unclassified",
+      "ms_per_eval": 0.022744
+    }
+  },
+  "llama-d8192-graph-r1-late": {
+    "unclassified": {
+      "family": "unclassified",
+      "count": 96,
+      "union_ns": 260096,
+      "group": "unclassified",
+      "ms_per_eval": 0.021674666666666665
+    }
+  },
+  "llama-d8192-graph-r2-early": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 738,
+      "union_ns": 1464192,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 0.122016
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 1106,
+      "union_ns": 13746629,
+      "group": "unclassified",
+      "ms_per_eval": 1.1455524166666666
+    },
+    "q4_swiglu": {
+      "family": "q4_swiglu",
+      "count": 48,
+      "union_ns": 43872,
+      "group": "ffn",
+      "ms_per_eval": 0.003656
+    },
+    "attn_core": {
+      "family": "attn_core",
+      "count": 32,
+      "union_ns": 500093,
+      "group": "attention",
+      "ms_per_eval": 0.041674416666666665
+    }
+  },
+  "llama-d8192-graph-r2-middle": {
+    "unclassified": {
+      "family": "unclassified",
+      "count": 96,
+      "union_ns": 304384,
+      "group": "unclassified",
+      "ms_per_eval": 0.025365333333333333
+    }
+  },
+  "llama-d8192-graph-r2-late": {
+    "unclassified": {
+      "family": "unclassified",
+      "count": 96,
+      "union_ns": 300800,
+      "group": "unclassified",
+      "ms_per_eval": 0.025066666666666668
+    }
+  },
+  "llama-d8192-node-r0-early": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 8856,
+      "union_ns": 16364546,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 1.3637121666666667
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 12216,
+      "union_ns": 160490007,
+      "group": "unclassified",
+      "ms_per_eval": 13.37416725
+    },
+    "q4_swiglu": {
+      "family": "q4_swiglu",
+      "count": 576,
+      "union_ns": 600064,
+      "group": "ffn",
+      "ms_per_eval": 0.05000533333333334
+    },
+    "attn_core": {
+      "family": "attn_core",
+      "count": 384,
+      "union_ns": 5800033,
+      "group": "attention",
+      "ms_per_eval": 0.48333608333333333
+    }
+  },
+  "llama-d8192-node-r0-middle": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 8856,
+      "union_ns": 16257504,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 1.354792
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 12216,
+      "union_ns": 160402415,
+      "group": "unclassified",
+      "ms_per_eval": 13.366867916666665
+    },
+    "q4_swiglu": {
+      "family": "q4_swiglu",
+      "count": 576,
+      "union_ns": 604800,
+      "group": "ffn",
+      "ms_per_eval": 0.0504
+    },
+    "attn_core": {
+      "family": "attn_core",
+      "count": 384,
+      "union_ns": 5784962,
+      "group": "attention",
+      "ms_per_eval": 0.4820801666666667
+    }
+  },
+  "llama-d8192-node-r0-late": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 8856,
+      "union_ns": 16260929,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 1.3550774166666668
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 12216,
+      "union_ns": 160354354,
+      "group": "unclassified",
+      "ms_per_eval": 13.362862833333333
+    },
+    "q4_swiglu": {
+      "family": "q4_swiglu",
+      "count": 576,
+      "union_ns": 605344,
+      "group": "ffn",
+      "ms_per_eval": 0.050445333333333335
+    },
+    "attn_core": {
+      "family": "attn_core",
+      "count": 384,
+      "union_ns": 5784128,
+      "group": "attention",
+      "ms_per_eval": 0.48201066666666664
+    }
+  },
+  "llama-d8192-node-r1-early": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 8856,
+      "union_ns": 16348385,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 1.3623654166666668
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 12216,
+      "union_ns": 160453833,
+      "group": "unclassified",
+      "ms_per_eval": 13.37115275
+    },
+    "q4_swiglu": {
+      "family": "q4_swiglu",
+      "count": 576,
+      "union_ns": 594944,
+      "group": "ffn",
+      "ms_per_eval": 0.04957866666666667
+    },
+    "attn_core": {
+      "family": "attn_core",
+      "count": 384,
+      "union_ns": 5795455,
+      "group": "attention",
+      "ms_per_eval": 0.4829545833333333
+    }
+  },
+  "llama-d8192-node-r1-middle": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 8856,
+      "union_ns": 16246824,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 1.353902
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 12216,
+      "union_ns": 160355616,
+      "group": "unclassified",
+      "ms_per_eval": 13.362968
+    },
+    "q4_swiglu": {
+      "family": "q4_swiglu",
+      "count": 576,
+      "union_ns": 604416,
+      "group": "ffn",
+      "ms_per_eval": 0.050367999999999996
+    },
+    "attn_core": {
+      "family": "attn_core",
+      "count": 384,
+      "union_ns": 5784802,
+      "group": "attention",
+      "ms_per_eval": 0.48206683333333333
+    }
+  },
+  "llama-d8192-node-r1-late": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 8856,
+      "union_ns": 16259681,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 1.3549734166666667
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 12216,
+      "union_ns": 160348003,
+      "group": "unclassified",
+      "ms_per_eval": 13.362333583333333
+    },
+    "q4_swiglu": {
+      "family": "q4_swiglu",
+      "count": 576,
+      "union_ns": 603073,
+      "group": "ffn",
+      "ms_per_eval": 0.05025608333333333
+    },
+    "attn_core": {
+      "family": "attn_core",
+      "count": 384,
+      "union_ns": 5781825,
+      "group": "attention",
+      "ms_per_eval": 0.48181875
+    }
+  },
+  "llama-d8192-node-r2-early": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 8856,
+      "union_ns": 16370528,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 1.3642106666666667
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 12216,
+      "union_ns": 160432397,
+      "group": "unclassified",
+      "ms_per_eval": 13.369366416666667
+    },
+    "q4_swiglu": {
+      "family": "q4_swiglu",
+      "count": 576,
+      "union_ns": 596384,
+      "group": "ffn",
+      "ms_per_eval": 0.04969866666666667
+    },
+    "attn_core": {
+      "family": "attn_core",
+      "count": 384,
+      "union_ns": 5803200,
+      "group": "attention",
+      "ms_per_eval": 0.48360000000000003
+    }
+  },
+  "llama-d8192-node-r2-middle": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 8856,
+      "union_ns": 16284868,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 1.3570723333333332
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 12216,
+      "union_ns": 160357087,
+      "group": "unclassified",
+      "ms_per_eval": 13.363090583333333
+    },
+    "q4_swiglu": {
+      "family": "q4_swiglu",
+      "count": 576,
+      "union_ns": 602368,
+      "group": "ffn",
+      "ms_per_eval": 0.05019733333333334
+    },
+    "attn_core": {
+      "family": "attn_core",
+      "count": 384,
+      "union_ns": 5779586,
+      "group": "attention",
+      "ms_per_eval": 0.4816321666666667
+    }
+  },
+  "llama-d8192-node-r2-late": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 8856,
+      "union_ns": 16275362,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 1.3562801666666668
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 12216,
+      "union_ns": 160386849,
+      "group": "unclassified",
+      "ms_per_eval": 13.365570750000002
+    },
+    "q4_swiglu": {
+      "family": "q4_swiglu",
+      "count": 576,
+      "union_ns": 605472,
+      "group": "ffn",
+      "ms_per_eval": 0.050456
+    },
+    "attn_core": {
+      "family": "attn_core",
+      "count": 384,
+      "union_ns": 5782369,
+      "group": "attention",
+      "ms_per_eval": 0.48186408333333336
+    }
+  },
+  "quartz-d32768-graph-r0-early": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 36,
+      "union_ns": 167328,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 0.013944
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 132,
+      "union_ns": 8246304,
+      "group": "unclassified",
+      "ms_per_eval": 0.687192
+    }
+  },
+  "quartz-d32768-graph-r0-middle": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 36,
+      "union_ns": 168224,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 0.014018666666666667
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 132,
+      "union_ns": 8232798,
+      "group": "unclassified",
+      "ms_per_eval": 0.6860665
+    }
+  },
+  "quartz-d32768-graph-r0-late": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 36,
+      "union_ns": 166208,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 0.013850666666666666
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 132,
+      "union_ns": 8231681,
+      "group": "unclassified",
+      "ms_per_eval": 0.6859734166666667
+    }
+  },
+  "quartz-d32768-graph-r1-early": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 36,
+      "union_ns": 167264,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 0.013938666666666667
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 132,
+      "union_ns": 8247201,
+      "group": "unclassified",
+      "ms_per_eval": 0.68726675
+    }
+  },
+  "quartz-d32768-graph-r1-middle": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 36,
+      "union_ns": 166368,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 0.013864
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 132,
+      "union_ns": 8230593,
+      "group": "unclassified",
+      "ms_per_eval": 0.6858827500000001
+    }
+  },
+  "quartz-d32768-graph-r1-late": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 36,
+      "union_ns": 166560,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 0.013880000000000002
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 132,
+      "union_ns": 8231073,
+      "group": "unclassified",
+      "ms_per_eval": 0.68592275
+    }
+  },
+  "quartz-d32768-graph-r2-early": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 36,
+      "union_ns": 165792,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 0.013816
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 132,
+      "union_ns": 8235939,
+      "group": "unclassified",
+      "ms_per_eval": 0.68632825
+    }
+  },
+  "quartz-d32768-graph-r2-middle": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 36,
+      "union_ns": 166944,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 0.013912
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 132,
+      "union_ns": 8239713,
+      "group": "unclassified",
+      "ms_per_eval": 0.68664275
+    }
+  },
+  "quartz-d32768-graph-r2-late": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 36,
+      "union_ns": 165984,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 0.013831999999999999
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 132,
+      "union_ns": 8228321,
+      "group": "unclassified",
+      "ms_per_eval": 0.6856934166666666
+    }
+  },
+  "quartz-d32768-node-r0-early": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 5616,
+      "union_ns": 33374184,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 2.781182
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 3012,
+      "union_ns": 95055081,
+      "group": "unclassified",
+      "ms_per_eval": 7.92125675
+    },
+    "q8_mixer": {
+      "family": "q8_mixer",
+      "count": 768,
+      "union_ns": 41000710,
+      "group": "mixer",
+      "ms_per_eval": 3.416725833333333
+    },
+    "attn_prepare": {
+      "family": "attn_prepare",
+      "count": 1152,
+      "union_ns": 2520832,
+      "group": "attention",
+      "ms_per_eval": 0.21006933333333333
+    },
+    "gdn_recurrence": {
+      "family": "gdn_recurrence",
+      "count": 576,
+      "union_ns": 15098370,
+      "group": "gdn",
+      "ms_per_eval": 1.2581974999999999
+    },
+    "attn_core": {
+      "family": "attn_core",
+      "count": 576,
+      "union_ns": 589025810,
+      "group": "attention",
+      "ms_per_eval": 49.08548416666667
+    },
+    "attn_merge": {
+      "family": "attn_merge",
+      "count": 192,
+      "union_ns": 440960,
+      "group": "attention",
+      "ms_per_eval": 0.03674666666666667
+    }
+  },
+  "quartz-d32768-node-r0-middle": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 5616,
+      "union_ns": 33344836,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 2.7787363333333333
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 3012,
+      "union_ns": 95043665,
+      "group": "unclassified",
+      "ms_per_eval": 7.920305416666667
+    },
+    "q8_mixer": {
+      "family": "q8_mixer",
+      "count": 768,
+      "union_ns": 40984677,
+      "group": "mixer",
+      "ms_per_eval": 3.4153897499999997
+    },
+    "attn_prepare": {
+      "family": "attn_prepare",
+      "count": 1152,
+      "union_ns": 2514848,
+      "group": "attention",
+      "ms_per_eval": 0.20957066666666668
+    },
+    "gdn_recurrence": {
+      "family": "gdn_recurrence",
+      "count": 576,
+      "union_ns": 15119329,
+      "group": "gdn",
+      "ms_per_eval": 1.2599440833333333
+    },
+    "attn_core": {
+      "family": "attn_core",
+      "count": 576,
+      "union_ns": 591057201,
+      "group": "attention",
+      "ms_per_eval": 49.254766749999995
+    },
+    "attn_merge": {
+      "family": "attn_merge",
+      "count": 192,
+      "union_ns": 432608,
+      "group": "attention",
+      "ms_per_eval": 0.03605066666666667
+    }
+  },
+  "quartz-d32768-node-r0-late": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 5616,
+      "union_ns": 33343495,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 2.778624583333333
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 3012,
+      "union_ns": 95030157,
+      "group": "unclassified",
+      "ms_per_eval": 7.9191797500000005
+    },
+    "q8_mixer": {
+      "family": "q8_mixer",
+      "count": 768,
+      "union_ns": 40982818,
+      "group": "mixer",
+      "ms_per_eval": 3.4152348333333333
+    },
+    "attn_prepare": {
+      "family": "attn_prepare",
+      "count": 1152,
+      "union_ns": 2517024,
+      "group": "attention",
+      "ms_per_eval": 0.20975200000000002
+    },
+    "gdn_recurrence": {
+      "family": "gdn_recurrence",
+      "count": 576,
+      "union_ns": 15071619,
+      "group": "gdn",
+      "ms_per_eval": 1.25596825
+    },
+    "attn_core": {
+      "family": "attn_core",
+      "count": 576,
+      "union_ns": 593352660,
+      "group": "attention",
+      "ms_per_eval": 49.446055
+    },
+    "attn_merge": {
+      "family": "attn_merge",
+      "count": 192,
+      "union_ns": 432512,
+      "group": "attention",
+      "ms_per_eval": 0.03604266666666667
+    }
+  },
+  "quartz-d32768-node-r1-early": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 5616,
+      "union_ns": 33362660,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 2.7802216666666664
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 3012,
+      "union_ns": 95066646,
+      "group": "unclassified",
+      "ms_per_eval": 7.922220500000001
+    },
+    "q8_mixer": {
+      "family": "q8_mixer",
+      "count": 768,
+      "union_ns": 40999493,
+      "group": "mixer",
+      "ms_per_eval": 3.4166244166666666
+    },
+    "attn_prepare": {
+      "family": "attn_prepare",
+      "count": 1152,
+      "union_ns": 2513280,
+      "group": "attention",
+      "ms_per_eval": 0.20944
+    },
+    "gdn_recurrence": {
+      "family": "gdn_recurrence",
+      "count": 576,
+      "union_ns": 15122338,
+      "group": "gdn",
+      "ms_per_eval": 1.2601948333333333
+    },
+    "attn_core": {
+      "family": "attn_core",
+      "count": 576,
+      "union_ns": 589136086,
+      "group": "attention",
+      "ms_per_eval": 49.09467383333333
+    },
+    "attn_merge": {
+      "family": "attn_merge",
+      "count": 192,
+      "union_ns": 443360,
+      "group": "attention",
+      "ms_per_eval": 0.03694666666666666
+    }
+  },
+  "quartz-d32768-node-r1-middle": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 5616,
+      "union_ns": 33353830,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 2.7794858333333337
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 3012,
+      "union_ns": 95056625,
+      "group": "unclassified",
+      "ms_per_eval": 7.921385416666666
+    },
+    "q8_mixer": {
+      "family": "q8_mixer",
+      "count": 768,
+      "union_ns": 40989321,
+      "group": "mixer",
+      "ms_per_eval": 3.4157767499999996
+    },
+    "attn_prepare": {
+      "family": "attn_prepare",
+      "count": 1152,
+      "union_ns": 2515456,
+      "group": "attention",
+      "ms_per_eval": 0.20962133333333333
+    },
+    "gdn_recurrence": {
+      "family": "gdn_recurrence",
+      "count": 576,
+      "union_ns": 15125184,
+      "group": "gdn",
+      "ms_per_eval": 1.260432
+    },
+    "attn_core": {
+      "family": "attn_core",
+      "count": 576,
+      "union_ns": 591249492,
+      "group": "attention",
+      "ms_per_eval": 49.270791
+    },
+    "attn_merge": {
+      "family": "attn_merge",
+      "count": 192,
+      "union_ns": 432224,
+      "group": "attention",
+      "ms_per_eval": 0.036018666666666664
+    }
+  },
+  "quartz-d32768-node-r1-late": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 5616,
+      "union_ns": 33335557,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 2.7779630833333333
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 3012,
+      "union_ns": 95058226,
+      "group": "unclassified",
+      "ms_per_eval": 7.921518833333334
+    },
+    "q8_mixer": {
+      "family": "q8_mixer",
+      "count": 768,
+      "union_ns": 41002152,
+      "group": "mixer",
+      "ms_per_eval": 3.416846
+    },
+    "attn_prepare": {
+      "family": "attn_prepare",
+      "count": 1152,
+      "union_ns": 2514016,
+      "group": "attention",
+      "ms_per_eval": 0.20950133333333332
+    },
+    "gdn_recurrence": {
+      "family": "gdn_recurrence",
+      "count": 576,
+      "union_ns": 15116357,
+      "group": "gdn",
+      "ms_per_eval": 1.2596964166666667
+    },
+    "attn_core": {
+      "family": "attn_core",
+      "count": 576,
+      "union_ns": 593584947,
+      "group": "attention",
+      "ms_per_eval": 49.46541225000001
+    },
+    "attn_merge": {
+      "family": "attn_merge",
+      "count": 192,
+      "union_ns": 432672,
+      "group": "attention",
+      "ms_per_eval": 0.036056
+    }
+  },
+  "quartz-d32768-node-r2-early": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 5616,
+      "union_ns": 33383073,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 2.78192275
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 3012,
+      "union_ns": 95072275,
+      "group": "unclassified",
+      "ms_per_eval": 7.922689583333334
+    },
+    "q8_mixer": {
+      "family": "q8_mixer",
+      "count": 768,
+      "union_ns": 40987406,
+      "group": "mixer",
+      "ms_per_eval": 3.415617166666667
+    },
+    "attn_prepare": {
+      "family": "attn_prepare",
+      "count": 1152,
+      "union_ns": 2518624,
+      "group": "attention",
+      "ms_per_eval": 0.20988533333333334
+    },
+    "gdn_recurrence": {
+      "family": "gdn_recurrence",
+      "count": 576,
+      "union_ns": 15123873,
+      "group": "gdn",
+      "ms_per_eval": 1.26032275
+    },
+    "attn_core": {
+      "family": "attn_core",
+      "count": 576,
+      "union_ns": 589866391,
+      "group": "attention",
+      "ms_per_eval": 49.15553258333333
+    },
+    "attn_merge": {
+      "family": "attn_merge",
+      "count": 192,
+      "union_ns": 443072,
+      "group": "attention",
+      "ms_per_eval": 0.036922666666666666
+    }
+  },
+  "quartz-d32768-node-r2-middle": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 5616,
+      "union_ns": 33345574,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 2.7787978333333334
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 3012,
+      "union_ns": 95060113,
+      "group": "unclassified",
+      "ms_per_eval": 7.921676083333334
+    },
+    "q8_mixer": {
+      "family": "q8_mixer",
+      "count": 768,
+      "union_ns": 40997160,
+      "group": "mixer",
+      "ms_per_eval": 3.41643
+    },
+    "attn_prepare": {
+      "family": "attn_prepare",
+      "count": 1152,
+      "union_ns": 2520256,
+      "group": "attention",
+      "ms_per_eval": 0.2100213333333333
+    },
+    "gdn_recurrence": {
+      "family": "gdn_recurrence",
+      "count": 576,
+      "union_ns": 15105700,
+      "group": "gdn",
+      "ms_per_eval": 1.2588083333333333
+    },
+    "attn_core": {
+      "family": "attn_core",
+      "count": 576,
+      "union_ns": 591923733,
+      "group": "attention",
+      "ms_per_eval": 49.32697775
+    },
+    "attn_merge": {
+      "family": "attn_merge",
+      "count": 192,
+      "union_ns": 432896,
+      "group": "attention",
+      "ms_per_eval": 0.036074666666666665
+    }
+  },
+  "quartz-d32768-node-r2-late": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 5616,
+      "union_ns": 33364710,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 2.7803925
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 3012,
+      "union_ns": 95037587,
+      "group": "unclassified",
+      "ms_per_eval": 7.919798916666667
+    },
+    "q8_mixer": {
+      "family": "q8_mixer",
+      "count": 768,
+      "union_ns": 40989259,
+      "group": "mixer",
+      "ms_per_eval": 3.415771583333333
+    },
+    "attn_prepare": {
+      "family": "attn_prepare",
+      "count": 1152,
+      "union_ns": 2522208,
+      "group": "attention",
+      "ms_per_eval": 0.210184
+    },
+    "gdn_recurrence": {
+      "family": "gdn_recurrence",
+      "count": 576,
+      "union_ns": 15086242,
+      "group": "gdn",
+      "ms_per_eval": 1.2571868333333334
+    },
+    "attn_core": {
+      "family": "attn_core",
+      "count": 576,
+      "union_ns": 594112979,
+      "group": "attention",
+      "ms_per_eval": 49.509414916666664
+    },
+    "attn_merge": {
+      "family": "attn_merge",
+      "count": 192,
+      "union_ns": 433472,
+      "group": "attention",
+      "ms_per_eval": 0.03612266666666667
+    }
+  },
+  "llama-d32768-graph-r0-early": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 738,
+      "union_ns": 1474368,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 0.12286399999999999
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 1106,
+      "union_ns": 13815479,
+      "group": "unclassified",
+      "ms_per_eval": 1.1512899166666666
+    },
+    "q4_swiglu": {
+      "family": "q4_swiglu",
+      "count": 48,
+      "union_ns": 44319,
+      "group": "ffn",
+      "ms_per_eval": 0.00369325
+    },
+    "attn_core": {
+      "family": "attn_core",
+      "count": 32,
+      "union_ns": 1444061,
+      "group": "attention",
+      "ms_per_eval": 0.12033841666666667
+    }
+  },
+  "llama-d32768-graph-r0-middle": {
+    "unclassified": {
+      "family": "unclassified",
+      "count": 96,
+      "union_ns": 342463,
+      "group": "unclassified",
+      "ms_per_eval": 0.028538583333333336
+    }
+  },
+  "llama-d32768-graph-r0-late": {
+    "unclassified": {
+      "family": "unclassified",
+      "count": 96,
+      "union_ns": 335072,
+      "group": "unclassified",
+      "ms_per_eval": 0.027922666666666665
+    }
+  },
+  "llama-d32768-graph-r1-early": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 738,
+      "union_ns": 1475679,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 0.12297324999999999
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 1106,
+      "union_ns": 13802490,
+      "group": "unclassified",
+      "ms_per_eval": 1.1502075
+    },
+    "q4_swiglu": {
+      "family": "q4_swiglu",
+      "count": 48,
+      "union_ns": 44224,
+      "group": "ffn",
+      "ms_per_eval": 0.0036853333333333334
+    },
+    "attn_core": {
+      "family": "attn_core",
+      "count": 32,
+      "union_ns": 1443040,
+      "group": "attention",
+      "ms_per_eval": 0.12025333333333334
+    }
+  },
+  "llama-d32768-graph-r1-middle": {
+    "unclassified": {
+      "family": "unclassified",
+      "count": 96,
+      "union_ns": 376607,
+      "group": "unclassified",
+      "ms_per_eval": 0.03138391666666667
+    }
+  },
+  "llama-d32768-graph-r1-late": {
+    "unclassified": {
+      "family": "unclassified",
+      "count": 96,
+      "union_ns": 328255,
+      "group": "unclassified",
+      "ms_per_eval": 0.027354583333333335
+    }
+  },
+  "llama-d32768-graph-r2-early": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 738,
+      "union_ns": 1469535,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 0.12246125000000001
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 1106,
+      "union_ns": 13796333,
+      "group": "unclassified",
+      "ms_per_eval": 1.1496944166666667
+    },
+    "q4_swiglu": {
+      "family": "q4_swiglu",
+      "count": 48,
+      "union_ns": 43936,
+      "group": "ffn",
+      "ms_per_eval": 0.0036613333333333337
+    },
+    "attn_core": {
+      "family": "attn_core",
+      "count": 32,
+      "union_ns": 1444128,
+      "group": "attention",
+      "ms_per_eval": 0.120344
+    }
+  },
+  "llama-d32768-graph-r2-middle": {
+    "unclassified": {
+      "family": "unclassified",
+      "count": 96,
+      "union_ns": 347200,
+      "group": "unclassified",
+      "ms_per_eval": 0.028933333333333335
+    }
+  },
+  "llama-d32768-graph-r2-late": {
+    "unclassified": {
+      "family": "unclassified",
+      "count": 96,
+      "union_ns": 330144,
+      "group": "unclassified",
+      "ms_per_eval": 0.027511999999999998
+    }
+  },
+  "llama-d32768-node-r0-early": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 8856,
+      "union_ns": 16446919,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 1.3705765833333334
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 12216,
+      "union_ns": 160680693,
+      "group": "unclassified",
+      "ms_per_eval": 13.390057749999999
+    },
+    "q4_swiglu": {
+      "family": "q4_swiglu",
+      "count": 576,
+      "union_ns": 597955,
+      "group": "ffn",
+      "ms_per_eval": 0.04982958333333334
+    },
+    "attn_core": {
+      "family": "attn_core",
+      "count": 384,
+      "union_ns": 17228639,
+      "group": "attention",
+      "ms_per_eval": 1.4357199166666668
+    }
+  },
+  "llama-d32768-node-r0-middle": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 8856,
+      "union_ns": 16318776,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 1.359898
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 12216,
+      "union_ns": 160588170,
+      "group": "unclassified",
+      "ms_per_eval": 13.3823475
+    },
+    "q4_swiglu": {
+      "family": "q4_swiglu",
+      "count": 576,
+      "union_ns": 606498,
+      "group": "ffn",
+      "ms_per_eval": 0.050541499999999996
+    },
+    "attn_core": {
+      "family": "attn_core",
+      "count": 384,
+      "union_ns": 17222719,
+      "group": "attention",
+      "ms_per_eval": 1.4352265833333335
+    }
+  },
+  "llama-d32768-node-r0-late": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 8856,
+      "union_ns": 16339926,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 1.3616605
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 12216,
+      "union_ns": 160516196,
+      "group": "unclassified",
+      "ms_per_eval": 13.376349666666668
+    },
+    "q4_swiglu": {
+      "family": "q4_swiglu",
+      "count": 576,
+      "union_ns": 605185,
+      "group": "ffn",
+      "ms_per_eval": 0.05043208333333333
+    },
+    "attn_core": {
+      "family": "attn_core",
+      "count": 384,
+      "union_ns": 17194245,
+      "group": "attention",
+      "ms_per_eval": 1.4328537499999998
+    }
+  },
+  "llama-d32768-node-r1-early": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 8856,
+      "union_ns": 16441893,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 1.37015775
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 12216,
+      "union_ns": 160643736,
+      "group": "unclassified",
+      "ms_per_eval": 13.386978
+    },
+    "q4_swiglu": {
+      "family": "q4_swiglu",
+      "count": 576,
+      "union_ns": 596930,
+      "group": "ffn",
+      "ms_per_eval": 0.049744166666666666
+    },
+    "attn_core": {
+      "family": "attn_core",
+      "count": 384,
+      "union_ns": 17209668,
+      "group": "attention",
+      "ms_per_eval": 1.434139
+    }
+  },
+  "llama-d32768-node-r1-middle": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 8856,
+      "union_ns": 16325669,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 1.3604724166666669
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 12216,
+      "union_ns": 160516250,
+      "group": "unclassified",
+      "ms_per_eval": 13.376354166666667
+    },
+    "q4_swiglu": {
+      "family": "q4_swiglu",
+      "count": 576,
+      "union_ns": 604322,
+      "group": "ffn",
+      "ms_per_eval": 0.05036016666666667
+    },
+    "attn_core": {
+      "family": "attn_core",
+      "count": 384,
+      "union_ns": 17210916,
+      "group": "attention",
+      "ms_per_eval": 1.4342430000000002
+    }
+  },
+  "llama-d32768-node-r1-late": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 8856,
+      "union_ns": 16317974,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 1.3598311666666667
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 12216,
+      "union_ns": 160565122,
+      "group": "unclassified",
+      "ms_per_eval": 13.380426833333333
+    },
+    "q4_swiglu": {
+      "family": "q4_swiglu",
+      "count": 576,
+      "union_ns": 604065,
+      "group": "ffn",
+      "ms_per_eval": 0.050338749999999995
+    },
+    "attn_core": {
+      "family": "attn_core",
+      "count": 384,
+      "union_ns": 17228867,
+      "group": "attention",
+      "ms_per_eval": 1.4357389166666668
+    }
+  },
+  "llama-d32768-node-r2-early": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 8856,
+      "union_ns": 16431422,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 1.3692851666666668
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 12216,
+      "union_ns": 160611888,
+      "group": "unclassified",
+      "ms_per_eval": 13.384324
+    },
+    "q4_swiglu": {
+      "family": "q4_swiglu",
+      "count": 576,
+      "union_ns": 599139,
+      "group": "ffn",
+      "ms_per_eval": 0.04992825
+    },
+    "attn_core": {
+      "family": "attn_core",
+      "count": 384,
+      "union_ns": 17219493,
+      "group": "attention",
+      "ms_per_eval": 1.43495775
+    }
+  },
+  "llama-d32768-node-r2-middle": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 8856,
+      "union_ns": 16320352,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 1.3600293333333333
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 12216,
+      "union_ns": 160495416,
+      "group": "unclassified",
+      "ms_per_eval": 13.374618
+    },
+    "q4_swiglu": {
+      "family": "q4_swiglu",
+      "count": 576,
+      "union_ns": 605569,
+      "group": "ffn",
+      "ms_per_eval": 0.05046408333333333
+    },
+    "attn_core": {
+      "family": "attn_core",
+      "count": 384,
+      "union_ns": 17209312,
+      "group": "attention",
+      "ms_per_eval": 1.4341093333333335
+    }
+  },
+  "llama-d32768-node-r2-late": {
+    "residual_norm_quant": {
+      "family": "residual_norm_quant",
+      "count": 8856,
+      "union_ns": 16327975,
+      "group": "residual_norm_quant",
+      "ms_per_eval": 1.3606645833333333
+    },
+    "unclassified": {
+      "family": "unclassified",
+      "count": 12216,
+      "union_ns": 160555546,
+      "group": "unclassified",
+      "ms_per_eval": 13.379628833333333
+    },
+    "q4_swiglu": {
+      "family": "q4_swiglu",
+      "count": 576,
+      "union_ns": 606498,
+      "group": "ffn",
+      "ms_per_eval": 0.050541499999999996
+    },
+    "attn_core": {
+      "family": "attn_core",
+      "count": 384,
+      "union_ns": 17228196,
+      "group": "attention",
+      "ms_per_eval": 1.435683
+    }
+  }
+}
