@@ -249,6 +249,23 @@ def validate_future_keep_policy(task: str, contract: Mapping[str, Any]) -> None:
     )
 
 
+def validate_opt_in_keep_policy(task: str, contract: Mapping[str, Any]) -> None:
+    """Apply target_guard_v2 schema only when a contract opts in.
+
+    Contracts without a keep-policy ID keep legacy loading. Unknown IDs fail
+    closed. Full target/guard schema is checked only when those fields exist.
+    """
+    from tools.performance_keep_policy import (
+        KeepPolicyError,
+        validate_opt_in_contract,
+    )
+
+    try:
+        validate_opt_in_contract(contract)
+    except KeepPolicyError as exc:
+        raise SetupError(f"keep policy error (task={task}): {exc}") from exc
+
+
 def load_contract(task: str) -> dict[str, Any]:
     path = contract_path(task)
     if not path.is_file():
@@ -257,6 +274,7 @@ def load_contract(task: str) -> dict[str, Any]:
     if contract.get("task") != task:
         raise SetupError(f"contract task {contract.get('task')!r} != {task}")
     validate_future_keep_policy(task, contract)
+    validate_opt_in_keep_policy(task, contract)
     return contract
 
 
@@ -771,6 +789,7 @@ class OptimizationRunner:
         )
         if contract_data is not None:
             validate_future_keep_policy(task, contract)
+            validate_opt_in_keep_policy(task, contract)
         plan = describe_plan(task, mode, contract, phase)
         if dry_run:
             return {

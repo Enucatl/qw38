@@ -90,12 +90,18 @@ findings enter the final narrative.
 ## 6. Target and guard roles
 
 Freeze region, primary metric, targets, guards, thresholds, and policy ID
-before candidate timing. Apply OPT-135 when the task opts into it; do not
-invent a second policy in a stage prompt. A guard needs non-regression, not
-demonstrated improvement. If a target improves and a guard CI contains 1 but
-lies above its non-regression floor, apply the opted-in target/guard policy,
-not a guard-improvement test. Preserve historical OPT-130 rejection and
-release gates.
+before candidate timing. Apply OPT-135 when the task opts into
+[`target_guard_v2`](../../../../pins/performance_keep_policy_v2.json); do not
+invent a second policy in a stage prompt. Validate the implemented policy with:
+
+```sh
+uv run python tools/performance_keep_policy.py --contract pins/performance_keep_policy_v2.json --self-check fixtures/opt135_target_guard_policy.json
+```
+
+A guard needs non-regression, not demonstrated improvement. If a target
+improves and a guard CI contains 1 but lies above its non-regression floor,
+apply the opted-in target/guard policy, not a guard-improvement test.
+Preserve historical OPT-130 rejection and release gates.
 
 ## 7. Independent verification
 

@@ -18,9 +18,11 @@ from tools.run_optimization_task import (
     OptimizationRunner,
     OwnedChild,
     ProcessLauncher,
+    SetupError,
     describe_plan,
     load_contract,
     loop_product,
+    validate_opt_in_keep_policy,
     validate_tier,
 )
 
@@ -188,6 +190,52 @@ def test_contract_and_makefile_declare_the_iteration_loop() -> None:
     assert "screen is not implemented by this binary" in header
     assert "--workload" in probe
     assert "tiny" in probe
+    assert "keep_policy_id" not in contract
+    assert "performance_keep_policy_id" not in contract
+
+
+def test_legacy_contracts_skip_target_guard_schema() -> None:
+    contract = load_contract("OPT-057")
+    validate_opt_in_keep_policy("OPT-057", contract)
+    assert contract["task"] == "OPT-057"
+
+
+def test_unknown_keep_policy_id_fails_closed() -> None:
+    payload = {
+        "schema_version": 1,
+        "task": "OPT-999",
+        "keep_policy_id": "not_a_real_policy",
+        "host_only": True,
+    }
+    with pytest.raises(SetupError, match="unknown keep policy id"):
+        validate_opt_in_keep_policy("OPT-999", payload)
+
+
+def test_target_guard_v2_schema_rejects_overlapping_roles() -> None:
+    payload = {
+        "keep_policy_id": "target_guard_v2",
+        "candidate_id": "overlap",
+        "dispatch_region": "decode>=2048",
+        "unchanged_branches": [],
+        "quality_gates": ["quality"],
+        "state_gates": ["state"],
+        "targets": [
+            {"workload": "d2048", "kind": "decode", "primary_metric": "decode_only"}
+        ],
+        "guards": [{"workload": "d2048", "kind": "decode"}],
+    }
+    with pytest.raises(SetupError, match="not disjoint"):
+        validate_opt_in_keep_policy("OPT-999", payload)
+
+
+def test_target_guard_v2_id_without_roles_is_opt_in_only() -> None:
+    payload = {
+        "schema_version": 1,
+        "task": "OPT-999",
+        "keep_policy_id": "target_guard_v2",
+        "host_only": True,
+    }
+    validate_opt_in_keep_policy("OPT-999", payload)
 
 
 def test_validate_tier_rejects_malformed_values(

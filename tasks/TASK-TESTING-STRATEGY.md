@@ -62,6 +62,11 @@ its caller sets the environment to smoke. An environment variable is not proof
 that a binary respects a tier. Release workloads require an explicit runner
 mode; implement `--mode release` separately from the new tier selection.
 
+The prospective internal keep policy `target_guard_v2`
+([`pins/performance_keep_policy_v2.json`](../pins/performance_keep_policy_v2.json))
+applies only to tasks that opt in. Historical task fixtures keep their frozen
+policies, and release gates (OPT-016, OPT-056, CMP-003) stay unchanged.
+
 An optional `deep` or `release` run may use full references or additional
 replicates, but it must be a separately invoked command and never a default or
 an unspecified-tier fallback. Its larger complexity, purpose, and proof limit
