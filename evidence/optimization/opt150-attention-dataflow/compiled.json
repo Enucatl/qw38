@@ -1,0 +1,24 @@
+{
+  "binary": "build/qw38-cuda-opt150-attention-dataflow-test",
+  "kernel": "dense_bf16_tile_f16_mma_decode",
+  "zero_weight_add": true,
+  "mma_qk_eight_defined": true,
+  "pv_uses_mma": false,
+  "note": "Source feeds MMA scores with a zero-weight add into the FP32 QK dot. A kernel name or launch counter cannot prove the compiler retains that MMA. SASS inspection is recorded separately.",
+  "proof_limit": "instruction presence without data dependence is unknown",
+  "sass": {
+    "ok": true,
+    "blocked": false,
+    "reason": null,
+    "tool": "cuobjdump",
+    "binary": "build/attention_decode.cuda.o",
+    "mangled_symbol": "_ZN4qw384cuda6opt13730dense_bf16_tile_f16_mma_decodeENS0_15AttentionConfigEmiPKfPK13__nv_bfloat16S7_S7_S7_PfS8_PKNS0_17DecodeLaunchStateE",
+    "kernel_symbol_present": true,
+    "hmma_count": 2,
+    "mma_sync_like_count": 2,
+    "zero_weight_mma_survives": true,
+    "note": "Production kernel SASS contains HMMA.16816 ops. That shows the compiler kept tensor-core instructions in opt137::dense_bf16_tile_f16_mma_decode. It does not prove the zero-weight QK add is on the output-producing dataflow; PV stays scalar.",
+    "raw_path": "evidence/optimization/opt150-attention-dataflow/compiled-sass.txt",
+    "raw_bytes": 171850
+  }
+}

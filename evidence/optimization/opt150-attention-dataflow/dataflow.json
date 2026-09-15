@@ -1,0 +1,50 @@
+{
+  "quartz_mma": {
+    "qk": "fp32_dot_plus_warp_sum",
+    "qk_mma": "mma_qk_eight_zero_weight",
+    "zero_weight_mma_in_source": true,
+    "qk_fp32_products": true,
+    "softmax": "per_kv_row_online",
+    "pv": "scalar_fp32_weight_times_v",
+    "pv_mma": false,
+    "gqa_reuse": "ncols2=8_live_heads_0_5_mask_6_7",
+    "loads_conversion": "dense_bf16_tile_to_f16_opt111_rounding",
+    "partitions": "frozen_graph_buckets_8448_33024_131072",
+    "merge": "merge_decode_kv_parts"
+  },
+  "llama_fattn_mma_d256_ncols1_1_ncols2_8": {
+    "qk": "mma_kq",
+    "softmax": "tiled_rescale_nbatch_fa_64_ampere",
+    "pv": "mma_vkq",
+    "gqa_reuse": "ncols2=8_shared_kv_when_gqa_ratio>4",
+    "loads_conversion": "staged_f16_tiles",
+    "nthreads": 64,
+    "occupancy": 4,
+    "nstages": 2,
+    "source_switch": "Ada+ decode Q.ne[1]==1 unquantized KV selects VEC unless gqa_ratio>4 and K.ne[1]>=8192",
+    "mma_config_present": true,
+    "selector_present": true
+  },
+  "quartz_flash_vec_window": {
+    "range": "[1024,4096]",
+    "path": "decode_attention_flash_vec_v1",
+    "launch": "flash_vec_decode_attention",
+    "n_parts": 16
+  },
+  "quartz_warp_query": {
+    "ranges": [
+      "<1024",
+      "[4097,8191]"
+    ],
+    "path": "warp_query",
+    "launch": "warp_query_decode_attention",
+    "n_parts": 16
+  },
+  "graph_eager_callers": {
+    "full_scheduler_uses_topology_index": true,
+    "partitioned_entry": "launch_attention_prepare_partitioned",
+    "mma_branch": "opt137_uses_mma_at(position) before vec/flash",
+    "flash_reuses_topology_1": true
+  },
+  "zero_weight_mma_is_source_fact_not_cost": true
+}

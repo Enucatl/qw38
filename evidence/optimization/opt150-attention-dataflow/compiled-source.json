@@ -1,0 +1,9 @@
+{
+  "binary": "build/qw38-cuda-opt150-attention-dataflow-test",
+  "kernel": "dense_bf16_tile_f16_mma_decode",
+  "zero_weight_add": true,
+  "mma_qk_eight_defined": true,
+  "pv_uses_mma": false,
+  "note": "Source feeds MMA scores with a zero-weight add into the FP32 QK dot. A kernel name or launch counter cannot prove the compiler retains that MMA. SASS inspection is recorded separately.",
+  "proof_limit": "instruction presence without data dependence is unknown"
+}

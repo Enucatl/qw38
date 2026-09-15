@@ -1,0 +1,244 @@
+{
+  "schema_version": 1,
+  "task": "OPT-150",
+  "phase": "replay",
+  "mode": "feedback",
+  "ok": true,
+  "skipped": false,
+  "blocked": false,
+  "status": "measured",
+  "warmups": 1,
+  "pairs": 3,
+  "attention_layers": 16,
+  "shapes": [
+    {
+      "shape": "D2048",
+      "position": 2048,
+      "quartz_mean_ms": 0.630378664,
+      "quartz_round_ms": [
+        0.624127984,
+        0.665920019,
+        0.601087987
+      ],
+      "llama_enclosing_mean_ms": 0.0365333334,
+      "adapter_mean_ms": 0.0135253333,
+      "llama_native_or_selected_ms": 0.0124693336,
+      "llama_selected_kernel": "flash_attn_ext_vec<256,1>",
+      "llama_vec_is_selected": true,
+      "path": "decode_attention_flash_vec_v1",
+      "attention_layers": 16,
+      "warmups": 1,
+      "samples": 3,
+      "adapter_charged_separately": true,
+      "llama_f16_kernel_mean_ms": 0.0124693336,
+      "matched_bf16_enclosing_ms": 0.0290133338,
+      "native_f16_is_selected_kernel": true
+    },
+    {
+      "shape": "D8192",
+      "position": 8192,
+      "quartz_mean_ms": 3.15950942,
+      "quartz_round_ms": [
+        3.1627841,
+        3.17391992,
+        3.14182401
+      ],
+      "llama_enclosing_mean_ms": null,
+      "adapter_mean_ms": null,
+      "llama_native_or_selected_ms": null,
+      "llama_selected_kernel": "fattn-mma-f16_ncols1=1_ncols2=8",
+      "llama_vec_is_selected": false,
+      "path": "dense_bf16_tile_f16_mma_decode_v1",
+      "attention_layers": 16,
+      "warmups": 1,
+      "samples": 3,
+      "adapter_charged_separately": true
+    },
+    {
+      "shape": "D32768",
+      "position": 32768,
+      "quartz_mean_ms": 13.6802988,
+      "quartz_round_ms": [
+        13.657568,
+        13.6883202,
+        13.6950083
+      ],
+      "llama_enclosing_mean_ms": 0.331808001,
+      "adapter_mean_ms": 0.19691734,
+      "llama_native_or_selected_ms": null,
+      "llama_selected_kernel": "fattn-mma-f16_ncols1=1_ncols2=8",
+      "llama_vec_is_selected": false,
+      "path": "dense_bf16_tile_f16_mma_decode_v1",
+      "attention_layers": 16,
+      "warmups": 1,
+      "samples": 3,
+      "adapter_charged_separately": true,
+      "llama_f16_kernel_mean_ms": 0.130687997,
+      "matched_bf16_enclosing_ms": 0.166079998,
+      "native_f16_is_selected_kernel": false,
+      "adapter_note": "opt129 F16 vec is not the source-selected llama kernel; do not label adapter or vec time as native MMA cost"
+    }
+  ],
+  "native": {
+    "returncode": 0,
+    "stdout_tail": "\n==========\n== CUDA ==\n==========\n\nCUDA Version 13.0.2\n\nContainer image Copyright (c) 2016-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.\n\nThis container image and its contents are governed by the NVIDIA Deep Learning Container License.\nBy pulling and using the container, you accept the terms and conditions of this license:\nhttps://developer.nvidia.com/ngc/nvidia-deep-learning-container-license\n\nA copy of this license is made available in this container at /NGC-DL-CONTAINER-LICENSE for your convenience.\n\nQW38_OPT150_ATTENTION_DATAFLOW_RESULT={\"schema_version\":1,\"task\":\"OPT-150\",\"ok\":true,\"pass\":true,\"workload\":\"replay\",\"shapes\":[{\"shape\":\"D2048\",\"position\":2048,\"quartz_mean_ms\":0.630378664,\"quartz_round_ms\":[0.624127984,0.665920019,0.601087987],\"llama_enclosing_mean_ms\":null,\"adapter_mean_ms\":null,\"llama_native_or_selected_ms\":null,\"llama_selected_kernel\":\"flash_attn_ext_vec<256,1>\",\"llama_vec_is_selected\":true,\"path\":\"decode_attention_flash_vec_v1\",\"attention_layers\":16,\"warmups\":1,\"samples\":3,\"adapter_charged_separately\":true},{\"shape\":\"D8192\",\"position\":8192,\"quartz_mean_ms\":3.15950942,\"quartz_round_ms\":[3.1627841,3.17391992,3.14182401],\"llama_enclosing_mean_ms\":null,\"adapter_mean_ms\":null,\"llama_native_or_selected_ms\":null,\"llama_selected_kernel\":\"fattn-mma-f16_ncols1=1_ncols2=8\",\"llama_vec_is_selected\":false,\"path\":\"dense_bf16_tile_f16_mma_decode_v1\",\"attention_layers\":16,\"warmups\":1,\"samples\":3,\"adapter_charged_separately\":true},{\"shape\":\"D32768\",\"position\":32768,\"quartz_mean_ms\":13.6802988,\"quartz_round_ms\":[13.657568,13.6883202,13.6950083],\"llama_enclosing_mean_ms\":null,\"adapter_mean_ms\":null,\"llama_native_or_selected_ms\":null,\"llama_selected_kernel\":\"fattn-mma-f16_ncols1=1_ncols2=8\",\"llama_vec_is_selected\":false,\"path\":\"dense_bf16_tile_f16_mma_decode_v1\",\"attention_layers\":16,\"warmups\":1,\"samples\":3,\"adapter_charged_separately\":true}],\"claims_throughput\":false}\nQW38_OPT150_NATIVE_COUNTS={\"schema_version\":1,\"task\":\"OPT-150\",\"observed_warmups\":1,\"observed_samples\":3,\"observed_candidates\":1,\"observed_shapes\":3,\"keep\":false}\n",
+    "result": {
+      "schema_version": 1,
+      "task": "OPT-150",
+      "ok": true,
+      "pass": true,
+      "workload": "replay",
+      "shapes": [
+        {
+          "shape": "D2048",
+          "position": 2048,
+          "quartz_mean_ms": 0.630378664,
+          "quartz_round_ms": [
+            0.624127984,
+            0.665920019,
+            0.601087987
+          ],
+          "llama_enclosing_mean_ms": null,
+          "adapter_mean_ms": null,
+          "llama_native_or_selected_ms": null,
+          "llama_selected_kernel": "flash_attn_ext_vec<256,1>",
+          "llama_vec_is_selected": true,
+          "path": "decode_attention_flash_vec_v1",
+          "attention_layers": 16,
+          "warmups": 1,
+          "samples": 3,
+          "adapter_charged_separately": true
+        },
+        {
+          "shape": "D8192",
+          "position": 8192,
+          "quartz_mean_ms": 3.15950942,
+          "quartz_round_ms": [
+            3.1627841,
+            3.17391992,
+            3.14182401
+          ],
+          "llama_enclosing_mean_ms": null,
+          "adapter_mean_ms": null,
+          "llama_native_or_selected_ms": null,
+          "llama_selected_kernel": "fattn-mma-f16_ncols1=1_ncols2=8",
+          "llama_vec_is_selected": false,
+          "path": "dense_bf16_tile_f16_mma_decode_v1",
+          "attention_layers": 16,
+          "warmups": 1,
+          "samples": 3,
+          "adapter_charged_separately": true
+        },
+        {
+          "shape": "D32768",
+          "position": 32768,
+          "quartz_mean_ms": 13.6802988,
+          "quartz_round_ms": [
+            13.657568,
+            13.6883202,
+            13.6950083
+          ],
+          "llama_enclosing_mean_ms": null,
+          "adapter_mean_ms": null,
+          "llama_native_or_selected_ms": null,
+          "llama_selected_kernel": "fattn-mma-f16_ncols1=1_ncols2=8",
+          "llama_vec_is_selected": false,
+          "path": "dense_bf16_tile_f16_mma_decode_v1",
+          "attention_layers": 16,
+          "warmups": 1,
+          "samples": 3,
+          "adapter_charged_separately": true
+        }
+      ],
+      "claims_throughput": false
+    },
+    "counts": {
+      "schema_version": 1,
+      "task": "OPT-150",
+      "observed_warmups": 1,
+      "observed_samples": 3,
+      "observed_candidates": 1,
+      "observed_shapes": 3,
+      "keep": false
+    },
+    "rows": [
+      {
+        "schema_version": 1,
+        "task": "OPT-150",
+        "ok": true,
+        "pass": true,
+        "workload": "replay",
+        "shapes": [
+          {
+            "shape": "D2048",
+            "position": 2048,
+            "quartz_mean_ms": 0.630378664,
+            "quartz_round_ms": [
+              0.624127984,
+              0.665920019,
+              0.601087987
+            ],
+            "llama_enclosing_mean_ms": null,
+            "adapter_mean_ms": null,
+            "llama_native_or_selected_ms": null,
+            "llama_selected_kernel": "flash_attn_ext_vec<256,1>",
+            "llama_vec_is_selected": true,
+            "path": "decode_attention_flash_vec_v1",
+            "attention_layers": 16,
+            "warmups": 1,
+            "samples": 3,
+            "adapter_charged_separately": true
+          },
+          {
+            "shape": "D8192",
+            "position": 8192,
+            "quartz_mean_ms": 3.15950942,
+            "quartz_round_ms": [
+              3.1627841,
+              3.17391992,
+              3.14182401
+            ],
+            "llama_enclosing_mean_ms": null,
+            "adapter_mean_ms": null,
+            "llama_native_or_selected_ms": null,
+            "llama_selected_kernel": "fattn-mma-f16_ncols1=1_ncols2=8",
+            "llama_vec_is_selected": false,
+            "path": "dense_bf16_tile_f16_mma_decode_v1",
+            "attention_layers": 16,
+            "warmups": 1,
+            "samples": 3,
+            "adapter_charged_separately": true
+          },
+          {
+            "shape": "D32768",
+            "position": 32768,
+            "quartz_mean_ms": 13.6802988,
+            "quartz_round_ms": [
+              13.657568,
+              13.6883202,
+              13.6950083
+            ],
+            "llama_enclosing_mean_ms": null,
+            "adapter_mean_ms": null,
+            "llama_native_or_selected_ms": null,
+            "llama_selected_kernel": "fattn-mma-f16_ncols1=1_ncols2=8",
+            "llama_vec_is_selected": false,
+            "path": "dense_bf16_tile_f16_mma_decode_v1",
+            "attention_layers": 16,
+            "warmups": 1,
+            "samples": 3,
+            "adapter_charged_separately": true
+          }
+        ],
+        "claims_throughput": false
+      }
+    ],
+    "pass": true,
+    "raw": "build/optimization-runs/opt150-smoke/replay-native.txt"
+  },
+  "adapter_charged_separately": true,
+  "native_f16_not_adapter": true,
+  "claims_throughput": false,
+  "family_plan": "task=OPT-150 mode=feedback phase=replay loop_product=24 cases=3 candidates=2 warmups=1 samples=3 tokens=1",
+  "measured_at": "2026-09-15T12:10:27Z"
+}

@@ -1,0 +1,43 @@
+{
+  "rows": [
+    {
+      "shape": "D2048",
+      "prefix": 2048,
+      "attention_family_quartz_ms": 0.630378664,
+      "attention_family_llama_ms": 0.0124693336,
+      "attention_only_ratio_quartz_over_llama": 50.554318636562904,
+      "denominator": "same_sitting_complete_attention_family_ms",
+      "whole_engine_quartz_ms_per_token": 16.629501979166665,
+      "whole_engine_llama_ms_per_token": 14.3661436875,
+      "whole_engine_ratio_quartz_over_llama": 1.1575480755935927,
+      "whole_engine_denominator": "decode_only_ms / eval_count",
+      "not_a_whole_engine_multiplier": true
+    },
+    {
+      "shape": "D8192",
+      "prefix": 8192,
+      "attention_family_quartz_ms": 3.15950942,
+      "attention_family_llama_ms": null,
+      "attention_only_ratio_quartz_over_llama": null,
+      "denominator": "same_sitting_complete_attention_family_ms",
+      "whole_engine_quartz_ms_per_token": 20.410231281250002,
+      "whole_engine_llama_ms_per_token": 17.072758635416665,
+      "whole_engine_ratio_quartz_over_llama": 1.1954852591256049,
+      "whole_engine_denominator": "decode_only_ms / eval_count",
+      "not_a_whole_engine_multiplier": true
+    },
+    {
+      "shape": "D32768",
+      "prefix": 32768,
+      "attention_family_quartz_ms": 13.6802988,
+      "attention_family_llama_ms": 0.331808001,
+      "attention_only_ratio_quartz_over_llama": 41.22956275548039,
+      "denominator": "same_sitting_complete_attention_family_ms",
+      "whole_engine_quartz_ms_per_token": 29.36345990625,
+      "whole_engine_llama_ms_per_token": 18.9222396875,
+      "whole_engine_ratio_quartz_over_llama": 1.5517962139358934,
+      "whole_engine_denominator": "decode_only_ms / eval_count",
+      "not_a_whole_engine_multiplier": true
+    }
+  ]
+}

@@ -1,0 +1,185 @@
+{
+  "schema_version": 1,
+  "task": "OPT-150",
+  "yardstick": "post149_decode_attention_dataflow_and_matched_scaling",
+  "claims_throughput": false,
+  "claims_performance_improvement": false,
+  "require_candidate_nll": false,
+  "opt074_family_admission_required": false,
+  "opt074_coverage_unadmitted_is_blocker": false,
+  "performance_admission": {
+    "enabled": true,
+    "instrumentation_only": true
+  },
+  "image": "qw38-cuda:13.0.2",
+  "model": "models/Qwen3.8-27B-Q4_K_M.gguf",
+  "gpu_lock": "build/optimization-runs/qw38-gpu.lock",
+  "aggregate_deadline_s": 7200,
+  "target": "tools/opt150_attention_dataflow.py",
+  "diagnostics_make_target": "cuda-opt150-diagnostics",
+  "selector": "decode_segments8",
+  "case_ids": [
+    "smoke",
+    "correctness",
+    "replay",
+    "matched",
+    "report"
+  ],
+  "modes": {
+    "feedback": {
+      "target": "tools/opt150_attention_dataflow.py",
+      "tier_sequence": ["smoke", "correctness", "replay", "matched"],
+      "make_targets": [
+        "build/qw38-cuda-opt150-attention-dataflow-test",
+        "build/qw38-cuda-opt136-matched-decode-profile-test"
+      ],
+      "build_once": true,
+      "warm_repetitions": 0,
+      "aggregate_deadline_s": 7200,
+      "workloads": ["smoke", "correctness", "replay", "matched"]
+    },
+    "acceptance": {
+      "target": "tools/opt150_attention_dataflow.py",
+      "tier_sequence": ["smoke", "correctness", "replay", "matched", "report"],
+      "make_targets": [
+        "build/qw38-cuda-opt150-attention-dataflow-test",
+        "build/qw38-cuda-opt136-matched-decode-profile-test"
+      ],
+      "warm_repetitions": 0,
+      "aggregate_deadline_s": 7200,
+      "workloads": ["smoke", "correctness", "replay", "matched", "report"]
+    },
+    "release": {
+      "target": "tools/opt150_attention_dataflow.py",
+      "tier": "acceptance",
+      "make_targets": [
+        "build/qw38-cuda-opt150-attention-dataflow-test",
+        "build/qw38-cuda-opt136-matched-decode-profile-test"
+      ],
+      "skip_compile": false,
+      "historical_oracles": false,
+      "aggregate_deadline_s": 7200,
+      "workloads": []
+    }
+  },
+  "workloads": {
+    "smoke": {
+      "target": "tools/opt150_attention_dataflow.py",
+      "tier": "smoke",
+      "runner": "host",
+      "kind": "host_dispatch_dataflow_compiled_source",
+      "cases": 13,
+      "candidates": 1,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 1,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 0,
+      "reference": 1,
+      "gpu_work": false,
+      "args": [
+        "uv", "run", "python", "tools/opt150_attention_dataflow.py",
+        "--phase", "smoke", "--mode", "{mode}", "--run-dir", "{run_dir}"
+      ]
+    },
+    "correctness": {
+      "target": "build/qw38-cuda-opt150-attention-dataflow-test",
+      "tier": "correctness",
+      "runner": "host",
+      "kind": "dispatch_launches_and_sampled_fp64",
+      "cases": 22,
+      "candidates": 1,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 1,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 0,
+      "reference": 1,
+      "gpu_work": true,
+      "native_targets": ["build/qw38-cuda-opt150-attention-dataflow-test"],
+      "args": [
+        "uv", "run", "python", "tools/opt150_attention_dataflow.py",
+        "--phase", "correctness", "--mode", "{mode}", "--run-dir", "{run_dir}"
+      ]
+    },
+    "replay": {
+      "target": "build/qw38-cuda-opt150-attention-dataflow-test",
+      "tier": "screen",
+      "runner": "host",
+      "kind": "complete_attention_family_d2048_d8192_d32768",
+      "cases": 3,
+      "candidates": 2,
+      "warmups": 1,
+      "samples": 3,
+      "tokens": 1,
+      "prefixes": [2048, 8192, 32768],
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 0,
+      "reference": 0,
+      "gpu_work": true,
+      "native_targets": ["build/qw38-cuda-opt150-attention-dataflow-test"],
+      "args": [
+        "uv", "run", "python", "tools/opt150_attention_dataflow.py",
+        "--phase", "replay", "--mode", "{mode}", "--run-dir", "{run_dir}"
+      ]
+    },
+    "matched": {
+      "target": "build/qw38-cuda-opt136-matched-decode-profile-test",
+      "tier": "screen",
+      "runner": "host",
+      "kind": "opt136_32eval_unprofiled_pairs",
+      "cases": 3,
+      "candidates": 2,
+      "warmups": 1,
+      "samples": 3,
+      "tokens": 32,
+      "prefixes": [2048, 8192, 32768],
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 1,
+      "reference": 0,
+      "gpu_work": true,
+      "native_targets": ["build/qw38-cuda-opt136-matched-decode-profile-test"],
+      "args": [
+        "uv", "run", "python", "tools/opt150_attention_dataflow.py",
+        "--phase", "matched", "--mode", "{mode}", "--run-dir", "{run_dir}"
+      ]
+    },
+    "report": {
+      "target": "tools/opt150_attention_dataflow.py",
+      "tier": "correctness",
+      "runner": "host",
+      "kind": "host_only_attention_dataflow_report",
+      "cases": 1,
+      "candidates": 1,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 1,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 0,
+      "reference": 1,
+      "gpu_work": false,
+      "args": [
+        "uv", "run", "python", "tools/opt150_attention_dataflow.py",
+        "--phase", "report", "--mode", "{mode}", "--run-dir", "{run_dir}"
+      ]
+    }
+  },
+  "proof_limit": [
+    "diagnostics only",
+    "no production selector change",
+    "instrumentation-only: no speed keep",
+    "historical oracles none",
+    "claims_throughput=false",
+    "NLL N/A",
+    "one warmup plus three alternating rounds per D2048/D8192/D32768 family shape",
+    "matched decode probes are 32 evals, one warmup plus three paired rounds",
+    "pinned llama is cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+    "300s phase timeout; 7200s aggregate is a ceiling"
+  ],
+  "report_path": "evidence/optimization/opt150-attention-dataflow/REPORT.md"
+}

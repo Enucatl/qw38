@@ -1,0 +1,16 @@
+{
+  "rows": [
+    {
+      "source": "OPT-129",
+      "claim": "approximately 0.050 ms at prefix 8192",
+      "correction": "That number is the BF16 llama-vector adapter enclosing path (matched_bf16_enclosing mean 0.05033 ms/layer), explicitly not the native selected fattn-mma-f16 ncols1=1 ncols2=8 kernel. The sitting was non-exclusive and allocated prefix+1, not production capacity 131072.",
+      "artifact": "evidence/optimization/opt129-matched-attention/REPORT.md"
+    },
+    {
+      "source": "OPT-136",
+      "claim": "D32768 ratio 0.243909",
+      "correction": "That ratio is pre-OPT-137 whole-engine decode-only throughput (quartz 15.317 tok/s / llama 62.799 tok/s) at capacity 131072, not a component attention ratio and not post-148 flash-vec.",
+      "artifact": "evidence/optimization/opt136-graph-accounting/REPORT.md"
+    }
+  ]
+}

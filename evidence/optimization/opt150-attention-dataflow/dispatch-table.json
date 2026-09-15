@@ -1,0 +1,342 @@
+{
+  "rows": [
+    {
+      "position": 0,
+      "quartz_visible_length": 1,
+      "quartz_zero_based_position": 0,
+      "allocated_capacity": 131072,
+      "quartz_path": "warp_query",
+      "quartz_launch": "warp_query_decode_attention",
+      "quartz_topology": 0,
+      "quartz_n_parts": 16,
+      "graph_boundary_crossing": null,
+      "llama_logical_nkv": 1,
+      "llama_padded_nkv": 256,
+      "llama_pad_rule": "max(256, pad(used_max_p1, 256))",
+      "llama_selected_kernel": "flash_attn_ext_vec<256,1>",
+      "llama_vec_is_selected": true,
+      "llama_mask": "causal mask present; gqa_opt requires mask and K.ne[1] % FATTN_KQ_STRIDE==0; padded used length is K.ne[1]",
+      "dtypes": {
+        "quartz_q": "fp32_prepared",
+        "quartz_kv": "bf16_physical",
+        "llama_kv_native": "f16_f16_token_major"
+      },
+      "strides": {
+        "quartz_kv_physical": "attention_kv_physical_index(token, kv_head, dim, capacity=131072, head_width=256)",
+        "llama_k_view": "hparams.n_embd_head_k x n_head_kv x n_kv"
+      }
+    },
+    {
+      "position": 128,
+      "quartz_visible_length": 129,
+      "quartz_zero_based_position": 128,
+      "allocated_capacity": 131072,
+      "quartz_path": "warp_query",
+      "quartz_launch": "warp_query_decode_attention",
+      "quartz_topology": 0,
+      "quartz_n_parts": 16,
+      "graph_boundary_crossing": null,
+      "llama_logical_nkv": 129,
+      "llama_padded_nkv": 256,
+      "llama_pad_rule": "max(256, pad(used_max_p1, 256))",
+      "llama_selected_kernel": "flash_attn_ext_vec<256,1>",
+      "llama_vec_is_selected": true,
+      "llama_mask": "causal mask present; gqa_opt requires mask and K.ne[1] % FATTN_KQ_STRIDE==0; padded used length is K.ne[1]",
+      "dtypes": {
+        "quartz_q": "fp32_prepared",
+        "quartz_kv": "bf16_physical",
+        "llama_kv_native": "f16_f16_token_major"
+      },
+      "strides": {
+        "quartz_kv_physical": "attention_kv_physical_index(token, kv_head, dim, capacity=131072, head_width=256)",
+        "llama_k_view": "hparams.n_embd_head_k x n_head_kv x n_kv"
+      }
+    },
+    {
+      "position": 1023,
+      "quartz_visible_length": 1024,
+      "quartz_zero_based_position": 1023,
+      "allocated_capacity": 131072,
+      "quartz_path": "warp_query",
+      "quartz_launch": "warp_query_decode_attention",
+      "quartz_topology": 0,
+      "quartz_n_parts": 16,
+      "graph_boundary_crossing": null,
+      "llama_logical_nkv": 1024,
+      "llama_padded_nkv": 1024,
+      "llama_pad_rule": "max(256, pad(used_max_p1, 256))",
+      "llama_selected_kernel": "flash_attn_ext_vec<256,1>",
+      "llama_vec_is_selected": true,
+      "llama_mask": "causal mask present; gqa_opt requires mask and K.ne[1] % FATTN_KQ_STRIDE==0; padded used length is K.ne[1]",
+      "dtypes": {
+        "quartz_q": "fp32_prepared",
+        "quartz_kv": "bf16_physical",
+        "llama_kv_native": "f16_f16_token_major"
+      },
+      "strides": {
+        "quartz_kv_physical": "attention_kv_physical_index(token, kv_head, dim, capacity=131072, head_width=256)",
+        "llama_k_view": "hparams.n_embd_head_k x n_head_kv x n_kv"
+      }
+    },
+    {
+      "position": 1024,
+      "quartz_visible_length": 1025,
+      "quartz_zero_based_position": 1024,
+      "allocated_capacity": 131072,
+      "quartz_path": "decode_attention_flash_vec_v1",
+      "quartz_launch": "flash_vec_decode_attention",
+      "quartz_topology": 1,
+      "quartz_n_parts": 16,
+      "graph_boundary_crossing": "topology_0_to_1",
+      "llama_logical_nkv": 1025,
+      "llama_padded_nkv": 1280,
+      "llama_pad_rule": "max(256, pad(used_max_p1, 256))",
+      "llama_selected_kernel": "flash_attn_ext_vec<256,1>",
+      "llama_vec_is_selected": true,
+      "llama_mask": "causal mask present; gqa_opt requires mask and K.ne[1] % FATTN_KQ_STRIDE==0; padded used length is K.ne[1]",
+      "dtypes": {
+        "quartz_q": "fp32_prepared",
+        "quartz_kv": "bf16_physical",
+        "llama_kv_native": "f16_f16_token_major"
+      },
+      "strides": {
+        "quartz_kv_physical": "attention_kv_physical_index(token, kv_head, dim, capacity=131072, head_width=256)",
+        "llama_k_view": "hparams.n_embd_head_k x n_head_kv x n_kv"
+      }
+    },
+    {
+      "position": 4096,
+      "quartz_visible_length": 4097,
+      "quartz_zero_based_position": 4096,
+      "allocated_capacity": 131072,
+      "quartz_path": "decode_attention_flash_vec_v1",
+      "quartz_launch": "flash_vec_decode_attention",
+      "quartz_topology": 1,
+      "quartz_n_parts": 16,
+      "graph_boundary_crossing": null,
+      "llama_logical_nkv": 4097,
+      "llama_padded_nkv": 4352,
+      "llama_pad_rule": "max(256, pad(used_max_p1, 256))",
+      "llama_selected_kernel": "flash_attn_ext_vec<256,1>",
+      "llama_vec_is_selected": true,
+      "llama_mask": "causal mask present; gqa_opt requires mask and K.ne[1] % FATTN_KQ_STRIDE==0; padded used length is K.ne[1]",
+      "dtypes": {
+        "quartz_q": "fp32_prepared",
+        "quartz_kv": "bf16_physical",
+        "llama_kv_native": "f16_f16_token_major"
+      },
+      "strides": {
+        "quartz_kv_physical": "attention_kv_physical_index(token, kv_head, dim, capacity=131072, head_width=256)",
+        "llama_k_view": "hparams.n_embd_head_k x n_head_kv x n_kv"
+      }
+    },
+    {
+      "position": 4097,
+      "quartz_visible_length": 4098,
+      "quartz_zero_based_position": 4097,
+      "allocated_capacity": 131072,
+      "quartz_path": "warp_query",
+      "quartz_launch": "warp_query_decode_attention",
+      "quartz_topology": 0,
+      "quartz_n_parts": 16,
+      "graph_boundary_crossing": "topology_1_to_0",
+      "llama_logical_nkv": 4098,
+      "llama_padded_nkv": 4352,
+      "llama_pad_rule": "max(256, pad(used_max_p1, 256))",
+      "llama_selected_kernel": "flash_attn_ext_vec<256,1>",
+      "llama_vec_is_selected": true,
+      "llama_mask": "causal mask present; gqa_opt requires mask and K.ne[1] % FATTN_KQ_STRIDE==0; padded used length is K.ne[1]",
+      "dtypes": {
+        "quartz_q": "fp32_prepared",
+        "quartz_kv": "bf16_physical",
+        "llama_kv_native": "f16_f16_token_major"
+      },
+      "strides": {
+        "quartz_kv_physical": "attention_kv_physical_index(token, kv_head, dim, capacity=131072, head_width=256)",
+        "llama_k_view": "hparams.n_embd_head_k x n_head_kv x n_kv"
+      }
+    },
+    {
+      "position": 6144,
+      "quartz_visible_length": 6145,
+      "quartz_zero_based_position": 6144,
+      "allocated_capacity": 131072,
+      "quartz_path": "warp_query",
+      "quartz_launch": "warp_query_decode_attention",
+      "quartz_topology": 0,
+      "quartz_n_parts": 16,
+      "graph_boundary_crossing": null,
+      "llama_logical_nkv": 6145,
+      "llama_padded_nkv": 6400,
+      "llama_pad_rule": "max(256, pad(used_max_p1, 256))",
+      "llama_selected_kernel": "flash_attn_ext_vec<256,1>",
+      "llama_vec_is_selected": true,
+      "llama_mask": "causal mask present; gqa_opt requires mask and K.ne[1] % FATTN_KQ_STRIDE==0; padded used length is K.ne[1]",
+      "dtypes": {
+        "quartz_q": "fp32_prepared",
+        "quartz_kv": "bf16_physical",
+        "llama_kv_native": "f16_f16_token_major"
+      },
+      "strides": {
+        "quartz_kv_physical": "attention_kv_physical_index(token, kv_head, dim, capacity=131072, head_width=256)",
+        "llama_k_view": "hparams.n_embd_head_k x n_head_kv x n_kv"
+      }
+    },
+    {
+      "position": 7935,
+      "quartz_visible_length": 7936,
+      "quartz_zero_based_position": 7935,
+      "allocated_capacity": 131072,
+      "quartz_path": "warp_query",
+      "quartz_launch": "warp_query_decode_attention",
+      "quartz_topology": 0,
+      "quartz_n_parts": 16,
+      "graph_boundary_crossing": null,
+      "llama_logical_nkv": 7936,
+      "llama_padded_nkv": 7936,
+      "llama_pad_rule": "max(256, pad(used_max_p1, 256))",
+      "llama_selected_kernel": "flash_attn_ext_vec<256,1>",
+      "llama_vec_is_selected": true,
+      "llama_mask": "causal mask present; gqa_opt requires mask and K.ne[1] % FATTN_KQ_STRIDE==0; padded used length is K.ne[1]",
+      "dtypes": {
+        "quartz_q": "fp32_prepared",
+        "quartz_kv": "bf16_physical",
+        "llama_kv_native": "f16_f16_token_major"
+      },
+      "strides": {
+        "quartz_kv_physical": "attention_kv_physical_index(token, kv_head, dim, capacity=131072, head_width=256)",
+        "llama_k_view": "hparams.n_embd_head_k x n_head_kv x n_kv"
+      }
+    },
+    {
+      "position": 7936,
+      "quartz_visible_length": 7937,
+      "quartz_zero_based_position": 7936,
+      "allocated_capacity": 131072,
+      "quartz_path": "warp_query",
+      "quartz_launch": "warp_query_decode_attention",
+      "quartz_topology": 0,
+      "quartz_n_parts": 16,
+      "graph_boundary_crossing": null,
+      "llama_logical_nkv": 7937,
+      "llama_padded_nkv": 8192,
+      "llama_pad_rule": "max(256, pad(used_max_p1, 256))",
+      "llama_selected_kernel": "fattn-mma-f16_ncols1=1_ncols2=8",
+      "llama_vec_is_selected": false,
+      "llama_mask": "causal mask present; gqa_opt requires mask and K.ne[1] % FATTN_KQ_STRIDE==0; padded used length is K.ne[1]",
+      "dtypes": {
+        "quartz_q": "fp32_prepared",
+        "quartz_kv": "bf16_physical",
+        "llama_kv_native": "f16_f16_token_major"
+      },
+      "strides": {
+        "quartz_kv_physical": "attention_kv_physical_index(token, kv_head, dim, capacity=131072, head_width=256)",
+        "llama_k_view": "hparams.n_embd_head_k x n_head_kv x n_kv"
+      }
+    },
+    {
+      "position": 8191,
+      "quartz_visible_length": 8192,
+      "quartz_zero_based_position": 8191,
+      "allocated_capacity": 131072,
+      "quartz_path": "warp_query",
+      "quartz_launch": "warp_query_decode_attention",
+      "quartz_topology": 0,
+      "quartz_n_parts": 16,
+      "graph_boundary_crossing": null,
+      "llama_logical_nkv": 8192,
+      "llama_padded_nkv": 8192,
+      "llama_pad_rule": "max(256, pad(used_max_p1, 256))",
+      "llama_selected_kernel": "fattn-mma-f16_ncols1=1_ncols2=8",
+      "llama_vec_is_selected": false,
+      "llama_mask": "causal mask present; gqa_opt requires mask and K.ne[1] % FATTN_KQ_STRIDE==0; padded used length is K.ne[1]",
+      "dtypes": {
+        "quartz_q": "fp32_prepared",
+        "quartz_kv": "bf16_physical",
+        "llama_kv_native": "f16_f16_token_major"
+      },
+      "strides": {
+        "quartz_kv_physical": "attention_kv_physical_index(token, kv_head, dim, capacity=131072, head_width=256)",
+        "llama_k_view": "hparams.n_embd_head_k x n_head_kv x n_kv"
+      }
+    },
+    {
+      "position": 8192,
+      "quartz_visible_length": 8193,
+      "quartz_zero_based_position": 8192,
+      "allocated_capacity": 131072,
+      "quartz_path": "dense_bf16_tile_f16_mma_decode_v1",
+      "quartz_launch": "dense_bf16_tile_f16_mma_decode_v1",
+      "quartz_topology": 2,
+      "quartz_n_parts": 132,
+      "graph_boundary_crossing": "topology_0_to_2",
+      "llama_logical_nkv": 8193,
+      "llama_padded_nkv": 8448,
+      "llama_pad_rule": "max(256, pad(used_max_p1, 256))",
+      "llama_selected_kernel": "fattn-mma-f16_ncols1=1_ncols2=8",
+      "llama_vec_is_selected": false,
+      "llama_mask": "causal mask present; gqa_opt requires mask and K.ne[1] % FATTN_KQ_STRIDE==0; padded used length is K.ne[1]",
+      "dtypes": {
+        "quartz_q": "fp32_prepared",
+        "quartz_kv": "bf16_physical",
+        "llama_kv_native": "f16_f16_token_major"
+      },
+      "strides": {
+        "quartz_kv_physical": "attention_kv_physical_index(token, kv_head, dim, capacity=131072, head_width=256)",
+        "llama_k_view": "hparams.n_embd_head_k x n_head_kv x n_kv"
+      }
+    },
+    {
+      "position": 8193,
+      "quartz_visible_length": 8194,
+      "quartz_zero_based_position": 8193,
+      "allocated_capacity": 131072,
+      "quartz_path": "dense_bf16_tile_f16_mma_decode_v1",
+      "quartz_launch": "dense_bf16_tile_f16_mma_decode_v1",
+      "quartz_topology": 2,
+      "quartz_n_parts": 132,
+      "graph_boundary_crossing": null,
+      "llama_logical_nkv": 8194,
+      "llama_padded_nkv": 8448,
+      "llama_pad_rule": "max(256, pad(used_max_p1, 256))",
+      "llama_selected_kernel": "fattn-mma-f16_ncols1=1_ncols2=8",
+      "llama_vec_is_selected": false,
+      "llama_mask": "causal mask present; gqa_opt requires mask and K.ne[1] % FATTN_KQ_STRIDE==0; padded used length is K.ne[1]",
+      "dtypes": {
+        "quartz_q": "fp32_prepared",
+        "quartz_kv": "bf16_physical",
+        "llama_kv_native": "f16_f16_token_major"
+      },
+      "strides": {
+        "quartz_kv_physical": "attention_kv_physical_index(token, kv_head, dim, capacity=131072, head_width=256)",
+        "llama_k_view": "hparams.n_embd_head_k x n_head_kv x n_kv"
+      }
+    },
+    {
+      "position": 32768,
+      "quartz_visible_length": 32769,
+      "quartz_zero_based_position": 32768,
+      "allocated_capacity": 131072,
+      "quartz_path": "dense_bf16_tile_f16_mma_decode_v1",
+      "quartz_launch": "dense_bf16_tile_f16_mma_decode_v1",
+      "quartz_topology": 3,
+      "quartz_n_parts": 148,
+      "graph_boundary_crossing": "topology_2_to_3",
+      "llama_logical_nkv": 32769,
+      "llama_padded_nkv": 33024,
+      "llama_pad_rule": "max(256, pad(used_max_p1, 256))",
+      "llama_selected_kernel": "fattn-mma-f16_ncols1=1_ncols2=8",
+      "llama_vec_is_selected": false,
+      "llama_mask": "causal mask present; gqa_opt requires mask and K.ne[1] % FATTN_KQ_STRIDE==0; padded used length is K.ne[1]",
+      "dtypes": {
+        "quartz_q": "fp32_prepared",
+        "quartz_kv": "bf16_physical",
+        "llama_kv_native": "f16_f16_token_major"
+      },
+      "strides": {
+        "quartz_kv_physical": "attention_kv_physical_index(token, kv_head, dim, capacity=131072, head_width=256)",
+        "llama_k_view": "hparams.n_embd_head_k x n_head_kv x n_kv"
+      }
+    }
+  ]
+}

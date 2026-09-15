@@ -1,0 +1,10 @@
+{
+  "blocked": false,
+  "status": "measured",
+  "gpu": "NVIDIA GeForce RTX 5090",
+  "zero_weight_mma_survives": true,
+  "claims_throughput": false,
+  "production_kept": true,
+  "nll": "N/A",
+  "throughput_shipping_delta": "N/A"
+}

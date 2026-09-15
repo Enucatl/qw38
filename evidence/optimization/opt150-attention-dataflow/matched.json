@@ -1,0 +1,98 @@
+{
+  "schema_version": 1,
+  "task": "OPT-150",
+  "phase": "matched",
+  "mode": "feedback",
+  "ok": true,
+  "skipped": false,
+  "blocked": false,
+  "status": "measured",
+  "warmups": 1,
+  "pairs": 3,
+  "eval_count": 32,
+  "prefixes": [
+    2048,
+    8192,
+    32768
+  ],
+  "shapes": [
+    {
+      "prefix": 2048,
+      "eval_count": 32,
+      "capacity": 131072,
+      "quartz_ms_per_token": 16.629501979166665,
+      "llama_ms_per_token": 14.3661436875,
+      "quartz_tok_s": 60.13409188397787,
+      "llama_tok_s": 69.60810233786687,
+      "ratio_quartz_over_llama": 1.1575480755935927,
+      "denominator": "decode_only_ms / eval_count",
+      "instrumented_quartz_ms_per_token": 16.6455008125,
+      "instrumented_kept_separate": true,
+      "quartz_rounds_ms_per_token": [
+        16.60970496875,
+        16.63722228125,
+        16.6415786875
+      ],
+      "llama_rounds_ms_per_token": [
+        14.35402690625,
+        14.379690375,
+        14.36471378125
+      ],
+      "metric": "decode_only"
+    },
+    {
+      "prefix": 8192,
+      "eval_count": 32,
+      "capacity": 131072,
+      "quartz_ms_per_token": 20.410231281250002,
+      "llama_ms_per_token": 17.072758635416665,
+      "quartz_tok_s": 48.99503519681606,
+      "llama_tok_s": 58.57284234813378,
+      "ratio_quartz_over_llama": 1.1954852591256049,
+      "denominator": "decode_only_ms / eval_count",
+      "instrumented_quartz_ms_per_token": 20.4114125625,
+      "instrumented_kept_separate": true,
+      "quartz_rounds_ms_per_token": [
+        20.4042263125,
+        20.40779878125,
+        20.41866875
+      ],
+      "llama_rounds_ms_per_token": [
+        17.05359784375,
+        17.09812625,
+        17.0665518125
+      ],
+      "metric": "decode_only"
+    },
+    {
+      "prefix": 32768,
+      "eval_count": 32,
+      "capacity": 131072,
+      "quartz_ms_per_token": 29.36345990625,
+      "llama_ms_per_token": 18.9222396875,
+      "quartz_tok_s": 34.05593220937668,
+      "llama_tok_s": 52.847866664568166,
+      "ratio_quartz_over_llama": 1.5517962139358934,
+      "denominator": "decode_only_ms / eval_count",
+      "instrumented_quartz_ms_per_token": 29.387756979166667,
+      "instrumented_kept_separate": true,
+      "quartz_rounds_ms_per_token": [
+        29.35269928125,
+        29.359521875,
+        29.3781585625
+      ],
+      "llama_rounds_ms_per_token": [
+        18.935059875,
+        18.90836540625,
+        18.92329378125
+      ],
+      "metric": "decode_only"
+    }
+  ],
+  "raw_count": 33,
+  "opt136_accounting": "unprofiled_decode_only_capacity_131072",
+  "opt142_accounting": "instrumented_attribution_separate_from_uninstrumented",
+  "claims_throughput": false,
+  "family_plan": "task=OPT-150 mode=feedback phase=matched loop_product=768 cases=3 candidates=2 warmups=1 samples=3 tokens=32",
+  "measured_at": "2026-09-15T12:16:16Z"
+}

@@ -1,0 +1,19 @@
+{
+  "shape": "D2048",
+  "position": 2048,
+  "quartz_mean_ms": 0.6303786633333334,
+  "llama_enclosing_mean_ms": 0.0365333334,
+  "adapter_mean_ms": 0.0135253333,
+  "llama_native_kernel_mean_ms": 0.023008000100000002,
+  "independent_recompute": {
+    "quartz_mean_ms": 0.6303786633333334,
+    "n_quartz": 3,
+    "n_llama": 0
+  },
+  "ratio": {
+    "quartz_over_llama_family": 17.254890388221003,
+    "denominator": "llama_complete_family_ms_including_adapter"
+  },
+  "llama_kernel_identity": "flash_attn_ext_vec<256,1>",
+  "adapter_charged_separately": true
+}
