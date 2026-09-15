@@ -314,6 +314,21 @@ constexpr char kLegalDecodeAttentionFlashVec[] =
 constexpr char kDecodeAttentionFlashVecLaunch[] =
     "flash_vec_decode_attention";
 constexpr bool kSelectedDecodeAttentionFlashVec = true;
+// OPT-152 dispatch-only coverage overlay. KEEP selected all_short:
+// flash-vec on [0,8191]. Do not raise verified_max globally. MMA at
+// >=8192 is unchanged. Arithmetic stays OPT-148 n_parts=16.
+constexpr char kLegalDecodeAttentionFlashVecGapOnly[] =
+    "flash_vec_gap_only_v1";
+constexpr char kLegalDecodeAttentionFlashVecAllShort[] =
+    "flash_vec_all_short_v1";
+constexpr char kLegalDecodeAttentionFlashVecCoverageParent[] = "parent";
+constexpr char kLegalDecodeAttentionFlashVecCoverageGapOnly[] = "gap_only";
+constexpr char kLegalDecodeAttentionFlashVecCoverageAllShort[] = "all_short";
+constexpr char kSelectedDecodeAttentionFlashVecCoverage[] = "all_short";
+constexpr int kOpt152FlashVecCoverageParent = 0;
+constexpr int kOpt152FlashVecCoverageGapOnly = 1;
+constexpr int kOpt152FlashVecCoverageAllShort = 2;
+constexpr int kOpt152FlashVecHiExclusive = 8192;
 
 inline thread_local bool g_opt137_mma_override = false;
 inline thread_local bool g_opt151_qk_pv_mma_override = false;
@@ -323,6 +338,7 @@ inline thread_local unsigned int g_opt151_mma_grid_y = 0;
 inline thread_local unsigned int g_opt151_mma_block = 0;
 inline thread_local int g_opt151_last_n_parts = 0;
 inline thread_local bool g_decode_attention_flash_vec_override = false;
+inline thread_local int g_opt152_flash_vec_coverage_override = -1;
 inline thread_local int g_opt137_frozen_n_parts[3] = {0, 0, 0};
 inline thread_local unsigned int g_opt137_mma_launches = 0;
 inline thread_local unsigned int g_opt137_mma_grid_x = 0;
@@ -413,6 +429,86 @@ inline bool opt151_uses_qk_pv_mma_at(std::size_t position) noexcept {
 inline bool decode_attention_flash_vec_enabled() noexcept {
   return g_decode_attention_flash_vec_override ||
          kSelectedDecodeAttentionFlashVec;
+}
+
+inline bool legal_opt152_flash_vec_coverage(int coverage) noexcept {
+  return coverage == kOpt152FlashVecCoverageParent ||
+         coverage == kOpt152FlashVecCoverageGapOnly ||
+         coverage == kOpt152FlashVecCoverageAllShort;
+}
+
+inline int opt152_flash_vec_coverage_from_ident(const char* path) noexcept {
+  if (path == nullptr) return -1;
+  if (std::strcmp(path, kLegalDecodeAttentionFlashVecGapOnly) == 0 ||
+      std::strcmp(path, kLegalDecodeAttentionFlashVecCoverageGapOnly) == 0) {
+    return kOpt152FlashVecCoverageGapOnly;
+  }
+  if (std::strcmp(path, kLegalDecodeAttentionFlashVecAllShort) == 0 ||
+      std::strcmp(path, kLegalDecodeAttentionFlashVecCoverageAllShort) == 0) {
+    return kOpt152FlashVecCoverageAllShort;
+  }
+  if (std::strcmp(path, kLegalDecodeAttentionFlashVecCoverageParent) == 0 ||
+      std::strcmp(path, kLegalDecodeAttentionFlashVec) == 0 ||
+      std::strcmp(path, kLegalDecodeAttentionHybridCrossover) == 0) {
+    return kOpt152FlashVecCoverageParent;
+  }
+  return -1;
+}
+
+inline int selected_opt152_flash_vec_coverage() noexcept {
+  const int from_pin =
+      opt152_flash_vec_coverage_from_ident(kSelectedDecodeAttentionFlashVecCoverage);
+  return legal_opt152_flash_vec_coverage(from_pin)
+             ? from_pin
+             : kOpt152FlashVecCoverageParent;
+}
+
+inline int effective_opt152_flash_vec_coverage() noexcept {
+  if (legal_opt152_flash_vec_coverage(g_opt152_flash_vec_coverage_override)) {
+    return g_opt152_flash_vec_coverage_override;
+  }
+  return selected_opt152_flash_vec_coverage();
+}
+
+inline const char* opt152_flash_vec_coverage_ident(int coverage) noexcept {
+  if (coverage == kOpt152FlashVecCoverageGapOnly) {
+    return kLegalDecodeAttentionFlashVecGapOnly;
+  }
+  if (coverage == kOpt152FlashVecCoverageAllShort) {
+    return kLegalDecodeAttentionFlashVecAllShort;
+  }
+  return kLegalDecodeAttentionFlashVecCoverageParent;
+}
+
+inline std::size_t opt152_flash_vec_lo(int coverage) noexcept {
+  return coverage == kOpt152FlashVecCoverageAllShort
+             ? 0
+             : static_cast<std::size_t>(
+                   kSelectedDecodeAttentionCrossoverThreshold);
+}
+
+inline std::size_t opt152_flash_vec_hi(int coverage) noexcept {
+  if (coverage == kOpt152FlashVecCoverageParent) {
+    return static_cast<std::size_t>(effective_decode_attention_verified_max());
+  }
+  return static_cast<std::size_t>(kOpt152FlashVecHiExclusive - 1);
+}
+
+inline bool opt152_flash_vec_covers(std::size_t position) noexcept {
+  if (!decode_attention_flash_vec_enabled()) return false;
+  const int coverage = effective_opt152_flash_vec_coverage();
+  return position >= opt152_flash_vec_lo(coverage) &&
+         position <= opt152_flash_vec_hi(coverage);
+}
+
+inline bool apply_opt152_flash_vec_coverage(int coverage) noexcept {
+  if (!legal_opt152_flash_vec_coverage(coverage)) return false;
+  g_opt152_flash_vec_coverage_override = coverage;
+  return true;
+}
+
+inline void clear_opt152_flash_vec_coverage_override() noexcept {
+  g_opt152_flash_vec_coverage_override = -1;
 }
 
 inline int opt137_bucket_index(std::size_t position) noexcept {
@@ -517,14 +613,14 @@ inline const char* decode_attention_vec128_path_for_position(
   if (g_decode_attention_vec128_path_override != nullptr) {
     return g_decode_attention_vec128_path_override;
   }
+  if (opt152_flash_vec_covers(position)) {
+    return kLegalDecodeAttentionFlashVec;
+  }
   const int threshold = effective_decode_attention_crossover_threshold();
   const int verified = effective_decode_attention_verified_max();
   if (threshold > 0 &&
       position >= static_cast<std::size_t>(threshold) &&
       position <= static_cast<std::size_t>(verified)) {
-    if (decode_attention_flash_vec_enabled()) {
-      return kLegalDecodeAttentionFlashVec;
-    }
     return kLegalDecodeAttentionVec128Online;
   }
   return kSelectedDecodeAttentionVec128Path;
@@ -696,16 +792,31 @@ inline bool apply_decode_attention_flash_vec_ident(const char* path) noexcept {
   if (path != nullptr &&
       std::strcmp(path, kLegalDecodeAttentionFlashVec) == 0) {
     g_decode_attention_flash_vec_override = true;
+    g_opt152_flash_vec_coverage_override = kOpt152FlashVecCoverageParent;
+    return true;
+  }
+  if (path != nullptr &&
+      std::strcmp(path, kLegalDecodeAttentionFlashVecGapOnly) == 0) {
+    g_decode_attention_flash_vec_override = true;
+    g_opt152_flash_vec_coverage_override = kOpt152FlashVecCoverageGapOnly;
+    return true;
+  }
+  if (path != nullptr &&
+      std::strcmp(path, kLegalDecodeAttentionFlashVecAllShort) == 0) {
+    g_decode_attention_flash_vec_override = true;
+    g_opt152_flash_vec_coverage_override = kOpt152FlashVecCoverageAllShort;
     return true;
   }
   if (path != nullptr &&
       std::strcmp(path, kLegalDecodeAttentionHybridCrossover) == 0) {
     g_decode_attention_flash_vec_override = false;
+    g_opt152_flash_vec_coverage_override = kOpt152FlashVecCoverageParent;
     return true;
   }
   if (path != nullptr &&
       std::strcmp(path, kLegalDecodeAttentionVec128Online) == 0) {
     g_decode_attention_flash_vec_override = false;
+    g_opt152_flash_vec_coverage_override = kOpt152FlashVecCoverageParent;
     return true;
   }
   return false;
@@ -713,6 +824,7 @@ inline bool apply_decode_attention_flash_vec_ident(const char* path) noexcept {
 
 inline void clear_decode_attention_flash_vec_override() noexcept {
   g_decode_attention_flash_vec_override = false;
+  g_opt152_flash_vec_coverage_override = -1;
 }
 
 inline void clear_opt137_dense_mma_ident() noexcept {
@@ -734,6 +846,7 @@ inline bool apply_opt130_dense_attention_ident(const char* path) noexcept {
     g_opt137_mma_override = false;
     g_opt151_qk_pv_mma_override = false;
     g_decode_attention_flash_vec_override = false;
+    g_opt152_flash_vec_coverage_override = kOpt152FlashVecCoverageParent;
     return true;
   }
   if (apply_opt137_dense_mma_ident(path)) {
@@ -862,18 +975,21 @@ struct Opt151QkPvMmaScope final {
 
 struct DecodeAttentionFlashVecScope final {
   explicit DecodeAttentionFlashVecScope(const char* path) noexcept
-      : previous_(g_decode_attention_flash_vec_override) {
+      : previous_flash_(g_decode_attention_flash_vec_override),
+        previous_coverage_(g_opt152_flash_vec_coverage_override) {
     apply_decode_attention_flash_vec_ident(path);
   }
   ~DecodeAttentionFlashVecScope() {
-    g_decode_attention_flash_vec_override = previous_;
+    g_decode_attention_flash_vec_override = previous_flash_;
+    g_opt152_flash_vec_coverage_override = previous_coverage_;
   }
   DecodeAttentionFlashVecScope(const DecodeAttentionFlashVecScope&) = delete;
   DecodeAttentionFlashVecScope& operator=(
       const DecodeAttentionFlashVecScope&) = delete;
 
  private:
-  bool previous_;
+  bool previous_flash_;
+  int previous_coverage_;
 };
 
 }  // namespace qw38::cuda

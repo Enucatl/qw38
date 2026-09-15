@@ -1,0 +1,63 @@
+{
+  "schema_version": 1,
+  "task": "OPT-152",
+  "phase": "report",
+  "mode": "acceptance",
+  "ok": true,
+  "verdict": "keep",
+  "production_kept": true,
+  "shipping_decode_attention": "decode_attention_flash_vec_v1",
+  "shipping_coverage": "all_short",
+  "tok_s_deltas": {
+    "d512.decode_only": {
+      "control_rate": 57.72085145159,
+      "candidate_rate": 60.38121583180972,
+      "delta": 2.6603643802197183,
+      "g": 1.0460901698621738
+    },
+    "d6144.decode_only": {
+      "control_rate": 39.20255955401916,
+      "candidate_rate": 58.193617308708454,
+      "delta": 18.991057754689294,
+      "g": 1.484433921886144
+    }
+  },
+  "candidate_measured_delta": {
+    "d512.decode_only": {
+      "control_rate": 57.72085145159,
+      "candidate_rate": 60.38121583180972,
+      "delta": 2.6603643802197183,
+      "g": 1.0460901698621738
+    },
+    "d6144.decode_only": {
+      "control_rate": 39.20255955401916,
+      "candidate_rate": 58.193617308708454,
+      "delta": 18.991057754689294,
+      "g": 1.484433921886144
+    }
+  },
+  "shipping_delta": {
+    "d512.decode_only": {
+      "control_rate": 57.72085145159,
+      "candidate_rate": 60.38121583180972,
+      "delta": 2.6603643802197183,
+      "g": 1.0460901698621738
+    },
+    "d6144.decode_only": {
+      "control_rate": 39.20255955401916,
+      "candidate_rate": 58.193617308708454,
+      "delta": 18.991057754689294,
+      "g": 1.484433921886144
+    }
+  },
+  "quality_result": "measured",
+  "family_plan": "task=OPT-152 mode=acceptance phase=report loop_product=1 cases=1 candidates=1 warmups=0 samples=1 tokens=1",
+  "measured_at": "2026-09-15T14:00:04Z",
+  "production_coverage": "all_short",
+  "final_dispatch_ranges": {
+    "flash_vec_lo": 0,
+    "flash_vec_hi": 8191,
+    "mma_lo": 8192,
+    "verified_max": 4096
+  }
+}

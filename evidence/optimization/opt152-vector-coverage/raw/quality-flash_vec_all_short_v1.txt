@@ -1,0 +1,18 @@
+
+==========
+== CUDA ==
+==========
+
+CUDA Version 13.0.2
+
+Container image Copyright (c) 2016-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+
+This container image and its contents are governed by the NVIDIA Deep Learning Container License.
+By pulling and using the container, you accept the terms and conditions of this license:
+https://developer.nvidia.com/ngc/nvidia-deep-learning-container-license
+
+A copy of this license is made available in this container at /NGC-DL-CONTAINER-LICENSE for your convenience.
+
+quality_flag=true restored_packed_or_r2=false effective_q4=llama_q4k_mmvq effective_ffn=paired_integer effective_q8_layout=r1_w4 effective_attention=prefill_attention_8x8_v1 applied_before_graph=true
+QW38_OPT058_RESULT={"schema_version":1,"task":"OPT-058","workload":"quality-baseline","engine":"quartz","repetitions":1,"selectors":{"q4_decode":"llama_q4k_mmvq","q8_decode":"dp4a_q8_1","q8_rows_skinny":1,"q8_layout_warps_skinny":4,"q8_layout":"r1_w4","ffn_decode":"paired_integer","execution_graph":"decode_segments8","rms_norm":"parallel_fma","effective_q4_decode":"llama_q4k_mmvq","effective_ffn_decode":"paired_integer"},"cases":[{"name":"wikitext_nll","scored":1024,"mean_nll":1.5254441451559835},{"name":"held_out_wikitext_1024","scored":1024,"mean_nll":1.7859087358662531},{"name":"recurrence_short","scored":128,"mean_nll":2.2420919339731524},{"name":"recurrence_long","scored":128,"mean_nll":2.7169926627043703}],"status":"passed"}
+status=passed

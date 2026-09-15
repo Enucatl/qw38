@@ -1,0 +1,560 @@
+{
+  "schema_version": 1,
+  "task": "OPT-152",
+  "phase": "screen",
+  "mode": "feedback",
+  "ok": true,
+  "screened_in": true,
+  "screened_out": false,
+  "advance": true,
+  "survivor": "flash_vec_all_short_v1",
+  "warmups": 1,
+  "pairs": 3,
+  "complete_attention_family": true,
+  "native": {
+    "returncode": 0,
+    "stdout_tail": "rs=16\nscreen_shape tokens=512 layers=16 coverage=flash_vec_gap_only_v1 parent_path=warp_query candidate_path=warp_query control_mean_ms=0.925579 candidate_mean_ms=0.914005 saving_ms=0.011573 faster=true pairs=3 warmups=1 rotating_layers=true complete_family=true n_parts=16\nround family=decode-attn cache_mode=rotating warmup=true sample_index=0 observation_unit=independent_round control_ms=0.917088 candidate_ms=0.917088 enclosing_ms=0.917088 attention_layers=16 path=flash_vec_gap_only_v1 tokens=6144 prep_included=true combine_included=true conversion_included=true\nround family=decode-attn cache_mode=rotating warmup=false sample_index=0 order=AB observation_unit=independent_round control_ms=7.017312 candidate_ms=0.895584 enclosing_ms=0.895584 attention_layers=16 path=flash_vec_gap_only_v1 launch=flash_vec_decode_attention tokens=6144 prep_included=true combine_included=true conversion_included=true rotating_layers=16\nround family=decode-attn cache_mode=rotating warmup=false sample_index=1 order=BA observation_unit=independent_round control_ms=6.925984 candidate_ms=0.947648 enclosing_ms=0.947648 attention_layers=16 path=flash_vec_gap_only_v1 launch=warp_query_decode_attention tokens=6144 prep_included=true combine_included=true conversion_included=true rotating_layers=16\nround family=decode-attn cache_mode=rotating warmup=false sample_index=2 order=AB observation_unit=independent_round control_ms=6.965952 candidate_ms=0.891808 enclosing_ms=0.891808 attention_layers=16 path=flash_vec_gap_only_v1 launch=flash_vec_decode_attention tokens=6144 prep_included=true combine_included=true conversion_included=true rotating_layers=16\nscreen_shape tokens=6144 layers=16 coverage=flash_vec_gap_only_v1 parent_path=warp_query candidate_path=decode_attention_flash_vec_v1 control_mean_ms=6.969749 candidate_mean_ms=0.911680 saving_ms=6.058069 faster=true pairs=3 warmups=1 rotating_layers=true complete_family=true n_parts=16\nround family=decode-attn cache_mode=rotating warmup=true sample_index=0 observation_unit=independent_round control_ms=0.401120 candidate_ms=0.401120 enclosing_ms=0.401120 attention_layers=16 path=flash_vec_all_short_v1 tokens=128 prep_included=true combine_included=true conversion_included=true\nround family=decode-attn cache_mode=rotating warmup=false sample_index=0 order=AB observation_unit=independent_round control_ms=0.513216 candidate_ms=0.410976 enclosing_ms=0.410976 attention_layers=16 path=flash_vec_all_short_v1 launch=flash_vec_decode_attention tokens=128 prep_included=true combine_included=true conversion_included=true rotating_layers=16\nround family=decode-attn cache_mode=rotating warmup=false sample_index=1 order=BA observation_unit=independent_round control_ms=0.490528 candidate_ms=0.449408 enclosing_ms=0.449408 attention_layers=16 path=flash_vec_all_short_v1 launch=warp_query_decode_attention tokens=128 prep_included=true combine_included=true conversion_included=true rotating_layers=16\nround family=decode-attn cache_mode=rotating warmup=false sample_index=2 order=AB observation_unit=independent_round control_ms=0.516096 candidate_ms=0.416192 enclosing_ms=0.416192 attention_layers=16 path=flash_vec_all_short_v1 launch=flash_vec_decode_attention tokens=128 prep_included=true combine_included=true conversion_included=true rotating_layers=16\nscreen_shape tokens=128 layers=16 coverage=flash_vec_all_short_v1 parent_path=warp_query candidate_path=decode_attention_flash_vec_v1 control_mean_ms=0.506613 candidate_mean_ms=0.425525 saving_ms=0.081088 faster=true pairs=3 warmups=1 rotating_layers=true complete_family=true n_parts=16\nround family=decode-attn cache_mode=rotating warmup=true sample_index=0 observation_unit=independent_round control_ms=0.439104 candidate_ms=0.439104 enclosing_ms=0.439104 attention_layers=16 path=flash_vec_all_short_v1 tokens=512 prep_included=true combine_included=true conversion_included=true\nround family=decode-attn cache_mode=rotating warmup=false sample_index=0 order=AB observation_unit=independent_round control_ms=0.944448 candidate_ms=0.412192 enclosing_ms=0.412192 attention_layers=16 path=flash_vec_all_short_v1 launch=flash_vec_decode_attention tokens=512 prep_included=true combine_included=true conversion_included=true rotating_layers=16\nround family=decode-attn cache_mode=rotating warmup=false sample_index=1 order=BA observation_unit=independent_round control_ms=0.903264 candidate_ms=0.473248 enclosing_ms=0.473248 attention_layers=16 path=flash_vec_all_short_v1 launch=warp_query_decode_attention tokens=512 prep_included=true combine_included=true conversion_included=true rotating_layers=16\nround family=decode-attn cache_mode=rotating warmup=false sample_index=2 order=AB observation_unit=independent_round control_ms=0.938880 candidate_ms=0.408224 enclosing_ms=0.408224 attention_layers=16 path=flash_vec_all_short_v1 launch=flash_vec_decode_attention tokens=512 prep_included=true combine_included=true conversion_included=true rotating_layers=16\nscreen_shape tokens=512 layers=16 coverage=flash_vec_all_short_v1 parent_path=warp_query candidate_path=decode_attention_flash_vec_v1 control_mean_ms=0.928864 candidate_mean_ms=0.431221 saving_ms=0.497643 faster=true pairs=3 warmups=1 rotating_layers=true complete_family=true n_parts=16\nround family=decode-attn cache_mode=rotating warmup=true sample_index=0 observation_unit=independent_round control_ms=0.887936 candidate_ms=0.887936 enclosing_ms=0.887936 attention_layers=16 path=flash_vec_all_short_v1 tokens=6144 prep_included=true combine_included=true conversion_included=true\nround family=decode-attn cache_mode=rotating warmup=false sample_index=0 order=AB observation_unit=independent_round control_ms=6.962336 candidate_ms=0.891488 enclosing_ms=0.891488 attention_layers=16 path=flash_vec_all_short_v1 launch=flash_vec_decode_attention tokens=6144 prep_included=true combine_included=true conversion_included=true rotating_layers=16\nround family=decode-attn cache_mode=rotating warmup=false sample_index=1 order=BA observation_unit=independent_round control_ms=6.930304 candidate_ms=0.926336 enclosing_ms=0.926336 attention_layers=16 path=flash_vec_all_short_v1 launch=warp_query_decode_attention tokens=6144 prep_included=true combine_included=true conversion_included=true rotating_layers=16\nround family=decode-attn cache_mode=rotating warmup=false sample_index=2 order=AB observation_unit=independent_round control_ms=6.972256 candidate_ms=0.891648 enclosing_ms=0.891648 attention_layers=16 path=flash_vec_all_short_v1 launch=flash_vec_decode_attention tokens=6144 prep_included=true combine_included=true conversion_included=true rotating_layers=16\nscreen_shape tokens=6144 layers=16 coverage=flash_vec_all_short_v1 parent_path=warp_query candidate_path=decode_attention_flash_vec_v1 control_mean_ms=6.954966 candidate_mean_ms=0.903157 saving_ms=6.051808 faster=true pairs=3 warmups=1 rotating_layers=true complete_family=true n_parts=16\nproduction_flash_vec=true coverage_pin=parent mma_threshold=8192 vec128_n_parts=16 verified_max=4096 opt151_selected=false opt130_n_parts_not_revived=true crossover=1024\nQW38_OPT152_VECTOR_COVERAGE_RESULT={\"schema_version\":1,\"task\":\"OPT-152\",\"workload\":\"screen\",\"llama_revision\":\"cc83d7b4824f73cfdda4dfbb47ee39804f71b328\",\"gguf_sha256\":\"31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34\",\"candidates\":[\"flash_vec_gap_only_v1\",\"flash_vec_all_short_v1\"],\"parent_coverage\":\"parent\",\"verified_max\":4096,\"nonfinite\":0,\"pass\":true,\"keep\":false,\"observed_warmups\":1,\"observed_samples\":3,\"observed_candidates\":2,\"observed_shapes\":3,\"observed_tier\":\"screen\",\"acceptance_executed\":true,\"pairs\":3,\"n_parts\":16,\"mma_threshold\":8192,\"opt130_revived\":false,\"claims_throughput\":false}\nQW38_OPT152_NATIVE_COUNTS={\"schema_version\":1,\"task\":\"OPT-152\",\"family\":\"decode-attn\",\"tier\":\"screen\",\"warmups\":1,\"samples\":3,\"observed_warmups\":1,\"observed_samples\":3,\"observed_candidates\":2,\"observed_shapes\":3,\"observed_tier\":\"screen\",\"pairs\":3,\"acceptance_executed\":true,\"keep\":false}\n",
+    "result": {
+      "schema_version": 1,
+      "task": "OPT-152",
+      "workload": "screen",
+      "llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+      "gguf_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+      "candidates": [
+        "flash_vec_gap_only_v1",
+        "flash_vec_all_short_v1"
+      ],
+      "parent_coverage": "parent",
+      "verified_max": 4096,
+      "nonfinite": 0,
+      "pass": true,
+      "keep": false,
+      "observed_warmups": 1,
+      "observed_samples": 3,
+      "observed_candidates": 2,
+      "observed_shapes": 3,
+      "observed_tier": "screen",
+      "acceptance_executed": true,
+      "pairs": 3,
+      "n_parts": 16,
+      "mma_threshold": 8192,
+      "opt130_revived": false,
+      "claims_throughput": false
+    },
+    "counts": {
+      "schema_version": 1,
+      "task": "OPT-152",
+      "family": "decode-attn",
+      "tier": "screen",
+      "warmups": 1,
+      "samples": 3,
+      "observed_warmups": 1,
+      "observed_samples": 3,
+      "observed_candidates": 2,
+      "observed_shapes": 3,
+      "observed_tier": "screen",
+      "pairs": 3,
+      "acceptance_executed": true,
+      "keep": false
+    },
+    "pass": true,
+    "raw": "build/optimization-runs/opt152/screen-native.txt"
+  },
+  "parsed": {
+    "shapes": {
+      "flash_vec_gap_only_v1": {
+        "128": {
+          "tokens": 128,
+          "layers": 16,
+          "coverage": "flash_vec_gap_only_v1",
+          "parent_path": "warp_query",
+          "candidate_path": "warp_query",
+          "control_mean_ms": 0.508587,
+          "candidate_mean_ms": 0.503083,
+          "saving_ms": 0.005504,
+          "faster": true,
+          "pairs": 3,
+          "warmups": 1
+        },
+        "512": {
+          "tokens": 512,
+          "layers": 16,
+          "coverage": "flash_vec_gap_only_v1",
+          "parent_path": "warp_query",
+          "candidate_path": "warp_query",
+          "control_mean_ms": 0.925579,
+          "candidate_mean_ms": 0.914005,
+          "saving_ms": 0.011573,
+          "faster": true,
+          "pairs": 3,
+          "warmups": 1
+        },
+        "6144": {
+          "tokens": 6144,
+          "layers": 16,
+          "coverage": "flash_vec_gap_only_v1",
+          "parent_path": "warp_query",
+          "candidate_path": "decode_attention_flash_vec_v1",
+          "control_mean_ms": 6.969749,
+          "candidate_mean_ms": 0.91168,
+          "saving_ms": 6.058069,
+          "faster": true,
+          "pairs": 3,
+          "warmups": 1
+        }
+      },
+      "flash_vec_all_short_v1": {
+        "128": {
+          "tokens": 128,
+          "layers": 16,
+          "coverage": "flash_vec_all_short_v1",
+          "parent_path": "warp_query",
+          "candidate_path": "decode_attention_flash_vec_v1",
+          "control_mean_ms": 0.506613,
+          "candidate_mean_ms": 0.425525,
+          "saving_ms": 0.081088,
+          "faster": true,
+          "pairs": 3,
+          "warmups": 1
+        },
+        "512": {
+          "tokens": 512,
+          "layers": 16,
+          "coverage": "flash_vec_all_short_v1",
+          "parent_path": "warp_query",
+          "candidate_path": "decode_attention_flash_vec_v1",
+          "control_mean_ms": 0.928864,
+          "candidate_mean_ms": 0.431221,
+          "saving_ms": 0.497643,
+          "faster": true,
+          "pairs": 3,
+          "warmups": 1
+        },
+        "6144": {
+          "tokens": 6144,
+          "layers": 16,
+          "coverage": "flash_vec_all_short_v1",
+          "parent_path": "warp_query",
+          "candidate_path": "decode_attention_flash_vec_v1",
+          "control_mean_ms": 6.954966,
+          "candidate_mean_ms": 0.903157,
+          "saving_ms": 6.051808,
+          "faster": true,
+          "pairs": 3,
+          "warmups": 1
+        }
+      }
+    },
+    "rounds": [
+      {
+        "warmup": false,
+        "sample_index": 0,
+        "control_ms": 0.529376,
+        "candidate_ms": 0.485504,
+        "path": "flash_vec_gap_only_v1",
+        "tokens": 128
+      },
+      {
+        "warmup": false,
+        "sample_index": 1,
+        "control_ms": 0.479712,
+        "candidate_ms": 0.532512,
+        "path": "flash_vec_gap_only_v1",
+        "tokens": 128
+      },
+      {
+        "warmup": false,
+        "sample_index": 2,
+        "control_ms": 0.516672,
+        "candidate_ms": 0.491232,
+        "path": "flash_vec_gap_only_v1",
+        "tokens": 128
+      },
+      {
+        "warmup": false,
+        "sample_index": 0,
+        "control_ms": 0.957792,
+        "candidate_ms": 0.89008,
+        "path": "flash_vec_gap_only_v1",
+        "tokens": 512
+      },
+      {
+        "warmup": false,
+        "sample_index": 1,
+        "control_ms": 0.890432,
+        "candidate_ms": 0.93696,
+        "path": "flash_vec_gap_only_v1",
+        "tokens": 512
+      },
+      {
+        "warmup": false,
+        "sample_index": 2,
+        "control_ms": 0.928512,
+        "candidate_ms": 0.914976,
+        "path": "flash_vec_gap_only_v1",
+        "tokens": 512
+      },
+      {
+        "warmup": false,
+        "sample_index": 0,
+        "control_ms": 7.017312,
+        "candidate_ms": 0.895584,
+        "path": "flash_vec_gap_only_v1",
+        "tokens": 6144
+      },
+      {
+        "warmup": false,
+        "sample_index": 1,
+        "control_ms": 6.925984,
+        "candidate_ms": 0.947648,
+        "path": "flash_vec_gap_only_v1",
+        "tokens": 6144
+      },
+      {
+        "warmup": false,
+        "sample_index": 2,
+        "control_ms": 6.965952,
+        "candidate_ms": 0.891808,
+        "path": "flash_vec_gap_only_v1",
+        "tokens": 6144
+      },
+      {
+        "warmup": false,
+        "sample_index": 0,
+        "control_ms": 0.513216,
+        "candidate_ms": 0.410976,
+        "path": "flash_vec_all_short_v1",
+        "tokens": 128
+      },
+      {
+        "warmup": false,
+        "sample_index": 1,
+        "control_ms": 0.490528,
+        "candidate_ms": 0.449408,
+        "path": "flash_vec_all_short_v1",
+        "tokens": 128
+      },
+      {
+        "warmup": false,
+        "sample_index": 2,
+        "control_ms": 0.516096,
+        "candidate_ms": 0.416192,
+        "path": "flash_vec_all_short_v1",
+        "tokens": 128
+      },
+      {
+        "warmup": false,
+        "sample_index": 0,
+        "control_ms": 0.944448,
+        "candidate_ms": 0.412192,
+        "path": "flash_vec_all_short_v1",
+        "tokens": 512
+      },
+      {
+        "warmup": false,
+        "sample_index": 1,
+        "control_ms": 0.903264,
+        "candidate_ms": 0.473248,
+        "path": "flash_vec_all_short_v1",
+        "tokens": 512
+      },
+      {
+        "warmup": false,
+        "sample_index": 2,
+        "control_ms": 0.93888,
+        "candidate_ms": 0.408224,
+        "path": "flash_vec_all_short_v1",
+        "tokens": 512
+      },
+      {
+        "warmup": false,
+        "sample_index": 0,
+        "control_ms": 6.962336,
+        "candidate_ms": 0.891488,
+        "path": "flash_vec_all_short_v1",
+        "tokens": 6144
+      },
+      {
+        "warmup": false,
+        "sample_index": 1,
+        "control_ms": 6.930304,
+        "candidate_ms": 0.926336,
+        "path": "flash_vec_all_short_v1",
+        "tokens": 6144
+      },
+      {
+        "warmup": false,
+        "sample_index": 2,
+        "control_ms": 6.972256,
+        "candidate_ms": 0.891648,
+        "path": "flash_vec_all_short_v1",
+        "tokens": 6144
+      }
+    ],
+    "ok": true
+  },
+  "choice": {
+    "all_short_ok": true,
+    "gap_only_ok": true,
+    "survivor": "flash_vec_all_short_v1",
+    "reason": "all_short_both_targets_improved_d128_within_2pct",
+    "choice_rule": "prefer all_short only if D512 and D6144 family means improve and D128 loses at most 2%; else gap_only if D6144 improves"
+  },
+  "reconstruction": {
+    "schema_version": 1,
+    "task": "OPT-152",
+    "complete_family": true,
+    "rotating_layers": 16,
+    "warmups": 1,
+    "pairs": 3,
+    "shapes": {
+      "flash_vec_gap_only_v1": {
+        "128": {
+          "tokens": 128,
+          "layers": 16,
+          "coverage": "flash_vec_gap_only_v1",
+          "parent_path": "warp_query",
+          "candidate_path": "warp_query",
+          "control_mean_ms": 0.508587,
+          "candidate_mean_ms": 0.503083,
+          "saving_ms": 0.005504,
+          "faster": true,
+          "pairs": 3,
+          "warmups": 1
+        },
+        "512": {
+          "tokens": 512,
+          "layers": 16,
+          "coverage": "flash_vec_gap_only_v1",
+          "parent_path": "warp_query",
+          "candidate_path": "warp_query",
+          "control_mean_ms": 0.925579,
+          "candidate_mean_ms": 0.914005,
+          "saving_ms": 0.011573,
+          "faster": true,
+          "pairs": 3,
+          "warmups": 1
+        },
+        "6144": {
+          "tokens": 6144,
+          "layers": 16,
+          "coverage": "flash_vec_gap_only_v1",
+          "parent_path": "warp_query",
+          "candidate_path": "decode_attention_flash_vec_v1",
+          "control_mean_ms": 6.969749,
+          "candidate_mean_ms": 0.91168,
+          "saving_ms": 6.058069,
+          "faster": true,
+          "pairs": 3,
+          "warmups": 1
+        }
+      },
+      "flash_vec_all_short_v1": {
+        "128": {
+          "tokens": 128,
+          "layers": 16,
+          "coverage": "flash_vec_all_short_v1",
+          "parent_path": "warp_query",
+          "candidate_path": "decode_attention_flash_vec_v1",
+          "control_mean_ms": 0.506613,
+          "candidate_mean_ms": 0.425525,
+          "saving_ms": 0.081088,
+          "faster": true,
+          "pairs": 3,
+          "warmups": 1
+        },
+        "512": {
+          "tokens": 512,
+          "layers": 16,
+          "coverage": "flash_vec_all_short_v1",
+          "parent_path": "warp_query",
+          "candidate_path": "decode_attention_flash_vec_v1",
+          "control_mean_ms": 0.928864,
+          "candidate_mean_ms": 0.431221,
+          "saving_ms": 0.497643,
+          "faster": true,
+          "pairs": 3,
+          "warmups": 1
+        },
+        "6144": {
+          "tokens": 6144,
+          "layers": 16,
+          "coverage": "flash_vec_all_short_v1",
+          "parent_path": "warp_query",
+          "candidate_path": "decode_attention_flash_vec_v1",
+          "control_mean_ms": 6.954966,
+          "candidate_mean_ms": 0.903157,
+          "saving_ms": 6.051808,
+          "faster": true,
+          "pairs": 3,
+          "warmups": 1
+        }
+      }
+    },
+    "rounds": [
+      {
+        "warmup": false,
+        "sample_index": 0,
+        "control_ms": 0.529376,
+        "candidate_ms": 0.485504,
+        "path": "flash_vec_gap_only_v1",
+        "tokens": 128
+      },
+      {
+        "warmup": false,
+        "sample_index": 1,
+        "control_ms": 0.479712,
+        "candidate_ms": 0.532512,
+        "path": "flash_vec_gap_only_v1",
+        "tokens": 128
+      },
+      {
+        "warmup": false,
+        "sample_index": 2,
+        "control_ms": 0.516672,
+        "candidate_ms": 0.491232,
+        "path": "flash_vec_gap_only_v1",
+        "tokens": 128
+      },
+      {
+        "warmup": false,
+        "sample_index": 0,
+        "control_ms": 0.957792,
+        "candidate_ms": 0.89008,
+        "path": "flash_vec_gap_only_v1",
+        "tokens": 512
+      },
+      {
+        "warmup": false,
+        "sample_index": 1,
+        "control_ms": 0.890432,
+        "candidate_ms": 0.93696,
+        "path": "flash_vec_gap_only_v1",
+        "tokens": 512
+      },
+      {
+        "warmup": false,
+        "sample_index": 2,
+        "control_ms": 0.928512,
+        "candidate_ms": 0.914976,
+        "path": "flash_vec_gap_only_v1",
+        "tokens": 512
+      },
+      {
+        "warmup": false,
+        "sample_index": 0,
+        "control_ms": 7.017312,
+        "candidate_ms": 0.895584,
+        "path": "flash_vec_gap_only_v1",
+        "tokens": 6144
+      },
+      {
+        "warmup": false,
+        "sample_index": 1,
+        "control_ms": 6.925984,
+        "candidate_ms": 0.947648,
+        "path": "flash_vec_gap_only_v1",
+        "tokens": 6144
+      },
+      {
+        "warmup": false,
+        "sample_index": 2,
+        "control_ms": 6.965952,
+        "candidate_ms": 0.891808,
+        "path": "flash_vec_gap_only_v1",
+        "tokens": 6144
+      },
+      {
+        "warmup": false,
+        "sample_index": 0,
+        "control_ms": 0.513216,
+        "candidate_ms": 0.410976,
+        "path": "flash_vec_all_short_v1",
+        "tokens": 128
+      },
+      {
+        "warmup": false,
+        "sample_index": 1,
+        "control_ms": 0.490528,
+        "candidate_ms": 0.449408,
+        "path": "flash_vec_all_short_v1",
+        "tokens": 128
+      },
+      {
+        "warmup": false,
+        "sample_index": 2,
+        "control_ms": 0.516096,
+        "candidate_ms": 0.416192,
+        "path": "flash_vec_all_short_v1",
+        "tokens": 128
+      },
+      {
+        "warmup": false,
+        "sample_index": 0,
+        "control_ms": 0.944448,
+        "candidate_ms": 0.412192,
+        "path": "flash_vec_all_short_v1",
+        "tokens": 512
+      },
+      {
+        "warmup": false,
+        "sample_index": 1,
+        "control_ms": 0.903264,
+        "candidate_ms": 0.473248,
+        "path": "flash_vec_all_short_v1",
+        "tokens": 512
+      },
+      {
+        "warmup": false,
+        "sample_index": 2,
+        "control_ms": 0.93888,
+        "candidate_ms": 0.408224,
+        "path": "flash_vec_all_short_v1",
+        "tokens": 512
+      },
+      {
+        "warmup": false,
+        "sample_index": 0,
+        "control_ms": 6.962336,
+        "candidate_ms": 0.891488,
+        "path": "flash_vec_all_short_v1",
+        "tokens": 6144
+      },
+      {
+        "warmup": false,
+        "sample_index": 1,
+        "control_ms": 6.930304,
+        "candidate_ms": 0.926336,
+        "path": "flash_vec_all_short_v1",
+        "tokens": 6144
+      },
+      {
+        "warmup": false,
+        "sample_index": 2,
+        "control_ms": 6.972256,
+        "candidate_ms": 0.891648,
+        "path": "flash_vec_all_short_v1",
+        "tokens": 6144
+      }
+    ],
+    "choice": {
+      "all_short_ok": true,
+      "gap_only_ok": true,
+      "survivor": "flash_vec_all_short_v1",
+      "reason": "all_short_both_targets_improved_d128_within_2pct",
+      "choice_rule": "prefer all_short only if D512 and D6144 family means improve and D128 loses at most 2%; else gap_only if D6144 improves"
+    },
+    "mechanism": "unknown",
+    "prep_included": true,
+    "combine_included": true,
+    "conversion_included": true
+  },
+  "candidates": [
+    "flash_vec_gap_only_v1",
+    "flash_vec_all_short_v1"
+  ],
+  "mechanism": "unknown",
+  "family_plan": "task=OPT-152 mode=feedback phase=screen loop_product=24 cases=3 candidates=2 warmups=1 samples=3 tokens=1",
+  "measured_at": "2026-09-15T13:27:07Z",
+  "reason": null
+}

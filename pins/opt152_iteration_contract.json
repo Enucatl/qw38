@@ -1,0 +1,209 @@
+{
+  "schema_version": 1,
+  "task": "OPT-152",
+  "yardstick": "flash_vec_gap_only_v1",
+  "claims_throughput": true,
+  "claims_performance_improvement": true,
+  "opt074_family_admission_required": false,
+  "opt074_coverage_unadmitted_is_blocker": false,
+  "keep_policy_id": "target_guard_v2",
+  "require_candidate_nll": true,
+  "performance_admission": {
+    "enabled": true
+  },
+  "image": "qw38-cuda:13.0.2",
+  "model": "models/Qwen3.8-27B-Q4_K_M.gguf",
+  "gpu_lock": "build/optimization-runs/qw38-gpu.lock",
+  "aggregate_deadline_s": 7200,
+  "target": "tools/opt152_vector_coverage.py",
+  "diagnostics_make_target": "cuda-opt152-diagnostics",
+  "selector": "flash_vec_gap_only_v1",
+  "case_ids": [
+    "correctness",
+    "screen",
+    "quality",
+    "state-memory",
+    "performance",
+    "report"
+  ],
+  "modes": {
+    "feedback": {
+      "target": "tools/opt152_vector_coverage.py",
+      "tier_sequence": ["correctness", "screen"],
+      "make_targets": [
+        "build/qw38-cuda-opt152-vector-coverage-test",
+        "build/qw38-cuda-opt058-quality-baseline-test"
+      ],
+      "build_once": true,
+      "warm_repetitions": 0,
+      "aggregate_deadline_s": 7200,
+      "workloads": ["correctness", "screen"]
+    },
+    "acceptance": {
+      "target": "tools/opt152_vector_coverage.py",
+      "tier_sequence": [
+        "quality",
+        "state-memory",
+        "performance",
+        "report"
+      ],
+      "make_targets": [
+        "build/qw38-cuda-opt152-vector-coverage-test",
+        "build/qw38-cuda-opt058-quality-baseline-test",
+        "build/qw38-cuda-checkpoint-test",
+        "build/qw38-cuda-memory-fit-test",
+        "build/qw38-cuda-optimization-engine-probe"
+      ],
+      "warm_repetitions": 0,
+      "aggregate_deadline_s": 7200,
+      "workloads": [
+        "quality",
+        "state-memory",
+        "performance",
+        "report"
+      ]
+    },
+    "release": {
+      "target": "tools/opt152_vector_coverage.py",
+      "tier": "acceptance",
+      "make_targets": [
+        "build/qw38-cuda-opt058-quality-baseline-test"
+      ],
+      "skip_compile": false,
+      "historical_oracles": false,
+      "aggregate_deadline_s": 7200,
+      "workloads": ["quality", "state-memory"]
+    }
+  },
+  "workloads": {
+    "correctness": {
+      "target": "build/qw38-cuda-opt152-vector-coverage-test",
+      "tier": "correctness",
+      "runner": "host",
+      "kind": "dispatch_fp64_graph_replay_positions",
+      "cases": 14,
+      "candidates": 2,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 1,
+      "execution_modes": 3,
+      "control_candidate_pairs": 1,
+      "load_model": 0,
+      "reference": 1,
+      "gpu_work": true,
+      "args": [
+        "uv", "run", "python", "tools/opt152_vector_coverage.py",
+        "--phase", "correctness", "--mode", "{mode}", "--run-dir", "{run_dir}"
+      ]
+    },
+    "screen": {
+      "target": "build/qw38-cuda-opt152-vector-coverage-test",
+      "tier": "screen",
+      "runner": "host",
+      "kind": "complete_attention_family_d128_d512_d6144",
+      "cases": 3,
+      "candidates": 2,
+      "warmups": 1,
+      "samples": 3,
+      "tokens": 1,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 0,
+      "gpu_work": true,
+      "args": [
+        "uv", "run", "python", "tools/opt152_vector_coverage.py",
+        "--phase", "screen", "--mode", "{mode}", "--run-dir", "{run_dir}"
+      ]
+    },
+    "quality": {
+      "target": "build/qw38-cuda-opt058-quality-baseline-test",
+      "tier": "acceptance",
+      "runner": "host",
+      "kind": "opt058_quality_flag_candidate_nll",
+      "engines": ["quartz"],
+      "configurations": ["decode_attention_flash_vec_v1", "flash_vec_gap_only_v1"],
+      "cases": 12,
+      "candidates": 1,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 1024,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 1,
+      "reference": 1,
+      "aggregate_deadline_s": 7200,
+      "args": [
+        "uv", "run", "python", "tools/opt152_vector_coverage.py",
+        "--phase", "quality", "--mode", "{mode}", "--run-dir", "{run_dir}"
+      ]
+    },
+    "state-memory": {
+      "target": "build/qw38-cuda-memory-fit-test",
+      "tier": "acceptance",
+      "runner": "host",
+      "kind": "checkpoint_graph_eager_handoff_128k_fit",
+      "cases": 3,
+      "candidates": 1,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 1,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 1,
+      "aggregate_deadline_s": 7200,
+      "args": [
+        "uv", "run", "python", "tools/opt152_vector_coverage.py",
+        "--phase", "state-memory", "--mode", "{mode}", "--run-dir", "{run_dir}"
+      ]
+    },
+    "performance": {
+      "target": "tools/opt152_vector_coverage.py",
+      "tier": "acceptance",
+      "runner": "host",
+      "kind": "target_guard_v2_ab_ba",
+      "cases": 7,
+      "candidates": 2,
+      "warmups": 3,
+      "samples": 10,
+      "tokens": 1,
+      "output_tokens": 256,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 1,
+      "gpu_work": true,
+      "args": [
+        "uv", "run", "python", "tools/opt152_vector_coverage.py",
+        "--phase", "performance", "--mode", "{mode}", "--run-dir", "{run_dir}"
+      ]
+    },
+    "report": {
+      "target": "tools/opt152_vector_coverage.py",
+      "tier": "acceptance",
+      "runner": "host",
+      "kind": "keep_or_screened_out_or_reject_report",
+      "cases": 1,
+      "candidates": 1,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 1,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 0,
+      "gpu_work": false,
+      "args": [
+        "uv", "run", "python", "tools/opt152_vector_coverage.py",
+        "--phase", "report", "--mode", "{mode}", "--run-dir", "{run_dir}"
+      ]
+    }
+  },
+  "proof_limit": [
+    "dispatch-only overlay of kept OPT-148 flash-vec; mechanism unknown at screen",
+    "do not increase verified_max globally; do not lower OPT-137 MMA threshold; do not revive OPT-130",
+    "screen both candidates at D128/D512/D6144, 1 warmup plus 3 pairs, 16-layer complete family",
+    "prefer all_short only if both target means improve and D128 loses at most 2%; else gap_only if D6144 improves",
+    "quality is required for a screened-in survivor and must execute OPT-058 --quality",
+    "aggregate_deadline_s 7200 is a ceiling, not a skip",
+    "missing required work is blocked/incomplete, never no_opportunity"
+  ],
+  "report_path": "evidence/optimization/opt152-vector-coverage/REPORT.md"
+}

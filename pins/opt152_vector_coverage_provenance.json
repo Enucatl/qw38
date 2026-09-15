@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "task": "OPT-152",
+  "candidate": ["flash_vec_gap_only_v1", "flash_vec_all_short_v1"],
+  "authority": "kept OPT-148 flash_vec_decode_attention plus OPT-150 dispatch table",
+  "llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+  "license": "MIT",
+  "authors": "The ggml authors",
+  "adapter_namespace": "qw38::cuda",
+  "specialization": "dispatch-only coverage overlay of shipping decode_attention_flash_vec_v1; arithmetic and n_parts=16 unchanged",
+  "not_vendored": [
+    "ggml tensor/runtime",
+    "new attention consumer",
+    "verified_max global raise"
+  ],
+  "copied_organization": [
+    {
+      "file": "cuda/opt148_short_decode_flash.cuh",
+      "use": "reused flash-vec consumer; OPT-152 changes selector ranges only"
+    }
+  ],
+  "local_modifications": [
+    "flash_vec_gap_only_v1 covers [1024,8191]; warp_query below 1024",
+    "flash_vec_all_short_v1 covers [0,8191]",
+    "kSelectedDecodeAttentionVerifiedMax stays 4096",
+    "OPT-137 MMA at >=8192 retained; OPT-151 remains unselected",
+    "production coverage pin flipped to all_short on keep; decode kernel pin unchanged"
+  ]
+}

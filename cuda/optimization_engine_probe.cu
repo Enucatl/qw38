@@ -144,7 +144,8 @@ int usage(const char* argv0) {
                "[--decode-query-prep warp_query|prepared_q|prepared_q_veckv] "
                "[--decode-attention-gqa warp_query|warp_query_gqa6] "
                "[--decode-attention-vec128 warp_query|vec128_online] "
-               "[--decode-attention hybrid_crossover|decode_attention_flash_vec_v1] "
+               "[--decode-attention hybrid_crossover|decode_attention_flash_vec_v1|"
+               "flash_vec_gap_only_v1|flash_vec_all_short_v1] "
                "[--decode-norm-q8 current_bf16_q8_staging|norm_to_q8_1_screen_v1] "
                "[--vec128-n-parts 4|8|16] "
                "[--decode-attention-crossover-threshold 0|512|1024|1536|2048] "
@@ -467,7 +468,8 @@ int reject_over_bounds(qw38::cuda::TestTier tier, const Options& options) {
                            options.prompt == 0 && options.pairs <= 5;
     const bool attn_guard_decode =
         options.prompt == 0 && options.output_tokens == 256 &&
-        (options.prefix == 128 || options.prefix == 2048 ||
+        (options.prefix == 128 || options.prefix == 512 ||
+         options.prefix == 2048 || options.prefix == 6144 ||
          options.prefix == 8192 || options.prefix == 32768);
     const bool attn_ok =
         attn_ab && options.pairs <= 10 &&
@@ -483,8 +485,8 @@ int reject_over_bounds(qw38::cuda::TestTier tier, const Options& options) {
         !(q8_ok || mmq_ok || q4_ok || gdn_ok || grouping_ok || device_ok ||
           attn_ok || prefill_ok)) {
       std::fprintf(stderr,
-                   "acceptance keep-ab allows ten P4096 or D128/D2048/D8192/"
-                   "D32768+256 pairs\n");
+                   "acceptance keep-ab allows ten P4096 or D128/D512/D2048/"
+                   "D6144/D8192/D32768+256 pairs\n");
       return 2;
     }
     return 0;

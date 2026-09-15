@@ -350,7 +350,7 @@ OPT-124 assesses the remaining ceiling without claiming universal optimality.
 | OPT-149 | Screen normalization fused directly into Q8_1 staging | OPT-135, OPT-148 | done | `screened_out`; `norm_to_q8_1_screen_v1` D2048 complete decode-mixer family 2.101→2.256 ms (−0.155 ms); quality skipped (`screened_out_retain_parent`, not stubbed); parent `current_bf16_q8_staging` retained; OPT-147/148 unchanged; shipping delta 0; `claims_throughput=false` | [`tasks/OPT-149.md`](tasks/OPT-149.md); [`tools/opt149_norm_q8.py`](tools/opt149_norm_q8.py); [`pins/opt149_norm_q8_contract.json`](pins/opt149_norm_q8_contract.json); [`fixtures/opt149_norm_q8.json`](fixtures/opt149_norm_q8.json); [`evidence/optimization/opt149-norm-q8/REPORT.md`](evidence/optimization/opt149-norm-q8/REPORT.md); verification 2026-09-15T09:10:00Z |
 | OPT-150 | Establish current attention dataflow and matched decode scaling | OPT-136, OPT-137, OPT-148, OPT-149 | done | Diagnostics only; QK FP32+warp_sum with zero-weight MMA helper, PV scalar; 2× HMMA.16816 SASS survival (not output-producing proof); dispatch 13 positions with llama MMA at padded 8192 (pos 7936) vs Quartz MMA at 8192; matched decode-only ms/token ratios D2048/D8192/D32768 1.16/1.20/1.55; D8192 llama family null (documented IMA); OPT-129/136 corrections appended; no production change; `claims_throughput=false` | [`tasks/OPT-150.md`](tasks/OPT-150.md); [`tools/opt150_attention_dataflow.py`](tools/opt150_attention_dataflow.py); [`pins/opt150_attention_dataflow_contract.json`](pins/opt150_attention_dataflow_contract.json); [`fixtures/opt150_attention_dataflow.json`](fixtures/opt150_attention_dataflow.json); [`evidence/optimization/opt150-attention-dataflow/REPORT.md`](evidence/optimization/opt150-attention-dataflow/REPORT.md); verification 2026-09-15T12:29:00Z |
 | OPT-151 | Implement output-producing QK and PV MMA for long decode | OPT-135, OPT-150 | done | `screened_out`; `decode_attention_qk_pv_mma_v2` D8192 complete 16-layer family 3.252→6.304 ms (~1.94× slower); D32768 13.804→38.466 ms (~2.79× slower); real QK+PV MMA (HMMA 1112, mma-dep ok); quality skipped (`screened_out`, not stubbed); parent `dense_bf16_tile_f16_mma_decode_v1` retained; shipping delta 0; `claims_throughput=false` | [`tasks/OPT-151.md`](tasks/OPT-151.md); [`tools/opt151_qk_pv_mma.py`](tools/opt151_qk_pv_mma.py); [`pins/opt151_qk_pv_mma_contract.json`](pins/opt151_qk_pv_mma_contract.json); [`fixtures/opt151_qk_pv_mma.json`](fixtures/opt151_qk_pv_mma.json); [`evidence/optimization/opt151-qk-pv-mma/REPORT.md`](evidence/optimization/opt151-qk-pv-mma/REPORT.md); verification 2026-09-15T13:01:40Z |
-| OPT-152 | Screen vector attention throughout sub-8K decode | OPT-135, OPT-150, OPT-151 | pending | Existing OPT-148 consumer screens gap-only versus all-short coverage; at most one survivor passes frozen target/guard, actual graph boundaries and quality/state gates, or measured no-keep | [`tasks/OPT-152.md`](tasks/OPT-152.md) |
+| OPT-152 | Screen vector attention throughout sub-8K decode | OPT-135, OPT-150, OPT-151 | done | `keep`; `flash_vec_all_short_v1` coverage overlay on OPT-148 `decode_attention_flash_vec_v1`; flash-vec `[0,8191]`, MMA `>=8192`, `verified_max=4096`; OPT-058 held-out `ppl_ratio=0.9983`; `target_guard_v2` D512 decode_only g=1.046 (+2.66 tok/s), D6144 decode_only g=1.484 (+18.99 tok/s); guards D128/D2048/D8192/D32768 + P4096 held; coverage pin flipped; mechanism unknown | [`tasks/OPT-152.md`](tasks/OPT-152.md); [`tools/opt152_vector_coverage.py`](tools/opt152_vector_coverage.py); [`pins/opt152_vector_coverage_contract.json`](pins/opt152_vector_coverage_contract.json); [`fixtures/opt152_vector_coverage.json`](fixtures/opt152_vector_coverage.json); [`evidence/optimization/opt152-vector-coverage/REPORT.md`](evidence/optimization/opt152-vector-coverage/REPORT.md); verification 2026-09-15T14:03:00Z |
 
 ### Post-138 counter evidence and optimization batch (OPT-139–146)
 
@@ -8758,3 +8758,38 @@ All three tasks are pending; no kernel, selector or historical verdict changed.
   [`fixtures/opt151_qk_pv_mma.json`](fixtures/opt151_qk_pv_mma.json);
   [`evidence/optimization/opt151-qk-pv-mma/REPORT.md`](evidence/optimization/opt151-qk-pv-mma/REPORT.md).
 - OPT-151 marked `done`. Coupled IDs: none. OPT-152 unchanged (`pending`).
+
+### OPT-152 delivery (2026-09-15T14:05:50Z)
+
+- Screened OPT-148 flash-vec coverage overlays `flash_vec_gap_only_v1` versus
+  `flash_vec_all_short_v1` (dispatch-only; `verified_max=4096` unchanged;
+  OPT-137 MMA at `>=8192` unchanged). Survivor **keep**:
+  `flash_vec_all_short_v1`; alternate gap_only screened in but not advanced
+  (D128/D512 stayed warp_query).
+- Verification **PASS** (2026-09-15T14:03:00Z): host pytest **9 passed**; ruff
+  clean; docker `cuda-opt152-diagnostics` pass; correctness at 14 positions,
+  graph live-position replay at 1024/4096/8192, OPT-058 candidate NLL,
+  state-memory/checkpoint/128k reserve, and `target_guard_v2` executed on the
+  sitting GPU.
+- Screen (complete family): all_short D128 **0.507→0.426** ms, D512
+  **0.929→0.431** ms, D6144 **6.955→0.903** ms. Gap-only won D6144
+  (**6.970→0.912** ms) but D128/D512 stayed warp_query.
+- Quality: OPT-058 measured; held-out NLL **1.785908735866253** vs control
+  **1.7875990840085783**; **`ppl_ratio=0.9983`**; wikitext **`ppl_ratio=1.0005`**;
+  `candidate_nll_measured=true`.
+- Whole-engine decode_only (candidate measured delta, keep): D512 control
+  **57.721** tok/s → candidate **60.381** tok/s (**+2.66**, **g=1.046**); D6144
+  control **39.203** tok/s → candidate **58.194** tok/s (**+18.99**,
+  **g=1.484**). Guards D128/D2048/D8192/D32768 + P4096 held (L>=0.98, decode
+  p95<=1.05). Mechanism remains `unknown`; causal claim withheld.
+- Production coverage pin flipped: `kSelectedDecodeAttentionFlashVecCoverage =
+  "all_short"`; shipping decode kernel remains `decode_attention_flash_vec_v1`.
+  Final ranges: flash-vec **`[0,8191]`**, MMA **`>=8192`**, **`verified_max=4096`**.
+- Candidate measured delta: D512 **+2.66** tok/s (**g=1.046**), D6144 **+18.99**
+  tok/s (**g=1.484**). Shipping delta (coverage pin flip only): same **+2.66**
+  / **+18.99** tok/s on frozen targets. Quality **measured** (`ppl_ratio=0.9983`).
+- Key evidence: [`tasks/OPT-152.md`](tasks/OPT-152.md);
+  [`tools/opt152_vector_coverage.py`](tools/opt152_vector_coverage.py);
+  [`fixtures/opt152_vector_coverage.json`](fixtures/opt152_vector_coverage.json);
+  [`evidence/optimization/opt152-vector-coverage/REPORT.md`](evidence/optimization/opt152-vector-coverage/REPORT.md).
+- OPT-152 marked `done`. Coupled IDs: none.
