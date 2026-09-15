@@ -1,0 +1,70 @@
+{
+  "schema_version": 1,
+  "task": "OPT-147",
+  "phase": "state-memory",
+  "mode": "acceptance",
+  "ok": true,
+  "skipped": false,
+  "state": {
+    "state": true
+  },
+  "native_state": {
+    "returncode": 0,
+    "stdout_tail": "\n==========\n== CUDA ==\n==========\n\nCUDA Version 13.0.2\n\nContainer image Copyright (c) 2016-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.\n\nThis container image and its contents are governed by the NVIDIA Deep Learning Container License.\nBy pulling and using the container, you accept the terms and conditions of this license:\nhttps://developer.nvidia.com/ngc/nvidia-deep-learning-container-license\n\nA copy of this license is made available in this container at /NGC-DL-CONTAINER-LICENSE for your convenience.\n\ngraph_eager tokens=32 start=0 control=opt111_base candidate=prefill_attention_8x8_v1 max_abs=0 nonfinite=0 gqa_max_abs=0 gqa_nonfinite=0 equal=true finite=true launch=fattn_mma_pipeline_prefill_attention_8x8_v1 convert_once=1 ncols1=8 ncols2=8 gqa_pad_heads=2\ngraph_eager_repeat pass=true error=none\nprompt_to_decode_kv_handoff pass=true atomic_publication=true candidate_committed_visibility=true final_token_output_policy=true\ncancellation_case tokens=0 skipped_launch=true pass=true\nQW38_OPT147_PREFILL_8X8_RESULT={\"schema_version\":1,\"task\":\"OPT-147\",\"workload\":\"state\",\"llama_revision\":\"cc83d7b4824f73cfdda4dfbb47ee39804f71b328\",\"gguf_sha256\":\"31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34\",\"selected_attention_pipeline_path\":\"opt111_base\",\"candidate_path\":\"prefill_attention_8x8_v1\",\"control_path\":\"opt111_base\",\"nonfinite\":0,\"pass\":true,\"keep\":false,\"observed_warmups\":0,\"observed_samples\":1,\"observed_candidates\":2,\"observed_shapes\":1,\"observed_tier\":\"acceptance\",\"acceptance_executed\":false,\"pairs\":1,\"ncols1\":8,\"ncols2\":8}\nQW38_OPT147_NATIVE_COUNTS={\"schema_version\":1,\"task\":\"OPT-147\",\"family\":\"prompt-attn\",\"tier\":\"acceptance\",\"warmups\":0,\"samples\":1,\"observed_warmups\":0,\"observed_samples\":1,\"observed_candidates\":2,\"observed_shapes\":1,\"observed_tier\":\"acceptance\",\"pairs\":1,\"acceptance_executed\":false,\"keep\":false}\nstatus=passed\n",
+    "result": {
+      "schema_version": 1,
+      "task": "OPT-147",
+      "workload": "state",
+      "llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+      "gguf_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+      "selected_attention_pipeline_path": "opt111_base",
+      "candidate_path": "prefill_attention_8x8_v1",
+      "control_path": "opt111_base",
+      "nonfinite": 0,
+      "pass": true,
+      "keep": false,
+      "observed_warmups": 0,
+      "observed_samples": 1,
+      "observed_candidates": 2,
+      "observed_shapes": 1,
+      "observed_tier": "acceptance",
+      "acceptance_executed": false,
+      "pairs": 1,
+      "ncols1": 8,
+      "ncols2": 8
+    },
+    "counts": {
+      "schema_version": 1,
+      "task": "OPT-147",
+      "family": "prompt-attn",
+      "tier": "acceptance",
+      "warmups": 0,
+      "samples": 1,
+      "observed_warmups": 0,
+      "observed_samples": 1,
+      "observed_candidates": 2,
+      "observed_shapes": 1,
+      "observed_tier": "acceptance",
+      "pairs": 1,
+      "acceptance_executed": false,
+      "keep": false
+    },
+    "pass": true,
+    "raw": "build/optimization-runs/opt147-prefill-8x8/state-native.txt"
+  },
+  "checkpoint_ok": true,
+  "checkpoint_native": "build/qw38-cuda-checkpoint-test",
+  "memory_fit_ok": true,
+  "128k_fit_with_graphs": true,
+  "capacity": 131072,
+  "free_bytes": 3508535296,
+  "reserve_required": 1610612736,
+  "arithmetic": "true",
+  "candidate": "prefill_attention_8x8_v1",
+  "family_plan": "task=OPT-147 mode=acceptance phase=state-memory loop_product=3 cases=3 candidates=1 warmups=0 samples=1 tokens=1",
+  "measured_at": "2026-09-15T07:01:10Z",
+  "stdout_tail": {
+    "checkpoint": "\n==========\n== CUDA ==\n==========\n\nCUDA Version 13.0.2\n\nContainer image Copyright (c) 2016-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.\n\nThis container image and its contents are governed by the NVIDIA Deep Learning Container License.\nBy pulling and using the container, you accept the terms and conditions of this license:\nhttps://developer.nvidia.com/ngc/nvidia-deep-learning-container-license\n\nA copy of this license is made available in this container at /NGC-DL-CONTAINER-LICENSE for your convenience.\n\ncheckpoint_case=round_trip bytes=160004416 frontier=2 published=true state_equal=true passed=true\ncheckpoint_case=exact_continuation frontier=3 state_equal=true passed=true\ncheckpoint_case=corrupt_rejected state_equal=true passed=true\ncheckpoint_case=incompatible_rejected state_equal=true passed=true\ncheckpoint_run=complete frontier=3 passed=true\nstatus=passed\n",
+    "memory": "\n==========\n== CUDA ==\n==========\n\nCUDA Version 13.0.2\n\nContainer image Copyright (c) 2016-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.\n\nThis container image and its contents are governed by the NVIDIA Deep Learning Container License.\nBy pulling and using the container, you accept the terms and conditions of this license:\nhttps://developer.nvidia.com/ngc/nvidia-deep-learning-container-license\n\nA copy of this license is made available in this container at /NGC-DL-CONTAINER-LICENSE for your convenience.\n\nmemory_owner=runtime_context bytes=565444608\nmemory_owner=resident_model bytes=18973870432 delta=18975031296\nmemory_owner=gdn_state bytes=158859264\nmemory_owner=attention_kv bytes=8589934592\nmemory_owner=session_total bytes=8749807676 delta=8753512448\nmemory_owner=workspace bytes=1831836288 delta=1837105152\nmemory_owner=allocator_delta bytes=10134500\nmemory_owner=graphs bytes=25165824 count=64 decode=0 prompt=64 decode_segments=40 prompt_rows=4096 graph_measured=25165824\nmemory_host=rss bytes=19193348096\nmemory_fit=post_graph capacity=131072 explicit_bytes=29580680220 measured_delta=29590814720 free_bytes=3508535296 reserve_required=1610612736 total_bytes=33664794624 arithmetic=true passed=true\nmemory_admission=post_graph passed=true\nstatus=passed\n"
+  }
+}

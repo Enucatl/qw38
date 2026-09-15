@@ -1,0 +1,27 @@
+
+==========
+== CUDA ==
+==========
+
+CUDA Version 13.0.2
+
+Container image Copyright (c) 2016-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+
+This container image and its contents are governed by the NVIDIA Deep Learning Container License.
+By pulling and using the container, you accept the terms and conditions of this license:
+https://developer.nvidia.com/ngc/nvidia-deep-learning-container-license
+
+A copy of this license is made available in this container at /NGC-DL-CONTAINER-LICENSE for your convenience.
+
+length tokens=1 start=0 control=opt111_base candidate=prefill_attention_8x8_v1 max_abs=0 nonfinite=0 gqa_max_abs=0 gqa_nonfinite=0 equal=true finite=true launch= convert_once=0 ncols1=8 ncols2=8 gqa_pad_heads=2
+length tokens=32 start=0 control=opt111_base candidate=prefill_attention_8x8_v1 max_abs=0 nonfinite=0 gqa_max_abs=0 gqa_nonfinite=0 equal=true finite=true launch=fattn_mma_pipeline_prefill_attention_8x8_v1 convert_once=1 ncols1=8 ncols2=8 gqa_pad_heads=2
+length tokens=128 start=0 control=opt111_base candidate=prefill_attention_8x8_v1 max_abs=0 nonfinite=0 gqa_max_abs=0 gqa_nonfinite=0 equal=true finite=true launch=fattn_mma_pipeline_prefill_attention_8x8_v1 convert_once=1 ncols1=8 ncols2=8 gqa_pad_heads=2
+length tokens=2048 start=0 control=opt111_base candidate=prefill_attention_8x8_v1 max_abs=0 nonfinite=0 gqa_max_abs=0 gqa_nonfinite=0 equal=true finite=true launch=fattn_mma_pipeline_prefill_attention_8x8_v1 convert_once=1 ncols1=8 ncols2=8 gqa_pad_heads=2
+length tokens=4096 start=0 control=opt111_base candidate=prefill_attention_8x8_v1 max_abs=0 nonfinite=0 gqa_max_abs=0 gqa_nonfinite=0 equal=true finite=true launch=fattn_mma_pipeline_prefill_attention_8x8_v1 convert_once=1 ncols1=8 ncols2=8 gqa_pad_heads=2
+causal_boundary tokens=32 start=0 control=opt111_base candidate=prefill_attention_8x8_v1 max_abs=0 nonfinite=0 gqa_max_abs=0 gqa_nonfinite=0 equal=true finite=true launch=fattn_mma_pipeline_prefill_attention_8x8_v1 convert_once=1 ncols1=8 ncols2=8 gqa_pad_heads=2
+causal_tail tokens=33 start=96 control=opt111_base candidate=prefill_attention_8x8_v1 max_abs=0 nonfinite=0 gqa_max_abs=0 gqa_nonfinite=0 equal=true finite=true launch=fattn_mma_pipeline_prefill_attention_8x8_v1 convert_once=1 ncols1=8 ncols2=8 gqa_pad_heads=2
+chunk_mid tokens=128 start=64 control=opt111_base candidate=prefill_attention_8x8_v1 max_abs=0 nonfinite=0 gqa_max_abs=0 gqa_nonfinite=0 equal=true finite=true launch=fattn_mma_pipeline_prefill_attention_8x8_v1 convert_once=1 ncols1=8 ncols2=8 gqa_pad_heads=2
+opt111_base_regs=207 opt111_base_local_bytes=0 opt111_base_occupancy=1 prefill_8x8_regs=204 prefill_8x8_local_bytes=0 prefill_8x8_occupancy=1 production_pin=opt111_base tile_control=16x2 tile_candidate=8x8 shared_16x2=85888 shared_8x8=94528 smem_block=49152 smem_optin=101376 prop_error=no error
+QW38_OPT147_PREFILL_8X8_RESULT={"schema_version":1,"task":"OPT-147","workload":"correctness","llama_revision":"cc83d7b4824f73cfdda4dfbb47ee39804f71b328","gguf_sha256":"31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34","selected_attention_pipeline_path":"opt111_base","candidate_path":"prefill_attention_8x8_v1","control_path":"opt111_base","nonfinite":0,"pass":true,"keep":false,"observed_warmups":0,"observed_samples":1,"observed_candidates":2,"observed_shapes":5,"observed_tier":"correctness","acceptance_executed":false,"pairs":1,"ncols1":8,"ncols2":8}
+QW38_OPT147_NATIVE_COUNTS={"schema_version":1,"task":"OPT-147","family":"prompt-attn","tier":"correctness","warmups":0,"samples":1,"observed_warmups":0,"observed_samples":1,"observed_candidates":2,"observed_shapes":5,"observed_tier":"correctness","pairs":1,"acceptance_executed":false,"keep":false}
+status=passed

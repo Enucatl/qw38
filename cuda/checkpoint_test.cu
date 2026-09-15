@@ -1,8 +1,10 @@
 #include "full_scheduler.h"
+#include "attention_decode.h"
 
 #include <array>
 #include <cstddef>
 #include <cstdio>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <string>
@@ -52,11 +54,37 @@ bool flip_byte(const std::string& source, const std::string& destination,
 }  // namespace
 
 int main(int argc, char** argv) {
-  if (argc != 3) {
-    std::fprintf(stderr, "usage: qw38-cuda-checkpoint-test MODEL CHECKPOINT\n");
+  const char* model_path = nullptr;
+  const char* checkpoint_path = nullptr;
+  const char* attention_pipeline = nullptr;
+  for (int index = 1; index < argc; ++index) {
+    if (std::strcmp(argv[index], "--attention-pipeline") == 0 &&
+        index + 1 < argc) {
+      attention_pipeline = argv[++index];
+    } else if (model_path == nullptr) {
+      model_path = argv[index];
+    } else if (checkpoint_path == nullptr) {
+      checkpoint_path = argv[index];
+    } else {
+      std::fprintf(stderr,
+                   "usage: qw38-cuda-checkpoint-test MODEL CHECKPOINT "
+                   "[--attention-pipeline PATH]\n");
+      return 1;
+    }
+  }
+  if (model_path == nullptr || checkpoint_path == nullptr) {
+    std::fprintf(stderr,
+                 "usage: qw38-cuda-checkpoint-test MODEL CHECKPOINT "
+                 "[--attention-pipeline PATH]\n");
     return 1;
   }
-  const std::string checkpoint = argv[2];
+  if (attention_pipeline != nullptr &&
+      !qw38::cuda::apply_attention_pipeline_ident(attention_pipeline)) {
+    std::fprintf(stderr, "invalid --attention-pipeline %s\n",
+                 attention_pipeline);
+    return 1;
+  }
+  const std::string checkpoint = checkpoint_path;
   const std::string corrupt = checkpoint + ".corrupt";
   const std::string incompatible = checkpoint + ".incompatible";
   std::remove(checkpoint.c_str());
@@ -65,10 +93,10 @@ int main(int argc, char** argv) {
   std::remove(incompatible.c_str());
 
   qw38::internal::ModelInfo info;
-  qw38::Status status = qw38::internal::inspect_gguf(argv[1], &info);
+  qw38::Status status = qw38::internal::inspect_gguf(model_path, &info);
   if (status.is_ok()) status = qw38::internal::validate_qwen38_contract(&info);
   qw38::internal::MappedFile mapping;
-  if (status.is_ok()) status = mapping.open(argv[1]);
+  if (status.is_ok()) status = mapping.open(model_path);
   qw38::internal::ModelWeights weights;
   if (status.is_ok()) {
     status = qw38::internal::bind_model_weights(info, mapping, &weights);

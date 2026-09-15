@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "task": "OPT-147",
+  "workload": "p4096",
+  "complete_family": true,
+  "rotating_layers": 16,
+  "warmups": 1,
+  "pairs": 3,
+  "control": "opt111_base",
+  "candidate": "prefill_attention_8x8_v1",
+  "native_control_mean_ms": 222.146301,
+  "native_candidate_mean_ms": 201.478683,
+  "independent_control_mean_ms": 222.14629066666666,
+  "independent_candidate_mean_ms": 201.478673,
+  "independent_saving_ms": 20.667617666666672,
+  "rounds": [
+    {
+      "warmup": false,
+      "sample_index": 0,
+      "control_ms": 222.128387,
+      "candidate_ms": 201.469543
+    },
+    {
+      "warmup": false,
+      "sample_index": 1,
+      "control_ms": 222.15657,
+      "candidate_ms": 201.502853
+    },
+    {
+      "warmup": false,
+      "sample_index": 2,
+      "control_ms": 222.153915,
+      "candidate_ms": 201.463623
+    }
+  ],
+  "mechanism": "unknown",
+  "prep_included": true,
+  "combine_included": true,
+  "conversion_included": true
+}

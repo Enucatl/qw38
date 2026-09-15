@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "task": "OPT-147",
+  "phase": "report",
+  "mode": "acceptance",
+  "ok": true,
+  "verdict": "keep",
+  "production_kept": true,
+  "shipping_prompt_attention": "prefill_attention_8x8_v1",
+  "tok_s_deltas": {
+    "p4096.prefill": {
+      "control_rate": 2997.7860688227747,
+      "candidate_rate": 3032.417338625696,
+      "delta": 34.63126980292145,
+      "g": 1.01158065552246
+    }
+  },
+  "candidate_measured_delta": {
+    "p4096.prefill": {
+      "control_rate": 2997.7860688227747,
+      "candidate_rate": 3032.417338625696,
+      "delta": 34.63126980292145,
+      "g": 1.01158065552246
+    }
+  },
+  "shipping_delta": {
+    "p4096.prefill": {
+      "control_rate": 2997.7860688227747,
+      "candidate_rate": 3032.417338625696,
+      "delta": 34.63126980292145,
+      "g": 1.01158065552246
+    }
+  },
+  "quality_result": "measured",
+  "family_plan": "task=OPT-147 mode=acceptance phase=report loop_product=1 cases=1 candidates=1 warmups=0 samples=1 tokens=1",
+  "measured_at": "2026-09-15T07:26:38Z",
+  "production_pin": "prefill_attention_8x8_v1"
+}

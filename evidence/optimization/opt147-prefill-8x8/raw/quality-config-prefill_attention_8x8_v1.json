@@ -1,0 +1,104 @@
+{
+  "quality": true,
+  "flag": "--quality",
+  "argv": [
+    "--quality",
+    "--quality-config",
+    "{path}"
+  ],
+  "shortcuts": {
+    "diagnostic_fallback": false,
+    "experimental_cuda": false,
+    "fmad_true": false,
+    "fast_math": false,
+    "incomplete_vocab_logits": false,
+    "logit_masking": false,
+    "teacher_forced_functional_answers": false,
+    "graph_kernel_divergence": false,
+    "speculative_decoding": false,
+    "numeric_bypass": false,
+    "ssd_streaming_approx": false,
+    "truncated_softmax": false
+  },
+  "disabled_shortcuts": [
+    "diagnostic_fallback",
+    "experimental_cuda",
+    "fmad_true",
+    "fast_math",
+    "incomplete_vocab_logits",
+    "logit_masking",
+    "teacher_forced_functional_answers",
+    "graph_kernel_divergence",
+    "speculative_decoding",
+    "numeric_bypass",
+    "ssd_streaming_approx",
+    "truncated_softmax"
+  ],
+  "enabled_shortcuts": [],
+  "selectors": {
+    "q4_decode": "llama_q4k_mmvq",
+    "q4_staging": "paired_integer",
+    "q8_decode": "r1_w4",
+    "q8_path": "dp4a_q8_1",
+    "prompt_mmq": "fma_async_x",
+    "prompt_mmq_tile": "i128_j128",
+    "prompt_attention": "prefill_attention_8x8_v1",
+    "decode_gdn": "sequential",
+    "decode_attention": "hybrid_crossover",
+    "prompt_pair": "off",
+    "nvccflags": "-O2 --fmad=false",
+    "production_numerics": "strict",
+    "execution_graphs": "decode_segments8",
+    "chat_template": "no_thinking",
+    "enable_thinking": false,
+    "logit_masking": false,
+    "ffn_decode": "paired_integer"
+  },
+  "encodings": {
+    "weight_encoding": {
+      "q4_decode": "llama_q4k_mmvq",
+      "q8_decode": "r1_w4",
+      "q8_path": "dp4a_q8_1",
+      "ffn_decode": "paired_integer"
+    },
+    "quantizer_parameters": {
+      "q4_staging": "paired_integer",
+      "q8_grouping": null
+    },
+    "graph_path": "decode_segments8"
+  },
+  "graph_path": "decode_segments8",
+  "delta": {
+    "flag": "--quality",
+    "selector": "production_arithmetic_under_test",
+    "precision": {
+      "nvccflags": "-O2 --fmad=false",
+      "fmad": false,
+      "fast_math": false,
+      "fp_contract": "off"
+    },
+    "disables": [
+      "diagnostic_fallback",
+      "experimental_cuda",
+      "fmad_true",
+      "fast_math",
+      "incomplete_vocab_logits",
+      "logit_masking",
+      "teacher_forced_functional_answers",
+      "graph_kernel_divergence",
+      "speculative_decoding",
+      "numeric_bypass",
+      "ssd_streaming_approx",
+      "truncated_softmax"
+    ],
+    "unknown_shortcut": "fail_closed",
+    "graph_vs_eager": "same_math_equivalence_not_different_kernel",
+    "diagnostic_fallbacks": "disabled",
+    "speed_oriented_numeric_bypass": "disabled",
+    "does_not_install_a_different_kernel": true
+  },
+  "graph_vs_eager": "same_math_equivalence",
+  "same_math_equivalence_not_different_kernel": true,
+  "does_not_restore_packed_or_r2": true,
+  "quality_config": true
+}

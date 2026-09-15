@@ -3,6 +3,7 @@
 #include "gdn_step.h"
 #include "optimization_component_replay.h"
 #include "opt111_llama_prompt_attention.cuh"
+#include "opt147_prefill_8x8.cuh"
 #include "scheduler_primitives.h"
 
 #include "engine_attribution.h"
@@ -87,6 +88,7 @@ struct Options final {
   bool opt138_protocol = false;
   bool opt140_protocol = false;
   const char* evidence_dir = nullptr;
+  const char* attention_pipeline = nullptr;
 };
 
 int usage(const char* argv0) {
@@ -110,7 +112,8 @@ int usage(const char* argv0) {
                "[--decode-attention-crossover-threshold 0|512|1024|1536|2048] "
                "[--decode-position 128|512|1024|1536|2048|4096] "
                "[--warmups N] [--samples N] [--ncu] [--corrupt-guard] "
-               "[--opt138-protocol] [--opt140-protocol] [--evidence-dir DIR]\n",
+               "[--opt138-protocol] [--opt140-protocol] [--evidence-dir DIR] "
+               "[--attention-pipeline opt111_base|opt111_xor|prefill_attention_8x8_v1]\n",
                argv0);
   return 2;
 }
@@ -180,6 +183,9 @@ int parse_args(int argc, char** argv, Options* options) {
       options->opt140_protocol = true;
     } else if (std::strcmp(arg, "--evidence-dir") == 0 && index + 1 < argc) {
       options->evidence_dir = argv[++index];
+    } else if (std::strcmp(arg, "--attention-pipeline") == 0 &&
+               index + 1 < argc) {
+      options->attention_pipeline = argv[++index];
     } else if (arg[0] != '-' && options->model == nullptr) {
       options->model = arg;
     } else {
@@ -2569,6 +2575,11 @@ int time_family(qw38::cuda::ResidentModel* model,
     int occupancy = 0;
     qw38::cuda::fattn_pipeline_opt111_base_attributes(&regs, &local_bytes,
                                                       &occupancy);
+    if (qw38::cuda::opt147::is_candidate_path(
+            qw38::cuda::current_attention_pipeline_path())) {
+      qw38::cuda::fattn_pipeline_prefill_8x8_attributes(&regs, &local_bytes,
+                                                        &occupancy);
+    }
     std::printf(
         "compiled_registers=%d compiled_local_bytes=%zu occupancy=%d "
         "target_kernel=%s complete_family_replay=true\n",
@@ -2793,6 +2804,13 @@ int run_family(const Options& options, qw38::cuda::ReplayFamily family) {
           options.decode_attention_crossover_threshold)) {
     std::fprintf(stderr, "invalid --decode-attention-crossover-threshold %d\n",
                  options.decode_attention_crossover_threshold);
+    if (rounds != nullptr) std::fclose(rounds);
+    return 1;
+  }
+  if (options.attention_pipeline != nullptr &&
+      !qw38::cuda::apply_attention_pipeline_ident(options.attention_pipeline)) {
+    std::fprintf(stderr, "invalid --attention-pipeline %s\n",
+                 options.attention_pipeline);
     if (rounds != nullptr) std::fclose(rounds);
     return 1;
   }

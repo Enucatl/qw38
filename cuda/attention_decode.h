@@ -364,6 +364,8 @@ void fattn_pipeline_opt111_base_attributes(int* regs, std::size_t* local_bytes,
                                            int* occupancy) noexcept;
 void fattn_pipeline_opt111_xor_attributes(int* regs, std::size_t* local_bytes,
                                           int* occupancy) noexcept;
+void fattn_pipeline_prefill_8x8_attributes(int* regs, std::size_t* local_bytes,
+                                           int* occupancy) noexcept;
 
 struct QueryPreparePathScope final {
   explicit QueryPreparePathScope(const char* path) noexcept {

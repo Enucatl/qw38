@@ -63,9 +63,11 @@ constexpr char kSelectedQueryPreparePath[] = "hoisted";
 // OPT-051 A/B winner f16_async; OPT-079 kept convert-once sibling kv_once.
 // OPT-111 kept opt111_base (llama decreasing-granularity KV load vs kv_once).
 // Legal values: off, f16, dual_reg, f16_reg, dual_async, f16_async, nbatch64,
-// gqa6, kv_once, opt111_base, opt111_xor. Sibling kernel in
-// fattn_mma_f16_pipeline.cuh. Not a vendor of llama.cpp fattn-mma-f16.cuh.
-constexpr char kSelectedAttentionPipelinePath[] = "opt111_base";
+// gqa6, kv_once, opt111_base, opt111_xor, prefill_attention_8x8_v1. Sibling
+// kernel in fattn_mma_f16_pipeline.cuh. OPT-147 screens llama-shaped 8x8 as a
+// diagnostic candidate; OPT-147 keep flips production to 8x8.
+// Not a vendor of llama.cpp fattn-mma-f16.cuh.
+constexpr char kSelectedAttentionPipelinePath[] = "prefill_attention_8x8_v1";
 
 // Pinned Ampere fattn-mma-f16 DKQ=DV=256, ncols=32 (ncols1=16, ncols2=2):
 // nthreads=128, occupancy=2, nbatch_fa=32, nbatch_K2=nbatch_V2=128,

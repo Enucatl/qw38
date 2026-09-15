@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "task": "OPT-147",
+  "candidate": "prefill_attention_8x8_v1",
+  "authority": "pinned llama.cpp plus shipping Quartz OPT-111 opt111_base",
+  "llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+  "license": "MIT",
+  "authors": "The ggml authors",
+  "adapter_namespace": "qw38::cuda::opt147",
+  "specialization": "Ampere fattn-mma-f16 DKQ=DV=256 llama-shaped ncols1=8 ncols2=8 prompt tile over OPT-111 arithmetic and dense BF16 KV",
+  "not_vendored": [
+    "ggml tensor/runtime",
+    "ggml graph/allocator",
+    "ggml CLI/model",
+    "current llama HEAD as release authority"
+  ],
+  "copied_organization": [
+    {
+      "file": ".cache/authorities/llama.cpp/ggml/src/ggml-cuda/fattn-mma-f16.cuh",
+      "sha256": "08977d8e6e26ce2c8554c85c97e1fa07c1c4e3bdbe454eaf9b9b53c677fa4038",
+      "use": "Ampere DKQ=256 ncols=64 (8x8) config, nthreads=128, nbatch_fa=32, nstages=2, GQA pad to ncols2=8"
+    }
+  ],
+  "local_modifications": [
+    "tile shape only: Quartz 16x2 becomes llama-shaped 8x8 with GQA heads 6 and 7 masked",
+    "OPT-111 convert-once + decreasing-granularity cp.async KV load retained; XOR not used",
+    "BF16 authoritative KV; causal mask remains absolute>qpos",
+    "chunking and final-token output policy unchanged",
+    "diagnostic pipeline identity only; production pin stays opt111_base until keep",
+    "mechanism remains unknown unless separately evidenced"
+  ]
+}

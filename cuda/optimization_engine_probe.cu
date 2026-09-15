@@ -142,8 +142,9 @@ int usage(const char* argv0) {
                "[--decode-attention-vec128 warp_query|vec128_online] "
                "[--vec128-n-parts 4|8|16] "
                "[--decode-attention-crossover-threshold 0|512|1024|1536|2048] "
-               "[--attention-pipeline f16_async|kv_once|opt111_base|opt111_xor] "
-               "[--attention-pipeline-control f16_async|kv_once] "
+               "[--attention-pipeline f16_async|kv_once|opt111_base|opt111_xor|"
+               "prefill_attention_8x8_v1] "
+               "[--attention-pipeline-control f16_async|kv_once|opt111_base] "
                "[--selector NAME] [--modes graph,eager] [--skip-logits]\n",
                argv0);
   return 2;
@@ -171,8 +172,8 @@ int parse_args(int argc, char** argv, Options* options) {
       options->runs = static_cast<int>(runs);
     } else if (std::strcmp(arg, "--pairs") == 0 && index + 1 < argc) {
       std::size_t pairs = 0;
-      if (!parse_size(argv[++index], &pairs) || pairs == 0 || pairs > 8) {
-        std::fprintf(stderr, "--pairs must be 1..8\n");
+      if (!parse_size(argv[++index], &pairs) || pairs == 0 || pairs > 10) {
+        std::fprintf(stderr, "--pairs must be 1..10\n");
         return 2;
       }
       options->pairs = static_cast<int>(pairs);
@@ -451,19 +452,26 @@ int reject_over_bounds(qw38::cuda::TestTier tier, const Options& options) {
                             options.prefix == 128) &&
                            options.output_tokens == kScreenOutputTokens &&
                            options.prompt == 0 && options.pairs <= 5;
+    const bool attn_guard_decode =
+        options.prompt == 0 && options.output_tokens == 256 &&
+        (options.prefix == 128 || options.prefix == 2048 ||
+         options.prefix == 8192 || options.prefix == 32768);
     const bool attn_ok =
-        attn_ab && options.pairs <= 5 &&
+        attn_ab && options.pairs <= 10 &&
         ((options.prompt == kScreenPrompt && options.prefix == 0 &&
           options.output_tokens == 0) ||
          ((options.prefix == kScreenPrefix || options.prefix == 128) &&
-          options.output_tokens == kScreenOutputTokens && options.prompt == 0));
+          options.output_tokens == kScreenOutputTokens &&
+          options.prompt == 0) ||
+         attn_guard_decode);
     const bool prefill_ok = prefill && options.prompt == kScreenPrompt &&
                             options.prefix == 0 && options.output_tokens == 0;
     if (options.model == nullptr ||
         !(q8_ok || mmq_ok || q4_ok || gdn_ok || grouping_ok || device_ok ||
           attn_ok || prefill_ok)) {
       std::fprintf(stderr,
-                   "acceptance keep-ab allows five P4096 or D2048+32 pairs\n");
+                   "acceptance keep-ab allows ten P4096 or D128/D2048/D8192/"
+                   "D32768+256 pairs\n");
       return 2;
     }
     return 0;
@@ -767,7 +775,7 @@ int run_engine(const Options& options, bool correctness) {
   }
   qw38::cuda::SchedulerGraphs graphs;
   if (status.is_ok() && options.graph) {
-    status = graphs.create(model, &workspace);
+    status = graphs.create(model, &workspace, &graph_session);
   }
   if (!status.is_ok()) return fail_status(status);
 
@@ -922,8 +930,11 @@ int run_keep_ab(const Options& options) {
       attn ? options.output_tokens : (decode_ab ? options.output_tokens : 0);
   const std::size_t token_count =
       prompt > 0 ? prompt : prefix + output_tokens;
+  const std::size_t needed = token_count;
   const std::size_t capacity =
-      prompt > 0 ? prompt : std::max(prefix + output_tokens, std::size_t{64});
+      attn ? std::max(needed, qw38::cuda::kPromptChunkRows)
+           : (prompt > 0 ? prompt
+                         : std::max(prefix + output_tokens, std::size_t{64}));
   std::vector<std::size_t> tokens(token_count);
   fill_tokens(&tokens);
   const char* control_layout = "r1_w4";
@@ -1120,7 +1131,7 @@ int run_keep_ab(const Options& options) {
       qw38::Status status = workspace.create(capacity);
       if (status.is_ok()) status = session.create(capacity);
       qw38::cuda::SchedulerGraphs graphs;
-      if (status.is_ok()) status = graphs.create(model, &workspace);
+      if (status.is_ok()) status = graphs.create(model, &workspace, &session);
       if (!status.is_ok()) return fail_status(status);
       std::vector<float> logits(qw38::internal::kVocabularySize);
       std::array<float, qw38::internal::kResidualWidth> hidden{};

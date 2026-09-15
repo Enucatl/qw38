@@ -3103,6 +3103,24 @@ void fattn_pipeline_opt111_xor_attributes(int* regs, std::size_t* local_bytes,
   }
 }
 
+void fattn_pipeline_prefill_8x8_attributes(int* regs, std::size_t* local_bytes,
+                                           int* occupancy) noexcept {
+  cudaFuncAttributes attrs{};
+  const cudaError_t error = cudaFuncGetAttributes(
+      &attrs, fattn_mma_pipeline_kernel<8, false, true, 32, 2, 8, 1, 2, true,
+                                        true, false>);
+  if (regs != nullptr) *regs = error == cudaSuccess ? attrs.numRegs : 0;
+  if (local_bytes != nullptr) {
+    *local_bytes = error == cudaSuccess
+                       ? static_cast<std::size_t>(attrs.localSizeBytes)
+                       : 1U;
+  }
+  if (occupancy != nullptr) {
+    *occupancy = fattn_pipeline_occupancy_typed<8, false, true, 32, 2, 8, 1, 2,
+                                                true, true, false>();
+  }
+}
+
 bool fattn_uses_warp_qk() noexcept {
   return fattn_qk_is_warp_microtile(kSelectedQKPath);
 }

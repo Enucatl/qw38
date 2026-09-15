@@ -345,7 +345,7 @@ OPT-124 assesses the remaining ceiling without claiming universal optimality.
 | OPT-144 | Evaluate one complete-boundary prefill attention optimization | OPT-135, OPT-141, OPT-143 | done | One production-boundary P4096 attention candidate yields verified keep or measured no-keep with quality and decode guards | Measured `no_opportunity`; P4096 attn_core +186.58 ms family excess; production `opt111_base`/`fattn_mma_pipeline_opt111_base`; no source-grounded mechanism; OPT-141 fused_boundary_mismatch 16x2 vs 8x8; parent retained; shipping delta 0; quality N/A (no arithmetic change); OPT-137 MMA retained; `claims_throughput=false`; no production change; [`tasks/OPT-144.md`](tasks/OPT-144.md); [`tools/opt144_prefill_attention.py`](tools/opt144_prefill_attention.py); [`pins/opt144_prefill_attention_contract.json`](pins/opt144_prefill_attention_contract.json); [`pins/opt144_iteration_contract.json`](pins/opt144_iteration_contract.json); [`fixtures/opt144_prefill_attention.json`](fixtures/opt144_prefill_attention.json); [`tests/test_opt144_prefill_attention.py`](tests/test_opt144_prefill_attention.py); [`evidence/optimization/opt144-prefill-attention/REPORT.md`](evidence/optimization/opt144-prefill-attention/REPORT.md); verification 2026-09-15T01:13:26Z |
 | OPT-145 | Evaluate one remaining normalization or prompt-MMQ optimization | OPT-135, OPT-143, OPT-144 | done | Fresh evidence selects at most one normalization or prompt-MMQ candidate with verified keep or measured no-opportunity/no-keep | Measured `no_opportunity`; `residual_norm_quant` D128 +7.21 ms family excess (fraction 0.0358); unselected `prompt_mmq` +27.11 ms (fraction 0.0201); OPT-141 fused_boundary_mismatch; no source-grounded mechanism; parent retained; shipping delta 0; quality N/A (no arithmetic change); OPT-137 MMA retained; `claims_throughput=false`; no production change; [`tasks/OPT-145.md`](tasks/OPT-145.md); [`tools/opt145_secondary_family.py`](tools/opt145_secondary_family.py); [`pins/opt145_secondary_family_contract.json`](pins/opt145_secondary_family_contract.json); [`pins/opt145_iteration_contract.json`](pins/opt145_iteration_contract.json); [`fixtures/opt145_secondary_family.json`](fixtures/opt145_secondary_family.json); [`tests/test_opt145_secondary_family.py`](tests/test_opt145_secondary_family.py); [`evidence/optimization/opt145-secondary-family/REPORT.md`](evidence/optimization/opt145-secondary-family/REPORT.md); verification 2026-09-15T01:26:00Z |
 | OPT-146 | Measure the combined stack and publish the next remaining-gap decision | OPT-142, OPT-143, OPT-144, OPT-145 | done | Diagnostics only; fresh matched Quartz vs llama throughput and OPT-142 wall reconciliation (21/21 ≤0.26%); OPT-143/144/145 summarized `no_opportunity`; net batch shipping delta 0; next experiments `candidate=null` with resolving measurements; parent OPT-137 stack retained; `claims_throughput=false`; no production change; [`tasks/OPT-146.md`](tasks/OPT-146.md); [`tools/opt146_batch_reconciliation.py`](tools/opt146_batch_reconciliation.py); [`fixtures/opt146_batch_reconciliation.json`](fixtures/opt146_batch_reconciliation.json); [`evidence/optimization/opt146-batch-reconciliation/REPORT.md`](evidence/optimization/opt146-batch-reconciliation/REPORT.md); verification 2026-09-15T02:15:00Z |
-| OPT-147 | Screen a prefill 8x8 flash-attention tile | OPT-135, OPT-140, OPT-144 | pending | One bounded P4096 8x8 prompt-attention hypothesis screen; unknown mechanism allowed at screen; shipping still requires correctness, quality, state/memory and whole-engine gates | [`tasks/OPT-147.md`](tasks/OPT-147.md) |
+| OPT-147 | Screen a prefill 8x8 flash-attention tile | OPT-135, OPT-140, OPT-144 | done | `keep`; `prefill_attention_8x8_v1` 8×8 vs parent `opt111_base` 16×2; P4096 complete-family screen 222.146→201.479 ms; OPT-058 held-out NLL 1.7875990840085783 identical; 131072 reserve pass; `target_guard_v2` P4096 g=1.01158 (+34.63 tok/s); shipping pin flipped; mechanism unknown | [`tasks/OPT-147.md`](tasks/OPT-147.md); [`tools/opt147_prefill_8x8.py`](tools/opt147_prefill_8x8.py); [`pins/opt147_prefill_8x8_contract.json`](pins/opt147_prefill_8x8_contract.json); [`fixtures/opt147_prefill_8x8.json`](fixtures/opt147_prefill_8x8.json); [`evidence/optimization/opt147-prefill-8x8/REPORT.md`](evidence/optimization/opt147-prefill-8x8/REPORT.md); verification 2026-09-15T07:29:38Z |
 | OPT-148 | Screen a short-decode flash-style vector attention path | OPT-135, OPT-147 | pending | One bounded D2048 vector/flash-style candidate screen against vec128_online; no causal claim from counters alone; full target/guard and quality gates required to ship | [`tasks/OPT-148.md`](tasks/OPT-148.md) |
 | OPT-149 | Screen normalization fused directly into Q8_1 staging | OPT-135, OPT-148 | pending | One bounded OPT-112 norm-to-Q8_1 candidate screen with representation/state checks; no Q8 byte-size-only claim; full target/guard and quality gates required to ship | [`tasks/OPT-149.md`](tasks/OPT-149.md) |
 
@@ -8591,3 +8591,36 @@ statements below are historical, not the current execution order.
   [`evidence/optimization/opt146-batch-reconciliation/REPORT.md`](evidence/optimization/opt146-batch-reconciliation/REPORT.md).
 - OPT-146 marked `done`. Coupled IDs: none. Post-138 optimization batch
   (OPT-139–146) complete.
+
+### OPT-147 delivery (2026-09-15T07:26:38Z)
+
+- Screened llama-shaped 8×8 prompt-attention tile `prefill_attention_8x8_v1`
+  against shipping `opt111_base` 16×2. OPT-111 arithmetic, BF16 state, causal
+  masks, chunking, and final-token policy retained. GQA ratio 6 padded to
+  ncols2=8 with heads 6–7 masked. Full 64-col 8×8 smem exceeded RTX 5090
+  opt-in (105216 > 101376); live-GQA `kSharedNcols=48` yields smem 94528,
+  occupancy 1.
+- Verification **PASS**: host pytest 9 passed; GPU correctness, P4096
+  complete-family screen, OPT-058 candidate NLL, graph/eager, checkpoint,
+  131072 memory/reserve, and `target_guard_v2` all executed on the sitting
+  GPU. Screened_in then kept.
+- Screen (complete family, not whole-engine): control **222.146301 ms**,
+  candidate **201.478683 ms**, saving **20.667618 ms**. Independent
+  reconstruction agrees.
+- Quality: held-out NLL **1.7875990840085783** identical; `ppl_ratio=1.0`;
+  `candidate_nll_measured=true`.
+- Whole-engine P4096 prefill (shipping delta, keep): control **2997.786**
+  tok/s, candidate **3032.417** tok/s, **g=1.01158**, **+34.63** tok/s.
+  Decode D128/D2048/D8192/D32768 guards passed. Mechanism remains
+  `unknown`; causal claim withheld.
+- Production pin flipped: `kSelectedAttentionPipelinePath[] =
+  "prefill_attention_8x8_v1"`. Verification PASS 2026-09-15T07:29:38Z;
+  candidate measured delta **+34.63** tok/s (P4096 prefill, g=1.01158);
+  shipping delta **+34.63** tok/s (pin flip on keep); quality **measured**
+  (`ppl_ratio=1.0`).
+- Key evidence: [`tasks/OPT-147.md`](tasks/OPT-147.md);
+  [`fixtures/opt147_prefill_8x8.json`](fixtures/opt147_prefill_8x8.json);
+  [`evidence/optimization/opt147-prefill-8x8/REPORT.md`](evidence/optimization/opt147-prefill-8x8/REPORT.md).
+- OPT-147 marked `done`. Coupled IDs: none. Next eligible pending task:
+  **OPT-148**.
+

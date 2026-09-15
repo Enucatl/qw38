@@ -1,0 +1,22 @@
+
+==========
+== CUDA ==
+==========
+
+CUDA Version 13.0.2
+
+Container image Copyright (c) 2016-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+
+This container image and its contents are governed by the NVIDIA Deep Learning Container License.
+By pulling and using the container, you accept the terms and conditions of this license:
+https://developer.nvidia.com/ngc/nvidia-deep-learning-container-license
+
+A copy of this license is made available in this container at /NGC-DL-CONTAINER-LICENSE for your convenience.
+
+graph_eager tokens=32 start=0 control=opt111_base candidate=prefill_attention_8x8_v1 max_abs=0 nonfinite=0 gqa_max_abs=0 gqa_nonfinite=0 equal=true finite=true launch=fattn_mma_pipeline_prefill_attention_8x8_v1 convert_once=1 ncols1=8 ncols2=8 gqa_pad_heads=2
+graph_eager_repeat pass=true error=none
+prompt_to_decode_kv_handoff pass=true atomic_publication=true candidate_committed_visibility=true final_token_output_policy=true
+cancellation_case tokens=0 skipped_launch=true pass=true
+QW38_OPT147_PREFILL_8X8_RESULT={"schema_version":1,"task":"OPT-147","workload":"state","llama_revision":"cc83d7b4824f73cfdda4dfbb47ee39804f71b328","gguf_sha256":"31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34","selected_attention_pipeline_path":"opt111_base","candidate_path":"prefill_attention_8x8_v1","control_path":"opt111_base","nonfinite":0,"pass":true,"keep":false,"observed_warmups":0,"observed_samples":1,"observed_candidates":2,"observed_shapes":1,"observed_tier":"acceptance","acceptance_executed":false,"pairs":1,"ncols1":8,"ncols2":8}
+QW38_OPT147_NATIVE_COUNTS={"schema_version":1,"task":"OPT-147","family":"prompt-attn","tier":"acceptance","warmups":0,"samples":1,"observed_warmups":0,"observed_samples":1,"observed_candidates":2,"observed_shapes":1,"observed_tier":"acceptance","pairs":1,"acceptance_executed":false,"keep":false}
+status=passed
