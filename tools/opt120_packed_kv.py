@@ -560,7 +560,8 @@ def parent_cache_nll() -> dict[str, float]:
             row.get("post113_mean_nll") or row.get("candidate_mean_nll") or 0.0
         )
         for row in spans
-        if row.get("id") and (row.get("post113_mean_nll") or row.get("candidate_mean_nll"))
+        if row.get("id")
+        and (row.get("post113_mean_nll") or row.get("candidate_mean_nll"))
     }
 
 

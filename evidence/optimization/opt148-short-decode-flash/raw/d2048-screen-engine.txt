@@ -1,0 +1,27 @@
+
+==========
+== CUDA ==
+==========
+
+CUDA Version 13.0.2
+
+Container image Copyright (c) 2016-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+
+This container image and its contents are governed by the NVIDIA Deep Learning Container License.
+By pulling and using the container, you accept the terms and conditions of this license:
+https://developer.nvidia.com/ngc/nvidia-deep-learning-container-license
+
+A copy of this license is made available in this container at /NGC-DL-CONTAINER-LICENSE for your convenience.
+
+phase=keep_ab family=attn pairs=1 model_loaded_once=true recapture_after_selector=true
+keep_ab_launch pair=0 side=0 config=0 graph_capture=true override_before_capture_applied=true recapture=true q8_layout=r1_w4 q8_grouping=grouped_r1_w4 q8_device_layout=raw_gguf q6_device_layout=raw_gguf q8_rows=1 mmq_kernel=q4_i128_j128_fma_async_x mmq_async_x=true q4_path=llama_q4k_mmvq q4_device_layout=raw_gguf ffn_path=paired_integer gate_variant=opt110_mul_mat_vec_q4_k_q8_1_swiglu up_variant=opt110_mul_mat_vec_q4_k_q8_1_swiglu down_variant=opt110_mul_mat_vec_q4_k_q8_1 gate_up_stage_count=1 down_stage_count=1 captured_in_graph=true staging=block_q8_1 warps_per_row=4 wall_ms=604.202759 captured_path=decode_segments8 gdn_decode=sequential gdn_launch=prepare_recurrence_window gdn_tile=0 attention_pipeline=prefill_attention_8x8_v1 attention_launch=fattn_mma_pipeline_prefill_attention_8x8_v1 convert_once=1 decode_query_prep=warp_query decode_query_prep_launch=vec128_online_decode_attention prep_grid=24 n_parts=16 prepared_q=false vec_kv=false
+keep_ab_launch pair=0 side=1 config=1 graph_capture=true override_before_capture_applied=true recapture=true q8_layout=r1_w4 q8_grouping=grouped_r1_w4 q8_device_layout=raw_gguf q6_device_layout=raw_gguf q8_rows=1 mmq_kernel=q4_i128_j128_fma_async_x mmq_async_x=true q4_path=llama_q4k_mmvq q4_device_layout=raw_gguf ffn_path=paired_integer gate_variant=opt110_mul_mat_vec_q4_k_q8_1_swiglu up_variant=opt110_mul_mat_vec_q4_k_q8_1_swiglu down_variant=opt110_mul_mat_vec_q4_k_q8_1 gate_up_stage_count=1 down_stage_count=1 captured_in_graph=true staging=block_q8_1 warps_per_row=4 wall_ms=531.014221 captured_path=decode_segments8 gdn_decode=sequential gdn_launch=prepare_recurrence_window gdn_tile=0 attention_pipeline=prefill_attention_8x8_v1 attention_launch=fattn_mma_pipeline_prefill_attention_8x8_v1 convert_once=1 decode_query_prep=warp_query decode_query_prep_launch=flash_vec_decode_attention prep_grid=24 n_parts=16 prepared_q=false vec_kv=false
+{"observation_unit":"independent_round","sample_index":0,"pair":0,"order":"AB","control_ms":604.202759,"candidate_ms":531.014221,"control_itl_p50_ms":18.794363,"control_itl_p95_ms":18.8897552,"candidate_itl_p50_ms":16.4976254,"candidate_itl_p95_ms":16.5112171,"family":"attn"}
+QW38_OPT070_NATIVE_COUNTS={"schema_version":1,"task":"OPT-070","family":"mmq","tier":"screen","warmups":0,"samples":1,"observed_warmups":0,"observed_samples":1,"observed_candidates":2,"observed_shapes":1,"observed_tier":"screen","pairs":1,"acceptance_executed":false,"keep":false,"override_before_capture_applied":true,"graph_capture_separate":true}
+QW38_OPT075_NATIVE_COUNTS={"schema_version":1,"task":"OPT-075","family":"q4","tier":"screen","warmups":0,"samples":1,"observed_warmups":0,"observed_samples":1,"observed_candidates":2,"observed_shapes":1,"observed_tier":"screen","pairs":1,"acceptance_executed":false,"keep":false,"override_before_capture_applied":true,"graph_capture_separate":true,"recapture_after_selector":true}
+QW38_OPT076_NATIVE_COUNTS={"schema_version":1,"task":"OPT-076","family":"q4","tier":"screen","warmups":0,"samples":1,"observed_warmups":0,"observed_samples":1,"observed_candidates":2,"observed_shapes":1,"observed_tier":"screen","pairs":1,"acceptance_executed":false,"keep":false,"override_before_capture_applied":true,"graph_capture_separate":true,"recapture_after_selector":true}
+QW38_OPT057_PROBE_RESULT={"schema_version":1,"task":"OPT-079","workload":"attn-ab","pairs":1,"model_loaded_once":true,"override_before_capture_applied":true,"recapture_after_selector":true}
+QW38_OPT077_NATIVE_COUNTS={"schema_version":1,"task":"OPT-077","family":"gdn","tier":"screen","warmups":0,"samples":1,"observed_warmups":0,"observed_samples":1,"observed_candidates":2,"observed_shapes":1,"observed_tier":"screen","pairs":1,"acceptance_executed":false,"keep":false,"override_before_capture_applied":true,"graph_capture_separate":true,"recapture_after_selector":true}
+QW38_OPT079_NATIVE_COUNTS={"schema_version":1,"task":"OPT-079","family":"attn","tier":"screen","warmups":0,"samples":1,"observed_warmups":0,"observed_samples":1,"observed_candidates":2,"observed_shapes":1,"observed_tier":"screen","pairs":1,"acceptance_executed":false,"keep":false,"override_before_capture_applied":true,"graph_capture_separate":true,"recapture_after_selector":true}
+QW38_OPT078_NATIVE_COUNTS={"schema_version":1,"task":"OPT-078","family":"decode-attention","tier":"screen","warmups":0,"samples":1,"observed_warmups":0,"observed_samples":1,"observed_candidates":2,"observed_shapes":1,"observed_tier":"screen","pairs":1,"acceptance_executed":false,"keep":false,"override_before_capture_applied":true,"graph_capture_separate":true,"recapture_after_selector":true}
+status=passed

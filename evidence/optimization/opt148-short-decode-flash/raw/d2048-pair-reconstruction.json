@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "task": "OPT-148",
+  "workload": "d2048",
+  "complete_family": true,
+  "rotating_layers": 16,
+  "warmups": 1,
+  "pairs": 3,
+  "control": "vec128_online",
+  "candidate": "decode_attention_flash_vec_v1",
+  "native_control_mean_ms": 1.775925,
+  "native_candidate_mean_ms": 0.601931,
+  "independent_control_mean_ms": 1.7759253333333334,
+  "independent_candidate_mean_ms": 0.6019306666666667,
+  "independent_saving_ms": 1.1739946666666667,
+  "rounds": [
+    {
+      "warmup": false,
+      "sample_index": 0,
+      "control_ms": 1.792352,
+      "candidate_ms": 0.590848
+    },
+    {
+      "warmup": false,
+      "sample_index": 1,
+      "control_ms": 1.749056,
+      "candidate_ms": 0.634112
+    },
+    {
+      "warmup": false,
+      "sample_index": 2,
+      "control_ms": 1.786368,
+      "candidate_ms": 0.580832
+    }
+  ],
+  "short_engine_pair": [
+    {
+      "observation_unit": "independent_round",
+      "sample_index": 0,
+      "pair": 0,
+      "order": "AB",
+      "control_ms": 604.202759,
+      "candidate_ms": 531.014221,
+      "control_itl_p50_ms": 18.794363,
+      "control_itl_p95_ms": 18.8897552,
+      "candidate_itl_p50_ms": 16.4976254,
+      "candidate_itl_p95_ms": 16.5112171,
+      "family": "attn"
+    }
+  ],
+  "mechanism": "unknown",
+  "prep_included": true,
+  "combine_included": true,
+  "conversion_included": true
+}

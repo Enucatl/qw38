@@ -1,0 +1,77 @@
+{
+  "schema_version": 1,
+  "task": "OPT-148",
+  "phase": "quality",
+  "mode": "acceptance",
+  "ok": true,
+  "skipped": false,
+  "opt058_invoked": true,
+  "candidate_nll_measured": true,
+  "candidate_nll_not_measured": false,
+  "nll_required": true,
+  "opt116_contract_id": "opt116_generated_v1",
+  "ppl_ratio": 1.0,
+  "wikitext_ppl_ratio": 1.0,
+  "ppl_ratio_max": 1.01,
+  "recurrence_incremental_nll_max": 0.02,
+  "parent_authenticated_ppl_ratio": 1.0,
+  "control": {
+    "id": "hybrid_crossover",
+    "cases": [
+      {
+        "name": "wikitext_nll",
+        "mean_nll": 1.5249350773895778
+      },
+      {
+        "name": "held_out_wikitext_1024",
+        "mean_nll": 1.7875990840085783
+      },
+      {
+        "name": "recurrence_short",
+        "mean_nll": 2.246893437286633
+      },
+      {
+        "name": "recurrence_long",
+        "mean_nll": 2.7207181590359952
+      }
+    ],
+    "restored_packed_or_r2": false,
+    "quality_flag": "--quality",
+    "sidecar": "build/optimization-runs/opt148-short-decode-flash/quality-hybrid_crossover.txt",
+    "opt058_invoked": true,
+    "opt058_argv": "./build/qw38-cuda-opt058-quality-baseline-test models/Qwen3.8-27B-Q4_K_M.gguf --workload quality-baseline --quality --quality-config build/optimization-runs/opt148-short-decode-flash/quality-config-hybrid_crossover.json --q4-decode llama_q4k_mmvq --ffn-decode paired_integer --q8-layout r1_w4 --attention-pipeline prefill_attention_8x8_v1 --bundle pins/production_quality_v2_nll.bundle",
+    "quality_config": "build/optimization-runs/opt148-short-decode-flash/quality-config-hybrid_crossover.json"
+  },
+  "candidate": {
+    "id": "decode_attention_flash_vec_v1",
+    "cases": [
+      {
+        "name": "wikitext_nll",
+        "mean_nll": 1.5249350773895778
+      },
+      {
+        "name": "held_out_wikitext_1024",
+        "mean_nll": 1.7875990840085783
+      },
+      {
+        "name": "recurrence_short",
+        "mean_nll": 2.246893437286633
+      },
+      {
+        "name": "recurrence_long",
+        "mean_nll": 2.7207181590359952
+      }
+    ],
+    "restored_packed_or_r2": false,
+    "quality_flag": "--quality",
+    "sidecar": "build/optimization-runs/opt148-short-decode-flash/quality-decode_attention_flash_vec_v1.txt",
+    "opt058_invoked": true,
+    "opt058_argv": "./build/qw38-cuda-opt058-quality-baseline-test models/Qwen3.8-27B-Q4_K_M.gguf --workload quality-baseline --quality --quality-config build/optimization-runs/opt148-short-decode-flash/quality-config-decode_attention_flash_vec_v1.json --q4-decode llama_q4k_mmvq --ffn-decode paired_integer --q8-layout r1_w4 --attention-pipeline prefill_attention_8x8_v1 --bundle pins/production_quality_v2_nll.bundle",
+    "quality_config": "build/optimization-runs/opt148-short-decode-flash/quality-config-decode_attention_flash_vec_v1.json",
+    "same_math_copied_from_control": false
+  },
+  "quality_flag": "--quality",
+  "arithmetic_changed": true,
+  "family_plan": "task=OPT-148 mode=acceptance phase=quality loop_product=12288 cases=12 candidates=1 warmups=0 samples=1 tokens=1024",
+  "measured_at": "2026-09-15T08:06:52Z"
+}

@@ -298,8 +298,17 @@ constexpr std::size_t kOpt137RepVisible8448 = 8448;
 constexpr std::size_t kOpt137RepVisible33024 = 33024;
 constexpr std::size_t kOpt137RepVisible131072 = 131072;
 constexpr bool kSelectedOpt137DenseMma = true;
+// OPT-148 flash-style vector decode. Production stays vec128_online in the
+// hybrid crossover window until KEEP flips this pin. D128 warp_query and
+// OPT-137 MMA at >=8192 are unchanged. Do not revive OPT-130 n_parts=8.
+constexpr char kLegalDecodeAttentionFlashVec[] =
+    "decode_attention_flash_vec_v1";
+constexpr char kDecodeAttentionFlashVecLaunch[] =
+    "flash_vec_decode_attention";
+constexpr bool kSelectedDecodeAttentionFlashVec = true;
 
 inline thread_local bool g_opt137_mma_override = false;
+inline thread_local bool g_decode_attention_flash_vec_override = false;
 inline thread_local int g_opt137_frozen_n_parts[3] = {0, 0, 0};
 inline thread_local unsigned int g_opt137_mma_launches = 0;
 inline thread_local unsigned int g_opt137_mma_grid_x = 0;
@@ -376,6 +385,11 @@ inline bool opt137_mma_enabled() noexcept {
 inline bool opt137_uses_mma_at(std::size_t position) noexcept {
   return opt137_mma_enabled() &&
          position >= static_cast<std::size_t>(kOpt137MmaThreshold);
+}
+
+inline bool decode_attention_flash_vec_enabled() noexcept {
+  return g_decode_attention_flash_vec_override ||
+         kSelectedDecodeAttentionFlashVec;
 }
 
 inline int opt137_bucket_index(std::size_t position) noexcept {
@@ -467,6 +481,9 @@ inline const char* decode_attention_vec128_path_for_position(
   if (threshold > 0 &&
       position >= static_cast<std::size_t>(threshold) &&
       position <= static_cast<std::size_t>(verified)) {
+    if (decode_attention_flash_vec_enabled()) {
+      return kLegalDecodeAttentionFlashVec;
+    }
     return kLegalDecodeAttentionVec128Online;
   }
   return kSelectedDecodeAttentionVec128Path;
@@ -488,14 +505,29 @@ inline bool decode_attention_vec128_uses_online_at(
       decode_attention_vec128_path_for_position(position));
 }
 
-// Bounded decode-graph topology: warp_query vs vec128_online vs OPT-137 MMA
-// buckets. n_parts is 16 on both sides of 2048 with current pins, so 2048 is
-// not a dispatch change. Candidate MMA adds topologies 2/3/4.
+inline bool decode_attention_flash_vec_uses(const char* path) noexcept {
+  return path != nullptr &&
+         std::strcmp(path, kLegalDecodeAttentionFlashVec) == 0;
+}
+
+inline bool decode_attention_flash_vec_at(std::size_t position) noexcept {
+  return decode_attention_flash_vec_uses(
+      decode_attention_vec128_path_for_position(position));
+}
+
+inline bool decode_attention_uses_short_vector_at(
+    std::size_t position) noexcept {
+  return decode_attention_vec128_uses_online_at(position) ||
+         decode_attention_flash_vec_at(position);
+}
+
+// Bounded decode-graph topology: warp_query vs vec128_online/flash_vec vs
+// OPT-137 MMA buckets. Flash-vec reuses topology 1; it does not add a graph.
 inline int decode_graph_topology_index(std::size_t position) noexcept {
   if (opt137_uses_mma_at(position)) {
     return 2 + opt137_bucket_index(position);
   }
-  return decode_attention_vec128_uses_online_at(position) ? 1 : 0;
+  return decode_attention_uses_short_vector_at(position) ? 1 : 0;
 }
 
 inline std::size_t decode_graph_topology_capture_position(int topology) noexcept {
@@ -523,6 +555,9 @@ inline int effective_vec128_n_parts() noexcept {
 
 inline const char* decode_attention_vec128_launch_variant(
     const char* path) noexcept {
+  if (decode_attention_flash_vec_uses(path)) {
+    return kDecodeAttentionFlashVecLaunch;
+  }
   if (decode_attention_vec128_uses_online(path)) {
     return kDecodeAttentionVec128LaunchOnline;
   }
@@ -591,6 +626,33 @@ inline bool apply_opt137_dense_mma_ident(const char* path) noexcept {
   return false;
 }
 
+inline void set_decode_attention_flash_vec_override(bool enabled) noexcept {
+  g_decode_attention_flash_vec_override = enabled;
+}
+
+inline bool apply_decode_attention_flash_vec_ident(const char* path) noexcept {
+  if (path != nullptr &&
+      std::strcmp(path, kLegalDecodeAttentionFlashVec) == 0) {
+    g_decode_attention_flash_vec_override = true;
+    return true;
+  }
+  if (path != nullptr &&
+      std::strcmp(path, kLegalDecodeAttentionHybridCrossover) == 0) {
+    g_decode_attention_flash_vec_override = false;
+    return true;
+  }
+  if (path != nullptr &&
+      std::strcmp(path, kLegalDecodeAttentionVec128Online) == 0) {
+    g_decode_attention_flash_vec_override = false;
+    return true;
+  }
+  return false;
+}
+
+inline void clear_decode_attention_flash_vec_override() noexcept {
+  g_decode_attention_flash_vec_override = false;
+}
+
 inline void clear_opt137_dense_mma_ident() noexcept {
   g_opt137_mma_override = false;
 }
@@ -607,6 +669,7 @@ inline bool apply_opt130_dense_attention_ident(const char* path) noexcept {
     clear_decode_attention_verified_max_override();
     clear_vec128_n_parts_override();
     g_opt137_mma_override = false;
+    g_decode_attention_flash_vec_override = false;
     return true;
   }
   if (apply_opt137_dense_mma_ident(path)) {
@@ -625,6 +688,9 @@ inline const char* effective_decode_attention_dispatch_path() noexcept {
   if (opt137_mma_enabled()) {
     return kLegalDecodeAttentionDenseMma;
   }
+  if (decode_attention_flash_vec_enabled()) {
+    return kLegalDecodeAttentionFlashVec;
+  }
   if (decode_attention_vec128_uses_online()) {
     return effective_decode_attention_vec128_path();
   }
@@ -636,7 +702,8 @@ inline const char* effective_decode_attention_dispatch_path(
   if (opt137_uses_mma_at(position)) {
     return kLegalDecodeAttentionDenseMma;
   }
-  if (decode_attention_vec128_uses_online_at(position)) {
+  if (decode_attention_flash_vec_at(position) ||
+      decode_attention_vec128_uses_online_at(position)) {
     return decode_attention_vec128_path_for_position(position);
   }
   return effective_decode_attention_gqa_path();
@@ -705,6 +772,22 @@ struct Opt137DenseMmaScope final {
   ~Opt137DenseMmaScope() { clear_opt137_dense_mma_ident(); }
   Opt137DenseMmaScope(const Opt137DenseMmaScope&) = delete;
   Opt137DenseMmaScope& operator=(const Opt137DenseMmaScope&) = delete;
+};
+
+struct DecodeAttentionFlashVecScope final {
+  explicit DecodeAttentionFlashVecScope(const char* path) noexcept
+      : previous_(g_decode_attention_flash_vec_override) {
+    apply_decode_attention_flash_vec_ident(path);
+  }
+  ~DecodeAttentionFlashVecScope() {
+    g_decode_attention_flash_vec_override = previous_;
+  }
+  DecodeAttentionFlashVecScope(const DecodeAttentionFlashVecScope&) = delete;
+  DecodeAttentionFlashVecScope& operator=(
+      const DecodeAttentionFlashVecScope&) = delete;
+
+ private:
+  bool previous_;
 };
 
 }  // namespace qw38::cuda

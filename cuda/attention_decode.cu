@@ -2,6 +2,7 @@
 #include "fattn_mma_f16.cuh"
 #include "mma.cuh"
 #include "opt137_dense_mma_decode.cuh"
+#include "opt148_short_decode_flash.cuh"
 #include "pdl_launch.cuh"
 #include "rms_norm.cuh"
 
@@ -2338,7 +2339,7 @@ int decode_kv_parts_for_position(std::size_t position) noexcept {
   if (opt137_uses_mma_at(position)) {
     return opt137_n_parts_for_position(position);
   }
-  if (decode_attention_vec128_uses_online_at(position)) {
+  if (decode_attention_uses_short_vector_at(position)) {
     return effective_vec128_n_parts();
   }
   return position >= kDecodeKvPartitionThreshold
@@ -2444,6 +2445,8 @@ int decode_kv_vec128_online_occupancy() noexcept {
   return blocks;
 }
 
+int decode_kv_flash_vec_occupancy() noexcept { return opt148::occupancy(); }
+
 namespace {
 
 constexpr int kLlamaVecNbatchFa = 256;
@@ -2519,6 +2522,10 @@ void decode_attention_kernel_attributes(const char* prep_path, int* registers,
                                         std::size_t* local_bytes,
                                         int* occupancy) noexcept {
   cudaFuncAttributes attrs{};
+  if (decode_attention_flash_vec_enabled()) {
+    opt148::kernel_attributes(registers, local_bytes, occupancy);
+    return;
+  }
   if (decode_attention_vec128_uses_online()) {
     cudaFuncGetAttributes(&attrs, vec128_online_decode_attention);
   } else if (decode_query_prep_uses_veckv(prep_path)) {
@@ -2589,7 +2596,7 @@ cudaError_t launch_attention_prepare_partitioned_vec(
     return cudaErrorInvalidValue;
   }
   if (decode_vec_is_warp_query(vec_path) &&
-      !decode_attention_vec128_uses_online_at(position) &&
+      !decode_attention_uses_short_vector_at(position) &&
       (n_parts != 16 || !production_warp_query_shape(config))) {
     return cudaErrorInvalidValue;
   }
@@ -2608,7 +2615,22 @@ cudaError_t launch_attention_prepare_partitioned_vec(
       score_workspace, output, stream, static_cast<std::size_t>(-1), launch);
   if (error != cudaSuccess) return error;
   publish_packed_kv_device_format(effective_packed_kv_format());
-  if (decode_attention_vec128_uses_online_at(position)) {
+  if (decode_attention_flash_vec_at(position)) {
+    if (!legal_vec128_n_parts(n_parts) ||
+        !production_warp_query_shape(config)) {
+      return cudaErrorInvalidValue;
+    }
+    error = opt148::launch_core(config, position, n_parts, query,
+                                query_norm_scale, committed, candidate_row,
+                                normalized_query, partial_vkq, meta, stream,
+                                launch);
+    if (error != cudaSuccess) return error;
+    record_decode_attention_gqa_launch(
+        kDecodeAttentionFlashVecLaunch, config.query_heads,
+        static_cast<unsigned int>(kWarpThreads),
+        static_cast<unsigned int>(kVec128Warps),
+        static_cast<unsigned int>(n_parts));
+  } else if (decode_attention_vec128_uses_online_at(position)) {
     if (!legal_vec128_n_parts(n_parts) ||
         !production_warp_query_shape(config)) {
       return cudaErrorInvalidValue;
@@ -2739,7 +2761,7 @@ cudaError_t launch_attention_prepare_partitioned(
   }
   const char* vec_path = selected_decode_attention_vec();
   if (decode_uses_warp_query() &&
-      !decode_attention_vec128_uses_online_at(position) &&
+      !decode_attention_uses_short_vector_at(position) &&
       (n_parts != 16 || !production_warp_query_shape(config))) {
     vec_path = "cta_group";
   }

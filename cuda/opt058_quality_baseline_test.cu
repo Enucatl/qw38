@@ -443,14 +443,22 @@ int apply_quality_selectors(const Options& options) {
     std::string decode_attn;
     if (json_string_field(text, "decode_attention", &decode_attn)) {
       if (decode_attn != "hybrid_crossover" && decode_attn != "warp_query" &&
+          decode_attn != "decode_attention_flash_vec_v1" &&
           !qw38::cuda::apply_opt130_dense_attention_ident(decode_attn.c_str()) &&
-          !qw38::cuda::apply_opt137_dense_mma_ident(decode_attn.c_str())) {
+          !qw38::cuda::apply_opt137_dense_mma_ident(decode_attn.c_str()) &&
+          !qw38::cuda::apply_decode_attention_flash_vec_ident(
+              decode_attn.c_str())) {
         std::fprintf(stderr, "invalid decode_attention %s\n",
                      decode_attn.c_str());
         return 2;
       }
       if (decode_attn == "hybrid_crossover" || decode_attn == "warp_query") {
         qw38::cuda::apply_opt130_dense_attention_ident("hybrid_crossover");
+        qw38::cuda::apply_decode_attention_flash_vec_ident("hybrid_crossover");
+      }
+      if (decode_attn == "decode_attention_flash_vec_v1") {
+        qw38::cuda::apply_decode_attention_flash_vec_ident(
+            decode_attn.c_str());
       }
     }
     int verified_max = 0;

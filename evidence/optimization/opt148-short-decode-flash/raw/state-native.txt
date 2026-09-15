@@ -1,0 +1,21 @@
+
+==========
+== CUDA ==
+==========
+
+CUDA Version 13.0.2
+
+Container image Copyright (c) 2016-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+
+This container image and its contents are governed by the NVIDIA Deep Learning Container License.
+By pulling and using the container, you accept the terms and conditions of this license:
+https://developer.nvidia.com/ngc/nvidia-deep-learning-container-license
+
+A copy of this license is made available in this container at /NGC-DL-CONTAINER-LICENSE for your convenience.
+
+graph_eager tokens=33 start=0 position=32 control_path=warp_query candidate_path=warp_query launch=warp_query_decode_attention max_abs=0 fp64_abs=0 nonfinite=0 equal=true finite=true convert_once=0 n_parts=16 rotating_layer=5 d128_warp_query=true opt137_mma=false
+graph_eager_repeat pass=true error=none
+prompt_to_decode_kv_handoff pass=true atomic_publication=true candidate_committed_visibility=true final_token_output_policy=true
+cancellation_case tokens=0 skipped_launch=true pass=true
+QW38_OPT148_SHORT_DECODE_FLASH_RESULT={"schema_version":1,"task":"OPT-148","workload":"state","llama_revision":"cc83d7b4824f73cfdda4dfbb47ee39804f71b328","gguf_sha256":"31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34","candidate_path":"decode_attention_flash_vec_v1","control_path":"vec128_online","nonfinite":0,"pass":true,"keep":false,"observed_warmups":0,"observed_samples":1,"observed_candidates":2,"observed_shapes":1,"observed_tier":"acceptance","acceptance_executed":false,"pairs":1,"n_parts":16,"mma_threshold":8192,"opt130_revived":false}
+QW38_OPT148_NATIVE_COUNTS={"schema_version":1,"task":"OPT-148","family":"decode-attn","tier":"acceptance","warmups":0,"samples":1,"observed_warmups":0,"observed_samples":1,"observed_candidates":2,"observed_shapes":1,"observed_tier":"acceptance","pairs":1,"acceptance_executed":false,"keep":false}

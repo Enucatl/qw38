@@ -4288,7 +4288,7 @@ Status SchedulerGraphs::capture_decode_segments(cudaStream_t stream) noexcept {
   captured_attention_key_ = session_->attention_key_;
   captured_frontier_ = static_cast<std::uint32_t>(session_->frontier_);
   captured_n_parts_ = decode_kv_parts_for_position(session_->frontier_);
-  captured_vec128_ = decode_attention_vec128_uses_online_at(session_->frontier_);
+  captured_vec128_ = decode_attention_uses_short_vector_at(session_->frontier_);
   decode_node_count_ = 0;
   for (std::size_t index = 0; index < decode_segment_graph_count_; ++index) {
     decode_node_count_ += count_cuda_graph_nodes(decode_segment_graphs_[index]);

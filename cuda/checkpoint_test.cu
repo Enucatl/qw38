@@ -57,10 +57,14 @@ int main(int argc, char** argv) {
   const char* model_path = nullptr;
   const char* checkpoint_path = nullptr;
   const char* attention_pipeline = nullptr;
+  const char* decode_attention = nullptr;
   for (int index = 1; index < argc; ++index) {
     if (std::strcmp(argv[index], "--attention-pipeline") == 0 &&
         index + 1 < argc) {
       attention_pipeline = argv[++index];
+    } else if (std::strcmp(argv[index], "--decode-attention") == 0 &&
+               index + 1 < argc) {
+      decode_attention = argv[++index];
     } else if (model_path == nullptr) {
       model_path = argv[index];
     } else if (checkpoint_path == nullptr) {
@@ -68,20 +72,27 @@ int main(int argc, char** argv) {
     } else {
       std::fprintf(stderr,
                    "usage: qw38-cuda-checkpoint-test MODEL CHECKPOINT "
-                   "[--attention-pipeline PATH]\n");
+                   "[--attention-pipeline PATH] [--decode-attention PATH]\n");
       return 1;
     }
   }
   if (model_path == nullptr || checkpoint_path == nullptr) {
     std::fprintf(stderr,
                  "usage: qw38-cuda-checkpoint-test MODEL CHECKPOINT "
-                 "[--attention-pipeline PATH]\n");
+                 "[--attention-pipeline PATH] [--decode-attention PATH]\n");
     return 1;
   }
   if (attention_pipeline != nullptr &&
       !qw38::cuda::apply_attention_pipeline_ident(attention_pipeline)) {
     std::fprintf(stderr, "invalid --attention-pipeline %s\n",
                  attention_pipeline);
+    return 1;
+  }
+  if (decode_attention != nullptr &&
+      !qw38::cuda::apply_decode_attention_flash_vec_ident(decode_attention) &&
+      !qw38::cuda::apply_opt130_dense_attention_ident(decode_attention) &&
+      !qw38::cuda::apply_opt137_dense_mma_ident(decode_attention)) {
+    std::fprintf(stderr, "invalid --decode-attention %s\n", decode_attention);
     return 1;
   }
   const std::string checkpoint = checkpoint_path;

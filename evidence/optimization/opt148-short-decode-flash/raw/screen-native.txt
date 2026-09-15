@@ -1,0 +1,23 @@
+
+==========
+== CUDA ==
+==========
+
+CUDA Version 13.0.2
+
+Container image Copyright (c) 2016-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+
+This container image and its contents are governed by the NVIDIA Deep Learning Container License.
+By pulling and using the container, you accept the terms and conditions of this license:
+https://developer.nvidia.com/ngc/nvidia-deep-learning-container-license
+
+A copy of this license is made available in this container at /NGC-DL-CONTAINER-LICENSE for your convenience.
+
+round family=decode-attn cache_mode=rotating warmup=true sample_index=0 observation_unit=independent_round control_ms=0.595584 candidate_ms=0.595584 enclosing_ms=0.595584 attention_layers=16 path=decode_attention_flash_vec_v1 prep_included=true combine_included=true conversion_included=true
+round family=decode-attn cache_mode=rotating warmup=false sample_index=0 order=AB observation_unit=independent_round control_ms=1.792352 candidate_ms=0.590848 enclosing_ms=0.590848 attention_layers=16 path=decode_attention_flash_vec_v1 launch=flash_vec_decode_attention tokens=2048 prep_included=true combine_included=true conversion_included=true rotating_layers=16
+round family=decode-attn cache_mode=rotating warmup=false sample_index=1 order=BA observation_unit=independent_round control_ms=1.749056 candidate_ms=0.634112 enclosing_ms=0.634112 attention_layers=16 path=decode_attention_flash_vec_v1 launch=vec128_online_decode_attention tokens=2048 prep_included=true combine_included=true conversion_included=true rotating_layers=16
+round family=decode-attn cache_mode=rotating warmup=false sample_index=2 order=AB observation_unit=independent_round control_ms=1.786368 candidate_ms=0.580832 enclosing_ms=0.580832 attention_layers=16 path=decode_attention_flash_vec_v1 launch=flash_vec_decode_attention tokens=2048 prep_included=true combine_included=true conversion_included=true rotating_layers=16
+screen_complete tokens=2048 layers=16 control_mean_ms=1.775925 candidate_mean_ms=0.601931 saving_ms=1.173995 faster=true screened_in=true pairs=3 warmups=1 rotating_layers=true complete_family=true n_parts=16
+flash_vec_regs=221 flash_vec_local_bytes=32 flash_vec_occupancy=2 production_flash_vec=false mma_threshold=8192 vec128_n_parts=16 opt130_n_parts_not_revived=true crossover=1024 verified_max=4096
+QW38_OPT148_SHORT_DECODE_FLASH_RESULT={"schema_version":1,"task":"OPT-148","workload":"screen","llama_revision":"cc83d7b4824f73cfdda4dfbb47ee39804f71b328","gguf_sha256":"31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34","candidate_path":"decode_attention_flash_vec_v1","control_path":"vec128_online","nonfinite":0,"pass":true,"keep":false,"observed_warmups":1,"observed_samples":3,"observed_candidates":2,"observed_shapes":1,"observed_tier":"screen","acceptance_executed":true,"pairs":3,"n_parts":16,"mma_threshold":8192,"opt130_revived":false}
+QW38_OPT148_NATIVE_COUNTS={"schema_version":1,"task":"OPT-148","family":"decode-attn","tier":"screen","warmups":1,"samples":3,"observed_warmups":1,"observed_samples":3,"observed_candidates":2,"observed_shapes":1,"observed_tier":"screen","pairs":3,"acceptance_executed":true,"keep":false}

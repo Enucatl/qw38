@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "task": "OPT-148",
+  "phase": "report",
+  "mode": "acceptance",
+  "ok": true,
+  "verdict": "keep",
+  "production_kept": true,
+  "shipping_decode_attention": "decode_attention_flash_vec_v1",
+  "tok_s_deltas": {
+    "d2048.decode_only": {
+      "control_rate": 49.44886580977065,
+      "candidate_rate": 59.765056814895765,
+      "delta": 10.316191005125113,
+      "g": 1.2086232764293652
+    }
+  },
+  "candidate_measured_delta": {
+    "d2048.decode_only": {
+      "control_rate": 49.44886580977065,
+      "candidate_rate": 59.765056814895765,
+      "delta": 10.316191005125113,
+      "g": 1.2086232764293652
+    }
+  },
+  "shipping_delta": {
+    "d2048.decode_only": {
+      "control_rate": 49.44886580977065,
+      "candidate_rate": 59.765056814895765,
+      "delta": 10.316191005125113,
+      "g": 1.2086232764293652
+    }
+  },
+  "quality_result": "measured",
+  "family_plan": "task=OPT-148 mode=acceptance phase=report loop_product=1 cases=1 candidates=1 warmups=0 samples=1 tokens=1",
+  "measured_at": "2026-09-15T08:24:17Z",
+  "production_pin": "decode_attention_flash_vec_v1"
+}

@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "task": "OPT-148",
+  "candidate": "decode_attention_flash_vec_v1",
+  "authority": "pinned llama.cpp flash_attn_ext_vec plus shipping Quartz vec128_online",
+  "llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+  "license": "MIT",
+  "authors": "The ggml authors",
+  "adapter_namespace": "qw38::cuda::opt148",
+  "specialization": "Ampere/Blackwell NVIDIA float2 BF16 flash-style vector decode over D2048 vec128_online; interleaved KV tiles, 16-byte copies, online reduction, n_parts=16",
+  "not_vendored": [
+    "ggml tensor/runtime",
+    "ggml graph/allocator",
+    "ggml CLI/model",
+    "current llama HEAD as release authority"
+  ],
+  "copied_organization": [
+    {
+      "file": ".cache/authorities/llama.cpp/ggml/src/ggml-cuda/fattn-vec.cuh",
+      "use": "flash_attn_ext_vec<256,1> interleaved KV tile, 16-byte copy, float2 V accum, nthreads_kq=nthreads_v=8 as implementation boundary only"
+    }
+  ],
+  "local_modifications": [
+    "in-kernel RMS+RoPE retained so query prep is charged on the complete family",
+    "partials written in vec128 merge_decode_kv_parts layout; output-gate stays shared",
+    "BF16 authoritative KV; GQA 24/4; n_parts stays 16; no OPT-130 occupancy path",
+    "D128 warp_query and OPT-137 MMA at >=8192 unchanged",
+    "diagnostic identity decode_attention_flash_vec_v1; production pin stays false until keep",
+    "mechanism remains unknown unless separately evidenced"
+  ]
+}

@@ -346,7 +346,7 @@ OPT-124 assesses the remaining ceiling without claiming universal optimality.
 | OPT-145 | Evaluate one remaining normalization or prompt-MMQ optimization | OPT-135, OPT-143, OPT-144 | done | Fresh evidence selects at most one normalization or prompt-MMQ candidate with verified keep or measured no-opportunity/no-keep | Measured `no_opportunity`; `residual_norm_quant` D128 +7.21 ms family excess (fraction 0.0358); unselected `prompt_mmq` +27.11 ms (fraction 0.0201); OPT-141 fused_boundary_mismatch; no source-grounded mechanism; parent retained; shipping delta 0; quality N/A (no arithmetic change); OPT-137 MMA retained; `claims_throughput=false`; no production change; [`tasks/OPT-145.md`](tasks/OPT-145.md); [`tools/opt145_secondary_family.py`](tools/opt145_secondary_family.py); [`pins/opt145_secondary_family_contract.json`](pins/opt145_secondary_family_contract.json); [`pins/opt145_iteration_contract.json`](pins/opt145_iteration_contract.json); [`fixtures/opt145_secondary_family.json`](fixtures/opt145_secondary_family.json); [`tests/test_opt145_secondary_family.py`](tests/test_opt145_secondary_family.py); [`evidence/optimization/opt145-secondary-family/REPORT.md`](evidence/optimization/opt145-secondary-family/REPORT.md); verification 2026-09-15T01:26:00Z |
 | OPT-146 | Measure the combined stack and publish the next remaining-gap decision | OPT-142, OPT-143, OPT-144, OPT-145 | done | Diagnostics only; fresh matched Quartz vs llama throughput and OPT-142 wall reconciliation (21/21 ≤0.26%); OPT-143/144/145 summarized `no_opportunity`; net batch shipping delta 0; next experiments `candidate=null` with resolving measurements; parent OPT-137 stack retained; `claims_throughput=false`; no production change; [`tasks/OPT-146.md`](tasks/OPT-146.md); [`tools/opt146_batch_reconciliation.py`](tools/opt146_batch_reconciliation.py); [`fixtures/opt146_batch_reconciliation.json`](fixtures/opt146_batch_reconciliation.json); [`evidence/optimization/opt146-batch-reconciliation/REPORT.md`](evidence/optimization/opt146-batch-reconciliation/REPORT.md); verification 2026-09-15T02:15:00Z |
 | OPT-147 | Screen a prefill 8x8 flash-attention tile | OPT-135, OPT-140, OPT-144 | done | `keep`; `prefill_attention_8x8_v1` 8×8 vs parent `opt111_base` 16×2; P4096 complete-family screen 222.146→201.479 ms; OPT-058 held-out NLL 1.7875990840085783 identical; 131072 reserve pass; `target_guard_v2` P4096 g=1.01158 (+34.63 tok/s); shipping pin flipped; mechanism unknown | [`tasks/OPT-147.md`](tasks/OPT-147.md); [`tools/opt147_prefill_8x8.py`](tools/opt147_prefill_8x8.py); [`pins/opt147_prefill_8x8_contract.json`](pins/opt147_prefill_8x8_contract.json); [`fixtures/opt147_prefill_8x8.json`](fixtures/opt147_prefill_8x8.json); [`evidence/optimization/opt147-prefill-8x8/REPORT.md`](evidence/optimization/opt147-prefill-8x8/REPORT.md); verification 2026-09-15T07:29:38Z |
-| OPT-148 | Screen a short-decode flash-style vector attention path | OPT-135, OPT-147 | pending | One bounded D2048 vector/flash-style candidate screen against vec128_online; no causal claim from counters alone; full target/guard and quality gates required to ship | [`tasks/OPT-148.md`](tasks/OPT-148.md) |
+| OPT-148 | Screen a short-decode flash-style vector attention path | OPT-135, OPT-147 | done | `keep`; `decode_attention_flash_vec_v1` flash-style vector vs parent `vec128_online`; D2048 complete-family screen 1.776→0.602 ms; OPT-058 held-out NLL 1.7875990840085783 identical; 131072 reserve pass; `target_guard_v2` D2048 decode_only g=1.209 (+10.32 tok/s); shipping pin flipped; mechanism unknown | [`tasks/OPT-148.md`](tasks/OPT-148.md); [`tools/opt148_short_decode_flash.py`](tools/opt148_short_decode_flash.py); [`pins/opt148_short_decode_flash_contract.json`](pins/opt148_short_decode_flash_contract.json); [`fixtures/opt148_short_decode_flash.json`](fixtures/opt148_short_decode_flash.json); [`evidence/optimization/opt148-short-decode-flash/REPORT.md`](evidence/optimization/opt148-short-decode-flash/REPORT.md); verification 2026-09-15T08:26:00Z |
 | OPT-149 | Screen normalization fused directly into Q8_1 staging | OPT-135, OPT-148 | pending | One bounded OPT-112 norm-to-Q8_1 candidate screen with representation/state checks; no Q8 byte-size-only claim; full target/guard and quality gates required to ship | [`tasks/OPT-149.md`](tasks/OPT-149.md) |
 
 ### Post-138 counter evidence and optimization batch (OPT-139–146)
@@ -8623,4 +8623,36 @@ statements below are historical, not the current execution order.
   [`evidence/optimization/opt147-prefill-8x8/REPORT.md`](evidence/optimization/opt147-prefill-8x8/REPORT.md).
 - OPT-147 marked `done`. Coupled IDs: none. Next eligible pending task:
   **OPT-148**.
+
+### OPT-148 delivery (2026-09-15T08:26:00Z)
+
+- Screened flash-style vector decode attention `decode_attention_flash_vec_v1`
+  against shipping `vec128_online` (`hybrid_crossover` window [1024,4096],
+  n_parts=16). BF16 KV, partial RoPE, GQA ratio, online-softmax outputs and
+  OPT-137 MMA at positions `>=8192` retained. D128 stays `warp_query`. OPT-130
+  not revived. llama `flash_attn_ext_vec` used only as implementation boundary.
+- Verification **PASS**: host pytest 9 passed; GPU correctness, D2048
+  complete-family screen, OPT-058 candidate NLL, graph/eager, checkpoint,
+  131072 memory/reserve, and `target_guard_v2` all executed on the sitting
+  GPU. Screened_in then kept.
+- Screen (complete family, not whole-engine): control **1.775925 ms**,
+  candidate **0.601931 ms**, saving **1.173995 ms**. Independent
+  reconstruction agrees.
+- Quality: held-out NLL **1.7875990840085783** identical; `ppl_ratio=1.0`;
+  `candidate_nll_measured=true`.
+- Whole-engine D2048 decode_only (shipping delta, keep): control **49.449**
+  tok/s, candidate **59.765** tok/s, **g=1.209**, **+10.32** tok/s. D2048
+  complete_request **g=1.187**. Guards: D128 **g=0.99975**, D8192 **g=1.000**,
+  D32768 **g=1.000**, P4096 prefill **g=0.998**. Mechanism remains
+  `unknown`; causal claim withheld.
+- Production pin flipped: `kSelectedDecodeAttentionFlashVec = true` →
+  `decode_attention_flash_vec_v1`. Verification PASS 2026-09-15T08:26:00Z;
+  candidate measured delta **+10.32** tok/s (D2048 decode_only, g=1.209);
+  shipping delta **+10.32** tok/s (pin flip on keep); quality **measured**
+  (`ppl_ratio=1.0`).
+- Key evidence: [`tasks/OPT-148.md`](tasks/OPT-148.md);
+  [`fixtures/opt148_short_decode_flash.json`](fixtures/opt148_short_decode_flash.json);
+  [`evidence/optimization/opt148-short-decode-flash/REPORT.md`](evidence/optimization/opt148-short-decode-flash/REPORT.md).
+- OPT-148 marked `done`. Coupled IDs: none. Next eligible pending task:
+  **OPT-149**.
 

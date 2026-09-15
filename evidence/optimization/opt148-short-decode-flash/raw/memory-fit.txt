@@ -1,0 +1,27 @@
+
+==========
+== CUDA ==
+==========
+
+CUDA Version 13.0.2
+
+Container image Copyright (c) 2016-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+
+This container image and its contents are governed by the NVIDIA Deep Learning Container License.
+By pulling and using the container, you accept the terms and conditions of this license:
+https://developer.nvidia.com/ngc/nvidia-deep-learning-container-license
+
+A copy of this license is made available in this container at /NGC-DL-CONTAINER-LICENSE for your convenience.
+
+memory_owner=runtime_context bytes=565444608
+memory_owner=resident_model bytes=18973870432 delta=18975031296
+memory_owner=gdn_state bytes=158859264
+memory_owner=attention_kv bytes=8589934592
+memory_owner=session_total bytes=8749807676 delta=8753512448
+memory_owner=workspace bytes=1831836288 delta=1837105152
+memory_owner=allocator_delta bytes=10134500
+memory_owner=graphs bytes=23068672 count=64 decode=0 prompt=64 decode_segments=40 prompt_rows=4096 graph_measured=23068672
+memory_host=rss bytes=19192913920
+memory_fit=post_graph capacity=131072 explicit_bytes=29578583068 measured_delta=29588717568 free_bytes=3510632448 reserve_required=1610612736 total_bytes=33664794624 arithmetic=true passed=true
+memory_admission=post_graph passed=true
+status=passed
