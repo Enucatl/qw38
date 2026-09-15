@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "task": "OPT-143",
+  "phase": "mechanism",
+  "mode": "acceptance",
+  "ok": true,
+  "skipped": true,
+  "supported_mechanism": null,
+  "candidate": null,
+  "admission_reason": "throughput_alone_cannot_establish_mechanism",
+  "source_observations": false,
+  "sass_observations": false,
+  "production_kernel_d2048": "vec128_online_decode_attention",
+  "opt137_mma_threshold": 8192,
+  "opt130_not_revived": true,
+  "family_plan": "task=OPT-143 mode=acceptance phase=mechanism loop_product=16 cases=2 candidates=1 warmups=0 samples=1 tokens=8",
+  "measured_at": "2026-09-15T01:02:20Z"
+}

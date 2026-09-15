@@ -1,0 +1,351 @@
+{
+  "schema_version": 1,
+  "task": "OPT-143",
+  "phase": "preflight",
+  "mode": "acceptance",
+  "ok": true,
+  "freeze": {
+    "ok": true,
+    "verdict": "no_opportunity",
+    "no_opportunity": true,
+    "candidate": null,
+    "supported_mechanism": null,
+    "admission_reason": "throughput_alone_cannot_establish_mechanism",
+    "blockers": [],
+    "reasons": [
+      "throughput_alone_cannot_establish_mechanism",
+      "throughput_occupancy_dram_alone_cannot_freeze_candidate",
+      "opt138_expected_benefit_unknown_until_mechanism",
+      "opt141_llama_mechanism_null",
+      "warp_query_rejected_as_d2048_evidence"
+    ],
+    "positive_excess": true,
+    "excess_ms": 47.51016466666667,
+    "excess_one_sided_low_ms": 47.38279750168242,
+    "excess_n": 3,
+    "excess_note": "mean_ms is over twelve middle-window evals, not per eval",
+    "d128_excess_ms": 4.297360666666666,
+    "d128_positive_excess": true,
+    "production_path_d2048": "vec128_online",
+    "production_kernel_d2048": "vec128_online_decode_attention",
+    "production_kernel_d128": "warp_query_decode_attention",
+    "warp_query_rejected_as_d2048": true,
+    "comparable_d2048": true,
+    "source_observations": false,
+    "sass_observations": false,
+    "opt137_mma_threshold": 8192,
+    "opt137_mma_retained": true,
+    "opt130_not_revived": true,
+    "arithmetic_changed": false,
+    "nll_required": false,
+    "target": "d2048",
+    "target_metric": "decode_only",
+    "typed_slots": {
+      "dram_read_bytes": 8.85,
+      "dram_throughput": 2.33,
+      "sm_throughput": 5.43,
+      "achieved_occupancy": 15.62,
+      "tensor_activity": 0.0,
+      "l2_traffic": 1932797.0
+    },
+    "llama_compare_slots": [
+      {
+        "slot": "dram_read_bytes",
+        "quartz": 8.85,
+        "llama": 9.5,
+        "unit": "Mbyte"
+      },
+      {
+        "slot": "dram_write_bytes",
+        "quartz": 0.0,
+        "llama": 0.0,
+        "unit": "byte"
+      },
+      {
+        "slot": "l2_traffic",
+        "quartz": 1932797.0,
+        "llama": 1803992.0,
+        "unit": "sector"
+      },
+      {
+        "slot": "dram_throughput",
+        "quartz": 2.33,
+        "llama": 29.8,
+        "unit": "%"
+      },
+      {
+        "slot": "sm_throughput",
+        "quartz": 5.43,
+        "llama": 11.51,
+        "unit": "%"
+      },
+      {
+        "slot": "tensor_activity",
+        "quartz": 0.0,
+        "llama": 0.0,
+        "unit": "cycle"
+      },
+      {
+        "slot": "achieved_occupancy",
+        "quartz": 15.62,
+        "llama": 10.8,
+        "unit": "%"
+      }
+    ],
+    "evidence_paths": {
+      "family_gaps": "evidence/optimization/opt138-remaining-gap/family-gaps.json",
+      "identity": "evidence/optimization/opt139-counter-identity/identity.json",
+      "counters": "evidence/optimization/opt139-counter-identity/counter-evidence.json",
+      "comparisons": "evidence/optimization/opt141-matched-llama-counters/comparisons.json"
+    }
+  },
+  "eligibility": {
+    "ok": true,
+    "verdict": "no_opportunity",
+    "no_opportunity": true,
+    "candidate": null,
+    "supported_mechanism": null,
+    "admission_reason": "throughput_alone_cannot_establish_mechanism",
+    "blockers": [],
+    "reasons": [
+      "throughput_alone_cannot_establish_mechanism",
+      "throughput_occupancy_dram_alone_cannot_freeze_candidate",
+      "opt138_expected_benefit_unknown_until_mechanism",
+      "opt141_llama_mechanism_null",
+      "warp_query_rejected_as_d2048_evidence"
+    ],
+    "positive_excess": true,
+    "excess_ms": 47.51016466666667,
+    "excess_one_sided_low_ms": 47.38279750168242,
+    "excess_n": 3,
+    "excess_note": "mean_ms is over twelve middle-window evals, not per eval",
+    "d128_excess_ms": 4.297360666666666,
+    "d128_positive_excess": true,
+    "production_path_d2048": "vec128_online",
+    "production_kernel_d2048": "vec128_online_decode_attention",
+    "production_kernel_d128": "warp_query_decode_attention",
+    "warp_query_rejected_as_d2048": true,
+    "comparable_d2048": true,
+    "source_observations": false,
+    "sass_observations": false,
+    "opt137_mma_threshold": 8192,
+    "opt137_mma_retained": true,
+    "opt130_not_revived": true,
+    "arithmetic_changed": false,
+    "nll_required": false,
+    "target": "d2048",
+    "target_metric": "decode_only",
+    "typed_slots": {
+      "dram_read_bytes": 8.85,
+      "dram_throughput": 2.33,
+      "sm_throughput": 5.43,
+      "achieved_occupancy": 15.62,
+      "tensor_activity": 0.0,
+      "l2_traffic": 1932797.0
+    },
+    "llama_compare_slots": [
+      {
+        "slot": "dram_read_bytes",
+        "quartz": 8.85,
+        "llama": 9.5,
+        "unit": "Mbyte"
+      },
+      {
+        "slot": "dram_write_bytes",
+        "quartz": 0.0,
+        "llama": 0.0,
+        "unit": "byte"
+      },
+      {
+        "slot": "l2_traffic",
+        "quartz": 1932797.0,
+        "llama": 1803992.0,
+        "unit": "sector"
+      },
+      {
+        "slot": "dram_throughput",
+        "quartz": 2.33,
+        "llama": 29.8,
+        "unit": "%"
+      },
+      {
+        "slot": "sm_throughput",
+        "quartz": 5.43,
+        "llama": 11.51,
+        "unit": "%"
+      },
+      {
+        "slot": "tensor_activity",
+        "quartz": 0.0,
+        "llama": 0.0,
+        "unit": "cycle"
+      },
+      {
+        "slot": "achieved_occupancy",
+        "quartz": 15.62,
+        "llama": 10.8,
+        "unit": "%"
+      }
+    ],
+    "evidence_paths": {
+      "family_gaps": "evidence/optimization/opt138-remaining-gap/family-gaps.json",
+      "identity": "evidence/optimization/opt139-counter-identity/identity.json",
+      "counters": "evidence/optimization/opt139-counter-identity/counter-evidence.json",
+      "comparisons": "evidence/optimization/opt141-matched-llama-counters/comparisons.json"
+    }
+  },
+  "gpu_available": true,
+  "gpu_blocker": "",
+  "make_returncode": 0,
+  "make_stderr_tail": "",
+  "gpu_residents": [],
+  "authenticated_post113": {
+    "ok": false,
+    "selectors": {
+      "rms_norm": "parallel_fma",
+      "q4_decode": "llama_q4k_mmvq",
+      "q8_decode": "dp4a_q8_1",
+      "q6_decode": "integer_q8_1",
+      "ffn_decode": "paired_integer",
+      "query_prepare": "hoisted",
+      "attention_pipeline": "opt111_base",
+      "gdn_preproc": "transpose",
+      "mmq_pipeline": "fma_async",
+      "ffn_prompt_pair": "off",
+      "execution_graphs": "decode_segments8",
+      "production_numerics": "strict",
+      "gdn_decode": "sequential",
+      "decode_query_prep": "warp_query",
+      "q8_decode_rows_skinny": 1,
+      "q8_decode_rows_medium": 1,
+      "q8_decode_rows_wide": 1,
+      "q8_decode_layout_warps_skinny": 4,
+      "q8_decode_layout_warps_medium": 4,
+      "q8_decode_layout_warps_wide": 4,
+      "ffn_gate_quality_i": 128,
+      "ffn_gate_prompt_tile": 128,
+      "prompt_microbatch_rows": 4096,
+      "mmq_async_x": true,
+      "nvccflags": "-O2 --fmad=false",
+      "q8_layout": "r1_w4",
+      "ffn_tiles": "i128_j128",
+      "q8_grouping": "grouped_r1_w4",
+      "q8_device_layout": "raw_gguf",
+      "q6_device_layout": "raw_gguf",
+      "mmq_double_x": false,
+      "decode_attention_vec128": "warp_query",
+      "decode_attention_crossover_threshold": 1024,
+      "decode_attention": "hybrid_crossover"
+    },
+    "expected": {
+      "rms_norm": "parallel_fma",
+      "q4_decode": "llama_q4k_mmvq",
+      "q8_decode": "dp4a_q8_1",
+      "q8_grouping": "grouped_r1_w4",
+      "q8_layout": "r1_w4",
+      "q6_decode": "integer_q8_1",
+      "ffn_decode": "paired_integer",
+      "query_prepare": "hoisted",
+      "attention_pipeline": "opt111_base",
+      "gdn_preproc": "transpose",
+      "mmq_pipeline": "fma_async",
+      "mmq_async_x": true,
+      "ffn_prompt_pair": "off",
+      "ffn_tiles": "i128_j128",
+      "prompt_microbatch_rows": 4096,
+      "execution_graphs": "ffn_only",
+      "production_numerics": "strict",
+      "nvccflags": "-O2 --fmad=false",
+      "gdn_decode": "sequential",
+      "decode_query_prep": "warp_query",
+      "decode_attention": "hybrid_crossover",
+      "decode_attention_vec128": "warp_query",
+      "decode_attention_crossover_threshold": 1024,
+      "q8_device_layout": "raw_gguf",
+      "q6_device_layout": "raw_gguf",
+      "mmq_double_x": false
+    },
+    "opt113_fixture_selected": {
+      "rms_norm": "parallel_fma",
+      "q4_decode": "llama_q4k_mmvq",
+      "q8_decode": "dp4a_q8_1",
+      "q6_decode": "integer_q8_1",
+      "ffn_decode": "paired_integer",
+      "query_prepare": "hoisted",
+      "attention_pipeline": "opt111_base",
+      "gdn_preproc": "transpose",
+      "mmq_pipeline": "fma_async",
+      "ffn_prompt_pair": "off",
+      "execution_graphs": "ffn_only",
+      "production_numerics": "strict",
+      "gdn_decode": "sequential",
+      "decode_query_prep": "warp_query",
+      "q8_decode_rows_skinny": 1,
+      "q8_decode_rows_medium": 1,
+      "q8_decode_rows_wide": 1,
+      "q8_decode_layout_warps_skinny": 4,
+      "q8_decode_layout_warps_medium": 4,
+      "q8_decode_layout_warps_wide": 4,
+      "ffn_gate_quality_i": 128,
+      "ffn_gate_prompt_tile": 128,
+      "prompt_microbatch_rows": 4096,
+      "mmq_async_x": true,
+      "nvccflags": "-O2 --fmad=false",
+      "q8_layout": "r1_w4",
+      "ffn_tiles": "i128_j128",
+      "q8_grouping": "grouped_r1_w4",
+      "q8_device_layout": "raw_gguf",
+      "q6_device_layout": "raw_gguf",
+      "mmq_double_x": false,
+      "decode_attention_vec128": "warp_query",
+      "decode_attention_crossover_threshold": 1024,
+      "decode_attention": "hybrid_crossover"
+    },
+    "mismatches": {
+      "execution_graphs": {
+        "actual": "decode_segments8",
+        "expected": "ffn_only"
+      }
+    },
+    "llama_q4k_mmvq": true,
+    "opt111_base": true,
+    "hybrid_crossover": true,
+    "sequential_gdn": true,
+    "ffn_only_graphs": false,
+    "opt113_numbers_historical_only": true
+  },
+  "authenticated_current_pins": {
+    "ok": true,
+    "execution_graphs": "decode_segments8",
+    "q4_decode": "llama_q4k_mmvq",
+    "opt137_dense_mma": true,
+    "ffn_only_prerequisite_not_used": true,
+    "mismatches": [],
+    "parent_identity": {
+      "ok": true,
+      "reason": null,
+      "mismatches": [],
+      "expected": {
+        "execution_graphs": "decode_segments8",
+        "q4_decode": "llama_q4k_mmvq",
+        "opt137_dense_mma": true
+      },
+      "observed": {
+        "execution_graphs": "decode_segments8",
+        "q4_decode": "llama_q4k_mmvq",
+        "opt137_dense_mma": true
+      }
+    }
+  },
+  "production_pins_parent": true,
+  "parent": "post124_plus_opt127_decode_segments8_plus_opt137_mma",
+  "candidate": null,
+  "source": "c63afe3a2a5a0b916667cb1196bcb3715d8e0230",
+  "dirty": true,
+  "family_plan": "task=OPT-143 mode=acceptance phase=preflight loop_product=1 cases=1 candidates=1 warmups=0 samples=1 tokens=1",
+  "measured_at": "2026-09-15T01:02:16Z",
+  "verdict": "no_opportunity",
+  "gpu_lock": "build/optimization-runs/qw38-gpu.lock",
+  "child_timeout_s": 300.0,
+  "aggregate_deadline_s": 7200
+}

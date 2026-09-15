@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "task": "OPT-143",
+  "candidate": null,
+  "authority": "pinned llama.cpp plus authenticated Quartz production dispatch",
+  "llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+  "license": "MIT",
+  "adapter_namespace": "qw38::cuda::opt143",
+  "specialization": "none — no source-grounded short-decode attn_core candidate was frozen",
+  "not_vendored": [
+    "ggml tensor/runtime",
+    "ggml graph/allocator",
+    "ggml CLI/model",
+    "current llama HEAD as release authority"
+  ],
+  "copied_organization": [],
+  "local_modifications": [
+    "no production kernel or selector change",
+    "OPT-137 MMA threshold remains 8192",
+    "rejected OPT-130 occupancy n_parts path is not reopened",
+    "D2048 evidence is vec128_online_decode_attention; warp_query is not D2048 evidence"
+  ],
+  "evidence_sources": [
+    "evidence/optimization/opt138-remaining-gap/family-gaps.json",
+    "evidence/optimization/opt138-remaining-gap/next-experiments.json",
+    "evidence/optimization/opt139-counter-identity/identity.json",
+    "evidence/optimization/opt139-counter-identity/counter-evidence.json",
+    "evidence/optimization/opt141-matched-llama-counters/comparisons.json",
+    "evidence/optimization/opt141-matched-llama-counters/counter-evidence.json",
+    "pins/performance_keep_policy_v2.json"
+  ]
+}

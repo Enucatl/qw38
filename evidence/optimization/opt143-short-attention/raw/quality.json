@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "task": "OPT-143",
+  "phase": "quality",
+  "mode": "acceptance",
+  "ok": true,
+  "skipped": true,
+  "skip_reason": "no_candidate_no_arithmetic_change",
+  "candidate": null,
+  "nll_required": false,
+  "opt058_invoked": false,
+  "candidate_nll_measured": false,
+  "candidate_nll_not_measured": false,
+  "family_plan": "task=OPT-143 mode=acceptance phase=quality loop_product=12288 cases=12 candidates=1 warmups=0 samples=1 tokens=1024",
+  "measured_at": "2026-09-15T01:02:19Z",
+  "opt116_contract_id": "opt116_generated_v1",
+  "ppl_ratio_max": 1.01,
+  "recurrence_incremental_nll_max": 0.02,
+  "arithmetic_changed": false
+}

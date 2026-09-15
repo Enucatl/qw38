@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "task": "OPT-143",
+  "phase": "screen",
+  "mode": "acceptance",
+  "ok": true,
+  "skipped": true,
+  "skip_reason": "no_candidate_no_arithmetic_change",
+  "candidate": null,
+  "nll_required": false,
+  "opt058_invoked": false,
+  "candidate_nll_measured": false,
+  "candidate_nll_not_measured": false,
+  "family_plan": "task=OPT-143 mode=acceptance phase=screen loop_product=8 cases=1 candidates=2 warmups=1 samples=3 tokens=1",
+  "measured_at": "2026-09-15T01:02:19Z",
+  "screened_out": false,
+  "advance": false,
+  "warmups": 1,
+  "pairs": 3,
+  "complete_attention_family": true
+}

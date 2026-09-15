@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "task": "OPT-143",
+  "phase": "performance",
+  "mode": "acceptance",
+  "ok": true,
+  "skipped": true,
+  "skip_reason": "no_candidate_no_arithmetic_change",
+  "candidate": null,
+  "nll_required": false,
+  "opt058_invoked": false,
+  "candidate_nll_measured": false,
+  "candidate_nll_not_measured": false,
+  "family_plan": "task=OPT-143 mode=acceptance phase=performance loop_product=130 cases=5 candidates=2 warmups=3 samples=10 tokens=1",
+  "measured_at": "2026-09-15T01:02:20Z",
+  "pairs": [],
+  "warmups": 3,
+  "aa_pairs": 10,
+  "target": "d2048.decode_only",
+  "guards": [
+    "d2048.complete_request",
+    "d128",
+    "d8192",
+    "d32768",
+    "p4096"
+  ]
+}

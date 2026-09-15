@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "task": "OPT-143",
+  "phase": "report",
+  "mode": "acceptance",
+  "ok": true,
+  "verdict": "no_opportunity",
+  "production_kept": false,
+  "shipping_decode_attention": "dense_bf16_tile_f16_mma_decode_v1",
+  "tok_s_deltas": {},
+  "candidate_measured_delta": null,
+  "shipping_delta": 0,
+  "quality_result": "nll_not_required_no_arithmetic_change",
+  "family_plan": "task=OPT-143 mode=acceptance phase=report loop_product=1 cases=1 candidates=1 warmups=0 samples=1 tokens=1",
+  "measured_at": "2026-09-15T01:03:36Z"
+}
