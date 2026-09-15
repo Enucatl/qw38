@@ -344,7 +344,7 @@ OPT-124 assesses the remaining ceiling without claiming universal optimality.
 | OPT-143 | Evaluate one production-matched short-decode attention optimization | OPT-135, OPT-141 | done | One source-supported short-decode attention candidate yields verified keep or measured no-keep under target_guard_v2 | Measured `no_opportunity`; D2048 attn_core +47.51 ms family excess; production `vec128_online_decode_attention`; no source-grounded mechanism; parent retained; shipping delta 0; quality N/A (no arithmetic change); OPT-137 MMA retained; `claims_throughput=false`; no production change; [`tasks/OPT-143.md`](tasks/OPT-143.md); [`tools/opt143_short_attention.py`](tools/opt143_short_attention.py); [`pins/opt143_short_attention_contract.json`](pins/opt143_short_attention_contract.json); [`pins/opt143_iteration_contract.json`](pins/opt143_iteration_contract.json); [`fixtures/opt143_short_attention.json`](fixtures/opt143_short_attention.json); [`tests/test_opt143_short_attention.py`](tests/test_opt143_short_attention.py); [`evidence/optimization/opt143-short-attention/REPORT.md`](evidence/optimization/opt143-short-attention/REPORT.md); verification 2026-09-15T01:05:00Z |
 | OPT-144 | Evaluate one complete-boundary prefill attention optimization | OPT-135, OPT-141, OPT-143 | done | One production-boundary P4096 attention candidate yields verified keep or measured no-keep with quality and decode guards | Measured `no_opportunity`; P4096 attn_core +186.58 ms family excess; production `opt111_base`/`fattn_mma_pipeline_opt111_base`; no source-grounded mechanism; OPT-141 fused_boundary_mismatch 16x2 vs 8x8; parent retained; shipping delta 0; quality N/A (no arithmetic change); OPT-137 MMA retained; `claims_throughput=false`; no production change; [`tasks/OPT-144.md`](tasks/OPT-144.md); [`tools/opt144_prefill_attention.py`](tools/opt144_prefill_attention.py); [`pins/opt144_prefill_attention_contract.json`](pins/opt144_prefill_attention_contract.json); [`pins/opt144_iteration_contract.json`](pins/opt144_iteration_contract.json); [`fixtures/opt144_prefill_attention.json`](fixtures/opt144_prefill_attention.json); [`tests/test_opt144_prefill_attention.py`](tests/test_opt144_prefill_attention.py); [`evidence/optimization/opt144-prefill-attention/REPORT.md`](evidence/optimization/opt144-prefill-attention/REPORT.md); verification 2026-09-15T01:13:26Z |
 | OPT-145 | Evaluate one remaining normalization or prompt-MMQ optimization | OPT-135, OPT-143, OPT-144 | done | Fresh evidence selects at most one normalization or prompt-MMQ candidate with verified keep or measured no-opportunity/no-keep | Measured `no_opportunity`; `residual_norm_quant` D128 +7.21 ms family excess (fraction 0.0358); unselected `prompt_mmq` +27.11 ms (fraction 0.0201); OPT-141 fused_boundary_mismatch; no source-grounded mechanism; parent retained; shipping delta 0; quality N/A (no arithmetic change); OPT-137 MMA retained; `claims_throughput=false`; no production change; [`tasks/OPT-145.md`](tasks/OPT-145.md); [`tools/opt145_secondary_family.py`](tools/opt145_secondary_family.py); [`pins/opt145_secondary_family_contract.json`](pins/opt145_secondary_family_contract.json); [`pins/opt145_iteration_contract.json`](pins/opt145_iteration_contract.json); [`fixtures/opt145_secondary_family.json`](fixtures/opt145_secondary_family.json); [`tests/test_opt145_secondary_family.py`](tests/test_opt145_secondary_family.py); [`evidence/optimization/opt145-secondary-family/REPORT.md`](evidence/optimization/opt145-secondary-family/REPORT.md); verification 2026-09-15T01:26:00Z |
-| OPT-146 | Measure the combined stack and publish the next remaining-gap decision | OPT-142, OPT-143, OPT-144, OPT-145 | in_progress | Final stack gains and llama gaps are freshly measured, reconciled and independently verified; next proposals remain evidence-gated | [`tasks/OPT-146.md`](tasks/OPT-146.md) |
+| OPT-146 | Measure the combined stack and publish the next remaining-gap decision | OPT-142, OPT-143, OPT-144, OPT-145 | done | Diagnostics only; fresh matched Quartz vs llama throughput and OPT-142 wall reconciliation (21/21 ≤0.26%); OPT-143/144/145 summarized `no_opportunity`; net batch shipping delta 0; next experiments `candidate=null` with resolving measurements; parent OPT-137 stack retained; `claims_throughput=false`; no production change; [`tasks/OPT-146.md`](tasks/OPT-146.md); [`tools/opt146_batch_reconciliation.py`](tools/opt146_batch_reconciliation.py); [`fixtures/opt146_batch_reconciliation.json`](fixtures/opt146_batch_reconciliation.json); [`evidence/optimization/opt146-batch-reconciliation/REPORT.md`](evidence/optimization/opt146-batch-reconciliation/REPORT.md); verification 2026-09-15T02:15:00Z |
 
 ### Post-138 counter evidence and optimization batch (OPT-139–146)
 
@@ -8551,3 +8551,29 @@ statements below are historical, not the current execution order.
   [`evidence/optimization/opt145-secondary-family/REPORT.md`](evidence/optimization/opt145-secondary-family/REPORT.md).
 - OPT-145 marked `done`. Coupled IDs: none. Next eligible pending task:
   **OPT-146** (all dependencies satisfied).
+
+### OPT-146 delivery (2026-09-15T02:15:00Z)
+
+- Implemented `opt146_batch_reconciliation.py` phased final batch reconciliation:
+  fresh matched Quartz vs llama throughput (D128/D2048/D8192/D32768
+  decode_only+complete_request and P4096 prefill; 3 warmups + 10 alternating
+  pairs), OPT-142 wall reconciliation on fresh captures (21/21 windows ≤0.26%
+  unresolved), OPT-143/144/145 experiment summaries, top-two family excess,
+  and next-experiment specs with `candidate=null` and resolving measurements
+  pointing at prior `no_opportunity` results. OPT-137 control reconstructed as
+  current production; historical OPT-137 rates not presented as paired gain.
+  Parent retained; no production kernel or selector change.
+- Verification **PASS** (2026-09-15T02:15:00Z): ruff check clean (OPT-146
+  scope); **53 passed** (OPT-146 + OPT-142–145 peers); coverage valid
+  (21 windows); independent D2048 decode_only mean and D2048 middle r0 wall
+  reconstructed from raw artifacts; net batch shipping delta 0.
+- Candidate measured delta: **0**; shipping delta: **0**; quality result:
+  **N/A** (diagnostics only).
+- Fresh Quartz/llama gaps (informational): D2048 decode_only 50.06 vs 69.56
+  tok/s; P4096 prefill 2996.22 vs 3223.78 tok/s.
+- Key evidence: [`tasks/OPT-146.md`](tasks/OPT-146.md);
+  [`tools/opt146_batch_reconciliation.py`](tools/opt146_batch_reconciliation.py);
+  [`fixtures/opt146_batch_reconciliation.json`](fixtures/opt146_batch_reconciliation.json);
+  [`evidence/optimization/opt146-batch-reconciliation/REPORT.md`](evidence/optimization/opt146-batch-reconciliation/REPORT.md).
+- OPT-146 marked `done`. Coupled IDs: none. Post-138 optimization batch
+  (OPT-139–146) complete.

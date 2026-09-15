@@ -1,0 +1,162 @@
+{
+  "schema_version": 1,
+  "task": "OPT-146",
+  "phase": "preflight",
+  "mode": "acceptance",
+  "ok": true,
+  "gpu_available": true,
+  "gpu_blocker": "",
+  "gpu_residents": [],
+  "exclusive_sitting": true,
+  "nsys_available": true,
+  "nsys_layout": {
+    "nsys_bin": "/usr/local/cuda/bin/nsys",
+    "host_dir": "/opt/nvidia/nsight-systems/2025.3.2/host-linux-x64",
+    "qdstrm_importer": "/opt/nvidia/nsight-systems/2025.3.2/host-linux-x64/QdstrmImporter",
+    "version": "NVIDIA Nsight Systems version 2025.3.2.474-253236389321v0",
+    "modern": true
+  },
+  "image": "qw38-cuda:13.0.2",
+  "native": "build/qw38-cuda-opt136-matched-decode-profile-test",
+  "llama_bin": ".cache/authorities/llama-build-opt136/bin/qw38-llama-opt136-decode-profile",
+  "hashes": {
+    "quartz_native": "7fd0efb4abb5b0943d2462812a4b88e0c99d7c372b61a2cfff7807b3099377e5",
+    "llama_profile": "4a02206a38b8c01a7f9b313ef2bd5ff42844790dfc3772aba43dca5c6ea9f794",
+    "replay": "130469b13ef1cb8dbe100bc8d5a05fb27653520f2401704ac8606c53c9273561"
+  },
+  "make_returncode": 0,
+  "make_stderr_tail": "",
+  "llama_build": {
+    "ok": true,
+    "returncode": 0,
+    "stdout_tail": "OPT-136 llama profile already present: /home/user/qw38/.cache/authorities/llama-build-opt136/bin/qw38-llama-opt136-decode-profile\n",
+    "stderr_tail": "",
+    "hash": "4a02206a38b8c01a7f9b313ef2bd5ff42844790dfc3772aba43dca5c6ea9f794"
+  },
+  "identity": {
+    "ok": true,
+    "returncode": 0,
+    "parsed": {
+      "schema_version": 1,
+      "task": "OPT-136",
+      "workload": "identity",
+      "ok": true,
+      "parent": "post124_plus_opt127_decode_segments8",
+      "shipping_execution_graphs": "decode_segments8",
+      "q4_decode": "llama_q4k_mmvq",
+      "packed_kv": "dense_bf16",
+      "weight_requant": "none",
+      "gdn_state": "fp32",
+      "decode_attention": "hybrid_crossover",
+      "crossover": 1024,
+      "n_parts": 16,
+      "verified_max": 4096,
+      "opt137_dense_mma": true,
+      "opt138_diagnostic_markers": true,
+      "capacity": 131072,
+      "decode_segment_graphs": 40,
+      "lazy": true,
+      "fusion": true,
+      "decode_d2h_bytes": 4,
+      "opt110_hooks_ready": true,
+      "opt136_diagnostic_markers": true,
+      "message": "",
+      "claims_throughput": false,
+      "keep": false
+    },
+    "opt137_dense_mma": true,
+    "capacity": 131072,
+    "stdout_tail": "\n==========\n== CUDA ==\n==========\n\nCUDA Version 13.0.2\n\nContainer image Copyright (c) 2016-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.\n\nThis container image and its contents are governed by the NVIDIA Deep Learning Container License.\nBy pulling and using the container, you accept the terms and conditions of this license:\nhttps://developer.nvidia.com/ngc/nvidia-deep-learning-container-license\n\nA copy of this license is made available in this container at /NGC-DL-CONTAINER-LICENSE for your convenience.\n\nindependently_restored=true same_binary=true\nQW38_OPT136_GRAPH_ACCOUNTING_RESULT={\"schema_version\":1,\"task\":\"OPT-136\",\"workload\":\"identity\",\"ok\":true,\"parent\":\"post124_plus_opt127_decode_segments8\",\"shipping_execution_graphs\":\"decode_segments8\",\"q4_decode\":\"llama_q4k_mmvq\",\"packed_kv\":\"dense_bf16\",\"weight_requant\":\"none\",\"gdn_state\":\"fp32\",\"decode_attention\":\"hybrid_crossover\",\"crossover\":1024,\"n_parts\":16,\"verified_max\":4096,\"opt137_dense_mma\":true,\"opt138_diagnostic_markers\":true,\"capacity\":131072,\"decode_segment_graphs\":40,\"lazy\":true,\"fusion\":true,\"decode_d2h_bytes\":4,\"opt110_hooks_ready\":true,\"opt136_diagnostic_markers\":true,\"message\":\"\",\"claims_throughput\":false,\"keep\":false}\nQW38_OPT136_NATIVE_COUNTS={\"schema_version\":1,\"task\":\"OPT-136\",\"observed_warmups\":0,\"observed_samples\":1,\"observed_candidates\":1,\"observed_shapes\":1,\"observed_tier\":\"screen\",\"keep\":false}\n"
+  },
+  "authenticated_current_pins": {
+    "ok": true,
+    "execution_graphs": "decode_segments8",
+    "q4_decode": "llama_q4k_mmvq",
+    "opt137_dense_mma": true,
+    "ffn_only_prerequisite_not_used": true,
+    "mismatches": [],
+    "parent_identity": {
+      "ok": true,
+      "reason": null,
+      "mismatches": [],
+      "expected": {
+        "execution_graphs": "decode_segments8",
+        "q4_decode": "llama_q4k_mmvq",
+        "opt137_dense_mma": true
+      },
+      "observed": {
+        "execution_graphs": "decode_segments8",
+        "q4_decode": "llama_q4k_mmvq",
+        "opt137_dense_mma": true
+      }
+    }
+  },
+  "opt137_control": {
+    "reconstructable": true,
+    "method": "current_production_is_opt137_kept_stack",
+    "parent": "post124_plus_opt127_decode_segments8_plus_opt137_mma",
+    "selector": "decode_segments8",
+    "opt137_dense_mma": true,
+    "q4_decode": "llama_q4k_mmvq",
+    "execution_graphs": "decode_segments8",
+    "mma_threshold": 8192,
+    "allocated_capacity": 131072,
+    "production_pins_changed_after_opt137": false,
+    "same_sitting_as_final": true,
+    "paired_gpu_rounds_versus_distinct_control_binary": false,
+    "historical_rates_as_paired_gain": false,
+    "reason": "OPT-143/144/145 did not keep. Production pins remain the OPT-137 kept stack. A distinct pre-keep control cannot be reconstructed without changing production pins.",
+    "hashes": {
+      "quartz_native": "7fd0efb4abb5b0943d2462812a4b88e0c99d7c372b61a2cfff7807b3099377e5",
+      "llama_profile": "4a02206a38b8c01a7f9b313ef2bd5ff42844790dfc3772aba43dca5c6ea9f794",
+      "replay": "130469b13ef1cb8dbe100bc8d5a05fb27653520f2401704ac8606c53c9273561"
+    },
+    "historical": {
+      "ok": true,
+      "claim_type": "historical",
+      "production_kept": true,
+      "verdict": "keep",
+      "tok_s_deltas": {
+        "d8192.decode_only": {
+          "control_rate": 34.90564309,
+          "candidate_rate": 48.65922203,
+          "delta": 13.753578940000004,
+          "g": 1.3940209895173834
+        },
+        "d32768.decode_only": {
+          "control_rate": 15.302007380000001,
+          "candidate_rate": 33.93855744,
+          "delta": 18.636550059999998,
+          "g": 2.217915272525001
+        }
+      },
+      "usable_as_paired_gain": false,
+      "note": "OPT-137 candidate rates are historical. They are not a paired gain versus the OPT-146 sitting unless binary identity matches."
+    },
+    "claim_type": "measured"
+  },
+  "parent": "post124_plus_opt127_decode_segments8_plus_opt137_mma",
+  "selector": "decode_segments8",
+  "capacity": 131072,
+  "decode_prefixes": [
+    128,
+    2048,
+    8192,
+    32768
+  ],
+  "profile_prefixes": [
+    128,
+    2048
+  ],
+  "prefill_tokens": 4096,
+  "eval_tokens": 256,
+  "token_generator": "(42 + index * 997) % 248320",
+  "gpu_lock": "build/optimization-runs/qw38-gpu.lock",
+  "child_deadline_s": 300,
+  "long_child_deadline_s": 1200,
+  "aggregate_deadline_s": 7200,
+  "claims_throughput": false,
+  "blocked": [],
+  "family_plan": "task=OPT-146 mode=acceptance phase=preflight loop_product=1 cases=1 candidates=1 warmups=0 samples=1 tokens=1",
+  "measured_at": "2026-09-15T01:36:50Z"
+}

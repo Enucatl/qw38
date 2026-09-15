@@ -1,0 +1,2634 @@
+{
+  "schema_version": 1,
+  "task": "OPT-146",
+  "phase": "throughput",
+  "mode": "acceptance",
+  "ok": true,
+  "results": {
+    "warmup-d128-quartz-0": {
+      "ok": true,
+      "returncode": 0
+    },
+    "warmup-d128-llama-0": {
+      "ok": true,
+      "returncode": 0
+    },
+    "warmup-d128-quartz-1": {
+      "ok": true,
+      "returncode": 0
+    },
+    "warmup-d128-llama-1": {
+      "ok": true,
+      "returncode": 0
+    },
+    "warmup-d128-quartz-2": {
+      "ok": true,
+      "returncode": 0
+    },
+    "warmup-d128-llama-2": {
+      "ok": true,
+      "returncode": 0
+    },
+    "pair-d128-quartz-0": {
+      "ok": true,
+      "returncode": 0,
+      "decode_only_ms": 4294.18457,
+      "complete_request_ms": 4376.18652,
+      "prefill_ms": 82.0020981,
+      "engine": "quartz",
+      "kind": "decode",
+      "prefix": 128,
+      "sample": 0
+    },
+    "pair-d128-llama-0": {
+      "ok": true,
+      "returncode": 0,
+      "decode_only_ms": 3625.25676,
+      "complete_request_ms": 3693.64226,
+      "prefill_ms": 68.385501,
+      "engine": "llama",
+      "kind": "decode",
+      "prefix": 128,
+      "sample": 0
+    },
+    "pair-d128-quartz-1": {
+      "ok": true,
+      "returncode": 0,
+      "decode_only_ms": 4300.58984,
+      "complete_request_ms": 4382.57031,
+      "prefill_ms": 81.9803162,
+      "engine": "quartz",
+      "kind": "decode",
+      "prefix": 128,
+      "sample": 1
+    },
+    "pair-d128-llama-1": {
+      "ok": true,
+      "returncode": 0,
+      "decode_only_ms": 3627.72743,
+      "complete_request_ms": 3696.65715,
+      "prefill_ms": 68.929725,
+      "engine": "llama",
+      "kind": "decode",
+      "prefix": 128,
+      "sample": 1
+    },
+    "pair-d128-quartz-2": {
+      "ok": true,
+      "returncode": 0,
+      "decode_only_ms": 4300.5415,
+      "complete_request_ms": 4382.50195,
+      "prefill_ms": 81.9602585,
+      "engine": "quartz",
+      "kind": "decode",
+      "prefix": 128,
+      "sample": 2
+    },
+    "pair-d128-llama-2": {
+      "ok": true,
+      "returncode": 0,
+      "decode_only_ms": 3633.1998,
+      "complete_request_ms": 3701.45789,
+      "prefill_ms": 68.25809,
+      "engine": "llama",
+      "kind": "decode",
+      "prefix": 128,
+      "sample": 2
+    },
+    "pair-d128-quartz-3": {
+      "ok": true,
+      "returncode": 0,
+      "decode_only_ms": 4302.27783,
+      "complete_request_ms": 4384.27637,
+      "prefill_ms": 81.9986877,
+      "engine": "quartz",
+      "kind": "decode",
+      "prefix": 128,
+      "sample": 3
+    },
+    "pair-d128-llama-3": {
+      "ok": true,
+      "returncode": 0,
+      "decode_only_ms": 3639.86553,
+      "complete_request_ms": 3708.73689,
+      "prefill_ms": 68.871354,
+      "engine": "llama",
+      "kind": "decode",
+      "prefix": 128,
+      "sample": 3
+    },
+    "pair-d128-quartz-4": {
+      "ok": true,
+      "returncode": 0,
+      "decode_only_ms": 4306.96289,
+      "complete_request_ms": 4388.97559,
+      "prefill_ms": 82.0126266,
+      "engine": "quartz",
+      "kind": "decode",
+      "prefix": 128,
+      "sample": 4
+    },
+    "pair-d128-llama-4": {
+      "ok": true,
+      "returncode": 0,
+      "decode_only_ms": 3633.88168,
+      "complete_request_ms": 3702.11608,
+      "prefill_ms": 68.234406,
+      "engine": "llama",
+      "kind": "decode",
+      "prefix": 128,
+      "sample": 4
+    },
+    "pair-d128-quartz-5": {
+      "ok": true,
+      "returncode": 0,
+      "decode_only_ms": 4307.4541,
+      "complete_request_ms": 4389.47021,
+      "prefill_ms": 82.0159302,
+      "engine": "quartz",
+      "kind": "decode",
+      "prefix": 128,
+      "sample": 5
+    },
+    "pair-d128-llama-5": {
+      "ok": true,
+      "returncode": 0,
+      "decode_only_ms": 3636.98062,
+      "complete_request_ms": 3705.3941,
+      "prefill_ms": 68.413476,
+      "engine": "llama",
+      "kind": "decode",
+      "prefix": 128,
+      "sample": 5
+    },
+    "pair-d128-quartz-6": {
+      "ok": true,
+      "returncode": 0,
+      "decode_only_ms": 4305.05713,
+      "complete_request_ms": 4387.11377,
+      "prefill_ms": 82.0566025,
+      "engine": "quartz",
+      "kind": "decode",
+      "prefix": 128,
+      "sample": 6
+    },
+    "pair-d128-llama-6": {
+      "ok": true,
+      "returncode": 0,
+      "decode_only_ms": 3637.15913,
+      "complete_request_ms": 3705.28328,
+      "prefill_ms": 68.124146,
+      "engine": "llama",
+      "kind": "decode",
+      "prefix": 128,
+      "sample": 6
+    },
+    "pair-d128-quartz-7": {
+      "ok": true,
+      "returncode": 0,
+      "decode_only_ms": 4311.42188,
+      "complete_request_ms": 4393.44238,
+      "prefill_ms": 82.0204163,
+      "engine": "quartz",
+      "kind": "decode",
+      "prefix": 128,
+      "sample": 7
+    },
+    "pair-d128-llama-7": {
+      "ok": true,
+      "returncode": 0,
+      "decode_only_ms": 3639.0328,
+      "complete_request_ms": 3708.40002,
+      "prefill_ms": 69.367217,
+      "engine": "llama",
+      "kind": "decode",
+      "prefix": 128,
+      "sample": 7
+    },
+    "pair-d128-quartz-8": {
+      "ok": true,
+      "returncode": 0,
+      "decode_only_ms": 4309.53809,
+      "complete_request_ms": 4391.51611,
+      "prefill_ms": 81.9779587,
+      "engine": "quartz",
+      "kind": "decode",
+      "prefix": 128,
+      "sample": 8
+    },
+    "pair-d128-llama-8": {
+      "ok": true,
+      "returncode": 0,
+      "decode_only_ms": 3638.89708,
+      "complete_request_ms": 3707.67888,
+      "prefill_ms": 68.781794,
+      "engine": "llama",
+      "kind": "decode",
+      "prefix": 128,
+      "sample": 8
+    },
+    "pair-d128-quartz-9": {
+      "ok": true,
+      "returncode": 0,
+      "decode_only_ms": 4312.93359,
+      "complete_request_ms": 4394.92627,
+      "prefill_ms": 81.9927673,
+      "engine": "quartz",
+      "kind": "decode",
+      "prefix": 128,
+      "sample": 9
+    },
+    "pair-d128-llama-9": {
+      "ok": true,
+      "returncode": 0,
+      "decode_only_ms": 3642.26057,
+      "complete_request_ms": 3710.65195,
+      "prefill_ms": 68.391374,
+      "engine": "llama",
+      "kind": "decode",
+      "prefix": 128,
+      "sample": 9
+    },
+    "d128": {
+      "kind": "decode",
+      "prefix": 128,
+      "capacity": 131072,
+      "eval_tokens": 256,
+      "quartz_decode_only_ms": [
+        4294.18457,
+        4300.58984,
+        4300.5415,
+        4302.27783,
+        4306.96289,
+        4307.4541,
+        4305.05713,
+        4311.42188,
+        4309.53809,
+        4312.93359
+      ],
+      "llama_decode_only_ms": [
+        3625.25676,
+        3627.72743,
+        3633.1998,
+        3639.86553,
+        3633.88168,
+        3636.98062,
+        3637.15913,
+        3639.0328,
+        3638.89708,
+        3642.26057
+      ],
+      "quartz_complete_request_ms": [
+        4376.18652,
+        4382.57031,
+        4382.50195,
+        4384.27637,
+        4388.97559,
+        4389.47021,
+        4387.11377,
+        4393.44238,
+        4391.51611,
+        4394.92627
+      ],
+      "llama_complete_request_ms": [
+        3693.64226,
+        3696.65715,
+        3701.45789,
+        3708.73689,
+        3702.11608,
+        3705.3941,
+        3705.28328,
+        3708.40002,
+        3707.67888,
+        3710.65195
+      ],
+      "quartz_prefill_ms": [],
+      "llama_prefill_ms": [],
+      "n_pairs": 10,
+      "warmups": 3,
+      "alternating": "quartz_then_llama",
+      "opt137_control_arm": "same_production_binary",
+      "decode_only": {
+        "metric": "decode_only_ms",
+        "n_pairs": 10,
+        "quartz_mean_ms": 4305.096142,
+        "llama_mean_ms": 3635.4261400000005,
+        "quartz_mean_tok_s": 59.4645052664816,
+        "llama_mean_tok_s": 70.41829697874773,
+        "gap_ms": 669.6700019999998,
+        "gap_tok_s": -10.953791712266131,
+        "paired_log_ratio_ci": {
+          "usable": true,
+          "n": 10,
+          "df": 9,
+          "geometric_ratio": 0.8444469699985239,
+          "ci95_low": 0.8439473825707173,
+          "ci95_high": 0.8449468531646704,
+          "point_ratios": [
+            0.8442247185476706,
+            0.8435418314618909,
+            0.8448237971892608,
+            0.8460321889532644,
+            0.8437225424990834,
+            0.8443457633129509,
+            0.8448573433913988,
+            0.8440447029507583,
+            0.8443821597594929,
+            0.8444972532025471
+          ],
+          "critical": 2.2621571628540993
+        },
+        "quartz_interval": {
+          "n": 10,
+          "mean": 4305.096142,
+          "se": 1.8204837510256104,
+          "low": 4300.977921642758,
+          "high": 4309.214362357243,
+          "df": 9,
+          "critical": 2.2621571628540993
+        },
+        "llama_interval": {
+          "n": 10,
+          "mean": 3635.4261400000005,
+          "se": 1.722146825532975,
+          "low": 3631.5303732231346,
+          "high": 3639.3219067768664,
+          "df": 9,
+          "critical": 2.2621571628540993
+        },
+        "claim_type": "measured",
+        "identity_matched": true,
+        "policy": "opt135_paired_log_ratio_df9"
+      },
+      "complete_request": {
+        "metric": "complete_request_ms",
+        "n_pairs": 10,
+        "quartz_mean_ms": 4387.0979480000005,
+        "llama_mean_ms": 3704.0018499999996,
+        "quartz_mean_tok_s": 58.353016217553,
+        "llama_mean_tok_s": 69.11457468188682,
+        "gap_ms": 683.0960980000009,
+        "gap_tok_s": -10.761558464333824,
+        "paired_log_ratio_ci": {
+          "usable": true,
+          "n": 10,
+          "df": 9,
+          "geometric_ratio": 0.8442941243363641,
+          "ci95_low": 0.8438047035028113,
+          "ci95_high": 0.8447838290421816,
+          "point_ratios": [
+            0.8440321826136423,
+            0.8434906660972656,
+            0.8445992568240615,
+            0.8459176787707844,
+            0.8435034563498222,
+            0.8441551993127662,
+            0.84458335804681,
+            0.8440761706313762,
+            0.8442821993883111,
+            0.8443035723554926
+          ],
+          "critical": 2.2621571628540993
+        },
+        "quartz_interval": {
+          "n": 10,
+          "mean": 4387.0979480000005,
+          "se": 1.8222430679838304,
+          "low": 4382.9757477913,
+          "high": 4391.220148208701,
+          "df": 9,
+          "critical": 2.2621571628540993
+        },
+        "llama_interval": {
+          "n": 10,
+          "mean": 3704.0018499999996,
+          "se": 1.7460523401897814,
+          "low": 3700.052005191921,
+          "high": 3707.951694808078,
+          "df": 9,
+          "critical": 2.2621571628540993
+        },
+        "claim_type": "measured",
+        "identity_matched": true,
+        "policy": "opt135_paired_log_ratio_df9"
+      }
+    },
+    "warmup-d2048-quartz-0": {
+      "ok": true,
+      "returncode": 0
+    },
+    "warmup-d2048-llama-0": {
+      "ok": true,
+      "returncode": 0
+    },
+    "warmup-d2048-quartz-1": {
+      "ok": true,
+      "returncode": 0
+    },
+    "warmup-d2048-llama-1": {
+      "ok": true,
+      "returncode": 0
+    },
+    "warmup-d2048-quartz-2": {
+      "ok": true,
+      "returncode": 0
+    },
+    "warmup-d2048-llama-2": {
+      "ok": true,
+      "returncode": 0
+    },
+    "pair-d2048-quartz-0": {
+      "ok": true,
+      "returncode": 0,
+      "decode_only_ms": 5114.46875,
+      "complete_request_ms": 5753.85645,
+      "prefill_ms": 639.387573,
+      "engine": "quartz",
+      "kind": "decode",
+      "prefix": 2048,
+      "sample": 0
+    },
+    "pair-d2048-llama-0": {
+      "ok": true,
+      "returncode": 0,
+      "decode_only_ms": 3677.74909,
+      "complete_request_ms": 4317.17291,
+      "prefill_ms": 639.423818,
+      "engine": "llama",
+      "kind": "decode",
+      "prefix": 2048,
+      "sample": 0
+    },
+    "pair-d2048-quartz-1": {
+      "ok": true,
+      "returncode": 0,
+      "decode_only_ms": 5113.6748,
+      "complete_request_ms": 5752.1958,
+      "prefill_ms": 638.520935,
+      "engine": "quartz",
+      "kind": "decode",
+      "prefix": 2048,
+      "sample": 1
+    },
+    "pair-d2048-llama-1": {
+      "ok": true,
+      "returncode": 0,
+      "decode_only_ms": 3679.40078,
+      "complete_request_ms": 4319.89108,
+      "prefill_ms": 640.490302,
+      "engine": "llama",
+      "kind": "decode",
+      "prefix": 2048,
+      "sample": 1
+    },
+    "pair-d2048-quartz-2": {
+      "ok": true,
+      "returncode": 0,
+      "decode_only_ms": 5113.44385,
+      "complete_request_ms": 5752.81738,
+      "prefill_ms": 639.373413,
+      "engine": "quartz",
+      "kind": "decode",
+      "prefix": 2048,
+      "sample": 2
+    },
+    "pair-d2048-llama-2": {
+      "ok": true,
+      "returncode": 0,
+      "decode_only_ms": 3683.90792,
+      "complete_request_ms": 4325.42178,
+      "prefill_ms": 641.513867,
+      "engine": "llama",
+      "kind": "decode",
+      "prefix": 2048,
+      "sample": 2
+    },
+    "pair-d2048-quartz-3": {
+      "ok": true,
+      "returncode": 0,
+      "decode_only_ms": 5112.3501,
+      "complete_request_ms": 5751.06689,
+      "prefill_ms": 638.71698,
+      "engine": "quartz",
+      "kind": "decode",
+      "prefix": 2048,
+      "sample": 3
+    },
+    "pair-d2048-llama-3": {
+      "ok": true,
+      "returncode": 0,
+      "decode_only_ms": 3680.10966,
+      "complete_request_ms": 4320.48474,
+      "prefill_ms": 640.375075,
+      "engine": "llama",
+      "kind": "decode",
+      "prefix": 2048,
+      "sample": 3
+    },
+    "pair-d2048-quartz-4": {
+      "ok": true,
+      "returncode": 0,
+      "decode_only_ms": 5115.0083,
+      "complete_request_ms": 5754.00195,
+      "prefill_ms": 638.993774,
+      "engine": "quartz",
+      "kind": "decode",
+      "prefix": 2048,
+      "sample": 4
+    },
+    "pair-d2048-llama-4": {
+      "ok": true,
+      "returncode": 0,
+      "decode_only_ms": 3681.06224,
+      "complete_request_ms": 4320.64625,
+      "prefill_ms": 639.584012,
+      "engine": "llama",
+      "kind": "decode",
+      "prefix": 2048,
+      "sample": 4
+    },
+    "pair-d2048-quartz-5": {
+      "ok": true,
+      "returncode": 0,
+      "decode_only_ms": 5113.80762,
+      "complete_request_ms": 5752.76172,
+      "prefill_ms": 638.953918,
+      "engine": "quartz",
+      "kind": "decode",
+      "prefix": 2048,
+      "sample": 5
+    },
+    "pair-d2048-llama-5": {
+      "ok": true,
+      "returncode": 0,
+      "decode_only_ms": 3681.32319,
+      "complete_request_ms": 4321.97691,
+      "prefill_ms": 640.653723,
+      "engine": "llama",
+      "kind": "decode",
+      "prefix": 2048,
+      "sample": 5
+    },
+    "pair-d2048-quartz-6": {
+      "ok": true,
+      "returncode": 0,
+      "decode_only_ms": 5113.06982,
+      "complete_request_ms": 5752.81543,
+      "prefill_ms": 639.745361,
+      "engine": "quartz",
+      "kind": "decode",
+      "prefix": 2048,
+      "sample": 6
+    },
+    "pair-d2048-llama-6": {
+      "ok": true,
+      "returncode": 0,
+      "decode_only_ms": 3679.72525,
+      "complete_request_ms": 4321.0346,
+      "prefill_ms": 641.309349,
+      "engine": "llama",
+      "kind": "decode",
+      "prefix": 2048,
+      "sample": 6
+    },
+    "pair-d2048-quartz-7": {
+      "ok": true,
+      "returncode": 0,
+      "decode_only_ms": 5114.17432,
+      "complete_request_ms": 5753.2207,
+      "prefill_ms": 639.04657,
+      "engine": "quartz",
+      "kind": "decode",
+      "prefix": 2048,
+      "sample": 7
+    },
+    "pair-d2048-llama-7": {
+      "ok": true,
+      "returncode": 0,
+      "decode_only_ms": 3681.92034,
+      "complete_request_ms": 4322.9022,
+      "prefill_ms": 640.981863,
+      "engine": "llama",
+      "kind": "decode",
+      "prefix": 2048,
+      "sample": 7
+    },
+    "pair-d2048-quartz-8": {
+      "ok": true,
+      "returncode": 0,
+      "decode_only_ms": 5113.354,
+      "complete_request_ms": 5753.62451,
+      "prefill_ms": 640.27063,
+      "engine": "quartz",
+      "kind": "decode",
+      "prefix": 2048,
+      "sample": 8
+    },
+    "pair-d2048-llama-8": {
+      "ok": true,
+      "returncode": 0,
+      "decode_only_ms": 3677.29396,
+      "complete_request_ms": 4318.34507,
+      "prefill_ms": 641.051116,
+      "engine": "llama",
+      "kind": "decode",
+      "prefix": 2048,
+      "sample": 8
+    },
+    "pair-d2048-quartz-9": {
+      "ok": true,
+      "returncode": 0,
+      "decode_only_ms": 5114.16357,
+      "complete_request_ms": 5753.99707,
+      "prefill_ms": 639.83374,
+      "engine": "quartz",
+      "kind": "decode",
+      "prefix": 2048,
+      "sample": 9
+    },
+    "pair-d2048-llama-9": {
+      "ok": true,
+      "returncode": 0,
+      "decode_only_ms": 3680.28503,
+      "complete_request_ms": 4321.44285,
+      "prefill_ms": 641.157817,
+      "engine": "llama",
+      "kind": "decode",
+      "prefix": 2048,
+      "sample": 9
+    },
+    "d2048": {
+      "kind": "decode",
+      "prefix": 2048,
+      "capacity": 131072,
+      "eval_tokens": 256,
+      "quartz_decode_only_ms": [
+        5114.46875,
+        5113.6748,
+        5113.44385,
+        5112.3501,
+        5115.0083,
+        5113.80762,
+        5113.06982,
+        5114.17432,
+        5113.354,
+        5114.16357
+      ],
+      "llama_decode_only_ms": [
+        3677.74909,
+        3679.40078,
+        3683.90792,
+        3680.10966,
+        3681.06224,
+        3681.32319,
+        3679.72525,
+        3681.92034,
+        3677.29396,
+        3680.28503
+      ],
+      "quartz_complete_request_ms": [
+        5753.85645,
+        5752.1958,
+        5752.81738,
+        5751.06689,
+        5754.00195,
+        5752.76172,
+        5752.81543,
+        5753.2207,
+        5753.62451,
+        5753.99707
+      ],
+      "llama_complete_request_ms": [
+        4317.17291,
+        4319.89108,
+        4325.42178,
+        4320.48474,
+        4320.64625,
+        4321.97691,
+        4321.0346,
+        4322.9022,
+        4318.34507,
+        4321.44285
+      ],
+      "quartz_prefill_ms": [],
+      "llama_prefill_ms": [],
+      "n_pairs": 10,
+      "warmups": 3,
+      "alternating": "quartz_then_llama",
+      "opt137_control_arm": "same_production_binary",
+      "decode_only": {
+        "metric": "decode_only_ms",
+        "n_pairs": 10,
+        "quartz_mean_ms": 5113.751513,
+        "llama_mean_ms": 3680.2777459999998,
+        "quartz_mean_tok_s": 50.06109592422651,
+        "llama_mean_tok_s": 69.55998484243555,
+        "gap_ms": 1433.4737670000004,
+        "gap_tok_s": -19.498888918209047,
+        "paired_log_ratio_ci": {
+          "usable": true,
+          "n": 10,
+          "df": 9,
+          "geometric_ratio": 0.7196824701159888,
+          "ci95_low": 0.7194040502889991,
+          "ci95_high": 0.7199609976954996,
+          "point_ratios": [
+            0.7190872150699913,
+            0.7195218553983918,
+            0.7204357822370535,
+            0.7198469564907146,
+            0.7196590941993193,
+            0.7198790927531998,
+            0.7196704483882835,
+            0.7199442392100549,
+            0.7191549734283994,
+            0.7196259915480178
+          ],
+          "critical": 2.2621571628540993
+        },
+        "quartz_interval": {
+          "n": 10,
+          "mean": 5113.751513,
+          "se": 0.23881347759780647,
+          "low": 5113.211279381067,
+          "high": 5114.291746618934,
+          "df": 9,
+          "critical": 2.2621571628540993
+        },
+        "llama_interval": {
+          "n": 10,
+          "mean": 3680.2777459999998,
+          "se": 0.6144950006816161,
+          "low": 3678.8876617326696,
+          "high": 3681.66783026733,
+          "df": 9,
+          "critical": 2.2621571628540993
+        },
+        "claim_type": "measured",
+        "identity_matched": true,
+        "policy": "opt135_paired_log_ratio_df9"
+      },
+      "complete_request": {
+        "metric": "complete_request_ms",
+        "n_pairs": 10,
+        "quartz_mean_ms": 5753.03579,
+        "llama_mean_ms": 4320.931839,
+        "quartz_mean_tok_s": 44.498246712574826,
+        "llama_mean_tok_s": 59.246494687900395,
+        "gap_ms": 1432.103951,
+        "gap_tok_s": -14.748247975325569,
+        "paired_log_ratio_ci": {
+          "usable": true,
+          "n": 10,
+          "df": 9,
+          "geometric_ratio": 0.7510697823041339,
+          "ci95_low": 0.7507562001295904,
+          "ci95_high": 0.751383495458322,
+          "point_ratios": [
+            0.7503094572336785,
+            0.7509986151723138,
+            0.7518788611363845,
+            0.7512492590744323,
+            0.7508941233500972,
+            0.7512873156164723,
+            0.7511165015770375,
+            0.7513882093902639,
+            0.7505434291887777,
+            0.7510332030808629
+          ],
+          "critical": 2.2621571628540993
+        },
+        "quartz_interval": {
+          "n": 10,
+          "mean": 5753.03579,
+          "se": 0.2918393088822662,
+          "low": 5752.37560361701,
+          "high": 5753.69597638299,
+          "df": 9,
+          "critical": 2.2621571628540993
+        },
+        "llama_interval": {
+          "n": 10,
+          "mean": 4320.931839,
+          "se": 0.7271811411905418,
+          "low": 4319.2868409727635,
+          "high": 4322.576837027236,
+          "df": 9,
+          "critical": 2.2621571628540993
+        },
+        "claim_type": "measured",
+        "identity_matched": true,
+        "policy": "opt135_paired_log_ratio_df9"
+      }
+    },
+    "warmup-d8192-quartz-0": {
+      "ok": true,
+      "returncode": 0
+    },
+    "warmup-d8192-llama-0": {
+      "ok": true,
+      "returncode": 0
+    },
+    "warmup-d8192-quartz-1": {
+      "ok": true,
+      "returncode": 0
+    },
+    "warmup-d8192-llama-1": {
+      "ok": true,
+      "returncode": 0
+    },
+    "warmup-d8192-quartz-2": {
+      "ok": true,
+      "returncode": 0
+    },
+    "warmup-d8192-llama-2": {
+      "ok": true,
+      "returncode": 0
+    },
+    "pair-d8192-quartz-0": {
+      "ok": true,
+      "returncode": 0,
+      "decode_only_ms": 5270.24414,
+      "complete_request_ms": 8407.30664,
+      "prefill_ms": 3137.06274,
+      "engine": "quartz",
+      "kind": "decode",
+      "prefix": 8192,
+      "sample": 0
+    },
+    "pair-d8192-llama-0": {
+      "ok": true,
+      "returncode": 0,
+      "decode_only_ms": 3823.54265,
+      "complete_request_ms": 6443.4266,
+      "prefill_ms": 2619.88395,
+      "engine": "llama",
+      "kind": "decode",
+      "prefix": 8192,
+      "sample": 0
+    },
+    "pair-d8192-quartz-1": {
+      "ok": true,
+      "returncode": 0,
+      "decode_only_ms": 5268.75586,
+      "complete_request_ms": 8406.73242,
+      "prefill_ms": 3137.97632,
+      "engine": "quartz",
+      "kind": "decode",
+      "prefix": 8192,
+      "sample": 1
+    },
+    "pair-d8192-llama-1": {
+      "ok": true,
+      "returncode": 0,
+      "decode_only_ms": 3830.43659,
+      "complete_request_ms": 6455.96536,
+      "prefill_ms": 2625.52877,
+      "engine": "llama",
+      "kind": "decode",
+      "prefix": 8192,
+      "sample": 1
+    },
+    "pair-d8192-quartz-2": {
+      "ok": true,
+      "returncode": 0,
+      "decode_only_ms": 5269.7124,
+      "complete_request_ms": 8411.82422,
+      "prefill_ms": 3142.11206,
+      "engine": "quartz",
+      "kind": "decode",
+      "prefix": 8192,
+      "sample": 2
+    },
+    "pair-d8192-llama-2": {
+      "ok": true,
+      "returncode": 0,
+      "decode_only_ms": 3824.6823,
+      "complete_request_ms": 6447.11699,
+      "prefill_ms": 2622.43469,
+      "engine": "llama",
+      "kind": "decode",
+      "prefix": 8192,
+      "sample": 2
+    },
+    "pair-d8192-quartz-3": {
+      "ok": true,
+      "returncode": 0,
+      "decode_only_ms": 5272.17529,
+      "complete_request_ms": 8409.70703,
+      "prefill_ms": 3137.53149,
+      "engine": "quartz",
+      "kind": "decode",
+      "prefix": 8192,
+      "sample": 3
+    },
+    "pair-d8192-llama-3": {
+      "ok": true,
+      "returncode": 0,
+      "decode_only_ms": 3831.71784,
+      "complete_request_ms": 6452.33004,
+      "prefill_ms": 2620.6122,
+      "engine": "llama",
+      "kind": "decode",
+      "prefix": 8192,
+      "sample": 3
+    },
+    "pair-d8192-quartz-4": {
+      "ok": true,
+      "returncode": 0,
+      "decode_only_ms": 5274.87695,
+      "complete_request_ms": 8415.00195,
+      "prefill_ms": 3140.125,
+      "engine": "quartz",
+      "kind": "decode",
+      "prefix": 8192,
+      "sample": 4
+    },
+    "pair-d8192-llama-4": {
+      "ok": true,
+      "returncode": 0,
+      "decode_only_ms": 3829.54252,
+      "complete_request_ms": 6452.13557,
+      "prefill_ms": 2622.59306,
+      "engine": "llama",
+      "kind": "decode",
+      "prefix": 8192,
+      "sample": 4
+    },
+    "pair-d8192-quartz-5": {
+      "ok": true,
+      "returncode": 0,
+      "decode_only_ms": 5271.72754,
+      "complete_request_ms": 8414.26758,
+      "prefill_ms": 3142.53955,
+      "engine": "quartz",
+      "kind": "decode",
+      "prefix": 8192,
+      "sample": 5
+    },
+    "pair-d8192-llama-5": {
+      "ok": true,
+      "returncode": 0,
+      "decode_only_ms": 3832.68358,
+      "complete_request_ms": 6461.0274,
+      "prefill_ms": 2628.34382,
+      "engine": "llama",
+      "kind": "decode",
+      "prefix": 8192,
+      "sample": 5
+    },
+    "pair-d8192-quartz-6": {
+      "ok": true,
+      "returncode": 0,
+      "decode_only_ms": 5272.19287,
+      "complete_request_ms": 8415.92969,
+      "prefill_ms": 3143.73682,
+      "engine": "quartz",
+      "kind": "decode",
+      "prefix": 8192,
+      "sample": 6
+    },
+    "pair-d8192-llama-6": {
+      "ok": true,
+      "returncode": 0,
+      "decode_only_ms": 3832.00329,
+      "complete_request_ms": 6458.14243,
+      "prefill_ms": 2626.13914,
+      "engine": "llama",
+      "kind": "decode",
+      "prefix": 8192,
+      "sample": 6
+    },
+    "pair-d8192-quartz-7": {
+      "ok": true,
+      "returncode": 0,
+      "decode_only_ms": 5274.16992,
+      "complete_request_ms": 8417.59863,
+      "prefill_ms": 3143.42871,
+      "engine": "quartz",
+      "kind": "decode",
+      "prefix": 8192,
+      "sample": 7
+    },
+    "pair-d8192-llama-7": {
+      "ok": true,
+      "returncode": 0,
+      "decode_only_ms": 3832.10234,
+      "complete_request_ms": 6458.59679,
+      "prefill_ms": 2626.49445,
+      "engine": "llama",
+      "kind": "decode",
+      "prefix": 8192,
+      "sample": 7
+    },
+    "pair-d8192-quartz-8": {
+      "ok": true,
+      "returncode": 0,
+      "decode_only_ms": 5272.52344,
+      "complete_request_ms": 8414.9082,
+      "prefill_ms": 3142.38428,
+      "engine": "quartz",
+      "kind": "decode",
+      "prefix": 8192,
+      "sample": 8
+    },
+    "pair-d8192-llama-8": {
+      "ok": true,
+      "returncode": 0,
+      "decode_only_ms": 3827.18801,
+      "complete_request_ms": 6454.77746,
+      "prefill_ms": 2627.58945,
+      "engine": "llama",
+      "kind": "decode",
+      "prefix": 8192,
+      "sample": 8
+    },
+    "pair-d8192-quartz-9": {
+      "ok": true,
+      "returncode": 0,
+      "decode_only_ms": 5270.15234,
+      "complete_request_ms": 8410.5293,
+      "prefill_ms": 3140.3772,
+      "engine": "quartz",
+      "kind": "decode",
+      "prefix": 8192,
+      "sample": 9
+    },
+    "pair-d8192-llama-9": {
+      "ok": true,
+      "returncode": 0,
+      "decode_only_ms": 3831.41198,
+      "complete_request_ms": 6457.57416,
+      "prefill_ms": 2626.16218,
+      "engine": "llama",
+      "kind": "decode",
+      "prefix": 8192,
+      "sample": 9
+    },
+    "d8192": {
+      "kind": "decode",
+      "prefix": 8192,
+      "capacity": 131072,
+      "eval_tokens": 256,
+      "quartz_decode_only_ms": [
+        5270.24414,
+        5268.75586,
+        5269.7124,
+        5272.17529,
+        5274.87695,
+        5271.72754,
+        5272.19287,
+        5274.16992,
+        5272.52344,
+        5270.15234
+      ],
+      "llama_decode_only_ms": [
+        3823.54265,
+        3830.43659,
+        3824.6823,
+        3831.71784,
+        3829.54252,
+        3832.68358,
+        3832.00329,
+        3832.10234,
+        3827.18801,
+        3831.41198
+      ],
+      "quartz_complete_request_ms": [
+        8407.30664,
+        8406.73242,
+        8411.82422,
+        8409.70703,
+        8415.00195,
+        8414.26758,
+        8415.92969,
+        8417.59863,
+        8414.9082,
+        8410.5293
+      ],
+      "llama_complete_request_ms": [
+        6443.4266,
+        6455.96536,
+        6447.11699,
+        6452.33004,
+        6452.13557,
+        6461.0274,
+        6458.14243,
+        6458.59679,
+        6454.77746,
+        6457.57416
+      ],
+      "quartz_prefill_ms": [],
+      "llama_prefill_ms": [],
+      "n_pairs": 10,
+      "warmups": 3,
+      "alternating": "quartz_then_llama",
+      "opt137_control_arm": "same_production_binary",
+      "decode_only": {
+        "metric": "decode_only_ms",
+        "n_pairs": 10,
+        "quartz_mean_ms": 5271.653075,
+        "llama_mean_ms": 3829.53111,
+        "quartz_mean_tok_s": 48.561623478005956,
+        "llama_mean_tok_s": 66.84895918125173,
+        "gap_ms": 1442.1219650000003,
+        "gap_tok_s": -18.287335703245773,
+        "paired_log_ratio_ci": {
+          "usable": true,
+          "n": 10,
+          "df": 9,
+          "geometric_ratio": 0.7264381836620276,
+          "ci95_low": 0.726017743524074,
+          "ci95_high": 0.7268588672787546,
+          "point_ratios": [
+            0.7254963049966031,
+            0.7270096948466311,
+            0.7257857753299781,
+            0.7267811916777145,
+            0.7259965599766266,
+            0.727026112582442,
+            0.7268329107997903,
+            0.7265792339128884,
+            0.7258740626860067,
+            0.7270021306442918
+          ],
+          "critical": 2.2621571628540993
+        },
+        "quartz_interval": {
+          "n": 10,
+          "mean": 5271.653075,
+          "se": 0.6187121371010144,
+          "low": 5270.253450907312,
+          "high": 5273.052699092688,
+          "df": 9,
+          "critical": 2.2621571628540993
+        },
+        "llama_interval": {
+          "n": 10,
+          "mean": 3829.53111,
+          "se": 1.0363567502029003,
+          "low": 3827.1867081542564,
+          "high": 3831.8755118457434,
+          "df": 9,
+          "critical": 2.2621571628540993
+        },
+        "claim_type": "measured",
+        "identity_matched": true,
+        "policy": "opt135_paired_log_ratio_df9"
+      },
+      "complete_request": {
+        "metric": "complete_request_ms",
+        "n_pairs": 10,
+        "quartz_mean_ms": 8412.380566,
+        "llama_mean_ms": 6454.10928,
+        "quartz_mean_tok_s": 30.431343812635827,
+        "llama_mean_tok_s": 39.66467797018283,
+        "gap_ms": 1958.2712860000001,
+        "gap_tok_s": -9.233334157547002,
+        "paired_log_ratio_ci": {
+          "usable": true,
+          "n": 10,
+          "df": 9,
+          "geometric_ratio": 0.7672153804591635,
+          "ci95_low": 0.7668136741661494,
+          "ci95_high": 0.7676172971917554,
+          "point_ratios": [
+            0.7664079444115529,
+            0.767951807844028,
+            0.7664350587202357,
+            0.767247897814105,
+            0.7667420172136741,
+            0.767865692238896,
+            0.7673712433308125,
+            0.7672730755992341,
+            0.7670645129557088,
+            0.7677964049182969
+          ],
+          "critical": 2.2621571628540993
+        },
+        "quartz_interval": {
+          "n": 10,
+          "mean": 8412.380566,
+          "se": 1.17934380216589,
+          "low": 8409.712704970463,
+          "high": 8415.048427029536,
+          "df": 9,
+          "critical": 2.2621571628540993
+        },
+        "llama_interval": {
+          "n": 10,
+          "mean": 6454.10928,
+          "se": 1.7328022190095378,
+          "low": 6450.1894090484575,
+          "high": 6458.029150951542,
+          "df": 9,
+          "critical": 2.2621571628540993
+        },
+        "claim_type": "measured",
+        "identity_matched": true,
+        "policy": "opt135_paired_log_ratio_df9"
+      }
+    },
+    "warmup-d32768-quartz-0": {
+      "ok": true,
+      "returncode": 0
+    },
+    "warmup-d32768-llama-0": {
+      "ok": true,
+      "returncode": 0
+    },
+    "warmup-d32768-quartz-1": {
+      "ok": true,
+      "returncode": 0
+    },
+    "warmup-d32768-llama-1": {
+      "ok": true,
+      "returncode": 0
+    },
+    "warmup-d32768-quartz-2": {
+      "ok": true,
+      "returncode": 0
+    },
+    "warmup-d32768-llama-2": {
+      "ok": true,
+      "returncode": 0
+    },
+    "pair-d32768-quartz-0": {
+      "ok": true,
+      "returncode": 0,
+      "decode_only_ms": 7530.10498,
+      "complete_request_ms": 29471.3906,
+      "prefill_ms": 21941.2852,
+      "engine": "quartz",
+      "kind": "decode",
+      "prefix": 32768,
+      "sample": 0
+    },
+    "pair-d32768-llama-0": {
+      "ok": true,
+      "returncode": 0,
+      "decode_only_ms": 4101.16364,
+      "complete_request_ms": 16405.0492,
+      "prefill_ms": 12303.8855,
+      "engine": "llama",
+      "kind": "decode",
+      "prefix": 32768,
+      "sample": 0
+    },
+    "pair-d32768-quartz-1": {
+      "ok": true,
+      "returncode": 0,
+      "decode_only_ms": 7533.20557,
+      "complete_request_ms": 29470.998,
+      "prefill_ms": 21937.793,
+      "engine": "quartz",
+      "kind": "decode",
+      "prefix": 32768,
+      "sample": 1
+    },
+    "pair-d32768-llama-1": {
+      "ok": true,
+      "returncode": 0,
+      "decode_only_ms": 4104.80682,
+      "complete_request_ms": 16417.9425,
+      "prefill_ms": 12313.1357,
+      "engine": "llama",
+      "kind": "decode",
+      "prefix": 32768,
+      "sample": 1
+    },
+    "pair-d32768-quartz-2": {
+      "ok": true,
+      "returncode": 0,
+      "decode_only_ms": 7530.01514,
+      "complete_request_ms": 29454.4434,
+      "prefill_ms": 21924.4277,
+      "engine": "quartz",
+      "kind": "decode",
+      "prefix": 32768,
+      "sample": 2
+    },
+    "pair-d32768-llama-2": {
+      "ok": true,
+      "returncode": 0,
+      "decode_only_ms": 4106.62775,
+      "complete_request_ms": 16401.3372,
+      "prefill_ms": 12294.7095,
+      "engine": "llama",
+      "kind": "decode",
+      "prefix": 32768,
+      "sample": 2
+    },
+    "pair-d32768-quartz-3": {
+      "ok": true,
+      "returncode": 0,
+      "decode_only_ms": 7531.85498,
+      "complete_request_ms": 29463.1953,
+      "prefill_ms": 21931.3398,
+      "engine": "quartz",
+      "kind": "decode",
+      "prefix": 32768,
+      "sample": 3
+    },
+    "pair-d32768-llama-3": {
+      "ok": true,
+      "returncode": 0,
+      "decode_only_ms": 4108.4671,
+      "complete_request_ms": 16423.5148,
+      "prefill_ms": 12315.0477,
+      "engine": "llama",
+      "kind": "decode",
+      "prefix": 32768,
+      "sample": 3
+    },
+    "pair-d32768-quartz-4": {
+      "ok": true,
+      "returncode": 0,
+      "decode_only_ms": 7530.22314,
+      "complete_request_ms": 29478.2285,
+      "prefill_ms": 21948.0059,
+      "engine": "quartz",
+      "kind": "decode",
+      "prefix": 32768,
+      "sample": 4
+    },
+    "pair-d32768-llama-4": {
+      "ok": true,
+      "returncode": 0,
+      "decode_only_ms": 4110.06251,
+      "complete_request_ms": 16439.48,
+      "prefill_ms": 12329.4175,
+      "engine": "llama",
+      "kind": "decode",
+      "prefix": 32768,
+      "sample": 4
+    },
+    "pair-d32768-quartz-5": {
+      "ok": true,
+      "returncode": 0,
+      "decode_only_ms": 7534.36182,
+      "complete_request_ms": 29482.2266,
+      "prefill_ms": 21947.8652,
+      "engine": "quartz",
+      "kind": "decode",
+      "prefix": 32768,
+      "sample": 5
+    },
+    "pair-d32768-llama-5": {
+      "ok": true,
+      "returncode": 0,
+      "decode_only_ms": 4106.52397,
+      "complete_request_ms": 16430.4374,
+      "prefill_ms": 12323.9134,
+      "engine": "llama",
+      "kind": "decode",
+      "prefix": 32768,
+      "sample": 5
+    },
+    "pair-d32768-quartz-6": {
+      "ok": true,
+      "returncode": 0,
+      "decode_only_ms": 7532.63428,
+      "complete_request_ms": 29464.7129,
+      "prefill_ms": 21932.0781,
+      "engine": "quartz",
+      "kind": "decode",
+      "prefix": 32768,
+      "sample": 6
+    },
+    "pair-d32768-llama-6": {
+      "ok": true,
+      "returncode": 0,
+      "decode_only_ms": 4103.56571,
+      "complete_request_ms": 16405.8804,
+      "prefill_ms": 12302.3147,
+      "engine": "llama",
+      "kind": "decode",
+      "prefix": 32768,
+      "sample": 6
+    },
+    "pair-d32768-quartz-7": {
+      "ok": true,
+      "returncode": 0,
+      "decode_only_ms": 7537.32861,
+      "complete_request_ms": 29467.8105,
+      "prefill_ms": 21930.4824,
+      "engine": "quartz",
+      "kind": "decode",
+      "prefix": 32768,
+      "sample": 7
+    },
+    "pair-d32768-llama-7": {
+      "ok": true,
+      "returncode": 0,
+      "decode_only_ms": 4107.79264,
+      "complete_request_ms": 16421.5046,
+      "prefill_ms": 12313.712,
+      "engine": "llama",
+      "kind": "decode",
+      "prefix": 32768,
+      "sample": 7
+    },
+    "pair-d32768-quartz-8": {
+      "ok": true,
+      "returncode": 0,
+      "decode_only_ms": 7533.10107,
+      "complete_request_ms": 29464.0801,
+      "prefill_ms": 21930.9785,
+      "engine": "quartz",
+      "kind": "decode",
+      "prefix": 32768,
+      "sample": 8
+    },
+    "pair-d32768-llama-8": {
+      "ok": true,
+      "returncode": 0,
+      "decode_only_ms": 4106.64202,
+      "complete_request_ms": 16398.4203,
+      "prefill_ms": 12291.7783,
+      "engine": "llama",
+      "kind": "decode",
+      "prefix": 32768,
+      "sample": 8
+    },
+    "pair-d32768-quartz-9": {
+      "ok": true,
+      "returncode": 0,
+      "decode_only_ms": 7536.6665,
+      "complete_request_ms": 29463.0176,
+      "prefill_ms": 21926.3516,
+      "engine": "quartz",
+      "kind": "decode",
+      "prefix": 32768,
+      "sample": 9
+    },
+    "pair-d32768-llama-9": {
+      "ok": true,
+      "returncode": 0,
+      "decode_only_ms": 4107.73805,
+      "complete_request_ms": 16416.2746,
+      "prefill_ms": 12308.5366,
+      "engine": "llama",
+      "kind": "decode",
+      "prefix": 32768,
+      "sample": 9
+    },
+    "d32768": {
+      "kind": "decode",
+      "prefix": 32768,
+      "capacity": 131072,
+      "eval_tokens": 256,
+      "quartz_decode_only_ms": [
+        7530.10498,
+        7533.20557,
+        7530.01514,
+        7531.85498,
+        7530.22314,
+        7534.36182,
+        7532.63428,
+        7537.32861,
+        7533.10107,
+        7536.6665
+      ],
+      "llama_decode_only_ms": [
+        4101.16364,
+        4104.80682,
+        4106.62775,
+        4108.4671,
+        4110.06251,
+        4106.52397,
+        4103.56571,
+        4107.79264,
+        4106.64202,
+        4107.73805
+      ],
+      "quartz_complete_request_ms": [
+        29471.3906,
+        29470.998,
+        29454.4434,
+        29463.1953,
+        29478.2285,
+        29482.2266,
+        29464.7129,
+        29467.8105,
+        29464.0801,
+        29463.0176
+      ],
+      "llama_complete_request_ms": [
+        16405.0492,
+        16417.9425,
+        16401.3372,
+        16423.5148,
+        16439.48,
+        16430.4374,
+        16405.8804,
+        16421.5046,
+        16398.4203,
+        16416.2746
+      ],
+      "quartz_prefill_ms": [],
+      "llama_prefill_ms": [],
+      "n_pairs": 10,
+      "warmups": 3,
+      "alternating": "quartz_then_llama",
+      "opt137_control_arm": "same_production_binary",
+      "decode_only": {
+        "metric": "decode_only_ms",
+        "n_pairs": 10,
+        "quartz_mean_ms": 7532.949609,
+        "llama_mean_ms": 4106.339021,
+        "quartz_mean_tok_s": 33.98403554798223,
+        "llama_mean_tok_s": 62.34265827882034,
+        "gap_ms": 3426.6105880000005,
+        "gap_tok_s": -28.358622730838107,
+        "paired_log_ratio_ci": {
+          "usable": true,
+          "n": 10,
+          "df": 9,
+          "geometric_ratio": 0.5451169499884564,
+          "ci95_low": 0.5448667614268686,
+          "ci95_high": 0.545367253430086,
+          "point_ratios": [
+            0.544635652609454,
+            0.5448951023382201,
+            0.5453677945725882,
+            0.5454787845636401,
+            0.5458088603201737,
+            0.5450393899453053,
+            0.5447716638647163,
+            0.544993173649092,
+            0.5451462793130958,
+            0.5450338090454181
+          ],
+          "critical": 2.2621571628540993
+        },
+        "quartz_interval": {
+          "n": 10,
+          "mean": 7532.949609,
+          "se": 0.8199459706718142,
+          "low": 7531.094762349292,
+          "high": 7534.804455650708,
+          "df": 9,
+          "critical": 2.2621571628540993
+        },
+        "llama_interval": {
+          "n": 10,
+          "mean": 4106.339021,
+          "se": 0.8130615814294501,
+          "low": 4104.499747919727,
+          "high": 4108.178294080272,
+          "df": 9,
+          "critical": 2.2621571628540993
+        },
+        "claim_type": "measured",
+        "identity_matched": true,
+        "policy": "opt135_paired_log_ratio_df9"
+      },
+      "complete_request": {
+        "metric": "complete_request_ms",
+        "n_pairs": 10,
+        "quartz_mean_ms": 29468.010349999997,
+        "llama_mean_ms": 16415.9841,
+        "quartz_mean_tok_s": 8.687387245227336,
+        "llama_mean_tok_s": 15.594566252730441,
+        "gap_ms": 13052.026249999995,
+        "gap_tok_s": -6.907179007503105,
+        "paired_log_ratio_ci": {
+          "usable": true,
+          "n": 10,
+          "df": 9,
+          "geometric_ratio": 0.5570779837413596,
+          "ci95_low": 0.5568190649842056,
+          "ci95_high": 0.5573370228947556,
+          "point_ratios": [
+            0.5566432009489231,
+            0.55708810743362,
+            0.5568374515608739,
+            0.557424767842475,
+            0.5576820873072478,
+            0.5572997461460389,
+            0.5567975651308653,
+            0.5572692480834299,
+            0.5565563304316432,
+            0.5571823912564883
+          ],
+          "critical": 2.2621571628540993
+        },
+        "quartz_interval": {
+          "n": 10,
+          "mean": 29468.010349999997,
+          "se": 2.550378771487979,
+          "low": 29462.240992394083,
+          "high": 29473.77970760591,
+          "df": 9,
+          "critical": 2.2621571628540993
+        },
+        "llama_interval": {
+          "n": 10,
+          "mean": 16415.9841,
+          "se": 4.212069724810499,
+          "low": 16406.45573630158,
+          "high": 16425.512463698422,
+          "df": 9,
+          "critical": 2.2621571628540993
+        },
+        "claim_type": "measured",
+        "identity_matched": true,
+        "policy": "opt135_paired_log_ratio_df9"
+      }
+    },
+    "warmup-p4096-quartz-0": {
+      "ok": true,
+      "returncode": 0
+    },
+    "warmup-p4096-llama-0": {
+      "ok": true,
+      "returncode": 0
+    },
+    "warmup-p4096-quartz-1": {
+      "ok": true,
+      "returncode": 0
+    },
+    "warmup-p4096-llama-1": {
+      "ok": true,
+      "returncode": 0
+    },
+    "warmup-p4096-quartz-2": {
+      "ok": true,
+      "returncode": 0
+    },
+    "warmup-p4096-llama-2": {
+      "ok": true,
+      "returncode": 0
+    },
+    "pair-p4096-quartz-0": {
+      "ok": true,
+      "returncode": 0,
+      "decode_only_ms": 0,
+      "complete_request_ms": 1374.64246,
+      "prefill_ms": 1374.64246,
+      "engine": "quartz",
+      "kind": "prefill",
+      "prefix": 4096,
+      "sample": 0
+    },
+    "pair-p4096-llama-0": {
+      "ok": true,
+      "returncode": 0,
+      "decode_only_ms": 0,
+      "complete_request_ms": 1276.92145,
+      "prefill_ms": 1276.92145,
+      "engine": "llama",
+      "kind": "prefill",
+      "prefix": 4096,
+      "sample": 0
+    },
+    "pair-p4096-quartz-1": {
+      "ok": true,
+      "returncode": 0,
+      "decode_only_ms": 0,
+      "complete_request_ms": 1371.50842,
+      "prefill_ms": 1371.50842,
+      "engine": "quartz",
+      "kind": "prefill",
+      "prefix": 4096,
+      "sample": 1
+    },
+    "pair-p4096-llama-1": {
+      "ok": true,
+      "returncode": 0,
+      "decode_only_ms": 0,
+      "complete_request_ms": 1274.9265,
+      "prefill_ms": 1274.9265,
+      "engine": "llama",
+      "kind": "prefill",
+      "prefix": 4096,
+      "sample": 1
+    },
+    "pair-p4096-quartz-2": {
+      "ok": true,
+      "returncode": 0,
+      "decode_only_ms": 0,
+      "complete_request_ms": 1369.70593,
+      "prefill_ms": 1369.70593,
+      "engine": "quartz",
+      "kind": "prefill",
+      "prefix": 4096,
+      "sample": 2
+    },
+    "pair-p4096-llama-2": {
+      "ok": true,
+      "returncode": 0,
+      "decode_only_ms": 0,
+      "complete_request_ms": 1273.50885,
+      "prefill_ms": 1273.50885,
+      "engine": "llama",
+      "kind": "prefill",
+      "prefix": 4096,
+      "sample": 2
+    },
+    "pair-p4096-quartz-3": {
+      "ok": true,
+      "returncode": 0,
+      "decode_only_ms": 0,
+      "complete_request_ms": 1366.94739,
+      "prefill_ms": 1366.94739,
+      "engine": "quartz",
+      "kind": "prefill",
+      "prefix": 4096,
+      "sample": 3
+    },
+    "pair-p4096-llama-3": {
+      "ok": true,
+      "returncode": 0,
+      "decode_only_ms": 0,
+      "complete_request_ms": 1272.68098,
+      "prefill_ms": 1272.68098,
+      "engine": "llama",
+      "kind": "prefill",
+      "prefix": 4096,
+      "sample": 3
+    },
+    "pair-p4096-quartz-4": {
+      "ok": true,
+      "returncode": 0,
+      "decode_only_ms": 0,
+      "complete_request_ms": 1366.59216,
+      "prefill_ms": 1366.59216,
+      "engine": "quartz",
+      "kind": "prefill",
+      "prefix": 4096,
+      "sample": 4
+    },
+    "pair-p4096-llama-4": {
+      "ok": true,
+      "returncode": 0,
+      "decode_only_ms": 0,
+      "complete_request_ms": 1269.7253,
+      "prefill_ms": 1269.7253,
+      "engine": "llama",
+      "kind": "prefill",
+      "prefix": 4096,
+      "sample": 4
+    },
+    "pair-p4096-quartz-5": {
+      "ok": true,
+      "returncode": 0,
+      "decode_only_ms": 0,
+      "complete_request_ms": 1366.66736,
+      "prefill_ms": 1366.66736,
+      "engine": "quartz",
+      "kind": "prefill",
+      "prefix": 4096,
+      "sample": 5
+    },
+    "pair-p4096-llama-5": {
+      "ok": true,
+      "returncode": 0,
+      "decode_only_ms": 0,
+      "complete_request_ms": 1269.75109,
+      "prefill_ms": 1269.75109,
+      "engine": "llama",
+      "kind": "prefill",
+      "prefix": 4096,
+      "sample": 5
+    },
+    "pair-p4096-quartz-6": {
+      "ok": true,
+      "returncode": 0,
+      "decode_only_ms": 0,
+      "complete_request_ms": 1365.73376,
+      "prefill_ms": 1365.73376,
+      "engine": "quartz",
+      "kind": "prefill",
+      "prefix": 4096,
+      "sample": 6
+    },
+    "pair-p4096-llama-6": {
+      "ok": true,
+      "returncode": 0,
+      "decode_only_ms": 0,
+      "complete_request_ms": 1268.17778,
+      "prefill_ms": 1268.17778,
+      "engine": "llama",
+      "kind": "prefill",
+      "prefix": 4096,
+      "sample": 6
+    },
+    "pair-p4096-quartz-7": {
+      "ok": true,
+      "returncode": 0,
+      "decode_only_ms": 0,
+      "complete_request_ms": 1364.76208,
+      "prefill_ms": 1364.76208,
+      "engine": "quartz",
+      "kind": "prefill",
+      "prefix": 4096,
+      "sample": 7
+    },
+    "pair-p4096-llama-7": {
+      "ok": true,
+      "returncode": 0,
+      "decode_only_ms": 0,
+      "complete_request_ms": 1267.36045,
+      "prefill_ms": 1267.36045,
+      "engine": "llama",
+      "kind": "prefill",
+      "prefix": 4096,
+      "sample": 7
+    },
+    "pair-p4096-quartz-8": {
+      "ok": true,
+      "returncode": 0,
+      "decode_only_ms": 0,
+      "complete_request_ms": 1362.36475,
+      "prefill_ms": 1362.36475,
+      "engine": "quartz",
+      "kind": "prefill",
+      "prefix": 4096,
+      "sample": 8
+    },
+    "pair-p4096-llama-8": {
+      "ok": true,
+      "returncode": 0,
+      "decode_only_ms": 0,
+      "complete_request_ms": 1266.70865,
+      "prefill_ms": 1266.70865,
+      "engine": "llama",
+      "kind": "prefill",
+      "prefix": 4096,
+      "sample": 8
+    },
+    "pair-p4096-quartz-9": {
+      "ok": true,
+      "returncode": 0,
+      "decode_only_ms": 0,
+      "complete_request_ms": 1361.73132,
+      "prefill_ms": 1361.73132,
+      "engine": "quartz",
+      "kind": "prefill",
+      "prefix": 4096,
+      "sample": 9
+    },
+    "pair-p4096-llama-9": {
+      "ok": true,
+      "returncode": 0,
+      "decode_only_ms": 0,
+      "complete_request_ms": 1265.93235,
+      "prefill_ms": 1265.93235,
+      "engine": "llama",
+      "kind": "prefill",
+      "prefix": 4096,
+      "sample": 9
+    },
+    "p4096": {
+      "kind": "prefill",
+      "prefix": 4096,
+      "capacity": 131072,
+      "eval_tokens": 4096,
+      "quartz_decode_only_ms": [],
+      "llama_decode_only_ms": [],
+      "quartz_complete_request_ms": [
+        1374.64246,
+        1371.50842,
+        1369.70593,
+        1366.94739,
+        1366.59216,
+        1366.66736,
+        1365.73376,
+        1364.76208,
+        1362.36475,
+        1361.73132
+      ],
+      "llama_complete_request_ms": [
+        1276.92145,
+        1274.9265,
+        1273.50885,
+        1272.68098,
+        1269.7253,
+        1269.75109,
+        1268.17778,
+        1267.36045,
+        1266.70865,
+        1265.93235
+      ],
+      "quartz_prefill_ms": [
+        1374.64246,
+        1371.50842,
+        1369.70593,
+        1366.94739,
+        1366.59216,
+        1366.66736,
+        1365.73376,
+        1364.76208,
+        1362.36475,
+        1361.73132
+      ],
+      "llama_prefill_ms": [
+        1276.92145,
+        1274.9265,
+        1273.50885,
+        1272.68098,
+        1269.7253,
+        1269.75109,
+        1268.17778,
+        1267.36045,
+        1266.70865,
+        1265.93235
+      ],
+      "n_pairs": 10,
+      "warmups": 3,
+      "alternating": "quartz_then_llama",
+      "opt137_control_arm": "same_production_binary",
+      "prefill": {
+        "metric": "prefill_ms",
+        "n_pairs": 10,
+        "quartz_mean_ms": 1367.0655629999999,
+        "llama_mean_ms": 1270.56934,
+        "quartz_mean_tok_s": 2996.2214122395735,
+        "llama_mean_tok_s": 3223.7768280631035,
+        "gap_ms": 96.49622299999987,
+        "gap_tok_s": -227.55541582352998,
+        "paired_log_ratio_ci": {
+          "usable": true,
+          "n": 10,
+          "df": 9,
+          "geometric_ratio": 0.9294135099483815,
+          "ci95_low": 0.9288934917153551,
+          "ci95_high": 0.9299338193008582,
+          "point_ratios": [
+            0.9289116895167053,
+            0.9295797834037359,
+            0.9297680780282522,
+            0.9310387431955227,
+            0.9291179454739446,
+            0.9290856920736001,
+            0.9285688156379761,
+            0.9286310548722162,
+            0.9297867182779062,
+            0.9296491395967892
+          ],
+          "critical": 2.2621571628540993
+        },
+        "quartz_interval": {
+          "n": 10,
+          "mean": 1367.0655629999999,
+          "se": 1.256750879845897,
+          "low": 1364.2225949952333,
+          "high": 1369.9085310047665,
+          "df": 9,
+          "critical": 2.2621571628540993
+        },
+        "llama_interval": {
+          "n": 10,
+          "mean": 1270.56934,
+          "se": 1.18433742204661,
+          "low": 1267.890182617481,
+          "high": 1273.248497382519,
+          "df": 9,
+          "critical": 2.2621571628540993
+        },
+        "claim_type": "measured",
+        "identity_matched": true,
+        "policy": "opt135_paired_log_ratio_df9"
+      },
+      "complete_request": {
+        "metric": "complete_request_ms",
+        "n_pairs": 10,
+        "quartz_mean_ms": 1367.0655629999999,
+        "llama_mean_ms": 1270.56934,
+        "quartz_mean_tok_s": 2996.2214122395735,
+        "llama_mean_tok_s": 3223.7768280631035,
+        "gap_ms": 96.49622299999987,
+        "gap_tok_s": -227.55541582352998,
+        "paired_log_ratio_ci": {
+          "usable": true,
+          "n": 10,
+          "df": 9,
+          "geometric_ratio": 0.9294135099483815,
+          "ci95_low": 0.9288934917153551,
+          "ci95_high": 0.9299338193008582,
+          "point_ratios": [
+            0.9289116895167053,
+            0.9295797834037359,
+            0.9297680780282522,
+            0.9310387431955227,
+            0.9291179454739446,
+            0.9290856920736001,
+            0.9285688156379761,
+            0.9286310548722162,
+            0.9297867182779062,
+            0.9296491395967892
+          ],
+          "critical": 2.2621571628540993
+        },
+        "quartz_interval": {
+          "n": 10,
+          "mean": 1367.0655629999999,
+          "se": 1.256750879845897,
+          "low": 1364.2225949952333,
+          "high": 1369.9085310047665,
+          "df": 9,
+          "critical": 2.2621571628540993
+        },
+        "llama_interval": {
+          "n": 10,
+          "mean": 1270.56934,
+          "se": 1.18433742204661,
+          "low": 1267.890182617481,
+          "high": 1273.248497382519,
+          "df": 9,
+          "critical": 2.2621571628540993
+        },
+        "claim_type": "measured",
+        "identity_matched": true,
+        "policy": "opt135_paired_log_ratio_df9"
+      }
+    }
+  },
+  "summaries": {
+    "d128": {
+      "decode_only": {
+        "metric": "decode_only_ms",
+        "n_pairs": 10,
+        "quartz_mean_ms": 4305.096142,
+        "llama_mean_ms": 3635.4261400000005,
+        "quartz_mean_tok_s": 59.4645052664816,
+        "llama_mean_tok_s": 70.41829697874773,
+        "gap_ms": 669.6700019999998,
+        "gap_tok_s": -10.953791712266131,
+        "paired_log_ratio_ci": {
+          "usable": true,
+          "n": 10,
+          "df": 9,
+          "geometric_ratio": 0.8444469699985239,
+          "ci95_low": 0.8439473825707173,
+          "ci95_high": 0.8449468531646704,
+          "point_ratios": [
+            0.8442247185476706,
+            0.8435418314618909,
+            0.8448237971892608,
+            0.8460321889532644,
+            0.8437225424990834,
+            0.8443457633129509,
+            0.8448573433913988,
+            0.8440447029507583,
+            0.8443821597594929,
+            0.8444972532025471
+          ],
+          "critical": 2.2621571628540993
+        },
+        "quartz_interval": {
+          "n": 10,
+          "mean": 4305.096142,
+          "se": 1.8204837510256104,
+          "low": 4300.977921642758,
+          "high": 4309.214362357243,
+          "df": 9,
+          "critical": 2.2621571628540993
+        },
+        "llama_interval": {
+          "n": 10,
+          "mean": 3635.4261400000005,
+          "se": 1.722146825532975,
+          "low": 3631.5303732231346,
+          "high": 3639.3219067768664,
+          "df": 9,
+          "critical": 2.2621571628540993
+        },
+        "claim_type": "measured",
+        "identity_matched": true,
+        "policy": "opt135_paired_log_ratio_df9"
+      },
+      "complete_request": {
+        "metric": "complete_request_ms",
+        "n_pairs": 10,
+        "quartz_mean_ms": 4387.0979480000005,
+        "llama_mean_ms": 3704.0018499999996,
+        "quartz_mean_tok_s": 58.353016217553,
+        "llama_mean_tok_s": 69.11457468188682,
+        "gap_ms": 683.0960980000009,
+        "gap_tok_s": -10.761558464333824,
+        "paired_log_ratio_ci": {
+          "usable": true,
+          "n": 10,
+          "df": 9,
+          "geometric_ratio": 0.8442941243363641,
+          "ci95_low": 0.8438047035028113,
+          "ci95_high": 0.8447838290421816,
+          "point_ratios": [
+            0.8440321826136423,
+            0.8434906660972656,
+            0.8445992568240615,
+            0.8459176787707844,
+            0.8435034563498222,
+            0.8441551993127662,
+            0.84458335804681,
+            0.8440761706313762,
+            0.8442821993883111,
+            0.8443035723554926
+          ],
+          "critical": 2.2621571628540993
+        },
+        "quartz_interval": {
+          "n": 10,
+          "mean": 4387.0979480000005,
+          "se": 1.8222430679838304,
+          "low": 4382.9757477913,
+          "high": 4391.220148208701,
+          "df": 9,
+          "critical": 2.2621571628540993
+        },
+        "llama_interval": {
+          "n": 10,
+          "mean": 3704.0018499999996,
+          "se": 1.7460523401897814,
+          "low": 3700.052005191921,
+          "high": 3707.951694808078,
+          "df": 9,
+          "critical": 2.2621571628540993
+        },
+        "claim_type": "measured",
+        "identity_matched": true,
+        "policy": "opt135_paired_log_ratio_df9"
+      }
+    },
+    "d2048": {
+      "decode_only": {
+        "metric": "decode_only_ms",
+        "n_pairs": 10,
+        "quartz_mean_ms": 5113.751513,
+        "llama_mean_ms": 3680.2777459999998,
+        "quartz_mean_tok_s": 50.06109592422651,
+        "llama_mean_tok_s": 69.55998484243555,
+        "gap_ms": 1433.4737670000004,
+        "gap_tok_s": -19.498888918209047,
+        "paired_log_ratio_ci": {
+          "usable": true,
+          "n": 10,
+          "df": 9,
+          "geometric_ratio": 0.7196824701159888,
+          "ci95_low": 0.7194040502889991,
+          "ci95_high": 0.7199609976954996,
+          "point_ratios": [
+            0.7190872150699913,
+            0.7195218553983918,
+            0.7204357822370535,
+            0.7198469564907146,
+            0.7196590941993193,
+            0.7198790927531998,
+            0.7196704483882835,
+            0.7199442392100549,
+            0.7191549734283994,
+            0.7196259915480178
+          ],
+          "critical": 2.2621571628540993
+        },
+        "quartz_interval": {
+          "n": 10,
+          "mean": 5113.751513,
+          "se": 0.23881347759780647,
+          "low": 5113.211279381067,
+          "high": 5114.291746618934,
+          "df": 9,
+          "critical": 2.2621571628540993
+        },
+        "llama_interval": {
+          "n": 10,
+          "mean": 3680.2777459999998,
+          "se": 0.6144950006816161,
+          "low": 3678.8876617326696,
+          "high": 3681.66783026733,
+          "df": 9,
+          "critical": 2.2621571628540993
+        },
+        "claim_type": "measured",
+        "identity_matched": true,
+        "policy": "opt135_paired_log_ratio_df9"
+      },
+      "complete_request": {
+        "metric": "complete_request_ms",
+        "n_pairs": 10,
+        "quartz_mean_ms": 5753.03579,
+        "llama_mean_ms": 4320.931839,
+        "quartz_mean_tok_s": 44.498246712574826,
+        "llama_mean_tok_s": 59.246494687900395,
+        "gap_ms": 1432.103951,
+        "gap_tok_s": -14.748247975325569,
+        "paired_log_ratio_ci": {
+          "usable": true,
+          "n": 10,
+          "df": 9,
+          "geometric_ratio": 0.7510697823041339,
+          "ci95_low": 0.7507562001295904,
+          "ci95_high": 0.751383495458322,
+          "point_ratios": [
+            0.7503094572336785,
+            0.7509986151723138,
+            0.7518788611363845,
+            0.7512492590744323,
+            0.7508941233500972,
+            0.7512873156164723,
+            0.7511165015770375,
+            0.7513882093902639,
+            0.7505434291887777,
+            0.7510332030808629
+          ],
+          "critical": 2.2621571628540993
+        },
+        "quartz_interval": {
+          "n": 10,
+          "mean": 5753.03579,
+          "se": 0.2918393088822662,
+          "low": 5752.37560361701,
+          "high": 5753.69597638299,
+          "df": 9,
+          "critical": 2.2621571628540993
+        },
+        "llama_interval": {
+          "n": 10,
+          "mean": 4320.931839,
+          "se": 0.7271811411905418,
+          "low": 4319.2868409727635,
+          "high": 4322.576837027236,
+          "df": 9,
+          "critical": 2.2621571628540993
+        },
+        "claim_type": "measured",
+        "identity_matched": true,
+        "policy": "opt135_paired_log_ratio_df9"
+      }
+    },
+    "d8192": {
+      "decode_only": {
+        "metric": "decode_only_ms",
+        "n_pairs": 10,
+        "quartz_mean_ms": 5271.653075,
+        "llama_mean_ms": 3829.53111,
+        "quartz_mean_tok_s": 48.561623478005956,
+        "llama_mean_tok_s": 66.84895918125173,
+        "gap_ms": 1442.1219650000003,
+        "gap_tok_s": -18.287335703245773,
+        "paired_log_ratio_ci": {
+          "usable": true,
+          "n": 10,
+          "df": 9,
+          "geometric_ratio": 0.7264381836620276,
+          "ci95_low": 0.726017743524074,
+          "ci95_high": 0.7268588672787546,
+          "point_ratios": [
+            0.7254963049966031,
+            0.7270096948466311,
+            0.7257857753299781,
+            0.7267811916777145,
+            0.7259965599766266,
+            0.727026112582442,
+            0.7268329107997903,
+            0.7265792339128884,
+            0.7258740626860067,
+            0.7270021306442918
+          ],
+          "critical": 2.2621571628540993
+        },
+        "quartz_interval": {
+          "n": 10,
+          "mean": 5271.653075,
+          "se": 0.6187121371010144,
+          "low": 5270.253450907312,
+          "high": 5273.052699092688,
+          "df": 9,
+          "critical": 2.2621571628540993
+        },
+        "llama_interval": {
+          "n": 10,
+          "mean": 3829.53111,
+          "se": 1.0363567502029003,
+          "low": 3827.1867081542564,
+          "high": 3831.8755118457434,
+          "df": 9,
+          "critical": 2.2621571628540993
+        },
+        "claim_type": "measured",
+        "identity_matched": true,
+        "policy": "opt135_paired_log_ratio_df9"
+      },
+      "complete_request": {
+        "metric": "complete_request_ms",
+        "n_pairs": 10,
+        "quartz_mean_ms": 8412.380566,
+        "llama_mean_ms": 6454.10928,
+        "quartz_mean_tok_s": 30.431343812635827,
+        "llama_mean_tok_s": 39.66467797018283,
+        "gap_ms": 1958.2712860000001,
+        "gap_tok_s": -9.233334157547002,
+        "paired_log_ratio_ci": {
+          "usable": true,
+          "n": 10,
+          "df": 9,
+          "geometric_ratio": 0.7672153804591635,
+          "ci95_low": 0.7668136741661494,
+          "ci95_high": 0.7676172971917554,
+          "point_ratios": [
+            0.7664079444115529,
+            0.767951807844028,
+            0.7664350587202357,
+            0.767247897814105,
+            0.7667420172136741,
+            0.767865692238896,
+            0.7673712433308125,
+            0.7672730755992341,
+            0.7670645129557088,
+            0.7677964049182969
+          ],
+          "critical": 2.2621571628540993
+        },
+        "quartz_interval": {
+          "n": 10,
+          "mean": 8412.380566,
+          "se": 1.17934380216589,
+          "low": 8409.712704970463,
+          "high": 8415.048427029536,
+          "df": 9,
+          "critical": 2.2621571628540993
+        },
+        "llama_interval": {
+          "n": 10,
+          "mean": 6454.10928,
+          "se": 1.7328022190095378,
+          "low": 6450.1894090484575,
+          "high": 6458.029150951542,
+          "df": 9,
+          "critical": 2.2621571628540993
+        },
+        "claim_type": "measured",
+        "identity_matched": true,
+        "policy": "opt135_paired_log_ratio_df9"
+      }
+    },
+    "d32768": {
+      "decode_only": {
+        "metric": "decode_only_ms",
+        "n_pairs": 10,
+        "quartz_mean_ms": 7532.949609,
+        "llama_mean_ms": 4106.339021,
+        "quartz_mean_tok_s": 33.98403554798223,
+        "llama_mean_tok_s": 62.34265827882034,
+        "gap_ms": 3426.6105880000005,
+        "gap_tok_s": -28.358622730838107,
+        "paired_log_ratio_ci": {
+          "usable": true,
+          "n": 10,
+          "df": 9,
+          "geometric_ratio": 0.5451169499884564,
+          "ci95_low": 0.5448667614268686,
+          "ci95_high": 0.545367253430086,
+          "point_ratios": [
+            0.544635652609454,
+            0.5448951023382201,
+            0.5453677945725882,
+            0.5454787845636401,
+            0.5458088603201737,
+            0.5450393899453053,
+            0.5447716638647163,
+            0.544993173649092,
+            0.5451462793130958,
+            0.5450338090454181
+          ],
+          "critical": 2.2621571628540993
+        },
+        "quartz_interval": {
+          "n": 10,
+          "mean": 7532.949609,
+          "se": 0.8199459706718142,
+          "low": 7531.094762349292,
+          "high": 7534.804455650708,
+          "df": 9,
+          "critical": 2.2621571628540993
+        },
+        "llama_interval": {
+          "n": 10,
+          "mean": 4106.339021,
+          "se": 0.8130615814294501,
+          "low": 4104.499747919727,
+          "high": 4108.178294080272,
+          "df": 9,
+          "critical": 2.2621571628540993
+        },
+        "claim_type": "measured",
+        "identity_matched": true,
+        "policy": "opt135_paired_log_ratio_df9"
+      },
+      "complete_request": {
+        "metric": "complete_request_ms",
+        "n_pairs": 10,
+        "quartz_mean_ms": 29468.010349999997,
+        "llama_mean_ms": 16415.9841,
+        "quartz_mean_tok_s": 8.687387245227336,
+        "llama_mean_tok_s": 15.594566252730441,
+        "gap_ms": 13052.026249999995,
+        "gap_tok_s": -6.907179007503105,
+        "paired_log_ratio_ci": {
+          "usable": true,
+          "n": 10,
+          "df": 9,
+          "geometric_ratio": 0.5570779837413596,
+          "ci95_low": 0.5568190649842056,
+          "ci95_high": 0.5573370228947556,
+          "point_ratios": [
+            0.5566432009489231,
+            0.55708810743362,
+            0.5568374515608739,
+            0.557424767842475,
+            0.5576820873072478,
+            0.5572997461460389,
+            0.5567975651308653,
+            0.5572692480834299,
+            0.5565563304316432,
+            0.5571823912564883
+          ],
+          "critical": 2.2621571628540993
+        },
+        "quartz_interval": {
+          "n": 10,
+          "mean": 29468.010349999997,
+          "se": 2.550378771487979,
+          "low": 29462.240992394083,
+          "high": 29473.77970760591,
+          "df": 9,
+          "critical": 2.2621571628540993
+        },
+        "llama_interval": {
+          "n": 10,
+          "mean": 16415.9841,
+          "se": 4.212069724810499,
+          "low": 16406.45573630158,
+          "high": 16425.512463698422,
+          "df": 9,
+          "critical": 2.2621571628540993
+        },
+        "claim_type": "measured",
+        "identity_matched": true,
+        "policy": "opt135_paired_log_ratio_df9"
+      }
+    },
+    "p4096": {
+      "complete_request": {
+        "metric": "complete_request_ms",
+        "n_pairs": 10,
+        "quartz_mean_ms": 1367.0655629999999,
+        "llama_mean_ms": 1270.56934,
+        "quartz_mean_tok_s": 2996.2214122395735,
+        "llama_mean_tok_s": 3223.7768280631035,
+        "gap_ms": 96.49622299999987,
+        "gap_tok_s": -227.55541582352998,
+        "paired_log_ratio_ci": {
+          "usable": true,
+          "n": 10,
+          "df": 9,
+          "geometric_ratio": 0.9294135099483815,
+          "ci95_low": 0.9288934917153551,
+          "ci95_high": 0.9299338193008582,
+          "point_ratios": [
+            0.9289116895167053,
+            0.9295797834037359,
+            0.9297680780282522,
+            0.9310387431955227,
+            0.9291179454739446,
+            0.9290856920736001,
+            0.9285688156379761,
+            0.9286310548722162,
+            0.9297867182779062,
+            0.9296491395967892
+          ],
+          "critical": 2.2621571628540993
+        },
+        "quartz_interval": {
+          "n": 10,
+          "mean": 1367.0655629999999,
+          "se": 1.256750879845897,
+          "low": 1364.2225949952333,
+          "high": 1369.9085310047665,
+          "df": 9,
+          "critical": 2.2621571628540993
+        },
+        "llama_interval": {
+          "n": 10,
+          "mean": 1270.56934,
+          "se": 1.18433742204661,
+          "low": 1267.890182617481,
+          "high": 1273.248497382519,
+          "df": 9,
+          "critical": 2.2621571628540993
+        },
+        "claim_type": "measured",
+        "identity_matched": true,
+        "policy": "opt135_paired_log_ratio_df9"
+      },
+      "prefill": {
+        "metric": "prefill_ms",
+        "n_pairs": 10,
+        "quartz_mean_ms": 1367.0655629999999,
+        "llama_mean_ms": 1270.56934,
+        "quartz_mean_tok_s": 2996.2214122395735,
+        "llama_mean_tok_s": 3223.7768280631035,
+        "gap_ms": 96.49622299999987,
+        "gap_tok_s": -227.55541582352998,
+        "paired_log_ratio_ci": {
+          "usable": true,
+          "n": 10,
+          "df": 9,
+          "geometric_ratio": 0.9294135099483815,
+          "ci95_low": 0.9288934917153551,
+          "ci95_high": 0.9299338193008582,
+          "point_ratios": [
+            0.9289116895167053,
+            0.9295797834037359,
+            0.9297680780282522,
+            0.9310387431955227,
+            0.9291179454739446,
+            0.9290856920736001,
+            0.9285688156379761,
+            0.9286310548722162,
+            0.9297867182779062,
+            0.9296491395967892
+          ],
+          "critical": 2.2621571628540993
+        },
+        "quartz_interval": {
+          "n": 10,
+          "mean": 1367.0655629999999,
+          "se": 1.256750879845897,
+          "low": 1364.2225949952333,
+          "high": 1369.9085310047665,
+          "df": 9,
+          "critical": 2.2621571628540993
+        },
+        "llama_interval": {
+          "n": 10,
+          "mean": 1270.56934,
+          "se": 1.18433742204661,
+          "low": 1267.890182617481,
+          "high": 1273.248497382519,
+          "df": 9,
+          "critical": 2.2621571628540993
+        },
+        "claim_type": "measured",
+        "identity_matched": true,
+        "policy": "opt135_paired_log_ratio_df9"
+      }
+    }
+  },
+  "hashes": {
+    "quartz_native": "7fd0efb4abb5b0943d2462812a4b88e0c99d7c372b61a2cfff7807b3099377e5",
+    "llama_profile": "4a02206a38b8c01a7f9b313ef2bd5ff42844790dfc3772aba43dca5c6ea9f794",
+    "replay": "130469b13ef1cb8dbe100bc8d5a05fb27653520f2401704ac8606c53c9273561"
+  },
+  "opt137_control": {
+    "reconstructable": true,
+    "method": "current_production_is_opt137_kept_stack",
+    "parent": "post124_plus_opt127_decode_segments8_plus_opt137_mma",
+    "selector": "decode_segments8",
+    "opt137_dense_mma": true,
+    "q4_decode": "llama_q4k_mmvq",
+    "execution_graphs": "decode_segments8",
+    "mma_threshold": 8192,
+    "allocated_capacity": 131072,
+    "production_pins_changed_after_opt137": false,
+    "same_sitting_as_final": true,
+    "paired_gpu_rounds_versus_distinct_control_binary": false,
+    "historical_rates_as_paired_gain": false,
+    "reason": "OPT-143/144/145 did not keep. Production pins remain the OPT-137 kept stack. A distinct pre-keep control cannot be reconstructed without changing production pins.",
+    "hashes": {
+      "quartz_native": "7fd0efb4abb5b0943d2462812a4b88e0c99d7c372b61a2cfff7807b3099377e5",
+      "llama_profile": "4a02206a38b8c01a7f9b313ef2bd5ff42844790dfc3772aba43dca5c6ea9f794",
+      "replay": "130469b13ef1cb8dbe100bc8d5a05fb27653520f2401704ac8606c53c9273561"
+    },
+    "historical": {
+      "ok": true,
+      "claim_type": "historical",
+      "production_kept": true,
+      "verdict": "keep",
+      "tok_s_deltas": {
+        "d8192.decode_only": {
+          "control_rate": 34.90564309,
+          "candidate_rate": 48.65922203,
+          "delta": 13.753578940000004,
+          "g": 1.3940209895173834
+        },
+        "d32768.decode_only": {
+          "control_rate": 15.302007380000001,
+          "candidate_rate": 33.93855744,
+          "delta": 18.636550059999998,
+          "g": 2.217915272525001
+        }
+      },
+      "usable_as_paired_gain": false,
+      "note": "OPT-137 candidate rates are historical. They are not a paired gain versus the OPT-146 sitting unless binary identity matches."
+    },
+    "claim_type": "measured"
+  },
+  "claims_throughput": false,
+  "shipping_delta": 0,
+  "family_plan": "task=OPT-146 mode=acceptance phase=throughput loop_product=130 cases=5 candidates=2 warmups=3 samples=10 tokens=1",
+  "measured_at": "2026-09-15T02:00:00Z"
+}

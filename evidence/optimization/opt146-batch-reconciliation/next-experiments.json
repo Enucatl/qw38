@@ -1,0 +1,89 @@
+{
+  "decode": {
+    "phase": "decode",
+    "selected_family": "attn_core",
+    "measured_excess_ms": 47.527693666666664,
+    "uncertainty": {
+      "one_sided_low": 47.438205958615086,
+      "df": 2,
+      "n": 3
+    },
+    "quartz_source_function": "cuda/attention_decode.cu",
+    "llama_source_function": "ggml-cuda fattn",
+    "supported_mechanism": null,
+    "candidate": null,
+    "prior_experiment": "OPT-143",
+    "prior_verdict": "no_opportunity",
+    "target_workloads": [
+      "D128",
+      "D2048"
+    ],
+    "guards_under_opt135": {
+      "policy": "target_guard_v2",
+      "decode_guards": [
+        "D128",
+        "D2048",
+        "D8192",
+        "D32768",
+        "P4096"
+      ]
+    },
+    "expected_benefit": {
+      "kind": "labeled_estimate",
+      "value": null,
+      "label": "unknown_until_mechanism"
+    },
+    "resolving_measurement": "OPT-143 already measured no_opportunity for attn_core: throughput_alone_cannot_establish_mechanism. A later experiment requires a new named source/SASS or fused-boundary identity, not a rerun of occupancy/DRAM ranking.",
+    "quality_state_gates": "N/A diagnostics; any later keep requires OPT-058 NLL",
+    "evidence_links": [
+      "evidence/optimization/opt146-batch-reconciliation/family-gaps.json",
+      "evidence/optimization/opt146-batch-reconciliation/coverage.json",
+      "evidence/optimization/opt143-short-attention/freeze.json",
+      "evidence/optimization/opt144-prefill-attention/freeze.json",
+      "evidence/optimization/opt145-secondary-family/freeze.json"
+    ]
+  },
+  "prefill": {
+    "phase": "prefill",
+    "selected_family": "attn_core",
+    "measured_excess_ms": 186.1317786666667,
+    "uncertainty": {
+      "one_sided_low": 185.17241394802826,
+      "df": 2,
+      "n": 3
+    },
+    "quartz_source_function": "cuda/attention_decode.cu",
+    "llama_source_function": "ggml-cuda fattn",
+    "supported_mechanism": null,
+    "candidate": null,
+    "prior_experiment": "OPT-144",
+    "prior_verdict": "no_opportunity",
+    "target_workloads": [
+      "P4096"
+    ],
+    "guards_under_opt135": {
+      "policy": "target_guard_v2",
+      "decode_guards": [
+        "D128",
+        "D2048",
+        "D8192",
+        "D32768",
+        "P4096"
+      ]
+    },
+    "expected_benefit": {
+      "kind": "labeled_estimate",
+      "value": null,
+      "label": "unknown_until_mechanism"
+    },
+    "resolving_measurement": "OPT-144 already measured no_opportunity for attn_core: throughput_alone_cannot_establish_mechanism. A later experiment requires a new named source/SASS or fused-boundary identity, not a rerun of occupancy/DRAM ranking.",
+    "quality_state_gates": "N/A diagnostics; any later keep requires OPT-058 NLL",
+    "evidence_links": [
+      "evidence/optimization/opt146-batch-reconciliation/family-gaps.json",
+      "evidence/optimization/opt146-batch-reconciliation/coverage.json",
+      "evidence/optimization/opt143-short-attention/freeze.json",
+      "evidence/optimization/opt144-prefill-attention/freeze.json",
+      "evidence/optimization/opt145-secondary-family/freeze.json"
+    ]
+  }
+}

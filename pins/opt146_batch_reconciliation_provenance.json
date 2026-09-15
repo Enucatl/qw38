@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "task": "OPT-146",
+  "candidate": null,
+  "authority": "OPT-136/138 matched diagnostics, OPT-142 whole-wall accounting, OPT-135 target_guard_v2 statistics, OPT-137 kept production stack",
+  "llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+  "license": "MIT",
+  "adapter_namespace": "qw38::cuda::opt146",
+  "specialization": "none — batch reconciliation only; no production optimization",
+  "not_vendored": [
+    "ggml tensor/runtime",
+    "ggml graph/allocator",
+    "ggml CLI/model",
+    "current llama HEAD as release authority"
+  ],
+  "copied_organization": [],
+  "local_modifications": [
+    "no production kernel or selector change",
+    "OPT-137 MMA retained at threshold 8192",
+    "OPT-143/144/145 measured no_opportunity; parent retained",
+    "shipping Q4 remains llama_q4k_mmvq",
+    "prompt attention remains opt111_base",
+    "OPT-016/056 and CMP-003 unchanged"
+  ],
+  "evidence_sources": [
+    "evidence/optimization/opt137-long-attention/REPORT.md",
+    "evidence/optimization/opt138-remaining-gap/family-gaps.json",
+    "evidence/optimization/opt142-wall-reconciliation/REPORT.md",
+    "evidence/optimization/opt143-short-attention/freeze.json",
+    "evidence/optimization/opt144-prefill-attention/freeze.json",
+    "evidence/optimization/opt145-secondary-family/freeze.json",
+    "fixtures/opt137_long_attention.json",
+    "fixtures/opt143_short_attention.json",
+    "fixtures/opt144_prefill_attention.json",
+    "fixtures/opt145_secondary_family.json"
+  ]
+}

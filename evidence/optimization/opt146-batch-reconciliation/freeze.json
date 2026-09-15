@@ -1,0 +1,69 @@
+{
+  "opt137_control": {
+    "reconstructable": true,
+    "method": "current_production_is_opt137_kept_stack",
+    "parent": "post124_plus_opt127_decode_segments8_plus_opt137_mma",
+    "selector": "decode_segments8",
+    "opt137_dense_mma": true,
+    "q4_decode": "llama_q4k_mmvq",
+    "execution_graphs": "decode_segments8",
+    "mma_threshold": 8192,
+    "allocated_capacity": 131072,
+    "production_pins_changed_after_opt137": false,
+    "same_sitting_as_final": true,
+    "paired_gpu_rounds_versus_distinct_control_binary": false,
+    "historical_rates_as_paired_gain": false,
+    "reason": "OPT-143/144/145 did not keep. Production pins remain the OPT-137 kept stack. A distinct pre-keep control cannot be reconstructed without changing production pins.",
+    "hashes": {
+      "quartz_native": "7fd0efb4abb5b0943d2462812a4b88e0c99d7c372b61a2cfff7807b3099377e5",
+      "llama_profile": "4a02206a38b8c01a7f9b313ef2bd5ff42844790dfc3772aba43dca5c6ea9f794",
+      "replay": "130469b13ef1cb8dbe100bc8d5a05fb27653520f2401704ac8606c53c9273561"
+    },
+    "historical": {
+      "ok": true,
+      "claim_type": "historical",
+      "production_kept": true,
+      "verdict": "keep",
+      "tok_s_deltas": {
+        "d8192.decode_only": {
+          "control_rate": 34.90564309,
+          "candidate_rate": 48.65922203,
+          "delta": 13.753578940000004,
+          "g": 1.3940209895173834
+        },
+        "d32768.decode_only": {
+          "control_rate": 15.302007380000001,
+          "candidate_rate": 33.93855744,
+          "delta": 18.636550059999998,
+          "g": 2.217915272525001
+        }
+      },
+      "usable_as_paired_gain": false,
+      "note": "OPT-137 candidate rates are historical. They are not a paired gain versus the OPT-146 sitting unless binary identity matches."
+    },
+    "claim_type": "measured"
+  },
+  "pins": {
+    "ok": true,
+    "execution_graphs": "decode_segments8",
+    "q4_decode": "llama_q4k_mmvq",
+    "opt137_dense_mma": true,
+    "ffn_only_prerequisite_not_used": true,
+    "mismatches": [],
+    "parent_identity": {
+      "ok": true,
+      "reason": null,
+      "mismatches": [],
+      "expected": {
+        "execution_graphs": "decode_segments8",
+        "q4_decode": "llama_q4k_mmvq",
+        "opt137_dense_mma": true
+      },
+      "observed": {
+        "execution_graphs": "decode_segments8",
+        "q4_decode": "llama_q4k_mmvq",
+        "opt137_dense_mma": true
+      }
+    }
+  }
+}
