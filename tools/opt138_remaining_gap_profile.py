@@ -37,6 +37,7 @@ from tools.performance_evidence import (  # noqa: E402
     replay_production_boundary_ok,
     select_top_two_families,
     validate_coverage_document,
+    whole_wall_gap_from_partitions,
 )
 from tools.run_optimization_task import (  # noqa: E402
     loop_product,
@@ -861,7 +862,10 @@ def run_families(run_dir: Path, mode: str) -> dict[str, Any]:
         grouped = regroup_fused_families(_family_ms(q_cov), _family_ms(l_cov))
         q_wall = q_cov.get("window_ms")
         l_wall = l_cov.get("window_ms")
+        q_part = q_cov.get("wall_reconciliation") or {}
+        l_part = l_cov.get("wall_reconciliation") or {}
         recon = None
+        wall_recon = None
         if q_wall is not None and l_wall is not None:
             recon = reconcile_whole_gap(
                 quartz_wall_ms=float(q_wall),
@@ -877,9 +881,14 @@ def run_families(run_dir: Path, mode: str) -> dict[str, Any]:
             recon["metric_identity"] = (
                 "prefill_complete" if kind == "prefill" else "decode_window"
             )
+            recon["method"] = "family_sum_plus_unmatched_host_unmeasured"
+            if q_part and l_part:
+                wall_recon = whole_wall_gap_from_partitions(q_part, l_part)
+                wall_recon["metric_identity"] = recon["metric_identity"]
         return {
             "regrouped": grouped,
             "reconciliation": recon,
+            "wall_reconciliation": wall_recon,
             "quartz_window_ms": q_wall,
             "llama_window_ms": l_wall,
         }
@@ -1525,6 +1534,13 @@ def write_report(payload: Mapping[str, Any]) -> None:
             "",
             "Unsupported counters leave causal explanation explicitly unknown.",
             "Missing trace coverage is blocked. Shipping throughput delta is N/A.",
+            "",
+            "## Whole-wall residual",
+            "",
+            "OPT-138 family-sum gap reconstruction left ~23% decode / ~5.9% prefill",
+            "unexplained. OPT-142 classifies that remainder with unions; see",
+            "`evidence/optimization/opt142-wall-reconciliation/REPORT.md`.",
+            "Family rankings stay separately qualified until that reconciliation.",
             "",
         ]
     )

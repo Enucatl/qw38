@@ -1,0 +1,12 @@
+{
+  "nll": "N/A",
+  "throughput_shipping_delta": "N/A",
+  "blocked": false,
+  "missing_observation": null,
+  "quartz_failures": [],
+  "unresolved_limit": 0.05,
+  "whole_wall_ranking_complete": true,
+  "family_rankings_separately_qualified": true,
+  "no_proportional_allocation": true,
+  "no_production_scheduling_change": true
+}

@@ -1,0 +1,152 @@
+{
+  "schema_version": 1,
+  "task": "OPT-142",
+  "yardstick": "whole_wall_profiling_residual_reconciliation",
+  "claims_throughput": false,
+  "claims_performance_improvement": false,
+  "require_candidate_nll": false,
+  "opt074_family_admission_required": false,
+  "opt074_coverage_unadmitted_is_blocker": false,
+  "performance_admission": {
+    "enabled": true,
+    "instrumentation_only": true
+  },
+  "image": "qw38-cuda:13.0.2",
+  "model": "models/Qwen3.8-27B-Q4_K_M.gguf",
+  "gpu_lock": "build/optimization-runs/qw38-gpu.lock",
+  "aggregate_deadline_s": 7200,
+  "target": "tools/opt142_wall_reconciliation.py",
+  "diagnostics_make_target": "cuda-opt142-diagnostics",
+  "selector": "decode_segments8",
+  "case_ids": ["preflight", "reproduce", "reconcile", "report"],
+  "modes": {
+    "feedback": {
+      "target": "tools/opt142_wall_reconciliation.py",
+      "tier_sequence": ["preflight", "reproduce", "reconcile"],
+      "make_targets": [
+        "build/qw38-cuda-opt136-matched-decode-profile-test"
+      ],
+      "build_once": true,
+      "warm_repetitions": 0,
+      "aggregate_deadline_s": 7200,
+      "workloads": ["preflight", "reproduce", "reconcile"]
+    },
+    "acceptance": {
+      "target": "tools/opt142_wall_reconciliation.py",
+      "tier_sequence": ["preflight", "reproduce", "reconcile", "report"],
+      "make_targets": [
+        "build/qw38-cuda-opt136-matched-decode-profile-test"
+      ],
+      "warm_repetitions": 0,
+      "aggregate_deadline_s": 7200,
+      "workloads": ["preflight", "reproduce", "reconcile", "report"]
+    },
+    "release": {
+      "target": "tools/opt142_wall_reconciliation.py",
+      "tier": "acceptance",
+      "make_targets": [
+        "build/qw38-cuda-opt136-matched-decode-profile-test"
+      ],
+      "skip_compile": false,
+      "historical_oracles": false,
+      "aggregate_deadline_s": 7200,
+      "workloads": []
+    }
+  },
+  "workloads": {
+    "preflight": {
+      "target": "tools/opt142_wall_reconciliation.py",
+      "tier": "correctness",
+      "runner": "host",
+      "kind": "opt138_trace_identity",
+      "cases": 1,
+      "candidates": 1,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 1,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 0,
+      "reference": 1,
+      "gpu_work": false,
+      "args": [
+        "uv", "run", "python", "tools/opt142_wall_reconciliation.py",
+        "--phase", "preflight", "--mode", "{mode}", "--run-dir", "{run_dir}"
+      ]
+    },
+    "reproduce": {
+      "target": "tools/opt142_wall_reconciliation.py",
+      "tier": "correctness",
+      "runner": "host",
+      "kind": "raw_interval_reproduction",
+      "cases": 2,
+      "candidates": 1,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 1,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 0,
+      "reference": 1,
+      "gpu_work": false,
+      "args": [
+        "uv", "run", "python", "tools/opt142_wall_reconciliation.py",
+        "--phase", "reproduce", "--mode", "{mode}", "--run-dir", "{run_dir}"
+      ]
+    },
+    "reconcile": {
+      "target": "tools/opt142_wall_reconciliation.py",
+      "tier": "correctness",
+      "runner": "host",
+      "kind": "per_window_wall_reconciliation",
+      "cases": 7,
+      "candidates": 1,
+      "warmups": 0,
+      "samples": 3,
+      "tokens": 1,
+      "prefixes": [128, 2048],
+      "prefill_tokens": 4096,
+      "windows": ["early", "middle", "late", "prefill"],
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 0,
+      "reference": 1,
+      "gpu_work": false,
+      "args": [
+        "uv", "run", "python", "tools/opt142_wall_reconciliation.py",
+        "--phase", "reconcile", "--mode", "{mode}", "--run-dir", "{run_dir}"
+      ]
+    },
+    "report": {
+      "target": "tools/opt142_wall_reconciliation.py",
+      "tier": "correctness",
+      "runner": "host",
+      "kind": "host_only_wall_report",
+      "cases": 1,
+      "candidates": 1,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 1,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 0,
+      "reference": 1,
+      "gpu_work": false,
+      "args": [
+        "uv", "run", "python", "tools/opt142_wall_reconciliation.py",
+        "--phase", "report", "--mode", "{mode}", "--run-dir", "{run_dir}"
+      ]
+    }
+  },
+  "proof_limit": [
+    "diagnostics only",
+    "no production selector or scheduling change",
+    "instrumentation-only: no speed keep",
+    "historical oracles none",
+    "claims_throughput=false",
+    "NLL N/A",
+    "D128/D2048 windows plus P4096",
+    "reuse authenticated OPT-138 traces"
+  ],
+  "report_path": "evidence/optimization/opt142-wall-reconciliation/REPORT.md"
+}

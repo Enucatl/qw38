@@ -33,3 +33,13 @@ status=`measured` blocked=`False`
 
 Unsupported counters leave causal explanation explicitly unknown.
 Missing trace coverage is blocked. Shipping throughput delta is N/A.
+
+## Whole-wall residual (OPT-142 follow-up)
+
+OPT-138 family-sum gap reconstruction left ~23% decode / ~5.9% prefill
+unexplained because overlapping llama families were summed and host-exclusive
+CUDA APIs were recorded as 0. OPT-142 reuses these captures and partitions
+each Quartz wall with interval unions. Maximum Quartz unresolved share across
+required D128/D2048 windows and P4096 is 0.27%. See
+[`evidence/optimization/opt142-wall-reconciliation/REPORT.md`](../opt142-wall-reconciliation/REPORT.md).
+Family rankings above remain separately qualified.

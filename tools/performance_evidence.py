@@ -50,6 +50,7 @@ NSYS_CUPTI_SCHEMA_NS: dict[str, dict[str, str]] = {
     "CUPTI_ACTIVITY_KIND_OVERHEAD": {"start": "ns", "end": "ns"},
     "CUPTI_ACTIVITY_KIND_CUDA_EVENT": {"start": "ns", "end": "ns"},
     "NVTX_EVENTS": {"start": "ns", "end": "ns", "endNs": "ns", "startNs": "ns"},
+    "PROFILER_OVERHEAD": {"start": "ns", "end": "ns"},
 }
 
 KERNEL_TABLES = ("CUPTI_ACTIVITY_KIND_KERNEL",)
@@ -64,6 +65,23 @@ CPU_API_TABLES = (
     "CUPTI_ACTIVITY_KIND_DRIVER",
     "CUPTI_ACTIVITY_KIND_SYNCHRONIZATION",
 )
+OVERHEAD_TABLES = (
+    "CUPTI_ACTIVITY_KIND_OVERHEAD",
+    "PROFILER_OVERHEAD",
+)
+WINDOW_MARKER_NAMES = (
+    "opt136.window",
+    "opt133.window",
+    "opt138.prefill",
+    "window",
+)
+PREFILL_NVTX_NAMES = ("opt138.prefill", "qw38.prefill_chunk")
+SYNC_TYPE_NAMES = {
+    1: "cudaEventSynchronize",
+    2: "cudaStreamWaitEvent",
+    3: "cudaStreamSynchronize",
+    4: "cudaDeviceSynchronize",
+}
 
 T_CRIT_DF2_ONE_SIDED = 2.919985580355516
 T_CRIT_DF2_TWO_SIDED = 4.302652729696142
@@ -219,6 +237,7 @@ class TraceTables:
     nodes: list[Interval] = field(default_factory=list)
     cpu_apis: list[Interval] = field(default_factory=list)
     nvtx: list[Interval] = field(default_factory=list)
+    overhead: list[Interval] = field(default_factory=list)
     table_counts: dict[str, int] = field(default_factory=dict)
     errors: list[str] = field(default_factory=list)
     drops: int = 0
@@ -282,6 +301,33 @@ def uncovered_ns(
 ) -> int:
     window = max(0, window_end - window_start)
     return max(0, window - union_ns(covered))
+
+
+def overlap_union_ns(left: Sequence[Interval], right: Sequence[Interval]) -> int:
+    """Disjoint overlap of two unions. Summing concurrent CPU+GPU is forbidden."""
+    return union_ns(left) + union_ns(right) - union_ns(list(left) + list(right))
+
+
+def exclusive_union_ns(left: Sequence[Interval], right: Sequence[Interval]) -> int:
+    """Duration in union(left) that does not overlap union(right)."""
+    return max(0, union_ns(left) - overlap_union_ns(left, right))
+
+
+def classify_host_api(name: str) -> str:
+    lowered = name.casefold()
+    if "launch" in lowered or "graphlaunch" in lowered:
+        return "launch"
+    if (
+        "synchron" in lowered
+        or "waitevent" in lowered
+        or lowered.startswith("cupti_sync")
+    ):
+        return "sync"
+    if "memcpy" in lowered:
+        return "memcpy_api"
+    if not lowered:
+        return "unnamed_api"
+    return "other_api"
 
 
 def first_last_span_ns(intervals: Sequence[Interval]) -> int:
@@ -520,9 +566,11 @@ def _read_activity_rows(
         "Name",
         "demangledName",
         "shortName",
+        "nameId",
         "valueId",
         "text",
         "eventType",
+        "syncType",
     )
     stream_col = _pick(columns, "streamId", "stream", "streamIndex")
     device_col = _pick(columns, "deviceId", "device")
@@ -571,6 +619,8 @@ def _read_activity_rows(
         raw_name = row[3]
         if isinstance(raw_name, int) and raw_name in strings:
             name = strings[raw_name]
+        elif table.endswith("SYNCHRONIZATION") and isinstance(raw_name, int):
+            name = SYNC_TYPE_NAMES.get(raw_name, f"cupti_sync_{raw_name}")
         else:
             name = "" if raw_name is None else str(raw_name)
         family = (
@@ -640,6 +690,13 @@ def parse_nsys_sqlite(path: Path | str) -> TraceTables:
             parsed.cpu_apis.extend(rows)
             parsed.errors.extend(errors)
             parsed.drops += drops
+        for table in OVERHEAD_TABLES:
+            rows, errors, drops = _read_activity_rows(
+                conn, table, schema, kind="overhead", strings=strings
+            )
+            parsed.overhead.extend(rows)
+            parsed.errors.extend(errors)
+            parsed.drops += drops
         if "NVTX_EVENTS" in tables:
             rows, errors, drops = _read_activity_rows(
                 conn, "NVTX_EVENTS", schema, kind="nvtx", strings=strings
@@ -661,13 +718,90 @@ def parse_nsys_sqlite(path: Path | str) -> TraceTables:
 def marker_window(
     nvtx: Sequence[Interval],
     *,
-    names: Sequence[str] = ("opt136.window", "opt133.window", "window"),
+    names: Sequence[str] = WINDOW_MARKER_NAMES,
 ) -> tuple[int, int] | None:
     wanted = {name.casefold() for name in names}
     matches = [item for item in nvtx if item.name.casefold() in wanted]
     if not matches:
         return None
     return min(item.start_ns for item in matches), max(item.end_ns for item in matches)
+
+
+def eval_or_prefill_nvtx_window(
+    nvtx: Sequence[Interval],
+) -> tuple[int, int] | None:
+    """Window from in-capture eval/prefill NVTX when envelope markers are absent.
+
+    `opt136.window` / `opt138.prefill` are pushed before cudaProfilerStart, so
+    nsys cudaProfilerApi captures omit them. The 12 decode eval ranges and
+    `qw38.prefill_chunk` remain inside the capture.
+    """
+    evals = [
+        item
+        for item in nvtx
+        if "op=eval" in item.name.casefold()
+        or item.name.casefold().startswith("opt136 engine=")
+    ]
+    if evals:
+        return min(item.start_ns for item in evals), max(item.end_ns for item in evals)
+    prefill = [item for item in nvtx if item.name.casefold() in PREFILL_NVTX_NAMES]
+    if prefill:
+        return (
+            min(item.start_ns for item in prefill),
+            max(item.end_ns for item in prefill),
+        )
+    return None
+
+
+def resolve_capture_window(
+    tables: TraceTables,
+    *,
+    window_start_ns: int | None = None,
+    window_end_ns: int | None = None,
+) -> dict[str, Any]:
+    if window_start_ns is not None and window_end_ns is not None:
+        return {
+            "window_start_ns": int(window_start_ns),
+            "window_end_ns": int(window_end_ns),
+            "source": "explicit",
+            "missing_observation": None,
+        }
+    marker = marker_window(tables.nvtx)
+    if marker is not None:
+        return {
+            "window_start_ns": marker[0],
+            "window_end_ns": marker[1],
+            "source": "nvtx_marker",
+            "missing_observation": None,
+        }
+    eval_window = eval_or_prefill_nvtx_window(tables.nvtx)
+    if eval_window is not None:
+        return {
+            "window_start_ns": eval_window[0],
+            "window_end_ns": eval_window[1],
+            "source": "eval_or_prefill_nvtx",
+            "missing_observation": (
+                "opt136.window/opt138.prefill envelopes are outside "
+                "cudaProfilerApi; used in-capture eval/prefill NVTX"
+            ),
+        }
+    gpu_all = tables.kernels + tables.copies + tables.graphs
+    if gpu_all:
+        return {
+            "window_start_ns": min(item.start_ns for item in gpu_all),
+            "window_end_ns": max(item.end_ns for item in gpu_all),
+            "source": "gpu_span_fallback",
+            "missing_observation": (
+                "NVTX window markers absent; host time before the first and "
+                "after the last GPU interval is unobservable"
+            ),
+        }
+    return {
+        "window_start_ns": 0,
+        "window_end_ns": 0,
+        "source": "empty",
+        "missing_observation": "no NVTX markers and no GPU intervals",
+    }
 
 
 def graph_exclusive_without_leaves(
@@ -701,6 +835,219 @@ def graph_exclusive_without_leaves(
                 )
             )
     return exclusive
+
+
+def _ms(value_ns: int) -> float:
+    return float(value_ns) / NS_PER_MS
+
+
+def family_union_sum_ns(leaves: Sequence[Interval]) -> tuple[int, dict[str, int]]:
+    grouped: dict[str, list[Interval]] = {}
+    for item in leaves:
+        grouped.setdefault(item.family, []).append(item)
+    per_family = {name: union_ns(items) for name, items in grouped.items()}
+    return sum(per_family.values()), per_family
+
+
+def reconcile_window_wall(
+    tables: TraceTables,
+    *,
+    window_start_ns: int,
+    window_end_ns: int,
+    window_source: str | None = None,
+    missing_observation: str | None = None,
+    profiler_perturbation: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Partition one wall window with unions. CPU overlapping GPU is not additive.
+
+    Remaining process-scoped gaps are unresolved, not proven device-wide idle.
+    Family-sum minus GPU union is bookkeeping, not extra wall.
+    """
+    window = max(0, int(window_end_ns) - int(window_start_ns))
+    kernels = clip_all(tables.kernels, window_start_ns, window_end_ns)
+    copies = clip_all(tables.copies, window_start_ns, window_end_ns)
+    graphs = clip_all(tables.graphs, window_start_ns, window_end_ns)
+    nodes = clip_all(tables.nodes, window_start_ns, window_end_ns)
+    cpu = clip_all(tables.cpu_apis, window_start_ns, window_end_ns)
+    overhead = clip_all(tables.overhead, window_start_ns, window_end_ns)
+    leaves = kernels + copies
+    gpu = leaves + graphs
+    gpu_union = union_ns(gpu)
+    kernel_copy_union = union_ns(leaves)
+    graph_union = union_ns(graphs)
+    graph_excl = union_ns(graph_exclusive_without_leaves(graphs, leaves))
+    launches = [item for item in cpu if classify_host_api(item.name) == "launch"]
+    syncs = [item for item in cpu if classify_host_api(item.name) == "sync"]
+    memcpy_apis = [item for item in cpu if classify_host_api(item.name) == "memcpy_api"]
+    other_apis = [
+        item
+        for item in cpu
+        if classify_host_api(item.name) not in {"launch", "sync", "memcpy_api"}
+    ]
+    host_exclusive = exclusive_union_ns(cpu, gpu)
+    host_launch_exclusive = exclusive_union_ns(launches, gpu)
+    host_sync_exclusive = exclusive_union_ns(syncs, gpu)
+    host_memcpy_exclusive = exclusive_union_ns(memcpy_apis, gpu)
+    host_other_exclusive = exclusive_union_ns(other_apis, gpu)
+    cpu_gpu_overlap = overlap_union_ns(cpu, gpu)
+    remaining = uncovered_ns(window_start_ns, window_end_ns, gpu + cpu)
+    instrumentation_exclusive = exclusive_union_ns(overhead, gpu + cpu)
+    unresolved_gap = max(0, remaining - instrumentation_exclusive)
+    accounted = gpu_union + host_exclusive + instrumentation_exclusive + unresolved_gap
+    conservation_delta = window - accounted
+    family_sum, per_family = family_union_sum_ns(leaves)
+    family_overlap = max(0, family_sum - kernel_copy_union)
+    perturbation = dict(profiler_perturbation or {})
+    overhead_union = union_ns(overhead)
+    relative_overhead = (instrumentation_exclusive / window) if window else None
+    median_rel = perturbation.get("median_relative_perturbation")
+    if median_rel is None:
+        median_rel = relative_overhead
+        perturbation["median_relative_perturbation"] = relative_overhead
+        perturbation["source"] = perturbation.get("source") or "profiler_overhead_union"
+    perturbed = bool(median_rel is not None and abs(float(median_rel)) > 0.05)
+    unresolved_share = (unresolved_gap / window) if window else None
+    within_limit = (
+        unresolved_share is not None and unresolved_share <= RESIDUAL_WALL_LIMIT
+    )
+    buckets = [
+        {
+            "label": "gpu_union",
+            "ns": gpu_union,
+            "ms": _ms(gpu_union),
+            "classification": "recovered",
+            "evidence": (
+                "union(CUPTI kernel+memcpy+graph); graph parents not added on "
+                "top of children"
+            ),
+        },
+        {
+            "label": "graph_exclusive_without_leaves",
+            "ns": graph_excl,
+            "ms": _ms(graph_excl),
+            "classification": "recovered",
+            "evidence": "graph envelope minus overlapping kernel/copy leaves",
+        },
+        {
+            "label": "host_launch_exclusive",
+            "ns": host_launch_exclusive,
+            "ms": _ms(host_launch_exclusive),
+            "classification": "recovered",
+            "evidence": "cudaLaunch/graphLaunch APIs exclusive of GPU union",
+        },
+        {
+            "label": "host_sync_exclusive",
+            "ns": host_sync_exclusive,
+            "ms": _ms(host_sync_exclusive),
+            "classification": "recovered",
+            "evidence": (
+                "synchronization APIs exclusive of GPU union; overlapping "
+                "cudaEventSynchronize is wait, not added GPU wall"
+            ),
+        },
+        {
+            "label": "host_memcpy_api_exclusive",
+            "ns": host_memcpy_exclusive,
+            "ms": _ms(host_memcpy_exclusive),
+            "classification": "recovered",
+            "evidence": "host memcpy APIs exclusive of GPU union",
+        },
+        {
+            "label": "host_other_api_exclusive",
+            "ns": host_other_exclusive,
+            "ms": _ms(host_other_exclusive),
+            "classification": "recovered",
+            "evidence": "other CUDA runtime/driver APIs exclusive of GPU union",
+        },
+        {
+            "label": "host_exclusive_total",
+            "ns": host_exclusive,
+            "ms": _ms(host_exclusive),
+            "classification": "recovered",
+            "evidence": "union(CPU APIs) minus overlap with GPU union",
+        },
+        {
+            "label": "instrumentation_exclusive",
+            "ns": instrumentation_exclusive,
+            "ms": _ms(instrumentation_exclusive),
+            "classification": "recovered",
+            "evidence": (
+                "PROFILER_OVERHEAD/CUPTI overhead exclusive of GPU and host APIs"
+            ),
+        },
+        {
+            "label": "unresolved_process_gap",
+            "ns": unresolved_gap,
+            "ms": _ms(unresolved_gap),
+            "classification": "unresolved",
+            "evidence": (
+                "process-scoped gap with neither GPU nor host API coverage; "
+                "not proven device-wide idle"
+            ),
+        },
+        {
+            "label": "family_sum_overlap_bookkeeping",
+            "ns": family_overlap,
+            "ms": _ms(family_overlap),
+            "classification": "bookkeeping",
+            "evidence": (
+                "sum of per-family GPU unions minus leaf GPU union; concurrent "
+                "families are not extra wall"
+            ),
+        },
+    ]
+    missing = missing_observation
+    if window_source == "gpu_span_fallback" and not missing:
+        missing = (
+            "NVTX window markers absent; host time before the first and after "
+            "the last GPU interval is unobservable"
+        )
+    return {
+        "window_start_ns": int(window_start_ns),
+        "window_end_ns": int(window_end_ns),
+        "window_ns": window,
+        "window_ms": _ms(window),
+        "window_source": window_source,
+        "gpu_union_ns": gpu_union,
+        "gpu_union_ms": _ms(gpu_union),
+        "kernel_copy_union_ns": kernel_copy_union,
+        "graph_envelope_union_ns": graph_union,
+        "graph_exclusive_without_leaf_ns": graph_excl,
+        "host_exclusive_ns": host_exclusive,
+        "host_exclusive_ms": _ms(host_exclusive),
+        "host_launch_exclusive_ns": host_launch_exclusive,
+        "host_sync_exclusive_ns": host_sync_exclusive,
+        "cpu_gpu_overlap_ns": cpu_gpu_overlap,
+        "cpu_api_union_ns": union_ns(cpu),
+        "instrumentation_union_ns": overhead_union,
+        "instrumentation_exclusive_ns": instrumentation_exclusive,
+        "instrumentation_overlap_gpu_or_host_ns": max(
+            0, overhead_union - instrumentation_exclusive
+        ),
+        "unresolved_ns": unresolved_gap,
+        "unresolved_ms": _ms(unresolved_gap),
+        "unresolved_share_of_wall": unresolved_share,
+        "accounted_ns": accounted,
+        "conservation_delta_ns": conservation_delta,
+        "conservation_ok": abs(conservation_delta) <= conservation_tolerance_ns(window),
+        "family_union_sum_ns": family_sum,
+        "family_overlap_ns": family_overlap,
+        "family_union_ns": per_family,
+        "observed_graph_launches": len(graphs),
+        "observed_node_count": len(nodes),
+        "observed_kernel_count": len(kernels),
+        "buckets": buckets,
+        "profiler_perturbation": perturbation,
+        "perturbed": perturbed,
+        "within_unresolved_limit": within_limit,
+        "residual_limit": RESIDUAL_WALL_LIMIT,
+        "missing_observation": missing,
+        "claim_type": "derived",
+        "parent_child_not_double_counted": True,
+        "cpu_overlapping_gpu_not_additive": True,
+        "process_scoped_gaps_are_not_device_wide_idle": True,
+        "no_proportional_allocation": True,
+    }
 
 
 def identities_match(
@@ -1251,6 +1598,51 @@ def reconcile_whole_gap(
     }
 
 
+def whole_wall_gap_from_partitions(
+    quartz: Mapping[str, Any],
+    llama: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Q-L wall gap from disjoint partitions, not summed family deltas."""
+    q_wall = float(quartz.get("window_ms") or 0.0)
+    l_wall = float(llama.get("window_ms") or 0.0)
+    gpu_gap = float(quartz.get("gpu_union_ms") or 0.0) - float(
+        llama.get("gpu_union_ms") or 0.0
+    )
+    host_gap = float(quartz.get("host_exclusive_ms") or 0.0) - float(
+        llama.get("host_exclusive_ms") or 0.0
+    )
+    q_instr = _ms(int(quartz.get("instrumentation_exclusive_ns") or 0))
+    l_instr = _ms(int(llama.get("instrumentation_exclusive_ns") or 0))
+    q_unresolved = float(quartz.get("unresolved_ms") or 0.0)
+    l_unresolved = float(llama.get("unresolved_ms") or 0.0)
+    reconstructed = (
+        gpu_gap + host_gap + (q_instr - l_instr) + (q_unresolved - l_unresolved)
+    )
+    observed = q_wall - l_wall
+    residual = observed - reconstructed
+    limit = RESIDUAL_WALL_LIMIT * q_wall if q_wall else 0.0
+    return {
+        "quartz_wall_ms": q_wall,
+        "llama_wall_ms": l_wall,
+        "observed_gap_ms": observed,
+        "gpu_union_gap_ms": gpu_gap,
+        "host_exclusive_gap_ms": host_gap,
+        "instrumentation_exclusive_gap_ms": q_instr - l_instr,
+        "unresolved_gap_ms": q_unresolved - l_unresolved,
+        "reconstructed_gap_ms": reconstructed,
+        "absolute_residual_ms": residual,
+        "residual_limit_ms": limit,
+        "residual_share_of_quartz_wall": abs(residual) / q_wall if q_wall else None,
+        "ranking_complete": abs(residual) <= limit,
+        "method": "disjoint_gpu_union_plus_host_exclusive_plus_unresolved",
+        "no_proportional_allocation": True,
+        "family_overlap_bookkeeping_ms": {
+            "quartz": _ms(int(quartz.get("family_overlap_ns") or 0)),
+            "llama": _ms(int(llama.get("family_overlap_ns") or 0)),
+        },
+    }
+
+
 def _positive_lower_bound(deltas: Sequence[float]) -> dict[str, Any]:
     stats = family_excess_significant(list(deltas))
     return {
@@ -1487,25 +1879,28 @@ def audit_window_from_tables(
     expected_graph_launches: int | None = None,
     identity: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
-    gpu_all = tables.kernels + tables.copies + tables.graphs
-    if window_start_ns is None or window_end_ns is None:
-        marker = marker_window(tables.nvtx)
-        if marker is not None:
-            window_start_ns, window_end_ns = marker
-        elif gpu_all:
-            # Historical OPT-133 traces may lack window markers. Span is reported
-            # separately and must not be used as the coverage window length.
-            window_start_ns = min(item.start_ns for item in gpu_all)
-            window_end_ns = max(item.end_ns for item in gpu_all)
-        else:
-            window_start_ns = 0
-            window_end_ns = 0
+    resolved = resolve_capture_window(
+        tables,
+        window_start_ns=window_start_ns,
+        window_end_ns=window_end_ns,
+    )
+    window_start_ns = int(resolved["window_start_ns"])
+    window_end_ns = int(resolved["window_end_ns"])
     row = coverage_row(
         tables,
         identity=identity or default_identity(),
-        window_start_ns=int(window_start_ns),
-        window_end_ns=int(window_end_ns),
+        window_start_ns=window_start_ns,
+        window_end_ns=window_end_ns,
         expected_graph_launches=expected_graph_launches,
+    )
+    row["window_source"] = resolved.get("source")
+    row["window_missing_observation"] = resolved.get("missing_observation")
+    row["wall_reconciliation"] = reconcile_window_wall(
+        tables,
+        window_start_ns=window_start_ns,
+        window_end_ns=window_end_ns,
+        window_source=str(resolved.get("source") or ""),
+        missing_observation=resolved.get("missing_observation"),
     )
     row["sql"] = {
         "kernel": "SELECT start, end FROM CUPTI_ACTIVITY_KIND_KERNEL",

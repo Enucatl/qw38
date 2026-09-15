@@ -1,0 +1,2895 @@
+{
+  "schema_version": 1,
+  "task": "OPT-142",
+  "phase": "reproduce",
+  "mode": "acceptance",
+  "ok": true,
+  "note": "Reproduced D2048 middle and P4096 from retained OPT-138 sqlite before using the new wall partition as the acceptance equation.",
+  "windows": [
+    {
+      "kind": "decode",
+      "prefix": 2048,
+      "window": "middle",
+      "rep": 0,
+      "quartz": {
+        "path": "build/optimization-runs/opt138/traces/quartz-d2048-node-r0.2.sqlite",
+        "coverage": {
+          "identity": {
+            "engine": "quartz",
+            "metric": "decode_only",
+            "prefix": 2048,
+            "eval_count": 12,
+            "allocated_capacity": 131072,
+            "populated_length": 2048,
+            "graph_mode": "decode_segments8",
+            "output_boundary": "eval_logits_no_host_materialize",
+            "capture_arm": "node",
+            "device": 0,
+            "context": 0,
+            "process": 1
+          },
+          "window_start_ns": 26159235,
+          "window_end_ns": 272414821,
+          "window_ns": 246255586,
+          "window_ms": 246.255586,
+          "tables": {
+            "ANALYSIS_DETAILS": {
+              "count": 1,
+              "unit": null
+            },
+            "ANALYSIS_FILE": {
+              "count": 2,
+              "unit": null
+            },
+            "CUDA_GRAPH_NODE_EVENTS": {
+              "count": 16567,
+              "unit": null
+            },
+            "CUPTI_ACTIVITY_KIND_CUDA_EVENT": {
+              "count": 36,
+              "unit": "ns"
+            },
+            "CUPTI_ACTIVITY_KIND_KERNEL": {
+              "count": 11808,
+              "unit": "ns"
+            },
+            "CUPTI_ACTIVITY_KIND_MEMCPY": {
+              "count": 84,
+              "unit": "ns"
+            },
+            "CUPTI_ACTIVITY_KIND_RUNTIME": {
+              "count": 481,
+              "unit": "ns"
+            },
+            "CUPTI_ACTIVITY_KIND_SYNCHRONIZATION": {
+              "count": 50,
+              "unit": "ns"
+            },
+            "DIAGNOSTIC_EVENT": {
+              "count": 12,
+              "unit": null
+            },
+            "ENUM_CUDA_DEV_MEM_EVENT_OPER": {
+              "count": 2,
+              "unit": null
+            },
+            "ENUM_CUDA_FUNC_CACHE_CONFIG": {
+              "count": 4,
+              "unit": null
+            },
+            "ENUM_CUDA_KERNEL_LAUNCH_TYPE": {
+              "count": 4,
+              "unit": null
+            },
+            "ENUM_CUDA_MEMCPY_OPER": {
+              "count": 14,
+              "unit": null
+            },
+            "ENUM_CUDA_MEMPOOL_OPER": {
+              "count": 4,
+              "unit": null
+            },
+            "ENUM_CUDA_MEMPOOL_TYPE": {
+              "count": 3,
+              "unit": null
+            },
+            "ENUM_CUDA_MEM_KIND": {
+              "count": 8,
+              "unit": null
+            },
+            "ENUM_CUDA_SHARED_MEM_LIMIT_CONFIG": {
+              "count": 2,
+              "unit": null
+            },
+            "ENUM_CUDA_UNIF_MEM_ACCESS_TYPE": {
+              "count": 5,
+              "unit": null
+            },
+            "ENUM_CUDA_UNIF_MEM_MIGRATION": {
+              "count": 6,
+              "unit": null
+            },
+            "ENUM_CUPTI_STREAM_TYPE": {
+              "count": 4,
+              "unit": null
+            },
+            "ENUM_CUPTI_SYNC_TYPE": {
+              "count": 5,
+              "unit": null
+            },
+            "ENUM_DIAGNOSTIC_SEVERITY_LEVEL": {
+              "count": 5,
+              "unit": null
+            },
+            "ENUM_DIAGNOSTIC_SOURCE_TYPE": {
+              "count": 4,
+              "unit": null
+            },
+            "ENUM_DIAGNOSTIC_TIMESTAMP_SOURCE": {
+              "count": 3,
+              "unit": null
+            },
+            "ENUM_NSYS_EVENT_CLASS": {
+              "count": 89,
+              "unit": null
+            },
+            "ENUM_NSYS_EVENT_TYPE": {
+              "count": 150,
+              "unit": null
+            },
+            "ENUM_NSYS_GENERIC_EVENT_FIELD_ETW_FLAGS": {
+              "count": 7,
+              "unit": null
+            },
+            "ENUM_NSYS_GENERIC_EVENT_FIELD_ETW_PROPERTY": {
+              "count": 8,
+              "unit": null
+            },
+            "ENUM_NSYS_GENERIC_EVENT_FIELD_ETW_TYPE": {
+              "count": 22,
+              "unit": null
+            },
+            "ENUM_NSYS_GENERIC_EVENT_FIELD_TYPE": {
+              "count": 4,
+              "unit": null
+            },
+            "ENUM_NSYS_GENERIC_EVENT_GROUP": {
+              "count": 5,
+              "unit": null
+            },
+            "ENUM_NSYS_GENERIC_EVENT_SOURCE": {
+              "count": 4,
+              "unit": null
+            },
+            "ENUM_SAMPLING_THREAD_STATE": {
+              "count": 11,
+              "unit": null
+            },
+            "ENUM_SCHEDULING_THREAD_BLOCK": {
+              "count": 53,
+              "unit": null
+            },
+            "ENUM_STACK_UNWIND_METHOD": {
+              "count": 10,
+              "unit": null
+            },
+            "META_DATA_CAPTURE": {
+              "count": 134,
+              "unit": null
+            },
+            "META_DATA_EXPORT": {
+              "count": 29,
+              "unit": null
+            },
+            "NVTX_EVENTS": {
+              "count": 168,
+              "unit": "ns"
+            },
+            "OSRT_API": {
+              "count": 27,
+              "unit": null
+            },
+            "OSRT_CALLCHAINS": {
+              "count": 133,
+              "unit": null
+            },
+            "PROCESSES": {
+              "count": 5,
+              "unit": null
+            },
+            "PROFILER_OVERHEAD": {
+              "count": 7,
+              "unit": "ns"
+            },
+            "ProcessStreams": {
+              "count": 2,
+              "unit": null
+            },
+            "StringIds": {
+              "count": 175,
+              "unit": null
+            },
+            "TARGET_INFO_CUDA_CONTEXT_INFO": {
+              "count": 1,
+              "unit": null
+            },
+            "TARGET_INFO_CUDA_DEVICE": {
+              "count": 1,
+              "unit": null
+            },
+            "TARGET_INFO_CUDA_STREAM": {
+              "count": 114,
+              "unit": null
+            },
+            "TARGET_INFO_GPU": {
+              "count": 1,
+              "unit": null
+            },
+            "TARGET_INFO_SESSION_START_TIME": {
+              "count": 1,
+              "unit": null
+            },
+            "TARGET_INFO_SYSTEM_ENV": {
+              "count": 71,
+              "unit": null
+            },
+            "ThreadNames": {
+              "count": 28,
+              "unit": null
+            }
+          },
+          "table_names": [
+            "ANALYSIS_DETAILS",
+            "ANALYSIS_FILE",
+            "CUDA_GRAPH_NODE_EVENTS",
+            "CUPTI_ACTIVITY_KIND_CUDA_EVENT",
+            "CUPTI_ACTIVITY_KIND_KERNEL",
+            "CUPTI_ACTIVITY_KIND_MEMCPY",
+            "CUPTI_ACTIVITY_KIND_RUNTIME",
+            "CUPTI_ACTIVITY_KIND_SYNCHRONIZATION",
+            "DIAGNOSTIC_EVENT",
+            "ENUM_CUDA_DEV_MEM_EVENT_OPER",
+            "ENUM_CUDA_FUNC_CACHE_CONFIG",
+            "ENUM_CUDA_KERNEL_LAUNCH_TYPE",
+            "ENUM_CUDA_MEMCPY_OPER",
+            "ENUM_CUDA_MEMPOOL_OPER",
+            "ENUM_CUDA_MEMPOOL_TYPE",
+            "ENUM_CUDA_MEM_KIND",
+            "ENUM_CUDA_SHARED_MEM_LIMIT_CONFIG",
+            "ENUM_CUDA_UNIF_MEM_ACCESS_TYPE",
+            "ENUM_CUDA_UNIF_MEM_MIGRATION",
+            "ENUM_CUPTI_STREAM_TYPE",
+            "ENUM_CUPTI_SYNC_TYPE",
+            "ENUM_DIAGNOSTIC_SEVERITY_LEVEL",
+            "ENUM_DIAGNOSTIC_SOURCE_TYPE",
+            "ENUM_DIAGNOSTIC_TIMESTAMP_SOURCE",
+            "ENUM_NSYS_EVENT_CLASS",
+            "ENUM_NSYS_EVENT_TYPE",
+            "ENUM_NSYS_GENERIC_EVENT_FIELD_ETW_FLAGS",
+            "ENUM_NSYS_GENERIC_EVENT_FIELD_ETW_PROPERTY",
+            "ENUM_NSYS_GENERIC_EVENT_FIELD_ETW_TYPE",
+            "ENUM_NSYS_GENERIC_EVENT_FIELD_TYPE",
+            "ENUM_NSYS_GENERIC_EVENT_GROUP",
+            "ENUM_NSYS_GENERIC_EVENT_SOURCE",
+            "ENUM_SAMPLING_THREAD_STATE",
+            "ENUM_SCHEDULING_THREAD_BLOCK",
+            "ENUM_STACK_UNWIND_METHOD",
+            "META_DATA_CAPTURE",
+            "META_DATA_EXPORT",
+            "NVTX_EVENTS",
+            "OSRT_API",
+            "OSRT_CALLCHAINS",
+            "PROCESSES",
+            "PROFILER_OVERHEAD",
+            "ProcessStreams",
+            "StringIds",
+            "TARGET_INFO_CUDA_CONTEXT_INFO",
+            "TARGET_INFO_CUDA_DEVICE",
+            "TARGET_INFO_CUDA_STREAM",
+            "TARGET_INFO_GPU",
+            "TARGET_INFO_SESSION_START_TIME",
+            "TARGET_INFO_SYSTEM_ENV",
+            "ThreadNames"
+          ],
+          "expected_graph_launches": null,
+          "observed_graph_launches": 0,
+          "observed_kernel_count": 11808,
+          "observed_copy_count": 84,
+          "observed_node_count": 11724,
+          "parent_node_correspondence": {
+            "graph_launches": 0,
+            "expanded_nodes": 11724,
+            "expected_nodes": null,
+            "matched": true
+          },
+          "drops": 0,
+          "errors": [],
+          "kernel_copy_union_ns": 238576647,
+          "graph_envelope_union_ns": 0,
+          "combined_union_ns": 238576647,
+          "graph_exclusive_without_leaf_ns": 0,
+          "time_outside_all_activity_ns": 7678939,
+          "first_last_span_ns": 246212430,
+          "outside_combined_envelopes_in_span_ns": 7635783,
+          "unmapped_kernel_time_ns": 2800643,
+          "named_family_share": 0.9882610346183631,
+          "family_assignment_ok": true,
+          "families": {
+            "residual_norm_quant": {
+              "family": "residual_norm_quant",
+              "count": 5424,
+              "union_ns": 24410815,
+              "group": "residual_norm_quant",
+              "ms_per_eval": 2.0342345833333333
+            },
+            "unclassified": {
+              "family": "unclassified",
+              "count": 876,
+              "union_ns": 2800643,
+              "group": "unclassified",
+              "ms_per_eval": 0.23338691666666667
+            },
+            "q8_mixer": {
+              "family": "q8_mixer",
+              "count": 768,
+              "union_ns": 40996601,
+              "group": "mixer",
+              "ms_per_eval": 3.4163834166666667
+            },
+            "attn_prepare": {
+              "family": "attn_prepare",
+              "count": 1152,
+              "union_ns": 2556901,
+              "group": "attention",
+              "ms_per_eval": 0.21307508333333333
+            },
+            "gdn_recurrence": {
+              "family": "gdn_recurrence",
+              "count": 576,
+              "union_ns": 15069140,
+              "group": "gdn",
+              "ms_per_eval": 1.2557616666666667
+            },
+            "decode_mmv": {
+              "family": "decode_mmv",
+              "count": 2316,
+              "union_ns": 101216529,
+              "group": "decode_mmv",
+              "ms_per_eval": 8.434710749999999
+            },
+            "attn_core": {
+              "family": "attn_core",
+              "count": 384,
+              "union_ns": 50106850,
+              "group": "attention",
+              "ms_per_eval": 4.1755708333333335
+            },
+            "staging": {
+              "family": "staging",
+              "count": 192,
+              "union_ns": 1023168,
+              "group": "staging",
+              "ms_per_eval": 0.085264
+            },
+            "attn_merge": {
+              "family": "attn_merge",
+              "count": 192,
+              "union_ns": 396000,
+              "group": "attention",
+              "ms_per_eval": 0.033
+            },
+            "commit_copy": {
+              "family": "commit_copy",
+              "count": 12,
+              "union_ns": 20192,
+              "group": "commit_copy",
+              "ms_per_eval": 0.0016826666666666667
+            }
+          },
+          "profiler_overhead": {},
+          "internal_idle_ms": 0.0,
+          "capture_arm": "node",
+          "cpu_api_union_ns": 245795888,
+          "conservation_ok": true,
+          "parent_child_not_double_counted": true,
+          "nvtx_does_not_add_gpu_work": true,
+          "process_scoped_gaps_are_not_device_wide_idle": true,
+          "coverage_valid": true,
+          "perturbed": false,
+          "sql_window": {
+            "start_ns": 26159235,
+            "end_ns": 272414821,
+            "source": "markers_or_explicit"
+          },
+          "window_source": "eval_or_prefill_nvtx",
+          "window_missing_observation": "opt136.window/opt138.prefill envelopes are outside cudaProfilerApi; used in-capture eval/prefill NVTX",
+          "wall_reconciliation": {
+            "window_start_ns": 26159235,
+            "window_end_ns": 272414821,
+            "window_ns": 246255586,
+            "window_ms": 246.255586,
+            "window_source": "eval_or_prefill_nvtx",
+            "gpu_union_ns": 238576647,
+            "gpu_union_ms": 238.576647,
+            "kernel_copy_union_ns": 238576647,
+            "graph_envelope_union_ns": 0,
+            "graph_exclusive_without_leaf_ns": 0,
+            "host_exclusive_ns": 7352494,
+            "host_exclusive_ms": 7.352494,
+            "host_launch_exclusive_ns": 1492509,
+            "host_sync_exclusive_ns": 5239323,
+            "cpu_gpu_overlap_ns": 238443394,
+            "cpu_api_union_ns": 245795888,
+            "instrumentation_union_ns": 198678,
+            "instrumentation_exclusive_ns": 0,
+            "instrumentation_overlap_gpu_or_host_ns": 198678,
+            "unresolved_ns": 326445,
+            "unresolved_ms": 0.326445,
+            "unresolved_share_of_wall": 0.001325634903567223,
+            "accounted_ns": 246255586,
+            "conservation_delta_ns": 0,
+            "conservation_ok": true,
+            "family_union_sum_ns": 238596839,
+            "family_overlap_ns": 20192,
+            "family_union_ns": {
+              "residual_norm_quant": 24410815,
+              "unclassified": 2800643,
+              "q8_mixer": 40996601,
+              "attn_prepare": 2556901,
+              "gdn_recurrence": 15069140,
+              "decode_mmv": 101216529,
+              "attn_core": 50106850,
+              "staging": 1023168,
+              "attn_merge": 396000,
+              "commit_copy": 20192
+            },
+            "observed_graph_launches": 0,
+            "observed_node_count": 11724,
+            "observed_kernel_count": 11808,
+            "buckets": [
+              {
+                "label": "gpu_union",
+                "ns": 238576647,
+                "ms": 238.576647,
+                "classification": "recovered",
+                "evidence": "union(CUPTI kernel+memcpy+graph); graph parents not added on top of children"
+              },
+              {
+                "label": "graph_exclusive_without_leaves",
+                "ns": 0,
+                "ms": 0.0,
+                "classification": "recovered",
+                "evidence": "graph envelope minus overlapping kernel/copy leaves"
+              },
+              {
+                "label": "host_launch_exclusive",
+                "ns": 1492509,
+                "ms": 1.492509,
+                "classification": "recovered",
+                "evidence": "cudaLaunch/graphLaunch APIs exclusive of GPU union"
+              },
+              {
+                "label": "host_sync_exclusive",
+                "ns": 5239323,
+                "ms": 5.239323,
+                "classification": "recovered",
+                "evidence": "synchronization APIs exclusive of GPU union; overlapping cudaEventSynchronize is wait, not added GPU wall"
+              },
+              {
+                "label": "host_memcpy_api_exclusive",
+                "ns": 499065,
+                "ms": 0.499065,
+                "classification": "recovered",
+                "evidence": "host memcpy APIs exclusive of GPU union"
+              },
+              {
+                "label": "host_other_api_exclusive",
+                "ns": 5334868,
+                "ms": 5.334868,
+                "classification": "recovered",
+                "evidence": "other CUDA runtime/driver APIs exclusive of GPU union"
+              },
+              {
+                "label": "host_exclusive_total",
+                "ns": 7352494,
+                "ms": 7.352494,
+                "classification": "recovered",
+                "evidence": "union(CPU APIs) minus overlap with GPU union"
+              },
+              {
+                "label": "instrumentation_exclusive",
+                "ns": 0,
+                "ms": 0.0,
+                "classification": "recovered",
+                "evidence": "PROFILER_OVERHEAD/CUPTI overhead exclusive of GPU and host APIs"
+              },
+              {
+                "label": "unresolved_process_gap",
+                "ns": 326445,
+                "ms": 0.326445,
+                "classification": "unresolved",
+                "evidence": "process-scoped gap with neither GPU nor host API coverage; not proven device-wide idle"
+              },
+              {
+                "label": "family_sum_overlap_bookkeeping",
+                "ns": 20192,
+                "ms": 0.020192,
+                "classification": "bookkeeping",
+                "evidence": "sum of per-family GPU unions minus leaf GPU union; concurrent families are not extra wall"
+              }
+            ],
+            "profiler_perturbation": {
+              "median_relative_perturbation": 0.0,
+              "source": "profiler_overhead_union"
+            },
+            "perturbed": false,
+            "within_unresolved_limit": true,
+            "residual_limit": 0.05,
+            "missing_observation": "opt136.window/opt138.prefill envelopes are outside cudaProfilerApi; used in-capture eval/prefill NVTX",
+            "claim_type": "derived",
+            "parent_child_not_double_counted": true,
+            "cpu_overlapping_gpu_not_additive": true,
+            "process_scoped_gaps_are_not_device_wide_idle": true,
+            "no_proportional_allocation": true
+          },
+          "sql": {
+            "kernel": "SELECT start, end FROM CUPTI_ACTIVITY_KIND_KERNEL",
+            "memcpy": "SELECT start, end FROM CUPTI_ACTIVITY_KIND_MEMCPY",
+            "graph": "SELECT start, end FROM CUPTI_ACTIVITY_KIND_GRAPH_TRACE",
+            "units": "export_schema / CUPTI documented nanoseconds"
+          },
+          "quantities_ms": {
+            "ordinary_kernel_count": 11808,
+            "gpu_graph_count": 0,
+            "kernel_copy_union_ms": 238.58,
+            "graph_envelope_union_ms": 0.0,
+            "combined_union_ms": 238.58,
+            "first_to_last_span_ms": 246.21,
+            "outside_combined_envelopes_ms": 7.64
+          }
+        },
+        "wall": {
+          "window_start_ns": 26159235,
+          "window_end_ns": 272414821,
+          "window_ns": 246255586,
+          "window_ms": 246.255586,
+          "window_source": "eval_or_prefill_nvtx",
+          "gpu_union_ns": 238576647,
+          "gpu_union_ms": 238.576647,
+          "kernel_copy_union_ns": 238576647,
+          "graph_envelope_union_ns": 0,
+          "graph_exclusive_without_leaf_ns": 0,
+          "host_exclusive_ns": 7352494,
+          "host_exclusive_ms": 7.352494,
+          "host_launch_exclusive_ns": 1492509,
+          "host_sync_exclusive_ns": 5239323,
+          "cpu_gpu_overlap_ns": 238443394,
+          "cpu_api_union_ns": 245795888,
+          "instrumentation_union_ns": 198678,
+          "instrumentation_exclusive_ns": 0,
+          "instrumentation_overlap_gpu_or_host_ns": 198678,
+          "unresolved_ns": 326445,
+          "unresolved_ms": 0.326445,
+          "unresolved_share_of_wall": 0.001325634903567223,
+          "accounted_ns": 246255586,
+          "conservation_delta_ns": 0,
+          "conservation_ok": true,
+          "family_union_sum_ns": 238596839,
+          "family_overlap_ns": 20192,
+          "family_union_ns": {
+            "residual_norm_quant": 24410815,
+            "unclassified": 2800643,
+            "q8_mixer": 40996601,
+            "attn_prepare": 2556901,
+            "gdn_recurrence": 15069140,
+            "decode_mmv": 101216529,
+            "attn_core": 50106850,
+            "staging": 1023168,
+            "attn_merge": 396000,
+            "commit_copy": 20192
+          },
+          "observed_graph_launches": 0,
+          "observed_node_count": 11724,
+          "observed_kernel_count": 11808,
+          "buckets": [
+            {
+              "label": "gpu_union",
+              "ns": 238576647,
+              "ms": 238.576647,
+              "classification": "recovered",
+              "evidence": "union(CUPTI kernel+memcpy+graph); graph parents not added on top of children"
+            },
+            {
+              "label": "graph_exclusive_without_leaves",
+              "ns": 0,
+              "ms": 0.0,
+              "classification": "recovered",
+              "evidence": "graph envelope minus overlapping kernel/copy leaves"
+            },
+            {
+              "label": "host_launch_exclusive",
+              "ns": 1492509,
+              "ms": 1.492509,
+              "classification": "recovered",
+              "evidence": "cudaLaunch/graphLaunch APIs exclusive of GPU union"
+            },
+            {
+              "label": "host_sync_exclusive",
+              "ns": 5239323,
+              "ms": 5.239323,
+              "classification": "recovered",
+              "evidence": "synchronization APIs exclusive of GPU union; overlapping cudaEventSynchronize is wait, not added GPU wall"
+            },
+            {
+              "label": "host_memcpy_api_exclusive",
+              "ns": 499065,
+              "ms": 0.499065,
+              "classification": "recovered",
+              "evidence": "host memcpy APIs exclusive of GPU union"
+            },
+            {
+              "label": "host_other_api_exclusive",
+              "ns": 5334868,
+              "ms": 5.334868,
+              "classification": "recovered",
+              "evidence": "other CUDA runtime/driver APIs exclusive of GPU union"
+            },
+            {
+              "label": "host_exclusive_total",
+              "ns": 7352494,
+              "ms": 7.352494,
+              "classification": "recovered",
+              "evidence": "union(CPU APIs) minus overlap with GPU union"
+            },
+            {
+              "label": "instrumentation_exclusive",
+              "ns": 0,
+              "ms": 0.0,
+              "classification": "recovered",
+              "evidence": "PROFILER_OVERHEAD/CUPTI overhead exclusive of GPU and host APIs"
+            },
+            {
+              "label": "unresolved_process_gap",
+              "ns": 326445,
+              "ms": 0.326445,
+              "classification": "unresolved",
+              "evidence": "process-scoped gap with neither GPU nor host API coverage; not proven device-wide idle"
+            },
+            {
+              "label": "family_sum_overlap_bookkeeping",
+              "ns": 20192,
+              "ms": 0.020192,
+              "classification": "bookkeeping",
+              "evidence": "sum of per-family GPU unions minus leaf GPU union; concurrent families are not extra wall"
+            }
+          ],
+          "profiler_perturbation": {
+            "median_relative_perturbation": 0.0,
+            "source": "profiler_overhead_union"
+          },
+          "perturbed": false,
+          "within_unresolved_limit": true,
+          "residual_limit": 0.05,
+          "missing_observation": "opt136.window/opt138.prefill envelopes are outside cudaProfilerApi; used in-capture eval/prefill NVTX",
+          "claim_type": "derived",
+          "parent_child_not_double_counted": true,
+          "cpu_overlapping_gpu_not_additive": true,
+          "process_scoped_gaps_are_not_device_wide_idle": true,
+          "no_proportional_allocation": true
+        },
+        "resolved_window": {
+          "window_start_ns": 26159235,
+          "window_end_ns": 272414821,
+          "source": "eval_or_prefill_nvtx",
+          "missing_observation": "opt136.window/opt138.prefill envelopes are outside cudaProfilerApi; used in-capture eval/prefill NVTX"
+        },
+        "tables_errors": [],
+        "kernel_count": 11808,
+        "cpu_count": 531,
+        "overhead_count": 7,
+        "nvtx_count": 168,
+        "ok": true,
+        "perturbation": {
+          "usable": true,
+          "identity": "whole_request_native_chrono",
+          "metric": "decode_only_ms",
+          "profiled_ms": 8157.7793,
+          "unprofiled_ms": 5101.19922,
+          "median_relative_perturbation": 0.5991885335542726,
+          "source": "opt138_unprofiled_twin",
+          "acceptable": false
+        }
+      },
+      "llama": {
+        "path": "build/optimization-runs/opt138/traces/llama-d2048-node-r0.2.sqlite",
+        "coverage": {
+          "identity": {
+            "engine": "llama",
+            "metric": "decode_only",
+            "prefix": 2048,
+            "eval_count": 12,
+            "allocated_capacity": 131072,
+            "populated_length": 2048,
+            "graph_mode": "decode_segments8",
+            "output_boundary": "eval_logits_no_host_materialize",
+            "capture_arm": "node",
+            "device": 0,
+            "context": 0,
+            "process": 1
+          },
+          "window_start_ns": 25473081,
+          "window_end_ns": 205086645,
+          "window_ns": 179613564,
+          "window_ms": 179.613564,
+          "tables": {
+            "ANALYSIS_DETAILS": {
+              "count": 1,
+              "unit": null
+            },
+            "ANALYSIS_FILE": {
+              "count": 2,
+              "unit": null
+            },
+            "CUDA_GRAPH_NODE_EVENTS": {
+              "count": 5484,
+              "unit": null
+            },
+            "CUPTI_ACTIVITY_KIND_KERNEL": {
+              "count": 21936,
+              "unit": "ns"
+            },
+            "CUPTI_ACTIVITY_KIND_MEMCPY": {
+              "count": 96,
+              "unit": "ns"
+            },
+            "CUPTI_ACTIVITY_KIND_RUNTIME": {
+              "count": 336,
+              "unit": "ns"
+            },
+            "CUPTI_ACTIVITY_KIND_SYNCHRONIZATION": {
+              "count": 229,
+              "unit": "ns"
+            },
+            "DIAGNOSTIC_EVENT": {
+              "count": 12,
+              "unit": null
+            },
+            "ENUM_CUDA_DEV_MEM_EVENT_OPER": {
+              "count": 2,
+              "unit": null
+            },
+            "ENUM_CUDA_FUNC_CACHE_CONFIG": {
+              "count": 4,
+              "unit": null
+            },
+            "ENUM_CUDA_KERNEL_LAUNCH_TYPE": {
+              "count": 4,
+              "unit": null
+            },
+            "ENUM_CUDA_MEMCPY_OPER": {
+              "count": 14,
+              "unit": null
+            },
+            "ENUM_CUDA_MEMPOOL_OPER": {
+              "count": 4,
+              "unit": null
+            },
+            "ENUM_CUDA_MEMPOOL_TYPE": {
+              "count": 3,
+              "unit": null
+            },
+            "ENUM_CUDA_MEM_KIND": {
+              "count": 8,
+              "unit": null
+            },
+            "ENUM_CUDA_SHARED_MEM_LIMIT_CONFIG": {
+              "count": 2,
+              "unit": null
+            },
+            "ENUM_CUDA_UNIF_MEM_ACCESS_TYPE": {
+              "count": 5,
+              "unit": null
+            },
+            "ENUM_CUDA_UNIF_MEM_MIGRATION": {
+              "count": 6,
+              "unit": null
+            },
+            "ENUM_CUPTI_STREAM_TYPE": {
+              "count": 4,
+              "unit": null
+            },
+            "ENUM_CUPTI_SYNC_TYPE": {
+              "count": 5,
+              "unit": null
+            },
+            "ENUM_DIAGNOSTIC_SEVERITY_LEVEL": {
+              "count": 5,
+              "unit": null
+            },
+            "ENUM_DIAGNOSTIC_SOURCE_TYPE": {
+              "count": 4,
+              "unit": null
+            },
+            "ENUM_DIAGNOSTIC_TIMESTAMP_SOURCE": {
+              "count": 3,
+              "unit": null
+            },
+            "ENUM_NSYS_EVENT_CLASS": {
+              "count": 89,
+              "unit": null
+            },
+            "ENUM_NSYS_EVENT_TYPE": {
+              "count": 150,
+              "unit": null
+            },
+            "ENUM_NSYS_GENERIC_EVENT_FIELD_ETW_FLAGS": {
+              "count": 7,
+              "unit": null
+            },
+            "ENUM_NSYS_GENERIC_EVENT_FIELD_ETW_PROPERTY": {
+              "count": 8,
+              "unit": null
+            },
+            "ENUM_NSYS_GENERIC_EVENT_FIELD_ETW_TYPE": {
+              "count": 22,
+              "unit": null
+            },
+            "ENUM_NSYS_GENERIC_EVENT_FIELD_TYPE": {
+              "count": 4,
+              "unit": null
+            },
+            "ENUM_NSYS_GENERIC_EVENT_GROUP": {
+              "count": 5,
+              "unit": null
+            },
+            "ENUM_NSYS_GENERIC_EVENT_SOURCE": {
+              "count": 4,
+              "unit": null
+            },
+            "ENUM_SAMPLING_THREAD_STATE": {
+              "count": 11,
+              "unit": null
+            },
+            "ENUM_SCHEDULING_THREAD_BLOCK": {
+              "count": 53,
+              "unit": null
+            },
+            "ENUM_STACK_UNWIND_METHOD": {
+              "count": 10,
+              "unit": null
+            },
+            "META_DATA_CAPTURE": {
+              "count": 132,
+              "unit": null
+            },
+            "META_DATA_EXPORT": {
+              "count": 29,
+              "unit": null
+            },
+            "NVTX_EVENTS": {
+              "count": 12,
+              "unit": "ns"
+            },
+            "OSRT_API": {
+              "count": 31,
+              "unit": null
+            },
+            "OSRT_CALLCHAINS": {
+              "count": 89,
+              "unit": null
+            },
+            "PROCESSES": {
+              "count": 5,
+              "unit": null
+            },
+            "PROFILER_OVERHEAD": {
+              "count": 7,
+              "unit": "ns"
+            },
+            "ProcessStreams": {
+              "count": 2,
+              "unit": null
+            },
+            "StringIds": {
+              "count": 166,
+              "unit": null
+            },
+            "TARGET_INFO_CUDA_CONTEXT_INFO": {
+              "count": 1,
+              "unit": null
+            },
+            "TARGET_INFO_CUDA_DEVICE": {
+              "count": 1,
+              "unit": null
+            },
+            "TARGET_INFO_CUDA_STREAM": {
+              "count": 10,
+              "unit": null
+            },
+            "TARGET_INFO_GPU": {
+              "count": 1,
+              "unit": null
+            },
+            "TARGET_INFO_SESSION_START_TIME": {
+              "count": 1,
+              "unit": null
+            },
+            "TARGET_INFO_SYSTEM_ENV": {
+              "count": 71,
+              "unit": null
+            },
+            "ThreadNames": {
+              "count": 28,
+              "unit": null
+            }
+          },
+          "table_names": [
+            "ANALYSIS_DETAILS",
+            "ANALYSIS_FILE",
+            "CUDA_GRAPH_NODE_EVENTS",
+            "CUPTI_ACTIVITY_KIND_KERNEL",
+            "CUPTI_ACTIVITY_KIND_MEMCPY",
+            "CUPTI_ACTIVITY_KIND_RUNTIME",
+            "CUPTI_ACTIVITY_KIND_SYNCHRONIZATION",
+            "DIAGNOSTIC_EVENT",
+            "ENUM_CUDA_DEV_MEM_EVENT_OPER",
+            "ENUM_CUDA_FUNC_CACHE_CONFIG",
+            "ENUM_CUDA_KERNEL_LAUNCH_TYPE",
+            "ENUM_CUDA_MEMCPY_OPER",
+            "ENUM_CUDA_MEMPOOL_OPER",
+            "ENUM_CUDA_MEMPOOL_TYPE",
+            "ENUM_CUDA_MEM_KIND",
+            "ENUM_CUDA_SHARED_MEM_LIMIT_CONFIG",
+            "ENUM_CUDA_UNIF_MEM_ACCESS_TYPE",
+            "ENUM_CUDA_UNIF_MEM_MIGRATION",
+            "ENUM_CUPTI_STREAM_TYPE",
+            "ENUM_CUPTI_SYNC_TYPE",
+            "ENUM_DIAGNOSTIC_SEVERITY_LEVEL",
+            "ENUM_DIAGNOSTIC_SOURCE_TYPE",
+            "ENUM_DIAGNOSTIC_TIMESTAMP_SOURCE",
+            "ENUM_NSYS_EVENT_CLASS",
+            "ENUM_NSYS_EVENT_TYPE",
+            "ENUM_NSYS_GENERIC_EVENT_FIELD_ETW_FLAGS",
+            "ENUM_NSYS_GENERIC_EVENT_FIELD_ETW_PROPERTY",
+            "ENUM_NSYS_GENERIC_EVENT_FIELD_ETW_TYPE",
+            "ENUM_NSYS_GENERIC_EVENT_FIELD_TYPE",
+            "ENUM_NSYS_GENERIC_EVENT_GROUP",
+            "ENUM_NSYS_GENERIC_EVENT_SOURCE",
+            "ENUM_SAMPLING_THREAD_STATE",
+            "ENUM_SCHEDULING_THREAD_BLOCK",
+            "ENUM_STACK_UNWIND_METHOD",
+            "META_DATA_CAPTURE",
+            "META_DATA_EXPORT",
+            "NVTX_EVENTS",
+            "OSRT_API",
+            "OSRT_CALLCHAINS",
+            "PROCESSES",
+            "PROFILER_OVERHEAD",
+            "ProcessStreams",
+            "StringIds",
+            "TARGET_INFO_CUDA_CONTEXT_INFO",
+            "TARGET_INFO_CUDA_DEVICE",
+            "TARGET_INFO_CUDA_STREAM",
+            "TARGET_INFO_GPU",
+            "TARGET_INFO_SESSION_START_TIME",
+            "TARGET_INFO_SYSTEM_ENV",
+            "ThreadNames"
+          ],
+          "expected_graph_launches": null,
+          "observed_graph_launches": 0,
+          "observed_kernel_count": 21936,
+          "observed_copy_count": 96,
+          "observed_node_count": 21936,
+          "parent_node_correspondence": {
+            "graph_launches": 0,
+            "expanded_nodes": 21936,
+            "expected_nodes": null,
+            "matched": true
+          },
+          "drops": 0,
+          "errors": [],
+          "kernel_copy_union_ns": 165618671,
+          "graph_envelope_union_ns": 0,
+          "combined_union_ns": 165618671,
+          "graph_exclusive_without_leaf_ns": 0,
+          "time_outside_all_activity_ns": 13994893,
+          "first_last_span_ns": 179477572,
+          "outside_combined_envelopes_in_span_ns": 13858901,
+          "unmapped_kernel_time_ns": 14107412,
+          "named_family_share": 0.9148199178581743,
+          "family_assignment_ok": false,
+          "families": {
+            "residual_norm_quant": {
+              "family": "residual_norm_quant",
+              "count": 8856,
+              "union_ns": 17751767,
+              "group": "residual_norm_quant",
+              "ms_per_eval": 1.4793139166666667
+            },
+            "unclassified": {
+              "family": "unclassified",
+              "count": 7020,
+              "union_ns": 14107412,
+              "group": "unclassified",
+              "ms_per_eval": 1.1756176666666667
+            },
+            "decode_mmv": {
+              "family": "decode_mmv",
+              "count": 5196,
+              "union_ns": 152028573,
+              "group": "decode_mmv",
+              "ms_per_eval": 12.669047749999999
+            },
+            "q4_swiglu": {
+              "family": "q4_swiglu",
+              "count": 576,
+              "union_ns": 603938,
+              "group": "ffn",
+              "ms_per_eval": 0.05032816666666667
+            },
+            "attn_core": {
+              "family": "attn_core",
+              "count": 384,
+              "union_ns": 2603875,
+              "group": "attention",
+              "ms_per_eval": 0.21698958333333332
+            }
+          },
+          "profiler_overhead": {},
+          "internal_idle_ms": 0.0,
+          "capture_arm": "node",
+          "cpu_api_union_ns": 178753527,
+          "conservation_ok": true,
+          "parent_child_not_double_counted": true,
+          "nvtx_does_not_add_gpu_work": true,
+          "process_scoped_gaps_are_not_device_wide_idle": true,
+          "coverage_valid": true,
+          "perturbed": false,
+          "sql_window": {
+            "start_ns": 25473081,
+            "end_ns": 205086645,
+            "source": "markers_or_explicit"
+          },
+          "window_source": "eval_or_prefill_nvtx",
+          "window_missing_observation": "opt136.window/opt138.prefill envelopes are outside cudaProfilerApi; used in-capture eval/prefill NVTX",
+          "wall_reconciliation": {
+            "window_start_ns": 25473081,
+            "window_end_ns": 205086645,
+            "window_ns": 179613564,
+            "window_ms": 179.613564,
+            "window_source": "eval_or_prefill_nvtx",
+            "gpu_union_ns": 165618671,
+            "gpu_union_ms": 165.618671,
+            "kernel_copy_union_ns": 165618671,
+            "graph_envelope_union_ns": 0,
+            "graph_exclusive_without_leaf_ns": 0,
+            "host_exclusive_ns": 13167666,
+            "host_exclusive_ms": 13.167666,
+            "host_launch_exclusive_ns": 12308383,
+            "host_sync_exclusive_ns": 550115,
+            "cpu_gpu_overlap_ns": 165585861,
+            "cpu_api_union_ns": 178753527,
+            "instrumentation_union_ns": 158040,
+            "instrumentation_exclusive_ns": 0,
+            "instrumentation_overlap_gpu_or_host_ns": 158040,
+            "unresolved_ns": 827227,
+            "unresolved_ms": 0.827227,
+            "unresolved_share_of_wall": 0.004605593149969453,
+            "accounted_ns": 179613564,
+            "conservation_delta_ns": 0,
+            "conservation_ok": true,
+            "family_union_sum_ns": 187095565,
+            "family_overlap_ns": 21476894,
+            "family_union_ns": {
+              "residual_norm_quant": 17751767,
+              "unclassified": 14107412,
+              "decode_mmv": 152028573,
+              "q4_swiglu": 603938,
+              "attn_core": 2603875
+            },
+            "observed_graph_launches": 0,
+            "observed_node_count": 21936,
+            "observed_kernel_count": 21936,
+            "buckets": [
+              {
+                "label": "gpu_union",
+                "ns": 165618671,
+                "ms": 165.618671,
+                "classification": "recovered",
+                "evidence": "union(CUPTI kernel+memcpy+graph); graph parents not added on top of children"
+              },
+              {
+                "label": "graph_exclusive_without_leaves",
+                "ns": 0,
+                "ms": 0.0,
+                "classification": "recovered",
+                "evidence": "graph envelope minus overlapping kernel/copy leaves"
+              },
+              {
+                "label": "host_launch_exclusive",
+                "ns": 12308383,
+                "ms": 12.308383,
+                "classification": "recovered",
+                "evidence": "cudaLaunch/graphLaunch APIs exclusive of GPU union"
+              },
+              {
+                "label": "host_sync_exclusive",
+                "ns": 550115,
+                "ms": 0.550115,
+                "classification": "recovered",
+                "evidence": "synchronization APIs exclusive of GPU union; overlapping cudaEventSynchronize is wait, not added GPU wall"
+              },
+              {
+                "label": "host_memcpy_api_exclusive",
+                "ns": 309168,
+                "ms": 0.309168,
+                "classification": "recovered",
+                "evidence": "host memcpy APIs exclusive of GPU union"
+              },
+              {
+                "label": "host_other_api_exclusive",
+                "ns": 494945,
+                "ms": 0.494945,
+                "classification": "recovered",
+                "evidence": "other CUDA runtime/driver APIs exclusive of GPU union"
+              },
+              {
+                "label": "host_exclusive_total",
+                "ns": 13167666,
+                "ms": 13.167666,
+                "classification": "recovered",
+                "evidence": "union(CPU APIs) minus overlap with GPU union"
+              },
+              {
+                "label": "instrumentation_exclusive",
+                "ns": 0,
+                "ms": 0.0,
+                "classification": "recovered",
+                "evidence": "PROFILER_OVERHEAD/CUPTI overhead exclusive of GPU and host APIs"
+              },
+              {
+                "label": "unresolved_process_gap",
+                "ns": 827227,
+                "ms": 0.827227,
+                "classification": "unresolved",
+                "evidence": "process-scoped gap with neither GPU nor host API coverage; not proven device-wide idle"
+              },
+              {
+                "label": "family_sum_overlap_bookkeeping",
+                "ns": 21476894,
+                "ms": 21.476894,
+                "classification": "bookkeeping",
+                "evidence": "sum of per-family GPU unions minus leaf GPU union; concurrent families are not extra wall"
+              }
+            ],
+            "profiler_perturbation": {
+              "median_relative_perturbation": 0.0,
+              "source": "profiler_overhead_union"
+            },
+            "perturbed": false,
+            "within_unresolved_limit": true,
+            "residual_limit": 0.05,
+            "missing_observation": "opt136.window/opt138.prefill envelopes are outside cudaProfilerApi; used in-capture eval/prefill NVTX",
+            "claim_type": "derived",
+            "parent_child_not_double_counted": true,
+            "cpu_overlapping_gpu_not_additive": true,
+            "process_scoped_gaps_are_not_device_wide_idle": true,
+            "no_proportional_allocation": true
+          },
+          "sql": {
+            "kernel": "SELECT start, end FROM CUPTI_ACTIVITY_KIND_KERNEL",
+            "memcpy": "SELECT start, end FROM CUPTI_ACTIVITY_KIND_MEMCPY",
+            "graph": "SELECT start, end FROM CUPTI_ACTIVITY_KIND_GRAPH_TRACE",
+            "units": "export_schema / CUPTI documented nanoseconds"
+          },
+          "quantities_ms": {
+            "ordinary_kernel_count": 21936,
+            "gpu_graph_count": 0,
+            "kernel_copy_union_ms": 165.62,
+            "graph_envelope_union_ms": 0.0,
+            "combined_union_ms": 165.62,
+            "first_to_last_span_ms": 179.48,
+            "outside_combined_envelopes_ms": 13.86
+          }
+        },
+        "wall": {
+          "window_start_ns": 25473081,
+          "window_end_ns": 205086645,
+          "window_ns": 179613564,
+          "window_ms": 179.613564,
+          "window_source": "eval_or_prefill_nvtx",
+          "gpu_union_ns": 165618671,
+          "gpu_union_ms": 165.618671,
+          "kernel_copy_union_ns": 165618671,
+          "graph_envelope_union_ns": 0,
+          "graph_exclusive_without_leaf_ns": 0,
+          "host_exclusive_ns": 13167666,
+          "host_exclusive_ms": 13.167666,
+          "host_launch_exclusive_ns": 12308383,
+          "host_sync_exclusive_ns": 550115,
+          "cpu_gpu_overlap_ns": 165585861,
+          "cpu_api_union_ns": 178753527,
+          "instrumentation_union_ns": 158040,
+          "instrumentation_exclusive_ns": 0,
+          "instrumentation_overlap_gpu_or_host_ns": 158040,
+          "unresolved_ns": 827227,
+          "unresolved_ms": 0.827227,
+          "unresolved_share_of_wall": 0.004605593149969453,
+          "accounted_ns": 179613564,
+          "conservation_delta_ns": 0,
+          "conservation_ok": true,
+          "family_union_sum_ns": 187095565,
+          "family_overlap_ns": 21476894,
+          "family_union_ns": {
+            "residual_norm_quant": 17751767,
+            "unclassified": 14107412,
+            "decode_mmv": 152028573,
+            "q4_swiglu": 603938,
+            "attn_core": 2603875
+          },
+          "observed_graph_launches": 0,
+          "observed_node_count": 21936,
+          "observed_kernel_count": 21936,
+          "buckets": [
+            {
+              "label": "gpu_union",
+              "ns": 165618671,
+              "ms": 165.618671,
+              "classification": "recovered",
+              "evidence": "union(CUPTI kernel+memcpy+graph); graph parents not added on top of children"
+            },
+            {
+              "label": "graph_exclusive_without_leaves",
+              "ns": 0,
+              "ms": 0.0,
+              "classification": "recovered",
+              "evidence": "graph envelope minus overlapping kernel/copy leaves"
+            },
+            {
+              "label": "host_launch_exclusive",
+              "ns": 12308383,
+              "ms": 12.308383,
+              "classification": "recovered",
+              "evidence": "cudaLaunch/graphLaunch APIs exclusive of GPU union"
+            },
+            {
+              "label": "host_sync_exclusive",
+              "ns": 550115,
+              "ms": 0.550115,
+              "classification": "recovered",
+              "evidence": "synchronization APIs exclusive of GPU union; overlapping cudaEventSynchronize is wait, not added GPU wall"
+            },
+            {
+              "label": "host_memcpy_api_exclusive",
+              "ns": 309168,
+              "ms": 0.309168,
+              "classification": "recovered",
+              "evidence": "host memcpy APIs exclusive of GPU union"
+            },
+            {
+              "label": "host_other_api_exclusive",
+              "ns": 494945,
+              "ms": 0.494945,
+              "classification": "recovered",
+              "evidence": "other CUDA runtime/driver APIs exclusive of GPU union"
+            },
+            {
+              "label": "host_exclusive_total",
+              "ns": 13167666,
+              "ms": 13.167666,
+              "classification": "recovered",
+              "evidence": "union(CPU APIs) minus overlap with GPU union"
+            },
+            {
+              "label": "instrumentation_exclusive",
+              "ns": 0,
+              "ms": 0.0,
+              "classification": "recovered",
+              "evidence": "PROFILER_OVERHEAD/CUPTI overhead exclusive of GPU and host APIs"
+            },
+            {
+              "label": "unresolved_process_gap",
+              "ns": 827227,
+              "ms": 0.827227,
+              "classification": "unresolved",
+              "evidence": "process-scoped gap with neither GPU nor host API coverage; not proven device-wide idle"
+            },
+            {
+              "label": "family_sum_overlap_bookkeeping",
+              "ns": 21476894,
+              "ms": 21.476894,
+              "classification": "bookkeeping",
+              "evidence": "sum of per-family GPU unions minus leaf GPU union; concurrent families are not extra wall"
+            }
+          ],
+          "profiler_perturbation": {
+            "median_relative_perturbation": 0.0,
+            "source": "profiler_overhead_union"
+          },
+          "perturbed": false,
+          "within_unresolved_limit": true,
+          "residual_limit": 0.05,
+          "missing_observation": "opt136.window/opt138.prefill envelopes are outside cudaProfilerApi; used in-capture eval/prefill NVTX",
+          "claim_type": "derived",
+          "parent_child_not_double_counted": true,
+          "cpu_overlapping_gpu_not_additive": true,
+          "process_scoped_gaps_are_not_device_wide_idle": true,
+          "no_proportional_allocation": true
+        },
+        "resolved_window": {
+          "window_start_ns": 25473081,
+          "window_end_ns": 205086645,
+          "source": "eval_or_prefill_nvtx",
+          "missing_observation": "opt136.window/opt138.prefill envelopes are outside cudaProfilerApi; used in-capture eval/prefill NVTX"
+        },
+        "tables_errors": [],
+        "kernel_count": 21936,
+        "cpu_count": 565,
+        "overhead_count": 7,
+        "nvtx_count": 12,
+        "ok": true,
+        "perturbation": {
+          "usable": true,
+          "identity": "whole_request_native_chrono",
+          "metric": "decode_only_ms",
+          "profiled_ms": 6993.28871,
+          "unprofiled_ms": 3645.69324,
+          "median_relative_perturbation": 0.9182328982786274,
+          "source": "opt138_unprofiled_twin",
+          "acceptable": false
+        }
+      },
+      "legacy_family_sum": {
+        "regrouped": {
+          "families": [
+            {
+              "family": "attn_fused",
+              "logical_members": [
+                "attn_prepare",
+                "attn_core",
+                "attn_merge"
+              ],
+              "Quartz_ms": 53.059751000000006,
+              "llama_ms": 2.603875,
+              "delta_ms": 50.455876,
+              "kernel_ids": [],
+              "coverage_status": "matched",
+              "proof_limit": "enclosing fused kernel; comparison is the fused boundary"
+            },
+            {
+              "family": "decode_mmv",
+              "logical_members": [
+                "decode_mmv"
+              ],
+              "Quartz_ms": 101.216529,
+              "llama_ms": 152.028573,
+              "delta_ms": -50.812044,
+              "kernel_ids": [],
+              "coverage_status": "matched",
+              "proof_limit": "leaf family"
+            },
+            {
+              "family": "q4_ffn_fused",
+              "logical_members": [
+                "q4_gate",
+                "q4_up",
+                "q4_swiglu"
+              ],
+              "Quartz_ms": 0.0,
+              "llama_ms": 0.603938,
+              "delta_ms": -0.603938,
+              "kernel_ids": [],
+              "coverage_status": "partial",
+              "proof_limit": "enclosing fused kernel; comparison is the fused boundary"
+            },
+            {
+              "family": "residual_norm_quant",
+              "logical_members": [
+                "residual_norm_quant"
+              ],
+              "Quartz_ms": 24.410815,
+              "llama_ms": 17.751767,
+              "delta_ms": 6.6590479999999985,
+              "kernel_ids": [],
+              "coverage_status": "matched",
+              "proof_limit": "leaf family"
+            }
+          ],
+          "matched_disjoint_excess_ms": 5.698942000000002,
+          "unmatched_quartz_ms": {},
+          "unmatched_llama_ms": {},
+          "unmatched_work_gap_ms": 2.800643,
+          "unclassified_ms": 2.800643
+        },
+        "reconciliation": {
+          "quartz_wall_ms": 246.255586,
+          "llama_wall_ms": 179.613564,
+          "observed_gap_ms": 66.642022,
+          "matched_disjoint_excess_ms": 5.698942000000002,
+          "unmatched_work_gap_ms": 2.800643,
+          "scheduling_host_residual_ms": 0.0,
+          "overlap_ms": 0.0,
+          "reconstructed_gap_ms": 8.499585000000003,
+          "absolute_residual_ms": 58.142436999999994,
+          "residual_limit_ms": 12.3127793,
+          "residual_share_of_quartz_wall": 0.23610606339707557,
+          "ranking_complete": false,
+          "proof_limit": "absolute residual above 5% of Quartz wall; mapping/window diagnosis required",
+          "method": "opt138_family_sum_host_unmeasured"
+        }
+      },
+      "disjoint_wall_gap": {
+        "quartz_wall_ms": 246.255586,
+        "llama_wall_ms": 179.613564,
+        "observed_gap_ms": 66.642022,
+        "gpu_union_gap_ms": 72.957976,
+        "host_exclusive_gap_ms": -5.8151720000000005,
+        "instrumentation_exclusive_gap_ms": 0.0,
+        "unresolved_gap_ms": -0.5007820000000001,
+        "reconstructed_gap_ms": 66.642022,
+        "absolute_residual_ms": 0.0,
+        "residual_limit_ms": 12.3127793,
+        "residual_share_of_quartz_wall": 0.0,
+        "ranking_complete": true,
+        "method": "disjoint_gpu_union_plus_host_exclusive_plus_unresolved",
+        "no_proportional_allocation": true,
+        "family_overlap_bookkeeping_ms": {
+          "quartz": 0.020192,
+          "llama": 21.476894
+        }
+      }
+    },
+    {
+      "kind": "prefill",
+      "prefix": 4096,
+      "window": "prefill",
+      "rep": 0,
+      "quartz": {
+        "path": "build/optimization-runs/opt138/traces/quartz-p4096-node-r0.sqlite",
+        "coverage": {
+          "identity": {
+            "engine": "quartz",
+            "metric": "prefill",
+            "prefix": 4096,
+            "eval_count": 4096,
+            "allocated_capacity": 131072,
+            "populated_length": 4096,
+            "graph_mode": "decode_segments8",
+            "output_boundary": "eval_logits_no_host_materialize",
+            "capture_arm": "node",
+            "device": 0,
+            "context": 0,
+            "process": 1
+          },
+          "window_start_ns": 27235688,
+          "window_end_ns": 1375078015,
+          "window_ns": 1347842327,
+          "window_ms": 1347.842327,
+          "tables": {
+            "ANALYSIS_DETAILS": {
+              "count": 1,
+              "unit": null
+            },
+            "ANALYSIS_FILE": {
+              "count": 2,
+              "unit": null
+            },
+            "CUDA_GRAPH_NODE_EVENTS": {
+              "count": 16567,
+              "unit": null
+            },
+            "CUPTI_ACTIVITY_KIND_KERNEL": {
+              "count": 1239,
+              "unit": "ns"
+            },
+            "CUPTI_ACTIVITY_KIND_MEMCPY": {
+              "count": 232,
+              "unit": "ns"
+            },
+            "CUPTI_ACTIVITY_KIND_RUNTIME": {
+              "count": 2143,
+              "unit": "ns"
+            },
+            "CUPTI_ACTIVITY_KIND_SYNCHRONIZATION": {
+              "count": 6,
+              "unit": "ns"
+            },
+            "DIAGNOSTIC_EVENT": {
+              "count": 18,
+              "unit": null
+            },
+            "ENUM_CUDA_DEV_MEM_EVENT_OPER": {
+              "count": 2,
+              "unit": null
+            },
+            "ENUM_CUDA_FUNC_CACHE_CONFIG": {
+              "count": 4,
+              "unit": null
+            },
+            "ENUM_CUDA_KERNEL_LAUNCH_TYPE": {
+              "count": 4,
+              "unit": null
+            },
+            "ENUM_CUDA_MEMCPY_OPER": {
+              "count": 14,
+              "unit": null
+            },
+            "ENUM_CUDA_MEMPOOL_OPER": {
+              "count": 4,
+              "unit": null
+            },
+            "ENUM_CUDA_MEMPOOL_TYPE": {
+              "count": 3,
+              "unit": null
+            },
+            "ENUM_CUDA_MEM_KIND": {
+              "count": 8,
+              "unit": null
+            },
+            "ENUM_CUDA_SHARED_MEM_LIMIT_CONFIG": {
+              "count": 2,
+              "unit": null
+            },
+            "ENUM_CUDA_UNIF_MEM_ACCESS_TYPE": {
+              "count": 5,
+              "unit": null
+            },
+            "ENUM_CUDA_UNIF_MEM_MIGRATION": {
+              "count": 6,
+              "unit": null
+            },
+            "ENUM_CUPTI_STREAM_TYPE": {
+              "count": 4,
+              "unit": null
+            },
+            "ENUM_CUPTI_SYNC_TYPE": {
+              "count": 5,
+              "unit": null
+            },
+            "ENUM_DIAGNOSTIC_SEVERITY_LEVEL": {
+              "count": 5,
+              "unit": null
+            },
+            "ENUM_DIAGNOSTIC_SOURCE_TYPE": {
+              "count": 4,
+              "unit": null
+            },
+            "ENUM_DIAGNOSTIC_TIMESTAMP_SOURCE": {
+              "count": 3,
+              "unit": null
+            },
+            "ENUM_NSYS_EVENT_CLASS": {
+              "count": 89,
+              "unit": null
+            },
+            "ENUM_NSYS_EVENT_TYPE": {
+              "count": 150,
+              "unit": null
+            },
+            "ENUM_NSYS_GENERIC_EVENT_FIELD_ETW_FLAGS": {
+              "count": 7,
+              "unit": null
+            },
+            "ENUM_NSYS_GENERIC_EVENT_FIELD_ETW_PROPERTY": {
+              "count": 8,
+              "unit": null
+            },
+            "ENUM_NSYS_GENERIC_EVENT_FIELD_ETW_TYPE": {
+              "count": 22,
+              "unit": null
+            },
+            "ENUM_NSYS_GENERIC_EVENT_FIELD_TYPE": {
+              "count": 4,
+              "unit": null
+            },
+            "ENUM_NSYS_GENERIC_EVENT_GROUP": {
+              "count": 5,
+              "unit": null
+            },
+            "ENUM_NSYS_GENERIC_EVENT_SOURCE": {
+              "count": 4,
+              "unit": null
+            },
+            "ENUM_SAMPLING_THREAD_STATE": {
+              "count": 11,
+              "unit": null
+            },
+            "ENUM_SCHEDULING_THREAD_BLOCK": {
+              "count": 53,
+              "unit": null
+            },
+            "ENUM_STACK_UNWIND_METHOD": {
+              "count": 10,
+              "unit": null
+            },
+            "META_DATA_CAPTURE": {
+              "count": 134,
+              "unit": null
+            },
+            "META_DATA_EXPORT": {
+              "count": 29,
+              "unit": null
+            },
+            "NVTX_EVENTS": {
+              "count": 389,
+              "unit": "ns"
+            },
+            "OSRT_API": {
+              "count": 141,
+              "unit": null
+            },
+            "OSRT_CALLCHAINS": {
+              "count": 761,
+              "unit": null
+            },
+            "PROCESSES": {
+              "count": 5,
+              "unit": null
+            },
+            "PROFILER_OVERHEAD": {
+              "count": 7,
+              "unit": "ns"
+            },
+            "ProcessStreams": {
+              "count": 2,
+              "unit": null
+            },
+            "StringIds": {
+              "count": 211,
+              "unit": null
+            },
+            "TARGET_INFO_CUDA_CONTEXT_INFO": {
+              "count": 1,
+              "unit": null
+            },
+            "TARGET_INFO_CUDA_DEVICE": {
+              "count": 1,
+              "unit": null
+            },
+            "TARGET_INFO_CUDA_STREAM": {
+              "count": 114,
+              "unit": null
+            },
+            "TARGET_INFO_GPU": {
+              "count": 1,
+              "unit": null
+            },
+            "TARGET_INFO_SESSION_START_TIME": {
+              "count": 1,
+              "unit": null
+            },
+            "TARGET_INFO_SYSTEM_ENV": {
+              "count": 71,
+              "unit": null
+            },
+            "ThreadNames": {
+              "count": 29,
+              "unit": null
+            }
+          },
+          "table_names": [
+            "ANALYSIS_DETAILS",
+            "ANALYSIS_FILE",
+            "CUDA_GRAPH_NODE_EVENTS",
+            "CUPTI_ACTIVITY_KIND_KERNEL",
+            "CUPTI_ACTIVITY_KIND_MEMCPY",
+            "CUPTI_ACTIVITY_KIND_RUNTIME",
+            "CUPTI_ACTIVITY_KIND_SYNCHRONIZATION",
+            "DIAGNOSTIC_EVENT",
+            "ENUM_CUDA_DEV_MEM_EVENT_OPER",
+            "ENUM_CUDA_FUNC_CACHE_CONFIG",
+            "ENUM_CUDA_KERNEL_LAUNCH_TYPE",
+            "ENUM_CUDA_MEMCPY_OPER",
+            "ENUM_CUDA_MEMPOOL_OPER",
+            "ENUM_CUDA_MEMPOOL_TYPE",
+            "ENUM_CUDA_MEM_KIND",
+            "ENUM_CUDA_SHARED_MEM_LIMIT_CONFIG",
+            "ENUM_CUDA_UNIF_MEM_ACCESS_TYPE",
+            "ENUM_CUDA_UNIF_MEM_MIGRATION",
+            "ENUM_CUPTI_STREAM_TYPE",
+            "ENUM_CUPTI_SYNC_TYPE",
+            "ENUM_DIAGNOSTIC_SEVERITY_LEVEL",
+            "ENUM_DIAGNOSTIC_SOURCE_TYPE",
+            "ENUM_DIAGNOSTIC_TIMESTAMP_SOURCE",
+            "ENUM_NSYS_EVENT_CLASS",
+            "ENUM_NSYS_EVENT_TYPE",
+            "ENUM_NSYS_GENERIC_EVENT_FIELD_ETW_FLAGS",
+            "ENUM_NSYS_GENERIC_EVENT_FIELD_ETW_PROPERTY",
+            "ENUM_NSYS_GENERIC_EVENT_FIELD_ETW_TYPE",
+            "ENUM_NSYS_GENERIC_EVENT_FIELD_TYPE",
+            "ENUM_NSYS_GENERIC_EVENT_GROUP",
+            "ENUM_NSYS_GENERIC_EVENT_SOURCE",
+            "ENUM_SAMPLING_THREAD_STATE",
+            "ENUM_SCHEDULING_THREAD_BLOCK",
+            "ENUM_STACK_UNWIND_METHOD",
+            "META_DATA_CAPTURE",
+            "META_DATA_EXPORT",
+            "NVTX_EVENTS",
+            "OSRT_API",
+            "OSRT_CALLCHAINS",
+            "PROCESSES",
+            "PROFILER_OVERHEAD",
+            "ProcessStreams",
+            "StringIds",
+            "TARGET_INFO_CUDA_CONTEXT_INFO",
+            "TARGET_INFO_CUDA_DEVICE",
+            "TARGET_INFO_CUDA_STREAM",
+            "TARGET_INFO_GPU",
+            "TARGET_INFO_SESSION_START_TIME",
+            "TARGET_INFO_SYSTEM_ENV",
+            "ThreadNames"
+          ],
+          "expected_graph_launches": null,
+          "observed_graph_launches": 0,
+          "observed_kernel_count": 1239,
+          "observed_copy_count": 232,
+          "observed_node_count": 384,
+          "parent_node_correspondence": {
+            "graph_launches": 0,
+            "expanded_nodes": 384,
+            "expected_nodes": null,
+            "matched": true
+          },
+          "drops": 0,
+          "errors": [],
+          "kernel_copy_union_ns": 1344636407,
+          "graph_envelope_union_ns": 0,
+          "combined_union_ns": 1344636407,
+          "graph_exclusive_without_leaf_ns": 0,
+          "time_outside_all_activity_ns": 3205920,
+          "first_last_span_ns": 1347756601,
+          "outside_combined_envelopes_in_span_ns": 3120194,
+          "unmapped_kernel_time_ns": 1685857,
+          "named_family_share": 0.9987462357919036,
+          "family_assignment_ok": true,
+          "families": {
+            "residual_norm_quant": {
+              "family": "residual_norm_quant",
+              "count": 4,
+              "union_ns": 240160,
+              "group": "residual_norm_quant",
+              "ms_per_eval": 5.86328125e-05
+            },
+            "prompt_mmq": {
+              "family": "prompt_mmq",
+              "count": 688,
+              "union_ns": 882436428,
+              "group": "prompt_mmq",
+              "ms_per_eval": 0.2154385810546875
+            },
+            "gdn_gated_out": {
+              "family": "gdn_gated_out",
+              "count": 288,
+              "union_ns": 15332623,
+              "group": "gdn",
+              "ms_per_eval": 0.003743316162109375
+            },
+            "attn_prepare": {
+              "family": "attn_prepare",
+              "count": 64,
+              "union_ns": 18706774,
+              "group": "attention",
+              "ms_per_eval": 0.00456708349609375
+            },
+            "gdn_recurrence": {
+              "family": "gdn_recurrence",
+              "count": 48,
+              "union_ns": 167253010,
+              "group": "gdn",
+              "ms_per_eval": 0.04083325439453125
+            },
+            "q4_swiglu": {
+              "family": "q4_swiglu",
+              "count": 64,
+              "union_ns": 31945950,
+              "group": "ffn",
+              "ms_per_eval": 0.00779930419921875
+            },
+            "attn_core": {
+              "family": "attn_core",
+              "count": 48,
+              "union_ns": 223968112,
+              "group": "attention",
+              "ms_per_eval": 0.05467971484375
+            },
+            "staging": {
+              "family": "staging",
+              "count": 16,
+              "union_ns": 2039715,
+              "group": "staging",
+              "ms_per_eval": 0.000497977294921875
+            },
+            "unclassified": {
+              "family": "unclassified",
+              "count": 249,
+              "union_ns": 1685857,
+              "group": "unclassified",
+              "ms_per_eval": 0.000411586181640625
+            },
+            "decode_mmv": {
+              "family": "decode_mmv",
+              "count": 1,
+              "union_ns": 683649,
+              "group": "decode_mmv",
+              "ms_per_eval": 0.000166906494140625
+            },
+            "commit_copy": {
+              "family": "commit_copy",
+              "count": 1,
+              "union_ns": 352481,
+              "group": "commit_copy",
+              "ms_per_eval": 8.6054931640625e-05
+            }
+          },
+          "profiler_overhead": {},
+          "internal_idle_ms": 0.0,
+          "capture_arm": "node",
+          "cpu_api_union_ns": 1346336002,
+          "conservation_ok": true,
+          "parent_child_not_double_counted": true,
+          "nvtx_does_not_add_gpu_work": true,
+          "process_scoped_gaps_are_not_device_wide_idle": true,
+          "coverage_valid": true,
+          "perturbed": false,
+          "sql_window": {
+            "start_ns": 27235688,
+            "end_ns": 1375078015,
+            "source": "markers_or_explicit"
+          },
+          "window_source": "eval_or_prefill_nvtx",
+          "window_missing_observation": "opt136.window/opt138.prefill envelopes are outside cudaProfilerApi; used in-capture eval/prefill NVTX",
+          "wall_reconciliation": {
+            "window_start_ns": 27235688,
+            "window_end_ns": 1375078015,
+            "window_ns": 1347842327,
+            "window_ms": 1347.842327,
+            "window_source": "eval_or_prefill_nvtx",
+            "gpu_union_ns": 1344636407,
+            "gpu_union_ms": 1344.636407,
+            "kernel_copy_union_ns": 1344636407,
+            "graph_envelope_union_ns": 0,
+            "graph_exclusive_without_leaf_ns": 0,
+            "host_exclusive_ns": 3129093,
+            "host_exclusive_ms": 3.129093,
+            "host_launch_exclusive_ns": 2737089,
+            "host_sync_exclusive_ns": 9135,
+            "cpu_gpu_overlap_ns": 1343206909,
+            "cpu_api_union_ns": 1346336002,
+            "instrumentation_union_ns": 638655,
+            "instrumentation_exclusive_ns": 0,
+            "instrumentation_overlap_gpu_or_host_ns": 638655,
+            "unresolved_ns": 76827,
+            "unresolved_ms": 0.076827,
+            "unresolved_share_of_wall": 5.69999906227904e-05,
+            "accounted_ns": 1347842327,
+            "conservation_delta_ns": 0,
+            "conservation_ok": true,
+            "family_union_sum_ns": 1344644759,
+            "family_overlap_ns": 8352,
+            "family_union_ns": {
+              "residual_norm_quant": 240160,
+              "prompt_mmq": 882436428,
+              "gdn_gated_out": 15332623,
+              "attn_prepare": 18706774,
+              "gdn_recurrence": 167253010,
+              "q4_swiglu": 31945950,
+              "attn_core": 223968112,
+              "staging": 2039715,
+              "unclassified": 1685857,
+              "decode_mmv": 683649,
+              "commit_copy": 352481
+            },
+            "observed_graph_launches": 0,
+            "observed_node_count": 384,
+            "observed_kernel_count": 1239,
+            "buckets": [
+              {
+                "label": "gpu_union",
+                "ns": 1344636407,
+                "ms": 1344.636407,
+                "classification": "recovered",
+                "evidence": "union(CUPTI kernel+memcpy+graph); graph parents not added on top of children"
+              },
+              {
+                "label": "graph_exclusive_without_leaves",
+                "ns": 0,
+                "ms": 0.0,
+                "classification": "recovered",
+                "evidence": "graph envelope minus overlapping kernel/copy leaves"
+              },
+              {
+                "label": "host_launch_exclusive",
+                "ns": 2737089,
+                "ms": 2.737089,
+                "classification": "recovered",
+                "evidence": "cudaLaunch/graphLaunch APIs exclusive of GPU union"
+              },
+              {
+                "label": "host_sync_exclusive",
+                "ns": 9135,
+                "ms": 0.009135,
+                "classification": "recovered",
+                "evidence": "synchronization APIs exclusive of GPU union; overlapping cudaEventSynchronize is wait, not added GPU wall"
+              },
+              {
+                "label": "host_memcpy_api_exclusive",
+                "ns": 374002,
+                "ms": 0.374002,
+                "classification": "recovered",
+                "evidence": "host memcpy APIs exclusive of GPU union"
+              },
+              {
+                "label": "host_other_api_exclusive",
+                "ns": 16990,
+                "ms": 0.01699,
+                "classification": "recovered",
+                "evidence": "other CUDA runtime/driver APIs exclusive of GPU union"
+              },
+              {
+                "label": "host_exclusive_total",
+                "ns": 3129093,
+                "ms": 3.129093,
+                "classification": "recovered",
+                "evidence": "union(CPU APIs) minus overlap with GPU union"
+              },
+              {
+                "label": "instrumentation_exclusive",
+                "ns": 0,
+                "ms": 0.0,
+                "classification": "recovered",
+                "evidence": "PROFILER_OVERHEAD/CUPTI overhead exclusive of GPU and host APIs"
+              },
+              {
+                "label": "unresolved_process_gap",
+                "ns": 76827,
+                "ms": 0.076827,
+                "classification": "unresolved",
+                "evidence": "process-scoped gap with neither GPU nor host API coverage; not proven device-wide idle"
+              },
+              {
+                "label": "family_sum_overlap_bookkeeping",
+                "ns": 8352,
+                "ms": 0.008352,
+                "classification": "bookkeeping",
+                "evidence": "sum of per-family GPU unions minus leaf GPU union; concurrent families are not extra wall"
+              }
+            ],
+            "profiler_perturbation": {
+              "median_relative_perturbation": 0.0,
+              "source": "profiler_overhead_union"
+            },
+            "perturbed": false,
+            "within_unresolved_limit": true,
+            "residual_limit": 0.05,
+            "missing_observation": "opt136.window/opt138.prefill envelopes are outside cudaProfilerApi; used in-capture eval/prefill NVTX",
+            "claim_type": "derived",
+            "parent_child_not_double_counted": true,
+            "cpu_overlapping_gpu_not_additive": true,
+            "process_scoped_gaps_are_not_device_wide_idle": true,
+            "no_proportional_allocation": true
+          },
+          "sql": {
+            "kernel": "SELECT start, end FROM CUPTI_ACTIVITY_KIND_KERNEL",
+            "memcpy": "SELECT start, end FROM CUPTI_ACTIVITY_KIND_MEMCPY",
+            "graph": "SELECT start, end FROM CUPTI_ACTIVITY_KIND_GRAPH_TRACE",
+            "units": "export_schema / CUPTI documented nanoseconds"
+          },
+          "quantities_ms": {
+            "ordinary_kernel_count": 1239,
+            "gpu_graph_count": 0,
+            "kernel_copy_union_ms": 1344.64,
+            "graph_envelope_union_ms": 0.0,
+            "combined_union_ms": 1344.64,
+            "first_to_last_span_ms": 1347.76,
+            "outside_combined_envelopes_ms": 3.12
+          }
+        },
+        "wall": {
+          "window_start_ns": 27235688,
+          "window_end_ns": 1375078015,
+          "window_ns": 1347842327,
+          "window_ms": 1347.842327,
+          "window_source": "eval_or_prefill_nvtx",
+          "gpu_union_ns": 1344636407,
+          "gpu_union_ms": 1344.636407,
+          "kernel_copy_union_ns": 1344636407,
+          "graph_envelope_union_ns": 0,
+          "graph_exclusive_without_leaf_ns": 0,
+          "host_exclusive_ns": 3129093,
+          "host_exclusive_ms": 3.129093,
+          "host_launch_exclusive_ns": 2737089,
+          "host_sync_exclusive_ns": 9135,
+          "cpu_gpu_overlap_ns": 1343206909,
+          "cpu_api_union_ns": 1346336002,
+          "instrumentation_union_ns": 638655,
+          "instrumentation_exclusive_ns": 0,
+          "instrumentation_overlap_gpu_or_host_ns": 638655,
+          "unresolved_ns": 76827,
+          "unresolved_ms": 0.076827,
+          "unresolved_share_of_wall": 5.69999906227904e-05,
+          "accounted_ns": 1347842327,
+          "conservation_delta_ns": 0,
+          "conservation_ok": true,
+          "family_union_sum_ns": 1344644759,
+          "family_overlap_ns": 8352,
+          "family_union_ns": {
+            "residual_norm_quant": 240160,
+            "prompt_mmq": 882436428,
+            "gdn_gated_out": 15332623,
+            "attn_prepare": 18706774,
+            "gdn_recurrence": 167253010,
+            "q4_swiglu": 31945950,
+            "attn_core": 223968112,
+            "staging": 2039715,
+            "unclassified": 1685857,
+            "decode_mmv": 683649,
+            "commit_copy": 352481
+          },
+          "observed_graph_launches": 0,
+          "observed_node_count": 384,
+          "observed_kernel_count": 1239,
+          "buckets": [
+            {
+              "label": "gpu_union",
+              "ns": 1344636407,
+              "ms": 1344.636407,
+              "classification": "recovered",
+              "evidence": "union(CUPTI kernel+memcpy+graph); graph parents not added on top of children"
+            },
+            {
+              "label": "graph_exclusive_without_leaves",
+              "ns": 0,
+              "ms": 0.0,
+              "classification": "recovered",
+              "evidence": "graph envelope minus overlapping kernel/copy leaves"
+            },
+            {
+              "label": "host_launch_exclusive",
+              "ns": 2737089,
+              "ms": 2.737089,
+              "classification": "recovered",
+              "evidence": "cudaLaunch/graphLaunch APIs exclusive of GPU union"
+            },
+            {
+              "label": "host_sync_exclusive",
+              "ns": 9135,
+              "ms": 0.009135,
+              "classification": "recovered",
+              "evidence": "synchronization APIs exclusive of GPU union; overlapping cudaEventSynchronize is wait, not added GPU wall"
+            },
+            {
+              "label": "host_memcpy_api_exclusive",
+              "ns": 374002,
+              "ms": 0.374002,
+              "classification": "recovered",
+              "evidence": "host memcpy APIs exclusive of GPU union"
+            },
+            {
+              "label": "host_other_api_exclusive",
+              "ns": 16990,
+              "ms": 0.01699,
+              "classification": "recovered",
+              "evidence": "other CUDA runtime/driver APIs exclusive of GPU union"
+            },
+            {
+              "label": "host_exclusive_total",
+              "ns": 3129093,
+              "ms": 3.129093,
+              "classification": "recovered",
+              "evidence": "union(CPU APIs) minus overlap with GPU union"
+            },
+            {
+              "label": "instrumentation_exclusive",
+              "ns": 0,
+              "ms": 0.0,
+              "classification": "recovered",
+              "evidence": "PROFILER_OVERHEAD/CUPTI overhead exclusive of GPU and host APIs"
+            },
+            {
+              "label": "unresolved_process_gap",
+              "ns": 76827,
+              "ms": 0.076827,
+              "classification": "unresolved",
+              "evidence": "process-scoped gap with neither GPU nor host API coverage; not proven device-wide idle"
+            },
+            {
+              "label": "family_sum_overlap_bookkeeping",
+              "ns": 8352,
+              "ms": 0.008352,
+              "classification": "bookkeeping",
+              "evidence": "sum of per-family GPU unions minus leaf GPU union; concurrent families are not extra wall"
+            }
+          ],
+          "profiler_perturbation": {
+            "median_relative_perturbation": 0.0,
+            "source": "profiler_overhead_union"
+          },
+          "perturbed": false,
+          "within_unresolved_limit": true,
+          "residual_limit": 0.05,
+          "missing_observation": "opt136.window/opt138.prefill envelopes are outside cudaProfilerApi; used in-capture eval/prefill NVTX",
+          "claim_type": "derived",
+          "parent_child_not_double_counted": true,
+          "cpu_overlapping_gpu_not_additive": true,
+          "process_scoped_gaps_are_not_device_wide_idle": true,
+          "no_proportional_allocation": true
+        },
+        "resolved_window": {
+          "window_start_ns": 27235688,
+          "window_end_ns": 1375078015,
+          "source": "eval_or_prefill_nvtx",
+          "missing_observation": "opt136.window/opt138.prefill envelopes are outside cudaProfilerApi; used in-capture eval/prefill NVTX"
+        },
+        "tables_errors": [],
+        "kernel_count": 1239,
+        "cpu_count": 2149,
+        "overhead_count": 7,
+        "nvtx_count": 389,
+        "ok": true,
+        "perturbation": {
+          "usable": true,
+          "identity": "whole_request_native_chrono",
+          "metric": "prefill_ms",
+          "profiled_ms": 1349.57385,
+          "unprofiled_ms": 1355.2738,
+          "median_relative_perturbation": -0.004205755324127084,
+          "source": "opt138_unprofiled_twin",
+          "acceptable": true
+        }
+      },
+      "llama": {
+        "path": "build/optimization-runs/opt138/traces/llama-p4096-node-r0.sqlite",
+        "coverage": {
+          "identity": {
+            "engine": "llama",
+            "metric": "prefill",
+            "prefix": 4096,
+            "eval_count": 4096,
+            "allocated_capacity": 131072,
+            "populated_length": 4096,
+            "graph_mode": "decode_segments8",
+            "output_boundary": "eval_logits_no_host_materialize",
+            "capture_arm": "node",
+            "device": 0,
+            "context": 0,
+            "process": 1
+          },
+          "window_start_ns": 46462631,
+          "window_end_ns": 1280870677,
+          "window_ns": 1234408046,
+          "window_ms": 1234.408046,
+          "tables": {
+            "ANALYSIS_DETAILS": {
+              "count": 1,
+              "unit": null
+            },
+            "ANALYSIS_FILE": {
+              "count": 2,
+              "unit": null
+            },
+            "CUPTI_ACTIVITY_KIND_KERNEL": {
+              "count": 2388,
+              "unit": "ns"
+            },
+            "CUPTI_ACTIVITY_KIND_MEMCPY": {
+              "count": 8,
+              "unit": "ns"
+            },
+            "CUPTI_ACTIVITY_KIND_RUNTIME": {
+              "count": 3654,
+              "unit": "ns"
+            },
+            "CUPTI_ACTIVITY_KIND_SYNCHRONIZATION": {
+              "count": 20,
+              "unit": "ns"
+            },
+            "DIAGNOSTIC_EVENT": {
+              "count": 18,
+              "unit": null
+            },
+            "ENUM_CUDA_DEV_MEM_EVENT_OPER": {
+              "count": 2,
+              "unit": null
+            },
+            "ENUM_CUDA_FUNC_CACHE_CONFIG": {
+              "count": 4,
+              "unit": null
+            },
+            "ENUM_CUDA_KERNEL_LAUNCH_TYPE": {
+              "count": 4,
+              "unit": null
+            },
+            "ENUM_CUDA_MEMCPY_OPER": {
+              "count": 14,
+              "unit": null
+            },
+            "ENUM_CUDA_MEMPOOL_OPER": {
+              "count": 4,
+              "unit": null
+            },
+            "ENUM_CUDA_MEMPOOL_TYPE": {
+              "count": 3,
+              "unit": null
+            },
+            "ENUM_CUDA_MEM_KIND": {
+              "count": 8,
+              "unit": null
+            },
+            "ENUM_CUDA_SHARED_MEM_LIMIT_CONFIG": {
+              "count": 2,
+              "unit": null
+            },
+            "ENUM_CUDA_UNIF_MEM_ACCESS_TYPE": {
+              "count": 5,
+              "unit": null
+            },
+            "ENUM_CUDA_UNIF_MEM_MIGRATION": {
+              "count": 6,
+              "unit": null
+            },
+            "ENUM_CUPTI_STREAM_TYPE": {
+              "count": 4,
+              "unit": null
+            },
+            "ENUM_CUPTI_SYNC_TYPE": {
+              "count": 5,
+              "unit": null
+            },
+            "ENUM_DIAGNOSTIC_SEVERITY_LEVEL": {
+              "count": 5,
+              "unit": null
+            },
+            "ENUM_DIAGNOSTIC_SOURCE_TYPE": {
+              "count": 4,
+              "unit": null
+            },
+            "ENUM_DIAGNOSTIC_TIMESTAMP_SOURCE": {
+              "count": 3,
+              "unit": null
+            },
+            "ENUM_NSYS_EVENT_CLASS": {
+              "count": 89,
+              "unit": null
+            },
+            "ENUM_NSYS_EVENT_TYPE": {
+              "count": 150,
+              "unit": null
+            },
+            "ENUM_NSYS_GENERIC_EVENT_FIELD_ETW_FLAGS": {
+              "count": 7,
+              "unit": null
+            },
+            "ENUM_NSYS_GENERIC_EVENT_FIELD_ETW_PROPERTY": {
+              "count": 8,
+              "unit": null
+            },
+            "ENUM_NSYS_GENERIC_EVENT_FIELD_ETW_TYPE": {
+              "count": 22,
+              "unit": null
+            },
+            "ENUM_NSYS_GENERIC_EVENT_FIELD_TYPE": {
+              "count": 4,
+              "unit": null
+            },
+            "ENUM_NSYS_GENERIC_EVENT_GROUP": {
+              "count": 5,
+              "unit": null
+            },
+            "ENUM_NSYS_GENERIC_EVENT_SOURCE": {
+              "count": 4,
+              "unit": null
+            },
+            "ENUM_SAMPLING_THREAD_STATE": {
+              "count": 11,
+              "unit": null
+            },
+            "ENUM_SCHEDULING_THREAD_BLOCK": {
+              "count": 53,
+              "unit": null
+            },
+            "ENUM_STACK_UNWIND_METHOD": {
+              "count": 10,
+              "unit": null
+            },
+            "META_DATA_CAPTURE": {
+              "count": 136,
+              "unit": null
+            },
+            "META_DATA_EXPORT": {
+              "count": 29,
+              "unit": null
+            },
+            "OSRT_API": {
+              "count": 163,
+              "unit": null
+            },
+            "OSRT_CALLCHAINS": {
+              "count": 802,
+              "unit": null
+            },
+            "PROCESSES": {
+              "count": 5,
+              "unit": null
+            },
+            "PROFILER_OVERHEAD": {
+              "count": 7,
+              "unit": "ns"
+            },
+            "ProcessStreams": {
+              "count": 2,
+              "unit": null
+            },
+            "StringIds": {
+              "count": 271,
+              "unit": null
+            },
+            "TARGET_INFO_CUDA_CONTEXT_INFO": {
+              "count": 1,
+              "unit": null
+            },
+            "TARGET_INFO_CUDA_DEVICE": {
+              "count": 1,
+              "unit": null
+            },
+            "TARGET_INFO_CUDA_STREAM": {
+              "count": 9,
+              "unit": null
+            },
+            "TARGET_INFO_GPU": {
+              "count": 1,
+              "unit": null
+            },
+            "TARGET_INFO_SESSION_START_TIME": {
+              "count": 1,
+              "unit": null
+            },
+            "TARGET_INFO_SYSTEM_ENV": {
+              "count": 71,
+              "unit": null
+            },
+            "ThreadNames": {
+              "count": 29,
+              "unit": null
+            }
+          },
+          "table_names": [
+            "ANALYSIS_DETAILS",
+            "ANALYSIS_FILE",
+            "CUPTI_ACTIVITY_KIND_KERNEL",
+            "CUPTI_ACTIVITY_KIND_MEMCPY",
+            "CUPTI_ACTIVITY_KIND_RUNTIME",
+            "CUPTI_ACTIVITY_KIND_SYNCHRONIZATION",
+            "DIAGNOSTIC_EVENT",
+            "ENUM_CUDA_DEV_MEM_EVENT_OPER",
+            "ENUM_CUDA_FUNC_CACHE_CONFIG",
+            "ENUM_CUDA_KERNEL_LAUNCH_TYPE",
+            "ENUM_CUDA_MEMCPY_OPER",
+            "ENUM_CUDA_MEMPOOL_OPER",
+            "ENUM_CUDA_MEMPOOL_TYPE",
+            "ENUM_CUDA_MEM_KIND",
+            "ENUM_CUDA_SHARED_MEM_LIMIT_CONFIG",
+            "ENUM_CUDA_UNIF_MEM_ACCESS_TYPE",
+            "ENUM_CUDA_UNIF_MEM_MIGRATION",
+            "ENUM_CUPTI_STREAM_TYPE",
+            "ENUM_CUPTI_SYNC_TYPE",
+            "ENUM_DIAGNOSTIC_SEVERITY_LEVEL",
+            "ENUM_DIAGNOSTIC_SOURCE_TYPE",
+            "ENUM_DIAGNOSTIC_TIMESTAMP_SOURCE",
+            "ENUM_NSYS_EVENT_CLASS",
+            "ENUM_NSYS_EVENT_TYPE",
+            "ENUM_NSYS_GENERIC_EVENT_FIELD_ETW_FLAGS",
+            "ENUM_NSYS_GENERIC_EVENT_FIELD_ETW_PROPERTY",
+            "ENUM_NSYS_GENERIC_EVENT_FIELD_ETW_TYPE",
+            "ENUM_NSYS_GENERIC_EVENT_FIELD_TYPE",
+            "ENUM_NSYS_GENERIC_EVENT_GROUP",
+            "ENUM_NSYS_GENERIC_EVENT_SOURCE",
+            "ENUM_SAMPLING_THREAD_STATE",
+            "ENUM_SCHEDULING_THREAD_BLOCK",
+            "ENUM_STACK_UNWIND_METHOD",
+            "META_DATA_CAPTURE",
+            "META_DATA_EXPORT",
+            "OSRT_API",
+            "OSRT_CALLCHAINS",
+            "PROCESSES",
+            "PROFILER_OVERHEAD",
+            "ProcessStreams",
+            "StringIds",
+            "TARGET_INFO_CUDA_CONTEXT_INFO",
+            "TARGET_INFO_CUDA_DEVICE",
+            "TARGET_INFO_CUDA_STREAM",
+            "TARGET_INFO_GPU",
+            "TARGET_INFO_SESSION_START_TIME",
+            "TARGET_INFO_SYSTEM_ENV",
+            "ThreadNames"
+          ],
+          "expected_graph_launches": null,
+          "observed_graph_launches": 0,
+          "observed_kernel_count": 2388,
+          "observed_copy_count": 8,
+          "observed_node_count": 0,
+          "parent_node_correspondence": {
+            "graph_launches": 0,
+            "expanded_nodes": 0,
+            "expected_nodes": null,
+            "matched": true
+          },
+          "drops": 0,
+          "errors": [
+            "node capture missing expanded node identities"
+          ],
+          "kernel_copy_union_ns": 1213555056,
+          "graph_envelope_union_ns": 0,
+          "combined_union_ns": 1213555056,
+          "graph_exclusive_without_leaf_ns": 0,
+          "time_outside_all_activity_ns": 20852990,
+          "first_last_span_ns": 1234408046,
+          "outside_combined_envelopes_in_span_ns": 20852990,
+          "unmapped_kernel_time_ns": 247236139,
+          "named_family_share": 0.7962711804646793,
+          "family_assignment_ok": false,
+          "families": {
+            "residual_norm_quant": {
+              "family": "residual_norm_quant",
+              "count": 306,
+              "union_ns": 32505736,
+              "group": "residual_norm_quant",
+              "ms_per_eval": 0.007935970703125
+            },
+            "unclassified": {
+              "family": "unclassified",
+              "count": 809,
+              "union_ns": 247236139,
+              "group": "unclassified",
+              "ms_per_eval": 0.06036038549804688
+            },
+            "prompt_mmq": {
+              "family": "prompt_mmq",
+              "count": 1120,
+              "union_ns": 854171484,
+              "group": "prompt_mmq",
+              "ms_per_eval": 0.2085379599609375
+            },
+            "q4_swiglu": {
+              "family": "q4_swiglu",
+              "count": 112,
+              "union_ns": 42031511,
+              "group": "ffn",
+              "ms_per_eval": 0.010261599365234375
+            },
+            "attn_core": {
+              "family": "attn_core",
+              "count": 48,
+              "union_ns": 37653644,
+              "group": "attention",
+              "ms_per_eval": 0.0091927841796875
+            },
+            "decode_mmv": {
+              "family": "decode_mmv",
+              "count": 1,
+              "union_ns": 687553,
+              "group": "decode_mmv",
+              "ms_per_eval": 0.000167859619140625
+            }
+          },
+          "profiler_overhead": {},
+          "internal_idle_ms": null,
+          "capture_arm": "node",
+          "cpu_api_union_ns": 612145110,
+          "conservation_ok": true,
+          "parent_child_not_double_counted": true,
+          "nvtx_does_not_add_gpu_work": true,
+          "process_scoped_gaps_are_not_device_wide_idle": true,
+          "coverage_valid": false,
+          "perturbed": false,
+          "sql_window": {
+            "start_ns": 46462631,
+            "end_ns": 1280870677,
+            "source": "markers_or_explicit"
+          },
+          "window_source": "gpu_span_fallback",
+          "window_missing_observation": "NVTX window markers absent; host time before the first and after the last GPU interval is unobservable",
+          "wall_reconciliation": {
+            "window_start_ns": 46462631,
+            "window_end_ns": 1280870677,
+            "window_ns": 1234408046,
+            "window_ms": 1234.408046,
+            "window_source": "gpu_span_fallback",
+            "gpu_union_ns": 1213555056,
+            "gpu_union_ms": 1213.555056,
+            "kernel_copy_union_ns": 1213555056,
+            "graph_envelope_union_ns": 0,
+            "graph_exclusive_without_leaf_ns": 0,
+            "host_exclusive_ns": 2742322,
+            "host_exclusive_ms": 2.742322,
+            "host_launch_exclusive_ns": 1707760,
+            "host_sync_exclusive_ns": 53144,
+            "cpu_gpu_overlap_ns": 609402788,
+            "cpu_api_union_ns": 612145110,
+            "instrumentation_union_ns": 641669,
+            "instrumentation_exclusive_ns": 192987,
+            "instrumentation_overlap_gpu_or_host_ns": 448682,
+            "unresolved_ns": 17917681,
+            "unresolved_ms": 17.917681,
+            "unresolved_share_of_wall": 0.014515201078007231,
+            "accounted_ns": 1234408046,
+            "conservation_delta_ns": 0,
+            "conservation_ok": true,
+            "family_union_sum_ns": 1214286067,
+            "family_overlap_ns": 731011,
+            "family_union_ns": {
+              "residual_norm_quant": 32505736,
+              "unclassified": 247236139,
+              "prompt_mmq": 854171484,
+              "q4_swiglu": 42031511,
+              "attn_core": 37653644,
+              "decode_mmv": 687553
+            },
+            "observed_graph_launches": 0,
+            "observed_node_count": 0,
+            "observed_kernel_count": 2388,
+            "buckets": [
+              {
+                "label": "gpu_union",
+                "ns": 1213555056,
+                "ms": 1213.555056,
+                "classification": "recovered",
+                "evidence": "union(CUPTI kernel+memcpy+graph); graph parents not added on top of children"
+              },
+              {
+                "label": "graph_exclusive_without_leaves",
+                "ns": 0,
+                "ms": 0.0,
+                "classification": "recovered",
+                "evidence": "graph envelope minus overlapping kernel/copy leaves"
+              },
+              {
+                "label": "host_launch_exclusive",
+                "ns": 1707760,
+                "ms": 1.70776,
+                "classification": "recovered",
+                "evidence": "cudaLaunch/graphLaunch APIs exclusive of GPU union"
+              },
+              {
+                "label": "host_sync_exclusive",
+                "ns": 53144,
+                "ms": 0.053144,
+                "classification": "recovered",
+                "evidence": "synchronization APIs exclusive of GPU union; overlapping cudaEventSynchronize is wait, not added GPU wall"
+              },
+              {
+                "label": "host_memcpy_api_exclusive",
+                "ns": 32099,
+                "ms": 0.032099,
+                "classification": "recovered",
+                "evidence": "host memcpy APIs exclusive of GPU union"
+              },
+              {
+                "label": "host_other_api_exclusive",
+                "ns": 997715,
+                "ms": 0.997715,
+                "classification": "recovered",
+                "evidence": "other CUDA runtime/driver APIs exclusive of GPU union"
+              },
+              {
+                "label": "host_exclusive_total",
+                "ns": 2742322,
+                "ms": 2.742322,
+                "classification": "recovered",
+                "evidence": "union(CPU APIs) minus overlap with GPU union"
+              },
+              {
+                "label": "instrumentation_exclusive",
+                "ns": 192987,
+                "ms": 0.192987,
+                "classification": "recovered",
+                "evidence": "PROFILER_OVERHEAD/CUPTI overhead exclusive of GPU and host APIs"
+              },
+              {
+                "label": "unresolved_process_gap",
+                "ns": 17917681,
+                "ms": 17.917681,
+                "classification": "unresolved",
+                "evidence": "process-scoped gap with neither GPU nor host API coverage; not proven device-wide idle"
+              },
+              {
+                "label": "family_sum_overlap_bookkeeping",
+                "ns": 731011,
+                "ms": 0.731011,
+                "classification": "bookkeeping",
+                "evidence": "sum of per-family GPU unions minus leaf GPU union; concurrent families are not extra wall"
+              }
+            ],
+            "profiler_perturbation": {
+              "median_relative_perturbation": 0.0001563397132944482,
+              "source": "profiler_overhead_union"
+            },
+            "perturbed": false,
+            "within_unresolved_limit": true,
+            "residual_limit": 0.05,
+            "missing_observation": "NVTX window markers absent; host time before the first and after the last GPU interval is unobservable",
+            "claim_type": "derived",
+            "parent_child_not_double_counted": true,
+            "cpu_overlapping_gpu_not_additive": true,
+            "process_scoped_gaps_are_not_device_wide_idle": true,
+            "no_proportional_allocation": true,
+            "node_identities_absent_used_kernel_leaves": true
+          },
+          "sql": {
+            "kernel": "SELECT start, end FROM CUPTI_ACTIVITY_KIND_KERNEL",
+            "memcpy": "SELECT start, end FROM CUPTI_ACTIVITY_KIND_MEMCPY",
+            "graph": "SELECT start, end FROM CUPTI_ACTIVITY_KIND_GRAPH_TRACE",
+            "units": "export_schema / CUPTI documented nanoseconds"
+          },
+          "quantities_ms": {
+            "ordinary_kernel_count": 2388,
+            "gpu_graph_count": 0,
+            "kernel_copy_union_ms": 1213.56,
+            "graph_envelope_union_ms": 0.0,
+            "combined_union_ms": 1213.56,
+            "first_to_last_span_ms": 1234.41,
+            "outside_combined_envelopes_ms": 20.85
+          },
+          "node_identities_absent_used_kernel_leaves": true
+        },
+        "wall": {
+          "window_start_ns": 46462631,
+          "window_end_ns": 1280870677,
+          "window_ns": 1234408046,
+          "window_ms": 1234.408046,
+          "window_source": "gpu_span_fallback",
+          "gpu_union_ns": 1213555056,
+          "gpu_union_ms": 1213.555056,
+          "kernel_copy_union_ns": 1213555056,
+          "graph_envelope_union_ns": 0,
+          "graph_exclusive_without_leaf_ns": 0,
+          "host_exclusive_ns": 2742322,
+          "host_exclusive_ms": 2.742322,
+          "host_launch_exclusive_ns": 1707760,
+          "host_sync_exclusive_ns": 53144,
+          "cpu_gpu_overlap_ns": 609402788,
+          "cpu_api_union_ns": 612145110,
+          "instrumentation_union_ns": 641669,
+          "instrumentation_exclusive_ns": 192987,
+          "instrumentation_overlap_gpu_or_host_ns": 448682,
+          "unresolved_ns": 17917681,
+          "unresolved_ms": 17.917681,
+          "unresolved_share_of_wall": 0.014515201078007231,
+          "accounted_ns": 1234408046,
+          "conservation_delta_ns": 0,
+          "conservation_ok": true,
+          "family_union_sum_ns": 1214286067,
+          "family_overlap_ns": 731011,
+          "family_union_ns": {
+            "residual_norm_quant": 32505736,
+            "unclassified": 247236139,
+            "prompt_mmq": 854171484,
+            "q4_swiglu": 42031511,
+            "attn_core": 37653644,
+            "decode_mmv": 687553
+          },
+          "observed_graph_launches": 0,
+          "observed_node_count": 0,
+          "observed_kernel_count": 2388,
+          "buckets": [
+            {
+              "label": "gpu_union",
+              "ns": 1213555056,
+              "ms": 1213.555056,
+              "classification": "recovered",
+              "evidence": "union(CUPTI kernel+memcpy+graph); graph parents not added on top of children"
+            },
+            {
+              "label": "graph_exclusive_without_leaves",
+              "ns": 0,
+              "ms": 0.0,
+              "classification": "recovered",
+              "evidence": "graph envelope minus overlapping kernel/copy leaves"
+            },
+            {
+              "label": "host_launch_exclusive",
+              "ns": 1707760,
+              "ms": 1.70776,
+              "classification": "recovered",
+              "evidence": "cudaLaunch/graphLaunch APIs exclusive of GPU union"
+            },
+            {
+              "label": "host_sync_exclusive",
+              "ns": 53144,
+              "ms": 0.053144,
+              "classification": "recovered",
+              "evidence": "synchronization APIs exclusive of GPU union; overlapping cudaEventSynchronize is wait, not added GPU wall"
+            },
+            {
+              "label": "host_memcpy_api_exclusive",
+              "ns": 32099,
+              "ms": 0.032099,
+              "classification": "recovered",
+              "evidence": "host memcpy APIs exclusive of GPU union"
+            },
+            {
+              "label": "host_other_api_exclusive",
+              "ns": 997715,
+              "ms": 0.997715,
+              "classification": "recovered",
+              "evidence": "other CUDA runtime/driver APIs exclusive of GPU union"
+            },
+            {
+              "label": "host_exclusive_total",
+              "ns": 2742322,
+              "ms": 2.742322,
+              "classification": "recovered",
+              "evidence": "union(CPU APIs) minus overlap with GPU union"
+            },
+            {
+              "label": "instrumentation_exclusive",
+              "ns": 192987,
+              "ms": 0.192987,
+              "classification": "recovered",
+              "evidence": "PROFILER_OVERHEAD/CUPTI overhead exclusive of GPU and host APIs"
+            },
+            {
+              "label": "unresolved_process_gap",
+              "ns": 17917681,
+              "ms": 17.917681,
+              "classification": "unresolved",
+              "evidence": "process-scoped gap with neither GPU nor host API coverage; not proven device-wide idle"
+            },
+            {
+              "label": "family_sum_overlap_bookkeeping",
+              "ns": 731011,
+              "ms": 0.731011,
+              "classification": "bookkeeping",
+              "evidence": "sum of per-family GPU unions minus leaf GPU union; concurrent families are not extra wall"
+            }
+          ],
+          "profiler_perturbation": {
+            "median_relative_perturbation": 0.0001563397132944482,
+            "source": "profiler_overhead_union"
+          },
+          "perturbed": false,
+          "within_unresolved_limit": true,
+          "residual_limit": 0.05,
+          "missing_observation": "NVTX window markers absent; host time before the first and after the last GPU interval is unobservable",
+          "claim_type": "derived",
+          "parent_child_not_double_counted": true,
+          "cpu_overlapping_gpu_not_additive": true,
+          "process_scoped_gaps_are_not_device_wide_idle": true,
+          "no_proportional_allocation": true,
+          "node_identities_absent_used_kernel_leaves": true
+        },
+        "resolved_window": {
+          "window_start_ns": 46462631,
+          "window_end_ns": 1280870677,
+          "source": "gpu_span_fallback",
+          "missing_observation": "NVTX window markers absent; host time before the first and after the last GPU interval is unobservable"
+        },
+        "tables_errors": [],
+        "kernel_count": 2388,
+        "cpu_count": 3674,
+        "overhead_count": 7,
+        "nvtx_count": 0,
+        "ok": true,
+        "perturbation": {
+          "usable": true,
+          "identity": "whole_request_native_chrono",
+          "metric": "prefill_ms",
+          "profiled_ms": 1257.1977,
+          "unprofiled_ms": 1262.77746,
+          "median_relative_perturbation": -0.004418640795188155,
+          "source": "opt138_unprofiled_twin",
+          "acceptable": true
+        }
+      },
+      "legacy_family_sum": {
+        "regrouped": {
+          "families": [
+            {
+              "family": "attn_fused",
+              "logical_members": [
+                "attn_prepare",
+                "attn_core"
+              ],
+              "Quartz_ms": 242.674886,
+              "llama_ms": 37.653644,
+              "delta_ms": 205.02124199999997,
+              "kernel_ids": [],
+              "coverage_status": "matched",
+              "proof_limit": "enclosing fused kernel; comparison is the fused boundary"
+            },
+            {
+              "family": "decode_mmv",
+              "logical_members": [
+                "decode_mmv"
+              ],
+              "Quartz_ms": 0.683649,
+              "llama_ms": 0.687553,
+              "delta_ms": -0.0039040000000000186,
+              "kernel_ids": [],
+              "coverage_status": "matched",
+              "proof_limit": "leaf family"
+            },
+            {
+              "family": "prompt_mmq",
+              "logical_members": [
+                "prompt_mmq"
+              ],
+              "Quartz_ms": 882.436428,
+              "llama_ms": 854.171484,
+              "delta_ms": 28.264944000000014,
+              "kernel_ids": [],
+              "coverage_status": "matched",
+              "proof_limit": "leaf family"
+            },
+            {
+              "family": "q4_ffn_fused",
+              "logical_members": [
+                "q4_swiglu"
+              ],
+              "Quartz_ms": 31.94595,
+              "llama_ms": 42.031511,
+              "delta_ms": -10.085561000000002,
+              "kernel_ids": [],
+              "coverage_status": "matched",
+              "proof_limit": "enclosing fused kernel; comparison is the fused boundary"
+            },
+            {
+              "family": "residual_norm_quant",
+              "logical_members": [
+                "residual_norm_quant"
+              ],
+              "Quartz_ms": 0.24016,
+              "llama_ms": 32.505736,
+              "delta_ms": -32.265575999999996,
+              "kernel_ids": [],
+              "coverage_status": "matched",
+              "proof_limit": "leaf family"
+            }
+          ],
+          "matched_disjoint_excess_ms": 190.93114499999996,
+          "unmatched_quartz_ms": {},
+          "unmatched_llama_ms": {},
+          "unmatched_work_gap_ms": 1.685857,
+          "unclassified_ms": 1.685857
+        },
+        "reconciliation": {
+          "quartz_wall_ms": 1347.842327,
+          "llama_wall_ms": 1234.408046,
+          "observed_gap_ms": 113.43428100000006,
+          "matched_disjoint_excess_ms": 190.93114499999996,
+          "unmatched_work_gap_ms": 1.685857,
+          "scheduling_host_residual_ms": 0.0,
+          "overlap_ms": 0.0,
+          "reconstructed_gap_ms": 192.61700199999996,
+          "absolute_residual_ms": -79.1827209999999,
+          "residual_limit_ms": 67.39211635000001,
+          "residual_share_of_quartz_wall": 0.058747762563773454,
+          "ranking_complete": false,
+          "proof_limit": "absolute residual above 5% of Quartz wall; mapping/window diagnosis required",
+          "method": "opt138_family_sum_host_unmeasured"
+        }
+      },
+      "disjoint_wall_gap": {
+        "quartz_wall_ms": 1347.842327,
+        "llama_wall_ms": 1234.408046,
+        "observed_gap_ms": 113.43428100000006,
+        "gpu_union_gap_ms": 131.08135100000004,
+        "host_exclusive_gap_ms": 0.386771,
+        "instrumentation_exclusive_gap_ms": -0.192987,
+        "unresolved_gap_ms": -17.840854,
+        "reconstructed_gap_ms": 113.43428100000006,
+        "absolute_residual_ms": 0.0,
+        "residual_limit_ms": 67.39211635000001,
+        "residual_share_of_quartz_wall": 0.0,
+        "ranking_complete": true,
+        "method": "disjoint_gpu_union_plus_host_exclusive_plus_unresolved",
+        "no_proportional_allocation": true,
+        "family_overlap_bookkeeping_ms": {
+          "quartz": 0.008352,
+          "llama": 0.731011
+        }
+      }
+    }
+  ],
+  "family_plan": "task=OPT-142 mode=acceptance phase=reproduce loop_product=2 cases=2 candidates=1 warmups=0 samples=1 tokens=1",
+  "measured_at": "2026-09-15T00:48:58Z"
+}
