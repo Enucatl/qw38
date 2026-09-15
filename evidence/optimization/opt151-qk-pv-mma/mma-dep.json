@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "task": "OPT-151",
+  "workload": "mma-dep",
+  "ok": true,
+  "qk_mma_used": true,
+  "pv_mma_used": true,
+  "qk_max_abs": 3.35276127e-08,
+  "pv_max_abs": 0,
+  "nonfinite": 0,
+  "zero_weight_helper": false,
+  "keep": false,
+  "phase": "mma-dep",
+  "mode": "feedback",
+  "family_plan": "task=OPT-151 mode=feedback phase=correctness loop_product=28 cases=14 candidates=2 warmups=0 samples=1 tokens=1",
+  "stdout_tail": "\n==========\n== CUDA ==\n==========\n\nCUDA Version 13.0.2\n\nContainer image Copyright (c) 2016-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.\n\nThis container image and its contents are governed by the NVIDIA Deep Learning Container License.\nBy pulling and using the container, you accept the terms and conditions of this license:\nhttps://developer.nvidia.com/ngc/nvidia-deep-learning-container-license\n\nA copy of this license is made available in this container at /NGC-DL-CONTAINER-LICENSE for your convenience.\n\nQW38_OPT151_QK_PV_MMA_RESULT={\"schema_version\":1,\"task\":\"OPT-151\",\"workload\":\"mma-dep\",\"ok\":true,\"qk_mma_used\":true,\"pv_mma_used\":true,\"qk_max_abs\":3.35276127e-08,\"pv_max_abs\":0,\"nonfinite\":0,\"zero_weight_helper\":false,\"keep\":false}\nQW38_OPT151_NATIVE_COUNTS={\"schema_version\":1,\"task\":\"OPT-151\",\"observed_warmups\":0,\"observed_samples\":1,\"observed_candidates\":1,\"observed_shapes\":1,\"observed_tier\":\"screen\",\"keep\":false}\n"
+}

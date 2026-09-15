@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "task": "OPT-151",
+  "candidate": "decode_attention_qk_pv_mma_v2",
+  "authority": "pinned llama.cpp",
+  "llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+  "license": "MIT",
+  "authors": "The ggml authors",
+  "adapter_namespace": "qw38::cuda::opt151",
+  "specialization": "Ampere fattn-mma-f16 DKQ=DV=256 ncols1=1 ncols2=8 nthreads=64 occupancy=4 nbatch_fa=64 QK and PV MMA over dense BF16 KV",
+  "not_vendored": [
+    "ggml tensor/runtime",
+    "ggml graph/allocator",
+    "ggml CLI/model",
+    "current llama HEAD as release authority"
+  ],
+  "copied_organization": [
+    {
+      "file": ".cache/authorities/llama.cpp/ggml/src/ggml-cuda/fattn-mma-f16.cuh",
+      "sha256": "08977d8e6e26ce2c8554c85c97e1fa07c1c4e3bdbe454eaf9b9b53c677fa4038",
+      "use": "KQ and VKQ MMA fragment organization, tiled softmax rescaling, nbatch_fa=64, nthreads=64, occupancy 4, ncols2=8 GQA pad"
+    },
+    {
+      "file": ".cache/authorities/llama.cpp/ggml/src/ggml-cuda/mma.cuh",
+      "sha256": "pinned-with-cuda-mma-cuh",
+      "use": "m16n8k16 f16.f32 fragment layout"
+    }
+  ],
+  "local_modifications": [
+    "BF16 committed/candidate KV load into a bounded F16 tile via FP32 with OPT-111 rounding",
+    "Quartz rotating cache physical strides and packed_kv_load for committed rows",
+    "GQA ratio six; padded eight-column tile masks heads 6 and 7",
+    "Q scaled by 1/sqrt(256) then F16 RN before QK MMA",
+    "softmax probabilities rounded to F16 for PV MMA; FP32 VKQ combine across two warps",
+    "causal frontier via decode launch state; no ggml mask tensor",
+    "output gating and merge of frozen OPT-137 graph-bucket partitions remain outside the MMA core",
+    "no persistent F16 shadow cache; no whole-cache conversion",
+    "OPT-137 scalar QK/PV kernel retained as parent; production pin kSelectedOpt151QkPvMma stays false until keep"
+  ]
+}

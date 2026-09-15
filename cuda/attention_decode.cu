@@ -2,6 +2,7 @@
 #include "fattn_mma_f16.cuh"
 #include "mma.cuh"
 #include "opt137_dense_mma_decode.cuh"
+#include "opt151_qk_pv_mma_decode.cuh"
 #include "opt148_short_decode_flash.cuh"
 #include "pdl_launch.cuh"
 #include "rms_norm.cuh"
@@ -2349,6 +2350,15 @@ int decode_kv_parts_for_position(std::size_t position) noexcept {
 
 int opt137_mma_occupancy(int* nsm) noexcept { return opt137::occupancy(nsm); }
 
+int opt151_mma_occupancy(int* nsm) noexcept { return opt151::occupancy(nsm); }
+
+cudaError_t opt151_launch_mma_products(
+    const __half* q_cols, const __half* k_tile, const __half* v_tile,
+    float* scores_out, float* pv_out, cudaStream_t stream) noexcept {
+  return opt151::launch_mma_products(q_cols, k_tile, v_tile, scores_out, pv_out,
+                                     stream);
+}
+
 void opt137_prepare_mma_runtime() noexcept {
   if (!opt137_mma_enabled()) return;
   if (g_opt137_frozen_n_parts[0] == 0) {
@@ -2367,6 +2377,7 @@ void opt137_prepare_mma_runtime() noexcept {
         opt137::dense_bf16_tile_f16_mma_decode,
         cudaFuncAttributeMaxDynamicSharedMemorySize,
         static_cast<int>(opt137::shared_bytes()));
+    opt151::prepare_runtime();
     shared_ready = true;
   }
 }
@@ -2751,9 +2762,15 @@ cudaError_t launch_attention_prepare_partitioned(
                                         query_norm_scale, normalized_query,
                                         stream, launch);
     if (error != cudaSuccess) return error;
-    error = opt137::launch_core(config, position, mma_parts, normalized_query,
-                                committed, candidate_row, partial_vkq, meta,
-                                stream, launch);
+    if (opt151_uses_qk_pv_mma_at(position)) {
+      error = opt151::launch_core(config, position, mma_parts, normalized_query,
+                                  committed, candidate_row, partial_vkq, meta,
+                                  stream, launch);
+    } else {
+      error = opt137::launch_core(config, position, mma_parts, normalized_query,
+                                  committed, candidate_row, partial_vkq, meta,
+                                  stream, launch);
+    }
     if (error != cudaSuccess) return error;
     merge_decode_kv_parts<<<config.query_heads, kThreads, 0, stream>>>(
         config, mma_parts, partial_vkq, meta, output_gate, output);

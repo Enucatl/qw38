@@ -448,6 +448,7 @@ int apply_quality_selectors(const Options& options) {
           decode_attn != "decode_attention_flash_vec_v1" &&
           !qw38::cuda::apply_opt130_dense_attention_ident(decode_attn.c_str()) &&
           !qw38::cuda::apply_opt137_dense_mma_ident(decode_attn.c_str()) &&
+          !qw38::cuda::apply_opt151_qk_pv_mma_ident(decode_attn.c_str()) &&
           !qw38::cuda::apply_decode_attention_flash_vec_ident(
               decode_attn.c_str())) {
         std::fprintf(stderr, "invalid decode_attention %s\n",
@@ -461,6 +462,9 @@ int apply_quality_selectors(const Options& options) {
       if (decode_attn == "decode_attention_flash_vec_v1") {
         qw38::cuda::apply_decode_attention_flash_vec_ident(
             decode_attn.c_str());
+      }
+      if (decode_attn == "decode_attention_qk_pv_mma_v2") {
+        qw38::cuda::apply_opt151_qk_pv_mma_ident(decode_attn.c_str());
       }
     }
     std::string decode_norm;

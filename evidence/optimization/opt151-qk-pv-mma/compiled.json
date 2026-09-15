@@ -1,0 +1,7 @@
+{
+  "kernel_symbol": true,
+  "hmma_count": 1112,
+  "survives": true,
+  "data_dependency_from_mma_dep": true,
+  "zero_weight_helper": false
+}

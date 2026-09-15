@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "task": "OPT-151",
+  "phase": "quality",
+  "mode": "acceptance",
+  "ok": false,
+  "skipped": true,
+  "skip_reason": "screened_out",
+  "opt058_invoked": false,
+  "candidate_nll_measured": false,
+  "candidate_nll_not_measured": true
+}

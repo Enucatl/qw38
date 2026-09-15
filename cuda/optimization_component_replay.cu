@@ -2815,7 +2815,8 @@ int run_family(const Options& options, qw38::cuda::ReplayFamily family) {
           options.decode_attention) &&
       !qw38::cuda::apply_opt130_dense_attention_ident(
           options.decode_attention) &&
-      !qw38::cuda::apply_opt137_dense_mma_ident(options.decode_attention)) {
+      !qw38::cuda::apply_opt137_dense_mma_ident(options.decode_attention) &&
+      !qw38::cuda::apply_opt151_qk_pv_mma_ident(options.decode_attention)) {
     std::fprintf(stderr, "invalid --decode-attention %s\n",
                  options.decode_attention);
     if (rounds != nullptr) std::fclose(rounds);

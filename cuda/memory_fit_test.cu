@@ -86,7 +86,8 @@ int main(int argc, char** argv) {
   if (decode_attention != nullptr &&
       !qw38::cuda::apply_decode_attention_flash_vec_ident(decode_attention) &&
       !qw38::cuda::apply_opt130_dense_attention_ident(decode_attention) &&
-      !qw38::cuda::apply_opt137_dense_mma_ident(decode_attention)) {
+      !qw38::cuda::apply_opt137_dense_mma_ident(decode_attention) &&
+      !qw38::cuda::apply_opt151_qk_pv_mma_ident(decode_attention)) {
     std::fprintf(stderr, "invalid --decode-attention %s\n", decode_attention);
     return 1;
   }

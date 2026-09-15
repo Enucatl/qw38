@@ -1069,7 +1069,8 @@ int run_keep_ab(const Options& options) {
                                             : "hybrid_crossover";
           if (!qw38::cuda::apply_decode_attention_flash_vec_ident(path) &&
               !qw38::cuda::apply_opt130_dense_attention_ident(path) &&
-              !qw38::cuda::apply_opt137_dense_mma_ident(path)) {
+              !qw38::cuda::apply_opt137_dense_mma_ident(path) &&
+              !qw38::cuda::apply_opt151_qk_pv_mma_ident(path)) {
             std::fprintf(stderr, "invalid --decode-attention %s\n", path);
             return 2;
           }

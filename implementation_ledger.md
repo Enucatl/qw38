@@ -349,7 +349,7 @@ OPT-124 assesses the remaining ceiling without claiming universal optimality.
 | OPT-148 | Screen a short-decode flash-style vector attention path | OPT-135, OPT-147 | done | `keep`; `decode_attention_flash_vec_v1` flash-style vector vs parent `vec128_online`; D2048 complete-family screen 1.776→0.602 ms; OPT-058 held-out NLL 1.7875990840085783 identical; 131072 reserve pass; `target_guard_v2` D2048 decode_only g=1.209 (+10.32 tok/s); shipping pin flipped; mechanism unknown | [`tasks/OPT-148.md`](tasks/OPT-148.md); [`tools/opt148_short_decode_flash.py`](tools/opt148_short_decode_flash.py); [`pins/opt148_short_decode_flash_contract.json`](pins/opt148_short_decode_flash_contract.json); [`fixtures/opt148_short_decode_flash.json`](fixtures/opt148_short_decode_flash.json); [`evidence/optimization/opt148-short-decode-flash/REPORT.md`](evidence/optimization/opt148-short-decode-flash/REPORT.md); verification 2026-09-15T08:26:00Z |
 | OPT-149 | Screen normalization fused directly into Q8_1 staging | OPT-135, OPT-148 | done | `screened_out`; `norm_to_q8_1_screen_v1` D2048 complete decode-mixer family 2.101→2.256 ms (−0.155 ms); quality skipped (`screened_out_retain_parent`, not stubbed); parent `current_bf16_q8_staging` retained; OPT-147/148 unchanged; shipping delta 0; `claims_throughput=false` | [`tasks/OPT-149.md`](tasks/OPT-149.md); [`tools/opt149_norm_q8.py`](tools/opt149_norm_q8.py); [`pins/opt149_norm_q8_contract.json`](pins/opt149_norm_q8_contract.json); [`fixtures/opt149_norm_q8.json`](fixtures/opt149_norm_q8.json); [`evidence/optimization/opt149-norm-q8/REPORT.md`](evidence/optimization/opt149-norm-q8/REPORT.md); verification 2026-09-15T09:10:00Z |
 | OPT-150 | Establish current attention dataflow and matched decode scaling | OPT-136, OPT-137, OPT-148, OPT-149 | done | Diagnostics only; QK FP32+warp_sum with zero-weight MMA helper, PV scalar; 2× HMMA.16816 SASS survival (not output-producing proof); dispatch 13 positions with llama MMA at padded 8192 (pos 7936) vs Quartz MMA at 8192; matched decode-only ms/token ratios D2048/D8192/D32768 1.16/1.20/1.55; D8192 llama family null (documented IMA); OPT-129/136 corrections appended; no production change; `claims_throughput=false` | [`tasks/OPT-150.md`](tasks/OPT-150.md); [`tools/opt150_attention_dataflow.py`](tools/opt150_attention_dataflow.py); [`pins/opt150_attention_dataflow_contract.json`](pins/opt150_attention_dataflow_contract.json); [`fixtures/opt150_attention_dataflow.json`](fixtures/opt150_attention_dataflow.json); [`evidence/optimization/opt150-attention-dataflow/REPORT.md`](evidence/optimization/opt150-attention-dataflow/REPORT.md); verification 2026-09-15T12:29:00Z |
-| OPT-151 | Implement output-producing QK and PV MMA for long decode | OPT-135, OPT-150 | pending | One pinned-organization BF16-tile candidate uses real MMA outputs for both products; bounded screen and quality/state/128K plus D8192/D32768 target_guard_v2 establish keep or measured no-keep | [`tasks/OPT-151.md`](tasks/OPT-151.md) |
+| OPT-151 | Implement output-producing QK and PV MMA for long decode | OPT-135, OPT-150 | done | `screened_out`; `decode_attention_qk_pv_mma_v2` D8192 complete 16-layer family 3.252→6.304 ms (~1.94× slower); D32768 13.804→38.466 ms (~2.79× slower); real QK+PV MMA (HMMA 1112, mma-dep ok); quality skipped (`screened_out`, not stubbed); parent `dense_bf16_tile_f16_mma_decode_v1` retained; shipping delta 0; `claims_throughput=false` | [`tasks/OPT-151.md`](tasks/OPT-151.md); [`tools/opt151_qk_pv_mma.py`](tools/opt151_qk_pv_mma.py); [`pins/opt151_qk_pv_mma_contract.json`](pins/opt151_qk_pv_mma_contract.json); [`fixtures/opt151_qk_pv_mma.json`](fixtures/opt151_qk_pv_mma.json); [`evidence/optimization/opt151-qk-pv-mma/REPORT.md`](evidence/optimization/opt151-qk-pv-mma/REPORT.md); verification 2026-09-15T13:01:40Z |
 | OPT-152 | Screen vector attention throughout sub-8K decode | OPT-135, OPT-150, OPT-151 | pending | Existing OPT-148 consumer screens gap-only versus all-short coverage; at most one survivor passes frozen target/guard, actual graph boundaries and quality/state gates, or measured no-keep | [`tasks/OPT-152.md`](tasks/OPT-152.md) |
 
 ### Post-138 counter evidence and optimization batch (OPT-139–146)
@@ -8733,3 +8733,28 @@ All three tasks are pending; no kernel, selector or historical verdict changed.
   [`evidence/optimization/opt150-attention-dataflow/REPORT.md`](evidence/optimization/opt150-attention-dataflow/REPORT.md).
 - OPT-150 marked `done`. Coupled IDs: none. Provides authenticated baseline for
   OPT-151/152.
+
+### OPT-151 delivery (2026-09-15T13:02:43Z)
+
+- Implemented `decode_attention_qk_pv_mma_v2` in `cuda/opt151_qk_pv_mma_decode.cuh`:
+  output-producing QK and PV MMA (`mma.m16n8k16.row.col.f32.f16.f16.f32`), dense
+  BF16→F16 tile conversion, GQA6 padded to 8 columns, frozen OPT-137 graph-bucket
+  partitions (131/170/170), llama Ampere D256 geometry (64 threads, nbatch_fa=64).
+  Correctness and mma-dep passed after B-fragment packing fix; mechanism HMMA
+  **1112**, data-dependent QK/PV, 48 graph launches at D8192/D32768.
+- Screen **screened_out**: D8192 complete 16-layer family parent **3.252** ms vs
+  candidate **6.304** ms (~**1.94×** slower); D32768 parent **13.804** ms vs
+  candidate **38.466** ms (~**2.79×** slower). Quality/state/performance skipped
+  after failed screen (`screened_out`, not stubbed NLL). Parent
+  `dense_bf16_tile_f16_mma_decode_v1` retained; `kSelectedOpt151QkPvMma = false`,
+  `kSelectedOpt137DenseMma = true`.
+- Verification **PASS** (2026-09-15T13:01:40Z): ruff clean; pytest **7 passed**;
+  docker `cuda-opt151-diagnostics` pass; screen/mechanism/correctness sidecars
+  consistent; OPT-137 historical keep unchanged.
+- Candidate measured delta: D8192 complete family ~**1.94×** slower, D32768 ~**2.79×**
+  slower; shipping delta: **0**; quality result: **skipped** (screened_out).
+- Key evidence: [`tasks/OPT-151.md`](tasks/OPT-151.md);
+  [`tools/opt151_qk_pv_mma.py`](tools/opt151_qk_pv_mma.py);
+  [`fixtures/opt151_qk_pv_mma.json`](fixtures/opt151_qk_pv_mma.json);
+  [`evidence/optimization/opt151-qk-pv-mma/REPORT.md`](evidence/optimization/opt151-qk-pv-mma/REPORT.md).
+- OPT-151 marked `done`. Coupled IDs: none. OPT-152 unchanged (`pending`).

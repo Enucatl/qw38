@@ -298,6 +298,14 @@ constexpr std::size_t kOpt137RepVisible8448 = 8448;
 constexpr std::size_t kOpt137RepVisible33024 = 33024;
 constexpr std::size_t kOpt137RepVisible131072 = 131072;
 constexpr bool kSelectedOpt137DenseMma = true;
+// OPT-151 QK+PV MMA. Production stays OPT-137 scalar-QK/PV MMA until KEEP.
+constexpr char kLegalDecodeAttentionQkPvMmaV2[] =
+    "decode_attention_qk_pv_mma_v2";
+constexpr char kDecodeAttentionQkPvMmaV2Launch[] =
+    "decode_attention_qk_pv_mma_v2";
+constexpr int kOpt151MmaOccupancyPinned = 4;
+constexpr int kOpt151MmaNthreads = 64;
+constexpr bool kSelectedOpt151QkPvMma = false;
 // OPT-148 flash-style vector decode. Production stays vec128_online in the
 // hybrid crossover window until KEEP flips this pin. D128 warp_query and
 // OPT-137 MMA at >=8192 are unchanged. Do not revive OPT-130 n_parts=8.
@@ -308,6 +316,12 @@ constexpr char kDecodeAttentionFlashVecLaunch[] =
 constexpr bool kSelectedDecodeAttentionFlashVec = true;
 
 inline thread_local bool g_opt137_mma_override = false;
+inline thread_local bool g_opt151_qk_pv_mma_override = false;
+inline thread_local unsigned int g_opt151_mma_launches = 0;
+inline thread_local unsigned int g_opt151_mma_grid_x = 0;
+inline thread_local unsigned int g_opt151_mma_grid_y = 0;
+inline thread_local unsigned int g_opt151_mma_block = 0;
+inline thread_local int g_opt151_last_n_parts = 0;
 inline thread_local bool g_decode_attention_flash_vec_override = false;
 inline thread_local int g_opt137_frozen_n_parts[3] = {0, 0, 0};
 inline thread_local unsigned int g_opt137_mma_launches = 0;
@@ -384,6 +398,15 @@ inline bool opt137_mma_enabled() noexcept {
 
 inline bool opt137_uses_mma_at(std::size_t position) noexcept {
   return opt137_mma_enabled() &&
+         position >= static_cast<std::size_t>(kOpt137MmaThreshold);
+}
+
+inline bool opt151_qk_pv_mma_enabled() noexcept {
+  return g_opt151_qk_pv_mma_override || kSelectedOpt151QkPvMma;
+}
+
+inline bool opt151_uses_qk_pv_mma_at(std::size_t position) noexcept {
+  return opt151_qk_pv_mma_enabled() &&
          position >= static_cast<std::size_t>(kOpt137MmaThreshold);
 }
 
@@ -468,8 +491,26 @@ inline unsigned int last_opt137_mma_launches() noexcept {
 
 inline void reset_opt137_mma_launches() noexcept { g_opt137_mma_launches = 0; }
 
+inline void record_opt151_mma_launch(unsigned int grid_x, unsigned int grid_y,
+                                     unsigned int block, int n_parts) noexcept {
+  ++g_opt151_mma_launches;
+  g_opt151_mma_grid_x = grid_x;
+  g_opt151_mma_grid_y = grid_y;
+  g_opt151_mma_block = block;
+  g_opt151_last_n_parts = n_parts;
+}
+
+inline unsigned int last_opt151_mma_launches() noexcept {
+  return g_opt151_mma_launches;
+}
+
+inline void reset_opt151_mma_launches() noexcept { g_opt151_mma_launches = 0; }
+
 inline const char* decode_attention_vec128_path_for_position(
     std::size_t position) noexcept {
+  if (opt151_uses_qk_pv_mma_at(position)) {
+    return kLegalDecodeAttentionQkPvMmaV2;
+  }
   if (opt137_uses_mma_at(position)) {
     return kLegalDecodeAttentionDenseMma;
   }
@@ -616,14 +657,35 @@ inline bool apply_opt137_dense_mma_ident(const char* path) noexcept {
   if (path != nullptr &&
       std::strcmp(path, kLegalDecodeAttentionDenseMma) == 0) {
     g_opt137_mma_override = true;
+    g_opt151_qk_pv_mma_override = false;
     return true;
   }
   if (path != nullptr &&
       std::strcmp(path, kLegalDecodeAttentionHybridCrossover) == 0) {
     g_opt137_mma_override = false;
+    g_opt151_qk_pv_mma_override = false;
     return true;
   }
   return false;
+}
+
+inline bool apply_opt151_qk_pv_mma_ident(const char* path) noexcept {
+  if (path != nullptr &&
+      std::strcmp(path, kLegalDecodeAttentionQkPvMmaV2) == 0) {
+    g_opt151_qk_pv_mma_override = true;
+    return true;
+  }
+  if (path != nullptr &&
+      (std::strcmp(path, kLegalDecodeAttentionDenseMma) == 0 ||
+       std::strcmp(path, kLegalDecodeAttentionHybridCrossover) == 0)) {
+    g_opt151_qk_pv_mma_override = false;
+    return true;
+  }
+  return false;
+}
+
+inline void clear_opt151_qk_pv_mma_ident() noexcept {
+  g_opt151_qk_pv_mma_override = false;
 }
 
 inline void set_decode_attention_flash_vec_override(bool enabled) noexcept {
@@ -655,6 +717,7 @@ inline void clear_decode_attention_flash_vec_override() noexcept {
 
 inline void clear_opt137_dense_mma_ident() noexcept {
   g_opt137_mma_override = false;
+  g_opt151_qk_pv_mma_override = false;
 }
 
 inline bool apply_opt130_dense_attention_ident(const char* path) noexcept {
@@ -669,10 +732,14 @@ inline bool apply_opt130_dense_attention_ident(const char* path) noexcept {
     clear_decode_attention_verified_max_override();
     clear_vec128_n_parts_override();
     g_opt137_mma_override = false;
+    g_opt151_qk_pv_mma_override = false;
     g_decode_attention_flash_vec_override = false;
     return true;
   }
   if (apply_opt137_dense_mma_ident(path)) {
+    return true;
+  }
+  if (apply_opt151_qk_pv_mma_ident(path)) {
     return true;
   }
   return false;
@@ -685,6 +752,9 @@ inline void clear_opt130_dense_attention_ident() noexcept {
 }
 
 inline const char* effective_decode_attention_dispatch_path() noexcept {
+  if (opt151_qk_pv_mma_enabled()) {
+    return kLegalDecodeAttentionQkPvMmaV2;
+  }
   if (opt137_mma_enabled()) {
     return kLegalDecodeAttentionDenseMma;
   }
@@ -699,6 +769,9 @@ inline const char* effective_decode_attention_dispatch_path() noexcept {
 
 inline const char* effective_decode_attention_dispatch_path(
     std::size_t position) noexcept {
+  if (opt151_uses_qk_pv_mma_at(position)) {
+    return kLegalDecodeAttentionQkPvMmaV2;
+  }
   if (opt137_uses_mma_at(position)) {
     return kLegalDecodeAttentionDenseMma;
   }
@@ -772,6 +845,19 @@ struct Opt137DenseMmaScope final {
   ~Opt137DenseMmaScope() { clear_opt137_dense_mma_ident(); }
   Opt137DenseMmaScope(const Opt137DenseMmaScope&) = delete;
   Opt137DenseMmaScope& operator=(const Opt137DenseMmaScope&) = delete;
+};
+
+struct Opt151QkPvMmaScope final {
+  explicit Opt151QkPvMmaScope(const char* path) noexcept
+      : previous_(g_opt151_qk_pv_mma_override) {
+    apply_opt151_qk_pv_mma_ident(path);
+  }
+  ~Opt151QkPvMmaScope() { g_opt151_qk_pv_mma_override = previous_; }
+  Opt151QkPvMmaScope(const Opt151QkPvMmaScope&) = delete;
+  Opt151QkPvMmaScope& operator=(const Opt151QkPvMmaScope&) = delete;
+
+ private:
+  bool previous_;
 };
 
 struct DecodeAttentionFlashVecScope final {
