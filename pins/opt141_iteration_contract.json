@@ -1,0 +1,162 @@
+{
+  "schema_version": 1,
+  "task": "OPT-141",
+  "yardstick": "matched_llama_ncu_counters",
+  "claims_throughput": false,
+  "claims_performance_improvement": false,
+  "require_candidate_nll": false,
+  "opt074_family_admission_required": false,
+  "opt074_coverage_unadmitted_is_blocker": false,
+  "performance_admission": {
+    "enabled": true,
+    "instrumentation_only": true
+  },
+  "image": "qw38-cuda:13.0.2",
+  "model": "models/Qwen3.8-27B-Q4_K_M.gguf",
+  "gpu_lock": "build/optimization-runs/qw38-gpu.lock",
+  "aggregate_deadline_s": 7200,
+  "target": "tools/opt141_matched_llama_counters.py",
+  "diagnostics_make_target": "cuda-opt141-diagnostics",
+  "selector": "decode_segments8",
+  "case_ids": [
+    "preflight",
+    "identity",
+    "counters",
+    "report"
+  ],
+  "modes": {
+    "feedback": {
+      "target": "tools/opt141_matched_llama_counters.py",
+      "tier_sequence": ["preflight", "identity"],
+      "make_targets": [
+        "build/qw38-cuda-opt136-matched-decode-profile-test",
+        "build/qw38-cuda-component-replay"
+      ],
+      "build_once": true,
+      "warm_repetitions": 0,
+      "aggregate_deadline_s": 7200,
+      "workloads": ["preflight", "identity"]
+    },
+    "acceptance": {
+      "target": "tools/opt141_matched_llama_counters.py",
+      "tier_sequence": ["preflight", "identity", "counters", "report"],
+      "make_targets": [
+        "build/qw38-cuda-opt136-matched-decode-profile-test",
+        "build/qw38-cuda-component-replay"
+      ],
+      "warm_repetitions": 0,
+      "aggregate_deadline_s": 7200,
+      "workloads": ["preflight", "identity", "counters", "report"]
+    },
+    "release": {
+      "target": "tools/opt141_matched_llama_counters.py",
+      "tier": "acceptance",
+      "make_targets": [
+        "build/qw38-cuda-opt136-matched-decode-profile-test",
+        "build/qw38-cuda-component-replay"
+      ],
+      "skip_compile": false,
+      "historical_oracles": false,
+      "aggregate_deadline_s": 7200,
+      "workloads": []
+    }
+  },
+  "workloads": {
+    "preflight": {
+      "target": "tools/opt141_matched_llama_counters.py",
+      "tier": "correctness",
+      "runner": "host",
+      "kind": "image_ncu_llama_stack_identity",
+      "cases": 1,
+      "candidates": 1,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 1,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 0,
+      "reference": 1,
+      "gpu_work": true,
+      "args": [
+        "uv", "run", "python", "tools/opt141_matched_llama_counters.py",
+        "--phase", "preflight", "--mode", "{mode}", "--run-dir", "{run_dir}"
+      ]
+    },
+    "identity": {
+      "target": "tools/opt141_matched_llama_counters.py",
+      "tier": "correctness",
+      "runner": "host",
+      "kind": "llama_launch_identity_four_selections",
+      "cases": 6,
+      "candidates": 1,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 1,
+      "prefixes": [128, 2048, 4096],
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 0,
+      "reference": 1,
+      "gpu_work": false,
+      "args": [
+        "uv", "run", "python", "tools/opt141_matched_llama_counters.py",
+        "--phase", "identity", "--mode", "{mode}", "--run-dir", "{run_dir}"
+      ]
+    },
+    "counters": {
+      "target": ".cache/authorities/llama-build-opt136/bin/qw38-llama-opt136-decode-profile",
+      "tier": "screen",
+      "runner": "host",
+      "kind": "bounded_llama_ncu_per_identified_kernel",
+      "cases": 5,
+      "candidates": 1,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 1,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 1,
+      "reference": 0,
+      "gpu_work": true,
+      "native_targets": [
+        ".cache/authorities/llama-build-opt136/bin/qw38-llama-opt136-decode-profile"
+      ],
+      "args": [
+        "uv", "run", "python", "tools/opt141_matched_llama_counters.py",
+        "--phase", "counters", "--mode", "{mode}", "--run-dir", "{run_dir}"
+      ]
+    },
+    "report": {
+      "target": "tools/opt141_matched_llama_counters.py",
+      "tier": "correctness",
+      "runner": "host",
+      "kind": "host_only_matched_llama_counter_report",
+      "cases": 1,
+      "candidates": 1,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 1,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 0,
+      "reference": 1,
+      "gpu_work": false,
+      "args": [
+        "uv", "run", "python", "tools/opt141_matched_llama_counters.py",
+        "--phase", "report", "--mode", "{mode}", "--run-dir", "{run_dir}"
+      ]
+    }
+  },
+  "proof_limit": [
+    "diagnostics only",
+    "no production selector change",
+    "instrumentation-only: no speed keep",
+    "historical oracles none",
+    "claims_throughput=false",
+    "NLL N/A",
+    "four OPT-138 selections only",
+    "one collection per identified kernel, one diagnosed retry",
+    "300s child timeout, 1200s prefill, 7200s aggregate"
+  ],
+  "report_path": "evidence/optimization/opt141-matched-llama-counters/REPORT.md"
+}

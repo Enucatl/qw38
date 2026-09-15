@@ -1,0 +1,705 @@
+{
+  "schema_version": 1,
+  "task": "OPT-141",
+  "phase": "identity",
+  "mode": "acceptance",
+  "ok": true,
+  "rows": {
+    "decode.attn_core.d128": {
+      "ok": true,
+      "status": "matched",
+      "phase": "decode",
+      "family": "attn_core",
+      "prefix": 128,
+      "workload": "D128",
+      "selection": "decode.attn_core",
+      "engine": "llama",
+      "expected_kernel": "flash_attn_ext_vec",
+      "ncu_regex": "flash_attn_ext_vec",
+      "function": "flash_attn_ext_vec<256,1>",
+      "source": ".cache/authorities/llama.cpp/ggml/src/ggml-cuda/fattn-vec.cuh",
+      "dispatch": "ggml_cuda_get_best_fattn_kernel: Ada+ VEC when Q.ne[1]==1 and n_kv<8192; D128 and D2048 share the stem and differ in n_kv",
+      "shape": {
+        "head_width": 256,
+        "ncols": 1,
+        "n_kv": 128,
+        "gqa_ratio": 6
+      },
+      "enclosing": [
+        "flash_attn_combine_results",
+        "flash_attn_stream_k_fixup_general",
+        "flash_attn_mask_to_KV_max"
+      ],
+      "replay_family": "decode-attention",
+      "kernel_source": "trace_plus_source",
+      "sqlite": "build/optimization-runs/opt138/traces/llama-d128-node-r0.2.sqlite",
+      "trace_summary": {
+        "launch_count": 288,
+        "stems": [
+          {
+            "stem": "flash_attn_ext_vec",
+            "count": 192,
+            "total_ns": 1435873,
+            "total_ms": 1.435873
+          },
+          {
+            "stem": "flash_attn_combine_results",
+            "count": 96,
+            "total_ns": 737536,
+            "total_ms": 0.737536
+          }
+        ],
+        "largest_leaf": {
+          "name": "void flash_attn_combine_results<(int)256>(const float *, const float2 *, float *, int)",
+          "stem": "flash_attn_combine_results",
+          "duration_ns": 9664
+        }
+      },
+      "matched": {
+        "matched_kernel": "flash_attn_ext_vec",
+        "largest_leaf": "flash_attn_combine_results",
+        "ambiguous": false,
+        "mismatches": [
+          "largest_leaf_is_enclosing_fused_sibling"
+        ],
+        "ok": true
+      },
+      "identity": {
+        "ok": true,
+        "phase": "decode",
+        "engine": "llama",
+        "family": "attn_core",
+        "workload": "D128",
+        "kernel": "flash_attn_ext_vec",
+        "expected_kernel": "flash_attn_ext_vec",
+        "replay_family": "decode-attention",
+        "mismatches": [],
+        "reason": null
+      },
+      "quartz_counterpart": {
+        "prefix": 128,
+        "workload": "D128",
+        "phase": "decode",
+        "family": "attn_core",
+        "engine": "quartz",
+        "replay_family": "decode-attention",
+        "path": "warp_query",
+        "expected_kernel": "warp_query_decode_attention",
+        "hybrid_crossover_threshold": 1024,
+        "verified_max": 4096,
+        "override": null,
+        "selector": "decode_segments8",
+        "proof_limit": "hybrid dispatch can select vec128_online at D2048; a warp_query replay is not automatically evidence for that gap"
+      },
+      "fusion": {
+        "ok": true,
+        "reason": null,
+        "details": [],
+        "enclosing": [
+          "flash_attn_combine_results",
+          "flash_attn_stream_k_fixup_general",
+          "flash_attn_mask_to_KV_max"
+        ],
+        "incomparable_counters": []
+      },
+      "cupti_graph_node_id": null,
+      "proof_limit": "P4096 uses kernel-leaf source/launch mapping; do not fabricate CUPTI graph-node IDs"
+    },
+    "decode.attn_core.d2048": {
+      "ok": true,
+      "status": "matched",
+      "phase": "decode",
+      "family": "attn_core",
+      "prefix": 2048,
+      "workload": "D2048",
+      "selection": "decode.attn_core",
+      "engine": "llama",
+      "expected_kernel": "flash_attn_ext_vec",
+      "ncu_regex": "flash_attn_ext_vec",
+      "function": "flash_attn_ext_vec<256,1>",
+      "source": ".cache/authorities/llama.cpp/ggml/src/ggml-cuda/fattn-vec.cuh",
+      "dispatch": "ggml_cuda_get_best_fattn_kernel: Ada+ VEC when Q.ne[1]==1 and n_kv<8192; D128 and D2048 share the stem and differ in n_kv",
+      "shape": {
+        "head_width": 256,
+        "ncols": 1,
+        "n_kv": 2048,
+        "gqa_ratio": 6
+      },
+      "enclosing": [
+        "flash_attn_combine_results",
+        "flash_attn_stream_k_fixup_general",
+        "flash_attn_mask_to_KV_max"
+      ],
+      "replay_family": "decode-attention",
+      "kernel_source": "trace_plus_source",
+      "sqlite": "build/optimization-runs/opt138/traces/llama-d2048-node-r0.2.sqlite",
+      "trace_summary": {
+        "launch_count": 384,
+        "stems": [
+          {
+            "stem": "flash_attn_combine_results",
+            "count": 192,
+            "total_ns": 2469283,
+            "total_ms": 2.469283
+          },
+          {
+            "stem": "flash_attn_ext_vec",
+            "count": 192,
+            "total_ns": 2332931,
+            "total_ms": 2.332931
+          }
+        ],
+        "largest_leaf": {
+          "name": "void flash_attn_combine_results<(int)256>(const float *, const float2 *, float *, int)",
+          "stem": "flash_attn_combine_results",
+          "duration_ns": 13344
+        }
+      },
+      "matched": {
+        "matched_kernel": "flash_attn_ext_vec",
+        "largest_leaf": "flash_attn_combine_results",
+        "ambiguous": false,
+        "mismatches": [
+          "largest_leaf_is_enclosing_fused_sibling"
+        ],
+        "ok": true
+      },
+      "identity": {
+        "ok": true,
+        "phase": "decode",
+        "engine": "llama",
+        "family": "attn_core",
+        "workload": "D2048",
+        "kernel": "flash_attn_ext_vec",
+        "expected_kernel": "flash_attn_ext_vec",
+        "replay_family": "decode-attention",
+        "mismatches": [],
+        "reason": null
+      },
+      "quartz_counterpart": {
+        "prefix": 2048,
+        "workload": "D2048",
+        "phase": "decode",
+        "family": "attn_core",
+        "engine": "quartz",
+        "replay_family": "decode-attention",
+        "path": "vec128_online",
+        "expected_kernel": "vec128_online_decode_attention",
+        "hybrid_crossover_threshold": 1024,
+        "verified_max": 4096,
+        "override": null,
+        "selector": "decode_segments8",
+        "proof_limit": "hybrid dispatch can select vec128_online at D2048; a warp_query replay is not automatically evidence for that gap"
+      },
+      "fusion": {
+        "ok": true,
+        "reason": null,
+        "details": [],
+        "enclosing": [
+          "flash_attn_combine_results",
+          "flash_attn_stream_k_fixup_general",
+          "flash_attn_mask_to_KV_max"
+        ],
+        "incomparable_counters": []
+      },
+      "cupti_graph_node_id": null,
+      "proof_limit": "P4096 uses kernel-leaf source/launch mapping; do not fabricate CUPTI graph-node IDs"
+    },
+    "decode.residual_norm_quant.d128": {
+      "ok": true,
+      "status": "matched",
+      "phase": "decode",
+      "family": "residual_norm_quant",
+      "prefix": 128,
+      "workload": "D128",
+      "selection": "decode.residual_norm_quant",
+      "engine": "llama",
+      "expected_kernel": "quantize_q8_1",
+      "ncu_regex": "^quantize_q8_1$",
+      "function": "quantize_q8_1",
+      "source": ".cache/authorities/llama.cpp/ggml/src/ggml-cuda/quantize.cu",
+      "dispatch": "decode MMVQ path; D128/D2048 share hidden-dim dispatch (rms_norm_f32 sibling is enclosing fused work)",
+      "shape": {
+        "prefix": 128,
+        "hidden_dim": "model_n_embd"
+      },
+      "enclosing": [
+        "rms_norm_f32",
+        "l2_norm_f32",
+        "quantize_q8_1"
+      ],
+      "replay_family": "decode-mixer",
+      "kernel_source": "trace_plus_source",
+      "sqlite": "build/optimization-runs/opt138/traces/llama-d128-node-r0.2.sqlite",
+      "trace_summary": {
+        "launch_count": 8856,
+        "stems": [
+          {
+            "stem": "quantize_q8_1",
+            "count": 5196,
+            "total_ns": 12211474,
+            "total_ms": 12.211474
+          },
+          {
+            "stem": "rms_norm_f32",
+            "count": 2508,
+            "total_ns": 7578004,
+            "total_ms": 7.578004
+          },
+          {
+            "stem": "l2_norm_f32",
+            "count": 1152,
+            "total_ns": 2939393,
+            "total_ms": 2.939393
+          }
+        ],
+        "largest_leaf": {
+          "name": "quantize_q8_1(const float *, void *, long, long, long, long, long, unsigned int, uint3)",
+          "stem": "quantize_q8_1",
+          "duration_ns": 9696
+        }
+      },
+      "matched": {
+        "matched_kernel": "quantize_q8_1",
+        "largest_leaf": "quantize_q8_1",
+        "ambiguous": false,
+        "mismatches": [],
+        "ok": true
+      },
+      "identity": {
+        "ok": true,
+        "phase": "decode",
+        "engine": "llama",
+        "family": "residual_norm_quant",
+        "workload": "D128",
+        "kernel": "quantize_q8_1",
+        "expected_kernel": "quantize_q8_1",
+        "replay_family": "decode-mixer",
+        "mismatches": [],
+        "reason": null
+      },
+      "quartz_counterpart": null,
+      "fusion": {
+        "ok": false,
+        "reason": "fused_boundary_mismatch",
+        "details": [
+          "llama_quantize_q8_1_vs_quartz_rms_plus_bf16_quant_fusion"
+        ],
+        "enclosing": [
+          "rms_norm_f32",
+          "l2_norm_f32",
+          "quantize_q8_1"
+        ],
+        "incomparable_counters": [
+          "dram_read_bytes",
+          "dram_write_bytes",
+          "l2_traffic",
+          "dram_throughput",
+          "sm_throughput",
+          "tensor_activity",
+          "achieved_occupancy"
+        ]
+      },
+      "cupti_graph_node_id": null,
+      "proof_limit": "P4096 uses kernel-leaf source/launch mapping; do not fabricate CUPTI graph-node IDs"
+    },
+    "decode.residual_norm_quant.d2048": {
+      "ok": true,
+      "status": "matched",
+      "phase": "decode",
+      "family": "residual_norm_quant",
+      "prefix": 2048,
+      "workload": "D2048",
+      "selection": "decode.residual_norm_quant",
+      "engine": "llama",
+      "expected_kernel": "quantize_q8_1",
+      "ncu_regex": "^quantize_q8_1$",
+      "function": "quantize_q8_1",
+      "source": ".cache/authorities/llama.cpp/ggml/src/ggml-cuda/quantize.cu",
+      "dispatch": "decode MMVQ path; D128/D2048 share hidden-dim dispatch (rms_norm_f32 sibling is enclosing fused work)",
+      "shape": {
+        "prefix": 2048,
+        "hidden_dim": "model_n_embd"
+      },
+      "enclosing": [
+        "rms_norm_f32",
+        "l2_norm_f32",
+        "quantize_q8_1"
+      ],
+      "replay_family": "decode-mixer",
+      "kernel_source": "trace_plus_source",
+      "sqlite": "build/optimization-runs/opt138/traces/llama-d2048-node-r0.2.sqlite",
+      "trace_summary": {
+        "launch_count": 8856,
+        "stems": [
+          {
+            "stem": "quantize_q8_1",
+            "count": 5196,
+            "total_ns": 12840370,
+            "total_ms": 12.84037
+          },
+          {
+            "stem": "rms_norm_f32",
+            "count": 2508,
+            "total_ns": 7567370,
+            "total_ms": 7.56737
+          },
+          {
+            "stem": "l2_norm_f32",
+            "count": 1152,
+            "total_ns": 3003427,
+            "total_ms": 3.003427
+          }
+        ],
+        "largest_leaf": {
+          "name": "quantize_q8_1(const float *, void *, long, long, long, long, long, unsigned int, uint3)",
+          "stem": "quantize_q8_1",
+          "duration_ns": 11552
+        }
+      },
+      "matched": {
+        "matched_kernel": "quantize_q8_1",
+        "largest_leaf": "quantize_q8_1",
+        "ambiguous": false,
+        "mismatches": [],
+        "ok": true
+      },
+      "identity": {
+        "ok": true,
+        "phase": "decode",
+        "engine": "llama",
+        "family": "residual_norm_quant",
+        "workload": "D2048",
+        "kernel": "quantize_q8_1",
+        "expected_kernel": "quantize_q8_1",
+        "replay_family": "decode-mixer",
+        "mismatches": [],
+        "reason": null
+      },
+      "quartz_counterpart": null,
+      "fusion": {
+        "ok": false,
+        "reason": "fused_boundary_mismatch",
+        "details": [
+          "llama_quantize_q8_1_vs_quartz_rms_plus_bf16_quant_fusion"
+        ],
+        "enclosing": [
+          "rms_norm_f32",
+          "l2_norm_f32",
+          "quantize_q8_1"
+        ],
+        "incomparable_counters": [
+          "dram_read_bytes",
+          "dram_write_bytes",
+          "l2_traffic",
+          "dram_throughput",
+          "sm_throughput",
+          "tensor_activity",
+          "achieved_occupancy"
+        ]
+      },
+      "cupti_graph_node_id": null,
+      "proof_limit": "P4096 uses kernel-leaf source/launch mapping; do not fabricate CUPTI graph-node IDs"
+    },
+    "prefill.attn_core.p4096": {
+      "ok": true,
+      "status": "matched",
+      "phase": "prefill",
+      "family": "attn_core",
+      "prefix": 4096,
+      "workload": "P4096",
+      "selection": "prefill.attn_core",
+      "engine": "llama",
+      "expected_kernel": "flash_attn_ext_f16",
+      "ncu_regex": "flash_attn_ext_f16",
+      "function": "flash_attn_ext_f16<256,256,8,8,false,false>",
+      "source": ".cache/authorities/llama.cpp/ggml/src/ggml-cuda/fattn-mma-f16.cuh",
+      "dispatch": "BEST_FATTN_KERNEL_MMA_F16 when Q.ne[1]==4096; gqa_ratio=6>4 selects ncols2=8, Q.ne[1]>4 selects ncols1=8",
+      "shape": {
+        "dkq": 256,
+        "dv": 256,
+        "ncols1": 8,
+        "ncols2": 8,
+        "tokens": 4096,
+        "gqa_ratio": 6
+      },
+      "enclosing": [
+        "flash_attn_stream_k_fixup_general",
+        "flash_attn_mask_to_KV_max"
+      ],
+      "replay_family": "prompt-attention",
+      "kernel_source": "trace_plus_source",
+      "sqlite": "build/optimization-runs/opt138/traces/llama-p4096-node-r0.sqlite",
+      "trace_summary": {
+        "launch_count": 48,
+        "stems": [
+          {
+            "stem": "flash_attn_ext_f16",
+            "count": 16,
+            "total_ns": 36988748,
+            "total_ms": 36.988748
+          },
+          {
+            "stem": "flash_attn_stream_k_fixup_general",
+            "count": 16,
+            "total_ns": 430144,
+            "total_ms": 0.430144
+          },
+          {
+            "stem": "flash_attn_mask_to_KV_max",
+            "count": 16,
+            "total_ns": 235264,
+            "total_ms": 0.235264
+          }
+        ],
+        "largest_leaf": {
+          "name": "void flash_attn_ext_f16<(int)256, (int)256, (int)8, (int)8, (bool)0, (bool)0>(const char *, const char *, const char *, const char *, const char *, const int *, float *, float2 *, float, float, float, float, unsigned int, float, int, uint3, int, int, int, int, int, int, int, int, int, int, int, long, int, int, long, int, int, int, int, int, long)",
+          "stem": "flash_attn_ext_f16",
+          "duration_ns": 2376611
+        }
+      },
+      "matched": {
+        "matched_kernel": "flash_attn_ext_f16",
+        "largest_leaf": "flash_attn_ext_f16",
+        "ambiguous": false,
+        "mismatches": [],
+        "ok": true
+      },
+      "identity": {
+        "ok": true,
+        "phase": "prefill",
+        "engine": "llama",
+        "family": "attn_core",
+        "workload": "P4096",
+        "kernel": "flash_attn_ext_f16",
+        "expected_kernel": "flash_attn_ext_f16",
+        "replay_family": "prompt-attention",
+        "mismatches": [],
+        "reason": null
+      },
+      "quartz_counterpart": {
+        "prefix": 4096,
+        "workload": "P4096",
+        "phase": "prefill",
+        "family": "attn_core",
+        "engine": "quartz",
+        "replay_family": "prompt-attention",
+        "path": "opt111_base",
+        "expected_kernel": "fattn_mma_pipeline_opt111_base",
+        "capacity": 131072,
+        "empty_initial_state": true,
+        "prefix_reuse": false,
+        "final_token_logits_only": true,
+        "selector": "decode_segments8",
+        "complete_family_replay": true,
+        "counter_kernel_is_complete_family": false,
+        "decode_attention_substitution": false,
+        "proof_limit": "complete prompt-attention replay includes split/stage/convert/core/merge/epilogue; NCU --kernel-name targets fattn_mma_pipeline_opt111_base only"
+      },
+      "fusion": {
+        "ok": false,
+        "reason": "fused_boundary_mismatch",
+        "details": [
+          "tile_shape_mismatch_quartz_16x2_vs_llama_8x8"
+        ],
+        "enclosing": [
+          "flash_attn_stream_k_fixup_general",
+          "flash_attn_mask_to_KV_max"
+        ],
+        "incomparable_counters": [
+          "dram_read_bytes",
+          "dram_write_bytes",
+          "l2_traffic",
+          "dram_throughput",
+          "sm_throughput",
+          "tensor_activity",
+          "achieved_occupancy"
+        ]
+      },
+      "cupti_graph_node_id": null,
+      "proof_limit": "P4096 uses kernel-leaf source/launch mapping; do not fabricate CUPTI graph-node IDs"
+    },
+    "prefill.prompt_mmq.p4096": {
+      "ok": true,
+      "status": "matched",
+      "phase": "prefill",
+      "family": "prompt_mmq",
+      "prefix": 4096,
+      "workload": "P4096",
+      "selection": "prefill.prompt_mmq",
+      "engine": "llama",
+      "expected_kernel": "mul_mat_q",
+      "ncu_regex": "^mul_mat_q$",
+      "function": "mul_mat_q<GGML_TYPE_Q4_K,128,false>",
+      "source": ".cache/authorities/llama.cpp/ggml/src/ggml-cuda/mmq.cuh",
+      "dispatch": "prompt MMQ Q4_K tile J=128; exclude mul_mat_q_stream_k_fixup",
+      "shape": {
+        "tokens": 4096,
+        "type": "q4_k",
+        "tile_j": 128
+      },
+      "enclosing": [
+        "quantize_mmq_q8_1",
+        "mul_mat_q_stream_k_fixup"
+      ],
+      "replay_family": "prompt-ffn",
+      "kernel_source": "trace_plus_source",
+      "sqlite": "build/optimization-runs/opt138/traces/llama-p4096-node-r0.sqlite",
+      "trace_summary": {
+        "launch_count": 1120,
+        "stems": [
+          {
+            "stem": "mul_mat_q",
+            "count": 496,
+            "total_ns": 815291165,
+            "total_ms": 815.291165
+          },
+          {
+            "stem": "quantize_mmq_q8_1",
+            "count": 496,
+            "total_ns": 37602189,
+            "total_ms": 37.602189
+          },
+          {
+            "stem": "mul_mat_q_stream_k_fixup",
+            "count": 128,
+            "total_ns": 1278130,
+            "total_ms": 1.27813
+          }
+        ],
+        "largest_leaf": {
+          "name": "void mul_mat_q<(ggml_type)12, (int)128, (bool)0>(const char *, const int *, const int *, const int *, float *, float *, const float *, uint3, int, int, int, int, int, uint3, uint3, int, int, int, uint3, uint3, int, int, int, uint3)",
+          "stem": "mul_mat_q",
+          "duration_ns": 3153188
+        }
+      },
+      "matched": {
+        "matched_kernel": "mul_mat_q",
+        "largest_leaf": "mul_mat_q",
+        "ambiguous": false,
+        "mismatches": [],
+        "ok": true
+      },
+      "identity": {
+        "ok": true,
+        "phase": "prefill",
+        "engine": "llama",
+        "family": "prompt_mmq",
+        "workload": "P4096",
+        "kernel": "mul_mat_q",
+        "expected_kernel": "mul_mat_q",
+        "replay_family": "prompt-ffn",
+        "mismatches": [],
+        "reason": null
+      },
+      "quartz_counterpart": null,
+      "fusion": {
+        "ok": true,
+        "reason": null,
+        "details": [],
+        "enclosing": [
+          "quantize_mmq_q8_1",
+          "mul_mat_q_stream_k_fixup"
+        ],
+        "incomparable_counters": []
+      },
+      "cupti_graph_node_id": null,
+      "proof_limit": "P4096 uses kernel-leaf source/launch mapping; do not fabricate CUPTI graph-node IDs"
+    }
+  },
+  "selections": {
+    "decode.attn_core": {
+      "status": "matched",
+      "reason": null
+    },
+    "decode.residual_norm_quant": {
+      "status": "matched",
+      "reason": null
+    },
+    "prefill.attn_core": {
+      "status": "matched",
+      "reason": null
+    },
+    "prefill.prompt_mmq": {
+      "status": "matched",
+      "reason": null
+    }
+  },
+  "collection_plan": [
+    {
+      "collect_id": "decode.attn_core.flash_attn_ext_vec.p128",
+      "phase": "decode",
+      "family": "attn_core",
+      "prefix": 128,
+      "workload": "D128",
+      "workloads": [
+        "D128"
+      ],
+      "expected_kernel": "flash_attn_ext_vec",
+      "ncu_regex": "flash_attn_ext_vec",
+      "replay_family": "decode-attention",
+      "shared_dispatch": false
+    },
+    {
+      "collect_id": "decode.attn_core.flash_attn_ext_vec.p2048",
+      "phase": "decode",
+      "family": "attn_core",
+      "prefix": 2048,
+      "workload": "D2048",
+      "workloads": [
+        "D2048"
+      ],
+      "expected_kernel": "flash_attn_ext_vec",
+      "ncu_regex": "flash_attn_ext_vec",
+      "replay_family": "decode-attention",
+      "shared_dispatch": false
+    },
+    {
+      "collect_id": "decode.residual_norm_quant.quantize_q8_1",
+      "phase": "decode",
+      "family": "residual_norm_quant",
+      "prefix": 128,
+      "workload": "D128",
+      "workloads": [
+        "D128",
+        "D2048"
+      ],
+      "expected_kernel": "quantize_q8_1",
+      "ncu_regex": "^quantize_q8_1$",
+      "replay_family": "decode-mixer",
+      "shared_dispatch": true
+    },
+    {
+      "collect_id": "prefill.attn_core.flash_attn_ext_f16.p4096",
+      "phase": "prefill",
+      "family": "attn_core",
+      "prefix": 4096,
+      "workload": "P4096",
+      "workloads": [
+        "P4096"
+      ],
+      "expected_kernel": "flash_attn_ext_f16",
+      "ncu_regex": "flash_attn_ext_f16",
+      "replay_family": "prompt-attention",
+      "shared_dispatch": false
+    },
+    {
+      "collect_id": "prefill.prompt_mmq.mul_mat_q.p4096",
+      "phase": "prefill",
+      "family": "prompt_mmq",
+      "prefix": 4096,
+      "workload": "P4096",
+      "workloads": [
+        "P4096"
+      ],
+      "expected_kernel": "mul_mat_q",
+      "ncu_regex": "^mul_mat_q$",
+      "replay_family": "prompt-ffn",
+      "shared_dispatch": false
+    }
+  ],
+  "unresolved_code_resolved": "llama_ncu_kernel_identity_unresolved",
+  "claims_throughput": false,
+  "family_plan": "task=OPT-141 mode=acceptance phase=identity loop_product=6 cases=6 candidates=1 warmups=0 samples=1 tokens=1",
+  "measured_at": "2026-09-15T00:23:23Z"
+}

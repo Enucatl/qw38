@@ -1,0 +1,299 @@
+{
+  "decode.attn_core.d128": {
+    "selection": "decode.attn_core",
+    "phase": "decode",
+    "family": "attn_core",
+    "workload": "D128",
+    "llama_kernel": "flash_attn_ext_vec",
+    "quartz_kernel": "void unnamed>::warp_query_decode_attention<0, 0>(AttentionConfig, unsigned long, int, const float *, const float *, const __nv_bfloat16 *, const __nv_bfloat16 *, const __nv_bfloat16 *, const __nv_bfloat16 *, float *, float *, float *, const DecodeLaunchState *)",
+    "fusion": {
+      "ok": true,
+      "reason": null,
+      "details": [],
+      "enclosing": [
+        "flash_attn_combine_results",
+        "flash_attn_stream_k_fixup_general",
+        "flash_attn_mask_to_KV_max"
+      ],
+      "incomparable_counters": []
+    },
+    "comparison": {
+      "comparable": true,
+      "reason": null,
+      "compared_slots": [
+        {
+          "slot": "dram_write_bytes",
+          "quartz": 0.0,
+          "llama": 0.0,
+          "unit": "byte"
+        },
+        {
+          "slot": "l2_traffic",
+          "quartz": 146745.0,
+          "llama": 212987.0,
+          "unit": "sector"
+        },
+        {
+          "slot": "dram_throughput",
+          "quartz": 1.14,
+          "llama": 4.96,
+          "unit": "%"
+        },
+        {
+          "slot": "sm_throughput",
+          "quartz": 3.92,
+          "llama": 1.72,
+          "unit": "%"
+        },
+        {
+          "slot": "tensor_activity",
+          "quartz": 0.0,
+          "llama": 0.0,
+          "unit": "cycle"
+        },
+        {
+          "slot": "achieved_occupancy",
+          "quartz": 4.62,
+          "llama": 8.13,
+          "unit": "%"
+        }
+      ],
+      "skipped_slots": [
+        {
+          "slot": "dram_read_bytes",
+          "reason": "unit_mismatch",
+          "quartz_unit": "Kbyte",
+          "llama_unit": "Mbyte"
+        }
+      ],
+      "claims_throughput": false,
+      "ncu_duration_benchmark": false,
+      "proof_limit": "like-for-like counters only; occupancy is not bandwidth; NCU duration is not a tok/s claim"
+    },
+    "identity_status": "matched"
+  },
+  "decode.attn_core.d2048": {
+    "selection": "decode.attn_core",
+    "phase": "decode",
+    "family": "attn_core",
+    "workload": "D2048",
+    "llama_kernel": "flash_attn_ext_vec",
+    "quartz_kernel": "unnamed>::vec128_online_decode_attention(AttentionConfig, unsigned long, int, const float *, const float *, const __nv_bfloat16 *, const __nv_bfloat16 *, const __nv_bfloat16 *, const __nv_bfloat16 *, float *, float *, float *, const DecodeLaunchState *)",
+    "fusion": {
+      "ok": true,
+      "reason": null,
+      "details": [],
+      "enclosing": [
+        "flash_attn_combine_results",
+        "flash_attn_stream_k_fixup_general",
+        "flash_attn_mask_to_KV_max"
+      ],
+      "incomparable_counters": []
+    },
+    "comparison": {
+      "comparable": true,
+      "reason": null,
+      "compared_slots": [
+        {
+          "slot": "dram_read_bytes",
+          "quartz": 8.85,
+          "llama": 9.5,
+          "unit": "Mbyte"
+        },
+        {
+          "slot": "dram_write_bytes",
+          "quartz": 0.0,
+          "llama": 0.0,
+          "unit": "byte"
+        },
+        {
+          "slot": "l2_traffic",
+          "quartz": 1932797.0,
+          "llama": 1803992.0,
+          "unit": "sector"
+        },
+        {
+          "slot": "dram_throughput",
+          "quartz": 2.33,
+          "llama": 29.8,
+          "unit": "%"
+        },
+        {
+          "slot": "sm_throughput",
+          "quartz": 5.43,
+          "llama": 11.51,
+          "unit": "%"
+        },
+        {
+          "slot": "tensor_activity",
+          "quartz": 0.0,
+          "llama": 0.0,
+          "unit": "cycle"
+        },
+        {
+          "slot": "achieved_occupancy",
+          "quartz": 15.62,
+          "llama": 10.8,
+          "unit": "%"
+        }
+      ],
+      "skipped_slots": [],
+      "claims_throughput": false,
+      "ncu_duration_benchmark": false,
+      "proof_limit": "like-for-like counters only; occupancy is not bandwidth; NCU duration is not a tok/s claim"
+    },
+    "identity_status": "matched"
+  },
+  "decode.residual_norm_quant.d128": {
+    "selection": "decode.residual_norm_quant",
+    "phase": "decode",
+    "family": "residual_norm_quant",
+    "workload": "D128",
+    "llama_kernel": "quantize_q8_1",
+    "quartz_kernel": null,
+    "fusion": {
+      "ok": false,
+      "reason": "fused_boundary_mismatch",
+      "details": [
+        "llama_quantize_q8_1_vs_quartz_rms_plus_bf16_quant_fusion"
+      ],
+      "enclosing": [
+        "rms_norm_f32",
+        "l2_norm_f32",
+        "quantize_q8_1"
+      ],
+      "incomparable_counters": [
+        "dram_read_bytes",
+        "dram_write_bytes",
+        "l2_traffic",
+        "dram_throughput",
+        "sm_throughput",
+        "tensor_activity",
+        "achieved_occupancy"
+      ]
+    },
+    "comparison": {
+      "comparable": false,
+      "reason": "quartz_counters_unusable",
+      "compared_slots": [],
+      "claims_throughput": false,
+      "ncu_duration_benchmark": false
+    },
+    "identity_status": "matched"
+  },
+  "decode.residual_norm_quant.d2048": {
+    "selection": "decode.residual_norm_quant",
+    "phase": "decode",
+    "family": "residual_norm_quant",
+    "workload": "D2048",
+    "llama_kernel": "quantize_q8_1",
+    "quartz_kernel": null,
+    "fusion": {
+      "ok": false,
+      "reason": "fused_boundary_mismatch",
+      "details": [
+        "llama_quantize_q8_1_vs_quartz_rms_plus_bf16_quant_fusion"
+      ],
+      "enclosing": [
+        "rms_norm_f32",
+        "l2_norm_f32",
+        "quantize_q8_1"
+      ],
+      "incomparable_counters": [
+        "dram_read_bytes",
+        "dram_write_bytes",
+        "l2_traffic",
+        "dram_throughput",
+        "sm_throughput",
+        "tensor_activity",
+        "achieved_occupancy"
+      ]
+    },
+    "comparison": {
+      "comparable": false,
+      "reason": "quartz_counters_unusable",
+      "compared_slots": [],
+      "claims_throughput": false,
+      "ncu_duration_benchmark": false
+    },
+    "identity_status": "matched"
+  },
+  "prefill.attn_core.p4096": {
+    "selection": "prefill.attn_core",
+    "phase": "prefill",
+    "family": "attn_core",
+    "workload": "P4096",
+    "llama_kernel": "flash_attn_ext_f16",
+    "quartz_kernel": "void fattn_mma_pipeline_kernel<16, 0, 1, 32, 2, 2, 1, 2, 1, 1, 0>(AttentionConfig, unsigned long, unsigned long, const float *, const float *, const float *, const __nv_bfloat16 *, const __nv_bfloat16 *, const __nv_bfloat16 *, const __nv_bfloat16 *, float *, float *, float *, float *, const __half *, unsigned long)",
+    "fusion": {
+      "ok": false,
+      "reason": "fused_boundary_mismatch",
+      "details": [
+        "tile_shape_mismatch_quartz_16x2_vs_llama_8x8"
+      ],
+      "enclosing": [
+        "flash_attn_stream_k_fixup_general",
+        "flash_attn_mask_to_KV_max"
+      ],
+      "incomparable_counters": [
+        "dram_read_bytes",
+        "dram_write_bytes",
+        "l2_traffic",
+        "dram_throughput",
+        "sm_throughput",
+        "tensor_activity",
+        "achieved_occupancy"
+      ]
+    },
+    "comparison": {
+      "comparable": false,
+      "reason": "fused_boundary_mismatch",
+      "details": [
+        "tile_shape_mismatch_quartz_16x2_vs_llama_8x8"
+      ],
+      "enclosing": [
+        "flash_attn_stream_k_fixup_general",
+        "flash_attn_mask_to_KV_max"
+      ],
+      "incomparable_counters": [
+        "dram_read_bytes",
+        "dram_write_bytes",
+        "l2_traffic",
+        "dram_throughput",
+        "sm_throughput",
+        "tensor_activity",
+        "achieved_occupancy"
+      ],
+      "compared_slots": [],
+      "claims_throughput": false,
+      "ncu_duration_benchmark": false
+    },
+    "identity_status": "matched"
+  },
+  "prefill.prompt_mmq.p4096": {
+    "selection": "prefill.prompt_mmq",
+    "phase": "prefill",
+    "family": "prompt_mmq",
+    "workload": "P4096",
+    "llama_kernel": "mul_mat_q",
+    "quartz_kernel": null,
+    "fusion": {
+      "ok": true,
+      "reason": null,
+      "details": [],
+      "enclosing": [
+        "quantize_mmq_q8_1",
+        "mul_mat_q_stream_k_fixup"
+      ],
+      "incomparable_counters": []
+    },
+    "comparison": {
+      "comparable": false,
+      "reason": "quartz_counters_unusable",
+      "compared_slots": [],
+      "claims_throughput": false,
+      "ncu_duration_benchmark": false
+    },
+    "identity_status": "matched"
+  }
+}

@@ -62,6 +62,19 @@ LAUNCH_WARP_QUERY = "warp_query_decode_attention"
 LAUNCH_VEC128_ONLINE = "vec128_online_decode_attention"
 LAUNCH_DENSE_MMA = "dense_bf16_tile_f16_mma_decode_v1"
 LAUNCH_PREFILL_ATTN = "fattn_mma_pipeline_opt111_base"
+LLAMA_KERNEL_STEMS = (
+    "flash_attn_stream_k_fixup_general",
+    "flash_attn_combine_results",
+    "flash_attn_mask_to_KV_max",
+    "flash_attn_ext_vec",
+    "flash_attn_ext_f16",
+    "quantize_mmq_q8_1",
+    "mul_mat_q_stream_k_fixup",
+    "quantize_q8_1",
+    "mul_mat_q",
+    "rms_norm_f32",
+    "l2_norm_f32",
+)
 OPT140_INELIGIBLE = "prefill_decode_attention_ineligible_until_opt140"
 RESULT_PREFIX = "QW38_OPT139_COUNTER_IDENTITY_RESULT="
 REQUIRED_FIXTURE_KEYS = (
@@ -486,6 +499,7 @@ def kernel_stem(name: str | None) -> str:
         LAUNCH_WARP_QUERY,
         LAUNCH_DENSE_MMA,
         LAUNCH_PREFILL_ATTN,
+        *LLAMA_KERNEL_STEMS,
     ):
         if known in text:
             return known
