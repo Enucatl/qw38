@@ -348,6 +348,9 @@ OPT-124 assesses the remaining ceiling without claiming universal optimality.
 | OPT-147 | Screen a prefill 8x8 flash-attention tile | OPT-135, OPT-140, OPT-144 | done | `keep`; `prefill_attention_8x8_v1` 8×8 vs parent `opt111_base` 16×2; P4096 complete-family screen 222.146→201.479 ms; OPT-058 held-out NLL 1.7875990840085783 identical; 131072 reserve pass; `target_guard_v2` P4096 g=1.01158 (+34.63 tok/s); shipping pin flipped; mechanism unknown | [`tasks/OPT-147.md`](tasks/OPT-147.md); [`tools/opt147_prefill_8x8.py`](tools/opt147_prefill_8x8.py); [`pins/opt147_prefill_8x8_contract.json`](pins/opt147_prefill_8x8_contract.json); [`fixtures/opt147_prefill_8x8.json`](fixtures/opt147_prefill_8x8.json); [`evidence/optimization/opt147-prefill-8x8/REPORT.md`](evidence/optimization/opt147-prefill-8x8/REPORT.md); verification 2026-09-15T07:29:38Z |
 | OPT-148 | Screen a short-decode flash-style vector attention path | OPT-135, OPT-147 | done | `keep`; `decode_attention_flash_vec_v1` flash-style vector vs parent `vec128_online`; D2048 complete-family screen 1.776→0.602 ms; OPT-058 held-out NLL 1.7875990840085783 identical; 131072 reserve pass; `target_guard_v2` D2048 decode_only g=1.209 (+10.32 tok/s); shipping pin flipped; mechanism unknown | [`tasks/OPT-148.md`](tasks/OPT-148.md); [`tools/opt148_short_decode_flash.py`](tools/opt148_short_decode_flash.py); [`pins/opt148_short_decode_flash_contract.json`](pins/opt148_short_decode_flash_contract.json); [`fixtures/opt148_short_decode_flash.json`](fixtures/opt148_short_decode_flash.json); [`evidence/optimization/opt148-short-decode-flash/REPORT.md`](evidence/optimization/opt148-short-decode-flash/REPORT.md); verification 2026-09-15T08:26:00Z |
 | OPT-149 | Screen normalization fused directly into Q8_1 staging | OPT-135, OPT-148 | done | `screened_out`; `norm_to_q8_1_screen_v1` D2048 complete decode-mixer family 2.101→2.256 ms (−0.155 ms); quality skipped (`screened_out_retain_parent`, not stubbed); parent `current_bf16_q8_staging` retained; OPT-147/148 unchanged; shipping delta 0; `claims_throughput=false` | [`tasks/OPT-149.md`](tasks/OPT-149.md); [`tools/opt149_norm_q8.py`](tools/opt149_norm_q8.py); [`pins/opt149_norm_q8_contract.json`](pins/opt149_norm_q8_contract.json); [`fixtures/opt149_norm_q8.json`](fixtures/opt149_norm_q8.json); [`evidence/optimization/opt149-norm-q8/REPORT.md`](evidence/optimization/opt149-norm-q8/REPORT.md); verification 2026-09-15T09:10:00Z |
+| OPT-150 | Establish current attention dataflow and matched decode scaling | OPT-136, OPT-137, OPT-148, OPT-149 | pending | Actual QK/PV arithmetic, compiled evidence, graph dispatch and current matched native-llama family/engine measurements resolve historical ratio and padding ambiguities; diagnostics only | [`tasks/OPT-150.md`](tasks/OPT-150.md) |
+| OPT-151 | Implement output-producing QK and PV MMA for long decode | OPT-135, OPT-150 | pending | One pinned-organization BF16-tile candidate uses real MMA outputs for both products; bounded screen and quality/state/128K plus D8192/D32768 target_guard_v2 establish keep or measured no-keep | [`tasks/OPT-151.md`](tasks/OPT-151.md) |
+| OPT-152 | Screen vector attention throughout sub-8K decode | OPT-135, OPT-150, OPT-151 | pending | Existing OPT-148 consumer screens gap-only versus all-short coverage; at most one survivor passes frozen target/guard, actual graph boundaries and quality/state gates, or measured no-keep | [`tasks/OPT-152.md`](tasks/OPT-152.md) |
 
 ### Post-138 counter evidence and optimization batch (OPT-139–146)
 
@@ -8683,3 +8686,23 @@ statements below are historical, not the current execution order.
   [`evidence/optimization/opt149-norm-q8/REPORT.md`](evidence/optimization/opt149-norm-q8/REPORT.md).
 - OPT-149 marked `done`. Coupled IDs: none.
 
+### OPT-150–152 task authoring (2026-09-15T10:33:54Z)
+
+Documentation only, requested closer alignment with pinned llama attention.
+All three tasks are pending; no kernel, selector or historical verdict changed.
+
+- OPT-150 authenticates the current baseline and resolves source/report
+  discrepancies. OPT-137's score is scalar QK plus a zero-weight MMA result;
+  weighted V is scalar. Compiled behavior and cost attribution require evidence.
+- OPT-151 implements actual QK and PV MMA using the pinned GQA/tile organization
+  while retaining authoritative BF16 state, checkpoint format and reserve.
+- OPT-152 reuses OPT-148 to screen wider vector coverage. Current production
+  verified_max=4096 leaves positions 4097–8191 on warp_query; coverage is not
+  already continuous to 8192. Llama selects using padded used K.ne[1], whereas
+  Quartz thresholds use position, so equal numeric thresholds are not parity.
+- Historical correction context: OPT-129's ~0.050 ms at 8192 is a BF16
+  llama-vector adapter, not selected native MMA. OPT-136's D32768 ~0.24 ratio
+  is pre-137 whole-engine decode throughput, not a current component result.
+  Keep original reports and measured OPT-137 gains as historical evidence.
+- Tasks reuse existing tooling and frozen quality/target_guard_v2 rules;
+  neither source similarity nor instruction/launch names establish a speedup.
