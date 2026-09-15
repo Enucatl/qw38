@@ -1,0 +1,272 @@
+{
+  "schema_version": 1,
+  "task": "OPT-149",
+  "yardstick": "norm_to_q8_1_screen_v1",
+  "claims_throughput": true,
+  "claims_performance_improvement": true,
+  "opt074_family_admission_required": false,
+  "opt074_coverage_unadmitted_is_blocker": false,
+  "keep_policy_id": "target_guard_v2",
+  "require_candidate_nll": true,
+  "performance_admission": {
+    "enabled": true
+  },
+  "image": "qw38-cuda:13.0.2",
+  "model": "models/Qwen3.8-27B-Q4_K_M.gguf",
+  "gpu_lock": "build/optimization-runs/qw38-gpu.lock",
+  "aggregate_deadline_s": 7200,
+  "target": "tools/opt149_norm_q8.py",
+  "diagnostics_make_target": "cuda-opt149-diagnostics",
+  "selector": "hybrid_crossover",
+  "case_ids": [
+    "correctness",
+    "screen",
+    "quality",
+    "state-memory",
+    "performance",
+    "report"
+  ],
+  "modes": {
+    "feedback": {
+      "target": "tools/opt149_norm_q8.py",
+      "tier_sequence": [
+        "correctness",
+        "screen"
+      ],
+      "make_targets": [
+        "build/qw38-cuda-opt149-norm-q8-test",
+        "build/qw38-cuda-opt058-quality-baseline-test"
+      ],
+      "build_once": true,
+      "warm_repetitions": 0,
+      "aggregate_deadline_s": 7200,
+      "workloads": [
+        "correctness",
+        "screen"
+      ]
+    },
+    "acceptance": {
+      "target": "tools/opt149_norm_q8.py",
+      "tier_sequence": [
+        "quality",
+        "state-memory",
+        "performance",
+        "report"
+      ],
+      "make_targets": [
+        "build/qw38-cuda-opt149-norm-q8-test",
+        "build/qw38-cuda-opt058-quality-baseline-test",
+        "build/qw38-cuda-checkpoint-test",
+        "build/qw38-cuda-memory-fit-test",
+        "build/qw38-cuda-optimization-engine-probe"
+      ],
+      "warm_repetitions": 0,
+      "aggregate_deadline_s": 7200,
+      "workloads": [
+        "quality",
+        "state-memory",
+        "performance",
+        "report"
+      ]
+    },
+    "release": {
+      "target": "tools/opt149_norm_q8.py",
+      "tier": "acceptance",
+      "make_targets": [
+        "build/qw38-cuda-opt058-quality-baseline-test"
+      ],
+      "skip_compile": false,
+      "historical_oracles": false,
+      "aggregate_deadline_s": 7200,
+      "workloads": [
+        "quality",
+        "state-memory"
+      ]
+    }
+  },
+  "workloads": {
+    "correctness": {
+      "target": "build/qw38-cuda-opt149-norm-q8-test",
+      "tier": "correctness",
+      "runner": "host",
+      "kind": "decode_mixer_norm_q8_fp64_identity",
+      "cases": 8,
+      "candidates": 2,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 1,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 0,
+      "reference": 1,
+      "gpu_work": true,
+      "args": [
+        "uv",
+        "run",
+        "python",
+        "tools/opt149_norm_q8.py",
+        "--phase",
+        "correctness",
+        "--mode",
+        "{mode}",
+        "--run-dir",
+        "{run_dir}"
+      ]
+    },
+    "screen": {
+      "target": "build/qw38-cuda-opt149-norm-q8-test",
+      "tier": "screen",
+      "runner": "host",
+      "kind": "complete_decode_mixer_family_d2048",
+      "cases": 1,
+      "candidates": 2,
+      "warmups": 1,
+      "samples": 3,
+      "tokens": 2048,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 0,
+      "gpu_work": true,
+      "args": [
+        "uv",
+        "run",
+        "python",
+        "tools/opt149_norm_q8.py",
+        "--phase",
+        "screen",
+        "--mode",
+        "{mode}",
+        "--run-dir",
+        "{run_dir}"
+      ]
+    },
+    "quality": {
+      "target": "build/qw38-cuda-opt058-quality-baseline-test",
+      "tier": "acceptance",
+      "runner": "host",
+      "kind": "opt058_quality_flag_candidate_nll",
+      "engines": [
+        "quartz"
+      ],
+      "configurations": [
+        "current_bf16_q8_staging",
+        "norm_to_q8_1_screen_v1"
+      ],
+      "cases": 12,
+      "candidates": 1,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 1024,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 1,
+      "reference": 1,
+      "aggregate_deadline_s": 7200,
+      "args": [
+        "uv",
+        "run",
+        "python",
+        "tools/opt149_norm_q8.py",
+        "--phase",
+        "quality",
+        "--mode",
+        "{mode}",
+        "--run-dir",
+        "{run_dir}"
+      ]
+    },
+    "state-memory": {
+      "target": "build/qw38-cuda-memory-fit-test",
+      "tier": "acceptance",
+      "runner": "host",
+      "kind": "checkpoint_graph_eager_handoff_128k_fit",
+      "cases": 3,
+      "candidates": 1,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 1,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 1,
+      "aggregate_deadline_s": 7200,
+      "args": [
+        "uv",
+        "run",
+        "python",
+        "tools/opt149_norm_q8.py",
+        "--phase",
+        "state-memory",
+        "--mode",
+        "{mode}",
+        "--run-dir",
+        "{run_dir}"
+      ]
+    },
+    "performance": {
+      "target": "tools/opt149_norm_q8.py",
+      "tier": "acceptance",
+      "runner": "host",
+      "kind": "target_guard_v2_ab_ba",
+      "cases": 5,
+      "candidates": 2,
+      "warmups": 3,
+      "samples": 10,
+      "tokens": 1,
+      "output_tokens": 256,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 1,
+      "gpu_work": true,
+      "args": [
+        "uv",
+        "run",
+        "python",
+        "tools/opt149_norm_q8.py",
+        "--phase",
+        "performance",
+        "--mode",
+        "{mode}",
+        "--run-dir",
+        "{run_dir}"
+      ]
+    },
+    "report": {
+      "target": "tools/opt149_norm_q8.py",
+      "tier": "acceptance",
+      "runner": "host",
+      "kind": "keep_or_screened_out_or_reject_report",
+      "cases": 1,
+      "candidates": 1,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 1,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 0,
+      "gpu_work": false,
+      "args": [
+        "uv",
+        "run",
+        "python",
+        "tools/opt149_norm_q8.py",
+        "--phase",
+        "report",
+        "--mode",
+        "{mode}",
+        "--run-dir",
+        "{run_dir}"
+      ]
+    }
+  },
+  "proof_limit": [
+    "candidate is frozen norm_to_q8_1_screen_v1; mechanism may remain unknown at screen",
+    "do not revive OPT-110; do not claim Q8 byte size alone is a win",
+    "do not lower OPT-137 MMA threshold; do not revive rejected OPT-130; do not n_parts sweep",
+    "D128 warp_query and decode>=8192 MMA are guards",
+    "screen is 1 warmup plus 3 paired complete decode-mixer rounds at D2048 plus one short engine pair",
+    "quality is required for a screened-in arithmetic survivor and must execute OPT-058 --quality",
+    "aggregate_deadline_s 7200 is a ceiling, not a skip",
+    "missing required work is blocked/incomplete, never no_opportunity"
+  ],
+  "report_path": "evidence/optimization/opt149-norm-q8/REPORT.md"
+}

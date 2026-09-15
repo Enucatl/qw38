@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "task": "OPT-149",
+  "workload": "d2048",
+  "complete_family": true,
+  "rotating_layers": 64,
+  "warmups": 1,
+  "pairs": 3,
+  "control": "current_bf16_q8_staging",
+  "candidate": "norm_to_q8_1_screen_v1",
+  "native_control_mean_ms": 2.101024,
+  "native_candidate_mean_ms": 2.255574,
+  "independent_control_mean_ms": 2.1010240000000002,
+  "independent_candidate_mean_ms": 2.2555733333333334,
+  "independent_saving_ms": -0.1545493333333332,
+  "rounds": [
+    {
+      "warmup": false,
+      "sample_index": 0,
+      "control_ms": 2.101248,
+      "candidate_ms": 2.24912
+    },
+    {
+      "warmup": false,
+      "sample_index": 1,
+      "control_ms": 2.102592,
+      "candidate_ms": 2.258944
+    },
+    {
+      "warmup": false,
+      "sample_index": 2,
+      "control_ms": 2.099232,
+      "candidate_ms": 2.258656
+    }
+  ],
+  "short_engine_pair": [
+    {
+      "observation_unit": "independent_round",
+      "sample_index": 0,
+      "pair": 0,
+      "order": "AB",
+      "control_ms": 530.686768,
+      "candidate_ms": 537.255005,
+      "control_itl_p50_ms": 16.4782028,
+      "control_itl_p95_ms": 16.4978809,
+      "candidate_itl_p50_ms": 16.6895332,
+      "candidate_itl_p95_ms": 16.7054253,
+      "family": "attn"
+    }
+  ],
+  "mechanism": "unknown",
+  "prep_included": true,
+  "combine_included": true,
+  "conversion_included": true
+}

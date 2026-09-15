@@ -6,6 +6,8 @@
 #include "q4k_decode_path.cuh"
 #include "q8_decode_path.cuh"
 #include "opt110_engine_hook.cuh"
+#define QW38_OPT149_HOST_ONLY
+#include "opt149_norm_q8.cuh"
 #include "quant_mmv.h"
 #include "test_tier.h"
 
@@ -62,6 +64,7 @@ struct Options final {
   const char* decode_attention_gqa = nullptr;
   const char* decode_attention_vec128 = nullptr;
   const char* decode_attention = nullptr;
+  const char* decode_norm_q8 = nullptr;
   int vec128_n_parts = 0;
   int decode_attention_crossover_threshold = -1;
   unsigned int q4_warps = 0;
@@ -142,6 +145,7 @@ int usage(const char* argv0) {
                "[--decode-attention-gqa warp_query|warp_query_gqa6] "
                "[--decode-attention-vec128 warp_query|vec128_online] "
                "[--decode-attention hybrid_crossover|decode_attention_flash_vec_v1] "
+               "[--decode-norm-q8 current_bf16_q8_staging|norm_to_q8_1_screen_v1] "
                "[--vec128-n-parts 4|8|16] "
                "[--decode-attention-crossover-threshold 0|512|1024|1536|2048] "
                "[--attention-pipeline f16_async|kv_once|opt111_base|opt111_xor|"
@@ -220,6 +224,8 @@ int parse_args(int argc, char** argv, Options* options) {
     } else if (std::strcmp(arg, "--decode-attention") == 0 &&
                index + 1 < argc) {
       options->decode_attention = argv[++index];
+    } else if (std::strcmp(arg, "--decode-norm-q8") == 0 && index + 1 < argc) {
+      options->decode_norm_q8 = argv[++index];
     } else if (std::strcmp(arg, "--vec128-n-parts") == 0 &&
                index + 1 < argc) {
       options->vec128_n_parts = std::atoi(argv[++index]);
@@ -323,6 +329,7 @@ int apply_defaults(const qw38::cuda::TestTier tier, Options* options) {
         options->decode_attention_gqa != nullptr ||
         options->decode_attention_vec128 != nullptr ||
         options->decode_attention != nullptr ||
+        options->decode_norm_q8 != nullptr ||
         options->decode_attention_crossover_threshold >= 0) {
       if (options->prefix == 0) options->prefix = kScreenPrefix;
       if (options->output_tokens == 0) {
@@ -1048,6 +1055,15 @@ int run_keep_ab(const Options& options) {
           return 2;
         }
       } else if (attn) {
+        if (options.decode_norm_q8 != nullptr) {
+          const char* path = candidate_side
+                                 ? options.decode_norm_q8
+                                 : qw38::cuda::opt149::kControlId;
+          if (!qw38::cuda::opt149::apply_decode_norm_q81_ident(path)) {
+            std::fprintf(stderr, "invalid --decode-norm-q8 %s\n", path);
+            return 2;
+          }
+        }
         if (options.decode_attention != nullptr) {
           const char* path = candidate_side ? options.decode_attention
                                             : "hybrid_crossover";
@@ -1221,6 +1237,7 @@ int run_keep_ab(const Options& options) {
       qw38::cuda::clear_decode_attention_flash_vec_override();
       qw38::cuda::clear_vec128_n_parts_override();
       qw38::cuda::clear_decode_attention_crossover_threshold_override();
+      qw38::cuda::opt149::clear_decode_norm_q81_fusion_override();
     }
     if (device_layout && !q6_device_layout) {
       const qw38::Status restored = model.set_q8_device_layout(

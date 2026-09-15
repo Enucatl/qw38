@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "task": "OPT-149",
+  "phase": "state-memory",
+  "mode": "acceptance",
+  "ok": true,
+  "skipped": true,
+  "skip_reason": "screened_out_retain_parent",
+  "candidate": "norm_to_q8_1_screen_v1",
+  "nll_required": false,
+  "opt058_invoked": false,
+  "candidate_nll_measured": false,
+  "candidate_nll_not_measured": false,
+  "family_plan": "task=OPT-149 mode=acceptance phase=state-memory loop_product=3 cases=3 candidates=1 warmups=0 samples=1 tokens=1",
+  "measured_at": "2026-09-15T09:02:11Z",
+  "mechanism": "unknown",
+  "supported_mechanism": null,
+  "memory_fit_parent_admitted": true,
+  "128k_fit_with_graphs": true,
+  "checkpoint_ok": true,
+  "checkpoint_skipped": true,
+  "checkpoint_native": "build/qw38-cuda-checkpoint-test"
+}

@@ -513,7 +513,8 @@ int run_stage_reuse() {
   }
   workspace.invalidate_q8_decode_staging();
   if (workspace.q8_decode_staged_activation_ != nullptr ||
-      workspace.q8_decode_staged_columns_ != 0) {
+      workspace.q8_decode_staged_columns_ != 0 ||
+      workspace.q8_decode_staged_scale_ != nullptr) {
     std::fprintf(stderr, "invalidate_q8_decode_staging left cookie set\n");
     free_case(&a);
     free_case(&b);

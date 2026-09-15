@@ -1,0 +1,26 @@
+
+==========
+== CUDA ==
+==========
+
+CUDA Version 13.0.2
+
+Container image Copyright (c) 2016-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+
+This container image and its contents are governed by the NVIDIA Deep Learning Container License.
+By pulling and using the container, you accept the terms and conditions of this license:
+https://developer.nvidia.com/ngc/nvidia-deep-learning-container-license
+
+A copy of this license is made available in this container at /NGC-DL-CONTAINER-LICENSE for your convenience.
+
+layer_kind=gdn residual=false control_path=current_bf16_q8_staging candidate_path=norm_to_q8_1_screen_v1 launch=rms_norm_fp32_to_q8_1 q8_vs_host=0 q8_vs_control=0 fp64_abs=0 equal=true finite=true format=quartz_q8_1_sum_q write_bf16=false launches_control=2 launches_candidate=1
+layer_kind=attention residual=false control_path=current_bf16_q8_staging candidate_path=norm_to_q8_1_screen_v1 launch=rms_norm_fp32_to_q8_1 q8_vs_host=0 q8_vs_control=0 fp64_abs=0 equal=true finite=true format=quartz_q8_1_sum_q write_bf16=false launches_control=2 launches_candidate=1
+layer_kind=gdn residual=true control_path=current_bf16_q8_staging candidate_path=norm_to_q8_1_screen_v1 launch=residual_add_norm_fp32_to_q8_1 q8_vs_host=0 q8_vs_control=0 fp64_abs=0 equal=true finite=true format=quartz_q8_1_sum_q write_bf16=false launches_control=2 launches_candidate=1
+layer_kind=attention residual=true control_path=current_bf16_q8_staging candidate_path=norm_to_q8_1_screen_v1 launch=residual_add_norm_fp32_to_q8_1 q8_vs_host=0 q8_vs_control=0 fp64_abs=0 equal=true finite=true format=quartz_q8_1_sum_q write_bf16=false launches_control=2 launches_candidate=1
+mixed_consumers eligible=false retain_existing=true mixer_group_eligible=true logits_bf16_eligible=false ffn_q8block_retain=true opt110_revived=false byte_size_only_claim=false selected_group=mixer_input_norm_q8_1 pass=true
+stale_buffer rejected=true kept_until_producer_rerun=true residual_state reset=true refreshed_equal=true vs_stale=160 pass=true
+graph_eager equal=true mismatches=0 error=none pass=true
+production_pin=false q4_decode=llama_q4k_mmvq opt110_revived=false prefill_fusion_untouched=true pass=true
+fused_regs=27 fused_local_bytes=0 fused_occupancy=6 production_fusion=false q4_decode=llama_q4k_mmvq opt110_revived=false single_cta_serial=false
+QW38_OPT149_NORM_Q8_RESULT={"schema_version":1,"task":"OPT-149","workload":"correctness","llama_revision":"cc83d7b4824f73cfdda4dfbb47ee39804f71b328","gguf_sha256":"31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34","candidate_path":"norm_to_q8_1_screen_v1","control_path":"current_bf16_q8_staging","nonfinite":0,"pass":true,"keep":false,"observed_warmups":0,"observed_samples":1,"observed_candidates":2,"observed_shapes":8,"observed_tier":"correctness","acceptance_executed":false,"pairs":1,"opt110_revived":false,"byte_size_only_claim":false}
+QW38_OPT149_NATIVE_COUNTS={"schema_version":1,"task":"OPT-149","family":"decode-mixer","tier":"correctness","warmups":0,"samples":1,"observed_warmups":0,"observed_samples":1,"observed_candidates":2,"observed_shapes":8,"observed_tier":"correctness","pairs":1,"acceptance_executed":false,"keep":false}

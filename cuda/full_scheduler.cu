@@ -31,6 +31,7 @@
 #include "q4k_decode_path.cuh"
 #include "ffn_decode_path.cuh"
 #include "opt110_engine_hook.cuh"
+#include "opt149_norm_q8.cuh"
 
 QW38_PDL_REGISTER_DEVICE_OPS()
 
@@ -1534,6 +1535,51 @@ cudaError_t launch_residual_add_norm_fp32_dispatch(
                               scale, count, output, normalized);
 }
 
+void mark_fused_mixer_q8(SchedulerWorkspace* workspace, const float* scale) {
+  workspace->q8_decode_staged_activation_ = workspace->normalized_;
+  workspace->q8_decode_staged_columns_ = internal::kResidualWidth;
+  workspace->q8_decode_staged_scale_ = scale;
+}
+
+cudaError_t launch_decode_mixer_input_norm(const float* residual,
+                                           const float* scale,
+                                           SchedulerWorkspace* workspace,
+                                           bool write_bf16,
+                                           cudaStream_t stream) noexcept {
+  if (opt149::decode_norm_q81_fusion_enabled() && workspace != nullptr &&
+      workspace->q8_ != nullptr) {
+    const cudaError_t error = opt149::launch_rms_norm_fp32_to_q8_1(
+        residual, scale, internal::kResidualWidth, workspace->q8_,
+        workspace->normalized_, write_bf16, stream);
+    if (error == cudaSuccess) mark_fused_mixer_q8(workspace, scale);
+    return error;
+  }
+  cudaError_t error = launch_rms_norm_fp32_dispatch(
+      residual, scale, internal::kResidualWidth, workspace->normalized_,
+      stream);
+  if (error == cudaSuccess && workspace != nullptr) {
+    workspace->invalidate_q8_decode_staging();
+  }
+  return error;
+}
+
+cudaError_t launch_decode_mixer_residual_norm(
+    const float* residual, const float* correction, const float* scale,
+    float* output, SchedulerWorkspace* workspace, bool write_bf16,
+    cudaStream_t stream) noexcept {
+  if (opt149::decode_norm_q81_fusion_enabled() && workspace != nullptr &&
+      workspace->q8_ != nullptr) {
+    const cudaError_t error = opt149::launch_residual_add_norm_fp32_to_q8_1(
+        residual, correction, scale, internal::kResidualWidth, output,
+        workspace->q8_, workspace->normalized_, write_bf16, stream);
+    if (error == cudaSuccess) mark_fused_mixer_q8(workspace, scale);
+    return error;
+  }
+  return launch_residual_add_norm_fp32_dispatch(
+      residual, correction, scale, internal::kResidualWidth, output,
+      workspace->normalized_, stream);
+}
+
 cudaError_t launch_residual_add_norm_rows_dispatch(
     const float* residual, const float* correction, const float* scale,
     std::size_t width, std::size_t token_count, float* output,
@@ -2354,16 +2400,9 @@ cudaError_t execute_ffn(const DeviceCommonLayer& layer,
   if (error == cudaSuccess) {
     if (pointwise_path == PointwisePath::kFused &&
         next_input_norm != nullptr) {
-      if (rms_norm_uses_serial()) {
-        residual_add_norm_fp32_to_bf16<<<1, kThreads, 0, stream>>>(
-            residual, workspace->mixer_output_, next_input_norm,
-            internal::kResidualWidth, output, workspace->normalized_);
-        error = cudaPeekAtLastError();
-      } else {
-        error = launch_residual_add_norm_fp32_dispatch(
-            residual, workspace->mixer_output_, next_input_norm,
-            internal::kResidualWidth, output, workspace->normalized_, stream);
-      }
+      error = launch_decode_mixer_residual_norm(
+          residual, workspace->mixer_output_, next_input_norm, output,
+          workspace, capture != nullptr, stream);
     } else {
       residual_add_fp32<<<20, kThreads, 0, stream>>>(
           residual, workspace->mixer_output_, internal::kResidualWidth, output);
@@ -3737,10 +3776,8 @@ cudaError_t enqueue_decode_layer_eager(
   cudaError_t error = cudaSuccess;
   const bool launch_rms = layer_index == 0;
   if (launch_rms) {
-    error = launch_rms_norm_fp32_dispatch(
-        residual, layer.common.input_norm, internal::kResidualWidth,
-        workspace->normalized_, stream);
-    if (error == cudaSuccess) workspace->invalidate_q8_decode_staging();
+    error = launch_decode_mixer_input_norm(
+        residual, layer.common.input_norm, workspace, false, stream);
   }
   if (error == cudaSuccess) {
     if (gdn_layer) {
@@ -5165,8 +5202,10 @@ SchedulerWorkspace& SchedulerWorkspace::operator=(
   QW38_MOVE_POINTER(q8_);
   q8_decode_staged_activation_ = other.q8_decode_staged_activation_;
   q8_decode_staged_columns_ = other.q8_decode_staged_columns_;
+  q8_decode_staged_scale_ = other.q8_decode_staged_scale_;
   other.q8_decode_staged_activation_ = nullptr;
   other.q8_decode_staged_columns_ = 0;
+  other.q8_decode_staged_scale_ = nullptr;
   QW38_MOVE_POINTER(q8_grouped_descs_);
   std::memcpy(q8_grouped_host_, other.q8_grouped_host_,
               sizeof(q8_grouped_host_));
@@ -5303,6 +5342,7 @@ void SchedulerWorkspace::release() noexcept {
   allocated_bytes_ = 0;
   q8_decode_staged_activation_ = nullptr;
   q8_decode_staged_columns_ = 0;
+  q8_decode_staged_scale_ = nullptr;
   q8_grouped_model_id_ = nullptr;
   q8_grouped_workspace_id_ = nullptr;
   q8_grouped_graph_generation_ = 0;
@@ -5312,6 +5352,7 @@ void SchedulerWorkspace::release() noexcept {
 void SchedulerWorkspace::invalidate_q8_decode_staging() noexcept {
   q8_decode_staged_activation_ = nullptr;
   q8_decode_staged_columns_ = 0;
+  q8_decode_staged_scale_ = nullptr;
 }
 
 cudaError_t SchedulerWorkspace::bind_q8_grouped_descriptors(
@@ -5731,12 +5772,9 @@ Status execute_token(const ResidentModel& model, std::size_t token,
                                         : &leaf_timings->input_norm);
       }
       if (error == cudaSuccess) {
-        error = launch_rms_norm_fp32_dispatch(
-            residual, layer.common.input_norm, internal::kResidualWidth,
-            workspace->normalized_, nullptr);
-      }
-      if (error == cudaSuccess) {
-        workspace->invalidate_q8_decode_staging();
+        error = launch_decode_mixer_input_norm(
+            residual, layer.common.input_norm, workspace, capture != nullptr,
+            nullptr);
       }
       if (error == cudaSuccess) error = end_phase(leaves);
       if (exclusive && error == cudaSuccess) error = end_phase(categories);

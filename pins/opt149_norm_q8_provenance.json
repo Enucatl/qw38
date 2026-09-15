@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "task": "OPT-149",
+  "candidate": "norm_to_q8_1_screen_v1",
+  "authority": "OPT-112 deferred hypothesis: fuse eligible decode residual/RMSNorm output into quartz_q8_1_sum_q staging",
+  "llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+  "license": "MIT",
+  "authors": "Quartz / qw38",
+  "adapter_namespace": "qw38::cuda::opt149",
+  "specialization": "Decode mixer input_norm Q8_1 fusion with in-register BF16 rounding before quartz_q8_1_sum_q; FFN llama_q4k_mmvq / Q8Block / logits BF16 unfused",
+  "not_vendored": [
+    "ggml tensor/runtime",
+    "ggml graph/allocator",
+    "ggml CLI/model",
+    "OPT-110 llama Q4 adapter",
+    "OPT-119 prompt MMQ mixer/ffn_norm_q8_fusion flags"
+  ],
+  "copied_organization": [],
+  "local_modifications": [
+    "RMSNorm math retained; BF16 round via rms_norm_store_bf16 then expand before Q8_1",
+    "256-thread CTA, warp-parallel 32-element Q8_1 blocks; no single-CTA serial 5120-element quantize",
+    "mixer input_norm Q8_1 group only; cookie q8_decode_staged_scale_ invalidates on residual/pointer/token/layer/scale",
+    "production pin kSelectedDecodeNormQ81Fusion stays false until keep",
+    "OPT-110 is not revived; Q4 stays llama_q4k_mmvq",
+    "Q8 byte size alone is not a win; complete decode-mixer family time is the screen",
+    "mechanism remains unknown unless separately evidenced"
+  ]
+}

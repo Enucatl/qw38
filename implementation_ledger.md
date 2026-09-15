@@ -347,7 +347,7 @@ OPT-124 assesses the remaining ceiling without claiming universal optimality.
 | OPT-146 | Measure the combined stack and publish the next remaining-gap decision | OPT-142, OPT-143, OPT-144, OPT-145 | done | Diagnostics only; fresh matched Quartz vs llama throughput and OPT-142 wall reconciliation (21/21 ≤0.26%); OPT-143/144/145 summarized `no_opportunity`; net batch shipping delta 0; next experiments `candidate=null` with resolving measurements; parent OPT-137 stack retained; `claims_throughput=false`; no production change; [`tasks/OPT-146.md`](tasks/OPT-146.md); [`tools/opt146_batch_reconciliation.py`](tools/opt146_batch_reconciliation.py); [`fixtures/opt146_batch_reconciliation.json`](fixtures/opt146_batch_reconciliation.json); [`evidence/optimization/opt146-batch-reconciliation/REPORT.md`](evidence/optimization/opt146-batch-reconciliation/REPORT.md); verification 2026-09-15T02:15:00Z |
 | OPT-147 | Screen a prefill 8x8 flash-attention tile | OPT-135, OPT-140, OPT-144 | done | `keep`; `prefill_attention_8x8_v1` 8×8 vs parent `opt111_base` 16×2; P4096 complete-family screen 222.146→201.479 ms; OPT-058 held-out NLL 1.7875990840085783 identical; 131072 reserve pass; `target_guard_v2` P4096 g=1.01158 (+34.63 tok/s); shipping pin flipped; mechanism unknown | [`tasks/OPT-147.md`](tasks/OPT-147.md); [`tools/opt147_prefill_8x8.py`](tools/opt147_prefill_8x8.py); [`pins/opt147_prefill_8x8_contract.json`](pins/opt147_prefill_8x8_contract.json); [`fixtures/opt147_prefill_8x8.json`](fixtures/opt147_prefill_8x8.json); [`evidence/optimization/opt147-prefill-8x8/REPORT.md`](evidence/optimization/opt147-prefill-8x8/REPORT.md); verification 2026-09-15T07:29:38Z |
 | OPT-148 | Screen a short-decode flash-style vector attention path | OPT-135, OPT-147 | done | `keep`; `decode_attention_flash_vec_v1` flash-style vector vs parent `vec128_online`; D2048 complete-family screen 1.776→0.602 ms; OPT-058 held-out NLL 1.7875990840085783 identical; 131072 reserve pass; `target_guard_v2` D2048 decode_only g=1.209 (+10.32 tok/s); shipping pin flipped; mechanism unknown | [`tasks/OPT-148.md`](tasks/OPT-148.md); [`tools/opt148_short_decode_flash.py`](tools/opt148_short_decode_flash.py); [`pins/opt148_short_decode_flash_contract.json`](pins/opt148_short_decode_flash_contract.json); [`fixtures/opt148_short_decode_flash.json`](fixtures/opt148_short_decode_flash.json); [`evidence/optimization/opt148-short-decode-flash/REPORT.md`](evidence/optimization/opt148-short-decode-flash/REPORT.md); verification 2026-09-15T08:26:00Z |
-| OPT-149 | Screen normalization fused directly into Q8_1 staging | OPT-135, OPT-148 | pending | One bounded OPT-112 norm-to-Q8_1 candidate screen with representation/state checks; no Q8 byte-size-only claim; full target/guard and quality gates required to ship | [`tasks/OPT-149.md`](tasks/OPT-149.md) |
+| OPT-149 | Screen normalization fused directly into Q8_1 staging | OPT-135, OPT-148 | done | `screened_out`; `norm_to_q8_1_screen_v1` D2048 complete decode-mixer family 2.101→2.256 ms (−0.155 ms); quality skipped (`screened_out_retain_parent`, not stubbed); parent `current_bf16_q8_staging` retained; OPT-147/148 unchanged; shipping delta 0; `claims_throughput=false` | [`tasks/OPT-149.md`](tasks/OPT-149.md); [`tools/opt149_norm_q8.py`](tools/opt149_norm_q8.py); [`pins/opt149_norm_q8_contract.json`](pins/opt149_norm_q8_contract.json); [`fixtures/opt149_norm_q8.json`](fixtures/opt149_norm_q8.json); [`evidence/optimization/opt149-norm-q8/REPORT.md`](evidence/optimization/opt149-norm-q8/REPORT.md); verification 2026-09-15T09:10:00Z |
 
 ### Post-138 counter evidence and optimization batch (OPT-139–146)
 
@@ -8655,4 +8655,31 @@ statements below are historical, not the current execution order.
   [`evidence/optimization/opt148-short-decode-flash/REPORT.md`](evidence/optimization/opt148-short-decode-flash/REPORT.md).
 - OPT-148 marked `done`. Coupled IDs: none. Next eligible pending task:
   **OPT-149**.
+
+### OPT-149 delivery (2026-09-15T09:10:00Z)
+
+- Screened decode-mixer RMSNorm fused into Q8_1 staging candidate
+  `norm_to_q8_1_screen_v1` against parent `current_bf16_q8_staging`
+  (BF16 RMSNorm plus `launch_quantize_bf16_q8_1`). Mixer input_norm Q8_1
+  fusion only; FFN `llama_q4k_mmvq`, Q8Block, and logits BF16 unfused. OPT-110
+  not revived. Parent stack: OPT-127 `decode_segments8` + OPT-137 MMA +
+  OPT-147 `prefill_attention_8x8_v1` + OPT-148 `decode_attention_flash_vec_v1`.
+- Verification **PASS**: host pytest 9 passed; ruff clean; GPU correctness and
+  D2048 complete-family screen executed on the sitting GPU. Screened_out;
+  quality/state-memory/performance skipped with `screened_out_retain_parent`
+  (`candidate_nll_not_measured=false`, not stubbed).
+- Screen (complete decode-mixer family, D2048): control **2.101024 ms**,
+  candidate **2.255574 ms**, saving **−0.15455 ms**. Independent
+  reconstruction agrees. Short engine pair control **530.687 ms** / candidate
+  **537.255 ms**.
+- Quality: OPT-058 not invoked (`nll_not_required_screened_out`); not stubbed.
+- Production pin retained: `kSelectedDecodeNormQ81Fusion = false` →
+  `current_bf16_q8_staging`. OPT-147 prompt and OPT-148 decode attention
+  unchanged. Verification PASS 2026-09-15T09:10:00Z; candidate measured delta
+  **−0.155 ms** (D2048 complete family); shipping delta **0**; quality
+  **skipped** (screened_out).
+- Key evidence: [`tasks/OPT-149.md`](tasks/OPT-149.md);
+  [`fixtures/opt149_norm_q8.json`](fixtures/opt149_norm_q8.json);
+  [`evidence/optimization/opt149-norm-q8/REPORT.md`](evidence/optimization/opt149-norm-q8/REPORT.md).
+- OPT-149 marked `done`. Coupled IDs: none.
 

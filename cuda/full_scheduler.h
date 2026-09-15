@@ -825,6 +825,7 @@ class SchedulerWorkspace final {
   std::uint8_t* llama_q81_ = nullptr;
   const __nv_bfloat16* q8_decode_staged_activation_ = nullptr;
   std::size_t q8_decode_staged_columns_ = 0;
+  const float* q8_decode_staged_scale_ = nullptr;
   Q8GroupedProjDesc* q8_grouped_descs_ = nullptr;
   Q8GroupedProjDesc q8_grouped_host_[internal::kModelLayerCount *
                                      kQ8GroupedDescCount]{};

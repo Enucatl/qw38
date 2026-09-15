@@ -1,0 +1,16 @@
+
+==========
+== CUDA ==
+==========
+
+CUDA Version 13.0.2
+
+Container image Copyright (c) 2016-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+
+This container image and its contents are governed by the NVIDIA Deep Learning Container License.
+By pulling and using the container, you accept the terms and conditions of this license:
+https://developer.nvidia.com/ngc/nvidia-deep-learning-container-license
+
+A copy of this license is made available in this container at /NGC-DL-CONTAINER-LICENSE for your convenience.
+
+nvcc -std=c++17 -O2 -arch=sm_120 --expt-relaxed-constexpr --fmad=false -Xcompiler=-Wall,-Wextra,-Werror,-fno-exceptions,-fno-rtti,-ffp-contract=off,-pthread -Iinclude -Isrc -Ithird_party/utf8proc -DQW38_DIAGNOSTIC_TRACE -Icuda -MMD -MP -MF build/qw38-cuda-opt149-norm-q8-test.d -MT build/qw38-cuda-opt149-norm-q8-test cuda/opt149_norm_q8_test.cu build/full_scheduler.trace.cuda.o build/scheduler_primitives.cuda.o build/quant_mmv.cuda.o build/q4_prompt_mmq.cuda.o build/q4k_decode_dots.cuda.o build/q8_decode_dots.cuda.o build/q6k_decode_dots.cuda.o build/gdn_step.cuda.o build/attention_decode.cuda.o build/diagnostic/status.o build/diagnostic/sha256.o build/diagnostic/model.o build/diagnostic/tokenizer.o build/diagnostic/template.o build/diagnostic/quant.o build/diagnostic/tensor.o build/diagnostic/conversion.o build/diagnostic/projection.o build/diagnostic/weights.o build/diagnostic/mixer.o build/diagnostic/scheduler.o build/diagnostic/scalar_runtime.o build/diagnostic/gdn.o build/diagnostic/attention.o build/diagnostic/engine.o build/diagnostic/diagnostic_trace.o build/utf8proc.o -o build/qw38-cuda-opt149-norm-q8-test

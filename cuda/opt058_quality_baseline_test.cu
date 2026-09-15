@@ -5,6 +5,8 @@
 #include "q4k_decode_path.cuh"
 #include "q8_decode_path.cuh"
 #include "rms_norm.cuh"
+#define QW38_OPT149_HOST_ONLY
+#include "opt149_norm_q8.cuh"
 #include "test_tier.h"
 
 #include <algorithm>
@@ -459,6 +461,13 @@ int apply_quality_selectors(const Options& options) {
       if (decode_attn == "decode_attention_flash_vec_v1") {
         qw38::cuda::apply_decode_attention_flash_vec_ident(
             decode_attn.c_str());
+      }
+    }
+    std::string decode_norm;
+    if (json_string_field(text, "decode_norm_q8", &decode_norm)) {
+      if (!qw38::cuda::opt149::apply_decode_norm_q81_ident(decode_norm.c_str())) {
+        std::fprintf(stderr, "invalid decode_norm_q8 %s\n", decode_norm.c_str());
+        return 2;
       }
     }
     int verified_max = 0;

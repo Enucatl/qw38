@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "task": "OPT-149",
+  "phase": "report",
+  "mode": "acceptance",
+  "ok": true,
+  "verdict": "screened_out",
+  "production_kept": false,
+  "shipping_decode_attention": "decode_attention_flash_vec_v1",
+  "shipping_decode_norm_q8": "current_bf16_q8_staging",
+  "tok_s_deltas": {},
+  "candidate_measured_delta": {
+    "rounds": [
+      {
+        "warmup": false,
+        "sample_index": 0,
+        "control_ms": 2.101248,
+        "candidate_ms": 2.24912
+      },
+      {
+        "warmup": false,
+        "sample_index": 1,
+        "control_ms": 2.102592,
+        "candidate_ms": 2.258944
+      },
+      {
+        "warmup": false,
+        "sample_index": 2,
+        "control_ms": 2.099232,
+        "candidate_ms": 2.258656
+      }
+    ],
+    "reconstructed_control_mean_ms": 2.1010240000000002,
+    "reconstructed_candidate_mean_ms": 2.2555733333333334,
+    "reconstructed_saving_ms": -0.1545493333333332,
+    "reconstructed_faster": false,
+    "layers": 64,
+    "control_mean_ms": 2.101024,
+    "candidate_mean_ms": 2.255574,
+    "saving_ms": -0.15455,
+    "faster": false,
+    "screened_in": false,
+    "pairs": 3,
+    "warmups": 1,
+    "ok": true
+  },
+  "shipping_delta": 0,
+  "quality_result": "nll_not_required_screened_out",
+  "family_plan": "task=OPT-149 mode=acceptance phase=report loop_product=1 cases=1 candidates=1 warmups=0 samples=1 tokens=1",
+  "measured_at": "2026-09-15T09:03:08Z",
+  "production_pin": "current_bf16_q8_staging"
+}

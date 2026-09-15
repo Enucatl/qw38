@@ -1,5 +1,7 @@
 #include "full_scheduler.h"
 #include "attention_decode.h"
+#define QW38_OPT149_HOST_ONLY
+#include "opt149_norm_q8.cuh"
 
 #include <array>
 #include <cstddef>
@@ -58,6 +60,7 @@ int main(int argc, char** argv) {
   const char* checkpoint_path = nullptr;
   const char* attention_pipeline = nullptr;
   const char* decode_attention = nullptr;
+  const char* decode_norm_q8 = nullptr;
   for (int index = 1; index < argc; ++index) {
     if (std::strcmp(argv[index], "--attention-pipeline") == 0 &&
         index + 1 < argc) {
@@ -65,6 +68,9 @@ int main(int argc, char** argv) {
     } else if (std::strcmp(argv[index], "--decode-attention") == 0 &&
                index + 1 < argc) {
       decode_attention = argv[++index];
+    } else if (std::strcmp(argv[index], "--decode-norm-q8") == 0 &&
+               index + 1 < argc) {
+      decode_norm_q8 = argv[++index];
     } else if (model_path == nullptr) {
       model_path = argv[index];
     } else if (checkpoint_path == nullptr) {
@@ -72,14 +78,16 @@ int main(int argc, char** argv) {
     } else {
       std::fprintf(stderr,
                    "usage: qw38-cuda-checkpoint-test MODEL CHECKPOINT "
-                   "[--attention-pipeline PATH] [--decode-attention PATH]\n");
+                   "[--attention-pipeline PATH] [--decode-attention PATH] "
+                   "[--decode-norm-q8 PATH]\n");
       return 1;
     }
   }
   if (model_path == nullptr || checkpoint_path == nullptr) {
     std::fprintf(stderr,
                  "usage: qw38-cuda-checkpoint-test MODEL CHECKPOINT "
-                 "[--attention-pipeline PATH] [--decode-attention PATH]\n");
+                 "[--attention-pipeline PATH] [--decode-attention PATH] "
+                 "[--decode-norm-q8 PATH]\n");
     return 1;
   }
   if (attention_pipeline != nullptr &&
@@ -93,6 +101,11 @@ int main(int argc, char** argv) {
       !qw38::cuda::apply_opt130_dense_attention_ident(decode_attention) &&
       !qw38::cuda::apply_opt137_dense_mma_ident(decode_attention)) {
     std::fprintf(stderr, "invalid --decode-attention %s\n", decode_attention);
+    return 1;
+  }
+  if (decode_norm_q8 != nullptr &&
+      !qw38::cuda::opt149::apply_decode_norm_q81_ident(decode_norm_q8)) {
+    std::fprintf(stderr, "invalid --decode-norm-q8 %s\n", decode_norm_q8);
     return 1;
   }
   const std::string checkpoint = checkpoint_path;

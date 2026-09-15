@@ -12,6 +12,7 @@
 #include "quant_mmv.h"
 #include "q8_decode_path.cuh"
 #include "opt110_engine_hook.cuh"
+#include "opt149_norm_q8.cuh"
 #include "rms_norm.cuh"
 #include "scheduler.h"
 #include "scheduler_primitives.h"
@@ -1316,13 +1317,25 @@ cudaError_t replay_mixer_layer(const qw38::cuda::DeviceLayer& layer,
                                cudaEvent_t kernel_stop, std::size_t layer_index,
                                const void* model_id) {
   workspace->invalidate_q8_decode_staging();
-  cudaError_t error = qw38::cuda::launch_rms_norm_fp32_to_bf16(
-      residual, layer.common.input_norm, qw38::internal::kResidualWidth,
-      workspace->normalized_, stream);
-  if (error == cudaSuccess) {
-    error = qw38::cuda::launch_quantize_bf16_q8_1(
-        workspace->normalized_, workspace->q8_, qw38::internal::kResidualWidth,
-        stream);
+  cudaError_t error = cudaSuccess;
+  if (qw38::cuda::opt149::decode_norm_q81_fusion_enabled()) {
+    error = qw38::cuda::opt149::launch_rms_norm_fp32_to_q8_1(
+        residual, layer.common.input_norm, qw38::internal::kResidualWidth,
+        workspace->q8_, workspace->normalized_, true, stream);
+    if (error == cudaSuccess) {
+      workspace->q8_decode_staged_activation_ = workspace->normalized_;
+      workspace->q8_decode_staged_columns_ = qw38::internal::kResidualWidth;
+      workspace->q8_decode_staged_scale_ = layer.common.input_norm;
+    }
+  } else {
+    error = qw38::cuda::launch_rms_norm_fp32_to_bf16(
+        residual, layer.common.input_norm, qw38::internal::kResidualWidth,
+        workspace->normalized_, stream);
+    if (error == cudaSuccess) {
+      error = qw38::cuda::launch_quantize_bf16_q8_1(
+          workspace->normalized_, workspace->q8_, qw38::internal::kResidualWidth,
+          stream);
+    }
   }
   if (error == cudaSuccess && kernel_start != nullptr) {
     error = cudaEventRecord(kernel_start, stream);

@@ -1,0 +1,162 @@
+{
+  "schema_version": 1,
+  "task": "OPT-149",
+  "phase": "screen",
+  "mode": "feedback",
+  "ok": true,
+  "blocked": false,
+  "screened_in": false,
+  "screened_out": true,
+  "advance": false,
+  "warmups": 1,
+  "pairs": 3,
+  "complete_mixer_family": true,
+  "short_engine_pair": true,
+  "cache_mode": "rotating",
+  "target": "d2048",
+  "native": {
+    "returncode": 0,
+    "stdout_tail": "\n==========\n== CUDA ==\n==========\n\nCUDA Version 13.0.2\n\nContainer image Copyright (c) 2016-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.\n\nThis container image and its contents are governed by the NVIDIA Deep Learning Container License.\nBy pulling and using the container, you accept the terms and conditions of this license:\nhttps://developer.nvidia.com/ngc/nvidia-deep-learning-container-license\n\nA copy of this license is made available in this container at /NGC-DL-CONTAINER-LICENSE for your convenience.\n\nround family=decode-mixer cache_mode=rotating warmup=true sample_index=0 observation_unit=independent_round control_ms=2.388640 candidate_ms=2.388640 enclosing_ms=2.388640 layers=64 path=norm_to_q8_1_screen_v1 residual_included=true staging_included=true projections_included=true\nround family=decode-mixer cache_mode=rotating warmup=false sample_index=0 order=AB observation_unit=independent_round control_ms=2.101248 candidate_ms=2.249120 enclosing_ms=2.249120 layers=64 path=norm_to_q8_1_screen_v1 launch=rms_norm_fp32_to_q8_1 tokens=2048 residual_included=true staging_included=true projections_included=true rotating_layers=64\nround family=decode-mixer cache_mode=rotating warmup=false sample_index=1 order=BA observation_unit=independent_round control_ms=2.102592 candidate_ms=2.258944 enclosing_ms=2.258944 layers=64 path=norm_to_q8_1_screen_v1 launch=rms_norm_fp32_to_q8_1 tokens=2048 residual_included=true staging_included=true projections_included=true rotating_layers=64\nround family=decode-mixer cache_mode=rotating warmup=false sample_index=2 order=AB observation_unit=independent_round control_ms=2.099232 candidate_ms=2.258656 enclosing_ms=2.258656 layers=64 path=norm_to_q8_1_screen_v1 launch=rms_norm_fp32_to_q8_1 tokens=2048 residual_included=true staging_included=true projections_included=true rotating_layers=64\nscreen_complete tokens=2048 layers=64 control_mean_ms=2.101024 candidate_mean_ms=2.255574 saving_ms=-0.154550 faster=false screened_in=false pairs=3 warmups=1 rotating_layers=true complete_family=true family=decode-mixer target=d2048 byte_size_only_claim=false\nfused_regs=27 fused_local_bytes=0 fused_occupancy=6 production_fusion=false q4_decode=llama_q4k_mmvq opt110_revived=false single_cta_serial=false\nQW38_OPT149_NORM_Q8_RESULT={\"schema_version\":1,\"task\":\"OPT-149\",\"workload\":\"screen\",\"llama_revision\":\"cc83d7b4824f73cfdda4dfbb47ee39804f71b328\",\"gguf_sha256\":\"31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34\",\"candidate_path\":\"norm_to_q8_1_screen_v1\",\"control_path\":\"current_bf16_q8_staging\",\"nonfinite\":0,\"pass\":true,\"keep\":false,\"observed_warmups\":1,\"observed_samples\":3,\"observed_candidates\":2,\"observed_shapes\":1,\"observed_tier\":\"screen\",\"acceptance_executed\":true,\"pairs\":3,\"opt110_revived\":false,\"byte_size_only_claim\":false}\nQW38_OPT149_NATIVE_COUNTS={\"schema_version\":1,\"task\":\"OPT-149\",\"family\":\"decode-mixer\",\"tier\":\"screen\",\"warmups\":1,\"samples\":3,\"observed_warmups\":1,\"observed_samples\":3,\"observed_candidates\":2,\"observed_shapes\":1,\"observed_tier\":\"screen\",\"pairs\":3,\"acceptance_executed\":false,\"keep\":false}\n",
+    "result": {
+      "schema_version": 1,
+      "task": "OPT-149",
+      "workload": "screen",
+      "llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+      "gguf_sha256": "31629f53165ab6a7dad8c9847dcfd1fdf55829dac1e6e748f4a68581b0033d34",
+      "candidate_path": "norm_to_q8_1_screen_v1",
+      "control_path": "current_bf16_q8_staging",
+      "nonfinite": 0,
+      "pass": true,
+      "keep": false,
+      "observed_warmups": 1,
+      "observed_samples": 3,
+      "observed_candidates": 2,
+      "observed_shapes": 1,
+      "observed_tier": "screen",
+      "acceptance_executed": true,
+      "pairs": 3,
+      "opt110_revived": false,
+      "byte_size_only_claim": false
+    },
+    "counts": {
+      "schema_version": 1,
+      "task": "OPT-149",
+      "family": "decode-mixer",
+      "tier": "screen",
+      "warmups": 1,
+      "samples": 3,
+      "observed_warmups": 1,
+      "observed_samples": 3,
+      "observed_candidates": 2,
+      "observed_shapes": 1,
+      "observed_tier": "screen",
+      "pairs": 3,
+      "acceptance_executed": false,
+      "keep": false
+    },
+    "pass": true,
+    "raw": "build/optimization-runs/opt149-norm-q8/screen-native.txt"
+  },
+  "parsed": {
+    "rounds": [
+      {
+        "warmup": false,
+        "sample_index": 0,
+        "control_ms": 2.101248,
+        "candidate_ms": 2.24912
+      },
+      {
+        "warmup": false,
+        "sample_index": 1,
+        "control_ms": 2.102592,
+        "candidate_ms": 2.258944
+      },
+      {
+        "warmup": false,
+        "sample_index": 2,
+        "control_ms": 2.099232,
+        "candidate_ms": 2.258656
+      }
+    ],
+    "reconstructed_control_mean_ms": 2.1010240000000002,
+    "reconstructed_candidate_mean_ms": 2.2555733333333334,
+    "reconstructed_saving_ms": -0.1545493333333332,
+    "reconstructed_faster": false,
+    "layers": 64,
+    "control_mean_ms": 2.101024,
+    "candidate_mean_ms": 2.255574,
+    "saving_ms": -0.15455,
+    "faster": false,
+    "screened_in": false,
+    "pairs": 3,
+    "warmups": 1,
+    "ok": true
+  },
+  "engine": {
+    "raw": "build/optimization-runs/opt149-norm-q8/d2048-screen-engine.txt"
+  },
+  "engine_error": null,
+  "reconstruction": {
+    "schema_version": 1,
+    "task": "OPT-149",
+    "workload": "d2048",
+    "complete_family": true,
+    "rotating_layers": 64,
+    "warmups": 1,
+    "pairs": 3,
+    "control": "current_bf16_q8_staging",
+    "candidate": "norm_to_q8_1_screen_v1",
+    "native_control_mean_ms": 2.101024,
+    "native_candidate_mean_ms": 2.255574,
+    "independent_control_mean_ms": 2.1010240000000002,
+    "independent_candidate_mean_ms": 2.2555733333333334,
+    "independent_saving_ms": -0.1545493333333332,
+    "rounds": [
+      {
+        "warmup": false,
+        "sample_index": 0,
+        "control_ms": 2.101248,
+        "candidate_ms": 2.24912
+      },
+      {
+        "warmup": false,
+        "sample_index": 1,
+        "control_ms": 2.102592,
+        "candidate_ms": 2.258944
+      },
+      {
+        "warmup": false,
+        "sample_index": 2,
+        "control_ms": 2.099232,
+        "candidate_ms": 2.258656
+      }
+    ],
+    "short_engine_pair": [
+      {
+        "observation_unit": "independent_round",
+        "sample_index": 0,
+        "pair": 0,
+        "order": "AB",
+        "control_ms": 530.686768,
+        "candidate_ms": 537.255005,
+        "control_itl_p50_ms": 16.4782028,
+        "control_itl_p95_ms": 16.4978809,
+        "candidate_itl_p50_ms": 16.6895332,
+        "candidate_itl_p95_ms": 16.7054253,
+        "family": "attn"
+      }
+    ],
+    "mechanism": "unknown",
+    "prep_included": true,
+    "combine_included": true,
+    "conversion_included": true
+  },
+  "candidate": "norm_to_q8_1_screen_v1",
+  "control": "current_bf16_q8_staging",
+  "mechanism": "unknown",
+  "supported_mechanism": null,
+  "screen_allowed_without_sass": true,
+  "family_plan": "task=OPT-149 mode=feedback phase=screen loop_product=16384 cases=1 candidates=2 warmups=1 samples=3 tokens=2048",
+  "measured_at": "2026-09-15T09:01:53Z",
+  "reason": "complete_family_time_did_not_improve"
+}
