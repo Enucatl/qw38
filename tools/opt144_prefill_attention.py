@@ -502,6 +502,10 @@ def freeze_candidate(
         no_opportunity = True
         verdict = "no_opportunity"
         reasons.append("opt138_p4096_attn_core_excess_not_positive")
+    elif proposed and not (source and sass and admission.get("ok") and mechanism):
+        candidate = str(proposed)
+        verdict = "candidate_frozen"
+        reasons.append("hypothesis_screen_allowed_without_supported_mechanism")
     elif not (source and sass and admission.get("ok") and mechanism and proposed):
         no_opportunity = True
         verdict = "no_opportunity"
@@ -565,6 +569,7 @@ def freeze_candidate(
         "opt130_not_revived": True,
         "opt143_short_decode_not_kept": True,
         "arithmetic_changed": bool(candidate),
+        "screen_only": bool(candidate and not mechanism),
         "nll_required": bool(candidate),
         "target": "p4096",
         "target_metric": "prefill",
@@ -1033,9 +1038,7 @@ def evaluate_keep(run_dir: Path) -> dict[str, Any]:
         if verdict not in {"incomplete", "reject"}:
             verdict = "reject"
     if not bool(mechanism.get("ok")):
-        reasons.append("mechanism_failed")
-        if verdict == "keep":
-            verdict = "reject"
+        reasons.append("mechanism_unproven_causal_claim_withheld")
     reasons.extend(str(item) for item in (policy.get("reasons") or []))
     keep = verdict == "keep"
     return {
@@ -1100,10 +1103,12 @@ def write_report(result: Mapping[str, Any], freeze: Mapping[str, Any]) -> None:
         f"Admission reason: `{freeze.get('admission_reason')}`.",
         f"Reasons: `{result.get('reasons') or freeze.get('reasons')}`.",
         "",
-        "Freeze requires matched positive family excess **and** a source-grounded "
-        "mechanism for the production prompt-attention dispatch. Occupancy, DRAM "
-        "throughput, and byte counters alone cannot freeze a kernel. Decode NCU is "
-        "not P4096 prefill evidence. OPT-111 `opt111_base` is already shipping.",
+        "Freeze requires matched positive family excess and a concrete candidate "
+        "at the production prompt-attention boundary. Source/SASS mechanism "
+        "evidence is required for a causal claim, not for screening. Occupancy, "
+        "DRAM throughput, and byte counters alone cannot establish that claim. "
+        "Decode NCU is not P4096 prefill evidence. OPT-111 `opt111_base` is "
+        "already shipping.",
         "",
         "## Family excess (OPT-138)",
         "",

@@ -345,6 +345,9 @@ OPT-124 assesses the remaining ceiling without claiming universal optimality.
 | OPT-144 | Evaluate one complete-boundary prefill attention optimization | OPT-135, OPT-141, OPT-143 | done | One production-boundary P4096 attention candidate yields verified keep or measured no-keep with quality and decode guards | Measured `no_opportunity`; P4096 attn_core +186.58 ms family excess; production `opt111_base`/`fattn_mma_pipeline_opt111_base`; no source-grounded mechanism; OPT-141 fused_boundary_mismatch 16x2 vs 8x8; parent retained; shipping delta 0; quality N/A (no arithmetic change); OPT-137 MMA retained; `claims_throughput=false`; no production change; [`tasks/OPT-144.md`](tasks/OPT-144.md); [`tools/opt144_prefill_attention.py`](tools/opt144_prefill_attention.py); [`pins/opt144_prefill_attention_contract.json`](pins/opt144_prefill_attention_contract.json); [`pins/opt144_iteration_contract.json`](pins/opt144_iteration_contract.json); [`fixtures/opt144_prefill_attention.json`](fixtures/opt144_prefill_attention.json); [`tests/test_opt144_prefill_attention.py`](tests/test_opt144_prefill_attention.py); [`evidence/optimization/opt144-prefill-attention/REPORT.md`](evidence/optimization/opt144-prefill-attention/REPORT.md); verification 2026-09-15T01:13:26Z |
 | OPT-145 | Evaluate one remaining normalization or prompt-MMQ optimization | OPT-135, OPT-143, OPT-144 | done | Fresh evidence selects at most one normalization or prompt-MMQ candidate with verified keep or measured no-opportunity/no-keep | Measured `no_opportunity`; `residual_norm_quant` D128 +7.21 ms family excess (fraction 0.0358); unselected `prompt_mmq` +27.11 ms (fraction 0.0201); OPT-141 fused_boundary_mismatch; no source-grounded mechanism; parent retained; shipping delta 0; quality N/A (no arithmetic change); OPT-137 MMA retained; `claims_throughput=false`; no production change; [`tasks/OPT-145.md`](tasks/OPT-145.md); [`tools/opt145_secondary_family.py`](tools/opt145_secondary_family.py); [`pins/opt145_secondary_family_contract.json`](pins/opt145_secondary_family_contract.json); [`pins/opt145_iteration_contract.json`](pins/opt145_iteration_contract.json); [`fixtures/opt145_secondary_family.json`](fixtures/opt145_secondary_family.json); [`tests/test_opt145_secondary_family.py`](tests/test_opt145_secondary_family.py); [`evidence/optimization/opt145-secondary-family/REPORT.md`](evidence/optimization/opt145-secondary-family/REPORT.md); verification 2026-09-15T01:26:00Z |
 | OPT-146 | Measure the combined stack and publish the next remaining-gap decision | OPT-142, OPT-143, OPT-144, OPT-145 | done | Diagnostics only; fresh matched Quartz vs llama throughput and OPT-142 wall reconciliation (21/21 ≤0.26%); OPT-143/144/145 summarized `no_opportunity`; net batch shipping delta 0; next experiments `candidate=null` with resolving measurements; parent OPT-137 stack retained; `claims_throughput=false`; no production change; [`tasks/OPT-146.md`](tasks/OPT-146.md); [`tools/opt146_batch_reconciliation.py`](tools/opt146_batch_reconciliation.py); [`fixtures/opt146_batch_reconciliation.json`](fixtures/opt146_batch_reconciliation.json); [`evidence/optimization/opt146-batch-reconciliation/REPORT.md`](evidence/optimization/opt146-batch-reconciliation/REPORT.md); verification 2026-09-15T02:15:00Z |
+| OPT-147 | Screen a prefill 8x8 flash-attention tile | OPT-135, OPT-140, OPT-144 | pending | One bounded P4096 8x8 prompt-attention hypothesis screen; unknown mechanism allowed at screen; shipping still requires correctness, quality, state/memory and whole-engine gates | [`tasks/OPT-147.md`](tasks/OPT-147.md) |
+| OPT-148 | Screen a short-decode flash-style vector attention path | OPT-135, OPT-147 | pending | One bounded D2048 vector/flash-style candidate screen against vec128_online; no causal claim from counters alone; full target/guard and quality gates required to ship | [`tasks/OPT-148.md`](tasks/OPT-148.md) |
+| OPT-149 | Screen normalization fused directly into Q8_1 staging | OPT-135, OPT-148 | pending | One bounded OPT-112 norm-to-Q8_1 candidate screen with representation/state checks; no Q8 byte-size-only claim; full target/guard and quality gates required to ship | [`tasks/OPT-149.md`](tasks/OPT-149.md) |
 
 ### Post-138 counter evidence and optimization batch (OPT-139–146)
 
@@ -368,6 +371,17 @@ totals and low occupancy are hypotheses, not causal or bandwidth proof.
 No candidate design or speedup is promised before matched evidence exists.
 Secondary work selects one remaining normalization/MMQ opportunity after
 attention, following the minimum-change approach rather than a tuning sweep.
+
+### Hypothesis-screen policy correction (OPT-147–149)
+
+Updated 2026-09-15. A concrete candidate with a matched boundary, bounded
+correctness plan, production-shaped inputs and a disconfirming experiment may
+enter the screen tier without a proven source/SASS mechanism. Unknown mechanism
+withholds causal explanation; it no longer establishes `no_opportunity` or
+blocks a keep when the independent correctness, quality, state/memory and
+whole-engine gates pass. Execute the three hypotheses in order:
+**OPT-147 → OPT-148 → OPT-149**. These are bounded screens, not a profiling
+sweep, and each measured no-keep retains the current parent.
 
 ### Post-133 evidence repair and focused performance work (OPT-134–138)
 

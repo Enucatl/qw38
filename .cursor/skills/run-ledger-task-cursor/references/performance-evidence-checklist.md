@@ -95,6 +95,15 @@ findings enter the final narrative.
 
 ## 6. Target and guard roles
 
+Screen eligibility is distinct from causal explanation. A concrete candidate
+with a valid matched boundary, bounded correctness plan, production-shaped
+inputs, and a falsifying experiment may proceed to `screen` while its mechanism
+is `unknown` or `hypothesis`. Do not turn missing source/SASS or counters into
+`no_opportunity`; use `incomplete`/`blocked` when required evidence is absent.
+Mechanism evidence controls what causal explanation may be claimed. Shipping
+still requires the existing correctness, quality, state/memory, and whole-engine
+target/guard gates.
+
 Freeze region, primary metric, targets, guards, thresholds, and policy ID
 before candidate timing. Apply OPT-135 when the task opts into
 [`target_guard_v2`](../../../../pins/performance_keep_policy_v2.json); do not

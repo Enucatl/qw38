@@ -323,6 +323,23 @@ def test_live_freeze_is_measured_no_opportunity() -> None:
     assert "decode_mixer_stalls" in reasons
 
 
+def test_freeze_admits_hypothesis_without_mechanism_for_screen() -> None:
+    record = _counter_record(family="residual_norm_quant", mechanism=False)
+    record["candidate"] = "norm_to_q8_1_screen_v1"
+    freeze = freeze_candidate(
+        gaps=_gaps(),
+        identity={},
+        counters={"kernels": [record]},
+        comparisons=_comparisons(),
+        llama_counters={"kernels": []},
+        next_experiments={},
+    )
+    assert freeze["verdict"] == "candidate_frozen"
+    assert freeze["candidate"] == "norm_to_q8_1_screen_v1"
+    assert freeze["screen_only"] is True
+    assert freeze["supported_mechanism"] is None
+
+
 def test_freeze_blocks_unmeasured_excess() -> None:
     freeze = freeze_candidate(
         gaps={

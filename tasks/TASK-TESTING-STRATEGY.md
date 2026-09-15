@@ -54,6 +54,16 @@ not informal labels:
   30 measured samples where the frozen protocol requires them. A candidate
   that fails screening must not receive an expensive P/D sitting.
 
+Screen eligibility and shipping acceptance are separate decisions. A screen may
+admit one concrete implementation hypothesis with a valid matched boundary,
+bounded correctness cases, production-shaped inputs, and a predefined
+disconfirming experiment. Proven source/SASS mechanism, matched hardware
+counters, or a causal explanation is not required to screen. Unknown mechanism
+must be reported as a hypothesis and cannot support a causal claim. Only
+acceptance may decide shipping, and it still requires the existing correctness,
+quality, state/memory, and whole-engine target/guard evidence. Missing required
+capture or candidate work is incomplete/blocked, not `no_opportunity`.
+
 For OPT-057–069, the versioned batch protocol permits 10 paired component rounds
 and a short target non-regression gate, then one combined release sitting.
 Do not feed 10-sample results to historical validators requiring 30. The existing

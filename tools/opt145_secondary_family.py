@@ -809,6 +809,10 @@ def freeze_candidate(
         no_opportunity = True
         verdict = "no_opportunity"
         reasons.append("no_supported_positive_excess_fraction")
+    elif proposed and not (source and sass and admission.get("ok") and mechanism):
+        candidate = str(proposed)
+        verdict = "candidate_frozen"
+        reasons.append("hypothesis_screen_allowed_without_supported_mechanism")
     elif not (source and sass and admission.get("ok") and mechanism and proposed):
         no_opportunity = True
         verdict = "no_opportunity"
@@ -882,6 +886,7 @@ def freeze_candidate(
         "opt144_prefill_attention_not_kept": bool(attention.get("opt144_not_kept")),
         "attention": attention,
         "arithmetic_changed": bool(candidate),
+        "screen_only": bool(candidate and not mechanism),
         "nll_required": bool(candidate),
         "refresh_reason": "production_unchanged_after_opt143_opt144_no_opportunity",
         "evidence_paths": {
@@ -1347,9 +1352,7 @@ def evaluate_keep(run_dir: Path) -> dict[str, Any]:
         if verdict not in {"incomplete", "reject"}:
             verdict = "reject"
     if not bool(mechanism.get("ok")):
-        reasons.append("mechanism_failed")
-        if verdict == "keep":
-            verdict = "reject"
+        reasons.append("mechanism_unproven_causal_claim_withheld")
     reasons.extend(str(item) for item in (policy.get("reasons") or []))
     keep = verdict == "keep"
     return {
@@ -1448,10 +1451,12 @@ def write_report(result: Mapping[str, Any], freeze: Mapping[str, Any]) -> None:
         f"Admission reason: `{freeze.get('admission_reason')}`.",
         f"Reasons: `{result.get('reasons') or freeze.get('reasons')}`.",
         "",
-        "Freeze requires matched positive family excess **and** a source-grounded "
-        "mechanism at the fused comparison boundary. Occupancy, DRAM, and byte "
-        "counters alone cannot freeze a kernel. Decode-mixer replay stalls cannot "
-        "identify an RMSNorm bottleneck. OPT-110/112/131/122/130 are not revived.",
+        "Freeze requires matched positive family excess and a concrete candidate "
+        "at the fused comparison boundary. Source/SASS mechanism evidence is "
+        "required for a causal claim, not for screening. Occupancy, DRAM, and "
+        "byte counters alone cannot establish that claim. Decode-mixer replay "
+        "stalls cannot identify an RMSNorm bottleneck. OPT-110/112/131/122/130 "
+        "are not revived.",
         "",
         "## Resolving measurement",
         "",

@@ -52,6 +52,11 @@ conclusions stay `unverified` until verification.
 - Claim types: each conclusion tagged `measured` | `derived` | `hypothesis` | `incomplete` | `historical` (derivations include formula, units, and input links)
 - Target/guard roles: <region, primary metric, targets, guards, thresholds, policy ID; apply OPT-135 when opted in; or not opted in>
 - Evidence completeness: <complete | incomplete | unavailable checks>
+- Screen eligibility: <candidate hypothesis, matched boundary, bounded
+  correctness cases, production-shaped inputs, and disconfirming experiment;
+  source/SASS mechanism may remain unknown>
+- Shipping evidence: <correctness, quality, state/memory, and whole-engine
+  target/guard gates; causal mechanism is required only for causal claims>
 
 ## Implementation decisions
 

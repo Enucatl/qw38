@@ -317,6 +317,23 @@ def test_freeze_admits_source_grounded_candidate() -> None:
     assert freeze["arithmetic_changed"] is True
 
 
+def test_freeze_admits_hypothesis_without_mechanism_for_screen() -> None:
+    record = _counter_record(mechanism=False)
+    record["candidate"] = "vec128_online_8x8_screen_v1"
+    freeze = freeze_candidate(
+        gaps=_gaps(),
+        identity=_identity(),
+        counters={"kernels": [record]},
+        comparisons={"decode.attn_core.d2048": {"comparison": {"comparable": True}}},
+        llama_counters={"kernels": []},
+        next_experiments={},
+    )
+    assert freeze["verdict"] == "candidate_frozen"
+    assert freeze["candidate"] == "vec128_online_8x8_screen_v1"
+    assert freeze["screen_only"] is True
+    assert freeze["supported_mechanism"] is None
+
+
 def test_quality_skip_does_not_set_nll_not_measured(tmp_path: Path) -> None:
     freeze = freeze_candidate()
     payload = skip_payload(tmp_path, "acceptance", "quality", freeze)

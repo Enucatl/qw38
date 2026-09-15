@@ -404,6 +404,10 @@ def freeze_candidate(
         no_opportunity = True
         verdict = "no_opportunity"
         reasons.append("opt138_d2048_attn_core_excess_not_positive")
+    elif proposed and not (source and sass and admission.get("ok") and mechanism):
+        candidate = str(proposed)
+        verdict = "candidate_frozen"
+        reasons.append("hypothesis_screen_allowed_without_supported_mechanism")
     elif not (source and sass and admission.get("ok") and mechanism and proposed):
         no_opportunity = True
         verdict = "no_opportunity"
@@ -447,6 +451,7 @@ def freeze_candidate(
         "opt137_mma_retained": True,
         "opt130_not_revived": True,
         "arithmetic_changed": bool(candidate),
+        "screen_only": bool(candidate and not mechanism),
         "nll_required": bool(candidate),
         "target": "d2048",
         "target_metric": "decode_only",
@@ -907,9 +912,7 @@ def evaluate_keep(run_dir: Path) -> dict[str, Any]:
         if verdict not in {"incomplete", "reject"}:
             verdict = "reject"
     if not bool(mechanism.get("ok")):
-        reasons.append("mechanism_failed")
-        if verdict == "keep":
-            verdict = "reject"
+        reasons.append("mechanism_unproven_causal_claim_withheld")
     reasons.extend(str(item) for item in (policy.get("reasons") or []))
     keep = verdict == "keep"
     return {
@@ -974,10 +977,11 @@ def write_report(result: Mapping[str, Any], freeze: Mapping[str, Any]) -> None:
         f"Admission reason: `{freeze.get('admission_reason')}`.",
         f"Reasons: `{result.get('reasons') or freeze.get('reasons')}`.",
         "",
-        "Freeze requires matched positive family excess **and** a source-grounded "
-        "mechanism for the production dispatch. Occupancy, DRAM throughput, and "
-        "byte counters alone cannot freeze a kernel. A warp_query replay is not "
-        "D2048 evidence.",
+        "Freeze requires matched positive family excess and a concrete candidate "
+        "at the production boundary. Source/SASS mechanism evidence is required "
+        "for a causal claim, not for screening. Occupancy, DRAM throughput, and "
+        "byte counters alone cannot establish that claim. A warp_query replay is "
+        "not D2048 evidence.",
         "",
         "## Family excess (OPT-138)",
         "",
