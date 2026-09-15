@@ -2,6 +2,7 @@
 #include "attention_decode.h"
 #include "gdn_step.h"
 #include "optimization_component_replay.h"
+#include "opt111_llama_prompt_attention.cuh"
 #include "scheduler_primitives.h"
 
 #include "engine_attribution.h"
@@ -84,6 +85,7 @@ struct Options final {
   bool ncu = false;
   bool corrupt_guard = false;
   bool opt138_protocol = false;
+  bool opt140_protocol = false;
   const char* evidence_dir = nullptr;
 };
 
@@ -91,7 +93,7 @@ int usage(const char* argv0) {
   std::fprintf(stderr,
                "usage: %s [--workload smoke|correctness|decode-ffn|"
                "decode-mixer|decode-gdn|decode-attention|decode-q6|prompt-ffn|"
-               "acceptance|hardware] [MODEL] "
+               "prompt-attention|acceptance|hardware] [MODEL] "
                "[--cache-mode hot|rotating] [--capture-key KEY] "
                "[--q8-layout r1_w4|r2_w2] [--q8-grouping separate|grouped_r1_w4] "
                "[--q8-device-layout raw_gguf|aligned_soa] [--mmq-async-x 0|1] "
@@ -108,7 +110,7 @@ int usage(const char* argv0) {
                "[--decode-attention-crossover-threshold 0|512|1024|1536|2048] "
                "[--decode-position 128|512|1024|1536|2048|4096] "
                "[--warmups N] [--samples N] [--ncu] [--corrupt-guard] "
-               "[--opt138-protocol] [--evidence-dir DIR]\n",
+               "[--opt138-protocol] [--opt140-protocol] [--evidence-dir DIR]\n",
                argv0);
   return 2;
 }
@@ -174,6 +176,8 @@ int parse_args(int argc, char** argv, Options* options) {
       options->corrupt_guard = true;
     } else if (std::strcmp(arg, "--opt138-protocol") == 0) {
       options->opt138_protocol = true;
+    } else if (std::strcmp(arg, "--opt140-protocol") == 0) {
+      options->opt140_protocol = true;
     } else if (std::strcmp(arg, "--evidence-dir") == 0 && index + 1 < argc) {
       options->evidence_dir = argv[++index];
     } else if (arg[0] != '-' && options->model == nullptr) {
@@ -773,8 +777,19 @@ struct LayerActivations final {
   std::vector<__nv_bfloat16> attn_candidate_key;
   std::vector<__nv_bfloat16> attn_candidate_value;
   std::vector<std::uint8_t> attn_slot_captured;
+  std::vector<float> prompt_attn_packed;
+  std::vector<float> prompt_attn_key;
+  std::vector<float> prompt_attn_value;
+  std::vector<float> prompt_attn_output;
+  std::vector<__nv_bfloat16> prompt_attn_candidate_key;
+  std::vector<__nv_bfloat16> prompt_attn_candidate_value;
+  std::vector<std::uint8_t> prompt_attn_slot_captured;
   std::size_t attn_kv_capacity = 0;
   std::size_t attn_decode_position = 0;
+  std::size_t prompt_attn_rows = 0;
+  std::size_t prompt_attn_capacity = 0;
+  std::size_t prompt_attn_query_start = 0;
+  std::size_t prompt_attn_chunk_count = 0;
   char identity[65]{};
 };
 
@@ -816,6 +831,28 @@ void resize_attn_capture(LayerActivations* acts, std::size_t capacity) {
   acts->attn_candidate_value.assign(
       kAttnCaptureCells * qw38::internal::kAttentionKvWidth, __nv_bfloat16{});
   acts->attn_slot_captured.assign(kAttnCaptureCells, 0);
+}
+
+void resize_prompt_attn_capture(LayerActivations* acts, std::size_t rows,
+                                std::size_t capacity) {
+  acts->prompt_attn_rows = rows;
+  acts->prompt_attn_capacity = capacity;
+  acts->prompt_attn_query_start = 0;
+  acts->prompt_attn_chunk_count = 1;
+  const std::size_t slots = qw38::cuda::kOpt078AttentionLayers;
+  acts->prompt_attn_packed.assign(
+      slots * rows * qw38::internal::kAttentionPackedQueryGateWidth, 0.0F);
+  acts->prompt_attn_key.assign(
+      slots * rows * qw38::internal::kAttentionKvWidth, 0.0F);
+  acts->prompt_attn_value.assign(
+      slots * rows * qw38::internal::kAttentionKvWidth, 0.0F);
+  acts->prompt_attn_output.assign(
+      slots * rows * qw38::internal::kAttentionQueryWidth, 0.0F);
+  acts->prompt_attn_candidate_key.assign(
+      slots * rows * qw38::internal::kAttentionKvWidth, __nv_bfloat16{});
+  acts->prompt_attn_candidate_value.assign(
+      slots * rows * qw38::internal::kAttentionKvWidth, __nv_bfloat16{});
+  acts->prompt_attn_slot_captured.assign(slots, 0);
 }
 
 bool write_floats(const char* path, const std::vector<float>& values) {
@@ -938,6 +975,43 @@ int persist_activations(const char* identity, const LayerActivations& acts,
                  qw38::cuda::kOpt078AttnCapturePositions);
     std::fclose(meta);
   }
+  if (family == qw38::cuda::ReplayFamily::kPromptAttention) {
+    std::snprintf(path, sizeof(path), "%s/prompt_attn_packed.bin", dir);
+    if (!write_floats(path, acts.prompt_attn_packed)) return 1;
+    std::snprintf(path, sizeof(path), "%s/prompt_attn_key.bin", dir);
+    if (!write_floats(path, acts.prompt_attn_key)) return 1;
+    std::snprintf(path, sizeof(path), "%s/prompt_attn_value.bin", dir);
+    if (!write_floats(path, acts.prompt_attn_value)) return 1;
+    std::snprintf(path, sizeof(path), "%s/prompt_attn_output.bin", dir);
+    if (!write_floats(path, acts.prompt_attn_output)) return 1;
+    std::snprintf(path, sizeof(path), "%s/prompt_attn_candidate_key.bin", dir);
+    if (!write_bf16(path, acts.prompt_attn_candidate_key)) return 1;
+    std::snprintf(path, sizeof(path), "%s/prompt_attn_candidate_value.bin", dir);
+    if (!write_bf16(path, acts.prompt_attn_candidate_value)) return 1;
+    std::snprintf(path, sizeof(path), "%s/prompt_attn_meta.json", dir);
+    FILE* meta = std::fopen(path, "w");
+    if (meta == nullptr) return 1;
+    std::fprintf(
+        meta,
+        "{\"schema_version\":1,\"task\":\"OPT-140\","
+        "\"prompt_attn_capacity\":%zu,\"prompt_attn_rows\":%zu,"
+        "\"query_start\":%zu,\"chunk_count\":%zu,\"layers\":%zu,"
+        "\"empty_initial_state\":true,\"prefix_reuse\":false,"
+        "\"final_token_logits_only\":true,"
+        "\"causal\":\"absolute_gt_qpos\","
+        "\"visible_length_policy\":\"query_index_plus_one\","
+        "\"packed_kv_physical_index\":\"(kv_head*capacity+token)*head_width+lane\","
+        "\"q_stride_token\":%zu,\"k_stride_token\":%zu,"
+        "\"head_width\":256,\"query_heads\":24,\"kv_heads\":4,"
+        "\"selector\":\"opt111_base\","
+        "\"expected_kernel\":\"fattn_mma_pipeline_opt111_base\"}\n",
+        acts.prompt_attn_capacity, acts.prompt_attn_rows,
+        acts.prompt_attn_query_start, acts.prompt_attn_chunk_count,
+        qw38::cuda::kOpt078AttentionLayers,
+        qw38::internal::kAttentionQueryWidth,
+        qw38::internal::kAttentionKvWidth);
+    std::fclose(meta);
+  }
   std::snprintf(path, sizeof(path), "%s/bundle.json", dir);
   FILE* out = std::fopen(path, "w");
   if (out == nullptr) return 1;
@@ -1055,6 +1129,39 @@ int load_activations(const char* identity, qw38::cuda::ReplayFamily family,
     if (!read_bf16(path, &acts->attn_candidate_key)) return 1;
     std::snprintf(path, sizeof(path), "%s/attn_candidate_value.bin", dir);
     if (!read_bf16(path, &acts->attn_candidate_value)) return 1;
+  }
+  if (family == qw38::cuda::ReplayFamily::kPromptAttention) {
+    std::snprintf(path, sizeof(path), "%s/prompt_attn_meta.json", dir);
+    FILE* meta = std::fopen(path, "r");
+    if (meta == nullptr) return 1;
+    unsigned long capacity = 0;
+    unsigned long rows = 0;
+    unsigned long query_start = 0;
+    unsigned long chunks = 0;
+    const int scanned = std::fscanf(
+        meta,
+        "{\"schema_version\":1,\"task\":\"OPT-140\","
+        "\"prompt_attn_capacity\":%lu,\"prompt_attn_rows\":%lu,"
+        "\"query_start\":%lu,\"chunk_count\":%lu",
+        &capacity, &rows, &query_start, &chunks);
+    std::fclose(meta);
+    if (scanned != 4 || capacity == 0 || rows == 0) return 1;
+    acts->prompt_attn_capacity = static_cast<std::size_t>(capacity);
+    acts->prompt_attn_rows = static_cast<std::size_t>(rows);
+    acts->prompt_attn_query_start = static_cast<std::size_t>(query_start);
+    acts->prompt_attn_chunk_count = static_cast<std::size_t>(chunks);
+    std::snprintf(path, sizeof(path), "%s/prompt_attn_packed.bin", dir);
+    if (!read_floats(path, &acts->prompt_attn_packed)) return 1;
+    std::snprintf(path, sizeof(path), "%s/prompt_attn_key.bin", dir);
+    if (!read_floats(path, &acts->prompt_attn_key)) return 1;
+    std::snprintf(path, sizeof(path), "%s/prompt_attn_value.bin", dir);
+    if (!read_floats(path, &acts->prompt_attn_value)) return 1;
+    std::snprintf(path, sizeof(path), "%s/prompt_attn_output.bin", dir);
+    if (!read_floats(path, &acts->prompt_attn_output)) return 1;
+    std::snprintf(path, sizeof(path), "%s/prompt_attn_candidate_key.bin", dir);
+    if (!read_bf16(path, &acts->prompt_attn_candidate_key)) return 1;
+    std::snprintf(path, sizeof(path), "%s/prompt_attn_candidate_value.bin", dir);
+    if (!read_bf16(path, &acts->prompt_attn_candidate_value)) return 1;
   }
   std::memcpy(acts->identity, identity, 64);
   acts->identity[64] = '\0';
@@ -1495,6 +1602,163 @@ cudaError_t replay_decode_attention_layer(
   return error;
 }
 
+std::size_t prompt_attn_core_bytes(std::size_t rows, std::size_t capacity) {
+  return rows *
+             (qw38::internal::kAttentionPackedQueryGateWidth +
+              qw38::internal::kAttentionKvWidth * 2 +
+              qw38::internal::kAttentionQueryWidth) *
+             sizeof(float) +
+         capacity * qw38::internal::kAttentionKvWidth * 2 *
+             sizeof(__nv_bfloat16);
+}
+
+cudaError_t restore_prompt_attn_snapshot(
+    const LayerActivations& acts, std::size_t attn_slot,
+    qw38::cuda::SchedulerWorkspace* workspace, __nv_bfloat16* committed_key,
+    __nv_bfloat16* committed_value) {
+  const std::size_t rows = acts.prompt_attn_rows;
+  const std::size_t packed_n =
+      rows * qw38::internal::kAttentionPackedQueryGateWidth;
+  const std::size_t kv_n = rows * qw38::internal::kAttentionKvWidth;
+  const std::size_t committed_n =
+      acts.prompt_attn_capacity * qw38::internal::kAttentionKvWidth;
+  cudaError_t error = cudaMemcpy(
+      workspace->prompt_projection_a_,
+      acts.prompt_attn_packed.data() + attn_slot * packed_n,
+      packed_n * sizeof(float), cudaMemcpyHostToDevice);
+  if (error == cudaSuccess) {
+    error = cudaMemcpy(workspace->prompt_projection_c_,
+                       acts.prompt_attn_key.data() + attn_slot * kv_n,
+                       kv_n * sizeof(float), cudaMemcpyHostToDevice);
+  }
+  if (error == cudaSuccess) {
+    error = cudaMemcpy(workspace->prompt_projection_d_,
+                       acts.prompt_attn_value.data() + attn_slot * kv_n,
+                       kv_n * sizeof(float), cudaMemcpyHostToDevice);
+  }
+  if (error == cudaSuccess) {
+    error = cudaMemset(committed_key, 0, committed_n * sizeof(__nv_bfloat16));
+  }
+  if (error == cudaSuccess) {
+    error =
+        cudaMemset(committed_value, 0, committed_n * sizeof(__nv_bfloat16));
+  }
+  const std::size_t candidate_stride =
+      workspace->prompt_chunk_rows_ * qw38::internal::kAttentionKvWidth;
+  if (error == cudaSuccess) {
+    error = cudaMemset(workspace->prompt_attention_candidate_key_ +
+                           attn_slot * candidate_stride,
+                       0, kv_n * sizeof(__nv_bfloat16));
+  }
+  if (error == cudaSuccess) {
+    error = cudaMemset(workspace->prompt_attention_candidate_value_ +
+                           attn_slot * candidate_stride,
+                       0, kv_n * sizeof(__nv_bfloat16));
+  }
+  if (error == cudaSuccess) error = cudaDeviceSynchronize();
+  return error;
+}
+
+cudaError_t replay_prompt_attention_layer(
+    const qw38::cuda::DeviceLayer& layer,
+    qw38::cuda::SchedulerWorkspace* workspace, std::size_t query_start,
+    std::size_t rows, std::uint32_t capacity, std::size_t attn_slot,
+    __nv_bfloat16* committed_key, __nv_bfloat16* committed_value,
+    cudaStream_t stream) {
+  const qw38::cuda::AttentionConfig config{24, 4, 256, 64, capacity};
+  const qw38::cuda::AttentionCache committed{committed_key, committed_value};
+  const std::size_t candidate_stride =
+      workspace->prompt_chunk_rows_ * qw38::internal::kAttentionKvWidth;
+  const qw38::cuda::AttentionCache candidate{
+      workspace->prompt_attention_candidate_key_ + attn_slot * candidate_stride,
+      workspace->prompt_attention_candidate_value_ +
+          attn_slot * candidate_stride};
+  const std::size_t qn = rows * qw38::internal::kAttentionQueryWidth;
+  cudaError_t error = qw38::cuda::launch_split_attention_rows_prompt(
+      workspace->prompt_projection_a_, qw38::internal::kAttentionQueryWidth,
+      256, rows, workspace->prompt_gdn_convolved_, workspace->prompt_projection_b_,
+      stream);
+  if (error != cudaSuccess) return error;
+  if (qw38::cuda::fattn_uses_stream_k()) {
+    const __half* prepared_q = nullptr;
+    if (qw38::cuda::fattn_uses_prepared_query()) {
+      const std::size_t need =
+          qw38::cuda::attention_prepared_query_bytes(config, rows);
+      const std::size_t overlay_bytes =
+          workspace->prompt_chunk_rows_ * qw38::internal::kFfnWidth *
+          sizeof(float);
+      if (need == 0 || need > overlay_bytes) return cudaErrorInvalidValue;
+      prepared_q =
+          reinterpret_cast<const __half*>(workspace->prompt_projection_a_);
+    }
+    error = qw38::cuda::launch_attention_prepare_chunk_stream_k(
+        config, query_start, rows, workspace->prompt_gdn_convolved_,
+        workspace->prompt_projection_c_, workspace->prompt_projection_d_,
+        layer.attention.query_norm, layer.attention.key_norm,
+        workspace->prompt_projection_b_, committed, candidate,
+        workspace->attention_normalized_query_,
+        workspace->attention_normalized_key_, workspace->attention_scores_,
+        workspace->prompt_gdn_recurrent_output_,
+        reinterpret_cast<float*>(workspace->prompt_projected_bf16_),
+        reinterpret_cast<float*>(workspace->prompt_q8_), stream, prepared_q,
+        query_start);
+  } else {
+    error = qw38::cuda::launch_attention_prepare_chunk(
+        config, query_start, rows, workspace->prompt_gdn_convolved_,
+        workspace->prompt_projection_c_, workspace->prompt_projection_d_,
+        layer.attention.query_norm, layer.attention.key_norm,
+        workspace->prompt_projection_b_, committed, candidate,
+        workspace->attention_normalized_query_,
+        workspace->attention_normalized_key_, workspace->attention_scores_,
+        workspace->prompt_gdn_recurrent_output_, stream, query_start);
+  }
+  if (error != cudaSuccess) return error;
+  return qw38::cuda::launch_fp32_to_bf16(
+      workspace->prompt_gdn_recurrent_output_, qn,
+      workspace->prompt_projected_bf16_, stream);
+}
+
+int compare_prompt_attention_outputs(const LayerActivations& acts,
+                                     std::size_t attn_slot,
+                                     const float* replay_output,
+                                     const __nv_bfloat16* replay_ck,
+                                     const __nv_bfloat16* replay_cv,
+                                     float* max_abs, std::size_t* nonfinite,
+                                     float* kv_max_abs) {
+  *max_abs = 0.0F;
+  *kv_max_abs = 0.0F;
+  *nonfinite = 0;
+  const std::size_t rows = acts.prompt_attn_rows;
+  const std::size_t out_n = rows * qw38::internal::kAttentionQueryWidth;
+  const std::size_t kv_n = rows * qw38::internal::kAttentionKvWidth;
+  const float* expected =
+      acts.prompt_attn_output.data() + attn_slot * out_n;
+  const __nv_bfloat16* exp_k =
+      acts.prompt_attn_candidate_key.data() + attn_slot * kv_n;
+  const __nv_bfloat16* exp_v =
+      acts.prompt_attn_candidate_value.data() + attn_slot * kv_n;
+  for (std::size_t index = 0; index < out_n; ++index) {
+    if (!std::isfinite(expected[index]) ||
+        !std::isfinite(replay_output[index])) {
+      ++*nonfinite;
+    }
+    *max_abs =
+        std::max(*max_abs, std::fabs(expected[index] - replay_output[index]));
+  }
+  for (std::size_t index = 0; index < kv_n; ++index) {
+    const float ek = __bfloat162float(exp_k[index]);
+    const float ev = __bfloat162float(exp_v[index]);
+    const float rk = __bfloat162float(replay_ck[index]);
+    const float rv = __bfloat162float(replay_cv[index]);
+    *kv_max_abs = std::max(*kv_max_abs, std::fabs(ek - rk));
+    *kv_max_abs = std::max(*kv_max_abs, std::fabs(ev - rv));
+  }
+  return *nonfinite == 0 && *max_abs <= qw38::cuda::kOpt140ExistingAbsTol &&
+                 *kv_max_abs <= qw38::cuda::kOpt140ExistingAbsTol
+             ? 0
+             : 1;
+}
+
 cudaError_t replay_decode_gdn_layer(const qw38::cuda::DeviceLayer& layer,
                                     qw38::cuda::SchedulerWorkspace* workspace,
                                     float* committed_conv, float* committed_rec,
@@ -1519,28 +1783,34 @@ int capture_bundle(const char* model_path, qw38::cuda::ResidentModel* model,
                    qw38::cuda::ReplayFamily family, const char* capture_key,
                    int decode_position, LayerActivations* acts) {
   const bool prompt = family == qw38::cuda::ReplayFamily::kPromptFfn;
+  const bool prompt_attn = family == qw38::cuda::ReplayFamily::kPromptAttention;
   const bool gdn = family == qw38::cuda::ReplayFamily::kDecodeGdn;
   const bool attn = family == qw38::cuda::ReplayFamily::kDecodeAttention;
   const int pos = decode_position;
   char attn_state[64];
   std::snprintf(attn_state, sizeof(attn_state), "decode_d%d_d%d", pos, pos + 1);
-  const char* stage = prompt ? "prompt-ffn"
-                             : (gdn ? "decode-gdn"
-                                    : (attn ? "decode-attention" : "d128"));
+  const char* stage = prompt_attn ? "prompt-attention"
+                                  : (prompt ? "prompt-ffn"
+                                            : (gdn ? "decode-gdn"
+                                                   : (attn ? "decode-attention"
+                                                           : "d128")));
   const char* state =
-      prompt ? "prefill_p4096"
-             : (gdn ? "decode_d128_d129"
-                    : (attn ? attn_state : "decode_d128"));
+      prompt_attn ? "prefill_p4096_capacity131072"
+                  : (prompt ? "prefill_p4096"
+                            : (gdn ? "decode_d128_d129"
+                                   : (attn ? attn_state : "decode_d128")));
   const std::size_t token_count =
-      prompt ? qw38::cuda::kOpt061PromptRows
-             : (gdn ? 130 : (attn ? static_cast<std::size_t>(pos) + 2 : 129));
+      (prompt || prompt_attn)
+          ? qw38::cuda::kOpt061PromptRows
+          : (gdn ? 130 : (attn ? static_cast<std::size_t>(pos) + 2 : 129));
   std::vector<std::size_t> tokens(token_count);
   fill_tokens(&tokens);
   char token_digest[65]{};
   token_hash_hex(tokens, token_digest);
   compute_capture_identity(model_path, stage, state,
-                           prompt ? static_cast<int>(qw38::cuda::kOpt061PromptRows)
-                                  : ((gdn || attn) ? 2 : 1),
+                           (prompt || prompt_attn)
+                               ? static_cast<int>(qw38::cuda::kOpt061PromptRows)
+                               : ((gdn || attn) ? 2 : 1),
                            token_digest, acts->identity);
   if (capture_key != nullptr && capture_key[0] != '\0') {
     if (std::strlen(capture_key) != 64) {
@@ -1566,8 +1836,9 @@ int capture_bundle(const char* model_path, qw38::cuda::ResidentModel* model,
   }
 
   const std::size_t capacity =
-      prompt ? qw38::cuda::kOpt061PromptRows + 16
-             : (attn ? static_cast<std::size_t>(pos) + 16 : 256);
+      prompt_attn ? qw38::cuda::kOpt140Capacity
+                  : (prompt ? qw38::cuda::kOpt061PromptRows + 16
+                            : (attn ? static_cast<std::size_t>(pos) + 16 : 256));
   qw38::cuda::SchedulerSession session;
   qw38::cuda::SchedulerWorkspace workspace;
   qw38::Status status = session.create(capacity);
@@ -1635,7 +1906,26 @@ int capture_bundle(const char* model_path, qw38::cuda::ResidentModel* model,
     capture.attn_candidate_value = acts->attn_candidate_value.data();
     capture.attn_slot_captured = attn_captured_slots.data();
   }
-  if (prompt) {
+  std::array<bool, qw38::cuda::kOpt078AttentionLayers> prompt_attn_captured{};
+  if (prompt_attn) {
+    resize_prompt_attn_capture(acts, qw38::cuda::kOpt140PrefillTokens,
+                               qw38::cuda::kOpt140Capacity);
+    capture.capture_prompt_attention = true;
+    capture.prompt_attn_slots = qw38::cuda::kOpt078AttentionLayers;
+    capture.prompt_attn_rows = qw38::cuda::kOpt140PrefillTokens;
+    capture.prompt_attn_capacity = qw38::cuda::kOpt140Capacity;
+    capture.prompt_attn_query_start = 0;
+    capture.prompt_attn_chunk_count = 1;
+    capture.prompt_attn_packed = acts->prompt_attn_packed.data();
+    capture.prompt_attn_key = acts->prompt_attn_key.data();
+    capture.prompt_attn_value = acts->prompt_attn_value.data();
+    capture.prompt_attn_output = acts->prompt_attn_output.data();
+    capture.prompt_attn_candidate_key = acts->prompt_attn_candidate_key.data();
+    capture.prompt_attn_candidate_value =
+        acts->prompt_attn_candidate_value.data();
+    capture.prompt_attn_slot_captured = prompt_attn_captured.data();
+  }
+  if (prompt || prompt_attn) {
     qw38::cuda::SyncResult sync{};
     qw38::cuda::PrefillAttribution attribution;
     attribution.capture = &capture;
@@ -1673,6 +1963,23 @@ int capture_bundle(const char* model_path, qw38::cuda::ResidentModel* model,
     }
   }
   if (!status.is_ok()) return fail_status(status);
+  if (prompt_attn) {
+    acts->prompt_attn_rows = capture.prompt_attn_rows;
+    acts->prompt_attn_query_start = capture.prompt_attn_query_start;
+    acts->prompt_attn_chunk_count =
+        capture.prompt_attn_chunk_count == 0 ? 1
+                                            : capture.prompt_attn_chunk_count;
+    acts->prompt_attn_slot_captured.assign(
+        prompt_attn_captured.begin(), prompt_attn_captured.end());
+    for (std::size_t slot = 0; slot < qw38::cuda::kOpt078AttentionLayers;
+         ++slot) {
+      if (!prompt_attn_captured[slot]) {
+        std::fprintf(stderr, "prompt-attention capture missed slot %zu\n",
+                     slot);
+        return 1;
+      }
+    }
+  }
   if (persist_activations(acts->identity, *acts, family) != 0) {
     std::fprintf(stderr, "failed to persist capture bundle\n");
     return 1;
@@ -1705,11 +2012,13 @@ int time_family(qw38::cuda::ResidentModel* model,
                 const LayerActivations& acts, int warmups, int samples,
                 const HardwareInfo& info, FILE* rounds_out) {
   const std::size_t capacity =
-      family == qw38::cuda::ReplayFamily::kPromptFfn
-          ? qw38::cuda::kOpt061PromptRows + 16
-          : (family == qw38::cuda::ReplayFamily::kDecodeAttention
-                 ? std::max(acts.attn_kv_capacity, std::size_t{256})
-                 : 256);
+      family == qw38::cuda::ReplayFamily::kPromptAttention
+          ? qw38::cuda::kOpt140Capacity
+          : (family == qw38::cuda::ReplayFamily::kPromptFfn
+                 ? qw38::cuda::kOpt061PromptRows + 16
+                 : (family == qw38::cuda::ReplayFamily::kDecodeAttention
+                        ? std::max(acts.attn_kv_capacity, std::size_t{256})
+                        : 256));
   qw38::cuda::SchedulerWorkspace workspace;
   qw38::Status status = workspace.create(capacity);
   if (!status.is_ok()) return fail_status(status);
@@ -1724,6 +2033,7 @@ int time_family(qw38::cuda::ResidentModel* model,
       layers.assign(layers.size(), layers.front());
     }
   } else if (family == qw38::cuda::ReplayFamily::kDecodeAttention ||
+             family == qw38::cuda::ReplayFamily::kPromptAttention ||
              family == qw38::cuda::ReplayFamily::kDecodeQ6) {
     for (std::size_t index = 0; index < qw38::cuda::kOpt061LayerCount; ++index) {
       if (model->layer(index).kind == qw38::internal::LayerKind::kAttention) {
@@ -1745,6 +2055,9 @@ int time_family(qw38::cuda::ResidentModel* model,
     working = layers.size() * gdn_core_bytes();
   } else if (family == qw38::cuda::ReplayFamily::kDecodeAttention) {
     working = layers.size() * attn_core_bytes(acts.attn_kv_capacity);
+  } else if (family == qw38::cuda::ReplayFamily::kPromptAttention) {
+    working = layers.size() * prompt_attn_core_bytes(
+                                  acts.prompt_attn_rows, acts.prompt_attn_capacity);
   } else if (family == qw38::cuda::ReplayFamily::kDecodeQ6) {
     const auto& logits_w = model->output_projection();
     working = logits_w.rows * (logits_w.columns / kBlock) * kQ6KBytes;
@@ -1803,6 +2116,17 @@ int time_family(qw38::cuda::ResidentModel* model,
     }
     if (alloc != cudaSuccess) return fail_cuda("attn snapshot malloc", alloc);
   }
+  if (family == qw38::cuda::ReplayFamily::kPromptAttention) {
+    const std::size_t committed_n =
+        acts.prompt_attn_capacity * qw38::internal::kAttentionKvWidth;
+    cudaError_t alloc = cudaMalloc(&attn_committed_key,
+                                   committed_n * sizeof(__nv_bfloat16));
+    if (alloc == cudaSuccess) {
+      alloc = cudaMalloc(&attn_committed_value,
+                         committed_n * sizeof(__nv_bfloat16));
+    }
+    if (alloc != cudaSuccess) return fail_cuda("prompt attn snapshot malloc", alloc);
+  }
   qw38::cuda::EngineEventPool<64> pool;
   std::array<qw38::cuda::EngineOpRecord, 64> storage{};
   qw38::cuda::EngineAttribution dest{};
@@ -1810,6 +2134,9 @@ int time_family(qw38::cuda::ResidentModel* model,
   dest.capacity = storage.size();
 
   auto restore_layer = [&](std::size_t layer_index) -> cudaError_t {
+    if (family == qw38::cuda::ReplayFamily::kPromptAttention) {
+      return cudaSuccess;
+    }
     const std::size_t offset = layer_index * qw38::internal::kResidualWidth;
     if (family == qw38::cuda::ReplayFamily::kPromptFfn) {
       return cudaMemcpy(workspace.prompt_residual_a_,
@@ -1826,6 +2153,100 @@ int time_family(qw38::cuda::ResidentModel* model,
                       qw38::internal::kResidualWidth * sizeof(float),
                       cudaMemcpyHostToDevice);
   };
+
+  if (family == qw38::cuda::ReplayFamily::kPromptAttention) {
+    float max_abs_all = 0.0F;
+    float kv_max_abs_all = 0.0F;
+    std::size_t nonfinite_all = 0;
+    int parity_rc = 0;
+    const std::size_t rows = acts.prompt_attn_rows;
+    const std::size_t out_n = rows * qw38::internal::kAttentionQueryWidth;
+    const std::size_t kv_n = rows * qw38::internal::kAttentionKvWidth;
+    std::vector<float> replay_out(out_n);
+    std::vector<__nv_bfloat16> replay_ck(kv_n);
+    std::vector<__nv_bfloat16> replay_cv(kv_n);
+    for (std::size_t step = 0; step < layers.size(); ++step) {
+      const std::size_t layer_index = layers[step];
+      std::size_t attn_slot = 0;
+      for (std::size_t index = 0; index < layer_index; ++index) {
+        if (model->layer(index).kind == qw38::internal::LayerKind::kAttention) {
+          ++attn_slot;
+        }
+      }
+      cudaError_t error = restore_prompt_attn_snapshot(
+          acts, attn_slot, &workspace, attn_committed_key, attn_committed_value);
+      if (error == cudaSuccess) {
+        error = replay_prompt_attention_layer(
+            model->layer(layer_index), &workspace, acts.prompt_attn_query_start,
+            rows, static_cast<std::uint32_t>(acts.prompt_attn_capacity),
+            attn_slot, attn_committed_key, attn_committed_value, nullptr);
+      }
+      if (error == cudaSuccess) error = cudaDeviceSynchronize();
+      if (error == cudaSuccess) {
+        error = cudaMemcpy(replay_out.data(),
+                           workspace.prompt_gdn_recurrent_output_,
+                           out_n * sizeof(float), cudaMemcpyDeviceToHost);
+      }
+      const std::size_t candidate_stride =
+          workspace.prompt_chunk_rows_ * qw38::internal::kAttentionKvWidth;
+      if (error == cudaSuccess) {
+        error = cudaMemcpy(
+            replay_ck.data(),
+            workspace.prompt_attention_candidate_key_ +
+                attn_slot * candidate_stride,
+            kv_n * sizeof(__nv_bfloat16), cudaMemcpyDeviceToHost);
+      }
+      if (error == cudaSuccess) {
+        error = cudaMemcpy(
+            replay_cv.data(),
+            workspace.prompt_attention_candidate_value_ +
+                attn_slot * candidate_stride,
+            kv_n * sizeof(__nv_bfloat16), cudaMemcpyDeviceToHost);
+      }
+      if (error != cudaSuccess) {
+        cudaFree(attn_committed_key);
+        cudaFree(attn_committed_value);
+        return fail_cuda("prompt-attention parity", error);
+      }
+      float max_abs = 0.0F;
+      float kv_max_abs = 0.0F;
+      std::size_t nonfinite = 0;
+      const int layer_rc = compare_prompt_attention_outputs(
+          acts, attn_slot, replay_out.data(), replay_ck.data(), replay_cv.data(),
+          &max_abs, &nonfinite, &kv_max_abs);
+      max_abs_all = std::max(max_abs_all, max_abs);
+      kv_max_abs_all = std::max(kv_max_abs_all, kv_max_abs);
+      nonfinite_all += nonfinite;
+      parity_rc |= layer_rc;
+      const std::size_t tail = (rows - 1) * qw38::internal::kAttentionQueryWidth;
+      const std::size_t mid = (rows / 2) * qw38::internal::kAttentionQueryWidth;
+      const float tail_abs = std::fabs(replay_out[tail] - acts.prompt_attn_output[attn_slot * out_n + tail]);
+      const float chunk0_abs = std::fabs(replay_out[0] - acts.prompt_attn_output[attn_slot * out_n]);
+      const float mid_abs = std::fabs(replay_out[mid] - acts.prompt_attn_output[attn_slot * out_n + mid]);
+      std::printf(
+          "prompt_attention_parity layer=%zu slot=%zu max_abs=%.9g "
+          "kv_max_abs=%.9g nonfinite=%zu causal_tail_abs=%.9g "
+          "chunk_start_abs=%.9g chunk_mid_abs=%.9g equal=%s\n",
+          layer_index, attn_slot, static_cast<double>(max_abs),
+          static_cast<double>(kv_max_abs), nonfinite,
+          static_cast<double>(tail_abs), static_cast<double>(chunk0_abs),
+          static_cast<double>(mid_abs), json_bool(layer_rc == 0));
+    }
+    std::printf(
+        "prompt_attention_parity_summary layers=%zu max_abs=%.9g "
+        "kv_max_abs=%.9g nonfinite=%zu equal=%s existing_abs_tol=%.9g "
+        "new_quality_tolerance=false\n",
+        layers.size(), static_cast<double>(max_abs_all),
+        static_cast<double>(kv_max_abs_all), nonfinite_all,
+        json_bool(parity_rc == 0),
+        static_cast<double>(qw38::cuda::kOpt140ExistingAbsTol));
+    if (parity_rc != 0) {
+      cudaFree(attn_committed_key);
+      cudaFree(attn_committed_value);
+      std::fprintf(stderr, "prompt-attention replay diverged from capture\n");
+      return 1;
+    }
+  }
 
   qw38::cuda::gdn_reset_layout_counters();
   const int total = warmups + samples;
@@ -1887,6 +2308,16 @@ int time_family(qw38::cuda::ResidentModel* model,
             acts, attn_capture_pos, attn_slot, &workspace, attn_committed_key,
             attn_committed_value, attn_candidate_key, attn_candidate_value);
       }
+      if (family == qw38::cuda::ReplayFamily::kPromptAttention) {
+        for (std::size_t index = 0; index < layer_index; ++index) {
+          if (model->layer(index).kind == qw38::internal::LayerKind::kAttention) {
+            ++attn_slot;
+          }
+        }
+        error = restore_prompt_attn_snapshot(
+            acts, attn_slot, &workspace, attn_committed_key,
+            attn_committed_value);
+      }
       if (error == cudaSuccess) error = cudaDeviceSynchronize();
       qw38::cuda::EngineOpRecord spec{};
       qw38::cuda::copy_cstr(spec.engine, sizeof(spec.engine), "quartz");
@@ -1938,6 +2369,15 @@ int time_family(qw38::cuda::ResidentModel* model,
               static_cast<std::uint32_t>(acts.attn_kv_capacity),
               attn_committed_key, attn_committed_value, attn_candidate_key,
               attn_candidate_value, nullptr);
+        }
+        ++attn_groups;
+      } else if (family == qw38::cuda::ReplayFamily::kPromptAttention) {
+        if (error == cudaSuccess) {
+          error = replay_prompt_attention_layer(
+              layer, &workspace, acts.prompt_attn_query_start,
+              acts.prompt_attn_rows,
+              static_cast<std::uint32_t>(acts.prompt_attn_capacity), attn_slot,
+              attn_committed_key, attn_committed_value, nullptr);
         }
         ++attn_groups;
       } else {
@@ -2123,6 +2563,41 @@ int time_family(qw38::cuda::ResidentModel* model,
     cudaFree(attn_candidate_value);
     return 0;
   }
+  if (family == qw38::cuda::ReplayFamily::kPromptAttention) {
+    int regs = 0;
+    std::size_t local_bytes = 0;
+    int occupancy = 0;
+    qw38::cuda::fattn_pipeline_opt111_base_attributes(&regs, &local_bytes,
+                                                      &occupancy);
+    std::printf(
+        "compiled_registers=%d compiled_local_bytes=%zu occupancy=%d "
+        "target_kernel=%s complete_family_replay=true\n",
+        regs, local_bytes, occupancy,
+        qw38::cuda::opt111::kLaunchBase);
+    std::printf(
+        "prompt_attention_dispatch path=%s launch=%s capacity=%zu tokens=%zu "
+        "chunk_count=%zu query_start=%zu empty_state=true prefix_reuse=false "
+        "final_token_logits_only=true causal=absolute_gt_qpos "
+        "visible_length_policy=query_index_plus_one "
+        "packed_kv_physical_index=(kv_head*capacity+token)*head_width+lane "
+        "q_stride_token=%zu k_stride_token=%zu head_width=256 query_heads=24 "
+        "kv_heads=4 attention_layers=%zu convert_once=%d "
+        "included=split,stage,bf16_f16_convert,core,merge,epilogue,fp32_to_bf16 "
+        "excluded=mixer_mmq,ffn_mmq,logits,commit_sync,embedding "
+        "decode_attention_substitution=false extra_kernel=false extra_sync=false "
+        "extra_alloc=false extra_copy=false\n",
+        qw38::cuda::current_attention_pipeline_path(),
+        qw38::cuda::last_attention_pipeline_launch(),
+        acts.prompt_attn_capacity, acts.prompt_attn_rows,
+        acts.prompt_attn_chunk_count == 0 ? std::size_t{1}
+                                          : acts.prompt_attn_chunk_count,
+        acts.prompt_attn_query_start, qw38::internal::kAttentionQueryWidth,
+        qw38::internal::kAttentionKvWidth, layers.size(),
+        qw38::cuda::last_attention_pipeline_convert_once());
+    cudaFree(attn_committed_key);
+    cudaFree(attn_committed_value);
+    return 0;
+  }
   int registers = 0;
   std::size_t local_bytes = 0;
   int occupancy = 0;
@@ -2190,6 +2665,16 @@ int run_family(const Options& options, qw38::cuda::ReplayFamily family) {
         std::strcmp(options.cache_mode, "hot") == 0) {
       std::fprintf(stderr,
                    "OPT-138 protocol refuses hot cache as production evidence\n");
+      return 1;
+    }
+  }
+  if (options.opt140_protocol) {
+    warmups = qw38::cuda::kOpt140ReplayWarmups;
+    samples = qw38::cuda::kOpt140ReplaySamples;
+    if (options.cache_mode != nullptr &&
+        std::strcmp(options.cache_mode, "hot") == 0) {
+      std::fprintf(stderr,
+                   "OPT-140 protocol refuses hot cache as production evidence\n");
       return 1;
     }
   }
@@ -2312,7 +2797,8 @@ int run_family(const Options& options, qw38::cuda::ReplayFamily family) {
     return 1;
   }
   const char* mode_arg = options.cache_mode;
-  if (options.opt138_protocol && mode_arg == nullptr) {
+  if ((options.opt138_protocol || options.opt140_protocol) &&
+      mode_arg == nullptr) {
     mode_arg = "rotating";
   }
   const qw38::cuda::CacheMode modes[] = {qw38::cuda::CacheMode::kHot,
@@ -2339,8 +2825,10 @@ int run_family(const Options& options, qw38::cuda::ReplayFamily family) {
   const bool opt103 = options.decode_attention_vec128 != nullptr;
   const bool opt104 = options.q6_device_layout != nullptr ||
                       family == qw38::cuda::ReplayFamily::kDecodeQ6;
+  const bool opt140 = options.opt140_protocol ||
+                      family == qw38::cuda::ReplayFamily::kPromptAttention;
   if (rc == 0 && !opt070 && !opt075 && !opt077 && !opt078 && !opt095 &&
-      !opt103 && !opt104) {
+      !opt103 && !opt104 && !opt140) {
     rc = run_streaming_calibration(hardware, &stream_gbps, &checksum);
   }
   const qw38::cuda::Q8DecodeDispatch q8_launch =
@@ -2381,6 +2869,35 @@ int run_family(const Options& options, qw38::cuda::ReplayFamily family) {
         qw38::cuda::replay_family_name(family),
         mode_arg != nullptr ? mode_arg : "rotating", warmups, samples,
         capture_key);
+  }
+  if (options.opt140_protocol ||
+      family == qw38::cuda::ReplayFamily::kPromptAttention) {
+    std::printf(
+        "%s{\"schema_version\":1,\"task\":\"OPT-140\","
+        "\"protocol\":\"%s\",\"family\":\"%s\",\"cache_mode\":\"%s\","
+        "\"warmups\":%d,\"samples\":%d,\"production_weights\":true,"
+        "\"synthetic_weights\":false,\"accept_hot_as_production\":false,"
+        "\"rotating_layers\":true,\"full_ncu_sweep\":false,"
+        "\"prefill_tokens\":%zu,\"capacity\":%zu,"
+        "\"empty_initial_state\":true,\"prefix_reuse\":false,"
+        "\"final_token_logits_only\":true,\"chunk_count\":%zu,"
+        "\"query_start\":%zu,\"attention_layers\":%zu,"
+        "\"expected_kernel\":\"fattn_mma_pipeline_opt111_base\","
+        "\"complete_family_replay\":true,"
+        "\"decode_attention_substitution\":false,"
+        "\"new_quality_tolerance\":false,\"existing_abs_tol\":%.9g,"
+        "\"included\":\"split,stage,bf16_f16_convert,core,merge,epilogue,"
+        "fp32_to_bf16\","
+        "\"excluded\":\"mixer_mmq,ffn_mmq,logits,commit_sync,embedding\","
+        "\"capture_key\":\"%s\",\"claims_throughput\":false}\n",
+        qw38::cuda::kOpt140ResultPrefix, qw38::cuda::kOpt140ReplayProtocol,
+        qw38::cuda::replay_family_name(family),
+        mode_arg != nullptr ? mode_arg : "rotating", warmups, samples,
+        qw38::cuda::kOpt140PrefillTokens, qw38::cuda::kOpt140Capacity,
+        acts.prompt_attn_chunk_count == 0 ? std::size_t{1}
+                                          : acts.prompt_attn_chunk_count,
+        acts.prompt_attn_query_start, qw38::cuda::kOpt078AttentionLayers,
+        static_cast<double>(qw38::cuda::kOpt140ExistingAbsTol), capture_key);
   }
   std::printf(
       "QW38_OPT070_NATIVE_COUNTS={\"schema_version\":1,\"task\":\"OPT-070\","
@@ -2651,6 +3168,9 @@ int main(int argc, char** argv) {
   }
   if (std::strcmp(workload, "prompt-ffn") == 0) {
     return run_family(options, qw38::cuda::ReplayFamily::kPromptFfn);
+  }
+  if (std::strcmp(workload, "prompt-attention") == 0) {
+    return run_family(options, qw38::cuda::ReplayFamily::kPromptAttention);
   }
   if (std::strcmp(workload, "acceptance") == 0) return run_acceptance(options);
   if (std::strcmp(workload, "hardware") == 0) return run_hardware(options);

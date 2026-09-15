@@ -448,6 +448,21 @@ struct ActivationCapture final {
   __nv_bfloat16* attn_candidate_key = nullptr;
   __nv_bfloat16* attn_candidate_value = nullptr;
   bool* attn_slot_captured = nullptr;
+  // OPT-140 prompt-attention production-boundary capture. Host owns the
+  // buffers; copies are untimed and excluded from replay intervals.
+  bool capture_prompt_attention = false;
+  std::size_t prompt_attn_slots = 0;
+  std::size_t prompt_attn_rows = 0;
+  std::size_t prompt_attn_capacity = 0;
+  std::size_t prompt_attn_query_start = 0;
+  std::size_t prompt_attn_chunk_count = 0;
+  float* prompt_attn_packed = nullptr;
+  float* prompt_attn_key = nullptr;
+  float* prompt_attn_value = nullptr;
+  float* prompt_attn_output = nullptr;
+  __nv_bfloat16* prompt_attn_candidate_key = nullptr;
+  __nv_bfloat16* prompt_attn_candidate_value = nullptr;
+  bool* prompt_attn_slot_captured = nullptr;
 };
 
 // One request-level attribution record. A false `measured` flag means that the

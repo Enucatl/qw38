@@ -22,6 +22,17 @@ constexpr char kOpt138ReplayProtocol[] = "opt138";
 constexpr int kOpt138ReplayWarmups = 1;
 constexpr int kOpt138ReplaySamples = 3;
 constexpr char kOpt138ResultPrefix[] = "QW38_OPT138_REPLAY_RESULT=";
+constexpr char kOpt140Task[] = "OPT-140";
+constexpr char kOpt140ReplayProtocol[] = "opt140";
+constexpr char kOpt140ResultPrefix[] =
+    "QW38_OPT140_PREFILL_ATTENTION_REPLAY_RESULT=";
+constexpr std::size_t kOpt140PrefillTokens = 4096;
+constexpr std::size_t kOpt140Capacity = 131072;
+constexpr int kOpt140ReplayWarmups = 1;
+constexpr int kOpt140ReplaySamples = 3;
+// Existing OPT-111 prompt-attention abs tolerance. OPT-140 does not add a
+// new quality tolerance.
+constexpr float kOpt140ExistingAbsTol = 2.0e-3F;
 constexpr char kOpt061ResultPrefix[] = "QW38_OPT061_COMPONENT_REPLAY_RESULT=";
 constexpr char kOpt061EvidenceDir[] =
     "evidence/optimization/opt061-component-replay";
@@ -52,7 +63,8 @@ enum class ReplayFamily {
   kPromptFfn,
   kDecodeGdn,
   kDecodeAttention,
-  kDecodeQ6
+  kDecodeQ6,
+  kPromptAttention
 };
 enum class CacheMode { kHot, kRotating };
 
@@ -70,6 +82,8 @@ inline const char* replay_family_name(ReplayFamily family) noexcept {
       return "decode-attention";
     case ReplayFamily::kDecodeQ6:
       return "decode-q6";
+    case ReplayFamily::kPromptAttention:
+      return "prompt-attention";
   }
   return "unknown";
 }

@@ -21,6 +21,7 @@ from tools.opt138_remaining_gap_profile import (
     _select_ncu_metrics,
     counter_timeout_s,
     family_plan,
+    replay_family_for,
     validate_fixture,
 )
 from tools.performance_evidence import (
@@ -219,6 +220,9 @@ def test_select_ncu_metrics_uses_aliases_not_table_lines() -> None:
 def test_counter_timeout_is_extended_for_prompt_ffn_replay() -> None:
     assert counter_timeout_s("decode-attention") == 300
     assert counter_timeout_s("prompt-ffn") == 1200
+    assert counter_timeout_s("prompt-attention") == 1200
+    assert replay_family_for("prefill", "attn_core") == "prompt-attention"
+    assert replay_family_for("decode", "attn_core") == "decode-attention"
 
 
 def test_missing_counters_are_null_never_zero() -> None:
@@ -257,6 +261,16 @@ def test_replay_production_boundary_mismatch() -> None:
     )
     assert mismatch["ok"] is False
     assert mismatch["reason"] == "replay/production boundary mismatch"
+    prefill_ok = replay_production_boundary_ok(
+        {
+            "cache_mode": "rotating",
+            "production_weights": True,
+            "synthetic_weights": False,
+            "phase": "prefill",
+            "replay_family": "prompt-attention",
+        }
+    )
+    assert prefill_ok["ok"] is True
     hot = replay_production_boundary_ok(
         {
             "cache_mode": "hot",

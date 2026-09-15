@@ -1,0 +1,157 @@
+{
+  "schema_version": 1,
+  "task": "OPT-140",
+  "yardstick": "prefill_attention_replay",
+  "claims_throughput": false,
+  "claims_performance_improvement": false,
+  "require_candidate_nll": false,
+  "opt074_family_admission_required": false,
+  "opt074_coverage_unadmitted_is_blocker": false,
+  "performance_admission": {
+    "enabled": true,
+    "instrumentation_only": true
+  },
+  "image": "qw38-cuda:13.0.2",
+  "model": "models/Qwen3.8-27B-Q4_K_M.gguf",
+  "gpu_lock": "build/optimization-runs/qw38-gpu.lock",
+  "aggregate_deadline_s": 7200,
+  "target": "tools/opt140_prefill_attention_replay.py",
+  "diagnostics_make_target": "cuda-opt140-diagnostics",
+  "selector": "decode_segments8",
+  "case_ids": [
+    "preflight",
+    "replay",
+    "counters",
+    "report"
+  ],
+  "modes": {
+    "feedback": {
+      "target": "tools/opt140_prefill_attention_replay.py",
+      "tier_sequence": ["preflight", "replay"],
+      "make_targets": [
+        "build/qw38-cuda-component-replay"
+      ],
+      "build_once": true,
+      "warm_repetitions": 0,
+      "aggregate_deadline_s": 7200,
+      "workloads": ["preflight", "replay"]
+    },
+    "acceptance": {
+      "target": "tools/opt140_prefill_attention_replay.py",
+      "tier_sequence": ["preflight", "replay", "counters", "report"],
+      "make_targets": [
+        "build/qw38-cuda-component-replay"
+      ],
+      "warm_repetitions": 0,
+      "aggregate_deadline_s": 7200,
+      "workloads": ["preflight", "replay", "counters", "report"]
+    },
+    "release": {
+      "target": "tools/opt140_prefill_attention_replay.py",
+      "tier": "acceptance",
+      "make_targets": [
+        "build/qw38-cuda-component-replay"
+      ],
+      "skip_compile": false,
+      "historical_oracles": false,
+      "aggregate_deadline_s": 7200,
+      "workloads": []
+    }
+  },
+  "workloads": {
+    "preflight": {
+      "target": "tools/opt140_prefill_attention_replay.py",
+      "tier": "correctness",
+      "runner": "host",
+      "kind": "image_ncu_stack_identity",
+      "cases": 1,
+      "candidates": 1,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 1,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 0,
+      "reference": 1,
+      "gpu_work": true,
+      "args": [
+        "uv", "run", "python", "tools/opt140_prefill_attention_replay.py",
+        "--phase", "preflight", "--mode", "{mode}", "--run-dir", "{run_dir}"
+      ]
+    },
+    "replay": {
+      "target": "build/qw38-cuda-component-replay",
+      "tier": "screen",
+      "runner": "host",
+      "kind": "p4096_prompt_attention_rotating_replay",
+      "cases": 1,
+      "candidates": 1,
+      "warmups": 1,
+      "samples": 3,
+      "tokens": 1,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 1,
+      "reference": 0,
+      "gpu_work": true,
+      "native_targets": ["build/qw38-cuda-component-replay"],
+      "args": [
+        "uv", "run", "python", "tools/opt140_prefill_attention_replay.py",
+        "--phase", "replay", "--mode", "{mode}", "--run-dir", "{run_dir}"
+      ]
+    },
+    "counters": {
+      "target": "build/qw38-cuda-component-replay",
+      "tier": "screen",
+      "runner": "host",
+      "kind": "bounded_ncu_prefill_attn_core",
+      "cases": 1,
+      "candidates": 1,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 1,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 1,
+      "reference": 0,
+      "gpu_work": true,
+      "native_targets": ["build/qw38-cuda-component-replay"],
+      "args": [
+        "uv", "run", "python", "tools/opt140_prefill_attention_replay.py",
+        "--phase", "counters", "--mode", "{mode}", "--run-dir", "{run_dir}"
+      ]
+    },
+    "report": {
+      "target": "tools/opt140_prefill_attention_replay.py",
+      "tier": "correctness",
+      "runner": "host",
+      "kind": "host_only_prefill_attention_report",
+      "cases": 1,
+      "candidates": 1,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 1,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 0,
+      "reference": 1,
+      "gpu_work": false,
+      "args": [
+        "uv", "run", "python", "tools/opt140_prefill_attention_replay.py",
+        "--phase", "report", "--mode", "{mode}", "--run-dir", "{run_dir}"
+      ]
+    }
+  },
+  "proof_limit": [
+    "diagnostics only",
+    "no production selector change",
+    "instrumentation-only: no speed keep",
+    "historical oracles none",
+    "claims_throughput=false",
+    "NLL N/A",
+    "P4096 prompt-attention replay only",
+    "decode-attention substitution rejected",
+    "300s child timeout, 1200s prompt-attention, 7200s aggregate"
+  ],
+  "report_path": "evidence/optimization/opt140-prefill-attention-replay/REPORT.md"
+}

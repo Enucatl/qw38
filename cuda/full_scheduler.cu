@@ -835,6 +835,73 @@ cudaError_t maybe_capture_decode_attention(
   return error;
 }
 
+cudaError_t maybe_capture_prompt_attention_inputs(
+    ActivationCapture* capture, std::size_t attention_slot, const float* packed,
+    const float* key, const float* value, std::size_t rows,
+    std::size_t query_start) noexcept {
+  if (capture == nullptr || !capture->capture_prompt_attention) {
+    return cudaSuccess;
+  }
+  if (attention_slot >= capture->prompt_attn_slots || rows == 0) {
+    return cudaSuccess;
+  }
+  cudaError_t error = cudaDeviceSynchronize();
+  if (error != cudaSuccess) return error;
+  capture->prompt_attn_rows = rows;
+  capture->prompt_attn_query_start = query_start;
+  const std::size_t packed_n = rows * internal::kAttentionPackedQueryGateWidth;
+  const std::size_t kv_n = rows * internal::kAttentionKvWidth;
+  auto copy_f = [&](float* host, const float* device, std::size_t count) {
+    if (host == nullptr || device == nullptr || count == 0) return cudaSuccess;
+    return cudaMemcpy(host + attention_slot * count, device,
+                      count * sizeof(float), cudaMemcpyDeviceToHost);
+  };
+  error = copy_f(capture->prompt_attn_packed, packed, packed_n);
+  if (error == cudaSuccess) {
+    error = copy_f(capture->prompt_attn_key, key, kv_n);
+  }
+  if (error == cudaSuccess) {
+    error = copy_f(capture->prompt_attn_value, value, kv_n);
+  }
+  return error;
+}
+
+cudaError_t maybe_capture_prompt_attention_outputs(
+    ActivationCapture* capture, std::size_t attention_slot, const float* output,
+    const AttentionCache& candidate, std::size_t rows) noexcept {
+  if (capture == nullptr || !capture->capture_prompt_attention) {
+    return cudaSuccess;
+  }
+  if (attention_slot >= capture->prompt_attn_slots || rows == 0) {
+    return cudaSuccess;
+  }
+  cudaError_t error = cudaDeviceSynchronize();
+  if (error != cudaSuccess) return error;
+  const std::size_t out_n = rows * internal::kAttentionQueryWidth;
+  const std::size_t kv_n = rows * internal::kAttentionKvWidth;
+  if (capture->prompt_attn_output != nullptr && output != nullptr) {
+    error = cudaMemcpy(capture->prompt_attn_output + attention_slot * out_n,
+                       output, out_n * sizeof(float), cudaMemcpyDeviceToHost);
+  }
+  if (error == cudaSuccess && capture->prompt_attn_candidate_key != nullptr &&
+      candidate.key != nullptr) {
+    error = cudaMemcpy(
+        capture->prompt_attn_candidate_key + attention_slot * kv_n,
+        candidate.key, kv_n * sizeof(__nv_bfloat16), cudaMemcpyDeviceToHost);
+  }
+  if (error == cudaSuccess && capture->prompt_attn_candidate_value != nullptr &&
+      candidate.value != nullptr) {
+    error = cudaMemcpy(
+        capture->prompt_attn_candidate_value + attention_slot * kv_n,
+        candidate.value, kv_n * sizeof(__nv_bfloat16), cudaMemcpyDeviceToHost);
+  }
+  if (error == cudaSuccess && capture->prompt_attn_slot_captured != nullptr) {
+    capture->prompt_attn_slot_captured[attention_slot] = true;
+    capture->prompt_attn_chunk_count = 1;
+  }
+  return error;
+}
+
 cudaError_t maybe_capture_down_input(ActivationCapture* capture,
                                      std::size_t layer,
                                      const __nv_bfloat16* device) noexcept {
@@ -6803,7 +6870,15 @@ Status execute_prompt_chunk(
               static_cast<std::size_t>(128), rows,
               workspace->prompt_projected_bf16_, stream);
         }
+        if (error == cudaSuccess) error = end_phase(leaves);
+        if (error == cudaSuccess) error = end_phase(categories);
       } else {
+        if (error == cudaSuccess) {
+          error = maybe_capture_prompt_attention_inputs(
+              capture, attention_slot, workspace->prompt_projection_a_,
+              workspace->prompt_projection_c_, workspace->prompt_projection_d_,
+              rows, query_start);
+        }
         if (error == cudaSuccess) {
           const std::size_t values =
               rows * internal::kAttentionQueryWidth;
@@ -6883,9 +6958,14 @@ Status execute_prompt_chunk(
               rows * internal::kAttentionQueryWidth,
               workspace->prompt_projected_bf16_, stream);
         }
+        if (error == cudaSuccess) error = end_phase(leaves);
+        if (error == cudaSuccess) error = end_phase(categories);
+        if (error == cudaSuccess) {
+          error = maybe_capture_prompt_attention_outputs(
+              capture, attention_slot, workspace->prompt_gdn_recurrent_output_,
+              candidate, rows);
+        }
       }
-      if (error == cudaSuccess) error = end_phase(leaves);
-      if (error == cudaSuccess) error = end_phase(categories);
     }
     {
       const NvtxRange mixer_range("qw38.mixer_mmq");

@@ -11,6 +11,7 @@ from tools.opt139_counter_identity import (
     CONTRACT,
     FIXTURE,
     ITERATION,
+    LAUNCH_PREFILL_ATTN,
     LAUNCH_VEC128_ONLINE,
     LAUNCH_WARP_QUERY,
     OPT140_INELIGIBLE,
@@ -28,6 +29,7 @@ from tools.opt139_counter_identity import (
     parse_ncu_output,
     parse_numeric,
     production_attn_identity,
+    production_prefill_attn_identity,
     select_largest_duration_kernel,
     select_target_launch,
     typed_slots_from_launch,
@@ -213,6 +215,22 @@ def test_phase_cross_contamination_is_rejected() -> None:
     assert admission["supported_mechanism"] is None
     assert admission["candidate"] is None
     assert admission["reason"] == OPT140_INELIGIBLE
+
+
+def test_prefill_prompt_attention_identity_matches_opt111_base() -> None:
+    expected = production_prefill_attn_identity()
+    assert expected["expected_kernel"] == LAUNCH_PREFILL_ATTN
+    matched = identity_match(
+        phase="prefill",
+        engine="quartz",
+        workload="P4096",
+        kernel=LAUNCH_PREFILL_ATTN,
+        expected_kernel=expected["expected_kernel"],
+        replay_family="prompt-attention",
+        replay_boundary=None,
+    )
+    assert matched["ok"] is True
+    assert kernel_stem(LAUNCH_PREFILL_ATTN) == LAUNCH_PREFILL_ATTN
 
 
 def test_selector_mismatch_rejects_warp_query_as_d2048() -> None:

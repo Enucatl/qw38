@@ -61,6 +61,7 @@ PATH_DENSE_MMA = "dense_bf16_tile_f16_mma_decode_v1"
 LAUNCH_WARP_QUERY = "warp_query_decode_attention"
 LAUNCH_VEC128_ONLINE = "vec128_online_decode_attention"
 LAUNCH_DENSE_MMA = "dense_bf16_tile_f16_mma_decode_v1"
+LAUNCH_PREFILL_ATTN = "fattn_mma_pipeline_opt111_base"
 OPT140_INELIGIBLE = "prefill_decode_attention_ineligible_until_opt140"
 RESULT_PREFIX = "QW38_OPT139_COUNTER_IDENTITY_RESULT="
 REQUIRED_FIXTURE_KEYS = (
@@ -480,15 +481,29 @@ def kernel_stem(name: str | None) -> str:
     if not name:
         return ""
     text = name.strip().strip('"')
-    for known in (LAUNCH_VEC128_ONLINE, LAUNCH_WARP_QUERY, LAUNCH_DENSE_MMA):
+    for known in (
+        LAUNCH_VEC128_ONLINE,
+        LAUNCH_WARP_QUERY,
+        LAUNCH_DENSE_MMA,
+        LAUNCH_PREFILL_ATTN,
+    ):
         if known in text:
             return known
+    if "fattn_mma_pipeline_kernel" in text:
+        return LAUNCH_PREFILL_ATTN
     text = re.sub(r"^void\s+", "", text)
     text = re.sub(r"<unnamed>", "", text)
     text = text.split("<", 1)[0]
     text = text.split("(", 1)[0]
     text = text.rsplit("::", 1)[-1]
     return text.strip()
+
+
+def ncu_kernel_regex(expected_kernel: str | None) -> str:
+    """NCU --kernel-name stem. Prefill identity is a Quartz launch name."""
+    if expected_kernel == LAUNCH_PREFILL_ATTN:
+        return "fattn_mma_pipeline_kernel"
+    return kernel_stem(expected_kernel)
 
 
 def decode_attention_vec128_path_for_position(
@@ -543,6 +558,33 @@ def production_attn_identity(
         "proof_limit": (
             "hybrid dispatch can select vec128_online at D2048; "
             "a warp_query replay is not automatically evidence for that gap"
+        ),
+    }
+
+
+def production_prefill_attn_identity() -> dict[str, Any]:
+    """P4096 attn_core identity: OPT-111 base launch, prompt-attention replay."""
+    return {
+        "prefix": 4096,
+        "workload": "P4096",
+        "phase": "prefill",
+        "family": "attn_core",
+        "engine": "quartz",
+        "replay_family": "prompt-attention",
+        "path": "opt111_base",
+        "expected_kernel": LAUNCH_PREFILL_ATTN,
+        "capacity": 131072,
+        "empty_initial_state": True,
+        "prefix_reuse": False,
+        "final_token_logits_only": True,
+        "selector": SELECTOR,
+        "complete_family_replay": True,
+        "counter_kernel_is_complete_family": False,
+        "decode_attention_substitution": False,
+        "proof_limit": (
+            "complete prompt-attention replay includes split/stage/convert/"
+            "core/merge/epilogue; NCU --kernel-name targets "
+            "fattn_mma_pipeline_opt111_base only"
         ),
     }
 
@@ -770,6 +812,13 @@ def identity_match(
         "decode",
     }
     if phase == "decode" and not workload_ok:
+        mismatches.append("workload_mismatch")
+    prefill_ok = workload.upper() in {"P4096", "PREFILL"} or workload in {
+        "p4096",
+        "prefill",
+        "prompt-attention",
+    }
+    if phase == "prefill" and replay_family == "prompt-attention" and not prefill_ok:
         mismatches.append("workload_mismatch")
     ok = not mismatches
     return {

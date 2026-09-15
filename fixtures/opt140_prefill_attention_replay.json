@@ -1,0 +1,1103 @@
+{
+  "schema_version": 1,
+  "task": "OPT-140",
+  "status": "measured",
+  "mode": "acceptance",
+  "measurement_utc": "2026-09-15T00:05:49Z",
+  "claims_throughput": false,
+  "claims_performance_improvement": false,
+  "production_kept": true,
+  "selected_execution_graph_path": "decode_segments8",
+  "parent": "post124_plus_opt127_decode_segments8_plus_opt137_mma",
+  "prefill_tokens": 4096,
+  "capacity": 131072,
+  "existing_abs_tol": 0.002,
+  "new_quality_tolerance": false,
+  "decode_attention_substitution": false,
+  "preflight": {
+    "schema_version": 1,
+    "task": "OPT-140",
+    "phase": "preflight",
+    "mode": "acceptance",
+    "ok": true,
+    "blocked": [],
+    "gpu_available": true,
+    "gpu_blocker": "",
+    "make_rc": 0,
+    "make_stdout_tail": "\n==========\n== CUDA ==\n==========\n\nCUDA Version 13.0.2\n\nContainer image Copyright (c) 2016-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.\n\nThis container image and its contents are governed by the NVIDIA Deep Learning Container License.\nBy pulling and using the container, you accept the terms and conditions of this license:\nhttps://developer.nvidia.com/ngc/nvidia-deep-learning-container-license\n\nA copy of this license is made available in this container at /NGC-DL-CONTAINER-LICENSE for your convenience.\n\n",
+    "make_stderr_tail": "",
+    "replay_bin": "build/qw38-cuda-component-replay",
+    "replay_sha256": "130469b13ef1cb8dbe100bc8d5a05fb27653520f2401704ac8606c53c9273561",
+    "ncu": {
+      "ncu_available": true,
+      "permission_denied": false,
+      "queried": true,
+      "full_ncu_sweep": false,
+      "selected_metrics": [
+        "dram__bytes_op_read",
+        "dram__bytes_op_write",
+        "dram__bytes",
+        "dram__throughput.avg.pct_of_peak_sustained_elapsed",
+        "lts__t_sectors",
+        "lts__t_sector_hit_rate",
+        "sm__pipe_tensor_cycles_active",
+        "sm__throughput.avg.pct_of_peak_sustained_elapsed",
+        "sm__warps_active.avg.pct_of_peak_sustained_active",
+        "smsp__warps_issue_stalled_long_scoreboard",
+        "smsp__warps_issue_stalled_barrier"
+      ],
+      "raw_name_count": 3871,
+      "error": null
+    },
+    "identity": {
+      "prefix": 4096,
+      "workload": "P4096",
+      "phase": "prefill",
+      "family": "attn_core",
+      "engine": "quartz",
+      "replay_family": "prompt-attention",
+      "path": "opt111_base",
+      "expected_kernel": "fattn_mma_pipeline_opt111_base",
+      "capacity": 131072,
+      "empty_initial_state": true,
+      "prefix_reuse": false,
+      "final_token_logits_only": true,
+      "selector": "decode_segments8",
+      "complete_family_replay": true,
+      "counter_kernel_is_complete_family": false,
+      "decode_attention_substitution": false,
+      "proof_limit": "complete prompt-attention replay includes split/stage/convert/core/merge/epilogue; NCU --kernel-name targets fattn_mma_pipeline_opt111_base only"
+    },
+    "identity_ok": {
+      "ok": true,
+      "phase": "prefill",
+      "engine": "quartz",
+      "workload": "P4096",
+      "kernel": "fattn_mma_pipeline_opt111_base",
+      "expected_kernel": "fattn_mma_pipeline_opt111_base",
+      "replay_family": "prompt-attention",
+      "replay_boundary": {
+        "ok": true,
+        "cache_mode": "rotating",
+        "production_weights": true,
+        "synthetic_weights": false,
+        "phase": "prefill",
+        "replay_family": "prompt-attention",
+        "reason": null
+      },
+      "mismatches": [],
+      "reason": null
+    },
+    "decode_attention_rejected": {
+      "ok": false,
+      "phase": "prefill",
+      "engine": "quartz",
+      "workload": "P4096",
+      "kernel": "fattn_mma_pipeline_opt111_base",
+      "expected_kernel": "fattn_mma_pipeline_opt111_base",
+      "replay_family": "decode-attention",
+      "replay_boundary": {
+        "ok": false,
+        "cache_mode": "rotating",
+        "production_weights": true,
+        "synthetic_weights": false,
+        "phase": "prefill",
+        "replay_family": "decode-attention",
+        "reason": "replay/production boundary mismatch"
+      },
+      "mismatches": [
+        "prefill_decode_attention_ineligible_until_opt140",
+        "replay/production boundary mismatch"
+      ],
+      "reason": "prefill_decode_attention_ineligible_until_opt140,replay/production boundary mismatch"
+    },
+    "claims_throughput": false,
+    "family_plan": "task=OPT-140 mode=acceptance phase=preflight loop_product=1 cases=1 candidates=1 warmups=0 samples=1 tokens=1",
+    "measured_at": "2026-09-15T00:01:06Z"
+  },
+  "replay": {
+    "schema_version": 1,
+    "task": "OPT-140",
+    "phase": "replay",
+    "mode": "acceptance",
+    "ok": true,
+    "returncode": 0,
+    "command": [
+      "./build/qw38-cuda-component-replay",
+      "models/Qwen3.8-27B-Q4_K_M.gguf",
+      "--workload",
+      "prompt-attention",
+      "--cache-mode",
+      "rotating",
+      "--opt140-protocol",
+      "--warmups",
+      "1",
+      "--samples",
+      "3",
+      "--evidence-dir",
+      "evidence/optimization/opt140-prefill-attention-replay/replay"
+    ],
+    "parsed": {
+      "schema_version": 1,
+      "task": "OPT-140",
+      "protocol": "opt140",
+      "family": "prompt-attention",
+      "cache_mode": "rotating",
+      "warmups": 1,
+      "samples": 3,
+      "production_weights": true,
+      "synthetic_weights": false,
+      "accept_hot_as_production": false,
+      "rotating_layers": true,
+      "full_ncu_sweep": false,
+      "prefill_tokens": 4096,
+      "capacity": 131072,
+      "empty_initial_state": true,
+      "prefix_reuse": false,
+      "final_token_logits_only": true,
+      "chunk_count": 1,
+      "query_start": 0,
+      "attention_layers": 16,
+      "expected_kernel": "fattn_mma_pipeline_opt111_base",
+      "complete_family_replay": true,
+      "decode_attention_substitution": false,
+      "new_quality_tolerance": false,
+      "existing_abs_tol": 0.00200000009,
+      "included": "split,stage,bf16_f16_convert,core,merge,epilogue,fp32_to_bf16",
+      "excluded": "mixer_mmq,ffn_mmq,logits,commit_sync,embedding",
+      "capture_key": "698a857387d5b5779f4921723f6592d72b248b3b4fd74f55d0c3116909cfcd11",
+      "claims_throughput": false
+    },
+    "capture_key": "698a857387d5b5779f4921723f6592d72b248b3b4fd74f55d0c3116909cfcd11",
+    "parity": {
+      "layers": 16,
+      "max_abs": 0.0,
+      "kv_max_abs": 0.0,
+      "nonfinite": 0,
+      "equal": true,
+      "existing_abs_tol": 0.002,
+      "new_quality_tolerance": false
+    },
+    "layer_parity": [
+      {
+        "layer": 3,
+        "slot": 0,
+        "causal_tail_abs": 0.0,
+        "chunk_start_abs": 0.0,
+        "chunk_mid_abs": 0.0,
+        "equal": true
+      },
+      {
+        "layer": 7,
+        "slot": 1,
+        "causal_tail_abs": 0.0,
+        "chunk_start_abs": 0.0,
+        "chunk_mid_abs": 0.0,
+        "equal": true
+      },
+      {
+        "layer": 11,
+        "slot": 2,
+        "causal_tail_abs": 0.0,
+        "chunk_start_abs": 0.0,
+        "chunk_mid_abs": 0.0,
+        "equal": true
+      },
+      {
+        "layer": 15,
+        "slot": 3,
+        "causal_tail_abs": 0.0,
+        "chunk_start_abs": 0.0,
+        "chunk_mid_abs": 0.0,
+        "equal": true
+      },
+      {
+        "layer": 19,
+        "slot": 4,
+        "causal_tail_abs": 0.0,
+        "chunk_start_abs": 0.0,
+        "chunk_mid_abs": 0.0,
+        "equal": true
+      },
+      {
+        "layer": 23,
+        "slot": 5,
+        "causal_tail_abs": 0.0,
+        "chunk_start_abs": 0.0,
+        "chunk_mid_abs": 0.0,
+        "equal": true
+      },
+      {
+        "layer": 27,
+        "slot": 6,
+        "causal_tail_abs": 0.0,
+        "chunk_start_abs": 0.0,
+        "chunk_mid_abs": 0.0,
+        "equal": true
+      },
+      {
+        "layer": 31,
+        "slot": 7,
+        "causal_tail_abs": 0.0,
+        "chunk_start_abs": 0.0,
+        "chunk_mid_abs": 0.0,
+        "equal": true
+      },
+      {
+        "layer": 35,
+        "slot": 8,
+        "causal_tail_abs": 0.0,
+        "chunk_start_abs": 0.0,
+        "chunk_mid_abs": 0.0,
+        "equal": true
+      },
+      {
+        "layer": 39,
+        "slot": 9,
+        "causal_tail_abs": 0.0,
+        "chunk_start_abs": 0.0,
+        "chunk_mid_abs": 0.0,
+        "equal": true
+      },
+      {
+        "layer": 43,
+        "slot": 10,
+        "causal_tail_abs": 0.0,
+        "chunk_start_abs": 0.0,
+        "chunk_mid_abs": 0.0,
+        "equal": true
+      },
+      {
+        "layer": 47,
+        "slot": 11,
+        "causal_tail_abs": 0.0,
+        "chunk_start_abs": 0.0,
+        "chunk_mid_abs": 0.0,
+        "equal": true
+      },
+      {
+        "layer": 51,
+        "slot": 12,
+        "causal_tail_abs": 0.0,
+        "chunk_start_abs": 0.0,
+        "chunk_mid_abs": 0.0,
+        "equal": true
+      },
+      {
+        "layer": 55,
+        "slot": 13,
+        "causal_tail_abs": 0.0,
+        "chunk_start_abs": 0.0,
+        "chunk_mid_abs": 0.0,
+        "equal": true
+      },
+      {
+        "layer": 59,
+        "slot": 14,
+        "causal_tail_abs": 0.0,
+        "chunk_start_abs": 0.0,
+        "chunk_mid_abs": 0.0,
+        "equal": true
+      },
+      {
+        "layer": 63,
+        "slot": 15,
+        "causal_tail_abs": 0.0,
+        "chunk_start_abs": 0.0,
+        "chunk_mid_abs": 0.0,
+        "equal": true
+      }
+    ],
+    "dispatch": {
+      "path": "opt111_base",
+      "launch": "fattn_mma_pipeline_opt111_base",
+      "capacity": 131072,
+      "tokens": 4096,
+      "chunk_count": 1,
+      "query_start": 0,
+      "decode_attention_substitution": false,
+      "complete_family_replay": true
+    },
+    "rounds": [
+      {
+        "family": "prompt-attention",
+        "cache_mode": "rotating",
+        "warmup": true,
+        "sample_index": 0,
+        "enclosing_ms": 418.776855,
+        "kernel_only_ms": 227.98114
+      },
+      {
+        "family": "prompt-attention",
+        "cache_mode": "rotating",
+        "warmup": false,
+        "sample_index": 0,
+        "enclosing_ms": 420.240936,
+        "kernel_only_ms": 228.073639
+      },
+      {
+        "family": "prompt-attention",
+        "cache_mode": "rotating",
+        "warmup": false,
+        "sample_index": 1,
+        "enclosing_ms": 419.551544,
+        "kernel_only_ms": 228.103851
+      },
+      {
+        "family": "prompt-attention",
+        "cache_mode": "rotating",
+        "warmup": false,
+        "sample_index": 2,
+        "enclosing_ms": 420.376007,
+        "kernel_only_ms": 228.141251
+      }
+    ],
+    "warmup_count": 1,
+    "sample_count": 3,
+    "protocol": {
+      "warmups": 1,
+      "samples": 3,
+      "cache_mode": "rotating",
+      "accept_hot_as_production": false
+    },
+    "boundary": {
+      "phase": "prefill",
+      "replay_family": "prompt-attention",
+      "production_leaves": [
+        "split_attention_rows",
+        "stage_chunk",
+        "bf16_f16_convert",
+        "fattn_mma_pipeline_opt111_base",
+        "merge",
+        "epilogue",
+        "fp32_to_bf16"
+      ],
+      "excluded": [
+        "mixer_mmq",
+        "ffn_mmq",
+        "logits",
+        "commit_sync",
+        "embedding"
+      ],
+      "complete_family_replay": true,
+      "counter_kernel": "fattn_mma_pipeline_opt111_base",
+      "counter_kernel_is_complete_family": false,
+      "empty_initial_state": true,
+      "prefix_reuse": false,
+      "final_token_logits_only": true,
+      "capacity": 131072,
+      "prefill_tokens": 4096,
+      "chunk_count": 1,
+      "query_start": 0,
+      "decode_attention_substitution": false,
+      "boundary": {
+        "ok": true,
+        "cache_mode": "rotating",
+        "production_weights": true,
+        "synthetic_weights": false,
+        "phase": "prefill",
+        "replay_family": "prompt-attention",
+        "reason": null
+      },
+      "identity": {
+        "ok": true,
+        "phase": "prefill",
+        "engine": "quartz",
+        "workload": "P4096",
+        "kernel": "fattn_mma_pipeline_opt111_base",
+        "expected_kernel": "fattn_mma_pipeline_opt111_base",
+        "replay_family": "prompt-attention",
+        "replay_boundary": {
+          "ok": true,
+          "cache_mode": "rotating",
+          "production_weights": true,
+          "synthetic_weights": false,
+          "phase": "prefill",
+          "replay_family": "prompt-attention",
+          "reason": null
+        },
+        "mismatches": [],
+        "reason": null
+      },
+      "reason": null
+    },
+    "identity": {
+      "ok": true,
+      "phase": "prefill",
+      "engine": "quartz",
+      "workload": "P4096",
+      "kernel": "fattn_mma_pipeline_opt111_base",
+      "expected_kernel": "fattn_mma_pipeline_opt111_base",
+      "replay_family": "prompt-attention",
+      "replay_boundary": {
+        "ok": true,
+        "cache_mode": "rotating",
+        "production_weights": true,
+        "synthetic_weights": false,
+        "phase": "prefill",
+        "replay_family": "prompt-attention",
+        "reason": null
+      },
+      "mismatches": [],
+      "reason": null
+    },
+    "raw_artifact": "evidence/optimization/opt140-prefill-attention-replay/replay/prompt-attention.stdout.txt",
+    "stdout_tail": "tance\",\"pairs\":3,\"sample_ids\":[0,1,2],\"acceptance_executed\":true,\"gdn_decode\":\"installed\",\"effective_gdn_decode\":\"sequential\",\"launch\":\"\",\"value_tile\":0,\"grid_x\":0,\"grid_y\":0,\"warps_per_cta\":4,\"keep\":false,\"capture_key\":\"698a857387d5b5779f4921723f6592d72b248b3b4fd74f55d0c3116909cfcd11\"}\nQW38_OPT078_NATIVE_COUNTS={\"schema_version\":1,\"task\":\"OPT-078\",\"family\":\"prompt-attention\",\"tier\":\"acceptance\",\"warmups\":1,\"samples\":3,\"observed_warmups\":1,\"observed_samples\":3,\"observed_candidates\":1,\"observed_shapes\":1,\"observed_tier\":\"acceptance\",\"pairs\":3,\"sample_ids\":[0,1,2],\"acceptance_executed\":true,\"decode_query_prep\":\"installed\",\"effective_decode_query_prep\":\"warp_query\",\"launch\":\"\",\"prep_grid\":0,\"n_parts\":0,\"prep_launches\":0,\"prepared_q\":false,\"vec_kv\":false,\"keep\":false,\"capture_key\":\"698a857387d5b5779f4921723f6592d72b248b3b4fd74f55d0c3116909cfcd11\"}\nQW38_OPT095_NATIVE_COUNTS={\"schema_version\":1,\"task\":\"OPT-095\",\"family\":\"prompt-attention\",\"tier\":\"acceptance\",\"warmups\":1,\"samples\":3,\"observed_warmups\":1,\"observed_samples\":3,\"observed_candidates\":1,\"observed_shapes\":1,\"observed_tier\":\"acceptance\",\"pairs\":3,\"sample_ids\":[0,1,2],\"acceptance_executed\":true,\"decode_attention_gqa\":\"installed\",\"effective_decode_attention_gqa\":\"warp_query\",\"launch\":\"\",\"prep_grid\":0,\"prep_block\":0,\"gqa_block_y\":0,\"n_parts\":0,\"prep_launches\":0,\"keep\":false,\"capture_key\":\"698a857387d5b5779f4921723f6592d72b248b3b4fd74f55d0c3116909cfcd11\"}\nQW38_OPT103_NATIVE_COUNTS={\"schema_version\":1,\"task\":\"OPT-103\",\"family\":\"prompt-attention\",\"tier\":\"acceptance\",\"warmups\":1,\"samples\":3,\"observed_warmups\":1,\"observed_samples\":3,\"observed_candidates\":1,\"observed_shapes\":1,\"observed_tier\":\"acceptance\",\"pairs\":3,\"sample_ids\":[0,1,2],\"acceptance_executed\":true,\"decode_attention_vec128\":\"installed\",\"effective_decode_attention_vec128\":\"warp_query\",\"launch\":\"\",\"prep_grid\":0,\"prep_block\":0,\"block_y\":0,\"n_parts\":0,\"prep_launches\":0,\"keep\":false,\"capture_key\":\"698a857387d5b5779f4921723f6592d72b248b3b4fd74f55d0c3116909cfcd11\"}\n",
+    "stderr_tail": "",
+    "claims_throughput": false,
+    "family_plan": "task=OPT-140 mode=acceptance phase=replay loop_product=4 cases=1 candidates=1 warmups=1 samples=3 tokens=1",
+    "measured_at": "2026-09-15T00:02:09Z"
+  },
+  "counters": {
+    "schema_version": 1,
+    "task": "OPT-140",
+    "phase": "counters",
+    "mode": "acceptance",
+    "ok": true,
+    "kernels": [
+      {
+        "kernel": "quartz:attn_core:P4096",
+        "engine": "quartz",
+        "family": "attn_core",
+        "phase": "prefill",
+        "workload": "P4096",
+        "prefix": 4096,
+        "visible_position": 4096,
+        "replay_family": "prompt-attention",
+        "replay_mode": "application",
+        "expected_kernel": "fattn_mma_pipeline_opt111_base",
+        "target_kernel": "void fattn_mma_pipeline_kernel<16, 0, 1, 32, 2, 2, 1, 2, 1, 1, 0>(AttentionConfig, unsigned long, unsigned long, const float *, const float *, const float *, const __nv_bfloat16 *, const __nv_bfloat16 *, const __nv_bfloat16 *, const __nv_bfloat16 *, float *, float *, float *, float *, const __half *, unsigned long)",
+        "target_launch_id": "0",
+        "launch_identity": {
+          "launch_id": "0",
+          "kernel_name": "void fattn_mma_pipeline_kernel<16, 0, 1, 32, 2, 2, 1, 2, 1, 1, 0>(AttentionConfig, unsigned long, unsigned long, const float *, const float *, const float *, const __nv_bfloat16 *, const __nv_bfloat16 *, const __nv_bfloat16 *, const __nv_bfloat16 *, float *, float *, float *, float *, const __half *, unsigned long)",
+          "metrics": {
+            "dram__throughput.avg.pct_of_peak_sustained_elapsed": {
+              "name": "dram__throughput.avg.pct_of_peak_sustained_elapsed",
+              "value": 1.22,
+              "unit": "%",
+              "raw": "1.22",
+              "missing_reason": null
+            },
+            "dram__bytes.avg": {
+              "name": "dram__bytes.avg",
+              "value": 26.28,
+              "unit": "Mbyte",
+              "raw": "26.28",
+              "missing_reason": null
+            },
+            "dram__bytes.max": {
+              "name": "dram__bytes.max",
+              "value": 26.32,
+              "unit": "Mbyte",
+              "raw": "26.32",
+              "missing_reason": null
+            },
+            "dram__bytes.min": {
+              "name": "dram__bytes.min",
+              "value": 26.25,
+              "unit": "Mbyte",
+              "raw": "26.25",
+              "missing_reason": null
+            },
+            "dram__bytes.sum": {
+              "name": "dram__bytes.sum",
+              "value": 420.54,
+              "unit": "Mbyte",
+              "raw": "420.54",
+              "missing_reason": null
+            },
+            "dram__bytes_op_read.avg": {
+              "name": "dram__bytes_op_read.avg",
+              "value": 15.76,
+              "unit": "Mbyte",
+              "raw": "15.76",
+              "missing_reason": null
+            },
+            "dram__bytes_op_read.max": {
+              "name": "dram__bytes_op_read.max",
+              "value": 15.78,
+              "unit": "Mbyte",
+              "raw": "15.78",
+              "missing_reason": null
+            },
+            "dram__bytes_op_read.min": {
+              "name": "dram__bytes_op_read.min",
+              "value": 15.74,
+              "unit": "Mbyte",
+              "raw": "15.74",
+              "missing_reason": null
+            },
+            "dram__bytes_op_read.sum": {
+              "name": "dram__bytes_op_read.sum",
+              "value": 252.12,
+              "unit": "Mbyte",
+              "raw": "252.12",
+              "missing_reason": null
+            },
+            "dram__bytes_op_write.avg": {
+              "name": "dram__bytes_op_write.avg",
+              "value": 10.53,
+              "unit": "Mbyte",
+              "raw": "10.53",
+              "missing_reason": null
+            },
+            "dram__bytes_op_write.max": {
+              "name": "dram__bytes_op_write.max",
+              "value": 10.54,
+              "unit": "Mbyte",
+              "raw": "10.54",
+              "missing_reason": null
+            },
+            "dram__bytes_op_write.min": {
+              "name": "dram__bytes_op_write.min",
+              "value": 10.51,
+              "unit": "Mbyte",
+              "raw": "10.51",
+              "missing_reason": null
+            },
+            "dram__bytes_op_write.sum": {
+              "name": "dram__bytes_op_write.sum",
+              "value": 168.42,
+              "unit": "Mbyte",
+              "raw": "168.42",
+              "missing_reason": null
+            },
+            "lts__t_sector_hit_rate.max_rate": {
+              "name": "lts__t_sector_hit_rate.max_rate",
+              "value": 1.0,
+              "unit": null,
+              "raw": "1",
+              "missing_reason": null
+            },
+            "lts__t_sector_hit_rate.pct": {
+              "name": "lts__t_sector_hit_rate.pct",
+              "value": 93.46,
+              "unit": "%",
+              "raw": "93.46",
+              "missing_reason": null
+            },
+            "lts__t_sector_hit_rate.ratio": {
+              "name": "lts__t_sector_hit_rate.ratio",
+              "value": 0.93,
+              "unit": null,
+              "raw": "0.93",
+              "missing_reason": null
+            },
+            "lts__t_sectors.avg": {
+              "name": "lts__t_sectors.avg",
+              "value": 4501365.65,
+              "unit": "sector",
+              "raw": "4501365.65",
+              "missing_reason": null
+            },
+            "lts__t_sectors.max": {
+              "name": "lts__t_sectors.max",
+              "value": 4510311.0,
+              "unit": "sector",
+              "raw": "4510311",
+              "missing_reason": null
+            },
+            "lts__t_sectors.min": {
+              "name": "lts__t_sectors.min",
+              "value": 4492699.0,
+              "unit": "sector",
+              "raw": "4492699",
+              "missing_reason": null
+            },
+            "lts__t_sectors.sum": {
+              "name": "lts__t_sectors.sum",
+              "value": 216065551.0,
+              "unit": "sector",
+              "raw": "216065551",
+              "missing_reason": null
+            },
+            "sm__pipe_tensor_cycles_active.avg": {
+              "name": "sm__pipe_tensor_cycles_active.avg",
+              "value": 4764852.71,
+              "unit": "cycle",
+              "raw": "4764852.71",
+              "missing_reason": null
+            },
+            "sm__pipe_tensor_cycles_active.max": {
+              "name": "sm__pipe_tensor_cycles_active.max",
+              "value": 5167104.0,
+              "unit": "cycle",
+              "raw": "5167104",
+              "missing_reason": null
+            },
+            "sm__pipe_tensor_cycles_active.min": {
+              "name": "sm__pipe_tensor_cycles_active.min",
+              "value": 4353024.0,
+              "unit": "cycle",
+              "raw": "4353024",
+              "missing_reason": null
+            },
+            "sm__pipe_tensor_cycles_active.sum": {
+              "name": "sm__pipe_tensor_cycles_active.sum",
+              "value": 810024960.0,
+              "unit": "cycle",
+              "raw": "810024960",
+              "missing_reason": null
+            },
+            "smsp__warps_issue_stalled_barrier.avg": {
+              "name": "smsp__warps_issue_stalled_barrier.avg",
+              "value": 326412.84,
+              "unit": "warp",
+              "raw": "326412.84",
+              "missing_reason": null
+            },
+            "smsp__warps_issue_stalled_barrier.max": {
+              "name": "smsp__warps_issue_stalled_barrier.max",
+              "value": 405659.0,
+              "unit": "warp",
+              "raw": "405659",
+              "missing_reason": null
+            },
+            "smsp__warps_issue_stalled_barrier.min": {
+              "name": "smsp__warps_issue_stalled_barrier.min",
+              "value": 259026.0,
+              "unit": "warp",
+              "raw": "259026",
+              "missing_reason": null
+            },
+            "smsp__warps_issue_stalled_barrier.sum": {
+              "name": "smsp__warps_issue_stalled_barrier.sum",
+              "value": 221960729.0,
+              "unit": "warp",
+              "raw": "221960729",
+              "missing_reason": null
+            },
+            "smsp__warps_issue_stalled_long_scoreboard.avg": {
+              "name": "smsp__warps_issue_stalled_long_scoreboard.avg",
+              "value": 1039196.58,
+              "unit": "warp",
+              "raw": "1039196.58",
+              "missing_reason": null
+            },
+            "smsp__warps_issue_stalled_long_scoreboard.max": {
+              "name": "smsp__warps_issue_stalled_long_scoreboard.max",
+              "value": 1633761.0,
+              "unit": "warp",
+              "raw": "1633761",
+              "missing_reason": null
+            },
+            "smsp__warps_issue_stalled_long_scoreboard.min": {
+              "name": "smsp__warps_issue_stalled_long_scoreboard.min",
+              "value": 843261.0,
+              "unit": "warp",
+              "raw": "843261",
+              "missing_reason": null
+            },
+            "smsp__warps_issue_stalled_long_scoreboard.sum": {
+              "name": "smsp__warps_issue_stalled_long_scoreboard.sum",
+              "value": 706653677.0,
+              "unit": "warp",
+              "raw": "706653677",
+              "missing_reason": null
+            },
+            "sm__throughput.avg.pct_of_peak_sustained_elapsed": {
+              "name": "sm__throughput.avg.pct_of_peak_sustained_elapsed",
+              "value": 22.4,
+              "unit": "%",
+              "raw": "22.40",
+              "missing_reason": null
+            },
+            "sm__warps_active.avg.pct_of_peak_sustained_active": {
+              "name": "sm__warps_active.avg.pct_of_peak_sustained_active",
+              "value": 8.33,
+              "unit": "%",
+              "raw": "8.33",
+              "missing_reason": null
+            }
+          },
+          "device": "0",
+          "context": "1",
+          "stream": "7",
+          "grid": "(4, 256, 2)",
+          "block": "(128, 1, 1)",
+          "process_name": "qw38-cuda-component-replay",
+          "stem": "fattn_mma_pipeline_opt111_base",
+          "family": "attn_core"
+        },
+        "other_launches": [],
+        "enclosing_replay": {
+          "kind": "application_replay_enclosing_totals",
+          "separated_from_target_kernel": true,
+          "notes": []
+        },
+        "parse_format": "csv",
+        "parse_errors": [],
+        "selected_metrics": [
+          "dram__bytes_op_read",
+          "dram__bytes_op_write",
+          "dram__bytes",
+          "dram__throughput.avg.pct_of_peak_sustained_elapsed",
+          "lts__t_sectors",
+          "lts__t_sector_hit_rate",
+          "sm__pipe_tensor_cycles_active",
+          "sm__throughput.avg.pct_of_peak_sustained_elapsed",
+          "sm__warps_active.avg.pct_of_peak_sustained_active",
+          "smsp__warps_issue_stalled_long_scoreboard",
+          "smsp__warps_issue_stalled_barrier"
+        ],
+        "timeout_s": 1200,
+        "command": [
+          "reused",
+          "evidence/optimization/opt140-prefill-attention-replay/raw/p4096-attn_core.ncu-rep"
+        ],
+        "raw_artifact": "evidence/optimization/opt140-prefill-attention-replay/raw/p4096-attn_core.ncu.csv",
+        "binary_hash": "130469b13ef1cb8dbe100bc8d5a05fb27653520f2401704ac8606c53c9273561",
+        "selector": "decode_segments8",
+        "metrics": {
+          "dram__throughput.avg.pct_of_peak_sustained_elapsed": {
+            "name": "dram__throughput.avg.pct_of_peak_sustained_elapsed",
+            "value": 1.22,
+            "unit": "%",
+            "raw": "1.22"
+          },
+          "dram__bytes.avg": {
+            "name": "dram__bytes.avg",
+            "value": 26.28,
+            "unit": "Mbyte",
+            "raw": "26.28"
+          },
+          "dram__bytes.max": {
+            "name": "dram__bytes.max",
+            "value": 26.32,
+            "unit": "Mbyte",
+            "raw": "26.32"
+          },
+          "dram__bytes.min": {
+            "name": "dram__bytes.min",
+            "value": 26.25,
+            "unit": "Mbyte",
+            "raw": "26.25"
+          },
+          "dram__bytes.sum": {
+            "name": "dram__bytes.sum",
+            "value": 420.54,
+            "unit": "Mbyte",
+            "raw": "420.54"
+          },
+          "dram__bytes_op_read.avg": {
+            "name": "dram__bytes_op_read.avg",
+            "value": 15.76,
+            "unit": "Mbyte",
+            "raw": "15.76"
+          },
+          "dram__bytes_op_read.max": {
+            "name": "dram__bytes_op_read.max",
+            "value": 15.78,
+            "unit": "Mbyte",
+            "raw": "15.78"
+          },
+          "dram__bytes_op_read.min": {
+            "name": "dram__bytes_op_read.min",
+            "value": 15.74,
+            "unit": "Mbyte",
+            "raw": "15.74"
+          },
+          "dram__bytes_op_read.sum": {
+            "name": "dram__bytes_op_read.sum",
+            "value": 252.12,
+            "unit": "Mbyte",
+            "raw": "252.12"
+          },
+          "dram__bytes_op_write.avg": {
+            "name": "dram__bytes_op_write.avg",
+            "value": 10.53,
+            "unit": "Mbyte",
+            "raw": "10.53"
+          },
+          "dram__bytes_op_write.max": {
+            "name": "dram__bytes_op_write.max",
+            "value": 10.54,
+            "unit": "Mbyte",
+            "raw": "10.54"
+          },
+          "dram__bytes_op_write.min": {
+            "name": "dram__bytes_op_write.min",
+            "value": 10.51,
+            "unit": "Mbyte",
+            "raw": "10.51"
+          },
+          "dram__bytes_op_write.sum": {
+            "name": "dram__bytes_op_write.sum",
+            "value": 168.42,
+            "unit": "Mbyte",
+            "raw": "168.42"
+          },
+          "lts__t_sector_hit_rate.max_rate": {
+            "name": "lts__t_sector_hit_rate.max_rate",
+            "value": 1.0,
+            "unit": null,
+            "raw": "1"
+          },
+          "lts__t_sector_hit_rate.pct": {
+            "name": "lts__t_sector_hit_rate.pct",
+            "value": 93.46,
+            "unit": "%",
+            "raw": "93.46"
+          },
+          "lts__t_sector_hit_rate.ratio": {
+            "name": "lts__t_sector_hit_rate.ratio",
+            "value": 0.93,
+            "unit": null,
+            "raw": "0.93"
+          },
+          "lts__t_sectors.avg": {
+            "name": "lts__t_sectors.avg",
+            "value": 4501365.65,
+            "unit": "sector",
+            "raw": "4501365.65"
+          },
+          "lts__t_sectors.max": {
+            "name": "lts__t_sectors.max",
+            "value": 4510311.0,
+            "unit": "sector",
+            "raw": "4510311"
+          },
+          "lts__t_sectors.min": {
+            "name": "lts__t_sectors.min",
+            "value": 4492699.0,
+            "unit": "sector",
+            "raw": "4492699"
+          },
+          "lts__t_sectors.sum": {
+            "name": "lts__t_sectors.sum",
+            "value": 216065551.0,
+            "unit": "sector",
+            "raw": "216065551"
+          },
+          "sm__pipe_tensor_cycles_active.avg": {
+            "name": "sm__pipe_tensor_cycles_active.avg",
+            "value": 4764852.71,
+            "unit": "cycle",
+            "raw": "4764852.71"
+          },
+          "sm__pipe_tensor_cycles_active.max": {
+            "name": "sm__pipe_tensor_cycles_active.max",
+            "value": 5167104.0,
+            "unit": "cycle",
+            "raw": "5167104"
+          },
+          "sm__pipe_tensor_cycles_active.min": {
+            "name": "sm__pipe_tensor_cycles_active.min",
+            "value": 4353024.0,
+            "unit": "cycle",
+            "raw": "4353024"
+          },
+          "sm__pipe_tensor_cycles_active.sum": {
+            "name": "sm__pipe_tensor_cycles_active.sum",
+            "value": 810024960.0,
+            "unit": "cycle",
+            "raw": "810024960"
+          },
+          "smsp__warps_issue_stalled_barrier.avg": {
+            "name": "smsp__warps_issue_stalled_barrier.avg",
+            "value": 326412.84,
+            "unit": "warp",
+            "raw": "326412.84"
+          },
+          "smsp__warps_issue_stalled_barrier.max": {
+            "name": "smsp__warps_issue_stalled_barrier.max",
+            "value": 405659.0,
+            "unit": "warp",
+            "raw": "405659"
+          },
+          "smsp__warps_issue_stalled_barrier.min": {
+            "name": "smsp__warps_issue_stalled_barrier.min",
+            "value": 259026.0,
+            "unit": "warp",
+            "raw": "259026"
+          },
+          "smsp__warps_issue_stalled_barrier.sum": {
+            "name": "smsp__warps_issue_stalled_barrier.sum",
+            "value": 221960729.0,
+            "unit": "warp",
+            "raw": "221960729"
+          },
+          "smsp__warps_issue_stalled_long_scoreboard.avg": {
+            "name": "smsp__warps_issue_stalled_long_scoreboard.avg",
+            "value": 1039196.58,
+            "unit": "warp",
+            "raw": "1039196.58"
+          },
+          "smsp__warps_issue_stalled_long_scoreboard.max": {
+            "name": "smsp__warps_issue_stalled_long_scoreboard.max",
+            "value": 1633761.0,
+            "unit": "warp",
+            "raw": "1633761"
+          },
+          "smsp__warps_issue_stalled_long_scoreboard.min": {
+            "name": "smsp__warps_issue_stalled_long_scoreboard.min",
+            "value": 843261.0,
+            "unit": "warp",
+            "raw": "843261"
+          },
+          "smsp__warps_issue_stalled_long_scoreboard.sum": {
+            "name": "smsp__warps_issue_stalled_long_scoreboard.sum",
+            "value": 706653677.0,
+            "unit": "warp",
+            "raw": "706653677"
+          },
+          "sm__throughput.avg.pct_of_peak_sustained_elapsed": {
+            "name": "sm__throughput.avg.pct_of_peak_sustained_elapsed",
+            "value": 22.4,
+            "unit": "%",
+            "raw": "22.40"
+          },
+          "sm__warps_active.avg.pct_of_peak_sustained_active": {
+            "name": "sm__warps_active.avg.pct_of_peak_sustained_active",
+            "value": 8.33,
+            "unit": "%",
+            "raw": "8.33"
+          }
+        },
+        "dram_read_bytes": 252.12,
+        "dram_write_bytes": 168.42,
+        "dram_throughput": 1.22,
+        "l2_traffic": 216065551.0,
+        "l2_hit_rate": 1.0,
+        "sm_throughput": 22.4,
+        "tensor_activity": 810024960.0,
+        "achieved_occupancy": 8.33,
+        "stalls": {
+          "long_scoreboard": {
+            "name": "smsp__warps_issue_stalled_long_scoreboard.avg",
+            "value": 1039196.58,
+            "unit": "warp",
+            "normalized": "warp",
+            "proof_limit": "do_not_sum_stall_percentages"
+          },
+          "barrier": {
+            "name": "smsp__warps_issue_stalled_barrier.avg",
+            "value": 326412.84,
+            "unit": "warp",
+            "normalized": "warp",
+            "proof_limit": "do_not_sum_stall_percentages"
+          }
+        },
+        "registers": null,
+        "local_memory_spills": null,
+        "units": {
+          "dram_read_bytes": "Mbyte",
+          "dram_write_bytes": "Mbyte",
+          "dram_throughput": "%",
+          "l2_traffic": "sector",
+          "sm_throughput": "%",
+          "tensor_activity": "cycle",
+          "achieved_occupancy": "%"
+        },
+        "missing_reasons": {
+          "registers": "metric_absent_from_capture",
+          "local_memory_spills": "metric_absent_from_capture"
+        },
+        "error": null,
+        "zero_filled": false,
+        "full_ncu_sweep": false,
+        "identity": {
+          "ok": true,
+          "phase": "prefill",
+          "engine": "quartz",
+          "workload": "P4096",
+          "kernel": "void fattn_mma_pipeline_kernel<16, 0, 1, 32, 2, 2, 1, 2, 1, 1, 0>(AttentionConfig, unsigned long, unsigned long, const float *, const float *, const float *, const __nv_bfloat16 *, const __nv_bfloat16 *, const __nv_bfloat16 *, const __nv_bfloat16 *, float *, float *, float *, float *, const __half *, unsigned long)",
+          "expected_kernel": "fattn_mma_pipeline_opt111_base",
+          "replay_family": "prompt-attention",
+          "replay_boundary": {
+            "ok": true,
+            "cache_mode": "rotating",
+            "production_weights": true,
+            "synthetic_weights": false,
+            "phase": "prefill",
+            "replay_family": "prompt-attention",
+            "reason": null
+          },
+          "mismatches": [],
+          "reason": null
+        },
+        "admission": {
+          "ok": false,
+          "supported_mechanism": null,
+          "candidate": null,
+          "reason": "throughput_alone_cannot_establish_mechanism",
+          "identity": {
+            "ok": true,
+            "phase": "prefill",
+            "engine": "quartz",
+            "workload": "P4096",
+            "kernel": "void fattn_mma_pipeline_kernel<16, 0, 1, 32, 2, 2, 1, 2, 1, 1, 0>(AttentionConfig, unsigned long, unsigned long, const float *, const float *, const float *, const __nv_bfloat16 *, const __nv_bfloat16 *, const __nv_bfloat16 *, const __nv_bfloat16 *, float *, float *, float *, float *, const __half *, unsigned long)",
+            "expected_kernel": "fattn_mma_pipeline_opt111_base",
+            "replay_family": "prompt-attention",
+            "replay_boundary": {
+              "ok": true,
+              "cache_mode": "rotating",
+              "production_weights": true,
+              "synthetic_weights": false,
+              "phase": "prefill",
+              "replay_family": "prompt-attention",
+              "reason": null
+            },
+            "mismatches": [],
+            "reason": null
+          }
+        },
+        "supported_mechanism": null,
+        "candidate": null,
+        "stdout_tail": "\":0,\"prepared_q\":false,\"vec_kv\":false,\"keep\":false,\"capture_key\":\"698a857387d5b5779f4921723f6592d72b248b3b4fd74f55d0c3116909cfcd11\"}\nQW38_OPT095_NATIVE_COUNTS={\"schema_version\":1,\"task\":\"OPT-095\",\"family\":\"prompt-attention\",\"tier\":\"acceptance\",\"warmups\":1,\"samples\":3,\"observed_warmups\":1,\"observed_samples\":3,\"observed_candidates\":1,\"observed_shapes\":1,\"observed_tier\":\"acceptance\",\"pairs\":3,\"sample_ids\":[0,1,2],\"acceptance_executed\":true,\"decode_attention_gqa\":\"installed\",\"effective_decode_attention_gqa\":\"warp_query\",\"launch\":\"\",\"prep_grid\":0,\"prep_block\":0,\"gqa_block_y\":0,\"n_parts\":0,\"prep_launches\":0,\"keep\":false,\"capture_key\":\"698a857387d5b5779f4921723f6592d72b248b3b4fd74f55d0c3116909cfcd11\"}\nQW38_OPT103_NATIVE_COUNTS={\"schema_version\":1,\"task\":\"OPT-103\",\"family\":\"prompt-attention\",\"tier\":\"acceptance\",\"warmups\":1,\"samples\":3,\"observed_warmups\":1,\"observed_samples\":3,\"observed_candidates\":1,\"observed_shapes\":1,\"observed_tier\":\"acceptance\",\"pairs\":3,\"sample_ids\":[0,1,2],\"acceptance_executed\":true,\"decode_attention_vec128\":\"installed\",\"effective_decode_attention_vec128\":\"warp_query\",\"launch\":\"\",\"prep_grid\":0,\"prep_block\":0,\"block_y\":0,\"n_parts\":0,\"prep_launches\":0,\"keep\":false,\"capture_key\":\"698a857387d5b5779f4921723f6592d72b248b3b4fd74f55d0c3116909cfcd11\"}\n==PROF== Disconnected from process 276\n==PROF== Creating report from application replay data: 0%............100%\n==PROF== Report: /workspace/evidence/optimization/opt140-prefill-attention-replay/raw/p4096-attn_core.ncu-rep\n",
+        "proof_limit": "typed slots come from the identified target launch only; throughput alone is not a mechanism; occupancy-only is not a bandwidth claim",
+        "ncu_report": "evidence/optimization/opt140-prefill-attention-replay/raw/p4096-attn_core.ncu-rep",
+        "returncode": 0,
+        "reused": true,
+        "complete_family_replay": true,
+        "counter_kernel_is_complete_family": false,
+        "stderr_tail": ""
+      }
+    ],
+    "ncu": {
+      "ncu_available": true,
+      "permission_denied": false,
+      "queried": true,
+      "full_ncu_sweep": false,
+      "selected_metrics": [
+        "dram__bytes_op_read",
+        "dram__bytes_op_write",
+        "dram__bytes",
+        "dram__throughput.avg.pct_of_peak_sustained_elapsed",
+        "lts__t_sectors",
+        "lts__t_sector_hit_rate",
+        "sm__pipe_tensor_cycles_active",
+        "sm__throughput.avg.pct_of_peak_sustained_elapsed",
+        "sm__warps_active.avg.pct_of_peak_sustained_active",
+        "smsp__warps_issue_stalled_long_scoreboard",
+        "smsp__warps_issue_stalled_barrier"
+      ],
+      "raw_name_count": 3871,
+      "error": null
+    },
+    "command": [
+      "reused",
+      "evidence/optimization/opt140-prefill-attention-replay/raw/p4096-attn_core.ncu-rep"
+    ],
+    "capture_key": "698a857387d5b5779f4921723f6592d72b248b3b4fd74f55d0c3116909cfcd11",
+    "claims_throughput": false,
+    "family_plan": "task=OPT-140 mode=acceptance phase=counters loop_product=1 cases=1 candidates=1 warmups=0 samples=1 tokens=1",
+    "measured_at": "2026-09-15T00:05:41Z"
+  },
+  "answers": {
+    "matched_p4096_replay": true,
+    "decode_attention_rejected": true,
+    "existing_abs_tol": 0.002,
+    "new_quality_tolerance": false,
+    "warmup_plus_three_rotating": true,
+    "bounded_ncu": true,
+    "claims_throughput": false,
+    "candidate": null,
+    "supported_mechanism": null
+  },
+  "report_path": "evidence/optimization/opt140-prefill-attention-replay/REPORT.md",
+  "nll": "N/A",
+  "throughput_shipping_delta": "N/A",
+  "gpu_phases_blocked": false
+}

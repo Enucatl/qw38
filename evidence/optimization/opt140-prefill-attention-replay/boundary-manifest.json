@@ -1,0 +1,61 @@
+{
+  "phase": "prefill",
+  "replay_family": "prompt-attention",
+  "production_leaves": [
+    "split_attention_rows",
+    "stage_chunk",
+    "bf16_f16_convert",
+    "fattn_mma_pipeline_opt111_base",
+    "merge",
+    "epilogue",
+    "fp32_to_bf16"
+  ],
+  "excluded": [
+    "mixer_mmq",
+    "ffn_mmq",
+    "logits",
+    "commit_sync",
+    "embedding"
+  ],
+  "complete_family_replay": true,
+  "counter_kernel": "fattn_mma_pipeline_opt111_base",
+  "counter_kernel_is_complete_family": false,
+  "empty_initial_state": true,
+  "prefix_reuse": false,
+  "final_token_logits_only": true,
+  "capacity": 131072,
+  "prefill_tokens": 4096,
+  "chunk_count": 1,
+  "query_start": 0,
+  "decode_attention_substitution": false,
+  "boundary": {
+    "ok": true,
+    "cache_mode": "rotating",
+    "production_weights": true,
+    "synthetic_weights": false,
+    "phase": "prefill",
+    "replay_family": "prompt-attention",
+    "reason": null
+  },
+  "identity": {
+    "ok": true,
+    "phase": "prefill",
+    "engine": "quartz",
+    "workload": "P4096",
+    "kernel": "fattn_mma_pipeline_opt111_base",
+    "expected_kernel": "fattn_mma_pipeline_opt111_base",
+    "replay_family": "prompt-attention",
+    "replay_boundary": {
+      "ok": true,
+      "cache_mode": "rotating",
+      "production_weights": true,
+      "synthetic_weights": false,
+      "phase": "prefill",
+      "replay_family": "prompt-attention",
+      "reason": null
+    },
+    "mismatches": [],
+    "reason": null
+  },
+  "reason": null
+}

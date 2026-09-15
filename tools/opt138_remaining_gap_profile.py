@@ -71,6 +71,7 @@ CHILD_TIMEOUT_S = 300
 # OPT-138 protocol; 300s expires around replay pass 3 of ~10.
 COUNTER_TIMEOUT_BY_REPLAY: dict[str, int] = {
     "prompt-ffn": 1200,
+    "prompt-attention": 1200,
 }
 AGGREGATE_DEADLINE_S = 7200
 PARENT = "post124_plus_opt127_decode_segments8_plus_opt137_mma"
@@ -140,6 +141,18 @@ FAMILY_TO_REPLAY = {
     "q6_logits": "decode-q6",
     "residual_norm_quant": "decode-mixer",
 }
+
+
+def replay_family_for(phase: str, family: str) -> str | None:
+    """Map a ranked family onto the production-boundary replay workload."""
+    if family in {"attn_core", "attn_fused"}:
+        if phase == "prefill":
+            return "prompt-attention"
+        if phase == "decode":
+            return "decode-attention"
+    return FAMILY_TO_REPLAY.get(family)
+
+
 FAMILY_SOURCES = {
     "q4_ffn_fused": {
         "quartz": "cuda/q4k_decode_path.cuh",
@@ -1055,7 +1068,7 @@ def run_counters(run_dir: Path, mode: str) -> dict[str, Any]:
                     )
                 )
                 continue
-            replay_family = FAMILY_TO_REPLAY.get(family)
+            replay_family = replay_family_for(phase, family)
             if replay_family is None:
                 kernels.append(
                     missing_counter_record(
@@ -1065,7 +1078,7 @@ def run_counters(run_dir: Path, mode: str) -> dict[str, Any]:
                     )
                 )
                 continue
-            if phase == "prefill" and replay_family == "decode-attention":
+            if phase == "prefill" and replay_family.startswith("decode-"):
                 kernels.append(
                     {
                         **missing_counter_record(
@@ -1106,6 +1119,13 @@ def run_counters(run_dir: Path, mode: str) -> dict[str, Any]:
                 expected_kernel = opt139.launch_for_path(
                     opt139.decode_attention_vec128_path_for_position(128)
                 )
+            if family == "attn_core" and phase == "prefill":
+                expected_kernel = opt139.LAUNCH_PREFILL_ATTN
+            protocol_flag = (
+                "--opt140-protocol"
+                if replay_family == "prompt-attention"
+                else "--opt138-protocol"
+            )
             collect = [
                 *_docker_ncu(),
                 "ncu",
@@ -1121,7 +1141,7 @@ def run_counters(run_dir: Path, mode: str) -> dict[str, Any]:
                 collect.extend(
                     [
                         "--kernel-name",
-                        f"regex:{opt139.kernel_stem(expected_kernel)}",
+                        f"regex:{opt139.ncu_kernel_regex(expected_kernel)}",
                         "--launch-count",
                         "1",
                     ]
@@ -1134,7 +1154,7 @@ def run_counters(run_dir: Path, mode: str) -> dict[str, Any]:
                     replay_family,
                     "--cache-mode",
                     "rotating",
-                    "--opt138-protocol",
+                    protocol_flag,
                     "--warmups",
                     "0",
                     "--samples",
@@ -1207,7 +1227,7 @@ def run_replay(run_dir: Path, mode: str) -> dict[str, Any]:
     selected = _selected_families(families)
     rounds: list[dict[str, Any]] = []
     for phase, family in selected:
-        replay_family = FAMILY_TO_REPLAY.get(family)
+        replay_family = replay_family_for(phase, family)
         record = {
             "phase": phase,
             "family": family,
@@ -1225,6 +1245,11 @@ def run_replay(run_dir: Path, mode: str) -> dict[str, Any]:
             record["reason"] = boundary.get("reason") or "unmapped_family"
             rounds.append(record)
             continue
+        protocol_flag = (
+            "--opt140-protocol"
+            if replay_family == "prompt-attention"
+            else "--opt138-protocol"
+        )
         command = [
             f"./{REPLAY_BIN}",
             MODEL,
@@ -1232,7 +1257,7 @@ def run_replay(run_dir: Path, mode: str) -> dict[str, Any]:
             replay_family,
             "--cache-mode",
             "rotating",
-            "--opt138-protocol",
+            protocol_flag,
             "--warmups",
             "1",
             "--samples",
@@ -1242,11 +1267,14 @@ def run_replay(run_dir: Path, mode: str) -> dict[str, Any]:
         ]
         completed = opt136.with_gpu_lock(
             opt136.native_command(command, tier="acceptance"),
-            timeout_s=CHILD_TIMEOUT_S,
+            timeout_s=counter_timeout_s(replay_family),
         )
-        parsed = opt136.parse_prefixed_json(
-            completed.stdout or "", "QW38_OPT138_REPLAY_RESULT="
+        prefix = (
+            "QW38_OPT140_PREFILL_ATTENTION_REPLAY_RESULT="
+            if replay_family == "prompt-attention"
+            else "QW38_OPT138_REPLAY_RESULT="
         )
+        parsed = opt136.parse_prefixed_json(completed.stdout or "", prefix)
         record.update(
             {
                 "ok": completed.returncode == 0,
@@ -1319,7 +1347,8 @@ def _experiment_entry(
                 "engine": row.get("engine") or "quartz",
                 "workload": row.get("workload") or phase,
                 "replay_family": row.get("replay_family")
-                or FAMILY_TO_REPLAY.get(family, ""),
+                or replay_family_for(phase, family)
+                or "",
                 "kernel": row.get("target_kernel") or row.get("kernel"),
                 "expected_kernel": row.get("expected_kernel"),
                 "identity": row.get("identity"),
