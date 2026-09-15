@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "task": "OPT-144",
+  "candidate": null,
+  "authority": "pinned llama.cpp plus authenticated Quartz production prompt-attention replay",
+  "llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+  "license": "MIT",
+  "adapter_namespace": "qw38::cuda::opt144",
+  "specialization": "none — no source-grounded P4096 attn_core candidate was frozen",
+  "not_vendored": [
+    "ggml tensor/runtime",
+    "ggml graph/allocator",
+    "ggml CLI/model",
+    "current llama HEAD as release authority"
+  ],
+  "copied_organization": [],
+  "local_modifications": [
+    "no production kernel or selector change",
+    "OPT-111 opt111_base remains shipping prompt attention; not re-ported",
+    "OPT-137 MMA threshold remains 8192",
+    "OPT-143 short-decode no_opportunity parent retained",
+    "P4096 evidence is OPT-140 prompt-attention replay of fattn_mma_pipeline_opt111_base; decode NCU is not prefill evidence",
+    "OPT-140 tensor_activity is nonzero; zero tensor activity is not assumed"
+  ],
+  "evidence_sources": [
+    "evidence/optimization/opt138-remaining-gap/family-gaps.json",
+    "evidence/optimization/opt138-remaining-gap/next-experiments.json",
+    "evidence/optimization/opt140-prefill-attention-replay/boundary-manifest.json",
+    "evidence/optimization/opt140-prefill-attention-replay/counter-evidence.json",
+    "evidence/optimization/opt141-matched-llama-counters/comparisons.json",
+    "evidence/optimization/opt141-matched-llama-counters/counter-evidence.json",
+    "pins/performance_keep_policy_v2.json"
+  ]
+}

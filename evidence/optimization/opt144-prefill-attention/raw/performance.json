@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "task": "OPT-144",
+  "phase": "performance",
+  "mode": "acceptance",
+  "ok": true,
+  "skipped": true,
+  "skip_reason": "no_candidate_no_arithmetic_change",
+  "candidate": null,
+  "nll_required": false,
+  "opt058_invoked": false,
+  "candidate_nll_measured": false,
+  "candidate_nll_not_measured": false,
+  "family_plan": "task=OPT-144 mode=acceptance phase=performance loop_product=130 cases=5 candidates=2 warmups=3 samples=10 tokens=1",
+  "measured_at": "2026-09-15T01:12:17Z",
+  "pairs": [],
+  "warmups": 3,
+  "aa_pairs": 10,
+  "target": "p4096.prefill",
+  "prompt_effect": null,
+  "whole_request_effect": null,
+  "guards": [
+    "d128.decode_only",
+    "d128.complete_request",
+    "d2048.decode_only",
+    "d2048.complete_request",
+    "d8192.decode_only",
+    "d8192.complete_request",
+    "d32768.decode_only",
+    "d32768.complete_request"
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "task": "OPT-144",
+  "phase": "mechanism",
+  "mode": "acceptance",
+  "ok": true,
+  "skipped": true,
+  "supported_mechanism": null,
+  "candidate": null,
+  "admission_reason": "throughput_alone_cannot_establish_mechanism",
+  "source_observations": false,
+  "sass_observations": false,
+  "production_kernel_p4096": "fattn_mma_pipeline_opt111_base",
+  "decode_ncu_rejected_as_prefill": true,
+  "opt111_not_re_ported": true,
+  "tensor_activity_nonzero": true,
+  "opt137_mma_threshold": 8192,
+  "opt130_not_revived": true,
+  "opt143_short_decode_not_kept": true,
+  "family_plan": "task=OPT-144 mode=acceptance phase=mechanism loop_product=16 cases=2 candidates=1 warmups=0 samples=1 tokens=8",
+  "measured_at": "2026-09-15T01:12:17Z"
+}
