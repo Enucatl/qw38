@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "task": "OPT-145",
+  "phase": "report",
+  "mode": "acceptance",
+  "ok": true,
+  "verdict": "no_opportunity",
+  "production_kept": false,
+  "selected_family": "residual_norm_quant",
+  "unselected_family": "prompt_mmq",
+  "tok_s_deltas": {},
+  "candidate_measured_delta": null,
+  "shipping_delta": 0,
+  "quality_result": "nll_not_required_no_arithmetic_change",
+  "family_plan": "task=OPT-145 mode=acceptance phase=report loop_product=1 cases=1 candidates=1 warmups=0 samples=1 tokens=1",
+  "measured_at": "2026-09-15T01:24:16Z"
+}

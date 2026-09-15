@@ -1,0 +1,64 @@
+{
+  "schema_version": 1,
+  "task": "OPT-145",
+  "phase": "mechanism",
+  "mode": "acceptance",
+  "ok": true,
+  "skipped": true,
+  "supported_mechanism": null,
+  "candidate": null,
+  "selected_family": "residual_norm_quant",
+  "admission_reason": "quartz_leaf_record_missing_or_unusable",
+  "source_observations": false,
+  "sass_observations": false,
+  "resolving_measurement": {
+    "ok": true,
+    "family": "residual_norm_quant",
+    "kind": "fused_boundary_identity",
+    "quartz_kernel": "rms_norm_fp32_to_bf16_parallel",
+    "llama_kernel": "quantize_q8_1",
+    "llama_enclosing": [
+      "rms_norm_f32",
+      "l2_norm_f32",
+      "quantize_q8_1"
+    ],
+    "fusion": {
+      "ok": false,
+      "reason": "fused_boundary_mismatch",
+      "details": [
+        "llama_quantize_q8_1_vs_quartz_rms_plus_bf16_quant_fusion"
+      ],
+      "enclosing": [
+        "rms_norm_f32",
+        "quantize_q8_1"
+      ],
+      "incomparable_counters": [
+        "dram_read_bytes",
+        "dram_write_bytes",
+        "l2_traffic",
+        "dram_throughput",
+        "sm_throughput",
+        "tensor_activity",
+        "achieved_occupancy"
+      ]
+    },
+    "comparison": {
+      "comparable": false,
+      "reason": "quartz_counters_unusable",
+      "compared_slots": [],
+      "claims_throughput": false,
+      "ncu_duration_benchmark": false
+    },
+    "identity_status": "matched",
+    "decode_mixer_stalls_identify_rmsnorm": false,
+    "named_source_sass": false,
+    "proof_limit": "fused residual+rms+bf16+quant vs llama rms_norm_f32+quantize_q8_1; leaf counters incomparable; decode-mixer replay stalls are not an RMSNorm bottleneck"
+  },
+  "opt110_not_re_ported": true,
+  "opt112_deferred_fusion_not_revived": true,
+  "opt131_chain_fusion_not_revived": true,
+  "opt137_mma_threshold": 8192,
+  "opt130_not_revived": true,
+  "family_plan": "task=OPT-145 mode=acceptance phase=mechanism loop_product=16 cases=2 candidates=1 warmups=0 samples=1 tokens=8",
+  "measured_at": "2026-09-15T01:24:16Z"
+}

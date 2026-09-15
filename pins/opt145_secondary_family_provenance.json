@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "task": "OPT-145",
+  "candidate": null,
+  "authority": "pinned llama.cpp plus authenticated Quartz production residual_norm_quant / prompt_mmq family accounting",
+  "llama_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+  "license": "MIT",
+  "adapter_namespace": "qw38::cuda::opt145",
+  "specialization": "none — freeze selects at most one family; no source-grounded candidate until named source/SASS",
+  "not_vendored": [
+    "ggml tensor/runtime",
+    "ggml graph/allocator",
+    "ggml CLI/model",
+    "current llama HEAD as release authority"
+  ],
+  "copied_organization": [],
+  "local_modifications": [
+    "no production kernel or selector change until a keep",
+    "OPT-110 llama_q4k_mmvq remains shipping decode Q4; not re-ported",
+    "OPT-112 residual_norm_to_typed_q8 remains deferred_below_trigger; not revived",
+    "OPT-131 residual chain fusion remains no-opportunity; not revived",
+    "OPT-122 packed GDN remains no_material_opportunity and is out of family",
+    "OPT-137 MMA threshold remains 8192",
+    "OPT-143/144 attention no_opportunity parent retained",
+    "residual_norm_quant comparison is the fused residual+RMS+quant boundary, not decode-mixer stalls",
+    "prompt_mmq charges quant_mmq_mma_quality_kernel plus quant/staging/output; other prompt-ffn kernels are excluded"
+  ],
+  "evidence_sources": [
+    "evidence/optimization/opt138-remaining-gap/family-gaps.json",
+    "evidence/optimization/opt138-remaining-gap/next-experiments.json",
+    "evidence/optimization/opt139-counter-identity/identity.json",
+    "evidence/optimization/opt139-counter-identity/counter-evidence.json",
+    "evidence/optimization/opt141-matched-llama-counters/comparisons.json",
+    "evidence/optimization/opt141-matched-llama-counters/counter-evidence.json",
+    "evidence/optimization/opt141-matched-llama-counters/identity.json",
+    "tasks/OPT-110.md",
+    "tasks/OPT-112.md",
+    "tasks/OPT-115.md",
+    "tasks/OPT-122.md",
+    "tasks/OPT-131.md",
+    "tasks/OPT-143.md",
+    "tasks/OPT-144.md",
+    "pins/performance_keep_policy_v2.json"
+  ]
+}

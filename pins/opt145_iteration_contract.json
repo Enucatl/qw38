@@ -1,0 +1,255 @@
+{
+  "schema_version": 1,
+  "task": "OPT-145",
+  "yardstick": "secondary_family_residual_norm_quant_or_prompt_mmq",
+  "claims_throughput": true,
+  "claims_performance_improvement": true,
+  "opt074_family_admission_required": false,
+  "opt074_coverage_unadmitted_is_blocker": false,
+  "keep_policy_id": "target_guard_v2",
+  "require_candidate_nll": true,
+  "performance_admission": {
+    "enabled": true
+  },
+  "image": "qw38-cuda:13.0.2",
+  "model": "models/Qwen3.8-27B-Q4_K_M.gguf",
+  "gpu_lock": "build/optimization-runs/qw38-gpu.lock",
+  "aggregate_deadline_s": 7200,
+  "target": "tools/opt145_secondary_family.py",
+  "diagnostics_make_target": "cuda-opt145-diagnostics",
+  "selector": "selected_family_at_preflight",
+  "case_ids": [
+    "preflight",
+    "correctness",
+    "screen",
+    "quality",
+    "state-memory",
+    "performance",
+    "mechanism",
+    "report"
+  ],
+  "modes": {
+    "feedback": {
+      "target": "tools/opt145_secondary_family.py",
+      "tier_sequence": ["preflight", "correctness", "screen"],
+      "make_targets": [
+        "build/qw38-cuda-opt058-quality-baseline-test"
+      ],
+      "build_once": true,
+      "warm_repetitions": 0,
+      "aggregate_deadline_s": 7200,
+      "workloads": ["preflight", "correctness", "screen"]
+    },
+    "acceptance": {
+      "target": "tools/opt145_secondary_family.py",
+      "tier_sequence": [
+        "quality",
+        "state-memory",
+        "performance",
+        "mechanism",
+        "report"
+      ],
+      "make_targets": [
+        "build/qw38-cuda-opt058-quality-baseline-test",
+        "build/qw38-cuda-checkpoint-test",
+        "build/qw38-cuda-memory-fit-test"
+      ],
+      "warm_repetitions": 0,
+      "aggregate_deadline_s": 7200,
+      "workloads": [
+        "quality",
+        "state-memory",
+        "performance",
+        "mechanism",
+        "report"
+      ]
+    },
+    "release": {
+      "target": "tools/opt145_secondary_family.py",
+      "tier": "acceptance",
+      "make_targets": [
+        "build/qw38-cuda-opt058-quality-baseline-test"
+      ],
+      "skip_compile": false,
+      "historical_oracles": false,
+      "aggregate_deadline_s": 7200,
+      "workloads": ["quality", "state-memory"]
+    }
+  },
+  "workloads": {
+    "preflight": {
+      "target": "tools/opt145_secondary_family.py",
+      "tier": "correctness",
+      "runner": "host",
+      "kind": "eligibility_freeze_and_diagnostics",
+      "cases": 1,
+      "candidates": 1,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 1,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 0,
+      "gpu_work": true,
+      "native_targets": ["build/qw38-cuda-opt058-quality-baseline-test"],
+      "args": [
+        "uv", "run", "python", "tools/opt145_secondary_family.py",
+        "--phase", "preflight", "--mode", "{mode}", "--run-dir", "{run_dir}"
+      ]
+    },
+    "correctness": {
+      "target": "tools/opt145_secondary_family.py",
+      "tier": "correctness",
+      "runner": "host",
+      "kind": "fused_boundary_and_identity",
+      "cases": 8,
+      "candidates": 2,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 1,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 0,
+      "reference": 1,
+      "gpu_work": true,
+      "args": [
+        "uv", "run", "python", "tools/opt145_secondary_family.py",
+        "--phase", "correctness", "--mode", "{mode}", "--run-dir", "{run_dir}"
+      ]
+    },
+    "screen": {
+      "target": "tools/opt145_secondary_family.py",
+      "tier": "screen",
+      "kind": "complete_family_rotating",
+      "runner": "host",
+      "cases": 1,
+      "candidates": 2,
+      "warmups": 1,
+      "samples": 3,
+      "tokens": 1,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 0,
+      "gpu_work": true,
+      "args": [
+        "uv", "run", "python", "tools/opt145_secondary_family.py",
+        "--phase", "screen", "--mode", "{mode}", "--run-dir", "{run_dir}"
+      ]
+    },
+    "quality": {
+      "target": "build/qw38-cuda-opt058-quality-baseline-test",
+      "tier": "acceptance",
+      "runner": "host",
+      "kind": "opt058_quality_flag_candidate_nll",
+      "engines": ["quartz"],
+      "configurations": ["selected_family"],
+      "cases": 12,
+      "candidates": 1,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 1024,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 1,
+      "reference": 1,
+      "aggregate_deadline_s": 7200,
+      "args": [
+        "uv", "run", "python", "tools/opt145_secondary_family.py",
+        "--phase", "quality", "--mode", "{mode}", "--run-dir", "{run_dir}"
+      ]
+    },
+    "state-memory": {
+      "target": "build/qw38-cuda-memory-fit-test",
+      "tier": "acceptance",
+      "runner": "host",
+      "kind": "checkpoint_graph_eager_handoff_128k_fit",
+      "cases": 3,
+      "candidates": 1,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 1,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 1,
+      "aggregate_deadline_s": 7200,
+      "args": [
+        "uv", "run", "python", "tools/opt145_secondary_family.py",
+        "--phase", "state-memory", "--mode", "{mode}", "--run-dir", "{run_dir}"
+      ]
+    },
+    "performance": {
+      "target": "tools/opt145_secondary_family.py",
+      "tier": "acceptance",
+      "runner": "host",
+      "kind": "target_guard_v2_ab_ba",
+      "cases": 5,
+      "candidates": 2,
+      "warmups": 3,
+      "samples": 10,
+      "tokens": 1,
+      "output_tokens": 256,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 1,
+      "gpu_work": true,
+      "args": [
+        "uv", "run", "python", "tools/opt145_secondary_family.py",
+        "--phase", "performance", "--mode", "{mode}", "--run-dir", "{run_dir}"
+      ]
+    },
+    "mechanism": {
+      "target": "tools/opt145_secondary_family.py",
+      "tier": "acceptance",
+      "runner": "host",
+      "kind": "source_grounded_mechanism_or_no_opportunity",
+      "cases": 2,
+      "candidates": 1,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 8,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 0,
+      "gpu_work": false,
+      "args": [
+        "uv", "run", "python", "tools/opt145_secondary_family.py",
+        "--phase", "mechanism", "--mode", "{mode}", "--run-dir", "{run_dir}"
+      ]
+    },
+    "report": {
+      "target": "tools/opt145_secondary_family.py",
+      "tier": "acceptance",
+      "runner": "host",
+      "kind": "keep_or_reject_or_no_opportunity_report",
+      "cases": 1,
+      "candidates": 1,
+      "warmups": 0,
+      "samples": 1,
+      "tokens": 1,
+      "execution_modes": 1,
+      "control_candidate_pairs": 1,
+      "load_model": 0,
+      "gpu_work": false,
+      "args": [
+        "uv", "run", "python", "tools/opt145_secondary_family.py",
+        "--phase", "report", "--mode", "{mode}", "--run-dir", "{run_dir}"
+      ]
+    }
+  },
+  "proof_limit": [
+    "parent is authenticated post124 combined plus OPT-127 decode_segments8 plus kept OPT-137 MMA; OPT-143/144 attention no_opportunity",
+    "select at most one of residual_norm_quant decode or prompt_mmq prefill by largest supported excess fraction; tie-break family_name",
+    "do not rank twelve decode evals against one P4096 prompt by raw milliseconds",
+    "one candidate frozen at preflight from OPT-138/139/141 or measured no_opportunity",
+    "do not re-port OPT-110; do not revive deferred OPT-112 fusion; do not revive OPT-131 chain fusion",
+    "dense BF16 KV; shipping Q4 decode remains llama_q4k_mmvq; prompt MMQ remains fma_async_x",
+    "keep requires OPT-058 --quality harness, state/memory/checkpoint/128K, and target_guard_v2",
+    "quality is required only when a frozen candidate changes arithmetic",
+    "screen is 1 warmup plus 3 paired complete-family rounds on the selected family",
+    "3 warmups plus 10 paired AB/BA acceptance; winning decode region or P4096 is the target",
+    "paired one-sided 95% Student-t log-ratio bounds; target L>1.00; guard L>=0.98; decode p95 <=1.05x parent",
+    "aggregate_deadline_s 7200 is a ceiling, not a skip",
+    "no new quality tolerance"
+  ],
+  "report_path": "evidence/optimization/opt145-secondary-family/REPORT.md"
+}

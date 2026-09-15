@@ -1,0 +1,1186 @@
+{
+  "schema_version": 1,
+  "task": "OPT-145",
+  "phase": "preflight",
+  "mode": "acceptance",
+  "ok": true,
+  "freeze": {
+    "ok": true,
+    "verdict": "no_opportunity",
+    "no_opportunity": true,
+    "candidate": null,
+    "supported_mechanism": null,
+    "admission_reason": "quartz_leaf_record_missing_or_unusable",
+    "blockers": [],
+    "reasons": [
+      "quartz_leaf_record_missing_or_unusable",
+      "throughput_occupancy_dram_alone_cannot_freeze_candidate",
+      "fused_boundary_mismatch_quartz_rms_plus_bf16_quant",
+      "decode_mixer_stalls_cannot_identify_rmsnorm",
+      "opt112_deferred_fusion_not_revived",
+      "opt131_chain_fusion_not_revived",
+      "opt138_expected_benefit_unknown_until_mechanism",
+      "quartz_counters_unusable",
+      "opt110_not_re_ported"
+    ],
+    "selected_family": "residual_norm_quant",
+    "unselected_family": "prompt_mmq",
+    "selection": {
+      "selection_rule": "largest_supported_excess_fraction",
+      "tie_break": "family_name",
+      "ranked_raw_ms_rejected": true,
+      "selected": {
+        "family": "residual_norm_quant",
+        "phase": "decode",
+        "windows": [
+          {
+            "workload": "d128",
+            "kind": "decode",
+            "source": "middle_window",
+            "excess_ms": 7.209406666666666,
+            "one_sided_low_ms": 7.167742421139227,
+            "n": 3,
+            "window_ms": 201.599441,
+            "fraction": 0.03576104492604553,
+            "significant_positive_excess": true,
+            "note": "twelve middle-window evals, not per eval"
+          },
+          {
+            "workload": "d2048",
+            "kind": "decode",
+            "source": "middle_window",
+            "excess_ms": 6.662013999999999,
+            "one_sided_low_ms": 6.641534788738445,
+            "n": 3,
+            "window_ms": 246.21243,
+            "fraction": 0.027057992157422755,
+            "significant_positive_excess": true,
+            "note": "twelve middle-window evals, not per eval"
+          }
+        ],
+        "supported_fraction": 0.03576104492604553,
+        "supported_excess_ms": 7.209406666666666,
+        "supported_workload": "d128",
+        "supported": true,
+        "fused_members": [
+          "residual_add",
+          "rms_norm",
+          "bf16_materialize",
+          "typed_quant",
+          "downstream_projections"
+        ],
+        "quartz_kernel": "rms_norm_fp32_to_bf16_parallel",
+        "llama_enclosing": [
+          "rms_norm_f32",
+          "l2_norm_f32",
+          "quantize_q8_1"
+        ],
+        "replay_family": "decode-mixer",
+        "decode_mixer_stalls_identify_rmsnorm": false,
+        "regrouped_d128": {
+          "family": "residual_norm_quant",
+          "logical_members": [
+            "residual_norm_quant"
+          ],
+          "Quartz_ms": 24.31356,
+          "llama_ms": 17.121724,
+          "delta_ms": 7.191835999999999,
+          "kernel_ids": [],
+          "coverage_status": "matched",
+          "proof_limit": "leaf family"
+        },
+        "regrouped_d2048": {
+          "family": "residual_norm_quant",
+          "logical_members": [
+            "residual_norm_quant"
+          ],
+          "Quartz_ms": 24.410815,
+          "llama_ms": 17.751767,
+          "delta_ms": 6.6590479999999985,
+          "kernel_ids": [],
+          "coverage_status": "matched",
+          "proof_limit": "leaf family"
+        },
+        "coverage_status": "matched"
+      },
+      "unselected": {
+        "family": "prompt_mmq",
+        "phase": "prefill",
+        "windows": [
+          {
+            "workload": "p4096",
+            "kind": "prefill",
+            "source": "p4096_complete",
+            "excess_ms": 27.108745000000038,
+            "one_sided_low_ms": 25.265120375562727,
+            "n": 3,
+            "window_ms": 1347.756601,
+            "fraction": 0.02011397679661599,
+            "significant_positive_excess": true,
+            "note": "one complete P4096 prompt, not ranked against twelve decode evals by raw ms"
+          }
+        ],
+        "supported_fraction": 0.02011397679661599,
+        "supported_excess_ms": 27.108745000000038,
+        "supported_workload": "p4096",
+        "supported": true,
+        "fused_members": [
+          "quantize_mmq_q8_1",
+          "quant_mmq_mma_quality_kernel",
+          "mul_mat_q_stream_k_fixup",
+          "staging",
+          "output"
+        ],
+        "quartz_kernel": "quant_mmq_mma_quality_kernel",
+        "llama_enclosing": [
+          "quantize_mmq_q8_1",
+          "mul_mat_q_stream_k_fixup"
+        ],
+        "replay_family": "prompt-ffn",
+        "other_prompt_ffn_excluded": true,
+        "regrouped": {
+          "family": "prompt_mmq",
+          "logical_members": [
+            "prompt_mmq"
+          ],
+          "Quartz_ms": 882.436428,
+          "llama_ms": 854.171484,
+          "delta_ms": 28.264944000000014,
+          "kernel_ids": [],
+          "coverage_status": "matched",
+          "proof_limit": "leaf family"
+        },
+        "coverage_status": "matched",
+        "unselected_reason": "smaller_supported_excess_fraction"
+      },
+      "candidates": [
+        {
+          "family": "residual_norm_quant",
+          "phase": "decode",
+          "windows": [
+            {
+              "workload": "d128",
+              "kind": "decode",
+              "source": "middle_window",
+              "excess_ms": 7.209406666666666,
+              "one_sided_low_ms": 7.167742421139227,
+              "n": 3,
+              "window_ms": 201.599441,
+              "fraction": 0.03576104492604553,
+              "significant_positive_excess": true,
+              "note": "twelve middle-window evals, not per eval"
+            },
+            {
+              "workload": "d2048",
+              "kind": "decode",
+              "source": "middle_window",
+              "excess_ms": 6.662013999999999,
+              "one_sided_low_ms": 6.641534788738445,
+              "n": 3,
+              "window_ms": 246.21243,
+              "fraction": 0.027057992157422755,
+              "significant_positive_excess": true,
+              "note": "twelve middle-window evals, not per eval"
+            }
+          ],
+          "supported_fraction": 0.03576104492604553,
+          "supported_excess_ms": 7.209406666666666,
+          "supported_workload": "d128",
+          "supported": true,
+          "fused_members": [
+            "residual_add",
+            "rms_norm",
+            "bf16_materialize",
+            "typed_quant",
+            "downstream_projections"
+          ],
+          "quartz_kernel": "rms_norm_fp32_to_bf16_parallel",
+          "llama_enclosing": [
+            "rms_norm_f32",
+            "l2_norm_f32",
+            "quantize_q8_1"
+          ],
+          "replay_family": "decode-mixer",
+          "decode_mixer_stalls_identify_rmsnorm": false,
+          "regrouped_d128": {
+            "family": "residual_norm_quant",
+            "logical_members": [
+              "residual_norm_quant"
+            ],
+            "Quartz_ms": 24.31356,
+            "llama_ms": 17.121724,
+            "delta_ms": 7.191835999999999,
+            "kernel_ids": [],
+            "coverage_status": "matched",
+            "proof_limit": "leaf family"
+          },
+          "regrouped_d2048": {
+            "family": "residual_norm_quant",
+            "logical_members": [
+              "residual_norm_quant"
+            ],
+            "Quartz_ms": 24.410815,
+            "llama_ms": 17.751767,
+            "delta_ms": 6.6590479999999985,
+            "kernel_ids": [],
+            "coverage_status": "matched",
+            "proof_limit": "leaf family"
+          },
+          "coverage_status": "matched"
+        },
+        {
+          "family": "prompt_mmq",
+          "phase": "prefill",
+          "windows": [
+            {
+              "workload": "p4096",
+              "kind": "prefill",
+              "source": "p4096_complete",
+              "excess_ms": 27.108745000000038,
+              "one_sided_low_ms": 25.265120375562727,
+              "n": 3,
+              "window_ms": 1347.756601,
+              "fraction": 0.02011397679661599,
+              "significant_positive_excess": true,
+              "note": "one complete P4096 prompt, not ranked against twelve decode evals by raw ms"
+            }
+          ],
+          "supported_fraction": 0.02011397679661599,
+          "supported_excess_ms": 27.108745000000038,
+          "supported_workload": "p4096",
+          "supported": true,
+          "fused_members": [
+            "quantize_mmq_q8_1",
+            "quant_mmq_mma_quality_kernel",
+            "mul_mat_q_stream_k_fixup",
+            "staging",
+            "output"
+          ],
+          "quartz_kernel": "quant_mmq_mma_quality_kernel",
+          "llama_enclosing": [
+            "quantize_mmq_q8_1",
+            "mul_mat_q_stream_k_fixup"
+          ],
+          "replay_family": "prompt-ffn",
+          "other_prompt_ffn_excluded": true,
+          "regrouped": {
+            "family": "prompt_mmq",
+            "logical_members": [
+              "prompt_mmq"
+            ],
+            "Quartz_ms": 882.436428,
+            "llama_ms": 854.171484,
+            "delta_ms": 28.264944000000014,
+            "kernel_ids": [],
+            "coverage_status": "matched",
+            "proof_limit": "leaf family"
+          },
+          "coverage_status": "matched"
+        }
+      ]
+    },
+    "selected": {
+      "family": "residual_norm_quant",
+      "phase": "decode",
+      "windows": [
+        {
+          "workload": "d128",
+          "kind": "decode",
+          "source": "middle_window",
+          "excess_ms": 7.209406666666666,
+          "one_sided_low_ms": 7.167742421139227,
+          "n": 3,
+          "window_ms": 201.599441,
+          "fraction": 0.03576104492604553,
+          "significant_positive_excess": true,
+          "note": "twelve middle-window evals, not per eval"
+        },
+        {
+          "workload": "d2048",
+          "kind": "decode",
+          "source": "middle_window",
+          "excess_ms": 6.662013999999999,
+          "one_sided_low_ms": 6.641534788738445,
+          "n": 3,
+          "window_ms": 246.21243,
+          "fraction": 0.027057992157422755,
+          "significant_positive_excess": true,
+          "note": "twelve middle-window evals, not per eval"
+        }
+      ],
+      "supported_fraction": 0.03576104492604553,
+      "supported_excess_ms": 7.209406666666666,
+      "supported_workload": "d128",
+      "supported": true,
+      "fused_members": [
+        "residual_add",
+        "rms_norm",
+        "bf16_materialize",
+        "typed_quant",
+        "downstream_projections"
+      ],
+      "quartz_kernel": "rms_norm_fp32_to_bf16_parallel",
+      "llama_enclosing": [
+        "rms_norm_f32",
+        "l2_norm_f32",
+        "quantize_q8_1"
+      ],
+      "replay_family": "decode-mixer",
+      "decode_mixer_stalls_identify_rmsnorm": false,
+      "regrouped_d128": {
+        "family": "residual_norm_quant",
+        "logical_members": [
+          "residual_norm_quant"
+        ],
+        "Quartz_ms": 24.31356,
+        "llama_ms": 17.121724,
+        "delta_ms": 7.191835999999999,
+        "kernel_ids": [],
+        "coverage_status": "matched",
+        "proof_limit": "leaf family"
+      },
+      "regrouped_d2048": {
+        "family": "residual_norm_quant",
+        "logical_members": [
+          "residual_norm_quant"
+        ],
+        "Quartz_ms": 24.410815,
+        "llama_ms": 17.751767,
+        "delta_ms": 6.6590479999999985,
+        "kernel_ids": [],
+        "coverage_status": "matched",
+        "proof_limit": "leaf family"
+      },
+      "coverage_status": "matched"
+    },
+    "unselected": {
+      "family": "prompt_mmq",
+      "phase": "prefill",
+      "windows": [
+        {
+          "workload": "p4096",
+          "kind": "prefill",
+          "source": "p4096_complete",
+          "excess_ms": 27.108745000000038,
+          "one_sided_low_ms": 25.265120375562727,
+          "n": 3,
+          "window_ms": 1347.756601,
+          "fraction": 0.02011397679661599,
+          "significant_positive_excess": true,
+          "note": "one complete P4096 prompt, not ranked against twelve decode evals by raw ms"
+        }
+      ],
+      "supported_fraction": 0.02011397679661599,
+      "supported_excess_ms": 27.108745000000038,
+      "supported_workload": "p4096",
+      "supported": true,
+      "fused_members": [
+        "quantize_mmq_q8_1",
+        "quant_mmq_mma_quality_kernel",
+        "mul_mat_q_stream_k_fixup",
+        "staging",
+        "output"
+      ],
+      "quartz_kernel": "quant_mmq_mma_quality_kernel",
+      "llama_enclosing": [
+        "quantize_mmq_q8_1",
+        "mul_mat_q_stream_k_fixup"
+      ],
+      "replay_family": "prompt-ffn",
+      "other_prompt_ffn_excluded": true,
+      "regrouped": {
+        "family": "prompt_mmq",
+        "logical_members": [
+          "prompt_mmq"
+        ],
+        "Quartz_ms": 882.436428,
+        "llama_ms": 854.171484,
+        "delta_ms": 28.264944000000014,
+        "kernel_ids": [],
+        "coverage_status": "matched",
+        "proof_limit": "leaf family"
+      },
+      "coverage_status": "matched",
+      "unselected_reason": "smaller_supported_excess_fraction"
+    },
+    "positive_excess": true,
+    "excess_ms": 7.209406666666666,
+    "excess_fraction": 0.03576104492604553,
+    "excess_note": "excess is a fraction of the matched whole-workload interval; twelve decode evals are not ranked against one P4096 prompt by raw ms",
+    "roles": {
+      "target_workloads": [
+        "d128"
+      ],
+      "targets": [
+        {
+          "workload": "d128",
+          "kind": "decode",
+          "primary_metric": "decode_only"
+        }
+      ],
+      "guards": [
+        {
+          "workload": "d2048",
+          "kind": "decode"
+        },
+        {
+          "workload": "d8192",
+          "kind": "decode"
+        },
+        {
+          "workload": "d32768",
+          "kind": "decode"
+        },
+        {
+          "workload": "p4096",
+          "kind": "prefill"
+        }
+      ],
+      "target_metric": "decode_only",
+      "complete_request_target_guard": true
+    },
+    "target": "d128",
+    "target_metric": "decode_only",
+    "resolving_measurement": {
+      "ok": true,
+      "family": "residual_norm_quant",
+      "kind": "fused_boundary_identity",
+      "quartz_kernel": "rms_norm_fp32_to_bf16_parallel",
+      "llama_kernel": "quantize_q8_1",
+      "llama_enclosing": [
+        "rms_norm_f32",
+        "l2_norm_f32",
+        "quantize_q8_1"
+      ],
+      "fusion": {
+        "ok": false,
+        "reason": "fused_boundary_mismatch",
+        "details": [
+          "llama_quantize_q8_1_vs_quartz_rms_plus_bf16_quant_fusion"
+        ],
+        "enclosing": [
+          "rms_norm_f32",
+          "quantize_q8_1"
+        ],
+        "incomparable_counters": [
+          "dram_read_bytes",
+          "dram_write_bytes",
+          "l2_traffic",
+          "dram_throughput",
+          "sm_throughput",
+          "tensor_activity",
+          "achieved_occupancy"
+        ]
+      },
+      "comparison": {
+        "comparable": false,
+        "reason": "quartz_counters_unusable",
+        "compared_slots": [],
+        "claims_throughput": false,
+        "ncu_duration_benchmark": false
+      },
+      "identity_status": "matched",
+      "decode_mixer_stalls_identify_rmsnorm": false,
+      "named_source_sass": false,
+      "proof_limit": "fused residual+rms+bf16+quant vs llama rms_norm_f32+quantize_q8_1; leaf counters incomparable; decode-mixer replay stalls are not an RMSNorm bottleneck"
+    },
+    "source_observations": false,
+    "sass_observations": false,
+    "comparable": false,
+    "fusion_reason": "quartz_counters_unusable",
+    "quartz_kernel": "rms_norm_fp32_to_bf16_parallel",
+    "replay_family": "decode-mixer",
+    "opt137_mma_threshold": 8192,
+    "opt137_mma_retained": true,
+    "opt130_not_revived": true,
+    "opt110_not_re_ported": true,
+    "opt112_deferred_fusion_not_revived": true,
+    "opt131_chain_fusion_not_revived": true,
+    "opt122_out_of_family": true,
+    "opt143_short_decode_not_kept": true,
+    "opt144_prefill_attention_not_kept": true,
+    "attention": {
+      "opt143_verdict": "no_opportunity",
+      "opt144_verdict": "no_opportunity",
+      "opt143_not_kept": true,
+      "opt144_not_kept": true
+    },
+    "arithmetic_changed": false,
+    "nll_required": false,
+    "refresh_reason": "production_unchanged_after_opt143_opt144_no_opportunity",
+    "evidence_paths": {
+      "family_gaps": "evidence/optimization/opt138-remaining-gap/family-gaps.json",
+      "identity": "evidence/optimization/opt141-matched-llama-counters/identity.json",
+      "counters": "evidence/optimization/opt139-counter-identity/counter-evidence.json",
+      "comparisons": "evidence/optimization/opt141-matched-llama-counters/comparisons.json"
+    }
+  },
+  "eligibility": {
+    "ok": true,
+    "verdict": "no_opportunity",
+    "no_opportunity": true,
+    "candidate": null,
+    "supported_mechanism": null,
+    "admission_reason": "quartz_leaf_record_missing_or_unusable",
+    "blockers": [],
+    "reasons": [
+      "quartz_leaf_record_missing_or_unusable",
+      "throughput_occupancy_dram_alone_cannot_freeze_candidate",
+      "fused_boundary_mismatch_quartz_rms_plus_bf16_quant",
+      "decode_mixer_stalls_cannot_identify_rmsnorm",
+      "opt112_deferred_fusion_not_revived",
+      "opt131_chain_fusion_not_revived",
+      "opt138_expected_benefit_unknown_until_mechanism",
+      "quartz_counters_unusable",
+      "opt110_not_re_ported"
+    ],
+    "selected_family": "residual_norm_quant",
+    "unselected_family": "prompt_mmq",
+    "selection": {
+      "selection_rule": "largest_supported_excess_fraction",
+      "tie_break": "family_name",
+      "ranked_raw_ms_rejected": true,
+      "selected": {
+        "family": "residual_norm_quant",
+        "phase": "decode",
+        "windows": [
+          {
+            "workload": "d128",
+            "kind": "decode",
+            "source": "middle_window",
+            "excess_ms": 7.209406666666666,
+            "one_sided_low_ms": 7.167742421139227,
+            "n": 3,
+            "window_ms": 201.599441,
+            "fraction": 0.03576104492604553,
+            "significant_positive_excess": true,
+            "note": "twelve middle-window evals, not per eval"
+          },
+          {
+            "workload": "d2048",
+            "kind": "decode",
+            "source": "middle_window",
+            "excess_ms": 6.662013999999999,
+            "one_sided_low_ms": 6.641534788738445,
+            "n": 3,
+            "window_ms": 246.21243,
+            "fraction": 0.027057992157422755,
+            "significant_positive_excess": true,
+            "note": "twelve middle-window evals, not per eval"
+          }
+        ],
+        "supported_fraction": 0.03576104492604553,
+        "supported_excess_ms": 7.209406666666666,
+        "supported_workload": "d128",
+        "supported": true,
+        "fused_members": [
+          "residual_add",
+          "rms_norm",
+          "bf16_materialize",
+          "typed_quant",
+          "downstream_projections"
+        ],
+        "quartz_kernel": "rms_norm_fp32_to_bf16_parallel",
+        "llama_enclosing": [
+          "rms_norm_f32",
+          "l2_norm_f32",
+          "quantize_q8_1"
+        ],
+        "replay_family": "decode-mixer",
+        "decode_mixer_stalls_identify_rmsnorm": false,
+        "regrouped_d128": {
+          "family": "residual_norm_quant",
+          "logical_members": [
+            "residual_norm_quant"
+          ],
+          "Quartz_ms": 24.31356,
+          "llama_ms": 17.121724,
+          "delta_ms": 7.191835999999999,
+          "kernel_ids": [],
+          "coverage_status": "matched",
+          "proof_limit": "leaf family"
+        },
+        "regrouped_d2048": {
+          "family": "residual_norm_quant",
+          "logical_members": [
+            "residual_norm_quant"
+          ],
+          "Quartz_ms": 24.410815,
+          "llama_ms": 17.751767,
+          "delta_ms": 6.6590479999999985,
+          "kernel_ids": [],
+          "coverage_status": "matched",
+          "proof_limit": "leaf family"
+        },
+        "coverage_status": "matched"
+      },
+      "unselected": {
+        "family": "prompt_mmq",
+        "phase": "prefill",
+        "windows": [
+          {
+            "workload": "p4096",
+            "kind": "prefill",
+            "source": "p4096_complete",
+            "excess_ms": 27.108745000000038,
+            "one_sided_low_ms": 25.265120375562727,
+            "n": 3,
+            "window_ms": 1347.756601,
+            "fraction": 0.02011397679661599,
+            "significant_positive_excess": true,
+            "note": "one complete P4096 prompt, not ranked against twelve decode evals by raw ms"
+          }
+        ],
+        "supported_fraction": 0.02011397679661599,
+        "supported_excess_ms": 27.108745000000038,
+        "supported_workload": "p4096",
+        "supported": true,
+        "fused_members": [
+          "quantize_mmq_q8_1",
+          "quant_mmq_mma_quality_kernel",
+          "mul_mat_q_stream_k_fixup",
+          "staging",
+          "output"
+        ],
+        "quartz_kernel": "quant_mmq_mma_quality_kernel",
+        "llama_enclosing": [
+          "quantize_mmq_q8_1",
+          "mul_mat_q_stream_k_fixup"
+        ],
+        "replay_family": "prompt-ffn",
+        "other_prompt_ffn_excluded": true,
+        "regrouped": {
+          "family": "prompt_mmq",
+          "logical_members": [
+            "prompt_mmq"
+          ],
+          "Quartz_ms": 882.436428,
+          "llama_ms": 854.171484,
+          "delta_ms": 28.264944000000014,
+          "kernel_ids": [],
+          "coverage_status": "matched",
+          "proof_limit": "leaf family"
+        },
+        "coverage_status": "matched",
+        "unselected_reason": "smaller_supported_excess_fraction"
+      },
+      "candidates": [
+        {
+          "family": "residual_norm_quant",
+          "phase": "decode",
+          "windows": [
+            {
+              "workload": "d128",
+              "kind": "decode",
+              "source": "middle_window",
+              "excess_ms": 7.209406666666666,
+              "one_sided_low_ms": 7.167742421139227,
+              "n": 3,
+              "window_ms": 201.599441,
+              "fraction": 0.03576104492604553,
+              "significant_positive_excess": true,
+              "note": "twelve middle-window evals, not per eval"
+            },
+            {
+              "workload": "d2048",
+              "kind": "decode",
+              "source": "middle_window",
+              "excess_ms": 6.662013999999999,
+              "one_sided_low_ms": 6.641534788738445,
+              "n": 3,
+              "window_ms": 246.21243,
+              "fraction": 0.027057992157422755,
+              "significant_positive_excess": true,
+              "note": "twelve middle-window evals, not per eval"
+            }
+          ],
+          "supported_fraction": 0.03576104492604553,
+          "supported_excess_ms": 7.209406666666666,
+          "supported_workload": "d128",
+          "supported": true,
+          "fused_members": [
+            "residual_add",
+            "rms_norm",
+            "bf16_materialize",
+            "typed_quant",
+            "downstream_projections"
+          ],
+          "quartz_kernel": "rms_norm_fp32_to_bf16_parallel",
+          "llama_enclosing": [
+            "rms_norm_f32",
+            "l2_norm_f32",
+            "quantize_q8_1"
+          ],
+          "replay_family": "decode-mixer",
+          "decode_mixer_stalls_identify_rmsnorm": false,
+          "regrouped_d128": {
+            "family": "residual_norm_quant",
+            "logical_members": [
+              "residual_norm_quant"
+            ],
+            "Quartz_ms": 24.31356,
+            "llama_ms": 17.121724,
+            "delta_ms": 7.191835999999999,
+            "kernel_ids": [],
+            "coverage_status": "matched",
+            "proof_limit": "leaf family"
+          },
+          "regrouped_d2048": {
+            "family": "residual_norm_quant",
+            "logical_members": [
+              "residual_norm_quant"
+            ],
+            "Quartz_ms": 24.410815,
+            "llama_ms": 17.751767,
+            "delta_ms": 6.6590479999999985,
+            "kernel_ids": [],
+            "coverage_status": "matched",
+            "proof_limit": "leaf family"
+          },
+          "coverage_status": "matched"
+        },
+        {
+          "family": "prompt_mmq",
+          "phase": "prefill",
+          "windows": [
+            {
+              "workload": "p4096",
+              "kind": "prefill",
+              "source": "p4096_complete",
+              "excess_ms": 27.108745000000038,
+              "one_sided_low_ms": 25.265120375562727,
+              "n": 3,
+              "window_ms": 1347.756601,
+              "fraction": 0.02011397679661599,
+              "significant_positive_excess": true,
+              "note": "one complete P4096 prompt, not ranked against twelve decode evals by raw ms"
+            }
+          ],
+          "supported_fraction": 0.02011397679661599,
+          "supported_excess_ms": 27.108745000000038,
+          "supported_workload": "p4096",
+          "supported": true,
+          "fused_members": [
+            "quantize_mmq_q8_1",
+            "quant_mmq_mma_quality_kernel",
+            "mul_mat_q_stream_k_fixup",
+            "staging",
+            "output"
+          ],
+          "quartz_kernel": "quant_mmq_mma_quality_kernel",
+          "llama_enclosing": [
+            "quantize_mmq_q8_1",
+            "mul_mat_q_stream_k_fixup"
+          ],
+          "replay_family": "prompt-ffn",
+          "other_prompt_ffn_excluded": true,
+          "regrouped": {
+            "family": "prompt_mmq",
+            "logical_members": [
+              "prompt_mmq"
+            ],
+            "Quartz_ms": 882.436428,
+            "llama_ms": 854.171484,
+            "delta_ms": 28.264944000000014,
+            "kernel_ids": [],
+            "coverage_status": "matched",
+            "proof_limit": "leaf family"
+          },
+          "coverage_status": "matched"
+        }
+      ]
+    },
+    "selected": {
+      "family": "residual_norm_quant",
+      "phase": "decode",
+      "windows": [
+        {
+          "workload": "d128",
+          "kind": "decode",
+          "source": "middle_window",
+          "excess_ms": 7.209406666666666,
+          "one_sided_low_ms": 7.167742421139227,
+          "n": 3,
+          "window_ms": 201.599441,
+          "fraction": 0.03576104492604553,
+          "significant_positive_excess": true,
+          "note": "twelve middle-window evals, not per eval"
+        },
+        {
+          "workload": "d2048",
+          "kind": "decode",
+          "source": "middle_window",
+          "excess_ms": 6.662013999999999,
+          "one_sided_low_ms": 6.641534788738445,
+          "n": 3,
+          "window_ms": 246.21243,
+          "fraction": 0.027057992157422755,
+          "significant_positive_excess": true,
+          "note": "twelve middle-window evals, not per eval"
+        }
+      ],
+      "supported_fraction": 0.03576104492604553,
+      "supported_excess_ms": 7.209406666666666,
+      "supported_workload": "d128",
+      "supported": true,
+      "fused_members": [
+        "residual_add",
+        "rms_norm",
+        "bf16_materialize",
+        "typed_quant",
+        "downstream_projections"
+      ],
+      "quartz_kernel": "rms_norm_fp32_to_bf16_parallel",
+      "llama_enclosing": [
+        "rms_norm_f32",
+        "l2_norm_f32",
+        "quantize_q8_1"
+      ],
+      "replay_family": "decode-mixer",
+      "decode_mixer_stalls_identify_rmsnorm": false,
+      "regrouped_d128": {
+        "family": "residual_norm_quant",
+        "logical_members": [
+          "residual_norm_quant"
+        ],
+        "Quartz_ms": 24.31356,
+        "llama_ms": 17.121724,
+        "delta_ms": 7.191835999999999,
+        "kernel_ids": [],
+        "coverage_status": "matched",
+        "proof_limit": "leaf family"
+      },
+      "regrouped_d2048": {
+        "family": "residual_norm_quant",
+        "logical_members": [
+          "residual_norm_quant"
+        ],
+        "Quartz_ms": 24.410815,
+        "llama_ms": 17.751767,
+        "delta_ms": 6.6590479999999985,
+        "kernel_ids": [],
+        "coverage_status": "matched",
+        "proof_limit": "leaf family"
+      },
+      "coverage_status": "matched"
+    },
+    "unselected": {
+      "family": "prompt_mmq",
+      "phase": "prefill",
+      "windows": [
+        {
+          "workload": "p4096",
+          "kind": "prefill",
+          "source": "p4096_complete",
+          "excess_ms": 27.108745000000038,
+          "one_sided_low_ms": 25.265120375562727,
+          "n": 3,
+          "window_ms": 1347.756601,
+          "fraction": 0.02011397679661599,
+          "significant_positive_excess": true,
+          "note": "one complete P4096 prompt, not ranked against twelve decode evals by raw ms"
+        }
+      ],
+      "supported_fraction": 0.02011397679661599,
+      "supported_excess_ms": 27.108745000000038,
+      "supported_workload": "p4096",
+      "supported": true,
+      "fused_members": [
+        "quantize_mmq_q8_1",
+        "quant_mmq_mma_quality_kernel",
+        "mul_mat_q_stream_k_fixup",
+        "staging",
+        "output"
+      ],
+      "quartz_kernel": "quant_mmq_mma_quality_kernel",
+      "llama_enclosing": [
+        "quantize_mmq_q8_1",
+        "mul_mat_q_stream_k_fixup"
+      ],
+      "replay_family": "prompt-ffn",
+      "other_prompt_ffn_excluded": true,
+      "regrouped": {
+        "family": "prompt_mmq",
+        "logical_members": [
+          "prompt_mmq"
+        ],
+        "Quartz_ms": 882.436428,
+        "llama_ms": 854.171484,
+        "delta_ms": 28.264944000000014,
+        "kernel_ids": [],
+        "coverage_status": "matched",
+        "proof_limit": "leaf family"
+      },
+      "coverage_status": "matched",
+      "unselected_reason": "smaller_supported_excess_fraction"
+    },
+    "positive_excess": true,
+    "excess_ms": 7.209406666666666,
+    "excess_fraction": 0.03576104492604553,
+    "excess_note": "excess is a fraction of the matched whole-workload interval; twelve decode evals are not ranked against one P4096 prompt by raw ms",
+    "roles": {
+      "target_workloads": [
+        "d128"
+      ],
+      "targets": [
+        {
+          "workload": "d128",
+          "kind": "decode",
+          "primary_metric": "decode_only"
+        }
+      ],
+      "guards": [
+        {
+          "workload": "d2048",
+          "kind": "decode"
+        },
+        {
+          "workload": "d8192",
+          "kind": "decode"
+        },
+        {
+          "workload": "d32768",
+          "kind": "decode"
+        },
+        {
+          "workload": "p4096",
+          "kind": "prefill"
+        }
+      ],
+      "target_metric": "decode_only",
+      "complete_request_target_guard": true
+    },
+    "target": "d128",
+    "target_metric": "decode_only",
+    "resolving_measurement": {
+      "ok": true,
+      "family": "residual_norm_quant",
+      "kind": "fused_boundary_identity",
+      "quartz_kernel": "rms_norm_fp32_to_bf16_parallel",
+      "llama_kernel": "quantize_q8_1",
+      "llama_enclosing": [
+        "rms_norm_f32",
+        "l2_norm_f32",
+        "quantize_q8_1"
+      ],
+      "fusion": {
+        "ok": false,
+        "reason": "fused_boundary_mismatch",
+        "details": [
+          "llama_quantize_q8_1_vs_quartz_rms_plus_bf16_quant_fusion"
+        ],
+        "enclosing": [
+          "rms_norm_f32",
+          "quantize_q8_1"
+        ],
+        "incomparable_counters": [
+          "dram_read_bytes",
+          "dram_write_bytes",
+          "l2_traffic",
+          "dram_throughput",
+          "sm_throughput",
+          "tensor_activity",
+          "achieved_occupancy"
+        ]
+      },
+      "comparison": {
+        "comparable": false,
+        "reason": "quartz_counters_unusable",
+        "compared_slots": [],
+        "claims_throughput": false,
+        "ncu_duration_benchmark": false
+      },
+      "identity_status": "matched",
+      "decode_mixer_stalls_identify_rmsnorm": false,
+      "named_source_sass": false,
+      "proof_limit": "fused residual+rms+bf16+quant vs llama rms_norm_f32+quantize_q8_1; leaf counters incomparable; decode-mixer replay stalls are not an RMSNorm bottleneck"
+    },
+    "source_observations": false,
+    "sass_observations": false,
+    "comparable": false,
+    "fusion_reason": "quartz_counters_unusable",
+    "quartz_kernel": "rms_norm_fp32_to_bf16_parallel",
+    "replay_family": "decode-mixer",
+    "opt137_mma_threshold": 8192,
+    "opt137_mma_retained": true,
+    "opt130_not_revived": true,
+    "opt110_not_re_ported": true,
+    "opt112_deferred_fusion_not_revived": true,
+    "opt131_chain_fusion_not_revived": true,
+    "opt122_out_of_family": true,
+    "opt143_short_decode_not_kept": true,
+    "opt144_prefill_attention_not_kept": true,
+    "attention": {
+      "opt143_verdict": "no_opportunity",
+      "opt144_verdict": "no_opportunity",
+      "opt143_not_kept": true,
+      "opt144_not_kept": true
+    },
+    "arithmetic_changed": false,
+    "nll_required": false,
+    "refresh_reason": "production_unchanged_after_opt143_opt144_no_opportunity",
+    "evidence_paths": {
+      "family_gaps": "evidence/optimization/opt138-remaining-gap/family-gaps.json",
+      "identity": "evidence/optimization/opt141-matched-llama-counters/identity.json",
+      "counters": "evidence/optimization/opt139-counter-identity/counter-evidence.json",
+      "comparisons": "evidence/optimization/opt141-matched-llama-counters/comparisons.json"
+    }
+  },
+  "gpu_available": true,
+  "gpu_blocker": "",
+  "make_returncode": 0,
+  "make_stderr_tail": "",
+  "gpu_residents": [],
+  "authenticated_post113": {
+    "ok": false,
+    "selectors": {
+      "rms_norm": "parallel_fma",
+      "q4_decode": "llama_q4k_mmvq",
+      "q8_decode": "dp4a_q8_1",
+      "q6_decode": "integer_q8_1",
+      "ffn_decode": "paired_integer",
+      "query_prepare": "hoisted",
+      "attention_pipeline": "opt111_base",
+      "gdn_preproc": "transpose",
+      "mmq_pipeline": "fma_async",
+      "ffn_prompt_pair": "off",
+      "execution_graphs": "decode_segments8",
+      "production_numerics": "strict",
+      "gdn_decode": "sequential",
+      "decode_query_prep": "warp_query",
+      "q8_decode_rows_skinny": 1,
+      "q8_decode_rows_medium": 1,
+      "q8_decode_rows_wide": 1,
+      "q8_decode_layout_warps_skinny": 4,
+      "q8_decode_layout_warps_medium": 4,
+      "q8_decode_layout_warps_wide": 4,
+      "ffn_gate_quality_i": 128,
+      "ffn_gate_prompt_tile": 128,
+      "prompt_microbatch_rows": 4096,
+      "mmq_async_x": true,
+      "nvccflags": "-O2 --fmad=false",
+      "q8_layout": "r1_w4",
+      "ffn_tiles": "i128_j128",
+      "q8_grouping": "grouped_r1_w4",
+      "q8_device_layout": "raw_gguf",
+      "q6_device_layout": "raw_gguf",
+      "mmq_double_x": false,
+      "decode_attention_vec128": "warp_query",
+      "decode_attention_crossover_threshold": 1024,
+      "decode_attention": "hybrid_crossover"
+    },
+    "expected": {
+      "rms_norm": "parallel_fma",
+      "q4_decode": "llama_q4k_mmvq",
+      "q8_decode": "dp4a_q8_1",
+      "q8_grouping": "grouped_r1_w4",
+      "q8_layout": "r1_w4",
+      "q6_decode": "integer_q8_1",
+      "ffn_decode": "paired_integer",
+      "query_prepare": "hoisted",
+      "attention_pipeline": "opt111_base",
+      "gdn_preproc": "transpose",
+      "mmq_pipeline": "fma_async",
+      "mmq_async_x": true,
+      "ffn_prompt_pair": "off",
+      "ffn_tiles": "i128_j128",
+      "prompt_microbatch_rows": 4096,
+      "execution_graphs": "ffn_only",
+      "production_numerics": "strict",
+      "nvccflags": "-O2 --fmad=false",
+      "gdn_decode": "sequential",
+      "decode_query_prep": "warp_query",
+      "decode_attention": "hybrid_crossover",
+      "decode_attention_vec128": "warp_query",
+      "decode_attention_crossover_threshold": 1024,
+      "q8_device_layout": "raw_gguf",
+      "q6_device_layout": "raw_gguf",
+      "mmq_double_x": false
+    },
+    "opt113_fixture_selected": {
+      "rms_norm": "parallel_fma",
+      "q4_decode": "llama_q4k_mmvq",
+      "q8_decode": "dp4a_q8_1",
+      "q6_decode": "integer_q8_1",
+      "ffn_decode": "paired_integer",
+      "query_prepare": "hoisted",
+      "attention_pipeline": "opt111_base",
+      "gdn_preproc": "transpose",
+      "mmq_pipeline": "fma_async",
+      "ffn_prompt_pair": "off",
+      "execution_graphs": "ffn_only",
+      "production_numerics": "strict",
+      "gdn_decode": "sequential",
+      "decode_query_prep": "warp_query",
+      "q8_decode_rows_skinny": 1,
+      "q8_decode_rows_medium": 1,
+      "q8_decode_rows_wide": 1,
+      "q8_decode_layout_warps_skinny": 4,
+      "q8_decode_layout_warps_medium": 4,
+      "q8_decode_layout_warps_wide": 4,
+      "ffn_gate_quality_i": 128,
+      "ffn_gate_prompt_tile": 128,
+      "prompt_microbatch_rows": 4096,
+      "mmq_async_x": true,
+      "nvccflags": "-O2 --fmad=false",
+      "q8_layout": "r1_w4",
+      "ffn_tiles": "i128_j128",
+      "q8_grouping": "grouped_r1_w4",
+      "q8_device_layout": "raw_gguf",
+      "q6_device_layout": "raw_gguf",
+      "mmq_double_x": false,
+      "decode_attention_vec128": "warp_query",
+      "decode_attention_crossover_threshold": 1024,
+      "decode_attention": "hybrid_crossover"
+    },
+    "mismatches": {
+      "execution_graphs": {
+        "actual": "decode_segments8",
+        "expected": "ffn_only"
+      }
+    },
+    "llama_q4k_mmvq": true,
+    "opt111_base": true,
+    "hybrid_crossover": true,
+    "sequential_gdn": true,
+    "ffn_only_graphs": false,
+    "opt113_numbers_historical_only": true
+  },
+  "authenticated_current_pins": {
+    "ok": true,
+    "execution_graphs": "decode_segments8",
+    "q4_decode": "llama_q4k_mmvq",
+    "opt137_dense_mma": true,
+    "ffn_only_prerequisite_not_used": true,
+    "mismatches": [],
+    "parent_identity": {
+      "ok": true,
+      "reason": null,
+      "mismatches": [],
+      "expected": {
+        "execution_graphs": "decode_segments8",
+        "q4_decode": "llama_q4k_mmvq",
+        "opt137_dense_mma": true
+      },
+      "observed": {
+        "execution_graphs": "decode_segments8",
+        "q4_decode": "llama_q4k_mmvq",
+        "opt137_dense_mma": true
+      }
+    }
+  },
+  "production_pins_parent": true,
+  "parent": "post124_plus_opt127_decode_segments8_plus_opt137_mma",
+  "candidate": null,
+  "selected_family": "residual_norm_quant",
+  "unselected_family": "prompt_mmq",
+  "source": "47ec159d83569480992819a3de3ed00a56781dbd",
+  "dirty": true,
+  "family_plan": "task=OPT-145 mode=acceptance phase=preflight loop_product=1 cases=1 candidates=1 warmups=0 samples=1 tokens=1",
+  "measured_at": "2026-09-15T01:24:02Z",
+  "verdict": "no_opportunity",
+  "gpu_lock": "build/optimization-runs/qw38-gpu.lock",
+  "child_timeout_s": 300.0,
+  "long_timeout_s": 1200.0,
+  "aggregate_deadline_s": 7200
+}
