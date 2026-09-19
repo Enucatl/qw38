@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Quartz and llama.cpp: inference structure",
+    "locale": "en",
+    "quality_profile": "showcase",
+    "viewBox": [1390, 685]
+  },
+  "components": [
+    {"id":"quartz-input","type":"frontend","label":"Tokens + embedding","sublabel":"BF16 lookup to FP32 residual","pos":[50,110],"size":[230,80]},
+    {"id":"quartz-mixer","type":"backend","label":"Norm + mixer","sublabel":"48 GDN / 16 attention layers","tag":"BF16 to Q8 staging","pos":[400,110],"size":[250,80]},
+    {"id":"quartz-ffn","type":"backend","label":"Residual + norm + FFN","sublabel":"Q4 llama-derived decode dots","tag":"BF16 SwiGLU boundary","pos":[770,110],"size":[260,80]},
+    {"id":"quartz-output","type":"frontend","label":"Final norm + logits","sublabel":"Q6 head / commit / sampling","pos":[1120,110],"size":[230,80]},
+    {"id":"quartz-state","type":"database","label":"Candidate state","sublabel":"Row-major FP32 GDN / BF16 KV","pos":[400,260],"size":[250,80]},
+    {"id":"llama-input","type":"frontend","label":"Tokens + embedding","sublabel":"FP32 graph activations","pos":[50,440],"size":[230,80]},
+    {"id":"llama-mixer","type":"backend","label":"Norm + mixer","sublabel":"48 GDN / 16 attention layers","tag":"FP32 to Q8 staging","pos":[400,440],"size":[250,80]},
+    {"id":"llama-ffn","type":"backend","label":"Residual + norm + FFN","sublabel":"Backend MMVQ / MMQ fusion","tag":"FP32 SwiGLU boundary","pos":[770,440],"size":[260,80]},
+    {"id":"llama-output","type":"frontend","label":"Final norm + logits","sublabel":"Selected output rows / sampling","pos":[1120,440],"size":[230,80]},
+    {"id":"llama-state","type":"database","label":"Hybrid memory","sublabel":"Transposed FP32 GDN / F16 KV*","pos":[770,570],"size":[260,70]}
+  ],
+  "boundaries": [
+    {"kind":"region","label":"Quartz: explicit scheduler; eight decode graph segments","wraps":["quartz-input","quartz-mixer","quartz-ffn","quartz-output","quartz-state"],"pad":22},
+    {"kind":"region","label":"llama.cpp: model graph; backend fusion and CUDA graph replay","wraps":["llama-input","llama-mixer","llama-ffn","llama-output","llama-state"],"pad":22}
+  ],
+  "connections": [
+    {"from":"quartz-input","to":"quartz-mixer","variant":"emphasis"},
+    {"from":"quartz-mixer","to":"quartz-ffn","variant":"emphasis"},
+    {"from":"quartz-ffn","to":"quartz-output","label":"after 64","variant":"emphasis"},
+    {"from":"quartz-mixer","to":"quartz-state","label":"update","labelDy":24},
+    {"from":"llama-input","to":"llama-mixer","variant":"emphasis"},
+    {"from":"llama-mixer","to":"llama-ffn","variant":"emphasis"},
+    {"from":"llama-ffn","to":"llama-output","label":"after 64","variant":"emphasis"},
+    {"from":"llama-mixer","to":"llama-state","label":"update"}
+  ],
+  "cards": [
+    {"dot":"cyan","title":"Shared model equations","items":["[GDN, GDN, GDN, attention] x 16; every mixer has a residual and FFN.","Prefill batches tokens; decode advances one token and persistent state."]},
+    {"dot":"amber","title":"Largest structural mismatch","items":["Quartz long-decode OPT-137 uses scalar QK and PV; its MMA score is multiplied by zero.","llama.cpp MMA attention uses matrix products for both QK and PV."]},
+    {"dot":"slate","title":"Scope and evidence","items":["Quartz 24ab9bc; llama.cpp 1945e092. Review: 2026-09-19.","*F16 KV is the llama default; dispatch depends on configuration. See companion review for sources and benchmark limits."]}
+  ]
+}

@@ -1,0 +1,40 @@
+{
+  "review_date": "2026-09-19",
+  "diagram_type": "architecture",
+  "output": "/home/user/qw38/docs/inference-pipeline-comparison.html",
+  "specification": {
+    "path": "inference-pipeline-comparison.architecture.json",
+    "sha256": "2e5e6e29c36ca8841b979538bd06dcf8829094f762e9bf4a674eae24428dbbce",
+    "bytes": 3490
+  },
+  "artifact": {
+    "path": "inference-pipeline-comparison.html",
+    "sha256": "620a41a618938c8f5314f3139091ea716e6840a1033c53e6c0bbe08033d75410",
+    "bytes": 714379
+  },
+  "validation": {
+    "profile": "showcase",
+    "checks_passed": 9,
+    "check_count": 9,
+    "composition_errors": 0,
+    "composition_warnings": 0
+  },
+  "visual_review": "passed",
+  "correction_rounds": 2,
+  "visual_correction_rounds": 0,
+  "visual_evidence": "inference-pipeline-comparison.visual-check.json",
+  "containment_viewports": ["1440x900", "1600x1000", "1920x1080", "2048x1320"],
+  "screenshots_inspected": [
+    "inference-pipeline-comparison.visual-check.1440x900.light.png",
+    "inference-pipeline-comparison.visual-check.1440x900.dark.png",
+    "inference-pipeline-comparison.visual-check.2048x1320.light.png",
+    "inference-pipeline-comparison.visual-check.2048x1320.dark.png"
+  ],
+  "scope": {
+    "quartz_revision": "24ab9bc0e9d6c76f125fd67d9786b6428e9b2989",
+    "llama_checkout_revision": "1945e092030f8668ff93382799502d01490e564d",
+    "historical_llama_benchmark_revision": "cc83d7b4824f73cfdda4dfbb47ee39804f71b328",
+    "new_gpu_benchmarks": false,
+    "inference_code_changed": false
+  }
+}
