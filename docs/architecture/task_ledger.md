@@ -291,18 +291,26 @@ persistent state.
 
 ## TASK-08 — Design the custom quantization research space
 
-**Status:** TODO
+**Status:** DONE
 
 **Depends on:** TASK-05, TASK-06, TASK-07
 
 **Produces:**
 - `docs/architecture/quantization-design-space.md`
+- `scripts/check_quantization_design_space.py`
 
 **Purpose:**
 Define tensor-specific custom quantization experiments from BF16 source evidence.
 
 **Established results:**
-- Not started.
+- `docs/architecture/quantization-design-space.md` — Phase 1 tensor-specific custom
+  quantization research space for language+MTP; four design dimensions (`bit_width`,
+  `grouping`, `scale`, `outlier_policy`); 22 candidate recipes; 16 policy families
+  with locked `family_candidates` and no winners; DERIVED metadata byte formulas and
+  MLP/unique-non-embed/embed/\(S\) illustrations; 17 quality + 9 decode-complexity
+  HYPOTHESIS risks citing TASK-05/06/07; one Mermaid flowchart; JSON fence.
+- `scripts/check_quantization_design_space.py` — stdlib checker with `--json` and
+  `--quantization-design-space` plus JSON-fence verification.
 
 **Open questions:**
 - Which bit widths, grouping, scales, and outlier policies form the Pareto frontier.
@@ -311,9 +319,9 @@ Define tensor-specific custom quantization experiments from BF16 source evidence
 - Defines possible compiled tensor representations and experiments.
 
 **Completion criteria:**
-- [ ] Cover requested design dimensions and metadata/compute implications.
-- [ ] Propose family-specific candidate policies without selecting winners.
-- [ ] Record quality and decode-complexity risks.
+- [x] Cover requested design dimensions and metadata/compute implications.
+- [x] Propose family-specific candidate policies without selecting winners.
+- [x] Record quality and decode-complexity risks.
 
 ## TASK-09 — Design the custom runtime model format
 
