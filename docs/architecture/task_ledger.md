@@ -436,29 +436,41 @@ Define hardware-independent Qwen-specific execution regions and contracts.
 
 ## TASK-12 — Determine materialization and fusion opportunities
 
-**Status:** TODO
+**Status:** DONE
 
 **Depends on:** TASK-03, TASK-04, TASK-11
 
 **Produces:**
 - `docs/architecture/materialization-and-fusion.md`
+- `scripts/check_materialization_and_fusion.py`
 
 **Purpose:**
 Classify physical-materialization need and fusion experiment opportunities.
 
 **Established results:**
-- Not started.
+- `docs/architecture/materialization-and-fusion.md` — Phase 1 hardware-independent
+  physical-need and fusion-hypothesis analysis; seven physical-need classes over 52
+  catalog IDs (partition 4/2/1/7/2/5/31); 21 important intermediates; four tradeoff
+  tactics; 22 unselected fusion hypotheses (5 fuse-internals + 10 split + 7
+  fuse-across-edge); 14 sync edges partitioned 7/5/2; DERIVED byte identities;
+  one Mermaid flowchart; JSON fence.
+- `scripts/check_materialization_and_fusion.py` — stdlib checker with `--json` and
+  `--materialization` plus JSON-fence verification.
+- Ledger open question closed: every apparent fusion remains a HYPOTHESIS after
+  working-set and synchronization-cost identities; no fusion winner selected.
 
 **Open questions:**
-- Which apparent fusions improve total behavior after working-set and synchronization costs.
+- Which fusion hypotheses TASK-13/14 schedules or TASK-17 CUDA maps improve total
+  behavior; decode/prefill schedules (TASK-13/14); layouts (TASK-15); CUDA mapping
+  (TASK-17).
 
 **Downstream impact:**
 - Constrains decode/prefill boundaries and CUDA experiments.
 
 **Completion criteria:**
-- [ ] Classify important intermediates with required justification.
-- [ ] List reuse, recomputation, local-working-set, and synchronization tradeoffs.
-- [ ] Label every fusion proposal as a hypothesis.
+- [x] Classify important intermediates with required justification.
+- [x] List reuse, recomputation, local-working-set, and synchronization tradeoffs.
+- [x] Label every fusion proposal as a hypothesis.
 
 ## TASK-13 — Derive a clean-sheet decode execution plan
 
