@@ -887,8 +887,8 @@ none
 - Quality result: not required
 - Evidence completeness: N/A (no performance-evidence checks)
 - Throughput delta: N/A — TASK-01 does not execute or time the model
-- Commit: `3bbbff1` — Establish authoritative Qwen3.8 model facts
-- Push: `origin/clean-sheet` (pending)
+- Commit: `e522a7a` — Establish authoritative Qwen3.8 model facts
+- Push: `origin/clean-sheet` (`5b8dee5..e522a7a`, success)
 - First-pass acceptance: **verified**
 - Total elapsed/tokens/cost: `telemetry_unavailable`
 - Remaining risk or recovery condition: none identified; local `.cache/` checkpoint must remain present for focused commands
