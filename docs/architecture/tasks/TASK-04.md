@@ -539,8 +539,8 @@ none
 - Quality result: not required
 - Evidence completeness: N/A
 - Throughput delta: N/A
-- Commit: Publish Qwen3.8 lifetime and state
-- Push: `origin/clean-sheet` (pending)
+- Commit: `9b67134cb8d9b558928ef2e4564d75bd42f8cc04` — Publish Qwen3.8 lifetime and state
+- Push: `origin/clean-sheet` (`eec14d4..9b67134`, success)
 - First-pass acceptance: yes
 - Total elapsed/tokens/cost: `telemetry_unavailable`
 - Remaining risk: local `.cache/` config must remain present for focused commands
