@@ -5,7 +5,7 @@
 - Primary ID: `TASK-03`
 - Coupled IDs: `none`
 - Dependencies: `TASK-02` (DONE at admission)
-- Status: `IN PROGRESS`
+- Status: `DONE`
 - Ledger acceptance: Diagram all required model regions and token-to-token state; tabulate significant logical intermediates and their consumers; state that logical values do not imply physical allocation.
 
 ## Goal and boundaries
@@ -452,7 +452,7 @@ none
 - Evidence completeness: N/A (no performance-evidence checks)
 - Throughput delta: N/A — TASK-03 does not execute or time the model
 - Commit: Publish Qwen3.8 logical dataflow graph
-- Push: `origin/clean-sheet` (pending)
+- Push: `origin/clean-sheet` (success)
 - First-pass acceptance: **verified**
 - Total elapsed/tokens/cost: `telemetry_unavailable`
 - Remaining risk or recovery condition: local `.cache/` config must remain present for focused commands
