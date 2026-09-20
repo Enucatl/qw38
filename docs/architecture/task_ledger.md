@@ -397,29 +397,42 @@ Define conceptual compiler stages from BF16 checkpoint to specialized runtime mo
 
 ## TASK-11 — Derive the specialized semantic graph
 
-**Status:** TODO
+**Status:** DONE
 
 **Depends on:** TASK-03, TASK-04, TASK-06, TASK-07
 
 **Produces:**
 - `docs/architecture/semantic-graph.md`
+- `scripts/check_semantic_graph.py`
 
 **Purpose:**
 Define hardware-independent Qwen-specific execution regions and contracts.
 
 **Established results:**
-- Not started.
+- `docs/architecture/semantic-graph.md` — Phase 1 hardware-independent semantic
+  graph for language+MTP; six DERIVED node types (`embed`, `gated_attn`,
+  `gated_delta_net`, `mlp`, `lm_head`, `mtp_mix`) with 135 complete instances;
+  per-node ops/I/O/state/internals/flexibilities; 52-ID catalog partition
+  (10/38/4); 14 sync edges; five flexibility kinds; ten unselected split
+  candidates; TASK-06/07 citations; one Mermaid flowchart; JSON fence.
+- `scripts/check_semantic_graph.py` — stdlib checker with `--json` and
+  `--semantic-graph` plus JSON-fence verification.
+- Ledger open question closed: natural boundaries, internal values, and
+  synchronization/materialization edges defined by DERIVED node cuts and declared
+  inter-node I/O (not by selecting fusion or a schedule).
 
 **Open questions:**
-- Natural boundaries, internal values, and synchronization/materialization edges.
+- Which split candidates and flexibilities TASK-12 promotes to fusion or
+  materialization winners; decode/prefill schedules (TASK-13/14); layouts
+  (TASK-15); CUDA mapping (TASK-17).
 
 **Downstream impact:**
 - Is the common contract for fusion, schedules, layouts, and CUDA alternatives.
 
 **Completion criteria:**
-- [ ] Derive node boundaries from semantic evidence rather than framework primitives.
-- [ ] Specify operations, I/O, state, internal values, and flexibilities per node.
-- [ ] Keep contracts hardware-independent.
+- [x] Derive node boundaries from semantic evidence rather than framework primitives.
+- [x] Specify operations, I/O, state, internal values, and flexibilities per node.
+- [x] Keep contracts hardware-independent.
 
 ## TASK-12 — Determine materialization and fusion opportunities
 
