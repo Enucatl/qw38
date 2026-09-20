@@ -112,30 +112,40 @@ next state.
 
 ## TASK-03 — Build the logical dataflow graph
 
-**Status:** TODO
+**Status:** DONE
 
 **Depends on:** TASK-02
 
 **Produces:**
 - `docs/architecture/dataflow.md`
+- `scripts/check_dataflow.py`
 
 **Purpose:**
 Represent the mathematical model as logical producers, consumers, fan-out, and
 state transitions.
 
 **Established results:**
-- Not started.
+- `docs/architecture/dataflow.md` — Phase 1 logical DAG for language + MTP with
+  eight Mermaid region diagrams, 52-row intermediate catalog, canonical
+  logical-≠-physical sentence, and DERIVED sharing/reuse ranking (items 1–11).
+- `scripts/check_dataflow.py` — stdlib checker for config arithmetic, `--json`
+  output, and dataflow headings, JSON fence, Mermaid node IDs, and
+  forbidden-token rules.
+- Ledger open question closed: consequential sharing/reuse ranked as graph
+  structure (`h`/`h_mid` residual stream, `h_tilde` projection fan-out, KV
+  writes, `qkv`/`C_state`, `S`, shared `E`/`W_lm`, live-across `g`/`z`, and
+  intra-equation `k_hat`).
 
 **Open questions:**
-- Which logical results have the most consequential sharing and reuse.
+- None for language logical DAG; vision encoder internals remain deferred.
 
 **Downstream impact:**
 - Constrains lifetime analysis, semantic nodes, and materialization study.
 
 **Completion criteria:**
-- [ ] Diagram all required model regions and token-to-token state.
-- [ ] Tabulate significant logical intermediates and their consumers.
-- [ ] State that logical values do not imply physical allocation.
+- [x] Diagram all required model regions and token-to-token state.
+- [x] Tabulate significant logical intermediates and their consumers.
+- [x] State that logical values do not imply physical allocation.
 
 ## TASK-04 — Analyze lifetime and persistent state
 
