@@ -615,18 +615,29 @@ Provide a model-independent CUDA resource and tradeoff reference.
 
 ## TASK-17 — Map semantic nodes into CUDA design spaces
 
-**Status:** TODO
+**Status:** DONE
 
 **Depends on:** TASK-11, TASK-13, TASK-14, TASK-15, TASK-16
 
 **Produces:**
 - `docs/architecture/cuda-design-space.md`
+- `scripts/check_cuda_design_space.py`
 
 **Purpose:**
 Describe multiple plausible CUDA ownership and reduction mappings per semantic node.
 
 **Established results:**
-- Not started.
+- `docs/architecture/cuda-design-space.md` — Phase 1 CUDA mapping experiment space;
+  six TASK-11 node types; eighteen unselected mappings (three per type); six estimate
+  dimensions; seven TASK-16 evaluation criteria with SKU-UNKNOWN symbols; nine TASK-15
+  parallel-decomposition attachments; named MMA decomposition without selected extents;
+  22 unselected fusion hypotheses; 8 mapping-risk hypotheses; one Mermaid flowchart;
+  JSON fence.
+- `scripts/check_cuda_design_space.py` — stdlib checker with `--json` and
+  `--cuda-design-space` plus JSON-fence verification.
+- Ledger open question kept unresolved: which mappings win on target hardware and
+  profiles after benchmarks (`ledger_open_question_mapping_winner_closed` false;
+  `mapping_winner_selected` false; `winner_selected_without_measurements` false).
 
 **Open questions:**
 - Which mappings win on target hardware and profiles after benchmarks.
@@ -635,9 +646,9 @@ Describe multiple plausible CUDA ownership and reduction mappings per semantic n
 - Seeds implementation experiments and performance validation.
 
 **Completion criteria:**
-- [ ] Analyze multiple mapping alternatives per semantic node.
-- [ ] Estimate work, storage, access, synchronization, occupancy, and mode suitability.
-- [ ] Select no winner without measurements.
+- [x] Analyze multiple mapping alternatives per semantic node.
+- [x] Estimate work, storage, access, synchronization, occupancy, and mode suitability.
+- [x] Select no winner without measurements.
 
 ## TASK-18 — Design quantization evaluation methodology
 
