@@ -549,18 +549,29 @@ Design an independent many-token semantic schedule.
 
 ## TASK-15 — Design physical tensor layouts from consumers
 
-**Status:** TODO
+**Status:** DONE
 
 **Depends on:** TASK-09, TASK-13, TASK-14
 
 **Produces:**
 - `docs/architecture/layout-strategy.md`
+- `scripts/check_layout_strategy.py`
 
 **Purpose:**
 Develop candidate consumer-driven layouts for weights and persistent state.
 
 **Established results:**
-- Not started.
+- `docs/architecture/layout-strategy.md` — Phase 1 hardware-independent candidate
+  layout space for weights and persistent state; seven layout objects (= TASK-09
+  access classes); six analysis dimensions; GDN / convolution / KV coverage; 14
+  unselected orderings; 9 unselected tile families; 9 unselected parallel
+  decompositions; 4 unselected conversion hypotheses; 10 unselected justification
+  hypotheses; 8 layout-risk hypotheses; one Mermaid flowchart; JSON fence.
+- `scripts/check_layout_strategy.py` — stdlib checker with `--json` and
+  `--layout-strategy` plus JSON-fence verification.
+- Ledger open question kept unresolved: which planned parallel decompositions
+  justify each candidate ordering and tile (`ledger_open_question_parallel_decomposition_closed`
+  false; `optimality_claim_absent` true).
 
 **Open questions:**
 - Which planned parallel decompositions justify each candidate ordering and tile.
@@ -569,9 +580,9 @@ Develop candidate consumer-driven layouts for weights and persistent state.
 - Supplies layout alternatives to CUDA design-space work and compiler planning.
 
 **Completion criteria:**
-- [ ] Analyze logical dimensions, consumers, access, tiling, alignment, and conversion.
-- [ ] Include GDN, convolution, and KV persistent state.
-- [ ] Avoid claims of optimality before CUDA analysis.
+- [x] Analyze logical dimensions, consumers, access, tiling, alignment, and conversion.
+- [x] Include GDN, convolution, and KV persistent state.
+- [x] Avoid claims of optimality before CUDA analysis.
 
 ## TASK-16 — Build the CUDA hardware model
 
