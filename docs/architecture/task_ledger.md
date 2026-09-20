@@ -513,18 +513,28 @@ Design the ideal semantic schedule for one-token inference independent of curren
 
 ## TASK-14 — Derive a clean-sheet prefill execution plan
 
-**Status:** TODO
+**Status:** DONE
 
 **Depends on:** TASK-06, TASK-09, TASK-11, TASK-12
 
 **Produces:**
 - `docs/architecture/prefill-plan.md`
+- `scripts/check_prefill_plan.py`
 
 **Purpose:**
 Design an independent many-token semantic schedule.
 
 **Established results:**
-- Not started.
+- `docs/architecture/prefill-plan.md` — Phase 1 hardware-independent prefill semantic
+  schedule; nine stage kinds (135 instances); layer-serial many-token order; five
+  fundamental differences versus decode; per-stage loads/state/visibility/reuse;
+  unavoidable vs stage-cut traffic identities (stage-cut 2355200 B vs forced
+  3123200 / region-cut 5847040); seven consumer sequences + 22 fusion + 5 hoist +
+  2 mode + 4 representation hypotheses unselected; one Mermaid flowchart; JSON fence.
+- `scripts/check_prefill_plan.py` — stdlib checker with `--json` and `--prefill-plan`
+  plus JSON-fence verification.
+- Ledger open question kept unresolved: decode/prefill representation tradeoffs and
+  potential need for multiple views; `decode_prefill_distinct_views_selected` false.
 
 **Open questions:**
 - Decode/prefill representation tradeoffs and potential need for multiple views.
@@ -533,9 +543,9 @@ Design an independent many-token semantic schedule.
 - Establishes prefill consumers for physical layout and CUDA mapping research.
 
 **Completion criteria:**
-- [ ] Explain fundamental matrix-matrix, reuse, tiling, state, and temporary-storage differences.
-- [ ] Compare every semantic node with decode.
-- [ ] Keep representation tradeoffs unresolved without evidence.
+- [x] Explain fundamental matrix-matrix, reuse, tiling, state, and temporary-storage differences.
+- [x] Compare every semantic node with decode.
+- [x] Keep representation tradeoffs unresolved without evidence.
 
 ## TASK-15 — Design physical tensor layouts from consumers
 
