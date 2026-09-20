@@ -1,15 +1,17 @@
 ---
 name: run-ledger-task-codex
-description: Execute the next eligible or an explicitly selected repository implementation-ledger task through fresh planning, implementation, documentation, independent verification, and authorized delivery agents using Codex subagents. Use for requests to advance implementation_ledger.md under Codex; do not use for ad hoc changes that are not tracked in the ledger.
+description: Execute the next eligible or an explicitly selected task in docs/architecture/task_ledger.md through fresh planning, implementation, documentation, independent verification, commit, and push using Codex subagents. Use for requests to advance that ledger under Codex; do not use for ad hoc changes that are not tracked in the ledger.
 ---
 
 # Run Ledger Task (Codex)
 
 Act as a lightweight coordinator for exactly one primary ledger increment. The
-repository's `plan.md` and `implementation_ledger.md` are authoritative. Keep a
-permanent dossier at `tasks/<PRIMARY-ID>.md`; read
+repository's `docs/architecture/plan.md` and `docs/architecture/task_ledger.md`
+are authoritative. Keep a permanent dossier at
+`docs/architecture/tasks/<PRIMARY-ID>.md`; read
 [the dossier template](references/task-dossier-template.md) before planning.
-Before planning or implementation, check whether `tasks/<PRIMARY-ID>.md`
+Before planning or implementation, check whether
+`docs/architecture/tasks/<PRIMARY-ID>.md`
 already exists. When it exists, read it in full and treat its resolved
 decisions, file boundaries, acceptance commands, non-goals, and run-record
 constraints as the implementation guide. Do not replace or silently weaken an
@@ -65,21 +67,21 @@ are required reading before ranking or verifying a bottleneck claim.
 Inspect the repository before mutation. Accept zero or one task ID:
 
 - With an explicit ID, use that task.
-- Without an ID, scan the `Gates and Tasks` table from top to bottom and select
-  the first `pending` task whose listed dependencies are all `done`. Ledger row
+- Without an ID, scan task entries from top to bottom and select the first
+  `TODO` task whose listed dependencies are all `DONE`. Ledger order
   order is the deterministic priority; do not infer a different priority from
   task names or perceived importance. Report the selected ID before mutation.
-- If more than one ID was supplied, or no eligible pending task exists, reject
+- If more than one ID was supplied, or no eligible TODO task exists, reject
   the run without changing files.
 
 Continue only when all of these hold:
 
-- The ID occurs exactly once in the ledger, has status `pending`, and all listed
-  dependencies have status `done`.
+- The ID occurs exactly once in the ledger, has status `TODO`, and all listed
+  dependencies have status `DONE`.
 - The worktree is clean, including untracked files.
 - The current branch has a configured upstream.
-- The task does not require an unapproved change to `plan.md`.
-- If `tasks/<ID>.md` exists, it is readable and internally consistent with the
+- The task does not require an unapproved change to `docs/architecture/plan.md`.
+- If `docs/architecture/tasks/<ID>.md` exists, it is readable and internally consistent with the
   selected ledger row; unresolved decisions or contradictory acceptance text
   are a planning stop, not an invitation to infer silently.
 - For throughput, recovery, keep/reject, or bottleneck-ranking increments,
@@ -98,9 +100,9 @@ tasks. Report the exact failed gate and the evidence inspected.
    coupled IDs, changed files, decisions made, and unresolved decisions. Apply
    the [performance evidence checklist](references/performance-evidence-checklist.md)
    when the increment ranks a bottleneck or reports a timing delta. Verify
-   that every coupled ID exists, is `pending`, has satisfied dependencies, and
+   that every coupled ID exists, is `TODO`, has satisfied dependencies, and
    represents documentation or evidence inseparable from the primary increment.
-   Then mark the primary and coupled tasks `in_progress`. Do not continue if any
+   Then mark the primary and coupled tasks `IN PROGRESS`. Do not continue if any
    implementation choice remains unresolved or the dossier is inconsistent with
    the ledger or plan.
 2. Spawn a `gpt-5.6-terra` agent at medium reasoning to implement only the
@@ -121,7 +123,7 @@ tasks. Report the exact failed gate and the evidence inspected.
    work in the dossier and does not commit.
 4. Spawn a fresh `gpt-5.6-sol` integration verifier at low reasoning. It
    independently reviews the complete diff against the dossier, ledger
-   acceptance condition, `plan.md`, and repository boundaries. It may run
+   acceptance condition, `docs/architecture/plan.md`, and repository boundaries. It may run
    formatting but makes no semantic fixes. It runs the dossier's focused and
    repository-wide gates, including `uv run ruff format .`, Ruff checks,
    required pytest selections, native builds/tests, and named CUDA or hardware
@@ -143,8 +145,8 @@ tasks. Report the exact failed gate and the evidence inspected.
    the dossier.
 5. Only after a passing verification, spawn a fresh Luna delivery agent at
    medium reasoning. It confirms scope and acceptance evidence as determined by
-   verification, changes the primary and every coupled task from `in_progress`
-   to `done`, adds the final UTC ledger entry, records the outcome in the
+   verification, changes the primary and every coupled task from `IN PROGRESS`
+   to `DONE`, adds the final UTC ledger entry, records the outcome in the
    dossier, creates one commit, and pushes the current branch to its configured
    upstream. Delivery may publish the verified verdict but must not invent or
    revise scientific conclusions; a semantic report change returns to
@@ -158,9 +160,12 @@ intent-focused body. It must not force-push, rebase, merge, amend, or
 automatically handle a non-fast-forward rejection. If push fails, stop and
 preserve the local commit.
 
-Explicit `$run-ledger-task-codex` invocation authorizes the ordinary final commit and
-push. Implicit activation does not: obtain user confirmation immediately before
-spawning the delivery agent. Neither form authorizes a `plan.md` change.
+Every successfully verified task must receive exactly one delivery commit and a
+successful push to the configured upstream before the next ledger task may
+begin. Invoking this skill, explicitly or implicitly, authorizes that ordinary
+delivery commit and push. A push failure is a delivery failure: preserve the
+local commit, report it, and do not advance the ledger. This does not authorize
+a change to `docs/architecture/plan.md`.
 
 ## Failure Loop
 
@@ -174,7 +179,7 @@ Keep retries bounded and record every attempt in the dossier:
   Terra medium repair and one fresh Sol low verification pass.
 - On any further failure, unavailable dependency, material ambiguity, or needed
   architecture change, set the primary and applicable coupled tasks to
-  `blocked`, add the reason and recovery condition to the dossier and ledger,
+  `BLOCKED`, add the reason and recovery condition to the dossier and ledger,
   and do not commit or push.
 
 When implementation discovers additional work, stop that stage. Have the

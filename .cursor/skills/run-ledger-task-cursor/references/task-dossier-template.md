@@ -21,8 +21,8 @@ evidence.
 
 - Primary ID: `<PRIMARY-ID>`
 - Coupled IDs: `<IDs or none>`
-- Dependencies: `<IDs or none; all done at admission>`
-- Status: `in_progress`
+- Dependencies: `<IDs or none; all DONE at admission>`
+- Status: `IN PROGRESS`
 - Ledger acceptance: <verbatim acceptance condition>
 
 ## Goal and boundaries
@@ -118,7 +118,7 @@ conclusions stay `unverified` until verification.
 
 ### Final outcome
 
-- Status: `done` or `blocked`
+- Status: `DONE` or `BLOCKED`
 - Acceptance evidence: <links for primary and coupled IDs>
 - Candidate measured delta: <identity-matched metric/window, or N/A with reason>
 - Shipping delta: <zero on reject/revert; N/A for diagnostics; identity-matched on keep>
