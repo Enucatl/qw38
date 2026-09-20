@@ -474,29 +474,42 @@ Classify physical-materialization need and fusion experiment opportunities.
 
 ## TASK-13 — Derive a clean-sheet decode execution plan
 
-**Status:** TODO
+**Status:** DONE
 
 **Depends on:** TASK-06, TASK-09, TASK-11, TASK-12
 
 **Produces:**
 - `docs/architecture/decode-plan.md`
+- `scripts/check_decode_plan.py`
 
 **Purpose:**
 Design the ideal semantic schedule for one-token inference independent of current engines.
 
 **Established results:**
-- Not started.
+- `docs/architecture/decode-plan.md` — Phase 1 hardware-independent decode semantic
+  schedule; nine stage kinds (135 instances); serial one-token order; per-stage
+  loads/state/visibility/reuse; unavoidable vs stage-cut traffic identities
+  (stage-cut 2355200 B vs forced 3123200 / region-cut 5847040); seven consumer
+  sequences + 22 fusion + 5 hoist hypotheses unselected; one Mermaid flowchart;
+  JSON fence.
+- `scripts/check_decode_plan.py` — stdlib checker with `--json` and `--decode-plan`
+  plus JSON-fence verification.
+- Ledger open question closed: boundary-added traffic relative to mathematical
+  minimum closed by DERIVED stage-cut identities versus TASK-06 minima;
+  unique-weight and state boundary extra 0; no fusion/packing winner selected.
 
 **Open questions:**
-- Boundary-added traffic relative to mathematical minimum traffic.
+- Which consumer sequences, fusion hypotheses, or hoist hypotheses TASK-14 prefill
+  or TASK-17 CUDA maps improve total behavior; layouts (TASK-15); CUDA mapping
+  (TASK-17).
 
 **Downstream impact:**
 - Establishes decode consumers for physical layout and CUDA mapping research.
 
 **Completion criteria:**
-- [ ] Describe loads, state reads/writes, visibility boundaries, and reuse per stage.
-- [ ] Separate unavoidable traffic from proposed-boundary traffic.
-- [ ] Identify packing and fusion hypotheses without thread geometry.
+- [x] Describe loads, state reads/writes, visibility boundaries, and reuse per stage.
+- [x] Separate unavoidable traffic from proposed-boundary traffic.
+- [x] Identify packing and fusion hypotheses without thread geometry.
 
 ## TASK-14 — Derive a clean-sheet prefill execution plan
 
