@@ -256,30 +256,38 @@ Derive decode/prefill mathematical work and irreducible data movement separately
 
 ## TASK-07 — Study numerical sensitivity from the mathematics
 
-**Status:** TODO
+**Status:** DONE
 
 **Depends on:** TASK-02, TASK-04
 
 **Produces:**
 - `docs/architecture/numerical-sensitivity.md`
+- `scripts/check_numerical_sensitivity.py`
 
 **Purpose:**
 Identify mathematical precision risks across weights, activations, reductions, and
 persistent state.
 
 **Established results:**
-- Not started.
+- `docs/architecture/numerical-sensitivity.md` — Phase 1 mathematical precision-risk
+  analysis for language+MTP; four precision roles (`param`, `activation`, `accum`,
+  `state`); seven risk mechanisms; IEEE BF16/F32 widths and config dtype facts;
+  20 sensitive ops/accumulation paths with DERIVED reduction lengths citing TASK-02
+  `(1)`–`(24)`; severities labelled HYPOTHESIS (9 high, 8 medium, 3 low); conceptual
+  BF16 \(K,V,C\) and F32 \(S\); one Mermaid flowchart; JSON fence.
+- `scripts/check_numerical_sensitivity.py` — stdlib checker with `--json` and
+  `--numerical-sensitivity` plus JSON-fence verification.
 
 **Open questions:**
-- Which qualitative risk hypotheses survive model-level validation.
+- Which qualitative risk hypotheses survive model-level validation (TASK-18).
 
 **Downstream impact:**
 - Frames quantization options, state precision experiments, and semantic contracts.
 
 **Completion criteria:**
-- [ ] Analyze requested sensitive operations and accumulation paths.
-- [ ] Distinguish all relevant precision roles.
-- [ ] Classify risk without claiming experimental proof.
+- [x] Analyze requested sensitive operations and accumulation paths.
+- [x] Distinguish all relevant precision roles.
+- [x] Classify risk without claiming experimental proof.
 
 ## TASK-08 — Design the custom quantization research space
 
