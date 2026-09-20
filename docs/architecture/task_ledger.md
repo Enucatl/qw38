@@ -652,18 +652,30 @@ Describe multiple plausible CUDA ownership and reduction mappings per semantic n
 
 ## TASK-18 — Design quantization evaluation methodology
 
-**Status:** TODO
+**Status:** DONE
 
 **Depends on:** TASK-07, TASK-08, TASK-10
 
 **Produces:**
 - `docs/architecture/quantization-validation.md`
+- `scripts/check_quantization_validation.py`
 
 **Purpose:**
 Define local diagnostics and model-level quality comparisons for quantization profiles.
 
 **Established results:**
-- Not started.
+- `docs/architecture/quantization-validation.md` — Phase 1 quantization evaluation methodology;
+  three eval layers; eight reconstruction diagnostics and six limits; five teacher-forced metrics;
+  three behavioral classes; Q4_K_M as future black-box Pareto reference not a requirement;
+  four unselected corpus classes; eight high-risk survival screens without survivors;
+  six HYPOTHESIS methodology risks; one Mermaid flowchart; JSON fence.
+- `scripts/check_quantization_validation.py` — stdlib checker with `--json` and
+  `--quantization-validation` plus JSON-fence verification.
+- Ledger open question kept unresolved: final calibration corpora, prompt suite, capability
+  benchmarks, and acceptance frontier (`calibration_corpus_selected` false;
+  `eval_corpus_selected` false; `prompt_suite_selected` false;
+  `capability_benchmark_selected` false; `acceptance_frontier_selected` false;
+  `pareto_frontier_selected` false; `hypothesis_survival_selected` false).
 
 **Open questions:**
 - Final calibration corpora, prompt suite, capability benchmarks, and acceptance frontier.
@@ -672,9 +684,9 @@ Define local diagnostics and model-level quality comparisons for quantization pr
 - Makes future quantizer selection evidence-driven rather than reconstruction-only.
 
 **Completion criteria:**
-- [ ] Define reconstruction diagnostics and their limits.
-- [ ] Define teacher-forced and behavioral comparisons.
-- [ ] Position Q4_K_M as a future black-box Pareto reference, not a requirement.
+- [x] Define reconstruction diagnostics and their limits.
+- [x] Define teacher-forced and behavioral comparisons.
+- [x] Position Q4_K_M as a future black-box Pareto reference, not a requirement.
 
 ## TASK-19 — Design the future performance methodology
 
