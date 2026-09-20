@@ -766,7 +766,7 @@ Connect completed evidence into a candidate architecture and ordered validation 
 
 ## TASK-21 — Freeze the clean-sheet baseline
 
-**Status:** TODO
+**Status:** DONE
 
 **Depends on:** TASK-20
 
@@ -777,16 +777,26 @@ Connect completed evidence into a candidate architecture and ordered validation 
 Consistency-review and freeze the self-contained Phase 1 architecture dossier.
 
 **Established results:**
-- Not started.
+- `docs/architecture/clean-sheet-review.md` — Phase 1 consistency review; eight headings;
+  21-document corpus table; 6 check families; 7 notation aliases; 0 inconsistencies
+  found/corrected; one Mermaid flowchart; 12 remaining open questions (0 closed);
+  freeze mark `FROZEN_FOR_COMPARATIVE_REVIEW` in this review only; JSON fence.
+- `scripts/check_clean_sheet_review.py` — stdlib checker with `--json` and `--review`
+  markdown verification; does not import or subprocess sibling checkers.
+- Ledger open question preserved (not closed): twelve genuine unresolved architectural
+  questions retained after consistency review (`n_remaining_open_questions_closed` 0;
+  `ledger_open_question_unknowns_preserved` true; `frozen_for_comparative_review` true
+  in review only; TASK-20 `synthesis_frozen_flag` false).
 
 **Open questions:**
-- Genuine unresolved architectural questions retained after consistency review.
+- Genuine unresolved architectural questions retained after consistency review (12 preserved
+  `oq_*` ids; freeze does not close them).
 
 **Downstream impact:**
 - Authorizes the subsequent comparative review of existing runtimes without making
   them silent design authority.
 
 **Completion criteria:**
-- [ ] Check cross-document equations, dimensions, totals, state, contracts, and proposals.
-- [ ] Correct documentation inconsistencies and preserve true unknowns.
-- [ ] Mark the reviewed design `FROZEN_FOR_COMPARATIVE_REVIEW`.
+- [x] Check cross-document equations, dimensions, totals, state, contracts, and proposals.
+- [x] Correct documentation inconsistencies and preserve true unknowns.
+- [x] Mark the reviewed design `FROZEN_FOR_COMPARATIVE_REVIEW`.
