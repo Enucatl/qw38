@@ -114,14 +114,14 @@ Vision encoder mathematics, preprocessor algorithm, and chat-template internals 
 
 ## State implications
 
-Structural naming only; forward equations and recurrence details are TASK-02.
+Structural naming only; forward equations and recurrence details are in [`model-semantics.md`](model-semantics.md) (TASK-02, unverified).
 
 ### Full attention (16 language layers + MTP self-attention)
 
 - **KV candidates:** `k_proj` / `v_proj` shapes `(1024, 5120)` = `4×256 × H` per full-attention layer and in MTP self-attention. **DERIVED**
 - **`use_cache`:** `true` — token-persistent KV cache is config-enabled. **OBSERVED**
 - **RoPE:** from `rope_parameters` and `partial_rotary_factor` 0.25; rotary dim = 0.25 × 256 = **64**. **DERIVED**; no `inv_freq` tensor in checkpoint. **OBSERVED**
-- **`mrope_section`:** `[11, 11, 10]` (sum 32). Relationship to rotary dim is **UNKNOWN** (TASK-02). **OBSERVED**
+- **`mrope_section`:** `[11, 11, 10]` (sum 32). Relationship to rotary dim is **UNKNOWN** here — specified in [`model-semantics.md`](model-semantics.md#rotary-embeddings-partial-mrope) (TASK-02, unverified). **OBSERVED**
 - Language full-attention layers have no bias tensors. **OBSERVED**
 
 ### Linear attention (48 layers)
@@ -130,13 +130,13 @@ Structural naming only; forward equations and recurrence details are TASK-02.
 - **`conv1d.weight`:** `(10240, 1, 4)` — length-`3` convolution delay along the 10240-wide qkv stream. **DERIVED**
 - **`A_log` / `dt_bias`:** shape `(48,)` = `linear_num_value_heads`. Recurrent parameters. **DERIVED**
 - **`mamba_ssm_dtype`:** `float32` — config-stated runtime SSM state dtype; all checkpoint weights are BF16. **OBSERVED**
-- Exact SSM / delta recurrence is **UNKNOWN** (TASK-02).
+- Exact SSM / delta recurrence is **UNKNOWN** here — specified in [`model-semantics.md`](model-semantics.md#linear-attention-gated-deltanet) (TASK-02, unverified).
 
 ### Output gate
 
 - **`attn_output_gate`:** `true`; **`output_gate_type`:** `swish`. **OBSERVED**
 - Doubled `q_proj` `(12288, 5120)` = `2×24×256 × H` and matching MTP `q_proj`; no dedicated gate tensor. **DERIVED** / **OBSERVED**
-- Application rule is **UNKNOWN** (TASK-02).
+- Application rule is **UNKNOWN** here — specified in [`model-semantics.md`](model-semantics.md#full-attention-gated-attention) (TASK-02, unverified).
 
 ### Embeddings
 

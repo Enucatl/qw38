@@ -76,30 +76,39 @@ BF16 tensor inventory from the authoritative checkpoint.
 
 ## TASK-02 — Derive the complete mathematical model
 
-**Status:** TODO
+**Status:** DONE
 
 **Depends on:** TASK-01
 
 **Produces:**
 - `docs/architecture/model-semantics.md`
+- `scripts/check_model_semantics.py`
 
 **Purpose:**
 Write the dimensioned forward specification from token and state to logits and
 next state.
 
 **Established results:**
-- Not started.
+- `docs/architecture/model-semantics.md` — dimensioned language + MTP forward map
+  with locked equations for embedding, RMSNorm, Gated Attention (sigmoid output
+  gate), partial interleaved mRoPE, GDN recurrence, SwiGLU MLP, persistent
+  state, primary logits, and MTP mix/block/logits; algebraic equivalents recorded.
+- `scripts/check_model_semantics.py` — stdlib checker for config arithmetic,
+  `--json` output, and semantics headings, JSON fence, and forbidden-token rules.
+- TASK-01 UNKNOWN closures: output gate on extra `q_proj` half; GDN Eq. (10)
+  recurrence with stored shape `(48,128,128)`; `mrope_section` sums to
+  `d_rot/2`, not `d_rot`.
 
 **Open questions:**
-- Exact equations and algebraic alternatives implied by the architecture.
+- None for language forward math; vision encoder internals remain deferred.
 
 **Downstream impact:**
 - Is the mathematical authority for dataflow, work, precision, and state study.
 
 **Completion criteria:**
-- [ ] Specify every required operation and recurrent transition with equations.
-- [ ] State dimensions for inputs, outputs, weights, and state.
-- [ ] Exclude kernel, graph-layout, and implementation detail.
+- [x] Specify every required operation and recurrent transition with equations.
+- [x] State dimensions for inputs, outputs, weights, and state.
+- [x] Exclude kernel, graph-layout, and implementation detail.
 
 ## TASK-03 — Build the logical dataflow graph
 
