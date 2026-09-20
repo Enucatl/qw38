@@ -690,18 +690,31 @@ Define local diagnostics and model-level quality comparisons for quantization pr
 
 ## TASK-19 — Design the future performance methodology
 
-**Status:** TODO
+**Status:** DONE
 
 **Depends on:** TASK-06, TASK-13, TASK-14, TASK-17
 
 **Produces:**
 - `docs/architecture/performance-validation.md`
+- `scripts/check_performance_validation.py`
 
 **Purpose:**
 Define decode, prefill, kernel, memory, and end-to-end performance measurements.
 
 **Established results:**
-- Not started.
+- `docs/architecture/performance-validation.md` — Phase 1 performance evaluation methodology;
+  five metric families and five metric classes; four decode / four prefill / five kernel /
+  five memory / three end-to-end metrics; fifteen identity fields, nine coverage fields,
+  and five time-accounting rules; seventeen SKU-UNKNOWN symbols with fill protocol and
+  unfilled table; eight HYPOTHESIS methodology risks; one Mermaid flowchart; JSON fence.
+- `scripts/check_performance_validation.py` — stdlib checker with `--json` and
+  `--performance-validation` plus JSON-fence verification.
+- Ledger open question kept unresolved: exact hardware, prompt matrix, and reproducibility
+  protocol (`hardware_selected` false; `prompt_matrix_selected` false;
+  `reproducibility_protocol_selected` false; `ledger_open_question_hardware_closed` false).
+- TASK-17 mapping selection remains unselected (`mapping_winner_selected` false;
+  `ledger_open_question_mapping_winner_closed` false; `benchmarks_run` false;
+  `sku_table_filled` false).
 
 **Open questions:**
 - Exact hardware, prompt matrix, and reproducibility protocol for implementation phase.
@@ -710,9 +723,9 @@ Define decode, prefill, kernel, memory, and end-to-end performance measurements.
 - Defines how architectural experiments will be evaluated fairly.
 
 **Completion criteria:**
-- [ ] Specify requested decode, prefill, and kernel metrics.
-- [ ] Require end-to-end measurement alongside microbenchmarks.
-- [ ] Do not run implementation benchmarks in this study task.
+- [x] Specify requested decode, prefill, and kernel metrics.
+- [x] Require end-to-end measurement alongside microbenchmarks.
+- [x] Do not run implementation benchmarks in this study task.
 
 ## TASK-20 — Synthesize the clean-sheet architecture
 
