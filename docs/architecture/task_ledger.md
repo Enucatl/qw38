@@ -36,31 +36,43 @@ Define the clean-sheet scope, evidence rules, study ordering, and task tracking.
 
 ## TASK-01 — Establish authoritative model facts
 
-**Status:** TODO
+**Status:** DONE
 
 **Depends on:** TASK-00
 
 **Produces:**
 - `docs/architecture/model-inventory.md`
+- `scripts/inventory_bf16_checkpoint.py`
 
 **Purpose:**
 Establish model configuration, layer ordering, state structures, and complete
 BF16 tensor inventory from the authoritative checkpoint.
 
 **Established results:**
-- Not started.
+- BF16 checkpoint at `.cache/authorities/qwen3.8-27b-transformers`: 1199 tensors,
+  18 shards, all `BF16`, 27,781,427,952 parameters, 55,562,855,904 payload bytes
+  (matches `metadata.total_size`).
+- `Qwen3_5ForConditionalGeneration` with 64 language layers (`48× linear_attention`,
+  `16× full_attention` at indices 3,7,…,63); one MTP full-attention block after
+  the stack; vision present but deferred in prose (333 tensors in totals).
+- Untied embeddings and `lm_head`; structural state implications documented
+  (KV candidates, linear-attn conv/SSM parameters, output gate via doubled
+  `q_proj`); forward math deferred to TASK-02.
+- Level-1/level-2 semantic-family inventory with machine-checkable JSON fence;
+  verified by `scripts/inventory_bf16_checkpoint.py`.
 
 **Open questions:**
-- Exact architecture-specific dimensions and checkpoint tensor totals.
+- Exact forward equations, gate application, linear-attention recurrence, and
+  `mrope_section` vs rotary-dim relationship (TASK-02).
 
 **Downstream impact:**
 - Provides dimensions, tensor names, and source totals to semantic and statistics
   work.
 
 **Completion criteria:**
-- [ ] Document observed structure and state implications.
-- [ ] Inventory tensors by semantic family with parameter and BF16 byte totals.
-- [ ] Verify totals against the checkpoint.
+- [x] Document observed structure and state implications.
+- [x] Inventory tensors by semantic family with parameter and BF16 byte totals.
+- [x] Verify totals against the checkpoint.
 
 ## TASK-02 — Derive the complete mathematical model
 
