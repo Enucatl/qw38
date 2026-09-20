@@ -471,29 +471,32 @@ Develop candidate consumer-driven layouts for weights and persistent state.
 
 ## TASK-16 — Build the CUDA hardware model
 
-**Status:** IN PROGRESS
+**Status:** DONE
 
 **Depends on:** TASK-00
 
 **Produces:**
 - `docs/architecture/cuda-hardware-model.md`
+- `scripts/check_cuda_hardware_model.py`
 
 **Purpose:**
 Provide a model-independent CUDA resource and tradeoff reference.
 
 **Established results:**
-- Not started.
+- `docs/architecture/cuda-hardware-model.md` — hardware-model document with 13 headings, 54-concept catalog, F1–F14 fusion/occupancy algebra, SKU-UNKNOWN parameterization, and JSON fence.
+- `scripts/check_cuda_hardware_model.py` — stdlib checker with `--json` and `--check` plus JSON-fence verification.
+- Ledger open question closed: sitting-GPU limits and instruction availability remain UNKNOWN until a future measured SKU table; symbols and TASK-17 evaluation criteria are supplied.
 
 **Open questions:**
-- Target-GPU-specific limits and instruction availability for future experiments.
+- Sitting-SKU numeric limits and optional capability availability (`async_copy_cap`, `mma_shapes`, `cluster_cap`) deferred to a future measured table.
 
 **Downstream impact:**
 - Supplies vocabulary and evaluation criteria for CUDA mapping alternatives.
 
 **Completion criteria:**
-- [ ] Cover requested execution, memory, resource, synchronization, and instruction concepts.
-- [ ] Explain fusion versus occupancy tradeoffs mathematically.
-- [ ] Exclude current Qwen kernel inspection.
+- [x] Cover requested execution, memory, resource, synchronization, and instruction concepts.
+- [x] Explain fusion versus occupancy tradeoffs mathematically.
+- [x] Exclude current Qwen kernel inspection.
 
 ## TASK-17 — Map semantic nodes into CUDA design spaces
 
