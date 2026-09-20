@@ -528,8 +528,8 @@ none
 - Quality result: not required
 - Evidence completeness: N/A (no performance-evidence checks)
 - Throughput delta: N/A — TASK-16 does not execute or time a model
-- Commit: Publish CUDA hardware model reference
-- Push: `origin/clean-sheet` (pending)
+- Commit: `cf7a5e9` — Publish CUDA hardware model reference
+- Push: `origin/clean-sheet` (`acfa10b..cf7a5e9`, success)
 - First-pass acceptance: yes
 - Total elapsed/tokens/cost: `telemetry_unavailable`
 - Remaining risk or recovery condition: none identified; sitting-SKU numeric limits remain UNKNOWN until a future measured table
