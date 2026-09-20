@@ -218,29 +218,41 @@ quantization research.
 
 ## TASK-06 — Derive theoretical computation and traffic lower bounds
 
-**Status:** TODO
+**Status:** DONE
 
 **Depends on:** TASK-02, TASK-03, TASK-04
 
 **Produces:**
 - `docs/architecture/work-and-traffic.md`
+- `scripts/check_work_and_traffic.py`
 
 **Purpose:**
 Derive decode/prefill mathematical work and irreducible data movement separately.
 
 **Established results:**
-- Not started.
+- `docs/architecture/work-and-traffic.md` — Phase 1 decode/prefill mathematical work
+  and irreducible traffic for language+MTP; symbolic MAC by region citing TASK-02
+  `(1)`–`(24)`; instantiated \(C_\text{complete}=27433238528\),
+  \(A_\text{complete}=208896\); decode \(W=C+AT\) and prefill
+  \(W=TC+AT(T+1)/2\) identities; weight (54.64 GiB unique language+MTP),
+  state (TASK-04 + triangular prefill KV), and activation (forced/region-cut/GEMM-IO)
+  channels; six HYPOTHESIS bottleneck labels; one Mermaid flowchart; JSON fence.
+- `scripts/check_work_and_traffic.py` — stdlib checker with `--json` and
+  `--work-traffic` plus JSON-fence verification.
+- Ledger open question closed: DERIVED region intensities \(I=1\) (MLP/`lm_head` vs
+  weights), \(0.75\) (GDN vs \(S\)), \(6\) (full-attn core vs KV); six bottleneck
+  classes labelled HYPOTHESIS versus an UNKNOWN SKU ridge.
 
 **Open questions:**
-- Region-level arithmetic intensity and resulting bottleneck hypotheses.
+- None for language+MTP work/traffic; vision encoder internals remain deferred.
 
 **Downstream impact:**
 - Grounds quantization, scheduling, semantic graph, and validation methodology.
 
 **Completion criteria:**
-- [ ] Derive symbolic and instantiated work counts.
-- [ ] Calculate unavoidable weight, state, and activation traffic.
-- [ ] Label bottleneck classifications as hypotheses.
+- [x] Derive symbolic and instantiated work counts.
+- [x] Calculate unavoidable weight, state, and activation traffic.
+- [x] Label bottleneck classifications as hypotheses.
 
 ## TASK-07 — Study numerical sensitivity from the mathematics
 
