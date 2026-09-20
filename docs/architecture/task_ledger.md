@@ -182,30 +182,39 @@ Classify value lifetimes and quantify persistent state traffic and storage.
 
 ## TASK-05 — Analyze BF16 tensor distributions
 
-**Status:** IN PROGRESS
+**Status:** DONE
 
 **Depends on:** TASK-01
 
 **Produces:**
 - `docs/architecture/bf16-tensor-analysis.md`
+- `scripts/analyze_bf16_tensors.py`
 
 **Purpose:**
 Measure family and layer-level BF16 weight distributions relevant to later
 quantization research.
 
 **Established results:**
-- Not started.
+- Full-stream MEASURED BF16 statistics over all 1199 tensors (55.56 GiB payload);
+  language+MTP in detail, vision coarse pooled totals.
+- Global: `pooled_all.absmax=25.5`, `pooled_language_mtp.absmax=19.25`,
+  `pooled_vision.absmax=25.5`; vision blocks carry the global absmax tail.
+- Layer extrema and directional row/col scale ratios documented per major family;
+  `linear_attn.dt_bias` sets language+MTP absmax; embed has the only pooled zeros.
+- `scripts/analyze_bf16_tensors.py` — stdlib checker with `--json` and
+  `--check-analysis`.
 
 **Open questions:**
-- Distribution variation, scale variation, and outlier structure by tensor family.
+- Distribution variation is **measured** by family/layer; quantization policy
+  winners remain for TASK-08 (no quality conclusions here).
 
 **Downstream impact:**
 - Supplies measured evidence for quantization and compiler-profile design.
 
 **Completion criteria:**
-- [ ] Measure requested global and directional distribution statistics.
-- [ ] Compare layers within each major family.
-- [ ] Label measurements and avoid quality conclusions without experiments.
+- [x] Measure requested global and directional distribution statistics.
+- [x] Compare layers within each major family.
+- [x] Label measurements and avoid quality conclusions without experiments.
 
 ## TASK-06 — Derive theoretical computation and traffic lower bounds
 
