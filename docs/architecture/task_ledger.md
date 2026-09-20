@@ -325,18 +325,27 @@ Define tensor-specific custom quantization experiments from BF16 source evidence
 
 ## TASK-09 — Design the custom runtime model format
 
-**Status:** TODO
+**Status:** DONE
 
 **Depends on:** TASK-03, TASK-06, TASK-08
 
 **Produces:**
 - `docs/architecture/runtime-format-design.md`
+- `scripts/check_runtime_format_design.py`
 
 **Purpose:**
 Specify requirements for a compiler-produced, consumer-oriented model artifact.
 
 **Established results:**
-- Not started.
+- `docs/architecture/runtime-format-design.md` — Phase 1 compiler-produced,
+  consumer-oriented runtime artifact requirements for language+MTP; six artifact
+  object kinds; 8 representation + 8 packing capabilities; MLP/unique-non-embed/
+  embed-gather/\(S\)/header/dual-view DERIVED illustrations; seven consumer
+  sequences without an ideal sequence; four artifact approaches compared on six
+  dimensions with no winner; eight open decisions left unselected; six HYPOTHESIS
+  format risks; one Mermaid flowchart; JSON fence.
+- `scripts/check_runtime_format_design.py` — stdlib checker with `--json` and
+  `--runtime-format-design` plus JSON-fence verification.
 
 **Open questions:**
 - Portable versus backend-specialized artifact boundaries and ideal consumer byte
@@ -346,9 +355,9 @@ Specify requirements for a compiler-produced, consumer-oriented model artifact.
 - Guides compiler planning, schedules, and physical layouts.
 
 **Completion criteria:**
-- [ ] Analyze all requested representation and packing capabilities.
-- [ ] Compare portable and backend-specific artifact approaches.
-- [ ] Keep decisions open absent compelling evidence.
+- [x] Analyze all requested representation and packing capabilities.
+- [x] Compare portable and backend-specific artifact approaches.
+- [x] Keep decisions open absent compelling evidence.
 
 ## TASK-10 — Design the offline model compiler
 
