@@ -729,7 +729,7 @@ Define decode, prefill, kernel, memory, and end-to-end performance measurements.
 
 ## TASK-20 — Synthesize the clean-sheet architecture
 
-**Status:** TODO
+**Status:** DONE
 
 **Depends on:** TASK-01 through TASK-19
 
@@ -741,18 +741,28 @@ Define decode, prefill, kernel, memory, and end-to-end performance measurements.
 Connect completed evidence into a candidate architecture and ordered validation backlog.
 
 **Established results:**
-- Not started.
+- `docs/architecture/clean-sheet-architecture.md` — Phase 1 clean-sheet synthesis; eight headings;
+  12 chain steps; 5 evidence classes; 19-task citation table; 14 alternative families
+  (125 catalogued / 0 selected); one Mermaid flowchart; 12 remaining open questions
+  (0 closed); JSON fence.
+- `docs/architecture/experiment-backlog.md` — dependency-ordered validation backlog; six headings;
+  16 topological `unrun` experiments with 12 fields each; identical JSON fence; no Mermaid.
+- `scripts/check_clean_sheet_architecture.py` — stdlib checker with `--json` and dual-path
+  markdown verification.
+- Ledger open question catalogued (not closed): candidate alternatives and unknowns remain
+  after Phase 1 analyses (`n_alternatives_selected` 0; `n_remaining_open_questions_closed` 0;
+  `frozen_for_comparative_review` false).
 
 **Open questions:**
-- Candidate alternatives and unknowns remaining after all Phase 1 analyses.
+- Candidate alternatives and unknowns remaining after all Phase 1 analyses (catalogued, not selected).
 
 **Downstream impact:**
 - Forms the documented baseline for future comparative runtime review.
 
 **Completion criteria:**
-- [ ] Synthesize the required architecture chain and evidence classes.
-- [ ] Include an architecture diagram and alternatives.
-- [ ] Create dependency-ordered experiment entries with all requested fields.
+- [x] Synthesize the required architecture chain and evidence classes.
+- [x] Include an architecture diagram and alternatives.
+- [x] Create dependency-ordered experiment entries with all requested fields.
 
 ## TASK-21 — Freeze the clean-sheet baseline
 
