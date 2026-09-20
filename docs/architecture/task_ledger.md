@@ -361,29 +361,39 @@ Specify requirements for a compiler-produced, consumer-oriented model artifact.
 
 ## TASK-10 — Design the offline model compiler
 
-**Status:** TODO
+**Status:** DONE
 
 **Depends on:** TASK-05, TASK-08, TASK-09
 
 **Produces:**
 - `docs/architecture/model-compiler-plan.md`
+- `scripts/check_model_compiler_plan.py`
 
 **Purpose:**
 Define conceptual compiler stages from BF16 checkpoint to specialized runtime model.
 
 **Established results:**
-- Not started.
+- `docs/architecture/model-compiler-plan.md` — Phase 1 conceptual offline compiler
+  pipeline for language+MTP; six stages (validation, analysis, quantization, packing,
+  metadata, integrity); seven validation checks; five analysis outputs; five
+  quantization outputs; packing/metadata/integrity stage contracts; 16 classified
+  decisions (8 locked structure + 8 unselected winners) across four ownership
+  classes; three conceptual profiles plus control emission; six HYPOTHESIS compiler
+  risks; one Mermaid flowchart; JSON fence.
+- `scripts/check_model_compiler_plan.py` — stdlib checker with `--json` and
+  `--model-compiler-plan` plus JSON-fence verification.
 
 **Open questions:**
-- Which profile decisions are architecture-, calibration-, model-, or backend-driven.
+- Pareto frontier, portable versus backend-specialized artifact boundaries, and
+  integrity algorithm value (`none` vs `checksum`).
 
 **Downstream impact:**
 - Establishes the future build pipeline and profile model.
 
 **Completion criteria:**
-- [ ] Describe validation, analysis, quantization, packing, metadata, and integrity stages.
-- [ ] Classify decision ownership.
-- [ ] Support future quality, balanced, and compression profiles conceptually.
+- [x] Describe validation, analysis, quantization, packing, metadata, and integrity stages.
+- [x] Classify decision ownership.
+- [x] Support future quality, balanced, and compression profiles conceptually.
 
 ## TASK-11 — Derive the specialized semantic graph
 
