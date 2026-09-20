@@ -800,3 +800,54 @@ Consistency-review and freeze the self-contained Phase 1 architecture dossier.
 - [x] Check cross-document equations, dimensions, totals, state, contracts, and proposals.
 - [x] Correct documentation inconsistencies and preserve true unknowns.
 - [x] Mark the reviewed design `FROZEN_FOR_COMPARATIVE_REVIEW`.
+
+## TASK-22 — Remediate Phase 1 review findings
+
+**Status:** TODO
+
+**Depends on:** TASK-21
+
+**Produces:**
+- Corrected Phase 1 architecture documents, checkers, and affected task dossiers.
+- `docs/architecture/tasks/TASK-22.md`
+
+**Purpose:**
+Resolve the evidence-backed correctness, completeness, and proof-quality findings
+from the post-freeze independent review before downstream work relies on the
+affected contracts.
+
+**Established review result:**
+- **SEVERE BLOCKER:** TASK-17 does not provide the required six estimates for
+  each of its 18 CUDA mappings. TASK-19 performance work and any implementation
+  selection must not treat the CUDA mapping space as complete until this is fixed.
+- Material findings include MTP evidence closure, GDN/state and traffic semantics,
+  two numerical-sensitivity errors, runtime-format metadata parseability, decode/
+  prefill omissions, CUDA-model formula scope, quantization measurement identity,
+  and an overstated TASK-21 freeze-verification claim.
+- Historical `unverified` banners on TASK-01–20 deliverables remain process
+  artifacts unless this task changes the underlying claim; do not mass-edit them.
+
+**Open questions:**
+- Existing architectural alternatives and experiment questions remain open; this
+  task corrects evidence and contracts but selects no implementation winner.
+
+**Downstream impact:**
+- TASK-17’s mapping-estimate gap is a severe blocker for TASK-19-driven CUDA
+  mapping comparison or implementation selection. Other findings are material but
+  do not invalidate the primary language-model facts or frozen candidate baseline.
+
+**Completion criteria:**
+- [ ] Correct all material factual and contract omissions recorded in TASK-22’s
+  dossier, including their propagated downstream references.
+- [ ] Add focused validations that fail on each corrected semantic/table/contract
+  regression, using upstream source data rather than duplicated self-consistency
+  constants where the dossier identifies an authoritative source.
+- [ ] Supply all 18 TASK-17 mapping records with the six required symbolic
+  estimates and correct the TASK-16/TASK-17 CUDA formula and synchronization
+  semantics without selecting a SKU, launch configuration, or winner.
+- [ ] Narrow TASK-21’s freeze claim to what its checker proves, or add an
+  independent semantic verifier that proves the stated cross-document contract
+  categories; preserve genuine unknowns and non-selection.
+- [ ] Re-run the required checkpoint/document validations, remove identified dead
+  declaration-only code, reconcile affected dossier control metadata, and record
+  exact review-remediation evidence.
