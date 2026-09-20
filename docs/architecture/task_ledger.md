@@ -149,7 +149,7 @@ state transitions.
 
 ## TASK-04 — Analyze lifetime and persistent state
 
-**Status:** TODO
+**Status:** DONE
 
 **Depends on:** TASK-03
 
@@ -160,22 +160,29 @@ state transitions.
 Classify value lifetimes and quantify persistent state traffic and storage.
 
 **Established results:**
-- Not started.
+- `docs/architecture/lifetime-and-state.md` — 52-ID lifetime taxonomy, persistent-state
+  storage and per-token volumes, and ranked semantic storage candidates 1–3.
+- `scripts/check_lifetime_and_state.py` — stdlib checker for config arithmetic, `--json`
+  output, and lifetime headings, JSON fence, Mermaid node IDs, and
+  forbidden-token rules.
+- Ledger open question closed: exact state sizes including MTP KV
+  (\(B_\text{store}(T)=69632T+153944064\) bytes) and mathematical boundary survivors
+  (token \(K,V,C,S\); residual-add `h`/`h_mid`; live-across `g`/`z`) — not CUDA.
 
 **Open questions:**
-- Exact state sizes and which values require materialization across boundaries.
+- None for language+MTP lifetime/state; vision encoder internals remain deferred.
 
 **Downstream impact:**
 - Informs traffic bounds, numerical risk, semantic contracts, and layouts.
 
 **Completion criteria:**
-- [ ] Classify every significant value by lifetime and recomputability.
-- [ ] Calculate persistent-state storage and per-token read/write volumes.
-- [ ] Identify semantic storage candidates without CUDA decisions.
+- [x] Classify every significant value by lifetime and recomputability.
+- [x] Calculate persistent-state storage and per-token read/write volumes.
+- [x] Identify semantic storage candidates without CUDA decisions.
 
 ## TASK-05 — Analyze BF16 tensor distributions
 
-**Status:** TODO
+**Status:** IN PROGRESS
 
 **Depends on:** TASK-01
 
@@ -464,7 +471,7 @@ Develop candidate consumer-driven layouts for weights and persistent state.
 
 ## TASK-16 — Build the CUDA hardware model
 
-**Status:** TODO
+**Status:** IN PROGRESS
 
 **Depends on:** TASK-00
 
