@@ -54,6 +54,22 @@ char const* code_name(FormatErrorCode code) noexcept {
       return "name_too_long";
     case FormatErrorCode::DuplicateId:
       return "duplicate_id";
+    case FormatErrorCode::IoFailure:
+      return "io_failure";
+    case FormatErrorCode::DuplicateSpan:
+      return "duplicate_span";
+    case FormatErrorCode::MissingSpan:
+      return "missing_span";
+    case FormatErrorCode::IncompleteSpan:
+      return "incomplete_span";
+    case FormatErrorCode::EmptySpan:
+      return "empty_span";
+    case FormatErrorCode::InconsistentInput:
+      return "inconsistent_input";
+    case FormatErrorCode::OverlappingSpan:
+      return "overlapping_span";
+    case FormatErrorCode::PublishFailed:
+      return "publish_failed";
   }
   return "unknown";
 }

@@ -20,6 +20,7 @@ inline constexpr std::uint64_t kSpanAlignment = 256;
 inline constexpr std::uint8_t kMaxRank = 8;
 inline constexpr std::uint16_t kMaxNameBytes = 1024;
 inline constexpr std::uint32_t kHashBytes = 32;
+inline constexpr std::uint32_t kIntegrityRecordBytes = 56;
 inline constexpr std::uint32_t kNoLayerIndex = 0xFFFFFFFFu;
 
 inline constexpr std::uint64_t kBf16Size = 2;

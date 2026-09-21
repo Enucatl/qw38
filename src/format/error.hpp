@@ -31,6 +31,14 @@ enum class FormatErrorCode : std::uint16_t {
   InvalidHeader = 22,
   NameTooLong = 23,
   DuplicateId = 24,
+  IoFailure = 25,
+  DuplicateSpan = 26,
+  MissingSpan = 27,
+  IncompleteSpan = 28,
+  EmptySpan = 29,
+  InconsistentInput = 30,
+  OverlappingSpan = 31,
+  PublishFailed = 32,
 };
 
 struct FormatError {

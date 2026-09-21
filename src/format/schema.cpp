@@ -1557,7 +1557,8 @@ std::expected<std::size_t, FormatError> encoded_size(
     return std::unexpected(st.error());
   }
   auto const integ_n =
-      checked_mul(schema.integrity.size(), 56, 0, "integrity");
+      checked_mul(schema.integrity.size(), kIntegrityRecordBytes, 0,
+                  "integrity");
   if (!integ_n) {
     return std::unexpected(integ_n.error());
   }
