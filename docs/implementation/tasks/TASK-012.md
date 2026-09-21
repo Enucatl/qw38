@@ -1,7 +1,7 @@
 # TASK-012 — GDN recurrence and continuation
 
 ## Status
-TODO
+DONE
 ## Milestone
 M4 — GDN execution
 ## Purpose
@@ -47,22 +47,72 @@ Run N steps, snapshot, restore in new session, continue, and compare with uninte
 ## Benchmark required
 Diagnostic one-step timing/resource report only.
 ## Acceptance criteria
-- [ ] One-step and multi-step S/o match reference tolerance.
-- [ ] Reset and restored continuation are correct.
-- [ ] Compiled resource report and diagnostic timing are recorded.
-- [ ] Physical layout and FP32 persistence exactly match S-01/S-02.
+- [x] One-step and multi-step S/o match reference tolerance.
+- [x] Reset and restored continuation are correct.
+- [x] Compiled resource report and diagnostic timing are recorded.
+- [x] Physical layout and FP32 persistence exactly match S-01/S-02.
 ## Architecture blocker rule
 If S-01/S-02 prevents correctness, stop with the complete required blocker report; never transpose/narrow silently.
 ## Completion report
 ### Result
-DONE | BLOCKED
+DONE
 ### Changes made
+- CPU reference `qw38::reference::gdn_recurrence_step`: in-place FP32 `[value_head,value,key]` update, BF16 v, 16-head q/k indexed by `value_head/3`. Order is D=αS, p=Σ D k̂, e=β(v−p), S=D+k̂e, then o=Σ S q̂/√128 (update before readout).
+- CUDA decode kernel in `cuda/gdn.{hpp,cu}`: 1536 blocks/layer, 128 threads; one warp owns one value row; lane `l` holds keys `l,l+32,l+64,l+96`; q/k staged once in 1 KiB shared memory. `launch_gdn_recurrence` takes prepared arrays, FP32 S with `s_layer` offset, FP32 o, and an ordered stream. No allocation, atomics, or state transpose.
+- Runtime `GdnRecurrencePlan` binds prepared workspace views (including reserved FP32 o at `kGdnOffO`) onto session S. `execute_gdn_recurrence` is a single launch. `bind_gdn_workspace` now overlays o.
+- Tests: `reference_math_unit` (α=0/β=0, shape reject); `gdn_unit` (bind/invalid views, HVK vs transposed slot, zero state, independent layers, session reset on the runtime stream); `gdn_reference` (front→recurrence, 1/2/17/128 steps, adversarial α/β); `gdn_integration` (5-step front+recurrence, snapshot at step 3, restore in a new session, continue).
+- Diagnostic bench `qw38_bench_gdn_recurrence` (`EXCLUDE_FROM_ALL`, not ctest).
 ### Tests run
-Exact commands/results.
+Debug:
+
+```text
+docker run --gpus all --rm -u "$(id -u):$(id -g)" \
+  -v "$PWD":/workspace -w /workspace qw38-dev:cuda13.4.1 \
+  bash -lc 'cmake -S . -B build/debug -DCMAKE_BUILD_TYPE=Debug && cmake --build build/debug && ctest --test-dir build/debug --output-on-failure'
+```
+
+Result: 34/34 tests passed (`reference_math_unit` 0.02s, `gdn_unit` 0.24s, `gdn_reference` 2.13s, `gdn_integration` 4.62s).
+
+Release:
+
+```text
+docker run --gpus all --rm -u "$(id -u):$(id -g)" \
+  -v "$PWD":/workspace -w /workspace qw38-dev:cuda13.4.1 \
+  bash -lc 'cmake -S . -B build/release -DCMAKE_BUILD_TYPE=Release && cmake --build build/release && ctest --test-dir build/release --output-on-failure'
+```
+
+Result: 34/34 tests passed (`gdn_unit` 0.23s, `gdn_reference` 0.66s, `gdn_integration` 1.12s).
+
 ### Benchmark results
-Diagnostic timing/resources.
+Identity: `qw38_bench_gdn_recurrence` Release, container `qw38-dev:cuda13.4.1`, device NVIDIA GeForce RTX 5090 `sm_120`. Geometry: four warps/block, 128 threads, 1536 blocks/layer, warp-per-value `[value_head,value,key]`. Command:
+
+```text
+docker run --gpus all --rm -u "$(id -u):$(id -g)" \
+  -v "$PWD":/workspace -w /workspace qw38-dev:cuda13.4.1 \
+  bash -lc 'cmake --build build/release --target qw38_bench_gdn_recurrence && ./build/release/benchmarks/qw38_bench_gdn_recurrence'
+```
+
+| Case | registers | shared_bytes | local_bytes | occupancy_blocks/SM | s_bytes | launches | ms |
+|---| ---:| ---:| ---:| ---:| ---:| ---:| ---:|
+| one-step decode recurrence | 31 | 1024 | 0 | 12 | 3145728 | 8 | 0.003176 |
+
+Diagnostic only; does not authorize layout, precision, or block-size change.
 ### Architecture blocker
-None/full report.
+None.
+### Verification
+VERIFICATION: PASS
+
+Commands run:
+- Debug: `cmake -S . -B build/debug -DCMAKE_BUILD_TYPE=Debug && cmake --build build/debug && ctest --test-dir build/debug --output-on-failure`
+- Release: `cmake -S . -B build/release -DCMAKE_BUILD_TYPE=Release && cmake --build build/release && ctest --test-dir build/release --output-on-failure`
+
+Results: 34/34 tests passed in Debug and Release (`reference_math_unit`, `gdn_unit`, `gdn_reference`, `gdn_integration`). Benchmark `qw38_bench_gdn_recurrence` recorded one-step diagnostic timing and resource report.
+
+Unmet acceptance criteria: none.
+
 ### Follow-up observations
-Concrete only.
+- Declared tolerances: one-step S/o 2e-5 abs / 1e-5 rel; multi-step (17/128) 5e-4 abs / 1e-4 rel (warp-tree vs sequential 128-key reduction feeding S).
+- Session reset and recurrence launches must share the session's ordered stream; a second test stream can race the persistent S zero.
+- 128-step fixtures use L2-normalized q/k, matching prepared decode arrays. Unnormalized keys overflow in FP32 within a long continuation; that is a fixture concern, not an S-01/S-02 issue.
+
 

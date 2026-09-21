@@ -1,17 +1,20 @@
 #include "gdn_support.hpp"
 
 #include "cuda/alloc.hpp"
+#include "cuda/copy.hpp"
 #include "runtime/runtime.hpp"
 #include "runtime_support.hpp"
 
 #include <cstdint>
 #include <iostream>
 #include <string>
+#include <vector>
 
 using qw38::cuda::DeviceBuffer;
 using qw38::cuda::Stream;
 using qw38::cuda::launch_gdn_conv_silu;
 using qw38::cuda::launch_gdn_prepare;
+using qw38::cuda::launch_gdn_recurrence;
 using qw38::cuda::malloc_count;
 using qw38::format::ArithmeticDtype;
 using qw38::format::PhysicalLayoutId;
@@ -32,25 +35,40 @@ using qw38::gdn::test::kGdnHeadDim;
 using qw38::gdn::test::kGdnKeyHeads;
 using qw38::gdn::test::kGdnQkFp32Abs;
 using qw38::gdn::test::kGdnQkFp32Rel;
+using qw38::gdn::test::kGdnRecurOAbs;
+using qw38::gdn::test::kGdnRecurORel;
+using qw38::gdn::test::kGdnRecurSAbs;
+using qw38::gdn::test::kGdnRecurSRel;
+using qw38::gdn::test::kGdnSElemsPerLayer;
 using qw38::gdn::test::kGdnValueHeads;
 using qw38::gdn::test::kGdnZWidth;
 using qw38::gdn::test::kHidden;
 using qw38::gdn::test::kQkvWidth;
 using qw38::gdn::test::make_view;
+using qw38::gdn::test::pattern_f;
 using qw38::gdn::test::pattern_h;
+using qw38::gdn::test::zeros_f;
 using qw38::gdn::test::zeros_h;
 using qw38::gdn::test::download_vec;
+using qw38::gdn::test::gdn_s_index;
 using qw38::gdn::test::upload_vec;
+using qw38::gdn::test::filled_f;
 using qw38::reference::gdn_alpha_beta;
 using qw38::reference::gdn_conv_history_step;
 using qw38::reference::gdn_key_head;
 using qw38::reference::gdn_prepare;
+using qw38::reference::gdn_recurrence_step;
 using qw38::runtime::GdnFrontBindViews;
+using qw38::runtime::GdnRecurrenceBindViews;
 using qw38::runtime::bind_gdn_front_plan;
+using qw38::runtime::bind_gdn_recurrence_plan;
 using qw38::runtime::bind_gdn_workspace;
 using qw38::runtime::execute_gdn_front;
+using qw38::runtime::execute_gdn_recurrence;
 using qw38::runtime::gdn_state_index;
+using qw38::runtime::gdn_s_byte_offset;
 using qw38::runtime::kGdnBytesQHat;
+using qw38::runtime::kGdnOffO;
 using qw38::runtime::kGdnOffQHat;
 using qw38::runtime::kGdnWorkspaceBytesPerToken;
 
@@ -131,6 +149,13 @@ void test_bind_errors(Stream const& stream) {
     expect(ok->scratch.q_hat.extent[0] * ok->scratch.q_hat.extent[1] * 4u ==
                kGdnBytesQHat,
            "q_hat bytes");
+    expect(static_cast<std::byte*>(ok->scratch.o.pointer) -
+                   static_cast<std::byte*>(ok->scratch.qkv.pointer) ==
+               static_cast<std::ptrdiff_t>(kGdnOffO),
+           "o scratch offset");
+    expect(ok->scratch.o.extent[0] == kGdnValueHeads &&
+               ok->scratch.o.extent[1] == kGdnHeadDim,
+           "o is [48,128] FP32");
   }
 
   Stream empty;
@@ -366,6 +391,327 @@ void test_workspace_and_missing_model(Stream const& stream) {
   (void)malloc_count;
 }
 
+GdnRecurrenceBindViews dummy_recur_views(void* s, void* o, void* q, void* k,
+                                         void* alpha, void* beta, void* v) {
+  GdnRecurrenceBindViews views;
+  std::size_t const nqk = static_cast<std::size_t>(kGdnKeyHeads) * kGdnHeadDim;
+  views.q_hat = make_view(q, ArithmeticDtype::Fp32, PhysicalLayoutId::CudaFp32VectorV0,
+                          StorageClass::Fp32, false, 2, kGdnKeyHeads, kGdnHeadDim);
+  views.k_hat = make_view(k, ArithmeticDtype::Fp32, PhysicalLayoutId::CudaFp32VectorV0,
+                          StorageClass::Fp32, false, 2, kGdnKeyHeads, kGdnHeadDim);
+  views.alpha = make_view(alpha, ArithmeticDtype::Fp32,
+                          PhysicalLayoutId::CudaFp32VectorV0, StorageClass::Fp32,
+                          false, 1, kGdnValueHeads);
+  views.beta = make_view(beta, ArithmeticDtype::Fp32, PhysicalLayoutId::CudaFp32VectorV0,
+                         StorageClass::Fp32, false, 1, kGdnValueHeads);
+  views.v = make_view(v, ArithmeticDtype::Bf16, PhysicalLayoutId::CudaBf16RowMajorV0,
+                      StorageClass::Bf16, false, 2, kGdnValueHeads, kGdnHeadDim);
+  views.s = make_view(s, ArithmeticDtype::Fp32,
+                      PhysicalLayoutId::CudaFp32GdnSHvKV0, StorageClass::Fp32, true,
+                      1, kGdnSElemsPerLayer);
+  views.o = make_view(o, ArithmeticDtype::Fp32, PhysicalLayoutId::CudaFp32VectorV0,
+                      StorageClass::Fp32, true, 2, kGdnValueHeads, kGdnHeadDim);
+  views.s_layer = 0;
+  views.language_layer = 0;
+  (void)nqk;
+  return views;
+}
+
+void test_recurrence_bind_and_invalid(Stream const& stream) {
+  std::size_t const nqk = static_cast<std::size_t>(kGdnKeyHeads) * kGdnHeadDim;
+  std::size_t const nv = static_cast<std::size_t>(kGdnValueHeads) * kGdnHeadDim;
+  auto d_q = DeviceBuffer::allocate(nqk * 4);
+  auto d_k = DeviceBuffer::allocate(nqk * 4);
+  auto d_a = DeviceBuffer::allocate(kGdnValueHeads * 4);
+  auto d_b = DeviceBuffer::allocate(kGdnValueHeads * 4);
+  auto d_v = DeviceBuffer::allocate(nv * 2);
+  auto d_s = DeviceBuffer::allocate(kGdnSElemsPerLayer * 4);
+  auto d_o = DeviceBuffer::allocate(nv * 4);
+  if (!d_q || !d_k || !d_a || !d_b || !d_v || !d_s || !d_o) {
+    fail("recur bind alloc");
+    return;
+  }
+  auto views = dummy_recur_views(d_s->data(), d_o->data(), d_q->data(), d_k->data(),
+                                 d_a->data(), d_b->data(), d_v->data());
+  auto ok = bind_gdn_recurrence_plan(views, stream);
+  expect(static_cast<bool>(ok), "valid recurrence bind");
+  if (ok) {
+    expect(ok->s_layer == 0 && ok->gdn_layer == 0, "layer 0 metadata");
+    expect(ok->q_hat.dtype == ArithmeticDtype::Fp32, "q FP32");
+    expect(ok->v.dtype == ArithmeticDtype::Bf16, "v BF16");
+    expect(ok->s.dtype == ArithmeticDtype::Fp32, "S FP32");
+    expect(ok->o.dtype == ArithmeticDtype::Fp32, "o FP32");
+  }
+
+  Stream empty;
+  expect(!bind_gdn_recurrence_plan(views, empty), "empty stream rejects");
+
+  auto attn = views;
+  attn.language_layer = 3;
+  expect(!bind_gdn_recurrence_plan(attn, stream), "attention language rejects");
+
+  auto host = views;
+  host.s.space = qw38::runtime::MemorySpace::Host;
+  expect(!bind_gdn_recurrence_plan(host, stream), "host S rejects");
+
+  auto bf16s = views;
+  bf16s.s.dtype = ArithmeticDtype::Bf16;
+  expect(!bind_gdn_recurrence_plan(bf16s, stream), "BF16 S rejects");
+
+  auto tiny = views;
+  tiny.s.extent[0] = 16;
+  expect(!bind_gdn_recurrence_plan(tiny, stream), "short S rejects");
+
+  auto same = views;
+  same.o.pointer = same.s.pointer;
+  expect(!bind_gdn_recurrence_plan(same, stream), "aliased S/o rejects");
+
+  auto qk = views;
+  qk.k_hat.pointer = qk.q_hat.pointer;
+  expect(!bind_gdn_recurrence_plan(qk, stream), "aliased q/k rejects");
+
+  auto layer = views;
+  layer.s_layer = 48;
+  expect(!bind_gdn_recurrence_plan(layer, stream), "s_layer 48 rejects");
+
+  auto st = launch_gdn_recurrence(nullptr, static_cast<float*>(d_k->data()),
+                                  static_cast<float*>(d_a->data()),
+                                  static_cast<float*>(d_b->data()),
+                                  static_cast<std::uint16_t*>(d_v->data()),
+                                  static_cast<float*>(d_s->data()), 0,
+                                  static_cast<float*>(d_o->data()), stream);
+  expect(!st, "null q_hat launch rejects");
+  st = launch_gdn_recurrence(static_cast<float*>(d_q->data()),
+                             static_cast<float*>(d_k->data()),
+                             static_cast<float*>(d_a->data()),
+                             static_cast<float*>(d_b->data()),
+                             static_cast<std::uint16_t*>(d_v->data()),
+                             static_cast<float*>(d_s->data()), 48,
+                             static_cast<float*>(d_o->data()), stream);
+  expect(!st, "s_layer 48 launch rejects");
+}
+
+void test_recurrence_layout_zero_heads_layers(Stream const& stream) {
+  std::size_t const nqk = static_cast<std::size_t>(kGdnKeyHeads) * kGdnHeadDim;
+  std::size_t const nv = static_cast<std::size_t>(kGdnValueHeads) * kGdnHeadDim;
+  std::size_t const ns = static_cast<std::size_t>(kGdnSElemsPerLayer);
+
+  auto q = zeros_f(static_cast<std::uint32_t>(nqk));
+  auto k = zeros_f(static_cast<std::uint32_t>(nqk));
+  auto alpha = filled_f(kGdnValueHeads, 0.5f);
+  auto beta = filled_f(kGdnValueHeads, 1.0f);
+  auto v = zeros_h(static_cast<std::uint32_t>(nv));
+  auto s = zeros_f(static_cast<std::uint32_t>(ns));
+  auto o = filled_f(static_cast<std::uint32_t>(nv), 9.0f);
+
+  // One-hot key 11, value row 9 of head 5; k_hat on key head 5/3=1.
+  std::uint32_t const vh = 5;
+  std::uint32_t const value_j = 9;
+  std::uint32_t const key = 11;
+  std::uint32_t const kh = gdn_key_head(vh);
+  k[kh * kGdnHeadDim + key] = 1.0f;
+  q[kh * kGdnHeadDim + key] = 1.0f;
+  v[vh * kGdnHeadDim + value_j] = qw38::format::fp32_to_bf16_rne(1.0f);
+  for (std::uint32_t h = 0; h < kGdnValueHeads; ++h) {
+    if (h != vh) {
+      alpha[h] = 0.0f;
+      beta[h] = 0.0f;
+    }
+  }
+
+  auto s_ref = s;
+  auto o_ref = o;
+  auto rst = gdn_recurrence_step(q, k, alpha, beta, v, s_ref, o_ref);
+  expect(static_cast<bool>(rst), "cpu one-hot");
+  auto off = gdn_s_byte_offset(0, vh, value_j, key);
+  expect(static_cast<bool>(off), "HVK offset");
+  if (off) {
+    expect(*off == gdn_s_index(vh, value_j, key) * 4u, "byte offset is [vh,value,key]");
+    expect(s_ref[gdn_s_index(vh, value_j, key)] == 1.0f, "updated key is 1");
+    auto trans = gdn_s_byte_offset(0, vh, key, value_j);
+    if (trans && *trans != *off) {
+      expect(s_ref[*trans / 4u] == 0.0f, "transposed [vh,key,value] slot stays 0");
+    }
+  }
+  // Same warp lane owns keys 11,43,75,107; only 11 had k_hat.
+  expect(s_ref[gdn_s_index(vh, value_j, 43)] == 0.0f, "lane sibling key 43 stays 0");
+  expect(s_ref[gdn_s_index(7, value_j, key)] == 0.0f, "other head stays 0");
+
+  auto d_q = upload_vec(q, stream);
+  auto d_k = upload_vec(k, stream);
+  auto d_a = upload_vec(alpha, stream);
+  auto d_b = upload_vec(beta, stream);
+  auto d_v = upload_vec(v, stream);
+  auto d_s = upload_vec(s, stream);
+  auto d_o = DeviceBuffer::allocate(nv * 4);
+  if (!d_q || !d_k || !d_a || !d_b || !d_v || !d_s || !d_o) {
+    fail("layout upload");
+    return;
+  }
+  auto st = launch_gdn_recurrence(static_cast<float const*>(d_q->data()),
+                                  static_cast<float const*>(d_k->data()),
+                                  static_cast<float const*>(d_a->data()),
+                                  static_cast<float const*>(d_b->data()),
+                                  static_cast<std::uint16_t const*>(d_v->data()),
+                                  static_cast<float*>(d_s->data()), 0,
+                                  static_cast<float*>(d_o->data()), stream);
+  expect(static_cast<bool>(st), "one-hot launch");
+  auto got_s = download_vec<float>(*d_s, ns, stream);
+  auto got_o = download_vec<float>(*d_o, nv, stream);
+  if (!got_s || !got_o) {
+    fail("one-hot download");
+    return;
+  }
+  expect_fp32_close(*got_s, s_ref, "one-hot S", kGdnRecurSAbs, kGdnRecurSRel);
+  expect_fp32_close(*got_o, o_ref, "one-hot o", kGdnRecurOAbs, kGdnRecurORel);
+
+  // Zero state, nonzero q/k/v: S_new = k_hat * beta * v because p=0.
+  auto qz = pattern_f(static_cast<std::uint32_t>(nqk), 0.4f);
+  auto kz = pattern_f(static_cast<std::uint32_t>(nqk), -0.3f);
+  auto az = filled_f(kGdnValueHeads, 0.25f);
+  auto bz = filled_f(kGdnValueHeads, 0.75f);
+  auto vz = pattern_h(static_cast<std::uint32_t>(nv), 0.6f);
+  auto sz = zeros_f(static_cast<std::uint32_t>(ns));
+  auto oz = zeros_f(static_cast<std::uint32_t>(nv));
+  auto sz_ref = sz;
+  auto oz_ref = oz;
+  rst = gdn_recurrence_step(qz, kz, az, bz, vz, sz_ref, oz_ref);
+  expect(static_cast<bool>(rst), "cpu zero-state");
+  auto d_qz = upload_vec(qz, stream);
+  auto d_kz = upload_vec(kz, stream);
+  auto d_az = upload_vec(az, stream);
+  auto d_bz = upload_vec(bz, stream);
+  auto d_vz = upload_vec(vz, stream);
+  auto d_sz = upload_vec(sz, stream);
+  if (!d_qz || !d_kz || !d_az || !d_bz || !d_vz || !d_sz) {
+    fail("zero-state upload");
+    return;
+  }
+  st = launch_gdn_recurrence(static_cast<float const*>(d_qz->data()),
+                             static_cast<float const*>(d_kz->data()),
+                             static_cast<float const*>(d_az->data()),
+                             static_cast<float const*>(d_bz->data()),
+                             static_cast<std::uint16_t const*>(d_vz->data()),
+                             static_cast<float*>(d_sz->data()), 0,
+                             static_cast<float*>(d_o->data()), stream);
+  expect(static_cast<bool>(st), "zero-state launch");
+  got_s = download_vec<float>(*d_sz, ns, stream);
+  got_o = download_vec<float>(*d_o, nv, stream);
+  if (!got_s || !got_o) {
+    fail("zero-state download");
+    return;
+  }
+  expect_fp32_close(*got_s, sz_ref, "zero-state S", kGdnRecurSAbs, kGdnRecurSRel);
+  expect_fp32_close(*got_o, oz_ref, "zero-state o", kGdnRecurOAbs, kGdnRecurORel);
+
+  // Independent layers: two-layer buffer, layer 1 holds a unique fill.
+  auto two = zeros_f(static_cast<std::uint32_t>(2u * ns));
+  for (std::size_t i = 0; i < ns; ++i) {
+    two[ns + i] = 0.125f + static_cast<float>(i % 17) * 1.0e-3f;
+  }
+  auto layer1 = std::vector<float>(two.begin() + static_cast<std::ptrdiff_t>(ns), two.end());
+  auto d_two = upload_vec(two, stream);
+  if (!d_two) {
+    fail("two-layer upload");
+    return;
+  }
+  auto views = dummy_recur_views(d_two->data(), d_o->data(), d_qz->data(), d_kz->data(),
+                                 d_az->data(), d_bz->data(), d_vz->data());
+  views.s.extent[0] = 2u * kGdnSElemsPerLayer;
+  views.s_layer = 0;
+  auto plan0 = bind_gdn_recurrence_plan(views, stream);
+  expect(static_cast<bool>(plan0), "bind layer 0 of two");
+  if (plan0) {
+    expect(static_cast<bool>(execute_gdn_recurrence(*plan0)), "execute layer 0");
+  }
+  auto got_two = download_vec<float>(*d_two, 2u * ns, stream);
+  if (!got_two) {
+    fail("two-layer download");
+    return;
+  }
+  std::vector<float> got_l1(got_two->begin() + static_cast<std::ptrdiff_t>(ns),
+                            got_two->end());
+  expect_fp32_close(got_l1, layer1, "layer 1 untouched", 0.0f, 0.0f);
+}
+
+void test_recurrence_reset() {
+  qw38::format::test::ScratchDir dir("qw38-gdn-recur-unit");
+  auto fx = qw38::runtime::test::write_language_fixture(dir.file("model.qw38"));
+  expect(!fx.path.empty(), "write fixture");
+  if (fx.path.empty()) {
+    return;
+  }
+  auto rt = qw38::runtime::Runtime::create();
+  if (!rt) {
+    fail("runtime");
+    return;
+  }
+  auto const& stream = rt->stream();
+  auto model = rt->load(fx.path);
+  auto session = rt->create_session(*model, 1);
+  if (!model || !session) {
+    fail("load/session");
+    return;
+  }
+  auto plan = bind_gdn_recurrence_plan(*session, 0, stream);
+  expect(static_cast<bool>(plan), "session recurrence bind");
+  if (!plan) {
+    return;
+  }
+  std::size_t const nqk = static_cast<std::size_t>(kGdnKeyHeads) * kGdnHeadDim;
+  std::size_t const nv = static_cast<std::size_t>(kGdnValueHeads) * kGdnHeadDim;
+  auto q = pattern_f(static_cast<std::uint32_t>(nqk), 0.2f);
+  auto k = pattern_f(static_cast<std::uint32_t>(nqk), 0.3f);
+  auto a = filled_f(kGdnValueHeads, 0.8f);
+  auto b = filled_f(kGdnValueHeads, 0.4f);
+  auto v = pattern_h(static_cast<std::uint32_t>(nv), 0.5f);
+  expect(static_cast<bool>(qw38::cuda::copy_h2d(plan->q_hat.pointer, q.data(),
+                                               nqk * 4, stream)),
+         "upload q");
+  expect(static_cast<bool>(qw38::cuda::copy_h2d(plan->k_hat.pointer, k.data(),
+                                               nqk * 4, stream)),
+         "upload k");
+  expect(static_cast<bool>(qw38::cuda::copy_h2d(plan->alpha.pointer, a.data(),
+                                               kGdnValueHeads * 4, stream)),
+         "upload alpha");
+  expect(static_cast<bool>(qw38::cuda::copy_h2d(plan->beta.pointer, b.data(),
+                                               kGdnValueHeads * 4, stream)),
+         "upload beta");
+  expect(static_cast<bool>(qw38::cuda::copy_h2d(plan->v.pointer, v.data(), nv * 2,
+                                               stream)),
+         "upload v");
+  auto const mallocs = malloc_count();
+  expect(static_cast<bool>(execute_gdn_recurrence(*plan)), "first execute");
+  expect(malloc_count() == mallocs, "recurrence allocates nothing");
+  expect(static_cast<bool>(session->reset()), "reset");
+  std::vector<float> s0(8, 1.0f);
+  auto off = gdn_s_byte_offset(0, 0, 0, 0);
+  expect(static_cast<bool>(off), "s offset");
+  if (off) {
+    expect(static_cast<bool>(qw38::cuda::copy_d2h(
+               s0.data(), static_cast<std::byte*>(session->gdn_s().pointer) + *off,
+               s0.size() * 4, stream)),
+           "download S after reset");
+    expect(static_cast<bool>(stream.sync()), "sync reset");
+    bool z = true;
+    for (float x : s0) {
+      z = z && (x == 0.0f);
+    }
+    expect(z, "reset zeros S");
+  }
+  auto s_ref = zeros_f(static_cast<std::uint32_t>(kGdnSElemsPerLayer));
+  auto o_ref = zeros_f(static_cast<std::uint32_t>(nv));
+  auto rst = gdn_recurrence_step(q, k, a, b, v, s_ref, o_ref);
+  expect(static_cast<bool>(rst), "cpu after reset");
+  expect(static_cast<bool>(execute_gdn_recurrence(*plan)), "execute after reset");
+  std::vector<float> o_got(nv);
+  expect(static_cast<bool>(qw38::cuda::copy_d2h(o_got.data(), plan->o.pointer,
+                                               nv * 4, stream)),
+         "download o");
+  expect(static_cast<bool>(stream.sync()), "sync o");
+  expect_fp32_close(o_got, o_ref, "o after reset", kGdnRecurOAbs, kGdnRecurORel);
+}
+
 }  // namespace
 
 int main() {
@@ -378,6 +724,9 @@ int main() {
   test_conv_history_and_taps(*stream);
   test_prepare_zero_and_gates(*stream);
   test_workspace_and_missing_model(*stream);
+  test_recurrence_bind_and_invalid(*stream);
+  test_recurrence_layout_zero_heads_layers(*stream);
+  test_recurrence_reset();
   if (g_failures != 0) {
     std::cerr << g_failures << " gdn unit failures\n";
     return 1;

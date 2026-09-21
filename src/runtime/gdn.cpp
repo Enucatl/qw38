@@ -334,6 +334,9 @@ std::expected<GdnWorkspaceViews, Error> bind_gdn_workspace(TensorView workspace)
   v.v = overlay(base, kGdnOffConvolved + kGdnVOffset * qw38::format::kBf16Size,
                 ArithmeticDtype::Bf16, PhysicalLayoutId::CudaBf16RowMajorV0,
                 StorageClass::Bf16, true, 2, kGdnValueHeads, kGdnValueDim);
+  v.o = overlay(base, kGdnOffO, ArithmeticDtype::Fp32,
+                PhysicalLayoutId::CudaFp32VectorV0, StorageClass::Fp32, true, 2,
+                kGdnValueHeads, kGdnValueDim);
   return v;
 }
 
@@ -650,6 +653,140 @@ std::expected<void, Error> execute_gdn_front(GdnFrontPlan const& plan) {
   if (auto st = qw38::cuda::launch_gdn_prepare(convolved, a, b, a_log, dt_bias,
                                                plan.eps, q_hat, k_hat, alpha,
                                                beta, *plan.stream);
+      !st) {
+    return std::unexpected(from_cuda(st.error()));
+  }
+  return {};
+}
+
+std::expected<GdnRecurrencePlan, Error> bind_gdn_recurrence_plan(
+    GdnRecurrenceBindViews const& views, qw38::cuda::Stream const& stream) {
+  if (stream.empty()) {
+    return std::unexpected(arg_error("stream", "empty stream"));
+  }
+  if (views.s_layer >= kGdnLayers) {
+    return std::unexpected(arg_error("s_layer", "GDN state layer must be < 48"));
+  }
+  auto q = as_vector(views.q_hat, static_cast<std::uint64_t>(kGdnKeyHeads) * kGdnKeyDim,
+                     ArithmeticDtype::Fp32, false, "q_hat");
+  if (!q) {
+    return std::unexpected(q.error());
+  }
+  auto k = as_vector(views.k_hat, static_cast<std::uint64_t>(kGdnKeyHeads) * kGdnKeyDim,
+                     ArithmeticDtype::Fp32, false, "k_hat");
+  if (!k) {
+    return std::unexpected(k.error());
+  }
+  auto alpha =
+      as_vector(views.alpha, kGdnValueHeads, ArithmeticDtype::Fp32, false, "alpha");
+  if (!alpha) {
+    return std::unexpected(alpha.error());
+  }
+  auto beta =
+      as_vector(views.beta, kGdnValueHeads, ArithmeticDtype::Fp32, false, "beta");
+  if (!beta) {
+    return std::unexpected(beta.error());
+  }
+  auto v = as_vector(views.v, static_cast<std::uint64_t>(kGdnValueHeads) * kGdnValueDim,
+                     ArithmeticDtype::Bf16, false, "v");
+  if (!v) {
+    return std::unexpected(v.error());
+  }
+  auto o = as_vector(views.o, static_cast<std::uint64_t>(kGdnValueHeads) * kGdnValueDim,
+                     ArithmeticDtype::Fp32, true, "o");
+  if (!o) {
+    return std::unexpected(o.error());
+  }
+  if (views.s.pointer == nullptr) {
+    return std::unexpected(arg_error("s", "null view"));
+  }
+  if (views.s.space != MemorySpace::Device) {
+    return std::unexpected(arg_error("s", "view must be device memory"));
+  }
+  if (views.s.dtype != ArithmeticDtype::Fp32) {
+    return std::unexpected(arg_error("s", "S must be FP32"));
+  }
+  if (!views.s.writable) {
+    return std::unexpected(arg_error("s", "view must be writable"));
+  }
+  std::uint64_t const need =
+      (static_cast<std::uint64_t>(views.s_layer) + 1u) * kGdnSElemsPerLayer;
+  if (views.s.rank == 0 || element_count(views.s) < need) {
+    return std::unexpected(
+        arg_error("s", "view is smaller than the addressed GDN layer"));
+  }
+  if (q->pointer == k->pointer) {
+    return std::unexpected(arg_error("q_hat", "q_hat and k_hat must be distinct"));
+  }
+  if (views.s.pointer == o->pointer) {
+    return std::unexpected(arg_error("s", "S and o must be distinct"));
+  }
+
+  auto idx = gdn_state_index(views.language_layer);
+  if (!idx) {
+    return std::unexpected(idx.error());
+  }
+
+  GdnRecurrencePlan plan;
+  plan.q_hat = *q;
+  plan.k_hat = *k;
+  plan.alpha = *alpha;
+  plan.beta = *beta;
+  plan.v = *v;
+  plan.s = views.s;
+  plan.s.writable = true;
+  plan.o = *o;
+  plan.s_layer = views.s_layer;
+  plan.language_layer = views.language_layer;
+  plan.gdn_layer = *idx;
+  plan.stream = &stream;
+  return plan;
+}
+
+std::expected<GdnRecurrencePlan, Error> bind_gdn_recurrence_plan(
+    Session& session, std::uint32_t layer, qw38::cuda::Stream const& stream) {
+  auto gdn_i = gdn_state_index(layer);
+  if (!gdn_i) {
+    return std::unexpected(gdn_i.error());
+  }
+  auto workspace = session.scratch(qw38::format::ScratchKind::GdnWorkspace);
+  if (!workspace) {
+    return std::unexpected(workspace.error());
+  }
+  auto slices = bind_gdn_workspace(*workspace);
+  if (!slices) {
+    return std::unexpected(slices.error());
+  }
+  GdnRecurrenceBindViews views;
+  views.q_hat = slices->q_hat;
+  views.k_hat = slices->k_hat;
+  views.alpha = slices->alpha;
+  views.beta = slices->beta;
+  views.v = slices->v;
+  views.s = session.gdn_s();
+  views.o = slices->o;
+  views.s_layer = *gdn_i;
+  views.language_layer = layer;
+  return bind_gdn_recurrence_plan(views, stream);
+}
+
+std::expected<void, Error> execute_gdn_recurrence(GdnRecurrencePlan const& plan) {
+  if (plan.stream == nullptr || plan.stream->empty()) {
+    return std::unexpected(arg_error("stream", "empty stream"));
+  }
+  auto* q_hat = static_cast<float const*>(plan.q_hat.pointer);
+  auto* k_hat = static_cast<float const*>(plan.k_hat.pointer);
+  auto* alpha = static_cast<float const*>(plan.alpha.pointer);
+  auto* beta = static_cast<float const*>(plan.beta.pointer);
+  auto* v = static_cast<std::uint16_t const*>(plan.v.pointer);
+  auto* s = static_cast<float*>(plan.s.pointer);
+  auto* o = static_cast<float*>(plan.o.pointer);
+  if (q_hat == nullptr || k_hat == nullptr || alpha == nullptr || beta == nullptr ||
+      v == nullptr || s == nullptr || o == nullptr) {
+    return std::unexpected(arg_error("gdn", "recurrence views are null"));
+  }
+  if (auto st = qw38::cuda::launch_gdn_recurrence(q_hat, k_hat, alpha, beta, v, s,
+                                                  plan.s_layer, o, *plan.stream);
       !st) {
     return std::unexpected(from_cuda(st.error()));
   }

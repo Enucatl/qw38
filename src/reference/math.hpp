@@ -53,6 +53,16 @@ inline constexpr float kGdnQkFp32Abs = 2.0e-5f;
 inline constexpr float kGdnQkFp32Rel = 1.0e-5f;
 inline constexpr float kGdnGateFp32Abs = 2.0e-5f;
 inline constexpr float kGdnGateFp32Rel = 1.0e-5f;
+// Recurrence: FP32 prediction/update/readout (P-01). Warp tree vs sequential
+// 128-key reduction is the one-step budget; multi-step lets that feed S.
+inline constexpr float kGdnRecurSAbs = 2.0e-5f;
+inline constexpr float kGdnRecurSRel = 1.0e-5f;
+inline constexpr float kGdnRecurOAbs = 2.0e-5f;
+inline constexpr float kGdnRecurORel = 1.0e-5f;
+inline constexpr float kGdnRecurMultiSAbs = 5.0e-4f;
+inline constexpr float kGdnRecurMultiSRel = 1.0e-4f;
+inline constexpr float kGdnRecurMultiOAbs = 5.0e-4f;
+inline constexpr float kGdnRecurMultiORel = 1.0e-4f;
 }  // namespace tol
 
 [[nodiscard]] bool eps_ok(float eps) noexcept;
@@ -170,6 +180,14 @@ struct GdnFrontReference {
   std::vector<std::uint16_t> history;
   std::uint32_t cursor{};
 };
+
+// One decode recurrence step. Physical S is FP32 [value_head, value, key];
+// q/k are 16 heads indexed by value_head/3; v is BF16 [48,128]; o FP32 [48,128].
+// Update precedes readout: D=α S_old, p=Σ D k̂, e=β(v-p), S=D+k̂ e, o=Σ S q̂/√128.
+[[nodiscard]] std::expected<void, Error> gdn_recurrence_step(
+    std::span<float const> q_hat, std::span<float const> k_hat,
+    std::span<float const> alpha, std::span<float const> beta,
+    std::span<std::uint16_t const> v, std::span<float> s, std::span<float> o);
 
 [[nodiscard]] std::expected<GdnFrontReference, Error> gdn_front_reference(
     std::span<float const> residual, std::span<std::uint16_t const> gamma,

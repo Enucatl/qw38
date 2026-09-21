@@ -33,6 +33,11 @@ inline constexpr std::uint32_t kFfnWidth = 17408;
 inline constexpr std::uint32_t kVocab = 248320;
 
 // Language-only persistent state. Architecture V0 DERIVED totals.
+// Physical S is FP32 [layer, value_head, value, key] (S-01/S-02).
+inline constexpr std::uint64_t kGdnSElemsPerLayer =
+    static_cast<std::uint64_t>(kGdnValueHeads) * kGdnValueDim * kGdnKeyDim;
+inline constexpr std::uint64_t kGdnSBytesPerLayer =
+    kGdnSElemsPerLayer * qw38::format::kFp32Size;
 inline constexpr std::uint64_t kGdnSBytes = 150994944;
 inline constexpr std::uint64_t kConvHistoryBytes = 2949120;
 inline constexpr std::uint64_t kFixedPersistentBytes = 153944064;
@@ -84,6 +89,10 @@ static_assert(kGdnOffU == kGdnOffO + kGdnBytesO);
 static_assert(kGdnOffU + kGdnBytesU == kGdnWorkspaceBytesPerToken);
 static_assert(kGdnValueHeads / kGdnRepeat == kGdnKeyHeads);
 static_assert(kGdnVOffset * 2u + kGdnBytesZ == kGdnBytesConvolved);
+static_assert(kGdnSBytesPerLayer * kGdnLayers == kGdnSBytes);
+static_assert(kGdnBytesO ==
+              static_cast<std::uint64_t>(kGdnValueHeads) * kGdnValueDim *
+                  qw38::format::kFp32Size);
 
 [[nodiscard]] std::expected<std::uint64_t, Error> kv_cache_bytes(
     std::uint64_t capacity);

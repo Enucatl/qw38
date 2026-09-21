@@ -489,6 +489,69 @@ std::expected<void, Error> gdn_prepare(
   return gdn_alpha_beta(a, b, a_log, dt_bias, alpha, beta);
 }
 
+std::expected<void, Error> gdn_recurrence_step(
+    std::span<float const> q_hat, std::span<float const> k_hat,
+    std::span<float const> alpha, std::span<float const> beta,
+    std::span<std::uint16_t const> v, std::span<float> s, std::span<float> o) {
+  std::size_t const nqk =
+      static_cast<std::size_t>(kGdnKeyHeads) * kGdnHeadDim;
+  std::size_t const ns = static_cast<std::size_t>(kGdnValueHeads) * kGdnHeadDim *
+                         kGdnHeadDim;
+  std::size_t const no =
+      static_cast<std::size_t>(kGdnValueHeads) * kGdnHeadDim;
+  std::size_t const nv = no;
+  if (auto st = require_span_size(q_hat.size(), nqk, "q_hat"); !st) {
+    return st;
+  }
+  if (auto st = require_span_size(k_hat.size(), nqk, "k_hat"); !st) {
+    return st;
+  }
+  if (auto st = require_span_size(alpha.size(), kGdnValueHeads, "alpha"); !st) {
+    return st;
+  }
+  if (auto st = require_span_size(beta.size(), kGdnValueHeads, "beta"); !st) {
+    return st;
+  }
+  if (auto st = require_span_size(v.size(), nv, "v"); !st) {
+    return st;
+  }
+  if (auto st = require_span_size(s.size(), ns, "s"); !st) {
+    return st;
+  }
+  if (auto st = require_span_size(o.size(), no, "o"); !st) {
+    return st;
+  }
+
+  float const inv_sqrt =
+      1.0f / std::sqrt(static_cast<float>(kGdnHeadDim));
+  for (std::uint32_t vh = 0; vh < kGdnValueHeads; ++vh) {
+    std::uint32_t const kh = gdn_key_head(vh);
+    float const a = alpha[vh];
+    float const b = beta[vh];
+    float const* q = q_hat.data() + static_cast<std::size_t>(kh) * kGdnHeadDim;
+    float const* k = k_hat.data() + static_cast<std::size_t>(kh) * kGdnHeadDim;
+    for (std::uint32_t j = 0; j < kGdnHeadDim; ++j) {
+      float* row =
+          s.data() + (static_cast<std::size_t>(vh) * kGdnHeadDim + j) * kGdnHeadDim;
+      float const vj = bf16_to_fp32(v[static_cast<std::size_t>(vh) * kGdnHeadDim + j]);
+      float p = 0.0f;
+      for (std::uint32_t key = 0; key < kGdnHeadDim; ++key) {
+        p += (a * row[key]) * k[key];
+      }
+      float const e = b * (vj - p);
+      float oacc = 0.0f;
+      for (std::uint32_t key = 0; key < kGdnHeadDim; ++key) {
+        float const d = a * row[key];
+        float const ns = d + k[key] * e;
+        row[key] = ns;
+        oacc += ns * q[key] * inv_sqrt;
+      }
+      o[static_cast<std::size_t>(vh) * kGdnHeadDim + j] = oacc;
+    }
+  }
+  return {};
+}
+
 std::expected<GdnFrontReference, Error> gdn_front_reference(
     std::span<float const> residual, std::span<std::uint16_t const> gamma,
     float eps, std::span<std::uint16_t const> w_qkv,

@@ -16,3 +16,10 @@ target_compile_features(qw38_bench_mlp PRIVATE cxx_std_23)
 target_compile_options(qw38_bench_mlp PRIVATE
   $<$<COMPILE_LANGUAGE:CXX>:-Wall -Wextra -Wpedantic>
 )
+
+add_executable(qw38_bench_gdn_recurrence EXCLUDE_FROM_ALL gdn_recurrence_bench.cpp)
+target_link_libraries(qw38_bench_gdn_recurrence PRIVATE qw38_cuda)
+target_compile_features(qw38_bench_gdn_recurrence PRIVATE cxx_std_23)
+target_compile_options(qw38_bench_gdn_recurrence PRIVATE
+  $<$<COMPILE_LANGUAGE:CXX>:-Wall -Wextra -Wpedantic>
+)

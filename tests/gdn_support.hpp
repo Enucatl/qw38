@@ -5,6 +5,12 @@
 
 #include "cuda/gdn.hpp"
 
+#include <cstddef>
+#include <cstdint>
+#include <span>
+#include <string_view>
+#include <vector>
+
 namespace qw38::gdn::test {
 
 using qw38::mlp::test::DeviceBuffer;
@@ -47,9 +53,18 @@ using qw38::reference::tol::kGdnGateFp32Abs;
 using qw38::reference::tol::kGdnGateFp32Rel;
 using qw38::reference::tol::kGdnQkFp32Abs;
 using qw38::reference::tol::kGdnQkFp32Rel;
+using qw38::reference::tol::kGdnRecurMultiOAbs;
+using qw38::reference::tol::kGdnRecurMultiORel;
+using qw38::reference::tol::kGdnRecurMultiSAbs;
+using qw38::reference::tol::kGdnRecurMultiSRel;
+using qw38::reference::tol::kGdnRecurOAbs;
+using qw38::reference::tol::kGdnRecurORel;
+using qw38::reference::tol::kGdnRecurSAbs;
+using qw38::reference::tol::kGdnRecurSRel;
 using qw38::runtime::GdnFrontBindViews;
 using qw38::runtime::MemorySpace;
 using qw38::runtime::TensorView;
+using qw38::runtime::kGdnSElemsPerLayer;
 
 inline std::vector<std::uint16_t> filled_h(std::uint32_t n, float v) {
   return std::vector<std::uint16_t>(n, fp32_to_bf16_rne(v));
@@ -66,6 +81,34 @@ inline std::vector<std::uint16_t> pattern_h(std::uint32_t n, float seed) {
         seed * (static_cast<float>(static_cast<int>(i % 9) - 4) / 4.0f));
   }
   return out;
+}
+
+inline std::vector<float> zeros_f(std::uint32_t n) {
+  return std::vector<float>(n, 0.0f);
+}
+
+inline std::vector<float> filled_f(std::uint32_t n, float v) {
+  return std::vector<float>(n, v);
+}
+
+inline std::vector<float> pattern_f(std::uint32_t n, float seed) {
+  std::vector<float> out(n);
+  for (std::uint32_t i = 0; i < n; ++i) {
+    out[i] = seed * (static_cast<float>(static_cast<int>(i % 11) - 5) / 5.0f);
+  }
+  return out;
+}
+
+inline std::size_t gdn_s_index(std::uint32_t vh, std::uint32_t value,
+                               std::uint32_t key) {
+  return (static_cast<std::size_t>(vh) * kGdnHeadDim + value) * kGdnHeadDim + key;
+}
+
+inline std::vector<std::uint16_t> v_from_convolved(
+    std::span<std::uint16_t const> convolved) {
+  std::size_t const n = static_cast<std::size_t>(kGdnValueHeads) * kGdnHeadDim;
+  return std::vector<std::uint16_t>(convolved.begin() + 4096,
+                                    convolved.begin() + 4096 + static_cast<std::ptrdiff_t>(n));
 }
 
 inline std::vector<std::byte> bf16_bytes(std::span<std::uint16_t const> src) {

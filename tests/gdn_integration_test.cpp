@@ -45,6 +45,15 @@ using qw38::gdn::test::kGdnHeadDim;
 using qw38::gdn::test::kGdnKeyHeads;
 using qw38::gdn::test::kGdnQkFp32Abs;
 using qw38::gdn::test::kGdnQkFp32Rel;
+using qw38::gdn::test::kGdnRecurMultiOAbs;
+using qw38::gdn::test::kGdnRecurMultiORel;
+using qw38::gdn::test::kGdnRecurMultiSAbs;
+using qw38::gdn::test::kGdnRecurMultiSRel;
+using qw38::gdn::test::kGdnRecurOAbs;
+using qw38::gdn::test::kGdnRecurORel;
+using qw38::gdn::test::kGdnRecurSAbs;
+using qw38::gdn::test::kGdnRecurSRel;
+using qw38::gdn::test::kGdnSElemsPerLayer;
 using qw38::gdn::test::kGdnValueHeads;
 using qw38::gdn::test::kGdnZWidth;
 using qw38::gdn::test::kHidden;
@@ -54,11 +63,17 @@ using qw38::gdn::test::pack_bf16_tile;
 using qw38::gdn::test::pack_q4_from_logical;
 using qw38::gdn::test::pattern_h;
 using qw38::gdn::test::residual_vec;
+using qw38::gdn::test::v_from_convolved;
+using qw38::gdn::test::zeros_f;
 using qw38::reference::gdn_front_reference;
+using qw38::reference::gdn_recurrence_step;
 using qw38::runtime::Runtime;
 using qw38::runtime::bind_gdn_front_plan;
+using qw38::runtime::bind_gdn_recurrence_plan;
 using qw38::runtime::execute_gdn_front;
+using qw38::runtime::execute_gdn_recurrence;
 using qw38::runtime::gdn_a_name;
+using qw38::runtime::gdn_s_byte_offset;
 using qw38::runtime::gdn_alog_name;
 using qw38::runtime::gdn_b_name;
 using qw38::runtime::gdn_conv_name;
@@ -323,17 +338,23 @@ int main() {
 
   auto plan_cont = bind_gdn_front_plan(*model, *s_cont, 0, rt->stream());
   auto plan_snap = bind_gdn_front_plan(*model, *s_snap, 0, rt->stream());
-  if (!plan_cont || !plan_snap) {
+  auto recur_cont = bind_gdn_recurrence_plan(*s_cont, 0, rt->stream());
+  auto recur_snap = bind_gdn_recurrence_plan(*s_snap, 0, rt->stream());
+  if (!plan_cont || !plan_snap || !recur_cont || !recur_snap) {
     fail("bind");
     return 1;
   }
   expect(plan_cont->scratch.q_hat.extent[0] == kGdnKeyHeads, "16 q heads");
   expect(plan_cont->history.extent[0] == kConvHistoryTaps, "history [3,10240]");
+  expect(plan_cont->scratch.o.extent[0] == kGdnValueHeads, "o [48,128]");
+  expect(recur_cont->s.dtype == qw38::format::ArithmeticDtype::Fp32, "S is FP32");
 
   std::vector<std::uint16_t> cpu_hist(kConvHistoryTaps * kQkvWidth,
                                       qw38::format::fp32_to_bf16_rne(0.0f));
   std::uint32_t cpu_cursor = 0;
   qw38::reference::GdnFrontReference last{};
+  auto cpu_s = zeros_f(static_cast<std::uint32_t>(kGdnSElemsPerLayer));
+  auto cpu_o = zeros_f(kGdnValueHeads * kGdnHeadDim);
 
   for (int step = 0; step < 5; ++step) {
     auto residual = residual_vec(kHidden, 0.3f + 0.1f * static_cast<float>(step));
@@ -352,6 +373,13 @@ int main() {
     }
     cpu_hist = cpu->history;
     cpu_cursor = cpu->cursor;
+    auto v_cpu = v_from_convolved(cpu->convolved);
+    auto rst_cpu = gdn_recurrence_step(cpu->q_hat, cpu->k_hat, cpu->alpha, cpu->beta,
+                                       v_cpu, cpu_s, cpu_o);
+    if (!rst_cpu) {
+      fail("cpu recurrence");
+      return 1;
+    }
     last = std::move(*cpu);
 
     auto const mallocs = malloc_count();
@@ -360,11 +388,21 @@ int main() {
       fail("execute cont: " + qw38::runtime::error_message(st.error()));
       return 1;
     }
+    auto rst = execute_gdn_recurrence(*recur_cont);
+    if (!rst) {
+      fail("recur cont: " + qw38::runtime::error_message(rst.error()));
+      return 1;
+    }
     expect(malloc_count() == mallocs, "execute allocates nothing");
     if (step < 3) {
       auto st2 = execute_gdn_front(*plan_snap);
       if (!st2) {
         fail("execute snap: " + qw38::runtime::error_message(st2.error()));
+        return 1;
+      }
+      auto rst2 = execute_gdn_recurrence(*recur_snap);
+      if (!rst2) {
+        fail("recur snap: " + qw38::runtime::error_message(rst2.error()));
         return 1;
       }
     }
@@ -379,24 +417,31 @@ int main() {
         fail("restore session");
         return 1;
       }
-      auto rst = restored->restore(*snap);
-      if (!rst) {
-        fail("restore: " + qw38::runtime::error_message(rst.error()));
+      auto rst_s = restored->restore(*snap);
+      if (!rst_s) {
+        fail("restore: " + qw38::runtime::error_message(rst_s.error()));
         return 1;
       }
       s_snap = std::move(*restored);
       auto rebound = bind_gdn_front_plan(*model, *s_snap, 0, rt->stream());
-      if (!rebound) {
+      auto rebound_r = bind_gdn_recurrence_plan(*s_snap, 0, rt->stream());
+      if (!rebound || !rebound_r) {
         fail("rebind");
         return 1;
       }
       plan_snap = std::move(*rebound);
+      recur_snap = std::move(*rebound_r);
       expect(s_snap->conv_cursor()[0] == cpu_cursor, "restored cursor");
     }
     if (step >= 3) {
       auto st2 = execute_gdn_front(*plan_snap);
       if (!st2) {
         fail("execute restored: " + qw38::runtime::error_message(st2.error()));
+        return 1;
+      }
+      auto rst2 = execute_gdn_recurrence(*recur_snap);
+      if (!rst2) {
+        fail("recur restored: " + qw38::runtime::error_message(rst2.error()));
         return 1;
       }
     }
@@ -445,6 +490,38 @@ int main() {
   }
   expect_bf16_close(h_cont, last.history, "cont history", 0.0f, 0.0f);
   expect_bf16_close(h_snap, last.history, "snap history", 0.0f, 0.0f);
+
+  auto s_off = gdn_s_byte_offset(0, 0, 0, 0);
+  expect(static_cast<bool>(s_off), "S offset");
+  std::size_t const nv = static_cast<std::size_t>(kGdnValueHeads) * kGdnHeadDim;
+  std::vector<float> state_cont(kGdnSElemsPerLayer);
+  std::vector<float> state_snap(kGdnSElemsPerLayer);
+  std::vector<float> o_cont(nv);
+  std::vector<float> o_snap(nv);
+  if (!s_off ||
+      !dl(state_cont.data(),
+          static_cast<std::byte*>(s_cont->gdn_s().pointer) + *s_off,
+          state_cont.size() * 4) ||
+      !dl(state_snap.data(),
+          static_cast<std::byte*>(s_snap->gdn_s().pointer) + *s_off,
+          state_snap.size() * 4) ||
+      !dl(o_cont.data(), plan_cont->scratch.o.pointer, nv * 4) ||
+      !dl(o_snap.data(), plan_snap->scratch.o.pointer, nv * 4) ||
+      !rt->stream().sync()) {
+    fail("S/o download");
+    return 1;
+  }
+  expect_fp32_close(state_cont, state_snap, "cont vs snap S", kGdnRecurSAbs,
+                    kGdnRecurSRel);
+  expect_fp32_close(o_cont, o_snap, "cont vs snap o", kGdnRecurOAbs, kGdnRecurORel);
+  expect_fp32_close(state_cont, cpu_s, "cont vs cpu S", kGdnRecurMultiSAbs,
+                    kGdnRecurMultiSRel);
+  expect_fp32_close(state_snap, cpu_s, "snap vs cpu S", kGdnRecurMultiSAbs,
+                    kGdnRecurMultiSRel);
+  expect_fp32_close(o_cont, cpu_o, "cont vs cpu o", kGdnRecurMultiOAbs,
+                    kGdnRecurMultiORel);
+  expect_fp32_close(o_snap, cpu_o, "snap vs cpu o", kGdnRecurMultiOAbs,
+                    kGdnRecurMultiORel);
 
   if (g_failures != 0) {
     std::cerr << g_failures << " gdn integration failures\n";

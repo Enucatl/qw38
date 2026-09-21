@@ -53,6 +53,7 @@ struct GdnWorkspaceViews {
   TensorView alpha{};      // FP32 [48]
   TensorView beta{};       // FP32 [48]
   TensorView v{};          // BF16 [48,128] alias of convolved[4096:]
+  TensorView o{};          // FP32 [48,128]
 };
 
 struct GdnFrontPlan {
@@ -116,5 +117,41 @@ struct GdnFrontBindViews {
 
 // GDN steps 1–5: RMS, qkv, z, a/b, conv+history, prepare. No allocation.
 [[nodiscard]] std::expected<void, Error> execute_gdn_front(GdnFrontPlan const& plan);
+
+struct GdnRecurrenceBindViews {
+  TensorView q_hat{};
+  TensorView k_hat{};
+  TensorView alpha{};
+  TensorView beta{};
+  TensorView v{};
+  TensorView s{};  // FP32 session S or a prefix of layers
+  TensorView o{};
+  std::uint32_t s_layer{};
+  std::uint32_t language_layer{};
+};
+
+// Decode recurrence over prepared q/k/α/β/v and persistent FP32 S. No allocation.
+struct GdnRecurrencePlan {
+  TensorView q_hat{};   // FP32 [16,128]
+  TensorView k_hat{};   // FP32 [16,128]
+  TensorView alpha{};   // FP32 [48]
+  TensorView beta{};    // FP32 [48]
+  TensorView v{};       // BF16 [48,128]
+  TensorView s{};       // FP32 base; s_layer selects [value_head,value,key]
+  TensorView o{};       // FP32 [48,128]
+  std::uint32_t s_layer{};
+  std::uint32_t language_layer{};
+  std::uint32_t gdn_layer{};
+  qw38::cuda::Stream const* stream{nullptr};
+};
+
+[[nodiscard]] std::expected<GdnRecurrencePlan, Error> bind_gdn_recurrence_plan(
+    GdnRecurrenceBindViews const& views, qw38::cuda::Stream const& stream);
+
+[[nodiscard]] std::expected<GdnRecurrencePlan, Error> bind_gdn_recurrence_plan(
+    Session& session, std::uint32_t layer, qw38::cuda::Stream const& stream);
+
+[[nodiscard]] std::expected<void, Error> execute_gdn_recurrence(
+    GdnRecurrencePlan const& plan);
 
 }  // namespace qw38::runtime

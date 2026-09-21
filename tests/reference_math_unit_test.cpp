@@ -5,6 +5,7 @@
 #include <cmath>
 #include <cstdint>
 #include <iostream>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -37,6 +38,10 @@ std::uint16_t bf16(float x) { return fp32_to_bf16_rne(x); }
 
 std::vector<float> zeros_f(std::uint32_t n) {
   return std::vector<float>(n, 0.0f);
+}
+
+std::vector<float> filled_f(std::uint32_t n, float v) {
+  return std::vector<float>(n, v);
 }
 
 std::vector<std::uint16_t> zeros_h(std::uint32_t n) {
@@ -397,6 +402,49 @@ void test_gdn_conv_prepare() {
   expect(beta[0] > 0.5f && beta[0] < 1.0f, "beta = sigmoid(2)");
 }
 
+void test_gdn_recurrence() {
+  using qw38::reference::gdn_key_head;
+  using qw38::reference::gdn_recurrence_step;
+  using qw38::reference::kGdnHeadDim;
+  using qw38::reference::kGdnKeyHeads;
+  using qw38::reference::kGdnValueHeads;
+
+  std::size_t const nqk = static_cast<std::size_t>(kGdnKeyHeads) * kGdnHeadDim;
+  std::size_t const nv = static_cast<std::size_t>(kGdnValueHeads) * kGdnHeadDim;
+  std::size_t const ns = nv * kGdnHeadDim;
+
+  auto q = zeros_f(static_cast<std::uint32_t>(nqk));
+  auto k = zeros_f(static_cast<std::uint32_t>(nqk));
+  auto alpha = filled_f(kGdnValueHeads, 1.0f);
+  auto beta = filled_f(kGdnValueHeads, 0.0f);
+  auto v = zeros_h(static_cast<std::uint32_t>(nv));
+  auto s = ramp_f(static_cast<std::uint32_t>(ns), 0.01f);
+  auto o = zeros_f(static_cast<std::uint32_t>(nv));
+  auto s_keep = s;
+  auto st = gdn_recurrence_step(q, k, alpha, beta, v, s, o);
+  expect(static_cast<bool>(st), "beta=0 keeps S");
+  expect(s == s_keep, "beta=0: S_new = α S with α=1");
+
+  alpha.assign(kGdnValueHeads, 0.0f);
+  beta.assign(kGdnValueHeads, 1.0f);
+  s.assign(ns, 3.0f);
+  k[0] = 1.0f;
+  q[0] = 1.0f;
+  v[0] = bf16(2.0f);
+  st = gdn_recurrence_step(q, k, alpha, beta, v, s, o);
+  expect(static_cast<bool>(st), "alpha=0");
+  expect(s[0] == 2.0f, "alpha=0: S = k̂ e, e=v because p=0");
+  expect(s[1] == 0.0f, "other keys of the same row become 0");
+  float const inv = 1.0f / std::sqrt(128.0f);
+  expect(std::fabs(o[0] - 2.0f * inv) < 1.0e-6f, "o = S q / sqrt(128)");
+  expect(gdn_key_head(5) == 1, "head 5 shares key head 1");
+
+  auto empty = gdn_recurrence_step(std::span<float const>(q.data(), 4), k, alpha, beta,
+                                   v, s, o);
+  expect(!empty && empty.error().code == ErrorCode::InvalidShape,
+         "short q_hat rejected");
+}
+
 }  // namespace
 
 int main() {
@@ -407,6 +455,7 @@ int main() {
   test_rope();
   test_silu_sigmoid_gemv_argmax();
   test_gdn_conv_prepare();
+  test_gdn_recurrence();
   if (g_failures != 0) {
     std::cerr << g_failures << " failures\n";
     return 1;

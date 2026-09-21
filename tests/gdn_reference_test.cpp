@@ -3,7 +3,9 @@
 #include "compiler/quantization/reference.hpp"
 #include "cuda/copy.hpp"
 #include "cuda/decode_mmv.hpp"
+#include "cuda/buffer.hpp"
 
+#include <cmath>
 #include <iostream>
 #include <string>
 #include <vector>
@@ -12,6 +14,7 @@ using qw38::cuda::DeviceBuffer;
 using qw38::cuda::Stream;
 using qw38::cuda::launch_gdn_conv_silu;
 using qw38::cuda::launch_gdn_prepare;
+using qw38::cuda::launch_gdn_recurrence;
 using qw38::format::LogicalQuantizerId;
 using qw38::format::PackedMatrix;
 using qw38::format::PhysicalLayoutId;
@@ -33,6 +36,15 @@ using qw38::gdn::test::kGdnHeadDim;
 using qw38::gdn::test::kGdnKeyHeads;
 using qw38::gdn::test::kGdnQkFp32Abs;
 using qw38::gdn::test::kGdnQkFp32Rel;
+using qw38::gdn::test::kGdnRecurMultiOAbs;
+using qw38::gdn::test::kGdnRecurMultiORel;
+using qw38::gdn::test::kGdnRecurMultiSAbs;
+using qw38::gdn::test::kGdnRecurMultiSRel;
+using qw38::gdn::test::kGdnRecurOAbs;
+using qw38::gdn::test::kGdnRecurORel;
+using qw38::gdn::test::kGdnRecurSAbs;
+using qw38::gdn::test::kGdnRecurSRel;
+using qw38::gdn::test::kGdnSElemsPerLayer;
 using qw38::gdn::test::kGdnValueHeads;
 using qw38::gdn::test::kGdnZWidth;
 using qw38::gdn::test::kHidden;
@@ -41,16 +53,24 @@ using qw38::gdn::test::make_logical;
 using qw38::gdn::test::make_view;
 using qw38::gdn::test::pack_bf16_tile;
 using qw38::gdn::test::pack_q4_from_logical;
+using qw38::gdn::test::pattern_f;
 using qw38::gdn::test::pattern_h;
 using qw38::gdn::test::residual_vec;
 using qw38::gdn::test::upload_vec;
+using qw38::gdn::test::v_from_convolved;
+using qw38::gdn::test::zeros_f;
 using qw38::gdn::test::zeros_h;
 using qw38::reference::gdn_conv_history_step;
 using qw38::reference::gdn_front_reference;
 using qw38::reference::gdn_prepare;
+using qw38::reference::gdn_recurrence_step;
 using qw38::runtime::GdnFrontBindViews;
+using qw38::runtime::GdnRecurrenceBindViews;
 using qw38::runtime::bind_gdn_front_plan;
+using qw38::runtime::bind_gdn_recurrence_plan;
 using qw38::runtime::execute_gdn_front;
+using qw38::runtime::execute_gdn_recurrence;
+using qw38::runtime::kGdnOffO;
 using qw38::runtime::kGdnWorkspaceBytesPerToken;
 
 namespace {
@@ -349,6 +369,194 @@ void test_front_vs_reference(Stream const& stream) {
   expect_fp32_close(g_beta, cpu->beta, "stage beta", kGdnGateFp32Abs,
                     kGdnGateFp32Rel);
   expect_bf16_close(*gh, cpu->history, "stage history", 0.0f, 0.0f);
+
+  auto v_cpu = v_from_convolved(cpu->convolved);
+  auto s_cpu = zeros_f(static_cast<std::uint32_t>(kGdnSElemsPerLayer));
+  auto o_cpu = zeros_f(kGdnValueHeads * kGdnHeadDim);
+  auto rst = gdn_recurrence_step(cpu->q_hat, cpu->k_hat, cpu->alpha, cpu->beta, v_cpu,
+                                 s_cpu, o_cpu);
+  expect(static_cast<bool>(rst), "cpu recurrence after front");
+  auto d_s = DeviceBuffer::allocate(kGdnSElemsPerLayer * 4);
+  if (!d_s) {
+    fail("S alloc");
+    return;
+  }
+  expect(static_cast<bool>(qw38::cuda::zero(*d_s, stream)), "zero S");
+  GdnRecurrenceBindViews rv;
+  rv.q_hat = plan->scratch.q_hat;
+  rv.k_hat = plan->scratch.k_hat;
+  rv.alpha = plan->scratch.alpha;
+  rv.beta = plan->scratch.beta;
+  rv.v = plan->scratch.v;
+  rv.s = make_view(d_s->data(), qw38::format::ArithmeticDtype::Fp32,
+                   PhysicalLayoutId::CudaFp32GdnSHvKV0, StorageClass::Fp32, true, 1,
+                   kGdnSElemsPerLayer);
+  rv.o = plan->scratch.o;
+  rv.s_layer = 0;
+  rv.language_layer = 0;
+  auto rplan = bind_gdn_recurrence_plan(rv, stream);
+  expect(static_cast<bool>(rplan), "bind recurrence after front");
+  if (!rplan) {
+    return;
+  }
+  auto est = execute_gdn_recurrence(*rplan);
+  expect(static_cast<bool>(est), "execute recurrence after front");
+  auto g_s = download_vec<float>(*d_s, kGdnSElemsPerLayer, stream);
+  std::vector<float> g_o(static_cast<std::size_t>(kGdnValueHeads) * kGdnHeadDim);
+  if (!g_s || !copy_ws(kGdnOffO, g_o.size() * 4, g_o.data())) {
+    fail("recurrence download");
+    return;
+  }
+  expect_fp32_close(*g_s, s_cpu, "front+recur S", kGdnRecurSAbs, kGdnRecurSRel);
+  expect_fp32_close(g_o, o_cpu, "front+recur o", kGdnRecurOAbs, kGdnRecurORel);
+}
+
+void l2_normalize_heads(std::vector<float>& x) {
+  for (std::uint32_t h = 0; h < kGdnKeyHeads; ++h) {
+    float sumsq = 0.0f;
+    for (std::uint32_t i = 0; i < kGdnHeadDim; ++i) {
+      float const v = x[static_cast<std::size_t>(h) * kGdnHeadDim + i];
+      sumsq += v * v;
+    }
+    float const inv = 1.0f / std::sqrt(sumsq + 1.0e-6f);
+    for (std::uint32_t i = 0; i < kGdnHeadDim; ++i) {
+      x[static_cast<std::size_t>(h) * kGdnHeadDim + i] *= inv;
+    }
+  }
+}
+
+void fill_step_inputs(int step, std::vector<float>& q, std::vector<float>& k,
+                      std::vector<float>& alpha, std::vector<float>& beta,
+                      std::vector<std::uint16_t>& v) {
+  float const s = 0.15f + 0.01f * static_cast<float>(step);
+  q = pattern_f(static_cast<std::uint32_t>(q.size()), s);
+  k = pattern_f(static_cast<std::uint32_t>(k.size()), -s);
+  l2_normalize_heads(q);
+  l2_normalize_heads(k);
+  alpha.assign(kGdnValueHeads, 0.35f + 0.002f * static_cast<float>(step % 17));
+  beta.assign(kGdnValueHeads, 0.45f + 0.003f * static_cast<float>(step % 11));
+  v = pattern_h(static_cast<std::uint32_t>(v.size()),
+                0.25f + 0.02f * static_cast<float>(step % 9));
+}
+
+bool run_gpu_step(Stream const& stream, std::vector<float> const& q,
+                  std::vector<float> const& k, std::vector<float> const& alpha,
+                  std::vector<float> const& beta,
+                  std::vector<std::uint16_t> const& v, DeviceBuffer& d_s,
+                  DeviceBuffer& d_o) {
+  auto d_q = upload_vec(q, stream);
+  auto d_k = upload_vec(k, stream);
+  auto d_a = upload_vec(alpha, stream);
+  auto d_b = upload_vec(beta, stream);
+  auto d_v = upload_vec(v, stream);
+  if (!d_q || !d_k || !d_a || !d_b || !d_v) {
+    fail("step upload");
+    return false;
+  }
+  auto st = launch_gdn_recurrence(static_cast<float const*>(d_q->data()),
+                                  static_cast<float const*>(d_k->data()),
+                                  static_cast<float const*>(d_a->data()),
+                                  static_cast<float const*>(d_b->data()),
+                                  static_cast<std::uint16_t const*>(d_v->data()),
+                                  static_cast<float*>(d_s.data()), 0,
+                                  static_cast<float*>(d_o.data()), stream);
+  expect(static_cast<bool>(st), "recurrence launch");
+  return static_cast<bool>(st);
+}
+
+void test_recurrence_steps_and_adversarial(Stream const& stream) {
+  std::size_t const nqk = static_cast<std::size_t>(kGdnKeyHeads) * kGdnHeadDim;
+  std::size_t const nv = static_cast<std::size_t>(kGdnValueHeads) * kGdnHeadDim;
+  std::size_t const ns = static_cast<std::size_t>(kGdnSElemsPerLayer);
+
+  auto d_s = DeviceBuffer::allocate(ns * 4);
+  auto d_o = DeviceBuffer::allocate(nv * 4);
+  if (!d_s || !d_o) {
+    fail("recur buffers");
+    return;
+  }
+  expect(static_cast<bool>(qw38::cuda::zero(*d_s, stream)), "zero S");
+
+  std::vector<float> q(nqk), k(nqk), alpha(kGdnValueHeads), beta(kGdnValueHeads);
+  std::vector<std::uint16_t> v(nv);
+  auto s_cpu = zeros_f(static_cast<std::uint32_t>(ns));
+  auto o_cpu = zeros_f(static_cast<std::uint32_t>(nv));
+  int const checkpoints[] = {1, 2, 17, 128};
+  int next = 0;
+  for (int step = 0; step < 128; ++step) {
+    fill_step_inputs(step, q, k, alpha, beta, v);
+    auto rst = gdn_recurrence_step(q, k, alpha, beta, v, s_cpu, o_cpu);
+    expect(static_cast<bool>(rst), "cpu step");
+    if (!run_gpu_step(stream, q, k, alpha, beta, v, *d_s, *d_o)) {
+      return;
+    }
+    if (next < 4 && step + 1 == checkpoints[next]) {
+      float const sa = (step + 1 <= 2) ? kGdnRecurSAbs : kGdnRecurMultiSAbs;
+      float const sr = (step + 1 <= 2) ? kGdnRecurSRel : kGdnRecurMultiSRel;
+      float const oa = (step + 1 <= 2) ? kGdnRecurOAbs : kGdnRecurMultiOAbs;
+      float const orr = (step + 1 <= 2) ? kGdnRecurORel : kGdnRecurMultiORel;
+      auto got_s = download_vec<float>(*d_s, ns, stream);
+      auto got_o = download_vec<float>(*d_o, nv, stream);
+      if (!got_s || !got_o) {
+        fail("checkpoint download");
+        return;
+      }
+      expect_fp32_close(*got_s, s_cpu,
+                        std::string("S steps=") + std::to_string(step + 1), sa, sr);
+      expect_fp32_close(*got_o, o_cpu,
+                        std::string("o steps=") + std::to_string(step + 1), oa, orr);
+      ++next;
+    }
+  }
+
+  struct Adv {
+    char const* name;
+    float a;
+    float b;
+    float qv;
+    float kv;
+    float vv;
+  };
+  Adv cases[] = {
+      {"alpha0", 0.0f, 1.0f, 0.3f, 0.4f, 0.5f},
+      {"beta0", 1.0f, 0.0f, 0.3f, 0.4f, 0.5f},
+      {"alpha1-beta1", 1.0f, 1.0f, 0.2f, -0.2f, 0.7f},
+      {"tiny-alpha", 1.0e-8f, 0.9f, 0.5f, 0.5f, 0.5f},
+      {"tiny-beta", 0.9f, 1.0e-8f, 0.5f, 0.5f, 0.5f},
+      {"large-v", 0.7f, 0.8f, 0.1f, 0.2f, 50.0f},
+  };
+  for (auto const& c : cases) {
+    q = pattern_f(static_cast<std::uint32_t>(nqk), c.qv);
+    k = pattern_f(static_cast<std::uint32_t>(nqk), c.kv);
+    l2_normalize_heads(q);
+    l2_normalize_heads(k);
+    alpha.assign(kGdnValueHeads, c.a);
+    beta.assign(kGdnValueHeads, c.b);
+    v = pattern_h(static_cast<std::uint32_t>(nv), c.vv);
+    auto s0 = pattern_f(static_cast<std::uint32_t>(ns), 0.05f);
+    auto s_ref = s0;
+    auto o_ref = zeros_f(static_cast<std::uint32_t>(nv));
+    auto rst = gdn_recurrence_step(q, k, alpha, beta, v, s_ref, o_ref);
+    expect(static_cast<bool>(rst), std::string(c.name) + " cpu");
+    auto d_si = upload_vec(s0, stream);
+    if (!d_si) {
+      fail(std::string(c.name) + " S upload");
+      return;
+    }
+    if (!run_gpu_step(stream, q, k, alpha, beta, v, *d_si, *d_o)) {
+      return;
+    }
+    auto got_s = download_vec<float>(*d_si, ns, stream);
+    auto got_o = download_vec<float>(*d_o, nv, stream);
+    if (!got_s || !got_o) {
+      fail(std::string(c.name) + " download");
+      return;
+    }
+    expect_fp32_close(*got_s, s_ref, std::string(c.name) + " S", kGdnRecurSAbs,
+                      kGdnRecurSRel);
+    expect_fp32_close(*got_o, o_ref, std::string(c.name) + " o", kGdnRecurOAbs,
+                      kGdnRecurORel);
+  }
 }
 
 }  // namespace
@@ -361,6 +569,7 @@ int main() {
   }
   test_multi_step_kernels(*stream);
   test_front_vs_reference(*stream);
+  test_recurrence_steps_and_adversarial(*stream);
   if (g_failures != 0) {
     std::cerr << g_failures << " gdn reference failures\n";
     return 1;
