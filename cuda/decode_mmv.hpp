@@ -28,6 +28,8 @@ enum class DecodeEpilogue : std::uint8_t {
   StoreBf16 = 1,
   StoreFp32 = 2,
   ResidualAddFp32 = 3,
+  // Paired gate/up only: y = BF16(SiLU(gate) * up). Does not materialize gate/up.
+  SwigluStoreBf16 = 4,
 };
 
 // Sequential CPU GEMV vs warp-tree FP32 reduction. Decoded BF16 operands match

@@ -4,6 +4,7 @@
 
 #include <cmath>
 #include <limits>
+#include <vector>
 
 namespace qw38::reference {
 namespace {
@@ -360,6 +361,44 @@ std::expected<void, Error> dense_gemv_bf16_f64(
     out[i] = acc;
   }
   return {};
+}
+
+std::expected<DecodeMlpReference, Error> decode_mlp_reference(
+    std::span<float const> h_mid, std::span<std::uint16_t const> gamma,
+    float eps, std::span<std::uint16_t const> w_gate,
+    std::span<std::uint16_t const> w_up, std::span<std::uint16_t const> w_down) {
+  if (h_mid.size() != kHidden) {
+    return std::unexpected(
+        shape_error("h_mid", "residual must be [5120] FP32"));
+  }
+  DecodeMlpReference out;
+  out.normalized.assign(kHidden, 0);
+  if (auto st = hidden_rms_norm_1p_gamma(h_mid, gamma, eps, out.normalized);
+      !st) {
+    return std::unexpected(st.error());
+  }
+  std::vector<float> gate(kFfn, 0.0f);
+  std::vector<float> up(kFfn, 0.0f);
+  if (auto st = dense_gemv_bf16(w_gate, out.normalized, kFfn, kHidden, gate);
+      !st) {
+    return std::unexpected(st.error());
+  }
+  if (auto st = dense_gemv_bf16(w_up, out.normalized, kFfn, kHidden, up); !st) {
+    return std::unexpected(st.error());
+  }
+  out.swiglu.assign(kFfn, 0);
+  for (std::uint32_t i = 0; i < kFfn; ++i) {
+    out.swiglu[i] = fp32_to_bf16_rne(silu_fp32(gate[i]) * up[i]);
+  }
+  std::vector<float> down(kHidden, 0.0f);
+  if (auto st = dense_gemv_bf16(w_down, out.swiglu, kHidden, kFfn, down); !st) {
+    return std::unexpected(st.error());
+  }
+  out.residual.resize(kHidden);
+  for (std::uint32_t i = 0; i < kHidden; ++i) {
+    out.residual[i] = h_mid[i] + down[i];
+  }
+  return out;
 }
 
 std::expected<std::uint32_t, Error> argmax_fp32(std::span<float const> logits) {

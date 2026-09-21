@@ -6,11 +6,13 @@
 #include <cstdint>
 #include <expected>
 #include <span>
+#include <vector>
 
 namespace qw38::reference {
 
 // Qwen3.8 language shapes (OBSERVED / DERIVED). Wrappers are shape-specific.
 inline constexpr std::uint32_t kHidden = 5120;
+inline constexpr std::uint32_t kFfn = 17408;
 inline constexpr std::uint32_t kHeadDim = 256;
 inline constexpr std::uint32_t kRotaryDim = 64;
 inline constexpr std::uint32_t kRopeFreqs = 32;
@@ -31,6 +33,13 @@ inline constexpr float kRopeSmallAbs = 8.0e-3f;
 inline constexpr float kRopeLargeAbs = 5.0e-2f;
 inline constexpr float kGemvRel = 1.0e-5f;
 inline constexpr float kGemvAbs = 1.0e-5f;
+// Composed decode MLP: RMS store, SwiGLU BF16 product, down+residual.
+// GEMV reduction-order noise (decode_mmv_tol) plus one BF16 store per stage.
+inline constexpr float kMlpNormAbs = kRmsBf16Abs;
+inline constexpr float kMlpSwigluAbs = 2.0e-2f;
+inline constexpr float kMlpSwigluRel = 1.0e-3f;
+inline constexpr float kMlpResidualAbs = 5.0e-2f;
+inline constexpr float kMlpResidualRel = 1.0e-3f;
 }  // namespace tol
 
 [[nodiscard]] bool eps_ok(float eps) noexcept;
@@ -93,6 +102,19 @@ inline constexpr float kGemvAbs = 1.0e-5f;
     std::span<std::uint16_t const> head_bf16,
     std::span<float const> inv_freq, std::int32_t position,
     std::span<std::uint16_t> out_bf16);
+
+// Decode MLP on decoded BF16 operands: RMS → gate/up GEMV → FP32 SiLU×up
+// BF16 store → down GEMV → FP32 residual add. Does not unpack Q4.
+struct DecodeMlpReference {
+  std::vector<std::uint16_t> normalized;
+  std::vector<std::uint16_t> swiglu;
+  std::vector<float> residual;
+};
+
+[[nodiscard]] std::expected<DecodeMlpReference, Error> decode_mlp_reference(
+    std::span<float const> h_mid, std::span<std::uint16_t const> gamma,
+    float eps, std::span<std::uint16_t const> w_gate,
+    std::span<std::uint16_t const> w_up, std::span<std::uint16_t const> w_down);
 
 // Simple row-major BF16 GEMV: y_n = Σ_k BF16(W_nk)*BF16(x_k) in FP32.
 [[nodiscard]] std::expected<void, Error> dense_gemv_bf16(

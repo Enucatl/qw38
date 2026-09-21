@@ -1,5 +1,6 @@
 #include "cuda/decode_mmv.hpp"
 
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -68,6 +69,19 @@ __device__ __forceinline__ float decode_scaled(int code, float scale) {
     decoded = static_cast<float>(code) * scale;
   }
   return bf16_to_fp32(fp32_to_bf16_rne(decoded));
+}
+
+__device__ __forceinline__ float sigmoid_fp32(float u) {
+  if (u >= 0.0f) {
+    float const e = expf(-u);
+    return 1.0f / (1.0f + e);
+  }
+  float const e = expf(u);
+  return e / (1.0f + e);
+}
+
+__device__ __forceinline__ float silu_fp32(float z) {
+  return z * sigmoid_fp32(z);
 }
 
 template <WeightKind Kind>
@@ -180,9 +194,16 @@ __global__ void decode_mmv_kernel(std::byte const* codes_a, std::byte const* sca
     acc_b = warp_sum(acc_b);
   }
   if (lane == 0 && row < n) {
-    apply_epilogue(epilogue, output_a, residual_a, row, acc_a);
-    if constexpr (Paired) {
-      apply_epilogue(epilogue, output_b, residual_b, row, acc_b);
+    if (epilogue == DecodeEpilogue::SwigluStoreBf16) {
+      if constexpr (Paired) {
+        float const prod = silu_fp32(acc_a) * acc_b;
+        static_cast<std::uint16_t*>(output_a)[row] = fp32_to_bf16_rne(prod);
+      }
+    } else {
+      apply_epilogue(epilogue, output_a, residual_a, row, acc_a);
+      if constexpr (Paired) {
+        apply_epilogue(epilogue, output_b, residual_b, row, acc_b);
+      }
     }
   }
 }
@@ -271,9 +292,14 @@ std::expected<void, Error> validate_geometry(DecodeMmvDesc const& d,
   }
   if (d.epilogue != DecodeEpilogue::StoreBf16 &&
       d.epilogue != DecodeEpilogue::StoreFp32 &&
-      d.epilogue != DecodeEpilogue::ResidualAddFp32) {
+      d.epilogue != DecodeEpilogue::ResidualAddFp32 &&
+      d.epilogue != DecodeEpilogue::SwigluStoreBf16) {
     return std::unexpected(
         make_error(ErrorCode::InvalidArgument, op, "unknown epilogue"));
+  }
+  if (d.epilogue == DecodeEpilogue::SwigluStoreBf16 && !paired_b) {
+    return std::unexpected(make_error(ErrorCode::InvalidArgument, op,
+                                      "SwiGLU epilogue requires paired gate/up launch"));
   }
   if (d.epilogue == DecodeEpilogue::ResidualAddFp32) {
     if (d.residual == nullptr) {
@@ -284,7 +310,6 @@ std::expected<void, Error> validate_geometry(DecodeMmvDesc const& d,
     return std::unexpected(
         make_error(ErrorCode::InvalidArgument, op, "null output"));
   }
-  (void)paired_b;
   return {};
 }
 
@@ -314,7 +339,8 @@ std::expected<void, Error> validate_paired_side(DecodeMmvPairedDesc const& d,
       return std::unexpected(make_error(ErrorCode::InvalidArgument, op,
                                         "paired residual-add requires two FP32 residuals"));
     }
-  } else if (d.output_b == nullptr) {
+  } else if (d.a.epilogue != DecodeEpilogue::SwigluStoreBf16 &&
+             d.output_b == nullptr) {
     return std::unexpected(
         make_error(ErrorCode::InvalidArgument, op, "null paired output"));
   }
