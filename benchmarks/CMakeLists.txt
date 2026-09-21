@@ -2,3 +2,10 @@
 # registered with CTest. EXCLUDE_FROM_ALL keeps them off the default build.
 add_executable(qw38_bench_placeholder EXCLUDE_FROM_ALL placeholder.cpp)
 target_compile_features(qw38_bench_placeholder PRIVATE cxx_std_23)
+
+add_executable(qw38_bench_decode_mmv EXCLUDE_FROM_ALL decode_mmv_bench.cpp)
+target_link_libraries(qw38_bench_decode_mmv PRIVATE qw38_cuda)
+target_compile_features(qw38_bench_decode_mmv PRIVATE cxx_std_23)
+target_compile_options(qw38_bench_decode_mmv PRIVATE
+  $<$<COMPILE_LANGUAGE:CXX>:-Wall -Wextra -Wpedantic>
+)

@@ -20,6 +20,7 @@ class Event {
   Event& operator=(Event const&) = delete;
 
   [[nodiscard]] static std::expected<Event, Error> create();
+  [[nodiscard]] static std::expected<Event, Error> create_timing();
 
   [[nodiscard]] cudaEvent_t native() const noexcept { return event_; }
   [[nodiscard]] bool empty() const noexcept { return event_ == nullptr; }
@@ -34,5 +35,8 @@ class Event {
 
   cudaEvent_t event_{nullptr};
 };
+
+[[nodiscard]] std::expected<float, Error> elapsed_ms(Event const& start,
+                                                     Event const& end);
 
 }  // namespace qw38::cuda

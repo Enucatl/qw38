@@ -34,6 +34,28 @@ std::expected<Event, Error> Event::create() {
   return Event{event};
 }
 
+std::expected<Event, Error> Event::create_timing() {
+  cudaEvent_t event = nullptr;
+  if (auto st = check(cudaEventCreate(&event), "cudaEventCreate"); !st) {
+    return std::unexpected(st.error());
+  }
+  return Event{event};
+}
+
+std::expected<float, Error> elapsed_ms(Event const& start, Event const& end) {
+  if (start.empty() || end.empty()) {
+    return std::unexpected(make_error(ErrorCode::InvalidArgument, "elapsed_ms",
+                                      "empty timing event"));
+  }
+  float ms = 0.0f;
+  if (auto st = check(cudaEventElapsedTime(&ms, start.native(), end.native()),
+                      "cudaEventElapsedTime");
+      !st) {
+    return std::unexpected(st.error());
+  }
+  return ms;
+}
+
 std::expected<void, Error> Event::record(Stream const& stream) const {
   if (event_ == nullptr || stream.empty()) {
     return std::unexpected(make_error(ErrorCode::InvalidArgument, "Event::record",
