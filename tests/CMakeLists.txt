@@ -83,6 +83,40 @@ set_tests_properties(
 set_tests_properties(cuda_runtime_smoke PROPERTIES
   LABELS "cuda;gpu"
 )
+add_executable(qw38_compiler_identity_test compiler_identity_test.cpp)
+target_link_libraries(qw38_compiler_identity_test PRIVATE qw38_compiler)
+target_compile_features(qw38_compiler_identity_test PRIVATE cxx_std_23)
+target_compile_options(qw38_compiler_identity_test PRIVATE
+  $<$<COMPILE_LANGUAGE:CXX>:-Wall -Wextra -Wpedantic>
+)
+
+add_executable(qw38_compiler_transform_test compiler_transform_test.cpp)
+target_link_libraries(qw38_compiler_transform_test PRIVATE qw38_compiler)
+target_compile_features(qw38_compiler_transform_test PRIVATE cxx_std_23)
+target_compile_options(qw38_compiler_transform_test PRIVATE
+  $<$<COMPILE_LANGUAGE:CXX>:-Wall -Wextra -Wpedantic>
+)
+
+add_executable(qw38_compiler_integration_test compiler_integration_test.cpp)
+target_link_libraries(qw38_compiler_integration_test PRIVATE qw38_compiler)
+target_compile_features(qw38_compiler_integration_test PRIVATE cxx_std_23)
+target_compile_options(qw38_compiler_integration_test PRIVATE
+  $<$<COMPILE_LANGUAGE:CXX>:-Wall -Wextra -Wpedantic>
+)
+target_compile_definitions(qw38_compiler_integration_test PRIVATE
+  QW38_SOURCE_DIR="${CMAKE_SOURCE_DIR}"
+)
+
+add_test(NAME compiler_identity COMMAND qw38_compiler_identity_test)
+add_test(NAME compiler_transform COMMAND qw38_compiler_transform_test)
+add_test(NAME compiler_integration COMMAND qw38_compiler_integration_test)
+
+set_tests_properties(
+  compiler_identity compiler_transform compiler_integration
+  PROPERTIES
+  LABELS "compiler"
+)
+
 set_tests_properties(cuda_sm120_cubin PROPERTIES
   LABELS "cuda"
 )

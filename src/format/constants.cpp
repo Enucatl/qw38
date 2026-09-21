@@ -21,6 +21,7 @@ bool is_known(StorageClass value) noexcept {
     case StorageClass::Int4Grouped:
     case StorageClass::Int8Grouped:
     case StorageClass::Bf16:
+    case StorageClass::Fp32:
       return true;
   }
   return false;
@@ -44,6 +45,7 @@ bool is_known(PhysicalLayoutId value) noexcept {
     case PhysicalLayoutId::CudaBf16RowMajorV0:
     case PhysicalLayoutId::CudaBf16VectorV0:
     case PhysicalLayoutId::CudaBf16TapMajorV0:
+    case PhysicalLayoutId::CudaFp32VectorV0:
     case PhysicalLayoutId::CudaFp32GdnSHvKV0:
     case PhysicalLayoutId::CudaBf16ConvHistoryV0:
     case PhysicalLayoutId::CudaBf16KvCacheV0:
@@ -180,6 +182,8 @@ char const* name_of(StorageClass value) noexcept {
       return "int8_grouped";
     case StorageClass::Bf16:
       return "bf16";
+    case StorageClass::Fp32:
+      return "fp32";
   }
   return "unknown_storage";
 }
@@ -210,6 +214,8 @@ char const* name_of(PhysicalLayoutId value) noexcept {
       return "cuda_bf16_vector_v0";
     case PhysicalLayoutId::CudaBf16TapMajorV0:
       return "cuda_bf16_tap_major_v0";
+    case PhysicalLayoutId::CudaFp32VectorV0:
+      return "cuda_fp32_vector_v0";
     case PhysicalLayoutId::CudaFp32GdnSHvKV0:
       return "cuda_fp32_gdn_s_hvk_v0";
     case PhysicalLayoutId::CudaBf16ConvHistoryV0:
@@ -346,6 +352,7 @@ bool layout_is_weight(PhysicalLayoutId layout) noexcept {
     case PhysicalLayoutId::CudaBf16RowMajorV0:
     case PhysicalLayoutId::CudaBf16VectorV0:
     case PhysicalLayoutId::CudaBf16TapMajorV0:
+    case PhysicalLayoutId::CudaFp32VectorV0:
       return true;
     case PhysicalLayoutId::CudaFp32GdnSHvKV0:
     case PhysicalLayoutId::CudaBf16ConvHistoryV0:

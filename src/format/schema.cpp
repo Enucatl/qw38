@@ -903,7 +903,8 @@ std::expected<void, FormatError> validate_mapping_for_tensor(
                                       "tensor.mapping",
                                       "non-tiled layout requires identity mapping"));
   }
-  if (tensor.layout == PhysicalLayoutId::CudaBf16VectorV0) {
+  if (tensor.layout == PhysicalLayoutId::CudaBf16VectorV0 ||
+      tensor.layout == PhysicalLayoutId::CudaFp32VectorV0) {
     if (auto st = require_shape_rank(tensor.shape, 1, offset, "tensor.shape");
         !st) {
       return st;
@@ -951,10 +952,19 @@ std::expected<void, FormatError> validate_quantizer_layout(
       }
       return {};
     case LogicalQuantizerId::None:
+      if (tensor.storage == StorageClass::Fp32) {
+        if (tensor.layout != PhysicalLayoutId::CudaFp32VectorV0) {
+          return std::unexpected(make_error(
+              FormatErrorCode::InvalidQuantizerLayoutPair, offset,
+              "tensor.layout",
+              "FP32 generated tensors require cuda_fp32_vector_v0"));
+        }
+        return {};
+      }
       if (tensor.storage != StorageClass::Bf16) {
         return std::unexpected(make_error(
             FormatErrorCode::InvalidStorageQuantizerPair, offset,
-            "tensor.storage", "unquantized tensors require BF16 storage"));
+            "tensor.storage", "unquantized tensors require BF16 or FP32 storage"));
       }
       if (tensor.layout != PhysicalLayoutId::CudaBf16DenseTileV0 &&
           tensor.layout != PhysicalLayoutId::CudaBf16RowMajorV0 &&
@@ -1303,7 +1313,9 @@ std::expected<std::uint64_t, FormatError> expected_payload_bytes(
   if (!elems) {
     return std::unexpected(elems.error());
   }
-  return checked_mul(*elems, kBf16Size, offset, "tensor.payload");
+  auto const elem_size = tensor.storage == StorageClass::Fp32 ? kFp32Size
+                                                              : kBf16Size;
+  return checked_mul(*elems, elem_size, offset, "tensor.payload");
 }
 
 std::expected<std::uint64_t, FormatError> expected_scale_bytes(

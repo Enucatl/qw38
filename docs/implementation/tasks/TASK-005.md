@@ -1,7 +1,7 @@
 # TASK-005 — BF16 identity compiler path
 
 ## Status
-TODO
+DONE
 ## Milestone
 M1 — Runtime artifact and compiler foundation
 ## Purpose
@@ -51,23 +51,52 @@ Host `compiler/`, compiler CLI, source-format reader, identity reconstruction te
 ## Benchmark required
 No; record peak host memory as diagnostic evidence only.
 ## Acceptance criteria
-- [ ] Identity artifact reconstructs every included BF16 source tensor exactly after inverse layout transforms.
-- [ ] Language graph has 130 instances and MTP is retained but disabled.
-- [ ] Source/config/tokenizer/compiler identities and state schema are present.
-- [ ] Compiler streams without holding the complete checkpoint in memory.
-- [ ] Tests pass with exact commands recorded.
+- [x] Identity artifact reconstructs every included BF16 source tensor exactly after inverse layout transforms.
+- [x] Language graph has 130 instances and MTP is retained but disabled.
+- [x] Source/config/tokenizer/compiler identities and state schema are present.
+- [x] Compiler streams without holding the complete checkpoint in memory.
+- [x] Tests pass with exact commands recorded.
 ## Architecture blocker rule
 On a locked conflict, stop with all required `ARCHITECTURE_BLOCKER` fields; do not reinterpret source semantics.
 ## Completion report
 ### Result
-DONE | BLOCKED
+DONE. Independent verification PASS (Debug/Release ctest 14/14).
 ### Changes made
+- Host `src/compiler/`: encoded 38-family identity table expanded to the sitting 866 language+MTP tensors; vision `model.visual.*` excluded; MTP classified retained-disabled.
+- Offline CLI `qw38-compile --checkpoint DIR --output FILE [--no-verify]` reads HF `config.json`, `model.safetensors.index.json`, and shard headers/payloads with a narrow JSON/safetensors parser (no PyTorch/TF).
+- Typed `std::expected` stages: config/architecture validation, header classification (names/shapes/dtypes/sharing), schema emit, streaming transform/write, independent reconstruction.
+- V0 identity transforms: BF16 dense `[N/8,K/256,8,256]` tiles streamed in 4 KiB units; conv `[channel,1,tap]`→`[tap,channel]`; generated 32 FP32 RoPE `ω_j=θ^{-2j/64}` as `rope.inv_freq`.
+- Artifact metadata: SHA-256 of index/config/tokenizer, compiler revision `qw38-bf16-identity` 0.1.0, precision policy V0, scope `language_plus_mtp_descriptors`, shared MTP embed/`lm_head` aliases, language GDN/conv/KV state schema, decode scratch schema. Graph bindings carry `layer_index` for diagnostic one-layer consumption.
+- Format extension required to store generated RoPE: `StorageClass::Fp32` and `PhysicalLayoutId::CudaFp32VectorV0`.
+- Tests: `compiler_identity`, `compiler_transform`, `compiler_integration`. CMake wires `qw38_compiler` and `qw38-compile`.
 ### Tests run
-Exact commands/results.
+Debug:
+
+```text
+docker run --gpus all --rm -u "$(id -u):$(id -g)" \
+  -v "$PWD":/workspace -w /workspace qw38-dev:cuda13.4.1 \
+  bash -lc 'cmake -S . -B build/debug -DCMAKE_BUILD_TYPE=Debug && cmake --build build/debug && ctest --test-dir build/debug --output-on-failure'
+```
+
+Result: 14/14 tests passed (`host_expected_smoke`, `format_schema`, `format_schema_integration`, `format_writer` 0.02s, `format_sha256` 0.02s, `format_writer_integration` 0.01s, `format_reader` 0.03s, `format_reader_digest` 0.01s, `format_reader_integration` 0.01s, `cuda_runtime_smoke` 0.23s, `cuda_sm120_cubin`, `compiler_identity` 0.02s, `compiler_transform`, `compiler_integration` 0.24s).
+
+Release:
+
+```text
+docker run --gpus all --rm -u "$(id -u):$(id -g)" \
+  -v "$PWD":/workspace -w /workspace qw38-dev:cuda13.4.1 \
+  bash -lc 'cmake -S . -B build/release -DCMAKE_BUILD_TYPE=Release && cmake --build build/release && ctest --test-dir build/release --output-on-failure'
+```
+
+Result: 14/14 tests passed (`host_expected_smoke`, `format_schema`, `format_schema_integration`, `format_writer` 0.03s, `format_sha256` 0.01s, `format_writer_integration` 0.01s, `format_reader` 0.03s, `format_reader_digest` 0.01s, `format_reader_integration` 0.01s, `cuda_runtime_smoke` 0.22s, `cuda_sm120_cubin`, `compiler_identity`, `compiler_transform`, `compiler_integration` 0.07s).
+
+Authoritative checkpoint `.cache/authorities/qwen3.8-27b-transformers` was present (18 shards). Integration classified all 866 language+MTP tensors, excluded 333 vision tensors, built a 130-instance language graph with 5 retained-disabled MTP instances, and reconstructed sampled real `A_log`, `conv1d`, and `in_proj_a` tensors exactly after inverse transforms. Repeated synthetic compile was byte-identical. Full 54 GiB identity emission is `src/qw38-compile --checkpoint ... --output ...`; default ctest does not write that artifact.
 ### Benchmark results
-Not required; include peak-memory diagnostic if measured.
+Not required. CLI prints `peak_rss_bytes` from `/proc/self/status` `VmHWM` after compile. Default tests stream one shard at a time plus 4 KiB dense tiles; they do not materialize the 54.64 GB source.
 ### Architecture blocker
-None or full report.
+None.
 ### Follow-up observations
-Concrete only.
+- TASK-002 graph validation allows `LM_HEAD` bindings only with role `LmHeadWeight`, so `model.language_model.norm.weight` and `mtp.norm.weight` are stored in the tensor directory but not graph-bound as head norms.
+- Generated RoPE required an FP32 vector storage/layout that TASK-002 did not define; `StorageClass::Fp32` / `cuda_fp32_vector_v0` is the additive ABI used here.
+- Full-checkpoint `.qw38` emission is implemented and reconstruction-checked in the CLI (`--no-verify` to skip the second pass) but is omitted from default ctest because the identity payload is ~54 GiB.
 

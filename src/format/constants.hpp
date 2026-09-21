@@ -41,6 +41,7 @@ enum class StorageClass : std::uint16_t {
   Int4Grouped = 0x0001,
   Int8Grouped = 0x0002,
   Bf16 = 0x0003,
+  Fp32 = 0x0004,
 };
 
 enum class LogicalQuantizerId : std::uint16_t {
@@ -56,6 +57,7 @@ enum class PhysicalLayoutId : std::uint16_t {
   CudaBf16RowMajorV0 = 0x0204,
   CudaBf16VectorV0 = 0x0205,
   CudaBf16TapMajorV0 = 0x0206,
+  CudaFp32VectorV0 = 0x020A,
   CudaFp32GdnSHvKV0 = 0x0207,
   CudaBf16ConvHistoryV0 = 0x0208,
   CudaBf16KvCacheV0 = 0x0209,
