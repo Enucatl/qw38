@@ -163,3 +163,44 @@ set_tests_properties(
 set_tests_properties(cuda_sm120_cubin PROPERTIES
   LABELS "cuda"
 )
+
+add_executable(qw38_runtime_plan_test runtime_plan_test.cpp)
+target_link_libraries(qw38_runtime_plan_test PRIVATE qw38_runtime)
+target_compile_features(qw38_runtime_plan_test PRIVATE cxx_std_23)
+target_compile_options(qw38_runtime_plan_test PRIVATE
+  $<$<COMPILE_LANGUAGE:CXX>:-Wall -Wextra -Wpedantic>
+)
+
+add_executable(qw38_runtime_raii_test runtime_raii_test.cpp)
+target_link_libraries(qw38_runtime_raii_test PRIVATE qw38_runtime)
+target_compile_features(qw38_runtime_raii_test PRIVATE cxx_std_23)
+target_compile_options(qw38_runtime_raii_test PRIVATE
+  $<$<COMPILE_LANGUAGE:CXX>:-Wall -Wextra -Wpedantic>
+)
+
+add_executable(qw38_runtime_state_index_test runtime_state_index_test.cpp)
+target_link_libraries(qw38_runtime_state_index_test PRIVATE qw38_runtime)
+target_compile_features(qw38_runtime_state_index_test PRIVATE cxx_std_23)
+target_compile_options(qw38_runtime_state_index_test PRIVATE
+  $<$<COMPILE_LANGUAGE:CXX>:-Wall -Wextra -Wpedantic>
+)
+
+add_executable(qw38_runtime_session_integration_test
+  runtime_session_integration_test.cpp)
+target_link_libraries(qw38_runtime_session_integration_test PRIVATE qw38_runtime)
+target_compile_features(qw38_runtime_session_integration_test PRIVATE cxx_std_23)
+target_compile_options(qw38_runtime_session_integration_test PRIVATE
+  $<$<COMPILE_LANGUAGE:CXX>:-Wall -Wextra -Wpedantic>
+)
+
+add_test(NAME runtime_plan COMMAND qw38_runtime_plan_test)
+add_test(NAME runtime_raii COMMAND qw38_runtime_raii_test)
+add_test(NAME runtime_state_index COMMAND qw38_runtime_state_index_test)
+add_test(NAME runtime_session_integration COMMAND qw38_runtime_session_integration_test)
+
+set_tests_properties(runtime_plan PROPERTIES LABELS "runtime")
+set_tests_properties(
+  runtime_raii runtime_state_index runtime_session_integration
+  PROPERTIES
+  LABELS "runtime;cuda;gpu"
+)

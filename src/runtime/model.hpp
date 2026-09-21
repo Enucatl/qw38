@@ -1,0 +1,79 @@
+#pragma once
+
+#include "runtime/error.hpp"
+#include "runtime/view.hpp"
+
+#include "cuda/buffer.hpp"
+#include "format/reader.hpp"
+
+#include <cstdint>
+#include <expected>
+#include <span>
+#include <string_view>
+#include <vector>
+
+namespace qw38::cuda {
+class Stream;
+}
+
+namespace qw38::runtime {
+
+class Model {
+ public:
+  Model(Model&&) noexcept = default;
+  Model& operator=(Model&&) noexcept = default;
+  ~Model() = default;
+
+  Model(Model const&) = delete;
+  Model& operator=(Model const&) = delete;
+
+  [[nodiscard]] qw38::format::ArtifactSchema const& schema() const noexcept {
+    return schema_;
+  }
+  [[nodiscard]] std::span<qw38::format::TensorRecord const> tensors()
+      const noexcept {
+    return schema_.tensors;
+  }
+  [[nodiscard]] std::span<qw38::format::StateAllocation const> state()
+      const noexcept {
+    return schema_.state;
+  }
+  [[nodiscard]] std::span<qw38::format::ScratchAllocation const> scratch()
+      const noexcept {
+    return schema_.scratch;
+  }
+  [[nodiscard]] std::span<qw38::format::GraphBinding const> graph_bindings()
+      const noexcept {
+    return schema_.graph_bindings;
+  }
+
+  [[nodiscard]] qw38::format::TensorRecord const* find_tensor(
+      std::string_view logical_name) const noexcept;
+  [[nodiscard]] std::expected<TensorView, Error> payload(
+      std::string_view logical_name) const;
+  [[nodiscard]] std::expected<TensorView, Error> scales(
+      std::string_view logical_name) const;
+
+  [[nodiscard]] std::uint64_t device_bytes() const noexcept { return device_bytes_; }
+
+ private:
+  friend class Runtime;
+
+  Model() = default;
+
+  static std::expected<Model, Error> upload(qw38::format::Artifact const& artifact,
+                                            qw38::cuda::Stream const& stream);
+
+  struct UploadedTensor {
+    std::uint32_t tensor_id{};
+    TensorView payload{};
+    TensorView scales{};
+  };
+
+  qw38::format::ArtifactSchema schema_{};
+  std::vector<qw38::cuda::DeviceBuffer> buffers_;
+  std::vector<UploadedTensor> uploaded_;
+  std::uint64_t device_bytes_{0};
+};
+
+}  // namespace qw38::runtime

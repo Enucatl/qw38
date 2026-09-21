@@ -1,0 +1,98 @@
+#pragma once
+
+#include "runtime/arena.hpp"
+#include "runtime/error.hpp"
+#include "runtime/sizes.hpp"
+#include "runtime/view.hpp"
+
+#include "cuda/buffer.hpp"
+#include "format/constants.hpp"
+
+#include <array>
+#include <cstddef>
+#include <cstdint>
+#include <expected>
+#include <vector>
+
+namespace qw38::cuda {
+class Stream;
+}
+
+namespace qw38::runtime {
+
+class Model;
+
+struct SessionSnapshot {
+  std::vector<std::byte> gdn_s;
+  std::vector<std::byte> conv_history;
+  std::vector<std::byte> kv;
+  std::array<std::uint32_t, kConvLayers> conv_cursor{};
+  std::uint64_t kv_populated{0};
+};
+
+class Session {
+ public:
+  Session(Session&&) noexcept = default;
+  Session& operator=(Session&&) noexcept = default;
+  ~Session() = default;
+
+  Session(Session const&) = delete;
+  Session& operator=(Session const&) = delete;
+
+  [[nodiscard]] std::expected<void, Error> reset();
+  [[nodiscard]] std::expected<SessionSnapshot, Error> save() const;
+  [[nodiscard]] std::expected<void, Error> restore(SessionSnapshot const& snap);
+
+  [[nodiscard]] TensorView gdn_s() const noexcept;
+  [[nodiscard]] TensorView conv_history() const noexcept;
+  [[nodiscard]] TensorView kv() const noexcept;
+  [[nodiscard]] TensorView residual_h() const noexcept;
+  [[nodiscard]] TensorView residual_h_mid() const noexcept;
+  [[nodiscard]] std::expected<TensorView, Error> scratch(
+      qw38::format::ScratchKind kind) const;
+
+  [[nodiscard]] std::uint64_t kv_capacity() const noexcept { return kv_capacity_; }
+  [[nodiscard]] std::uint64_t kv_populated() const noexcept {
+    return kv_populated_;
+  }
+  [[nodiscard]] std::expected<void, Error> set_populated_length(
+      std::uint64_t populated);
+
+  [[nodiscard]] std::array<std::uint32_t, kConvLayers> const& conv_cursor()
+      const noexcept {
+    return conv_cursor_;
+  }
+  [[nodiscard]] std::expected<void, Error> set_conv_cursor(
+      std::array<std::uint32_t, kConvLayers> cursor);
+
+  [[nodiscard]] ArenaPlan const& arena_plan() const noexcept { return arena_; }
+  [[nodiscard]] std::uint64_t persistent_bytes() const noexcept {
+    return persistent_bytes_;
+  }
+
+ private:
+  friend class Runtime;
+
+  Session() = default;
+
+  static std::expected<Session, Error> create(Model const& model,
+                                              qw38::cuda::Stream const& stream,
+                                              std::uint64_t kv_capacity);
+
+  [[nodiscard]] std::expected<void, Error> zero_persistent();
+
+  qw38::cuda::Stream const* stream_{nullptr};
+  qw38::cuda::DeviceBuffer gdn_s_;
+  qw38::cuda::DeviceBuffer conv_history_;
+  qw38::cuda::DeviceBuffer kv_;
+  qw38::cuda::DeviceBuffer residual_h_;
+  qw38::cuda::DeviceBuffer residual_h_mid_;
+  qw38::cuda::DeviceBuffer scratch_;
+  ArenaPlan arena_{};
+  std::array<std::uint32_t, kConvLayers> conv_cursor_{};
+  std::uint64_t kv_capacity_{0};
+  std::uint64_t kv_populated_{0};
+  std::uint64_t persistent_bytes_{0};
+};
+
+}  // namespace qw38::runtime

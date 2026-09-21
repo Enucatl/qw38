@@ -63,8 +63,8 @@ message(STATUS "qw38 CUDA host compiler: ${CMAKE_CUDA_HOST_COMPILER}")
 message(STATUS "qw38 CUDA architectures: ${CMAKE_CUDA_ARCHITECTURES}")
 message(STATUS "qw38 build type: ${CMAKE_BUILD_TYPE}")
 
-add_subdirectory(src)
 add_subdirectory(cuda)
+add_subdirectory(src)
 add_subdirectory(benchmarks)
 
 include(CTest)
