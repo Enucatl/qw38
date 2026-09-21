@@ -39,6 +39,9 @@ enum class FormatErrorCode : std::uint16_t {
   InconsistentInput = 30,
   OverlappingSpan = 31,
   PublishFailed = 32,
+  IntegrityDigestMismatch = 33,
+  MissingIntegrity = 34,
+  TensorNotFound = 35,
 };
 
 struct FormatError {

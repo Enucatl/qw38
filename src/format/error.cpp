@@ -70,6 +70,12 @@ char const* code_name(FormatErrorCode code) noexcept {
       return "overlapping_span";
     case FormatErrorCode::PublishFailed:
       return "publish_failed";
+    case FormatErrorCode::IntegrityDigestMismatch:
+      return "integrity_digest_mismatch";
+    case FormatErrorCode::MissingIntegrity:
+      return "missing_integrity";
+    case FormatErrorCode::TensorNotFound:
+      return "tensor_not_found";
   }
   return "unknown";
 }

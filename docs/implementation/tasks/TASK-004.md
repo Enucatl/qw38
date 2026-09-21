@@ -1,7 +1,7 @@
 # TASK-004 — `.qw38` reader, metadata, and corruption validation
 
 ## Status
-TODO
+DONE
 ## Milestone
 M1 — Runtime artifact and compiler foundation
 ## Purpose
@@ -47,23 +47,46 @@ Host `format/` reader/validator and corruption/round-trip fixtures.
 ## Benchmark required
 No.
 ## Acceptance criteria
-- [ ] Valid artifacts expose all mandated metadata and exact bytes.
-- [ ] Corruption and unsupported versions fail before allocation/use.
-- [ ] Mapping/view ownership is unambiguous and RAII-managed.
-- [ ] State schema represents language-only coefficients correctly and does not include live state.
-- [ ] All tests pass.
+- [x] Valid artifacts expose all mandated metadata and exact bytes.
+- [x] Corruption and unsupported versions fail before allocation/use.
+- [x] Mapping/view ownership is unambiguous and RAII-managed.
+- [x] State schema represents language-only coefficients correctly and does not include live state.
+- [x] All tests pass.
 ## Architecture blocker rule
 On a locked conflict, stop with all required `ARCHITECTURE_BLOCKER` fields; do not substitute.
 ## Completion report
 ### Result
-DONE | BLOCKED
+DONE. Independent verification PASS (Debug/Release ctest 11/11).
 ### Changes made
+- Host-only `Artifact` under `src/format/reader.hpp` / `reader.cpp`: `open(path)` memory-maps with RAII `mmap`/`munmap` + fd; `parse(vector|span)` owns a byte buffer. Payload/scale views are `std::span<std::byte const>` whose lifetime is the `Artifact`.
+- `std::expected<Artifact, FormatError>` is returned only after header decode, overflow-safe range checks, exact file-size match, schema validation (versions, enums, layouts, shapes, storage/scale pairs, shared/graph bindings, compiler revision, precision policy, semantic scope, state/scratch schema including live-state rejection), unique-span ordering/overlap vs header+manifest, required integrity coverage, and SHA-256 of every schema-declared region.
+- Manifest digest covers the encoded prefix `manifest_length - 56` (excludes the trailing digest record), matching the TASK-003 writer.
+- Lookup by stable logical name or tensor id; typed accessors for compiler, precision, scope, graph bindings, and state/scratch schema. Unknown names return `TensorNotFound`; digest mismatch is `IntegrityDigestMismatch`; missing records are `MissingIntegrity`.
+- Tests: truncation at every header/span/manifest record boundary; bad magic/version/enum/hash; misalignment, overflow, overlap; invalid layout/quantizer and storage/quantizer pairs; bad shapes/scales/shared bindings/state; independent digest verification; TASK-003 multi-tensor writer→reader round trip with identical metadata and span bytes; corruption mutations for every validation family.
 ### Tests run
-Exact commands/results.
+Debug:
+
+```text
+docker run --gpus all --rm -u "$(id -u):$(id -g)" \
+  -v "$PWD":/workspace -w /workspace qw38-dev:cuda13.4.1 \
+  bash -lc 'cmake -S . -B build/debug -DCMAKE_BUILD_TYPE=Debug && cmake --build build/debug && ctest --test-dir build/debug --output-on-failure'
+```
+
+Result: 11/11 tests passed (`host_expected_smoke`, `format_schema`, `format_schema_integration`, `format_writer` 0.03s, `format_sha256` 0.02s, `format_writer_integration` 0.01s, `format_reader` 0.03s, `format_reader_digest` 0.01s, `format_reader_integration` 0.01s, `cuda_runtime_smoke` 0.23s, `cuda_sm120_cubin`).
+
+Release:
+
+```text
+docker run --gpus all --rm -u "$(id -u):$(id -g)" \
+  -v "$PWD":/workspace -w /workspace qw38-dev:cuda13.4.1 \
+  bash -lc 'cmake -S . -B build/release -DCMAKE_BUILD_TYPE=Release && cmake --build build/release && ctest --test-dir build/release --output-on-failure'
+```
+
+Result: 11/11 tests passed (`host_expected_smoke`, `format_schema`, `format_schema_integration`, `format_writer` 0.03s, `format_sha256` 0.01s, `format_writer_integration` 0.01s, `format_reader` 0.03s, `format_reader_digest` 0.01s, `format_reader_integration` 0.01s, `cuda_runtime_smoke` 0.23s, `cuda_sm120_cubin`).
 ### Benchmark results
 Not required.
 ### Architecture blocker
-None or full report.
+None.
 ### Follow-up observations
-Concrete only.
+- POSIX fd RAII is duplicated in `writer.cpp` and `reader.cpp`; they are intentionally separate host I/O units. A shared helper would be a later cleanup, not a TASK-004 contract.
 

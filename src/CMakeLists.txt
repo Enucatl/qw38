@@ -6,6 +6,7 @@ add_library(qw38_format STATIC
   format/schema.cpp
   format/sha256.cpp
   format/writer.cpp
+  format/reader.cpp
 )
 target_include_directories(qw38_format PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 target_compile_features(qw38_format PUBLIC cxx_std_23)

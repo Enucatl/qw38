@@ -1,0 +1,334 @@
+#include "format_reader_support.hpp"
+
+#include <algorithm>
+#include <iostream>
+#include <string>
+#include <string_view>
+
+using qw38::format::Artifact;
+using qw38::format::error_message;
+using qw38::format::FormatErrorCode;
+using qw38::format::PhysicalLayoutId;
+using qw38::format::StorageClass;
+using qw38::format::test::mutate_schema;
+using qw38::format::test::read_all;
+using qw38::format::test::record_boundaries;
+using qw38::format::test::ScratchDir;
+using qw38::format::test::write_minimal;
+using qw38::format::test::write_task003;
+
+namespace {
+
+int g_failures = 0;
+
+void fail(std::string_view what) {
+  std::cerr << "FAIL: " << what << '\n';
+  ++g_failures;
+}
+
+void expect(bool cond, std::string_view what) {
+  if (!cond) {
+    fail(what);
+  }
+}
+
+void expect_code(std::expected<Artifact, qw38::format::FormatError> const& r,
+                 FormatErrorCode code, std::string_view what) {
+  if (r) {
+    fail(std::string(what) + ": unexpectedly succeeded");
+    return;
+  }
+  if (r.error().code != code) {
+    fail(std::string(what) + ": got " + error_message(r.error()));
+  }
+}
+
+void test_truncation_at_record_boundaries() {
+  ScratchDir dir("qw38-reader-trunc");
+  auto fx = write_task003(dir.file("fixture.qw38"));
+  if (fx.path.empty()) {
+    fail("write task003 fixture for truncation");
+    return;
+  }
+  auto bytes = read_all(fx.path);
+  auto art = Artifact::open(fx.path);
+  if (!art) {
+    fail(std::string("open valid fixture: ") + error_message(art.error()));
+    return;
+  }
+  auto bounds = record_boundaries(art->header(), art->schema());
+  expect(!bounds.empty(), "record boundaries are nonempty");
+  expect(bounds.back() == bytes.size(),
+         "walker last boundary is the full artifact size");
+
+  int checked = 0;
+  for (auto b : bounds) {
+    if (b >= bytes.size()) {
+      continue;
+    }
+    auto truncated = std::vector<std::byte>(bytes.begin(),
+                                            bytes.begin() + static_cast<std::ptrdiff_t>(b));
+    auto parsed = Artifact::parse(truncated);
+    if (parsed) {
+      fail("truncation at " + std::to_string(b) + " was accepted");
+    }
+    ++checked;
+  }
+  expect(checked >= 20, "checked many record-boundary truncations");
+}
+
+void test_open_and_parse_roundtrip_minimal() {
+  ScratchDir dir("qw38-reader-min");
+  auto fx = write_minimal(dir.file("min.qw38"));
+  if (fx.path.empty()) {
+    fail("write minimal fixture");
+    return;
+  }
+  auto opened = Artifact::open(fx.path);
+  if (!opened) {
+    fail(std::string("open minimal: ") + error_message(opened.error()));
+    return;
+  }
+  expect(opened->find_tensor("v") != nullptr, "logical identity v exists");
+  expect(opened->find_tensor(1) != nullptr, "tensor id 1 exists");
+  expect(opened->find_tensor("missing") == nullptr, "unknown name is null");
+  auto payload = opened->payload("v");
+  if (!payload) {
+    fail(error_message(payload.error()));
+    return;
+  }
+  expect(payload->size() == fx.payload.size(), "payload length 8");
+  expect(std::equal(payload->begin(), payload->end(), fx.payload.begin()),
+         "payload bytes match");
+  auto scales = opened->scales("v");
+  expect(scales && scales->empty(), "unquantized tensor has empty scales");
+  auto missing = opened->payload("nope");
+  if (missing) {
+    fail("missing payload lookup succeeded");
+  } else {
+    expect(missing.error().code == FormatErrorCode::TensorNotFound,
+           "unknown logical identity is tensor_not_found");
+  }
+  expect(opened->compiler().ident == "qw38", "compiler revision");
+  expect(opened->state().empty(), "minimal artifact has no live or schema state");
+  expect(opened->identity().path == fx.path, "identity path");
+
+  auto bytes = read_all(fx.path);
+  auto parsed = Artifact::parse(bytes);
+  if (!parsed) {
+    fail(std::string("parse minimal: ") + error_message(parsed.error()));
+    return;
+  }
+  auto p2 = parsed->payload("v");
+  expect(p2 && std::equal(p2->begin(), p2->end(), fx.payload.begin()),
+         "parse views match open");
+}
+
+void test_bad_magic_version_enum() {
+  ScratchDir dir("qw38-reader-magic");
+  auto fx = write_minimal(dir.file("m.qw38"));
+  auto bytes = read_all(fx.path);
+  bytes[0] = std::byte{'X'};
+  expect_code(Artifact::parse(bytes), FormatErrorCode::BadMagic, "bad magic");
+
+  bytes = read_all(fx.path);
+  bytes[8] = std::byte{2};
+  expect_code(Artifact::parse(bytes), FormatErrorCode::UnsupportedContainerVersion,
+              "unsupported container version");
+
+  bytes = read_all(fx.path);
+  bytes[10] = std::byte{9};
+  expect_code(Artifact::parse(bytes), FormatErrorCode::UnsupportedManifestVersion,
+              "unsupported header manifest version");
+
+  auto mutated = mutate_schema(read_all(fx.path), [](auto& schema) {
+    schema.manifest_version = 9;
+  });
+  if (!mutated) {
+    fail(error_message(mutated.error()));
+    return;
+  }
+  expect_code(Artifact::parse(*mutated),
+              FormatErrorCode::UnsupportedManifestVersion,
+              "unsupported schema manifest version");
+
+  mutated = mutate_schema(read_all(fx.path), [](auto& schema) {
+    schema.tensors[0].layout = static_cast<PhysicalLayoutId>(0xFFFFu);
+  });
+  if (!mutated) {
+    fail(error_message(mutated.error()));
+    return;
+  }
+  expect_code(Artifact::parse(*mutated), FormatErrorCode::UnknownEnum,
+              "unknown layout enum");
+}
+
+void test_misalignment_overflow_overlap() {
+  ScratchDir dir("qw38-reader-arith");
+  auto fx = write_minimal(dir.file("a.qw38"));
+  auto file = read_all(fx.path);
+
+  auto misaligned = mutate_schema(file, [](auto& schema) {
+    schema.tensors[0].payload.offset += 1;
+  });
+  if (!misaligned) {
+    fail(error_message(misaligned.error()));
+    return;
+  }
+  expect_code(Artifact::parse(*misaligned), FormatErrorCode::Misaligned,
+              "misaligned payload");
+
+  auto overflowed = file;
+  // manifest_offset = UINT64_MAX-10, length = 32 → add overflow in header.
+  overflowed[16] = std::byte{0xF6};
+  overflowed[17] = std::byte{0xFF};
+  overflowed[18] = std::byte{0xFF};
+  overflowed[19] = std::byte{0xFF};
+  overflowed[20] = std::byte{0xFF};
+  overflowed[21] = std::byte{0xFF};
+  overflowed[22] = std::byte{0xFF};
+  overflowed[23] = std::byte{0xFF};
+  overflowed[24] = std::byte{32};
+  overflowed[25] = std::byte{0};
+  overflowed[26] = std::byte{0};
+  overflowed[27] = std::byte{0};
+  overflowed[28] = std::byte{0};
+  overflowed[29] = std::byte{0};
+  overflowed[30] = std::byte{0};
+  overflowed[31] = std::byte{0};
+  expect_code(Artifact::parse(overflowed), FormatErrorCode::Overflow,
+              "header manifest arithmetic overflow");
+
+  auto fx2 = write_task003(dir.file("ov.qw38"));
+  auto two = read_all(fx2.path);
+  auto overlap = mutate_schema(two, [](auto& schema) {
+    schema.tensors[1].payload.offset = schema.tensors[0].payload.offset;
+  });
+  if (!overlap) {
+    fail(error_message(overlap.error()));
+    return;
+  }
+  expect_code(Artifact::parse(*overlap), FormatErrorCode::OverlappingSpan,
+              "overlapping unique payloads");
+}
+
+void test_invalid_pairs_shapes_scales_shared_state() {
+  ScratchDir dir("qw38-reader-schema");
+  auto fx = write_task003(dir.file("s.qw38"));
+  auto file = read_all(fx.path);
+
+  auto pair = mutate_schema(file, [](auto& schema) {
+    schema.tensors[1].layout = PhysicalLayoutId::CudaBf16DenseTileV0;
+  });
+  if (!pair) {
+    fail(error_message(pair.error()));
+    return;
+  }
+  expect_code(Artifact::parse(*pair), FormatErrorCode::InvalidQuantizerLayoutPair,
+              "invalid layout/quantizer pair");
+
+  auto storage = mutate_schema(file, [](auto& schema) {
+    schema.tensors[1].storage = StorageClass::Bf16;
+  });
+  if (!storage) {
+    fail(error_message(storage.error()));
+    return;
+  }
+  expect_code(Artifact::parse(*storage),
+              FormatErrorCode::InvalidStorageQuantizerPair,
+              "invalid storage/quantizer pair");
+
+  auto shape = mutate_schema(file, [](auto& schema) {
+    schema.tensors[0].shape.logical[0] = 0;
+  });
+  if (!shape) {
+    fail(error_message(shape.error()));
+    return;
+  }
+  expect_code(Artifact::parse(*shape), FormatErrorCode::InvalidShape, "bad shape");
+
+  auto scales = mutate_schema(file, [](auto& schema) {
+    schema.tensors[1].scales.length += 2;
+  });
+  if (!scales) {
+    fail(error_message(scales.error()));
+    return;
+  }
+  expect_code(Artifact::parse(*scales), FormatErrorCode::InvalidSpan,
+              "scale length mismatch");
+
+  auto shared = mutate_schema(file, [](auto& schema) {
+    schema.shared_bindings[0].alias_tensor_id =
+        schema.shared_bindings[0].owner_tensor_id;
+  });
+  if (!shared) {
+    fail(error_message(shared.error()));
+    return;
+  }
+  expect_code(Artifact::parse(*shared), FormatErrorCode::SharedBinding,
+              "self shared binding");
+
+  auto state = mutate_schema(file, [](auto& schema) {
+    schema.state[0].layer_count = 7;
+  });
+  if (!state) {
+    fail(error_message(state.error()));
+    return;
+  }
+  expect_code(Artifact::parse(*state), FormatErrorCode::InvalidStateAllocation,
+              "bad GDN state schema");
+
+  auto live = mutate_schema(file, [](auto& schema) {
+    schema.state[0].live_payload_present = true;
+  });
+  if (!live) {
+    fail(error_message(live.error()));
+    return;
+  }
+  expect_code(Artifact::parse(*live), FormatErrorCode::LiveStateForbidden,
+              "live state forbidden");
+}
+
+void test_bad_hash_and_leftover() {
+  ScratchDir dir("qw38-reader-hash");
+  auto fx = write_minimal(dir.file("h.qw38"));
+  auto bytes = read_all(fx.path);
+  bytes[256] = static_cast<std::byte>(static_cast<std::uint8_t>(bytes[256]) ^ 0xFF);
+  expect_code(Artifact::parse(bytes), FormatErrorCode::IntegrityDigestMismatch,
+              "payload byte flip");
+
+  bytes = read_all(fx.path);
+  auto opened = Artifact::open(fx.path);
+  auto const& recs = opened->schema().integrity;
+  expect(!recs.empty(), "integrity records present");
+  auto const digest_off =
+      opened->header().manifest_offset + opened->header().manifest_length - 32;
+  bytes[static_cast<std::size_t>(digest_off)] =
+      static_cast<std::byte>(static_cast<std::uint8_t>(
+                                 bytes[static_cast<std::size_t>(digest_off)]) ^
+                             0x01);
+  expect_code(Artifact::parse(bytes), FormatErrorCode::IntegrityDigestMismatch,
+              "manifest digest flip");
+
+  bytes = read_all(fx.path);
+  bytes.push_back(std::byte{0xAB});
+  expect_code(Artifact::parse(bytes), FormatErrorCode::LeftoverBytes,
+              "trailing leftover bytes");
+}
+
+}  // namespace
+
+int main() {
+  test_truncation_at_record_boundaries();
+  test_open_and_parse_roundtrip_minimal();
+  test_bad_magic_version_enum();
+  test_misalignment_overflow_overlap();
+  test_invalid_pairs_shapes_scales_shared_state();
+  test_bad_hash_and_leftover();
+  if (g_failures != 0) {
+    std::cerr << g_failures << " reader unit checks failed\n";
+    return 1;
+  }
+  std::cout << "format reader unit ok\n";
+  return 0;
+}

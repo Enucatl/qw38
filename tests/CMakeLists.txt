@@ -35,12 +35,37 @@ target_compile_options(qw38_format_writer_integration_test PRIVATE
   $<$<COMPILE_LANGUAGE:CXX>:-Wall -Wextra -Wpedantic>
 )
 
+add_executable(qw38_format_reader_test format_reader_test.cpp)
+target_link_libraries(qw38_format_reader_test PRIVATE qw38_format)
+target_compile_features(qw38_format_reader_test PRIVATE cxx_std_23)
+target_compile_options(qw38_format_reader_test PRIVATE
+  $<$<COMPILE_LANGUAGE:CXX>:-Wall -Wextra -Wpedantic>
+)
+
+add_executable(qw38_format_reader_digest_test format_reader_digest_test.cpp)
+target_link_libraries(qw38_format_reader_digest_test PRIVATE qw38_format)
+target_compile_features(qw38_format_reader_digest_test PRIVATE cxx_std_23)
+target_compile_options(qw38_format_reader_digest_test PRIVATE
+  $<$<COMPILE_LANGUAGE:CXX>:-Wall -Wextra -Wpedantic>
+)
+
+add_executable(qw38_format_reader_integration_test
+  format_reader_integration_test.cpp)
+target_link_libraries(qw38_format_reader_integration_test PRIVATE qw38_format)
+target_compile_features(qw38_format_reader_integration_test PRIVATE cxx_std_23)
+target_compile_options(qw38_format_reader_integration_test PRIVATE
+  $<$<COMPILE_LANGUAGE:CXX>:-Wall -Wextra -Wpedantic>
+)
+
 add_test(NAME host_expected_smoke COMMAND qw38_host_expected_smoke)
 add_test(NAME format_schema COMMAND qw38_format_schema_test)
 add_test(NAME format_schema_integration COMMAND qw38_format_schema_integration_test)
 add_test(NAME format_writer COMMAND qw38_format_writer_test)
 add_test(NAME format_sha256 COMMAND qw38_format_sha256_test)
 add_test(NAME format_writer_integration COMMAND qw38_format_writer_integration_test)
+add_test(NAME format_reader COMMAND qw38_format_reader_test)
+add_test(NAME format_reader_digest COMMAND qw38_format_reader_digest_test)
+add_test(NAME format_reader_integration COMMAND qw38_format_reader_integration_test)
 add_test(NAME cuda_runtime_smoke COMMAND qw38_cuda_runtime_smoke)
 add_test(
   NAME cuda_sm120_cubin
@@ -51,6 +76,7 @@ add_test(
 set_tests_properties(
   format_schema format_schema_integration
   format_writer format_sha256 format_writer_integration
+  format_reader format_reader_digest format_reader_integration
   PROPERTIES
   LABELS "format"
 )

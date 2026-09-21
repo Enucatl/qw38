@@ -7,3 +7,4 @@
 #include "format/sha256.hpp"
 #include "format/wire.hpp"
 #include "format/writer.hpp"
+#include "format/reader.hpp"
