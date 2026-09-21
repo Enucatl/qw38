@@ -7,10 +7,35 @@
 - Store GDN recurrent state in **FP32**, with key coordinates contiguous in physical `[head, value, key]` order. Store convolution history and KV in **BF16**. Persistent state lives in VRAM and survives both kernel and token boundaries.
 - Retain six model-native semantic families: `EMBED`, `GATED_ATTENTION`, `GATED_DELTA_NET`, `MLP`, `LM_HEAD`, and conditional `MTP_MIX`. Lower each into explicit, modest CUDA kernels; semantic nodes are not kernel boundaries.
 - Make decode a sequence of packed-weight matrix-vector contractions, recurrent updates, and streamed attention. Optimize weight bytes per token first, while recognizing that long-context KV traffic can become dominant.
-- Make prefill layer-wise within 256-token input chunks: tensor-core matrix-matrix projections, tiled causal attention, and 64-token GDN recurrence kernels that retain state slices in registers. Decode and prefill share semantics and packed weights, not their execution strategy.
+- Make prefill layer-wise in bounded input chunks: tensor-core matrix-matrix projections, tiled causal attention, and state-resident GDN recurrence kernels. Decode and prefill share semantics and packed weights, not their execution strategy.
 - Materialize residuals and selected scratch buffers to keep V0 implementable. Keep unpacked weight tiles, reduction intermediates, attention scores, and recurrent update temporaries local; never expand the entire packed model into floating-point weights at runtime.
 
 These are implementation decisions. Their quality and speed are **HYPOTHESIS**, not benchmark results. **OBSERVED** denotes checkpoint/config facts, **MEASURED** existing tensor statistics, **DERIVED** equations or arithmetic, and **UNKNOWN** a fact the dossier does not establish. Uncertainty changes a decision only through the experiments below; it does not leave the initial implementation unspecified.
+
+# Architecture decision traceability
+
+This register is normative. Every V0 decision that changes on-disk bytes, numerical behavior, persistent state, semantic or physical graph boundaries, or a kernel ABI appears here. A V1 change updates the named ID and its affected consumers rather than silently changing repeated prose. `T-*` entries are tuning defaults, not architecture contracts; their values may change after profiling without a new artifact or semantic version.
+
+| ID | V0 decision | Evidence | Class | Why selected | Weakest assumption | Falsified by |
+| --- | --- | --- | --- | --- | --- | --- |
+| A-01 | CUDA-oriented `.qw38`, one packed view | Runtime-format and traffic studies | DERIVED + HYPOTHESIS | Removes runtime repacking and duplicate-view capacity | CUDA specialization harms prefill/workflow enough to outweigh it | EXP-G; later backend work |
+| A-02 | Logical quantizer separate from physical layout ABI | Artifact/compiler design | DERIVED | Lets equivalent quantized values receive a new packing | Code/scale reordering cannot remain lossless/useful | Layout decoder tests |
+| Q-01 | Main dense projections use Q4G64 | BF16 statistics, weight traffic, quantization study | MEASURED + DERIVED + HYPOTHESIS | Largest byte reduction with one simple decoder | G64 preserves behavior sufficiently | EXP-A |
+| Q-02 | `lm_head` uses Q8G32 | Vocabulary traffic and output sensitivity | DERIVED + HYPOTHESIS | Conservative head compression | Q4 is equally acceptable | EXP-B |
+| Q-03 | Embeddings and small/sensitive families remain BF16 | Gather access class, recurrence/sensitivity analysis | DERIVED + HYPOTHESIS | Avoids low-value numerical and implementation variables | Narrowing produces material capacity/latency gain without behavior loss | Future family-specific study |
+| P-01 | FP32 residual, reductions, nonlinear/recurrent arithmetic | Numerical sensitivity analysis | DERIVED + HYPOTHESIS | Bounds accumulation and recurrence error | Narrower working paths are behaviorally sufficient | EXP-C, EXP-E |
+| P-02 | BF16 normalized/projection transport and BF16 KV/C | Source dtype, tensor-core path, state schema | OBSERVED + HYPOTHESIS | Reduces scratch/cache traffic and feeds prefill operands | BF16 transport changes behavior materially | EXP-E |
+| S-01 | FP32 GDN S | Recurrent equations and `mamba_ssm_dtype` intent | OBSERVED + DERIVED + HYPOTHESIS | Error crosses token boundaries; 144 MiB fixed state is affordable | BF16 state error remains bounded | EXP-C |
+| S-02 | S ABI is `[head,value,key]`, warp per value row | GDN dimensions and CUDA layout analysis | DERIVED + HYPOTHESIS | Coalesced key reduction, one read/update/write ownership | Alternate ownership wins end to end | EXP-D |
+| G-01 | Six Qwen-native semantic node families | Model semantics, dataflow, semantic graph | DERIVED | Preserves model-relevant state and boundaries | A node boundary prevents necessary optimization | EXP-F, profiling |
+| G-02 | Decode and prefill have separate physical schedules | Decode/prefill work and reuse analysis | DERIVED + HYPOTHESIS | GEMV/state work differs from GEMM/token reuse | Common schedule is competitive | End-to-end mode comparison |
+| L-01 | `cuda_q4g64_v0` / `cuda_q8g32_v0` packed dense layouts | Q4G64/Q8G32 consumer design | HYPOTHESIS | Matches initial warp-row MMV and local prefill decode | Another ownership/packing is materially better | Projection microbenchmarks + E2E |
+| M-01 | Residual/state/output obligations plus selected scratch cuts | Lifetime and materialization analysis | DERIVED + HYPOTHESIS | Separates mandatory state from debuggable V0 stores | A chosen store is too costly | EXP-F |
+| T-01 | Initial decode projection geometry: 8 warps/block, 256-input K tile | Consumer dimensions | HYPOTHESIS — tuning | Simple aligned first kernel | Resource/throughput profile is poor | Profiling |
+| T-02 | Initial prefill geometry: 256-token input chunk, 32×64×64 projection tile, 64-token recurrence interval | Working-set reasoning | HYPOTHESIS — tuning | Bounds scratch and reuses operands/state | Another geometry is materially better | EXP-H; profiling |
+| T-03 | Initial attention geometry: 128-thread blocks, 256-key decode segment / 32-key subtile, 32-query × 64-key prefill tile | Head dimensions and working-set reasoning | HYPOTHESIS — tuning | Supplies parallel segments with bounded staging | Register/shared-memory profile is poor | Profiling |
+
+`Q4G64` and `Q8G32` are logical quantizer contracts: grouping, signed code range, scale computation, and logical matrix coordinates. `cuda_q4g64_v0` and `cuda_q8g32_v0` are separate physical-layout contracts: byte order, tile shape, alignment, and scale-array order. A future `cuda_q4g64_v1` may rearrange exactly the same quantized values, but needs its own manifest layout version and reader/kernel support. Changing Q4G64 itself requires a quantizer version and fresh behavior validation.
 
 # Scope and evidence that drive the choices
 
@@ -30,7 +55,7 @@ This design uses the existing dossier and checkpoint config. Quartz and llama.cp
 
 The primary artifact is a single little-endian `.qw38` container: versioned header, manifest/tensor directory, and aligned CUDA-oriented payload spans. V0 does not emit a portable duplicate of the weights. It does not load GGUF.
 
-The header identifies the container version and manifest location. The directory records each tensor's logical identity and shape, storage class, physical layout version, logical-to-physical mapping, payload/scale offsets and lengths, and shared bindings. It also records the source/config hashes, compiler revision, precision policy, supported semantic scope, and state allocation schema. Use 64-bit byte offsets and lengths, 256-byte-aligned payload and scale spans, and SHA-256 integrity records over the manifest and payload spans. Reader validation rejects unsupported layout versions and malformed spans before allocating device memory.
+The header identifies the container version and manifest location. The directory records each tensor's logical identity and shape, storage class, **quantizer version**, physical layout version (`cuda_q4g64_v0`, `cuda_q8g32_v0`, or a BF16 layout), logical-to-physical mapping, payload/scale offsets and lengths, and shared bindings. It also records the source/config hashes, compiler revision, precision policy, supported semantic scope, and state allocation schema. Use 64-bit byte offsets and lengths, 256-byte-aligned payload and scale spans, and SHA-256 integrity records over the manifest and payload spans. Reader validation rejects unsupported layout versions and malformed spans before allocating device memory.
 
 The artifact contains weights and state **schemas**, not live state, zero-filled state templates, CUDA binaries, activations, or tokenizer tables. Tokenizer assets remain external, with their hashes bound to the deployment manifest. Embeddings and `lm_head` remain untied; conditional MTP binds to those same two payloads rather than adding copies.
 
@@ -94,9 +119,9 @@ This is a deliberately simple initial quantizer, not a claim that round-to-neare
 
 ## Physical packing and consumption
 
-Dense matrices use logical `W[N, K]`, with an initial physical code order `[N/8, K/256, 8, packed_256]`: eight output rows by 256 consecutive input coordinates per tile. Q4 uses 128 code bytes per tile row; Q8 uses 256. The lower nibble represents the earlier coordinate in Q4. BF16 dense control/gate matrices use the corresponding eight-row, 256-input tile order without code packing. Embeddings are independently row-major; vector weights are contiguous; convolution weights are tap-major.
+Dense matrices use logical `W[N, K]`. Physical layout `cuda_q4g64_v0` / `cuda_q8g32_v0` uses code order `[N/8, K/256, 8, packed_256]`: eight output rows by 256 consecutive input coordinates per tile. Q4 uses 128 code bytes per tile row; Q8 uses 256. The lower nibble represents the earlier coordinate in Q4. BF16 dense control/gate matrices use the corresponding eight-row, 256-input tile order without code packing. Embeddings are independently row-major; vector weights are contiguous; convolution weights are tap-major.
 
-Scales occupy a **separate contiguous array**, ordered `[N/8, K/256, row_in_tile, group_in_tile]`: four scales per row for Q4 and eight for Q8. They are not interleaved as 34-byte records with codes, which would disrupt aligned code loads. Both arrays have 256-byte-aligned bases; code tile rows and tile strides have natural vector alignment. The actual projection dimensions divide eight output rows and 256 input coordinates exactly. The format still records logical extents; any padded coordinates are zero and excluded from outputs and scale estimation.
+Scales occupy a **separate contiguous array**, ordered `[N/8, K/256, row_in_tile, group_in_tile]`: four scales per row for Q4 and eight for Q8. They are not interleaved as 34-byte records with codes, which would disrupt aligned code loads. Both arrays have 256-byte-aligned bases; code tile rows and tile strides have natural vector alignment. The actual projection dimensions divide eight output rows and 256 input coordinates exactly. The format still records logical extents; any padded coordinates are zero and excluded from outputs and scale estimation. This byte order belongs to `cuda_q4g64_v0` / `cuda_q8g32_v0`, not to Q4G64/Q8G32 themselves.
 
 ```text
 global packed weight tile + matching scale tile
@@ -239,6 +264,10 @@ At populated length 4096, KV is 256 MiB and total state about 402.81 MiB. At the
 
 # Decode schedule
 
+## Initial tuning defaults
+
+The following geometry is `T-01`/`T-03` tuning, not an architecture contract: a decode projection uses eight warps per block and a 256-input K tile; decode attention uses a 128-thread block per query head and 256-key segment, scanned in 32-key subtiles. The artifact ABI, quantizer, state ABI, and semantic result do not depend on those values. Profiling may change them without creating Architecture V1.
+
 **Central hypothesis:** for batch-one decode at short and moderate contexts, packed weight movement dominates the large contractions. V0 reduces those bytes and keeps unpacking adjacent to use, while providing enough parallelism for recurrent and attention state work.
 
 ```mermaid
@@ -263,6 +292,10 @@ All main matrices are consumed from the tile/scale arrays specified above. There
 Under the selected policy, unique active language non-embedding weights occupy about **14.33 GB / 13.34 GiB** (DERIVED), versus about 51.25 GB in BF16. This is an ideal one-pass weight-byte count, not measured HBM traffic. GDN adds 288 MiB of state read-plus-write per decode step across 48 layers. At T=4096, unique past-KV reads are about 256 MiB; query-head rereads may multiply physical traffic. At very long contexts, the growing KV scan can rival or exceed weight movement, so “weight-bound decode” is not a universal claim. Kernel launch and unpack instruction costs are additional unmeasured risks.
 
 # Prefill is a different physical schedule
+
+## Initial tuning defaults
+
+The following values are `T-02`/`T-03` tuning defaults, not architecture contracts: 256-token input chunks, 32-token × 64-output projection tiles with K stepped by 64, 64-token GDN recurrence intervals, and 128-thread attention/projection blocks. They are selected to make the first working set explicit. Changing them requires continuation and correctness checks, but does not change the artifact ABI or semantic graph.
 
 V0 processes a prompt in **256-token input chunks**, in order. Within each chunk it executes all tokens of a layer together, then the next layer; it does not invoke the full decode stack once per prompt token. The first chunk starts from zero state; later chunks continue exact incoming C/S/KV and absolute positions. This bounds scratch without replacing causal attention with a window.
 
@@ -289,6 +322,8 @@ Prefill uses the same quantized values, residual semantics, GQA mapping, norms, 
 
 # Initial CUDA ownership commitments
 
+Ownership axes and persistence boundaries in this table are architecture commitments where they define an ABI, especially `S-02`. Thread counts, block dimensions, and tile extents are `T-*` tuning defaults even when shown to make the first kernel implementable.
+
 All rows below are **HYPOTHESIS** mappings selected from the concerns in the [layout study](layout-strategy.md), [hardware model](cuda-hardware-model.md), and [CUDA design space](cuda-design-space.md). They are the kernels to implement first, not measured winners.
 
 | Computation | V0 CUDA ownership and local storage | Strongest risk |
@@ -314,11 +349,13 @@ First establish the BF16 identity compiler path against the source model's langu
 
 Then evaluate the V0 artifact using teacher-forced target-token NLL relative to that BF16 control, FP32 log-softmax, output-distribution KL, deterministic greedy generation, and representative language, code, arithmetic/reasoning, and long-context retrieval tasks. Hash the tokenized evaluation inputs and loss masks; reset at document boundaries and count each scored target once. Any later calibration uses disjoint data. MTP metrics remain unavailable until its semantics are verified and must never be folded into an apparently comparable language-only average.
 
-Choose provisional release gates now: **HYPOTHESIS** limits of +0.03 nats/token mean NLL and +0.06 on each declared domain/context slice relative to the BF16 control, with no capability-score regression greater than two percentage points beyond paired uncertainty. Deterministic outputs are inspected for failures and repetition, not required to match token-for-token. These are engineering acceptance budgets, not thresholds established by the dossier. Freeze the actual held-out suite and scoring rules before comparing quantizers; failure blocks a quality claim and drives targeted wider precision, rather than silently relaxing the gate.
+## Initial validation policy
+
+The following are validation-policy defaults, not architecture contracts: **HYPOTHESIS** limits of +0.03 nats/token mean NLL and +0.06 on each declared domain/context slice relative to the BF16 control, with no capability-score regression greater than two percentage points beyond paired uncertainty. Deterministic outputs are inspected for failures and repetition, not required to match token-for-token. These are engineering acceptance budgets, not thresholds established by the dossier. Freeze the actual held-out suite and scoring rules before comparing quantizers; failure blocks a quality claim and drives targeted wider precision, rather than silently relaxing the gate.
 
 Measure batch-one decode at populated lengths 512, 4096, and 32768; prefill at 256, 4096, and 32768 tokens; and a request that prefills then generates 128 tokens. Exercise the maximum supported context separately when memory permits, and report any untested long-context coverage. Record artifact/binary hashes, GPU and resource limits, capacity versus populated length, clocks, graph mode, warmups, repetitions, and token/output policy. Warm up five runs, collect at least twenty timed repetitions with restored identical incoming state, and report median, p99, and uncertainty. Setup, upload, warmup, and state restore are outside steady-state timing and reported separately; the first generated token belongs to TTFT, not subsequent decode throughput.
 
-Use node/kernel profiles, actual memory traffic, spills, and occupancy to explain end-to-end measurements. Do not add parent graph durations to their child kernel times. A local speedup is insufficient if the matching end-to-end request regresses. For architectural replacements below, require a reproducible benefit beyond noise; use 5% end-to-end improvement in the affected mode as the initial engineering threshold, alongside the quality gate and explicit memory accounting.
+Use node/kernel profiles, actual memory traffic, spills, and occupancy to explain end-to-end measurements. Do not add parent graph durations to their child kernel times. A local speedup is insufficient if the matching end-to-end request regresses. The initial validation policy requests a reproducible benefit beyond noise, using 5% end-to-end improvement in the affected mode as an engineering threshold alongside the quality gate and explicit memory accounting. This threshold is not an architecture decision.
 
 `models/Qwen3.8-27B-Q4_K_M.gguf` through llama.cpp is a **future black-box Pareto point** for quality, size, and performance under matching identities. It supplies neither compiler input nor numerical targets. Compiling directly from BF16 may produce better quality than Q4_K_M; V0 must neither inherit its errors nor reproduce its logits. No quality or throughput result is claimed by this document.
 
