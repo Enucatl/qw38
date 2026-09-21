@@ -179,6 +179,18 @@ Identity for `tf_delta_vs_control` (protocol, not executed):
 - Candidate = a legal TASK-08 recipe per family; this document assigns none.
 - Prefill and decode share the metric; do not report decode-only tok/s as NLL.
 
+The corpus-agnostic identity artifact records tokenizer implementation and
+version, hashes of every tokenizer asset, exact input IDs, explicit special-token
+IDs, and an explicit boolean loss mask. Artificial context-only tokens have mask
+0; a target is scored exactly when its mask is 1. Aggregate events by summing
+language and MTP negative-log-likelihood numerators and dividing by their scored
+event counts; document/window means are never averaged. Scored targets form
+non-overlapping ranges and have exactly one owner window; overlap is left context
+only. Reset at every document boundary and never continue state across documents.
+Every window starts reset and reconstructs its declared left context. Complete-map
+MTP behavior inherited here remains conditional on TASK-02's unverified analysis
+model.
+
 Omitting MTP from the primary number is methodology risk `v_nll_without_mtp`. Language-only NLL may be tabulated as a **secondary** row, not the Pareto \(Y\) value.
 
 Softmax over \(V\) for sampling remains out of the TASK-02 forward map. Log-softmax used here is an evaluation readout of logits already specified by TASK-02 `(22)`/`(24)` and MTP \(\ell^{(1)}\). Language logits \(\ell^{(0)}_t\) predict token \(t+1\); MTP \(\ell^{(1)}_t\) consumes the embedding of \(t+1\) and predicts token \(t+2\). The complete map includes MTP.
@@ -409,6 +421,20 @@ Live object from sitting `text_config` plus locked constants. First fenced `json
   "mtp_in_primary_nll": true,
   "sampling_out_of_nll": true,
   "log_softmax_is_eval_readout": true,
+  "measurement_identity": {
+    "tokenizer_implementation": "required_with_version",
+    "tokenizer_asset_hashes": "required",
+    "exact_input_ids": "required",
+    "special_token_ids": "required",
+    "loss_mask": "explicit_boolean_per_target",
+    "artificial_context_tokens_scored": false,
+    "aggregation": "sum_nll_numerators_divide_by_scored_event_counts",
+    "target_partition": "nonoverlapping_exactly_one_owner_window",
+    "window_overlap": "left_context_only",
+    "document_boundary_reset": true,
+    "cross_document_state": false,
+    "window_start": "reset_then_reconstruct_declared_left_context"
+  },
   "behavioral_class_ids": [
     "beh_greedy_prefix",
     "beh_prompt_suite",
@@ -557,6 +583,11 @@ Live object from sitting `text_config` plus locked constants. First fenced `json
     "i3_g32",
     "i3_g32_extract",
     "i2_g32_extract"
+  ],
+  "compiler_profile_ids": [
+    "quality",
+    "balanced",
+    "compression"
   ],
   "n_policy_families": 16,
   "n_candidate_recipes": 22,

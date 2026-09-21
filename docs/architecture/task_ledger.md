@@ -797,13 +797,13 @@ Consistency-review and freeze the self-contained Phase 1 architecture dossier.
   them silent design authority.
 
 **Completion criteria:**
-- [x] Check cross-document equations, dimensions, totals, state, contracts, and proposals.
+- [x] Mechanically check cross-document first-fence schemas, keys, counts, and flags; this is not independent semantic proof.
 - [x] Correct documentation inconsistencies and preserve true unknowns.
 - [x] Mark the reviewed design `FROZEN_FOR_COMPARATIVE_REVIEW`.
 
 ## TASK-22 — Remediate Phase 1 review findings
 
-**Status:** TODO
+**Status:** DONE
 
 **Depends on:** TASK-21
 
@@ -837,17 +837,21 @@ affected contracts.
   do not invalidate the primary language-model facts or frozen candidate baseline.
 
 **Completion criteria:**
-- [ ] Correct all material factual and contract omissions recorded in TASK-22’s
+- [x] Correct all material factual and contract omissions recorded in TASK-22’s
   dossier, including their propagated downstream references.
-- [ ] Add focused validations that fail on each corrected semantic/table/contract
+- [x] Add focused validations that fail on each corrected semantic/table/contract
   regression, using upstream source data rather than duplicated self-consistency
   constants where the dossier identifies an authoritative source.
-- [ ] Supply all 18 TASK-17 mapping records with the six required symbolic
+- [x] Supply all 18 TASK-17 mapping records with the six required symbolic
   estimates and correct the TASK-16/TASK-17 CUDA formula and synchronization
   semantics without selecting a SKU, launch configuration, or winner.
-- [ ] Narrow TASK-21’s freeze claim to what its checker proves, or add an
+- [x] Narrow TASK-21’s freeze claim to what its checker proves, or add an
   independent semantic verifier that proves the stated cross-document contract
   categories; preserve genuine unknowns and non-selection.
-- [ ] Re-run the required checkpoint/document validations, remove identified dead
+- [x] Re-run the required checkpoint/document validations, remove identified dead
   declaration-only code, reconcile affected dossier control metadata, and record
   exact review-remediation evidence.
+
+## Ledger history
+
+- `2026-09-21T09:01:28Z` — TASK-22 marked `DONE` after independent verification `PASS`.

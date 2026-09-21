@@ -1,5 +1,7 @@
 # Qwen3.8-27B performance methodology (TASK-19)
 
+Complete-map MTP behavior cited here is conditional on TASK-02's unverified analysis model.
+
 > **Draft status:** conclusions in this document are **unverified** until the verification stage completes.
 
 Phase 1 **performance evaluation methodology** for Qwen3.8-27B language+MTP.

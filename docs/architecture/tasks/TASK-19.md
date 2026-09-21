@@ -5,7 +5,7 @@
 - Primary ID: `TASK-19`
 - Coupled IDs: `none`
 - Dependencies: `TASK-06`, `TASK-13`, `TASK-14`, `TASK-17` (all DONE at admission)
-- Status: `IN PROGRESS`
+- Status: `DONE`
 - Ledger acceptance: Specify requested decode, prefill, and kernel metrics; Require end-to-end measurement alongside microbenchmarks; Do not run implementation benchmarks in this study task.
 
 ## Goal and boundaries

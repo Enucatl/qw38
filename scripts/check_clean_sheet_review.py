@@ -43,10 +43,9 @@ CANONICAL_SENTENCE_FREEZE = (
     "existing runtimes are not thereby design authority."
 )
 REVIEW_QUESTION_SENTENCE = (
-    "Cross-document equations, dimensions, totals, state, contracts, "
-    "and proposals are checked; documentation inconsistencies are "
-    "corrected and true unknowns are preserved; the reviewed design is "
-    "marked FROZEN_FOR_COMPARATIVE_REVIEW."
+    "Cross-document first-fence schemas, keys, counts, and flags are mechanically "
+    "checked; this is not independent semantic proof; true unknowns are preserved; "
+    "the reviewed design is marked FROZEN_FOR_COMPARATIVE_REVIEW."
 )
 FREEZE_NON_AUTHORITY_SENTENCE = (
     "Existing Quartz and llama.cpp/GGML Qwen implementations are not "
@@ -86,7 +85,7 @@ EQUATION_TAG_END = 24
 N_CANDIDATE_RECIPES = 22
 N_FUSION_HYPOTHESES = 22
 N_MAPPINGS = 18
-N_SENSITIVE_OPS = 20
+N_SENSITIVE_OPS = 21
 N_CATALOGUED_ALTERNATIVES = 125
 POOLED_ALL_ABSMAX = 25.5
 POOLED_LANGUAGE_MTP_ABSMAX = 19.25

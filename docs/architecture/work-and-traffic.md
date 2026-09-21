@@ -1,5 +1,7 @@
 # Qwen3.8-27B work and traffic bounds (TASK-06)
 
+All MTP-only work and traffic totals are conditional on TASK-02's unverified analysis model.
+
 > **Draft status:** conclusions in this document are **unverified** until the verification stage completes.
 
 Phase 1 decode/prefill **mathematical work** and **irreducible traffic** analysis
@@ -261,8 +263,10 @@ recurrent `(17)`.
 
 ## Activation traffic
 
-BF16 activations (not \(S\)). Three DERIVED views; **primary reported bound is
-region-cut**. None is a CUDA live-set or fusion claim.
+BF16 activations (not \(S\)). Three DERIVED views. Only the forced set is the
+unqualified semantic minimum. Region-cut is
+`assumed_region_interface_accounting`, not a minimum or selected boundary.
+None is a CUDA live-set or fusion claim.
 
 Catalog IDs (TASK-03/04 order, 52 nodes): `token_id`, `e`, `h`, `h_tilde`,
 `h_mid`, `h_post`, `h_64`, `h_final`, `logits_0`, `u_q`, `q_prime`, `g`,
@@ -276,7 +280,7 @@ Catalog IDs (TASK-03/04 order, 52 nodes): `token_id`, `e`, `h`, `h_tilde`,
    `logits_0`, and for complete also MTP `h` / `h_mid` / `g` / `logits_1`.
    - Decode language: \(64\cdot 10240\cdot 2 + 16\cdot 12288 + 48\cdot 12288 + 496640 = 2593792\) bytes (`h`+`h_mid` + `g` + `z` + `logits_0`).
    - Decode complete: \(2593792 + 2\cdot 10240 + 12288 + 496640 = 3123200\).
-2. **Region-cut** (primary): forced plus catalog IDs at TASK-03 region
+2. **Assumed region interface accounting:** forced plus catalog IDs at TASK-03 region
    boundaries: `e`, `h_tilde`, `mix_lin` / `mix_full`, `h_post`, `mlp_out`,
    `h_64`, `h_final`, and MTP `e_next`, `mtp_u`, `h_mtp` (plus the MTP
    residual-layer cuts `h` / `h_tilde` / mix / `h_mid` / `h_post` / `mlp_out`).
@@ -562,6 +566,7 @@ Live object from `text_config` arithmetic plus locked constants (copied from
     "lm_head",
     "mtp"
   ],
+  "region_accounting_status": "forced_is_semantic_minimum; region_cut_is_assumed_region_interface_accounting",
   "n_catalog_nodes": 52,
   "catalog_ids": [
     "token_id",

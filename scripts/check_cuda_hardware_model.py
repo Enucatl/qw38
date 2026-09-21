@@ -122,11 +122,11 @@ FORMULA_IDS: tuple[str, ...] = (
 
 FORMULA_SUBSTRINGS: tuple[str, ...] = (
     r"O = \min(O_\text{reg}, O_\text{smem}, O_\text{threads}, O_\text{cta})",
-    r"B_\text{reg} = \lfloor S_\text{reg} / R_\text{cta} \rfloor",
+    r"B_\text{reg}=\lfloor S_\text{reg}/R_\text{alloc,cta}\rfloor",
     r"B_\text{smem} = \lfloor C_\text{smem} / C_\text{alloc} \rfloor",
     r"B_\text{threads} = \lfloor T_\max / T_\text{cta} \rfloor",
     r"B_\text{cta} = B_\max",
-    r"B_\text{SM} = \min(B_\text{reg}, B_\text{smem}, B_\text{threads}, B_\text{cta})",
+    r"B_\text{SM} = \min(B_\text{reg}, B_\text{smem}, B_\text{threads}, B_\text{cta}, B_\text{warp})",
     r"W_\text{cta} = \lceil T_\text{cta} / N_w \rceil",
     r"O = W_\text{active} / W_\max",
     r"W_\text{need} = N_\text{sched} \cdot L_\text{issue}",

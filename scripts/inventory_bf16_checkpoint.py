@@ -227,7 +227,6 @@ def _empty_family(family_id: str) -> dict[str, Any]:
         "n_bytes": 0,
         "dtype": BF16,
         "shape_set": set(),
-        "names": [],
     }
 
 
@@ -348,7 +347,6 @@ def inventory_checkpoint(checkpoint: Path) -> dict[str, Any]:
         family["n_parameters"] += spec["n_parameters"]
         family["n_bytes"] += spec["n_bytes"]
         family["shape_set"].add(tuple(spec["shape"]))
-        family["names"].append(name)
         assert family["dtype"] == BF16
         assert spec["dtype"] == BF16
 

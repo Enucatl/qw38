@@ -5,7 +5,7 @@
 - Primary ID: `TASK-21`
 - Coupled IDs: `none`
 - Dependencies: `TASK-20` (DONE at admission)
-- Status: `IN PROGRESS`
+- Status: `DONE`
 - Ledger acceptance: Check cross-document equations, dimensions, totals, state, contracts, and proposals; Correct documentation inconsistencies and preserve true unknowns; Mark the reviewed design `FROZEN_FOR_COMPARATIVE_REVIEW`.
 
 ## Goal and boundaries

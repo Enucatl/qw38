@@ -1,5 +1,7 @@
 # Qwen3.8-27B lifetime and persistent state (TASK-04)
 
+All MTP-only state and lifetime results are conditional on TASK-02's unverified analysis model.
+
 > **Draft status:** conclusions in this document are **unverified** until the verification stage completes.
 
 Phase 1 lifetime and persistent-state analysis for the Qwen3.8-27B language +

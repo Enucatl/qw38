@@ -222,7 +222,8 @@ $$
 Resident CTAs per SM (F6):
 
 $$
-B_\text{SM} = \min(B_\text{reg}, B_\text{smem}, B_\text{threads}, B_\text{cta})
+B_\text{warp}=\lfloor W_\max/W_\text{cta}\rfloor,\qquad
+B_\text{SM} = \min(B_\text{reg}, B_\text{smem}, B_\text{threads}, B_\text{cta}, B_\text{warp})
 $$
 
 (F6)
@@ -297,7 +298,13 @@ Fusing kernels raises register and shared-memory live ranges. Occupancy $O$ may 
 | `arithmetic_intensity` | $I=F/B$ | FLOPs per byte at a named level (HBM unless stated). Evaluation criterion, not a measured point. |
 | `roofline` | $\Pi\le\min(\Pi_{\text{peak}},I\cdot\Beta)$ | Upper bound used as a TASK-17 criterion. $\Pi_{\text{peak}}$ and $\Beta$ stay `UNKNOWN`. |
 
-Fused register footprint (F11), `DERIVED`:
+Register allocation is SKU-scoped:
+\(R_\text{alloc,cta}=A_\text{reg}(R_t,T_\text{cta},G_\text{reg},\text{scope}_\text{reg})\),
+and \(B_\text{reg}=\lfloor S_\text{reg}/R_\text{alloc,cta}\rfloor\).
+Both allocation granularity and `scope_reg` are `UNKNOWN` until SKU fill.
+
+Fused register footprint (F11), `DERIVED` only when constituent live
+allocations remain live under the same accounting scope:
 
 $$
 R_f \ge \max(R_1, R_2)
@@ -305,13 +312,18 @@ $$
 
 (F11)
 
-Fused shared-memory footprint (F12), `DERIVED`:
+Otherwise compiler recomputation or lifetime changes require re-deriving the
+fused footprint; F11 is not universal. Fused shared-memory footprint (F12) is
+likewise `DERIVED` only when constituent allocations remain live under the same
+accounting scope:
 
 $$
 C_f \ge \max(C_1, C_2)
 $$
 
 (F12)
+
+Otherwise the fused shared-memory footprint is re-derived; F12 is not universal.
 
 Arithmetic intensity (F13), `DERIVED`:
 
@@ -484,11 +496,11 @@ Live catalog object from `python3 scripts/check_cuda_hardware_model.py --json`:
   ],
   "formula_substrings": [
     "O = \\min(O_\\text{reg}, O_\\text{smem}, O_\\text{threads}, O_\\text{cta})",
-    "B_\\text{reg} = \\lfloor S_\\text{reg} / R_\\text{cta} \\rfloor",
+    "B_\\text{reg}=\\lfloor S_\\text{reg}/R_\\text{alloc,cta}\\rfloor",
     "B_\\text{smem} = \\lfloor C_\\text{smem} / C_\\text{alloc} \\rfloor",
     "B_\\text{threads} = \\lfloor T_\\max / T_\\text{cta} \\rfloor",
     "B_\\text{cta} = B_\\max",
-    "B_\\text{SM} = \\min(B_\\text{reg}, B_\\text{smem}, B_\\text{threads}, B_\\text{cta})",
+    "B_\\text{SM} = \\min(B_\\text{reg}, B_\\text{smem}, B_\\text{threads}, B_\\text{cta}, B_\\text{warp})",
     "W_\\text{cta} = \\lceil T_\\text{cta} / N_w \\rceil",
     "O = W_\\text{active} / W_\\max",
     "W_\\text{need} = N_\\text{sched} \\cdot L_\\text{issue}",

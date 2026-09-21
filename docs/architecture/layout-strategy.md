@@ -541,17 +541,17 @@ flowchart TB
     kv[state_kv]
     gdn[state_s]
     c_state[state_c]
-    portable[portable view]
-    specialized[seq_specialized_tile]
-    open[open question]
-    gemm --> portable
-    gather --> portable
-    conv --> specialized
-    kv --> specialized
-    gdn --> specialized
-    c_state --> specialized
-    portable --> open
-    specialized --> open
+    choice[unresolved view choice]
+    portable[portable candidate]
+    specialized[specialized candidate]
+    gemm --> choice
+    gather --> choice
+    conv --> choice
+    kv --> choice
+    gdn --> choice
+    c_state --> choice
+    choice --> portable
+    choice --> specialized
 ```
 
 Layout-risk hypotheses (every severity is HYPOTHESIS). JSON array
@@ -1173,7 +1173,7 @@ First fenced `json` object equals a fresh
     "c_state",
     "portable",
     "specialized",
-    "open"
+    "choice"
   ],
   "n_diagrams": 1,
   "canonical_sentence_logical": "Logical values in this document are graph nodes. They do not imply physical allocation, materialization, buffer reuse, or kernel fusion.",

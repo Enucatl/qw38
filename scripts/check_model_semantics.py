@@ -47,6 +47,11 @@ SCHEMA_KEYS: tuple[str, ...] = (
     "n_full_layers",
     "full_attention_indices",
     "mtp_num_hidden_layers",
+    "mtp_semantics_status",
+    "mtp_concat_order_proven",
+    "mtp_token_alignment_proven",
+    "mtp_decoder_block_behavior_proven",
+    "mtp_independent_kv_state_proven",
 )
 
 REQUIRED_HEADINGS: tuple[str, ...] = (
@@ -291,6 +296,11 @@ def instantiate_dimensions(config: dict) -> dict:
         "n_full_layers": n_full_layers,
         "full_attention_indices": full_from_types,
         "mtp_num_hidden_layers": mtp_num_hidden_layers,
+        "mtp_semantics_status": "conditional_unverified",
+        "mtp_concat_order_proven": False,
+        "mtp_token_alignment_proven": False,
+        "mtp_decoder_block_behavior_proven": False,
+        "mtp_independent_kv_state_proven": False,
     }
     _assert_identities(totals, text)
     return totals
@@ -420,13 +430,32 @@ def check_semantics(live: dict, semantics_path: Path) -> None:
         differences.append(str(exc))
         vis_start, vis_end = 0, 0
 
+    mtp_match = re.search(r"^## MTP\s*$", text, flags=re.MULTILINE)
+    algebra_match = re.search(r"^## Algebraic equivalents\s*$", text, flags=re.MULTILINE)
+    mtp_start = mtp_match.start() if mtp_match else -1
+    mtp_end = algebra_match.start() if algebra_match else -1
     for match in UNKNOWN_RE.finditer(text):
-        if vis_start <= match.start() < vis_end:
+        if vis_start <= match.start() < vis_end or mtp_start <= match.start() < mtp_end:
             continue
         line = text.count("\n", 0, match.start()) + 1
         differences.append(
             f"line {line}: UNKNOWN outside Deferred vision section"
         )
+
+    mtp_section = text[mtp_start:mtp_end] if mtp_start >= 0 and mtp_end > mtp_start else ""
+    mtp_contract = " ".join(mtp_section.split())
+    required_mtp = (
+        "Conditional analysis model (not checkpoint-proven semantics)",
+        "concat order",
+        "token alignment",
+        "decoder-block behavior",
+        "independent KV state",
+        "\\tag{23}",
+        "\\tag{24}",
+    )
+    for token in required_mtp:
+        if token not in mtp_contract:
+            differences.append(f"MTP section missing required conditional contract: {token!r}")
 
     if differences:
         raise SemanticsMismatch(differences)

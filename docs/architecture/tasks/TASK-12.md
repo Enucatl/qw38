@@ -5,7 +5,7 @@
 - Primary ID: `TASK-12`
 - Coupled IDs: `none`
 - Dependencies: `TASK-03`, `TASK-04`, `TASK-11` (all DONE at admission)
-- Status: `IN PROGRESS`
+- Status: `DONE`
 - Ledger acceptance: Classify important intermediates with required justification; List reuse, recomputation, local-working-set, and synchronization tradeoffs; Label every fusion proposal as a hypothesis.
 
 ## Goal and boundaries

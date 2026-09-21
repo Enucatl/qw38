@@ -295,6 +295,7 @@ SCHEMA_KEYS: tuple[str, ...] = (
     "i_attn_core_vs_kv",
     "bottleneck_labels",
     "region_ids",
+    "region_accounting_status",
     "n_catalog_nodes",
     "catalog_ids",
     "n_diagrams",
@@ -898,6 +899,7 @@ def instantiate_work_traffic_summary(config: dict) -> dict:
         "i_attn_core_vs_kv": i_attn_core_vs_kv,
         "bottleneck_labels": list(BOTTLENECK_LABELS),
         "region_ids": list(REGION_IDS),
+        "region_accounting_status": "forced_is_semantic_minimum; region_cut_is_assumed_region_interface_accounting",
         "n_catalog_nodes": 52,
         "catalog_ids": list(CATALOG_IDS),
         "n_diagrams": 1,
@@ -1186,6 +1188,8 @@ def check_work_traffic(live: dict, work_traffic_path: Path) -> None:
 
     text = work_traffic_path.read_text(encoding="utf-8")
     differences: list[str] = []
+    if "All MTP-only work and traffic totals are conditional on TASK-02's unverified analysis model." not in text:
+        differences.append("missing conditional MTP work qualification")
 
     headings = HEADING_RE.findall(text)
     if headings != list(REQUIRED_HEADINGS):

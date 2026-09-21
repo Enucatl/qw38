@@ -217,7 +217,7 @@ DIAGRAM_REQUIRED_IDS: tuple[tuple[str, ...], ...] = (
         "C_state",
     ),
     ("h_post", "g_mlp", "up", "swiglu", "mlp_out"),
-    ("K_state", "V_state", "C_state", "S", "k_rope", "v_full", "qkv"),
+    ("K_prior", "V_prior", "C_prior", "S_prior", "attention", "fir", "recurrence", "K_next", "V_next", "C_next", "S_next", "k_rope", "v_full", "qkv", "alpha", "beta", "k_hat", "v_lin", "o"),
     (
         "h_64",
         "h_final",
@@ -521,6 +521,8 @@ def check_dataflow(live: dict, dataflow_path: Path) -> None:
 
     text = dataflow_path.read_text(encoding="utf-8")
     differences: list[str] = []
+    if "All MTP-only graph edges and counts are conditional on TASK-02's unverified analysis model." not in text:
+        differences.append("missing conditional MTP graph qualification")
 
     headings = HEADING_RE.findall(text)
     if headings != list(REQUIRED_HEADINGS):
@@ -550,15 +552,36 @@ def check_dataflow(live: dict, dataflow_path: Path) -> None:
                 f"diagram {index + 1}: mermaid fence does not contain flowchart"
             )
         if index < len(DIAGRAM_REQUIRED_IDS):
+            diagram_ids = set(re.findall(r"(?m)^\s*([A-Za-z][A-Za-z0-9_]*)\s*(?:\[|\()", body))
             missing_ids = [
                 node_id
                 for node_id in DIAGRAM_REQUIRED_IDS[index]
-                if node_id not in body
+                if node_id not in diagram_ids
             ]
             if missing_ids:
                 differences.append(
                     f"diagram {index + 1}: missing node ids {missing_ids}"
                 )
+            if index == 5:
+                required_edges = (
+                    "K_prior -->|attention read before append| attention",
+                    "V_prior -->|attention read before append| attention",
+                    "k_rope -->|append current K| K_next",
+                    "v_full -->|append current V| V_next",
+                    "C_prior -->|three prior taps| fir",
+                    "qkv -->|current value| fir",
+                    "fir --> C_next",
+                    "S_prior --> recurrence",
+                    "alpha --> recurrence",
+                    "beta --> recurrence",
+                    "k_hat --> recurrence",
+                    "v_lin --> recurrence",
+                    "recurrence --> o",
+                    "recurrence --> S_next",
+                )
+                for edge in required_edges:
+                    if edge not in body:
+                        differences.append(f"diagram 6: missing exact edge {edge!r}")
 
     if CANONICAL_SENTENCE not in text:
         differences.append("canonical sentence not present verbatim")

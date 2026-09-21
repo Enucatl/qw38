@@ -330,6 +330,7 @@ SENSITIVE_OPS: tuple[str, ...] = (
     "softmax_over_T",
     "attn_av_over_T",
     "gemm_k5120",
+    "gemm_k6144",
     "gemm_k17408",
     "gemm_lm_head",
     "gdn_S_recurrent",

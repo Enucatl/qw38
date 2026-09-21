@@ -1,5 +1,7 @@
 # Qwen3.8-27B experiment backlog (TASK-20)
 
+Complete-map MTP behavior cited here is conditional on TASK-02's unverified analysis model.
+
 > **Draft status:** conclusions in this document are **unverified** until the verification stage completes.
 
 Phase 1 **unrun experiment backlog** for Qwen3.8-27B language+MTP. Sixteen
@@ -659,7 +661,7 @@ Live object from sitting `text_config` plus locked constants. First fenced `json
     "mma_shapes",
     "cluster_cap"
   ],
-  "n_sensitive_ops": 20,
+  "n_sensitive_ops": 21,
   "sensitive_ops": [
     "param_bf16",
     "residual_stream",
@@ -671,6 +673,7 @@ Live object from sitting `text_config` plus locked constants. First fenced `json
     "softmax_over_T",
     "attn_av_over_T",
     "gemm_k5120",
+    "gemm_k6144",
     "gemm_k17408",
     "gemm_lm_head",
     "gdn_S_recurrent",
@@ -1307,6 +1310,7 @@ Live object from sitting `text_config` plus locked constants. First fenced `json
         "softmax_over_T",
         "attn_av_over_T",
         "gemm_k5120",
+        "gemm_k6144",
         "gemm_k17408",
         "gemm_lm_head",
         "gdn_S_recurrent",

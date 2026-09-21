@@ -1,5 +1,7 @@
 # Qwen3.8-27B numerical sensitivity (TASK-07)
 
+All MTP-only counts are conditional on TASK-02's unverified analysis model.
+
 > **Draft status:** conclusions in this document are **unverified** until the verification stage completes.
 
 Phase 1 mathematical precision-risk analysis for the Qwen3.8-27B language +
@@ -168,7 +170,8 @@ output. `gemm_lm_head` is the \(H\)-reduction into logits `(22)` `(24)`.
 | `l2_gdn` | `normalize` | 128 per Q/K head | `(16)` |
 | `softmax_over_T` | `exp_range` | \(T\in\{1,4096\}\) examples; \(T\le 262144\) | `(9)` |
 | `attn_av_over_T` | `long_sum` | same \(T\) | `(9)` |
-| `gemm_k5120` | `long_sum` | \(K=5120\) | `(6)` `(10)` `(13)` `(20)` `(21)` up/gate `(22)` `(23)` |
+| `gemm_k5120` | `long_sum` | \(K=5120\) | `(6)` `(10)` `(13)` `(21)` up/gate `(22)` `(23)` |
+| `gemm_k6144` | `long_sum` | \(K=6144\) | GDN `W_out` `(20)` |
 | `gemm_k17408` | `long_sum` | \(K=17408\) | `(21)` down |
 | `gemm_lm_head` | `long_sum` | \(K=5120\), \(V=248320\) outputs | `(22)` `(24)` |
 | `gdn_S_recurrent` | `recurrent` | \(T\) steps, \(48\times128\times128\) per layer | `(17)` `(18)` |
@@ -183,7 +186,8 @@ layer in+post, `mtp.norm`), `n_rms_qk` 34, `n_rms_gdn` 48. Attention softmax/AV
 length at stored \(T\) includes the current token (TASK-04). `example_T` is
 `[1, 4096]`; `T_max` is 262144; `T_is_stored_length_after_append` true;
 `decode_T_new` 1. Softmax scale \(d_h^{-1/2}=0.0625\). RoPE phase at
-\(T_\max\) for \(j=0\) is \(T_\max\cdot\omega_0=262144\).
+the maximum zero-based position \(T_\max-1\) for \(j=0\) is
+\((T_\max-1)\omega_0=262143\).
 
 ## Persistent state
 
@@ -208,7 +212,7 @@ measured requirement, and not a claim that F32 \(S\) is itself risky.
 ## Risk classification
 
 Complete 20-row table. Every severity cell is HYPOTHESIS. Locked partitions:
-`high_risk_ids` (9), `medium_risk_ids` (8), `low_risk_ids` (3). This table does
+`high_risk_ids` (9), `medium_risk_ids` (9), `low_risk_ids` (3). This table does
 not claim experimental proof or validation survival.
 
 | ID | Role | Mechanism | Width / horizon (DERIVED) | Eqs | Severity |
@@ -222,7 +226,8 @@ not claim experimental proof or validation survival.
 | `l2_gdn` | accum | normalize | 128 per Q/K head | (16) | medium (HYPOTHESIS) |
 | `softmax_over_T` | accum | exp_range | \(T\in\{1,4096\}\); \(T\le 262144\) | (9) | high (HYPOTHESIS) |
 | `attn_av_over_T` | accum | long_sum | same \(T\) | (9) | high (HYPOTHESIS) |
-| `gemm_k5120` | accum | long_sum | \(K=5120\) | (6)(10)(13)(20)(21-up/gate)(22)(23) | medium (HYPOTHESIS) |
+| `gemm_k5120` | accum | long_sum | \(K=5120\) | (6)(10)(13)(21-up/gate)(22)(23) | medium (HYPOTHESIS) |
+| `gemm_k6144` | accum | long_sum | \(K=6144\) | GDN `W_out` (20) | medium (HYPOTHESIS) |
 | `gemm_k17408` | accum | long_sum | \(K=17408\) | (21) down | medium (HYPOTHESIS) |
 | `gemm_lm_head` | accum | long_sum | \(K=5120\), \(V=248320\) outputs | (22)(24) | medium (HYPOTHESIS) |
 | `gdn_S_recurrent` | accum | recurrent | \(T\) steps, \(48\times128\times128\) per layer | (17)(18) | high (HYPOTHESIS) |
@@ -321,7 +326,7 @@ Live object from `text_config` arithmetic plus locked constants (copied from
   "softmax_scale": 0.0625,
   "rope_theta": 10000000,
   "T_max": 262144,
-  "rope_phase_at_T_max_j0": 262144,
+  "rope_phase_at_T_max_j0": 262143,
   "T_is_stored_length_after_append": true,
   "decode_T_new": 1,
   "primary_includes_mtp": true,
@@ -342,6 +347,7 @@ Live object from `text_config` arithmetic plus locked constants (copied from
   "reduction_rms_gdn": 128,
   "reduction_l2_gdn": 128,
   "reduction_gemm_hidden": 5120,
+  "reduction_gemm_gdn_out": 6144,
   "reduction_gemm_mlp_down": 17408,
   "reduction_lm_head_k": 5120,
   "reduction_lm_head_outputs": 248320,
@@ -388,6 +394,7 @@ Live object from `text_config` arithmetic plus locked constants (copied from
     "softmax_over_T",
     "attn_av_over_T",
     "gemm_k5120",
+    "gemm_k6144",
     "gemm_k17408",
     "gemm_lm_head",
     "gdn_S_recurrent",
@@ -404,6 +411,7 @@ Live object from `text_config` arithmetic plus locked constants (copied from
     "activation",
     "activation",
     "activation",
+    "accum",
     "accum",
     "accum",
     "accum",
@@ -434,6 +442,7 @@ Live object from `text_config` arithmetic plus locked constants (copied from
     "long_sum",
     "long_sum",
     "long_sum",
+    "long_sum",
     "recurrent",
     "long_sum",
     "exp_range",
@@ -453,6 +462,7 @@ Live object from `text_config` arithmetic plus locked constants (copied from
     "medium",
     "high",
     "high",
+    "medium",
     "medium",
     "medium",
     "medium",
@@ -482,6 +492,7 @@ Live object from `text_config` arithmetic plus locked constants (copied from
     "rms_head",
     "l2_gdn",
     "gemm_k5120",
+    "gemm_k6144",
     "gemm_k17408",
     "gemm_lm_head",
     "gdn_inner_d128"
@@ -491,9 +502,9 @@ Live object from `text_config` arithmetic plus locked constants (copied from
     "state_c_bf16",
     "conv_fir"
   ],
-  "n_sensitive_ops": 20,
+  "n_sensitive_ops": 21,
   "n_high_risk": 9,
-  "n_medium_risk": 8,
+  "n_medium_risk": 9,
   "n_low_risk": 3,
   "state_ids": [
     "K_state",

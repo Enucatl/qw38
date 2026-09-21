@@ -297,16 +297,27 @@ $$
 
 Not required to produce \(\ell^{(0)}\). It is part of the complete model. `mtp_num_hidden_layers: 1` OBSERVED ⇒ a single block `mtp.layers.0`.
 
-**Alignment:** at position \(t\), main hidden \(h^{(64)}_t\) has seen tokens \(1\ldots t\). MTP consumes the embedding of token \(t+1\) (teacher-forced or sampled from \(\ell^{(0)}\)) and predicts token \(t+2\).
+**Conditional analysis model (not checkpoint-proven semantics):** the concat
+order, token alignment, decoder-block behavior, and independent KV state below
+are **UNKNOWN**. The checkpoint proves only the MTP config fields, tensor names,
+shapes, and sharing flags. Conditional on the TASK-02 analysis model, position
+\(t\) uses main hidden \(h^{(64)}_t\), the embedding of token \(t+1\), and
+predicts token \(t+2\).
 
-\(W_\text{fc}\in\mathbb{R}^{5120\times 10240}\) OBSERVED (`mtp.fc`; concat embedding then hidden). \(\gamma_e,\gamma_h\in\mathbb{R}^{H}\) are `mtp.pre_fc_norm_embedding` and `mtp.pre_fc_norm_hidden`.
+\(W_\text{fc}\in\mathbb{R}^{5120\times 10240}\) OBSERVED (`mtp.fc`). The
+displayed embedding-then-hidden concat is conditional and **UNKNOWN**.
+\(\gamma_e,\gamma_h\in\mathbb{R}^{H}\) are OBSERVED tensors
+`mtp.pre_fc_norm_embedding` and `mtp.pre_fc_norm_hidden`.
 
 $$
 u_t=W_\text{fc}\begin{bmatrix}\operatorname{RMSNorm}_{1+\gamma_e}(e_{t+1})\\ \operatorname{RMSNorm}_{1+\gamma_h}(h^{(64)}_t)\end{bmatrix}\in\mathbb{R}^{H}.
 \tag{23}
 $$
 
-Then one decoder layer `mtp.layers.0` with **full** Gated Attention + MLP (equations (4)–(10) and (21), including doubled `q_proj` and sigmoid gate), using mRoPE at the MTP token’s positions, with its own KV state. Then \(\gamma_\text{mtp}\in\mathbb{R}^{H}\) (`mtp.norm`):
+Conditionally, one decoder layer `mtp.layers.0` is modeled as full Gated
+Attention + MLP (equations (4)–(10) and (21)), using mRoPE and independent KV
+state; all three behavioral details are **UNKNOWN**. The tensor
+\(\gamma_\text{mtp}\in\mathbb{R}^{H}\) (`mtp.norm`) is OBSERVED:
 
 $$
 \ell^{(1)}_t=W_\text{lm}\,\operatorname{RMSNorm}_{1+\gamma_\text{mtp}}(h^{\text{mtp}}_t)\in\mathbb{R}^{V}.
@@ -389,6 +400,11 @@ Live object from `text_config` arithmetic (copied from [`scripts/check_model_sem
     59,
     63
   ],
-  "mtp_num_hidden_layers": 1
+  "mtp_num_hidden_layers": 1,
+  "mtp_semantics_status": "conditional_unverified",
+  "mtp_concat_order_proven": false,
+  "mtp_token_alignment_proven": false,
+  "mtp_decoder_block_behavior_proven": false,
+  "mtp_independent_kv_state_proven": false
 }
 ```

@@ -1,6 +1,8 @@
 # Qwen3.8-27B clean-sheet review (TASK-21)
 
-> **Draft status:** conclusions in this document are **unverified** until the verification stage completes.
+Complete-map MTP behavior cited here is conditional on TASK-02's unverified analysis model.
+
+> **Final status:** verified for mechanical first-fence/schema/key/count/flag consistency only; this is not independent semantic proof.
 
 Phase 1 **consistency review and freeze record** of TASK-01 through TASK-20.
 This is a review, not a selected runtime and not measurements. Prefill and
@@ -9,7 +11,8 @@ decode share **one** semantic graph (TASK-11) and **one** compiled artifact
 (TASK-19). Quality methodology is shared (TASK-18). The primary object is
 language+MTP **complete map** (135 node instances). Language-only is a
 secondary row. Freeze records that the locked structure plus the catalogue of
-unselected alternatives was consistency-checked. It does not select a CUDA
+unselected alternatives was mechanically consistency-checked. It is not
+independent semantic proof. It does not select a CUDA
 mapping, recipe map, or layout.
 
 If any occupancy, MAC/byte, catalog id, node type, stage kind, recipe, mapping,
@@ -78,7 +81,7 @@ True unknowns remain unknowns; consistency review does not select winners or clo
 
 The reviewed design is marked FROZEN_FOR_COMPARATIVE_REVIEW; existing runtimes are not thereby design authority.
 
-Cross-document equations, dimensions, totals, state, contracts, and proposals are checked; documentation inconsistencies are corrected and true unknowns are preserved; the reviewed design is marked FROZEN_FOR_COMPARATIVE_REVIEW.
+Cross-document first-fence schemas, keys, counts, and flags are mechanically checked; this is not independent semantic proof; true unknowns are preserved; the reviewed design is marked FROZEN_FOR_COMPARATIVE_REVIEW.
 
 JSON: `canonical_sentence_logical` = sentence 1; `canonical_sentence_review` = sentence 2; `canonical_sentence_unknowns` = sentence 3; `canonical_sentence_freeze` = sentence 4; `review_question_sentence` = the review sentence.
 
@@ -387,7 +390,7 @@ Live object from sitting `text_config`, locked constants, and first JSON fences 
     "mma_shapes",
     "cluster_cap"
   ],
-  "n_sensitive_ops": 20,
+  "n_sensitive_ops": 21,
   "n_catalogued_alternatives": 125,
   "pooled_all_absmax": 25.5,
   "pooled_language_mtp_absmax": 19.25,
@@ -564,7 +567,7 @@ Live object from sitting `text_config`, locked constants, and first JSON fences 
   "canonical_sentence_review": "This document is a Phase 1 consistency review of TASK-01 through TASK-20, not a selected runtime and not measurements.",
   "canonical_sentence_unknowns": "True unknowns remain unknowns; consistency review does not select winners or close experiment questions.",
   "canonical_sentence_freeze": "The reviewed design is marked FROZEN_FOR_COMPARATIVE_REVIEW; existing runtimes are not thereby design authority.",
-  "review_question_sentence": "Cross-document equations, dimensions, totals, state, contracts, and proposals are checked; documentation inconsistencies are corrected and true unknowns are preserved; the reviewed design is marked FROZEN_FOR_COMPARATIVE_REVIEW.",
+  "review_question_sentence": "Cross-document first-fence schemas, keys, counts, and flags are mechanically checked; this is not independent semantic proof; true unknowns are preserved; the reviewed design is marked FROZEN_FOR_COMPARATIVE_REVIEW.",
   "freeze_non_authority_sentence": "Existing Quartz and llama.cpp/GGML Qwen implementations are not design authority by this freeze; they may be compared later as black-box references with matching identities."
 }
 ```

@@ -1,5 +1,7 @@
 # Qwen3.8-27B logical dataflow (TASK-03)
 
+All MTP-only graph edges and counts are conditional on TASK-02's unverified analysis model.
+
 > **Draft status:** conclusions in this document are **unverified** until the verification stage completes.
 
 Phase 1 logical DAG for the Qwen3.8-27B language + MTP forward map: named
@@ -293,7 +295,8 @@ flowchart TB
 
 ## Persistent state transitions
 
-Diagram 6. Token \(t-1 \to t\) for the four state kinds. Ranks OBSERVED /
+Diagram 6. Token \(t-1 \to t\) for the four state kinds. MTP state behavior is
+conditional on TASK-02's unverified analysis model. Language ranks are OBSERVED /
 DERIVED from TASK-02: \(K,V\in\mathbb{R}^{4\times T\times 256}\) (grows with
 \(T\)); \(C\) last 3 vectors in \(\mathbb{R}^{10240}\); \(S\in\mathbb{R}^{48\times 128\times 128}\).
 RoPE is baked into stored \(K\). Prefill starts from zeros; decode is the same
@@ -305,19 +308,39 @@ flowchart TB
         k_rope[k_rope]
         v_full[v_full]
         qkv[qkv]
-        K_state[(K_state)]
-        V_state[(V_state)]
-        C_state[(C_state)]
-        S[(S)]
+        K_prior[(K prior)]
+        V_prior[(V prior)]
+        C_prior[(C prior)]
+        S_prior[(S prior)]
+        attention[attention]
+        fir[FIR]
+        recurrence[GDN recurrence]
+        K_next[(K next)]
+        V_next[(V next)]
+        C_next[(C next)]
+        S_next[(S next)]
+        alpha[alpha]
+        beta[beta]
+        k_hat[k_hat]
+        v_lin[v_lin]
+        o[o]
     end
-    K_state -.->|past K t-1| K_state
-    k_rope -->|concat append write| K_state
-    V_state -.->|past V t-1| V_state
-    v_full -->|concat append write| V_state
-    C_state -.->|3-tap delay| C_state
-    qkv -->|concat into FIR Eq 14| C_state
-    S -.->|S t-1 Eq 17| S
-    qkv -.->|recurrence path via conv split| S
+    K_prior -->|attention read before append| attention
+    V_prior -->|attention read before append| attention
+    K_prior --> K_next
+    k_rope -->|append current K| K_next
+    V_prior --> V_next
+    v_full -->|append current V| V_next
+    C_prior -->|three prior taps| fir
+    qkv -->|current value| fir
+    fir --> C_next
+    S_prior --> recurrence
+    alpha --> recurrence
+    beta --> recurrence
+    k_hat --> recurrence
+    v_lin --> recurrence
+    recurrence --> o
+    recurrence --> S_next
 ```
 
 ## Primary logits and MTP

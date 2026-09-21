@@ -383,6 +383,20 @@ decode; sequence rank is \(T\) versus 1 (`stage_vs_decode_rank` all
 `T_vs_1` in prose). JSON `stage_kinds_match_decode` true. The nine
 `stage_kind_ids` equal the decode-plan list.
 
+| Stage kind | Decode | Prefill |
+| --- | --- | --- |
+| `embed_current` | one current row | \(T\) current rows |
+| `language_mixer` | one token, populated state | \(T\) positions from reset |
+| `language_mlp` | GEMV rank 1 | GEMM rank \(T\) |
+| `lm_head_primary` | one logits row | \(T\) rows or declared last-logits mode |
+| `embed_next` | one next-token row | \(T\) teacher-forced rows |
+| `mtp_mix` | one conditional MTP position | \(T\) conditional MTP positions |
+| `mtp_mixer` | one token, conditional KV | \(T\) positions, conditional KV from reset |
+| `mtp_mlp` | GEMV rank 1 | GEMM rank \(T\) |
+| `lm_head_mtp` | one MTP logits row | \(T\) MTP logits rows |
+
+All MTP rows are conditional on TASK-02's unverified analysis model.
+
 Every semantic node is the **same** TASK-11 type with a **different**
 sequence rank, work class, and incoming-state convention; no extra node type
 is introduced for prefill.

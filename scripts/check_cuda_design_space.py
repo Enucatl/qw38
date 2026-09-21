@@ -78,11 +78,11 @@ ESTIMATE_DIMENSION_IDS: tuple[str, ...] = (
 )
 
 SYNC_CLASS_IDS: tuple[str, ...] = (
-    "sync_none",
+    "sync_stream_event",
     "sync_warp",
     "sync_cta",
     "sync_grid",
-    "sync_stream_event",
+    "sync_none",
 )
 
 PIPELINE_IDS: tuple[str, ...] = (
@@ -213,7 +213,7 @@ MAPPING_SYNC_CLASS_IDS: tuple[str, ...] = (
     "sync_cta",
     "sync_cta",
     "sync_cta",
-    "sync_stream_event",
+    "sync_none",
     "sync_cta",
     "sync_cta",
     "sync_warp",
@@ -792,6 +792,7 @@ SCHEMA_KEYS: tuple[str, ...] = (
     "mapping_work_mac_ids",
     "mapping_layout_object_ids",
     "mapping_decomposition_ids",
+    "mapping_records",
     "mapping_usefulness_label",
     "n_decode_primary_mappings",
     "n_prefill_primary_mappings",
@@ -1230,6 +1231,36 @@ def instantiate_cuda_design_space(config: dict) -> dict:
     mapping_decompositions = _ordered_str_list_mapping(
         MAPPING_IDS, MAPPING_DECOMPOSITION_IDS
     )
+    hbm_citations = {
+        "embed": ("TASK-06 weight_gather_bytes_per_row", "weight_gather_bytes_per_row"),
+        "gated_attn": ("TASK-06 kv_bytes_per_full_layer_per_token", "kv_bytes_per_full_layer_per_token * sequence_length"),
+        "gated_delta_net": ("TASK-06 c_bytes_per_layer and s_bytes_per_layer", "c_bytes_per_layer + s_bytes_per_layer"),
+        "mlp": ("TASK-06 weight-memory class", "3 * intermediate_size * hidden_size * bytes_bf16"),
+        "lm_head": ("TASK-06 weight_bytes_lm_head", "weight_bytes_lm_head"),
+        "mtp_mix": ("TASK-06 weight_bytes_mtp_fc", "weight_bytes_mtp_fc"),
+    }
+    mapping_records: dict[str, dict] = {}
+    for index, mapping_id in enumerate(MAPPING_IDS):
+        node_type = MAPPING_NODE_TYPES[index]
+        sync_class = MAPPING_SYNC_CLASS_IDS[index]
+        dependency: object = "none" if sync_class == "sync_none" else f"{sync_class} orders mapping-local dependences"
+        if mapping_id == "map_mtp_split_norm_gemm":
+            dependency = {
+                "stages": ["embedding_norm", "hidden_norm", "concat_materialize", "fc_gemm"],
+                "events": ["embedding_norm->concat_materialize", "hidden_norm->concat_materialize", "concat_materialize->fc_gemm"],
+            }
+        hbm_citation, hbm_expression = hbm_citations[node_type]
+        mapping_records[mapping_id] = {
+            "node_type": node_type,
+            "work": {"citation": f"TASK-06 {MAPPING_WORK_MAC_IDS[index]}", "partition": "TASK-17 F_owner=(e/L)*F_node for red_none; otherwise cited reduction partials"},
+            "hbm": {"citation": hbm_citation, "expression": hbm_expression},
+            "access": {"layout_objects": mapping_layout_objects[mapping_id], "decompositions": mapping_decompositions[mapping_id], "owner_expression": f"{MAPPING_OWNERSHIP_IDS[index]} owns {','.join(mapping_decompositions[mapping_id])}"},
+            "synchronization": {"class": sync_class, "scope": MAPPING_OWNERSHIP_IDS[index], "dependency": dependency},
+            "resources": {"R_t": "symbolic", "C_cta": "symbolic", "T_cta_candidates": list(CTA_T_CANDIDATES)},
+            "occupancy": {"B_warp": "floor(W_max/W_cta)", "B_SM": "min(B_reg,B_smem,B_threads,B_cta,B_warp)", "O": "B_SM*W_cta/W_max", "W_need": "ceil(L_issue*N_sched)"},
+            "waves": {"N_grid": "symbolic mapping-dependent grid size", "N_waves": "ceil(N_grid/(N_SM*B_SM))", "eta_wave": "N_grid/(N_waves*N_SM*B_SM)"},
+            "mode_fit": MAPPING_MODE_FIT_IDS[index],
+        }
     decomposition_mappings = _ordered_str_list_mapping(
         PARALLEL_DECOMPOSITION_IDS, DECOMPOSITION_MAPPING_IDS
     )
@@ -1340,6 +1371,7 @@ def instantiate_cuda_design_space(config: dict) -> dict:
         "mapping_work_mac_ids": list(MAPPING_WORK_MAC_IDS),
         "mapping_layout_object_ids": mapping_layout_objects,
         "mapping_decomposition_ids": mapping_decompositions,
+        "mapping_records": mapping_records,
         "mapping_usefulness_label": "HYPOTHESIS",
         "n_decode_primary_mappings": n_decode_primary_mappings,
         "n_prefill_primary_mappings": n_prefill_primary_mappings,
@@ -1597,6 +1629,20 @@ def _assert_summary(summary: dict) -> None:
     assert summary["cuda_mapping_deferred"] is False
     assert summary["hardware_independent"] is False
     assert summary["n_diagrams"] == 1
+    assert list(summary["mapping_records"]) == list(MAPPING_IDS)
+    for record in summary["mapping_records"].values():
+        assert set(record) == {"node_type", "work", "hbm", "access", "synchronization", "resources", "occupancy", "waves", "mode_fit"}
+        assert set(record["work"]) == {"citation", "partition"}
+        assert set(record["hbm"]) == {"citation", "expression"}
+        assert set(record["access"]) == {"layout_objects", "decompositions", "owner_expression"}
+        assert set(record["synchronization"]) == {"class", "scope", "dependency"}
+        assert set(record["resources"]) == {"R_t", "C_cta", "T_cta_candidates"}
+        assert set(record["occupancy"]) == {"B_warp", "B_SM", "O", "W_need"}
+        assert set(record["waves"]) == {"N_grid", "N_waves", "eta_wave"}
+        assert record["work"]["citation"].startswith("TASK-06 ")
+        assert record["hbm"]["citation"].startswith("TASK-06 ")
+    assert summary["mapping_records"]["map_mlp_grid_T"]["synchronization"] == {"class": "sync_none", "scope": "grid", "dependency": "none"}
+    assert summary["mapping_records"]["map_mtp_split_norm_gemm"]["synchronization"]["dependency"]["stages"] == ["embedding_norm", "hidden_norm", "concat_materialize", "fc_gemm"]
     assert summary["n_secondary_pipelines_selected"] == 0
     assert summary["n_fusion_hypotheses_selected"] == 0
     used_decomps: set[str] = set()

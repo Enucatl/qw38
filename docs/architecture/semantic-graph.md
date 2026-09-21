@@ -1,5 +1,7 @@
 # Qwen3.8-27B semantic graph (TASK-11)
 
+All MTP-only graph counts are conditional on TASK-02's unverified analysis model.
+
 > **Draft status:** conclusions in this document are **unverified** until the verification stage completes.
 
 Phase 1 **hardware-independent** Qwen-specific semantic graph: execution-region

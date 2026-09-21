@@ -1278,6 +1278,8 @@ def check_semantic_graph(live: dict, semantic_path: Path) -> None:
 
     text = semantic_path.read_text(encoding="utf-8")
     differences: list[str] = []
+    if "All MTP-only graph counts are conditional on TASK-02's unverified analysis model." not in text:
+        differences.append("missing conditional MTP semantic-graph qualification")
 
     headings = HEADING_RE.findall(text)
     if headings != list(REQUIRED_HEADINGS):

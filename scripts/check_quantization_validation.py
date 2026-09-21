@@ -357,6 +357,7 @@ SCHEMA_KEYS: tuple[str, ...] = (
     "mtp_in_primary_nll",
     "sampling_out_of_nll",
     "log_softmax_is_eval_readout",
+    "measurement_identity",
     "behavioral_class_ids",
     "n_behavioral_classes",
     "pareto_axis_ids",
@@ -384,6 +385,7 @@ SCHEMA_KEYS: tuple[str, ...] = (
     "n_methodology_low",
     "policy_families",
     "candidate_recipe_ids",
+    "compiler_profile_ids",
     "n_policy_families",
     "n_candidate_recipes",
     "keep_source_packable_on_all_defined_families",
@@ -622,6 +624,10 @@ def instantiate_quantization_validation(config: dict) -> dict:
         AssertionError: If required fields are missing or identities fail.
     """
 
+    upstream_dir = Path(__file__).resolve().parents[1] / "docs/architecture"
+    task07 = first_json_fence((upstream_dir / "numerical-sensitivity.md").read_text(encoding="utf-8"))
+    task08 = first_json_fence((upstream_dir / "quantization-design-space.md").read_text(encoding="utf-8"))
+    task10 = first_json_fence((upstream_dir / "model-compiler-plan.md").read_text(encoding="utf-8"))
     assert isinstance(config, dict), "config.json root is not an object"
     assert "text_config" in config, "config.json has no text_config"
     text = config["text_config"]
@@ -817,6 +823,20 @@ def instantiate_quantization_validation(config: dict) -> dict:
         "mtp_in_primary_nll": True,
         "sampling_out_of_nll": True,
         "log_softmax_is_eval_readout": True,
+        "measurement_identity": {
+            "tokenizer_implementation": "required_with_version",
+            "tokenizer_asset_hashes": "required",
+            "exact_input_ids": "required",
+            "special_token_ids": "required",
+            "loss_mask": "explicit_boolean_per_target",
+            "artificial_context_tokens_scored": False,
+            "aggregation": "sum_nll_numerators_divide_by_scored_event_counts",
+            "target_partition": "nonoverlapping_exactly_one_owner_window",
+            "window_overlap": "left_context_only",
+            "document_boundary_reset": True,
+            "cross_document_state": False,
+            "window_start": "reset_then_reconstruct_declared_left_context",
+        },
         "behavioral_class_ids": list(BEHAVIORAL_CLASS_IDS),
         "n_behavioral_classes": len(BEHAVIORAL_CLASS_IDS),
         "pareto_axis_ids": list(PARETO_AXIS_IDS),
@@ -829,10 +849,10 @@ def instantiate_quantization_validation(config: dict) -> dict:
         "n_quality_high": len(QUALITY_HIGH_IDS),
         "survival_reconstruction_ids": list(SURVIVAL_RECONSTRUCTION_IDS),
         "survival_requires_teacher_forced": True,
-        "quality_risk_ids": list(QUALITY_RISK_IDS),
-        "n_quality_risks": len(QUALITY_RISK_IDS),
-        "sensitive_high_ids": list(SENSITIVE_HIGH_IDS),
-        "n_sensitive_high": len(SENSITIVE_HIGH_IDS),
+        "quality_risk_ids": list(task08["quality_risk_ids"]),
+        "n_quality_risks": len(task08["quality_risk_ids"]),
+        "sensitive_high_ids": list(task07["high_risk_ids"]),
+        "n_sensitive_high": len(task07["high_risk_ids"]),
         "methodology_risk_ids": list(METHODOLOGY_RISK_IDS),
         "methodology_risk_severities": list(METHODOLOGY_RISK_SEVERITIES),
         "methodology_high_ids": list(METHODOLOGY_HIGH_IDS),
@@ -842,10 +862,11 @@ def instantiate_quantization_validation(config: dict) -> dict:
         "n_methodology_high": len(METHODOLOGY_HIGH_IDS),
         "n_methodology_medium": len(METHODOLOGY_MEDIUM_IDS),
         "n_methodology_low": len(METHODOLOGY_LOW_IDS),
-        "policy_families": list(POLICY_FAMILIES),
-        "candidate_recipe_ids": list(CANDIDATE_RECIPE_IDS),
-        "n_policy_families": len(POLICY_FAMILIES),
-        "n_candidate_recipes": len(CANDIDATE_RECIPE_IDS),
+        "policy_families": list(task08["policy_families"]),
+        "candidate_recipe_ids": list(task08["candidate_recipe_ids"]),
+        "compiler_profile_ids": list(task10["compiler_profile_ids"]),
+        "n_policy_families": len(task08["policy_families"]),
+        "n_candidate_recipes": len(task08["candidate_recipe_ids"]),
         "keep_source_packable_on_all_defined_families": True,
         "control_profile_id": "control",
         "control_profile_is_keep_source": True,

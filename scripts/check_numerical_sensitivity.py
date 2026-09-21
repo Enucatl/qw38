@@ -53,6 +53,7 @@ SENSITIVE_OPS: tuple[str, ...] = (
     "softmax_over_T",
     "attn_av_over_T",
     "gemm_k5120",
+    "gemm_k6144",
     "gemm_k17408",
     "gemm_lm_head",
     "gdn_S_recurrent",
@@ -70,6 +71,7 @@ SENSITIVE_OP_ROLES: tuple[str, ...] = (
     "activation",
     "activation",
     "activation",
+    "accum",
     "accum",
     "accum",
     "accum",
@@ -101,6 +103,7 @@ SENSITIVE_OP_MECHANISMS: tuple[str, ...] = (
     "long_sum",
     "long_sum",
     "long_sum",
+    "long_sum",
     "recurrent",
     "long_sum",
     "exp_range",
@@ -121,6 +124,7 @@ SENSITIVE_OP_SEVERITIES: tuple[str, ...] = (
     "medium",
     "high",
     "high",
+    "medium",
     "medium",
     "medium",
     "medium",
@@ -152,6 +156,7 @@ MEDIUM_RISK_IDS: tuple[str, ...] = (
     "rms_head",
     "l2_gdn",
     "gemm_k5120",
+    "gemm_k6144",
     "gemm_k17408",
     "gemm_lm_head",
     "gdn_inner_d128",
@@ -277,6 +282,7 @@ SCHEMA_KEYS: tuple[str, ...] = (
     "reduction_rms_gdn",
     "reduction_l2_gdn",
     "reduction_gemm_hidden",
+    "reduction_gemm_gdn_out",
     "reduction_gemm_mlp_down",
     "reduction_lm_head_k",
     "reduction_lm_head_outputs",
@@ -526,7 +532,7 @@ def instantiate_numerical_sensitivity(config: dict) -> dict:
     linear_conv_delay = linear_conv_kernel_dim - 1
 
     softmax_scale = 1.0 / (head_dim ** 0.5)
-    rope_phase_at_t_max_j0 = t_max * 1
+    rope_phase_at_t_max_j0 = (t_max - 1) * 1
     eps_lt_bf16_ulp_at_1 = eps < BF16_ULP_AT_1
     example_t = list(EXAMPLE_T)
 
@@ -599,6 +605,7 @@ def instantiate_numerical_sensitivity(config: dict) -> dict:
         "reduction_rms_gdn": linear_value_head_dim,
         "reduction_l2_gdn": linear_key_head_dim,
         "reduction_gemm_hidden": hidden_size,
+        "reduction_gemm_gdn_out": linear_num_value_heads * linear_value_head_dim,
         "reduction_gemm_mlp_down": intermediate_size,
         "reduction_lm_head_k": hidden_size,
         "reduction_lm_head_outputs": vocab_size,
@@ -690,17 +697,17 @@ def _assert_identities(summary: dict, text: dict) -> None:
     assert summary["reduction_attn_over_T_max"] == 262144
     assert summary["reduction_attn_over_T_max"] == summary["T_max"]
     assert summary["T_max"] == text["max_position_embeddings"]
-    assert summary["rope_phase_at_T_max_j0"] == 262144
-    assert summary["rope_phase_at_T_max_j0"] == summary["T_max"]
+    assert summary["rope_phase_at_T_max_j0"] == 262143
+    assert summary["rope_phase_at_T_max_j0"] == summary["T_max"] - 1
     assert summary["n_residual_adds_language"] == 128
     assert summary["n_residual_adds_complete"] == 130
     assert summary["n_rms_hidden_language"] == 129
     assert summary["n_rms_hidden_complete"] == 134
     assert summary["n_rms_qk"] == 34
     assert summary["n_rms_gdn"] == 48
-    assert summary["n_sensitive_ops"] == 20
+    assert summary["n_sensitive_ops"] == 21
     assert summary["n_high_risk"] == 9
-    assert summary["n_medium_risk"] == 8
+    assert summary["n_medium_risk"] == 9
     assert summary["n_low_risk"] == 3
     assert summary["sensitive_ops"] == list(SENSITIVE_OPS)
     assert summary["sensitive_op_roles"] == list(SENSITIVE_OP_ROLES)
@@ -882,6 +889,8 @@ def check_numerical_sensitivity(live: dict, numerical_path: Path) -> None:
 
     text = numerical_path.read_text(encoding="utf-8")
     differences: list[str] = []
+    if "All MTP-only counts are conditional on TASK-02's unverified analysis model." not in text:
+        differences.append("missing conditional MTP numerical qualification")
 
     headings = HEADING_RE.findall(text)
     if headings != list(REQUIRED_HEADINGS):

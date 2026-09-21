@@ -218,10 +218,10 @@ byte sequence.
 | `language_mlp` | MLP unique weights for that layer (counted once in the unique-weight total). Access `dense_gemm` | none | none | `h_mid` (live until MLP add) | next `h`, or `h_64` at \(\ell=63\) | Residual `h_mid` until add; `h_post`/`swiglu` fuse_or_recompute HYPOTHESIS |
 | `lm_head_primary` | Shared \(W_\text{lm}\) 2542796800 B (`seq_lm_head_full`) plus final RMS gamma | none | none | `h_64` | `logits_0` | `shared_W_lm`; `h_64` also consumed by `mtp_mix` |
 | `embed_next` | One row of shared \(E\) (10240 B gather) | none | none | next `token_id` | `e_next` | `shared_E` (same payload as `embed_current`) |
-| `mtp_mix` | `mtp.fc` contraction weights. Access `dense_gemm` | none | none | `h_64`, `e_next` | `mtp_u` as residual `h` | `h_64` fan-out reuse; `mtp_cat` split HYPOTHESIS |
+| `mtp_mix` | `mtp.pre_fc_norm_embedding`, `mtp.pre_fc_norm_hidden`, and `mtp.fc` contraction weights. Access `dense_gemm` | none | none | `h_64`, `e_next` | `mtp_u` as residual `h` | `h_64` fan-out reuse; `mtp_cat` split HYPOTHESIS |
 | `mtp_mixer` | MTP `gated_attn` unique weights. Access `dense_gemm` | MTP \(K,V\) of length \(T-1\) | MTP \(K,V\) append 4096 B | `mtp_u` as `h` | `h_mid` | Same gated-attn reuse as language full layers |
 | `mtp_mlp` | MTP MLP unique weights. Access `dense_gemm` | none | none | `h_mid` | `h_mtp` | Same MLP reuse as language |
-| `lm_head_mtp` | Shared \(W_\text{lm}\) (second physical read HYPOTHESIS, not unique bytes) | none | none | `h_mtp` | `logits_1` | `shared_W_lm` |
+| `lm_head_mtp` | `mtp.norm` and shared \(W_\text{lm}\) (second physical read HYPOTHESIS, not unique bytes) | none | none | `h_mtp` | `logits_1` | `shared_W_lm` |
 
 JSON `stage_visibility_in` / `stage_visibility_out` keyed in `stage_kind_ids`
 order: `embed_current` in `["token_id"]` out `["e"]`; `language_mixer` in
@@ -238,6 +238,9 @@ JSON `stage_state_read` / `stage_state_write`: mixers as TASK-11.
 stores the union `["K_state","V_state","C_state","S"]` so both families are
 named without duplicating 64 keys. `mtp_mixer` `["K_state","V_state"]`. All
 other kinds empty arrays. JSON `language_mixer_state_is_xor` true.
+These are the complete explicit state-read sets for all nine rows. Complete-map
+MTP scheduling and its KV state are conditional on TASK-02's unverified analysis
+model; the table does not promote them to observed checkpoint semantics.
 
 JSON `stage_primary_sequence_ids` in this exact order (9 ids):
 `seq_gather_row`, `seq_gemm_codes_then_scales`, `seq_gemm_codes_then_scales`,

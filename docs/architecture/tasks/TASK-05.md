@@ -239,6 +239,10 @@ Top-level keys, all required, this order:
 
 **GlobalStats** keys, all required: `n`, `min`, `max`, `absmax`, `mean`, `mean_abs`, `rms`, `std`, `n_zero`, `fraction_zero`, `p50_abs`, `p90_abs`, `p99_abs`, `p99_9_abs`, `p99_99_abs`, `n_out_6x`, `frac_out_6x`, `n_out_10x`, `frac_out_10x`, `n_nonfinite`. Counts are ints; the rest are canonical floats except `n_nonfinite` is int `0`.
 
+Retained per-tensor evidence consists of absmax, RMS, and directional summaries
+used to form family aggregates. A full per-tensor `GlobalStats` object is not
+retained; `GlobalStats` applies to pooled family and grand-total objects.
+
 Each `families` value:
 
 - `level1` (string), `n_tensors` (int), `n_parameters` (int), `detail` (`full` for language+MTP, `coarse` for vision), `pooled` (GlobalStats), `unweighted_mean_absmax`, `unweighted_mean_rms`, `weighted_mean_absmax`, `weighted_mean_rms` (canonical floats), `layer_comparison` (object or `null`), `directional` (object).

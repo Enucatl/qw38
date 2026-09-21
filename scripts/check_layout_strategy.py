@@ -303,7 +303,7 @@ DIAGRAM_REQUIRED_IDS: tuple[str, ...] = (
     "c_state",
     "portable",
     "specialized",
-    "open",
+    "choice",
 )
 
 LOCKED_FULL_ATTENTION_INDICES: tuple[int, ...] = (
@@ -1396,9 +1396,8 @@ def check_layout_strategy(live: dict, layout_strategy_path: Path) -> None:
             )
         if "flowchart" not in body:
             differences.append("mermaid fence does not contain flowchart")
-        missing_ids = [
-            node_id for node_id in DIAGRAM_REQUIRED_IDS if node_id not in body
-        ]
+        diagram_ids = set(re.findall(r"(?m)^\s*([A-Za-z][A-Za-z0-9_]*)\s*(?:\[|\()", body))
+        missing_ids = [node_id for node_id in DIAGRAM_REQUIRED_IDS if node_id not in diagram_ids]
         if missing_ids:
             differences.append(f"diagram 1: missing node ids {missing_ids}")
         par_match = re.search(

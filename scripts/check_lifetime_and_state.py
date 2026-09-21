@@ -800,6 +800,8 @@ def check_lifetime(live: dict, lifetime_path: Path) -> None:
 
     text = lifetime_path.read_text(encoding="utf-8")
     differences: list[str] = []
+    if "All MTP-only state and lifetime results are conditional on TASK-02's unverified analysis model." not in text:
+        differences.append("missing conditional MTP lifetime qualification")
 
     headings = HEADING_RE.findall(text)
     if headings != list(REQUIRED_HEADINGS):

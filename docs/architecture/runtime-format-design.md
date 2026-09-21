@@ -160,6 +160,12 @@ that family's TASK-08 `family_candidates`.
 | `access_class` | Consumer access class per family (table below) | TASK-03/06 |
 | `state_schema` | \(K,V\) rank \((4,T,256)\) BF16 conceptual; \(C\) \(3\times 10240\) BF16; \(S\) \((48,128,128)\) F32 conceptual; 17 KV instances including MTP; 48 C/S instances | TASK-03/04/06 |
 
+The first JSON fence contains parseable `logical_descriptors` for
+`i8_row_asym`, `extract_high`, and `mixed_group`, plus `view_descriptor`.
+Offsets and lengths are spans; ordering and tile references are nullable and
+remain unselected. Alignment, view presence, and packed-code bit order remain
+unselected. Complete-map MTP counts inherit TASK-02's conditional model.
+
 JSON array `access_class_ids` in this order: `gather_row`, `dense_gemm`,
 `depthwise_conv`, `vector_param`, `state_kv`, `state_c`, `state_s`. JSON
 `n_access_classes` = 7. JSON object `family_access_class` maps each of
@@ -541,6 +547,61 @@ from
     "state_schema"
   ],
   "n_representation_capabilities": 8,
+  "logical_descriptors": {
+    "i8_row_asym": {
+      "zero_point_encoding": "signed_int8",
+      "count": "d_out",
+      "range": [
+        -128,
+        127
+      ],
+      "binding": "logical_output_row_ordinal",
+      "storage": "metadata_blob_span",
+      "scale_field": "separate_per_row"
+    },
+    "extract_high": {
+      "count": "explicit",
+      "value_encoding": "bf16_le",
+      "index_encoding_candidates": [
+        "flat_u32",
+        "flat_u64"
+      ],
+      "selected_index_encoding_per_view": true,
+      "binding": "logical_flat_index",
+      "index_range": "0 <= index < numel",
+      "value_span": "sidecar_payload_span",
+      "index_span": "sidecar_index_span"
+    },
+    "mixed_group": {
+      "width_code_encoding": "u8",
+      "count": "group_count",
+      "binding": "logical_group_ordinal",
+      "allowed_values": "recipe_narrow_and_wide_formats",
+      "storage": "sidecar_span"
+    }
+  },
+  "view_descriptor": {
+    "logical_tensor_id": "required",
+    "view_id": "required",
+    "view_role": "required",
+    "backend_tag": "required",
+    "payload_span": [
+      "offset",
+      "length"
+    ],
+    "metadata_span": [
+      "offset",
+      "length"
+    ],
+    "sidecar_span": [
+      "offset",
+      "length"
+    ],
+    "access_consumer_binding": "required",
+    "ordering_ref": null,
+    "tile_ref": null,
+    "integrity_ref": "required"
+  },
   "packing_capability_ids": [
     "bit_pack",
     "scale_storage",

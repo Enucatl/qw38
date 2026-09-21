@@ -153,120 +153,6 @@ QUALITY_PHRASES: tuple[str, ...] = (
 )
 BANNER_SUBSTRING = "unverified"
 
-TOP_KEYS: tuple[str, ...] = (
-    "authority",
-    "n_tensors",
-    "n_shards",
-    "dtype",
-    "n_parameters",
-    "n_bytes",
-    "payload_policy",
-    "bf16_decode",
-    "percentile_method",
-    "percentiles",
-    "outlier_multiples",
-    "chunk_bytes",
-    "axis_convention",
-    "scope_detail",
-    "scope_coarse",
-    "n_language_mtp_tensors",
-    "n_vision_tensors",
-    "n_language_mtp_parameters",
-    "n_vision_parameters",
-    "pooled_all",
-    "pooled_language_mtp",
-    "pooled_vision",
-    "families",
-)
-GLOBAL_STATS_KEYS: tuple[str, ...] = (
-    "n",
-    "min",
-    "max",
-    "absmax",
-    "mean",
-    "mean_abs",
-    "rms",
-    "std",
-    "n_zero",
-    "fraction_zero",
-    "p50_abs",
-    "p90_abs",
-    "p99_abs",
-    "p99_9_abs",
-    "p99_99_abs",
-    "n_out_6x",
-    "frac_out_6x",
-    "n_out_10x",
-    "frac_out_10x",
-    "n_nonfinite",
-)
-FAMILY_KEYS: tuple[str, ...] = (
-    "level1",
-    "n_tensors",
-    "n_parameters",
-    "detail",
-    "pooled",
-    "unweighted_mean_absmax",
-    "unweighted_mean_rms",
-    "weighted_mean_absmax",
-    "weighted_mean_rms",
-    "layer_comparison",
-    "directional",
-)
-LAYER_COMPARISON_BASE_KEYS: tuple[str, ...] = (
-    "n_layers",
-    "layer_index",
-    "absmax",
-    "rms",
-    "absmax_min",
-    "absmax_min_layer",
-    "absmax_median",
-    "absmax_max",
-    "absmax_max_layer",
-    "rms_min",
-    "rms_min_layer",
-    "rms_median",
-    "rms_max",
-    "rms_max_layer",
-)
-LAYER_COMPARISON_DIR_KEYS: tuple[str, ...] = (
-    "row_absmax_max_over_median",
-    "col_absmax_max_over_median",
-    "max_row_absmax_max_over_median",
-    "max_row_absmax_max_over_median_layer",
-    "max_col_absmax_max_over_median",
-    "max_col_absmax_max_over_median_layer",
-)
-OCC1_DIRECTIONAL_KEYS: tuple[str, ...] = (
-    "applicable",
-    "n_rows",
-    "n_cols",
-    "row_absmax_min",
-    "row_absmax_median",
-    "row_absmax_max",
-    "row_rms_min",
-    "row_rms_median",
-    "row_rms_max",
-    "col_absmax_min",
-    "col_absmax_median",
-    "col_absmax_max",
-    "col_rms_min",
-    "col_rms_median",
-    "col_rms_max",
-    "row_absmax_max_over_median",
-    "row_rms_max_over_median",
-    "col_absmax_max_over_median",
-    "col_rms_max_over_median",
-)
-MAJOR_DIRECTIONAL_KEYS: tuple[str, ...] = (
-    "applicable",
-    "n_rows",
-    "n_cols",
-    "unweighted_mean_row_absmax_max_over_median",
-    "unweighted_mean_col_absmax_max_over_median",
-    "unweighted_mean_row_rms_max_over_median",
-    "unweighted_mean_col_rms_max_over_median",
-)
 GLOBAL_INT_KEYS: frozenset[str] = frozenset(
     {"n", "n_zero", "n_out_6x", "n_out_10x", "n_nonfinite"}
 )
@@ -1500,6 +1386,33 @@ def check_analysis(live: dict[str, Any], analysis_path: Path) -> None:
 
     if documented is not None:
         differences.extend(diff_analysis(live, documented))
+        authority_row = (
+            f"| `n_tensors` / `n_shards` / `dtype` | {live['n_tensors']} / "
+            f"{live['n_shards']} / `BF16` | OBSERVED |"
+        )
+        if authority_row not in text:
+            differences.append("Authority table numeric provenance row mismatch")
+        global_match = re.search(
+            r"^## Global distributions\s*$.*?"
+            r"^\| Pool \| n \| min \| max \| absmax \| mean \| mean_abs \| rms \| std \| fraction_zero \| p50_abs \| p90_abs \| p99_abs \| p99_9_abs \| p99_99_abs \| frac_out_6x \| frac_out_10x \|\n"
+            r"^\| ---[^\n]*\n(?P<rows>(?:^\| `pooled_[^\n]*\n){3})",
+            text,
+            flags=re.MULTILINE | re.DOTALL,
+        )
+        if global_match is None:
+            differences.append("Global distributions table missing or malformed")
+        else:
+            columns = ("n", "min", "max", "absmax", "mean", "mean_abs", "rms", "std", "fraction_zero", "p50_abs", "p90_abs", "p99_abs", "p99_9_abs", "p99_99_abs", "frac_out_6x", "frac_out_10x")
+            for row in global_match.group("rows").splitlines():
+                cells = [cell.strip() for cell in row.strip("|").split("|")]
+                pool = cells[0].strip("`")
+                expected = documented.get(pool, {})
+                if len(cells) != 17 or pool not in {"pooled_all", "pooled_language_mtp", "pooled_vision"}:
+                    differences.append(f"Global distributions malformed row: {row}")
+                    continue
+                for key, cell in zip(columns, cells[1:]):
+                    if str(expected.get(key)) != cell:
+                        differences.append(f"Global distributions {pool}.{key}: table={cell!r} json={expected.get(key)!r}")
 
     for match in FORBIDDEN_RE.finditer(text):
         line = text.count("\n", 0, match.start()) + 1

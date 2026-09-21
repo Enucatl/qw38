@@ -5,7 +5,7 @@
 - Primary ID: `TASK-14`
 - Coupled IDs: `none`
 - Dependencies: `TASK-06`, `TASK-09`, `TASK-11`, `TASK-12` (all DONE at admission)
-- Status: `IN PROGRESS`
+- Status: `DONE`
 - Ledger acceptance: Explain fundamental matrix-matrix, reuse, tiling, state, and temporary-storage differences; Compare every semantic node with decode; Keep representation tradeoffs unresolved without evidence.
 
 ## Goal and boundaries
@@ -125,7 +125,7 @@ Bullets required under that heading:
 - Nine stage kinds are complete for this task; their multiplicities sum to 135 complete node instances (`n_stage_kinds` 9, `n_stage_instances` 135).
 - A stage is a named execution of one TASK-11 node type (or mixer xor) over the length-\(T\) sequence, with loads, state R/W, visibility I/O, and reuse.
 - This document selects one **serial** **layer-serial** order (`schedule_serial_selected` true, `schedule_layer_serial_selected` true). Token-serial decode replay remains a mode HYPOTHESIS (`n_mode_hypotheses_selected` 0). Hoist and overlap remain HYPOTHESIS (`n_hoist_hypotheses_selected` 0).
-- Decode is not scheduled here (`decode_schedule_deferred` true). Prefill \(T_\text{new}=T\); incoming state is zeros (`incoming_state_zeros` true, `incoming_state_populated` false).
+- TASK-13 remains the decode authority; decode is comparison evidence only. Prefill \(T_\text{new}=T\); incoming state is zeros (`incoming_state_zeros` true, `incoming_state_populated` false).
 - Residual add stays inside mixer/`mlp`; `g`/`z` stay internal; RMS stays inside the consumer (TASK-11 locks).
 - Unique weights are counted once per complete prefill (`weight_unique_counted_once` true).
 - Fan-out ≠ must-store and node I/O ≠ must-store still hold.
@@ -158,7 +158,6 @@ JSON booleans (lock true unless noted):
 - `hardware_independent` = true
 - `cuda_mapping_deferred` = true
 - `thread_geometry_absent` = true
-- `decode_schedule_deferred` = true
 - `layout_selected` = false
 - `tile_size_selected` = false
 - `fusion_winner_selected` = false
@@ -305,20 +304,6 @@ State volume citations (do not re-derive KV identities; checker recomputes from 
 | `decode_read_fixed_bytes` | 153944064 |
 | `prefill_kv_read_coeff` | 69632 (times \(T(T-1)/2\)) |
 | `prefill_kv_write_coeff` | 69632 (times \(T\)) |
-
-JSON arrays at `example_T`:
-
-- `prefill_kv_read_bytes_at_example_T` `[0, 583972945920]`
-- `prefill_kv_write_bytes_at_example_T` `[69632, 285212672]`
-- `prefill_c_write_bytes_at_example_T` `[983040, 4026531840]`
-- `prefill_s_write_bytes_at_example_T` `[150994944, 618471290880]`
-- `prefill_write_bytes_at_example_T` `[152047616, 622783035392]`
-- `prefill_c_read_math_at_example_T` `[2949120, 12079595520]`
-- `prefill_s_read_math_at_example_T` `[150994944, 618471290880]`
-- `prefill_c_read_physical_at_example_T` `[0, 12076646400]`
-- `prefill_s_read_physical_at_example_T` `[0, 618320295936]`
-- `prefill_read_physical_at_example_T` `[0, 1214369888256]`
-- `storage_bytes_at_example_T` `[154013696, 439156736]`
 
 Identities: `prefill_kv_read = kv_bytes_all_per_token * T * (T-1) / 2`; `prefill_kv_write = kv_bytes_all_per_token * T`; C/S write = decode per-token write \(\times T\); C/S math read = decode per-token read \(\times T\); C/S physical read = decode per-token read \(\times (T-1)\) (initial zeros); `prefill_write = kv_write + c_write + s_write`; `prefill_read_physical = kv_read + c_read_physical + s_read_physical`; `storage = 69632T + 153944064`.
 
@@ -593,7 +578,7 @@ Top-level keys (all required; script key order locked as this list):
 
 `consumer_sequence_ids`, `n_consumer_sequences`, `fusion_hypothesis_ids`, `n_fusion_hypotheses`, `fusion_selected`, `n_fusion_hypotheses_selected`, `fusion_usefulness_label`, `sync_edge_ids`, `n_sync_edges`,
 
-`decode_prefill_share_graph`, `decode_prefill_share_artifact`, `decode_prefill_distinct_views_selected`, `residual_add_inside_mixer`, `residual_add_inside_mlp`, `residual_input_live_until_add`, `rms_inside_consumer`, `live_across_are_internal`, `hardware_independent`, `cuda_mapping_deferred`, `thread_geometry_absent`, `decode_schedule_deferred`, `layout_selected`, `tile_size_selected`, `fusion_winner_selected`, `ideal_byte_sequence_selected`, `artifact_boundary_selected`, `schedule_serial_selected`, `schedule_layer_serial_selected`, `gdn_primary_is_recurrent_eq_17`, `chunkwise_not_zero_s_traffic`, `state_write_not_optional`, `fanout_h64_cannot_hide_from_one_consumer`, `weight_unique_counted_once`, `weight_second_w_lm_read_is_hypothesis`, `mixer_xor_by_layer_types`, `activation_dtype_decided`, `vision_interface_is_not_a_node`, `mtp_omission_is_algebraic_equivalent`, `mtp_runs_all_T_positions`, `every_semantic_node_compared`, `representation_tradeoffs_unresolved`, `ledger_open_question_representation_tradeoffs_closed`, `mac_prefill_equals_decode_at_T1`, `state_read_prefill_equals_decode_at_T1`, `kv_incoming_empty_at_T1_both`,
+`decode_prefill_share_graph`, `decode_prefill_share_artifact`, `decode_prefill_distinct_views_selected`, `residual_add_inside_mixer`, `residual_add_inside_mlp`, `residual_input_live_until_add`, `rms_inside_consumer`, `live_across_are_internal`, `hardware_independent`, `cuda_mapping_deferred`, `thread_geometry_absent`, `layout_selected`, `tile_size_selected`, `fusion_winner_selected`, `ideal_byte_sequence_selected`, `artifact_boundary_selected`, `schedule_serial_selected`, `schedule_layer_serial_selected`, `gdn_primary_is_recurrent_eq_17`, `chunkwise_not_zero_s_traffic`, `state_write_not_optional`, `fanout_h64_cannot_hide_from_one_consumer`, `weight_unique_counted_once`, `weight_second_w_lm_read_is_hypothesis`, `mixer_xor_by_layer_types`, `activation_dtype_decided`, `vision_interface_is_not_a_node`, `mtp_omission_is_algebraic_equivalent`, `mtp_runs_all_T_positions`, `every_semantic_node_compared`, `representation_tradeoffs_unresolved`, `ledger_open_question_representation_tradeoffs_closed`, `mac_prefill_equals_decode_at_T1`, `state_read_prefill_equals_decode_at_T1`, `kv_incoming_empty_at_T1_both`,
 
 `diagram_ids`, `n_diagrams`, `canonical_sentence_logical`, `canonical_sentence_schedule`, `canonical_sentence_traffic`, `canonical_sentence_open_question`.
 

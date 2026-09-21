@@ -274,6 +274,11 @@ width map), `view` (portable and/or specialized projections),
 (TASK-09). JSON `state_schema_required` true. JSON
 `state_payload_in_artifact_selected` false.
 
+The compiler emits and validates TASK-09's exact `logical_descriptors` and
+`view_descriptor`: zero-point, sparse-value/index, mixed-width, payload,
+metadata, and sidecar spans retain their counts, encodings, ranges, and ordinal
+bindings. Nullable ordering/tile references stay unselected.
+
 **Integrity** is the stage that **owns** TASK-09 open decision
 `integrity_algorithm` as a **slot-writing procedure**. JSON
 `integrity_algorithm_candidates` = `["none","checksum"]`. JSON
@@ -531,6 +536,61 @@ from
     "view_binding"
   ],
   "n_packing_capabilities": 8,
+  "logical_descriptors": {
+    "i8_row_asym": {
+      "zero_point_encoding": "signed_int8",
+      "count": "d_out",
+      "range": [
+        -128,
+        127
+      ],
+      "binding": "logical_output_row_ordinal",
+      "storage": "metadata_blob_span",
+      "scale_field": "separate_per_row"
+    },
+    "extract_high": {
+      "count": "explicit",
+      "value_encoding": "bf16_le",
+      "index_encoding_candidates": [
+        "flat_u32",
+        "flat_u64"
+      ],
+      "selected_index_encoding_per_view": true,
+      "binding": "logical_flat_index",
+      "index_range": "0 <= index < numel",
+      "value_span": "sidecar_payload_span",
+      "index_span": "sidecar_index_span"
+    },
+    "mixed_group": {
+      "width_code_encoding": "u8",
+      "count": "group_count",
+      "binding": "logical_group_ordinal",
+      "allowed_values": "recipe_narrow_and_wide_formats",
+      "storage": "sidecar_span"
+    }
+  },
+  "view_descriptor": {
+    "logical_tensor_id": "required",
+    "view_id": "required",
+    "view_role": "required",
+    "backend_tag": "required",
+    "payload_span": [
+      "offset",
+      "length"
+    ],
+    "metadata_span": [
+      "offset",
+      "length"
+    ],
+    "sidecar_span": [
+      "offset",
+      "length"
+    ],
+    "access_consumer_binding": "required",
+    "ordering_ref": null,
+    "tile_ref": null,
+    "integrity_ref": "required"
+  },
   "integrity_algorithm_candidates": [
     "none",
     "checksum"

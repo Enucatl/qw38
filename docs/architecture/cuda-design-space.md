@@ -251,7 +251,7 @@ ledger checkbox 1. Every usefulness cell below is HYPOTHESIS.
 | `map_gdn_cta_chunk` | `gated_delta_net` | `cta` | `red_cta` | `sync_cta` | `fma` | `prefill_primary` |
 | `map_mlp_cta_dout` | `mlp` | `cta` | `red_none` | `sync_cta` | `fma` | `both` |
 | `map_mlp_cta_splitk` | `mlp` | `cta` | `red_splitk_cta` | `sync_cta` | `fma` | `both` |
-| `map_mlp_grid_T` | `mlp` | `grid` | `red_none` | `sync_stream_event` | `tensor_core_mma` | `prefill_primary` |
+| `map_mlp_grid_T` | `mlp` | `grid` | `red_none` | `sync_none` | `tensor_core_mma` | `prefill_primary` |
 | `map_lm_cta_vocab` | `lm_head` | `cta` | `red_none` | `sync_cta` | `fma` | `both` |
 | `map_lm_cta_splitk` | `lm_head` | `cta` | `red_splitk_cta` | `sync_cta` | `fma` | `both` |
 | `map_lm_warp_gemv` | `lm_head` | `warp` | `red_warp` | `sync_warp` | `fma` | `decode_primary` |
@@ -315,7 +315,9 @@ for MTP logits stays HYPOTHESIS extra, not unique bytes
 `mac_mtp_fc` 52428800. `map_mtp_cta_fc` is the unfused-looking CTA GEMM
 of \(W_\text{fc}\). `map_mtp_cta_fused` attaches unselected
 `fuse_mtp_mix_internals`. `map_mtp_split_norm_gemm` attaches unselected
-`split_mtp_cat` as two launches joined by `sync_stream_event`. Attaching
+`split_mtp_cat` as four stages: embedding norm, hidden norm,
+concat/materialize, and FC GEMM. Events order both norm producers before concat
+and concat before GEMM. Attaching
 a TASK-12/13/14 fusion id is not selecting it.
 
 Secondary pipelines (optional; JSON object
@@ -441,7 +443,9 @@ Cited TASK-13/14 `stage_kind_ids` (9, unselected as CUDA launches):
 Completes estimate dimensions `synchronization`, `occupancy`,
 `mode_suitability`. Completes ledger checkbox 2.
 
-**Synchronization.** Use the `mapping_sync_class_ids` column. What is
+**Synchronization.** Use the `mapping_sync_class_ids` column. Independent T-row
+CTAs in `map_mlp_grid_T` use `sync_none` because they have no
+producer/consumer edge. What is
 ordered (cite TASK-16): `sync_none` orders nothing beyond the issuing
 thread; `sync_warp` orders one warp; `sync_cta` is `__syncthreads`
 within one CTA; `sync_stream_event` orders kernels/memcopies on a stream
@@ -852,11 +856,11 @@ sitting `text_config`.
   ],
   "n_estimate_dimensions": 6,
   "sync_class_ids": [
-    "sync_none",
+    "sync_stream_event",
     "sync_warp",
     "sync_cta",
     "sync_grid",
-    "sync_stream_event"
+    "sync_none"
   ],
   "n_sync_classes": 5,
   "pipeline_ids": [
@@ -1007,7 +1011,7 @@ sitting `text_config`.
     "sync_cta",
     "sync_cta",
     "sync_cta",
-    "sync_stream_event",
+    "sync_none",
     "sync_cta",
     "sync_cta",
     "sync_warp",
@@ -1226,6 +1230,886 @@ sitting `text_config`.
     "map_mtp_split_norm_gemm": [
       "par_gemm_d_out"
     ]
+  },
+  "mapping_records": {
+    "map_embed_thread_element": {
+      "node_type": "embed",
+      "work": {
+        "citation": "TASK-06 mac_embed",
+        "partition": "TASK-17 F_owner=(e/L)*F_node for red_none; otherwise cited reduction partials"
+      },
+      "hbm": {
+        "citation": "TASK-06 weight_gather_bytes_per_row",
+        "expression": "weight_gather_bytes_per_row"
+      },
+      "access": {
+        "layout_objects": [
+          "gather_row"
+        ],
+        "decompositions": [
+          "par_embed_row"
+        ],
+        "owner_expression": "thread owns par_embed_row"
+      },
+      "synchronization": {
+        "class": "sync_none",
+        "scope": "thread",
+        "dependency": "none"
+      },
+      "resources": {
+        "R_t": "symbolic",
+        "C_cta": "symbolic",
+        "T_cta_candidates": [
+          32,
+          64,
+          128,
+          256
+        ]
+      },
+      "occupancy": {
+        "B_warp": "floor(W_max/W_cta)",
+        "B_SM": "min(B_reg,B_smem,B_threads,B_cta,B_warp)",
+        "O": "B_SM*W_cta/W_max",
+        "W_need": "ceil(L_issue*N_sched)"
+      },
+      "waves": {
+        "N_grid": "symbolic mapping-dependent grid size",
+        "N_waves": "ceil(N_grid/(N_SM*B_SM))",
+        "eta_wave": "N_grid/(N_waves*N_SM*B_SM)"
+      },
+      "mode_fit": "both"
+    },
+    "map_embed_warp_row": {
+      "node_type": "embed",
+      "work": {
+        "citation": "TASK-06 mac_embed",
+        "partition": "TASK-17 F_owner=(e/L)*F_node for red_none; otherwise cited reduction partials"
+      },
+      "hbm": {
+        "citation": "TASK-06 weight_gather_bytes_per_row",
+        "expression": "weight_gather_bytes_per_row"
+      },
+      "access": {
+        "layout_objects": [
+          "gather_row"
+        ],
+        "decompositions": [
+          "par_embed_row"
+        ],
+        "owner_expression": "warp owns par_embed_row"
+      },
+      "synchronization": {
+        "class": "sync_warp",
+        "scope": "warp",
+        "dependency": "sync_warp orders mapping-local dependences"
+      },
+      "resources": {
+        "R_t": "symbolic",
+        "C_cta": "symbolic",
+        "T_cta_candidates": [
+          32,
+          64,
+          128,
+          256
+        ]
+      },
+      "occupancy": {
+        "B_warp": "floor(W_max/W_cta)",
+        "B_SM": "min(B_reg,B_smem,B_threads,B_cta,B_warp)",
+        "O": "B_SM*W_cta/W_max",
+        "W_need": "ceil(L_issue*N_sched)"
+      },
+      "waves": {
+        "N_grid": "symbolic mapping-dependent grid size",
+        "N_waves": "ceil(N_grid/(N_SM*B_SM))",
+        "eta_wave": "N_grid/(N_waves*N_SM*B_SM)"
+      },
+      "mode_fit": "both"
+    },
+    "map_embed_cta_vector": {
+      "node_type": "embed",
+      "work": {
+        "citation": "TASK-06 mac_embed",
+        "partition": "TASK-17 F_owner=(e/L)*F_node for red_none; otherwise cited reduction partials"
+      },
+      "hbm": {
+        "citation": "TASK-06 weight_gather_bytes_per_row",
+        "expression": "weight_gather_bytes_per_row"
+      },
+      "access": {
+        "layout_objects": [
+          "gather_row"
+        ],
+        "decompositions": [
+          "par_embed_row"
+        ],
+        "owner_expression": "cta owns par_embed_row"
+      },
+      "synchronization": {
+        "class": "sync_cta",
+        "scope": "cta",
+        "dependency": "sync_cta orders mapping-local dependences"
+      },
+      "resources": {
+        "R_t": "symbolic",
+        "C_cta": "symbolic",
+        "T_cta_candidates": [
+          32,
+          64,
+          128,
+          256
+        ]
+      },
+      "occupancy": {
+        "B_warp": "floor(W_max/W_cta)",
+        "B_SM": "min(B_reg,B_smem,B_threads,B_cta,B_warp)",
+        "O": "B_SM*W_cta/W_max",
+        "W_need": "ceil(L_issue*N_sched)"
+      },
+      "waves": {
+        "N_grid": "symbolic mapping-dependent grid size",
+        "N_waves": "ceil(N_grid/(N_SM*B_SM))",
+        "eta_wave": "N_grid/(N_waves*N_SM*B_SM)"
+      },
+      "mode_fit": "both"
+    },
+    "map_attn_cta_head": {
+      "node_type": "gated_attn",
+      "work": {
+        "citation": "TASK-06 mac_full_proj_per_layer",
+        "partition": "TASK-17 F_owner=(e/L)*F_node for red_none; otherwise cited reduction partials"
+      },
+      "hbm": {
+        "citation": "TASK-06 kv_bytes_per_full_layer_per_token",
+        "expression": "kv_bytes_per_full_layer_per_token * sequence_length"
+      },
+      "access": {
+        "layout_objects": [
+          "dense_gemm",
+          "state_kv"
+        ],
+        "decompositions": [
+          "par_attn_head",
+          "par_kv_head"
+        ],
+        "owner_expression": "cta owns par_attn_head,par_kv_head"
+      },
+      "synchronization": {
+        "class": "sync_cta",
+        "scope": "cta",
+        "dependency": "sync_cta orders mapping-local dependences"
+      },
+      "resources": {
+        "R_t": "symbolic",
+        "C_cta": "symbolic",
+        "T_cta_candidates": [
+          32,
+          64,
+          128,
+          256
+        ]
+      },
+      "occupancy": {
+        "B_warp": "floor(W_max/W_cta)",
+        "B_SM": "min(B_reg,B_smem,B_threads,B_cta,B_warp)",
+        "O": "B_SM*W_cta/W_max",
+        "W_need": "ceil(L_issue*N_sched)"
+      },
+      "waves": {
+        "N_grid": "symbolic mapping-dependent grid size",
+        "N_waves": "ceil(N_grid/(N_SM*B_SM))",
+        "eta_wave": "N_grid/(N_waves*N_SM*B_SM)"
+      },
+      "mode_fit": "both"
+    },
+    "map_attn_warp_t": {
+      "node_type": "gated_attn",
+      "work": {
+        "citation": "TASK-06 mac_attn_coeff_per_full_layer",
+        "partition": "TASK-17 F_owner=(e/L)*F_node for red_none; otherwise cited reduction partials"
+      },
+      "hbm": {
+        "citation": "TASK-06 kv_bytes_per_full_layer_per_token",
+        "expression": "kv_bytes_per_full_layer_per_token * sequence_length"
+      },
+      "access": {
+        "layout_objects": [
+          "dense_gemm",
+          "state_kv"
+        ],
+        "decompositions": [
+          "par_attn_T"
+        ],
+        "owner_expression": "warp owns par_attn_T"
+      },
+      "synchronization": {
+        "class": "sync_warp",
+        "scope": "warp",
+        "dependency": "sync_warp orders mapping-local dependences"
+      },
+      "resources": {
+        "R_t": "symbolic",
+        "C_cta": "symbolic",
+        "T_cta_candidates": [
+          32,
+          64,
+          128,
+          256
+        ]
+      },
+      "occupancy": {
+        "B_warp": "floor(W_max/W_cta)",
+        "B_SM": "min(B_reg,B_smem,B_threads,B_cta,B_warp)",
+        "O": "B_SM*W_cta/W_max",
+        "W_need": "ceil(L_issue*N_sched)"
+      },
+      "waves": {
+        "N_grid": "symbolic mapping-dependent grid size",
+        "N_waves": "ceil(N_grid/(N_SM*B_SM))",
+        "eta_wave": "N_grid/(N_waves*N_SM*B_SM)"
+      },
+      "mode_fit": "decode_primary"
+    },
+    "map_attn_cta_splitk": {
+      "node_type": "gated_attn",
+      "work": {
+        "citation": "TASK-06 mac_attn_coeff_per_full_layer",
+        "partition": "TASK-17 F_owner=(e/L)*F_node for red_none; otherwise cited reduction partials"
+      },
+      "hbm": {
+        "citation": "TASK-06 kv_bytes_per_full_layer_per_token",
+        "expression": "kv_bytes_per_full_layer_per_token * sequence_length"
+      },
+      "access": {
+        "layout_objects": [
+          "dense_gemm",
+          "state_kv"
+        ],
+        "decompositions": [
+          "par_attn_T",
+          "par_gemm_d_in"
+        ],
+        "owner_expression": "cta owns par_attn_T,par_gemm_d_in"
+      },
+      "synchronization": {
+        "class": "sync_cta",
+        "scope": "cta",
+        "dependency": "sync_cta orders mapping-local dependences"
+      },
+      "resources": {
+        "R_t": "symbolic",
+        "C_cta": "symbolic",
+        "T_cta_candidates": [
+          32,
+          64,
+          128,
+          256
+        ]
+      },
+      "occupancy": {
+        "B_warp": "floor(W_max/W_cta)",
+        "B_SM": "min(B_reg,B_smem,B_threads,B_cta,B_warp)",
+        "O": "B_SM*W_cta/W_max",
+        "W_need": "ceil(L_issue*N_sched)"
+      },
+      "waves": {
+        "N_grid": "symbolic mapping-dependent grid size",
+        "N_waves": "ceil(N_grid/(N_SM*B_SM))",
+        "eta_wave": "N_grid/(N_waves*N_SM*B_SM)"
+      },
+      "mode_fit": "both"
+    },
+    "map_gdn_cta_head": {
+      "node_type": "gated_delta_net",
+      "work": {
+        "citation": "TASK-06 mac_lin_token_per_layer",
+        "partition": "TASK-17 F_owner=(e/L)*F_node for red_none; otherwise cited reduction partials"
+      },
+      "hbm": {
+        "citation": "TASK-06 c_bytes_per_layer and s_bytes_per_layer",
+        "expression": "c_bytes_per_layer + s_bytes_per_layer"
+      },
+      "access": {
+        "layout_objects": [
+          "dense_gemm",
+          "depthwise_conv",
+          "vector_param",
+          "state_c",
+          "state_s"
+        ],
+        "decompositions": [
+          "par_gdn_head",
+          "par_conv_channel"
+        ],
+        "owner_expression": "cta owns par_gdn_head,par_conv_channel"
+      },
+      "synchronization": {
+        "class": "sync_cta",
+        "scope": "cta",
+        "dependency": "sync_cta orders mapping-local dependences"
+      },
+      "resources": {
+        "R_t": "symbolic",
+        "C_cta": "symbolic",
+        "T_cta_candidates": [
+          32,
+          64,
+          128,
+          256
+        ]
+      },
+      "occupancy": {
+        "B_warp": "floor(W_max/W_cta)",
+        "B_SM": "min(B_reg,B_smem,B_threads,B_cta,B_warp)",
+        "O": "B_SM*W_cta/W_max",
+        "W_need": "ceil(L_issue*N_sched)"
+      },
+      "waves": {
+        "N_grid": "symbolic mapping-dependent grid size",
+        "N_waves": "ceil(N_grid/(N_SM*B_SM))",
+        "eta_wave": "N_grid/(N_waves*N_SM*B_SM)"
+      },
+      "mode_fit": "both"
+    },
+    "map_gdn_warp_recurrent": {
+      "node_type": "gated_delta_net",
+      "work": {
+        "citation": "TASK-06 mac_gdn_per_layer",
+        "partition": "TASK-17 F_owner=(e/L)*F_node for red_none; otherwise cited reduction partials"
+      },
+      "hbm": {
+        "citation": "TASK-06 c_bytes_per_layer and s_bytes_per_layer",
+        "expression": "c_bytes_per_layer + s_bytes_per_layer"
+      },
+      "access": {
+        "layout_objects": [
+          "dense_gemm",
+          "depthwise_conv",
+          "vector_param",
+          "state_c",
+          "state_s"
+        ],
+        "decompositions": [
+          "par_gdn_head",
+          "par_conv_channel"
+        ],
+        "owner_expression": "warp owns par_gdn_head,par_conv_channel"
+      },
+      "synchronization": {
+        "class": "sync_warp",
+        "scope": "warp",
+        "dependency": "sync_warp orders mapping-local dependences"
+      },
+      "resources": {
+        "R_t": "symbolic",
+        "C_cta": "symbolic",
+        "T_cta_candidates": [
+          32,
+          64,
+          128,
+          256
+        ]
+      },
+      "occupancy": {
+        "B_warp": "floor(W_max/W_cta)",
+        "B_SM": "min(B_reg,B_smem,B_threads,B_cta,B_warp)",
+        "O": "B_SM*W_cta/W_max",
+        "W_need": "ceil(L_issue*N_sched)"
+      },
+      "waves": {
+        "N_grid": "symbolic mapping-dependent grid size",
+        "N_waves": "ceil(N_grid/(N_SM*B_SM))",
+        "eta_wave": "N_grid/(N_waves*N_SM*B_SM)"
+      },
+      "mode_fit": "decode_primary"
+    },
+    "map_gdn_cta_chunk": {
+      "node_type": "gated_delta_net",
+      "work": {
+        "citation": "TASK-06 mac_gdn_per_layer",
+        "partition": "TASK-17 F_owner=(e/L)*F_node for red_none; otherwise cited reduction partials"
+      },
+      "hbm": {
+        "citation": "TASK-06 c_bytes_per_layer and s_bytes_per_layer",
+        "expression": "c_bytes_per_layer + s_bytes_per_layer"
+      },
+      "access": {
+        "layout_objects": [
+          "dense_gemm",
+          "depthwise_conv",
+          "vector_param",
+          "state_c",
+          "state_s"
+        ],
+        "decompositions": [
+          "par_gdn_head",
+          "par_conv_channel"
+        ],
+        "owner_expression": "cta owns par_gdn_head,par_conv_channel"
+      },
+      "synchronization": {
+        "class": "sync_cta",
+        "scope": "cta",
+        "dependency": "sync_cta orders mapping-local dependences"
+      },
+      "resources": {
+        "R_t": "symbolic",
+        "C_cta": "symbolic",
+        "T_cta_candidates": [
+          32,
+          64,
+          128,
+          256
+        ]
+      },
+      "occupancy": {
+        "B_warp": "floor(W_max/W_cta)",
+        "B_SM": "min(B_reg,B_smem,B_threads,B_cta,B_warp)",
+        "O": "B_SM*W_cta/W_max",
+        "W_need": "ceil(L_issue*N_sched)"
+      },
+      "waves": {
+        "N_grid": "symbolic mapping-dependent grid size",
+        "N_waves": "ceil(N_grid/(N_SM*B_SM))",
+        "eta_wave": "N_grid/(N_waves*N_SM*B_SM)"
+      },
+      "mode_fit": "prefill_primary"
+    },
+    "map_mlp_cta_dout": {
+      "node_type": "mlp",
+      "work": {
+        "citation": "TASK-06 mac_mlp_per_layer",
+        "partition": "TASK-17 F_owner=(e/L)*F_node for red_none; otherwise cited reduction partials"
+      },
+      "hbm": {
+        "citation": "TASK-06 weight-memory class",
+        "expression": "3 * intermediate_size * hidden_size * bytes_bf16"
+      },
+      "access": {
+        "layout_objects": [
+          "dense_gemm"
+        ],
+        "decompositions": [
+          "par_gemm_d_out"
+        ],
+        "owner_expression": "cta owns par_gemm_d_out"
+      },
+      "synchronization": {
+        "class": "sync_cta",
+        "scope": "cta",
+        "dependency": "sync_cta orders mapping-local dependences"
+      },
+      "resources": {
+        "R_t": "symbolic",
+        "C_cta": "symbolic",
+        "T_cta_candidates": [
+          32,
+          64,
+          128,
+          256
+        ]
+      },
+      "occupancy": {
+        "B_warp": "floor(W_max/W_cta)",
+        "B_SM": "min(B_reg,B_smem,B_threads,B_cta,B_warp)",
+        "O": "B_SM*W_cta/W_max",
+        "W_need": "ceil(L_issue*N_sched)"
+      },
+      "waves": {
+        "N_grid": "symbolic mapping-dependent grid size",
+        "N_waves": "ceil(N_grid/(N_SM*B_SM))",
+        "eta_wave": "N_grid/(N_waves*N_SM*B_SM)"
+      },
+      "mode_fit": "both"
+    },
+    "map_mlp_cta_splitk": {
+      "node_type": "mlp",
+      "work": {
+        "citation": "TASK-06 mac_mlp_per_layer",
+        "partition": "TASK-17 F_owner=(e/L)*F_node for red_none; otherwise cited reduction partials"
+      },
+      "hbm": {
+        "citation": "TASK-06 weight-memory class",
+        "expression": "3 * intermediate_size * hidden_size * bytes_bf16"
+      },
+      "access": {
+        "layout_objects": [
+          "dense_gemm"
+        ],
+        "decompositions": [
+          "par_gemm_d_in"
+        ],
+        "owner_expression": "cta owns par_gemm_d_in"
+      },
+      "synchronization": {
+        "class": "sync_cta",
+        "scope": "cta",
+        "dependency": "sync_cta orders mapping-local dependences"
+      },
+      "resources": {
+        "R_t": "symbolic",
+        "C_cta": "symbolic",
+        "T_cta_candidates": [
+          32,
+          64,
+          128,
+          256
+        ]
+      },
+      "occupancy": {
+        "B_warp": "floor(W_max/W_cta)",
+        "B_SM": "min(B_reg,B_smem,B_threads,B_cta,B_warp)",
+        "O": "B_SM*W_cta/W_max",
+        "W_need": "ceil(L_issue*N_sched)"
+      },
+      "waves": {
+        "N_grid": "symbolic mapping-dependent grid size",
+        "N_waves": "ceil(N_grid/(N_SM*B_SM))",
+        "eta_wave": "N_grid/(N_waves*N_SM*B_SM)"
+      },
+      "mode_fit": "both"
+    },
+    "map_mlp_grid_T": {
+      "node_type": "mlp",
+      "work": {
+        "citation": "TASK-06 mac_mlp_per_layer",
+        "partition": "TASK-17 F_owner=(e/L)*F_node for red_none; otherwise cited reduction partials"
+      },
+      "hbm": {
+        "citation": "TASK-06 weight-memory class",
+        "expression": "3 * intermediate_size * hidden_size * bytes_bf16"
+      },
+      "access": {
+        "layout_objects": [
+          "dense_gemm"
+        ],
+        "decompositions": [
+          "par_gemm_T"
+        ],
+        "owner_expression": "grid owns par_gemm_T"
+      },
+      "synchronization": {
+        "class": "sync_none",
+        "scope": "grid",
+        "dependency": "none"
+      },
+      "resources": {
+        "R_t": "symbolic",
+        "C_cta": "symbolic",
+        "T_cta_candidates": [
+          32,
+          64,
+          128,
+          256
+        ]
+      },
+      "occupancy": {
+        "B_warp": "floor(W_max/W_cta)",
+        "B_SM": "min(B_reg,B_smem,B_threads,B_cta,B_warp)",
+        "O": "B_SM*W_cta/W_max",
+        "W_need": "ceil(L_issue*N_sched)"
+      },
+      "waves": {
+        "N_grid": "symbolic mapping-dependent grid size",
+        "N_waves": "ceil(N_grid/(N_SM*B_SM))",
+        "eta_wave": "N_grid/(N_waves*N_SM*B_SM)"
+      },
+      "mode_fit": "prefill_primary"
+    },
+    "map_lm_cta_vocab": {
+      "node_type": "lm_head",
+      "work": {
+        "citation": "TASK-06 mac_lm_head",
+        "partition": "TASK-17 F_owner=(e/L)*F_node for red_none; otherwise cited reduction partials"
+      },
+      "hbm": {
+        "citation": "TASK-06 weight_bytes_lm_head",
+        "expression": "weight_bytes_lm_head"
+      },
+      "access": {
+        "layout_objects": [
+          "dense_gemm"
+        ],
+        "decompositions": [
+          "par_gemm_d_out"
+        ],
+        "owner_expression": "cta owns par_gemm_d_out"
+      },
+      "synchronization": {
+        "class": "sync_cta",
+        "scope": "cta",
+        "dependency": "sync_cta orders mapping-local dependences"
+      },
+      "resources": {
+        "R_t": "symbolic",
+        "C_cta": "symbolic",
+        "T_cta_candidates": [
+          32,
+          64,
+          128,
+          256
+        ]
+      },
+      "occupancy": {
+        "B_warp": "floor(W_max/W_cta)",
+        "B_SM": "min(B_reg,B_smem,B_threads,B_cta,B_warp)",
+        "O": "B_SM*W_cta/W_max",
+        "W_need": "ceil(L_issue*N_sched)"
+      },
+      "waves": {
+        "N_grid": "symbolic mapping-dependent grid size",
+        "N_waves": "ceil(N_grid/(N_SM*B_SM))",
+        "eta_wave": "N_grid/(N_waves*N_SM*B_SM)"
+      },
+      "mode_fit": "both"
+    },
+    "map_lm_cta_splitk": {
+      "node_type": "lm_head",
+      "work": {
+        "citation": "TASK-06 mac_lm_head",
+        "partition": "TASK-17 F_owner=(e/L)*F_node for red_none; otherwise cited reduction partials"
+      },
+      "hbm": {
+        "citation": "TASK-06 weight_bytes_lm_head",
+        "expression": "weight_bytes_lm_head"
+      },
+      "access": {
+        "layout_objects": [
+          "dense_gemm"
+        ],
+        "decompositions": [
+          "par_gemm_d_in"
+        ],
+        "owner_expression": "cta owns par_gemm_d_in"
+      },
+      "synchronization": {
+        "class": "sync_cta",
+        "scope": "cta",
+        "dependency": "sync_cta orders mapping-local dependences"
+      },
+      "resources": {
+        "R_t": "symbolic",
+        "C_cta": "symbolic",
+        "T_cta_candidates": [
+          32,
+          64,
+          128,
+          256
+        ]
+      },
+      "occupancy": {
+        "B_warp": "floor(W_max/W_cta)",
+        "B_SM": "min(B_reg,B_smem,B_threads,B_cta,B_warp)",
+        "O": "B_SM*W_cta/W_max",
+        "W_need": "ceil(L_issue*N_sched)"
+      },
+      "waves": {
+        "N_grid": "symbolic mapping-dependent grid size",
+        "N_waves": "ceil(N_grid/(N_SM*B_SM))",
+        "eta_wave": "N_grid/(N_waves*N_SM*B_SM)"
+      },
+      "mode_fit": "both"
+    },
+    "map_lm_warp_gemv": {
+      "node_type": "lm_head",
+      "work": {
+        "citation": "TASK-06 mac_lm_head",
+        "partition": "TASK-17 F_owner=(e/L)*F_node for red_none; otherwise cited reduction partials"
+      },
+      "hbm": {
+        "citation": "TASK-06 weight_bytes_lm_head",
+        "expression": "weight_bytes_lm_head"
+      },
+      "access": {
+        "layout_objects": [
+          "dense_gemm"
+        ],
+        "decompositions": [
+          "par_gemm_d_out"
+        ],
+        "owner_expression": "warp owns par_gemm_d_out"
+      },
+      "synchronization": {
+        "class": "sync_warp",
+        "scope": "warp",
+        "dependency": "sync_warp orders mapping-local dependences"
+      },
+      "resources": {
+        "R_t": "symbolic",
+        "C_cta": "symbolic",
+        "T_cta_candidates": [
+          32,
+          64,
+          128,
+          256
+        ]
+      },
+      "occupancy": {
+        "B_warp": "floor(W_max/W_cta)",
+        "B_SM": "min(B_reg,B_smem,B_threads,B_cta,B_warp)",
+        "O": "B_SM*W_cta/W_max",
+        "W_need": "ceil(L_issue*N_sched)"
+      },
+      "waves": {
+        "N_grid": "symbolic mapping-dependent grid size",
+        "N_waves": "ceil(N_grid/(N_SM*B_SM))",
+        "eta_wave": "N_grid/(N_waves*N_SM*B_SM)"
+      },
+      "mode_fit": "decode_primary"
+    },
+    "map_mtp_cta_fc": {
+      "node_type": "mtp_mix",
+      "work": {
+        "citation": "TASK-06 mac_mtp_fc",
+        "partition": "TASK-17 F_owner=(e/L)*F_node for red_none; otherwise cited reduction partials"
+      },
+      "hbm": {
+        "citation": "TASK-06 weight_bytes_mtp_fc",
+        "expression": "weight_bytes_mtp_fc"
+      },
+      "access": {
+        "layout_objects": [
+          "dense_gemm"
+        ],
+        "decompositions": [
+          "par_gemm_d_out"
+        ],
+        "owner_expression": "cta owns par_gemm_d_out"
+      },
+      "synchronization": {
+        "class": "sync_cta",
+        "scope": "cta",
+        "dependency": "sync_cta orders mapping-local dependences"
+      },
+      "resources": {
+        "R_t": "symbolic",
+        "C_cta": "symbolic",
+        "T_cta_candidates": [
+          32,
+          64,
+          128,
+          256
+        ]
+      },
+      "occupancy": {
+        "B_warp": "floor(W_max/W_cta)",
+        "B_SM": "min(B_reg,B_smem,B_threads,B_cta,B_warp)",
+        "O": "B_SM*W_cta/W_max",
+        "W_need": "ceil(L_issue*N_sched)"
+      },
+      "waves": {
+        "N_grid": "symbolic mapping-dependent grid size",
+        "N_waves": "ceil(N_grid/(N_SM*B_SM))",
+        "eta_wave": "N_grid/(N_waves*N_SM*B_SM)"
+      },
+      "mode_fit": "both"
+    },
+    "map_mtp_cta_fused": {
+      "node_type": "mtp_mix",
+      "work": {
+        "citation": "TASK-06 mac_mtp_fc",
+        "partition": "TASK-17 F_owner=(e/L)*F_node for red_none; otherwise cited reduction partials"
+      },
+      "hbm": {
+        "citation": "TASK-06 weight_bytes_mtp_fc",
+        "expression": "weight_bytes_mtp_fc"
+      },
+      "access": {
+        "layout_objects": [
+          "dense_gemm"
+        ],
+        "decompositions": [
+          "par_gemm_d_out"
+        ],
+        "owner_expression": "cta owns par_gemm_d_out"
+      },
+      "synchronization": {
+        "class": "sync_cta",
+        "scope": "cta",
+        "dependency": "sync_cta orders mapping-local dependences"
+      },
+      "resources": {
+        "R_t": "symbolic",
+        "C_cta": "symbolic",
+        "T_cta_candidates": [
+          32,
+          64,
+          128,
+          256
+        ]
+      },
+      "occupancy": {
+        "B_warp": "floor(W_max/W_cta)",
+        "B_SM": "min(B_reg,B_smem,B_threads,B_cta,B_warp)",
+        "O": "B_SM*W_cta/W_max",
+        "W_need": "ceil(L_issue*N_sched)"
+      },
+      "waves": {
+        "N_grid": "symbolic mapping-dependent grid size",
+        "N_waves": "ceil(N_grid/(N_SM*B_SM))",
+        "eta_wave": "N_grid/(N_waves*N_SM*B_SM)"
+      },
+      "mode_fit": "both"
+    },
+    "map_mtp_split_norm_gemm": {
+      "node_type": "mtp_mix",
+      "work": {
+        "citation": "TASK-06 mac_mtp_fc",
+        "partition": "TASK-17 F_owner=(e/L)*F_node for red_none; otherwise cited reduction partials"
+      },
+      "hbm": {
+        "citation": "TASK-06 weight_bytes_mtp_fc",
+        "expression": "weight_bytes_mtp_fc"
+      },
+      "access": {
+        "layout_objects": [
+          "dense_gemm"
+        ],
+        "decompositions": [
+          "par_gemm_d_out"
+        ],
+        "owner_expression": "grid owns par_gemm_d_out"
+      },
+      "synchronization": {
+        "class": "sync_stream_event",
+        "scope": "grid",
+        "dependency": {
+          "stages": [
+            "embedding_norm",
+            "hidden_norm",
+            "concat_materialize",
+            "fc_gemm"
+          ],
+          "events": [
+            "embedding_norm->concat_materialize",
+            "hidden_norm->concat_materialize",
+            "concat_materialize->fc_gemm"
+          ]
+        }
+      },
+      "resources": {
+        "R_t": "symbolic",
+        "C_cta": "symbolic",
+        "T_cta_candidates": [
+          32,
+          64,
+          128,
+          256
+        ]
+      },
+      "occupancy": {
+        "B_warp": "floor(W_max/W_cta)",
+        "B_SM": "min(B_reg,B_smem,B_threads,B_cta,B_warp)",
+        "O": "B_SM*W_cta/W_max",
+        "W_need": "ceil(L_issue*N_sched)"
+      },
+      "waves": {
+        "N_grid": "symbolic mapping-dependent grid size",
+        "N_waves": "ceil(N_grid/(N_SM*B_SM))",
+        "eta_wave": "N_grid/(N_waves*N_SM*B_SM)"
+      },
+      "mode_fit": "both"
+    }
   },
   "mapping_usefulness_label": "HYPOTHESIS",
   "n_decode_primary_mappings": 3,
