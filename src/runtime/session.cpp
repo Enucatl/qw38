@@ -342,6 +342,15 @@ std::expected<void, Error> Session::set_populated_length(
   return {};
 }
 
+std::expected<std::uint32_t*, Error> Session::conv_cursor_slot(
+    std::uint32_t gdn_layer) {
+  if (gdn_layer >= kConvLayers) {
+    return std::unexpected(make_error(ErrorCode::InvalidArgument, "conv.layer",
+                                      "GDN layer index must be < 48"));
+  }
+  return &conv_cursor_[gdn_layer];
+}
+
 std::expected<void, Error> Session::set_conv_cursor(
     std::array<std::uint32_t, kConvLayers> cursor) {
   for (auto c : cursor) {

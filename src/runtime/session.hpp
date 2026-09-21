@@ -62,6 +62,8 @@ class Session {
       const noexcept {
     return conv_cursor_;
   }
+  [[nodiscard]] std::expected<std::uint32_t*, Error> conv_cursor_slot(
+      std::uint32_t gdn_layer);
   [[nodiscard]] std::expected<void, Error> set_conv_cursor(
       std::array<std::uint32_t, kConvLayers> cursor);
 

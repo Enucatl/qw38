@@ -1,0 +1,370 @@
+#include "gdn_support.hpp"
+
+#include "compiler/quantization/reference.hpp"
+#include "cuda/copy.hpp"
+#include "cuda/decode_mmv.hpp"
+
+#include <iostream>
+#include <string>
+#include <vector>
+
+using qw38::cuda::DeviceBuffer;
+using qw38::cuda::Stream;
+using qw38::cuda::launch_gdn_conv_silu;
+using qw38::cuda::launch_gdn_prepare;
+using qw38::format::LogicalQuantizerId;
+using qw38::format::PackedMatrix;
+using qw38::format::PhysicalLayoutId;
+using qw38::format::StorageClass;
+using qw38::gdn::test::download_vec;
+using qw38::gdn::test::expect;
+using qw38::gdn::test::expect_bf16_close;
+using qw38::gdn::test::expect_fp32_close;
+using qw38::gdn::test::fail;
+using qw38::gdn::test::fill_logical_pattern;
+using qw38::gdn::test::g_failures;
+using qw38::gdn::test::kConvHistoryTaps;
+using qw38::gdn::test::kConvKernel;
+using qw38::gdn::test::kDefaultRmsEps;
+using qw38::gdn::test::kGdnConvBf16Abs;
+using qw38::gdn::test::kGdnGateFp32Abs;
+using qw38::gdn::test::kGdnGateFp32Rel;
+using qw38::gdn::test::kGdnHeadDim;
+using qw38::gdn::test::kGdnKeyHeads;
+using qw38::gdn::test::kGdnQkFp32Abs;
+using qw38::gdn::test::kGdnQkFp32Rel;
+using qw38::gdn::test::kGdnValueHeads;
+using qw38::gdn::test::kGdnZWidth;
+using qw38::gdn::test::kHidden;
+using qw38::gdn::test::kQkvWidth;
+using qw38::gdn::test::make_logical;
+using qw38::gdn::test::make_view;
+using qw38::gdn::test::pack_bf16_tile;
+using qw38::gdn::test::pack_q4_from_logical;
+using qw38::gdn::test::pattern_h;
+using qw38::gdn::test::residual_vec;
+using qw38::gdn::test::upload_vec;
+using qw38::gdn::test::zeros_h;
+using qw38::reference::gdn_conv_history_step;
+using qw38::reference::gdn_front_reference;
+using qw38::reference::gdn_prepare;
+using qw38::runtime::GdnFrontBindViews;
+using qw38::runtime::bind_gdn_front_plan;
+using qw38::runtime::execute_gdn_front;
+using qw38::runtime::kGdnWorkspaceBytesPerToken;
+
+namespace {
+
+void test_multi_step_kernels(Stream const& stream) {
+  auto taps = pattern_h(kConvKernel * kQkvWidth, 0.35f);
+  auto history = zeros_h(kConvHistoryTaps * kQkvWidth);
+  auto d_t = upload_vec(taps, stream);
+  auto d_h = upload_vec(history, stream);
+  auto d_c = DeviceBuffer::allocate(kQkvWidth * 2);
+  if (!d_t || !d_h || !d_c) {
+    fail("multi-step alloc");
+    return;
+  }
+  std::uint32_t cpu_cursor = 0;
+  std::uint32_t gpu_cursor = 0;
+  auto cpu_hist = history;
+  for (int step = 0; step < 7; ++step) {
+    auto qkv = pattern_h(kQkvWidth, 0.2f * static_cast<float>(step + 1));
+    auto cpu_conv = zeros_h(kQkvWidth);
+    auto rst = gdn_conv_history_step(qkv, taps, cpu_hist, cpu_cursor, cpu_conv);
+    expect(static_cast<bool>(rst), "cpu multi conv");
+    auto d_q = upload_vec(qkv, stream);
+    if (!d_q) {
+      fail("multi qkv upload");
+      return;
+    }
+    auto st = launch_gdn_conv_silu(static_cast<std::uint16_t const*>(d_q->data()),
+                                   static_cast<std::uint16_t const*>(d_t->data()),
+                                   static_cast<std::uint16_t*>(d_h->data()),
+                                   gpu_cursor, static_cast<std::uint16_t*>(d_c->data()),
+                                   stream);
+    expect(static_cast<bool>(st), "gpu multi conv");
+    gpu_cursor = (gpu_cursor + 1u) % 3u;
+    auto got = download_vec<std::uint16_t>(*d_c, kQkvWidth, stream);
+    if (!got) {
+      fail("multi conv download");
+      return;
+    }
+    expect_bf16_close(*got, cpu_conv,
+                      std::string("conv step ") + std::to_string(step),
+                      kGdnConvBf16Abs, 0.0f);
+
+    std::vector<float> a(kGdnValueHeads, 0.1f * static_cast<float>(step));
+    std::vector<float> b(kGdnValueHeads, -0.2f + 0.05f * static_cast<float>(step));
+    auto alog = pattern_h(kGdnValueHeads, -0.4f);
+    auto dt = pattern_h(kGdnValueHeads, 0.3f);
+    std::size_t const nqk = static_cast<std::size_t>(kGdnKeyHeads) * kGdnHeadDim;
+    std::vector<float> q_ref(nqk);
+    std::vector<float> k_ref(nqk);
+    std::vector<float> alpha_ref(kGdnValueHeads);
+    std::vector<float> beta_ref(kGdnValueHeads);
+    auto pst = gdn_prepare(cpu_conv, a, b, alog, dt, kDefaultRmsEps, q_ref, k_ref,
+                           alpha_ref, beta_ref);
+    expect(static_cast<bool>(pst), "cpu prepare");
+    auto d_a = upload_vec(a, stream);
+    auto d_b = upload_vec(b, stream);
+    auto d_al = upload_vec(alog, stream);
+    auto d_dt = upload_vec(dt, stream);
+    auto d_qhat = DeviceBuffer::allocate(nqk * 4);
+    auto d_khat = DeviceBuffer::allocate(nqk * 4);
+    auto d_alpha = DeviceBuffer::allocate(kGdnValueHeads * 4);
+    auto d_beta = DeviceBuffer::allocate(kGdnValueHeads * 4);
+    if (!d_a || !d_b || !d_al || !d_dt || !d_qhat || !d_khat || !d_alpha ||
+        !d_beta) {
+      fail("prepare alloc");
+      return;
+    }
+    st = launch_gdn_prepare(static_cast<std::uint16_t const*>(d_c->data()),
+                            static_cast<float const*>(d_a->data()),
+                            static_cast<float const*>(d_b->data()),
+                            static_cast<std::uint16_t const*>(d_al->data()),
+                            static_cast<std::uint16_t const*>(d_dt->data()),
+                            kDefaultRmsEps, static_cast<float*>(d_qhat->data()),
+                            static_cast<float*>(d_khat->data()),
+                            static_cast<float*>(d_alpha->data()),
+                            static_cast<float*>(d_beta->data()), stream);
+    expect(static_cast<bool>(st), "gpu prepare");
+    auto gq = download_vec<float>(*d_qhat, nqk, stream);
+    auto gk = download_vec<float>(*d_khat, nqk, stream);
+    auto ga = download_vec<float>(*d_alpha, kGdnValueHeads, stream);
+    auto gb = download_vec<float>(*d_beta, kGdnValueHeads, stream);
+    if (!gq || !gk || !ga || !gb) {
+      fail("prepare download");
+      return;
+    }
+    expect_fp32_close(*gq, q_ref, std::string("q step ") + std::to_string(step),
+                      kGdnQkFp32Abs, kGdnQkFp32Rel);
+    expect_fp32_close(*gk, k_ref, std::string("k step ") + std::to_string(step),
+                      kGdnQkFp32Abs, kGdnQkFp32Rel);
+    expect_fp32_close(*ga, alpha_ref,
+                      std::string("alpha step ") + std::to_string(step),
+                      kGdnGateFp32Abs, kGdnGateFp32Rel);
+    expect_fp32_close(*gb, beta_ref,
+                      std::string("beta step ") + std::to_string(step),
+                      kGdnGateFp32Abs, kGdnGateFp32Rel);
+  }
+  expect(cpu_cursor == gpu_cursor, "cursors stay aligned");
+  auto got_h = download_vec<std::uint16_t>(*d_h, kConvHistoryTaps * kQkvWidth, stream);
+  if (got_h) {
+    expect_bf16_close(*got_h, cpu_hist, "history after 7 steps", 0.0f, 0.0f);
+  }
+}
+
+struct HostFront {
+  PackedMatrix qkv;
+  PackedMatrix z;
+  PackedMatrix a;
+  PackedMatrix b;
+  std::vector<std::uint16_t> w_qkv;
+  std::vector<std::uint16_t> w_z;
+  std::vector<std::uint16_t> w_a;
+  std::vector<std::uint16_t> w_b;
+  std::vector<std::uint16_t> gamma;
+  std::vector<std::uint16_t> taps;
+  std::vector<std::uint16_t> a_log;
+  std::vector<std::uint16_t> dt_bias;
+  std::vector<float> residual;
+};
+
+bool make_host(HostFront& host) {
+  auto lq = make_logical(LogicalQuantizerId::Q4G64V0, kQkvWidth, kHidden, 1, 0x3C00);
+  auto lz = make_logical(LogicalQuantizerId::Q4G64V0, kGdnZWidth, kHidden, -2, 0x3C00);
+  fill_logical_pattern(lq, 2);
+  fill_logical_pattern(lz, 5);
+  if (!pack_q4_from_logical(lq, host.qkv, "qkv") ||
+      !pack_q4_from_logical(lz, host.z, "z")) {
+    return false;
+  }
+  auto wq = qw38::compiler::dequantize_to_bf16(lq);
+  auto wz = qw38::compiler::dequantize_to_bf16(lz);
+  if (!wq || !wz) {
+    fail("dequant qkv/z");
+    return false;
+  }
+  host.w_qkv = std::move(*wq);
+  host.w_z = std::move(*wz);
+  host.w_a = pattern_h(kGdnValueHeads * kHidden, 0.04f);
+  host.w_b = pattern_h(kGdnValueHeads * kHidden, -0.03f);
+  if (!pack_bf16_tile(host.w_a, kGdnValueHeads, kHidden, host.a, "a") ||
+      !pack_bf16_tile(host.w_b, kGdnValueHeads, kHidden, host.b, "b")) {
+    return false;
+  }
+  host.gamma = pattern_h(kHidden, 0.2f);
+  host.taps = pattern_h(kConvKernel * kQkvWidth, 0.15f);
+  host.a_log = pattern_h(kGdnValueHeads, -0.5f);
+  host.dt_bias = pattern_h(kGdnValueHeads, 0.4f);
+  host.residual = residual_vec(kHidden, 0.8f);
+  return true;
+}
+
+void test_front_vs_reference(Stream const& stream) {
+  HostFront host;
+  if (!make_host(host)) {
+    return;
+  }
+  auto history = zeros_h(kConvHistoryTaps * kQkvWidth);
+  std::uint32_t cursor = 0;
+  auto cpu = gdn_front_reference(host.residual, host.gamma, kDefaultRmsEps,
+                                 host.w_qkv, host.w_z, host.w_a, host.w_b,
+                                 host.taps, host.a_log, host.dt_bias, history,
+                                 cursor);
+  expect(static_cast<bool>(cpu), "cpu front");
+  if (!cpu) {
+    return;
+  }
+
+  auto d_qkv = upload_vec(host.qkv.codes, stream);
+  auto d_qkv_s = upload_vec(host.qkv.scales, stream);
+  auto d_z = upload_vec(host.z.codes, stream);
+  auto d_z_s = upload_vec(host.z.scales, stream);
+  auto d_a = upload_vec(host.a.codes, stream);
+  auto d_b = upload_vec(host.b.codes, stream);
+  auto d_gamma = upload_vec(host.gamma, stream);
+  auto d_taps = upload_vec(host.taps, stream);
+  auto d_alog = upload_vec(host.a_log, stream);
+  auto d_dt = upload_vec(host.dt_bias, stream);
+  auto d_res = upload_vec(host.residual, stream);
+  auto d_norm = DeviceBuffer::allocate(kHidden * 2);
+  auto d_ws = DeviceBuffer::allocate(kGdnWorkspaceBytesPerToken);
+  auto d_hist = upload_vec(history, stream);
+  if (!d_qkv || !d_qkv_s || !d_z || !d_z_s || !d_a || !d_b || !d_gamma ||
+      !d_taps || !d_alog || !d_dt || !d_res || !d_norm || !d_ws || !d_hist) {
+    fail("front upload");
+    return;
+  }
+  std::uint32_t gpu_cursor = 0;
+  GdnFrontBindViews views;
+  views.qkv = make_view(d_qkv->data(), qw38::format::ArithmeticDtype::Bf16,
+                        PhysicalLayoutId::CudaQ4G64V0, StorageClass::Int4Grouped,
+                        false, 2, kQkvWidth, kHidden);
+  views.qkv_scales = make_view(d_qkv_s->data(), qw38::format::ArithmeticDtype::Fp16,
+                               PhysicalLayoutId::CudaQ4G64V0, StorageClass::Int4Grouped,
+                               false, 1, host.qkv.scales.size() / 2);
+  views.z = make_view(d_z->data(), qw38::format::ArithmeticDtype::Bf16,
+                      PhysicalLayoutId::CudaQ4G64V0, StorageClass::Int4Grouped, false,
+                      2, kGdnZWidth, kHidden);
+  views.z_scales = make_view(d_z_s->data(), qw38::format::ArithmeticDtype::Fp16,
+                             PhysicalLayoutId::CudaQ4G64V0, StorageClass::Int4Grouped,
+                             false, 1, host.z.scales.size() / 2);
+  views.a = make_view(d_a->data(), qw38::format::ArithmeticDtype::Bf16,
+                      PhysicalLayoutId::CudaBf16DenseTileV0, StorageClass::Bf16,
+                      false, 2, kGdnValueHeads, kHidden);
+  views.b = make_view(d_b->data(), qw38::format::ArithmeticDtype::Bf16,
+                      PhysicalLayoutId::CudaBf16DenseTileV0, StorageClass::Bf16,
+                      false, 2, kGdnValueHeads, kHidden);
+  views.gamma = make_view(d_gamma->data(), qw38::format::ArithmeticDtype::Bf16,
+                          PhysicalLayoutId::CudaBf16VectorV0, StorageClass::Bf16,
+                          false, 1, kHidden);
+  views.taps = make_view(d_taps->data(), qw38::format::ArithmeticDtype::Bf16,
+                         PhysicalLayoutId::CudaBf16TapMajorV0, StorageClass::Bf16,
+                         false, 2, kConvKernel, kQkvWidth);
+  views.a_log = make_view(d_alog->data(), qw38::format::ArithmeticDtype::Bf16,
+                          PhysicalLayoutId::CudaBf16VectorV0, StorageClass::Bf16,
+                          false, 1, kGdnValueHeads);
+  views.dt_bias = make_view(d_dt->data(), qw38::format::ArithmeticDtype::Bf16,
+                            PhysicalLayoutId::CudaBf16VectorV0, StorageClass::Bf16,
+                            false, 1, kGdnValueHeads);
+  views.residual = make_view(d_res->data(), qw38::format::ArithmeticDtype::Fp32,
+                             PhysicalLayoutId::CudaFp32VectorV0, StorageClass::Fp32,
+                             true, 1, kHidden);
+  views.normalized = make_view(d_norm->data(), qw38::format::ArithmeticDtype::Bf16,
+                               PhysicalLayoutId::CudaBf16RowMajorV0,
+                               StorageClass::Bf16, true, 1, kHidden);
+  views.workspace = make_view(d_ws->data(), qw38::format::ArithmeticDtype::Fp32,
+                              PhysicalLayoutId::CudaFp32VectorV0, StorageClass::Fp32,
+                              true, 1, kGdnWorkspaceBytesPerToken / 4);
+  views.history = make_view(d_hist->data(), qw38::format::ArithmeticDtype::Bf16,
+                            PhysicalLayoutId::CudaBf16ConvHistoryV0,
+                            StorageClass::Bf16, true, 2, kConvHistoryTaps, kQkvWidth);
+  views.host_cursor = &gpu_cursor;
+  views.language_layer = 0;
+  auto plan = bind_gdn_front_plan(views, stream);
+  expect(static_cast<bool>(plan), "front bind");
+  if (!plan) {
+    return;
+  }
+  auto st = execute_gdn_front(*plan);
+  expect(static_cast<bool>(st), "front execute");
+  if (!st) {
+    fail(qw38::runtime::error_message(st.error()));
+    return;
+  }
+  expect(gpu_cursor == cpu->cursor, "front cursor");
+
+  auto* ws = static_cast<std::byte*>(d_ws->data());
+  auto copy_ws = [&](std::uint64_t off, std::uint64_t bytes, auto* dst) {
+    auto stc = qw38::cuda::copy_d2h(dst, ws + off, bytes, stream);
+    return static_cast<bool>(stc) && static_cast<bool>(stream.sync());
+  };
+  std::vector<std::uint16_t> g_qkv(kQkvWidth);
+  std::vector<std::uint16_t> g_z(kGdnZWidth);
+  std::vector<std::uint16_t> g_conv(kQkvWidth);
+  std::size_t const nqk = static_cast<std::size_t>(kGdnKeyHeads) * kGdnHeadDim;
+  std::vector<float> g_q(nqk);
+  std::vector<float> g_k(nqk);
+  std::vector<float> g_a(kGdnValueHeads);
+  std::vector<float> g_b(kGdnValueHeads);
+  std::vector<float> g_alpha(kGdnValueHeads);
+  std::vector<float> g_beta(kGdnValueHeads);
+  std::vector<std::uint16_t> g_norm(kHidden);
+  std::vector<std::uint16_t> g_hist(kConvHistoryTaps * kQkvWidth);
+  if (!copy_ws(qw38::runtime::kGdnOffQkv, kQkvWidth * 2, g_qkv.data()) ||
+      !copy_ws(qw38::runtime::kGdnOffZ, kGdnZWidth * 2, g_z.data()) ||
+      !copy_ws(qw38::runtime::kGdnOffConvolved, kQkvWidth * 2, g_conv.data()) ||
+      !copy_ws(qw38::runtime::kGdnOffQHat, nqk * 4, g_q.data()) ||
+      !copy_ws(qw38::runtime::kGdnOffKHat, nqk * 4, g_k.data()) ||
+      !copy_ws(qw38::runtime::kGdnOffA, kGdnValueHeads * 4, g_a.data()) ||
+      !copy_ws(qw38::runtime::kGdnOffB, kGdnValueHeads * 4, g_b.data()) ||
+      !copy_ws(qw38::runtime::kGdnOffAlpha, kGdnValueHeads * 4, g_alpha.data()) ||
+      !copy_ws(qw38::runtime::kGdnOffBeta, kGdnValueHeads * 4, g_beta.data())) {
+    fail("workspace download");
+    return;
+  }
+  auto gn = download_vec<std::uint16_t>(*d_norm, kHidden, stream);
+  auto gh = download_vec<std::uint16_t>(*d_hist, kConvHistoryTaps * kQkvWidth, stream);
+  if (!gn || !gh) {
+    fail("norm/hist download");
+    return;
+  }
+  expect_bf16_close(*gn, cpu->normalized, "stage rms",
+                    qw38::reference::tol::kRmsBf16Abs, 0.0f);
+  expect_bf16_close(g_qkv, cpu->qkv, "stage qkv",
+                    qw38::cuda::decode_mmv_tol::kBf16StoreAbs, 1.0e-4f);
+  expect_bf16_close(g_z, cpu->z, "stage z",
+                    qw38::cuda::decode_mmv_tol::kBf16StoreAbs, 1.0e-4f);
+  expect_fp32_close(g_a, cpu->a, "stage a", qw38::cuda::decode_mmv_tol::kFp32Abs,
+                    qw38::cuda::decode_mmv_tol::kFp32Rel);
+  expect_fp32_close(g_b, cpu->b, "stage b", qw38::cuda::decode_mmv_tol::kFp32Abs,
+                    qw38::cuda::decode_mmv_tol::kFp32Rel);
+  expect_bf16_close(g_conv, cpu->convolved, "stage conv", kGdnConvBf16Abs, 1.0e-4f);
+  expect_fp32_close(g_q, cpu->q_hat, "stage q_hat", kGdnQkFp32Abs, kGdnQkFp32Rel);
+  expect_fp32_close(g_k, cpu->k_hat, "stage k_hat", kGdnQkFp32Abs, kGdnQkFp32Rel);
+  expect_fp32_close(g_alpha, cpu->alpha, "stage alpha", kGdnGateFp32Abs,
+                    kGdnGateFp32Rel);
+  expect_fp32_close(g_beta, cpu->beta, "stage beta", kGdnGateFp32Abs,
+                    kGdnGateFp32Rel);
+  expect_bf16_close(*gh, cpu->history, "stage history", 0.0f, 0.0f);
+}
+
+}  // namespace
+
+int main() {
+  auto stream = Stream::create();
+  if (!stream) {
+    fail("stream");
+    return 1;
+  }
+  test_multi_step_kernels(*stream);
+  test_front_vs_reference(*stream);
+  if (g_failures != 0) {
+    std::cerr << g_failures << " gdn reference failures\n";
+    return 1;
+  }
+  std::cout << "gdn reference ok\n";
+  return 0;
+}

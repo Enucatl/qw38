@@ -288,6 +288,115 @@ void test_silu_sigmoid_gemv_argmax() {
          "empty argmax rejected");
 }
 
+void test_gdn_conv_prepare() {
+  using qw38::reference::gdn_alpha_beta;
+  using qw38::reference::gdn_conv_history_step;
+  using qw38::reference::gdn_key_head;
+  using qw38::reference::gdn_prepare;
+  using qw38::reference::kConvHistoryTaps;
+  using qw38::reference::kConvKernel;
+  using qw38::reference::kGdnHeadDim;
+  using qw38::reference::kGdnKeyHeads;
+  using qw38::reference::kGdnRepeat;
+  using qw38::reference::kGdnValueHeads;
+  using qw38::reference::kQkvWidth;
+  using qw38::reference::silu_fp32;
+
+  expect(gdn_key_head(0) == 0 && gdn_key_head(2) == 0, "value 0..2 → key 0");
+  expect(gdn_key_head(3) == 1 && gdn_key_head(5) == 1, "value 3..5 → key 1");
+  expect(gdn_key_head(47) == 15, "value 47 → key 15");
+  expect(kGdnValueHeads / kGdnRepeat == kGdnKeyHeads, "no q/k triplication");
+
+  auto qkv = filled_h(kQkvWidth, 0.0f);
+  auto taps = zeros_h(kConvKernel * kQkvWidth);
+  auto history = zeros_h(kConvHistoryTaps * kQkvWidth);
+  auto conv = zeros_h(kQkvWidth);
+  std::uint32_t cursor = 3;
+  auto badc = gdn_conv_history_step(qkv, taps, history, cursor, conv);
+  expect(!badc && badc.error().code == ErrorCode::InvalidArgument,
+         "cursor >= 3 rejected");
+
+  cursor = 0;
+  qkv = filled_h(kQkvWidth, 1.5f);
+  taps = zeros_h(kConvKernel * kQkvWidth);
+  taps[3 * kQkvWidth] = bf16(1.0f);
+  history = zeros_h(kConvHistoryTaps * kQkvWidth);
+  auto st = gdn_conv_history_step(qkv, taps, history, cursor, conv);
+  expect(static_cast<bool>(st), "conv step 1");
+  expect(cursor == 1, "cursor advances");
+  expect(history[0] == qkv[0], "raw current enters history, not SiLU");
+  expect(std::fabs(bf16_to_fp32(conv[0]) - silu_fp32(1.5f)) < 1.0e-3f,
+         "tap 3 (current) only");
+  expect(bf16_to_fp32(conv[1]) == 0.0f, "other channels stay 0");
+
+  auto qkv2 = filled_h(kQkvWidth, 0.25f);
+  taps[3 * kQkvWidth] = bf16(0.0f);
+  taps[0 * kQkvWidth] = bf16(1.0f);
+  st = gdn_conv_history_step(qkv2, taps, history, cursor, conv);
+  expect(static_cast<bool>(st) && cursor == 2, "step 2 cursor");
+  expect(history[kQkvWidth] == qkv2[0], "slot 1 is second raw qkv");
+  expect(bf16_to_fp32(conv[0]) == 0.0f,
+         "tap 0 is x_{t-3}; still pad after one prior token");
+
+  taps[0 * kQkvWidth] = bf16(0.0f);
+  taps[2 * kQkvWidth] = bf16(1.0f);
+  auto qkv3 = filled_h(kQkvWidth, 0.0f);
+  st = gdn_conv_history_step(qkv3, taps, history, cursor, conv);
+  expect(static_cast<bool>(st) && cursor == 0, "step 3 cursor");
+  expect(history[2 * kQkvWidth] == qkv3[0], "slot 2 is third raw qkv");
+  expect(std::fabs(bf16_to_fp32(conv[0]) - silu_fp32(0.25f)) < 1.0e-3f,
+         "tap 2 (newest history) reads the previous raw token");
+
+  history.assign(kConvHistoryTaps * kQkvWidth, bf16(0.0f));
+  cursor = 0;
+  taps.assign(kConvKernel * kQkvWidth, bf16(0.0f));
+  for (int t = 0; t < 4; ++t) {
+    auto cur = filled_h(kQkvWidth, static_cast<float>(t + 1));
+    st = gdn_conv_history_step(cur, taps, history, cursor, conv);
+    expect(static_cast<bool>(st), "wrap step");
+  }
+  expect(cursor == 1, "wrap cursor after 4 steps");
+  expect(bf16_to_fp32(history[0]) == 4.0f, "oldest slot overwritten by token 4");
+  expect(bf16_to_fp32(history[kQkvWidth]) == 2.0f, "slot 1 still token 2");
+  expect(bf16_to_fp32(history[2 * kQkvWidth]) == 3.0f, "slot 2 still token 3");
+
+  auto convolved = zeros_h(kQkvWidth);
+  std::vector<float> q_hat(kGdnKeyHeads * kGdnHeadDim, 1.0f);
+  std::vector<float> k_hat(kGdnKeyHeads * kGdnHeadDim, 1.0f);
+  std::vector<float> a(kGdnValueHeads, 0.0f);
+  std::vector<float> b(kGdnValueHeads, 0.0f);
+  auto alog = zeros_h(kGdnValueHeads);
+  auto dt = zeros_h(kGdnValueHeads);
+  std::vector<float> alpha(kGdnValueHeads, 99.0f);
+  std::vector<float> beta(kGdnValueHeads, 99.0f);
+  st = gdn_prepare(convolved, a, b, alog, dt, kDefaultRmsEps, q_hat, k_hat, alpha,
+                   beta);
+  expect(static_cast<bool>(st), "zero q/k prepare");
+  bool qz = true;
+  for (float v : q_hat) {
+    qz = qz && (v == 0.0f);
+  }
+  bool kz = true;
+  for (float v : k_hat) {
+    kz = kz && (v == 0.0f);
+  }
+  expect(qz && kz, "zero-norm heads stay zero");
+  expect(q_hat.size() == static_cast<std::size_t>(kGdnKeyHeads) * kGdnHeadDim,
+         "q/k not physically triplicated");
+  expect(std::fabs(alpha[0] - 0.5f) < 1.0e-5f,
+         "A_log=0, a=0, dt=0 → α=0.5");
+  expect(std::fabs(beta[0] - 0.5f) < 1.0e-5f, "b=0 → β=0.5");
+
+  a.assign(kGdnValueHeads, 1.0f);
+  b.assign(kGdnValueHeads, 2.0f);
+  alog = filled_h(kGdnValueHeads, -1.0f);
+  dt = filled_h(kGdnValueHeads, 0.5f);
+  st = gdn_alpha_beta(a, b, alog, dt, alpha, beta);
+  expect(static_cast<bool>(st), "nonzero gates");
+  expect(alpha[0] > 0.0f && alpha[0] <= 1.0f, "alpha in (0,1]");
+  expect(beta[0] > 0.5f && beta[0] < 1.0f, "beta = sigmoid(2)");
+}
+
 }  // namespace
 
 int main() {
@@ -297,6 +406,7 @@ int main() {
   test_bf16_rounding();
   test_rope();
   test_silu_sigmoid_gemv_argmax();
+  test_gdn_conv_prepare();
   if (g_failures != 0) {
     std::cerr << g_failures << " failures\n";
     return 1;

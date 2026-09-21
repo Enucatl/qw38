@@ -1,6 +1,6 @@
 find_package(CUDAToolkit REQUIRED)
 
-add_library(qw38_cuda STATIC
+  add_library(qw38_cuda STATIC
   error.cpp
   alloc.cpp
   buffer.cpp
@@ -10,6 +10,7 @@ add_library(qw38_cuda STATIC
   copy.cu
   activation.cu
   decode_mmv.cu
+  gdn.cu
 )
 set_target_properties(qw38_cuda PROPERTIES
   CUDA_SEPARABLE_COMPILATION OFF

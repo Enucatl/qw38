@@ -17,6 +17,13 @@ inline constexpr std::uint32_t kHeadDim = 256;
 inline constexpr std::uint32_t kRotaryDim = 64;
 inline constexpr std::uint32_t kRopeFreqs = 32;
 inline constexpr std::uint32_t kGdnHeadDim = 128;
+inline constexpr std::uint32_t kGdnKeyHeads = 16;
+inline constexpr std::uint32_t kGdnValueHeads = 48;
+inline constexpr std::uint32_t kGdnRepeat = 3;
+inline constexpr std::uint32_t kQkvWidth = 10240;
+inline constexpr std::uint32_t kGdnZWidth = 6144;
+inline constexpr std::uint32_t kConvKernel = 4;
+inline constexpr std::uint32_t kConvHistoryTaps = 3;
 inline constexpr float kDefaultRmsEps = 1.0e-6f;
 inline constexpr double kRopeTheta = 10000000.0;
 
@@ -40,6 +47,12 @@ inline constexpr float kMlpSwigluAbs = 2.0e-2f;
 inline constexpr float kMlpSwigluRel = 1.0e-3f;
 inline constexpr float kMlpResidualAbs = 5.0e-2f;
 inline constexpr float kMlpResidualRel = 1.0e-3f;
+// GDN front: FP32 FIR+SiLU then one BF16 store; FP32 q/k L2 and gates.
+inline constexpr float kGdnConvBf16Abs = 8.0e-3f;
+inline constexpr float kGdnQkFp32Abs = 2.0e-5f;
+inline constexpr float kGdnQkFp32Rel = 1.0e-5f;
+inline constexpr float kGdnGateFp32Abs = 2.0e-5f;
+inline constexpr float kGdnGateFp32Rel = 1.0e-5f;
 }  // namespace tol
 
 [[nodiscard]] bool eps_ok(float eps) noexcept;
@@ -110,6 +123,61 @@ struct DecodeMlpReference {
   std::vector<std::uint16_t> swiglu;
   std::vector<float> residual;
 };
+
+[[nodiscard]] constexpr std::uint32_t gdn_key_head(
+    std::uint32_t value_head) noexcept {
+  return value_head / kGdnRepeat;
+}
+
+[[nodiscard]] float softplus_fp32(float x) noexcept;
+
+// Four-tap causal FIR + SiLU. History is circular [3,10240] oldest at cursor;
+// current raw qkv (not SiLU) overwrites that slot. taps is tap-major [4,10240].
+[[nodiscard]] std::expected<void, Error> gdn_conv_history_step(
+    std::span<std::uint16_t const> qkv, std::span<std::uint16_t const> taps,
+    std::span<std::uint16_t> history, std::uint32_t& cursor,
+    std::span<std::uint16_t> convolved);
+
+// Eq. (16): per-head L2, ε added inside the sqrt. Writes 16 q/k heads, not 48.
+[[nodiscard]] std::expected<void, Error> gdn_qk_normalize(
+    std::span<std::uint16_t const> convolved, float eps,
+    std::span<float> q_hat, std::span<float> k_hat);
+
+// Eq. (15): β=σ(b), α=exp(-exp(A_log)⊙softplus(a+dt_bias)). a/b FP32, params BF16.
+[[nodiscard]] std::expected<void, Error> gdn_alpha_beta(
+    std::span<float const> a, std::span<float const> b,
+    std::span<std::uint16_t const> a_log, std::span<std::uint16_t const> dt_bias,
+    std::span<float> alpha, std::span<float> beta);
+
+[[nodiscard]] std::expected<void, Error> gdn_prepare(
+    std::span<std::uint16_t const> convolved, std::span<float const> a,
+    std::span<float const> b, std::span<std::uint16_t const> a_log,
+    std::span<std::uint16_t const> dt_bias, float eps, std::span<float> q_hat,
+    std::span<float> k_hat, std::span<float> alpha, std::span<float> beta);
+
+// Decode GDN steps 1–5 on decoded BF16 operands. History/cursor in/out.
+struct GdnFrontReference {
+  std::vector<std::uint16_t> normalized;
+  std::vector<std::uint16_t> qkv;
+  std::vector<std::uint16_t> z;
+  std::vector<float> a;
+  std::vector<float> b;
+  std::vector<std::uint16_t> convolved;
+  std::vector<float> q_hat;
+  std::vector<float> k_hat;
+  std::vector<float> alpha;
+  std::vector<float> beta;
+  std::vector<std::uint16_t> history;
+  std::uint32_t cursor{};
+};
+
+[[nodiscard]] std::expected<GdnFrontReference, Error> gdn_front_reference(
+    std::span<float const> residual, std::span<std::uint16_t const> gamma,
+    float eps, std::span<std::uint16_t const> w_qkv,
+    std::span<std::uint16_t const> w_z, std::span<std::uint16_t const> w_a,
+    std::span<std::uint16_t const> w_b, std::span<std::uint16_t const> taps,
+    std::span<std::uint16_t const> a_log, std::span<std::uint16_t const> dt_bias,
+    std::span<std::uint16_t const> history, std::uint32_t cursor);
 
 [[nodiscard]] std::expected<DecodeMlpReference, Error> decode_mlp_reference(
     std::span<float const> h_mid, std::span<std::uint16_t const> gamma,

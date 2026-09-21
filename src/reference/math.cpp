@@ -94,6 +94,11 @@ float sigmoid_fp32(float u) noexcept {
 
 float silu_fp32(float z) noexcept { return z * sigmoid_fp32(z); }
 
+float softplus_fp32(float x) noexcept {
+  float const ax = std::fabs(x);
+  return std::fmax(x, 0.0f) + std::log1p(std::exp(-ax));
+}
+
 double sigmoid_f64(double u) noexcept {
   if (u >= 0.0) {
     double const e = std::exp(-u);
@@ -361,6 +366,200 @@ std::expected<void, Error> dense_gemv_bf16_f64(
     out[i] = acc;
   }
   return {};
+}
+
+std::expected<void, Error> gdn_conv_history_step(
+    std::span<std::uint16_t const> qkv, std::span<std::uint16_t const> taps,
+    std::span<std::uint16_t> history, std::uint32_t& cursor,
+    std::span<std::uint16_t> convolved) {
+  if (cursor >= kConvHistoryTaps) {
+    return std::unexpected(arg_error("cursor", "convolution cursor must be < 3"));
+  }
+  if (auto st = require_span_size(qkv.size(), kQkvWidth, "qkv"); !st) {
+    return st;
+  }
+  if (auto st = require_span_size(taps.size(), kConvKernel * kQkvWidth, "taps");
+      !st) {
+    return st;
+  }
+  if (auto st =
+          require_span_size(history.size(), kConvHistoryTaps * kQkvWidth, "history");
+      !st) {
+    return st;
+  }
+  if (auto st = require_span_size(convolved.size(), kQkvWidth, "convolved"); !st) {
+    return st;
+  }
+  for (std::uint32_t c = 0; c < kQkvWidth; ++c) {
+    float acc = 0.0f;
+    for (std::uint32_t j = 0; j < kConvKernel; ++j) {
+      std::uint16_t xbits = qkv[c];
+      if (j < kConvHistoryTaps) {
+        std::uint32_t const slot = (cursor + j) % kConvHistoryTaps;
+        xbits = history[slot * kQkvWidth + c];
+      }
+      float const w = bf16_to_fp32(taps[j * kQkvWidth + c]);
+      acc += w * bf16_to_fp32(xbits);
+    }
+    convolved[c] = fp32_to_bf16_rne(silu_fp32(acc));
+    history[cursor * kQkvWidth + c] = qkv[c];
+  }
+  cursor = (cursor + 1u) % kConvHistoryTaps;
+  return {};
+}
+
+std::expected<void, Error> gdn_qk_normalize(
+    std::span<std::uint16_t const> convolved, float eps, std::span<float> q_hat,
+    std::span<float> k_hat) {
+  if (!eps_ok(eps)) {
+    return std::unexpected(arg_error("eps", "epsilon must be finite and > 0"));
+  }
+  if (auto st = require_span_size(convolved.size(), kQkvWidth, "convolved"); !st) {
+    return st;
+  }
+  std::size_t const nqk =
+      static_cast<std::size_t>(kGdnKeyHeads) * kGdnHeadDim;
+  if (auto st = require_span_size(q_hat.size(), nqk, "q_hat"); !st) {
+    return st;
+  }
+  if (auto st = require_span_size(k_hat.size(), nqk, "k_hat"); !st) {
+    return st;
+  }
+  auto normalize_heads = [&](std::uint32_t src_off, std::span<float> out) {
+    for (std::uint32_t h = 0; h < kGdnKeyHeads; ++h) {
+      float sumsq = 0.0f;
+      std::uint32_t const base = src_off + h * kGdnHeadDim;
+      for (std::uint32_t i = 0; i < kGdnHeadDim; ++i) {
+        float const v = bf16_to_fp32(convolved[base + i]);
+        sumsq += v * v;
+      }
+      float const inv = 1.0f / std::sqrt(sumsq + eps);
+      std::uint32_t const dst = h * kGdnHeadDim;
+      for (std::uint32_t i = 0; i < kGdnHeadDim; ++i) {
+        out[dst + i] = bf16_to_fp32(convolved[base + i]) * inv;
+      }
+    }
+  };
+  normalize_heads(0, q_hat);
+  normalize_heads(kGdnKeyHeads * kGdnHeadDim, k_hat);
+  return {};
+}
+
+std::expected<void, Error> gdn_alpha_beta(
+    std::span<float const> a, std::span<float const> b,
+    std::span<std::uint16_t const> a_log, std::span<std::uint16_t const> dt_bias,
+    std::span<float> alpha, std::span<float> beta) {
+  if (auto st = require_span_size(a.size(), kGdnValueHeads, "a"); !st) {
+    return st;
+  }
+  if (auto st = require_span_size(b.size(), kGdnValueHeads, "b"); !st) {
+    return st;
+  }
+  if (auto st = require_span_size(a_log.size(), kGdnValueHeads, "A_log"); !st) {
+    return st;
+  }
+  if (auto st = require_span_size(dt_bias.size(), kGdnValueHeads, "dt_bias");
+      !st) {
+    return st;
+  }
+  if (auto st = require_span_size(alpha.size(), kGdnValueHeads, "alpha"); !st) {
+    return st;
+  }
+  if (auto st = require_span_size(beta.size(), kGdnValueHeads, "beta"); !st) {
+    return st;
+  }
+  for (std::uint32_t i = 0; i < kGdnValueHeads; ++i) {
+    float const alog = bf16_to_fp32(a_log[i]);
+    float const dt = bf16_to_fp32(dt_bias[i]);
+    float const sp = softplus_fp32(a[i] + dt);
+    alpha[i] = std::exp(-std::exp(alog) * sp);
+    beta[i] = sigmoid_fp32(b[i]);
+  }
+  return {};
+}
+
+std::expected<void, Error> gdn_prepare(
+    std::span<std::uint16_t const> convolved, std::span<float const> a,
+    std::span<float const> b, std::span<std::uint16_t const> a_log,
+    std::span<std::uint16_t const> dt_bias, float eps, std::span<float> q_hat,
+    std::span<float> k_hat, std::span<float> alpha, std::span<float> beta) {
+  if (auto st = gdn_qk_normalize(convolved, eps, q_hat, k_hat); !st) {
+    return st;
+  }
+  return gdn_alpha_beta(a, b, a_log, dt_bias, alpha, beta);
+}
+
+std::expected<GdnFrontReference, Error> gdn_front_reference(
+    std::span<float const> residual, std::span<std::uint16_t const> gamma,
+    float eps, std::span<std::uint16_t const> w_qkv,
+    std::span<std::uint16_t const> w_z, std::span<std::uint16_t const> w_a,
+    std::span<std::uint16_t const> w_b, std::span<std::uint16_t const> taps,
+    std::span<std::uint16_t const> a_log, std::span<std::uint16_t const> dt_bias,
+    std::span<std::uint16_t const> history, std::uint32_t cursor) {
+  if (residual.size() != kHidden) {
+    return std::unexpected(
+        shape_error("residual", "residual must be [5120] FP32"));
+  }
+  GdnFrontReference out;
+  out.normalized.assign(kHidden, 0);
+  if (auto st = hidden_rms_norm_1p_gamma(residual, gamma, eps, out.normalized);
+      !st) {
+    return std::unexpected(st.error());
+  }
+
+  std::vector<float> qkv_f(kQkvWidth, 0.0f);
+  std::vector<float> z_f(kGdnZWidth, 0.0f);
+  if (auto st = dense_gemv_bf16(w_qkv, out.normalized, kQkvWidth, kHidden, qkv_f);
+      !st) {
+    return std::unexpected(st.error());
+  }
+  if (auto st = dense_gemv_bf16(w_z, out.normalized, kGdnZWidth, kHidden, z_f);
+      !st) {
+    return std::unexpected(st.error());
+  }
+  out.qkv.resize(kQkvWidth);
+  out.z.resize(kGdnZWidth);
+  for (std::uint32_t i = 0; i < kQkvWidth; ++i) {
+    out.qkv[i] = fp32_to_bf16_rne(qkv_f[i]);
+  }
+  for (std::uint32_t i = 0; i < kGdnZWidth; ++i) {
+    out.z[i] = fp32_to_bf16_rne(z_f[i]);
+  }
+
+  out.a.assign(kGdnValueHeads, 0.0f);
+  out.b.assign(kGdnValueHeads, 0.0f);
+  if (auto st =
+          dense_gemv_bf16(w_a, out.normalized, kGdnValueHeads, kHidden, out.a);
+      !st) {
+    return std::unexpected(st.error());
+  }
+  if (auto st =
+          dense_gemv_bf16(w_b, out.normalized, kGdnValueHeads, kHidden, out.b);
+      !st) {
+    return std::unexpected(st.error());
+  }
+
+  out.history.assign(history.begin(), history.end());
+  out.cursor = cursor;
+  out.convolved.assign(kQkvWidth, 0);
+  if (auto st = gdn_conv_history_step(out.qkv, taps, out.history, out.cursor,
+                                      out.convolved);
+      !st) {
+    return std::unexpected(st.error());
+  }
+
+  std::size_t const nqk =
+      static_cast<std::size_t>(kGdnKeyHeads) * kGdnHeadDim;
+  out.q_hat.assign(nqk, 0.0f);
+  out.k_hat.assign(nqk, 0.0f);
+  out.alpha.assign(kGdnValueHeads, 0.0f);
+  out.beta.assign(kGdnValueHeads, 0.0f);
+  if (auto st = gdn_prepare(out.convolved, out.a, out.b, a_log, dt_bias, eps,
+                            out.q_hat, out.k_hat, out.alpha, out.beta);
+      !st) {
+    return std::unexpected(st.error());
+  }
+  return out;
 }
 
 std::expected<DecodeMlpReference, Error> decode_mlp_reference(
