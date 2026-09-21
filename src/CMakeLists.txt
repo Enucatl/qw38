@@ -41,6 +41,16 @@ target_compile_options(qw38_compile PRIVATE
 )
 set_target_properties(qw38_compile PROPERTIES OUTPUT_NAME qw38-compile)
 
+add_library(qw38_reference STATIC
+  reference/error.cpp
+  reference/math.cpp
+)
+target_include_directories(qw38_reference PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
+target_compile_features(qw38_reference PUBLIC cxx_std_23)
+target_compile_options(qw38_reference PRIVATE
+  $<$<COMPILE_LANGUAGE:CXX>:-Wall -Wextra -Wpedantic>
+)
+
 add_library(qw38_runtime STATIC
   runtime/error.cpp
   runtime/sizes.cpp

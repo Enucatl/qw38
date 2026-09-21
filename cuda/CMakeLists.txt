@@ -8,6 +8,7 @@ add_library(qw38_cuda STATIC
   event.cpp
   upload.cpp
   copy.cu
+  activation.cu
 )
 set_target_properties(qw38_cuda PROPERTIES
   CUDA_SEPARABLE_COMPILATION OFF

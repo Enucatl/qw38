@@ -1,7 +1,7 @@
 # TASK-008 — Core reference math and activation kernels
 
 ## Status
-TODO
+DONE
 ## Milestone
 M3 — Core runtime and MLP
 ## Purpose
@@ -47,22 +47,45 @@ Embedding→hidden RMS and QK norm→RoPE pipelines on deterministic inputs.
 ## Benchmark required
 No.
 ## Acceptance criteria
-- [ ] Every operation has an independent reference.
-- [ ] Norm roles, per-head association, and partial RoPE are explicitly tested.
-- [ ] FP32/BF16 boundaries match V0.
-- [ ] CUDA results meet recorded tolerances.
+- [x] Every operation has an independent reference.
+- [x] Norm roles, per-head association, and partial RoPE are explicitly tested.
+- [x] FP32/BF16 boundaries match V0.
+- [x] CUDA results meet recorded tolerances.
 ## Architecture blocker rule
 On locked conflict stop and report all required blocker fields; do not change precision or semantic roles.
 ## Completion report
 ### Result
-DONE | BLOCKED
+DONE
 ### Changes made
+- CPU references in `src/reference/`: span APIs returning `std::expected`, explicit `eps`/`position`/`inv_freq`, FP32 math with declared BF16 stores, plus independent double golds. Operations: BF16 embed gather→FP32 `[5120]`; hidden zero-centered RMS `(1+γ)`→BF16; QK RMS `(1+γ)` on `[256]`; GDN multiplicative gated RMS `(γ ⊙ o/RMS(o)) ⊙ SiLU(z)`→BF16 `[128]`; FP32 SiLU/sigmoid; partial RoPE on the first 64 of 256 coords using 32 FP32 `ω_j`; row-major BF16 dense GEMV with FP32 accumulation; deterministic argmax (lowest index on ties).
+- CUDA kernels/wrappers in `cuda/activation.{hpp,cu}`: shape-specific launches, no device allocations, T-01 256-thread hidden RMS (one block/token), T-03 128-thread head norms (one block/head). Integer positions convert only at FP32 phase evaluation. Host checks reject invalid token ids, empty streams, non-positive `eps`, and negative positions.
+- Declared tolerances in `qw38::reference::tol` (embed exact; RMS 8e-3; gated RMS 1.6e-2; SiLU/sigmoid 2e-5; small-pos RoPE 8e-3; large-pos RoPE 5e-2).
+- Tests: `reference_math_unit` (zero/nonzero, `1+γ` vs multiplicative γ, BF16 RNE store, large positions, RoPE suffix, invalid shapes/indices); `activation_reference` (CUDA vs FP32/double, adversarial magnitudes); `activation_integration` (embed→hidden RMS; 24-head QK RMS→RoPE).
+- CMake: `qw38_reference`, `activation.cu` on `qw38_cuda`, three ctest targets.
 ### Tests run
-Exact commands/results.
+Debug:
+
+```text
+docker run --gpus all --rm -u "$(id -u):$(id -g)" \
+  -v "$PWD":/workspace -w /workspace qw38-dev:cuda13.4.1 \
+  bash -lc 'cmake -S . -B build/debug -DCMAKE_BUILD_TYPE=Debug && cmake --build build/debug && ctest --test-dir build/debug --output-on-failure'
+```
+
+Result: 25/25 tests passed (`host_expected_smoke`, `format_schema`, `format_schema_integration`, `format_writer` 0.03s, `format_sha256` 0.02s, `format_writer_integration` 0.01s, `format_reader` 0.03s, `format_reader_digest` 0.01s, `format_reader_integration` 0.01s, `cuda_runtime_smoke` 0.23s, `cuda_sm120_cubin`, `compiler_identity` 0.02s, `compiler_transform`, `compiler_integration` 0.23s, `quantizer`, `pack_layout`, `quant_reference`, `quant_compiler_integration` 0.91s, `runtime_plan`, `runtime_raii` 0.17s, `runtime_state_index` 0.19s, `runtime_session_integration` 0.34s, `reference_math_unit`, `activation_reference` 0.17s, `activation_integration` 0.17s).
+
+Release:
+
+```text
+docker run --gpus all --rm -u "$(id -u):$(id -g)" \
+  -v "$PWD":/workspace -w /workspace qw38-dev:cuda13.4.1 \
+  bash -lc 'cmake -S . -B build/release -DCMAKE_BUILD_TYPE=Release && cmake --build build/release && ctest --test-dir build/release --output-on-failure'
+```
+
+Result: 25/25 tests passed (`compiler_integration` 0.07s, `quant_compiler_integration` 0.75s, `activation_reference` 0.17s, `activation_integration` 0.17s; remaining tests as above).
 ### Benchmark results
 Not required.
 ### Architecture blocker
-None/full report.
+None.
 ### Follow-up observations
-Concrete only.
+Independent QK RMS then RoPE materializes a BF16 vector between the two launches. TASK-014's fused preparation kernel can keep the pre-RoPE head in FP32 and round once after rotation; that is a later fusion cut, not a V0 precision change. Text-only RoPE takes one integer position (equal T/H/W). Packed dense CUDA remains TASK-009.
 

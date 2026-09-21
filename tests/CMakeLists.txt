@@ -204,3 +204,35 @@ set_tests_properties(
   PROPERTIES
   LABELS "runtime;cuda;gpu"
 )
+
+add_executable(qw38_reference_math_unit_test reference_math_unit_test.cpp)
+target_link_libraries(qw38_reference_math_unit_test PRIVATE qw38_reference)
+target_compile_features(qw38_reference_math_unit_test PRIVATE cxx_std_23)
+target_compile_options(qw38_reference_math_unit_test PRIVATE
+  $<$<COMPILE_LANGUAGE:CXX>:-Wall -Wextra -Wpedantic>
+)
+
+add_executable(qw38_activation_reference_test activation_reference_test.cpp)
+target_link_libraries(qw38_activation_reference_test PRIVATE qw38_reference qw38_cuda)
+target_compile_features(qw38_activation_reference_test PRIVATE cxx_std_23)
+target_compile_options(qw38_activation_reference_test PRIVATE
+  $<$<COMPILE_LANGUAGE:CXX>:-Wall -Wextra -Wpedantic>
+)
+
+add_executable(qw38_activation_integration_test activation_integration_test.cpp)
+target_link_libraries(qw38_activation_integration_test PRIVATE qw38_reference qw38_cuda)
+target_compile_features(qw38_activation_integration_test PRIVATE cxx_std_23)
+target_compile_options(qw38_activation_integration_test PRIVATE
+  $<$<COMPILE_LANGUAGE:CXX>:-Wall -Wextra -Wpedantic>
+)
+
+add_test(NAME reference_math_unit COMMAND qw38_reference_math_unit_test)
+add_test(NAME activation_reference COMMAND qw38_activation_reference_test)
+add_test(NAME activation_integration COMMAND qw38_activation_integration_test)
+
+set_tests_properties(reference_math_unit PROPERTIES LABELS "reference")
+set_tests_properties(
+  activation_reference activation_integration
+  PROPERTIES
+  LABELS "reference;cuda;gpu"
+)
