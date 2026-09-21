@@ -1,11 +1,17 @@
 #include "compiler/compile.hpp"
 
+#include "compiler/quantization/quantizer.hpp"
+#include "compiler/quantization/reference.hpp"
 #include "compiler/transforms.hpp"
+#include "format/floatcvt.hpp"
+#include "format/pack.hpp"
 #include "format/reader.hpp"
 #include "format/schema.hpp"
+#include "format/unpack.hpp"
 
 #include <algorithm>
 #include <array>
+#include <cstddef>
 #include <cstdio>
 #include <cstring>
 #include <fstream>
@@ -83,6 +89,24 @@ TensorShape artifact_shape(ExpectedTensor const& exp) {
 }
 
 LogicalPhysicalMapping mapping_for(PhysicalLayoutId layout) {
+  if (layout == PhysicalLayoutId::CudaQ4G64V0) {
+    return LogicalPhysicalMapping{
+        .kind = MappingKind::DenseTileNK,
+        .tile_rows = kDenseTileRows,
+        .tile_k = kDenseTileK,
+        .group_size = qw38::format::kQ4GroupSize,
+        .packed_bytes_per_tile_row = qw38::format::kQ4PackedBytesPerTileRow,
+    };
+  }
+  if (layout == PhysicalLayoutId::CudaQ8G32V0) {
+    return LogicalPhysicalMapping{
+        .kind = MappingKind::DenseTileNK,
+        .tile_rows = kDenseTileRows,
+        .tile_k = kDenseTileK,
+        .group_size = qw38::format::kQ8GroupSize,
+        .packed_bytes_per_tile_row = qw38::format::kQ8PackedBytesPerTileRow,
+    };
+  }
   if (layout == PhysicalLayoutId::CudaBf16DenseTileV0) {
     return LogicalPhysicalMapping{
         .kind = MappingKind::DenseTileNK,
@@ -178,6 +202,70 @@ std::expected<void, CompilerError> emit_tiled(
         return st;
       }
     }
+  }
+  return {};
+}
+
+std::expected<void, CompilerError> emit_quantized(
+    ArtifactWriter& writer, std::string_view name,
+    std::span<std::byte const> src, std::uint64_t n, std::uint64_t k,
+    LogicalQuantizerId quantizer, PhysicalLayoutId layout) {
+  if (n == 0 || k == 0 || n % kDenseTileRows != 0 || k % kDenseTileK != 0) {
+    return std::unexpected(make_error(CompilerErrorCode::ShapeMismatch, name,
+                                      "quantized dense N must divide 8 and K 256"));
+  }
+  if (src.size() != n * k * 2) {
+    return std::unexpected(make_error(CompilerErrorCode::ShapeMismatch, name,
+                                      "dense source byte length"));
+  }
+  auto const group = quantizer_group_size(quantizer);
+  if (group == 0 || k % group != 0) {
+    return std::unexpected(make_error(CompilerErrorCode::Internal, name,
+                                      "quantizer group does not divide K"));
+  }
+  std::vector<std::byte> scale_bytes;
+  std::vector<float> row(static_cast<std::size_t>(k));
+  for (std::uint64_t tn = 0; tn < n / kDenseTileRows; ++tn) {
+    qw38::format::LogicalWeightCodes slice;
+    slice.quantizer = quantizer;
+    slice.n = kDenseTileRows;
+    slice.k = k;
+    slice.group_size = group;
+    slice.qmax = quantizer_qmax(quantizer);
+    slice.codes.resize(static_cast<std::size_t>(kDenseTileRows * k));
+    slice.scales.resize(static_cast<std::size_t>(kDenseTileRows * (k / group)));
+    for (std::uint32_t r = 0; r < kDenseTileRows; ++r) {
+      auto const src_row = src.subspan(((tn * kDenseTileRows + r) * k) * 2, k * 2);
+      for (std::uint64_t col = 0; col < k; ++col) {
+        auto const bits = qw38::format::load_u16_le(src_row.data() + col * 2);
+        row[static_cast<std::size_t>(col)] = qw38::format::bf16_to_fp32(bits);
+      }
+      for (std::uint64_t g = 0; g < k / group; ++g) {
+        auto qg = quantize_group(
+            quantizer, std::span<float const>{row.data() + g * group, group});
+        if (!qg) {
+          return std::unexpected(qg.error());
+        }
+        slice.scales[static_cast<std::size_t>(r * (k / group) + g)] =
+            qg->scale_bits;
+        std::copy(qg->codes.begin(), qg->codes.end(),
+                  slice.codes.begin() +
+                      static_cast<std::ptrdiff_t>(r * k + g * group));
+      }
+    }
+    auto packed = qw38::format::pack_cuda_v0(quantizer, layout, slice);
+    if (!packed) {
+      return std::unexpected(from_format(packed.error()));
+    }
+    if (auto st = write_span(writer, name, packed->codes); !st) {
+      return st;
+    }
+    scale_bytes.insert(scale_bytes.end(), packed->scales.begin(),
+                       packed->scales.end());
+  }
+  auto st = writer.write_span(name, SpanKind::Scales, scale_bytes);
+  if (!st) {
+    return std::unexpected(from_format(st.error()));
   }
   return {};
 }
@@ -330,10 +418,10 @@ std::uint64_t current_peak_rss_bytes() {
   return 0;
 }
 
-std::expected<ArtifactSchema, CompilerError> build_identity_schema(
+std::expected<ArtifactSchema, CompilerError> build_schema(
     ClassifiedCheckpoint const& classified, Hash256 const& source_hash,
     Hash256 const& config_hash, Hash256 const& tokenizer_hash,
-    CompilerRevision const& revision) {
+    CompilerRevision const& revision, WeightFormatPolicy policy) {
   ArtifactSchema schema{};
   schema.compiler = revision;
   schema.source_hash = source_hash;
@@ -355,10 +443,12 @@ std::expected<ArtifactSchema, CompilerError> build_identity_schema(
     rec.tensor_id = next_id++;
     rec.logical_name = item.expected.name;
     rec.shape = artifact_shape(item.expected);
-    rec.storage = StorageClass::Bf16;
-    rec.quantizer = LogicalQuantizerId::None;
-    rec.layout = item.expected.layout;
-    rec.mapping = mapping_for(item.expected.layout);
+    auto const fmt = select_weight_format(item.expected.family,
+                                          item.expected.layout, policy);
+    rec.storage = fmt.storage;
+    rec.quantizer = fmt.quantizer;
+    rec.layout = fmt.layout;
+    rec.mapping = mapping_for(fmt.layout);
     if (item.expected.family == TensorFamily::Embed) {
       embed_id = rec.tensor_id;
     }
@@ -463,15 +553,29 @@ std::expected<ArtifactSchema, CompilerError> build_identity_schema(
   return schema;
 }
 
+std::expected<ArtifactSchema, CompilerError> build_identity_schema(
+    ClassifiedCheckpoint const& classified, Hash256 const& source_hash,
+    Hash256 const& config_hash, Hash256 const& tokenizer_hash,
+    CompilerRevision const& revision) {
+  return build_schema(classified, source_hash, config_hash, tokenizer_hash,
+                      revision, WeightFormatPolicy::IdentityBf16);
+}
+
 std::expected<void, CompilerError> emit_classified_tensor(
     ArtifactWriter& writer, ClassifiedTensor const& item,
-    std::span<std::byte const> src) {
+    std::span<std::byte const> src, WeightFormatPolicy policy) {
   auto const& exp = item.expected;
-  if (exp.layout == PhysicalLayoutId::CudaBf16DenseTileV0) {
+  auto const fmt = select_weight_format(exp.family, exp.layout, policy);
+  if (fmt.quantizer == LogicalQuantizerId::Q4G64V0 ||
+      fmt.quantizer == LogicalQuantizerId::Q8G32V0) {
+    return emit_quantized(writer, exp.name, src, exp.shape.dims[0],
+                          exp.shape.dims[1], fmt.quantizer, fmt.layout);
+  }
+  if (fmt.layout == PhysicalLayoutId::CudaBf16DenseTileV0) {
     return emit_tiled(writer, exp.name, src, exp.shape.dims[0],
                       exp.shape.dims[1]);
   }
-  if (exp.layout == PhysicalLayoutId::CudaBf16TapMajorV0) {
+  if (fmt.layout == PhysicalLayoutId::CudaBf16TapMajorV0) {
     auto packed = conv_to_tap_major(src, exp.shape.dims[0], exp.shape.dims[2]);
     if (!packed) {
       return std::unexpected(packed.error());
@@ -484,16 +588,16 @@ std::expected<void, CompilerError> emit_classified_tensor(
   return emit_identity_bytes(writer, exp.name, src);
 }
 
-std::expected<CompileResult, CompilerError> compile_identity(
+std::expected<CompileResult, CompilerError> compile_checkpoint(
     std::filesystem::path const& checkpoint,
     std::filesystem::path const& output, CompileOptions const& options) {
   auto ckpt = open_checkpoint(checkpoint);
   if (!ckpt) {
     return std::unexpected(ckpt.error());
   }
-  auto schema = build_identity_schema(ckpt->classified, ckpt->source_hash,
-                                      ckpt->config_hash, ckpt->tokenizer_hash,
-                                      options.revision);
+  auto schema = build_schema(ckpt->classified, ckpt->source_hash,
+                             ckpt->config_hash, ckpt->tokenizer_hash,
+                             options.revision, options.format_policy);
   if (!schema) {
     return std::unexpected(schema.error());
   }
@@ -527,7 +631,9 @@ std::expected<CompileResult, CompilerError> compile_identity(
       if (!src) {
         return std::unexpected(src.error());
       }
-      if (auto st = emit_classified_tensor(*writer, *item, *src); !st) {
+      if (auto st = emit_classified_tensor(*writer, *item, *src,
+                                           options.format_policy);
+          !st) {
         return std::unexpected(st.error());
       }
     }
@@ -550,16 +656,26 @@ std::expected<CompileResult, CompilerError> compile_identity(
   result.peak_rss_bytes = current_peak_rss_bytes();
 
   if (options.verify_reconstruction) {
-    if (auto st = verify_identity_artifact(output, checkpoint); !st) {
+    if (auto st = verify_compiled_artifact(output, checkpoint,
+                                           options.format_policy);
+        !st) {
       return std::unexpected(st.error());
     }
   }
   return result;
 }
 
-std::expected<void, CompilerError> verify_identity_artifact(
+std::expected<CompileResult, CompilerError> compile_identity(
+    std::filesystem::path const& checkpoint,
+    std::filesystem::path const& output, CompileOptions const& options) {
+  CompileOptions identity = options;
+  identity.format_policy = WeightFormatPolicy::IdentityBf16;
+  return compile_checkpoint(checkpoint, output, identity);
+}
+
+std::expected<void, CompilerError> verify_compiled_artifact(
     std::filesystem::path const& artifact_path,
-    std::filesystem::path const& checkpoint) {
+    std::filesystem::path const& checkpoint, WeightFormatPolicy policy) {
   auto ckpt = open_checkpoint(checkpoint);
   if (!ckpt) {
     return std::unexpected(ckpt.error());
@@ -601,13 +717,37 @@ std::expected<void, CompilerError> verify_identity_artifact(
         return std::unexpected(from_format(payload.error()));
       }
       auto const& exp = item->expected;
-      if (exp.layout == PhysicalLayoutId::CudaBf16DenseTileV0) {
+      auto const fmt = select_weight_format(exp.family, exp.layout, policy);
+      if (fmt.quantizer == LogicalQuantizerId::Q4G64V0 ||
+          fmt.quantizer == LogicalQuantizerId::Q8G32V0) {
+        auto scales = art->scales(exp.name);
+        if (!scales) {
+          return std::unexpected(from_format(scales.error()));
+        }
+        auto want = quantize_bf16(fmt.quantizer, exp.shape.dims[0],
+                                  exp.shape.dims[1], *src);
+        if (!want) {
+          return std::unexpected(want.error());
+        }
+        auto packed = qw38::format::pack_cuda_v0(fmt.quantizer, fmt.layout, *want);
+        if (!packed) {
+          return std::unexpected(from_format(packed.error()));
+        }
+        if (auto st = compare_bytes(*payload, packed->codes, exp.name); !st) {
+          return st;
+        }
+        if (auto st = compare_bytes(*scales, packed->scales, exp.name); !st) {
+          return st;
+        }
+        continue;
+      }
+      if (fmt.layout == PhysicalLayoutId::CudaBf16DenseTileV0) {
         if (auto st = compare_tiled(*payload, *src, exp.shape.dims[0],
                                     exp.shape.dims[1], exp.name);
             !st) {
           return st;
         }
-      } else if (exp.layout == PhysicalLayoutId::CudaBf16TapMajorV0) {
+      } else if (fmt.layout == PhysicalLayoutId::CudaBf16TapMajorV0) {
         auto restored =
             conv_from_tap_major(*payload, exp.shape.dims[0], exp.shape.dims[2]);
         if (!restored) {
@@ -626,10 +766,18 @@ std::expected<void, CompilerError> verify_identity_artifact(
   return {};
 }
 
+std::expected<void, CompilerError> verify_identity_artifact(
+    std::filesystem::path const& artifact_path,
+    std::filesystem::path const& checkpoint) {
+  return verify_compiled_artifact(artifact_path, checkpoint,
+                                  WeightFormatPolicy::IdentityBf16);
+}
+
 std::expected<CompileResult, CompilerError> compile_synthetic(
     std::filesystem::path const& output, Hash256 const& source_hash,
     Hash256 const& config_hash, Hash256 const& tokenizer_hash,
-    CompilerRevision const& revision, std::vector<SyntheticTensor> tensors) {
+    CompilerRevision const& revision, std::vector<SyntheticTensor> tensors,
+    WeightFormatPolicy policy) {
   ClassifiedCheckpoint classified{};
   classified.included.reserve(tensors.size());
   for (auto& t : tensors) {
@@ -644,8 +792,8 @@ std::expected<CompileResult, CompilerError> compile_synthetic(
         .source = std::move(src),
     });
   }
-  auto schema = build_identity_schema(classified, source_hash, config_hash,
-                                      tokenizer_hash, revision);
+  auto schema = build_schema(classified, source_hash, config_hash,
+                             tokenizer_hash, revision, policy);
   if (!schema) {
     return std::unexpected(schema.error());
   }
@@ -660,7 +808,8 @@ std::expected<CompileResult, CompilerError> compile_synthetic(
   for (std::size_t i = 0; i < tensors.size(); ++i) {
     ClassifiedTensor item{};
     item.expected = classified.included[i].expected;
-    if (auto st = emit_classified_tensor(*writer, item, tensors[i].bytes); !st) {
+    if (auto st = emit_classified_tensor(*writer, item, tensors[i].bytes, policy);
+        !st) {
       return std::unexpected(st.error());
     }
   }

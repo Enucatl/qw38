@@ -3,6 +3,7 @@
 #include "compiler/checkpoint.hpp"
 #include "compiler/error.hpp"
 #include "compiler/identity.hpp"
+#include "compiler/quantization/reference.hpp"
 #include "format/writer.hpp"
 
 #include <cstdint>
@@ -20,6 +21,7 @@ struct CompileOptions {
       .minor = kCompilerMinor,
       .patch = kCompilerPatch};
   bool verify_reconstruction{true};
+  WeightFormatPolicy format_policy{WeightFormatPolicy::IdentityBf16};
 };
 
 struct CompileResult {
@@ -35,11 +37,23 @@ struct CompileResult {
 [[nodiscard]] std::vector<qw38::format::ScratchAllocation> language_scratch_schema();
 
 [[nodiscard]] std::expected<qw38::format::ArtifactSchema, CompilerError>
+build_schema(ClassifiedCheckpoint const& classified,
+             qw38::format::Hash256 const& source_hash,
+             qw38::format::Hash256 const& config_hash,
+             qw38::format::Hash256 const& tokenizer_hash,
+             qw38::format::CompilerRevision const& revision,
+             WeightFormatPolicy policy);
+
+[[nodiscard]] std::expected<qw38::format::ArtifactSchema, CompilerError>
 build_identity_schema(ClassifiedCheckpoint const& classified,
                       qw38::format::Hash256 const& source_hash,
                       qw38::format::Hash256 const& config_hash,
                       qw38::format::Hash256 const& tokenizer_hash,
                       qw38::format::CompilerRevision const& revision);
+
+[[nodiscard]] std::expected<CompileResult, CompilerError> compile_checkpoint(
+    std::filesystem::path const& checkpoint,
+    std::filesystem::path const& output, CompileOptions const& options = {});
 
 [[nodiscard]] std::expected<CompileResult, CompilerError> compile_identity(
     std::filesystem::path const& checkpoint,
@@ -48,6 +62,10 @@ build_identity_schema(ClassifiedCheckpoint const& classified,
 [[nodiscard]] std::expected<void, CompilerError> verify_identity_artifact(
     std::filesystem::path const& artifact,
     std::filesystem::path const& checkpoint);
+
+[[nodiscard]] std::expected<void, CompilerError> verify_compiled_artifact(
+    std::filesystem::path const& artifact,
+    std::filesystem::path const& checkpoint, WeightFormatPolicy policy);
 
 struct SyntheticTensor {
   ExpectedTensor expected;
@@ -60,7 +78,8 @@ struct SyntheticTensor {
     qw38::format::Hash256 const& config_hash,
     qw38::format::Hash256 const& tokenizer_hash,
     qw38::format::CompilerRevision const& revision,
-    std::vector<SyntheticTensor> tensors);
+    std::vector<SyntheticTensor> tensors,
+    WeightFormatPolicy policy = WeightFormatPolicy::IdentityBf16);
 
 [[nodiscard]] std::uint32_t count_instances(
     std::span<qw38::format::GraphBinding const> bindings,

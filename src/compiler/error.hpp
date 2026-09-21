@@ -23,6 +23,8 @@ enum class CompilerErrorCode : std::uint16_t {
   HashMismatch = 12,
   Format = 13,
   Internal = 14,
+  Unrepresentable = 15,
+  InvalidCode = 16,
 };
 
 struct CompilerError {

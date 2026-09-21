@@ -7,6 +7,8 @@ add_library(qw38_format STATIC
   format/sha256.cpp
   format/writer.cpp
   format/reader.cpp
+  format/pack.cpp
+  format/unpack.cpp
 )
 target_include_directories(qw38_format PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 target_compile_features(qw38_format PUBLIC cxx_std_23)
@@ -21,6 +23,8 @@ add_library(qw38_compiler STATIC
   compiler/transforms.cpp
   compiler/checkpoint.cpp
   compiler/compile.cpp
+  compiler/quantization/quantizer.cpp
+  compiler/quantization/reference.cpp
 )
 target_include_directories(qw38_compiler PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 target_link_libraries(qw38_compiler PUBLIC qw38_format)

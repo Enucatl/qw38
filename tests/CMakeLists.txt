@@ -111,10 +111,53 @@ add_test(NAME compiler_identity COMMAND qw38_compiler_identity_test)
 add_test(NAME compiler_transform COMMAND qw38_compiler_transform_test)
 add_test(NAME compiler_integration COMMAND qw38_compiler_integration_test)
 
+add_executable(qw38_quantizer_test quantizer_test.cpp)
+target_link_libraries(qw38_quantizer_test PRIVATE qw38_compiler)
+target_compile_features(qw38_quantizer_test PRIVATE cxx_std_23)
+target_compile_options(qw38_quantizer_test PRIVATE
+  $<$<COMPILE_LANGUAGE:CXX>:-Wall -Wextra -Wpedantic>
+)
+
+add_executable(qw38_pack_layout_test pack_layout_test.cpp)
+target_link_libraries(qw38_pack_layout_test PRIVATE qw38_format)
+target_compile_features(qw38_pack_layout_test PRIVATE cxx_std_23)
+target_compile_options(qw38_pack_layout_test PRIVATE
+  $<$<COMPILE_LANGUAGE:CXX>:-Wall -Wextra -Wpedantic>
+)
+
+add_executable(qw38_quant_reference_test quant_reference_test.cpp)
+target_link_libraries(qw38_quant_reference_test PRIVATE qw38_compiler)
+target_compile_features(qw38_quant_reference_test PRIVATE cxx_std_23)
+target_compile_options(qw38_quant_reference_test PRIVATE
+  $<$<COMPILE_LANGUAGE:CXX>:-Wall -Wextra -Wpedantic>
+)
+
+add_executable(qw38_quant_compiler_integration_test
+  quant_compiler_integration_test.cpp)
+target_link_libraries(qw38_quant_compiler_integration_test PRIVATE qw38_compiler)
+target_compile_features(qw38_quant_compiler_integration_test PRIVATE cxx_std_23)
+target_compile_options(qw38_quant_compiler_integration_test PRIVATE
+  $<$<COMPILE_LANGUAGE:CXX>:-Wall -Wextra -Wpedantic>
+)
+target_compile_definitions(qw38_quant_compiler_integration_test PRIVATE
+  QW38_SOURCE_DIR="${CMAKE_SOURCE_DIR}"
+)
+
+add_test(NAME quantizer COMMAND qw38_quantizer_test)
+add_test(NAME pack_layout COMMAND qw38_pack_layout_test)
+add_test(NAME quant_reference COMMAND qw38_quant_reference_test)
+add_test(NAME quant_compiler_integration COMMAND qw38_quant_compiler_integration_test)
+
 set_tests_properties(
   compiler_identity compiler_transform compiler_integration
   PROPERTIES
   LABELS "compiler"
+)
+
+set_tests_properties(
+  quantizer pack_layout quant_reference quant_compiler_integration
+  PROPERTIES
+  LABELS "quantizer;compiler"
 )
 
 set_tests_properties(cuda_sm120_cubin PROPERTIES

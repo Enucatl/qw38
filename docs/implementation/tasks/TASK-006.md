@@ -1,7 +1,7 @@
 # TASK-006 — Logical quantizers and CUDA V0 packers
 
 ## Status
-TODO
+DONE
 ## Milestone
 M2 — Quantized contraction foundation
 ## Purpose
@@ -52,22 +52,46 @@ Host `compiler/quantization`, `format/layout`, reference numerical code, golden-
 ## Benchmark required
 No.
 ## Acceptance criteria
-- [ ] Logical quantizer tests do not depend on physical packing.
-- [ ] Physical pack tests use independent expected/golden bytes.
-- [ ] Q4/Q8/BF16 reference contractions are understandable and deterministic.
-- [ ] Compiler produces only V0 family assignments and one physical view.
-- [ ] All tests pass.
+- [x] Logical quantizer tests do not depend on physical packing.
+- [x] Physical pack tests use independent expected/golden bytes.
+- [x] Q4/Q8/BF16 reference contractions are understandable and deterministic.
+- [x] Compiler produces only V0 family assignments and one physical view.
+- [x] All tests pass.
 ## Architecture blocker rule
 On a locked conflict, stop with every required `ARCHITECTURE_BLOCKER` field; do not change group size, scale rule, code range, or layout.
 ## Completion report
 ### Result
-DONE | BLOCKED
+DONE. Independent verification PASS (Debug/Release ctest 18/18; delivery re-run 18/18).
 ### Changes made
+- Host logical quantizers in `src/compiler/quantization/quantizer.cpp`: Q4G64 (`qmax=7`, G64) and Q8G32 (`qmax=127`, G32) with group absmax, zero-group scale 0, smallest finite FP16 `>= a/qmax`, least-positive-normal floor, codes from the stored FP16 scale, RNE, clamp, and nonfinite/unrepresentable rejection.
+- Physical packers/unpackers in `src/format/pack.cpp` and independent `src/format/unpack.cpp` for `cuda_q4g64_v0` / `cuda_q8g32_v0`: `[N/8,K/256,8,packed_256]`, scales `[N/8,K/256,row,group]`, lower-nibble-first Q4, signed two's-complement, padded coordinates zero, 256-byte-aligned spans via the existing writer.
+- CPU FP32 reference GEMV in `src/compiler/quantization/reference.cpp` that dequantizes, rounds operands to BF16, then accumulates; BF16 dense-tile passthrough decode.
+- Compiler format selection: `WeightFormatPolicy::{IdentityBf16,ProductionV0}` without changing family assignments. Production uses Q4G64 for GDN qkv/z/out, full-attention q/g/k/v/o, MLP, matching MTP and `mtp.fc`; Q8G32 for `lm_head`; BF16 for embeddings, norms, conv, GDN a/b, and remaining families. CLI `--format identity|production`. Streaming emit processes eight output rows at a time.
+- Tests: `quantizer` (logical only), `pack_layout` (golden bytes, no quantizer), `quant_reference` (round-trip + GEMV), `quant_compiler_integration` (mixed identity+Q4+Q8 artifact plus real 8×256 samples).
 ### Tests run
-Exact commands/results.
+Debug:
+
+```text
+docker run --gpus all --rm -u "$(id -u):$(id -g)" \
+  -v "$PWD":/workspace -w /workspace qw38-dev:cuda13.4.1 \
+  bash -lc 'cmake -S . -B build/debug -DCMAKE_BUILD_TYPE=Debug && cmake --build build/debug && ctest --test-dir build/debug --output-on-failure'
+```
+
+Result: 18/18 tests passed (`host_expected_smoke`, `format_schema`, `format_schema_integration`, `format_writer` 0.04s, `format_sha256` 0.02s, `format_writer_integration` 0.01s, `format_reader` 0.03s, `format_reader_digest` 0.01s, `format_reader_integration` 0.01s, `cuda_runtime_smoke` 0.23s, `cuda_sm120_cubin`, `compiler_identity` 0.02s, `compiler_transform`, `compiler_integration` 0.22s, `quantizer`, `pack_layout`, `quant_reference`, `quant_compiler_integration` 3.69s).
+
+Release:
+
+```text
+docker run --gpus all --rm -u "$(id -u):$(id -g)" \
+  -v "$PWD":/workspace -w /workspace qw38-dev:cuda13.4.1 \
+  bash -lc 'cmake -S . -B build/release -DCMAKE_BUILD_TYPE=Release && cmake --build build/release && ctest --test-dir build/release --output-on-failure'
+```
+
+Result: 18/18 tests passed (`host_expected_smoke`, `format_schema`, `format_schema_integration`, `format_writer` 0.03s, `format_sha256` 0.01s, `format_writer_integration` 0.01s, `format_reader` 0.03s, `format_reader_digest` 0.01s, `format_reader_integration` 0.01s, `cuda_runtime_smoke` 0.17s, `cuda_sm120_cubin`, `compiler_identity`, `compiler_transform`, `compiler_integration` 0.07s, `quantizer`, `pack_layout`, `quant_reference`, `quant_compiler_integration` 0.84s).
 ### Benchmark results
 Not required.
 ### Architecture blocker
-None or full report.
+None.
 ### Follow-up observations
-Concrete only.
+- Default ctest compiles mixed synthetic identity+Q4+Q8 fixtures and 8×256 slices of real `in_proj_qkv` / `lm_head`; it does not emit a full-model production `.qw38`. Use `qw38-compile --format production --checkpoint ... --output ...` for that path (`--no-verify` skips the second-pass requantize).
+- CUDA decode contraction remains TASK-009; this task's unpacker/reference GEMV is the correctness authority for packed bytes.

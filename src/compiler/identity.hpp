@@ -51,6 +51,7 @@ inline constexpr char const kEmbedName[] =
 inline constexpr char const kLmHeadName[] = "lm_head.weight";
 inline constexpr char const kFinalNormName[] = "model.language_model.norm.weight";
 inline constexpr char const kCompilerIdent[] = "qw38-bf16-identity";
+inline constexpr char const kProductionCompilerIdent[] = "qw38-v0";
 inline constexpr std::uint32_t kCompilerMajor = 0;
 inline constexpr std::uint32_t kCompilerMinor = 1;
 inline constexpr std::uint32_t kCompilerPatch = 0;

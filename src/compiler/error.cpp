@@ -34,6 +34,10 @@ char const* code_name(CompilerErrorCode code) noexcept {
       return "format";
     case CompilerErrorCode::Internal:
       return "internal";
+    case CompilerErrorCode::Unrepresentable:
+      return "unrepresentable";
+    case CompilerErrorCode::InvalidCode:
+      return "invalid_code";
   }
   return "unknown";
 }
