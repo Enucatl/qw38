@@ -11,6 +11,7 @@
 #include <vector>
 
 using qw38::compiler::CompilerErrorCode;
+using qw38::compiler::quantize_bf16;
 using qw38::compiler::quantize_fp32;
 using qw38::compiler::quantize_group;
 using qw38::format::ceil_pos_fp16;
@@ -204,6 +205,15 @@ int main() {
     auto wrong = quantize_group(LogicalQuantizerId::Q4G64V0, zeros(32));
     expect(!wrong && wrong.error().code == CompilerErrorCode::ShapeMismatch,
            "wrong group length rejected");
+  }
+
+  {
+    constexpr std::uint64_t huge_n = std::uint64_t{1} << 57;
+    std::span<std::byte const> empty;
+    auto overflow =
+        quantize_bf16(LogicalQuantizerId::Q4G64V0, huge_n, 64, empty);
+    expect(!overflow && overflow.error().code == CompilerErrorCode::Format,
+           "BF16 quantizer rejects byte-size overflow");
   }
 
   (void)fp32_to_bf16_rne;

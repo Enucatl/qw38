@@ -216,8 +216,15 @@ std::expected<PackedMatrix, FormatError> pack_bf16_dense_tile_v0(
     return std::unexpected(pack_err(FormatErrorCode::InvalidShape, "pack.bf16",
                                     "BF16 dense tile requires N%8==0 and K%256==0"));
   }
-  auto const elems = n * k;
-  if (elems / k != n || row_major.size() != elems * kBf16Size) {
+  auto elems = checked_mul(n, k, 0, "pack.bf16.elements");
+  if (!elems) {
+    return std::unexpected(elems.error());
+  }
+  auto bytes = checked_mul(*elems, kBf16Size, 0, "pack.bf16.bytes");
+  if (!bytes) {
+    return std::unexpected(bytes.error());
+  }
+  if (row_major.size() != *bytes) {
     return std::unexpected(pack_err(FormatErrorCode::InvalidSpan, "pack.bf16",
                                     "BF16 payload length must equal 2*N*K"));
   }
@@ -228,7 +235,7 @@ std::expected<PackedMatrix, FormatError> pack_bf16_dense_tile_v0(
   out.logical_k = k;
   out.padded_n = n;
   out.padded_k = k;
-  out.codes.resize(static_cast<std::size_t>(elems * kBf16Size));
+  out.codes.resize(static_cast<std::size_t>(*bytes));
   auto const tiles_n = n / kDenseTileRows;
   auto const tiles_k = k / kDenseTileK;
   for (std::uint64_t tn = 0; tn < tiles_n; ++tn) {

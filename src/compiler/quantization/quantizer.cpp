@@ -1,6 +1,7 @@
 #include "compiler/quantization/quantizer.hpp"
 
 #include "format/floatcvt.hpp"
+#include "format/layout.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -178,17 +179,25 @@ std::expected<LogicalWeightCodes, CompilerError> quantize_fp32(
 std::expected<LogicalWeightCodes, CompilerError> quantize_bf16(
     LogicalQuantizerId quantizer, std::uint64_t n, std::uint64_t k,
     std::span<std::byte const> weights) {
-  auto const need = n * k;
-  if (n == 0 || k == 0 || need / k != n) {
+  if (n == 0 || k == 0) {
     return std::unexpected(qerr(CompilerErrorCode::ShapeMismatch,
                                 "N and K must be positive"));
   }
-  if (weights.size() != need * kBf16Size) {
+  auto need = qw38::format::checked_mul(n, k, 0, "quantizer.elements");
+  if (!need) {
+    return std::unexpected(from_format(need.error()));
+  }
+  auto bytes =
+      qw38::format::checked_mul(*need, kBf16Size, 0, "quantizer.bytes");
+  if (!bytes) {
+    return std::unexpected(from_format(bytes.error()));
+  }
+  if (weights.size() != *bytes) {
     return std::unexpected(qerr(CompilerErrorCode::ShapeMismatch,
                                 "BF16 byte length must equal 2*N*K"));
   }
-  std::vector<float> fp32(static_cast<std::size_t>(need));
-  for (std::uint64_t i = 0; i < need; ++i) {
+  std::vector<float> fp32(static_cast<std::size_t>(*need));
+  for (std::uint64_t i = 0; i < *need; ++i) {
     auto const bits = load_u16_le(weights.data() + i * kBf16Size);
     float const v = bf16_to_fp32(bits);
     if (!fp32_is_finite(v)) {

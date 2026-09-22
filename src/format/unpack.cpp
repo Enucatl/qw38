@@ -339,12 +339,19 @@ std::expected<std::vector<std::byte>, FormatError> unpack_bf16_dense_tile_v0(
     return std::unexpected(unpack_err(FormatErrorCode::InvalidShape, "unpack.bf16",
                                       "BF16 dense tile requires N%8==0 and K%256==0"));
   }
-  auto const elems = n * k;
-  if (elems / k != n || tiled.size() != elems * kBf16Size) {
+  auto elems = checked_mul(n, k, 0, "unpack.bf16.elements");
+  if (!elems) {
+    return std::unexpected(elems.error());
+  }
+  auto bytes = checked_mul(*elems, kBf16Size, 0, "unpack.bf16.bytes");
+  if (!bytes) {
+    return std::unexpected(bytes.error());
+  }
+  if (tiled.size() != *bytes) {
     return std::unexpected(unpack_err(FormatErrorCode::InvalidSpan, "unpack.bf16",
                                       "tiled BF16 length must equal 2*N*K"));
   }
-  std::vector<std::byte> out(static_cast<std::size_t>(elems * kBf16Size));
+  std::vector<std::byte> out(static_cast<std::size_t>(*bytes));
   auto const tiles_k = k / kDenseTileK;
   for (std::uint64_t row = 0; row < n; ++row) {
     auto const tn = row / kDenseTileRows;

@@ -2,6 +2,7 @@
 
 #include "compiler/quantization/quantizer.hpp"
 #include "format/floatcvt.hpp"
+#include "format/layout.hpp"
 #include "format/unpack.hpp"
 
 #include <cstring>
@@ -118,6 +119,20 @@ std::expected<std::vector<std::uint16_t>, CompilerError> dequantize_to_bf16(
 std::expected<std::vector<std::uint16_t>, CompilerError> decode_bf16_payload(
     PhysicalLayoutId layout, std::span<std::byte const> payload, std::uint64_t n,
     std::uint64_t k) {
+  auto elems = qw38::format::checked_mul(n, k, 0, "reference.bf16.elements");
+  if (!elems) {
+    return std::unexpected(from_format(elems.error()));
+  }
+  auto bytes = qw38::format::checked_mul(
+      *elems, qw38::format::kBf16Size, 0, "reference.bf16.bytes");
+  if (!bytes) {
+    return std::unexpected(from_format(bytes.error()));
+  }
+  if (payload.size() != *bytes) {
+    return std::unexpected(ref_err(
+        CompilerErrorCode::ShapeMismatch,
+        "BF16 payload length must equal the declared 2*N*K bytes"));
+  }
   std::vector<std::byte> row_major;
   if (layout == PhysicalLayoutId::CudaBf16DenseTileV0) {
     auto unpacked = qw38::format::unpack_bf16_dense_tile_v0(payload, n, k);
@@ -132,13 +147,8 @@ std::expected<std::vector<std::uint16_t>, CompilerError> decode_bf16_payload(
     return std::unexpected(ref_err(CompilerErrorCode::Internal,
                                    "unsupported BF16 decode layout"));
   }
-  if (row_major.size() % 2 != 0) {
-    return std::unexpected(ref_err(CompilerErrorCode::ShapeMismatch,
-                                   "BF16 payload is not even"));
-  }
-  auto const elems = row_major.size() / 2;
-  std::vector<std::uint16_t> out(elems);
-  for (std::size_t i = 0; i < elems; ++i) {
+  std::vector<std::uint16_t> out(static_cast<std::size_t>(*elems));
+  for (std::size_t i = 0; i < out.size(); ++i) {
     out[i] = load_u16_le(row_major.data() + i * 2);
   }
   return out;

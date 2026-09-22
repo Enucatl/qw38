@@ -1,6 +1,7 @@
 #include "format/floatcvt.hpp"
 #include "format/logical.hpp"
 #include "format/pack.hpp"
+#include "format/unpack.hpp"
 
 #include <cstdint>
 #include <cstring>
@@ -11,6 +12,7 @@
 using qw38::format::dense_pad_k;
 using qw38::format::dense_pad_n;
 using qw38::format::error_message;
+using qw38::format::FormatErrorCode;
 using qw38::format::kDenseTileK;
 using qw38::format::kDenseTileRows;
 using qw38::format::kQ4GroupSize;
@@ -24,6 +26,7 @@ using qw38::format::pack_cuda_v0;
 using qw38::format::PhysicalLayoutId;
 using qw38::format::quantizer_layout_pair_ok;
 using qw38::format::store_u16_le;
+using qw38::format::unpack_bf16_dense_tile_v0;
 
 namespace {
 
@@ -366,6 +369,17 @@ int main() {
     auto mismatch = pack_cuda_v0(LogicalQuantizerId::Q4G64V0,
                                  PhysicalLayoutId::CudaQ8G32V0, m);
     expect(!mismatch, "mismatched strong IDs rejected");
+  }
+
+  {
+    constexpr std::uint64_t huge_n = std::uint64_t{1} << 55;
+    std::span<std::byte const> empty;
+    auto packed = qw38::format::pack_bf16_dense_tile_v0(empty, huge_n, 256);
+    expect(!packed && packed.error().code == FormatErrorCode::Overflow,
+           "BF16 pack rejects byte-size overflow");
+    auto unpacked = unpack_bf16_dense_tile_v0(empty, huge_n, 256);
+    expect(!unpacked && unpacked.error().code == FormatErrorCode::Overflow,
+           "BF16 unpack rejects byte-size overflow");
   }
 
   if (g_failures != 0) {

@@ -12,6 +12,8 @@
 #include <vector>
 
 using qw38::compiler::dequantize_to_bf16;
+using qw38::compiler::decode_bf16_payload;
+using qw38::compiler::CompilerErrorCode;
 using qw38::compiler::quantize_bf16;
 using qw38::compiler::quantize_fp32;
 using qw38::compiler::reference_gemv_bf16;
@@ -367,6 +369,35 @@ int main() {
         expect(!bad, "unpack rejects forbidden Q4 nibble -8");
       }
     }
+  }
+
+  {
+    std::vector<std::byte> exact(4);
+    auto decoded = decode_bf16_payload(
+        PhysicalLayoutId::CudaBf16RowMajorV0, exact, 1, 2);
+    expect(decoded && decoded->size() == 2,
+           "BF16 decoder accepts exact declared payload");
+
+    std::vector<std::byte> short_payload(2);
+    auto short_result = decode_bf16_payload(
+        PhysicalLayoutId::CudaBf16RowMajorV0, short_payload, 1, 2);
+    expect(!short_result &&
+               short_result.error().code == CompilerErrorCode::ShapeMismatch,
+           "BF16 decoder rejects short payload");
+
+    std::vector<std::byte> long_payload(6);
+    auto long_result = decode_bf16_payload(
+        PhysicalLayoutId::CudaBf16RowMajorV0, long_payload, 1, 2);
+    expect(!long_result &&
+               long_result.error().code == CompilerErrorCode::ShapeMismatch,
+           "BF16 decoder rejects long payload");
+
+    std::span<std::byte const> empty;
+    auto overflow = decode_bf16_payload(
+        PhysicalLayoutId::CudaBf16RowMajorV0, empty,
+        std::uint64_t{1} << 63, 2);
+    expect(!overflow && overflow.error().code == CompilerErrorCode::Format,
+           "BF16 decoder rejects declared geometry overflow");
   }
 
   if (g_failures != 0) {
