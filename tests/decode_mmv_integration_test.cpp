@@ -3,6 +3,7 @@
 #include "compiler/identity.hpp"
 #include "compiler/quantization/quantizer.hpp"
 
+#include <cstring>
 #include <string>
 
 using qw38::compiler::kHeadDim;
@@ -42,8 +43,12 @@ using qw38::decode_mmv::test::residual_vec;
 using qw38::format::LogicalQuantizerId;
 using qw38::format::PackedMatrix;
 using qw38::format::PhysicalLayoutId;
+using qw38::format::bf16_to_fp32;
+using qw38::format::fp16_to_fp32;
+using qw38::format::fp32_to_bf16_rne;
 using qw38::format::pack_bf16_dense_tile_v0;
 using qw38::format::pack_cuda_v0;
+using qw38::format::store_u16_le;
 
 namespace {
 
@@ -267,34 +272,155 @@ void gdn_ab(Stream const& stream) {
   expect_fp32_close(*gb, *rb, "gdn b");
 }
 
+constexpr std::uint32_t kHeadSourceRowPeriod = 21u * 17u;
+
+std::int8_t q8_head_code(std::uint64_t row, std::uint32_t col,
+                         std::uint32_t k) {
+  return static_cast<std::int8_t>(
+      static_cast<int>((row * k + col) % 21u) - 10);
+}
+
+std::uint16_t q8_head_scale(std::uint64_t row, std::uint32_t col,
+                            std::uint32_t k) {
+  auto const groups_per_row = k / 32u;
+  auto const group = row * groups_per_row + col / 32u;
+  return (group % 17u == 0u) ? std::uint16_t{0x4000}
+                             : std::uint16_t{0x3C00};
+}
+
+std::uint16_t q8_head_bf16(std::uint64_t row, std::uint32_t col,
+                           std::uint32_t k) {
+  float const weight =
+      static_cast<float>(q8_head_code(row, col, k)) *
+      fp16_to_fp32(q8_head_scale(row, col, k));
+  return fp32_to_bf16_rne(weight);
+}
+
+PackedMatrix make_q8_head_bf16_tiles(std::uint32_t n, std::uint32_t k) {
+  PackedMatrix packed;
+  packed.layout = PhysicalLayoutId::CudaBf16DenseTileV0;
+  packed.quantizer = LogicalQuantizerId::None;
+  packed.logical_n = n;
+  packed.logical_k = k;
+  packed.padded_n = n;
+  packed.padded_k = k;
+  packed.codes.resize(static_cast<std::size_t>(n) * k * 2u);
+
+  std::vector<std::byte> source_rows(
+      static_cast<std::size_t>(kHeadSourceRowPeriod) * k * 2u);
+  for (std::uint32_t row = 0; row < kHeadSourceRowPeriod; ++row) {
+    for (std::uint32_t col = 0; col < k; ++col) {
+      auto const offset = (static_cast<std::size_t>(row) * k + col) * 2u;
+      store_u16_le(source_rows.data() + offset, q8_head_bf16(row, col, k));
+    }
+  }
+
+  auto const tiles_n = n / 8u;
+  auto const tiles_k = k / 256u;
+  for (std::uint32_t tn = 0; tn < tiles_n; ++tn) {
+    for (std::uint32_t tk = 0; tk < tiles_k; ++tk) {
+      for (std::uint32_t r = 0; r < 8u; ++r) {
+        auto const row = tn * 8u + r;
+        auto const source_row = row % kHeadSourceRowPeriod;
+        auto const src =
+            (static_cast<std::size_t>(source_row) * k + tk * 256u) * 2u;
+        auto const dst =
+            ((static_cast<std::size_t>(tn) * tiles_k + tk) * 8u + r) * 512u;
+        std::memcpy(packed.codes.data() + dst, source_rows.data() + src, 512u);
+      }
+    }
+  }
+  return packed;
+}
+
+std::vector<float> q8_head_bf16_oracle(
+    std::uint32_t n, std::uint32_t k,
+    std::span<std::uint16_t const> x) {
+  std::vector<float> row_oracle(kHeadSourceRowPeriod);
+  for (std::uint32_t row = 0; row < kHeadSourceRowPeriod; ++row) {
+    float acc = 0.0f;
+    for (std::uint32_t col = 0; col < k; ++col) {
+      acc += bf16_to_fp32(q8_head_bf16(row, col, k)) *
+             bf16_to_fp32(x[col]);
+    }
+    row_oracle[row] = acc;
+  }
+  std::vector<float> out(n);
+  for (std::uint32_t row = 0; row < n; ++row) {
+    out[row] = row_oracle[row % kHeadSourceRowPeriod];
+  }
+  return out;
+}
+
+void q8_head_bf16_control(std::uint32_t n, std::uint32_t k,
+                          std::span<std::uint16_t const> x,
+                          Stream const& stream) {
+  auto packed = make_q8_head_bf16_tiles(n, k);
+  auto reference = q8_head_bf16_oracle(n, k, x);
+  expect(packed.logical_n == n && packed.logical_k == k,
+         "q8 head bf16-control full logical shape");
+  expect(packed.codes.size() == static_cast<std::size_t>(n) * k * 2u,
+         "q8 head bf16-control full packed extent");
+
+  auto d_codes = upload_vec(packed.codes, stream);
+  std::vector<std::uint16_t> x_owned(x.begin(), x.end());
+  auto d_x = upload_vec(x_owned, stream);
+  auto d_y = DeviceBuffer::allocate(static_cast<std::uint64_t>(n) * sizeof(float));
+  if (!d_codes || !d_x || !d_y) {
+    fail("q8 head bf16-control full upload/alloc");
+    return;
+  }
+  auto d = desc_from_packed(packed, DecodeEpilogue::StoreFp32);
+  d.codes.pointer = d_codes->as_bytes();
+  bind_input(d, d_x->data());
+  bind_output(d, d_y->data());
+  expect(d.output.dtype == qw38::cuda::DecodeDtype::Fp32,
+         "q8 head bf16-control FP32 logits");
+  expect(d.output.logical_n == n &&
+             d.output.bytes == static_cast<std::uint64_t>(n) * sizeof(float),
+         "q8 head bf16-control output extent");
+
+  auto st = launch_decode_mmv(d, stream);
+  if (!st) {
+    fail("q8 head bf16-control full launch: " +
+         qw38::cuda::error_message(st.error()));
+    return;
+  }
+  auto got = download_vec<float>(*d_y, n, stream);
+  if (!got) {
+    fail("q8 head bf16-control full download");
+    return;
+  }
+  expect_fp32_close(*got, reference, "q8-head-bf16-control-full");
+}
+
 void q8_head(Stream const& stream) {
   auto n = static_cast<std::uint32_t>(kVocab);
   auto k = static_cast<std::uint32_t>(kHidden);
-  auto logical = make_logical(LogicalQuantizerId::Q8G32V0, n, k, 0, 0x3C00);
-  for (std::uint64_t i = 0; i < logical.codes.size(); ++i) {
-    int const v = static_cast<int>(i % 21) - 10;
-    logical.codes[static_cast<std::size_t>(i)] = static_cast<std::int8_t>(v);
-  }
-  for (std::uint64_t i = 0; i < logical.scales.size(); ++i) {
-    logical.scales[static_cast<std::size_t>(i)] =
-        (i % 17 == 0) ? std::uint16_t{0x4000} : std::uint16_t{0x3C00};
-  }
-  auto packed = pack_cuda_v0(LogicalQuantizerId::Q8G32V0, PhysicalLayoutId::CudaQ8G32V0,
-                             logical);
-  if (!packed) {
-    fail("q8 head pack: " + qw38::format::error_message(packed.error()));
-    return;
-  }
   auto x = bf16_vec(k, 0.05f);
-  compare_cuda(*packed, x, DecodeEpilogue::StoreFp32, stream, "q8-head");
-
-  auto slice_src = bf16_matrix(256, k, 0.4f);
-  auto slice = pack_bf16_dense_tile_v0(slice_src, 256, k);
-  if (!slice) {
-    fail("q8 head bf16-control pack");
-    return;
+  {
+    auto logical = make_logical(LogicalQuantizerId::Q8G32V0, n, k, 0, 0x3C00);
+    for (std::uint32_t row = 0; row < n; ++row) {
+      for (std::uint32_t col = 0; col < k; ++col) {
+        logical.codes[static_cast<std::size_t>(row) * k + col] =
+            q8_head_code(row, col, k);
+      }
+      for (std::uint32_t group = 0; group < k / 32u; ++group) {
+        logical.scales[static_cast<std::size_t>(row) * (k / 32u) + group] =
+            q8_head_scale(row, group * 32u, k);
+      }
+    }
+    auto packed =
+        pack_cuda_v0(LogicalQuantizerId::Q8G32V0,
+                     PhysicalLayoutId::CudaQ8G32V0, logical);
+    if (!packed) {
+      fail("q8 head pack: " + qw38::format::error_message(packed.error()));
+      return;
+    }
+    logical = {};
+    compare_cuda(*packed, x, DecodeEpilogue::StoreFp32, stream, "q8-head");
   }
-  compare_cuda(*slice, x, DecodeEpilogue::StoreFp32, stream, "q8-head-bf16-control-256");
+  q8_head_bf16_control(n, k, x, stream);
 }
 
 }  // namespace
