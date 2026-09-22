@@ -7,6 +7,7 @@
 
 #include <cstdint>
 #include <expected>
+#include <optional>
 #include <span>
 #include <vector>
 
@@ -34,7 +35,9 @@ struct LiveInterval {
 
 struct ScratchRequest {
   qw38::format::ScratchKind kind{qw38::format::ScratchKind::NormalizedHidden};
-  qw38::format::ArithmeticDtype dtype{qw38::format::ArithmeticDtype::Bf16};
+  // Empty for composite byte arenas whose subregions have mixed dtypes.
+  std::optional<qw38::format::ArithmeticDtype> dtype{
+      qw38::format::ArithmeticDtype::Bf16};
   std::uint64_t bytes{};
   std::vector<LiveInterval> live;
   // Nonzero: mutually exclusive with other requests in the same group even if
@@ -44,7 +47,7 @@ struct ScratchRequest {
 
 struct ScratchPlacement {
   qw38::format::ScratchKind kind{};
-  qw38::format::ArithmeticDtype dtype{};
+  std::optional<qw38::format::ArithmeticDtype> dtype{};
   std::uint64_t bytes{};
   std::uint64_t offset{};
 

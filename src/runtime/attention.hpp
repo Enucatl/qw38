@@ -30,8 +30,8 @@ inline constexpr float kAttnRmsEps = 1.0e-6f;
     std::uint32_t language_layer);
 
 struct AttnWeightBinding {
-  TensorView codes{};
-  TensorView scales{};
+  ConstTensorView codes{};
+  ConstTensorView scales{};
   std::uint16_t layout{};
   std::uint16_t quantizer{};
   std::uint32_t n{};
@@ -55,10 +55,10 @@ struct AttentionPrepPlan {
   AttnWeightBinding qg{};
   AttnWeightBinding k{};
   AttnWeightBinding v{};
-  TensorView gamma{};      // input RMS, BF16 [5120]
-  TensorView gamma_q{};    // QK RMS, BF16 [256]
-  TensorView gamma_k{};    // QK RMS, BF16 [256]
-  TensorView inv_freq{};   // FP32 [32]
+  ConstTensorView gamma{};      // input RMS, BF16 [5120]
+  ConstTensorView gamma_q{};    // QK RMS, BF16 [256]
+  ConstTensorView gamma_k{};    // QK RMS, BF16 [256]
+  ConstTensorView inv_freq{};   // FP32 [32]
   TensorView residual{};   // FP32 h, decode token 0
   TensorView normalized{}; // BF16 [5120]
   AttnWorkspaceViews scratch{};
@@ -72,19 +72,19 @@ struct AttentionPrepPlan {
 };
 
 struct AttentionPrepBindViews {
-  TensorView qg{};
-  TensorView qg_scales{};
-  TensorView k{};
-  TensorView k_scales{};
-  TensorView v{};
-  TensorView v_scales{};
-  TensorView gamma{};
-  TensorView gamma_q{};
-  TensorView gamma_k{};
-  TensorView inv_freq{};
+  ConstTensorView qg{};
+  ConstTensorView qg_scales{};
+  ConstTensorView k{};
+  ConstTensorView k_scales{};
+  ConstTensorView v{};
+  ConstTensorView v_scales{};
+  ConstTensorView gamma{};
+  ConstTensorView gamma_q{};
+  ConstTensorView gamma_k{};
+  ConstTensorView inv_freq{};
   TensorView residual{};
   TensorView normalized{};
-  TensorView workspace{};
+  WorkspaceView workspace{};
   TensorView kv{};
   std::uint64_t* host_populated{nullptr};
   std::uint64_t kv_capacity{};
@@ -102,8 +102,8 @@ struct AttentionCoreBindViews {
   TensorView y{};             // BF16 [24,256], gated attention output
   TensorView residual{};      // FP32 input residual
   TensorView residual_out{};  // FP32 output residual
-  TensorView out{};           // [5120,6144] Q4/BF16 projection
-  TensorView out_scales{};
+  ConstTensorView out{};           // [5120,6144] Q4/BF16 projection
+  ConstTensorView out_scales{};
   std::uint64_t* host_populated{nullptr};
   std::uint64_t kv_capacity{};
   std::uint32_t language_layer{};
@@ -126,8 +126,8 @@ struct AttentionCorePlan {
 
 struct AttentionMixerBindViews {
   AttentionPrepBindViews prep{};
-  TensorView out{};
-  TensorView out_scales{};
+  ConstTensorView out{};
+  ConstTensorView out_scales{};
   TensorView residual_out{};
 };
 
@@ -145,7 +145,7 @@ struct AttentionMixerPlan {
 [[nodiscard]] std::string attn_k_norm_name(std::uint32_t layer);
 
 [[nodiscard]] std::expected<AttnWorkspaceViews, Error> bind_attention_workspace(
-    TensorView workspace);
+    WorkspaceView workspace);
 
 [[nodiscard]] std::expected<AttentionPrepPlan, Error> bind_attention_prep_plan(
     AttentionPrepBindViews const& views, qw38::cuda::Stream const& stream,

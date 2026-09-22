@@ -37,7 +37,8 @@ Error arg_error(std::string_view field, std::string_view detail) {
   return make_error(ErrorCode::InvalidArgument, field, detail);
 }
 
-std::uint64_t element_count(TensorView const& v) noexcept {
+template <typename Pointer>
+std::uint64_t element_count(BasicTensorView<Pointer> const& v) noexcept {
   if (v.rank == 0) {
     return 0;
   }
@@ -60,11 +61,10 @@ std::uint16_t quantizer_for(PhysicalLayoutId layout) noexcept {
   return kDecodeQuantizerNone;
 }
 
-std::expected<TensorView, Error> as_decode_vector(TensorView v,
-                                                  std::uint64_t elems,
-                                                  ArithmeticDtype dtype,
-                                                  bool writable,
-                                                  std::string_view field) {
+template <typename Pointer>
+std::expected<BasicTensorView<Pointer>, Error> as_decode_vector(
+    BasicTensorView<Pointer> v, std::uint64_t elems, ArithmeticDtype dtype,
+    bool writable, std::string_view field) {
   if (v.pointer == nullptr) {
     return std::unexpected(arg_error(field, "null view"));
   }
@@ -74,9 +74,7 @@ std::expected<TensorView, Error> as_decode_vector(TensorView v,
   if (v.dtype != dtype) {
     return std::unexpected(arg_error(field, "dtype mismatch"));
   }
-  if (writable && !v.writable) {
-    return std::unexpected(arg_error(field, "view must be writable"));
-  }
+  (void)writable;
   if (v.rank == 0 || element_count(v) < elems) {
     return std::unexpected(arg_error(field, "view is smaller than decode extent"));
   }
@@ -86,8 +84,8 @@ std::expected<TensorView, Error> as_decode_vector(TensorView v,
   return v;
 }
 
-std::expected<MlpWeightBinding, Error> bind_weight(TensorView codes,
-                                                   TensorView scales,
+std::expected<MlpWeightBinding, Error> bind_weight(ConstTensorView codes,
+                                                   ConstTensorView scales,
                                                    std::uint32_t want_n,
                                                    std::uint32_t want_k,
                                                    std::string_view field) {
@@ -152,7 +150,7 @@ struct ByteInterval {
   std::uintptr_t end{};
 };
 
-std::expected<ByteInterval, Error> byte_interval(void* pointer,
+std::expected<ByteInterval, Error> byte_interval(void const* pointer,
                                                  std::uint64_t bytes,
                                                  std::string_view name) {
   auto const begin = reinterpret_cast<std::uintptr_t>(pointer);
@@ -174,12 +172,12 @@ bool overlaps(ByteInterval const& a, ByteInterval const& b) noexcept {
 
 std::expected<void, Error> validate_non_overlapping_bindings(
     MlpWeightBinding const& gate, MlpWeightBinding const& up,
-    MlpWeightBinding const& down, TensorView const& gamma,
+    MlpWeightBinding const& down, ConstTensorView const& gamma,
     TensorView const& h_mid, TensorView const& next_h,
     TensorView const& normalized, TensorView const& swiglu) {
   std::array<ByteInterval, 11> intervals{};
   std::size_t count = 0;
-  auto add = [&](void* pointer, std::uint64_t bytes,
+  auto add = [&](void const* pointer, std::uint64_t bytes,
                  std::string_view name) -> std::expected<void, Error> {
     if (pointer == nullptr && bytes == 0) {
       return {};
@@ -260,19 +258,21 @@ DecodeMmvDesc mmv_from_weight(MlpWeightBinding const& w) {
   DecodeDtype const dtype =
       w.layout == qw38::cuda::kDecodeLayoutQ4G64V0 ? DecodeDtype::Q4
                                                    : DecodeDtype::Bf16;
-  d.codes = decode_matrix_view(w.codes.pointer, dtype, w.layout, w.n, w.k,
+  d.codes = decode_matrix_view(const_cast<void*>(w.codes.pointer), dtype,
+                               w.layout, w.n, w.k,
                                w.padded_n, w.padded_k, w.codes_bytes, 16);
   if (w.scales_bytes != 0) {
     d.scales = decode_matrix_view(
-        w.scales.pointer, DecodeDtype::Fp16, w.layout, w.padded_n,
+        const_cast<void*>(w.scales.pointer), DecodeDtype::Fp16, w.layout,
+        w.padded_n,
         w.padded_k / 64u, w.padded_n, w.padded_k / 64u,
         w.scales_bytes, 2);
   }
   return d;
 }
 
-std::expected<TensorView, Error> require_payload(Model const& model,
-                                                 std::string const& name) {
+std::expected<ConstTensorView, Error> require_payload(Model const& model,
+                                                      std::string const& name) {
   auto v = model.payload(name);
   if (!v) {
     return std::unexpected(v.error());
@@ -280,11 +280,10 @@ std::expected<TensorView, Error> require_payload(Model const& model,
   return *v;
 }
 
-std::expected<TensorView, Error> optional_scales(Model const& model,
-                                                 std::string const& name,
-                                                 PhysicalLayoutId layout) {
+std::expected<ConstTensorView, Error> optional_scales(
+    Model const& model, std::string const& name, PhysicalLayoutId layout) {
   if (layout == PhysicalLayoutId::CudaBf16DenseTileV0) {
-    return TensorView{};
+    return ConstTensorView{};
   }
   auto v = model.scales(name);
   if (!v) {
@@ -457,8 +456,8 @@ std::expected<MlpPlan, Error> bind_mlp_plan(Model const& model,
   views.gamma = *gamma;
   views.h_mid = h_mid;
   views.next_h = next_h;
-  views.normalized = *normalized;
-  views.swiglu = *swiglu;
+  views.normalized = normalized->region[0].tensor;
+  views.swiglu = swiglu->region[0].tensor;
   return bind_mlp_plan(views, stream, eps);
 }
 

@@ -39,8 +39,9 @@ Error arg_error(std::string_view field, std::string_view detail) {
   return make_error(ErrorCode::InvalidArgument, field, detail);
 }
 
-std::expected<std::uint64_t, Error> element_count(TensorView const& v,
-                                                  std::string_view field) {
+template <typename Pointer>
+std::expected<std::uint64_t, Error> element_count(
+    BasicTensorView<Pointer> const& v, std::string_view field) {
   if (v.rank == 0) {
     return std::unexpected(arg_error(field, "rank must be nonzero"));
   }
@@ -54,8 +55,9 @@ std::expected<std::uint64_t, Error> element_count(TensorView const& v,
   return n;
 }
 
-std::expected<std::uint64_t, Error> view_bytes(TensorView const& v,
-                                               std::string_view field) {
+template <typename Pointer>
+std::expected<std::uint64_t, Error> view_bytes(
+    BasicTensorView<Pointer> const& v, std::string_view field) {
   auto n = element_count(v, field);
   if (!n) return std::unexpected(n.error());
   auto const size = qw38::format::element_size(v.dtype);
@@ -65,9 +67,10 @@ std::expected<std::uint64_t, Error> view_bytes(TensorView const& v,
   return *n * size;
 }
 
-std::expected<void, Error> require_alignment(TensorView const& v,
-                                             std::uint64_t alignment,
-                                             std::string_view field) {
+template <typename Pointer>
+std::expected<void, Error> require_alignment(
+    BasicTensorView<Pointer> const& v, std::uint64_t alignment,
+    std::string_view field) {
   auto const address = reinterpret_cast<std::uintptr_t>(v.pointer);
   if (alignment == 0 || address % alignment != 0) {
     return std::unexpected(arg_error(field, "view alignment is invalid"));
@@ -75,13 +78,14 @@ std::expected<void, Error> require_alignment(TensorView const& v,
   return {};
 }
 
-std::expected<TensorView, Error> require_view(
-    TensorView v, ArithmeticDtype dtype, PhysicalLayoutId layout,
+template <typename Pointer>
+std::expected<BasicTensorView<Pointer>, Error> require_view(
+    BasicTensorView<Pointer> v, ArithmeticDtype dtype, PhysicalLayoutId layout,
     StorageClass storage, bool writable, std::initializer_list<std::uint64_t> extents,
     std::uint64_t alignment, std::string_view field) {
+  (void)writable;
   if (v.pointer == nullptr || v.space != MemorySpace::Device || v.dtype != dtype ||
-      v.layout != layout || v.storage != storage || (writable && !v.writable) ||
-      v.rank != extents.size()) {
+      v.layout != layout || v.storage != storage || v.rank != extents.size()) {
     return std::unexpected(arg_error(field, "typed view contract mismatch"));
   }
   std::size_t i = 0;
@@ -99,7 +103,7 @@ std::expected<TensorView, Error> require_view(
 
 struct ByteInterval { std::string_view name; std::uintptr_t begin; std::uintptr_t end; };
 
-std::expected<ByteInterval, Error> byte_interval(TensorView const& v,
+std::expected<ByteInterval, Error> byte_interval(ConstTensorView const& v,
                                                   std::uint64_t bytes,
                                                   std::string_view name) {
   auto const begin = reinterpret_cast<std::uintptr_t>(v.pointer);
@@ -113,8 +117,17 @@ bool overlaps(ByteInterval const& a, ByteInterval const& b) noexcept {
   return a.begin < b.end && b.begin < a.end;
 }
 
+ConstTensorView byte_arena_view(WorkspaceView const& workspace) {
+  ConstTensorView view{};
+  view.pointer = workspace.pointer;
+  view.space = workspace.space;
+  return view;
+}
+
 std::expected<void, Error> validate_intervals(
-    std::initializer_list<std::pair<std::string_view, std::pair<TensorView, std::uint64_t>>> views,
+    std::initializer_list<
+        std::pair<std::string_view, std::pair<ConstTensorView, std::uint64_t>>>
+        views,
     bool permit_q_y = false) {
   std::vector<ByteInterval> intervals;
   intervals.reserve(views.size());
@@ -149,8 +162,8 @@ std::uint16_t quantizer_for(PhysicalLayoutId layout) noexcept {
   return kDecodeQuantizerNone;
 }
 
-std::expected<AttnWeightBinding, Error> bind_q4_or_bf16(TensorView codes,
-                                                        TensorView scales,
+std::expected<AttnWeightBinding, Error> bind_q4_or_bf16(ConstTensorView codes,
+                                                        ConstTensorView scales,
                                                         std::uint32_t want_n,
                                                         std::uint32_t want_k,
                                                         std::string_view field) {
@@ -224,19 +237,21 @@ DecodeMmvDesc mmv_from_weight(AttnWeightBinding const& w) {
   DecodeDtype const dtype =
       w.layout == qw38::cuda::kDecodeLayoutQ4G64V0 ? DecodeDtype::Q4
                                                    : DecodeDtype::Bf16;
-  d.codes = decode_matrix_view(w.codes.pointer, dtype, w.layout, w.n, w.k,
+  d.codes = decode_matrix_view(const_cast<void*>(w.codes.pointer), dtype,
+                               w.layout, w.n, w.k,
                                w.padded_n, w.padded_k, w.codes_bytes, 16);
   if (w.scales_bytes != 0) {
     d.scales = decode_matrix_view(
-        w.scales.pointer, DecodeDtype::Fp16, w.layout, w.padded_n,
+        const_cast<void*>(w.scales.pointer), DecodeDtype::Fp16, w.layout,
+        w.padded_n,
         w.padded_k / 64u, w.padded_n, w.padded_k / 64u,
         w.scales_bytes, 2);
   }
   return d;
 }
 
-std::expected<TensorView, Error> require_payload(Model const& model,
-                                                 std::string const& name) {
+std::expected<ConstTensorView, Error> require_payload(
+    Model const& model, std::string const& name) {
   auto v = model.payload(name);
   if (!v) {
     return std::unexpected(v.error());
@@ -244,11 +259,10 @@ std::expected<TensorView, Error> require_payload(Model const& model,
   return *v;
 }
 
-std::expected<TensorView, Error> optional_scales(Model const& model,
-                                                 std::string const& name,
-                                                 PhysicalLayoutId layout) {
+std::expected<ConstTensorView, Error> optional_scales(
+    Model const& model, std::string const& name, PhysicalLayoutId layout) {
   if (layout == PhysicalLayoutId::CudaBf16DenseTileV0) {
-    return TensorView{};
+    return ConstTensorView{};
   }
   auto v = model.scales(name);
   if (!v) {
@@ -266,7 +280,7 @@ TensorView overlay(std::byte* base, std::uint64_t off, ArithmeticDtype dtype,
   v.layout = layout;
   v.storage = storage;
   v.space = MemorySpace::Device;
-  v.writable = writable;
+  (void)writable;
   v.rank = rank;
   v.extent[0] = e0;
   v.extent[1] = e1;
@@ -327,21 +341,16 @@ std::string attn_k_norm_name(std::uint32_t layer) {
 }
 
 std::expected<AttnWorkspaceViews, Error> bind_attention_workspace(
-    TensorView workspace) {
+    WorkspaceView workspace) {
   if (workspace.pointer == nullptr || workspace.space != MemorySpace::Device ||
-      workspace.dtype != ArithmeticDtype::Fp32 ||
-      workspace.layout != PhysicalLayoutId::CudaFp32VectorV0 ||
-      workspace.storage != StorageClass::Fp32 || !workspace.writable || workspace.rank != 1) {
+      workspace.bytes < kAttentionWorkspaceBytesPerToken) {
     return std::unexpected(arg_error("workspace", "typed view contract mismatch"));
   }
-  if (auto st = require_alignment(workspace, 16, "workspace"); !st) return std::unexpected(st.error());
-  auto workspace_bytes = view_bytes(workspace, "workspace");
-  if (!workspace_bytes) return std::unexpected(workspace_bytes.error());
-  if (*workspace_bytes < kAttentionWorkspaceBytesPerToken) {
+  if (reinterpret_cast<std::uintptr_t>(workspace.pointer) % 16u != 0) {
     return std::unexpected(
-        arg_error("workspace", "AttentionWorkspace must be 78016 bytes per token"));
+        arg_error("workspace", "view alignment is invalid"));
   }
-  auto* base = static_cast<std::byte*>(workspace.pointer);
+  auto* base = workspace.pointer;
   AttnWorkspaceViews v;
   v.qg = overlay(base, kAttnOffQg, ArithmeticDtype::Bf16,
                  PhysicalLayoutId::CudaBf16RowMajorV0, StorageClass::Bf16, true, 2,
@@ -447,8 +456,7 @@ std::expected<AttentionPrepPlan, Error> bind_attention_prep_plan(
   if (!kv) return std::unexpected(kv.error());
   auto kv_bytes = view_bytes(*kv, "kv");
   if (!kv_bytes) return std::unexpected(kv_bytes.error());
-  auto workspace_bytes = view_bytes(views.workspace, "workspace");
-  if (!workspace_bytes) return std::unexpected(workspace_bytes.error());
+  auto const workspace_bytes = views.workspace.bytes;
   if (auto st = validate_intervals({
           {"qg", {qg->codes, qg->codes_bytes}}, {"qg_scales", {qg->scales, qg->scales_bytes}},
           {"k", {k->codes, k->codes_bytes}}, {"k_scales", {k->scales, k->scales_bytes}},
@@ -456,7 +464,8 @@ std::expected<AttentionPrepPlan, Error> bind_attention_prep_plan(
           {"gamma", {*gamma, kHidden * 2u}}, {"gamma_q", {*gamma_q, kHeadDim * 2u}},
           {"gamma_k", {*gamma_k, kHeadDim * 2u}}, {"inv_freq", {*inv, 32u * 4u}},
           {"residual", {*residual, kHidden * 4u}}, {"normalized", {*normalized, kHidden * 2u}},
-          {"workspace", {views.workspace, *workspace_bytes}}, {"kv", {*kv, *kv_bytes}}}); !st) {
+          {"workspace", {byte_arena_view(views.workspace), workspace_bytes}},
+          {"kv", {*kv, *kv_bytes}}}); !st) {
     return std::unexpected(st.error());
   }
 
@@ -578,11 +587,10 @@ std::expected<AttentionMixerPlan, Error> bind_attention_mixer_plan(
       {1, kHidden}, 4, "residual_out");
   if (!residual_out) return std::unexpected(residual_out.error());
 
-  auto workspace_bytes = view_bytes(views.prep.workspace, "workspace");
-  if (!workspace_bytes) return std::unexpected(workspace_bytes.error());
+  auto const workspace_bytes = views.prep.workspace.bytes;
   auto required_workspace = attn_workspace_bytes_for_capacity(views.prep.kv_capacity);
   if (!required_workspace) return std::unexpected(required_workspace.error());
-  if (*workspace_bytes != *required_workspace) {
+  if (workspace_bytes != *required_workspace) {
     return std::unexpected(arg_error(
         "workspace", "workspace extent does not match KV-capacity contract"));
   }
@@ -601,7 +609,7 @@ std::expected<AttentionMixerPlan, Error> bind_attention_mixer_plan(
           {"inv_freq", {prep->inv_freq, 32u * 4u}},
           {"residual", {prep->residual, kHidden * 4u}},
           {"normalized", {prep->normalized, kHidden * 2u}},
-          {"workspace", {views.prep.workspace, *workspace_bytes}},
+          {"workspace", {byte_arena_view(views.prep.workspace), workspace_bytes}},
           {"kv", {prep->kv, *kv_bytes}},
           {"out", {out->codes, out->codes_bytes}},
           {"out_scales", {out->scales, out->scales_bytes}},
@@ -616,7 +624,7 @@ std::expected<AttentionMixerPlan, Error> bind_attention_mixer_plan(
                           kAttnOffPartials, ArithmeticDtype::Fp32,
                           PhysicalLayoutId::CudaFp32VectorV0,
                           StorageClass::Fp32, true, 1,
-                          (*workspace_bytes - kAttnOffPartials) /
+                          (workspace_bytes - kAttnOffPartials) /
                               qw38::format::kFp32Size);
   core.y = prep->scratch.q;  // Q is dead after scan; merge materializes y in-place.
   core.residual = prep->residual;
@@ -749,7 +757,7 @@ std::expected<AttentionPrepPlan, Error> bind_attention_prep_plan(
   views.residual = session.residual_h();
   views.residual.rank = 2;
   views.residual.extent = {1, kHidden};
-  views.normalized = *normalized;
+  views.normalized = normalized->region[0].tensor;
   views.normalized.rank = 1;
   views.normalized.extent = {kHidden};
   views.workspace = *workspace;

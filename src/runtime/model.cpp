@@ -24,27 +24,27 @@ qw38::format::ArithmeticDtype dtype_for_storage(
   return qw38::format::ArithmeticDtype::Bf16;
 }
 
-TensorView make_payload_view(qw38::format::TensorRecord const& rec, void* ptr) {
-  TensorView v{};
+ConstTensorView make_payload_view(qw38::format::TensorRecord const& rec,
+                                  void const* ptr) {
+  ConstTensorView v{};
   v.pointer = ptr;
   v.dtype = dtype_for_storage(rec.storage);
   v.layout = rec.layout;
   v.storage = rec.storage;
   v.space = MemorySpace::Device;
-  v.writable = false;
   v.rank = rec.shape.rank;
   v.extent = rec.shape.logical;
   return v;
 }
 
-TensorView make_scale_view(qw38::format::TensorRecord const& rec, void* ptr) {
-  TensorView v{};
+ConstTensorView make_scale_view(qw38::format::TensorRecord const& rec,
+                                void const* ptr) {
+  ConstTensorView v{};
   v.pointer = ptr;
   v.dtype = qw38::format::ArithmeticDtype::Fp16;
   v.layout = rec.layout;
   v.storage = rec.storage;
   v.space = MemorySpace::Device;
-  v.writable = false;
   v.rank = 1;
   v.extent[0] = rec.scales.length / qw38::format::kFp16Size;
   return v;
@@ -91,7 +91,7 @@ qw38::format::TensorRecord const* Model::find_tensor(
   return nullptr;
 }
 
-std::expected<TensorView, Error> Model::payload(
+std::expected<ConstTensorView, Error> Model::payload(
     std::string_view logical_name) const {
   auto const* rec = find_tensor(logical_name);
   if (rec == nullptr) {
@@ -111,7 +111,7 @@ std::expected<TensorView, Error> Model::payload(
       make_error(ErrorCode::Internal, "payload", "uploaded tensor missing"));
 }
 
-std::expected<TensorView, Error> Model::scales(
+std::expected<ConstTensorView, Error> Model::scales(
     std::string_view logical_name) const {
   auto const* rec = find_tensor(logical_name);
   if (rec == nullptr) {

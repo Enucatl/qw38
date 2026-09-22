@@ -29,8 +29,8 @@ inline constexpr float kGdnRmsEps = 1.0e-6f;
     std::uint32_t language_layer);
 
 struct GdnWeightBinding {
-  TensorView codes{};
-  TensorView scales{};
+  ConstTensorView codes{};
+  ConstTensorView scales{};
   std::uint16_t layout{};
   std::uint16_t quantizer{};
   std::uint32_t n{};
@@ -62,10 +62,10 @@ struct GdnFrontPlan {
   GdnWeightBinding z{};
   GdnWeightBinding a_proj{};
   GdnWeightBinding b_proj{};
-  TensorView gamma{};
-  TensorView taps{};       // BF16 tap-major [4,10240]
-  TensorView a_log{};      // BF16 [48]
-  TensorView dt_bias{};    // BF16 [48]
+  ConstTensorView gamma{};
+  ConstTensorView taps{};       // BF16 tap-major [4,10240]
+  ConstTensorView a_log{};      // BF16 [48]
+  ConstTensorView dt_bias{};    // BF16 [48]
   TensorView residual{};   // FP32 h, decode token 0
   TensorView normalized{}; // BF16 [5120]
   GdnWorkspaceViews scratch{};
@@ -78,19 +78,19 @@ struct GdnFrontPlan {
 };
 
 struct GdnFrontBindViews {
-  TensorView qkv{};
-  TensorView qkv_scales{};
-  TensorView z{};
-  TensorView z_scales{};
-  TensorView a{};
-  TensorView b{};
-  TensorView gamma{};
-  TensorView taps{};
-  TensorView a_log{};
-  TensorView dt_bias{};
+  ConstTensorView qkv{};
+  ConstTensorView qkv_scales{};
+  ConstTensorView z{};
+  ConstTensorView z_scales{};
+  ConstTensorView a{};
+  ConstTensorView b{};
+  ConstTensorView gamma{};
+  ConstTensorView taps{};
+  ConstTensorView a_log{};
+  ConstTensorView dt_bias{};
   TensorView residual{};
   TensorView normalized{};
-  TensorView workspace{};
+  WorkspaceView workspace{};
   TensorView history{};
   std::uint32_t* host_cursor{nullptr};
   std::uint32_t language_layer{};
@@ -108,7 +108,7 @@ struct GdnFrontBindViews {
 [[nodiscard]] std::string gdn_dt_name(std::uint32_t layer);
 
 [[nodiscard]] std::expected<GdnWorkspaceViews, Error> bind_gdn_workspace(
-    TensorView workspace);
+    WorkspaceView workspace);
 
 [[nodiscard]] std::expected<GdnFrontPlan, Error> bind_gdn_front_plan(
     GdnFrontBindViews const& views, qw38::cuda::Stream const& stream,
@@ -168,23 +168,23 @@ struct GdnRegionTimings {
 };
 
 struct GdnBindViews {
-  TensorView qkv{};
-  TensorView qkv_scales{};
-  TensorView z{};
-  TensorView z_scales{};
-  TensorView a{};
-  TensorView b{};
-  TensorView out{};
-  TensorView out_scales{};
-  TensorView gamma{};
-  TensorView gated_gamma{};
-  TensorView taps{};
-  TensorView a_log{};
-  TensorView dt_bias{};
+  ConstTensorView qkv{};
+  ConstTensorView qkv_scales{};
+  ConstTensorView z{};
+  ConstTensorView z_scales{};
+  ConstTensorView a{};
+  ConstTensorView b{};
+  ConstTensorView out{};
+  ConstTensorView out_scales{};
+  ConstTensorView gamma{};
+  ConstTensorView gated_gamma{};
+  ConstTensorView taps{};
+  ConstTensorView a_log{};
+  ConstTensorView dt_bias{};
   TensorView residual{};
   TensorView residual_out{};
   TensorView normalized{};
-  TensorView workspace{};
+  WorkspaceView workspace{};
   TensorView history{};
   TensorView s{};
   std::uint32_t* host_cursor{nullptr};
@@ -194,7 +194,7 @@ struct GdnBindViews {
 struct GdnPlan {
   GdnFrontPlan front{};
   GdnWeightBinding out{};
-  TensorView gated_gamma{};   // BF16 [128], multiplicative
+  ConstTensorView gated_gamma{};   // BF16 [128], multiplicative
   TensorView residual_out{};  // FP32 h_mid; original residual stays live
   TensorView s{};             // FP32 session S
   std::uint32_t s_layer{};

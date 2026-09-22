@@ -109,29 +109,30 @@ MlpBindViews dummy_ok_views() {
 void test_bind_alias_errors(Stream const& stream) {
   struct ViewField {
     char const* name;
-    qw38::runtime::TensorView MlpBindViews::*member;
+    void const* (*get)(MlpBindViews const&);
+    void (*set)(MlpBindViews&, void*);
   };
+#define VIEW_FIELD(member)                                                   \
+  ViewField {                                                               \
+    #member,                                                               \
+        [](MlpBindViews const& v) -> void const* { return v.member.pointer; }, \
+        [](MlpBindViews& v, void* pointer) { v.member.pointer = pointer; }   \
+  }
   constexpr std::array fields{
-      ViewField{"gate", &MlpBindViews::gate},
-      ViewField{"gate_scales", &MlpBindViews::gate_scales},
-      ViewField{"up", &MlpBindViews::up},
-      ViewField{"up_scales", &MlpBindViews::up_scales},
-      ViewField{"down", &MlpBindViews::down},
-      ViewField{"down_scales", &MlpBindViews::down_scales},
-      ViewField{"gamma", &MlpBindViews::gamma},
-      ViewField{"h_mid", &MlpBindViews::h_mid},
-      ViewField{"next_h", &MlpBindViews::next_h},
-      ViewField{"normalized", &MlpBindViews::normalized},
-      ViewField{"swiglu", &MlpBindViews::swiglu},
+      VIEW_FIELD(gate),       VIEW_FIELD(gate_scales), VIEW_FIELD(up),
+      VIEW_FIELD(up_scales),  VIEW_FIELD(down),        VIEW_FIELD(down_scales),
+      VIEW_FIELD(gamma),      VIEW_FIELD(h_mid),       VIEW_FIELD(next_h),
+      VIEW_FIELD(normalized), VIEW_FIELD(swiglu),
   };
+#undef VIEW_FIELD
 
   for (std::size_t i = 0; i < fields.size(); ++i) {
     for (std::size_t j = i + 1; j < fields.size(); ++j) {
       for (std::uintptr_t offset : {std::uintptr_t{0}, std::uintptr_t{16}}) {
         auto views = dummy_ok_views();
-        auto const base = reinterpret_cast<std::uintptr_t>(
-            (views.*fields[i].member).pointer);
-        (views.*fields[j].member).pointer = dummy_ptr(base + offset);
+        auto const base =
+            reinterpret_cast<std::uintptr_t>(fields[i].get(views));
+        fields[j].set(views, dummy_ptr(base + offset));
         auto got = bind_mlp_plan(views, stream);
         expect(!got &&
                    got.error().code == qw38::runtime::ErrorCode::InvalidArgument,
@@ -191,12 +192,6 @@ void test_bind_errors(Stream const& stream) {
   auto bad_mix = bind_mlp_plan(mix, stream);
   expect(!bad_mix && bad_mix.error().code == qw38::runtime::ErrorCode::InvalidArgument,
          "mixed Q4/BF16 family rejects");
-
-  auto nowrite = views;
-  nowrite.next_h.writable = false;
-  auto bad_res = bind_mlp_plan(nowrite, stream);
-  expect(!bad_res && bad_res.error().code == qw38::runtime::ErrorCode::InvalidArgument,
-         "non-writable next residual rejects");
 
   auto small = views;
   small.swiglu.extent[0] = 8;

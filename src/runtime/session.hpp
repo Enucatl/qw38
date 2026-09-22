@@ -49,7 +49,7 @@ class Session {
   [[nodiscard]] TensorView kv() const noexcept;
   [[nodiscard]] TensorView residual_h() const noexcept;
   [[nodiscard]] TensorView residual_h_mid() const noexcept;
-  [[nodiscard]] std::expected<TensorView, Error> scratch(
+  [[nodiscard]] std::expected<WorkspaceView, Error> scratch(
       qw38::format::ScratchKind kind) const;
 
   [[nodiscard]] std::uint64_t kv_capacity() const noexcept { return kv_capacity_; }

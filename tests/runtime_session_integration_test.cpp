@@ -11,6 +11,7 @@
 #include <fstream>
 #include <iostream>
 #include <string_view>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -21,6 +22,11 @@ using qw38::runtime::kMaxKvCapacity;
 using qw38::runtime::Runtime;
 using qw38::runtime::Session;
 using qw38::runtime::test::write_language_fixture;
+
+static_assert(!std::is_convertible_v<qw38::runtime::ConstTensorView,
+                                     qw38::runtime::TensorView>);
+static_assert(!std::is_invocable_v<void (*)(qw38::runtime::TensorView),
+                                   qw38::runtime::ConstTensorView>);
 
 namespace {
 
@@ -86,7 +92,7 @@ int main() {
   }
   auto payload = model->payload("v");
   expect(static_cast<bool>(payload) && payload->pointer != nullptr &&
-             !payload->writable && payload->rank == 1 && payload->extent[0] == 4,
+             payload->rank == 1 && payload->extent[0] == 4,
          "immutable model tensor view");
   std::vector<std::byte> uploaded(8);
   expect(static_cast<bool>(
@@ -171,6 +177,25 @@ int main() {
   auto attn = s1->scratch(qw38::format::ScratchKind::AttentionWorkspace);
   expect(mixer && attn && mixer->pointer == attn->pointer,
          "stable mixer reuse addresses");
+  expect(mixer && mixer->region_count == 11 &&
+             mixer->region[0].offset == qw38::runtime::kGdnOffQkv &&
+             mixer->region[0].bytes == qw38::runtime::kGdnBytesQkv &&
+             mixer->region[0].stride_bytes ==
+                 qw38::runtime::kGdnWorkspaceBytesPerToken &&
+             mixer->region[0].repetitions ==
+                 qw38::runtime::kArenaTokenCapacity &&
+             mixer->region[0].tensor.dtype ==
+                 qw38::format::ArithmeticDtype::Bf16 &&
+             mixer->region[3].tensor.dtype ==
+                 qw38::format::ArithmeticDtype::Fp32,
+         "GDN workspace reports mixed typed regions");
+  expect(attn && attn->region_count == 6 &&
+             attn->region[5].offset == qw38::runtime::kAttnOffPartials &&
+             attn->region[0].tensor.dtype ==
+                 qw38::format::ArithmeticDtype::Bf16 &&
+             attn->region[5].tensor.dtype ==
+                 qw38::format::ArithmeticDtype::Fp32,
+         "attention workspace reports mixed typed regions");
   expect(scratch_addr != mixer->pointer, "normalized distinct from mixer");
 
   auto snap = s1->save();

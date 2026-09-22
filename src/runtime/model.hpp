@@ -49,9 +49,9 @@ class Model {
 
   [[nodiscard]] qw38::format::TensorRecord const* find_tensor(
       std::string_view logical_name) const noexcept;
-  [[nodiscard]] std::expected<TensorView, Error> payload(
+  [[nodiscard]] std::expected<ConstTensorView, Error> payload(
       std::string_view logical_name) const;
-  [[nodiscard]] std::expected<TensorView, Error> scales(
+  [[nodiscard]] std::expected<ConstTensorView, Error> scales(
       std::string_view logical_name) const;
 
   [[nodiscard]] std::uint64_t device_bytes() const noexcept { return device_bytes_; }
@@ -66,8 +66,8 @@ class Model {
 
   struct UploadedTensor {
     std::uint32_t tensor_id{};
-    TensorView payload{};
-    TensorView scales{};
+    ConstTensorView payload{};
+    ConstTensorView scales{};
   };
 
   qw38::format::ArtifactSchema schema_{};

@@ -40,7 +40,8 @@ Error arg_error(std::string_view field, std::string_view detail) {
   return make_error(ErrorCode::InvalidArgument, field, detail);
 }
 
-std::uint64_t element_count(TensorView const& v) noexcept {
+template <typename Pointer>
+std::uint64_t element_count(BasicTensorView<Pointer> const& v) noexcept {
   if (v.rank == 0) {
     return 0;
   }
@@ -67,9 +68,6 @@ std::expected<void, Error> validate_gdn_state_view(TensorView const& s) {
   if (s.storage != StorageClass::Fp32) {
     return std::unexpected(arg_error("s", "S storage must be fp32"));
   }
-  if (!s.writable) {
-    return std::unexpected(arg_error("s", "view must be writable"));
-  }
   if (s.rank > qw38::format::kMaxRank) {
     return std::unexpected(arg_error("s", "rank exceeds maximum"));
   }
@@ -92,14 +90,6 @@ std::expected<void, Error> validate_gdn_state_view(TensorView const& s) {
   return {};
 }
 
-std::uint64_t view_bytes(TensorView const& v) noexcept {
-  auto const n = element_count(v);
-  if (v.dtype == ArithmeticDtype::Fp32) {
-    return n * qw38::format::kFp32Size;
-  }
-  return n * qw38::format::kBf16Size;
-}
-
 bool q4_or_bf16_tile(PhysicalLayoutId layout) noexcept {
   return layout == PhysicalLayoutId::CudaQ4G64V0 ||
          layout == PhysicalLayoutId::CudaBf16DenseTileV0;
@@ -112,9 +102,11 @@ std::uint16_t quantizer_for(PhysicalLayoutId layout) noexcept {
   return kDecodeQuantizerNone;
 }
 
-std::expected<TensorView, Error> as_vector(TensorView v, std::uint64_t elems,
-                                           ArithmeticDtype dtype, bool writable,
-                                           std::string_view field) {
+template <typename Pointer>
+std::expected<BasicTensorView<Pointer>, Error> as_vector(
+    BasicTensorView<Pointer> v, std::uint64_t elems, ArithmeticDtype dtype,
+    bool writable, std::string_view field) {
+  (void)writable;
   if (v.pointer == nullptr) {
     return std::unexpected(arg_error(field, "null view"));
   }
@@ -123,9 +115,6 @@ std::expected<TensorView, Error> as_vector(TensorView v, std::uint64_t elems,
   }
   if (v.dtype != dtype) {
     return std::unexpected(arg_error(field, "dtype mismatch"));
-  }
-  if (writable && !v.writable) {
-    return std::unexpected(arg_error(field, "view must be writable"));
   }
   if (v.rank == 0 || element_count(v) < elems) {
     return std::unexpected(arg_error(field, "view is smaller than decode extent"));
@@ -136,8 +125,8 @@ std::expected<TensorView, Error> as_vector(TensorView v, std::uint64_t elems,
   return v;
 }
 
-std::expected<GdnWeightBinding, Error> bind_q4_or_bf16(TensorView codes,
-                                                       TensorView scales,
+std::expected<GdnWeightBinding, Error> bind_q4_or_bf16(ConstTensorView codes,
+                                                       ConstTensorView scales,
                                                        std::uint32_t want_n,
                                                        std::uint32_t want_k,
                                                        std::string_view field) {
@@ -192,7 +181,7 @@ std::expected<GdnWeightBinding, Error> bind_q4_or_bf16(TensorView codes,
   return b;
 }
 
-std::expected<GdnWeightBinding, Error> bind_ab_bf16(TensorView codes,
+std::expected<GdnWeightBinding, Error> bind_ab_bf16(ConstTensorView codes,
                                                     std::string_view field) {
   if (codes.pointer == nullptr) {
     return std::unexpected(arg_error(field, "null codes"));
@@ -232,19 +221,21 @@ DecodeMmvDesc mmv_from_weight(GdnWeightBinding const& w) {
   DecodeDtype const dtype =
       w.layout == qw38::cuda::kDecodeLayoutQ4G64V0 ? DecodeDtype::Q4
                                                    : DecodeDtype::Bf16;
-  d.codes = decode_matrix_view(w.codes.pointer, dtype, w.layout, w.n, w.k,
+  d.codes = decode_matrix_view(const_cast<void*>(w.codes.pointer), dtype,
+                               w.layout, w.n, w.k,
                                w.padded_n, w.padded_k, w.codes_bytes, 16);
   if (w.scales_bytes != 0) {
     d.scales = decode_matrix_view(
-        w.scales.pointer, DecodeDtype::Fp16, w.layout, w.padded_n,
+        const_cast<void*>(w.scales.pointer), DecodeDtype::Fp16, w.layout,
+        w.padded_n,
         w.padded_k / 64u, w.padded_n, w.padded_k / 64u,
         w.scales_bytes, 2);
   }
   return d;
 }
 
-std::expected<TensorView, Error> require_payload(Model const& model,
-                                                 std::string const& name) {
+std::expected<ConstTensorView, Error> require_payload(
+    Model const& model, std::string const& name) {
   auto v = model.payload(name);
   if (!v) {
     return std::unexpected(v.error());
@@ -252,11 +243,10 @@ std::expected<TensorView, Error> require_payload(Model const& model,
   return *v;
 }
 
-std::expected<TensorView, Error> optional_scales(Model const& model,
-                                                 std::string const& name,
-                                                 PhysicalLayoutId layout) {
+std::expected<ConstTensorView, Error> optional_scales(
+    Model const& model, std::string const& name, PhysicalLayoutId layout) {
   if (layout == PhysicalLayoutId::CudaBf16DenseTileV0) {
-    return TensorView{};
+    return ConstTensorView{};
   }
   auto v = model.scales(name);
   if (!v) {
@@ -274,7 +264,7 @@ TensorView overlay(std::byte* base, std::uint64_t off, ArithmeticDtype dtype,
   v.layout = layout;
   v.storage = storage;
   v.space = MemorySpace::Device;
-  v.writable = writable;
+  (void)writable;
   v.rank = rank;
   v.extent[0] = e0;
   v.extent[1] = e1;
@@ -457,21 +447,19 @@ std::string gdn_dt_name(std::uint32_t layer) {
   return out.str();
 }
 
-std::expected<GdnWorkspaceViews, Error> bind_gdn_workspace(TensorView workspace) {
+std::expected<GdnWorkspaceViews, Error> bind_gdn_workspace(
+    WorkspaceView workspace) {
   if (workspace.pointer == nullptr) {
     return std::unexpected(arg_error("workspace", "null view"));
   }
   if (workspace.space != MemorySpace::Device) {
     return std::unexpected(arg_error("workspace", "view must be device memory"));
   }
-  if (!workspace.writable) {
-    return std::unexpected(arg_error("workspace", "view must be writable"));
-  }
-  if (view_bytes(workspace) < kGdnWorkspaceBytesPerToken) {
+  if (workspace.bytes < kGdnWorkspaceBytesPerToken) {
     return std::unexpected(
         arg_error("workspace", "GdnWorkspace must be 107264 bytes per token"));
   }
-  auto* base = static_cast<std::byte*>(workspace.pointer);
+  auto* base = workspace.pointer;
   GdnWorkspaceViews v;
   v.qkv = overlay(base, kGdnOffQkv, ArithmeticDtype::Bf16,
                   PhysicalLayoutId::CudaBf16RowMajorV0, StorageClass::Bf16, true, 1,
@@ -596,7 +584,7 @@ std::expected<GdnFrontPlan, Error> bind_gdn_front_plan(
   if (views.history.pointer == nullptr || views.history.space != MemorySpace::Device) {
     return std::unexpected(arg_error("history", "history view required"));
   }
-  if (!views.history.writable || views.history.dtype != ArithmeticDtype::Bf16) {
+  if (views.history.dtype != ArithmeticDtype::Bf16) {
     return std::unexpected(arg_error("history", "history must be writable BF16"));
   }
   if (element_count(views.history) <
@@ -737,7 +725,7 @@ std::expected<GdnFrontPlan, Error> bind_gdn_front_plan(
   views.a_log = *alog;
   views.dt_bias = *dt;
   views.residual = session.residual_h();
-  views.normalized = *normalized;
+  views.normalized = normalized->region[0].tensor;
   views.workspace = *workspace;
   views.history = history;
   views.host_cursor = *cursor;
@@ -825,7 +813,6 @@ std::expected<GdnRecurrencePlan, Error> bind_gdn_recurrence_plan(
   plan.beta = *beta;
   plan.v = *v;
   plan.s = views.s;
-  plan.s.writable = true;
   plan.o = *o;
   plan.s_layer = *idx;
   plan.language_layer = views.language_layer;
@@ -948,7 +935,6 @@ std::expected<GdnPlan, Error> bind_gdn_plan(GdnBindViews const& views,
   plan.gated_gamma = *gated;
   plan.residual_out = *residual_out;
   plan.s = views.s;
-  plan.s.writable = true;
   plan.s_layer = plan.front.gdn_layer;
   return plan;
 }

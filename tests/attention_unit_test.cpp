@@ -221,7 +221,7 @@ void test_bind_errors(Stream const& stream) {
   expect(!bind_attention_prep_plan(bad_scale_storage, stream),
          "Q4 scales require grouped storage");
   auto bad_workspace = views;
-  bad_workspace.workspace.storage = StorageClass::Bf16;
+  bad_workspace.workspace.bytes = 1;
   expect(!bind_attention_prep_plan(bad_workspace, stream),
          "workspace requires FP32 storage contract");
   auto bad_kv_layout = views;
@@ -233,7 +233,8 @@ void test_bind_errors(Stream const& stream) {
   expect(!bind_attention_prep_plan(misaligned, stream),
          "misaligned residual rejects");
   auto misaligned_workspace = views;
-  misaligned_workspace.workspace.pointer = dummy_ptr(0x01000004);
+  misaligned_workspace.workspace.pointer =
+      static_cast<std::byte*>(dummy_ptr(0x01000004));
   expect(!bind_attention_prep_plan(misaligned_workspace, stream),
          "misaligned workspace rejects");
   auto overlap_normalized = views;

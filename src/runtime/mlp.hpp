@@ -21,8 +21,8 @@ inline constexpr float kMlpRmsEps = 1.0e-6f;
 // input/output residual views, two scratch views, and one ordered stream.
 // execute_decode_mlp allocates nothing.
 struct MlpWeightBinding {
-  TensorView codes{};
-  TensorView scales{};
+  ConstTensorView codes{};
+  ConstTensorView scales{};
   std::uint16_t layout{};
   std::uint16_t quantizer{};
   std::uint32_t n{};
@@ -37,7 +37,7 @@ struct MlpPlan {
   MlpWeightBinding gate{};
   MlpWeightBinding up{};
   MlpWeightBinding down{};
-  TensorView gamma{};
+  ConstTensorView gamma{};
   TensorView h_mid{};        // FP32 input, preserved through the down add
   TensorView next_h{};       // FP32 output: h_mid + down projection
   TensorView normalized{};   // BF16 [5120]
@@ -47,13 +47,13 @@ struct MlpPlan {
 };
 
 struct MlpBindViews {
-  TensorView gate{};
-  TensorView gate_scales{};
-  TensorView up{};
-  TensorView up_scales{};
-  TensorView down{};
-  TensorView down_scales{};
-  TensorView gamma{};
+  ConstTensorView gate{};
+  ConstTensorView gate_scales{};
+  ConstTensorView up{};
+  ConstTensorView up_scales{};
+  ConstTensorView down{};
+  ConstTensorView down_scales{};
+  ConstTensorView gamma{};
   TensorView h_mid{};
   TensorView next_h{};
   TensorView normalized{};

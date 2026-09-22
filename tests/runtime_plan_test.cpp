@@ -87,6 +87,8 @@ int main() {
       expect(gdn->bytes == kGdnWorkspaceBytesPerToken, "GDN workspace size");
       expect(attn->bytes == kAttentionWorkspaceBytesPerToken,
              "attention workspace size");
+      expect(!gdn->dtype && !attn->dtype,
+             "mixed workspaces are composite byte arenas");
       expect(sw->offset == gdn->offset, "SwiGLU reuses mixer lifetime");
       expect(logits->offset == gdn->offset, "logits reuse mixer lifetime");
       expect(norm->offset != gdn->offset, "normalized stays live across mixer");

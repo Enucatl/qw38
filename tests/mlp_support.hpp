@@ -66,7 +66,7 @@ inline TensorView make_view(void* ptr, qw38::format::ArithmeticDtype dtype,
   v.layout = layout;
   v.storage = storage;
   v.space = MemorySpace::Device;
-  v.writable = writable;
+  (void)writable;
   v.rank = rank;
   v.extent[0] = e0;
   v.extent[1] = e1;

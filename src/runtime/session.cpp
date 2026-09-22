@@ -23,7 +23,6 @@ TensorView view_from_buffer(qw38::cuda::DeviceBuffer const& buf,
   v.layout = layout;
   v.storage = storage;
   v.space = MemorySpace::Device;
-  v.writable = true;
   v.rank = rank;
   v.extent = extent;
   return v;
@@ -324,7 +323,7 @@ TensorView Session::residual_h_mid() const noexcept {
                           extent2(kArenaTokenCapacity, kHidden));
 }
 
-std::expected<TensorView, Error> Session::scratch(
+std::expected<WorkspaceView, Error> Session::scratch(
     qw38::format::ScratchKind kind) const {
   auto const* p = find_placement(arena_, kind);
   if (p == nullptr) {
@@ -336,22 +335,90 @@ std::expected<TensorView, Error> Session::scratch(
     return std::unexpected(
         make_error(ErrorCode::Internal, "scratch", "placement exceeds arena"));
   }
-  TensorView v{};
-  v.pointer = const_cast<std::byte*>(scratch_.as_bytes()) + p->offset;
-  v.dtype = p->dtype;
-  v.layout = qw38::format::PhysicalLayoutId::CudaBf16RowMajorV0;
-  if (p->dtype == qw38::format::ArithmeticDtype::Fp32) {
-    v.layout = qw38::format::PhysicalLayoutId::CudaFp32VectorV0;
-    v.storage = qw38::format::StorageClass::Fp32;
-  } else {
-    v.storage = qw38::format::StorageClass::Bf16;
+  WorkspaceView workspace{};
+  workspace.pointer =
+      const_cast<std::byte*>(scratch_.as_bytes()) + p->offset;
+  workspace.bytes = p->bytes;
+  workspace.kind = kind;
+
+  auto add_region = [&](std::uint64_t offset, std::uint64_t bytes,
+                        qw38::format::ArithmeticDtype dtype,
+                        std::uint8_t rank, std::uint64_t e0,
+                        std::uint64_t e1 = 0) {
+    auto& region = workspace.region[workspace.region_count++];
+    region.offset = offset;
+    region.bytes = bytes;
+    region.stride_bytes = bytes;
+    if (kind == qw38::format::ScratchKind::GdnWorkspace) {
+      region.stride_bytes = kGdnWorkspaceBytesPerToken;
+      region.repetitions = p->bytes / kGdnWorkspaceBytesPerToken;
+    }
+    auto& v = region.tensor;
+    v.pointer = workspace.pointer + offset;
+    v.dtype = dtype;
+    v.layout = dtype == qw38::format::ArithmeticDtype::Fp32
+                   ? qw38::format::PhysicalLayoutId::CudaFp32VectorV0
+                   : qw38::format::PhysicalLayoutId::CudaBf16RowMajorV0;
+    v.storage = dtype == qw38::format::ArithmeticDtype::Fp32
+                    ? qw38::format::StorageClass::Fp32
+                    : qw38::format::StorageClass::Bf16;
+    v.rank = rank;
+    v.extent[0] = e0;
+    v.extent[1] = e1;
+  };
+
+  if (kind == qw38::format::ScratchKind::GdnWorkspace) {
+    add_region(kGdnOffQkv, kGdnBytesQkv,
+               qw38::format::ArithmeticDtype::Bf16, 1, kConvChannels);
+    add_region(kGdnOffZ, kGdnBytesZ, qw38::format::ArithmeticDtype::Bf16, 2,
+               kGdnValueHeads, kGdnValueDim);
+    add_region(kGdnOffConvolved, kGdnBytesConvolved,
+               qw38::format::ArithmeticDtype::Bf16, 1, kConvChannels);
+    add_region(kGdnOffQHat, kGdnBytesQHat,
+               qw38::format::ArithmeticDtype::Fp32, 2, kGdnKeyHeads,
+               kGdnKeyDim);
+    add_region(kGdnOffKHat, kGdnBytesKHat,
+               qw38::format::ArithmeticDtype::Fp32, 2, kGdnKeyHeads,
+               kGdnKeyDim);
+    add_region(kGdnOffA, kGdnBytesGate, qw38::format::ArithmeticDtype::Fp32,
+               1, kGdnValueHeads);
+    add_region(kGdnOffB, kGdnBytesGate, qw38::format::ArithmeticDtype::Fp32,
+               1, kGdnValueHeads);
+    add_region(kGdnOffAlpha, kGdnBytesGate,
+               qw38::format::ArithmeticDtype::Fp32, 1, kGdnValueHeads);
+    add_region(kGdnOffBeta, kGdnBytesGate,
+               qw38::format::ArithmeticDtype::Fp32, 1, kGdnValueHeads);
+    add_region(kGdnOffO, kGdnBytesO, qw38::format::ArithmeticDtype::Fp32, 2,
+               kGdnValueHeads, kGdnValueDim);
+    add_region(kGdnOffU, kGdnBytesU, qw38::format::ArithmeticDtype::Bf16, 2,
+               kGdnValueHeads, kGdnValueDim);
+    return workspace;
   }
-  v.space = MemorySpace::Device;
-  v.writable = true;
-  v.rank = 1;
-  auto const elem = qw38::format::element_size(p->dtype);
-  v.extent[0] = elem == 0 ? p->bytes : p->bytes / elem;
-  return v;
+  if (kind == qw38::format::ScratchKind::AttentionWorkspace) {
+    add_region(kAttnOffQg, kAttnBytesQg,
+               qw38::format::ArithmeticDtype::Bf16, 2, kQueryHeads,
+               2u * kHeadDim);
+    add_region(kAttnOffK, kAttnBytesK, qw38::format::ArithmeticDtype::Bf16, 2,
+               kKvHeads, kHeadDim);
+    add_region(kAttnOffV, kAttnBytesV, qw38::format::ArithmeticDtype::Bf16, 2,
+               kKvHeads, kHeadDim);
+    add_region(kAttnOffQ, kAttnBytesQ, qw38::format::ArithmeticDtype::Bf16, 2,
+               kQueryHeads, kHeadDim);
+    add_region(kAttnOffG, kAttnBytesG, qw38::format::ArithmeticDtype::Bf16, 2,
+               kQueryHeads, kHeadDim);
+    add_region(kAttnOffPartials, p->bytes - kAttnOffPartials,
+               qw38::format::ArithmeticDtype::Fp32, 1,
+               (p->bytes - kAttnOffPartials) / qw38::format::kFp32Size);
+    return workspace;
+  }
+
+  if (!p->dtype) {
+    return std::unexpected(make_error(
+        ErrorCode::Internal, "scratch", "composite workspace metadata missing"));
+  }
+  add_region(0, p->bytes, *p->dtype, 1,
+             p->bytes / qw38::format::element_size(*p->dtype));
+  return workspace;
 }
 
 std::expected<void, Error> Session::set_populated_length(

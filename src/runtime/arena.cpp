@@ -258,20 +258,24 @@ std::expected<std::vector<ScratchRequest>, Error> v0_scratch_requests(
       !st) {
     return std::unexpected(st.error());
   }
-  if (auto st = add(ScratchKind::GdnWorkspace, ArithmeticDtype::Fp32,
-                    kGdnWorkspaceBytesPerToken,
-                    {{KernelStage::Mixer, KernelStage::MixerOutput}}, 1,
-                    "scratch.gdn");
-      !st) {
-    return std::unexpected(st.error());
+  auto gdn_bytes = scale(kGdnWorkspaceBytesPerToken, "scratch.gdn");
+  if (!gdn_bytes) {
+    return std::unexpected(gdn_bytes.error());
   }
+  out.push_back(ScratchRequest{
+      .kind = ScratchKind::GdnWorkspace,
+      .dtype = std::nullopt,
+      .bytes = *gdn_bytes,
+      .live = {{KernelStage::Mixer, KernelStage::MixerOutput}},
+      .exclusive_group = 1,
+  });
   auto attention_bytes = attn_workspace_bytes_for_capacity(attention_capacity);
   if (!attention_bytes) {
     return std::unexpected(attention_bytes.error());
   }
   out.push_back(ScratchRequest{
       .kind = ScratchKind::AttentionWorkspace,
-      .dtype = ArithmeticDtype::Fp32,
+      .dtype = std::nullopt,
       .bytes = *attention_bytes,
       .live = {{KernelStage::Mixer, KernelStage::MixerOutput}},
       .exclusive_group = 1,
