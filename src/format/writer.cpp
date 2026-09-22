@@ -8,6 +8,7 @@
 #include <array>
 #include <cerrno>
 #include <cstring>
+#include <cstdlib>
 #include <fcntl.h>
 #include <limits>
 #include <string>
@@ -432,7 +433,7 @@ std::expected<ArtifactWriter, FormatError> ArtifactWriter::create(
   impl->schema = std::move(*prepared);
   impl->manifest_offset = *manifest_off;
   impl->temp_path = impl->destination;
-  impl->temp_path += ".tmp";
+  impl->temp_path += ".tmp.XXXXXX";
 
   std::error_code ec;
   auto const parent = impl->destination.parent_path();
@@ -440,14 +441,20 @@ std::expected<ArtifactWriter, FormatError> ArtifactWriter::create(
     return std::unexpected(io_error(0, "destination",
                                     "parent directory does not exist"));
   }
-  std::filesystem::remove(impl->temp_path, ec);
 
-  int const raw = ::open(impl->temp_path.c_str(),
-                         O_CREAT | O_EXCL | O_WRONLY | O_CLOEXEC, 0644);
+  std::string temp_template = impl->temp_path.string();
+  int const raw = ::mkstemp(temp_template.data());
   if (raw < 0) {
-    return std::unexpected(io_error(0, "destination", std::strerror(errno)));
+    return std::unexpected(
+        io_error(0, "temporary", std::strerror(errno)));
   }
+  impl->temp_path = std::move(temp_template);
   impl->fd = UniqueFd{raw};
+  if (::fcntl(raw, F_SETFD, FD_CLOEXEC) < 0) {
+    auto const error = io_error(0, "temporary", std::strerror(errno));
+    impl->abandon();
+    return std::unexpected(error);
+  }
 
   if (auto st = write_zeros(impl->fd.get(), 0, kHeaderSizeV0, "header"); !st) {
     impl->abandon();

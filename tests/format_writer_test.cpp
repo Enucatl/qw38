@@ -103,6 +103,24 @@ std::vector<std::byte> read_all(std::filesystem::path const& path) {
   return bytes;
 }
 
+std::size_t count_temp_files(ScratchDir const& dir,
+                             std::filesystem::path const& destination) {
+  std::size_t count = 0;
+  auto const prefix = destination.filename().string() + ".tmp.";
+  std::error_code ec;
+  for (std::filesystem::directory_iterator it(dir.path(), ec), end; it != end;
+       it.increment(ec)) {
+    if (ec) {
+      fail("iterate temporary files");
+      break;
+    }
+    if (it->path().filename().string().starts_with(prefix)) {
+      ++count;
+    }
+  }
+  return count;
+}
+
 ArtifactSchema base_schema() {
   ArtifactSchema schema{};
   schema.compiler = {.ident = "qw38", .major = 0, .minor = 1, .patch = 0};
@@ -275,8 +293,8 @@ void test_empty_duplicate_missing() {
          "missing span is rejected at finalize");
   expect(!std::filesystem::exists(dest2),
          "failed finalize does not publish destination");
-  expect(!std::filesystem::exists(dest2.string() + ".tmp"),
-         "failed finalize removes the temp file");
+  expect(count_temp_files(dir, dest2) == 0,
+         "failed finalize removes the owned temp file");
 
   auto dest3 = dir.file("incomplete.qw38");
   auto writer3 = ArtifactWriter::create(dest3, schema);
@@ -348,13 +366,13 @@ void test_failure_cleanup() {
   {
     auto writer = ArtifactWriter::create(dest, schema);
     expect(static_cast<bool>(writer), "create for destructor cleanup");
-    expect(std::filesystem::exists(dest.string() + ".tmp"),
-           "temp file exists while writer is open");
+    expect(count_temp_files(dir, dest) == 1,
+           "unique temp file exists while writer is open");
   }
   expect(!std::filesystem::exists(dest),
          "destroying an unfinalized writer leaves no destination");
-  expect(!std::filesystem::exists(dest.string() + ".tmp"),
-         "destroying an unfinalized writer removes the temp file");
+  expect(count_temp_files(dir, dest) == 0,
+         "destroying an unfinalized writer removes the owned temp file");
 
   auto writer = ArtifactWriter::create(preexisting, schema);
   expect(static_cast<bool>(writer), "create over existing dest");
@@ -364,6 +382,81 @@ void test_failure_cleanup() {
   auto kept = read_all(preexisting);
   expect(kept.size() == 3 && static_cast<char>(kept[0]) == 'O',
          "failed finalize does not replace an existing destination");
+
+  auto destination_with_temp = dir.file("preexisting-temp.qw38");
+  auto preexisting_temp = destination_with_temp.string() + ".tmp";
+  {
+    std::ofstream out(preexisting_temp, std::ios::binary);
+    out << "KEEP";
+  }
+  auto writer_with_temp =
+      ArtifactWriter::create(destination_with_temp, schema);
+  expect(static_cast<bool>(writer_with_temp),
+         "create with pre-existing temporary file");
+  expect(std::filesystem::exists(preexisting_temp),
+         "pre-existing temporary file is retained at create");
+  expect(count_temp_files(dir, destination_with_temp) == 1,
+         "writer owns one unique temporary file");
+  if (writer_with_temp) {
+    auto failed = writer_with_temp->finalize();
+    expect(!failed, "finalize with pre-existing temporary file fails missing");
+  }
+  expect(std::filesystem::exists(preexisting_temp),
+         "cleanup retains unrelated pre-existing temporary file");
+  expect(read_all(preexisting_temp).size() == 4,
+         "pre-existing temporary file contents are unchanged");
+  expect(count_temp_files(dir, destination_with_temp) == 0,
+         "owned temporary file is removed after failure");
+}
+
+void test_writer_interleaving_owns_publication() {
+  ScratchDir dir;
+  auto dest = dir.file("concurrent.qw38");
+  auto schema = base_schema();
+  schema.tensors.push_back(unplaced_bf16_vector(1, "v", 4));
+
+  auto writer_a = ArtifactWriter::create(dest, schema);
+  auto writer_b = ArtifactWriter::create(dest, schema);
+  expect(static_cast<bool>(writer_a) && static_cast<bool>(writer_b),
+         "two writers can open the same destination");
+  if (!writer_a || !writer_b) {
+    return;
+  }
+  expect(count_temp_files(dir, dest) == 2,
+         "concurrent writers receive distinct temporary files");
+
+  std::array<std::byte, 8> payload_a{};
+  payload_a.fill(std::byte{0xA1});
+  std::array<std::byte, 8> payload_b{};
+  payload_b.fill(std::byte{0xB2});
+  expect(static_cast<bool>(
+             writer_a->write_span("v", SpanKind::Payload, payload_a)),
+         "writer A writes its payload");
+
+  auto id_a = writer_a->finalize();
+  expect(static_cast<bool>(id_a), "writer A publishes its own complete file");
+  if (id_a) {
+    auto bytes = read_all(dest);
+    expect(bytes.size() == id_a->size_bytes,
+           "writer A publication has the complete artifact size");
+    expect(bytes.size() > 256 && bytes[256] == std::byte{0xA1},
+           "writer A publication contains writer A payload");
+  }
+
+  expect(static_cast<bool>(
+             writer_b->write_span("v", SpanKind::Payload, payload_b)),
+         "writer B writes its payload");
+  auto id_b = writer_b->finalize();
+  expect(static_cast<bool>(id_b), "writer B publishes its own complete file");
+  if (id_b) {
+    auto bytes = read_all(dest);
+    expect(bytes.size() == id_b->size_bytes,
+           "final destination has the complete writer B artifact");
+    expect(bytes.size() > 256 && bytes[256] == std::byte{0xB2},
+           "final destination contains writer B payload");
+  }
+  expect(count_temp_files(dir, dest) == 0,
+         "all owned temporary files are cleaned after publication");
 }
 
 void test_chunked_stream() {
@@ -401,6 +494,7 @@ int main() {
   test_empty_duplicate_missing();
   test_overflow_and_inconsistent();
   test_failure_cleanup();
+  test_writer_interleaving_owns_publication();
   test_chunked_stream();
   if (g_failures != 0) {
     std::cerr << g_failures << " format writer checks failed\n";
