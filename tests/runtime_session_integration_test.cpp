@@ -60,6 +60,17 @@ bool is_zero(std::span<std::byte const> bytes) {
       bytes, [](std::byte value) { return value == std::byte{}; });
 }
 
+bool matches_pattern(std::span<std::byte const> bytes, std::uint8_t seed) {
+  for (std::size_t i = 0; i < bytes.size(); ++i) {
+    auto const expected =
+        static_cast<std::byte>(seed + static_cast<std::uint8_t>(i));
+    if (bytes[i] != expected) {
+      return false;
+    }
+  }
+  return true;
+}
+
 struct SessionAddresses {
   void const *gdn_s{};
   void const *conv_history{};
@@ -255,9 +266,10 @@ int main() {
       static_cast<bool>(qw38::cuda::fill_pattern(
           s1->gdn_s().pointer, qw38::runtime::kGdnSBytes, 0x11, rt->stream())),
       "fill all session 1 S bytes");
-  expect(static_cast<bool>(qw38::cuda::fill_pattern(s2->gdn_s().pointer, 256,
-                                                    0x22, rt->stream())),
-         "fill session 2");
+  expect(static_cast<bool>(qw38::cuda::fill_pattern(
+             s2->gdn_s().pointer, qw38::runtime::kGdnSBytes, 0x22,
+             rt->stream())),
+         "fill all session 2 S bytes");
   expect(static_cast<bool>(qw38::cuda::fill_pattern(
              s1->conv_history().pointer, qw38::runtime::kConvHistoryBytes, 0x33,
              rt->stream())),
@@ -391,12 +403,15 @@ int main() {
          "no device allocations on session hot path");
 
   expect(s2->gdn_s().pointer != s1->gdn_s().pointer, "isolation after restore");
-  std::byte still2{};
-  expect(static_cast<bool>(qw38::cuda::copy_d2h(&still2, s2->gdn_s().pointer, 1,
-                                                rt->stream())),
-         "read s2 after s1 restore");
-  expect(static_cast<bool>(rt->stream().sync()), "sync s2");
-  expect(still2 == std::byte{0x22}, "session 2 unchanged");
+  {
+    std::vector<std::byte> still2(qw38::runtime::kGdnSBytes);
+    expect(static_cast<bool>(qw38::cuda::copy_d2h(
+               still2, s2->gdn_s().pointer, rt->stream())),
+           "read complete s2 S after s1 restore");
+    expect(static_cast<bool>(rt->stream().sync()), "sync complete s2 S");
+    expect(matches_pattern(still2, 0x22),
+           "every session 2 S byte unchanged");
+  }
 
   {
     auto const moved_addresses = addresses(*s2);

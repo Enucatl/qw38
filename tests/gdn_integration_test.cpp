@@ -8,6 +8,7 @@
 #include "runtime/runtime.hpp"
 #include "runtime_support.hpp"
 
+#include <cstring>
 #include <filesystem>
 #include <iostream>
 #include <string>
@@ -52,8 +53,6 @@ using qw38::gdn::test::kGdnRecurMultiSAbs;
 using qw38::gdn::test::kGdnRecurMultiSRel;
 using qw38::gdn::test::kGdnRecurOAbs;
 using qw38::gdn::test::kGdnRecurORel;
-using qw38::gdn::test::kGdnRecurSAbs;
-using qw38::gdn::test::kGdnRecurSRel;
 using qw38::gdn::test::kGdnSElemsPerLayer;
 using qw38::gdn::test::kGdnValueHeads;
 using qw38::gdn::test::kGdnZWidth;
@@ -219,11 +218,16 @@ bool write_gdn_artifact(std::filesystem::path const& path, HostFront const& host
   TensorRecord taps{};
   taps.tensor_id = 6;
   taps.logical_name = gdn_conv_name(0);
-  taps.shape = rank2(kConvKernel, kQkvWidth);
+  taps.shape.rank = 3;
+  taps.shape.logical[0] = kConvKernel;
+  taps.shape.logical[1] = 1;
+  taps.shape.logical[2] = kQkvWidth;
+  taps.shape.padded = taps.shape.logical;
   taps.storage = StorageClass::Bf16;
   taps.quantizer = LogicalQuantizerId::None;
   taps.layout = PhysicalLayoutId::CudaBf16TapMajorV0;
-  taps.mapping = LogicalPhysicalMapping{.kind = MappingKind::Identity};
+  taps.mapping =
+      LogicalPhysicalMapping{.kind = MappingKind::TapMajorConvC1T};
   auto alog = bf16_vec(7, gdn_alog_name(0), kGdnValueHeads,
                        PhysicalLayoutId::CudaBf16VectorV0);
   auto dt = bf16_vec(8, gdn_dt_name(0), kGdnValueHeads,
@@ -580,6 +584,7 @@ int main() {
   }
   expect_bf16_close(hist_cont, last.history, "cont history", 0.0f, 0.0f);
   expect_bf16_close(hist_snap, last.history, "snap history", 0.0f, 0.0f);
+  expect(hist_cont == hist_snap, "cont vs snap history is bitwise identical");
 
   auto s_off = gdn_s_byte_offset(0, 0, 0, 0);
   expect(static_cast<bool>(s_off), "S offset");
@@ -596,8 +601,9 @@ int main() {
     fail("S download");
     return 1;
   }
-  expect_fp32_close(state_cont, state_snap, "cont vs snap S", kGdnRecurSAbs,
-                    kGdnRecurSRel);
+  expect(std::memcmp(state_cont.data(), state_snap.data(),
+                     state_cont.size() * sizeof(state_cont.front())) == 0,
+         "cont vs snap complete layer S is bitwise identical");
   expect_fp32_close(state_cont, last.s, "cont vs cpu S", kGdnRecurMultiSAbs,
                     kGdnRecurMultiSRel);
   expect_fp32_close(state_snap, last.s, "snap vs cpu S", kGdnRecurMultiSAbs,

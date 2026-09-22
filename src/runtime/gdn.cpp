@@ -828,6 +828,10 @@ std::expected<GdnFrontPlan, Error> bind_gdn_front_plan(
   views.b = *b;
   views.gamma = *gamma;
   views.taps = *taps;
+  views.taps.rank = 2;
+  views.taps.extent = {};
+  views.taps.extent[0] = kConvKernel;
+  views.taps.extent[1] = kConvChannels;
   views.a_log = *alog;
   views.dt_bias = *dt;
   views.residual = session.residual_h();
