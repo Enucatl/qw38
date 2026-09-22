@@ -5,6 +5,7 @@
 #include "cuda/event.hpp"
 #include "cuda/stream.hpp"
 #include "runtime/error.hpp"
+#include "runtime/runtime.hpp"
 
 #include <cstdint>
 #include <iostream>
@@ -102,6 +103,26 @@ int main() {
   expect(qw38::cuda::malloc_count() == mallocs0 + 1, "destructor does not malloc");
   expect(qw38::cuda::free_count() >= 1, "destructor frees");
 
+  auto const frees_before_close = qw38::cuda::free_count();
+  auto const bytes_before_close = qw38::cuda::live_bytes();
+  auto explicitly_closed = DeviceBuffer::allocate(32);
+  expect(static_cast<bool>(explicitly_closed), "allocate explicit-close buffer");
+  if (explicitly_closed) {
+    expect(qw38::cuda::live_bytes() == bytes_before_close + 32,
+           "explicit-close allocation is live");
+    expect(static_cast<bool>(explicitly_closed->close()),
+           "explicit buffer close reports success");
+    expect(explicitly_closed->empty(), "explicit buffer close consumes ownership");
+    expect(qw38::cuda::free_count() == frees_before_close + 1,
+           "successful explicit close records one free");
+    expect(qw38::cuda::live_bytes() == bytes_before_close,
+           "successful explicit close removes live bytes");
+    expect(static_cast<bool>(explicitly_closed->close()),
+           "explicit buffer close is idempotent");
+    expect(qw38::cuda::free_count() == frees_before_close + 1,
+           "idempotent close does not record another free");
+  }
+
   auto zero = DeviceBuffer::allocate(0);
   expect(!zero && zero.error().code == ErrorCode::InvalidArgument,
          "zero-byte alloc rejected");
@@ -148,6 +169,24 @@ int main() {
     expect(static_cast<bool>(taken.sync()), "sync D2H");
     expect(static_cast<unsigned>(host[0]) == 0x10, "pattern byte 0");
     expect(static_cast<unsigned>(host[5]) == 0x15, "pattern byte 5");
+    expect(static_cast<bool>(pattern_buf->close()),
+           "pattern buffer explicit close");
+  }
+
+  expect(static_cast<bool>(ev2.close()), "explicit event close");
+  expect(ev2.empty(), "event close consumes ownership");
+  expect(static_cast<bool>(ev2.close()), "event close is idempotent");
+  expect(static_cast<bool>(taken.close()), "explicit stream close");
+  expect(taken.empty(), "stream close consumes ownership");
+  expect(static_cast<bool>(taken.close()), "stream close is idempotent");
+
+  auto runtime = qw38::runtime::Runtime::create();
+  expect(static_cast<bool>(runtime), "create Runtime for explicit shutdown");
+  if (runtime) {
+    expect(static_cast<bool>(runtime->shutdown()),
+           "Runtime shutdown reports successful stream teardown");
+    expect(static_cast<bool>(runtime->shutdown()),
+           "Runtime shutdown is idempotent");
   }
 
   if (g_failures != 0) {

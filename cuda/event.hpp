@@ -22,6 +22,10 @@ class Event {
   [[nodiscard]] static std::expected<Event, Error> create();
   [[nodiscard]] static std::expected<Event, Error> create_timing();
 
+  // Explicit teardown reports CUDA failure while consuming ownership. The
+  // destructor is non-throwing best-effort and discards this status.
+  [[nodiscard]] std::expected<void, Error> close();
+
   [[nodiscard]] cudaEvent_t native() const noexcept { return event_; }
   [[nodiscard]] bool empty() const noexcept { return event_ == nullptr; }
   [[nodiscard]] int device() const noexcept { return device_; }
@@ -32,7 +36,7 @@ class Event {
 
  private:
   Event(cudaEvent_t event, int device) noexcept : event_(event), device_(device) {}
-  void destroy() noexcept;
+  [[nodiscard]] cudaError_t destroy() noexcept;
 
   cudaEvent_t event_{nullptr};
   int device_{-1};

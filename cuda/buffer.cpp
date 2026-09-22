@@ -14,7 +14,7 @@ DeviceBuffer::DeviceBuffer(DeviceBuffer&& other) noexcept
 
 DeviceBuffer& DeviceBuffer::operator=(DeviceBuffer&& other) noexcept {
   if (this != &other) {
-    destroy();
+    (void)destroy();
     ptr_ = other.ptr_;
     bytes_ = other.bytes_;
     device_ = other.device_;
@@ -25,23 +25,32 @@ DeviceBuffer& DeviceBuffer::operator=(DeviceBuffer&& other) noexcept {
   return *this;
 }
 
-DeviceBuffer::~DeviceBuffer() { destroy(); }
+DeviceBuffer::~DeviceBuffer() { (void)destroy(); }
 
-void DeviceBuffer::destroy() noexcept {
-  if (ptr_ != nullptr) {
-    int previous = 0;
-    bool const restore =
-        cudaGetDevice(&previous) == cudaSuccess && previous != device_ &&
-        cudaSetDevice(device_) == cudaSuccess;
-    cudaFree(ptr_);
-    if (restore) {
-      (void)cudaSetDevice(previous);
-    }
-    record_free(bytes_);
-    ptr_ = nullptr;
-    bytes_ = 0;
-    device_ = -1;
+cudaError_t DeviceBuffer::destroy() noexcept {
+  if (ptr_ == nullptr) {
+    return cudaSuccess;
   }
+
+  int previous = 0;
+  bool const restore =
+      cudaGetDevice(&previous) == cudaSuccess && previous != device_ &&
+      cudaSetDevice(device_) == cudaSuccess;
+  cudaError_t const status = cudaFree(ptr_);
+  if (restore) {
+    (void)cudaSetDevice(previous);
+  }
+  if (status == cudaSuccess) {
+    record_free(bytes_);
+  }
+  ptr_ = nullptr;
+  bytes_ = 0;
+  device_ = -1;
+  return status;
+}
+
+std::expected<void, Error> DeviceBuffer::close() {
+  return check(destroy(), "cudaFree");
 }
 
 std::expected<DeviceBuffer, Error> DeviceBuffer::allocate(std::uint64_t bytes) {

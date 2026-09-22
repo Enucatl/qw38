@@ -28,6 +28,28 @@ std::expected<Runtime, Error> Runtime::create() {
   }
 }
 
+std::expected<void, Error> Runtime::shutdown() {
+  if (!stream_) {
+    return {};
+  }
+  if (stream_.use_count() != 1) {
+    return std::unexpected(make_error(
+        ErrorCode::InvalidArgument, "runtime.shutdown",
+        "stream is still shared by a Session or moved Runtime"));
+  }
+
+  auto synchronized = stream_->sync();
+  auto closed = stream_->close();
+  stream_.reset();
+  if (!synchronized) {
+    return std::unexpected(from_cuda(synchronized.error()));
+  }
+  if (!closed) {
+    return std::unexpected(from_cuda(closed.error()));
+  }
+  return {};
+}
+
 std::expected<Model, Error> Runtime::load(std::filesystem::path const& path) {
   auto art = qw38::format::Artifact::open(path);
   if (!art) {

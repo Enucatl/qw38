@@ -17,7 +17,7 @@ Stream::Stream(Stream&& other) noexcept
 
 Stream& Stream::operator=(Stream&& other) noexcept {
   if (this != &other) {
-    destroy();
+    (void)destroy();
     stream_ = other.stream_;
     device_ = other.device_;
     other.stream_ = nullptr;
@@ -26,21 +26,28 @@ Stream& Stream::operator=(Stream&& other) noexcept {
   return *this;
 }
 
-Stream::~Stream() { destroy(); }
+Stream::~Stream() { (void)destroy(); }
 
-void Stream::destroy() noexcept {
-  if (stream_ != nullptr) {
-    int previous = 0;
-    bool const restore =
-        cudaGetDevice(&previous) == cudaSuccess && previous != device_ &&
-        cudaSetDevice(device_) == cudaSuccess;
-    cudaStreamDestroy(stream_);
-    if (restore) {
-      (void)cudaSetDevice(previous);
-    }
-    stream_ = nullptr;
-    device_ = -1;
+cudaError_t Stream::destroy() noexcept {
+  if (stream_ == nullptr) {
+    return cudaSuccess;
   }
+
+  int previous = 0;
+  bool const restore =
+      cudaGetDevice(&previous) == cudaSuccess && previous != device_ &&
+      cudaSetDevice(device_) == cudaSuccess;
+  cudaError_t const status = cudaStreamDestroy(stream_);
+  if (restore) {
+    (void)cudaSetDevice(previous);
+  }
+  stream_ = nullptr;
+  device_ = -1;
+  return status;
+}
+
+std::expected<void, Error> Stream::close() {
+  return check(destroy(), "cudaStreamDestroy");
 }
 
 std::expected<Stream, Error> Stream::create() {

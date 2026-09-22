@@ -22,6 +22,10 @@ class Stream {
   // One ordered eager stream (cudaStreamDefault). Not non-blocking, not a graph.
   [[nodiscard]] static std::expected<Stream, Error> create();
 
+  // Explicit teardown reports CUDA failure while consuming ownership. The
+  // destructor is non-throwing best-effort and discards this status.
+  [[nodiscard]] std::expected<void, Error> close();
+
   [[nodiscard]] cudaStream_t native() const noexcept { return stream_; }
   [[nodiscard]] bool empty() const noexcept { return stream_ == nullptr; }
   [[nodiscard]] int device() const noexcept { return device_; }
@@ -32,7 +36,7 @@ class Stream {
  private:
   Stream(cudaStream_t stream, int device) noexcept
       : stream_(stream), device_(device) {}
-  void destroy() noexcept;
+  [[nodiscard]] cudaError_t destroy() noexcept;
 
   cudaStream_t stream_{nullptr};
   int device_{-1};

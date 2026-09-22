@@ -315,6 +315,39 @@ std::expected<Session, Error> Session::create(
   }
 }
 
+std::expected<void, Error> Session::shutdown() {
+  std::expected<void, qw38::cuda::Error> synchronized;
+  if (stream_) {
+    synchronized = stream_->sync();
+  }
+
+  std::expected<void, qw38::cuda::Error> first_close_error;
+  auto close = [&first_close_error](qw38::cuda::DeviceBuffer& buffer) {
+    auto status = buffer.close();
+    if (!status && first_close_error) {
+      first_close_error = std::unexpected(status.error());
+    }
+  };
+
+  // Reverse allocation order keeps the explicit path consistent with member
+  // destruction and attempts every release after an error.
+  close(scratch_);
+  close(residual_h_mid_);
+  close(residual_h_);
+  close(kv_);
+  close(conv_history_);
+  close(gdn_s_);
+  stream_.reset();
+
+  if (!synchronized) {
+    return std::unexpected(from_cuda(synchronized.error()));
+  }
+  if (!first_close_error) {
+    return std::unexpected(from_cuda(first_close_error.error()));
+  }
+  return {};
+}
+
 std::expected<void, Error> Session::zero_persistent() {
   if (!stream_) {
     return std::unexpected(

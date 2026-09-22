@@ -29,6 +29,12 @@ class Runtime {
 
   [[nodiscard]] static std::expected<Runtime, Error> create();
 
+  // Synchronizes and destroys the stream with error reporting. Shutdown is
+  // rejected while a Session or moved Runtime still shares the stream.
+  // Ordinary destruction only drops this owner's reference; final CUDA
+  // teardown is best-effort and non-throwing.
+  [[nodiscard]] std::expected<void, Error> shutdown();
+
   [[nodiscard]] std::expected<Model, Error> load(std::filesystem::path const& path);
   [[nodiscard]] std::expected<Model, Error> upload(
       qw38::format::Artifact const& artifact);

@@ -25,6 +25,12 @@ class DeviceBuffer {
   [[nodiscard]] static std::expected<DeviceBuffer, Error> allocate(
       std::uint64_t bytes, int device);
 
+  // Fallible teardown for callers that need diagnostics. Ownership is consumed
+  // even on failure because CUDA may have released the allocation while
+  // reporting an earlier asynchronous error. The destructor uses the same
+  // teardown path but necessarily discards its status.
+  [[nodiscard]] std::expected<void, Error> close();
+
   [[nodiscard]] void* data() noexcept { return ptr_; }
   [[nodiscard]] void const* data() const noexcept { return ptr_; }
   [[nodiscard]] std::uint64_t bytes() const noexcept { return bytes_; }
@@ -41,7 +47,7 @@ class DeviceBuffer {
  private:
   DeviceBuffer(void* ptr, std::uint64_t bytes, int device) noexcept
       : ptr_(ptr), bytes_(bytes), device_(device) {}
-  void destroy() noexcept;
+  [[nodiscard]] cudaError_t destroy() noexcept;
 
   void* ptr_{nullptr};
   std::uint64_t bytes_{0};

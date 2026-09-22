@@ -12,7 +12,7 @@ Event::Event(Event&& other) noexcept
 
 Event& Event::operator=(Event&& other) noexcept {
   if (this != &other) {
-    destroy();
+    (void)destroy();
     event_ = other.event_;
     device_ = other.device_;
     other.event_ = nullptr;
@@ -21,21 +21,28 @@ Event& Event::operator=(Event&& other) noexcept {
   return *this;
 }
 
-Event::~Event() { destroy(); }
+Event::~Event() { (void)destroy(); }
 
-void Event::destroy() noexcept {
-  if (event_ != nullptr) {
-    int previous = 0;
-    bool const restore =
-        cudaGetDevice(&previous) == cudaSuccess && previous != device_ &&
-        cudaSetDevice(device_) == cudaSuccess;
-    cudaEventDestroy(event_);
-    if (restore) {
-      (void)cudaSetDevice(previous);
-    }
-    event_ = nullptr;
-    device_ = -1;
+cudaError_t Event::destroy() noexcept {
+  if (event_ == nullptr) {
+    return cudaSuccess;
   }
+
+  int previous = 0;
+  bool const restore =
+      cudaGetDevice(&previous) == cudaSuccess && previous != device_ &&
+      cudaSetDevice(device_) == cudaSuccess;
+  cudaError_t const status = cudaEventDestroy(event_);
+  if (restore) {
+    (void)cudaSetDevice(previous);
+  }
+  event_ = nullptr;
+  device_ = -1;
+  return status;
+}
+
+std::expected<void, Error> Event::close() {
+  return check(destroy(), "cudaEventDestroy");
 }
 
 std::expected<Event, Error> Event::create() {

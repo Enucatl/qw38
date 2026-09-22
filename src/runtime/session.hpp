@@ -91,6 +91,12 @@ class Session {
   Session(Session const&) = delete;
   Session& operator=(Session const&) = delete;
 
+  // Synchronizes pending work, releases every owned CUDA allocation, and
+  // returns the first teardown error. All resources are consumed even when an
+  // error is returned. The destructor and move assignment perform the same
+  // cleanup best-effort because they cannot report failures.
+  [[nodiscard]] std::expected<void, Error> shutdown();
+
   [[nodiscard]] std::expected<void, Error> reset();
   [[nodiscard]] std::expected<SessionSnapshot, Error> save() const;
   [[nodiscard]] std::expected<void, Error> restore(SessionSnapshot const& snap);
