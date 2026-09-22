@@ -4,7 +4,6 @@
 #include <limits>
 #include <map>
 #include <sstream>
-#include <tuple>
 #include <unordered_map>
 #include <utility>
 
@@ -225,6 +224,14 @@ bool layer_applies(FamilyIdentity const& fam, std::uint32_t layer) {
   return true;
 }
 
+bool exact_source_sharing_allowed(SourceTensor const& a,
+                                  SourceTensor const& b) noexcept {
+  // Vision payloads are outside the emitted artifact, so exact aliases among
+  // them are harmless. Every language/MTP source tensor has distinct storage;
+  // their artifact-level MTP aliases are generated separately.
+  return is_vision_tensor(a.name) && is_vision_tensor(b.name);
+}
+
 std::expected<std::uint64_t, CompilerError> source_tensor_bytes(
     SourceTensor const& tensor) {
   if (tensor.shape.empty() || tensor.shape.size() > qw38::format::kMaxRank) {
@@ -302,23 +309,50 @@ std::expected<ClassifiedCheckpoint, CompilerError> classify_source_tensors(
     }
   }
 
-  using ShareKey = std::tuple<std::string, std::uint64_t, std::uint64_t>;
-  std::map<ShareKey, std::vector<std::string>> shares;
-  for (auto const& t : tensors) {
-    if (is_vision_tensor(t.name)) {
-      continue;
+  struct SourceSpan {
+    SourceTensor const* tensor{};
+    std::uint64_t end{};
+  };
+  std::map<std::string, std::vector<SourceSpan>> spans_by_shard;
+  for (auto const& tensor : tensors) {
+    if (tensor.data_offset >
+        std::numeric_limits<std::uint64_t>::max() - tensor.nbytes) {
+      return std::unexpected(make_error(
+          CompilerErrorCode::Unrepresentable, tensor.name,
+          "source tensor interval overflows uint64"));
     }
-    shares[{t.shard, t.data_offset, t.nbytes}].push_back(t.name);
+    spans_by_shard[tensor.shard].push_back(
+        SourceSpan{.tensor = &tensor,
+                   .end = tensor.data_offset + tensor.nbytes});
   }
-  for (auto const& [key, names] : shares) {
-    if (names.size() > 1) {
-      std::ostringstream detail;
-      detail << "checkpoint tensors share storage:";
-      for (auto const& n : names) {
-        detail << ' ' << n;
+
+  for (auto& [shard, spans] : spans_by_shard) {
+    std::ranges::sort(spans, {}, [](SourceSpan const& span) {
+      return std::pair{span.tensor->data_offset, span.end};
+    });
+    for (std::size_t i = 0; i < spans.size(); ++i) {
+      auto const& current = spans[i];
+      for (std::size_t j = i; j-- > 0;) {
+        auto const& prior = spans[j];
+        if (prior.end <= current.tensor->data_offset) {
+          continue;
+        }
+        bool const exact =
+            prior.tensor->data_offset == current.tensor->data_offset &&
+            prior.end == current.end;
+        if (exact &&
+            exact_source_sharing_allowed(*prior.tensor, *current.tensor)) {
+          continue;
+        }
+        std::ostringstream detail;
+        detail << (exact ? "unexpected exact source sharing"
+                         : "overlapping source tensor intervals")
+               << " in " << shard << ": " << prior.tensor->name << " and "
+               << current.tensor->name;
+        return std::unexpected(make_error(
+            CompilerErrorCode::UnexpectedSharing, current.tensor->name,
+            detail.str()));
       }
-      return std::unexpected(make_error(CompilerErrorCode::UnexpectedSharing,
-                                        names.front(), detail.str()));
     }
   }
 

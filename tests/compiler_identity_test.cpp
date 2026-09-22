@@ -2,6 +2,7 @@
 #include "format/format.hpp"
 
 #include <cmath>
+#include <cstring>
 #include <cstdint>
 #include <filesystem>
 #include <iostream>
@@ -19,6 +20,7 @@ using qw38::compiler::is_vision_tensor;
 using qw38::compiler::kIncludedTensors;
 using qw38::compiler::parse_json_u64;
 using qw38::compiler::parse_safetensors_shape;
+using qw38::compiler::parse_shard_header;
 using qw38::compiler::parse_text_config;
 using qw38::compiler::SourceClass;
 using qw38::compiler::SourceTensor;
@@ -113,6 +115,17 @@ std::string replace_one(std::string input, std::string_view from,
   }
   input.replace(at, from.size(), to);
   return input;
+}
+
+std::vector<std::byte> safetensors_file(std::string_view header,
+                                        std::size_t payload_bytes) {
+  std::vector<std::byte> file(8 + header.size() + payload_bytes);
+  auto const size = static_cast<std::uint64_t>(header.size());
+  for (std::size_t i = 0; i < 8; ++i) {
+    file[i] = static_cast<std::byte>((size >> (8 * i)) & 0xffU);
+  }
+  std::memcpy(file.data() + 8, header.data(), header.size());
+  return file;
 }
 
 }  // namespace
@@ -255,6 +268,43 @@ int main() {
            "unrepresentable JSON integer is rejected");
   }
 
+  {
+    auto parse_header = [](std::string_view offsets, std::size_t payload = 2) {
+      std::string const header =
+          R"({"tensor":{"dtype":"BF16","shape":[1],"data_offsets":)" +
+          std::string(offsets) + "}}";
+      auto file = safetensors_file(header, payload);
+      return parse_shard_header(file, "fixture.safetensors");
+    };
+
+    auto valid = parse_header("[0,2]");
+    expect(valid && valid->size() == 1 && valid->front().nbytes == 2,
+           "valid safetensors offsets parse");
+
+    for (std::string_view offsets :
+         {"[\"0\",2]", "[false,2]", "[null,2]", "[{},2]", "[[0],2]",
+          "[0.5,2]", "[-1,2]", "[0,1.5]", "[0,-1]",
+          "[0,18446744073709551616]"}) {
+      auto malformed = parse_header(offsets);
+      expect(!malformed &&
+                 malformed.error().code == CompilerErrorCode::InvalidJson,
+             "malformed safetensors offset is a typed error");
+    }
+
+    auto reversed = parse_header("[2,0]");
+    expect(!reversed &&
+               reversed.error().code == CompilerErrorCode::ShapeMismatch,
+           "reversed safetensors interval is rejected");
+    auto out_of_file = parse_header("[0,3]");
+    expect(!out_of_file &&
+               out_of_file.error().code == CompilerErrorCode::ShapeMismatch,
+           "out-of-file safetensors interval is rejected");
+    auto huge_interval = parse_header("[0,18446744073709549568]");
+    expect(!huge_interval &&
+               huge_interval.error().code == CompilerErrorCode::ShapeMismatch,
+           "payload interval arithmetic cannot overflow");
+  }
+
   auto expected = expand_identity_table();
   expect(expected.size() == kIncludedTensors, "identity table expands to 866");
   expect(family_identity_table().size() >= 38, "family table is encoded");
@@ -370,6 +420,43 @@ int main() {
     auto got = classify_source_tensors(shared);
     expect(!got && got.error().code == CompilerErrorCode::UnexpectedSharing,
            "unexpected sharing");
+  }
+  {
+    auto overlapping = headers;
+    overlapping[1].shard = overlapping[0].shard;
+    overlapping[1].data_offset = overlapping[0].data_offset + 2;
+    auto got = classify_source_tensors(overlapping);
+    expect(!got && got.error().code == CompilerErrorCode::UnexpectedSharing,
+           "partial source tensor overlap is rejected");
+  }
+  {
+    auto contained = headers;
+    contained[1].shard = contained[0].shard;
+    contained[1].data_offset = contained[0].data_offset + 2;
+    contained[1].nbytes = 2;
+    auto got = classify_source_tensors(contained);
+    expect(!got && got.error().code == CompilerErrorCode::UnexpectedSharing,
+           "contained source tensor overlap is rejected");
+  }
+  {
+    auto vision_shared = headers;
+    auto first =
+        make_source("model.visual.shared_a.weight", {4}, off);
+    auto second =
+        make_source("model.visual.shared_b.weight", {4}, off);
+    vision_shared.push_back(std::move(first));
+    vision_shared.push_back(std::move(second));
+    auto got = classify_source_tensors(vision_shared);
+    expect(got && got->vision_excluded == 2,
+           "explicit exact sharing for excluded vision tensors is valid");
+  }
+  {
+    auto overflow = headers;
+    overflow[0].data_offset = std::numeric_limits<std::uint64_t>::max();
+    overflow[0].nbytes = 2;
+    auto got = classify_source_tensors(overflow);
+    expect(!got && got.error().code == CompilerErrorCode::Unrepresentable,
+           "source interval overflow is rejected");
   }
   {
     auto with_vision = headers;

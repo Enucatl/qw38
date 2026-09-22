@@ -76,6 +76,10 @@ struct OpenShard {
 [[nodiscard]] std::expected<std::vector<std::uint64_t>, CompilerError>
 parse_safetensors_shape(Json const& value, std::string_view field);
 
+[[nodiscard]] std::expected<std::vector<SourceTensor>, CompilerError>
+parse_shard_header(std::span<std::byte const> file,
+                   std::string const& shard_name);
+
 [[nodiscard]] std::expected<void, CompilerError> validate_architecture(
     ArchitectureConfig const& cfg);
 
