@@ -48,8 +48,10 @@ using qw38::reference::attn_split_qg;
 using qw38::reference::kv_head_for_query;
 using qw38::reference::qk_rms_norm_1p_gamma;
 using qw38::runtime::AttentionPrepBindViews;
+using qw38::runtime::AttentionMixerBindViews;
 using qw38::runtime::attn_state_index;
 using qw38::runtime::bind_attention_prep_plan;
+using qw38::runtime::bind_attention_mixer_plan;
 using qw38::runtime::bind_attention_workspace;
 using qw38::runtime::execute_decode_attention_prep;
 using qw38::runtime::is_attention_language_layer;
@@ -69,55 +71,54 @@ void* dummy_ptr(std::uintptr_t v) { return reinterpret_cast<void*>(v); }
 AttentionPrepBindViews dummy_ok_views(std::uint64_t* populated,
                                       std::uint64_t capacity) {
   AttentionPrepBindViews v;
-  auto* ws = dummy_ptr(0x100000);
-  v.qg = make_view(dummy_ptr(0x110000), ArithmeticDtype::Bf16,
+  auto* ws = dummy_ptr(0x01000000);
+  v.qg = make_view(dummy_ptr(0x10000000), ArithmeticDtype::Bf16,
                    PhysicalLayoutId::CudaQ4G64V0, StorageClass::Int4Grouped, false,
                    2, kQgWidth, kHidden);
-  v.k = make_view(dummy_ptr(0x120000), ArithmeticDtype::Bf16,
+  v.k = make_view(dummy_ptr(0x20000000), ArithmeticDtype::Bf16,
                   PhysicalLayoutId::CudaQ4G64V0, StorageClass::Int4Grouped, false, 2,
                   kAttnKvWidth, kHidden);
-  v.v = make_view(dummy_ptr(0x130000), ArithmeticDtype::Bf16,
+  v.v = make_view(dummy_ptr(0x30000000), ArithmeticDtype::Bf16,
                   PhysicalLayoutId::CudaQ4G64V0, StorageClass::Int4Grouped, false, 2,
                   kAttnKvWidth, kHidden);
   std::uint64_t const qg_scales =
       static_cast<std::uint64_t>(kQgWidth) * (kHidden / 64u);
   std::uint64_t const kv_scales =
       static_cast<std::uint64_t>(kAttnKvWidth) * (kHidden / 64u);
-  v.qg_scales = make_view(dummy_ptr(0x140000), ArithmeticDtype::Fp16,
+  v.qg_scales = make_view(dummy_ptr(0x40000000), ArithmeticDtype::Fp16,
                           PhysicalLayoutId::CudaQ4G64V0, StorageClass::Int4Grouped,
                           false, 1, qg_scales);
-  v.k_scales = make_view(dummy_ptr(0x150000), ArithmeticDtype::Fp16,
+  v.k_scales = make_view(dummy_ptr(0x50000000), ArithmeticDtype::Fp16,
                          PhysicalLayoutId::CudaQ4G64V0, StorageClass::Int4Grouped,
                          false, 1, kv_scales);
-  v.v_scales = make_view(dummy_ptr(0x160000), ArithmeticDtype::Fp16,
+  v.v_scales = make_view(dummy_ptr(0x60000000), ArithmeticDtype::Fp16,
                          PhysicalLayoutId::CudaQ4G64V0, StorageClass::Int4Grouped,
                          false, 1, kv_scales);
-  v.gamma = make_view(dummy_ptr(0x170000), ArithmeticDtype::Bf16,
+  v.gamma = make_view(dummy_ptr(0x70000000), ArithmeticDtype::Bf16,
                       PhysicalLayoutId::CudaBf16VectorV0, StorageClass::Bf16, false,
                       1, kHidden);
-  v.gamma_q = make_view(dummy_ptr(0x180000), ArithmeticDtype::Bf16,
+  v.gamma_q = make_view(dummy_ptr(0x71000000), ArithmeticDtype::Bf16,
                         PhysicalLayoutId::CudaBf16VectorV0, StorageClass::Bf16,
                         false, 1, kHeadDim);
-  v.gamma_k = make_view(dummy_ptr(0x190000), ArithmeticDtype::Bf16,
+  v.gamma_k = make_view(dummy_ptr(0x72000000), ArithmeticDtype::Bf16,
                         PhysicalLayoutId::CudaBf16VectorV0, StorageClass::Bf16,
                         false, 1, kHeadDim);
-  v.inv_freq = make_view(dummy_ptr(0x1A0000), ArithmeticDtype::Fp32,
+  v.inv_freq = make_view(dummy_ptr(0x73000000), ArithmeticDtype::Fp32,
                          PhysicalLayoutId::CudaFp32VectorV0, StorageClass::Fp32,
                          false, 1, 32);
-  v.residual = make_view(dummy_ptr(0x1B0000), ArithmeticDtype::Fp32,
+  v.residual = make_view(dummy_ptr(0x74000000), ArithmeticDtype::Fp32,
                          PhysicalLayoutId::CudaFp32VectorV0, StorageClass::Fp32, true,
-                         1, kHidden);
-  v.normalized = make_view(dummy_ptr(0x1C0000), ArithmeticDtype::Bf16,
+                         2, 1, kHidden);
+  v.normalized = make_view(dummy_ptr(0x75000000), ArithmeticDtype::Bf16,
                            PhysicalLayoutId::CudaBf16RowMajorV0, StorageClass::Bf16,
                            true, 1, kHidden);
   v.workspace = make_view(ws, ArithmeticDtype::Fp32,
                           PhysicalLayoutId::CudaFp32VectorV0, StorageClass::Fp32,
                           true, 1, kAttentionWorkspaceBytesPerToken / 4);
-  std::uint64_t const kv_elems =
-      static_cast<std::uint64_t>(16) * 2u * kKvHeads * capacity * kHeadDim;
-  v.kv = make_view(dummy_ptr(0x1D0000), ArithmeticDtype::Bf16,
-                   PhysicalLayoutId::CudaBf16KvCacheV0, StorageClass::Bf16, true, 1,
-                   kv_elems);
+  v.kv = make_view(dummy_ptr(0x76000000), ArithmeticDtype::Bf16,
+                   PhysicalLayoutId::CudaBf16KvCacheV0, StorageClass::Bf16, true, 5,
+                   16, 2);
+  v.kv.extent = {16, 2, kKvHeads, capacity, kHeadDim};
   v.host_populated = populated;
   v.kv_capacity = capacity;
   v.language_layer = 3;
@@ -199,6 +200,62 @@ void test_bind_errors(Stream const& stream) {
   auto ws = bind_attention_workspace(views.workspace);
   expect(static_cast<bool>(ws), "workspace bind");
   expect(kAttnOffQg == 0, "qg is first workspace alias");
+
+  auto bad_scale_dtype = views;
+  bad_scale_dtype.qg_scales.dtype = ArithmeticDtype::Bf16;
+  expect(!bind_attention_prep_plan(bad_scale_dtype, stream),
+         "Q4 scales require FP16 typed view");
+  auto bad_scale_layout = views;
+  bad_scale_layout.k_scales.layout = PhysicalLayoutId::CudaBf16VectorV0;
+  expect(!bind_attention_prep_plan(bad_scale_layout, stream),
+         "Q4 scales require matching physical layout");
+  auto bad_scale_storage = views;
+  bad_scale_storage.v_scales.storage = StorageClass::Bf16;
+  expect(!bind_attention_prep_plan(bad_scale_storage, stream),
+         "Q4 scales require grouped storage");
+  auto bad_workspace = views;
+  bad_workspace.workspace.storage = StorageClass::Bf16;
+  expect(!bind_attention_prep_plan(bad_workspace, stream),
+         "workspace requires FP32 storage contract");
+  auto bad_kv_layout = views;
+  bad_kv_layout.kv.layout = PhysicalLayoutId::CudaBf16RowMajorV0;
+  expect(!bind_attention_prep_plan(bad_kv_layout, stream),
+         "KV requires cache physical layout");
+  auto misaligned = views;
+  misaligned.residual.pointer = dummy_ptr(0x74000002);
+  expect(!bind_attention_prep_plan(misaligned, stream),
+         "misaligned residual rejects");
+  auto misaligned_workspace = views;
+  misaligned_workspace.workspace.pointer = dummy_ptr(0x01000004);
+  expect(!bind_attention_prep_plan(misaligned_workspace, stream),
+         "misaligned workspace rejects");
+  auto overlap_normalized = views;
+  overlap_normalized.normalized.pointer = dummy_ptr(0x74000004);
+  expect(!bind_attention_prep_plan(overlap_normalized, stream),
+         "residual and normalized offset overlap rejects");
+  auto overlap_cache = views;
+  overlap_cache.kv.pointer = dummy_ptr(0x01000010);
+  expect(!bind_attention_prep_plan(overlap_cache, stream),
+         "workspace and cache offset overlap rejects");
+
+  AttentionMixerBindViews mixer;
+  mixer.prep = views;
+  mixer.out = make_view(dummy_ptr(0x80000000), ArithmeticDtype::Bf16,
+                        PhysicalLayoutId::CudaQ4G64V0,
+                        StorageClass::Int4Grouped, false, 2, kHidden,
+                        kQueryHeads * kHeadDim);
+  mixer.out_scales = make_view(
+      dummy_ptr(0x90000000), ArithmeticDtype::Fp16,
+      PhysicalLayoutId::CudaQ4G64V0, StorageClass::Int4Grouped, false, 1,
+      static_cast<std::uint64_t>(kHidden) * (kQueryHeads * kHeadDim / 64u));
+  mixer.residual_out = make_view(dummy_ptr(0xA0000000), ArithmeticDtype::Fp32,
+                                 PhysicalLayoutId::CudaFp32VectorV0,
+                                 StorageClass::Fp32, true, 2, 1, kHidden);
+  expect(static_cast<bool>(bind_attention_mixer_plan(mixer, stream)),
+         "mixer permits only its internal Q to Y reuse");
+  mixer.residual_out.pointer = dummy_ptr(0x74000004);
+  expect(!bind_attention_mixer_plan(mixer, stream),
+         "residual and output offset overlap rejects");
 }
 
 void test_qg_ordering_and_suffix(Stream const& stream) {

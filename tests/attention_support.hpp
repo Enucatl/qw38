@@ -149,7 +149,7 @@ inline bool upload_host_attn(HostAttn const& host, DeviceAttn& dev,
   auto r = upload_vec(host.residual, stream);
   auto n = DeviceBuffer::allocate(kHidden * 2);
   auto ws = DeviceBuffer::allocate(kAttentionWorkspaceBytesPerToken);
-  auto kv_n = 2u * kKvHeads * capacity * kHeadDim * 2u;
+  auto kv_n = 16u * 2u * kKvHeads * capacity * kHeadDim * 2u;
   auto kv = DeviceBuffer::allocate(kv_n);
   if (!g || !gq || !gk || !inf || !r || !n || !ws || !kv) {
     fail("attention activation upload");
@@ -210,17 +210,19 @@ inline AttentionPrepBindViews bind_views(DeviceAttn& dev,
   v.residual = vec_view(dev.residual, ArithmeticDtype::Fp32,
                         PhysicalLayoutId::CudaFp32VectorV0, StorageClass::Fp32, true,
                         kHidden);
+  v.residual.rank = 2;
+  v.residual.extent[0] = 1;
+  v.residual.extent[1] = kHidden;
   v.normalized = vec_view(dev.normalized, ArithmeticDtype::Bf16,
                           PhysicalLayoutId::CudaBf16RowMajorV0, StorageClass::Bf16,
                           true, kHidden);
   v.workspace = vec_view(dev.workspace, ArithmeticDtype::Fp32,
                          PhysicalLayoutId::CudaFp32VectorV0, StorageClass::Fp32, true,
                          kAttentionWorkspaceBytesPerToken / 4);
-  std::uint64_t const kv_elems =
-      2u * kKvHeads * dev.capacity * kHeadDim;
   v.kv = vec_view(dev.kv, ArithmeticDtype::Bf16,
-                  PhysicalLayoutId::CudaBf16KvCacheV0, StorageClass::Bf16, true,
-                  kv_elems);
+                  PhysicalLayoutId::CudaBf16KvCacheV0, StorageClass::Bf16, true, 1);
+  v.kv.rank = 5;
+  v.kv.extent = {16, 2, kKvHeads, dev.capacity, kHeadDim};
   v.host_populated = &dev.populated;
   v.kv_capacity = dev.capacity;
   v.language_layer = language_layer;

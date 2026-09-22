@@ -12,6 +12,7 @@
 #include <limits>
 #include <sstream>
 #include <string_view>
+#include <vector>
 
 namespace qw38::runtime {
 namespace {
@@ -38,26 +39,102 @@ Error arg_error(std::string_view field, std::string_view detail) {
   return make_error(ErrorCode::InvalidArgument, field, detail);
 }
 
-std::uint64_t element_count(TensorView const& v) noexcept {
+std::expected<std::uint64_t, Error> element_count(TensorView const& v,
+                                                  std::string_view field) {
   if (v.rank == 0) {
-    return 0;
+    return std::unexpected(arg_error(field, "rank must be nonzero"));
   }
   std::uint64_t n = 1;
   for (std::uint8_t i = 0; i < v.rank; ++i) {
+    if (v.extent[i] == 0 || n > std::numeric_limits<std::uint64_t>::max() / v.extent[i]) {
+      return std::unexpected(arg_error(field, "element count overflows or is empty"));
+    }
     n *= v.extent[i];
   }
   return n;
 }
 
-std::uint64_t view_bytes(TensorView const& v) noexcept {
-  auto const n = element_count(v);
-  if (v.dtype == ArithmeticDtype::Fp32) {
-    return n * qw38::format::kFp32Size;
+std::expected<std::uint64_t, Error> view_bytes(TensorView const& v,
+                                               std::string_view field) {
+  auto n = element_count(v, field);
+  if (!n) return std::unexpected(n.error());
+  auto const size = qw38::format::element_size(v.dtype);
+  if (size == 0 || *n > std::numeric_limits<std::uint64_t>::max() / size) {
+    return std::unexpected(arg_error(field, "byte count overflows"));
   }
-  if (v.dtype == ArithmeticDtype::Fp16) {
-    return n * qw38::format::kFp16Size;
+  return *n * size;
+}
+
+std::expected<void, Error> require_alignment(TensorView const& v,
+                                             std::uint64_t alignment,
+                                             std::string_view field) {
+  auto const address = reinterpret_cast<std::uintptr_t>(v.pointer);
+  if (alignment == 0 || address % alignment != 0) {
+    return std::unexpected(arg_error(field, "view alignment is invalid"));
   }
-  return n * qw38::format::kBf16Size;
+  return {};
+}
+
+std::expected<TensorView, Error> require_view(
+    TensorView v, ArithmeticDtype dtype, PhysicalLayoutId layout,
+    StorageClass storage, bool writable, std::initializer_list<std::uint64_t> extents,
+    std::uint64_t alignment, std::string_view field) {
+  if (v.pointer == nullptr || v.space != MemorySpace::Device || v.dtype != dtype ||
+      v.layout != layout || v.storage != storage || (writable && !v.writable) ||
+      v.rank != extents.size()) {
+    return std::unexpected(arg_error(field, "typed view contract mismatch"));
+  }
+  std::size_t i = 0;
+  for (auto const extent : extents) {
+    if (v.extent[i++] != extent) {
+      return std::unexpected(arg_error(field, "typed view extent mismatch"));
+    }
+  }
+  if (auto st = require_alignment(v, alignment, field); !st) {
+    return std::unexpected(st.error());
+  }
+  if (auto bytes = view_bytes(v, field); !bytes) return std::unexpected(bytes.error());
+  return v;
+}
+
+struct ByteInterval { std::string_view name; std::uintptr_t begin; std::uintptr_t end; };
+
+std::expected<ByteInterval, Error> byte_interval(TensorView const& v,
+                                                  std::uint64_t bytes,
+                                                  std::string_view name) {
+  auto const begin = reinterpret_cast<std::uintptr_t>(v.pointer);
+  if (v.pointer == nullptr || bytes == 0 || bytes > std::numeric_limits<std::uintptr_t>::max() - begin) {
+    return std::unexpected(arg_error(name, "byte interval is invalid"));
+  }
+  return ByteInterval{name, begin, begin + static_cast<std::uintptr_t>(bytes)};
+}
+
+bool overlaps(ByteInterval const& a, ByteInterval const& b) noexcept {
+  return a.begin < b.end && b.begin < a.end;
+}
+
+std::expected<void, Error> validate_intervals(
+    std::initializer_list<std::pair<std::string_view, std::pair<TensorView, std::uint64_t>>> views,
+    bool permit_q_y = false) {
+  std::vector<ByteInterval> intervals;
+  intervals.reserve(views.size());
+  for (auto const& [name, view] : views) {
+    if (view.second == 0 && view.first.pointer == nullptr) continue;
+    auto interval = byte_interval(view.first, view.second, name);
+    if (!interval) return std::unexpected(interval.error());
+    for (auto const& prior : intervals) {
+      bool const allowed = permit_q_y &&
+          ((prior.name == "q" && interval->name == "y") ||
+           (prior.name == "y" && interval->name == "q")) &&
+          prior.begin == interval->begin && prior.end == interval->end;
+      if (overlaps(prior, *interval) && !allowed) {
+        return std::unexpected(arg_error("alias", std::string(prior.name) +
+            " overlaps " + std::string(interval->name)));
+      }
+    }
+    intervals.push_back(*interval);
+  }
+  return {};
 }
 
 bool q4_or_bf16_tile(PhysicalLayoutId layout) noexcept {
@@ -72,30 +149,6 @@ std::uint16_t quantizer_for(PhysicalLayoutId layout) noexcept {
   return kDecodeQuantizerNone;
 }
 
-std::expected<TensorView, Error> as_vector(TensorView v, std::uint64_t elems,
-                                           ArithmeticDtype dtype, bool writable,
-                                           std::string_view field) {
-  if (v.pointer == nullptr) {
-    return std::unexpected(arg_error(field, "null view"));
-  }
-  if (v.space != MemorySpace::Device) {
-    return std::unexpected(arg_error(field, "view must be device memory"));
-  }
-  if (v.dtype != dtype) {
-    return std::unexpected(arg_error(field, "dtype mismatch"));
-  }
-  if (writable && !v.writable) {
-    return std::unexpected(arg_error(field, "view must be writable"));
-  }
-  if (v.rank == 0 || element_count(v) < elems) {
-    return std::unexpected(arg_error(field, "view is smaller than decode extent"));
-  }
-  v.rank = 1;
-  v.extent = {};
-  v.extent[0] = elems;
-  return v;
-}
-
 std::expected<AttnWeightBinding, Error> bind_q4_or_bf16(TensorView codes,
                                                         TensorView scales,
                                                         std::uint32_t want_n,
@@ -104,7 +157,8 @@ std::expected<AttnWeightBinding, Error> bind_q4_or_bf16(TensorView codes,
   if (codes.pointer == nullptr) {
     return std::unexpected(arg_error(field, "null codes"));
   }
-  if (codes.space != MemorySpace::Device) {
+  if (auto st = require_alignment(codes, 16, field); !st) return std::unexpected(st.error());
+  if (codes.space != MemorySpace::Device || codes.dtype != ArithmeticDtype::Bf16) {
     return std::unexpected(arg_error(field, "codes must be device memory"));
   }
   if (codes.rank != 2 || codes.extent[0] != want_n || codes.extent[1] != want_k) {
@@ -135,7 +189,7 @@ std::expected<AttnWeightBinding, Error> bind_q4_or_bf16(TensorView codes,
   b.codes_bytes = decode_code_bytes(b.layout, b.padded_n, b.padded_k);
   b.scales_bytes = decode_scale_bytes(b.layout, b.padded_n, b.padded_k);
   if (b.scales_bytes == 0) {
-    if (scales.pointer != nullptr || element_count(scales) != 0) {
+    if (scales.pointer != nullptr || scales.rank != 0) {
       return std::unexpected(arg_error(field, "BF16 dense tile must not supply scales"));
     }
   } else {
@@ -145,7 +199,13 @@ std::expected<AttnWeightBinding, Error> bind_q4_or_bf16(TensorView codes,
     if (scales.space != MemorySpace::Device) {
       return std::unexpected(arg_error(field, "scales must be device memory"));
     }
-    if (element_count(scales) * qw38::format::kFp16Size != b.scales_bytes) {
+    if (scales.dtype != ArithmeticDtype::Fp16 || scales.layout != codes.layout ||
+        scales.storage != codes.storage || scales.rank != 1 ||
+        scales.extent[0] != b.scales_bytes / qw38::format::kFp16Size) {
+      return std::unexpected(arg_error(field, "scale typed view contract mismatch"));
+    }
+    if (auto st = require_alignment(scales, 2, field); !st) return std::unexpected(st.error());
+    if (scales.extent[0] * qw38::format::kFp16Size != b.scales_bytes) {
       return std::unexpected(arg_error(field, "scale view length does not match layout"));
     }
     b.scales = scales;
@@ -268,16 +328,16 @@ std::string attn_k_norm_name(std::uint32_t layer) {
 
 std::expected<AttnWorkspaceViews, Error> bind_attention_workspace(
     TensorView workspace) {
-  if (workspace.pointer == nullptr) {
-    return std::unexpected(arg_error("workspace", "null view"));
+  if (workspace.pointer == nullptr || workspace.space != MemorySpace::Device ||
+      workspace.dtype != ArithmeticDtype::Fp32 ||
+      workspace.layout != PhysicalLayoutId::CudaFp32VectorV0 ||
+      workspace.storage != StorageClass::Fp32 || !workspace.writable || workspace.rank != 1) {
+    return std::unexpected(arg_error("workspace", "typed view contract mismatch"));
   }
-  if (workspace.space != MemorySpace::Device) {
-    return std::unexpected(arg_error("workspace", "view must be device memory"));
-  }
-  if (!workspace.writable) {
-    return std::unexpected(arg_error("workspace", "view must be writable"));
-  }
-  if (view_bytes(workspace) < kAttentionWorkspaceBytesPerToken) {
+  if (auto st = require_alignment(workspace, 16, "workspace"); !st) return std::unexpected(st.error());
+  auto workspace_bytes = view_bytes(workspace, "workspace");
+  if (!workspace_bytes) return std::unexpected(workspace_bytes.error());
+  if (*workspace_bytes < kAttentionWorkspaceBytesPerToken) {
     return std::unexpected(
         arg_error("workspace", "AttentionWorkspace must be 78016 bytes per token"));
   }
@@ -347,31 +407,35 @@ std::expected<AttentionPrepPlan, Error> bind_attention_prep_plan(
         arg_error("layout", "q/g, k, and v must share one Q4 or BF16-control family"));
   }
 
-  auto gamma = as_vector(views.gamma, kHidden, ArithmeticDtype::Bf16, false, "gamma");
+  auto gamma = require_view(views.gamma, ArithmeticDtype::Bf16,
+      PhysicalLayoutId::CudaBf16VectorV0, StorageClass::Bf16, false, {kHidden}, 2, "gamma");
   if (!gamma) {
     return std::unexpected(gamma.error());
   }
   auto gamma_q =
-      as_vector(views.gamma_q, kHeadDim, ArithmeticDtype::Bf16, false, "gamma_q");
+      require_view(views.gamma_q, ArithmeticDtype::Bf16,
+          PhysicalLayoutId::CudaBf16VectorV0, StorageClass::Bf16, false, {kHeadDim}, 2, "gamma_q");
   if (!gamma_q) {
     return std::unexpected(gamma_q.error());
   }
   auto gamma_k =
-      as_vector(views.gamma_k, kHeadDim, ArithmeticDtype::Bf16, false, "gamma_k");
+      require_view(views.gamma_k, ArithmeticDtype::Bf16,
+          PhysicalLayoutId::CudaBf16VectorV0, StorageClass::Bf16, false, {kHeadDim}, 2, "gamma_k");
   if (!gamma_k) {
     return std::unexpected(gamma_k.error());
   }
-  auto inv = as_vector(views.inv_freq, 32, ArithmeticDtype::Fp32, false, "inv_freq");
+  auto inv = require_view(views.inv_freq, ArithmeticDtype::Fp32,
+      PhysicalLayoutId::CudaFp32VectorV0, StorageClass::Fp32, false, {32}, 4, "inv_freq");
   if (!inv) {
     return std::unexpected(inv.error());
   }
-  auto residual =
-      as_vector(views.residual, kHidden, ArithmeticDtype::Fp32, true, "residual");
+  auto residual = require_view(views.residual, ArithmeticDtype::Fp32,
+      PhysicalLayoutId::CudaFp32VectorV0, StorageClass::Fp32, true, {1, kHidden}, 4, "residual");
   if (!residual) {
     return std::unexpected(residual.error());
   }
-  auto normalized = as_vector(views.normalized, kHidden, ArithmeticDtype::Bf16, true,
-                              "normalized");
+  auto normalized = require_view(views.normalized, ArithmeticDtype::Bf16,
+      PhysicalLayoutId::CudaBf16RowMajorV0, StorageClass::Bf16, true, {kHidden}, 2, "normalized");
   if (!normalized) {
     return std::unexpected(normalized.error());
   }
@@ -379,34 +443,23 @@ std::expected<AttentionPrepPlan, Error> bind_attention_prep_plan(
   if (!scratch) {
     return std::unexpected(scratch.error());
   }
-
-  if (views.kv.pointer == nullptr) {
-    return std::unexpected(arg_error("kv", "null view"));
-  }
-  if (views.kv.space != MemorySpace::Device) {
-    return std::unexpected(arg_error("kv", "view must be device memory"));
-  }
-  if (views.kv.dtype != ArithmeticDtype::Bf16) {
-    return std::unexpected(arg_error("kv", "K/V cache must be BF16"));
-  }
-  if (!views.kv.writable) {
-    return std::unexpected(arg_error("kv", "view must be writable"));
-  }
-  std::uint64_t const layer_elems =
-      static_cast<std::uint64_t>(kKvComponents) * kKvHeads * views.kv_capacity *
-      kHeadDim;
-  std::uint64_t const need = (static_cast<std::uint64_t>(*attn_i) + 1u) * layer_elems;
-  if (views.kv.rank == 0 || element_count(views.kv) < need) {
-    return std::unexpected(
-        arg_error("kv", "view is smaller than the addressed attention layer"));
-  }
-  if (gamma->pointer == residual->pointer ||
-      residual->pointer == normalized->pointer ||
-      scratch->qg.pointer == scratch->q.pointer ||
-      scratch->q.pointer == scratch->g.pointer ||
-      scratch->k.pointer == scratch->v.pointer) {
-    return std::unexpected(arg_error(
-        "scratch", "residual, normalized, projected, and prepared arrays must be distinct"));
+  auto kv = require_view(views.kv, ArithmeticDtype::Bf16,
+      PhysicalLayoutId::CudaBf16KvCacheV0, StorageClass::Bf16, true,
+      {kAttnLayers, kKvComponents, kKvHeads, views.kv_capacity, kHeadDim}, 2, "kv");
+  if (!kv) return std::unexpected(kv.error());
+  auto kv_bytes = view_bytes(*kv, "kv");
+  if (!kv_bytes) return std::unexpected(kv_bytes.error());
+  auto workspace_bytes = view_bytes(views.workspace, "workspace");
+  if (!workspace_bytes) return std::unexpected(workspace_bytes.error());
+  if (auto st = validate_intervals({
+          {"qg", {qg->codes, qg->codes_bytes}}, {"qg_scales", {qg->scales, qg->scales_bytes}},
+          {"k", {k->codes, k->codes_bytes}}, {"k_scales", {k->scales, k->scales_bytes}},
+          {"v", {v->codes, v->codes_bytes}}, {"v_scales", {v->scales, v->scales_bytes}},
+          {"gamma", {*gamma, kHidden * 2u}}, {"gamma_q", {*gamma_q, kHeadDim * 2u}},
+          {"gamma_k", {*gamma_k, kHeadDim * 2u}}, {"inv_freq", {*inv, 32u * 4u}},
+          {"residual", {*residual, kHidden * 4u}}, {"normalized", {*normalized, kHidden * 2u}},
+          {"workspace", {views.workspace, *workspace_bytes}}, {"kv", {*kv, *kv_bytes}}}); !st) {
+    return std::unexpected(st.error());
   }
 
   AttentionPrepPlan plan;
@@ -420,7 +473,7 @@ std::expected<AttentionPrepPlan, Error> bind_attention_prep_plan(
   plan.residual = *residual;
   plan.normalized = *normalized;
   plan.scratch = *scratch;
-  plan.kv = views.kv;
+  plan.kv = *kv;
   plan.host_populated = views.host_populated;
   plan.kv_capacity = views.kv_capacity;
   plan.stream = &stream;
@@ -444,51 +497,58 @@ std::expected<AttentionCorePlan, Error> bind_attention_core_plan(
   }
   auto attn_i = attn_state_index(views.language_layer);
   if (!attn_i) return std::unexpected(attn_i.error());
-  auto q = as_vector(views.q, kQueryHeads * kHeadDim, ArithmeticDtype::Bf16,
-                     false, "q");
-  auto g = as_vector(views.g, kQueryHeads * kHeadDim, ArithmeticDtype::Bf16,
-                     false, "g");
-  auto y = as_vector(views.y, kQueryHeads * kHeadDim, ArithmeticDtype::Bf16,
-                     true, "y");
-  auto residual = as_vector(views.residual, kHidden, ArithmeticDtype::Fp32,
-                           false, "residual");
-  auto residual_out = as_vector(views.residual_out, kHidden, ArithmeticDtype::Fp32,
-                                true, "residual_out");
-  auto partials = as_vector(views.partials, kQueryHeads * kAttnPartialStride,
-                            ArithmeticDtype::Fp32, true, "partials");
+  auto q = require_view(views.q, ArithmeticDtype::Bf16,
+      PhysicalLayoutId::CudaBf16RowMajorV0, StorageClass::Bf16, false,
+      {kQueryHeads, kHeadDim}, 2, "q");
+  auto g = require_view(views.g, ArithmeticDtype::Bf16,
+      PhysicalLayoutId::CudaBf16RowMajorV0, StorageClass::Bf16, false,
+      {kQueryHeads, kHeadDim}, 2, "g");
+  auto y = require_view(views.y, ArithmeticDtype::Bf16,
+      PhysicalLayoutId::CudaBf16RowMajorV0, StorageClass::Bf16, true,
+      {kQueryHeads, kHeadDim}, 2, "y");
+  auto residual = require_view(views.residual, ArithmeticDtype::Fp32,
+      PhysicalLayoutId::CudaFp32VectorV0, StorageClass::Fp32, false,
+      {1, kHidden}, 4, "residual");
+  auto residual_out = require_view(views.residual_out, ArithmeticDtype::Fp32,
+      PhysicalLayoutId::CudaFp32VectorV0, StorageClass::Fp32, true,
+      {1, kHidden}, 4, "residual_out");
+  auto required_workspace = attn_workspace_bytes_for_capacity(views.kv_capacity);
+  if (!required_workspace) return std::unexpected(required_workspace.error());
+  std::uint64_t const partial_elements =
+      (*required_workspace - kAttnOffPartials) / qw38::format::kFp32Size;
+  auto partials = require_view(views.partials, ArithmeticDtype::Fp32,
+      PhysicalLayoutId::CudaFp32VectorV0, StorageClass::Fp32, true,
+      {partial_elements}, 4, "partials");
   if (!q) return std::unexpected(q.error());
   if (!g) return std::unexpected(g.error());
   if (!y) return std::unexpected(y.error());
   if (!residual) return std::unexpected(residual.error());
   if (!residual_out) return std::unexpected(residual_out.error());
   if (!partials) return std::unexpected(partials.error());
-  if (q->pointer == g->pointer || residual->pointer == residual_out->pointer) {
-    return std::unexpected(arg_error("core", "core views must not alias"));
-  }
-  if (views.kv.pointer == nullptr || views.kv.space != MemorySpace::Device ||
-      views.kv.dtype != ArithmeticDtype::Bf16 || !views.kv.writable) {
-    return std::unexpected(arg_error("kv", "KV cache must be writable BF16 device memory"));
-  }
-  std::uint64_t const layer_elems = static_cast<std::uint64_t>(kKvComponents) *
-                                    kKvHeads * views.kv_capacity * kHeadDim;
-  if (views.kv.rank == 0 || element_count(views.kv) <
-                              (static_cast<std::uint64_t>(*attn_i) + 1u) * layer_elems) {
-    return std::unexpected(arg_error("kv", "cache is smaller than addressed layer"));
-  }
+  auto kv = require_view(views.kv, ArithmeticDtype::Bf16,
+      PhysicalLayoutId::CudaBf16KvCacheV0, StorageClass::Bf16, true,
+      {kAttnLayers, kKvComponents, kKvHeads, views.kv_capacity, kHeadDim}, 2, "kv");
+  if (!kv) return std::unexpected(kv.error());
   auto out = bind_q4_or_bf16(views.out, views.out_scales, kHidden,
                              kAttnOutWidth, "out");
   if (!out) return std::unexpected(out.error());
-  std::uint64_t const nseg = attn_segment_count(views.kv_capacity);
-  std::uint64_t const need = nseg * kQueryHeads * kAttnPartialStride;
-  if (element_count(views.partials) < need) {
-    return std::unexpected(arg_error("partials", "workspace is too small for KV capacity"));
+  auto partial_bytes = view_bytes(*partials, "partials");
+  auto kv_bytes = view_bytes(*kv, "kv");
+  if (!partial_bytes || !kv_bytes) return std::unexpected(arg_error("core", "view byte count invalid"));
+  if (auto st = validate_intervals({
+          {"out", {out->codes, out->codes_bytes}}, {"out_scales", {out->scales, out->scales_bytes}},
+          {"q", {*q, kAttnOutWidth * 2u}}, {"g", {*g, kAttnOutWidth * 2u}},
+          {"kv", {*kv, *kv_bytes}}, {"partials", {*partials, *partial_bytes}},
+          {"y", {*y, kAttnOutWidth * 2u}}, {"residual", {*residual, kHidden * 4u}},
+          {"residual_out", {*residual_out, kHidden * 4u}}}, true); !st) {
+    return std::unexpected(st.error());
   }
 
   AttentionCorePlan plan;
   plan.out = *out;
   plan.q = *q;
   plan.g = *g;
-  plan.kv = views.kv;
+  plan.kv = *kv;
   plan.partials = *partials;
   plan.y = *y;
   plan.residual = *residual;
@@ -511,15 +571,40 @@ std::expected<AttentionMixerPlan, Error> bind_attention_mixer_plan(
   auto out = bind_q4_or_bf16(views.out, views.out_scales, kHidden,
                              kAttnOutWidth, "out");
   if (!out) return std::unexpected(out.error());
-  auto residual_out = as_vector(views.residual_out, kHidden, ArithmeticDtype::Fp32,
-                                true, "residual_out");
+  auto residual_out = require_view(views.residual_out, ArithmeticDtype::Fp32,
+      PhysicalLayoutId::CudaFp32VectorV0, StorageClass::Fp32, true,
+      {1, kHidden}, 4, "residual_out");
   if (!residual_out) return std::unexpected(residual_out.error());
 
-  auto const workspace_bytes = view_bytes(views.prep.workspace);
-  std::uint64_t const required = kAttnOffPartials +
-      attn_partials_bytes(attn_segment_count(views.prep.kv_capacity));
-  if (workspace_bytes < required) {
-    return std::unexpected(arg_error("workspace", "workspace is too small for KV capacity"));
+  auto workspace_bytes = view_bytes(views.prep.workspace, "workspace");
+  if (!workspace_bytes) return std::unexpected(workspace_bytes.error());
+  auto required_workspace = attn_workspace_bytes_for_capacity(views.prep.kv_capacity);
+  if (!required_workspace) return std::unexpected(required_workspace.error());
+  if (*workspace_bytes != *required_workspace) {
+    return std::unexpected(arg_error(
+        "workspace", "workspace extent does not match KV-capacity contract"));
+  }
+  auto kv_bytes = view_bytes(prep->kv, "kv");
+  if (!kv_bytes) return std::unexpected(kv_bytes.error());
+  if (auto st = validate_intervals({
+          {"qg", {prep->qg.codes, prep->qg.codes_bytes}},
+          {"qg_scales", {prep->qg.scales, prep->qg.scales_bytes}},
+          {"k", {prep->k.codes, prep->k.codes_bytes}},
+          {"k_scales", {prep->k.scales, prep->k.scales_bytes}},
+          {"v", {prep->v.codes, prep->v.codes_bytes}},
+          {"v_scales", {prep->v.scales, prep->v.scales_bytes}},
+          {"gamma", {prep->gamma, kHidden * 2u}},
+          {"gamma_q", {prep->gamma_q, kHeadDim * 2u}},
+          {"gamma_k", {prep->gamma_k, kHeadDim * 2u}},
+          {"inv_freq", {prep->inv_freq, 32u * 4u}},
+          {"residual", {prep->residual, kHidden * 4u}},
+          {"normalized", {prep->normalized, kHidden * 2u}},
+          {"workspace", {views.prep.workspace, *workspace_bytes}},
+          {"kv", {prep->kv, *kv_bytes}},
+          {"out", {out->codes, out->codes_bytes}},
+          {"out_scales", {out->scales, out->scales_bytes}},
+          {"residual_out", {*residual_out, kHidden * 4u}}}); !st) {
+    return std::unexpected(st.error());
   }
   AttentionCoreBindViews core;
   core.q = prep->scratch.q;
@@ -529,7 +614,7 @@ std::expected<AttentionMixerPlan, Error> bind_attention_mixer_plan(
                           kAttnOffPartials, ArithmeticDtype::Fp32,
                           PhysicalLayoutId::CudaFp32VectorV0,
                           StorageClass::Fp32, true, 1,
-                          (workspace_bytes - kAttnOffPartials) /
+                          (*workspace_bytes - kAttnOffPartials) /
                               qw38::format::kFp32Size);
   core.y = prep->scratch.q;  // Q is dead after scan; merge materializes y in-place.
   core.residual = prep->residual;
@@ -579,6 +664,8 @@ std::expected<AttentionMixerPlan, Error> bind_attention_mixer_plan(
   views.out = *out;
   views.out_scales = *scales;
   views.residual_out = session.residual_h_mid();
+  views.residual_out.rank = 2;
+  views.residual_out.extent = {1, kHidden};
   return bind_attention_mixer_plan(views, stream, eps);
 }
 
@@ -658,7 +745,11 @@ std::expected<AttentionPrepPlan, Error> bind_attention_prep_plan(
   views.gamma_k = *gamma_k;
   views.inv_freq = *inv;
   views.residual = session.residual_h();
+  views.residual.rank = 2;
+  views.residual.extent = {1, kHidden};
   views.normalized = *normalized;
+  views.normalized.rank = 1;
+  views.normalized.extent = {kHidden};
   views.workspace = *workspace;
   views.kv = session.kv();
   auto populated = session.kv_populated_slot(*attn_i);
