@@ -738,6 +738,107 @@ void test_encode_decode_reject_unknown_record_enums() {
       0x0801, "integrity kind");
 }
 
+// This is an independently transcribed V0 manifest, not output from encode().
+// It fixes the complete record sequence (including the required full V0 state
+// and scratch schemas), all little-endian field values, and all reserved bytes.
+std::vector<std::byte> golden_manifest_bytes() {
+  constexpr std::string_view hex =
+      "010001006701000000020000000300000000000000101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f"
+      "01040a00010b010a020b020a030b020a040b010a050b010a060b010a070b020a080b020a090b010a0a0b030a010502000000010000000100610100000000000000040000000000000004000000000000000300000105020000010700000000000000000000000000000000000000010000000000000800000000000000000000000000000000000000000000000200000001006201000000000000000400000000000000040000000000000003000001050200000107000000000000000000000000000000000000000100000000000008000000000000000000000000000000000000000000000001000000010000000200000001090000010000000700000001030206ffffffff0100000003000000010c010a07020000300000000100000000000000000000000000300000000000000000000000000000000009000000000300000000000000300000000000000030000000000000008000000000000000800000000000000080000000000000008000000000000000020c020a080200003000000001000000000000000000000000f0000000000000000000000000000000002d000000000002000000000000000300000000000000030000000000000000280000000000000028000000000000030c020a09020100100000000200000000000000000000000000000000000000000001000000000000000000000000000200000000000000040000000000000004000000000000000001000000000000000100000000000007000000010d010a005000000000000000000000020d010a005000000000000000000000030d020a002800000000000000000000040d010a00a301000000000000000000050d010ac03001000000000000000000060d020a008800000000000000000000070d010a00280f00000000000000000001000000020800000100000000010000000000000800000000000000a0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebf";
+  std::vector<std::byte> bytes;
+  bytes.reserve(hex.size() / 2);
+  auto hex_digit = [](char c) -> std::uint8_t {
+    if (c >= '0' && c <= '9') return static_cast<std::uint8_t>(c - '0');
+    if (c >= 'a' && c <= 'f') return static_cast<std::uint8_t>(c - 'a' + 10);
+    return static_cast<std::uint8_t>(c - 'A' + 10);
+  };
+  for (std::size_t i = 0; i < hex.size(); i += 2) {
+    bytes.push_back(static_cast<std::byte>((hex_digit(hex[i]) << 4) |
+                                           hex_digit(hex[i + 1])));
+  }
+  return bytes;
+}
+
+void test_manifest_golden_bytes() {
+  constexpr std::size_t kManifestBytes = 845;
+  constexpr std::size_t kCompilerReserved = 17;
+  constexpr std::size_t kFirstTensor = 167;
+  constexpr std::size_t kSecondTensor = 258;
+  constexpr std::size_t kShared = 353;
+  constexpr std::size_t kGraph = 369;
+  constexpr std::size_t kState = 389;
+  constexpr std::size_t kScratch = 673;
+  constexpr std::size_t kIntegrity = 789;
+  auto const golden = golden_manifest_bytes();
+  expect(golden.size() == kManifestBytes, "golden manifest length is frozen");
+  expect(golden[kCompilerReserved] == std::byte{0} &&
+             golden[kCompilerReserved + 1] == std::byte{0} &&
+             golden[kCompilerReserved + 2] == std::byte{0} &&
+             golden[kCompilerReserved + 3] == std::byte{0},
+         "compiler reserved bytes are frozen zero");
+  expect(golden[kFirstTensor] == std::byte{1} &&
+             golden[kSecondTensor] == std::byte{2},
+         "tensor records retain their frozen order and offsets");
+  expect(golden[kFirstTensor + 37] == std::byte{0} &&
+             golden[kFirstTensor + 38] == std::byte{0} &&
+             golden[kFirstTensor + 41] == std::byte{0} &&
+             golden[kFirstTensor + 42] == std::byte{0} &&
+             golden[kSecondTensor + 37] == std::byte{0} &&
+             golden[kSecondTensor + 38] == std::byte{0},
+         "tensor and mapping reserved bytes are frozen zero");
+  expect(golden[kShared + 10] == std::byte{0} &&
+             golden[kShared + 11] == std::byte{0} &&
+             golden[kScratch + 12] == std::byte{0} &&
+             golden[kIntegrity + 2] == std::byte{0} &&
+             golden[kIntegrity + 3] == std::byte{0},
+         "shared scratch and integrity reserved bytes are frozen zero");
+  expect(golden[kGraph] == std::byte{7} && golden[kState] == std::byte{1} &&
+             golden[kState + 1] == std::byte{0x0C},
+         "graph and state records retain their frozen offsets and order");
+
+  auto decoded = decode_schema(golden);
+  if (!decoded) {
+    fail(std::string("independent golden manifest decodes: ") +
+         error_message(decoded.error()));
+    return;
+  }
+  expect(decoded->tensors.size() == 2 && decoded->shared_bindings.size() == 1 &&
+             decoded->graph_bindings.size() == 1 && decoded->state.size() == 3 &&
+             decoded->scratch.size() == 7 && decoded->integrity.size() == 1,
+         "golden manifest contains every representative record family");
+  expect(decoded->tensors[0].payload == ByteSpan{.offset = 256, .length = 8} &&
+             decoded->tensors[1].payload == ByteSpan{.offset = 256, .length = 8} &&
+             decoded->integrity[0].region == ByteSpan{.offset = 256, .length = 8},
+         "golden payload and integrity offsets and lengths are frozen");
+  expect(decoded->graph_bindings[0].instance_id == 7 &&
+             decoded->graph_bindings[0].tensor_id == 1 &&
+             decoded->shared_bindings[0].owner_tensor_id == 1 &&
+             decoded->shared_bindings[0].alias_tensor_id == 2,
+         "golden shared and graph field order is frozen");
+
+  auto schema = base_schema();
+  schema.compiler = {.ident = "g", .major = 1, .minor = 2, .patch = 3};
+  schema.source_hash = hash_with(0x10);
+  schema.config_hash = hash_with(0x30);
+  schema.tokenizer_hash = hash_with(0x50);
+  schema.tensors = {bf16_vector(1, "a", 4, 256), bf16_vector(2, "b", 4, 256)};
+  schema.shared_bindings = {SharedBinding{.owner_tensor_id = 1,
+                                           .alias_tensor_id = 2,
+                                           .role = SharedBindingRole::GenericAlias}};
+  schema.graph_bindings = {GraphBinding{.instance_id = 7,
+                                        .kind = SemanticNodeKind::Embed,
+                                        .role = TensorRole::EmbeddingTable,
+                                        .layer_index = kNoLayerIndex,
+                                        .tensor_id = 1}};
+  schema.integrity = {IntegrityRecord{.kind = IntegrityKind::Sha256PayloadSpan,
+                                      .tensor_id = 1,
+                                      .region = ByteSpan{.offset = 256, .length = 8},
+                                      .digest = hash_with(0xA0)}};
+  auto const encoded = must_encode(schema, "golden manifest encoder comparison");
+  expect(encoded == golden,
+         "production encoder exactly preserves the independently frozen manifest ABI");
+}
+
 void test_schema_roundtrip_and_object_layout_independence() {
   auto schema = base_schema();
   schema.tensors.push_back(bf16_vector(7, "dt_bias", 48, 256));
@@ -859,6 +960,7 @@ int main() {
   test_shared_binding_ownership_graph();
   test_span_overlap_classes();
   test_encode_decode_reject_unknown_record_enums();
+  test_manifest_golden_bytes();
   test_schema_roundtrip_and_object_layout_independence();
   test_truncated_input();
   test_hostile_record_counts_are_bounded();
