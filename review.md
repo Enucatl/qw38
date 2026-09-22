@@ -4,6 +4,29 @@ This is the deduplicated review of the completed subagent reviews for TASK-001 t
 
 There were no P0 findings. “Confirmed” means the reviewer found the issue directly in the current implementation. “Concern” means the issue needs a contract decision or additional reproduction before changing code.
 
+## Repair verification policy
+
+Each repair uses the smallest deterministic test that exercises its changed
+behavior, plus a focused regression for any shared interface it affects. Use
+one configured build by default: Debug for host-side format/compiler/validation
+changes and Release for CUDA/runtime numerical changes. Do not run both full
+suites unless the change is configuration-sensitive, changes the build or
+toolchain, or the task contract explicitly requires it.
+
+The default repair suite is:
+
+```text
+ctest --test-dir build/release --output-on-failure -LE extended
+```
+
+The `extended` label is reserved for authoritative-checkpoint scans and
+full-vocabulary MMV integration. Run an extended test only when the change
+affects that property or at a deliberate repair-batch/release checkpoint, and
+state why. Long-context, maximum-capacity, sanitizer, benchmark, and full
+artifact identity checks follow the same rule. Existing test directions below
+describe the required property; they do not require the largest available
+fixture when a smaller fixture establishes that property.
+
 ## P1 — high priority
 
 ### 1. Pin the complete TASK-001 build toolchain (confirmed; TASK-001)

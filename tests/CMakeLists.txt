@@ -155,9 +155,21 @@ set_tests_properties(
 )
 
 set_tests_properties(
+  compiler_integration
+  PROPERTIES
+  LABELS "compiler;extended;checkpoint"
+)
+
+set_tests_properties(
   quantizer pack_layout quant_reference quant_compiler_integration
   PROPERTIES
   LABELS "quantizer;compiler"
+)
+
+set_tests_properties(
+  quant_compiler_integration
+  PROPERTIES
+  LABELS "quantizer;compiler;extended;checkpoint"
 )
 
 set_tests_properties(cuda_sm120_cubin PROPERTIES
@@ -266,6 +278,12 @@ set_tests_properties(
   decode_mmv_unit decode_mmv_reference decode_mmv_integration
   PROPERTIES
   LABELS "cuda;gpu;decode_mmv"
+)
+
+set_tests_properties(
+  decode_mmv_integration
+  PROPERTIES
+  LABELS "cuda;gpu;decode_mmv;extended;full_vocab"
 )
 
 add_executable(qw38_mlp_unit_test mlp_unit_test.cpp)

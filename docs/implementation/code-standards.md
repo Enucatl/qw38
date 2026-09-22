@@ -109,6 +109,45 @@ Implementation tasks should prefer deterministic unit tests, understandable refe
 
 An optimized CUDA kernel must not become the sole definition of correctness. Maintain an independently understandable reference implementation for formats and numerical operations where practical.
 
+## Verification scope
+
+Verification is proportional to the change. A repair must run the smallest
+test set that directly exercises its changed behavior, plus any focused
+regression needed to cover a shared interface. Do not run the complete Debug
+and Release suites merely because a repair changes one component.
+
+Use one configured build by default. Prefer Debug for host-side parsing,
+format, compiler, and validation changes. Prefer Release for CUDA numerical
+or runtime changes. Run both configurations only when the change is known to
+be configuration-sensitive, changes build/toolchain behavior, or a task file
+explicitly requires both.
+
+Every test command must identify the behavior it validates. Reuse an existing
+configured build and build only affected targets when practical. A delivery or
+review step must inspect the diff and reported focused results; it must not
+repeat an unchanged test run without a concrete reason.
+
+## Fast and extended tests
+
+The normal repair command is the fast suite, selected with CTest labels that
+exclude `extended` tests. Extended tests cover expensive evidence such as
+authoritative checkpoint scans, full-vocabulary contractions, maximum-context
+allocations, long-context runs, sanitizers, and benchmarks. They are not a
+default requirement for unrelated repairs.
+
+Run an extended test only when the changed behavior can affect the property it
+covers, when a task file explicitly requires it, or at a deliberate release
+or repair-batch checkpoint. State the reason before running it. Use the
+smallest fixture that reproduces the defect: for example, test a segment
+boundary at 255/256/257 rather than a long-context sweep, and test malformed
+hash handling with a small fixture rather than repeatedly hashing an
+unchanged checkpoint.
+
+Cached or previously computed identities may be reused within one operation
+when their source bytes are immutable for that operation. Content identity
+remains mandatory at artifact/compiler boundaries; this policy only avoids
+repeating the same expensive evidence in unrelated test executions.
+
 # Performance policy
 
 Do not sacrifice clarity outside demonstrated hot paths. Use profiling evidence before introducing difficult low-level host-side optimizations. CUDA kernels and model-format consumers are intentionally performance-oriented; host compiler and tooling code should emphasize correctness, explicit ownership, understandable transformations, and deterministic behavior.

@@ -41,15 +41,32 @@ docker run --gpus all --rm -u "$(id -u):$(id -g)" \
   bash -lc 'cmake -S . -B build/release -DCMAKE_BUILD_TYPE=Release && cmake --build build/release'
 ```
 
-**Normal CTest command**
+**Fast repair CTest command**
 
 ```bash
 docker run --gpus all --rm -u "$(id -u):$(id -g)" \
   -v "$PWD":/workspace -w /workspace qw38-dev:cuda13.4.1 \
-  ctest --test-dir build/release --output-on-failure
+  ctest --test-dir build/release --output-on-failure -LE extended
 ```
 
-`ctest` runs host `std::expected` smoke, CUDA kernel/runtime smoke on the GPU, and `cuobjdump` confirmation of native `sm_120` cubin. The `qw38_bench_placeholder` target is `EXCLUDE_FROM_ALL` and is not a CTest test.
+This command runs the ordinary host and GPU correctness suite while excluding
+tests labelled `extended`. It is the default for a focused repair after
+building the affected target. Run a focused component test with `ctest -R
+'<pattern>'`; for example, `ctest --test-dir build/release -R format_writer
+--output-on-failure`.
+
+**Extended validation**
+
+```bash
+docker run --gpus all --rm -u "$(id -u):$(id -g)" \
+  -v "$PWD":/workspace -w /workspace qw38-dev:cuda13.4.1 \
+  ctest --test-dir build/release --output-on-failure -L extended
+```
+
+Extended tests use authoritative checkpoints or full-vocabulary tensors. Run
+them when a change affects compiler identity/reconstruction or full MMV
+addressing, when a task explicitly requires them, or at a release checkpoint.
+Benchmarks remain `EXCLUDE_FROM_ALL` and are not CTest correctness tests.
 
 ## Driver / container compatibility
 
