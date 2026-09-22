@@ -6,16 +6,20 @@
 #include "runtime_support.hpp"
 
 #include <cstdint>
+#include <expected>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <limits>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 using qw38::runtime::ErrorCode;
 using qw38::runtime::kFixedPersistentBytes;
 using qw38::runtime::kKvBytesPerToken;
 using qw38::runtime::Runtime;
+using qw38::runtime::Session;
 using qw38::runtime::test::write_language_fixture;
 
 namespace {
@@ -31,6 +35,19 @@ void expect(bool cond, std::string_view what) {
   if (!cond) {
     fail(what);
   }
+}
+
+std::expected<Session, qw38::runtime::Error> create_session_that_outlives_runtime(
+    std::filesystem::path const& model_path) {
+  auto runtime = Runtime::create();
+  if (!runtime) {
+    return std::unexpected(runtime.error());
+  }
+  auto model = runtime->load(model_path);
+  if (!model) {
+    return std::unexpected(model.error());
+  }
+  return runtime->create_session(*model, 1);
 }
 
 }  // namespace
@@ -225,6 +242,62 @@ int main() {
          "read s2 after s1 restore");
   expect(static_cast<bool>(rt->stream().sync()), "sync s2");
   expect(still2 == std::byte{0x22}, "session 2 unchanged");
+
+  Runtime moved_runtime = std::move(*rt);
+  expect(static_cast<bool>(moved_runtime.stream().sync()),
+         "moved Runtime stream works");
+  expect(static_cast<bool>(rt->stream().sync()),
+         "moved-from Runtime stream remains valid");
+  auto move_assignment_destination = Runtime::create();
+  expect(static_cast<bool>(move_assignment_destination),
+         "Runtime move-assignment destination");
+  if (move_assignment_destination) {
+    *move_assignment_destination = std::move(moved_runtime);
+    expect(static_cast<bool>(move_assignment_destination->stream().sync()),
+           "move-assigned Runtime stream works");
+  }
+  auto after_runtime_move = s1->save();
+  expect(static_cast<bool>(after_runtime_move), "save after Runtime move");
+  expect(static_cast<bool>(s1->reset()), "reset after Runtime move");
+  if (after_runtime_move) {
+    expect(static_cast<bool>(s1->restore(*after_runtime_move)),
+           "restore after Runtime move");
+  }
+
+  auto surviving_session = create_session_that_outlives_runtime(fx.path);
+  expect(static_cast<bool>(surviving_session), "create surviving session");
+  if (surviving_session) {
+    auto surviving_snapshot = surviving_session->save();
+    expect(static_cast<bool>(surviving_snapshot),
+           "save after Runtime destruction");
+    expect(static_cast<bool>(surviving_session->reset()),
+           "reset after Runtime destruction");
+    if (surviving_snapshot) {
+      expect(static_cast<bool>(surviving_session->restore(*surviving_snapshot)),
+             "restore after Runtime destruction");
+    }
+    expect(surviving_session->gdn_s().pointer != nullptr &&
+               surviving_session->conv_history().pointer != nullptr &&
+               surviving_session->kv().pointer != nullptr &&
+               surviving_session->residual_h().pointer != nullptr &&
+               surviving_session->residual_h_mid().pointer != nullptr,
+           "session views survive Runtime destruction");
+    expect(static_cast<bool>(surviving_session->scratch(
+               qw38::format::ScratchKind::NormalizedHidden)),
+           "scratch survives Runtime destruction");
+    expect(static_cast<bool>(surviving_session->set_populated_length(0, 1)),
+           "population update survives Runtime destruction");
+    auto populated = surviving_session->kv_populated_slot(0);
+    expect(populated && **populated == 1,
+           "population slot survives Runtime destruction");
+    auto cursor = surviving_session->conv_cursor();
+    cursor[0] = 2;
+    expect(static_cast<bool>(surviving_session->set_conv_cursor(cursor)),
+           "cursor update survives Runtime destruction");
+    auto cursor_slot = surviving_session->conv_cursor_slot(0);
+    expect(cursor_slot && **cursor_slot == 2,
+           "cursor slot survives Runtime destruction");
+  }
 
   if (g_failures != 0) {
     std::cerr << g_failures << " failures\n";

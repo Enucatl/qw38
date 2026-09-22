@@ -12,6 +12,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <expected>
+#include <memory>
 #include <vector>
 
 namespace qw38::cuda {
@@ -81,12 +82,12 @@ class Session {
   Session() = default;
 
   static std::expected<Session, Error> create(Model const& model,
-                                              qw38::cuda::Stream const& stream,
+                                              std::shared_ptr<qw38::cuda::Stream> stream,
                                               std::uint64_t kv_capacity);
 
   [[nodiscard]] std::expected<void, Error> zero_persistent();
 
-  qw38::cuda::Stream const* stream_{nullptr};
+  std::shared_ptr<qw38::cuda::Stream> stream_;
   qw38::cuda::DeviceBuffer gdn_s_;
   qw38::cuda::DeviceBuffer conv_history_;
   qw38::cuda::DeviceBuffer kv_;

@@ -72,7 +72,7 @@ std::array<std::uint64_t, qw38::format::kMaxRank> extent5(
 }  // namespace
 
 std::expected<Session, Error> Session::create(
-    Model const& model, qw38::cuda::Stream const& stream,
+    Model const& model, std::shared_ptr<qw38::cuda::Stream> stream,
     std::uint64_t kv_capacity) {
   try {
   if (auto st = require_language_state(model.state()); !st) {
@@ -100,7 +100,7 @@ std::expected<Session, Error> Session::create(
   }
 
   Session s;
-  s.stream_ = &stream;
+  s.stream_ = std::move(stream);
   s.kv_capacity_ = kv_capacity;
   s.kv_populated_.fill(0);
   s.persistent_bytes_ = *persist;
@@ -139,26 +139,26 @@ std::expected<Session, Error> Session::create(
   }
   s.scratch_ = std::move(*scratch);
 
-  if (auto st = qw38::cuda::zero(s.gdn_s_, stream); !st) {
+  if (auto st = qw38::cuda::zero(s.gdn_s_, *s.stream_); !st) {
     return std::unexpected(from_cuda(st.error()));
   }
-  if (auto st = qw38::cuda::zero(s.conv_history_, stream); !st) {
+  if (auto st = qw38::cuda::zero(s.conv_history_, *s.stream_); !st) {
     return std::unexpected(from_cuda(st.error()));
   }
-  if (auto st = qw38::cuda::zero(s.kv_, stream); !st) {
+  if (auto st = qw38::cuda::zero(s.kv_, *s.stream_); !st) {
     return std::unexpected(from_cuda(st.error()));
   }
-  if (auto st = qw38::cuda::zero(s.residual_h_, stream); !st) {
+  if (auto st = qw38::cuda::zero(s.residual_h_, *s.stream_); !st) {
     return std::unexpected(from_cuda(st.error()));
   }
-  if (auto st = qw38::cuda::zero(s.residual_h_mid_, stream); !st) {
+  if (auto st = qw38::cuda::zero(s.residual_h_mid_, *s.stream_); !st) {
     return std::unexpected(from_cuda(st.error()));
   }
-  if (auto st = qw38::cuda::zero(s.scratch_, stream); !st) {
+  if (auto st = qw38::cuda::zero(s.scratch_, *s.stream_); !st) {
     return std::unexpected(from_cuda(st.error()));
   }
   s.conv_cursor_.fill(0);
-  if (auto st = stream.sync(); !st) {
+  if (auto st = s.stream_->sync(); !st) {
     return std::unexpected(from_cuda(st.error()));
   }
   return s;
@@ -172,7 +172,7 @@ std::expected<Session, Error> Session::create(
 }
 
 std::expected<void, Error> Session::zero_persistent() {
-  if (stream_ == nullptr) {
+  if (!stream_) {
     return std::unexpected(
         make_error(ErrorCode::Internal, "session", "missing stream"));
   }
@@ -202,7 +202,7 @@ std::expected<void, Error> Session::reset() {
 
 std::expected<SessionSnapshot, Error> Session::save() const {
   try {
-  if (stream_ == nullptr) {
+  if (!stream_) {
     return std::unexpected(
         make_error(ErrorCode::Internal, "session.save", "missing stream"));
   }
@@ -239,7 +239,7 @@ std::expected<SessionSnapshot, Error> Session::save() const {
 }
 
 std::expected<void, Error> Session::restore(SessionSnapshot const& snap) {
-  if (stream_ == nullptr) {
+  if (!stream_) {
     return std::unexpected(
         make_error(ErrorCode::Internal, "session.restore", "missing stream"));
   }

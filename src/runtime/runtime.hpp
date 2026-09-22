@@ -9,13 +9,19 @@
 
 #include <expected>
 #include <filesystem>
+#include <memory>
 
 namespace qw38::runtime {
 
 class Runtime {
  public:
-  Runtime(Runtime&&) noexcept = default;
-  Runtime& operator=(Runtime&&) noexcept = default;
+  Runtime(Runtime&& other) noexcept
+      : stream_(other.stream_), device_(other.device_) {}
+  Runtime& operator=(Runtime&& other) noexcept {
+    stream_ = other.stream_;
+    device_ = other.device_;
+    return *this;
+  }
   ~Runtime() = default;
 
   Runtime(Runtime const&) = delete;
@@ -30,14 +36,14 @@ class Runtime {
       Model const& model, std::uint64_t kv_capacity);
 
   [[nodiscard]] qw38::cuda::Stream const& stream() const noexcept {
-    return stream_;
+    return *stream_;
   }
   [[nodiscard]] int device() const noexcept { return device_; }
 
  private:
   Runtime() = default;
 
-  qw38::cuda::Stream stream_;
+  std::shared_ptr<qw38::cuda::Stream> stream_;
   int device_{0};
 };
 
