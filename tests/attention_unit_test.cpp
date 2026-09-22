@@ -385,6 +385,10 @@ void test_bind_errors(Stream const& stream) {
   overlap_cache.kv.pointer = dummy_ptr(0x01000010);
   expect(!bind_attention_prep_plan(overlap_cache, stream),
          "workspace and cache offset overlap rejects");
+  auto overlap_projection_weight = views;
+  overlap_projection_weight.qg.pointer = dummy_ptr(0x75000010);
+  expect(!bind_attention_prep_plan(overlap_projection_weight, stream),
+         "projection weight and normalized input offset overlap rejects");
 
   AttentionMixerBindViews mixer;
   mixer.prep = views;
@@ -404,6 +408,50 @@ void test_bind_errors(Stream const& stream) {
   mixer.residual_out.pointer = dummy_ptr(0x74000004);
   expect(!bind_attention_mixer_plan(mixer, stream),
          "residual and output offset overlap rejects");
+}
+
+void test_cuda_prepare_alias_errors(Stream const& stream) {
+  constexpr std::uint64_t kCapacity = 1;
+  auto arena = DeviceBuffer::allocate(160u * 1024u);
+  if (!arena) {
+    fail("CUDA preparation alias arena allocation");
+    return;
+  }
+  auto* base = static_cast<std::byte*>(arena->data());
+  auto* qg = reinterpret_cast<std::uint16_t*>(base);
+  auto* k_raw = reinterpret_cast<std::uint16_t*>(base + 32768u);
+  auto* v_raw = reinterpret_cast<std::uint16_t*>(base + 36864u);
+  auto* gamma_q = reinterpret_cast<std::uint16_t*>(base + 40960u);
+  auto* gamma_k = reinterpret_cast<std::uint16_t*>(base + 41984u);
+  auto* inv_freq = reinterpret_cast<float*>(base + 43008u);
+  auto* q_out = reinterpret_cast<std::uint16_t*>(base + 49152u);
+  auto* g_out = reinterpret_cast<std::uint16_t*>(base + 65536u);
+  auto* kv = reinterpret_cast<std::uint16_t*>(base + 81920u);
+
+  auto launch = [&](std::uint16_t const* k_arg, std::uint16_t* q_arg,
+                    std::uint16_t* g_arg) {
+    return launch_attention_prepare(
+        qg, k_arg, v_raw, gamma_q, gamma_k, inv_freq, kDefaultRmsEps, 0,
+        q_arg, g_arg, kv, 0, kCapacity, 0, stream);
+  };
+
+  auto projection_overlap = launch(k_raw, k_raw + 1, g_out);
+  expect(!projection_overlap &&
+             projection_overlap.error().code ==
+                 qw38::cuda::ErrorCode::InvalidArgument,
+         "CUDA prep rejects offset-overlapping projection input/output");
+
+  auto cache_overlap = launch(k_raw, q_out, kv + 1);
+  expect(!cache_overlap &&
+             cache_overlap.error().code ==
+                 qw38::cuda::ErrorCode::InvalidArgument,
+         "CUDA prep rejects offset-overlapping prepared output/cache");
+
+  auto input_cache_overlap = launch(kv + 1, q_out, g_out);
+  expect(!input_cache_overlap &&
+             input_cache_overlap.error().code ==
+                 qw38::cuda::ErrorCode::InvalidArgument,
+         "CUDA prep rejects offset-overlapping projection input/cache");
 }
 
 void test_qg_ordering_and_suffix(Stream const& stream) {
@@ -634,6 +682,7 @@ int main() {
     return 1;
   }
   test_bind_errors(*stream);
+  test_cuda_prepare_alias_errors(*stream);
   test_qg_ordering_and_suffix(*stream);
   test_capacity_and_mismatch(*stream);
   test_reset_session();

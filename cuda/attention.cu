@@ -1,8 +1,11 @@
 #include "cuda/attention.hpp"
 
+#include <array>
 #include <cstddef>
 #include <cmath>
 #include <limits>
+#include <string>
+#include <string_view>
 
 namespace qw38::cuda {
 namespace {
@@ -363,6 +366,92 @@ std::expected<void, Error> require_stream(Stream const& stream,
   return {};
 }
 
+struct ByteInterval {
+  std::string_view name;
+  std::uintptr_t begin;
+  std::uintptr_t end;
+};
+
+template <typename Pointer>
+std::expected<ByteInterval, Error> checked_interval(
+    Pointer pointer, std::uint64_t bytes, std::string_view name) {
+  auto const begin = reinterpret_cast<std::uintptr_t>(pointer);
+  if (pointer == nullptr || bytes == 0 ||
+      bytes > std::numeric_limits<std::uintptr_t>::max() - begin) {
+    return std::unexpected(make_error(ErrorCode::Overflow,
+                                      "attention_prepare",
+                                      "preparation byte interval is invalid"));
+  }
+  return ByteInterval{
+      name, begin, begin + static_cast<std::uintptr_t>(bytes)};
+}
+
+bool overlaps(ByteInterval const& a, ByteInterval const& b) noexcept {
+  return a.begin < b.end && b.begin < a.end;
+}
+
+std::expected<void, Error> require_disjoint_prepare_operands(
+    std::uint16_t const* qg, std::uint16_t const* k_raw,
+    std::uint16_t const* v_raw, std::uint16_t const* gamma_q,
+    std::uint16_t const* gamma_k, float const* inv_freq,
+    std::uint16_t* q_out, std::uint16_t* g_out, std::uint16_t* kv,
+    std::uint64_t capacity) {
+  constexpr std::uint64_t kBf16Bytes = sizeof(std::uint16_t);
+  constexpr std::uint64_t kQGBytes =
+      static_cast<std::uint64_t>(kAttnQueryHeads) * 2u * kAttnHeadDim *
+      kBf16Bytes;
+  constexpr std::uint64_t kKvProjectionBytes =
+      static_cast<std::uint64_t>(kAttnKvHeads) * kAttnHeadDim * kBf16Bytes;
+  constexpr std::uint64_t kPreparedBytes =
+      static_cast<std::uint64_t>(kAttnQueryHeads) * kAttnHeadDim *
+      kBf16Bytes;
+  constexpr std::uint64_t kGammaBytes =
+      static_cast<std::uint64_t>(kAttnHeadDim) * kBf16Bytes;
+  constexpr std::uint64_t kInvFreqBytes =
+      static_cast<std::uint64_t>(kAttnRopeFreqs) * sizeof(float);
+  constexpr std::uint64_t kKvBytesPerToken =
+      static_cast<std::uint64_t>(kAttnLayers) * 2u * kAttnKvHeads *
+      kAttnHeadDim * kBf16Bytes;
+  if (capacity > std::numeric_limits<std::uint64_t>::max() /
+                     kKvBytesPerToken) {
+    return std::unexpected(make_error(ErrorCode::Overflow,
+                                      "attention_prepare",
+                                      "cache byte count overflows"));
+  }
+  auto const kv_bytes = capacity * kKvBytesPerToken;
+
+  std::array<std::expected<ByteInterval, Error>, 9> checked{
+      checked_interval(qg, kQGBytes, "qg"),
+      checked_interval(k_raw, kKvProjectionBytes, "k_raw"),
+      checked_interval(v_raw, kKvProjectionBytes, "v_raw"),
+      checked_interval(gamma_q, kGammaBytes, "gamma_q"),
+      checked_interval(gamma_k, kGammaBytes, "gamma_k"),
+      checked_interval(inv_freq, kInvFreqBytes, "inv_freq"),
+      checked_interval(q_out, kPreparedBytes, "q_out"),
+      checked_interval(g_out, kPreparedBytes, "g_out"),
+      checked_interval(kv, kv_bytes, "kv")};
+  std::array<ByteInterval, 9> intervals{};
+  for (std::size_t i = 0; i < checked.size(); ++i) {
+    if (!checked[i]) return std::unexpected(checked[i].error());
+    intervals[i] = *checked[i];
+  }
+  // The preparation kernel has no authorized aliases: input projection
+  // values and parameters remain live while Q, g, and the cache are written.
+  for (std::size_t i = 0; i < intervals.size(); ++i) {
+    for (std::size_t j = i + 1; j < intervals.size(); ++j) {
+      if (overlaps(intervals[i], intervals[j])) {
+        std::string detail(intervals[i].name);
+        detail += " overlaps ";
+        detail += intervals[j].name;
+        return std::unexpected(make_error(
+            ErrorCode::InvalidArgument, "attention_prepare",
+            detail));
+      }
+    }
+  }
+  return {};
+}
+
 }  // namespace
 
 std::expected<void, Error> launch_attention_prepare(
@@ -383,12 +472,6 @@ std::expected<void, Error> launch_attention_prepare(
                                       "attention_prepare",
                                       "null preparation operand"));
   }
-  if (qg == q_out || qg == g_out || q_out == g_out || k_raw == kv ||
-      v_raw == kv) {
-    return std::unexpected(make_error(ErrorCode::InvalidArgument,
-                                      "attention_prepare",
-                                      "projected, prepared, and cache buffers must be distinct"));
-  }
   if (attn_layer >= kAttnLayers) {
     return std::unexpected(make_error(ErrorCode::InvalidArgument,
                                       "attention_prepare",
@@ -403,6 +486,12 @@ std::expected<void, Error> launch_attention_prepare(
     return std::unexpected(make_error(ErrorCode::InvalidArgument,
                                       "attention_prepare",
                                       "position must be >= 0"));
+  }
+  if (auto alias = require_disjoint_prepare_operands(
+          qg, k_raw, v_raw, gamma_q, gamma_k, inv_freq, q_out, g_out, kv,
+          capacity);
+      !alias) {
+    return alias;
   }
   if (!finite_pos(eps)) {
     return std::unexpected(make_error(ErrorCode::InvalidArgument,
