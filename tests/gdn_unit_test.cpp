@@ -1072,6 +1072,116 @@ void test_mixer_gamma_z_residual_state(Stream const& stream) {
   expect(malloc_count() == mallocs2, "repeated mixer allocates nothing");
 }
 
+void test_session_history_wrap_reset_zero_padding() {
+  qw38::format::test::ScratchDir dir("qw38-gdn-history-reset");
+  auto fixture =
+      qw38::runtime::test::write_language_fixture(dir.file("model.qw38"));
+  expect(!fixture.path.empty(), "write history-reset runtime fixture");
+  if (fixture.path.empty()) {
+    return;
+  }
+
+  auto runtime = qw38::runtime::Runtime::create();
+  expect(static_cast<bool>(runtime), "create history-reset runtime");
+  if (!runtime) {
+    return;
+  }
+  auto model = runtime->load(fixture.path);
+  expect(static_cast<bool>(model), "load history-reset runtime fixture");
+  if (!model) {
+    return;
+  }
+  auto session = runtime->create_session(*model, 1);
+  expect(static_cast<bool>(session), "create history-reset session");
+  if (!session) {
+    return;
+  }
+
+  HostGdnMixer host;
+  if (!make_q4_mixer(host, 2, 0, 0, 0.55f, true, false)) {
+    return;
+  }
+  std::ranges::fill(host.taps, qw38::format::fp32_to_bf16_rne(0.0f));
+  for (std::uint32_t tap = 0; tap < kConvHistoryTaps; ++tap) {
+    std::ranges::fill(
+        std::span(host.taps).subspan(static_cast<std::size_t>(tap) * kQkvWidth,
+                                    kQkvWidth),
+        qw38::format::fp32_to_bf16_rne(1.0f));
+  }
+
+  DeviceGdnMixer dev;
+  if (!upload_host_mixer(host, dev, runtime->stream(), 1)) {
+    return;
+  }
+  auto views = mixer_views(dev);
+  views.history = session->conv_history();
+  views.history.rank = 2;
+  views.history.extent = {};
+  views.history.extent[0] = kConvHistoryTaps;
+  views.history.extent[1] = kQkvWidth;
+  auto cursor =
+      qw38::runtime::detail::SessionPlanAccess::conv_cursor(*session, 0);
+  expect(static_cast<bool>(cursor), "bind session convolution cursor");
+  if (!cursor) {
+    return;
+  }
+  views.cursor = *cursor;
+
+  auto plan = bind_gdn_plan(views, runtime->stream());
+  expect(static_cast<bool>(plan), "bind session-backed GDN front");
+  if (!plan) {
+    return;
+  }
+  for (std::uint32_t step = 0; step < 4; ++step) {
+    expect(static_cast<bool>(execute_gdn_front(plan->front)),
+           "execute session-backed GDN front through wrap");
+  }
+  auto seeded = session->save();
+  expect(static_cast<bool>(seeded), "save wrapped convolution history");
+  if (!seeded) {
+    return;
+  }
+  expect(seeded->conv_cursor[0] == 1, "real front execution wraps cursor to one");
+  for (std::uint32_t slot = 0; slot < kConvHistoryTaps; ++slot) {
+    auto begin = seeded->conv_history.begin() +
+                 static_cast<std::ptrdiff_t>(slot * kQkvWidth * 2u);
+    auto end = begin + static_cast<std::ptrdiff_t>(kQkvWidth * 2u);
+    expect(std::ranges::any_of(begin, end,
+                              [](std::byte value) {
+                                return value != std::byte{};
+                              }),
+           "real front execution seeds every history slot");
+  }
+
+  expect(static_cast<bool>(session->reset()), "reset wrapped GDN session");
+  auto reset = session->save();
+  expect(static_cast<bool>(reset), "save reset GDN session");
+  if (!reset) {
+    return;
+  }
+  expect(std::ranges::all_of(reset->conv_history,
+                             [](std::byte value) {
+                               return value == std::byte{};
+                             }),
+         "reset zeros every convolution history byte");
+  expect(std::ranges::all_of(reset->conv_cursor,
+                             [](std::uint32_t value) { return value == 0; }),
+         "reset zeros every convolution cursor");
+
+  expect(static_cast<bool>(execute_gdn_front(plan->front)),
+         "execute GDN front after reset");
+  std::vector<std::uint16_t> convolved(kQkvWidth);
+  expect(static_cast<bool>(qw38::cuda::copy_d2h(
+             convolved.data(), plan->front.scratch.convolved.pointer,
+             convolved.size() * sizeof(std::uint16_t), runtime->stream())),
+         "download post-reset convolved output");
+  expect(static_cast<bool>(runtime->stream().sync()),
+         "sync post-reset convolved output");
+  expect(std::ranges::all_of(
+             convolved, [](std::uint16_t value) { return value == 0; }),
+         "first post-reset convolution observes zero history padding");
+}
+
 }  // namespace
 
 int main() {
@@ -1089,6 +1199,7 @@ int main() {
   test_recurrence_reset();
   test_mixer_bind_and_lifetimes(*stream);
   test_mixer_gamma_z_residual_state(*stream);
+  test_session_history_wrap_reset_zero_padding();
   if (g_failures != 0) {
     std::cerr << g_failures << " gdn unit failures\n";
     return 1;
