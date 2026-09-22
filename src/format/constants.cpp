@@ -89,6 +89,11 @@ bool is_known(TensorRole value) noexcept {
     case TensorRole::ConvWeight:
     case TensorRole::VectorWeight:
     case TensorRole::TimeParameter:
+    case TensorRole::AdditiveNorm:
+    case TensorRole::QkNorm:
+    case TensorRole::GdnGatedNorm:
+    case TensorRole::FinalLanguageNorm:
+    case TensorRole::MtpNorm:
       return true;
   }
   return false;

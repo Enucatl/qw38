@@ -2223,10 +2223,31 @@ std::expected<void, FormatError> validate_schema(ArtifactSchema const& schema,
                                         "EMBED binds an embedding table"));
     }
     if (g.kind == SemanticNodeKind::LmHead &&
-        g.role != TensorRole::LmHeadWeight) {
+        g.role != TensorRole::LmHeadWeight &&
+        g.role != TensorRole::FinalLanguageNorm &&
+        g.role != TensorRole::MtpNorm) {
       return std::unexpected(make_error(FormatErrorCode::InvalidGraphBinding,
                                         offset, "graph.role",
-                                        "LM_HEAD binds the vocabulary matrix"));
+                                        "LM_HEAD binds its vocabulary matrix and norm"));
+    }
+    bool const valid_norm_node =
+        (g.role != TensorRole::AdditiveNorm ||
+         g.kind == SemanticNodeKind::GatedAttention ||
+         g.kind == SemanticNodeKind::GatedDeltaNet ||
+         g.kind == SemanticNodeKind::Mlp ||
+         g.kind == SemanticNodeKind::MtpMix) &&
+        (g.role != TensorRole::QkNorm ||
+         g.kind == SemanticNodeKind::GatedAttention) &&
+        (g.role != TensorRole::GdnGatedNorm ||
+         g.kind == SemanticNodeKind::GatedDeltaNet) &&
+        (g.role != TensorRole::FinalLanguageNorm ||
+         g.kind == SemanticNodeKind::LmHead) &&
+        (g.role != TensorRole::MtpNorm ||
+         g.kind == SemanticNodeKind::LmHead);
+    if (!valid_norm_node) {
+      return std::unexpected(make_error(FormatErrorCode::InvalidGraphBinding,
+                                        offset, "graph.role",
+                                        "norm role is invalid for graph node"));
     }
   }
   bool seen_gdn = false;

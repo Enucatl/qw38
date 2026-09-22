@@ -102,6 +102,11 @@ enum class TensorRole : std::uint16_t {
   ConvWeight = 0x0605,
   VectorWeight = 0x0606,
   TimeParameter = 0x0607,
+  AdditiveNorm = 0x0608,
+  QkNorm = 0x0609,
+  GdnGatedNorm = 0x060A,
+  FinalLanguageNorm = 0x060B,
+  MtpNorm = 0x060C,
 };
 
 enum class MappingKind : std::uint16_t {

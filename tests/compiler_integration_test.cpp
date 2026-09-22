@@ -44,6 +44,7 @@ using qw38::format::kNoLayerIndex;
 using qw38::format::PhysicalLayoutId;
 using qw38::format::SemanticScope;
 using qw38::format::SharedBindingRole;
+using qw38::format::TensorRole;
 using qw38::format::test::read_all;
 using qw38::format::test::ScratchDir;
 
@@ -172,6 +173,30 @@ int main() {
            "MTP alias roles");
     expect(schema->state.size() == 3, "GDN/conv/KV state schema");
     expect(schema->scratch.size() == 7, "language scratch schema");
+    std::array<std::uint32_t, 5> norm_counts{};
+    for (auto const& binding : schema->graph_bindings) {
+      switch (binding.role) {
+        case TensorRole::AdditiveNorm:
+          ++norm_counts[0];
+          break;
+        case TensorRole::QkNorm:
+          ++norm_counts[1];
+          break;
+        case TensorRole::GdnGatedNorm:
+          ++norm_counts[2];
+          break;
+        case TensorRole::FinalLanguageNorm:
+          ++norm_counts[3];
+          break;
+        case TensorRole::MtpNorm:
+          ++norm_counts[4];
+          break;
+        default:
+          break;
+      }
+    }
+    expect(norm_counts == std::array<std::uint32_t, 5>{132, 34, 48, 1, 1},
+           "complete semantic norm binding multiplicities");
     bool saw_rope = false;
     for (auto const& t : schema->tensors) {
       if (t.logical_name == kRopeInvFreqName) {
@@ -180,6 +205,19 @@ int main() {
       }
     }
     expect(saw_rope, "generated RoPE tensor");
+
+    auto malformed = classified;
+    for (auto& item : malformed.included) {
+      if (item.expected.family == TensorFamily::FinalNorm) {
+        item.expected.role = TensorRole::AdditiveNorm;
+      }
+    }
+    auto rejected = build_identity_schema(
+        malformed, hash_seed(1), hash_seed(2), hash_seed(3),
+        CompilerRevision{.ident = kCompilerIdent, .major = 0, .minor = 1});
+    expect(!rejected &&
+               rejected.error().code == CompilerErrorCode::ArchitectureMismatch,
+           "compiler rejects incomplete norm role multiplicity");
   }
 
   ScratchDir dir{"qw38-compiler-int"};
@@ -272,10 +310,19 @@ int main() {
   conv.expected.shape = {.rank = 3, .dims = {32, 1, 4}};
   conv.bytes = pattern(32 * 4, 4);
   auto vec = synth_from(find_expected(TensorFamily::LinearAttnALog), 5);
+  auto additive = synth_from(find_expected(TensorFamily::InputLayernorm), 6);
+  auto q_norm = synth_from(find_expected(TensorFamily::SelfAttnQNorm), 7);
+  auto k_norm = synth_from(find_expected(TensorFamily::SelfAttnKNorm), 8);
+  auto gated = synth_from(find_expected(TensorFamily::LinearAttnNorm), 9);
+  auto final_norm = synth_from(find_expected(TensorFamily::FinalNorm), 10);
+  auto mtp_norm = synth_from(find_expected(TensorFamily::MtpNorm), 11);
 
   CompilerRevision rev{.ident = kCompilerIdent, .major = 0, .minor = 1, .patch = 0};
   auto hashes = std::array{hash_seed(0x11), hash_seed(0x22), hash_seed(0x33)};
-  std::vector<SyntheticTensor> fixture{embed, head, dense, conv, vec};
+  std::vector<SyntheticTensor> fixture{embed,      head,       dense,
+                                       conv,       vec,        additive,
+                                       q_norm,     k_norm,     gated,
+                                       final_norm, mtp_norm};
 
   auto first = compile_synthetic(dest1, hashes[0], hashes[1], hashes[2], rev,
                                  fixture);
@@ -302,6 +349,37 @@ int main() {
       expect(art->state().size() == 3 && art->scratch().size() == 7,
              "reader state/scratch");
       expect(art->shared_bindings().size() == 2, "reader shared bindings");
+      std::array<std::uint32_t, 5> artifact_norm_counts{};
+      for (auto const& binding : art->graph_bindings()) {
+        std::size_t slot = artifact_norm_counts.size();
+        switch (binding.role) {
+          case TensorRole::AdditiveNorm:
+            slot = 0;
+            break;
+          case TensorRole::QkNorm:
+            slot = 1;
+            break;
+          case TensorRole::GdnGatedNorm:
+            slot = 2;
+            break;
+          case TensorRole::FinalLanguageNorm:
+            slot = 3;
+            break;
+          case TensorRole::MtpNorm:
+            slot = 4;
+            break;
+          default:
+            break;
+        }
+        if (slot != artifact_norm_counts.size()) {
+          ++artifact_norm_counts[slot];
+          expect(art->find_tensor(binding.tensor_id) != nullptr,
+                 "norm binding resolves by tensor id");
+        }
+      }
+      expect(artifact_norm_counts ==
+                 std::array<std::uint32_t, 5>{1, 2, 1, 1, 1},
+             "artifact exposes every semantic norm role without name lookup");
       auto rope = art->payload(kRopeInvFreqName);
       auto want = generate_rope_inv_freq();
       expect(static_cast<bool>(rope) &&

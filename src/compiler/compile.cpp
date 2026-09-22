@@ -187,11 +187,98 @@ std::uint32_t instance_for(ExpectedTensor const& exp) {
 }
 
 bool bindable(ExpectedTensor const& exp) {
-  if (exp.node == SemanticNodeKind::LmHead &&
-      exp.role != TensorRole::LmHeadWeight) {
-    return false;
+  return exp.node != SemanticNodeKind::LmHead ||
+         exp.role == TensorRole::LmHeadWeight ||
+         exp.role == TensorRole::FinalLanguageNorm ||
+         exp.role == TensorRole::MtpNorm;
+}
+
+struct NormCounts {
+  std::uint32_t additive{};
+  std::uint32_t qk{};
+  std::uint32_t gdn_gated{};
+  std::uint32_t final_language{};
+  std::uint32_t mtp{};
+};
+
+std::expected<void, CompilerError> validate_required_norm_bindings(
+    std::span<GraphBinding const> bindings) {
+  std::unordered_map<std::uint32_t, NormCounts> counts;
+  for (auto const& binding : bindings) {
+    auto& c = counts[binding.instance_id];
+    switch (binding.role) {
+      case TensorRole::AdditiveNorm:
+        ++c.additive;
+        break;
+      case TensorRole::QkNorm:
+        ++c.qk;
+        break;
+      case TensorRole::GdnGatedNorm:
+        ++c.gdn_gated;
+        break;
+      case TensorRole::FinalLanguageNorm:
+        ++c.final_language;
+        break;
+      case TensorRole::MtpNorm:
+        ++c.mtp;
+        break;
+      default:
+        break;
+    }
   }
-  return true;
+
+  auto require = [&](std::uint32_t instance, NormCounts expected,
+                     std::string_view field)
+      -> std::expected<void, CompilerError> {
+    auto const got = counts[instance];
+    if (got.additive != expected.additive || got.qk != expected.qk ||
+        got.gdn_gated != expected.gdn_gated ||
+        got.final_language != expected.final_language ||
+        got.mtp != expected.mtp) {
+      return std::unexpected(make_error(
+          CompilerErrorCode::ArchitectureMismatch, field,
+          "required semantic norm binding multiplicity is not satisfied"));
+    }
+    return {};
+  };
+
+  for (std::uint32_t layer = 0; layer < kLayers; ++layer) {
+    auto const mixer = mixer_instance(layer);
+    if (is_full_attention_layer(layer)) {
+      if (auto st = require(mixer, {.additive = 1, .qk = 2},
+                            "gated_attention.norms");
+          !st) {
+        return st;
+      }
+    } else if (auto st = require(mixer, {.additive = 1, .gdn_gated = 1},
+                                 "gated_delta_net.norms");
+               !st) {
+      return st;
+    }
+    if (auto st = require(mlp_instance(layer), {.additive = 1}, "mlp.norms");
+        !st) {
+      return st;
+    }
+  }
+  if (auto st = require(kLmHeadInstance, {.final_language = 1},
+                        "lm_head.norms");
+      !st) {
+    return st;
+  }
+  if (auto st = require(kMtpMixInstance, {.additive = 2}, "mtp_mix.norms");
+      !st) {
+    return st;
+  }
+  if (auto st = require(kMtpAttnInstance, {.additive = 1, .qk = 2},
+                        "mtp_attention.norms");
+      !st) {
+    return st;
+  }
+  if (auto st = require(kMtpMlpInstance, {.additive = 1}, "mtp_mlp.norms");
+      !st) {
+    return st;
+  }
+  return require(kMtpLmHeadInstance, {.mtp = 1}, "mtp_lm_head.norms");
 }
 
 std::expected<void, CompilerError> write_span(
@@ -558,6 +645,12 @@ std::expected<ArtifactSchema, CompilerError> build_schema(
       .alias_tensor_id = mtp_head_id,
       .role = SharedBindingRole::MtpLmHeadAlias,
   });
+
+  if (classified.included.size() == kIncludedTensors) {
+    if (auto st = validate_required_norm_bindings(schema.graph_bindings); !st) {
+      return std::unexpected(st.error());
+    }
+  }
 
   return schema;
 }
