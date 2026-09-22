@@ -6,6 +6,7 @@
 #include "cuda/decode_mmv.hpp"
 
 #include "format/constants.hpp"
+#include "format/layout.hpp"
 
 #include <array>
 #include <cmath>
@@ -42,15 +43,17 @@ Error arg_error(std::string_view field, std::string_view detail) {
 template <typename Pointer>
 std::expected<std::uint64_t, Error> element_count(
     BasicTensorView<Pointer> const& v, std::string_view field) {
-  if (v.rank == 0) {
-    return std::unexpected(arg_error(field, "rank must be nonzero"));
+  if (v.rank == 0 || v.rank > qw38::format::kMaxRank) {
+    return std::unexpected(arg_error(field, "rank is invalid"));
   }
   std::uint64_t n = 1;
   for (std::uint8_t i = 0; i < v.rank; ++i) {
-    if (v.extent[i] == 0 || n > std::numeric_limits<std::uint64_t>::max() / v.extent[i]) {
-      return std::unexpected(arg_error(field, "element count overflows or is empty"));
+    auto product = qw38::format::checked_mul(n, v.extent[i], 0, field);
+    if (!product) {
+      return std::unexpected(make_error(ErrorCode::Overflow, product.error().field,
+                                        product.error().detail));
     }
-    n *= v.extent[i];
+    n = *product;
   }
   return n;
 }
@@ -58,13 +61,15 @@ std::expected<std::uint64_t, Error> element_count(
 template <typename Pointer>
 std::expected<std::uint64_t, Error> view_bytes(
     BasicTensorView<Pointer> const& v, std::string_view field) {
-  auto n = element_count(v, field);
-  if (!n) return std::unexpected(n.error());
-  auto const size = qw38::format::element_size(v.dtype);
-  if (size == 0 || *n > std::numeric_limits<std::uint64_t>::max() / size) {
-    return std::unexpected(arg_error(field, "byte count overflows"));
+  auto elements = element_count(v, field);
+  if (!elements) return std::unexpected(elements.error());
+  auto bytes = qw38::format::checked_mul(
+      *elements, qw38::format::element_size(v.dtype), 0, field);
+  if (!bytes) {
+    return std::unexpected(make_error(ErrorCode::Overflow, bytes.error().field,
+                                      bytes.error().detail));
   }
-  return *n * size;
+  return *bytes;
 }
 
 template <typename Pointer>
@@ -85,7 +90,12 @@ std::expected<BasicTensorView<Pointer>, Error> require_view(
     std::uint64_t alignment, std::string_view field) {
   (void)writable;
   if (v.pointer == nullptr || v.space != MemorySpace::Device || v.dtype != dtype ||
-      v.layout != layout || v.storage != storage || v.rank != extents.size()) {
+      v.layout != layout || v.storage != storage) {
+    return std::unexpected(arg_error(field, "typed view contract mismatch"));
+  }
+  auto bytes = view_bytes(v, field);
+  if (!bytes) return std::unexpected(bytes.error());
+  if (v.rank != extents.size()) {
     return std::unexpected(arg_error(field, "typed view contract mismatch"));
   }
   std::size_t i = 0;
@@ -97,8 +107,30 @@ std::expected<BasicTensorView<Pointer>, Error> require_view(
   if (auto st = require_alignment(v, alignment, field); !st) {
     return std::unexpected(st.error());
   }
-  if (auto bytes = view_bytes(v, field); !bytes) return std::unexpected(bytes.error());
   return v;
+}
+
+std::expected<void, Error> require_workspace_region(
+    WorkspaceView const& workspace, std::uint8_t index, std::uint64_t offset,
+    std::uint64_t bytes, ArithmeticDtype dtype, PhysicalLayoutId layout,
+    StorageClass storage, std::initializer_list<std::uint64_t> extents) {
+  auto const& region = workspace.region[index];
+  if (region.offset != offset || region.bytes != bytes ||
+      region.stride_bytes != bytes || region.repetitions != 1 ||
+      region.tensor.pointer != workspace.pointer + offset) {
+    return std::unexpected(
+        arg_error("workspace", "region metadata does not match attention schema"));
+  }
+  auto view = require_view(region.tensor, dtype, layout, storage, true, extents,
+                           qw38::format::element_size(dtype), "workspace");
+  if (!view) return std::unexpected(view.error());
+  auto actual_bytes = view_bytes(*view, "workspace");
+  if (!actual_bytes) return std::unexpected(actual_bytes.error());
+  if (*actual_bytes != bytes) {
+    return std::unexpected(
+        arg_error("workspace", "region byte count does not match attention schema"));
+  }
+  return {};
 }
 
 struct ByteInterval { std::string_view name; std::uintptr_t begin; std::uintptr_t end; };
@@ -201,8 +233,11 @@ std::expected<AttnWeightBinding, Error> bind_q4_or_bf16(ConstTensorView codes,
   b.padded_k = decode_pad_k(want_k);
   b.codes_bytes = decode_code_bytes(b.layout, b.padded_n, b.padded_k);
   b.scales_bytes = decode_scale_bytes(b.layout, b.padded_n, b.padded_k);
+  if (b.codes_bytes == 0) {
+    return std::unexpected(arg_error(field, "payload byte count is invalid"));
+  }
   if (b.scales_bytes == 0) {
-    if (scales.pointer != nullptr || scales.rank != 0) {
+    if (scales != ConstTensorView{}) {
       return std::unexpected(arg_error(field, "BF16 dense tile must not supply scales"));
     }
   } else {
@@ -218,7 +253,9 @@ std::expected<AttnWeightBinding, Error> bind_q4_or_bf16(ConstTensorView codes,
       return std::unexpected(arg_error(field, "scale typed view contract mismatch"));
     }
     if (auto st = require_alignment(scales, 2, field); !st) return std::unexpected(st.error());
-    if (scales.extent[0] * qw38::format::kFp16Size != b.scales_bytes) {
+    auto scale_bytes = view_bytes(scales, field);
+    if (!scale_bytes) return std::unexpected(scale_bytes.error());
+    if (*scale_bytes != b.scales_bytes) {
       return std::unexpected(arg_error(field, "scale view length does not match layout"));
     }
     b.scales = scales;
@@ -343,12 +380,59 @@ std::string attn_k_norm_name(std::uint32_t layer) {
 std::expected<AttnWorkspaceViews, Error> bind_attention_workspace(
     WorkspaceView workspace) {
   if (workspace.pointer == nullptr || workspace.space != MemorySpace::Device ||
-      workspace.bytes < kAttentionWorkspaceBytesPerToken) {
+      workspace.kind != qw38::format::ScratchKind::AttentionWorkspace ||
+      workspace.bytes < kAttentionWorkspaceBytesPerToken ||
+      workspace.bytes % qw38::format::kFp32Size != 0 ||
+      workspace.region_count != 6) {
     return std::unexpected(arg_error("workspace", "typed view contract mismatch"));
   }
   if (reinterpret_cast<std::uintptr_t>(workspace.pointer) % 16u != 0) {
     return std::unexpected(
         arg_error("workspace", "view alignment is invalid"));
+  }
+  auto const partial_bytes = workspace.bytes - kAttnOffPartials;
+  auto const partial_elements = partial_bytes / qw38::format::kFp32Size;
+  if (auto st = require_workspace_region(
+          workspace, 0, kAttnOffQg, kAttnBytesQg, ArithmeticDtype::Bf16,
+          PhysicalLayoutId::CudaBf16RowMajorV0, StorageClass::Bf16,
+          {kQueryHeads, 2u * kHeadDim});
+      !st) {
+    return std::unexpected(st.error());
+  }
+  if (auto st = require_workspace_region(
+          workspace, 1, kAttnOffK, kAttnBytesK, ArithmeticDtype::Bf16,
+          PhysicalLayoutId::CudaBf16RowMajorV0, StorageClass::Bf16,
+          {kKvHeads, kHeadDim});
+      !st) {
+    return std::unexpected(st.error());
+  }
+  if (auto st = require_workspace_region(
+          workspace, 2, kAttnOffV, kAttnBytesV, ArithmeticDtype::Bf16,
+          PhysicalLayoutId::CudaBf16RowMajorV0, StorageClass::Bf16,
+          {kKvHeads, kHeadDim});
+      !st) {
+    return std::unexpected(st.error());
+  }
+  if (auto st = require_workspace_region(
+          workspace, 3, kAttnOffQ, kAttnBytesQ, ArithmeticDtype::Bf16,
+          PhysicalLayoutId::CudaBf16RowMajorV0, StorageClass::Bf16,
+          {kQueryHeads, kHeadDim});
+      !st) {
+    return std::unexpected(st.error());
+  }
+  if (auto st = require_workspace_region(
+          workspace, 4, kAttnOffG, kAttnBytesG, ArithmeticDtype::Bf16,
+          PhysicalLayoutId::CudaBf16RowMajorV0, StorageClass::Bf16,
+          {kQueryHeads, kHeadDim});
+      !st) {
+    return std::unexpected(st.error());
+  }
+  if (auto st = require_workspace_region(
+          workspace, 5, kAttnOffPartials, partial_bytes, ArithmeticDtype::Fp32,
+          PhysicalLayoutId::CudaFp32VectorV0, StorageClass::Fp32,
+          {partial_elements});
+      !st) {
+    return std::unexpected(st.error());
   }
   auto* base = workspace.pointer;
   AttnWorkspaceViews v;
@@ -439,6 +523,12 @@ std::expected<AttentionPrepPlan, Error> bind_attention_prep_plan(
       PhysicalLayoutId::CudaBf16RowMajorV0, StorageClass::Bf16, true, {kHidden}, 2, "normalized");
   if (!normalized) {
     return std::unexpected(normalized.error());
+  }
+  auto required_workspace = attn_workspace_bytes_for_capacity(views.kv_capacity);
+  if (!required_workspace) return std::unexpected(required_workspace.error());
+  if (views.workspace.bytes != *required_workspace) {
+    return std::unexpected(arg_error(
+        "workspace", "workspace extent does not match KV-capacity contract"));
   }
   auto scratch = bind_attention_workspace(views.workspace);
   if (!scratch) {

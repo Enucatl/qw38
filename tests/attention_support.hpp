@@ -62,6 +62,7 @@ using qw38::reference::tol::kAttnProjRel;
 using qw38::runtime::AttentionPrepBindViews;
 using qw38::runtime::MemorySpace;
 using qw38::runtime::TensorView;
+using qw38::runtime::WorkspaceView;
 using qw38::runtime::kAttentionWorkspaceBytesPerToken;
 
 inline std::vector<std::uint16_t> pattern_h(std::uint32_t n, float seed) {
@@ -75,6 +76,45 @@ inline std::vector<std::uint16_t> pattern_h(std::uint32_t n, float seed) {
 
 inline std::vector<std::byte> bf16_bytes(std::span<std::uint16_t const> src) {
   return as_bytes(src);
+}
+
+inline WorkspaceView attention_workspace_view(
+    void* pointer, std::uint64_t bytes = kAttentionWorkspaceBytesPerToken) {
+  WorkspaceView workspace{};
+  workspace.pointer = static_cast<std::byte*>(pointer);
+  workspace.bytes = bytes;
+  workspace.kind = qw38::format::ScratchKind::AttentionWorkspace;
+  auto add = [&](std::uint64_t offset, std::uint64_t region_bytes,
+                 ArithmeticDtype dtype, PhysicalLayoutId layout,
+                 StorageClass storage, std::uint8_t rank, std::uint64_t e0,
+                 std::uint64_t e1 = 0) {
+    auto& region = workspace.region[workspace.region_count++];
+    region.offset = offset;
+    region.bytes = region_bytes;
+    region.stride_bytes = region_bytes;
+    region.tensor = make_view(workspace.pointer + offset, dtype, layout, storage,
+                              true, rank, e0, e1);
+  };
+  add(qw38::runtime::kAttnOffQg, qw38::runtime::kAttnBytesQg,
+      ArithmeticDtype::Bf16, PhysicalLayoutId::CudaBf16RowMajorV0,
+      StorageClass::Bf16, 2, kQueryHeads, 2u * kHeadDim);
+  add(qw38::runtime::kAttnOffK, qw38::runtime::kAttnBytesK,
+      ArithmeticDtype::Bf16, PhysicalLayoutId::CudaBf16RowMajorV0,
+      StorageClass::Bf16, 2, kKvHeads, kHeadDim);
+  add(qw38::runtime::kAttnOffV, qw38::runtime::kAttnBytesV,
+      ArithmeticDtype::Bf16, PhysicalLayoutId::CudaBf16RowMajorV0,
+      StorageClass::Bf16, 2, kKvHeads, kHeadDim);
+  add(qw38::runtime::kAttnOffQ, qw38::runtime::kAttnBytesQ,
+      ArithmeticDtype::Bf16, PhysicalLayoutId::CudaBf16RowMajorV0,
+      StorageClass::Bf16, 2, kQueryHeads, kHeadDim);
+  add(qw38::runtime::kAttnOffG, qw38::runtime::kAttnBytesG,
+      ArithmeticDtype::Bf16, PhysicalLayoutId::CudaBf16RowMajorV0,
+      StorageClass::Bf16, 2, kQueryHeads, kHeadDim);
+  auto const partial_bytes = bytes - qw38::runtime::kAttnOffPartials;
+  add(qw38::runtime::kAttnOffPartials, partial_bytes, ArithmeticDtype::Fp32,
+      PhysicalLayoutId::CudaFp32VectorV0, StorageClass::Fp32, 1,
+      partial_bytes / qw38::format::kFp32Size);
+  return workspace;
 }
 
 inline bool pack_bf16_tile(std::span<std::uint16_t const> row_major, std::uint32_t n,
@@ -216,9 +256,7 @@ inline AttentionPrepBindViews bind_views(DeviceAttn& dev,
   v.normalized = vec_view(dev.normalized, ArithmeticDtype::Bf16,
                           PhysicalLayoutId::CudaBf16RowMajorV0, StorageClass::Bf16,
                           true, kHidden);
-  v.workspace = vec_view(dev.workspace, ArithmeticDtype::Fp32,
-                         PhysicalLayoutId::CudaFp32VectorV0, StorageClass::Fp32, true,
-                         kAttentionWorkspaceBytesPerToken / 4);
+  v.workspace = attention_workspace_view(dev.workspace.data());
   v.kv = vec_view(dev.kv, ArithmeticDtype::Bf16,
                   PhysicalLayoutId::CudaBf16KvCacheV0, StorageClass::Bf16, true, 1);
   v.kv.rank = 5;

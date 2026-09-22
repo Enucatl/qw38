@@ -17,6 +17,7 @@
 
 using qw38::attn::test::DeviceAttn;
 using qw38::attn::test::HostAttn;
+using qw38::attn::test::attention_workspace_view;
 using qw38::attn::test::bind_views;
 using qw38::attn::test::download_vec;
 using qw38::attn::test::expect;
@@ -112,9 +113,7 @@ AttentionPrepBindViews dummy_ok_views(std::uint64_t* populated,
   v.normalized = make_view(dummy_ptr(0x75000000), ArithmeticDtype::Bf16,
                            PhysicalLayoutId::CudaBf16RowMajorV0, StorageClass::Bf16,
                            true, 1, kHidden);
-  v.workspace = make_view(ws, ArithmeticDtype::Fp32,
-                          PhysicalLayoutId::CudaFp32VectorV0, StorageClass::Fp32,
-                          true, 1, kAttentionWorkspaceBytesPerToken / 4);
+  v.workspace = attention_workspace_view(ws);
   v.kv = make_view(dummy_ptr(0x76000000), ArithmeticDtype::Bf16,
                    PhysicalLayoutId::CudaBf16KvCacheV0, StorageClass::Bf16, true, 5,
                    16, 2);
@@ -213,26 +212,162 @@ void test_bind_errors(Stream const& stream) {
   expect(static_cast<bool>(ws), "workspace bind");
   expect(kAttnOffQg == 0, "qg is first workspace alias");
 
+  auto rejects = [&](AttentionPrepBindViews const& bad, std::string const& label) {
+    expect(!bind_attention_prep_plan(bad, stream), label);
+  };
+
+  auto bad_payload_pointer = views;
+  bad_payload_pointer.qg.pointer = nullptr;
+  rejects(bad_payload_pointer, "payload null pointer rejects");
+  auto bad_payload_space = views;
+  bad_payload_space.qg.space = qw38::runtime::MemorySpace::Host;
+  rejects(bad_payload_space, "payload host space rejects");
+  auto bad_payload_dtype = views;
+  bad_payload_dtype.qg.dtype = ArithmeticDtype::Fp32;
+  rejects(bad_payload_dtype, "payload arithmetic dtype rejects");
+  auto bad_payload_layout = views;
+  bad_payload_layout.qg.layout = PhysicalLayoutId::CudaBf16RowMajorV0;
+  rejects(bad_payload_layout, "payload physical layout rejects");
+  auto bad_payload_storage = views;
+  bad_payload_storage.qg.storage = StorageClass::Bf16;
+  rejects(bad_payload_storage, "payload storage rejects");
+  auto bad_payload_rank = views;
+  bad_payload_rank.qg.rank = 1;
+  rejects(bad_payload_rank, "payload rank rejects");
+  auto bad_payload_extent = views;
+  bad_payload_extent.qg.extent[1] = kHidden + 1;
+  rejects(bad_payload_extent, "payload extent rejects");
+  auto excessive_payload_rank = views;
+  excessive_payload_rank.qg.rank = qw38::format::kMaxRank + 1;
+  rejects(excessive_payload_rank, "payload rank above maximum rejects");
+
+  auto bad_scale_pointer = views;
+  bad_scale_pointer.qg_scales.pointer = nullptr;
+  rejects(bad_scale_pointer, "Q4 scale null pointer rejects");
+  auto bad_scale_space = views;
+  bad_scale_space.qg_scales.space = qw38::runtime::MemorySpace::Host;
+  rejects(bad_scale_space, "Q4 scale host space rejects");
   auto bad_scale_dtype = views;
   bad_scale_dtype.qg_scales.dtype = ArithmeticDtype::Bf16;
-  expect(!bind_attention_prep_plan(bad_scale_dtype, stream),
-         "Q4 scales require FP16 typed view");
+  rejects(bad_scale_dtype, "Q4 scales require FP16 typed view");
   auto bad_scale_layout = views;
   bad_scale_layout.k_scales.layout = PhysicalLayoutId::CudaBf16VectorV0;
-  expect(!bind_attention_prep_plan(bad_scale_layout, stream),
-         "Q4 scales require matching physical layout");
+  rejects(bad_scale_layout, "Q4 scales require matching physical layout");
   auto bad_scale_storage = views;
   bad_scale_storage.v_scales.storage = StorageClass::Bf16;
-  expect(!bind_attention_prep_plan(bad_scale_storage, stream),
-         "Q4 scales require grouped storage");
+  rejects(bad_scale_storage, "Q4 scales require grouped storage");
+  auto bad_scale_rank = views;
+  bad_scale_rank.qg_scales.rank = 2;
+  rejects(bad_scale_rank, "Q4 scale rank rejects");
+  auto bad_scale_extent = views;
+  ++bad_scale_extent.qg_scales.extent[0];
+  rejects(bad_scale_extent, "Q4 scale extent rejects");
+
+  auto bad_gamma_extent = views;
+  --bad_gamma_extent.gamma.extent[0];
+  rejects(bad_gamma_extent, "gamma exact extent rejects");
+  auto bad_gamma_q_rank = views;
+  bad_gamma_q_rank.gamma_q.rank = 2;
+  bad_gamma_q_rank.gamma_q.extent = {1, kHeadDim};
+  rejects(bad_gamma_q_rank, "gamma_q flattened-equivalent rank rejects");
+  auto bad_gamma_k_layout = views;
+  bad_gamma_k_layout.gamma_k.layout = PhysicalLayoutId::CudaBf16RowMajorV0;
+  rejects(bad_gamma_k_layout, "gamma_k layout rejects");
+  auto bad_inv_storage = views;
+  bad_inv_storage.inv_freq.storage = StorageClass::Bf16;
+  rejects(bad_inv_storage, "inv_freq storage rejects");
+  auto bad_residual_dtype = views;
+  bad_residual_dtype.residual.dtype = ArithmeticDtype::Bf16;
+  rejects(bad_residual_dtype, "residual dtype rejects");
+  auto bad_normalized_extent = views;
+  ++bad_normalized_extent.normalized.extent[0];
+  rejects(bad_normalized_extent, "normalized extent rejects");
+
+  auto bad_workspace_kind = views;
+  bad_workspace_kind.workspace.kind = qw38::format::ScratchKind::GdnWorkspace;
+  rejects(bad_workspace_kind, "workspace kind rejects");
+  auto bad_workspace_space = views;
+  bad_workspace_space.workspace.space = qw38::runtime::MemorySpace::Host;
+  rejects(bad_workspace_space, "workspace space rejects");
   auto bad_workspace = views;
   bad_workspace.workspace.bytes = 1;
-  expect(!bind_attention_prep_plan(bad_workspace, stream),
-         "workspace requires FP32 storage contract");
+  rejects(bad_workspace, "workspace exact byte extent rejects");
+  auto bad_workspace_count = views;
+  bad_workspace_count.workspace.region_count = 5;
+  rejects(bad_workspace_count, "workspace region count rejects");
+  auto bad_workspace_dtype = views;
+  bad_workspace_dtype.workspace.region[0].tensor.dtype = ArithmeticDtype::Fp32;
+  rejects(bad_workspace_dtype, "workspace region dtype rejects");
+  auto bad_workspace_layout = views;
+  bad_workspace_layout.workspace.region[0].tensor.layout =
+      PhysicalLayoutId::CudaBf16VectorV0;
+  rejects(bad_workspace_layout, "workspace region layout rejects");
+  auto bad_workspace_storage = views;
+  bad_workspace_storage.workspace.region[0].tensor.storage = StorageClass::Fp32;
+  rejects(bad_workspace_storage, "workspace region storage rejects");
+  auto bad_workspace_rank = views;
+  bad_workspace_rank.workspace.region[0].tensor.rank = 1;
+  rejects(bad_workspace_rank, "workspace region rank rejects");
+  auto bad_workspace_extent = views;
+  ++bad_workspace_extent.workspace.region[0].tensor.extent[0];
+  rejects(bad_workspace_extent, "workspace region extent rejects");
+  auto bad_workspace_offset = views;
+  ++bad_workspace_offset.workspace.region[0].offset;
+  rejects(bad_workspace_offset, "workspace region offset rejects");
+  auto bad_workspace_region_bytes = views;
+  ++bad_workspace_region_bytes.workspace.region[0].bytes;
+  rejects(bad_workspace_region_bytes, "workspace region byte count rejects");
+  auto bad_workspace_stride = views;
+  ++bad_workspace_stride.workspace.region[0].stride_bytes;
+  rejects(bad_workspace_stride, "workspace region stride rejects");
+  auto bad_workspace_repetitions = views;
+  bad_workspace_repetitions.workspace.region[0].repetitions = 2;
+  rejects(bad_workspace_repetitions, "workspace region repetitions reject");
+  auto bad_workspace_region_pointer = views;
+  bad_workspace_region_pointer.workspace.region[0].tensor.pointer =
+      dummy_ptr(0x01000010);
+  rejects(bad_workspace_region_pointer, "workspace region pointer rejects");
+
   auto bad_kv_layout = views;
   bad_kv_layout.kv.layout = PhysicalLayoutId::CudaBf16RowMajorV0;
-  expect(!bind_attention_prep_plan(bad_kv_layout, stream),
-         "KV requires cache physical layout");
+  rejects(bad_kv_layout, "KV requires cache physical layout");
+  auto bad_kv_pointer = views;
+  bad_kv_pointer.kv.pointer = nullptr;
+  rejects(bad_kv_pointer, "KV null pointer rejects");
+  auto bad_kv_space = views;
+  bad_kv_space.kv.space = qw38::runtime::MemorySpace::Host;
+  rejects(bad_kv_space, "KV host space rejects");
+  auto bad_kv_dtype = views;
+  bad_kv_dtype.kv.dtype = ArithmeticDtype::Fp32;
+  rejects(bad_kv_dtype, "KV arithmetic dtype rejects");
+  auto bad_kv_storage = views;
+  bad_kv_storage.kv.storage = StorageClass::Fp32;
+  rejects(bad_kv_storage, "KV storage rejects");
+  auto bad_kv_rank = views;
+  bad_kv_rank.kv.rank = 1;
+  rejects(bad_kv_rank, "KV rank rejects");
+  auto bad_kv_extent = views;
+  ++bad_kv_extent.kv.extent[2];
+  rejects(bad_kv_extent, "KV exact geometry rejects");
+  auto excessive_kv_rank = views;
+  excessive_kv_rank.kv.rank = qw38::format::kMaxRank + 1;
+  rejects(excessive_kv_rank, "KV rank above maximum rejects");
+  auto element_overflow = views;
+  element_overflow.kv.extent[0] = std::numeric_limits<std::uint64_t>::max();
+  element_overflow.kv.extent[1] = 2;
+  auto element_overflow_result = bind_attention_prep_plan(element_overflow, stream);
+  expect(!element_overflow_result &&
+             element_overflow_result.error().code ==
+                 qw38::runtime::ErrorCode::Overflow,
+         "overflowing KV element product rejects");
+  auto byte_overflow = views;
+  byte_overflow.normalized.extent[0] =
+      std::numeric_limits<std::uint64_t>::max();
+  auto byte_overflow_result = bind_attention_prep_plan(byte_overflow, stream);
+  expect(!byte_overflow_result &&
+             byte_overflow_result.error().code ==
+                 qw38::runtime::ErrorCode::Overflow,
+         "overflowing view byte product rejects");
   auto misaligned = views;
   misaligned.residual.pointer = dummy_ptr(0x74000002);
   expect(!bind_attention_prep_plan(misaligned, stream),
