@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cerrno>
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
@@ -38,6 +39,7 @@ using qw38::format::SpanKind;
 using qw38::format::StorageClass;
 using qw38::format::TensorRecord;
 using qw38::format::TensorShape;
+using qw38::format::WriterFilesystem;
 using qw38::format::v0_precision_policy;
 
 namespace {
@@ -583,6 +585,104 @@ void test_chunked_stream() {
          "chunked payload concatenated in order");
 }
 
+enum class FaultStage { PayloadWrite, ManifestWrite, Fsync, Close, Rename };
+
+struct FaultFilesystem {
+  FaultStage stage;
+
+  static ssize_t pwrite(void* context, int fd, void const* data,
+                        std::size_t size, off_t offset) {
+    auto const stage = static_cast<FaultFilesystem*>(context)->stage;
+    if ((stage == FaultStage::PayloadWrite && offset == 256) ||
+        (stage == FaultStage::ManifestWrite && offset >= 512)) {
+      errno = EIO;
+      return -1;
+    }
+    return ::pwrite(fd, data, size, offset);
+  }
+
+  static int fsync(void* context, int fd) {
+    if (static_cast<FaultFilesystem*>(context)->stage == FaultStage::Fsync) {
+      errno = EIO;
+      return -1;
+    }
+    return ::fsync(fd);
+  }
+
+  static int close(void* context, int fd) {
+    int const result = ::close(fd);
+    if (static_cast<FaultFilesystem*>(context)->stage == FaultStage::Close) {
+      errno = EIO;
+      return -1;
+    }
+    return result;
+  }
+
+  static int rename(void* context, char const* from, char const* to) {
+    if (static_cast<FaultFilesystem*>(context)->stage == FaultStage::Rename) {
+      errno = EIO;
+      return -1;
+    }
+    return ::rename(from, to);
+  }
+
+  [[nodiscard]] WriterFilesystem operations() {
+    return WriterFilesystem{.pwrite = pwrite,
+                            .fsync = fsync,
+                            .close = close,
+                            .rename = rename,
+                            .context = this};
+  }
+};
+
+void test_publication_io_failure_cleanup() {
+  struct Case {
+    FaultStage stage;
+    std::string_view name;
+    FormatErrorCode error;
+  };
+  std::array const cases{
+      Case{FaultStage::PayloadWrite, "payload-pwrite", FormatErrorCode::IoFailure},
+      Case{FaultStage::ManifestWrite, "manifest-pwrite", FormatErrorCode::IoFailure},
+      Case{FaultStage::Fsync, "fsync", FormatErrorCode::IoFailure},
+      Case{FaultStage::Close, "close", FormatErrorCode::IoFailure},
+      Case{FaultStage::Rename, "rename", FormatErrorCode::PublishFailed},
+  };
+  for (auto const& test : cases) {
+    ScratchDir dir;
+    auto const dest = dir.file(std::string(test.name) + ".qw38");
+    {
+      std::ofstream out(dest, std::ios::binary);
+      out << "OLD";
+    }
+    auto schema = base_schema();
+    schema.tensors.push_back(unplaced_bf16_vector(1, "v", 4));
+    FaultFilesystem fault{test.stage};
+    auto operations = fault.operations();
+    {
+      auto writer = ArtifactWriter::create(dest, schema, &operations);
+      expect(static_cast<bool>(writer), "fault-injected writer opens");
+      if (writer) {
+        std::array<std::byte, 8> payload{};
+        auto write = writer->write_span("v", SpanKind::Payload, payload);
+        if (test.stage == FaultStage::PayloadWrite) {
+          expect(!write && write.error().code == test.error,
+                 "injected payload pwrite fails");
+        } else {
+          expect(static_cast<bool>(write), "payload succeeds before publication fault");
+          auto final = writer->finalize();
+          expect(!final && final.error().code == test.error,
+                 "injected publication stage fails");
+        }
+      }
+    }
+    expect(read_all(dest) == std::vector<std::byte>{std::byte{'O'}, std::byte{'L'}, std::byte{'D'}},
+           "publication failure preserves destination");
+    expect(count_temp_files(dir, dest) == 0,
+           "publication failure removes owned temporary file");
+  }
+}
+
 }  // namespace
 
 int main() {
@@ -595,6 +695,7 @@ int main() {
   test_failure_cleanup();
   test_writer_interleaving_owns_publication();
   test_chunked_stream();
+  test_publication_io_failure_cleanup();
   if (g_failures != 0) {
     std::cerr << g_failures << " format writer checks failed\n";
     return 1;

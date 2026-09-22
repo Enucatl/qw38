@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <array>
 #include <cerrno>
+#include <cstdio>
 #include <cstring>
 #include <cstdlib>
 #include <fcntl.h>
@@ -23,6 +24,22 @@
 namespace qw38::format {
 namespace {
 
+ssize_t posix_pwrite(void*, int fd, void const* data, std::size_t size,
+                     off_t offset) {
+  return ::pwrite(fd, data, size, offset);
+}
+int posix_fsync(void*, int fd) { return ::fsync(fd); }
+int posix_close(void*, int fd) { return ::close(fd); }
+int posix_rename(void*, char const* from, char const* to) {
+  return ::rename(from, to);
+}
+WriterFilesystem const kPosixFilesystem{
+    .pwrite = posix_pwrite,
+    .fsync = posix_fsync,
+    .close = posix_close,
+    .rename = posix_rename,
+};
+
 FormatError io_error(std::uint64_t offset, std::string_view field,
                      std::string_view detail) {
   return make_error(FormatErrorCode::IoFailure, offset, field, detail);
@@ -31,14 +48,18 @@ FormatError io_error(std::uint64_t offset, std::string_view field,
 class UniqueFd {
  public:
   UniqueFd() noexcept = default;
-  explicit UniqueFd(int fd) noexcept : fd_(fd) {}
+  explicit UniqueFd(int fd, WriterFilesystem const& filesystem = kPosixFilesystem) noexcept
+      : fd_(fd), filesystem_(&filesystem) {}
   ~UniqueFd() { reset(); }
 
-  UniqueFd(UniqueFd&& other) noexcept : fd_(other.fd_) { other.fd_ = -1; }
+  UniqueFd(UniqueFd&& other) noexcept : fd_(other.fd_), filesystem_(other.filesystem_) {
+    other.fd_ = -1;
+  }
   UniqueFd& operator=(UniqueFd&& other) noexcept {
     if (this != &other) {
       reset();
       fd_ = other.fd_;
+      filesystem_ = other.filesystem_;
       other.fd_ = -1;
     }
     return *this;
@@ -52,9 +73,18 @@ class UniqueFd {
 
   void reset() noexcept {
     if (fd_ >= 0) {
-      ::close(fd_);
+      filesystem_->close(filesystem_->context, fd_);
       fd_ = -1;
     }
+  }
+
+  [[nodiscard]] int close() noexcept {
+    if (fd_ < 0) {
+      return 0;
+    }
+    int const result = filesystem_->close(filesystem_->context, fd_);
+    fd_ = -1;
+    return result;
   }
 
   int release() noexcept {
@@ -65,9 +95,11 @@ class UniqueFd {
 
  private:
   int fd_{-1};
+  WriterFilesystem const* filesystem_{&kPosixFilesystem};
 };
 
-std::expected<void, FormatError> write_at(int fd, std::uint64_t offset,
+std::expected<void, FormatError> write_at(WriterFilesystem const& filesystem,
+                                          int fd, std::uint64_t offset,
                                           std::span<std::byte const> data,
                                           std::string_view field) {
   while (!data.empty()) {
@@ -75,8 +107,8 @@ std::expected<void, FormatError> write_at(int fd, std::uint64_t offset,
       return std::unexpected(make_error(FormatErrorCode::Overflow, offset, field,
                                         "file offset exceeds off_t"));
     }
-    ssize_t const n = ::pwrite(fd, data.data(), data.size(),
-                               static_cast<off_t>(offset));
+    ssize_t const n = filesystem.pwrite(filesystem.context, fd, data.data(),
+                                        data.size(), static_cast<off_t>(offset));
     if (n < 0) {
       if (errno == EINTR) {
         continue;
@@ -92,14 +124,15 @@ std::expected<void, FormatError> write_at(int fd, std::uint64_t offset,
   return {};
 }
 
-std::expected<void, FormatError> write_zeros(int fd, std::uint64_t offset,
+std::expected<void, FormatError> write_zeros(WriterFilesystem const& filesystem,
+                                             int fd, std::uint64_t offset,
                                              std::uint64_t length,
                                              std::string_view field) {
   std::array<std::byte, 256> zeros{};
   while (length > 0) {
     std::size_t const n =
         static_cast<std::size_t>(std::min<std::uint64_t>(length, zeros.size()));
-    if (auto st = write_at(fd, offset,
+    if (auto st = write_at(filesystem, fd, offset,
                            std::span<std::byte const>{zeros.data(), n}, field);
         !st) {
       return st;
@@ -404,6 +437,7 @@ struct ArtifactWriter::Impl {
   std::filesystem::path temp_path;
   ArtifactSchema schema;
   UniqueFd fd;
+  WriterFilesystem const* filesystem{&kPosixFilesystem};
   std::uint64_t manifest_offset{};
   bool published{false};
   bool closed{false};
@@ -446,7 +480,8 @@ ArtifactWriter::~ArtifactWriter() {
 }
 
 std::expected<ArtifactWriter, FormatError> ArtifactWriter::create(
-    std::filesystem::path destination, ArtifactSchema const& schema) {
+    std::filesystem::path destination, ArtifactSchema const& schema,
+    WriterFilesystem const* filesystem) {
   if (destination.empty()) {
     return std::unexpected(make_error(FormatErrorCode::InconsistentInput, 0,
                                       "destination",
@@ -469,6 +504,12 @@ std::expected<ArtifactWriter, FormatError> ArtifactWriter::create(
   }
 
   auto impl = std::make_unique<Impl>();
+  impl->filesystem = filesystem == nullptr ? &kPosixFilesystem : filesystem;
+  if (impl->filesystem->pwrite == nullptr || impl->filesystem->fsync == nullptr ||
+      impl->filesystem->close == nullptr || impl->filesystem->rename == nullptr) {
+    return std::unexpected(make_error(FormatErrorCode::InconsistentInput, 0,
+                                      "filesystem", "filesystem operations are incomplete"));
+  }
   impl->destination = std::move(destination);
   impl->schema = std::move(*prepared);
   impl->manifest_offset = *manifest_off;
@@ -489,14 +530,15 @@ std::expected<ArtifactWriter, FormatError> ArtifactWriter::create(
         io_error(0, "temporary", std::strerror(errno)));
   }
   impl->temp_path = std::move(temp_template);
-  impl->fd = UniqueFd{raw};
+  impl->fd = UniqueFd{raw, *impl->filesystem};
   if (::fcntl(raw, F_SETFD, FD_CLOEXEC) < 0) {
     auto const error = io_error(0, "temporary", std::strerror(errno));
     impl->abandon();
     return std::unexpected(error);
   }
 
-  if (auto st = write_zeros(impl->fd.get(), 0, kHeaderSizeV0, "header"); !st) {
+  if (auto st = write_zeros(*impl->filesystem, impl->fd.get(), 0,
+                            kHeaderSizeV0, "header"); !st) {
     impl->abandon();
     return std::unexpected(st.error());
   }
@@ -586,7 +628,8 @@ std::expected<void, FormatError> ArtifactWriter::write_span(
         "chunk exceeds remaining span length"));
   }
   auto const offset = span.region.offset + span.written;
-  if (auto st = write_at(impl_->fd.get(), offset, chunk, span.field); !st) {
+  if (auto st = write_at(*impl_->filesystem, impl_->fd.get(), offset, chunk,
+                         span.field); !st) {
     return st;
   }
   span.hasher.update(chunk);
@@ -730,14 +773,16 @@ std::expected<ArtifactIdentity, FormatError> ArtifactWriter::finalize() {
         PadRegion{prev, impl_->manifest_offset - prev});
   }
   for (auto const& pad : pads) {
-    if (auto st = write_zeros(impl_->fd.get(), pad.offset, pad.length,
+    if (auto st = write_zeros(*impl_->filesystem, impl_->fd.get(), pad.offset,
+                              pad.length,
                               "padding");
         !st) {
       return fail(st.error());
     }
   }
 
-  if (auto st = write_at(impl_->fd.get(), impl_->manifest_offset, manifest,
+  if (auto st = write_at(*impl_->filesystem, impl_->fd.get(),
+                         impl_->manifest_offset, manifest,
                          "manifest");
       !st) {
     return fail(st.error());
@@ -747,22 +792,27 @@ std::expected<ArtifactIdentity, FormatError> ArtifactWriter::finalize() {
   if (auto st = encode(header, header_bytes); !st) {
     return fail(st.error());
   }
-  if (auto st = write_at(impl_->fd.get(), 0, header_bytes, "header"); !st) {
+  if (auto st = write_at(*impl_->filesystem, impl_->fd.get(), 0, header_bytes,
+                         "header"); !st) {
     return fail(st.error());
   }
 
-  if (::fsync(impl_->fd.get()) != 0) {
+  if (impl_->filesystem->fsync(impl_->filesystem->context, impl_->fd.get()) != 0) {
     return fail(io_error(0, "destination", std::strerror(errno)));
   }
-  impl_->fd.reset();
+  if (impl_->fd.close() != 0) {
+    return fail(io_error(0, "destination", std::strerror(errno)));
+  }
 
-  std::error_code ec;
-  std::filesystem::rename(impl_->temp_path, impl_->destination, ec);
-  if (ec) {
-    std::filesystem::remove(impl_->temp_path, ec);
+  if (impl_->filesystem->rename(impl_->filesystem->context,
+                                impl_->temp_path.c_str(),
+                                impl_->destination.c_str()) != 0) {
+    int const saved_errno = errno;
+    std::error_code cleanup_ec;
+    std::filesystem::remove(impl_->temp_path, cleanup_ec);
     impl_->closed = true;
     return std::unexpected(make_error(FormatErrorCode::PublishFailed, 0,
-                                      "destination", ec.message()));
+                                      "destination", std::strerror(saved_errno)));
   }
   impl_->published = true;
   impl_->closed = true;

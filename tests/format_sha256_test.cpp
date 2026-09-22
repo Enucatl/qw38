@@ -161,7 +161,8 @@ void test_emitted_span_digest() {
     std::filesystem::remove_all(dir);
     return;
   }
-  Hash256 const independent = sha256(payload);
+  Hash256 const independent = parse_hex(
+      "a51f32551aae346ed4948a0dba69cf406bdcfd3db57f30c2c9bf0f5d2945f2c4");
   bool found = false;
   for (auto const& rec : manifest->integrity) {
     if (rec.kind == IntegrityKind::Sha256PayloadSpan && rec.tensor_id == 1) {
@@ -177,11 +178,100 @@ void test_emitted_span_digest() {
   std::filesystem::remove_all(dir, ec);
 }
 
+void test_emitted_multichunk_digest() {
+  auto base = std::filesystem::temp_directory_path() / "qw38-sha256-chunks-XXXXXX";
+  std::string tmpl = base.string();
+  std::vector<char> name(tmpl.begin(), tmpl.end());
+  name.push_back('\0');
+  if (::mkdtemp(name.data()) == nullptr) {
+    fail("mkdtemp chunks");
+    return;
+  }
+  std::filesystem::path const dir{name.data()};
+  auto const dest = dir / "chunks.qw38";
+
+  ArtifactSchema schema{};
+  schema.compiler = {.ident = "qw38", .major = 0, .minor = 1, .patch = 0};
+  schema.precision = v0_precision_policy();
+  auto const state = qw38::format::v0_language_state_schema();
+  schema.state.assign(state.begin(), state.end());
+  auto const scratch = qw38::format::v0_language_scratch_schema();
+  schema.scratch.assign(scratch.begin(), scratch.end());
+  TensorRecord t{};
+  t.tensor_id = 1;
+  t.logical_name = "v";
+  t.shape.rank = 1;
+  t.shape.logical[0] = 513;
+  t.shape.padded[0] = 513;
+  t.storage = StorageClass::Bf16;
+  t.quantizer = LogicalQuantizerId::None;
+  t.layout = PhysicalLayoutId::CudaBf16VectorV0;
+  t.mapping = LogicalPhysicalMapping{.kind = MappingKind::Identity};
+  schema.tensors.push_back(t);
+
+  std::vector<std::byte> payload(1026);
+  for (std::size_t i = 0; i < payload.size(); ++i) {
+    payload[i] = static_cast<std::byte>((i * 37 + 11) & 0xff);
+  }
+  auto writer = ArtifactWriter::create(dest, schema);
+  if (!writer) {
+    fail("create chunks");
+    return;
+  }
+  for (std::size_t offset = 0; offset < payload.size();) {
+    std::size_t const chunk = std::min<std::size_t>(
+        payload.size() - offset, (offset % 3 == 0) ? 1 : (offset % 3 == 1) ? 63 : 64);
+    auto st = writer->write_span("v", SpanKind::Payload,
+                                 std::span<std::byte const>{payload}.subspan(offset, chunk));
+    if (!st) {
+      fail(std::string("write chunks: ") + error_message(st.error()));
+      return;
+    }
+    offset += chunk;
+  }
+  if (auto id = writer->finalize(); !id) {
+    fail(std::string("finalize chunks: ") + error_message(id.error()));
+    return;
+  }
+
+  std::ifstream in(dest, std::ios::binary | std::ios::ate);
+  auto const n = static_cast<std::size_t>(in.tellg());
+  in.seekg(0);
+  std::vector<std::byte> bytes(n);
+  in.read(reinterpret_cast<char*>(bytes.data()), static_cast<std::streamsize>(n));
+  auto const header = decode_header(std::span<std::byte const>{bytes.data(), 64});
+  if (!header) {
+    fail("decode chunks header");
+    return;
+  }
+  auto const manifest = decode_schema(std::span<std::byte const>{
+      bytes.data() + header->manifest_offset,
+      static_cast<std::size_t>(header->manifest_length)});
+  if (!manifest) {
+    fail("decode chunks schema");
+    return;
+  }
+  Hash256 const frozen = parse_hex(
+      "90f04006647c0f19dbba34cfe1787474ea25e8a44dbfee4def4393ec5e6a4125");
+  bool found = false;
+  for (auto const& record : manifest->integrity) {
+    if (record.kind == IntegrityKind::Sha256PayloadSpan && record.tensor_id == 1) {
+      found = true;
+      expect(record.digest == frozen,
+             "emitted multi-chunk digest matches externally frozen SHA-256");
+    }
+  }
+  expect(found, "multi-chunk payload integrity record present");
+  std::error_code ec;
+  std::filesystem::remove_all(dir, ec);
+}
+
 }  // namespace
 
 int main() {
   test_known_vectors();
   test_emitted_span_digest();
+  test_emitted_multichunk_digest();
   if (g_failures != 0) {
     std::cerr << g_failures << " SHA-256 checks failed\n";
     return 1;

@@ -8,6 +8,7 @@
 #include <memory>
 #include <span>
 #include <string_view>
+#include <sys/types.h>
 
 namespace qw38::format {
 
@@ -28,6 +29,17 @@ struct ArtifactIdentity {
                          ArtifactIdentity const&) = default;
 };
 
+// Explicit syscall boundary for deterministic writer I/O tests. Production
+// callers use the default POSIX operations by leaving this unset.
+struct WriterFilesystem {
+  ssize_t (*pwrite)(void* context, int fd, void const* data, std::size_t size,
+                    off_t offset){};
+  int (*fsync)(void* context, int fd){};
+  int (*close)(void* context, int fd){};
+  int (*rename)(void* context, char const* from, char const* to){};
+  void* context{};
+};
+
 // Streaming host writer. Payload and scale bytes are hashed and stored as they
 // arrive; the immutable input schema is copied and its span/integrity slots are
 // filled by the writer. Failed finalization never publishes a destination file.
@@ -41,7 +53,8 @@ class ArtifactWriter {
   ArtifactWriter& operator=(ArtifactWriter const&) = delete;
 
   [[nodiscard]] static std::expected<ArtifactWriter, FormatError> create(
-      std::filesystem::path destination, ArtifactSchema const& schema);
+      std::filesystem::path destination, ArtifactSchema const& schema,
+      WriterFilesystem const* filesystem = nullptr);
 
   // Append a nonempty chunk of a named span. Repeated calls with the same
   // (logical_name, kind) stream into one span until the layout length is met.
