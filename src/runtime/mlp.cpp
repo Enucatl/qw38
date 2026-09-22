@@ -5,7 +5,9 @@
 
 #include "format/constants.hpp"
 
+#include <array>
 #include <cmath>
+#include <cstdint>
 #include <limits>
 #include <sstream>
 #include <string_view>
@@ -144,6 +146,109 @@ bool same_family(MlpWeightBinding const& a, MlpWeightBinding const& b) noexcept 
   return a.layout == b.layout && a.quantizer == b.quantizer;
 }
 
+struct ByteInterval {
+  std::string_view name;
+  std::uintptr_t begin{};
+  std::uintptr_t end{};
+};
+
+std::expected<ByteInterval, Error> byte_interval(void* pointer,
+                                                 std::uint64_t bytes,
+                                                 std::string_view name) {
+  auto const begin = reinterpret_cast<std::uintptr_t>(pointer);
+  if (pointer == nullptr || bytes == 0) {
+    return std::unexpected(arg_error(name, "empty byte interval"));
+  }
+  if (bytes > std::numeric_limits<std::uintptr_t>::max() - begin) {
+    return std::unexpected(
+        arg_error(name, "byte interval overflows address space"));
+  }
+  return ByteInterval{.name = name,
+                      .begin = begin,
+                      .end = begin + static_cast<std::uintptr_t>(bytes)};
+}
+
+bool overlaps(ByteInterval const& a, ByteInterval const& b) noexcept {
+  return a.begin < b.end && b.begin < a.end;
+}
+
+std::expected<void, Error> validate_non_overlapping_bindings(
+    MlpWeightBinding const& gate, MlpWeightBinding const& up,
+    MlpWeightBinding const& down, TensorView const& gamma,
+    TensorView const& h_mid, TensorView const& next_h,
+    TensorView const& normalized, TensorView const& swiglu) {
+  std::array<ByteInterval, 11> intervals{};
+  std::size_t count = 0;
+  auto add = [&](void* pointer, std::uint64_t bytes,
+                 std::string_view name) -> std::expected<void, Error> {
+    if (pointer == nullptr && bytes == 0) {
+      return {};
+    }
+    auto interval = byte_interval(pointer, bytes, name);
+    if (!interval) {
+      return std::unexpected(interval.error());
+    }
+    intervals[count++] = *interval;
+    return {};
+  };
+
+  auto add_weight = [&](MlpWeightBinding const& weight,
+                        std::string_view codes_name,
+                        std::string_view scales_name)
+      -> std::expected<void, Error> {
+    if (auto st = add(weight.codes.pointer, weight.codes_bytes, codes_name); !st) {
+      return st;
+    }
+    return add(weight.scales.pointer, weight.scales_bytes, scales_name);
+  };
+
+  if (auto st = add_weight(gate, "gate", "gate_scales"); !st) {
+    return st;
+  }
+  if (auto st = add_weight(up, "up", "up_scales"); !st) {
+    return st;
+  }
+  if (auto st = add_weight(down, "down", "down_scales"); !st) {
+    return st;
+  }
+  if (auto st = add(gamma.pointer, static_cast<std::uint64_t>(kHidden) * 2u,
+                    "gamma");
+      !st) {
+    return st;
+  }
+  if (auto st = add(h_mid.pointer, static_cast<std::uint64_t>(kHidden) * 4u,
+                    "h_mid");
+      !st) {
+    return st;
+  }
+  if (auto st = add(next_h.pointer, static_cast<std::uint64_t>(kHidden) * 4u,
+                    "next_h");
+      !st) {
+    return st;
+  }
+  if (auto st = add(normalized.pointer,
+                    static_cast<std::uint64_t>(kHidden) * 2u, "normalized");
+      !st) {
+    return st;
+  }
+  if (auto st = add(swiglu.pointer, static_cast<std::uint64_t>(kFfnWidth) * 2u,
+                    "swiglu");
+      !st) {
+    return st;
+  }
+
+  for (std::size_t i = 0; i < count; ++i) {
+    for (std::size_t j = i + 1; j < count; ++j) {
+      if (overlaps(intervals[i], intervals[j])) {
+        return std::unexpected(arg_error(
+            "alias", std::string(intervals[i].name) + " overlaps " +
+                         std::string(intervals[j].name)));
+      }
+    }
+  }
+  return {};
+}
+
 DecodeMmvDesc mmv_from_weight(MlpWeightBinding const& w) {
   DecodeMmvDesc d;
   d.layout = w.layout;
@@ -269,16 +374,10 @@ std::expected<MlpPlan, Error> bind_mlp_plan(MlpBindViews const& views,
   if (!swiglu) {
     return std::unexpected(swiglu.error());
   }
-  if (h_mid->pointer == next_h->pointer) {
-    return std::unexpected(
-        arg_error("next_h", "next residual must be distinct from h_mid"));
-  }
-  if (gamma->pointer == h_mid->pointer || gamma->pointer == next_h->pointer ||
-      normalized->pointer == swiglu->pointer ||
-      h_mid->pointer == normalized->pointer ||
-      next_h->pointer == normalized->pointer) {
-    return std::unexpected(arg_error("scratch",
-                                     "gamma, residuals, normalized, and SwiGLU must be distinct"));
+  if (auto st = validate_non_overlapping_bindings(
+          *gate, *up, *down, *gamma, *h_mid, *next_h, *normalized, *swiglu);
+      !st) {
+    return std::unexpected(st.error());
   }
 
   MlpPlan plan;

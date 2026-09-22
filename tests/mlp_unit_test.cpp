@@ -5,8 +5,10 @@
 #include "runtime/runtime.hpp"
 #include "runtime_support.hpp"
 
+#include <array>
 #include <cstdint>
 #include <iostream>
+#include <limits>
 #include <string>
 
 using qw38::cuda::DecodeEpilogue;
@@ -55,17 +57,17 @@ void* dummy_ptr(std::uintptr_t v) {
 
 MlpBindViews dummy_ok_views() {
   MlpBindViews v;
-  auto* p = dummy_ptr(0x10000);
-  auto* p2 = dummy_ptr(0x20000);
-  auto* p3 = dummy_ptr(0x30000);
-  auto* p4 = dummy_ptr(0x40000);
-  auto* p5 = dummy_ptr(0x50000);
-  auto* p6 = dummy_ptr(0x60000);
-  auto* p7 = dummy_ptr(0x70000);
-  auto* p8 = dummy_ptr(0x80000);
-  auto* p9 = dummy_ptr(0x90000);
-  auto* p10 = dummy_ptr(0xA0000);
-  auto* p11 = dummy_ptr(0xB0000);
+  auto* p = dummy_ptr(0x10000000);
+  auto* p2 = dummy_ptr(0x20000000);
+  auto* p3 = dummy_ptr(0x30000000);
+  auto* p4 = dummy_ptr(0x40000000);
+  auto* p5 = dummy_ptr(0x50000000);
+  auto* p6 = dummy_ptr(0x60000000);
+  auto* p7 = dummy_ptr(0x70000000);
+  auto* p8 = dummy_ptr(0x80000000);
+  auto* p9 = dummy_ptr(0x90000000);
+  auto* p10 = dummy_ptr(0xA0000000);
+  auto* p11 = dummy_ptr(0xB0000000);
   v.gate = make_view(p, qw38::format::ArithmeticDtype::Bf16,
                      PhysicalLayoutId::CudaQ4G64V0, StorageClass::Int4Grouped,
                      false, 2, kFfn, kHidden);
@@ -102,6 +104,57 @@ MlpBindViews dummy_ok_views() {
                        PhysicalLayoutId::CudaBf16RowMajorV0, StorageClass::Bf16,
                        true, 1, kFfn);
   return v;
+}
+
+void test_bind_alias_errors(Stream const& stream) {
+  struct ViewField {
+    char const* name;
+    qw38::runtime::TensorView MlpBindViews::*member;
+  };
+  constexpr std::array fields{
+      ViewField{"gate", &MlpBindViews::gate},
+      ViewField{"gate_scales", &MlpBindViews::gate_scales},
+      ViewField{"up", &MlpBindViews::up},
+      ViewField{"up_scales", &MlpBindViews::up_scales},
+      ViewField{"down", &MlpBindViews::down},
+      ViewField{"down_scales", &MlpBindViews::down_scales},
+      ViewField{"gamma", &MlpBindViews::gamma},
+      ViewField{"h_mid", &MlpBindViews::h_mid},
+      ViewField{"next_h", &MlpBindViews::next_h},
+      ViewField{"normalized", &MlpBindViews::normalized},
+      ViewField{"swiglu", &MlpBindViews::swiglu},
+  };
+
+  for (std::size_t i = 0; i < fields.size(); ++i) {
+    for (std::size_t j = i + 1; j < fields.size(); ++j) {
+      for (std::uintptr_t offset : {std::uintptr_t{0}, std::uintptr_t{16}}) {
+        auto views = dummy_ok_views();
+        auto const base = reinterpret_cast<std::uintptr_t>(
+            (views.*fields[i].member).pointer);
+        (views.*fields[j].member).pointer = dummy_ptr(base + offset);
+        auto got = bind_mlp_plan(views, stream);
+        expect(!got &&
+                   got.error().code == qw38::runtime::ErrorCode::InvalidArgument,
+               std::string(fields[i].name) + "/" + fields[j].name +
+                   (offset == 0 ? " exact alias rejects"
+                                : " offset overlap rejects"));
+      }
+    }
+  }
+
+  auto overflow = dummy_ok_views();
+  overflow.swiglu.pointer = dummy_ptr(
+      std::numeric_limits<std::uintptr_t>::max() - std::uintptr_t{15});
+  auto bad_overflow = bind_mlp_plan(overflow, stream);
+  expect(!bad_overflow &&
+             bad_overflow.error().code == qw38::runtime::ErrorCode::InvalidArgument,
+         "overflowing byte interval rejects");
+
+  auto adjacent = dummy_ok_views();
+  adjacent.next_h.pointer = dummy_ptr(
+      reinterpret_cast<std::uintptr_t>(adjacent.gamma.pointer) + kHidden * 2u);
+  expect(static_cast<bool>(bind_mlp_plan(adjacent, stream)),
+         "adjacent byte intervals do not overlap");
 }
 
 void test_bind_errors(Stream const& stream) {
@@ -144,19 +197,6 @@ void test_bind_errors(Stream const& stream) {
   auto bad_res = bind_mlp_plan(nowrite, stream);
   expect(!bad_res && bad_res.error().code == qw38::runtime::ErrorCode::InvalidArgument,
          "non-writable next residual rejects");
-
-  auto residual_alias = views;
-  residual_alias.next_h.pointer = residual_alias.h_mid.pointer;
-  auto bad_res_alias = bind_mlp_plan(residual_alias, stream);
-  expect(!bad_res_alias &&
-             bad_res_alias.error().code == qw38::runtime::ErrorCode::InvalidArgument,
-         "h_mid/next_h alias rejects");
-
-  auto alias = views;
-  alias.normalized.pointer = alias.swiglu.pointer;
-  auto bad_alias = bind_mlp_plan(alias, stream);
-  expect(!bad_alias && bad_alias.error().code == qw38::runtime::ErrorCode::InvalidArgument,
-         "aliased scratch rejects");
 
   auto small = views;
   small.swiglu.extent[0] = 8;
@@ -387,6 +427,7 @@ int main() {
     return 1;
   }
   test_bind_errors(*stream);
+  test_bind_alias_errors(*stream);
   test_swiglu_epilogue(*stream);
   test_zero_extreme_and_reuse(*stream);
   test_model_bind_missing(*stream);
