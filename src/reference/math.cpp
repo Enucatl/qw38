@@ -625,6 +625,78 @@ std::expected<GdnFrontReference, Error> gdn_front_reference(
   return out;
 }
 
+std::expected<GdnMixerReference, Error> gdn_mixer_reference(
+    std::span<float const> residual, std::span<std::uint16_t const> gamma,
+    std::span<std::uint16_t const> gated_gamma, float eps,
+    std::span<std::uint16_t const> w_qkv, std::span<std::uint16_t const> w_z,
+    std::span<std::uint16_t const> w_a, std::span<std::uint16_t const> w_b,
+    std::span<std::uint16_t const> w_out, std::span<std::uint16_t const> taps,
+    std::span<std::uint16_t const> a_log, std::span<std::uint16_t const> dt_bias,
+    std::span<std::uint16_t const> history, std::uint32_t cursor,
+    std::span<float const> s) {
+  std::size_t const ns = static_cast<std::size_t>(kGdnValueHeads) * kGdnHeadDim *
+                         kGdnHeadDim;
+  std::size_t const no =
+      static_cast<std::size_t>(kGdnValueHeads) * kGdnHeadDim;
+  if (auto st = require_span_size(gated_gamma.size(), kGdnHeadDim, "gated_gamma");
+      !st) {
+    return std::unexpected(st.error());
+  }
+  if (auto st = require_span_size(w_out.size(), static_cast<std::size_t>(kHidden) *
+                                                   kGdnZWidth,
+                                  "w_out");
+      !st) {
+    return std::unexpected(st.error());
+  }
+  if (auto st = require_span_size(s.size(), ns, "s"); !st) {
+    return std::unexpected(st.error());
+  }
+
+  auto front = gdn_front_reference(residual, gamma, eps, w_qkv, w_z, w_a, w_b,
+                                   taps, a_log, dt_bias, history, cursor);
+  if (!front) {
+    return std::unexpected(front.error());
+  }
+
+  GdnMixerReference out;
+  out.front = std::move(*front);
+  out.s.assign(s.begin(), s.end());
+  out.o.assign(no, 0.0f);
+  auto v = std::span<std::uint16_t const>(out.front.convolved).subspan(
+      static_cast<std::size_t>(kGdnKeyHeads) * 2u * kGdnHeadDim, no);
+  if (auto st = gdn_recurrence_step(out.front.q_hat, out.front.k_hat,
+                                    out.front.alpha, out.front.beta, v, out.s,
+                                    out.o);
+      !st) {
+    return std::unexpected(st.error());
+  }
+
+  out.u.assign(no, 0);
+  for (std::uint32_t vh = 0; vh < kGdnValueHeads; ++vh) {
+    std::size_t const off = static_cast<std::size_t>(vh) * kGdnHeadDim;
+    auto ost = gdn_gated_rms_norm(
+        std::span<float const>(out.o.data() + off, kGdnHeadDim),
+        std::span<std::uint16_t const>(out.front.z.data() + off, kGdnHeadDim),
+        gated_gamma, eps,
+        std::span<std::uint16_t>(out.u.data() + off, kGdnHeadDim));
+    if (!ost) {
+      return std::unexpected(ost.error());
+    }
+  }
+
+  std::vector<float> mix(kHidden, 0.0f);
+  if (auto st = dense_gemv_bf16(w_out, out.u, kHidden, kGdnZWidth, mix); !st) {
+    return std::unexpected(st.error());
+  }
+  out.residual.resize(kHidden);
+  for (std::uint32_t i = 0; i < kHidden; ++i) {
+    out.residual[i] = residual[i] + mix[i];
+  }
+  out.history = out.front.history;
+  out.cursor = out.front.cursor;
+  return out;
+}
+
 std::expected<DecodeMlpReference, Error> decode_mlp_reference(
     std::span<float const> h_mid, std::span<std::uint16_t const> gamma,
     float eps, std::span<std::uint16_t const> w_gate,

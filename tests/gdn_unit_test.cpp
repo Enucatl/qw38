@@ -17,12 +17,14 @@ using qw38::cuda::launch_gdn_prepare;
 using qw38::cuda::launch_gdn_recurrence;
 using qw38::cuda::malloc_count;
 using qw38::format::ArithmeticDtype;
+using qw38::format::LogicalQuantizerId;
 using qw38::format::PhysicalLayoutId;
 using qw38::format::StorageClass;
 using qw38::gdn::test::expect;
 using qw38::gdn::test::expect_bf16_close;
 using qw38::gdn::test::expect_fp32_close;
 using qw38::gdn::test::fail;
+using qw38::gdn::test::fill_logical_pattern;
 using qw38::gdn::test::filled_h;
 using qw38::gdn::test::g_failures;
 using qw38::gdn::test::kConvHistoryTaps;
@@ -49,20 +51,31 @@ using qw38::gdn::test::pattern_f;
 using qw38::gdn::test::pattern_h;
 using qw38::gdn::test::zeros_f;
 using qw38::gdn::test::zeros_h;
+using qw38::gdn::test::DeviceGdnMixer;
+using qw38::gdn::test::HostGdnMixer;
 using qw38::gdn::test::download_vec;
-using qw38::gdn::test::gdn_s_index;
-using qw38::gdn::test::upload_vec;
 using qw38::gdn::test::filled_f;
+using qw38::gdn::test::gdn_s_index;
+using qw38::gdn::test::make_logical;
+using qw38::gdn::test::mixer_views;
+using qw38::gdn::test::pack_bf16_tile;
+using qw38::gdn::test::pack_q4_from_logical;
+using qw38::gdn::test::residual_vec;
+using qw38::gdn::test::upload_host_mixer;
+using qw38::gdn::test::upload_vec;
 using qw38::reference::gdn_alpha_beta;
 using qw38::reference::gdn_conv_history_step;
 using qw38::reference::gdn_key_head;
 using qw38::reference::gdn_prepare;
 using qw38::reference::gdn_recurrence_step;
+using qw38::runtime::GdnBindViews;
 using qw38::runtime::GdnFrontBindViews;
 using qw38::runtime::GdnRecurrenceBindViews;
 using qw38::runtime::bind_gdn_front_plan;
+using qw38::runtime::bind_gdn_plan;
 using qw38::runtime::bind_gdn_recurrence_plan;
 using qw38::runtime::bind_gdn_workspace;
+using qw38::runtime::execute_decode_gdn;
 using qw38::runtime::execute_gdn_front;
 using qw38::runtime::execute_gdn_recurrence;
 using qw38::runtime::gdn_state_index;
@@ -156,6 +169,14 @@ void test_bind_errors(Stream const& stream) {
     expect(ok->scratch.o.extent[0] == kGdnValueHeads &&
                ok->scratch.o.extent[1] == kGdnHeadDim,
            "o is [48,128] FP32");
+    expect(static_cast<std::byte*>(ok->scratch.u.pointer) -
+                   static_cast<std::byte*>(ok->scratch.qkv.pointer) ==
+               static_cast<std::ptrdiff_t>(qw38::runtime::kGdnOffU),
+           "u scratch offset");
+    expect(ok->scratch.u.dtype == ArithmeticDtype::Bf16 &&
+               ok->scratch.u.extent[0] == kGdnValueHeads &&
+               ok->scratch.u.extent[1] == kGdnHeadDim,
+           "u is [48,128] BF16");
   }
 
   Stream empty;
@@ -364,6 +385,11 @@ void test_workspace_and_missing_model(Stream const& stream) {
     expect(slices->qkv.pointer != slices->convolved.pointer, "qkv != convolved");
     expect(slices->q_hat.pointer != slices->k_hat.pointer, "q != k");
     expect(slices->alpha.pointer != slices->beta.pointer, "alpha != beta");
+    expect(slices->o.pointer != slices->u.pointer, "o != u");
+    expect(static_cast<std::byte*>(slices->u.pointer) -
+                   static_cast<std::byte*>(slices->qkv.pointer) ==
+               static_cast<std::ptrdiff_t>(qw38::runtime::kGdnOffU),
+           "workspace u offset");
   }
 
   qw38::format::test::ScratchDir dir("qw38-gdn-unit");
@@ -386,6 +412,9 @@ void test_workspace_and_missing_model(Stream const& stream) {
   auto plan = bind_gdn_front_plan(*model, *session, 0, stream);
   expect(!plan && plan.error().code == qw38::runtime::ErrorCode::InvalidArgument,
          "missing GDN identities reject");
+  auto mix = bind_gdn_plan(*model, *session, 0, stream);
+  expect(!mix && mix.error().code == qw38::runtime::ErrorCode::InvalidArgument,
+         "missing complete mixer identities reject");
   auto bad = bind_gdn_front_plan(*model, *session, 3, stream);
   expect(!bad, "attention layer 3 rejects");
   (void)malloc_count;
@@ -712,6 +741,209 @@ void test_recurrence_reset() {
   expect_fp32_close(o_got, o_ref, "o after reset", kGdnRecurOAbs, kGdnRecurORel);
 }
 
+GdnBindViews dummy_mixer_views(std::uint32_t* cursor) {
+  GdnBindViews v;
+  auto front = dummy_ok_views(cursor);
+  v.qkv = front.qkv;
+  v.qkv_scales = front.qkv_scales;
+  v.z = front.z;
+  v.z_scales = front.z_scales;
+  v.a = front.a;
+  v.b = front.b;
+  v.gamma = front.gamma;
+  v.taps = front.taps;
+  v.a_log = front.a_log;
+  v.dt_bias = front.dt_bias;
+  v.residual = front.residual;
+  v.normalized = front.normalized;
+  v.workspace = front.workspace;
+  v.history = front.history;
+  v.host_cursor = front.host_cursor;
+  v.language_layer = front.language_layer;
+  v.out = make_view(dummy_ptr(0x1E0000), ArithmeticDtype::Bf16,
+                    PhysicalLayoutId::CudaQ4G64V0, StorageClass::Int4Grouped, false, 2,
+                    kHidden, kGdnZWidth);
+  std::uint64_t const out_scales =
+      static_cast<std::uint64_t>(kHidden) * (kGdnZWidth / 64u);
+  v.out_scales = make_view(dummy_ptr(0x1F0000), ArithmeticDtype::Fp16,
+                           PhysicalLayoutId::CudaQ4G64V0, StorageClass::Int4Grouped,
+                           false, 1, out_scales);
+  v.gated_gamma = make_view(dummy_ptr(0x200000), ArithmeticDtype::Bf16,
+                            PhysicalLayoutId::CudaBf16VectorV0, StorageClass::Bf16,
+                            false, 1, kGdnHeadDim);
+  v.residual_out = make_view(dummy_ptr(0x210000), ArithmeticDtype::Fp32,
+                             PhysicalLayoutId::CudaFp32VectorV0, StorageClass::Fp32,
+                             true, 1, kHidden);
+  v.s = make_view(dummy_ptr(0x220000), ArithmeticDtype::Fp32,
+                  PhysicalLayoutId::CudaFp32GdnSHvKV0, StorageClass::Fp32, true, 1,
+                  kGdnSElemsPerLayer);
+  return v;
+}
+
+bool make_q4_mixer(HostGdnMixer& host, std::int8_t qkv_code, std::int8_t z_code,
+                   std::int8_t out_code, float h_seed, bool zero_gated,
+                   bool zero_z) {
+  auto lq = make_logical(LogicalQuantizerId::Q4G64V0, kQkvWidth, kHidden, qkv_code,
+                         0x3C00);
+  auto lz = make_logical(LogicalQuantizerId::Q4G64V0, kGdnZWidth, kHidden,
+                         zero_z ? std::int8_t{0} : z_code, 0x3C00);
+  auto lo = make_logical(LogicalQuantizerId::Q4G64V0, kHidden, kGdnZWidth, out_code,
+                         0x3C00);
+  fill_logical_pattern(lq, 2);
+  if (!zero_z) {
+    fill_logical_pattern(lz, 5);
+  }
+  fill_logical_pattern(lo, 9);
+  if (!pack_q4_from_logical(lq, host.qkv, "qkv") ||
+      !pack_q4_from_logical(lz, host.z, "z") ||
+      !pack_q4_from_logical(lo, host.out, "out")) {
+    return false;
+  }
+  auto wq = qw38::compiler::dequantize_to_bf16(lq);
+  auto wz = qw38::compiler::dequantize_to_bf16(lz);
+  auto wo = qw38::compiler::dequantize_to_bf16(lo);
+  if (!wq || !wz || !wo) {
+    fail("mixer dequant");
+    return false;
+  }
+  host.w_qkv = std::move(*wq);
+  host.w_z = std::move(*wz);
+  host.w_out = std::move(*wo);
+  host.w_a = pattern_h(kGdnValueHeads * kHidden, 0.04f);
+  host.w_b = pattern_h(kGdnValueHeads * kHidden, -0.03f);
+  if (!pack_bf16_tile(host.w_a, kGdnValueHeads, kHidden, host.a, "a") ||
+      !pack_bf16_tile(host.w_b, kGdnValueHeads, kHidden, host.b, "b")) {
+    return false;
+  }
+  host.gamma = pattern_h(kHidden, 0.2f);
+  host.gated_gamma = zero_gated ? zeros_h(kGdnHeadDim) : pattern_h(kGdnHeadDim, 0.7f);
+  host.taps = pattern_h(kConvKernel * kQkvWidth, 0.15f);
+  host.a_log = pattern_h(kGdnValueHeads, -0.5f);
+  host.dt_bias = pattern_h(kGdnValueHeads, 0.4f);
+  host.residual = residual_vec(kHidden, h_seed);
+  return true;
+}
+
+void test_mixer_bind_and_lifetimes(Stream const& stream) {
+  std::uint32_t cursor = 0;
+  auto views = dummy_mixer_views(&cursor);
+  auto ok = bind_gdn_plan(views, stream);
+  expect(static_cast<bool>(ok), "valid mixer dummy bind");
+  if (ok) {
+    expect(ok->front.scratch.u.extent[0] == kGdnValueHeads, "plan u heads");
+    expect(ok->residual_out.pointer != ok->front.residual.pointer,
+           "h and h_mid distinct");
+    expect(ok->s_layer == 0, "layer 0 s_layer");
+  }
+
+  Stream empty;
+  expect(!bind_gdn_plan(views, empty), "empty stream rejects mixer");
+
+  auto alias = views;
+  alias.residual_out.pointer = alias.residual.pointer;
+  expect(!bind_gdn_plan(alias, stream), "aliased residual/h_mid rejects");
+
+  auto same_g = views;
+  same_g.gated_gamma.pointer = same_g.gamma.pointer;
+  expect(!bind_gdn_plan(same_g, stream), "aliased gammas reject");
+
+  auto attn = views;
+  attn.language_layer = 3;
+  expect(!bind_gdn_plan(attn, stream), "attention layer rejects mixer");
+
+  auto tiny_s = views;
+  tiny_s.s.extent[0] = 16;
+  expect(!bind_gdn_plan(tiny_s, stream), "short S rejects mixer");
+
+  auto mix_fam = views;
+  mix_fam.out.layout = PhysicalLayoutId::CudaBf16DenseTileV0;
+  mix_fam.out.storage = StorageClass::Bf16;
+  mix_fam.out_scales = {};
+  expect(!bind_gdn_plan(mix_fam, stream), "mixed Q4/BF16 out family rejects");
+}
+
+void test_mixer_gamma_z_residual_state(Stream const& stream) {
+  HostGdnMixer host;
+  if (!make_q4_mixer(host, 2, -1, 3, 0.55f, true, false)) {
+    return;
+  }
+  DeviceGdnMixer dev;
+  if (!upload_host_mixer(host, dev, stream, 2)) {
+    return;
+  }
+  auto layer1 = pattern_f(static_cast<std::uint32_t>(kGdnSElemsPerLayer), 0.11f);
+  expect(static_cast<bool>(qw38::cuda::copy_h2d(
+             static_cast<std::byte*>(dev.s.data()) + kGdnSElemsPerLayer * 4u,
+             layer1.data(), layer1.size() * 4u, stream)),
+         "seed layer 1 S");
+
+  auto views = mixer_views(dev);
+  auto plan = bind_gdn_plan(views, stream);
+  expect(static_cast<bool>(plan), "gamma0 mixer bind");
+  if (!plan) {
+    return;
+  }
+  auto const mallocs = malloc_count();
+  auto out = execute_decode_gdn(*plan);
+  expect(static_cast<bool>(out), "gamma0 execute");
+  expect(malloc_count() == mallocs, "mixer allocates nothing");
+  if (!out) {
+    return;
+  }
+  expect(out->pointer == dev.residual_out.data(), "returns h_mid");
+
+  auto hin = download_vec<float>(dev.residual, kHidden, stream);
+  auto hout = download_vec<float>(dev.residual_out, kHidden, stream);
+  if (!hin || !hout) {
+    fail("gamma0 download");
+    return;
+  }
+  expect_fp32_close(*hin, host.residual, "input residual preserved", 0.0f, 0.0f);
+  expect_fp32_close(*hout, host.residual, "gamma=0 Mix is 0",
+                    qw38::reference::tol::kGdnMixerResidualAbs,
+                    qw38::reference::tol::kGdnMixerResidualRel);
+
+  auto s_all = download_vec<float>(dev.s, 2u * kGdnSElemsPerLayer, stream);
+  if (!s_all) {
+    fail("S download");
+    return;
+  }
+  std::vector<float> got_l1(s_all->begin() + static_cast<std::ptrdiff_t>(kGdnSElemsPerLayer),
+                            s_all->end());
+  expect_fp32_close(got_l1, layer1, "other S layer isolated", 0.0f, 0.0f);
+
+  HostGdnMixer zhost;
+  if (!make_q4_mixer(zhost, 2, 0, 3, 0.62f, false, true)) {
+    return;
+  }
+  DeviceGdnMixer zdev;
+  if (!upload_host_mixer(zhost, zdev, stream, 1)) {
+    return;
+  }
+  auto zviews = mixer_views(zdev);
+  auto zplan = bind_gdn_plan(zviews, stream);
+  expect(static_cast<bool>(zplan), "z=0 mixer bind");
+  if (!zplan) {
+    return;
+  }
+  auto zout = execute_decode_gdn(*zplan);
+  expect(static_cast<bool>(zout), "z=0 execute");
+  auto zhin = download_vec<float>(zdev.residual, kHidden, stream);
+  auto zhout = download_vec<float>(zdev.residual_out, kHidden, stream);
+  if (!zhin || !zhout) {
+    fail("z=0 download");
+    return;
+  }
+  expect_fp32_close(*zhin, zhost.residual, "z=0 input residual preserved", 0.0f, 0.0f);
+  expect_fp32_close(*zhout, zhost.residual, "SiLU(z)=0 Mix is 0",
+                    qw38::reference::tol::kGdnMixerResidualAbs,
+                    qw38::reference::tol::kGdnMixerResidualRel);
+
+  auto const mallocs2 = malloc_count();
+  expect(static_cast<bool>(execute_decode_gdn(*zplan)), "repeated mixer");
+  expect(malloc_count() == mallocs2, "repeated mixer allocates nothing");
+}
+
 }  // namespace
 
 int main() {
@@ -727,6 +959,8 @@ int main() {
   test_recurrence_bind_and_invalid(*stream);
   test_recurrence_layout_zero_heads_layers(*stream);
   test_recurrence_reset();
+  test_mixer_bind_and_lifetimes(*stream);
+  test_mixer_gamma_z_residual_state(*stream);
   if (g_failures != 0) {
     std::cerr << g_failures << " gdn unit failures\n";
     return 1;

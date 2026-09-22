@@ -1,7 +1,9 @@
 #include "runtime/gdn.hpp"
 
 #include "cuda/activation.hpp"
+#include "cuda/copy.hpp"
 #include "cuda/decode_mmv.hpp"
+#include "cuda/event.hpp"
 #include "cuda/gdn.hpp"
 
 #include "format/constants.hpp"
@@ -9,6 +11,7 @@
 #include <cmath>
 #include <sstream>
 #include <string_view>
+#include <utility>
 
 namespace qw38::runtime {
 namespace {
@@ -227,6 +230,97 @@ TensorView overlay(std::byte* base, std::uint64_t off, ArithmeticDtype dtype,
   return v;
 }
 
+std::expected<void, Error> region_rms(GdnFrontPlan const& plan) {
+  auto* residual = static_cast<float*>(plan.residual.pointer);
+  auto* gamma = static_cast<std::uint16_t const*>(plan.gamma.pointer);
+  auto* normalized = static_cast<std::uint16_t*>(plan.normalized.pointer);
+  if (residual == nullptr || gamma == nullptr || normalized == nullptr) {
+    return std::unexpected(arg_error("gdn", "plan views are null"));
+  }
+  if (auto st = qw38::cuda::launch_hidden_rms(residual, gamma, plan.eps, 1,
+                                              normalized, *plan.stream);
+      !st) {
+    return std::unexpected(from_cuda(st.error()));
+  }
+  return {};
+}
+
+std::expected<void, Error> region_qkvz(GdnFrontPlan const& plan) {
+  auto* normalized = static_cast<std::uint16_t*>(plan.normalized.pointer);
+  auto* qkv = static_cast<std::uint16_t*>(plan.scratch.qkv.pointer);
+  auto* z = static_cast<std::uint16_t*>(plan.scratch.z.pointer);
+  DecodeMmvDesc qkv_d = mmv_from_weight(plan.qkv);
+  qkv_d.input = normalized;
+  qkv_d.output = qkv;
+  qkv_d.epilogue = DecodeEpilogue::StoreBf16;
+  if (auto st = qw38::cuda::launch_decode_mmv(qkv_d, *plan.stream); !st) {
+    return std::unexpected(from_cuda(st.error()));
+  }
+  DecodeMmvDesc z_d = mmv_from_weight(plan.z);
+  z_d.input = normalized;
+  z_d.output = z;
+  z_d.epilogue = DecodeEpilogue::StoreBf16;
+  if (auto st = qw38::cuda::launch_decode_mmv(z_d, *plan.stream); !st) {
+    return std::unexpected(from_cuda(st.error()));
+  }
+  return {};
+}
+
+std::expected<void, Error> region_ab(GdnFrontPlan const& plan) {
+  auto* normalized = static_cast<std::uint16_t*>(plan.normalized.pointer);
+  auto* a = static_cast<float*>(plan.scratch.a.pointer);
+  auto* b = static_cast<float*>(plan.scratch.b.pointer);
+  DecodeMmvPairedDesc ab;
+  ab.a = mmv_from_weight(plan.a_proj);
+  ab.a.input = normalized;
+  ab.a.output = a;
+  ab.a.epilogue = DecodeEpilogue::StoreFp32;
+  ab.codes_b = static_cast<std::byte const*>(plan.b_proj.codes.pointer);
+  ab.codes_b_bytes = plan.b_proj.codes_bytes;
+  ab.output_b = b;
+  if (auto st = qw38::cuda::launch_decode_ab_bf16(ab, *plan.stream); !st) {
+    return std::unexpected(from_cuda(st.error()));
+  }
+  return {};
+}
+
+std::expected<void, Error> region_conv(GdnFrontPlan const& plan) {
+  if (plan.host_cursor == nullptr || *plan.host_cursor >= kConvTaps) {
+    return std::unexpected(arg_error("cursor", "invalid host cursor"));
+  }
+  auto* qkv = static_cast<std::uint16_t*>(plan.scratch.qkv.pointer);
+  auto* convolved = static_cast<std::uint16_t*>(plan.scratch.convolved.pointer);
+  auto* history = static_cast<std::uint16_t*>(plan.history.pointer);
+  auto* taps = static_cast<std::uint16_t const*>(plan.taps.pointer);
+  std::uint32_t const cursor = *plan.host_cursor;
+  if (auto st = qw38::cuda::launch_gdn_conv_silu(qkv, taps, history, cursor,
+                                                 convolved, *plan.stream);
+      !st) {
+    return std::unexpected(from_cuda(st.error()));
+  }
+  *plan.host_cursor = (cursor + 1u) % kConvTaps;
+  return {};
+}
+
+std::expected<void, Error> region_prep(GdnFrontPlan const& plan) {
+  auto* a = static_cast<float*>(plan.scratch.a.pointer);
+  auto* b = static_cast<float*>(plan.scratch.b.pointer);
+  auto* convolved = static_cast<std::uint16_t*>(plan.scratch.convolved.pointer);
+  auto* q_hat = static_cast<float*>(plan.scratch.q_hat.pointer);
+  auto* k_hat = static_cast<float*>(plan.scratch.k_hat.pointer);
+  auto* alpha = static_cast<float*>(plan.scratch.alpha.pointer);
+  auto* beta = static_cast<float*>(plan.scratch.beta.pointer);
+  auto* a_log = static_cast<std::uint16_t const*>(plan.a_log.pointer);
+  auto* dt_bias = static_cast<std::uint16_t const*>(plan.dt_bias.pointer);
+  if (auto st = qw38::cuda::launch_gdn_prepare(convolved, a, b, a_log, dt_bias,
+                                               plan.eps, q_hat, k_hat, alpha,
+                                               beta, *plan.stream);
+      !st) {
+    return std::unexpected(from_cuda(st.error()));
+  }
+  return {};
+}
+
 }  // namespace
 
 std::expected<std::uint32_t, Error> gdn_state_index(std::uint32_t language_layer) {
@@ -239,6 +333,12 @@ std::expected<std::uint32_t, Error> gdn_state_index(std::uint32_t language_layer
 std::string gdn_norm_name(std::uint32_t layer) {
   std::ostringstream out;
   out << "model.language_model.layers." << layer << ".input_layernorm.weight";
+  return out.str();
+}
+
+std::string gdn_gated_norm_name(std::uint32_t layer) {
+  std::ostringstream out;
+  out << "model.language_model.layers." << layer << ".linear_attn.norm.weight";
   return out.str();
 }
 
@@ -267,6 +367,12 @@ std::string gdn_b_name(std::uint32_t layer) {
   std::ostringstream out;
   out << "model.language_model.layers." << layer
       << ".linear_attn.in_proj_b.weight";
+  return out.str();
+}
+
+std::string gdn_out_name(std::uint32_t layer) {
+  std::ostringstream out;
+  out << "model.language_model.layers." << layer << ".linear_attn.out_proj.weight";
   return out.str();
 }
 
@@ -336,6 +442,9 @@ std::expected<GdnWorkspaceViews, Error> bind_gdn_workspace(TensorView workspace)
                 StorageClass::Bf16, true, 2, kGdnValueHeads, kGdnValueDim);
   v.o = overlay(base, kGdnOffO, ArithmeticDtype::Fp32,
                 PhysicalLayoutId::CudaFp32VectorV0, StorageClass::Fp32, true, 2,
+                kGdnValueHeads, kGdnValueDim);
+  v.u = overlay(base, kGdnOffU, ArithmeticDtype::Bf16,
+                PhysicalLayoutId::CudaBf16RowMajorV0, StorageClass::Bf16, true, 2,
                 kGdnValueHeads, kGdnValueDim);
   return v;
 }
@@ -577,86 +686,19 @@ std::expected<void, Error> execute_gdn_front(GdnFrontPlan const& plan) {
   if (plan.stream == nullptr || plan.stream->empty()) {
     return std::unexpected(arg_error("stream", "empty stream"));
   }
-  if (plan.host_cursor == nullptr || *plan.host_cursor >= kConvTaps) {
-    return std::unexpected(arg_error("cursor", "invalid host cursor"));
+  if (auto st = region_rms(plan); !st) {
+    return st;
   }
-  auto* residual = static_cast<float*>(plan.residual.pointer);
-  auto* gamma = static_cast<std::uint16_t const*>(plan.gamma.pointer);
-  auto* normalized = static_cast<std::uint16_t*>(plan.normalized.pointer);
-  auto* qkv = static_cast<std::uint16_t*>(plan.scratch.qkv.pointer);
-  auto* z = static_cast<std::uint16_t*>(plan.scratch.z.pointer);
-  auto* a = static_cast<float*>(plan.scratch.a.pointer);
-  auto* b = static_cast<float*>(plan.scratch.b.pointer);
-  auto* convolved = static_cast<std::uint16_t*>(plan.scratch.convolved.pointer);
-  auto* q_hat = static_cast<float*>(plan.scratch.q_hat.pointer);
-  auto* k_hat = static_cast<float*>(plan.scratch.k_hat.pointer);
-  auto* alpha = static_cast<float*>(plan.scratch.alpha.pointer);
-  auto* beta = static_cast<float*>(plan.scratch.beta.pointer);
-  auto* history = static_cast<std::uint16_t*>(plan.history.pointer);
-  auto* taps = static_cast<std::uint16_t const*>(plan.taps.pointer);
-  auto* a_log = static_cast<std::uint16_t const*>(plan.a_log.pointer);
-  auto* dt_bias = static_cast<std::uint16_t const*>(plan.dt_bias.pointer);
-  if (residual == nullptr || gamma == nullptr || normalized == nullptr ||
-      qkv == nullptr || z == nullptr || a == nullptr || b == nullptr ||
-      convolved == nullptr || q_hat == nullptr || k_hat == nullptr ||
-      alpha == nullptr || beta == nullptr || history == nullptr ||
-      taps == nullptr || a_log == nullptr || dt_bias == nullptr) {
-    return std::unexpected(arg_error("gdn", "plan views are null"));
+  if (auto st = region_qkvz(plan); !st) {
+    return st;
   }
-
-  // Region 1: input RMS → BF16 normalized residual.
-  if (auto st = qw38::cuda::launch_hidden_rms(residual, gamma, plan.eps, 1,
-                                              normalized, *plan.stream);
-      !st) {
-    return std::unexpected(from_cuda(st.error()));
+  if (auto st = region_ab(plan); !st) {
+    return st;
   }
-
-  // Region 2: Q4/BF16 qkv then z. Separate reductions; grouped only as a/b is.
-  DecodeMmvDesc qkv_d = mmv_from_weight(plan.qkv);
-  qkv_d.input = normalized;
-  qkv_d.output = qkv;
-  qkv_d.epilogue = DecodeEpilogue::StoreBf16;
-  if (auto st = qw38::cuda::launch_decode_mmv(qkv_d, *plan.stream); !st) {
-    return std::unexpected(from_cuda(st.error()));
+  if (auto st = region_conv(plan); !st) {
+    return st;
   }
-  DecodeMmvDesc z_d = mmv_from_weight(plan.z);
-  z_d.input = normalized;
-  z_d.output = z;
-  z_d.epilogue = DecodeEpilogue::StoreBf16;
-  if (auto st = qw38::cuda::launch_decode_mmv(z_d, *plan.stream); !st) {
-    return std::unexpected(from_cuda(st.error()));
-  }
-
-  // Region 3: grouped BF16 a/b → FP32.
-  DecodeMmvPairedDesc ab;
-  ab.a = mmv_from_weight(plan.a_proj);
-  ab.a.input = normalized;
-  ab.a.output = a;
-  ab.a.epilogue = DecodeEpilogue::StoreFp32;
-  ab.codes_b = static_cast<std::byte const*>(plan.b_proj.codes.pointer);
-  ab.codes_b_bytes = plan.b_proj.codes_bytes;
-  ab.output_b = b;
-  if (auto st = qw38::cuda::launch_decode_ab_bf16(ab, *plan.stream); !st) {
-    return std::unexpected(from_cuda(st.error()));
-  }
-
-  // Region 4: FIR + SiLU and circular raw-qkv history update.
-  std::uint32_t const cursor = *plan.host_cursor;
-  if (auto st = qw38::cuda::launch_gdn_conv_silu(qkv, taps, history, cursor,
-                                                 convolved, *plan.stream);
-      !st) {
-    return std::unexpected(from_cuda(st.error()));
-  }
-  *plan.host_cursor = (cursor + 1u) % kConvTaps;
-
-  // Region 5: q/k L2 (16 heads) and FP32 alpha/beta. v aliases convolved v.
-  if (auto st = qw38::cuda::launch_gdn_prepare(convolved, a, b, a_log, dt_bias,
-                                               plan.eps, q_hat, k_hat, alpha,
-                                               beta, *plan.stream);
-      !st) {
-    return std::unexpected(from_cuda(st.error()));
-  }
-  return {};
+  return region_prep(plan);
 }
 
 std::expected<GdnRecurrencePlan, Error> bind_gdn_recurrence_plan(
@@ -791,6 +833,311 @@ std::expected<void, Error> execute_gdn_recurrence(GdnRecurrencePlan const& plan)
     return std::unexpected(from_cuda(st.error()));
   }
   return {};
+}
+
+std::expected<GdnPlan, Error> bind_gdn_plan(GdnBindViews const& views,
+                                           qw38::cuda::Stream const& stream,
+                                           float eps) {
+  GdnFrontBindViews front;
+  front.qkv = views.qkv;
+  front.qkv_scales = views.qkv_scales;
+  front.z = views.z;
+  front.z_scales = views.z_scales;
+  front.a = views.a;
+  front.b = views.b;
+  front.gamma = views.gamma;
+  front.taps = views.taps;
+  front.a_log = views.a_log;
+  front.dt_bias = views.dt_bias;
+  front.residual = views.residual;
+  front.normalized = views.normalized;
+  front.workspace = views.workspace;
+  front.history = views.history;
+  front.host_cursor = views.host_cursor;
+  front.language_layer = views.language_layer;
+  auto fp = bind_gdn_front_plan(front, stream, eps);
+  if (!fp) {
+    return std::unexpected(fp.error());
+  }
+  auto out = bind_q4_or_bf16(views.out, views.out_scales, kHidden, kGdnZWidth, "out");
+  if (!out) {
+    return std::unexpected(out.error());
+  }
+  if (out->layout != fp->qkv.layout || out->quantizer != fp->qkv.quantizer) {
+    return std::unexpected(
+        arg_error("layout", "qkv/z/out must share one Q4 or BF16-control family"));
+  }
+  auto gated = as_vector(views.gated_gamma, kGdnValueDim, ArithmeticDtype::Bf16,
+                         false, "gated_gamma");
+  if (!gated) {
+    return std::unexpected(gated.error());
+  }
+  auto residual_out =
+      as_vector(views.residual_out, kHidden, ArithmeticDtype::Fp32, true,
+                "residual_out");
+  if (!residual_out) {
+    return std::unexpected(residual_out.error());
+  }
+  if (residual_out->pointer == fp->residual.pointer) {
+    return std::unexpected(
+        arg_error("residual_out", "h_mid must be distinct from input residual"));
+  }
+  if (gated->pointer == fp->gamma.pointer) {
+    return std::unexpected(
+        arg_error("gated_gamma", "gated gamma must be distinct from input RMS gamma"));
+  }
+  if (views.s.pointer == nullptr) {
+    return std::unexpected(arg_error("s", "null view"));
+  }
+  if (views.s.space != MemorySpace::Device) {
+    return std::unexpected(arg_error("s", "view must be device memory"));
+  }
+  if (views.s.dtype != ArithmeticDtype::Fp32) {
+    return std::unexpected(arg_error("s", "S must be FP32"));
+  }
+  if (!views.s.writable) {
+    return std::unexpected(arg_error("s", "view must be writable"));
+  }
+  std::uint64_t const need =
+      (static_cast<std::uint64_t>(fp->gdn_layer) + 1u) * kGdnSElemsPerLayer;
+  if (views.s.rank == 0 || element_count(views.s) < need) {
+    return std::unexpected(
+        arg_error("s", "view is smaller than the addressed GDN layer"));
+  }
+  if (fp->scratch.u.pointer == nullptr) {
+    return std::unexpected(arg_error("workspace", "u overlay is required"));
+  }
+
+  GdnPlan plan;
+  plan.front = std::move(*fp);
+  plan.out = *out;
+  plan.gated_gamma = *gated;
+  plan.residual_out = *residual_out;
+  plan.s = views.s;
+  plan.s.writable = true;
+  plan.s_layer = plan.front.gdn_layer;
+  return plan;
+}
+
+std::expected<GdnPlan, Error> bind_gdn_plan(Model const& model, Session& session,
+                                           std::uint32_t layer,
+                                           qw38::cuda::Stream const& stream,
+                                           float eps) {
+  auto gdn_i = gdn_state_index(layer);
+  if (!gdn_i) {
+    return std::unexpected(gdn_i.error());
+  }
+  auto const out_n = gdn_out_name(layer);
+  auto const gated_n = gdn_gated_norm_name(layer);
+  auto out = require_payload(model, out_n);
+  auto gated = require_payload(model, gated_n);
+  if (!out) {
+    return std::unexpected(out.error());
+  }
+  if (!gated) {
+    return std::unexpected(gated.error());
+  }
+  auto out_s = optional_scales(model, out_n, out->layout);
+  if (!out_s) {
+    return std::unexpected(out_s.error());
+  }
+
+  auto front = bind_gdn_front_plan(model, session, layer, stream, eps);
+  if (!front) {
+    return std::unexpected(front.error());
+  }
+
+  GdnBindViews views;
+  views.qkv = front->qkv.codes;
+  views.qkv_scales = front->qkv.scales;
+  views.z = front->z.codes;
+  views.z_scales = front->z.scales;
+  views.a = front->a_proj.codes;
+  views.b = front->b_proj.codes;
+  views.out = *out;
+  views.out_scales = *out_s;
+  views.gamma = front->gamma;
+  views.gated_gamma = *gated;
+  views.taps = front->taps;
+  views.a_log = front->a_log;
+  views.dt_bias = front->dt_bias;
+  views.residual = front->residual;
+  views.residual_out = session.residual_h_mid();
+  views.normalized = front->normalized;
+  auto workspace = session.scratch(qw38::format::ScratchKind::GdnWorkspace);
+  if (!workspace) {
+    return std::unexpected(workspace.error());
+  }
+  views.workspace = *workspace;
+  views.history = front->history;
+  views.s = session.gdn_s();
+  views.host_cursor = front->host_cursor;
+  views.language_layer = layer;
+  return bind_gdn_plan(views, stream, eps);
+}
+
+std::expected<void, Error> region_recur(GdnPlan const& plan) {
+  auto* q_hat = static_cast<float const*>(plan.front.scratch.q_hat.pointer);
+  auto* k_hat = static_cast<float const*>(plan.front.scratch.k_hat.pointer);
+  auto* alpha = static_cast<float const*>(plan.front.scratch.alpha.pointer);
+  auto* beta = static_cast<float const*>(plan.front.scratch.beta.pointer);
+  auto* v = static_cast<std::uint16_t const*>(plan.front.scratch.v.pointer);
+  auto* s = static_cast<float*>(plan.s.pointer);
+  auto* o = static_cast<float*>(plan.front.scratch.o.pointer);
+  if (q_hat == nullptr || k_hat == nullptr || alpha == nullptr || beta == nullptr ||
+      v == nullptr || s == nullptr || o == nullptr) {
+    return std::unexpected(arg_error("gdn", "recurrence views are null"));
+  }
+  if (auto st = qw38::cuda::launch_gdn_recurrence(q_hat, k_hat, alpha, beta, v, s,
+                                                  plan.s_layer, o, *plan.front.stream);
+      !st) {
+    return std::unexpected(from_cuda(st.error()));
+  }
+  return {};
+}
+
+std::expected<void, Error> region_gated(GdnPlan const& plan) {
+  auto* o = static_cast<float const*>(plan.front.scratch.o.pointer);
+  auto* z = static_cast<std::uint16_t const*>(plan.front.scratch.z.pointer);
+  auto* gamma = static_cast<std::uint16_t const*>(plan.gated_gamma.pointer);
+  auto* u = static_cast<std::uint16_t*>(plan.front.scratch.u.pointer);
+  if (o == nullptr || z == nullptr || gamma == nullptr || u == nullptr) {
+    return std::unexpected(arg_error("gdn", "gated-RMS views are null"));
+  }
+  if (auto st = qw38::cuda::launch_gdn_output_transform(o, z, gamma, plan.front.eps,
+                                                        u, *plan.front.stream);
+      !st) {
+    return std::unexpected(from_cuda(st.error()));
+  }
+  return {};
+}
+
+std::expected<void, Error> region_out_residual(GdnPlan const& plan) {
+  auto* residual = static_cast<float const*>(plan.front.residual.pointer);
+  auto* residual_out = static_cast<float*>(plan.residual_out.pointer);
+  auto* u = static_cast<std::uint16_t const*>(plan.front.scratch.u.pointer);
+  if (residual == nullptr || residual_out == nullptr || u == nullptr) {
+    return std::unexpected(arg_error("gdn", "residual views are null"));
+  }
+  if (auto st = qw38::cuda::copy_d2d(residual_out, residual,
+                                     kHidden * qw38::format::kFp32Size,
+                                     *plan.front.stream);
+      !st) {
+    return std::unexpected(from_cuda(st.error()));
+  }
+  qw38::cuda::DecodeMmvDesc out = mmv_from_weight(plan.out);
+  out.input = u;
+  out.residual = residual_out;
+  out.epilogue = DecodeEpilogue::ResidualAddFp32;
+  if (auto st = qw38::cuda::launch_decode_mmv(out, *plan.front.stream); !st) {
+    return std::unexpected(from_cuda(st.error()));
+  }
+  return {};
+}
+
+std::expected<TensorView, Error> execute_decode_gdn_impl(
+    GdnPlan const& plan, GdnRegionTimings* timings) {
+  if (plan.front.stream == nullptr || plan.front.stream->empty()) {
+    return std::unexpected(arg_error("stream", "empty stream"));
+  }
+
+  using qw38::cuda::Event;
+  using qw38::cuda::elapsed_ms;
+  Event marks[kGdnMixerRegions + 1];
+  if (timings != nullptr) {
+    for (int i = 0; i <= kGdnMixerRegions; ++i) {
+      auto e = Event::create_timing();
+      if (!e) {
+        return std::unexpected(from_cuda(e.error()));
+      }
+      marks[i] = std::move(*e);
+    }
+  }
+
+  auto mark = [&](int i) -> std::expected<void, Error> {
+    if (timings == nullptr) {
+      return {};
+    }
+    if (auto st = marks[i].record(*plan.front.stream); !st) {
+      return std::unexpected(from_cuda(st.error()));
+    }
+    return {};
+  };
+
+  if (auto st = mark(0); !st) {
+    return std::unexpected(st.error());
+  }
+  if (auto st = region_rms(plan.front); !st) {
+    return std::unexpected(st.error());
+  }
+  if (auto st = mark(1); !st) {
+    return std::unexpected(st.error());
+  }
+  if (auto st = region_qkvz(plan.front); !st) {
+    return std::unexpected(st.error());
+  }
+  if (auto st = mark(2); !st) {
+    return std::unexpected(st.error());
+  }
+  if (auto st = region_ab(plan.front); !st) {
+    return std::unexpected(st.error());
+  }
+  if (auto st = mark(3); !st) {
+    return std::unexpected(st.error());
+  }
+  if (auto st = region_conv(plan.front); !st) {
+    return std::unexpected(st.error());
+  }
+  if (auto st = mark(4); !st) {
+    return std::unexpected(st.error());
+  }
+  if (auto st = region_prep(plan.front); !st) {
+    return std::unexpected(st.error());
+  }
+  if (auto st = mark(5); !st) {
+    return std::unexpected(st.error());
+  }
+  if (auto st = region_recur(plan); !st) {
+    return std::unexpected(st.error());
+  }
+  if (auto st = mark(6); !st) {
+    return std::unexpected(st.error());
+  }
+  if (auto st = region_gated(plan); !st) {
+    return std::unexpected(st.error());
+  }
+  if (auto st = mark(7); !st) {
+    return std::unexpected(st.error());
+  }
+  if (auto st = region_out_residual(plan); !st) {
+    return std::unexpected(st.error());
+  }
+  if (auto st = mark(8); !st) {
+    return std::unexpected(st.error());
+  }
+
+  if (timings != nullptr) {
+    if (auto st = marks[kGdnMixerRegions].sync(); !st) {
+      return std::unexpected(from_cuda(st.error()));
+    }
+    for (int i = 0; i < kGdnMixerRegions; ++i) {
+      auto ms = elapsed_ms(marks[i], marks[i + 1]);
+      if (!ms) {
+        return std::unexpected(from_cuda(ms.error()));
+      }
+      timings->ms[i] = *ms;
+    }
+  }
+  return plan.residual_out;
+}
+
+std::expected<TensorView, Error> execute_decode_gdn(GdnPlan const& plan) {
+  return execute_decode_gdn_impl(plan, nullptr);
+}
+
+std::expected<TensorView, Error> execute_decode_gdn_timed(
+    GdnPlan const& plan, GdnRegionTimings& timings) {
+  return execute_decode_gdn_impl(plan, &timings);
 }
 
 }  // namespace qw38::runtime

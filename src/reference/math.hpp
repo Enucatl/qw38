@@ -63,6 +63,11 @@ inline constexpr float kGdnRecurMultiSAbs = 5.0e-4f;
 inline constexpr float kGdnRecurMultiSRel = 1.0e-4f;
 inline constexpr float kGdnRecurMultiOAbs = 5.0e-4f;
 inline constexpr float kGdnRecurMultiORel = 1.0e-4f;
+// Complete mixer: gated-RMS BF16 u plus Q4/BF16 out GEMV residual-add.
+inline constexpr float kGdnUAbs = 2.0e-2f;
+inline constexpr float kGdnURel = 1.0e-3f;
+inline constexpr float kGdnMixerResidualAbs = 5.0e-2f;
+inline constexpr float kGdnMixerResidualRel = 1.0e-3f;
 }  // namespace tol
 
 [[nodiscard]] bool eps_ok(float eps) noexcept;
@@ -196,6 +201,28 @@ struct GdnFrontReference {
     std::span<std::uint16_t const> w_b, std::span<std::uint16_t const> taps,
     std::span<std::uint16_t const> a_log, std::span<std::uint16_t const> dt_bias,
     std::span<std::uint16_t const> history, std::uint32_t cursor);
+
+// Decode GDN steps 1–8 on decoded BF16 operands. S/history/cursor in/out.
+// residual_out = residual + W_out vec(u); input residual is not mutated.
+struct GdnMixerReference {
+  GdnFrontReference front;
+  std::vector<float> o;
+  std::vector<std::uint16_t> u;
+  std::vector<float> residual;
+  std::vector<float> s;
+  std::vector<std::uint16_t> history;
+  std::uint32_t cursor{};
+};
+
+[[nodiscard]] std::expected<GdnMixerReference, Error> gdn_mixer_reference(
+    std::span<float const> residual, std::span<std::uint16_t const> gamma,
+    std::span<std::uint16_t const> gated_gamma, float eps,
+    std::span<std::uint16_t const> w_qkv, std::span<std::uint16_t const> w_z,
+    std::span<std::uint16_t const> w_a, std::span<std::uint16_t const> w_b,
+    std::span<std::uint16_t const> w_out, std::span<std::uint16_t const> taps,
+    std::span<std::uint16_t const> a_log, std::span<std::uint16_t const> dt_bias,
+    std::span<std::uint16_t const> history, std::uint32_t cursor,
+    std::span<float const> s);
 
 [[nodiscard]] std::expected<DecodeMlpReference, Error> decode_mlp_reference(
     std::span<float const> h_mid, std::span<std::uint16_t const> gamma,

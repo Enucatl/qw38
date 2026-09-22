@@ -1,7 +1,7 @@
 # TASK-013 — Complete decode GDN mixer
 
 ## Status
-TODO
+DONE
 ## Milestone
 M4 — GDN execution
 ## Purpose
@@ -47,22 +47,63 @@ Complete GDN mixer followed by TASK-010 MLP for two sessions and restored contin
 ## Benchmark required
 Report region timings diagnostically; no fusion authorization.
 ## Acceptance criteria
-- [ ] Eight regions and declared stores remain separately attributable.
-- [ ] Final residual/state pass reference and continuation tests.
-- [ ] Gated norm/gate precision semantics are correct.
-- [ ] Steady state performs no allocations.
+- [x] Eight regions and declared stores remain separately attributable.
+- [x] Final residual/state pass reference and continuation tests.
+- [x] Gated norm/gate precision semantics are correct.
+- [x] Steady state performs no allocations.
 ## Architecture blocker rule
 On locked conflict stop with full required blocker report; do not fuse or alter boundaries as a workaround.
 ## Completion report
 ### Result
-DONE | BLOCKED
+DONE
 ### Changes made
+- CPU `qw38::reference::gdn_mixer_reference`: front + recurrence + per-head multiplicative gated RMS (`y=(γ⊙o/RMS(o))⊙SiLU(z)`) + BF16 `u` + GEMV `out_proj` + FP32 residual add. Input residual is not mutated; S/history/cursor are in/out.
+- CUDA `launch_gdn_output_transform` wraps TASK-008 `launch_gdn_gated_rms` with 48 value heads. Workspace overlay `u` BF16 `[48,128]` at `kGdnOffU`.
+- Runtime `GdnPlan` / `bind_gdn_plan` (views and Model/Session) plus `execute_decode_gdn` / `_timed`. Eight named regions: rms, qkvz (two MMVs), ab, conv, prep, recur, gated, out-residual. Region 8 copies `residual_h` → `residual_h_mid` then Q4/BF16-control `ResidualAddFp32`. Returns `h_mid`. No fusion, one stream, no allocation on execute.
+- Tests: `gdn_unit` (bind/lifetimes, γ=0 Mix=0, SiLU(z)=0 Mix=0, residual live, S isolation, no malloc); `gdn_reference` (Q4 3 tokens + BF16-control 2 tokens, every materialized boundary); `gdn_integration` (mixer then TASK-010 MLP, two sessions, snapshot/restore at step 3).
+- Diagnostic bench `qw38_bench_gdn_mixer` (`EXCLUDE_FROM_ALL`, not ctest).
 ### Tests run
-Exact commands/results.
+Debug:
+
+```text
+docker run --gpus all --rm -u "$(id -u):$(id -g)" \
+  -v "$PWD":/workspace -w /workspace qw38-dev:cuda13.4.1 \
+  bash -lc 'cmake -S . -B build/debug -DCMAKE_BUILD_TYPE=Debug && cmake --build build/debug && ctest --test-dir build/debug --output-on-failure'
+```
+
+Result: 34/34 tests passed (`gdn_unit` 2.70s, `gdn_reference` 7.83s, `gdn_integration` 18.68s).
+
+Release:
+
+```text
+docker run --gpus all --rm -u "$(id -u):$(id -g)" \
+  -v "$PWD":/workspace -w /workspace qw38-dev:cuda13.4.1 \
+  bash -lc 'cmake -S . -B build/release -DCMAKE_BUILD_TYPE=Release && cmake --build build/release && ctest --test-dir build/release --output-on-failure'
+```
+
+Result: 34/34 tests passed (`gdn_unit` 1.09s, `gdn_reference` 1.87s, `gdn_integration` 4.13s).
+
 ### Benchmark results
-Diagnostic region timings.
+Identity: `qw38_bench_gdn_mixer` Release, container `qw38-dev:cuda13.4.1`, device NVIDIA GeForce RTX 5090 `sm_120`. Q4 decode mixer, eight regions, 8 timed launches after 2 warmup. Command:
+
+```text
+docker run --gpus all --rm -u "$(id -u):$(id -g)" \
+  -v "$PWD":/workspace -w /workspace qw38-dev:cuda13.4.1 \
+  bash -lc 'cmake --build build/release --target qw38_bench_gdn_mixer && ./build/release/benchmarks/qw38_bench_gdn_mixer'
+```
+
+| Case | weight_bytes | launches | ms |
+|---| ---:| ---:| ---:|
+| decode GDN mixer (8 regions) | 62351808 | 8 | 0.128784 |
+
+Region mean ms: rms=0.009988, qkvz=0.081184, ab=0.01182, conv=0.002232, prep=0.004096, recur=0.004068, gated=0.004124, out-residual=0.032768.
+
+Diagnostic only; does not authorize fusion, layout, or precision change.
 ### Architecture blocker
-None/full report.
+None.
 ### Follow-up observations
-Concrete only.
+- Region 2 stays two MMV launches (qkv then z) in one named region; no fusion.
+- Region 8 is `copy_d2d` then in-place `ResidualAddFp32` (TASK-009 epilogue unchanged).
+- Mixer writes `residual_h_mid`; MLP still adds in place on `h_mid` (next-layer ping-pong into `residual_h` remains TASK-016).
+- Delivered with commit and push after verification PASS.
 

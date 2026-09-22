@@ -48,6 +48,11 @@ inline constexpr std::uint32_t kGdnSElemsPerLayer =
     std::uint16_t const* v, float* s, std::uint32_t s_layer, float* o,
     Stream const& stream);
 
+// One block per value head: multiplicative gamma, FP32 SiLU(z), BF16 u [48,128].
+[[nodiscard]] std::expected<void, Error> launch_gdn_output_transform(
+    float const* o, std::uint16_t const* z, std::uint16_t const* gamma, float eps,
+    std::uint16_t* u, Stream const& stream);
+
 struct GdnRecurrenceResources {
   int registers{0};
   std::size_t shared_bytes{0};

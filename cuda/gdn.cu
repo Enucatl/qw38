@@ -1,5 +1,7 @@
 #include "cuda/gdn.hpp"
 
+#include "cuda/activation.hpp"
+
 #include <cmath>
 #include <cstddef>
 #include <limits>
@@ -303,6 +305,26 @@ std::expected<void, Error> launch_gdn_recurrence(
                           stream.native()>>>(q_hat, k_hat, alpha, beta, v, layer_s,
                                            o);
   return check(cudaGetLastError(), "gdn_recurrence_kernel");
+}
+
+std::expected<void, Error> launch_gdn_output_transform(
+    float const* o, std::uint16_t const* z, std::uint16_t const* gamma, float eps,
+    std::uint16_t* u, Stream const& stream) {
+  auto st = require_stream(stream, "gdn_output_transform");
+  if (!st) {
+    return st;
+  }
+  if (o == nullptr || z == nullptr || gamma == nullptr || u == nullptr) {
+    return std::unexpected(make_error(ErrorCode::InvalidArgument,
+                                      "gdn_output_transform",
+                                      "null o, z, gamma, or u"));
+  }
+  if (o == reinterpret_cast<float const*>(u)) {
+    return std::unexpected(make_error(ErrorCode::InvalidArgument,
+                                      "gdn_output_transform",
+                                      "o and u must be distinct"));
+  }
+  return launch_gdn_gated_rms(o, z, gamma, eps, kGdnValueHeads, u, stream);
 }
 
 std::expected<GdnRecurrenceResources, Error> gdn_recurrence_resources() {

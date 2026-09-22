@@ -19,6 +19,8 @@ using qw38::format::LogicalQuantizerId;
 using qw38::format::PackedMatrix;
 using qw38::format::PhysicalLayoutId;
 using qw38::format::StorageClass;
+using qw38::gdn::test::DeviceGdnMixer;
+using qw38::gdn::test::HostGdnMixer;
 using qw38::gdn::test::download_vec;
 using qw38::gdn::test::expect;
 using qw38::gdn::test::expect_bf16_close;
@@ -51,26 +53,32 @@ using qw38::gdn::test::kHidden;
 using qw38::gdn::test::kQkvWidth;
 using qw38::gdn::test::make_logical;
 using qw38::gdn::test::make_view;
+using qw38::gdn::test::mixer_views;
 using qw38::gdn::test::pack_bf16_tile;
 using qw38::gdn::test::pack_q4_from_logical;
 using qw38::gdn::test::pattern_f;
 using qw38::gdn::test::pattern_h;
 using qw38::gdn::test::residual_vec;
+using qw38::gdn::test::upload_host_mixer;
 using qw38::gdn::test::upload_vec;
 using qw38::gdn::test::v_from_convolved;
 using qw38::gdn::test::zeros_f;
 using qw38::gdn::test::zeros_h;
 using qw38::reference::gdn_conv_history_step;
 using qw38::reference::gdn_front_reference;
+using qw38::reference::gdn_mixer_reference;
 using qw38::reference::gdn_prepare;
 using qw38::reference::gdn_recurrence_step;
 using qw38::runtime::GdnFrontBindViews;
 using qw38::runtime::GdnRecurrenceBindViews;
 using qw38::runtime::bind_gdn_front_plan;
+using qw38::runtime::bind_gdn_plan;
 using qw38::runtime::bind_gdn_recurrence_plan;
+using qw38::runtime::execute_decode_gdn;
 using qw38::runtime::execute_gdn_front;
 using qw38::runtime::execute_gdn_recurrence;
 using qw38::runtime::kGdnOffO;
+using qw38::runtime::kGdnOffU;
 using qw38::runtime::kGdnWorkspaceBytesPerToken;
 
 namespace {
@@ -559,6 +567,196 @@ void test_recurrence_steps_and_adversarial(Stream const& stream) {
   }
 }
 
+bool make_q4_mixer_host(HostGdnMixer& host) {
+  auto lq = make_logical(LogicalQuantizerId::Q4G64V0, kQkvWidth, kHidden, 2, 0x3C00);
+  auto lz = make_logical(LogicalQuantizerId::Q4G64V0, kGdnZWidth, kHidden, -1, 0x3C00);
+  auto lo = make_logical(LogicalQuantizerId::Q4G64V0, kHidden, kGdnZWidth, 3, 0x3C00);
+  fill_logical_pattern(lq, 3);
+  fill_logical_pattern(lz, 6);
+  fill_logical_pattern(lo, 10);
+  if (!pack_q4_from_logical(lq, host.qkv, "mix qkv") ||
+      !pack_q4_from_logical(lz, host.z, "mix z") ||
+      !pack_q4_from_logical(lo, host.out, "mix out")) {
+    return false;
+  }
+  auto wq = qw38::compiler::dequantize_to_bf16(lq);
+  auto wz = qw38::compiler::dequantize_to_bf16(lz);
+  auto wo = qw38::compiler::dequantize_to_bf16(lo);
+  if (!wq || !wz || !wo) {
+    fail("mix dequant");
+    return false;
+  }
+  host.w_qkv = std::move(*wq);
+  host.w_z = std::move(*wz);
+  host.w_out = std::move(*wo);
+  host.w_a = pattern_h(kGdnValueHeads * kHidden, 0.04f);
+  host.w_b = pattern_h(kGdnValueHeads * kHidden, -0.03f);
+  if (!pack_bf16_tile(host.w_a, kGdnValueHeads, kHidden, host.a, "mix a") ||
+      !pack_bf16_tile(host.w_b, kGdnValueHeads, kHidden, host.b, "mix b")) {
+    return false;
+  }
+  host.gamma = pattern_h(kHidden, 0.18f);
+  host.gated_gamma = pattern_h(kGdnHeadDim, 0.65f);
+  host.taps = pattern_h(kConvKernel * kQkvWidth, 0.14f);
+  host.a_log = pattern_h(kGdnValueHeads, -0.4f);
+  host.dt_bias = pattern_h(kGdnValueHeads, 0.35f);
+  host.residual = residual_vec(kHidden, 0.77f);
+  return true;
+}
+
+bool compare_mixer(HostGdnMixer const& host, DeviceGdnMixer& dev, Stream const& stream,
+                   std::string_view tag, int tokens) {
+  auto views = mixer_views(dev);
+  auto plan = bind_gdn_plan(views, stream);
+  if (!plan) {
+    fail(std::string(tag) + " bind: " + qw38::runtime::error_message(plan.error()));
+    return false;
+  }
+  std::vector<std::uint16_t> hist(kConvHistoryTaps * kQkvWidth,
+                                  qw38::format::fp32_to_bf16_rne(0.0f));
+  std::uint32_t cursor = 0;
+  auto s_cpu = zeros_f(static_cast<std::uint32_t>(kGdnSElemsPerLayer));
+  auto residual = host.residual;
+  for (int t = 0; t < tokens; ++t) {
+    if (t > 0) {
+      residual = residual_vec(kHidden, 0.5f + 0.07f * static_cast<float>(t));
+      auto up = qw38::cuda::copy_h2d(dev.residual.data(), residual.data(),
+                                     residual.size() * 4u, stream);
+      if (!up) {
+        fail(std::string(tag) + " residual upload");
+        return false;
+      }
+    }
+    auto cpu = gdn_mixer_reference(residual, host.gamma, host.gated_gamma,
+                                   kDefaultRmsEps, host.w_qkv, host.w_z, host.w_a,
+                                   host.w_b, host.w_out, host.taps, host.a_log,
+                                   host.dt_bias, hist, cursor, s_cpu);
+    if (!cpu) {
+      fail(std::string(tag) + " cpu: " +
+           qw38::reference::error_message(cpu.error()));
+      return false;
+    }
+    hist = cpu->history;
+    cursor = cpu->cursor;
+    s_cpu = cpu->s;
+
+    auto st = execute_decode_gdn(*plan);
+    if (!st) {
+      fail(std::string(tag) + " execute: " +
+           qw38::runtime::error_message(st.error()));
+      return false;
+    }
+
+    auto* ws = static_cast<std::byte*>(dev.workspace.data());
+    auto copy_ws = [&](std::uint64_t off, std::uint64_t bytes, auto* dst) {
+      auto stc = qw38::cuda::copy_d2h(dst, ws + off, bytes, stream);
+      return static_cast<bool>(stc) && static_cast<bool>(stream.sync());
+    };
+    std::vector<std::uint16_t> g_qkv(kQkvWidth);
+    std::vector<std::uint16_t> g_z(kGdnZWidth);
+    std::vector<std::uint16_t> g_conv(kQkvWidth);
+    std::vector<std::uint16_t> g_u(kGdnValueHeads * kGdnHeadDim);
+    std::vector<float> g_o(static_cast<std::size_t>(kGdnValueHeads) * kGdnHeadDim);
+    std::vector<float> g_q(static_cast<std::size_t>(kGdnKeyHeads) * kGdnHeadDim);
+    std::vector<float> g_alpha(kGdnValueHeads);
+    if (!copy_ws(qw38::runtime::kGdnOffQkv, kQkvWidth * 2, g_qkv.data()) ||
+        !copy_ws(qw38::runtime::kGdnOffZ, kGdnZWidth * 2, g_z.data()) ||
+        !copy_ws(qw38::runtime::kGdnOffConvolved, kQkvWidth * 2, g_conv.data()) ||
+        !copy_ws(qw38::runtime::kGdnOffQHat, g_q.size() * 4, g_q.data()) ||
+        !copy_ws(qw38::runtime::kGdnOffAlpha, kGdnValueHeads * 4, g_alpha.data()) ||
+        !copy_ws(kGdnOffO, g_o.size() * 4, g_o.data()) ||
+        !copy_ws(kGdnOffU, g_u.size() * 2, g_u.data())) {
+      fail(std::string(tag) + " workspace download");
+      return false;
+    }
+    auto g_norm = download_vec<std::uint16_t>(dev.normalized, kHidden, stream);
+    auto g_hist = download_vec<std::uint16_t>(dev.history, kConvHistoryTaps * kQkvWidth,
+                                             stream);
+    auto g_s = download_vec<float>(dev.s, kGdnSElemsPerLayer, stream);
+    auto g_h = download_vec<float>(dev.residual, kHidden, stream);
+    auto g_hmid = download_vec<float>(dev.residual_out, kHidden, stream);
+    if (!g_norm || !g_hist || !g_s || !g_h || !g_hmid) {
+      fail(std::string(tag) + " download");
+      return false;
+    }
+    std::string step = std::string(tag) + " t" + std::to_string(t);
+    expect_fp32_close(*g_h, residual, step + " residual live", 0.0f, 0.0f);
+    expect_bf16_close(*g_norm, cpu->front.normalized, step + " rms",
+                      qw38::reference::tol::kRmsBf16Abs, 0.0f);
+    expect_bf16_close(g_qkv, cpu->front.qkv, step + " qkv",
+                      qw38::cuda::decode_mmv_tol::kBf16StoreAbs, 1.0e-4f);
+    expect_bf16_close(g_z, cpu->front.z, step + " z",
+                      qw38::cuda::decode_mmv_tol::kBf16StoreAbs, 1.0e-4f);
+    expect_bf16_close(g_conv, cpu->front.convolved, step + " conv", kGdnConvBf16Abs,
+                      1.0e-4f);
+    expect_fp32_close(g_q, cpu->front.q_hat, step + " q_hat", kGdnQkFp32Abs,
+                      kGdnQkFp32Rel);
+    expect_fp32_close(g_alpha, cpu->front.alpha, step + " alpha", kGdnGateFp32Abs,
+                      kGdnGateFp32Rel);
+    float const sa = (t == 0) ? kGdnRecurSAbs : kGdnRecurMultiSAbs;
+    float const sr = (t == 0) ? kGdnRecurSRel : kGdnRecurMultiSRel;
+    float const oa = (t == 0) ? kGdnRecurOAbs : kGdnRecurMultiOAbs;
+    float const orr = (t == 0) ? kGdnRecurORel : kGdnRecurMultiORel;
+    expect_fp32_close(*g_s, cpu->s, step + " S", sa, sr);
+    expect_fp32_close(g_o, cpu->o, step + " o", oa, orr);
+    expect_bf16_close(g_u, cpu->u, step + " u", qw38::reference::tol::kGdnUAbs,
+                      qw38::reference::tol::kGdnURel);
+    expect_bf16_close(*g_hist, cpu->history, step + " history", 0.0f, 0.0f);
+    expect_fp32_close(*g_hmid, cpu->residual, step + " h_mid",
+                      qw38::reference::tol::kGdnMixerResidualAbs,
+                      qw38::reference::tol::kGdnMixerResidualRel);
+    expect(dev.cursor == cpu->cursor, step + " cursor");
+  }
+  return true;
+}
+
+void test_mixer_q4_and_bf16(Stream const& stream) {
+  HostGdnMixer host;
+  if (!make_q4_mixer_host(host)) {
+    return;
+  }
+  DeviceGdnMixer dev;
+  if (!upload_host_mixer(host, dev, stream)) {
+    return;
+  }
+  (void)compare_mixer(host, dev, stream, "q4-mixer", 3);
+
+  HostGdnMixer bf;
+  auto src_q = qw38::mlp::test::bf16_matrix(kQkvWidth, kHidden, 0.12f, 1);
+  auto src_z = qw38::mlp::test::bf16_matrix(kGdnZWidth, kHidden, 0.11f, 4);
+  auto src_o = qw38::mlp::test::bf16_matrix(kHidden, kGdnZWidth, 0.09f, 8);
+  auto pq = qw38::format::pack_bf16_dense_tile_v0(src_q, kQkvWidth, kHidden);
+  auto pz = qw38::format::pack_bf16_dense_tile_v0(src_z, kGdnZWidth, kHidden);
+  auto po = qw38::format::pack_bf16_dense_tile_v0(src_o, kHidden, kGdnZWidth);
+  if (!pq || !pz || !po) {
+    fail("bf16 mixer pack");
+    return;
+  }
+  bf.qkv = std::move(*pq);
+  bf.z = std::move(*pz);
+  bf.out = std::move(*po);
+  bf.w_qkv = qw38::mlp::test::bytes_to_u16(src_q);
+  bf.w_z = qw38::mlp::test::bytes_to_u16(src_z);
+  bf.w_out = qw38::mlp::test::bytes_to_u16(src_o);
+  bf.w_a = pattern_h(kGdnValueHeads * kHidden, 0.05f);
+  bf.w_b = pattern_h(kGdnValueHeads * kHidden, -0.02f);
+  if (!pack_bf16_tile(bf.w_a, kGdnValueHeads, kHidden, bf.a, "bf a") ||
+      !pack_bf16_tile(bf.w_b, kGdnValueHeads, kHidden, bf.b, "bf b")) {
+    return;
+  }
+  bf.gamma = pattern_h(kHidden, 0.16f);
+  bf.gated_gamma = pattern_h(kGdnHeadDim, 0.8f);
+  bf.taps = pattern_h(kConvKernel * kQkvWidth, 0.13f);
+  bf.a_log = pattern_h(kGdnValueHeads, -0.35f);
+  bf.dt_bias = pattern_h(kGdnValueHeads, 0.28f);
+  bf.residual = residual_vec(kHidden, 0.6f);
+  DeviceGdnMixer bdev;
+  if (!upload_host_mixer(bf, bdev, stream)) {
+    return;
+  }
+  (void)compare_mixer(bf, bdev, stream, "bf16-mixer", 2);
+}
+
 }  // namespace
 
 int main() {
@@ -570,6 +768,7 @@ int main() {
   test_multi_step_kernels(*stream);
   test_front_vs_reference(*stream);
   test_recurrence_steps_and_adversarial(*stream);
+  test_mixer_q4_and_bf16(*stream);
   if (g_failures != 0) {
     std::cerr << g_failures << " gdn reference failures\n";
     return 1;

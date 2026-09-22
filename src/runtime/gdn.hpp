@@ -54,6 +54,7 @@ struct GdnWorkspaceViews {
   TensorView beta{};       // FP32 [48]
   TensorView v{};          // BF16 [48,128] alias of convolved[4096:]
   TensorView o{};          // FP32 [48,128]
+  TensorView u{};          // BF16 [48,128]
 };
 
 struct GdnFrontPlan {
@@ -96,10 +97,12 @@ struct GdnFrontBindViews {
 };
 
 [[nodiscard]] std::string gdn_norm_name(std::uint32_t layer);
+[[nodiscard]] std::string gdn_gated_norm_name(std::uint32_t layer);
 [[nodiscard]] std::string gdn_qkv_name(std::uint32_t layer);
 [[nodiscard]] std::string gdn_z_name(std::uint32_t layer);
 [[nodiscard]] std::string gdn_a_name(std::uint32_t layer);
 [[nodiscard]] std::string gdn_b_name(std::uint32_t layer);
+[[nodiscard]] std::string gdn_out_name(std::uint32_t layer);
 [[nodiscard]] std::string gdn_conv_name(std::uint32_t layer);
 [[nodiscard]] std::string gdn_alog_name(std::uint32_t layer);
 [[nodiscard]] std::string gdn_dt_name(std::uint32_t layer);
@@ -153,5 +156,64 @@ struct GdnRecurrencePlan {
 
 [[nodiscard]] std::expected<void, Error> execute_gdn_recurrence(
     GdnRecurrencePlan const& plan);
+
+// Complete decode GDN mixer: eight V0 regions, MLP-compatible ping-pong residual.
+// Input residual stays live until region 8; output is the other FP32 buffer.
+inline constexpr int kGdnMixerRegions = 8;
+inline constexpr char const* kGdnMixerRegionNames[kGdnMixerRegions] = {
+    "rms", "qkvz", "ab", "conv", "prep", "recur", "gated", "out-residual"};
+
+struct GdnRegionTimings {
+  float ms[kGdnMixerRegions]{};
+};
+
+struct GdnBindViews {
+  TensorView qkv{};
+  TensorView qkv_scales{};
+  TensorView z{};
+  TensorView z_scales{};
+  TensorView a{};
+  TensorView b{};
+  TensorView out{};
+  TensorView out_scales{};
+  TensorView gamma{};
+  TensorView gated_gamma{};
+  TensorView taps{};
+  TensorView a_log{};
+  TensorView dt_bias{};
+  TensorView residual{};
+  TensorView residual_out{};
+  TensorView normalized{};
+  TensorView workspace{};
+  TensorView history{};
+  TensorView s{};
+  std::uint32_t* host_cursor{nullptr};
+  std::uint32_t language_layer{};
+};
+
+struct GdnPlan {
+  GdnFrontPlan front{};
+  GdnWeightBinding out{};
+  TensorView gated_gamma{};   // BF16 [128], multiplicative
+  TensorView residual_out{};  // FP32 h_mid; original residual stays live
+  TensorView s{};             // FP32 session S
+  std::uint32_t s_layer{};
+};
+
+[[nodiscard]] std::expected<GdnPlan, Error> bind_gdn_plan(
+    GdnBindViews const& views, qw38::cuda::Stream const& stream,
+    float eps = kGdnRmsEps);
+
+[[nodiscard]] std::expected<GdnPlan, Error> bind_gdn_plan(
+    Model const& model, Session& session, std::uint32_t layer,
+    qw38::cuda::Stream const& stream, float eps = kGdnRmsEps);
+
+// Eight launches, no allocation. Returns residual_out (h_mid).
+[[nodiscard]] std::expected<TensorView, Error> execute_decode_gdn(
+    GdnPlan const& plan);
+
+// Same map; fills diagnostic per-region milliseconds. Not a fusion license.
+[[nodiscard]] std::expected<TensorView, Error> execute_decode_gdn_timed(
+    GdnPlan const& plan, GdnRegionTimings& timings);
 
 }  // namespace qw38::runtime

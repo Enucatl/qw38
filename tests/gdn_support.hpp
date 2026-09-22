@@ -31,6 +31,7 @@ using qw38::mlp::test::make_logical;
 using qw38::mlp::test::make_view;
 using qw38::mlp::test::pack_q4_from_logical;
 using qw38::mlp::test::residual_vec;
+using qw38::mlp::test::scale_view;
 using qw38::mlp::test::upload_vec;
 using qw38::mlp::test::vec_view;
 using qw38::mlp::test::weight_view;
@@ -126,6 +127,168 @@ inline bool pack_bf16_tile(std::span<std::uint16_t const> row_major, std::uint32
   }
   out = std::move(*packed);
   return true;
+}
+
+struct HostGdnMixer {
+  qw38::format::PackedMatrix qkv;
+  qw38::format::PackedMatrix z;
+  qw38::format::PackedMatrix a;
+  qw38::format::PackedMatrix b;
+  qw38::format::PackedMatrix out;
+  std::vector<std::uint16_t> w_qkv;
+  std::vector<std::uint16_t> w_z;
+  std::vector<std::uint16_t> w_a;
+  std::vector<std::uint16_t> w_b;
+  std::vector<std::uint16_t> w_out;
+  std::vector<std::uint16_t> gamma;
+  std::vector<std::uint16_t> gated_gamma;
+  std::vector<std::uint16_t> taps;
+  std::vector<std::uint16_t> a_log;
+  std::vector<std::uint16_t> dt_bias;
+  std::vector<float> residual;
+};
+
+struct DeviceGdnMixer {
+  DeviceBuffer qkv_codes;
+  DeviceBuffer qkv_scales;
+  DeviceBuffer z_codes;
+  DeviceBuffer z_scales;
+  DeviceBuffer a;
+  DeviceBuffer b;
+  DeviceBuffer out_codes;
+  DeviceBuffer out_scales;
+  DeviceBuffer gamma;
+  DeviceBuffer gated_gamma;
+  DeviceBuffer taps;
+  DeviceBuffer a_log;
+  DeviceBuffer dt_bias;
+  DeviceBuffer residual;
+  DeviceBuffer residual_out;
+  DeviceBuffer normalized;
+  DeviceBuffer workspace;
+  DeviceBuffer history;
+  DeviceBuffer s;
+  std::uint32_t cursor{0};
+  bool has_scales{true};
+  PhysicalLayoutId layout{PhysicalLayoutId::CudaQ4G64V0};
+  StorageClass storage{StorageClass::Int4Grouped};
+};
+
+inline bool upload_packed_named(DeviceBuffer& codes, DeviceBuffer& scales,
+                                qw38::format::PackedMatrix const& packed,
+                                Stream const& stream, std::string_view tag) {
+  return qw38::mlp::test::upload_packed(codes, scales, packed, stream, tag);
+}
+
+inline bool upload_host_mixer(HostGdnMixer const& host, DeviceGdnMixer& dev,
+                              Stream const& stream, std::uint32_t s_layers = 1) {
+  if (!upload_packed_named(dev.qkv_codes, dev.qkv_scales, host.qkv, stream, "qkv") ||
+      !upload_packed_named(dev.z_codes, dev.z_scales, host.z, stream, "z") ||
+      !upload_packed_named(dev.out_codes, dev.out_scales, host.out, stream, "out")) {
+    return false;
+  }
+  auto a = upload_vec(host.a.codes, stream);
+  auto b = upload_vec(host.b.codes, stream);
+  auto g = upload_vec(host.gamma, stream);
+  auto gg = upload_vec(host.gated_gamma, stream);
+  auto t = upload_vec(host.taps, stream);
+  auto al = upload_vec(host.a_log, stream);
+  auto dt = upload_vec(host.dt_bias, stream);
+  auto r = upload_vec(host.residual, stream);
+  auto ro = DeviceBuffer::allocate(kHidden * 4);
+  auto n = DeviceBuffer::allocate(kHidden * 2);
+  auto ws = DeviceBuffer::allocate(qw38::runtime::kGdnWorkspaceBytesPerToken);
+  auto hist = DeviceBuffer::allocate(static_cast<std::uint64_t>(kConvHistoryTaps) *
+                                     kQkvWidth * 2u);
+  auto s = DeviceBuffer::allocate(static_cast<std::uint64_t>(s_layers) *
+                                  kGdnSElemsPerLayer * 4u);
+  if (!a || !b || !g || !gg || !t || !al || !dt || !r || !ro || !n || !ws ||
+      !hist || !s) {
+    fail("mixer upload");
+    return false;
+  }
+  if (!qw38::cuda::zero(*ro, stream) || !qw38::cuda::zero(*n, stream) ||
+      !qw38::cuda::zero(*ws, stream) || !qw38::cuda::zero(*hist, stream) ||
+      !qw38::cuda::zero(*s, stream)) {
+    fail("mixer zero");
+    return false;
+  }
+  dev.a = std::move(*a);
+  dev.b = std::move(*b);
+  dev.gamma = std::move(*g);
+  dev.gated_gamma = std::move(*gg);
+  dev.taps = std::move(*t);
+  dev.a_log = std::move(*al);
+  dev.dt_bias = std::move(*dt);
+  dev.residual = std::move(*r);
+  dev.residual_out = std::move(*ro);
+  dev.normalized = std::move(*n);
+  dev.workspace = std::move(*ws);
+  dev.history = std::move(*hist);
+  dev.s = std::move(*s);
+  dev.cursor = 0;
+  dev.has_scales = !host.qkv.scales.empty();
+  dev.layout = host.qkv.layout;
+  dev.storage = (host.qkv.layout == PhysicalLayoutId::CudaQ4G64V0)
+                    ? StorageClass::Int4Grouped
+                    : StorageClass::Bf16;
+  return true;
+}
+
+inline qw38::runtime::GdnBindViews mixer_views(DeviceGdnMixer& dev) {
+  qw38::runtime::GdnBindViews v;
+  v.qkv = weight_view(dev.qkv_codes, dev.layout, dev.storage, kQkvWidth, kHidden);
+  v.z = weight_view(dev.z_codes, dev.layout, dev.storage, kGdnZWidth, kHidden);
+  v.out = weight_view(dev.out_codes, dev.layout, dev.storage, kHidden, kGdnZWidth);
+  if (dev.has_scales) {
+    v.qkv_scales = scale_view(dev.qkv_scales, dev.layout, dev.storage,
+                              dev.qkv_scales.bytes() / 2);
+    v.z_scales = scale_view(dev.z_scales, dev.layout, dev.storage,
+                            dev.z_scales.bytes() / 2);
+    v.out_scales = scale_view(dev.out_scales, dev.layout, dev.storage,
+                              dev.out_scales.bytes() / 2);
+  }
+  v.a = weight_view(dev.a, PhysicalLayoutId::CudaBf16DenseTileV0, StorageClass::Bf16,
+                    kGdnValueHeads, kHidden);
+  v.b = weight_view(dev.b, PhysicalLayoutId::CudaBf16DenseTileV0, StorageClass::Bf16,
+                    kGdnValueHeads, kHidden);
+  v.gamma = vec_view(dev.gamma, ArithmeticDtype::Bf16,
+                     PhysicalLayoutId::CudaBf16VectorV0, StorageClass::Bf16, false,
+                     kHidden);
+  v.gated_gamma = vec_view(dev.gated_gamma, ArithmeticDtype::Bf16,
+                           PhysicalLayoutId::CudaBf16VectorV0, StorageClass::Bf16,
+                           false, kGdnHeadDim);
+  v.taps = make_view(dev.taps.data(), ArithmeticDtype::Bf16,
+                     PhysicalLayoutId::CudaBf16TapMajorV0, StorageClass::Bf16, false,
+                     2, kConvKernel, kQkvWidth);
+  v.a_log = vec_view(dev.a_log, ArithmeticDtype::Bf16,
+                     PhysicalLayoutId::CudaBf16VectorV0, StorageClass::Bf16, false,
+                     kGdnValueHeads);
+  v.dt_bias = vec_view(dev.dt_bias, ArithmeticDtype::Bf16,
+                       PhysicalLayoutId::CudaBf16VectorV0, StorageClass::Bf16, false,
+                       kGdnValueHeads);
+  v.residual = vec_view(dev.residual, ArithmeticDtype::Fp32,
+                        PhysicalLayoutId::CudaFp32VectorV0, StorageClass::Fp32, true,
+                        kHidden);
+  v.residual_out =
+      vec_view(dev.residual_out, ArithmeticDtype::Fp32,
+               PhysicalLayoutId::CudaFp32VectorV0, StorageClass::Fp32, true, kHidden);
+  v.normalized =
+      vec_view(dev.normalized, ArithmeticDtype::Bf16,
+               PhysicalLayoutId::CudaBf16RowMajorV0, StorageClass::Bf16, true,
+               kHidden);
+  v.workspace = make_view(dev.workspace.data(), ArithmeticDtype::Fp32,
+                          PhysicalLayoutId::CudaFp32VectorV0, StorageClass::Fp32, true,
+                          1, qw38::runtime::kGdnWorkspaceBytesPerToken / 4);
+  v.history = make_view(dev.history.data(), ArithmeticDtype::Bf16,
+                        PhysicalLayoutId::CudaBf16ConvHistoryV0, StorageClass::Bf16,
+                        true, 2, kConvHistoryTaps, kQkvWidth);
+  v.s = make_view(dev.s.data(), ArithmeticDtype::Fp32,
+                  PhysicalLayoutId::CudaFp32GdnSHvKV0, StorageClass::Fp32, true, 1,
+                  dev.s.bytes() / 4);
+  v.host_cursor = &dev.cursor;
+  v.language_layer = 0;
+  return v;
 }
 
 }  // namespace qw38::gdn::test
