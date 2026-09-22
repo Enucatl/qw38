@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <cerrno>
 #include <cstdint>
 #include <cstdlib>
@@ -10,6 +11,7 @@
 #include <fstream>
 #include <iostream>
 #include <limits>
+#include <new>
 #include <span>
 #include <string>
 #include <string_view>
@@ -42,9 +44,28 @@ using qw38::format::TensorShape;
 using qw38::format::WriterFilesystem;
 using qw38::format::v0_precision_policy;
 
+std::atomic<bool> g_fail_next_allocation{false};
+
+void* operator new(std::size_t bytes) {
+  if (g_fail_next_allocation.exchange(false, std::memory_order_relaxed)) {
+    throw std::bad_alloc();
+  }
+  if (void* p = std::malloc(bytes == 0 ? 1 : bytes)) {
+    return p;
+  }
+  throw std::bad_alloc();
+}
+
+void operator delete(void* p) noexcept { std::free(p); }
+void operator delete(void* p, std::size_t) noexcept { std::free(p); }
+
 namespace {
 
 int g_failures = 0;
+
+void fail_next_host_allocation() noexcept {
+  g_fail_next_allocation.store(true, std::memory_order_relaxed);
+}
 
 void fail(std::string_view what) {
   std::cerr << "FAIL: " << what << '\n';
@@ -585,7 +606,14 @@ void test_chunked_stream() {
          "chunked payload concatenated in order");
 }
 
-enum class FaultStage { PayloadWrite, ManifestWrite, Fsync, Close, Rename };
+enum class FaultStage {
+  PayloadWrite,
+  ManifestWrite,
+  Fsync,
+  Close,
+  Rename,
+  RenameAndCleanup,
+};
 
 struct FaultFilesystem {
   FaultStage stage;
@@ -619,11 +647,21 @@ struct FaultFilesystem {
   }
 
   static int rename(void* context, char const* from, char const* to) {
-    if (static_cast<FaultFilesystem*>(context)->stage == FaultStage::Rename) {
+    auto const stage = static_cast<FaultFilesystem*>(context)->stage;
+    if (stage == FaultStage::Rename || stage == FaultStage::RenameAndCleanup) {
       errno = EIO;
       return -1;
     }
     return ::rename(from, to);
+  }
+
+  static int remove(void* context, char const* path) {
+    if (static_cast<FaultFilesystem*>(context)->stage ==
+        FaultStage::RenameAndCleanup) {
+      errno = EACCES;
+      return -1;
+    }
+    return ::unlink(path);
   }
 
   [[nodiscard]] WriterFilesystem operations() {
@@ -631,6 +669,7 @@ struct FaultFilesystem {
                             .fsync = fsync,
                             .close = close,
                             .rename = rename,
+                            .remove = remove,
                             .context = this};
   }
 };
@@ -647,6 +686,8 @@ void test_publication_io_failure_cleanup() {
       Case{FaultStage::Fsync, "fsync", FormatErrorCode::IoFailure},
       Case{FaultStage::Close, "close", FormatErrorCode::IoFailure},
       Case{FaultStage::Rename, "rename", FormatErrorCode::PublishFailed},
+      Case{FaultStage::RenameAndCleanup, "rename-cleanup",
+           FormatErrorCode::PublishFailed},
   };
   for (auto const& test : cases) {
     ScratchDir dir;
@@ -673,6 +714,15 @@ void test_publication_io_failure_cleanup() {
           auto final = writer->finalize();
           expect(!final && final.error().code == test.error,
                  "injected publication stage fails");
+          if (test.stage == FaultStage::RenameAndCleanup && !final) {
+            expect(final.error().detail.find("Input/output error") !=
+                       std::string::npos,
+                   "rename error remains the primary failure");
+            expect(final.error().detail.find("temporary cleanup failed") !=
+                       std::string::npos,
+                   "cleanup failure is retained as secondary context");
+            fault.stage = FaultStage::Rename;
+          }
         }
       }
     }
@@ -680,6 +730,47 @@ void test_publication_io_failure_cleanup() {
            "publication failure preserves destination");
     expect(count_temp_files(dir, dest) == 0,
            "publication failure removes owned temporary file");
+  }
+}
+
+void test_writer_allocation_failure_translation() {
+  ScratchDir dir;
+  auto schema = base_schema();
+  std::string const name(64, 'v');
+  schema.tensors.push_back(unplaced_bf16_vector(1, name, 4));
+  auto create_destination = dir.file("create.qw38");
+
+  fail_next_host_allocation();
+  auto create = ArtifactWriter::create(create_destination, schema);
+  expect(!create && create.error().code == FormatErrorCode::AllocationFailure,
+         "create allocation failure is typed");
+
+  auto writer = ArtifactWriter::create(dir.file("write.qw38"), schema);
+  expect(static_cast<bool>(writer), "writer opens before write allocation test");
+  if (writer) {
+    std::array<std::byte, 8> payload{};
+    fail_next_host_allocation();
+    auto write = writer->write_span(name, SpanKind::Payload, payload);
+    expect(!write && write.error().code == FormatErrorCode::AllocationFailure,
+           "write allocation failure is typed");
+    expect(count_temp_files(dir, dir.file("write.qw38")) == 0,
+           "write allocation failure cleans up temporary file");
+  }
+
+  auto final_writer = ArtifactWriter::create(dir.file("finalize.qw38"), schema);
+  expect(static_cast<bool>(final_writer),
+         "writer opens before finalize allocation test");
+  if (final_writer) {
+    std::array<std::byte, 8> payload{};
+    expect(static_cast<bool>(final_writer->write_span(name, SpanKind::Payload,
+                                                       payload)),
+           "write succeeds before finalize allocation test");
+    fail_next_host_allocation();
+    auto final = final_writer->finalize();
+    expect(!final && final.error().code == FormatErrorCode::AllocationFailure,
+           "finalize allocation failure is typed");
+    expect(count_temp_files(dir, dir.file("finalize.qw38")) == 0,
+           "finalize allocation failure cleans up temporary file");
   }
 }
 
@@ -696,6 +787,7 @@ int main() {
   test_writer_interleaving_owns_publication();
   test_chunked_stream();
   test_publication_io_failure_cleanup();
+  test_writer_allocation_failure_translation();
   if (g_failures != 0) {
     std::cerr << g_failures << " format writer checks failed\n";
     return 1;

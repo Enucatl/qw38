@@ -37,6 +37,7 @@ struct WriterFilesystem {
   int (*fsync)(void* context, int fd){};
   int (*close)(void* context, int fd){};
   int (*rename)(void* context, char const* from, char const* to){};
+  int (*remove)(void* context, char const* path){};
   void* context{};
 };
 
@@ -53,7 +54,7 @@ class ArtifactWriter {
   ArtifactWriter& operator=(ArtifactWriter const&) = delete;
 
   [[nodiscard]] static std::expected<ArtifactWriter, FormatError> create(
-      std::filesystem::path destination, ArtifactSchema const& schema,
+      std::filesystem::path const& destination, ArtifactSchema const& schema,
       WriterFilesystem const* filesystem = nullptr);
 
   // Append a nonempty chunk of a named span. Repeated calls with the same

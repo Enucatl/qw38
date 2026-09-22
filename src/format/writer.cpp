@@ -12,6 +12,7 @@
 #include <cstdlib>
 #include <fcntl.h>
 #include <limits>
+#include <new>
 #include <string>
 #include <system_error>
 #include <unistd.h>
@@ -33,11 +34,13 @@ int posix_close(void*, int fd) { return ::close(fd); }
 int posix_rename(void*, char const* from, char const* to) {
   return ::rename(from, to);
 }
+int posix_remove(void*, char const* path) { return ::unlink(path); }
 WriterFilesystem const kPosixFilesystem{
     .pwrite = posix_pwrite,
     .fsync = posix_fsync,
     .close = posix_close,
     .rename = posix_rename,
+    .remove = posix_remove,
 };
 
 FormatError io_error(std::uint64_t offset, std::string_view field,
@@ -457,11 +460,16 @@ struct ArtifactWriter::Impl {
   std::unordered_map<std::string, std::size_t> payload_by_name;
   std::unordered_map<std::string, std::size_t> scales_by_name;
 
-  void abandon() {
+  ~Impl() {
+    if (!published) {
+      abandon();
+    }
+  }
+
+  void abandon() noexcept {
     fd.reset();
     if (!published && !temp_path.empty()) {
-      std::error_code ec;
-      std::filesystem::remove(temp_path, ec);
+      filesystem->remove(filesystem->context, temp_path.c_str());
     }
     closed = true;
   }
@@ -480,8 +488,8 @@ ArtifactWriter::~ArtifactWriter() {
 }
 
 std::expected<ArtifactWriter, FormatError> ArtifactWriter::create(
-    std::filesystem::path destination, ArtifactSchema const& schema,
-    WriterFilesystem const* filesystem) {
+    std::filesystem::path const& destination, ArtifactSchema const& schema,
+    WriterFilesystem const* filesystem) try {
   if (destination.empty()) {
     return std::unexpected(make_error(FormatErrorCode::InconsistentInput, 0,
                                       "destination",
@@ -506,11 +514,12 @@ std::expected<ArtifactWriter, FormatError> ArtifactWriter::create(
   auto impl = std::make_unique<Impl>();
   impl->filesystem = filesystem == nullptr ? &kPosixFilesystem : filesystem;
   if (impl->filesystem->pwrite == nullptr || impl->filesystem->fsync == nullptr ||
-      impl->filesystem->close == nullptr || impl->filesystem->rename == nullptr) {
+      impl->filesystem->close == nullptr || impl->filesystem->rename == nullptr ||
+      impl->filesystem->remove == nullptr) {
     return std::unexpected(make_error(FormatErrorCode::InconsistentInput, 0,
                                       "filesystem", "filesystem operations are incomplete"));
   }
-  impl->destination = std::move(destination);
+  impl->destination = destination;
   impl->schema = std::move(*prepared);
   impl->manifest_offset = *manifest_off;
   impl->temp_path = impl->destination;
@@ -589,11 +598,20 @@ std::expected<ArtifactWriter, FormatError> ArtifactWriter::create(
   }
 
   return ArtifactWriter{std::move(impl)};
+} catch (std::bad_alloc const&) {
+  return std::unexpected(FormatError{.code = FormatErrorCode::AllocationFailure,
+                                     .offset = 0,
+                                     .field = {},
+                                     .detail = {}});
+} catch (std::length_error const&) {
+  return std::unexpected(make_error(
+      FormatErrorCode::ResourceLimitExceeded, 0, "writer",
+      "writer state size is not representable while creating artifact"));
 }
 
 std::expected<void, FormatError> ArtifactWriter::write_span(
     std::string_view logical_name, SpanKind kind,
-    std::span<std::byte const> chunk) {
+    std::span<std::byte const> chunk) try {
   if (!impl_ || impl_->closed || impl_->published) {
     return std::unexpected(make_error(FormatErrorCode::PublishFailed, 0,
                                       "writer",
@@ -639,9 +657,24 @@ std::expected<void, FormatError> ArtifactWriter::write_span(
     span.complete = true;
   }
   return {};
+} catch (std::bad_alloc const&) {
+  if (impl_ && !impl_->published) {
+    impl_->abandon();
+  }
+  return std::unexpected(FormatError{.code = FormatErrorCode::AllocationFailure,
+                                     .offset = 0,
+                                     .field = {},
+                                     .detail = {}});
+} catch (std::length_error const&) {
+  if (impl_ && !impl_->published) {
+    impl_->abandon();
+  }
+  return std::unexpected(make_error(
+      FormatErrorCode::ResourceLimitExceeded, 0, "writer",
+      "writer state size is not representable while writing span"));
 }
 
-std::expected<ArtifactIdentity, FormatError> ArtifactWriter::finalize() {
+std::expected<ArtifactIdentity, FormatError> ArtifactWriter::finalize() try {
   if (!impl_ || impl_->closed || impl_->published) {
     return std::unexpected(make_error(FormatErrorCode::PublishFailed, 0,
                                       "writer",
@@ -808,11 +841,18 @@ std::expected<ArtifactIdentity, FormatError> ArtifactWriter::finalize() {
                                 impl_->temp_path.c_str(),
                                 impl_->destination.c_str()) != 0) {
     int const saved_errno = errno;
-    std::error_code cleanup_ec;
-    std::filesystem::remove(impl_->temp_path, cleanup_ec);
+    int const cleanup_result =
+        impl_->filesystem->remove(impl_->filesystem->context,
+                                  impl_->temp_path.c_str());
+    int const cleanup_errno = errno;
     impl_->closed = true;
+    std::string detail = std::strerror(saved_errno);
+    if (cleanup_result != 0) {
+      detail += "; temporary cleanup failed: ";
+      detail += std::strerror(cleanup_errno);
+    }
     return std::unexpected(make_error(FormatErrorCode::PublishFailed, 0,
-                                      "destination", std::strerror(saved_errno)));
+                                      "destination", detail));
   }
   impl_->published = true;
   impl_->closed = true;
@@ -834,6 +874,21 @@ std::expected<ArtifactIdentity, FormatError> ArtifactWriter::finalize() {
   id.manifest_length = static_cast<std::uint64_t>(*encoded_n);
   id.compiler = impl_->schema.compiler;
   return id;
+} catch (std::bad_alloc const&) {
+  if (impl_ && !impl_->published) {
+    impl_->abandon();
+  }
+  return std::unexpected(FormatError{.code = FormatErrorCode::AllocationFailure,
+                                     .offset = 0,
+                                     .field = {},
+                                     .detail = {}});
+} catch (std::length_error const&) {
+  if (impl_ && !impl_->published) {
+    impl_->abandon();
+  }
+  return std::unexpected(make_error(
+      FormatErrorCode::ResourceLimitExceeded, 0, "writer",
+      "writer state size is not representable while finalizing artifact"));
 }
 
 ArtifactBuilder& ArtifactBuilder::destination(std::filesystem::path path) {
