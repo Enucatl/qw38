@@ -69,6 +69,60 @@ std::expected<void, Error> rms_norm_1p_gamma_impl(
   return {};
 }
 
+template <class Acc>
+std::expected<void, Error> qk_rms_rope_1p_gamma_impl(
+    std::span<std::uint16_t const> projected_head_bf16,
+    std::span<std::uint16_t const> gamma, float eps,
+    std::span<float const> inv_freq, std::int32_t position,
+    std::span<std::uint16_t> out_bf16) {
+  if (!eps_ok(eps)) {
+    return std::unexpected(arg_error("eps", "epsilon must be finite and > 0"));
+  }
+  if (position < 0) {
+    return std::unexpected(arg_error("position", "position must be >= 0"));
+  }
+  if (projected_head_bf16.size() != kHeadDim ||
+      gamma.size() != kHeadDim || out_bf16.size() != kHeadDim) {
+    return std::unexpected(shape_error(
+        "qk_rms_rope", "projected head/gamma/out must be [256] BF16"));
+  }
+  if (inv_freq.size() != kRopeFreqs) {
+    return std::unexpected(shape_error("inv_freq", "inv_freq must be 32 FP32"));
+  }
+
+  std::array<Acc, kHeadDim> normalized{};
+  Acc sumsq = Acc{0};
+  for (std::uint32_t i = 0; i < kHeadDim; ++i) {
+    Acc const v = static_cast<Acc>(bf16_to_fp32(projected_head_bf16[i]));
+    normalized[i] = v;
+    sumsq += v * v;
+  }
+  Acc const rms =
+      std::sqrt(sumsq / static_cast<Acc>(kHeadDim) + static_cast<Acc>(eps));
+  Acc const inv_rms = Acc{1} / rms;
+  for (std::uint32_t i = 0; i < kHeadDim; ++i) {
+    Acc const g = static_cast<Acc>(bf16_to_fp32(gamma[i]));
+    normalized[i] = (Acc{1} + g) * normalized[i] * inv_rms;
+  }
+
+  Acc const p = static_cast<Acc>(position);
+  constexpr std::uint32_t kHalf = kRotaryDim / 2;
+  for (std::uint32_t j = 0; j < kHalf; ++j) {
+    Acc const phase = p * static_cast<Acc>(inv_freq[j]);
+    Acc const c = std::cos(phase);
+    Acc const s = std::sin(phase);
+    Acc const x0 = normalized[j];
+    Acc const x1 = normalized[j + kHalf];
+    out_bf16[j] = fp32_to_bf16_rne(static_cast<float>(x0 * c - x1 * s));
+    out_bf16[j + kHalf] =
+        fp32_to_bf16_rne(static_cast<float>(x1 * c + x0 * s));
+  }
+  for (std::uint32_t i = kRotaryDim; i < kHeadDim; ++i) {
+    out_bf16[i] = fp32_to_bf16_rne(static_cast<float>(normalized[i]));
+  }
+  return {};
+}
+
 }  // namespace
 
 bool eps_ok(float eps) noexcept { return finite_val(eps) && eps > 0.0f; }
@@ -146,6 +200,24 @@ std::expected<void, Error> hidden_rms_norm_1p_gamma_f64(
     float eps, std::span<std::uint16_t> out_bf16) {
   return rms_norm_1p_gamma_impl<double>(residual, gamma, eps, out_bf16, kHidden,
                                         "residual");
+}
+
+std::expected<void, Error> qk_rms_rope_1p_gamma(
+    std::span<std::uint16_t const> projected_head_bf16,
+    std::span<std::uint16_t const> gamma, float eps,
+    std::span<float const> inv_freq, std::int32_t position,
+    std::span<std::uint16_t> out_bf16) {
+  return qk_rms_rope_1p_gamma_impl<float>(
+      projected_head_bf16, gamma, eps, inv_freq, position, out_bf16);
+}
+
+std::expected<void, Error> qk_rms_rope_1p_gamma_f64(
+    std::span<std::uint16_t const> projected_head_bf16,
+    std::span<std::uint16_t const> gamma, float eps,
+    std::span<float const> inv_freq, std::int32_t position,
+    std::span<std::uint16_t> out_bf16) {
+  return qk_rms_rope_1p_gamma_impl<double>(
+      projected_head_bf16, gamma, eps, inv_freq, position, out_bf16);
 }
 
 std::expected<void, Error> qk_rms_norm_1p_gamma(
@@ -766,53 +838,8 @@ std::expected<void, Error> attn_qk_norm_rope(
     std::span<std::uint16_t const> head_bf16,
     std::span<std::uint16_t const> gamma, std::span<float const> inv_freq,
     std::int32_t position, float eps, std::span<std::uint16_t> out_bf16) {
-  if (!eps_ok(eps)) {
-    return std::unexpected(arg_error("eps", "epsilon must be finite and > 0"));
-  }
-  if (position < 0) {
-    return std::unexpected(arg_error("position", "position must be >= 0"));
-  }
-  if (auto st = require_span_size(head_bf16.size(), kHeadDim, "head"); !st) {
-    return st;
-  }
-  if (auto st = require_span_size(gamma.size(), kHeadDim, "gamma"); !st) {
-    return st;
-  }
-  if (auto st = require_span_size(inv_freq.size(), kRopeFreqs, "inv_freq");
-      !st) {
-    return st;
-  }
-  if (auto st = require_span_size(out_bf16.size(), kHeadDim, "out"); !st) {
-    return st;
-  }
-  float sumsq = 0.0f;
-  float y[kHeadDim];
-  for (std::uint32_t i = 0; i < kHeadDim; ++i) {
-    y[i] = bf16_to_fp32(head_bf16[i]);
-    sumsq += y[i] * y[i];
-  }
-  float const rms =
-      std::sqrt(sumsq / static_cast<float>(kHeadDim) + eps);
-  float const inv_rms = 1.0f / rms;
-  for (std::uint32_t i = 0; i < kHeadDim; ++i) {
-    float const g = bf16_to_fp32(gamma[i]);
-    y[i] = (1.0f + g) * y[i] * inv_rms;
-  }
-  float const p = static_cast<float>(position);
-  constexpr std::uint32_t kHalf = kRotaryDim / 2;
-  for (std::uint32_t j = 0; j < kHalf; ++j) {
-    float const x0 = y[j];
-    float const x1 = y[j + kHalf];
-    float const phase = p * inv_freq[j];
-    float const c = std::cos(phase);
-    float const s = std::sin(phase);
-    y[j] = x0 * c - x1 * s;
-    y[j + kHalf] = x1 * c + x0 * s;
-  }
-  for (std::uint32_t i = 0; i < kHeadDim; ++i) {
-    out_bf16[i] = fp32_to_bf16_rne(y[i]);
-  }
-  return {};
+  return qk_rms_rope_1p_gamma(
+      head_bf16, gamma, eps, inv_freq, position, out_bf16);
 }
 
 std::expected<void, Error> attn_cache_append(

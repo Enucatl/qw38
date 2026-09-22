@@ -101,6 +101,47 @@ __global__ void hidden_rms_kernel(float const* residual,
   }
 }
 
+__global__ void qk_rms_rope_kernel(std::uint16_t const* projected_heads,
+                                   std::uint16_t const* gamma, float eps,
+                                   float const* inv_freq, float position,
+                                   std::uint16_t* out_bf16) {
+  std::uint16_t const* x =
+      projected_heads + static_cast<std::size_t>(blockIdx.x) * kHeadDim;
+  std::uint16_t* out =
+      out_bf16 + static_cast<std::size_t>(blockIdx.x) * kHeadDim;
+  __shared__ float normalized[kHeadDim];
+  float sumsq = 0.0f;
+  for (std::uint32_t i = threadIdx.x; i < kHeadDim; i += blockDim.x) {
+    float const v = bf16_to_fp32(x[i]);
+    normalized[i] = v;
+    sumsq += v * v;
+  }
+  sumsq = block_sum<kHeadNormThreads>(sumsq);
+  float const inv_rms =
+      1.0f / sqrtf(sumsq / static_cast<float>(kHeadDim) + eps);
+  for (std::uint32_t i = threadIdx.x; i < kHeadDim; i += blockDim.x) {
+    float const g = bf16_to_fp32(gamma[i]);
+    normalized[i] = (1.0f + g) * normalized[i] * inv_rms;
+  }
+  __syncthreads();
+
+  constexpr std::uint32_t kHalf = kRotaryDim / 2;
+  if (threadIdx.x < kHalf) {
+    std::uint32_t const j = threadIdx.x;
+    float const x0 = normalized[j];
+    float const x1 = normalized[j + kHalf];
+    float const phase = position * inv_freq[j];
+    float const c = cosf(phase);
+    float const s = sinf(phase);
+    out[j] = fp32_to_bf16_rne(x0 * c - x1 * s);
+    out[j + kHalf] = fp32_to_bf16_rne(x1 * c + x0 * s);
+  }
+  for (std::uint32_t i = kRotaryDim + threadIdx.x; i < kHeadDim;
+       i += blockDim.x) {
+    out[i] = fp32_to_bf16_rne(normalized[i]);
+  }
+}
+
 __global__ void qk_rms_kernel(float const* heads, std::uint16_t const* gamma,
                               float eps, std::uint16_t* out_bf16) {
   float const* x = heads + static_cast<std::size_t>(blockIdx.x) * kHeadDim;
@@ -297,6 +338,40 @@ std::expected<void, Error> launch_hidden_rms(float const* residual,
   hidden_rms_kernel<<<n_tokens, kHiddenRmsThreads, 0, stream.native()>>>(
       residual, gamma, eps, out_bf16);
   return check(cudaGetLastError(), "hidden_rms_kernel");
+}
+
+std::expected<void, Error> launch_qk_rms_rope(
+    std::uint16_t const* projected_heads_bf16, std::uint16_t const* gamma,
+    float eps, float const* inv_freq, std::int32_t position,
+    std::uint32_t n_heads, std::uint16_t* out_bf16, Stream const& stream) {
+  auto st = require_stream(stream, "qk_rms_rope");
+  if (!st) {
+    return st;
+  }
+  if (projected_heads_bf16 == nullptr || gamma == nullptr ||
+      inv_freq == nullptr || out_bf16 == nullptr) {
+    return std::unexpected(make_error(
+        ErrorCode::InvalidArgument, "qk_rms_rope",
+        "null projected heads, gamma, inv_freq, or out"));
+  }
+  if (n_heads == 0) {
+    return std::unexpected(make_error(ErrorCode::InvalidArgument,
+                                      "qk_rms_rope", "n_heads == 0"));
+  }
+  if (!finite_pos(eps)) {
+    return std::unexpected(make_error(ErrorCode::InvalidArgument,
+                                      "qk_rms_rope",
+                                      "epsilon must be finite and > 0"));
+  }
+  if (position < 0) {
+    return std::unexpected(make_error(ErrorCode::InvalidArgument,
+                                      "qk_rms_rope",
+                                      "position must be >= 0"));
+  }
+  float const pos = static_cast<float>(position);
+  qk_rms_rope_kernel<<<n_heads, kHeadNormThreads, 0, stream.native()>>>(
+      projected_heads_bf16, gamma, eps, inv_freq, pos, out_bf16);
+  return check(cudaGetLastError(), "qk_rms_rope_kernel");
 }
 
 std::expected<void, Error> launch_qk_rms(float const* heads,

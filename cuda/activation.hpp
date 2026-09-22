@@ -27,7 +27,15 @@ inline constexpr int kHeadNormThreads = 128;   // T-03: one block/head
     float const* residual, std::uint16_t const* gamma, float eps,
     std::uint32_t n_tokens, std::uint16_t* out_bf16, Stream const& stream);
 
-// Per-head QK RMS (1+gamma) → BF16. q/out are head-contiguous [n_heads, 256].
+// Authoritative attention preparation boundary. Consume BF16 projection
+// staging, keep QK RMS + partial RoPE in FP32, then store BF16 once.
+[[nodiscard]] std::expected<void, Error> launch_qk_rms_rope(
+    std::uint16_t const* projected_heads_bf16, std::uint16_t const* gamma,
+    float eps, float const* inv_freq, std::int32_t position,
+    std::uint32_t n_heads, std::uint16_t* out_bf16, Stream const& stream);
+
+// Diagnostic standalone QK RMS → BF16. Non-authoritative before RoPE because
+// composing the two rounded primitives introduces an extra BF16 store.
 [[nodiscard]] std::expected<void, Error> launch_qk_rms(
     float const* heads, std::uint16_t const* gamma, float eps,
     std::uint32_t n_heads, std::uint16_t* out_bf16, Stream const& stream);
@@ -43,7 +51,8 @@ inline constexpr int kHeadNormThreads = 128;   // T-03: one block/head
 [[nodiscard]] std::expected<void, Error> launch_silu_fp32(
     float const* in, float* out, std::uint32_t n, Stream const& stream);
 
-// Partial RoPE: first 64 of 256 coords; suffix unchanged. One integer position.
+// Diagnostic standalone partial RoPE over BF16 input. Non-authoritative after
+// QK RMS; launch_qk_rms_rope owns the production precision boundary.
 [[nodiscard]] std::expected<void, Error> launch_partial_rope(
     std::uint16_t const* heads_bf16, float const* inv_freq,
     std::int32_t position, std::uint32_t n_heads, std::uint16_t* out_bf16,

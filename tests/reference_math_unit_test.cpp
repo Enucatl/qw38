@@ -189,6 +189,57 @@ void test_bf16_rounding() {
   expect(rounded, "at least one RMS coordinate is not a BF16 value before store");
 }
 
+void test_qk_rope_single_store() {
+  std::vector<std::uint16_t> projected(kHeadDim);
+  for (std::uint32_t i = 0; i < kHeadDim; ++i) {
+    projected[i] = bf16((i % 3 == 0) ? -0.75f : 0.75f);
+  }
+  std::vector<std::uint16_t> gamma(kHeadDim);
+  for (std::uint32_t i = 0; i < kHeadDim; ++i) {
+    gamma[i] = bf16(0.2f * static_cast<float>(static_cast<int>(i % 13) - 6) /
+                    6.0f);
+  }
+  auto inv = qw38::reference::rope_inv_freq();
+  std::vector<std::uint16_t> single_store(kHeadDim);
+  expect(static_cast<bool>(qw38::reference::qk_rms_rope_1p_gamma(
+             projected, gamma, kDefaultRmsEps, inv, 4096, single_store)),
+         "authoritative fused qk-rope");
+  std::vector<std::uint16_t> gold(kHeadDim);
+  expect(static_cast<bool>(qw38::reference::qk_rms_rope_1p_gamma_f64(
+             projected, gamma, kDefaultRmsEps, inv, 4096, gold)),
+         "f64 fused qk-rope");
+  for (std::uint32_t i = 0; i < kHeadDim; ++i) {
+    expect(std::fabs(bf16_to_fp32(single_store[i]) - bf16_to_fp32(gold[i])) <=
+               qw38::reference::tol::kRopeSmallAbs,
+           "fused qk-rope fp32 vs f64");
+  }
+
+  std::vector<float> widened(kHeadDim);
+  for (std::uint32_t i = 0; i < kHeadDim; ++i) {
+    widened[i] = bf16_to_fp32(projected[i]);
+  }
+  std::vector<std::uint16_t> rounded_norm(kHeadDim);
+  std::vector<std::uint16_t> double_store(kHeadDim);
+  expect(static_cast<bool>(qw38::reference::qk_rms_norm_1p_gamma(
+             widened, gamma, kDefaultRmsEps, rounded_norm)),
+         "diagnostic rounded qk");
+  expect(static_cast<bool>(
+             qw38::reference::partial_rope(rounded_norm, inv, 4096, double_store)),
+         "diagnostic rounded rope");
+
+  std::size_t differing_bits = 0;
+  for (std::uint32_t i = 0; i < kRotaryDim; ++i) {
+    differing_bits += single_store[i] != double_store[i] ? 1u : 0u;
+  }
+  expect(differing_bits > 0,
+         "one post-RoPE BF16 store is bit-distinct from two stores");
+
+  auto negative = qw38::reference::qk_rms_rope_1p_gamma(
+      projected, gamma, kDefaultRmsEps, inv, -1, single_store);
+  expect(!negative && negative.error().code == ErrorCode::InvalidArgument,
+         "fused qk-rope rejects negative position");
+}
+
 void test_rope() {
   auto inv = qw38::reference::rope_inv_freq();
   expect(inv[0] == 1.0f, "ω_0 is 1");
@@ -452,6 +503,7 @@ int main() {
   test_hidden_rms_zero_nonzero_gamma();
   test_qk_and_gdn_gamma_roles();
   test_bf16_rounding();
+  test_qk_rope_single_store();
   test_rope();
   test_silu_sigmoid_gemv_argmax();
   test_gdn_conv_prepare();

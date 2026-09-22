@@ -119,7 +119,21 @@ inline constexpr float kAttnMixerResidualRel = 1.0e-3f;
     std::span<float const> residual, std::span<std::uint16_t const> gamma,
     float eps, std::span<std::uint16_t> out_bf16);
 
-// QK / head RMS: same 1+γ role on a contiguous 256-vector.
+// Authoritative attention preparation boundary: BF16 projection staging,
+// FP32 QK RMS and partial RoPE, then one BF16 store.
+[[nodiscard]] std::expected<void, Error> qk_rms_rope_1p_gamma(
+    std::span<std::uint16_t const> projected_head_bf16,
+    std::span<std::uint16_t const> gamma, float eps,
+    std::span<float const> inv_freq, std::int32_t position,
+    std::span<std::uint16_t> out_bf16);
+[[nodiscard]] std::expected<void, Error> qk_rms_rope_1p_gamma_f64(
+    std::span<std::uint16_t const> projected_head_bf16,
+    std::span<std::uint16_t const> gamma, float eps,
+    std::span<float const> inv_freq, std::int32_t position,
+    std::span<std::uint16_t> out_bf16);
+
+// Diagnostic standalone QK RMS. It rounds its FP32 input to BF16 output and is
+// non-authoritative when followed by RoPE.
 [[nodiscard]] std::expected<void, Error> qk_rms_norm_1p_gamma(
     std::span<float const> head, std::span<std::uint16_t const> gamma,
     float eps, std::span<std::uint16_t> out_bf16);
@@ -146,7 +160,8 @@ inline constexpr float kAttnMixerResidualRel = 1.0e-3f;
 [[nodiscard]] std::expected<void, Error> silu_f64(std::span<float const> in,
                                                   std::span<double> out);
 
-// Partial RoPE on the first 64 of 256 coordinates; 192-suffix unchanged.
+// Diagnostic standalone partial RoPE over BF16 input. This rounded primitive
+// is non-authoritative after QK RMS; use qk_rms_rope_1p_gamma for that path.
 // Integer position is converted only for FP32 (or f64) phase evaluation.
 [[nodiscard]] std::expected<void, Error> partial_rope(
     std::span<std::uint16_t const> head_bf16,

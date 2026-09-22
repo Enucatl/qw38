@@ -91,73 +91,72 @@ int main() {
     expect(d <= tol::kRmsBf16Abs, "pipeline norm within RMS tolerance");
   }
 
-  // Per-head QK RMS → partial RoPE. Distinct heads must not mix.
-  std::vector<float> q(kQueryHeads * kHeadDim);
+  // BF16 projection staging → fused FP32 QK RMS + RoPE → one BF16 store.
+  // Distinct heads must not mix.
+  std::vector<std::uint16_t> q(kQueryHeads * kHeadDim);
   for (std::uint32_t h = 0; h < kQueryHeads; ++h) {
     for (std::uint32_t i = 0; i < kHeadDim; ++i) {
-      q[h * kHeadDim + i] =
-          0.05f * static_cast<float>(h + 1) *
-          (static_cast<float>(static_cast<int>(i % 11) - 5) / 5.0f);
+      float const magnitude = 0.25f * static_cast<float>((h % 4) + 1);
+      float const sign = ((i + h) % 3 == 0) ? -1.0f : 1.0f;
+      q[h * kHeadDim + i] = bf16(sign * magnitude);
     }
   }
   auto q_gamma = ramp_h(kHeadDim, 0.2f, 0.0f);
   auto inv = qw38::reference::rope_inv_freq();
   std::int32_t const pos = 4096;
-  std::vector<std::uint16_t> q_norm_cpu(kQueryHeads * kHeadDim);
   std::vector<std::uint16_t> q_rope_cpu(kQueryHeads * kHeadDim);
+  std::vector<std::uint16_t> q_double_rounded(kQueryHeads * kHeadDim);
   for (std::uint32_t h = 0; h < kQueryHeads; ++h) {
-    auto in = std::span<float const>(q.data() + h * kHeadDim, kHeadDim);
-    auto nrm = std::span<std::uint16_t>(q_norm_cpu.data() + h * kHeadDim, kHeadDim);
+    auto in =
+        std::span<std::uint16_t const>(q.data() + h * kHeadDim, kHeadDim);
     auto rot = std::span<std::uint16_t>(q_rope_cpu.data() + h * kHeadDim, kHeadDim);
+    expect(static_cast<bool>(qw38::reference::qk_rms_rope_1p_gamma(
+               in, q_gamma, kDefaultRmsEps, inv, pos, rot)),
+           "cpu fused per-head qk-rope");
+
+    std::vector<float> widened(kHeadDim);
+    for (std::uint32_t i = 0; i < kHeadDim; ++i) {
+      widened[i] = qw38::format::bf16_to_fp32(in[i]);
+    }
+    std::vector<std::uint16_t> rounded_norm(kHeadDim);
+    auto rounded_rot = std::span<std::uint16_t>(
+        q_double_rounded.data() + h * kHeadDim, kHeadDim);
     expect(static_cast<bool>(qw38::reference::qk_rms_norm_1p_gamma(
-               in, q_gamma, kDefaultRmsEps, nrm)),
-           "cpu per-head qk");
-    expect(static_cast<bool>(qw38::reference::partial_rope(nrm, inv, pos, rot)),
-           "cpu per-head rope");
+               widened, q_gamma, kDefaultRmsEps, rounded_norm)),
+           "diagnostic rounded per-head qk");
+    expect(static_cast<bool>(
+               qw38::reference::partial_rope(rounded_norm, inv, pos, rounded_rot)),
+           "diagnostic rounded per-head rope");
   }
+  expect(q_rope_cpu != q_double_rounded,
+         "single post-RoPE store differs from two rounded stores");
 
   auto d_q = upload_vec(q, *stream);
   auto d_qg = upload_vec(q_gamma, *stream);
   auto d_inv = upload_vec(std::vector<float>(inv.begin(), inv.end()), *stream);
-  auto d_qn = DeviceBuffer::allocate(q_norm_cpu.size() * sizeof(std::uint16_t));
   auto d_qr = DeviceBuffer::allocate(q_rope_cpu.size() * sizeof(std::uint16_t));
   expect(static_cast<bool>(d_q) && static_cast<bool>(d_qg) &&
-             static_cast<bool>(d_inv) && static_cast<bool>(d_qn) &&
-             static_cast<bool>(d_qr),
+             static_cast<bool>(d_inv) && static_cast<bool>(d_qr),
          "qk-rope alloc");
-  if (!d_q || !d_qg || !d_inv || !d_qn || !d_qr) {
+  if (!d_q || !d_qg || !d_inv || !d_qr) {
     std::cerr << g_failures << " failures\n";
     return 1;
   }
-  expect(static_cast<bool>(qw38::cuda::launch_qk_rms(
-             static_cast<float const*>(d_q->data()),
+  expect(static_cast<bool>(qw38::cuda::launch_qk_rms_rope(
+             static_cast<std::uint16_t const*>(d_q->data()),
              static_cast<std::uint16_t const*>(d_qg->data()), kDefaultRmsEps,
-             kQueryHeads, static_cast<std::uint16_t*>(d_qn->data()), *stream)),
-         "launch qk heads");
-  expect(static_cast<bool>(qw38::cuda::launch_partial_rope(
-             static_cast<std::uint16_t const*>(d_qn->data()),
              static_cast<float const*>(d_inv->data()), pos, kQueryHeads,
              static_cast<std::uint16_t*>(d_qr->data()), *stream)),
-         "launch rope heads");
-  auto got_qn = download_vec<std::uint16_t>(*d_qn, q_norm_cpu.size(), *stream);
+         "launch fused qk-rope heads");
   auto got_qr = download_vec<std::uint16_t>(*d_qr, q_rope_cpu.size(), *stream);
-  expect(static_cast<bool>(got_qn) && static_cast<bool>(got_qr),
-         "download qk-rope");
-  if (got_qn && got_qr) {
-    float dn = max_abs_diff_bf16(*got_qn, q_norm_cpu);
+  expect(static_cast<bool>(got_qr), "download qk-rope");
+  if (got_qr) {
     float dr = max_abs_diff_bf16(*got_qr, q_rope_cpu);
-    expect(dn <= tol::kRmsBf16Abs, "per-head QK RMS matches CPU");
-    expect(dr <= tol::kRopeSmallAbs, "per-head RoPE matches CPU");
-    for (std::uint32_t h = 0; h < kQueryHeads; ++h) {
-      for (std::uint32_t i = qw38::reference::kRotaryDim; i < kHeadDim; ++i) {
-        std::size_t const idx = static_cast<std::size_t>(h) * kHeadDim + i;
-        if ((*got_qr)[idx] != (*got_qn)[idx]) {
-          fail("integration RoPE suffix equals QK output");
-          h = kQueryHeads;
-          break;
-        }
-      }
-    }
+    expect(dr <= tol::kRopeSmallAbs, "fused per-head QK/RoPE matches CPU");
+    expect(*got_qr == q_rope_cpu,
+           "CUDA preserves the single-store result bit-for-bit");
+    expect(*got_qr != q_double_rounded,
+           "CUDA does not reproduce the two-store pipeline");
   }
 
   if (g_failures != 0) {
