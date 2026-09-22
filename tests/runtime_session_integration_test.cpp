@@ -1,19 +1,21 @@
+#include <algorithm>
+#include <cstdint>
+#include <expected>
+#include <filesystem>
+#include <fstream>
+#include <iostream>
+#include <span>
+#include <string_view>
+#include <type_traits>
+#include <utility>
+#include <vector>
+
 #include "cuda/alloc.hpp"
 #include "cuda/copy.hpp"
 #include "format/format.hpp"
 #include "runtime/runtime.hpp"
 #include "runtime/sizes.hpp"
 #include "runtime_support.hpp"
-
-#include <cstdint>
-#include <expected>
-#include <filesystem>
-#include <fstream>
-#include <iostream>
-#include <string_view>
-#include <type_traits>
-#include <utility>
-#include <vector>
 
 using qw38::runtime::ErrorCode;
 using qw38::runtime::kFixedPersistentBytes;
@@ -23,6 +25,10 @@ using qw38::runtime::Runtime;
 using qw38::runtime::Session;
 using qw38::runtime::test::write_language_fixture;
 
+static_assert(std::is_nothrow_move_constructible_v<Runtime>);
+static_assert(std::is_nothrow_move_assignable_v<Runtime>);
+static_assert(std::is_nothrow_move_constructible_v<Session>);
+static_assert(std::is_nothrow_move_assignable_v<Session>);
 static_assert(!std::is_convertible_v<qw38::runtime::ConstTensorView,
                                      qw38::runtime::TensorView>);
 static_assert(!std::is_invocable_v<void (*)(qw38::runtime::TensorView),
@@ -43,8 +49,57 @@ void expect(bool cond, std::string_view what) {
   }
 }
 
-std::expected<Session, qw38::runtime::Error> create_session_that_outlives_runtime(
-    std::filesystem::path const& model_path) {
+bool aligned_256(void const *pointer) {
+  return pointer != nullptr && reinterpret_cast<std::uintptr_t>(pointer) %
+                                       qw38::format::kSpanAlignment ==
+                                   0;
+}
+
+bool is_zero(std::span<std::byte const> bytes) {
+  return std::ranges::all_of(
+      bytes, [](std::byte value) { return value == std::byte{}; });
+}
+
+struct SessionAddresses {
+  void const *gdn_s{};
+  void const *conv_history{};
+  void const *kv{};
+  void const *residual_h{};
+  void const *residual_h_mid{};
+  void const *normalized{};
+  void const *mixer{};
+};
+
+SessionAddresses addresses(Session const &session) {
+  auto normalized =
+      session.scratch(qw38::format::ScratchKind::NormalizedHidden);
+  auto mixer = session.scratch(qw38::format::ScratchKind::GdnWorkspace);
+  return {
+      .gdn_s = session.gdn_s().pointer,
+      .conv_history = session.conv_history().pointer,
+      .kv = session.kv().pointer,
+      .residual_h = session.residual_h().pointer,
+      .residual_h_mid = session.residual_h_mid().pointer,
+      .normalized = normalized ? normalized->pointer : nullptr,
+      .mixer = mixer ? mixer->pointer : nullptr,
+  };
+}
+
+void expect_addresses(Session const &session, SessionAddresses const &expected,
+                      std::string_view what) {
+  auto actual = addresses(session);
+  expect(actual.gdn_s == expected.gdn_s &&
+             actual.conv_history == expected.conv_history &&
+             actual.kv == expected.kv &&
+             actual.residual_h == expected.residual_h &&
+             actual.residual_h_mid == expected.residual_h_mid &&
+             actual.normalized == expected.normalized &&
+             actual.mixer == expected.mixer,
+         what);
+}
+
+std::expected<Session, qw38::runtime::Error>
+create_session_that_outlives_runtime(std::filesystem::path const &model_path) {
   auto runtime = Runtime::create();
   if (!runtime) {
     return std::unexpected(runtime.error());
@@ -84,6 +139,26 @@ int main() {
   expect(qw38::cuda::malloc_count() == mallocs_before_load,
          "malformed artifact allocates no device memory");
 
+  auto fixture_bytes = qw38::format::test::read_all(fx.path);
+  auto truncated_path = dir.file("truncated-fixture.qw38");
+  fixture_bytes.resize(fixture_bytes.size() - 1);
+  qw38::format::test::write_all(truncated_path, fixture_bytes);
+  auto truncated = rt->load(truncated_path);
+  expect(!truncated && truncated.error().code == ErrorCode::Format,
+         "truncated complete artifact rejected");
+  expect(qw38::cuda::malloc_count() == mallocs_before_load,
+         "truncated complete artifact allocates no device memory");
+
+  fixture_bytes = qw38::format::test::read_all(fx.path);
+  fixture_bytes[0] ^= std::byte{0xff};
+  auto corrupt_header_path = dir.file("corrupt-header.qw38");
+  qw38::format::test::write_all(corrupt_header_path, fixture_bytes);
+  auto corrupt_header = rt->load(corrupt_header_path);
+  expect(!corrupt_header && corrupt_header.error().code == ErrorCode::Format,
+         "corrupt full artifact rejected");
+  expect(qw38::cuda::malloc_count() == mallocs_before_load,
+         "corrupt full artifact allocates no device memory");
+
   auto model = rt->load(fx.path);
   expect(static_cast<bool>(model), "upload fixture");
   if (!model) {
@@ -94,13 +169,16 @@ int main() {
   expect(static_cast<bool>(payload) && payload->pointer != nullptr &&
              payload->rank == 1 && payload->extent[0] == 4,
          "immutable model tensor view");
+  expect(payload && aligned_256(payload->pointer),
+         "uploaded tensor is actually 256-byte aligned");
   std::vector<std::byte> uploaded(8);
   expect(static_cast<bool>(
              qw38::cuda::copy_d2h(uploaded, payload->pointer, rt->stream())),
          "download uploaded tensor");
   expect(static_cast<bool>(rt->stream().sync()), "sync download");
-  expect(uploaded == std::vector<std::byte>(fx.payload.begin(), fx.payload.end()),
-         "uploaded bytes match fixture");
+  expect(
+      uploaded == std::vector<std::byte>(fx.payload.begin(), fx.payload.end()),
+      "uploaded bytes match fixture");
 
   constexpr std::uint64_t kCap = 8;
   auto const mallocs_before_sessions = qw38::cuda::malloc_count();
@@ -109,11 +187,25 @@ int main() {
              zero_capacity.error().code == ErrorCode::InvalidCapacity,
          "zero capacity rejected before alloc");
   auto unsupported = rt->create_session(*model, kMaxKvCapacity + 1);
-  expect(!unsupported &&
-             unsupported.error().code == ErrorCode::InvalidCapacity,
+  expect(!unsupported && unsupported.error().code == ErrorCode::InvalidCapacity,
          "one-past-maximum capacity rejected before alloc");
+  expect(static_cast<bool>(qw38::runtime::validate_kv_capacity(1)),
+         "minimum capacity boundary accepted");
+  expect(static_cast<bool>(qw38::runtime::validate_kv_capacity(kMaxKvCapacity)),
+         "maximum capacity boundary accepted without allocation");
   expect(qw38::cuda::malloc_count() == mallocs_before_sessions,
          "invalid capacities do not allocate");
+
+  {
+    auto minimum_capacity = rt->create_session(*model, 1);
+    expect(static_cast<bool>(minimum_capacity),
+           "minimum-capacity session can be allocated");
+    if (minimum_capacity) {
+      expect(minimum_capacity->kv_capacity() == 1 &&
+                 minimum_capacity->kv().extent[3] == 1,
+             "minimum-capacity session preserves boundary");
+    }
+  }
 
   auto s1 = rt->create_session(*model, kCap);
   auto s2 = rt->create_session(*model, kCap);
@@ -134,84 +226,90 @@ int main() {
   expect(s1->kv().pointer != s2->kv().pointer, "KV buffers isolated");
   expect(s1->residual_h().pointer != s2->residual_h().pointer,
          "residual buffers isolated");
-  expect(s1->persistent_bytes() == kFixedPersistentBytes + kKvBytesPerToken * kCap,
-         "language-only persistent size");
-  expect(s1->kv_capacity() == kCap && s1->kv_populated(0) == 0, "zero populated");
+  expect(
+      s1->persistent_bytes() == kFixedPersistentBytes + kKvBytesPerToken * kCap,
+      "language-only persistent size");
+  expect(s1->kv_capacity() == kCap && s1->kv_populated(0) == 0,
+         "zero populated");
   expect(s1->gdn_s().extent[0] == 48 && s1->conv_history().extent[1] == 3 &&
              s1->kv().extent[3] == kCap,
          "state view extents");
+  auto stable_addresses = addresses(*s1);
+  expect(aligned_256(stable_addresses.gdn_s) &&
+             aligned_256(stable_addresses.conv_history) &&
+             aligned_256(stable_addresses.kv) &&
+             aligned_256(stable_addresses.residual_h) &&
+             aligned_256(stable_addresses.residual_h_mid) &&
+             aligned_256(stable_addresses.normalized) &&
+             aligned_256(stable_addresses.mixer),
+         "all session allocations and arena views are 256-byte aligned");
 
   std::byte zero{};
-  expect(static_cast<bool>(qw38::cuda::copy_d2h(
-             &zero, s1->gdn_s().pointer, 1, rt->stream())),
+  expect(static_cast<bool>(
+             qw38::cuda::copy_d2h(&zero, s1->gdn_s().pointer, 1, rt->stream())),
          "read initial S");
   expect(static_cast<bool>(rt->stream().sync()), "sync zero check");
   expect(zero == std::byte{0}, "state is zero initially");
 
-  expect(static_cast<bool>(
-             qw38::cuda::fill_pattern(s1->gdn_s().pointer, 256, 0x11, rt->stream())),
-         "fill session 1");
-  expect(static_cast<bool>(
-             qw38::cuda::fill_pattern(s2->gdn_s().pointer, 256, 0x22, rt->stream())),
+  expect(
+      static_cast<bool>(qw38::cuda::fill_pattern(
+          s1->gdn_s().pointer, qw38::runtime::kGdnSBytes, 0x11, rt->stream())),
+      "fill all session 1 S bytes");
+  expect(static_cast<bool>(qw38::cuda::fill_pattern(s2->gdn_s().pointer, 256,
+                                                    0x22, rt->stream())),
          "fill session 2");
+  expect(static_cast<bool>(qw38::cuda::fill_pattern(
+             s1->conv_history().pointer, qw38::runtime::kConvHistoryBytes, 0x33,
+             rt->stream())),
+         "fill all session 1 history bytes");
+  expect(static_cast<bool>(qw38::cuda::fill_pattern(
+             s1->kv().pointer, kKvBytesPerToken * kCap, 0x55, rt->stream())),
+         "fill all session 1 KV bytes");
   expect(static_cast<bool>(rt->stream().sync()), "sync fills");
   std::byte b1{};
   std::byte b2{};
-  expect(static_cast<bool>(qw38::cuda::copy_d2h(&b1, s1->gdn_s().pointer, 1,
-                                                rt->stream())),
+  expect(static_cast<bool>(
+             qw38::cuda::copy_d2h(&b1, s1->gdn_s().pointer, 1, rt->stream())),
          "read s1");
-  expect(static_cast<bool>(qw38::cuda::copy_d2h(&b2, s2->gdn_s().pointer, 1,
-                                                rt->stream())),
+  expect(static_cast<bool>(
+             qw38::cuda::copy_d2h(&b2, s2->gdn_s().pointer, 1, rt->stream())),
          "read s2");
   expect(static_cast<bool>(rt->stream().sync()), "sync isolation read");
   expect(b1 == std::byte{0x11} && b2 == std::byte{0x22},
          "sessions do not share state");
 
-  void const* s_addr = s1->gdn_s().pointer;
-  void const* h_addr = s1->residual_h().pointer;
-  void const* mid_addr = s1->residual_h_mid().pointer;
   auto scratch = s1->scratch(qw38::format::ScratchKind::NormalizedHidden);
   expect(static_cast<bool>(scratch), "normalized scratch");
-  void const* scratch_addr = scratch ? scratch->pointer : nullptr;
+  void const *scratch_addr = scratch ? scratch->pointer : nullptr;
   auto mixer = s1->scratch(qw38::format::ScratchKind::GdnWorkspace);
   auto attn = s1->scratch(qw38::format::ScratchKind::AttentionWorkspace);
   expect(mixer && attn && mixer->pointer == attn->pointer,
          "stable mixer reuse addresses");
-  expect(mixer && mixer->region_count == 11 &&
-             mixer->region[0].offset == qw38::runtime::kGdnOffQkv &&
-             mixer->region[0].bytes == qw38::runtime::kGdnBytesQkv &&
-             mixer->region[0].stride_bytes ==
-                 qw38::runtime::kGdnWorkspaceBytesPerToken &&
-             mixer->region[0].repetitions ==
-                 qw38::runtime::kArenaTokenCapacity &&
-             mixer->region[0].tensor.dtype ==
-                 qw38::format::ArithmeticDtype::Bf16 &&
-             mixer->region[3].tensor.dtype ==
-                 qw38::format::ArithmeticDtype::Fp32,
-         "GDN workspace reports mixed typed regions");
-  expect(attn && attn->region_count == 6 &&
-             attn->region[5].offset == qw38::runtime::kAttnOffPartials &&
-             attn->region[0].tensor.dtype ==
-                 qw38::format::ArithmeticDtype::Bf16 &&
-             attn->region[5].tensor.dtype ==
-                 qw38::format::ArithmeticDtype::Fp32,
-         "attention workspace reports mixed typed regions");
+  expect(
+      mixer && mixer->region_count == 11 &&
+          mixer->region[0].offset == qw38::runtime::kGdnOffQkv &&
+          mixer->region[0].bytes == qw38::runtime::kGdnBytesQkv &&
+          mixer->region[0].stride_bytes ==
+              qw38::runtime::kGdnWorkspaceBytesPerToken &&
+          mixer->region[0].repetitions == qw38::runtime::kArenaTokenCapacity &&
+          mixer->region[0].tensor.dtype ==
+              qw38::format::ArithmeticDtype::Bf16 &&
+          mixer->region[3].tensor.dtype == qw38::format::ArithmeticDtype::Fp32,
+      "GDN workspace reports mixed typed regions");
+  expect(
+      attn && attn->region_count == 6 &&
+          attn->region[5].offset == qw38::runtime::kAttnOffPartials &&
+          attn->region[0].tensor.dtype == qw38::format::ArithmeticDtype::Bf16 &&
+          attn->region[5].tensor.dtype == qw38::format::ArithmeticDtype::Fp32,
+      "attention workspace reports mixed typed regions");
   expect(scratch_addr != mixer->pointer, "normalized distinct from mixer");
-
-  auto snap = s1->save();
-  expect(static_cast<bool>(snap), "snapshot");
-  if (snap) {
-    expect(snap->gdn_s.size() == 150994944, "snapshot S bytes");
-    expect(snap->conv_history.size() == 2949120, "snapshot conv bytes");
-    expect(snap->kv.size() == kKvBytesPerToken * kCap, "snapshot KV bytes");
-    expect(snap->gdn_s[0] == std::byte{0x11}, "snapshot captured pattern");
-  }
 
   expect(!s1->set_populated_length(0, kCap + 1) &&
              s1->set_populated_length(0, kCap + 1).error().code ==
                  ErrorCode::InvalidPopulatedLength,
          "populated > capacity rejected");
-  expect(static_cast<bool>(s1->set_populated_length(0, 3)), "populated within cap");
+  expect(static_cast<bool>(s1->set_populated_length(0, 3)),
+         "populated within cap");
   expect(s1->kv_populated(0) == 3, "populated stored");
 
   auto cursor = s1->conv_cursor();
@@ -219,13 +317,22 @@ int main() {
   expect(static_cast<bool>(s1->set_conv_cursor(cursor)), "set cursor");
 
   auto snap2 = s1->save();
+  expect(static_cast<bool>(snap2), "snapshot all persistent state");
   if (snap2) {
+    expect(snap2->gdn_s ==
+               qw38::format::test::pattern(qw38::runtime::kGdnSBytes, 0x11),
+           "snapshot captures every S byte");
+    expect(snap2->conv_history == qw38::format::test::pattern(
+                                      qw38::runtime::kConvHistoryBytes, 0x33),
+           "snapshot captures every history byte");
+    expect(
+        snap2->kv == qw38::format::test::pattern(kKvBytesPerToken * kCap, 0x55),
+        "snapshot captures every KV byte");
     auto invalid_populated = *snap2;
     invalid_populated.kv_populated[0] = kCap + 1;
     auto bad_populated_restore = s1->restore(invalid_populated);
-    expect(!bad_populated_restore &&
-               bad_populated_restore.error().code ==
-                   ErrorCode::InvalidPopulatedLength,
+    expect(!bad_populated_restore && bad_populated_restore.error().code ==
+                                         ErrorCode::InvalidPopulatedLength,
            "restore rejects populated length beyond capacity");
     auto invalid_cursor = *snap2;
     invalid_cursor.conv_cursor[0] = qw38::runtime::kConvTaps;
@@ -239,30 +346,33 @@ int main() {
   expect(static_cast<bool>(s1->reset()), "reset");
   expect(s1->kv_populated(0) == 0, "reset clears populated");
   expect(s1->conv_cursor()[1] == 0, "reset clears cursor");
-  std::byte after_reset{};
-  expect(static_cast<bool>(qw38::cuda::copy_d2h(&after_reset, s1->gdn_s().pointer,
-                                                1, rt->stream())),
-         "read after reset");
-  expect(static_cast<bool>(rt->stream().sync()), "sync reset");
-  expect(after_reset == std::byte{0}, "reset zeros S");
-  expect(s1->gdn_s().pointer == s_addr && s1->residual_h().pointer == h_addr &&
-             s1->residual_h_mid().pointer == mid_addr,
-         "addresses stable across reset");
-  auto scratch_after = s1->scratch(qw38::format::ScratchKind::NormalizedHidden);
-  expect(scratch_after && scratch_after->pointer == scratch_addr,
-         "scratch address stable across reset");
+  expect_addresses(*s1, stable_addresses, "all addresses stable across reset");
+  {
+    auto reset_snapshot = s1->save();
+    expect(static_cast<bool>(reset_snapshot), "snapshot reset state");
+    if (reset_snapshot) {
+      expect(is_zero(reset_snapshot->gdn_s), "reset zeros every S byte");
+      expect(is_zero(reset_snapshot->conv_history),
+             "reset zeros every history byte");
+      expect(is_zero(reset_snapshot->kv), "reset zeros every KV byte");
+    }
+  }
 
   if (snap2) {
     expect(static_cast<bool>(s1->restore(*snap2)), "restore");
     expect(s1->kv_populated(0) == 3, "restore populated");
     expect(s1->conv_cursor()[1] == 2, "restore cursor");
-    std::byte restored{};
-    expect(static_cast<bool>(qw38::cuda::copy_d2h(&restored, s1->gdn_s().pointer,
-                                                  1, rt->stream())),
-           "read restore");
-    expect(static_cast<bool>(rt->stream().sync()), "sync restore");
-    expect(restored == std::byte{0x11}, "restore exact S bytes");
-    expect(s1->gdn_s().pointer == s_addr, "addresses stable across restore");
+    auto restored = s1->save();
+    expect(static_cast<bool>(restored), "snapshot restored state");
+    if (restored) {
+      expect(restored->gdn_s == snap2->gdn_s,
+             "restore round-trips every S byte");
+      expect(restored->conv_history == snap2->conv_history,
+             "restore round-trips every history byte");
+      expect(restored->kv == snap2->kv, "restore round-trips every KV byte");
+    }
+    expect_addresses(*s1, stable_addresses,
+                     "all addresses stable across restore");
   }
 
   auto const mallocs_hot = qw38::cuda::malloc_count();
@@ -287,6 +397,38 @@ int main() {
          "read s2 after s1 restore");
   expect(static_cast<bool>(rt->stream().sync()), "sync s2");
   expect(still2 == std::byte{0x22}, "session 2 unchanged");
+
+  {
+    auto const moved_addresses = addresses(*s2);
+    Session moved_session = std::move(*s2);
+    expect(s2->gdn_s().pointer == nullptr &&
+               s2->conv_history().pointer == nullptr &&
+               s2->kv().pointer == nullptr,
+           "move-constructed Session relinquishes persistent buffers");
+    expect_addresses(moved_session, moved_addresses,
+                     "Session move construction preserves every address");
+    auto moved_snapshot = moved_session.save();
+    expect(static_cast<bool>(moved_snapshot),
+           "move-constructed Session remains usable");
+
+    auto assignment_destination = rt->create_session(*model, 1);
+    expect(static_cast<bool>(assignment_destination),
+           "Session move-assignment destination");
+    if (assignment_destination) {
+      auto const frees_before_assignment = qw38::cuda::free_count();
+      *assignment_destination = std::move(moved_session);
+      expect(moved_session.gdn_s().pointer == nullptr &&
+                 moved_session.conv_history().pointer == nullptr &&
+                 moved_session.kv().pointer == nullptr,
+             "move-assigned Session relinquishes persistent buffers");
+      expect_addresses(*assignment_destination, moved_addresses,
+                       "Session move assignment preserves every address");
+      expect(qw38::cuda::free_count() > frees_before_assignment,
+             "Session move assignment destroys prior owned buffers");
+      expect(static_cast<bool>(assignment_destination->reset()),
+             "move-assigned Session remains usable");
+    }
+  }
 
   Runtime moved_runtime = std::move(*rt);
   expect(static_cast<bool>(moved_runtime.stream().sync()),
@@ -340,6 +482,32 @@ int main() {
            "cursor update survives Runtime destruction");
     expect(surviving_session->conv_cursor()[0] == 2,
            "cursor metadata survives Runtime destruction");
+  }
+
+  {
+    auto lifetime_runtime = Runtime::create();
+    expect(static_cast<bool>(lifetime_runtime),
+           "create Runtime for Session-first destruction");
+    if (lifetime_runtime) {
+      auto lifetime_model = lifetime_runtime->load(fx.path);
+      expect(static_cast<bool>(lifetime_model),
+             "load model for Session-first destruction");
+      if (lifetime_model) {
+        auto const bytes_before_session = qw38::cuda::live_bytes();
+        {
+          auto short_session =
+              lifetime_runtime->create_session(*lifetime_model, 1);
+          expect(static_cast<bool>(short_session),
+                 "create short-lived Session");
+          expect(qw38::cuda::live_bytes() > bytes_before_session,
+                 "short-lived Session owns device allocations");
+        }
+        expect(qw38::cuda::live_bytes() == bytes_before_session,
+               "Session destruction releases allocations before Runtime");
+        expect(static_cast<bool>(lifetime_runtime->stream().sync()),
+               "Runtime remains usable after Session destruction");
+      }
+    }
   }
 
   if (g_failures != 0) {
