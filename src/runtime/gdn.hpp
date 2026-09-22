@@ -127,9 +127,9 @@ struct GdnRecurrenceBindViews {
   TensorView alpha{};
   TensorView beta{};
   TensorView v{};
-  TensorView s{};  // FP32 session S or a prefix of layers
+  TensorView s{};  // FP32 session S [layer,value_head,value,key]
   TensorView o{};
-  std::uint32_t s_layer{};
+  std::uint32_t s_layer{};  // Must equal the layer derived from language_layer.
   std::uint32_t language_layer{};
 };
 
@@ -140,7 +140,7 @@ struct GdnRecurrencePlan {
   TensorView alpha{};   // FP32 [48]
   TensorView beta{};    // FP32 [48]
   TensorView v{};       // BF16 [48,128]
-  TensorView s{};       // FP32 base; s_layer selects [value_head,value,key]
+  TensorView s{};       // FP32 [layer,value_head,value,key]
   TensorView o{};       // FP32 [48,128]
   std::uint32_t s_layer{};
   std::uint32_t language_layer{};

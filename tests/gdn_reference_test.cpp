@@ -398,9 +398,7 @@ void test_front_vs_reference(Stream const& stream) {
   rv.alpha = plan->scratch.alpha;
   rv.beta = plan->scratch.beta;
   rv.v = plan->scratch.v;
-  rv.s = make_view(d_s->data(), qw38::format::ArithmeticDtype::Fp32,
-                   PhysicalLayoutId::CudaFp32GdnSHvKV0, StorageClass::Fp32, true, 1,
-                   kGdnSElemsPerLayer);
+  rv.s = qw38::gdn::test::gdn_state_view(d_s->data());
   rv.o = plan->scratch.o;
   rv.s_layer = 0;
   rv.language_layer = 0;

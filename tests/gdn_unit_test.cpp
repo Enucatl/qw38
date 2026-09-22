@@ -7,6 +7,7 @@
 
 #include <cstdint>
 #include <iostream>
+#include <limits>
 #include <string>
 #include <vector>
 
@@ -56,6 +57,7 @@ using qw38::gdn::test::HostGdnMixer;
 using qw38::gdn::test::download_vec;
 using qw38::gdn::test::filled_f;
 using qw38::gdn::test::gdn_s_index;
+using qw38::gdn::test::gdn_state_view;
 using qw38::gdn::test::make_logical;
 using qw38::gdn::test::mixer_views;
 using qw38::gdn::test::pack_bf16_tile;
@@ -435,9 +437,7 @@ GdnRecurrenceBindViews dummy_recur_views(void* s, void* o, void* q, void* k,
                          StorageClass::Fp32, false, 1, kGdnValueHeads);
   views.v = make_view(v, ArithmeticDtype::Bf16, PhysicalLayoutId::CudaBf16RowMajorV0,
                       StorageClass::Bf16, false, 2, kGdnValueHeads, kGdnHeadDim);
-  views.s = make_view(s, ArithmeticDtype::Fp32,
-                      PhysicalLayoutId::CudaFp32GdnSHvKV0, StorageClass::Fp32, true,
-                      1, kGdnSElemsPerLayer);
+  views.s = gdn_state_view(s);
   views.o = make_view(o, ArithmeticDtype::Fp32, PhysicalLayoutId::CudaFp32VectorV0,
                       StorageClass::Fp32, true, 2, kGdnValueHeads, kGdnHeadDim);
   views.s_layer = 0;
@@ -487,9 +487,25 @@ void test_recurrence_bind_and_invalid(Stream const& stream) {
   bf16s.s.dtype = ArithmeticDtype::Bf16;
   expect(!bind_gdn_recurrence_plan(bf16s, stream), "BF16 S rejects");
 
-  auto tiny = views;
-  tiny.s.extent[0] = 16;
-  expect(!bind_gdn_recurrence_plan(tiny, stream), "short S rejects");
+  auto transposed = views;
+  transposed.s.layout = PhysicalLayoutId::CudaFp32VectorV0;
+  expect(!bind_gdn_recurrence_plan(transposed, stream), "transposed S rejects");
+
+  auto wrong_storage = views;
+  wrong_storage.s.storage = StorageClass::Bf16;
+  expect(!bind_gdn_recurrence_plan(wrong_storage, stream), "wrong S storage rejects");
+
+  auto wrong_shape = views;
+  wrong_shape.s.extent[2] = 127;
+  expect(!bind_gdn_recurrence_plan(wrong_shape, stream), "wrong S shape rejects");
+
+  auto overflow = views;
+  overflow.s.extent[0] = std::numeric_limits<std::uint64_t>::max();
+  overflow.s.extent[1] = 2;
+  auto overflow_result = bind_gdn_recurrence_plan(overflow, stream);
+  expect(!overflow_result &&
+             overflow_result.error().code == qw38::runtime::ErrorCode::Overflow,
+         "overflowing S shape rejects");
 
   auto same = views;
   same.o.pointer = same.s.pointer;
@@ -499,9 +515,9 @@ void test_recurrence_bind_and_invalid(Stream const& stream) {
   qk.k_hat.pointer = qk.q_hat.pointer;
   expect(!bind_gdn_recurrence_plan(qk, stream), "aliased q/k rejects");
 
-  auto layer = views;
-  layer.s_layer = 48;
-  expect(!bind_gdn_recurrence_plan(layer, stream), "s_layer 48 rejects");
+  auto wrong_layer = views;
+  wrong_layer.language_layer = 4;
+  expect(!bind_gdn_recurrence_plan(wrong_layer, stream), "wrong derived S layer rejects");
 
   auto st = launch_gdn_recurrence(nullptr, static_cast<float*>(d_k->data()),
                                   static_cast<float*>(d_a->data()),
@@ -646,7 +662,6 @@ void test_recurrence_layout_zero_heads_layers(Stream const& stream) {
   }
   auto views = dummy_recur_views(d_two->data(), d_o->data(), d_qz->data(), d_kz->data(),
                                  d_az->data(), d_bz->data(), d_vz->data());
-  views.s.extent[0] = 2u * kGdnSElemsPerLayer;
   views.s_layer = 0;
   auto plan0 = bind_gdn_recurrence_plan(views, stream);
   expect(static_cast<bool>(plan0), "bind layer 0 of two");
@@ -774,9 +789,7 @@ GdnBindViews dummy_mixer_views(std::uint32_t* cursor) {
   v.residual_out = make_view(dummy_ptr(0x210000), ArithmeticDtype::Fp32,
                              PhysicalLayoutId::CudaFp32VectorV0, StorageClass::Fp32,
                              true, 1, kHidden);
-  v.s = make_view(dummy_ptr(0x220000), ArithmeticDtype::Fp32,
-                  PhysicalLayoutId::CudaFp32GdnSHvKV0, StorageClass::Fp32, true, 1,
-                  kGdnSElemsPerLayer);
+  v.s = gdn_state_view(dummy_ptr(0x220000));
   return v;
 }
 

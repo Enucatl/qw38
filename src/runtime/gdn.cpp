@@ -6,6 +6,7 @@
 #include "cuda/gdn.hpp"
 
 #include "format/constants.hpp"
+#include "format/layout.hpp"
 
 #include <array>
 #include <cmath>
@@ -48,6 +49,47 @@ std::uint64_t element_count(TensorView const& v) noexcept {
     n *= v.extent[i];
   }
   return n;
+}
+
+std::expected<void, Error> validate_gdn_state_view(TensorView const& s) {
+  if (s.pointer == nullptr) {
+    return std::unexpected(arg_error("s", "null view"));
+  }
+  if (s.space != MemorySpace::Device) {
+    return std::unexpected(arg_error("s", "view must be device memory"));
+  }
+  if (s.dtype != ArithmeticDtype::Fp32) {
+    return std::unexpected(arg_error("s", "S must be FP32"));
+  }
+  if (s.layout != PhysicalLayoutId::CudaFp32GdnSHvKV0) {
+    return std::unexpected(arg_error("s", "S must use cuda_fp32_gdn_s_hvk_v0"));
+  }
+  if (s.storage != StorageClass::Fp32) {
+    return std::unexpected(arg_error("s", "S storage must be fp32"));
+  }
+  if (!s.writable) {
+    return std::unexpected(arg_error("s", "view must be writable"));
+  }
+  if (s.rank > qw38::format::kMaxRank) {
+    return std::unexpected(arg_error("s", "rank exceeds maximum"));
+  }
+
+  std::uint64_t elements = 1;
+  for (std::uint8_t i = 0; i < s.rank; ++i) {
+    auto product = qw38::format::checked_mul(elements, s.extent[i], 0, "s.extent");
+    if (!product) {
+      return std::unexpected(make_error(ErrorCode::Overflow, product.error().field,
+                                        product.error().detail));
+    }
+    elements = *product;
+  }
+  if (s.rank != 4 || s.extent[0] != kGdnLayers ||
+      s.extent[1] != kGdnValueHeads || s.extent[2] != kGdnValueDim ||
+      s.extent[3] != kGdnKeyDim || elements != kGdnSBytes / qw38::format::kFp32Size) {
+    return std::unexpected(
+        arg_error("s", "S must be FP32 [48,48,128,128] in [layer,value_head,value,key] order"));
+  }
+  return {};
 }
 
 std::uint64_t view_bytes(TensorView const& v) noexcept {
@@ -727,9 +769,6 @@ std::expected<GdnRecurrencePlan, Error> bind_gdn_recurrence_plan(
   if (stream.empty()) {
     return std::unexpected(arg_error("stream", "empty stream"));
   }
-  if (views.s_layer >= kGdnLayers) {
-    return std::unexpected(arg_error("s_layer", "GDN state layer must be < 48"));
-  }
   auto q = as_vector(views.q_hat, static_cast<std::uint64_t>(kGdnKeyHeads) * kGdnKeyDim,
                      ArithmeticDtype::Fp32, false, "q_hat");
   if (!q) {
@@ -760,23 +799,8 @@ std::expected<GdnRecurrencePlan, Error> bind_gdn_recurrence_plan(
   if (!o) {
     return std::unexpected(o.error());
   }
-  if (views.s.pointer == nullptr) {
-    return std::unexpected(arg_error("s", "null view"));
-  }
-  if (views.s.space != MemorySpace::Device) {
-    return std::unexpected(arg_error("s", "view must be device memory"));
-  }
-  if (views.s.dtype != ArithmeticDtype::Fp32) {
-    return std::unexpected(arg_error("s", "S must be FP32"));
-  }
-  if (!views.s.writable) {
-    return std::unexpected(arg_error("s", "view must be writable"));
-  }
-  std::uint64_t const need =
-      (static_cast<std::uint64_t>(views.s_layer) + 1u) * kGdnSElemsPerLayer;
-  if (views.s.rank == 0 || element_count(views.s) < need) {
-    return std::unexpected(
-        arg_error("s", "view is smaller than the addressed GDN layer"));
+  if (auto state = validate_gdn_state_view(views.s); !state) {
+    return std::unexpected(state.error());
   }
   if (q->pointer == k->pointer) {
     return std::unexpected(arg_error("q_hat", "q_hat and k_hat must be distinct"));
@@ -789,6 +813,10 @@ std::expected<GdnRecurrencePlan, Error> bind_gdn_recurrence_plan(
   if (!idx) {
     return std::unexpected(idx.error());
   }
+  if (views.s_layer != *idx) {
+    return std::unexpected(
+        arg_error("s_layer", "must match the GDN state layer derived from language_layer"));
+  }
 
   GdnRecurrencePlan plan;
   plan.q_hat = *q;
@@ -799,7 +827,7 @@ std::expected<GdnRecurrencePlan, Error> bind_gdn_recurrence_plan(
   plan.s = views.s;
   plan.s.writable = true;
   plan.o = *o;
-  plan.s_layer = views.s_layer;
+  plan.s_layer = *idx;
   plan.language_layer = views.language_layer;
   plan.gdn_layer = *idx;
   plan.stream = &stream;
@@ -907,23 +935,8 @@ std::expected<GdnPlan, Error> bind_gdn_plan(GdnBindViews const& views,
     return std::unexpected(
         arg_error("gated_gamma", "gated gamma must be distinct from input RMS gamma"));
   }
-  if (views.s.pointer == nullptr) {
-    return std::unexpected(arg_error("s", "null view"));
-  }
-  if (views.s.space != MemorySpace::Device) {
-    return std::unexpected(arg_error("s", "view must be device memory"));
-  }
-  if (views.s.dtype != ArithmeticDtype::Fp32) {
-    return std::unexpected(arg_error("s", "S must be FP32"));
-  }
-  if (!views.s.writable) {
-    return std::unexpected(arg_error("s", "view must be writable"));
-  }
-  std::uint64_t const need =
-      (static_cast<std::uint64_t>(fp->gdn_layer) + 1u) * kGdnSElemsPerLayer;
-  if (views.s.rank == 0 || element_count(views.s) < need) {
-    return std::unexpected(
-        arg_error("s", "view is smaller than the addressed GDN layer"));
+  if (auto state = validate_gdn_state_view(views.s); !state) {
+    return std::unexpected(state.error());
   }
   if (fp->scratch.u.pointer == nullptr) {
     return std::unexpected(arg_error("workspace", "u overlay is required"));

@@ -67,6 +67,16 @@ using qw38::runtime::MemorySpace;
 using qw38::runtime::TensorView;
 using qw38::runtime::kGdnSElemsPerLayer;
 
+inline TensorView gdn_state_view(void* ptr) {
+  TensorView v = make_view(ptr, ArithmeticDtype::Fp32,
+                           PhysicalLayoutId::CudaFp32GdnSHvKV0,
+                           StorageClass::Fp32, true, 1, kGdnSElemsPerLayer);
+  v.rank = 4;
+  v.extent = {qw38::runtime::kGdnLayers, kGdnValueHeads, kGdnHeadDim,
+              kGdnHeadDim};
+  return v;
+}
+
 inline std::vector<std::uint16_t> filled_h(std::uint32_t n, float v) {
   return std::vector<std::uint16_t>(n, fp32_to_bf16_rne(v));
 }
@@ -283,9 +293,7 @@ inline qw38::runtime::GdnBindViews mixer_views(DeviceGdnMixer& dev) {
   v.history = make_view(dev.history.data(), ArithmeticDtype::Bf16,
                         PhysicalLayoutId::CudaBf16ConvHistoryV0, StorageClass::Bf16,
                         true, 2, kConvHistoryTaps, kQkvWidth);
-  v.s = make_view(dev.s.data(), ArithmeticDtype::Fp32,
-                  PhysicalLayoutId::CudaFp32GdnSHvKV0, StorageClass::Fp32, true, 1,
-                  dev.s.bytes() / 4);
+  v.s = gdn_state_view(dev.s.data());
   v.host_cursor = &dev.cursor;
   v.language_layer = 0;
   return v;
