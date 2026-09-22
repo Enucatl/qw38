@@ -8,6 +8,7 @@
 
 #include <filesystem>
 #include <iostream>
+#include <optional>
 #include <span>
 #include <string>
 #include <vector>
@@ -16,9 +17,11 @@ using qw38::attn::test::HostAttn;
 using qw38::attn::test::download_vec;
 using qw38::attn::test::expect;
 using qw38::attn::test::expect_bf16_close;
+using qw38::attn::test::expect_fp32_close;
 using qw38::attn::test::fail;
 using qw38::attn::test::g_failures;
 using qw38::attn::test::kAttnKvWidth;
+using qw38::attn::test::kAttnOutWidth;
 using qw38::attn::test::kAttnPrepSmallAbs;
 using qw38::attn::test::kAttnPrepSmallRel;
 using qw38::attn::test::kHeadDim;
@@ -43,14 +46,18 @@ using qw38::format::TensorRecord;
 using qw38::format::TensorRole;
 using qw38::format::v0_precision_policy;
 using qw38::reference::attn_prep_reference;
+using qw38::reference::attn_mixer_reference;
 using qw38::runtime::Runtime;
 using qw38::runtime::attn_k_name;
 using qw38::runtime::attn_k_norm_name;
 using qw38::runtime::attn_norm_name;
+using qw38::runtime::attn_o_name;
 using qw38::runtime::attn_q_name;
 using qw38::runtime::attn_q_norm_name;
 using qw38::runtime::attn_v_name;
 using qw38::runtime::bind_attention_prep_plan;
+using qw38::runtime::bind_attention_mixer_plan;
+using qw38::runtime::execute_decode_attention;
 using qw38::runtime::execute_decode_attention_prep;
 using qw38::runtime::kv_byte_offset;
 using qw38::runtime::language_persistent_schema;
@@ -124,6 +131,7 @@ bool write_attn_artifact(std::filesystem::path const& path, HostAttn const& host
   auto qg = q4_weight(2, attn_q_name(kLayer), kQgWidth, kHidden);
   auto k = q4_weight(3, attn_k_name(kLayer), kAttnKvWidth, kHidden);
   auto v = q4_weight(4, attn_v_name(kLayer), kAttnKvWidth, kHidden);
+  auto o = q4_weight(8, attn_o_name(kLayer), kHidden, kAttnOutWidth);
   auto qn = bf16_vec(5, attn_q_norm_name(kLayer), kHeadDim);
   auto kn = bf16_vec(6, attn_k_norm_name(kLayer), kHeadDim);
   TensorRecord rope{};
@@ -134,7 +142,7 @@ bool write_attn_artifact(std::filesystem::path const& path, HostAttn const& host
   rope.quantizer = LogicalQuantizerId::None;
   rope.layout = PhysicalLayoutId::CudaFp32VectorV0;
   rope.mapping = LogicalPhysicalMapping{.kind = MappingKind::Identity};
-  schema.tensors = {gamma, qg, k, v, qn, kn, rope};
+  schema.tensors = {gamma, qg, k, v, qn, kn, rope, o};
   schema.graph_bindings = {
       GraphBinding{.instance_id = 1,
                    .kind = SemanticNodeKind::GatedAttention,
@@ -151,6 +159,11 @@ bool write_attn_artifact(std::filesystem::path const& path, HostAttn const& host
                    .role = TensorRole::VectorWeight,
                    .layer_index = kLayer,
                    .tensor_id = 7},
+      GraphBinding{.instance_id = 1,
+                   .kind = SemanticNodeKind::GatedAttention,
+                   .role = TensorRole::DenseWeight,
+                   .layer_index = kLayer,
+                   .tensor_id = 8},
   };
   auto state = language_persistent_schema();
   schema.state.assign(state.begin(), state.end());
@@ -187,6 +200,8 @@ bool write_attn_artifact(std::filesystem::path const& path, HostAttn const& host
       !write(k.logical_name, SpanKind::Scales, host.k.scales) ||
       !write(v.logical_name, SpanKind::Payload, host.v.codes) ||
       !write(v.logical_name, SpanKind::Scales, host.v.scales) ||
+      !write(o.logical_name, SpanKind::Payload, host.o.codes) ||
+      !write(o.logical_name, SpanKind::Scales, host.o.scales) ||
       !write(qn.logical_name, SpanKind::Payload, qn_b) ||
       !write(kn.logical_name, SpanKind::Payload, kn_b) ||
       !write(rope.logical_name, SpanKind::Payload, inv_b)) {
@@ -377,6 +392,122 @@ int main() {
     }
   }
   expect(isolated, "two sessions store distinct KV bytes");
+
+  // Exercise the complete preparation → segmented attention → gated BF16
+  // output → Q4 projection/residual path on repeated tokens. Keep a CPU
+  // reference cache in lockstep, then replay from a snapshot and a fresh
+  // session to prove continuation and deterministic outputs.
+  constexpr std::uint64_t kMixerCap = 8;
+  auto mixer_session = rt->create_session(*model, kMixerCap);
+  if (!mixer_session) {
+    fail("mixer session");
+    return 1;
+  }
+  auto mixer_plan = bind_attention_mixer_plan(*model, *mixer_session, 3,
+                                               rt->stream());
+  if (!mixer_plan) {
+    fail("bind mixer: " + qw38::runtime::error_message(mixer_plan.error()));
+    return 1;
+  }
+  std::vector<std::uint16_t> mixer_kv(
+      static_cast<std::size_t>(16) * 2u * kKvHeads * kMixerCap * kHeadDim, 0);
+  std::vector<std::vector<float>> mixer_outputs;
+  std::optional<qw38::runtime::SessionSnapshot> mixer_snapshot;
+  for (std::uint64_t t = 0; t < 4; ++t) {
+    if (!upload_residual(*mixer_session, host.residual, rt->stream(), "mixer")) {
+      return 1;
+    }
+    auto cpu = attn_mixer_reference(
+        host.residual, host.gamma, qw38::reference::kDefaultRmsEps, host.w_qg,
+        host.w_k, host.w_v, host.w_o, host.gamma_q, host.gamma_k,
+        host.inv_freq, mixer_kv, 3, kMixerCap, t, true);
+    if (!cpu) {
+      fail("mixer cpu " + std::to_string(t));
+      return 1;
+    }
+    mixer_kv = cpu->kv;
+    auto got = execute_decode_attention(*mixer_plan, t);
+    if (!got) {
+      fail("mixer execute " + std::to_string(t) + ": " +
+           qw38::runtime::error_message(got.error()));
+      return 1;
+    }
+    std::vector<float> gpu(kHidden);
+    expect(static_cast<bool>(qw38::cuda::copy_d2h(
+               gpu.data(), mixer_session->residual_h_mid().pointer,
+               gpu.size() * sizeof(float), rt->stream())),
+           "mixer residual download");
+    expect(static_cast<bool>(rt->stream().sync()), "mixer residual sync");
+    expect_fp32_close(gpu, cpu->residual,
+                      "full mixer residual token " + std::to_string(t),
+                      qw38::reference::tol::kAttnMixerResidualAbs,
+                      qw38::reference::tol::kAttnMixerResidualRel);
+    mixer_outputs.push_back(std::move(gpu));
+    if (t == 1) {
+      auto snap = mixer_session->save();
+      if (!snap) {
+        fail("mixer snapshot");
+        return 1;
+      }
+      mixer_snapshot = std::move(*snap);
+    }
+  }
+  expect(mixer_session->kv_populated() == 4, "mixer repeated append length");
+  if (mixer_snapshot) {
+    auto restored_mixer = rt->create_session(*model, kMixerCap);
+    if (!restored_mixer || !restored_mixer->restore(*mixer_snapshot)) {
+      fail("mixer snapshot restore");
+      return 1;
+    }
+    auto restored_plan = bind_attention_mixer_plan(
+        *model, *restored_mixer, 3, rt->stream());
+    if (!restored_plan ||
+        !upload_residual(*restored_mixer, host.residual, rt->stream(), "restore mixer")) {
+      fail("bind restored mixer");
+      return 1;
+    }
+    auto restored_out = execute_decode_attention(*restored_plan, 2);
+    expect(static_cast<bool>(restored_out), "restored mixer continuation");
+    std::vector<float> restored_vec(kHidden);
+    expect(static_cast<bool>(qw38::cuda::copy_d2h(
+               restored_vec.data(), restored_mixer->residual_h_mid().pointer,
+               restored_vec.size() * sizeof(float), rt->stream())),
+           "restored mixer output download");
+    expect(static_cast<bool>(rt->stream().sync()), "restored mixer output sync");
+    if (mixer_outputs.size() > 2) {
+      expect_fp32_close(restored_vec, mixer_outputs[2],
+                        "restored mixer token 2",
+                        qw38::reference::tol::kAttnMixerResidualAbs,
+                        qw38::reference::tol::kAttnMixerResidualRel);
+    }
+  }
+  auto repeat_session = rt->create_session(*model, kMixerCap);
+  if (!repeat_session) {
+    fail("repeat mixer session");
+    return 1;
+  }
+  auto repeat_plan = bind_attention_mixer_plan(*model, *repeat_session, 3,
+                                                rt->stream());
+  expect(static_cast<bool>(repeat_plan), "bind repeat mixer");
+  if (repeat_plan) {
+    for (std::uint64_t t = 0; t < mixer_outputs.size(); ++t) {
+      if (!upload_residual(*repeat_session, host.residual, rt->stream(), "repeat mixer")) {
+        return 1;
+      }
+      auto out = execute_decode_attention(*repeat_plan, t);
+      expect(static_cast<bool>(out), "repeat mixer execute");
+      std::vector<float> repeat(kHidden);
+      expect(static_cast<bool>(qw38::cuda::copy_d2h(
+                 repeat.data(), repeat_session->residual_h_mid().pointer,
+                 repeat.size() * sizeof(float), rt->stream())),
+             "repeat mixer output download");
+      expect(static_cast<bool>(rt->stream().sync()), "repeat mixer output sync");
+      expect_fp32_close(repeat, mixer_outputs[t],
+                        "deterministic mixer token " + std::to_string(t),
+                        qw38::reference::tol::kAttnMixerResidualAbs,
+                        qw38::reference::tol::kAttnMixerResidualRel);
+    }
+  }
 
   std::vector<std::uint16_t> q_s1(kQueryHeads * kHeadDim);
   std::vector<std::uint16_t> g_s1(kQueryHeads * kHeadDim);

@@ -934,6 +934,199 @@ std::expected<AttnPrepReference, Error> attn_prep_reference(
   return out;
 }
 
+namespace {
+
+constexpr float kNegInf = -std::numeric_limits<float>::infinity();
+
+struct OnlinePartial {
+  float m{kNegInf};
+  float l{0.0f};
+  float num[kHeadDim]{};
+};
+
+void merge_partial(OnlinePartial& a, OnlinePartial const& b) {
+  float const m_new = a.m > b.m ? a.m : b.m;
+  if (!(m_new > kNegInf)) {
+    return;
+  }
+  float const sa = (a.m > kNegInf) ? std::exp(a.m - m_new) : 0.0f;
+  float const sb = (b.m > kNegInf) ? std::exp(b.m - m_new) : 0.0f;
+  a.l = sa * a.l + sb * b.l;
+  for (std::uint32_t d = 0; d < kHeadDim; ++d) {
+    a.num[d] = sa * a.num[d] + sb * b.num[d];
+  }
+  a.m = m_new;
+}
+
+void online_key(OnlinePartial& p, float score, std::span<float const> v) {
+  float const m_new = p.m > score ? p.m : score;
+  float const alpha = (p.m > kNegInf) ? std::exp(p.m - m_new) : 0.0f;
+  float const w = std::exp(score - m_new);
+  p.l = p.l * alpha + w;
+  for (std::uint32_t d = 0; d < kHeadDim; ++d) {
+    p.num[d] = p.num[d] * alpha + w * v[d];
+  }
+  p.m = m_new;
+}
+
+float head_dot(std::span<float const> q, std::span<float const> k) {
+  float s = 0.0f;
+  for (std::uint32_t d = 0; d < kHeadDim; ++d) {
+    s += q[d] * k[d];
+  }
+  return s * kAttnScale;
+}
+
+std::size_t cache_index(std::uint32_t attn_layer, std::uint32_t component,
+                        std::uint32_t head, std::uint64_t token,
+                        std::uint32_t dim, std::uint64_t capacity) {
+  std::size_t const head_stride = static_cast<std::size_t>(capacity) * kHeadDim;
+  std::size_t const comp_stride = static_cast<std::size_t>(kKvHeads) * head_stride;
+  return (static_cast<std::size_t>(attn_layer) * 2u + component) * comp_stride +
+         static_cast<std::size_t>(head) * head_stride +
+         static_cast<std::size_t>(token) * kHeadDim + dim;
+}
+
+std::expected<void, Error> require_kv(std::span<std::uint16_t const> kv,
+                                      std::uint32_t attn_layer,
+                                      std::uint64_t capacity) {
+  if (capacity == 0) {
+    return std::unexpected(arg_error("capacity", "capacity must be > 0"));
+  }
+  if (attn_layer >= 16u) {
+    return std::unexpected(arg_error("attn_layer", "attn_layer must be < 16"));
+  }
+  std::size_t const layer_elems =
+      static_cast<std::size_t>(2u) * kKvHeads * static_cast<std::size_t>(capacity) *
+      kHeadDim;
+  std::size_t const want = static_cast<std::size_t>(attn_layer + 1u) * layer_elems;
+  if (kv.size() < want) {
+    return std::unexpected(shape_error("kv", "cache is smaller than the addressed layer"));
+  }
+  return {};
+}
+
+OnlinePartial scan_range(std::span<float const> q, std::span<std::uint16_t const> kv,
+                         std::uint32_t attn_layer, std::uint32_t kv_h,
+                         std::uint64_t capacity, std::uint64_t key0,
+                         std::uint64_t key1, std::uint64_t populated) {
+  OnlinePartial p;
+  float v[kHeadDim];
+  float k[kHeadDim];
+  for (std::uint64_t t = key0; t < key1; ++t) {
+    if (t >= populated || t >= capacity) {
+      continue;
+    }
+    for (std::uint32_t d = 0; d < kHeadDim; ++d) {
+      k[d] = bf16_to_fp32(
+          kv[cache_index(attn_layer, kKvComponentK, kv_h, t, d, capacity)]);
+      v[d] = bf16_to_fp32(
+          kv[cache_index(attn_layer, kKvComponentV, kv_h, t, d, capacity)]);
+    }
+    online_key(p, head_dot(q, std::span<float const>(k, kHeadDim)),
+               std::span<float const>(v, kHeadDim));
+  }
+  return p;
+}
+
+}  // namespace
+
+std::expected<AttnCoreReference, Error> attn_online_core(
+    std::span<std::uint16_t const> q, std::span<std::uint16_t const> g,
+    std::span<std::uint16_t const> kv, std::uint32_t attn_layer,
+    std::uint64_t capacity, std::uint64_t populated, bool segmented) {
+  std::size_t const nq = static_cast<std::size_t>(kQueryHeads) * kHeadDim;
+  if (auto st = require_span_size(q.size(), nq, "q"); !st) {
+    return std::unexpected(st.error());
+  }
+  if (auto st = require_span_size(g.size(), nq, "g"); !st) {
+    return std::unexpected(st.error());
+  }
+  if (auto st = require_kv(kv, attn_layer, capacity); !st) {
+    return std::unexpected(st.error());
+  }
+  if (populated > capacity) {
+    return std::unexpected(
+        arg_error("populated", "populated length exceeds capacity"));
+  }
+
+  AttnCoreReference out;
+  out.attn.assign(nq, 0.0f);
+  out.y.assign(nq, 0);
+  for (std::uint32_t h = 0; h < kQueryHeads; ++h) {
+    std::uint32_t const kv_h = kv_head_for_query(h);
+    float qf[kHeadDim];
+    std::size_t const off = static_cast<std::size_t>(h) * kHeadDim;
+    for (std::uint32_t d = 0; d < kHeadDim; ++d) {
+      qf[d] = bf16_to_fp32(q[off + d]);
+    }
+    OnlinePartial acc;
+    if (segmented) {
+      std::uint64_t const nseg =
+          populated == 0 ? 0 : (populated + (kAttnSegmentKeys - 1u)) / kAttnSegmentKeys;
+      for (std::uint64_t s = 0; s < nseg; ++s) {
+        std::uint64_t const key0 = s * kAttnSegmentKeys;
+        std::uint64_t const key1 = key0 + kAttnSegmentKeys;
+        merge_partial(acc, scan_range(std::span<float const>(qf, kHeadDim), kv,
+                                      attn_layer, kv_h, capacity, key0, key1,
+                                      populated));
+      }
+    } else {
+      acc = scan_range(std::span<float const>(qf, kHeadDim), kv, attn_layer, kv_h,
+                       capacity, 0, populated, populated);
+    }
+    float const inv = (acc.l > 0.0f) ? (1.0f / acc.l) : 0.0f;
+    for (std::uint32_t d = 0; d < kHeadDim; ++d) {
+      float const attn = acc.num[d] * inv;
+      out.attn[off + d] = attn;
+      float const gate = sigmoid_fp32(bf16_to_fp32(g[off + d]));
+      out.y[off + d] = fp32_to_bf16_rne(attn * gate);
+    }
+  }
+  return out;
+}
+
+std::expected<AttnMixerReference, Error> attn_mixer_reference(
+    std::span<float const> residual, std::span<std::uint16_t const> gamma,
+    float eps, std::span<std::uint16_t const> w_qg,
+    std::span<std::uint16_t const> w_k, std::span<std::uint16_t const> w_v,
+    std::span<std::uint16_t const> w_o, std::span<std::uint16_t const> gamma_q,
+    std::span<std::uint16_t const> gamma_k, std::span<float const> inv_freq,
+    std::span<std::uint16_t const> kv_in, std::uint32_t attn_layer,
+    std::uint64_t capacity, std::uint64_t token, bool segmented) {
+  if (token >= capacity) {
+    return std::unexpected(arg_error("token", "token must be < capacity"));
+  }
+  auto prep = attn_prep_reference(residual, gamma, eps, w_qg, w_k, w_v, gamma_q,
+                                  gamma_k, inv_freq, static_cast<std::int32_t>(token));
+  if (!prep) {
+    return std::unexpected(prep.error());
+  }
+  std::vector<std::uint16_t> kv(kv_in.begin(), kv_in.end());
+  if (auto st = attn_cache_append(kv, attn_layer, capacity, token, prep->k, prep->v);
+      !st) {
+    return std::unexpected(st.error());
+  }
+  auto core = attn_online_core(prep->q, prep->g, kv, attn_layer, capacity, token + 1u,
+                               segmented);
+  if (!core) {
+    return std::unexpected(core.error());
+  }
+  std::vector<float> mix(kHidden, 0.0f);
+  if (auto st = dense_gemv_bf16(w_o, core->y, kHidden, kAttnOutWidth, mix); !st) {
+    return std::unexpected(st.error());
+  }
+  AttnMixerReference out;
+  out.prep = std::move(*prep);
+  out.core = std::move(*core);
+  out.kv = std::move(kv);
+  out.residual.resize(kHidden);
+  for (std::uint32_t i = 0; i < kHidden; ++i) {
+    out.residual[i] = residual[i] + mix[i];
+  }
+  return out;
+}
+
 std::expected<std::uint32_t, Error> argmax_fp32(std::span<float const> logits) {
   if (logits.empty()) {
     return std::unexpected(arg_error("logits", "logits must be non-empty"));

@@ -2,6 +2,7 @@
 
 #include "cuda/activation.hpp"
 #include "cuda/attention.hpp"
+#include "cuda/copy.hpp"
 #include "cuda/decode_mmv.hpp"
 
 #include "format/constants.hpp"
@@ -238,6 +239,12 @@ std::string attn_v_name(std::uint32_t layer) {
   return out.str();
 }
 
+std::string attn_o_name(std::uint32_t layer) {
+  std::ostringstream out;
+  out << "model.language_model.layers." << layer << ".self_attn.o_proj.weight";
+  return out.str();
+}
+
 std::string attn_q_norm_name(std::uint32_t layer) {
   std::ostringstream out;
   out << "model.language_model.layers." << layer << ".self_attn.q_norm.weight";
@@ -414,6 +421,158 @@ std::expected<AttentionPrepPlan, Error> bind_attention_prep_plan(
   return plan;
 }
 
+std::expected<AttentionCorePlan, Error> bind_attention_core_plan(
+    AttentionCoreBindViews const& views, qw38::cuda::Stream const& stream) {
+  if (stream.empty()) {
+    return std::unexpected(arg_error("stream", "empty stream"));
+  }
+  if (views.host_populated == nullptr) {
+    return std::unexpected(arg_error("populated", "missing populated pointer"));
+  }
+  if (views.kv_capacity == 0 || *views.host_populated > views.kv_capacity) {
+    return std::unexpected(make_error(ErrorCode::InvalidCapacity, "kv.capacity",
+                                      "invalid capacity/populated length"));
+  }
+  auto attn_i = attn_state_index(views.language_layer);
+  if (!attn_i) return std::unexpected(attn_i.error());
+  auto q = as_vector(views.q, kQueryHeads * kHeadDim, ArithmeticDtype::Bf16,
+                     false, "q");
+  auto g = as_vector(views.g, kQueryHeads * kHeadDim, ArithmeticDtype::Bf16,
+                     false, "g");
+  auto y = as_vector(views.y, kQueryHeads * kHeadDim, ArithmeticDtype::Bf16,
+                     true, "y");
+  auto residual = as_vector(views.residual, kHidden, ArithmeticDtype::Fp32,
+                           false, "residual");
+  auto residual_out = as_vector(views.residual_out, kHidden, ArithmeticDtype::Fp32,
+                                true, "residual_out");
+  auto partials = as_vector(views.partials, kQueryHeads * kAttnPartialStride,
+                            ArithmeticDtype::Fp32, true, "partials");
+  if (!q) return std::unexpected(q.error());
+  if (!g) return std::unexpected(g.error());
+  if (!y) return std::unexpected(y.error());
+  if (!residual) return std::unexpected(residual.error());
+  if (!residual_out) return std::unexpected(residual_out.error());
+  if (!partials) return std::unexpected(partials.error());
+  if (q->pointer == g->pointer || residual->pointer == residual_out->pointer) {
+    return std::unexpected(arg_error("core", "core views must not alias"));
+  }
+  if (views.kv.pointer == nullptr || views.kv.space != MemorySpace::Device ||
+      views.kv.dtype != ArithmeticDtype::Bf16 || !views.kv.writable) {
+    return std::unexpected(arg_error("kv", "KV cache must be writable BF16 device memory"));
+  }
+  std::uint64_t const layer_elems = static_cast<std::uint64_t>(kKvComponents) *
+                                    kKvHeads * views.kv_capacity * kHeadDim;
+  if (views.kv.rank == 0 || element_count(views.kv) <
+                              (static_cast<std::uint64_t>(*attn_i) + 1u) * layer_elems) {
+    return std::unexpected(arg_error("kv", "cache is smaller than addressed layer"));
+  }
+  auto out = bind_q4_or_bf16(views.out, views.out_scales, kHidden,
+                             kAttnOutWidth, "out");
+  if (!out) return std::unexpected(out.error());
+  std::uint64_t const nseg = attn_segment_count(views.kv_capacity);
+  std::uint64_t const need = nseg * kQueryHeads * kAttnPartialStride;
+  if (element_count(views.partials) < need) {
+    return std::unexpected(arg_error("partials", "workspace is too small for KV capacity"));
+  }
+
+  AttentionCorePlan plan;
+  plan.out = *out;
+  plan.q = *q;
+  plan.g = *g;
+  plan.kv = views.kv;
+  plan.partials = *partials;
+  plan.y = *y;
+  plan.residual = *residual;
+  plan.residual_out = *residual_out;
+  plan.host_populated = views.host_populated;
+  plan.kv_capacity = views.kv_capacity;
+  plan.attn_layer = *attn_i;
+  plan.stream = &stream;
+  return plan;
+}
+
+std::expected<AttentionMixerPlan, Error> bind_attention_mixer_plan(
+    AttentionMixerBindViews const& views, qw38::cuda::Stream const& stream,
+    float eps) {
+  auto prep = bind_attention_prep_plan(views.prep, stream, eps);
+  if (!prep) return std::unexpected(prep.error());
+  if (views.residual_out.pointer == nullptr) {
+    return std::unexpected(arg_error("residual_out", "null view"));
+  }
+  auto out = bind_q4_or_bf16(views.out, views.out_scales, kHidden,
+                             kAttnOutWidth, "out");
+  if (!out) return std::unexpected(out.error());
+  auto residual_out = as_vector(views.residual_out, kHidden, ArithmeticDtype::Fp32,
+                                true, "residual_out");
+  if (!residual_out) return std::unexpected(residual_out.error());
+
+  auto const workspace_bytes = view_bytes(views.prep.workspace);
+  std::uint64_t const required = kAttnOffPartials +
+      attn_partials_bytes(attn_segment_count(views.prep.kv_capacity));
+  if (workspace_bytes < required) {
+    return std::unexpected(arg_error("workspace", "workspace is too small for KV capacity"));
+  }
+  AttentionCoreBindViews core;
+  core.q = prep->scratch.q;
+  core.g = prep->scratch.g;
+  core.kv = prep->kv;
+  core.partials = overlay(static_cast<std::byte*>(views.prep.workspace.pointer),
+                          kAttnOffPartials, ArithmeticDtype::Fp32,
+                          PhysicalLayoutId::CudaFp32VectorV0,
+                          StorageClass::Fp32, true, 1,
+                          (workspace_bytes - kAttnOffPartials) /
+                              qw38::format::kFp32Size);
+  core.y = prep->scratch.q;  // Q is dead after scan; merge materializes y in-place.
+  core.residual = prep->residual;
+  core.residual_out = *residual_out;
+  core.out = views.out;
+  core.out_scales = views.out_scales;
+  core.host_populated = prep->host_populated;
+  core.kv_capacity = prep->kv_capacity;
+  core.language_layer = prep->language_layer;
+  auto cp = bind_attention_core_plan(core, stream);
+  if (!cp) return std::unexpected(cp.error());
+  AttentionMixerPlan plan;
+  plan.prep = std::move(*prep);
+  plan.core = std::move(*cp);
+  return plan;
+}
+
+std::expected<AttentionMixerPlan, Error> bind_attention_mixer_plan(
+    Model const& model, Session& session, std::uint32_t layer,
+    qw38::cuda::Stream const& stream, float eps) {
+  auto prep = bind_attention_prep_plan(model, session, layer, stream, eps);
+  if (!prep) return std::unexpected(prep.error());
+  auto out = require_payload(model, attn_o_name(layer));
+  if (!out) return std::unexpected(out.error());
+  auto scales = optional_scales(model, attn_o_name(layer), out->layout);
+  if (!scales) return std::unexpected(scales.error());
+  AttentionMixerBindViews views;
+  views.prep.qg = prep->qg.codes;
+  views.prep.qg_scales = prep->qg.scales;
+  views.prep.k = prep->k.codes;
+  views.prep.k_scales = prep->k.scales;
+  views.prep.v = prep->v.codes;
+  views.prep.v_scales = prep->v.scales;
+  views.prep.gamma = prep->gamma;
+  views.prep.gamma_q = prep->gamma_q;
+  views.prep.gamma_k = prep->gamma_k;
+  views.prep.inv_freq = prep->inv_freq;
+  views.prep.residual = prep->residual;
+  views.prep.normalized = prep->normalized;
+  auto workspace = session.scratch(qw38::format::ScratchKind::AttentionWorkspace);
+  if (!workspace) return std::unexpected(workspace.error());
+  views.prep.workspace = *workspace;
+  views.prep.kv = prep->kv;
+  views.prep.host_populated = prep->host_populated;
+  views.prep.kv_capacity = prep->kv_capacity;
+  views.prep.language_layer = layer;
+  views.out = *out;
+  views.out_scales = *scales;
+  views.residual_out = session.residual_h_mid();
+  return bind_attention_mixer_plan(views, stream, eps);
+}
+
 std::expected<AttentionPrepPlan, Error> bind_attention_prep_plan(
     Model const& model, Session& session, std::uint32_t layer,
     qw38::cuda::Stream const& stream, float eps) {
@@ -574,6 +733,67 @@ std::expected<void, Error> execute_decode_attention_prep(
   }
   *plan.host_populated = position + 1u;
   return {};
+}
+
+std::expected<TensorView, Error> execute_attention_core(
+    AttentionCorePlan const& plan) {
+  if (plan.stream == nullptr || plan.stream->empty()) {
+    return std::unexpected(arg_error("stream", "empty stream"));
+  }
+  if (plan.host_populated == nullptr || *plan.host_populated > plan.kv_capacity) {
+    return std::unexpected(make_error(ErrorCode::InvalidPopulatedLength, "populated",
+                                      "populated length exceeds capacity"));
+  }
+  std::uint64_t const populated = *plan.host_populated;
+  std::uint64_t const nseg64 = attn_segment_count(populated);
+  if (nseg64 > std::numeric_limits<std::uint32_t>::max()) {
+    return std::unexpected(arg_error("populated", "segment count exceeds CUDA launch range"));
+  }
+  std::uint32_t const nseg = static_cast<std::uint32_t>(nseg64);
+  auto* q = static_cast<std::uint16_t const*>(plan.q.pointer);
+  auto* g = static_cast<std::uint16_t const*>(plan.g.pointer);
+  auto* kv = static_cast<std::uint16_t const*>(plan.kv.pointer);
+  auto* partials = static_cast<float*>(plan.partials.pointer);
+  auto* y = static_cast<std::uint16_t*>(plan.y.pointer);
+  auto* residual = static_cast<float const*>(plan.residual.pointer);
+  auto* residual_out = static_cast<float*>(plan.residual_out.pointer);
+  if (q == nullptr || g == nullptr || kv == nullptr || partials == nullptr ||
+      y == nullptr || residual == nullptr || residual_out == nullptr) {
+    return std::unexpected(arg_error("attention", "core views are null"));
+  }
+  if (auto st = qw38::cuda::launch_attention_scan(
+          q, kv, plan.attn_layer, plan.kv_capacity, populated, partials, nseg,
+          *plan.stream);
+      !st) {
+    return std::unexpected(from_cuda(st.error()));
+  }
+  if (auto st = qw38::cuda::launch_attention_merge(partials, g, nseg, y,
+                                                     *plan.stream);
+      !st) {
+    return std::unexpected(from_cuda(st.error()));
+  }
+  if (auto st = qw38::cuda::copy_d2d(
+          residual_out, residual, kHidden * qw38::format::kFp32Size,
+          *plan.stream);
+      !st) {
+    return std::unexpected(from_cuda(st.error()));
+  }
+  DecodeMmvDesc out = mmv_from_weight(plan.out);
+  out.input = y;
+  out.residual = residual_out;
+  out.epilogue = DecodeEpilogue::ResidualAddFp32;
+  if (auto st = qw38::cuda::launch_decode_mmv(out, *plan.stream); !st) {
+    return std::unexpected(from_cuda(st.error()));
+  }
+  return plan.residual_out;
+}
+
+std::expected<TensorView, Error> execute_decode_attention(
+    AttentionMixerPlan const& plan, std::uint64_t position) {
+  if (auto st = execute_decode_attention_prep(plan.prep, position); !st) {
+    return std::unexpected(st.error());
+  }
+  return execute_attention_core(plan.core);
 }
 
 }  // namespace qw38::runtime

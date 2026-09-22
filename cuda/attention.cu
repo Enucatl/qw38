@@ -144,6 +144,202 @@ __global__ void attention_prepare_kernel(
   copy_head(v_src, v_dst);
 }
 
+// The segment scan deliberately keeps scores and K/V staging in shared memory.
+// A block owns one query head and one 256-key segment.  Only one 32-key tile is
+// staged at a time; partials are the sole sequence-length-dependent global
+// output.
+__global__ void attention_scan_kernel(
+    std::uint16_t const* q, std::uint16_t const* kv,
+    std::uint32_t attn_layer, std::uint64_t capacity,
+    std::uint64_t populated, float* partials, std::uint32_t n_segments) {
+  __shared__ float q_shared[kAttnHeadDim];
+  __shared__ std::uint16_t tile[kAttnSubtileKeys * kAttnHeadDim];
+  __shared__ float scores[kAttnSubtileKeys];
+  __shared__ float m_shared;
+  __shared__ float l_shared;
+  __shared__ float num_shared[kAttnHeadDim];
+  __shared__ float old_scale;
+  __shared__ float tile_scale;
+
+  std::uint32_t const h = blockIdx.x;
+  std::uint32_t const segment = blockIdx.y;
+  std::uint32_t const tid = threadIdx.x;
+  std::size_t const head_stride =
+      static_cast<std::size_t>(capacity) * kAttnHeadDim;
+  std::size_t const comp_stride =
+      static_cast<std::size_t>(kAttnKvHeads) * head_stride;
+  std::size_t const layer_stride = 2u * comp_stride;
+  std::uint16_t const* layer =
+      kv + static_cast<std::size_t>(attn_layer) * layer_stride;
+  std::uint16_t const* k_base = layer;
+  std::uint16_t const* v_base = layer + comp_stride;
+  std::uint32_t const kv_h = h / kAttnGqaGroup;
+  std::uint16_t const* q_head = q + static_cast<std::size_t>(h) * kAttnHeadDim;
+  std::size_t const kv_head_base = static_cast<std::size_t>(kv_h) * head_stride;
+
+  for (std::uint32_t d = tid; d < kAttnHeadDim; d += kAttnScanThreads) {
+    q_shared[d] = bf16_to_fp32(q_head[d]);
+    num_shared[d] = 0.0f;
+  }
+  if (tid == 0) {
+    m_shared = -INFINITY;
+    l_shared = 0.0f;
+  }
+  __syncthreads();
+
+  std::uint64_t const segment_begin =
+      static_cast<std::uint64_t>(segment) * kAttnSegmentKeys;
+  for (std::uint32_t sub = 0; sub < kAttnSegmentKeys;
+       sub += kAttnSubtileKeys) {
+    std::uint32_t const key_count = kAttnSubtileKeys;
+    for (std::uint32_t i = tid; i < key_count * kAttnHeadDim;
+         i += kAttnScanThreads) {
+      std::uint32_t const local_key = i / kAttnHeadDim;
+      std::uint32_t const d = i % kAttnHeadDim;
+      std::uint64_t const token = segment_begin + sub + local_key;
+      if (token < populated && token < capacity) {
+        tile[i] = k_base[kv_head_base + token * kAttnHeadDim + d];
+      } else {
+        tile[i] = 0;
+      }
+    }
+    __syncthreads();
+
+    // One thread computes each score.  This preserves a simple, explicit
+    // FP32 dot-product definition while the 128-thread block performs staging.
+    if (tid < kAttnSubtileKeys) {
+      std::uint64_t const token = segment_begin + sub + tid;
+      if (token < populated && token < capacity) {
+        float score = 0.0f;
+        for (std::uint32_t d = 0; d < kAttnHeadDim; ++d) {
+          score += q_shared[d] * bf16_to_fp32(tile[tid * kAttnHeadDim + d]);
+        }
+        scores[tid] = score * kAttnScale;
+      } else {
+        scores[tid] = -INFINITY;
+      }
+    }
+    __syncthreads();
+
+    if (tid == 0) {
+      float tile_max = -INFINITY;
+      for (std::uint32_t i = 0; i < key_count; ++i) {
+        tile_max = fmaxf(tile_max, scores[i]);
+      }
+      float const m_new = fmaxf(m_shared, tile_max);
+      old_scale = (m_shared == -INFINITY)
+                      ? 0.0f
+                      : expf(m_shared - m_new);
+      tile_scale = (tile_max == -INFINITY)
+                       ? 0.0f
+                       : expf(tile_max - m_new);
+      l_shared *= old_scale;
+      float tile_sum = 0.0f;
+      for (std::uint32_t i = 0; i < key_count; ++i) {
+        if (scores[i] != -INFINITY) {
+          tile_sum += expf(scores[i] - tile_max);
+        }
+      }
+      l_shared += tile_scale * tile_sum;
+      for (std::uint32_t d = 0; d < kAttnHeadDim; ++d) {
+        num_shared[d] *= old_scale;
+      }
+      m_shared = m_new;
+    }
+    __syncthreads();
+
+    for (std::uint32_t i = tid; i < key_count * kAttnHeadDim;
+         i += kAttnScanThreads) {
+      std::uint32_t const local_key = i / kAttnHeadDim;
+      std::uint32_t const d = i % kAttnHeadDim;
+      std::uint64_t const token = segment_begin + sub + local_key;
+      if (token < populated && token < capacity) {
+        tile[i] = v_base[kv_head_base + token * kAttnHeadDim + d];
+      } else {
+        tile[i] = 0;
+      }
+    }
+    __syncthreads();
+    // There are 256 value coordinates but only 128 threads, so each thread
+    // owns two coordinates.  Every numerator lane must be updated; leaving
+    // the upper half untouched would silently zero half of attention output.
+    for (std::uint32_t d = tid; d < kAttnHeadDim; d += kAttnScanThreads) {
+      float add = 0.0f;
+      if (m_shared != -INFINITY) {
+        for (std::uint32_t i = 0; i < key_count; ++i) {
+          if (scores[i] != -INFINITY) {
+            add += expf(scores[i] - m_shared) *
+                   bf16_to_fp32(tile[i * kAttnHeadDim + d]);
+          }
+        }
+      }
+      num_shared[d] += add;
+    }
+    __syncthreads();
+  }
+
+  std::size_t const out =
+      (static_cast<std::size_t>(h) * n_segments + segment) *
+      static_cast<std::size_t>(kAttnPartialStride);
+  for (std::uint32_t d = tid; d < kAttnHeadDim; d += kAttnScanThreads) {
+    partials[out + 2u + d] = num_shared[d];
+  }
+  if (tid == 0) {
+    partials[out] = m_shared;
+    partials[out + 1u] = l_shared;
+  }
+}
+
+__global__ void attention_merge_kernel(
+    float const* partials, std::uint16_t const* g, std::uint32_t n_segments,
+    std::uint16_t* y_out) {
+  __shared__ float num[kAttnHeadDim];
+  __shared__ float m;
+  __shared__ float l;
+  __shared__ float old_scale;
+  __shared__ float tile_scale;
+  std::uint32_t const h = blockIdx.x;
+  std::uint32_t const tid = threadIdx.x;
+  if (tid == 0) {
+    m = -INFINITY;
+    l = 0.0f;
+  }
+  for (std::uint32_t d = tid; d < kAttnHeadDim; d += kAttnMergeThreads) {
+    num[d] = 0.0f;
+  }
+  __syncthreads();
+  for (std::uint32_t s = 0; s < n_segments; ++s) {
+    std::size_t const off =
+        (static_cast<std::size_t>(h) * n_segments + s) *
+        static_cast<std::size_t>(kAttnPartialStride);
+    if (tid == 0) {
+      float const bm = partials[off];
+      float const bl = partials[off + 1u];
+      float const mn = fmaxf(m, bm);
+      old_scale = (m == -INFINITY) ? 0.0f : expf(m - mn);
+      tile_scale = (bm == -INFINITY) ? 0.0f : expf(bm - mn);
+      l = old_scale * l + tile_scale * bl;
+      m = mn;
+    }
+    __syncthreads();
+    for (std::uint32_t d = tid; d < kAttnHeadDim; d += kAttnMergeThreads) {
+      num[d] = old_scale * num[d] + tile_scale * partials[off + 2u + d];
+    }
+    __syncthreads();
+  }
+  if (tid == 0) {
+    for (std::uint32_t d = 0; d < kAttnHeadDim; ++d) {
+      float const a = (l > 0.0f) ? num[d] / l : 0.0f;
+      float const gate = bf16_to_fp32(g[static_cast<std::size_t>(h) * kAttnHeadDim + d]);
+      float const sig = 1.0f / (1.0f + expf(-gate));
+      float gated = a;
+      gated *= sig;
+      y_out[static_cast<std::size_t>(h) * kAttnHeadDim + d] =
+          fp32_to_bf16_rne(gated);
+    }
+  }
+}
+
 bool finite_pos(float x) noexcept {
   return x == x && x <= std::numeric_limits<float>::max() &&
          x >= std::numeric_limits<float>::lowest() && x > 0.0f;
@@ -210,6 +406,54 @@ std::expected<void, Error> launch_attention_prepare(
       qg, k_raw, v_raw, gamma_q, gamma_k, inv_freq, eps, pos, q_out, g_out, kv,
       attn_layer, capacity, token);
   return check(cudaGetLastError(), "attention_prepare_kernel");
+}
+
+std::expected<void, Error> launch_attention_scan(
+    std::uint16_t const* q, std::uint16_t const* kv, std::uint32_t attn_layer,
+    std::uint64_t capacity, std::uint64_t populated, float* partials,
+    std::uint32_t n_segments, Stream const& stream) {
+  auto st = require_stream(stream, "attention_scan");
+  if (!st) return st;
+  if (q == nullptr || kv == nullptr || partials == nullptr) {
+    return std::unexpected(make_error(ErrorCode::InvalidArgument, "attention_scan",
+                                       "null scan operand"));
+  }
+  if (attn_layer >= kAttnLayers) {
+    return std::unexpected(make_error(ErrorCode::InvalidArgument, "attention_scan",
+                                       "attn_layer must be < 16"));
+  }
+  if (capacity == 0 || populated > capacity) {
+    return std::unexpected(make_error(ErrorCode::InvalidArgument, "attention_scan",
+                                       "populated length exceeds capacity"));
+  }
+  if (n_segments == 0) return {};
+  auto const expected = static_cast<std::uint64_t>(n_segments) * kAttnSegmentKeys;
+  if (populated > expected) {
+    return std::unexpected(make_error(ErrorCode::InvalidArgument, "attention_scan",
+                                       "n_segments is smaller than populated length"));
+  }
+  attention_scan_kernel<<<dim3(kAttnQueryHeads, n_segments, 1), kAttnScanThreads, 0,
+                          stream.native()>>>(q, kv, attn_layer, capacity, populated,
+                                              partials, n_segments);
+  return check(cudaGetLastError(), "attention_scan_kernel");
+}
+
+std::expected<void, Error> launch_attention_merge(
+    float const* partials, std::uint16_t const* g, std::uint32_t n_segments,
+    std::uint16_t* y_out, Stream const& stream) {
+  auto st = require_stream(stream, "attention_merge");
+  if (!st) return st;
+  if (partials == nullptr || g == nullptr || y_out == nullptr) {
+    return std::unexpected(make_error(ErrorCode::InvalidArgument, "attention_merge",
+                                       "null merge operand"));
+  }
+  if (n_segments == 0) {
+    // There is no causal key; launch the same deterministic merge path with a
+    // zero segment count, which emits zero gated output.
+  }
+  attention_merge_kernel<<<kAttnQueryHeads, kAttnMergeThreads, 0, stream.native()>>>(
+      partials, g, n_segments, y_out);
+  return check(cudaGetLastError(), "attention_merge_kernel");
 }
 
 }  // namespace qw38::cuda

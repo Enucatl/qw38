@@ -30,3 +30,10 @@ target_compile_features(qw38_bench_gdn_mixer PRIVATE cxx_std_23)
 target_compile_options(qw38_bench_gdn_mixer PRIVATE
   $<$<COMPILE_LANGUAGE:CXX>:-Wall -Wextra -Wpedantic>
 )
+
+add_executable(qw38_bench_attention EXCLUDE_FROM_ALL attention_bench.cpp)
+target_link_libraries(qw38_bench_attention PRIVATE qw38_cuda)
+target_compile_features(qw38_bench_attention PRIVATE cxx_std_23)
+target_compile_options(qw38_bench_attention PRIVATE
+  $<$<COMPILE_LANGUAGE:CXX>:-Wall -Wextra -Wpedantic>
+)

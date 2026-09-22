@@ -337,6 +337,13 @@ target_compile_options(qw38_attention_unit_test PRIVATE
   $<$<COMPILE_LANGUAGE:CXX>:-Wall -Wextra -Wpedantic>
 )
 
+add_executable(qw38_attention_core_unit_test attention_core_unit_test.cpp)
+target_link_libraries(qw38_attention_core_unit_test PRIVATE qw38_cuda qw38_reference)
+target_compile_features(qw38_attention_core_unit_test PRIVATE cxx_std_23)
+target_compile_options(qw38_attention_core_unit_test PRIVATE
+  $<$<COMPILE_LANGUAGE:CXX>:-Wall -Wextra -Wpedantic>
+)
+
 add_executable(qw38_attention_reference_test attention_reference_test.cpp)
 target_link_libraries(qw38_attention_reference_test PRIVATE qw38_runtime qw38_compiler qw38_reference)
 target_compile_features(qw38_attention_reference_test PRIVATE cxx_std_23)
@@ -352,11 +359,12 @@ target_compile_options(qw38_attention_integration_test PRIVATE
 )
 
 add_test(NAME attention_unit COMMAND qw38_attention_unit_test)
+add_test(NAME attention_core_unit COMMAND qw38_attention_core_unit_test)
 add_test(NAME attention_reference COMMAND qw38_attention_reference_test)
 add_test(NAME attention_integration COMMAND qw38_attention_integration_test)
 
 set_tests_properties(
-  attention_unit attention_reference attention_integration
+  attention_unit attention_core_unit attention_reference attention_integration
   PROPERTIES
   LABELS "cuda;gpu;attention"
 )

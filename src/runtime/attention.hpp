@@ -91,10 +91,56 @@ struct AttentionPrepBindViews {
   std::uint32_t language_layer{};
 };
 
+// Attention core binds the prepared Q/g vectors and persistent cache to the
+// sequence-length partial workspace and the output projection.  Partials are
+// laid out [query_head, segment, (max,sum,numerator[256])].
+struct AttentionCoreBindViews {
+  TensorView q{};
+  TensorView g{};
+  TensorView kv{};
+  TensorView partials{};      // FP32, enough for all segments used by capacity
+  TensorView y{};             // BF16 [24,256], gated attention output
+  TensorView residual{};      // FP32 input residual
+  TensorView residual_out{};  // FP32 output residual
+  TensorView out{};           // [5120,6144] Q4/BF16 projection
+  TensorView out_scales{};
+  std::uint64_t* host_populated{nullptr};
+  std::uint64_t kv_capacity{};
+  std::uint32_t language_layer{};
+};
+
+struct AttentionCorePlan {
+  AttnWeightBinding out{};
+  TensorView q{};
+  TensorView g{};
+  TensorView kv{};
+  TensorView partials{};
+  TensorView y{};
+  TensorView residual{};
+  TensorView residual_out{};
+  std::uint64_t* host_populated{nullptr};
+  std::uint64_t kv_capacity{};
+  std::uint32_t attn_layer{};
+  qw38::cuda::Stream const* stream{nullptr};
+};
+
+struct AttentionMixerBindViews {
+  AttentionPrepBindViews prep{};
+  TensorView out{};
+  TensorView out_scales{};
+  TensorView residual_out{};
+};
+
+struct AttentionMixerPlan {
+  AttentionPrepPlan prep{};
+  AttentionCorePlan core{};
+};
+
 [[nodiscard]] std::string attn_norm_name(std::uint32_t layer);
 [[nodiscard]] std::string attn_q_name(std::uint32_t layer);
 [[nodiscard]] std::string attn_k_name(std::uint32_t layer);
 [[nodiscard]] std::string attn_v_name(std::uint32_t layer);
+[[nodiscard]] std::string attn_o_name(std::uint32_t layer);
 [[nodiscard]] std::string attn_q_norm_name(std::uint32_t layer);
 [[nodiscard]] std::string attn_k_norm_name(std::uint32_t layer);
 
@@ -109,9 +155,28 @@ struct AttentionPrepBindViews {
     Model const& model, Session& session, std::uint32_t layer,
     qw38::cuda::Stream const& stream, float eps = kAttnRmsEps);
 
+[[nodiscard]] std::expected<AttentionCorePlan, Error> bind_attention_core_plan(
+    AttentionCoreBindViews const& views, qw38::cuda::Stream const& stream);
+
+[[nodiscard]] std::expected<AttentionMixerPlan, Error> bind_attention_mixer_plan(
+    AttentionMixerBindViews const& views, qw38::cuda::Stream const& stream,
+    float eps = kAttnRmsEps);
+
+[[nodiscard]] std::expected<AttentionMixerPlan, Error> bind_attention_mixer_plan(
+    Model const& model, Session& session, std::uint32_t layer,
+    qw38::cuda::Stream const& stream, float eps = kAttnRmsEps);
+
 // Steps 1–3: RMS, one ranged Q4 q/g+k+v launch, fused QK-norm/RoPE + cache
 // append. Advances populated length only after successful work. No allocation.
 [[nodiscard]] std::expected<void, Error> execute_decode_attention_prep(
     AttentionPrepPlan const& plan, std::uint64_t position);
+
+// Preparation followed by ordered segmented scan, fixed-order merge, and
+// Q4/BF16 output projection plus direct FP32 residual add.
+[[nodiscard]] std::expected<TensorView, Error> execute_decode_attention(
+    AttentionMixerPlan const& plan, std::uint64_t position);
+
+[[nodiscard]] std::expected<TensorView, Error> execute_attention_core(
+    AttentionCorePlan const& plan);
 
 }  // namespace qw38::runtime

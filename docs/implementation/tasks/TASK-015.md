@@ -1,7 +1,7 @@
 # TASK-015 — Segmented online decode attention
 
 ## Status
-TODO
+DONE
 ## Milestone
 M5 — Attention execution
 ## Purpose
@@ -54,14 +54,68 @@ Diagnostic timings at populated lengths 512,4096,32768 where memory permits.
 On locked conflict stop with full blocker report; tuning limits do not authorize semantic/layout changes.
 ## Completion report
 ### Result
-DONE | BLOCKED
+DONE. Independent verification PASS (fresh Debug ctest 38/38; fresh Release
+attention ctest 4/4; RTX 5090 `sm_120` diagnostic benchmark at populated
+lengths 512, 4096, and 32768 with 5 warmups and 20 repetitions).
 ### Changes made
+- Corrected `tests/attention_core_unit_test.cpp` gate oracle to evaluate FP32
+  sigmoid at the BF16 `+80/-80` gate inputs, preserving nonzero negative-tail
+  coverage instead of hardcoding sigmoid(-80) to zero.
+- Added a two-segment (`populated=257`) CUDA core scenario with nonuniform
+  logits spanning `[-120,120]`, independent FP64-stabilized host softmax
+  comparison, finite per-segment partial checks, and BF16 output/gate checks.
+  This specifically exercises scan rescaling and increasing-index merge
+  rescaling.
+- Updated diagnostic `benchmarks/attention_bench.cpp` to use 5 warmups and 20
+  measured repetitions per length, reporting median, p99, and standard-error
+  uncertainty. It explicitly labels itself diagnostic-only.
 ### Tests run
-Exact commands/results.
-### Benchmark results
-Diagnostic identities/timings.
-### Architecture blocker
-None/full report.
-### Follow-up observations
-Concrete only.
+Hardware: NVIDIA GeForce RTX 5090 (32,607 MiB), driver 590.48.01, `sm_120`.
+Artifact: Docker image `qw38-dev:cuda13.4.1`, image ID
+`sha256:be0903b40ab2e14ec1b5ba285655219cc9e521cd1455b070a6dfdb68ed4e4bfb`;
+CUDA 13.4.1 (`nvcc` 13.4.59), CMake 3.28.3, GCC 14.2.0.
 
+Command:
+`docker run --gpus all --rm -u "$(id -u):$(id -g)" -v "$PWD":/workspace -w /workspace qw38-dev:cuda13.4.1 bash -lc 'cmake --build build/debug --target qw38_attention_core_unit_test qw38_bench_attention -j2'`
+Result: build passed. Final artifacts after the oracle-guard rebuild have
+core-unit binary SHA-256
+`3e410a04c1948d7953bcd02d01f943680c018beb1da7b3e0f86f110f7b4c3865`;
+benchmark binary SHA-256
+`4e15c66b62f8fc72c0e0b480f1cd607607137fcc95091755db58ea1701e2c7d8`.
+
+Final oracle-guard rebuild/run:
+`docker run --gpus all --rm -u "$(id -u):$(id -g)" -v "$PWD":/workspace -w /workspace qw38-dev:cuda13.4.1 bash -lc 'cmake --build build/debug --target qw38_attention_core_unit_test -j2 && ./build/debug/tests/qw38_attention_core_unit_test'`
+Result: build passed; `attention core unit ok`.
+
+Command:
+`docker run --gpus all --rm -u "$(id -u):$(id -g)" -v "$PWD":/workspace -w /workspace qw38-dev:cuda13.4.1 bash -lc './build/debug/tests/qw38_attention_core_unit_test'`
+Result: `attention core unit ok`.
+
+Command:
+`docker run --gpus all --rm -u "$(id -u):$(id -g)" -v "$PWD":/workspace -w /workspace qw38-dev:cuda13.4.1 bash -lc 'ctest --test-dir build/debug -R "attention_(unit|core_unit|reference|integration)$" --output-on-failure'`
+Result: 4/4 passed (`attention_unit` 2.84 s, `attention_core_unit` 0.21 s,
+`attention_reference` 13.04 s, `attention_integration` 7.26 s; total 23.36 s).
+
+Independent verification:
+- Fresh Debug `ctest --test-dir build/debug --output-on-failure`: 38/38 passed.
+- Fresh Release attention ctest: 4/4 passed.
+- The verifier also reran the diagnostic benchmark on NVIDIA GeForce RTX 5090
+  `sm_120` at populated lengths 512, 4096, and 32768 with 5 warmups and 20
+  measured repetitions, reporting median, p99, and standard error.
+### Benchmark results
+Command:
+`docker run --gpus all --rm -u "$(id -u):$(id -g)" -v "$PWD":/workspace -w /workspace qw38-dev:cuda13.4.1 bash -lc './build/debug/benchmarks/qw38_bench_attention'`
+
+Diagnostic identity: `sm_120`, 128 threads, 256-key segments, 32-key
+subtiles, 128 merge threads; 5 warmups and 20 repetitions; timings include
+the partial zero plus scan/merge launch sequence. Output (ms):
+
+| populated | segments | median | p99 | uncertainty (standard error) |
+|---:|---:|---:|---:|---:|
+| 512 | 2 | 0.167344 | 0.180444 | 0.000988623 |
+| 4096 | 16 | 0.206640 | 0.214420 | 0.000844191 |
+| 32768 | 128 | 1.017200 | 1.033520 | 0.00189285 |
+### Architecture blocker
+None.
+### Follow-up observations
+None.

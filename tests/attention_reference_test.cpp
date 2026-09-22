@@ -2,6 +2,7 @@
 
 #include "cuda/copy.hpp"
 
+#include <cmath>
 #include <cstdint>
 #include <iostream>
 #include <span>
@@ -35,6 +36,7 @@ using qw38::attn::test::make_host_q4;
 using qw38::attn::test::upload_host_attn;
 using qw38::cuda::Stream;
 using qw38::reference::attn_prep_reference;
+using qw38::reference::attn_online_core;
 using qw38::runtime::bind_attention_prep_plan;
 using qw38::runtime::bind_attention_workspace;
 using qw38::runtime::execute_decode_attention_prep;
@@ -45,6 +47,49 @@ using qw38::runtime::kAttnOffQg;
 using qw38::runtime::kAttnOffV;
 
 namespace {
+
+bool compare_online_lengths() {
+  constexpr std::uint64_t capacity = 257;
+  constexpr std::uint64_t kv_elems = 16ull * 2ull * kKvHeads * capacity * kHeadDim;
+  std::vector<std::uint16_t> q(kQueryHeads * kHeadDim, 0);
+  std::vector<std::uint16_t> g(kQueryHeads * kHeadDim, 0);
+  std::vector<std::uint16_t> kv(kv_elems, 0);
+  auto kv_index = [&](std::uint32_t component, std::uint32_t h,
+                      std::uint64_t t, std::uint32_t d) {
+    auto const hs = capacity * kHeadDim;
+    auto const cs = kKvHeads * hs;
+    return component * cs + h * hs + t * kHeadDim + d;
+  };
+  for (std::uint32_t h = 0; h < kKvHeads; ++h) {
+    for (std::uint64_t t = 0; t < capacity; ++t) {
+      auto const bits = qw38::format::fp32_to_bf16_rne(
+          0.01f * static_cast<float>(h + 1u) * static_cast<float>(t + 1u));
+      for (std::uint32_t d = 0; d < kHeadDim; ++d) {
+        kv[kv_index(1, h, t, d)] = bits;
+      }
+    }
+  }
+  for (std::uint64_t length : {0ull, 1ull, 31ull, 32ull, 255ull, 256ull,
+                               257ull}) {
+    auto segmented = attn_online_core(q, g, kv, 0, capacity, length, true);
+    auto unsegmented = attn_online_core(q, g, kv, 0, capacity, length, false);
+    if (!segmented || !unsegmented) {
+      fail("online reference bind length " + std::to_string(length));
+      return false;
+    }
+    for (std::size_t i = 0; i < segmented->attn.size(); ++i) {
+      float const a = segmented->attn[i];
+      float const b = unsegmented->attn[i];
+      float const scale = std::fmax(1.0f, std::fabs(b));
+      if (std::fabs(a - b) > 2.0e-5f * scale ||
+          segmented->y[i] != unsegmented->y[i]) {
+        fail("segmented/unsegmented mismatch length " + std::to_string(length));
+        return false;
+      }
+    }
+  }
+  return true;
+}
 
 bool compare_prep(DeviceAttn& dev, HostAttn const& host, Stream const& stream,
                   std::int32_t position, std::string_view tag) {
@@ -178,6 +223,7 @@ int main() {
   }
   run_family(true, "q4", *stream);
   run_family(false, "bf16-control", *stream);
+  expect(compare_online_lengths(), "segmented online reference boundaries");
   if (g_failures != 0) {
     std::cerr << g_failures << " attention reference failures\n";
     return 1;

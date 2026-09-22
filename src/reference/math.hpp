@@ -27,6 +27,9 @@ inline constexpr std::uint32_t kKvHeads = 4;
 inline constexpr std::uint32_t kGqaGroup = 6;
 inline constexpr std::uint32_t kQgWidth = 12288;
 inline constexpr std::uint32_t kAttnKvWidth = 1024;
+inline constexpr std::uint32_t kAttnOutWidth = 6144;
+inline constexpr std::uint32_t kAttnSegmentKeys = 256;
+inline constexpr float kAttnScale = 1.0f / 16.0f;
 inline constexpr std::uint32_t kKvComponentK = 0;
 inline constexpr std::uint32_t kKvComponentV = 1;
 inline constexpr std::uint32_t kConvKernel = 4;
@@ -83,6 +86,14 @@ inline constexpr float kAttnPrepSmallAbs = 2.0e-2f;
 inline constexpr float kAttnPrepSmallRel = 1.0e-3f;
 inline constexpr float kAttnPrepLargeAbs = 5.0e-2f;
 inline constexpr float kAttnPrepLargeRel = 1.0e-3f;
+// Segmented online softmax: sequential vs CUDA subtile/warp reduction, then
+// one BF16 gated store and Q4/BF16 o_proj residual-add.
+inline constexpr float kAttnOnlineFp32Abs = 2.0e-3f;
+inline constexpr float kAttnOnlineFp32Rel = 1.0e-4f;
+inline constexpr float kAttnGateBf16Abs = 2.0e-2f;
+inline constexpr float kAttnGateBf16Rel = 1.0e-3f;
+inline constexpr float kAttnMixerResidualAbs = 5.0e-2f;
+inline constexpr float kAttnMixerResidualRel = 1.0e-3f;
 }  // namespace tol
 
 [[nodiscard]] bool eps_ok(float eps) noexcept;
@@ -284,6 +295,35 @@ struct AttnPrepReference {
     std::span<std::uint16_t const> w_k, std::span<std::uint16_t const> w_v,
     std::span<std::uint16_t const> gamma_q, std::span<std::uint16_t const> gamma_k,
     std::span<float const> inv_freq, std::int32_t position);
+
+// Independent FP32 online GQA attention. Segmented uses 256-key chunks and
+// merges in increasing segment index; unsegmented is one online pass over
+// [0, populated). No quadratic score matrix. Sigmoid gate then BF16 y.
+struct AttnCoreReference {
+  std::vector<float> attn;       // FP32 [24,256] after normalize, before gate
+  std::vector<std::uint16_t> y;  // BF16 gated [24,256]
+};
+
+[[nodiscard]] std::expected<AttnCoreReference, Error> attn_online_core(
+    std::span<std::uint16_t const> q, std::span<std::uint16_t const> g,
+    std::span<std::uint16_t const> kv, std::uint32_t attn_layer,
+    std::uint64_t capacity, std::uint64_t populated, bool segmented);
+
+struct AttnMixerReference {
+  AttnPrepReference prep;
+  AttnCoreReference core;
+  std::vector<std::uint16_t> kv;
+  std::vector<float> residual;  // h + o_proj(y); input residual is not mutated
+};
+
+[[nodiscard]] std::expected<AttnMixerReference, Error> attn_mixer_reference(
+    std::span<float const> residual, std::span<std::uint16_t const> gamma,
+    float eps, std::span<std::uint16_t const> w_qg,
+    std::span<std::uint16_t const> w_k, std::span<std::uint16_t const> w_v,
+    std::span<std::uint16_t const> w_o, std::span<std::uint16_t const> gamma_q,
+    std::span<std::uint16_t const> gamma_k, std::span<float const> inv_freq,
+    std::span<std::uint16_t const> kv_in, std::uint32_t attn_layer,
+    std::uint64_t capacity, std::uint64_t token, bool segmented);
 
 // Simple row-major BF16 GEMV: y_n = Σ_k BF16(W_nk)*BF16(x_k) in FP32.
 [[nodiscard]] std::expected<void, Error> dense_gemv_bf16(

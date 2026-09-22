@@ -34,6 +34,7 @@ inline constexpr std::uint32_t kKvComponentK = 0;
 inline constexpr std::uint32_t kKvComponentV = 1;
 inline constexpr std::uint32_t kQgWidth = 12288;     // 2 * 24 * 256
 inline constexpr std::uint32_t kAttnKvWidth = 1024;  // 4 * 256
+inline constexpr std::uint32_t kAttnOutWidth = 6144; // 24 * 256 gated y / o_proj K
 inline constexpr std::uint32_t kHidden = 5120;
 inline constexpr std::uint32_t kFfnWidth = 17408;
 inline constexpr std::uint32_t kVocab = 248320;
@@ -118,6 +119,32 @@ inline constexpr std::uint64_t kAttnOffG = 40960;          // BF16 [24, 256]
 inline constexpr std::uint64_t kAttnBytesG = 12288;
 inline constexpr std::uint64_t kAttnOffPartials = 53248;   // FP32 TASK-015
 inline constexpr std::uint64_t kAttnBytesPartials = 24768;
+// T-03 decode attention geometry. Tuning, not ABI.
+inline constexpr std::uint32_t kAttnSegmentKeys = 256;
+inline constexpr std::uint32_t kAttnSubtileKeys = 32;
+inline constexpr std::uint32_t kAttnPartialStride = 2u + kHeadDim;  // max, sum, num[256]
+inline constexpr float kAttnScale = 1.0f / 16.0f;  // 1/sqrt(256)
+
+[[nodiscard]] constexpr std::uint64_t attn_segment_count(
+    std::uint64_t populated) noexcept {
+  if (populated == 0) {
+    return 0;
+  }
+  return (populated + (kAttnSegmentKeys - 1u)) / kAttnSegmentKeys;
+}
+
+[[nodiscard]] constexpr std::uint64_t attn_partials_bytes(
+    std::uint64_t n_segments) noexcept {
+  return n_segments * static_cast<std::uint64_t>(kQueryHeads) *
+         kAttnPartialStride * qw38::format::kFp32Size;
+}
+
+[[nodiscard]] constexpr std::uint64_t attn_workspace_bytes_for_segments(
+    std::uint64_t n_segments) noexcept {
+  std::uint64_t const need = kAttnOffPartials + attn_partials_bytes(n_segments);
+  return need < kAttentionWorkspaceBytesPerToken ? kAttentionWorkspaceBytesPerToken
+                                                 : need;
+}
 
 static_assert(kAttnOffK == kAttnOffQg + kAttnBytesQg);
 static_assert(kAttnOffV == kAttnOffK + kAttnBytesK);
@@ -133,6 +160,12 @@ static_assert(kAttnBytesQ == static_cast<std::uint64_t>(kQueryHeads) *
 static_assert(kAttnBytesPartials ==
               static_cast<std::uint64_t>(kQueryHeads) * (2u + kHeadDim) *
                   qw38::format::kFp32Size);
+static_assert(kAttnOutWidth == kQueryHeads * kHeadDim);
+static_assert(kAttnPartialStride == 2u + kHeadDim);
+static_assert(kAttnBytesPartials == attn_partials_bytes(1));
+static_assert(kAttnSubtileKeys * 8u == kAttnSegmentKeys);
+static_assert(kAttnSubtileKeys * kHeadDim * qw38::format::kBf16Size ==
+              16384u);  // 16 KiB K or V staging bound
 
 [[nodiscard]] std::expected<std::uint64_t, Error> kv_cache_bytes(
     std::uint64_t capacity);

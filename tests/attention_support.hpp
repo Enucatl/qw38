@@ -43,6 +43,7 @@ using qw38::format::PhysicalLayoutId;
 using qw38::format::StorageClass;
 using qw38::format::fp32_to_bf16_rne;
 using qw38::reference::kAttnKvWidth;
+using qw38::reference::kAttnOutWidth;
 using qw38::reference::kDefaultRmsEps;
 using qw38::reference::kHeadDim;
 using qw38::reference::kHidden;
@@ -93,9 +94,11 @@ struct HostAttn {
   qw38::format::PackedMatrix qg;
   qw38::format::PackedMatrix k;
   qw38::format::PackedMatrix v;
+  qw38::format::PackedMatrix o;
   std::vector<std::uint16_t> w_qg;
   std::vector<std::uint16_t> w_k;
   std::vector<std::uint16_t> w_v;
+  std::vector<std::uint16_t> w_o;
   std::vector<std::uint16_t> gamma;
   std::vector<std::uint16_t> gamma_q;
   std::vector<std::uint16_t> gamma_k;
@@ -228,24 +231,29 @@ inline bool make_host_q4(HostAttn& host, std::int8_t seed) {
   auto qg = make_logical(LogicalQuantizerId::Q4G64V0, kQgWidth, kHidden, 1, 0x3C00);
   auto k = make_logical(LogicalQuantizerId::Q4G64V0, kAttnKvWidth, kHidden, 2, 0x3C00);
   auto v = make_logical(LogicalQuantizerId::Q4G64V0, kAttnKvWidth, kHidden, -1, 0x3A00);
+  auto o = make_logical(LogicalQuantizerId::Q4G64V0, kHidden, kAttnOutWidth, 1, 0x3A00);
   fill_logical_pattern(qg, seed);
   fill_logical_pattern(k, static_cast<std::int8_t>(seed + 1));
   fill_logical_pattern(v, static_cast<std::int8_t>(seed + 2));
+  fill_logical_pattern(o, static_cast<std::int8_t>(seed + 3));
   if (!pack_q4_from_logical(qg, host.qg, "qg") ||
       !pack_q4_from_logical(k, host.k, "k") ||
-      !pack_q4_from_logical(v, host.v, "v")) {
+      !pack_q4_from_logical(v, host.v, "v") ||
+      !pack_q4_from_logical(o, host.o, "o")) {
     return false;
   }
   auto wqg = qw38::mlp::test::decoded_weights(host.qg);
   auto wk = qw38::mlp::test::decoded_weights(host.k);
   auto wv = qw38::mlp::test::decoded_weights(host.v);
-  if (!wqg || !wk || !wv) {
+  auto wo = qw38::mlp::test::decoded_weights(host.o);
+  if (!wqg || !wk || !wv || !wo) {
     fail("decode packed attention weights");
     return false;
   }
   host.w_qg = std::move(*wqg);
   host.w_k = std::move(*wk);
   host.w_v = std::move(*wv);
+  host.w_o = std::move(*wo);
   host.gamma = pattern_h(kHidden, 0.15f);
   host.gamma_q = pattern_h(kHeadDim, 0.08f);
   host.gamma_k = pattern_h(kHeadDim, -0.05f);
