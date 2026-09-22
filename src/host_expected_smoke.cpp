@@ -1,5 +1,6 @@
 #include <expected>
 #include <iostream>
+#include <limits>
 #include <string>
 #include <string_view>
 
@@ -25,11 +26,10 @@ std::expected<int, SmokeError> add_checked(int a, int b) {
   if (!right) {
     return std::unexpected(right.error());
   }
-  const int sum = *left + *right;
-  if (sum < *left) {
+  if (*left > std::numeric_limits<int>::max() - *right) {
     return std::unexpected(SmokeError::overflow);
   }
-  return sum;
+  return *left + *right;
 }
 
 bool expect_error(std::expected<int, SmokeError> const& result, SmokeError want,
@@ -54,7 +54,9 @@ int main() {
     return 1;
   }
   if (!expect_error(add_checked(-1, 2), SmokeError::non_positive, "left") ||
-      !expect_error(add_checked(2, 0), SmokeError::non_positive, "right")) {
+      !expect_error(add_checked(2, 0), SmokeError::non_positive, "right") ||
+      !expect_error(add_checked(std::numeric_limits<int>::max(), 1),
+                    SmokeError::overflow, "overflow")) {
     return 1;
   }
   std::cout << "host std::expected smoke ok\n";
