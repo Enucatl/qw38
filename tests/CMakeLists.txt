@@ -70,7 +70,7 @@ add_test(NAME cuda_runtime_smoke COMMAND qw38_cuda_runtime_smoke)
 add_test(
   NAME cuda_sm120_cubin
   COMMAND bash "${CMAKE_SOURCE_DIR}/tests/check_sm120_cubin.sh"
-          $<TARGET_FILE:qw38_cuda_runtime_smoke>
+          $<TARGET_FILE:qw38_decode_mmv_unit_test>
 )
 
 set_tests_properties(
@@ -264,6 +264,12 @@ target_link_libraries(qw38_decode_mmv_unit_test PRIVATE qw38_compiler qw38_cuda)
 target_compile_features(qw38_decode_mmv_unit_test PRIVATE cxx_std_23)
 target_compile_options(qw38_decode_mmv_unit_test PRIVATE
   $<$<COMPILE_LANGUAGE:CXX>:-Wall -Wextra -Wpedantic>
+)
+add_custom_target(qw38_cuda_sm120_cubin_test
+  COMMAND bash "${CMAKE_SOURCE_DIR}/tests/check_sm120_cubin.sh"
+          $<TARGET_FILE:qw38_decode_mmv_unit_test>
+  DEPENDS qw38_decode_mmv_unit_test
+  VERBATIM
 )
 
 add_executable(qw38_decode_mmv_reference_test decode_mmv_reference_test.cpp)

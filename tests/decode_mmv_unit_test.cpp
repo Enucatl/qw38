@@ -269,6 +269,29 @@ void test_padding_and_epilogues(Stream const& stream) {
   bad_alignment.codes.alignment = 8;
   expect(!launch_decode_mmv(bad_alignment, stream),
          "insufficient weight alignment rejects");
+  auto unaligned_q4 = d;
+  unaligned_q4.codes.pointer =
+      static_cast<std::byte*>(unaligned_q4.codes.pointer) + 1;
+  expect(!launch_decode_mmv(unaligned_q4, stream),
+         "unaligned Q4 packed-word span rejects");
+
+  auto q8 = d;
+  q8.layout = qw38::cuda::kDecodeLayoutQ8G32V0;
+  q8.quantizer = kDecodeQuantizerQ8G32V0;
+  q8.codes = qw38::cuda::decode_matrix_view(
+      d_codes->as_bytes(), qw38::cuda::DecodeDtype::Q8, q8.layout,
+      q8.n, q8.k, q8.padded_n, q8.padded_k,
+      decode_code_bytes(q8.layout, q8.padded_n, q8.padded_k), 16);
+  q8.scales = qw38::cuda::decode_matrix_view(
+      d_scales->as_bytes(), qw38::cuda::DecodeDtype::Fp16, q8.layout,
+      q8.padded_n, q8.padded_k / 32u, q8.padded_n, q8.padded_k / 32u,
+      decode_scale_bytes(q8.layout, q8.padded_n, q8.padded_k), 2);
+  auto unaligned_q8 = q8;
+  unaligned_q8.codes.pointer =
+      static_cast<std::byte*>(unaligned_q8.codes.pointer) + 4;
+  expect(!launch_decode_mmv(unaligned_q8, stream),
+         "unaligned Q8 packed-word span rejects");
+
   auto bad_overlap = d;
   bad_overlap.output.pointer = bad_overlap.input.pointer;
   expect(!launch_decode_mmv(bad_overlap, stream),

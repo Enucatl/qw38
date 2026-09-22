@@ -3,7 +3,6 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
-#include <cstring>
 #include <limits>
 
 namespace qw38::cuda {
@@ -90,8 +89,7 @@ __device__ void decode8(std::byte const* codes, std::byte const* scales,
                         std::uint64_t tile_row, int lane, float out[8]) {
   if constexpr (Kind == WeightKind::Q4) {
     auto const* row = codes + tile_row * 128u + static_cast<std::uint32_t>(lane) * 4u;
-    std::uint32_t word;
-    std::memcpy(&word, row, sizeof(word));
+    auto const word = *reinterpret_cast<std::uint32_t const*>(row);
     int const group = lane >> 3;
     std::uint16_t scale_bits = 0;
     if ((lane & 7) == 0) {
@@ -108,8 +106,7 @@ __device__ void decode8(std::byte const* codes, std::byte const* scales,
     }
   } else if constexpr (Kind == WeightKind::Q8) {
     auto const* row = codes + tile_row * 256u + static_cast<std::uint32_t>(lane) * 8u;
-    std::uint64_t word;
-    std::memcpy(&word, row, sizeof(word));
+    auto const word = *reinterpret_cast<std::uint64_t const*>(row);
     int const group = lane >> 2;
     std::uint16_t scale_bits = 0;
     if ((lane & 3) == 0) {
