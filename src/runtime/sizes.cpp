@@ -182,19 +182,9 @@ std::expected<void, Error> require_language_state(
                                         "missing V0 language state kind"));
     }
     auto const& got = *it;
-    if (got.kind != w.kind || got.dtype != w.dtype || got.layout != w.layout ||
-        got.layer_count != w.layer_count ||
-        got.component_count != w.component_count ||
-        got.shape_per_layer != w.shape_per_layer ||
-        got.bytes_per_token != w.bytes_per_token) {
+    if (got != w) {
       return std::unexpected(make_error(ErrorCode::MalformedArtifact, "state",
                                         "state schema does not match V0 language"));
-    }
-    if (got.kind != qw38::format::StateKind::KvCache &&
-        (got.bytes_per_layer != w.bytes_per_layer ||
-         got.total_bytes != w.total_bytes)) {
-      return std::unexpected(make_error(ErrorCode::MalformedArtifact, "state",
-                                        "fixed state byte counts mismatch"));
     }
   }
   return {};

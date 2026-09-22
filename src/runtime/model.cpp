@@ -3,6 +3,7 @@
 #include "cuda/stream.hpp"
 #include "cuda/upload.hpp"
 #include "format/constants.hpp"
+#include "runtime/sizes.hpp"
 
 #include <new>
 #include <stdexcept>
@@ -142,6 +143,12 @@ std::expected<Model, Error> Model::upload(qw38::format::Artifact const& artifact
   // boundary so no future Artifact construction path can bypass it.
   if (auto st = qw38::format::validate_schema(model.schema_); !st) {
     return std::unexpected(from_format(st.error()));
+  }
+  if (auto st = require_language_state(model.state()); !st) {
+    return std::unexpected(st.error());
+  }
+  if (auto st = require_language_scratch(model.scratch()); !st) {
+    return std::unexpected(st.error());
   }
 
   // Host-side span checks happen before any device allocation.

@@ -170,6 +170,42 @@ int main() {
   expect(qw38::cuda::malloc_count() == mallocs_before_load,
          "corrupt full artifact allocates no device memory");
 
+  auto incompatible_path = dir.file("fixed-capacity-state.qw38");
+  auto incompatible_schema = qw38::format::test::base_schema();
+  incompatible_schema.tensors.push_back(
+      qw38::format::test::unplaced_bf16_vector(1, "v", 4));
+  auto incompatible_state = qw38::runtime::language_persistent_schema();
+  incompatible_state[2].declared_capacity = 1;
+  incompatible_state[2].bytes_per_layer = 4096;
+  incompatible_state[2].total_bytes =
+      incompatible_state[2].bytes_per_token;
+  incompatible_schema.state.assign(incompatible_state.begin(),
+                                   incompatible_state.end());
+  incompatible_schema.scratch = qw38::runtime::test::language_scratch();
+  auto incompatible_writer =
+      qw38::format::ArtifactWriter::create(incompatible_path,
+                                           incompatible_schema);
+  expect(static_cast<bool>(incompatible_writer),
+         "create format-valid runtime-incompatible artifact");
+  if (incompatible_writer) {
+    expect(static_cast<bool>(incompatible_writer->write_span(
+               "v", qw38::format::SpanKind::Payload, fx.payload)) &&
+               static_cast<bool>(incompatible_writer->finalize()),
+           "write format-valid runtime-incompatible artifact");
+  }
+  auto incompatible_artifact =
+      qw38::format::Artifact::open(incompatible_path);
+  expect(static_cast<bool>(incompatible_artifact),
+         "runtime-incompatible artifact remains format-valid");
+  if (incompatible_artifact) {
+    auto incompatible = rt->upload(*incompatible_artifact);
+    expect(!incompatible &&
+               incompatible.error().code == ErrorCode::MalformedArtifact,
+           "runtime-incompatible artifact rejected during upload preflight");
+  }
+  expect(qw38::cuda::malloc_count() == mallocs_before_load,
+         "runtime-incompatible artifact allocates no device memory");
+
   auto model = rt->load(fx.path);
   expect(static_cast<bool>(model), "upload fixture");
   if (!model) {
