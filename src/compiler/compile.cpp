@@ -16,6 +16,7 @@
 #include <cstring>
 #include <fstream>
 #include <initializer_list>
+#include <limits>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -86,6 +87,42 @@ TensorShape artifact_shape(ExpectedTensor const& exp) {
     return make_shape({exp.shape.dims[0], exp.shape.dims[1]});
   }
   return make_shape({exp.shape.dims[0], exp.shape.dims[1], exp.shape.dims[2]});
+}
+
+std::expected<std::uint64_t, CompilerError> expected_tensor_bytes(
+    ExpectedTensor const& tensor) {
+  if (tensor.shape.rank == 0 || tensor.shape.rank > tensor.shape.dims.size()) {
+    return std::unexpected(make_error(CompilerErrorCode::ShapeMismatch,
+                                      tensor.name, "shape rank must be 1..3"));
+  }
+  std::uint64_t elements = 1;
+  for (std::uint8_t i = 0; i < tensor.shape.rank; ++i) {
+    auto const dim = tensor.shape.dims[i];
+    if (dim == 0) {
+      return std::unexpected(make_error(CompilerErrorCode::ShapeMismatch,
+                                        tensor.name,
+                                        "shape extents must be nonzero"));
+    }
+    if (elements > std::numeric_limits<std::uint64_t>::max() / dim) {
+      return std::unexpected(make_error(CompilerErrorCode::Unrepresentable,
+                                        tensor.name,
+                                        "shape element count overflows uint64"));
+    }
+    elements *= dim;
+  }
+  for (std::size_t i = tensor.shape.rank; i < tensor.shape.dims.size(); ++i) {
+    if (tensor.shape.dims[i] != 0) {
+      return std::unexpected(make_error(CompilerErrorCode::ShapeMismatch,
+                                        tensor.name,
+                                        "unused shape dimensions must be zero"));
+    }
+  }
+  if (elements > std::numeric_limits<std::uint64_t>::max() / 2) {
+    return std::unexpected(make_error(CompilerErrorCode::Unrepresentable,
+                                      tensor.name,
+                                      "BF16 byte size overflows uint64"));
+  }
+  return elements * 2;
 }
 
 LogicalPhysicalMapping mapping_for(PhysicalLayoutId layout) {
@@ -439,6 +476,10 @@ std::expected<ArtifactSchema, CompilerError> build_schema(
   std::uint32_t lm_head_id = 0;
   std::uint32_t next_id = 1;
   for (auto const& item : classified.included) {
+    auto const source_bytes = expected_tensor_bytes(item.expected);
+    if (!source_bytes) {
+      return std::unexpected(source_bytes.error());
+    }
     TensorRecord rec{};
     rec.tensor_id = next_id++;
     rec.logical_name = item.expected.name;
@@ -781,6 +822,15 @@ std::expected<CompileResult, CompilerError> compile_synthetic(
   ClassifiedCheckpoint classified{};
   classified.included.reserve(tensors.size());
   for (auto& t : tensors) {
+    auto expected_bytes = expected_tensor_bytes(t.expected);
+    if (!expected_bytes) {
+      return std::unexpected(expected_bytes.error());
+    }
+    if (t.bytes.size() != *expected_bytes) {
+      return std::unexpected(make_error(CompilerErrorCode::ShapeMismatch,
+                                        t.expected.name,
+                                        "synthetic BF16 byte length mismatch"));
+    }
     SourceTensor src{};
     src.name = t.expected.name;
     src.dtype = "BF16";

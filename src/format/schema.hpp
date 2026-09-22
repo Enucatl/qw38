@@ -11,6 +11,7 @@
 #include <expected>
 #include <span>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace qw38::format {
@@ -35,12 +36,12 @@ struct TensorShape {
   std::array<std::uint64_t, kMaxRank> logical{};
   std::array<std::uint64_t, kMaxRank> padded{};
 
-  [[nodiscard]] std::span<std::uint64_t const> logical_dims() const noexcept {
-    return std::span<std::uint64_t const>{logical.data(), rank};
-  }
-  [[nodiscard]] std::span<std::uint64_t const> padded_dims() const noexcept {
-    return std::span<std::uint64_t const>{padded.data(), rank};
-  }
+  [[nodiscard]] std::expected<std::span<std::uint64_t const>, FormatError>
+  logical_dims(std::uint64_t offset = 0,
+               std::string_view field = "shape") const noexcept;
+  [[nodiscard]] std::expected<std::span<std::uint64_t const>, FormatError>
+  padded_dims(std::uint64_t offset = 0,
+              std::string_view field = "shape") const noexcept;
 
   friend bool operator==(TensorShape const&, TensorShape const&) = default;
 };

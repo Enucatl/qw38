@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <array>
 #include <cerrno>
+#include <cmath>
 #include <cstring>
 #include <fcntl.h>
 #include <fstream>
@@ -35,17 +36,11 @@ std::expected<std::uint64_t, CompilerError> require_u64(Json const& obj,
     return std::unexpected(make_error(CompilerErrorCode::InvalidConfig, field,
                                       std::string(key) + " missing"));
   }
-  double const d = v->as_number();
-  if (d < 0 || d > static_cast<double>(std::numeric_limits<std::uint64_t>::max())) {
-    return std::unexpected(make_error(CompilerErrorCode::InvalidConfig, field,
-                                      std::string(key) + " out of range"));
+  auto n = parse_json_u64(*v, std::string(field) + "." + std::string(key));
+  if (!n) {
+    return std::unexpected(n.error());
   }
-  auto const n = static_cast<std::uint64_t>(d);
-  if (static_cast<double>(n) != d) {
-    return std::unexpected(make_error(CompilerErrorCode::InvalidConfig, field,
-                                      std::string(key) + " is not an integer"));
-  }
-  return n;
+  return *n;
 }
 
 std::expected<bool, CompilerError> require_bool(Json const& obj,
@@ -57,6 +52,19 @@ std::expected<bool, CompilerError> require_bool(Json const& obj,
                                       std::string(key) + " missing"));
   }
   return v->as_bool();
+}
+
+std::expected<std::uint32_t, CompilerError> require_u32(
+    Json const& obj, std::string_view key, std::string_view field) {
+  auto value = require_u64(obj, key, field);
+  if (!value) {
+    return std::unexpected(value.error());
+  }
+  if (*value > std::numeric_limits<std::uint32_t>::max()) {
+    return std::unexpected(make_error(CompilerErrorCode::InvalidConfig, field,
+                                      std::string(key) + " exceeds uint32"));
+  }
+  return static_cast<std::uint32_t>(*value);
 }
 
 std::expected<std::string, CompilerError> require_string(
@@ -95,6 +103,57 @@ std::expected<std::uint64_t, CompilerError> read_u64_le(
 }
 
 }  // namespace
+
+std::expected<std::uint64_t, CompilerError> parse_json_u64(
+    Json const& value, std::string_view field) {
+  if (!value.is_number()) {
+    return std::unexpected(make_error(CompilerErrorCode::InvalidJson, field,
+                                      "expected an integer"));
+  }
+  double const number = value.as_number();
+  if (!std::isfinite(number)) {
+    return std::unexpected(make_error(CompilerErrorCode::InvalidJson, field,
+                                      "integer must be finite"));
+  }
+  if (number < 0) {
+    return std::unexpected(make_error(CompilerErrorCode::InvalidJson, field,
+                                      "integer must be nonnegative"));
+  }
+  if (std::trunc(number) != number) {
+    return std::unexpected(make_error(CompilerErrorCode::InvalidJson, field,
+                                      "integer must not be fractional"));
+  }
+  // 2^64 is exactly representable as double, while UINT64_MAX is not.
+  if (number >= std::ldexp(1.0, 64)) {
+    return std::unexpected(make_error(CompilerErrorCode::InvalidJson, field,
+                                      "integer is not representable as uint64"));
+  }
+  return static_cast<std::uint64_t>(number);
+}
+
+std::expected<std::vector<std::uint64_t>, CompilerError>
+parse_safetensors_shape(Json const& value, std::string_view field) {
+  if (!value.is_array()) {
+    return std::unexpected(make_error(CompilerErrorCode::InvalidJson, field,
+                                      "shape is not an array"));
+  }
+  auto const& values = value.as_array();
+  if (values.empty() || values.size() > qw38::format::kMaxRank) {
+    return std::unexpected(make_error(CompilerErrorCode::ShapeMismatch, field,
+                                      "shape rank must be 1..8"));
+  }
+  std::vector<std::uint64_t> shape;
+  shape.reserve(values.size());
+  for (std::size_t i = 0; i < values.size(); ++i) {
+    auto dim = parse_json_u64(values[i],
+                              std::string(field) + "[" + std::to_string(i) + "]");
+    if (!dim) {
+      return std::unexpected(dim.error());
+    }
+    shape.push_back(*dim);
+  }
+  return shape;
+}
 
 MappedShard::MappedShard(MappedShard&& other) noexcept
     : fd_(other.fd_), addr_(other.addr_), size_(other.size_) {
@@ -174,10 +233,16 @@ MappedShard::tensor_bytes(SourceTensor const& tensor) const {
   if (!header_len) {
     return std::unexpected(header_len.error());
   }
+  if (*header_len > file.size() - 8) {
+    return std::unexpected(io(tensor.name, "safetensor header overruns file"));
+  }
   auto const payload_base = 8 + *header_len;
+  if (tensor.data_offset > file.size() - payload_base) {
+    return std::unexpected(make_error(CompilerErrorCode::ShapeMismatch, tensor.name,
+                                      "safetensor payload is out of range"));
+  }
   auto const start = payload_base + tensor.data_offset;
-  auto const end = start + tensor.nbytes;
-  if (end < start || end > file.size()) {
+  if (tensor.nbytes > file.size() - start) {
     return std::unexpected(make_error(CompilerErrorCode::ShapeMismatch, tensor.name,
                                       "safetensor payload is out of range"));
   }
@@ -260,17 +325,17 @@ std::expected<ArchitectureConfig, CompilerError> parse_text_config(
   auto hidden = require_u64(tc, "hidden_size", "text_config");
   auto inter = require_u64(tc, "intermediate_size", "text_config");
   auto vocab = require_u64(tc, "vocab_size", "text_config");
-  auto layers = require_u64(tc, "num_hidden_layers", "text_config");
-  auto heads = require_u64(tc, "num_attention_heads", "text_config");
-  auto kv = require_u64(tc, "num_key_value_heads", "text_config");
+  auto layers = require_u32(tc, "num_hidden_layers", "text_config");
+  auto heads = require_u32(tc, "num_attention_heads", "text_config");
+  auto kv = require_u32(tc, "num_key_value_heads", "text_config");
   auto head_dim = require_u64(tc, "head_dim", "text_config");
-  auto interval = require_u64(tc, "full_attention_interval", "text_config");
+  auto interval = require_u32(tc, "full_attention_interval", "text_config");
   auto conv = require_u64(tc, "linear_conv_kernel_dim", "text_config");
   auto lk = require_u64(tc, "linear_key_head_dim", "text_config");
   auto lv = require_u64(tc, "linear_value_head_dim", "text_config");
   auto nlk = require_u64(tc, "linear_num_key_heads", "text_config");
   auto nlv = require_u64(tc, "linear_num_value_heads", "text_config");
-  auto mtp_layers = require_u64(tc, "mtp_num_hidden_layers", "text_config");
+  auto mtp_layers = require_u32(tc, "mtp_num_hidden_layers", "text_config");
   auto dtype = require_string(tc, "dtype", "text_config");
   auto ssm = require_string(tc, "mamba_ssm_dtype", "text_config");
   auto mtp_ded = require_bool(tc, "mtp_use_dedicated_embeddings", "text_config");
@@ -288,17 +353,17 @@ std::expected<ArchitectureConfig, CompilerError> parse_text_config(
   cfg.hidden_size = *hidden;
   cfg.intermediate_size = *inter;
   cfg.vocab_size = *vocab;
-  cfg.num_hidden_layers = static_cast<std::uint32_t>(*layers);
-  cfg.num_attention_heads = static_cast<std::uint32_t>(*heads);
-  cfg.num_key_value_heads = static_cast<std::uint32_t>(*kv);
+  cfg.num_hidden_layers = *layers;
+  cfg.num_attention_heads = *heads;
+  cfg.num_key_value_heads = *kv;
   cfg.head_dim = *head_dim;
-  cfg.full_attention_interval = static_cast<std::uint32_t>(*interval);
+  cfg.full_attention_interval = *interval;
   cfg.linear_conv_kernel_dim = *conv;
   cfg.linear_key_head_dim = *lk;
   cfg.linear_value_head_dim = *lv;
   cfg.linear_num_key_heads = *nlk;
   cfg.linear_num_value_heads = *nlv;
-  cfg.mtp_num_hidden_layers = static_cast<std::uint32_t>(*mtp_layers);
+  cfg.mtp_num_hidden_layers = *mtp_layers;
   cfg.dtype = *dtype;
   cfg.mamba_ssm_dtype = *ssm;
   cfg.mtp_use_dedicated_embeddings = *mtp_ded;
@@ -315,12 +380,14 @@ std::expected<ArchitectureConfig, CompilerError> parse_text_config(
   cfg.rope_theta = theta->as_number();
   cfg.mrope_interleaved = *interleaved;
   for (auto const& item : section->as_array()) {
-    if (!item.is_number()) {
-      return std::unexpected(make_error(CompilerErrorCode::InvalidConfig,
-                                        "mrope_section", "expected integers"));
+    auto value = parse_json_u64(item, "mrope_section");
+    if (!value || *value > std::numeric_limits<std::uint32_t>::max()) {
+      return std::unexpected(
+          value ? make_error(CompilerErrorCode::InvalidConfig, "mrope_section",
+                             "integer exceeds uint32")
+                : value.error());
     }
-    cfg.mrope_section.push_back(
-        static_cast<std::uint32_t>(item.as_number()));
+    cfg.mrope_section.push_back(static_cast<std::uint32_t>(*value));
   }
   for (auto const& item : layer_types->as_array()) {
     if (!item.is_string()) {
@@ -426,22 +493,23 @@ std::expected<std::vector<SourceTensor>, CompilerError> parse_shard_header(
     t.name = name;
     t.dtype = dtype->as_string();
     t.shard = shard_name;
-    for (auto const& dim : shape->as_array()) {
-      if (!dim.is_number()) {
-        return std::unexpected(make_error(CompilerErrorCode::InvalidJson, name,
-                                          "shape dim is not a number"));
-      }
-      t.shape.push_back(static_cast<std::uint64_t>(dim.as_number()));
+    auto parsed_shape = parse_safetensors_shape(*shape, name + ".shape");
+    if (!parsed_shape) {
+      return std::unexpected(parsed_shape.error());
     }
-    auto const start = static_cast<std::uint64_t>(offsets->as_array()[0].as_number());
-    auto const stop = static_cast<std::uint64_t>(offsets->as_array()[1].as_number());
-    if (stop < start) {
+    t.shape = std::move(*parsed_shape);
+    auto start = parse_json_u64(offsets->as_array()[0], name + ".data_offsets[0]");
+    auto stop = parse_json_u64(offsets->as_array()[1], name + ".data_offsets[1]");
+    if (!start || !stop) {
+      return std::unexpected(!start ? start.error() : stop.error());
+    }
+    if (*stop < *start) {
       return std::unexpected(make_error(CompilerErrorCode::ShapeMismatch, name,
                                         "data_offsets reverse"));
     }
-    t.data_offset = start;
-    t.nbytes = stop - start;
-    if (payload_base + stop > file.size()) {
+    t.data_offset = *start;
+    t.nbytes = *stop - *start;
+    if (*stop > file.size() || payload_base > file.size() - *stop) {
       return std::unexpected(make_error(CompilerErrorCode::ShapeMismatch, name,
                                         "payload overruns shard"));
     }

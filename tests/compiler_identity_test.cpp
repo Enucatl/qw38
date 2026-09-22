@@ -1,8 +1,11 @@
 #include "compiler/compiler.hpp"
 #include "format/format.hpp"
 
+#include <cmath>
 #include <cstdint>
+#include <filesystem>
 #include <iostream>
+#include <limits>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -13,8 +16,11 @@ using qw38::compiler::expand_identity_table;
 using qw38::compiler::family_identity_table;
 using qw38::compiler::is_vision_tensor;
 using qw38::compiler::kIncludedTensors;
+using qw38::compiler::parse_json_u64;
+using qw38::compiler::parse_safetensors_shape;
 using qw38::compiler::SourceClass;
 using qw38::compiler::SourceTensor;
+using qw38::compiler::SyntheticTensor;
 using qw38::compiler::TensorFamily;
 
 namespace {
@@ -65,6 +71,39 @@ std::vector<SourceTensor> complete_language_mtp(std::uint64_t* offset) {
 }  // namespace
 
 int main() {
+  {
+    qw38::compiler::Json::Array rank8(8, qw38::compiler::Json{1.0});
+    auto shape = parse_safetensors_shape(qw38::compiler::Json{rank8}, "shape");
+    expect(shape && shape->size() == 8, "safetensors rank 8 is valid");
+
+    qw38::compiler::Json::Array rank9(9, qw38::compiler::Json{1.0});
+    shape = parse_safetensors_shape(qw38::compiler::Json{rank9}, "shape");
+    expect(!shape && shape.error().code == CompilerErrorCode::ShapeMismatch,
+           "safetensors rank 9 is rejected");
+    shape = parse_safetensors_shape(
+        qw38::compiler::Json{qw38::compiler::Json::Array{}}, "shape");
+    expect(!shape && shape.error().code == CompilerErrorCode::ShapeMismatch,
+           "safetensors rank 0 is rejected");
+    shape = parse_safetensors_shape(
+        qw38::compiler::Json{
+            qw38::compiler::Json::Array{qw38::compiler::Json{0.0}}},
+        "shape");
+    expect(shape && (*shape)[0] == 0,
+           "safetensors zero dimension is parsed without conversion UB");
+
+    for (double invalid :
+         {1.5, -1.0, std::numeric_limits<double>::quiet_NaN(),
+          std::numeric_limits<double>::infinity()}) {
+      auto value = parse_json_u64(qw38::compiler::Json{invalid}, "dimension");
+      expect(!value && value.error().code == CompilerErrorCode::InvalidJson,
+             "invalid JSON integer is rejected");
+    }
+    auto too_large =
+        parse_json_u64(qw38::compiler::Json{std::ldexp(1.0, 64)}, "dimension");
+    expect(!too_large && too_large.error().code == CompilerErrorCode::InvalidJson,
+           "unrepresentable JSON integer is rejected");
+  }
+
   auto expected = expand_identity_table();
   expect(expected.size() == kIncludedTensors, "identity table expands to 866");
   expect(family_identity_table().size() >= 38, "family table is encoded");
@@ -146,6 +185,27 @@ int main() {
   }
   {
     auto bad = headers;
+    bad[0].shape.assign(9, 1);
+    auto got = classify_source_tensors(bad);
+    expect(!got && got.error().code == CompilerErrorCode::ShapeMismatch,
+           "rank-9 source tensor is rejected");
+  }
+  {
+    auto bad = headers;
+    bad[0].shape[0] = 0;
+    auto got = classify_source_tensors(bad);
+    expect(!got && got.error().code == CompilerErrorCode::ShapeMismatch,
+           "zero source extent is rejected");
+  }
+  {
+    auto bad = headers;
+    bad[0].shape = {std::numeric_limits<std::uint64_t>::max(), 2};
+    auto got = classify_source_tensors(bad);
+    expect(!got && got.error().code == CompilerErrorCode::Unrepresentable,
+           "source dimension product overflow is rejected");
+  }
+  {
+    auto bad = headers;
     bad[0].dtype = "F32";
     auto got = classify_source_tensors(bad);
     expect(!got && got.error().code == CompilerErrorCode::DtypeMismatch,
@@ -167,6 +227,16 @@ int main() {
     auto got = classify_source_tensors(with_vision);
     expect(static_cast<bool>(got) && got->vision_excluded == 1,
            "vision tensors are excluded");
+  }
+  {
+    SyntheticTensor malformed{};
+    malformed.expected = expected.front();
+    malformed.expected.shape.rank = 9;
+    auto got = qw38::compiler::compile_synthetic(
+        std::filesystem::path{"/tmp/qw38-malformed-rank.qw38"}, {}, {}, {},
+        {.ident = "test"}, {std::move(malformed)});
+    expect(!got && got.error().code == CompilerErrorCode::ShapeMismatch,
+           "compile entry point rejects malformed fixed-array rank");
   }
 
   if (g_failures != 0) {

@@ -2,6 +2,7 @@
 
 #include "compiler/error.hpp"
 #include "compiler/identity.hpp"
+#include "compiler/json.hpp"
 #include "format/schema.hpp"
 
 #include <cstdint>
@@ -56,6 +57,12 @@ struct OpenShard {
 
 [[nodiscard]] std::expected<ArchitectureConfig, CompilerError> parse_text_config(
     std::string_view json_text);
+
+[[nodiscard]] std::expected<std::uint64_t, CompilerError> parse_json_u64(
+    Json const& value, std::string_view field);
+
+[[nodiscard]] std::expected<std::vector<std::uint64_t>, CompilerError>
+parse_safetensors_shape(Json const& value, std::string_view field);
 
 [[nodiscard]] std::expected<void, CompilerError> validate_architecture(
     ArchitectureConfig const& cfg);

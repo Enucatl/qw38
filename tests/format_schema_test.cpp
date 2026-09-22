@@ -23,6 +23,8 @@ using qw38::format::decode_schema;
 using qw38::format::encode;
 using qw38::format::encoded_size;
 using qw38::format::error_message;
+using qw38::format::expected_payload_bytes;
+using qw38::format::expected_scale_bytes;
 using qw38::format::FormatErrorCode;
 using qw38::format::GraphBinding;
 using qw38::format::Hash256;
@@ -394,6 +396,70 @@ void test_invalid_shape_and_span() {
          "BF16 tensor cannot carry a scale span");
 }
 
+void test_shape_entry_points_reject_malformed_ranks_and_sizes() {
+  TensorRecord tensor{};
+  tensor.logical_name = "shape-test";
+  tensor.storage = StorageClass::Bf16;
+  tensor.layout = PhysicalLayoutId::CudaBf16RowMajorV0;
+  tensor.mapping = identity_mapping();
+
+  tensor.shape.rank = 8;
+  tensor.shape.logical.fill(1);
+  tensor.shape.padded.fill(1);
+  auto dims = tensor.shape.logical_dims();
+  expect(dims && dims->size() == 8, "rank-8 logical_dims is valid");
+  auto bytes = expected_payload_bytes(tensor);
+  expect(bytes && *bytes == 2, "rank-8 payload sizing is valid");
+  auto scales = expected_scale_bytes(tensor);
+  expect(scales && *scales == 0, "rank-8 scale sizing is valid");
+
+  tensor.shape.rank = 9;
+  dims = tensor.shape.logical_dims();
+  expect(!dims && dims.error().code == FormatErrorCode::InvalidShape,
+         "rank-9 logical_dims returns InvalidShape");
+  bytes = expected_payload_bytes(tensor);
+  expect(!bytes && bytes.error().code == FormatErrorCode::InvalidShape,
+         "rank-9 payload sizing returns InvalidShape");
+  scales = expected_scale_bytes(tensor);
+  expect(!scales && scales.error().code == FormatErrorCode::InvalidShape,
+         "rank-9 scale sizing returns InvalidShape");
+  auto schema = base_schema();
+  schema.tensors.push_back(tensor);
+  auto size = encoded_size(schema);
+  expect(!size && size.error().code == FormatErrorCode::InvalidShape,
+         "encoded_size rejects rank 9 before array access");
+  std::array<std::byte, 4096> output{};
+  auto encoded = encode(schema, output);
+  expect(!encoded && encoded.error().code == FormatErrorCode::InvalidShape,
+         "encode rejects rank 9 before array access");
+
+  tensor.shape = {};
+  dims = tensor.shape.padded_dims();
+  expect(!dims && dims.error().code == FormatErrorCode::InvalidShape,
+         "rank-0 padded_dims returns InvalidShape");
+  bytes = expected_payload_bytes(tensor);
+  expect(!bytes && bytes.error().code == FormatErrorCode::InvalidShape,
+         "rank-0 payload sizing returns InvalidShape");
+
+  tensor.shape = rank1(0);
+  bytes = expected_payload_bytes(tensor);
+  expect(!bytes && bytes.error().code == FormatErrorCode::InvalidShape,
+         "zero extent payload sizing returns InvalidShape");
+
+  tensor.shape = rank2(std::numeric_limits<std::uint64_t>::max(), 2,
+                       std::numeric_limits<std::uint64_t>::max(), 2);
+  bytes = expected_payload_bytes(tensor);
+  expect(!bytes && bytes.error().code == FormatErrorCode::Overflow,
+         "dimension product overflow is typed");
+  schema.tensors[0] = tensor;
+  size = encoded_size(schema);
+  expect(!size && size.error().code == FormatErrorCode::Overflow,
+         "schema sizing rejects dimension product overflow");
+  encoded = encode(schema, output);
+  expect(!encoded && encoded.error().code == FormatErrorCode::Overflow,
+         "encode rejects dimension product overflow");
+}
+
 void test_shared_bindings() {
   auto schema = base_schema();
   auto embed = bf16_rows(1, "embed_tokens", 8, 8, 256);
@@ -651,6 +717,7 @@ int main() {
   test_enum_and_version_rejection();
   test_overflow_and_alignment();
   test_invalid_shape_and_span();
+  test_shape_entry_points_reject_malformed_ranks_and_sizes();
   test_shared_bindings();
   test_shared_binding_ownership_graph();
   test_schema_roundtrip_and_object_layout_independence();

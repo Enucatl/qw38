@@ -240,14 +240,24 @@ void test_invalid_pairs_shapes_scales_shared_state() {
               FormatErrorCode::InvalidStorageQuantizerPair,
               "invalid storage/quantizer pair");
 
-  auto shape = mutate_schema(file, [](auto& schema) {
-    schema.tensors[0].shape.logical[0] = 0;
-  });
-  if (!shape) {
-    fail(error_message(shape.error()));
+  auto valid = Artifact::parse(file);
+  if (!valid) {
+    fail(error_message(valid.error()));
     return;
   }
-  expect_code(Artifact::parse(*shape), FormatErrorCode::InvalidShape, "bad shape");
+  auto shape = file;
+  auto const& schema = valid->schema();
+  std::size_t const first_shape =
+      static_cast<std::size_t>(valid->header().manifest_offset) + 2 +
+      (2 + schema.compiler.ident.size() + 16) + 3 * 32 +
+      (4 + schema.precision.bindings.size() * 4) + 2 + 4 + 4 +
+      (2 + schema.tensors[0].logical_name.size());
+  // Keep the valid rank and corrupt logical[0] directly. Object-level encode
+  // now rejects malformed shapes, while the reader still needs hostile bytes.
+  for (std::size_t i = 0; i < 8; ++i) {
+    shape[first_shape + 8 + i] = std::byte{0};
+  }
+  expect_code(Artifact::parse(shape), FormatErrorCode::InvalidShape, "bad shape");
 
   auto scales = mutate_schema(file, [](auto& schema) {
     schema.tensors[1].scales.length += 2;

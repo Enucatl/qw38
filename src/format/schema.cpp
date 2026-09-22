@@ -9,6 +9,27 @@
 #include <utility>
 
 namespace qw38::format {
+
+std::expected<std::span<std::uint64_t const>, FormatError>
+TensorShape::logical_dims(std::uint64_t offset,
+                          std::string_view field) const noexcept {
+  if (rank == 0 || rank > kMaxRank) {
+    return std::unexpected(make_error(FormatErrorCode::InvalidShape, offset,
+                                      field, "rank must be 1..8"));
+  }
+  return std::span<std::uint64_t const>{logical.data(), rank};
+}
+
+std::expected<std::span<std::uint64_t const>, FormatError>
+TensorShape::padded_dims(std::uint64_t offset,
+                         std::string_view field) const noexcept {
+  if (rank == 0 || rank > kMaxRank) {
+    return std::unexpected(make_error(FormatErrorCode::InvalidShape, offset,
+                                      field, "rank must be 1..8"));
+  }
+  return std::span<std::uint64_t const>{padded.data(), rank};
+}
+
 namespace {
 
 constexpr std::uint16_t kFlagPopulatedDistinct = 0x0001;
@@ -66,6 +87,32 @@ class SizeAcc {
   std::uint64_t n_{0};
 };
 
+std::expected<void, FormatError> validate_shape(TensorShape const& shape,
+                                                std::uint64_t offset,
+                                                std::string_view field) {
+  if (shape.rank == 0 || shape.rank > kMaxRank) {
+    return std::unexpected(make_error(FormatErrorCode::InvalidShape, offset,
+                                      field, "rank must be 1..8"));
+  }
+  for (std::uint8_t i = 0; i < shape.rank; ++i) {
+    if (shape.logical[i] == 0) {
+      return std::unexpected(make_error(FormatErrorCode::InvalidShape, offset,
+                                        field, "logical extent must be > 0"));
+    }
+    if (shape.padded[i] < shape.logical[i]) {
+      return std::unexpected(make_error(FormatErrorCode::InvalidShape, offset,
+                                        field, "padded extent < logical"));
+    }
+  }
+  for (std::uint8_t i = shape.rank; i < kMaxRank; ++i) {
+    if (shape.logical[i] != 0 || shape.padded[i] != 0) {
+      return std::unexpected(make_error(FormatErrorCode::InvalidShape, offset,
+                                        field, "unused dims must be zero"));
+    }
+  }
+  return {};
+}
+
 std::expected<void, FormatError> write_hash(ByteWriter& w, Hash256 const& hash,
                                             std::string_view field) {
   std::array<std::byte, 32> raw{};
@@ -113,6 +160,22 @@ std::expected<ByteSpan, FormatError> read_span(ByteReader& r,
 
 std::expected<std::uint64_t, FormatError> shape_encoded_bytes(
     TensorShape const& shape, std::uint64_t offset) {
+  if (auto st = validate_shape(shape, offset, "shape"); !st) {
+    return std::unexpected(st.error());
+  }
+  auto logical = shape.logical_dims(offset, "shape.logical");
+  auto padded = shape.padded_dims(offset, "shape.padded");
+  if (!logical || !padded) {
+    return std::unexpected(!logical ? logical.error() : padded.error());
+  }
+  if (auto product = checked_product(*logical, offset, "shape.logical");
+      !product) {
+    return std::unexpected(product.error());
+  }
+  if (auto product = checked_product(*padded, offset, "shape.padded");
+      !product) {
+    return std::unexpected(product.error());
+  }
   SizeAcc acc;
   if (auto st = acc.add(8, offset, "shape"); !st) {
     return std::unexpected(st.error());
@@ -130,6 +193,9 @@ std::expected<std::uint64_t, FormatError> shape_encoded_bytes(
 std::expected<void, FormatError> write_shape(ByteWriter& w,
                                              TensorShape const& shape,
                                              std::string_view field) {
+  if (auto st = validate_shape(shape, w.offset(), field); !st) {
+    return st;
+  }
   if (auto st = w.u8(shape.rank, field); !st) {
     return st;
   }
@@ -852,32 +918,6 @@ std::expected<void, FormatError> require_shape_rank(
   return {};
 }
 
-std::expected<void, FormatError> validate_shape(TensorShape const& shape,
-                                                std::uint64_t offset,
-                                                std::string_view field) {
-  if (shape.rank == 0 || shape.rank > kMaxRank) {
-    return std::unexpected(make_error(FormatErrorCode::InvalidShape, offset,
-                                      field, "rank must be 1..8"));
-  }
-  for (std::uint8_t i = 0; i < shape.rank; ++i) {
-    if (shape.logical[i] == 0) {
-      return std::unexpected(make_error(FormatErrorCode::InvalidShape, offset,
-                                        field, "logical extent must be > 0"));
-    }
-    if (shape.padded[i] < shape.logical[i]) {
-      return std::unexpected(make_error(FormatErrorCode::InvalidShape, offset,
-                                        field, "padded extent < logical"));
-    }
-  }
-  for (std::uint8_t i = shape.rank; i < kMaxRank; ++i) {
-    if (shape.logical[i] != 0 || shape.padded[i] != 0) {
-      return std::unexpected(make_error(FormatErrorCode::InvalidShape, offset,
-                                        field, "unused dims must be zero"));
-    }
-  }
-  return {};
-}
-
 std::expected<void, FormatError> validate_mapping_for_tensor(
     TensorRecord const& tensor, std::uint64_t offset) {
   auto const& m = tensor.mapping;
@@ -1154,8 +1194,12 @@ std::expected<void, FormatError> validate_state(StateAllocation const& s,
     return std::unexpected(make_error(FormatErrorCode::UnknownEnum, offset,
                                       "state.dtype", "unknown arithmetic dtype"));
   }
-  auto const elems = checked_product(s.shape_per_layer.logical_dims(), offset,
-                                     "state.shape");
+  auto const dims =
+      s.shape_per_layer.logical_dims(offset, "state.shape");
+  if (!dims) {
+    return std::unexpected(dims.error());
+  }
+  auto const elems = checked_product(*dims, offset, "state.shape");
   if (!elems) {
     return std::unexpected(elems.error());
   }
@@ -1308,6 +1352,9 @@ PrecisionPolicyRecord v0_precision_policy() {
 
 std::expected<std::uint64_t, FormatError> expected_payload_bytes(
     TensorRecord const& tensor, std::uint64_t offset) {
+  if (auto st = validate_shape(tensor.shape, offset, "tensor.shape"); !st) {
+    return std::unexpected(st.error());
+  }
   if (layout_is_tiled_dense(tensor.layout)) {
     if (tensor.shape.rank != 2) {
       return std::unexpected(make_error(FormatErrorCode::InvalidShape, offset,
@@ -1336,8 +1383,11 @@ std::expected<std::uint64_t, FormatError> expected_payload_bytes(
     }
     return checked_mul(*rows, packed, offset, "tensor.payload");
   }
-  auto const elems =
-      checked_product(tensor.shape.logical_dims(), offset, "tensor.shape");
+  auto const dims = tensor.shape.logical_dims(offset, "tensor.shape");
+  if (!dims) {
+    return std::unexpected(dims.error());
+  }
+  auto const elems = checked_product(*dims, offset, "tensor.shape");
   if (!elems) {
     return std::unexpected(elems.error());
   }
@@ -1348,6 +1398,9 @@ std::expected<std::uint64_t, FormatError> expected_payload_bytes(
 
 std::expected<std::uint64_t, FormatError> expected_scale_bytes(
     TensorRecord const& tensor, std::uint64_t offset) {
+  if (auto st = validate_shape(tensor.shape, offset, "tensor.shape"); !st) {
+    return std::unexpected(st.error());
+  }
   if (tensor.quantizer == LogicalQuantizerId::None) {
     return 0;
   }

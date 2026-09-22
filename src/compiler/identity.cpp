@@ -1,6 +1,7 @@
 #include "compiler/identity.hpp"
 
 #include <algorithm>
+#include <limits>
 #include <map>
 #include <sstream>
 #include <tuple>
@@ -224,6 +225,34 @@ bool layer_applies(FamilyIdentity const& fam, std::uint32_t layer) {
   return true;
 }
 
+std::expected<std::uint64_t, CompilerError> source_tensor_bytes(
+    SourceTensor const& tensor) {
+  if (tensor.shape.empty() || tensor.shape.size() > qw38::format::kMaxRank) {
+    return std::unexpected(make_error(CompilerErrorCode::ShapeMismatch,
+                                      tensor.name, "shape rank must be 1..8"));
+  }
+  std::uint64_t elements = 1;
+  for (auto const dim : tensor.shape) {
+    if (dim == 0) {
+      return std::unexpected(make_error(CompilerErrorCode::ShapeMismatch,
+                                        tensor.name,
+                                        "shape extents must be nonzero"));
+    }
+    if (elements > std::numeric_limits<std::uint64_t>::max() / dim) {
+      return std::unexpected(make_error(CompilerErrorCode::Unrepresentable,
+                                        tensor.name,
+                                        "shape element count overflows uint64"));
+    }
+    elements *= dim;
+  }
+  if (elements > std::numeric_limits<std::uint64_t>::max() / 2) {
+    return std::unexpected(make_error(CompilerErrorCode::Unrepresentable,
+                                      tensor.name,
+                                      "BF16 byte size overflows uint64"));
+  }
+  return elements * 2;
+}
+
 }  // namespace
 
 std::span<FamilyIdentity const> family_identity_table() noexcept {
@@ -266,6 +295,10 @@ std::expected<ClassifiedCheckpoint, CompilerError> classify_source_tensors(
     if (!inserted) {
       return std::unexpected(make_error(CompilerErrorCode::DuplicateTensor,
                                         t.name, "duplicate tensor name"));
+    }
+    auto bytes = source_tensor_bytes(t);
+    if (!bytes) {
+      return std::unexpected(bytes.error());
     }
   }
 
@@ -317,14 +350,11 @@ std::expected<ClassifiedCheckpoint, CompilerError> classify_source_tensors(
       return std::unexpected(make_error(CompilerErrorCode::ShapeMismatch,
                                         src.name, "shape does not match identity table"));
     }
-    auto const elems = [&] {
-      std::uint64_t n = 1;
-      for (auto d : src.shape) {
-        n *= d;
-      }
-      return n;
-    }();
-    if (src.nbytes != elems * 2) {
+    auto const bytes = source_tensor_bytes(src);
+    if (!bytes) {
+      return std::unexpected(bytes.error());
+    }
+    if (src.nbytes != *bytes) {
       return std::unexpected(make_error(CompilerErrorCode::ShapeMismatch,
                                         src.name,
                                         "payload byte length is not BF16 numel"));
