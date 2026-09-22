@@ -754,13 +754,29 @@ std::expected<Checkpoint, CompilerError> open_checkpoint(
   }
   ckpt.config = *cfg;
 
-  auto identities = compute_checkpoint_identities(root);
-  if (!identities) {
-    return std::unexpected(identities.error());
+  // Opening a checkpoint only inspects its metadata and safetensors headers.
+  // In particular, do not stream every shard here: normal compiler tests open
+  // the authority to inspect its schema and must not rehash its payload.
+  auto config_hash = hash_file(root / "config.json", "config.json");
+  if (!config_hash) {
+    return std::unexpected(config_hash.error());
   }
-  ckpt.source_hash = identities->source_hash;
-  ckpt.config_hash = identities->config_hash;
-  ckpt.tokenizer_hash = identities->tokenizer_hash;
+  ckpt.config_hash = *config_hash;
+  auto index_hash = hash_file(root / "model.safetensors.index.json",
+                              "model.safetensors.index.json");
+  if (!index_hash) {
+    return std::unexpected(index_hash.error());
+  }
+  ckpt.source_hash = *index_hash;
+  auto tokenizer_path = root / "tokenizer.json";
+  if (!std::filesystem::exists(tokenizer_path)) {
+    tokenizer_path = root / "tokenizer_config.json";
+  }
+  auto tokenizer_hash = hash_file(tokenizer_path, "tokenizer");
+  if (!tokenizer_hash) {
+    return std::unexpected(tokenizer_hash.error());
+  }
+  ckpt.tokenizer_hash = *tokenizer_hash;
 
   auto index_text =
       read_text_file(root / "model.safetensors.index.json", "index");
