@@ -119,7 +119,10 @@ AttentionPrepBindViews dummy_ok_views(std::uint64_t* populated,
                    PhysicalLayoutId::CudaBf16KvCacheV0, StorageClass::Bf16, true, 5,
                    16, 2);
   v.kv.extent = {16, 2, kKvHeads, capacity, kHeadDim};
-  v.host_populated = populated;
+  auto slot = qw38::runtime::KvPopulatedSlot::bind(populated, capacity);
+  if (slot) {
+    v.populated = *slot;
+  }
   v.kv_capacity = capacity;
   v.language_layer = 3;
   return v;
@@ -180,7 +183,7 @@ void test_bind_errors(Stream const& stream) {
   expect(kQueryHeads / kKvHeads == kGqaGroup, "GQA group size");
 
   auto no_pop = views;
-  no_pop.host_populated = nullptr;
+  no_pop.populated = {};
   expect(!bind_attention_prep_plan(no_pop, stream), "missing populated pointer");
 
   auto cap0 = views;
@@ -197,12 +200,14 @@ void test_bind_errors(Stream const& stream) {
          "unsupported capacity is typed");
 
   populated = 9;
-  auto over = dummy_ok_views(&populated, 8);
-  auto bad_pop = bind_attention_prep_plan(over, stream);
+  auto bad_pop = qw38::runtime::KvPopulatedSlot::bind(&populated, 8);
   expect(!bad_pop &&
-             bad_pop.error().code == qw38::runtime::ErrorCode::InvalidPopulatedLength,
+             bad_pop.error().code ==
+                 qw38::runtime::ErrorCode::InvalidPopulatedLength,
          "populated > capacity is typed");
   populated = 0;
+  expect(ok && !ok->populated.commit_append(1) && populated == 0,
+         "out-of-order append commit cannot mutate populated length");
 
   auto ws = bind_attention_workspace(views.workspace);
   expect(static_cast<bool>(ws), "workspace bind");

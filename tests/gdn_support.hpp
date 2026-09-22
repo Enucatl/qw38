@@ -294,7 +294,10 @@ inline qw38::runtime::GdnBindViews mixer_views(DeviceGdnMixer& dev) {
                         PhysicalLayoutId::CudaBf16ConvHistoryV0, StorageClass::Bf16,
                         true, 2, kConvHistoryTaps, kQkvWidth);
   v.s = gdn_state_view(dev.s.data());
-  v.host_cursor = &dev.cursor;
+  auto cursor = qw38::runtime::ConvCursorSlot::bind(&dev.cursor);
+  if (cursor) {
+    v.cursor = *cursor;
+  }
   v.language_layer = 0;
   return v;
 }

@@ -338,21 +338,21 @@ std::expected<void, Error> region_ab(GdnFrontPlan const& plan) {
 }
 
 std::expected<void, Error> region_conv(GdnFrontPlan const& plan) {
-  if (plan.host_cursor == nullptr || *plan.host_cursor >= kConvTaps) {
-    return std::unexpected(arg_error("cursor", "invalid host cursor"));
+  auto current = plan.cursor.value();
+  if (!current) {
+    return std::unexpected(current.error());
   }
   auto* qkv = static_cast<std::uint16_t*>(plan.scratch.qkv.pointer);
   auto* convolved = static_cast<std::uint16_t*>(plan.scratch.convolved.pointer);
   auto* history = static_cast<std::uint16_t*>(plan.history.pointer);
   auto* taps = static_cast<std::uint16_t const*>(plan.taps.pointer);
-  std::uint32_t const cursor = *plan.host_cursor;
+  std::uint32_t const cursor = *current;
   if (auto st = qw38::cuda::launch_gdn_conv_silu(qkv, taps, history, cursor,
                                                  convolved, *plan.stream);
       !st) {
     return std::unexpected(from_cuda(st.error()));
   }
-  *plan.host_cursor = (cursor + 1u) % kConvTaps;
-  return {};
+  return plan.cursor.commit_advance(cursor);
 }
 
 std::expected<void, Error> region_prep(GdnFrontPlan const& plan) {
@@ -508,11 +508,8 @@ std::expected<GdnFrontPlan, Error> bind_gdn_front_plan(
   if (!std::isfinite(eps) || eps <= 0.0f) {
     return std::unexpected(arg_error("eps", "epsilon must be finite and > 0"));
   }
-  if (views.host_cursor == nullptr) {
-    return std::unexpected(arg_error("cursor", "host cursor pointer is required"));
-  }
-  if (*views.host_cursor >= kConvTaps) {
-    return std::unexpected(arg_error("cursor", "convolution cursor must be < 3"));
+  if (auto cursor = views.cursor.value(); !cursor) {
+    return std::unexpected(cursor.error());
   }
   auto gdn_i = gdn_state_index(views.language_layer);
   if (!gdn_i) {
@@ -624,7 +621,7 @@ std::expected<GdnFrontPlan, Error> bind_gdn_front_plan(
   plan.normalized = *normalized;
   plan.scratch = *scratch;
   plan.history = history;
-  plan.host_cursor = views.host_cursor;
+  plan.cursor = views.cursor;
   plan.stream = &stream;
   plan.eps = eps;
   plan.language_layer = views.language_layer;
@@ -689,7 +686,7 @@ std::expected<GdnFrontPlan, Error> bind_gdn_front_plan(
     return std::unexpected(z_s.error());
   }
 
-  auto cursor = session.conv_cursor_slot(*gdn_i);
+  auto cursor = detail::SessionPlanAccess::conv_cursor(session, *gdn_i);
   if (!cursor) {
     return std::unexpected(cursor.error());
   }
@@ -728,7 +725,7 @@ std::expected<GdnFrontPlan, Error> bind_gdn_front_plan(
   views.normalized = normalized->region[0].tensor;
   views.workspace = *workspace;
   views.history = history;
-  views.host_cursor = *cursor;
+  views.cursor = *cursor;
   views.language_layer = layer;
   return bind_gdn_front_plan(views, stream, eps);
 }
@@ -889,7 +886,7 @@ std::expected<GdnPlan, Error> bind_gdn_plan(GdnBindViews const& views,
   front.normalized = views.normalized;
   front.workspace = views.workspace;
   front.history = views.history;
-  front.host_cursor = views.host_cursor;
+  front.cursor = views.cursor;
   front.language_layer = views.language_layer;
   auto fp = bind_gdn_front_plan(front, stream, eps);
   if (!fp) {
@@ -991,7 +988,7 @@ std::expected<GdnPlan, Error> bind_gdn_plan(Model const& model, Session& session
   views.workspace = *workspace;
   views.history = front->history;
   views.s = session.gdn_s();
-  views.host_cursor = front->host_cursor;
+  views.cursor = front->cursor;
   views.language_layer = layer;
   return bind_gdn_plan(views, stream, eps);
 }

@@ -311,7 +311,10 @@ void test_front_vs_reference(Stream const& stream) {
   views.history = make_view(d_hist->data(), qw38::format::ArithmeticDtype::Bf16,
                             PhysicalLayoutId::CudaBf16ConvHistoryV0,
                             StorageClass::Bf16, true, 2, kConvHistoryTaps, kQkvWidth);
-  views.host_cursor = &gpu_cursor;
+  auto cursor_slot = qw38::runtime::ConvCursorSlot::bind(&gpu_cursor);
+  if (cursor_slot) {
+    views.cursor = *cursor_slot;
+  }
   views.language_layer = 0;
   auto plan = bind_gdn_front_plan(views, stream);
   expect(static_cast<bool>(plan), "front bind");
@@ -610,7 +613,11 @@ void expect_eight_launch_schedule(qw38::runtime::GdnPlan const& plan,
     fail(std::string(tag) + " launch-count pre-sync");
     return;
   }
-  std::uint32_t const saved_cursor = *plan.front.host_cursor;
+  auto saved_cursor = plan.front.cursor.value();
+  if (!saved_cursor) {
+    fail(std::string(tag) + " read launch-count cursor");
+    return;
+  }
   cudaGraph_t graph = nullptr;
   auto status = cudaStreamBeginCapture(stream.native(), cudaStreamCaptureModeThreadLocal);
   if (status != cudaSuccess) {
@@ -620,7 +627,17 @@ void expect_eight_launch_schedule(qw38::runtime::GdnPlan const& plan,
   }
   auto run = execute_decode_gdn(plan);
   status = cudaStreamEndCapture(stream.native(), &graph);
-  *plan.front.host_cursor = saved_cursor;
+  for (int i = 0; i < 2; ++i) {
+    auto current = plan.front.cursor.value();
+    if (!current || *current == *saved_cursor) {
+      break;
+    }
+    (void)plan.front.cursor.commit_advance(*current);
+  }
+  if (auto restored = plan.front.cursor.value();
+      !restored || *restored != *saved_cursor) {
+    fail(std::string(tag) + " restore launch-count cursor");
+  }
   if (!run || status != cudaSuccess || graph == nullptr) {
     if (graph != nullptr) {
       (void)cudaGraphDestroy(graph);

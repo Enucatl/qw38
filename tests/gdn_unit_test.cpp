@@ -140,7 +140,10 @@ GdnFrontBindViews dummy_ok_views(std::uint32_t* cursor) {
   v.history = make_view(dummy_ptr(0x1D0000), ArithmeticDtype::Bf16,
                         PhysicalLayoutId::CudaBf16ConvHistoryV0, StorageClass::Bf16,
                         true, 2, kConvHistoryTaps, kQkvWidth);
-  v.host_cursor = cursor;
+  auto cursor_slot = qw38::runtime::ConvCursorSlot::bind(cursor);
+  if (cursor_slot) {
+    v.cursor = *cursor_slot;
+  }
   v.language_layer = 0;
   return v;
 }
@@ -151,6 +154,8 @@ void test_bind_errors(Stream const& stream) {
   auto ok = bind_gdn_front_plan(views, stream);
   expect(static_cast<bool>(ok), "valid dummy bind");
   if (ok) {
+    expect(!ok->cursor.commit_advance(1) && cursor == 0,
+           "out-of-order cursor commit cannot mutate cursor");
     expect(ok->scratch.q_hat.extent[0] == kGdnKeyHeads, "q_hat is 16 heads");
     expect(ok->scratch.k_hat.extent[0] == kGdnKeyHeads, "k_hat is 16 heads");
     expect(ok->scratch.v.pointer ==
@@ -773,7 +778,7 @@ GdnBindViews dummy_mixer_views(std::uint32_t* cursor) {
   v.normalized = front.normalized;
   v.workspace = front.workspace;
   v.history = front.history;
-  v.host_cursor = front.host_cursor;
+  v.cursor = front.cursor;
   v.language_layer = front.language_layer;
   v.out = make_view(dummy_ptr(0x1E0000), ArithmeticDtype::Bf16,
                     PhysicalLayoutId::CudaQ4G64V0, StorageClass::Int4Grouped, false, 2,

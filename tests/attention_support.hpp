@@ -223,7 +223,11 @@ inline AttentionPrepBindViews bind_views(DeviceAttn& dev,
                   PhysicalLayoutId::CudaBf16KvCacheV0, StorageClass::Bf16, true, 1);
   v.kv.rank = 5;
   v.kv.extent = {16, 2, kKvHeads, dev.capacity, kHeadDim};
-  v.host_populated = &dev.populated;
+  auto populated =
+      qw38::runtime::KvPopulatedSlot::bind(&dev.populated, dev.capacity);
+  if (populated) {
+    v.populated = *populated;
+  }
   v.kv_capacity = dev.capacity;
   v.language_layer = language_layer;
   return v;

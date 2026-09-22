@@ -70,7 +70,7 @@ struct GdnFrontPlan {
   TensorView normalized{}; // BF16 [5120]
   GdnWorkspaceViews scratch{};
   TensorView history{};    // BF16 [3,10240] for this GDN layer
-  std::uint32_t* host_cursor{nullptr};
+  ConvCursorSlot cursor{};
   qw38::cuda::Stream const* stream{nullptr};
   float eps{kGdnRmsEps};
   std::uint32_t language_layer{};
@@ -92,7 +92,7 @@ struct GdnFrontBindViews {
   TensorView normalized{};
   WorkspaceView workspace{};
   TensorView history{};
-  std::uint32_t* host_cursor{nullptr};
+  ConvCursorSlot cursor{};
   std::uint32_t language_layer{};
 };
 
@@ -187,7 +187,7 @@ struct GdnBindViews {
   WorkspaceView workspace{};
   TensorView history{};
   TensorView s{};
-  std::uint32_t* host_cursor{nullptr};
+  ConvCursorSlot cursor{};
   std::uint32_t language_layer{};
 };
 

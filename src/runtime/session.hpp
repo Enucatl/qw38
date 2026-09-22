@@ -22,6 +22,40 @@ class Stream;
 namespace qw38::runtime {
 
 class Model;
+class Session;
+
+namespace detail {
+struct SessionPlanAccess;
+}
+
+class KvPopulatedSlot {
+ public:
+  KvPopulatedSlot() = default;
+
+  [[nodiscard]] static std::expected<KvPopulatedSlot, Error> bind(
+      std::uint64_t* value, std::uint64_t capacity);
+  [[nodiscard]] std::expected<std::uint64_t, Error> value() const;
+  [[nodiscard]] std::expected<void, Error> commit_append(
+      std::uint64_t position) const;
+
+ private:
+  std::uint64_t* value_{nullptr};
+  std::uint64_t capacity_{0};
+};
+
+class ConvCursorSlot {
+ public:
+  ConvCursorSlot() = default;
+
+  [[nodiscard]] static std::expected<ConvCursorSlot, Error> bind(
+      std::uint32_t* value);
+  [[nodiscard]] std::expected<std::uint32_t, Error> value() const;
+  [[nodiscard]] std::expected<void, Error> commit_advance(
+      std::uint32_t cursor) const;
+
+ private:
+  std::uint32_t* value_{nullptr};
+};
 
 struct SessionSnapshot {
   std::vector<std::byte> gdn_s;
@@ -59,15 +93,11 @@ class Session {
   }
   [[nodiscard]] std::expected<void, Error> set_populated_length(
       std::uint32_t attention_layer, std::uint64_t populated);
-  [[nodiscard]] std::expected<std::uint64_t*, Error> kv_populated_slot(
-      std::uint32_t attention_layer);
 
   [[nodiscard]] std::array<std::uint32_t, kConvLayers> const& conv_cursor()
       const noexcept {
     return conv_cursor_;
   }
-  [[nodiscard]] std::expected<std::uint32_t*, Error> conv_cursor_slot(
-      std::uint32_t gdn_layer);
   [[nodiscard]] std::expected<void, Error> set_conv_cursor(
       std::array<std::uint32_t, kConvLayers> cursor);
 
@@ -78,6 +108,7 @@ class Session {
 
  private:
   friend class Runtime;
+  friend struct detail::SessionPlanAccess;
 
   Session() = default;
 
@@ -86,6 +117,11 @@ class Session {
                                               std::uint64_t kv_capacity);
 
   [[nodiscard]] std::expected<void, Error> zero_persistent();
+  [[nodiscard]] std::expected<void, Error> validate_metadata() const;
+  [[nodiscard]] std::expected<KvPopulatedSlot, Error> kv_populated_slot(
+      std::uint32_t attention_layer);
+  [[nodiscard]] std::expected<ConvCursorSlot, Error> conv_cursor_slot(
+      std::uint32_t gdn_layer);
 
   std::shared_ptr<qw38::cuda::Stream> stream_;
   qw38::cuda::DeviceBuffer gdn_s_;
@@ -100,5 +136,16 @@ class Session {
   std::array<std::uint64_t, kAttnLayers> kv_populated_{};
   std::uint64_t persistent_bytes_{0};
 };
+
+namespace detail {
+
+struct SessionPlanAccess {
+  [[nodiscard]] static std::expected<KvPopulatedSlot, Error> kv_populated(
+      Session& session, std::uint32_t attention_layer);
+  [[nodiscard]] static std::expected<ConvCursorSlot, Error> conv_cursor(
+      Session& session, std::uint32_t gdn_layer);
+};
+
+}  // namespace detail
 
 }  // namespace qw38::runtime

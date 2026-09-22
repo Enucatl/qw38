@@ -63,7 +63,7 @@ struct AttentionPrepPlan {
   TensorView normalized{}; // BF16 [5120]
   AttnWorkspaceViews scratch{};
   TensorView kv{};         // BF16 [layer, 2, 4, capacity, 256]
-  std::uint64_t* host_populated{nullptr};
+  KvPopulatedSlot populated{};
   std::uint64_t kv_capacity{};
   qw38::cuda::Stream const* stream{nullptr};
   float eps{kAttnRmsEps};
@@ -86,7 +86,7 @@ struct AttentionPrepBindViews {
   TensorView normalized{};
   WorkspaceView workspace{};
   TensorView kv{};
-  std::uint64_t* host_populated{nullptr};
+  KvPopulatedSlot populated{};
   std::uint64_t kv_capacity{};
   std::uint32_t language_layer{};
 };
@@ -104,7 +104,7 @@ struct AttentionCoreBindViews {
   TensorView residual_out{};  // FP32 output residual
   ConstTensorView out{};           // [5120,6144] Q4/BF16 projection
   ConstTensorView out_scales{};
-  std::uint64_t* host_populated{nullptr};
+  KvPopulatedSlot populated{};
   std::uint64_t kv_capacity{};
   std::uint32_t language_layer{};
 };
@@ -118,7 +118,7 @@ struct AttentionCorePlan {
   TensorView y{};
   TensorView residual{};
   TensorView residual_out{};
-  std::uint64_t* host_populated{nullptr};
+  KvPopulatedSlot populated{};
   std::uint64_t kv_capacity{};
   std::uint32_t attn_layer{};
   qw38::cuda::Stream const* stream{nullptr};

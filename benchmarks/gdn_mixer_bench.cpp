@@ -190,7 +190,12 @@ int main() {
   views.s = make_view(s->data(), ArithmeticDtype::Fp32,
                       PhysicalLayoutId::CudaFp32GdnSHvKV0, StorageClass::Fp32, true,
                       1, kGdnSElemsPerLayer);
-  views.host_cursor = &cursor;
+  auto cursor_slot = qw38::runtime::ConvCursorSlot::bind(&cursor);
+  if (!cursor_slot) {
+    std::cerr << qw38::runtime::error_message(cursor_slot.error()) << '\n';
+    return 1;
+  }
+  views.cursor = *cursor_slot;
   views.language_layer = 0;
 
   auto plan = bind_gdn_plan(views, *stream);

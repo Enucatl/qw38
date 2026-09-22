@@ -379,17 +379,11 @@ std::expected<AttentionPrepPlan, Error> bind_attention_prep_plan(
   if (!std::isfinite(eps) || eps <= 0.0f) {
     return std::unexpected(arg_error("eps", "epsilon must be finite and > 0"));
   }
-  if (views.host_populated == nullptr) {
-    return std::unexpected(
-        arg_error("populated", "host populated-length pointer is required"));
-  }
   if (auto st = validate_kv_capacity(views.kv_capacity); !st) {
     return std::unexpected(st.error());
   }
-  if (*views.host_populated > views.kv_capacity) {
-    return std::unexpected(make_error(ErrorCode::InvalidPopulatedLength,
-                                      "kv.populated",
-                                      "populated length exceeds capacity"));
+  if (auto populated = views.populated.value(); !populated) {
+    return std::unexpected(populated.error());
   }
   auto attn_i = attn_state_index(views.language_layer);
   if (!attn_i) {
@@ -481,7 +475,7 @@ std::expected<AttentionPrepPlan, Error> bind_attention_prep_plan(
   plan.normalized = *normalized;
   plan.scratch = *scratch;
   plan.kv = *kv;
-  plan.host_populated = views.host_populated;
+  plan.populated = views.populated;
   plan.kv_capacity = views.kv_capacity;
   plan.stream = &stream;
   plan.eps = eps;
@@ -495,16 +489,11 @@ std::expected<AttentionCorePlan, Error> bind_attention_core_plan(
   if (stream.empty()) {
     return std::unexpected(arg_error("stream", "empty stream"));
   }
-  if (views.host_populated == nullptr) {
-    return std::unexpected(arg_error("populated", "missing populated pointer"));
-  }
   if (auto st = validate_kv_capacity(views.kv_capacity); !st) {
     return std::unexpected(st.error());
   }
-  if (*views.host_populated > views.kv_capacity) {
-    return std::unexpected(make_error(ErrorCode::InvalidPopulatedLength,
-                                      "kv.populated",
-                                      "populated length exceeds capacity"));
+  if (auto populated = views.populated.value(); !populated) {
+    return std::unexpected(populated.error());
   }
   auto attn_i = attn_state_index(views.language_layer);
   if (!attn_i) return std::unexpected(attn_i.error());
@@ -564,7 +553,7 @@ std::expected<AttentionCorePlan, Error> bind_attention_core_plan(
   plan.y = *y;
   plan.residual = *residual;
   plan.residual_out = *residual_out;
-  plan.host_populated = views.host_populated;
+  plan.populated = views.populated;
   plan.kv_capacity = views.kv_capacity;
   plan.attn_layer = *attn_i;
   plan.stream = &stream;
@@ -631,7 +620,7 @@ std::expected<AttentionMixerPlan, Error> bind_attention_mixer_plan(
   core.residual_out = *residual_out;
   core.out = views.out;
   core.out_scales = views.out_scales;
-  core.host_populated = prep->host_populated;
+  core.populated = prep->populated;
   core.kv_capacity = prep->kv_capacity;
   core.language_layer = prep->language_layer;
   auto cp = bind_attention_core_plan(core, stream);
@@ -668,7 +657,7 @@ std::expected<AttentionMixerPlan, Error> bind_attention_mixer_plan(
   if (!workspace) return std::unexpected(workspace.error());
   views.prep.workspace = *workspace;
   views.prep.kv = prep->kv;
-  views.prep.host_populated = prep->host_populated;
+  views.prep.populated = prep->populated;
   views.prep.kv_capacity = prep->kv_capacity;
   views.prep.language_layer = layer;
   views.out = *out;
@@ -762,11 +751,11 @@ std::expected<AttentionPrepPlan, Error> bind_attention_prep_plan(
   views.normalized.extent = {kHidden};
   views.workspace = *workspace;
   views.kv = session.kv();
-  auto populated = session.kv_populated_slot(*attn_i);
+  auto populated = detail::SessionPlanAccess::kv_populated(session, *attn_i);
   if (!populated) {
     return std::unexpected(populated.error());
   }
-  views.host_populated = *populated;
+  views.populated = *populated;
   views.kv_capacity = session.kv_capacity();
   views.language_layer = layer;
   return bind_attention_prep_plan(views, stream, eps);
@@ -777,14 +766,15 @@ std::expected<void, Error> execute_decode_attention_prep(
   if (plan.stream == nullptr || plan.stream->empty()) {
     return std::unexpected(arg_error("stream", "empty stream"));
   }
-  if (plan.host_populated == nullptr) {
-    return std::unexpected(arg_error("populated", "missing populated-length slot"));
-  }
   if (position >= plan.kv_capacity) {
     return std::unexpected(make_error(ErrorCode::InvalidCapacity, "position",
                                       "position exceeds KV capacity"));
   }
-  if (position != *plan.host_populated) {
+  auto populated = plan.populated.value();
+  if (!populated) {
+    return std::unexpected(populated.error());
+  }
+  if (position != *populated) {
     return std::unexpected(make_error(ErrorCode::InvalidPopulatedLength, "position",
                                       "position must equal the append/populated contract"));
   }
@@ -857,8 +847,7 @@ std::expected<void, Error> execute_decode_attention_prep(
   if (auto st = plan.stream->sync(); !st) {
     return std::unexpected(from_cuda(st.error()));
   }
-  *plan.host_populated = position + 1u;
-  return {};
+  return plan.populated.commit_append(position);
 }
 
 std::expected<TensorView, Error> execute_attention_core(
@@ -866,11 +855,11 @@ std::expected<TensorView, Error> execute_attention_core(
   if (plan.stream == nullptr || plan.stream->empty()) {
     return std::unexpected(arg_error("stream", "empty stream"));
   }
-  if (plan.host_populated == nullptr || *plan.host_populated > plan.kv_capacity) {
-    return std::unexpected(make_error(ErrorCode::InvalidPopulatedLength, "populated",
-                                      "populated length exceeds capacity"));
+  auto current = plan.populated.value();
+  if (!current) {
+    return std::unexpected(current.error());
   }
-  std::uint64_t const populated = *plan.host_populated;
+  std::uint64_t const populated = *current;
   std::uint64_t const nseg64 = attn_segment_count(populated);
   if (nseg64 > std::numeric_limits<std::uint32_t>::max()) {
     return std::unexpected(arg_error("populated", "segment count exceeds CUDA launch range"));

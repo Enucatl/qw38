@@ -219,6 +219,23 @@ int main() {
   expect(static_cast<bool>(s1->set_conv_cursor(cursor)), "set cursor");
 
   auto snap2 = s1->save();
+  if (snap2) {
+    auto invalid_populated = *snap2;
+    invalid_populated.kv_populated[0] = kCap + 1;
+    auto bad_populated_restore = s1->restore(invalid_populated);
+    expect(!bad_populated_restore &&
+               bad_populated_restore.error().code ==
+                   ErrorCode::InvalidPopulatedLength,
+           "restore rejects populated length beyond capacity");
+    auto invalid_cursor = *snap2;
+    invalid_cursor.conv_cursor[0] = qw38::runtime::kConvTaps;
+    auto bad_cursor_restore = s1->restore(invalid_cursor);
+    expect(!bad_cursor_restore &&
+               bad_cursor_restore.error().code == ErrorCode::InvalidArgument,
+           "restore rejects invalid convolution cursor");
+    expect(s1->kv_populated(0) == 3 && s1->conv_cursor()[1] == 2,
+           "rejected restore leaves metadata unchanged");
+  }
   expect(static_cast<bool>(s1->reset()), "reset");
   expect(s1->kv_populated(0) == 0, "reset clears populated");
   expect(s1->conv_cursor()[1] == 0, "reset clears cursor");
@@ -315,16 +332,14 @@ int main() {
            "scratch survives Runtime destruction");
     expect(static_cast<bool>(surviving_session->set_populated_length(0, 1)),
            "population update survives Runtime destruction");
-    auto populated = surviving_session->kv_populated_slot(0);
-    expect(populated && **populated == 1,
-           "population slot survives Runtime destruction");
+    expect(surviving_session->kv_populated(0) == 1,
+           "population metadata survives Runtime destruction");
     auto cursor = surviving_session->conv_cursor();
     cursor[0] = 2;
     expect(static_cast<bool>(surviving_session->set_conv_cursor(cursor)),
            "cursor update survives Runtime destruction");
-    auto cursor_slot = surviving_session->conv_cursor_slot(0);
-    expect(cursor_slot && **cursor_slot == 2,
-           "cursor slot survives Runtime destruction");
+    expect(surviving_session->conv_cursor()[0] == 2,
+           "cursor metadata survives Runtime destruction");
   }
 
   if (g_failures != 0) {

@@ -70,6 +70,97 @@ std::array<std::uint64_t, qw38::format::kMaxRank> extent5(
 
 }  // namespace
 
+std::expected<KvPopulatedSlot, Error> KvPopulatedSlot::bind(
+    std::uint64_t* value, std::uint64_t capacity) {
+  if (value == nullptr) {
+    return std::unexpected(make_error(
+        ErrorCode::InvalidArgument, "populated",
+        "host populated-length pointer is required"));
+  }
+  if (auto st = validate_kv_capacity(capacity); !st) {
+    return std::unexpected(st.error());
+  }
+  if (*value > capacity) {
+    return std::unexpected(make_error(ErrorCode::InvalidPopulatedLength,
+                                      "kv.populated",
+                                      "populated length exceeds capacity"));
+  }
+  KvPopulatedSlot slot;
+  slot.value_ = value;
+  slot.capacity_ = capacity;
+  return slot;
+}
+
+std::expected<std::uint64_t, Error> KvPopulatedSlot::value() const {
+  if (value_ == nullptr) {
+    return std::unexpected(make_error(
+        ErrorCode::InvalidArgument, "populated",
+        "host populated-length pointer is required"));
+  }
+  if (*value_ > capacity_) {
+    return std::unexpected(make_error(ErrorCode::InvalidPopulatedLength,
+                                      "populated",
+                                      "populated length exceeds capacity"));
+  }
+  return *value_;
+}
+
+std::expected<void, Error> KvPopulatedSlot::commit_append(
+    std::uint64_t position) const {
+  auto populated = value();
+  if (!populated) {
+    return std::unexpected(populated.error());
+  }
+  if (position >= capacity_) {
+    return std::unexpected(make_error(ErrorCode::InvalidCapacity, "position",
+                                      "position exceeds KV capacity"));
+  }
+  if (*populated != position) {
+    return std::unexpected(make_error(
+        ErrorCode::InvalidPopulatedLength, "position",
+        "position must equal the append/populated contract"));
+  }
+  *value_ = position + 1u;
+  return {};
+}
+
+std::expected<ConvCursorSlot, Error> ConvCursorSlot::bind(
+    std::uint32_t* value) {
+  if (value == nullptr) {
+    return std::unexpected(make_error(ErrorCode::InvalidArgument, "cursor",
+                                      "host cursor pointer is required"));
+  }
+  if (*value >= kConvTaps) {
+    return std::unexpected(make_error(ErrorCode::InvalidArgument, "cursor",
+                                      "convolution cursor must be < 3"));
+  }
+  ConvCursorSlot slot;
+  slot.value_ = value;
+  return slot;
+}
+
+std::expected<std::uint32_t, Error> ConvCursorSlot::value() const {
+  if (value_ == nullptr || *value_ >= kConvTaps) {
+    return std::unexpected(make_error(ErrorCode::InvalidArgument, "cursor",
+                                      "invalid host cursor"));
+  }
+  return *value_;
+}
+
+std::expected<void, Error> ConvCursorSlot::commit_advance(
+    std::uint32_t cursor) const {
+  auto current = value();
+  if (!current) {
+    return std::unexpected(current.error());
+  }
+  if (*current != cursor) {
+    return std::unexpected(make_error(ErrorCode::InvalidArgument, "cursor",
+                                      "cursor changed before commit"));
+  }
+  *value_ = (cursor + 1u) % kConvTaps;
+  return {};
+}
+
 std::expected<Session, Error> Session::create(
     Model const& model, std::shared_ptr<qw38::cuda::Stream> stream,
     std::uint64_t kv_capacity) {
@@ -202,11 +293,32 @@ std::expected<void, Error> Session::reset() {
   return {};
 }
 
+std::expected<void, Error> Session::validate_metadata() const {
+  for (auto populated : kv_populated_) {
+    if (populated > kv_capacity_) {
+      return std::unexpected(make_error(ErrorCode::InvalidPopulatedLength,
+                                        "session.populated",
+                                        "populated length exceeds capacity"));
+    }
+  }
+  for (auto cursor : conv_cursor_) {
+    if (cursor >= kConvTaps) {
+      return std::unexpected(make_error(ErrorCode::InvalidArgument,
+                                        "session.cursor",
+                                        "convolution cursor must be < 3"));
+    }
+  }
+  return {};
+}
+
 std::expected<SessionSnapshot, Error> Session::save() const {
   try {
   if (!stream_) {
     return std::unexpected(
         make_error(ErrorCode::Internal, "session.save", "missing stream"));
+  }
+  if (auto st = validate_metadata(); !st) {
+    return std::unexpected(st.error());
   }
   SessionSnapshot snap;
   snap.gdn_s.resize(static_cast<std::size_t>(gdn_s_.bytes()));
@@ -436,22 +548,22 @@ std::expected<void, Error> Session::set_populated_length(
   return {};
 }
 
-std::expected<std::uint64_t*, Error> Session::kv_populated_slot(
+std::expected<KvPopulatedSlot, Error> Session::kv_populated_slot(
     std::uint32_t attention_layer) {
   if (attention_layer >= kAttnLayers) {
     return std::unexpected(make_error(ErrorCode::InvalidArgument, "kv.layer",
                                       "attention layer index must be < 16"));
   }
-  return &kv_populated_[attention_layer];
+  return KvPopulatedSlot::bind(&kv_populated_[attention_layer], kv_capacity_);
 }
 
-std::expected<std::uint32_t*, Error> Session::conv_cursor_slot(
+std::expected<ConvCursorSlot, Error> Session::conv_cursor_slot(
     std::uint32_t gdn_layer) {
   if (gdn_layer >= kConvLayers) {
     return std::unexpected(make_error(ErrorCode::InvalidArgument, "conv.layer",
                                       "GDN layer index must be < 48"));
   }
-  return &conv_cursor_[gdn_layer];
+  return ConvCursorSlot::bind(&conv_cursor_[gdn_layer]);
 }
 
 std::expected<void, Error> Session::set_conv_cursor(
@@ -464,6 +576,16 @@ std::expected<void, Error> Session::set_conv_cursor(
   }
   conv_cursor_ = cursor;
   return {};
+}
+
+std::expected<KvPopulatedSlot, Error> detail::SessionPlanAccess::kv_populated(
+    Session& session, std::uint32_t attention_layer) {
+  return session.kv_populated_slot(attention_layer);
+}
+
+std::expected<ConvCursorSlot, Error> detail::SessionPlanAccess::conv_cursor(
+    Session& session, std::uint32_t gdn_layer) {
+  return session.conv_cursor_slot(gdn_layer);
 }
 
 }  // namespace qw38::runtime
