@@ -2,6 +2,8 @@
 
 #include "format/layout.hpp"
 
+#include <algorithm>
+
 namespace qw38::runtime {
 namespace {
 
@@ -29,29 +31,6 @@ std::expected<std::uint64_t, Error> add(std::uint64_t a, std::uint64_t b,
     return std::unexpected(overflow_error(r.error()));
   }
   return *r;
-}
-
-qw38::format::TensorShape shape3(std::uint64_t a, std::uint64_t b,
-                                 std::uint64_t c) {
-  qw38::format::TensorShape s{};
-  s.rank = 3;
-  s.logical[0] = a;
-  s.logical[1] = b;
-  s.logical[2] = c;
-  s.padded[0] = a;
-  s.padded[1] = b;
-  s.padded[2] = c;
-  return s;
-}
-
-qw38::format::TensorShape shape2(std::uint64_t a, std::uint64_t b) {
-  qw38::format::TensorShape s{};
-  s.rank = 2;
-  s.logical[0] = a;
-  s.logical[1] = b;
-  s.padded[0] = a;
-  s.padded[1] = b;
-  return s;
 }
 
 }  // namespace
@@ -158,42 +137,7 @@ std::expected<std::uint64_t, Error> kv_byte_offset(
 }
 
 std::array<qw38::format::StateAllocation, 3> language_persistent_schema() {
-  using qw38::format::ArithmeticDtype;
-  using qw38::format::PhysicalLayoutId;
-  using qw38::format::StateKind;
-
-  qw38::format::StateAllocation gdn{};
-  gdn.kind = StateKind::GdnS;
-  gdn.dtype = ArithmeticDtype::Fp32;
-  gdn.layout = PhysicalLayoutId::CudaFp32GdnSHvKV0;
-  gdn.shape_per_layer = shape3(kGdnValueHeads, kGdnValueDim, kGdnKeyDim);
-  gdn.layer_count = kGdnLayers;
-  gdn.component_count = 1;
-  gdn.bytes_per_layer = 3145728;
-  gdn.total_bytes = kGdnSBytes;
-
-  qw38::format::StateAllocation conv{};
-  conv.kind = StateKind::ConvolutionHistory;
-  conv.dtype = ArithmeticDtype::Bf16;
-  conv.layout = PhysicalLayoutId::CudaBf16ConvHistoryV0;
-  conv.shape_per_layer = shape2(kConvTaps, kConvChannels);
-  conv.layer_count = kConvLayers;
-  conv.component_count = 1;
-  conv.bytes_per_layer = 61440;
-  conv.total_bytes = kConvHistoryBytes;
-
-  qw38::format::StateAllocation kv{};
-  kv.kind = StateKind::KvCache;
-  kv.dtype = ArithmeticDtype::Bf16;
-  kv.layout = PhysicalLayoutId::CudaBf16KvCacheV0;
-  kv.shape_per_layer = shape2(kKvHeads, kHeadDim);
-  kv.layer_count = kAttnLayers;
-  kv.component_count = kKvComponents;
-  kv.declared_capacity = 0;
-  kv.bytes_per_token = kKvBytesPerToken;
-  kv.populated_length_distinct_from_capacity = true;
-
-  return {gdn, conv, kv};
+  return qw38::format::v0_language_state_schema();
 }
 
 std::expected<void, Error> require_language_state(
@@ -203,9 +147,14 @@ std::expected<void, Error> require_language_state(
     return std::unexpected(make_error(ErrorCode::MalformedArtifact, "state",
                                       "language-only state must have GDN/conv/KV"));
   }
-  for (std::size_t i = 0; i < want.size(); ++i) {
-    auto const& got = state[i];
-    auto const& w = want[i];
+  for (auto const& w : want) {
+    auto const it = std::ranges::find(state, w.kind,
+                                      &qw38::format::StateAllocation::kind);
+    if (it == state.end()) {
+      return std::unexpected(make_error(ErrorCode::MalformedArtifact, "state",
+                                        "missing V0 language state kind"));
+    }
+    auto const& got = *it;
     if (got.kind != w.kind || got.dtype != w.dtype || got.layout != w.layout ||
         got.layer_count != w.layer_count ||
         got.component_count != w.component_count ||
@@ -226,25 +175,11 @@ std::expected<void, Error> require_language_state(
 
 std::expected<void, Error> require_language_scratch(
     std::span<qw38::format::ScratchAllocation const> scratch) {
-  using qw38::format::ArithmeticDtype;
-  using qw38::format::ScratchKind;
-  struct Req {
-    ScratchKind kind;
-    ArithmeticDtype dtype;
-    std::uint64_t bytes;
-  };
-  Req const reqs[] = {
-      {ScratchKind::ResidualH, ArithmeticDtype::Fp32, kResidualBytesPerToken},
-      {ScratchKind::ResidualHMid, ArithmeticDtype::Fp32, kResidualBytesPerToken},
-      {ScratchKind::NormalizedHidden, ArithmeticDtype::Bf16,
-       kNormalizedBytesPerToken},
-      {ScratchKind::GdnWorkspace, ArithmeticDtype::Fp32,
-       kGdnWorkspaceBytesPerToken},
-      {ScratchKind::AttentionWorkspace, ArithmeticDtype::Fp32,
-       kAttentionWorkspaceBytesPerToken},
-      {ScratchKind::MlpSwiglu, ArithmeticDtype::Bf16, kSwigluBytesPerToken},
-      {ScratchKind::Logits, ArithmeticDtype::Fp32, kLogitsBytesPerToken},
-  };
+  auto const reqs = qw38::format::v0_language_scratch_schema();
+  if (scratch.size() != reqs.size()) {
+    return std::unexpected(make_error(ErrorCode::MalformedArtifact, "scratch",
+                                      "V0 language scratch count mismatch"));
+  }
   for (auto const& req : reqs) {
     bool found = false;
     for (auto const& s : scratch) {

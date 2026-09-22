@@ -123,6 +123,10 @@ ArtifactSchema base_schema() {
   schema.tokenizer_hash = hash_with(3);
   schema.precision = v0_precision_policy();
   schema.scope = SemanticScope::PrimaryLanguage;
+  auto const state = qw38::format::v0_language_state_schema();
+  schema.state.assign(state.begin(), state.end());
+  auto const scratch = qw38::format::v0_language_scratch_schema();
+  schema.scratch.assign(scratch.begin(), scratch.end());
   return schema;
 }
 
@@ -689,10 +693,18 @@ void test_hostile_record_counts_are_bounded() {
 
   std::size_t const tensor_count_offset =
       precision_count_offset + 2 + 4 * schema.precision.bindings.size() + 2;
+  std::size_t state_bytes = 0;
+  for (auto const& state : schema.state) {
+    state_bytes += 48 + 8 + 16 * state.shape_per_layer.rank;
+  }
+  std::size_t const scratch_count_offset =
+      tensor_count_offset + 4 + 4 + 4 + 4 + state_bytes;
+  std::size_t const integrity_count_offset =
+      scratch_count_offset + 4 + 16 * schema.scratch.size();
   std::array<std::size_t, 6> const count_offsets{
       tensor_count_offset, tensor_count_offset + 4, tensor_count_offset + 8,
-      tensor_count_offset + 12, tensor_count_offset + 16,
-      tensor_count_offset + 20};
+      tensor_count_offset + 12, scratch_count_offset,
+      integrity_count_offset};
   for (auto const offset : count_offsets) {
     hostile = bytes;
     put_u32(hostile, offset, std::numeric_limits<std::uint32_t>::max());
@@ -703,7 +715,7 @@ void test_hostile_record_counts_are_bounded() {
   }
 
   hostile = bytes;
-  put_u32(hostile, tensor_count_offset, 1);
+  put_u32(hostile, tensor_count_offset, 100);
   decoded = decode_schema(hostile);
   expect(!decoded && decoded.error().code == FormatErrorCode::Truncated,
          "plausible count is preflighted against remaining manifest bytes");

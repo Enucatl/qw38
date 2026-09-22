@@ -27,8 +27,6 @@ using qw38::format::LogicalPhysicalMapping;
 using qw38::format::LogicalQuantizerId;
 using qw38::format::MappingKind;
 using qw38::format::PhysicalLayoutId;
-using qw38::format::ScratchAllocation;
-using qw38::format::ScratchKind;
 using qw38::format::SemanticNodeKind;
 using qw38::format::SemanticScope;
 using qw38::format::StateAllocation;
@@ -225,23 +223,8 @@ int main() {
   kv.populated_length_distinct_from_capacity = true;
   schema.state = {gdn, conv, kv};
 
-  schema.scratch = {
-      ScratchAllocation{.kind = ScratchKind::ResidualH,
-                        .dtype = ArithmeticDtype::Fp32,
-                        .bytes = 20480},
-      ScratchAllocation{.kind = ScratchKind::ResidualHMid,
-                        .dtype = ArithmeticDtype::Fp32,
-                        .bytes = 20480},
-      ScratchAllocation{.kind = ScratchKind::NormalizedHidden,
-                        .dtype = ArithmeticDtype::Bf16,
-                        .bytes = 10240},
-      ScratchAllocation{.kind = ScratchKind::MlpSwiglu,
-                        .dtype = ArithmeticDtype::Bf16,
-                        .bytes = 34816},
-      ScratchAllocation{.kind = ScratchKind::Logits,
-                        .dtype = ArithmeticDtype::Fp32,
-                        .bytes = 993280},
-  };
+  auto const scratch = qw38::format::v0_language_scratch_schema();
+  schema.scratch.assign(scratch.begin(), scratch.end());
 
   schema.integrity = {
       IntegrityRecord{.kind = IntegrityKind::Sha256Manifest,

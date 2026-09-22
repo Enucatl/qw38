@@ -108,6 +108,10 @@ inline ArtifactSchema base_schema() {
   ArtifactSchema schema{};
   schema.compiler = {.ident = "qw38", .major = 0, .minor = 1, .patch = 0};
   schema.precision = v0_precision_policy();
+  auto const state = v0_language_state_schema();
+  schema.state.assign(state.begin(), state.end());
+  auto const scratch = v0_language_scratch_schema();
+  schema.scratch.assign(scratch.begin(), scratch.end());
   return schema;
 }
 
@@ -273,11 +277,8 @@ inline ArtifactSchema task003_schema() {
   kv.total_bytes = 268435456;
   kv.populated_length_distinct_from_capacity = true;
   schema.state = {gdn, conv, kv};
-  schema.scratch = {
-      ScratchAllocation{.kind = ScratchKind::ResidualH,
-                        .dtype = ArithmeticDtype::Fp32,
-                        .bytes = 20480},
-  };
+  auto const scratch = v0_language_scratch_schema();
+  schema.scratch.assign(scratch.begin(), scratch.end());
   return schema;
 }
 

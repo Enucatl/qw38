@@ -1203,6 +1203,13 @@ std::expected<void, FormatError> validate_state(StateAllocation const& s,
   if (!elems) {
     return std::unexpected(elems.error());
   }
+  for (std::uint8_t i = 0; i < s.shape_per_layer.rank; ++i) {
+    if (s.shape_per_layer.padded[i] != s.shape_per_layer.logical[i]) {
+      return std::unexpected(make_error(FormatErrorCode::InvalidShape, offset,
+                                        "state.shape",
+                                        "state schema does not pad extents"));
+    }
+  }
   switch (s.kind) {
     case StateKind::GdnS: {
       if (s.dtype != ArithmeticDtype::Fp32 ||
@@ -1305,13 +1312,6 @@ std::expected<void, FormatError> validate_state(StateAllocation const& s,
                                       offset, "state.total_bytes",
                                       "state byte counts do not match geometry"));
   }
-  for (std::uint8_t i = 0; i < s.shape_per_layer.rank; ++i) {
-    if (s.shape_per_layer.padded[i] != s.shape_per_layer.logical[i]) {
-      return std::unexpected(make_error(FormatErrorCode::InvalidShape, offset,
-                                        "state.shape",
-                                        "state schema does not pad extents"));
-    }
-  }
   return {};
 }
 
@@ -1322,9 +1322,49 @@ std::expected<void, FormatError> validate_scratch(ScratchAllocation const& s,
                                       offset, "scratch.bytes",
                                       "scratch allocation must be nonzero"));
   }
-  if (element_size(s.dtype) == 0) {
+  auto const elem = element_size(s.dtype);
+  if (elem == 0) {
     return std::unexpected(make_error(FormatErrorCode::UnknownEnum, offset,
                                       "scratch.dtype", "unknown dtype"));
+  }
+  if ((s.bytes % elem) != 0) {
+    return std::unexpected(make_error(
+        FormatErrorCode::InvalidScratchAllocation, offset, "scratch.bytes",
+        "scratch byte count must be aligned to its arithmetic dtype"));
+  }
+  ArithmeticDtype expected_dtype{};
+  std::uint64_t expected_bytes = 0;
+  switch (s.kind) {
+    case ScratchKind::ResidualH:
+    case ScratchKind::ResidualHMid:
+      expected_dtype = ArithmeticDtype::Fp32;
+      expected_bytes = 20480;
+      break;
+    case ScratchKind::NormalizedHidden:
+      expected_dtype = ArithmeticDtype::Bf16;
+      expected_bytes = 10240;
+      break;
+    case ScratchKind::GdnWorkspace:
+      expected_dtype = ArithmeticDtype::Fp32;
+      expected_bytes = 107264;
+      break;
+    case ScratchKind::AttentionWorkspace:
+      expected_dtype = ArithmeticDtype::Fp32;
+      expected_bytes = 78016;
+      break;
+    case ScratchKind::MlpSwiglu:
+      expected_dtype = ArithmeticDtype::Bf16;
+      expected_bytes = 34816;
+      break;
+    case ScratchKind::Logits:
+      expected_dtype = ArithmeticDtype::Fp32;
+      expected_bytes = 993280;
+      break;
+  }
+  if (s.dtype != expected_dtype || s.bytes != expected_bytes) {
+    return std::unexpected(make_error(
+        FormatErrorCode::InvalidScratchAllocation, offset, "scratch",
+        "scratch record does not match the V0 language schema"));
   }
   return {};
 }
@@ -1347,6 +1387,76 @@ PrecisionPolicyRecord v0_precision_policy() {
               {PrecisionDomain::Logits, ArithmeticDtype::Fp32},
               {PrecisionDomain::WeightScale, ArithmeticDtype::Fp16},
           },
+  };
+}
+
+std::array<StateAllocation, 3> v0_language_state_schema() {
+  StateAllocation gdn{};
+  gdn.kind = StateKind::GdnS;
+  gdn.dtype = ArithmeticDtype::Fp32;
+  gdn.layout = PhysicalLayoutId::CudaFp32GdnSHvKV0;
+  gdn.shape_per_layer.rank = 3;
+  gdn.shape_per_layer.logical[0] = 48;
+  gdn.shape_per_layer.logical[1] = 128;
+  gdn.shape_per_layer.logical[2] = 128;
+  gdn.shape_per_layer.padded = gdn.shape_per_layer.logical;
+  gdn.layer_count = 48;
+  gdn.component_count = 1;
+  gdn.bytes_per_layer = 3145728;
+  gdn.total_bytes = 150994944;
+
+  StateAllocation conv{};
+  conv.kind = StateKind::ConvolutionHistory;
+  conv.dtype = ArithmeticDtype::Bf16;
+  conv.layout = PhysicalLayoutId::CudaBf16ConvHistoryV0;
+  conv.shape_per_layer.rank = 2;
+  conv.shape_per_layer.logical[0] = 3;
+  conv.shape_per_layer.logical[1] = 10240;
+  conv.shape_per_layer.padded = conv.shape_per_layer.logical;
+  conv.layer_count = 48;
+  conv.component_count = 1;
+  conv.bytes_per_layer = 61440;
+  conv.total_bytes = 2949120;
+
+  StateAllocation kv{};
+  kv.kind = StateKind::KvCache;
+  kv.dtype = ArithmeticDtype::Bf16;
+  kv.layout = PhysicalLayoutId::CudaBf16KvCacheV0;
+  kv.shape_per_layer.rank = 2;
+  kv.shape_per_layer.logical[0] = 4;
+  kv.shape_per_layer.logical[1] = 256;
+  kv.shape_per_layer.padded = kv.shape_per_layer.logical;
+  kv.layer_count = 16;
+  kv.component_count = 2;
+  kv.bytes_per_token = 65536;
+  kv.populated_length_distinct_from_capacity = true;
+
+  return {gdn, conv, kv};
+}
+
+std::array<ScratchAllocation, 7> v0_language_scratch_schema() {
+  return {
+      ScratchAllocation{.kind = ScratchKind::ResidualH,
+                        .dtype = ArithmeticDtype::Fp32,
+                        .bytes = 20480},
+      ScratchAllocation{.kind = ScratchKind::ResidualHMid,
+                        .dtype = ArithmeticDtype::Fp32,
+                        .bytes = 20480},
+      ScratchAllocation{.kind = ScratchKind::NormalizedHidden,
+                        .dtype = ArithmeticDtype::Bf16,
+                        .bytes = 10240},
+      ScratchAllocation{.kind = ScratchKind::GdnWorkspace,
+                        .dtype = ArithmeticDtype::Fp32,
+                        .bytes = 107264},
+      ScratchAllocation{.kind = ScratchKind::AttentionWorkspace,
+                        .dtype = ArithmeticDtype::Fp32,
+                        .bytes = 78016},
+      ScratchAllocation{.kind = ScratchKind::MlpSwiglu,
+                        .dtype = ArithmeticDtype::Bf16,
+                        .bytes = 34816},
+      ScratchAllocation{.kind = ScratchKind::Logits,
+                        .dtype = ArithmeticDtype::Fp32,
+                        .bytes = 993280},
   };
 }
 
@@ -2148,6 +2258,11 @@ std::expected<void, FormatError> validate_schema(ArtifactSchema const& schema,
       seen_kv = true;
     }
   }
+  if (!seen_gdn || !seen_conv || !seen_kv || schema.state.size() != 3) {
+    return std::unexpected(make_error(
+        FormatErrorCode::InvalidStateAllocation, offset, "state",
+        "V0 language state requires exactly GDN S, convolution history, and KV"));
+  }
   for (std::size_t i = 0; i < schema.scratch.size(); ++i) {
     if (auto st = validate_scratch(schema.scratch[i], offset); !st) {
       return st;
@@ -2159,6 +2274,11 @@ std::expected<void, FormatError> validate_schema(ArtifactSchema const& schema,
                                           "duplicate scratch kind"));
       }
     }
+  }
+  if (schema.scratch.size() != v0_language_scratch_schema().size()) {
+    return std::unexpected(make_error(
+        FormatErrorCode::InvalidScratchAllocation, offset, "scratch",
+        "V0 language scratch requires every declared scratch kind exactly once"));
   }
   for (auto const& b : schema.shared_bindings) {
     auto const* owner = find_tensor(schema, b.owner_tensor_id);

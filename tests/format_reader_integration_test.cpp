@@ -69,7 +69,7 @@ void test_task003_roundtrip() {
   expect(art->shared_bindings().size() == 1, "MTP shared binding");
   expect(art->graph_bindings().size() == 3, "graph bindings");
   expect(art->state().size() == 3, "GDN/conv/KV schema");
-  expect(art->scratch().size() == 1, "scratch schema");
+  expect(art->scratch().size() == 7, "complete V0 scratch schema");
 
   auto const* embed = art->find_tensor("model.embed_tokens.weight");
   auto const* q4 = art->find_tensor("model.layers.0.mlp.down_proj.weight");

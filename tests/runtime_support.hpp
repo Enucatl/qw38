@@ -12,32 +12,8 @@
 namespace qw38::runtime::test {
 
 inline std::vector<qw38::format::ScratchAllocation> language_scratch() {
-  using qw38::format::ArithmeticDtype;
-  using qw38::format::ScratchAllocation;
-  using qw38::format::ScratchKind;
-  return {
-      ScratchAllocation{.kind = ScratchKind::ResidualH,
-                        .dtype = ArithmeticDtype::Fp32,
-                        .bytes = kResidualBytesPerToken},
-      ScratchAllocation{.kind = ScratchKind::ResidualHMid,
-                        .dtype = ArithmeticDtype::Fp32,
-                        .bytes = kResidualBytesPerToken},
-      ScratchAllocation{.kind = ScratchKind::NormalizedHidden,
-                        .dtype = ArithmeticDtype::Bf16,
-                        .bytes = kNormalizedBytesPerToken},
-      ScratchAllocation{.kind = ScratchKind::GdnWorkspace,
-                        .dtype = ArithmeticDtype::Fp32,
-                        .bytes = kGdnWorkspaceBytesPerToken},
-      ScratchAllocation{.kind = ScratchKind::AttentionWorkspace,
-                        .dtype = ArithmeticDtype::Fp32,
-                        .bytes = kAttentionWorkspaceBytesPerToken},
-      ScratchAllocation{.kind = ScratchKind::MlpSwiglu,
-                        .dtype = ArithmeticDtype::Bf16,
-                        .bytes = kSwigluBytesPerToken},
-      ScratchAllocation{.kind = ScratchKind::Logits,
-                        .dtype = ArithmeticDtype::Fp32,
-                        .bytes = kLogitsBytesPerToken},
-  };
+  auto const schema = qw38::format::v0_language_scratch_schema();
+  return {schema.begin(), schema.end()};
 }
 
 struct RuntimeFixture {

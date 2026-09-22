@@ -39,14 +39,12 @@ using qw38::format::LogicalQuantizerId;
 using qw38::format::MappingKind;
 using qw38::format::PhysicalLayoutId;
 using qw38::format::ScratchAllocation;
-using qw38::format::ScratchKind;
 using qw38::format::SemanticNodeKind;
 using qw38::format::SemanticScope;
 using qw38::format::SharedBinding;
 using qw38::format::SharedBindingRole;
 using qw38::format::SpanKind;
 using qw38::format::StateAllocation;
-using qw38::format::StateKind;
 using qw38::format::StorageClass;
 using qw38::format::TensorRecord;
 using qw38::format::TensorRole;
@@ -368,65 +366,13 @@ std::expected<void, CompilerError> compare_tiled(
 }  // namespace
 
 std::vector<StateAllocation> language_state_schema() {
-  StateAllocation gdn{};
-  gdn.kind = StateKind::GdnS;
-  gdn.dtype = ArithmeticDtype::Fp32;
-  gdn.layout = PhysicalLayoutId::CudaFp32GdnSHvKV0;
-  gdn.shape_per_layer = make_shape({48, 128, 128});
-  gdn.layer_count = 48;
-  gdn.component_count = 1;
-  gdn.bytes_per_layer = 3145728;
-  gdn.total_bytes = 150994944;
-
-  StateAllocation conv{};
-  conv.kind = StateKind::ConvolutionHistory;
-  conv.dtype = ArithmeticDtype::Bf16;
-  conv.layout = PhysicalLayoutId::CudaBf16ConvHistoryV0;
-  conv.shape_per_layer = make_shape({3, 10240});
-  conv.layer_count = 48;
-  conv.component_count = 1;
-  conv.bytes_per_layer = 61440;
-  conv.total_bytes = 2949120;
-
-  StateAllocation kv{};
-  kv.kind = StateKind::KvCache;
-  kv.dtype = ArithmeticDtype::Bf16;
-  kv.layout = PhysicalLayoutId::CudaBf16KvCacheV0;
-  kv.shape_per_layer = make_shape({4, 256});
-  kv.layer_count = 16;
-  kv.component_count = 2;
-  kv.declared_capacity = 0;
-  kv.bytes_per_token = 65536;
-  kv.bytes_per_layer = 0;
-  kv.total_bytes = 0;
-  kv.populated_length_distinct_from_capacity = true;
-  return {gdn, conv, kv};
+  auto const schema = qw38::format::v0_language_state_schema();
+  return {schema.begin(), schema.end()};
 }
 
 std::vector<ScratchAllocation> language_scratch_schema() {
-  return {
-      ScratchAllocation{.kind = ScratchKind::ResidualH,
-                        .dtype = ArithmeticDtype::Fp32,
-                        .bytes = 20480},
-      ScratchAllocation{.kind = ScratchKind::ResidualHMid,
-                        .dtype = ArithmeticDtype::Fp32,
-                        .bytes = 20480},
-      ScratchAllocation{.kind = ScratchKind::NormalizedHidden,
-                        .dtype = ArithmeticDtype::Bf16,
-                        .bytes = 10240},
-      ScratchAllocation{.kind = ScratchKind::GdnWorkspace,
-                        .dtype = ArithmeticDtype::Fp32,
-                        .bytes = 107264},
-      ScratchAllocation{.kind = ScratchKind::AttentionWorkspace,
-                        .dtype = ArithmeticDtype::Fp32,
-                        .bytes = 78016},
-      ScratchAllocation{.kind = ScratchKind::MlpSwiglu,
-                        .dtype = ArithmeticDtype::Bf16,
-                        .bytes = 34816},
-      ScratchAllocation{.kind = ScratchKind::Logits,
-                        .dtype = ArithmeticDtype::Fp32,
-                        .bytes = 993280},
-  };
+  auto const schema = qw38::format::v0_language_scratch_schema();
+  return {schema.begin(), schema.end()};
 }
 
 std::uint32_t count_instances(std::span<GraphBinding const> bindings,

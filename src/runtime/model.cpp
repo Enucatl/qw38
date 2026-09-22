@@ -134,6 +134,12 @@ std::expected<Model, Error> Model::upload(qw38::format::Artifact const& artifact
   Model model;
   model.schema_ = artifact.schema();
 
+  // Repeat the complete host-side compatibility preflight at the allocation
+  // boundary so no future Artifact construction path can bypass it.
+  if (auto st = qw38::format::validate_schema(model.schema_); !st) {
+    return std::unexpected(from_format(st.error()));
+  }
+
   // Host-side span checks happen before any device allocation.
   for (auto const& rec : model.schema_.tensors) {
     if (is_alias(model.schema_, rec.tensor_id)) {

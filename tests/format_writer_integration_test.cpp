@@ -29,8 +29,6 @@ using qw38::format::LogicalPhysicalMapping;
 using qw38::format::LogicalQuantizerId;
 using qw38::format::MappingKind;
 using qw38::format::PhysicalLayoutId;
-using qw38::format::ScratchAllocation;
-using qw38::format::ScratchKind;
 using qw38::format::SemanticNodeKind;
 using qw38::format::SemanticScope;
 using qw38::format::sha256;
@@ -225,11 +223,8 @@ int main() {
   kv.total_bytes = 268435456;
   kv.populated_length_distinct_from_capacity = true;
   schema.state = {gdn, conv, kv};
-  schema.scratch = {
-      ScratchAllocation{.kind = ScratchKind::ResidualH,
-                        .dtype = ArithmeticDtype::Fp32,
-                        .bytes = 20480},
-  };
+  auto const scratch = qw38::format::v0_language_scratch_schema();
+  schema.scratch.assign(scratch.begin(), scratch.end());
 
   auto embed_n = expected_payload_bytes(embed);
   auto q4_n = expected_payload_bytes(q4);

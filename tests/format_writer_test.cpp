@@ -126,6 +126,10 @@ ArtifactSchema base_schema() {
   ArtifactSchema schema{};
   schema.compiler = {.ident = "qw38", .major = 0, .minor = 1, .patch = 0};
   schema.precision = v0_precision_policy();
+  auto const state = qw38::format::v0_language_state_schema();
+  schema.state.assign(state.begin(), state.end());
+  auto const scratch = qw38::format::v0_language_scratch_schema();
+  schema.scratch.assign(scratch.begin(), scratch.end());
   return schema;
 }
 

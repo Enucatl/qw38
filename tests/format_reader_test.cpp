@@ -112,7 +112,7 @@ void test_open_and_parse_roundtrip_minimal() {
            "unknown logical identity is tensor_not_found");
   }
   expect(opened->compiler().ident == "qw38", "compiler revision");
-  expect(opened->state().empty(), "minimal artifact has no live or schema state");
+  expect(opened->state().size() == 3, "minimal fixture carries V0 state schema");
   expect(opened->identity().path == fx.path, "identity path");
 
   auto bytes = read_all(fx.path);
@@ -314,6 +314,59 @@ void test_invalid_pairs_shapes_scales_shared_state() {
               "live state forbidden");
 }
 
+void test_required_state_scratch_and_precision_schema() {
+  ScratchDir dir("qw38-reader-runtime-schema");
+  auto fx = write_task003(dir.file("runtime-schema.qw38"));
+  auto const file = read_all(fx.path);
+
+  auto expect_mutation = [&](auto&& mutator, FormatErrorCode code,
+                             std::string_view what) {
+    auto mutated = mutate_schema(file, mutator);
+    if (!mutated) {
+      fail(std::string(what) + ": " + error_message(mutated.error()));
+      return;
+    }
+    expect_code(Artifact::parse(*mutated), code, what);
+  };
+
+  expect_mutation(
+      [](auto& schema) { schema.state.erase(schema.state.begin()); },
+      FormatErrorCode::InvalidStateAllocation, "missing required state");
+  expect_mutation(
+      [](auto& schema) { schema.state[0].total_bytes += 4; },
+      FormatErrorCode::InvalidStateAllocation, "wrong fixed state byte count");
+  expect_mutation(
+      [](auto& schema) {
+        schema.state[1].dtype = qw38::format::ArithmeticDtype::Fp32;
+      },
+      FormatErrorCode::InvalidStateAllocation, "wrong state dtype");
+  expect_mutation(
+      [](auto& schema) { schema.state[2].shape_per_layer.padded[1] += 1; },
+      FormatErrorCode::InvalidShape, "padded KV state");
+  expect_mutation(
+      [](auto& schema) { schema.scratch.pop_back(); },
+      FormatErrorCode::InvalidScratchAllocation, "missing required scratch");
+  expect_mutation(
+      [](auto& schema) { schema.scratch[0].bytes -= 4; },
+      FormatErrorCode::InvalidScratchAllocation, "invalid scratch byte count");
+  expect_mutation(
+      [](auto& schema) {
+        schema.scratch[2].dtype = qw38::format::ArithmeticDtype::Fp32;
+      },
+      FormatErrorCode::InvalidScratchAllocation, "wrong scratch dtype");
+  expect_mutation(
+      [](auto& schema) {
+        for (auto& binding : schema.precision.bindings) {
+          if (binding.domain ==
+              qw38::format::PrecisionDomain::GdnRecurrentState) {
+            binding.dtype = qw38::format::ArithmeticDtype::Bf16;
+          }
+        }
+      },
+      FormatErrorCode::InvalidPrecisionPolicy,
+      "contradictory persistent-state precision policy");
+}
+
 void test_canonical_owner_range_and_integrity_validation() {
   ScratchDir dir("qw38-reader-owner");
   auto fx = write_task003(dir.file("owner.qw38"));
@@ -408,6 +461,7 @@ int main() {
   test_bad_magic_version_enum();
   test_misalignment_overflow_overlap();
   test_invalid_pairs_shapes_scales_shared_state();
+  test_required_state_scratch_and_precision_schema();
   test_canonical_owner_range_and_integrity_validation();
   test_bad_hash_and_leftover();
   test_manifest_limit_precedes_span_copy();

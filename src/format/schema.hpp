@@ -184,6 +184,8 @@ struct ArtifactSchema {
 };
 
 [[nodiscard]] PrecisionPolicyRecord v0_precision_policy();
+[[nodiscard]] std::array<StateAllocation, 3> v0_language_state_schema();
+[[nodiscard]] std::array<ScratchAllocation, 7> v0_language_scratch_schema();
 
 [[nodiscard]] std::expected<std::uint64_t, FormatError> expected_payload_bytes(
     TensorRecord const& tensor, std::uint64_t offset = 0);
