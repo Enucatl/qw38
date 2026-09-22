@@ -80,6 +80,8 @@ char const* code_name(FormatErrorCode code) noexcept {
       return "resource_limit_exceeded";
     case FormatErrorCode::AllocationFailure:
       return "allocation_failure";
+    case FormatErrorCode::InvalidQuantizedPayload:
+      return "invalid_quantized_payload";
   }
   return "unknown";
 }

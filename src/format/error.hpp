@@ -44,6 +44,7 @@ enum class FormatErrorCode : std::uint16_t {
   TensorNotFound = 35,
   ResourceLimitExceeded = 36,
   AllocationFailure = 37,
+  InvalidQuantizedPayload = 38,
 };
 
 struct FormatError {

@@ -3,6 +3,7 @@
 #include "format/constants.hpp"
 #include "format/layout.hpp"
 #include "format/sha256.hpp"
+#include "format/unpack.hpp"
 
 #include <algorithm>
 #include <cerrno>
@@ -411,6 +412,49 @@ std::expected<void, FormatError> verify_digests(
   return {};
 }
 
+std::expected<void, FormatError> validate_quantized_payloads(
+    std::span<std::byte const> file, ArtifactSchema const& schema) {
+  std::unordered_set<std::uint32_t> checked_owners;
+  for (auto const& tensor : schema.tensors) {
+    auto const owner_id =
+        canonical_owner_tensor_id(schema, tensor.tensor_id);
+    if (!owner_id) {
+      return std::unexpected(owner_id.error());
+    }
+    if (!checked_owners.insert(*owner_id).second) {
+      continue;
+    }
+    auto const* owner = tensor_by_id(schema, *owner_id);
+    if (owner == nullptr) {
+      return std::unexpected(make_error(
+          FormatErrorCode::SharedBinding, 0, "shared.owner",
+          "canonical owner is missing"));
+    }
+    if (owner->quantizer != LogicalQuantizerId::Q4G64V0 &&
+        owner->quantizer != LogicalQuantizerId::Q8G32V0) {
+      continue;
+    }
+    auto codes = slice(file, owner->payload, "tensor.payload");
+    if (!codes) {
+      return std::unexpected(codes.error());
+    }
+    auto scales = slice(file, owner->scales, "tensor.scales");
+    if (!scales) {
+      return std::unexpected(scales.error());
+    }
+    auto st = validate_cuda_v0(
+        owner->quantizer, owner->layout, owner->shape.logical[0],
+        owner->shape.logical[1], *codes, *scales, owner->payload.offset,
+        owner->scales.offset);
+    if (!st) {
+      auto error = st.error();
+      error.field = owner->logical_name + "." + error.field;
+      return std::unexpected(std::move(error));
+    }
+  }
+  return {};
+}
+
 struct Validated {
   ContainerHeader header{};
   ArtifactSchema schema{};
@@ -468,6 +512,9 @@ std::expected<Validated, FormatError> validate_bytes(
     return std::unexpected(st.error());
   }
   if (auto st = verify_digests(bytes, *schema); !st) {
+    return std::unexpected(st.error());
+  }
+  if (auto st = validate_quantized_payloads(bytes, *schema); !st) {
     return std::unexpected(st.error());
   }
 

@@ -282,7 +282,9 @@ inline ArtifactSchema task003_schema() {
   return schema;
 }
 
-inline Task003Fixture write_task003(std::filesystem::path dest) {
+template <typename Mutator>
+inline Task003Fixture write_task003_mutated(std::filesystem::path dest,
+                                            Mutator&& mutate) {
   Task003Fixture fx;
   fx.path = std::move(dest);
   auto schema = task003_schema();
@@ -296,10 +298,17 @@ inline Task003Fixture write_task003(std::filesystem::path dest) {
     return fx;
   }
   fx.embed = pattern(*embed_n, 0x10);
-  fx.q4_payload = pattern(*q4_n, 0x40);
-  fx.q4_scales = pattern(*q4_s, 0x50);
-  fx.q8_payload = pattern(*q8_n, 0x80);
-  fx.q8_scales = pattern(*q8_s, 0x90);
+  fx.q4_payload.assign(static_cast<std::size_t>(*q4_n), std::byte{0x11});
+  fx.q4_scales.assign(static_cast<std::size_t>(*q4_s), std::byte{0});
+  fx.q8_payload.assign(static_cast<std::size_t>(*q8_n), std::byte{0x01});
+  fx.q8_scales.assign(static_cast<std::size_t>(*q8_s), std::byte{0});
+  for (std::size_t i = 1; i < fx.q4_scales.size(); i += 2) {
+    fx.q4_scales[i] = std::byte{0x04};
+  }
+  for (std::size_t i = 1; i < fx.q8_scales.size(); i += 2) {
+    fx.q8_scales[i] = std::byte{0x04};
+  }
+  mutate(schema, fx);
 
   auto writer = ArtifactWriter::create(fx.path, schema);
   if (!writer) {
@@ -326,6 +335,11 @@ inline Task003Fixture write_task003(std::filesystem::path dest) {
     return fx;
   }
   return fx;
+}
+
+inline Task003Fixture write_task003(std::filesystem::path dest) {
+  return write_task003_mutated(
+      std::move(dest), [](ArtifactSchema&, Task003Fixture&) {});
 }
 
 inline bool is_alias_id(ArtifactSchema const& schema, std::uint32_t id) {

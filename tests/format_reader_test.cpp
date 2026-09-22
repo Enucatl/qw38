@@ -4,6 +4,7 @@
 #include <iostream>
 #include <string>
 #include <string_view>
+#include <utility>
 
 using qw38::format::Artifact;
 using qw38::format::error_message;
@@ -18,6 +19,7 @@ using qw38::format::test::record_boundaries;
 using qw38::format::test::ScratchDir;
 using qw38::format::test::write_minimal;
 using qw38::format::test::write_task003;
+using qw38::format::test::write_task003_mutated;
 
 namespace {
 
@@ -453,6 +455,69 @@ void test_manifest_limit_precedes_span_copy() {
               "oversized manifest is rejected before span ownership copy");
 }
 
+void test_quantized_payload_domains() {
+  ScratchDir dir("qw38-reader-quantized-domains");
+  auto expect_malformed = [&](std::string_view name, auto&& mutate) {
+    auto fx = write_task003_mutated(dir.file(std::string(name) + ".qw38"),
+                                    std::forward<decltype(mutate)>(mutate));
+    if (fx.path.empty()) {
+      fail(std::string(name) + ": failed to write fixture");
+      return;
+    }
+    expect_code(Artifact::open(fx.path),
+                FormatErrorCode::InvalidQuantizedPayload, name);
+  };
+
+  expect_malformed("forbidden Q4 code", [](auto&, auto& fx) {
+    fx.q4_payload[0] = std::byte{0x08};
+  });
+  expect_malformed("forbidden Q8 code", [](auto&, auto& fx) {
+    fx.q8_payload[0] = std::byte{0x80};
+  });
+  expect_malformed("nonzero Q4 code padding", [](auto& schema, auto& fx) {
+    schema.tensors[1].shape.logical[0] = 7;
+    std::fill(fx.q4_payload.begin() + 7 * 128, fx.q4_payload.end(),
+              std::byte{0});
+    std::fill(fx.q4_scales.begin() + 7 * 8, fx.q4_scales.end(),
+              std::byte{0});
+    fx.q4_payload[7 * 128] = std::byte{0x01};
+  });
+  expect_malformed("nonzero Q4 scale padding", [](auto& schema, auto& fx) {
+    schema.tensors[1].shape.logical[0] = 7;
+    std::fill(fx.q4_payload.begin() + 7 * 128, fx.q4_payload.end(),
+              std::byte{0});
+  });
+
+  struct BadScale {
+    std::uint16_t bits;
+    char const* name;
+  };
+  for (auto const bad : {BadScale{0x0001u, "subnormal FP16 scale"},
+                         BadScale{0x8000u, "negative zero FP16 scale"},
+                         BadScale{0xBC00u, "negative FP16 scale"},
+                         BadScale{0x7C00u, "infinite FP16 scale"},
+                         BadScale{0x7E00u, "NaN FP16 scale"}}) {
+    expect_malformed(bad.name, [bad](auto&, auto& fx) {
+      fx.q4_scales[0] = static_cast<std::byte>(bad.bits & 0xFFu);
+      fx.q4_scales[1] =
+          static_cast<std::byte>((bad.bits >> 8) & 0xFFu);
+    });
+  }
+
+  auto direct = write_task003_mutated(
+      dir.file("direct-unpack.qw38"), [](auto&, auto& fx) {
+        fx.q4_payload[0] = std::byte{0x08};
+      });
+  auto unpacked = qw38::format::unpack_cuda_v0(
+      qw38::format::LogicalQuantizerId::Q4G64V0,
+      qw38::format::PhysicalLayoutId::CudaQ4G64V0, 8, 256,
+      direct.q4_payload, direct.q4_scales);
+  expect(!unpacked &&
+             unpacked.error().code ==
+                 FormatErrorCode::InvalidQuantizedPayload,
+         "independent unpacker rejects the artifact domain rejected before CUDA");
+}
+
 }  // namespace
 
 int main() {
@@ -465,6 +530,7 @@ int main() {
   test_canonical_owner_range_and_integrity_validation();
   test_bad_hash_and_leftover();
   test_manifest_limit_precedes_span_copy();
+  test_quantized_payload_domains();
   if (g_failures != 0) {
     std::cerr << g_failures << " reader unit checks failed\n";
     return 1;
