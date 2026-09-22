@@ -140,6 +140,8 @@ class Session {
 namespace detail {
 
 struct SessionPlanAccess {
+  [[nodiscard]] static qw38::cuda::Stream const* stream(
+      Session const& session) noexcept;
   [[nodiscard]] static std::expected<KvPopulatedSlot, Error> kv_populated(
       Session& session, std::uint32_t attention_layer);
   [[nodiscard]] static std::expected<ConvCursorSlot, Error> conv_cursor(

@@ -416,13 +416,19 @@ void test_workspace_and_missing_model(Stream const& stream) {
     fail("load/session");
     return;
   }
-  auto plan = bind_gdn_front_plan(*model, *session, 0, stream);
+  auto const& session_stream = rt->stream();
+  auto plan = bind_gdn_front_plan(*model, *session, 0, session_stream);
   expect(!plan && plan.error().code == qw38::runtime::ErrorCode::InvalidArgument,
          "missing GDN identities reject");
-  auto mix = bind_gdn_plan(*model, *session, 0, stream);
+  auto mix = bind_gdn_plan(*model, *session, 0, session_stream);
   expect(!mix && mix.error().code == qw38::runtime::ErrorCode::InvalidArgument,
-         "missing complete mixer identities reject");
-  auto bad = bind_gdn_front_plan(*model, *session, 3, stream);
+         "session stream passes ownership validation");
+  auto foreign = bind_gdn_plan(*model, *session, 0, stream);
+  expect(!foreign &&
+             foreign.error().code == qw38::runtime::ErrorCode::InvalidArgument &&
+             foreign.error().field == "stream",
+         "foreign stream rejects session mixer");
+  auto bad = bind_gdn_front_plan(*model, *session, 3, session_stream);
   expect(!bad, "attention layer 3 rejects");
   (void)malloc_count;
 }

@@ -940,6 +940,19 @@ std::expected<GdnPlan, Error> bind_gdn_plan(Model const& model, Session& session
                                            std::uint32_t layer,
                                            qw38::cuda::Stream const& stream,
                                            float eps) {
+  auto const* session_stream = detail::SessionPlanAccess::stream(session);
+  if (session_stream == nullptr || session_stream->empty()) {
+    return std::unexpected(
+        make_error(ErrorCode::Internal, "session", "missing stream"));
+  }
+  if (stream.empty()) {
+    return std::unexpected(arg_error("stream", "empty stream"));
+  }
+  if (stream.native() != session_stream->native()) {
+    return std::unexpected(
+        arg_error("stream", "must match the session stream"));
+  }
+
   auto gdn_i = gdn_state_index(layer);
   if (!gdn_i) {
     return std::unexpected(gdn_i.error());

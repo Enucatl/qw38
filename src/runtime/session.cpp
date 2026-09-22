@@ -578,6 +578,11 @@ std::expected<void, Error> Session::set_conv_cursor(
   return {};
 }
 
+qw38::cuda::Stream const* detail::SessionPlanAccess::stream(
+    Session const& session) noexcept {
+  return session.stream_.get();
+}
+
 std::expected<KvPopulatedSlot, Error> detail::SessionPlanAccess::kv_populated(
     Session& session, std::uint32_t attention_layer) {
   return session.kv_populated_slot(attention_layer);
