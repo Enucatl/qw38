@@ -418,6 +418,12 @@ std::expected<ArtifactSchema, FormatError> prepare_schema(
   if (auto st = validate_shared_binding_ownership(schema); !st) {
     return std::unexpected(st.error());
   }
+  // Tensor collection order is not semantic.  Canonicalize it before assigning
+  // physical spans so equivalent schemas cannot produce different artifacts.
+  std::sort(schema.tensors.begin(), schema.tensors.end(),
+            [](TensorRecord const& a, TensorRecord const& b) {
+              return a.tensor_id < b.tensor_id;
+            });
   if (auto st = validate_input_span_placements(schema); !st) {
     return std::unexpected(st.error());
   }

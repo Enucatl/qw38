@@ -2388,6 +2388,13 @@ std::expected<void, FormatError> validate_schema(ArtifactSchema const& schema,
       }
     }
   }
+  for (std::size_t i = 1; i < schema.tensors.size(); ++i) {
+    if (schema.tensors[i - 1].tensor_id > schema.tensors[i].tensor_id) {
+      return std::unexpected(make_error(
+          FormatErrorCode::InvalidSpan, offset, "tensor.order",
+          "tensor directory must be ordered by ascending tensor id"));
+    }
+  }
   if (auto st = validate_shared_binding_ownership(schema, offset); !st) {
     return st;
   }

@@ -293,6 +293,46 @@ void test_deterministic_repeat() {
   expect(a == b && !a.empty(), "same inputs yield byte-identical artifacts");
 }
 
+void test_permuted_tensor_order_is_byte_identical() {
+  ScratchDir dir;
+  auto canonical = base_schema();
+  canonical.tensors = {
+      unplaced_bf16_vector(1, "a", 4),
+      unplaced_bf16_vector(2, "b", 4),
+  };
+  auto permuted = canonical;
+  std::reverse(permuted.tensors.begin(), permuted.tensors.end());
+
+  std::array<std::byte, 8> const a{
+      std::byte{0x10}, std::byte{0x11}, std::byte{0x12}, std::byte{0x13},
+      std::byte{0x14}, std::byte{0x15}, std::byte{0x16}, std::byte{0x17}};
+  std::array<std::byte, 8> const b{
+      std::byte{0x20}, std::byte{0x21}, std::byte{0x22}, std::byte{0x23},
+      std::byte{0x24}, std::byte{0x25}, std::byte{0x26}, std::byte{0x27}};
+  auto write_one = [&](std::string_view name, ArtifactSchema const& input) {
+    auto const dest = dir.file(std::string(name));
+    auto writer = ArtifactWriter::create(dest, input);
+    expect(static_cast<bool>(writer), "permuted writer opens");
+    if (!writer) {
+      return std::vector<std::byte>{};
+    }
+    expect(static_cast<bool>(
+               writer->write_span("b", SpanKind::Payload, b)),
+           "write b from permuted input");
+    expect(static_cast<bool>(
+               writer->write_span("a", SpanKind::Payload, a)),
+           "write a from permuted input");
+    expect(static_cast<bool>(writer->finalize()),
+           "finalize permuted input");
+    return read_all(dest);
+  };
+
+  auto const expected = write_one("canonical.qw38", canonical);
+  auto const actual = write_one("permuted.qw38", permuted);
+  expect(!expected.empty() && expected == actual,
+         "equivalent permuted tensor collections are byte-identical");
+}
+
 void test_empty_duplicate_missing() {
   ScratchDir dir;
   auto schema = base_schema();
@@ -779,6 +819,7 @@ void test_writer_allocation_failure_translation() {
 int main() {
   test_golden_alignment_and_offsets();
   test_deterministic_repeat();
+  test_permuted_tensor_order_is_byte_identical();
   test_empty_duplicate_missing();
   test_overflow_and_inconsistent();
   test_invalid_input_span_placements();

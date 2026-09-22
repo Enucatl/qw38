@@ -224,6 +224,44 @@ void test_misalignment_overflow_overlap() {
               "overlapping unique payloads");
 }
 
+void test_noncanonical_directory_and_span_order() {
+  ScratchDir dir("qw38-reader-order");
+  auto fx = write_task003(dir.file("order.qw38"));
+  auto const file = read_all(fx.path);
+
+  auto directory = mutate_schema(file, [](auto& schema) {
+    std::swap(schema.tensors[1], schema.tensors[2]);
+  });
+  if (!directory) {
+    fail(error_message(directory.error()));
+    return;
+  }
+  expect_code(Artifact::parse(*directory), FormatErrorCode::InvalidSpan,
+              "noncanonical tensor directory order");
+
+  auto spans = mutate_schema(file, [](auto& schema) {
+    auto& tensor = schema.tensors[1];
+    tensor.payload.offset = 768;
+    tensor.scales.offset = 512;
+    for (auto& rec : schema.integrity) {
+      if (rec.tensor_id != tensor.tensor_id) {
+        continue;
+      }
+      if (rec.kind == IntegrityKind::Sha256PayloadSpan) {
+        rec.region = tensor.payload;
+      } else if (rec.kind == IntegrityKind::Sha256ScaleSpan) {
+        rec.region = tensor.scales;
+      }
+    }
+  });
+  if (!spans) {
+    fail(error_message(spans.error()));
+    return;
+  }
+  expect_code(Artifact::parse(*spans), FormatErrorCode::InvalidSpan,
+              "scale span preceding its payload");
+}
+
 void test_invalid_pairs_shapes_scales_shared_state() {
   ScratchDir dir("qw38-reader-schema");
   auto fx = write_task003(dir.file("s.qw38"));
@@ -597,6 +635,7 @@ int main() {
   test_open_and_parse_roundtrip_minimal();
   test_bad_magic_version_enum();
   test_misalignment_overflow_overlap();
+  test_noncanonical_directory_and_span_order();
   test_invalid_pairs_shapes_scales_shared_state();
   test_required_state_scratch_and_precision_schema();
   test_canonical_owner_range_and_integrity_validation();

@@ -244,36 +244,54 @@ std::expected<void, FormatError> validate_file_layout(
   occupied.push_back(Occupied{header.manifest_offset, header.manifest_length,
                               "manifest"});
 
-  std::unordered_set<std::uint32_t> checked_owners;
+  // Header/manifest overlap is diagnosed by the general occupied-range check
+  // below; this cursor only enforces canonical ordering among tensor spans.
+  std::uint64_t previous_span_end = 0;
   for (auto const& tensor : schema.tensors) {
     auto const owner_id =
         canonical_owner_tensor_id(schema, tensor.tensor_id);
     if (!owner_id) {
       return std::unexpected(owner_id.error());
     }
-    if (!checked_owners.insert(*owner_id).second) {
+    if (*owner_id != tensor.tensor_id) {
       continue;
     }
-    auto const* owner = tensor_by_id(schema, *owner_id);
-    if (owner == nullptr) {
-      return std::unexpected(make_error(FormatErrorCode::SharedBinding, 0,
-                                        "shared.owner",
-                                        "canonical owner is missing"));
-    }
-    if (auto st = require_in_file(owner->payload, file_size, "tensor.payload");
+    if (auto st = require_in_file(tensor.payload, file_size, "tensor.payload");
         !st) {
       return st;
     }
-    if (auto st = require_in_file(owner->scales, file_size, "tensor.scales");
+    if (auto st = require_in_file(tensor.scales, file_size, "tensor.scales");
         !st) {
       return st;
     }
-    if (!owner->payload.empty()) {
-      occupied.push_back(Occupied{owner->payload.offset, owner->payload.length,
+    if (tensor.payload.offset < previous_span_end) {
+      return std::unexpected(make_error(
+          FormatErrorCode::InvalidSpan, tensor.payload.offset, "tensor.payload",
+          "owner payload spans must follow tensor directory order"));
+    }
+    auto payload_end = checked_add(tensor.payload.offset, tensor.payload.length,
+                                   tensor.payload.offset, "tensor.payload");
+    if (!payload_end) {
+      return std::unexpected(payload_end.error());
+    }
+    previous_span_end = *payload_end;
+    if (!tensor.payload.empty()) {
+      occupied.push_back(Occupied{tensor.payload.offset, tensor.payload.length,
                                   "tensor.payload"});
     }
-    if (!owner->scales.empty()) {
-      occupied.push_back(Occupied{owner->scales.offset, owner->scales.length,
+    if (!tensor.scales.empty()) {
+      if (tensor.scales.offset < previous_span_end) {
+        return std::unexpected(make_error(
+            FormatErrorCode::InvalidSpan, tensor.scales.offset, "tensor.scales",
+            "scale span must follow its tensor payload"));
+      }
+      auto scale_end = checked_add(tensor.scales.offset, tensor.scales.length,
+                                   tensor.scales.offset, "tensor.scales");
+      if (!scale_end) {
+        return std::unexpected(scale_end.error());
+      }
+      previous_span_end = *scale_end;
+      occupied.push_back(Occupied{tensor.scales.offset, tensor.scales.length,
                                   "tensor.scales"});
     }
   }
