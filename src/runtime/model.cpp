@@ -4,6 +4,8 @@
 #include "cuda/upload.hpp"
 #include "format/constants.hpp"
 
+#include <new>
+#include <stdexcept>
 #include <unordered_map>
 
 namespace qw38::runtime {
@@ -131,6 +133,7 @@ std::expected<TensorView, Error> Model::scales(
 
 std::expected<Model, Error> Model::upload(qw38::format::Artifact const& artifact,
                                           qw38::cuda::Stream const& stream) {
+  try {
   Model model;
   model.schema_ = artifact.schema();
 
@@ -246,6 +249,13 @@ std::expected<Model, Error> Model::upload(qw38::format::Artifact const& artifact
     return std::unexpected(from_cuda(st.error()));
   }
   return model;
+  } catch (std::bad_alloc const&) {
+    return std::unexpected(make_error(ErrorCode::AllocationFailed, "model.upload",
+                                      "host allocation failed"));
+  } catch (std::length_error const&) {
+    return std::unexpected(make_error(ErrorCode::AllocationFailed, "model.upload",
+                                      "host allocation size is invalid"));
+  }
 }
 
 }  // namespace qw38::runtime

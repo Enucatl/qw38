@@ -4,6 +4,8 @@
 
 #include <algorithm>
 #include <limits>
+#include <new>
+#include <stdexcept>
 #include <utility>
 
 namespace qw38::runtime {
@@ -71,6 +73,7 @@ ScratchPlacement const* find_placement(ArenaPlan const& plan,
 
 std::expected<ArenaPlan, Error> plan_scratch_arena(
     std::span<ScratchRequest const> requests, std::uint64_t alignment) {
+  try {
   if (alignment == 0) {
     return std::unexpected(make_error(ErrorCode::InvalidArgument, "arena.align",
                                       "alignment must be nonzero"));
@@ -194,10 +197,18 @@ std::expected<ArenaPlan, Error> plan_scratch_arena(
     });
   }
   return plan;
+  } catch (std::bad_alloc const&) {
+    return std::unexpected(make_error(ErrorCode::AllocationFailed, "arena.plan",
+                                      "host allocation failed"));
+  } catch (std::length_error const&) {
+    return std::unexpected(make_error(ErrorCode::AllocationFailed, "arena.plan",
+                                      "host allocation size is invalid"));
+  }
 }
 
 std::expected<std::vector<ScratchRequest>, Error> v0_scratch_requests(
     std::uint64_t token_capacity) {
+  try {
   if (token_capacity == 0) {
     return std::unexpected(make_error(ErrorCode::InvalidArgument,
                                       "arena.token_capacity",
@@ -268,6 +279,13 @@ std::expected<std::vector<ScratchRequest>, Error> v0_scratch_requests(
     return std::unexpected(st.error());
   }
   return out;
+  } catch (std::bad_alloc const&) {
+    return std::unexpected(make_error(ErrorCode::AllocationFailed, "arena.requests",
+                                      "host allocation failed"));
+  } catch (std::length_error const&) {
+    return std::unexpected(make_error(ErrorCode::AllocationFailed, "arena.requests",
+                                      "host allocation size is invalid"));
+  }
 }
 
 std::expected<ArenaPlan, Error> plan_v0_arena(std::uint64_t token_capacity) {

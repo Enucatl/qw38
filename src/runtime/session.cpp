@@ -4,6 +4,8 @@
 #include "cuda/stream.hpp"
 #include "runtime/model.hpp"
 
+#include <new>
+#include <stdexcept>
 #include <utility>
 
 namespace qw38::runtime {
@@ -72,6 +74,7 @@ std::array<std::uint64_t, qw38::format::kMaxRank> extent5(
 std::expected<Session, Error> Session::create(
     Model const& model, qw38::cuda::Stream const& stream,
     std::uint64_t kv_capacity) {
+  try {
   if (auto st = require_language_state(model.state()); !st) {
     return std::unexpected(st.error());
   }
@@ -159,6 +162,13 @@ std::expected<Session, Error> Session::create(
     return std::unexpected(from_cuda(st.error()));
   }
   return s;
+  } catch (std::bad_alloc const&) {
+    return std::unexpected(make_error(ErrorCode::AllocationFailed, "session.create",
+                                      "host allocation failed"));
+  } catch (std::length_error const&) {
+    return std::unexpected(make_error(ErrorCode::AllocationFailed, "session.create",
+                                      "host allocation size is invalid"));
+  }
 }
 
 std::expected<void, Error> Session::zero_persistent() {
@@ -191,6 +201,7 @@ std::expected<void, Error> Session::reset() {
 }
 
 std::expected<SessionSnapshot, Error> Session::save() const {
+  try {
   if (stream_ == nullptr) {
     return std::unexpected(
         make_error(ErrorCode::Internal, "session.save", "missing stream"));
@@ -218,6 +229,13 @@ std::expected<SessionSnapshot, Error> Session::save() const {
     return std::unexpected(from_cuda(st.error()));
   }
   return snap;
+  } catch (std::bad_alloc const&) {
+    return std::unexpected(make_error(ErrorCode::AllocationFailed, "session.save",
+                                      "host allocation failed"));
+  } catch (std::length_error const&) {
+    return std::unexpected(make_error(ErrorCode::AllocationFailed, "session.save",
+                                      "host allocation size is invalid"));
+  }
 }
 
 std::expected<void, Error> Session::restore(SessionSnapshot const& snap) {
