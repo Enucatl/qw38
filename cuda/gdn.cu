@@ -59,6 +59,34 @@ __device__ float block_sum_128(float v, float* sm) {
   return sm[0];
 }
 
+__device__ __forceinline__ float warp_max(float v) {
+#pragma unroll
+  for (int off = 16; off > 0; off >>= 1) {
+    v = fmaxf(v, __shfl_down_sync(0xffffffffu, v, off));
+  }
+  return v;
+}
+
+__device__ float block_max_128(float v, float* sm) {
+  v = warp_max(v);
+  int const warp = threadIdx.x >> 5;
+  int const lane = threadIdx.x & 31;
+  if (lane == 0) {
+    sm[warp] = v;
+  }
+  __syncthreads();
+  float t = 0.0f;
+  if (warp == 0) {
+    t = (lane < 4) ? sm[lane] : 0.0f;
+    t = warp_max(t);
+    if (lane == 0) {
+      sm[0] = t;
+    }
+  }
+  __syncthreads();
+  return sm[0];
+}
+
 __device__ __forceinline__ float sigmoid_fp32(float u) {
   if (u >= 0.0f) {
     float const e = expf(-u);
@@ -102,15 +130,28 @@ __global__ void gdn_conv_silu_kernel(std::uint16_t const* qkv,
 
 __device__ void l2_normalize_head(std::uint16_t const* src, float* dst, float eps,
                                   float* sm) {
+  float max_abs = 0.0f;
+  for (std::uint32_t i = threadIdx.x; i < kGdnHeadDim; i += blockDim.x) {
+    max_abs = fmaxf(max_abs, fabsf(bf16_to_fp32(src[i])));
+  }
+  max_abs = block_max_128(max_abs, sm);
+  if (max_abs == 0.0f) {
+    for (std::uint32_t i = threadIdx.x; i < kGdnHeadDim; i += blockDim.x) {
+      dst[i] = 0.0f;
+    }
+    __syncthreads();
+    return;
+  }
+
   float sumsq = 0.0f;
   for (std::uint32_t i = threadIdx.x; i < kGdnHeadDim; i += blockDim.x) {
-    float const v = bf16_to_fp32(src[i]);
-    sumsq += v * v;
+    float const scaled = bf16_to_fp32(src[i]) / max_abs;
+    sumsq += scaled * scaled;
   }
   sumsq = block_sum_128(sumsq, sm);
-  float const inv = 1.0f / sqrtf(sumsq + eps);
+  float const denom = hypotf(sqrtf(sumsq), sqrtf(eps) / max_abs);
   for (std::uint32_t i = threadIdx.x; i < kGdnHeadDim; i += blockDim.x) {
-    dst[i] = bf16_to_fp32(src[i]) * inv;
+    dst[i] = (bf16_to_fp32(src[i]) / max_abs) / denom;
   }
   __syncthreads();
 }

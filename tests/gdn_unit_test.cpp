@@ -5,6 +5,7 @@
 #include "runtime/runtime.hpp"
 #include "runtime_support.hpp"
 
+#include <cmath>
 #include <cstdint>
 #include <iostream>
 #include <limits>
@@ -439,6 +440,63 @@ void test_prepare_zero_and_gates(Stream const& stream) {
   expect_fp32_close(*ga, alpha_ref, "nonzero alpha", kGdnGateFp32Abs,
                     kGdnGateFp32Rel);
   expect_fp32_close(*gb, beta_ref, "nonzero beta", kGdnGateFp32Abs, kGdnGateFp32Rel);
+}
+
+void test_prepare_large_finite_qk(Stream const& stream) {
+  constexpr std::uint16_t kMaxBf16 = 0x7F7Fu;
+  constexpr std::uint16_t kMinBf16 = 0xFF7Fu;
+  auto convolved = zeros_h(kQkvWidth);
+  std::size_t const nqk = static_cast<std::size_t>(kGdnKeyHeads) * kGdnHeadDim;
+  std::vector<float> expected_q(nqk);
+  std::vector<float> expected_k(nqk);
+  float const normalized = 1.0f / std::sqrt(static_cast<float>(kGdnHeadDim));
+  for (std::size_t i = 0; i < nqk; ++i) {
+    bool const q_positive = (i & 1u) == 0u;
+    bool const k_positive = !q_positive;
+    convolved[i] = q_positive ? kMaxBf16 : kMinBf16;
+    convolved[nqk + i] = k_positive ? kMaxBf16 : kMinBf16;
+    expected_q[i] = q_positive ? normalized : -normalized;
+    expected_k[i] = k_positive ? normalized : -normalized;
+  }
+
+  auto d_c = upload_vec(convolved, stream);
+  auto d_a = upload_vec(zeros_f(kGdnValueHeads), stream);
+  auto d_b = upload_vec(zeros_f(kGdnValueHeads), stream);
+  auto d_alog = upload_vec(zeros_h(kGdnValueHeads), stream);
+  auto d_dt = upload_vec(zeros_h(kGdnValueHeads), stream);
+  auto d_q = DeviceBuffer::allocate(nqk * sizeof(float));
+  auto d_k = DeviceBuffer::allocate(nqk * sizeof(float));
+  auto d_alpha = DeviceBuffer::allocate(kGdnValueHeads * sizeof(float));
+  auto d_beta = DeviceBuffer::allocate(kGdnValueHeads * sizeof(float));
+  if (!d_c || !d_a || !d_b || !d_alog || !d_dt || !d_q || !d_k || !d_alpha ||
+      !d_beta) {
+    fail("large finite prepare allocation");
+    return;
+  }
+
+  auto st = launch_gdn_prepare(
+      static_cast<std::uint16_t const*>(d_c->data()),
+      static_cast<float const*>(d_a->data()), static_cast<float const*>(d_b->data()),
+      static_cast<std::uint16_t const*>(d_alog->data()),
+      static_cast<std::uint16_t const*>(d_dt->data()), kDefaultRmsEps,
+      static_cast<float*>(d_q->data()), static_cast<float*>(d_k->data()),
+      static_cast<float*>(d_alpha->data()), static_cast<float*>(d_beta->data()),
+      stream);
+  expect(static_cast<bool>(st), "large finite prepare launch");
+  auto q = download_vec<float>(*d_q, nqk, stream);
+  auto k = download_vec<float>(*d_k, nqk, stream);
+  if (!q || !k) {
+    fail("large finite prepare download");
+    return;
+  }
+  expect(std::ranges::all_of(*q, [](float v) { return std::isfinite(v); }),
+         "large finite q_hat remains finite");
+  expect(std::ranges::all_of(*k, [](float v) { return std::isfinite(v); }),
+         "large finite k_hat remains finite");
+  expect_fp32_close(*q, expected_q, "large finite q_hat", kGdnQkFp32Abs,
+                    kGdnQkFp32Rel);
+  expect_fp32_close(*k, expected_k, "large finite k_hat", kGdnQkFp32Abs,
+                    kGdnQkFp32Rel);
 }
 
 void test_workspace_and_missing_model(Stream const& stream) {
@@ -1245,6 +1303,7 @@ int main() {
   test_bind_errors(*stream);
   test_conv_history_and_taps(*stream);
   test_prepare_zero_and_gates(*stream);
+  test_prepare_large_finite_qk(*stream);
   test_workspace_and_missing_model(*stream);
   test_recurrence_bind_and_invalid(*stream);
   test_recurrence_layout_zero_heads_layers(*stream);
