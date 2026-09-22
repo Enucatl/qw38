@@ -273,6 +273,104 @@ std::expected<void, FormatError> check_unique_span_overlap(
   return {};
 }
 
+std::expected<void, FormatError> validate_input_span(
+    ByteSpan const& span, std::uint64_t expected_length,
+    std::string_view field) {
+  if (span.length != 0 && span.length != expected_length) {
+    return std::unexpected(make_error(
+        FormatErrorCode::InconsistentInput, span.offset, field,
+        "declared span length does not match layout"));
+  }
+  if ((span.offset == 0) != (span.length == 0)) {
+    return std::unexpected(make_error(
+        FormatErrorCode::InvalidSpan, span.offset, field,
+        "an unplaced span must use offset and length 0"));
+  }
+  if (auto st = require_span_alignment(span.offset, span.length, field); !st) {
+    return std::unexpected(st.error());
+  }
+  if (auto end = checked_add(span.offset, span.length, span.offset, field);
+      !end) {
+    return std::unexpected(end.error());
+  }
+  return {};
+}
+
+std::expected<void, FormatError> validate_input_span_placements(
+    ArtifactSchema const& schema) {
+  struct Placed {
+    ByteSpan span;
+    SpanKind kind;
+    std::uint32_t owner_tensor_id;
+  };
+
+  std::vector<Placed> placed;
+  placed.reserve(schema.tensors.size() * 2);
+  for (auto const& tensor : schema.tensors) {
+    auto const payload_n = expected_payload_bytes(tensor);
+    if (!payload_n) {
+      return std::unexpected(payload_n.error());
+    }
+    auto const scale_n = expected_scale_bytes(tensor);
+    if (!scale_n) {
+      return std::unexpected(scale_n.error());
+    }
+    if (auto st = validate_input_span(tensor.payload, *payload_n,
+                                      "tensor.payload");
+        !st) {
+      return std::unexpected(st.error());
+    }
+    if (auto st = validate_input_span(tensor.scales, *scale_n,
+                                      "tensor.scales");
+        !st) {
+      return std::unexpected(st.error());
+    }
+    auto const owner_id = owner_of(schema, tensor.tensor_id);
+    if (!owner_id) {
+      return std::unexpected(owner_id.error());
+    }
+    if (!tensor.payload.empty()) {
+      placed.push_back(Placed{tensor.payload, SpanKind::Payload, *owner_id});
+    }
+    if (!tensor.scales.empty()) {
+      placed.push_back(Placed{tensor.scales, SpanKind::Scales, *owner_id});
+    }
+  }
+
+  for (auto const& binding : schema.shared_bindings) {
+    auto const* owner = find_tensor(schema, binding.owner_tensor_id);
+    auto const* alias = find_tensor(schema, binding.alias_tensor_id);
+    if (owner == nullptr || alias == nullptr) {
+      return std::unexpected(make_error(FormatErrorCode::SharedBinding, 0,
+                                        "shared.owner",
+                                        "alias owner is missing"));
+    }
+    if (alias->payload != owner->payload || alias->scales != owner->scales) {
+      return std::unexpected(make_error(
+          FormatErrorCode::SharedBinding, alias->payload.offset,
+          "shared.alias", "alias spans must exactly match their owner"));
+    }
+  }
+
+  for (std::size_t i = 0; i < placed.size(); ++i) {
+    for (std::size_t j = i + 1; j < placed.size(); ++j) {
+      if (!spans_overlap(placed[i].span, placed[j].span)) {
+        continue;
+      }
+      bool const permitted =
+          placed[i].kind == placed[j].kind &&
+          placed[i].owner_tensor_id == placed[j].owner_tensor_id &&
+          placed[i].span == placed[j].span;
+      if (!permitted) {
+        return std::unexpected(make_error(
+            FormatErrorCode::OverlappingSpan, placed[i].span.offset,
+            "tensor.span", "input payload/scale spans overlap"));
+      }
+    }
+  }
+  return {};
+}
+
 std::expected<ArtifactSchema, FormatError> prepare_schema(
     ArtifactSchema const& input) {
   if (!input.integrity.empty()) {
@@ -284,68 +382,8 @@ std::expected<ArtifactSchema, FormatError> prepare_schema(
   if (auto st = validate_shared_binding_ownership(schema); !st) {
     return std::unexpected(st.error());
   }
-  std::vector<ByteSpan> input_unique_spans;
-  for (auto const& tensor : schema.tensors) {
-    auto const payload_n = expected_payload_bytes(tensor);
-    if (!payload_n) {
-      return std::unexpected(payload_n.error());
-    }
-    auto const scale_n = expected_scale_bytes(tensor);
-    if (!scale_n) {
-      return std::unexpected(scale_n.error());
-    }
-    if (tensor.payload.length != 0 && tensor.payload.length != *payload_n) {
-      return std::unexpected(make_error(
-          FormatErrorCode::InconsistentInput, tensor.payload.offset,
-          "tensor.payload.length",
-          "declared payload length does not match layout"));
-    }
-    if (tensor.scales.length != 0 && tensor.scales.length != *scale_n) {
-      return std::unexpected(make_error(
-          FormatErrorCode::InconsistentInput, tensor.scales.offset,
-          "tensor.scales.length",
-          "declared scale length does not match quantizer"));
-    }
-    if (is_alias(schema, tensor.tensor_id)) {
-      continue;
-    }
-    if (tensor.payload.length != 0) {
-      if (auto st = require_span_alignment(tensor.payload.offset,
-                                           tensor.payload.length,
-                                           "tensor.payload");
-          !st) {
-        return std::unexpected(st.error());
-      }
-      if (auto st = checked_add(tensor.payload.offset, tensor.payload.length,
-                                tensor.payload.offset, "tensor.payload");
-          !st) {
-        return std::unexpected(st.error());
-      }
-      input_unique_spans.push_back(tensor.payload);
-    }
-    if (tensor.scales.length != 0) {
-      if (auto st = require_span_alignment(tensor.scales.offset,
-                                           tensor.scales.length,
-                                           "tensor.scales");
-          !st) {
-        return std::unexpected(st.error());
-      }
-      if (auto st = checked_add(tensor.scales.offset, tensor.scales.length,
-                                tensor.scales.offset, "tensor.scales");
-          !st) {
-        return std::unexpected(st.error());
-      }
-      input_unique_spans.push_back(tensor.scales);
-    }
-  }
-  for (std::size_t i = 0; i < input_unique_spans.size(); ++i) {
-    for (std::size_t j = i + 1; j < input_unique_spans.size(); ++j) {
-      if (spans_overlap(input_unique_spans[i], input_unique_spans[j])) {
-        return std::unexpected(make_error(
-            FormatErrorCode::OverlappingSpan, input_unique_spans[i].offset,
-            "tensor.payload", "input payload/scale spans overlap"));
-      }
-    }
+  if (auto st = validate_input_span_placements(schema); !st) {
+    return std::unexpected(st.error());
   }
   if (auto st = assign_spans(schema); !st) {
     return std::unexpected(st.error());

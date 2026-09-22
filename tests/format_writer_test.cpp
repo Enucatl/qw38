@@ -366,6 +366,66 @@ void test_overflow_and_inconsistent() {
          "payload length mismatch is rejected");
 }
 
+void test_invalid_input_span_placements() {
+  auto rejects = [](ArtifactSchema schema, FormatErrorCode code,
+                    std::string_view what) {
+    auto writer = ArtifactWriter::create("/tmp/unused.qw38", schema);
+    expect(!writer && writer.error().code == code, what);
+  };
+
+  auto schema = base_schema();
+  auto t = unplaced_bf16_vector(1, "v", 4);
+  t.payload = ByteSpan{.offset = 256, .length = 0};
+  schema.tensors = {t};
+  rejects(schema, FormatErrorCode::InvalidSpan,
+          "empty payload with a nonzero offset is rejected");
+
+  t.payload = ByteSpan{};
+  t.scales = ByteSpan{.offset = 256, .length = 0};
+  schema.tensors = {t};
+  rejects(schema, FormatErrorCode::InvalidSpan,
+          "empty scale span with a nonzero offset is rejected");
+
+  t.payload = ByteSpan{.offset = 0, .length = 8};
+  t.scales = ByteSpan{};
+  schema.tensors = {t};
+  rejects(schema, FormatErrorCode::InvalidSpan,
+          "nonempty payload without a placement offset is rejected");
+
+  t = unplaced_bf16_vector(1, "v", 256);
+  t.payload = ByteSpan{.offset = std::numeric_limits<std::uint64_t>::max() -
+                                   255,
+                       .length = 512};
+  schema.tensors = {t};
+  rejects(schema, FormatErrorCode::Overflow,
+          "overflowing payload placement is rejected");
+
+  schema = base_schema();
+  auto owner = unplaced_bf16_vector(1, "owner", 4);
+  auto alias = unplaced_bf16_vector(2, "alias", 4);
+  owner.payload = ByteSpan{.offset = 256, .length = 8};
+  alias.payload = ByteSpan{.offset = 512, .length = 8};
+  schema.tensors = {owner, alias};
+  schema.shared_bindings = {
+      SharedBinding{.owner_tensor_id = 1, .alias_tensor_id = 2},
+  };
+  alias.payload = ByteSpan{.offset = 128, .length = 8};
+  schema.tensors = {owner, alias};
+  rejects(schema, FormatErrorCode::Misaligned,
+          "misaligned alias payload placement is rejected");
+
+  alias.payload = ByteSpan{.offset = 512, .length = 8};
+  schema.tensors = {owner, alias};
+  rejects(schema, FormatErrorCode::SharedBinding,
+          "alias payload placement must exactly match its owner");
+
+  alias.payload = owner.payload;
+  schema.tensors = {owner, alias};
+  auto writer = ArtifactWriter::create("/tmp/unused.qw38", schema);
+  expect(static_cast<bool>(writer),
+         "identical owner and alias input placements are permitted");
+}
+
 void test_invalid_shared_ownership_rejected_before_writing() {
   auto schema = base_schema();
   schema.tensors = {
@@ -530,6 +590,7 @@ int main() {
   test_deterministic_repeat();
   test_empty_duplicate_missing();
   test_overflow_and_inconsistent();
+  test_invalid_input_span_placements();
   test_invalid_shared_ownership_rejected_before_writing();
   test_failure_cleanup();
   test_writer_interleaving_owns_publication();
