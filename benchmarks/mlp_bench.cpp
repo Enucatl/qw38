@@ -82,17 +82,19 @@ int main() {
   auto down_c = DeviceBuffer::allocate(down_codes_n);
   auto down_s = DeviceBuffer::allocate(down_scale_n);
   auto gamma = DeviceBuffer::allocate(kHidden * 2);
-  auto residual = DeviceBuffer::allocate(kHidden * 4);
+  auto h_mid = DeviceBuffer::allocate(kHidden * 4);
+  auto next_h = DeviceBuffer::allocate(kHidden * 4);
   auto normalized = DeviceBuffer::allocate(kHidden * 2);
   auto swiglu = DeviceBuffer::allocate(kFfnWidth * 2);
   if (!gate_c || !gate_s || !up_c || !up_s || !down_c || !down_s || !gamma ||
-      !residual || !normalized || !swiglu) {
+      !h_mid || !next_h || !normalized || !swiglu) {
     std::cerr << "allocate failed\n";
     return 1;
   }
   if (!zero(*gate_c, *stream) || !zero(*gate_s, *stream) || !zero(*up_c, *stream) ||
       !zero(*up_s, *stream) || !zero(*down_c, *stream) || !zero(*down_s, *stream) ||
-      !zero(*gamma, *stream) || !zero(*residual, *stream) ||
+      !zero(*gamma, *stream) || !zero(*h_mid, *stream) ||
+      !zero(*next_h, *stream) ||
       !zero(*normalized, *stream) || !zero(*swiglu, *stream)) {
     std::cerr << "zero failed\n";
     return 1;
@@ -123,9 +125,12 @@ int main() {
   views.gamma = make_view(gamma->data(), ArithmeticDtype::Bf16,
                           PhysicalLayoutId::CudaBf16VectorV0, StorageClass::Bf16,
                           false, 1, kHidden);
-  views.residual = make_view(residual->data(), ArithmeticDtype::Fp32,
-                             PhysicalLayoutId::CudaFp32VectorV0, StorageClass::Fp32,
-                             true, 1, kHidden);
+  views.h_mid = make_view(h_mid->data(), ArithmeticDtype::Fp32,
+                          PhysicalLayoutId::CudaFp32VectorV0, StorageClass::Fp32,
+                          true, 1, kHidden);
+  views.next_h = make_view(next_h->data(), ArithmeticDtype::Fp32,
+                           PhysicalLayoutId::CudaFp32VectorV0, StorageClass::Fp32,
+                           true, 1, kHidden);
   views.normalized = make_view(normalized->data(), ArithmeticDtype::Bf16,
                                PhysicalLayoutId::CudaBf16RowMajorV0,
                                StorageClass::Bf16, true, 1, kHidden);

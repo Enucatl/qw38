@@ -65,6 +65,7 @@ MlpBindViews dummy_ok_views() {
   auto* p8 = dummy_ptr(0x80000);
   auto* p9 = dummy_ptr(0x90000);
   auto* p10 = dummy_ptr(0xA0000);
+  auto* p11 = dummy_ptr(0xB0000);
   v.gate = make_view(p, qw38::format::ArithmeticDtype::Bf16,
                      PhysicalLayoutId::CudaQ4G64V0, StorageClass::Int4Grouped,
                      false, 2, kFfn, kHidden);
@@ -88,9 +89,12 @@ MlpBindViews dummy_ok_views() {
   v.gamma = make_view(p7, qw38::format::ArithmeticDtype::Bf16,
                       PhysicalLayoutId::CudaBf16VectorV0, StorageClass::Bf16, false,
                       1, kHidden);
-  v.residual = make_view(p8, qw38::format::ArithmeticDtype::Fp32,
-                         PhysicalLayoutId::CudaFp32VectorV0, StorageClass::Fp32,
-                         true, 1, kHidden);
+  v.h_mid = make_view(p8, qw38::format::ArithmeticDtype::Fp32,
+                      PhysicalLayoutId::CudaFp32VectorV0, StorageClass::Fp32,
+                      true, 1, kHidden);
+  v.next_h = make_view(p11, qw38::format::ArithmeticDtype::Fp32,
+                       PhysicalLayoutId::CudaFp32VectorV0, StorageClass::Fp32,
+                       true, 1, kHidden);
   v.normalized = make_view(p9, qw38::format::ArithmeticDtype::Bf16,
                            PhysicalLayoutId::CudaBf16RowMajorV0, StorageClass::Bf16,
                            true, 1, kHidden);
@@ -136,10 +140,17 @@ void test_bind_errors(Stream const& stream) {
          "mixed Q4/BF16 family rejects");
 
   auto nowrite = views;
-  nowrite.residual.writable = false;
+  nowrite.next_h.writable = false;
   auto bad_res = bind_mlp_plan(nowrite, stream);
   expect(!bad_res && bad_res.error().code == qw38::runtime::ErrorCode::InvalidArgument,
-         "non-writable residual rejects");
+         "non-writable next residual rejects");
+
+  auto residual_alias = views;
+  residual_alias.next_h.pointer = residual_alias.h_mid.pointer;
+  auto bad_res_alias = bind_mlp_plan(residual_alias, stream);
+  expect(!bad_res_alias &&
+             bad_res_alias.error().code == qw38::runtime::ErrorCode::InvalidArgument,
+         "h_mid/next_h alias rejects");
 
   auto alias = views;
   alias.normalized.pointer = alias.swiglu.pointer;
@@ -289,7 +300,7 @@ void test_zero_extreme_and_reuse(Stream const& stream) {
   st = execute_decode_mlp(*plan);
   expect(static_cast<bool>(st), "zero execute 2");
   expect(qw38::cuda::malloc_count() == mallocs, "repeated call allocates nothing");
-  auto got = download_vec<float>(dev.residual, kHidden, stream);
+  auto got = download_vec<float>(dev.next_h, kHidden, stream);
   if (got) {
     expect(all_finite(*got, "zero residual"), "zero residual finite");
     for (auto v : *got) {
@@ -320,7 +331,7 @@ void test_zero_extreme_and_reuse(Stream const& stream) {
   st = execute_decode_mlp(*plan_x);
   expect(static_cast<bool>(st), "extreme execute");
   expect(qw38::cuda::malloc_count() == mallocs_x, "extreme execute allocates nothing");
-  auto got_x = download_vec<float>(dev_x.residual, kHidden, stream);
+  auto got_x = download_vec<float>(dev_x.next_h, kHidden, stream);
   if (got_x) {
     expect(all_finite(*got_x, "extreme residual"), "extreme residual finite");
   } else {

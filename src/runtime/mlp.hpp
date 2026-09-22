@@ -17,8 +17,9 @@ namespace qw38::runtime {
 inline constexpr std::uint32_t kMlpLayers = 64;
 inline constexpr float kMlpRmsEps = 1.0e-6f;
 
-// Bound decode MLP: three weight identities, post-mixer RMS gamma, residual,
-// two scratch views, and one ordered stream. execute_decode_mlp allocates nothing.
+// Bound decode MLP: three weight identities, post-mixer RMS gamma, distinct
+// input/output residual views, two scratch views, and one ordered stream.
+// execute_decode_mlp allocates nothing.
 struct MlpWeightBinding {
   TensorView codes{};
   TensorView scales{};
@@ -37,7 +38,8 @@ struct MlpPlan {
   MlpWeightBinding up{};
   MlpWeightBinding down{};
   TensorView gamma{};
-  TensorView residual{};     // FP32 h_mid, live through down add (in-place)
+  TensorView h_mid{};        // FP32 input, preserved through the down add
+  TensorView next_h{};       // FP32 output: h_mid + down projection
   TensorView normalized{};   // BF16 [5120]
   TensorView swiglu{};       // BF16 [17408]; only globally materialized gate/up value
   qw38::cuda::Stream const* stream{nullptr};
@@ -52,7 +54,8 @@ struct MlpBindViews {
   TensorView down{};
   TensorView down_scales{};
   TensorView gamma{};
-  TensorView residual{};
+  TensorView h_mid{};
+  TensorView next_h{};
   TensorView normalized{};
   TensorView swiglu{};
 };

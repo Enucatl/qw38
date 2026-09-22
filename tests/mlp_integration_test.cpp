@@ -212,13 +212,6 @@ int main() {
     fail("cpu1: " + qw38::reference::error_message(cpu1.error()));
     return 1;
   }
-  auto cpu2 = decode_mlp_reference(cpu1->residual, host.gamma, kDefaultRmsEps,
-                                   host.w_gate, host.w_up, host.w_down);
-  if (!cpu2) {
-    fail("cpu2: " + qw38::reference::error_message(cpu2.error()));
-    return 1;
-  }
-
   qw38::format::test::ScratchDir dir("qw38-mlp-int");
   auto path = dir.file("mlp.qw38");
   if (!write_mlp_artifact(path, host)) {
@@ -248,7 +241,12 @@ int main() {
   }
   expect(plan->swiglu.extent[0] == kFfn, "SwiGLU scratch is 17408 BF16");
   expect(plan->normalized.extent[0] == kHidden, "normalized scratch is 5120 BF16");
-  expect(plan->residual.extent[0] == kHidden, "decode residual is 5120 FP32");
+  expect(plan->h_mid.extent[0] == kHidden, "h_mid is 5120 FP32");
+  expect(plan->next_h.extent[0] == kHidden, "next_h is 5120 FP32");
+  expect(plan->h_mid.pointer == session->residual_h_mid().pointer,
+         "MLP consumes session h_mid");
+  expect(plan->next_h.pointer == session->residual_h().pointer,
+         "MLP produces next-layer session h");
   expect(plan->stream == &rt->stream(), "ordered stream bound");
 
   auto residual = session->residual_h_mid();
@@ -262,7 +260,8 @@ int main() {
 
   auto const nptr = plan->normalized.pointer;
   auto const sptr = plan->swiglu.pointer;
-  auto const rptr = plan->residual.pointer;
+  auto const hptr = plan->h_mid.pointer;
+  auto const next_ptr = plan->next_h.pointer;
   auto const mallocs = qw38::cuda::malloc_count();
 
   auto st = execute_decode_mlp(*plan);
@@ -272,16 +271,21 @@ int main() {
   }
   expect(qw38::cuda::malloc_count() == mallocs, "first call allocates nothing");
   expect(plan->normalized.pointer == nptr && plan->swiglu.pointer == sptr &&
-             plan->residual.pointer == rptr,
+             plan->h_mid.pointer == hptr && plan->next_h.pointer == next_ptr,
          "scratch/residual addresses stable after first call");
 
+  std::vector<float> source1(kHidden);
   std::vector<float> got1(kHidden);
-  auto d1 = qw38::cuda::copy_d2h(got1.data(), plan->residual.pointer,
+  auto ds1 = qw38::cuda::copy_d2h(source1.data(), plan->h_mid.pointer,
+                                 kHidden * sizeof(float), rt->stream());
+  auto d1 = qw38::cuda::copy_d2h(got1.data(), plan->next_h.pointer,
                                 kHidden * sizeof(float), rt->stream());
-  expect(static_cast<bool>(d1), "download residual 1");
+  expect(static_cast<bool>(ds1) && static_cast<bool>(d1),
+         "download source/destination 1");
   auto sync1 = rt->stream().sync();
   expect(static_cast<bool>(sync1), "sync 1");
   expect_fp32_close(got1, cpu1->residual, "call1 residual", kResAbs, kResRel);
+  expect_fp32_close(source1, host.h_mid, "call1 h_mid preserved", 0.0f, 0.0f);
 
   st = execute_decode_mlp(*plan);
   if (!st) {
@@ -290,25 +294,22 @@ int main() {
   }
   expect(qw38::cuda::malloc_count() == mallocs, "second call allocates nothing");
   expect(plan->normalized.pointer == nptr && plan->swiglu.pointer == sptr &&
-             plan->residual.pointer == rptr,
+             plan->h_mid.pointer == hptr && plan->next_h.pointer == next_ptr,
          "scratch reuse across consecutive MLP calls");
 
+  std::vector<float> source2(kHidden);
   std::vector<float> got2(kHidden);
-  auto d2 = qw38::cuda::copy_d2h(got2.data(), plan->residual.pointer,
+  auto ds2 = qw38::cuda::copy_d2h(source2.data(), plan->h_mid.pointer,
+                                 kHidden * sizeof(float), rt->stream());
+  auto d2 = qw38::cuda::copy_d2h(got2.data(), plan->next_h.pointer,
                                 kHidden * sizeof(float), rt->stream());
-  expect(static_cast<bool>(d2), "download residual 2");
+  expect(static_cast<bool>(ds2) && static_cast<bool>(d2),
+         "download source/destination 2");
   auto sync2 = rt->stream().sync();
   expect(static_cast<bool>(sync2), "sync 2");
-  expect_fp32_close(got2, cpu2->residual, "call2 residual", kResAbs, kResRel);
-
-  bool changed = false;
-  for (std::uint32_t i = 0; i < kHidden; ++i) {
-    if (got1[i] != got2[i]) {
-      changed = true;
-      break;
-    }
-  }
-  expect(changed, "consecutive calls produce a new residual");
+  expect_fp32_close(got2, cpu1->residual, "call2 residual", kResAbs, kResRel);
+  expect_fp32_close(source2, host.h_mid, "call2 h_mid preserved", 0.0f, 0.0f);
+  expect_fp32_close(got2, got1, "repeated execution is stable", 0.0f, 0.0f);
 
   if (g_failures != 0) {
     std::cerr << g_failures << " mlp integration failures\n";

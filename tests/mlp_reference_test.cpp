@@ -68,8 +68,9 @@ bool run_against_reference(HostMlp& host, Stream const& stream,
   }
   auto norm = download_vec<std::uint16_t>(dev.normalized, kHidden, stream);
   auto sw = download_vec<std::uint16_t>(dev.swiglu, kFfn, stream);
-  auto res = download_vec<float>(dev.residual, kHidden, stream);
-  if (!norm || !sw || !res) {
+  auto source = download_vec<float>(dev.h_mid, kHidden, stream);
+  auto res = download_vec<float>(dev.next_h, kHidden, stream);
+  if (!norm || !sw || !source || !res) {
     fail(std::string(tag) + " download");
     return false;
   }
@@ -77,6 +78,8 @@ bool run_against_reference(HostMlp& host, Stream const& stream,
                     0.0f);
   expect_bf16_close(*sw, cpu->swiglu, std::string(tag) + " swiglu", kSwigluAbs,
                     kSwigluRel);
+  expect_fp32_close(*source, host.h_mid, std::string(tag) + " h_mid preserved",
+                    0.0f, 0.0f);
   expect_fp32_close(*res, cpu->residual, std::string(tag) + " residual", kResAbs,
                     kResRel);
   return true;

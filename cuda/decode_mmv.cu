@@ -135,13 +135,16 @@ __device__ void decode8(std::byte const* codes, std::byte const* scales,
 }
 
 __device__ void apply_epilogue(DecodeEpilogue epilogue, void* output,
-                               float* residual, std::uint32_t row, float acc) {
+                               float const* residual, std::uint32_t row,
+                               float acc) {
   if (epilogue == DecodeEpilogue::StoreBf16) {
     static_cast<std::uint16_t*>(output)[row] = fp32_to_bf16_rne(acc);
   } else if (epilogue == DecodeEpilogue::StoreFp32) {
     static_cast<float*>(output)[row] = acc;
   } else {
-    residual[row] += acc;
+    auto* destination = output == nullptr ? const_cast<float*>(residual)
+                                          : static_cast<float*>(output);
+    destination[row] = residual[row] + acc;
   }
 }
 
@@ -149,7 +152,8 @@ template <WeightKind Kind, bool Paired>
 __global__ void decode_mmv_kernel(std::byte const* codes_a, std::byte const* scales_a,
                                  std::byte const* codes_b, std::byte const* scales_b,
                                  std::uint16_t const* input, void* output_a,
-                                 void* output_b, float* residual_a, float* residual_b,
+                                 void* output_b, float const* residual_a,
+                                 float const* residual_b,
                                  std::uint32_t n, std::uint32_t k, std::uint32_t padded_k,
                                  DecodeEpilogue epilogue) {
   std::uint32_t const tn = blockIdx.x;
@@ -382,16 +386,23 @@ std::expected<void, Error> validate_geometry(DecodeMmvDesc const& d,
                                       "SwiGLU epilogue requires paired gate/up launch"));
   }
   if (d.epilogue == DecodeEpilogue::ResidualAddFp32) {
-    if (!empty_view(d.output)) {
-      return std::unexpected(make_error(ErrorCode::InvalidArgument, op,
-                                        "residual-add must not supply output"));
-    }
+    bool const separate_output = !empty_view(d.output);
     st = validate_view(d.residual, DecodeDtype::Fp32, kDecodeLayoutFp32VectorV0,
                        d.n, 1, d.n, 1,
-                       static_cast<std::uint64_t>(d.n) * 4u, 4, true, op,
+                       static_cast<std::uint64_t>(d.n) * 4u, 4,
+                       !separate_output, op,
                        "residual");
     if (!st) {
       return st;
+    }
+    if (separate_output) {
+      st = validate_view(d.output, DecodeDtype::Fp32,
+                         kDecodeLayoutFp32VectorV0, d.n, 1, d.n, 1,
+                         static_cast<std::uint64_t>(d.n) * 4u, 4, true, op,
+                         "output");
+      if (!st) {
+        return st;
+      }
     }
   } else {
     if (!empty_view(d.residual)) {
@@ -473,8 +484,8 @@ std::expected<void, Error> launch_kind(DecodeMmvDesc const& a,
       b == nullptr ? nullptr : static_cast<std::byte const*>(b->scales.pointer),
       static_cast<std::uint16_t const*>(a.input.pointer), a.output.pointer,
       b == nullptr ? nullptr : b->output.pointer,
-      static_cast<float*>(a.residual.pointer),
-      b == nullptr ? nullptr : static_cast<float*>(b->residual.pointer),
+      static_cast<float const*>(a.residual.pointer),
+      b == nullptr ? nullptr : static_cast<float const*>(b->residual.pointer),
       a.n, a.k, a.padded_k, a.epilogue);
   return check(cudaGetLastError(), op);
 }

@@ -247,7 +247,8 @@ struct DeviceMlp {
   DeviceBuffer down_codes;
   DeviceBuffer down_scales;
   DeviceBuffer gamma;
-  DeviceBuffer residual;
+  DeviceBuffer h_mid;
+  DeviceBuffer next_h;
   DeviceBuffer normalized;
   DeviceBuffer swiglu;
   bool has_scales{true};
@@ -282,15 +283,17 @@ inline bool upload_host_mlp(HostMlp const& host, DeviceMlp& dev, Stream const& s
     return false;
   }
   auto g = upload_vec(host.gamma, stream);
-  auto r = upload_vec(host.h_mid, stream);
+  auto h = upload_vec(host.h_mid, stream);
+  auto next = DeviceBuffer::allocate(kHidden * sizeof(float));
   auto n = DeviceBuffer::allocate(kHidden * 2);
   auto s = DeviceBuffer::allocate(kFfn * 2);
-  if (!g || !r || !n || !s) {
+  if (!g || !h || !next || !n || !s) {
     fail("activation upload");
     return false;
   }
   dev.gamma = std::move(*g);
-  dev.residual = std::move(*r);
+  dev.h_mid = std::move(*h);
+  dev.next_h = std::move(*next);
   dev.normalized = std::move(*n);
   dev.swiglu = std::move(*s);
   dev.has_scales = !host.gate.scales.empty();
@@ -317,9 +320,12 @@ inline MlpBindViews bind_views(DeviceMlp& dev) {
   v.gamma = vec_view(dev.gamma, qw38::format::ArithmeticDtype::Bf16,
                      PhysicalLayoutId::CudaBf16VectorV0, StorageClass::Bf16, false,
                      kHidden);
-  v.residual = vec_view(dev.residual, qw38::format::ArithmeticDtype::Fp32,
-                        PhysicalLayoutId::CudaFp32VectorV0, StorageClass::Fp32, true,
-                        kHidden);
+  v.h_mid = vec_view(dev.h_mid, qw38::format::ArithmeticDtype::Fp32,
+                     PhysicalLayoutId::CudaFp32VectorV0, StorageClass::Fp32,
+                     true, kHidden);
+  v.next_h = vec_view(dev.next_h, qw38::format::ArithmeticDtype::Fp32,
+                      PhysicalLayoutId::CudaFp32VectorV0, StorageClass::Fp32,
+                      true, kHidden);
   v.normalized =
       vec_view(dev.normalized, qw38::format::ArithmeticDtype::Bf16,
                PhysicalLayoutId::CudaBf16RowMajorV0, StorageClass::Bf16, true,

@@ -105,6 +105,8 @@ struct DecodeMmvDesc {
   DecodeOperandView scales{};
   DecodeOperandView input{};
   DecodeOperandView output{};
+  // ResidualAddFp32 reads residual and writes output when output is supplied.
+  // An empty output retains the legacy in-place residual update.
   DecodeOperandView residual{};
   DecodeEpilogue epilogue{DecodeEpilogue::StoreBf16};
 };

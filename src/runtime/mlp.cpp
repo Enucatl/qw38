@@ -249,10 +249,15 @@ std::expected<MlpPlan, Error> bind_mlp_plan(MlpBindViews const& views,
   if (!gamma) {
     return std::unexpected(gamma.error());
   }
-  auto residual = as_decode_vector(views.residual, kHidden, ArithmeticDtype::Fp32,
-                                   true, "residual");
-  if (!residual) {
-    return std::unexpected(residual.error());
+  auto h_mid = as_decode_vector(views.h_mid, kHidden, ArithmeticDtype::Fp32,
+                                false, "h_mid");
+  if (!h_mid) {
+    return std::unexpected(h_mid.error());
+  }
+  auto next_h = as_decode_vector(views.next_h, kHidden, ArithmeticDtype::Fp32,
+                                 true, "next_h");
+  if (!next_h) {
+    return std::unexpected(next_h.error());
   }
   auto normalized = as_decode_vector(views.normalized, kHidden,
                                      ArithmeticDtype::Bf16, true, "normalized");
@@ -264,11 +269,16 @@ std::expected<MlpPlan, Error> bind_mlp_plan(MlpBindViews const& views,
   if (!swiglu) {
     return std::unexpected(swiglu.error());
   }
-  if (gamma->pointer == residual->pointer ||
+  if (h_mid->pointer == next_h->pointer) {
+    return std::unexpected(
+        arg_error("next_h", "next residual must be distinct from h_mid"));
+  }
+  if (gamma->pointer == h_mid->pointer || gamma->pointer == next_h->pointer ||
       normalized->pointer == swiglu->pointer ||
-      residual->pointer == normalized->pointer) {
+      h_mid->pointer == normalized->pointer ||
+      next_h->pointer == normalized->pointer) {
     return std::unexpected(arg_error("scratch",
-                                     "gamma, residual, normalized, and SwiGLU must be distinct"));
+                                     "gamma, residuals, normalized, and SwiGLU must be distinct"));
   }
 
   MlpPlan plan;
@@ -276,7 +286,8 @@ std::expected<MlpPlan, Error> bind_mlp_plan(MlpBindViews const& views,
   plan.up = *up;
   plan.down = *down;
   plan.gamma = *gamma;
-  plan.residual = *residual;
+  plan.h_mid = *h_mid;
+  plan.next_h = *next_h;
   plan.normalized = *normalized;
   plan.swiglu = *swiglu;
   plan.stream = &stream;
@@ -326,7 +337,8 @@ std::expected<MlpPlan, Error> bind_mlp_plan(Model const& model,
     return std::unexpected(down_s.error());
   }
 
-  auto residual = session.residual_h_mid();
+  auto h_mid = session.residual_h_mid();
+  auto next_h = session.residual_h();
   auto normalized = session.scratch(qw38::format::ScratchKind::NormalizedHidden);
   auto swiglu = session.scratch(qw38::format::ScratchKind::MlpSwiglu);
   if (!normalized) {
@@ -344,7 +356,8 @@ std::expected<MlpPlan, Error> bind_mlp_plan(Model const& model,
   views.down = *down;
   views.down_scales = *down_s;
   views.gamma = *gamma;
-  views.residual = residual;
+  views.h_mid = h_mid;
+  views.next_h = next_h;
   views.normalized = *normalized;
   views.swiglu = *swiglu;
   return bind_mlp_plan(views, stream, eps);
@@ -354,17 +367,18 @@ std::expected<void, Error> execute_decode_mlp(MlpPlan const& plan) {
   if (plan.stream == nullptr || plan.stream->empty()) {
     return std::unexpected(arg_error("stream", "empty stream"));
   }
-  auto* residual = static_cast<float*>(plan.residual.pointer);
+  auto* h_mid = static_cast<float const*>(plan.h_mid.pointer);
+  auto* next_h = static_cast<float*>(plan.next_h.pointer);
   auto* gamma = static_cast<std::uint16_t const*>(plan.gamma.pointer);
   auto* normalized = static_cast<std::uint16_t*>(plan.normalized.pointer);
   auto* swiglu = static_cast<std::uint16_t*>(plan.swiglu.pointer);
-  if (residual == nullptr || gamma == nullptr || normalized == nullptr ||
-      swiglu == nullptr) {
+  if (h_mid == nullptr || next_h == nullptr || gamma == nullptr ||
+      normalized == nullptr || swiglu == nullptr) {
     return std::unexpected(arg_error("mlp", "plan views are null"));
   }
 
   // Region 1: post-mixer zero-centered RMS → BF16 normalized h_mid.
-  if (auto st = qw38::cuda::launch_hidden_rms(residual, gamma, plan.eps, 1,
+  if (auto st = qw38::cuda::launch_hidden_rms(h_mid, gamma, plan.eps, 1,
                                               normalized, *plan.stream);
       !st) {
     return std::unexpected(from_cuda(st.error()));
@@ -393,7 +407,11 @@ std::expected<void, Error> execute_decode_mlp(MlpPlan const& plan) {
       swiglu, DecodeDtype::Bf16, qw38::cuda::kDecodeLayoutBf16VectorV0,
       down.k, static_cast<std::uint64_t>(down.k) * 2u, 2, false);
   down.residual = decode_vector_view(
-      residual, DecodeDtype::Fp32, qw38::cuda::kDecodeLayoutFp32VectorV0,
+      const_cast<float*>(h_mid), DecodeDtype::Fp32,
+      qw38::cuda::kDecodeLayoutFp32VectorV0, down.n,
+      static_cast<std::uint64_t>(down.n) * 4u, 4, false);
+  down.output = decode_vector_view(
+      next_h, DecodeDtype::Fp32, qw38::cuda::kDecodeLayoutFp32VectorV0,
       down.n, static_cast<std::uint64_t>(down.n) * 4u, 4, true);
   down.epilogue = DecodeEpilogue::ResidualAddFp32;
   if (auto st = qw38::cuda::launch_decode_mmv(down, *plan.stream); !st) {

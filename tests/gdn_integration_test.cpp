@@ -417,8 +417,12 @@ int main() {
   expect(plan_cont->front.scratch.u.extent[0] == kGdnValueHeads, "u [48,128]");
   expect(plan_cont->residual_out.pointer == s_cont->residual_h_mid().pointer,
          "mixer writes h_mid");
-  expect(mlp_cont->residual.pointer == s_cont->residual_h_mid().pointer,
+  expect(mlp_cont->h_mid.pointer == s_cont->residual_h_mid().pointer,
          "MLP consumes h_mid");
+  expect(mlp_cont->next_h.pointer == s_cont->residual_h().pointer,
+         "MLP writes the buffer consumed by the next layer");
+  expect(plan_cont->front.residual.pointer == mlp_cont->next_h.pointer,
+         "next layer consumes the exact MLP destination buffer");
 
   std::vector<std::uint16_t> cpu_hist(kConvHistoryTaps * kQkvWidth,
                                       qw38::format::fp32_to_bf16_rne(0.0f));
@@ -541,9 +545,12 @@ int main() {
     fail("download stages");
     return 1;
   }
-  auto last_in = residual_vec(kHidden, 0.3f + 0.1f * 4.0f);
-  expect_fp32_close(h_cont, last_in, "cont input residual live", 0.0f, 0.0f);
-  expect_fp32_close(h_snap, last_in, "snap input residual live", 0.0f, 0.0f);
+  expect_fp32_close(h_cont, last_post, "cont post-MLP",
+                    qw38::reference::tol::kMlpResidualAbs,
+                    qw38::reference::tol::kMlpResidualRel);
+  expect_fp32_close(h_snap, last_post, "snap post-MLP",
+                    qw38::reference::tol::kMlpResidualAbs,
+                    qw38::reference::tol::kMlpResidualRel);
   expect_fp32_close(q_cont, last.front.q_hat, "cont q_hat", kGdnQkFp32Abs,
                     kGdnQkFp32Rel);
   expect_fp32_close(q_snap, last.front.q_hat, "snap q_hat", kGdnQkFp32Abs,
@@ -552,12 +559,12 @@ int main() {
                     qw38::reference::tol::kGdnURel);
   expect_bf16_close(u_snap, last.u, "snap u", qw38::reference::tol::kGdnUAbs,
                     qw38::reference::tol::kGdnURel);
-  expect_fp32_close(mid_cont, last_post, "cont post-MLP",
-                    qw38::reference::tol::kMlpResidualAbs,
-                    qw38::reference::tol::kMlpResidualRel);
-  expect_fp32_close(mid_snap, last_post, "snap post-MLP",
-                    qw38::reference::tol::kMlpResidualAbs,
-                    qw38::reference::tol::kMlpResidualRel);
+  expect_fp32_close(mid_cont, last.residual, "cont h_mid preserved",
+                    qw38::reference::tol::kGdnMixerResidualAbs,
+                    qw38::reference::tol::kGdnMixerResidualRel);
+  expect_fp32_close(mid_snap, last.residual, "snap h_mid preserved",
+                    qw38::reference::tol::kGdnMixerResidualAbs,
+                    qw38::reference::tol::kGdnMixerResidualRel);
 
   auto hist_off = qw38::runtime::conv_history_byte_offset(0, 0, 0);
   expect(static_cast<bool>(hist_off), "hist offset");
