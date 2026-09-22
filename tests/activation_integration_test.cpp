@@ -1,13 +1,16 @@
 #include "activation_support.hpp"
 #include "cuda/activation.hpp"
+#include "cuda/attention.hpp"
 #include "cuda/buffer.hpp"
 #include "cuda/stream.hpp"
 #include "format/floatcvt.hpp"
 #include "reference/math.hpp"
 
+#include <algorithm>
 #include <cstdint>
 #include <iostream>
 #include <span>
+#include <string>
 #include <vector>
 
 using qw38::activation::test::bf16;
@@ -96,9 +99,16 @@ int main() {
   std::vector<std::uint16_t> q(kQueryHeads * kHeadDim);
   for (std::uint32_t h = 0; h < kQueryHeads; ++h) {
     for (std::uint32_t i = 0; i < kHeadDim; ++i) {
-      float const magnitude = 0.25f * static_cast<float>((h % 4) + 1);
-      float const sign = ((i + h) % 3 == 0) ? -1.0f : 1.0f;
-      q[h * kHeadDim + i] = bf16(sign * magnitude);
+      int const code =
+          static_cast<int>((37u * i + 71u * h + 11u * h * h) % 251u) - 125;
+      float value = static_cast<float>(code) / 64.0f;
+      if (i == (11u * h + 3u) % kHeadDim) {
+        value += 4.0f + static_cast<float>(h) / 16.0f;
+      }
+      if (i == (17u * h + 129u) % kHeadDim) {
+        value -= 3.0f + static_cast<float>(h) / 32.0f;
+      }
+      q[h * kHeadDim + i] = bf16(value);
     }
   }
   auto q_gamma = ramp_h(kHeadDim, 0.2f, 0.0f);
@@ -157,6 +167,88 @@ int main() {
            "CUDA preserves the single-store result bit-for-bit");
     expect(*got_qr != q_double_rounded,
            "CUDA does not reproduce the two-store pipeline");
+  }
+
+  // Attention projection output is interleaved [head][Q then g], not split
+  // into global Q and g halves. Give every half of every head an independent
+  // signature so either a head permutation or a global-half interpretation
+  // is observable.
+  std::vector<std::uint16_t> qg(kQueryHeads * 2u * kHeadDim);
+  std::vector<std::uint16_t> g_expected(kQueryHeads * kHeadDim);
+  for (std::uint32_t h = 0; h < kQueryHeads; ++h) {
+    auto const q_src = q.data() + static_cast<std::size_t>(h) * kHeadDim;
+    auto const qg_head =
+        qg.data() + static_cast<std::size_t>(h) * 2u * kHeadDim;
+    std::copy_n(q_src, kHeadDim, qg_head);
+    for (std::uint32_t i = 0; i < kHeadDim; ++i) {
+      int const gate_code =
+          2048 + static_cast<int>(97u * h) +
+          (static_cast<int>((29u * i + 13u * h) % 61u) - 30);
+      auto const sentinel = bf16(static_cast<float>(gate_code) / 32.0f);
+      qg_head[kHeadDim + i] = sentinel;
+      g_expected[static_cast<std::size_t>(h) * kHeadDim + i] = sentinel;
+    }
+  }
+
+  constexpr std::uint32_t kKvHeads = qw38::reference::kKvHeads;
+  constexpr std::uint64_t kCapacity = 1;
+  std::vector<std::uint16_t> k_raw(kKvHeads * kHeadDim, bf16(0.5f));
+  std::vector<std::uint16_t> v_raw(kKvHeads * kHeadDim, bf16(-0.75f));
+  auto d_qg_interleaved = upload_vec(qg, *stream);
+  auto d_k_raw = upload_vec(k_raw, *stream);
+  auto d_v_raw = upload_vec(v_raw, *stream);
+  auto d_k_gamma = upload_vec(q_gamma, *stream);
+  auto d_q_from_qg =
+      DeviceBuffer::allocate(q_rope_cpu.size() * sizeof(std::uint16_t));
+  auto d_g_from_qg =
+      DeviceBuffer::allocate(g_expected.size() * sizeof(std::uint16_t));
+  auto d_kv = DeviceBuffer::allocate(
+      static_cast<std::uint64_t>(qw38::cuda::kAttnLayers) * 2u * kKvHeads *
+      kCapacity * kHeadDim * sizeof(std::uint16_t));
+  expect(static_cast<bool>(d_qg_interleaved) && static_cast<bool>(d_k_raw) &&
+             static_cast<bool>(d_v_raw) && static_cast<bool>(d_k_gamma) &&
+             static_cast<bool>(d_q_from_qg) && static_cast<bool>(d_g_from_qg) &&
+             static_cast<bool>(d_kv),
+         "interleaved q/g alloc");
+  if (!d_qg_interleaved || !d_k_raw || !d_v_raw || !d_k_gamma ||
+      !d_q_from_qg || !d_g_from_qg || !d_kv) {
+    std::cerr << g_failures << " failures\n";
+    return 1;
+  }
+  expect(static_cast<bool>(qw38::cuda::launch_attention_prepare(
+             static_cast<std::uint16_t const*>(d_qg_interleaved->data()),
+             static_cast<std::uint16_t const*>(d_k_raw->data()),
+             static_cast<std::uint16_t const*>(d_v_raw->data()),
+             static_cast<std::uint16_t const*>(d_qg->data()),
+             static_cast<std::uint16_t const*>(d_k_gamma->data()),
+             static_cast<float const*>(d_inv->data()), kDefaultRmsEps, pos,
+             static_cast<std::uint16_t*>(d_q_from_qg->data()),
+             static_cast<std::uint16_t*>(d_g_from_qg->data()),
+             static_cast<std::uint16_t*>(d_kv->data()), 0, kCapacity, 0,
+             *stream)),
+         "launch interleaved q/g preparation");
+  auto got_q_from_qg =
+      download_vec<std::uint16_t>(*d_q_from_qg, q_rope_cpu.size(), *stream);
+  auto got_g_from_qg =
+      download_vec<std::uint16_t>(*d_g_from_qg, g_expected.size(), *stream);
+  expect(static_cast<bool>(got_q_from_qg) && static_cast<bool>(got_g_from_qg),
+         "download interleaved q/g preparation");
+  if (got_q_from_qg && got_g_from_qg) {
+    for (std::uint32_t h = 0; h < kQueryHeads; ++h) {
+      auto const offset = static_cast<std::size_t>(h) * kHeadDim;
+      expect(std::equal(got_q_from_qg->begin() + offset,
+                        got_q_from_qg->begin() + offset + kHeadDim,
+                        q_rope_cpu.begin() + offset),
+             "Q output preserves exact head association " + std::to_string(h));
+      expect(std::equal(got_g_from_qg->begin() + offset,
+                        got_g_from_qg->begin() + offset + kHeadDim,
+                        g_expected.begin() + offset),
+             "g output preserves exact head association " + std::to_string(h));
+    }
+    expect(*got_q_from_qg == q_rope_cpu,
+           "Q halves map independently from interleaved q/g");
+    expect(*got_g_from_qg == g_expected,
+           "g halves map independently from interleaved q/g");
   }
 
   if (g_failures != 0) {
