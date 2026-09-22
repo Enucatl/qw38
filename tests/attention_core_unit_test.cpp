@@ -3,6 +3,7 @@
 #include "cuda/copy.hpp"
 #include "cuda/stream.hpp"
 #include "format/floatcvt.hpp"
+#include "reference/math.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -27,13 +28,7 @@ std::size_t kv_index(std::uint32_t component, std::uint32_t head,
   return component * component_stride + head * head_stride + token * kDim + dim;
 }
 
-float sigmoid_for_test(float x) {
-  if (x >= 0.0f) {
-    return 1.0f / (1.0f + std::exp(-x));
-  }
-  auto const e = std::exp(x);
-  return e / (1.0f + e);
-}
+float sigmoid_for_test(float x) { return qw38::reference::sigmoid_fp32(x); }
 
 }  // namespace
 
@@ -56,9 +51,9 @@ int main() {
   // Zero Q/K gives uniform stable-softmax weights. Distinct KV-head values
   // make the six-query-head GQA mapping observable.
   for (std::uint32_t h = 0; h < kHeads; ++h) {
-    g_h[h * kDim] = qw38::format::fp32_to_bf16_rne(80.0f);
+    g_h[h * kDim] = qw38::format::fp32_to_bf16_rne(-90.0f);
     g_h[h * kDim + (kDim - 1u)] =
-        qw38::format::fp32_to_bf16_rne(-80.0f);
+        qw38::format::fp32_to_bf16_rne(90.0f);
   }
   for (std::uint32_t h = 0; h < kKvHeads; ++h) {
     for (std::uint64_t t = 0; t < kCapacity; ++t) {
@@ -75,9 +70,9 @@ int main() {
         d.data(), std::as_bytes(h), *stream));
   };
   auto const negative_gate_bf16 = qw38::format::fp32_to_bf16_rne(
-      sigmoid_for_test(-80.0f));
+      sigmoid_for_test(-90.0f));
   if (negative_gate_bf16 == 0) {
-    std::cerr << "sigmoid(-80) unexpectedly rounded to BF16 zero\n";
+    std::cerr << "sigmoid(-90) unexpectedly rounded to BF16 zero\n";
     return 1;
   }
   if (!upload(*q, q_h) || !upload(*g, g_h) || !upload(*kv, kv_h)) return 1;
@@ -122,7 +117,7 @@ int main() {
       }
       if (length != 0) mean /= static_cast<float>(length);
       for (std::uint32_t d = 0; d < kDim; ++d) {
-        float const gate = d == 0 ? 80.0f : (d == kDim - 1u ? -80.0f : 0.0f);
+        float const gate = d == 0 ? -90.0f : (d == kDim - 1u ? 90.0f : 0.0f);
         auto const expected = qw38::format::fp32_to_bf16_rne(
             mean * sigmoid_for_test(gate));
         if (got[h * kDim + d] != expected) {
@@ -147,9 +142,9 @@ int main() {
   std::vector<float> logits(extreme_length);
   for (std::uint32_t h = 0; h < kHeads; ++h) {
     q_extreme[h * kDim] = qw38::format::fp32_to_bf16_rne(16.0f);
-    g_extreme[h * kDim] = qw38::format::fp32_to_bf16_rne(80.0f);
+    g_extreme[h * kDim] = qw38::format::fp32_to_bf16_rne(-90.0f);
     g_extreme[h * kDim + (kDim - 1u)] =
-        qw38::format::fp32_to_bf16_rne(-80.0f);
+        qw38::format::fp32_to_bf16_rne(90.0f);
   }
   for (std::uint64_t t = 0; t < extreme_length; ++t) {
     float score = -60.0f + static_cast<float>((t % 7u) * 4u);
@@ -242,7 +237,7 @@ int main() {
             kv_extreme[kv_index(1, kv_h_id, t, d)]));
       }
       weighted /= denom;
-      float const gate = d == 0 ? 80.0f : (d == kDim - 1u ? -80.0f : 0.0f);
+      float const gate = d == 0 ? -90.0f : (d == kDim - 1u ? 90.0f : 0.0f);
       auto const expected = qw38::format::fp32_to_bf16_rne(
           static_cast<float>(weighted) * sigmoid_for_test(gate));
       if (extreme_got[h * kDim + d] != expected) {
@@ -252,10 +247,78 @@ int main() {
         return 1;
       }
     }
-    if (extreme_got[h * kDim + (kDim - 1u)] == 0) {
+    if (extreme_got[h * kDim] == 0) {
       std::cerr << "negative extreme gate incorrectly rounded to zero\n";
       return 1;
     }
+  }
+  // At -90, the unstable 1 / (1 + expf(-x)) form overflows, but the stable
+  // FP32 sigmoid remains BF16-representable.  Unit attention at dim 0 makes
+  // the CUDA output directly observable as the gate; dim 255 also verifies a
+  // non-unit final gated output at the positive extreme.
+  std::vector<std::uint16_t> gate_q(kHeads * kDim, 0);
+  std::vector<std::uint16_t> gate_g(kHeads * kDim, 0);
+  std::vector<std::uint16_t> gate_kv(kKvElems, 0);
+  for (std::uint32_t h = 0; h < kHeads; ++h) {
+    gate_g[h * kDim] = qw38::format::fp32_to_bf16_rne(-90.0f);
+    gate_g[h * kDim + (kDim - 1u)] =
+        qw38::format::fp32_to_bf16_rne(90.0f);
+  }
+  for (std::uint32_t h = 0; h < kKvHeads; ++h) {
+    for (std::uint32_t d = 0; d < kDim; ++d) {
+      gate_kv[kv_index(1, h, 0, d)] = qw38::format::fp32_to_bf16_rne(
+          d == kDim - 1u ? 0.75f : 1.0f);
+    }
+  }
+  auto const gate_reference = qw38::reference::attn_online_core(
+      gate_q, gate_g, gate_kv, 0, kCapacity, 1, true);
+  if (!gate_reference) {
+    std::cerr << "stable gate reference failed\n";
+    return 1;
+  }
+  float const stable_negative_gate = qw38::reference::sigmoid_fp32(-90.0f);
+  if (stable_negative_gate == 0.0f ||
+      qw38::format::fp32_to_bf16_rne(stable_negative_gate) == 0) {
+    std::cerr << "stable negative gate lost before BF16 output\n";
+    return 1;
+  }
+  if (!upload(*q, gate_q) || !upload(*g, gate_g) || !upload(*kv, gate_kv) ||
+      !qw38::cuda::zero(*partials, *stream) || !qw38::cuda::zero(*y, *stream)) {
+    return 1;
+  }
+  if (auto st = qw38::cuda::launch_attention_scan(
+          static_cast<std::uint16_t const*>(q->data()),
+          static_cast<std::uint16_t const*>(kv->data()), 0, kCapacity, 1,
+          static_cast<float*>(partials->data()), 1, *stream);
+      !st) {
+    std::cerr << qw38::cuda::error_message(st.error()) << '\n';
+    return 1;
+  }
+  if (auto st = qw38::cuda::launch_attention_merge(
+          static_cast<float const*>(partials->data()),
+          static_cast<std::uint16_t const*>(g->data()), 1,
+          static_cast<std::uint16_t*>(y->data()), *stream);
+      !st) {
+    std::cerr << qw38::cuda::error_message(st.error()) << '\n';
+    return 1;
+  }
+  std::vector<std::uint16_t> gate_got(kHeads * kDim);
+  if (!qw38::cuda::copy_d2h(std::as_writable_bytes(std::span(gate_got)), y->data(),
+                            *stream) ||
+      !stream->sync()) {
+    return 1;
+  }
+  for (std::size_t i = 0; i < gate_got.size(); ++i) {
+    if (gate_got[i] != gate_reference->y[i]) {
+      std::cerr << "stable gate CUDA/reference output mismatch index=" << i
+                << " got=" << gate_got[i]
+                << " expected=" << gate_reference->y[i] << '\n';
+      return 1;
+    }
+  }
+  if (gate_got[0] != qw38::format::fp32_to_bf16_rne(stable_negative_gate)) {
+    std::cerr << "stable negative CUDA gate mismatch\n";
+    return 1;
   }
   std::cout << "attention core unit ok\n";
   return 0;

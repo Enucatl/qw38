@@ -26,6 +26,15 @@ __device__ __forceinline__ std::uint16_t fp32_to_bf16_rne(float x) {
   return static_cast<std::uint16_t>((bits + add) >> 16);
 }
 
+__device__ __forceinline__ float sigmoid_fp32(float u) {
+  if (u >= 0.0f) {
+    float const e = expf(-u);
+    return 1.0f / (1.0f + e);
+  }
+  float const e = expf(u);
+  return e / (1.0f + e);
+}
+
 __device__ __forceinline__ float warp_sum(float v) {
 #pragma unroll
   for (int off = 16; off > 0; off >>= 1) {
@@ -331,7 +340,7 @@ __global__ void attention_merge_kernel(
     for (std::uint32_t d = 0; d < kAttnHeadDim; ++d) {
       float const a = (l > 0.0f) ? num[d] / l : 0.0f;
       float const gate = bf16_to_fp32(g[static_cast<std::size_t>(h) * kAttnHeadDim + d]);
-      float const sig = 1.0f / (1.0f + expf(-gate));
+      float const sig = sigmoid_fp32(gate);
       float gated = a;
       gated *= sig;
       y_out[static_cast<std::size_t>(h) * kAttnHeadDim + d] =
