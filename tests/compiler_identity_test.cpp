@@ -15,6 +15,7 @@
 using qw38::compiler::classify_source_tensors;
 using qw38::compiler::CompilerErrorCode;
 using qw38::compiler::expand_identity_table;
+using qw38::compiler::expand_vision_inventory;
 using qw38::compiler::family_identity_table;
 using qw38::compiler::is_vision_tensor;
 using qw38::compiler::kIncludedTensors;
@@ -71,6 +72,18 @@ std::vector<SourceTensor> complete_language_mtp(std::uint64_t* offset) {
     out.push_back(std::move(t));
   }
   return out;
+}
+
+void append_vision_inventory(std::vector<SourceTensor>* tensors,
+                             std::uint64_t* offset) {
+  for (auto const& e : expand_vision_inventory()) {
+    std::vector<std::uint64_t> shape(e.shape.dims.begin(),
+                                     e.shape.dims.begin() + e.shape.rank);
+    auto t = make_source(e.name, std::move(shape), *offset);
+    t.shard = e.shard;
+    *offset += t.nbytes;
+    tensors->push_back(std::move(t));
+  }
 }
 
 std::string valid_config_json() {
@@ -327,12 +340,13 @@ int main() {
 
   std::uint64_t off = 0;
   auto headers = complete_language_mtp(&off);
+  append_vision_inventory(&headers, &off);
   auto classified = classify_source_tensors(headers);
   if (!classified) {
     fail(qw38::compiler::error_message(classified.error()));
   } else {
     expect(classified->included.size() == kIncludedTensors, "classified 866");
-    expect(classified->vision_excluded == 0, "no vision in language-only set");
+    expect(classified->vision_excluded == 333, "exact vision inventory excluded");
     bool saw_embed = false;
     bool saw_conv = false;
     bool saw_mtp = false;
@@ -362,6 +376,43 @@ int main() {
     auto got = classify_source_tensors(missing);
     expect(!got && got.error().code == CompilerErrorCode::MissingTensor,
            "missing tensor");
+  }
+  {
+    auto missing = headers;
+    auto const it = std::find_if(missing.begin(), missing.end(), [](auto const& t) {
+      return t.name == "model.visual.pos_embed.weight";
+    });
+    missing.erase(it);
+    auto got = classify_source_tensors(missing);
+    expect(!got && got.error().code == CompilerErrorCode::MissingTensor,
+           "missing vision tensor");
+  }
+  {
+    auto extra = headers;
+    extra.push_back(make_source("model.visual.unrecognized.weight", {1}, off));
+    auto got = classify_source_tensors(extra);
+    expect(!got && got.error().code == CompilerErrorCode::ExtraTensor,
+           "extra vision tensor");
+  }
+  {
+    auto bad = headers;
+    auto const it = std::find_if(bad.begin(), bad.end(), [](auto const& t) {
+      return t.name == "model.visual.pos_embed.weight";
+    });
+    it->shape[0] += 1;
+    auto got = classify_source_tensors(bad);
+    expect(!got && got.error().code == CompilerErrorCode::ShapeMismatch,
+           "vision shape mismatch");
+  }
+  {
+    auto bad = headers;
+    auto const it = std::find_if(bad.begin(), bad.end(), [](auto const& t) {
+      return t.name == "model.visual.pos_embed.weight";
+    });
+    it->dtype = "F32";
+    auto got = classify_source_tensors(bad);
+    expect(!got && got.error().code == CompilerErrorCode::DtypeMismatch,
+           "vision dtype mismatch");
   }
   {
     auto extra = headers;
@@ -440,14 +491,18 @@ int main() {
   }
   {
     auto vision_shared = headers;
-    auto first =
-        make_source("model.visual.shared_a.weight", {4}, off);
-    auto second =
-        make_source("model.visual.shared_b.weight", {4}, off);
-    vision_shared.push_back(std::move(first));
-    vision_shared.push_back(std::move(second));
+    auto first = std::find_if(vision_shared.begin(), vision_shared.end(),
+                              [](auto const& t) {
+                                return t.name == "model.visual.blocks.0.norm1.bias";
+                              });
+    auto second = std::find_if(vision_shared.begin(), vision_shared.end(),
+                               [](auto const& t) {
+                                 return t.name == "model.visual.blocks.0.norm1.weight";
+                               });
+    second->data_offset = first->data_offset;
+    second->nbytes = first->nbytes;
     auto got = classify_source_tensors(vision_shared);
-    expect(got && got->vision_excluded == 2,
+    expect(got && got->vision_excluded == 333,
            "explicit exact sharing for excluded vision tensors is valid");
   }
   {
@@ -457,14 +512,6 @@ int main() {
     auto got = classify_source_tensors(overflow);
     expect(!got && got.error().code == CompilerErrorCode::Unrepresentable,
            "source interval overflow is rejected");
-  }
-  {
-    auto with_vision = headers;
-    with_vision.push_back(
-        make_source("model.visual.patch_embed.proj.weight", {4}, off));
-    auto got = classify_source_tensors(with_vision);
-    expect(static_cast<bool>(got) && got->vision_excluded == 1,
-           "vision tensors are excluded");
   }
   {
     SyntheticTensor malformed{};

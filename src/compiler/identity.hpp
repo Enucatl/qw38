@@ -120,7 +120,7 @@ enum class SourceClass : std::uint8_t {
 
 struct TensorShapeSpec {
   std::uint8_t rank{};
-  std::array<std::uint64_t, 3> dims{};
+  std::array<std::uint64_t, qw38::format::kMaxRank> dims{};
 
   [[nodiscard]] bool matches(std::span<std::uint64_t const> got) const noexcept {
     if (got.size() != rank) {
@@ -167,7 +167,16 @@ struct ExpectedTensor {
 
 [[nodiscard]] std::vector<ExpectedTensor> expand_identity_table();
 
-[[nodiscard]] bool is_vision_tensor(std::string_view name) noexcept;
+struct VisionTensorIdentity {
+  std::string name;
+  TensorShapeSpec shape{};
+  std::string shard;
+};
+
+// The vision encoder remains outside V0 payload emission, but its authoritative
+// checkpoint inventory is still a required source-validation boundary.
+[[nodiscard]] std::vector<VisionTensorIdentity> expand_vision_inventory();
+[[nodiscard]] bool is_vision_tensor(std::string_view name);
 
 struct SourceTensor {
   std::string name;

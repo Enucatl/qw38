@@ -201,7 +201,9 @@ ExpectedTensor make_expected(FamilyIdentity const& fam, std::string name,
   t.layout = fam.layout;
   t.role = fam.role;
   t.node = fam.node;
-  t.layer_index = layer;
+  t.layer_index = fam.source_class == SourceClass::MtpRetainedDisabled
+                      ? 0
+                      : layer;
   if (fam.family == TensorFamily::InputLayernorm && layer != kNoLayerIndex &&
       is_full_attention_layer(layer)) {
     t.node = SemanticNodeKind::GatedAttention;
@@ -287,8 +289,59 @@ std::vector<ExpectedTensor> expand_identity_table() {
   return out;
 }
 
-bool is_vision_tensor(std::string_view name) noexcept {
-  return name.starts_with("model.visual.");
+std::vector<VisionTensorIdentity> expand_vision_inventory() {
+  std::vector<VisionTensorIdentity> out;
+  out.reserve(kVisionTensors);
+  constexpr char const kShard[] = "model-00001-of-00018.safetensors";
+  struct BlockTensor {
+    char const* suffix;
+    TensorShapeSpec shape;
+  };
+  constexpr BlockTensor kBlockTensors[] = {
+      {"attn.proj.bias", shape1(1152)},
+      {"attn.proj.weight", shape2(1152, 1152)},
+      {"attn.qkv.bias", shape1(3456)},
+      {"attn.qkv.weight", shape2(3456, 1152)},
+      {"mlp.linear_fc1.bias", shape1(4304)},
+      {"mlp.linear_fc1.weight", shape2(4304, 1152)},
+      {"mlp.linear_fc2.bias", shape1(1152)},
+      {"mlp.linear_fc2.weight", shape2(1152, 4304)},
+      {"norm1.bias", shape1(1152)},
+      {"norm1.weight", shape1(1152)},
+      {"norm2.bias", shape1(1152)},
+      {"norm2.weight", shape1(1152)},
+  };
+  for (std::uint32_t block = 0; block < 27; ++block) {
+    for (auto const& tensor : kBlockTensors) {
+      out.push_back({.name = "model.visual.blocks." + std::to_string(block) +
+                             "." + tensor.suffix,
+                     .shape = tensor.shape,
+                     .shard = kShard});
+    }
+  }
+  auto add = [&](char const* suffix, TensorShapeSpec shape) {
+    out.push_back({.name = std::string("model.visual.") + suffix,
+                   .shape = shape,
+                   .shard = kShard});
+  };
+  add("merger.linear_fc1.bias", shape1(4608));
+  add("merger.linear_fc1.weight", shape2(4608, 4608));
+  add("merger.linear_fc2.bias", shape1(5120));
+  add("merger.linear_fc2.weight", shape2(5120, 4608));
+  add("merger.norm.bias", shape1(1152));
+  add("merger.norm.weight", shape1(1152));
+  add("patch_embed.proj.bias", shape1(1152));
+  add("patch_embed.proj.weight", TensorShapeSpec{.rank = 5,
+                                                     .dims = {1152, 3, 2, 16, 16}});
+  add("pos_embed.weight", shape2(2304, 1152));
+  return out;
+}
+
+bool is_vision_tensor(std::string_view name) {
+  static auto const inventory = expand_vision_inventory();
+  return std::ranges::any_of(inventory, [name](VisionTensorIdentity const& item) {
+    return item.name == name;
+  });
 }
 
 std::expected<ClassifiedCheckpoint, CompilerError> classify_source_tensors(
@@ -400,27 +453,64 @@ std::expected<ClassifiedCheckpoint, CompilerError> classify_source_tensors(
         ClassifiedTensor{.expected = std::move(exp), .source = src});
   }
 
+  auto vision = expand_vision_inventory();
+  if (vision.size() != kVisionTensors) {
+    return std::unexpected(make_error(CompilerErrorCode::Internal, "vision",
+                                      "authoritative vision inventory is not 333"));
+  }
+  std::unordered_map<std::string, VisionTensorIdentity const*> expected_vision;
+  expected_vision.reserve(vision.size());
+  for (auto const& item : vision) {
+    expected_vision.emplace(item.name, &item);
+  }
+  for (auto const& item : vision) {
+    auto const it = by_name.find(item.name);
+    if (it == by_name.end()) {
+      return std::unexpected(make_error(CompilerErrorCode::MissingTensor,
+                                        item.name,
+                                        "required excluded vision tensor is absent"));
+    }
+    auto const& src = tensors[it->second];
+    if (src.dtype != "BF16") {
+      return std::unexpected(make_error(CompilerErrorCode::DtypeMismatch, src.name,
+                                        "excluded vision tensor must be BF16"));
+    }
+    if (!item.shape.matches(src.shape)) {
+      return std::unexpected(make_error(CompilerErrorCode::ShapeMismatch, src.name,
+                                        "shape does not match vision inventory"));
+    }
+    if (src.shard != item.shard) {
+      return std::unexpected(make_error(CompilerErrorCode::ArchitectureMismatch,
+                                        src.name,
+                                        "vision tensor shard does not match inventory"));
+    }
+    auto const bytes = source_tensor_bytes(src);
+    if (!bytes) {
+      return std::unexpected(bytes.error());
+    }
+    if (src.nbytes != *bytes) {
+      return std::unexpected(make_error(CompilerErrorCode::ShapeMismatch, src.name,
+                                        "vision payload byte length is not BF16 numel"));
+    }
+    ++classified.vision_excluded;
+  }
+
   for (auto const& t : tensors) {
     if (seen_expected.contains(t.name)) {
       continue;
     }
-    if (is_vision_tensor(t.name)) {
-      if (t.dtype != "BF16") {
-        return std::unexpected(make_error(CompilerErrorCode::DtypeMismatch,
-                                          t.name, "vision tensor is not BF16"));
-      }
-      ++classified.vision_excluded;
+    if (expected_vision.contains(t.name)) {
       continue;
     }
     return std::unexpected(make_error(CompilerErrorCode::ExtraTensor, t.name,
                                       "tensor is not in the V0 identity table"));
   }
 
-  if (classified.vision_excluded != kVisionTensors &&
-      tensors.size() == kCheckpointTensors) {
+  if (classified.vision_excluded != kVisionTensors ||
+      tensors.size() != kCheckpointTensors) {
     return std::unexpected(make_error(
         CompilerErrorCode::ArchitectureMismatch, "vision",
-        "vision tensor count is not 333"));
+        "checkpoint occupancy does not match authoritative inventory"));
   }
 
   return classified;

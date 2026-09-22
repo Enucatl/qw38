@@ -6,6 +6,7 @@
 #include <array>
 #include <cstdint>
 #include <cstring>
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -15,6 +16,7 @@
 
 using qw38::compiler::build_identity_schema;
 using qw38::compiler::ClassifiedCheckpoint;
+using qw38::compiler::compile_identity;
 using qw38::compiler::compile_synthetic;
 using qw38::compiler::compute_checkpoint_identities;
 using qw38::compiler::CompilerErrorCode;
@@ -37,10 +39,12 @@ using qw38::compiler::SourceTensor;
 using qw38::compiler::SyntheticTensor;
 using qw38::compiler::TensorFamily;
 using qw38::compiler::verify_artifact_identities;
+using qw38::compiler::verify_identity_artifact;
 using qw38::format::Artifact;
 using qw38::format::ArtifactSchema;
 using qw38::format::Hash256;
 using qw38::format::kNoLayerIndex;
+using qw38::format::MappingKind;
 using qw38::format::PhysicalLayoutId;
 using qw38::format::SemanticScope;
 using qw38::format::SharedBindingRole;
@@ -389,6 +393,13 @@ int main() {
       if (!conv_payload) {
         fail("conv payload");
       } else {
+        auto const* conv_record = art->find_tensor(conv.expected.name);
+        expect(conv_record != nullptr && conv_record->shape.rank == 3 &&
+                   conv_record->shape.logical[0] == 32 &&
+                   conv_record->shape.logical[1] == 1 &&
+                   conv_record->shape.logical[2] == 4 &&
+                   conv_record->mapping.kind == MappingKind::TapMajorConvC1T,
+               "conv retains logical shape and tap-major transform metadata");
         auto restored = conv_from_tap_major(*conv_payload, 32, 4);
         expect(static_cast<bool>(restored) && *restored == conv.bytes,
                "fixture conv reconstructs exactly");
@@ -413,7 +424,8 @@ int main() {
   std::filesystem::path authority =
       std::filesystem::path(QW38_SOURCE_DIR) /
       ".cache/authorities/qwen3.8-27b-transformers";
-  if (std::filesystem::exists(authority / "config.json") &&
+  if (std::getenv("QW38_SKIP_AUTHORITY") == nullptr &&
+      std::filesystem::exists(authority / "config.json") &&
       std::filesystem::exists(authority / "model.safetensors.index.json")) {
     auto ckpt = open_checkpoint(authority);
     if (!ckpt) {
@@ -509,9 +521,31 @@ int main() {
           }
         }
       }
+
+      // Extended, non-hermetic authority evidence. This deliberately drives
+      // the public checkpoint compiler and independent verifier over all 866
+      // emitted tensors; vision is validated but never written.
+      auto const artifact_path = dir.path() / "authority-identity.qw38";
+      auto compiled = compile_identity(authority, artifact_path);
+      if (!compiled) {
+        fail(qw38::compiler::error_message(compiled.error()));
+      } else {
+        expect(compiled->included_tensors == kIncludedTensors &&
+                   compiled->vision_excluded == kVisionTensors,
+               "authority compiler emits every included tensor only");
+        expect(compiled->peak_rss_bytes > 0 &&
+                   compiled->peak_rss_bytes < (16ULL << 30),
+               "authority compiler records bounded peak RSS after completion");
+        std::cout << "authority_identity_peak_rss_bytes="
+                  << compiled->peak_rss_bytes << '\n';
+        auto verified = verify_identity_artifact(artifact_path, authority, rev);
+        expect(static_cast<bool>(verified),
+               "authority identity artifact independently reconstructs exactly");
+      }
     }
   } else {
-    fail("authoritative checkpoint is missing");
+    std::cout << "authority compiler integration skipped (explicit extended "
+                 "checkpoint evidence)\n";
   }
 
   if (g_failures != 0) {

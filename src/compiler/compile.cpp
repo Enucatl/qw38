@@ -75,9 +75,6 @@ TensorShape make_shape(std::initializer_list<std::uint64_t> dims) {
 }
 
 TensorShape artifact_shape(ExpectedTensor const& exp) {
-  if (exp.layout == PhysicalLayoutId::CudaBf16TapMajorV0) {
-    return make_shape({exp.shape.dims[2], exp.shape.dims[0]});
-  }
   if (exp.shape.rank == 1) {
     return make_shape({exp.shape.dims[0]});
   }
@@ -150,6 +147,9 @@ LogicalPhysicalMapping mapping_for(PhysicalLayoutId layout) {
         .group_size = 0,
         .packed_bytes_per_tile_row = qw38::format::kBf16PackedBytesPerTileRow,
     };
+  }
+  if (layout == PhysicalLayoutId::CudaBf16TapMajorV0) {
+    return LogicalPhysicalMapping{.kind = MappingKind::TapMajorConvC1T};
   }
   return LogicalPhysicalMapping{.kind = MappingKind::Identity};
 }
@@ -419,35 +419,31 @@ std::expected<void, CompilerError> compare_bytes(std::span<std::byte const> a,
   return {};
 }
 
-std::expected<void, CompilerError> compare_tiled(
-    std::span<std::byte const> tiled, std::span<std::byte const> src,
-    std::uint64_t n, std::uint64_t k, std::string_view name) {
-  auto extents = dense_tile_extents(n, k);
-  if (!extents) {
-    return std::unexpected(extents.error());
-  }
-  if (src.size() != n * k * 2 || tiled.size() != src.size()) {
-    return std::unexpected(make_error(CompilerErrorCode::ShapeMismatch, name,
-                                      "tiled reconstruction size"));
-  }
-  std::array<std::byte, kDenseTileRows * kDenseTileK * 2> tile{};
-  std::size_t cursor = 0;
-  for (std::uint64_t tn = 0; tn < extents->tiles_n; ++tn) {
-    for (std::uint64_t tk = 0; tk < extents->tiles_k; ++tk) {
-      std::memcpy(tile.data(), tiled.data() + cursor, tile.size());
-      cursor += tile.size();
-      for (std::uint32_t r = 0; r < kDenseTileRows; ++r) {
-        auto const row = tn * kDenseTileRows + r;
-        auto const src_off = (row * k + tk * kDenseTileK) * 2;
-        if (std::memcmp(tile.data() + r * kDenseTileK * 2, src.data() + src_off,
-                        kDenseTileK * 2) != 0) {
-          return std::unexpected(make_error(CompilerErrorCode::HashMismatch, name,
-                                            "dense tile reconstruction mismatch"));
-        }
-      }
+std::expected<std::vector<std::byte>, CompilerError> reconstruct_bf16_payload(
+    TensorRecord const& record, std::span<std::byte const> payload) {
+  auto const& shape = record.shape;
+  if (record.mapping.kind == MappingKind::TapMajorConvC1T) {
+    if (shape.rank != 3 || shape.logical[1] != 1) {
+      return std::unexpected(make_error(CompilerErrorCode::ShapeMismatch,
+                                        record.logical_name,
+                                        "tap-major mapping has invalid logical shape"));
     }
+    return conv_from_tap_major(payload, shape.logical[0], shape.logical[2]);
   }
-  return {};
+  if (record.mapping.kind == MappingKind::DenseTileNK) {
+    if (shape.rank != 2) {
+      return std::unexpected(make_error(CompilerErrorCode::ShapeMismatch,
+                                        record.logical_name,
+                                        "dense-tile mapping has invalid logical shape"));
+    }
+    return row_major_from_tile_nk(payload, shape.logical[0], shape.logical[1]);
+  }
+  if (record.mapping.kind == MappingKind::Identity) {
+    return std::vector<std::byte>(payload.begin(), payload.end());
+  }
+  return std::unexpected(make_error(CompilerErrorCode::Internal,
+                                    record.logical_name,
+                                    "unsupported BF16 reconstruction mapping"));
 }
 
 }  // namespace
@@ -887,7 +883,7 @@ std::expected<void, CompilerError> verify_quantized_tensor(
 
 std::expected<void, CompilerError> verify_compiled_artifact(
     std::filesystem::path const& artifact_path,
-    std::filesystem::path const& checkpoint, WeightFormatPolicy policy,
+    std::filesystem::path const& checkpoint, WeightFormatPolicy /*policy*/,
     CompilerRevision const& revision) {
   auto ckpt = open_checkpoint(checkpoint);
   if (!ckpt) {
@@ -938,41 +934,34 @@ std::expected<void, CompilerError> verify_compiled_artifact(
       if (!payload) {
         return std::unexpected(from_format(payload.error()));
       }
+      auto const* record = art->find_tensor(item->expected.name);
+      if (record == nullptr) {
+        return std::unexpected(make_error(CompilerErrorCode::MissingTensor,
+                                          item->expected.name,
+                                          "artifact tensor metadata is absent"));
+      }
       auto const& exp = item->expected;
-      auto const fmt = select_weight_format(exp.family, exp.layout, policy);
-      if (fmt.quantizer == LogicalQuantizerId::Q4G64V0 ||
-          fmt.quantizer == LogicalQuantizerId::Q8G32V0) {
+      if (record->quantizer == LogicalQuantizerId::Q4G64V0 ||
+          record->quantizer == LogicalQuantizerId::Q8G32V0) {
         auto scales = art->scales(exp.name);
         if (!scales) {
           return std::unexpected(from_format(scales.error()));
         }
         if (auto st = verify_quantized_tensor(
-                exp.name, fmt.quantizer, fmt.layout, exp.shape.dims[0],
-                exp.shape.dims[1], *src, *payload, *scales);
+                exp.name, record->quantizer, record->layout,
+                record->shape.logical[0], record->shape.logical[1], *src,
+                *payload, *scales);
             !st) {
           return st;
         }
         continue;
       }
-      if (fmt.layout == PhysicalLayoutId::CudaBf16DenseTileV0) {
-        if (auto st = compare_tiled(*payload, *src, exp.shape.dims[0],
-                                    exp.shape.dims[1], exp.name);
-            !st) {
-          return st;
-        }
-      } else if (fmt.layout == PhysicalLayoutId::CudaBf16TapMajorV0) {
-        auto restored =
-            conv_from_tap_major(*payload, exp.shape.dims[0], exp.shape.dims[2]);
-        if (!restored) {
-          return std::unexpected(restored.error());
-        }
-        if (auto st = compare_bytes(*restored, *src, exp.name); !st) {
-          return st;
-        }
-      } else {
-        if (auto st = compare_bytes(*payload, *src, exp.name); !st) {
-          return st;
-        }
+      auto restored = reconstruct_bf16_payload(*record, *payload);
+      if (!restored) {
+        return std::unexpected(restored.error());
+      }
+      if (auto st = compare_bytes(*restored, *src, exp.name); !st) {
+        return st;
       }
     }
   }

@@ -112,6 +112,8 @@ enum class TensorRole : std::uint16_t {
 enum class MappingKind : std::uint16_t {
   Identity = 0x0701,
   DenseTileNK = 0x0702,
+  // Logical [channel, 1, tap] is stored as physical [tap, channel].
+  TapMajorConvC1T = 0x0703,
 };
 
 enum class IntegrityKind : std::uint16_t {

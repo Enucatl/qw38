@@ -106,6 +106,7 @@ bool is_known(MappingKind value) noexcept {
   switch (value) {
     case MappingKind::Identity:
     case MappingKind::DenseTileNK:
+    case MappingKind::TapMajorConvC1T:
       return true;
   }
   return false;

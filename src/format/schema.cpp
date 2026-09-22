@@ -998,6 +998,28 @@ std::expected<void, FormatError> validate_mapping_for_tensor(
     }
     return {};
   }
+  if (tensor.layout == PhysicalLayoutId::CudaBf16TapMajorV0) {
+    if (m.kind != MappingKind::TapMajorConvC1T || m.tile_rows != 0 ||
+        m.tile_k != 0 || m.group_size != 0 ||
+        m.packed_bytes_per_tile_row != 0) {
+      return std::unexpected(make_error(
+          FormatErrorCode::InvalidMapping, offset, "tensor.mapping",
+          "tap-major convolution requires TapMajorConvC1T mapping"));
+    }
+    if (auto st = require_shape_rank(tensor.shape, 3, offset, "tensor.shape");
+        !st) {
+      return st;
+    }
+    if (tensor.shape.logical[1] != 1 ||
+        tensor.shape.padded[0] != tensor.shape.logical[0] ||
+        tensor.shape.padded[1] != tensor.shape.logical[1] ||
+        tensor.shape.padded[2] != tensor.shape.logical[2]) {
+      return std::unexpected(make_error(
+          FormatErrorCode::InvalidShape, offset, "tensor.shape",
+          "tap-major convolution logical shape must be unpadded [channel,1,tap]"));
+    }
+    return {};
+  }
   if (m.kind != MappingKind::Identity || m.tile_rows != 0 || m.tile_k != 0 ||
       m.group_size != 0 || m.packed_bytes_per_tile_row != 0) {
     return std::unexpected(make_error(FormatErrorCode::InvalidMapping, offset,

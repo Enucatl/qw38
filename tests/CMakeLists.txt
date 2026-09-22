@@ -157,7 +157,7 @@ set_tests_properties(
 set_tests_properties(
   compiler_integration
   PROPERTIES
-  LABELS "compiler;extended;checkpoint"
+  LABELS "compiler;extended;checkpoint;authority"
 )
 
 set_tests_properties(
