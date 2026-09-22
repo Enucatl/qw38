@@ -179,6 +179,7 @@ struct DeviceGdnMixer {
   DeviceBuffer history;
   DeviceBuffer s;
   std::uint32_t cursor{0};
+  std::uint64_t position{0};
   bool has_scales{true};
   PhysicalLayoutId layout{PhysicalLayoutId::CudaQ4G64V0};
   StorageClass storage{StorageClass::Int4Grouped};
@@ -237,6 +238,7 @@ inline bool upload_host_mixer(HostGdnMixer const& host, DeviceGdnMixer& dev,
   dev.history = std::move(*hist);
   dev.s = std::move(*s);
   dev.cursor = 0;
+  dev.position = 0;
   dev.has_scales = !host.qkv.scales.empty();
   dev.layout = host.qkv.layout;
   dev.storage = (host.qkv.layout == PhysicalLayoutId::CudaQ4G64V0)
@@ -297,6 +299,10 @@ inline qw38::runtime::GdnBindViews mixer_views(DeviceGdnMixer& dev) {
   auto cursor = qw38::runtime::ConvCursorSlot::bind(&dev.cursor);
   if (cursor) {
     v.cursor = *cursor;
+  }
+  auto position = qw38::runtime::GdnPositionSlot::bind(&dev.position);
+  if (position) {
+    v.position = *position;
   }
   v.language_layer = 0;
   return v;

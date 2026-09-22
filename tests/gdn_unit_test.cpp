@@ -854,7 +854,8 @@ void test_recurrence_reset() {
   expect_fp32_close(o_got, o_ref, "o after reset", kGdnRecurOAbs, kGdnRecurORel);
 }
 
-GdnBindViews dummy_mixer_views(std::uint32_t* cursor) {
+GdnBindViews dummy_mixer_views(std::uint32_t* cursor,
+                               std::uint64_t* position) {
   GdnBindViews v;
   auto front = dummy_ok_views(cursor);
   v.qkv = front.qkv;
@@ -888,6 +889,9 @@ GdnBindViews dummy_mixer_views(std::uint32_t* cursor) {
                              PhysicalLayoutId::CudaFp32VectorV0, StorageClass::Fp32,
                              true, 1, kHidden);
   v.s = gdn_state_view(dummy_ptr(0x220000));
+  if (auto slot = qw38::runtime::GdnPositionSlot::bind(position); slot) {
+    v.position = *slot;
+  }
   return v;
 }
 
@@ -937,7 +941,8 @@ bool make_q4_mixer(HostGdnMixer& host, std::int8_t qkv_code, std::int8_t z_code,
 
 void test_mixer_bind_and_lifetimes(Stream const& stream) {
   std::uint32_t cursor = 0;
-  auto views = dummy_mixer_views(&cursor);
+  std::uint64_t position = 0;
+  auto views = dummy_mixer_views(&cursor, &position);
   auto ok = bind_gdn_plan(views, stream);
   expect(static_cast<bool>(ok), "valid mixer dummy bind");
   if (ok) {
@@ -1012,7 +1017,7 @@ void test_mixer_gamma_z_residual_state(Stream const& stream) {
     return;
   }
   auto const mallocs = malloc_count();
-  auto out = execute_decode_gdn(*plan);
+  auto out = execute_decode_gdn(*plan, 0);
   expect(static_cast<bool>(out), "gamma0 execute");
   expect(malloc_count() == mallocs, "mixer allocates nothing");
   if (!out) {
@@ -1054,7 +1059,7 @@ void test_mixer_gamma_z_residual_state(Stream const& stream) {
   if (!zplan) {
     return;
   }
-  auto zout = execute_decode_gdn(*zplan);
+  auto zout = execute_decode_gdn(*zplan, 0);
   expect(static_cast<bool>(zout), "z=0 execute");
   auto zhin = download_vec<float>(zdev.residual, kHidden, stream);
   auto zhout = download_vec<float>(zdev.residual_out, kHidden, stream);
@@ -1068,8 +1073,8 @@ void test_mixer_gamma_z_residual_state(Stream const& stream) {
                     qw38::reference::tol::kGdnMixerResidualRel);
 
   auto const mallocs2 = malloc_count();
-  expect(static_cast<bool>(execute_decode_gdn(*zplan)), "repeated mixer");
-  expect(malloc_count() == mallocs2, "repeated mixer allocates nothing");
+  expect(!execute_decode_gdn(*zplan, 0), "duplicate mixer position rejects");
+  expect(malloc_count() == mallocs2, "duplicate rejection allocates nothing");
 }
 
 void test_session_history_wrap_reset_zero_padding() {
@@ -1126,6 +1131,14 @@ void test_session_history_wrap_reset_zero_padding() {
     return;
   }
   views.cursor = *cursor;
+  auto position =
+      qw38::runtime::detail::SessionPlanAccess::gdn_position(*session, 0);
+  expect(static_cast<bool>(position), "bind session GDN token position");
+  if (!position) {
+    return;
+  }
+  views.position = *position;
+  views.s = session->gdn_s();
 
   auto plan = bind_gdn_plan(views, runtime->stream());
   expect(static_cast<bool>(plan), "bind session-backed GDN front");
@@ -1168,8 +1181,19 @@ void test_session_history_wrap_reset_zero_padding() {
                              [](std::uint32_t value) { return value == 0; }),
          "reset zeros every convolution cursor");
 
-  expect(static_cast<bool>(execute_gdn_front(plan->front)),
-         "execute GDN front after reset");
+  expect(!execute_decode_gdn(*plan, 1),
+         "skipped GDN token position rejects before execution");
+  auto after_skip = session->save();
+  expect(static_cast<bool>(after_skip), "save after skipped position rejection");
+  if (after_skip) {
+    expect(after_skip->conv_cursor == reset->conv_cursor &&
+               after_skip->conv_history == reset->conv_history &&
+               after_skip->gdn_s == reset->gdn_s,
+           "skipped position leaves history and recurrence unchanged");
+  }
+
+  expect(static_cast<bool>(execute_decode_gdn(*plan, 0)),
+         "execute GDN token zero after reset");
   std::vector<std::uint16_t> convolved(kQkvWidth);
   expect(static_cast<bool>(qw38::cuda::copy_d2h(
              convolved.data(), plan->front.scratch.convolved.pointer,
@@ -1180,6 +1204,34 @@ void test_session_history_wrap_reset_zero_padding() {
   expect(std::ranges::all_of(
              convolved, [](std::uint16_t value) { return value == 0; }),
          "first post-reset convolution observes zero history padding");
+
+  auto after_zero = session->save();
+  expect(static_cast<bool>(after_zero), "save accepted GDN token zero");
+  if (after_zero) {
+    expect(after_zero->gdn_position[0] == 1,
+           "accepted token commits the next absolute GDN position");
+  }
+  expect(!execute_decode_gdn(*plan, 0),
+         "duplicate GDN token position rejects before execution");
+  auto after_duplicate = session->save();
+  expect(static_cast<bool>(after_duplicate),
+         "save after duplicate position rejection");
+  if (after_zero && after_duplicate) {
+    expect(after_duplicate->conv_cursor == after_zero->conv_cursor &&
+               after_duplicate->conv_history == after_zero->conv_history &&
+               after_duplicate->gdn_s == after_zero->gdn_s,
+           "duplicate position leaves history and recurrence unchanged");
+  }
+
+  expect(static_cast<bool>(execute_decode_gdn(*plan, 1)),
+         "next absolute GDN token position continues");
+  auto after_continuation = session->save();
+  expect(after_continuation && after_continuation->gdn_position[0] == 2,
+         "continuation commits the session GDN sequence once");
+  expect(static_cast<bool>(session->reset()),
+         "second reset restarts GDN token sequence");
+  expect(static_cast<bool>(execute_decode_gdn(*plan, 0)),
+         "token zero is accepted after sequence reset");
 }
 
 }  // namespace

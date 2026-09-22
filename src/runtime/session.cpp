@@ -4,6 +4,7 @@
 #include "cuda/stream.hpp"
 #include "runtime/model.hpp"
 
+#include <limits>
 #include <new>
 #include <stdexcept>
 #include <utility>
@@ -161,6 +162,53 @@ std::expected<void, Error> ConvCursorSlot::commit_advance(
   return {};
 }
 
+std::expected<GdnPositionSlot, Error> GdnPositionSlot::bind(
+    std::uint64_t* value) {
+  if (value == nullptr) {
+    return std::unexpected(make_error(ErrorCode::InvalidArgument, "position",
+                                      "host GDN position pointer is required"));
+  }
+  GdnPositionSlot slot;
+  slot.value_ = value;
+  return slot;
+}
+
+std::expected<std::uint64_t, Error> GdnPositionSlot::value() const {
+  if (value_ == nullptr) {
+    return std::unexpected(make_error(ErrorCode::InvalidArgument, "position",
+                                      "host GDN position pointer is required"));
+  }
+  return *value_;
+}
+
+std::expected<void, Error> GdnPositionSlot::validate(
+    std::uint64_t position) const {
+  auto expected = value();
+  if (!expected) {
+    return std::unexpected(expected.error());
+  }
+  if (position != *expected) {
+    return std::unexpected(make_error(
+        ErrorCode::InvalidPopulatedLength, "position",
+        position < *expected ? "GDN token position was already executed"
+                             : "GDN token position skips the session sequence"));
+  }
+  if (position == std::numeric_limits<std::uint64_t>::max()) {
+    return std::unexpected(make_error(ErrorCode::Overflow, "position",
+                                      "GDN token position cannot advance"));
+  }
+  return {};
+}
+
+std::expected<void, Error> GdnPositionSlot::commit(
+    std::uint64_t position) const {
+  if (auto st = validate(position); !st) {
+    return st;
+  }
+  *value_ = position + 1u;
+  return {};
+}
+
 std::expected<Session, Error> Session::create(
     Model const& model, std::shared_ptr<qw38::cuda::Stream> stream,
     std::uint64_t kv_capacity) {
@@ -195,6 +243,7 @@ std::expected<Session, Error> Session::create(
   Session s;
   s.stream_ = std::move(stream);
   s.kv_capacity_ = kv_capacity;
+  s.gdn_position_.fill(0);
   s.kv_populated_.fill(0);
   s.persistent_bytes_ = *persist;
   s.arena_ = std::move(*arena);
@@ -279,6 +328,7 @@ std::expected<void, Error> Session::zero_persistent() {
     return std::unexpected(from_cuda(st.error()));
   }
   conv_cursor_.fill(0);
+  gdn_position_.fill(0);
   kv_populated_.fill(0);
   return {};
 }
@@ -325,6 +375,7 @@ std::expected<SessionSnapshot, Error> Session::save() const {
   snap.conv_history.resize(static_cast<std::size_t>(conv_history_.bytes()));
   snap.kv.resize(static_cast<std::size_t>(kv_.bytes()));
   snap.conv_cursor = conv_cursor_;
+  snap.gdn_position = gdn_position_;
   snap.kv_populated = kv_populated_;
   if (auto st = qw38::cuda::copy_d2h(snap.gdn_s, gdn_s_.data(), *stream_); !st) {
     return std::unexpected(from_cuda(st.error()));
@@ -391,6 +442,7 @@ std::expected<void, Error> Session::restore(SessionSnapshot const& snap) {
     }
   }
   conv_cursor_ = snap.conv_cursor;
+  gdn_position_ = snap.gdn_position;
   kv_populated_ = snap.kv_populated;
   if (auto st = stream_->sync(); !st) {
     return std::unexpected(from_cuda(st.error()));
@@ -566,6 +618,15 @@ std::expected<ConvCursorSlot, Error> Session::conv_cursor_slot(
   return ConvCursorSlot::bind(&conv_cursor_[gdn_layer]);
 }
 
+std::expected<GdnPositionSlot, Error> Session::gdn_position_slot(
+    std::uint32_t gdn_layer) {
+  if (gdn_layer >= kGdnLayers) {
+    return std::unexpected(make_error(ErrorCode::InvalidArgument, "gdn.layer",
+                                      "GDN layer index must be < 48"));
+  }
+  return GdnPositionSlot::bind(&gdn_position_[gdn_layer]);
+}
+
 std::expected<void, Error> Session::set_conv_cursor(
     std::array<std::uint32_t, kConvLayers> cursor) {
   for (auto c : cursor) {
@@ -591,6 +652,11 @@ std::expected<KvPopulatedSlot, Error> detail::SessionPlanAccess::kv_populated(
 std::expected<ConvCursorSlot, Error> detail::SessionPlanAccess::conv_cursor(
     Session& session, std::uint32_t gdn_layer) {
   return session.conv_cursor_slot(gdn_layer);
+}
+
+std::expected<GdnPositionSlot, Error> detail::SessionPlanAccess::gdn_position(
+    Session& session, std::uint32_t gdn_layer) {
+  return session.gdn_position_slot(gdn_layer);
 }
 
 }  // namespace qw38::runtime

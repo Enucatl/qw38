@@ -1009,6 +1009,9 @@ std::expected<void, Error> execute_gdn_recurrence(GdnRecurrencePlan const& plan)
 std::expected<GdnPlan, Error> bind_gdn_plan(GdnBindViews const& views,
                                            qw38::cuda::Stream const& stream,
                                            float eps) {
+  if (auto position = views.position.value(); !position) {
+    return std::unexpected(position.error());
+  }
   GdnFrontBindViews front;
   front.qkv = views.qkv;
   front.qkv_scales = views.qkv_scales;
@@ -1100,6 +1103,7 @@ std::expected<GdnPlan, Error> bind_gdn_plan(GdnBindViews const& views,
   plan.gated_gamma = *gated;
   plan.residual_out = *residual_out;
   plan.s = views.s;
+  plan.position = views.position;
   plan.s_layer = plan.front.gdn_layer;
   return plan;
 }
@@ -1144,6 +1148,10 @@ std::expected<GdnPlan, Error> bind_gdn_plan(Model const& model, Session& session
   if (!front) {
     return std::unexpected(front.error());
   }
+  auto position = detail::SessionPlanAccess::gdn_position(session, *gdn_i);
+  if (!position) {
+    return std::unexpected(position.error());
+  }
 
   GdnBindViews views;
   views.qkv = front->qkv.codes;
@@ -1174,6 +1182,7 @@ std::expected<GdnPlan, Error> bind_gdn_plan(Model const& model, Session& session
   views.history = front->history;
   views.s = session.gdn_s();
   views.cursor = front->cursor;
+  views.position = *position;
   views.language_layer = layer;
   return bind_gdn_plan(views, stream, eps);
 }
@@ -1241,9 +1250,12 @@ std::expected<void, Error> region_out_residual(GdnPlan const& plan) {
 }
 
 std::expected<TensorView, Error> execute_decode_gdn_impl(
-    GdnPlan const& plan, GdnRegionTimings* timings) {
+    GdnPlan const& plan, std::uint64_t position, GdnRegionTimings* timings) {
   if (plan.front.stream == nullptr || plan.front.stream->empty()) {
     return std::unexpected(arg_error("stream", "empty stream"));
+  }
+  if (auto st = plan.position.validate(position); !st) {
+    return std::unexpected(st.error());
   }
 
   using qw38::cuda::Event;
@@ -1333,16 +1345,20 @@ std::expected<TensorView, Error> execute_decode_gdn_impl(
       timings->ms[i] = *ms;
     }
   }
+  if (auto st = plan.position.commit(position); !st) {
+    return std::unexpected(st.error());
+  }
   return plan.residual_out;
 }
 
-std::expected<TensorView, Error> execute_decode_gdn(GdnPlan const& plan) {
-  return execute_decode_gdn_impl(plan, nullptr);
+std::expected<TensorView, Error> execute_decode_gdn(GdnPlan const& plan,
+                                                   std::uint64_t position) {
+  return execute_decode_gdn_impl(plan, position, nullptr);
 }
 
 std::expected<TensorView, Error> execute_decode_gdn_timed(
-    GdnPlan const& plan, GdnRegionTimings& timings) {
-  return execute_decode_gdn_impl(plan, &timings);
+    GdnPlan const& plan, std::uint64_t position, GdnRegionTimings& timings) {
+  return execute_decode_gdn_impl(plan, position, &timings);
 }
 
 }  // namespace qw38::runtime

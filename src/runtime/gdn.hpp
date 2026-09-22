@@ -188,6 +188,7 @@ struct GdnBindViews {
   TensorView history{};
   TensorView s{};
   ConvCursorSlot cursor{};
+  GdnPositionSlot position{};
   std::uint32_t language_layer{};
 };
 
@@ -197,6 +198,7 @@ struct GdnPlan {
   ConstTensorView gated_gamma{};   // BF16 [128], multiplicative
   TensorView residual_out{};  // FP32 h_mid; original residual stays live
   TensorView s{};             // FP32 session S
+  GdnPositionSlot position{}; // Absolute next-token sequence for this layer
   std::uint32_t s_layer{};
 };
 
@@ -210,10 +212,10 @@ struct GdnPlan {
 
 // Eight launches, no allocation. Returns residual_out (h_mid).
 [[nodiscard]] std::expected<TensorView, Error> execute_decode_gdn(
-    GdnPlan const& plan);
+    GdnPlan const& plan, std::uint64_t position);
 
 // Same map; fills diagnostic per-region milliseconds. Not a fusion license.
 [[nodiscard]] std::expected<TensorView, Error> execute_decode_gdn_timed(
-    GdnPlan const& plan, GdnRegionTimings& timings);
+    GdnPlan const& plan, std::uint64_t position, GdnRegionTimings& timings);
 
 }  // namespace qw38::runtime

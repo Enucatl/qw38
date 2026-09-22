@@ -57,11 +57,28 @@ class ConvCursorSlot {
   std::uint32_t* value_{nullptr};
 };
 
+class GdnPositionSlot {
+ public:
+  GdnPositionSlot() = default;
+
+  [[nodiscard]] static std::expected<GdnPositionSlot, Error> bind(
+      std::uint64_t* value);
+  [[nodiscard]] std::expected<std::uint64_t, Error> value() const;
+  [[nodiscard]] std::expected<void, Error> validate(
+      std::uint64_t position) const;
+  [[nodiscard]] std::expected<void, Error> commit(
+      std::uint64_t position) const;
+
+ private:
+  std::uint64_t* value_{nullptr};
+};
+
 struct SessionSnapshot {
   std::vector<std::byte> gdn_s;
   std::vector<std::byte> conv_history;
   std::vector<std::byte> kv;
   std::array<std::uint32_t, kConvLayers> conv_cursor{};
+  std::array<std::uint64_t, kGdnLayers> gdn_position{};
   std::array<std::uint64_t, kAttnLayers> kv_populated{};
 };
 
@@ -122,6 +139,8 @@ class Session {
       std::uint32_t attention_layer);
   [[nodiscard]] std::expected<ConvCursorSlot, Error> conv_cursor_slot(
       std::uint32_t gdn_layer);
+  [[nodiscard]] std::expected<GdnPositionSlot, Error> gdn_position_slot(
+      std::uint32_t gdn_layer);
 
   std::shared_ptr<qw38::cuda::Stream> stream_;
   qw38::cuda::DeviceBuffer gdn_s_;
@@ -132,6 +151,7 @@ class Session {
   qw38::cuda::DeviceBuffer scratch_;
   ArenaPlan arena_{};
   std::array<std::uint32_t, kConvLayers> conv_cursor_{};
+  std::array<std::uint64_t, kGdnLayers> gdn_position_{};
   std::uint64_t kv_capacity_{0};
   std::array<std::uint64_t, kAttnLayers> kv_populated_{};
   std::uint64_t persistent_bytes_{0};
@@ -145,6 +165,8 @@ struct SessionPlanAccess {
   [[nodiscard]] static std::expected<KvPopulatedSlot, Error> kv_populated(
       Session& session, std::uint32_t attention_layer);
   [[nodiscard]] static std::expected<ConvCursorSlot, Error> conv_cursor(
+      Session& session, std::uint32_t gdn_layer);
+  [[nodiscard]] static std::expected<GdnPositionSlot, Error> gdn_position(
       Session& session, std::uint32_t gdn_layer);
 };
 

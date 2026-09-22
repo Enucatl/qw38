@@ -129,6 +129,7 @@ int main() {
   }
 
   std::uint32_t cursor = 0;
+  std::uint64_t position = 0;
   GdnBindViews views;
   views.qkv = make_view(qkv_c->data(), ArithmeticDtype::Bf16,
                         PhysicalLayoutId::CudaQ4G64V0, StorageClass::Int4Grouped,
@@ -195,6 +196,12 @@ int main() {
     return 1;
   }
   views.cursor = *cursor_slot;
+  auto position_slot = qw38::runtime::GdnPositionSlot::bind(&position);
+  if (!position_slot) {
+    std::cerr << qw38::runtime::error_message(position_slot.error()) << '\n';
+    return 1;
+  }
+  views.position = *position_slot;
   views.language_layer = 0;
 
   auto plan = bind_gdn_plan(views, *stream);
@@ -209,7 +216,7 @@ int main() {
   int const device_copies_per_iteration = 1;
   for (int i = 0; i < warmup; ++i) {
     cursor = 0;
-    auto st = execute_decode_gdn(*plan);
+    auto st = execute_decode_gdn(*plan, position);
     if (!st) {
       std::cerr << qw38::runtime::error_message(st.error()) << '\n';
       return 1;
@@ -227,7 +234,7 @@ int main() {
     return 1;
   }
   for (int i = 0; i < iterations; ++i) {
-    auto st = execute_decode_gdn(*plan);
+    auto st = execute_decode_gdn(*plan, position);
     if (!st) {
       std::cerr << qw38::runtime::error_message(st.error()) << '\n';
       return 1;
@@ -252,7 +259,7 @@ int main() {
   GdnRegionTimings regions{};
   GdnRegionTimings acc{};
   for (int i = 0; i < iterations; ++i) {
-    auto st = execute_decode_gdn_timed(*plan, regions);
+    auto st = execute_decode_gdn_timed(*plan, position, regions);
     if (!st) {
       std::cerr << qw38::runtime::error_message(st.error()) << '\n';
       return 1;

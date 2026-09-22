@@ -435,8 +435,9 @@ int main() {
   auto cpu_s = zeros_f(static_cast<std::uint32_t>(kGdnSElemsPerLayer));
   std::vector<float> last_post;
 
-  auto run_pair = [&](auto& gdn, auto& mlp, char const* tag) -> bool {
-    auto st = execute_decode_gdn(gdn);
+  auto run_pair = [&](auto& gdn, auto& mlp, std::uint64_t position,
+                      char const* tag) -> bool {
+    auto st = execute_decode_gdn(gdn, position);
     if (!st) {
       fail(std::string(tag) + " gdn: " + qw38::runtime::error_message(st.error()));
       return false;
@@ -479,12 +480,12 @@ int main() {
     last_post = cpu_mlp->residual;
 
     auto const mallocs = malloc_count();
-    if (!run_pair(*plan_cont, *mlp_cont, "cont")) {
+    if (!run_pair(*plan_cont, *mlp_cont, step, "cont")) {
       return 1;
     }
     expect(malloc_count() == mallocs, "execute allocates nothing");
     if (step < 3) {
-      if (!run_pair(*plan_snap, *mlp_snap, "snap")) {
+      if (!run_pair(*plan_snap, *mlp_snap, step, "snap")) {
         return 1;
       }
     }
@@ -516,7 +517,7 @@ int main() {
       expect(s_snap->conv_cursor()[0] == cpu_cursor, "restored cursor");
     }
     if (step >= 3) {
-      if (!run_pair(*plan_snap, *mlp_snap, "restored")) {
+      if (!run_pair(*plan_snap, *mlp_snap, step, "restored")) {
         return 1;
       }
     }

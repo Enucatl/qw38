@@ -608,7 +608,8 @@ bool make_q4_mixer_host(HostGdnMixer& host) {
 }
 
 void expect_eight_launch_schedule(qw38::runtime::GdnPlan const& plan,
-                                  Stream const& stream, std::string_view tag) {
+                                  Stream const& stream, std::uint64_t& position,
+                                  std::string_view tag) {
   if (auto st = stream.sync(); !st) {
     fail(std::string(tag) + " launch-count pre-sync");
     return;
@@ -625,8 +626,10 @@ void expect_eight_launch_schedule(qw38::runtime::GdnPlan const& plan,
          cudaGetErrorString(status));
     return;
   }
-  auto run = execute_decode_gdn(plan);
+  auto const saved_position = position;
+  auto run = execute_decode_gdn(plan, position);
   status = cudaStreamEndCapture(stream.native(), &graph);
+  position = saved_position;
   for (int i = 0; i < 2; ++i) {
     auto current = plan.front.cursor.value();
     if (!current || *current == *saved_cursor) {
@@ -686,7 +689,7 @@ bool compare_mixer(HostGdnMixer const& host, DeviceGdnMixer& dev, Stream const& 
     fail(std::string(tag) + " bind: " + qw38::runtime::error_message(plan.error()));
     return false;
   }
-  expect_eight_launch_schedule(*plan, stream, tag);
+  expect_eight_launch_schedule(*plan, stream, dev.position, tag);
   std::vector<std::uint16_t> hist(kConvHistoryTaps * kQkvWidth,
                                   qw38::format::fp32_to_bf16_rne(0.0f));
   std::uint32_t cursor = 0;
@@ -715,7 +718,7 @@ bool compare_mixer(HostGdnMixer const& host, DeviceGdnMixer& dev, Stream const& 
     cursor = cpu->cursor;
     s_cpu = cpu->s;
 
-    auto st = execute_decode_gdn(*plan);
+    auto st = execute_decode_gdn(*plan, dev.position);
     if (!st) {
       fail(std::string(tag) + " execute: " +
            qw38::runtime::error_message(st.error()));
