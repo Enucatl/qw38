@@ -1,5 +1,7 @@
 #include "format/constants.hpp"
 
+#include <format>
+
 namespace qw38::format {
 namespace {
 
@@ -8,8 +10,9 @@ std::expected<E, FormatError> decode_known(std::uint16_t raw, std::uint64_t offs
                                            std::string_view field) {
   E const value{raw};
   if (!is_known(value)) {
-    return std::unexpected(make_error(FormatErrorCode::UnknownEnum, offset, field,
-                                      "unsupported enumerator"));
+    return std::unexpected(make_error(
+        FormatErrorCode::UnknownEnum, offset, field,
+        std::format("unsupported enumerator raw=0x{:04X}", raw)));
   }
   return value;
 }
@@ -274,12 +277,24 @@ std::expected<StorageClass, FormatError> decode_storage_class(
 
 std::expected<LogicalQuantizerId, FormatError> decode_logical_quantizer(
     std::uint16_t raw, std::uint64_t offset, std::string_view field) {
-  return decode_known<LogicalQuantizerId>(raw, offset, field);
+  auto value = decode_known<LogicalQuantizerId>(raw, offset, field);
+  if (!value) {
+    auto error = value.error();
+    error.code = FormatErrorCode::UnsupportedQuantizerVersion;
+    return std::unexpected(std::move(error));
+  }
+  return value;
 }
 
 std::expected<PhysicalLayoutId, FormatError> decode_physical_layout(
     std::uint16_t raw, std::uint64_t offset, std::string_view field) {
-  return decode_known<PhysicalLayoutId>(raw, offset, field);
+  auto value = decode_known<PhysicalLayoutId>(raw, offset, field);
+  if (!value) {
+    auto error = value.error();
+    error.code = FormatErrorCode::UnsupportedPhysicalLayoutVersion;
+    return std::unexpected(std::move(error));
+  }
+  return value;
 }
 
 std::expected<SemanticNodeKind, FormatError> decode_semantic_node(

@@ -45,6 +45,8 @@ enum class FormatErrorCode : std::uint16_t {
   ResourceLimitExceeded = 36,
   AllocationFailure = 37,
   InvalidQuantizedPayload = 38,
+  UnsupportedQuantizerVersion = 39,
+  UnsupportedPhysicalLayoutVersion = 40,
 };
 
 struct FormatError {

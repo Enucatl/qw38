@@ -509,7 +509,7 @@ std::expected<Validated, FormatError> validate_bytes(
   if (!manifest) {
     return std::unexpected(manifest.error());
   }
-  auto schema = decode_schema(*manifest);
+  auto schema = decode_schema(*manifest, header->manifest_offset);
   if (!schema) {
     return std::unexpected(schema.error());
   }

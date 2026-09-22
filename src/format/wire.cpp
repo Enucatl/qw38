@@ -136,12 +136,14 @@ std::expected<void, FormatError> ByteWriter::name(std::string_view value,
   return bytes(std::span<std::byte const>{p, value.size()}, field);
 }
 
-ByteReader::ByteReader(std::span<std::byte const> in) noexcept : buf_(in) {}
+ByteReader::ByteReader(std::span<std::byte const> in,
+                       std::uint64_t base_offset) noexcept
+    : buf_(in), base_offset_(base_offset) {}
 
 std::expected<void, FormatError> ByteReader::ensure(
     std::size_t count, std::string_view field) const {
   if (count > remaining()) {
-    return std::unexpected(make_error(FormatErrorCode::Truncated, pos_, field,
+    return std::unexpected(make_error(FormatErrorCode::Truncated, offset(), field,
                                       "input ends before field"));
   }
   return {};
@@ -206,7 +208,7 @@ std::expected<void, FormatError> ByteReader::expect_zeros(
   for (std::size_t i = 0; i < count; ++i) {
     if (buf_[pos_ + i] != std::byte{0}) {
       return std::unexpected(make_error(FormatErrorCode::ReservedNonzero,
-                                        pos_ + i, field,
+                                        offset() + i, field,
                                         "reserved bytes must be zero"));
     }
   }
@@ -221,7 +223,7 @@ std::expected<std::string, FormatError> ByteReader::name(
     return std::unexpected(len.error());
   }
   if (*len > kMaxNameBytes) {
-    return std::unexpected(make_error(FormatErrorCode::NameTooLong, pos_ - 2,
+    return std::unexpected(make_error(FormatErrorCode::NameTooLong, offset() - 2,
                                       field, "logical name exceeds 1024 bytes"));
   }
   if (auto st = ensure(*len, field); !st) {
@@ -237,7 +239,7 @@ std::expected<std::string, FormatError> ByteReader::name(
 
 std::expected<void, FormatError> ByteReader::expect_consumed() const {
   if (!empty()) {
-    return std::unexpected(make_error(FormatErrorCode::LeftoverBytes, pos_,
+    return std::unexpected(make_error(FormatErrorCode::LeftoverBytes, offset(),
                                       "trailing", "unconsumed manifest bytes"));
   }
   return {};

@@ -217,6 +217,11 @@ canonical_owner_tensor_id(ArtifactSchema const& schema,
     ArtifactSchema const& schema, std::span<std::byte> out);
 [[nodiscard]] std::expected<ArtifactSchema, FormatError> decode_schema(
     std::span<std::byte const> in);
+// Decodes a manifest embedded at base_offset in its containing artifact.  The
+// returned errors retain absolute file positions while the wire ABI remains
+// independent of container placement.
+[[nodiscard]] std::expected<ArtifactSchema, FormatError> decode_schema(
+    std::span<std::byte const> in, std::uint64_t base_offset);
 [[nodiscard]] std::expected<void, FormatError> validate_schema(
     ArtifactSchema const& schema, std::uint64_t offset = 0);
 

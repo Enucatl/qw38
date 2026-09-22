@@ -170,7 +170,8 @@ void test_bad_magic_version_enum() {
     }
   }
   expect(replaced_layout, "minimal manifest contains its BF16 vector layout");
-  expect_code(Artifact::parse(bytes), FormatErrorCode::UnknownEnum,
+  expect_code(Artifact::parse(bytes),
+              FormatErrorCode::UnsupportedPhysicalLayoutVersion,
               "unknown layout enum");
 }
 

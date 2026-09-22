@@ -2138,13 +2138,18 @@ std::expected<void, FormatError> encode(ArtifactSchema const& schema,
 }
 
 std::expected<ArtifactSchema, FormatError> decode_schema(
-    std::span<std::byte const> in) try {
+    std::span<std::byte const> in) {
+  return decode_schema(in, 0);
+}
+
+std::expected<ArtifactSchema, FormatError> decode_schema(
+    std::span<std::byte const> in, std::uint64_t base_offset) try {
   if (in.size() > kMaxManifestBytesV0) {
     return std::unexpected(make_error(
-        FormatErrorCode::ResourceLimitExceeded, 0, "manifest",
+        FormatErrorCode::ResourceLimitExceeded, base_offset, "manifest",
         "manifest exceeds the V0 size limit"));
   }
-  ByteReader r{in};
+  ByteReader r{in, base_offset};
   ArtifactSchema schema{};
   auto const version = r.u16("manifest.version");
   if (!version) {
@@ -2152,7 +2157,7 @@ std::expected<ArtifactSchema, FormatError> decode_schema(
   }
   if (*version != kManifestVersionV0) {
     return std::unexpected(make_error(
-        FormatErrorCode::UnsupportedManifestVersion, 0, "manifest.version",
+        FormatErrorCode::UnsupportedManifestVersion, r.offset() - 2, "manifest.version",
         "only manifest version 1 is supported"));
   }
   schema.manifest_version = *version;
@@ -2296,7 +2301,7 @@ std::expected<ArtifactSchema, FormatError> decode_schema(
   if (auto st = r.expect_consumed(); !st) {
     return std::unexpected(st.error());
   }
-  if (auto st = validate_schema(schema, 0); !st) {
+  if (auto st = validate_schema(schema, base_offset); !st) {
     return std::unexpected(st.error());
   }
   return schema;
@@ -2344,7 +2349,9 @@ std::expected<void, FormatError> validate_schema(ArtifactSchema const& schema,
   }
   for (std::size_t i = 0; i < schema.tensors.size(); ++i) {
     if (auto st = validate_tensor(schema.tensors[i], offset); !st) {
-      return st;
+      auto error = st.error();
+      error.field = schema.tensors[i].logical_name + "." + error.field;
+      return std::unexpected(std::move(error));
     }
     for (std::size_t j = i + 1; j < schema.tensors.size(); ++j) {
       if (schema.tensors[i].tensor_id == schema.tensors[j].tensor_id) {
@@ -2429,7 +2436,10 @@ std::expected<void, FormatError> validate_schema(ArtifactSchema const& schema,
   bool seen_kv = false;
   for (auto const& s : schema.state) {
     if (auto st = validate_state(s, offset); !st) {
-      return st;
+      auto error = st.error();
+      error.field = "state[" + std::to_string(std::to_underlying(s.kind)) +
+                    "]." + error.field;
+      return std::unexpected(std::move(error));
     }
     if (s.kind == StateKind::GdnS) {
       if (seen_gdn) {

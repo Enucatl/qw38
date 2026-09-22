@@ -82,6 +82,10 @@ char const* code_name(FormatErrorCode code) noexcept {
       return "allocation_failure";
     case FormatErrorCode::InvalidQuantizedPayload:
       return "invalid_quantized_payload";
+    case FormatErrorCode::UnsupportedQuantizerVersion:
+      return "unsupported_quantizer_version";
+    case FormatErrorCode::UnsupportedPhysicalLayoutVersion:
+      return "unsupported_physical_layout_version";
   }
   return "unknown";
 }

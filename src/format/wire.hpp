@@ -48,9 +48,12 @@ class ByteWriter {
 
 class ByteReader {
  public:
-  explicit ByteReader(std::span<std::byte const> in) noexcept;
+  explicit ByteReader(std::span<std::byte const> in,
+                      std::uint64_t base_offset = 0) noexcept;
 
-  [[nodiscard]] std::size_t offset() const noexcept { return pos_; }
+  [[nodiscard]] std::uint64_t offset() const noexcept {
+    return base_offset_ + pos_;
+  }
   [[nodiscard]] std::size_t remaining() const noexcept {
     return buf_.size() - pos_;
   }
@@ -78,6 +81,7 @@ class ByteReader {
 
   std::span<std::byte const> buf_{};
   std::size_t pos_{0};
+  std::uint64_t base_offset_{0};
 };
 
 [[nodiscard]] std::uint16_t native_to_le_u16(std::uint16_t value) noexcept;

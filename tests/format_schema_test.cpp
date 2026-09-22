@@ -268,7 +268,9 @@ void test_enum_and_version_rejection() {
          "quantizer and layout IDs occupy disjoint wire ranges");
   auto as_layout = decode_physical_layout(
       std::to_underlying(LogicalQuantizerId::Q4G64V0), 0, "layout");
-  expect(!as_layout && as_layout.error().code == FormatErrorCode::UnknownEnum,
+  expect(!as_layout &&
+             as_layout.error().code ==
+                 FormatErrorCode::UnsupportedPhysicalLayoutVersion,
          "logical quantizer wire value is not a physical layout");
 
   ContainerHeader header{};
@@ -323,6 +325,33 @@ void test_enum_and_version_rejection() {
   st = validate_schema(schema);
   expect(!st && st.error().code == FormatErrorCode::InvalidStorageQuantizerPair,
          "Q4 quantizer cannot use BF16 storage");
+}
+
+void test_manifest_absolute_error_context() {
+  auto schema = base_schema();
+  schema.tensors.push_back(bf16_vector(17, "named_tensor", 4, 256));
+  auto bytes = must_encode(schema, "absolute error context");
+  if (bytes.empty()) {
+    return;
+  }
+  // The tensor layout follows the fixed prefix, name, shape, and storage /
+  // quantizer fields.  This test intentionally mutates frozen wire position
+  // rather than using the production decoder to locate it.
+  std::size_t const layout_offset = 2 + (2 + 4 + 16) + 96 +
+                                    (4 + 4 * schema.precision.bindings.size()) +
+                                    2 + 4 + 4 + 2 + schema.tensors[0].logical_name.size() +
+                                    8 + 16 + 2 + 2;
+  bytes[layout_offset] = std::byte{0xFF};
+  bytes[layout_offset + 1] = std::byte{0xFF};
+  constexpr std::uint64_t kManifestFileOffset = 512;
+  auto decoded = decode_schema(bytes, kManifestFileOffset);
+  expect(!decoded &&
+             decoded.error().code ==
+                 FormatErrorCode::UnsupportedPhysicalLayoutVersion &&
+             decoded.error().offset == kManifestFileOffset + layout_offset &&
+             decoded.error().field == "tensor.layout" &&
+             decoded.error().detail.find("raw=0xFFFF") != std::string::npos,
+         "layout error preserves absolute offset, field, and raw value");
 }
 
 void test_overflow_and_alignment() {
@@ -822,6 +851,7 @@ int main() {
   test_golden_header_and_integers();
   test_endian_mismatch_is_rejected_as_version();
   test_enum_and_version_rejection();
+  test_manifest_absolute_error_context();
   test_overflow_and_alignment();
   test_invalid_shape_and_span();
   test_shape_entry_points_reject_malformed_ranks_and_sizes();
