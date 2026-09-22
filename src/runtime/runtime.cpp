@@ -43,6 +43,11 @@ std::expected<Model, Error> Runtime::upload(
 
 std::expected<Session, Error> Runtime::create_session(Model const& model,
                                                       std::uint64_t kv_capacity) {
+  if (model.device() != device_) {
+    return std::unexpected(make_error(
+        ErrorCode::InvalidArgument, "runtime.create_session",
+        "model and runtime devices differ"));
+  }
   return Session::create(model, stream_, kv_capacity);
 }
 

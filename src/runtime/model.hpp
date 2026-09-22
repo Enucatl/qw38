@@ -55,6 +55,7 @@ class Model {
       std::string_view logical_name) const;
 
   [[nodiscard]] std::uint64_t device_bytes() const noexcept { return device_bytes_; }
+  [[nodiscard]] int device() const noexcept { return device_; }
 
  private:
   friend class Runtime;
@@ -74,6 +75,7 @@ class Model {
   std::vector<qw38::cuda::DeviceBuffer> buffers_;
   std::vector<UploadedTensor> uploaded_;
   std::uint64_t device_bytes_{0};
+  int device_{-1};
 };
 
 }  // namespace qw38::runtime

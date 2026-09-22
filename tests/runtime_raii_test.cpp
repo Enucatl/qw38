@@ -56,6 +56,33 @@ int main() {
     std::cerr << g_failures << " failures\n";
     return 1;
   }
+  int original_device = 0;
+  int device_count = 0;
+  expect(cudaGetDevice(&original_device) == cudaSuccess, "query current device");
+  expect(stream->device() == original_device, "stream records owning device");
+  expect(cudaGetDeviceCount(&device_count) == cudaSuccess, "query device count");
+  if (device_count > 1) {
+    int const other_device = (original_device + 1) % device_count;
+    expect(cudaSetDevice(other_device) == cudaSuccess, "select alternate device");
+    expect(static_cast<bool>(stream->sync()),
+           "stream operation restores its owning device");
+    int current_device = -1;
+    expect(cudaGetDevice(&current_device) == cudaSuccess &&
+               current_device == other_device,
+           "stream operation preserves caller device");
+
+    auto cross_device = DeviceBuffer::allocate(64);
+    expect(static_cast<bool>(cross_device), "allocate on alternate device");
+    if (cross_device) {
+      expect(cross_device->device() == other_device,
+             "buffer records owning device");
+      auto mismatch = qw38::cuda::zero(*cross_device, *stream);
+      expect(!mismatch && mismatch.error().code == ErrorCode::InvalidArgument,
+             "cross-device buffer and stream rejected");
+    }
+    expect(cudaSetDevice(original_device) == cudaSuccess,
+           "restore original device");
+  }
 
   auto const mallocs0 = qw38::cuda::malloc_count();
   auto buf = DeviceBuffer::allocate(256);

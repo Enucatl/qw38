@@ -12,7 +12,7 @@ std::expected<DeviceBuffer, Error> upload(std::span<std::byte const> host,
     return std::unexpected(
         make_error(ErrorCode::InvalidArgument, "upload", "empty stream"));
   }
-  auto buffer = DeviceBuffer::allocate(host.size());
+  auto buffer = DeviceBuffer::allocate(host.size(), stream.device());
   if (!buffer) {
     return std::unexpected(buffer.error());
   }

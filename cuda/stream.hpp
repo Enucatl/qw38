@@ -1,5 +1,6 @@
 #pragma once
 
+#include "cuda/device.hpp"
 #include "cuda/error.hpp"
 
 #include <cuda_runtime.h>
@@ -23,14 +24,18 @@ class Stream {
 
   [[nodiscard]] cudaStream_t native() const noexcept { return stream_; }
   [[nodiscard]] bool empty() const noexcept { return stream_ == nullptr; }
+  [[nodiscard]] int device() const noexcept { return device_; }
 
+  [[nodiscard]] std::expected<DeviceGuard, Error> activate() const;
   [[nodiscard]] std::expected<void, Error> sync() const;
 
  private:
-  explicit Stream(cudaStream_t stream) noexcept : stream_(stream) {}
+  Stream(cudaStream_t stream, int device) noexcept
+      : stream_(stream), device_(device) {}
   void destroy() noexcept;
 
   cudaStream_t stream_{nullptr};
+  int device_{-1};
 };
 
 }  // namespace qw38::cuda

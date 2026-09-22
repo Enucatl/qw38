@@ -243,6 +243,8 @@ std::expected<void, Error> launch_gdn_conv_silu(
   unsigned const blocks =
       (kGdnQkvWidth + static_cast<unsigned>(kGdnConvThreads) - 1u) /
       static_cast<unsigned>(kGdnConvThreads);
+  auto guard = stream.activate();
+  if (!guard) return std::unexpected(guard.error());
   gdn_conv_silu_kernel<<<blocks, kGdnConvThreads, 0, stream.native()>>>(
       qkv, taps, history, cursor, convolved);
   return check(cudaGetLastError(), "gdn_conv_silu_kernel");
@@ -270,6 +272,8 @@ std::expected<void, Error> launch_gdn_prepare(
     return std::unexpected(make_error(ErrorCode::InvalidArgument, "gdn_prepare",
                                       "q_hat and k_hat must be distinct"));
   }
+  auto guard = stream.activate();
+  if (!guard) return std::unexpected(guard.error());
   gdn_prepare_kernel<<<kGdnKeyHeads, kGdnPrepThreads, 0, stream.native()>>>(
       convolved, a, b, a_log, dt_bias, eps, q_hat, k_hat, alpha, beta);
   return check(cudaGetLastError(), "gdn_prepare_kernel");
@@ -301,6 +305,8 @@ std::expected<void, Error> launch_gdn_recurrence(
                                       "s and o must be distinct"));
   }
   float* layer_s = s + static_cast<std::size_t>(s_layer) * kGdnSElemsPerLayer;
+  auto guard = stream.activate();
+  if (!guard) return std::unexpected(guard.error());
   gdn_recurrence_kernel<<<kGdnRecurBlocksPerLayer, kGdnRecurThreads, 0,
                           stream.native()>>>(q_hat, k_hat, alpha, beta, v, layer_s,
                                            o);

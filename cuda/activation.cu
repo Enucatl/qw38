@@ -387,6 +387,8 @@ std::expected<void, Error> launch_embed_gather(std::uint16_t const* table,
     return std::unexpected(make_error(ErrorCode::InvalidArgument, "embed_gather",
                                       "token_id >= vocab"));
   }
+  auto guard = stream.activate();
+  if (!guard) return std::unexpected(guard.error());
   embed_gather_kernel<<<1, kHiddenRmsThreads, 0, stream.native()>>>(
       table, token_id, residual);
   return check(cudaGetLastError(), "embed_gather_kernel");
@@ -413,6 +415,8 @@ std::expected<void, Error> launch_hidden_rms(float const* residual,
     return std::unexpected(make_error(ErrorCode::InvalidArgument, "hidden_rms",
                                       "epsilon must be finite and > 0"));
   }
+  auto guard = stream.activate();
+  if (!guard) return std::unexpected(guard.error());
   hidden_rms_kernel<<<n_tokens, kHiddenRmsThreads, 0, stream.native()>>>(
       residual, gamma, eps, out_bf16);
   return check(cudaGetLastError(), "hidden_rms_kernel");
@@ -447,6 +451,8 @@ std::expected<void, Error> launch_qk_rms_rope(
                                       "position must be >= 0"));
   }
   float const pos = static_cast<float>(position);
+  auto guard = stream.activate();
+  if (!guard) return std::unexpected(guard.error());
   qk_rms_rope_kernel<<<n_heads, kHeadNormThreads, 0, stream.native()>>>(
       projected_heads_bf16, gamma, eps, inv_freq, pos, out_bf16);
   return check(cudaGetLastError(), "qk_rms_rope_kernel");
@@ -473,6 +479,8 @@ std::expected<void, Error> launch_qk_rms(float const* heads,
     return std::unexpected(make_error(ErrorCode::InvalidArgument, "qk_rms",
                                       "epsilon must be finite and > 0"));
   }
+  auto guard = stream.activate();
+  if (!guard) return std::unexpected(guard.error());
   qk_rms_kernel<<<n_heads, kHeadNormThreads, 0, stream.native()>>>(
       heads, gamma, eps, out_bf16);
   return check(cudaGetLastError(), "qk_rms_kernel");
@@ -501,6 +509,8 @@ std::expected<void, Error> launch_gdn_gated_rms(
                                       "gdn_gated_rms",
                                       "epsilon must be finite and > 0"));
   }
+  auto guard = stream.activate();
+  if (!guard) return std::unexpected(guard.error());
   gdn_gated_rms_kernel<<<n_heads, kHeadNormThreads, 0, stream.native()>>>(
       o, z_bf16, gamma, eps, out_bf16);
   return check(cudaGetLastError(), "gdn_gated_rms_kernel");
@@ -517,6 +527,8 @@ std::expected<void, Error> launch_sigmoid_fp32(float const* in, float* out,
     return std::unexpected(make_error(ErrorCode::InvalidArgument, "sigmoid_fp32",
                                       "null in/out or n == 0"));
   }
+  auto guard = stream.activate();
+  if (!guard) return std::unexpected(guard.error());
   sigmoid_fp32_kernel<<<elementwise_blocks(n), 256, 0, stream.native()>>>(in,
                                                                          out, n);
   return check(cudaGetLastError(), "sigmoid_fp32_kernel");
@@ -533,6 +545,8 @@ std::expected<void, Error> launch_silu_fp32(float const* in, float* out,
     return std::unexpected(make_error(ErrorCode::InvalidArgument, "silu_fp32",
                                       "null in/out or n == 0"));
   }
+  auto guard = stream.activate();
+  if (!guard) return std::unexpected(guard.error());
   silu_fp32_kernel<<<elementwise_blocks(n), 256, 0, stream.native()>>>(in, out,
                                                                       n);
   return check(cudaGetLastError(), "silu_fp32_kernel");
@@ -561,6 +575,8 @@ std::expected<void, Error> launch_partial_rope(std::uint16_t const* heads_bf16,
                                       "position must be >= 0"));
   }
   float const pos = static_cast<float>(position);
+  auto guard = stream.activate();
+  if (!guard) return std::unexpected(guard.error());
   partial_rope_kernel<<<n_heads, kHeadNormThreads, 0, stream.native()>>>(
       heads_bf16, inv_freq, pos, out_bf16);
   return check(cudaGetLastError(), "partial_rope_kernel");
@@ -578,6 +594,8 @@ std::expected<void, Error> launch_argmax_fp32(float const* logits,
     return std::unexpected(make_error(ErrorCode::InvalidArgument, "argmax_fp32",
                                       "null logits/out or n == 0"));
   }
+  auto guard = stream.activate();
+  if (!guard) return std::unexpected(guard.error());
   argmax_fp32_kernel<<<1, kHiddenRmsThreads, 0, stream.native()>>>(logits, n,
                                                                   out_index);
   if (auto launch = check(cudaGetLastError(), "argmax_fp32_kernel"); !launch) {

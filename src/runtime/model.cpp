@@ -136,6 +136,7 @@ std::expected<Model, Error> Model::upload(qw38::format::Artifact const& artifact
   try {
   Model model;
   model.schema_ = artifact.schema();
+  model.device_ = stream.device();
 
   // Repeat the complete host-side compatibility preflight at the allocation
   // boundary so no future Artifact construction path can bypass it.

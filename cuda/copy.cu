@@ -27,6 +27,10 @@ std::expected<void, Error> copy_kind(void* dst, void const* src,
     return std::unexpected(
         make_error(ErrorCode::InvalidArgument, op, "empty pointer or stream"));
   }
+  auto guard = stream.activate();
+  if (!guard) {
+    return std::unexpected(guard.error());
+  }
   return check(cudaMemcpyAsync(dst, src, static_cast<std::size_t>(bytes), kind,
                                stream.native()),
                op);
@@ -68,6 +72,10 @@ std::expected<void, Error> fill_pattern(void* dst, std::uint64_t bytes,
   if (dst == nullptr || stream.empty()) {
     return std::unexpected(make_error(ErrorCode::InvalidArgument, "fill_pattern",
                                       "empty pointer or stream"));
+  }
+  auto guard = stream.activate();
+  if (!guard) {
+    return std::unexpected(guard.error());
   }
   int const threads = 256;
   unsigned int const max_blocks = 65535u;

@@ -248,34 +248,36 @@ std::expected<Session, Error> Session::create(
   s.persistent_bytes_ = *persist;
   s.arena_ = std::move(*arena);
 
-  auto gdn = qw38::cuda::DeviceBuffer::allocate(kGdnSBytes);
+  auto const device = s.stream_->device();
+  auto gdn = qw38::cuda::DeviceBuffer::allocate(kGdnSBytes, device);
   if (!gdn) {
     return std::unexpected(from_cuda(gdn.error()));
   }
-  auto conv = qw38::cuda::DeviceBuffer::allocate(kConvHistoryBytes);
+  auto conv = qw38::cuda::DeviceBuffer::allocate(kConvHistoryBytes, device);
   if (!conv) {
     return std::unexpected(from_cuda(conv.error()));
   }
   s.gdn_s_ = std::move(*gdn);
   s.conv_history_ = std::move(*conv);
   if (*kv_n != 0) {
-    auto kv = qw38::cuda::DeviceBuffer::allocate(*kv_n);
+    auto kv = qw38::cuda::DeviceBuffer::allocate(*kv_n, device);
     if (!kv) {
       return std::unexpected(from_cuda(kv.error()));
     }
     s.kv_ = std::move(*kv);
   }
-  auto h = qw38::cuda::DeviceBuffer::allocate(*res_n);
+  auto h = qw38::cuda::DeviceBuffer::allocate(*res_n, device);
   if (!h) {
     return std::unexpected(from_cuda(h.error()));
   }
-  auto h_mid = qw38::cuda::DeviceBuffer::allocate(*res_n);
+  auto h_mid = qw38::cuda::DeviceBuffer::allocate(*res_n, device);
   if (!h_mid) {
     return std::unexpected(from_cuda(h_mid.error()));
   }
   s.residual_h_ = std::move(*h);
   s.residual_h_mid_ = std::move(*h_mid);
-  auto scratch = qw38::cuda::DeviceBuffer::allocate(s.arena_.total_bytes);
+  auto scratch =
+      qw38::cuda::DeviceBuffer::allocate(s.arena_.total_bytes, device);
   if (!scratch) {
     return std::unexpected(from_cuda(scratch.error()));
   }

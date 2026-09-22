@@ -207,6 +207,13 @@ int main() {
   expect(qw38::cuda::malloc_count() == mallocs_before_sessions,
          "invalid capacities do not allocate");
 
+  int device_count = 0;
+  expect(cudaGetDeviceCount(&device_count) == cudaSuccess, "query device count");
+  int const runtime_device = rt->device();
+  int const caller_device =
+      device_count > 1 ? (runtime_device + 1) % device_count : runtime_device;
+  expect(cudaSetDevice(caller_device) == cudaSuccess,
+         "select caller device before session creation");
   {
     auto minimum_capacity = rt->create_session(*model, 1);
     expect(static_cast<bool>(minimum_capacity),
@@ -215,8 +222,16 @@ int main() {
       expect(minimum_capacity->kv_capacity() == 1 &&
                  minimum_capacity->kv().extent[3] == 1,
              "minimum-capacity session preserves boundary");
+      expect(static_cast<bool>(minimum_capacity->reset()),
+             "session operation uses runtime device");
     }
   }
+  int current_device = -1;
+  expect(cudaGetDevice(&current_device) == cudaSuccess &&
+             current_device == caller_device,
+         "runtime operations preserve caller device");
+  expect(cudaSetDevice(runtime_device) == cudaSuccess,
+         "restore runtime device");
 
   auto s1 = rt->create_session(*model, kCap);
   auto s2 = rt->create_session(*model, kCap);

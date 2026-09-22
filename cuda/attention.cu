@@ -499,6 +499,8 @@ std::expected<void, Error> launch_attention_prepare(
                                       "epsilon must be finite and > 0"));
   }
   float const pos = static_cast<float>(position);
+  auto guard = stream.activate();
+  if (!guard) return std::unexpected(guard.error());
   attention_prepare_kernel<<<kAttnPrepBlocks, kAttnPrepThreads, 0,
                              stream.native()>>>(
       qg, k_raw, v_raw, gamma_q, gamma_k, inv_freq, eps, pos, q_out, g_out, kv,
@@ -530,6 +532,8 @@ std::expected<void, Error> launch_attention_scan(
     return std::unexpected(make_error(ErrorCode::InvalidArgument, "attention_scan",
                                        "n_segments is smaller than populated length"));
   }
+  auto guard = stream.activate();
+  if (!guard) return std::unexpected(guard.error());
   attention_scan_kernel<<<dim3(kAttnQueryHeads, n_segments, 1), kAttnScanThreads, 0,
                           stream.native()>>>(q, kv, attn_layer, capacity, populated,
                                               partials, n_segments);
@@ -549,6 +553,8 @@ std::expected<void, Error> launch_attention_merge(
     // There is no causal key; launch the same deterministic merge path with a
     // zero segment count, which emits zero gated output.
   }
+  auto guard = stream.activate();
+  if (!guard) return std::unexpected(guard.error());
   attention_merge_kernel<<<kAttnQueryHeads, kAttnMergeThreads, 0, stream.native()>>>(
       partials, g, n_segments, y_out);
   return check(cudaGetLastError(), "attention_merge_kernel");

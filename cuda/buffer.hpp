@@ -22,11 +22,14 @@ class DeviceBuffer {
 
   [[nodiscard]] static std::expected<DeviceBuffer, Error> allocate(
       std::uint64_t bytes);
+  [[nodiscard]] static std::expected<DeviceBuffer, Error> allocate(
+      std::uint64_t bytes, int device);
 
   [[nodiscard]] void* data() noexcept { return ptr_; }
   [[nodiscard]] void const* data() const noexcept { return ptr_; }
   [[nodiscard]] std::uint64_t bytes() const noexcept { return bytes_; }
   [[nodiscard]] bool empty() const noexcept { return ptr_ == nullptr; }
+  [[nodiscard]] int device() const noexcept { return device_; }
 
   [[nodiscard]] std::byte* as_bytes() noexcept {
     return static_cast<std::byte*>(ptr_);
@@ -36,12 +39,13 @@ class DeviceBuffer {
   }
 
  private:
-  DeviceBuffer(void* ptr, std::uint64_t bytes) noexcept
-      : ptr_(ptr), bytes_(bytes) {}
+  DeviceBuffer(void* ptr, std::uint64_t bytes, int device) noexcept
+      : ptr_(ptr), bytes_(bytes), device_(device) {}
   void destroy() noexcept;
 
   void* ptr_{nullptr};
   std::uint64_t bytes_{0};
+  int device_{-1};
 };
 
 [[nodiscard]] std::expected<void, Error> zero(DeviceBuffer& buffer,

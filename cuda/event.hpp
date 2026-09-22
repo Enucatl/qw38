@@ -24,16 +24,18 @@ class Event {
 
   [[nodiscard]] cudaEvent_t native() const noexcept { return event_; }
   [[nodiscard]] bool empty() const noexcept { return event_ == nullptr; }
+  [[nodiscard]] int device() const noexcept { return device_; }
 
   [[nodiscard]] std::expected<void, Error> record(Stream const& stream) const;
   [[nodiscard]] std::expected<void, Error> wait(Stream const& stream) const;
   [[nodiscard]] std::expected<void, Error> sync() const;
 
  private:
-  explicit Event(cudaEvent_t event) noexcept : event_(event) {}
+  Event(cudaEvent_t event, int device) noexcept : event_(event), device_(device) {}
   void destroy() noexcept;
 
   cudaEvent_t event_{nullptr};
+  int device_{-1};
 };
 
 [[nodiscard]] std::expected<float, Error> elapsed_ms(Event const& start,

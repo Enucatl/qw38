@@ -479,6 +479,8 @@ std::expected<void, Error> launch_kind(DecodeMmvDesc const& a,
                                        Stream const& stream,
                                        std::string_view op) {
   unsigned const blocks = a.padded_n / static_cast<unsigned>(kDecodeTileRows);
+  auto guard = stream.activate();
+  if (!guard) return std::unexpected(guard.error());
   decode_mmv_kernel<Kind, Paired><<<blocks, kDecodeThreads, 0, stream.native()>>>(
       static_cast<std::byte const*>(a.codes.pointer),
       static_cast<std::byte const*>(a.scales.pointer),
@@ -602,6 +604,8 @@ std::expected<void, Error> launch_range_kind(
       d2 == nullptr ? 0u
                     : d2->padded_n / static_cast<unsigned>(kDecodeTileRows);
   unsigned const blocks = tiles0 + tiles1 + tiles2;
+  auto guard = stream.activate();
+  if (!guard) return std::unexpected(guard.error());
   decode_mmv_ranges_kernel<Kind><<<blocks, kDecodeThreads, 0, stream.native()>>>(
       static_cast<std::byte const*>(d0.codes.pointer),
       static_cast<std::byte const*>(d0.scales.pointer), d0.output.pointer, d0.n,
