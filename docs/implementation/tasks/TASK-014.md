@@ -1,7 +1,7 @@
 # TASK-014 — Attention preparation and KV cache
 
 ## Status
-TODO
+DONE
 ## Milestone
 M5 — Attention execution
 ## Purpose
@@ -46,22 +46,47 @@ Multiple appends, snapshot/restore, two sessions, cache byte/index verification.
 ## Benchmark required
 No.
 ## Acceptance criteria
-- [ ] Per-head q/g, QK norm, and partial RoPE semantics pass.
-- [ ] Cache contains one BF16 K/V copy per KV head/token.
-- [ ] Append length changes only after success.
-- [ ] Continuation/reset tests pass.
+- [x] Per-head q/g, QK norm, and partial RoPE semantics pass.
+- [x] Cache contains one BF16 K/V copy per KV head/token.
+- [x] Append length changes only after success.
+- [x] Continuation/reset tests pass.
 ## Architecture blocker rule
 On locked conflict stop with complete blocker fields; do not change cache layout or RoPE scope.
 ## Completion report
 ### Result
-DONE | BLOCKED
+DONE
 ### Changes made
+- AttentionWorkspace aliases (M-01): projected q/g `[24,512]`, k/v `[4,256]`, prepared Q and per-query-head g `[24,256]`; trailing 24768 bytes reserved for TASK-015 segment partials. Total 78016 bytes. K/V append directly to cache; no prepared K/V duplicate.
+- One ranged decode MMV launch (`launch_decode_mmv_ranges`) computes q/g, k, and v into distinct slices, sharing K/input/layout (Q4 or BF16-control).
+- CUDA `launch_attention_prepare`: 28 blocks × 128 threads (T-03). Fused zero-centered QK RMS in FP32, partial RoPE on the first 64 of 256, one BF16 store for Q and rotated K. g copied per query head; V bit-copied once. Writes K/V at `[layer, component, kv_head, token, 256]`.
+- CPU `attn_split_qg`, `attn_qk_norm_rope`, `attn_cache_append`, `attn_prep_reference`.
+- Runtime `AttentionPrepPlan` / `bind_attention_prep_plan` (views and Model/Session) plus `execute_decode_attention_prep`. Steps: hidden RMS; one ranged projection; fused prep+append. Position must equal populated and be `< capacity`. Stream-syncs, then sets populated to `position+1` only after success. Typed `InvalidCapacity` / `InvalidPopulatedLength`.
+- Tests: `attention_unit` (bind, GQA mapping, per-head q/g, isolated prep, RoPE suffix, one K/V per head, capacity/mismatch, session reset); `attention_reference` (Q4 and BF16-control at positions 0, 1, 123456); `attention_integration` (artifact layer 3, two sessions, three appends, snapshot/restore continuation, `kv_byte_offset`, reset, no malloc on execute).
 ### Tests run
-Exact commands/results.
+Debug:
+
+```text
+docker run --gpus all --rm -u "$(id -u):$(id -g)" \
+  -v "$PWD":/workspace -w /workspace qw38-dev:cuda13.4.1 \
+  bash -lc 'cmake -S . -B build/debug -DCMAKE_BUILD_TYPE=Debug && cmake --build build/debug && ctest --test-dir build/debug --output-on-failure'
+```
+
+Result: 37/37 tests passed (`attention_unit` 1.81s, `attention_reference` 9.92s, `attention_integration` 3.94s).
+
+Release:
+
+```text
+docker run --gpus all --rm -u "$(id -u):$(id -g)" \
+  -v "$PWD":/workspace -w /workspace qw38-dev:cuda13.4.1 \
+  bash -lc 'cmake -S . -B build/release -DCMAKE_BUILD_TYPE=Release && cmake --build build/release && ctest --test-dir build/release --output-on-failure'
+```
+
+Result: 37/37 tests passed (`attention_unit` 0.60s, `attention_reference` 3.21s, `attention_integration` 1.00s).
 ### Benchmark results
 Not required.
 ### Architecture blocker
-None/full report.
+None.
 ### Follow-up observations
-Concrete only.
-
+- AttentionWorkspace bytes 53248–78016 are reserved for TASK-015 FP32 segment partials (`24 × (2 + 256)`); unused by this task.
+- `execute_decode_attention_prep` synchronizes the stream before advancing host populated length so a failed kernel does not commit the append.
+- Restored missing `gdn_unit`/`gdn_reference`/`gdn_integration` CMake labels (`cuda;gpu;gdn`) dropped when adding attention tests.

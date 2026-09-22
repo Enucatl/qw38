@@ -57,6 +57,9 @@ class Session {
   }
   [[nodiscard]] std::expected<void, Error> set_populated_length(
       std::uint64_t populated);
+  [[nodiscard]] std::uint64_t* kv_populated_slot() noexcept {
+    return &kv_populated_;
+  }
 
   [[nodiscard]] std::array<std::uint32_t, kConvLayers> const& conv_cursor()
       const noexcept {

@@ -67,6 +67,14 @@ struct DecodeMmvPairedDesc {
   float* residual_b{};
 };
 
+// One launch, three independent output-N ranges that share K/input/layout.
+// Combines scheduling for attention q/g, k, and v; reductions stay per row.
+struct DecodeMmvRangeDesc {
+  DecodeMmvDesc qg;
+  DecodeMmvDesc k;
+  DecodeMmvDesc v;
+};
+
 [[nodiscard]] constexpr std::uint32_t decode_pad_n(std::uint32_t n) noexcept {
   if (n == 0) {
     return 0;
@@ -120,5 +128,9 @@ struct DecodeMmvPairedDesc {
 // Grouped GDN a/b: two BF16 dense-tile matrices, FP32 outputs, one launch.
 [[nodiscard]] std::expected<void, Error> launch_decode_ab_bf16(
     DecodeMmvPairedDesc const& desc, Stream const& stream);
+
+// Attention q/g, k, v: one Q4 or BF16-control launch into separate slices.
+[[nodiscard]] std::expected<void, Error> launch_decode_mmv_ranges(
+    DecodeMmvRangeDesc const& desc, Stream const& stream);
 
 }  // namespace qw38::cuda

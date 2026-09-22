@@ -60,6 +60,7 @@ add_library(qw38_runtime STATIC
   runtime/runtime.cpp
   runtime/mlp.cpp
   runtime/gdn.cpp
+  runtime/attention.cpp
 )
 target_include_directories(qw38_runtime PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 target_link_libraries(qw38_runtime PUBLIC qw38_format qw38_cuda)

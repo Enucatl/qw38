@@ -376,6 +376,88 @@ std::expected<void, Error> launch_layout(DecodeMmvDesc const& a, std::byte const
                                               stream, op);
 }
 
+template <WeightKind Kind>
+__global__ void decode_mmv_ranges_kernel(
+    std::byte const* codes0, std::byte const* scales0, void* out0,
+    std::uint32_t n0, std::uint32_t tiles0, std::byte const* codes1,
+    std::byte const* scales1, void* out1, std::uint32_t n1, std::uint32_t tiles1,
+    std::byte const* codes2, std::byte const* scales2, void* out2,
+    std::uint32_t n2, std::uint16_t const* input, std::uint32_t k,
+    std::uint32_t padded_k) {
+  std::byte const* codes = codes0;
+  std::byte const* scales = scales0;
+  void* output = out0;
+  std::uint32_t n = n0;
+  std::uint32_t tn = blockIdx.x;
+  if (blockIdx.x >= tiles0 + tiles1) {
+    codes = codes2;
+    scales = scales2;
+    output = out2;
+    n = n2;
+    tn = blockIdx.x - tiles0 - tiles1;
+  } else if (blockIdx.x >= tiles0) {
+    codes = codes1;
+    scales = scales1;
+    output = out1;
+    n = n1;
+    tn = blockIdx.x - tiles0;
+  }
+  std::uint32_t const warp = threadIdx.x >> 5;
+  int const lane = static_cast<int>(threadIdx.x & 31u);
+  std::uint32_t const row = tn * 8u + warp;
+  std::uint32_t const tiles_k = padded_k / static_cast<std::uint32_t>(kDecodeTileK);
+
+  __shared__ alignas(16) std::uint16_t xs[kDecodeMaxK];
+  for (std::uint32_t i = threadIdx.x; i < k; i += blockDim.x) {
+    xs[i] = input[i];
+  }
+  for (std::uint32_t i = k + threadIdx.x; i < padded_k; i += blockDim.x) {
+    xs[i] = 0;
+  }
+  __syncthreads();
+
+  float acc = 0.0f;
+  for (std::uint32_t tk = 0; tk < tiles_k; ++tk) {
+    std::uint64_t const tile_row =
+        (static_cast<std::uint64_t>(tn) * tiles_k + tk) * 8u + warp;
+    float d[8];
+    decode8<Kind>(codes, scales, tile_row, lane, d);
+    std::uint32_t const k0 =
+        tk * static_cast<std::uint32_t>(kDecodeTileK) + static_cast<std::uint32_t>(lane) * 8u;
+#pragma unroll
+    for (int i = 0; i < 8; ++i) {
+      float const x = bf16_to_fp32(xs[k0 + static_cast<std::uint32_t>(i)]);
+      acc = fmaf(d[i], x, acc);
+    }
+  }
+  acc = warp_sum(acc);
+  if (lane == 0 && row < n) {
+    static_cast<std::uint16_t*>(output)[row] = fp32_to_bf16_rne(acc);
+  }
+}
+
+std::expected<void, Error> validate_range_side(DecodeMmvDesc const& d,
+                                               DecodeMmvDesc const& qg,
+                                               std::string_view field) {
+  if (d.layout != qg.layout || d.quantizer != qg.quantizer) {
+    return std::unexpected(make_error(ErrorCode::InvalidArgument, field,
+                                      "q/g, k, and v must share one layout family"));
+  }
+  if (d.k != qg.k || d.padded_k != qg.padded_k) {
+    return std::unexpected(make_error(ErrorCode::InvalidArgument, field,
+                                      "q/g, k, and v must share K"));
+  }
+  if (d.input != qg.input) {
+    return std::unexpected(make_error(ErrorCode::InvalidArgument, field,
+                                      "q/g, k, and v must share the normalized input"));
+  }
+  if (d.epilogue != DecodeEpilogue::StoreBf16) {
+    return std::unexpected(make_error(ErrorCode::InvalidArgument, field,
+                                      "ranged projections store BF16"));
+  }
+  return validate_geometry(d, field, false);
+}
+
 }  // namespace
 
 std::expected<void, Error> launch_decode_mmv(DecodeMmvDesc const& desc,
@@ -427,6 +509,65 @@ std::expected<void, Error> launch_decode_ab_bf16(DecodeMmvPairedDesc const& desc
   }
   return launch_layout<true>(desc.a, desc.codes_b, desc.scales_b, desc.output_b,
                              desc.residual_b, stream, "decode_ab_bf16_kernel");
+}
+
+std::expected<void, Error> launch_decode_mmv_ranges(DecodeMmvRangeDesc const& desc,
+                                                    Stream const& stream) {
+  auto st = require_stream(stream, "decode_mmv_ranges");
+  if (!st) {
+    return st;
+  }
+  if (desc.qg.epilogue != DecodeEpilogue::StoreBf16) {
+    return std::unexpected(make_error(ErrorCode::InvalidArgument, "decode_mmv_ranges",
+                                      "ranged projections store BF16"));
+  }
+  st = validate_geometry(desc.qg, "decode_mmv_ranges.qg", false);
+  if (!st) {
+    return st;
+  }
+  st = validate_range_side(desc.k, desc.qg, "decode_mmv_ranges.k");
+  if (!st) {
+    return st;
+  }
+  st = validate_range_side(desc.v, desc.qg, "decode_mmv_ranges.v");
+  if (!st) {
+    return st;
+  }
+  if (desc.qg.output == desc.k.output || desc.qg.output == desc.v.output ||
+      desc.k.output == desc.v.output) {
+    return std::unexpected(make_error(ErrorCode::InvalidArgument, "decode_mmv_ranges",
+                                      "q/g, k, and v outputs must be distinct"));
+  }
+  unsigned const tiles0 =
+      desc.qg.padded_n / static_cast<unsigned>(kDecodeTileRows);
+  unsigned const tiles1 =
+      desc.k.padded_n / static_cast<unsigned>(kDecodeTileRows);
+  unsigned const tiles2 =
+      desc.v.padded_n / static_cast<unsigned>(kDecodeTileRows);
+  unsigned const blocks = tiles0 + tiles1 + tiles2;
+  if (desc.qg.layout == kDecodeLayoutQ4G64V0) {
+    decode_mmv_ranges_kernel<WeightKind::Q4>
+        <<<blocks, kDecodeThreads, 0, stream.native()>>>(
+            desc.qg.codes, desc.qg.scales, desc.qg.output, desc.qg.n, tiles0,
+            desc.k.codes, desc.k.scales, desc.k.output, desc.k.n, tiles1,
+            desc.v.codes, desc.v.scales, desc.v.output, desc.v.n, desc.qg.input,
+            desc.qg.k, desc.qg.padded_k);
+  } else if (desc.qg.layout == kDecodeLayoutQ8G32V0) {
+    decode_mmv_ranges_kernel<WeightKind::Q8>
+        <<<blocks, kDecodeThreads, 0, stream.native()>>>(
+            desc.qg.codes, desc.qg.scales, desc.qg.output, desc.qg.n, tiles0,
+            desc.k.codes, desc.k.scales, desc.k.output, desc.k.n, tiles1,
+            desc.v.codes, desc.v.scales, desc.v.output, desc.v.n, desc.qg.input,
+            desc.qg.k, desc.qg.padded_k);
+  } else {
+    decode_mmv_ranges_kernel<WeightKind::Bf16>
+        <<<blocks, kDecodeThreads, 0, stream.native()>>>(
+            desc.qg.codes, desc.qg.scales, desc.qg.output, desc.qg.n, tiles0,
+            desc.k.codes, desc.k.scales, desc.k.output, desc.k.n, tiles1,
+            desc.v.codes, desc.v.scales, desc.v.output, desc.v.n, desc.qg.input,
+            desc.qg.k, desc.qg.padded_k);
+  }
+  return check(cudaGetLastError(), "decode_mmv_ranges_kernel");
 }
 
 }  // namespace qw38::cuda

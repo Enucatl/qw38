@@ -735,6 +735,205 @@ std::expected<DecodeMlpReference, Error> decode_mlp_reference(
   return out;
 }
 
+std::expected<void, Error> attn_split_qg(std::span<std::uint16_t const> qg,
+                                         std::span<std::uint16_t> q_raw,
+                                         std::span<std::uint16_t> g) {
+  std::size_t const nq =
+      static_cast<std::size_t>(kQueryHeads) * kHeadDim;
+  if (auto st = require_span_size(qg.size(), static_cast<std::size_t>(kQgWidth),
+                                  "qg");
+      !st) {
+    return st;
+  }
+  if (auto st = require_span_size(q_raw.size(), nq, "q_raw"); !st) {
+    return st;
+  }
+  if (auto st = require_span_size(g.size(), nq, "g"); !st) {
+    return st;
+  }
+  for (std::uint32_t h = 0; h < kQueryHeads; ++h) {
+    std::size_t const src = static_cast<std::size_t>(h) * (2u * kHeadDim);
+    std::size_t const dst = static_cast<std::size_t>(h) * kHeadDim;
+    for (std::uint32_t i = 0; i < kHeadDim; ++i) {
+      q_raw[dst + i] = qg[src + i];
+      g[dst + i] = qg[src + kHeadDim + i];
+    }
+  }
+  return {};
+}
+
+std::expected<void, Error> attn_qk_norm_rope(
+    std::span<std::uint16_t const> head_bf16,
+    std::span<std::uint16_t const> gamma, std::span<float const> inv_freq,
+    std::int32_t position, float eps, std::span<std::uint16_t> out_bf16) {
+  if (!eps_ok(eps)) {
+    return std::unexpected(arg_error("eps", "epsilon must be finite and > 0"));
+  }
+  if (position < 0) {
+    return std::unexpected(arg_error("position", "position must be >= 0"));
+  }
+  if (auto st = require_span_size(head_bf16.size(), kHeadDim, "head"); !st) {
+    return st;
+  }
+  if (auto st = require_span_size(gamma.size(), kHeadDim, "gamma"); !st) {
+    return st;
+  }
+  if (auto st = require_span_size(inv_freq.size(), kRopeFreqs, "inv_freq");
+      !st) {
+    return st;
+  }
+  if (auto st = require_span_size(out_bf16.size(), kHeadDim, "out"); !st) {
+    return st;
+  }
+  float sumsq = 0.0f;
+  float y[kHeadDim];
+  for (std::uint32_t i = 0; i < kHeadDim; ++i) {
+    y[i] = bf16_to_fp32(head_bf16[i]);
+    sumsq += y[i] * y[i];
+  }
+  float const rms =
+      std::sqrt(sumsq / static_cast<float>(kHeadDim) + eps);
+  float const inv_rms = 1.0f / rms;
+  for (std::uint32_t i = 0; i < kHeadDim; ++i) {
+    float const g = bf16_to_fp32(gamma[i]);
+    y[i] = (1.0f + g) * y[i] * inv_rms;
+  }
+  float const p = static_cast<float>(position);
+  constexpr std::uint32_t kHalf = kRotaryDim / 2;
+  for (std::uint32_t j = 0; j < kHalf; ++j) {
+    float const x0 = y[j];
+    float const x1 = y[j + kHalf];
+    float const phase = p * inv_freq[j];
+    float const c = std::cos(phase);
+    float const s = std::sin(phase);
+    y[j] = x0 * c - x1 * s;
+    y[j + kHalf] = x1 * c + x0 * s;
+  }
+  for (std::uint32_t i = 0; i < kHeadDim; ++i) {
+    out_bf16[i] = fp32_to_bf16_rne(y[i]);
+  }
+  return {};
+}
+
+std::expected<void, Error> attn_cache_append(
+    std::span<std::uint16_t> kv, std::uint32_t attn_layer,
+    std::uint64_t capacity, std::uint64_t token,
+    std::span<std::uint16_t const> k, std::span<std::uint16_t const> v) {
+  std::size_t const nkv =
+      static_cast<std::size_t>(kKvHeads) * kHeadDim;
+  if (capacity == 0 || token >= capacity) {
+    return std::unexpected(arg_error("token", "token must be < capacity"));
+  }
+  if (attn_layer >= 16u) {
+    return std::unexpected(arg_error("attn_layer", "attn_layer must be < 16"));
+  }
+  std::size_t const layer_elems =
+      static_cast<std::size_t>(2u) * kKvHeads * static_cast<std::size_t>(capacity) *
+      kHeadDim;
+  std::size_t const want = static_cast<std::size_t>(attn_layer + 1u) * layer_elems;
+  if (kv.size() < want) {
+    return std::unexpected(shape_error("kv", "cache is smaller than the addressed layer"));
+  }
+  if (auto st = require_span_size(k.size(), nkv, "k"); !st) {
+    return st;
+  }
+  if (auto st = require_span_size(v.size(), nkv, "v"); !st) {
+    return st;
+  }
+  std::size_t const head_stride = static_cast<std::size_t>(capacity) * kHeadDim;
+  std::size_t const comp_stride = static_cast<std::size_t>(kKvHeads) * head_stride;
+  std::size_t const layer_off = static_cast<std::size_t>(attn_layer) * 2u * comp_stride;
+  for (std::uint32_t h = 0; h < kKvHeads; ++h) {
+    std::size_t const src = static_cast<std::size_t>(h) * kHeadDim;
+    std::size_t const k_off = layer_off + static_cast<std::size_t>(h) * head_stride +
+                              static_cast<std::size_t>(token) * kHeadDim;
+    std::size_t const v_off = layer_off + comp_stride +
+                              static_cast<std::size_t>(h) * head_stride +
+                              static_cast<std::size_t>(token) * kHeadDim;
+    for (std::uint32_t i = 0; i < kHeadDim; ++i) {
+      kv[k_off + i] = k[src + i];
+      kv[v_off + i] = v[src + i];
+    }
+  }
+  return {};
+}
+
+std::expected<AttnPrepReference, Error> attn_prep_reference(
+    std::span<float const> residual, std::span<std::uint16_t const> gamma,
+    float eps, std::span<std::uint16_t const> w_qg,
+    std::span<std::uint16_t const> w_k, std::span<std::uint16_t const> w_v,
+    std::span<std::uint16_t const> gamma_q, std::span<std::uint16_t const> gamma_k,
+    std::span<float const> inv_freq, std::int32_t position) {
+  if (residual.size() != kHidden) {
+    return std::unexpected(
+        shape_error("residual", "residual must be [5120] FP32"));
+  }
+  AttnPrepReference out;
+  out.normalized.assign(kHidden, 0);
+  if (auto st = hidden_rms_norm_1p_gamma(residual, gamma, eps, out.normalized);
+      !st) {
+    return std::unexpected(st.error());
+  }
+
+  std::vector<float> qg_f(kQgWidth, 0.0f);
+  std::vector<float> k_f(kAttnKvWidth, 0.0f);
+  std::vector<float> v_f(kAttnKvWidth, 0.0f);
+  if (auto st = dense_gemv_bf16(w_qg, out.normalized, kQgWidth, kHidden, qg_f);
+      !st) {
+    return std::unexpected(st.error());
+  }
+  if (auto st = dense_gemv_bf16(w_k, out.normalized, kAttnKvWidth, kHidden, k_f);
+      !st) {
+    return std::unexpected(st.error());
+  }
+  if (auto st = dense_gemv_bf16(w_v, out.normalized, kAttnKvWidth, kHidden, v_f);
+      !st) {
+    return std::unexpected(st.error());
+  }
+  out.qg.resize(kQgWidth);
+  out.k_raw.resize(kAttnKvWidth);
+  out.v_raw.resize(kAttnKvWidth);
+  for (std::uint32_t i = 0; i < kQgWidth; ++i) {
+    out.qg[i] = fp32_to_bf16_rne(qg_f[i]);
+  }
+  for (std::uint32_t i = 0; i < kAttnKvWidth; ++i) {
+    out.k_raw[i] = fp32_to_bf16_rne(k_f[i]);
+    out.v_raw[i] = fp32_to_bf16_rne(v_f[i]);
+  }
+
+  std::size_t const nq =
+      static_cast<std::size_t>(kQueryHeads) * kHeadDim;
+  std::vector<std::uint16_t> q_raw(nq, 0);
+  out.g.assign(nq, 0);
+  if (auto st = attn_split_qg(out.qg, q_raw, out.g); !st) {
+    return std::unexpected(st.error());
+  }
+  out.q.assign(nq, 0);
+  out.k.assign(kAttnKvWidth, 0);
+  out.v = out.v_raw;
+  for (std::uint32_t h = 0; h < kQueryHeads; ++h) {
+    std::size_t const off = static_cast<std::size_t>(h) * kHeadDim;
+    auto st = attn_qk_norm_rope(
+        std::span<std::uint16_t const>(q_raw.data() + off, kHeadDim), gamma_q,
+        inv_freq, position, eps,
+        std::span<std::uint16_t>(out.q.data() + off, kHeadDim));
+    if (!st) {
+      return std::unexpected(st.error());
+    }
+  }
+  for (std::uint32_t h = 0; h < kKvHeads; ++h) {
+    std::size_t const off = static_cast<std::size_t>(h) * kHeadDim;
+    auto st = attn_qk_norm_rope(
+        std::span<std::uint16_t const>(out.k_raw.data() + off, kHeadDim),
+        gamma_k, inv_freq, position, eps,
+        std::span<std::uint16_t>(out.k.data() + off, kHeadDim));
+    if (!st) {
+      return std::unexpected(st.error());
+    }
+  }
+  return out;
+}
+
 std::expected<std::uint32_t, Error> argmax_fp32(std::span<float const> logits) {
   if (logits.empty()) {
     return std::unexpected(arg_error("logits", "logits must be non-empty"));

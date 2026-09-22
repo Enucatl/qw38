@@ -22,6 +22,13 @@ inline constexpr std::uint32_t kGdnValueHeads = 48;
 inline constexpr std::uint32_t kGdnRepeat = 3;
 inline constexpr std::uint32_t kQkvWidth = 10240;
 inline constexpr std::uint32_t kGdnZWidth = 6144;
+inline constexpr std::uint32_t kQueryHeads = 24;
+inline constexpr std::uint32_t kKvHeads = 4;
+inline constexpr std::uint32_t kGqaGroup = 6;
+inline constexpr std::uint32_t kQgWidth = 12288;
+inline constexpr std::uint32_t kAttnKvWidth = 1024;
+inline constexpr std::uint32_t kKvComponentK = 0;
+inline constexpr std::uint32_t kKvComponentV = 1;
 inline constexpr std::uint32_t kConvKernel = 4;
 inline constexpr std::uint32_t kConvHistoryTaps = 3;
 inline constexpr float kDefaultRmsEps = 1.0e-6f;
@@ -68,6 +75,14 @@ inline constexpr float kGdnUAbs = 2.0e-2f;
 inline constexpr float kGdnURel = 1.0e-3f;
 inline constexpr float kGdnMixerResidualAbs = 5.0e-2f;
 inline constexpr float kGdnMixerResidualRel = 1.0e-3f;
+// Attention prep: GEMV BF16 store plus fused QK-RMS/RoPE store. Large-position
+// RoPE uses the existing phase budget.
+inline constexpr float kAttnProjAbs = 8.0e-3f;
+inline constexpr float kAttnProjRel = 1.0e-4f;
+inline constexpr float kAttnPrepSmallAbs = 2.0e-2f;
+inline constexpr float kAttnPrepSmallRel = 1.0e-3f;
+inline constexpr float kAttnPrepLargeAbs = 5.0e-2f;
+inline constexpr float kAttnPrepLargeRel = 1.0e-3f;
 }  // namespace tol
 
 [[nodiscard]] bool eps_ok(float eps) noexcept;
@@ -142,6 +157,11 @@ struct DecodeMlpReference {
 [[nodiscard]] constexpr std::uint32_t gdn_key_head(
     std::uint32_t value_head) noexcept {
   return value_head / kGdnRepeat;
+}
+
+[[nodiscard]] constexpr std::uint32_t kv_head_for_query(
+    std::uint32_t query_head) noexcept {
+  return query_head / kGqaGroup;
 }
 
 [[nodiscard]] float softplus_fp32(float x) noexcept;
@@ -228,6 +248,42 @@ struct GdnMixerReference {
     std::span<float const> h_mid, std::span<std::uint16_t const> gamma,
     float eps, std::span<std::uint16_t const> w_gate,
     std::span<std::uint16_t const> w_up, std::span<std::uint16_t const> w_down);
+
+// Split projected q/g [24,512] into per-head q' and g, each [24,256].
+[[nodiscard]] std::expected<void, Error> attn_split_qg(
+    std::span<std::uint16_t const> qg, std::span<std::uint16_t> q_raw,
+    std::span<std::uint16_t> g);
+
+// Zero-centered QK RMS in FP32, then partial RoPE, one BF16 store.
+[[nodiscard]] std::expected<void, Error> attn_qk_norm_rope(
+    std::span<std::uint16_t const> head_bf16,
+    std::span<std::uint16_t const> gamma, std::span<float const> inv_freq,
+    std::int32_t position, float eps, std::span<std::uint16_t> out_bf16);
+
+// Append one prepared K and V into BF16 [layers,2,4,capacity,256].
+[[nodiscard]] std::expected<void, Error> attn_cache_append(
+    std::span<std::uint16_t> kv, std::uint32_t attn_layer,
+    std::uint64_t capacity, std::uint64_t token,
+    std::span<std::uint16_t const> k, std::span<std::uint16_t const> v);
+
+// Decode attention steps 1–3 on decoded BF16 operands. Does not unpack Q4.
+struct AttnPrepReference {
+  std::vector<std::uint16_t> normalized;
+  std::vector<std::uint16_t> qg;
+  std::vector<std::uint16_t> k_raw;
+  std::vector<std::uint16_t> v_raw;
+  std::vector<std::uint16_t> q;
+  std::vector<std::uint16_t> g;
+  std::vector<std::uint16_t> k;
+  std::vector<std::uint16_t> v;
+};
+
+[[nodiscard]] std::expected<AttnPrepReference, Error> attn_prep_reference(
+    std::span<float const> residual, std::span<std::uint16_t const> gamma,
+    float eps, std::span<std::uint16_t const> w_qg,
+    std::span<std::uint16_t const> w_k, std::span<std::uint16_t const> w_v,
+    std::span<std::uint16_t const> gamma_q, std::span<std::uint16_t const> gamma_k,
+    std::span<float const> inv_freq, std::int32_t position);
 
 // Simple row-major BF16 GEMV: y_n = Σ_k BF16(W_nk)*BF16(x_k) in FP32.
 [[nodiscard]] std::expected<void, Error> dense_gemv_bf16(

@@ -25,9 +25,15 @@ inline constexpr std::uint32_t kConvKernel = 4;
 inline constexpr std::uint32_t kConvChannels = 10240;
 inline constexpr std::uint32_t kGdnZWidth = 6144;
 inline constexpr std::uint32_t kAttnLayers = 16;
+inline constexpr std::uint32_t kQueryHeads = 24;
 inline constexpr std::uint32_t kKvHeads = 4;
+inline constexpr std::uint32_t kGqaGroup = 6;  // 24 query heads / 4 KV heads
 inline constexpr std::uint32_t kHeadDim = 256;
 inline constexpr std::uint32_t kKvComponents = 2;
+inline constexpr std::uint32_t kKvComponentK = 0;
+inline constexpr std::uint32_t kKvComponentV = 1;
+inline constexpr std::uint32_t kQgWidth = 12288;     // 2 * 24 * 256
+inline constexpr std::uint32_t kAttnKvWidth = 1024;  // 4 * 256
 inline constexpr std::uint32_t kHidden = 5120;
 inline constexpr std::uint32_t kFfnWidth = 17408;
 inline constexpr std::uint32_t kVocab = 248320;
@@ -92,6 +98,40 @@ static_assert(kGdnVOffset * 2u + kGdnBytesZ == kGdnBytesConvolved);
 static_assert(kGdnSBytesPerLayer * kGdnLayers == kGdnSBytes);
 static_assert(kGdnBytesO ==
               static_cast<std::uint64_t>(kGdnValueHeads) * kGdnValueDim *
+                  qw38::format::kFp32Size);
+static_assert(kQueryHeads / kKvHeads == kGqaGroup);
+static_assert(kQgWidth == 2u * kQueryHeads * kHeadDim);
+static_assert(kAttnKvWidth == kKvHeads * kHeadDim);
+
+// Typed aliases inside AttentionWorkspace (M-01). Projected q/g/k/v, prepared Q,
+// and per-query-head g. K/V append directly to cache (no prepared K/V duplicate).
+// Trailing partials are reserved for TASK-015 segment statistics.
+inline constexpr std::uint64_t kAttnOffQg = 0;            // BF16 [24, 512]
+inline constexpr std::uint64_t kAttnBytesQg = 24576;
+inline constexpr std::uint64_t kAttnOffK = 24576;          // BF16 [4, 256]
+inline constexpr std::uint64_t kAttnBytesK = 2048;
+inline constexpr std::uint64_t kAttnOffV = 26624;          // BF16 [4, 256]
+inline constexpr std::uint64_t kAttnBytesV = 2048;
+inline constexpr std::uint64_t kAttnOffQ = 28672;          // BF16 [24, 256]
+inline constexpr std::uint64_t kAttnBytesQ = 12288;
+inline constexpr std::uint64_t kAttnOffG = 40960;          // BF16 [24, 256]
+inline constexpr std::uint64_t kAttnBytesG = 12288;
+inline constexpr std::uint64_t kAttnOffPartials = 53248;   // FP32 TASK-015
+inline constexpr std::uint64_t kAttnBytesPartials = 24768;
+
+static_assert(kAttnOffK == kAttnOffQg + kAttnBytesQg);
+static_assert(kAttnOffV == kAttnOffK + kAttnBytesK);
+static_assert(kAttnOffQ == kAttnOffV + kAttnBytesV);
+static_assert(kAttnOffG == kAttnOffQ + kAttnBytesQ);
+static_assert(kAttnOffPartials == kAttnOffG + kAttnBytesG);
+static_assert(kAttnOffPartials + kAttnBytesPartials ==
+              kAttentionWorkspaceBytesPerToken);
+static_assert(kAttnBytesQg ==
+              static_cast<std::uint64_t>(kQgWidth) * qw38::format::kBf16Size);
+static_assert(kAttnBytesQ == static_cast<std::uint64_t>(kQueryHeads) *
+                                 kHeadDim * qw38::format::kBf16Size);
+static_assert(kAttnBytesPartials ==
+              static_cast<std::uint64_t>(kQueryHeads) * (2u + kHeadDim) *
                   qw38::format::kFp32Size);
 
 [[nodiscard]] std::expected<std::uint64_t, Error> kv_cache_bytes(

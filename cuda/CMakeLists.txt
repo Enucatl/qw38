@@ -11,6 +11,7 @@ find_package(CUDAToolkit REQUIRED)
   activation.cu
   decode_mmv.cu
   gdn.cu
+  attention.cu
 )
 set_target_properties(qw38_cuda PROPERTIES
   CUDA_SEPARABLE_COMPILATION OFF
