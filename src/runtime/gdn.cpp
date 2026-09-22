@@ -10,9 +10,13 @@
 
 #include <array>
 #include <cmath>
+#include <initializer_list>
+#include <limits>
 #include <sstream>
+#include <string>
 #include <string_view>
 #include <utility>
+#include <vector>
 
 namespace qw38::runtime {
 namespace {
@@ -41,15 +45,113 @@ Error arg_error(std::string_view field, std::string_view detail) {
 }
 
 template <typename Pointer>
-std::uint64_t element_count(BasicTensorView<Pointer> const& v) noexcept {
-  if (v.rank == 0) {
-    return 0;
+std::expected<std::uint64_t, Error> element_count(
+    BasicTensorView<Pointer> const& v, std::string_view field) {
+  if (v.rank == 0 || v.rank > qw38::format::kMaxRank) {
+    return std::unexpected(arg_error(field, "rank is invalid"));
   }
   std::uint64_t n = 1;
   for (std::uint8_t i = 0; i < v.rank; ++i) {
-    n *= v.extent[i];
+    auto product = qw38::format::checked_mul(n, v.extent[i], 0, field);
+    if (!product) {
+      return std::unexpected(make_error(ErrorCode::Overflow, product.error().field,
+                                        product.error().detail));
+    }
+    n = *product;
   }
   return n;
+}
+
+template <typename Pointer>
+std::expected<std::uint64_t, Error> view_bytes(
+    BasicTensorView<Pointer> const& v, std::string_view field) {
+  auto elements = element_count(v, field);
+  if (!elements) {
+    return std::unexpected(elements.error());
+  }
+  auto bytes = qw38::format::checked_mul(
+      *elements, qw38::format::element_size(v.dtype), 0, field);
+  if (!bytes) {
+    return std::unexpected(make_error(ErrorCode::Overflow, bytes.error().field,
+                                      bytes.error().detail));
+  }
+  return *bytes;
+}
+
+template <typename Pointer>
+std::expected<BasicTensorView<Pointer>, Error> require_view(
+    BasicTensorView<Pointer> v, ArithmeticDtype dtype, PhysicalLayoutId layout,
+    StorageClass storage, std::initializer_list<std::uint64_t> extents,
+    std::string_view field) {
+  if (v.pointer == nullptr || v.space != MemorySpace::Device ||
+      v.dtype != dtype || v.layout != layout || v.storage != storage ||
+      v.rank != extents.size()) {
+    return std::unexpected(arg_error(field, "typed view contract mismatch"));
+  }
+  std::size_t i = 0;
+  for (auto extent : extents) {
+    if (v.extent[i++] != extent) {
+      return std::unexpected(arg_error(field, "typed view extent mismatch"));
+    }
+  }
+  if (auto bytes = view_bytes(v, field); !bytes) {
+    return std::unexpected(bytes.error());
+  }
+  return v;
+}
+
+struct ByteInterval {
+  std::string_view name;
+  std::uintptr_t begin;
+  std::uintptr_t end;
+};
+
+std::expected<ByteInterval, Error> byte_interval(
+    ConstTensorView const& view, std::uint64_t bytes, std::string_view name) {
+  auto const begin = reinterpret_cast<std::uintptr_t>(view.pointer);
+  if (view.pointer == nullptr || bytes == 0 ||
+      bytes > std::numeric_limits<std::uintptr_t>::max() - begin) {
+    return std::unexpected(arg_error(name, "byte interval is invalid"));
+  }
+  return ByteInterval{name, begin, begin + static_cast<std::uintptr_t>(bytes)};
+}
+
+bool overlaps(ByteInterval const& a, ByteInterval const& b) noexcept {
+  return a.begin < b.end && b.begin < a.end;
+}
+
+std::expected<void, Error> validate_intervals(
+    std::initializer_list<
+        std::pair<std::string_view,
+                  std::pair<ConstTensorView, std::uint64_t>>> views) {
+  std::vector<ByteInterval> intervals;
+  intervals.reserve(views.size());
+  for (auto const& [name, view_and_bytes] : views) {
+    auto const& [view, bytes] = view_and_bytes;
+    if (view.pointer == nullptr && bytes == 0) {
+      continue;
+    }
+    auto interval = byte_interval(view, bytes, name);
+    if (!interval) {
+      return std::unexpected(interval.error());
+    }
+    for (auto const& prior : intervals) {
+      if (overlaps(prior, *interval)) {
+        return std::unexpected(arg_error(
+            "alias", std::string(prior.name) + " overlaps " +
+                         std::string(interval->name)));
+      }
+    }
+    intervals.push_back(*interval);
+  }
+  return {};
+}
+
+ConstTensorView byte_arena_view(WorkspaceView const& workspace) {
+  ConstTensorView view{};
+  view.pointer = workspace.pointer;
+  view.space = workspace.space;
+  return view;
 }
 
 std::expected<void, Error> validate_gdn_state_view(TensorView const& s) {
@@ -68,24 +170,23 @@ std::expected<void, Error> validate_gdn_state_view(TensorView const& s) {
   if (s.storage != StorageClass::Fp32) {
     return std::unexpected(arg_error("s", "S storage must be fp32"));
   }
-  if (s.rank > qw38::format::kMaxRank) {
-    return std::unexpected(arg_error("s", "rank exceeds maximum"));
-  }
-
-  std::uint64_t elements = 1;
-  for (std::uint8_t i = 0; i < s.rank; ++i) {
-    auto product = qw38::format::checked_mul(elements, s.extent[i], 0, "s.extent");
-    if (!product) {
-      return std::unexpected(make_error(ErrorCode::Overflow, product.error().field,
-                                        product.error().detail));
-    }
-    elements = *product;
+  auto elements = element_count(s, "s.extent");
+  if (!elements) {
+    return std::unexpected(elements.error());
   }
   if (s.rank != 4 || s.extent[0] != kGdnLayers ||
       s.extent[1] != kGdnValueHeads || s.extent[2] != kGdnValueDim ||
-      s.extent[3] != kGdnKeyDim || elements != kGdnSBytes / qw38::format::kFp32Size) {
+      s.extent[3] != kGdnKeyDim ||
+      *elements != kGdnSBytes / qw38::format::kFp32Size) {
     return std::unexpected(
         arg_error("s", "S must be FP32 [48,48,128,128] in [layer,value_head,value,key] order"));
+  }
+  auto bytes = view_bytes(s, "s");
+  if (!bytes) {
+    return std::unexpected(bytes.error());
+  }
+  if (*bytes != kGdnSBytes) {
+    return std::unexpected(arg_error("s", "S byte count mismatch"));
   }
   return {};
 }
@@ -102,29 +203,6 @@ std::uint16_t quantizer_for(PhysicalLayoutId layout) noexcept {
   return kDecodeQuantizerNone;
 }
 
-template <typename Pointer>
-std::expected<BasicTensorView<Pointer>, Error> as_vector(
-    BasicTensorView<Pointer> v, std::uint64_t elems, ArithmeticDtype dtype,
-    bool writable, std::string_view field) {
-  (void)writable;
-  if (v.pointer == nullptr) {
-    return std::unexpected(arg_error(field, "null view"));
-  }
-  if (v.space != MemorySpace::Device) {
-    return std::unexpected(arg_error(field, "view must be device memory"));
-  }
-  if (v.dtype != dtype) {
-    return std::unexpected(arg_error(field, "dtype mismatch"));
-  }
-  if (v.rank == 0 || element_count(v) < elems) {
-    return std::unexpected(arg_error(field, "view is smaller than decode extent"));
-  }
-  v.rank = 1;
-  v.extent = {};
-  v.extent[0] = elems;
-  return v;
-}
-
 std::expected<GdnWeightBinding, Error> bind_q4_or_bf16(ConstTensorView codes,
                                                        ConstTensorView scales,
                                                        std::uint32_t want_n,
@@ -133,8 +211,10 @@ std::expected<GdnWeightBinding, Error> bind_q4_or_bf16(ConstTensorView codes,
   if (codes.pointer == nullptr) {
     return std::unexpected(arg_error(field, "null codes"));
   }
-  if (codes.space != MemorySpace::Device) {
-    return std::unexpected(arg_error(field, "codes must be device memory"));
+  if (codes.space != MemorySpace::Device ||
+      codes.dtype != ArithmeticDtype::Bf16) {
+    return std::unexpected(
+        arg_error(field, "codes must be BF16 arithmetic device memory"));
   }
   if (codes.rank != 2 || codes.extent[0] != want_n || codes.extent[1] != want_k) {
     return std::unexpected(arg_error(field, "logical shape must be V0 GDN geometry"));
@@ -162,19 +242,32 @@ std::expected<GdnWeightBinding, Error> bind_q4_or_bf16(ConstTensorView codes,
   b.padded_k = decode_pad_k(want_k);
   b.codes_bytes = decode_code_bytes(b.layout, b.padded_n, b.padded_k);
   b.scales_bytes = decode_scale_bytes(b.layout, b.padded_n, b.padded_k);
+  if (b.codes_bytes == 0) {
+    return std::unexpected(arg_error(field, "payload byte count is invalid"));
+  }
   if (b.scales_bytes == 0) {
-    if (scales.pointer != nullptr || element_count(scales) != 0) {
+    if (scales.pointer != nullptr || scales.rank != 0) {
       return std::unexpected(arg_error(field, "BF16 dense tile must not supply scales"));
     }
   } else {
     if (scales.pointer == nullptr) {
       return std::unexpected(arg_error(field, "Q4 weight requires scales"));
     }
-    if (scales.space != MemorySpace::Device) {
-      return std::unexpected(arg_error(field, "scales must be device memory"));
+    if (scales.space != MemorySpace::Device ||
+        scales.dtype != ArithmeticDtype::Fp16 ||
+        scales.layout != codes.layout || scales.storage != codes.storage ||
+        scales.rank != 1 ||
+        scales.extent[0] != b.scales_bytes / qw38::format::kFp16Size) {
+      return std::unexpected(
+          arg_error(field, "scale typed view contract mismatch"));
     }
-    if (element_count(scales) * qw38::format::kFp16Size != b.scales_bytes) {
-      return std::unexpected(arg_error(field, "scale view length does not match layout"));
+    auto scale_bytes = view_bytes(scales, field);
+    if (!scale_bytes) {
+      return std::unexpected(scale_bytes.error());
+    }
+    if (*scale_bytes != b.scales_bytes) {
+      return std::unexpected(
+          arg_error(field, "scale view length does not match layout"));
     }
     b.scales = scales;
   }
@@ -186,8 +279,10 @@ std::expected<GdnWeightBinding, Error> bind_ab_bf16(ConstTensorView codes,
   if (codes.pointer == nullptr) {
     return std::unexpected(arg_error(field, "null codes"));
   }
-  if (codes.space != MemorySpace::Device) {
-    return std::unexpected(arg_error(field, "codes must be device memory"));
+  if (codes.space != MemorySpace::Device ||
+      codes.dtype != ArithmeticDtype::Bf16) {
+    return std::unexpected(
+        arg_error(field, "codes must be BF16 arithmetic device memory"));
   }
   if (codes.rank != 2 || codes.extent[0] != kGdnValueHeads ||
       codes.extent[1] != kHidden) {
@@ -455,7 +550,7 @@ std::expected<GdnWorkspaceViews, Error> bind_gdn_workspace(
   if (workspace.space != MemorySpace::Device) {
     return std::unexpected(arg_error("workspace", "view must be device memory"));
   }
-  if (workspace.bytes < kGdnWorkspaceBytesPerToken) {
+  if (workspace.bytes != kGdnWorkspaceBytesPerToken) {
     return std::unexpected(
         arg_error("workspace", "GdnWorkspace must be 107264 bytes per token"));
   }
@@ -538,74 +633,88 @@ std::expected<GdnFrontPlan, Error> bind_gdn_front_plan(
     return std::unexpected(b.error());
   }
 
-  auto gamma = as_vector(views.gamma, kHidden, ArithmeticDtype::Bf16, false, "gamma");
+  auto gamma = require_view(
+      views.gamma, ArithmeticDtype::Bf16,
+      PhysicalLayoutId::CudaBf16VectorV0, StorageClass::Bf16, {kHidden},
+      "gamma");
   if (!gamma) {
     return std::unexpected(gamma.error());
   }
-  auto residual =
-      as_vector(views.residual, kHidden, ArithmeticDtype::Fp32, true, "residual");
+  auto residual = require_view(
+      views.residual, ArithmeticDtype::Fp32,
+      PhysicalLayoutId::CudaFp32VectorV0, StorageClass::Fp32, {kHidden},
+      "residual");
   if (!residual) {
     return std::unexpected(residual.error());
   }
-  auto normalized = as_vector(views.normalized, kHidden, ArithmeticDtype::Bf16, true,
-                              "normalized");
+  auto normalized = require_view(
+      views.normalized, ArithmeticDtype::Bf16,
+      PhysicalLayoutId::CudaBf16RowMajorV0, StorageClass::Bf16, {kHidden},
+      "normalized");
   if (!normalized) {
     return std::unexpected(normalized.error());
   }
 
-  if (views.taps.pointer == nullptr || views.taps.space != MemorySpace::Device) {
-    return std::unexpected(arg_error("taps", "tap-major conv weights required"));
-  }
-  if (views.taps.layout != PhysicalLayoutId::CudaBf16TapMajorV0 ||
-      views.taps.storage != StorageClass::Bf16 ||
-      views.taps.dtype != ArithmeticDtype::Bf16) {
-    return std::unexpected(
-        arg_error("taps", "convolution must be cuda_bf16_tap_major_v0"));
-  }
-  if (views.taps.rank != 2 || views.taps.extent[0] != kConvKernel ||
-      views.taps.extent[1] != kConvChannels) {
-    return std::unexpected(arg_error("taps", "taps must be [4,10240]"));
+  auto taps = require_view(
+      views.taps, ArithmeticDtype::Bf16,
+      PhysicalLayoutId::CudaBf16TapMajorV0, StorageClass::Bf16,
+      {kConvKernel, kConvChannels}, "taps");
+  if (!taps) {
+    return std::unexpected(taps.error());
   }
 
-  auto a_log =
-      as_vector(views.a_log, kGdnValueHeads, ArithmeticDtype::Bf16, false, "A_log");
+  auto a_log = require_view(
+      views.a_log, ArithmeticDtype::Bf16,
+      PhysicalLayoutId::CudaBf16VectorV0, StorageClass::Bf16,
+      {kGdnValueHeads}, "A_log");
   if (!a_log) {
     return std::unexpected(a_log.error());
   }
-  auto dt = as_vector(views.dt_bias, kGdnValueHeads, ArithmeticDtype::Bf16, false,
-                      "dt_bias");
+  auto dt = require_view(
+      views.dt_bias, ArithmeticDtype::Bf16,
+      PhysicalLayoutId::CudaBf16VectorV0, StorageClass::Bf16,
+      {kGdnValueHeads}, "dt_bias");
   if (!dt) {
     return std::unexpected(dt.error());
   }
 
-  if (views.history.pointer == nullptr || views.history.space != MemorySpace::Device) {
-    return std::unexpected(arg_error("history", "history view required"));
+  auto history = require_view(
+      views.history, ArithmeticDtype::Bf16,
+      PhysicalLayoutId::CudaBf16ConvHistoryV0, StorageClass::Bf16,
+      {kConvTaps, kConvChannels}, "history");
+  if (!history) {
+    return std::unexpected(history.error());
   }
-  if (views.history.dtype != ArithmeticDtype::Bf16) {
-    return std::unexpected(arg_error("history", "history must be writable BF16"));
-  }
-  if (element_count(views.history) <
-      static_cast<std::uint64_t>(kConvTaps) * kConvChannels) {
-    return std::unexpected(arg_error("history", "history must be [3,10240]"));
-  }
-  TensorView history = views.history;
-  history.rank = 2;
-  history.extent = {};
-  history.extent[0] = kConvTaps;
-  history.extent[1] = kConvChannels;
-  history.layout = PhysicalLayoutId::CudaBf16ConvHistoryV0;
-  history.storage = StorageClass::Bf16;
 
   auto scratch = bind_gdn_workspace(views.workspace);
   if (!scratch) {
     return std::unexpected(scratch.error());
   }
-  if (gamma->pointer == residual->pointer ||
-      residual->pointer == normalized->pointer ||
-      scratch->qkv.pointer == scratch->convolved.pointer ||
-      scratch->q_hat.pointer == scratch->k_hat.pointer) {
-    return std::unexpected(
-        arg_error("scratch", "residual, normalized, qkv, and prepared arrays must be distinct"));
+  if (auto st = validate_intervals(
+          {{"qkv", {qkv->codes, qkv->codes_bytes}},
+           {"qkv_scales", {qkv->scales, qkv->scales_bytes}},
+           {"z", {z->codes, z->codes_bytes}},
+           {"z_scales", {z->scales, z->scales_bytes}},
+           {"a", {a->codes, a->codes_bytes}},
+           {"b", {b->codes, b->codes_bytes}},
+           {"gamma", {*gamma, kHidden * qw38::format::kBf16Size}},
+           {"taps",
+            {*taps, static_cast<std::uint64_t>(kConvKernel) *
+                        kConvChannels * qw38::format::kBf16Size}},
+           {"A_log",
+            {*a_log, kGdnValueHeads * qw38::format::kBf16Size}},
+           {"dt_bias", {*dt, kGdnValueHeads * qw38::format::kBf16Size}},
+           {"residual",
+            {*residual, kHidden * qw38::format::kFp32Size}},
+           {"normalized",
+            {*normalized, kHidden * qw38::format::kBf16Size}},
+           {"workspace",
+            {byte_arena_view(views.workspace), views.workspace.bytes}},
+           {"history",
+            {*history, static_cast<std::uint64_t>(kConvTaps) *
+                           kConvChannels * qw38::format::kBf16Size}}});
+      !st) {
+    return std::unexpected(st.error());
   }
 
   GdnFrontPlan plan;
@@ -614,13 +723,13 @@ std::expected<GdnFrontPlan, Error> bind_gdn_front_plan(
   plan.a_proj = *a;
   plan.b_proj = *b;
   plan.gamma = *gamma;
-  plan.taps = views.taps;
+  plan.taps = *taps;
   plan.a_log = *a_log;
   plan.dt_bias = *dt;
   plan.residual = *residual;
   plan.normalized = *normalized;
   plan.scratch = *scratch;
-  plan.history = history;
+  plan.history = *history;
   plan.cursor = views.cursor;
   plan.stream = &stream;
   plan.eps = eps;
@@ -722,7 +831,14 @@ std::expected<GdnFrontPlan, Error> bind_gdn_front_plan(
   views.a_log = *alog;
   views.dt_bias = *dt;
   views.residual = session.residual_h();
+  views.residual.rank = 1;
+  views.residual.extent = {};
+  views.residual.extent[0] = kHidden;
   views.normalized = normalized->region[0].tensor;
+  views.normalized.rank = 1;
+  views.normalized.extent = {};
+  views.normalized.extent[0] = kHidden;
+  workspace->bytes = kGdnWorkspaceBytesPerToken;
   views.workspace = *workspace;
   views.history = history;
   views.cursor = *cursor;
@@ -754,44 +870,61 @@ std::expected<GdnRecurrencePlan, Error> bind_gdn_recurrence_plan(
   if (stream.empty()) {
     return std::unexpected(arg_error("stream", "empty stream"));
   }
-  auto q = as_vector(views.q_hat, static_cast<std::uint64_t>(kGdnKeyHeads) * kGdnKeyDim,
-                     ArithmeticDtype::Fp32, false, "q_hat");
+  auto q = require_view(
+      views.q_hat, ArithmeticDtype::Fp32,
+      PhysicalLayoutId::CudaFp32VectorV0, StorageClass::Fp32,
+      {kGdnKeyHeads, kGdnKeyDim}, "q_hat");
   if (!q) {
     return std::unexpected(q.error());
   }
-  auto k = as_vector(views.k_hat, static_cast<std::uint64_t>(kGdnKeyHeads) * kGdnKeyDim,
-                     ArithmeticDtype::Fp32, false, "k_hat");
+  auto k = require_view(
+      views.k_hat, ArithmeticDtype::Fp32,
+      PhysicalLayoutId::CudaFp32VectorV0, StorageClass::Fp32,
+      {kGdnKeyHeads, kGdnKeyDim}, "k_hat");
   if (!k) {
     return std::unexpected(k.error());
   }
-  auto alpha =
-      as_vector(views.alpha, kGdnValueHeads, ArithmeticDtype::Fp32, false, "alpha");
+  auto alpha = require_view(
+      views.alpha, ArithmeticDtype::Fp32,
+      PhysicalLayoutId::CudaFp32VectorV0, StorageClass::Fp32,
+      {kGdnValueHeads}, "alpha");
   if (!alpha) {
     return std::unexpected(alpha.error());
   }
-  auto beta =
-      as_vector(views.beta, kGdnValueHeads, ArithmeticDtype::Fp32, false, "beta");
+  auto beta = require_view(
+      views.beta, ArithmeticDtype::Fp32,
+      PhysicalLayoutId::CudaFp32VectorV0, StorageClass::Fp32,
+      {kGdnValueHeads}, "beta");
   if (!beta) {
     return std::unexpected(beta.error());
   }
-  auto v = as_vector(views.v, static_cast<std::uint64_t>(kGdnValueHeads) * kGdnValueDim,
-                     ArithmeticDtype::Bf16, false, "v");
+  auto v = require_view(
+      views.v, ArithmeticDtype::Bf16,
+      PhysicalLayoutId::CudaBf16RowMajorV0, StorageClass::Bf16,
+      {kGdnValueHeads, kGdnValueDim}, "v");
   if (!v) {
     return std::unexpected(v.error());
   }
-  auto o = as_vector(views.o, static_cast<std::uint64_t>(kGdnValueHeads) * kGdnValueDim,
-                     ArithmeticDtype::Fp32, true, "o");
+  auto o = require_view(
+      views.o, ArithmeticDtype::Fp32,
+      PhysicalLayoutId::CudaFp32VectorV0, StorageClass::Fp32,
+      {kGdnValueHeads, kGdnValueDim}, "o");
   if (!o) {
     return std::unexpected(o.error());
   }
   if (auto state = validate_gdn_state_view(views.s); !state) {
     return std::unexpected(state.error());
   }
-  if (q->pointer == k->pointer) {
-    return std::unexpected(arg_error("q_hat", "q_hat and k_hat must be distinct"));
-  }
-  if (views.s.pointer == o->pointer) {
-    return std::unexpected(arg_error("s", "S and o must be distinct"));
+  if (auto st = validate_intervals(
+          {{"q_hat", {*q, kGdnBytesQHat}},
+           {"k_hat", {*k, kGdnBytesKHat}},
+           {"alpha", {*alpha, kGdnBytesGate}},
+           {"beta", {*beta, kGdnBytesGate}},
+           {"v", {*v, kGdnBytesZ}},
+           {"s", {views.s, kGdnSBytes}},
+           {"o", {*o, kGdnBytesO}}});
+      !st) {
+    return std::unexpected(st.error());
   }
 
   auto idx = gdn_state_index(views.language_layer);
@@ -828,6 +961,7 @@ std::expected<GdnRecurrencePlan, Error> bind_gdn_recurrence_plan(
   if (!workspace) {
     return std::unexpected(workspace.error());
   }
+  workspace->bytes = kGdnWorkspaceBytesPerToken;
   auto slices = bind_gdn_workspace(*workspace);
   if (!slices) {
     return std::unexpected(slices.error());
@@ -900,30 +1034,60 @@ std::expected<GdnPlan, Error> bind_gdn_plan(GdnBindViews const& views,
     return std::unexpected(
         arg_error("layout", "qkv/z/out must share one Q4 or BF16-control family"));
   }
-  auto gated = as_vector(views.gated_gamma, kGdnValueDim, ArithmeticDtype::Bf16,
-                         false, "gated_gamma");
+  auto gated = require_view(
+      views.gated_gamma, ArithmeticDtype::Bf16,
+      PhysicalLayoutId::CudaBf16VectorV0, StorageClass::Bf16,
+      {kGdnValueDim}, "gated_gamma");
   if (!gated) {
     return std::unexpected(gated.error());
   }
-  auto residual_out =
-      as_vector(views.residual_out, kHidden, ArithmeticDtype::Fp32, true,
-                "residual_out");
+  auto residual_out = require_view(
+      views.residual_out, ArithmeticDtype::Fp32,
+      PhysicalLayoutId::CudaFp32VectorV0, StorageClass::Fp32, {kHidden},
+      "residual_out");
   if (!residual_out) {
     return std::unexpected(residual_out.error());
-  }
-  if (residual_out->pointer == fp->residual.pointer) {
-    return std::unexpected(
-        arg_error("residual_out", "h_mid must be distinct from input residual"));
-  }
-  if (gated->pointer == fp->gamma.pointer) {
-    return std::unexpected(
-        arg_error("gated_gamma", "gated gamma must be distinct from input RMS gamma"));
   }
   if (auto state = validate_gdn_state_view(views.s); !state) {
     return std::unexpected(state.error());
   }
   if (fp->scratch.u.pointer == nullptr) {
     return std::unexpected(arg_error("workspace", "u overlay is required"));
+  }
+  if (auto st = validate_intervals(
+          {{"qkv", {fp->qkv.codes, fp->qkv.codes_bytes}},
+           {"qkv_scales", {fp->qkv.scales, fp->qkv.scales_bytes}},
+           {"z", {fp->z.codes, fp->z.codes_bytes}},
+           {"z_scales", {fp->z.scales, fp->z.scales_bytes}},
+           {"a", {fp->a_proj.codes, fp->a_proj.codes_bytes}},
+           {"b", {fp->b_proj.codes, fp->b_proj.codes_bytes}},
+           {"out", {out->codes, out->codes_bytes}},
+           {"out_scales", {out->scales, out->scales_bytes}},
+           {"gamma",
+            {fp->gamma, kHidden * qw38::format::kBf16Size}},
+           {"gated_gamma",
+            {*gated, kGdnValueDim * qw38::format::kBf16Size}},
+           {"taps",
+            {fp->taps, static_cast<std::uint64_t>(kConvKernel) *
+                           kConvChannels * qw38::format::kBf16Size}},
+           {"A_log",
+            {fp->a_log, kGdnValueHeads * qw38::format::kBf16Size}},
+           {"dt_bias",
+            {fp->dt_bias, kGdnValueHeads * qw38::format::kBf16Size}},
+           {"residual",
+            {fp->residual, kHidden * qw38::format::kFp32Size}},
+           {"residual_out",
+            {*residual_out, kHidden * qw38::format::kFp32Size}},
+           {"normalized",
+            {fp->normalized, kHidden * qw38::format::kBf16Size}},
+           {"workspace",
+            {byte_arena_view(views.workspace), views.workspace.bytes}},
+           {"history",
+            {fp->history, static_cast<std::uint64_t>(kConvTaps) *
+                              kConvChannels * qw38::format::kBf16Size}},
+           {"s", {views.s, kGdnSBytes}}});
+      !st) {
+    return std::unexpected(st.error());
   }
 
   GdnPlan plan;
@@ -993,11 +1157,15 @@ std::expected<GdnPlan, Error> bind_gdn_plan(Model const& model, Session& session
   views.dt_bias = front->dt_bias;
   views.residual = front->residual;
   views.residual_out = session.residual_h_mid();
+  views.residual_out.rank = 1;
+  views.residual_out.extent = {};
+  views.residual_out.extent[0] = kHidden;
   views.normalized = front->normalized;
   auto workspace = session.scratch(qw38::format::ScratchKind::GdnWorkspace);
   if (!workspace) {
     return std::unexpected(workspace.error());
   }
+  workspace->bytes = kGdnWorkspaceBytesPerToken;
   views.workspace = *workspace;
   views.history = front->history;
   views.s = session.gdn_s();

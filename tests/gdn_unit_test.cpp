@@ -89,7 +89,9 @@ using qw38::runtime::kGdnWorkspaceBytesPerToken;
 
 namespace {
 
-void* dummy_ptr(std::uintptr_t v) { return reinterpret_cast<void*>(v); }
+void* dummy_ptr(std::uintptr_t v) {
+  return reinterpret_cast<void*>(v * 4096u);
+}
 
 GdnFrontBindViews dummy_ok_views(std::uint32_t* cursor) {
   GdnFrontBindViews v;
@@ -211,10 +213,72 @@ void test_bind_errors(Stream const& stream) {
   auto bad_shape = bind_gdn_front_plan(shape, stream);
   expect(!bad_shape, "qkv shape rejects");
 
+  auto qkv_dtype = views;
+  qkv_dtype.qkv.dtype = ArithmeticDtype::Fp32;
+  expect(!bind_gdn_front_plan(qkv_dtype, stream),
+         "Q4 payload arithmetic dtype rejects");
+
+  auto scale_dtype = views;
+  scale_dtype.qkv_scales.dtype = ArithmeticDtype::Bf16;
+  expect(!bind_gdn_front_plan(scale_dtype, stream),
+         "Q4 scale dtype rejects");
+
+  auto scale_layout = views;
+  scale_layout.z_scales.layout = PhysicalLayoutId::CudaBf16VectorV0;
+  expect(!bind_gdn_front_plan(scale_layout, stream),
+         "Q4 scale layout rejects");
+
+  auto scale_storage = views;
+  scale_storage.qkv_scales.storage = StorageClass::Bf16;
+  expect(!bind_gdn_front_plan(scale_storage, stream),
+         "Q4 scale storage rejects");
+
   auto ab = views;
   ab.a.layout = PhysicalLayoutId::CudaQ4G64V0;
   auto bad_ab = bind_gdn_front_plan(ab, stream);
   expect(!bad_ab, "Q4 a/b rejects");
+
+  auto ab_dtype = views;
+  ab_dtype.a.dtype = ArithmeticDtype::Fp32;
+  expect(!bind_gdn_front_plan(ab_dtype, stream), "a/b arithmetic dtype rejects");
+
+  auto gamma_rank = views;
+  gamma_rank.gamma.rank = 2;
+  gamma_rank.gamma.extent = {1, kHidden};
+  expect(!bind_gdn_front_plan(gamma_rank, stream),
+         "gamma equivalent flattened shape rejects");
+
+  auto normalized_layout = views;
+  normalized_layout.normalized.layout = PhysicalLayoutId::CudaBf16VectorV0;
+  expect(!bind_gdn_front_plan(normalized_layout, stream),
+         "normalized layout rejects");
+
+  auto oversized_history = views;
+  oversized_history.history.extent[0] = kConvHistoryTaps + 1u;
+  expect(!bind_gdn_front_plan(oversized_history, stream),
+         "oversized history rejects");
+
+  auto oversized_workspace = views;
+  oversized_workspace.workspace.bytes += 4;
+  expect(!bind_gdn_front_plan(oversized_workspace, stream),
+         "oversized workspace rejects");
+
+  auto overlap_weights = views;
+  overlap_weights.z.pointer =
+      static_cast<std::byte*>(const_cast<void*>(overlap_weights.qkv.pointer)) + 16;
+  expect(!bind_gdn_front_plan(overlap_weights, stream),
+         "offset-overlapping weight payloads reject");
+
+  auto overlap_activation = views;
+  overlap_activation.normalized.pointer =
+      static_cast<std::byte*>(overlap_activation.residual.pointer) + 4;
+  expect(!bind_gdn_front_plan(overlap_activation, stream),
+         "offset-overlapping residual and normalized reject");
+
+  auto overlap_history = views;
+  overlap_history.history.pointer = overlap_history.workspace.pointer + 8;
+  expect(!bind_gdn_front_plan(overlap_history, stream),
+         "offset-overlapping workspace and history reject");
 }
 
 void test_conv_history_and_taps(Stream const& stream) {
@@ -525,6 +589,29 @@ void test_recurrence_bind_and_invalid(Stream const& stream) {
   auto qk = views;
   qk.k_hat.pointer = qk.q_hat.pointer;
   expect(!bind_gdn_recurrence_plan(qk, stream), "aliased q/k rejects");
+
+  auto qk_offset = views;
+  qk_offset.k_hat.pointer =
+      static_cast<std::byte*>(qk_offset.q_hat.pointer) + 4;
+  expect(!bind_gdn_recurrence_plan(qk_offset, stream),
+         "offset-overlapping q/k rejects");
+
+  auto so_offset = views;
+  so_offset.o.pointer = static_cast<std::byte*>(so_offset.s.pointer) + 4;
+  expect(!bind_gdn_recurrence_plan(so_offset, stream),
+         "offset-overlapping S/o rejects");
+
+  auto q_shape = views;
+  q_shape.q_hat.rank = 1;
+  q_shape.q_hat.extent = {
+      static_cast<std::uint64_t>(kGdnKeyHeads) * kGdnHeadDim};
+  expect(!bind_gdn_recurrence_plan(q_shape, stream),
+         "flattened q_hat shape rejects");
+
+  auto v_layout = views;
+  v_layout.v.layout = PhysicalLayoutId::CudaBf16VectorV0;
+  expect(!bind_gdn_recurrence_plan(v_layout, stream),
+         "recurrence v layout rejects");
 
   auto wrong_layer = views;
   wrong_layer.language_layer = 4;
@@ -870,6 +957,23 @@ void test_mixer_bind_and_lifetimes(Stream const& stream) {
   auto same_g = views;
   same_g.gated_gamma.pointer = same_g.gamma.pointer;
   expect(!bind_gdn_plan(same_g, stream), "aliased gammas reject");
+
+  auto offset_residual = views;
+  offset_residual.residual_out.pointer =
+      static_cast<std::byte*>(offset_residual.residual.pointer) + 4;
+  expect(!bind_gdn_plan(offset_residual, stream),
+         "offset-overlapping residual/h_mid rejects");
+
+  auto overlap_u = views;
+  overlap_u.residual_out.pointer =
+      overlap_u.workspace.pointer + qw38::runtime::kGdnOffU + 2;
+  expect(!bind_gdn_plan(overlap_u, stream),
+         "output overlapping workspace u rejects");
+
+  auto gated_shape = views;
+  gated_shape.gated_gamma.extent[0] = kGdnHeadDim + 1u;
+  expect(!bind_gdn_plan(gated_shape, stream),
+         "oversized gated gamma rejects");
 
   auto attn = views;
   attn.language_layer = 3;
