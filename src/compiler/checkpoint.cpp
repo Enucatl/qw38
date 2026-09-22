@@ -54,6 +54,18 @@ std::expected<bool, CompilerError> require_bool(Json const& obj,
   return v->as_bool();
 }
 
+std::expected<double, CompilerError> require_number(Json const& obj,
+                                                    std::string_view key,
+                                                    std::string_view field) {
+  auto const* v = obj.find(key);
+  if (v == nullptr || !v->is_number() || !std::isfinite(v->as_number())) {
+    return std::unexpected(make_error(CompilerErrorCode::InvalidConfig, field,
+                                      std::string(key) +
+                                          " missing or nonfinite"));
+  }
+  return v->as_number();
+}
+
 std::expected<std::uint32_t, CompilerError> require_u32(
     Json const& obj, std::string_view key, std::string_view field) {
   auto value = require_u64(obj, key, field);
@@ -322,9 +334,12 @@ std::expected<ArchitectureConfig, CompilerError> parse_text_config(
     return std::unexpected(text.error());
   }
   Json const& tc = **text;
+  auto text_model_type = require_string(tc, "model_type", "text_config");
   auto hidden = require_u64(tc, "hidden_size", "text_config");
   auto inter = require_u64(tc, "intermediate_size", "text_config");
   auto vocab = require_u64(tc, "vocab_size", "text_config");
+  auto max_positions =
+      require_u64(tc, "max_position_embeddings", "text_config");
   auto layers = require_u32(tc, "num_hidden_layers", "text_config");
   auto heads = require_u32(tc, "num_attention_heads", "text_config");
   auto kv = require_u32(tc, "num_key_value_heads", "text_config");
@@ -338,21 +353,35 @@ std::expected<ArchitectureConfig, CompilerError> parse_text_config(
   auto mtp_layers = require_u32(tc, "mtp_num_hidden_layers", "text_config");
   auto dtype = require_string(tc, "dtype", "text_config");
   auto ssm = require_string(tc, "mamba_ssm_dtype", "text_config");
+  auto hidden_act = require_string(tc, "hidden_act", "text_config");
+  auto output_gate_type =
+      require_string(tc, "output_gate_type", "text_config");
   auto mtp_ded = require_bool(tc, "mtp_use_dedicated_embeddings", "text_config");
-  auto prf = tc.find("partial_rotary_factor");
+  auto text_tie = require_bool(tc, "tie_word_embeddings", "text_config");
+  auto attention_bias = require_bool(tc, "attention_bias", "text_config");
+  auto attn_output_gate = require_bool(tc, "attn_output_gate", "text_config");
+  auto use_cache = require_bool(tc, "use_cache", "text_config");
+  auto attention_dropout =
+      require_number(tc, "attention_dropout", "text_config");
+  auto rms_norm_eps = require_number(tc, "rms_norm_eps", "text_config");
+  auto prf = require_number(tc, "partial_rotary_factor", "text_config");
   auto rope = require_object(tc, "rope_parameters", "text_config");
   auto layer_types = tc.find("layer_types");
-  if (!hidden || !inter || !vocab || !layers || !heads || !kv || !head_dim ||
-      !interval || !conv || !lk || !lv || !nlk || !nlv || !mtp_layers || !dtype ||
-      !ssm || !mtp_ded || !rope || prf == nullptr || !prf->is_number() ||
-      layer_types == nullptr || !layer_types->is_array()) {
+  if (!text_model_type || !hidden || !inter || !vocab || !max_positions ||
+      !layers || !heads || !kv || !head_dim || !interval || !conv || !lk ||
+      !lv || !nlk || !nlv || !mtp_layers || !dtype || !ssm || !hidden_act ||
+      !output_gate_type || !mtp_ded || !text_tie || !attention_bias ||
+      !attn_output_gate || !use_cache || !attention_dropout || !rms_norm_eps ||
+      !prf || !rope || layer_types == nullptr || !layer_types->is_array()) {
     return std::unexpected(make_error(CompilerErrorCode::InvalidConfig,
                                       "text_config",
                                       "sitting text_config fields are incomplete"));
   }
+  cfg.text_model_type = *text_model_type;
   cfg.hidden_size = *hidden;
   cfg.intermediate_size = *inter;
   cfg.vocab_size = *vocab;
+  cfg.max_position_embeddings = *max_positions;
   cfg.num_hidden_layers = *layers;
   cfg.num_attention_heads = *heads;
   cfg.num_key_value_heads = *kv;
@@ -366,18 +395,31 @@ std::expected<ArchitectureConfig, CompilerError> parse_text_config(
   cfg.mtp_num_hidden_layers = *mtp_layers;
   cfg.dtype = *dtype;
   cfg.mamba_ssm_dtype = *ssm;
+  cfg.hidden_act = *hidden_act;
+  cfg.output_gate_type = *output_gate_type;
   cfg.mtp_use_dedicated_embeddings = *mtp_ded;
-  cfg.partial_rotary_factor = prf->as_number();
+  cfg.text_tie_word_embeddings = *text_tie;
+  cfg.attention_bias = *attention_bias;
+  cfg.attn_output_gate = *attn_output_gate;
+  cfg.use_cache = *use_cache;
+  cfg.attention_dropout = *attention_dropout;
+  cfg.rms_norm_eps = *rms_norm_eps;
+  cfg.partial_rotary_factor = *prf;
   Json const& rp = **rope;
-  auto theta = rp.find("rope_theta");
+  auto theta = require_number(rp, "rope_theta", "rope_parameters");
+  auto rope_partial =
+      require_number(rp, "partial_rotary_factor", "rope_parameters");
+  auto rope_type = require_string(rp, "rope_type", "rope_parameters");
   auto interleaved = require_bool(rp, "mrope_interleaved", "rope_parameters");
   auto section = rp.find("mrope_section");
-  if (theta == nullptr || !theta->is_number() || !interleaved ||
+  if (!theta || !rope_partial || !rope_type || !interleaved ||
       section == nullptr || !section->is_array()) {
     return std::unexpected(make_error(CompilerErrorCode::InvalidConfig,
                                       "rope_parameters", "incomplete RoPE block"));
   }
-  cfg.rope_theta = theta->as_number();
+  cfg.rope_theta = *theta;
+  cfg.rope_partial_rotary_factor = *rope_partial;
+  cfg.rope_type = *rope_type;
   cfg.mrope_interleaved = *interleaved;
   for (auto const& item : section->as_array()) {
     auto value = parse_json_u64(item, "mrope_section");
@@ -406,10 +448,17 @@ std::expected<void, CompilerError> validate_architecture(
                                       field, detail));
   };
   if (cfg.architecture != kArchitecture) {
-    return fail("architectures", "not Qwen3_5ForConditionalGeneration");
+    return fail("architectures", "unsupported architecture");
   }
   if (cfg.model_type != kModelType) {
-    return fail("model_type", "not qwen3_5");
+    return fail("model_type", "unsupported multimodal model type");
+  }
+  if (cfg.text_model_type != kTextModelType) {
+    return fail("text_config.model_type", "unsupported language model type");
+  }
+  if (cfg.tie_word_embeddings != cfg.text_tie_word_embeddings) {
+    return fail("tie_word_embeddings",
+                "root and text embedding-sharing settings disagree");
   }
   if (cfg.tie_word_embeddings) {
     return fail("tie_word_embeddings", "embeddings and lm_head must remain untied");
@@ -418,21 +467,116 @@ std::expected<void, CompilerError> validate_architecture(
     return fail("mtp_use_dedicated_embeddings",
                 "MTP must alias the language embedding payload");
   }
-  if (cfg.hidden_size != kHidden || cfg.intermediate_size != kIntermediate ||
-      cfg.vocab_size != kVocab || cfg.num_hidden_layers != kLayers ||
-      cfg.num_attention_heads != kQueryHeads ||
-      cfg.num_key_value_heads != kKvHeads || cfg.head_dim != kHeadDim ||
-      cfg.full_attention_interval != kFullInterval ||
-      cfg.linear_conv_kernel_dim != kConvKernel ||
-      cfg.linear_key_head_dim != kLinearHeadDim ||
-      cfg.linear_value_head_dim != kLinearHeadDim ||
-      cfg.linear_num_key_heads != kLinearKeyHeads ||
-      cfg.linear_num_value_heads != kLinearValueHeads ||
-      cfg.mtp_num_hidden_layers != 1 || cfg.dtype != "bfloat16" ||
-      cfg.mamba_ssm_dtype != "float32" || cfg.rope_theta != kRopeTheta ||
-      cfg.partial_rotary_factor != 0.25 || !cfg.mrope_interleaved ||
-      cfg.mrope_section != std::vector<std::uint32_t>{11, 11, 10}) {
-    return fail("text_config", "sitting Qwen3.8 ranks do not match Architecture V0");
+  if (cfg.hidden_size != kHidden) {
+    return fail("hidden_size", "unsupported hidden width");
+  }
+  if (cfg.intermediate_size != kIntermediate) {
+    return fail("intermediate_size", "unsupported MLP width");
+  }
+  if (cfg.vocab_size != kVocab) {
+    return fail("vocab_size", "unsupported vocabulary size");
+  }
+  if (cfg.max_position_embeddings != kMaxPositionEmbeddings) {
+    return fail("max_position_embeddings", "unsupported context limit");
+  }
+  if (cfg.num_hidden_layers != kLayers) {
+    return fail("num_hidden_layers", "unsupported language layer count");
+  }
+  if (cfg.num_attention_heads != kQueryHeads) {
+    return fail("num_attention_heads", "unsupported query-head count");
+  }
+  if (cfg.num_key_value_heads != kKvHeads) {
+    return fail("num_key_value_heads", "unsupported KV-head count");
+  }
+  if (cfg.num_key_value_heads == 0 ||
+      cfg.num_attention_heads % cfg.num_key_value_heads != 0) {
+    return fail("num_key_value_heads", "query heads must divide into KV groups");
+  }
+  if (cfg.head_dim != kHeadDim) {
+    return fail("head_dim", "unsupported attention head width");
+  }
+  if (cfg.full_attention_interval != kFullInterval) {
+    return fail("full_attention_interval", "unsupported hybrid layer interval");
+  }
+  if (cfg.linear_conv_kernel_dim != kConvKernel) {
+    return fail("linear_conv_kernel_dim", "unsupported causal convolution width");
+  }
+  if (cfg.linear_key_head_dim != kLinearHeadDim) {
+    return fail("linear_key_head_dim", "unsupported GDN key width");
+  }
+  if (cfg.linear_value_head_dim != kLinearHeadDim) {
+    return fail("linear_value_head_dim", "unsupported GDN value width");
+  }
+  if (cfg.linear_num_key_heads != kLinearKeyHeads) {
+    return fail("linear_num_key_heads", "unsupported GDN key-head count");
+  }
+  if (cfg.linear_num_value_heads != kLinearValueHeads) {
+    return fail("linear_num_value_heads", "unsupported GDN value-head count");
+  }
+  if (cfg.linear_num_key_heads == 0 ||
+      cfg.linear_num_value_heads % cfg.linear_num_key_heads != 0) {
+    return fail("linear_num_value_heads",
+                "GDN value heads must be a multiple of key heads");
+  }
+  if (cfg.mtp_num_hidden_layers != 1) {
+    return fail("mtp_num_hidden_layers", "V0 retains exactly one MTP layer");
+  }
+  if (cfg.dtype != kWeightDtype) {
+    return fail("dtype", "V0 source weights must be bfloat16");
+  }
+  if (cfg.mamba_ssm_dtype != kMambaSsmDtype) {
+    return fail("mamba_ssm_dtype", "V0 GDN state semantics require float32");
+  }
+  if (cfg.rms_norm_eps != kRmsNormEps) {
+    return fail("rms_norm_eps", "unsupported RMS normalization epsilon");
+  }
+  if (cfg.attention_bias) {
+    return fail("attention_bias", "V0 projections are bias-free");
+  }
+  if (cfg.attention_dropout != kAttentionDropout) {
+    return fail("attention_dropout", "V0 attention must be dropout-free");
+  }
+  if (!cfg.attn_output_gate) {
+    return fail("attn_output_gate", "full attention requires its sigmoid gate");
+  }
+  if (cfg.hidden_act != kHiddenAct) {
+    return fail("hidden_act", "V0 MLP activation must be SiLU");
+  }
+  if (cfg.output_gate_type != kOutputGateType) {
+    return fail("output_gate_type", "V0 GDN output gate must be swish");
+  }
+  if (!cfg.use_cache) {
+    return fail("use_cache", "V0 requires persistent decode caches");
+  }
+  if (cfg.partial_rotary_factor != cfg.rope_partial_rotary_factor) {
+    return fail("partial_rotary_factor",
+                "text and RoPE partial rotary factors disagree");
+  }
+  if (cfg.partial_rotary_factor != kPartialRotaryFactor) {
+    return fail("partial_rotary_factor", "unsupported partial rotary width");
+  }
+  if (cfg.rope_theta != kRopeTheta) {
+    return fail("rope_theta", "unsupported RoPE base");
+  }
+  if (cfg.rope_type != kRopeType) {
+    return fail("rope_type", "unsupported RoPE variant");
+  }
+  if (!cfg.mrope_interleaved) {
+    return fail("mrope_interleaved", "V0 requires interleaved multimodal RoPE");
+  }
+  if (cfg.mrope_section != std::vector<std::uint32_t>{11, 11, 10}) {
+    return fail("mrope_section", "unsupported multimodal RoPE partition");
+  }
+  auto const rotary_width =
+      static_cast<std::uint64_t>(cfg.head_dim * cfg.partial_rotary_factor);
+  std::uint64_t section_sum = 0;
+  for (auto const width : cfg.mrope_section) {
+    section_sum += width;
+  }
+  if (rotary_width != kRotaryDim || rotary_width % 2 != 0 ||
+      section_sum != rotary_width / 2) {
+    return fail("mrope_section",
+                "RoPE width and multimodal partition are inconsistent");
   }
   if (cfg.layer_types.size() != kLayers) {
     return fail("layer_types", "expected 64 entries");

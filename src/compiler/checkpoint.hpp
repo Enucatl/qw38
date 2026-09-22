@@ -18,11 +18,17 @@ namespace qw38::compiler {
 struct ArchitectureConfig {
   std::string architecture;
   std::string model_type;
+  std::string text_model_type;
   bool tie_word_embeddings{true};
+  bool text_tie_word_embeddings{true};
   bool mtp_use_dedicated_embeddings{true};
+  bool attention_bias{true};
+  bool attn_output_gate{};
+  bool use_cache{};
   std::uint64_t hidden_size{};
   std::uint64_t intermediate_size{};
   std::uint64_t vocab_size{};
+  std::uint64_t max_position_embeddings{};
   std::uint32_t num_hidden_layers{};
   std::uint32_t num_attention_heads{};
   std::uint32_t num_key_value_heads{};
@@ -33,12 +39,18 @@ struct ArchitectureConfig {
   std::uint64_t linear_value_head_dim{};
   std::uint64_t linear_num_key_heads{};
   std::uint64_t linear_num_value_heads{};
+  double rms_norm_eps{};
+  double attention_dropout{};
   double rope_theta{};
   double partial_rotary_factor{};
+  double rope_partial_rotary_factor{};
   std::vector<std::uint32_t> mrope_section;
   bool mrope_interleaved{};
   std::string dtype;
   std::string mamba_ssm_dtype;
+  std::string hidden_act;
+  std::string output_gate_type;
+  std::string rope_type;
   std::uint32_t mtp_num_hidden_layers{};
   std::vector<std::string> layer_types;
 };

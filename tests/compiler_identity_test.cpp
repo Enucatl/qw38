@@ -6,6 +6,7 @@
 #include <filesystem>
 #include <iostream>
 #include <limits>
+#include <sstream>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -18,10 +19,12 @@ using qw38::compiler::is_vision_tensor;
 using qw38::compiler::kIncludedTensors;
 using qw38::compiler::parse_json_u64;
 using qw38::compiler::parse_safetensors_shape;
+using qw38::compiler::parse_text_config;
 using qw38::compiler::SourceClass;
 using qw38::compiler::SourceTensor;
 using qw38::compiler::SyntheticTensor;
 using qw38::compiler::TensorFamily;
+using qw38::compiler::validate_architecture;
 
 namespace {
 
@@ -68,9 +71,157 @@ std::vector<SourceTensor> complete_language_mtp(std::uint64_t* offset) {
   return out;
 }
 
+std::string valid_config_json() {
+  std::ostringstream out;
+  out << R"({"architectures":["Qwen3_5ForConditionalGeneration"],)"
+      << R"("model_type":"qwen3_5","tie_word_embeddings":false,)"
+      << R"("text_config":{"attention_bias":false,"attention_dropout":0.0,)"
+      << R"("attn_output_gate":true,"dtype":"bfloat16",)"
+      << R"("full_attention_interval":4,"head_dim":256,"hidden_act":"silu",)"
+      << R"("hidden_size":5120,"intermediate_size":17408,)"
+      << R"("linear_conv_kernel_dim":4,"linear_key_head_dim":128,)"
+      << R"("linear_num_key_heads":16,"linear_num_value_heads":48,)"
+      << R"("linear_value_head_dim":128,"mamba_ssm_dtype":"float32",)"
+      << R"("max_position_embeddings":262144,"model_type":"qwen3_5_text",)"
+      << R"("mtp_num_hidden_layers":1,"mtp_use_dedicated_embeddings":false,)"
+      << R"("num_attention_heads":24,"num_hidden_layers":64,)"
+      << R"("num_key_value_heads":4,"output_gate_type":"swish",)"
+      << R"("partial_rotary_factor":0.25,"rms_norm_eps":1e-6,)"
+      << R"("rope_parameters":{"mrope_interleaved":true,)"
+      << R"("mrope_section":[11,11,10],"partial_rotary_factor":0.25,)"
+      << R"("rope_theta":10000000,"rope_type":"default"},)"
+      << R"("tie_word_embeddings":false,"use_cache":true,"vocab_size":248320,)"
+      << R"("layer_types":[)";
+  for (std::uint32_t layer = 0; layer < 64; ++layer) {
+    if (layer != 0) {
+      out << ',';
+    }
+    out << (layer % 4 == 3 ? R"("full_attention")"
+                           : R"("linear_attention")");
+  }
+  out << "]}}";
+  return out.str();
+}
+
+std::string replace_one(std::string input, std::string_view from,
+                        std::string_view to) {
+  auto const at = input.find(from);
+  if (at == std::string::npos ||
+      input.find(from, at + from.size()) != std::string::npos) {
+    fail(std::string("mutation target is not unique: ") + std::string(from));
+    return input;
+  }
+  input.replace(at, from.size(), to);
+  return input;
+}
+
 }  // namespace
 
 int main() {
+  {
+    auto const baseline_text = valid_config_json();
+    auto baseline = parse_text_config(baseline_text);
+    expect(static_cast<bool>(baseline), "complete architecture config parses");
+    if (baseline) {
+      auto status = validate_architecture(*baseline);
+      expect(static_cast<bool>(status), "complete architecture config validates");
+    }
+
+    struct Mutation {
+      std::string_view from;
+      std::string_view to;
+      std::string_view field;
+    };
+    std::vector<Mutation> const mutations{
+        {R"("Qwen3_5ForConditionalGeneration")", R"("Qwen3ForCausalLM")",
+         "architectures"},
+        {R"("model_type":"qwen3_5","tie_word_embeddings")",
+         R"("model_type":"qwen3","tie_word_embeddings")", "model_type"},
+        {R"("model_type":"qwen3_5_text")", R"("model_type":"qwen3_text")",
+         "text_config.model_type"},
+        {R"("model_type":"qwen3_5","tie_word_embeddings":false)",
+         R"("model_type":"qwen3_5","tie_word_embeddings":true)",
+         "tie_word_embeddings"},
+        {R"("tie_word_embeddings":false,"use_cache")",
+         R"("tie_word_embeddings":true,"use_cache")", "tie_word_embeddings"},
+        {R"("attention_bias":false)", R"("attention_bias":true)",
+         "attention_bias"},
+        {R"("attention_dropout":0.0)", R"("attention_dropout":0.1)",
+         "attention_dropout"},
+        {R"("attn_output_gate":true)", R"("attn_output_gate":false)",
+         "attn_output_gate"},
+        {R"("dtype":"bfloat16")", R"("dtype":"float16")", "dtype"},
+        {R"("full_attention_interval":4)", R"("full_attention_interval":8)",
+         "full_attention_interval"},
+        {R"("head_dim":256)", R"("head_dim":128)", "head_dim"},
+        {R"("hidden_act":"silu")", R"("hidden_act":"gelu")", "hidden_act"},
+        {R"("hidden_size":5120)", R"("hidden_size":4096)", "hidden_size"},
+        {R"("intermediate_size":17408)", R"("intermediate_size":16384)",
+         "intermediate_size"},
+        {R"("linear_conv_kernel_dim":4)", R"("linear_conv_kernel_dim":3)",
+         "linear_conv_kernel_dim"},
+        {R"("linear_key_head_dim":128)", R"("linear_key_head_dim":64)",
+         "linear_key_head_dim"},
+        {R"("linear_num_key_heads":16)", R"("linear_num_key_heads":8)",
+         "linear_num_key_heads"},
+        {R"("linear_num_value_heads":48)", R"("linear_num_value_heads":32)",
+         "linear_num_value_heads"},
+        {R"("linear_value_head_dim":128)", R"("linear_value_head_dim":64)",
+         "linear_value_head_dim"},
+        {R"("mamba_ssm_dtype":"float32")",
+         R"("mamba_ssm_dtype":"bfloat16")", "mamba_ssm_dtype"},
+        {R"("max_position_embeddings":262144)",
+         R"("max_position_embeddings":131072)", "max_position_embeddings"},
+        {R"("mtp_num_hidden_layers":1)", R"("mtp_num_hidden_layers":2)",
+         "mtp_num_hidden_layers"},
+        {R"("mtp_use_dedicated_embeddings":false)",
+         R"("mtp_use_dedicated_embeddings":true)",
+         "mtp_use_dedicated_embeddings"},
+        {R"("num_attention_heads":24)", R"("num_attention_heads":16)",
+         "num_attention_heads"},
+        {R"("num_hidden_layers":64)", R"("num_hidden_layers":63)",
+         "num_hidden_layers"},
+        {R"("num_key_value_heads":4)", R"("num_key_value_heads":8)",
+         "num_key_value_heads"},
+        {R"("output_gate_type":"swish")",
+         R"("output_gate_type":"sigmoid")", "output_gate_type"},
+        {R"("partial_rotary_factor":0.25,"rms_norm_eps")",
+         R"("partial_rotary_factor":0.5,"rms_norm_eps")",
+         "partial_rotary_factor"},
+        {R"("rms_norm_eps":1e-6)", R"("rms_norm_eps":1e-5)",
+         "rms_norm_eps"},
+        {R"("mrope_interleaved":true)", R"("mrope_interleaved":false)",
+         "mrope_interleaved"},
+        {R"("mrope_section":[11,11,10])", R"("mrope_section":[10,11,11])",
+         "mrope_section"},
+        {R"("mrope_section":[11,11,10],"partial_rotary_factor":0.25)",
+         R"("mrope_section":[11,11,10],"partial_rotary_factor":0.5)",
+         "partial_rotary_factor"},
+        {R"("rope_theta":10000000)", R"("rope_theta":10000)", "rope_theta"},
+        {R"("rope_type":"default")", R"("rope_type":"linear")", "rope_type"},
+        {R"("use_cache":true)", R"("use_cache":false)", "use_cache"},
+        {R"("vocab_size":248320)", R"("vocab_size":248321)", "vocab_size"},
+        {R"("layer_types":["linear_attention","linear_attention","linear_attention")",
+         R"("layer_types":["full_attention","linear_attention","linear_attention")",
+         "layer_types"},
+    };
+    for (auto const& mutation : mutations) {
+      auto changed = replace_one(baseline_text, mutation.from, mutation.to);
+      auto parsed = parse_text_config(changed);
+      if (!parsed) {
+        fail(std::string("mutation did not parse: ") +
+             qw38::compiler::error_message(parsed.error()));
+        continue;
+      }
+      auto status = validate_architecture(*parsed);
+      expect(!status &&
+                 status.error().code == CompilerErrorCode::ArchitectureMismatch &&
+                 status.error().field == mutation.field,
+             std::string("typed config rejection: ") +
+                 std::string(mutation.field));
+    }
+  }
+
   {
     qw38::compiler::Json::Array rank8(8, qw38::compiler::Json{1.0});
     auto shape = parse_safetensors_shape(qw38::compiler::Json{rank8}, "shape");
