@@ -66,9 +66,14 @@ struct ArenaPlan {
 
 [[nodiscard]] std::expected<std::vector<ScratchRequest>, Error>
 v0_scratch_requests(std::uint64_t token_capacity);
+[[nodiscard]] std::expected<std::vector<ScratchRequest>, Error>
+v0_scratch_requests(std::uint64_t token_capacity,
+                    std::uint64_t attention_capacity);
 
 [[nodiscard]] std::expected<ArenaPlan, Error> plan_v0_arena(
     std::uint64_t token_capacity = kArenaTokenCapacity);
+[[nodiscard]] std::expected<ArenaPlan, Error> plan_v0_arena(
+    std::uint64_t token_capacity, std::uint64_t attention_capacity);
 
 [[nodiscard]] ScratchPlacement const* find_placement(
     ArenaPlan const& plan, qw38::format::ScratchKind kind) noexcept;

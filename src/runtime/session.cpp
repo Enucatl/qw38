@@ -94,7 +94,7 @@ std::expected<Session, Error> Session::create(
   if (!res_n) {
     return std::unexpected(res_n.error());
   }
-  auto arena = plan_v0_arena(kArenaTokenCapacity);
+  auto arena = plan_v0_arena(kArenaTokenCapacity, kv_capacity);
   if (!arena) {
     return std::unexpected(arena.error());
   }

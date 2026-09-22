@@ -146,6 +146,12 @@ inline constexpr float kAttnScale = 1.0f / 16.0f;  // 1/sqrt(256)
                                                  : need;
 }
 
+// Capacity-derived attention partial storage. Unlike the decode-sized aliases
+// above, this is checked because it is driven by the session's requested KV
+// capacity.
+[[nodiscard]] std::expected<std::uint64_t, Error>
+attn_workspace_bytes_for_capacity(std::uint64_t capacity);
+
 static_assert(kAttnOffK == kAttnOffQg + kAttnBytesQg);
 static_assert(kAttnOffV == kAttnOffK + kAttnBytesK);
 static_assert(kAttnOffQ == kAttnOffV + kAttnBytesV);

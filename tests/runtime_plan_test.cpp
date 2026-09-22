@@ -113,6 +113,30 @@ int main() {
     }
   }
 
+  struct AttentionCapacityCase {
+    std::uint64_t capacity;
+    std::uint64_t workspace_bytes;
+  };
+  constexpr std::array kAttentionCapacityCases{
+      AttentionCapacityCase{205824, 19966720},
+      AttentionCapacityCase{205825, 19991488},
+      AttentionCapacityCase{262144, 25415680},
+  };
+  for (auto const& c : kAttentionCapacityCases) {
+    auto plan = plan_v0_arena(kArenaTokenCapacity, c.capacity);
+    expect(static_cast<bool>(plan), "capacity-derived attention arena");
+    if (!plan) {
+      continue;
+    }
+    auto const* attention = find_placement(*plan, ScratchKind::AttentionWorkspace);
+    expect(attention && attention->bytes == c.workspace_bytes,
+           "attention partial workspace covers requested KV capacity");
+  }
+  auto attention_overflow = qw38::runtime::attn_workspace_bytes_for_capacity(
+      std::numeric_limits<std::uint64_t>::max());
+  expect(!attention_overflow && attention_overflow.error().code == ErrorCode::Overflow,
+         "attention workspace arithmetic is checked");
+
   ScratchRequest a{};
   a.kind = ScratchKind::GdnWorkspace;
   a.bytes = 1024;

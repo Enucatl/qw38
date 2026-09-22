@@ -208,6 +208,11 @@ std::expected<ArenaPlan, Error> plan_scratch_arena(
 
 std::expected<std::vector<ScratchRequest>, Error> v0_scratch_requests(
     std::uint64_t token_capacity) {
+  return v0_scratch_requests(token_capacity, token_capacity);
+}
+
+std::expected<std::vector<ScratchRequest>, Error> v0_scratch_requests(
+    std::uint64_t token_capacity, std::uint64_t attention_capacity) {
   try {
   if (token_capacity == 0) {
     return std::unexpected(make_error(ErrorCode::InvalidArgument,
@@ -257,13 +262,17 @@ std::expected<std::vector<ScratchRequest>, Error> v0_scratch_requests(
       !st) {
     return std::unexpected(st.error());
   }
-  if (auto st = add(ScratchKind::AttentionWorkspace, ArithmeticDtype::Fp32,
-                    kAttentionWorkspaceBytesPerToken,
-                    {{KernelStage::Mixer, KernelStage::MixerOutput}}, 1,
-                    "scratch.attn");
-      !st) {
-    return std::unexpected(st.error());
+  auto attention_bytes = attn_workspace_bytes_for_capacity(attention_capacity);
+  if (!attention_bytes) {
+    return std::unexpected(attention_bytes.error());
   }
+  out.push_back(ScratchRequest{
+      .kind = ScratchKind::AttentionWorkspace,
+      .dtype = ArithmeticDtype::Fp32,
+      .bytes = *attention_bytes,
+      .live = {{KernelStage::Mixer, KernelStage::MixerOutput}},
+      .exclusive_group = 1,
+  });
   if (auto st = add(ScratchKind::MlpSwiglu, ArithmeticDtype::Bf16,
                     kSwigluBytesPerToken,
                     {{KernelStage::MlpSwiglu, KernelStage::MlpDown}}, 0,
@@ -289,7 +298,12 @@ std::expected<std::vector<ScratchRequest>, Error> v0_scratch_requests(
 }
 
 std::expected<ArenaPlan, Error> plan_v0_arena(std::uint64_t token_capacity) {
-  auto reqs = v0_scratch_requests(token_capacity);
+  return plan_v0_arena(token_capacity, token_capacity);
+}
+
+std::expected<ArenaPlan, Error> plan_v0_arena(
+    std::uint64_t token_capacity, std::uint64_t attention_capacity) {
+  auto reqs = v0_scratch_requests(token_capacity, attention_capacity);
   if (!reqs) {
     return std::unexpected(reqs.error());
   }

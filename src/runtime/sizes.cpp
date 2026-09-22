@@ -53,6 +53,24 @@ std::expected<std::uint64_t, Error> residual_bytes(
   return mul(kResidualBytesPerToken, token_capacity, "residual.bytes");
 }
 
+std::expected<std::uint64_t, Error> attn_workspace_bytes_for_capacity(
+    std::uint64_t capacity) {
+  // Quotient/remainder avoids an unchecked capacity + (segment - 1) ceil.
+  std::uint64_t segments = capacity / kAttnSegmentKeys;
+  if (capacity % kAttnSegmentKeys != 0) {
+    ++segments;
+  }
+  auto partials = mul(segments, kAttnBytesPartials, "scratch.attn.partials");
+  if (!partials) {
+    return partials;
+  }
+  auto total = add(kAttnOffPartials, *partials, "scratch.attn.workspace");
+  if (!total) {
+    return total;
+  }
+  return std::max(kAttentionWorkspaceBytesPerToken, *total);
+}
+
 std::expected<std::uint64_t, Error> gdn_s_byte_offset(std::uint32_t layer,
                                                       std::uint32_t value_head,
                                                       std::uint32_t value,
