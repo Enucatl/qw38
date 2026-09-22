@@ -16,8 +16,11 @@ namespace qw38::runtime {
 namespace {
 
 using qw38::cuda::DecodeEpilogue;
+using qw38::cuda::DecodeDtype;
 using qw38::cuda::DecodeMmvDesc;
 using qw38::cuda::DecodeMmvRangeDesc;
+using qw38::cuda::decode_matrix_view;
+using qw38::cuda::decode_vector_view;
 using qw38::cuda::decode_code_bytes;
 using qw38::cuda::decode_pad_k;
 using qw38::cuda::decode_pad_n;
@@ -157,11 +160,16 @@ DecodeMmvDesc mmv_from_weight(AttnWeightBinding const& w) {
   d.k = w.k;
   d.padded_n = w.padded_n;
   d.padded_k = w.padded_k;
-  d.codes = static_cast<std::byte const*>(w.codes.pointer);
-  d.codes_bytes = w.codes_bytes;
+  DecodeDtype const dtype =
+      w.layout == qw38::cuda::kDecodeLayoutQ4G64V0 ? DecodeDtype::Q4
+                                                   : DecodeDtype::Bf16;
+  d.codes = decode_matrix_view(w.codes.pointer, dtype, w.layout, w.n, w.k,
+                               w.padded_n, w.padded_k, w.codes_bytes, 16);
   if (w.scales_bytes != 0) {
-    d.scales = static_cast<std::byte const*>(w.scales.pointer);
-    d.scales_bytes = w.scales_bytes;
+    d.scales = decode_matrix_view(
+        w.scales.pointer, DecodeDtype::Fp16, w.layout, w.padded_n,
+        w.padded_k / 64u, w.padded_n, w.padded_k / 64u,
+        w.scales_bytes, 2);
   }
   return d;
 }
@@ -705,16 +713,24 @@ std::expected<void, Error> execute_decode_attention_prep(
 
   DecodeMmvRangeDesc ranges;
   ranges.qg = mmv_from_weight(plan.qg);
-  ranges.qg.input = normalized;
-  ranges.qg.output = qg;
+  ranges.qg.input = decode_vector_view(
+      normalized, DecodeDtype::Bf16, qw38::cuda::kDecodeLayoutBf16VectorV0,
+      ranges.qg.k, static_cast<std::uint64_t>(ranges.qg.k) * 2u, 2, false);
+  ranges.qg.output = decode_vector_view(
+      qg, DecodeDtype::Bf16, qw38::cuda::kDecodeLayoutBf16VectorV0,
+      ranges.qg.n, static_cast<std::uint64_t>(ranges.qg.n) * 2u, 2, true);
   ranges.qg.epilogue = DecodeEpilogue::StoreBf16;
   ranges.k = mmv_from_weight(plan.k);
-  ranges.k.input = normalized;
-  ranges.k.output = k;
+  ranges.k.input = ranges.qg.input;
+  ranges.k.output = decode_vector_view(
+      k, DecodeDtype::Bf16, qw38::cuda::kDecodeLayoutBf16VectorV0,
+      ranges.k.n, static_cast<std::uint64_t>(ranges.k.n) * 2u, 2, true);
   ranges.k.epilogue = DecodeEpilogue::StoreBf16;
   ranges.v = mmv_from_weight(plan.v);
-  ranges.v.input = normalized;
-  ranges.v.output = v;
+  ranges.v.input = ranges.qg.input;
+  ranges.v.output = decode_vector_view(
+      v, DecodeDtype::Bf16, qw38::cuda::kDecodeLayoutBf16VectorV0,
+      ranges.v.n, static_cast<std::uint64_t>(ranges.v.n) * 2u, 2, true);
   ranges.v.epilogue = DecodeEpilogue::StoreBf16;
   if (auto st = qw38::cuda::launch_decode_mmv_ranges(ranges, *plan.stream); !st) {
     return std::unexpected(from_cuda(st.error()));
@@ -779,8 +795,12 @@ std::expected<TensorView, Error> execute_attention_core(
     return std::unexpected(from_cuda(st.error()));
   }
   DecodeMmvDesc out = mmv_from_weight(plan.out);
-  out.input = y;
-  out.residual = residual_out;
+  out.input = decode_vector_view(
+      y, DecodeDtype::Bf16, qw38::cuda::kDecodeLayoutBf16VectorV0,
+      out.k, static_cast<std::uint64_t>(out.k) * 2u, 2, false);
+  out.residual = decode_vector_view(
+      residual_out, DecodeDtype::Fp32, qw38::cuda::kDecodeLayoutFp32VectorV0,
+      out.n, static_cast<std::uint64_t>(out.n) * 4u, 4, true);
   out.epilogue = DecodeEpilogue::ResidualAddFp32;
   if (auto st = qw38::cuda::launch_decode_mmv(out, *plan.stream); !st) {
     return std::unexpected(from_cuda(st.error()));

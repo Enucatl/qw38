@@ -30,14 +30,17 @@ using qw38::activation::test::fail;
 using qw38::activation::test::g_failures;
 using qw38::activation::test::upload_vec;
 using qw38::cuda::DecodeEpilogue;
+using qw38::cuda::DecodeDtype;
 using qw38::cuda::DecodeMmvDesc;
 using qw38::cuda::DecodeMmvPairedDesc;
 using qw38::cuda::DeviceBuffer;
 using qw38::cuda::Stream;
 using qw38::cuda::decode_code_bytes;
+using qw38::cuda::decode_matrix_view;
 using qw38::cuda::decode_pad_k;
 using qw38::cuda::decode_pad_n;
 using qw38::cuda::decode_scale_bytes;
+using qw38::cuda::decode_vector_view;
 using qw38::cuda::kDecodeLayoutBf16DenseTileV0;
 using qw38::cuda::kDecodeLayoutQ4G64V0;
 using qw38::cuda::kDecodeLayoutQ8G32V0;
@@ -104,10 +107,49 @@ inline DecodeMmvDesc desc_from_packed(PackedMatrix const& packed,
   d.k = static_cast<std::uint32_t>(packed.logical_k);
   d.padded_n = static_cast<std::uint32_t>(packed.padded_n);
   d.padded_k = static_cast<std::uint32_t>(packed.padded_k);
-  d.codes_bytes = packed.codes.size();
-  d.scales_bytes = packed.scales.size();
+  DecodeDtype const dtype =
+      d.layout == kDecodeLayoutQ4G64V0
+          ? DecodeDtype::Q4
+          : (d.layout == kDecodeLayoutQ8G32V0 ? DecodeDtype::Q8
+                                               : DecodeDtype::Bf16);
+  d.codes = decode_matrix_view(
+      nullptr, dtype, d.layout, d.n, d.k, d.padded_n, d.padded_k,
+      packed.codes.size(), 16);
+  if (!packed.scales.empty()) {
+    std::uint32_t const group =
+        d.layout == kDecodeLayoutQ4G64V0 ? 64u : 32u;
+    d.scales = decode_matrix_view(
+        nullptr, DecodeDtype::Fp16, d.layout, d.padded_n, d.padded_k / group,
+        d.padded_n, d.padded_k / group, packed.scales.size(), 2);
+  }
   d.epilogue = epi;
   return d;
+}
+
+inline void bind_input(DecodeMmvDesc& d, void* pointer) {
+  d.input = decode_vector_view(
+      pointer, DecodeDtype::Bf16, qw38::cuda::kDecodeLayoutBf16VectorV0,
+      d.k, static_cast<std::uint64_t>(d.k) * 2u, 2, false);
+}
+
+inline void bind_output(DecodeMmvDesc& d, void* pointer) {
+  DecodeDtype const dtype =
+      d.epilogue == DecodeEpilogue::StoreFp32 ? DecodeDtype::Fp32
+                                              : DecodeDtype::Bf16;
+  d.output = decode_vector_view(
+      pointer, dtype,
+      dtype == DecodeDtype::Fp32 ? qw38::cuda::kDecodeLayoutFp32VectorV0
+                                 : qw38::cuda::kDecodeLayoutBf16VectorV0,
+      d.n, static_cast<std::uint64_t>(d.n) *
+               (dtype == DecodeDtype::Fp32 ? 4u : 2u),
+      dtype == DecodeDtype::Fp32 ? 4u : 2u, true);
+}
+
+inline void bind_residual(DecodeMmvDesc& d, void* pointer) {
+  d.output = {};
+  d.residual = decode_vector_view(
+      pointer, DecodeDtype::Fp32, qw38::cuda::kDecodeLayoutFp32VectorV0,
+      d.n, static_cast<std::uint64_t>(d.n) * 4u, 4, true);
 }
 
 inline bool fp32_close(float a, float b, float abs_tol, float rel_tol) {

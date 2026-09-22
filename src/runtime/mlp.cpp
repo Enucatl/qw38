@@ -14,8 +14,11 @@ namespace qw38::runtime {
 namespace {
 
 using qw38::cuda::DecodeEpilogue;
+using qw38::cuda::DecodeDtype;
 using qw38::cuda::DecodeMmvDesc;
 using qw38::cuda::DecodeMmvPairedDesc;
+using qw38::cuda::decode_matrix_view;
+using qw38::cuda::decode_vector_view;
 using qw38::cuda::decode_code_bytes;
 using qw38::cuda::decode_pad_k;
 using qw38::cuda::decode_pad_n;
@@ -149,11 +152,16 @@ DecodeMmvDesc mmv_from_weight(MlpWeightBinding const& w) {
   d.k = w.k;
   d.padded_n = w.padded_n;
   d.padded_k = w.padded_k;
-  d.codes = static_cast<std::byte const*>(w.codes.pointer);
-  d.codes_bytes = w.codes_bytes;
+  DecodeDtype const dtype =
+      w.layout == qw38::cuda::kDecodeLayoutQ4G64V0 ? DecodeDtype::Q4
+                                                   : DecodeDtype::Bf16;
+  d.codes = decode_matrix_view(w.codes.pointer, dtype, w.layout, w.n, w.k,
+                               w.padded_n, w.padded_k, w.codes_bytes, 16);
   if (w.scales_bytes != 0) {
-    d.scales = static_cast<std::byte const*>(w.scales.pointer);
-    d.scales_bytes = w.scales_bytes;
+    d.scales = decode_matrix_view(
+        w.scales.pointer, DecodeDtype::Fp16, w.layout, w.padded_n,
+        w.padded_k / 64u, w.padded_n, w.padded_k / 64u,
+        w.scales_bytes, 2);
   }
   return d;
 }
@@ -365,21 +373,28 @@ std::expected<void, Error> execute_decode_mlp(MlpPlan const& plan) {
   // Region 2: paired gate/up, FP32 SiLU(gate)×up, BF16 SwiGLU scratch only.
   DecodeMmvPairedDesc paired;
   paired.a = mmv_from_weight(plan.gate);
-  paired.a.input = normalized;
-  paired.a.output = swiglu;
+  paired.a.input = decode_vector_view(
+      normalized, DecodeDtype::Bf16, qw38::cuda::kDecodeLayoutBf16VectorV0,
+      paired.a.k, static_cast<std::uint64_t>(paired.a.k) * 2u, 2, false);
+  paired.a.output = decode_vector_view(
+      swiglu, DecodeDtype::Bf16, qw38::cuda::kDecodeLayoutBf16VectorV0,
+      paired.a.n, static_cast<std::uint64_t>(paired.a.n) * 2u, 2, true);
   paired.a.epilogue = DecodeEpilogue::SwigluStoreBf16;
-  paired.codes_b = static_cast<std::byte const*>(plan.up.codes.pointer);
-  paired.scales_b = static_cast<std::byte const*>(plan.up.scales.pointer);
-  paired.codes_b_bytes = plan.up.codes_bytes;
-  paired.scales_b_bytes = plan.up.scales_bytes;
+  paired.b = mmv_from_weight(plan.up);
+  paired.b.input = paired.a.input;
+  paired.b.epilogue = paired.a.epilogue;
   if (auto st = qw38::cuda::launch_decode_mmv_paired(paired, *plan.stream); !st) {
     return std::unexpected(from_cuda(st.error()));
   }
 
   // Region 3: Q4/BF16 down contraction, FP32 add to original h_mid.
   DecodeMmvDesc down = mmv_from_weight(plan.down);
-  down.input = swiglu;
-  down.residual = residual;
+  down.input = decode_vector_view(
+      swiglu, DecodeDtype::Bf16, qw38::cuda::kDecodeLayoutBf16VectorV0,
+      down.k, static_cast<std::uint64_t>(down.k) * 2u, 2, false);
+  down.residual = decode_vector_view(
+      residual, DecodeDtype::Fp32, qw38::cuda::kDecodeLayoutFp32VectorV0,
+      down.n, static_cast<std::uint64_t>(down.n) * 4u, 4, true);
   down.epilogue = DecodeEpilogue::ResidualAddFp32;
   if (auto st = qw38::cuda::launch_decode_mmv(down, *plan.stream); !st) {
     return std::unexpected(from_cuda(st.error()));

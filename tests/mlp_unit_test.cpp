@@ -1,4 +1,5 @@
 #include "mlp_support.hpp"
+#include "decode_mmv_support.hpp"
 
 #include "cuda/error.hpp"
 #include "runtime/runtime.hpp"
@@ -166,12 +167,19 @@ void test_swiglu_epilogue(Stream const& stream) {
   if (!buf) {
     return;
   }
-  d.codes = buf->as_bytes();
-  d.codes_bytes = qw38::cuda::decode_code_bytes(kDecodeLayoutQ4G64V0, 8, 256);
-  d.scales = buf->as_bytes();
-  d.scales_bytes = qw38::cuda::decode_scale_bytes(kDecodeLayoutQ4G64V0, 8, 256);
-  d.input = static_cast<std::uint16_t const*>(buf->data());
-  d.output = buf->data();
+  d.codes = qw38::cuda::decode_matrix_view(
+      buf->data(), qw38::cuda::DecodeDtype::Q4, kDecodeLayoutQ4G64V0,
+      8, 256, 8, 256,
+      qw38::cuda::decode_code_bytes(kDecodeLayoutQ4G64V0, 8, 256), 16);
+  d.scales = qw38::cuda::decode_matrix_view(
+      static_cast<std::byte*>(buf->data()) + 2048,
+      qw38::cuda::DecodeDtype::Fp16, kDecodeLayoutQ4G64V0,
+      8, 4, 8, 4,
+      qw38::cuda::decode_scale_bytes(kDecodeLayoutQ4G64V0, 8, 256), 2);
+  qw38::decode_mmv::test::bind_input(
+      d, static_cast<std::byte*>(buf->data()) + 2112);
+  qw38::decode_mmv::test::bind_output(
+      d, static_cast<std::byte*>(buf->data()) + 3072);
   d.epilogue = DecodeEpilogue::SwigluStoreBf16;
   auto unpaired = launch_decode_mmv(d, stream);
   expect(!unpaired && unpaired.error().code == qw38::cuda::ErrorCode::InvalidArgument,
@@ -201,23 +209,17 @@ void test_swiglu_epilogue(Stream const& stream) {
     return;
   }
   DecodeMmvPairedDesc paired;
-  paired.a.layout = kDecodeLayoutQ4G64V0;
-  paired.a.quantizer = kDecodeQuantizerQ4G64V0;
-  paired.a.n = 8;
-  paired.a.k = 256;
-  paired.a.padded_n = 8;
-  paired.a.padded_k = 256;
-  paired.a.codes = d_cg->as_bytes();
-  paired.a.codes_bytes = pg->codes.size();
-  paired.a.scales = d_sg->as_bytes();
-  paired.a.scales_bytes = pg->scales.size();
-  paired.a.input = static_cast<std::uint16_t const*>(d_x->data());
-  paired.a.output = d_y->data();
-  paired.a.epilogue = DecodeEpilogue::SwigluStoreBf16;
-  paired.codes_b = d_cu->as_bytes();
-  paired.scales_b = d_su->as_bytes();
-  paired.codes_b_bytes = pu->codes.size();
-  paired.scales_b_bytes = pu->scales.size();
+  paired.a = qw38::decode_mmv::test::desc_from_packed(
+      *pg, DecodeEpilogue::SwigluStoreBf16);
+  paired.a.codes.pointer = d_cg->as_bytes();
+  paired.a.scales.pointer = d_sg->as_bytes();
+  qw38::decode_mmv::test::bind_input(paired.a, d_x->data());
+  qw38::decode_mmv::test::bind_output(paired.a, d_y->data());
+  paired.b = qw38::decode_mmv::test::desc_from_packed(
+      *pu, DecodeEpilogue::SwigluStoreBf16);
+  paired.b.codes.pointer = d_cu->as_bytes();
+  paired.b.scales.pointer = d_su->as_bytes();
+  paired.b.input = paired.a.input;
   auto st = launch_decode_mmv_paired(paired, stream);
   expect(static_cast<bool>(st), "small swiglu launch");
   auto got = download_vec<std::uint16_t>(*d_y, 8, stream);

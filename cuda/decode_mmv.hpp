@@ -32,6 +32,60 @@ enum class DecodeEpilogue : std::uint8_t {
   SwigluStoreBf16 = 4,
 };
 
+enum class DecodeMemorySpace : std::uint8_t {
+  Device = 1,
+  Host = 2,
+};
+
+enum class DecodeDtype : std::uint8_t {
+  Q4 = 1,
+  Q8 = 2,
+  Bf16 = 3,
+  Fp16 = 4,
+  Fp32 = 5,
+};
+
+inline constexpr std::uint16_t kDecodeLayoutBf16VectorV0 = 0x0205;
+inline constexpr std::uint16_t kDecodeLayoutFp32VectorV0 = 0x020A;
+
+// Complete borrowed operand metadata at the CUDA launch boundary. Matrix
+// shapes are [N,K]; vectors use logical/padded N with K=1.
+struct DecodeOperandView {
+  void* pointer{};
+  DecodeMemorySpace space{DecodeMemorySpace::Device};
+  DecodeDtype dtype{};
+  std::uint16_t layout{};
+  std::uint32_t logical_n{};
+  std::uint32_t logical_k{};
+  std::uint32_t padded_n{};
+  std::uint32_t padded_k{};
+  std::uint64_t bytes{};
+  std::uint32_t alignment{};
+  bool writable{};
+
+  friend bool operator==(DecodeOperandView const&,
+                         DecodeOperandView const&) = default;
+};
+
+[[nodiscard]] constexpr DecodeOperandView decode_matrix_view(
+    void* pointer, DecodeDtype dtype, std::uint16_t layout,
+    std::uint32_t logical_n, std::uint32_t logical_k,
+    std::uint32_t padded_n, std::uint32_t padded_k, std::uint64_t bytes,
+    std::uint32_t alignment, bool writable = false,
+    DecodeMemorySpace space = DecodeMemorySpace::Device) noexcept {
+  return {pointer, space, dtype, layout, logical_n, logical_k,
+          padded_n, padded_k, bytes, alignment, writable};
+}
+
+[[nodiscard]] constexpr DecodeOperandView decode_vector_view(
+    void* pointer, DecodeDtype dtype, std::uint16_t layout,
+    std::uint32_t elements, std::uint64_t bytes, std::uint32_t alignment,
+    bool writable,
+    DecodeMemorySpace space = DecodeMemorySpace::Device) noexcept {
+  return {pointer, space, dtype, layout, elements, 1, elements, 1,
+          bytes, alignment, writable};
+}
+
 // Sequential CPU GEMV vs warp-tree FP32 reduction. Decoded BF16 operands match
 // TASK-006; this budget covers accumulation-order differences only.
 namespace decode_mmv_tol {
@@ -47,24 +101,17 @@ struct DecodeMmvDesc {
   std::uint32_t k{};
   std::uint32_t padded_n{};
   std::uint32_t padded_k{};
-  std::byte const* codes{};
-  std::byte const* scales{};
-  std::uint64_t codes_bytes{};
-  std::uint64_t scales_bytes{};
-  std::uint16_t const* input{};
-  void* output{};
-  float* residual{};
+  DecodeOperandView codes{};
+  DecodeOperandView scales{};
+  DecodeOperandView input{};
+  DecodeOperandView output{};
+  DecodeOperandView residual{};
   DecodeEpilogue epilogue{DecodeEpilogue::StoreBf16};
 };
 
 struct DecodeMmvPairedDesc {
   DecodeMmvDesc a;
-  std::byte const* codes_b{};
-  std::byte const* scales_b{};
-  std::uint64_t codes_b_bytes{};
-  std::uint64_t scales_b_bytes{};
-  void* output_b{};
-  float* residual_b{};
+  DecodeMmvDesc b;
 };
 
 // One launch, three independent output-N ranges that share K/input/layout.

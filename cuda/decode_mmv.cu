@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <limits>
 
 namespace qw38::cuda {
 namespace {
@@ -229,6 +230,75 @@ bool layout_quantizer_ok(std::uint16_t layout, std::uint16_t quantizer) noexcept
   return false;
 }
 
+DecodeDtype weight_dtype(std::uint16_t layout) noexcept {
+  if (layout == kDecodeLayoutQ4G64V0) {
+    return DecodeDtype::Q4;
+  }
+  if (layout == kDecodeLayoutQ8G32V0) {
+    return DecodeDtype::Q8;
+  }
+  return DecodeDtype::Bf16;
+}
+
+bool same_shape(DecodeOperandView const& v, std::uint32_t logical_n,
+                std::uint32_t logical_k, std::uint32_t padded_n,
+                std::uint32_t padded_k) noexcept {
+  return v.logical_n == logical_n && v.logical_k == logical_k &&
+         v.padded_n == padded_n && v.padded_k == padded_k;
+}
+
+std::expected<void, Error> validate_view(
+    DecodeOperandView const& v, DecodeDtype dtype, std::uint16_t layout,
+    std::uint32_t logical_n, std::uint32_t logical_k,
+    std::uint32_t padded_n, std::uint32_t padded_k, std::uint64_t bytes,
+    std::uint32_t min_alignment, bool writable, std::string_view op,
+    std::string_view name) {
+  if (v.pointer == nullptr || v.space != DecodeMemorySpace::Device ||
+      v.dtype != dtype || v.layout != layout ||
+      !same_shape(v, logical_n, logical_k, padded_n, padded_k) ||
+      v.bytes != bytes || v.alignment < min_alignment ||
+      (v.alignment & (v.alignment - 1u)) != 0u ||
+      (reinterpret_cast<std::uintptr_t>(v.pointer) % v.alignment) != 0u ||
+      v.writable != writable) {
+    return std::unexpected(make_error(
+        ErrorCode::InvalidArgument, op,
+        std::string(name) + " typed view does not match the required contract"));
+  }
+  return {};
+}
+
+bool empty_view(DecodeOperandView const& v) noexcept {
+  return v == DecodeOperandView{};
+}
+
+bool overlaps(DecodeOperandView const& a, DecodeOperandView const& b) noexcept {
+  if (a.pointer == nullptr || b.pointer == nullptr || a.bytes == 0 || b.bytes == 0) {
+    return false;
+  }
+  auto const ab = reinterpret_cast<std::uintptr_t>(a.pointer);
+  auto const bb = reinterpret_cast<std::uintptr_t>(b.pointer);
+  if (a.bytes > std::numeric_limits<std::uintptr_t>::max() - ab ||
+      b.bytes > std::numeric_limits<std::uintptr_t>::max() - bb) {
+    return true;
+  }
+  return ab < bb + b.bytes && bb < ab + a.bytes;
+}
+
+std::expected<void, Error> validate_non_overlap(DecodeMmvDesc const& d,
+                                                std::string_view op) {
+  DecodeOperandView const* views[] = {
+      &d.codes, &d.scales, &d.input, &d.output, &d.residual};
+  for (std::size_t i = 0; i < std::size(views); ++i) {
+    for (std::size_t j = i + 1; j < std::size(views); ++j) {
+      if (overlaps(*views[i], *views[j])) {
+        return std::unexpected(make_error(ErrorCode::InvalidArgument, op,
+                                          "operand views must not overlap"));
+      }
+    }
+  }
+  return {};
+}
+
 std::uint32_t group_size(std::uint16_t layout) noexcept {
   if (layout == kDecodeLayoutQ4G64V0) {
     return 64;
@@ -273,22 +343,32 @@ std::expected<void, Error> validate_geometry(DecodeMmvDesc const& d,
   }
   auto const want_codes = decode_code_bytes(d.layout, d.padded_n, d.padded_k);
   auto const want_scales = decode_scale_bytes(d.layout, d.padded_n, d.padded_k);
-  if (d.codes == nullptr || d.codes_bytes != want_codes) {
-    return std::unexpected(make_error(ErrorCode::InvalidArgument, op,
-                                      "code view length does not match layout"));
+  auto st = validate_view(d.codes, weight_dtype(d.layout), d.layout, d.n, d.k,
+                          d.padded_n, d.padded_k, want_codes, 16, false, op,
+                          "codes");
+  if (!st) {
+    return st;
   }
   if (want_scales == 0) {
-    if (d.scales != nullptr || d.scales_bytes != 0) {
+    if (!empty_view(d.scales)) {
       return std::unexpected(make_error(ErrorCode::InvalidArgument, op,
                                         "BF16 dense tile must not supply scales"));
     }
-  } else if (d.scales == nullptr || d.scales_bytes != want_scales) {
-    return std::unexpected(make_error(ErrorCode::InvalidArgument, op,
-                                      "scale view length does not match layout"));
+  } else {
+    st = validate_view(d.scales, DecodeDtype::Fp16, d.layout, d.padded_n,
+                       d.padded_k / group_size(d.layout), d.padded_n,
+                       d.padded_k / group_size(d.layout), want_scales, 2, false,
+                       op, "scales");
+    if (!st) {
+      return st;
+    }
   }
-  if (d.input == nullptr) {
-    return std::unexpected(
-        make_error(ErrorCode::InvalidArgument, op, "null input"));
+  st = validate_view(d.input, DecodeDtype::Bf16, kDecodeLayoutBf16VectorV0,
+                     d.k, 1, d.k, 1,
+                     static_cast<std::uint64_t>(d.k) * 2u, 2, false, op,
+                     "input");
+  if (!st) {
+    return st;
   }
   if (d.epilogue != DecodeEpilogue::StoreBf16 &&
       d.epilogue != DecodeEpilogue::StoreFp32 &&
@@ -302,15 +382,39 @@ std::expected<void, Error> validate_geometry(DecodeMmvDesc const& d,
                                       "SwiGLU epilogue requires paired gate/up launch"));
   }
   if (d.epilogue == DecodeEpilogue::ResidualAddFp32) {
-    if (d.residual == nullptr) {
+    if (!empty_view(d.output)) {
       return std::unexpected(make_error(ErrorCode::InvalidArgument, op,
-                                        "residual-add requires an FP32 residual"));
+                                        "residual-add must not supply output"));
     }
-  } else if (d.output == nullptr) {
-    return std::unexpected(
-        make_error(ErrorCode::InvalidArgument, op, "null output"));
+    st = validate_view(d.residual, DecodeDtype::Fp32, kDecodeLayoutFp32VectorV0,
+                       d.n, 1, d.n, 1,
+                       static_cast<std::uint64_t>(d.n) * 4u, 4, true, op,
+                       "residual");
+    if (!st) {
+      return st;
+    }
+  } else {
+    if (!empty_view(d.residual)) {
+      return std::unexpected(make_error(ErrorCode::InvalidArgument, op,
+                                        "store epilogue must not supply residual"));
+    }
+    DecodeDtype const out_dtype =
+        (d.epilogue == DecodeEpilogue::StoreFp32) ? DecodeDtype::Fp32
+                                                  : DecodeDtype::Bf16;
+    std::uint16_t const out_layout =
+        (out_dtype == DecodeDtype::Fp32) ? kDecodeLayoutFp32VectorV0
+                                         : kDecodeLayoutBf16VectorV0;
+    std::uint64_t const out_bytes =
+        static_cast<std::uint64_t>(d.n) *
+        ((out_dtype == DecodeDtype::Fp32) ? 4u : 2u);
+    st = validate_view(d.output, out_dtype, out_layout, d.n, 1, d.n, 1,
+                       out_bytes, (out_dtype == DecodeDtype::Fp32) ? 4u : 2u,
+                       true, op, "output");
+    if (!st) {
+      return st;
+    }
   }
-  return {};
+  return validate_non_overlap(d, op);
 }
 
 std::expected<void, Error> validate_paired_side(DecodeMmvPairedDesc const& d,
@@ -319,61 +423,74 @@ std::expected<void, Error> validate_paired_side(DecodeMmvPairedDesc const& d,
   if (!st) {
     return st;
   }
-  auto const want_codes = decode_code_bytes(d.a.layout, d.a.padded_n, d.a.padded_k);
-  auto const want_scales = decode_scale_bytes(d.a.layout, d.a.padded_n, d.a.padded_k);
-  if (d.codes_b == nullptr || d.codes_b_bytes != want_codes) {
-    return std::unexpected(make_error(ErrorCode::InvalidArgument, op,
-                                      "paired code view length does not match layout"));
-  }
-  if (want_scales == 0) {
-    if (d.scales_b != nullptr || d.scales_b_bytes != 0) {
-      return std::unexpected(make_error(ErrorCode::InvalidArgument, op,
-                                        "paired BF16 must not supply scales"));
+  DecodeMmvDesc b_for_validation = d.b;
+  if (d.a.epilogue == DecodeEpilogue::SwigluStoreBf16) {
+    if (!empty_view(d.b.output) || !empty_view(d.b.residual)) {
+      return std::unexpected(make_error(
+          ErrorCode::InvalidArgument, op,
+          "SwiGLU paired B must not declare a separately materialized output"));
     }
-  } else if (d.scales_b == nullptr || d.scales_b_bytes != want_scales) {
-    return std::unexpected(make_error(ErrorCode::InvalidArgument, op,
-                                      "paired scale view length does not match layout"));
+    b_for_validation.output = d.a.output;
   }
-  if (d.a.epilogue == DecodeEpilogue::ResidualAddFp32) {
-    if (d.residual_b == nullptr) {
-      return std::unexpected(make_error(ErrorCode::InvalidArgument, op,
-                                        "paired residual-add requires two FP32 residuals"));
+  st = validate_geometry(b_for_validation, op, true);
+  if (!st) {
+    return st;
+  }
+  if (d.b.layout != d.a.layout || d.b.quantizer != d.a.quantizer ||
+      d.b.n != d.a.n || d.b.k != d.a.k ||
+      d.b.padded_n != d.a.padded_n || d.b.padded_k != d.a.padded_k ||
+      d.b.epilogue != d.a.epilogue || d.b.input.pointer != d.a.input.pointer ||
+      d.b.input != d.a.input) {
+    return std::unexpected(make_error(
+        ErrorCode::InvalidArgument, op,
+        "paired B must match A shape, layout, input, and epilogue contract"));
+  }
+  DecodeOperandView const* av[] = {&d.a.codes, &d.a.scales, &d.a.output,
+                                   &d.a.residual};
+  DecodeOperandView const* bv[] = {&d.b.codes, &d.b.scales, &d.b.output,
+                                   &d.b.residual};
+  for (auto* a : av) {
+    for (auto* b : bv) {
+      if (overlaps(*a, *b)) {
+        return std::unexpected(make_error(ErrorCode::InvalidArgument, op,
+                                          "paired A/B operands must not overlap"));
+      }
     }
-  } else if (d.a.epilogue != DecodeEpilogue::SwigluStoreBf16 &&
-             d.output_b == nullptr) {
-    return std::unexpected(
-        make_error(ErrorCode::InvalidArgument, op, "null paired output"));
   }
   return {};
 }
 
 template <WeightKind Kind, bool Paired>
-std::expected<void, Error> launch_kind(DecodeMmvDesc const& a, std::byte const* codes_b,
-                                       std::byte const* scales_b, void* output_b,
-                                       float* residual_b, Stream const& stream,
+std::expected<void, Error> launch_kind(DecodeMmvDesc const& a,
+                                       DecodeMmvDesc const* b,
+                                       Stream const& stream,
                                        std::string_view op) {
   unsigned const blocks = a.padded_n / static_cast<unsigned>(kDecodeTileRows);
   decode_mmv_kernel<Kind, Paired><<<blocks, kDecodeThreads, 0, stream.native()>>>(
-      a.codes, a.scales, codes_b, scales_b, a.input, a.output, output_b, a.residual,
-      residual_b, a.n, a.k, a.padded_k, a.epilogue);
+      static_cast<std::byte const*>(a.codes.pointer),
+      static_cast<std::byte const*>(a.scales.pointer),
+      b == nullptr ? nullptr : static_cast<std::byte const*>(b->codes.pointer),
+      b == nullptr ? nullptr : static_cast<std::byte const*>(b->scales.pointer),
+      static_cast<std::uint16_t const*>(a.input.pointer), a.output.pointer,
+      b == nullptr ? nullptr : b->output.pointer,
+      static_cast<float*>(a.residual.pointer),
+      b == nullptr ? nullptr : static_cast<float*>(b->residual.pointer),
+      a.n, a.k, a.padded_k, a.epilogue);
   return check(cudaGetLastError(), op);
 }
 
 template <bool Paired>
-std::expected<void, Error> launch_layout(DecodeMmvDesc const& a, std::byte const* codes_b,
-                                         std::byte const* scales_b, void* output_b,
-                                         float* residual_b, Stream const& stream,
+std::expected<void, Error> launch_layout(DecodeMmvDesc const& a,
+                                         DecodeMmvDesc const* b,
+                                         Stream const& stream,
                                          std::string_view op) {
   if (a.layout == kDecodeLayoutQ4G64V0) {
-    return launch_kind<WeightKind::Q4, Paired>(a, codes_b, scales_b, output_b, residual_b,
-                                               stream, op);
+    return launch_kind<WeightKind::Q4, Paired>(a, b, stream, op);
   }
   if (a.layout == kDecodeLayoutQ8G32V0) {
-    return launch_kind<WeightKind::Q8, Paired>(a, codes_b, scales_b, output_b, residual_b,
-                                               stream, op);
+    return launch_kind<WeightKind::Q8, Paired>(a, b, stream, op);
   }
-  return launch_kind<WeightKind::Bf16, Paired>(a, codes_b, scales_b, output_b, residual_b,
-                                              stream, op);
+  return launch_kind<WeightKind::Bf16, Paired>(a, b, stream, op);
 }
 
 template <WeightKind Kind>
@@ -470,8 +587,7 @@ std::expected<void, Error> launch_decode_mmv(DecodeMmvDesc const& desc,
   if (!st) {
     return st;
   }
-  return launch_layout<false>(desc, nullptr, nullptr, nullptr, nullptr, stream,
-                              "decode_mmv_kernel");
+  return launch_layout<false>(desc, nullptr, stream, "decode_mmv_kernel");
 }
 
 std::expected<void, Error> launch_decode_mmv_paired(DecodeMmvPairedDesc const& desc,
@@ -484,8 +600,8 @@ std::expected<void, Error> launch_decode_mmv_paired(DecodeMmvPairedDesc const& d
   if (!st) {
     return st;
   }
-  return launch_layout<true>(desc.a, desc.codes_b, desc.scales_b, desc.output_b,
-                             desc.residual_b, stream, "decode_mmv_paired_kernel");
+  return launch_layout<true>(desc.a, &desc.b, stream,
+                             "decode_mmv_paired_kernel");
 }
 
 std::expected<void, Error> launch_decode_ab_bf16(DecodeMmvPairedDesc const& desc,
@@ -507,8 +623,7 @@ std::expected<void, Error> launch_decode_ab_bf16(DecodeMmvPairedDesc const& desc
   if (!st) {
     return st;
   }
-  return launch_layout<true>(desc.a, desc.codes_b, desc.scales_b, desc.output_b,
-                             desc.residual_b, stream, "decode_ab_bf16_kernel");
+  return launch_layout<true>(desc.a, &desc.b, stream, "decode_ab_bf16_kernel");
 }
 
 std::expected<void, Error> launch_decode_mmv_ranges(DecodeMmvRangeDesc const& desc,
@@ -533,10 +648,29 @@ std::expected<void, Error> launch_decode_mmv_ranges(DecodeMmvRangeDesc const& de
   if (!st) {
     return st;
   }
-  if (desc.qg.output == desc.k.output || desc.qg.output == desc.v.output ||
-      desc.k.output == desc.v.output) {
+  if (overlaps(desc.qg.output, desc.k.output) ||
+      overlaps(desc.qg.output, desc.v.output) ||
+      overlaps(desc.k.output, desc.v.output)) {
     return std::unexpected(make_error(ErrorCode::InvalidArgument, "decode_mmv_ranges",
                                       "q/g, k, and v outputs must be distinct"));
+  }
+  DecodeMmvDesc const* sides[] = {&desc.qg, &desc.k, &desc.v};
+  for (std::size_t i = 0; i < std::size(sides); ++i) {
+    for (std::size_t j = i + 1; j < std::size(sides); ++j) {
+      DecodeOperandView const* left[] = {
+          &sides[i]->codes, &sides[i]->scales, &sides[i]->output};
+      DecodeOperandView const* right[] = {
+          &sides[j]->codes, &sides[j]->scales, &sides[j]->output};
+      for (auto* a : left) {
+        for (auto* b : right) {
+          if (overlaps(*a, *b)) {
+            return std::unexpected(make_error(
+                ErrorCode::InvalidArgument, "decode_mmv_ranges",
+                "q/g, k, and v operand spans must not overlap"));
+          }
+        }
+      }
+    }
   }
   unsigned const tiles0 =
       desc.qg.padded_n / static_cast<unsigned>(kDecodeTileRows);
@@ -548,23 +682,44 @@ std::expected<void, Error> launch_decode_mmv_ranges(DecodeMmvRangeDesc const& de
   if (desc.qg.layout == kDecodeLayoutQ4G64V0) {
     decode_mmv_ranges_kernel<WeightKind::Q4>
         <<<blocks, kDecodeThreads, 0, stream.native()>>>(
-            desc.qg.codes, desc.qg.scales, desc.qg.output, desc.qg.n, tiles0,
-            desc.k.codes, desc.k.scales, desc.k.output, desc.k.n, tiles1,
-            desc.v.codes, desc.v.scales, desc.v.output, desc.v.n, desc.qg.input,
+            static_cast<std::byte const*>(desc.qg.codes.pointer),
+            static_cast<std::byte const*>(desc.qg.scales.pointer),
+            desc.qg.output.pointer, desc.qg.n, tiles0,
+            static_cast<std::byte const*>(desc.k.codes.pointer),
+            static_cast<std::byte const*>(desc.k.scales.pointer),
+            desc.k.output.pointer, desc.k.n, tiles1,
+            static_cast<std::byte const*>(desc.v.codes.pointer),
+            static_cast<std::byte const*>(desc.v.scales.pointer),
+            desc.v.output.pointer, desc.v.n,
+            static_cast<std::uint16_t const*>(desc.qg.input.pointer),
             desc.qg.k, desc.qg.padded_k);
   } else if (desc.qg.layout == kDecodeLayoutQ8G32V0) {
     decode_mmv_ranges_kernel<WeightKind::Q8>
         <<<blocks, kDecodeThreads, 0, stream.native()>>>(
-            desc.qg.codes, desc.qg.scales, desc.qg.output, desc.qg.n, tiles0,
-            desc.k.codes, desc.k.scales, desc.k.output, desc.k.n, tiles1,
-            desc.v.codes, desc.v.scales, desc.v.output, desc.v.n, desc.qg.input,
+            static_cast<std::byte const*>(desc.qg.codes.pointer),
+            static_cast<std::byte const*>(desc.qg.scales.pointer),
+            desc.qg.output.pointer, desc.qg.n, tiles0,
+            static_cast<std::byte const*>(desc.k.codes.pointer),
+            static_cast<std::byte const*>(desc.k.scales.pointer),
+            desc.k.output.pointer, desc.k.n, tiles1,
+            static_cast<std::byte const*>(desc.v.codes.pointer),
+            static_cast<std::byte const*>(desc.v.scales.pointer),
+            desc.v.output.pointer, desc.v.n,
+            static_cast<std::uint16_t const*>(desc.qg.input.pointer),
             desc.qg.k, desc.qg.padded_k);
   } else {
     decode_mmv_ranges_kernel<WeightKind::Bf16>
         <<<blocks, kDecodeThreads, 0, stream.native()>>>(
-            desc.qg.codes, desc.qg.scales, desc.qg.output, desc.qg.n, tiles0,
-            desc.k.codes, desc.k.scales, desc.k.output, desc.k.n, tiles1,
-            desc.v.codes, desc.v.scales, desc.v.output, desc.v.n, desc.qg.input,
+            static_cast<std::byte const*>(desc.qg.codes.pointer),
+            static_cast<std::byte const*>(desc.qg.scales.pointer),
+            desc.qg.output.pointer, desc.qg.n, tiles0,
+            static_cast<std::byte const*>(desc.k.codes.pointer),
+            static_cast<std::byte const*>(desc.k.scales.pointer),
+            desc.k.output.pointer, desc.k.n, tiles1,
+            static_cast<std::byte const*>(desc.v.codes.pointer),
+            static_cast<std::byte const*>(desc.v.scales.pointer),
+            desc.v.output.pointer, desc.v.n,
+            static_cast<std::uint16_t const*>(desc.qg.input.pointer),
             desc.qg.k, desc.qg.padded_k);
   }
   return check(cudaGetLastError(), "decode_mmv_ranges_kernel");

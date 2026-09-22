@@ -28,6 +28,9 @@ using qw38::decode_mmv::test::download_vec;
 using qw38::decode_mmv::test::upload_vec;
 using qw38::decode_mmv::test::bf16_matrix;
 using qw38::decode_mmv::test::bf16_vec;
+using qw38::decode_mmv::test::bind_input;
+using qw38::decode_mmv::test::bind_output;
+using qw38::decode_mmv::test::bind_residual;
 using qw38::decode_mmv::test::desc_from_packed;
 using qw38::decode_mmv::test::expect;
 using qw38::decode_mmv::test::expect_bf16_close;
@@ -63,10 +66,10 @@ bool compare_cuda(PackedMatrix const& packed, std::vector<std::uint16_t> const& 
     return false;
   }
   DecodeMmvDesc d = desc_from_packed(packed, epi);
-  d.codes = d_codes->as_bytes();
-  d.input = static_cast<std::uint16_t const*>(d_x->data());
+  d.codes.pointer = d_codes->as_bytes();
+  bind_input(d, d_x->data());
   if (!packed.scales.empty()) {
-    d.scales = d_scales->as_bytes();
+    d.scales.pointer = d_scales->as_bytes();
   }
   if (epi == DecodeEpilogue::StoreBf16) {
     auto d_y = DeviceBuffer::allocate(packed.logical_n * 2);
@@ -74,7 +77,7 @@ bool compare_cuda(PackedMatrix const& packed, std::vector<std::uint16_t> const& 
       fail(std::string(tag) + " alloc");
       return false;
     }
-    d.output = d_y->data();
+    bind_output(d, d_y->data());
     auto st = launch_decode_mmv(d, stream);
     if (!st) {
       fail(std::string(tag) + " launch: " + qw38::cuda::error_message(st.error()));
@@ -95,7 +98,7 @@ bool compare_cuda(PackedMatrix const& packed, std::vector<std::uint16_t> const& 
       fail(std::string(tag) + " alloc");
       return false;
     }
-    d.output = d_y->data();
+    bind_output(d, d_y->data());
     auto st = launch_decode_mmv(d, stream);
     if (!st) {
       fail(std::string(tag) + " launch: " + qw38::cuda::error_message(st.error()));
@@ -116,7 +119,7 @@ bool compare_cuda(PackedMatrix const& packed, std::vector<std::uint16_t> const& 
     fail(std::string(tag) + " residual upload");
     return false;
   }
-  d.residual = static_cast<float*>(d_r->data());
+  bind_residual(d, d_r->data());
   auto st = launch_decode_mmv(d, stream);
   if (!st) {
     fail(std::string(tag) + " launch: " + qw38::cuda::error_message(st.error()));
@@ -193,15 +196,15 @@ void mlp_paired(Stream const& stream) {
   }
   DecodeMmvPairedDesc d;
   d.a = desc_from_packed(*pg, DecodeEpilogue::StoreBf16);
-  d.a.codes = d_cg->as_bytes();
-  d.a.scales = d_sg->as_bytes();
-  d.a.input = static_cast<std::uint16_t const*>(d_x->data());
-  d.a.output = d_yg->data();
-  d.codes_b = d_cu->as_bytes();
-  d.scales_b = d_su->as_bytes();
-  d.codes_b_bytes = pu->codes.size();
-  d.scales_b_bytes = pu->scales.size();
-  d.output_b = d_yu->data();
+  d.a.codes.pointer = d_cg->as_bytes();
+  d.a.scales.pointer = d_sg->as_bytes();
+  bind_input(d.a, d_x->data());
+  bind_output(d.a, d_yg->data());
+  d.b = desc_from_packed(*pu, DecodeEpilogue::StoreBf16);
+  d.b.codes.pointer = d_cu->as_bytes();
+  d.b.scales.pointer = d_su->as_bytes();
+  d.b.input = d.a.input;
+  bind_output(d.b, d_yu->data());
   auto st = launch_decode_mmv_paired(d, stream);
   if (!st) {
     fail("mlp paired launch: " + qw38::cuda::error_message(st.error()));
@@ -242,12 +245,13 @@ void gdn_ab(Stream const& stream) {
   }
   DecodeMmvPairedDesc d;
   d.a = desc_from_packed(*pa, DecodeEpilogue::StoreFp32);
-  d.a.codes = d_ca->as_bytes();
-  d.a.input = static_cast<std::uint16_t const*>(d_x->data());
-  d.a.output = d_ya->data();
-  d.codes_b = d_cb->as_bytes();
-  d.codes_b_bytes = pb->codes.size();
-  d.output_b = d_yb->data();
+  d.a.codes.pointer = d_ca->as_bytes();
+  bind_input(d.a, d_x->data());
+  bind_output(d.a, d_ya->data());
+  d.b = desc_from_packed(*pb, DecodeEpilogue::StoreFp32);
+  d.b.codes.pointer = d_cb->as_bytes();
+  d.b.input = d.a.input;
+  bind_output(d.b, d_yb->data());
   auto st = launch_decode_ab_bf16(d, stream);
   if (!st) {
     fail("gdn a/b launch: " + qw38::cuda::error_message(st.error()));

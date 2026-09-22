@@ -13,6 +13,7 @@
 #include <vector>
 
 using qw38::cuda::DecodeEpilogue;
+using qw38::cuda::DecodeDtype;
 using qw38::cuda::DecodeMmvDesc;
 using qw38::cuda::DecodeMmvPairedDesc;
 using qw38::cuda::DeviceBuffer;
@@ -165,13 +166,24 @@ int main() {
     d.k = c.k;
     d.padded_n = pn;
     d.padded_k = pk;
-    d.codes = codes->as_bytes();
-    d.codes_bytes = code_n;
+    DecodeDtype const weight_dtype =
+        c.layout == kDecodeLayoutQ4G64V0
+            ? DecodeDtype::Q4
+            : (c.layout == kDecodeLayoutQ8G32V0 ? DecodeDtype::Q8
+                                                 : DecodeDtype::Bf16);
+    d.codes = qw38::cuda::decode_matrix_view(
+        codes->data(), weight_dtype, c.layout, c.n, c.k, pn, pk, code_n, 16);
     if (scale_n != 0) {
-      d.scales = scales->as_bytes();
-      d.scales_bytes = scale_n;
+      std::uint32_t const group =
+          c.layout == kDecodeLayoutQ4G64V0 ? 64u : 32u;
+      d.scales = qw38::cuda::decode_matrix_view(
+          scales->data(), DecodeDtype::Fp16, c.layout, pn, pk / group,
+          pn, pk / group, scale_n, 2);
     }
-    d.input = static_cast<std::uint16_t const*>(input->data());
+    d.input = qw38::cuda::decode_vector_view(
+        input->data(), DecodeDtype::Bf16,
+        qw38::cuda::kDecodeLayoutBf16VectorV0, c.k,
+        static_cast<std::uint64_t>(c.k) * 2u, 2, false);
     d.epilogue = c.epi;
 
     std::expected<DeviceBuffer, qw38::cuda::Error> out;
@@ -186,19 +198,28 @@ int main() {
       if (!zo) {
         return 1;
       }
-      d.residual = static_cast<float*>(out->data());
+      d.residual = qw38::cuda::decode_vector_view(
+          out->data(), DecodeDtype::Fp32,
+          qw38::cuda::kDecodeLayoutFp32VectorV0, c.n,
+          static_cast<std::uint64_t>(c.n) * 4u, 4, true);
     } else if (c.epi == DecodeEpilogue::StoreFp32) {
       out = DeviceBuffer::allocate(static_cast<std::uint64_t>(c.n) * 4);
       if (!out) {
         return 1;
       }
-      d.output = out->data();
+      d.output = qw38::cuda::decode_vector_view(
+          out->data(), DecodeDtype::Fp32,
+          qw38::cuda::kDecodeLayoutFp32VectorV0, c.n,
+          static_cast<std::uint64_t>(c.n) * 4u, 4, true);
     } else {
       out = DeviceBuffer::allocate(static_cast<std::uint64_t>(c.n) * 2);
       if (!out) {
         return 1;
       }
-      d.output = out->data();
+      d.output = qw38::cuda::decode_vector_view(
+          out->data(), DecodeDtype::Bf16,
+          qw38::cuda::kDecodeLayoutBf16VectorV0, c.n,
+          static_cast<std::uint64_t>(c.n) * 2u, 2, true);
     }
 
     float ms = 0.0f;
@@ -216,9 +237,12 @@ int main() {
       }
       DecodeMmvPairedDesc p;
       p.a = d;
-      p.codes_b = codes_b->as_bytes();
-      p.codes_b_bytes = code_n;
-      p.output_b = out_b->data();
+      p.b = d;
+      p.b.codes.pointer = codes_b->data();
+      p.b.output = qw38::cuda::decode_vector_view(
+          out_b->data(), DecodeDtype::Fp32,
+          qw38::cuda::kDecodeLayoutFp32VectorV0, c.n,
+          static_cast<std::uint64_t>(c.n) * 4u, 4, true);
       for (int i = 0; i < 2; ++i) {
         auto st = launch_decode_ab_bf16(p, *stream);
         if (!st) {

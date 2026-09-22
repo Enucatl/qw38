@@ -22,6 +22,9 @@ using qw38::cuda::launch_decode_ab_bf16;
 using qw38::cuda::launch_decode_mmv;
 using qw38::cuda::launch_decode_mmv_paired;
 using qw38::decode_mmv::test::desc_from_packed;
+using qw38::decode_mmv::test::bind_input;
+using qw38::decode_mmv::test::bind_output;
+using qw38::decode_mmv::test::bind_residual;
 using qw38::decode_mmv::test::download_vec;
 using qw38::decode_mmv::test::expect;
 using qw38::decode_mmv::test::expect_bf16_close;
@@ -38,7 +41,7 @@ using qw38::format::pack_cuda_v0;
 namespace {
 
 void test_launch_validation(Stream const& stream) {
-  auto buf = DeviceBuffer::allocate(4096);
+  auto buf = DeviceBuffer::allocate(16384);
   expect(static_cast<bool>(buf), "tiny buffer");
   if (!buf) {
     return;
@@ -50,12 +53,15 @@ void test_launch_validation(Stream const& stream) {
   d.k = 256;
   d.padded_n = 8;
   d.padded_k = 256;
-  d.codes = buf->as_bytes();
-  d.codes_bytes = decode_code_bytes(kDecodeLayoutQ4G64V0, 8, 256);
-  d.scales = buf->as_bytes();
-  d.scales_bytes = decode_scale_bytes(kDecodeLayoutQ4G64V0, 8, 256);
-  d.input = static_cast<std::uint16_t const*>(buf->data());
-  d.output = buf->data();
+  d.codes = qw38::cuda::decode_matrix_view(
+      buf->data(), qw38::cuda::DecodeDtype::Q4, kDecodeLayoutQ4G64V0,
+      8, 256, 8, 256, decode_code_bytes(kDecodeLayoutQ4G64V0, 8, 256), 16);
+  d.scales = qw38::cuda::decode_matrix_view(
+      static_cast<std::byte*>(buf->data()) + 2048,
+      qw38::cuda::DecodeDtype::Fp16, kDecodeLayoutQ4G64V0,
+      8, 4, 8, 4, decode_scale_bytes(kDecodeLayoutQ4G64V0, 8, 256), 2);
+  bind_input(d, static_cast<std::byte*>(buf->data()) + 2112);
+  bind_output(d, static_cast<std::byte*>(buf->data()) + 3072);
   auto mismatch = launch_decode_mmv(d, stream);
   expect(!mismatch && mismatch.error().code == ErrorCode::InvalidArgument,
          "layout/quantizer mismatch rejects");
@@ -86,14 +92,14 @@ void test_launch_validation(Stream const& stream) {
   d.k = 256;
   d.padded_k = 256;
 
-  d.codes_bytes = 4;
+  d.codes.bytes = 4;
   auto bad_codes = launch_decode_mmv(d, stream);
   expect(!bad_codes && bad_codes.error().code == ErrorCode::InvalidArgument,
          "code length mismatch rejects");
-  d.codes_bytes = decode_code_bytes(kDecodeLayoutQ4G64V0, 8, 256);
+  d.codes.bytes = decode_code_bytes(kDecodeLayoutQ4G64V0, 8, 256);
 
   d.epilogue = DecodeEpilogue::ResidualAddFp32;
-  d.residual = nullptr;
+  d.output = {};
   auto bad_res = launch_decode_mmv(d, stream);
   expect(!bad_res && bad_res.error().code == ErrorCode::InvalidArgument,
          "residual-add without residual rejects");
@@ -105,17 +111,73 @@ void test_launch_validation(Stream const& stream) {
   ab.a.k = 256;
   ab.a.padded_n = 8;
   ab.a.padded_k = 256;
-  ab.a.codes = buf->as_bytes();
-  ab.a.codes_bytes = decode_code_bytes(kDecodeLayoutBf16DenseTileV0, 8, 256);
-  ab.a.input = static_cast<std::uint16_t const*>(buf->data());
-  ab.a.output = buf->data();
+  ab.a.codes = qw38::cuda::decode_matrix_view(
+      buf->data(), qw38::cuda::DecodeDtype::Bf16,
+      kDecodeLayoutBf16DenseTileV0, 8, 256, 8, 256,
+      decode_code_bytes(kDecodeLayoutBf16DenseTileV0, 8, 256), 16);
+  bind_input(ab.a, static_cast<std::byte*>(buf->data()) + 2048);
+  bind_output(ab.a, static_cast<std::byte*>(buf->data()) + 3072);
   ab.a.epilogue = DecodeEpilogue::StoreBf16;
-  ab.codes_b = buf->as_bytes();
-  ab.codes_b_bytes = ab.a.codes_bytes;
-  ab.output_b = buf->data();
+  ab.b = ab.a;
+  ab.b.codes.pointer = static_cast<std::byte*>(buf->data()) + 4096;
   auto ab_wrong = launch_decode_ab_bf16(ab, stream);
   expect(!ab_wrong && ab_wrong.error().code == ErrorCode::InvalidArgument,
          "a/b requires FP32 epilogue");
+
+  auto make_q4 = [&](std::uint32_t n, std::uint32_t k, std::uint64_t off) {
+    DecodeMmvDesc x;
+    x.layout = kDecodeLayoutQ4G64V0;
+    x.quantizer = kDecodeQuantizerQ4G64V0;
+    x.n = n;
+    x.k = k;
+    x.padded_n = qw38::cuda::decode_pad_n(n);
+    x.padded_k = decode_pad_k(k);
+    x.codes = qw38::cuda::decode_matrix_view(
+        static_cast<std::byte*>(buf->data()) + off,
+        qw38::cuda::DecodeDtype::Q4, x.layout, n, k, x.padded_n, x.padded_k,
+        decode_code_bytes(x.layout, x.padded_n, x.padded_k), 16);
+    x.scales = qw38::cuda::decode_matrix_view(
+        static_cast<std::byte*>(buf->data()) + off + 2048,
+        qw38::cuda::DecodeDtype::Fp16, x.layout, x.padded_n, x.padded_k / 64u,
+        x.padded_n, x.padded_k / 64u,
+        decode_scale_bytes(x.layout, x.padded_n, x.padded_k), 2);
+    bind_input(x, static_cast<std::byte*>(buf->data()) + 8192);
+    bind_output(x, static_cast<std::byte*>(buf->data()) + off + 3072);
+    return x;
+  };
+  DecodeMmvPairedDesc shape_mismatch;
+  shape_mismatch.a = make_q4(8, 512, 0);
+  shape_mismatch.b = make_q4(16, 256, 4096);
+  shape_mismatch.b.input =
+      qw38::cuda::decode_vector_view(
+          shape_mismatch.a.input.pointer, qw38::cuda::DecodeDtype::Bf16,
+          qw38::cuda::kDecodeLayoutBf16VectorV0, 256, 512, 2, false);
+  auto bad_shape = launch_decode_mmv_paired(shape_mismatch, stream);
+  expect(!bad_shape && bad_shape.error().code == ErrorCode::InvalidArgument,
+         "equal-byte differently shaped paired B rejects");
+
+  DecodeMmvPairedDesc format_mismatch;
+  format_mismatch.a = make_q4(16, 256, 0);
+  format_mismatch.b = format_mismatch.a;
+  format_mismatch.b.layout = qw38::cuda::kDecodeLayoutQ8G32V0;
+  format_mismatch.b.quantizer = kDecodeQuantizerQ8G32V0;
+  format_mismatch.b.n = 8;
+  format_mismatch.b.padded_n = 8;
+  format_mismatch.b.codes = qw38::cuda::decode_matrix_view(
+      static_cast<std::byte*>(buf->data()) + 4096,
+      qw38::cuda::DecodeDtype::Q8, format_mismatch.b.layout, 8, 256, 8, 256,
+      2048, 16);
+  format_mismatch.b.scales = qw38::cuda::decode_matrix_view(
+      static_cast<std::byte*>(buf->data()) + 6144,
+      qw38::cuda::DecodeDtype::Fp16, format_mismatch.b.layout, 8, 8, 8, 8,
+      128, 2);
+  format_mismatch.b.output = qw38::cuda::decode_vector_view(
+      static_cast<std::byte*>(buf->data()) + 7168,
+      qw38::cuda::DecodeDtype::Bf16,
+      qw38::cuda::kDecodeLayoutBf16VectorV0, 8, 16, 2, true);
+  auto bad_format = launch_decode_mmv_paired(format_mismatch, stream);
+  expect(!bad_format && bad_format.error().code == ErrorCode::InvalidArgument,
+         "equal-byte differently formatted paired B rejects");
 }
 
 void test_padding_and_epilogues(Stream const& stream) {
@@ -147,10 +209,30 @@ void test_padding_and_epilogues(Stream const& stream) {
   }
 
   DecodeMmvDesc d = desc_from_packed(*packed, DecodeEpilogue::StoreFp32);
-  d.codes = d_codes->as_bytes();
-  d.scales = d_scales->as_bytes();
-  d.input = static_cast<std::uint16_t const*>(d_x->data());
-  d.output = d_y->data();
+  d.codes.pointer = d_codes->as_bytes();
+  d.scales.pointer = d_scales->as_bytes();
+  bind_input(d, d_x->data());
+  bind_output(d, d_y->data());
+  auto bad_space = d;
+  bad_space.input.space = qw38::cuda::DecodeMemorySpace::Host;
+  expect(!launch_decode_mmv(bad_space, stream),
+         "host input typed view rejects");
+  auto bad_dtype = d;
+  bad_dtype.output.dtype = qw38::cuda::DecodeDtype::Bf16;
+  expect(!launch_decode_mmv(bad_dtype, stream),
+         "epilogue output dtype mismatch rejects");
+  auto bad_write = d;
+  bad_write.codes.writable = true;
+  expect(!launch_decode_mmv(bad_write, stream),
+         "writable weight typed view rejects");
+  auto bad_alignment = d;
+  bad_alignment.codes.alignment = 8;
+  expect(!launch_decode_mmv(bad_alignment, stream),
+         "insufficient weight alignment rejects");
+  auto bad_overlap = d;
+  bad_overlap.output.pointer = bad_overlap.input.pointer;
+  expect(!launch_decode_mmv(bad_overlap, stream),
+         "overlapping input/output spans reject");
   auto st = launch_decode_mmv(d, stream);
   expect(static_cast<bool>(st), "pad fp32 launch");
   auto got = download_vec<float>(*d_y, 20, stream);
@@ -161,7 +243,7 @@ void test_padding_and_epilogues(Stream const& stream) {
   }
 
   d.epilogue = DecodeEpilogue::StoreBf16;
-  d.output = d_h->data();
+  bind_output(d, d_h->data());
   st = launch_decode_mmv(d, stream);
   expect(static_cast<bool>(st), "pad bf16 launch");
   auto got_h = download_vec<std::uint16_t>(*d_h, 20, stream);
@@ -172,8 +254,7 @@ void test_padding_and_epilogues(Stream const& stream) {
   }
 
   d.epilogue = DecodeEpilogue::ResidualAddFp32;
-  d.output = nullptr;
-  d.residual = static_cast<float*>(d_r->data());
+  bind_residual(d, d_r->data());
   st = launch_decode_mmv(d, stream);
   expect(static_cast<bool>(st), "pad residual launch");
   auto got_r = download_vec<float>(*d_r, 20, stream);
@@ -207,10 +288,10 @@ void test_zero_and_extreme(Stream const& stream) {
       return;
     }
     DecodeMmvDesc d = desc_from_packed(*packed, DecodeEpilogue::StoreFp32);
-    d.codes = d_codes->as_bytes();
-    d.scales = d_scales->as_bytes();
-    d.input = static_cast<std::uint16_t const*>(d_x->data());
-    d.output = d_y->data();
+    d.codes.pointer = d_codes->as_bytes();
+    d.scales.pointer = d_scales->as_bytes();
+    bind_input(d, d_x->data());
+    bind_output(d, d_y->data());
     auto st = launch_decode_mmv(d, stream);
     expect(static_cast<bool>(st), "zero launch");
     auto got = download_vec<float>(*d_y, 8, stream);
@@ -240,10 +321,10 @@ void test_zero_and_extreme(Stream const& stream) {
       return;
     }
     DecodeMmvDesc d = desc_from_packed(*packed, DecodeEpilogue::StoreFp32);
-    d.codes = d_codes->as_bytes();
-    d.scales = d_scales->as_bytes();
-    d.input = static_cast<std::uint16_t const*>(d_x->data());
-    d.output = d_y->data();
+    d.codes.pointer = d_codes->as_bytes();
+    d.scales.pointer = d_scales->as_bytes();
+    bind_input(d, d_x->data());
+    bind_output(d, d_y->data());
     auto st = launch_decode_mmv(d, stream);
     expect(static_cast<bool>(st), "extreme launch");
     auto got = download_vec<float>(*d_y, 8, stream);
