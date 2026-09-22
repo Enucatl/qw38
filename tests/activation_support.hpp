@@ -6,9 +6,11 @@
 #include "cuda/stream.hpp"
 #include "format/floatcvt.hpp"
 
+#include <cmath>
 #include <cstdint>
 #include <expected>
 #include <iostream>
+#include <limits>
 #include <span>
 #include <string>
 #include <string_view>
@@ -75,19 +77,49 @@ inline float f32(std::uint16_t h) {
   return qw38::format::bf16_to_fp32(h);
 }
 
-inline bool almost_equal(float a, float b, float abs_tol, float rel_tol = 0.0f) {
-  float const d = a > b ? a - b : b - a;
+enum class NonFiniteComparison {
+  reject,
+  allow_matching,
+};
+
+inline bool matching_non_finite(float a, float b) {
+  return (std::isnan(a) && std::isnan(b)) ||
+         (std::isinf(a) && a == b);
+}
+
+inline float abs_diff(
+    float a, float b,
+    NonFiniteComparison non_finite = NonFiniteComparison::reject) {
+  if (!std::isfinite(a) || !std::isfinite(b)) {
+    if (non_finite == NonFiniteComparison::allow_matching &&
+        matching_non_finite(a, b)) {
+      return 0.0f;
+    }
+    return std::numeric_limits<float>::infinity();
+  }
+  return a > b ? a - b : b - a;
+}
+
+inline bool almost_equal(
+    float a, float b, float abs_tol, float rel_tol = 0.0f,
+    NonFiniteComparison non_finite = NonFiniteComparison::reject) {
+  float const d = abs_diff(a, b, non_finite);
+  if (!std::isfinite(d)) {
+    return false;
+  }
   float const scale = (a > 0 ? a : -a) > (b > 0 ? b : -b)
                           ? (a > 0 ? a : -a)
                           : (b > 0 ? b : -b);
   return d <= abs_tol || d <= rel_tol * (scale + 1.0e-12f);
 }
 
-inline float max_abs_diff(std::span<float const> a, std::span<float const> b) {
+inline float max_abs_diff(
+    std::span<float const> a, std::span<float const> b,
+    NonFiniteComparison non_finite = NonFiniteComparison::reject) {
   float m = 0.0f;
   auto n = a.size() < b.size() ? a.size() : b.size();
   for (std::size_t i = 0; i < n; ++i) {
-    float d = a[i] > b[i] ? a[i] - b[i] : b[i] - a[i];
+    float const d = abs_diff(a[i], b[i], non_finite);
     if (d > m) {
       m = d;
     }
@@ -96,13 +128,15 @@ inline float max_abs_diff(std::span<float const> a, std::span<float const> b) {
 }
 
 inline float max_abs_diff_bf16(std::span<std::uint16_t const> a,
-                               std::span<std::uint16_t const> b) {
+                               std::span<std::uint16_t const> b,
+                               NonFiniteComparison non_finite =
+                                   NonFiniteComparison::reject) {
   float m = 0.0f;
   auto n = a.size() < b.size() ? a.size() : b.size();
   for (std::size_t i = 0; i < n; ++i) {
     float fa = f32(a[i]);
     float fb = f32(b[i]);
-    float d = fa > fb ? fa - fb : fb - fa;
+    float const d = abs_diff(fa, fb, non_finite);
     if (d > m) {
       m = d;
     }

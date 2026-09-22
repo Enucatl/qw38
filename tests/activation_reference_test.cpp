@@ -19,7 +19,9 @@ using qw38::activation::test::download_vec;
 using qw38::activation::test::expect;
 using qw38::activation::test::fail;
 using qw38::activation::test::g_failures;
+using qw38::activation::test::max_abs_diff;
 using qw38::activation::test::max_abs_diff_bf16;
+using qw38::activation::test::NonFiniteComparison;
 using qw38::activation::test::upload_vec;
 using qw38::cuda::DeviceBuffer;
 using qw38::cuda::ErrorCode;
@@ -52,6 +54,57 @@ std::vector<std::uint16_t> ramp_h(std::uint32_t n, float scale) {
 
 std::vector<std::uint16_t> filled_h(std::uint32_t n, float v) {
   return std::vector<std::uint16_t>(n, bf16(v));
+}
+
+void test_comparison_helpers() {
+  float const nan = std::numeric_limits<float>::quiet_NaN();
+  float const inf = std::numeric_limits<float>::infinity();
+  auto const allow_matching = NonFiniteComparison::allow_matching;
+
+  expect(!almost_equal(1.0f, nan, 0.0f), "finite and NaN differ");
+  expect(!almost_equal(nan, nan, 0.0f), "NaN pair rejected by default");
+  expect(almost_equal(nan, nan, 0.0f, 0.0f, allow_matching),
+         "NaN pair accepted when explicitly allowed");
+  expect(!almost_equal(inf, inf, 0.0f),
+         "infinity pair rejected by default");
+  expect(almost_equal(inf, inf, 0.0f, 0.0f, allow_matching),
+         "matching positive infinities accepted when explicitly allowed");
+  expect(almost_equal(-inf, -inf, 0.0f, 0.0f, allow_matching),
+         "matching negative infinities accepted when explicitly allowed");
+  expect(!almost_equal(inf, -inf, 0.0f, 0.0f, allow_matching),
+         "opposite infinities differ");
+
+  expect(std::isinf(max_abs_diff(std::vector<float>{1.0f},
+                                 std::vector<float>{nan})),
+         "FP32 max diff rejects finite and NaN");
+  expect(std::isinf(max_abs_diff(std::vector<float>{nan},
+                                 std::vector<float>{nan})),
+         "FP32 max diff rejects NaN pair by default");
+  expect(max_abs_diff(std::vector<float>{nan}, std::vector<float>{nan},
+                      allow_matching) == 0.0f,
+         "FP32 max diff explicitly accepts NaN pair");
+
+  std::uint16_t const nan_bf16 = bf16(nan);
+  std::uint16_t const inf_bf16 = bf16(inf);
+  std::uint16_t const neg_inf_bf16 = bf16(-inf);
+  expect(std::isinf(max_abs_diff_bf16(std::vector<std::uint16_t>{bf16(1.0f)},
+                                     std::vector<std::uint16_t>{nan_bf16})),
+         "BF16 max diff rejects finite and NaN");
+  expect(std::isinf(max_abs_diff_bf16(std::vector<std::uint16_t>{nan_bf16},
+                                     std::vector<std::uint16_t>{nan_bf16})),
+         "BF16 max diff rejects NaN pair by default");
+  expect(max_abs_diff_bf16(std::vector<std::uint16_t>{nan_bf16},
+                           std::vector<std::uint16_t>{nan_bf16},
+                           allow_matching) == 0.0f,
+         "BF16 max diff explicitly accepts NaN pair");
+  expect(max_abs_diff_bf16(std::vector<std::uint16_t>{inf_bf16},
+                           std::vector<std::uint16_t>{inf_bf16},
+                           allow_matching) == 0.0f,
+         "BF16 max diff explicitly accepts matching infinity");
+  expect(std::isinf(max_abs_diff_bf16(
+             std::vector<std::uint16_t>{inf_bf16},
+             std::vector<std::uint16_t>{neg_inf_bf16}, allow_matching)),
+         "BF16 max diff rejects opposite infinities");
 }
 
 void expect_bf16_close(std::span<std::uint16_t const> got,
@@ -580,6 +633,7 @@ void test_rms_overflow_thresholds(Stream const& stream) {
 }  // namespace
 
 int main() {
+  test_comparison_helpers();
   auto stream = Stream::create();
   expect(static_cast<bool>(stream), "create stream");
   if (!stream) {
