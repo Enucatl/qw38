@@ -1,0 +1,4 @@
+interface:
+  display_name: "Run Implementation Task (Codex)"
+  short_description: "Execute one implementation task with gated agents"
+  default_prompt: "Use $run-implementation-task-codex to execute the next eligible task in docs/implementation/task_ledger.md through verification, one commit, and a successful push."
