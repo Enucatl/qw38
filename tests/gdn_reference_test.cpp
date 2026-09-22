@@ -23,6 +23,7 @@ using qw38::format::PhysicalLayoutId;
 using qw38::format::StorageClass;
 using qw38::gdn::test::DeviceGdnMixer;
 using qw38::gdn::test::HostGdnMixer;
+using qw38::gdn::test::all_finite;
 using qw38::gdn::test::download_vec;
 using qw38::gdn::test::expect;
 using qw38::gdn::test::expect_bf16_close;
@@ -475,6 +476,91 @@ bool run_gpu_step(Stream const& stream, std::vector<float> const& q,
   return static_cast<bool>(st);
 }
 
+void fill_long_horizon_inputs(int step, std::vector<float>& q,
+                              std::vector<float>& k,
+                              std::vector<float>& alpha,
+                              std::vector<float>& beta,
+                              std::vector<std::uint16_t>& v) {
+  for (std::uint32_t h = 0; h < kGdnKeyHeads; ++h) {
+    for (std::uint32_t i = 0; i < kGdnHeadDim; ++i) {
+      std::size_t const index = static_cast<std::size_t>(h) * kGdnHeadDim + i;
+      float const q_sign = ((i + h + static_cast<std::uint32_t>(step)) & 1u)
+                               ? -1.0f
+                               : 1.0f;
+      float const k_sign =
+          (((i / 2u) + h + static_cast<std::uint32_t>(step)) & 1u) ? -1.0f
+                                                                    : 1.0f;
+      q[index] = q_sign * (1.0f + 0.015625f * static_cast<float>(i % 7u));
+      k[index] = k_sign * (1.0f + 0.0078125f * static_cast<float>(i % 11u));
+    }
+  }
+  l2_normalize_heads(q);
+  l2_normalize_heads(k);
+
+  for (std::uint32_t h = 0; h < kGdnValueHeads; ++h) {
+    alpha[h] = 0.9990f + 0.0001f * static_cast<float>(h % 7u);
+    beta[h] = 0.9985f + 0.0001f * static_cast<float>(h % 5u);
+  }
+
+  constexpr float magnitudes[] = {0.03125f, 1.0f, 64.0f, 4096.0f, 16384.0f};
+  for (std::size_t i = 0; i < v.size(); ++i) {
+    float const sign = ((i + static_cast<std::size_t>(step)) & 1u) ? -1.0f : 1.0f;
+    float const magnitude =
+        magnitudes[(i + static_cast<std::size_t>(step)) %
+                   (sizeof(magnitudes) / sizeof(magnitudes[0]))];
+    v[i] = qw38::format::fp32_to_bf16_rne(sign * magnitude);
+  }
+}
+
+void test_long_horizon_adversarial_recurrence(Stream const& stream) {
+  constexpr float kCancellationStateAbs = 1.0e-2f;
+  std::size_t const nqk = static_cast<std::size_t>(kGdnKeyHeads) * kGdnHeadDim;
+  std::size_t const nv = static_cast<std::size_t>(kGdnValueHeads) * kGdnHeadDim;
+  std::size_t const ns = static_cast<std::size_t>(kGdnSElemsPerLayer);
+  auto d_s = DeviceBuffer::allocate(ns * 4);
+  auto d_o = DeviceBuffer::allocate(nv * 4);
+  if (!d_s || !d_o) {
+    fail("long-horizon buffers");
+    return;
+  }
+  expect(static_cast<bool>(qw38::cuda::zero(*d_s, stream)),
+         "zero long-horizon S");
+
+  std::vector<float> q(nqk), k(nqk), alpha(kGdnValueHeads), beta(kGdnValueHeads);
+  std::vector<std::uint16_t> v(nv);
+  auto s_cpu = zeros_f(static_cast<std::uint32_t>(ns));
+  auto o_cpu = zeros_f(static_cast<std::uint32_t>(nv));
+  int const checkpoints[] = {64, 128, 256, 512};
+  int next = 0;
+  for (int step = 0; step < checkpoints[3]; ++step) {
+    fill_long_horizon_inputs(step, q, k, alpha, beta, v);
+    auto rst = gdn_recurrence_step(q, k, alpha, beta, v, s_cpu, o_cpu);
+    expect(static_cast<bool>(rst), "long-horizon cpu step");
+    if (!rst || !run_gpu_step(stream, q, k, alpha, beta, v, *d_s, *d_o)) {
+      return;
+    }
+    if (step + 1 == checkpoints[next]) {
+      std::string const tag =
+          std::string("long-horizon steps=") + std::to_string(step + 1);
+      auto got_s = download_vec<float>(*d_s, ns, stream);
+      auto got_o = download_vec<float>(*d_o, nv, stream);
+      if (!got_s || !got_o) {
+        fail(tag + " download");
+        return;
+      }
+      expect(all_finite(s_cpu, tag + " cpu S"), tag + " cpu S finite");
+      expect(all_finite(o_cpu, tag + " cpu o"), tag + " cpu o finite");
+      expect(all_finite(*got_s, tag + " gpu S"), tag + " gpu S finite");
+      expect(all_finite(*got_o, tag + " gpu o"), tag + " gpu o finite");
+      expect_fp32_close(*got_s, s_cpu, tag + " S", kCancellationStateAbs,
+                        kGdnRecurMultiSRel);
+      expect_fp32_close(*got_o, o_cpu, tag + " o", kGdnRecurMultiOAbs,
+                        kGdnRecurMultiORel);
+      ++next;
+    }
+  }
+}
+
 void test_recurrence_steps_and_adversarial(Stream const& stream) {
   std::size_t const nqk = static_cast<std::size_t>(kGdnKeyHeads) * kGdnHeadDim;
   std::size_t const nv = static_cast<std::size_t>(kGdnValueHeads) * kGdnHeadDim;
@@ -846,6 +932,7 @@ int main() {
   test_multi_step_kernels(*stream);
   test_front_vs_reference(*stream);
   test_recurrence_steps_and_adversarial(*stream);
+  test_long_horizon_adversarial_recurrence(*stream);
   test_mixer_q4_and_bf16(*stream);
   if (g_failures != 0) {
     std::cerr << g_failures << " gdn reference failures\n";
