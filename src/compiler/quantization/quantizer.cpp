@@ -51,15 +51,29 @@ int quantizer_qmax(LogicalQuantizerId id) noexcept {
 
 std::expected<QuantizedGroup, CompilerError> quantize_group(
     LogicalQuantizerId quantizer, std::span<float const> weights) {
+  QuantizedGroup out;
+  out.codes.resize(weights.size());
+  auto scale = quantize_group_into(quantizer, weights, out.codes);
+  if (!scale) {
+    return std::unexpected(scale.error());
+  }
+  out.scale_bits = *scale;
+  return out;
+}
+
+std::expected<std::uint16_t, CompilerError> quantize_group_into(
+    LogicalQuantizerId quantizer, std::span<float const> weights,
+    std::span<std::int8_t> codes) {
   auto const group = quantizer_group_size(quantizer);
   auto const qmax = quantizer_qmax(quantizer);
   if (group == 0 || qmax <= 0) {
     return std::unexpected(qerr(CompilerErrorCode::Internal,
                                 "logical quantizer id is not Q4G64 or Q8G32"));
   }
-  if (weights.size() != group) {
-    return std::unexpected(qerr(CompilerErrorCode::ShapeMismatch,
-                                "group length must equal the quantizer group"));
+  if (weights.size() != group || codes.size() != group) {
+    return std::unexpected(
+        qerr(CompilerErrorCode::ShapeMismatch,
+             "group and code lengths must equal the quantizer group"));
   }
   for (float w : weights) {
     if (!fp32_is_finite(w)) {
@@ -73,11 +87,9 @@ std::expected<QuantizedGroup, CompilerError> quantize_group(
     a = std::max(a, std::fabs(w));
   }
 
-  QuantizedGroup out;
-  out.codes.assign(group, 0);
   if (a == 0.0f) {
-    out.scale_bits = kFp16Zero;
-    return out;
+    std::fill(codes.begin(), codes.end(), 0);
+    return kFp16Zero;
   }
 
   float const need = a / static_cast<float>(qmax);
@@ -96,7 +108,6 @@ std::expected<QuantizedGroup, CompilerError> quantize_group(
                                   "scale exceeds finite FP16"));
     }
   }
-  out.scale_bits = scale_bits;
   float const scale = fp16_to_fp32(scale_bits);
   float const hi = static_cast<float>(qmax) + 0.5f;
   float const lo = static_cast<float>(-qmax) - 0.5f;
@@ -115,9 +126,9 @@ std::expected<QuantizedGroup, CompilerError> quantize_group(
         q = -qmax;
       }
     }
-    out.codes[i] = static_cast<std::int8_t>(q);
+    codes[i] = static_cast<std::int8_t>(q);
   }
-  return out;
+  return scale_bits;
 }
 
 std::expected<LogicalWeightCodes, CompilerError> quantize_fp32(

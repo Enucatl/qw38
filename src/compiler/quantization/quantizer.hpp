@@ -26,6 +26,10 @@ struct QuantizedGroup {
 [[nodiscard]] std::expected<QuantizedGroup, CompilerError> quantize_group(
     qw38::format::LogicalQuantizerId quantizer, std::span<float const> weights);
 
+[[nodiscard]] std::expected<std::uint16_t, CompilerError> quantize_group_into(
+    qw38::format::LogicalQuantizerId quantizer, std::span<float const> weights,
+    std::span<std::int8_t> codes);
+
 [[nodiscard]] std::expected<LogicalWeightCodes, CompilerError> quantize_fp32(
     qw38::format::LogicalQuantizerId quantizer, std::uint64_t n, std::uint64_t k,
     std::span<float const> weights);

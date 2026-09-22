@@ -10,6 +10,7 @@
 #include <expected>
 #include <filesystem>
 #include <span>
+#include <string_view>
 #include <vector>
 
 namespace qw38::compiler {
@@ -76,6 +77,12 @@ build_identity_schema(ClassifiedCheckpoint const& classified,
         .major = kCompilerMajor,
         .minor = kCompilerMinor,
         .patch = kCompilerPatch});
+
+[[nodiscard]] std::expected<void, CompilerError> verify_quantized_tensor(
+    std::string_view name, qw38::format::LogicalQuantizerId quantizer,
+    qw38::format::PhysicalLayoutId layout, std::uint64_t n, std::uint64_t k,
+    std::span<std::byte const> source, std::span<std::byte const> payload,
+    std::span<std::byte const> scales);
 
 [[nodiscard]] std::expected<void, CompilerError> verify_artifact_identities(
     qw38::format::ArtifactSchema const& artifact,

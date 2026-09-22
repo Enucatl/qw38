@@ -14,14 +14,17 @@
 #include <vector>
 
 using qw38::compiler::compile_synthetic;
+using qw38::compiler::current_peak_rss_bytes;
 using qw38::compiler::dequantize_to_bf16;
 using qw38::compiler::expand_identity_table;
 using qw38::compiler::kProductionCompilerIdent;
 using qw38::compiler::open_checkpoint;
 using qw38::compiler::quantize_bf16;
+using qw38::compiler::quantize_group_into;
 using qw38::compiler::select_weight_format;
 using qw38::compiler::SyntheticTensor;
 using qw38::compiler::TensorFamily;
+using qw38::compiler::verify_quantized_tensor;
 using qw38::compiler::WeightFormatPolicy;
 using qw38::format::Artifact;
 using qw38::format::expected_payload_bytes;
@@ -142,6 +145,50 @@ int main() {
                  .layout == PhysicalLayoutId::CudaBf16RowMajorV0,
          "embed family assignment unchanged");
 
+  {
+    constexpr std::uint64_t kLargeN = 1024;
+    constexpr std::uint64_t kLargeK = 4096;
+    constexpr std::uint64_t kElements = kLargeN * kLargeK;
+    std::vector<std::byte> source(static_cast<std::size_t>(kElements * 2));
+    for (std::uint64_t i = 0; i < kElements; ++i) {
+      source[static_cast<std::size_t>(i * 2)] = std::byte{0x80};
+      source[static_cast<std::size_t>(i * 2 + 1)] = std::byte{0x3F};
+    }
+    std::array<float, qw38::format::kQ8GroupSize> group{};
+    group.fill(1.0f);
+    std::array<std::int8_t, qw38::format::kQ8GroupSize> codes{};
+    auto scale =
+        quantize_group_into(LogicalQuantizerId::Q8G32V0, group, codes);
+    expect(static_cast<bool>(scale), "large verification fixture quantizes");
+    std::vector<std::byte> payload(static_cast<std::size_t>(kElements));
+    std::fill(payload.begin(), payload.end(),
+              static_cast<std::byte>(static_cast<std::uint8_t>(codes[0])));
+    std::vector<std::byte> scales(
+        static_cast<std::size_t>(kElements / qw38::format::kQ8GroupSize * 2));
+    for (std::size_t i = 0; i < scales.size(); i += 2) {
+      qw38::format::store_u16_le(scales.data() + i, *scale);
+    }
+
+    auto const rss_before = current_peak_rss_bytes();
+    auto verified = verify_quantized_tensor(
+        "large_q8", LogicalQuantizerId::Q8G32V0,
+        PhysicalLayoutId::CudaQ8G32V0, kLargeN, kLargeK, source, payload,
+        scales);
+    auto const rss_after = current_peak_rss_bytes();
+    constexpr std::uint64_t kVerificationRssBudget = 8ULL << 20;
+    expect(static_cast<bool>(verified), "large Q8 tensor verifies");
+    expect(rss_before != 0 && rss_after >= rss_before &&
+               rss_after - rss_before <= kVerificationRssBudget,
+           "large verification peak RSS stays within 8 MiB");
+
+    payload.front() ^= std::byte{1};
+    auto corrupted = verify_quantized_tensor(
+        "large_q8", LogicalQuantizerId::Q8G32V0,
+        PhysicalLayoutId::CudaQ8G32V0, kLargeN, kLargeK, source, payload,
+        scales);
+    expect(!corrupted, "incremental verification rejects corrupt payload");
+  }
+
   ScratchDir dir{"qw38-quant-int"};
   auto embed = small_matrix(find_expected(TensorFamily::Embed), 8, 8, 1);
   embed.expected.layout = PhysicalLayoutId::CudaBf16RowMajorV0;
@@ -239,6 +286,11 @@ int main() {
                  std::equal(q4p->begin(), q4p->end(), packed->codes.begin()) &&
                  std::equal(q4sc->begin(), q4sc->end(), packed->scales.begin()),
              "Q4 reconstructed codes/scales");
+      expect(static_cast<bool>(verify_quantized_tensor(
+                 dense.expected.name, LogicalQuantizerId::Q4G64V0,
+                 PhysicalLayoutId::CudaQ4G64V0, 8, 256, dense.bytes, *q4p,
+                 *q4sc)),
+             "Q4 incremental verification");
       auto unpacked = unpack_cuda_v0(LogicalQuantizerId::Q4G64V0,
                                      PhysicalLayoutId::CudaQ4G64V0, 8, 256,
                                      *q4p, *q4sc);
@@ -253,6 +305,11 @@ int main() {
                  std::equal(q8p->begin(), q8p->end(), packed->codes.begin()) &&
                  std::equal(q8sc->begin(), q8sc->end(), packed->scales.begin()),
              "Q8 reconstructed codes/scales");
+      expect(static_cast<bool>(verify_quantized_tensor(
+                 head.expected.name, LogicalQuantizerId::Q8G32V0,
+                 PhysicalLayoutId::CudaQ8G32V0, 8, 256, head.bytes, *q8p,
+                 *q8sc)),
+             "Q8 incremental verification");
     }
   }
 

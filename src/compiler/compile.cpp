@@ -755,7 +755,6 @@ std::expected<CompileResult, CompilerError> compile_checkpoint(
   result.included_tensors =
       static_cast<std::uint32_t>(ckpt->classified.included.size());
   result.vision_excluded = ckpt->classified.vision_excluded;
-  result.peak_rss_bytes = current_peak_rss_bytes();
 
   if (options.verify_reconstruction) {
     if (auto st = verify_compiled_artifact(output, checkpoint,
@@ -765,6 +764,7 @@ std::expected<CompileResult, CompilerError> compile_checkpoint(
       return std::unexpected(st.error());
     }
   }
+  result.peak_rss_bytes = current_peak_rss_bytes();
   return result;
 }
 
@@ -774,6 +774,115 @@ std::expected<CompileResult, CompilerError> compile_identity(
   CompileOptions identity = options;
   identity.format_policy = WeightFormatPolicy::IdentityBf16;
   return compile_checkpoint(checkpoint, output, identity);
+}
+
+std::expected<void, CompilerError> verify_quantized_tensor(
+    std::string_view name, LogicalQuantizerId quantizer,
+    PhysicalLayoutId layout, std::uint64_t n, std::uint64_t k,
+    std::span<std::byte const> source, std::span<std::byte const> payload,
+    std::span<std::byte const> scales) {
+  if (!qw38::format::quantizer_layout_pair_ok(quantizer, layout)) {
+    return std::unexpected(make_error(
+        CompilerErrorCode::Internal, name,
+        "quantizer and physical layout disagree during verification"));
+  }
+  if (n == 0 || k == 0 || n % kDenseTileRows != 0 ||
+      k % kDenseTileK != 0 ||
+      n > std::numeric_limits<std::uint64_t>::max() / k) {
+    return std::unexpected(make_error(
+        CompilerErrorCode::ShapeMismatch, name,
+        "quantized verification requires N%8==0 and K%256==0"));
+  }
+  auto const elements = n * k;
+  auto const group = quantizer_group_size(quantizer);
+  auto const packed_row =
+      quantizer == LogicalQuantizerId::Q4G64V0
+          ? qw38::format::kQ4PackedBytesPerTileRow
+          : qw38::format::kQ8PackedBytesPerTileRow;
+  auto const payload_bytes =
+      quantizer == LogicalQuantizerId::Q4G64V0 ? elements / 2 : elements;
+  if (group == 0 || elements > std::numeric_limits<std::uint64_t>::max() / 2 ||
+      source.size() != elements * 2 ||
+      payload.size() != payload_bytes ||
+      scales.size() != elements / group * 2) {
+    return std::unexpected(make_error(
+        CompilerErrorCode::ShapeMismatch, name,
+        "quantized verification span lengths do not match tensor geometry"));
+  }
+
+  constexpr std::size_t kMaxCodeTile =
+      kDenseTileRows * qw38::format::kQ8PackedBytesPerTileRow;
+  constexpr std::size_t kMaxScaleTile =
+      kDenseTileRows * (kDenseTileK / qw38::format::kQ8GroupSize) * 2;
+  std::array<float, kDenseTileK> row{};
+  std::array<std::int8_t, qw38::format::kQ4GroupSize> group_codes{};
+  std::array<std::byte, kMaxCodeTile> expected_codes{};
+  std::array<std::byte, kMaxScaleTile> expected_scales{};
+
+  auto const groups_per_tile = kDenseTileK / group;
+  auto const code_tile_bytes = kDenseTileRows * packed_row;
+  auto const scale_tile_bytes = kDenseTileRows * groups_per_tile * 2;
+  auto const tiles_k = k / kDenseTileK;
+  for (std::uint64_t tn = 0; tn < n / kDenseTileRows; ++tn) {
+    for (std::uint64_t tk = 0; tk < tiles_k; ++tk) {
+      for (std::uint32_t r = 0; r < kDenseTileRows; ++r) {
+        auto const source_row = tn * kDenseTileRows + r;
+        auto const source_col = tk * kDenseTileK;
+        auto const source_offset = (source_row * k + source_col) * 2;
+        for (std::uint32_t c = 0; c < kDenseTileK; ++c) {
+          auto const bits =
+              qw38::format::load_u16_le(source.data() + source_offset + c * 2);
+          row[c] = qw38::format::bf16_to_fp32(bits);
+        }
+        for (std::uint32_t g = 0; g < groups_per_tile; ++g) {
+          auto codes = std::span<std::int8_t>{group_codes}.first(group);
+          auto scale = quantize_group_into(
+              quantizer,
+              std::span<float const>{row}.subspan(g * group, group), codes);
+          if (!scale) {
+            return std::unexpected(scale.error());
+          }
+          auto const scale_offset = (r * groups_per_tile + g) * 2;
+          qw38::format::store_u16_le(expected_scales.data() + scale_offset,
+                                      *scale);
+          auto const code_offset = r * packed_row;
+          if (quantizer == LogicalQuantizerId::Q4G64V0) {
+            for (std::uint32_t i = 0; i < group; i += 2) {
+              auto const lo = static_cast<std::uint8_t>(codes[i]) & 0x0Fu;
+              auto const hi = static_cast<std::uint8_t>(codes[i + 1]) & 0x0Fu;
+              expected_codes[code_offset + g * (group / 2) + i / 2] =
+                  static_cast<std::byte>(lo | (hi << 4));
+            }
+          } else {
+            for (std::uint32_t i = 0; i < group; ++i) {
+              expected_codes[code_offset + g * group + i] =
+                  static_cast<std::byte>(static_cast<std::uint8_t>(codes[i]));
+            }
+          }
+        }
+      }
+      auto const tile = tn * tiles_k + tk;
+      auto const got_codes =
+          payload.subspan(tile * code_tile_bytes, code_tile_bytes);
+      auto const got_scales =
+          scales.subspan(tile * scale_tile_bytes, scale_tile_bytes);
+      if (auto st = compare_bytes(
+              got_codes,
+              std::span<std::byte const>{expected_codes}.first(code_tile_bytes),
+              name);
+          !st) {
+        return st;
+      }
+      if (auto st = compare_bytes(
+              got_scales,
+              std::span<std::byte const>{expected_scales}.first(scale_tile_bytes),
+              name);
+          !st) {
+        return st;
+      }
+    }
+  }
+  return {};
 }
 
 std::expected<void, CompilerError> verify_compiled_artifact(
@@ -837,19 +946,10 @@ std::expected<void, CompilerError> verify_compiled_artifact(
         if (!scales) {
           return std::unexpected(from_format(scales.error()));
         }
-        auto want = quantize_bf16(fmt.quantizer, exp.shape.dims[0],
-                                  exp.shape.dims[1], *src);
-        if (!want) {
-          return std::unexpected(want.error());
-        }
-        auto packed = qw38::format::pack_cuda_v0(fmt.quantizer, fmt.layout, *want);
-        if (!packed) {
-          return std::unexpected(from_format(packed.error()));
-        }
-        if (auto st = compare_bytes(*payload, packed->codes, exp.name); !st) {
-          return st;
-        }
-        if (auto st = compare_bytes(*scales, packed->scales, exp.name); !st) {
+        if (auto st = verify_quantized_tensor(
+                exp.name, fmt.quantizer, fmt.layout, exp.shape.dims[0],
+                exp.shape.dims[1], *src, *payload, *scales);
+            !st) {
           return st;
         }
         continue;
