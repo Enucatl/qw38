@@ -178,6 +178,11 @@ void test_bind_errors(Stream const& stream) {
   expect(!bad_shape && bad_shape.error().code == qw38::runtime::ErrorCode::InvalidArgument,
          "gate shape rejects");
 
+  auto payload_dtype = views;
+  payload_dtype.gate.dtype = qw38::format::ArithmeticDtype::Fp32;
+  expect(!bind_mlp_plan(payload_dtype, stream),
+         "weight payload arithmetic dtype rejects");
+
   auto layout = views;
   layout.gate.layout = PhysicalLayoutId::CudaQ8G32V0;
   layout.gate.storage = StorageClass::Int8Grouped;
@@ -193,11 +198,59 @@ void test_bind_errors(Stream const& stream) {
   expect(!bad_mix && bad_mix.error().code == qw38::runtime::ErrorCode::InvalidArgument,
          "mixed Q4/BF16 family rejects");
 
+  auto scale_dtype = views;
+  scale_dtype.gate_scales.dtype = qw38::format::ArithmeticDtype::Bf16;
+  expect(!bind_mlp_plan(scale_dtype, stream), "Q4 scales require FP16 dtype");
+
+  auto scale_layout = views;
+  scale_layout.up_scales.layout = PhysicalLayoutId::CudaBf16VectorV0;
+  expect(!bind_mlp_plan(scale_layout, stream),
+         "Q4 scales require matching physical layout");
+
+  auto scale_storage = views;
+  scale_storage.down_scales.storage = StorageClass::Bf16;
+  expect(!bind_mlp_plan(scale_storage, stream),
+         "Q4 scales require grouped storage");
+
+  auto scale_rank = views;
+  scale_rank.gate_scales.rank = 2;
+  scale_rank.gate_scales.extent = {1, scale_rank.gate_scales.extent[0]};
+  expect(!bind_mlp_plan(scale_rank, stream), "flattened Q4 scale rank rejects");
+
+  auto scale_extent = views;
+  --scale_extent.gate_scales.extent[0];
+  expect(!bind_mlp_plan(scale_extent, stream), "undersized Q4 scale rejects");
+
+  auto vector_layout = views;
+  vector_layout.gamma.layout = PhysicalLayoutId::CudaBf16RowMajorV0;
+  expect(!bind_mlp_plan(vector_layout, stream), "wrong gamma vector layout rejects");
+
+  auto vector_storage = views;
+  vector_storage.next_h.storage = StorageClass::Bf16;
+  expect(!bind_mlp_plan(vector_storage, stream), "wrong output storage rejects");
+
+  auto vector_rank = views;
+  vector_rank.normalized.rank = 2;
+  vector_rank.normalized.extent = {1, kHidden};
+  expect(!bind_mlp_plan(vector_rank, stream),
+         "flattened-equivalent scratch rank rejects");
+
+  auto oversized = views;
+  ++oversized.h_mid.extent[0];
+  expect(!bind_mlp_plan(oversized, stream), "oversized residual view rejects");
+
   auto small = views;
   small.swiglu.extent[0] = 8;
   auto bad_sw = bind_mlp_plan(small, stream);
   expect(!bad_sw && bad_sw.error().code == qw38::runtime::ErrorCode::InvalidArgument,
          "short SwiGLU view rejects");
+
+  auto byte_overflow = views;
+  byte_overflow.swiglu.extent[0] = std::numeric_limits<std::uint64_t>::max();
+  auto bad_overflow = bind_mlp_plan(byte_overflow, stream);
+  expect(!bad_overflow &&
+             bad_overflow.error().code == qw38::runtime::ErrorCode::Overflow,
+         "overflowing vector byte extent rejects");
 }
 
 void test_swiglu_epilogue(Stream const& stream) {

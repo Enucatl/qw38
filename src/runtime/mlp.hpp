@@ -38,7 +38,7 @@ struct MlpPlan {
   MlpWeightBinding up{};
   MlpWeightBinding down{};
   ConstTensorView gamma{};
-  TensorView h_mid{};        // FP32 input, preserved through the down add
+  ConstTensorView h_mid{};   // FP32 input, preserved through the down add
   TensorView next_h{};       // FP32 output: h_mid + down projection
   TensorView normalized{};   // BF16 [5120]
   TensorView swiglu{};       // BF16 [17408]; only globally materialized gate/up value
@@ -54,7 +54,7 @@ struct MlpBindViews {
   ConstTensorView down{};
   ConstTensorView down_scales{};
   ConstTensorView gamma{};
-  TensorView h_mid{};
+  ConstTensorView h_mid{};
   TensorView next_h{};
   TensorView normalized{};
   TensorView swiglu{};

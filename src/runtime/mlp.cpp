@@ -4,6 +4,7 @@
 #include "cuda/decode_mmv.hpp"
 
 #include "format/constants.hpp"
+#include "format/layout.hpp"
 
 #include <array>
 #include <cmath>
@@ -38,15 +39,38 @@ Error arg_error(std::string_view field, std::string_view detail) {
 }
 
 template <typename Pointer>
-std::uint64_t element_count(BasicTensorView<Pointer> const& v) noexcept {
-  if (v.rank == 0) {
-    return 0;
+std::expected<std::uint64_t, Error> view_bytes(
+    BasicTensorView<Pointer> const& v, std::string_view field) {
+  if (v.rank == 0 || v.rank > qw38::format::kMaxRank) {
+    return std::unexpected(arg_error(field, "rank is invalid"));
   }
   std::uint64_t n = 1;
   for (std::uint8_t i = 0; i < v.rank; ++i) {
-    n *= v.extent[i];
+    auto product = qw38::format::checked_mul(n, v.extent[i], 0, field);
+    if (!product) {
+      return std::unexpected(make_error(ErrorCode::Overflow, product.error().field,
+                                        product.error().detail));
+    }
+    n = *product;
   }
-  return n;
+  auto bytes = qw38::format::checked_mul(
+      n, qw38::format::element_size(v.dtype), 0, field);
+  if (!bytes) {
+    return std::unexpected(make_error(ErrorCode::Overflow, bytes.error().field,
+                                      bytes.error().detail));
+  }
+  return *bytes;
+}
+
+template <typename Pointer>
+std::expected<void, Error> require_alignment(
+    BasicTensorView<Pointer> const& v, std::uint64_t alignment,
+    std::string_view field) {
+  auto const address = reinterpret_cast<std::uintptr_t>(v.pointer);
+  if (alignment == 0 || address % alignment != 0) {
+    return std::unexpected(arg_error(field, "view alignment is invalid"));
+  }
+  return {};
 }
 
 bool layout_ok(PhysicalLayoutId layout) noexcept {
@@ -64,23 +88,32 @@ std::uint16_t quantizer_for(PhysicalLayoutId layout) noexcept {
 template <typename Pointer>
 std::expected<BasicTensorView<Pointer>, Error> as_decode_vector(
     BasicTensorView<Pointer> v, std::uint64_t elems, ArithmeticDtype dtype,
-    bool writable, std::string_view field) {
-  if (v.pointer == nullptr) {
-    return std::unexpected(arg_error(field, "null view"));
+    PhysicalLayoutId layout, StorageClass storage, std::string_view field) {
+  if (v.pointer == nullptr || v.space != MemorySpace::Device ||
+      v.dtype != dtype || v.layout != layout || v.storage != storage) {
+    return std::unexpected(arg_error(field, "typed view contract mismatch"));
   }
-  if (v.space != MemorySpace::Device) {
-    return std::unexpected(arg_error(field, "view must be device memory"));
+  auto bytes = view_bytes(v, field);
+  if (!bytes) {
+    return std::unexpected(bytes.error());
   }
-  if (v.dtype != dtype) {
-    return std::unexpected(arg_error(field, "dtype mismatch"));
+  if (v.rank != 1 || v.extent[0] != elems) {
+    return std::unexpected(arg_error(field, "typed view extent mismatch"));
   }
-  (void)writable;
-  if (v.rank == 0 || element_count(v) < elems) {
-    return std::unexpected(arg_error(field, "view is smaller than decode extent"));
+  auto expected_bytes =
+      qw38::format::checked_mul(elems, qw38::format::element_size(dtype), 0, field);
+  if (!expected_bytes) {
+    return std::unexpected(make_error(ErrorCode::Overflow,
+                                      expected_bytes.error().field,
+                                      expected_bytes.error().detail));
   }
-  v.rank = 1;
-  v.extent = {};
-  v.extent[0] = elems;
+  if (*bytes != *expected_bytes) {
+    return std::unexpected(arg_error(field, "view byte extent mismatch"));
+  }
+  if (auto st = require_alignment(v, qw38::format::element_size(dtype), field);
+      !st) {
+    return std::unexpected(st.error());
+  }
   return v;
 }
 
@@ -94,6 +127,12 @@ std::expected<MlpWeightBinding, Error> bind_weight(ConstTensorView codes,
   }
   if (codes.space != MemorySpace::Device) {
     return std::unexpected(arg_error(field, "codes must be device memory"));
+  }
+  if (codes.dtype != ArithmeticDtype::Bf16) {
+    return std::unexpected(arg_error(field, "payload arithmetic dtype must be bf16"));
+  }
+  if (auto st = require_alignment(codes, 16, field); !st) {
+    return std::unexpected(st.error());
   }
   if (codes.rank != 2 || codes.extent[0] != want_n || codes.extent[1] != want_k) {
     return std::unexpected(arg_error(field, "logical shape must be V0 MLP geometry"));
@@ -121,8 +160,11 @@ std::expected<MlpWeightBinding, Error> bind_weight(ConstTensorView codes,
   b.padded_k = decode_pad_k(want_k);
   b.codes_bytes = decode_code_bytes(b.layout, b.padded_n, b.padded_k);
   b.scales_bytes = decode_scale_bytes(b.layout, b.padded_n, b.padded_k);
+  if (b.codes_bytes == 0) {
+    return std::unexpected(arg_error(field, "payload byte count is invalid"));
+  }
   if (b.scales_bytes == 0) {
-    if (scales.pointer != nullptr || element_count(scales) != 0) {
+    if (scales != ConstTensorView{}) {
       return std::unexpected(arg_error(field, "BF16 dense tile must not supply scales"));
     }
   } else {
@@ -132,7 +174,20 @@ std::expected<MlpWeightBinding, Error> bind_weight(ConstTensorView codes,
     if (scales.space != MemorySpace::Device) {
       return std::unexpected(arg_error(field, "scales must be device memory"));
     }
-    if (element_count(scales) * qw38::format::kFp16Size != b.scales_bytes) {
+    if (scales.dtype != ArithmeticDtype::Fp16 || scales.layout != codes.layout ||
+        scales.storage != codes.storage || scales.rank != 1 ||
+        scales.extent[0] != b.scales_bytes / qw38::format::kFp16Size) {
+      return std::unexpected(arg_error(field, "scale typed view contract mismatch"));
+    }
+    if (auto st = require_alignment(scales, qw38::format::kFp16Size, field);
+        !st) {
+      return std::unexpected(st.error());
+    }
+    auto scale_bytes = view_bytes(scales, field);
+    if (!scale_bytes) {
+      return std::unexpected(scale_bytes.error());
+    }
+    if (*scale_bytes != b.scales_bytes) {
       return std::unexpected(arg_error(field, "scale view length does not match layout"));
     }
     b.scales = scales;
@@ -173,7 +228,7 @@ bool overlaps(ByteInterval const& a, ByteInterval const& b) noexcept {
 std::expected<void, Error> validate_non_overlapping_bindings(
     MlpWeightBinding const& gate, MlpWeightBinding const& up,
     MlpWeightBinding const& down, ConstTensorView const& gamma,
-    TensorView const& h_mid, TensorView const& next_h,
+    ConstTensorView const& h_mid, TensorView const& next_h,
     TensorView const& normalized, TensorView const& swiglu) {
   std::array<ByteInterval, 11> intervals{};
   std::size_t count = 0;
@@ -348,28 +403,33 @@ std::expected<MlpPlan, Error> bind_mlp_plan(MlpBindViews const& views,
         arg_error("layout", "gate/up/down must share one Q4 or BF16-control family"));
   }
 
-  auto gamma = as_decode_vector(views.gamma, kHidden, ArithmeticDtype::Bf16,
-                                false, "gamma");
+  auto gamma = as_decode_vector(
+      views.gamma, kHidden, ArithmeticDtype::Bf16,
+      PhysicalLayoutId::CudaBf16VectorV0, StorageClass::Bf16, "gamma");
   if (!gamma) {
     return std::unexpected(gamma.error());
   }
-  auto h_mid = as_decode_vector(views.h_mid, kHidden, ArithmeticDtype::Fp32,
-                                false, "h_mid");
+  auto h_mid = as_decode_vector(
+      views.h_mid, kHidden, ArithmeticDtype::Fp32,
+      PhysicalLayoutId::CudaFp32VectorV0, StorageClass::Fp32, "h_mid");
   if (!h_mid) {
     return std::unexpected(h_mid.error());
   }
-  auto next_h = as_decode_vector(views.next_h, kHidden, ArithmeticDtype::Fp32,
-                                 true, "next_h");
+  auto next_h = as_decode_vector(
+      views.next_h, kHidden, ArithmeticDtype::Fp32,
+      PhysicalLayoutId::CudaFp32VectorV0, StorageClass::Fp32, "next_h");
   if (!next_h) {
     return std::unexpected(next_h.error());
   }
-  auto normalized = as_decode_vector(views.normalized, kHidden,
-                                     ArithmeticDtype::Bf16, true, "normalized");
+  auto normalized = as_decode_vector(
+      views.normalized, kHidden, ArithmeticDtype::Bf16,
+      PhysicalLayoutId::CudaBf16RowMajorV0, StorageClass::Bf16, "normalized");
   if (!normalized) {
     return std::unexpected(normalized.error());
   }
-  auto swiglu = as_decode_vector(views.swiglu, kFfnWidth, ArithmeticDtype::Bf16,
-                                 true, "swiglu");
+  auto swiglu = as_decode_vector(
+      views.swiglu, kFfnWidth, ArithmeticDtype::Bf16,
+      PhysicalLayoutId::CudaBf16RowMajorV0, StorageClass::Bf16, "swiglu");
   if (!swiglu) {
     return std::unexpected(swiglu.error());
   }
