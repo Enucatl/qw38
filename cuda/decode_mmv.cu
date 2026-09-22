@@ -565,25 +565,52 @@ __global__ void decode_mmv_ranges_kernel(
 }
 
 std::expected<void, Error> validate_range_side(DecodeMmvDesc const& d,
-                                               DecodeMmvDesc const& qg,
+                                               DecodeMmvDesc const& first,
                                                std::string_view field) {
-  if (d.layout != qg.layout || d.quantizer != qg.quantizer) {
+  if (d.layout != first.layout || d.quantizer != first.quantizer) {
     return std::unexpected(make_error(ErrorCode::InvalidArgument, field,
-                                      "q/g, k, and v must share one layout family"));
+                                      "ranged projections must share one layout family"));
   }
-  if (d.k != qg.k || d.padded_k != qg.padded_k) {
+  if (d.k != first.k || d.padded_k != first.padded_k) {
     return std::unexpected(make_error(ErrorCode::InvalidArgument, field,
-                                      "q/g, k, and v must share K"));
+                                      "ranged projections must share K"));
   }
-  if (d.input != qg.input) {
+  if (d.input != first.input) {
     return std::unexpected(make_error(ErrorCode::InvalidArgument, field,
-                                      "q/g, k, and v must share the normalized input"));
+                                      "ranged projections must share the input"));
   }
   if (d.epilogue != DecodeEpilogue::StoreBf16) {
     return std::unexpected(make_error(ErrorCode::InvalidArgument, field,
                                       "ranged projections store BF16"));
   }
   return validate_geometry(d, field, false);
+}
+
+template <WeightKind Kind>
+std::expected<void, Error> launch_range_kind(
+    std::span<DecodeMmvDesc const> ranges, Stream const& stream) {
+  auto const& d0 = ranges[0];
+  auto const& d1 = ranges[1];
+  DecodeMmvDesc const* d2 = ranges.size() == 3 ? &ranges[2] : nullptr;
+  unsigned const tiles0 =
+      d0.padded_n / static_cast<unsigned>(kDecodeTileRows);
+  unsigned const tiles1 =
+      d1.padded_n / static_cast<unsigned>(kDecodeTileRows);
+  unsigned const tiles2 =
+      d2 == nullptr ? 0u
+                    : d2->padded_n / static_cast<unsigned>(kDecodeTileRows);
+  unsigned const blocks = tiles0 + tiles1 + tiles2;
+  decode_mmv_ranges_kernel<Kind><<<blocks, kDecodeThreads, 0, stream.native()>>>(
+      static_cast<std::byte const*>(d0.codes.pointer),
+      static_cast<std::byte const*>(d0.scales.pointer), d0.output.pointer, d0.n,
+      tiles0, static_cast<std::byte const*>(d1.codes.pointer),
+      static_cast<std::byte const*>(d1.scales.pointer), d1.output.pointer, d1.n,
+      tiles1,
+      d2 == nullptr ? nullptr : static_cast<std::byte const*>(d2->codes.pointer),
+      d2 == nullptr ? nullptr : static_cast<std::byte const*>(d2->scales.pointer),
+      d2 == nullptr ? nullptr : d2->output.pointer, d2 == nullptr ? 0u : d2->n,
+      static_cast<std::uint16_t const*>(d0.input.pointer), d0.k, d0.padded_k);
+  return check(cudaGetLastError(), "decode_mmv_ranges_kernel");
 }
 
 }  // namespace
@@ -643,97 +670,52 @@ std::expected<void, Error> launch_decode_mmv_ranges(DecodeMmvRangeDesc const& de
   if (!st) {
     return st;
   }
-  if (desc.qg.epilogue != DecodeEpilogue::StoreBf16) {
+  if (desc.ranges.size() < 2 || desc.ranges.size() > 3) {
+    return std::unexpected(make_error(
+        ErrorCode::InvalidArgument, "decode_mmv_ranges",
+        "ranged launch requires two or three projections"));
+  }
+  auto const& first = desc.ranges.front();
+  if (first.epilogue != DecodeEpilogue::StoreBf16) {
     return std::unexpected(make_error(ErrorCode::InvalidArgument, "decode_mmv_ranges",
                                       "ranged projections store BF16"));
   }
-  st = validate_geometry(desc.qg, "decode_mmv_ranges.qg", false);
+  st = validate_geometry(first, "decode_mmv_ranges[0]", false);
   if (!st) {
     return st;
   }
-  st = validate_range_side(desc.k, desc.qg, "decode_mmv_ranges.k");
-  if (!st) {
-    return st;
+  for (std::size_t i = 1; i < desc.ranges.size(); ++i) {
+    st = validate_range_side(desc.ranges[i], first, "decode_mmv_ranges");
+    if (!st) {
+      return st;
+    }
   }
-  st = validate_range_side(desc.v, desc.qg, "decode_mmv_ranges.v");
-  if (!st) {
-    return st;
-  }
-  if (overlaps(desc.qg.output, desc.k.output) ||
-      overlaps(desc.qg.output, desc.v.output) ||
-      overlaps(desc.k.output, desc.v.output)) {
-    return std::unexpected(make_error(ErrorCode::InvalidArgument, "decode_mmv_ranges",
-                                      "q/g, k, and v outputs must be distinct"));
-  }
-  DecodeMmvDesc const* sides[] = {&desc.qg, &desc.k, &desc.v};
-  for (std::size_t i = 0; i < std::size(sides); ++i) {
-    for (std::size_t j = i + 1; j < std::size(sides); ++j) {
+  for (std::size_t i = 0; i < desc.ranges.size(); ++i) {
+    for (std::size_t j = i + 1; j < desc.ranges.size(); ++j) {
       DecodeOperandView const* left[] = {
-          &sides[i]->codes, &sides[i]->scales, &sides[i]->output};
+          &desc.ranges[i].codes, &desc.ranges[i].scales,
+          &desc.ranges[i].output};
       DecodeOperandView const* right[] = {
-          &sides[j]->codes, &sides[j]->scales, &sides[j]->output};
+          &desc.ranges[j].codes, &desc.ranges[j].scales,
+          &desc.ranges[j].output};
       for (auto* a : left) {
         for (auto* b : right) {
           if (overlaps(*a, *b)) {
             return std::unexpected(make_error(
                 ErrorCode::InvalidArgument, "decode_mmv_ranges",
-                "q/g, k, and v operand spans must not overlap"));
+                "ranged projection operand spans must not overlap"));
           }
         }
       }
     }
   }
-  unsigned const tiles0 =
-      desc.qg.padded_n / static_cast<unsigned>(kDecodeTileRows);
-  unsigned const tiles1 =
-      desc.k.padded_n / static_cast<unsigned>(kDecodeTileRows);
-  unsigned const tiles2 =
-      desc.v.padded_n / static_cast<unsigned>(kDecodeTileRows);
-  unsigned const blocks = tiles0 + tiles1 + tiles2;
-  if (desc.qg.layout == kDecodeLayoutQ4G64V0) {
-    decode_mmv_ranges_kernel<WeightKind::Q4>
-        <<<blocks, kDecodeThreads, 0, stream.native()>>>(
-            static_cast<std::byte const*>(desc.qg.codes.pointer),
-            static_cast<std::byte const*>(desc.qg.scales.pointer),
-            desc.qg.output.pointer, desc.qg.n, tiles0,
-            static_cast<std::byte const*>(desc.k.codes.pointer),
-            static_cast<std::byte const*>(desc.k.scales.pointer),
-            desc.k.output.pointer, desc.k.n, tiles1,
-            static_cast<std::byte const*>(desc.v.codes.pointer),
-            static_cast<std::byte const*>(desc.v.scales.pointer),
-            desc.v.output.pointer, desc.v.n,
-            static_cast<std::uint16_t const*>(desc.qg.input.pointer),
-            desc.qg.k, desc.qg.padded_k);
-  } else if (desc.qg.layout == kDecodeLayoutQ8G32V0) {
-    decode_mmv_ranges_kernel<WeightKind::Q8>
-        <<<blocks, kDecodeThreads, 0, stream.native()>>>(
-            static_cast<std::byte const*>(desc.qg.codes.pointer),
-            static_cast<std::byte const*>(desc.qg.scales.pointer),
-            desc.qg.output.pointer, desc.qg.n, tiles0,
-            static_cast<std::byte const*>(desc.k.codes.pointer),
-            static_cast<std::byte const*>(desc.k.scales.pointer),
-            desc.k.output.pointer, desc.k.n, tiles1,
-            static_cast<std::byte const*>(desc.v.codes.pointer),
-            static_cast<std::byte const*>(desc.v.scales.pointer),
-            desc.v.output.pointer, desc.v.n,
-            static_cast<std::uint16_t const*>(desc.qg.input.pointer),
-            desc.qg.k, desc.qg.padded_k);
-  } else {
-    decode_mmv_ranges_kernel<WeightKind::Bf16>
-        <<<blocks, kDecodeThreads, 0, stream.native()>>>(
-            static_cast<std::byte const*>(desc.qg.codes.pointer),
-            static_cast<std::byte const*>(desc.qg.scales.pointer),
-            desc.qg.output.pointer, desc.qg.n, tiles0,
-            static_cast<std::byte const*>(desc.k.codes.pointer),
-            static_cast<std::byte const*>(desc.k.scales.pointer),
-            desc.k.output.pointer, desc.k.n, tiles1,
-            static_cast<std::byte const*>(desc.v.codes.pointer),
-            static_cast<std::byte const*>(desc.v.scales.pointer),
-            desc.v.output.pointer, desc.v.n,
-            static_cast<std::uint16_t const*>(desc.qg.input.pointer),
-            desc.qg.k, desc.qg.padded_k);
+  if (first.layout == kDecodeLayoutQ4G64V0) {
+    return launch_range_kind<WeightKind::Q4>(desc.ranges, stream);
   }
-  return check(cudaGetLastError(), "decode_mmv_ranges_kernel");
+  if (first.layout == kDecodeLayoutQ8G32V0) {
+    return launch_range_kind<WeightKind::Q8>(desc.ranges, stream);
+  }
+  return launch_range_kind<WeightKind::Bf16>(desc.ranges, stream);
 }
 
 }  // namespace qw38::cuda

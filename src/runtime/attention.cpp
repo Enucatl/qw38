@@ -7,6 +7,7 @@
 
 #include "format/constants.hpp"
 
+#include <array>
 #include <cmath>
 #include <limits>
 #include <sstream>
@@ -711,27 +712,31 @@ std::expected<void, Error> execute_decode_attention_prep(
     return std::unexpected(from_cuda(st.error()));
   }
 
-  DecodeMmvRangeDesc ranges;
-  ranges.qg = mmv_from_weight(plan.qg);
-  ranges.qg.input = decode_vector_view(
+  std::array<DecodeMmvDesc, 3> range_descs;
+  auto& qg_range = range_descs[0];
+  auto& k_range = range_descs[1];
+  auto& v_range = range_descs[2];
+  qg_range = mmv_from_weight(plan.qg);
+  qg_range.input = decode_vector_view(
       normalized, DecodeDtype::Bf16, qw38::cuda::kDecodeLayoutBf16VectorV0,
-      ranges.qg.k, static_cast<std::uint64_t>(ranges.qg.k) * 2u, 2, false);
-  ranges.qg.output = decode_vector_view(
+      qg_range.k, static_cast<std::uint64_t>(qg_range.k) * 2u, 2, false);
+  qg_range.output = decode_vector_view(
       qg, DecodeDtype::Bf16, qw38::cuda::kDecodeLayoutBf16VectorV0,
-      ranges.qg.n, static_cast<std::uint64_t>(ranges.qg.n) * 2u, 2, true);
-  ranges.qg.epilogue = DecodeEpilogue::StoreBf16;
-  ranges.k = mmv_from_weight(plan.k);
-  ranges.k.input = ranges.qg.input;
-  ranges.k.output = decode_vector_view(
+      qg_range.n, static_cast<std::uint64_t>(qg_range.n) * 2u, 2, true);
+  qg_range.epilogue = DecodeEpilogue::StoreBf16;
+  k_range = mmv_from_weight(plan.k);
+  k_range.input = qg_range.input;
+  k_range.output = decode_vector_view(
       k, DecodeDtype::Bf16, qw38::cuda::kDecodeLayoutBf16VectorV0,
-      ranges.k.n, static_cast<std::uint64_t>(ranges.k.n) * 2u, 2, true);
-  ranges.k.epilogue = DecodeEpilogue::StoreBf16;
-  ranges.v = mmv_from_weight(plan.v);
-  ranges.v.input = ranges.qg.input;
-  ranges.v.output = decode_vector_view(
+      k_range.n, static_cast<std::uint64_t>(k_range.n) * 2u, 2, true);
+  k_range.epilogue = DecodeEpilogue::StoreBf16;
+  v_range = mmv_from_weight(plan.v);
+  v_range.input = qg_range.input;
+  v_range.output = decode_vector_view(
       v, DecodeDtype::Bf16, qw38::cuda::kDecodeLayoutBf16VectorV0,
-      ranges.v.n, static_cast<std::uint64_t>(ranges.v.n) * 2u, 2, true);
-  ranges.v.epilogue = DecodeEpilogue::StoreBf16;
+      v_range.n, static_cast<std::uint64_t>(v_range.n) * 2u, 2, true);
+  v_range.epilogue = DecodeEpilogue::StoreBf16;
+  DecodeMmvRangeDesc ranges{range_descs};
   if (auto st = qw38::cuda::launch_decode_mmv_ranges(ranges, *plan.stream); !st) {
     return std::unexpected(from_cuda(st.error()));
   }

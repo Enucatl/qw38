@@ -6,6 +6,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <expected>
+#include <span>
 
 namespace qw38::cuda {
 
@@ -116,12 +117,10 @@ struct DecodeMmvPairedDesc {
   DecodeMmvDesc b;
 };
 
-// One launch, three independent output-N ranges that share K/input/layout.
-// Combines scheduling for attention q/g, k, and v; reductions stay per row.
+// One launch over two or three independent output-N ranges that share
+// K/input/layout. This combines scheduling only; reductions stay per row.
 struct DecodeMmvRangeDesc {
-  DecodeMmvDesc qg;
-  DecodeMmvDesc k;
-  DecodeMmvDesc v;
+  std::span<DecodeMmvDesc const> ranges{};
 };
 
 [[nodiscard]] constexpr std::uint32_t decode_pad_n(std::uint32_t n) noexcept {
@@ -178,7 +177,7 @@ struct DecodeMmvRangeDesc {
 [[nodiscard]] std::expected<void, Error> launch_decode_ab_bf16(
     DecodeMmvPairedDesc const& desc, Stream const& stream);
 
-// Attention q/g, k, v: one Q4 or BF16-control launch into separate slices.
+// Two or three Q4 or BF16-control projections in one launch into separate slices.
 [[nodiscard]] std::expected<void, Error> launch_decode_mmv_ranges(
     DecodeMmvRangeDesc const& desc, Stream const& stream);
 
