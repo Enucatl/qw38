@@ -1,6 +1,13 @@
 #include "cuda/stream.hpp"
 
+#include <atomic>
+
 namespace qw38::cuda {
+namespace {
+
+std::atomic<bool> g_fail_next_stream_sync{false};
+
+}  // namespace
 
 Stream::Stream(Stream&& other) noexcept
     : stream_(other.stream_), device_(other.device_) {
@@ -67,7 +74,20 @@ std::expected<void, Error> Stream::sync() const {
   if (!guard) {
     return std::unexpected(guard.error());
   }
-  return check(cudaStreamSynchronize(stream_), "cudaStreamSynchronize");
+  if (auto st = check(cudaStreamSynchronize(stream_), "cudaStreamSynchronize");
+      !st) {
+    return st;
+  }
+  if (g_fail_next_stream_sync.exchange(false, std::memory_order_relaxed)) {
+    return std::unexpected(make_error(
+        ErrorCode::Status, "cudaStreamSynchronize",
+        "injected deferred stream failure"));
+  }
+  return {};
+}
+
+void testing::fail_next_stream_sync() noexcept {
+  g_fail_next_stream_sync.store(true, std::memory_order_relaxed);
 }
 
 }  // namespace qw38::cuda

@@ -329,9 +329,6 @@ std::expected<void, Error> Session::zero_persistent() {
   if (auto st = qw38::cuda::zero(kv_, *stream_); !st) {
     return std::unexpected(from_cuda(st.error()));
   }
-  conv_cursor_.fill(0);
-  gdn_position_.fill(0);
-  kv_populated_.fill(0);
   return {};
 }
 
@@ -342,6 +339,9 @@ std::expected<void, Error> Session::reset() {
   if (auto st = stream_->sync(); !st) {
     return std::unexpected(from_cuda(st.error()));
   }
+  conv_cursor_.fill(0);
+  gdn_position_.fill(0);
+  kv_populated_.fill(0);
   return {};
 }
 
@@ -443,12 +443,12 @@ std::expected<void, Error> Session::restore(SessionSnapshot const& snap) {
       return std::unexpected(from_cuda(st.error()));
     }
   }
-  conv_cursor_ = snap.conv_cursor;
-  gdn_position_ = snap.gdn_position;
-  kv_populated_ = snap.kv_populated;
   if (auto st = stream_->sync(); !st) {
     return std::unexpected(from_cuda(st.error()));
   }
+  conv_cursor_ = snap.conv_cursor;
+  gdn_position_ = snap.gdn_position;
+  kv_populated_ = snap.kv_populated;
   return {};
 }
 

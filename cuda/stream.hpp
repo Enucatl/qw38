@@ -38,4 +38,13 @@ class Stream {
   int device_{-1};
 };
 
+namespace testing {
+
+// Makes the next successful stream synchronization report a failure. The
+// synchronization still completes so tests can deterministically exercise
+// deferred-failure metadata handling without leaving work in flight.
+void fail_next_stream_sync() noexcept;
+
+}  // namespace testing
+
 }  // namespace qw38::cuda

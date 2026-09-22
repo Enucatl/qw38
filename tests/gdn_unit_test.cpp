@@ -1250,6 +1250,17 @@ void test_session_history_wrap_reset_zero_padding() {
            "skipped position leaves history and recurrence unchanged");
   }
 
+  qw38::cuda::testing::fail_next_stream_sync();
+  auto deferred = execute_decode_gdn(*plan, 0);
+  expect(!deferred && deferred.error().code == qw38::runtime::ErrorCode::Cuda,
+         "injected deferred GDN failure is reported");
+  auto after_failure = session->save();
+  expect(after_failure && after_failure->conv_cursor[0] == 0 &&
+             after_failure->gdn_position[0] == 0,
+         "failed GDN execution does not commit continuation metadata");
+  expect(static_cast<bool>(session->reset()),
+         "reset device state after injected GDN failure");
+
   expect(static_cast<bool>(execute_decode_gdn(*plan, 0)),
          "execute GDN token zero after reset");
   std::vector<std::uint16_t> convolved(kQkvWidth);

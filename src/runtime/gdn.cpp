@@ -432,7 +432,7 @@ std::expected<void, Error> region_ab(GdnFrontPlan const& plan) {
   return {};
 }
 
-std::expected<void, Error> region_conv(GdnFrontPlan const& plan) {
+std::expected<std::uint32_t, Error> region_conv(GdnFrontPlan const& plan) {
   auto current = plan.cursor.value();
   if (!current) {
     return std::unexpected(current.error());
@@ -447,7 +447,7 @@ std::expected<void, Error> region_conv(GdnFrontPlan const& plan) {
       !st) {
     return std::unexpected(from_cuda(st.error()));
   }
-  return plan.cursor.commit_advance(cursor);
+  return cursor;
 }
 
 std::expected<void, Error> region_prep(GdnFrontPlan const& plan) {
@@ -863,10 +863,17 @@ std::expected<void, Error> execute_gdn_front(GdnFrontPlan const& plan) {
   if (auto st = region_ab(plan); !st) {
     return st;
   }
-  if (auto st = region_conv(plan); !st) {
+  auto cursor = region_conv(plan);
+  if (!cursor) {
+    return std::unexpected(cursor.error());
+  }
+  if (auto st = region_prep(plan); !st) {
     return st;
   }
-  return region_prep(plan);
+  if (auto st = plan.stream->sync(); !st) {
+    return std::unexpected(from_cuda(st.error()));
+  }
+  return plan.cursor.commit_advance(*cursor);
 }
 
 std::expected<GdnRecurrencePlan, Error> bind_gdn_recurrence_plan(
@@ -1302,8 +1309,9 @@ std::expected<TensorView, Error> execute_decode_gdn_impl(
   if (auto st = mark(3); !st) {
     return std::unexpected(st.error());
   }
-  if (auto st = region_conv(plan.front); !st) {
-    return std::unexpected(st.error());
+  auto cursor = region_conv(plan.front);
+  if (!cursor) {
+    return std::unexpected(cursor.error());
   }
   if (auto st = mark(4); !st) {
     return std::unexpected(st.error());
@@ -1344,6 +1352,12 @@ std::expected<TensorView, Error> execute_decode_gdn_impl(
       }
       timings->ms[i] = *ms;
     }
+  }
+  if (auto st = plan.front.stream->sync(); !st) {
+    return std::unexpected(from_cuda(st.error()));
+  }
+  if (auto st = plan.front.cursor.commit_advance(*cursor); !st) {
+    return std::unexpected(st.error());
   }
   if (auto st = plan.position.commit(position); !st) {
     return std::unexpected(st.error());

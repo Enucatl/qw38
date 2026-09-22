@@ -406,6 +406,12 @@ int main() {
     expect(s1->kv_populated(0) == 3 && s1->conv_cursor()[1] == 2,
            "rejected restore leaves metadata unchanged");
   }
+  qw38::cuda::testing::fail_next_stream_sync();
+  auto failed_reset = s1->reset();
+  expect(!failed_reset && failed_reset.error().code == ErrorCode::Cuda,
+         "injected deferred reset failure is reported");
+  expect(s1->kv_populated(0) == 3 && s1->conv_cursor()[1] == 2,
+         "failed reset does not commit host metadata");
   expect(static_cast<bool>(s1->reset()), "reset");
   expect(s1->kv_populated(0) == 0, "reset clears populated");
   expect(s1->conv_cursor()[1] == 0, "reset clears cursor");
@@ -422,6 +428,12 @@ int main() {
   }
 
   if (snap2) {
+    qw38::cuda::testing::fail_next_stream_sync();
+    auto failed_restore = s1->restore(*snap2);
+    expect(!failed_restore && failed_restore.error().code == ErrorCode::Cuda,
+           "injected deferred restore failure is reported");
+    expect(s1->kv_populated(0) == 0 && s1->conv_cursor()[1] == 0,
+           "failed restore does not commit host metadata");
     expect(static_cast<bool>(s1->restore(*snap2)), "restore");
     expect(s1->kv_populated(0) == 3, "restore populated");
     expect(s1->conv_cursor()[1] == 2, "restore cursor");

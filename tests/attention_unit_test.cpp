@@ -610,6 +610,13 @@ void test_capacity_and_mismatch(Stream const& stream) {
          "position mismatch is typed");
   expect(dev.populated == 0, "mismatch does not advance populated length");
 
+  qw38::cuda::testing::fail_next_stream_sync();
+  auto deferred = execute_decode_attention_prep(*plan, 0);
+  expect(!deferred && deferred.error().code == qw38::runtime::ErrorCode::Cuda,
+         "injected deferred attention append failure is reported");
+  expect(dev.populated == 0,
+         "failed attention append does not commit populated length");
+
   expect(static_cast<bool>(execute_decode_attention_prep(*plan, 0)), "append 0");
   expect(dev.populated == 1, "populated is 1 after first success");
   expect(static_cast<bool>(execute_decode_attention_prep(*plan, 1)), "append 1");
