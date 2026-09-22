@@ -158,14 +158,19 @@ void test_bad_magic_version_enum() {
               FormatErrorCode::UnsupportedManifestVersion,
               "unsupported schema manifest version");
 
-  mutated = mutate_schema(read_all(fx.path), [](auto& schema) {
-    schema.tensors[0].layout = static_cast<PhysicalLayoutId>(0xFFFFu);
-  });
-  if (!mutated) {
-    fail(error_message(mutated.error()));
-    return;
+  bytes = read_all(fx.path);
+  bool replaced_layout = false;
+  for (std::size_t i = qw38::format::kHeaderSizeV0; i + 1 < bytes.size();
+       ++i) {
+    if (bytes[i] == std::byte{0x05} && bytes[i + 1] == std::byte{0x02}) {
+      bytes[i] = std::byte{0xFF};
+      bytes[i + 1] = std::byte{0xFF};
+      replaced_layout = true;
+      break;
+    }
   }
-  expect_code(Artifact::parse(*mutated), FormatErrorCode::UnknownEnum,
+  expect(replaced_layout, "minimal manifest contains its BF16 vector layout");
+  expect_code(Artifact::parse(bytes), FormatErrorCode::UnknownEnum,
               "unknown layout enum");
 }
 

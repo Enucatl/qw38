@@ -888,6 +888,38 @@ bool tensors_share_payload(TensorRecord const& a,
          a.scales == b.scales && !a.payload.empty();
 }
 
+bool spans_overlap(ByteSpan const& a, ByteSpan const& b) noexcept {
+  // Tensor validation has already checked the end arithmetic for every
+  // nonempty span before this comparison is reached.
+  return !a.empty() && !b.empty() &&
+         a.offset < b.offset + b.length && b.offset < a.offset + a.length;
+}
+
+bool has_shared_binding(ArtifactSchema const& schema, std::uint32_t a,
+                        std::uint32_t b) noexcept {
+  for (auto const& binding : schema.shared_bindings) {
+    if ((binding.owner_tensor_id == a && binding.alias_tensor_id == b) ||
+        (binding.owner_tensor_id == b && binding.alias_tensor_id == a)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+std::expected<void, FormatError> validate_span_overlap(
+    ByteSpan const& a, ByteSpan const& b, bool exact_sharing_authorized,
+    std::uint64_t offset, std::string_view field) {
+  if (!spans_overlap(a, b)) {
+    return {};
+  }
+  if (a == b && exact_sharing_authorized) {
+    return {};
+  }
+  return std::unexpected(make_error(
+      FormatErrorCode::OverlappingSpan, offset, field,
+      "payload and scale spans may overlap only through an authorized exact alias"));
+}
+
 TensorRecord const* find_tensor(ArtifactSchema const& schema,
                                 std::uint32_t id) {
   for (auto const& t : schema.tensors) {
@@ -1059,6 +1091,22 @@ std::expected<void, FormatError> validate_tensor(TensorRecord const& tensor,
   if (auto st = validate_shape(tensor.shape, offset, "tensor.shape"); !st) {
     return st;
   }
+  if (!is_known(tensor.storage)) {
+    return std::unexpected(make_error(FormatErrorCode::UnknownEnum, offset,
+                                      "tensor.storage", "unknown storage class"));
+  }
+  if (!is_known(tensor.quantizer)) {
+    return std::unexpected(make_error(FormatErrorCode::UnknownEnum, offset,
+                                      "tensor.quantizer", "unknown quantizer"));
+  }
+  if (!is_known(tensor.layout)) {
+    return std::unexpected(make_error(FormatErrorCode::UnknownEnum, offset,
+                                      "tensor.layout", "unknown physical layout"));
+  }
+  if (!is_known(tensor.mapping.kind)) {
+    return std::unexpected(make_error(FormatErrorCode::UnknownEnum, offset,
+                                      "tensor.mapping.kind", "unknown mapping kind"));
+  }
   if (!layout_is_weight(tensor.layout)) {
     return std::unexpected(make_error(
         FormatErrorCode::InvalidQuantizerLayoutPair, offset, "tensor.layout",
@@ -1118,6 +1166,10 @@ std::expected<void, FormatError> validate_tensor(TensorRecord const& tensor,
 
 std::expected<void, FormatError> validate_precision(
     PrecisionPolicyRecord const& policy, std::uint64_t offset) {
+  if (!is_known(policy.id)) {
+    return std::unexpected(make_error(FormatErrorCode::UnknownEnum, offset,
+                                      "precision.id", "unknown precision policy"));
+  }
   if (policy.id != PrecisionPolicyId::V0) {
     return std::unexpected(make_error(FormatErrorCode::InvalidPrecisionPolicy,
                                       offset, "precision.id",
@@ -1152,6 +1204,16 @@ std::expected<void, FormatError> validate_precision(
     return std::unexpected(make_error(
         FormatErrorCode::InvalidPrecisionPolicy, offset, "precision.bindings",
         "V0 policy must list every precision domain once"));
+  }
+  for (auto const& binding : policy.bindings) {
+    if (!is_known(binding.domain)) {
+      return std::unexpected(make_error(FormatErrorCode::UnknownEnum, offset,
+                                        "precision.domain", "unknown precision domain"));
+    }
+    if (!is_known(binding.dtype)) {
+      return std::unexpected(make_error(FormatErrorCode::UnknownEnum, offset,
+                                        "precision.dtype", "unknown arithmetic dtype"));
+    }
   }
   for (auto const& req : kRequired) {
     int seen = 0;
@@ -1188,6 +1250,18 @@ std::expected<void, FormatError> validate_state(StateAllocation const& s,
     return std::unexpected(make_error(FormatErrorCode::InvalidStateAllocation,
                                       offset, "state.layer_count",
                                       "layer and component counts must be > 0"));
+  }
+  if (!is_known(s.kind)) {
+    return std::unexpected(make_error(FormatErrorCode::UnknownEnum, offset,
+                                      "state.kind", "unknown state kind"));
+  }
+  if (!is_known(s.dtype)) {
+    return std::unexpected(make_error(FormatErrorCode::UnknownEnum, offset,
+                                      "state.dtype", "unknown arithmetic dtype"));
+  }
+  if (!is_known(s.layout)) {
+    return std::unexpected(make_error(FormatErrorCode::UnknownEnum, offset,
+                                      "state.layout", "unknown physical layout"));
   }
   auto const elem = element_size(s.dtype);
   if (elem == 0) {
@@ -1322,11 +1396,15 @@ std::expected<void, FormatError> validate_scratch(ScratchAllocation const& s,
                                       offset, "scratch.bytes",
                                       "scratch allocation must be nonzero"));
   }
-  auto const elem = element_size(s.dtype);
-  if (elem == 0) {
+  if (!is_known(s.kind)) {
+    return std::unexpected(make_error(FormatErrorCode::UnknownEnum, offset,
+                                      "scratch.kind", "unknown scratch kind"));
+  }
+  if (!is_known(s.dtype)) {
     return std::unexpected(make_error(FormatErrorCode::UnknownEnum, offset,
                                       "scratch.dtype", "unknown dtype"));
   }
+  auto const elem = element_size(s.dtype);
   if ((s.bytes % elem) != 0) {
     return std::unexpected(make_error(
         FormatErrorCode::InvalidScratchAllocation, offset, "scratch.bytes",
@@ -1465,6 +1543,14 @@ std::expected<std::uint64_t, FormatError> expected_payload_bytes(
   if (auto st = validate_shape(tensor.shape, offset, "tensor.shape"); !st) {
     return std::unexpected(st.error());
   }
+  if (!is_known(tensor.storage)) {
+    return std::unexpected(make_error(FormatErrorCode::UnknownEnum, offset,
+                                      "tensor.storage", "unknown storage class"));
+  }
+  if (!is_known(tensor.layout)) {
+    return std::unexpected(make_error(FormatErrorCode::UnknownEnum, offset,
+                                      "tensor.layout", "unknown physical layout"));
+  }
   if (layout_is_tiled_dense(tensor.layout)) {
     if (tensor.shape.rank != 2) {
       return std::unexpected(make_error(FormatErrorCode::InvalidShape, offset,
@@ -1511,6 +1597,10 @@ std::expected<std::uint64_t, FormatError> expected_scale_bytes(
   if (auto st = validate_shape(tensor.shape, offset, "tensor.shape"); !st) {
     return std::unexpected(st.error());
   }
+  if (!is_known(tensor.quantizer)) {
+    return std::unexpected(make_error(FormatErrorCode::UnknownEnum, offset,
+                                      "tensor.quantizer", "unknown quantizer"));
+  }
   if (tensor.quantizer == LogicalQuantizerId::None) {
     return 0;
   }
@@ -1553,6 +1643,10 @@ std::expected<void, FormatError> validate_shared_binding_ownership(
   owners.reserve(schema.shared_bindings.size());
 
   for (auto const& binding : schema.shared_bindings) {
+    if (!is_known(binding.role)) {
+      return std::unexpected(make_error(FormatErrorCode::UnknownEnum, offset,
+                                        "shared.role", "unknown shared binding role"));
+    }
     if (binding.owner_tensor_id == binding.alias_tensor_id) {
       return std::unexpected(make_error(FormatErrorCode::SharedBinding, offset,
                                         "shared.alias",
@@ -1604,6 +1698,64 @@ std::expected<std::uint32_t, FormatError> canonical_owner_tensor_id(
     }
   }
   return tensor_id;
+}
+
+std::expected<void, FormatError> validate_schema_enums(
+    ArtifactSchema const& schema, std::uint64_t offset) {
+  if (!is_known(schema.scope)) {
+    return std::unexpected(make_error(FormatErrorCode::UnknownEnum, offset,
+                                      "scope", "unsupported semantic scope"));
+  }
+  if (!is_known(schema.precision.id)) {
+    return std::unexpected(make_error(FormatErrorCode::UnknownEnum, offset,
+                                      "precision.id", "unknown precision policy"));
+  }
+  for (auto const& binding : schema.precision.bindings) {
+    if (!is_known(binding.domain) || !is_known(binding.dtype)) {
+      return std::unexpected(make_error(
+          FormatErrorCode::UnknownEnum, offset, "precision",
+          "unknown precision domain or arithmetic dtype"));
+    }
+  }
+  for (auto const& tensor : schema.tensors) {
+    if (!is_known(tensor.storage) || !is_known(tensor.quantizer) ||
+        !is_known(tensor.layout) || !is_known(tensor.mapping.kind)) {
+      return std::unexpected(make_error(FormatErrorCode::UnknownEnum, offset,
+                                        "tensor", "unknown tensor enum"));
+    }
+  }
+  for (auto const& binding : schema.shared_bindings) {
+    if (!is_known(binding.role)) {
+      return std::unexpected(make_error(FormatErrorCode::UnknownEnum, offset,
+                                        "shared.role", "unknown shared binding role"));
+    }
+  }
+  for (auto const& binding : schema.graph_bindings) {
+    if (!is_known(binding.kind) || !is_known(binding.role)) {
+      return std::unexpected(make_error(FormatErrorCode::UnknownEnum, offset,
+                                        "graph", "unknown graph enum"));
+    }
+  }
+  for (auto const& state : schema.state) {
+    if (!is_known(state.kind) || !is_known(state.dtype) ||
+        !is_known(state.layout)) {
+      return std::unexpected(make_error(FormatErrorCode::UnknownEnum, offset,
+                                        "state", "unknown state enum"));
+    }
+  }
+  for (auto const& scratch : schema.scratch) {
+    if (!is_known(scratch.kind) || !is_known(scratch.dtype)) {
+      return std::unexpected(make_error(FormatErrorCode::UnknownEnum, offset,
+                                        "scratch", "unknown scratch enum"));
+    }
+  }
+  for (auto const& integrity : schema.integrity) {
+    if (!is_known(integrity.kind)) {
+      return std::unexpected(make_error(FormatErrorCode::UnknownEnum, offset,
+                                        "integrity.kind", "unknown integrity kind"));
+    }
+  }
+  return {};
 }
 
 std::expected<std::size_t, FormatError> encoded_size(
@@ -1741,6 +1893,9 @@ std::expected<void, FormatError> validate_header(ContainerHeader const& header,
 
 std::expected<std::size_t, FormatError> encoded_size(
     ArtifactSchema const& schema) {
+  if (auto st = validate_schema_enums(schema, 0); !st) {
+    return std::unexpected(st.error());
+  }
   SizeAcc acc;
   if (auto st = acc.add(2, 0, "manifest.version"); !st) {
     return std::unexpected(st.error());
@@ -2169,6 +2324,9 @@ std::expected<void, FormatError> validate_schema(ArtifactSchema const& schema,
                                       "compiler.ident",
                                       "compiler revision ident is required"));
   }
+  if (auto st = validate_schema_enums(schema, offset); !st) {
+    return st;
+  }
   if (!is_known(schema.scope)) {
     return std::unexpected(make_error(FormatErrorCode::UnknownEnum, offset,
                                       "scope", "unsupported semantic scope"));
@@ -2197,6 +2355,14 @@ std::expected<void, FormatError> validate_schema(ArtifactSchema const& schema,
     return st;
   }
   for (auto const& g : schema.graph_bindings) {
+    if (!is_known(g.kind)) {
+      return std::unexpected(make_error(FormatErrorCode::UnknownEnum, offset,
+                                        "graph.kind", "unknown semantic node kind"));
+    }
+    if (!is_known(g.role)) {
+      return std::unexpected(make_error(FormatErrorCode::UnknownEnum, offset,
+                                        "graph.role", "unknown tensor role"));
+    }
     if (find_tensor(schema, g.tensor_id) == nullptr) {
       return std::unexpected(make_error(FormatErrorCode::InvalidGraphBinding,
                                         offset, "graph.tensor",
@@ -2354,32 +2520,42 @@ std::expected<void, FormatError> validate_schema(ArtifactSchema const& schema,
     }
   }
   for (std::size_t i = 0; i < schema.tensors.size(); ++i) {
+    auto const& a = schema.tensors[i];
+    if (auto st = validate_span_overlap(a.payload, a.scales, false, offset,
+                                        "tensor.payload/scales");
+        !st) {
+      return st;
+    }
     for (std::size_t j = i + 1; j < schema.tensors.size(); ++j) {
-      auto const& a = schema.tensors[i];
       auto const& b = schema.tensors[j];
-      if (a.payload.empty() || b.payload.empty()) {
-        continue;
+      bool const authorized = has_shared_binding(schema, a.tensor_id, b.tensor_id);
+      if (auto st = validate_span_overlap(a.payload, b.payload, authorized,
+                                          offset, "tensor.payload");
+          !st) {
+        return st;
       }
-      if (a.payload == b.payload) {
-        bool bound = false;
-        for (auto const& sb : schema.shared_bindings) {
-          if ((sb.owner_tensor_id == a.tensor_id &&
-               sb.alias_tensor_id == b.tensor_id) ||
-              (sb.owner_tensor_id == b.tensor_id &&
-               sb.alias_tensor_id == a.tensor_id)) {
-            bound = true;
-            break;
-          }
-        }
-        if (!bound) {
-          return std::unexpected(make_error(
-              FormatErrorCode::SharedBinding, offset, "tensor.payload",
-              "identical payload spans require a shared binding"));
-        }
+      if (auto st = validate_span_overlap(a.payload, b.scales, false, offset,
+                                          "tensor.payload/scales");
+          !st) {
+        return st;
+      }
+      if (auto st = validate_span_overlap(a.scales, b.payload, false, offset,
+                                          "tensor.scales/payload");
+          !st) {
+        return st;
+      }
+      if (auto st = validate_span_overlap(a.scales, b.scales, authorized,
+                                          offset, "tensor.scales");
+          !st) {
+        return st;
       }
     }
   }
   for (auto const& rec : schema.integrity) {
+    if (!is_known(rec.kind)) {
+      return std::unexpected(make_error(FormatErrorCode::UnknownEnum, offset,
+                                        "integrity.kind", "unknown integrity kind"));
+    }
     if (auto st = checked_add(rec.region.offset, rec.region.length, offset,
                               "integrity.region");
         !st) {

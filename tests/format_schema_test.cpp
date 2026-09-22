@@ -503,7 +503,7 @@ void test_shared_bindings() {
   schema.tensors.push_back(a);
   schema.tensors.push_back(b);
   st = validate_schema(schema);
-  expect(!st && st.error().code == FormatErrorCode::SharedBinding,
+  expect(!st && st.error().code == FormatErrorCode::OverlappingSpan,
          "identical spans without a shared binding are rejected");
 
   schema.shared_bindings.push_back(SharedBinding{
@@ -612,6 +612,101 @@ void test_shared_binding_ownership_graph() {
       SharedBinding{.owner_tensor_id = 3, .alias_tensor_id = 1},
   };
   rejects(schema, "long shared-binding cycles are rejected");
+}
+
+void test_span_overlap_classes() {
+  auto schema = base_schema();
+  schema.tensors.push_back(bf16_vector(1, "a", 256, 256));
+  schema.tensors.push_back(bf16_vector(2, "b", 256, 512));
+  auto st = validate_schema(schema);
+  expect(!st && st.error().code == FormatErrorCode::OverlappingSpan,
+         "partial payload overlap is rejected");
+
+  schema = base_schema();
+  schema.tensors.push_back(q4_matrix(1, "a", 8, 256, 256, 1280));
+  schema.tensors.push_back(q4_matrix(2, "b", 8, 256, 2048, 512));
+  st = validate_schema(schema);
+  expect(!st && st.error().code == FormatErrorCode::OverlappingSpan,
+         "payload and scale overlap is rejected");
+
+  schema = base_schema();
+  schema.tensors.push_back(q4_matrix(1, "a", 8, 256, 256, 1280));
+  schema.tensors.push_back(q4_matrix(2, "b", 8, 256, 2048, 1280));
+  st = validate_schema(schema);
+  expect(!st && st.error().code == FormatErrorCode::OverlappingSpan,
+         "scale and scale overlap is rejected");
+}
+
+void test_encode_decode_reject_unknown_record_enums() {
+  auto schema = base_schema();
+  auto a = bf16_vector(1, "a", 4, 256);
+  auto b = a;
+  b.tensor_id = 2;
+  b.logical_name = "b";
+  schema.tensors = {a, b};
+  schema.shared_bindings.push_back(SharedBinding{
+      .owner_tensor_id = 1,
+      .alias_tensor_id = 2,
+      .role = SharedBindingRole::GenericAlias,
+  });
+  schema.graph_bindings.push_back(GraphBinding{
+      .instance_id = 1,
+      .kind = SemanticNodeKind::Embed,
+      .role = TensorRole::EmbeddingTable,
+      .layer_index = kNoLayerIndex,
+      .tensor_id = 1,
+  });
+  schema.integrity.push_back(IntegrityRecord{
+      .kind = IntegrityKind::Sha256Manifest,
+      .region = ByteSpan{.offset = 64, .length = 128},
+      .digest = hash_with(9),
+  });
+  auto const bytes = must_encode(schema, "record enum fixture");
+  if (bytes.empty()) {
+    return;
+  }
+
+  auto expect_rejected = [&](auto mutate, std::uint16_t valid_wire,
+                             std::string_view what) {
+    auto invalid = schema;
+    mutate(invalid);
+    std::vector<std::byte> output(bytes.size());
+    auto encoded = encode(invalid, output);
+    expect(!encoded && encoded.error().code == FormatErrorCode::UnknownEnum,
+           std::string(what) + " encoder rejection");
+
+    auto hostile = bytes;
+    bool replaced = false;
+    for (std::size_t i = 0; i + 1 < hostile.size(); ++i) {
+      if (hostile[i] == static_cast<std::byte>(valid_wire & 0xFFu) &&
+          hostile[i + 1] == static_cast<std::byte>(valid_wire >> 8)) {
+        hostile[i] = std::byte{0xFF};
+        hostile[i + 1] = std::byte{0xFF};
+        replaced = true;
+        break;
+      }
+    }
+    expect(replaced, std::string(what) + " wire field located");
+    auto decoded = decode_schema(hostile);
+    expect(!decoded && decoded.error().code == FormatErrorCode::UnknownEnum,
+           std::string(what) + " decoder rejection");
+  };
+
+  expect_rejected(
+      [](auto& value) { value.state[0].kind = static_cast<qw38::format::StateKind>(0xFFFFu); },
+      0x0C01, "state kind");
+  expect_rejected(
+      [](auto& value) { value.scratch[0].kind = static_cast<qw38::format::ScratchKind>(0xFFFFu); },
+      0x0D01, "scratch kind");
+  expect_rejected(
+      [](auto& value) { value.graph_bindings[0].kind = static_cast<SemanticNodeKind>(0xFFFFu); },
+      0x0301, "graph kind");
+  expect_rejected(
+      [](auto& value) { value.shared_bindings[0].role = static_cast<SharedBindingRole>(0xFFFFu); },
+      0x0901, "shared role");
+  expect_rejected(
+      [](auto& value) { value.integrity[0].kind = static_cast<IntegrityKind>(0xFFFFu); },
+      0x0801, "integrity kind");
 }
 
 void test_schema_roundtrip_and_object_layout_independence() {
@@ -732,6 +827,8 @@ int main() {
   test_shape_entry_points_reject_malformed_ranks_and_sizes();
   test_shared_bindings();
   test_shared_binding_ownership_graph();
+  test_span_overlap_classes();
+  test_encode_decode_reject_unknown_record_enums();
   test_schema_roundtrip_and_object_layout_independence();
   test_truncated_input();
   test_hostile_record_counts_are_bounded();
