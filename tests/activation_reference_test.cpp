@@ -65,6 +65,16 @@ void expect_bf16_close(std::span<std::uint16_t const> got,
   }
 }
 
+void expect_finite_bf16(std::span<std::uint16_t const> values,
+                        std::string_view tag) {
+  for (auto value : values) {
+    if (!std::isfinite(qw38::format::bf16_to_fp32(value))) {
+      fail(std::string(tag) + " produced non-finite output");
+      return;
+    }
+  }
+}
+
 void test_invalid_launches(Stream const& stream) {
   auto buf = DeviceBuffer::allocate(64);
   expect(static_cast<bool>(buf), "tiny buffer");
@@ -398,6 +408,175 @@ void test_adversarial_magnitudes(Stream const& stream) {
   }
 }
 
+void test_rms_overflow_thresholds(Stream const& stream) {
+  float const hidden_threshold =
+      std::sqrt(std::numeric_limits<float>::max() / static_cast<float>(kHidden));
+  float const head_threshold =
+      std::sqrt(std::numeric_limits<float>::max() / static_cast<float>(kHeadDim));
+  float const gdn_threshold = std::sqrt(
+      std::numeric_limits<float>::max() / static_cast<float>(kGdnHeadDim));
+
+  for (float multiplier : {0.5f, 2.0f}) {
+    auto hidden = std::vector<float>(kHidden);
+    for (std::uint32_t i = 0; i < kHidden; ++i) {
+      hidden[i] = (i & 1u ? -1.0f : 1.0f) * hidden_threshold * multiplier;
+    }
+    auto hidden_gamma = filled_h(kHidden, 0.0f);
+    std::vector<std::uint16_t> hidden_cpu(kHidden);
+    std::vector<std::uint16_t> hidden_gold(kHidden);
+    expect(static_cast<bool>(qw38::reference::hidden_rms_norm_1p_gamma(
+               hidden, hidden_gamma, kDefaultRmsEps, hidden_cpu)),
+           "cpu hidden threshold rms");
+    expect(static_cast<bool>(qw38::reference::hidden_rms_norm_1p_gamma_f64(
+               hidden, hidden_gamma, kDefaultRmsEps, hidden_gold)),
+           "f64 hidden threshold rms");
+    expect_finite_bf16(hidden_cpu, "cpu hidden threshold rms");
+    expect(hidden_cpu == hidden_gold, "hidden threshold rms matches f64");
+
+    auto d_hidden = upload_vec(hidden, stream);
+    auto d_hidden_gamma = upload_vec(hidden_gamma, stream);
+    auto d_hidden_out =
+        DeviceBuffer::allocate(kHidden * sizeof(std::uint16_t));
+    expect(static_cast<bool>(d_hidden) && static_cast<bool>(d_hidden_gamma) &&
+               static_cast<bool>(d_hidden_out),
+           "hidden threshold alloc");
+    if (!d_hidden || !d_hidden_gamma || !d_hidden_out) {
+      continue;
+    }
+    expect(static_cast<bool>(qw38::cuda::launch_hidden_rms(
+               static_cast<float const*>(d_hidden->data()),
+               static_cast<std::uint16_t const*>(d_hidden_gamma->data()),
+               kDefaultRmsEps, 1,
+               static_cast<std::uint16_t*>(d_hidden_out->data()), stream)),
+           "launch hidden threshold rms");
+    auto hidden_gpu =
+        download_vec<std::uint16_t>(*d_hidden_out, kHidden, stream);
+    expect(static_cast<bool>(hidden_gpu), "download hidden threshold rms");
+    if (hidden_gpu) {
+      expect_finite_bf16(*hidden_gpu, "cuda hidden threshold rms");
+      expect_bf16_close(*hidden_gpu, hidden_gold, tol::kRmsBf16Abs,
+                        "hidden threshold rms");
+    }
+
+    auto head = std::vector<float>(kHeadDim);
+    for (std::uint32_t i = 0; i < kHeadDim; ++i) {
+      head[i] = (i & 1u ? -1.0f : 1.0f) * head_threshold * multiplier;
+    }
+    auto head_bf16 = std::vector<std::uint16_t>(kHeadDim);
+    for (std::uint32_t i = 0; i < kHeadDim; ++i) {
+      head_bf16[i] = bf16(head[i]);
+    }
+    auto head_gamma = filled_h(kHeadDim, 0.0f);
+    std::vector<std::uint16_t> qk_cpu(kHeadDim);
+    std::vector<std::uint16_t> qk_gold(kHeadDim);
+    expect(static_cast<bool>(qw38::reference::qk_rms_norm_1p_gamma(
+               head, head_gamma, kDefaultRmsEps, qk_cpu)),
+           "cpu qk threshold rms");
+    expect(static_cast<bool>(qw38::reference::qk_rms_norm_1p_gamma_f64(
+               head, head_gamma, kDefaultRmsEps, qk_gold)),
+           "f64 qk threshold rms");
+    expect_finite_bf16(qk_cpu, "cpu qk threshold rms");
+    expect(qk_cpu == qk_gold, "qk threshold rms matches f64");
+
+    auto d_head = upload_vec(head, stream);
+    auto d_head_bf16 = upload_vec(head_bf16, stream);
+    auto d_head_gamma = upload_vec(head_gamma, stream);
+    auto d_qk_out = DeviceBuffer::allocate(kHeadDim * sizeof(std::uint16_t));
+    auto inv = qw38::reference::rope_inv_freq();
+    auto d_inv =
+        upload_vec(std::vector<float>(inv.begin(), inv.end()), stream);
+    expect(static_cast<bool>(d_head) && static_cast<bool>(d_head_bf16) &&
+               static_cast<bool>(d_head_gamma) &&
+               static_cast<bool>(d_qk_out) && static_cast<bool>(d_inv),
+           "qk threshold alloc");
+    if (!d_head || !d_head_bf16 || !d_head_gamma || !d_qk_out || !d_inv) {
+      continue;
+    }
+    expect(static_cast<bool>(qw38::cuda::launch_qk_rms(
+               static_cast<float const*>(d_head->data()),
+               static_cast<std::uint16_t const*>(d_head_gamma->data()),
+               kDefaultRmsEps, 1,
+               static_cast<std::uint16_t*>(d_qk_out->data()), stream)),
+           "launch qk threshold rms");
+    auto qk_gpu = download_vec<std::uint16_t>(*d_qk_out, kHeadDim, stream);
+    expect(static_cast<bool>(qk_gpu), "download qk threshold rms");
+    if (qk_gpu) {
+      expect_finite_bf16(*qk_gpu, "cuda qk threshold rms");
+      expect_bf16_close(*qk_gpu, qk_gold, tol::kRmsBf16Abs,
+                        "qk threshold rms");
+    }
+
+    std::vector<std::uint16_t> fused_cpu(kHeadDim);
+    std::vector<std::uint16_t> fused_gold(kHeadDim);
+    expect(static_cast<bool>(qw38::reference::qk_rms_rope_1p_gamma(
+               head_bf16, head_gamma, kDefaultRmsEps, inv, 0, fused_cpu)),
+           "cpu fused qk threshold rms");
+    expect(static_cast<bool>(qw38::reference::qk_rms_rope_1p_gamma_f64(
+               head_bf16, head_gamma, kDefaultRmsEps, inv, 0, fused_gold)),
+           "f64 fused qk threshold rms");
+    expect_finite_bf16(fused_cpu, "cpu fused qk threshold rms");
+    expect(fused_cpu == fused_gold, "fused qk threshold rms matches f64");
+    expect(static_cast<bool>(qw38::cuda::launch_qk_rms_rope(
+               static_cast<std::uint16_t const*>(d_head_bf16->data()),
+               static_cast<std::uint16_t const*>(d_head_gamma->data()),
+               kDefaultRmsEps, static_cast<float const*>(d_inv->data()), 0, 1,
+               static_cast<std::uint16_t*>(d_qk_out->data()), stream)),
+           "launch fused qk threshold rms");
+    auto fused_gpu = download_vec<std::uint16_t>(*d_qk_out, kHeadDim, stream);
+    expect(static_cast<bool>(fused_gpu), "download fused qk threshold rms");
+    if (fused_gpu) {
+      expect_finite_bf16(*fused_gpu, "cuda fused qk threshold rms");
+      expect_bf16_close(*fused_gpu, fused_gold, tol::kRmsBf16Abs,
+                        "fused qk threshold rms");
+    }
+
+    auto gdn = std::vector<float>(kGdnHeadDim);
+    for (std::uint32_t i = 0; i < kGdnHeadDim; ++i) {
+      gdn[i] = (i & 1u ? -1.0f : 1.0f) * gdn_threshold * multiplier;
+    }
+    auto z = filled_h(kGdnHeadDim, 1.0f);
+    auto gdn_gamma = filled_h(kGdnHeadDim, 1.0f);
+    std::vector<std::uint16_t> gdn_cpu(kGdnHeadDim);
+    std::vector<std::uint16_t> gdn_gold(kGdnHeadDim);
+    expect(static_cast<bool>(qw38::reference::gdn_gated_rms_norm(
+               gdn, z, gdn_gamma, kDefaultRmsEps, gdn_cpu)),
+           "cpu gated threshold rms");
+    expect(static_cast<bool>(qw38::reference::gdn_gated_rms_norm_f64(
+               gdn, z, gdn_gamma, kDefaultRmsEps, gdn_gold)),
+           "f64 gated threshold rms");
+    expect_finite_bf16(gdn_cpu, "cpu gated threshold rms");
+    expect(gdn_cpu == gdn_gold, "gated threshold rms matches f64");
+
+    auto d_gdn = upload_vec(gdn, stream);
+    auto d_z = upload_vec(z, stream);
+    auto d_gdn_gamma = upload_vec(gdn_gamma, stream);
+    auto d_gdn_out =
+        DeviceBuffer::allocate(kGdnHeadDim * sizeof(std::uint16_t));
+    expect(static_cast<bool>(d_gdn) && static_cast<bool>(d_z) &&
+               static_cast<bool>(d_gdn_gamma) &&
+               static_cast<bool>(d_gdn_out),
+           "gated threshold alloc");
+    if (!d_gdn || !d_z || !d_gdn_gamma || !d_gdn_out) {
+      continue;
+    }
+    expect(static_cast<bool>(qw38::cuda::launch_gdn_gated_rms(
+               static_cast<float const*>(d_gdn->data()),
+               static_cast<std::uint16_t const*>(d_z->data()),
+               static_cast<std::uint16_t const*>(d_gdn_gamma->data()),
+               kDefaultRmsEps, 1,
+               static_cast<std::uint16_t*>(d_gdn_out->data()), stream)),
+           "launch gated threshold rms");
+    auto gdn_gpu =
+        download_vec<std::uint16_t>(*d_gdn_out, kGdnHeadDim, stream);
+    expect(static_cast<bool>(gdn_gpu), "download gated threshold rms");
+    if (gdn_gpu) {
+      expect_finite_bf16(*gdn_gpu, "cuda gated threshold rms");
+      expect_bf16_close(*gdn_gpu, gdn_gold, tol::kGatedRmsBf16Abs,
+                        "gated threshold rms");
+    }
+  }
+}
+
 }  // namespace
 
 int main() {
@@ -415,6 +594,7 @@ int main() {
   test_rope(*stream);
   test_argmax(*stream);
   test_adversarial_magnitudes(*stream);
+  test_rms_overflow_thresholds(*stream);
   if (g_failures != 0) {
     std::cerr << g_failures << " failures\n";
     return 1;

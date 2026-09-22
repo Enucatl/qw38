@@ -2,6 +2,7 @@
 
 #include "format/floatcvt.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <limits>
 #include <vector>
@@ -39,6 +40,34 @@ std::expected<void, Error> require_span_size(std::size_t got, std::size_t want,
 }
 
 template <class Acc>
+struct ScaledRms {
+  Acc scale;
+  Acc inv_scaled_rms;
+};
+
+template <class Acc, class Value>
+ScaledRms<Acc> scaled_rms(std::uint32_t dim, Value value, float eps) {
+  Acc scale = Acc{0};
+  for (std::uint32_t i = 0; i < dim; ++i) {
+    scale = std::max(scale, std::abs(static_cast<Acc>(value(i))));
+  }
+  if (scale == Acc{0}) {
+    return {Acc{1}, Acc{1} / std::sqrt(static_cast<Acc>(eps))};
+  }
+
+  Acc sumsq = Acc{0};
+  for (std::uint32_t i = 0; i < dim; ++i) {
+    Acc const scaled = static_cast<Acc>(value(i)) / scale;
+    sumsq += scaled * scaled;
+  }
+  Acc const scaled_eps = std::sqrt(static_cast<Acc>(eps)) / scale;
+  Acc const inv_scaled_rms =
+      Acc{1} / std::sqrt(sumsq / static_cast<Acc>(dim) +
+                         scaled_eps * scaled_eps);
+  return {scale, inv_scaled_rms};
+}
+
+template <class Acc>
 std::expected<void, Error> rms_norm_1p_gamma_impl(
     std::span<float const> x, std::span<std::uint16_t const> gamma, float eps,
     std::span<std::uint16_t> out, std::uint32_t dim, std::string_view name) {
@@ -54,16 +83,13 @@ std::expected<void, Error> rms_norm_1p_gamma_impl(
   if (auto st = require_span_size(out.size(), dim, "out"); !st) {
     return st;
   }
-  Acc sumsq = Acc{0};
-  for (std::uint32_t i = 0; i < dim; ++i) {
-    Acc const v = static_cast<Acc>(x[i]);
-    sumsq += v * v;
-  }
-  Acc const rms = std::sqrt(sumsq / static_cast<Acc>(dim) + static_cast<Acc>(eps));
-  Acc const inv_rms = Acc{1} / rms;
+  auto const rms = scaled_rms<Acc>(
+      dim, [&](std::uint32_t i) { return x[i]; }, eps);
   for (std::uint32_t i = 0; i < dim; ++i) {
     Acc const g = static_cast<Acc>(bf16_to_fp32(gamma[i]));
-    Acc const y = (Acc{1} + g) * static_cast<Acc>(x[i]) * inv_rms;
+    Acc const normalized =
+        (static_cast<Acc>(x[i]) / rms.scale) * rms.inv_scaled_rms;
+    Acc const y = (Acc{1} + g) * normalized;
     out[i] = fp32_to_bf16_rne(static_cast<float>(y));
   }
   return {};
@@ -91,18 +117,16 @@ std::expected<void, Error> qk_rms_rope_1p_gamma_impl(
   }
 
   std::array<Acc, kHeadDim> normalized{};
-  Acc sumsq = Acc{0};
   for (std::uint32_t i = 0; i < kHeadDim; ++i) {
     Acc const v = static_cast<Acc>(bf16_to_fp32(projected_head_bf16[i]));
     normalized[i] = v;
-    sumsq += v * v;
   }
-  Acc const rms =
-      std::sqrt(sumsq / static_cast<Acc>(kHeadDim) + static_cast<Acc>(eps));
-  Acc const inv_rms = Acc{1} / rms;
+  auto const rms = scaled_rms<Acc>(
+      kHeadDim, [&](std::uint32_t i) { return normalized[i]; }, eps);
   for (std::uint32_t i = 0; i < kHeadDim; ++i) {
     Acc const g = static_cast<Acc>(bf16_to_fp32(gamma[i]));
-    normalized[i] = (Acc{1} + g) * normalized[i] * inv_rms;
+    Acc const unit = (normalized[i] / rms.scale) * rms.inv_scaled_rms;
+    normalized[i] = (Acc{1} + g) * unit;
   }
 
   Acc const p = static_cast<Acc>(position);
@@ -246,17 +270,13 @@ std::expected<void, Error> gdn_gated_rms_norm(
     return std::unexpected(
         shape_error("gdn_gated_rms", "o/z/gamma/out must be [128]"));
   }
-  float sumsq = 0.0f;
-  for (std::uint32_t i = 0; i < kGdnHeadDim; ++i) {
-    sumsq += o[i] * o[i];
-  }
-  float const rms =
-      std::sqrt(sumsq / static_cast<float>(kGdnHeadDim) + eps);
-  float const inv_rms = 1.0f / rms;
+  auto const rms = scaled_rms<float>(
+      kGdnHeadDim, [&](std::uint32_t i) { return o[i]; }, eps);
   for (std::uint32_t i = 0; i < kGdnHeadDim; ++i) {
     float const g = bf16_to_fp32(gamma[i]);
     float const z = bf16_to_fp32(z_bf16[i]);
-    float const y = g * (o[i] * inv_rms) * silu_fp32(z);
+    float const normalized = (o[i] / rms.scale) * rms.inv_scaled_rms;
+    float const y = g * normalized * silu_fp32(z);
     out_bf16[i] = fp32_to_bf16_rne(y);
   }
   return {};
@@ -274,18 +294,14 @@ std::expected<void, Error> gdn_gated_rms_norm_f64(
     return std::unexpected(
         shape_error("gdn_gated_rms", "o/z/gamma/out must be [128]"));
   }
-  double sumsq = 0.0;
-  for (std::uint32_t i = 0; i < kGdnHeadDim; ++i) {
-    double const v = static_cast<double>(o[i]);
-    sumsq += v * v;
-  }
-  double const rms =
-      std::sqrt(sumsq / static_cast<double>(kGdnHeadDim) + static_cast<double>(eps));
-  double const inv_rms = 1.0 / rms;
+  auto const rms = scaled_rms<double>(
+      kGdnHeadDim, [&](std::uint32_t i) { return o[i]; }, eps);
   for (std::uint32_t i = 0; i < kGdnHeadDim; ++i) {
     double const g = static_cast<double>(bf16_to_fp32(gamma[i]));
     double const z = static_cast<double>(bf16_to_fp32(z_bf16[i]));
-    double const y = g * (static_cast<double>(o[i]) * inv_rms) * silu_f64(z);
+    double const normalized =
+        (static_cast<double>(o[i]) / rms.scale) * rms.inv_scaled_rms;
+    double const y = g * normalized * silu_f64(z);
     out_bf16[i] = fp32_to_bf16_rne(static_cast<float>(y));
   }
   return {};

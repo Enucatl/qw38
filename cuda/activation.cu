@@ -36,6 +36,14 @@ __device__ __forceinline__ float warp_sum(float v) {
   return v;
 }
 
+__device__ __forceinline__ float warp_max(float v) {
+#pragma unroll
+  for (int off = 16; off > 0; off >>= 1) {
+    v = fmaxf(v, __shfl_down_sync(0xffffffffu, v, off));
+  }
+  return v;
+}
+
 template <int Threads>
 __device__ float block_sum(float v) {
   static_assert(Threads == 128 || Threads == 256);
@@ -52,6 +60,30 @@ __device__ float block_sum(float v) {
   if (warp == 0) {
     t = (lane < kWarps) ? sm[lane] : 0.0f;
     t = warp_sum(t);
+    if (lane == 0) {
+      sm[0] = t;
+    }
+  }
+  __syncthreads();
+  return sm[0];
+}
+
+template <int Threads>
+__device__ float block_max(float v) {
+  static_assert(Threads == 128 || Threads == 256);
+  constexpr int kWarps = Threads / 32;
+  v = warp_max(v);
+  __shared__ float sm[kWarps];
+  int const warp = threadIdx.x >> 5;
+  int const lane = threadIdx.x & 31;
+  if (lane == 0) {
+    sm[warp] = v;
+  }
+  __syncthreads();
+  float t = 0.0f;
+  if (warp == 0) {
+    t = (lane < kWarps) ? sm[lane] : 0.0f;
+    t = warp_max(t);
     if (lane == 0) {
       sm[0] = t;
     }
@@ -87,18 +119,26 @@ __global__ void hidden_rms_kernel(float const* residual,
   float const* x = residual + static_cast<std::size_t>(blockIdx.x) * kHidden;
   std::uint16_t* y =
       out_bf16 + static_cast<std::size_t>(blockIdx.x) * kHidden;
+  float scale = 0.0f;
+  for (std::uint32_t i = threadIdx.x; i < kHidden; i += blockDim.x) {
+    scale = fmaxf(scale, fabsf(x[i]));
+  }
+  scale = block_max<kHiddenRmsThreads>(scale);
+  float const safe_scale = scale == 0.0f ? 1.0f : scale;
   float sumsq = 0.0f;
   for (std::uint32_t i = threadIdx.x; i < kHidden; i += blockDim.x) {
-    float const v = x[i];
-    sumsq += v * v;
+    float const scaled = x[i] / safe_scale;
+    sumsq += scaled * scaled;
   }
   sumsq = block_sum<kHiddenRmsThreads>(sumsq);
-  float const rms =
-      sqrtf(sumsq / static_cast<float>(kHidden) + eps);
-  float const inv_rms = 1.0f / rms;
+  float const scaled_eps = sqrtf(eps) / safe_scale;
+  float const inv_scaled_rms =
+      1.0f / sqrtf(sumsq / static_cast<float>(kHidden) +
+                   scaled_eps * scaled_eps);
   for (std::uint32_t i = threadIdx.x; i < kHidden; i += blockDim.x) {
     float const g = bf16_to_fp32(gamma[i]);
-    float const v = (1.0f + g) * x[i] * inv_rms;
+    float const normalized = (x[i] / safe_scale) * inv_scaled_rms;
+    float const v = (1.0f + g) * normalized;
     y[i] = fp32_to_bf16_rne(v);
   }
 }
@@ -112,18 +152,28 @@ __global__ void qk_rms_rope_kernel(std::uint16_t const* projected_heads,
   std::uint16_t* out =
       out_bf16 + static_cast<std::size_t>(blockIdx.x) * kHeadDim;
   __shared__ float normalized[kHeadDim];
-  float sumsq = 0.0f;
+  float scale = 0.0f;
   for (std::uint32_t i = threadIdx.x; i < kHeadDim; i += blockDim.x) {
     float const v = bf16_to_fp32(x[i]);
     normalized[i] = v;
-    sumsq += v * v;
+    scale = fmaxf(scale, fabsf(v));
+  }
+  scale = block_max<kHeadNormThreads>(scale);
+  float const safe_scale = scale == 0.0f ? 1.0f : scale;
+  float sumsq = 0.0f;
+  for (std::uint32_t i = threadIdx.x; i < kHeadDim; i += blockDim.x) {
+    float const scaled = normalized[i] / safe_scale;
+    sumsq += scaled * scaled;
   }
   sumsq = block_sum<kHeadNormThreads>(sumsq);
-  float const inv_rms =
-      1.0f / sqrtf(sumsq / static_cast<float>(kHeadDim) + eps);
+  float const scaled_eps = sqrtf(eps) / safe_scale;
+  float const inv_scaled_rms =
+      1.0f / sqrtf(sumsq / static_cast<float>(kHeadDim) +
+                   scaled_eps * scaled_eps);
   for (std::uint32_t i = threadIdx.x; i < kHeadDim; i += blockDim.x) {
     float const g = bf16_to_fp32(gamma[i]);
-    normalized[i] = (1.0f + g) * normalized[i] * inv_rms;
+    float const unit = (normalized[i] / safe_scale) * inv_scaled_rms;
+    normalized[i] = (1.0f + g) * unit;
   }
   __syncthreads();
 
@@ -149,18 +199,26 @@ __global__ void qk_rms_kernel(float const* heads, std::uint16_t const* gamma,
   float const* x = heads + static_cast<std::size_t>(blockIdx.x) * kHeadDim;
   std::uint16_t* y =
       out_bf16 + static_cast<std::size_t>(blockIdx.x) * kHeadDim;
+  float scale = 0.0f;
+  for (std::uint32_t i = threadIdx.x; i < kHeadDim; i += blockDim.x) {
+    scale = fmaxf(scale, fabsf(x[i]));
+  }
+  scale = block_max<kHeadNormThreads>(scale);
+  float const safe_scale = scale == 0.0f ? 1.0f : scale;
   float sumsq = 0.0f;
   for (std::uint32_t i = threadIdx.x; i < kHeadDim; i += blockDim.x) {
-    float const v = x[i];
-    sumsq += v * v;
+    float const scaled = x[i] / safe_scale;
+    sumsq += scaled * scaled;
   }
   sumsq = block_sum<kHeadNormThreads>(sumsq);
-  float const rms =
-      sqrtf(sumsq / static_cast<float>(kHeadDim) + eps);
-  float const inv_rms = 1.0f / rms;
+  float const scaled_eps = sqrtf(eps) / safe_scale;
+  float const inv_scaled_rms =
+      1.0f / sqrtf(sumsq / static_cast<float>(kHeadDim) +
+                   scaled_eps * scaled_eps);
   for (std::uint32_t i = threadIdx.x; i < kHeadDim; i += blockDim.x) {
     float const g = bf16_to_fp32(gamma[i]);
-    float const v = (1.0f + g) * x[i] * inv_rms;
+    float const normalized = (x[i] / safe_scale) * inv_scaled_rms;
+    float const v = (1.0f + g) * normalized;
     y[i] = fp32_to_bf16_rne(v);
   }
 }
@@ -174,19 +232,27 @@ __global__ void gdn_gated_rms_kernel(float const* o,
       z_bf16 + static_cast<std::size_t>(blockIdx.x) * kGdnHeadDim;
   std::uint16_t* y =
       out_bf16 + static_cast<std::size_t>(blockIdx.x) * kGdnHeadDim;
+  float scale = 0.0f;
+  for (std::uint32_t i = threadIdx.x; i < kGdnHeadDim; i += blockDim.x) {
+    scale = fmaxf(scale, fabsf(oh[i]));
+  }
+  scale = block_max<kHeadNormThreads>(scale);
+  float const safe_scale = scale == 0.0f ? 1.0f : scale;
   float sumsq = 0.0f;
   for (std::uint32_t i = threadIdx.x; i < kGdnHeadDim; i += blockDim.x) {
-    float const v = oh[i];
-    sumsq += v * v;
+    float const scaled = oh[i] / safe_scale;
+    sumsq += scaled * scaled;
   }
   sumsq = block_sum<kHeadNormThreads>(sumsq);
-  float const rms =
-      sqrtf(sumsq / static_cast<float>(kGdnHeadDim) + eps);
-  float const inv_rms = 1.0f / rms;
+  float const scaled_eps = sqrtf(eps) / safe_scale;
+  float const inv_scaled_rms =
+      1.0f / sqrtf(sumsq / static_cast<float>(kGdnHeadDim) +
+                   scaled_eps * scaled_eps);
   for (std::uint32_t i = threadIdx.x; i < kGdnHeadDim; i += blockDim.x) {
     float const g = bf16_to_fp32(gamma[i]);
     float const z = bf16_to_fp32(zh[i]);
-    float const v = g * (oh[i] * inv_rms) * silu_fp32(z);
+    float const normalized = (oh[i] / safe_scale) * inv_scaled_rms;
+    float const v = g * normalized * silu_fp32(z);
     y[i] = fp32_to_bf16_rne(v);
   }
 }
