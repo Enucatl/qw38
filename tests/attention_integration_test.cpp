@@ -6,6 +6,7 @@
 #include "runtime/runtime.hpp"
 #include "runtime_support.hpp"
 
+#include <algorithm>
 #include <filesystem>
 #include <iostream>
 #include <optional>
@@ -241,6 +242,22 @@ bool upload_residual(qw38::runtime::Session& session, std::span<float const> h,
     return false;
   }
   return true;
+}
+
+template <typename T>
+bool byte_equal(std::span<T const> lhs, std::span<T const> rhs) {
+  return lhs.size() == rhs.size() &&
+         std::equal(std::as_bytes(lhs).begin(), std::as_bytes(lhs).end(),
+                    std::as_bytes(rhs).begin());
+}
+
+bool snapshot_equal(qw38::runtime::SessionSnapshot const& lhs,
+                    qw38::runtime::SessionSnapshot const& rhs) {
+  return lhs.gdn_s == rhs.gdn_s &&
+         lhs.conv_history == rhs.conv_history && lhs.kv == rhs.kv &&
+         lhs.conv_cursor == rhs.conv_cursor &&
+         lhs.gdn_position == rhs.gdn_position &&
+         lhs.kv_populated == rhs.kv_populated;
 }
 
 }  // namespace
@@ -504,10 +521,8 @@ int main() {
            "restored mixer output download");
     expect(static_cast<bool>(rt->stream().sync()), "restored mixer output sync");
     if (mixer_outputs.size() > 2) {
-      expect_fp32_close(restored_vec, mixer_outputs[2],
-                        "restored mixer token 2",
-                        qw38::reference::tol::kAttnMixerResidualAbs,
-                        qw38::reference::tol::kAttnMixerResidualRel);
+      expect(byte_equal<float>(restored_vec, mixer_outputs[2]),
+             "restored mixer token 2 is byte exact");
     }
   }
   auto repeat_session = rt->create_session(*model, kMixerCap);
@@ -531,11 +546,111 @@ int main() {
                  repeat.size() * sizeof(float), rt->stream())),
              "repeat mixer output download");
       expect(static_cast<bool>(rt->stream().sync()), "repeat mixer output sync");
-      expect_fp32_close(repeat, mixer_outputs[t],
-                        "deterministic mixer token " + std::to_string(t),
-                        qw38::reference::tol::kAttnMixerResidualAbs,
-                        qw38::reference::tol::kAttnMixerResidualRel);
+      expect(byte_equal<float>(repeat, mixer_outputs[t]),
+             "deterministic mixer token " + std::to_string(t) +
+                 " is byte exact");
     }
+  }
+
+  // Drive the complete runtime path across the 256-key segment boundary.
+  // Save immediately before each continuation so restore/replay validates
+  // lengths 255->256, 256->257, and 257->258 independently.
+  constexpr std::uint64_t kBoundaryCap = 258;
+  auto boundary_session = rt->create_session(*model, kBoundaryCap);
+  if (!boundary_session) {
+    fail("boundary session");
+    return 1;
+  }
+  auto boundary_plan = bind_attention_mixer_plan(
+      *model, *boundary_session, 3, rt->stream());
+  if (!boundary_plan) {
+    fail("bind boundary mixer: " +
+         qw38::runtime::error_message(boundary_plan.error()));
+    return 1;
+  }
+  std::array<std::optional<qw38::runtime::SessionSnapshot>, 4>
+      boundary_snapshots;
+  std::array<std::vector<float>, 3> boundary_outputs;
+  for (std::uint64_t t = 0; t < kBoundaryCap; ++t) {
+    if (t >= 255) {
+      auto snap = boundary_session->save();
+      if (!snap) {
+        fail("boundary snapshot length " + std::to_string(t));
+        return 1;
+      }
+      boundary_snapshots[static_cast<std::size_t>(t - 255)] =
+          std::move(*snap);
+    }
+    if (!upload_residual(*boundary_session, host.residual, rt->stream(),
+                         "boundary mixer")) {
+      return 1;
+    }
+    auto out = execute_decode_attention(*boundary_plan, t);
+    if (!out) {
+      fail("boundary mixer execute " + std::to_string(t) + ": " +
+           qw38::runtime::error_message(out.error()));
+      return 1;
+    }
+    if (t >= 255) {
+      auto& output = boundary_outputs[static_cast<std::size_t>(t - 255)];
+      output.resize(kHidden);
+      expect(static_cast<bool>(qw38::cuda::copy_d2h(
+                 output.data(), boundary_session->residual_h_mid().pointer,
+                 output.size() * sizeof(float), rt->stream())),
+             "boundary output download " + std::to_string(t));
+      expect(static_cast<bool>(rt->stream().sync()),
+             "boundary output sync " + std::to_string(t));
+    }
+  }
+  auto final_boundary_snapshot = boundary_session->save();
+  if (!final_boundary_snapshot) {
+    fail("boundary final snapshot");
+    return 1;
+  }
+  boundary_snapshots[3] = std::move(*final_boundary_snapshot);
+
+  for (std::uint64_t length : {255ull, 256ull, 257ull}) {
+    auto const index = static_cast<std::size_t>(length - 255);
+    expect(boundary_snapshots[index].has_value(),
+           "baseline boundary snapshot length " + std::to_string(length));
+    auto replay = rt->create_session(*model, kBoundaryCap);
+    if (!replay || !boundary_snapshots[index] ||
+        !replay->restore(*boundary_snapshots[index])) {
+      fail("boundary restore length " + std::to_string(length));
+      return 1;
+    }
+    auto replay_plan =
+        bind_attention_mixer_plan(*model, *replay, 3, rt->stream());
+    if (!replay_plan ||
+        !upload_residual(*replay, host.residual, rt->stream(),
+                         "boundary replay")) {
+      fail("bind boundary replay length " + std::to_string(length));
+      return 1;
+    }
+    auto replay_out = execute_decode_attention(*replay_plan, length);
+    if (!replay_out) {
+      fail("boundary replay execute " + std::to_string(length) + ": " +
+           qw38::runtime::error_message(replay_out.error()));
+      return 1;
+    }
+    std::vector<float> replay_output(kHidden);
+    expect(static_cast<bool>(qw38::cuda::copy_d2h(
+               replay_output.data(), replay->residual_h_mid().pointer,
+               replay_output.size() * sizeof(float), rt->stream())),
+           "boundary replay output download " + std::to_string(length));
+    expect(static_cast<bool>(rt->stream().sync()),
+           "boundary replay output sync " + std::to_string(length));
+    expect(byte_equal<float>(replay_output, boundary_outputs[index]),
+           "boundary replay output " + std::to_string(length) +
+               " is byte exact");
+    auto replay_snapshot = replay->save();
+    if (!replay_snapshot || !boundary_snapshots[index + 1]) {
+      fail("boundary replay snapshot length " + std::to_string(length + 1));
+      return 1;
+    }
+    expect(snapshot_equal(*replay_snapshot, *boundary_snapshots[index + 1]),
+           "boundary replay snapshot " + std::to_string(length + 1) +
+               " is byte exact");
   }
 
   std::vector<std::uint16_t> q_s1(kQueryHeads * kHeadDim);
