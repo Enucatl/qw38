@@ -16,6 +16,8 @@
 using qw38::compiler::build_identity_schema;
 using qw38::compiler::ClassifiedCheckpoint;
 using qw38::compiler::compile_synthetic;
+using qw38::compiler::compute_checkpoint_identities;
+using qw38::compiler::CompilerErrorCode;
 using qw38::format::CompilerRevision;
 using qw38::compiler::conv_from_tap_major;
 using qw38::compiler::count_instances;
@@ -34,7 +36,9 @@ using qw38::compiler::SourceClass;
 using qw38::compiler::SourceTensor;
 using qw38::compiler::SyntheticTensor;
 using qw38::compiler::TensorFamily;
+using qw38::compiler::verify_artifact_identities;
 using qw38::format::Artifact;
+using qw38::format::ArtifactSchema;
 using qw38::format::Hash256;
 using qw38::format::kNoLayerIndex;
 using qw38::format::PhysicalLayoutId;
@@ -111,6 +115,14 @@ SyntheticTensor small_matrix(qw38::compiler::ExpectedTensor exp, std::uint64_t n
   return t;
 }
 
+void write_text(std::filesystem::path const& path, std::string_view text) {
+  std::ofstream out(path, std::ios::binary | std::ios::trunc);
+  out.write(text.data(), static_cast<std::streamsize>(text.size()));
+  if (!out) {
+    fail(std::string("write fixture: ") + path.string());
+  }
+}
+
 }  // namespace
 
 int main() {
@@ -171,6 +183,84 @@ int main() {
   }
 
   ScratchDir dir{"qw38-compiler-int"};
+  {
+    auto const identity_dir = dir.path() / "identity";
+    std::filesystem::create_directories(identity_dir);
+    auto const index = identity_dir / "model.safetensors.index.json";
+    auto const shard = identity_dir / "model-00001-of-00001.safetensors";
+    auto const config = identity_dir / "config.json";
+    auto const tokenizer = identity_dir / "tokenizer.json";
+    write_text(index,
+               R"({"weight_map":{"tensor":"model-00001-of-00001.safetensors"}})");
+    write_text(shard, "shard-v1");
+    write_text(config, "config-v1");
+    write_text(tokenizer, "tokenizer-v1");
+
+    auto baseline = compute_checkpoint_identities(identity_dir);
+    if (!baseline) {
+      fail(qw38::compiler::error_message(baseline.error()));
+    } else {
+      CompilerRevision expected_revision{
+          .ident = kCompilerIdent, .major = 0, .minor = 1, .patch = 0};
+      ArtifactSchema metadata{};
+      metadata.source_hash = baseline->source_hash;
+      metadata.config_hash = baseline->config_hash;
+      metadata.tokenizer_hash = baseline->tokenizer_hash;
+      metadata.compiler = expected_revision;
+      expect(static_cast<bool>(verify_artifact_identities(
+                 metadata, *baseline, expected_revision)),
+             "matching artifact identities verify");
+
+      auto expect_identity_mismatch =
+          [&](std::string_view field,
+              qw38::compiler::CheckpointIdentities const& changed,
+              CompilerRevision const& revision = CompilerRevision{
+                  .ident = kCompilerIdent,
+                  .major = 0,
+                  .minor = 1,
+                  .patch = 0}) {
+            auto status =
+                verify_artifact_identities(metadata, changed, revision);
+            expect(!status &&
+                       status.error().code == CompilerErrorCode::HashMismatch &&
+                       status.error().field == field,
+                   std::string("typed identity mismatch: ") +
+                       std::string(field));
+          };
+
+      write_text(shard, "shard-v2");
+      auto changed = compute_checkpoint_identities(identity_dir);
+      if (changed) {
+        expect_identity_mismatch("source_hash", *changed);
+      } else {
+        fail(qw38::compiler::error_message(changed.error()));
+      }
+      write_text(shard, "shard-v1");
+
+      write_text(config, "config-v2");
+      changed = compute_checkpoint_identities(identity_dir);
+      if (changed) {
+        expect_identity_mismatch("config_hash", *changed);
+      } else {
+        fail(qw38::compiler::error_message(changed.error()));
+      }
+      write_text(config, "config-v1");
+
+      write_text(tokenizer, "tokenizer-v2");
+      changed = compute_checkpoint_identities(identity_dir);
+      if (changed) {
+        expect_identity_mismatch("tokenizer_hash", *changed);
+      } else {
+        fail(qw38::compiler::error_message(changed.error()));
+      }
+      write_text(tokenizer, "tokenizer-v1");
+
+      CompilerRevision changed_revision = expected_revision;
+      ++changed_revision.patch;
+      expect_identity_mismatch("compiler_revision", *baseline,
+                               changed_revision);
+    }
+  }
   auto dest1 = dir.path() / "a.qw38";
   auto dest2 = dir.path() / "b.qw38";
   auto embed = small_matrix(find_expected(TensorFamily::Embed), 8, 8, 1);

@@ -401,6 +401,28 @@ std::uint64_t current_peak_rss_bytes() {
   return 0;
 }
 
+std::expected<void, CompilerError> verify_artifact_identities(
+    ArtifactSchema const& artifact, CheckpointIdentities const& checkpoint,
+    CompilerRevision const& revision) {
+  auto mismatch = [](std::string_view field) {
+    return std::unexpected(make_error(CompilerErrorCode::HashMismatch, field,
+                                      "artifact identity does not match source"));
+  };
+  if (artifact.source_hash != checkpoint.source_hash) {
+    return mismatch("source_hash");
+  }
+  if (artifact.config_hash != checkpoint.config_hash) {
+    return mismatch("config_hash");
+  }
+  if (artifact.tokenizer_hash != checkpoint.tokenizer_hash) {
+    return mismatch("tokenizer_hash");
+  }
+  if (artifact.compiler != revision) {
+    return mismatch("compiler_revision");
+  }
+  return {};
+}
+
 std::expected<ArtifactSchema, CompilerError> build_schema(
     ClassifiedCheckpoint const& classified, Hash256 const& source_hash,
     Hash256 const& config_hash, Hash256 const& tokenizer_hash,
@@ -644,7 +666,8 @@ std::expected<CompileResult, CompilerError> compile_checkpoint(
 
   if (options.verify_reconstruction) {
     if (auto st = verify_compiled_artifact(output, checkpoint,
-                                           options.format_policy);
+                                           options.format_policy,
+                                           options.revision);
         !st) {
       return std::unexpected(st.error());
     }
@@ -662,7 +685,8 @@ std::expected<CompileResult, CompilerError> compile_identity(
 
 std::expected<void, CompilerError> verify_compiled_artifact(
     std::filesystem::path const& artifact_path,
-    std::filesystem::path const& checkpoint, WeightFormatPolicy policy) {
+    std::filesystem::path const& checkpoint, WeightFormatPolicy policy,
+    CompilerRevision const& revision) {
   auto ckpt = open_checkpoint(checkpoint);
   if (!ckpt) {
     return std::unexpected(ckpt.error());
@@ -670,6 +694,15 @@ std::expected<void, CompilerError> verify_compiled_artifact(
   auto art = Artifact::open(artifact_path);
   if (!art) {
     return std::unexpected(from_format(art.error()));
+  }
+  CheckpointIdentities identities{
+      .source_hash = ckpt->source_hash,
+      .config_hash = ckpt->config_hash,
+      .tokenizer_hash = ckpt->tokenizer_hash,
+  };
+  if (auto st = verify_artifact_identities(art->schema(), identities, revision);
+      !st) {
+    return st;
   }
   auto rope_got = art->payload(kRopeInvFreqName);
   if (!rope_got) {
@@ -755,9 +788,10 @@ std::expected<void, CompilerError> verify_compiled_artifact(
 
 std::expected<void, CompilerError> verify_identity_artifact(
     std::filesystem::path const& artifact_path,
-    std::filesystem::path const& checkpoint) {
+    std::filesystem::path const& checkpoint,
+    CompilerRevision const& revision) {
   return verify_compiled_artifact(artifact_path, checkpoint,
-                                  WeightFormatPolicy::IdentityBf16);
+                                  WeightFormatPolicy::IdentityBf16, revision);
 }
 
 std::expected<CompileResult, CompilerError> compile_synthetic(

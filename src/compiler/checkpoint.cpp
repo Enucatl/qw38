@@ -298,6 +298,81 @@ std::expected<Hash256, CompilerError> hash_file(std::filesystem::path const& pat
   return hasher.finish();
 }
 
+std::expected<CheckpointIdentities, CompilerError>
+compute_checkpoint_identities(std::filesystem::path const& root) {
+  auto const index_path = root / "model.safetensors.index.json";
+  auto index_text = read_text_file(index_path, "model.safetensors.index.json");
+  if (!index_text) {
+    return std::unexpected(index_text.error());
+  }
+  auto index = parse_json(*index_text, "model.safetensors.index.json");
+  if (!index) {
+    return std::unexpected(index.error());
+  }
+  auto const* weight_map = index->find("weight_map");
+  if (weight_map == nullptr || !weight_map->is_object()) {
+    return std::unexpected(make_error(CompilerErrorCode::InvalidConfig,
+                                      "weight_map", "index has no weight_map"));
+  }
+
+  std::map<std::string, int> shard_names;
+  for (auto const& [name, shard] : weight_map->as_object()) {
+    if (!shard.is_string()) {
+      return std::unexpected(make_error(CompilerErrorCode::InvalidConfig, name,
+                                        "weight_map value is not a string"));
+    }
+    shard_names.emplace(shard.as_string(), 0);
+  }
+
+  Sha256 source;
+  auto update_bytes = [&source](void const* data, std::size_t size) {
+    source.update({static_cast<std::byte const*>(data), size});
+  };
+  auto update_u64 = [&update_bytes](std::uint64_t value) {
+    std::array<std::byte, 8> encoded{};
+    for (std::size_t i = 0; i < encoded.size(); ++i) {
+      encoded[i] = static_cast<std::byte>((value >> (8 * i)) & 0xffU);
+    }
+    update_bytes(encoded.data(), encoded.size());
+  };
+  auto update_string = [&update_bytes, &update_u64](std::string_view value) {
+    update_u64(value.size());
+    update_bytes(value.data(), value.size());
+  };
+  constexpr std::string_view domain = "qw38-source-identity-v1";
+  update_string(domain);
+  update_string("model.safetensors.index.json");
+  update_u64(index_text->size());
+  update_bytes(index_text->data(), index_text->size());
+  update_u64(shard_names.size());
+  for (auto const& [shard_name, _] : shard_names) {
+    auto digest = hash_file(root / shard_name, shard_name);
+    if (!digest) {
+      return std::unexpected(digest.error());
+    }
+    update_string(shard_name);
+    update_bytes(digest->bytes.data(), digest->bytes.size());
+  }
+
+  CheckpointIdentities identities{};
+  identities.source_hash = source.finish();
+  auto config = hash_file(root / "config.json", "config.json");
+  if (!config) {
+    return std::unexpected(config.error());
+  }
+  identities.config_hash = *config;
+  auto tokenizer_path = root / "tokenizer.json";
+  if (!std::filesystem::exists(tokenizer_path)) {
+    tokenizer_path = root / "tokenizer_config.json";
+  }
+  auto tokenizer = hash_file(tokenizer_path, "tokenizer");
+  if (!tokenizer) {
+    return std::unexpected(tokenizer.error());
+  }
+  identities.tokenizer_hash = *tokenizer;
+  return identities;
+}
+
 std::expected<ArchitectureConfig, CompilerError> parse_text_config(
     std::string_view json_text) {
   auto parsed = parse_json(json_text, "config.json");
@@ -679,26 +754,13 @@ std::expected<Checkpoint, CompilerError> open_checkpoint(
   }
   ckpt.config = *cfg;
 
-  auto config_hash = hash_file(root / "config.json", "config.json");
-  if (!config_hash) {
-    return std::unexpected(config_hash.error());
+  auto identities = compute_checkpoint_identities(root);
+  if (!identities) {
+    return std::unexpected(identities.error());
   }
-  ckpt.config_hash = *config_hash;
-  auto index_hash = hash_file(root / "model.safetensors.index.json",
-                              "model.safetensors.index.json");
-  if (!index_hash) {
-    return std::unexpected(index_hash.error());
-  }
-  ckpt.source_hash = *index_hash;
-  auto tok_path = root / "tokenizer.json";
-  if (!std::filesystem::exists(tok_path)) {
-    tok_path = root / "tokenizer_config.json";
-  }
-  auto tok_hash = hash_file(tok_path, "tokenizer");
-  if (!tok_hash) {
-    return std::unexpected(tok_hash.error());
-  }
-  ckpt.tokenizer_hash = *tok_hash;
+  ckpt.source_hash = identities->source_hash;
+  ckpt.config_hash = identities->config_hash;
+  ckpt.tokenizer_hash = identities->tokenizer_hash;
 
   auto index_text =
       read_text_file(root / "model.safetensors.index.json", "index");

@@ -118,6 +118,15 @@ struct Checkpoint {
   std::unordered_map<std::string, OpenShard> shards;
 };
 
+struct CheckpointIdentities {
+  qw38::format::Hash256 source_hash{};
+  qw38::format::Hash256 config_hash{};
+  qw38::format::Hash256 tokenizer_hash{};
+};
+
+[[nodiscard]] std::expected<CheckpointIdentities, CompilerError>
+compute_checkpoint_identities(std::filesystem::path const& root);
+
 [[nodiscard]] std::expected<Checkpoint, CompilerError> open_checkpoint(
     std::filesystem::path const& root);
 

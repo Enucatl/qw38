@@ -61,11 +61,26 @@ build_identity_schema(ClassifiedCheckpoint const& classified,
 
 [[nodiscard]] std::expected<void, CompilerError> verify_identity_artifact(
     std::filesystem::path const& artifact,
-    std::filesystem::path const& checkpoint);
+    std::filesystem::path const& checkpoint,
+    qw38::format::CompilerRevision const& revision = {
+        .ident = kCompilerIdent,
+        .major = kCompilerMajor,
+        .minor = kCompilerMinor,
+        .patch = kCompilerPatch});
 
 [[nodiscard]] std::expected<void, CompilerError> verify_compiled_artifact(
     std::filesystem::path const& artifact,
-    std::filesystem::path const& checkpoint, WeightFormatPolicy policy);
+    std::filesystem::path const& checkpoint, WeightFormatPolicy policy,
+    qw38::format::CompilerRevision const& revision = {
+        .ident = kCompilerIdent,
+        .major = kCompilerMajor,
+        .minor = kCompilerMinor,
+        .patch = kCompilerPatch});
+
+[[nodiscard]] std::expected<void, CompilerError> verify_artifact_identities(
+    qw38::format::ArtifactSchema const& artifact,
+    CheckpointIdentities const& checkpoint,
+    qw38::format::CompilerRevision const& revision);
 
 struct SyntheticTensor {
   ExpectedTensor expected;
