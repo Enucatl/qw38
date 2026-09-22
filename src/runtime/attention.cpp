@@ -661,7 +661,11 @@ std::expected<AttentionPrepPlan, Error> bind_attention_prep_plan(
   views.normalized = *normalized;
   views.workspace = *workspace;
   views.kv = session.kv();
-  views.host_populated = session.kv_populated_slot();
+  auto populated = session.kv_populated_slot(*attn_i);
+  if (!populated) {
+    return std::unexpected(populated.error());
+  }
+  views.host_populated = *populated;
   views.kv_capacity = session.kv_capacity();
   views.language_layer = layer;
   return bind_attention_prep_plan(views, stream, eps);

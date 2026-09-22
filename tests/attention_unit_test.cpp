@@ -395,9 +395,9 @@ void test_reset_session() {
   if (!session) {
     return;
   }
-  expect(session->kv_populated() == 0, "new session populated is 0");
-  expect(static_cast<bool>(session->set_populated_length(3)), "set populated");
-  expect(session->kv_populated() == 3, "populated set");
+  expect(session->kv_populated(0) == 0, "new session populated is 0");
+  expect(static_cast<bool>(session->set_populated_length(0, 3)), "set populated");
+  expect(session->kv_populated(0) == 3, "populated set");
   std::uint16_t marker = 0xBEEF;
   auto off = kv_byte_offset(0, 0, 0, 1, 0, 4);
   expect(static_cast<bool>(off), "kv offset");
@@ -408,7 +408,7 @@ void test_reset_session() {
            "write marker");
   }
   expect(static_cast<bool>(session->reset()), "reset");
-  expect(session->kv_populated() == 0, "reset clears populated");
+  expect(session->kv_populated(0) == 0, "reset clears populated");
   if (off) {
     std::uint16_t back = 0xFFFF;
     expect(static_cast<bool>(qw38::cuda::copy_d2h(

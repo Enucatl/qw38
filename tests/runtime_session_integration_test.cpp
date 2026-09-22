@@ -110,7 +110,7 @@ int main() {
          "residual buffers isolated");
   expect(s1->persistent_bytes() == kFixedPersistentBytes + kKvBytesPerToken * kCap,
          "language-only persistent size");
-  expect(s1->kv_capacity() == kCap && s1->kv_populated() == 0, "zero populated");
+  expect(s1->kv_capacity() == kCap && s1->kv_populated(0) == 0, "zero populated");
   expect(s1->gdn_s().extent[0] == 48 && s1->conv_history().extent[1] == 3 &&
              s1->kv().extent[3] == kCap,
          "state view extents");
@@ -162,12 +162,12 @@ int main() {
     expect(snap->gdn_s[0] == std::byte{0x11}, "snapshot captured pattern");
   }
 
-  expect(!s1->set_populated_length(kCap + 1) &&
-             s1->set_populated_length(kCap + 1).error().code ==
+  expect(!s1->set_populated_length(0, kCap + 1) &&
+             s1->set_populated_length(0, kCap + 1).error().code ==
                  ErrorCode::InvalidPopulatedLength,
          "populated > capacity rejected");
-  expect(static_cast<bool>(s1->set_populated_length(3)), "populated within cap");
-  expect(s1->kv_populated() == 3, "populated stored");
+  expect(static_cast<bool>(s1->set_populated_length(0, 3)), "populated within cap");
+  expect(s1->kv_populated(0) == 3, "populated stored");
 
   auto cursor = s1->conv_cursor();
   cursor[1] = 2;
@@ -175,7 +175,7 @@ int main() {
 
   auto snap2 = s1->save();
   expect(static_cast<bool>(s1->reset()), "reset");
-  expect(s1->kv_populated() == 0, "reset clears populated");
+  expect(s1->kv_populated(0) == 0, "reset clears populated");
   expect(s1->conv_cursor()[1] == 0, "reset clears cursor");
   std::byte after_reset{};
   expect(static_cast<bool>(qw38::cuda::copy_d2h(&after_reset, s1->gdn_s().pointer,
@@ -192,7 +192,7 @@ int main() {
 
   if (snap2) {
     expect(static_cast<bool>(s1->restore(*snap2)), "restore");
-    expect(s1->kv_populated() == 3, "restore populated");
+    expect(s1->kv_populated(0) == 3, "restore populated");
     expect(s1->conv_cursor()[1] == 2, "restore cursor");
     std::byte restored{};
     expect(static_cast<bool>(qw38::cuda::copy_d2h(&restored, s1->gdn_s().pointer,
@@ -210,7 +210,7 @@ int main() {
     auto snap3 = s1->save();
     expect(static_cast<bool>(snap3), "hot save");
   }
-  expect(static_cast<bool>(s1->set_populated_length(1)), "hot populated");
+  expect(static_cast<bool>(s1->set_populated_length(0, 1)), "hot populated");
   (void)s1->gdn_s();
   (void)s1->residual_h();
   (void)s1->scratch(qw38::format::ScratchKind::MlpSwiglu);

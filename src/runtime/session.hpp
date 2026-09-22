@@ -27,7 +27,7 @@ struct SessionSnapshot {
   std::vector<std::byte> conv_history;
   std::vector<std::byte> kv;
   std::array<std::uint32_t, kConvLayers> conv_cursor{};
-  std::uint64_t kv_populated{0};
+  std::array<std::uint64_t, kAttnLayers> kv_populated{};
 };
 
 class Session {
@@ -52,14 +52,14 @@ class Session {
       qw38::format::ScratchKind kind) const;
 
   [[nodiscard]] std::uint64_t kv_capacity() const noexcept { return kv_capacity_; }
-  [[nodiscard]] std::uint64_t kv_populated() const noexcept {
-    return kv_populated_;
+  [[nodiscard]] std::uint64_t kv_populated(
+      std::uint32_t attention_layer) const noexcept {
+    return kv_populated_[attention_layer];
   }
   [[nodiscard]] std::expected<void, Error> set_populated_length(
-      std::uint64_t populated);
-  [[nodiscard]] std::uint64_t* kv_populated_slot() noexcept {
-    return &kv_populated_;
-  }
+      std::uint32_t attention_layer, std::uint64_t populated);
+  [[nodiscard]] std::expected<std::uint64_t*, Error> kv_populated_slot(
+      std::uint32_t attention_layer);
 
   [[nodiscard]] std::array<std::uint32_t, kConvLayers> const& conv_cursor()
       const noexcept {
@@ -96,7 +96,7 @@ class Session {
   ArenaPlan arena_{};
   std::array<std::uint32_t, kConvLayers> conv_cursor_{};
   std::uint64_t kv_capacity_{0};
-  std::uint64_t kv_populated_{0};
+  std::array<std::uint64_t, kAttnLayers> kv_populated_{};
   std::uint64_t persistent_bytes_{0};
 };
 

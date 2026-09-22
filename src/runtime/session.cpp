@@ -99,7 +99,7 @@ std::expected<Session, Error> Session::create(
   Session s;
   s.stream_ = &stream;
   s.kv_capacity_ = kv_capacity;
-  s.kv_populated_ = 0;
+  s.kv_populated_.fill(0);
   s.persistent_bytes_ = *persist;
   s.arena_ = std::move(*arena);
 
@@ -176,7 +176,7 @@ std::expected<void, Error> Session::zero_persistent() {
     return std::unexpected(from_cuda(st.error()));
   }
   conv_cursor_.fill(0);
-  kv_populated_ = 0;
+  kv_populated_.fill(0);
   return {};
 }
 
@@ -231,10 +231,12 @@ std::expected<void, Error> Session::restore(SessionSnapshot const& snap) {
     return std::unexpected(make_error(ErrorCode::InvalidArgument, "snapshot",
                                       "snapshot size does not match session"));
   }
-  if (snap.kv_populated > kv_capacity_) {
-    return std::unexpected(make_error(ErrorCode::InvalidPopulatedLength,
-                                      "snapshot.populated",
-                                      "populated length exceeds capacity"));
+  for (auto populated : snap.kv_populated) {
+    if (populated > kv_capacity_) {
+      return std::unexpected(make_error(ErrorCode::InvalidPopulatedLength,
+                                        "snapshot.populated",
+                                        "populated length exceeds capacity"));
+    }
   }
   for (auto c : snap.conv_cursor) {
     if (c >= kConvTaps) {
@@ -332,14 +334,27 @@ std::expected<TensorView, Error> Session::scratch(
 }
 
 std::expected<void, Error> Session::set_populated_length(
-    std::uint64_t populated) {
+    std::uint32_t attention_layer, std::uint64_t populated) {
+  if (attention_layer >= kAttnLayers) {
+    return std::unexpected(make_error(ErrorCode::InvalidArgument, "kv.layer",
+                                      "attention layer index must be < 16"));
+  }
   if (populated > kv_capacity_) {
     return std::unexpected(make_error(ErrorCode::InvalidPopulatedLength,
                                       "kv.populated",
                                       "populated length exceeds capacity"));
   }
-  kv_populated_ = populated;
+  kv_populated_[attention_layer] = populated;
   return {};
+}
+
+std::expected<std::uint64_t*, Error> Session::kv_populated_slot(
+    std::uint32_t attention_layer) {
+  if (attention_layer >= kAttnLayers) {
+    return std::unexpected(make_error(ErrorCode::InvalidArgument, "kv.layer",
+                                      "attention layer index must be < 16"));
+  }
+  return &kv_populated_[attention_layer];
 }
 
 std::expected<std::uint32_t*, Error> Session::conv_cursor_slot(

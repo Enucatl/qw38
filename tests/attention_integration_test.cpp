@@ -127,6 +127,7 @@ bool write_attn_artifact(std::filesystem::path const& path, HostAttn const& host
   schema.scope = SemanticScope::PrimaryLanguage;
 
   constexpr std::uint32_t kLayer = 3;
+  constexpr std::uint32_t kSecondLayer = 7;
   auto gamma = bf16_vec(1, attn_norm_name(kLayer), kHidden);
   auto qg = q4_weight(2, attn_q_name(kLayer), kQgWidth, kHidden);
   auto k = q4_weight(3, attn_k_name(kLayer), kAttnKvWidth, kHidden);
@@ -142,7 +143,14 @@ bool write_attn_artifact(std::filesystem::path const& path, HostAttn const& host
   rope.quantizer = LogicalQuantizerId::None;
   rope.layout = PhysicalLayoutId::CudaFp32VectorV0;
   rope.mapping = LogicalPhysicalMapping{.kind = MappingKind::Identity};
-  schema.tensors = {gamma, qg, k, v, qn, kn, rope, o};
+  auto gamma_second = bf16_vec(9, attn_norm_name(kSecondLayer), kHidden);
+  auto qg_second = q4_weight(10, attn_q_name(kSecondLayer), kQgWidth, kHidden);
+  auto k_second = q4_weight(11, attn_k_name(kSecondLayer), kAttnKvWidth, kHidden);
+  auto v_second = q4_weight(12, attn_v_name(kSecondLayer), kAttnKvWidth, kHidden);
+  auto qn_second = bf16_vec(13, attn_q_norm_name(kSecondLayer), kHeadDim);
+  auto kn_second = bf16_vec(14, attn_k_norm_name(kSecondLayer), kHeadDim);
+  schema.tensors = {gamma, qg, k, v, qn, kn, rope, o, gamma_second,
+                    qg_second, k_second, v_second, qn_second, kn_second};
   schema.graph_bindings = {
       GraphBinding{.instance_id = 1,
                    .kind = SemanticNodeKind::GatedAttention,
@@ -204,7 +212,16 @@ bool write_attn_artifact(std::filesystem::path const& path, HostAttn const& host
       !write(o.logical_name, SpanKind::Scales, host.o.scales) ||
       !write(qn.logical_name, SpanKind::Payload, qn_b) ||
       !write(kn.logical_name, SpanKind::Payload, kn_b) ||
-      !write(rope.logical_name, SpanKind::Payload, inv_b)) {
+      !write(rope.logical_name, SpanKind::Payload, inv_b) ||
+      !write(gamma_second.logical_name, SpanKind::Payload, gamma_b) ||
+      !write(qg_second.logical_name, SpanKind::Payload, host.qg.codes) ||
+      !write(qg_second.logical_name, SpanKind::Scales, host.qg.scales) ||
+      !write(k_second.logical_name, SpanKind::Payload, host.k.codes) ||
+      !write(k_second.logical_name, SpanKind::Scales, host.k.scales) ||
+      !write(v_second.logical_name, SpanKind::Payload, host.v.codes) ||
+      !write(v_second.logical_name, SpanKind::Scales, host.v.scales) ||
+      !write(qn_second.logical_name, SpanKind::Payload, qn_b) ||
+      !write(kn_second.logical_name, SpanKind::Payload, kn_b)) {
     return false;
   }
   auto id = writer->finalize();
@@ -257,11 +274,13 @@ int main() {
     return 1;
   }
   expect(s1->kv().pointer != s2->kv().pointer, "sessions have isolated KV");
-  expect(s1->kv_populated() == 0 && s2->kv_populated() == 0, "fresh populated");
+  expect(s1->kv_populated(0) == 0 && s2->kv_populated(0) == 0,
+         "fresh populated");
 
   auto p1 = bind_attention_prep_plan(*model, *s1, 3, rt->stream());
   auto p2 = bind_attention_prep_plan(*model, *s2, 3, rt->stream());
-  if (!p1 || !p2) {
+  auto p_second = bind_attention_prep_plan(*model, *s1, 7, rt->stream());
+  if (!p1 || !p2 || !p_second) {
     fail("bind plans");
     return 1;
   }
@@ -293,23 +312,31 @@ int main() {
            qw38::runtime::error_message(st.error()));
       return 1;
     }
-    expect(s1->kv_populated() == t + 1, "s1 populated advances after success");
+    expect(s1->kv_populated(0) == t + 1, "s1 populated advances after success");
+    if (t == 0) {
+      auto second = execute_decode_attention_prep(*p_second, t);
+      expect(static_cast<bool>(second),
+             "second attention layer appends token 0 in one session");
+      expect(s1->kv_populated(0) == 1 && s1->kv_populated(1) == 1,
+             "each attention layer owns its token-0 cache length");
+    }
   }
-  expect(s2->kv_populated() == 0, "s2 populated is unaffected by s1");
+  expect(s2->kv_populated(0) == 0, "s2 populated is unaffected by s1");
 
   auto snap = s1->save();
   if (!snap) {
     fail("save");
     return 1;
   }
-  expect(snap->kv_populated == 3, "snapshot populated");
+  expect(snap->kv_populated[0] == 3, "snapshot populated");
+  expect(snap->kv_populated[1] == 1, "snapshot preserves second cache length");
 
   auto st2 = execute_decode_attention_prep(*p2, 0);
   if (!st2) {
     fail("s2 append: " + qw38::runtime::error_message(st2.error()));
     return 1;
   }
-  expect(s2->kv_populated() == 1, "s2 append independent");
+  expect(s2->kv_populated(0) == 1, "s2 append independent");
   expect(qw38::cuda::malloc_count() == malloc_before,
          "hot-path execute does not allocate");
 
@@ -323,7 +350,9 @@ int main() {
     fail("restore: " + qw38::runtime::error_message(rst.error()));
     return 1;
   }
-  expect(restored->kv_populated() == 3, "restored populated");
+  expect(restored->kv_populated(0) == 3, "restored populated");
+  expect(restored->kv_populated(1) == 1,
+         "restored second attention cache length");
   auto pr = bind_attention_prep_plan(*model, *restored, 3, rt->stream());
   if (!pr) {
     fail("rebind restored");
@@ -337,8 +366,8 @@ int main() {
     fail("restored append 3: " + qw38::runtime::error_message(st3.error()));
     return 1;
   }
-  expect(restored->kv_populated() == 4, "restored continuation");
-  expect(s1->kv_populated() == 3, "source session populated unchanged by restore");
+  expect(restored->kv_populated(0) == 4, "restored continuation");
+  expect(s1->kv_populated(0) == 3, "source session populated unchanged by restore");
 
   std::vector<std::uint16_t> host_kv(
       static_cast<std::size_t>(16) * 2u * kKvHeads * kCap * kHeadDim);
@@ -452,7 +481,7 @@ int main() {
       mixer_snapshot = std::move(*snap);
     }
   }
-  expect(mixer_session->kv_populated() == 4, "mixer repeated append length");
+  expect(mixer_session->kv_populated(0) == 4, "mixer repeated append length");
   if (mixer_snapshot) {
     auto restored_mixer = rt->create_session(*model, kMixerCap);
     if (!restored_mixer || !restored_mixer->restore(*mixer_snapshot)) {
@@ -531,7 +560,7 @@ int main() {
                       kAttnPrepSmallRel);
   }
 
-  expect(s1->reset() && s1->kv_populated() == 0, "session reset");
+  expect(s1->reset() && s1->kv_populated(0) == 0, "session reset");
   std::uint16_t marker = 0xFFFF;
   expect(static_cast<bool>(qw38::cuda::copy_d2h(
              &marker, s1->kv().pointer, sizeof(marker), rt->stream())),
