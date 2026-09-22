@@ -18,12 +18,26 @@ ENV DEBIAN_FRONTEND=noninteractive \
     CXX=g++-14 \
     CUDAHOSTCXX=g++-14
 
-RUN apt-get update \
+RUN printf '%s\n' \
+        'Types: deb' \
+        'URIs: https://snapshot.ubuntu.com/ubuntu/20260804T000000Z' \
+        'Suites: noble noble-updates' \
+        'Components: main universe restricted multiverse' \
+        'Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg' \
+        '' \
+        'Types: deb' \
+        'URIs: https://snapshot.ubuntu.com/ubuntu/20260804T000000Z' \
+        'Suites: noble-security' \
+        'Components: main universe restricted multiverse' \
+        'Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg' \
+    > /etc/apt/sources.list.d/ubuntu.sources \
+    && apt-get update \
     && apt-get install -y --no-install-recommends \
-        cmake \
-        ninja-build \
-        gcc-14 \
-        g++-14 \
+        cmake=3.28.3-1build7 \
+        ninja-build=1.11.1-2 \
+        gcc-14=14.2.0-4ubuntu2~24.04.1 \
+        g++-14=14.2.0-4ubuntu2~24.04.1 \
+        libstdc++-14-dev=14.2.0-4ubuntu2~24.04.1 \
         ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 

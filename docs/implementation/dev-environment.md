@@ -11,13 +11,15 @@ Pinned CUDA 13.4.x container, CMake, and GPU-smoke commands for Architecture V0.
 | linux/amd64 image digest | `sha256:f0eec85d23f7fdff7b6d74feb1d63e1e5921b0a92c3adfd9847875f830eb0382` |
 | Base distribution | Ubuntu 24.04.5 LTS (noble) |
 | CUDA Toolkit | 13.4.1 (`nvcc` V13.4.59, built 2026-08-03) |
-| Host compiler | GCC/G++ 14.2.0 (`g++-14`) |
-| CMake | 3.28.3 (`3.28.3-1build7`) |
-| Ninja | 1.11.1 |
+| Ubuntu package snapshot | `20260804T000000Z` (Ubuntu Snapshot Service) |
+| Host compiler | GCC/G++ 14.2.0 (`14.2.0-4ubuntu2~24.04.1`, `g++-14`) |
+| Standard library | `libstdc++-14-dev` `14.2.0-4ubuntu2~24.04.1` |
+| CMake | `3.28.3-1build7` |
+| Ninja | `1.11.1-2` |
 | Native CUDA architecture | `120-real` (`sm_120` cubin only) |
 | Language dialects | C++23 host, CUDA C++23 device |
 
-The Dockerfile `FROM` line pins the manifest-list digest. `CC`/`CXX`/`CUDAHOSTCXX` are `gcc-14`/`g++-14` because `nvcc` 13.4 ignores `-std=c++23` with GCC 13.
+The Dockerfile `FROM` line pins the manifest-list digest. Its Ubuntu sources use the immutable Snapshot Service timestamp above, and the CMake, Ninja, GCC/G++, and libstdc++ package versions are installed explicitly. `CC`/`CXX`/`CUDAHOSTCXX` are `gcc-14`/`g++-14` because `nvcc` 13.4 ignores `-std=c++23` with GCC 13.
 
 CMake 3.28's NVIDIA module records CUDA standards only through C++20. `CMakeLists.txt` supplies `-std=c++23` for nvcc 13.3+ so `CMAKE_CUDA_STANDARD 23` with `CMAKE_CUDA_STANDARD_REQUIRED ON` is real, not decayed to C++20.
 
