@@ -351,7 +351,7 @@ void test_required_state_scratch_and_precision_schema() {
       FormatErrorCode::InvalidStateAllocation, "wrong state dtype");
   expect_mutation(
       [](auto& schema) { schema.state[2].shape_per_layer.padded[1] += 1; },
-      FormatErrorCode::InvalidShape, "padded KV state");
+      FormatErrorCode::InvalidStateAllocation, "padded KV state");
   expect_mutation(
       [](auto& schema) { schema.scratch.pop_back(); },
       FormatErrorCode::InvalidScratchAllocation, "missing required scratch");
@@ -374,6 +374,28 @@ void test_required_state_scratch_and_precision_schema() {
       },
       FormatErrorCode::InvalidPrecisionPolicy,
       "contradictory persistent-state precision policy");
+
+  for (std::size_t i = 0; i < 3; ++i) {
+    expect_mutation(
+        [i](auto& schema) { schema.state[i].shape_per_layer.padded[0] += 1; },
+        FormatErrorCode::InvalidStateAllocation,
+        "locked state representation rejects padded geometry");
+  }
+  for (std::size_t i = 0; i < 7; ++i) {
+    expect_mutation(
+        [i](auto& schema) {
+          schema.scratch[i].dtype =
+              schema.scratch[i].dtype == qw38::format::ArithmeticDtype::Fp32
+                  ? qw38::format::ArithmeticDtype::Bf16
+                  : qw38::format::ArithmeticDtype::Fp32;
+        },
+        FormatErrorCode::InvalidScratchAllocation,
+        "locked scratch representation rejects contradictory dtype");
+    expect_mutation(
+        [i](auto& schema) { schema.scratch[i].bytes += 4; },
+        FormatErrorCode::InvalidScratchAllocation,
+        "locked scratch representation rejects contradictory bytes");
+  }
 }
 
 void test_canonical_owner_range_and_integrity_validation() {

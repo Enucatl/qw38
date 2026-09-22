@@ -1,5 +1,6 @@
 #include "format/schema.hpp"
 
+#include <initializer_list>
 #include <iterator>
 #include <limits>
 #include <new>
@@ -1236,6 +1237,21 @@ std::expected<void, FormatError> validate_precision(
   return {};
 }
 
+bool has_exact_shape(TensorShape const& shape,
+                     std::initializer_list<std::uint64_t> extents) {
+  if (shape.rank != extents.size()) {
+    return false;
+  }
+  std::size_t i = 0;
+  for (auto const extent : extents) {
+    if (shape.logical[i] != extent || shape.padded[i] != extent) {
+      return false;
+    }
+    ++i;
+  }
+  return true;
+}
+
 std::expected<void, FormatError> validate_state(StateAllocation const& s,
                                                 std::uint64_t offset) {
   if (s.live_payload_present) {
@@ -1277,20 +1293,12 @@ std::expected<void, FormatError> validate_state(StateAllocation const& s,
   if (!elems) {
     return std::unexpected(elems.error());
   }
-  for (std::uint8_t i = 0; i < s.shape_per_layer.rank; ++i) {
-    if (s.shape_per_layer.padded[i] != s.shape_per_layer.logical[i]) {
-      return std::unexpected(make_error(FormatErrorCode::InvalidShape, offset,
-                                        "state.shape",
-                                        "state schema does not pad extents"));
-    }
-  }
   switch (s.kind) {
     case StateKind::GdnS: {
       if (s.dtype != ArithmeticDtype::Fp32 ||
           s.layout != PhysicalLayoutId::CudaFp32GdnSHvKV0 ||
-          s.shape_per_layer.rank != 3 || s.shape_per_layer.logical[0] != 48 ||
-          s.shape_per_layer.logical[1] != 128 ||
-          s.shape_per_layer.logical[2] != 128 || s.component_count != 1 ||
+          !has_exact_shape(s.shape_per_layer, {48, 128, 128}) ||
+          s.component_count != 1 ||
           s.declared_capacity != 0 || s.bytes_per_token != 0 ||
           s.populated_length_distinct_from_capacity || s.layer_count != 48) {
         return std::unexpected(make_error(
@@ -1302,8 +1310,8 @@ std::expected<void, FormatError> validate_state(StateAllocation const& s,
     case StateKind::ConvolutionHistory: {
       if (s.dtype != ArithmeticDtype::Bf16 ||
           s.layout != PhysicalLayoutId::CudaBf16ConvHistoryV0 ||
-          s.shape_per_layer.rank != 2 || s.shape_per_layer.logical[0] != 3 ||
-          s.shape_per_layer.logical[1] != 10240 || s.component_count != 1 ||
+          !has_exact_shape(s.shape_per_layer, {3, 10240}) ||
+          s.component_count != 1 ||
           s.declared_capacity != 0 || s.bytes_per_token != 0 ||
           s.populated_length_distinct_from_capacity || s.layer_count != 48) {
         return std::unexpected(make_error(
@@ -1315,8 +1323,8 @@ std::expected<void, FormatError> validate_state(StateAllocation const& s,
     case StateKind::KvCache: {
       if (s.dtype != ArithmeticDtype::Bf16 ||
           s.layout != PhysicalLayoutId::CudaBf16KvCacheV0 ||
-          s.shape_per_layer.rank != 2 || s.shape_per_layer.logical[0] != 4 ||
-          s.shape_per_layer.logical[1] != 256 || s.component_count != 2 ||
+          !has_exact_shape(s.shape_per_layer, {4, 256}) ||
+          s.component_count != 2 ||
           !s.populated_length_distinct_from_capacity || s.layer_count != 16) {
         return std::unexpected(make_error(
             FormatErrorCode::InvalidStateAllocation, offset, "state.kv",
